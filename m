@@ -1,89 +1,84 @@
-From: slash.tmp@free.fr (Mason)
-Date: Mon, 6 Mar 2017 15:56:31 +0100
-Subject: Panic in quirk_usb_early_handoff
-In-Reply-To: <377ce76b-5397-5a02-6bae-7d961b7e9242@arm.com>
-References: <4b2a7606-de27-c8ad-1530-958dd5d12233@free.fr>
- <45e38a07-e8da-80e4-36bb-31e471f02004@free.fr>
- <3c5bd8f5-468f-d25e-08a9-8944ee419096@free.fr>
- <38b8c9be-724b-0cfc-a941-76f2c62e1c58@arm.com>
- <491b40db-dc07-2a8e-9bc4-07b86f990600@free.fr>
- <377ce76b-5397-5a02-6bae-7d961b7e9242@arm.com>
-Message-ID: <9b0e6a06-7c50-1ac3-a687-db0afae38509@free.fr>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 06 Mar 2017 17:02:05 +0200
+Subject: [RFC PATCH 00/12] Ion cleanup in preparation for moving out of
+ staging
+In-Reply-To: <20170306103820.ixuvs7fd6s4tvfzy@phenom.ffwll.local>
+References: <1488491084-17252-1-git-send-email-labbott@redhat.com>
+ <10344634.XsotFaGzfj@avalon>
+ <20170306103820.ixuvs7fd6s4tvfzy@phenom.ffwll.local>
+Message-ID: <9366352.DJUlrUijoL@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/03/2017 15:30, Robin Murphy wrote:
+Hi Daniel,
 
-> On 06/03/17 12:42, Mason wrote:
->
->> $ arm-linux-gnueabihf-addr2line -i -e vmlinux c039fe44
->> arch/arm/include/asm/io.h:119
->>
->> In other words, readl()
->> Not as helpful as expected...
+On Monday 06 Mar 2017 11:38:20 Daniel Vetter wrote:
+> On Fri, Mar 03, 2017 at 06:45:40PM +0200, Laurent Pinchart wrote:
+> > - I haven't seen any proposal how a heap-based solution could be used in a
+> > generic distribution. This needs to be figured out before committing to
+> > any API/ABI.
 > 
-> I guess your toolchain isn't generating whatever debug info that -i uses
-> to show where it was actually inlined, shame.
+> Two replies from my side:
+> 
+> - Just because a patch doesn't solve world hunger isn't really a good
+>   reason to reject it.
 
-I used gcc-linaro-5.3.1-2016.05-x86_64_arm-linux-gnueabihf
-Is that too old?
+As long as it goes in the right direction, sure :-) The points I mentioned 
+were to be interpreted that way, I want to make sure we're not going in a 
+dead-end (or worse, driving full speed into a wall).
 
-Might the issue come from my kernel config?
+> - Heap doesn't mean its not resizeable (but I'm not sure that's really
+>   your concern).
 
-#
-# Compile-time checks and compiler options
-#
-CONFIG_DEBUG_INFO=y
-CONFIG_DEBUG_INFO_REDUCED=y
-CONFIG_DEBUG_INFO_SPLIT=y
-# CONFIG_DEBUG_INFO_DWARF4 is not set
-# CONFIG_GDB_SCRIPTS is not set
-CONFIG_ENABLE_WARN_DEPRECATED=y
-CONFIG_ENABLE_MUST_CHECK=y
-CONFIG_FRAME_WARN=1024
-# CONFIG_STRIP_ASM_SYMS is not set
-# CONFIG_READABLE_ASM is not set
-# CONFIG_UNUSED_SYMBOLS is not set
-# CONFIG_PAGE_OWNER is not set
-# CONFIG_DEBUG_FS is not set
-# CONFIG_HEADERS_CHECK is not set
-# CONFIG_DEBUG_SECTION_MISMATCH is not set
-CONFIG_SECTION_MISMATCH_WARN_ONLY=y
-# CONFIG_DEBUG_FORCE_WEAK_PER_CPU is not set
-# CONFIG_MAGIC_SYSRQ is not set
-CONFIG_DEBUG_KERNEL=y
+Not really, no. Heap is another word to mean pool here. It might not be the 
+best term in this context as it has a precise meaning in the context of memory 
+allocation, but that's a detail.
 
+> - Imo ION is very much part of the picture here to solve this for real. We
+>   need to bits:
+> 
+>   * Be able to allocate memory from specific pools, not going through a
+>     specific driver. ION gives us that interface. This is e.g. also needed
+>     for "special" memory, like SMA tries to expose.
+> 
+>   * Some way to figure out how&where to allocate the buffer object. This
+>     is purely a userspace problem, and this is the part the unix memory
+>     allocator tries to solve. There's no plans in there for big kernel
+>     changes, instead userspace does a dance to reconcile all the
+>     constraints, and one of the constraints might be "you have to allocate
+>     this from this special ION heap". The only thing the kernel needs to
+>     expose is which devices use which ION heaps (we kinda do that
+>     already), and maybe some hints of how they can be generalized (but I
+>     guess stuff like "minimal pagesize of x KB" is also fulfilled by any
+>     CMA heap is knowledge userspace needs).
 
-> Put together, if I'm skimming unfamiliar XHCI code and docs correctly,
-> this would imply that a supposed read of the HCC Parameters register
-> claimed that the extended capabilities register was at offset 0x29f8
-> into a 0x2000-long BAR. That does suggest that whatever's being accessed
-> through that ioremap() isn't actually the contents of BAR 0 at all (said
-> field should apparently read as 0x140 representing an offset of 0x500).
-> You're not still trying have your PCI host controller place its
-> MEM-space window over the top of system RAM, are you? Otherwise, I'd be
-> inclined to double check that your config space accesses and resource
-> assignment are producing sane values.
+The constraint solver could live in userspace, I'm open to a solution that 
+would go in that direction, but it will require help from the kernel to fetch 
+the constraints from the devices that need to be involved in buffer sharing.
 
-It looks like the current PCI framework doesn't expect platforms to
-multiplex config space and MEM space :-(
+Given a userspace constraint resolver, the interface with the kernel allocator 
+will likely be based on pools. I'm not opposed to that, as long as pool are 
+identified by opaque handles. I don't want userspace to know about the meaning 
+of any particular ION heap. Application must not attempt to "allocate from 
+CMA" for instance, that would lock us to a crazy API that will grow completely 
+out of hands as vendors will start adding all kind of custom heaps, and 
+applications will have to follow (or will be patched out-of-tree by vendors).
 
-[    0.994011] OF: PCI: host bridge /soc/pcie at 50000000 ranges:
-[    0.999721] OF: PCI: Parsing ranges property...
-[    1.004386] OF: PCI:   MEM 0x50000000..0x5fffffff -> 0x00000000
-[    1.010471] pci-host-generic 50000000.pcie:
-		can't claim ECAM area [mem 0x50000000-0x5fffffff]:
-		address conflict with /soc/pcie at 50000000 [mem 0x50000000-0x5fffffff]
-[    1.025265] pci-host-generic: probe of 50000000.pcie failed with error -16
+> Again I think waiting for this to be fully implemented before we merge any
+> part is going to just kill any upstreaming efforts. ION in itself, without
+> the full buffer negotiation dance seems clearly useful (also for stuff
+> like SMA), and having it merged will help with moving the buffer
+> allocation dance forward.
 
-		pcie at 50000000 {
-			compatible = "pci-host-ecam-generic";
-			reg = <0x50000000 0x10000000>;
-			device_type = "pci";
-			#size-cells = <2>;
-			#address-cells = <3>;
-			#interrupt-cells = <1>;
-			ranges = <0x02000000 0x0 0x0  0x50000000  0x0 0x10000000>;
-		};
+Again I'm not opposed to a kernel allocator based on pools/heaps, as long as
 
-Regards.
+- pools/heaps stay internal to the kernel and are not directly exposed to 
+userspace
+
+- a reasonable way to size the different kinds of pools in a generic 
+distribution kernel can be found
+
+-- 
+Regards,
+
+Laurent Pinchart
