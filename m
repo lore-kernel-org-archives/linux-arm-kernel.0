@@ -1,78 +1,140 @@
 From: hoegeun.kwon@samsung.com (Hoegeun Kwon)
-Date: Mon, 06 Mar 2017 13:42:21 +0900
-Subject: [PATCH v4 3/5] drm/exynos: dsi: Fix the parse_dt function
+Date: Mon, 06 Mar 2017 13:42:23 +0900
+Subject: [PATCH v4 5/5] arm: dts: Remove the OF graph from DSI node
 In-Reply-To: <1488775343-6236-1-git-send-email-hoegeun.kwon@samsung.com>
 References: <1488775343-6236-1-git-send-email-hoegeun.kwon@samsung.com>
- <CGME20170306044236epcas5p326440b0139bee5a33fd6545d0400bb57@epcas5p3.samsung.com>
-Message-ID: <1488775343-6236-4-git-send-email-hoegeun.kwon@samsung.com>
+ <CGME20170306044239epcas1p2cf8ad82b218e72119af0a35af249148f@epcas1p2.samsung.com>
+Message-ID: <1488775343-6236-6-git-send-email-hoegeun.kwon@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The dsi + panel is a parental relationship, so OF grpah is not needed.
-Therefore, the current dsi_parse_dt function will throw an error,
-because there is no linked OF graph for case such as fimd + dsi +
-panel. So this patch parse the Pll, burst and esc clock frequency
-properties in dsi_parse_dt and modified to create a bridge_node only
-if there is an OF graph associated with dsi.
-So I think the ABI breakage is needed.
+The OF graph is not needed because the panel is a child of dsi. Remove
+the ports node in DSI node, and port node in panel node.
 
 Signed-off-by: Hoegeun Kwon <hoegeun.kwon@samsung.com>
 Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
 ---
- drivers/gpu/drm/exynos/exynos_drm_dsi.c | 32 ++++++++------------------------
- 1 file changed, 8 insertions(+), 24 deletions(-)
+ arch/arm/boot/dts/exynos3250-rinato.dts | 21 ---------------------
+ arch/arm/boot/dts/exynos4210-trats.dts  | 21 ---------------------
+ arch/arm/boot/dts/exynos4412-trats2.dts | 21 ---------------------
+ 3 files changed, 63 deletions(-)
 
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_dsi.c b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
-index f5c04d0..2d4e118 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_dsi.c
-+++ b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
-@@ -1652,39 +1652,23 @@ static int exynos_dsi_parse_dt(struct exynos_dsi *dsi)
- 	if (ret < 0)
- 		return ret;
+diff --git a/arch/arm/boot/dts/exynos3250-rinato.dts b/arch/arm/boot/dts/exynos3250-rinato.dts
+index c9f191c..82e676a 100644
+--- a/arch/arm/boot/dts/exynos3250-rinato.dts
++++ b/arch/arm/boot/dts/exynos3250-rinato.dts
+@@ -220,21 +220,6 @@
+ 	samsung,pll-clock-frequency = <24000000>;
+ 	status = "okay";
  
--	ep = of_graph_get_endpoint_by_regs(node, DSI_PORT_OUT, 0);
--	if (!ep) {
--		dev_err(dev, "no output port with endpoint specified\n");
--		return -EINVAL;
--	}
+-	ports {
+-		#address-cells = <1>;
+-		#size-cells = <0>;
 -
--	ret = exynos_dsi_of_read_u32(ep, "samsung,burst-clock-frequency",
-+	ret = exynos_dsi_of_read_u32(node, "samsung,burst-clock-frequency",
- 				     &dsi->burst_clk_rate);
- 	if (ret < 0)
--		goto end;
-+		return ret;
- 
--	ret = exynos_dsi_of_read_u32(ep, "samsung,esc-clock-frequency",
-+	ret = exynos_dsi_of_read_u32(node, "samsung,esc-clock-frequency",
- 				     &dsi->esc_clk_rate);
- 	if (ret < 0)
--		goto end;
+-		port at 1 {
+-			reg = <1>;
 -
--	of_node_put(ep);
-+		return ret;
- 
- 	ep = of_graph_get_next_endpoint(node, NULL);
--	if (!ep) {
--		ret = -EINVAL;
--		goto end;
--	}
+-			dsi_out: endpoint {
+-				remote-endpoint = <&dsi_in>;
+-				samsung,burst-clock-frequency = <250000000>;
+-				samsung,esc-clock-frequency = <20000000>;
+-			};
+-		};
+-	};
 -
--	dsi->bridge_node = of_graph_get_remote_port_parent(ep);
--	if (!dsi->bridge_node) {
--		ret = -EINVAL;
--		goto end;
-+	if (ep) {
-+		dsi->bridge_node = of_graph_get_remote_port_parent(ep);
-+		of_node_put(ep);
- 	}
--end:
--	of_node_put(ep);
+ 	panel at 0 {
+ 		compatible = "samsung,s6e63j0x03";
+ 		reg = <0>;
+@@ -264,12 +249,6 @@
+ 				vsync-len = <2>;
+ 			};
+ 		};
+-
+-		port {
+-			dsi_in: endpoint {
+-				remote-endpoint = <&dsi_out>;
+-			};
+-		};
+ 	};
+ };
  
--	return ret;
-+	return 0;
- }
+diff --git a/arch/arm/boot/dts/exynos4210-trats.dts b/arch/arm/boot/dts/exynos4210-trats.dts
+index 1743ca8..9452bed 100644
+--- a/arch/arm/boot/dts/exynos4210-trats.dts
++++ b/arch/arm/boot/dts/exynos4210-trats.dts
+@@ -202,21 +202,6 @@
+ 	samsung,pll-clock-frequency = <24000000>;
+ 	status = "okay";
  
- static int exynos_dsi_bind(struct device *dev, struct device *master,
+-	ports {
+-		#address-cells = <1>;
+-		#size-cells = <0>;
+-
+-		port at 1 {
+-			reg = <1>;
+-
+-			dsi_out: endpoint {
+-				remote-endpoint = <&dsi_in>;
+-				samsung,burst-clock-frequency = <500000000>;
+-				samsung,esc-clock-frequency = <20000000>;
+-			};
+-		};
+-	};
+-
+ 	panel at 0 {
+ 		reg = <0>;
+ 		compatible = "samsung,s6e8aa0";
+@@ -244,12 +229,6 @@
+ 				vsync-len = <2>;
+ 			};
+ 		};
+-
+-		port {
+-			dsi_in: endpoint {
+-				remote-endpoint = <&dsi_out>;
+-			};
+-		};
+ 	};
+ };
+ 
+diff --git a/arch/arm/boot/dts/exynos4412-trats2.dts b/arch/arm/boot/dts/exynos4412-trats2.dts
+index 82221a0..86ce5e5 100644
+--- a/arch/arm/boot/dts/exynos4412-trats2.dts
++++ b/arch/arm/boot/dts/exynos4412-trats2.dts
+@@ -390,21 +390,6 @@
+ 	samsung,pll-clock-frequency = <24000000>;
+ 	status = "okay";
+ 
+-	ports {
+-		#address-cells = <1>;
+-		#size-cells = <0>;
+-
+-		port at 1 {
+-			reg = <1>;
+-
+-			dsi_out: endpoint {
+-				remote-endpoint = <&dsi_in>;
+-				samsung,burst-clock-frequency = <500000000>;
+-				samsung,esc-clock-frequency = <20000000>;
+-			};
+-		};
+-	};
+-
+ 	panel at 0 {
+ 		compatible = "samsung,s6e8aa0";
+ 		reg = <0>;
+@@ -432,12 +417,6 @@
+ 				vsync-len = <2>;
+ 			};
+ 		};
+-
+-		port {
+-			dsi_in: endpoint {
+-				remote-endpoint = <&dsi_out>;
+-			};
+-		};
+ 	};
+ };
+ 
 -- 
 1.9.1
