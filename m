@@ -1,51 +1,68 @@
 From: daniel@ffwll.ch (Daniel Vetter)
-Date: Mon, 6 Mar 2017 11:38:20 +0100
+Date: Mon, 6 Mar 2017 11:40:41 +0100
 Subject: [RFC PATCH 00/12] Ion cleanup in preparation for moving out of
  staging
-In-Reply-To: <10344634.XsotFaGzfj@avalon>
+In-Reply-To: <20170306074258.GA27953@dhcp22.suse.cz>
 References: <1488491084-17252-1-git-send-email-labbott@redhat.com>
- <20170303100433.lm5t4hqxj6friyp6@phenom.ffwll.local>
- <10344634.XsotFaGzfj@avalon>
-Message-ID: <20170306103820.ixuvs7fd6s4tvfzy@phenom.ffwll.local>
+ <20170303132949.GC31582@dhcp22.suse.cz>
+ <cf383b9b-3cbc-0092-a071-f120874c053c@redhat.com>
+ <20170306074258.GA27953@dhcp22.suse.cz>
+Message-ID: <20170306104041.zghsicrnadoap7lp@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 03, 2017 at 06:45:40PM +0200, Laurent Pinchart wrote:
-> - I haven't seen any proposal how a heap-based solution could be used in a 
-> generic distribution. This needs to be figured out before committing to any 
-> API/ABI.
+On Mon, Mar 06, 2017 at 08:42:59AM +0100, Michal Hocko wrote:
+> On Fri 03-03-17 09:37:55, Laura Abbott wrote:
+> > On 03/03/2017 05:29 AM, Michal Hocko wrote:
+> > > On Thu 02-03-17 13:44:32, Laura Abbott wrote:
+> > >> Hi,
+> > >>
+> > >> There's been some recent discussions[1] about Ion-like frameworks. There's
+> > >> apparently interest in just keeping Ion since it works reasonablly well.
+> > >> This series does what should be the final clean ups for it to possibly be
+> > >> moved out of staging.
+> > >>
+> > >> This includes the following:
+> > >> - Some general clean up and removal of features that never got a lot of use
+> > >>   as far as I can tell.
+> > >> - Fixing up the caching. This is the series I proposed back in December[2]
+> > >>   but never heard any feedback on. It will certainly break existing
+> > >>   applications that rely on the implicit caching. I'd rather make an effort
+> > >>   to move to a model that isn't going directly against the establishement
+> > >>   though.
+> > >> - Fixing up the platform support. The devicetree approach was never well
+> > >>   recieved by DT maintainers. The proposal here is to think of Ion less as
+> > >>   specifying requirements and more of a framework for exposing memory to
+> > >>   userspace.
+> > >> - CMA allocations now happen without the need of a dummy device structure.
+> > >>   This fixes a bunch of the reasons why I attempted to add devicetree
+> > >>   support before.
+> > >>
+> > >> I've had problems getting feedback in the past so if I don't hear any major
+> > >> objections I'm going to send out with the RFC dropped to be picked up.
+> > >> The only reason there isn't a patch to come out of staging is to discuss any
+> > >> other changes to the ABI people might want. Once this comes out of staging,
+> > >> I really don't want to mess with the ABI.
+> > > 
+> > > Could you recapitulate concerns preventing the code being merged
+> > > normally rather than through the staging tree and how they were
+> > > addressed?
+> > > 
+> > 
+> > Sorry, I'm really not understanding your question here, can you
+> > clarify?
+> 
+> There must have been a reason why this code ended up in the staging
+> tree, right? So my question is what those reasons were and how they were
+> handled in order to move the code from the staging subtree.
 
-Two replies from my side:
+No one gave a thing about android in upstream, so Greg KH just dumped it
+all into staging/android/. We've discussed ION a bunch of times, recorded
+anything we'd like to fix in staging/android/TODO, and Laura's patch
+series here addresses a big chunk of that.
 
-- Just because a patch doesn't solve world hunger isn't really a good
-  reason to reject it.
-
-- Heap doesn't mean its not resizeable (but I'm not sure that's really
-  your concern).
-
-- Imo ION is very much part of the picture here to solve this for real. We
-  need to bits:
-
-  * Be able to allocate memory from specific pools, not going through a
-    specific driver. ION gives us that interface. This is e.g. also needed
-    for "special" memory, like SMA tries to expose.
-
-  * Some way to figure out how&where to allocate the buffer object. This
-    is purely a userspace problem, and this is the part the unix memory
-    allocator tries to solve. There's no plans in there for big kernel
-    changes, instead userspace does a dance to reconcile all the
-    constraints, and one of the constraints might be "you have to allocate
-    this from this special ION heap". The only thing the kernel needs to
-    expose is which devices use which ION heaps (we kinda do that
-    already), and maybe some hints of how they can be generalized (but I
-    guess stuff like "minimal pagesize of x KB" is also fulfilled by any
-    CMA heap is knowledge userspace needs).
-
-Again I think waiting for this to be fully implemented before we merge any
-part is going to just kill any upstreaming efforts. ION in itself, without
-the full buffer negotiation dance seems clearly useful (also for stuff
-like SMA), and having it merged will help with moving the buffer
-allocation dance forward.
+This is pretty much the same approach we (gpu folks) used to de-stage the
+syncpt stuff.
 -Daniel
 -- 
 Daniel Vetter
