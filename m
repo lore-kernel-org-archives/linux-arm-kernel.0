@@ -1,192 +1,20 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 6 Mar 2017 12:15:04 +0800
-Subject: [linux-sunxi] [PATCH v2 05/12] ASoC: sun4i-codec: Add support for
- V3s codec
-In-Reply-To: <CAGb2v66TZj7EjcAf3PyYky5adjTc4xdHUAh7jFChe2LWs7cYjA@mail.gmail.com>
+Date: Mon, 6 Mar 2017 12:17:12 +0800
+Subject: [PATCH v2 10/12] ARM: dts: sun8i: add audio codec support into
+ V3s DTSI
+In-Reply-To: <20170305133709.6288-11-icenowy@aosc.xyz>
 References: <20170305133709.6288-1-icenowy@aosc.xyz>
- <20170305133709.6288-6-icenowy@aosc.xyz>
- <CAGb2v66TZj7EjcAf3PyYky5adjTc4xdHUAh7jFChe2LWs7cYjA@mail.gmail.com>
-Message-ID: <CAGb2v67-LBTmkKhM9n4Pzg_JB310dYjBVS8Rs2=h9NuOe1CzxQ@mail.gmail.com>
+ <20170305133709.6288-11-icenowy@aosc.xyz>
+Message-ID: <CAGb2v67=qe3dqAy3NxxaBHdqKt0+iZY-vUz+Hvxp0DcFwXOTHg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 6, 2017 at 12:05 PM, Chen-Yu Tsai <wens@csie.org> wrote:
-> On Sun, Mar 5, 2017 at 9:37 PM, Icenowy Zheng <icenowy@aosc.xyz> wrote:
->> The codec in the V3s is similar to the one found on the A31. One key
->> difference is the analog path controls are routed through the PRCM
->> block. This is supported by the sun8i-codec-analog driver, and tied
->> into this codec driver with the audio card's aux_dev.
->>
->> In addition, the V3s does not have LINEIN, LINEOUT, MBIAS and MIC2,
->> MIC3, and the FIFO related registers are like H3.
->>
->> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
->> ---
->>  .../devicetree/bindings/sound/sun4i-codec.txt      | 11 ++--
->>  sound/soc/sunxi/sun4i-codec.c                      | 59 ++++++++++++++++++++++
->>  2 files changed, 66 insertions(+), 4 deletions(-)
->>
->> diff --git a/Documentation/devicetree/bindings/sound/sun4i-codec.txt b/Documentation/devicetree/bindings/sound/sun4i-codec.txt
->> index 3863531d1e6d..2d4e10deb6f4 100644
->> --- a/Documentation/devicetree/bindings/sound/sun4i-codec.txt
->> +++ b/Documentation/devicetree/bindings/sound/sun4i-codec.txt
->> @@ -7,6 +7,7 @@ Required properties:
->>                 - "allwinner,sun7i-a20-codec"
->>                 - "allwinner,sun8i-a23-codec"
->>                 - "allwinner,sun8i-h3-codec"
->> +               - "allwinner,sun8i-v3s-codec"
->>  - reg: must contain the registers location and length
->>  - interrupts: must contain the codec interrupt
->>  - dmas: DMA channels for tx and rx dma. See the DMA client binding,
->> @@ -25,6 +26,7 @@ Required properties for the following compatibles:
->>                 - "allwinner,sun6i-a31-codec"
->>                 - "allwinner,sun8i-a23-codec"
->>                 - "allwinner,sun8i-h3-codec"
->> +               - "allwinner,sun8i-v3s-codec"
->>  - resets: phandle to the reset control for this device
->>  - allwinner,audio-routing: A list of the connections between audio components.
->>                            Each entry is a pair of strings, the first being the
->> @@ -34,15 +36,15 @@ Required properties for the following compatibles:
->>                            Audio pins on the SoC:
->>                            "HP"
->>                            "HPCOM"
->> -                          "LINEIN"
->> -                          "LINEOUT"    (not on sun8i-a23)
->> +                          "LINEIN"     (not on sun8i-v3s)
->> +                          "LINEOUT"    (not on sun8i-a23 or sun8i-v3s)
->>                            "MIC1"
->> -                          "MIC2"
->> +                          "MIC2"       (not on sun8i-v3s)
->>                            "MIC3"       (sun6i-a31 only)
->>
->>                            Microphone biases from the SoC:
->>                            "HBIAS"
->> -                          "MBIAS"
->> +                          "MBIAS"      (not on sun8i-v3s)
->>
->>                            Board connectors:
->>                            "Headphone"
->> @@ -55,6 +57,7 @@ Required properties for the following compatibles:
->>  Required properties for the following compatibles:
->>                 - "allwinner,sun8i-a23-codec"
->>                 - "allwinner,sun8i-h3-codec"
->> +               - "allwinner,sun8i-v3s-codec"
->>  - allwinner,codec-analog-controls: A phandle to the codec analog controls
->>                                    block in the PRCM.
->>
->> diff --git a/sound/soc/sunxi/sun4i-codec.c b/sound/soc/sunxi/sun4i-codec.c
->> index c3aab10fa085..7f1b1aa95e0b 100644
->> --- a/sound/soc/sunxi/sun4i-codec.c
->> +++ b/sound/soc/sunxi/sun4i-codec.c
->> @@ -1339,6 +1339,44 @@ static struct snd_soc_card *sun8i_h3_codec_create_card(struct device *dev)
->>         return card;
->>  };
->>
->> +static struct snd_soc_card *sun8i_v3s_codec_create_card(struct device *dev)
->> +{
->> +       struct snd_soc_card *card;
->> +       int ret;
->> +
->> +       card = devm_kzalloc(dev, sizeof(*card), GFP_KERNEL);
->> +       if (!card)
->> +               return ERR_PTR(-ENOMEM);
->> +
->> +       aux_dev.codec_of_node = of_parse_phandle(dev->of_node,
->> +                                                "allwinner,codec-analog-controls",
->> +                                                0);
->> +       if (!aux_dev.codec_of_node) {
->> +               dev_err(dev, "Can't find analog controls for codec.\n");
->> +               return ERR_PTR(-EINVAL);
->> +       };
->> +
->> +       card->dai_link = sun4i_codec_create_link(dev, &card->num_links);
->> +       if (!card->dai_link)
->> +               return ERR_PTR(-ENOMEM);
->> +
->> +       card->dev               = dev;
->> +       card->name              = "V3s Audio Codec";
->> +       card->dapm_widgets      = sun6i_codec_card_dapm_widgets;
->> +       card->num_dapm_widgets  = ARRAY_SIZE(sun6i_codec_card_dapm_widgets);
->> +       card->dapm_routes       = sun8i_codec_card_routes;
->> +       card->num_dapm_routes   = ARRAY_SIZE(sun8i_codec_card_routes);
->> +       card->aux_dev           = &aux_dev;
->> +       card->num_aux_devs      = 1;
->> +       card->fully_routed      = true;
->> +
->> +       ret = snd_soc_of_parse_audio_routing(card, "allwinner,audio-routing");
->> +       if (ret)
->> +               dev_warn(dev, "failed to parse audio-routing: %d\n", ret);
->> +
->> +       return card;
->> +};
->> +
->>  static const struct regmap_config sun4i_codec_regmap_config = {
->>         .reg_bits       = 32,
->>         .reg_stride     = 4,
->> @@ -1374,6 +1412,13 @@ static const struct regmap_config sun8i_h3_codec_regmap_config = {
->>         .max_register   = SUN8I_H3_CODEC_ADC_DBG,
->>  };
->>
->> +static const struct regmap_config sun8i_v3s_codec_regmap_config = {
->> +       .reg_bits       = 32,
->> +       .reg_stride     = 4,
->> +       .val_bits       = 32,
->> +       .max_register   = SUN6I_CODEC_HMIC_DATA,
+On Sun, Mar 5, 2017 at 9:37 PM, Icenowy Zheng <icenowy@aosc.xyz> wrote:
+> Allwinner V3s SoC features an internal audio codec like the one in H3,
+> and a analog codec like the one in H3/A23 (but much simpler).
 >
-> The last defined register for the non digital audio processing parts is
-> SUN8I_H3_CODEC_ADC_DBG.
+> Add them in the DTSI file.
 >
-> Or if you want you could include everything, which goes up to 0x400.
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
 
-Correction, it goes up to 0x2bc. 0x400 is the register for controlling
-the analog bits.
-
-ChenYu
-
->> +};
->> +
->>  struct sun4i_codec_quirks {
->>         const struct regmap_config *regmap_config;
->>         const struct snd_soc_codec_driver *codec;
->> @@ -1422,6 +1467,16 @@ static const struct sun4i_codec_quirks sun8i_a23_codec_quirks = {
->>         .has_reset      = true,
->>  };
->>
->> +static const struct sun4i_codec_quirks sun8i_v3s_codec_quirks = {
->> +       .regmap_config  = &sun8i_v3s_codec_regmap_config,
->> +       .codec          = &sun8i_a23_codec_codec,
->
-> Please leave a note, like the H3, that this should be changed if digital audio
-> processing is added.
->
-> Regards
-> ChenYu
->
->> +       .create_card    = sun8i_v3s_codec_create_card,
->> +       .reg_adc_fifoc  = REG_FIELD(SUN6I_CODEC_ADC_FIFOC, 0, 31),
->> +       .reg_dac_txdata = SUN8I_H3_CODEC_DAC_TXDATA,
->> +       .reg_adc_rxdata = SUN6I_CODEC_ADC_RXDATA,
->> +       .has_reset      = true,
->> +};
->> +
->>  static const struct sun4i_codec_quirks sun8i_h3_codec_quirks = {
->>         .regmap_config  = &sun8i_h3_codec_regmap_config,
->>         /*
->> @@ -1458,6 +1513,10 @@ static const struct of_device_id sun4i_codec_of_match[] = {
->>                 .compatible = "allwinner,sun8i-h3-codec",
->>                 .data = &sun8i_h3_codec_quirks,
->>         },
->> +       {
->> +               .compatible = "allwinner,sun8i-v3s-codec",
->> +               .data = &sun8i_v3s_codec_quirks,
->> +       },
->>         {}
->>  };
->>  MODULE_DEVICE_TABLE(of, sun4i_codec_of_match);
->> --
->> 2.11.1
->>
->> --
->> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
->> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
->> For more options, visit https://groups.google.com/d/optout.
+Acked-by: Chen-Yu Tsai <wens@csie.org>
