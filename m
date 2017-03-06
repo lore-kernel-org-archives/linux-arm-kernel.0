@@ -1,114 +1,61 @@
-From: tbaicar@codeaurora.org (Tyler Baicar)
-Date: Mon,  6 Mar 2017 13:45:02 -0700
-Subject: [PATCH V12 09/10] trace, ras: add ARM processor error trace event
-In-Reply-To: <1488833103-21082-1-git-send-email-tbaicar@codeaurora.org>
-References: <1488833103-21082-1-git-send-email-tbaicar@codeaurora.org>
-Message-ID: <1488833103-21082-10-git-send-email-tbaicar@codeaurora.org>
+From: emil.l.velikov@gmail.com (Emil Velikov)
+Date: Mon, 6 Mar 2017 20:58:14 +0000
+Subject: [PATCH 2/3] drm/rockchip: Fix link error when
+ CONFIG_DRM_ANALOGIX_DP undefined
+In-Reply-To: <20170306202722.9301-3-seanpaul@chromium.org>
+References: <20170306202722.9301-1-seanpaul@chromium.org>
+ <20170306202722.9301-3-seanpaul@chromium.org>
+Message-ID: <CACvgo53paS0-5PbT-bmPoSMyx+r0jCQqMVUNFsPJQXZ+QXtB_g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently there are trace events for the various RAS
-errors with the exception of ARM processor type errors.
-Add a new trace event for such errors so that the user
-will know when they occur. These trace events are
-consistent with the ARM processor error section type
-defined in UEFI 2.6 spec section N.2.4.4.
+On 6 March 2017 at 20:27, Sean Paul <seanpaul@chromium.org> wrote:
+> Fixes the following link error when CONFIG_DRM_ANALOGIX_DP is not defined:
+>
+> ERROR: "analogix_dp_start_crc" [drivers/gpu/drm/rockchip/rockchipdrm.ko] undefined!
+> ERROR: "analogix_dp_stop_crc" [drivers/gpu/drm/rockchip/rockchipdrm.ko] undefined!
+>
+> Fixes: 3190e58dafaf ("drm/rockchip: Implement CRC debugfs API")
+> Reported-by: Emil Velikov <emil.l.velikov@gmail.com>
+> Cc: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+> Cc: Mark Yao <mark.yao@rock-chips.com>
+> Cc: Sean Paul <seanpaul@chromium.org>
+> Cc: Heiko Stuebner <heiko@sntech.de>
+> Cc: dri-devel at lists.freedesktop.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-rockchip at lists.infradead.org
+> Cc: Emil Velikov <emil.l.velikov@gmail.com>
+> Signed-off-by: Sean Paul <seanpaul@chromium.org>
+> ---
+>  drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 10 ++++++++++
+>  1 file changed, 10 insertions(+)
+>
+> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> index 17ab16c4b922..2151e1cee4b4 100644
+> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> @@ -19,7 +19,9 @@
+>  #include <drm/drm_crtc_helper.h>
+>  #include <drm/drm_flip_work.h>
+>  #include <drm/drm_plane_helper.h>
+> +#ifdef CONFIG_DRM_ANALOGIX_DP
+>  #include <drm/bridge/analogix_dp.h>
+> +#endif
+>
+>  #include <linux/kernel.h>
+>  #include <linux/module.h>
+> @@ -1112,6 +1114,7 @@ static void vop_crtc_destroy_state(struct drm_crtc *crtc,
+>         kfree(s);
+>  }
+>
+> +#ifdef CONFIG_DRM_ANALOGIX_DP
+>  static struct drm_connector *vop_get_edp_connector(struct vop *vop)
+>  {
+Similar to 3/3 adding stubs for
+analogix_dp_start_crc/analogix_dp_stop_crc will be shorter/cleaner
+than ifdef spaghetti.
 
-Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
-Acked-by: Steven Rostedt <rostedt@goodmis.org>
----
- drivers/acpi/apei/ghes.c    |  8 +++++++-
- drivers/firmware/efi/cper.c |  1 +
- drivers/ras/ras.c           |  1 +
- include/ras/ras_event.h     | 34 ++++++++++++++++++++++++++++++++++
- 4 files changed, 43 insertions(+), 1 deletion(-)
+At the same these fix the problems so, for the series:
+Reviewed-by: Emil Velikov <emil.l.velikov@gmail.com>
 
-diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
-index 842c0cc..81d7b79 100644
---- a/drivers/acpi/apei/ghes.c
-+++ b/drivers/acpi/apei/ghes.c
-@@ -514,7 +514,13 @@ static void ghes_do_proc(struct ghes *ghes,
- 		}
- #endif
- #ifdef CONFIG_RAS
--		else if (trace_unknown_sec_event_enabled()) {
-+		else if (!uuid_le_cmp(sec_type, CPER_SEC_PROC_ARM) &&
-+			 trace_arm_event_enabled()) {
-+			struct cper_sec_proc_arm *arm_err;
-+
-+			arm_err = acpi_hest_generic_data_payload(gdata);
-+			trace_arm_event(arm_err);
-+		} else if (trace_unknown_sec_event_enabled()) {
- 			void *unknown_err = acpi_hest_generic_data_payload(gdata);
- 			trace_unknown_sec_event(&sec_type,
- 					fru_id, fru_text, sec_sev,
-diff --git a/drivers/firmware/efi/cper.c b/drivers/firmware/efi/cper.c
-index 545a6c2..e9fb56a 100644
---- a/drivers/firmware/efi/cper.c
-+++ b/drivers/firmware/efi/cper.c
-@@ -35,6 +35,7 @@
- #include <linux/printk.h>
- #include <linux/bcd.h>
- #include <acpi/ghes.h>
-+#include <ras/ras_event.h>
- 
- #define INDENT_SP	" "
- 
-diff --git a/drivers/ras/ras.c b/drivers/ras/ras.c
-index fb2500b..8ba5a94 100644
---- a/drivers/ras/ras.c
-+++ b/drivers/ras/ras.c
-@@ -28,3 +28,4 @@ static int __init ras_init(void)
- #endif
- EXPORT_TRACEPOINT_SYMBOL_GPL(mc_event);
- EXPORT_TRACEPOINT_SYMBOL_GPL(unknown_sec_event);
-+EXPORT_TRACEPOINT_SYMBOL_GPL(arm_event);
-diff --git a/include/ras/ras_event.h b/include/ras/ras_event.h
-index 5861b6f..b36db48 100644
---- a/include/ras/ras_event.h
-+++ b/include/ras/ras_event.h
-@@ -162,6 +162,40 @@
- );
- 
- /*
-+ * ARM Processor Events Report
-+ *
-+ * This event is generated when hardware detects an ARM processor error
-+ * has occurred. UEFI 2.6 spec section N.2.4.4.
-+ */
-+TRACE_EVENT(arm_event,
-+
-+	TP_PROTO(const struct cper_sec_proc_arm *proc),
-+
-+	TP_ARGS(proc),
-+
-+	TP_STRUCT__entry(
-+		__field(u64, mpidr)
-+		__field(u64, midr)
-+		__field(u32, running_state)
-+		__field(u32, psci_state)
-+		__field(u8, affinity)
-+	),
-+
-+	TP_fast_assign(
-+		__entry->affinity = proc->affinity_level;
-+		__entry->mpidr = proc->mpidr;
-+		__entry->midr = proc->midr;
-+		__entry->running_state = proc->running_state;
-+		__entry->psci_state = proc->psci_state;
-+	),
-+
-+	TP_printk("affinity level: %d; MPIDR: %016llx; MIDR: %016llx; "
-+		  "running state: %d; PSCI state: %d",
-+		  __entry->affinity, __entry->mpidr, __entry->midr,
-+		  __entry->running_state, __entry->psci_state)
-+);
-+
-+/*
-  * Unknown Section Report
-  *
-  * This event is generated when hardware detected a hardware
--- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project.
+-Emil
