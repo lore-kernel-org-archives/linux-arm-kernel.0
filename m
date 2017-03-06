@@ -1,33 +1,37 @@
 From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Tue,  7 Mar 2017 06:34:48 +0800
-Subject: [PATCH v3 4/5] ARM: dts: sun8i: h3: enable USB OTG on Orange Pi One
+Date: Tue,  7 Mar 2017 06:34:49 +0800
+Subject: [PATCH v3 5/5] ARM: dts: sun8i: h2+: enable USB OTG for Orange Pi
+ Zero board
 In-Reply-To: <20170306223449.21404-1-icenowy@aosc.xyz>
 References: <20170306223449.21404-1-icenowy@aosc.xyz>
-Message-ID: <20170306223449.21404-5-icenowy@aosc.xyz>
+Message-ID: <20170306223449.21404-6-icenowy@aosc.xyz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Orange Pi One features a MicroUSB port that can work in both host mode
-and peripheral mode.
+Orange Pi Zero board features a USB OTG port, which has a ID pin, and
+can be used to power up the board. However, even if the board is powered
+via +5V pin in GPIO/expansion headers, the VBUS in the OTG port cannot
+be powered up, thus it's impossible to use it in host mode with simple
+OTG cables.
 
-When in host mode, its VBUS is controlled via a GPIO; when in peripheral
-mode, its VBUS cannot be used to power up the board.
+Add support for it in peripheral mode.
 
-Add support for this port.
+If someone really want to use it in host mode, the mode of PHY can be
+switch via sysfs, then use a powered USB OTG cable or powered USB HUB to
+power up external USB devices.
 
 Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
 ---
-Changes in v3:
-- Add "h3:" in commit message.
+New patch in v3.
 
- arch/arm/boot/dts/sun8i-h3-orangepi-one.dts | 22 +++++++++++++++++++++-
- 1 file changed, 21 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts
-index 34da853ee037..b87778d74239 100644
---- a/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts
-+++ b/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts
-@@ -90,6 +90,10 @@
+diff --git a/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts b/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts
+index b7ca916d871d..63f819394b98 100644
+--- a/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts
++++ b/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts
+@@ -96,6 +96,10 @@
  	};
  };
  
@@ -38,8 +42,8 @@ index 34da853ee037..b87778d74239 100644
  &ehci1 {
  	status = "okay";
  };
-@@ -104,6 +108,10 @@
- 	status = "okay";
+@@ -132,6 +136,10 @@
+ 	bias-pull-up;
  };
  
 +&ohci0 {
@@ -49,33 +53,19 @@ index 34da853ee037..b87778d74239 100644
  &ohci1 {
  	status = "okay";
  };
-@@ -127,6 +135,11 @@
- 	};
- };
- 
-+&reg_usb0_vbus {
-+	gpio = <&r_pio 0 2 GPIO_ACTIVE_HIGH>; /* PL2 */
-+	status = "okay";
-+};
-+
- &uart0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart0_pins_a>;
-@@ -151,7 +164,14 @@
+@@ -154,7 +162,13 @@
  	status = "disabled";
  };
  
 +&usb_otg {
-+	dr_mode = "otg";
++	dr_mode = "peripheral";
 +	status = "okay";
 +};
 +
  &usbphy {
--	/* USB VBUS is always on */
-+	/* USB Type-A port's VBUS is always on */
-+	usb0_id_det-gpios = <&pio 6 12 GPIO_ACTIVE_HIGH>; /* PG12 */
-+	usb0_vbus-supply = <&reg_usb0_vbus>;
+ 	/* USB VBUS is always on */
  	status = "okay";
++	usb0_id_det-gpios = <&pio 6 12 GPIO_ACTIVE_HIGH>; /* PG12 */
  };
 -- 
 2.11.1
