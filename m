@@ -1,31 +1,65 @@
-From: Ramiro.Oliveira@synopsys.com (Ramiro Oliveira)
-Date: Mon, 6 Mar 2017 15:11:48 +0000
-Subject: [PATCH v3 resend] i2c: designware: add reset interface
-In-Reply-To: <20170112185445.jtryoj65sdvey7bc@ninjato>
-References: <y> <1482848560-3752-1-git-send-email-zhangfei.gao@linaro.org>
- <20170112185445.jtryoj65sdvey7bc@ninjato>
-Message-ID: <381cd2c0-499d-884a-3c4e-6fedc422f2e0@synopsys.com>
+From: jon.mason@broadcom.com (Jon Mason)
+Date: Mon, 6 Mar 2017 10:12:26 -0500
+Subject: [PATCH v2 3/3] ARM: dts: bcm5301x: Add I2C support to the DT
+In-Reply-To: <bb91cbbd-f5e5-9ce8-e925-89e6f831e50c@gmail.com>
+References: <1488500494-20622-1-git-send-email-jon.mason@broadcom.com>
+ <1488500494-20622-4-git-send-email-jon.mason@broadcom.com>
+ <bb91cbbd-f5e5-9ce8-e925-89e6f831e50c@gmail.com>
+Message-ID: <CAC3K-4qHPpFJj_UKo3VePw-1qwk-y6Zt2R00O9UpyXqJnt31rA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wolfram
-
-On 1/12/2017 6:54 PM, Wolfram Sang wrote:
-> On Tue, Dec 27, 2016 at 10:22:40PM +0800, Zhangfei Gao wrote:
->> Some platforms like hi3660 need do reset first to allow accessing registers
+On Sun, Mar 5, 2017 at 8:13 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
+>
+>
+> On 03/02/2017 04:21 PM, Jon Mason wrote:
+>> From: Jon Mason <jonmason@broadcom.com>
 >>
->> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
->> Reviewed-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
->> Tested-by: Ramiro Oliveira <ramiro.oliveira@synopsys.com>
-> 
-> Applied to for-next, thanks!
-> 
+>> Add I2C support to the bcm5301x Device Tree.  Since no driver changes
+>> are needed to enable this hardware, only the device tree changes are
+>> required to make this functional.
+>>
+>> Signed-off-by: Jon Mason <jonmason@broadcom.com>
+>> ---
+>>  arch/arm/boot/dts/bcm5301x.dtsi | 9 +++++++++
+>>  1 file changed, 9 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/bcm5301x.dtsi b/arch/arm/boot/dts/bcm5301x.dtsi
+>> index 4e3fbce..2a343f2 100644
+>> --- a/arch/arm/boot/dts/bcm5301x.dtsi
+>> +++ b/arch/arm/boot/dts/bcm5301x.dtsi
+>> @@ -338,6 +338,15 @@
+>>               };
+>>       };
+>>
+>> +     i2c0: i2c at 18009000 {
+>> +             compatible = "brcm,iproc-i2c";
+>> +             reg = <0x18009000 0x50>;
+>> +             interrupts = <GIC_SPI 121 IRQ_TYPE_NONE>;
+>> +             #address-cells = <1>;
+>> +             #size-cells = <0>;
+>> +             clock-frequency = <100000>;
+>
+> Should not this have a:
+>                 status = "disabled"
+>
+> property by default such that boards can override this by phandle when
+> there are actual I2C devices available?
 
-I haven't been able to find this patch anywhere. Do you still have plans to
-apply it to for-next?
+Your comment appears to match the way it is being done in most device trees.
 
--- 
-Best Regards
+NSP implementation is identical to this.  So, if I should change it
+here, I should make there too.
 
-Ramiro Oliveira
-Ramiro.Oliveira at synopsys.com
+Thanks,
+Jon
+
+>> +     };
+>> +
+>>       lcpll0: lcpll0 at 1800c100 {
+>>               #clock-cells = <1>;
+>>               compatible = "brcm,nsp-lcpll0";
+>>
+>
+> --
+> Florian
