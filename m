@@ -1,101 +1,66 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon,  6 Mar 2017 11:26:16 +0000
-Subject: [PATCH 11/17] arm64: arch_timer: Move clocksource_counter and co
- around
+Date: Mon,  6 Mar 2017 11:26:15 +0000
+Subject: [PATCH 10/17] arm64: Add CNTVCT_EL0 trap handler
 In-Reply-To: <20170306112622.13853-1-marc.zyngier@arm.com>
 References: <20170306112622.13853-1-marc.zyngier@arm.com>
-Message-ID: <20170306112622.13853-12-marc.zyngier@arm.com>
+Message-ID: <20170306112622.13853-11-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to access clocksource_counter from the errata handling code,
-move it (together with the related structures and functions) towards
-the top of the file.
+Since people seem to make a point in breaking the userspace visible
+counter, we have no choice but to trap the access. Add the required
+handler.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/clocksource/arm_arch_timer.c | 62 ++++++++++++++++++------------------
- 1 file changed, 31 insertions(+), 31 deletions(-)
+ arch/arm64/include/asm/esr.h |  2 ++
+ arch/arm64/kernel/traps.c    | 14 ++++++++++++++
+ 2 files changed, 16 insertions(+)
 
-diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index 2bbe0b9c3c24..a5a88db2ac90 100644
---- a/drivers/clocksource/arm_arch_timer.c
-+++ b/drivers/clocksource/arm_arch_timer.c
-@@ -158,6 +158,37 @@ u32 arch_timer_reg_read(int access, enum arch_timer_reg reg,
- 	return val;
+diff --git a/arch/arm64/include/asm/esr.h b/arch/arm64/include/asm/esr.h
+index d14c478976d0..ad42e79a5d4d 100644
+--- a/arch/arm64/include/asm/esr.h
++++ b/arch/arm64/include/asm/esr.h
+@@ -175,6 +175,8 @@
+ #define ESR_ELx_SYS64_ISS_SYS_CTR_READ	(ESR_ELx_SYS64_ISS_SYS_CTR | \
+ 					 ESR_ELx_SYS64_ISS_DIR_READ)
+ 
++#define ESR_ELx_SYS64_ISS_SYS_CNTVCT	(ESR_ELx_SYS64_ISS_SYS_VAL(3, 3, 2, 14, 0) | \
++					 ESR_ELx_SYS64_ISS_DIR_READ)
+ #ifndef __ASSEMBLY__
+ #include <asm/types.h>
+ 
+diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+index e52be6aa44ee..1de444e6c669 100644
+--- a/arch/arm64/kernel/traps.c
++++ b/arch/arm64/kernel/traps.c
+@@ -505,6 +505,14 @@ static void ctr_read_handler(unsigned int esr, struct pt_regs *regs)
+ 	regs->pc += 4;
  }
  
-+/*
-+ * Default to cp15 based access because arm64 uses this function for
-+ * sched_clock() before DT is probed and the cp15 method is guaranteed
-+ * to exist on arm64. arm doesn't use this before DT is probed so even
-+ * if we don't have the cp15 accessors we won't have a problem.
-+ */
-+u64 (*arch_timer_read_counter)(void) = arch_counter_get_cntvct;
-+
-+static u64 arch_counter_read(struct clocksource *cs)
++static void cntvct_read_handler(unsigned int esr, struct pt_regs *regs)
 +{
-+	return arch_timer_read_counter();
++	int rt = (esr & ESR_ELx_SYS64_ISS_RT_MASK) >> ESR_ELx_SYS64_ISS_RT_SHIFT;
++
++	pt_regs_write_reg(regs, rt, arch_counter_get_cntvct());
++	regs->pc += 4;
 +}
 +
-+static u64 arch_counter_read_cc(const struct cyclecounter *cc)
-+{
-+	return arch_timer_read_counter();
-+}
-+
-+static struct clocksource clocksource_counter = {
-+	.name	= "arch_sys_counter",
-+	.rating	= 400,
-+	.read	= arch_counter_read,
-+	.mask	= CLOCKSOURCE_MASK(56),
-+	.flags	= CLOCK_SOURCE_IS_CONTINUOUS,
-+};
-+
-+static struct cyclecounter cyclecounter __ro_after_init = {
-+	.read	= arch_counter_read_cc,
-+	.mask	= CLOCKSOURCE_MASK(56),
-+};
-+
- #ifdef CONFIG_FSL_ERRATUM_A008585
- /*
-  * The number of retries is an arbitrary value well beyond the highest number
-@@ -747,37 +778,6 @@ static u64 arch_counter_get_cntvct_mem(void)
- 	return ((u64) vct_hi << 32) | vct_lo;
- }
+ struct sys64_hook {
+ 	unsigned int esr_mask;
+ 	unsigned int esr_val;
+@@ -523,6 +531,12 @@ static struct sys64_hook sys64_hooks[] = {
+ 		.esr_val = ESR_ELx_SYS64_ISS_SYS_CTR_READ,
+ 		.handler = ctr_read_handler,
+ 	},
++	{
++		/* Trap read access to CNTVCT_EL0 */
++		.esr_mask = ESR_ELx_SYS64_ISS_SYS_OP_MASK,
++		.esr_val = ESR_ELx_SYS64_ISS_SYS_CNTVCT,
++		.handler = cntvct_read_handler,
++	},
+ 	{},
+ };
  
--/*
-- * Default to cp15 based access because arm64 uses this function for
-- * sched_clock() before DT is probed and the cp15 method is guaranteed
-- * to exist on arm64. arm doesn't use this before DT is probed so even
-- * if we don't have the cp15 accessors we won't have a problem.
-- */
--u64 (*arch_timer_read_counter)(void) = arch_counter_get_cntvct;
--
--static u64 arch_counter_read(struct clocksource *cs)
--{
--	return arch_timer_read_counter();
--}
--
--static u64 arch_counter_read_cc(const struct cyclecounter *cc)
--{
--	return arch_timer_read_counter();
--}
--
--static struct clocksource clocksource_counter = {
--	.name	= "arch_sys_counter",
--	.rating	= 400,
--	.read	= arch_counter_read,
--	.mask	= CLOCKSOURCE_MASK(56),
--	.flags	= CLOCK_SOURCE_IS_CONTINUOUS,
--};
--
--static struct cyclecounter cyclecounter __ro_after_init = {
--	.read	= arch_counter_read_cc,
--	.mask	= CLOCKSOURCE_MASK(56),
--};
--
- static struct arch_timer_kvm_info arch_timer_kvm_info;
- 
- struct arch_timer_kvm_info *arch_timer_get_kvm_info(void)
 -- 
 2.11.0
