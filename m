@@ -1,115 +1,170 @@
 From: eric.auger@redhat.com (Eric Auger)
-Date: Mon,  6 Mar 2017 12:34:23 +0100
-Subject: [PATCH v3 08/19] KVM: arm64: ITS: Interpret MAPD Size field and check
- related errors
+Date: Mon,  6 Mar 2017 12:34:20 +0100
+Subject: [PATCH v3 05/19] KVM: arm64: ITS: Implement vgic_its_has_attr_regs
+ and attr_regs_access
 In-Reply-To: <1488800074-21991-1-git-send-email-eric.auger@redhat.com>
 References: <1488800074-21991-1-git-send-email-eric.auger@redhat.com>
-Message-ID: <1488800074-21991-9-git-send-email-eric.auger@redhat.com>
+Message-ID: <1488800074-21991-6-git-send-email-eric.auger@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Up to now the MAPD's ITT size field has been ignored. It encodes
-the number of eventid bit minus 1. It should be used to check
-the eventid when a MAPTI command is issued on a device. Let's
-store the nb_eventid_bits in the its_device and do the check
-on MAPTI. Also make sure the ITT size field does not exceed the
-GITS_TYPER IDBITS field.
+This patch implements vgic_its_has_attr_regs and vgic_its_attr_regs_access
+upon the MMIO framework. VGIC ITS KVM device KVM_DEV_ARM_VGIC_GRP_ITS_REGS
+group becomes functional.
+
+At least GITS_CREADR requires to differentiate a guest write action from a
+user access. As such let's introduce a new uaccess_its_write
+vgic_register_region callback.
 
 Signed-off-by: Eric Auger <eric.auger@redhat.com>
-
 ---
----
- include/linux/irqchip/arm-gic-v3.h |  2 ++
- virt/kvm/arm/vgic/vgic-its.c       | 14 +++++++++++++-
- 2 files changed, 15 insertions(+), 1 deletion(-)
+ virt/kvm/arm/vgic/vgic-its.c  | 74 ++++++++++++++++++++++++++++++++++++-------
+ virt/kvm/arm/vgic/vgic-mmio.h |  9 ++++--
+ 2 files changed, 69 insertions(+), 14 deletions(-)
 
-diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-index d81f10f..a7a5548 100644
---- a/include/linux/irqchip/arm-gic-v3.h
-+++ b/include/linux/irqchip/arm-gic-v3.h
-@@ -338,9 +338,11 @@
- #define E_ITS_INT_UNMAPPED_INTERRUPT		0x010307
- #define E_ITS_CLEAR_UNMAPPED_INTERRUPT		0x010507
- #define E_ITS_MAPD_DEVICE_OOR			0x010801
-+#define E_ITS_MAPD_ITTSIZE_OOR			0x010802
- #define E_ITS_MAPC_PROCNUM_OOR			0x010902
- #define E_ITS_MAPC_COLLECTION_OOR		0x010903
- #define E_ITS_MAPTI_UNMAPPED_DEVICE		0x010a04
-+#define E_ITS_MAPTI_ID_OOR			0x010a05
- #define E_ITS_MAPTI_PHYSICALID_OOR		0x010a06
- #define E_ITS_INV_UNMAPPED_INTERRUPT		0x010c07
- #define E_ITS_INVALL_UNMAPPED_COLLECTION	0x010d09
 diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index 6d84508..56bcd92 100644
+index 43bb17e..e9c8f9f 100644
 --- a/virt/kvm/arm/vgic/vgic-its.c
 +++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -99,6 +99,7 @@ struct its_device {
+@@ -1287,13 +1287,14 @@ static void vgic_mmio_write_its_baser(struct kvm *kvm,
+ 	*regptr = reg;
+ }
  
- 	/* the head for the list of ITTEs */
- 	struct list_head itt_head;
-+	u32 nb_eventid_bits;
- 	u32 device_id;
+-#define REGISTER_ITS_DESC(off, rd, wr, length, acc)		\
++#define REGISTER_ITS_DESC(off, rd, wr, uwr, length, acc)		\
+ {								\
+ 	.reg_offset = off,					\
+ 	.len = length,						\
+ 	.access_flags = acc,					\
+ 	.its_read = rd,						\
+ 	.its_write = wr,					\
++	.uaccess_its_write = uwr,					\
+ }
+ 
+ static void its_mmio_write_wi(struct kvm *kvm, struct vgic_its *its,
+@@ -1304,28 +1305,28 @@ static void its_mmio_write_wi(struct kvm *kvm, struct vgic_its *its,
+ 
+ static struct vgic_register_region its_registers[] = {
+ 	REGISTER_ITS_DESC(GITS_CTLR,
+-		vgic_mmio_read_its_ctlr, vgic_mmio_write_its_ctlr, 4,
++		vgic_mmio_read_its_ctlr, vgic_mmio_write_its_ctlr, NULL, 4,
+ 		VGIC_ACCESS_32bit),
+ 	REGISTER_ITS_DESC(GITS_IIDR,
+-		vgic_mmio_read_its_iidr, its_mmio_write_wi, 4,
++		vgic_mmio_read_its_iidr, its_mmio_write_wi, NULL, 4,
+ 		VGIC_ACCESS_32bit),
+ 	REGISTER_ITS_DESC(GITS_TYPER,
+-		vgic_mmio_read_its_typer, its_mmio_write_wi, 8,
++		vgic_mmio_read_its_typer, its_mmio_write_wi, NULL, 8,
+ 		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
+ 	REGISTER_ITS_DESC(GITS_CBASER,
+-		vgic_mmio_read_its_cbaser, vgic_mmio_write_its_cbaser, 8,
++		vgic_mmio_read_its_cbaser, vgic_mmio_write_its_cbaser, NULL, 8,
+ 		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
+ 	REGISTER_ITS_DESC(GITS_CWRITER,
+-		vgic_mmio_read_its_cwriter, vgic_mmio_write_its_cwriter, 8,
+-		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
++		vgic_mmio_read_its_cwriter, vgic_mmio_write_its_cwriter, NULL,
++		8, VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
+ 	REGISTER_ITS_DESC(GITS_CREADR,
+-		vgic_mmio_read_its_creadr, its_mmio_write_wi, 8,
++		vgic_mmio_read_its_creadr, its_mmio_write_wi, NULL, 8,
+ 		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
+ 	REGISTER_ITS_DESC(GITS_BASER,
+-		vgic_mmio_read_its_baser, vgic_mmio_write_its_baser, 0x40,
++		vgic_mmio_read_its_baser, vgic_mmio_write_its_baser, NULL, 0x40,
+ 		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
+ 	REGISTER_ITS_DESC(GITS_IDREGS_BASE,
+-		vgic_mmio_read_its_idregs, its_mmio_write_wi, 0x30,
++		vgic_mmio_read_its_idregs, its_mmio_write_wi, NULL, 0x30,
+ 		VGIC_ACCESS_32bit),
  };
  
-@@ -177,6 +178,7 @@ static struct its_ite *find_ite(struct vgic_its *its, u32 device_id,
- #define GIC_LPI_OFFSET 8192
- 
- #define VITS_ESZ 8
-+#define VITS_TYPER_IDBITS 0xF
- 
- /*
-  * Finds and returns a collection in the ITS collection table.
-@@ -400,7 +402,7 @@ static unsigned long vgic_mmio_read_its_typer(struct kvm *kvm,
- 	 * DevBits low - as least for the time being.
- 	 */
- 	reg |= 0x0f << GITS_TYPER_DEVBITS_SHIFT;
--	reg |= 0x0f << GITS_TYPER_IDBITS_SHIFT;
-+	reg |= VITS_TYPER_IDBITS << GITS_TYPER_IDBITS_SHIFT;
- 	reg |= (VITS_ESZ - 1) << GITS_TYPER_ITT_ENTRY_SIZE_SHIFT;
- 
- 	return extract_bytes(reg, addr & 7, len);
-@@ -560,6 +562,7 @@ static u64 its_cmd_mask_field(u64 *its_cmd, int word, int shift, int size)
- #define its_cmd_get_collection(cmd)	its_cmd_mask_field(cmd, 2,  0, 16)
- #define its_cmd_get_target_addr(cmd)	its_cmd_mask_field(cmd, 2, 16, 32)
- #define its_cmd_get_validbit(cmd)	its_cmd_mask_field(cmd, 2, 63,  1)
-+#define its_cmd_get_size(cmd)		its_cmd_mask_field(cmd, 1, 0,  5)
- 
- /*
-  * The DISCARD command frees an Interrupt Translation Table Entry (ITTE).
-@@ -745,6 +748,9 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
- 	if (!device)
- 		return E_ITS_MAPTI_UNMAPPED_DEVICE;
- 
-+	if (event_id >= (2 << device->nb_eventid_bits))
-+		return E_ITS_MAPTI_ID_OOR;
-+
- 	if (its_cmd_get_command(its_cmd) == GITS_CMD_MAPTI)
- 		lpi_nr = its_cmd_get_physical_id(its_cmd);
- 	else
-@@ -825,11 +831,15 @@ static int vgic_its_cmd_handle_mapd(struct kvm *kvm, struct vgic_its *its,
+@@ -1448,14 +1449,63 @@ static void vgic_its_destroy(struct kvm_device *kvm_dev)
+ int vgic_its_has_attr_regs(struct kvm_device *dev,
+ 			   struct kvm_device_attr *attr)
  {
- 	u32 device_id = its_cmd_get_deviceid(its_cmd);
- 	bool valid = its_cmd_get_validbit(its_cmd);
-+	size_t size = its_cmd_get_size(its_cmd);
- 	struct its_device *device;
- 
- 	if (!vgic_its_check_id(its, its->baser_device_table, device_id))
- 		return E_ITS_MAPD_DEVICE_OOR;
- 
-+	if (valid && size > VITS_TYPER_IDBITS)
-+		return E_ITS_MAPD_ITTSIZE_OOR;
+-	return -ENXIO;
++	const struct vgic_register_region *region;
++	struct vgic_io_device iodev = {
++		.regions = its_registers,
++		.nr_regions = ARRAY_SIZE(its_registers),
++	};
++	gpa_t offset;
 +
- 	device = find_its_device(its, device_id);
- 
- 	/*
-@@ -852,6 +862,8 @@ static int vgic_its_cmd_handle_mapd(struct kvm *kvm, struct vgic_its *its,
- 		return -ENOMEM;
- 
- 	device->device_id = device_id;
-+	device->nb_eventid_bits = size + 1;
++	offset = attr->attr;
 +
- 	INIT_LIST_HEAD(&device->itt_head);
++	region = vgic_find_mmio_region(iodev.regions,
++				       iodev.nr_regions,
++				       offset);
++	if (!region)
++		return -ENXIO;
++	return 0;
+ }
  
- 	list_add_tail(&device->dev_list, &its->device_list);
+ int vgic_its_attr_regs_access(struct kvm_device *dev,
+ 			      struct kvm_device_attr *attr,
+ 			      u64 *reg, bool is_write)
+ {
+-	return -ENXIO;
++	const struct vgic_register_region *region;
++	struct vgic_io_device iodev = {
++		.regions = its_registers,
++		.nr_regions = ARRAY_SIZE(its_registers),
++	};
++	struct vgic_its *its = dev->private;
++	gpa_t addr, offset;
++	unsigned int len;
++
++	if (IS_VGIC_ADDR_UNDEF(its->vgic_its_base))
++		return -ENXIO;
++
++	offset = attr->attr;
++	if (offset & 0x7)
++		return -EINVAL;
++
++	addr = its->vgic_its_base + offset;
++
++	region = vgic_find_mmio_region(iodev.regions,
++				       iodev.nr_regions,
++				       offset);
++	if (!region)
++		return -ENXIO;
++
++	len = region->access_flags & VGIC_ACCESS_64bit ? 8 : 4;
++
++	if (is_write) {
++		if (region->uaccess_its_write)
++			region->uaccess_its_write(dev->kvm, its, addr,
++						  len, *reg);
++		else
++			region->its_write(dev->kvm, its, addr, len, *reg);
++	} else {
++		*reg = region->its_read(dev->kvm, its, addr, len);
++	}
++	return 0;
+ }
+ 
+ static int vgic_its_has_attr(struct kvm_device *dev,
+diff --git a/virt/kvm/arm/vgic/vgic-mmio.h b/virt/kvm/arm/vgic/vgic-mmio.h
+index 055ad42..ad8a585 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio.h
++++ b/virt/kvm/arm/vgic/vgic-mmio.h
+@@ -36,8 +36,13 @@ struct vgic_register_region {
+ 	};
+ 	unsigned long (*uaccess_read)(struct kvm_vcpu *vcpu, gpa_t addr,
+ 				      unsigned int len);
+-	void (*uaccess_write)(struct kvm_vcpu *vcpu, gpa_t addr,
+-			      unsigned int len, unsigned long val);
++	union {
++		void (*uaccess_write)(struct kvm_vcpu *vcpu, gpa_t addr,
++				      unsigned int len, unsigned long val);
++		void (*uaccess_its_write)(struct kvm *kvm, struct vgic_its *its,
++					  gpa_t addr, unsigned int len,
++					  unsigned long val);
++	};
+ };
+ 
+ extern struct kvm_io_device_ops kvm_io_gic_ops;
 -- 
 2.5.5
