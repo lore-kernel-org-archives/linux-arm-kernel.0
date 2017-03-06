@@ -1,100 +1,26 @@
-From: mark.yao@rock-chips.com (Mark yao)
-Date: Mon, 6 Mar 2017 08:55:27 +0800
-Subject: [PATCH v6 4/4] drm/rockchip: Implement CRC debugfs API
-In-Reply-To: <20170303133936.14964-5-tomeu.vizoso@collabora.com>
-References: <20170303133936.14964-1-tomeu.vizoso@collabora.com>
- <20170303133936.14964-5-tomeu.vizoso@collabora.com>
-Message-ID: <58BCB37F.50108@rock-chips.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Sun, 5 Mar 2017 17:11:32 -0800
+Subject: [PATCH v2 1/3] ARM: dts: BCM5301X: Correct GIC_PPI interrupt flags
+In-Reply-To: <1488500494-20622-2-git-send-email-jon.mason@broadcom.com>
+References: <1488500494-20622-1-git-send-email-jon.mason@broadcom.com>
+ <1488500494-20622-2-git-send-email-jon.mason@broadcom.com>
+Message-ID: <01eb66cb-0359-2f58-511b-acaaf62be828@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017?03?03? 21:39, Tomeu Vizoso wrote:
-> Implement the .set_crc_source() callback and call the DP helpers
-> accordingly to start and stop CRC capture.
->
-> This is only done if this CRTC is currently using the eDP connector.
->
-> v3: Remove superfluous check on rockchip_crtc_state->output_type
->
-> v6: Remove superfluous variable
->
-> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
-> ---
-
-looks good for me
-
-Acked-by: Mark Yao <mark.yao@rock-chips.com>
-
->   drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 41 +++++++++++++++++++++++++++++
->   1 file changed, 41 insertions(+)
->
-> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-> index 94d7b7327ff7..17ab16c4b922 100644
-> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-> @@ -19,6 +19,7 @@
->   #include <drm/drm_crtc_helper.h>
->   #include <drm/drm_flip_work.h>
->   #include <drm/drm_plane_helper.h>
-> +#include <drm/bridge/analogix_dp.h>
->   
->   #include <linux/kernel.h>
->   #include <linux/module.h>
-> @@ -1111,6 +1112,45 @@ static void vop_crtc_destroy_state(struct drm_crtc *crtc,
->   	kfree(s);
->   }
->   
-> +static struct drm_connector *vop_get_edp_connector(struct vop *vop)
-> +{
-> +	struct drm_crtc *crtc = &vop->crtc;
-> +	struct drm_connector *connector;
-> +
-> +	mutex_lock(&crtc->dev->mode_config.mutex);
-> +	drm_for_each_connector(connector, crtc->dev)
-> +		if (connector->connector_type == DRM_MODE_CONNECTOR_eDP) {
-> +			mutex_unlock(&crtc->dev->mode_config.mutex);
-> +			return connector;
-> +		}
-> +	mutex_unlock(&crtc->dev->mode_config.mutex);
-> +
-> +	return NULL;
-> +}
-> +
-> +static int vop_crtc_set_crc_source(struct drm_crtc *crtc,
-> +				   const char *source_name, size_t *values_cnt)
-> +{
-> +	struct vop *vop = to_vop(crtc);
-> +	struct drm_connector *connector;
-> +	int ret;
-> +
-> +	connector = vop_get_edp_connector(vop);
-> +	if (!connector)
-> +		return -EINVAL;
-> +
-> +	*values_cnt = 3;
-> +
-> +	if (source_name && strcmp(source_name, "auto") == 0)
-> +		ret = analogix_dp_start_crc(connector);
-> +	else if (!source_name)
-> +		ret = analogix_dp_stop_crc(connector);
-> +	else
-> +		ret = -EINVAL;
-> +
-> +	return ret;
-> +}
-> +
->   static const struct drm_crtc_funcs vop_crtc_funcs = {
->   	.set_config = drm_atomic_helper_set_config,
->   	.page_flip = drm_atomic_helper_page_flip,
-> @@ -1120,6 +1160,7 @@ static const struct drm_crtc_funcs vop_crtc_funcs = {
->   	.atomic_destroy_state = vop_crtc_destroy_state,
->   	.enable_vblank = vop_crtc_enable_vblank,
->   	.disable_vblank = vop_crtc_disable_vblank,
-> +	.set_crc_source = vop_crtc_set_crc_source,
->   };
->   
->   static void vop_fb_unref_worker(struct drm_flip_work *work, void *val)
 
 
+On 03/02/2017 04:21 PM, Jon Mason wrote:
+> GIC_PPI flags were misconfigured for the timers, resulting in errors
+> like:
+> [    0.000000] GIC: PPI11 is secure or misconfigured
+> 
+> Changing them to being edge triggered corrects the issue
+> 
+> Suggested-by: Rafa? Mi?ecki <rafal@milecki.pl>
+> Signed-off-by: Jon Mason <jon.mason@broadcom.com>
+> Fixes: d27509f1 ("ARM: BCM5301X: add dts files for BCM4708 SoC")
+
+Applied, thanks!
 -- 
-?ark Yao
+Florian
