@@ -1,37 +1,42 @@
 From: naveen.n.rao@linux.vnet.ibm.com (Naveen N. Rao)
-Date: Tue,  7 Mar 2017 00:34:55 +0530
-Subject: [PATCH 2/3] arm: kprobes: remove kprobe_exceptions_notify
-In-Reply-To: <20170306183815.GX21222@n2100.armlinux.org.uk>
-References: <20170306183815.GX21222@n2100.armlinux.org.uk>
-Message-ID: <cover.1488826671.git.naveen.n.rao@linux.vnet.ibm.com>
+Date: Tue,  7 Mar 2017 00:34:56 +0530
+Subject: [PATCH 1/2] arm: kprobes: remove kprobe_exceptions_notify
+In-Reply-To: <cover.1488826671.git.naveen.n.rao@linux.vnet.ibm.com>
+References: <cover.1488826671.git.naveen.n.rao@linux.vnet.ibm.com>
+Message-ID: <67983f0757dc99e8f50b4fe2956b053df920df10.1488826671.git.naveen.n.rao@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017/03/06 06:38PM, Russell King - ARM Linux wrote:
-> On Mon, Mar 06, 2017 at 11:37:20PM +0530, Naveen N. Rao wrote:
-> > On 2017/02/08 01:24AM, Naveen N Rao wrote:
-> > > ... as the weak variant will do.
-> > > 
-> > > Signed-off-by: Naveen N. Rao <naveen.n.rao@linux.vnet.ibm.com>
-> > > ---
-> > >  arch/arm/probes/kprobes/core.c     | 10 ----------
-> > >  arch/arm64/kernel/probes/kprobes.c |  6 ------
-> > >  2 files changed, 16 deletions(-)
-> > 
-> > With the generic changes in this series now in -rc1, can you please pick 
-> > this up?
-> 
-> It would've been nice to have been in the To: or Cc: on this patch,
-> I suspect everyone on the ARM side ignored this series (I certainly
-> didn't notice it, and I suspect the ARM64 folk didn't notice it for
-> exactly the same reason.)
-> 
-> In any case, this patch needs to be split - ARM and ARM64 are
-> maintained separately (as stated in MAINTAINERS), and patches go via
-> different trees.  Please resubmit with the patch split between the
-> architectures and proper recipients in the headers.
+Commit fc62d0207ae0 ("kprobes: Introduce weak variant of
+kprobe_exceptions_notify()") introduces a generic empty version of the
+function for architectures that don't need special handling, like arm.
+As such, remove the arch/arm/ specific handler.
 
-Got it. Please find the updated patches in this thread.
+Signed-off-by: Naveen N. Rao <naveen.n.rao@linux.vnet.ibm.com>
+---
+ arch/arm/probes/kprobes/core.c | 10 ----------
+ 1 file changed, 10 deletions(-)
 
-Thanks,
-Naveen
+diff --git a/arch/arm/probes/kprobes/core.c b/arch/arm/probes/kprobes/core.c
+index b6dc9d838a9a..4a548b99965b 100644
+--- a/arch/arm/probes/kprobes/core.c
++++ b/arch/arm/probes/kprobes/core.c
+@@ -392,16 +392,6 @@ int __kprobes kprobe_fault_handler(struct pt_regs *regs, unsigned int fsr)
+ 	return 0;
+ }
+ 
+-int __kprobes kprobe_exceptions_notify(struct notifier_block *self,
+-				       unsigned long val, void *data)
+-{
+-	/*
+-	 * notify_die() is currently never called on ARM,
+-	 * so this callback is currently empty.
+-	 */
+-	return NOTIFY_DONE;
+-}
+-
+ /*
+  * When a retprobed function returns, trampoline_handler() is called,
+  * calling the kretprobe's handler. We construct a struct pt_regs to
+-- 
+2.11.1
