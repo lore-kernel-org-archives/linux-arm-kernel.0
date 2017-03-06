@@ -1,156 +1,59 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon,  6 Mar 2017 11:26:06 +0000
-Subject: [PATCH 01/17] arm64: arch_timer: Add infrastructure for multiple
- erratum detection methods
+Date: Mon,  6 Mar 2017 11:26:08 +0000
+Subject: [PATCH 03/17] arm64: Allow checking of a CPU-local erratum
 In-Reply-To: <20170306112622.13853-1-marc.zyngier@arm.com>
 References: <20170306112622.13853-1-marc.zyngier@arm.com>
-Message-ID: <20170306112622.13853-2-marc.zyngier@arm.com>
+Message-ID: <20170306112622.13853-4-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We're currently stuck with DT when it comes to handling errata, which
-is pretty restrictive. In order to make things more flexible, let's
-introduce an infrastructure that could support alternative discovery
-methods. No change in functionnality.
+this_cpu_has_cap() only checks the feature array, and not the errata
+one. In order to be able to check for a CPU-local erratum, allow it
+to inspect the latter as well.
+
+This is consistent with cpus_have_cap()'s behaviour, which includes
+errata already.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/arch_timer.h  |  7 +++-
- drivers/clocksource/arm_arch_timer.c | 80 +++++++++++++++++++++++++++++++-----
- 2 files changed, 75 insertions(+), 12 deletions(-)
+ arch/arm64/kernel/cpufeature.c | 13 +++++++++++--
+ 1 file changed, 11 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
-index b4b34004a21e..1c92d52619a6 100644
---- a/arch/arm64/include/asm/arch_timer.h
-+++ b/arch/arm64/include/asm/arch_timer.h
-@@ -37,9 +37,14 @@ extern struct static_key_false arch_timer_read_ool_enabled;
- #define needs_unstable_timer_counter_workaround()  false
- #endif
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index abda8e861865..6eb77ae99b79 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -1090,20 +1090,29 @@ static void __init setup_feature_capabilities(void)
+  * Check if the current CPU has a given feature capability.
+  * Should be called from non-preemptible context.
+  */
+-bool this_cpu_has_cap(unsigned int cap)
++static bool __this_cpu_has_cap(const struct arm64_cpu_capabilities *cap_array,
++			       unsigned int cap)
+ {
+ 	const struct arm64_cpu_capabilities *caps;
  
-+enum arch_timer_erratum_match_type {
-+	ate_match_dt,
-+};
+ 	if (WARN_ON(preemptible()))
+ 		return false;
  
- struct arch_timer_erratum_workaround {
--	const char *id;		/* Indicate the Erratum ID */
-+	enum arch_timer_erratum_match_type match_type;
-+	const void *id;		/* Indicate the Erratum ID */
-+	const char *desc_str;
- 	u32 (*read_cntp_tval_el0)(void);
- 	u32 (*read_cntv_tval_el0)(void);
- 	u64 (*read_cntvct_el0)(void);
-diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index 7a8a4117f123..36980cdd5c0a 100644
---- a/drivers/clocksource/arm_arch_timer.c
-+++ b/drivers/clocksource/arm_arch_timer.c
-@@ -182,7 +182,9 @@ EXPORT_SYMBOL_GPL(arch_timer_read_ool_enabled);
- static const struct arch_timer_erratum_workaround ool_workarounds[] = {
- #ifdef CONFIG_FSL_ERRATUM_A008585
- 	{
-+		.match_type = ate_match_dt,
- 		.id = "fsl,erratum-a008585",
-+		.desc_str = "Freescale erratum a005858",
- 		.read_cntp_tval_el0 = fsl_a008585_read_cntp_tval_el0,
- 		.read_cntv_tval_el0 = fsl_a008585_read_cntv_tval_el0,
- 		.read_cntvct_el0 = fsl_a008585_read_cntvct_el0,
-@@ -190,13 +192,78 @@ static const struct arch_timer_erratum_workaround ool_workarounds[] = {
- #endif
- #ifdef CONFIG_HISILICON_ERRATUM_161010101
- 	{
-+		.match_type = ate_match_dt,
- 		.id = "hisilicon,erratum-161010101",
-+		.desc_str = "HiSilicon erratum 161010101",
- 		.read_cntp_tval_el0 = hisi_161010101_read_cntp_tval_el0,
- 		.read_cntv_tval_el0 = hisi_161010101_read_cntv_tval_el0,
- 		.read_cntvct_el0 = hisi_161010101_read_cntvct_el0,
- 	},
- #endif
- };
+-	for (caps = arm64_features; caps->desc; caps++)
++	for (caps = cap_array; caps->desc; caps++)
+ 		if (caps->capability == cap && caps->matches)
+ 			return caps->matches(caps, SCOPE_LOCAL_CPU);
+ 
+ 	return false;
+ }
+ 
++extern const struct arm64_cpu_capabilities arm64_errata[];
 +
-+typedef bool (*ate_match_fn_t)(const struct arch_timer_erratum_workaround *,
-+			       const void *);
-+
-+static
-+bool arch_timer_check_dt_erratum(const struct arch_timer_erratum_workaround *wa,
-+				 const void *arg)
++bool this_cpu_has_cap(unsigned int cap)
 +{
-+	const struct device_node *np = arg;
-+
-+	return of_property_read_bool(np, wa->id);
++	return (__this_cpu_has_cap(arm64_features, cap) ||
++		__this_cpu_has_cap(arm64_errata, cap));
 +}
 +
-+static const struct arch_timer_erratum_workaround *
-+arch_timer_iterate_errata(enum arch_timer_erratum_match_type type,
-+			  ate_match_fn_t match_fn,
-+			  void *arg)
-+{
-+	int i;
-+
-+	for (i = 0; i < ARRAY_SIZE(ool_workarounds); i++) {
-+		if (ool_workarounds[i].match_type != type)
-+			continue;
-+
-+		if (match_fn(&ool_workarounds[i], arg))
-+			return &ool_workarounds[i];
-+	}
-+
-+	return NULL;
-+}
-+
-+static
-+void arch_timer_enable_workaround(const struct arch_timer_erratum_workaround *wa)
-+{
-+	timer_unstable_counter_workaround = wa;
-+	static_branch_enable(&arch_timer_read_ool_enabled);
-+}
-+
-+static void arch_timer_check_ool_workaround(enum arch_timer_erratum_match_type type,
-+					    void *arg)
-+{
-+	const struct arch_timer_erratum_workaround *wa;
-+	ate_match_fn_t match_fn = NULL;
-+
-+	if (static_branch_unlikely(&arch_timer_read_ool_enabled))
-+		return;
-+
-+	switch (type) {
-+	case ate_match_dt:
-+		match_fn = arch_timer_check_dt_erratum;
-+		break;
-+	}
-+
-+	wa = arch_timer_iterate_errata(type, match_fn, arg);
-+	if (!wa)
-+		return;
-+
-+	arch_timer_enable_workaround(wa);
-+	pr_info("Enabling global workaround for %s\n", wa->desc_str);
-+}
-+
-+#else
-+#define arch_timer_check_ool_workaround(t,a)		do { } while(0)
- #endif /* CONFIG_ARM_ARCH_TIMER_OOL_WORKAROUND */
- 
- static __always_inline
-@@ -960,17 +1027,8 @@ static int __init arch_timer_of_init(struct device_node *np)
- 
- 	arch_timer_c3stop = !of_property_read_bool(np, "always-on");
- 
--#ifdef CONFIG_ARM_ARCH_TIMER_OOL_WORKAROUND
--	for (i = 0; i < ARRAY_SIZE(ool_workarounds); i++) {
--		if (of_property_read_bool(np, ool_workarounds[i].id)) {
--			timer_unstable_counter_workaround = &ool_workarounds[i];
--			static_branch_enable(&arch_timer_read_ool_enabled);
--			pr_info("arch_timer: Enabling workaround for %s\n",
--				timer_unstable_counter_workaround->id);
--			break;
--		}
--	}
--#endif
-+	/* Check for globally applicable workarounds */
-+	arch_timer_check_ool_workaround(ate_match_dt, np);
- 
- 	/*
- 	 * If we cannot rely on firmware initializing the timer registers then
+ void __init setup_cpu_features(void)
+ {
+ 	u32 cwg;
 -- 
 2.11.0
