@@ -1,55 +1,105 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon,  6 Mar 2017 19:06:40 +0000
-Subject: [PATCH] arm64: kasan: avoid bad virt_to_pfn()
-Message-ID: <1488827200-23990-1-git-send-email-mark.rutland@arm.com>
+From: labbott@redhat.com (Laura Abbott)
+Date: Mon, 6 Mar 2017 11:20:20 -0800
+Subject: [RFC PATCH 06/12] staging: android: ion: Remove crufty cache
+ support
+In-Reply-To: <CACvgo52Q-HvChU7_q65GFqOaVY7Z7EaDoRfELup0D_N_ge9poQ@mail.gmail.com>
+References: <1488491084-17252-1-git-send-email-labbott@redhat.com>
+ <1488491084-17252-7-git-send-email-labbott@redhat.com>
+ <20170303095654.zbcqkcojo3vf6y4y@phenom.ffwll.local>
+ <2273106.Hjr80nPvcZ@avalon> <87fe5d0a-19d2-b6c7-391f-687aa5ff8571@redhat.com>
+ <20170306102959.5iixtstrl7ktwxdp@phenom.ffwll.local>
+ <CACvgo52Q-HvChU7_q65GFqOaVY7Z7EaDoRfELup0D_N_ge9poQ@mail.gmail.com>
+Message-ID: <aa4a0307-62d0-7aed-80bc-bc569d49ffcd@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Booting a v4.11-rc1 kernel with DEBUG_VIRTUAL and KASAN enabled produces
-the following splat (trimmed for brevity):
+On 03/06/2017 09:00 AM, Emil Velikov wrote:
+> On 6 March 2017 at 10:29, Daniel Vetter <daniel@ffwll.ch> wrote:
+>> On Fri, Mar 03, 2017 at 10:46:03AM -0800, Laura Abbott wrote:
+>>> On 03/03/2017 08:39 AM, Laurent Pinchart wrote:
+>>>> Hi Daniel,
+>>>>
+>>>> On Friday 03 Mar 2017 10:56:54 Daniel Vetter wrote:
+>>>>> On Thu, Mar 02, 2017 at 01:44:38PM -0800, Laura Abbott wrote:
+>>>>>> Now that we call dma_map in the dma_buf API callbacks there is no need
+>>>>>> to use the existing cache APIs. Remove the sync ioctl and the existing
+>>>>>> bad dma_sync calls. Explicit caching can be handled with the dma_buf
+>>>>>> sync API.
+>>>>>>
+>>>>>> Signed-off-by: Laura Abbott <labbott@redhat.com>
+>>>>>> ---
+>>>>>>
+>>>>>>  drivers/staging/android/ion/ion-ioctl.c         |  5 ----
+>>>>>>  drivers/staging/android/ion/ion.c               | 40 --------------------
+>>>>>>  drivers/staging/android/ion/ion_carveout_heap.c |  6 ----
+>>>>>>  drivers/staging/android/ion/ion_chunk_heap.c    |  6 ----
+>>>>>>  drivers/staging/android/ion/ion_page_pool.c     |  3 --
+>>>>>>  drivers/staging/android/ion/ion_system_heap.c   |  5 ----
+>>>>>>  6 files changed, 65 deletions(-)
+>>>>>>
+>>>>>> diff --git a/drivers/staging/android/ion/ion-ioctl.c
+>>>>>> b/drivers/staging/android/ion/ion-ioctl.c index 5b2e93f..f820d77 100644
+>>>>>> --- a/drivers/staging/android/ion/ion-ioctl.c
+>>>>>> +++ b/drivers/staging/android/ion/ion-ioctl.c
+>>>>>> @@ -146,11 +146,6 @@ long ion_ioctl(struct file *filp, unsigned int cmd,
+>>>>>> unsigned long arg)>
+>>>>>>                   data.handle.handle = handle->id;
+>>>>>>
+>>>>>>           break;
+>>>>>>
+>>>>>>   }
+>>>>>>
+>>>>>> - case ION_IOC_SYNC:
+>>>>>> - {
+>>>>>> -         ret = ion_sync_for_device(client, data.fd.fd);
+>>>>>> -         break;
+>>>>>> - }
+>>>>>
+>>>>> You missed the case ION_IOC_SYNC: in compat_ion.c.
+>>>>>
+>>>>> While at it: Should we also remove the entire custom_ioctl infrastructure?
+>>>>> It's entirely unused afaict, and for a pure buffer allocator I don't see
+>>>>> any need to have custom ioctl.
+>>>>
+>>>> I second that, if you want to make ion a standard API, then we certainly don't
+>>>> want any custom ioctl.
+>>>>
+>>>>> More code to remove potentially:
+>>>>> - The entire compat ioctl stuff - would be an abi break, but I guess if we
+>>>>>   pick the 32bit abi and clean up the uapi headers we'll be mostly fine.
+>>>>>   would allow us to remove compat_ion.c entirely.
+>>>>>
+>>>>> - ION_IOC_IMPORT: With this ion is purely an allocator, so not sure we
+>>>>>   still need to be able to import anything. All the cache flushing/mapping
+>>>>>   is done through dma-buf ops/ioctls.
+>>>>>
+>>>>>
+>>>
+>>> Good point to all of the above. I was considering keeping the import around
+>>> for backwards compatibility reasons but given how much other stuff is being
+>>> potentially broken, everything should just get ripped out.
+>>
+>> If you're ok with breaking the world, then I strongly suggest we go
+>> through the uapi header and replace all types with the standard
+>> fixed-width ones (__s32, __s64 and __u32, __u64). Allows us to remove all
+>> the compat ioctl code :-)
+> 
+> I think the other comments from your "botching-up ioctls" [1] also apply ;-)
+> Namely - align structs to multiple of 64bit, add "flags" and properly
+> verity user input returning -EINVAL.
+> 
+> -Emil
+> 
+> [1] https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/Documentation/ioctl/botching-up-ioctls.txt
 
-[    0.000000] virt_to_phys used for non-linear address: ffff200008080000 (0xffff200008080000)
-[    0.000000] WARNING: CPU: 0 PID: 0 at arch/arm64/mm/physaddr.c:14 __virt_to_phys+0x48/0x70
-[    0.000000] PC is at __virt_to_phys+0x48/0x70
-[    0.000000] LR is at __virt_to_phys+0x48/0x70
-[    0.000000] Call trace:
-[    0.000000] [<ffff2000080b1ac0>] __virt_to_phys+0x48/0x70
-[    0.000000] [<ffff20000a03b86c>] kasan_init+0x1c0/0x498
-[    0.000000] [<ffff20000a034018>] setup_arch+0x2fc/0x948
-[    0.000000] [<ffff20000a030c68>] start_kernel+0xb8/0x570
-[    0.000000] [<ffff20000a0301e8>] __primary_switched+0x6c/0x74
+I'm more torn on this. There's a difference between dropping an old
+ioctl/implicit caching vs. changing an actual ioctl ABI.
+Maybe having obvious breakage is better than subtle though,
+plus nobody has come begging me not to break the ABI yet.
+I might leave this for right before we do the actual move
+out of staging.
 
-This is because we use virt_to_pfn() on a kernel image address when
-trying to figure out its nid, so that we can allocate its shadow from
-the same node.
+Thanks,
+Laura
 
-As with other recent changes, this patch uses lm_alias() to solve this.
-
-We could instead use NUMA_NO_NODE, as x86 does for all shadow
-allocations, though we'll likely want the "real" memory shadow to be
-backed from its corresponding nid anyway, so we may as well be
-consistent and find the nid for the image shadow.
-
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Laura Abbott <labbott@redhat.com>
-Cc: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/mm/kasan_init.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm64/mm/kasan_init.c b/arch/arm64/mm/kasan_init.c
-index 55d1e92..687a358 100644
---- a/arch/arm64/mm/kasan_init.c
-+++ b/arch/arm64/mm/kasan_init.c
-@@ -162,7 +162,7 @@ void __init kasan_init(void)
- 	clear_pgds(KASAN_SHADOW_START, KASAN_SHADOW_END);
  
- 	vmemmap_populate(kimg_shadow_start, kimg_shadow_end,
--			 pfn_to_nid(virt_to_pfn(_text)));
-+			 pfn_to_nid(virt_to_pfn(lm_alias(_text))));
- 
- 	/*
- 	 * vmemmap_populate() has populated the shadow region that covers the
--- 
-1.9.1
