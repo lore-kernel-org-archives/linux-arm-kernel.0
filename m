@@ -1,42 +1,105 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon,  6 Mar 2017 11:26:18 +0000
-Subject: [PATCH 13/17] arm64: cpu_errata: Allow an erratum to be match for all
- revisions of a core
+Date: Mon,  6 Mar 2017 11:26:17 +0000
+Subject: [PATCH 12/17] arm64: arch_timer: Enable CNTVCT_EL0 trap if workaround
+ is enabled
 In-Reply-To: <20170306112622.13853-1-marc.zyngier@arm.com>
 References: <20170306112622.13853-1-marc.zyngier@arm.com>
-Message-ID: <20170306112622.13853-14-marc.zyngier@arm.com>
+Message-ID: <20170306112622.13853-13-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some minor erratum may not be fixed in further revisions of a core,
-leading to a situation where the workaround needs to be updated each
-time an updated core is released.
-
-Introduce a MIDR_ALL_VERSIONS match helper that will work for all
-versions of that MIDR, once and for all.
+Userspace being allowed to use read CNTVCT_EL0 anytime (and not
+only in the VDSO), we need to enable trapping whenever a cntvct
+workaround is enabled on a given CPU.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/kernel/cpu_errata.c | 7 +++++++
- 1 file changed, 7 insertions(+)
+ drivers/clocksource/arm_arch_timer.c | 42 +++++++++++++++++++++++++-----------
+ 1 file changed, 30 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-index f6cc67e7626e..2be1d1c05303 100644
---- a/arch/arm64/kernel/cpu_errata.c
-+++ b/arch/arm64/kernel/cpu_errata.c
-@@ -53,6 +53,13 @@ static int cpu_enable_trap_ctr_access(void *__unused)
- 	.midr_range_min = min, \
- 	.midr_range_max = max
+diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+index a5a88db2ac90..8e3638397347 100644
+--- a/drivers/clocksource/arm_arch_timer.c
++++ b/drivers/clocksource/arm_arch_timer.c
+@@ -83,6 +83,7 @@ static enum ppi_nr arch_timer_uses_ppi = VIRT_PPI;
+ static bool arch_timer_c3stop;
+ static bool arch_timer_mem_use_virtual;
+ static bool arch_counter_suspend_stop;
++static bool vdso_default = true;
  
-+#define MIDR_ALL_VERSIONS(model) \
-+	.def_scope = SCOPE_LOCAL_CPU, \
-+	.matches = is_affected_midr_range, \
-+	.midr_model = model, \
-+	.midr_range_min = 0, \
-+	.midr_range_max = (MIDR_VARIANT_MASK | MIDR_REVISION_MASK)
+ static bool evtstrm_enable = IS_ENABLED(CONFIG_ARM_ARCH_TIMER_EVTSTREAM);
+ 
+@@ -390,6 +391,17 @@ void arch_timer_enable_workaround(const struct arch_timer_erratum_workaround *wa
+ 	}
+ 
+ 	static_branch_enable(&arch_timer_read_ool_enabled);
 +
- const struct arm64_cpu_capabilities arm64_errata[] = {
- #if	defined(CONFIG_ARM64_ERRATUM_826319) || \
- 	defined(CONFIG_ARM64_ERRATUM_827319) || \
++	/*
++	 * Don't use the vdso fastpath if errata require using the
++	 * out-of-line counter accessor. We may change our mind pretty
++	 * late in the game (with a per-CPU erratum, for example), so
++	 * change both the default value and the vdso itself.
++	 */
++	if (wa->read_cntvct_el0) {
++		clocksource_counter.archdata.vdso_direct = false;
++		vdso_default = false;
++	}
+ }
+ 
+ static void arch_timer_check_ool_workaround(enum arch_timer_erratum_match_type type,
+@@ -450,9 +462,17 @@ static void arch_timer_check_ool_workaround(enum arch_timer_erratum_match_type t
+ 	__val;								\
+ })
+ 
++static bool arch_timer_this_cpu_has_cntvct_wa(void)
++{
++	const struct arch_timer_erratum_workaround *wa;
++
++	wa = __this_cpu_read(timer_unstable_counter_workaround);
++	return wa && wa->read_cntvct_el0;
++}
+ #else
+ #define arch_timer_check_ool_workaround(t,a)		do { } while(0)
+ #define erratum_handler(fn, r, ...)			({false;})
++#define arch_timer_this_cpu_has_cntvct_wa()		({false;})
+ #endif /* CONFIG_ARM_ARCH_TIMER_OOL_WORKAROUND */
+ 
+ static __always_inline irqreturn_t timer_handler(const int access,
+@@ -672,8 +692,15 @@ static void arch_counter_set_user_access(void)
+ 			| ARCH_TIMER_VIRT_EVT_EN
+ 			| ARCH_TIMER_USR_PCT_ACCESS_EN);
+ 
+-	/* Enable user access to the virtual counter */
+-	cntkctl |= ARCH_TIMER_USR_VCT_ACCESS_EN;
++	/*
++	 * Enable user access to the virtual counter if it doesn't
++	 * need to be workaround. The vdso may have been already
++	 * disabled though.
++	 */
++	if (arch_timer_this_cpu_has_cntvct_wa())
++		pr_info("CPU%d: Trapping CNTVCT access\n", smp_processor_id());
++	else
++		cntkctl |= ARCH_TIMER_USR_VCT_ACCESS_EN;
+ 
+ 	arch_timer_set_cntkctl(cntkctl);
+ }
+@@ -796,16 +823,7 @@ static void __init arch_counter_register(unsigned type)
+ 		else
+ 			arch_timer_read_counter = arch_counter_get_cntpct;
+ 
+-		clocksource_counter.archdata.vdso_direct = true;
+-
+-#ifdef CONFIG_ARM_ARCH_TIMER_OOL_WORKAROUND
+-		/*
+-		 * Don't use the vdso fastpath if errata require using
+-		 * the out-of-line counter accessor.
+-		 */
+-		if (static_branch_unlikely(&arch_timer_read_ool_enabled))
+-			clocksource_counter.archdata.vdso_direct = false;
+-#endif
++		clocksource_counter.archdata.vdso_direct = vdso_default;
+ 	} else {
+ 		arch_timer_read_counter = arch_counter_get_cntvct_mem;
+ 	}
 -- 
 2.11.0
