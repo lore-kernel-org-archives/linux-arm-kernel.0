@@ -1,64 +1,72 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 06 Mar 2017 08:34:00 +0000
-Subject: [PATCH v2] arm64: kvm: Use has_vhe() instead of
- hyp_alternate_select()
-In-Reply-To: <1488767598-2055-1-git-send-email-shankerd@codeaurora.org>
- (Shanker Donthineni's message of "Sun, 5 Mar 2017 20:33:18 -0600")
-References: <1488767598-2055-1-git-send-email-shankerd@codeaurora.org>
-Message-ID: <87bmte3itj.fsf@on-the-bus.cambridge.arm.com>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Mon, 6 Mar 2017 09:38:51 +0100
+Subject: [PATCH v4 2/5] arm: dts: Add the burst and esc clock frequency
+ properties to DSI node
+In-Reply-To: <1488775343-6236-3-git-send-email-hoegeun.kwon@samsung.com>
+References: <1488775343-6236-1-git-send-email-hoegeun.kwon@samsung.com>
+ <CGME20170306044234epcas1p22e9481182e11330cea0d169ce0ad2666@epcas1p2.samsung.com>
+ <1488775343-6236-3-git-send-email-hoegeun.kwon@samsung.com>
+Message-ID: <20170306093851.3870ab29@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shanker,
+Hi,
 
-On Mon, Mar 06 2017 at  2:33:18 am GMT, Shanker Donthineni <shankerd@codeaurora.org> wrote:
-> Now all the cpu_hwcaps features have their own static keys. We don't
-> need a separate function hyp_alternate_select() to patch the vhe/nvhe
-> code. We can achieve the same functionality by using has_vhe(). It
-> improves the code readability, uses the jump label instructions, and
-> also compiler generates the better code with a fewer instructions.
-
-How do you define "better"? Which compiler? Do you have any benchmarking data?
-
+On Mon, 06 Mar 2017 13:42:20 +0900 Hoegeun Kwon wrote:
+> The OF graph is not needed because the panel is a child of dsi. Add
 >
-> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
+This is obviously from your patch #5 and doesn't make sense in this
+context.
+
+> the burst and esc clock frequency properties to the parent (DSI node).
+> 
+> Signed-off-by: Hoegeun Kwon <hoegeun.kwon@samsung.com>
+> Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
 > ---
-> v2: removed 'Change-Id: Ia8084189833f2081ff13c392deb5070c46a64038' from commit
->
->  arch/arm64/kvm/hyp/debug-sr.c  | 12 ++++++----
->  arch/arm64/kvm/hyp/switch.c    | 50 +++++++++++++++++++-----------------------
->  arch/arm64/kvm/hyp/sysreg-sr.c | 23 +++++++++----------
->  3 files changed, 43 insertions(+), 42 deletions(-)
->
-> diff --git a/arch/arm64/kvm/hyp/debug-sr.c b/arch/arm64/kvm/hyp/debug-sr.c
-> index f5154ed..e5642c2 100644
-> --- a/arch/arm64/kvm/hyp/debug-sr.c
-> +++ b/arch/arm64/kvm/hyp/debug-sr.c
-> @@ -109,9 +109,13 @@ static void __hyp_text __debug_save_spe_nvhe(u64 *pmscr_el1)
->  	dsb(nsh);
->  }
+>  arch/arm/boot/dts/exynos3250-rinato.dts | 2 ++
+>  arch/arm/boot/dts/exynos4210-trats.dts  | 2 ++
+>  arch/arm/boot/dts/exynos4412-trats2.dts | 2 ++
+>  3 files changed, 6 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/exynos3250-rinato.dts b/arch/arm/boot/dts/exynos3250-rinato.dts
+> index 548413e..c9f191c 100644
+> --- a/arch/arm/boot/dts/exynos3250-rinato.dts
+> +++ b/arch/arm/boot/dts/exynos3250-rinato.dts
+> @@ -215,6 +215,8 @@
+>  &dsi_0 {
+>  	vddcore-supply = <&ldo6_reg>;
+>  	vddio-supply = <&ldo6_reg>;
+> +	samsung,burst-clock-frequency = <250000000>;
+> +	samsung,esc-clock-frequency = <20000000>;
+>  	samsung,pll-clock-frequency = <24000000>;
+>  	status = "okay";
 >  
-> -static hyp_alternate_select(__debug_save_spe,
-> -			    __debug_save_spe_nvhe, __debug_save_spe_vhe,
-> -			    ARM64_HAS_VIRT_HOST_EXTN);
-> +static void __hyp_text __debug_save_spe(u64 *pmscr_el1)
-> +{
-> +	if (has_vhe())
-> +		__debug_save_spe_vhe(pmscr_el1);
-> +	else
-> +		__debug_save_spe_nvhe(pmscr_el1);
-> +}
+> diff --git a/arch/arm/boot/dts/exynos4210-trats.dts b/arch/arm/boot/dts/exynos4210-trats.dts
+> index 0ca1b4d..1743ca8 100644
+> --- a/arch/arm/boot/dts/exynos4210-trats.dts
+> +++ b/arch/arm/boot/dts/exynos4210-trats.dts
+> @@ -197,6 +197,8 @@
+>  &dsi_0 {
+>  	vddcore-supply = <&vusb_reg>;
+>  	vddio-supply = <&vmipi_reg>;
+> +	samsung,burst-clock-frequency = <500000000>;
+> +	samsung,esc-clock-frequency = <20000000>;
+>  	samsung,pll-clock-frequency = <24000000>;
+>  	status = "okay";
+>  
+> diff --git a/arch/arm/boot/dts/exynos4412-trats2.dts b/arch/arm/boot/dts/exynos4412-trats2.dts
+> index 41ecd6d..82221a0 100644
+> --- a/arch/arm/boot/dts/exynos4412-trats2.dts
+> +++ b/arch/arm/boot/dts/exynos4412-trats2.dts
+> @@ -385,6 +385,8 @@
+>  &dsi_0 {
+>  	vddcore-supply = <&ldo8_reg>;
+>  	vddio-supply = <&ldo10_reg>;
+> +	samsung,burst-clock-frequency = <500000000>;
+> +	samsung,esc-clock-frequency = <20000000>;
+>  	samsung,pll-clock-frequency = <24000000>;
+>  	status = "okay";
+>  
 
-I have two worries about this kind of thing:
-- Not all compilers do support jump labels, leading to a memory access
-on each static key (GCC 4.8, for example). This would immediately
-introduce a pretty big regression
-- The hyp_alternate_select() method doesn't introduce a fast/slow path
-duality. Each path has the exact same cost. I'm not keen on choosing
-what is supposed to be the fast path, really.
 
-Thanks,
-
-	M.
--- 
-Jazz is not dead, it just smell funny.
+Lothar Wa?mann
