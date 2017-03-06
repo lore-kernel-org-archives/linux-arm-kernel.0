@@ -1,115 +1,122 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon,  6 Mar 2017 14:24:56 +0000
-Subject: [PATCH v3 23/25] ARM: hyp-stub/KVM: Kill __hyp_get_vectors
+Date: Mon,  6 Mar 2017 14:24:47 +0000
+Subject: [PATCH v3 14/25] ARM: KVM: Implement HVC_RESET_VECTORS stub hypercall
 In-Reply-To: <20170306142458.8875-1-marc.zyngier@arm.com>
 References: <20170306142458.8875-1-marc.zyngier@arm.com>
-Message-ID: <20170306142458.8875-24-marc.zyngier@arm.com>
+Message-ID: <20170306142458.8875-15-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nobody is using __hyp_get_vectors anymore, so let's remove both
-implementations (hyp-stub and KVM).
+In order to restore HYP mode to its original condition, KVM currently
+implements __kvm_hyp_reset(). As we're moving towards a hyp-stub
+defined API, it becomes necessary to implement HVC_RESET_VECTORS.
+
+This patch adds the HVC_RESET_VECTORS hypercall to the KVM init
+code, which so far lacked any form of hypercall support.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/asm/virt.h | 10 ++++------
- arch/arm/kernel/hyp-stub.S  | 13 +------------
- arch/arm/kvm/init.S         |  7 +------
- arch/arm/kvm/interrupts.S   |  4 ----
- 4 files changed, 6 insertions(+), 28 deletions(-)
+ arch/arm/include/asm/virt.h |  1 +
+ arch/arm/kernel/hyp-stub.S  |  2 +-
+ arch/arm/kvm/init.S         | 33 +++++++++++++++++++++++++++------
+ 3 files changed, 29 insertions(+), 7 deletions(-)
 
 diff --git a/arch/arm/include/asm/virt.h b/arch/arm/include/asm/virt.h
-index 8d5625b790b5..5f45969d4063 100644
+index 5186718aab68..8d5625b790b5 100644
 --- a/arch/arm/include/asm/virt.h
 +++ b/arch/arm/include/asm/virt.h
-@@ -53,7 +53,6 @@ static inline void sync_boot_mode(void)
- }
+@@ -54,6 +54,7 @@ static inline void sync_boot_mode(void)
  
  void __hyp_set_vectors(unsigned long phys_vector_base);
--unsigned long __hyp_get_vectors(void);
- void __hyp_reset_vectors(void);
+ unsigned long __hyp_get_vectors(void);
++void __hyp_reset_vectors(void);
  #else
  #define __boot_cpu_mode	(SVC_MODE)
-@@ -99,12 +98,11 @@ extern char __hyp_text_end[];
- 
- /* Only assembly code should need those */
- 
--#define HVC_GET_VECTORS 0
--#define HVC_SET_VECTORS 1
--#define HVC_SOFT_RESTART 2
--#define HVC_RESET_VECTORS 3
-+#define HVC_SET_VECTORS 0
-+#define HVC_SOFT_RESTART 1
-+#define HVC_RESET_VECTORS 2
- 
--#define HVC_STUB_HCALL_NR 4
-+#define HVC_STUB_HCALL_NR 3
- 
- #endif /* __ASSEMBLY__ */
- 
+ #define sync_boot_mode()
 diff --git a/arch/arm/kernel/hyp-stub.S b/arch/arm/kernel/hyp-stub.S
-index 3cb01e8a291d..68bf72777ac7 100644
+index 21794d4a8f36..3cb01e8a291d 100644
 --- a/arch/arm/kernel/hyp-stub.S
 +++ b/arch/arm/kernel/hyp-stub.S
-@@ -202,12 +202,7 @@ ARM_BE8(orr	r7, r7, #(1 << 25))     @ HSCTLR.EE
- ENDPROC(__hyp_stub_install_secondary)
+@@ -280,7 +280,7 @@ ENDPROC(__hyp_reset_vectors)
+ #endif
  
- __hyp_stub_do_trap:
--	teq	r0, #HVC_GET_VECTORS
--	bne	1f
--	mrc	p15, 4, r0, c12, c0, 0	@ get HVBAR
--	b	__hyp_stub_exit
--
--1:	teq	r0, #HVC_SET_VECTORS
-+	teq	r0, #HVC_SET_VECTORS
- 	bne	1f
- 	mcr	p15, 4, r1, c12, c0, 0	@ set HVBAR
- 	b	__hyp_stub_exit
-@@ -247,12 +242,6 @@ ENDPROC(__hyp_stub_do_trap)
-  * so you will need to set that to something sensible@the new hypervisor's
-  * initialisation entry point.
-  */
--ENTRY(__hyp_get_vectors)
--	mov	r0, #HVC_GET_VECTORS
--	__HVC(0)
--	ret	lr
--ENDPROC(__hyp_get_vectors)
--
- ENTRY(__hyp_set_vectors)
- 	mov	r1, r0
- 	mov	r0, #HVC_SET_VECTORS
+ .align 5
+-__hyp_stub_vectors:
++ENTRY(__hyp_stub_vectors)
+ __hyp_stub_reset:	W(b)	.
+ __hyp_stub_und:		W(b)	.
+ __hyp_stub_svc:		W(b)	.
 diff --git a/arch/arm/kvm/init.S b/arch/arm/kvm/init.S
-index c92e092103b2..3cff15152800 100644
+index bf89c919efc1..9b0c735a68f7 100644
 --- a/arch/arm/kvm/init.S
 +++ b/arch/arm/kvm/init.S
-@@ -122,12 +122,7 @@ __do_hyp_init:
+@@ -23,6 +23,7 @@
+ #include <asm/kvm_asm.h>
+ #include <asm/kvm_arm.h>
+ #include <asm/kvm_mmu.h>
++#include <asm/virt.h>
+ 
+ /********************************************************************
+  * Hypervisor initialization
+@@ -39,6 +40,10 @@
+  * - Setup the page tables
+  * - Enable the MMU
+  * - Profit! (or eret, if you only care about the code).
++ *
++ * Another possibility is to get a HYP stub hypercall.
++ * We discriminate between the two by checking if r0 contains a value
++ * that is less than HVC_STUB_HCALL_NR.
+  */
+ 
+ 	.text
+@@ -58,6 +63,10 @@ __kvm_hyp_init:
+ 	W(b)	.
+ 
+ __do_hyp_init:
++	@ Check for a stub hypercall
++	cmp	r0, #HVC_STUB_HCALL_NR
++	blo	__kvm_handle_stub_hvc
++
+ 	@ Set stack pointer
+ 	mov	sp, r0
+ 
+@@ -112,19 +121,31 @@ __do_hyp_init:
+ 
  	eret
  
- ENTRY(__kvm_handle_stub_hvc)
--	cmp	r0, #HVC_GET_VECTORS
--	bne	1f
--	mrc	p15, 4, r0, c12, c0, 0	@ get HVBAR
--	b	exit
--
--1:	cmp	r0, #HVC_SOFT_RESTART
-+	cmp	r0, #HVC_SOFT_RESTART
- 	bne	1f
+-	@ r0 : stub vectors address
++ENTRY(__kvm_handle_stub_hvc)
++	cmp	r0, #HVC_RESET_VECTORS
++	bne	1f
+ ENTRY(__kvm_hyp_reset)
+ 	/* We're now in idmap, disable MMU */
+ 	mrc	p15, 4, r1, c1, c0, 0	@ HSCTLR
+-	ldr	r2, =(HSCTLR_M | HSCTLR_A | HSCTLR_C | HSCTLR_I)
+-	bic	r1, r1, r2
++	ldr	r0, =(HSCTLR_M | HSCTLR_A | HSCTLR_C | HSCTLR_I)
++	bic	r1, r1, r0
+ 	mcr	p15, 4, r1, c1, c0, 0	@ HSCTLR
  
- 	/* The target is expected in r1 */
-diff --git a/arch/arm/kvm/interrupts.S b/arch/arm/kvm/interrupts.S
-index b1bd316f14c0..80a1d6cd261c 100644
---- a/arch/arm/kvm/interrupts.S
-+++ b/arch/arm/kvm/interrupts.S
-@@ -37,10 +37,6 @@
-  * in Hyp mode (see init_hyp_mode in arch/arm/kvm/arm.c).  Return values are
-  * passed in r0 (strictly 32bit).
-  *
-- * A function pointer with a value of 0xffffffff has a special meaning,
-- * and is used to implement __hyp_get_vectors in the same way as in
-- * arch/arm/kernel/hyp_stub.S.
-- *
-  * The calling convention follows the standard AAPCS:
-  *   r0 - r3: caller save
-  *   r12:     caller save
+-	/* Install stub vectors */
+-	mcr	p15, 4, r0, c12, c0, 0	@ HVBAR
+-	isb
++	/*
++	 * Install stub vectors, using ardb's VA->PA trick.
++	 */
++0:	adr	r0, 0b					@ PA(0)
++	movw	r1, #:lower16:__hyp_stub_vectors - 0b   @ VA(stub) - VA(0)
++	movt	r1, #:upper16:__hyp_stub_vectors - 0b
++	add	r1, r1, r0				@ PA(stub)
++	mcr	p15, 4, r1, c12, c0, 0	@ HVBAR
++	b	exit
++
++1:	mov	r0, #-1
+ 
++exit:
+ 	eret
++ENDPROC(__kvm_handle_stub_hvc)
+ ENDPROC(__kvm_hyp_reset)
+ 
+ 	.ltorg
 -- 
 2.11.0
