@@ -1,47 +1,88 @@
-From: slash.tmp@free.fr (Mason)
-Date: Mon, 6 Mar 2017 16:45:36 +0100
-Subject: Panic in quirk_usb_early_handoff
-In-Reply-To: <063D6719AE5E284EB5DD2968C1650D6DCFE78D44@AcuExch.aculab.com>
-References: <4b2a7606-de27-c8ad-1530-958dd5d12233@free.fr>
- <45e38a07-e8da-80e4-36bb-31e471f02004@free.fr>
- <3c5bd8f5-468f-d25e-08a9-8944ee419096@free.fr>
- <38b8c9be-724b-0cfc-a941-76f2c62e1c58@arm.com>
- <491b40db-dc07-2a8e-9bc4-07b86f990600@free.fr>
- <76dea81d-c524-ad40-06bf-e549bb457f59@free.fr>
- <063D6719AE5E284EB5DD2968C1650D6DCFE78D44@AcuExch.aculab.com>
-Message-ID: <7bfbe98c-0bee-a13d-0c85-508645e97c58@free.fr>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Mon, 6 Mar 2017 16:52:57 +0100
+Subject: [RFC PATCH 10/12] staging: android: ion: Use CMA APIs directly
+In-Reply-To: <6709093.jyTQHIiK7d@avalon>
+References: <1488491084-17252-1-git-send-email-labbott@redhat.com>
+ <0541f57b-4060-ea10-7173-26ae77777518@redhat.com>
+ <20170306103204.d3yf6woxpsqvdakp@phenom.ffwll.local>
+ <6709093.jyTQHIiK7d@avalon>
+Message-ID: <20170306155257.y5tnlq4orv2xkjbd@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/03/2017 16:27, David Laight wrote:
-
-> Mason wrote:
->>
->>> So the kernel panics in xhci_find_next_ext_cap()
->>> ( drivers/usb/host/xhci-ext-caps.h:122 )
->>> http://lxr.free-electrons.com/source/drivers/usb/host/xhci-ext-caps.h?v=4.9#L122
->>>
->>> Any idea how this can happen?
->>>
->>> 	base = ioremap_nocache(pci_resource_start(pdev, 0), len);
->>>
->>> Could I be passing garbage to ioremap_nocache?
->>
->> Oh...
->>
->> I have just now understood what Ard wrote a few days ago.
->>
->> The issue was that, on this platform, the PCI configuration space
->> and memory space are multiplexed; in other words they reside at
->> the same physical address, with a bit in MMIO to choose one or
->> the other.
+On Mon, Mar 06, 2017 at 03:43:53PM +0200, Laurent Pinchart wrote:
+> Hi Daniel,
 > 
-> Time to shoot another hardware engineer.
+> On Monday 06 Mar 2017 11:32:04 Daniel Vetter wrote:
+> > On Fri, Mar 03, 2017 at 10:50:20AM -0800, Laura Abbott wrote:
+> > > On 03/03/2017 08:41 AM, Laurent Pinchart wrote:
+> > >> On Thursday 02 Mar 2017 13:44:42 Laura Abbott wrote:
+> > >>> When CMA was first introduced, its primary use was for DMA allocation
+> > >>> and the only way to get CMA memory was to call dma_alloc_coherent. This
+> > >>> put Ion in an awkward position since there was no device structure
+> > >>> readily available and setting one up messed up the coherency model.
+> > >>> These days, CMA can be allocated directly from the APIs. Switch to
+> > >>> using this model to avoid needing a dummy device. This also avoids
+> > >>> awkward caching questions.
+> > >> 
+> > >> If the DMA mapping API isn't suitable for today's requirements anymore,
+> > >> I believe that's what needs to be fixed, instead of working around the
+> > >> problem by introducing another use-case-specific API.
+> > > 
+> > > I don't think this is a usecase specific API. CMA has been decoupled from
+> > > DMA already because it's used in other places. The trying to go through
+> > > DMA was just another layer of abstraction, especially since there isn't
+> > > a device available for allocation.
+> > 
+> > Also, we've had separation of allocation and dma-mapping since forever,
+> > that's how it works almost everywhere. Not exactly sure why/how arm-soc
+> > ecosystem ended up focused so much on dma_alloc_coherent.
+> 
+> I believe because that was the easy way to specify memory constraints. The API 
+> receives a device pointer and will allocate memory suitable for DMA for that 
+> device. The fact that it maps it to the device is a side-effect in my opinion.
+> 
+> > I think separating allocation from dma mapping/coherency is perfectly
+> > fine, and the way to go.
+> 
+> Especially given that in many cases we'll want to share buffers between 
+> multiple devices, so we'll need to map them multiple times.
+> 
+> My point still stands though, if we want to move towards a model where 
+> allocation and mapping are decoupled, we need an allocation function that 
+> takes constraints (possibly implemented with two layers, a constraint 
+> resolution layer on top of a pool/heap/type/foo-based allocator), and a 
+> mapping API. IOMMU handling being integrated in the DMA mapping API we're 
+> currently stuck with it, which might call for brushing up that API.
 
-He's in CC :-)
+Hm, maybe I wasn't clear, but that's exactly what I assume will happen:
 
-> Hopefully it isn't an SMP system - but I wouldn't put it past them.
+The constraint resolver is the unix device memory allocation thing, which
+happens entirely in userspace. There's a lot more than just "where to
+allocate" to negotiate, e.g. pixel format, stride/size
+limits/requirements, tiling formats. A lot of it the kernel doesn't even
+know.
 
-This is a dual- and quad- Cortex A9 MP platform :-(
+Allocation then needs to happen through the kernel ofc, but that doesn't
+mean we need to have all the constraint resolving in the kernel. As long
+as the kernel exposes the device /dev node -> ion heap stuff, userspace
+can figure this out. Or an alternative way would be to have a cascade of
+ion heaps to keep things a notch more opaque. Either way, no actaul
+constraint resolving in the kernel itself, and except for a bunch more
+stuff in sysfs maybe, also no other uapi changes. Once we have a place to
+allocate stuff which isn't the device driver at least, aka ION.
 
-Regards.
+And then once allocated you use the dma apis to instantiate the iommus
+mappings.
+
+Anyway, at least from my understanding I think there's 0 risk with merging
+ION wrt the constraint resolving side (at least as discussed around XDC
+last year), and for setups that need cma, it might finally enable to get
+things moving forward.
+
+Or do I miss something big here?
+-Daniel
+-- 
+Daniel Vetter
+Software Engineer, Intel Corporation
+http://blog.ffwll.ch
