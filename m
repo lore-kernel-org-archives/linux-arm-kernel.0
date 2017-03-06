@@ -1,59 +1,101 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon,  6 Mar 2017 11:26:08 +0000
-Subject: [PATCH 03/17] arm64: Allow checking of a CPU-local erratum
+Date: Mon,  6 Mar 2017 11:26:09 +0000
+Subject: [PATCH 04/17] arm64: arch_timer: Add erratum handler for CPU-specific
+ capability
 In-Reply-To: <20170306112622.13853-1-marc.zyngier@arm.com>
 References: <20170306112622.13853-1-marc.zyngier@arm.com>
-Message-ID: <20170306112622.13853-4-marc.zyngier@arm.com>
+Message-ID: <20170306112622.13853-5-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-this_cpu_has_cap() only checks the feature array, and not the errata
-one. In order to be able to check for a CPU-local erratum, allow it
-to inspect the latter as well.
-
-This is consistent with cpus_have_cap()'s behaviour, which includes
-errata already.
+Should we ever have a workaround for an erratum that is detected using
+a capability and affecting a particular CPU, it'd be nice to have
+a way to probe them directly.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/kernel/cpufeature.c | 13 +++++++++++--
- 1 file changed, 11 insertions(+), 2 deletions(-)
+ arch/arm64/include/asm/arch_timer.h  |  1 +
+ drivers/clocksource/arm_arch_timer.c | 28 ++++++++++++++++++++++++----
+ 2 files changed, 25 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index abda8e861865..6eb77ae99b79 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -1090,20 +1090,29 @@ static void __init setup_feature_capabilities(void)
-  * Check if the current CPU has a given feature capability.
-  * Should be called from non-preemptible context.
-  */
--bool this_cpu_has_cap(unsigned int cap)
-+static bool __this_cpu_has_cap(const struct arm64_cpu_capabilities *cap_array,
-+			       unsigned int cap)
- {
- 	const struct arm64_cpu_capabilities *caps;
+diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
+index 8b8beab20bb6..f841e08a0dfc 100644
+--- a/arch/arm64/include/asm/arch_timer.h
++++ b/arch/arm64/include/asm/arch_timer.h
+@@ -40,6 +40,7 @@ extern struct static_key_false arch_timer_read_ool_enabled;
+ enum arch_timer_erratum_match_type {
+ 	ate_match_dt,
+ 	ate_match_global_cap_id,
++	ate_match_local_cap_id,
+ };
  
- 	if (WARN_ON(preemptible()))
- 		return false;
- 
--	for (caps = arm64_features; caps->desc; caps++)
-+	for (caps = cap_array; caps->desc; caps++)
- 		if (caps->capability == cap && caps->matches)
- 			return caps->matches(caps, SCOPE_LOCAL_CPU);
- 
- 	return false;
+ struct arch_timer_erratum_workaround {
+diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+index 0470b07af6fe..3018eeeee7fa 100644
+--- a/drivers/clocksource/arm_arch_timer.c
++++ b/drivers/clocksource/arm_arch_timer.c
+@@ -221,6 +221,13 @@ bool arch_timer_check_global_cap_erratum(const struct arch_timer_erratum_workaro
+ 	return cpus_have_cap((uintptr_t)wa->id);
  }
  
-+extern const struct arm64_cpu_capabilities arm64_errata[];
-+
-+bool this_cpu_has_cap(unsigned int cap)
++static
++bool arch_timer_check_local_cap_erratum(const struct arch_timer_erratum_workaround *wa,
++					const void *arg)
 +{
-+	return (__this_cpu_has_cap(arm64_features, cap) ||
-+		__this_cpu_has_cap(arm64_errata, cap));
++	return this_cpu_has_cap((uintptr_t)wa->id);
 +}
 +
- void __init setup_cpu_features(void)
+ static const struct arch_timer_erratum_workaround *
+ arch_timer_iterate_errata(enum arch_timer_erratum_match_type type,
+ 			  ate_match_fn_t match_fn,
+@@ -251,9 +258,7 @@ static void arch_timer_check_ool_workaround(enum arch_timer_erratum_match_type t
  {
- 	u32 cwg;
+ 	const struct arch_timer_erratum_workaround *wa;
+ 	ate_match_fn_t match_fn = NULL;
+-
+-	if (static_branch_unlikely(&arch_timer_read_ool_enabled))
+-		return;
++	bool local = false;
+ 
+ 	switch (type) {
+ 	case ate_match_dt:
+@@ -262,14 +267,27 @@ static void arch_timer_check_ool_workaround(enum arch_timer_erratum_match_type t
+ 	case ate_match_global_cap_id:
+ 		match_fn = arch_timer_check_global_cap_erratum;
+ 		break;
++	case ate_match_local_cap_id:
++		match_fn = arch_timer_check_local_cap_erratum;
++		local = true;
++		break;
+ 	}
+ 
+ 	wa = arch_timer_iterate_errata(type, match_fn, arg);
+ 	if (!wa)
+ 		return;
+ 
++	if (static_branch_unlikely(&arch_timer_read_ool_enabled)) {
++		if (wa != timer_unstable_counter_workaround)
++			pr_warn("Can't enable workaround for %s (clashes with %s\n)",
++				wa->desc_str,
++				timer_unstable_counter_workaround->desc_str);
++		return;
++	}
++
+ 	arch_timer_enable_workaround(wa);
+-	pr_info("Enabling global workaround for %s\n", wa->desc_str);
++	pr_info("Enabling %s workaround for %s\n",
++		local ? "local" : "global", wa->desc_str);
+ }
+ 
+ #else
+@@ -529,6 +547,8 @@ static void __arch_timer_setup(unsigned type,
+ 			BUG();
+ 		}
+ 
++		arch_timer_check_ool_workaround(ate_match_local_cap_id, NULL);
++
+ 		erratum_workaround_set_sne(clk);
+ 	} else {
+ 		clk->features |= CLOCK_EVT_FEAT_DYNIRQ;
 -- 
 2.11.0
