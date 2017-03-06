@@ -1,61 +1,184 @@
-From: emil.l.velikov@gmail.com (Emil Velikov)
-Date: Mon, 6 Mar 2017 20:58:14 +0000
-Subject: [PATCH 2/3] drm/rockchip: Fix link error when
- CONFIG_DRM_ANALOGIX_DP undefined
-In-Reply-To: <20170306202722.9301-3-seanpaul@chromium.org>
-References: <20170306202722.9301-1-seanpaul@chromium.org>
- <20170306202722.9301-3-seanpaul@chromium.org>
-Message-ID: <CACvgo53paS0-5PbT-bmPoSMyx+r0jCQqMVUNFsPJQXZ+QXtB_g@mail.gmail.com>
+From: tbaicar@codeaurora.org (Tyler Baicar)
+Date: Mon,  6 Mar 2017 13:45:03 -0700
+Subject: [PATCH V12 10/10] arm/arm64: KVM: add guest SEA support
+In-Reply-To: <1488833103-21082-1-git-send-email-tbaicar@codeaurora.org>
+References: <1488833103-21082-1-git-send-email-tbaicar@codeaurora.org>
+Message-ID: <1488833103-21082-11-git-send-email-tbaicar@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 March 2017 at 20:27, Sean Paul <seanpaul@chromium.org> wrote:
-> Fixes the following link error when CONFIG_DRM_ANALOGIX_DP is not defined:
->
-> ERROR: "analogix_dp_start_crc" [drivers/gpu/drm/rockchip/rockchipdrm.ko] undefined!
-> ERROR: "analogix_dp_stop_crc" [drivers/gpu/drm/rockchip/rockchipdrm.ko] undefined!
->
-> Fixes: 3190e58dafaf ("drm/rockchip: Implement CRC debugfs API")
-> Reported-by: Emil Velikov <emil.l.velikov@gmail.com>
-> Cc: Tomeu Vizoso <tomeu.vizoso@collabora.com>
-> Cc: Mark Yao <mark.yao@rock-chips.com>
-> Cc: Sean Paul <seanpaul@chromium.org>
-> Cc: Heiko Stuebner <heiko@sntech.de>
-> Cc: dri-devel at lists.freedesktop.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-rockchip at lists.infradead.org
-> Cc: Emil Velikov <emil.l.velikov@gmail.com>
-> Signed-off-by: Sean Paul <seanpaul@chromium.org>
-> ---
->  drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 10 ++++++++++
->  1 file changed, 10 insertions(+)
->
-> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-> index 17ab16c4b922..2151e1cee4b4 100644
-> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-> @@ -19,7 +19,9 @@
->  #include <drm/drm_crtc_helper.h>
->  #include <drm/drm_flip_work.h>
->  #include <drm/drm_plane_helper.h>
-> +#ifdef CONFIG_DRM_ANALOGIX_DP
->  #include <drm/bridge/analogix_dp.h>
-> +#endif
->
->  #include <linux/kernel.h>
->  #include <linux/module.h>
-> @@ -1112,6 +1114,7 @@ static void vop_crtc_destroy_state(struct drm_crtc *crtc,
->         kfree(s);
->  }
->
-> +#ifdef CONFIG_DRM_ANALOGIX_DP
->  static struct drm_connector *vop_get_edp_connector(struct vop *vop)
->  {
-Similar to 3/3 adding stubs for
-analogix_dp_start_crc/analogix_dp_stop_crc will be shorter/cleaner
-than ifdef spaghetti.
+Currently external aborts are unsupported by the guest abort
+handling. Add handling for SEAs so that the host kernel reports
+SEAs which occur in the guest kernel.
 
-At the same these fix the problems so, for the series:
-Reviewed-by: Emil Velikov <emil.l.velikov@gmail.com>
+Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
+---
+ arch/arm/include/asm/kvm_arm.h       | 10 ++++++++++
+ arch/arm/include/asm/system_misc.h   |  5 +++++
+ arch/arm/kvm/mmu.c                   | 36 ++++++++++++++++++++++++++++++++++--
+ arch/arm64/include/asm/kvm_arm.h     | 10 ++++++++++
+ arch/arm64/include/asm/system_misc.h |  2 ++
+ arch/arm64/mm/fault.c                | 18 ++++++++++++++++++
+ 6 files changed, 79 insertions(+), 2 deletions(-)
 
--Emil
+diff --git a/arch/arm/include/asm/kvm_arm.h b/arch/arm/include/asm/kvm_arm.h
+index e22089f..a1a3dff 100644
+--- a/arch/arm/include/asm/kvm_arm.h
++++ b/arch/arm/include/asm/kvm_arm.h
+@@ -187,6 +187,16 @@
+ #define FSC_FAULT	(0x04)
+ #define FSC_ACCESS	(0x08)
+ #define FSC_PERM	(0x0c)
++#define FSC_SEA		(0x10)
++#define FSC_SEA_TTW0	(0x14)
++#define FSC_SEA_TTW1	(0x15)
++#define FSC_SEA_TTW2	(0x16)
++#define FSC_SEA_TTW3	(0x17)
++#define FSC_SECC	(0x18)
++#define FSC_SECC_TTW0	(0x1c)
++#define FSC_SECC_TTW1	(0x1d)
++#define FSC_SECC_TTW2	(0x1e)
++#define FSC_SECC_TTW3	(0x1f)
+ 
+ /* Hyp Prefetch Fault Address Register (HPFAR/HDFAR) */
+ #define HPFAR_MASK	(~0xf)
+diff --git a/arch/arm/include/asm/system_misc.h b/arch/arm/include/asm/system_misc.h
+index a3d61ad..ea45d94 100644
+--- a/arch/arm/include/asm/system_misc.h
++++ b/arch/arm/include/asm/system_misc.h
+@@ -24,4 +24,9 @@
+ 
+ #endif /* !__ASSEMBLY__ */
+ 
++static inline int handle_guest_sea(unsigned long addr, unsigned int esr)
++{
++	return -1;
++}
++
+ #endif /* __ASM_ARM_SYSTEM_MISC_H */
+diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+index a5265ed..f3608c9 100644
+--- a/arch/arm/kvm/mmu.c
++++ b/arch/arm/kvm/mmu.c
+@@ -29,6 +29,7 @@
+ #include <asm/kvm_asm.h>
+ #include <asm/kvm_emulate.h>
+ #include <asm/virt.h>
++#include <asm/system_misc.h>
+ 
+ #include "trace.h"
+ 
+@@ -1409,6 +1410,24 @@ static void handle_access_fault(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa)
+ 		kvm_set_pfn_accessed(pfn);
+ }
+ 
++static bool is_abort_synchronous(unsigned long fault_status) {
++	switch (fault_status) {
++	case FSC_SEA:
++	case FSC_SEA_TTW0:
++	case FSC_SEA_TTW1:
++	case FSC_SEA_TTW2:
++	case FSC_SEA_TTW3:
++	case FSC_SECC:
++	case FSC_SECC_TTW0:
++	case FSC_SECC_TTW1:
++	case FSC_SECC_TTW2:
++	case FSC_SECC_TTW3:
++		return true;
++	default:
++		return false;
++	}
++}
++
+ /**
+  * kvm_handle_guest_abort - handles all 2nd stage aborts
+  * @vcpu:	the VCPU pointer
+@@ -1444,8 +1463,21 @@ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 
+ 	/* Check the stage-2 fault is trans. fault or write fault */
+ 	fault_status = kvm_vcpu_trap_get_fault_type(vcpu);
+-	if (fault_status != FSC_FAULT && fault_status != FSC_PERM &&
+-	    fault_status != FSC_ACCESS) {
++
++	/* The host kernel will handle the synchronous external abort. There
++	 * is no need to pass the error into the guest.
++	 */
++	if (is_abort_synchronous(fault_status)) {
++		if(handle_guest_sea((unsigned long)fault_ipa,
++				    kvm_vcpu_get_hsr(vcpu))) {
++			kvm_err("Failed to handle guest SEA, FSC: EC=%#x xFSC=%#lx ESR_EL2=%#lx\n",
++				kvm_vcpu_trap_get_class(vcpu),
++				(unsigned long)kvm_vcpu_trap_get_fault(vcpu),
++				(unsigned long)kvm_vcpu_get_hsr(vcpu));
++			return -EFAULT;
++		}
++	} else if (fault_status != FSC_FAULT && fault_status != FSC_PERM &&
++		   fault_status != FSC_ACCESS) {
+ 		kvm_err("Unsupported FSC: EC=%#x xFSC=%#lx ESR_EL2=%#lx\n",
+ 			kvm_vcpu_trap_get_class(vcpu),
+ 			(unsigned long)kvm_vcpu_trap_get_fault(vcpu),
+diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+index 2a2752b..dcacdbb 100644
+--- a/arch/arm64/include/asm/kvm_arm.h
++++ b/arch/arm64/include/asm/kvm_arm.h
+@@ -201,6 +201,16 @@
+ #define FSC_FAULT	ESR_ELx_FSC_FAULT
+ #define FSC_ACCESS	ESR_ELx_FSC_ACCESS
+ #define FSC_PERM	ESR_ELx_FSC_PERM
++#define FSC_SEA		ESR_ELx_FSC_EXTABT
++#define FSC_SEA_TTW0	(0x14)
++#define FSC_SEA_TTW1	(0x15)
++#define FSC_SEA_TTW2	(0x16)
++#define FSC_SEA_TTW3	(0x17)
++#define FSC_SECC	(0x18)
++#define FSC_SECC_TTW0	(0x1c)
++#define FSC_SECC_TTW1	(0x1d)
++#define FSC_SECC_TTW2	(0x1e)
++#define FSC_SECC_TTW3	(0x1f)
+ 
+ /* Hyp Prefetch Fault Address Register (HPFAR/HDFAR) */
+ #define HPFAR_MASK	(~UL(0xf))
+diff --git a/arch/arm64/include/asm/system_misc.h b/arch/arm64/include/asm/system_misc.h
+index bc81243..5b2cecd1 100644
+--- a/arch/arm64/include/asm/system_misc.h
++++ b/arch/arm64/include/asm/system_misc.h
+@@ -58,4 +58,6 @@ void hook_debug_fault_code(int nr, int (*fn)(unsigned long, unsigned int,
+ 
+ #endif	/* __ASSEMBLY__ */
+ 
++int handle_guest_sea(unsigned long addr, unsigned int esr);
++
+ #endif	/* __ASM_SYSTEM_MISC_H */
+diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+index b2d57fc..31c5171 100644
+--- a/arch/arm64/mm/fault.c
++++ b/arch/arm64/mm/fault.c
+@@ -602,6 +602,24 @@ static const char *fault_name(unsigned int esr)
+ }
+ 
+ /*
++ * Handle Synchronous External Aborts that occur in a guest kernel.
++ */
++int handle_guest_sea(unsigned long addr, unsigned int esr)
++{
++	/*
++	 * synchronize_rcu() will wait for nmi_exit(), so no need to
++	 * rcu_read_lock().
++	 */
++	if(IS_ENABLED(ACPI_APEI_SEA)) {
++		rcu_read_lock();
++		ghes_notify_sea();
++		rcu_read_unlock();
++	}
++
++	return 0;
++}
++
++/*
+  * Dispatch a data abort to the relevant handler.
+  */
+ asmlinkage void __exception do_mem_abort(unsigned long addr, unsigned int esr,
+-- 
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
