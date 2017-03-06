@@ -1,55 +1,106 @@
 From: eric.auger@redhat.com (Eric Auger)
-Date: Mon,  6 Mar 2017 12:34:24 +0100
-Subject: [PATCH v3 09/19] KVM: arm64: ITS: Interpret MAPD ITT_addr field
-In-Reply-To: <1488800074-21991-1-git-send-email-eric.auger@redhat.com>
-References: <1488800074-21991-1-git-send-email-eric.auger@redhat.com>
-Message-ID: <1488800074-21991-10-git-send-email-eric.auger@redhat.com>
+Date: Mon,  6 Mar 2017 12:34:15 +0100
+Subject: [PATCH v3 00/19] vITS save/restore
+Message-ID: <1488800074-21991-1-git-send-email-eric.auger@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Up to now the MAPD ITT_addr had been ignored. We will need it
-for save/restore. Let's record it in the its_device struct.
+This series specifies and implements an API aimed at saving and restoring
+the state of the in-kernel emulated ITS device.
 
-Signed-off-by: Eric Auger <eric.auger@redhat.com>
----
- virt/kvm/arm/vgic/vgic-its.c | 4 ++++
- 1 file changed, 4 insertions(+)
+The ITS is programmed through registers and tables. Those latter
+are allocated by the guest. Their base address is programmed in
+registers or table entries before the ITS is enabled.
 
-diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index 56bcd92..694023f 100644
---- a/virt/kvm/arm/vgic/vgic-its.c
-+++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -99,6 +99,7 @@ struct its_device {
- 
- 	/* the head for the list of ITTEs */
- 	struct list_head itt_head;
-+	gpa_t itt_addr;
- 	u32 nb_eventid_bits;
- 	u32 device_id;
- };
-@@ -562,6 +563,7 @@ static u64 its_cmd_mask_field(u64 *its_cmd, int word, int shift, int size)
- #define its_cmd_get_collection(cmd)	its_cmd_mask_field(cmd, 2,  0, 16)
- #define its_cmd_get_target_addr(cmd)	its_cmd_mask_field(cmd, 2, 16, 32)
- #define its_cmd_get_validbit(cmd)	its_cmd_mask_field(cmd, 2, 63,  1)
-+#define its_cmd_get_ittaddr(cmd)	its_cmd_mask_field(cmd, 2, 8,  44)
- #define its_cmd_get_size(cmd)		its_cmd_mask_field(cmd, 1, 0,  5)
- 
- /*
-@@ -832,6 +834,7 @@ static int vgic_its_cmd_handle_mapd(struct kvm *kvm, struct vgic_its *its,
- 	u32 device_id = its_cmd_get_deviceid(its_cmd);
- 	bool valid = its_cmd_get_validbit(its_cmd);
- 	size_t size = its_cmd_get_size(its_cmd);
-+	gpa_t itt_addr = its_cmd_get_ittaddr(its_cmd);
- 	struct its_device *device;
- 
- 	if (!vgic_its_check_id(its, its->baser_device_table, device_id))
-@@ -862,6 +865,7 @@ static int vgic_its_cmd_handle_mapd(struct kvm *kvm, struct vgic_its *its,
- 		return -ENOMEM;
- 
- 	device->device_id = device_id;
-+	device->itt_addr = itt_addr << 8;
- 	device->nb_eventid_bits = size + 1;
- 
- 	INIT_LIST_HEAD(&device->itt_head);
+The ITS is free to use some of them to flush its internal caches. This
+is likely to be used when entering low power state.
+
+Therefore, for save/restore use case, it looks natural to use this
+guest RAM allocated space to save the table related data. However,
+currently, The ITS in-kernel emulated device does not use all of those
+tables and for those it uses, it does not always sync them with its
+cached data. Additional sync must happen for:
+- the collection table
+- the device table
+- the per-device translation tables
+- the LPI pending tables.
+
+The LPI configation table and the command queues do not need extra
+syncs.
+
+An alternative to flushing the tables into guest RAM could have been
+to flush them into a separate user-space buffer. However the drawback
+of this alternative is that the virtualizer would allocate dedicated
+buffers to store the data that should normally be laid out in guest
+RAM. It would also be obliged to re-compute their size from
+register/table content.
+
+So saving the tables in guest RAM better fit the ITS programming
+model and optimizes the memory usage. The drawback of this solution
+is it brings additional challenges at user-space level to make sure
+the guest RAM is frozen after table sync.
+
+Best Regards
+
+Eric
+
+Git: complete series available at
+https://github.com/eauger/linux/tree/v4.11-rc1-its-mig-v3
+
+* Testing:
+- on Cavium ThunderX using a virtio-net-pci guest,
+  virsh save/restore commands and virt-manager live migration.
+  Tested with 1 and 2 stage device table.
+
+History:
+
+v2 -> v3:
+- fix restore ITS ITT_addr bit masking
+
+v1 -> v2:
+- rebased on Vijaya's v11
+- all entries now are 8 byte large
+- devid/eventid indexing for device table and ITT
+- support 2 stage device table
+- common infra to read indexed tables
+- add cpu <-> le64 conversions
+- itte renamed into ite
+- do not care anymore about pending table 1st KB
+  (not needed at the moment for coarse mapping)
+
+RFC v1
+- creation
+
+
+Eric Auger (19):
+  KVM: arm/arm64: Add vITS save/restore API documentation
+  KVM: arm/arm64: rename itte into ite
+  arm/arm64: vgic: turn vgic_find_mmio_region into public
+  KVM: arm64: ITS: KVM_DEV_ARM_VGIC_GRP_ITS_REGS group
+  KVM: arm64: ITS: Implement vgic_its_has_attr_regs and attr_regs_access
+  KVM: arm64: ITS: Implement vgic_mmio_uaccess_write_its_creadr
+  KVM: arm64: ITS: Report the ITE size in GITS_TYPER
+  KVM: arm64: ITS: Interpret MAPD Size field and check related errors
+  KVM: arm64: ITS: Interpret MAPD ITT_addr field
+  KVM: arm64: ITS: Check the device id matches TYPER DEVBITS range
+  KVM: arm64: ITS: KVM_DEV_ARM_VGIC_GRP_ITS_TABLES group
+  KVM: arm64: ITS: vgic_its_alloc_ite/device
+  KVM: arm64: ITS: Sort the device and ITE lists
+  KVM: arm64: ITS: Add infrastructure for table lookup
+  KVM: arm64: ITS: Collection table save/restore
+  KVM: arm64: ITS: vgic_its_check_id returns the entry's GPA
+  KVM: arm64: ITS: ITT flush and restore
+  KVM: arm64: ITS: Device table save/restore
+  KVM: arm64: ITS: Pending table save/restore
+
+ Documentation/virtual/kvm/devices/arm-vgic-its.txt |   78 ++
+ arch/arm/include/uapi/asm/kvm.h                    |    2 +
+ arch/arm64/include/uapi/asm/kvm.h                  |    2 +
+ include/linux/irqchip/arm-gic-v3.h                 |    3 +
+ virt/kvm/arm/vgic/vgic-its.c                       | 1031 ++++++++++++++++++--
+ virt/kvm/arm/vgic/vgic-mmio.c                      |    3 +-
+ virt/kvm/arm/vgic/vgic-mmio.h                      |   14 +-
+ 7 files changed, 1022 insertions(+), 111 deletions(-)
+
 -- 
 2.5.5
