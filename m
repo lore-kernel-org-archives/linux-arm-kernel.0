@@ -1,56 +1,183 @@
-From: seanpaul@chromium.org (Sean Paul)
-Date: Mon, 6 Mar 2017 12:19:59 -0500
-Subject: [PATCH v6 0/4] drm/dp: Implement CRC debugfs API
-In-Reply-To: <20170303133936.14964-1-tomeu.vizoso@collabora.com>
-References: <20170303133936.14964-1-tomeu.vizoso@collabora.com>
-Message-ID: <20170306171959.GA20329@art_vandelay>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Tue,  7 Mar 2017 01:17:49 +0800
+Subject: [PATCH v8 5/6] arm64: dts: allwinner: h5: add Allwinner H5 .dtsi
+In-Reply-To: <20170306171750.7491-1-icenowy@aosc.xyz>
+References: <20170306171750.7491-1-icenowy@aosc.xyz>
+Message-ID: <20170306171750.7491-6-icenowy@aosc.xyz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 03, 2017 at 02:39:32PM +0100, Tomeu Vizoso wrote:
-> Hi,
-> 
-> this series builds up on the API for exposing captured CRCs through
-> debugfs.
-> 
-> It adds new DP helpers for starting and stopping CRC capture and gets
-> the Rockchip driver to use it.
-> 
-> With these patches, tests in IGT such as kms_pipe_crc_basic and
-> kms_plane do pass on RK3288.
-> 
-> In this v6, the backpointer in drm_dp_aux becomes drm_crtc instead of
-> drm_connector, following discussion with Sean Paul.
-> 
-> Thanks,
+From: Andre Przywara <andre.przywara@arm.com>
 
-Thanks for respinning this, Tomeu.
+The Allwinner H5 SoC is pin-compatible to the H3 SoC, but uses
+Cortex-A53 cores instead.
+Based on the now shared base .dtsi describing the common peripherals
+describe the H5 specific nodes on top of that.
+That symlinks in the sunxi-h3-h5.dtsi from the arch/arm tree.
 
-Applied to -misc
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+[Icenowy: add H5 pinctrl compatible, and changes for my h3-h5 dtsi
+ refactor, commit message changed to meet new arm64 naming scheme,
+ drop H3 pinctrl compatible because of interrupt bank change, drop
+ H3 ccu compatible because of clock change, drop ccu node as it come
+ into h3-h5 dtsi]
+Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+---
+Changes in v8:
+- Add h5: in commit message.
+Changes in v6:
+- Dropped GIC node as it's in sunxi-h3-h5.dtsi now
+- Fixed some words in commit message, thanks to Rask Ingemann Lambertsen
+Changes in v3:
+- Dropped sun5i-a13-mmc, sun8i-h3-ccu compatibles.
+- Used sun50i-{h5,a64}-emmc compatible for mmc2.
+Changes in v2:
+- Dropped sun8i-h3-pinctrl compatible, as the interrupt of H3 and H5 is
+  incompatible
 
-Sean
+ arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi   | 124 +++++++++++++++++++++++++
+ arch/arm64/boot/dts/allwinner/sunxi-h3-h5.dtsi |   1 +
+ 2 files changed, 125 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi
+ create mode 120000 arch/arm64/boot/dts/allwinner/sunxi-h3-h5.dtsi
 
-> 
-> Tomeu
-> 
-> 
-> Tomeu Vizoso (4):
->   drm/dp: add crtc backpointer to drm_dp_aux
->   drm/dp: add helpers for capture of frame CRCs
->   drm/bridge: analogix_dp: add helpers for capture of frame CRCs
->   drm/rockchip: Implement CRC debugfs API
-> 
->  drivers/gpu/drm/bridge/analogix/analogix_dp_core.c |  22 ++++
->  drivers/gpu/drm/drm_dp_helper.c                    | 126 +++++++++++++++++++++
->  drivers/gpu/drm/rockchip/rockchip_drm_vop.c        |  41 +++++++
->  include/drm/bridge/analogix_dp.h                   |   3 +
->  include/drm/drm_dp_helper.h                        |   9 ++
->  5 files changed, 201 insertions(+)
-> 
-> -- 
-> 2.9.3
-> 
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi
+new file mode 100644
+index 000000000000..4d314a253fd9
+--- /dev/null
++++ b/arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi
+@@ -0,0 +1,124 @@
++/*
++ * Copyright (C) 2016 ARM Ltd.
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++#include "sunxi-h3-h5.dtsi"
++
++/ {
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		cpu at 0 {
++			compatible = "arm,cortex-a53", "arm,armv8";
++			device_type = "cpu";
++			reg = <0>;
++			enable-method = "psci";
++		};
++
++		cpu at 1 {
++			compatible = "arm,cortex-a53", "arm,armv8";
++			device_type = "cpu";
++			reg = <1>;
++			enable-method = "psci";
++		};
++
++		cpu at 2 {
++			compatible = "arm,cortex-a53", "arm,armv8";
++			device_type = "cpu";
++			reg = <2>;
++			enable-method = "psci";
++		};
++
++		cpu at 3 {
++			compatible = "arm,cortex-a53", "arm,armv8";
++			device_type = "cpu";
++			reg = <3>;
++			enable-method = "psci";
++		};
++	};
++
++	psci {
++		compatible = "arm,psci-0.2";
++		method = "smc";
++	};
++
++	timer {
++		compatible = "arm,armv8-timer";
++		interrupts = <GIC_PPI 13
++				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
++			     <GIC_PPI 14
++				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
++			     <GIC_PPI 11
++				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
++			     <GIC_PPI 10
++				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
++	};
++};
++
++&ccu {
++	compatible = "allwinner,sun50i-h5-ccu";
++};
++
++&mmc0 {
++	compatible = "allwinner,sun50i-h5-mmc",
++		     "allwinner,sun50i-a64-mmc";
++	clocks = <&ccu CLK_BUS_MMC0>, <&ccu CLK_MMC0>;
++	clock-names = "ahb", "mmc";
++};
++
++&mmc1 {
++	compatible = "allwinner,sun50i-h5-mmc",
++		     "allwinner,sun50i-a64-mmc";
++	clocks = <&ccu CLK_BUS_MMC1>, <&ccu CLK_MMC1>;
++	clock-names = "ahb", "mmc";
++};
++
++&mmc2 {
++	compatible = "allwinner,sun50i-h5-emmc",
++		     "allwinner,sun50i-a64-emmc";
++	clocks = <&ccu CLK_BUS_MMC2>, <&ccu CLK_MMC2>;
++	clock-names = "ahb", "mmc";
++};
++
++&pio {
++	compatible = "allwinner,sun50i-h5-pinctrl";
++};
+diff --git a/arch/arm64/boot/dts/allwinner/sunxi-h3-h5.dtsi b/arch/arm64/boot/dts/allwinner/sunxi-h3-h5.dtsi
+new file mode 120000
+index 000000000000..036f01dc2b9b
+--- /dev/null
++++ b/arch/arm64/boot/dts/allwinner/sunxi-h3-h5.dtsi
+@@ -0,0 +1 @@
++../../../../arm/boot/dts/sunxi-h3-h5.dtsi
+\ No newline at end of file
+-- 
+2.11.1
