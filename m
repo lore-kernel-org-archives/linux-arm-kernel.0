@@ -1,45 +1,98 @@
-From: balbi@kernel.org (Felipe Balbi)
-Date: Mon, 06 Mar 2017 17:06:11 +0200
-Subject: [PATCH 1/4 linux-next] usb: gadget: udc: atmel: Check fifo
- configuration values against device tree
-In-Reply-To: <f71b15dfe79e227491aced411af203297e746603.1487007870.git.cristian.birsan@microchip.com>
-References: <cover.1487007870.git.cristian.birsan@microchip.com>
- <f71b15dfe79e227491aced411af203297e746603.1487007870.git.cristian.birsan@microchip.com>
-Message-ID: <87varm1m3g.fsf@linux.intel.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 6 Mar 2017 07:08:03 -0800
+Subject: [PATCH 1/2] arm/kvm: survive unknown traps from guests
+In-Reply-To: <1487593812-9174-2-git-send-email-mark.rutland@arm.com>
+References: <1487593812-9174-1-git-send-email-mark.rutland@arm.com>
+ <1487593812-9174-2-git-send-email-mark.rutland@arm.com>
+Message-ID: <20170306150803.GB1502@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-cristian.birsan at microchip.com writes:
-
-> From: Cristian Birsan <cristian.birsan@microchip.com>
->
-> Check fifo configuration values against device tree values for endpoint
-> fifo in auto configuration mode (fifo_mode=0).
->
-> Signed-off-by: Cristian Birsan <cristian.birsan@microchip.com>
+On Mon, Feb 20, 2017 at 12:30:11PM +0000, Mark Rutland wrote:
+> Currently we BUG() if we see a HSR.EC value we don't recognise. As
+> configurable disables/enables are added to the architecture (controlled
+> by RES1/RES0 bits respectively), with associated synchronous exceptions,
+> it may be possible for a guest to trigger exceptions with classes that
+> we don't recognise.
+> 
+> While we can't service these exceptions in a manner useful to the guest,
+> we can avoid bringing down the host. Per ARM DDI 0406C.c, all currently
+> unallocated HSR EC encodings are reserved, and per ARM DDI
+> 0487A.k_iss10775, page G6-4395, EC values within the range 0x00 - 0x2c
+> are reserved for future use with synchronous exceptions, and EC values
+> within the range 0x2d - 0x3f may be used for either synchronous or
+> asynchronous exceptions.
+> 
+> The patch makes KVM handle any unknown EC by injecting an UNDEFINED
+> exception into the guest, with a corresponding (ratelimited) warning in
+> the host dmesg. We could later improve on this with with a new (opt-in)
+> exit to the host userspace.
+> 
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+> Cc: Dave Martin <dave.martin@arm.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
 > ---
->  drivers/usb/gadget/udc/atmel_usba_udc.c | 26 +++++++++++++++++++++++---
->  1 file changed, 23 insertions(+), 3 deletions(-)
->
-> diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.c b/drivers/usb/gadget/udc/atmel_usba_udc.c
-> index 11bbce2..ce8bf8b 100644
-> --- a/drivers/usb/gadget/udc/atmel_usba_udc.c
-> +++ b/drivers/usb/gadget/udc/atmel_usba_udc.c
-> @@ -371,7 +371,7 @@ static struct usba_fifo_cfg mode_4_cfg[] = {
->  };
->  /* Add additional configurations here */
+>  arch/arm/include/asm/kvm_arm.h |  1 +
+>  arch/arm/kvm/handle_exit.c     | 19 ++++++++++++-------
+>  2 files changed, 13 insertions(+), 7 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/kvm_arm.h b/arch/arm/include/asm/kvm_arm.h
+> index e22089f..a3f0b3d 100644
+> --- a/arch/arm/include/asm/kvm_arm.h
+> +++ b/arch/arm/include/asm/kvm_arm.h
+> @@ -209,6 +209,7 @@
+>  #define HSR_EC_IABT_HYP	(0x21)
+>  #define HSR_EC_DABT	(0x24)
+>  #define HSR_EC_DABT_HYP	(0x25)
+> +#define HSR_EC_MAX	(0x3f)
 >  
-> -int usba_config_fifo_table(struct usba_udc *udc)
-> +static int usba_config_fifo_table(struct usba_udc *udc)
+>  #define HSR_WFI_IS_WFE		(_AC(1, UL) << 0)
+>  
+> diff --git a/arch/arm/kvm/handle_exit.c b/arch/arm/kvm/handle_exit.c
+> index 4e40d19..96af65a 100644
+> --- a/arch/arm/kvm/handle_exit.c
+> +++ b/arch/arm/kvm/handle_exit.c
+> @@ -79,7 +79,19 @@ static int kvm_handle_wfx(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>  	return 1;
+>  }
+>  
+> +static int kvm_handle_unknown_ec(struct kvm_vcpu *vcpu, struct kvm_run *run)
+> +{
+> +	u32 hsr = kvm_vcpu_get_hsr(vcpu);
+> +
+> +	kvm_pr_unimpl("Unknown exception class: hsr: %#08x\n",
+> +		      hsr);
+> +
+> +	kvm_inject_undefined(vcpu);
+> +	return 1;
+> +}
+> +
+>  static exit_handle_fn arm_exit_handlers[] = {
+> +	[0 ... HSR_EC_MAX]	= kvm_handle_unknown_ec,
 
-this is not part of $subject. Should be a separate patch. Please fix.
+Cool stuff, didn't know you could do this in C.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170306/f076d9b7/attachment.sig>
+>  	[HSR_EC_WFI]		= kvm_handle_wfx,
+>  	[HSR_EC_CP15_32]	= kvm_handle_cp15_32,
+>  	[HSR_EC_CP15_64]	= kvm_handle_cp15_64,
+> @@ -98,13 +110,6 @@ static exit_handle_fn kvm_get_exit_handler(struct kvm_vcpu *vcpu)
+>  {
+>  	u8 hsr_ec = kvm_vcpu_trap_get_class(vcpu);
+>  
+> -	if (hsr_ec >= ARRAY_SIZE(arm_exit_handlers) ||
+> -	    !arm_exit_handlers[hsr_ec]) {
+> -		kvm_err("Unknown exception class: hsr: %#08x\n",
+> -			(unsigned int)kvm_vcpu_get_hsr(vcpu));
+> -		BUG();
+> -	}
+> -
+>  	return arm_exit_handlers[hsr_ec];
+>  }
+>  
+> -- 
+> 1.9.1
+> 
+
+Reviewed-by: Christoffer Dall <cdall@linaro.org>
