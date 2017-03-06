@@ -1,225 +1,90 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Tue,  7 Mar 2017 01:17:50 +0800
-Subject: [PATCH v8 6/6] arm64: dts: allwinner: h5: add support for the Orange
- Pi PC 2 board
-In-Reply-To: <20170306171750.7491-1-icenowy@aosc.xyz>
-References: <20170306171750.7491-1-icenowy@aosc.xyz>
-Message-ID: <20170306171750.7491-7-icenowy@aosc.xyz>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Mon, 06 Mar 2017 09:27:47 -0800
+Subject: [PATCH v2 3/3] ARM64: dts: meson-gx: Add MALI nodes for GXBB and
+ GXL
+In-Reply-To: <1825920f-586f-7c84-8e0e-958046397b64@baylibre.com> (Neil
+ Armstrong's message of "Mon, 6 Mar 2017 09:58:33 +0100")
+References: <1488365164-22861-1-git-send-email-narmstrong@baylibre.com>
+ <1488365164-22861-4-git-send-email-narmstrong@baylibre.com>
+ <e26cf584-dab2-2702-f7e6-b28f750fa00c@suse.de>
+ <e80d9fb0-1d71-7cab-5e32-72316474fdfc@baylibre.com>
+ <m2tw7a17nb.fsf@baylibre.com>
+ <9f3a17e8-63fa-6c14-4d17-0539ef7cd5a2@suse.de>
+ <1825920f-586f-7c84-8e0e-958046397b64@baylibre.com>
+Message-ID: <m2efya1fjg.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andre Przywara <andre.przywara@arm.com>
+Neil Armstrong <narmstrong@baylibre.com> writes:
 
-The Orange Pi PC 2 is a typical single board computer using the
-Allwinner H5 SoC. Apart from the usual suspects it features three
-separately driven USB ports and a Gigabit Ethernet port.
-Also it has a SPI NOR flash soldered, from which the board can boot
-from. This enables the SBC to behave like a "real computer" with
-built-in firmware.
+> On 03/04/2017 01:38 PM, Andreas F?rber wrote:
+>> Am 03.03.2017 um 20:29 schrieb Kevin Hilman:
+>>> Neil Armstrong <narmstrong@baylibre.com> writes:
+>>>> On 03/02/2017 01:31 PM, Andreas F?rber wrote:
+>>>>> Am 01.03.2017 um 11:46 schrieb Neil Armstrong:
+>>>>>> The same MALI-450 MP3 GPU is present in the GXBB and GXL SoCs.
+>> [...]
+>>>>>> The node is simply added in the meson-gxbb.dtsi file.
+>> [...]
+>>>>>> For GXL, since a lot is shared with the GXM that has a MALI-T820 IP, this
+>>>>>> patch adds a new meson-gxl-mali.dtsi and is included in the SoC specific
+>>>>>> dtsi files.
+>>>>>
+>>>>> This part is slightly confusing though.
+>>>>>
+>>>>> What exactly is the GXL vs. GXM difference that this can't be handled by
+>>>>> overriding node properties compatible/interrupts/clocks? I am missing a
+>>>>> GXM patch in this series as rationale for doing it this way.
+>>>>>
+>>>>> In particular I am wondering whether the whole GXM-inherits-from-GXL
+>>>>> concept is flawed and should be adjusted if this leads to secondary
+>>>>> .dtsi files like this: My proposal would be to instead create a
+>>>>> meson-gxl-gxm.dtsi, that meson-gxl.dtsi and meson-gxm.dtsi can inherit
+>>>>> the current common parts from, then the Mali bits can simply go into
+>>>>> meson-gxl.dtsi without extra #includes needed in S905X and S905D. While
+>>>>> it's slightly more work to split once again, I think it would be cleaner.
+>> [...]
+>>>> The only changes are :
+>> [...]
+>>>>  - A different Mali core, but with the same interrupts (less but they share the same lower interrupts), clocks and memory space
+>>>>
+>>>> This is why it was decided to have a sub-dtsi, having a secondary dtsi will simply copy 99% of the GXL dtsi,
+>>>> but surely we could also have an intermediate dtsi but for boards I'm ok with it, but less for a SoC dtsi,
+>>>> since it could lead to some confusion.
+>>>>
+>>>> Finally, yes I could have added the mali node to the GXL dtsi, but the midgard Mali dt-bindings are not upstream
+>>>> and the family is too big and recent enough to consider having stable bindings for now.
+>>>>
+>>>> Nevertheless, nothing is final, this gxl-mali.dtsi could be merged into the GXL dtsi in the future when we
+>>>> have proper dt-bindings and a real support of the T820 Mali on the S912.
+>>>>
+>>>> Kevin, what's your thought about this ?
+>>>
+>>> I don't have a strong preference.  I'm OK with a separate Mali .dtsi due
+>>> to the signficant overlap between GXL/GXM in terms of clocks, interrupts
+>>> etc.
+>>>
+>>> However, if the plan is to #include this from GXM .dts files, whould a
+>>> better name be meson-gx-mali.dtsi?
+>> 
+>> I thought the purpose was specifically to not have GXM include it
+>> because it uses a Midgard IP.
+>> 
+>> If you want to share the fragment with GXBB too (gx), we should rather
+>> use meson-gx-mali-utgard.dtsi, which would differentiate from GXM's
+>> Midgard while still allowing for variation on the 4xx side (e.g., 470).
+>> 
+>> Regards,
+>> Andreas
+>> 
+>
+> Exact, there is no plan to include it from GXM.
+>
+> I'm not fan of having meson-gx-mali-utgard.dtsi, we should still need some attributes additions for
+> the clocks to the mali node in the gxbb dtsi and each s905x and s905d dtsi files.
+> I'm not sure this is even cleaner...
 
-Add the board specific .dts file, which includes the H5 .dtsi and
-enables the peripherals that we support so far.
+OK, I misunderstood the intent of having it separated from out from the
+GXL .dsti then.  Could you please clarify?
 
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-[Icenowy: dropped all GPIO pinctrl nodes, change red LED gpio,
- change MMC cd to active-low, rename some node names to prevent
- underscores]
-Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
----
-Changes in v8:
-- Added h5: in commit message.
-Changes in v6:
-- Renamed some node names to prevent underscores and changed MMC card
-  detect GPIO to active-low. Thanks to Rask Ingemann Lambertsen.
-Changes in v2:
-- Dropped all GPIO pinctrl nodes.
-- Changed red LED gpio to the correct one.
-- Added audio codec configuration copied from Orange Pi PC.
-
- arch/arm64/boot/dts/allwinner/Makefile             |   1 +
- .../boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts  | 163 +++++++++++++++++++++
- 2 files changed, 164 insertions(+)
- create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts
-
-diff --git a/arch/arm64/boot/dts/allwinner/Makefile b/arch/arm64/boot/dts/allwinner/Makefile
-index bc6f342be59f..244e8b7565f9 100644
---- a/arch/arm64/boot/dts/allwinner/Makefile
-+++ b/arch/arm64/boot/dts/allwinner/Makefile
-@@ -1,5 +1,6 @@
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-bananapi-m64.dtb
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-pine64-plus.dtb sun50i-a64-pine64.dtb
-+dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-pc2.dtb
- 
- always		:= $(dtb-y)
- subdir-y	:= $(dts-dirs)
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts
-new file mode 100644
-index 000000000000..30639729920d
---- /dev/null
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts
-@@ -0,0 +1,163 @@
-+/*
-+ * Copyright (C) 2016 ARM Ltd.
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+#include "sun50i-h5.dtsi"
-+
-+#include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/input/input.h>
-+#include <dt-bindings/pinctrl/sun4i-a10.h>
-+
-+/ {
-+	model = "Xunlong Orange Pi PC 2";
-+	compatible = "xunlong,orangepi-pc2", "allwinner,sun50i-h5";
-+
-+	reg_vcc3v3: vcc3v3 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vcc3v3";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+	};
-+
-+	aliases {
-+		serial0 = &uart0;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+
-+		pwr {
-+			label = "orangepi:green:pwr";
-+			gpios = <&r_pio 0 10 GPIO_ACTIVE_HIGH>;
-+			default-state = "on";
-+		};
-+
-+		status {
-+			label = "orangepi:red:status";
-+			gpios = <&pio 0 20 GPIO_ACTIVE_HIGH>;
-+		};
-+	};
-+
-+	r-gpio-keys {
-+		compatible = "gpio-keys";
-+
-+		sw4 {
-+			label = "sw4";
-+			linux,code = <BTN_0>;
-+			gpios = <&r_pio 0 3 GPIO_ACTIVE_LOW>;
-+		};
-+	};
-+};
-+
-+&codec {
-+	allwinner,audio-routing =
-+		"Line Out", "LINEOUT",
-+		"MIC1", "Mic",
-+		"Mic",  "MBIAS";
-+	status = "okay";
-+};
-+
-+&ehci1 {
-+	status = "okay";
-+};
-+
-+&ehci2 {
-+	status = "okay";
-+};
-+
-+&ehci3 {
-+	status = "okay";
-+};
-+
-+&ir {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&ir_pins_a>;
-+	status = "okay";
-+};
-+
-+&mmc0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin>;
-+	vmmc-supply = <&reg_vcc3v3>;
-+	bus-width = <4>;
-+	cd-gpios = <&pio 5 6 GPIO_ACTIVE_LOW>; /* PF6 */
-+	status = "okay";
-+};
-+
-+&ohci1 {
-+	status = "okay";
-+};
-+
-+&ohci2 {
-+	status = "okay";
-+};
-+
-+&ohci3 {
-+	status = "okay";
-+};
-+
-+&uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_pins_a>;
-+	status = "okay";
-+};
-+
-+&uart1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart1_pins>;
-+	status = "disabled";
-+};
-+
-+&uart2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart2_pins>;
-+	status = "disabled";
-+};
-+
-+&usbphy {
-+	/* USB VBUS is always on */
-+	status = "okay";
-+};
--- 
-2.11.1
+Kevin
