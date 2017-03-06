@@ -1,27 +1,61 @@
-From: sunil.kovvuri@gmail.com (Sunil Kovvuri)
-Date: Mon, 6 Mar 2017 18:27:52 +0530
-Subject: [PATCH 1/4] net: thunderx: Fix IOMMU translation faults
-In-Reply-To: <cad7da5d-fce7-cef2-d0db-9585c31f0575@arm.com>
-References: <1488538070-12549-1-git-send-email-sunil.kovvuri@gmail.com>
- <1488538070-12549-2-git-send-email-sunil.kovvuri@gmail.com>
- <20170303.095635.355325147613813698.davem@davemloft.net>
- <CA+sq2CcFxk=LuqYhR-sFaVVSu3rMaZUcytx-3tC9kEiRFNwREg@mail.gmail.com>
- <cad7da5d-fce7-cef2-d0db-9585c31f0575@arm.com>
-Message-ID: <CA+sq2CeiXZNwVsURxNNE+vxf3uhjM=vnKtb2nhtLRj6QwHKWrw@mail.gmail.com>
+From: rrichter@cavium.com (Robert Richter)
+Date: Mon,  6 Mar 2017 13:57:31 +0100
+Subject: [PATCH v2 0/8] irqchip/gic-v3-its: Implement ITS nodes as kernel
+ devices and use CMA
+Message-ID: <20170306125739.19445-1-rrichter@cavium.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>
->> We are seeing a 0.75Mpps drop with IP forwarding rate due to that.
->> Hence I have restricted calling DMA interfaces to only when IOMMU is enabled.
->
-> What's 0.07Mpps as a percentage of baseline? On a correctly configured
-> coherent arm64 system, in the absence of an IOMMU, dma_map_*() is
-> essentially just virt_to_phys() behind a function call or two, so I'd be
-> interested to know where any non-trivial overhead might be coming from.
+This patch series implements ITS nodes as kernel devices. The
+advantage of that is that CMA can be used to allocate large ITS
+tables, where standard memory and page allocation fails (above
+MAX_ORDER - 1). This approach was suggested first here:
 
-It's a 5% drop and yes device is configured as coherent.
-And the drop is due to additional function calls.
+ https://marc.info/?i=56D44812.6000309%40arm.com
 
-Thanks,
-Sunil.
+Another advantage is that all memory resources of the device are now
+device managed, thus the code for releasing the device becomes much
+easier.
+
+The following is required to implement this:
+
+ * each ITS node must be assigned to a struct device each,
+
+ * the ITS initialization must be moved to a later point during boot,
+
+ * the ITS enablement must be separated from the GIC code (the GIC
+   still needs to be enabled early),
+
+ * the early ITS node probing by DT or ACPI must be separated from the
+   ITS initialization,
+
+ * ITS table allocation must be changed to use dma_alloc_coherent()
+   which uses CMA for allocation of large memory ranges.
+
+V2:
+ * rebased onto v4.11-rc1,
+ * fixed syntax error in its_init() function (split probing patch),
+ * added comment in its_create_device(),
+ * fixed GITS_BASER_PAGE_SIZE_MASK usage in its_setup_baser()
+
+
+Robert Richter (8):
+  irqchip/gic-v3-its: Initialize its nodes in probe order
+  irqchip/gic-v3-its: Initialize MSIs with subsys_initcalls
+  irqchip/gic-v3-its: Split probing from its node initialization
+  irqchip/gic-v3-its: Decouple its initialization from gic
+  irqchip/gic-v3-its: Prevent its init ordering dependencies
+  irqchip/gic-v3-its: Initialize its nodes later
+  irqchip/gic-v3-its: Handle its nodes as kernel devices
+  irqchip, gicv3-its, cma: Use CMA for allocation of large device tables
+
+ drivers/irqchip/irq-gic-v3-its-pci-msi.c      |   6 +-
+ drivers/irqchip/irq-gic-v3-its-platform-msi.c |   6 +-
+ drivers/irqchip/irq-gic-v3-its.c              | 276 ++++++++++++++++----------
+ drivers/irqchip/irq-gic-v3.c                  |   8 +-
+ include/linux/cpuhotplug.h                    |   1 +
+ include/linux/irqchip/arm-gic-v3.h            |   5 +-
+ 6 files changed, 186 insertions(+), 116 deletions(-)
+
+-- 
+2.11.0
