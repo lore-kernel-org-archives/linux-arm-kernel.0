@@ -1,88 +1,84 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Mon, 6 Mar 2017 16:52:57 +0100
-Subject: [RFC PATCH 10/12] staging: android: ion: Use CMA APIs directly
-In-Reply-To: <6709093.jyTQHIiK7d@avalon>
-References: <1488491084-17252-1-git-send-email-labbott@redhat.com>
- <0541f57b-4060-ea10-7173-26ae77777518@redhat.com>
- <20170306103204.d3yf6woxpsqvdakp@phenom.ffwll.local>
- <6709093.jyTQHIiK7d@avalon>
-Message-ID: <20170306155257.y5tnlq4orv2xkjbd@phenom.ffwll.local>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 6 Mar 2017 16:53:13 +0100
+Subject: [PATCH] mmc: sunxi: mask all Response Timeout error messages
+In-Reply-To: <1597991488796361@web24m.yandex.ru>
+References: <20170305164535.36259-1-icenowy@aosc.xyz>
+ <20170306100437.sr7mrvssdwnt7aaz@lukather>
+ <1597991488796361@web24m.yandex.ru>
+Message-ID: <20170306155313.nqxnhtsl4o5yrv33@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 06, 2017 at 03:43:53PM +0200, Laurent Pinchart wrote:
-> Hi Daniel,
+On Mon, Mar 06, 2017 at 06:32:41PM +0800, Icenowy Zheng wrote:
+> 06.03.2017, 18:04, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
+> > Hi,
+> >
+> > On Mon, Mar 06, 2017 at 12:45:35AM +0800, Icenowy Zheng wrote:
+> >> ?Response Timeout is very usual: it will happen when trying to run some
+> >> ?commands that do not belong to the card; it will happen when some SDIO
+> >> ?card transfer beyond its SDIO bandwidth; and when the MMC controller is
+> >> ?set to poll the card with "broken-cd" property (the Lichee Pi series of
+> >> ?boards do this), it will flood to the console and make the console
+> >> ?unusable.
+> >>
+> >> ?Mask all response-timeout-only error messages, only show it when another
+> >> ?error happens.
+> >>
+> >> ?Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+> >> ?---
+> >> ??drivers/mmc/host/sunxi-mmc.c | 13 +++++++++----
+> >> ??1 file changed, 9 insertions(+), 4 deletions(-)
+> >>
+> >> ?diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
+> >> ?index 6ffcd2838272..7828e1f57cf0 100644
+> >> ?--- a/drivers/mmc/host/sunxi-mmc.c
+> >> ?+++ b/drivers/mmc/host/sunxi-mmc.c
+> >> ?@@ -483,10 +483,15 @@ static void sunxi_mmc_dump_errinfo(struct sunxi_mmc_host *host)
+> >> ??????????struct mmc_command *cmd = host->mrq->cmd;
+> >> ??????????struct mmc_data *data = host->mrq->data;
+> >>
+> >> ?- /* For some cmds timeout is normal with sd/mmc cards */
+> >> ?- if ((host->int_sum & SDXC_INTERRUPT_ERROR_BIT) ==
+> >> ?- SDXC_RESP_TIMEOUT && (cmd->opcode == SD_IO_SEND_OP_COND ||
+> >> ?- cmd->opcode == SD_IO_RW_DIRECT))
+> >> ?+ /*
+> >> ?+ * Reading timeout is usually normal, especially when doing
+> >> ?+ * card-polling with "broken-cd" in device tree.
+> >> ?+ * If do not mask it, the RTO error message will flood the console
+> >> ?+ * and even hide useful error messages.
+> >> ?+ *
+> >> ?+ * Some SDIO commands will also normally timeout with non-SDIO cards.
+> >> ?+ */
+> >> ?+ if ((host->int_sum & SDXC_INTERRUPT_ERROR_BIT) == SDXC_RESP_TIMEOUT)
+> >
+> > We really shouldn't silence legit errors.
+> >
+> > The actual problem here is that we log them as error, we could
+> > probably reduce it to debug.
 > 
-> On Monday 06 Mar 2017 11:32:04 Daniel Vetter wrote:
-> > On Fri, Mar 03, 2017 at 10:50:20AM -0800, Laura Abbott wrote:
-> > > On 03/03/2017 08:41 AM, Laurent Pinchart wrote:
-> > >> On Thursday 02 Mar 2017 13:44:42 Laura Abbott wrote:
-> > >>> When CMA was first introduced, its primary use was for DMA allocation
-> > >>> and the only way to get CMA memory was to call dma_alloc_coherent. This
-> > >>> put Ion in an awkward position since there was no device structure
-> > >>> readily available and setting one up messed up the coherency model.
-> > >>> These days, CMA can be allocated directly from the APIs. Switch to
-> > >>> using this model to avoid needing a dummy device. This also avoids
-> > >>> awkward caching questions.
-> > >> 
-> > >> If the DMA mapping API isn't suitable for today's requirements anymore,
-> > >> I believe that's what needs to be fixed, instead of working around the
-> > >> problem by introducing another use-case-specific API.
-> > > 
-> > > I don't think this is a usecase specific API. CMA has been decoupled from
-> > > DMA already because it's used in other places. The trying to go through
-> > > DMA was just another layer of abstraction, especially since there isn't
-> > > a device available for allocation.
-> > 
-> > Also, we've had separation of allocation and dma-mapping since forever,
-> > that's how it works almost everywhere. Not exactly sure why/how arm-soc
-> > ecosystem ended up focused so much on dma_alloc_coherent.
-> 
-> I believe because that was the easy way to specify memory constraints. The API 
-> receives a device pointer and will allocate memory suitable for DMA for that 
-> device. The fact that it maps it to the device is a side-effect in my opinion.
-> 
-> > I think separating allocation from dma mapping/coherency is perfectly
-> > fine, and the way to go.
-> 
-> Especially given that in many cases we'll want to share buffers between 
-> multiple devices, so we'll need to map them multiple times.
-> 
-> My point still stands though, if we want to move towards a model where 
-> allocation and mapping are decoupled, we need an allocation function that 
-> takes constraints (possibly implemented with two layers, a constraint 
-> resolution layer on top of a pool/heap/type/foo-based allocator), and a 
-> mapping API. IOMMU handling being integrated in the DMA mapping API we're 
-> currently stuck with it, which might call for brushing up that API.
+> Even if it's reduced to debug, it will still flush dmesg buffers.
 
-Hm, maybe I wasn't clear, but that's exactly what I assume will happen:
+No, it will not even be compiled by default.
 
-The constraint resolver is the unix device memory allocation thing, which
-happens entirely in userspace. There's a lot more than just "where to
-allocate" to negotiate, e.g. pixel format, stride/size
-limits/requirements, tiling formats. A lot of it the kernel doesn't even
-know.
+> Or make it only visible when "debug" parameter is present in kernel
+> cmdline?
 
-Allocation then needs to happen through the kernel ofc, but that doesn't
-mean we need to have all the constraint resolving in the kernel. As long
-as the kernel exposes the device /dev node -> ion heap stuff, userspace
-can figure this out. Or an alternative way would be to have a cascade of
-ion heaps to keep things a notch more opaque. Either way, no actaul
-constraint resolving in the kernel itself, and except for a bunch more
-stuff in sysfs maybe, also no other uapi changes. Once we have a place to
-allocate stuff which isn't the device driver at least, aka ION.
+debug messages are visible in dmesg only if DEBUG is defined, which is
+only happening if CONFIG_MMC_DEBUG is set. This won't affect the
+general case in any way.
 
-And then once allocated you use the dma apis to instantiate the iommus
-mappings.
+And it is output only if loglevel is set higher than 7.
 
-Anyway, at least from my understanding I think there's 0 risk with merging
-ION wrt the constraint resolving side (at least as discussed around XDC
-last year), and for setups that need cma, it might finally enable to get
-things moving forward.
+Maxime
 
-Or do I miss something big here?
--Daniel
 -- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170306/f0cd5a6a/attachment-0001.sig>
