@@ -1,75 +1,72 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon,  6 Mar 2017 14:24:58 +0000
-Subject: [PATCH v3 25/25] arm/arm64: Add hyp-stub API documentation
+Date: Mon,  6 Mar 2017 14:24:49 +0000
+Subject: [PATCH v3 16/25] ARM: KVM: Allow the main HYP code to use the init
+ hyp stub implementation
 In-Reply-To: <20170306142458.8875-1-marc.zyngier@arm.com>
 References: <20170306142458.8875-1-marc.zyngier@arm.com>
-Message-ID: <20170306142458.8875-26-marc.zyngier@arm.com>
+Message-ID: <20170306142458.8875-17-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to help people understanding the hyp-stub API that exists
-between the host kernel and the hypervisor mode (whether a hypervisor
-has been installed or not), let's document said API.
+We now have a full hyp-stub implementation in the KVM init code,
+but the main KVM code only supports HVC_GET_VECTORS, which is not
+enough.
 
-As as with any form of documentation, I expect it to become obsolete
-and completely misleading within 20 minutes after having being merged.
+Instead of reinventing the wheel, let's reuse the init implementation
+by branching to the idmap page when called with a hyp-stub hypercall.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- Documentation/virtual/kvm/arm/hyp-abi.txt | 45 +++++++++++++++++++++++++++++++
- 1 file changed, 45 insertions(+)
- create mode 100644 Documentation/virtual/kvm/arm/hyp-abi.txt
+ arch/arm/kvm/hyp/hyp-entry.S | 29 ++++++++++++++++++++++++-----
+ 1 file changed, 24 insertions(+), 5 deletions(-)
 
-diff --git a/Documentation/virtual/kvm/arm/hyp-abi.txt b/Documentation/virtual/kvm/arm/hyp-abi.txt
-new file mode 100644
-index 000000000000..a1e0314d2249
---- /dev/null
-+++ b/Documentation/virtual/kvm/arm/hyp-abi.txt
-@@ -0,0 +1,45 @@
-+* Internal ABI between the kernel and HYP
+diff --git a/arch/arm/kvm/hyp/hyp-entry.S b/arch/arm/kvm/hyp/hyp-entry.S
+index 1f8db7d21fc5..a35baa81fd23 100644
+--- a/arch/arm/kvm/hyp/hyp-entry.S
++++ b/arch/arm/kvm/hyp/hyp-entry.S
+@@ -126,11 +126,30 @@ hyp_hvc:
+ 	 */
+ 	pop	{r0, r1, r2}
+ 
+-	/* Check for __hyp_get_vectors */
+-	cmp	r0, #HVC_GET_VECTORS
+-	mrceq	p15, 4, r0, c12, c0, 0	@ get HVBAR
+-	beq	1f
++	/*
++	 * Check if we have a kernel function, which is guaranteed to be
++	 * bigger than the maximum hyp stub hypercall
++	 */
++	cmp	r0, #HVC_STUB_HCALL_NR
++	bhs	1f
+ 
++	/*
++	 * Not a kernel function, treat it as a stub hypercall.
++	 * Compute the physical address for __kvm_handle_stub_hvc
++	 * (as the code lives in the idmaped page) and branch there.
++	 * We hijack ip (r12) as a tmp register.
++	 */
++	push	{r1}
++	ldr	r1, =kimage_voffset
++	ldr	r1, [r1]
++	ldr	ip, =__kvm_handle_stub_hvc
++	sub	ip, ip, r1
++THUMB(	add	ip, ip, #1)
++	pop	{r1}
 +
-+This file documents the interaction between the Linux kernel and the
-+hypervisor layer when running Linux as a hypervisor (for example
-+KVM). It doesn't cover the interaction of the kernel with the
-+hypervisor when running as a guest (under Xen, KVM or any other
-+hypervisor), or any hypervisor-specific interaction when the kernel is
-+used as a host.
++	bx	ip
 +
-+On arm and arm64 (without VHE), the kernel doesn't run in hypervisor
-+mode, but still needs to interact with it, allowing a built-in
-+hypervisor to be either installed or torn down.
-+
-+In order to achieve this, the kernel must be booted at HYP (arm) or
-+EL2 (arm64), allowing it to install a set of stubs before dropping to
-+SVC/EL1. These stubs are accessible by using a 'hvc #0' instruction,
-+and only act on individual CPUs.
-+
-+Unless specified otherwise, any built-in hypervisor must implement
-+these functions (see arch/arm{,64}/include/asm/virt.h):
-+
-+* r0/x0 = HVC_SET_VECTORS
-+  r1/x1 = vectors
-+
-+  Set HVBAR/VBAR_EL2 to 'vectors' to enable a hypervisor. 'vectors'
-+  must be a physical address, and respect the alignment requirements
-+  of the architecture. Only implemented by the initial stubs.
-+
-+* r0/x0 = HVC_RESET_VECTORS
-+
-+  Turn HYP/EL2 MMU off, and reset HVBAR/VBAR_EL2 to the default
-+  value. This effectively disables an existing hypervisor.
-+
-+* r0/x0 = HVC_SOFT_RESTART
-+  r1/x1 = restart address
-+  x2 = x0's value when entering the next payload (arm64)
-+  x3 = x1's value when entering the next payload (arm64)
-+  x4 = x2's value when entering the next payload (arm64)
-+
-+  Mask all exceptions, disable the MMU, move the arguments into place
-+  (arm64 only), and jump to the restart address while at HYP/EL2. This
-+  hypercall is not expected to return to its caller.
-+
-+Any other value of r0/x0 triggers a hypervisor-specific handling,
-+which is not documented here.
++1:
+ 	push	{lr}
+ 
+ 	mov	lr, r0
+@@ -142,7 +161,7 @@ THUMB(	orr	lr, #1)
+ 	blx	lr			@ Call the HYP function
+ 
+ 	pop	{lr}
+-1:	eret
++	eret
+ 
+ guest_trap:
+ 	load_vcpu r0			@ Load VCPU pointer to r0
 -- 
 2.11.0
