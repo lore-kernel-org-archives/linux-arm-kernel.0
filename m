@@ -1,53 +1,87 @@
-From: james.morse@arm.com (James Morse)
-Date: Mon, 06 Mar 2017 10:28:04 +0000
-Subject: [PATCH V11 10/10] arm/arm64: KVM: add guest SEA support
-In-Reply-To: <ff3aa805-0e03-9854-e294-ff6934c57f3f@codeaurora.org>
-References: <1487712121-16688-1-git-send-email-tbaicar@codeaurora.org>
- <1487712121-16688-11-git-send-email-tbaicar@codeaurora.org>
- <58B00E12.5020602@arm.com>
- <ff3aa805-0e03-9854-e294-ff6934c57f3f@codeaurora.org>
-Message-ID: <58BD39B4.9050809@arm.com>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Mon, 6 Mar 2017 11:29:59 +0100
+Subject: [RFC PATCH 06/12] staging: android: ion: Remove crufty cache
+ support
+In-Reply-To: <87fe5d0a-19d2-b6c7-391f-687aa5ff8571@redhat.com>
+References: <1488491084-17252-1-git-send-email-labbott@redhat.com>
+ <1488491084-17252-7-git-send-email-labbott@redhat.com>
+ <20170303095654.zbcqkcojo3vf6y4y@phenom.ffwll.local>
+ <2273106.Hjr80nPvcZ@avalon>
+ <87fe5d0a-19d2-b6c7-391f-687aa5ff8571@redhat.com>
+Message-ID: <20170306102959.5iixtstrl7ktwxdp@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tyler,
+On Fri, Mar 03, 2017 at 10:46:03AM -0800, Laura Abbott wrote:
+> On 03/03/2017 08:39 AM, Laurent Pinchart wrote:
+> > Hi Daniel,
+> > 
+> > On Friday 03 Mar 2017 10:56:54 Daniel Vetter wrote:
+> >> On Thu, Mar 02, 2017 at 01:44:38PM -0800, Laura Abbott wrote:
+> >>> Now that we call dma_map in the dma_buf API callbacks there is no need
+> >>> to use the existing cache APIs. Remove the sync ioctl and the existing
+> >>> bad dma_sync calls. Explicit caching can be handled with the dma_buf
+> >>> sync API.
+> >>>
+> >>> Signed-off-by: Laura Abbott <labbott@redhat.com>
+> >>> ---
+> >>>
+> >>>  drivers/staging/android/ion/ion-ioctl.c         |  5 ----
+> >>>  drivers/staging/android/ion/ion.c               | 40 --------------------
+> >>>  drivers/staging/android/ion/ion_carveout_heap.c |  6 ----
+> >>>  drivers/staging/android/ion/ion_chunk_heap.c    |  6 ----
+> >>>  drivers/staging/android/ion/ion_page_pool.c     |  3 --
+> >>>  drivers/staging/android/ion/ion_system_heap.c   |  5 ----
+> >>>  6 files changed, 65 deletions(-)
+> >>>
+> >>> diff --git a/drivers/staging/android/ion/ion-ioctl.c
+> >>> b/drivers/staging/android/ion/ion-ioctl.c index 5b2e93f..f820d77 100644
+> >>> --- a/drivers/staging/android/ion/ion-ioctl.c
+> >>> +++ b/drivers/staging/android/ion/ion-ioctl.c
+> >>> @@ -146,11 +146,6 @@ long ion_ioctl(struct file *filp, unsigned int cmd,
+> >>> unsigned long arg)> 
+> >>>  			data.handle.handle = handle->id;
+> >>>  		
+> >>>  		break;
+> >>>  	
+> >>>  	}
+> >>>
+> >>> -	case ION_IOC_SYNC:
+> >>> -	{
+> >>> -		ret = ion_sync_for_device(client, data.fd.fd);
+> >>> -		break;
+> >>> -	}
+> >>
+> >> You missed the case ION_IOC_SYNC: in compat_ion.c.
+> >>
+> >> While at it: Should we also remove the entire custom_ioctl infrastructure?
+> >> It's entirely unused afaict, and for a pure buffer allocator I don't see
+> >> any need to have custom ioctl.
+> > 
+> > I second that, if you want to make ion a standard API, then we certainly don't 
+> > want any custom ioctl.
+> > 
+> >> More code to remove potentially:
+> >> - The entire compat ioctl stuff - would be an abi break, but I guess if we
+> >>   pick the 32bit abi and clean up the uapi headers we'll be mostly fine.
+> >>   would allow us to remove compat_ion.c entirely.
+> >>
+> >> - ION_IOC_IMPORT: With this ion is purely an allocator, so not sure we
+> >>   still need to be able to import anything. All the cache flushing/mapping
+> >>   is done through dma-buf ops/ioctls.
+> >>
+> >>
+> 
+> Good point to all of the above. I was considering keeping the import around
+> for backwards compatibility reasons but given how much other stuff is being
+> potentially broken, everything should just get ripped out.
 
-On 28/02/17 19:43, Baicar, Tyler wrote:
-> On 2/24/2017 3:42 AM, James Morse wrote:
->> On 21/02/17 21:22, Tyler Baicar wrote:
->>> Currently external aborts are unsupported by the guest abort
->>> handling. Add handling for SEAs so that the host kernel reports
->>> SEAs which occur in the guest kernel.
-
->>> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
->>> index b2d57fc..403277b 100644
->>> --- a/arch/arm64/mm/fault.c
->>> +++ b/arch/arm64/mm/fault.c
->>> @@ -602,6 +602,24 @@ static const char *fault_name(unsigned int esr)
->>>   }
->>>
->>>   /*
->>> + * Handle Synchronous External Aborts that occur in a guest kernel.
->>> + */
->>> +int handle_guest_sea(unsigned long addr, unsigned int esr)
->>> +{
->>> +    if(IS_ENABLED(HAVE_ACPI_APEI_SEA)) {
->>> +        nmi_enter();
->>> +        ghes_notify_sea();
->>> +        nmi_exit();
-
->> This nmi stuff was needed for synchronous aborts that may have interrupted
->> APEI's interrupts-masked code. We want to avoid trying to take the same set of
->> locks, hence taking the in_nmi() path through APEI. Here we know we interrupted
->> a guest, so there is no risk that we have interrupted APEI on the host.
->> ghes_notify_sea() can safely take the normal path.
-
-> Makes sense, I can remove the nmi_* calls here.
-
-Just occurs to me: if we do this we need to add the rcu_read_lock() in
-ghes_notify_sea() as its not protected by the rcu/nmi weirdness.
-
-
-Thanks,
-
-James
+If you're ok with breaking the world, then I strongly suggest we go
+through the uapi header and replace all types with the standard
+fixed-width ones (__s32, __s64 and __u32, __u64). Allows us to remove all
+the compat ioctl code :-)
+-Daniel
+-- 
+Daniel Vetter
+Software Engineer, Intel Corporation
+http://blog.ffwll.ch
