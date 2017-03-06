@@ -1,89 +1,87 @@
-From: seanpaul@chromium.org (Sean Paul)
-Date: Mon, 6 Mar 2017 18:44:38 -0500
-Subject: [PATCH 2/3] drm/rockchip: Fix link error when
- CONFIG_DRM_ANALOGIX_DP undefined
-In-Reply-To: <20170306231512.GB20329@art_vandelay>
-References: <20170306202722.9301-1-seanpaul@chromium.org>
- <20170306202722.9301-3-seanpaul@chromium.org>
- <CACvgo53paS0-5PbT-bmPoSMyx+r0jCQqMVUNFsPJQXZ+QXtB_g@mail.gmail.com>
- <20170306231512.GB20329@art_vandelay>
-Message-ID: <20170306234438.GE20329@art_vandelay>
+From: megous@megous.com (=?UTF-8?Q?Ond=c5=99ej_Jirman?=)
+Date: Tue, 7 Mar 2017 00:48:05 +0100
+Subject: [linux-sunxi] [PATCH v3 0/5] Add dual-role OTG support for
+ Allwinner H3
+In-Reply-To: <20170306223449.21404-1-icenowy@aosc.xyz>
+References: <20170306223449.21404-1-icenowy@aosc.xyz>
+Message-ID: <e110a2c0-ee91-b6eb-9e94-e32034aae4d7@megous.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 06, 2017 at 06:15:12PM -0500, Sean Paul wrote:
-> On Mon, Mar 06, 2017 at 08:58:14PM +0000, Emil Velikov wrote:
-> > On 6 March 2017 at 20:27, Sean Paul <seanpaul@chromium.org> wrote:
-> > > Fixes the following link error when CONFIG_DRM_ANALOGIX_DP is not defined:
-> > >
-> > > ERROR: "analogix_dp_start_crc" [drivers/gpu/drm/rockchip/rockchipdrm.ko] undefined!
-> > > ERROR: "analogix_dp_stop_crc" [drivers/gpu/drm/rockchip/rockchipdrm.ko] undefined!
-> > >
-> > > Fixes: 3190e58dafaf ("drm/rockchip: Implement CRC debugfs API")
-> > > Reported-by: Emil Velikov <emil.l.velikov@gmail.com>
-> > > Cc: Tomeu Vizoso <tomeu.vizoso@collabora.com>
-> > > Cc: Mark Yao <mark.yao@rock-chips.com>
-> > > Cc: Sean Paul <seanpaul@chromium.org>
-> > > Cc: Heiko Stuebner <heiko@sntech.de>
-> > > Cc: dri-devel at lists.freedesktop.org
-> > > Cc: linux-arm-kernel at lists.infradead.org
-> > > Cc: linux-rockchip at lists.infradead.org
-> > > Cc: Emil Velikov <emil.l.velikov@gmail.com>
-> > > Signed-off-by: Sean Paul <seanpaul@chromium.org>
-> > > ---
-> > >  drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 10 ++++++++++
-> > >  1 file changed, 10 insertions(+)
-> > >
-> > > diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-> > > index 17ab16c4b922..2151e1cee4b4 100644
-> > > --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-> > > +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-> > > @@ -19,7 +19,9 @@
-> > >  #include <drm/drm_crtc_helper.h>
-> > >  #include <drm/drm_flip_work.h>
-> > >  #include <drm/drm_plane_helper.h>
-> > > +#ifdef CONFIG_DRM_ANALOGIX_DP
-> > >  #include <drm/bridge/analogix_dp.h>
-> > > +#endif
-> > >
-> > >  #include <linux/kernel.h>
-> > >  #include <linux/module.h>
-> > > @@ -1112,6 +1114,7 @@ static void vop_crtc_destroy_state(struct drm_crtc *crtc,
-> > >         kfree(s);
-> > >  }
-> > >
-> > > +#ifdef CONFIG_DRM_ANALOGIX_DP
-> > >  static struct drm_connector *vop_get_edp_connector(struct vop *vop)
-> > >  {
-> > Similar to 3/3 adding stubs for
-> > analogix_dp_start_crc/analogix_dp_stop_crc will be shorter/cleaner
-> > than ifdef spaghetti.
-> > 
+Hi Icenowy,
+
+when I was trying to add OTG support I found an issue with powercycling.
+When I have USB cable connecting PC and the OTG port on the SBC, when
+the board enables the vbus, it would become impossible to power cycle
+the board after poweroff. The reason being that when vbus is enabled,
+the board is powered from the OTG port even if you disconnect the barrel
+plug.
+
+Should kernel turn off the vbus before shutting down/restarting? What do
+you think?
+
+regards,
+  o.
+
+Dne 6.3.2017 v 23:34 Icenowy Zheng napsal(a):
+> Allwinner H3 have a its USB PHY0 routed to two USB controllers: one is
+> a MUSB controller, which can work in peripheral mode, but works badly in
+> host mode (several hardware will fail on the MUSB controller, even connect
+> one MUSB controller in peripheral mode to another one in host mode cannot
+> work); the other is a pair of EHCI/OHCI controller, which can work only
+> in host mode, but have better compatibillity. The route is controlled in
+> a register, which we have set it to HCI only when we do not know about
+> it well.
 > 
-> Thanks for the review, Emil.
+> Add support to route to the best controller according to current USB mode
+> (host/peripheral).
 > 
-> I think given that there's only one driver that supports crc in
-> rockchip-land, it makes sense to target that driver specifically.
-> If/when there is more than one, I agree we should have a shim/stub.
+> Note: Currently even if hardware only support hostmode, we should still
+> enable the MUSB controller, as it controls the USB mode. (Some this kind
+> of hardware can also work in peripheral mode by settings in the sysfs
+> node of MUSB, then connect it to another host via a USB Type-A to Type-A
+> cable.)
 > 
-> That said, if Tomeu or anyone else wants to follow on with an ifdef
-> cleanup, I'm happy to review.
+> Patch 1 changes the device tree binding to include the "pmu0" for HCI pair.
+> 
+> Patch 2 adds support for auto routing of PHY0. It's currently only enabled
+> on H3, but it's easy to extend it to other SoCs which feature this
+> route control.
+> 
+> Patch 3 adds necessary device tree nodes to the H3 DTSI file. Note: The
+> phy is not bind for OHCI/EHCI0, as OHCI/EHCI drivers will keep the VBUS
+> on. Only MUSB driver can properly handle a dual-role PHY.
+> 
+> Patch 4 enables USB OTG functionality on Orange Pi One board, which is
+> the only H3 board I have that have proper OTG function. It's easy to
+> enable OTG on other boards with their schematics.
+> 
+> Patch 5 enables USB OTG functionality on Orange Pi Zero board, as the
+> board cannot output power on Vbus, I only enabled peripheral mode by
+> default.
+> 
+> The USB PHY on V3s/A64 SoCs also feature this capability, and it will
+> be soon enabled on these SoCs after this patchset is merged.
+> 
+> Icenowy Zheng (5):
+>   dt: bindings: add pmu0 regs for USB PHYs on Allwinner H3/V3s/A64
+>   phy: sun4i-usb: support automatically switch PHY0 route to MUSB/HCI
+>   ARM: dts: sun8i: h3: add usb_otg and OHCI/EHCI for usbc0 on H3
+>   ARM: dts: sun8i: h3: enable USB OTG on Orange Pi One
+>   ARM: dts: sun8i: h2+: enable USB OTG for Orange Pi Zero board
+> 
+>  .../devicetree/bindings/phy/sun4i-usb-phy.txt      |  1 +
+>  arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts  | 14 ++++++
+>  arch/arm/boot/dts/sun8i-h3-orangepi-one.dts        | 22 +++++++++-
+>  arch/arm/boot/dts/sun8i-h3.dtsi                    | 32 ++++++++++++++
+>  drivers/phy/phy-sun4i-usb.c                        | 50 ++++++++++++++--------
+>  5 files changed, 101 insertions(+), 18 deletions(-)
 > 
 
-Applied to drm-misc-next
-
-Thanks for the review,
-
-Sean
-
-
-> Sean
-> 
-> > At the same these fix the problems so, for the series:
-> > Reviewed-by: Emil Velikov <emil.l.velikov@gmail.com>
-> > 
-> > -Emil
-> > _______________________________________________
-> > dri-devel mailing list
-> > dri-devel at lists.freedesktop.org
-> > https://lists.freedesktop.org/mailman/listinfo/dri-devel
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170307/171375c6/attachment-0001.sig>
