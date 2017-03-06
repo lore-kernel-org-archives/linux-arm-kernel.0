@@ -1,47 +1,75 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon,  6 Mar 2017 14:24:51 +0000
-Subject: [PATCH v3 18/25] ARM: KVM: Implement HVC_SOFT_RESTART in the init code
+Date: Mon,  6 Mar 2017 14:24:58 +0000
+Subject: [PATCH v3 25/25] arm/arm64: Add hyp-stub API documentation
 In-Reply-To: <20170306142458.8875-1-marc.zyngier@arm.com>
 References: <20170306142458.8875-1-marc.zyngier@arm.com>
-Message-ID: <20170306142458.8875-19-marc.zyngier@arm.com>
+Message-ID: <20170306142458.8875-26-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Another missing stub hypercall is HVC_SOFT_RESTART. It turns out
-that it is pretty easy to implement in terms of HVC_RESET_VECTORS
-(since it needs to turn the MMU off).
+In order to help people understanding the hyp-stub API that exists
+between the host kernel and the hypervisor mode (whether a hypervisor
+has been installed or not), let's document said API.
+
+As as with any form of documentation, I expect it to become obsolete
+and completely misleading within 20 minutes after having being merged.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/kvm/init.S | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+ Documentation/virtual/kvm/arm/hyp-abi.txt | 45 +++++++++++++++++++++++++++++++
+ 1 file changed, 45 insertions(+)
+ create mode 100644 Documentation/virtual/kvm/arm/hyp-abi.txt
 
-diff --git a/arch/arm/kvm/init.S b/arch/arm/kvm/init.S
-index 7335a510eee4..c92e092103b2 100644
---- a/arch/arm/kvm/init.S
-+++ b/arch/arm/kvm/init.S
-@@ -127,8 +127,22 @@ ENTRY(__kvm_handle_stub_hvc)
- 	mrc	p15, 4, r0, c12, c0, 0	@ get HVBAR
- 	b	exit
- 
-+1:	cmp	r0, #HVC_SOFT_RESTART
-+	bne	1f
+diff --git a/Documentation/virtual/kvm/arm/hyp-abi.txt b/Documentation/virtual/kvm/arm/hyp-abi.txt
+new file mode 100644
+index 000000000000..a1e0314d2249
+--- /dev/null
++++ b/Documentation/virtual/kvm/arm/hyp-abi.txt
+@@ -0,0 +1,45 @@
++* Internal ABI between the kernel and HYP
 +
-+	/* The target is expected in r1 */
-+	msr	ELR_hyp, r1
-+	mrs	r0, cpsr
-+	bic	r0, r0, #MODE_MASK
-+	orr	r0, r0, #HYP_MODE
-+THUMB(	orr	r0, r0, #PSR_T_BIT	)
-+	msr	spsr_cxsf, r0
-+	b	reset
++This file documents the interaction between the Linux kernel and the
++hypervisor layer when running Linux as a hypervisor (for example
++KVM). It doesn't cover the interaction of the kernel with the
++hypervisor when running as a guest (under Xen, KVM or any other
++hypervisor), or any hypervisor-specific interaction when the kernel is
++used as a host.
 +
- 1:	cmp	r0, #HVC_RESET_VECTORS
- 	bne	1f
++On arm and arm64 (without VHE), the kernel doesn't run in hypervisor
++mode, but still needs to interact with it, allowing a built-in
++hypervisor to be either installed or torn down.
 +
-+reset:
- 	/* We're now in idmap, disable MMU */
- 	mrc	p15, 4, r1, c1, c0, 0	@ HSCTLR
- 	ldr	r0, =(HSCTLR_M | HSCTLR_A | HSCTLR_C | HSCTLR_I)
++In order to achieve this, the kernel must be booted at HYP (arm) or
++EL2 (arm64), allowing it to install a set of stubs before dropping to
++SVC/EL1. These stubs are accessible by using a 'hvc #0' instruction,
++and only act on individual CPUs.
++
++Unless specified otherwise, any built-in hypervisor must implement
++these functions (see arch/arm{,64}/include/asm/virt.h):
++
++* r0/x0 = HVC_SET_VECTORS
++  r1/x1 = vectors
++
++  Set HVBAR/VBAR_EL2 to 'vectors' to enable a hypervisor. 'vectors'
++  must be a physical address, and respect the alignment requirements
++  of the architecture. Only implemented by the initial stubs.
++
++* r0/x0 = HVC_RESET_VECTORS
++
++  Turn HYP/EL2 MMU off, and reset HVBAR/VBAR_EL2 to the default
++  value. This effectively disables an existing hypervisor.
++
++* r0/x0 = HVC_SOFT_RESTART
++  r1/x1 = restart address
++  x2 = x0's value when entering the next payload (arm64)
++  x3 = x1's value when entering the next payload (arm64)
++  x4 = x2's value when entering the next payload (arm64)
++
++  Mask all exceptions, disable the MMU, move the arguments into place
++  (arm64 only), and jump to the restart address while at HYP/EL2. This
++  hypercall is not expected to return to its caller.
++
++Any other value of r0/x0 triggers a hypervisor-specific handling,
++which is not documented here.
 -- 
 2.11.0
