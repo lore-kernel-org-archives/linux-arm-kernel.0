@@ -1,49 +1,36 @@
 From: jon.mason@broadcom.com (Jon Mason)
-Date: Mon,  6 Mar 2017 11:24:44 -0500
-Subject: [PATCH v3 1/2] ARM: dts: bcm5301x: Add TWD WD Support to DT
-In-Reply-To: <1488817485-7503-1-git-send-email-jon.mason@broadcom.com>
-References: <1488817485-7503-1-git-send-email-jon.mason@broadcom.com>
-Message-ID: <1488817485-7503-2-git-send-email-jon.mason@broadcom.com>
+Date: Mon,  6 Mar 2017 11:24:43 -0500
+Subject: [PATCH v3 0/2] ARM: dts: BCM5301X: TWD WD and i2c Support
+Message-ID: <1488817485-7503-1-git-send-email-jon.mason@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jon Mason <jonmason@broadcom.com>
+Changes in v3:
+* Dropped the "Correct GIC_PPI interrupt flags" patch from the series,
+  as it was already accepted
+* Disabled the i2c bus by default, to follow current convention (per
+  Florian)
 
-Add support for the ARM TWD Watchdog to the bcm5301x device tree.  The
-ARM TWD timer allocated the register space for the WDT, so this patch
-necessitated shrinking that.  Also, the GIC masks were added for these.
+Changes in v2:
+* Rafal discovered an issue with the GIC_PPI flags being incorrect.
+  Since there was a dependency on that DT entry in this series, I added
+  a patch to correct the issue and reworked the TWD patch with the
+  changes.
 
-Signed-off-by: Jon Mason <jonmason@broadcom.com>
----
- arch/arm/boot/dts/bcm5301x.dtsi | 15 ++++++++++++---
- 1 file changed, 12 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/bcm5301x.dtsi b/arch/arm/boot/dts/bcm5301x.dtsi
-index 1e5a97b..a9aa7be 100644
---- a/arch/arm/boot/dts/bcm5301x.dtsi
-+++ b/arch/arm/boot/dts/bcm5301x.dtsi
-@@ -70,10 +70,19 @@
- 			clocks = <&periph_clk>;
- 		};
- 
--		local-timer at 20600 {
-+		timer at 20600 {
- 			compatible = "arm,cortex-a9-twd-timer";
--			reg = <0x20600 0x100>;
--			interrupts = <GIC_PPI 13 IRQ_TYPE_EDGE_RISING>;
-+			reg = <0x20600 0x20>;
-+			interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) |
-+						  IRQ_TYPE_EDGE_RISING)>;
-+			clocks = <&periph_clk>;
-+		};
-+
-+		watchdog at 20620 {
-+			compatible = "arm,cortex-a9-twd-wdt";
-+			reg = <0x20620 0x20>;
-+			interrupts = <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(2) |
-+						  IRQ_TYPE_EDGE_RISING)>;
- 			clocks = <&periph_clk>;
- 		};
- 
+These seemed to have been lost sometime last year.  See
+https://lkml.org/lkml/2016/5/11/953
+
+I am dropping the syscon reboot from the series, as I believe that was
+the sticking point, and resending the TWD and i2c patches.
+
+
+Jon Mason (2):
+  ARM: dts: bcm5301x: Add TWD WD Support to DT
+  ARM: dts: bcm5301x: Add I2C support to the DT
+
+ arch/arm/boot/dts/bcm5301x.dtsi | 25 ++++++++++++++++++++++---
+ 1 file changed, 22 insertions(+), 3 deletions(-)
+
 -- 
 2.7.4
