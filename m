@@ -1,102 +1,66 @@
-From: xiexiuqi@huawei.com (Xie XiuQi)
-Date: Mon, 6 Mar 2017 19:06:32 +0800
-Subject: [PATCH 2/2] acpi: apei: handle SEI notification type for ARMv8
-In-Reply-To: <58BD3355.2010201@arm.com>
-References: <1488537595-72161-1-git-send-email-xiexiuqi@huawei.com>
- <1488537595-72161-2-git-send-email-xiexiuqi@huawei.com>
- <58BD3355.2010201@arm.com>
-Message-ID: <58BD42B8.3060804@huawei.com>
+From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
+Date: Mon, 6 Mar 2017 11:14:51 +0000
+Subject: [RFC PATCH 00/30] Add PCIe SVM support to ARM SMMUv3
+In-Reply-To: <A2975661238FB949B60364EF0F2C2574390186B8@shsmsx102.ccr.corp.intel.com>
+References: <20170227195441.5170-1-jean-philippe.brucker@arm.com>
+ <A2975661238FB949B60364EF0F2C2574390186B8@shsmsx102.ccr.corp.intel.com>
+Message-ID: <20170306111451.GA28804@e106794-lin.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi James,
+Hi Yi,
 
-Thanks for your comments.
-
-On 2017/3/6 18:00, James Morse wrote:
-> Hi Xie XiuQi,
+On 06/03/17 08:20, Liu, Yi L wrote:
 > 
-> On 03/03/17 10:39, Xie XiuQi wrote:
->> ARM APEI extension proposal added SEI (asynchronous SError interrupt)
->> notification type for ARMv8.
+> 
+>> -----Original Message-----
+>> From: iommu-bounces at lists.linux-foundation.org [mailto:iommu-
+>> bounces at lists.linux-foundation.org] On Behalf Of Jean-Philippe Brucker
+>> Sent: Tuesday, February 28, 2017 3:54 AM
+>> Cc: Shanker Donthineni <shankerd@qti.qualcomm.com>; kvm at vger.kernel.org;
+>> Catalin Marinas <catalin.marinas@arm.com>; Sinan Kaya
+>> <okaya@qti.qualcomm.com>; Will Deacon <will.deacon@arm.com>;
+>> iommu at lists.linux-foundation.org; Harv Abdulhamid <harba@qti.qualcomm.com>;
+>> linux-pci at vger.kernel.org; Bjorn Helgaas <bhelgaas@google.com>; David
+>> Woodhouse <dwmw2@infradead.org>; linux-arm-kernel at lists.infradead.org; Nate
+>> Watterson <nwatters@qti.qualcomm.com>
+>> Subject: [RFC PATCH 00/30] Add PCIe SVM support to ARM SMMUv3
 >>
->> Add a new GHES error source handling function for SEI. In firmware
->> first mode, if an error source's notification type is SEI. Then GHES
->> could parse and report the detail error information.
+>> Hi,
+>>
+>> This series adds support for PCI ATS, PRI and PASID extensions to the
+>> SMMUv3 driver. In systems that support it, it is now possible for some high-end
+>> devices to perform DMA into process address spaces. Page tables are shared
+>> between MMU and SMMU; page faults from devices are recoverable and handled by
+>> the mm subsystem.
+>>
+>> We propose an extension to the IOMMU API that unifies existing SVM
+>> implementations (AMD, Intel and ARM) in patches 22 and 24. Nothing is set in stone,
+>> the goal is to start discussions and find an intersection between implementations.
+>>
+>> We also propose a VFIO interface in patches 29 and 30, that allows userspace device
+>> drivers to make use of SVM. It would also serve as example implementation for
+>> other device drivers.
+>>
+>> Overview of the patches:
+>>
+>> * 1 and 2 prepare the SMMUv3 structures for ATS,
+>> * 3 to 5 enable ATS for devices that support it.
+>> * 6 to 10 prepare the SMMUv3 structures for PASID and PRI. Patch 9,
+>>   in particular, provides details on the structure requirements.
+>> * 11 introduces an interface for sharing ASIDs on ARM64,
+>> * 12 to 17 add more infrastructure for sharing page tables,
+>> * 18 and 19 add minor helpers to PCI,
+>> * 20 enables PASID in devices that support it,
 > 
-> This patch doesn't apply to any upstream tree. Is this based on Tyler's larger
-> UEFI/ACPI update series? If so, please mention this in your cover letter, (Nit:
-> please include a cover letter when sending two or more patches!).
-> 
+> Jean, supposedly, you will introduce a PASID management mechanism in
+> SMMU v3 driver. Here I have a question about PASID management on ARM.
+> Will there be a system wide PASID table? Or there is equivalent implementation.
 
-Yes, this patch is based on Tyler's series "[PATCH V11 00/10] Add UEFI 2.6 and ACPI 6.1 updates
-for RAS on ARM64" and linux-next 20170302.
-
-I'll add a cover letter next time, thanks.
-
-
-> What happens if the SError Interrupt arrives while KVM was doing its work? We
-> set the HCR_EL2.AMO bit when running a guest, so KVM may receive these instead
-> of the host kernel.
-> 
-
-OK, I'll do it in next version.
-
-> 
->> diff --git a/drivers/acpi/apei/Kconfig b/drivers/acpi/apei/Kconfig
->> index 1122d7f..a32f046 100644
->> --- a/drivers/acpi/apei/Kconfig
->> +++ b/drivers/acpi/apei/Kconfig
->> @@ -18,6 +18,20 @@ config HAVE_ACPI_APEI_SEA
->>  	  option allows the OS to look for such hardware error record, and
->>  	  take appropriate action.
->>  
->> +config ACPI_APEI_SEI
->> +	bool "APEI Asynchronous SError Interrupt logging/recovering support"
->> +	depends on ARM64 && ACPI_APEI_GHES
->> +	help
->> +	  This option should be enabled if the system supports
->> +	  firmware first handling of SEI (asynchronous SError interrupt).
->> +
->> +	  SEI happens with invalid instruction access or asynchronous exceptions
->> +	  on ARMv8 systems. If a system supports firmware first handling of SEI,
->> +	  the platform analyzes and handles hardware error notifications from
->> +	  SEI, and it may then form a HW error record for the OS to parse and
->> +	  handle. This option allows the OS to look for such hardware error
->> +	  record, and take appropriate action.
->> +
->>  config ACPI_APEI
->>  	bool "ACPI Platform Error Interface (APEI)"
->>  	select MISC_FILESYSTEMS
->> diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
->> index 3e4ea1b..d084a09 100644
->> --- a/drivers/acpi/apei/ghes.c
->> +++ b/drivers/acpi/apei/ghes.c
->> @@ -850,6 +850,50 @@ static inline void ghes_sea_remove(struct ghes *ghes)
->>  }
->>  #endif /* CONFIG_HAVE_ACPI_APEI_SEA */
->>  
->> +#ifdef CONFIG_ACPI_APEI_SEI
->> +static LIST_HEAD(ghes_sei);
->> +
->> +void ghes_notify_sei(void)
->> +{
->> +	struct ghes *ghes;
->> +
->> +	/*
->> +	 * synchronize_rcu() will wait for nmi_exit(), so no need to
-> 
-> Where nmi_exit()?
-> 
-> This nmi enter/exit was to prevent APEI being interrupted by APEI and trying to
-> take the same set of locks. APEI masks IRQs to prevent this happening normally,
-> but Synchronous External Abort couldn't be masked.
-> We don't mask Asynchronous Exceptions in APEI so the same thing can happen here.
-> Adding nmi_{enter,exit}() round the ghes call in the arch bad_mode() will
-> prevent this lockup.
-> 
-
-Thank you for your detailed explanation, I'll add it in next version.
+Yes the SMMUv3 driver allocates and manages PASIDs. In this series I
+implemented one PASID table for each device (for simplicity), but as
+explained in my reply on patch 22, I'd like to introduce a PASID table
+for each IOMMU domain in the next version.
 
 Thanks,
-Xie XiuQi
+Jean-Philippe
