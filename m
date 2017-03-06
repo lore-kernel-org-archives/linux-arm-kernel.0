@@ -1,46 +1,79 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 6 Mar 2017 14:45:36 -0800
-Subject: [PATCH DO NOT MERGE 5/6] ARM: dts: omap4: add some sample
- clkctrl data
-In-Reply-To: <1486992157-10673-6-git-send-email-t-kristo@ti.com>
-References: <1486992157-10673-1-git-send-email-t-kristo@ti.com>
- <1486992157-10673-6-git-send-email-t-kristo@ti.com>
-Message-ID: <20170306224535.GP20572@atomide.com>
+From: seanpaul@chromium.org (Sean Paul)
+Date: Mon, 6 Mar 2017 18:15:12 -0500
+Subject: [PATCH 2/3] drm/rockchip: Fix link error when
+ CONFIG_DRM_ANALOGIX_DP undefined
+In-Reply-To: <CACvgo53paS0-5PbT-bmPoSMyx+r0jCQqMVUNFsPJQXZ+QXtB_g@mail.gmail.com>
+References: <20170306202722.9301-1-seanpaul@chromium.org>
+ <20170306202722.9301-3-seanpaul@chromium.org>
+ <CACvgo53paS0-5PbT-bmPoSMyx+r0jCQqMVUNFsPJQXZ+QXtB_g@mail.gmail.com>
+Message-ID: <20170306231512.GB20329@art_vandelay>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tero Kristo <t-kristo@ti.com> [170213 05:24]:
-> @@ -304,6 +339,8 @@
->  			#gpio-cells = <2>;
->  			interrupt-controller;
->  			#interrupt-cells = <2>;
-> +			clocks = <&cm_l4per_clkctrl OMAP4_GPIO2_CLKCTRL 0>;
-> +			clock-names = "clkctrl";
->  		};
->  
->  		gpio3: gpio at 48057000 {
-> @@ -315,6 +352,8 @@
->  			#gpio-cells = <2>;
->  			interrupt-controller;
->  			#interrupt-cells = <2>;
-> +			clocks = <&cm_l4per_clkctrl OMAP4_GPIO3_CLKCTRL 0>;
-> +			clock-names = "clkctrl";
->  		};
->  
->  		gpio4: gpio at 48059000 {
-> @@ -384,6 +423,8 @@
->  			interrupts = <GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>;
->  			ti,hwmods = "uart1";
->  			clock-frequency = <48000000>;
-> +			clocks = <&cm_l4per_clkctrl OMAP4_UART1_CLKCTRL 0>;
-> +			clock-names = "clkctrl";
->  		};
+On Mon, Mar 06, 2017 at 08:58:14PM +0000, Emil Velikov wrote:
+> On 6 March 2017 at 20:27, Sean Paul <seanpaul@chromium.org> wrote:
+> > Fixes the following link error when CONFIG_DRM_ANALOGIX_DP is not defined:
+> >
+> > ERROR: "analogix_dp_start_crc" [drivers/gpu/drm/rockchip/rockchipdrm.ko] undefined!
+> > ERROR: "analogix_dp_stop_crc" [drivers/gpu/drm/rockchip/rockchipdrm.ko] undefined!
+> >
+> > Fixes: 3190e58dafaf ("drm/rockchip: Implement CRC debugfs API")
+> > Reported-by: Emil Velikov <emil.l.velikov@gmail.com>
+> > Cc: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+> > Cc: Mark Yao <mark.yao@rock-chips.com>
+> > Cc: Sean Paul <seanpaul@chromium.org>
+> > Cc: Heiko Stuebner <heiko@sntech.de>
+> > Cc: dri-devel at lists.freedesktop.org
+> > Cc: linux-arm-kernel at lists.infradead.org
+> > Cc: linux-rockchip at lists.infradead.org
+> > Cc: Emil Velikov <emil.l.velikov@gmail.com>
+> > Signed-off-by: Sean Paul <seanpaul@chromium.org>
+> > ---
+> >  drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 10 ++++++++++
+> >  1 file changed, 10 insertions(+)
+> >
+> > diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> > index 17ab16c4b922..2151e1cee4b4 100644
+> > --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> > +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> > @@ -19,7 +19,9 @@
+> >  #include <drm/drm_crtc_helper.h>
+> >  #include <drm/drm_flip_work.h>
+> >  #include <drm/drm_plane_helper.h>
+> > +#ifdef CONFIG_DRM_ANALOGIX_DP
+> >  #include <drm/bridge/analogix_dp.h>
+> > +#endif
+> >
+> >  #include <linux/kernel.h>
+> >  #include <linux/module.h>
+> > @@ -1112,6 +1114,7 @@ static void vop_crtc_destroy_state(struct drm_crtc *crtc,
+> >         kfree(s);
+> >  }
+> >
+> > +#ifdef CONFIG_DRM_ANALOGIX_DP
+> >  static struct drm_connector *vop_get_edp_connector(struct vop *vop)
+> >  {
+> Similar to 3/3 adding stubs for
+> analogix_dp_start_crc/analogix_dp_stop_crc will be shorter/cleaner
+> than ifdef spaghetti.
+> 
 
-BTW, one thing you might want to test also is that the opt clocks
-can be mapped here properly for gpios to reset. That can be easily
-tested by kexec booting on beagle-x15 where we currently get warnings
-on kexec boot about GPIOs failing to reset.
+Thanks for the review, Emil.
 
-Regards,
+I think given that there's only one driver that supports crc in
+rockchip-land, it makes sense to target that driver specifically.
+If/when there is more than one, I agree we should have a shim/stub.
 
-Tony
+That said, if Tomeu or anyone else wants to follow on with an ifdef
+cleanup, I'm happy to review.
+
+Sean
+
+> At the same these fix the problems so, for the series:
+> Reviewed-by: Emil Velikov <emil.l.velikov@gmail.com>
+> 
+> -Emil
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
