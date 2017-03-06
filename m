@@ -1,48 +1,41 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Mon, 6 Mar 2017 09:23:37 -0600
-Subject: [PATCH 0/5] ARM: OMAP2+: Add and enable operating-points-v2
-Message-ID: <1488813822-26042-1-git-send-email-d-gerlach@ti.com>
+From: David.Laight@ACULAB.COM (David Laight)
+Date: Mon, 6 Mar 2017 15:27:01 +0000
+Subject: Panic in quirk_usb_early_handoff
+In-Reply-To: <76dea81d-c524-ad40-06bf-e549bb457f59@free.fr>
+References: <4b2a7606-de27-c8ad-1530-958dd5d12233@free.fr>
+ <45e38a07-e8da-80e4-36bb-31e471f02004@free.fr>
+ <3c5bd8f5-468f-d25e-08a9-8944ee419096@free.fr>
+ <38b8c9be-724b-0cfc-a941-76f2c62e1c58@arm.com>
+ <491b40db-dc07-2a8e-9bc4-07b86f990600@free.fr>
+ <76dea81d-c524-ad40-06bf-e549bb457f59@free.fr>
+Message-ID: <063D6719AE5E284EB5DD2968C1650D6DCFE78D44@AcuExch.aculab.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-This series adds the necessary changes to get proper operating-points-v2 tables
-for AM335x/AM437x/DRA7xx/AM57xx TI SoCs. Doing this enables the ti-cpufreq
-driver and allows the platform to detect which CPU OPPs are valid for the
-configuration in use and enable them.
+From: Mason
+> Sent: 06 March 2017 13:50
+> On 06/03/2017 13:42, Mason wrote:
+> 
+> > So the kernel panics in xhci_find_next_ext_cap()
+> > ( drivers/usb/host/xhci-ext-caps.h:122 )
+> > http://lxr.free-electrons.com/source/drivers/usb/host/xhci-ext-caps.h?v=4.9#L122
+> >
+> > Any idea how this can happen?
+> >
+> > 	base = ioremap_nocache(pci_resource_start(pdev, 0), len);
+> >
+> > Could I be passing garbage to ioremap_nocache?
+> 
+> Oh...
+> 
+> I have just now understood what Ard wrote a few days ago.
+> 
+> The issue was that, on this platform, the PCI configuration space
+> and memory space are multiplexed; in other words they reside at
+> the same physical address, with a bit in MMIO to choose one or
+> the other.
 
-This series adds complete tables for am335x and adds 1GHz support for all
-beaglebone black boards and updates the already merged but unused am437x table
-to match the finalized DT bindings. It also moves the existing dra7xx/am57xx
-OPPs to OPPv2 but does not enable 1.5GHz yet as this requires multiregulator
-support which will come at a later date.
+Time to shoot another hardware engineer.
+Hopefully it isn't an SMP system - but I wouldn't put it past them.
 
-Also, now that so many TI platforms will depend on the ti-cpufreq driver let's
-add CONFIG_ARM_TI_CPUFREQ to omap2plus_defconfig to enable it as part of the
-default configuration.
-
-Pushed a branch containing these patches on top of v4.11-rc1 if anyone wants
-to try it out [1].
-
-Regards,
-Dave
-
-[1] https://github.com/dgerlach/linux-pm/tree/upstream/v4.11/ti-cpufreq-dts
-
-Dave Gerlach (5):
-  ARM: dts: am33xx: Add updated operating-points-v2 table for cpu
-  ARM: dts: am335x-boneblack: Enable 1GHz OPP for cpu
-  ARM: dts: am4372: Update operating-points-v2 table for cpu
-  ARM: dts: dra7: Add updated operating-points-v2 table for cpu
-  ARM: omap2plus_defconfig: Enable support for ti-cpufreq
-
- arch/arm/boot/dts/am335x-boneblack.dts | 11 +++++
- arch/arm/boot/dts/am33xx.dtsi          | 87 +++++++++++++++++++++++++++++-----
- arch/arm/boot/dts/am4372.dtsi          |  7 ++-
- arch/arm/boot/dts/dra7.dtsi            | 24 ++++++++--
- arch/arm/boot/dts/dra74x.dtsi          |  5 ++
- arch/arm/configs/omap2plus_defconfig   |  1 +
- 6 files changed, 113 insertions(+), 22 deletions(-)
-
--- 
-2.11.0
+	David
