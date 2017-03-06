@@ -1,34 +1,37 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 6 Mar 2017 17:33:30 +0000
-Subject: [PATCH 1/2] arm/kvm: survive unknown traps from guests
-In-Reply-To: <20170306150803.GB1502@lvm>
-References: <1487593812-9174-1-git-send-email-mark.rutland@arm.com>
- <1487593812-9174-2-git-send-email-mark.rutland@arm.com>
- <20170306150803.GB1502@lvm>
-Message-ID: <20170306173330.GH18519@leverpostej>
+From: emil.l.velikov@gmail.com (Emil Velikov)
+Date: Mon, 6 Mar 2017 17:58:14 +0000
+Subject: [PATCH v6 4/4] drm/rockchip: Implement CRC debugfs API
+In-Reply-To: <20170303133936.14964-5-tomeu.vizoso@collabora.com>
+References: <20170303133936.14964-1-tomeu.vizoso@collabora.com>
+ <20170303133936.14964-5-tomeu.vizoso@collabora.com>
+Message-ID: <CACvgo50hmYjTe=jvet5miv3UTk8eM5XF8qatG3Uq_LTdsO5GYg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 06, 2017 at 07:08:03AM -0800, Christoffer Dall wrote:
-> On Mon, Feb 20, 2017 at 12:30:11PM +0000, Mark Rutland wrote:
-> >  static exit_handle_fn arm_exit_handlers[] = {
-> > +	[0 ... HSR_EC_MAX]	= kvm_handle_unknown_ec,
-> 
-> Cool stuff, didn't know you could do this in C.
+Hi Tomeu,
 
-Strictly speaking, it's a GCC-ism, though we use it all over the place:
+Pardon for dropping in late.
 
-[mark at leverpostej:~/src/linux]% git grep '\[.*\.\.\..*\]\s=' | wc -l
-394
+On 3 March 2017 at 13:39, Tomeu Vizoso <tomeu.vizoso@collabora.com> wrote:
+> Implement the .set_crc_source() callback and call the DP helpers
+> accordingly to start and stop CRC capture.
+>
+> This is only done if this CRTC is currently using the eDP connector.
+>
+> v3: Remove superfluous check on rockchip_crtc_state->output_type
+>
+> v6: Remove superfluous variable
+>
+> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+> ---
+>
+>  drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 41 +++++++++++++++++++++++++++++
+>  1 file changed, 41 insertions(+)
+>
+I think this won't fly (build).
 
-It may also make checkpatch a bit grumpy, though I think that's being
-worked on.
+Afaict analogix_dp-rockchip.c (as guarded by ROCKCHIP_ANALOGIX_DP) is
+the only piece that can/should have DRM_ANALOGIX_DP code. Perhaps
+adding a simple wrapper/stubs will be the easier option here ?
 
-> Reviewed-by: Christoffer Dall <cdall@linaro.org>
-
-Cheers!
-
-I assume you or Marc will pick this up?
-
-Thanks,
-Mark.
+-Emil
