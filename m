@@ -1,60 +1,55 @@
 From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Mon, 6 Mar 2017 21:49:28 +0800
-Subject: [RESEND PATCH v3 7/8] arm64: dts: mt8173: move clock from phy node
- into port nodes
-In-Reply-To: <1488808169-6031-1-git-send-email-chunfeng.yun@mediatek.com>
-References: <1488808169-6031-1-git-send-email-chunfeng.yun@mediatek.com>
-Message-ID: <1488808169-6031-7-git-send-email-chunfeng.yun@mediatek.com>
+Date: Mon, 6 Mar 2017 21:49:22 +0800
+Subject: [RESEND PATCH v3 1/8] phy: phy-mt65xx-usb3: improve RX detection
+ stable time
+Message-ID: <1488808169-6031-1-git-send-email-chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-there is a reference clock for each port, HighSpeed port is 48M,
-and SuperSpeed port is 26M which usually comes from 26M oscillator
-directly, but some SoCs is not. it is flexible to move it into port
-node.
+The default value of RX detection stable time is 10us, and this
+margin is too big for some critical cases which cause U3 link fail
+and link to U2(probability is about 1%). So change it to 5us.
 
 Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
 ---
- arch/arm64/boot/dts/mediatek/mt8173.dtsi |    8 ++++++--
- 1 file changed, 6 insertions(+), 2 deletions(-)
+ drivers/phy/phy-mt65xx-usb3.c |   18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-index 1dc4629..1c9e0d5 100644
---- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-+++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-@@ -764,8 +764,6 @@
- 		u3phy: usb-phy at 11290000 {
- 			compatible = "mediatek,mt8173-u3phy";
- 			reg = <0 0x11290000 0 0x800>;
--			clocks = <&apmixedsys CLK_APMIXED_REF2USB_TX>;
--			clock-names = "u3phya_ref";
- 			#address-cells = <2>;
- 			#size-cells = <2>;
- 			ranges;
-@@ -773,18 +771,24 @@
+diff --git a/drivers/phy/phy-mt65xx-usb3.c b/drivers/phy/phy-mt65xx-usb3.c
+index d972067..fe2392a 100644
+--- a/drivers/phy/phy-mt65xx-usb3.c
++++ b/drivers/phy/phy-mt65xx-usb3.c
+@@ -112,6 +112,14 @@
+ #define P3D_RG_CDR_BIR_LTD0		GENMASK(12, 8)
+ #define P3D_RG_CDR_BIR_LTD0_VAL(x)	((0x1f & (x)) << 8)
  
- 			u2port0: usb-phy at 11290800 {
- 				reg = <0 0x11290800 0 0x100>;
-+				clocks = <&apmixedsys CLK_APMIXED_REF2USB_TX>;
-+				clock-names = "ref";
- 				#phy-cells = <1>;
- 				status = "okay";
- 			};
++#define U3P_U3_PHYD_RXDET1		(SSUSB_SIFSLV_U3PHYD_BASE + 0x128)
++#define P3D_RG_RXDET_STB2_SET		GENMASK(17, 9)
++#define P3D_RG_RXDET_STB2_SET_VAL(x)	((0x1ff & (x)) << 9)
++
++#define U3P_U3_PHYD_RXDET2		(SSUSB_SIFSLV_U3PHYD_BASE + 0x12c)
++#define P3D_RG_RXDET_STB2_SET_P3	GENMASK(8, 0)
++#define P3D_RG_RXDET_STB2_SET_P3_VAL(x)	(0x1ff & (x))
++
+ #define U3P_XTALCTL3		(SSUSB_SIFSLV_SPLLC + 0x0018)
+ #define XC3_RG_U3_XTAL_RX_PWD		BIT(9)
+ #define XC3_RG_U3_FRC_XTAL_RX_PWD	BIT(8)
+@@ -295,6 +303,16 @@ static void phy_instance_init(struct mt65xx_u3phy *u3phy,
+ 	tmp |= P3D_RG_CDR_BIR_LTD0_VAL(0xc) | P3D_RG_CDR_BIR_LTD1_VAL(0x3);
+ 	writel(tmp, port_base + U3P_PHYD_CDR1);
  
- 			u3port0: usb-phy at 11290900 {
- 				reg = <0 0x11290900 0 0x700>;
-+				clocks = <&clk26m>;
-+				clock-names = "ref";
- 				#phy-cells = <1>;
- 				status = "okay";
- 			};
++	tmp = readl(port_base + U3P_U3_PHYD_RXDET1);
++	tmp &= ~P3D_RG_RXDET_STB2_SET;
++	tmp |= P3D_RG_RXDET_STB2_SET_VAL(0x10);
++	writel(tmp, port_base + U3P_U3_PHYD_RXDET1);
++
++	tmp = readl(port_base + U3P_U3_PHYD_RXDET2);
++	tmp &= ~P3D_RG_RXDET_STB2_SET_P3;
++	tmp |= P3D_RG_RXDET_STB2_SET_P3_VAL(0x10);
++	writel(tmp, port_base + U3P_U3_PHYD_RXDET2);
++
+ 	dev_dbg(u3phy->dev, "%s(%d)\n", __func__, index);
+ }
  
- 			u2port1: usb-phy at 11291000 {
- 				reg = <0 0x11291000 0 0x100>;
-+				clocks = <&apmixedsys CLK_APMIXED_REF2USB_TX>;
-+				clock-names = "ref";
- 				#phy-cells = <1>;
- 				status = "okay";
- 			};
 -- 
 1.7.9.5
