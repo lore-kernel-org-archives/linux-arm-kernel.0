@@ -1,67 +1,35 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon,  6 Mar 2017 01:35:56 +0000
-Subject: [PATCH] reset: sunxi: fix for 64-bit compilation
-Message-ID: <1488764156-22197-1-git-send-email-andre.przywara@arm.com>
+From: dalias@libc.org (Rich Felker)
+Date: Sun, 5 Mar 2017 20:52:07 -0500
+Subject: [PATCH 1/3] futex: remove duplicated code
+In-Reply-To: <20170303122712.13353-1-jslaby@suse.cz>
+References: <20170303122712.13353-1-jslaby@suse.cz>
+Message-ID: <20170306015207.GN1520@brightrain.aerifal.cx>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Allwinner reset controller has 32-bit registers, so translating
-the reset cell number into a register and bit offset should not use
-any architecture dependent data size. Otherwise this breaks for 64-bit
-architectures like arm64.
-Fix this by making it clear that it's the hardware register width which
-matters here in the calculation.
+On Fri, Mar 03, 2017 at 01:27:10PM +0100, Jiri Slaby wrote:
+> There is code duplicated over all architecture's headers for
+> futex_atomic_op_inuser. Namely op decoding, access_ok check for uaddr,
+> and comparison of the result.
+> 
+> Remove this duplication and leave up to the arches only the needed
+> assembly which is now in arch_futex_atomic_op_inuser.
+> 
+> Note that s390 removed access_ok check in d12a29703 ("s390/uaccess:
+> remove pointless access_ok() checks") as access_ok there returns true.
+> We introduce it back to the helper for the sake of simplicity (it gets
+> optimized away anyway).
 
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
----
- drivers/reset/reset-sunxi.c | 18 ++++++++++--------
- 1 file changed, 10 insertions(+), 8 deletions(-)
+Overall I'm in favor of this patch, and it's close to what I had in
+mind in the commit message for
+00b73d8d1b7131da03aec73011a7286f566fe87f. But I'd actually like to see
+it go further. These ops are mainly (only?) used for the (almost never
+used) FUTEX_WAKE_OP operation, and there's very little sense in trying
+to optimize them with dedicated arch-specific forms like "lock xadd".
+Instead the entire logic should be in an arch-generic file, and all
+the arch should need to provide is a cmpxchg-on-user-memory primitive
+for it to use. On most archs, the same cmpxchg used in kernelspace
+should also work for user addresses, meaning a huge amount of
+unmaintained, largely untested, junk code can be removed.
 
-diff --git a/drivers/reset/reset-sunxi.c b/drivers/reset/reset-sunxi.c
-index b44f6b5..cd585cd 100644
---- a/drivers/reset/reset-sunxi.c
-+++ b/drivers/reset/reset-sunxi.c
-@@ -34,15 +34,16 @@ static int sunxi_reset_assert(struct reset_controller_dev *rcdev,
- 	struct sunxi_reset_data *data = container_of(rcdev,
- 						     struct sunxi_reset_data,
- 						     rcdev);
--	int bank = id / BITS_PER_LONG;
--	int offset = id % BITS_PER_LONG;
-+	int reg_width = sizeof(u32);
-+	int bank = id / (reg_width * BITS_PER_BYTE);
-+	int offset = id % (reg_width * BITS_PER_BYTE);
- 	unsigned long flags;
- 	u32 reg;
- 
- 	spin_lock_irqsave(&data->lock, flags);
- 
--	reg = readl(data->membase + (bank * 4));
--	writel(reg & ~BIT(offset), data->membase + (bank * 4));
-+	reg = readl(data->membase + (bank * reg_width));
-+	writel(reg & ~BIT(offset), data->membase + (bank * reg_width));
- 
- 	spin_unlock_irqrestore(&data->lock, flags);
- 
-@@ -55,15 +56,16 @@ static int sunxi_reset_deassert(struct reset_controller_dev *rcdev,
- 	struct sunxi_reset_data *data = container_of(rcdev,
- 						     struct sunxi_reset_data,
- 						     rcdev);
--	int bank = id / BITS_PER_LONG;
--	int offset = id % BITS_PER_LONG;
-+	int reg_width = sizeof(u32);
-+	int bank = id / (reg_width * BITS_PER_BYTE);
-+	int offset = id % (reg_width * BITS_PER_BYTE);
- 	unsigned long flags;
- 	u32 reg;
- 
- 	spin_lock_irqsave(&data->lock, flags);
- 
--	reg = readl(data->membase + (bank * 4));
--	writel(reg | BIT(offset), data->membase + (bank * 4));
-+	reg = readl(data->membase + (bank * reg_width));
-+	writel(reg | BIT(offset), data->membase + (bank * reg_width));
- 
- 	spin_unlock_irqrestore(&data->lock, flags);
- 
--- 
-2.8.2
+Rich
