@@ -1,153 +1,138 @@
 From: eric.auger@redhat.com (Eric Auger)
-Date: Mon,  6 Mar 2017 12:34:30 +0100
-Subject: [PATCH v3 15/19] KVM: arm64: ITS: Collection table save/restore
+Date: Mon,  6 Mar 2017 12:34:27 +0100
+Subject: [PATCH v3 12/19] KVM: arm64: ITS: vgic_its_alloc_ite/device
 In-Reply-To: <1488800074-21991-1-git-send-email-eric.auger@redhat.com>
 References: <1488800074-21991-1-git-send-email-eric.auger@redhat.com>
-Message-ID: <1488800074-21991-16-git-send-email-eric.auger@redhat.com>
+Message-ID: <1488800074-21991-13-git-send-email-eric.auger@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The flush path copies the collection entries into guest RAM
-at the GPA specified in the BASER register. This obviously
-requires the BASER to be set. The last written element
-is a dummy collection table entry.
-
-We do not index by collection ID as the collection entry
-can fit into 8 bytes while containing the collection ID.
-
-On restore path we re-allocate the collection objects.
+Add two new helpers to allocate an its ite and an its device.
+This will avoid duplication on restore path.
 
 Signed-off-by: Eric Auger <eric.auger@redhat.com>
 
 ---
 
 v1 -> v2:
-- reword commit message and directly use 8 as entry size
-- no kvm parameter anymore
-- add helper for flush/restore cte
-- table size computed here
-- add le64/cpu conversions
+- report itt_size fix and remove ITE_SIZE
+- s/itte/ite/g
 ---
- virt/kvm/arm/vgic/vgic-its.c | 94 +++++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 92 insertions(+), 2 deletions(-)
+ virt/kvm/arm/vgic/vgic-its.c | 70 +++++++++++++++++++++++++++++---------------
+ 1 file changed, 47 insertions(+), 23 deletions(-)
 
 diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index cf04776..ad67759 100644
+index dd7545a..9792110 100644
 --- a/virt/kvm/arm/vgic/vgic-its.c
 +++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -1761,13 +1761,84 @@ static int vgic_its_restore_device_tables(struct vgic_its *its)
- 	return -ENXIO;
+@@ -734,6 +734,26 @@ static void vgic_its_free_collection(struct vgic_its *its, u32 coll_id)
+ 	kfree(collection);
  }
  
-+static int vgic_its_flush_cte(struct vgic_its *its,
-+			      struct its_collection *collection, u64 *ptr)
++static int vgic_its_alloc_ite(struct its_device *device,
++			       struct its_ite **itep,
++			       struct its_collection *collection,
++			       u32 lpi_id, u32 event_id)
 +{
-+	u64 val;
-+	int ret;
++	struct its_ite *ite;
 +
-+	val = ((u64)1 << 63 | ((u64)collection->target_addr << 16) |
-+	       collection->collection_id);
-+	val = cpu_to_le64(val);
-+	ret = kvm_write_guest(its->dev->kvm, (gpa_t)ptr, &val, 8);
-+	return ret;
-+}
++	ite = kzalloc(sizeof(ite), GFP_KERNEL);
++	if (!ite)
++		return -ENOMEM;
 +
-+static int vgic_its_restore_cte(struct vgic_its *its, u64 *ptr, bool *valid)
-+{
-+	struct its_collection *collection;
-+	u32 target_addr;
-+	u32 coll_id;
-+	u64 val;
-+	int ret;
++	ite->event_id	= event_id;
++	ite->collection = collection;
++	ite->lpi = lpi_id;
 +
-+	*valid = false;
-+
-+	ret = kvm_read_guest(its->dev->kvm, (gpa_t)ptr, &val, 8);
-+	if (ret)
-+		return ret;
-+	val = le64_to_cpu(val);
-+	*valid = val & BIT_ULL(63);
-+
-+	if (!*valid)
-+		return 0;
-+
-+	target_addr = (u32)(val >> 16);
-+	coll_id = val & 0xFFFF;
-+	ret = vgic_its_alloc_collection(its, &collection, coll_id);
-+	if (ret)
-+		return ret;
-+	collection->target_addr = target_addr;
++	list_add_tail(&ite->ite_list, &device->itt_head);
++	*itep = ite;
 +	return 0;
 +}
 +
- /**
-  * vgic_its_flush_collection_table - flush the collection table into
-  * guest RAM
-  */
- static int vgic_its_flush_collection_table(struct vgic_its *its)
- {
--	return -ENXIO;
-+	struct its_collection *collection;
-+	u64 val, *ptr;
-+	size_t max_size, filled = 0;
-+	int ret;
-+
-+	ptr = (u64 *)(BASER_ADDRESS(its->baser_coll_table));
-+	if (!ptr)
-+		return 0;
-+
-+	max_size = GITS_BASER_NR_PAGES(its->baser_coll_table) * SZ_64K;
-+
-+	list_for_each_entry(collection, &its->collection_list, coll_list) {
-+		if (filled == max_size)
-+			return -ENOSPC;
-+		ret = vgic_its_flush_cte(its, collection, ptr);
-+		if (ret)
-+			return ret;
-+		ptr++;
-+		filled += 8;
-+	}
-+
-+	if (filled == max_size)
-+		return 0;
-+
-+	/*
-+	 * table is not fully filled, add a last dummy element
-+	 * with valid bit unset
-+	 */
-+	val = 0;
-+	ret = kvm_write_guest(its->dev->kvm, (gpa_t)ptr, &val, 8);
-+	return ret;
+ /*
+  * The MAPTI and MAPI commands map LPIs to ITTEs.
+  * Must be called with its_lock mutex held.
+@@ -747,7 +767,7 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
+ 	struct its_ite *ite;
+ 	struct its_device *device;
+ 	struct its_collection *collection, *new_coll = NULL;
+-	int lpi_nr;
++	int lpi_nr, ret;
+ 	struct vgic_irq *irq;
+ 
+ 	device = find_its_device(its, device_id);
+@@ -777,19 +797,13 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
+ 		new_coll = collection;
+ 	}
+ 
+-	ite = kzalloc(sizeof(struct its_ite), GFP_KERNEL);
+-	if (!ite) {
++	ret = vgic_its_alloc_ite(device, &ite, collection, lpi_nr, event_id);
++	if (ret) {
+ 		if (new_coll)
+ 			vgic_its_free_collection(its, coll_id);
+-		return -ENOMEM;
++		return ret;
+ 	}
+ 
+-	ite->event_id	= event_id;
+-	list_add_tail(&ite->ite_list, &device->itt_head);
+-
+-	ite->collection = collection;
+-	ite->lpi = lpi_nr;
+-
+ 	irq = vgic_add_lpi(kvm, lpi_nr);
+ 	if (IS_ERR(irq)) {
+ 		if (new_coll)
+@@ -828,6 +842,28 @@ static void vgic_its_unmap_device(struct kvm *kvm, struct its_device *device)
+ 	kfree(device);
  }
  
- /**
-@@ -1777,7 +1848,26 @@ static int vgic_its_flush_collection_table(struct vgic_its *its)
-  */
- static int vgic_its_restore_collection_table(struct vgic_its *its)
- {
--	return -ENXIO;
-+	size_t max_size, read = 0;
-+	u64 *ptr;
-+	int ret;
++static int vgic_its_alloc_device(struct vgic_its *its,
++				 struct its_device **devp,
++				 u32 device_id, gpa_t itt_addr_field,
++				 size_t size_field)
++{
++	struct its_device *device;
 +
-+	ptr = (u64 *)(BASER_ADDRESS(its->baser_coll_table));
-+	if (!ptr)
-+		return 0;
++	device = kzalloc(sizeof(*device), GFP_KERNEL);
++	if (!device)
++		return -ENOMEM;
 +
-+	max_size = GITS_BASER_NR_PAGES(its->baser_coll_table) * SZ_64K;
++	device->device_id = device_id;
++	device->itt_addr = itt_addr_field << 8;
++	device->nb_eventid_bits = size_field + 1;
++	INIT_LIST_HEAD(&device->itt_head);
 +
-+	while (read < max_size) {
-+		bool valid;
++	list_add_tail(&device->dev_list, &its->device_list);
++	*devp = device;
 +
-+		ret = vgic_its_restore_cte(its, ptr, &valid);
-+		if (!valid || ret)
-+			break;
-+		ptr++;
-+		read += 8;
-+	}
-+	return ret;
++	return 0;
++}
++
+ /*
+  * MAPD maps or unmaps a device ID to Interrupt Translation Tables (ITTs).
+  * Must be called with the its_lock mutex held.
+@@ -864,19 +900,7 @@ static int vgic_its_cmd_handle_mapd(struct kvm *kvm, struct vgic_its *its,
+ 	if (!valid)
+ 		return 0;
+ 
+-	device = kzalloc(sizeof(struct its_device), GFP_KERNEL);
+-	if (!device)
+-		return -ENOMEM;
+-
+-	device->device_id = device_id;
+-	device->itt_addr = itt_addr << 8;
+-	device->nb_eventid_bits = size + 1;
+-
+-	INIT_LIST_HEAD(&device->itt_head);
+-
+-	list_add_tail(&device->dev_list, &its->device_list);
+-
+-	return 0;
++	return vgic_its_alloc_device(its, &device, device_id, itt_addr, size);
  }
  
- /**
+ /*
 -- 
 2.5.5
