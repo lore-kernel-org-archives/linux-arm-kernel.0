@@ -1,59 +1,95 @@
-From: tbaicar@codeaurora.org (Baicar, Tyler)
-Date: Mon, 6 Mar 2017 07:00:30 -0700
-Subject: [PATCH V11 10/10] arm/arm64: KVM: add guest SEA support
-In-Reply-To: <58BD39B4.9050809@arm.com>
-References: <1487712121-16688-1-git-send-email-tbaicar@codeaurora.org>
- <1487712121-16688-11-git-send-email-tbaicar@codeaurora.org>
- <58B00E12.5020602@arm.com>
- <ff3aa805-0e03-9854-e294-ff6934c57f3f@codeaurora.org>
- <58BD39B4.9050809@arm.com>
-Message-ID: <4b4bea7c-7591-8051-7be0-528581f29d10@codeaurora.org>
+From: romain.perier@collabora.com (Romain Perier)
+Date: Mon,  6 Mar 2017 15:17:13 +0100
+Subject: [PATCH v2 1/4] mmc: core: Add post_ios_power_on callback for power
+ sequences
+In-Reply-To: <20170306141716.19120-1-romain.perier@collabora.com>
+References: <20170306141716.19120-1-romain.perier@collabora.com>
+Message-ID: <20170306141716.19120-2-romain.perier@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello James,
+Currently, ->pre_power_on() callback is called at the beginning of the
+mmc_power_up() function before MMC_POWER_UP and MMC_POWER_ON sequences.
+The callback ->post_power_on() is called at the end of the
+mmc_power_up() function. Some SDIO Chipsets require to gate the clock
+after than the vqmmc supply is powered on and then toggle the reset
+line. Currently, there is no way for doing this.
 
+This commit introduces a new callback ->post_ios_power_on(), that is
+called at the end of the mmc_power_up() function after the mmc_set_ios()
+operation. In this way the entire power sequences can be done from this
+function after the enablement of the power supply.
 
-On 3/6/2017 3:28 AM, James Morse wrote:
-> On 28/02/17 19:43, Baicar, Tyler wrote:
->> On 2/24/2017 3:42 AM, James Morse wrote:
->>> On 21/02/17 21:22, Tyler Baicar wrote:
->>>> Currently external aborts are unsupported by the guest abort
->>>> handling. Add handling for SEAs so that the host kernel reports
->>>> SEAs which occur in the guest kernel.
->>>> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
->>>> index b2d57fc..403277b 100644
->>>> --- a/arch/arm64/mm/fault.c
->>>> +++ b/arch/arm64/mm/fault.c
->>>> @@ -602,6 +602,24 @@ static const char *fault_name(unsigned int esr)
->>>>    }
->>>>
->>>>    /*
->>>> + * Handle Synchronous External Aborts that occur in a guest kernel.
->>>> + */
->>>> +int handle_guest_sea(unsigned long addr, unsigned int esr)
->>>> +{
->>>> +    if(IS_ENABLED(HAVE_ACPI_APEI_SEA)) {
->>>> +        nmi_enter();
->>>> +        ghes_notify_sea();
->>>> +        nmi_exit();
->>> This nmi stuff was needed for synchronous aborts that may have interrupted
->>> APEI's interrupts-masked code. We want to avoid trying to take the same set of
->>> locks, hence taking the in_nmi() path through APEI. Here we know we interrupted
->>> a guest, so there is no risk that we have interrupted APEI on the host.
->>> ghes_notify_sea() can safely take the normal path.
->> Makes sense, I can remove the nmi_* calls here.
-> Just occurs to me: if we do this we need to add the rcu_read_lock() in
-> ghes_notify_sea() as its not protected by the rcu/nmi weirdness.
->
-True, would you suggest leaving these nmi_* calls or adding the rcu_* 
-calls? And since that's only needed for this KVM case, shouldn't the 
-rcu_* calls just replace the nmi_* calls here (outside of ghes_notify_sea)?
+Signed-off-by: Romain Perier <romain.perier@collabora.com>
+---
 
-Thanks,
-Tyler
+Changes in v2:
+ - Added missing declaration for mmc_pwrseq_post_ios_power_on when
+   CONFIG_OF is disabled.
 
+ drivers/mmc/core/core.c   | 1 +
+ drivers/mmc/core/pwrseq.c | 8 ++++++++
+ drivers/mmc/core/pwrseq.h | 3 +++
+ 3 files changed, 12 insertions(+)
+
+diff --git a/drivers/mmc/core/core.c b/drivers/mmc/core/core.c
+index 1076b9d..d73a050 100644
+--- a/drivers/mmc/core/core.c
++++ b/drivers/mmc/core/core.c
+@@ -1831,6 +1831,7 @@ void mmc_power_up(struct mmc_host *host, u32 ocr)
+ 	 * time required to reach a stable voltage.
+ 	 */
+ 	mmc_delay(10);
++	mmc_pwrseq_post_ios_power_on(host);
+ }
+ 
+ void mmc_power_off(struct mmc_host *host)
+diff --git a/drivers/mmc/core/pwrseq.c b/drivers/mmc/core/pwrseq.c
+index 9386c47..98f50b7 100644
+--- a/drivers/mmc/core/pwrseq.c
++++ b/drivers/mmc/core/pwrseq.c
+@@ -68,6 +68,14 @@ void mmc_pwrseq_post_power_on(struct mmc_host *host)
+ 		pwrseq->ops->post_power_on(host);
+ }
+ 
++void mmc_pwrseq_post_ios_power_on(struct mmc_host *host)
++{
++	struct mmc_pwrseq *pwrseq = host->pwrseq;
++
++	if (pwrseq && pwrseq->ops->post_ios_power_on)
++		pwrseq->ops->post_ios_power_on(host);
++}
++
+ void mmc_pwrseq_power_off(struct mmc_host *host)
+ {
+ 	struct mmc_pwrseq *pwrseq = host->pwrseq;
+diff --git a/drivers/mmc/core/pwrseq.h b/drivers/mmc/core/pwrseq.h
+index d69e751..ad6e3af 100644
+--- a/drivers/mmc/core/pwrseq.h
++++ b/drivers/mmc/core/pwrseq.h
+@@ -13,6 +13,7 @@
+ struct mmc_pwrseq_ops {
+ 	void (*pre_power_on)(struct mmc_host *host);
+ 	void (*post_power_on)(struct mmc_host *host);
++	void (*post_ios_power_on)(struct mmc_host *host);
+ 	void (*power_off)(struct mmc_host *host);
+ };
+ 
+@@ -31,6 +32,7 @@ void mmc_pwrseq_unregister(struct mmc_pwrseq *pwrseq);
+ int mmc_pwrseq_alloc(struct mmc_host *host);
+ void mmc_pwrseq_pre_power_on(struct mmc_host *host);
+ void mmc_pwrseq_post_power_on(struct mmc_host *host);
++void mmc_pwrseq_post_ios_power_on(struct mmc_host *host);
+ void mmc_pwrseq_power_off(struct mmc_host *host);
+ void mmc_pwrseq_free(struct mmc_host *host);
+ 
+@@ -44,6 +46,7 @@ static inline void mmc_pwrseq_unregister(struct mmc_pwrseq *pwrseq) {}
+ static inline int mmc_pwrseq_alloc(struct mmc_host *host) { return 0; }
+ static inline void mmc_pwrseq_pre_power_on(struct mmc_host *host) {}
+ static inline void mmc_pwrseq_post_power_on(struct mmc_host *host) {}
++static inline void mmc_pwrseq_post_ios_power_on(struct mmc_host *host) {}
+ static inline void mmc_pwrseq_power_off(struct mmc_host *host) {}
+ static inline void mmc_pwrseq_free(struct mmc_host *host) {}
+ 
 -- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project.
+2.9.3
