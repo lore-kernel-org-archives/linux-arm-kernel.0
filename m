@@ -1,84 +1,120 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon,  6 Mar 2017 13:18:36 -0300
-Subject: [PATCH] ARM: dts: imx6sx: Make UART compatible to 'imx6q-uart'
-Message-ID: <1488817116-6079-1-git-send-email-festevam@gmail.com>
+From: lukma@denx.de (Lukasz Majewski)
+Date: Mon, 6 Mar 2017 17:23:48 +0100
+Subject: [PATCH 4/5] ARM: dts: dra7: Add updated operating-points-v2
+ table for cpu
+In-Reply-To: <1488813822-26042-5-git-send-email-d-gerlach@ti.com>
+References: <1488813822-26042-1-git-send-email-d-gerlach@ti.com>
+ <1488813822-26042-5-git-send-email-d-gerlach@ti.com>
+Message-ID: <20170306172348.2832ba51@jawa>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@nxp.com>
+On Mon, 6 Mar 2017 09:23:41 -0600
+Dave Gerlach <d-gerlach@ti.com> wrote:
 
-UART on i.MX6SX (like all other i.MX6 SoC variants) has the same
-programming model as the 'imx6q-uart' type, so add it to the compatible
-UART string.
+> After the ti-cpufreq driver has been added, we can now drop the
+> operating-points table present in dra7.dtsi for the cpu and add an
+> operating-points-v2 table with all OPPs available for all silicon
+> revisions. Also add necessary data for use by ti-cpufreq to
+> selectively enable the appropriate OPPs at runtime as part of the
+> operating-points table.
+> 
+> As we now need to define voltage ranges for each OPP, we define the
+> minimum and maximum voltage to match the ranges possible for AVS
+> class0 voltage as defined by the DRA7/AM57 Data Manual, with the
+> exception of using a range for OPP_OD based on historical data to
+> ensure that SoCs from older lots still continue to boot, even though
+> more optimal voltages are now the standard. Once an AVS Class0 driver
+> is in place it will be possible for these OPP voltages to be adjusted
+> to any voltage within the provided range.
+> 
+> Information from SPRS953, Revised December 2015.
+> 
+> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
 
-Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
----
- arch/arm/boot/dts/imx6sx.dtsi | 18 ++++++++++++------
- 1 file changed, 12 insertions(+), 6 deletions(-)
+Reviewed-by: Lukasz Majewski <lukma@denx.de>
 
-diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
-index dd4ec85..f58d7f5 100644
---- a/arch/arm/boot/dts/imx6sx.dtsi
-+++ b/arch/arm/boot/dts/imx6sx.dtsi
-@@ -297,7 +297,8 @@
- 				};
- 
- 				uart1: serial at 02020000 {
--					compatible = "fsl,imx6sx-uart", "fsl,imx21-uart";
-+					compatible = "fsl,imx6sx-uart",
-+						     "fsl,imx6q-uart", "fsl,imx21-uart";
- 					reg = <0x02020000 0x4000>;
- 					interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
- 					clocks = <&clks IMX6SX_CLK_UART_IPG>,
-@@ -1053,7 +1054,8 @@
- 			};
- 
- 			uart2: serial at 021e8000 {
--				compatible = "fsl,imx6sx-uart", "fsl,imx21-uart";
-+				compatible = "fsl,imx6sx-uart",
-+					     "fsl,imx6q-uart", "fsl,imx21-uart";
- 				reg = <0x021e8000 0x4000>;
- 				interrupts = <GIC_SPI 27 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&clks IMX6SX_CLK_UART_IPG>,
-@@ -1065,7 +1067,8 @@
- 			};
- 
- 			uart3: serial at 021ec000 {
--				compatible = "fsl,imx6sx-uart", "fsl,imx21-uart";
-+				compatible = "fsl,imx6sx-uart",
-+					     "fsl,imx6q-uart", "fsl,imx21-uart";
- 				reg = <0x021ec000 0x4000>;
- 				interrupts = <GIC_SPI 28 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&clks IMX6SX_CLK_UART_IPG>,
-@@ -1077,7 +1080,8 @@
- 			};
- 
- 			uart4: serial at 021f0000 {
--				compatible = "fsl,imx6sx-uart", "fsl,imx21-uart";
-+				compatible = "fsl,imx6sx-uart",
-+					     "fsl,imx6q-uart", "fsl,imx21-uart";
- 				reg = <0x021f0000 0x4000>;
- 				interrupts = <GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&clks IMX6SX_CLK_UART_IPG>,
-@@ -1089,7 +1093,8 @@
- 			};
- 
- 			uart5: serial at 021f4000 {
--				compatible = "fsl,imx6sx-uart", "fsl,imx21-uart";
-+				compatible = "fsl,imx6sx-uart",
-+					     "fsl,imx6q-uart", "fsl,imx21-uart";
- 				reg = <0x021f4000 0x4000>;
- 				interrupts = <GIC_SPI 30 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&clks IMX6SX_CLK_UART_IPG>,
-@@ -1229,7 +1234,8 @@
- 			};
- 
- 			uart6: serial at 022a0000 {
--				compatible = "fsl,imx6sx-uart", "fsl,imx21-uart";
-+				compatible = "fsl,imx6sx-uart",
-+					     "fsl,imx6q-uart", "fsl,imx21-uart";
- 				reg = <0x022a0000 0x4000>;
- 				interrupts = <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&clks IMX6SX_CLK_UART_IPG>,
--- 
-2.7.4
+> ---
+>  arch/arm/boot/dts/dra7.dtsi   | 24 +++++++++++++++++++-----
+>  arch/arm/boot/dts/dra74x.dtsi |  5 +++++
+>  2 files changed, 24 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+> index 2c9e56f4aac5..e9dc314b0dcf 100644
+> --- a/arch/arm/boot/dts/dra7.dtsi
+> +++ b/arch/arm/boot/dts/dra7.dtsi
+> @@ -81,11 +81,7 @@
+>  			compatible = "arm,cortex-a15";
+>  			reg = <0>;
+>  
+> -			operating-points = <
+> -				/* kHz    uV */
+> -				1000000	1060000
+> -				1176000	1160000
+> -				>;
+> +			operating-points-v2 = <&cpu0_opp_table>;
+>  
+>  			clocks = <&dpll_mpu_ck>;
+>  			clock-names = "cpu";
+> @@ -99,6 +95,24 @@
+>  		};
+>  	};
+>  
+> +	cpu0_opp_table: opp-table {
+> +		compatible = "operating-points-v2-ti-cpu";
+> +		syscon = <&scm_wkup>;
+> +
+> +		opp_nom at 1000000000 {
+> +			opp-hz = /bits/ 64 <1000000000>;
+> +			opp-microvolt = <1060000 850000 1150000>;
+> +			opp-supported-hw = <0xFF 0x01>;
+> +			opp-suspend;
+> +		};
+> +
+> +		opp_od at 1176000000 {
+> +			opp-hz = /bits/ 64 <1176000000>;
+> +			opp-microvolt = <1160000 885000 1160000>;
+> +			opp-supported-hw = <0xFF 0x02>;
+> +		};
+> +	};
+> +
+>  	/*
+>  	 * The soc node represents the soc top level view. It is
+> used for IPs
+>  	 * that are not memory mapped in the MPU view or for the MPU
+> itself. diff --git a/arch/arm/boot/dts/dra74x.dtsi
+> b/arch/arm/boot/dts/dra74x.dtsi index 0a78347e6615..24e6746c5b26
+> 100644 --- a/arch/arm/boot/dts/dra74x.dtsi
+> +++ b/arch/arm/boot/dts/dra74x.dtsi
+> @@ -17,6 +17,7 @@
+>  			device_type = "cpu";
+>  			compatible = "arm,cortex-a15";
+>  			reg = <1>;
+> +			operating-points-v2 = <&cpu0_opp_table>;
+>  		};
+>  	};
+>  
+> @@ -79,6 +80,10 @@
+>  	};
+>  };
+>  
+> +&cpu0_opp_table {
+> +	opp-shared;
+> +};
+> +
+>  &dss {
+>  	reg = <0x58000000 0x80>,
+>  	      <0x58004054 0x4>,
+
+
+
+
+Best regards,
+
+Lukasz Majewski
+
+--
+
+DENX Software Engineering GmbH,      Managing Director: Wolfgang Denk
+HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
+Phone: (+49)-8142-66989-10 Fax: (+49)-8142-66989-80 Email: wd at denx.de
