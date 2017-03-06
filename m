@@ -1,35 +1,55 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 6 Mar 2017 11:58:05 +0100
-Subject: [RFC PATCH 00/12] Ion cleanup in preparation for moving out of
- staging
-In-Reply-To: <20170306104041.zghsicrnadoap7lp@phenom.ffwll.local>
-References: <1488491084-17252-1-git-send-email-labbott@redhat.com>
- <20170303132949.GC31582@dhcp22.suse.cz>
- <cf383b9b-3cbc-0092-a071-f120874c053c@redhat.com>
- <20170306074258.GA27953@dhcp22.suse.cz>
- <20170306104041.zghsicrnadoap7lp@phenom.ffwll.local>
-Message-ID: <20170306105805.jsq44kfxhsvazkm6@sirena.org.uk>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Mon, 6 Mar 2017 11:03:56 +0000
+Subject: [PATCHv3 2/4] ARM: versatile: define empty debug_ll_io_init() for
+ no-MMU
+In-Reply-To: <1488332385-3367-3-git-send-email-gerg@uclinux.org>
+References: <1488332385-3367-1-git-send-email-gerg@uclinux.org>
+ <1488332385-3367-3-git-send-email-gerg@uclinux.org>
+Message-ID: <05c7cff1-d45f-2589-028a-f1892b11fdd2@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 06, 2017 at 11:40:41AM +0100, Daniel Vetter wrote:
+On 01/03/17 01:39, Greg Ungerer wrote:
+> No-MMU configured targets have no definition for debug_ll_io_init().
+> Not all machines use this and it will only be required if CONFIG_DEBUG_LL
+> is enabled.
+> 
+> But when compiling for a target that uses it and it is configured for
+> no-MMU (!CONFIG_MMU), for example the versatile machine, you will get:
+> 
+>   CC      arch/arm/mach-versatile/versatile_dt.o
+> arch/arm/mach-versatile/versatile_dt.c: In function ?versatile_map_io?:
+> arch/arm/mach-versatile/versatile_dt.c:283:2: error: implicit declaration of function ?debug_ll_io_init? [-Werror=implicit-function-declaration]
+>   debug_ll_io_init();
+>   ^
+> 
+> Fix by adding a macro for it to the !CONFIG_MMU path in map.h.
+> 
+> Signed-off-by: Greg Ungerer <gerg@uclinux.org>
+> ---
+>  arch/arm/include/asm/mach/map.h | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> v2: no change
+> v3: rebase on top of linux-4.10
+> 
+> diff --git a/arch/arm/include/asm/mach/map.h b/arch/arm/include/asm/mach/map.h
+> index 9b7c328..b1fe9c8 100644
+> --- a/arch/arm/include/asm/mach/map.h
+> +++ b/arch/arm/include/asm/mach/map.h
+> @@ -62,6 +62,7 @@ extern int ioremap_page(unsigned long virt, unsigned long phys,
+>  #else
+>  #define iotable_init(map,num)	do { } while (0)
+>  #define vm_reserve_area_early(a,s,c)	do { } while (0)
+> +#define debug_ll_io_init()	do { } while (0)
+>  #endif
+>  
+>  #endif
+> 
 
-> No one gave a thing about android in upstream, so Greg KH just dumped it
-> all into staging/android/. We've discussed ION a bunch of times, recorded
-> anything we'd like to fix in staging/android/TODO, and Laura's patch
-> series here addresses a big chunk of that.
+I ended up with the similar patch and I'd like to see fix merged, so FWIW
 
-> This is pretty much the same approach we (gpu folks) used to de-stage the
-> syncpt stuff.
+Reviewed-by: Vladimir Murzin <vladimir.murzin@arm.com>
 
-Well, there's also the fact that quite a few people have issues with the
-design (like Laurent).  It seems like a lot of them have either got more
-comfortable with it over time, or at least not managed to come up with
-any better ideas in the meantime.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170306/a9d7cff2/attachment.sig>
+Thanks
+Vladimir
