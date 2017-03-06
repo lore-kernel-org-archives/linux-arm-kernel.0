@@ -1,33 +1,37 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 6 Mar 2017 10:42:16 -0800
-Subject: [PATCH 0/7] thermal: ti-soc-thermal: Migrate slope/offset data
- to device tree
-In-Reply-To: <1488364190-23488-1-git-send-email-j-keerthy@ti.com>
-References: <1488364190-23488-1-git-send-email-j-keerthy@ti.com>
-Message-ID: <20170306184215.GO20572@atomide.com>
+From: naveen.n.rao@linux.vnet.ibm.com (Naveen N. Rao)
+Date: Tue,  7 Mar 2017 00:34:55 +0530
+Subject: [PATCH 2/3] arm: kprobes: remove kprobe_exceptions_notify
+In-Reply-To: <20170306183815.GX21222@n2100.armlinux.org.uk>
+References: <20170306183815.GX21222@n2100.armlinux.org.uk>
+Message-ID: <cover.1488826671.git.naveen.n.rao@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Keerthy <j-keerthy@ti.com> [170301 02:31]:
-> Currently the slope and offset values for calculating the
-> hot spot temperature of a particular thermal zone is part
-> of driver data. Pass them here instead and obtain the values
-> while of node parsing.
+On 2017/03/06 06:38PM, Russell King - ARM Linux wrote:
+> On Mon, Mar 06, 2017 at 11:37:20PM +0530, Naveen N. Rao wrote:
+> > On 2017/02/08 01:24AM, Naveen N Rao wrote:
+> > > ... as the weak variant will do.
+> > > 
+> > > Signed-off-by: Naveen N. Rao <naveen.n.rao@linux.vnet.ibm.com>
+> > > ---
+> > >  arch/arm/probes/kprobes/core.c     | 10 ----------
+> > >  arch/arm64/kernel/probes/kprobes.c |  6 ------
+> > >  2 files changed, 16 deletions(-)
+> > 
+> > With the generic changes in this series now in -rc1, can you please pick 
+> > this up?
 > 
-> Tested for the slope and constant values on DRA7-EVM.
+> It would've been nice to have been in the To: or Cc: on this patch,
+> I suspect everyone on the ARM side ignored this series (I certainly
+> didn't notice it, and I suspect the ARM64 folk didn't notice it for
+> exactly the same reason.)
 > 
-> Keerthy (7):
->   ARM: DRA7: Thermal: Add slope and offset values
->   ARM: OMAP5: Thermal: Add slope and offset values
->   ARM: OMAP443x: Thermal: Add slope and offset values
->   ARM: OMAP4460: Thermal: Add slope and offset values
->   thermal: ti-soc-thermal: Fetch slope and offset from DT
->   thermal: ti-soc-thermal: Remove redundant constants
->   thermal: ti-soc-thermal: Remove redundant code
+> In any case, this patch needs to be split - ARM and ARM64 are
+> maintained separately (as stated in MAINTAINERS), and patches go via
+> different trees.  Please resubmit with the patch split between the
+> architectures and proper recipients in the headers.
 
-Are the dts changes safe for me to pick separately into
-omap-for-v4.12/dt?
+Got it. Please find the updated patches in this thread.
 
-Regards,
-
-Tony
+Thanks,
+Naveen
