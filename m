@@ -1,78 +1,59 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon,  6 Mar 2017 05:42:37 -0800
-Subject: [PATCH v2] KVM: arm/arm64: Let vcpu thread modify its own active state
-Message-ID: <1488807757-86131-1-git-send-email-christoffer.dall@linaro.org>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 06 Mar 2017 15:43:53 +0200
+Subject: [RFC PATCH 10/12] staging: android: ion: Use CMA APIs directly
+In-Reply-To: <20170306103204.d3yf6woxpsqvdakp@phenom.ffwll.local>
+References: <1488491084-17252-1-git-send-email-labbott@redhat.com>
+ <0541f57b-4060-ea10-7173-26ae77777518@redhat.com>
+ <20170306103204.d3yf6woxpsqvdakp@phenom.ffwll.local>
+Message-ID: <6709093.jyTQHIiK7d@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jintack Lim <jintack@cs.columbia.edu>
+Hi Daniel,
 
-Currently, if a vcpu thread tries to change the active state of an
-interrupt which is already on the same vcpu's AP list, Since the VGIC
-mmio handler is called after a vcpu has already synced back the LR state
-to the struct vgic_irq, we can just let it proceed safely.
+On Monday 06 Mar 2017 11:32:04 Daniel Vetter wrote:
+> On Fri, Mar 03, 2017 at 10:50:20AM -0800, Laura Abbott wrote:
+> > On 03/03/2017 08:41 AM, Laurent Pinchart wrote:
+> >> On Thursday 02 Mar 2017 13:44:42 Laura Abbott wrote:
+> >>> When CMA was first introduced, its primary use was for DMA allocation
+> >>> and the only way to get CMA memory was to call dma_alloc_coherent. This
+> >>> put Ion in an awkward position since there was no device structure
+> >>> readily available and setting one up messed up the coherency model.
+> >>> These days, CMA can be allocated directly from the APIs. Switch to
+> >>> using this model to avoid needing a dummy device. This also avoids
+> >>> awkward caching questions.
+> >> 
+> >> If the DMA mapping API isn't suitable for today's requirements anymore,
+> >> I believe that's what needs to be fixed, instead of working around the
+> >> problem by introducing another use-case-specific API.
+> > 
+> > I don't think this is a usecase specific API. CMA has been decoupled from
+> > DMA already because it's used in other places. The trying to go through
+> > DMA was just another layer of abstraction, especially since there isn't
+> > a device available for allocation.
+> 
+> Also, we've had separation of allocation and dma-mapping since forever,
+> that's how it works almost everywhere. Not exactly sure why/how arm-soc
+> ecosystem ended up focused so much on dma_alloc_coherent.
 
-Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
----
-Changes since v1:
- - Reworked comment
- - Consider userspace accesses
- - Get the right requester VCPU for GICv3 private IRQ accesses
- - Tested using kvm-unit-tests and verified that it deadlocked without
-   this patch and passed the test with this patch :)
+I believe because that was the easy way to specify memory constraints. The API 
+receives a device pointer and will allocate memory suitable for DMA for that 
+device. The fact that it maps it to the device is a side-effect in my opinion.
 
- virt/kvm/arm/vgic/vgic-mmio.c | 32 ++++++++++++++++++++++++--------
- 1 file changed, 24 insertions(+), 8 deletions(-)
+> I think separating allocation from dma mapping/coherency is perfectly
+> fine, and the way to go.
 
-diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
-index 3654b4c..2a5db13 100644
---- a/virt/kvm/arm/vgic/vgic-mmio.c
-+++ b/virt/kvm/arm/vgic/vgic-mmio.c
-@@ -180,21 +180,37 @@ unsigned long vgic_mmio_read_active(struct kvm_vcpu *vcpu,
- static void vgic_mmio_change_active(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
- 				    bool new_active_state)
- {
-+	struct kvm_vcpu *requester_vcpu;
- 	spin_lock(&irq->irq_lock);
-+
-+	/*
-+	 * The vcpu parameter here can mean multiple things depending on how
-+	 * this function is called; when handling a trap from the kernel it
-+	 * depends on the GIC version, and these functions are also called as
-+	 * part of save/restore from userspace.
-+	 *
-+	 * Therefore, we have to figure out the requester in a reliable way.
-+	 *
-+	 * When accessing VGIC state from user space, the requester_vcpu is
-+	 * NULL, which is fine, because we guarantee that no VCPUs are running
-+	 * when accessing VGIC state from user space so irq->vcpu->cpu is
-+	 * always -1.
-+	 */
-+	requester_vcpu = kvm_arm_get_running_vcpu();
-+
- 	/*
- 	 * If this virtual IRQ was written into a list register, we
- 	 * have to make sure the CPU that runs the VCPU thread has
--	 * synced back LR state to the struct vgic_irq.  We can only
--	 * know this for sure, when either this irq is not assigned to
--	 * anyone's AP list anymore, or the VCPU thread is not
--	 * running on any CPUs.
-+	 * synced back the LR state to the struct vgic_irq.
- 	 *
--	 * In the opposite case, we know the VCPU thread may be on its
--	 * way back from the guest and still has to sync back this
--	 * IRQ, so we release and re-acquire the spin_lock to let the
--	 * other thread sync back the IRQ.
-+	 * As long as the conditions below are true, we know the VCPU thread
-+	 * may be on its way back from the guest (we kicked the VCPU thread in
-+	 * vgic_change_active_prepare)  and still has to sync back this IRQ,
-+	 * so we release and re-acquire the spin_lock to let the other thread
-+	 * sync back the IRQ.
- 	 */
- 	while (irq->vcpu && /* IRQ may have state in an LR somewhere */
-+	       irq->vcpu != requester_vcpu && /* Current thread is not the VCPU thread */
- 	       irq->vcpu->cpu != -1) /* VCPU thread is running */
- 		cond_resched_lock(&irq->irq_lock);
- 
+Especially given that in many cases we'll want to share buffers between 
+multiple devices, so we'll need to map them multiple times.
+
+My point still stands though, if we want to move towards a model where 
+allocation and mapping are decoupled, we need an allocation function that 
+takes constraints (possibly implemented with two layers, a constraint 
+resolution layer on top of a pool/heap/type/foo-based allocator), and a 
+mapping API. IOMMU handling being integrated in the DMA mapping API we're 
+currently stuck with it, which might call for brushing up that API.
+
 -- 
-2.5.0
+Regards,
+
+Laurent Pinchart
