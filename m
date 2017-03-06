@@ -1,35 +1,49 @@
-From: dalias@libc.org (Rich Felker)
-Date: Sun, 5 Mar 2017 20:52:07 -0500
-Subject: [PATCH 1/3] futex: remove duplicated code
-In-Reply-To: <20170303122712.13353-1-jslaby@suse.cz>
-References: <20170303122712.13353-1-jslaby@suse.cz>
-Message-ID: <20170306015207.GN1520@brightrain.aerifal.cx>
+From: lkp@intel.com (kbuild test robot)
+Date: Mon, 6 Mar 2017 10:16:04 +0800
+Subject: [PATCH] MIPS: jump_lable: Give __jump_table elements an entsize.
+In-Reply-To: <7fa95eea-20be-611c-2b63-fca600779465@caviumnetworks.com>
+Message-ID: <201703061059.MZ3PD3Yi%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 03, 2017 at 01:27:10PM +0100, Jiri Slaby wrote:
-> There is code duplicated over all architecture's headers for
-> futex_atomic_op_inuser. Namely op decoding, access_ok check for uaddr,
-> and comparison of the result.
-> 
-> Remove this duplication and leave up to the arches only the needed
-> assembly which is now in arch_futex_atomic_op_inuser.
-> 
-> Note that s390 removed access_ok check in d12a29703 ("s390/uaccess:
-> remove pointless access_ok() checks") as access_ok there returns true.
-> We introduce it back to the helper for the sake of simplicity (it gets
-> optimized away anyway).
+Hi David,
 
-Overall I'm in favor of this patch, and it's close to what I had in
-mind in the commit message for
-00b73d8d1b7131da03aec73011a7286f566fe87f. But I'd actually like to see
-it go further. These ops are mainly (only?) used for the (almost never
-used) FUTEX_WAKE_OP operation, and there's very little sense in trying
-to optimize them with dedicated arch-specific forms like "lock xadd".
-Instead the entire logic should be in an arch-generic file, and all
-the arch should need to provide is a cmpxchg-on-user-memory primitive
-for it to use. On most archs, the same cmpxchg used in kernelspace
-should also work for user addresses, meaning a huge amount of
-unmaintained, largely untested, junk code can be removed.
+[auto build test ERROR on linus/master]
+[also build test ERROR on v4.11-rc1 next-20170303]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-Rich
+url:    https://github.com/0day-ci/linux/commits/David-Daney/MIPS-jump_lable-Give-__jump_table-elements-an-entsize/20170228-231935
+config: mips-allyesconfig (attached as .config)
+compiler: mips-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=mips 
+
+All error/warnings (new ones prefixed by >>):
+
+   {standard input}: Assembler messages:
+>> {standard input}:968: Warning: entity size for SHF_MERGE not specified
+>> {standard input}:968: Error: junk at end of line, first unrecognized character is `@'
+>> {standard input}:968: Warning: ignoring changed section attributes for __jump_table
+   {standard input}:987: Warning: entity size for SHF_MERGE not specified
+   {standard input}:987: Error: junk at end of line, first unrecognized character is `@'
+   {standard input}:987: Warning: ignoring changed section attributes for __jump_table
+   {standard input}:1092: Warning: entity size for SHF_MERGE not specified
+   {standard input}:1092: Error: junk at end of line, first unrecognized character is `@'
+   {standard input}:1092: Warning: ignoring changed section attributes for __jump_table
+   {standard input}:1113: Warning: entity size for SHF_MERGE not specified
+   {standard input}:1113: Error: junk at end of line, first unrecognized character is `@'
+   {standard input}:1113: Warning: ignoring changed section attributes for __jump_table
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 45689 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170306/b764249a/attachment-0001.gz>
