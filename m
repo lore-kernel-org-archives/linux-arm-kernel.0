@@ -1,41 +1,97 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Mon, 6 Mar 2017 17:04:37 +0100
-Subject: [RFC PATCH 00/12] Ion cleanup in preparation for moving out of
- staging
-In-Reply-To: <20170306105805.jsq44kfxhsvazkm6@sirena.org.uk>
-References: <1488491084-17252-1-git-send-email-labbott@redhat.com>
- <20170303132949.GC31582@dhcp22.suse.cz>
- <cf383b9b-3cbc-0092-a071-f120874c053c@redhat.com>
- <20170306074258.GA27953@dhcp22.suse.cz>
- <20170306104041.zghsicrnadoap7lp@phenom.ffwll.local>
- <20170306105805.jsq44kfxhsvazkm6@sirena.org.uk>
-Message-ID: <20170306160437.sf7bksorlnw7u372@phenom.ffwll.local>
+From: slash.tmp@free.fr (Mason)
+Date: Mon, 6 Mar 2017 17:12:12 +0100
+Subject: Using the generic host PCIe driver
+In-Reply-To: <20170303200407.GB30375@bhelgaas-glaptop.roam.corp.google.com>
+References: <20170227164430.GB11162@bhelgaas-glaptop.roam.corp.google.com>
+ <8643c952-e915-bcd1-390e-9d4001789872@free.fr>
+ <20170227183534.GA12481@bhelgaas-glaptop.roam.corp.google.com>
+ <347d4200-e089-60df-5f60-58d16efc7c4e@free.fr>
+ <20170301161801.GB13171@bhelgaas-glaptop.roam.corp.google.com>
+ <98ee3041-6a94-91af-b4bf-208aa02624ed@free.fr>
+ <20170301215726.GA32286@bhelgaas-glaptop.roam.corp.google.com>
+ <258cd6f3-ef17-6705-ff48-ae06f26778c2@free.fr>
+ <20170303154628.GA21522@bhelgaas-glaptop.roam.corp.google.com>
+ <8e1a0b5d-8dfb-4be1-a049-b16892a6c0d0@free.fr>
+ <20170303200407.GB30375@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <267ec246-c32a-e0e2-b708-304a3dfb7342@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 06, 2017 at 11:58:05AM +0100, Mark Brown wrote:
-> On Mon, Mar 06, 2017 at 11:40:41AM +0100, Daniel Vetter wrote:
-> 
-> > No one gave a thing about android in upstream, so Greg KH just dumped it
-> > all into staging/android/. We've discussed ION a bunch of times, recorded
-> > anything we'd like to fix in staging/android/TODO, and Laura's patch
-> > series here addresses a big chunk of that.
-> 
-> > This is pretty much the same approach we (gpu folks) used to de-stage the
-> > syncpt stuff.
-> 
-> Well, there's also the fact that quite a few people have issues with the
-> design (like Laurent).  It seems like a lot of them have either got more
-> comfortable with it over time, or at least not managed to come up with
-> any better ideas in the meantime.
+On 03/03/2017 21:04, Bjorn Helgaas wrote:
 
-See the TODO, it has everything a really big group (look at the patch for
-the full Cc: list) figured needs to be improved at LPC 2015. We don't just
-merge stuff because merging stuff is fun :-)
+> On Fri, Mar 03, 2017 at 06:18:02PM +0100, Mason wrote:
+>
+>> # /usr/sbin/lspci -v
+>> 00:00.0 PCI bridge: Sigma Designs, Inc. Device 0024 (rev 01) (prog-if 00 [Normal decode])
+>>         Flags: bus master, fast devsel, latency 0
+>>         Memory at 90000000 (64-bit, non-prefetchable) [size=16M]
+>>         Bus: primary=00, secondary=01, subordinate=01, sec-latency=0
+>>         I/O behind bridge: 00000000-00000fff
+> 
+> Something's wrong with this.  You have no I/O windows through the host
+> bridge, which implies that you can't generic PCI I/O transactions, so
+> this I/O window should be disabled.  This might be an lspci issue;
+> what does "lspci -xxx" show?
+> 
+>>         Memory behind bridge: 91000000-910fffff
+>>         Prefetchable memory behind bridge: 00000000-000fffff
+> 
+> This prefetchable memory window is bogus, too.  It should probably be
+> disabled.  If the bridge doesn't support a prefetchable window, the
+> base and limit should be hardwired to zero.  If it supports a window
+> but it's disabled, the limit should be less than the base.  For
+> example, on my system I see this for a bridge with the window
+> disabled:
+> 
+>   # setpci -s00:1c.0 PREF_MEMORY_BASE
+>   fff1
+>   # setpci -s00:1c.0 PREF_MEMORY_LIMIT
+>   0001
 
-Laurent was even in that group ...
--Daniel
--- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
+MAJOR UPDATE: As pointed out by Ard, my DT was hopelessly wrong for
+the non-prefetchable memory region (in the ranges prop).
+
+In fact, my platform *multiplexes* config and MEM spaces.
+
+In other words, there are *two* overlapping 256 MB windows at CPU
+address 0x50000000. A register in MMIO space allows software to
+select either config space or MEM space.
+
+Current DT node:
+
+		pcie at 50000000 {
+			compatible = "pci-host-ecam-generic";
+			reg = <0x50000000 0x10000000>;
+			device_type = "pci";
+			#size-cells = <2>;
+			#address-cells = <3>;
+			#interrupt-cells = <1>;
+			ranges = <0x02000000 0x0 0x0  0x50000000  0x0 0x10000000>;
+		};
+
+
+Ard pointed out that Linux does not support such a setup.
+
+[    0.994011] OF: PCI: host bridge /soc/pcie at 50000000 ranges:
+[    0.999721] OF: PCI: Parsing ranges property...
+[    1.004386] OF: PCI:   MEM 0x50000000..0x5fffffff -> 0x00000000
+[    1.010471] pci-host-generic 50000000.pcie:
+		can't claim ECAM area [mem 0x50000000-0x5fffffff]:
+		address conflict with /soc/pcie at 50000000 [mem 0x50000000-0x5fffffff]
+[    1.025265] pci-host-generic: probe of 50000000.pcie failed with error -16
+
+IIUC, there may be concurrent accesses to config space and MEM space?
+
+I'm wondering what my options are for this controller at this point :-(
+
+In a separate (related) thread ("Panic in quirk_usb_early_handoff",
+David Laight wrote:
+
+> So to do a config space access you have to use a pair of IPIs
+> to stop the other cpus doing any PCIe data accesses while the
+> MMIO bit makes the accesses all point to config space.
+> (After taking a lock to get access to the MMIO register.)
+> 
+> Or has someone a better idea?
+
+Regards.
