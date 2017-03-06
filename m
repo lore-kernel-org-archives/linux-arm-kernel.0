@@ -1,90 +1,84 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Mon, 06 Mar 2017 09:27:47 -0800
-Subject: [PATCH v2 3/3] ARM64: dts: meson-gx: Add MALI nodes for GXBB and
- GXL
-In-Reply-To: <1825920f-586f-7c84-8e0e-958046397b64@baylibre.com> (Neil
- Armstrong's message of "Mon, 6 Mar 2017 09:58:33 +0100")
-References: <1488365164-22861-1-git-send-email-narmstrong@baylibre.com>
- <1488365164-22861-4-git-send-email-narmstrong@baylibre.com>
- <e26cf584-dab2-2702-f7e6-b28f750fa00c@suse.de>
- <e80d9fb0-1d71-7cab-5e32-72316474fdfc@baylibre.com>
- <m2tw7a17nb.fsf@baylibre.com>
- <9f3a17e8-63fa-6c14-4d17-0539ef7cd5a2@suse.de>
- <1825920f-586f-7c84-8e0e-958046397b64@baylibre.com>
-Message-ID: <m2efya1fjg.fsf@baylibre.com>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Tue, 07 Mar 2017 01:28:42 +0800
+Subject: [PATCH] mmc: sunxi: mask all Response Timeout error messages
+In-Reply-To: <20170306155313.nqxnhtsl4o5yrv33@lukather>
+References: <20170305164535.36259-1-icenowy@aosc.xyz>
+ <20170306100437.sr7mrvssdwnt7aaz@lukather>
+ <1597991488796361@web24m.yandex.ru> <20170306155313.nqxnhtsl4o5yrv33@lukather>
+Message-ID: <364721488821322@web5o.yandex.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Neil Armstrong <narmstrong@baylibre.com> writes:
 
-> On 03/04/2017 01:38 PM, Andreas F?rber wrote:
->> Am 03.03.2017 um 20:29 schrieb Kevin Hilman:
->>> Neil Armstrong <narmstrong@baylibre.com> writes:
->>>> On 03/02/2017 01:31 PM, Andreas F?rber wrote:
->>>>> Am 01.03.2017 um 11:46 schrieb Neil Armstrong:
->>>>>> The same MALI-450 MP3 GPU is present in the GXBB and GXL SoCs.
->> [...]
->>>>>> The node is simply added in the meson-gxbb.dtsi file.
->> [...]
->>>>>> For GXL, since a lot is shared with the GXM that has a MALI-T820 IP, this
->>>>>> patch adds a new meson-gxl-mali.dtsi and is included in the SoC specific
->>>>>> dtsi files.
->>>>>
->>>>> This part is slightly confusing though.
->>>>>
->>>>> What exactly is the GXL vs. GXM difference that this can't be handled by
->>>>> overriding node properties compatible/interrupts/clocks? I am missing a
->>>>> GXM patch in this series as rationale for doing it this way.
->>>>>
->>>>> In particular I am wondering whether the whole GXM-inherits-from-GXL
->>>>> concept is flawed and should be adjusted if this leads to secondary
->>>>> .dtsi files like this: My proposal would be to instead create a
->>>>> meson-gxl-gxm.dtsi, that meson-gxl.dtsi and meson-gxm.dtsi can inherit
->>>>> the current common parts from, then the Mali bits can simply go into
->>>>> meson-gxl.dtsi without extra #includes needed in S905X and S905D. While
->>>>> it's slightly more work to split once again, I think it would be cleaner.
->> [...]
->>>> The only changes are :
->> [...]
->>>>  - A different Mali core, but with the same interrupts (less but they share the same lower interrupts), clocks and memory space
->>>>
->>>> This is why it was decided to have a sub-dtsi, having a secondary dtsi will simply copy 99% of the GXL dtsi,
->>>> but surely we could also have an intermediate dtsi but for boards I'm ok with it, but less for a SoC dtsi,
->>>> since it could lead to some confusion.
->>>>
->>>> Finally, yes I could have added the mali node to the GXL dtsi, but the midgard Mali dt-bindings are not upstream
->>>> and the family is too big and recent enough to consider having stable bindings for now.
->>>>
->>>> Nevertheless, nothing is final, this gxl-mali.dtsi could be merged into the GXL dtsi in the future when we
->>>> have proper dt-bindings and a real support of the T820 Mali on the S912.
->>>>
->>>> Kevin, what's your thought about this ?
->>>
->>> I don't have a strong preference.  I'm OK with a separate Mali .dtsi due
->>> to the signficant overlap between GXL/GXM in terms of clocks, interrupts
->>> etc.
->>>
->>> However, if the plan is to #include this from GXM .dts files, whould a
->>> better name be meson-gx-mali.dtsi?
->> 
->> I thought the purpose was specifically to not have GXM include it
->> because it uses a Midgard IP.
->> 
->> If you want to share the fragment with GXBB too (gx), we should rather
->> use meson-gx-mali-utgard.dtsi, which would differentiate from GXM's
->> Midgard while still allowing for variation on the 4xx side (e.g., 470).
->> 
->> Regards,
->> Andreas
->> 
+
+06.03.2017, 23:53, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
+> On Mon, Mar 06, 2017 at 06:32:41PM +0800, Icenowy Zheng wrote:
+>> ?06.03.2017, 18:04, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
+>> ?> Hi,
+>> ?>
+>> ?> On Mon, Mar 06, 2017 at 12:45:35AM +0800, Icenowy Zheng wrote:
+>> ?>> ?Response Timeout is very usual: it will happen when trying to run some
+>> ?>> ?commands that do not belong to the card; it will happen when some SDIO
+>> ?>> ?card transfer beyond its SDIO bandwidth; and when the MMC controller is
+>> ?>> ?set to poll the card with "broken-cd" property (the Lichee Pi series of
+>> ?>> ?boards do this), it will flood to the console and make the console
+>> ?>> ?unusable.
+>> ?>>
+>> ?>> ?Mask all response-timeout-only error messages, only show it when another
+>> ?>> ?error happens.
+>> ?>>
+>> ?>> ?Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+>> ?>> ?---
+>> ?>> ??drivers/mmc/host/sunxi-mmc.c | 13 +++++++++----
+>> ?>> ??1 file changed, 9 insertions(+), 4 deletions(-)
+>> ?>>
+>> ?>> ?diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
+>> ?>> ?index 6ffcd2838272..7828e1f57cf0 100644
+>> ?>> ?--- a/drivers/mmc/host/sunxi-mmc.c
+>> ?>> ?+++ b/drivers/mmc/host/sunxi-mmc.c
+>> ?>> ?@@ -483,10 +483,15 @@ static void sunxi_mmc_dump_errinfo(struct sunxi_mmc_host *host)
+>> ?>> ??????????struct mmc_command *cmd = host->mrq->cmd;
+>> ?>> ??????????struct mmc_data *data = host->mrq->data;
+>> ?>>
+>> ?>> ?- /* For some cmds timeout is normal with sd/mmc cards */
+>> ?>> ?- if ((host->int_sum & SDXC_INTERRUPT_ERROR_BIT) ==
+>> ?>> ?- SDXC_RESP_TIMEOUT && (cmd->opcode == SD_IO_SEND_OP_COND ||
+>> ?>> ?- cmd->opcode == SD_IO_RW_DIRECT))
+>> ?>> ?+ /*
+>> ?>> ?+ * Reading timeout is usually normal, especially when doing
+>> ?>> ?+ * card-polling with "broken-cd" in device tree.
+>> ?>> ?+ * If do not mask it, the RTO error message will flood the console
+>> ?>> ?+ * and even hide useful error messages.
+>> ?>> ?+ *
+>> ?>> ?+ * Some SDIO commands will also normally timeout with non-SDIO cards.
+>> ?>> ?+ */
+>> ?>> ?+ if ((host->int_sum & SDXC_INTERRUPT_ERROR_BIT) == SDXC_RESP_TIMEOUT)
+>> ?>
+>> ?> We really shouldn't silence legit errors.
+>> ?>
+>> ?> The actual problem here is that we log them as error, we could
+>> ?> probably reduce it to debug.
+>>
+>> ?Even if it's reduced to debug, it will still flush dmesg buffers.
 >
-> Exact, there is no plan to include it from GXM.
+> No, it will not even be compiled by default.
 >
-> I'm not fan of having meson-gx-mali-utgard.dtsi, we should still need some attributes additions for
-> the clocks to the mali node in the gxbb dtsi and each s905x and s905d dtsi files.
-> I'm not sure this is even cleaner...
+>> ?Or make it only visible when "debug" parameter is present in kernel
+>> ?cmdline?
+>
+> debug messages are visible in dmesg only if DEBUG is defined, which is
+> only happening if CONFIG_MMC_DEBUG is set. This won't affect the
+> general case in any way.
+>
+> And it is output only if loglevel is set higher than 7.
 
-OK, I misunderstood the intent of having it separated from out from the
-GXL .dsti then.  Could you please clarify?
+Should I make all error messages debug level or only make "RTO"-only
+error to debug level like I currently do?
 
-Kevin
+>
+> Maxime
+>
+> --
+> Maxime Ripard, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
