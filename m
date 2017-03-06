@@ -1,28 +1,153 @@
-From: Jean-Philippe.Brucker@arm.com (Jean-Philippe Brucker)
-Date: Mon, 6 Mar 2017 11:31:08 +0000
-Subject: [RFC PATCH 18/30] PCI: Make "PRG Response PASID Required"
- handling common
-In-Reply-To: <20170303211140.GC31767@bhelgaas-glaptop.roam.corp.google.com>
-References: <20170227195441.5170-1-jean-philippe.brucker@arm.com>
- <20170227195441.5170-19-jean-philippe.brucker@arm.com>
- <20170303211140.GC31767@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <20170306113108.GC28804@e106794-lin.localdomain>
+From: eric.auger@redhat.com (Eric Auger)
+Date: Mon,  6 Mar 2017 12:34:30 +0100
+Subject: [PATCH v3 15/19] KVM: arm64: ITS: Collection table save/restore
+In-Reply-To: <1488800074-21991-1-git-send-email-eric.auger@redhat.com>
+References: <1488800074-21991-1-git-send-email-eric.auger@redhat.com>
+Message-ID: <1488800074-21991-16-git-send-email-eric.auger@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 03, 2017 at 03:11:40PM -0600, Bjorn Helgaas wrote:
-> On Mon, Feb 27, 2017 at 07:54:29PM +0000, Jean-Philippe Brucker wrote:
-> > The PASID ECN to the PCIe spec added a bit in the PRI status register that
-> > allows a Function to declare whether a PRG Response should contain the
-> > PASID prefix or not.
-> > 
-> > Move the helper that accesses it from amd_iommu into the PCI subsystem,
-> > renaming it to something more consistent with the spec, and introducing
-> > another obscure acronym to make it all fit.
-> 
-> Maybe mention the acronym itelf and spell it out here?
+The flush path copies the collection entries into guest RAM
+at the GPA specified in the BASER register. This obviously
+requires the BASER to be set. The last written element
+is a dummy collection table entry.
 
-Sure, I'll add this.
+We do not index by collection ID as the collection entry
+can fit into 8 bytes while containing the collection ID.
 
-Thanks,
-Jean-Philippe
+On restore path we re-allocate the collection objects.
+
+Signed-off-by: Eric Auger <eric.auger@redhat.com>
+
+---
+
+v1 -> v2:
+- reword commit message and directly use 8 as entry size
+- no kvm parameter anymore
+- add helper for flush/restore cte
+- table size computed here
+- add le64/cpu conversions
+---
+ virt/kvm/arm/vgic/vgic-its.c | 94 +++++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 92 insertions(+), 2 deletions(-)
+
+diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+index cf04776..ad67759 100644
+--- a/virt/kvm/arm/vgic/vgic-its.c
++++ b/virt/kvm/arm/vgic/vgic-its.c
+@@ -1761,13 +1761,84 @@ static int vgic_its_restore_device_tables(struct vgic_its *its)
+ 	return -ENXIO;
+ }
+ 
++static int vgic_its_flush_cte(struct vgic_its *its,
++			      struct its_collection *collection, u64 *ptr)
++{
++	u64 val;
++	int ret;
++
++	val = ((u64)1 << 63 | ((u64)collection->target_addr << 16) |
++	       collection->collection_id);
++	val = cpu_to_le64(val);
++	ret = kvm_write_guest(its->dev->kvm, (gpa_t)ptr, &val, 8);
++	return ret;
++}
++
++static int vgic_its_restore_cte(struct vgic_its *its, u64 *ptr, bool *valid)
++{
++	struct its_collection *collection;
++	u32 target_addr;
++	u32 coll_id;
++	u64 val;
++	int ret;
++
++	*valid = false;
++
++	ret = kvm_read_guest(its->dev->kvm, (gpa_t)ptr, &val, 8);
++	if (ret)
++		return ret;
++	val = le64_to_cpu(val);
++	*valid = val & BIT_ULL(63);
++
++	if (!*valid)
++		return 0;
++
++	target_addr = (u32)(val >> 16);
++	coll_id = val & 0xFFFF;
++	ret = vgic_its_alloc_collection(its, &collection, coll_id);
++	if (ret)
++		return ret;
++	collection->target_addr = target_addr;
++	return 0;
++}
++
+ /**
+  * vgic_its_flush_collection_table - flush the collection table into
+  * guest RAM
+  */
+ static int vgic_its_flush_collection_table(struct vgic_its *its)
+ {
+-	return -ENXIO;
++	struct its_collection *collection;
++	u64 val, *ptr;
++	size_t max_size, filled = 0;
++	int ret;
++
++	ptr = (u64 *)(BASER_ADDRESS(its->baser_coll_table));
++	if (!ptr)
++		return 0;
++
++	max_size = GITS_BASER_NR_PAGES(its->baser_coll_table) * SZ_64K;
++
++	list_for_each_entry(collection, &its->collection_list, coll_list) {
++		if (filled == max_size)
++			return -ENOSPC;
++		ret = vgic_its_flush_cte(its, collection, ptr);
++		if (ret)
++			return ret;
++		ptr++;
++		filled += 8;
++	}
++
++	if (filled == max_size)
++		return 0;
++
++	/*
++	 * table is not fully filled, add a last dummy element
++	 * with valid bit unset
++	 */
++	val = 0;
++	ret = kvm_write_guest(its->dev->kvm, (gpa_t)ptr, &val, 8);
++	return ret;
+ }
+ 
+ /**
+@@ -1777,7 +1848,26 @@ static int vgic_its_flush_collection_table(struct vgic_its *its)
+  */
+ static int vgic_its_restore_collection_table(struct vgic_its *its)
+ {
+-	return -ENXIO;
++	size_t max_size, read = 0;
++	u64 *ptr;
++	int ret;
++
++	ptr = (u64 *)(BASER_ADDRESS(its->baser_coll_table));
++	if (!ptr)
++		return 0;
++
++	max_size = GITS_BASER_NR_PAGES(its->baser_coll_table) * SZ_64K;
++
++	while (read < max_size) {
++		bool valid;
++
++		ret = vgic_its_restore_cte(its, ptr, &valid);
++		if (!valid || ret)
++			break;
++		ptr++;
++		read += 8;
++	}
++	return ret;
+ }
+ 
+ /**
+-- 
+2.5.5
