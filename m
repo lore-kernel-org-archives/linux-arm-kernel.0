@@ -1,49 +1,39 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Mon, 6 Mar 2017 15:52:08 -0600
-Subject: [PATCH] pinctrl: qcom: add get_direction function
-In-Reply-To: <CACRpkdaoHTZa+XjEBAMtO2dS1jevi5h-QYe90SrZDuJghQSyYw@mail.gmail.com>
-References: <1486768860-18237-1-git-send-email-timur@codeaurora.org>
- <8652c018-4051-5c77-3126-2d41d150518a@codeaurora.org>
- <CACRpkdaoHTZa+XjEBAMtO2dS1jevi5h-QYe90SrZDuJghQSyYw@mail.gmail.com>
-Message-ID: <13b19c7f-9440-ab8e-8a2f-d1796a9b3dde@codeaurora.org>
+From: christopher.spinrath@rwth-aachen.de (Christopher Spinrath)
+Date: Mon, 6 Mar 2017 22:51:19 +0100
+Subject: [PATCH 1/2] drm/bridge: ti-tfp410: support hpd via gpio
+In-Reply-To: <093b4e9c0ae6413499e5bf8ec309fa41@rwthex-s1-b.rwth-ad.de>
+References: <2e47786ab3d04078ae70d0c4064f7c4d@rwthex-s1-b.rwth-ad.de>
+ <093b4e9c0ae6413499e5bf8ec309fa41@rwthex-s1-b.rwth-ad.de>
+Message-ID: <6dfb2b66ec2a408dabe80d703f411ce0@rwthex-s1-b.rwth-ad.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/22/2017 09:49 AM, Linus Walleij wrote:
-> Actually no. The GPIOF* #defines are for the consumer side of GPIO,
-> not the driver side. We actually just use 0/1 in drivers.
+Hi Fabio,
+
+On 03/06/2017 10:46 PM, Fabio Estevam wrote:
+> Hi Christopher,
 >
-> So I merged this v1 version.
+> On Mon, Mar 6, 2017 at 6:40 PM,  <christopher.spinrath@rwth-aachen.de> wrote:
+>> From: Christopher Spinrath <christopher.spinrath@rwth-aachen.de>
+>>
+>> On some boards the hpd pin of a hdmi connector is wired up to a gpio
+>> pin. Since in the DRM world the tfp410 driver is responsible for
+>> handling the connector, add support for hpd gpios in this very driver.
+>>
+>> Signed-off-by: Christopher Spinrath <christopher.spinrath@rwth-aachen.de>
+>> ---
+>>  drivers/gpu/drm/bridge/ti-tfp410.c | 72 ++++++++++++++++++++++++++++++++++++--
+>
+> It would be nice to add 'hpd-gpios' property in the binding doc as well:
+> Documentation/devicetree/bindings/display/bridge/ti,tfp410.txt
 
-Thanks.
+The hpd-gpios property does *not* belong to the ti,tfp410 binding but to 
+the hdmi-connector one where it is already documented:
+Documentation/devicetree/bindings/display/connector/hdmi-connector.txt
 
-So I have a follow-up question.
+Unfortunatly, there is no dedicated driver for the connector in Linux; 
+the connector properties have to be handled by the encoder (here  the 
+tfp410) driver. Note that this already happens for the ddc-i2c-bus property.
 
-On ACPI platforms, the kernel has no control over the muxing (aka function) 
-of the various pins.  Firmware configures the TLMM controller for all pins, 
-and configures them for whatever functions they're supposed to be.
-
-You can see an example of this in pinctrl-qdf2xxx.c.  As you can see, each 
-group consists of 1 pin, and there are 0 functions defined.
-
-Function 0 is plain gpio I/O.  The other functions (1-7, typically) are muxes 
-for various devices, like UART TX, etc.
-
-Therefore, on ACPI, the driver should never change the function of any pin. 
-If it's set to something other than 0, then it should never touch that pin. 
-Don't write to it, don't change the direction, and definitely don't change 
-the function.
-
-So would it be acceptable, for example, to change msm_gpio_set() such that if 
-the function of that pin is non-zero, just return an error?
-
-After all, if pin #17 is set to UART and not GPIO, then there's no point in 
-setting that value to 1 or 0, because it's not muxed for GPIO and therefore, 
-that 1/0 is not actually going anywhere.  It won't be written to the pin.
-
-I hope I'm making sense.
-
--- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
-Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+Cheers,
+Christopher
