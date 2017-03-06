@@ -1,16 +1,82 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 6 Mar 2017 11:01:06 +0100
-Subject: [PATCH v5 0/3][RESEND] Add QorIQ LS2088A platform support
-In-Reply-To: <1485930516-23146-1-git-send-email-abhimanyu.saini@nxp.com>
-References: <1485930516-23146-1-git-send-email-abhimanyu.saini@nxp.com>
-Message-ID: <20170306100105.GA6023@x250>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 6 Mar 2017 11:02:20 +0100
+Subject: [PATCH 4/4] tty/serial: sh-sci: remove uneeded IS_ERR_OR_NULL
+ calls
+In-Reply-To: <CAMuHMdWQuvANNU14A7NQuzv6AFp04bq4DG_oc7w9h4wUrG+4aQ@mail.gmail.com>
+References: <20170303191248.wlwjri55ip2x5pgg@pengutronix.de>
+ <CAMuHMdXFrwa2jCVDb+8ecqgARLG0oGrPp9pLs0b6vEiWeKJ+uA@mail.gmail.com>
+ <20170303194414.n76tr3oa2mlrzjre@pengutronix.de>
+ <CAMuHMdXiz5hqW=fm-2H1aNKq_gXD2o0508jD2XjxYUvKoEvHdw@mail.gmail.com>
+ <20170304174819.esxhwwbsxzuq3vyc@pengutronix.de>
+ <CAMuHMdX8BEnaTtNFAbcvfHwJH=oPUmQ2NB+jfouGyhQpJ_m_4A@mail.gmail.com>
+ <20170306085842.yijkfpqi3adcedmm@pengutronix.de>
+ <CAMuHMdV2_vbocY4wCzvYtPAaF+QEX_Y4g6qVu5EqEBf5AnFdaw@mail.gmail.com>
+ <20170306093043.ay4dz3ehp3aakwxh@pengutronix.de>
+ <CAMuHMdWQuvANNU14A7NQuzv6AFp04bq4DG_oc7w9h4wUrG+4aQ@mail.gmail.com>
+Message-ID: <20170306100220.droey65uq2ew3mzu@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 01, 2017 at 11:58:33AM +0530, Abhimanyu Saini wrote:
-> Abhimanyu Saini (3):
->   dt-bindings: Add compatible for LS2088A QDS and RDB board
->   arm64: dts: freescale: ls2080a: Split devicetree for code resuability
->   arm64: dts: freescale: ls2088a: Add DTS support for FSL's LS2088A SoC
+Cc += LinusW
 
-Applied all, thanks.
+On Mon, Mar 06, 2017 at 10:53:27AM +0100, Geert Uytterhoeven wrote:
+> On Mon, Mar 6, 2017 at 10:30 AM, Uwe Kleine-K?nig
+> <u.kleine-koenig@pengutronix.de> wrote:
+> > On Mon, Mar 06, 2017 at 10:09:50AM +0100, Geert Uytterhoeven wrote:
+> >> On Mon, Mar 6, 2017 at 9:58 AM, Uwe Kleine-K?nig
+> >> <u.kleine-koenig@pengutronix.de> wrote:
+> >> > On Mon, Mar 06, 2017 at 09:49:39AM +0100, Geert Uytterhoeven wrote:
+> >> >> > Given that mctrl-gpio can be useful on legacy platforms, a device could
+> >> >> > silently run without cts-gpio even there.
+> >> >>
+> >> >> On platforms were CONFIG_GPIOLIB=n, this is not true, so the issue is moot.
+> >> >>
+> >> >> All serial drivers using (optional) mctrl-gpio have this in Kconfig:
+> >> >>
+> >> >>     select SERIAL_MCTRL_GPIO if GPIOLIB
+> >> >>
+> >> >> So they will use mctrl-gpio when GPIOLIB is enabled.
+> >> >> If GPIOPLIB is disabled, no flow control GPIOs are expected, and the
+> >> >> driver should not break that case.
+> >> >
+> >> > So it all boils down to the question: Is GPIOLIB=n enough to assume no
+> >> > gpio is needed?
+> >> >
+> >> > I'd say it is not.
+> >>
+> >> How does the platform register these GPIOs when GPIOPLIB is not enabled by
+> >> the platform, and gpiod_add_lookup_table() is thus not available?
+> >
+> > Obviously the platformcode cannot. In this case you could argue that
+> > platformcode shouldn't register the device if a gpio is necessary. But
+> > this reasoning doesn't work for (DT=y || ACPI=y) && GPIOLIB=n.
+> >
+> > I wouldn't want to code this in each driver (something like:
+> >
+> >         if (IS_ENABLED(GPIOLIB) || device_is_instantiated_by_dt(dev) || device_is_instantiated_by_acpi(dev))
+> >                 gpios = mctrl_gpio_init(...);
+> >         else
+> >                 gpios = NULL;
+> >
+> > ). Putting this into GPIOLIB is the right approach, and so this is
+> > another argument for HALFGPIOLIB. This would fix mctrl_gpio_init en
+> > passant.
+> 
+> Do we have platforms where DT=y || ACPI=y, but GPIOLIB=n?
+> Ah, x86 ;-)
+
+Yeah, and I think rm -r arch/x86 won't be acceptable :-) I assume you
+can also configure some arm or powerpc systems without GPIOLIB.
+
+> Anyway, for sh-sci.c, platforms either have DT and GPIOLIB, or they do not
+> need mctrl-gpio.
+
+So we're in agreement now that HALFGPIOLIB is the way to go?
+Linus, what do you think?
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
