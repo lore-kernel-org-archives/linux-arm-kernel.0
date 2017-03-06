@@ -1,68 +1,60 @@
-From: brian.kim@hardkernel.com (Brian Kim)
-Date: Mon,  6 Mar 2017 11:52:09 +0900
-Subject: [PATCH] ARM: dts: exynos: Add power button for Odroid XU3/4
-Message-ID: <1488768729-9435-1-git-send-email-brian.kim@hardkernel.com>
+From: wangxiongfeng2@huawei.com (Xiongfeng Wang)
+Date: Mon, 6 Mar 2017 11:38:46 +0800
+Subject: [PATCH V11 10/10] arm/arm64: KVM: add guest SEA support
+In-Reply-To: <6d0fa5a5-bcbf-38b8-45ac-d645220ee9e2@arm.com>
+References: <1487712121-16688-1-git-send-email-tbaicar@codeaurora.org>
+ <1487712121-16688-11-git-send-email-tbaicar@codeaurora.org>
+ <df6ba5dc-d93f-925a-46bf-1e1e209d17f3@huawei.com> <58B43092.6040401@arm.com>
+ <3df82a7b-1a32-e2d7-ae78-7132a4eab1a0@huawei.com> <58B57941.3000703@arm.com>
+ <4ff98823-d6f0-eb2e-4b98-f6d5e255f6c3@huawei.com>
+ <6d0fa5a5-bcbf-38b8-45ac-d645220ee9e2@arm.com>
+Message-ID: <8d020d81-d697-f05e-dbce-3a5a02c7c7db@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The power button on Odroid XU3/4 is connected with the PWRON pin of
-s2mps11 PMIC. The s2mps11 sends low signal to GPIO input in exynos 5422
-via ONOB pin.
+Hi Marc,
 
-This patch adds devicetree bindings for the power button of Odroid
-XU3/4.
+On 2017/3/2 17:39, Marc Zyngier wrote:
+> On 01/03/17 02:31, Xiongfeng Wang wrote:
+> 
+> [lot of things]
+> 
+>> If an SEA is injected into guest OS, the guest OS will jump to the SEA
+>> exception entry when the context switched to guest OS. And the CPSR and
+>> FAR_EL1 are recovered according to the content of vcpu. Then the guest
+>> OS can signal a process or panic. If another guest process read the
+>> error data, another SEA will be generated and it will be single too.
+>>
+>> Without QEMU involved, the drawback is that no APEI table can be mocked
+>> up in guest OS, and no memory_failure() will be called. So the memory of
+>> error data will be released into buddy system and assigned to another
+>> process. If the error was caused by instantaneous radiation or
+>> electromagnetic, the memory is usable again if it is written with a
+>> correct data. If the memory has wore out and a correct data is written,
+>> the ECC error may occurs again with high possibility. Before a 2-bit ECC
+>> error is reported, much more 1-bit errors will be reported. This is
+>> report to host os, the host os can determine the memory node has worn
+>> out and hot-plug out the memory node, and guest os may be terminated if
+>> its memory data can't be migrated.
+>>
+>> Of course, it is better to get QEMU involved, so the memory_failure can
+>> be executed in guest OS. But before that implemented, can we add SEA
+>> injection in kvm_handle_guest_abort()?
+> 
+> No. I will strongly object to that. This is a platform decision to
+> forward SEAs, not an architectural one. The core KVM code is only
+> concerned about implementing the ARM architecture, and not something
+> that is firmware dependent.
+> 
+Thanks for the reply!
+I'm not sure if there exists some misunderstanding here. I was saying
+that APEI stuff is not included in the core KVM code, but SEA injection
+can be included, just like the SEI injection in the core KVM code. Yes,
+APEI is firmware dependent, but I think SEA is not. And the processing
+for SEA doesn't depend on whether APEI is implemented.
 
-Signed-off-by: Brian Kim <brian.kim@hardkernel.com>
----
- arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi | 22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
 
-diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
-index 05b9afdd..671d87f 100644
---- a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
-+++ b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
-@@ -13,6 +13,7 @@
- */
- 
- #include <dt-bindings/clock/samsung,s2mps11.h>
-+#include <dt-bindings/input/input.h>
- #include <dt-bindings/interrupt-controller/irq.h>
- #include <dt-bindings/gpio/gpio.h>
- #include <dt-bindings/sound/samsung-i2s.h>
-@@ -42,6 +43,22 @@
- 		};
- 	};
- 
-+	gpio_keys {
-+		compatible = "gpio-keys";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&gpio_power_key>;
-+
-+		power_key {
-+			interrupt-parent = <&gpx0>;
-+			interrupts = <3 0>;
-+			gpios = <&gpx0 3 GPIO_ACTIVE_LOW>;
-+			linux,code = <KEY_POWER>;
-+			label = "power key";
-+			debounce-interval = <10>;
-+			wakeup-source;
-+		};
-+	};
-+
- 	emmc_pwrseq: pwrseq {
- 		pinctrl-0 = <&emmc_nrst_pin>;
- 		pinctrl-names = "default";
-@@ -557,6 +574,11 @@
- };
- 
- &pinctrl_0 {
-+	gpio_power_key: power_key {
-+		samsung,pins = "gpx0-3";
-+		samsung,pin-pud = <EXYNOS_PIN_PULL_NONE>;
-+	};
-+
- 	hdmi_hpd_irq: hdmi-hpd-irq {
- 		samsung,pins = "gpx3-7";
- 		samsung,pin-function = <EXYNOS_PIN_FUNC_INPUT>;
--- 
-2.7.4
+Thanks,
+
+Wang Xiongfeng
+.
