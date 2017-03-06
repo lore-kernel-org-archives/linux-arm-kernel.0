@@ -1,195 +1,50 @@
-From: jon.mason@broadcom.com (Jon Mason)
-Date: Mon,  6 Mar 2017 11:29:04 -0500
-Subject: [PATCH] arm64: dts: NS2: convert "ok" to "okay"
-Message-ID: <1488817744-7844-1-git-send-email-jon.mason@broadcom.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Mon, 6 Mar 2017 16:32:54 +0000
+Subject: [PATCH 1/4] net: thunderx: Fix IOMMU translation faults
+In-Reply-To: <CA+sq2CeiXZNwVsURxNNE+vxf3uhjM=vnKtb2nhtLRj6QwHKWrw@mail.gmail.com>
+References: <1488538070-12549-1-git-send-email-sunil.kovvuri@gmail.com>
+ <1488538070-12549-2-git-send-email-sunil.kovvuri@gmail.com>
+ <20170303.095635.355325147613813698.davem@davemloft.net>
+ <CA+sq2CcFxk=LuqYhR-sFaVVSu3rMaZUcytx-3tC9kEiRFNwREg@mail.gmail.com>
+ <cad7da5d-fce7-cef2-d0db-9585c31f0575@arm.com>
+ <CA+sq2CeiXZNwVsURxNNE+vxf3uhjM=vnKtb2nhtLRj6QwHKWrw@mail.gmail.com>
+Message-ID: <9a809c6e-3b01-4deb-e69e-65aa62d1e5e1@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Per e-mail from Sergei Shtylyov, the DT spec dictates it should be
-"okay" (although "ok" is also recognized).  Thus, changing all "ok" to
-"okay" in NS2 device tree files
+On 06/03/17 12:57, Sunil Kovvuri wrote:
+>>>
+>>> We are seeing a 0.75Mpps drop with IP forwarding rate due to that.
+>>> Hence I have restricted calling DMA interfaces to only when IOMMU is enabled.
+>>
+>> What's 0.07Mpps as a percentage of baseline? On a correctly configured
+>> coherent arm64 system, in the absence of an IOMMU, dma_map_*() is
+>> essentially just virt_to_phys() behind a function call or two, so I'd be
+>> interested to know where any non-trivial overhead might be coming from.
+> 
+> It's a 5% drop and yes device is configured as coherent.
+> And the drop is due to additional function calls.
 
-Suggested-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Signed-off-by: Jon Mason <jon.mason@broadcom.com>
----
- arch/arm64/boot/dts/broadcom/ns2-svk.dts | 38 ++++++++++++++++----------------
- arch/arm64/boot/dts/broadcom/ns2-xmc.dts | 20 ++++++++---------
- 2 files changed, 29 insertions(+), 29 deletions(-)
+OK, interesting - sounds like there's potential for some optimisation
+there as well. AFAICS the callchain goes:
 
-diff --git a/arch/arm64/boot/dts/broadcom/ns2-svk.dts b/arch/arm64/boot/dts/broadcom/ns2-svk.dts
-index 5ae0816..ec19fbf 100644
---- a/arch/arm64/boot/dts/broadcom/ns2-svk.dts
-+++ b/arch/arm64/boot/dts/broadcom/ns2-svk.dts
-@@ -57,55 +57,55 @@
- };
- 
- &enet {
--	status = "ok";
-+	status = "okay";
- };
- 
- &pci_phy0 {
--	status = "ok";
-+	status = "okay";
- };
- 
- &pci_phy1 {
--	status = "ok";
-+	status = "okay";
- };
- 
- &pcie0 {
--	status = "ok";
-+	status = "okay";
- };
- 
- &pcie4 {
--	status = "ok";
-+	status = "okay";
- };
- 
- &pcie8 {
--	status = "ok";
-+	status = "okay";
- };
- 
- &i2c0 {
--	status = "ok";
-+	status = "okay";
- };
- 
- &i2c1 {
--	status = "ok";
-+	status = "okay";
- };
- 
- &uart0 {
--	status = "ok";
-+	status = "okay";
- };
- 
- &uart1 {
--	status = "ok";
-+	status = "okay";
- };
- 
- &uart2 {
--	status = "ok";
-+	status = "okay";
- };
- 
- &uart3 {
--	status = "ok";
-+	status = "okay";
- };
- 
- &ssp0 {
--	status = "ok";
-+	status = "okay";
- 
- 	slic at 0 {
- 		compatible = "silabs,si3226x";
-@@ -126,7 +126,7 @@
- };
- 
- &ssp1 {
--	status = "ok";
-+	status = "okay";
- 
- 	at25 at 0 {
- 		compatible = "atmel,at25";
-@@ -150,23 +150,23 @@
- };
- 
- &sata_phy0 {
--	status = "ok";
-+	status = "okay";
- };
- 
- &sata_phy1 {
--	status = "ok";
-+	status = "okay";
- };
- 
- &sata {
--	status = "ok";
-+	status = "okay";
- };
- 
- &sdio0 {
--	status = "ok";
-+	status = "okay";
- };
- 
- &sdio1 {
--	status = "ok";
-+	status = "okay";
- };
- 
- &nand {
-diff --git a/arch/arm64/boot/dts/broadcom/ns2-xmc.dts b/arch/arm64/boot/dts/broadcom/ns2-xmc.dts
-index 99a2723..ab4ae1a 100644
---- a/arch/arm64/boot/dts/broadcom/ns2-xmc.dts
-+++ b/arch/arm64/boot/dts/broadcom/ns2-xmc.dts
-@@ -54,15 +54,15 @@
- };
- 
- &enet {
--	status = "ok";
-+	status = "okay";
- };
- 
- &i2c0 {
--	status = "ok";
-+	status = "okay";
- };
- 
- &i2c1 {
--	status = "ok";
-+	status = "okay";
- };
- 
- &mdio_mux_iproc {
-@@ -122,27 +122,27 @@
- };
- 
- &pci_phy0 {
--	status = "ok";
-+	status = "okay";
- };
- 
- &pcie0 {
--	status = "ok";
-+	status = "okay";
- };
- 
- &pcie8 {
--	status = "ok";
-+	status = "okay";
- };
- 
- &sata_phy0 {
--	status = "ok";
-+	status = "okay";
- };
- 
- &sata_phy1 {
--	status = "ok";
-+	status = "okay";
- };
- 
- &sata {
--	status = "ok";
-+	status = "okay";
- };
- 
- &qspi {
-@@ -187,5 +187,5 @@
- };
- 
- &uart3 {
--	status = "ok";
-+	status = "okay";
- };
--- 
-2.7.4
+dma_map_single_attrs (inline)
+- ops->map_page (__swiotlb_map_page)
+  - swiotlb_map_page
+    - phys_to_dma (inline)
+    - dma_capable (inline)
+
+Do you happen to have a breakdown of where the time goes? If it's mostly
+just in the indirect branch our options are limited (I'm guessing
+ThunderX doesn't have a particularly fancy branch predictor, if it's not
+even got a data prefetcher), but if it's in the SWIOTLB code then
+there's certainly room for improvement (which will hopefully tie in with
+some DMA ops work I'm planning to do soon anyway).
+
+Thanks,
+Robin.
+
+> 
+> Thanks,
+> Sunil.
+> 
