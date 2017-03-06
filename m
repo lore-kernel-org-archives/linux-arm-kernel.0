@@ -1,162 +1,78 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 6 Mar 2017 13:39:33 +0000
-Subject: ARM64 CONFIG_ZONE_DMA for 32-bit devices
-In-Reply-To: <6427e006-371d-83be-f0b8-8ad1d8a70279@arm.com>
-References: <6eab56bb5a4ffd8812d8b59ffa8a7cce@mail.gmail.com>
- <66ba5ad3-456e-f205-b142-b3f938d7c42b@arm.com>
- <20170302183509.GH12157@e104818-lin.cambridge.arm.com>
- <6427e006-371d-83be-f0b8-8ad1d8a70279@arm.com>
-Message-ID: <20170306133932.GC22810@e104818-lin.cambridge.arm.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon,  6 Mar 2017 05:42:37 -0800
+Subject: [PATCH v2] KVM: arm/arm64: Let vcpu thread modify its own active state
+Message-ID: <1488807757-86131-1-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 06, 2017 at 01:00:18PM +0000, Robin Murphy wrote:
-> On 02/03/17 18:35, Catalin Marinas wrote:
-> > On Tue, Feb 28, 2017 at 12:42:51PM +0000, Robin Murphy wrote:
-> >> On 28/02/17 10:34, Kashyap Desai wrote:
-> >>> I was reading below articles. Mine is not similar issue, but  I understand
-> >>> few things about ARM64 SWIOTLB interface from below discussion.
-> >>> Any input will be a great help to resolve/understand the issue.
-> >>>
-> >>> https://patchwork.codeaurora.org/patch/143833/
-> >>> https://patchwork.kernel.org/patch/9495893/
-> >>>
-> >>> Current problem statement is -
-> >>> "Trying to load kdump kernel from above 4GB memory does not work on ARM64
-> >>> platform as <megaraid_sas> driver require certain DMA buffer from below
-> >>> 4GB memory range."
-> >>>
-> >>> Looking for alternative/workaround for time being. Long term plan is to
-> >>> remove limitation of <megaraid_sas> driver to remove 32 bit DMA mask for
-> >>> SAS3.0 onwards controller.
-> >>>
-> >>> 1) I found below code @arch/arm64/mm/init.c . ARM64 kernel has provision
-> >>> to support 32-bit DMA as well.  I am not sure about why CONFIG_ZONE_DMA
-> >>> option is an configurable option for ARM64 ?
-> >>>
-> >>>         /* 4GB maximum for 32-bit only capable devices */
-> >>>         if (IS_ENABLED(CONFIG_ZONE_DMA))
-> >>>                 arm64_dma_phys_limit = max_zone_dma_phys();
-> >>>         else
-> >>>                 arm64_dma_phys_limit = PHYS_MASK + 1;
-> >>>         dma_contiguous_reserve(arm64_dma_phys_limit);
-> >>>
-> >>> One of the reason I think "kdump" kernel can load from above 4GB memory
-> >>> range provided crashkernel=<>, high and crashkernel=0, low option. So I
-> >>> guess ARM64 kdump kernel may have disabled CONFIG_ZONE_DMA option, but
-> >>> base kernel must have enabled CONFIG_ZONE_DMA option to support 32-bit
-> >>> only capable devices.
-> >>
-> >> I believe it's more that ZONE_DMA goes a bit crazy when the available
-> >> RAM starts above 4GB. It's not technically possible to turn it off
-> >> without hacking Kconfig.
-> > 
-> > I think even if you hack Kconfig, the kernel may not build. We keep the
-> > Kconfig option so that enum zone_type has ZONE_DMA defined.
-> > 
-> > Regarding the DMA zone selection, max_zone_dma_phys() is more of a hack
-> > (needed on Seattle where all RAM is above 4GB). Basically the first
-> > 32-bit at the start of RAM are considered for ZONE_DMA, even though the
-> > actual physical address of the start of RAM would be well beyond 4GB.
-> > This assumes that 32-bit only devices have the relevant dma_pfn_offset
-> > passed via DT (not sure what we do on ACPI).
-> 
-> Except Seattle doesn't have dma_pfn_offsets :/
-> 
-> The DT has an identity-mapped "dma-ranges", and I've seen it
-> demonstrated that a PCI card whose driver sets a 32-bit mask simply has
-> all DMA API calls fail.
+From: Jintack Lim <jintack@cs.columbia.edu>
 
-IIRC, the problem was an empty ZONE_DMA rather than an actual device
-using this memory. It could have been just swiotlb failing, I don't
-remember the details.
+Currently, if a vcpu thread tries to change the active state of an
+interrupt which is already on the same vcpu's AP list, Since the VGIC
+mmio handler is called after a vcpu has already synced back the LR state
+to the struct vgic_irq, we can just let it proceed safely.
 
-> >>> 2.)
-> >>>
-> >>> Typically - SWIOTLB uses DMA buffer from below 4GB range only. ARM64 is
-> >>> the only architecture which support Low memory definition as per ARCH
-> >>> specified. See below
-> >>>
-> >>> [root@ linux]# grep -R ARCH_LOW_ADDRESS_LIMIT arch/
-> >>> arch/s390/include/asm/processor.h:#define ARCH_LOW_ADDRESS_LIMIT
-> >>> 0x7fffffffUL
-> >>> arch/arm64/include/asm/processor.h:#define ARCH_LOW_ADDRESS_LIMIT
-> >>> (arm64_dma_phys_limit - 1)
-> >>>
-> >>> For only ARM64, it is possible to get SWTBL DMA buffer above 4GB. See
-> >>> below snippet from crashed kernel on ARM64.
-> >>>
-> >>> [    0.000000] Zone ranges:
-> >>> [    0.000000]   DMA      [mem 0x0000005fc0000000-0x0000005fffffffff]
-> >>> [    0.000000]   Normal   empty
-> > 
-> > I guess that's because the kernel thinks 0x5fc00000 is the start of all
-> > RAM that is available and just assumes that ZONE_DMA would be covered by
-> > the lower 32-bit of this (high) range.
-> > 
-> > The physical address in the 32-bit DMA context is rather irrelevant.
-> > What you need is the actual DMA address that the device is seeing and
-> > this is calculated by phys_to_dma (taking dma_pfn_offset into account).
-> > 
-> >>> SWIOTLB can map 64MB buffer from above 4GB only on ARM64 machine and that
-> >>> is causing problem for <megaraid_sas> driver.
-> >>> Current megaraid_sas driver wants certain resources from below 4GB memory
-> >>> and that is why it request consistent dma mask as below -
-> >>> pci_set_consistent_dma_mask(pdev, DMA_BIT_MASK(32)).
-> >>>
-> >>> If I do the same on x86_64, SWTBL INIT will fail because there is no Low
-> >>> memory below 4GB. See below prints from x86_64 machine.
-> >>>
-> >>> [    0.000000] Zone ranges:
-> >>> [    0.000000]   DMA      [mem 0x0000000000001000-0x0000000000ffffff]
-> >>> [    0.000000]   DMA32    [mem 0x0000000001000000-0x00000000ffffffff]
-> >>> [    0.000000]   Normal   [mem 0x0000000100000000-0x000000407effffff]
-> >>>   [    0.000000] Movable zone start for each node
-> >>>    ..
-> >>>    [    0.000000] Cannot allocate SWIOTLB buffer
-> >>>
-> >>> Question is - "ARM64 platform can't allocate memory for crash kernel in
-> >>> below 4GB range ?"
-> >>
-> >> If you want to use a device which requires 32-bit-addressable DMA
-> >> resources with your crash kernel, and that device isn't behind an IOMMU,
-> >> then don't load your crash kernel above 4GB. It's as simple as that,
-> >> because in general there's no other way around the issue. And if said
-> >> device doesn't actually need 32-bit-addressable resources, then yeah,
-> >> fix the dma_set_mask() calls in the driver.
-> > 
-> > I agree. I don't think there is much we can do, other than parsing all
-> > dma_pfn_offsets early on in DT and deciding whether the ZONE_DMA
-> > heuristics actually helps (and, if not, print some warning).
-> > 
-> >> That said, I think something is a bit wonky in max_zone_dma_phys() with
-> >> "It currently assumes that for memory starting above 4G, 32-bit devices
-> >> will use a DMA offset" - I think that assumption needs to be revisited
-> >> since, even disregarding cases like kdump, commonly available hardware
-> >> now exists for which that is not true (e.g. AMD Seattle). Catalin?
-> > 
-> > IIRC, I did this specifically for Seattle, though not sure whether it
-> > was just a matter of failing memory allocations when ZONE_DMA was empty
-> > rather than a device actually using it. That's the best we could do if
-> > there actually is a device with the relevant dma_pfn_offset.
-> > 
-> > The alternative would be to put everything in ZONE_DMA if the RAM is
-> > beyond 4GB but it doesn't help if we do have devices with a proper
-> > dma_pfn_offset. Leaving ZONE_DMA empty probably has other implications
-> > with failing allocations (you can fall back from ZONE_NORMAL to ZONE_DMA
-> > but not the other way around).
-> 
-> I'd be more inclined to take the latter approach - the vast majority of
-> (if not all) systems where this is even a concern at all have IOMMUs,
-> which make ZONE_DMA rather moot as a concept once you can freely
-> allocate pages to back buffer mappings from anywhere you like. Of
-> course, it might be nice to avoid allocating a useless SWIOTLB buffer in
-> such cases, but I guess that's perhaps a separate problem in itself.
+Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
+---
+Changes since v1:
+ - Reworked comment
+ - Consider userspace accesses
+ - Get the right requester VCPU for GICv3 private IRQ accesses
+ - Tested using kvm-unit-tests and verified that it deadlocked without
+   this patch and passed the test with this patch :)
 
-We could revert the DMA zone hack but only if we make swiotlb fail
-silently in this case (and subsequent uses of it). It allocates its
-buffers using GFP_DMA and automatically fail to get them if ZONE_DMA is
-empty.
+ virt/kvm/arm/vgic/vgic-mmio.c | 32 ++++++++++++++++++++++++--------
+ 1 file changed, 24 insertions(+), 8 deletions(-)
 
+diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
+index 3654b4c..2a5db13 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio.c
++++ b/virt/kvm/arm/vgic/vgic-mmio.c
+@@ -180,21 +180,37 @@ unsigned long vgic_mmio_read_active(struct kvm_vcpu *vcpu,
+ static void vgic_mmio_change_active(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
+ 				    bool new_active_state)
+ {
++	struct kvm_vcpu *requester_vcpu;
+ 	spin_lock(&irq->irq_lock);
++
++	/*
++	 * The vcpu parameter here can mean multiple things depending on how
++	 * this function is called; when handling a trap from the kernel it
++	 * depends on the GIC version, and these functions are also called as
++	 * part of save/restore from userspace.
++	 *
++	 * Therefore, we have to figure out the requester in a reliable way.
++	 *
++	 * When accessing VGIC state from user space, the requester_vcpu is
++	 * NULL, which is fine, because we guarantee that no VCPUs are running
++	 * when accessing VGIC state from user space so irq->vcpu->cpu is
++	 * always -1.
++	 */
++	requester_vcpu = kvm_arm_get_running_vcpu();
++
+ 	/*
+ 	 * If this virtual IRQ was written into a list register, we
+ 	 * have to make sure the CPU that runs the VCPU thread has
+-	 * synced back LR state to the struct vgic_irq.  We can only
+-	 * know this for sure, when either this irq is not assigned to
+-	 * anyone's AP list anymore, or the VCPU thread is not
+-	 * running on any CPUs.
++	 * synced back the LR state to the struct vgic_irq.
+ 	 *
+-	 * In the opposite case, we know the VCPU thread may be on its
+-	 * way back from the guest and still has to sync back this
+-	 * IRQ, so we release and re-acquire the spin_lock to let the
+-	 * other thread sync back the IRQ.
++	 * As long as the conditions below are true, we know the VCPU thread
++	 * may be on its way back from the guest (we kicked the VCPU thread in
++	 * vgic_change_active_prepare)  and still has to sync back this IRQ,
++	 * so we release and re-acquire the spin_lock to let the other thread
++	 * sync back the IRQ.
+ 	 */
+ 	while (irq->vcpu && /* IRQ may have state in an LR somewhere */
++	       irq->vcpu != requester_vcpu && /* Current thread is not the VCPU thread */
+ 	       irq->vcpu->cpu != -1) /* VCPU thread is running */
+ 		cond_resched_lock(&irq->irq_lock);
+ 
 -- 
-Catalin
+2.5.0
