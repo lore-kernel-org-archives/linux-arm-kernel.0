@@ -1,38 +1,23 @@
-From: romain.perier@collabora.com (Romain Perier)
-Date: Mon,  6 Mar 2017 15:17:16 +0100
-Subject: [PATCH v2 4/4] arm: dts: rockchip: Enable post_ios_power_on and
- pre-power-on-delay-ms
-In-Reply-To: <20170306141716.19120-1-romain.perier@collabora.com>
-References: <20170306141716.19120-1-romain.perier@collabora.com>
-Message-ID: <20170306141716.19120-5-romain.perier@collabora.com>
+From: a.hajda@samsung.com (Andrzej Hajda)
+Date: Mon, 06 Mar 2017 15:18:14 +0100
+Subject: [Patch v2 03/11] s5p-mfc: Use min scratch buffer size as provided
+ by F/W
+In-Reply-To: <1488532036-13044-4-git-send-email-smitha.t@samsung.com>
+References: <1488532036-13044-1-git-send-email-smitha.t@samsung.com>
+ <CGME20170303090440epcas5p33f1bea986f2f9c961c93af94df7ec565@epcas5p3.samsung.com>
+ <1488532036-13044-4-git-send-email-smitha.t@samsung.com>
+Message-ID: <33a42a78-aaf8-5a57-c58c-62ebd37aa1ca@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This enables the property post_ios_power_on. With this property, the
-driver pwrseq_simple will do its entire power sequence at the end of the
-mmc_power_up() function. The property pre-power-on-delay-ms adds a delay
-of 1ms between the enablement of the clk and the assertion of the reset
-line.
-
-It fixes the power-up sequence for the Wifi chipset AP6335.
-
-Signed-off-by: Romain Perier <romain.perier@collabora.com>
----
- arch/arm/boot/dts/rk3288-rock2-square.dts | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/arch/arm/boot/dts/rk3288-rock2-square.dts b/arch/arm/boot/dts/rk3288-rock2-square.dts
-index 818c4bf..9bf2991 100644
---- a/arch/arm/boot/dts/rk3288-rock2-square.dts
-+++ b/arch/arm/boot/dts/rk3288-rock2-square.dts
-@@ -106,6 +106,8 @@
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&wifi_enable>;
- 		reset-gpios = <&gpio4 28 GPIO_ACTIVE_LOW>;
-+		pre-power-on-delay-ms = <1>;
-+		post-ios-power-on;
- 	};
- 
- 	vcc_usb_host: vcc-host-regulator {
--- 
-2.9.3
+On 03.03.2017 10:07, Smitha T Murthy wrote:
+> After MFC v8.0, mfc f/w lets the driver know how much scratch buffer
+> size is required for decoder. If mfc f/w has the functionality,
+> E_MIN_SCRATCH_BUFFER_SIZE, driver can know how much scratch buffer size
+> is required for encoder too.
+>
+> Signed-off-by: Smitha T Murthy <smitha.t@samsung.com>
+Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
+--
+Regards
+Andrzej
