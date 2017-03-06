@@ -1,63 +1,78 @@
 From: hoegeun.kwon@samsung.com (Hoegeun Kwon)
-Date: Mon, 06 Mar 2017 13:42:20 +0900
-Subject: [PATCH v4 2/5] arm: dts: Add the burst and esc clock frequency
- properties to DSI node
+Date: Mon, 06 Mar 2017 13:42:21 +0900
+Subject: [PATCH v4 3/5] drm/exynos: dsi: Fix the parse_dt function
 In-Reply-To: <1488775343-6236-1-git-send-email-hoegeun.kwon@samsung.com>
 References: <1488775343-6236-1-git-send-email-hoegeun.kwon@samsung.com>
- <CGME20170306044234epcas1p22e9481182e11330cea0d169ce0ad2666@epcas1p2.samsung.com>
-Message-ID: <1488775343-6236-3-git-send-email-hoegeun.kwon@samsung.com>
+ <CGME20170306044236epcas5p326440b0139bee5a33fd6545d0400bb57@epcas5p3.samsung.com>
+Message-ID: <1488775343-6236-4-git-send-email-hoegeun.kwon@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The OF graph is not needed because the panel is a child of dsi. Add
-the burst and esc clock frequency properties to the parent (DSI node).
+The dsi + panel is a parental relationship, so OF grpah is not needed.
+Therefore, the current dsi_parse_dt function will throw an error,
+because there is no linked OF graph for case such as fimd + dsi +
+panel. So this patch parse the Pll, burst and esc clock frequency
+properties in dsi_parse_dt and modified to create a bridge_node only
+if there is an OF graph associated with dsi.
+So I think the ABI breakage is needed.
 
 Signed-off-by: Hoegeun Kwon <hoegeun.kwon@samsung.com>
 Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
 ---
- arch/arm/boot/dts/exynos3250-rinato.dts | 2 ++
- arch/arm/boot/dts/exynos4210-trats.dts  | 2 ++
- arch/arm/boot/dts/exynos4412-trats2.dts | 2 ++
- 3 files changed, 6 insertions(+)
+ drivers/gpu/drm/exynos/exynos_drm_dsi.c | 32 ++++++++------------------------
+ 1 file changed, 8 insertions(+), 24 deletions(-)
 
-diff --git a/arch/arm/boot/dts/exynos3250-rinato.dts b/arch/arm/boot/dts/exynos3250-rinato.dts
-index 548413e..c9f191c 100644
---- a/arch/arm/boot/dts/exynos3250-rinato.dts
-+++ b/arch/arm/boot/dts/exynos3250-rinato.dts
-@@ -215,6 +215,8 @@
- &dsi_0 {
- 	vddcore-supply = <&ldo6_reg>;
- 	vddio-supply = <&ldo6_reg>;
-+	samsung,burst-clock-frequency = <250000000>;
-+	samsung,esc-clock-frequency = <20000000>;
- 	samsung,pll-clock-frequency = <24000000>;
- 	status = "okay";
+diff --git a/drivers/gpu/drm/exynos/exynos_drm_dsi.c b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
+index f5c04d0..2d4e118 100644
+--- a/drivers/gpu/drm/exynos/exynos_drm_dsi.c
++++ b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
+@@ -1652,39 +1652,23 @@ static int exynos_dsi_parse_dt(struct exynos_dsi *dsi)
+ 	if (ret < 0)
+ 		return ret;
  
-diff --git a/arch/arm/boot/dts/exynos4210-trats.dts b/arch/arm/boot/dts/exynos4210-trats.dts
-index 0ca1b4d..1743ca8 100644
---- a/arch/arm/boot/dts/exynos4210-trats.dts
-+++ b/arch/arm/boot/dts/exynos4210-trats.dts
-@@ -197,6 +197,8 @@
- &dsi_0 {
- 	vddcore-supply = <&vusb_reg>;
- 	vddio-supply = <&vmipi_reg>;
-+	samsung,burst-clock-frequency = <500000000>;
-+	samsung,esc-clock-frequency = <20000000>;
- 	samsung,pll-clock-frequency = <24000000>;
- 	status = "okay";
+-	ep = of_graph_get_endpoint_by_regs(node, DSI_PORT_OUT, 0);
+-	if (!ep) {
+-		dev_err(dev, "no output port with endpoint specified\n");
+-		return -EINVAL;
+-	}
+-
+-	ret = exynos_dsi_of_read_u32(ep, "samsung,burst-clock-frequency",
++	ret = exynos_dsi_of_read_u32(node, "samsung,burst-clock-frequency",
+ 				     &dsi->burst_clk_rate);
+ 	if (ret < 0)
+-		goto end;
++		return ret;
  
-diff --git a/arch/arm/boot/dts/exynos4412-trats2.dts b/arch/arm/boot/dts/exynos4412-trats2.dts
-index 41ecd6d..82221a0 100644
---- a/arch/arm/boot/dts/exynos4412-trats2.dts
-+++ b/arch/arm/boot/dts/exynos4412-trats2.dts
-@@ -385,6 +385,8 @@
- &dsi_0 {
- 	vddcore-supply = <&ldo8_reg>;
- 	vddio-supply = <&ldo10_reg>;
-+	samsung,burst-clock-frequency = <500000000>;
-+	samsung,esc-clock-frequency = <20000000>;
- 	samsung,pll-clock-frequency = <24000000>;
- 	status = "okay";
+-	ret = exynos_dsi_of_read_u32(ep, "samsung,esc-clock-frequency",
++	ret = exynos_dsi_of_read_u32(node, "samsung,esc-clock-frequency",
+ 				     &dsi->esc_clk_rate);
+ 	if (ret < 0)
+-		goto end;
+-
+-	of_node_put(ep);
++		return ret;
  
+ 	ep = of_graph_get_next_endpoint(node, NULL);
+-	if (!ep) {
+-		ret = -EINVAL;
+-		goto end;
+-	}
+-
+-	dsi->bridge_node = of_graph_get_remote_port_parent(ep);
+-	if (!dsi->bridge_node) {
+-		ret = -EINVAL;
+-		goto end;
++	if (ep) {
++		dsi->bridge_node = of_graph_get_remote_port_parent(ep);
++		of_node_put(ep);
+ 	}
+-end:
+-	of_node_put(ep);
+ 
+-	return ret;
++	return 0;
+ }
+ 
+ static int exynos_dsi_bind(struct device *dev, struct device *master,
 -- 
 1.9.1
