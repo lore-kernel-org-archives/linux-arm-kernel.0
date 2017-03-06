@@ -1,65 +1,46 @@
-From: jon.mason@broadcom.com (Jon Mason)
-Date: Mon, 6 Mar 2017 10:12:26 -0500
-Subject: [PATCH v2 3/3] ARM: dts: bcm5301x: Add I2C support to the DT
-In-Reply-To: <bb91cbbd-f5e5-9ce8-e925-89e6f831e50c@gmail.com>
-References: <1488500494-20622-1-git-send-email-jon.mason@broadcom.com>
- <1488500494-20622-4-git-send-email-jon.mason@broadcom.com>
- <bb91cbbd-f5e5-9ce8-e925-89e6f831e50c@gmail.com>
-Message-ID: <CAC3K-4qHPpFJj_UKo3VePw-1qwk-y6Zt2R00O9UpyXqJnt31rA@mail.gmail.com>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Mon, 6 Mar 2017 09:23:40 -0600
+Subject: [PATCH 3/5] ARM: dts: am4372: Update operating-points-v2 table for cpu
+In-Reply-To: <1488813822-26042-1-git-send-email-d-gerlach@ti.com>
+References: <1488813822-26042-1-git-send-email-d-gerlach@ti.com>
+Message-ID: <1488813822-26042-4-git-send-email-d-gerlach@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 5, 2017 at 8:13 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
->
->
-> On 03/02/2017 04:21 PM, Jon Mason wrote:
->> From: Jon Mason <jonmason@broadcom.com>
->>
->> Add I2C support to the bcm5301x Device Tree.  Since no driver changes
->> are needed to enable this hardware, only the device tree changes are
->> required to make this functional.
->>
->> Signed-off-by: Jon Mason <jonmason@broadcom.com>
->> ---
->>  arch/arm/boot/dts/bcm5301x.dtsi | 9 +++++++++
->>  1 file changed, 9 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/bcm5301x.dtsi b/arch/arm/boot/dts/bcm5301x.dtsi
->> index 4e3fbce..2a343f2 100644
->> --- a/arch/arm/boot/dts/bcm5301x.dtsi
->> +++ b/arch/arm/boot/dts/bcm5301x.dtsi
->> @@ -338,6 +338,15 @@
->>               };
->>       };
->>
->> +     i2c0: i2c at 18009000 {
->> +             compatible = "brcm,iproc-i2c";
->> +             reg = <0x18009000 0x50>;
->> +             interrupts = <GIC_SPI 121 IRQ_TYPE_NONE>;
->> +             #address-cells = <1>;
->> +             #size-cells = <0>;
->> +             clock-frequency = <100000>;
->
-> Should not this have a:
->                 status = "disabled"
->
-> property by default such that boards can override this by phandle when
-> there are actual I2C devices available?
+The operatings-points-v2 table for am4372 was merged before any user of
+it was present in the kernel and before the binding had been finalized.
+The new ti-cpufreq driver and binding expects the platform specific
+properties to be part of the operating-points-v2 table rather than the
+cpu node so let's move them there as the only user is the ti-cpufreq
+driver.
 
-Your comment appears to match the way it is being done in most device trees.
+Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+---
+ arch/arm/boot/dts/am4372.dtsi | 7 +++----
+ 1 file changed, 3 insertions(+), 4 deletions(-)
 
-NSP implementation is identical to this.  So, if I should change it
-here, I should make there too.
-
-Thanks,
-Jon
-
->> +     };
->> +
->>       lcpll0: lcpll0 at 1800c100 {
->>               #clock-cells = <1>;
->>               compatible = "brcm,nsp-lcpll0";
->>
->
-> --
-> Florian
+diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
+index 97fcaf415de1..176e09e9a45e 100644
+--- a/arch/arm/boot/dts/am4372.dtsi
++++ b/arch/arm/boot/dts/am4372.dtsi
+@@ -50,15 +50,14 @@
+ 			clock-names = "cpu";
+ 
+ 			operating-points-v2 = <&cpu0_opp_table>;
+-			ti,syscon-efuse = <&scm_conf 0x610 0x3f 0>;
+-			ti,syscon-rev = <&scm_conf 0x600>;
+ 
+ 			clock-latency = <300000>; /* From omap-cpufreq driver */
+ 		};
+ 	};
+ 
+-	cpu0_opp_table: opp_table0 {
+-		compatible = "operating-points-v2";
++	cpu0_opp_table: opp-table {
++		compatible = "operating-points-v2-ti-cpu";
++		syscon = <&scm_conf>;
+ 
+ 		opp50 at 300000000 {
+ 			opp-hz = /bits/ 64 <300000000>;
+-- 
+2.11.0
