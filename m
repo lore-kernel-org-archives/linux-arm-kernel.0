@@ -1,102 +1,48 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon,  6 Mar 2017 11:26:21 +0000
-Subject: [PATCH 16/17] arm64: arch_timer: Allow erratum matching with ACPI OEM
- information
-In-Reply-To: <20170306112622.13853-1-marc.zyngier@arm.com>
-References: <20170306112622.13853-1-marc.zyngier@arm.com>
-Message-ID: <20170306112622.13853-17-marc.zyngier@arm.com>
+From: romain.izard.pro@gmail.com (Romain Izard)
+Date: Mon, 6 Mar 2017 12:28:00 +0100
+Subject: Warning on boot on SAMA5D2 with Linux 4.11-rc1
+Message-ID: <CAGkQfmPP7w09xutsK5OhfWzNfCyC3Bj8VmoFxDiB5eqAFnZBbQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Just as we're able to identify a broken platform using some DT
-information, let's enable a way to spot the offenders with ACPI.
+Hello,
 
-The difference is that we can only match on some OEM info instead
-of implementation-specific properties. So in order to avoid the
-insane multiplication of errata structures, we allow an array
-of OEM descriptions to be attached to an erratum structure.
+While looking for another issue, I tried Linux 4.11-rc1 on a SAMA5D2 Xplained
+board. The boot log contains the following warning:
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm64/include/asm/arch_timer.h  |  1 +
- drivers/clocksource/arm_arch_timer.c | 32 ++++++++++++++++++++++++++++++++
- 2 files changed, 33 insertions(+)
+[    0.100000] ------------[ cut here ]------------
+[    0.100000] WARNING: CPU: 0 PID: 1 at
+../kernel/time/sched_clock.c:180 sched_clock_register+0x44/0x1e4
+[    0.100000] CPU: 0 PID: 1 Comm: swapper Not tainted 4.11.0-rc1+ #3
+[    0.100000] Hardware name: Atmel SAMA5
+[    0.100000] [<c010c494>] (unwind_backtrace) from [<c010a558>]
+(show_stack+0x10/0x14)
+[    0.100000] [<c010a558>] (show_stack) from [<c0115654>] (__warn+0xe0/0xf8)
+[    0.100000] [<c0115654>] (__warn) from [<c011571c>]
+(warn_slowpath_null+0x20/0x28)
+[    0.100000] [<c011571c>] (warn_slowpath_null) from [<c090b0d0>]
+(sched_clock_register+0x44/0x1e4)
+[    0.100000] [<c090b0d0>] (sched_clock_register) from [<c091fb98>]
+(tcb_clksrc_init+0x1ac/0x360)
+[    0.100000] [<c091fb98>] (tcb_clksrc_init) from [<c0900d8c>]
+(do_one_initcall+0xb4/0x15c)
+[    0.100000] [<c0900d8c>] (do_one_initcall) from [<c0900f68>]
+(kernel_init_freeable+0x134/0x1c4)
+[    0.100000] [<c0900f68>] (kernel_init_freeable) from [<c06bfc64>]
+(kernel_init+0x8/0x10c)
+[    0.100000] [<c06bfc64>] (kernel_init) from [<c0107318>]
+(ret_from_fork+0x14/0x3c)
+[    0.100000] ---[ end trace 7ce9be9d7cf6f800 ]---
+[    0.100012] sched_clock: 32 bits at 10MHz, resolution 96ns, wraps
+every 206986376143ns
 
-diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
-index 159513479f6e..2e635deba776 100644
---- a/arch/arm64/include/asm/arch_timer.h
-+++ b/arch/arm64/include/asm/arch_timer.h
-@@ -42,6 +42,7 @@ enum arch_timer_erratum_match_type {
- 	ate_match_dt,
- 	ate_match_global_cap_id,
- 	ate_match_local_cap_id,
-+	ate_match_acpi_oem_info,
- };
- 
- struct clock_event_device;
-diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index 4eb1109da330..6182871af4eb 100644
---- a/drivers/clocksource/arm_arch_timer.c
-+++ b/drivers/clocksource/arm_arch_timer.c
-@@ -190,6 +190,12 @@ static struct cyclecounter cyclecounter __ro_after_init = {
- 	.mask	= CLOCKSOURCE_MASK(56),
- };
- 
-+struct ate_acpi_oem_info {
-+	char oem_id[ACPI_OEM_ID_SIZE + 1];
-+	char oem_table_id[ACPI_OEM_TABLE_ID_SIZE + 1];
-+	u32 oem_revision;
-+};
-+
- #ifdef CONFIG_FSL_ERRATUM_A008585
- /*
-  * The number of retries is an arbitrary value well beyond the highest number
-@@ -378,6 +384,28 @@ bool arch_timer_check_local_cap_erratum(const struct arch_timer_erratum_workarou
- 	return this_cpu_has_cap((uintptr_t)wa->id);
- }
- 
-+
-+static
-+bool arch_timer_check_acpi_oem_erratum(const struct arch_timer_erratum_workaround *wa,
-+				       const void *arg)
-+{
-+	static const struct ate_acpi_oem_info empty_oem_info = {};
-+	const struct ate_acpi_oem_info *info = wa->id;
-+	const struct acpi_table_header *table = arg;
-+
-+	/* Iterate over the ACPI EOM info array, looking for a match */
-+	while (memcmp(info, &empty_oem_info, sizeof(*info))) {
-+		if (!memcmp(info->oem_id, table->oem_id, ACPI_OEM_ID_SIZE) &&
-+		    !memcmp(info->oem_table_id, table->oem_table_id, ACPI_OEM_TABLE_ID_SIZE) &&
-+		    info->oem_revision == table->oem_revision)
-+			return true;
-+
-+		info++;
-+	}
-+
-+	return false;
-+}
-+
- static const struct arch_timer_erratum_workaround *
- arch_timer_iterate_errata(enum arch_timer_erratum_match_type type,
- 			  ate_match_fn_t match_fn,
-@@ -441,6 +469,9 @@ static void arch_timer_check_ool_workaround(enum arch_timer_erratum_match_type t
- 		match_fn = arch_timer_check_local_cap_erratum;
- 		local = true;
- 		break;
-+	case ate_match_acpi_oem_info:
-+		match_fn = arch_timer_check_acpi_oem_erratum;
-+		break;
- 	}
- 
- 	wa = arch_timer_iterate_errata(type, match_fn, arg);
-@@ -1284,6 +1315,7 @@ static int __init arch_timer_acpi_init(struct acpi_table_header *table)
- 
- 	/* Check for globally applicable workarounds */
- 	arch_timer_check_ool_workaround(ate_match_global_cap_id, NULL);
-+	arch_timer_check_ool_workaround(ate_match_acpi_oem_info, table);
- 
- 	arch_timer_init();
- 	return 0;
+This is related to the following commit:
+7b9f1d16e6d1 clocksource/drivers/tcb_clksrc: Use 32 bit tcb as sched_clock
+
+When we call sched_clock_register from tcb_clksrc_init from
+arch_initcall, we are too late as sched expects all the candidates for
+its clock to be registered before interrupts are enabled. This warning
+does not prevent the tcb clock from being used.
+
 -- 
-2.11.0
+Romain Izard
