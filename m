@@ -1,72 +1,49 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon,  6 Mar 2017 14:24:49 +0000
-Subject: [PATCH v3 16/25] ARM: KVM: Allow the main HYP code to use the init
- hyp stub implementation
+Date: Mon,  6 Mar 2017 14:24:55 +0000
+Subject: [PATCH v3 22/25] ARM: decompressor: Remove __hyp_get_vectors usage
 In-Reply-To: <20170306142458.8875-1-marc.zyngier@arm.com>
 References: <20170306142458.8875-1-marc.zyngier@arm.com>
-Message-ID: <20170306142458.8875-17-marc.zyngier@arm.com>
+Message-ID: <20170306142458.8875-23-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We now have a full hyp-stub implementation in the KVM init code,
-but the main KVM code only supports HVC_GET_VECTORS, which is not
-enough.
+When the compressed image needs to be relocated to avoid being
+overwritten by the decompression process, we need to relocate
+the hyp vectors as well so that we can find them once the
+decompression has taken effect.
 
-Instead of reinventing the wheel, let's reuse the init implementation
-by branching to the idmap page when called with a hyp-stub hypercall.
+For that, we perform the following calculation:
+	u32 v = __hyp_get_vectors();
+	v += offset;
+	__hyp_set_vectors(v);
+
+But we're guaranteed that the initial value of v as returned by
+__hyp_get_vectors is always __hyp_stub_vectors, because we have
+just set it by calling __hyp_stub_install.
+
+So let's remove the use of __hyp_get_vectors, and directly use
+__hyp_stub_vectors instead.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/kvm/hyp/hyp-entry.S | 29 ++++++++++++++++++++++++-----
- 1 file changed, 24 insertions(+), 5 deletions(-)
+ arch/arm/boot/compressed/head.S | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/kvm/hyp/hyp-entry.S b/arch/arm/kvm/hyp/hyp-entry.S
-index 1f8db7d21fc5..a35baa81fd23 100644
---- a/arch/arm/kvm/hyp/hyp-entry.S
-+++ b/arch/arm/kvm/hyp/hyp-entry.S
-@@ -126,11 +126,30 @@ hyp_hvc:
- 	 */
- 	pop	{r0, r1, r2}
+diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+index 9150f9732785..d58bb104c6e8 100644
+--- a/arch/arm/boot/compressed/head.S
++++ b/arch/arm/boot/compressed/head.S
+@@ -422,7 +422,10 @@ dtb_check_done:
+ 		cmp	r0, #HYP_MODE
+ 		bne	1f
  
--	/* Check for __hyp_get_vectors */
--	cmp	r0, #HVC_GET_VECTORS
--	mrceq	p15, 4, r0, c12, c0, 0	@ get HVBAR
--	beq	1f
-+	/*
-+	 * Check if we have a kernel function, which is guaranteed to be
-+	 * bigger than the maximum hyp stub hypercall
-+	 */
-+	cmp	r0, #HVC_STUB_HCALL_NR
-+	bhs	1f
- 
-+	/*
-+	 * Not a kernel function, treat it as a stub hypercall.
-+	 * Compute the physical address for __kvm_handle_stub_hvc
-+	 * (as the code lives in the idmaped page) and branch there.
-+	 * We hijack ip (r12) as a tmp register.
-+	 */
-+	push	{r1}
-+	ldr	r1, =kimage_voffset
-+	ldr	r1, [r1]
-+	ldr	ip, =__kvm_handle_stub_hvc
-+	sub	ip, ip, r1
-+THUMB(	add	ip, ip, #1)
-+	pop	{r1}
-+
-+	bx	ip
-+
-+1:
- 	push	{lr}
- 
- 	mov	lr, r0
-@@ -142,7 +161,7 @@ THUMB(	orr	lr, #1)
- 	blx	lr			@ Call the HYP function
- 
- 	pop	{lr}
--1:	eret
-+	eret
- 
- guest_trap:
- 	load_vcpu r0			@ Load VCPU pointer to r0
+-		bl	__hyp_get_vectors
++0:		adr	r0, 0b
++		movw	r1, #:lower16:__hyp_stub_vectors - 0b
++		movt	r1, #:upper16:__hyp_stub_vectors - 0b
++		add	r0, r0, r1
+ 		sub	r0, r0, r5
+ 		add	r0, r0, r10
+ 		bl	__hyp_set_vectors
 -- 
 2.11.0
