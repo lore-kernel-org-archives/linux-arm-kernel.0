@@ -1,89 +1,156 @@
-From: anup.patel@broadcom.com (Anup Patel)
-Date: Mon,  6 Mar 2017 15:10:40 +0530
-Subject: [PATCH v5 2/2] dt-bindings: Add DT bindings info for FlexRM ring
- manager
-In-Reply-To: <1488793240-25484-1-git-send-email-anup.patel@broadcom.com>
-References: <1488793240-25484-1-git-send-email-anup.patel@broadcom.com>
-Message-ID: <1488793240-25484-3-git-send-email-anup.patel@broadcom.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Mon, 6 Mar 2017 15:11:23 +0530
+Subject: [PATCH v2 03/22] PCI: endpoint: Introduce configfs entry for
+ configuring EP functions
+In-Reply-To: <20170217170459.GA15276@infradead.org>
+References: <1487325042-28227-1-git-send-email-kishon@ti.com>
+ <1487325042-28227-4-git-send-email-kishon@ti.com>
+ <20170217170459.GA15276@infradead.org>
+Message-ID: <58BD2EC3.4030604@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds device tree bindings document for the FlexRM
-ring manager found on Broadcom iProc SoCs.
+Hi,
 
-Acked-by: Rob Herring <robh@kernel.org>
-Reviewed-by: Ray Jui <ray.jui@broadcom.com>
-Reviewed-by: Scott Branden <scott.branden@broadcom.com>
-Signed-off-by: Anup Patel <anup.patel@broadcom.com>
----
- .../bindings/mailbox/brcm,iproc-flexrm-mbox.txt    | 59 ++++++++++++++++++++++
- 1 file changed, 59 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/mailbox/brcm,iproc-flexrm-mbox.txt
+On Friday 17 February 2017 10:34 PM, Christoph Hellwig wrote:
+> On Fri, Feb 17, 2017 at 03:20:23PM +0530, Kishon Vijay Abraham I wrote:
+>> Introduce a new configfs entry to configure the EP function (like
+>> configuring the standard configuration header entries) and to
+>> bind the EP function with EP controller.
+>>
+>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+>> ---
+>>  drivers/pci/endpoint/Kconfig      |   14 +-
+>>  drivers/pci/endpoint/Makefile     |    1 +
+>>  drivers/pci/endpoint/pci-ep-cfs.c |  427 +++++++++++++++++++++++++++++++++++++
+>>  3 files changed, 440 insertions(+), 2 deletions(-)
+>>  create mode 100644 drivers/pci/endpoint/pci-ep-cfs.c
+>>
+>> diff --git a/drivers/pci/endpoint/Kconfig b/drivers/pci/endpoint/Kconfig
+>> index 7eb1c79..8470f0b 100644
+>> --- a/drivers/pci/endpoint/Kconfig
+>> +++ b/drivers/pci/endpoint/Kconfig
+>> @@ -6,7 +6,6 @@ menu "PCI Endpoint"
+>>  
+>>  config PCI_ENDPOINT
+>>  	bool "PCI Endpoint Support"
+>> -	select CONFIGFS_FS
+>>  	help
+>>  	   Enable this configuration option to support configurable PCI
+>>  	   endpoint. This should be enabled if the platform has a PCI
+>> @@ -14,8 +13,19 @@ config PCI_ENDPOINT
+>>  
+>>  	   Enabling this option will build the endpoint library, which
+>>  	   includes endpoint controller library and endpoint function
+>> -	   library.
+>> +	   library. This will also enable the configfs entry required to
+>> +	   configure the endpoint function and used to bind the
+>> +	   function with a endpoint controller.
+>>  
+>>  	   If in doubt, say "N" to disable Endpoint support.
+>>  
+>> +config PCI_ENDPOINT_CONFIGFS
+>> +	bool "PCI Endpoint Configfs Support"
+>> +	depends on PCI_ENDPOINT
+>> +	select CONFIGFS_FS
+>> +	help
+>> +	   This will enable the configfs entry that can be used to
+>> +	   configure the endpoint function and used to bind the
+>> +	   function with a endpoint controller.
+>> +
+>>  endmenu
+>> diff --git a/drivers/pci/endpoint/Makefile b/drivers/pci/endpoint/Makefile
+>> index dc1bc16..dd9163c 100644
+>> --- a/drivers/pci/endpoint/Makefile
+>> +++ b/drivers/pci/endpoint/Makefile
+>> @@ -4,3 +4,4 @@
+>>  
+>>  obj-$(CONFIG_PCI_ENDPOINT)		+= pci-epc-core.o pci-epf-core.o\
+>>  					   pci-epc-mem.o
+>> +obj-$(CONFIG_PCI_ENDPOINT_CONFIGFS)	+= pci-ep-cfs.o
+>> diff --git a/drivers/pci/endpoint/pci-ep-cfs.c b/drivers/pci/endpoint/pci-ep-cfs.c
+>> new file mode 100644
+>> index 0000000..ed0f8c2
+>> --- /dev/null
+>> +++ b/drivers/pci/endpoint/pci-ep-cfs.c
+>> @@ -0,0 +1,427 @@
+>> +/**
+>> + * configfs to configure the PCI endpoint
+>> + *
+>> + * Copyright (C) 2017 Texas Instruments
+>> + * Author: Kishon Vijay Abraham I <kishon@ti.com>
+>> + *
+>> + * This program is free software: you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 of
+>> + * the License as published by the Free Software Foundation.
+>> + *
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + *
+>> + * You should have received a copy of the GNU General Public License
+>> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+>> + */
+>> +
+>> +#include <linux/configfs.h>
+>> +#include <linux/module.h>
+>> +#include <linux/slab.h>
+>> +
+>> +#include <linux/pci-epc.h>
+>> +#include <linux/pci-epf.h>
+>> +
+>> +struct pci_epf_info {
+>> +	struct config_group group;
+>> +	struct list_head list;
+>> +	struct pci_epf *epf;
+>> +};
+>> +
+>> +struct pci_ep_info {
+>> +	struct config_group group;
+>> +	struct config_group pci_epf_group;
+>> +	/* mutex to protect pci_epf list */
+>> +	struct mutex lock;
+>> +	struct list_head pci_epf;
+>> +	const char *epc_name;
+>> +	struct pci_epc *epc;
+>> +};
+>> +
+>> +static inline struct pci_epf_info *to_pci_epf_info(struct config_item *item)
+>> +{
+>> +	return container_of(to_config_group(item), struct pci_epf_info, group);
+>> +}
+>> +
+>> +static inline struct pci_ep_info *to_pci_ep_info(struct config_item *item)
+>> +{
+>> +	return container_of(to_config_group(item), struct pci_ep_info, group);
+>> +}
+>> +
+>> +#define PCI_EPF_HEADER_R(_name)						       \
+>> +static ssize_t pci_epf_##_name##_show(struct config_item *item,	char *page)    \
+>> +{									       \
+>> +	struct pci_epf *epf = to_pci_epf_info(item)->epf;		       \
+>> +	if (!epf->header) {						       \
+>> +		WARN_ON_ONCE("epf device not bound to function driver\n");     \
+> 
+> WARN_ON_ONCE takes a string to evaluate as argument, not a message
+> 
+>> +		return 0;					
+> 
+> and if we return 0 here the callers will retry because that is
+> interpreted as a short read.  The code should be something like:
+> 
+> 	if (WARN_ON_ONCE(!epf->header))
+> 		return -EINVAL;
+> 
+>> +	if (!epf->header) {						       \
+>> +		WARN_ON_ONCE("epf device not bound to function driver\n");     \
+>> +		return 0;						       \
+>> +	}								       \
+> 
+> Same here, and a couple more instances down below.
 
-diff --git a/Documentation/devicetree/bindings/mailbox/brcm,iproc-flexrm-mbox.txt b/Documentation/devicetree/bindings/mailbox/brcm,iproc-flexrm-mbox.txt
-new file mode 100644
-index 0000000..752ae6b
---- /dev/null
-+++ b/Documentation/devicetree/bindings/mailbox/brcm,iproc-flexrm-mbox.txt
-@@ -0,0 +1,59 @@
-+Broadcom FlexRM Ring Manager
-+============================
-+The Broadcom FlexRM ring manager provides a set of rings which can be
-+used to submit work to offload engines. An SoC may have multiple FlexRM
-+hardware blocks. There is one device tree entry per FlexRM block. The
-+FlexRM driver will create a mailbox-controller instance for given FlexRM
-+hardware block where each mailbox channel is a separate FlexRM ring.
-+
-+Required properties:
-+--------------------
-+- compatible:	Should be "brcm,iproc-flexrm-mbox"
-+- reg:		Specifies base physical address and size of the FlexRM
-+		ring registers
-+- msi-parent:	Phandles (and potential Device IDs) to MSI controllers
-+		The FlexRM engine will send MSIs (instead of wired
-+		interrupts) to CPU. There is one MSI for each FlexRM ring.
-+		Refer devicetree/bindings/interrupt-controller/msi.txt
-+- #mbox-cells:	Specifies the number of cells needed to encode a mailbox
-+		channel. This should be 3.
-+
-+		The 1st cell is the mailbox channel number.
-+
-+		The 2nd cell contains MSI completion threshold. This is the
-+		number of completion messages for which FlexRM will inject
-+		one MSI interrupt to CPU.
-+
-+		The 3nd cell contains MSI timer value representing time for
-+		which FlexRM will wait to accumulate N completion messages
-+		where N is the value specified by 2nd cell above. If FlexRM
-+		does not get required number of completion messages in time
-+		specified by this cell then it will inject one MSI interrupt
-+		to CPU provided atleast one completion message is available.
-+
-+Optional properties:
-+--------------------
-+- dma-coherent:	Present if DMA operations made by the FlexRM engine (such
-+		as DMA descriptor access, access to buffers pointed by DMA
-+		descriptors and read/write pointer updates to DDR) are
-+		cache coherent with the CPU.
-+
-+Example:
-+--------
-+crypto_mbox: mbox at 67000000 {
-+	compatible = "brcm,iproc-flexrm-mbox";
-+	reg = <0x67000000 0x200000>;
-+	msi-parent = <&gic_its 0x7f00>;
-+	#mbox-cells = <3>;
-+};
-+
-+crypto at 672c0000 {
-+	compatible = "brcm,spu2-v2-crypto";
-+	reg = <0x672c0000 0x1000>;
-+	mboxes = <&crypto_mbox 0 0x1 0xffff>,
-+		 <&crypto_mbox 1 0x1 0xffff>,
-+		 <&crypto_mbox 16 0x1 0xffff>,
-+		 <&crypto_mbox 17 0x1 0xffff>,
-+		 <&crypto_mbox 30 0x1 0xffff>,
-+		 <&crypto_mbox 31 0x1 0xffff>;
-+};
--- 
-2.7.4
+sure, fixed it now.
+
+Thanks
+Kishon
