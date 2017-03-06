@@ -1,43 +1,38 @@
 From: romain.perier@collabora.com (Romain Perier)
-Date: Mon,  6 Mar 2017 15:17:12 +0100
-Subject: [PATCH v2 0/4] mmc: pwrseq: post_ios power sequence
-Message-ID: <20170306141716.19120-1-romain.perier@collabora.com>
+Date: Mon,  6 Mar 2017 15:17:16 +0100
+Subject: [PATCH v2 4/4] arm: dts: rockchip: Enable post_ios_power_on and
+ pre-power-on-delay-ms
+In-Reply-To: <20170306141716.19120-1-romain.perier@collabora.com>
+References: <20170306141716.19120-1-romain.perier@collabora.com>
+Message-ID: <20170306141716.19120-5-romain.perier@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some devices, like WiFi chipsets AP6335 require a specific power-up
-sequence ordering before being used. You must enable the vqmmc power supply
-and wait until it reaches its minimum voltage, gate the clock and wait
-at least two cycles and then assert the reset line.
+This enables the property post_ios_power_on. With this property, the
+driver pwrseq_simple will do its entire power sequence at the end of the
+mmc_power_up() function. The property pre-power-on-delay-ms adds a delay
+of 1ms between the enablement of the clk and the assertion of the reset
+line.
 
-See DS 1/
+It fixes the power-up sequence for the Wifi chipset AP6335.
 
-Currently, there is no generic manner for doing this with pwrseq_simple.
-This set of patches proposes an approach to support this use case.
+Signed-off-by: Romain Perier <romain.perier@collabora.com>
+---
+ arch/arm/boot/dts/rk3288-rock2-square.dts | 2 ++
+ 1 file changed, 2 insertions(+)
 
-It is related to the old patch 2/
-
-1. http://www.t-firefly.com/download/firefly-rk3288/hardware/AP6335%20datasheet_V1.3_02102014.pdf
-2. http://lists.infradead.org/pipermail/linux-arm-kernel/2017-March/490681.html
-
-Changes in v2:
-- Added missing power_off function in operations for post_ios
-- Fixed warning found by 0day-ci about missing
-  mmc_pwrseq_post_ios_power_on when CONFIG_OF is disabled.
-
-Romain Perier (4):
-  mmc: core: Add post_ios_power_on callback for power sequences
-  mmc: pwrseq-simple: Add optional op. for post_ios_power_on callback
-  mmc: pwrseq_simple: Add an optional pre-power-on-delay
-  arm: dts: rockchip: Enable post_ios_power_on and pre-power-on-delay-ms
-
- .../devicetree/bindings/mmc/mmc-pwrseq-simple.txt  |  2 ++
- arch/arm/boot/dts/rk3288-rock2-square.dts          |  2 ++
- drivers/mmc/core/core.c                            |  1 +
- drivers/mmc/core/pwrseq.c                          |  8 ++++++++
- drivers/mmc/core/pwrseq.h                          |  3 +++
- drivers/mmc/core/pwrseq_simple.c                   | 22 +++++++++++++++++++++-
- 6 files changed, 37 insertions(+), 1 deletion(-)
-
+diff --git a/arch/arm/boot/dts/rk3288-rock2-square.dts b/arch/arm/boot/dts/rk3288-rock2-square.dts
+index 818c4bf..9bf2991 100644
+--- a/arch/arm/boot/dts/rk3288-rock2-square.dts
++++ b/arch/arm/boot/dts/rk3288-rock2-square.dts
+@@ -106,6 +106,8 @@
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&wifi_enable>;
+ 		reset-gpios = <&gpio4 28 GPIO_ACTIVE_LOW>;
++		pre-power-on-delay-ms = <1>;
++		post-ios-power-on;
+ 	};
+ 
+ 	vcc_usb_host: vcc-host-regulator {
 -- 
 2.9.3
