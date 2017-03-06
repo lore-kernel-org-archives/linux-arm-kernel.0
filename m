@@ -1,68 +1,101 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon,  6 Mar 2017 11:26:22 +0000
-Subject: [PATCH 17/17] arm64: arch_timer: Add HISILICON_ERRATUM_161010101 ACPI
- matching data
+Date: Mon,  6 Mar 2017 11:26:16 +0000
+Subject: [PATCH 11/17] arm64: arch_timer: Move clocksource_counter and co
+ around
 In-Reply-To: <20170306112622.13853-1-marc.zyngier@arm.com>
 References: <20170306112622.13853-1-marc.zyngier@arm.com>
-Message-ID: <20170306112622.13853-18-marc.zyngier@arm.com>
+Message-ID: <20170306112622.13853-12-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to deal with ACPI enabled platforms suffering from the
-HISILICON_ERRATUM_161010101, let's add the required OEM data that
-allow the workaround to be enabled.
+In order to access clocksource_counter from the errata handling code,
+move it (together with the related structures and functions) towards
+the top of the file.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/clocksource/arm_arch_timer.c | 29 +++++++++++++++++++++++++++++
- 1 file changed, 29 insertions(+)
+ drivers/clocksource/arm_arch_timer.c | 62 ++++++++++++++++++------------------
+ 1 file changed, 31 insertions(+), 31 deletions(-)
 
 diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index 6182871af4eb..b46584f058b6 100644
+index 2bbe0b9c3c24..a5a88db2ac90 100644
 --- a/drivers/clocksource/arm_arch_timer.c
 +++ b/drivers/clocksource/arm_arch_timer.c
-@@ -270,6 +270,25 @@ static u64 notrace hisi_161010101_read_cntvct_el0(void)
- {
- 	return __hisi_161010101_read_reg(cntvct_el0);
+@@ -158,6 +158,37 @@ u32 arch_timer_reg_read(int access, enum arch_timer_reg reg,
+ 	return val;
  }
-+
-+static struct ate_acpi_oem_info hisi_161010101_oem_info[] = {
-+	{
-+		.oem_id		= "HISI  ",
-+		.oem_table_id	= "HIP05   ",
-+		.oem_revision	= 0,
-+	},
-+	{
-+		.oem_id		= "HISI  ",
-+		.oem_table_id	= "HIP06   ",
-+		.oem_revision	= 0,
-+	},
-+	{
-+		.oem_id		= "HISI  ",
-+		.oem_table_id	= "HIP07   ",
-+		.oem_revision	= 0,
-+	},
-+	{ },
-+};
- #endif
  
- #ifdef CONFIG_ARM64_ERRATUM_858921
-@@ -347,6 +366,16 @@ static const struct arch_timer_erratum_workaround ool_workarounds[] = {
- 		.set_next_event_phys = erratum_set_next_event_tval_phys,
- 		.set_next_event_virt = erratum_set_next_event_tval_virt,
- 	},
-+	{
-+		.match_type = ate_match_acpi_oem_info,
-+		.id = hisi_161010101_oem_info,
-+		.desc_str = "HiSilicon erratum 161010101",
-+		.read_cntp_tval_el0 = hisi_161010101_read_cntp_tval_el0,
-+		.read_cntv_tval_el0 = hisi_161010101_read_cntv_tval_el0,
-+		.read_cntvct_el0 = hisi_161010101_read_cntvct_el0,
-+		.set_next_event_phys = erratum_set_next_event_tval_phys,
-+		.set_next_event_virt = erratum_set_next_event_tval_virt,
-+	},
- #endif
- #ifdef CONFIG_ARM64_ERRATUM_858921
- 	{
++/*
++ * Default to cp15 based access because arm64 uses this function for
++ * sched_clock() before DT is probed and the cp15 method is guaranteed
++ * to exist on arm64. arm doesn't use this before DT is probed so even
++ * if we don't have the cp15 accessors we won't have a problem.
++ */
++u64 (*arch_timer_read_counter)(void) = arch_counter_get_cntvct;
++
++static u64 arch_counter_read(struct clocksource *cs)
++{
++	return arch_timer_read_counter();
++}
++
++static u64 arch_counter_read_cc(const struct cyclecounter *cc)
++{
++	return arch_timer_read_counter();
++}
++
++static struct clocksource clocksource_counter = {
++	.name	= "arch_sys_counter",
++	.rating	= 400,
++	.read	= arch_counter_read,
++	.mask	= CLOCKSOURCE_MASK(56),
++	.flags	= CLOCK_SOURCE_IS_CONTINUOUS,
++};
++
++static struct cyclecounter cyclecounter __ro_after_init = {
++	.read	= arch_counter_read_cc,
++	.mask	= CLOCKSOURCE_MASK(56),
++};
++
+ #ifdef CONFIG_FSL_ERRATUM_A008585
+ /*
+  * The number of retries is an arbitrary value well beyond the highest number
+@@ -747,37 +778,6 @@ static u64 arch_counter_get_cntvct_mem(void)
+ 	return ((u64) vct_hi << 32) | vct_lo;
+ }
+ 
+-/*
+- * Default to cp15 based access because arm64 uses this function for
+- * sched_clock() before DT is probed and the cp15 method is guaranteed
+- * to exist on arm64. arm doesn't use this before DT is probed so even
+- * if we don't have the cp15 accessors we won't have a problem.
+- */
+-u64 (*arch_timer_read_counter)(void) = arch_counter_get_cntvct;
+-
+-static u64 arch_counter_read(struct clocksource *cs)
+-{
+-	return arch_timer_read_counter();
+-}
+-
+-static u64 arch_counter_read_cc(const struct cyclecounter *cc)
+-{
+-	return arch_timer_read_counter();
+-}
+-
+-static struct clocksource clocksource_counter = {
+-	.name	= "arch_sys_counter",
+-	.rating	= 400,
+-	.read	= arch_counter_read,
+-	.mask	= CLOCKSOURCE_MASK(56),
+-	.flags	= CLOCK_SOURCE_IS_CONTINUOUS,
+-};
+-
+-static struct cyclecounter cyclecounter __ro_after_init = {
+-	.read	= arch_counter_read_cc,
+-	.mask	= CLOCKSOURCE_MASK(56),
+-};
+-
+ static struct arch_timer_kvm_info arch_timer_kvm_info;
+ 
+ struct arch_timer_kvm_info *arch_timer_get_kvm_info(void)
 -- 
 2.11.0
