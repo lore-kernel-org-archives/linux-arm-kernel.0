@@ -1,32 +1,28 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Mon, 6 Mar 2017 09:23:42 -0600
-Subject: [PATCH 5/5] ARM: omap2plus_defconfig: Enable support for ti-cpufreq
-In-Reply-To: <1488813822-26042-1-git-send-email-d-gerlach@ti.com>
-References: <1488813822-26042-1-git-send-email-d-gerlach@ti.com>
-Message-ID: <1488813822-26042-6-git-send-email-d-gerlach@ti.com>
+From: dan.carpenter@oracle.com (Dan Carpenter)
+Date: Mon, 6 Mar 2017 18:23:34 +0300
+Subject: [PATCH] Staging: media: platform: bcm2835 - Style fix
+In-Reply-To: <20170304214319.GA15368@bigbird>
+References: <20170304013120.24949-1-robsonde@gmail.com>
+ <20170304113548.GA4386@mwanda> <20170304214319.GA15368@bigbird>
+Message-ID: <20170306152334.GA4335@mwanda>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-AM335x, AM437x, DRA7xx, and AM57xx platforms all now depend on
-ti-cpufreq driver to enable proper OPPs for use with cpufreq, so
-enable the same.
+On Sun, Mar 05, 2017 at 10:43:19AM +1300, Derek Robson wrote:
+> On Sat, Mar 04, 2017 at 02:57:22PM +0300, Dan Carpenter wrote:
+> > Copy a patch prefix that everyone else has been using:
+> > 
+> > git log --oneline drivers/staging/media/platform/bcm2835/
+> > 
+> > The subject is too vague as well.
+> 
+> Is this what you are looking for?
+> 
+> [patch] Staging: bcm2835: fixed style of block comments
+> 
+> And should I just re-send as a V2 with new subject?
 
-Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
----
- arch/arm/configs/omap2plus_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+Yes.
 
-diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
-index f2462a6bdba6..62a4b6cf16f0 100644
---- a/arch/arm/configs/omap2plus_defconfig
-+++ b/arch/arm/configs/omap2plus_defconfig
-@@ -64,6 +64,7 @@ CONFIG_CPU_FREQ_GOV_POWERSAVE=y
- CONFIG_CPU_FREQ_GOV_USERSPACE=y
- CONFIG_CPU_FREQ_GOV_CONSERVATIVE=y
- CONFIG_CPUFREQ_DT=m
-+CONFIG_ARM_TI_CPUFREQ=y
- # CONFIG_ARM_OMAP2PLUS_CPUFREQ is not set
- CONFIG_CPU_IDLE=y
- CONFIG_BINFMT_MISC=y
--- 
-2.11.0
+regards,
+dan carpenter
