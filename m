@@ -1,47 +1,37 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Mon, 06 Mar 2017 18:47:01 +0800
-Subject: [PATCH v7 6/6] arm64: dts: sunxi: add support for the Orange Pi
- PC 2 board
-In-Reply-To: <20170306103729.y7tsj6dyydf2zmmr@lukather>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 6 Mar 2017 18:48:34 +0800
+Subject: [linux-sunxi] Re: [PATCH v7 1/6] ARM: dts: sun8i: drop
+ skeleton.dtsi inclusion in H3 DTSI
+In-Reply-To: <1681991488797167@web29m.yandex.ru>
 References: <20170305233138.64574-1-icenowy@aosc.xyz>
- <20170305233138.64574-7-icenowy@aosc.xyz>
- <20170306103729.y7tsj6dyydf2zmmr@lukather>
-Message-ID: <1690011488797221@web29m.yandex.ru>
+ <20170305233138.64574-2-icenowy@aosc.xyz>
+ <20170306103535.jdaiwr65gtrhh7jp@lukather> <1681991488797167@web29m.yandex.ru>
+Message-ID: <CAGb2v64gDZ4=28Etwrv0eb=vAVEp1hh6ek9+18irRPvos7vJcw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-06.03.2017, 18:37, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
-> On Mon, Mar 06, 2017 at 07:31:38AM +0800, Icenowy Zheng wrote:
->> ?From: Andre Przywara <andre.przywara@arm.com>
+On Mon, Mar 6, 2017 at 6:46 PM, Icenowy Zheng <icenowy@aosc.xyz> wrote:
+>
+>
+> 06.03.2017, 18:35, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
+>> Hi,
 >>
->> ?The Orange Pi PC 2 is a typical single board computer using the
->> ?Allwinner H5 SoC. Apart from the usual suspects it features three
->> ?separately driven USB ports and a Gigabit Ethernet port.
->> ?Also it has a SPI NOR flash soldered, from which the board can boot
->> ?from. This enables the SBC to behave like a "real computer" with
->> ?built-in firmware.
+>> On Mon, Mar 06, 2017 at 07:31:33AM +0800, Icenowy Zheng wrote:
+>>>  The skeleton.dtsi file is now deprecated, and do not exist in ARM64
+>>>  environment.
+>>>
+>>>  Since we will soon reuse most part of H3 DTSI for H5, which is an ARM64
+>>>  chip, drop skeleton.dtsi inclusion now.
+>>>
+>>>  Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
 >>
->> ?Add the board specific .dts file, which includes the H5 .dtsi and
->> ?enables the peripherals that we support so far.
->>
->> ?Signed-off-by: Andre Przywara <andre.przywara@arm.com>
->> ?[Icenowy: dropped all GPIO pinctrl nodes, change red LED gpio,
->> ??change MMC cd to active-low, rename some node names to prevent
->> ??underscores]
->> ?Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+>> Your prefix (and in the three later patches) should be
+>> ARM: sun8i: h3
 >
-> And here your prefix should be "arm64: allwinner: h5:"
+> Oh I think we never added SoC name in prefix...
 
-Is this a new standard to have SoC name in prefix?
+It's better to add them for sun8i, which encompasses a whole
+bunch of SoCs, unlike the older sun[4-7]i. Even sun5i patches
+have them.
 
->
-> (This also applies to your previous patch).
->
-> Maxime
->
-> --
-> Maxime Ripard, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
+ChenYu
