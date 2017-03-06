@@ -1,82 +1,67 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 6 Mar 2017 11:02:20 +0100
-Subject: [PATCH 4/4] tty/serial: sh-sci: remove uneeded IS_ERR_OR_NULL
- calls
-In-Reply-To: <CAMuHMdWQuvANNU14A7NQuzv6AFp04bq4DG_oc7w9h4wUrG+4aQ@mail.gmail.com>
-References: <20170303191248.wlwjri55ip2x5pgg@pengutronix.de>
- <CAMuHMdXFrwa2jCVDb+8ecqgARLG0oGrPp9pLs0b6vEiWeKJ+uA@mail.gmail.com>
- <20170303194414.n76tr3oa2mlrzjre@pengutronix.de>
- <CAMuHMdXiz5hqW=fm-2H1aNKq_gXD2o0508jD2XjxYUvKoEvHdw@mail.gmail.com>
- <20170304174819.esxhwwbsxzuq3vyc@pengutronix.de>
- <CAMuHMdX8BEnaTtNFAbcvfHwJH=oPUmQ2NB+jfouGyhQpJ_m_4A@mail.gmail.com>
- <20170306085842.yijkfpqi3adcedmm@pengutronix.de>
- <CAMuHMdV2_vbocY4wCzvYtPAaF+QEX_Y4g6qVu5EqEBf5AnFdaw@mail.gmail.com>
- <20170306093043.ay4dz3ehp3aakwxh@pengutronix.de>
- <CAMuHMdWQuvANNU14A7NQuzv6AFp04bq4DG_oc7w9h4wUrG+4aQ@mail.gmail.com>
-Message-ID: <20170306100220.droey65uq2ew3mzu@pengutronix.de>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 6 Mar 2017 11:04:37 +0100
+Subject: [PATCH] mmc: sunxi: mask all Response Timeout error messages
+In-Reply-To: <20170305164535.36259-1-icenowy@aosc.xyz>
+References: <20170305164535.36259-1-icenowy@aosc.xyz>
+Message-ID: <20170306100437.sr7mrvssdwnt7aaz@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cc += LinusW
+Hi,
 
-On Mon, Mar 06, 2017 at 10:53:27AM +0100, Geert Uytterhoeven wrote:
-> On Mon, Mar 6, 2017 at 10:30 AM, Uwe Kleine-K?nig
-> <u.kleine-koenig@pengutronix.de> wrote:
-> > On Mon, Mar 06, 2017 at 10:09:50AM +0100, Geert Uytterhoeven wrote:
-> >> On Mon, Mar 6, 2017 at 9:58 AM, Uwe Kleine-K?nig
-> >> <u.kleine-koenig@pengutronix.de> wrote:
-> >> > On Mon, Mar 06, 2017 at 09:49:39AM +0100, Geert Uytterhoeven wrote:
-> >> >> > Given that mctrl-gpio can be useful on legacy platforms, a device could
-> >> >> > silently run without cts-gpio even there.
-> >> >>
-> >> >> On platforms were CONFIG_GPIOLIB=n, this is not true, so the issue is moot.
-> >> >>
-> >> >> All serial drivers using (optional) mctrl-gpio have this in Kconfig:
-> >> >>
-> >> >>     select SERIAL_MCTRL_GPIO if GPIOLIB
-> >> >>
-> >> >> So they will use mctrl-gpio when GPIOLIB is enabled.
-> >> >> If GPIOPLIB is disabled, no flow control GPIOs are expected, and the
-> >> >> driver should not break that case.
-> >> >
-> >> > So it all boils down to the question: Is GPIOLIB=n enough to assume no
-> >> > gpio is needed?
-> >> >
-> >> > I'd say it is not.
-> >>
-> >> How does the platform register these GPIOs when GPIOPLIB is not enabled by
-> >> the platform, and gpiod_add_lookup_table() is thus not available?
-> >
-> > Obviously the platformcode cannot. In this case you could argue that
-> > platformcode shouldn't register the device if a gpio is necessary. But
-> > this reasoning doesn't work for (DT=y || ACPI=y) && GPIOLIB=n.
-> >
-> > I wouldn't want to code this in each driver (something like:
-> >
-> >         if (IS_ENABLED(GPIOLIB) || device_is_instantiated_by_dt(dev) || device_is_instantiated_by_acpi(dev))
-> >                 gpios = mctrl_gpio_init(...);
-> >         else
-> >                 gpios = NULL;
-> >
-> > ). Putting this into GPIOLIB is the right approach, and so this is
-> > another argument for HALFGPIOLIB. This would fix mctrl_gpio_init en
-> > passant.
+On Mon, Mar 06, 2017 at 12:45:35AM +0800, Icenowy Zheng wrote:
+> Response Timeout is very usual: it will happen when trying to run some
+> commands that do not belong to the card; it will happen when some SDIO
+> card transfer beyond its SDIO bandwidth; and when the MMC controller is
+> set to poll the card with "broken-cd" property (the Lichee Pi series of
+> boards do this), it will flood to the console and make the console
+> unusable.
 > 
-> Do we have platforms where DT=y || ACPI=y, but GPIOLIB=n?
-> Ah, x86 ;-)
+> Mask all response-timeout-only error messages, only show it when another
+> error happens.
+> 
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+> ---
+>  drivers/mmc/host/sunxi-mmc.c | 13 +++++++++----
+>  1 file changed, 9 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
+> index 6ffcd2838272..7828e1f57cf0 100644
+> --- a/drivers/mmc/host/sunxi-mmc.c
+> +++ b/drivers/mmc/host/sunxi-mmc.c
+> @@ -483,10 +483,15 @@ static void sunxi_mmc_dump_errinfo(struct sunxi_mmc_host *host)
+>  	struct mmc_command *cmd = host->mrq->cmd;
+>  	struct mmc_data *data = host->mrq->data;
+>  
+> -	/* For some cmds timeout is normal with sd/mmc cards */
+> -	if ((host->int_sum & SDXC_INTERRUPT_ERROR_BIT) ==
+> -		SDXC_RESP_TIMEOUT && (cmd->opcode == SD_IO_SEND_OP_COND ||
+> -				      cmd->opcode == SD_IO_RW_DIRECT))
+> +	/*
+> +	 * Reading timeout is usually normal, especially when doing
+> +	 * card-polling with "broken-cd" in device tree.
+> +	 * If do not mask it, the RTO error message will flood the console
+> +	 * and even hide useful error messages.
+> +	 *
+> +	 * Some SDIO commands will also normally timeout with non-SDIO cards.
+> +	 */
+> +	if ((host->int_sum & SDXC_INTERRUPT_ERROR_BIT) == SDXC_RESP_TIMEOUT)
 
-Yeah, and I think rm -r arch/x86 won't be acceptable :-) I assume you
-can also configure some arm or powerpc systems without GPIOLIB.
+We really shouldn't silence legit errors.
 
-> Anyway, for sh-sci.c, platforms either have DT and GPIOLIB, or they do not
-> need mctrl-gpio.
+The actual problem here is that we log them as error, we could
+probably reduce it to debug.
 
-So we're in agreement now that HALFGPIOLIB is the way to go?
-Linus, what do you think?
-
-Best regards
-Uwe
+Maxime
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170306/5dbeee70/attachment.sig>
