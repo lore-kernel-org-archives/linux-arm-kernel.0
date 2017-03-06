@@ -1,115 +1,70 @@
 From: eric.auger@redhat.com (Eric Auger)
-Date: Mon,  6 Mar 2017 12:34:16 +0100
-Subject: [PATCH v3 01/19] KVM: arm/arm64: Add vITS save/restore API
- documentation
+Date: Mon,  6 Mar 2017 12:34:22 +0100
+Subject: [PATCH v3 07/19] KVM: arm64: ITS: Report the ITE size in GITS_TYPER
 In-Reply-To: <1488800074-21991-1-git-send-email-eric.auger@redhat.com>
 References: <1488800074-21991-1-git-send-email-eric.auger@redhat.com>
-Message-ID: <1488800074-21991-2-git-send-email-eric.auger@redhat.com>
+Message-ID: <1488800074-21991-8-git-send-email-eric.auger@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add description for how to access vITS registers and how to flush/restore
-vITS tables into/from memory
+An ITE size of 8 Bytes is reported to the guest. Combining this
+information with the number of event IDs the guest wants to support,
+this latter will be able to allocate each device's ITT with the
+right size.
 
 Signed-off-by: Eric Auger <eric.auger@redhat.com>
 
 ---
 
 v1 -> v2:
-- DTE and ITE now are 8 bytes
-- DTE and ITE now indexed by deviceid/eventid
-- use ITE name instead of ITTE
-- mentions ITT_addr matches bits [51:8] of the actual address
-- mentions LE layout
+- correct ITT_ENTRY_SIZE field
+- remove ITE_SIZE since all entries become 8 bytes
 ---
- Documentation/virtual/kvm/devices/arm-vgic-its.txt | 78 ++++++++++++++++++++++
- 1 file changed, 78 insertions(+)
+ include/linux/irqchip/arm-gic-v3.h | 1 +
+ virt/kvm/arm/vgic/vgic-its.c       | 5 ++++-
+ 2 files changed, 5 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/virtual/kvm/devices/arm-vgic-its.txt b/Documentation/virtual/kvm/devices/arm-vgic-its.txt
-index 6081a5b..49ade0c 100644
---- a/Documentation/virtual/kvm/devices/arm-vgic-its.txt
-+++ b/Documentation/virtual/kvm/devices/arm-vgic-its.txt
-@@ -36,3 +36,81 @@ Groups:
-     -ENXIO:  ITS not properly configured as required prior to setting
-              this attribute
-     -ENOMEM: Memory shortage when allocating ITS internal data
+diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+index 672cfef..d81f10f 100644
+--- a/include/linux/irqchip/arm-gic-v3.h
++++ b/include/linux/irqchip/arm-gic-v3.h
+@@ -232,6 +232,7 @@
+ #define GITS_CTLR_QUIESCENT		(1U << 31)
+ 
+ #define GITS_TYPER_PLPIS		(1UL << 0)
++#define GITS_TYPER_ITT_ENTRY_SIZE_SHIFT	4
+ #define GITS_TYPER_IDBITS_SHIFT		8
+ #define GITS_TYPER_DEVBITS_SHIFT	13
+ #define GITS_TYPER_DEVBITS(r)		((((r) >> GITS_TYPER_DEVBITS_SHIFT) & 0x1f) + 1)
+diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+index 6120c6e..6d84508 100644
+--- a/virt/kvm/arm/vgic/vgic-its.c
++++ b/virt/kvm/arm/vgic/vgic-its.c
+@@ -176,6 +176,8 @@ static struct its_ite *find_ite(struct vgic_its *its, u32 device_id,
+ 
+ #define GIC_LPI_OFFSET 8192
+ 
++#define VITS_ESZ 8
 +
-+  KVM_DEV_ARM_VGIC_GRP_ITS_REGS
-+  Attributes:
-+      The attr field of kvm_device_attr encodes the offset of the
-+      ITS register, relative to the ITS control frame base address
-+      (ITS_base).
-+
-+      kvm_device_attr.addr points to a __u64 value whatever the width
-+      of the addressed register (32/64 bits).
-+
-+      Writes to read-only registers are ignored by the kernel except
-+      for a single register, GITS_READR. Normally this register is RO
-+      but it needs to be restored otherwise commands in the queue will
-+      be re-executed after CWRITER setting.
-+
-+      For other registers, Getting or setting a register has the same
-+      effect as reading/writing the register on real hardware.
-+  Errors:
-+    -ENXIO: Offset does not correspond to any supported register
-+    -EFAULT: Invalid user pointer for attr->addr
-+    -EINVAL: Offset is not 64-bit aligned
-+
-+  KVM_DEV_ARM_VGIC_GRP_ITS_TABLES
-+  Attributes
-+       The attr field of kvm_device_attr is not used.
-+
-+       request the flush-save/restore of the ITS tables, namely
-+       the device table, the collection table, all the ITT tables,
-+       the LPI pending tables. On save, the tables are flushed
-+       into guest memory at the location provisioned by the guest
-+       in GITS_BASER (device and collection tables), on MAPD command
-+       (ITT_addr), GICR_PENDBASERs (pending tables).
-+
-+       This means the GIC should be restored before the ITS and all
-+       ITS registers but the GITS_CTRL must be restored before
-+       restoring the ITS tables.
-+
-+       Note the LPI configuration table is read-only for the
-+       in-kernel ITS and its save/restore goes through the standard
-+       RAM save/restore.
-+
-+       The layout of the tables in guest memory defines an ABI.
-+       The entries are laid in little endian format as follows;
-+
-+    The device table and ITE are respectively indexed by device id and
-+    eventid. The collection table however is not indexed by collection id:
-+    CTE are written at the beginning of the buffer.
-+
-+    Device Table Entry (DTE) layout: entry size = 8 bytes
-+
-+    bits:     | 63 ... 45 | 44 ... 5 | 4 ... 0 |
-+    values:   |   next    | ITT_addr |  Size   |
-+
-+    where
-+    - ITT_addr matches bits [48:8] of the ITT address (256B aligned).
-+    - next field is meaningful only if the entry is valid (ITT_addr != NULL).
-+    It equals to 0 if this entry is the last one; otherwise it corresponds
-+    to the minimum between the offset to the next device id and 2^19 -1.
-+
-+    Collection Table Entry (CTE) layout: entry size = 8 bytes
-+
-+    bits:     | 63| 62 ..  52  | 51 ... 16 | 15  ...   0 |
-+    values:   | V |    RES0    |  RDBase   |    ICID     |
-+
-+    Interrupt Translation Entry (ITE) layout: entry size = 8 bytes
-+
-+    bits:     | 63 ... 48 | 47 ... 16 | 15 ... 0 |
-+    values:   |    next   |   pINTID  |  ICID    |
-+
-+    - next field is meaningful only if the entry is valid (pINTID != NULL).
-+    It equals to 0 if this entry is the last one; otherwise it corresponds
-+    to the minimum between the eventid offset to the next ITE and 2^16 -1.
-+
-+    LPI Pending Table layout:
-+
-+    As specified in the ARM Generic Interrupt Controller Architecture
-+    Specification GIC Architecture version 3.0 and version 4. The first
-+    1kB is not modified and therefore should contain zeroes.
+ /*
+  * Finds and returns a collection in the ITS collection table.
+  * Must be called with the its_lock mutex held.
+@@ -399,6 +401,7 @@ static unsigned long vgic_mmio_read_its_typer(struct kvm *kvm,
+ 	 */
+ 	reg |= 0x0f << GITS_TYPER_DEVBITS_SHIFT;
+ 	reg |= 0x0f << GITS_TYPER_IDBITS_SHIFT;
++	reg |= (VITS_ESZ - 1) << GITS_TYPER_ITT_ENTRY_SIZE_SHIFT;
+ 
+ 	return extract_bytes(reg, addr & 7, len);
+ }
+@@ -1387,7 +1390,7 @@ static int vgic_register_its_iodev(struct kvm *kvm, struct vgic_its *its)
+ 	(GIC_BASER_CACHEABILITY(GITS_BASER, INNER, RaWb)		| \
+ 	 GIC_BASER_CACHEABILITY(GITS_BASER, OUTER, SameAsInner)		| \
+ 	 GIC_BASER_SHAREABILITY(GITS_BASER, InnerShareable)		| \
+-	 ((8ULL - 1) << GITS_BASER_ENTRY_SIZE_SHIFT)			| \
++	 ((u64)(VITS_ESZ - 1) << GITS_BASER_ENTRY_SIZE_SHIFT)		| \
+ 	 GITS_BASER_PAGE_SIZE_64K)
+ 
+ #define INITIAL_PROPBASER_VALUE						  \
 -- 
 2.5.5
