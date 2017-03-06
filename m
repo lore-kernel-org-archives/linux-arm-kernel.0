@@ -1,97 +1,56 @@
-From: slash.tmp@free.fr (Mason)
-Date: Mon, 6 Mar 2017 17:12:12 +0100
-Subject: Using the generic host PCIe driver
-In-Reply-To: <20170303200407.GB30375@bhelgaas-glaptop.roam.corp.google.com>
-References: <20170227164430.GB11162@bhelgaas-glaptop.roam.corp.google.com>
- <8643c952-e915-bcd1-390e-9d4001789872@free.fr>
- <20170227183534.GA12481@bhelgaas-glaptop.roam.corp.google.com>
- <347d4200-e089-60df-5f60-58d16efc7c4e@free.fr>
- <20170301161801.GB13171@bhelgaas-glaptop.roam.corp.google.com>
- <98ee3041-6a94-91af-b4bf-208aa02624ed@free.fr>
- <20170301215726.GA32286@bhelgaas-glaptop.roam.corp.google.com>
- <258cd6f3-ef17-6705-ff48-ae06f26778c2@free.fr>
- <20170303154628.GA21522@bhelgaas-glaptop.roam.corp.google.com>
- <8e1a0b5d-8dfb-4be1-a049-b16892a6c0d0@free.fr>
- <20170303200407.GB30375@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <267ec246-c32a-e0e2-b708-304a3dfb7342@free.fr>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Mon, 6 Mar 2017 17:12:52 +0100
+Subject: [PATCH 0/3] Khadas VIM support (Amlogic Meson GXL S905X)
+In-Reply-To: <20170304215126.7020-1-martin.blumenstingl@googlemail.com>
+References: <20170304215126.7020-1-martin.blumenstingl@googlemail.com>
+Message-ID: <ffcba782-4200-4a7e-af67-2e23432de1e9@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/03/2017 21:04, Bjorn Helgaas wrote:
-
-> On Fri, Mar 03, 2017 at 06:18:02PM +0100, Mason wrote:
->
->> # /usr/sbin/lspci -v
->> 00:00.0 PCI bridge: Sigma Designs, Inc. Device 0024 (rev 01) (prog-if 00 [Normal decode])
->>         Flags: bus master, fast devsel, latency 0
->>         Memory at 90000000 (64-bit, non-prefetchable) [size=16M]
->>         Bus: primary=00, secondary=01, subordinate=01, sec-latency=0
->>         I/O behind bridge: 00000000-00000fff
+On 03/04/2017 10:51 PM, Martin Blumenstingl wrote:
+> This series adds support for the Khadas VIM and Khadas VIM Pro boards
+> (both are provided through a single .dts as the only two differences are
+> the eMMC size and different SDIO WIFI chips - both are Broadcom brcmfmac
+> based though).
+> More details can be found on the official website: [0]
 > 
-> Something's wrong with this.  You have no I/O windows through the host
-> bridge, which implies that you can't generic PCI I/O transactions, so
-> this I/O window should be disabled.  This might be an lspci issue;
-> what does "lspci -xxx" show?
+> I have tested this on a Khadas VIM Pro board. It would be nice if someone
+> with a non-Pro board could give it a try as well.
 > 
->>         Memory behind bridge: 91000000-910fffff
->>         Prefetchable memory behind bridge: 00000000-000fffff
 > 
-> This prefetchable memory window is bogus, too.  It should probably be
-> disabled.  If the bridge doesn't support a prefetchable window, the
-> base and limit should be hardwired to zero.  If it supports a window
-> but it's disabled, the limit should be less than the base.  For
-> example, on my system I see this for a bridge with the window
-> disabled:
+> This patchset depends on:
+> - "ARM64: defconfig: enable the leds-pwm driver and default-on trigger"
+>   see [1] - already merged in v4.12/defconfig of Kevin's Amlogic tree
+> - "meson-gxl pinctrl - add the missing PWM pins" see [2]
+> - "brcmfmac: add support for BCM43455 with modalias sdio:c00v02D0dA9BF"
+>   see [3], this is NOT a direct dependency (it's only required to get
+>   WIFI working on the Khadas VIM Pro) and it's already merged for v4.11
+>   (commit a62a77881b1b6708ffeddd9bf0529494f7b199e3)
 > 
->   # setpci -s00:1c.0 PREF_MEMORY_BASE
->   fff1
->   # setpci -s00:1c.0 PREF_MEMORY_LIMIT
->   0001
-
-MAJOR UPDATE: As pointed out by Ard, my DT was hopelessly wrong for
-the non-prefetchable memory region (in the ranges prop).
-
-In fact, my platform *multiplexes* config and MEM spaces.
-
-In other words, there are *two* overlapping 256 MB windows at CPU
-address 0x50000000. A register in MMIO space allows software to
-select either config space or MEM space.
-
-Current DT node:
-
-		pcie at 50000000 {
-			compatible = "pci-host-ecam-generic";
-			reg = <0x50000000 0x10000000>;
-			device_type = "pci";
-			#size-cells = <2>;
-			#address-cells = <3>;
-			#interrupt-cells = <1>;
-			ranges = <0x02000000 0x0 0x0  0x50000000  0x0 0x10000000>;
-		};
-
-
-Ard pointed out that Linux does not support such a setup.
-
-[    0.994011] OF: PCI: host bridge /soc/pcie at 50000000 ranges:
-[    0.999721] OF: PCI: Parsing ranges property...
-[    1.004386] OF: PCI:   MEM 0x50000000..0x5fffffff -> 0x00000000
-[    1.010471] pci-host-generic 50000000.pcie:
-		can't claim ECAM area [mem 0x50000000-0x5fffffff]:
-		address conflict with /soc/pcie at 50000000 [mem 0x50000000-0x5fffffff]
-[    1.025265] pci-host-generic: probe of 50000000.pcie failed with error -16
-
-IIUC, there may be concurrent accesses to config space and MEM space?
-
-I'm wondering what my options are for this controller at this point :-(
-
-In a separate (related) thread ("Panic in quirk_usb_early_handoff",
-David Laight wrote:
-
-> So to do a config space access you have to use a pair of IPIs
-> to stop the other cpus doing any PCIe data accesses while the
-> MMIO bit makes the accesses all point to config space.
-> (After taking a lock to get access to the MMIO register.)
+>   
+> [0] http://khadas.com/vim/
+> [1] http://lists.infradead.org/pipermail/linux-amlogic/2017-February/002474.html
+> [2] http://lists.infradead.org/pipermail/linux-amlogic/2017-March/002658.html
+> [3] https://www.spinics.net/lists/linux-mmc/msg41627.html
 > 
-> Or has someone a better idea?
+> Martin Blumenstingl (3):
+>   devicetree: add vendor prefix for Khadas
+>   dt-bindings: amlogic: add the Khadas VIM
+>   ARM64: dts: meson-gxl: add support for the Khadas VIM board
+> 
+>  Documentation/devicetree/bindings/arm/amlogic.txt  |   2 +
+>  .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+>  arch/arm64/boot/dts/amlogic/Makefile               |   1 +
+>  .../dts/amlogic/meson-gxl-s905x-khadas-vim.dts     | 114 +++++++++++++++++++++
+>  4 files changed, 118 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxl-s905x-khadas-vim.dts
+> 
 
-Regards.
+Thanks for the work,
+I just tested and it works on a non-pro version,
+
+Tested-by: Neil Armstrong <narmstrong@baylibre.com>
+
+BTW, you should list the other dependencies like the p212 patch.
+
+Neil
