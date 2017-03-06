@@ -1,37 +1,81 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Mon,  6 Mar 2017 17:40:42 +0100
-Subject: [PATCH 7/8] ARM: dts: r8a7793: Remove unit-address and reg from
- integrated cache
-In-Reply-To: <1488818443-25196-1-git-send-email-geert+renesas@glider.be>
-References: <1488818443-25196-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1488818443-25196-8-git-send-email-geert+renesas@glider.be>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon,  6 Mar 2017 08:46:42 -0800
+Subject: [GIT PULL] omap fixes v4.11-rc cycle
+Message-ID: <pull-1488818752-862211>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Cortex-A15 cache controller is an integrated controller, and thus
-the device node representing it should not have a unit-addresses or reg
-property.
+The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
 
-Fixes: ad53f5f00b095a0d ("ARM: dts: r8a7793: Fix W=1 dtc warnings")
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
- arch/arm/boot/dts/r8a7793.dtsi | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+  Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
 
-diff --git a/arch/arm/boot/dts/r8a7793.dtsi b/arch/arm/boot/dts/r8a7793.dtsi
-index 48ce21c5e8db3c52..38506f563b2b2e5a 100644
---- a/arch/arm/boot/dts/r8a7793.dtsi
-+++ b/arch/arm/boot/dts/r8a7793.dtsi
-@@ -65,9 +65,8 @@
- 			power-domains = <&sysc R8A7793_PD_CA15_CPU1>;
- 		};
- 
--		L2_CA15: cache-controller at 0 {
-+		L2_CA15: cache-controller-0 {
- 			compatible = "cache";
--			reg = <0>;
- 			power-domains = <&sysc R8A7793_PD_CA15_SCU>;
- 			cache-unified;
- 			cache-level = <2>;
--- 
-2.7.4
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.11/fixes-rc1-v2
+
+for you to fetch changes up to e24bce8fb4c26bd0d8eca74cbbee1ad049246be3:
+
+  Merge tag 'v4.11-rc1' into omap-for-v4.11/fixes (2017-03-06 08:37:53 -0800)
+
+----------------------------------------------------------------
+Fixes for omaps for v4.11-rc cycle:
+
+- Fix smartreflex platform data regression where I accidentally
+  removed legacy platform data still in use
+
+- Fix hypervisor mode for thumb2 kernel
+
+- Fix misplaced tpic2810 to move it to right bus
+
+- Enable INPUT_MOUSEDEV as a loadable module have mice working
+
+- Fix use of gpio-key,wakeup and use wakeup-source instead as
+  this accidentally sneaked in during the merge window
+
+- Fix error handling for onenand to properly return error
+
+- Remove legacy gpmc-nand.c that's now dead code, this
+  also removes dependency to the MTD tree for further driver
+  changes
+
+- Fix device node reference count errors for omap3 and
+  related to it also release device nodes after no longer
+  needed
+
+----------------------------------------------------------------
+Guenter Roeck (2):
+      ARM: OMAP2+: Fix device node reference counts
+      ARM: OMAP2+: Release device node after it is no longer needed.
+
+Ladislav Michl (2):
+      ARM: OMAP2+: gpmc-onenand: propagate error on initialization failure
+      ARM: OMAP2+: Remove legacy gpmc-nand.c
+
+Matthijs van Duin (1):
+      ARM: OMAP5 / DRA7: Fix HYP mode boot for thumb2 build
+
+Sekhar Nori (1):
+      ARM: dts: am57xx-idk: tpic2810 is on I2C bus, not SPI
+
+Teresa Remmet (1):
+      ARM: dts: am335x-pcm953: Fix legacy wakeup source binding
+
+Tony Lindgren (5):
+      ARM: OMAP3: Fix smartreflex platform data regression
+      Merge branch 'omap-for-v4.10/fixes' into omap-for-v4.11/fixes
+      ARM: omap2plus_defconfig: Enable INPUT_MOUSEDEV as loadable modules
+      Merge branch 'gpio-key-wakeup-fix' into omap-for-v4.11/fixes
+      Merge tag 'v4.11-rc1' into omap-for-v4.11/fixes
+
+ arch/arm/boot/dts/am335x-pcm-953.dtsi      |   4 +-
+ arch/arm/boot/dts/am57xx-idk-common.dtsi   |  14 +--
+ arch/arm/configs/omap2plus_defconfig       |   1 +
+ arch/arm/mach-omap2/Makefile               |   3 -
+ arch/arm/mach-omap2/gpmc-nand.c            | 154 -----------------------------
+ arch/arm/mach-omap2/gpmc-onenand.c         |  10 +-
+ arch/arm/mach-omap2/omap-headsmp.S         |   3 +-
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |  45 +++++++--
+ drivers/memory/omap-gpmc.c                 |   4 +-
+ include/linux/omap-gpmc.h                  |  16 +--
+ 10 files changed, 59 insertions(+), 195 deletions(-)
+ delete mode 100644 arch/arm/mach-omap2/gpmc-nand.c
