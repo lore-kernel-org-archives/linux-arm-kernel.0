@@ -1,55 +1,102 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Mon, 6 Mar 2017 11:03:56 +0000
-Subject: [PATCHv3 2/4] ARM: versatile: define empty debug_ll_io_init() for
- no-MMU
-In-Reply-To: <1488332385-3367-3-git-send-email-gerg@uclinux.org>
-References: <1488332385-3367-1-git-send-email-gerg@uclinux.org>
- <1488332385-3367-3-git-send-email-gerg@uclinux.org>
-Message-ID: <05c7cff1-d45f-2589-028a-f1892b11fdd2@arm.com>
+From: xiexiuqi@huawei.com (Xie XiuQi)
+Date: Mon, 6 Mar 2017 19:06:32 +0800
+Subject: [PATCH 2/2] acpi: apei: handle SEI notification type for ARMv8
+In-Reply-To: <58BD3355.2010201@arm.com>
+References: <1488537595-72161-1-git-send-email-xiexiuqi@huawei.com>
+ <1488537595-72161-2-git-send-email-xiexiuqi@huawei.com>
+ <58BD3355.2010201@arm.com>
+Message-ID: <58BD42B8.3060804@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/03/17 01:39, Greg Ungerer wrote:
-> No-MMU configured targets have no definition for debug_ll_io_init().
-> Not all machines use this and it will only be required if CONFIG_DEBUG_LL
-> is enabled.
+Hi James,
+
+Thanks for your comments.
+
+On 2017/3/6 18:00, James Morse wrote:
+> Hi Xie XiuQi,
 > 
-> But when compiling for a target that uses it and it is configured for
-> no-MMU (!CONFIG_MMU), for example the versatile machine, you will get:
+> On 03/03/17 10:39, Xie XiuQi wrote:
+>> ARM APEI extension proposal added SEI (asynchronous SError interrupt)
+>> notification type for ARMv8.
+>>
+>> Add a new GHES error source handling function for SEI. In firmware
+>> first mode, if an error source's notification type is SEI. Then GHES
+>> could parse and report the detail error information.
 > 
->   CC      arch/arm/mach-versatile/versatile_dt.o
-> arch/arm/mach-versatile/versatile_dt.c: In function ?versatile_map_io?:
-> arch/arm/mach-versatile/versatile_dt.c:283:2: error: implicit declaration of function ?debug_ll_io_init? [-Werror=implicit-function-declaration]
->   debug_ll_io_init();
->   ^
-> 
-> Fix by adding a macro for it to the !CONFIG_MMU path in map.h.
-> 
-> Signed-off-by: Greg Ungerer <gerg@uclinux.org>
-> ---
->  arch/arm/include/asm/mach/map.h | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> v2: no change
-> v3: rebase on top of linux-4.10
-> 
-> diff --git a/arch/arm/include/asm/mach/map.h b/arch/arm/include/asm/mach/map.h
-> index 9b7c328..b1fe9c8 100644
-> --- a/arch/arm/include/asm/mach/map.h
-> +++ b/arch/arm/include/asm/mach/map.h
-> @@ -62,6 +62,7 @@ extern int ioremap_page(unsigned long virt, unsigned long phys,
->  #else
->  #define iotable_init(map,num)	do { } while (0)
->  #define vm_reserve_area_early(a,s,c)	do { } while (0)
-> +#define debug_ll_io_init()	do { } while (0)
->  #endif
->  
->  #endif
+> This patch doesn't apply to any upstream tree. Is this based on Tyler's larger
+> UEFI/ACPI update series? If so, please mention this in your cover letter, (Nit:
+> please include a cover letter when sending two or more patches!).
 > 
 
-I ended up with the similar patch and I'd like to see fix merged, so FWIW
+Yes, this patch is based on Tyler's series "[PATCH V11 00/10] Add UEFI 2.6 and ACPI 6.1 updates
+for RAS on ARM64" and linux-next 20170302.
 
-Reviewed-by: Vladimir Murzin <vladimir.murzin@arm.com>
+I'll add a cover letter next time, thanks.
 
-Thanks
-Vladimir
+
+> What happens if the SError Interrupt arrives while KVM was doing its work? We
+> set the HCR_EL2.AMO bit when running a guest, so KVM may receive these instead
+> of the host kernel.
+> 
+
+OK, I'll do it in next version.
+
+> 
+>> diff --git a/drivers/acpi/apei/Kconfig b/drivers/acpi/apei/Kconfig
+>> index 1122d7f..a32f046 100644
+>> --- a/drivers/acpi/apei/Kconfig
+>> +++ b/drivers/acpi/apei/Kconfig
+>> @@ -18,6 +18,20 @@ config HAVE_ACPI_APEI_SEA
+>>  	  option allows the OS to look for such hardware error record, and
+>>  	  take appropriate action.
+>>  
+>> +config ACPI_APEI_SEI
+>> +	bool "APEI Asynchronous SError Interrupt logging/recovering support"
+>> +	depends on ARM64 && ACPI_APEI_GHES
+>> +	help
+>> +	  This option should be enabled if the system supports
+>> +	  firmware first handling of SEI (asynchronous SError interrupt).
+>> +
+>> +	  SEI happens with invalid instruction access or asynchronous exceptions
+>> +	  on ARMv8 systems. If a system supports firmware first handling of SEI,
+>> +	  the platform analyzes and handles hardware error notifications from
+>> +	  SEI, and it may then form a HW error record for the OS to parse and
+>> +	  handle. This option allows the OS to look for such hardware error
+>> +	  record, and take appropriate action.
+>> +
+>>  config ACPI_APEI
+>>  	bool "ACPI Platform Error Interface (APEI)"
+>>  	select MISC_FILESYSTEMS
+>> diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
+>> index 3e4ea1b..d084a09 100644
+>> --- a/drivers/acpi/apei/ghes.c
+>> +++ b/drivers/acpi/apei/ghes.c
+>> @@ -850,6 +850,50 @@ static inline void ghes_sea_remove(struct ghes *ghes)
+>>  }
+>>  #endif /* CONFIG_HAVE_ACPI_APEI_SEA */
+>>  
+>> +#ifdef CONFIG_ACPI_APEI_SEI
+>> +static LIST_HEAD(ghes_sei);
+>> +
+>> +void ghes_notify_sei(void)
+>> +{
+>> +	struct ghes *ghes;
+>> +
+>> +	/*
+>> +	 * synchronize_rcu() will wait for nmi_exit(), so no need to
+> 
+> Where nmi_exit()?
+> 
+> This nmi enter/exit was to prevent APEI being interrupted by APEI and trying to
+> take the same set of locks. APEI masks IRQs to prevent this happening normally,
+> but Synchronous External Abort couldn't be masked.
+> We don't mask Asynchronous Exceptions in APEI so the same thing can happen here.
+> Adding nmi_{enter,exit}() round the ghes call in the arch bad_mode() will
+> prevent this lockup.
+> 
+
+Thank you for your detailed explanation, I'll add it in next version.
+
+Thanks,
+Xie XiuQi
