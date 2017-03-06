@@ -1,67 +1,41 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon,  6 Mar 2017 09:00:29 +0100
-Subject: [PATCH 1/2] ARM: dts: add SDC2 and SDC4 to the MSM8660 family
-Message-ID: <20170306080029.3422-1-linus.walleij@linaro.org>
+Date: Mon,  6 Mar 2017 09:00:40 +0100
+Subject: [PATCH 2/2] ARM: dts: fix typo on APQ8060 Dragonboard
+Message-ID: <20170306080040.3472-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To make the picture complete, add DTS entries also for the
-second and fourth MMC/SD blocks on the MSM8660. SDC2 is
-an 8-bit interface and SDC4 is a 4-bit interface.
+The DTS referred to SDC5 when it meant SDC1.
 
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/boot/dts/qcom-msm8660.dtsi | 31 +++++++++++++++++++++++++++++++
- 1 file changed, 31 insertions(+)
+ arch/arm/boot/dts/qcom-apq8060-dragonboard.dts | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/qcom-msm8660.dtsi b/arch/arm/boot/dts/qcom-msm8660.dtsi
-index 91c9a62ae725..5564ad131325 100644
---- a/arch/arm/boot/dts/qcom-msm8660.dtsi
-+++ b/arch/arm/boot/dts/qcom-msm8660.dtsi
-@@ -392,6 +392,22 @@
- 				cap-mmc-highspeed;
- 			};
- 
-+			sdcc2: sdcc at 12140000 {
-+				status		= "disabled";
-+				compatible	= "arm,pl18x", "arm,primecell";
-+				arm,primecell-periphid = <0x00051180>;
-+				reg		= <0x12140000 0x8000>;
-+				interrupts	= <GIC_SPI 103 IRQ_TYPE_LEVEL_HIGH>;
-+				interrupt-names	= "cmd_irq";
-+				clocks		= <&gcc SDC2_CLK>, <&gcc SDC2_H_CLK>;
-+				clock-names	= "mclk", "apb_pclk";
-+				bus-width	= <8>;
-+				max-frequency	= <48000000>;
-+				non-removable;
-+				cap-sd-highspeed;
-+				cap-mmc-highspeed;
-+			};
-+
- 			sdcc3: sdcc at 12180000 {
- 				compatible	= "arm,pl18x", "arm,primecell";
- 				arm,primecell-periphid = <0x00051180>;
-@@ -408,6 +424,21 @@
- 				no-1-8-v;
- 			};
- 
-+			sdcc4: sdcc at 121c0000 {
-+				compatible	= "arm,pl18x", "arm,primecell";
-+				arm,primecell-periphid = <0x00051180>;
-+				status		= "disabled";
-+				reg		= <0x121c0000 0x8000>;
-+				interrupts	= <GIC_SPI 101 IRQ_TYPE_LEVEL_HIGH>;
-+				interrupt-names	= "cmd_irq";
-+				clocks		= <&gcc SDC4_CLK>, <&gcc SDC4_H_CLK>;
-+				clock-names	= "mclk", "apb_pclk";
-+				bus-width	= <4>;
-+				cap-sd-highspeed;
-+				cap-mmc-highspeed;
-+				max-frequency	= <48000000>;
-+			};
-+
- 			sdcc5: sdcc at 12200000 {
- 				compatible	= "arm,pl18x", "arm,primecell";
- 				arm,primecell-periphid = <0x00051180>;
+diff --git a/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts b/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts
+index 39d9e6ddefed..2da1413f5720 100644
+--- a/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts
++++ b/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts
+@@ -95,17 +95,17 @@
+ 					     function = "sdc1";
+ 				};
+ 				clk {
+-					pins = "gpio167"; /* SDC5 CLK */
++					pins = "gpio167"; /* SDC1 CLK */
+ 					drive-strength = <16>;
+ 					bias-disable;
+ 				};
+ 				cmd {
+-					pins = "gpio168"; /* SDC5 CMD */
++					pins = "gpio168"; /* SDC1 CMD */
+ 					drive-strength = <10>;
+ 					bias-pull-up;
+ 				};
+ 				data {
+-					/* SDC5 D0 to D7 */
++					/* SDC1 D0 to D7 */
+ 					pins = "gpio159", "gpio160", "gpio161", "gpio162",
+ 					     "gpio163", "gpio164", "gpio165", "gpio166";
+ 					drive-strength = <10>;
 -- 
 2.9.3
