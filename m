@@ -1,58 +1,32 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Mon, 6 Mar 2017 15:46:15 +0530
-Subject: [PATCH v2 04/22] Documentation: PCI: Guide to use pci endpoint
- configfs
-In-Reply-To: <20170217171506.GB15276@infradead.org>
-References: <1487325042-28227-1-git-send-email-kishon@ti.com>
- <1487325042-28227-5-git-send-email-kishon@ti.com>
- <20170217171506.GB15276@infradead.org>
-Message-ID: <58BD36EF.9070804@ti.com>
+From: kaloz@openwrt.org (Imre Kaloz)
+Date: Mon, 6 Mar 2017 11:28:00 +0100
+Subject: [PATCH] ARM: DTS armada: Add support for 2 more mvebu model
+In-Reply-To: <1488560855-421-1-git-send-email-ansuelsmth@gmail.com>
+References: <1488560855-421-1-git-send-email-ansuelsmth@gmail.com>
+Message-ID: <1544a3df-6440-4322-e818-3361cd39cd80@openwrt.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 2017-03-03 18:07, Ansuel Smith wrote:
+> This patch add support for 2 Linksys router model
+> (shelby and rango). With this we now support all
+> the mvebu board on the market.
+>
+> Signed-off-by: Imre Kaloz <kaloz@openwrt.org>
+> Signed-off-by: ?lvaro Fern?ndez Rojas <noltari@gmail.com>
+> Signed-off-by: Ansuel Smith <ansuelsmth@gmail.com>
+> ---
+>   arch/arm/boot/dts/armada-385-linksys-rango.dts  | 443 ++++++++++++++++++++++++
+>   arch/arm/boot/dts/armada-385-linksys-shelby.dts | 115 ++++++
+>   2 files changed, 558 insertions(+)
+>   create mode 100644 arch/arm/boot/dts/armada-385-linksys-rango.dts
+>   create mode 100644 arch/arm/boot/dts/armada-385-linksys-shelby.dts
+>
 
-On Friday 17 February 2017 10:45 PM, Christoph Hellwig wrote:
-> I'm commenting on the configfs layout here instead of the patch with the
-> code as the issues are easier to explain that way.  I think the layout
-> is a bit confusing and could be cleaner by making use of pre-created
-> entries and symlinks.  Here is my suggestion:
-> 
-> /sys/kernel/config/pci_ep/functions/		
->     .. test/					# a directory for each function driver
->        ... user-specified-name1/
->        ... user-specified-name2
->     .. nvme/
->        ... user-specified-name42/		
-> 
-> Each directory under /sys/kernel/config/pci_ep/functions/ is owned
-> by a function drivers.  Under that function driver's directory you
-> can create a directory for each instance of a function driver.  The
-> configfs layout is controlled by the function driver.  E.g. your current
-> EPF fields would move into the test function driver, while the nvme
-> function would expose totally different fields.
-> 
-> 
-> /sys/kernel/config/pci_ep/controllers/
-> 	... dwc-0/
-> 	    ... function
-> 	... dwc-1/
-> 	    ... function
-> 	... vhost-0/
-> 	    ... function
-> 
-> 	Here you have a directory for each controller that can be bound
-> 	to a function.  The directories are pre-created for each
-> 	controller port that is EP capable.
-> 	Function is a symlink to the function instance above.
-> 	Additional parameters might also be present depending on the
-> 	EPC driver.
+NAK. Patch to support shelby has been sent upstream by Ralph - the rango 
+dts isn't finalized yet, hence it hasn't been sent upstream.
 
-I've changed the configfs entry according to your suggestion. However I've
-considered only the generic test function and a standard EP controller and
-implemented the configfs in a single file pci-ep-cfs.c. But I think this will
-get more complex as we add custom parameters for individual EPC, new functions
-etc..
 
-Thanks
-Kishon
+Best,
+
+Imre
