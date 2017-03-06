@@ -1,40 +1,32 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 6 Mar 2017 18:38:16 +0000
-Subject: [PATCH 2/3] arm: kprobes: remove kprobe_exceptions_notify
-In-Reply-To: <20170306180720.GC7467@naverao1-tp.localdomain>
-References: <b0894e503195b13a5ed6319e897e673f376a748d.1486496890.git.naveen.n.rao@linux.vnet.ibm.com>
- <46a640f65b86650d3a7d64a577dd441838de1c20.1486496890.git.naveen.n.rao@linux.vnet.ibm.com>
- <20170306180720.GC7467@naverao1-tp.localdomain>
-Message-ID: <20170306183815.GX21222@n2100.armlinux.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 6 Mar 2017 10:38:57 -0800
+Subject: [PATCH 0/3] ARM: PM: Drop useless checks for PM_SUSPEND_STANDBY
+In-Reply-To: <20170217164018.GE21809@atomide.com>
+References: <1487347836-14427-1-git-send-email-geert+renesas@glider.be>
+ <20170217164018.GE21809@atomide.com>
+Message-ID: <20170306183856.GM20572@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 06, 2017 at 11:37:20PM +0530, Naveen N. Rao wrote:
-> On 2017/02/08 01:24AM, Naveen N Rao wrote:
-> > ... as the weak variant will do.
+* Tony Lindgren <tony@atomide.com> [170217 08:41]:
+> * Geert Uytterhoeven <geert+renesas@glider.be> [170217 08:12]:
+> > 	Hi all,
 > > 
-> > Signed-off-by: Naveen N. Rao <naveen.n.rao@linux.vnet.ibm.com>
-> > ---
-> >  arch/arm/probes/kprobes/core.c     | 10 ----------
-> >  arch/arm64/kernel/probes/kprobes.c |  6 ------
-> >  2 files changed, 16 deletions(-)
+> > The system suspend implementations for DaVinci, OMAP, and SoCFPGA use
+> > the standard suspend_valid_only_mem() for their
+> > platform_suspend_ops.valid() callbacks.  Hence their
+> > platform_suspend_ops.enter() callbacks will never be called with state
+> > equal to PM_SUSPEND_STANDBY, and checks for this can thus be removed.
+> > 
+> > Thanks for your comments!
 > 
-> With the generic changes in this series now in -rc1, can you please pick 
-> this up?
+> Seems safe to remove:
+> 
+> Acked-by: Tony Lindgren <tony@atomide.com>
 
-It would've been nice to have been in the To: or Cc: on this patch,
-I suspect everyone on the ARM side ignored this series (I certainly
-didn't notice it, and I suspect the ARM64 folk didn't notice it for
-exactly the same reason.)
+Sounds like you wanted me to pick this up so applying the
+omap related patch into omap-for-v4.12/soc.
 
-In any case, this patch needs to be split - ARM and ARM64 are
-maintained separately (as stated in MAINTAINERS), and patches go via
-different trees.  Please resubmit with the patch split between the
-architectures and proper recipients in the headers.
+Thanks,
 
-Thanks.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Tony
