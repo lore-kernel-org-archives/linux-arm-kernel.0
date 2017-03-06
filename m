@@ -1,43 +1,195 @@
 From: jon.mason@broadcom.com (Jon Mason)
-Date: Mon,  6 Mar 2017 11:24:45 -0500
-Subject: [PATCH v3 2/2] ARM: dts: bcm5301x: Add I2C support to the DT
-In-Reply-To: <1488817485-7503-1-git-send-email-jon.mason@broadcom.com>
-References: <1488817485-7503-1-git-send-email-jon.mason@broadcom.com>
-Message-ID: <1488817485-7503-3-git-send-email-jon.mason@broadcom.com>
+Date: Mon,  6 Mar 2017 11:29:04 -0500
+Subject: [PATCH] arm64: dts: NS2: convert "ok" to "okay"
+Message-ID: <1488817744-7844-1-git-send-email-jon.mason@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jon Mason <jonmason@broadcom.com>
+Per e-mail from Sergei Shtylyov, the DT spec dictates it should be
+"okay" (although "ok" is also recognized).  Thus, changing all "ok" to
+"okay" in NS2 device tree files
 
-Add I2C support to the bcm5301x Device Tree.  Since no driver changes
-are needed to enable this hardware, only the device tree changes are
-required to make this functional.
-
-Signed-off-by: Jon Mason <jonmason@broadcom.com>
+Suggested-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Signed-off-by: Jon Mason <jon.mason@broadcom.com>
 ---
- arch/arm/boot/dts/bcm5301x.dtsi | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ arch/arm64/boot/dts/broadcom/ns2-svk.dts | 38 ++++++++++++++++----------------
+ arch/arm64/boot/dts/broadcom/ns2-xmc.dts | 20 ++++++++---------
+ 2 files changed, 29 insertions(+), 29 deletions(-)
 
-diff --git a/arch/arm/boot/dts/bcm5301x.dtsi b/arch/arm/boot/dts/bcm5301x.dtsi
-index a9aa7be..89b3c7f5 100644
---- a/arch/arm/boot/dts/bcm5301x.dtsi
-+++ b/arch/arm/boot/dts/bcm5301x.dtsi
-@@ -324,6 +324,16 @@
- 		};
- 	};
+diff --git a/arch/arm64/boot/dts/broadcom/ns2-svk.dts b/arch/arm64/boot/dts/broadcom/ns2-svk.dts
+index 5ae0816..ec19fbf 100644
+--- a/arch/arm64/boot/dts/broadcom/ns2-svk.dts
++++ b/arch/arm64/boot/dts/broadcom/ns2-svk.dts
+@@ -57,55 +57,55 @@
+ };
  
-+	i2c0: i2c at 18009000 {
-+		compatible = "brcm,iproc-i2c";
-+		reg = <0x18009000 0x50>;
-+		interrupts = <GIC_SPI 121 IRQ_TYPE_NONE>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		clock-frequency = <100000>;
-+		status = "disabled";
-+	};
-+
- 	lcpll0: lcpll0 at 1800c100 {
- 		#clock-cells = <1>;
- 		compatible = "brcm,nsp-lcpll0";
+ &enet {
+-	status = "ok";
++	status = "okay";
+ };
+ 
+ &pci_phy0 {
+-	status = "ok";
++	status = "okay";
+ };
+ 
+ &pci_phy1 {
+-	status = "ok";
++	status = "okay";
+ };
+ 
+ &pcie0 {
+-	status = "ok";
++	status = "okay";
+ };
+ 
+ &pcie4 {
+-	status = "ok";
++	status = "okay";
+ };
+ 
+ &pcie8 {
+-	status = "ok";
++	status = "okay";
+ };
+ 
+ &i2c0 {
+-	status = "ok";
++	status = "okay";
+ };
+ 
+ &i2c1 {
+-	status = "ok";
++	status = "okay";
+ };
+ 
+ &uart0 {
+-	status = "ok";
++	status = "okay";
+ };
+ 
+ &uart1 {
+-	status = "ok";
++	status = "okay";
+ };
+ 
+ &uart2 {
+-	status = "ok";
++	status = "okay";
+ };
+ 
+ &uart3 {
+-	status = "ok";
++	status = "okay";
+ };
+ 
+ &ssp0 {
+-	status = "ok";
++	status = "okay";
+ 
+ 	slic at 0 {
+ 		compatible = "silabs,si3226x";
+@@ -126,7 +126,7 @@
+ };
+ 
+ &ssp1 {
+-	status = "ok";
++	status = "okay";
+ 
+ 	at25 at 0 {
+ 		compatible = "atmel,at25";
+@@ -150,23 +150,23 @@
+ };
+ 
+ &sata_phy0 {
+-	status = "ok";
++	status = "okay";
+ };
+ 
+ &sata_phy1 {
+-	status = "ok";
++	status = "okay";
+ };
+ 
+ &sata {
+-	status = "ok";
++	status = "okay";
+ };
+ 
+ &sdio0 {
+-	status = "ok";
++	status = "okay";
+ };
+ 
+ &sdio1 {
+-	status = "ok";
++	status = "okay";
+ };
+ 
+ &nand {
+diff --git a/arch/arm64/boot/dts/broadcom/ns2-xmc.dts b/arch/arm64/boot/dts/broadcom/ns2-xmc.dts
+index 99a2723..ab4ae1a 100644
+--- a/arch/arm64/boot/dts/broadcom/ns2-xmc.dts
++++ b/arch/arm64/boot/dts/broadcom/ns2-xmc.dts
+@@ -54,15 +54,15 @@
+ };
+ 
+ &enet {
+-	status = "ok";
++	status = "okay";
+ };
+ 
+ &i2c0 {
+-	status = "ok";
++	status = "okay";
+ };
+ 
+ &i2c1 {
+-	status = "ok";
++	status = "okay";
+ };
+ 
+ &mdio_mux_iproc {
+@@ -122,27 +122,27 @@
+ };
+ 
+ &pci_phy0 {
+-	status = "ok";
++	status = "okay";
+ };
+ 
+ &pcie0 {
+-	status = "ok";
++	status = "okay";
+ };
+ 
+ &pcie8 {
+-	status = "ok";
++	status = "okay";
+ };
+ 
+ &sata_phy0 {
+-	status = "ok";
++	status = "okay";
+ };
+ 
+ &sata_phy1 {
+-	status = "ok";
++	status = "okay";
+ };
+ 
+ &sata {
+-	status = "ok";
++	status = "okay";
+ };
+ 
+ &qspi {
+@@ -187,5 +187,5 @@
+ };
+ 
+ &uart3 {
+-	status = "ok";
++	status = "okay";
+ };
 -- 
 2.7.4
