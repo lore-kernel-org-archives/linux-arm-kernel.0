@@ -1,60 +1,76 @@
-From: wangxiongfeng2@huawei.com (Xiongfeng Wang)
-Date: Mon, 6 Mar 2017 11:38:46 +0800
-Subject: [PATCH V11 10/10] arm/arm64: KVM: add guest SEA support
-In-Reply-To: <6d0fa5a5-bcbf-38b8-45ac-d645220ee9e2@arm.com>
-References: <1487712121-16688-1-git-send-email-tbaicar@codeaurora.org>
- <1487712121-16688-11-git-send-email-tbaicar@codeaurora.org>
- <df6ba5dc-d93f-925a-46bf-1e1e209d17f3@huawei.com> <58B43092.6040401@arm.com>
- <3df82a7b-1a32-e2d7-ae78-7132a4eab1a0@huawei.com> <58B57941.3000703@arm.com>
- <4ff98823-d6f0-eb2e-4b98-f6d5e255f6c3@huawei.com>
- <6d0fa5a5-bcbf-38b8-45ac-d645220ee9e2@arm.com>
-Message-ID: <8d020d81-d697-f05e-dbce-3a5a02c7c7db@huawei.com>
+From: jh80.chung@samsung.com (Jaehoon Chung)
+Date: Mon, 06 Mar 2017 12:41:22 +0900
+Subject: [PATCH v4 2/2] mmc: host: s3cmci: allow probing from device tree
+In-Reply-To: <20170303113847.GA17377@sprado-desktop>
+References: <1488417536-15110-1-git-send-email-sergio.prado@e-labworks.com>
+ <CGME20170302012845epcas4p3d7e48f13c80b2115cea89e914b067eeb@epcas4p3.samsung.com>
+ <1488417536-15110-3-git-send-email-sergio.prado@e-labworks.com>
+ <39c2b81b-6519-826b-2c8d-344725ce2882@samsung.com>
+ <20170303113847.GA17377@sprado-desktop>
+Message-ID: <b13fb653-9449-8744-a30b-9634d46eff8b@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
-
-On 2017/3/2 17:39, Marc Zyngier wrote:
-> On 01/03/17 02:31, Xiongfeng Wang wrote:
-> 
-> [lot of things]
-> 
->> If an SEA is injected into guest OS, the guest OS will jump to the SEA
->> exception entry when the context switched to guest OS. And the CPSR and
->> FAR_EL1 are recovered according to the content of vcpu. Then the guest
->> OS can signal a process or panic. If another guest process read the
->> error data, another SEA will be generated and it will be single too.
+On 03/03/2017 08:38 PM, Sergio Prado wrote:
+> On Fri, Mar 03, 2017 at 11:14:29AM +0900, Jaehoon Chung wrote:
+>> On 03/02/2017 10:18 AM, Sergio Prado wrote:
+>>> Allows configuring Samsung S3C24XX MMC/SD/SDIO controller using a device
+>>> tree.
+>>>
+>>> Signed-off-by: Sergio Prado <sergio.prado@e-labworks.com>
+>>> ---
+>>>  drivers/mmc/host/s3cmci.c | 298 ++++++++++++++++++++++++----------------------
+>>>  drivers/mmc/host/s3cmci.h |   3 +-
+>>>  2 files changed, 158 insertions(+), 143 deletions(-)
+>>>
+>>> diff --git a/drivers/mmc/host/s3cmci.c b/drivers/mmc/host/s3cmci.c
+>>> index 7a173f8c455b..d066dbdb957c 100644
+>>> --- a/drivers/mmc/host/s3cmci.c
+>>> +++ b/drivers/mmc/host/s3cmci.c
+>>> @@ -24,6 +24,10 @@
+>>>  #include <linux/interrupt.h>
+>>>  #include <linux/irq.h>
+>>>  #include <linux/io.h>
+>>> +#include <linux/of.h>
+>>> +#include <linux/of_device.h>
+>>> +#include <linux/of_gpio.h>
+>>> +#include <linux/mmc/slot-gpio.h>
+>>>  
+>>>  #include <plat/gpio-cfg.h>
+>>>  #include <mach/dma.h>
+>>> @@ -128,6 +132,22 @@ enum dbg_channels {
+>>>  	dbg_conf  = (1 << 8),
+>>>  };
+>>>  
+>>> +struct s3cmci_variant_data {
+>>> +	int s3c2440_compatible;
+>>> +};
 >>
->> Without QEMU involved, the drawback is that no APEI table can be mocked
->> up in guest OS, and no memory_failure() will be called. So the memory of
->> error data will be released into buddy system and assigned to another
->> process. If the error was caused by instantaneous radiation or
->> electromagnetic, the memory is usable again if it is written with a
->> correct data. If the memory has wore out and a correct data is written,
->> the ECC error may occurs again with high possibility. Before a 2-bit ECC
->> error is reported, much more 1-bit errors will be reported. This is
->> report to host os, the host os can determine the memory node has worn
->> out and hot-plug out the memory node, and guest os may be terminated if
->> its memory data can't be migrated.
+>> I didn't understand why this structure needs.
 >>
->> Of course, it is better to get QEMU involved, so the memory_failure can
->> be executed in guest OS. But before that implemented, can we add SEA
->> injection in kvm_handle_guest_abort()?
+>> Before this patch,
+>> host->is2440;
+>>
+>> After this patch,
+>> host->variant->s3c2440_compatible;
+>>
+>> Just add the one pointer for checking s3c2400 compatible..
+>> Is it really meaningful?
+>> (I didn't read the previous comments fully.)
 > 
-> No. I will strongly object to that. This is a platform decision to
-> forward SEAs, not an architectural one. The core KVM code is only
-> concerned about implementing the ARM architecture, and not something
-> that is firmware dependent.
+> Although just a pointer would be enought, having a structure makes it
+> more flexible to extend it in the future.
+
+If you will add the other members in this structure, it's ok.
+But if it's only for compatible, i don't agree this.
+
+Best Regards,
+Jaehoon Chung
+
 > 
-Thanks for the reply!
-I'm not sure if there exists some misunderstanding here. I was saying
-that APEI stuff is not included in the core KVM code, but SEA injection
-can be included, just like the SEI injection in the core KVM code. Yes,
-APEI is firmware dependent, but I think SEA is not. And the processing
-for SEA doesn't depend on whether APEI is implemented.
-
-
-Thanks,
-
-Wang Xiongfeng
-.
+> Best regards,
+> 
+> Sergio Prado
+> 
+> 
+> 
