@@ -1,63 +1,89 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Mon,  6 Mar 2017 17:32:02 -0600
-Subject: [PATCH] pinctrl: qcom: qdf2xxx: add names to the gpios
-Message-ID: <1488843122-7960-1-git-send-email-timur@codeaurora.org>
+From: seanpaul@chromium.org (Sean Paul)
+Date: Mon, 6 Mar 2017 18:44:38 -0500
+Subject: [PATCH 2/3] drm/rockchip: Fix link error when
+ CONFIG_DRM_ANALOGIX_DP undefined
+In-Reply-To: <20170306231512.GB20329@art_vandelay>
+References: <20170306202722.9301-1-seanpaul@chromium.org>
+ <20170306202722.9301-3-seanpaul@chromium.org>
+ <CACvgo53paS0-5PbT-bmPoSMyx+r0jCQqMVUNFsPJQXZ+QXtB_g@mail.gmail.com>
+ <20170306231512.GB20329@art_vandelay>
+Message-ID: <20170306234438.GE20329@art_vandelay>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The sysfs and debugfs entries for pin control drivers work better when
-the individual pins are given real names, even if they are all just
-"gpio0", "gpio1", etc.
+On Mon, Mar 06, 2017 at 06:15:12PM -0500, Sean Paul wrote:
+> On Mon, Mar 06, 2017 at 08:58:14PM +0000, Emil Velikov wrote:
+> > On 6 March 2017 at 20:27, Sean Paul <seanpaul@chromium.org> wrote:
+> > > Fixes the following link error when CONFIG_DRM_ANALOGIX_DP is not defined:
+> > >
+> > > ERROR: "analogix_dp_start_crc" [drivers/gpu/drm/rockchip/rockchipdrm.ko] undefined!
+> > > ERROR: "analogix_dp_stop_crc" [drivers/gpu/drm/rockchip/rockchipdrm.ko] undefined!
+> > >
+> > > Fixes: 3190e58dafaf ("drm/rockchip: Implement CRC debugfs API")
+> > > Reported-by: Emil Velikov <emil.l.velikov@gmail.com>
+> > > Cc: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+> > > Cc: Mark Yao <mark.yao@rock-chips.com>
+> > > Cc: Sean Paul <seanpaul@chromium.org>
+> > > Cc: Heiko Stuebner <heiko@sntech.de>
+> > > Cc: dri-devel at lists.freedesktop.org
+> > > Cc: linux-arm-kernel at lists.infradead.org
+> > > Cc: linux-rockchip at lists.infradead.org
+> > > Cc: Emil Velikov <emil.l.velikov@gmail.com>
+> > > Signed-off-by: Sean Paul <seanpaul@chromium.org>
+> > > ---
+> > >  drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 10 ++++++++++
+> > >  1 file changed, 10 insertions(+)
+> > >
+> > > diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> > > index 17ab16c4b922..2151e1cee4b4 100644
+> > > --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> > > +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> > > @@ -19,7 +19,9 @@
+> > >  #include <drm/drm_crtc_helper.h>
+> > >  #include <drm/drm_flip_work.h>
+> > >  #include <drm/drm_plane_helper.h>
+> > > +#ifdef CONFIG_DRM_ANALOGIX_DP
+> > >  #include <drm/bridge/analogix_dp.h>
+> > > +#endif
+> > >
+> > >  #include <linux/kernel.h>
+> > >  #include <linux/module.h>
+> > > @@ -1112,6 +1114,7 @@ static void vop_crtc_destroy_state(struct drm_crtc *crtc,
+> > >         kfree(s);
+> > >  }
+> > >
+> > > +#ifdef CONFIG_DRM_ANALOGIX_DP
+> > >  static struct drm_connector *vop_get_edp_connector(struct vop *vop)
+> > >  {
+> > Similar to 3/3 adding stubs for
+> > analogix_dp_start_crc/analogix_dp_stop_crc will be shorter/cleaner
+> > than ifdef spaghetti.
+> > 
+> 
+> Thanks for the review, Emil.
+> 
+> I think given that there's only one driver that supports crc in
+> rockchip-land, it makes sense to target that driver specifically.
+> If/when there is more than one, I agree we should have a shim/stub.
+> 
+> That said, if Tomeu or anyone else wants to follow on with an ifdef
+> cleanup, I'm happy to review.
+> 
 
-Signed-off-by: Timur Tabi <timur@codeaurora.org>
----
- drivers/pinctrl/qcom/pinctrl-qdf2xxx.c | 14 ++++++++++++--
- 1 file changed, 12 insertions(+), 2 deletions(-)
+Applied to drm-misc-next
 
-diff --git a/drivers/pinctrl/qcom/pinctrl-qdf2xxx.c b/drivers/pinctrl/qcom/pinctrl-qdf2xxx.c
-index f448534..bb3ce5c 100644
---- a/drivers/pinctrl/qcom/pinctrl-qdf2xxx.c
-+++ b/drivers/pinctrl/qcom/pinctrl-qdf2xxx.c
-@@ -35,10 +35,14 @@
- /* A reasonable limit to the number of GPIOS */
- #define MAX_GPIOS	256
- 
-+/* maximum size of each gpio name (enough room for "gpioXXX" + null) */
-+#define NAME_SIZE	8
-+
- static int qdf2xxx_pinctrl_probe(struct platform_device *pdev)
- {
- 	struct pinctrl_pin_desc *pins;
- 	struct msm_pingroup *groups;
-+	char (*names)[NAME_SIZE];
- 	unsigned int i;
- 	u32 num_gpios;
- 	int ret;
-@@ -59,15 +63,21 @@ static int qdf2xxx_pinctrl_probe(struct platform_device *pdev)
- 		sizeof(struct pinctrl_pin_desc), GFP_KERNEL);
- 	groups = devm_kcalloc(&pdev->dev, num_gpios,
- 		sizeof(struct msm_pingroup), GFP_KERNEL);
-+	names = devm_kcalloc(&pdev->dev, num_gpios, NAME_SIZE, GFP_KERNEL);
- 
--	if (!pins || !groups)
-+	if (!pins || !groups || !names)
- 		return -ENOMEM;
- 
- 	for (i = 0; i < num_gpios; i++) {
-+		snprintf(names[i], NAME_SIZE, "gpio%u", i);
-+
- 		pins[i].number = i;
-+		pins[i].name = names[i];
- 
--		groups[i].npins = 1,
-+		groups[i].npins = 1;
-+		groups[i].name = names[i];
- 		groups[i].pins = &pins[i].number;
-+
- 		groups[i].ctl_reg = 0x10000 * i;
- 		groups[i].io_reg = 0x04 + 0x10000 * i;
- 		groups[i].intr_cfg_reg = 0x08 + 0x10000 * i;
--- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
-Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+Thanks for the review,
+
+Sean
+
+
+> Sean
+> 
+> > At the same these fix the problems so, for the series:
+> > Reviewed-by: Emil Velikov <emil.l.velikov@gmail.com>
+> > 
+> > -Emil
+> > _______________________________________________
+> > dri-devel mailing list
+> > dri-devel at lists.freedesktop.org
+> > https://lists.freedesktop.org/mailman/listinfo/dri-devel
