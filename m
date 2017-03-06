@@ -1,139 +1,118 @@
 From: eric.auger@redhat.com (Eric Auger)
-Date: Mon,  6 Mar 2017 12:34:32 +0100
-Subject: [PATCH v3 17/19] KVM: arm64: ITS: ITT flush and restore
+Date: Mon,  6 Mar 2017 12:34:19 +0100
+Subject: [PATCH v3 04/19] KVM: arm64: ITS: KVM_DEV_ARM_VGIC_GRP_ITS_REGS group
 In-Reply-To: <1488800074-21991-1-git-send-email-eric.auger@redhat.com>
 References: <1488800074-21991-1-git-send-email-eric.auger@redhat.com>
-Message-ID: <1488800074-21991-18-git-send-email-eric.auger@redhat.com>
+Message-ID: <1488800074-21991-5-git-send-email-eric.auger@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce routines to flush and restore device ITT and their
-interrupt table entries (ITE).
+The ITS KVM device exposes a new KVM_DEV_ARM_VGIC_GRP_ITS_REGS
+group which allows the userspace to save/restore ITS registers.
 
-The routines will be called on device table flush and
-restore.
+At this stage the get/set/has operations are not yet implemented.
 
 Signed-off-by: Eric Auger <eric.auger@redhat.com>
-
 ---
-v2 -> v3:
-- add return 0 in vgic_its_restore_ite (was in subsequent patch)
+ arch/arm/include/uapi/asm/kvm.h   |  1 +
+ arch/arm64/include/uapi/asm/kvm.h |  1 +
+ virt/kvm/arm/vgic/vgic-its.c      | 36 +++++++++++++++++++++++++++++++++++-
+ 3 files changed, 37 insertions(+), 1 deletion(-)
 
-v2: creation
----
- virt/kvm/arm/vgic/vgic-its.c | 100 +++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 100 insertions(+)
-
+diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
+index 6ebd3e6..4beb83b 100644
+--- a/arch/arm/include/uapi/asm/kvm.h
++++ b/arch/arm/include/uapi/asm/kvm.h
+@@ -192,6 +192,7 @@ struct kvm_arch_memory_slot {
+ #define KVM_DEV_ARM_VGIC_GRP_REDIST_REGS 5
+ #define KVM_DEV_ARM_VGIC_GRP_CPU_SYSREGS 6
+ #define KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO  7
++#define KVM_DEV_ARM_VGIC_GRP_ITS_REGS	8
+ #define KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_SHIFT	10
+ #define KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_MASK \
+ 			(0x3fffffULL << KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_SHIFT)
+diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+index c286035..7e8dd69 100644
+--- a/arch/arm64/include/uapi/asm/kvm.h
++++ b/arch/arm64/include/uapi/asm/kvm.h
+@@ -212,6 +212,7 @@ struct kvm_arch_memory_slot {
+ #define KVM_DEV_ARM_VGIC_GRP_REDIST_REGS 5
+ #define KVM_DEV_ARM_VGIC_GRP_CPU_SYSREGS 6
+ #define KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO  7
++#define KVM_DEV_ARM_VGIC_GRP_ITS_REGS 8
+ #define KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_SHIFT	10
+ #define KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_MASK \
+ 			(0x3fffffULL << KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_SHIFT)
 diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index 1060125..a216849 100644
+index a7b5a50..43bb17e 100644
 --- a/virt/kvm/arm/vgic/vgic-its.c
 +++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -1748,6 +1748,106 @@ static int vgic_its_restore_pending_tables(struct vgic_its *its)
- 	return -ENXIO;
+@@ -1445,6 +1445,19 @@ static void vgic_its_destroy(struct kvm_device *kvm_dev)
+ 	kfree(its);
  }
  
-+static int vgic_its_flush_ite(struct vgic_its *its, struct its_device *dev,
-+			      struct its_ite *ite, gpa_t gpa)
++int vgic_its_has_attr_regs(struct kvm_device *dev,
++			   struct kvm_device_attr *attr)
 +{
-+	struct kvm *kvm = its->dev->kvm;
-+	u32 next_offset;
-+	u64 val;
-+
-+	next_offset = compute_next_eventid_offset(&dev->itt_head, ite);
-+	val = ((u64)next_offset << 48) | ((u64)ite->lpi << 16) |
-+		ite->collection->collection_id;
-+	val = cpu_to_le64(val);
-+	return kvm_write_guest(kvm, gpa, &val, VITS_ESZ);
++	return -ENXIO;
 +}
 +
-+/**
-+ * vgic_its_restore_ite - restore an interrupt translation entry
-+ * @event_id: id used for indexing
-+ * @ptr: kernel VA where the 8 byte ITE is located
-+ * @opaque: pointer to the its_device
-+ * @next: id offset to the next entry
-+ */
-+static int vgic_its_restore_ite(struct vgic_its *its, u32 event_id,
-+				void *ptr, void *opaque, u32 *next)
++int vgic_its_attr_regs_access(struct kvm_device *dev,
++			      struct kvm_device_attr *attr,
++			      u64 *reg, bool is_write)
 +{
-+	struct its_device *dev = (struct its_device *)opaque;
-+	struct its_collection *collection;
-+	struct kvm *kvm = its->dev->kvm;
-+	u64 val, *p = (u64 *)ptr;
-+	struct vgic_irq *irq;
-+	u32 coll_id, lpi_id;
-+	struct its_ite *ite;
-+	int ret;
-+
-+	val = *p;
-+	*next = 1;
-+
-+	val = le64_to_cpu(val);
-+
-+	coll_id = val & GENMASK_ULL(15, 0);
-+	lpi_id = (val & GENMASK_ULL(47, 16)) >> 16;
-+
-+	if (!lpi_id)
-+		return 0;
-+
-+	*next = (val & GENMASK_ULL(63, 48)) >> 48;
-+
-+	collection = find_collection(its, coll_id);
-+	if (!collection)
-+		return -EINVAL;
-+
-+	ret = vgic_its_alloc_ite(dev, &ite, collection,
-+				  lpi_id, event_id);
-+	if (ret)
-+		return ret;
-+
-+	irq = vgic_add_lpi(kvm, lpi_id);
-+	if (IS_ERR(irq))
-+		return PTR_ERR(irq);
-+	ite->irq = irq;
-+
-+	/* restore the configuration of the LPI */
-+	ret = update_lpi_config(kvm, irq, NULL);
-+	if (ret)
-+		return ret;
-+
-+	update_affinity_ite(kvm, ite);
-+	return 0;
++	return -ENXIO;
 +}
 +
-+static int vgic_its_flush_itt(struct vgic_its *its, struct its_device *device)
-+{
-+	gpa_t base = device->itt_addr;
-+	struct its_ite *ite;
-+	int ret;
+ static int vgic_its_has_attr(struct kvm_device *dev,
+ 			     struct kvm_device_attr *attr)
+ {
+@@ -1461,6 +1474,8 @@ static int vgic_its_has_attr(struct kvm_device *dev,
+ 			return 0;
+ 		}
+ 		break;
++	case KVM_DEV_ARM_VGIC_GRP_ITS_REGS:
++		return vgic_its_has_attr_regs(dev, attr);
+ 	}
+ 	return -ENXIO;
+ }
+@@ -1500,6 +1515,15 @@ static int vgic_its_set_attr(struct kvm_device *dev,
+ 			return 0;
+ 		}
+ 		break;
++	case KVM_DEV_ARM_VGIC_GRP_ITS_REGS: {
++		u64 __user *uaddr = (u64 __user *)(long)attr->addr;
++		u64 reg;
 +
-+	list_for_each_entry(ite, &device->itt_head, ite_list) {
-+		gpa_t gpa = base + ite->event_id * VITS_ESZ;
++		if (get_user(reg, uaddr))
++			return -EFAULT;
 +
-+		ret = vgic_its_flush_ite(its, device, ite, gpa);
++		return vgic_its_attr_regs_access(dev, attr, &reg, true);
++	}
+ 	}
+ 	return -ENXIO;
+ }
+@@ -1520,10 +1544,20 @@ static int vgic_its_get_attr(struct kvm_device *dev,
+ 		if (copy_to_user(uaddr, &addr, sizeof(addr)))
+ 			return -EFAULT;
+ 		break;
++	}
++	case KVM_DEV_ARM_VGIC_GRP_ITS_REGS: {
++		u64 __user *uaddr = (u64 __user *)(long)attr->addr;
++		u64 reg;
++		int ret;
++
++		ret = vgic_its_attr_regs_access(dev, attr, &reg, false);
 +		if (ret)
 +			return ret;
++		return put_user(reg, uaddr);
 +	}
-+	return 0;
-+}
-+
-+static int vgic_its_restore_itt(struct vgic_its *its,
-+				struct its_device *dev)
-+{
-+	size_t max_size = (2 << dev->nb_eventid_bits) * VITS_ESZ;
-+	gpa_t base = dev->itt_addr;
-+	int ret;
-+
-+	ret =  lookup_table(its, base, max_size, VITS_ESZ, 0,
-+			    vgic_its_restore_ite, dev);
-+
-+	if (ret < 0)
-+		return ret;
-+	return 0;
-+}
-+
- /**
-  * vgic_its_flush_device_tables - flush the device table and all ITT
-  * into guest RAM
+ 	default:
+ 		return -ENXIO;
+ 	}
+-	}
+ 
+ 	return 0;
+ }
 -- 
 2.5.5
