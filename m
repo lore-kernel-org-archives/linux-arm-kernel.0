@@ -1,51 +1,49 @@
-From: lukma@denx.de (Lukasz Majewski)
-Date: Mon, 6 Mar 2017 17:24:30 +0100
-Subject: [PATCH 5/5] ARM: omap2plus_defconfig: Enable support for
- ti-cpufreq
-In-Reply-To: <1488813822-26042-6-git-send-email-d-gerlach@ti.com>
-References: <1488813822-26042-1-git-send-email-d-gerlach@ti.com>
- <1488813822-26042-6-git-send-email-d-gerlach@ti.com>
-Message-ID: <20170306172430.5e91b576@jawa>
+From: jon.mason@broadcom.com (Jon Mason)
+Date: Mon,  6 Mar 2017 11:24:44 -0500
+Subject: [PATCH v3 1/2] ARM: dts: bcm5301x: Add TWD WD Support to DT
+In-Reply-To: <1488817485-7503-1-git-send-email-jon.mason@broadcom.com>
+References: <1488817485-7503-1-git-send-email-jon.mason@broadcom.com>
+Message-ID: <1488817485-7503-2-git-send-email-jon.mason@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 6 Mar 2017 09:23:42 -0600
-Dave Gerlach <d-gerlach@ti.com> wrote:
+From: Jon Mason <jonmason@broadcom.com>
 
-> AM335x, AM437x, DRA7xx, and AM57xx platforms all now depend on
-> ti-cpufreq driver to enable proper OPPs for use with cpufreq, so
-> enable the same.
-> 
-> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+Add support for the ARM TWD Watchdog to the bcm5301x device tree.  The
+ARM TWD timer allocated the register space for the WDT, so this patch
+necessitated shrinking that.  Also, the GIC masks were added for these.
 
-Reviewed-by: Lukasz Majewski <lukma@denx.de>
+Signed-off-by: Jon Mason <jonmason@broadcom.com>
+---
+ arch/arm/boot/dts/bcm5301x.dtsi | 15 ++++++++++++---
+ 1 file changed, 12 insertions(+), 3 deletions(-)
 
-> ---
->  arch/arm/configs/omap2plus_defconfig | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/configs/omap2plus_defconfig
-> b/arch/arm/configs/omap2plus_defconfig index
-> f2462a6bdba6..62a4b6cf16f0 100644 ---
-> a/arch/arm/configs/omap2plus_defconfig +++
-> b/arch/arm/configs/omap2plus_defconfig @@ -64,6 +64,7 @@
-> CONFIG_CPU_FREQ_GOV_POWERSAVE=y CONFIG_CPU_FREQ_GOV_USERSPACE=y
->  CONFIG_CPU_FREQ_GOV_CONSERVATIVE=y
->  CONFIG_CPUFREQ_DT=m
-> +CONFIG_ARM_TI_CPUFREQ=y
->  # CONFIG_ARM_OMAP2PLUS_CPUFREQ is not set
->  CONFIG_CPU_IDLE=y
->  CONFIG_BINFMT_MISC=y
-
-
-
-
-Best regards,
-
-Lukasz Majewski
-
---
-
-DENX Software Engineering GmbH,      Managing Director: Wolfgang Denk
-HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
-Phone: (+49)-8142-66989-10 Fax: (+49)-8142-66989-80 Email: wd at denx.de
+diff --git a/arch/arm/boot/dts/bcm5301x.dtsi b/arch/arm/boot/dts/bcm5301x.dtsi
+index 1e5a97b..a9aa7be 100644
+--- a/arch/arm/boot/dts/bcm5301x.dtsi
++++ b/arch/arm/boot/dts/bcm5301x.dtsi
+@@ -70,10 +70,19 @@
+ 			clocks = <&periph_clk>;
+ 		};
+ 
+-		local-timer at 20600 {
++		timer at 20600 {
+ 			compatible = "arm,cortex-a9-twd-timer";
+-			reg = <0x20600 0x100>;
+-			interrupts = <GIC_PPI 13 IRQ_TYPE_EDGE_RISING>;
++			reg = <0x20600 0x20>;
++			interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) |
++						  IRQ_TYPE_EDGE_RISING)>;
++			clocks = <&periph_clk>;
++		};
++
++		watchdog at 20620 {
++			compatible = "arm,cortex-a9-twd-wdt";
++			reg = <0x20620 0x20>;
++			interrupts = <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(2) |
++						  IRQ_TYPE_EDGE_RISING)>;
+ 			clocks = <&periph_clk>;
+ 		};
+ 
+-- 
+2.7.4
