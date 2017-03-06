@@ -1,62 +1,203 @@
-From: eric.auger@redhat.com (Eric Auger)
-Date: Mon,  6 Mar 2017 12:34:21 +0100
-Subject: [PATCH v3 06/19] KVM: arm64: ITS: Implement
- vgic_mmio_uaccess_write_its_creadr
-In-Reply-To: <1488800074-21991-1-git-send-email-eric.auger@redhat.com>
-References: <1488800074-21991-1-git-send-email-eric.auger@redhat.com>
-Message-ID: <1488800074-21991-7-git-send-email-eric.auger@redhat.com>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Mon,  6 Mar 2017 20:14:43 +0800
+Subject: [PATCH] spi: sun6i: Allow transfers larger than FIFO size
+Message-ID: <20170306121443.36954-1-icenowy@aosc.xyz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-GITS_CREADR needs to be restored so let's implement the associated
-uaccess_write_its callback.
+The spi-sun6i driver have the same problem that spi-sun4i used to have
+-- SPI transfers are limited to one FIFO depth.
 
-Signed-off-by: Eric Auger <eric.auger@redhat.com>
+This commit fixes this problem in the same way it's fixed in spi-sun4i.
+See commit 196737912da5 ("spi: sun4i: Allow transfers larger than FIFO size")
+for more information.
 
+The sun6i SPI controllers features changeable interrupt trigger level, but I
+set it to 3/4 of fifo depth, as same as the the sun4i SPI controllers.
+
+Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
 ---
----
- virt/kvm/arm/vgic/vgic-its.c | 22 +++++++++++++++++++++-
- 1 file changed, 21 insertions(+), 1 deletion(-)
+ drivers/spi/spi-sun6i.c | 90 ++++++++++++++++++++++++++++++++++++++++++++-----
+ 1 file changed, 81 insertions(+), 9 deletions(-)
 
-diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index e9c8f9f..6120c6e 100644
---- a/virt/kvm/arm/vgic/vgic-its.c
-+++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -1225,6 +1225,25 @@ static unsigned long vgic_mmio_read_its_creadr(struct kvm *kvm,
- 	return extract_bytes(its->creadr, addr & 0x7, len);
+diff --git a/drivers/spi/spi-sun6i.c b/drivers/spi/spi-sun6i.c
+index e3114832c485..6e9ca93db9bf 100644
+--- a/drivers/spi/spi-sun6i.c
++++ b/drivers/spi/spi-sun6i.c
+@@ -46,13 +46,19 @@
+ #define SUN6I_TFR_CTL_XCH			BIT(31)
+ 
+ #define SUN6I_INT_CTL_REG		0x10
++#define SUN6I_INT_CTL_RF_RDY			BIT(0)
++#define SUN6I_INT_CTL_TF_ERQ			BIT(4)
+ #define SUN6I_INT_CTL_RF_OVF			BIT(8)
+ #define SUN6I_INT_CTL_TC			BIT(12)
+ 
+ #define SUN6I_INT_STA_REG		0x14
+ 
+ #define SUN6I_FIFO_CTL_REG		0x18
++#define SUN6I_FIFO_CTL_RF_RDY_TRIG_LEVEL_MASK	0xff
++#define SUN6I_FIFO_CTL_RF_RDY_TRIG_LEVEL_BITS	0
+ #define SUN6I_FIFO_CTL_RF_RST			BIT(15)
++#define SUN6I_FIFO_CTL_TF_ERQ_TRIG_LEVEL_MASK	0xff
++#define SUN6I_FIFO_CTL_TF_ERQ_TRIG_LEVEL_BITS	16
+ #define SUN6I_FIFO_CTL_TF_RST			BIT(31)
+ 
+ #define SUN6I_FIFO_STA_REG		0x1c
+@@ -68,14 +74,16 @@
+ #define SUN6I_CLK_CTL_CDR1(div)			(((div) & SUN6I_CLK_CTL_CDR1_MASK) << 8)
+ #define SUN6I_CLK_CTL_DRS			BIT(12)
+ 
++#define SUN6I_MAX_XFER_SIZE		0xffffff
++
+ #define SUN6I_BURST_CNT_REG		0x30
+-#define SUN6I_BURST_CNT(cnt)			((cnt) & 0xffffff)
++#define SUN6I_BURST_CNT(cnt)			((cnt) & SUN6I_MAX_XFER_SIZE)
+ 
+ #define SUN6I_XMIT_CNT_REG		0x34
+-#define SUN6I_XMIT_CNT(cnt)			((cnt) & 0xffffff)
++#define SUN6I_XMIT_CNT(cnt)			((cnt) & SUN6I_MAX_XFER_SIZE)
+ 
+ #define SUN6I_BURST_CTL_CNT_REG		0x38
+-#define SUN6I_BURST_CTL_CNT_STC(cnt)		((cnt) & 0xffffff)
++#define SUN6I_BURST_CTL_CNT_STC(cnt)		((cnt) & SUN6I_MAX_XFER_SIZE)
+ 
+ #define SUN6I_TXDATA_REG		0x200
+ #define SUN6I_RXDATA_REG		0x300
+@@ -105,6 +113,31 @@ static inline void sun6i_spi_write(struct sun6i_spi *sspi, u32 reg, u32 value)
+ 	writel(value, sspi->base_addr + reg);
  }
  
-+static void vgic_mmio_uaccess_write_its_creadr(struct kvm *kvm,
-+					       struct vgic_its *its,
-+					       gpa_t addr, unsigned int len,
-+					       unsigned long val)
++static inline u32 sun6i_spi_get_tx_fifo_count(struct sun6i_spi *sspi)
 +{
-+	u32 reg;
++	u32 reg = sun6i_spi_read(sspi, SUN6I_FIFO_STA_REG);
 +
-+	mutex_lock(&its->cmd_lock);
-+	reg = update_64bit_reg(its->creadr, addr & 7, len, val);
-+	reg = ITS_CMD_OFFSET(reg);
-+	if (reg >= ITS_CMD_BUFFER_SIZE(its->cbaser)) {
-+		mutex_unlock(&its->cmd_lock);
-+		return;
-+	}
++	reg >>= SUN6I_FIFO_STA_TF_CNT_BITS;
 +
-+	its->creadr = reg;
-+	mutex_unlock(&its->cmd_lock);
++	return reg & SUN6I_FIFO_STA_TF_CNT_MASK;
 +}
 +
- #define BASER_INDEX(addr) (((addr) / sizeof(u64)) & 0x7)
- static unsigned long vgic_mmio_read_its_baser(struct kvm *kvm,
- 					      struct vgic_its *its,
-@@ -1320,7 +1339,8 @@ static struct vgic_register_region its_registers[] = {
- 		vgic_mmio_read_its_cwriter, vgic_mmio_write_its_cwriter, NULL,
- 		8, VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
- 	REGISTER_ITS_DESC(GITS_CREADR,
--		vgic_mmio_read_its_creadr, its_mmio_write_wi, NULL, 8,
-+		vgic_mmio_read_its_creadr, its_mmio_write_wi,
-+		vgic_mmio_uaccess_write_its_creadr, 8,
- 		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
- 	REGISTER_ITS_DESC(GITS_BASER,
- 		vgic_mmio_read_its_baser, vgic_mmio_write_its_baser, NULL, 0x40,
++static inline void sun6i_spi_enable_interrupt(struct sun6i_spi *sspi, u32 mask)
++{
++	u32 reg = sun6i_spi_read(sspi, SUN6I_INT_CTL_REG);
++
++	reg |= mask;
++	sun6i_spi_write(sspi, SUN6I_INT_CTL_REG, reg);
++}
++
++static inline void sun6i_spi_disable_interrupt(struct sun6i_spi *sspi, u32 mask)
++{
++	u32 reg = sun6i_spi_read(sspi, SUN6I_INT_CTL_REG);
++
++	reg &= ~mask;
++	sun6i_spi_write(sspi, SUN6I_INT_CTL_REG, reg);
++}
++
+ static inline void sun6i_spi_drain_fifo(struct sun6i_spi *sspi, int len)
+ {
+ 	u32 reg, cnt;
+@@ -127,10 +160,13 @@ static inline void sun6i_spi_drain_fifo(struct sun6i_spi *sspi, int len)
+ 
+ static inline void sun6i_spi_fill_fifo(struct sun6i_spi *sspi, int len)
+ {
++	u32 cnt;
+ 	u8 byte;
+ 
+-	if (len > sspi->len)
+-		len = sspi->len;
++	/* See how much data we can fit */
++	cnt = sspi->fifo_depth - sun6i_spi_get_tx_fifo_count(sspi);
++
++	len = min3(len, (int)cnt, sspi->len);
+ 
+ 	while (len--) {
+ 		byte = sspi->tx_buf ? *sspi->tx_buf++ : 0;
+@@ -170,12 +206,12 @@ static int sun6i_spi_transfer_one(struct spi_master *master,
+ 	struct sun6i_spi *sspi = spi_master_get_devdata(master);
+ 	unsigned int mclk_rate, div, timeout;
+ 	unsigned int start, end, tx_time;
++	unsigned int trig_level;
+ 	unsigned int tx_len = 0;
+ 	int ret = 0;
+ 	u32 reg;
+ 
+-	/* We don't support transfer larger than the FIFO */
+-	if (tfr->len > sspi->fifo_depth)
++	if (tfr->len > SUN6I_MAX_XFER_SIZE)
+ 		return -EINVAL;
+ 
+ 	reinit_completion(&sspi->done);
+@@ -191,6 +227,17 @@ static int sun6i_spi_transfer_one(struct spi_master *master,
+ 			SUN6I_FIFO_CTL_RF_RST | SUN6I_FIFO_CTL_TF_RST);
+ 
+ 	/*
++	 * Setup FIFO interrupt trigger level
++	 * Here we choose 3/4 of the full fifo depth, as it's the hardcoded
++	 * value used in old generation of Allwinner SPI controller.
++	 * (See spi-sun4i.c)
++	 */
++	trig_level = sspi->fifo_depth / 4 * 3;
++	sun6i_spi_write(sspi, SUN6I_FIFO_CTL_REG,
++			(trig_level << SUN6I_FIFO_CTL_RF_RDY_TRIG_LEVEL_BITS) |
++			(trig_level << SUN6I_FIFO_CTL_TF_ERQ_TRIG_LEVEL_BITS));
++
++	/*
+ 	 * Setup the transfer control register: Chip Select,
+ 	 * polarities, etc.
+ 	 */
+@@ -274,6 +321,10 @@ static int sun6i_spi_transfer_one(struct spi_master *master,
+ 
+ 	/* Enable the interrupts */
+ 	sun6i_spi_write(sspi, SUN6I_INT_CTL_REG, SUN6I_INT_CTL_TC);
++	sun6i_spi_enable_interrupt(sspi, SUN6I_INT_CTL_TC |
++					 SUN6I_INT_CTL_RF_RDY);
++	if (tx_len > sspi->fifo_depth)
++		sun6i_spi_enable_interrupt(sspi, SUN6I_INT_CTL_TF_ERQ);
+ 
+ 	/* Start the transfer */
+ 	reg = sun6i_spi_read(sspi, SUN6I_TFR_CTL_REG);
+@@ -293,8 +344,6 @@ static int sun6i_spi_transfer_one(struct spi_master *master,
+ 		goto out;
+ 	}
+ 
+-	sun6i_spi_drain_fifo(sspi, sspi->fifo_depth);
+-
+ out:
+ 	sun6i_spi_write(sspi, SUN6I_INT_CTL_REG, 0);
+ 
+@@ -309,10 +358,33 @@ static irqreturn_t sun6i_spi_handler(int irq, void *dev_id)
+ 	/* Transfer complete */
+ 	if (status & SUN6I_INT_CTL_TC) {
+ 		sun6i_spi_write(sspi, SUN6I_INT_STA_REG, SUN6I_INT_CTL_TC);
++		sun6i_spi_drain_fifo(sspi, sspi->fifo_depth);
+ 		complete(&sspi->done);
+ 		return IRQ_HANDLED;
+ 	}
+ 
++	/* Receive FIFO 3/4 full */
++	if (status & SUN6I_INT_CTL_RF_RDY) {
++		sun6i_spi_drain_fifo(sspi, SUN6I_FIFO_DEPTH);
++		/* Only clear the interrupt _after_ draining the FIFO */
++		sun6i_spi_write(sspi, SUN6I_INT_STA_REG, SUN6I_INT_CTL_RF_RDY);
++		return IRQ_HANDLED;
++	}
++
++	/* Transmit FIFO 3/4 empty */
++	if (status & SUN6I_INT_CTL_TF_ERQ) {
++		sun6i_spi_fill_fifo(sspi, SUN6I_FIFO_DEPTH);
++
++		if (!sspi->len)
++			/* nothing left to transmit */
++			sun6i_spi_disable_interrupt(sspi, SUN6I_INT_CTL_TF_ERQ);
++
++		/* Only clear the interrupt _after_ re-seeding the FIFO */
++		sun6i_spi_write(sspi, SUN6I_INT_STA_REG, SUN6I_INT_CTL_TF_ERQ);
++
++		return IRQ_HANDLED;
++	}
++
+ 	return IRQ_NONE;
+ }
+ 
 -- 
-2.5.5
+2.11.1
