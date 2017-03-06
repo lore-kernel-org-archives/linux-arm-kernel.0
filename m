@@ -1,59 +1,60 @@
-From: dann.frazier@canonical.com (dann frazier)
-Date: Mon, 6 Mar 2017 14:48:50 -0700
-Subject: [PATCH 00/17] clocksource/arch_timer: Errara workaround
- infrastructure rework
-In-Reply-To: <20170306112622.13853-1-marc.zyngier@arm.com>
-References: <20170306112622.13853-1-marc.zyngier@arm.com>
-Message-ID: <CALdTtntmgZDzKWgveydH0vCBTO74Tu=tHCQYSTkVt476G=SR6Q@mail.gmail.com>
+From: rask@formelder.dk (Rask Ingemann Lambertsen)
+Date: Mon, 6 Mar 2017 22:49:05 +0100
+Subject: [PATCH v8 6/6] arm64: dts: allwinner: h5: add support for the
+ Orange Pi PC 2 board
+In-Reply-To: <20170306171750.7491-7-icenowy@aosc.xyz>
+References: <20170306171750.7491-1-icenowy@aosc.xyz>
+ <20170306171750.7491-7-icenowy@aosc.xyz>
+Message-ID: <20170306214904.o2zpw3q3fvtrmsmd@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 6, 2017 at 4:26 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> It has recently become obvious that a number of arm64 systems have
-> been blessed with a set of timers that are slightly less than perfect,
-> and require a bit of hand-holding. We already have a bunch of
-> errata-specific code to deal with this, but as we're adding more
-> potential detection methods (DT, ACPI, capability), things are getting
-> a bit out of hands.
->
-> Instead of adding more ad-hoc fixes to an already difficult code base,
-> let's give ourselves a bit of an infrastructure that can deal with
-> this and hide most of the uggliness behind frendly accessors.
->
-> The series is structured as such:
->
-> - The first half of the series rework the existing workarounds,
->   allowing errata to be matched using a given detection method
->
-> - Another patch allows a workaround to affect a subset of the CPUs,
->   and not the whole system
->
-> - Another set of patches allow the virtual counter to be trapped when
->   accessed from userspace (something that affects the current set of
->   broken platform, and that is not worked around yet)
->
-> - We then work around a Cortex-A73 erratum, whose counter can return a
->   wrong value if read while crossing a 32bit boundary
->
-> - Finally, we add some ACPI-specific workarounds for HiSilicon
->   platforms that have the HISILICON_ERRATUM_161010101 defect.
->
-> Note that so far, we only deal with arm64. Once the infrastructure is
-> agreed upon, we can look at generalizing it (to some extent) to 32bit
-> ARM (typical use case would be a 32bit guest running on an affected
-> host).
+On Tue, Mar 07, 2017 at 01:17:50AM +0800, Icenowy Zheng wrote:
+> From: Andre Przywara <andre.przywara@arm.com>
+> 
+> The Orange Pi PC 2 is a typical single board computer using the
+> Allwinner H5 SoC. Apart from the usual suspects it features three
+> separately driven USB ports and a Gigabit Ethernet port.
+> Also it has a SPI NOR flash soldered, from which the board can boot
+> from. This enables the SBC to behave like a "real computer" with
+> built-in firmware.
+> 
+> Add the board specific .dts file, which includes the H5 .dtsi and
+> enables the peripherals that we support so far.
+> 
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> [Icenowy: dropped all GPIO pinctrl nodes, change red LED gpio,
+>  change MMC cd to active-low, rename some node names to prevent
+>  underscores]
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
 
-Thanks Marc. Worked on our HiSilicon board:
+Reviewed-by: Rask Ingemann Lambertsen <rask@formelder.dk>
 
-[    0.000000] arm_arch_timer: Enabling global workaround for
-HiSilicon erratum 161010101
-[    0.000000] arm_arch_timer: CPU0: Trapping CNTVCT access
-[    0.000000] arm_arch_timer: Architected cp15 timer(s) running at
-50.00MHz (phys).
-[    0.266571] arm_arch_timer: CPU1: Trapping CNTVCT access
-[    0.270108] arm_arch_timer: CPU2: Trapping CNTVCT access
-[...]
+> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts
+> new file mode 100644
+> index 000000000000..30639729920d
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts
+> @@ -0,0 +1,163 @@
+> +/*
+> + * Copyright (C) 2016 ARM Ltd.
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
 
-Tested-by: dann frazier <dann.frazier@canonical.com>
+I didn't catch any sort of announcement of it, but it seems as if we've
+started using SPDX license identifiers in dts files. Thus you can simply
+include the line
+SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+after the copyright notice and omit the license notices themselves. Even
+though the comment refers to "the X11 license", the license text matches that
+associated with the MIT license identifier [1] rather than that of the X11
+license [2]. The same goes for patch 5/6.
 
-  -dann
+[1] https://spdx.org/licenses/MIT.html#licenseText
+[2] https://spdx.org/licenses/X11.html#licenseText
+
+-- 
+Rask Ingemann Lambertsen
