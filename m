@@ -1,65 +1,41 @@
-From: lukma@denx.de (Lukasz Majewski)
-Date: Mon, 6 Mar 2017 17:03:58 +0100
-Subject: [PATCH 3/5] ARM: dts: am4372: Update operating-points-v2 table
- for cpu
-In-Reply-To: <1488813822-26042-4-git-send-email-d-gerlach@ti.com>
-References: <1488813822-26042-1-git-send-email-d-gerlach@ti.com>
- <1488813822-26042-4-git-send-email-d-gerlach@ti.com>
-Message-ID: <20170306170358.52a3ff37@jawa>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Mon, 6 Mar 2017 17:04:37 +0100
+Subject: [RFC PATCH 00/12] Ion cleanup in preparation for moving out of
+ staging
+In-Reply-To: <20170306105805.jsq44kfxhsvazkm6@sirena.org.uk>
+References: <1488491084-17252-1-git-send-email-labbott@redhat.com>
+ <20170303132949.GC31582@dhcp22.suse.cz>
+ <cf383b9b-3cbc-0092-a071-f120874c053c@redhat.com>
+ <20170306074258.GA27953@dhcp22.suse.cz>
+ <20170306104041.zghsicrnadoap7lp@phenom.ffwll.local>
+ <20170306105805.jsq44kfxhsvazkm6@sirena.org.uk>
+Message-ID: <20170306160437.sf7bksorlnw7u372@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 6 Mar 2017 09:23:40 -0600
-Dave Gerlach <d-gerlach@ti.com> wrote:
-
-> The operatings-points-v2 table for am4372 was merged before any user
-> of it was present in the kernel and before the binding had been
-> finalized. The new ti-cpufreq driver and binding expects the platform
-> specific properties to be part of the operating-points-v2 table
-> rather than the cpu node so let's move them there as the only user is
-> the ti-cpufreq driver.
+On Mon, Mar 06, 2017 at 11:58:05AM +0100, Mark Brown wrote:
+> On Mon, Mar 06, 2017 at 11:40:41AM +0100, Daniel Vetter wrote:
 > 
-> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
-
-Reviewed-by: Lukasz Majewski <lukma@denx.de>
-
-> ---
->  arch/arm/boot/dts/am4372.dtsi | 7 +++----
->  1 file changed, 3 insertions(+), 4 deletions(-)
+> > No one gave a thing about android in upstream, so Greg KH just dumped it
+> > all into staging/android/. We've discussed ION a bunch of times, recorded
+> > anything we'd like to fix in staging/android/TODO, and Laura's patch
+> > series here addresses a big chunk of that.
 > 
-> diff --git a/arch/arm/boot/dts/am4372.dtsi
-> b/arch/arm/boot/dts/am4372.dtsi index 97fcaf415de1..176e09e9a45e
-> 100644 --- a/arch/arm/boot/dts/am4372.dtsi
-> +++ b/arch/arm/boot/dts/am4372.dtsi
-> @@ -50,15 +50,14 @@
->  			clock-names = "cpu";
->  
->  			operating-points-v2 = <&cpu0_opp_table>;
-> -			ti,syscon-efuse = <&scm_conf 0x610 0x3f 0>;
-> -			ti,syscon-rev = <&scm_conf 0x600>;
->  
->  			clock-latency = <300000>; /* From
-> omap-cpufreq driver */ };
->  	};
->  
-> -	cpu0_opp_table: opp_table0 {
-> -		compatible = "operating-points-v2";
-> +	cpu0_opp_table: opp-table {
-> +		compatible = "operating-points-v2-ti-cpu";
-> +		syscon = <&scm_conf>;
->  
->  		opp50 at 300000000 {
->  			opp-hz = /bits/ 64 <300000000>;
+> > This is pretty much the same approach we (gpu folks) used to de-stage the
+> > syncpt stuff.
+> 
+> Well, there's also the fact that quite a few people have issues with the
+> design (like Laurent).  It seems like a lot of them have either got more
+> comfortable with it over time, or at least not managed to come up with
+> any better ideas in the meantime.
 
+See the TODO, it has everything a really big group (look at the patch for
+the full Cc: list) figured needs to be improved at LPC 2015. We don't just
+merge stuff because merging stuff is fun :-)
 
-
-
-Best regards,
-
-Lukasz Majewski
-
---
-
-DENX Software Engineering GmbH,      Managing Director: Wolfgang Denk
-HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
-Phone: (+49)-8142-66989-10 Fax: (+49)-8142-66989-80 Email: wd at denx.de
+Laurent was even in that group ...
+-Daniel
+-- 
+Daniel Vetter
+Software Engineer, Intel Corporation
+http://blog.ffwll.ch
