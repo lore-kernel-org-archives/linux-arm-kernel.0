@@ -1,45 +1,125 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon,  6 Mar 2017 01:56:39 -0800
-Subject: [PATCH] KVM: arm/arm64: Let vcpu thread modify its own active state
-Message-ID: <1488794199-22397-1-git-send-email-christoffer.dall@linaro.org>
+From: james.morse@arm.com (James Morse)
+Date: Mon, 06 Mar 2017 10:00:53 +0000
+Subject: [PATCH 2/2] acpi: apei: handle SEI notification type for ARMv8
+In-Reply-To: <1488537595-72161-2-git-send-email-xiexiuqi@huawei.com>
+References: <1488537595-72161-1-git-send-email-xiexiuqi@huawei.com>
+ <1488537595-72161-2-git-send-email-xiexiuqi@huawei.com>
+Message-ID: <58BD3355.2010201@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jintack Lim <jintack@cs.columbia.edu>
+Hi Xie XiuQi,
 
-Currently, if a vcpu thread tries to change its own active state when
-the irq is already in AP list, it'll loop forever. Since the VCPU thread
-has already synced back LR state to the struct vgic_irq, let it modify
-its own state safely.
+On 03/03/17 10:39, Xie XiuQi wrote:
+> ARM APEI extension proposal added SEI (asynchronous SError interrupt)
+> notification type for ARMv8.
+> 
+> Add a new GHES error source handling function for SEI. In firmware
+> first mode, if an error source's notification type is SEI. Then GHES
+> could parse and report the detail error information.
 
-Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
----
- virt/kvm/arm/vgic/vgic-mmio.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+This patch doesn't apply to any upstream tree. Is this based on Tyler's larger
+UEFI/ACPI update series? If so, please mention this in your cover letter, (Nit:
+please include a cover letter when sending two or more patches!).
 
-diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
-index 3654b4c..29101ab 100644
---- a/virt/kvm/arm/vgic/vgic-mmio.c
-+++ b/virt/kvm/arm/vgic/vgic-mmio.c
-@@ -185,9 +185,9 @@ static void vgic_mmio_change_active(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
- 	 * If this virtual IRQ was written into a list register, we
- 	 * have to make sure the CPU that runs the VCPU thread has
- 	 * synced back LR state to the struct vgic_irq.  We can only
--	 * know this for sure, when either this irq is not assigned to
-+	 * know this for sure, when this irq is not assigned to
- 	 * anyone's AP list anymore, or the VCPU thread is not
--	 * running on any CPUs.
-+	 * running on any CPUs, or current thread is the VCPU thread.
- 	 *
- 	 * In the opposite case, we know the VCPU thread may be on its
- 	 * way back from the guest and still has to sync back this
-@@ -195,6 +195,7 @@ static void vgic_mmio_change_active(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
- 	 * other thread sync back the IRQ.
- 	 */
- 	while (irq->vcpu && /* IRQ may have state in an LR somewhere */
-+	       irq->vcpu != vcpu && /* Current thread is not the VCPU thread */
- 	       irq->vcpu->cpu != -1) /* VCPU thread is running */
- 		cond_resched_lock(&irq->irq_lock);
- 
--- 
-2.5.0
+What happens if the SError Interrupt arrives while KVM was doing its work? We
+set the HCR_EL2.AMO bit when running a guest, so KVM may receive these instead
+of the host kernel.
+
+
+> diff --git a/drivers/acpi/apei/Kconfig b/drivers/acpi/apei/Kconfig
+> index 1122d7f..a32f046 100644
+> --- a/drivers/acpi/apei/Kconfig
+> +++ b/drivers/acpi/apei/Kconfig
+> @@ -18,6 +18,20 @@ config HAVE_ACPI_APEI_SEA
+>  	  option allows the OS to look for such hardware error record, and
+>  	  take appropriate action.
+>  
+> +config ACPI_APEI_SEI
+> +	bool "APEI Asynchronous SError Interrupt logging/recovering support"
+> +	depends on ARM64 && ACPI_APEI_GHES
+> +	help
+> +	  This option should be enabled if the system supports
+> +	  firmware first handling of SEI (asynchronous SError interrupt).
+> +
+> +	  SEI happens with invalid instruction access or asynchronous exceptions
+> +	  on ARMv8 systems. If a system supports firmware first handling of SEI,
+> +	  the platform analyzes and handles hardware error notifications from
+> +	  SEI, and it may then form a HW error record for the OS to parse and
+> +	  handle. This option allows the OS to look for such hardware error
+> +	  record, and take appropriate action.
+> +
+>  config ACPI_APEI
+>  	bool "ACPI Platform Error Interface (APEI)"
+>  	select MISC_FILESYSTEMS
+> diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
+> index 3e4ea1b..d084a09 100644
+> --- a/drivers/acpi/apei/ghes.c
+> +++ b/drivers/acpi/apei/ghes.c
+> @@ -850,6 +850,50 @@ static inline void ghes_sea_remove(struct ghes *ghes)
+>  }
+>  #endif /* CONFIG_HAVE_ACPI_APEI_SEA */
+>  
+> +#ifdef CONFIG_ACPI_APEI_SEI
+> +static LIST_HEAD(ghes_sei);
+> +
+> +void ghes_notify_sei(void)
+> +{
+> +	struct ghes *ghes;
+> +
+> +	/*
+> +	 * synchronize_rcu() will wait for nmi_exit(), so no need to
+
+Where nmi_exit()?
+
+This nmi enter/exit was to prevent APEI being interrupted by APEI and trying to
+take the same set of locks. APEI masks IRQs to prevent this happening normally,
+but Synchronous External Abort couldn't be masked.
+We don't mask Asynchronous Exceptions in APEI so the same thing can happen here.
+Adding nmi_{enter,exit}() round the ghes call in the arch bad_mode() will
+prevent this lockup.
+
+
+Thanks,
+
+James
+
+
+> +	 * rcu_read_lock().
+> +	 */
+> +	list_for_each_entry_rcu(ghes, &ghes_sei, list) {
+> +		ghes_proc(ghes);
+> +	}
+> +}
+> +
+> +static void ghes_sei_add(struct ghes *ghes)
+> +{
+> +	mutex_lock(&ghes_list_mutex);
+> +	list_add_rcu(&ghes->list, &ghes_sei);
+> +	mutex_unlock(&ghes_list_mutex);
+> +}
+> +
+> +static void ghes_sei_remove(struct ghes *ghes)
+> +{
+> +	mutex_lock(&ghes_list_mutex);
+> +	list_del_rcu(&ghes->list);
+> +	mutex_unlock(&ghes_list_mutex);
+> +	synchronize_rcu();
+> +}
+> +#else /* CONFIG_ACPI_APEI_SEI */
+> +static inline void ghes_sei_add(struct ghes *ghes)
+> +{
+> +	pr_err(GHES_PFX "ID: %d, trying to add SEI notification which is not supported\n",
+> +	       ghes->generic->header.source_id);
+> +}
+> +
+> +static inline void ghes_sei_remove(struct ghes *ghes)
+> +{
+> +	pr_err(GHES_PFX "ID: %d, trying to remove SEI notification which is not supported\n",
+> +	       ghes->generic->header.source_id);
+> +}
+> +#endif /* CONFIG_HAVE_ACPI_APEI_SEI */
+> +
+>  #ifdef CONFIG_HAVE_ACPI_APEI_NMI
+>  /*
+>   * printk is not safe in NMI context.  So in NMI handler, we allocate
