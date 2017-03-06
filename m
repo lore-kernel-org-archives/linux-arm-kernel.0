@@ -1,90 +1,157 @@
 From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Mon, 6 Mar 2017 21:49:25 +0800
-Subject: [RESEND PATCH v3 4/8] phy: phy-mt65xx-usb3: move clock from phy node
- into port nodes
+Date: Mon, 6 Mar 2017 21:49:29 +0800
+Subject: [RESEND PATCH v3 8/8] dt-bindings: phy-mt65xx-usb: add support for
+ new version phy
 In-Reply-To: <1488808169-6031-1-git-send-email-chunfeng.yun@mediatek.com>
 References: <1488808169-6031-1-git-send-email-chunfeng.yun@mediatek.com>
-Message-ID: <1488808169-6031-4-git-send-email-chunfeng.yun@mediatek.com>
+Message-ID: <1488808169-6031-8-git-send-email-chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-the reference clock of HighSpeed port is 48M which comes from PLL;
-the reference clock of SuperSpeed port is 26M which usually comes
-from 26M oscillator directly, but some SoCs are not, add it for
-compatibility, and put them into port node for flexibility.
+add a new compatible string for "mt2712", and move reference clock
+into each port node;
 
 Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+Acked-by: Rob Herring <robh@kernel.org>
 ---
- drivers/phy/phy-mt65xx-usb3.c |   21 +++++++++++----------
- 1 file changed, 11 insertions(+), 10 deletions(-)
+ .../devicetree/bindings/phy/phy-mt65xx-usb.txt     |   93 +++++++++++++++++---
+ 1 file changed, 80 insertions(+), 13 deletions(-)
 
-diff --git a/drivers/phy/phy-mt65xx-usb3.c b/drivers/phy/phy-mt65xx-usb3.c
-index 7fff482..f4a3505 100644
---- a/drivers/phy/phy-mt65xx-usb3.c
-+++ b/drivers/phy/phy-mt65xx-usb3.c
-@@ -153,6 +153,7 @@ struct mt65xx_phy_pdata {
- struct mt65xx_phy_instance {
- 	struct phy *phy;
- 	void __iomem *port_base;
-+	struct clk *ref_clk;	/* reference clock of anolog phy */
- 	u32 index;
- 	u8 type;
- };
-@@ -160,7 +161,6 @@ struct mt65xx_phy_instance {
- struct mt65xx_u3phy {
- 	struct device *dev;
- 	void __iomem *sif_base;	/* only shared sif */
--	struct clk *u3phya_ref;	/* reference clock of usb3 anolog phy */
- 	const struct mt65xx_phy_pdata *pdata;
- 	struct mt65xx_phy_instance **phys;
- 	int nphys;
-@@ -449,9 +449,9 @@ static int mt65xx_phy_init(struct phy *phy)
- 	struct mt65xx_u3phy *u3phy = dev_get_drvdata(phy->dev.parent);
- 	int ret;
+diff --git a/Documentation/devicetree/bindings/phy/phy-mt65xx-usb.txt b/Documentation/devicetree/bindings/phy/phy-mt65xx-usb.txt
+index 33a2b1e..0acc5a9 100644
+--- a/Documentation/devicetree/bindings/phy/phy-mt65xx-usb.txt
++++ b/Documentation/devicetree/bindings/phy/phy-mt65xx-usb.txt
+@@ -6,12 +6,11 @@ This binding describes a usb3.0 phy for mt65xx platforms of Medaitek SoC.
+ Required properties (controller (parent) node):
+  - compatible	: should be one of
+ 		  "mediatek,mt2701-u3phy"
++		  "mediatek,mt2712-u3phy"
+ 		  "mediatek,mt8173-u3phy"
+- - reg		: offset and length of register for phy, exclude port's
+-		  register.
+- - clocks	: a list of phandle + clock-specifier pairs, one for each
+-		  entry in clock-names
+- - clock-names	: must contain
++ - clocks	: (deprecated, use port's clocks instead) a list of phandle +
++		  clock-specifier pairs, one for each entry in clock-names
++ - clock-names	: (deprecated, use port's one instead) must contain
+ 		  "u3phya_ref": for reference clock of usb3.0 analog phy.
  
--	ret = clk_prepare_enable(u3phy->u3phya_ref);
-+	ret = clk_prepare_enable(instance->ref_clk);
- 	if (ret) {
--		dev_err(u3phy->dev, "failed to enable u3phya_ref\n");
-+		dev_err(u3phy->dev, "failed to enable ref_clk\n");
- 		return ret;
- 	}
+ Required nodes	: a sub-node is required for each port the controller
+@@ -19,8 +18,19 @@ Required nodes	: a sub-node is required for each port the controller
+ 		  'reg' property is used inside these nodes to describe
+ 		  the controller's topology.
  
-@@ -494,7 +494,7 @@ static int mt65xx_phy_exit(struct phy *phy)
- 	if (instance->type == PHY_TYPE_USB2)
- 		phy_instance_exit(u3phy, instance);
- 
--	clk_disable_unprepare(u3phy->u3phya_ref);
-+	clk_disable_unprepare(instance->ref_clk);
- 	return 0;
- }
- 
-@@ -594,12 +594,6 @@ static int mt65xx_u3phy_probe(struct platform_device *pdev)
- 		return PTR_ERR(u3phy->sif_base);
- 	}
- 
--	u3phy->u3phya_ref = devm_clk_get(dev, "u3phya_ref");
--	if (IS_ERR(u3phy->u3phya_ref)) {
--		dev_err(dev, "error to get u3phya_ref\n");
--		return PTR_ERR(u3phy->u3phya_ref);
--	}
--
- 	port = 0;
- 	for_each_child_of_node(np, child_np) {
- 		struct mt65xx_phy_instance *instance;
-@@ -634,6 +628,13 @@ static int mt65xx_u3phy_probe(struct platform_device *pdev)
- 			goto put_child;
- 		}
- 
-+		instance->ref_clk = devm_clk_get(&phy->dev, "ref");
-+		if (IS_ERR(instance->ref_clk)) {
-+			dev_err(dev, "failed to get ref_clk(id-%d)\n", port);
-+			retval = PTR_ERR(instance->ref_clk);
-+			goto put_child;
-+		}
++Optional properties (controller (parent) node):
++ - reg		: offset and length of register shared by multiple ports,
++		  exclude port's private register. It is needed on mt2701
++		  and mt8173, but not on mt2712.
 +
- 		instance->phy = phy;
- 		instance->index = port;
- 		phy_set_drvdata(phy, instance);
+ Required properties (port (child) node):
+ - reg		: address and length of the register set for the port.
++- clocks	: a list of phandle + clock-specifier pairs, one for each
++		  entry in clock-names
++- clock-names	: must contain
++		  "ref": 48M reference clock for HighSpeed analog phy; and 26M
++			reference clock for SuperSpeed analog phy, sometimes is
++			24M, 25M or 27M, depended on platform.
+ - #phy-cells	: should be 1 (See second example)
+ 		  cell after port phandle is phy type from:
+ 			- PHY_TYPE_USB2
+@@ -31,21 +41,31 @@ Example:
+ u3phy: usb-phy at 11290000 {
+ 	compatible = "mediatek,mt8173-u3phy";
+ 	reg = <0 0x11290000 0 0x800>;
+-	clocks = <&apmixedsys CLK_APMIXED_REF2USB_TX>;
+-	clock-names = "u3phya_ref";
+ 	#address-cells = <2>;
+ 	#size-cells = <2>;
+ 	ranges;
+ 	status = "okay";
+ 
+-	phy_port0: port at 11290800 {
+-		reg = <0 0x11290800 0 0x800>;
++	u2port0: usb-phy at 11290800 {
++		reg = <0 0x11290800 0 0x100>;
++		clocks = <&apmixedsys CLK_APMIXED_REF2USB_TX>;
++		clock-names = "ref";
+ 		#phy-cells = <1>;
+ 		status = "okay";
+ 	};
+ 
+-	phy_port1: port at 11291000 {
+-		reg = <0 0x11291000 0 0x800>;
++	u3port0: usb-phy at 11290900 {
++		reg = <0 0x11290800 0 0x700>;
++		clocks = <&clk26m>;
++		clock-names = "ref";
++		#phy-cells = <1>;
++		status = "okay";
++	};
++
++	u2port1: usb-phy at 11291000 {
++		reg = <0 0x11291000 0 0x100>;
++		clocks = <&apmixedsys CLK_APMIXED_REF2USB_TX>;
++		clock-names = "ref";
+ 		#phy-cells = <1>;
+ 		status = "okay";
+ 	};
+@@ -64,7 +84,54 @@ Example:
+ 
+ usb30: usb at 11270000 {
+ 	...
+-	phys = <&phy_port0 PHY_TYPE_USB3>;
+-	phy-names = "usb3-0";
++	phys = <&u2port0 PHY_TYPE_USB2>, <&u3port0 PHY_TYPE_USB3>;
++	phy-names = "usb2-0", "usb3-0";
+ 	...
+ };
++
++
++Layout differences of banks between mt8173/mt2701 and mt2712
++-------------------------------------------------------------
++mt8173 and mt2701:
++port        offset    bank
++shared      0x0000    SPLLC
++            0x0100    FMREG
++u2 port0    0x0800    U2PHY_COM
++u3 port0    0x0900    U3PHYD
++            0x0a00    U3PHYD_BANK2
++            0x0b00    U3PHYA
++            0x0c00    U3PHYA_DA
++u2 port1    0x1000    U2PHY_COM
++u3 port1    0x1100    U3PHYD
++            0x1200    U3PHYD_BANK2
++            0x1300    U3PHYA
++            0x1400    U3PHYA_DA
++u2 port2    0x1800    U2PHY_COM
++            ...
++
++mt2712:
++port        offset    bank
++u2 port0    0x0000    MISC
++            0x0100    FMREG
++            0x0300    U2PHY_COM
++u3 port0    0x0700    SPLLC
++            0x0800    CHIP
++            0x0900    U3PHYD
++            0x0a00    U3PHYD_BANK2
++            0x0b00    U3PHYA
++            0x0c00    U3PHYA_DA
++u2 port1    0x1000    MISC
++            0x1100    FMREG
++            0x1300    U2PHY_COM
++u3 port1    0x1700    SPLLC
++            0x1800    CHIP
++            0x1900    U3PHYD
++            0x1a00    U3PHYD_BANK2
++            0x1b00    U3PHYA
++            0x1c00    U3PHYA_DA
++u2 port2    0x2000    MISC
++            ...
++
++    SPLLC shared by u3 ports and FMREG shared by u2 ports on
++mt8173/mt2701 are put back into each port; a new bank MISC for
++u2 ports and CHIP for u3 ports are added on mt2712.
 -- 
 1.7.9.5
