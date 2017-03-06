@@ -1,37 +1,35 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 6 Mar 2017 18:48:34 +0800
-Subject: [linux-sunxi] Re: [PATCH v7 1/6] ARM: dts: sun8i: drop
- skeleton.dtsi inclusion in H3 DTSI
-In-Reply-To: <1681991488797167@web29m.yandex.ru>
-References: <20170305233138.64574-1-icenowy@aosc.xyz>
- <20170305233138.64574-2-icenowy@aosc.xyz>
- <20170306103535.jdaiwr65gtrhh7jp@lukather> <1681991488797167@web29m.yandex.ru>
-Message-ID: <CAGb2v64gDZ4=28Etwrv0eb=vAVEp1hh6ek9+18irRPvos7vJcw@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 6 Mar 2017 11:58:05 +0100
+Subject: [RFC PATCH 00/12] Ion cleanup in preparation for moving out of
+ staging
+In-Reply-To: <20170306104041.zghsicrnadoap7lp@phenom.ffwll.local>
+References: <1488491084-17252-1-git-send-email-labbott@redhat.com>
+ <20170303132949.GC31582@dhcp22.suse.cz>
+ <cf383b9b-3cbc-0092-a071-f120874c053c@redhat.com>
+ <20170306074258.GA27953@dhcp22.suse.cz>
+ <20170306104041.zghsicrnadoap7lp@phenom.ffwll.local>
+Message-ID: <20170306105805.jsq44kfxhsvazkm6@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 6, 2017 at 6:46 PM, Icenowy Zheng <icenowy@aosc.xyz> wrote:
->
->
-> 06.03.2017, 18:35, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
->> Hi,
->>
->> On Mon, Mar 06, 2017 at 07:31:33AM +0800, Icenowy Zheng wrote:
->>>  The skeleton.dtsi file is now deprecated, and do not exist in ARM64
->>>  environment.
->>>
->>>  Since we will soon reuse most part of H3 DTSI for H5, which is an ARM64
->>>  chip, drop skeleton.dtsi inclusion now.
->>>
->>>  Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
->>
->> Your prefix (and in the three later patches) should be
->> ARM: sun8i: h3
->
-> Oh I think we never added SoC name in prefix...
+On Mon, Mar 06, 2017 at 11:40:41AM +0100, Daniel Vetter wrote:
 
-It's better to add them for sun8i, which encompasses a whole
-bunch of SoCs, unlike the older sun[4-7]i. Even sun5i patches
-have them.
+> No one gave a thing about android in upstream, so Greg KH just dumped it
+> all into staging/android/. We've discussed ION a bunch of times, recorded
+> anything we'd like to fix in staging/android/TODO, and Laura's patch
+> series here addresses a big chunk of that.
 
-ChenYu
+> This is pretty much the same approach we (gpu folks) used to de-stage the
+> syncpt stuff.
+
+Well, there's also the fact that quite a few people have issues with the
+design (like Laurent).  It seems like a lot of them have either got more
+comfortable with it over time, or at least not managed to come up with
+any better ideas in the meantime.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170306/a9d7cff2/attachment.sig>
