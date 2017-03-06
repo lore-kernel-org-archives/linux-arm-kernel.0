@@ -1,49 +1,131 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon,  6 Mar 2017 14:24:55 +0000
-Subject: [PATCH v3 22/25] ARM: decompressor: Remove __hyp_get_vectors usage
+Date: Mon,  6 Mar 2017 14:24:57 +0000
+Subject: [PATCH v3 24/25] arm64: hyp-stub/KVM: Kill __hyp_get_vectors
 In-Reply-To: <20170306142458.8875-1-marc.zyngier@arm.com>
 References: <20170306142458.8875-1-marc.zyngier@arm.com>
-Message-ID: <20170306142458.8875-23-marc.zyngier@arm.com>
+Message-ID: <20170306142458.8875-25-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the compressed image needs to be relocated to avoid being
-overwritten by the decompression process, we need to relocate
-the hyp vectors as well so that we can find them once the
-decompression has taken effect.
-
-For that, we perform the following calculation:
-	u32 v = __hyp_get_vectors();
-	v += offset;
-	__hyp_set_vectors(v);
-
-But we're guaranteed that the initial value of v as returned by
-__hyp_get_vectors is always __hyp_stub_vectors, because we have
-just set it by calling __hyp_stub_install.
-
-So let's remove the use of __hyp_get_vectors, and directly use
-__hyp_stub_vectors instead.
+Nobody is using __hyp_get_vectors anymore, so let's remove both
+implementations (hyp-stub and KVM).
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/boot/compressed/head.S | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+ arch/arm64/include/asm/virt.h | 12 ++++--------
+ arch/arm64/kernel/hyp-stub.S  | 15 +--------------
+ arch/arm64/kvm/hyp-init.S     |  7 +------
+ arch/arm64/kvm/hyp.S          |  2 +-
+ 4 files changed, 7 insertions(+), 29 deletions(-)
 
-diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-index 9150f9732785..d58bb104c6e8 100644
---- a/arch/arm/boot/compressed/head.S
-+++ b/arch/arm/boot/compressed/head.S
-@@ -422,7 +422,10 @@ dtb_check_done:
- 		cmp	r0, #HYP_MODE
- 		bne	1f
+diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
+index f24f1eb72dc0..a7c9dfdd6430 100644
+--- a/arch/arm64/include/asm/virt.h
++++ b/arch/arm64/include/asm/virt.h
+@@ -24,28 +24,25 @@
+  * Any other value is used as a pointer to the function to call.
+  */
  
--		bl	__hyp_get_vectors
-+0:		adr	r0, 0b
-+		movw	r1, #:lower16:__hyp_stub_vectors - 0b
-+		movt	r1, #:upper16:__hyp_stub_vectors - 0b
-+		add	r0, r0, r1
- 		sub	r0, r0, r5
- 		add	r0, r0, r10
- 		bl	__hyp_set_vectors
+-/* HVC_GET_VECTORS - Return the value of the vbar_el2 register. */
+-#define HVC_GET_VECTORS 0
+-
+ /*
+  * HVC_SET_VECTORS - Set the value of the vbar_el2 register.
+  *
+  * @x1: Physical address of the new vector table.
+  */
+-#define HVC_SET_VECTORS 1
++#define HVC_SET_VECTORS 0
+ 
+ /*
+  * HVC_SOFT_RESTART - CPU soft reset, used by the cpu_soft_restart routine.
+  */
+-#define HVC_SOFT_RESTART 2
++#define HVC_SOFT_RESTART 1
+ 
+ /*
+  * HVC_RESET_VECTORS - Restore the vectors to the original HYP stubs
+  */
+-#define HVC_RESET_VECTORS 3
++#define HVC_RESET_VECTORS 2
+ 
+ /* Max number of HYP stub hypercalls */
+-#define HVC_STUB_HCALL_NR 4
++#define HVC_STUB_HCALL_NR 3
+ 
+ #define BOOT_CPU_MODE_EL1	(0xe11)
+ #define BOOT_CPU_MODE_EL2	(0xe12)
+@@ -69,7 +66,6 @@
+ extern u32 __boot_cpu_mode[2];
+ 
+ void __hyp_set_vectors(phys_addr_t phys_vector_base);
+-phys_addr_t __hyp_get_vectors(void);
+ void __hyp_reset_vectors(void);
+ 
+ /* Reports the availability of HYP mode */
+diff --git a/arch/arm64/kernel/hyp-stub.S b/arch/arm64/kernel/hyp-stub.S
+index a162182d5662..8ccdd549f7c7 100644
+--- a/arch/arm64/kernel/hyp-stub.S
++++ b/arch/arm64/kernel/hyp-stub.S
+@@ -61,12 +61,7 @@ el1_sync:
+ 	cmp	x30, #ESR_ELx_EC_HVC64
+ 	b.ne	9f				// Not an HVC trap
+ 
+-	cmp	x0, #HVC_GET_VECTORS
+-	b.ne	1f
+-	mrs	x0, vbar_el2
+-	b	9f
+-
+-1:	cmp	x0, #HVC_SET_VECTORS
++	cmp	x0, #HVC_SET_VECTORS
+ 	b.ne	2f
+ 	msr	vbar_el2, x1
+ 	b	9f
+@@ -124,14 +119,6 @@ ENDPROC(\label)
+  * initialisation entry point.
+  */
+ 
+-ENTRY(__hyp_get_vectors)
+-	str	lr, [sp, #-16]!
+-	mov	x0, #HVC_GET_VECTORS
+-	hvc	#0
+-	ldr	lr, [sp], #16
+-	ret
+-ENDPROC(__hyp_get_vectors)
+-
+ ENTRY(__hyp_set_vectors)
+ 	str	lr, [sp, #-16]!
+ 	mov	x1, x0
+diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
+index 128d6e9732b9..cf01cdb8bc61 100644
+--- a/arch/arm64/kvm/hyp-init.S
++++ b/arch/arm64/kvm/hyp-init.S
+@@ -124,12 +124,7 @@ __do_hyp_init:
+ ENDPROC(__kvm_hyp_init)
+ 
+ ENTRY(__kvm_handle_stub_hvc)
+-	cmp	x0, #HVC_GET_VECTORS
+-	b.ne	1f
+-	mrs	x0, vbar_el2
+-	b	exit
+-
+-1:	cmp	x0, #HVC_SOFT_RESTART
++	cmp	x0, #HVC_SOFT_RESTART
+ 	b.ne	1f
+ 
+ 	/* This is where we're about to jump, staying at EL2 */
+diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
+index 2726635dceba..09391cf0c93c 100644
+--- a/arch/arm64/kvm/hyp.S
++++ b/arch/arm64/kvm/hyp.S
+@@ -36,7 +36,7 @@
+  * passed in x0.
+  *
+  * A function pointer with a value less than 0xfff has a special meaning,
+- * and is used to implement __hyp_get_vectors in the same way as in
++ * and is used to implement hyp stubs in the same way as in
+  * arch/arm64/kernel/hyp_stub.S.
+  * HVC behaves as a 'bl' call and will clobber lr.
+  */
 -- 
 2.11.0
