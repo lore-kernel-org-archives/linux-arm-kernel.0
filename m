@@ -1,57 +1,37 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Mon, 6 Mar 2017 18:00:03 +0900
-Subject: [PATCH/RFC v2 0/4] iommu/ipmmu-vmsa: IPMMU slave device whitelist
- V2
-In-Reply-To: <148549764733.22203.16459470412085471955.sendpatchset@little-apple>
-References: <148549764733.22203.16459470412085471955.sendpatchset@little-apple>
-Message-ID: <CANqRtoQR3S=MbVE91s5Ku=XZZ6XxpPFUfZ0FYFxiEcqts5N-pA@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 6 Mar 2017 10:06:39 +0100
+Subject: [PATCH] clk: sunxi-ng: tighten SoC deps on explicit AllWinner SoCs
+In-Reply-To: <20170302174357.6246-1-pbrobinson@gmail.com>
+References: <20170302174357.6246-1-pbrobinson@gmail.com>
+Message-ID: <20170306090639.aubg4ixtt7f4kb5s@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 27, 2017 at 3:14 PM, Magnus Damm <magnus.damm@gmail.com> wrote:
-> iommu/ipmmu-vmsa: IPMMU slave device whitelist V2
->
-> [PATCH/RFC v2 1/4] iommu/of: Skip IOMMU devices disabled in DT
-> [PATCH/RFC v2 2/4] iommu/ipmmu-vmsa: Get rid of disabled device check
-> [PATCH/RFC v2 3/4] iommu/ipmmu-vmsa: Check devices in xlate()
-> [PATCH/RFC v2 3/4] iommu/ipmmu-vmsa: Opt-in slave devices based on ES version
->
-> Here's an updated prototype that shows how DT integration of IPMMU details
-> may be integrated and merged upstream based on SoC data sheet ahead of
-> time followed by enablement in the IPMMU driver code once the appropriate
-> SoC ES version has been released and the hardware has been tested.
->
-> Changes since V1:
->  - Broke out patch 1 from the IPMMU driver
->  - Moved slave device check from ->add_device() to ->xlate() (Thanks Robin!)
->  - Updated white list patch to hook into ->xlate()
->
-> Patch 1 may be suitable for upstream merge, however other patches should
-> in the future if agreed on be rolled into the IPMMU driver series.
+Hi,
 
-Hi Geert, everyone,
+On Thu, Mar 02, 2017 at 05:43:57PM +0000, Peter Robinson wrote:
+> Tighten the depends on the various AllWinn SoCs so we don't
+> inadvertantly get clock drivers when we're not wanting them
+> like 32 bit SoC clocks for 64 bit configs. Ensure there's
+> still test coverage though.
+> 
+> Signed-off-by: Peter Robinson <pbrobinson@gmail.com>
 
-Do you have any opinion about the code in this version of the series?
+It turns out that this was making Kconfig crash, because the keyword
+is depends on and not depends.
 
-I recall that you agreed with the approach in "[PATCH/RFC 2/2]
-iommu/ipmmu-vmsa: Opt-in slave devices based on ES version", however
-it was suggested to me by Robin that my code in "[PATCH/RFC 1/2]
-arm64: mm: Silently allow devices lacking IOMMU group" should be
-reworked to use ->xlate().
+I fixed it, but please make sure the syntax is correct next time.
 
-Now this series makes use of ->xlate() to implement the white list, so
-I hope that makes everyone happy.
+Maxime
 
-Also, based on your suggestion I finally managed to break out the code
-that skips over disabled devices in "[PATCH/RFC v2 1/4] iommu/of: Skip
-IOMMU devices disabled in DT" but I'm not sure if this will cause
-problem for other platforms.
-
-Anyway, my current plan is to wait for feedback for "[PATCH/RFC v2
-1/4] iommu/of: Skip IOMMU devices disabled in DT" and handle that
-independently, and also roll in the other changes in this series into
-my other IPMMU code.
-
-Thanks,
-
-/ magnus
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170306/71c49958/attachment.sig>
