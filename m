@@ -1,91 +1,335 @@
-From: emil.l.velikov@gmail.com (Emil Velikov)
-Date: Mon, 6 Mar 2017 17:00:50 +0000
-Subject: [RFC PATCH 06/12] staging: android: ion: Remove crufty cache
- support
-In-Reply-To: <20170306102959.5iixtstrl7ktwxdp@phenom.ffwll.local>
-References: <1488491084-17252-1-git-send-email-labbott@redhat.com>
- <1488491084-17252-7-git-send-email-labbott@redhat.com>
- <20170303095654.zbcqkcojo3vf6y4y@phenom.ffwll.local>
- <2273106.Hjr80nPvcZ@avalon> <87fe5d0a-19d2-b6c7-391f-687aa5ff8571@redhat.com>
- <20170306102959.5iixtstrl7ktwxdp@phenom.ffwll.local>
-Message-ID: <CACvgo52Q-HvChU7_q65GFqOaVY7Z7EaDoRfELup0D_N_ge9poQ@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 6 Mar 2017 17:09:07 +0000
+Subject: [PATCH V3] perf: qcom: Add L3 cache PMU driver
+In-Reply-To: <aad6234cbdd83994607249f91461281a@codeaurora.org>
+References: <1488488312-6294-1-git-send-email-agustinv@codeaurora.org>
+ <20170303145040.GB12945@leverpostej>
+ <aad6234cbdd83994607249f91461281a@codeaurora.org>
+Message-ID: <20170306170907.GE18519@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 March 2017 at 10:29, Daniel Vetter <daniel@ffwll.ch> wrote:
-> On Fri, Mar 03, 2017 at 10:46:03AM -0800, Laura Abbott wrote:
->> On 03/03/2017 08:39 AM, Laurent Pinchart wrote:
->> > Hi Daniel,
->> >
->> > On Friday 03 Mar 2017 10:56:54 Daniel Vetter wrote:
->> >> On Thu, Mar 02, 2017 at 01:44:38PM -0800, Laura Abbott wrote:
->> >>> Now that we call dma_map in the dma_buf API callbacks there is no need
->> >>> to use the existing cache APIs. Remove the sync ioctl and the existing
->> >>> bad dma_sync calls. Explicit caching can be handled with the dma_buf
->> >>> sync API.
->> >>>
->> >>> Signed-off-by: Laura Abbott <labbott@redhat.com>
->> >>> ---
->> >>>
->> >>>  drivers/staging/android/ion/ion-ioctl.c         |  5 ----
->> >>>  drivers/staging/android/ion/ion.c               | 40 --------------------
->> >>>  drivers/staging/android/ion/ion_carveout_heap.c |  6 ----
->> >>>  drivers/staging/android/ion/ion_chunk_heap.c    |  6 ----
->> >>>  drivers/staging/android/ion/ion_page_pool.c     |  3 --
->> >>>  drivers/staging/android/ion/ion_system_heap.c   |  5 ----
->> >>>  6 files changed, 65 deletions(-)
->> >>>
->> >>> diff --git a/drivers/staging/android/ion/ion-ioctl.c
->> >>> b/drivers/staging/android/ion/ion-ioctl.c index 5b2e93f..f820d77 100644
->> >>> --- a/drivers/staging/android/ion/ion-ioctl.c
->> >>> +++ b/drivers/staging/android/ion/ion-ioctl.c
->> >>> @@ -146,11 +146,6 @@ long ion_ioctl(struct file *filp, unsigned int cmd,
->> >>> unsigned long arg)>
->> >>>                   data.handle.handle = handle->id;
->> >>>
->> >>>           break;
->> >>>
->> >>>   }
->> >>>
->> >>> - case ION_IOC_SYNC:
->> >>> - {
->> >>> -         ret = ion_sync_for_device(client, data.fd.fd);
->> >>> -         break;
->> >>> - }
->> >>
->> >> You missed the case ION_IOC_SYNC: in compat_ion.c.
->> >>
->> >> While at it: Should we also remove the entire custom_ioctl infrastructure?
->> >> It's entirely unused afaict, and for a pure buffer allocator I don't see
->> >> any need to have custom ioctl.
->> >
->> > I second that, if you want to make ion a standard API, then we certainly don't
->> > want any custom ioctl.
->> >
->> >> More code to remove potentially:
->> >> - The entire compat ioctl stuff - would be an abi break, but I guess if we
->> >>   pick the 32bit abi and clean up the uapi headers we'll be mostly fine.
->> >>   would allow us to remove compat_ion.c entirely.
->> >>
->> >> - ION_IOC_IMPORT: With this ion is purely an allocator, so not sure we
->> >>   still need to be able to import anything. All the cache flushing/mapping
->> >>   is done through dma-buf ops/ioctls.
->> >>
->> >>
->>
->> Good point to all of the above. I was considering keeping the import around
->> for backwards compatibility reasons but given how much other stuff is being
->> potentially broken, everything should just get ripped out.
->
-> If you're ok with breaking the world, then I strongly suggest we go
-> through the uapi header and replace all types with the standard
-> fixed-width ones (__s32, __s64 and __u32, __u64). Allows us to remove all
-> the compat ioctl code :-)
+Hi,
 
-I think the other comments from your "botching-up ioctls" [1] also apply ;-)
-Namely - align structs to multiple of 64bit, add "flags" and properly
-verity user input returning -EINVAL.
+On Mon, Mar 06, 2017 at 10:29:25AM -0500, Agustin Vega-Frias wrote:
+> On 2017-03-03 09:50, Mark Rutland wrote:
+> >Hi Augustin,
 
--Emil
+Apologies for the typo here, btw.
 
-[1] https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/Documentation/ioctl/botching-up-ioctls.txt
+> >On Thu, Mar 02, 2017 at 03:58:32PM -0500, Agustin Vega-Frias wrote:
+> >>The driver exports formatting and event information to sysfs so it can
+> >>be used by the perf user space tools with the syntaxes:
+> >>   perf stat -a -e l3cache_0_0/read-miss/
+> >>   perf stat -a -e l3cache_0_0/event=0x21/
+> >
+> >As a high-level thing, while we can't do aggregation of counts across
+> >slices, and while we'd have to reject cross-slice groups, we *could*
+> >have a single struct PMU that covers all those slices, with userspace
+> >selecting which slice an event targets via
+> >perf_event_attr::config{,1,2}. i.e. we'd treat those as independent
+> >sub-units under the PMU.
+> >
+> >With some sysfs and userspace work, it would then be possible to have
+> >the perf tool infer automatically that it should open an event on each
+> >sub-unit as it currently does per-cpu.
+> 
+> Agreed, I will be looking at that change later, which can be seen as
+> related Andi Kleen's work on uncore events [1].
+
+Interesting; I had not spotted this series, and will have to look at it
+in more detail.
+
+> In my opinion having the separate perf PMUs fits more cleanly into that
+> work, since there is currently no way to translate something like:
+> 
+>   l3cache/read-miss,slice=0xF/ # slices 0-3
+> 
+> into the individual events:
+> 
+>   l3cache/read-miss,slice=0x1/ # slice 0
+>   l3cache/read-miss,slice=0x2/ # slice 1
+>   l3cache/read-miss,slice=0x4/ # slice 2
+>   l3cache/read-miss,slice=0x8/ # slice 3
+> 
+> I'd prefer something like:
+> 
+>   l3cache_0_[0123]/read-miss/ # slices 0-3 on socket 0
+>   l3cache_0_*/read-miss/      # all slices on socket 0
+> 
+> Thoughts?
+
+At present, I don't have a strong feeling either way.
+
+I'll have to consider this more deeply.
+
+[...]
+
+> >>+ *
+> >>+ * The hardware also supports a feature that asserts the IRQ on
+> >>the toggling
+> >>+ * of the most significanty bit in the 32bit counter.
+> >
+> >Nit: s/significanty/significant/
+> >
+> >This is just an overflow interrupt, right?
+> >
+> >Or does this interrupt also trigger when bit 31 goes from 0 to 1?
+> >
+> 
+> Yes the interrupt also triggers when bit 31 goes from 0 to 1. This
+> feature was added so we can avoid counter reprogramming and leave the
+> counters as free running and still handle the deltas properly.
+
+I see. That is somewhat surprising, so it might be worth having more
+detail in the comment.
+
+I guess that makes sense, though it's somewhat annoying that this means
+this has to be different to every other PMU w.r.t. interrupt handling.
+I'll have to try to recall the various races our usual approach avoids.
+
+> >>+/*
+> >>+ * Decoding of settings from perf_event_attr
+> >>+ *
+> >>+ * The config format for perf events is:
+> >>+ * - config: bits 0-7: event type
+> >>+ *           bit  32:  HW counter size requested, 0: 32 bits,
+> >>1: 64 bits
+> >>+ */
+> >
+> >Not really a problem, but is there a specific reason to avoid bits
+> >31-8?
+> 
+> No, just leaving some space in case the event types are expanded.
+
+Ok. If you could drop in a comment to that effect, that would be great.
+
+[...]
+
+> >>+static inline int get_hw_counter_size(struct perf_event *event)
+> >>+{
+> >>+	return event->attr.config >> 32 & 1;
+> >>+}
+> >
+> >This would be better as something like
+> >
+> >#define L3_EVENT_ATTR_LC_BIT	32
+> >
+> >static inline bool event_uses_long_counter(struct perf_event *event)
+> >{
+> >	return !!(event->attr.config & BIT_ULL(L3_EVENT_ATTR_LC_BIT));
+> >}
+
+> I was implementing it this way so I can just directly use it as a
+> parameter to bitmap_find_free_region,
+
+Sure. I found this made those calls harder to read, since it wasn't
+obvious what the size variable was exactly.
+
+> but I can take a look to see how to make this cleaner.
+
+Great. FWIW, I think it would be clearer to either have a wrapper of
+bitmap_find_free_region that took a 'long' boolean parameter, or just
+have a ternary when calling it to figure out the size parameter.
+
+[...]
+
+> >>+struct l3cache_pmu_hwc {
+> >>+	struct perf_event	*event;
+> >>+	/* Called to start event monitoring */
+> >>+	void (*start)(struct perf_event *event);
+> >>+	/* Called to stop event monitoring */
+> >>+	void (*stop)(struct perf_event *event, int flags);
+> >>+	/* Called to update the perf_event */
+> >>+	void (*update)(struct perf_event *event);
+> >>+};
+> >
+> >Even if having separate ops makes handling chaining simpler, I don't
+> >think we need a copy of all these per-event.
+> >
+> >We can instead have something like:
+> >
+> >struct l3cache_event_ops {
+> >	void (*start)(struct perf_event *event);
+> >	void (*stop)(struct perf_event *event, int flags);
+> >	void (*update)(struct perf_event *event);
+> >};
+> >
+> >struct l3cache_event_ops event_ops_std;
+> >struct l3cache_event_ops event_ops_long;
+> >
+> >static struct l3cache_event_ops *l3cache_event_get_ops(struct
+> >perf_event *event)
+> >{
+> >	if (event_uses_long_counter(event))
+> >		return &event_ops_long;
+> >	else
+> >		return &event_ops_std;
+> >}
+> >
+> >... and callers the need the ops can consult
+> >l3cache_event_get_ops(event).
+> 
+> Understood. How about a single pointer to ops in the counter struct?
+> E.g.:
+> 
+> struct l3cache_pmu_hwc {
+> 	struct perf_event	 *event;
+>         struct l3cache_event_ops *ops;
+> };
+> 
+> Then instead of the current:
+> 	pmu->counters[hwc->idx].start(event);
+> we have:
+> 	pmu->counters[hwc->idx].ops->start(event);
+
+I'd rather that we figured this out dynamically, since that way we don't
+need a special l3cache_pmu_hwc type, and it's not possible for the ops
+to becomes out of sync with the event somehow.
+
+[...]
+
+> >>+static void qcom_l3_cache__64bit_counter_start(struct
+> >>perf_event *event)
+> >>+{
+> >>+	struct l3cache_pmu *pmu = to_l3cache_pmu(event->pmu);
+> >>+	int idx = event->hw.idx;
+> >>+	u32 evsel = get_event_type(event);
+> >>+	u64 evcnt = local64_read(&event->count);
+> >>+	u32 gang = readl_relaxed(pmu->regs + L3_M_BC_GANG);
+> >>+
+> >>+	writel_relaxed(gang | GANG_EN(idx), pmu->regs + L3_M_BC_GANG);
+> >
+> >I take it this is what actually configures the chaining behaviour?
+> 
+> Correct, that's the register name, I might just change GANG to CHAIN
+> even if the HW guys yell at me ;o)
+
+The name is fine as-is; it should match the HW naming.
+
+It might be worth a comment, but that's about it.
+
+[...]
+
+> >>+	writel_relaxed(EVSEL(0), pmu->regs + L3_HML3_PM_EVTYPE(idx+1));
+> >>+	writel_relaxed(EVSEL(evsel), pmu->regs + L3_HML3_PM_EVTYPE(idx));
+> >>+
+> >>+	writel_relaxed(PMCNTENSET(idx+1), pmu->regs + L3_M_BC_CNTENSET);
+> >>+	writel_relaxed(PMCNTENSET(idx), pmu->regs + L3_M_BC_CNTENSET);
+> >>+}
+> >
+> >IIUC, we're not enabling the interrupt here, is that correct?
+> >
+> >If that's deliberate, there should be a comment as to why.
+> 
+> The IRQ is not needed because in essence we have a 64bit hardware
+> counter which matches the software counter size. I will add a comment.
+
+Ok. I take it that the (maximum potential) rate of increment is such
+that this never feasibly overflows.
+
+> >These are all relaxed, so what ensures the counter is actually started
+> >when we return from this function?
+> 
+> Given how the framework works at a high level, once all events are
+> scheduled into the PMU there is a pmu->enable call, which will use a
+> non-relaxed write to do the final enable. Am I missing something?
+
+Good point; I failed to consider that.
+
+[...]
+
+> >>+}
+> >>+
+> >>+/*
+> >>+ * 32 bit counter interface implementation
+> >>+ */
+> >>+
+> >>+static void qcom_l3_cache__32bit_counter_start(struct
+> >>perf_event *event)
+> >>+{
+> >>+	struct l3cache_pmu *pmu = to_l3cache_pmu(event->pmu);
+> >>+	int idx = event->hw.idx;
+> >>+	u32 evsel = get_event_type(event);
+> >>+	u32 irqctl = readl_relaxed(pmu->regs + L3_M_BC_IRQCTL);
+> >>+
+> >>+	local64_set(&event->hw.prev_count, 0);
+> >
+> >Please follow the example set elsewhere, and start the counter at half
+> >its max value (e.g. 0x80000000 here). So long as the IRQ is taken
+> >before
+> >another 2^31 events occur, that caters for extreme IRQ latency, and the
+> >IRQ handler doesn't have to treat the overflow as an implicit extra
+> >counter bit.
+> 
+> We can start at zero given that we enable the feature that asserts the
+> IRQ on toggle of the MSB. In essence we are doing the same thing other
+> drivers do with hardware support that obviates the need to adjust the
+> counter on every overflow. I will add a block comment to explain this.
+
+Ok. I think that's ok, but as above I'll need to consider this a bit
+more.
+
+[...]
+
+> >>+static irqreturn_t qcom_l3_cache__handle_irq(int irq_num, void *data)
+> >>+{
+> >>+	struct l3cache_pmu *pmu = data;
+> >>+	u32 status = readl_relaxed(pmu->regs + L3_M_BC_OVSR);
+> >>+	int idx;
+> >>+
+> >>+	if (status == 0)
+> >>+		return IRQ_NONE;
+> >>+
+> >>+	writel_relaxed(status, pmu->regs + L3_M_BC_OVSR);
+> >
+> >I take it this clears the overflow status bits? i.e. it's write to
+> >clear?
+> >
+> >It would be worth a comment.
+> >
+> 
+> Will do
+> 
+> >>+	while (status) {
+> >>+		struct perf_event *event;
+> >>+
+> >>+		idx = __ffs(status);
+> >>+		status &= ~(1 << idx);
+> >
+> >It would be better to have status in an unsigned long, and use
+> >for_each_set_bit() over that.
+> 
+> Will do, however I have seen that the AARCH64 compiler can optimize
+> better
+> if we use __ffs directly. It might be the version that I'm using, I will
+> double-check.
+
+I'd prefer the for_each_set_bit() approach regardless. It's clearer, and
+I can't imagine that it has significant overhead here.
+
+[...]
+
+> >>+static void qcom_l3_cache__pmu_disable(struct pmu *perf_pmu)
+> >>+{
+> >>+	struct l3cache_pmu *pmu = to_l3cache_pmu(perf_pmu);
+> >>+
+> >>+	writel_relaxed(0, pmu->regs + L3_M_BC_CR);
+> >>+
+> >>+	/* Ensure the basic counter unit is stopped before proceeding */
+> >>+	wmb();
+> >
+> >You presumably want likewise on the enable path, before enabling the
+> >PMU.
+> 
+> I am doing that, I am using writel on the last operation of pmu_enable,
+
+Ah, true.
+
+> I will make it a separate barrier to be more explicit.
+
+It would also be fine to drop a comment in the pmu_enable() use of
+writel(); either way is fine.
+
+Thanks,
+Mark.
