@@ -1,67 +1,55 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 6 Mar 2017 10:30:43 +0100
-Subject: [PATCH 4/4] tty/serial: sh-sci: remove uneeded IS_ERR_OR_NULL
- calls
-In-Reply-To: <CAMuHMdV2_vbocY4wCzvYtPAaF+QEX_Y4g6qVu5EqEBf5AnFdaw@mail.gmail.com>
-References: <20170303142201.16452-1-richard.genoud@gmail.com>
- <CAMuHMdX-K9B20Tu5NtHJRHmGGuT60OFu8TokZxsF8aSaS7HuHQ@mail.gmail.com>
- <20170303191248.wlwjri55ip2x5pgg@pengutronix.de>
- <CAMuHMdXFrwa2jCVDb+8ecqgARLG0oGrPp9pLs0b6vEiWeKJ+uA@mail.gmail.com>
- <20170303194414.n76tr3oa2mlrzjre@pengutronix.de>
- <CAMuHMdXiz5hqW=fm-2H1aNKq_gXD2o0508jD2XjxYUvKoEvHdw@mail.gmail.com>
- <20170304174819.esxhwwbsxzuq3vyc@pengutronix.de>
- <CAMuHMdX8BEnaTtNFAbcvfHwJH=oPUmQ2NB+jfouGyhQpJ_m_4A@mail.gmail.com>
- <20170306085842.yijkfpqi3adcedmm@pengutronix.de>
- <CAMuHMdV2_vbocY4wCzvYtPAaF+QEX_Y4g6qVu5EqEBf5AnFdaw@mail.gmail.com>
-Message-ID: <20170306093043.ay4dz3ehp3aakwxh@pengutronix.de>
+From: anup.patel@broadcom.com (Anup Patel)
+Date: Mon,  6 Mar 2017 15:10:38 +0530
+Subject: [PATCH v5 0/2] Broadcom FlexRM ring manager support
+Message-ID: <1488793240-25484-1-git-send-email-anup.patel@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Geert,
+The Broadcom FlexRM ring manager provides producer-consumer style
+ring interface for offload engines on Broadcom iProc SoCs. We can
+have one or more instances of Broadcom FlexRM ring manager in a SoC.
 
-On Mon, Mar 06, 2017 at 10:09:50AM +0100, Geert Uytterhoeven wrote:
-> On Mon, Mar 6, 2017 at 9:58 AM, Uwe Kleine-K?nig
-> <u.kleine-koenig@pengutronix.de> wrote:
-> > On Mon, Mar 06, 2017 at 09:49:39AM +0100, Geert Uytterhoeven wrote:
-> >> > Given that mctrl-gpio can be useful on legacy platforms, a device could
-> >> > silently run without cts-gpio even there.
-> >>
-> >> On platforms were CONFIG_GPIOLIB=n, this is not true, so the issue is moot.
-> >>
-> >> All serial drivers using (optional) mctrl-gpio have this in Kconfig:
-> >>
-> >>     select SERIAL_MCTRL_GPIO if GPIOLIB
-> >>
-> >> So they will use mctrl-gpio when GPIOLIB is enabled.
-> >> If GPIOPLIB is disabled, no flow control GPIOs are expected, and the
-> >> driver should not break that case.
-> >
-> > So it all boils down to the question: Is GPIOLIB=n enough to assume no
-> > gpio is needed?
-> >
-> > I'd say it is not.
-> 
-> How does the platform register these GPIOs when GPIOPLIB is not enabled by
-> the platform, and gpiod_add_lookup_table() is thus not available?
+This patchset adds a mailbox driver for Broadcom FlexRM ring manager
+which can be used by offload engine drivers as mailbox clients.
 
-Obviously the platformcode cannot. In this case you could argue that
-platformcode shouldn't register the device if a gpio is necessary. But
-this reasoning doesn't work for (DT=y || ACPI=y) && GPIOLIB=n.
+The Broadcom FlexRM mailbox driver is feature complete for RAID and
+Crypto offload engines. We will have incremental patches in-future
+for ring-level statistics using debugfs and minor optimizations.
 
-I wouldn't want to code this in each driver (something like:
+This patchset is based on Linux-4.11-rc1 and it is also available
+at flexrm-v5 branch of https://github.com/Broadcom/arm64-linux.git
 
-	if (IS_ENABLED(GPIOLIB) || device_is_instantiated_by_dt(dev) || device_is_instantiated_by_acpi(dev))
-		gpios = mctrl_gpio_init(...);
-	else
-		gpios = NULL;
+Changes since v4:
+ - Rebased patches for Linux-4.11-rc1
 
-). Putting this into GPIOLIB is the right approach, and so this is
-another argument for HALFGPIOLIB. This would fix mctrl_gpio_init en
-passant.
+Changes since v3:
+ - Fixed mailbox client example DT node in DT bindings document
 
-Best regards
-Uwe
+Changes since v2:
+ - Rebased patches for Linux-4.10-rc2
+
+Changes since v1:
+ - Use compatile string as brcm,iproc-flexrm-mbox
+ - Rephrase commit message and text in DT bindings patch
+
+Anup Patel (2):
+  mailbox: Add driver for Broadcom FlexRM ring manager
+  dt-bindings: Add DT bindings info for FlexRM ring manager
+
+ .../bindings/mailbox/brcm,iproc-flexrm-mbox.txt    |  59 ++
+ drivers/mailbox/Kconfig                            |  11 +
+ drivers/mailbox/Makefile                           |   2 +
+ drivers/mailbox/mailbox-flexrm/Makefile            |   6 +
+ drivers/mailbox/mailbox-flexrm/flexrm-desc.c       | 764 +++++++++++++++++++
+ drivers/mailbox/mailbox-flexrm/flexrm-desc.h       |  47 ++
+ drivers/mailbox/mailbox-flexrm/flexrm-main.c       | 829 +++++++++++++++++++++
+ include/linux/mailbox/brcm-message.h               |  14 +-
+ 8 files changed, 1728 insertions(+), 4 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mailbox/brcm,iproc-flexrm-mbox.txt
+ create mode 100644 drivers/mailbox/mailbox-flexrm/Makefile
+ create mode 100644 drivers/mailbox/mailbox-flexrm/flexrm-desc.c
+ create mode 100644 drivers/mailbox/mailbox-flexrm/flexrm-desc.h
+ create mode 100644 drivers/mailbox/mailbox-flexrm/flexrm-main.c
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+2.7.4
