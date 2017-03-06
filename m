@@ -1,66 +1,38 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon,  6 Mar 2017 14:24:37 +0000
-Subject: [PATCH v3 04/25] arm64: KVM: Allow the main HYP code to use the init
- hyp stub implementation
+Date: Mon,  6 Mar 2017 14:24:36 +0000
+Subject: [PATCH v3 03/25] arm64: KVM: Implement HVC_GET_VECTORS in the init
+ code
 In-Reply-To: <20170306142458.8875-1-marc.zyngier@arm.com>
 References: <20170306142458.8875-1-marc.zyngier@arm.com>
-Message-ID: <20170306142458.8875-5-marc.zyngier@arm.com>
+Message-ID: <20170306142458.8875-4-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We now have a full hyp-stub implementation in the KVM init code,
-but the main KVM code only supports HVC_GET_VECTORS, which is not
-enough.
-
-Instead of reinventing the wheel, let's reuse the init implementation
-by branching to the idmap page when called with a hyp-stub hypercall.
+Now that we have an infrastructure to handle hypercalls in the KVM
+init code, let's implement HVC_GET_VECTORS there.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/kvm/hyp/hyp-entry.S | 24 +++++++++++++++++++-----
- 1 file changed, 19 insertions(+), 5 deletions(-)
+ arch/arm64/kvm/hyp-init.S | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/kvm/hyp/hyp-entry.S b/arch/arm64/kvm/hyp/hyp-entry.S
-index 5e9052f087f2..21eeb2552f33 100644
---- a/arch/arm64/kvm/hyp/hyp-entry.S
-+++ b/arch/arm64/kvm/hyp/hyp-entry.S
-@@ -87,10 +87,24 @@ alternative_endif
- 	/* Here, we're pretty sure the host called HVC. */
- 	ldp	x0, x1, [sp], #16
+diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
+index 6cf98ccd10f2..1d89995378e9 100644
+--- a/arch/arm64/kvm/hyp-init.S
++++ b/arch/arm64/kvm/hyp-init.S
+@@ -124,7 +124,12 @@ __do_hyp_init:
+ ENDPROC(__kvm_hyp_init)
  
--	cmp	x0, #HVC_GET_VECTORS
--	b.ne	1f
--	mrs	x0, vbar_el2
--	b	2f
-+	/* Check for a stub HVC call */
-+	cmp	x0, #HVC_STUB_HCALL_NR
-+	b.hs	1f
+ ENTRY(__kvm_handle_stub_hvc)
+-	cmp	x0, #HVC_RESET_VECTORS
++	cmp	x0, #HVC_GET_VECTORS
++	b.ne	1f
++	mrs	x0, vbar_el2
++	b	exit
 +
-+	/*
-+	 * Compute the idmap address of __kvm_handle_stub_hvc and
-+	 * jump there. Since we use kimage_voffset, do not use the
-+	 * HYP VA for __kvm_handle_stub_hvc, but the kernel VA instead
-+	 * (by loading it from the constant pool).
-+	 *
-+	 * Preserve x0-x4, which may contain stub parameters.
-+	 */
-+	ldr	x5, =__kvm_handle_stub_hvc
-+	ldr_l	x6, kimage_voffset
-+
-+	/* x5 = __pa(x5) */
-+	sub	x5, x5, x6
-+	br	x5
- 
- 1:
++1:	cmp	x0, #HVC_RESET_VECTORS
+ 	b.ne	1f
  	/*
-@@ -99,7 +113,7 @@ alternative_endif
- 	kern_hyp_va	x0
- 	do_el2_call
- 
--2:	eret
-+	eret
- 
- el1_trap:
- 	/*
+ 	 * Reset kvm back to the hyp stub.
 -- 
 2.11.0
