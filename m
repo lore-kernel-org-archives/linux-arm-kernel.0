@@ -1,37 +1,24 @@
-From: emil.l.velikov@gmail.com (Emil Velikov)
-Date: Mon, 6 Mar 2017 17:58:14 +0000
-Subject: [PATCH v6 4/4] drm/rockchip: Implement CRC debugfs API
-In-Reply-To: <20170303133936.14964-5-tomeu.vizoso@collabora.com>
-References: <20170303133936.14964-1-tomeu.vizoso@collabora.com>
- <20170303133936.14964-5-tomeu.vizoso@collabora.com>
-Message-ID: <CACvgo50hmYjTe=jvet5miv3UTk8eM5XF8qatG3Uq_LTdsO5GYg@mail.gmail.com>
+From: naveen.n.rao@linux.vnet.ibm.com (Naveen N. Rao)
+Date: Mon, 6 Mar 2017 23:37:20 +0530
+Subject: [PATCH 2/3] arm: kprobes: remove kprobe_exceptions_notify
+In-Reply-To: <46a640f65b86650d3a7d64a577dd441838de1c20.1486496890.git.naveen.n.rao@linux.vnet.ibm.com>
+References: <b0894e503195b13a5ed6319e897e673f376a748d.1486496890.git.naveen.n.rao@linux.vnet.ibm.com>
+ <46a640f65b86650d3a7d64a577dd441838de1c20.1486496890.git.naveen.n.rao@linux.vnet.ibm.com>
+Message-ID: <20170306180720.GC7467@naverao1-tp.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomeu,
-
-Pardon for dropping in late.
-
-On 3 March 2017 at 13:39, Tomeu Vizoso <tomeu.vizoso@collabora.com> wrote:
-> Implement the .set_crc_source() callback and call the DP helpers
-> accordingly to start and stop CRC capture.
->
-> This is only done if this CRTC is currently using the eDP connector.
->
-> v3: Remove superfluous check on rockchip_crtc_state->output_type
->
-> v6: Remove superfluous variable
->
-> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+On 2017/02/08 01:24AM, Naveen N Rao wrote:
+> ... as the weak variant will do.
+> 
+> Signed-off-by: Naveen N. Rao <naveen.n.rao@linux.vnet.ibm.com>
 > ---
->
->  drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 41 +++++++++++++++++++++++++++++
->  1 file changed, 41 insertions(+)
->
-I think this won't fly (build).
+>  arch/arm/probes/kprobes/core.c     | 10 ----------
+>  arch/arm64/kernel/probes/kprobes.c |  6 ------
+>  2 files changed, 16 deletions(-)
 
-Afaict analogix_dp-rockchip.c (as guarded by ROCKCHIP_ANALOGIX_DP) is
-the only piece that can/should have DRM_ANALOGIX_DP code. Perhaps
-adding a simple wrapper/stubs will be the easier option here ?
+With the generic changes in this series now in -rc1, can you please pick 
+this up?
 
--Emil
+Thanks,
+Naveen
