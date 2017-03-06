@@ -1,58 +1,67 @@
-From: mhocko@kernel.org (Michal Hocko)
-Date: Mon, 6 Mar 2017 08:42:59 +0100
-Subject: [RFC PATCH 00/12] Ion cleanup in preparation for moving out of
- staging
-In-Reply-To: <cf383b9b-3cbc-0092-a071-f120874c053c@redhat.com>
-References: <1488491084-17252-1-git-send-email-labbott@redhat.com>
- <20170303132949.GC31582@dhcp22.suse.cz>
- <cf383b9b-3cbc-0092-a071-f120874c053c@redhat.com>
-Message-ID: <20170306074258.GA27953@dhcp22.suse.cz>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon,  6 Mar 2017 09:00:29 +0100
+Subject: [PATCH 1/2] ARM: dts: add SDC2 and SDC4 to the MSM8660 family
+Message-ID: <20170306080029.3422-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri 03-03-17 09:37:55, Laura Abbott wrote:
-> On 03/03/2017 05:29 AM, Michal Hocko wrote:
-> > On Thu 02-03-17 13:44:32, Laura Abbott wrote:
-> >> Hi,
-> >>
-> >> There's been some recent discussions[1] about Ion-like frameworks. There's
-> >> apparently interest in just keeping Ion since it works reasonablly well.
-> >> This series does what should be the final clean ups for it to possibly be
-> >> moved out of staging.
-> >>
-> >> This includes the following:
-> >> - Some general clean up and removal of features that never got a lot of use
-> >>   as far as I can tell.
-> >> - Fixing up the caching. This is the series I proposed back in December[2]
-> >>   but never heard any feedback on. It will certainly break existing
-> >>   applications that rely on the implicit caching. I'd rather make an effort
-> >>   to move to a model that isn't going directly against the establishement
-> >>   though.
-> >> - Fixing up the platform support. The devicetree approach was never well
-> >>   recieved by DT maintainers. The proposal here is to think of Ion less as
-> >>   specifying requirements and more of a framework for exposing memory to
-> >>   userspace.
-> >> - CMA allocations now happen without the need of a dummy device structure.
-> >>   This fixes a bunch of the reasons why I attempted to add devicetree
-> >>   support before.
-> >>
-> >> I've had problems getting feedback in the past so if I don't hear any major
-> >> objections I'm going to send out with the RFC dropped to be picked up.
-> >> The only reason there isn't a patch to come out of staging is to discuss any
-> >> other changes to the ABI people might want. Once this comes out of staging,
-> >> I really don't want to mess with the ABI.
-> > 
-> > Could you recapitulate concerns preventing the code being merged
-> > normally rather than through the staging tree and how they were
-> > addressed?
-> > 
-> 
-> Sorry, I'm really not understanding your question here, can you
-> clarify?
+To make the picture complete, add DTS entries also for the
+second and fourth MMC/SD blocks on the MSM8660. SDC2 is
+an 8-bit interface and SDC4 is a 4-bit interface.
 
-There must have been a reason why this code ended up in the staging
-tree, right? So my question is what those reasons were and how they were
-handled in order to move the code from the staging subtree.
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/boot/dts/qcom-msm8660.dtsi | 31 +++++++++++++++++++++++++++++++
+ 1 file changed, 31 insertions(+)
+
+diff --git a/arch/arm/boot/dts/qcom-msm8660.dtsi b/arch/arm/boot/dts/qcom-msm8660.dtsi
+index 91c9a62ae725..5564ad131325 100644
+--- a/arch/arm/boot/dts/qcom-msm8660.dtsi
++++ b/arch/arm/boot/dts/qcom-msm8660.dtsi
+@@ -392,6 +392,22 @@
+ 				cap-mmc-highspeed;
+ 			};
+ 
++			sdcc2: sdcc at 12140000 {
++				status		= "disabled";
++				compatible	= "arm,pl18x", "arm,primecell";
++				arm,primecell-periphid = <0x00051180>;
++				reg		= <0x12140000 0x8000>;
++				interrupts	= <GIC_SPI 103 IRQ_TYPE_LEVEL_HIGH>;
++				interrupt-names	= "cmd_irq";
++				clocks		= <&gcc SDC2_CLK>, <&gcc SDC2_H_CLK>;
++				clock-names	= "mclk", "apb_pclk";
++				bus-width	= <8>;
++				max-frequency	= <48000000>;
++				non-removable;
++				cap-sd-highspeed;
++				cap-mmc-highspeed;
++			};
++
+ 			sdcc3: sdcc at 12180000 {
+ 				compatible	= "arm,pl18x", "arm,primecell";
+ 				arm,primecell-periphid = <0x00051180>;
+@@ -408,6 +424,21 @@
+ 				no-1-8-v;
+ 			};
+ 
++			sdcc4: sdcc at 121c0000 {
++				compatible	= "arm,pl18x", "arm,primecell";
++				arm,primecell-periphid = <0x00051180>;
++				status		= "disabled";
++				reg		= <0x121c0000 0x8000>;
++				interrupts	= <GIC_SPI 101 IRQ_TYPE_LEVEL_HIGH>;
++				interrupt-names	= "cmd_irq";
++				clocks		= <&gcc SDC4_CLK>, <&gcc SDC4_H_CLK>;
++				clock-names	= "mclk", "apb_pclk";
++				bus-width	= <4>;
++				cap-sd-highspeed;
++				cap-mmc-highspeed;
++				max-frequency	= <48000000>;
++			};
++
+ 			sdcc5: sdcc at 12200000 {
+ 				compatible	= "arm,pl18x", "arm,primecell";
+ 				arm,primecell-periphid = <0x00051180>;
 -- 
-Michal Hocko
-SUSE Labs
+2.9.3
