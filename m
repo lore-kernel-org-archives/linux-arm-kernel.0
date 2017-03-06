@@ -1,156 +1,85 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Mon, 6 Mar 2017 15:11:23 +0530
-Subject: [PATCH v2 03/22] PCI: endpoint: Introduce configfs entry for
- configuring EP functions
-In-Reply-To: <20170217170459.GA15276@infradead.org>
-References: <1487325042-28227-1-git-send-email-kishon@ti.com>
- <1487325042-28227-4-git-send-email-kishon@ti.com>
- <20170217170459.GA15276@infradead.org>
-Message-ID: <58BD2EC3.4030604@ti.com>
+From: anup.patel@broadcom.com (Anup Patel)
+Date: Mon,  6 Mar 2017 15:13:24 +0530
+Subject: [PATCH v6 0/4] Broadcom SBA RAID support
+Message-ID: <1488793408-25592-1-git-send-email-anup.patel@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The Broadcom SBA RAID is a stream-based device which provides
+RAID5/6 offload.
 
-On Friday 17 February 2017 10:34 PM, Christoph Hellwig wrote:
-> On Fri, Feb 17, 2017 at 03:20:23PM +0530, Kishon Vijay Abraham I wrote:
->> Introduce a new configfs entry to configure the EP function (like
->> configuring the standard configuration header entries) and to
->> bind the EP function with EP controller.
->>
->> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
->> ---
->>  drivers/pci/endpoint/Kconfig      |   14 +-
->>  drivers/pci/endpoint/Makefile     |    1 +
->>  drivers/pci/endpoint/pci-ep-cfs.c |  427 +++++++++++++++++++++++++++++++++++++
->>  3 files changed, 440 insertions(+), 2 deletions(-)
->>  create mode 100644 drivers/pci/endpoint/pci-ep-cfs.c
->>
->> diff --git a/drivers/pci/endpoint/Kconfig b/drivers/pci/endpoint/Kconfig
->> index 7eb1c79..8470f0b 100644
->> --- a/drivers/pci/endpoint/Kconfig
->> +++ b/drivers/pci/endpoint/Kconfig
->> @@ -6,7 +6,6 @@ menu "PCI Endpoint"
->>  
->>  config PCI_ENDPOINT
->>  	bool "PCI Endpoint Support"
->> -	select CONFIGFS_FS
->>  	help
->>  	   Enable this configuration option to support configurable PCI
->>  	   endpoint. This should be enabled if the platform has a PCI
->> @@ -14,8 +13,19 @@ config PCI_ENDPOINT
->>  
->>  	   Enabling this option will build the endpoint library, which
->>  	   includes endpoint controller library and endpoint function
->> -	   library.
->> +	   library. This will also enable the configfs entry required to
->> +	   configure the endpoint function and used to bind the
->> +	   function with a endpoint controller.
->>  
->>  	   If in doubt, say "N" to disable Endpoint support.
->>  
->> +config PCI_ENDPOINT_CONFIGFS
->> +	bool "PCI Endpoint Configfs Support"
->> +	depends on PCI_ENDPOINT
->> +	select CONFIGFS_FS
->> +	help
->> +	   This will enable the configfs entry that can be used to
->> +	   configure the endpoint function and used to bind the
->> +	   function with a endpoint controller.
->> +
->>  endmenu
->> diff --git a/drivers/pci/endpoint/Makefile b/drivers/pci/endpoint/Makefile
->> index dc1bc16..dd9163c 100644
->> --- a/drivers/pci/endpoint/Makefile
->> +++ b/drivers/pci/endpoint/Makefile
->> @@ -4,3 +4,4 @@
->>  
->>  obj-$(CONFIG_PCI_ENDPOINT)		+= pci-epc-core.o pci-epf-core.o\
->>  					   pci-epc-mem.o
->> +obj-$(CONFIG_PCI_ENDPOINT_CONFIGFS)	+= pci-ep-cfs.o
->> diff --git a/drivers/pci/endpoint/pci-ep-cfs.c b/drivers/pci/endpoint/pci-ep-cfs.c
->> new file mode 100644
->> index 0000000..ed0f8c2
->> --- /dev/null
->> +++ b/drivers/pci/endpoint/pci-ep-cfs.c
->> @@ -0,0 +1,427 @@
->> +/**
->> + * configfs to configure the PCI endpoint
->> + *
->> + * Copyright (C) 2017 Texas Instruments
->> + * Author: Kishon Vijay Abraham I <kishon@ti.com>
->> + *
->> + * This program is free software: you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 of
->> + * the License as published by the Free Software Foundation.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + * GNU General Public License for more details.
->> + *
->> + * You should have received a copy of the GNU General Public License
->> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
->> + */
->> +
->> +#include <linux/configfs.h>
->> +#include <linux/module.h>
->> +#include <linux/slab.h>
->> +
->> +#include <linux/pci-epc.h>
->> +#include <linux/pci-epf.h>
->> +
->> +struct pci_epf_info {
->> +	struct config_group group;
->> +	struct list_head list;
->> +	struct pci_epf *epf;
->> +};
->> +
->> +struct pci_ep_info {
->> +	struct config_group group;
->> +	struct config_group pci_epf_group;
->> +	/* mutex to protect pci_epf list */
->> +	struct mutex lock;
->> +	struct list_head pci_epf;
->> +	const char *epc_name;
->> +	struct pci_epc *epc;
->> +};
->> +
->> +static inline struct pci_epf_info *to_pci_epf_info(struct config_item *item)
->> +{
->> +	return container_of(to_config_group(item), struct pci_epf_info, group);
->> +}
->> +
->> +static inline struct pci_ep_info *to_pci_ep_info(struct config_item *item)
->> +{
->> +	return container_of(to_config_group(item), struct pci_ep_info, group);
->> +}
->> +
->> +#define PCI_EPF_HEADER_R(_name)						       \
->> +static ssize_t pci_epf_##_name##_show(struct config_item *item,	char *page)    \
->> +{									       \
->> +	struct pci_epf *epf = to_pci_epf_info(item)->epf;		       \
->> +	if (!epf->header) {						       \
->> +		WARN_ON_ONCE("epf device not bound to function driver\n");     \
-> 
-> WARN_ON_ONCE takes a string to evaluate as argument, not a message
-> 
->> +		return 0;					
-> 
-> and if we return 0 here the callers will retry because that is
-> interpreted as a short read.  The code should be something like:
-> 
-> 	if (WARN_ON_ONCE(!epf->header))
-> 		return -EINVAL;
-> 
->> +	if (!epf->header) {						       \
->> +		WARN_ON_ONCE("epf device not bound to function driver\n");     \
->> +		return 0;						       \
->> +	}								       \
-> 
-> Same here, and a couple more instances down below.
+It requires a SoC specific ring manager (such as Broadcom FlexRM
+ring manager) to provide ring-based programming interface. Due to
+this, the Broadcom SBA RAID driver (mailbox client) implements
+DMA device having one DMA channel using a set of mailbox channels
+provided by Broadcom SoC specific ring manager driver (mailbox
+controller).
 
-sure, fixed it now.
+The Broadcom SBA RAID hardware requires PQ disk position instead
+of PQ disk coefficient. To address this, we have added raid_gflog
+table which will help driver to convert PQ disk coefficient to PQ
+disk position.
 
-Thanks
-Kishon
+This patchset is based on Linux-4.11-rc1 and depends on patchset
+"[PATCH v5 0/2] Broadcom FlexRM ring manager support"
+
+It is also available at sba-raid-v6 branch of
+https://github.com/Broadcom/arm64-linux.git
+
+Changes since v5:
+ - Rebased patches for Linux-4.11-rc1
+
+Changes since v4:
+ - Removed dependency of bcm-sba-raid driver on kconfig opton
+   ASYNC_TX_ENABLE_CHANNEL_SWITCH
+ - Select kconfig options ASYNC_TX_DISABLE_XOR_VAL_DMA and
+   ASYNC_TX_DISABLE_PQ_VAL_DMA for bcm-sba-raid driver
+ - Implemented device_prep_dma_interrupt() using dummy 8-byte
+   copy operation so that the dma_async_device_register() can
+   set DMA_ASYNC_TX capability for the DMA device provided
+   by bcm-sba-raid driver
+
+Changes since v3:
+ - Replaced SBA_ENC() with sba_cmd_enc() inline function
+ - Use list_first_entry_or_null() wherever possible
+ - Remove unwanted brances around loops wherever possible
+ - Use lockdep_assert_held() where required
+
+Changes since v2:
+ - Droped patch to handle DMA devices having support for fewer
+   PQ coefficients in Linux Async Tx
+ - Added work-around in bcm-sba-raid driver to handle unsupported
+   PQ coefficients using multiple SBA requests
+
+Changes since v1:
+ - Droped patch to add mbox_channel_device() API
+ - Used GENMASK and BIT macros wherever possible in bcm-sba-raid driver
+ - Replaced C_MDATA macros with static inline functions in
+   bcm-sba-raid driver
+ - Removed sba_alloc_chan_resources() callback in bcm-sba-raid driver
+ - Used dev_err() instead of dev_info() wherever applicable
+ - Removed call to sba_issue_pending() from sba_tx_submit() in
+   bcm-sba-raid driver
+ - Implemented SBA request chaning for handling (len > sba->req_size)
+   in bcm-sba-raid driver
+ - Implemented device_terminate_all() callback in bcm-sba-raid driver
+
+Anup Patel (4):
+  lib/raid6: Add log-of-2 table for RAID6 HW requiring disk position
+  async_tx: Fix DMA_PREP_FENCE usage in do_async_gen_syndrome()
+  dmaengine: Add Broadcom SBA RAID driver
+  dt-bindings: Add DT bindings document for Broadcom SBA RAID driver
+
+ .../devicetree/bindings/dma/brcm,iproc-sba.txt     |   29 +
+ crypto/async_tx/async_pq.c                         |    5 +-
+ drivers/dma/Kconfig                                |   14 +
+ drivers/dma/Makefile                               |    1 +
+ drivers/dma/bcm-sba-raid.c                         | 1785 ++++++++++++++++++++
+ include/linux/raid/pq.h                            |    1 +
+ lib/raid6/mktables.c                               |   20 +
+ 7 files changed, 1852 insertions(+), 3 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/dma/brcm,iproc-sba.txt
+ create mode 100644 drivers/dma/bcm-sba-raid.c
+
+-- 
+2.7.4
