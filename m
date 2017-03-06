@@ -1,40 +1,67 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon,  6 Mar 2017 14:24:43 +0000
-Subject: [PATCH v3 10/25] ARM: Update cpu_v7_reset documentation
+Date: Mon,  6 Mar 2017 14:24:46 +0000
+Subject: [PATCH v3 13/25] ARM: hyp-stub: Implement HVC_RESET_VECTORS stub
+ hypercall
 In-Reply-To: <20170306142458.8875-1-marc.zyngier@arm.com>
 References: <20170306142458.8875-1-marc.zyngier@arm.com>
-Message-ID: <20170306142458.8875-11-marc.zyngier@arm.com>
+Message-ID: <20170306142458.8875-14-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-cpu_v7_reset() now takes a second parameter indicating whether
-we should reboot in HYP or not. Update the documentation to
-reflect this.
+Let's define a new stub hypercall that resets the HYP configuration
+to its default: hyp-stub vectors, and MMU disabled.
+
+Of course, for the hyp-stub itself, this is a trivial no-op.
+Hypervisors will have a bit more work to do.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/mm/proc-v7.S | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ arch/arm/include/asm/virt.h |  3 +++
+ arch/arm/kernel/hyp-stub.S  | 11 ++++++++++-
+ 2 files changed, 13 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-index 1846ca4255d0..01d64c0b2563 100644
---- a/arch/arm/mm/proc-v7.S
-+++ b/arch/arm/mm/proc-v7.S
-@@ -39,13 +39,14 @@ ENTRY(cpu_v7_proc_fin)
- ENDPROC(cpu_v7_proc_fin)
+diff --git a/arch/arm/include/asm/virt.h b/arch/arm/include/asm/virt.h
+index 4ea16fcaf2ed..5186718aab68 100644
+--- a/arch/arm/include/asm/virt.h
++++ b/arch/arm/include/asm/virt.h
+@@ -101,6 +101,9 @@ extern char __hyp_text_end[];
+ #define HVC_GET_VECTORS 0
+ #define HVC_SET_VECTORS 1
+ #define HVC_SOFT_RESTART 2
++#define HVC_RESET_VECTORS 3
++
++#define HVC_STUB_HCALL_NR 4
  
- /*
-- *	cpu_v7_reset(loc)
-+ *	cpu_v7_reset(loc, hyp)
-  *
-  *	Perform a soft reset of the system.  Put the CPU into the
-  *	same state as it would be if it had been reset, and branch
-  *	to what would be the reset vector.
-  *
-  *	- loc   - location to jump to for soft reset
-+ *	- hyp   - indicate if restart occurs in HYP mode
-  *
-  *	This code must be executed using a flat identity mapping with
-  *      caches disabled.
+ #endif /* __ASSEMBLY__ */
+ 
+diff --git a/arch/arm/kernel/hyp-stub.S b/arch/arm/kernel/hyp-stub.S
+index 15eaa14322a7..21794d4a8f36 100644
+--- a/arch/arm/kernel/hyp-stub.S
++++ b/arch/arm/kernel/hyp-stub.S
+@@ -216,7 +216,10 @@ __hyp_stub_do_trap:
+ 	bne	1f
+ 	bx	r1
+ 
+-1:	mov	r0, #-1
++1:	teq	r0, #HVC_RESET_VECTORS
++	beq	__hyp_stub_exit
++
++	mov	r0, #-1
+ 
+ __hyp_stub_exit:
+ 	__ERET
+@@ -264,6 +267,12 @@ ENTRY(__hyp_soft_restart)
+ 	ret	lr
+ ENDPROC(__hyp_soft_restart)
+ 
++ENTRY(__hyp_reset_vectors)
++	mov	r0, #HVC_RESET_VECTORS
++	__HVC(0)
++	ret	lr
++ENDPROC(__hyp_reset_vectors)
++
+ #ifndef ZIMAGE
+ .align 2
+ .L__boot_cpu_mode_offset:
 -- 
 2.11.0
