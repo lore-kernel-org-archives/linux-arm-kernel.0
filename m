@@ -1,44 +1,57 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 6 Mar 2017 09:58:42 +0100
-Subject: [PATCH 4/4] tty/serial: sh-sci: remove uneeded IS_ERR_OR_NULL
- calls
-In-Reply-To: <CAMuHMdX8BEnaTtNFAbcvfHwJH=oPUmQ2NB+jfouGyhQpJ_m_4A@mail.gmail.com>
-References: <20170303142201.16452-1-richard.genoud@gmail.com>
- <CAMuHMdX-K9B20Tu5NtHJRHmGGuT60OFu8TokZxsF8aSaS7HuHQ@mail.gmail.com>
- <20170303191248.wlwjri55ip2x5pgg@pengutronix.de>
- <CAMuHMdXFrwa2jCVDb+8ecqgARLG0oGrPp9pLs0b6vEiWeKJ+uA@mail.gmail.com>
- <20170303194414.n76tr3oa2mlrzjre@pengutronix.de>
- <CAMuHMdXiz5hqW=fm-2H1aNKq_gXD2o0508jD2XjxYUvKoEvHdw@mail.gmail.com>
- <20170304174819.esxhwwbsxzuq3vyc@pengutronix.de>
- <CAMuHMdX8BEnaTtNFAbcvfHwJH=oPUmQ2NB+jfouGyhQpJ_m_4A@mail.gmail.com>
-Message-ID: <20170306085842.yijkfpqi3adcedmm@pengutronix.de>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Mon, 6 Mar 2017 18:00:03 +0900
+Subject: [PATCH/RFC v2 0/4] iommu/ipmmu-vmsa: IPMMU slave device whitelist
+ V2
+In-Reply-To: <148549764733.22203.16459470412085471955.sendpatchset@little-apple>
+References: <148549764733.22203.16459470412085471955.sendpatchset@little-apple>
+Message-ID: <CANqRtoQR3S=MbVE91s5Ku=XZZ6XxpPFUfZ0FYFxiEcqts5N-pA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Geert,
+On Fri, Jan 27, 2017 at 3:14 PM, Magnus Damm <magnus.damm@gmail.com> wrote:
+> iommu/ipmmu-vmsa: IPMMU slave device whitelist V2
+>
+> [PATCH/RFC v2 1/4] iommu/of: Skip IOMMU devices disabled in DT
+> [PATCH/RFC v2 2/4] iommu/ipmmu-vmsa: Get rid of disabled device check
+> [PATCH/RFC v2 3/4] iommu/ipmmu-vmsa: Check devices in xlate()
+> [PATCH/RFC v2 3/4] iommu/ipmmu-vmsa: Opt-in slave devices based on ES version
+>
+> Here's an updated prototype that shows how DT integration of IPMMU details
+> may be integrated and merged upstream based on SoC data sheet ahead of
+> time followed by enablement in the IPMMU driver code once the appropriate
+> SoC ES version has been released and the hardware has been tested.
+>
+> Changes since V1:
+>  - Broke out patch 1 from the IPMMU driver
+>  - Moved slave device check from ->add_device() to ->xlate() (Thanks Robin!)
+>  - Updated white list patch to hook into ->xlate()
+>
+> Patch 1 may be suitable for upstream merge, however other patches should
+> in the future if agreed on be rolled into the IPMMU driver series.
 
-On Mon, Mar 06, 2017 at 09:49:39AM +0100, Geert Uytterhoeven wrote:
-> > Given that mctrl-gpio can be useful on legacy platforms, a device could
-> > silently run without cts-gpio even there.
-> 
-> On platforms were CONFIG_GPIOLIB=n, this is not true, so the issue is moot.
-> 
-> All serial drivers using (optional) mctrl-gpio have this in Kconfig:
-> 
->     select SERIAL_MCTRL_GPIO if GPIOLIB
-> 
-> So they will use mctrl-gpio when GPIOLIB is enabled.
-> If GPIOPLIB is disabled, no flow control GPIOs are expected, and the
-> driver should not break that case.
+Hi Geert, everyone,
 
-So it all boils down to the question: Is GPIOLIB=n enough to assume no
-gpio is needed?
+Do you have any opinion about the code in this version of the series?
 
-I'd say it is not.
+I recall that you agreed with the approach in "[PATCH/RFC 2/2]
+iommu/ipmmu-vmsa: Opt-in slave devices based on ES version", however
+it was suggested to me by Robin that my code in "[PATCH/RFC 1/2]
+arm64: mm: Silently allow devices lacking IOMMU group" should be
+reworked to use ->xlate().
 
-Best regards
-Uwe
+Now this series makes use of ->xlate() to implement the white list, so
+I hope that makes everyone happy.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Also, based on your suggestion I finally managed to break out the code
+that skips over disabled devices in "[PATCH/RFC v2 1/4] iommu/of: Skip
+IOMMU devices disabled in DT" but I'm not sure if this will cause
+problem for other platforms.
+
+Anyway, my current plan is to wait for feedback for "[PATCH/RFC v2
+1/4] iommu/of: Skip IOMMU devices disabled in DT" and handle that
+independently, and also roll in the other changes in this series into
+my other IPMMU code.
+
+Thanks,
+
+/ magnus
