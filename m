@@ -1,150 +1,48 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Tue,  7 Mar 2017 18:43:32 +0100
-Subject: [PATCH v5] arm64: Add support for DMA_ATTR_FORCE_CONTIGUOUS to IOMMU
-Message-ID: <1488908612-22522-1-git-send-email-geert+renesas@glider.be>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 07 Mar 2017 18:46:22 +0100
+Subject: [PATCH] arm64: defconfig: enable MVNETA
+In-Reply-To: <20170220172717.8252-1-gregory.clement@free-electrons.com>
+ (Gregory CLEMENT's message of "Mon, 20 Feb 2017 18:27:17 +0100")
+References: <20170220172717.8252-1-gregory.clement@free-electrons.com>
+Message-ID: <87mvcxnfo1.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for allocating physically contiguous DMA buffers on arm64
-systems with an IOMMU.  This can be useful when two or more devices
-with different memory requirements are involved in buffer sharing.
-
-Note that as this uses the CMA allocator, setting the
-DMA_ATTR_FORCE_CONTIGUOUS attribute has a runtime-dependency on
-CONFIG_DMA_CMA, just like on arm32.
-
-For arm64 systems using swiotlb, no changes are needed to support the
-allocation of physically contiguous DMA buffers:
-  - swiotlb always uses physically contiguous buffers (up to
-    IO_TLB_SEGSIZE = 128 pages),
-  - arm64's __dma_alloc_coherent() already calls
-    dma_alloc_from_contiguous() when CMA is available.
-
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-Reviewed-by: Robin Murphy <robin.murphy@arm.com>
----
-v5:
-  - Add Reviewed-by,
-  - Pass GFP flags to dma_alloc_from_contiguous(), cfr. commit
-    712c604dcdf818629 ("mm: wire up GFP flag passing in
-    dma_alloc_from_contiguous"),
-
-v4:
-  - Replace dma_to_phys()/phys_to_page() by vmalloc_to_page(), to pass
-    the correct page pointer to dma_release_from_contiguous().
-    Note that the latter doesn't scream when passed a wrong pointer, but
-    just returns false.  While this makes life easier for callers who
-    may want to call another deallocator, it makes it harder catching
-    bugs.
-
-v3:
-  - Add Acked-by,
-  - Update comment to "one of _4_ things",
-  - Call dma_alloc_from_contiguous() and iommu_dma_map_page() directly,
-    as suggested by Robin Murphy,
-
-v2:
-  - New, handle dispatching in the arch (arm64) code, as requested by
-    Robin Murphy.
----
- arch/arm64/mm/dma-mapping.c | 63 ++++++++++++++++++++++++++++++++++-----------
- 1 file changed, 48 insertions(+), 15 deletions(-)
-
-diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-index 81cdb2e844ed9fe8..f7b54019ef55378d 100644
---- a/arch/arm64/mm/dma-mapping.c
-+++ b/arch/arm64/mm/dma-mapping.c
-@@ -584,20 +584,7 @@ static void *__iommu_alloc_attrs(struct device *dev, size_t size,
- 	 */
- 	gfp |= __GFP_ZERO;
+Hi,
  
--	if (gfpflags_allow_blocking(gfp)) {
--		struct page **pages;
--		pgprot_t prot = __get_dma_pgprot(attrs, PAGE_KERNEL, coherent);
--
--		pages = iommu_dma_alloc(dev, iosize, gfp, attrs, ioprot,
--					handle, flush_page);
--		if (!pages)
--			return NULL;
--
--		addr = dma_common_pages_remap(pages, size, VM_USERMAP, prot,
--					      __builtin_return_address(0));
--		if (!addr)
--			iommu_dma_free(dev, pages, iosize, handle);
--	} else {
-+	if (!gfpflags_allow_blocking(gfp)) {
- 		struct page *page;
- 		/*
- 		 * In atomic context we can't remap anything, so we'll only
-@@ -621,6 +608,45 @@ static void *__iommu_alloc_attrs(struct device *dev, size_t size,
- 				__free_from_pool(addr, size);
- 			addr = NULL;
- 		}
-+	} else if (attrs & DMA_ATTR_FORCE_CONTIGUOUS) {
-+		pgprot_t prot = __get_dma_pgprot(attrs, PAGE_KERNEL, coherent);
-+		struct page *page;
-+
-+		page = dma_alloc_from_contiguous(dev, size >> PAGE_SHIFT,
-+						 get_order(size), gfp);
-+		if (!page)
-+			return NULL;
-+
-+		*handle = iommu_dma_map_page(dev, page, 0, iosize, ioprot);
-+		if (iommu_dma_mapping_error(dev, *handle)) {
-+			dma_release_from_contiguous(dev, page,
-+						    size >> PAGE_SHIFT);
-+			return NULL;
-+		}
-+		if (!coherent)
-+			__dma_flush_area(page_to_virt(page), iosize);
-+
-+		addr = dma_common_contiguous_remap(page, size, VM_USERMAP,
-+						   prot,
-+						   __builtin_return_address(0));
-+		if (!addr) {
-+			iommu_dma_unmap_page(dev, *handle, iosize, 0, attrs);
-+			dma_release_from_contiguous(dev, page,
-+						    size >> PAGE_SHIFT);
-+		}
-+	} else {
-+		pgprot_t prot = __get_dma_pgprot(attrs, PAGE_KERNEL, coherent);
-+		struct page **pages;
-+
-+		pages = iommu_dma_alloc(dev, iosize, gfp, attrs, ioprot,
-+					handle, flush_page);
-+		if (!pages)
-+			return NULL;
-+
-+		addr = dma_common_pages_remap(pages, size, VM_USERMAP, prot,
-+					      __builtin_return_address(0));
-+		if (!addr)
-+			iommu_dma_free(dev, pages, iosize, handle);
- 	}
- 	return addr;
- }
-@@ -632,7 +658,8 @@ static void __iommu_free_attrs(struct device *dev, size_t size, void *cpu_addr,
- 
- 	size = PAGE_ALIGN(size);
- 	/*
--	 * @cpu_addr will be one of 3 things depending on how it was allocated:
-+	 * @cpu_addr will be one of 4 things depending on how it was allocated:
-+	 * - A remapped array of pages for contiguous allocations.
- 	 * - A remapped array of pages from iommu_dma_alloc(), for all
- 	 *   non-atomic allocations.
- 	 * - A non-cacheable alias from the atomic pool, for atomic
-@@ -644,6 +671,12 @@ static void __iommu_free_attrs(struct device *dev, size_t size, void *cpu_addr,
- 	if (__in_atomic_pool(cpu_addr, size)) {
- 		iommu_dma_unmap_page(dev, handle, iosize, 0, 0);
- 		__free_from_pool(cpu_addr, size);
-+	} else if (attrs & DMA_ATTR_FORCE_CONTIGUOUS) {
-+		struct page *page = vmalloc_to_page(cpu_addr);
-+
-+		iommu_dma_unmap_page(dev, handle, iosize, 0, attrs);
-+		dma_release_from_contiguous(dev, page, size >> PAGE_SHIFT);
-+		dma_common_free_remap(cpu_addr, size, VM_USERMAP);
- 	} else if (is_vmalloc_addr(cpu_addr)){
- 		struct vm_struct *area = find_vm_area(cpu_addr);
- 
+ On lun., f?vr. 20 2017, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
+
+> Now that the Armada 37xx SoCs support the mvneta driver, enable it by
+> default. It is especially useful when booting on an NFS root.
+>
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+
+Applied on mvebu/defconfig64
+
+Gregory
+
+> ---
+>  arch/arm64/configs/defconfig | 1 +
+>  1 file changed, 1 insertion(+)
+>
+> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+> index 7c48028ec64a..0ebe737d3778 100644
+> --- a/arch/arm64/configs/defconfig
+> +++ b/arch/arm64/configs/defconfig
+> @@ -185,6 +185,7 @@ CONFIG_HNS_ENET=y
+>  CONFIG_E1000E=y
+>  CONFIG_IGB=y
+>  CONFIG_IGBVF=y
+> +CONFIG_MVNETA=y
+>  CONFIG_SKY2=y
+>  CONFIG_RAVB=y
+>  CONFIG_SMC91X=y
+> -- 
+> 2.11.0
+>
+
 -- 
-2.7.4
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
