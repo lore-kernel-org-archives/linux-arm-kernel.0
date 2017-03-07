@@ -1,58 +1,102 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 7 Mar 2017 18:09:09 +0100
-Subject: [PATCH v8 6/6] arm64: dts: allwinner: h5: add support for the
- Orange Pi PC 2 board
-In-Reply-To: <20170306214904.o2zpw3q3fvtrmsmd@localhost>
-References: <20170306171750.7491-1-icenowy@aosc.xyz>
- <20170306171750.7491-7-icenowy@aosc.xyz>
- <20170306214904.o2zpw3q3fvtrmsmd@localhost>
-Message-ID: <20170307170909.qnjy36yxbz5eiwe4@lukather>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 07 Mar 2017 18:10:12 +0100
+Subject: [PATCH v2 0/6] Updates for Marvell Switch SoCs
+In-Reply-To: <20170216085041.28337-1-chris.packham@alliedtelesis.co.nz> (Chris
+ Packham's message of "Thu, 16 Feb 2017 21:50:34 +1300")
+References: <20170216085041.28337-1-chris.packham@alliedtelesis.co.nz>
+Message-ID: <87bmtdovwr.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 06, 2017 at 10:49:05PM +0100, Rask Ingemann Lambertsen wrote:
-> > diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts
-> > new file mode 100644
-> > index 000000000000..30639729920d
-> > --- /dev/null
-> > +++ b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts
-> > @@ -0,0 +1,163 @@
-> > +/*
-> > + * Copyright (C) 2016 ARM Ltd.
-> > + *
-> > + * This file is dual-licensed: you can use it either under the terms
-> > + * of the GPL or the X11 license, at your option. Note that this dual
-> > + * licensing only applies to this file, and not this project as a
-> > + * whole.
-> 
-> I didn't catch any sort of announcement of it, but it seems as if we've
-> started using SPDX license identifiers in dts files. Thus you can simply
-> include the line
-> SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-> after the copyright notice and omit the license notices themselves. Even
-> though the comment refers to "the X11 license", the license text matches that
-> associated with the MIT license identifier [1] rather than that of the X11
-> license [2]. The same goes for patch 5/6.
-> 
-> [1] https://spdx.org/licenses/MIT.html#licenseText
-> [2] https://spdx.org/licenses/X11.html#licenseText
+Hi Chris,
+ 
+ On jeu., f?vr. 16 2017, Chris Packham <chris.packham@alliedtelesis.co.nz> wrote:
 
-For my opinion on the matter, see this mail from RMK:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2017-February/490649.html
+> Shortly after I posted my last series I got access to a more recent
+> Marvell SDK which had some device tree support for the switch SoCs I'd
+> been wanting. It was still based on an older kernel but it was a huge
+> improvement over what came before.
+>
+> Patch 1/6 is a typo I noticed after my initial series was applied.
+>
+> Patch 2/6 is a bit of a cleanup. I did initially struggle with how to
+> access individual parts of the DFX block as well as retaining a handle on
+> the entire thing for the switch driver to use.
+>
+> Patch 3/6 is a re-jig of the dtsi files which is needed by 5/6. This is
+> required because I need to use the coreclk label on a different node. It
+> also means I don't have to disable nodes for blocks that only exist on
+> the Armada-XP.
+>
+> Patch 4/6, 5/6 are split from the previous versions.
+>
+> Patch 6/6 is the device tree portion of a change already in clk-next.
 
-If people want to use it, I'm okay with that, but I really don't want
-to actively enforce it during the reviews.
 
-Maxime
+I applied patches 2, 3 and 6 on mvebu/dt with the acked-by from Rob when
+he gave it.
+
+Patch 1 is already part of 4.11-rc1.
+
+For patch 4 and 5 I understand that either we don't need it or it should
+be a updated version so I skipped them.
+
+Thanks,
+
+Gregory
+
+>
+> Chris Packham (6):
+>   ARM: dts: Fix typo in armada-xp-98dx4251
+>     Changes in v2
+>     - new
+>     Changes in v3:
+>     - none
+>   ARM: dts: armada-xp-98dx3236: combine dfx server nodes
+>     Changes in v2:
+>     - none
+>     Changes in v3:
+>     - none
+>   ARM: dts: Use armada-370-xp as a base for armada-xp-98dx3236
+>     Changes in v2:
+>     - Update root compatible strings in armada-xp-98dx3336.dtsi,
+>       armada-xp-98dx4251.dtsi, armada-xp-db-dxbc2.dts and
+>       armada-xp-db-xc3-24g4xg.dts
+>     Changes in v3:
+>     - none
+>   ARM: dts: mvebu: Add binding for mv98dx3236-soc-id
+>     Changes in v3:
+>     - new, split from driver
+>   ARM: mvebu: Add driver for mv98dx3236-soc-id
+>     Changes in v2:
+>     - none
+>     Changes in v3:
+>     - split from dts changes
+>   ARM: dts: mvebu: Move mv98dx3236 clock bindings
+>     Changes in v2:
+>     - New. Split out from "clk: mvebu: Expand mv98dx3236-core-clock support"
+>     Changes in v3:
+>     - Clarify why the old location was wrong (but worked).
+>
+>
+>  .../bindings/arm/marvell/mv98dx3236-soc-id.txt     |  14 ++
+>  .../devicetree/bindings/clock/mvebu-core-clock.txt |   7 +
+>  .../bindings/clock/mvebu-gated-clock.txt           |  11 ++
+>  .../devicetree/bindings/net/marvell,prestera.txt   |  13 +-
+>  arch/arm/boot/dts/armada-xp-98dx3236.dtsi          | 213 ++++++++++++++++-----
+>  arch/arm/boot/dts/armada-xp-98dx3336.dtsi          |   2 +-
+>  arch/arm/boot/dts/armada-xp-98dx4251.dtsi          |   2 +-
+>  arch/arm/boot/dts/armada-xp-db-dxbc2.dts           |   2 +-
+>  arch/arm/boot/dts/armada-xp-db-xc3-24g4xg.dts      |   2 +-
+>  arch/arm/mach-mvebu/mvebu-soc-id.c                 |  43 ++++-
+>  10 files changed, 242 insertions(+), 67 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/arm/marvell/mv98dx3236-soc-id.txt
+>
+> -- 
+> 2.11.0.24.ge6920cf
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
 http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170307/86bee1ea/attachment-0001.sig>
