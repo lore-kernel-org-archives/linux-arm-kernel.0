@@ -1,39 +1,37 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Tue, 7 Mar 2017 21:04:50 +0900
-Subject: [PATCH v2 3/3] mtd: nand: Remove unused chip->write_page() hook
-In-Reply-To: <1487593718-20752-4-git-send-email-boris.brezillon@free-electrons.com>
-References: <1487593718-20752-1-git-send-email-boris.brezillon@free-electrons.com>
- <1487593718-20752-4-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <CAK7LNASNFJ6_LJBS7jyyJ3-Uv_ExTYAj+tkJTCYrpDz8_BXa3Q@mail.gmail.com>
+From: a.hajda@samsung.com (Andrzej Hajda)
+Date: Tue, 07 Mar 2017 13:08:19 +0100
+Subject: [Patch v2 11/11] Documention: v4l: Documentation for HEVC CIDs
+In-Reply-To: <1488532036-13044-12-git-send-email-smitha.t@samsung.com>
+References: <1488532036-13044-1-git-send-email-smitha.t@samsung.com>
+ <CGME20170303090518epcas5p4d50e0bbaae69e93dc931c29ffaaa658b@epcas5p4.samsung.com>
+ <1488532036-13044-12-git-send-email-smitha.t@samsung.com>
+Message-ID: <6c537c6a-0b87-0624-6770-73404972fb7a@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
 
-2017-02-20 21:28 GMT+09:00 Boris Brezillon <boris.brezillon@free-electrons.com>:
-> The last/only user of the chip->write_page() hook (the Atmel NAND
-> controller driver) has been reworked and is no longer specifying a custom
-> ->write_page() implementation.
-> Drop this hook before someone else start abusing it.
->
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+On 03.03.2017 10:07, Smitha T Murthy wrote:
+> Added V4l2 controls for HEVC encoder
 
+It should be rather "Document controls for HEVC encoder" or sth similar.
 
-Just a minor comment.
+In general most of comments are in previous patch.
+Few additional comments:
+- please be careful about control names - they are exported to userspace
+and becomes ABI, so it will be difficult to change them later (this
+comment is rather to previous patch),
+- please provide good documentation as for most users this documentation
+will be the only available source of information,
+- in short: bugs in the driver can be easily fixed(usually), wrong
+control names will be hard to fix, weak documentation will prevent using it.
 
+And regarding this patch:
+- please expand all acronyms (pb, tmv, BIT,...),
+- please consider using menu instead of numbers for profile, level,
+tier, types, generally everywhere where control value enumerates
+'things' and is not a pure number (coefficient, counter,...),
+- if control is per-frame please drop it, V4L2 does not support it at
+the moment ( I suppose ),
 
-/**
- * nand_write_page - [REPLACEABLE] write one page
- * @mtd: MTD device structure
-
-
-Can you update the comment block for nand_write_page(), too?
-
-  [REPLACEABLE]  ->  [INTERNAL]
-
-
-
-
--- 
-Best Regards
-Masahiro Yamada
+Regards
+Andrzej
