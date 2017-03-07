@@ -1,40 +1,93 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 7 Mar 2017 19:34:41 +0100
-Subject: [PATCH v2 3/3] mtd: nand: Remove unused chip->write_page() hook
-In-Reply-To: <CAK7LNASNFJ6_LJBS7jyyJ3-Uv_ExTYAj+tkJTCYrpDz8_BXa3Q@mail.gmail.com>
-References: <1487593718-20752-1-git-send-email-boris.brezillon@free-electrons.com>
- <1487593718-20752-4-git-send-email-boris.brezillon@free-electrons.com>
- <CAK7LNASNFJ6_LJBS7jyyJ3-Uv_ExTYAj+tkJTCYrpDz8_BXa3Q@mail.gmail.com>
-Message-ID: <20170307193441.0c6fd555@bbrezillon>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 7 Mar 2017 18:35:55 +0000
+Subject: [PATCH] iommu/arm-smmu: Add global SMR masking property
+In-Reply-To: <f26137836bb8416e38390ba68973ae5cd19c2c53.1488910978.git.robin.murphy@arm.com>
+References: <f26137836bb8416e38390ba68973ae5cd19c2c53.1488910978.git.robin.murphy@arm.com>
+Message-ID: <20170307183555.GH3514@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 7 Mar 2017 21:04:50 +0900
-Masahiro Yamada <yamada.masahiro@socionext.com> wrote:
+On Tue, Mar 07, 2017 at 06:26:28PM +0000, Robin Murphy wrote:
+> The current SMR masking support using a 2-cell iommu-specifier is
+> primarily intended to handle individual masters with large and/or
+> complex Stream ID assignments; it quickly gets a bit clunky in other SMR
+> use-cases where we just want to consistently mask out the same part of
+> every Stream ID (e.g. for MMU-500 configurations where the appended TBU
+> number gets in the way unnecessarily). Let's add a new property to allow
+> a single global mask value to better fit the latter situation.
+> 
+> Tested-by: Nipun Gupta <nipun.gupta@nxp.com>
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> ---
+> 
+> Time to rekindle the discussion about whether an architecture-level
+> concept with a rather specific name needs a vendor prefix ;)
+> 
+> Robin.
+> 
+>  Documentation/devicetree/bindings/iommu/arm,smmu.txt | 10 ++++++++++
+>  drivers/iommu/arm-smmu.c                             |  4 +++-
+>  2 files changed, 13 insertions(+), 1 deletion(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu.txt b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+> index 6cdf32d037fc..d66f355e174f 100644
+> --- a/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+> +++ b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+> @@ -60,6 +60,16 @@ conditions.
+>                    aliases of secure registers have to be used during
+>                    SMMU configuration.
+>  
+> +- stream-match-mask : Specifies a fixed SMR mask value to combine with
+> +                  the Stream ID value from every iommu-specifier. This
+> +                  may be used instead of an "#iommu-cells" value of 2
+> +                  when there is no need for per-master SMR masks, but
+> +                  it is still desired to mask some portion of every
+> +                  Stream ID (e.g. for certain MMU-500 configurations
+> +                  given globally unique external IDs). This property is
+> +                  not valid for SMMUs using stream indexing, and may be
+> +                  ignored if stream matching is not supported.
+> +
 
-> Hi Boris,
-> 
-> 2017-02-20 21:28 GMT+09:00 Boris Brezillon <boris.brezillon@free-electrons.com>:
-> > The last/only user of the chip->write_page() hook (the Atmel NAND
-> > controller driver) has been reworked and is no longer specifying a custom  
-> > ->write_page() implementation.  
-> > Drop this hook before someone else start abusing it.
-> >
-> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>  
-> 
-> 
-> Just a minor comment.
-> 
-> 
-> /**
->  * nand_write_page - [REPLACEABLE] write one page
->  * @mtd: MTD device structure
-> 
-> 
-> Can you update the comment block for nand_write_page(), too?
-> 
->   [REPLACEABLE]  ->  [INTERNAL]
+Generally, this sounds fine.
 
-I think I'll just drop it, it does not mean anything to flag a static
-function as replaceable (the ->write_page() method could be overloaded,
-but not the nand_write_page() implementation itself).
+However, there is an ambiguity here (inherited from the existing
+#iommu-cells = <2> case), in that it's not clear what is meant by "to
+combine".
+
+>From the example at the end of the file, this appears to be a mask of
+bits to not consider for matching purposes?
+
+Would you mind clarifying that in both cases?
+
+This could also do with an example.
+
+Thanks,
+Mark.
+
+>  ** Deprecated properties:
+>  
+>  - mmu-masters (deprecated in favour of the generic "iommus" binding) :
+> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> index abf6496843a6..e394d55146a6 100644
+> --- a/drivers/iommu/arm-smmu.c
+> +++ b/drivers/iommu/arm-smmu.c
+> @@ -1590,13 +1590,15 @@ static int arm_smmu_domain_set_attr(struct iommu_domain *domain,
+>  
+>  static int arm_smmu_of_xlate(struct device *dev, struct of_phandle_args *args)
+>  {
+> -	u32 fwid = 0;
+> +	u32 mask, fwid = 0;
+>  
+>  	if (args->args_count > 0)
+>  		fwid |= (u16)args->args[0];
+>  
+>  	if (args->args_count > 1)
+>  		fwid |= (u16)args->args[1] << SMR_MASK_SHIFT;
+> +	else if (!of_property_read_u32(args->np, "stream-match-mask", &mask))
+> +		fwid |= (u16)mask << SMR_MASK_SHIFT;
+>  
+>  	return iommu_fwspec_add_ids(dev, &fwid, 1);
+>  }
+> -- 
+> 2.11.0.dirty
+> 
