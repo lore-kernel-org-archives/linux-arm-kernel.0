@@ -1,54 +1,94 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue,  7 Mar 2017 16:53:11 +0100
-Subject: [PATCHv3 net-next 13/22] net: mvpp2: adapt mvpp2_defaults_set() to
- PPv2.2
+Date: Tue,  7 Mar 2017 16:53:12 +0100
+Subject: [PATCHv3 net-next 14/22] net: mvpp2: adjust mvpp2_{rxq,
+ txq}_init for PPv2.2
 In-Reply-To: <1488902000-2658-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1488902000-2658-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1488902000-2658-14-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1488902000-2658-15-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit modifies the mvpp2_defaults_set() function to not do the
-loopback and FIFO threshold initialization, which are not needed for
-PPv2.2.
+In PPv2.2, the MVPP2_RXQ_DESC_ADDR_REG and MVPP2_TXQ_DESC_ADDR_REG
+registers have a slightly different layout, because they need to contain
+a 64-bit address for the RX and TX descriptor arrays. This commit
+adjusts those functions accordingly.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- drivers/net/ethernet/marvell/mvpp2.c | 22 ++++++++++++----------
- 1 file changed, 12 insertions(+), 10 deletions(-)
+ drivers/net/ethernet/marvell/mvpp2.c | 26 +++++++++++++++++++++-----
+ 1 file changed, 21 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/net/ethernet/marvell/mvpp2.c b/drivers/net/ethernet/marvell/mvpp2.c
-index 91dca01..da48d606 100644
+index da48d606..2eec380 100644
 --- a/drivers/net/ethernet/marvell/mvpp2.c
 +++ b/drivers/net/ethernet/marvell/mvpp2.c
-@@ -4157,16 +4157,18 @@ static void mvpp2_defaults_set(struct mvpp2_port *port)
+@@ -102,6 +102,7 @@
+ /* Descriptor Manager Top Registers */
+ #define MVPP2_RXQ_NUM_REG			0x2040
+ #define MVPP2_RXQ_DESC_ADDR_REG			0x2044
++#define     MVPP22_DESC_ADDR_OFFS		8
+ #define MVPP2_RXQ_DESC_SIZE_REG			0x2048
+ #define     MVPP2_RXQ_DESC_SIZE_MASK		0x3ff0
+ #define MVPP2_RXQ_STATUS_UPDATE_REG(rxq)	(0x3000 + 4 * (rxq))
+@@ -140,6 +141,7 @@
+ #define MVPP2_TXQ_RSVD_CLR_REG			0x20b8
+ #define     MVPP2_TXQ_RSVD_CLR_OFFSET		16
+ #define MVPP2_AGGR_TXQ_DESC_ADDR_REG(cpu)	(0x2100 + 4 * (cpu))
++#define     MVPP22_AGGR_TXQ_DESC_ADDR_OFFS	8
+ #define MVPP2_AGGR_TXQ_DESC_SIZE_REG(cpu)	(0x2140 + 4 * (cpu))
+ #define     MVPP2_AGGR_TXQ_DESC_SIZE_MASK	0x3ff0
+ #define MVPP2_AGGR_TXQ_STATUS_REG(cpu)		(0x2180 + 4 * (cpu))
+@@ -4726,6 +4728,8 @@ static int mvpp2_aggr_txq_init(struct platform_device *pdev,
+ 			       int desc_num, int cpu,
+ 			       struct mvpp2 *priv)
  {
- 	int tx_port_num, val, queue, ptxq, lrxq;
- 
--	/* Configure port to loopback if needed */
--	if (port->flags & MVPP2_F_LOOPBACK)
--		mvpp2_port_loopback_set(port);
--
--	/* Update TX FIFO MIN Threshold */
--	val = readl(port->base + MVPP2_GMAC_PORT_FIFO_CFG_1_REG);
--	val &= ~MVPP2_GMAC_TX_FIFO_MIN_TH_ALL_MASK;
--	/* Min. TX threshold must be less than minimal packet length */
--	val |= MVPP2_GMAC_TX_FIFO_MIN_TH_MASK(64 - 4 - 2);
--	writel(val, port->base + MVPP2_GMAC_PORT_FIFO_CFG_1_REG);
-+	if (port->priv->hw_version == MVPP21) {
-+		/* Configure port to loopback if needed */
-+		if (port->flags & MVPP2_F_LOOPBACK)
-+			mvpp2_port_loopback_set(port);
++	u32 txq_dma;
 +
-+		/* Update TX FIFO MIN Threshold */
-+		val = readl(port->base + MVPP2_GMAC_PORT_FIFO_CFG_1_REG);
-+		val &= ~MVPP2_GMAC_TX_FIFO_MIN_TH_ALL_MASK;
-+		/* Min. TX threshold must be less than minimal packet length */
-+		val |= MVPP2_GMAC_TX_FIFO_MIN_TH_MASK(64 - 4 - 2);
-+		writel(val, port->base + MVPP2_GMAC_PORT_FIFO_CFG_1_REG);
-+	}
+ 	/* Allocate memory for TX descriptors */
+ 	aggr_txq->descs = dma_alloc_coherent(&pdev->dev,
+ 				desc_num * MVPP2_DESC_ALIGNED_SIZE,
+@@ -4739,10 +4743,16 @@ static int mvpp2_aggr_txq_init(struct platform_device *pdev,
+ 	aggr_txq->next_desc_to_proc = mvpp2_read(priv,
+ 						 MVPP2_AGGR_TXQ_INDEX_REG(cpu));
  
- 	/* Disable Legacy WRR, Disable EJP, Release from reset */
- 	tx_port_num = mvpp2_egress_port(port);
+-	/* Set Tx descriptors queue starting address */
+-	/* indirect access */
+-	mvpp2_write(priv, MVPP2_AGGR_TXQ_DESC_ADDR_REG(cpu),
+-		    aggr_txq->descs_dma);
++	/* Set Tx descriptors queue starting address indirect
++	 * access
++	 */
++	if (priv->hw_version == MVPP21)
++		txq_dma = aggr_txq->descs_dma;
++	else
++		txq_dma = aggr_txq->descs_dma >>
++			MVPP22_AGGR_TXQ_DESC_ADDR_OFFS;
++
++	mvpp2_write(priv, MVPP2_AGGR_TXQ_DESC_ADDR_REG(cpu), txq_dma);
+ 	mvpp2_write(priv, MVPP2_AGGR_TXQ_DESC_SIZE_REG(cpu), desc_num);
+ 
+ 	return 0;
+@@ -4753,6 +4763,8 @@ static int mvpp2_rxq_init(struct mvpp2_port *port,
+ 			  struct mvpp2_rx_queue *rxq)
+ 
+ {
++	u32 rxq_dma;
++
+ 	rxq->size = port->rx_ring_size;
+ 
+ 	/* Allocate memory for RX descriptors */
+@@ -4769,7 +4781,11 @@ static int mvpp2_rxq_init(struct mvpp2_port *port,
+ 
+ 	/* Set Rx descriptors queue starting address - indirect access */
+ 	mvpp2_write(port->priv, MVPP2_RXQ_NUM_REG, rxq->id);
+-	mvpp2_write(port->priv, MVPP2_RXQ_DESC_ADDR_REG, rxq->descs_dma);
++	if (port->priv->hw_version == MVPP21)
++		rxq_dma = rxq->descs_dma;
++	else
++		rxq_dma = rxq->descs_dma >> MVPP22_DESC_ADDR_OFFS;
++	mvpp2_write(port->priv, MVPP2_RXQ_DESC_ADDR_REG, rxq_dma);
+ 	mvpp2_write(port->priv, MVPP2_RXQ_DESC_SIZE_REG, rxq->size);
+ 	mvpp2_write(port->priv, MVPP2_RXQ_INDEX_REG, 0);
+ 
 -- 
 2.7.4
