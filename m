@@ -1,61 +1,35 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Tue, 7 Mar 2017 21:04:00 +0000
-Subject: [PATCH 05/11] arm64: tegra: Enable ethernet on P3310
-In-Reply-To: <20170223173053.19701-5-thierry.reding@gmail.com>
-References: <20170223173053.19701-1-thierry.reding@gmail.com>
- <20170223173053.19701-5-thierry.reding@gmail.com>
-Message-ID: <9974a9ad-d4ce-88c7-e448-911f306ef961@nvidia.com>
+From: labbott@redhat.com (Laura Abbott)
+Date: Tue,  7 Mar 2017 12:55:32 -0800
+Subject: [PATCHv3 15/16] video: vermilion: Use set_memory.h header
+In-Reply-To: <1488920133-27229-1-git-send-email-labbott@redhat.com>
+References: <1488920133-27229-1-git-send-email-labbott@redhat.com>
+Message-ID: <1488920133-27229-16-git-send-email-labbott@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-On 23/02/17 17:30, Thierry Reding wrote:
-> From: Thierry Reding <treding@nvidia.com>
-> 
-> The P3310 processor module provides networking via the ethernet
-> controller found on NVIDIA Tegra186 SoCs.
-> 
-> Signed-off-by: Thierry Reding <treding@nvidia.com>
-> ---
->  arch/arm64/boot/dts/nvidia/tegra186-p3310.dtsi | 20 ++++++++++++++++++++
->  1 file changed, 20 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/nvidia/tegra186-p3310.dtsi b/arch/arm64/boot/dts/nvidia/tegra186-p3310.dtsi
-> index 762f4756346c..ffbb4be5122e 100644
-> --- a/arch/arm64/boot/dts/nvidia/tegra186-p3310.dtsi
-> +++ b/arch/arm64/boot/dts/nvidia/tegra186-p3310.dtsi
-> @@ -26,6 +26,26 @@
->  		reg = <0x0 0x80000000 0x2 0x00000000>;
->  	};
->  
-> +	ethernet at 2490000 {
-> +		status = "okay";
-> +
-> +		phy-reset-gpios = <&gpio TEGRA_MAIN_GPIO(M, 4) GPIO_ACTIVE_LOW>;
-> +		phy-handle = <&phy>;
-> +		phy-mode = "rgmii";
-> +
-> +		mdio {
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +
-> +			phy: phy at 0 {
-> +				compatible = "ethernet-phy-ieee802.3-c22";
-> +				reg = <0x0>;
-> +				interrupt-parent = <&gpio>;
-> +				interrupts = <TEGRA_MAIN_GPIO(M, 5) IRQ_TYPE_LEVEL_HIGH>;
-> +			};
-> +		};
-> +	};
-> +
->  	serial at 3100000 {
->  		status = "okay";
->  	};
+set_memory_* functions have moved to set_memory.h. Switch to this
+explicitly.
 
-Acked-by: Jon Hunter <jonathanh@nvidia.com>
+Signed-off-by: Laura Abbott <labbott@redhat.com>
+---
+v3: New files not caught in the first pass
+---
+ drivers/video/fbdev/vermilion/vermilion.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Cheers
-Jon
-
+diff --git a/drivers/video/fbdev/vermilion/vermilion.c b/drivers/video/fbdev/vermilion/vermilion.c
+index 1c1e95a..ce4c4729 100644
+--- a/drivers/video/fbdev/vermilion/vermilion.c
++++ b/drivers/video/fbdev/vermilion/vermilion.c
+@@ -37,7 +37,7 @@
+ #include <linux/mm.h>
+ #include <linux/fb.h>
+ #include <linux/pci.h>
+-#include <asm/cacheflush.h>
++#include <asm/set_memory.h>
+ #include <asm/tlbflush.h>
+ #include <linux/mmzone.h>
+ 
 -- 
-nvpublic
+2.7.4
