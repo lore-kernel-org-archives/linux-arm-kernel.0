@@ -1,34 +1,70 @@
 From: fcooper@ti.com (Franklin S Cooper Jr)
-Date: Tue, 7 Mar 2017 15:57:50 -0600
-Subject: [PATCH 1/2] doc: dt: mtd: add w25q64 to list of supported SPI flashes
+Date: Tue, 7 Mar 2017 15:57:51 -0600
+Subject: [PATCH 2/2] ARM: dts: am335x-icev2: Add SPI based NOR
 In-Reply-To: <20170307215751.29266-1-fcooper@ti.com>
 References: <20170307215751.29266-1-fcooper@ti.com>
-Message-ID: <20170307215751.29266-2-fcooper@ti.com>
+Message-ID: <20170307215751.29266-3-fcooper@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sekhar Nori <nsekhar@ti.com>
+Enable support for W25Q64CVSSIG which is a Winbond 64 Mbit SPI NOR.
 
-W25Q64 is found on TI's AM335x ICEv2 board. Add it to list
-for supported SPI flash devices. This flash can be identified
-using JEDEC READ ID opcode.
+At boot you will see the following message:
+m25p80 spi1.0: found s25fl064k, expected w25q64
 
+This is because the JEDEC ID for this chip is the same as s25fl064k.
+However, this should be harmless since both chips are essentially the
+same.
+
+Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
 Signed-off-by: Sekhar Nori <nsekhar@ti.com>
 ---
- Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/am335x-icev2.dts | 33 +++++++++++++++++++++++++++++++++
+ 1 file changed, 33 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt b/Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt
-index 3e920ec..9ce35af 100644
---- a/Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt
-+++ b/Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt
-@@ -40,6 +40,7 @@ Required properties:
-                  w25x80
-                  w25x32
-                  w25q32
-+                 w25q64
-                  w25q32dw
-                  w25q80bl
-                  w25q128
+diff --git a/arch/arm/boot/dts/am335x-icev2.dts b/arch/arm/boot/dts/am335x-icev2.dts
+index a2ad076..1e643dc 100644
+--- a/arch/arm/boot/dts/am335x-icev2.dts
++++ b/arch/arm/boot/dts/am335x-icev2.dts
+@@ -245,6 +245,39 @@
+ 		spi-max-frequency = <1000000>;
+ 		spi-cpol;
+ 	};
++
++	spi_nor: flash at 0 {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		compatible = "winbond,w25q64", "jedec,spi-nor";
++		spi-max-frequency = <80000000>;
++		m25p,fast-read;
++		reg = <0>;
++
++		partition at 0 {
++			label = "u-boot-spl";
++			reg = <0x0 0x80000>;
++			read-only;
++		};
++
++		partition at 1 {
++			label = "u-boot";
++			reg = <0x80000 0x100000>;
++			read-only;
++		};
++
++		partition at 2 {
++			label = "u-boot-env";
++			reg = <0x180000 0x20000>;
++			read-only;
++		};
++
++		partition at 3 {
++			label = "misc";
++			reg = <0x1A0000 0x660000>;
++		};
++	};
++
+ };
+ 
+ &tscadc {
 -- 
 2.10.0
