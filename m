@@ -1,55 +1,42 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue,  7 Mar 2017 18:12:51 +0000
-Subject: [PATCH] of: Fix DMA mask assignment
-Message-ID: <94ede94e98502a7948085fba5a16994d3805010c.1488910224.git.robin.murphy@arm.com>
+From: slemieux.tyco@gmail.com (Sylvain Lemieux)
+Date: Tue, 07 Mar 2017 13:20:19 -0500
+Subject: [RESEND PATCH 0/3] pwm: lpc32xx: switch driver to one phandle
+ argument for PWM consumers
+In-Reply-To: <20170216202749.20653-1-slemieux.tyco@gmail.com>
+References: <20170216202749.20653-1-slemieux.tyco@gmail.com>
+Message-ID: <1488910819.4022.2.camel@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As we start moving towards mandating that device DMA addressing
-capabilities are correctly described in DT for platforms like arm64, it
-turns out that actually assigning DMA masks wider than 32 bits from
-"dma-ranges" is made largely impossible by the current code. New PCI
-devices are passed in with 32-bit masks, while new platform devices are
-passed in with their masks unset, so we install default 32-bit masks for
-them. As a result, subsequently taking the minimum between any existing
-mask and the size given by "dma-ranges" means that we can never exceed
-32 bits for the vast majority of devices.
+On Thu, 2017-02-16 at 15:27 -0500, slemieux.tyco at gmail.com wrote:
+> From: Sylvain Lemieux <slemieux@tycoint.com>
+> 
+> The change adds private of_xlate() function to process one argument given along with a PWM phandle. LPC32xx SoCs have two independent single channel PWM controllers, the argument is used as a description of PWM output frequency, see previous discussion here:
+> 
+>   http://www.spinics.net/lists/arm-kernel/msg534068.html
+> 
+> The changes on actual board dts files are not needed at the moment, because all LPC32xx boards in upstream don't describe any PWM consumers.
+> 
+> Please refer to the following URL to view the previous patch #1 review discussion:
+>   http://www.spinics.net/lists/arm-kernel/msg549772.html
+> 
+Hi Thierry,
 
-Since the DT can be assumed to describe the hardware appropriately, and
-the device's driver is expected by the DMA API to explicitly set a mask
-later when it probes, we can safely let "dma-ranges" unconditionally
-override any initial mask from device creation (and as a small bonus
-deduplicate the calculation in the process).
+can you take this patchset for 4.12?
 
-CC: Arnd Bergmann <arnd@arndb.de>
-CC: Murali Karicheri <m-karicheri2@ti.com>
-Fixes: 9a6d7298b083 ("of: Calculate device DMA masks based on DT dma-range size")
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
- drivers/of/device.c | 11 ++---------
- 1 file changed, 2 insertions(+), 9 deletions(-)
+Let me know if you have more questions.
 
-diff --git a/drivers/of/device.c b/drivers/of/device.c
-index b1e6bebda3f3..9bb8518b28f2 100644
---- a/drivers/of/device.c
-+++ b/drivers/of/device.c
-@@ -129,15 +129,8 @@ void of_dma_configure(struct device *dev, struct device_node *np)
- 	}
- 
- 	dev->dma_pfn_offset = offset;
--
--	/*
--	 * Limit coherent and dma mask based on size and default mask
--	 * set by the driver.
--	 */
--	dev->coherent_dma_mask = min(dev->coherent_dma_mask,
--				     DMA_BIT_MASK(ilog2(dma_addr + size)));
--	*dev->dma_mask = min((*dev->dma_mask),
--			     DMA_BIT_MASK(ilog2(dma_addr + size)));
-+	dev->coherent_dma_mask = DMA_BIT_MASK(ilog2(dma_addr + size));
-+	*dev->dma_mask = dev->coherent_dma_mask;
- 
- 	coherent = of_dma_is_coherent(np);
- 	dev_dbg(dev, "device is%sdma coherent\n",
--- 
-2.11.0.dirty
+Regards,
+Sylvain
+
+> The "Reviewed-by" and "Acked-by" from the original posting are added into this resend.
+> 
+> Vladimir Zapolskiy (3):
+>   dt: pwm: lpc32xx: add description of clocks and #pwm-cells properties
+>   pwm: lpc32xx: switch driver to one phandle argument for PWM consumers
+>   pwm: lpc32xx: remove handling of PWM channels
+> 
+>  .../devicetree/bindings/pwm/lpc32xx-pwm.txt        |  7 +++++
+>  drivers/pwm/pwm-lpc32xx.c                          | 36 +++++++++++++++-------
+>  2 files changed, 32 insertions(+), 11 deletions(-)
+> 
