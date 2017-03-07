@@ -1,36 +1,164 @@
-From: sunil.kovvuri@gmail.com (Sunil Kovvuri)
-Date: Tue, 7 Mar 2017 18:29:09 +0530
-Subject: IOMMU in bypass mode by default on ARM64,
- instead of command line option
-In-Reply-To: <CA+sq2CeAKE+fDJhTA_W=bG531b8f7q=NZmgCtEQbXgZsR2RbSA@mail.gmail.com>
-References: <CA+sq2CdawVNqEjpuzkdmEDbvW69aXufHJAEoH_g55=sr2d1rOw@mail.gmail.com>
- <07f4a3d7-f41b-2459-65c6-729f3a692e7d@arm.com>
- <20170307113237.GB30058@arm.com>
- <CA+sq2CeAKE+fDJhTA_W=bG531b8f7q=NZmgCtEQbXgZsR2RbSA@mail.gmail.com>
-Message-ID: <CA+sq2CcUnfb4UHiQAEF+-A_3z8a5trNsAJUCf_0-VPkm9qgoAQ@mail.gmail.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Tue, 7 Mar 2017 21:03:55 +0800
+Subject: [PATCH 01/17] arm64: arch_timer: Add infrastructure for multiple
+ erratum detection methods
+In-Reply-To: <20170306112622.13853-2-marc.zyngier@arm.com>
+References: <20170306112622.13853-1-marc.zyngier@arm.com>
+ <20170306112622.13853-2-marc.zyngier@arm.com>
+Message-ID: <d0411c3c-d32b-89dd-8305-49d6f3810991@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> locks which are
->> being used for IOVA maintenance and while updating translation tables inside
->> ARM SMMUv2/v3 drivers.
+On 2017/3/6 19:26, Marc Zyngier wrote:
+> We're currently stuck with DT when it comes to handling errata, which
+> is pretty restrictive. In order to make things more flexible, let's
+> introduce an infrastructure that could support alternative discovery
+> methods. No change in functionnality.
+>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm64/include/asm/arch_timer.h  |  7 +++-
+>  drivers/clocksource/arm_arch_timer.c | 80 +++++++++++++++++++++++++++++++-----
+>  2 files changed, 75 insertions(+), 12 deletions(-)
+>
+> diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
+> index b4b34004a21e..1c92d52619a6 100644
+> --- a/arch/arm64/include/asm/arch_timer.h
+> +++ b/arch/arm64/include/asm/arch_timer.h
+> @@ -37,9 +37,14 @@ extern struct static_key_false arch_timer_read_ool_enabled;
+>  #define needs_unstable_timer_counter_workaround()  false
+>  #endif
+>
+> +enum arch_timer_erratum_match_type {
+> +	ate_match_dt,
+> +};
+>
+>  struct arch_timer_erratum_workaround {
+> -	const char *id;		/* Indicate the Erratum ID */
+> +	enum arch_timer_erratum_match_type match_type;
+> +	const void *id;		/* Indicate the Erratum ID */
+> +	const char *desc_str;
+>  	u32 (*read_cntp_tval_el0)(void);
+>  	u32 (*read_cntv_tval_el0)(void);
+>  	u64 (*read_cntvct_el0)(void);
+> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+> index 7a8a4117f123..36980cdd5c0a 100644
+> --- a/drivers/clocksource/arm_arch_timer.c
+> +++ b/drivers/clocksource/arm_arch_timer.c
+> @@ -182,7 +182,9 @@ EXPORT_SYMBOL_GPL(arch_timer_read_ool_enabled);
+>  static const struct arch_timer_erratum_workaround ool_workarounds[] = {
+>  #ifdef CONFIG_FSL_ERRATUM_A008585
+>  	{
+> +		.match_type = ate_match_dt,
+>  		.id = "fsl,erratum-a008585",
+> +		.desc_str = "Freescale erratum a005858",
+>  		.read_cntp_tval_el0 = fsl_a008585_read_cntp_tval_el0,
+>  		.read_cntv_tval_el0 = fsl_a008585_read_cntv_tval_el0,
+>  		.read_cntvct_el0 = fsl_a008585_read_cntvct_el0,
+> @@ -190,13 +192,78 @@ static const struct arch_timer_erratum_workaround ool_workarounds[] = {
+>  #endif
+>  #ifdef CONFIG_HISILICON_ERRATUM_161010101
+>  	{
+> +		.match_type = ate_match_dt,
+>  		.id = "hisilicon,erratum-161010101",
+> +		.desc_str = "HiSilicon erratum 161010101",
+>  		.read_cntp_tval_el0 = hisi_161010101_read_cntp_tval_el0,
+>  		.read_cntv_tval_el0 = hisi_161010101_read_cntv_tval_el0,
+>  		.read_cntvct_el0 = hisi_161010101_read_cntvct_el0,
+>  	},
+>  #endif
+>  };
+> +
+> +typedef bool (*ate_match_fn_t)(const struct arch_timer_erratum_workaround *,
+> +			       const void *);
+> +
+> +static
+> +bool arch_timer_check_dt_erratum(const struct arch_timer_erratum_workaround *wa,
+> +				 const void *arg)
+> +{
+> +	const struct device_node *np = arg;
+> +
+> +	return of_property_read_bool(np, wa->id);
+> +}
+> +
+> +static const struct arch_timer_erratum_workaround *
+> +arch_timer_iterate_errata(enum arch_timer_erratum_match_type type,
+> +			  ate_match_fn_t match_fn,
+> +			  void *arg)
+> +{
+> +	int i;
+> +
+> +	for (i = 0; i < ARRAY_SIZE(ool_workarounds); i++) {
+> +		if (ool_workarounds[i].match_type != type)
+> +			continue;
+> +
+> +		if (match_fn(&ool_workarounds[i], arg))
+> +			return &ool_workarounds[i];
+> +	}
+> +
+> +	return NULL;
+> +}
+> +
+> +static
+> +void arch_timer_enable_workaround(const struct arch_timer_erratum_workaround *wa)
+> +{
+> +	timer_unstable_counter_workaround = wa;
+> +	static_branch_enable(&arch_timer_read_ool_enabled);
+> +}
+> +
+> +static void arch_timer_check_ool_workaround(enum arch_timer_erratum_match_type type,
+> +					    void *arg)
+> +{
+> +	const struct arch_timer_erratum_workaround *wa;
+> +	ate_match_fn_t match_fn = NULL;
+> +
+> +	if (static_branch_unlikely(&arch_timer_read_ool_enabled))
+> +		return;
+> +
+> +	switch (type) {
+> +	case ate_match_dt:
+> +		match_fn = arch_timer_check_dt_erratum;
+> +		break;
+> +	}
+> +
+> +	wa = arch_timer_iterate_errata(type, match_fn, arg);
+> +	if (!wa)
+> +		return;
+> +
+> +	arch_timer_enable_workaround(wa);
+> +	pr_info("Enabling global workaround for %s\n", wa->desc_str);
+> +}
+> +
+> +#else
+> +#define arch_timer_check_ool_workaround(t,a)		do { } while(0)
+>  #endif /* CONFIG_ARM_ARCH_TIMER_OOL_WORKAROUND */
+>
+>  static __always_inline
+> @@ -960,17 +1027,8 @@ static int __init arch_timer_of_init(struct device_node *np)
+>
+>  	arch_timer_c3stop = !of_property_read_bool(np, "always-on");
+>
+> -#ifdef CONFIG_ARM_ARCH_TIMER_OOL_WORKAROUND
+> -	for (i = 0; i < ARRAY_SIZE(ool_workarounds); i++) {
+> -		if (of_property_read_bool(np, ool_workarounds[i].id)) {
+> -			timer_unstable_counter_workaround = &ool_workarounds[i];
+> -			static_branch_enable(&arch_timer_read_ool_enabled);
+> -			pr_info("arch_timer: Enabling workaround for %s\n",
+> -				timer_unstable_counter_workaround->id);
+> -			break;
+> -		}
+> -	}
+> -#endif
+> +	/* Check for globally applicable workarounds */
+> +	arch_timer_check_ool_workaround(ate_match_dt, np);
+>
+>  	/*
+>  	 * If we cannot rely on firmware initializing the timer registers then
+>
 
->Yes, we're well aware that there's a whole load of potential lock
->contention where there doesn't really need to be. The performance
->optimisation effort has mostly been waiting for sufficiently big
->systems/workloads to start appearing in order to measure and justify it.
->Consider yourself the winner :)
+It's cool to me,
 
->> Intel and AMD IOMMU drivers does make use of per-cpu IOVA caches to
->> reduce the impact of 'iova_rbtree_lock' but ARM is yet to catchup.
->> http://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/commit/drivers/iommu/iova.c?id=9257b4a206fc0229dd5f84b78e4d1ebf3f91d270
->>
->> And the other lock is 'pgtbl_lock' used in ARM SMMUv2/V3 drivers.
+Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
 
->Do you have any measurements to show how the contention on those two
->locks compares? That would be useful to start with.
-
-Sure, I will capture a fresh and send you the perf data tomorrow.
-
-Thanks,
-Sunil.
+Thanks
+Hanjun
