@@ -1,37 +1,91 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue, 7 Mar 2017 22:17:46 +0200
-Subject: [PATCH v10 3/3] arm64: dts: exynos: Add support for S6E3HA2
- panel device on TM2 board
-In-Reply-To: <5be15c1c-ba4c-94d9-30be-8d161e9be7b3@samsung.com>
-References: <1487574582-15746-1-git-send-email-hoegeun.kwon@samsung.com>
- <CGME20170220071001epcas1p3c2b32665942ba55c3ed4e06d2c66d661@epcas1p3.samsung.com>
- <5be15c1c-ba4c-94d9-30be-8d161e9be7b3@samsung.com>
-Message-ID: <20170307201746.brpn4h2atvueg3l5@kozik-lap>
+From: tbaicar@codeaurora.org (Baicar, Tyler)
+Date: Tue, 7 Mar 2017 13:28:01 -0700
+Subject: [PATCH V2] arm64: hwpoison: add VM_FAULT_HWPOISON[_LARGE] handling
+In-Reply-To: <874lz4oo80.fsf@e105922-lin.cambridge.arm.com>
+References: <1487720205-14594-1-git-send-email-tbaicar@codeaurora.org>
+ <87wpc7o7mo.fsf@e105922-lin.cambridge.arm.com>
+ <874lz4oo80.fsf@e105922-lin.cambridge.arm.com>
+Message-ID: <fae5fa32-687b-4ebd-2d0c-b9df5837ba89@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 22, 2017 at 10:09:54AM +0900, Hoegeun Kwon wrote:
-> From: Hyungwon Hwang <human.hwang@samsung.com>
-> 
-> This patch add the panel device tree node for S6E3HA2 display
-> controller to TM2 dts.
-> 
-> Signed-off-by: Hyungwon Hwang <human.hwang@samsung.com>
-> Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
-> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-> Signed-off-by: Hoegeun Kwon <hoegeun.kwon@samsung.com>
-> Tested-by: Chanwoo Choi <cw00.choi@samsung.com>
-> ---
->  arch/arm64/boot/dts/exynos/exynos5433-tm2.dts | 12 ++++++++++++
->  1 file changed, 12 insertions(+)
+On 3/7/2017 12:56 PM, Punit Agrawal wrote:
+> Punit Agrawal <punit.agrawal@arm.com> writes:
+>
+> [...]
+>
+>> The code looks good but I ran into some failures while running the
+>> hugepages hwpoison tests from mce-tests suite[0]. I get a bad pmd error
+>> in dmesg -
+>>
+>> [  344.165544] mm/pgtable-generic.c:33: bad pmd 000000083af00074.
+>>
+>> I suspect that this is due to the huge pte accessors not correctly
+>> dealing with poisoned entries (which are represented as swap entries).
+> I think I've got to the bottom of the issue - the problem is due to
+> huge_pte_at() returning NULL for poisoned pmd entries (which in turn is
+> due to pmd_present() not handling poisoned pmd entries correctly)
+>
+> The following is the call chain for the failure case.
+>
+> do_munmap
+>    unmap_region
+>      unmap_vmas
+>        unmap_single_vma
+>          __unmap_hugepage_range_final    # The test case uses hugepages
+>            __unmap_hugepage_range
+>              huge_pte_offset             # Returns NULL for a poisoned pmd
+>
+> Reverting 5bb1cc0ff9a6 ("arm64: Ensure pmd_present() returns false after
+> pmd_mknotpresent()") fixes the problem for me but I don't think that is
+> the right fix.
+>
+> While I work on a proper fix, it would be great if you can confirm that
+> reverting 5bb1cc0ff9a6 makes the problem go away at your end.
+Thanks Punit! I haven't got a chance to do this yet, but I will let you 
+know once I get it tested :)
+>
+>> I am investigating the failure but could you try running the tests at
+>> your end as well.
+>>
+>> To run the tests, I cloned the repository[0]. It test needs a simple fix
+>> at the end of this mail to run correctly. With that applied and running
+>> as root -
+>>
+>> # cd mce-test/cases/function/hwpoison
+>> # ./run_hugepage.sh
+>>
+>>
+>> [0] https://git.kernel.org/cgit/utils/cpu/mce/mce-test.git/
+>>
+>> --------->8--------------
+>> commit cb5c61f18dd86baf01b90404d4ecf51dd3d176c7
+>> Author: Punit Agrawal <punit.agrawal@arm.com>
+>> Date:   Thu Mar 2 18:24:40 2017 +0000
+>>
+>>      Use correct return type for getopt_long
+>>
+>>      getopt_long returns an int. Fix the return type to avoid issues when
+>>      checking for negative error codes on architectures with unsigned char,
+>>      e.g., arm.
+>>
+>>      Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+>>
+>> diff --git a/cases/function/hwpoison/thugetlb.c b/cases/function/hwpoison/thugetlb.c
+>> index 92dc7d2..fbcf426 100644
+>> --- a/cases/function/hwpoison/thugetlb.c
+>> +++ b/cases/function/hwpoison/thugetlb.c
+>> @@ -125,7 +125,7 @@ int main(int argc, char *argv[])
+>>          int forkflag = 0;
+>>          int privateflag = 0;
+>>          int cowflag = 0;
+>> -   char c;
+>> + int c;
+>>          pid_t pid = 0;
+>>          void *expected_addr = NULL;
+>>          struct sembuf sembuffer;
 
-I tried to apply but:
-fatal: corrupt patch at line 37
-Patch failed at 0001 arm64: dts: exynos: Add support for S6E3HA2 panel
-device on TM2 board
-
-Please fix, rebase, add blank link as suggested by Javier and send a
-v11.
-
-Best regards,
-Krzysztof
+-- 
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
