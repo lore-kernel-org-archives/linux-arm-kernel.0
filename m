@@ -1,58 +1,44 @@
-From: julian.calaby@gmail.com (Julian Calaby)
-Date: Tue, 7 Mar 2017 21:21:19 +1100
-Subject: [linux-sunxi] [PATCH 5/15] clk: sunxi-ng: sun5i: Export video PLLs
-In-Reply-To: <4bb77a9793d4ba25bf633eff6abe41910bb7fc3c.1488876832.git-series.maxime.ripard@free-electrons.com>
-References: <cover.bc06ffa88f847ddd9ddd7c259415d5f61b55307b.1488876832.git-series.maxime.ripard@free-electrons.com>
- <4bb77a9793d4ba25bf633eff6abe41910bb7fc3c.1488876832.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <CAGRGNgUvNgQonORN0iTV-e2NJzUJpzQUnn13w+C7MwzvR8uZUQ@mail.gmail.com>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Tue, 7 Mar 2017 04:22:31 -0600
+Subject: [PATCH v4 2/5] PM / Domains: Do not check if simple providers have
+ phandle cells
+In-Reply-To: <1488882154-21485-1-git-send-email-d-gerlach@ti.com>
+References: <1488882154-21485-1-git-send-email-d-gerlach@ti.com>
+Message-ID: <1488882154-21485-3-git-send-email-d-gerlach@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+There is no reason that a platform genpd driver registered using
+of_genpd_add_provider_simple needs to be constrained to having no cells
+in the "power-domains" phandle. Currently the genpd framework will fail
+if any arguments are passed with for a simple provider but the framework
+does not actually care, so remove the check for phandle argument count.
 
-On Tue, Mar 7, 2017 at 7:56 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> The video PLLs are used directly by the HDMI controller. Export them so
-> that we can use them in our DT node.
->
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  drivers/clk/sunxi-ng/ccu-sun5i.h      | 6 ++++--
->  include/dt-bindings/clock/sun5i-ccu.h | 3 +++
->  2 files changed, 7 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/clk/sunxi-ng/ccu-sun5i.h b/drivers/clk/sunxi-ng/ccu-sun5i.h
-> index 8144487eb7ca..16f7aa92957e 100644
-> --- a/drivers/clk/sunxi-ng/ccu-sun5i.h
-> +++ b/drivers/clk/sunxi-ng/ccu-sun5i.h
-> @@ -28,15 +28,17 @@
->  #define CLK_PLL_AUDIO_4X       6
->  #define CLK_PLL_AUDIO_8X       7
->  #define CLK_PLL_VIDEO0         8
-> -#define CLK_PLL_VIDEO0_2X      9
-> +
-> +/* The PLL_VIDEO0_2X is exported for HDMI */
-> +
->  #define CLK_PLL_VE             10
->  #define CLK_PLL_DDR_BASE       11
->  #define CLK_PLL_DDR            12
->  #define CLK_PLL_DDR_OTHER      13
->  #define CLK_PLL_PERIPH         14
->  #define CLK_PLL_VIDEO1         15
-> -#define CLK_PLL_VIDEO1_2X      16
->
-> +/* The PLL_VIDEO0_2X is exported for HDMI */
+This will allow greater flexibility for genpd providers to use their own
+arguments that are passed in the phandle and interpret them however they
+see fit.
 
-PLL_VIDEO*1*_2X, right?
+Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+---
+v3->v4:
+ Drop ti,sci-id device property and instead describe using phandle cell
+ for id.
 
->  /* The CPU clock is exported */
->
->  #define CLK_AXI                        18
+ drivers/base/power/domain.c | 2 --
+ 1 file changed, 2 deletions(-)
 
-Thanks,
-
+diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+index e697dec9d25b..8e0550c27394 100644
+--- a/drivers/base/power/domain.c
++++ b/drivers/base/power/domain.c
+@@ -1622,8 +1622,6 @@ static struct generic_pm_domain *genpd_xlate_simple(
+ 					struct of_phandle_args *genpdspec,
+ 					void *data)
+ {
+-	if (genpdspec->args_count != 0)
+-		return ERR_PTR(-EINVAL);
+ 	return data;
+ }
+ 
 -- 
-Julian Calaby
-
-Email: julian.calaby at gmail.com
-Profile: http://www.google.com/profiles/julian.calaby/
+2.11.0
