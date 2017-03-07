@@ -1,22 +1,34 @@
 From: fcooper@ti.com (Franklin S Cooper Jr)
-Date: Tue, 7 Mar 2017 15:57:49 -0600
-Subject: [PATCH 0/2] ARM: dts: am335x-icev2: Add support for W25Q64 NOR flash
-Message-ID: <20170307215751.29266-1-fcooper@ti.com>
+Date: Tue, 7 Mar 2017 15:57:50 -0600
+Subject: [PATCH 1/2] doc: dt: mtd: add w25q64 to list of supported SPI flashes
+In-Reply-To: <20170307215751.29266-1-fcooper@ti.com>
+References: <20170307215751.29266-1-fcooper@ti.com>
+Message-ID: <20170307215751.29266-2-fcooper@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch set adds support for the on board SPI NOR flash on TI's AM335x
-Industrial Communication Engine rev 2.x board.
+From: Sekhar Nori <nsekhar@ti.com>
 
-Franklin S Cooper Jr (1):
-  ARM: dts: am335x-icev2: Add SPI based NOR
+W25Q64 is found on TI's AM335x ICEv2 board. Add it to list
+for supported SPI flash devices. This flash can be identified
+using JEDEC READ ID opcode.
 
-Sekhar Nori (1):
-  doc: dt: mtd: add w25q64 to list of supported SPI flashes
+Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+---
+ Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
- .../devicetree/bindings/mtd/jedec,spi-nor.txt      |  1 +
- arch/arm/boot/dts/am335x-icev2.dts                 | 33 ++++++++++++++++++++++
- 2 files changed, 34 insertions(+)
-
+diff --git a/Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt b/Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt
+index 3e920ec..9ce35af 100644
+--- a/Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt
++++ b/Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt
+@@ -40,6 +40,7 @@ Required properties:
+                  w25x80
+                  w25x32
+                  w25q32
++                 w25q64
+                  w25q32dw
+                  w25q80bl
+                  w25q128
 -- 
 2.10.0
