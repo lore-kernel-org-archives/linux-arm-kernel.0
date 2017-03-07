@@ -1,31 +1,73 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 8 Mar 2017 00:16:38 +0200
-Subject: [PATCH 02/15] clk: ti: add support for automatic clock alias
- generation
-In-Reply-To: <20170307144823.GF10239@codeaurora.org>
-References: <1486978511-29668-1-git-send-email-t-kristo@ti.com>
- <1486978511-29668-3-git-send-email-t-kristo@ti.com>
- <20170307144823.GF10239@codeaurora.org>
-Message-ID: <63a69af9-38b2-6633-5ed6-35cc2fd3c91c@ti.com>
+From: slash.tmp@free.fr (Mason)
+Date: Tue, 7 Mar 2017 23:45:27 +0100
+Subject: Neophyte questions about PCIe
+Message-ID: <ced6a4bf-c94a-c116-1e94-52a8d675d132@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/03/17 16:48, Stephen Boyd wrote:
-> On 02/13, Tero Kristo wrote:
->> diff --git a/drivers/clk/ti/clock.h b/drivers/clk/ti/clock.h
->> index 13c37f4..ac95fda 100644
->> --- a/drivers/clk/ti/clock.h
->> +++ b/drivers/clk/ti/clock.h
->> @@ -16,6 +16,8 @@
->>  #ifndef __DRIVERS_CLK_TI_CLOCK__
->>  #define __DRIVERS_CLK_TI_CLOCK__
->>
->> +#include <linux/clkdev.h>
->
-> What is this include for? Shouldn't this be in whatever C file is
-> using clkdev?
+Hello,
 
-Good question. This seems to be a leftover from some evolution of this 
-patch, it is totally unneeded for anything. Will drop from v2.
+I've been working with the Linux PCIe framework for a few weeks,
+and there are still a few things that remain unclear to me.
+I thought I'd group them in a single message.
 
--Tero
+1) If I understand correctly, PCI defines 3 types of (address?) "spaces"
+	- configuration
+	- memory
+	- I/O
+
+I think PCI has its roots in x86, where there are separate
+instructions for I/O accesses and memory accesses (with MMIO
+sitting somewhere in the middle). I'm on ARMv7 which doesn't
+have I/O instructions AFAIK. I'm not sure what the I/O address
+space is used for in PCIe, especially since I was told that
+one may map I/O-type registers (in my understanding, registers
+for which accesses cause side effects) within mem space.
+
+
+2) On my platform, there are two revisions of the PCIe controller.
+Rev1 muxes config and mem inside a 256 MB window, and doesn't support
+I/O space.
+Rev2 muxes all 3 spaces inside a 256 MB window.
+
+Ard has stated that this model is not supported by Linux.
+AFAIU, the reason is that accesses may occur concurrently
+(especially on SMP systems). Thus tweaking a bit before
+the actual access necessarily creates a race condition.
+
+I wondered if there might be (reasonable) software
+work-arounds, in your experience?
+
+
+3) What happens if a device requires more than 256 MB of
+mem space? (Is that common? What kind of device? GPUs?)
+Our controller supports a remapping "facility" to add an
+offset to the bus address. Is such a feature supported
+by Linux at all?  The problem is that this creates
+another race condition, as setting the offset register
+before an access may occur concurrently on two cores.
+Perhaps 256 MB is plenty on a 32-bit embedded device?
+
+
+4) The HW dev is considering the following fix.
+Instead of muxing the address spaces, provide smaller
+exclusive spaces. For example
+[0x5000_0000, 0x5400_0000] for config (64MB)
+[0x5400_0000, 0x5800_0000] for I/O (64MB)
+[0x5800_0000, 0x6000_0000] for mem (128MB)
+
+That way, bits 26:27 implicitly select the address space
+	00 = config
+	01 = I/O
+	1x = mem
+
+This would be more in line with what Linux expects, right?
+Are these sizes acceptable? 64 MB config is probably overkill
+(we'll never have 64 devices on this board). 64 MB for I/O
+is probably plenty. The issue might be mem space?
+
+
+Thanks to anyone who can shine some light on either of
+these points for me :-)
+
+Regards.
