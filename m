@@ -1,54 +1,44 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 07 Mar 2017 17:27:36 +0100
-Subject: [PATCH] ARM: dts: armada-38x: Adjust mbus controller description
- on Armada 38x
-In-Reply-To: <20170216163826.28071-1-gregory.clement@free-electrons.com>
- (Gregory CLEMENT's message of "Thu, 16 Feb 2017 17:38:26 +0100")
-References: <20170216163826.28071-1-gregory.clement@free-electrons.com>
-Message-ID: <87k281oxvr.fsf@free-electrons.com>
+From: tbaicar@codeaurora.org (Baicar, Tyler)
+Date: Tue, 7 Mar 2017 09:37:38 -0700
+Subject: [PATCH V12 00/10] Add UEFI 2.6 and ACPI 6.1 updates for RAS on
+ ARM64
+In-Reply-To: <58BE9B6B.3020000@arm.com>
+References: <1488833103-21082-1-git-send-email-tbaicar@codeaurora.org>
+ <58BE9B6B.3020000@arm.com>
+Message-ID: <0908a4cc-bb6b-341b-0bde-ccb820d17385@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
- 
- On jeu., f?vr. 16 2017, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
-
-> The mbus binding had been extended more than two years ago, but the
-> device tree files for Armada 38x didn't change.
+On 3/7/2017 4:37 AM, James Morse wrote:
+> Hi Tyler,
 >
-> Adding this third entry will allow the mbus going to suspend which was
-> the last thing preventing the SoC going to standby mode
+> On 06/03/17 20:44, Tyler Baicar wrote:
+>> When a memory error, CPU error, PCIe error, or other type of hardware error
+>> that's covered by RAS occurs, firmware should populate the shared GHES memory
+>> location with the proper GHES structures to notify the OS of the error.
+>> For example, platforms that implement firmware first handling may implement
+>> separate GHES sources for corrected errors and uncorrected errors. If the
+>> error is an uncorrectable error, then the firmware will notify the OS
+>> immediately since the error needs to be handled ASAP. The OS will then be able
+>> to take the appropriate action needed such as offlining a page. If the error
+>> is a corrected error, then the firmware will not interrupt the OS immediately.
+>> Instead, the OS will see and report the error the next time it's GHES timer
+>> expires. The kernel will first parse the GHES structures and report the errors
+>> through the kernel logs and then notify the user space through RAS trace
+>> events. This allows user space applications such as RAS Daemon to see the
+>> errors and report them however the user desires. This patchset extends the
+>> kernel functionality for RAS errors based on updates in the UEFI 2.6 and
+>> ACPI 6.1 specifications.
+> This series doesn't apply cleanly to v4.11-rc1, what did you base it on?
 >
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-
-Now applied on mvebu/dt
-
-Gregory
-
-> ---
->  arch/arm/boot/dts/armada-38x.dtsi | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
+> Please base this on a v4.11 release candidate if you want it considered for v4.12.
 >
-> diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
-> index c558a5d6a21f..ba27ec104981 100644
-> --- a/arch/arm/boot/dts/armada-38x.dtsi
-> +++ b/arch/arm/boot/dts/armada-38x.dtsi
-> @@ -360,7 +360,8 @@
->  
->  			mbusc: mbus-controller at 20000 {
->  				compatible = "marvell,mbus-controller";
-> -				reg = <0x20000 0x100>, <0x20180 0x20>;
-> +				reg = <0x20000 0x100>, <0x20180 0x20>,
-> +				      <0x20250 0x8>;
->  			};
->  
->  			mpic: interrupt-controller at 20a00 {
-> -- 
-> 2.11.0
->
+This was based on 4.10, I will base it on 4.11-rc1 for the next patch set.
+
+Thanks,
+Tyler
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
