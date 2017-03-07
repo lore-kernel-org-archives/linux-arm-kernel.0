@@ -1,97 +1,151 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Tue, 07 Mar 2017 08:24:53 +0800
-Subject: [linux-sunxi] [PATCH v3 0/5] Add dual-role OTG support for
- Allwinner H3
-In-Reply-To: <e110a2c0-ee91-b6eb-9e94-e32034aae4d7@megous.com>
-References: <20170306223449.21404-1-icenowy@aosc.xyz>
- <e110a2c0-ee91-b6eb-9e94-e32034aae4d7@megous.com>
-Message-ID: <974021488846293@web19o.yandex.ru>
+From: petr.cvek@tul.cz (Petr Cvek)
+Date: Tue, 7 Mar 2017 02:17:55 +0100
+Subject: [PATCH] ARM: pxa: magician: Add support for ADS7846 touchscreen
+Message-ID: <b2805fd9-f208-ab60-a58f-eccc15dceebd@tul.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch adds support for ADS7846 touchscreen driver.
 
+The basic functionality was tested, x_plate_ohms and y_plate_ohms were
+physically measured. The value pressure_max was empirically set to match
+the measured range, which is affected by x_plate_ohms and ADS samples.
 
-07.03.2017, 07:48, "Ond?ej Jirman" <megous@megous.com>:
-> Hi Icenowy,
->
-> when I was trying to add OTG support I found an issue with powercycling.
-> When I have USB cable connecting PC and the OTG port on the SBC, when
-> the board enables the vbus, it would become impossible to power cycle
-> the board after poweroff. The reason being that when vbus is enabled,
-> the board is powered from the OTG port even if you disconnect the barrel
-> plug.
->
-> Should kernel turn off the vbus before shutting down/restarting? What do
-> you think?
+Signed-off-by: Petr Cvek <petr.cvek@tul.cz>
+---
+ arch/arm/mach-pxa/magician.c | 85 +++++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 84 insertions(+), 1 deletion(-)
 
-It's a good problem.
-
-I think this problem can be abstracted into:
-Some regulators are needed to be shut down before system 
-shutdown.
-
-Is there any framework for it?
-
-Mark,
-I add you to recipients for the question above.
-
-Thanks,
-Icenowy
-
->
-> regards,
-> ??o.
->
-> Dne 6.3.2017 v 23:34 Icenowy Zheng napsal(a):
->> ?Allwinner H3 have a its USB PHY0 routed to two USB controllers: one is
->> ?a MUSB controller, which can work in peripheral mode, but works badly in
->> ?host mode (several hardware will fail on the MUSB controller, even connect
->> ?one MUSB controller in peripheral mode to another one in host mode cannot
->> ?work); the other is a pair of EHCI/OHCI controller, which can work only
->> ?in host mode, but have better compatibillity. The route is controlled in
->> ?a register, which we have set it to HCI only when we do not know about
->> ?it well.
->>
->> ?Add support to route to the best controller according to current USB mode
->> ?(host/peripheral).
->>
->> ?Note: Currently even if hardware only support hostmode, we should still
->> ?enable the MUSB controller, as it controls the USB mode. (Some this kind
->> ?of hardware can also work in peripheral mode by settings in the sysfs
->> ?node of MUSB, then connect it to another host via a USB Type-A to Type-A
->> ?cable.)
->>
->> ?Patch 1 changes the device tree binding to include the "pmu0" for HCI pair.
->>
->> ?Patch 2 adds support for auto routing of PHY0. It's currently only enabled
->> ?on H3, but it's easy to extend it to other SoCs which feature this
->> ?route control.
->>
->> ?Patch 3 adds necessary device tree nodes to the H3 DTSI file. Note: The
->> ?phy is not bind for OHCI/EHCI0, as OHCI/EHCI drivers will keep the VBUS
->> ?on. Only MUSB driver can properly handle a dual-role PHY.
->>
->> ?Patch 4 enables USB OTG functionality on Orange Pi One board, which is
->> ?the only H3 board I have that have proper OTG function. It's easy to
->> ?enable OTG on other boards with their schematics.
->>
->> ?Patch 5 enables USB OTG functionality on Orange Pi Zero board, as the
->> ?board cannot output power on Vbus, I only enabled peripheral mode by
->> ?default.
->>
->> ?The USB PHY on V3s/A64 SoCs also feature this capability, and it will
->> ?be soon enabled on these SoCs after this patchset is merged.
->>
->> ?Icenowy Zheng (5):
->> ???dt: bindings: add pmu0 regs for USB PHYs on Allwinner H3/V3s/A64
->> ???phy: sun4i-usb: support automatically switch PHY0 route to MUSB/HCI
->> ???ARM: dts: sun8i: h3: add usb_otg and OHCI/EHCI for usbc0 on H3
->> ???ARM: dts: sun8i: h3: enable USB OTG on Orange Pi One
->> ???ARM: dts: sun8i: h2+: enable USB OTG for Orange Pi Zero board
->>
->> ??.../devicetree/bindings/phy/sun4i-usb-phy.txt | 1 +
->> ??arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts | 14 ++++++
->> ??arch/arm/boot/dts/sun8i-h3-orangepi-one.dts | 22 +++++++++-
->> ??arch/arm/boot/dts/sun8i-h3.dtsi | 32 ++++++++++++++
->> ??drivers/phy/phy-sun4i-usb.c | 50 ++++++++++++++--------
->> ??5 files changed, 101 insertions(+), 18 deletions(-)
+diff --git a/arch/arm/mach-pxa/magician.c b/arch/arm/mach-pxa/magician.c
+index b413e36506af..a42eaeab382f 100644
+--- a/arch/arm/mach-pxa/magician.c
++++ b/arch/arm/mach-pxa/magician.c
+@@ -54,6 +54,11 @@
+ #include "devices.h"
+ #include "generic.h"
+ 
++#include <linux/regulator/fixed.h>
++#include <linux/spi/spi.h>
++#include <linux/spi/pxa2xx_spi.h>
++#include <linux/spi/ads7846.h>
++
+ static unsigned long magician_pin_config[] __initdata = {
+ 
+ 	/* SDRAM and Static Memory I/O Signals */
+@@ -85,7 +90,7 @@ static unsigned long magician_pin_config[] __initdata = {
+ 
+ 	/* SSP 2 TSC2046 touchscreen */
+ 	GPIO19_SSP2_SCLK,
+-	GPIO14_SSP2_SFRM,
++	MFP_CFG_OUT(GPIO14, AF0, DRIVE_HIGH),	/* frame as GPIO */
+ 	GPIO89_SSP2_TXD,
+ 	GPIO88_SSP2_RXD,
+ 
+@@ -675,6 +680,37 @@ static struct platform_device bq24022 = {
+ };
+ 
+ /*
++ * fixed regulator for ads7846
++ */
++
++static struct regulator_consumer_supply ads7846_supply =
++	REGULATOR_SUPPLY("vcc", "spi2.0");
++
++static struct regulator_init_data vads7846_regulator = {
++	.constraints	= {
++		.valid_ops_mask	= REGULATOR_CHANGE_STATUS,
++	},
++	.num_consumer_supplies	= 1,
++	.consumer_supplies	= &ads7846_supply,
++};
++
++static struct fixed_voltage_config vads7846 = {
++	.supply_name	= "vads7846",
++	.microvolts	= 3300000, /* probably */
++	.gpio	= -EINVAL,
++	.startup_delay	= 0,
++	.init_data	= &vads7846_regulator,
++};
++
++static struct platform_device vads7846_device = {
++	.name	= "reg-fixed-voltage",
++	.id	= 1,
++	.dev	= {
++		.platform_data	= &vads7846,
++	},
++};
++
++/*
+  * Vcore regulator MAX1587A
+  */
+ 
+@@ -852,6 +888,49 @@ static struct i2c_pxa_platform_data magician_i2c_power_info = {
+ };
+ 
+ /*
++ * Touchscreen
++ */
++
++static struct ads7846_platform_data ads7846_pdata = {
++	.model		= 7846,
++	.x_plate_ohms	= 317,
++	.y_plate_ohms	= 500,
++	.pressure_max	= 1023,	/* with x plate ohms it will overflow 255 */
++	.debounce_max	= 3,	/* first readout is always bad */
++	.debounce_tol	= 30,
++	.debounce_rep	= 0,
++	.gpio_pendown	= GPIO115_MAGICIAN_nPEN_IRQ,
++	.keep_vref_on	= 1,	/* TODO can be off? */
++	.wakeup		= true,
++	.vref_delay_usecs		= 100,
++	.penirq_recheck_delay_usecs	= 100,
++};
++
++struct pxa2xx_spi_chip tsc2046_chip_info = {
++	.tx_threshold	= 1,
++	.rx_threshold	= 2,
++	.timeout	= 64,
++	/* NOTICE must be GPIO, incompatibility with hw PXA SPI framing */
++	.gpio_cs	= 14,
++};
++
++static struct pxa2xx_spi_master magician_spi_info = {
++	.num_chipselect	= 1,
++	.enable_dma	= 1,
++};
++
++static struct spi_board_info ads7846_spi_board_info[] __initdata = {
++	{
++		.modalias		= "ads7846",
++		.bus_num		= 2,
++		.max_speed_hz		= 2500000,
++		.platform_data		= &ads7846_pdata,
++		.controller_data	= &tsc2046_chip_info,
++		.irq = PXA_GPIO_TO_IRQ(GPIO115_MAGICIAN_nPEN_IRQ),
++	},
++};
++
++/*
+  * Platform devices
+  */
+ 
+@@ -865,6 +944,7 @@ static struct platform_device *devices[] __initdata = {
+ 	&power_supply,
+ 	&strataflash,
+ 	&leds_gpio,
++	&vads7846_device,
+ };
+ 
+ static struct gpio magician_global_gpios[] = {
+@@ -922,6 +1002,9 @@ static void __init magician_init(void)
+ 	} else
+ 		pr_err("LCD detection: CPLD mapping failed\n");
+ 
++	pxa2xx_set_spi_info(2, &magician_spi_info);
++	spi_register_board_info(ARRAY_AND_SIZE(ads7846_spi_board_info));
++
+ 	regulator_register_always_on(0, "power", pwm_backlight_supply,
+ 		ARRAY_SIZE(pwm_backlight_supply), 5000000);
+ 
+-- 
+2.11.0
