@@ -1,32 +1,62 @@
-From: zhangqing@rock-chips.com (Elaine Zhang)
-Date: Tue,  7 Mar 2017 19:16:48 +0800
-Subject: [PATCH v2 5/5] clk: rockchip: rk3368: add some clks as critical
-In-Reply-To: <1488884719-10350-1-git-send-email-zhangqing@rock-chips.com>
-References: <1488884719-10350-1-git-send-email-zhangqing@rock-chips.com>
-Message-ID: <1488885408-17169-1-git-send-email-zhangqing@rock-chips.com>
+From: Joao.Pinto@synopsys.com (Joao Pinto)
+Date: Tue, 7 Mar 2017 11:18:35 +0000
+Subject: [PATCH v2 5/7] PCI: dwc: all: Modify dbi accessors to access data
+ of 4/2/1 bytes
+In-Reply-To: <1488880372-7390-6-git-send-email-kishon@ti.com>
+References: <1488880372-7390-1-git-send-email-kishon@ti.com>
+ <1488880372-7390-6-git-send-email-kishon@ti.com>
+Message-ID: <090d9947-8003-4608-5e3a-92f62f90eda6@synopsys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-make pclk_pd_alive, pclk_peri, hclk_peri as critical
+?s 9:52 AM de 3/7/2017, Kishon Vijay Abraham I escreveu:
+> Previously dbi accessors can be used to access data of size 4
+> bytes. But there might be situations (like accessing
+> MSI_MESSAGE_CONTROL in order to set/get the number of required
+> MSI interrupts in EP mode) where dbi accessors must
+> be used to access data of size 2. This is in preparation for
+> adding endpoint mode support to designware driver.
+> 
+> Cc: Jingoo Han <jingoohan1@gmail.com>
+> Cc: Richard Zhu <hongxing.zhu@nxp.com>
+> Cc: Lucas Stach <l.stach@pengutronix.de>
+> Cc: Murali Karicheri <m-karicheri2@ti.com>
+> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Cc: Niklas Cassel <niklas.cassel@axis.com>
+> Cc: Jesper Nilsson <jesper.nilsson@axis.com>
+> Cc: Joao Pinto <Joao.Pinto@synopsys.com>
+> Cc: Zhou Wang <wangzhou1@hisilicon.com>
+> Cc: Gabriele Paoloni <gabriele.paoloni@huawei.com>
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> ---
+>  drivers/pci/dwc/Kconfig                |   18 ++++----
+>  drivers/pci/dwc/pci-dra7xx.c           |    8 ++--
+>  drivers/pci/dwc/pci-exynos.c           |   16 +++----
+>  drivers/pci/dwc/pci-imx6.c             |   54 +++++++++++-----------
+>  drivers/pci/dwc/pci-keystone-dw.c      |   13 +++---
+>  drivers/pci/dwc/pcie-armada8k.c        |   38 ++++++++--------
+>  drivers/pci/dwc/pcie-artpec6.c         |    6 +--
+>  drivers/pci/dwc/pcie-designware-host.c |   18 ++++----
+>  drivers/pci/dwc/pcie-designware.c      |   77 +++++++++++++++++++-------------
+>  drivers/pci/dwc/pcie-designware.h      |   14 +++---
+>  drivers/pci/dwc/pcie-hisi.c            |   14 +++---
+>  11 files changed, 147 insertions(+), 129 deletions(-)
+> 
+> diff --git a/drivers/pci/dwc/Kconfig b/drivers/pci/dwc/Kconfig
+> index dfb8a69..cb3d5d0 100644
+> --- a/drivers/pci/dwc/Kconfig
+> +++ b/drivers/pci/dwc/Kconfig
+> @@ -36,7 +36,7 @@ config PCIE_DW_PLAT
+>  config PCI_EXYNOS
+>  	bool "Samsung Exynos PCIe controller"
+>  	depends on PCI
+> -	depends on SOC_EXYNOS5440
+> +	depends on SOC_EXYNOS5440 || COMPILE_TEST
 
-Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
----
- drivers/clk/rockchip/clk-rk3368.c | 3 +++
- 1 file changed, 3 insertions(+)
+Kishon, I have the idea that Bjorn suggested some time ago not to use
+COMPILE_TEST, because there were some problems in some drivers that needed
+specific arch stuff.
 
-diff --git a/drivers/clk/rockchip/clk-rk3368.c b/drivers/clk/rockchip/clk-rk3368.c
-index 139d418f448e..024762d3214d 100644
---- a/drivers/clk/rockchip/clk-rk3368.c
-+++ b/drivers/clk/rockchip/clk-rk3368.c
-@@ -858,6 +858,9 @@ enum rk3368_plls {
- 	 */
- 	"pclk_pwm1",
- 	"pclk_pd_pmu",
-+	"pclk_pd_alive",
-+	"pclk_peri",
-+	"hclk_peri",
- };
- 
- static void __init rk3368_clk_init(struct device_node *np)
--- 
-1.9.1
+Bjorn: Could you please confirm?
+
+Thanks.
