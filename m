@@ -1,94 +1,68 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue,  7 Mar 2017 16:53:12 +0100
-Subject: [PATCHv3 net-next 14/22] net: mvpp2: adjust mvpp2_{rxq,
- txq}_init for PPv2.2
+Date: Tue,  7 Mar 2017 16:53:06 +0100
+Subject: [PATCHv3 net-next 08/22] net: mvpp2: add hw_version field in "struct
+ mvpp2"
 In-Reply-To: <1488902000-2658-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1488902000-2658-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1488902000-2658-15-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1488902000-2658-9-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In PPv2.2, the MVPP2_RXQ_DESC_ADDR_REG and MVPP2_TXQ_DESC_ADDR_REG
-registers have a slightly different layout, because they need to contain
-a 64-bit address for the RX and TX descriptor arrays. This commit
-adjusts those functions accordingly.
+In preparation to the introduction for the support of PPv2.2 in the
+mvpp2 driver, this commit adds a hw_version field to the struct
+mvpp2, and uses the .data field of the DT match table to fill it in.
+
+Having the MVPP21 and MVPP22 definitions available will allow to start
+adding the necessary conditional code to support PPv2.2.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- drivers/net/ethernet/marvell/mvpp2.c | 26 +++++++++++++++++++++-----
- 1 file changed, 21 insertions(+), 5 deletions(-)
+ drivers/net/ethernet/marvell/mvpp2.c | 12 +++++++++++-
+ 1 file changed, 11 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/net/ethernet/marvell/mvpp2.c b/drivers/net/ethernet/marvell/mvpp2.c
-index da48d606..2eec380 100644
+index 2ee066b..27d8838 100644
 --- a/drivers/net/ethernet/marvell/mvpp2.c
 +++ b/drivers/net/ethernet/marvell/mvpp2.c
-@@ -102,6 +102,7 @@
- /* Descriptor Manager Top Registers */
- #define MVPP2_RXQ_NUM_REG			0x2040
- #define MVPP2_RXQ_DESC_ADDR_REG			0x2044
-+#define     MVPP22_DESC_ADDR_OFFS		8
- #define MVPP2_RXQ_DESC_SIZE_REG			0x2048
- #define     MVPP2_RXQ_DESC_SIZE_MASK		0x3ff0
- #define MVPP2_RXQ_STATUS_UPDATE_REG(rxq)	(0x3000 + 4 * (rxq))
-@@ -140,6 +141,7 @@
- #define MVPP2_TXQ_RSVD_CLR_REG			0x20b8
- #define     MVPP2_TXQ_RSVD_CLR_OFFSET		16
- #define MVPP2_AGGR_TXQ_DESC_ADDR_REG(cpu)	(0x2100 + 4 * (cpu))
-+#define     MVPP22_AGGR_TXQ_DESC_ADDR_OFFS	8
- #define MVPP2_AGGR_TXQ_DESC_SIZE_REG(cpu)	(0x2140 + 4 * (cpu))
- #define     MVPP2_AGGR_TXQ_DESC_SIZE_MASK	0x3ff0
- #define MVPP2_AGGR_TXQ_STATUS_REG(cpu)		(0x2180 + 4 * (cpu))
-@@ -4726,6 +4728,8 @@ static int mvpp2_aggr_txq_init(struct platform_device *pdev,
- 			       int desc_num, int cpu,
- 			       struct mvpp2 *priv)
- {
-+	u32 txq_dma;
+@@ -25,6 +25,7 @@
+ #include <linux/of_mdio.h>
+ #include <linux/of_net.h>
+ #include <linux/of_address.h>
++#include <linux/of_device.h>
+ #include <linux/phy.h>
+ #include <linux/clk.h>
+ #include <linux/hrtimer.h>
+@@ -643,6 +644,9 @@ struct mvpp2 {
+ 
+ 	/* Tclk value */
+ 	u32 tclk;
 +
- 	/* Allocate memory for TX descriptors */
- 	aggr_txq->descs = dma_alloc_coherent(&pdev->dev,
- 				desc_num * MVPP2_DESC_ALIGNED_SIZE,
-@@ -4739,10 +4743,16 @@ static int mvpp2_aggr_txq_init(struct platform_device *pdev,
- 	aggr_txq->next_desc_to_proc = mvpp2_read(priv,
- 						 MVPP2_AGGR_TXQ_INDEX_REG(cpu));
++	/* HW version */
++	enum { MVPP21, MVPP22 } hw_version;
+ };
  
--	/* Set Tx descriptors queue starting address */
--	/* indirect access */
--	mvpp2_write(priv, MVPP2_AGGR_TXQ_DESC_ADDR_REG(cpu),
--		    aggr_txq->descs_dma);
-+	/* Set Tx descriptors queue starting address indirect
-+	 * access
-+	 */
-+	if (priv->hw_version == MVPP21)
-+		txq_dma = aggr_txq->descs_dma;
-+	else
-+		txq_dma = aggr_txq->descs_dma >>
-+			MVPP22_AGGR_TXQ_DESC_ADDR_OFFS;
+ struct mvpp2_pcpu_stats {
+@@ -6429,6 +6433,9 @@ static int mvpp2_probe(struct platform_device *pdev)
+ 	if (!priv)
+ 		return -ENOMEM;
+ 
++	priv->hw_version =
++		(unsigned long)of_device_get_match_data(&pdev->dev);
 +
-+	mvpp2_write(priv, MVPP2_AGGR_TXQ_DESC_ADDR_REG(cpu), txq_dma);
- 	mvpp2_write(priv, MVPP2_AGGR_TXQ_DESC_SIZE_REG(cpu), desc_num);
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	priv->base = devm_ioremap_resource(&pdev->dev, res);
+ 	if (IS_ERR(priv->base))
+@@ -6533,7 +6540,10 @@ static int mvpp2_remove(struct platform_device *pdev)
+ }
  
- 	return 0;
-@@ -4753,6 +4763,8 @@ static int mvpp2_rxq_init(struct mvpp2_port *port,
- 			  struct mvpp2_rx_queue *rxq)
- 
- {
-+	u32 rxq_dma;
-+
- 	rxq->size = port->rx_ring_size;
- 
- 	/* Allocate memory for RX descriptors */
-@@ -4769,7 +4781,11 @@ static int mvpp2_rxq_init(struct mvpp2_port *port,
- 
- 	/* Set Rx descriptors queue starting address - indirect access */
- 	mvpp2_write(port->priv, MVPP2_RXQ_NUM_REG, rxq->id);
--	mvpp2_write(port->priv, MVPP2_RXQ_DESC_ADDR_REG, rxq->descs_dma);
-+	if (port->priv->hw_version == MVPP21)
-+		rxq_dma = rxq->descs_dma;
-+	else
-+		rxq_dma = rxq->descs_dma >> MVPP22_DESC_ADDR_OFFS;
-+	mvpp2_write(port->priv, MVPP2_RXQ_DESC_ADDR_REG, rxq_dma);
- 	mvpp2_write(port->priv, MVPP2_RXQ_DESC_SIZE_REG, rxq->size);
- 	mvpp2_write(port->priv, MVPP2_RXQ_INDEX_REG, 0);
- 
+ static const struct of_device_id mvpp2_match[] = {
+-	{ .compatible = "marvell,armada-375-pp2" },
++	{
++		.compatible = "marvell,armada-375-pp2",
++		.data = (void *)MVPP21,
++	},
+ 	{ }
+ };
+ MODULE_DEVICE_TABLE(of, mvpp2_match);
 -- 
 2.7.4
