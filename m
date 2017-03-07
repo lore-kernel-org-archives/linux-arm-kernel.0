@@ -1,91 +1,58 @@
-From: tbaicar@codeaurora.org (Baicar, Tyler)
-Date: Tue, 7 Mar 2017 13:28:01 -0700
-Subject: [PATCH V2] arm64: hwpoison: add VM_FAULT_HWPOISON[_LARGE] handling
-In-Reply-To: <874lz4oo80.fsf@e105922-lin.cambridge.arm.com>
-References: <1487720205-14594-1-git-send-email-tbaicar@codeaurora.org>
- <87wpc7o7mo.fsf@e105922-lin.cambridge.arm.com>
- <874lz4oo80.fsf@e105922-lin.cambridge.arm.com>
-Message-ID: <fae5fa32-687b-4ebd-2d0c-b9df5837ba89@codeaurora.org>
+From: linux.amoon@gmail.com (Anand Moon)
+Date: Wed,  8 Mar 2017 02:06:01 +0530
+Subject: [PATCH] ARM64: dts: meson-gxbb-odroidc2: enable USB Host Nodes
+Message-ID: <1488918961-4666-1-git-send-email-linux.amoon@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/7/2017 12:56 PM, Punit Agrawal wrote:
-> Punit Agrawal <punit.agrawal@arm.com> writes:
->
-> [...]
->
->> The code looks good but I ran into some failures while running the
->> hugepages hwpoison tests from mce-tests suite[0]. I get a bad pmd error
->> in dmesg -
->>
->> [  344.165544] mm/pgtable-generic.c:33: bad pmd 000000083af00074.
->>
->> I suspect that this is due to the huge pte accessors not correctly
->> dealing with poisoned entries (which are represented as swap entries).
-> I think I've got to the bottom of the issue - the problem is due to
-> huge_pte_at() returning NULL for poisoned pmd entries (which in turn is
-> due to pmd_present() not handling poisoned pmd entries correctly)
->
-> The following is the call chain for the failure case.
->
-> do_munmap
->    unmap_region
->      unmap_vmas
->        unmap_single_vma
->          __unmap_hugepage_range_final    # The test case uses hugepages
->            __unmap_hugepage_range
->              huge_pte_offset             # Returns NULL for a poisoned pmd
->
-> Reverting 5bb1cc0ff9a6 ("arm64: Ensure pmd_present() returns false after
-> pmd_mknotpresent()") fixes the problem for me but I don't think that is
-> the right fix.
->
-> While I work on a proper fix, it would be great if you can confirm that
-> reverting 5bb1cc0ff9a6 makes the problem go away at your end.
-Thanks Punit! I haven't got a chance to do this yet, but I will let you 
-know once I get it tested :)
->
->> I am investigating the failure but could you try running the tests at
->> your end as well.
->>
->> To run the tests, I cloned the repository[0]. It test needs a simple fix
->> at the end of this mail to run correctly. With that applied and running
->> as root -
->>
->> # cd mce-test/cases/function/hwpoison
->> # ./run_hugepage.sh
->>
->>
->> [0] https://git.kernel.org/cgit/utils/cpu/mce/mce-test.git/
->>
->> --------->8--------------
->> commit cb5c61f18dd86baf01b90404d4ecf51dd3d176c7
->> Author: Punit Agrawal <punit.agrawal@arm.com>
->> Date:   Thu Mar 2 18:24:40 2017 +0000
->>
->>      Use correct return type for getopt_long
->>
->>      getopt_long returns an int. Fix the return type to avoid issues when
->>      checking for negative error codes on architectures with unsigned char,
->>      e.g., arm.
->>
->>      Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
->>
->> diff --git a/cases/function/hwpoison/thugetlb.c b/cases/function/hwpoison/thugetlb.c
->> index 92dc7d2..fbcf426 100644
->> --- a/cases/function/hwpoison/thugetlb.c
->> +++ b/cases/function/hwpoison/thugetlb.c
->> @@ -125,7 +125,7 @@ int main(int argc, char *argv[])
->>          int forkflag = 0;
->>          int privateflag = 0;
->>          int cowflag = 0;
->> -   char c;
->> + int c;
->>          pid_t pid = 0;
->>          void *expected_addr = NULL;
->>          struct sembuf sembuffer;
+From: Anand Moon <linux.amoon@gmail.com>
 
+update the regulator supply nodes for usb host to
+enable usb host on odroid-c2
+
+Signed-off-by: Anand Moon <linux.amoon@gmail.com>
+---
+root at odroid64:/usr/src/odroidxu3-4.y-devel# lsusb -t
+/:  Bus 01.Port 1: Dev 1, Class=root_hub, Driver=dwc2/1p, 480M
+    |__ Port 1: Dev 2, If 0, Class=Hub, Driver=hub/4p, 480M
+        |__ Port 1: Dev 3, If 0, Class=Human Interface Device, Driver=usbhid, 1.5M
+        |__ Port 1: Dev 3, If 1, Class=Human Interface Device, Driver=usbhid, 1.5M
+        |__ Port 2: Dev 4, If 0, Class=Mass Storage, Driver=usb-storage, 480M
+        |__ Port 4: Dev 5, If 0, Class=Mass Storage, Driver=usb-storage, 480M
+---
+ arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
+index c59403a..304b676 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
+@@ -64,6 +64,18 @@
+ 		reg = <0x0 0x0 0x0 0x80000000>;
+ 	};
+ 
++	usb_host_pwr: regulator-usb-pwrs {
++		compatible = "regulator-fixed";
++
++		regulator-name = "USB_HOST_PWR";
++
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++
++		gpio = <&gpio_ao GPIOAO_4 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++	};
++
+ 	usb_otg_pwr: regulator-usb-pwrs {
+ 		compatible = "regulator-fixed";
+ 
+@@ -184,6 +196,7 @@
+ 
+ &usb1_phy {
+ 	status = "okay";
++	phy-supply = <&usb_host_pwr>;
+ };
+ 
+ &usb0 {
 -- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project.
+2.7.4
