@@ -1,74 +1,109 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Tue, 7 Mar 2017 20:42:00 +0000
-Subject: [PATCH 02/11] arm64: tegra: Add ethernet support for Tegra186
-In-Reply-To: <20170223173053.19701-2-thierry.reding@gmail.com>
-References: <20170223173053.19701-1-thierry.reding@gmail.com>
- <20170223173053.19701-2-thierry.reding@gmail.com>
-Message-ID: <076c74f2-d0ce-a567-74e9-dcc705c75795@nvidia.com>
+From: labbott@redhat.com (Laura Abbott)
+Date: Tue,  7 Mar 2017 12:55:17 -0800
+Subject: [PATCHv3 00/16] set_memory_* functions header refactor
+Message-ID: <1488920133-27229-1-git-send-email-labbott@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-On 23/02/17 17:30, Thierry Reding wrote:
-> From: Thierry Reding <treding@nvidia.com>
-> 
-> The NVIDIA Tegra186 SoC contains an instance of the Synopsys DWC
-> ethernet QOS IP block, which supports 10, 100 and 1000 Mbps data
-> transfer rates.
-> 
-> Signed-off-by: Thierry Reding <treding@nvidia.com>
-> ---
->  arch/arm64/boot/dts/nvidia/tegra186.dtsi | 31 +++++++++++++++++++++++++++++++
->  1 file changed, 31 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/nvidia/tegra186.dtsi b/arch/arm64/boot/dts/nvidia/tegra186.dtsi
-> index d6955bb46ae0..3ea5e6369bc3 100644
-> --- a/arch/arm64/boot/dts/nvidia/tegra186.dtsi
-> +++ b/arch/arm64/boot/dts/nvidia/tegra186.dtsi
-> @@ -27,6 +27,37 @@
->  		gpio-controller;
->  	};
->  
-> +	ethernet at 2490000 {
-> +		compatible = "nvidia,tegra186-eqos",
-> +			     "snps,dwc-qos-ethernet-4.10";
-> +		reg = <0x0 0x02490000 0x0 0x10000>;
-> +		interrupts = <GIC_SPI 194 IRQ_TYPE_LEVEL_HIGH>, /* common */
-> +			     <GIC_SPI 195 IRQ_TYPE_LEVEL_HIGH>, /* power */
-> +			     <GIC_SPI 190 IRQ_TYPE_LEVEL_HIGH>, /* rx0 */
-> +			     <GIC_SPI 186 IRQ_TYPE_LEVEL_HIGH>, /* tx0 */
-> +			     <GIC_SPI 191 IRQ_TYPE_LEVEL_HIGH>, /* rx1 */
-> +			     <GIC_SPI 187 IRQ_TYPE_LEVEL_HIGH>, /* tx1 */
-> +			     <GIC_SPI 192 IRQ_TYPE_LEVEL_HIGH>, /* rx2 */
-> +			     <GIC_SPI 188 IRQ_TYPE_LEVEL_HIGH>, /* tx2 */
-> +			     <GIC_SPI 193 IRQ_TYPE_LEVEL_HIGH>, /* rx3 */
-> +			     <GIC_SPI 189 IRQ_TYPE_LEVEL_HIGH>; /* tx3 */
-> +		clocks = <&bpmp TEGRA186_CLK_AXI_CBB>,
-> +			 <&bpmp TEGRA186_CLK_EQOS_AXI>,
-> +			 <&bpmp TEGRA186_CLK_EQOS_RX>,
-> +			 <&bpmp TEGRA186_CLK_EQOS_TX>,
-> +			 <&bpmp TEGRA186_CLK_EQOS_PTP_REF>;
-> +		clock-names = "master_bus", "slave_bus", "rx", "tx", "ptp_ref";
-> +		resets = <&bpmp TEGRA186_RESET_EQOS>;
-> +		reset-names = "eqos";
-> +		status = "disabled";
-> +
-> +		snps,write-requests = <1>;
-> +		snps,read-requests = <3>;
-> +		snps,burst-map = <0x7>;
-> +		snps,txpbl = <32>;
-> +		snps,rxpbl = <8>;
-> +	};
-> +
->  	uarta: serial at 3100000 {
->  		compatible = "nvidia,tegra186-uart", "nvidia,tegra20-uart";
->  		reg = <0x0 0x03100000 0x0 0x40>;
-> 
+This is v3 of the series to decouple set_memory_* from cacheflush.h. This
+version contains a few minor alphabetical order fixes and some fixes caught
+by the 0day bot. Several places unfortunately need an #ifdef around the
+header for arches without the set_memory_* functions.
 
-Acked-by: Jon Hunter <jonathanh@nvidia.com>
+Andrew, it might be best to wait a few days to let the 0day bot churn on this
+series.
 
-Cheers
-Jon
+Thanks,
+Laura
+
+Laura Abbott (16):
+  treewide: Move set_memory_* functions away from cacheflush.h
+  arm: Use set_memory.h header
+  arm64: Use set_memory.h header
+  s390: Use set_memory.h header
+  x86: Use set_memory.h header
+  agp: Use set_memory.h header
+  drm: Use set_memory.h header
+  intel_th: Use set_memory.h header
+  watchdog: hpwdt: Use set_memory.h header
+  bpf: Use set_memory.h header
+  module: Use set_memory.h header
+  PM / hibernate: Use set_memory.h header
+  ALSA: Use set_memory.h header
+  misc: sram: Use set_memory.h header
+  video: vermilion: Use set_memory.h header
+  treewide: Decouple cacheflush.h and set_memory.h
+
+ arch/arm/include/asm/cacheflush.h         | 20 -------
+ arch/arm/include/asm/set_memory.h         | 32 ++++++++++++
+ arch/arm/kernel/ftrace.c                  |  1 +
+ arch/arm/kernel/machine_kexec.c           |  1 +
+ arch/arm/mm/pageattr.c                    |  1 +
+ arch/arm/net/bpf_jit_32.c                 |  1 +
+ arch/arm64/include/asm/Kbuild             |  1 +
+ arch/arm64/include/asm/cacheflush.h       |  5 --
+ arch/arm64/mm/pageattr.c                  |  1 +
+ arch/arm64/net/bpf_jit_comp.c             |  1 +
+ arch/s390/include/asm/Kbuild              |  1 +
+ arch/s390/include/asm/cacheflush.h        | 34 ------------
+ arch/s390/include/asm/set_memory.h        | 31 +++++++++++
+ arch/s390/kernel/ftrace.c                 |  1 +
+ arch/s390/kernel/kprobes.c                |  2 +-
+ arch/s390/kernel/machine_kexec.c          |  1 +
+ arch/s390/mm/init.c                       |  1 +
+ arch/s390/mm/pageattr.c                   |  1 +
+ arch/s390/mm/vmem.c                       |  1 +
+ arch/s390/net/bpf_jit_comp.c              |  1 +
+ arch/x86/include/asm/cacheflush.h         | 85 ------------------------------
+ arch/x86/include/asm/set_memory.h         | 87 +++++++++++++++++++++++++++++++
+ arch/x86/kernel/amd_gart_64.c             |  2 +-
+ arch/x86/kernel/cpu/amd.c                 |  2 +-
+ arch/x86/kernel/cpu/bugs.c                |  2 +-
+ arch/x86/kernel/ftrace.c                  |  2 +-
+ arch/x86/kernel/machine_kexec_32.c        |  2 +-
+ arch/x86/kernel/machine_kexec_64.c        |  1 +
+ arch/x86/mm/init.c                        |  2 +-
+ arch/x86/mm/init_32.c                     |  2 +-
+ arch/x86/mm/init_64.c                     |  2 +-
+ arch/x86/mm/ioremap.c                     |  2 +-
+ arch/x86/mm/pageattr.c                    |  1 +
+ arch/x86/net/bpf_jit_comp.c               |  1 +
+ arch/x86/pci/pcbios.c                     |  2 +-
+ arch/x86/platform/efi/efi.c               |  2 +-
+ arch/x86/realmode/init.c                  |  2 +-
+ drivers/char/agp/amd-k7-agp.c             |  1 +
+ drivers/char/agp/ati-agp.c                |  1 +
+ drivers/char/agp/generic.                 |  0
+ drivers/char/agp/generic.c                |  4 +-
+ drivers/char/agp/intel-gtt.c              |  1 +
+ drivers/char/agp/sworks-agp.c             |  1 +
+ drivers/gpu/drm/amd/amdgpu/amdgpu_gart.c  |  3 ++
+ drivers/gpu/drm/gma500/gtt.c              |  1 +
+ drivers/gpu/drm/gma500/psb_drv.c          |  1 +
+ drivers/gpu/drm/radeon/radeon_gart.c      |  3 ++
+ drivers/gpu/drm/ttm/ttm_page_alloc.c      |  3 ++
+ drivers/gpu/drm/ttm/ttm_page_alloc_dma.c  |  3 ++
+ drivers/gpu/drm/ttm/ttm_tt.c              |  3 ++
+ drivers/hwtracing/intel_th/msu.c          |  4 +-
+ drivers/misc/sram-exec.c                  |  3 +-
+ drivers/video/fbdev/vermilion/vermilion.c |  2 +-
+ drivers/watchdog/hpwdt.c                  |  2 +-
+ include/asm-generic/set_memory.h          | 12 +++++
+ include/linux/filter.h                    |  4 +-
+ kernel/module.c                           |  3 ++
+ kernel/power/snapshot.c                   |  3 ++
+ sound/pci/hda/hda_intel.c                 |  2 +-
+ sound/pci/intel8x0.c                      |  4 +-
+ sound/x86/intel_hdmi_audio.c              |  2 +-
+ 61 files changed, 237 insertions(+), 166 deletions(-)
+ create mode 100644 arch/arm/include/asm/set_memory.h
+ delete mode 100644 arch/s390/include/asm/cacheflush.h
+ create mode 100644 arch/s390/include/asm/set_memory.h
+ create mode 100644 arch/x86/include/asm/set_memory.h
+ create mode 100644 drivers/char/agp/generic.
+ create mode 100644 include/asm-generic/set_memory.h
 
 -- 
-nvpublic
+2.7.4
