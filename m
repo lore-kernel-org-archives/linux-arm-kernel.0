@@ -1,109 +1,97 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Tue, 7 Mar 2017 08:15:25 +0800
-Subject: [alsa-devel] [PATCH v2 03/12] ASoC: sun8i-codec-analog: split
- out mbias
-In-Reply-To: <20170305133709.6288-4-icenowy@aosc.xyz>
-Message-ID: <201703070743.k6QjVQJ7%fengguang.wu@intel.com>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Tue, 07 Mar 2017 08:24:53 +0800
+Subject: [linux-sunxi] [PATCH v3 0/5] Add dual-role OTG support for
+ Allwinner H3
+In-Reply-To: <e110a2c0-ee91-b6eb-9e94-e32034aae4d7@megous.com>
+References: <20170306223449.21404-1-icenowy@aosc.xyz>
+ <e110a2c0-ee91-b6eb-9e94-e32034aae4d7@megous.com>
+Message-ID: <974021488846293@web19o.yandex.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Icenowy,
 
-[auto build test ERROR on linus/master]
-[also build test ERROR on v4.11-rc1 next-20170306]
-[cannot apply to robh/for-next asoc/for-next]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-url:    https://github.com/0day-ci/linux/commits/Icenowy-Zheng/ASoC-sun8i-codec-analog-split-out-mic2/20170307-064313
-config: i386-allmodconfig (attached as .config)
-compiler: gcc-6 (Debian 6.2.0-3) 6.2.0 20160901
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=i386 
+07.03.2017, 07:48, "Ond?ej Jirman" <megous@megous.com>:
+> Hi Icenowy,
+>
+> when I was trying to add OTG support I found an issue with powercycling.
+> When I have USB cable connecting PC and the OTG port on the SBC, when
+> the board enables the vbus, it would become impossible to power cycle
+> the board after poweroff. The reason being that when vbus is enabled,
+> the board is powered from the OTG port even if you disconnect the barrel
+> plug.
+>
+> Should kernel turn off the vbus before shutting down/restarting? What do
+> you think?
 
-All errors (new ones prefixed by >>):
+It's a good problem.
 
->> sound/soc/sunxi/sun8i-codec-analog.c:705:2: error: unknown field 'has_mbias' specified in initializer
-     .has_mbias = true,
-     ^
-   sound/soc/sunxi/sun8i-codec-analog.c:712:2: error: unknown field 'has_mbias' specified in initializer
-     .has_mbias = true,
-     ^
-   sound/soc/sunxi/sun8i-codec-analog.c: In function 'sun8i_codec_analog_cmpnt_probe':
->> sound/soc/sunxi/sun8i-codec-analog.c:755:12: error: 'const struct sun8i_codec_analog_quirks' has no member named 'has_mbias'; did you mean 'has_mic2'?
-     if (quirks->has_mbias) {
-               ^~
+I think this problem can be abstracted into:
+Some regulators are needed to be shut down before system 
+shutdown.
 
-vim +/has_mbias +705 sound/soc/sunxi/sun8i-codec-analog.c
+Is there any framework for it?
 
-   699	};
-   700	
-   701	static const struct sun8i_codec_analog_quirks sun8i_a23_quirks = {
-   702		.has_headphone	= true,
-   703		.has_hmic	= true,
-   704		.has_linein	= true,
- > 705		.has_mbias	= true,
-   706		.has_mic2	= true,
-   707	};
-   708	
-   709	static const struct sun8i_codec_analog_quirks sun8i_h3_quirks = {
-   710		.has_linein	= true,
-   711		.has_lineout	= true,
-   712		.has_mbias	= true,
-   713		.has_mic2	= true,
-   714	};
-   715	
-   716	static int sun8i_codec_analog_cmpnt_probe(struct snd_soc_component *cmpnt)
-   717	{
-   718		struct device *dev = cmpnt->dev;
-   719		const struct sun8i_codec_analog_quirks *quirks;
-   720		int ret;
-   721	
-   722		/*
-   723		 * This would never return NULL unless someone directly registers a
-   724		 * platform device matching this driver's name, without specifying a
-   725		 * device tree node.
-   726		 */
-   727		quirks = of_device_get_match_data(dev);
-   728	
-   729		/* Add controls, widgets, and routes for individual features */
-   730	
-   731		if (quirks->has_headphone) {
-   732			ret = sun8i_codec_add_headphone(cmpnt);
-   733			if (ret)
-   734				return ret;
-   735		}
-   736	
-   737		if (quirks->has_hmic) {
-   738			ret = sun8i_codec_add_hmic(cmpnt);
-   739			if (ret)
-   740				return ret;
-   741		}
-   742	
-   743		if (quirks->has_linein) {
-   744			ret = sun8i_codec_add_linein(cmpnt);
-   745			if (ret)
-   746				return ret;
-   747		}
-   748	
-   749		if (quirks->has_lineout) {
-   750			ret = sun8i_codec_add_lineout(cmpnt);
-   751			if (ret)
-   752				return ret;
-   753		}
-   754	
- > 755		if (quirks->has_mbias) {
-   756			ret = sun8i_codec_add_mbias(cmpnt);
-   757			if (ret)
-   758				return ret;
+Mark,
+I add you to recipients for the question above.
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 58978 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170307/f18e9bc0/attachment-0001.gz>
+Thanks,
+Icenowy
+
+>
+> regards,
+> ??o.
+>
+> Dne 6.3.2017 v 23:34 Icenowy Zheng napsal(a):
+>> ?Allwinner H3 have a its USB PHY0 routed to two USB controllers: one is
+>> ?a MUSB controller, which can work in peripheral mode, but works badly in
+>> ?host mode (several hardware will fail on the MUSB controller, even connect
+>> ?one MUSB controller in peripheral mode to another one in host mode cannot
+>> ?work); the other is a pair of EHCI/OHCI controller, which can work only
+>> ?in host mode, but have better compatibillity. The route is controlled in
+>> ?a register, which we have set it to HCI only when we do not know about
+>> ?it well.
+>>
+>> ?Add support to route to the best controller according to current USB mode
+>> ?(host/peripheral).
+>>
+>> ?Note: Currently even if hardware only support hostmode, we should still
+>> ?enable the MUSB controller, as it controls the USB mode. (Some this kind
+>> ?of hardware can also work in peripheral mode by settings in the sysfs
+>> ?node of MUSB, then connect it to another host via a USB Type-A to Type-A
+>> ?cable.)
+>>
+>> ?Patch 1 changes the device tree binding to include the "pmu0" for HCI pair.
+>>
+>> ?Patch 2 adds support for auto routing of PHY0. It's currently only enabled
+>> ?on H3, but it's easy to extend it to other SoCs which feature this
+>> ?route control.
+>>
+>> ?Patch 3 adds necessary device tree nodes to the H3 DTSI file. Note: The
+>> ?phy is not bind for OHCI/EHCI0, as OHCI/EHCI drivers will keep the VBUS
+>> ?on. Only MUSB driver can properly handle a dual-role PHY.
+>>
+>> ?Patch 4 enables USB OTG functionality on Orange Pi One board, which is
+>> ?the only H3 board I have that have proper OTG function. It's easy to
+>> ?enable OTG on other boards with their schematics.
+>>
+>> ?Patch 5 enables USB OTG functionality on Orange Pi Zero board, as the
+>> ?board cannot output power on Vbus, I only enabled peripheral mode by
+>> ?default.
+>>
+>> ?The USB PHY on V3s/A64 SoCs also feature this capability, and it will
+>> ?be soon enabled on these SoCs after this patchset is merged.
+>>
+>> ?Icenowy Zheng (5):
+>> ???dt: bindings: add pmu0 regs for USB PHYs on Allwinner H3/V3s/A64
+>> ???phy: sun4i-usb: support automatically switch PHY0 route to MUSB/HCI
+>> ???ARM: dts: sun8i: h3: add usb_otg and OHCI/EHCI for usbc0 on H3
+>> ???ARM: dts: sun8i: h3: enable USB OTG on Orange Pi One
+>> ???ARM: dts: sun8i: h2+: enable USB OTG for Orange Pi Zero board
+>>
+>> ??.../devicetree/bindings/phy/sun4i-usb-phy.txt | 1 +
+>> ??arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts | 14 ++++++
+>> ??arch/arm/boot/dts/sun8i-h3-orangepi-one.dts | 22 +++++++++-
+>> ??arch/arm/boot/dts/sun8i-h3.dtsi | 32 ++++++++++++++
+>> ??drivers/phy/phy-sun4i-usb.c | 50 ++++++++++++++--------
+>> ??5 files changed, 101 insertions(+), 18 deletions(-)
