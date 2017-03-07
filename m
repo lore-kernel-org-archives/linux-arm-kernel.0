@@ -1,72 +1,72 @@
-From: Joao.Pinto@synopsys.com (Joao Pinto)
-Date: Tue, 7 Mar 2017 11:12:50 +0000
-Subject: [PATCH v2 3/7] PCI: dwc: artpec6: Populate cpu_addr_fixup ops
-In-Reply-To: <1488880372-7390-4-git-send-email-kishon@ti.com>
-References: <1488880372-7390-1-git-send-email-kishon@ti.com>
- <1488880372-7390-4-git-send-email-kishon@ti.com>
-Message-ID: <bf20e36d-ba5f-1da6-8dda-6d2c8ac7023b@synopsys.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Tue,  7 Mar 2017 11:12:28 +0000
+Subject: [PATCH v2 1/7] dma: Take into account dma_pfn_offset
+In-Reply-To: <1488885154-12429-1-git-send-email-vladimir.murzin@arm.com>
+References: <1488885154-12429-1-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <1488885154-12429-2-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-?s 9:52 AM de 3/7/2017, Kishon Vijay Abraham I escreveu:
-> Populate cpu_addr_fixup ops to extract the least 28 bits of the
-> corresponding cpu address.
-> 
-> Cc: Niklas Cassel <niklas.cassel@axis.com>
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-> ---
->  drivers/pci/dwc/pcie-artpec6.c |   15 ++++++++++-----
->  1 file changed, 10 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/pci/dwc/pcie-artpec6.c b/drivers/pci/dwc/pcie-artpec6.c
-> index fcd3ef8..5b3b3af 100644
-> --- a/drivers/pci/dwc/pcie-artpec6.c
-> +++ b/drivers/pci/dwc/pcie-artpec6.c
-> @@ -78,6 +78,11 @@ static void artpec6_pcie_writel(struct artpec6_pcie *artpec6_pcie, u32 offset, u
->  	regmap_write(artpec6_pcie->regmap, offset, val);
->  }
->  
-> +static u64 artpec6_pcie_cpu_addr_fixup(u64 pci_addr)
-> +{
-> +	return pci_addr & ARTPEC6_CPU_TO_BUS_ADDR;
-> +}
-> +
->  static int artpec6_pcie_establish_link(struct artpec6_pcie *artpec6_pcie)
->  {
->  	struct dw_pcie *pci = artpec6_pcie->pci;
-> @@ -142,11 +147,6 @@ static int artpec6_pcie_establish_link(struct artpec6_pcie *artpec6_pcie)
->  	 */
->  	dw_pcie_writel_dbi(pci, MISC_CONTROL_1_OFF, DBI_RO_WR_EN);
->  
-> -	pp->io_base &= ARTPEC6_CPU_TO_BUS_ADDR;
-> -	pp->mem_base &= ARTPEC6_CPU_TO_BUS_ADDR;
-> -	pp->cfg0_base &= ARTPEC6_CPU_TO_BUS_ADDR;
-> -	pp->cfg1_base &= ARTPEC6_CPU_TO_BUS_ADDR;
-> -
->  	/* setup root complex */
->  	dw_pcie_setup_rc(pp);
->  
-> @@ -234,6 +234,10 @@ static int artpec6_add_pcie_port(struct artpec6_pcie *artpec6_pcie,
->  	return 0;
->  }
->  
-> +static const struct dw_pcie_ops dw_pcie_ops = {
-> +	.cpu_addr_fixup = artpec6_pcie_cpu_addr_fixup,
-> +};
-> +
->  static int artpec6_pcie_probe(struct platform_device *pdev)
->  {
->  	struct device *dev = &pdev->dev;
-> @@ -252,6 +256,7 @@ static int artpec6_pcie_probe(struct platform_device *pdev)
->  		return -ENOMEM;
->  
->  	pci->dev = dev;
-> +	pci->ops = &dw_pcie_ops;
->  
->  	artpec6_pcie->pci = pci;
->  
-> 
+Even though dma-noop-ops assumes 1:1 memory mapping DMA memory range
+can be different to RAM. For example, ARM STM32F4 MCU offers the
+possibility to remap SDRAM from 0xc000_0000 to 0x0 to get CPU
+performance boost, but DMA continue to see SDRAM at 0xc000_0000. This
+difference in mapping is handled via device-tree "dma-range" property
+which leads to dev->dma_pfn_offset is set nonzero. To handle such
+cases take dma_pfn_offset into account.
 
-Simpler, no doubt.
+Cc: Joerg Roedel <jroedel@suse.de>
+Cc: Christian Borntraeger <borntraeger@de.ibm.com>
+Cc: Doug Ledford <dledford@redhat.com>
+Reported-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
+Tested-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
+Tested-by: Andras Szemzo <sza@esh.hu>
+Tested-by: Alexandre TORGUE <alexandre.torgue@st.com>
+Reviewed-by: Robin Murphy <robin.murphy@arm.com>
+Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+---
+ lib/dma-noop.c | 8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
 
-Acked-By: Joao Pinto <jpinto@synopsys.com>
+diff --git a/lib/dma-noop.c b/lib/dma-noop.c
+index de26c8b..ff4ef5e 100644
+--- a/lib/dma-noop.c
++++ b/lib/dma-noop.c
+@@ -7,6 +7,7 @@
+ #include <linux/mm.h>
+ #include <linux/dma-mapping.h>
+ #include <linux/scatterlist.h>
++#include <linux/pfn.h>
+ 
+ static void *dma_noop_alloc(struct device *dev, size_t size,
+ 			    dma_addr_t *dma_handle, gfp_t gfp,
+@@ -16,7 +17,8 @@ static void *dma_noop_alloc(struct device *dev, size_t size,
+ 
+ 	ret = (void *)__get_free_pages(gfp, get_order(size));
+ 	if (ret)
+-		*dma_handle = virt_to_phys(ret);
++		*dma_handle = virt_to_phys(ret) - PFN_PHYS(dev->dma_pfn_offset);
++
+ 	return ret;
+ }
+ 
+@@ -32,7 +34,7 @@ static dma_addr_t dma_noop_map_page(struct device *dev, struct page *page,
+ 				      enum dma_data_direction dir,
+ 				      unsigned long attrs)
+ {
+-	return page_to_phys(page) + offset;
++	return page_to_phys(page) + offset - PFN_PHYS(dev->dma_pfn_offset);
+ }
+ 
+ static int dma_noop_map_sg(struct device *dev, struct scatterlist *sgl, int nents,
+@@ -47,7 +49,7 @@ static int dma_noop_map_sg(struct device *dev, struct scatterlist *sgl, int nent
+ 
+ 		BUG_ON(!sg_page(sg));
+ 		va = sg_virt(sg);
+-		sg_dma_address(sg) = (dma_addr_t)virt_to_phys(va);
++		sg_dma_address(sg) = (dma_addr_t)(virt_to_phys(va) - PFN_PHYS(dev->dma_pfn_offset));
+ 		sg_dma_len(sg) = sg->length;
+ 	}
+ 
+-- 
+2.0.0
