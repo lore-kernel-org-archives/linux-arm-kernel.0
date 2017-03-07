@@ -1,52 +1,38 @@
-From: sunil.kovvuri@gmail.com (Sunil Kovvuri)
-Date: Tue, 7 Mar 2017 18:14:31 +0530
-Subject: [PATCH 1/4] net: thunderx: Fix IOMMU translation faults
-In-Reply-To: <9a809c6e-3b01-4deb-e69e-65aa62d1e5e1@arm.com>
-References: <1488538070-12549-1-git-send-email-sunil.kovvuri@gmail.com>
- <1488538070-12549-2-git-send-email-sunil.kovvuri@gmail.com>
- <20170303.095635.355325147613813698.davem@davemloft.net>
- <CA+sq2CcFxk=LuqYhR-sFaVVSu3rMaZUcytx-3tC9kEiRFNwREg@mail.gmail.com>
- <cad7da5d-fce7-cef2-d0db-9585c31f0575@arm.com>
- <CA+sq2CeiXZNwVsURxNNE+vxf3uhjM=vnKtb2nhtLRj6QwHKWrw@mail.gmail.com>
- <9a809c6e-3b01-4deb-e69e-65aa62d1e5e1@arm.com>
-Message-ID: <CA+sq2CfCS1aQGtCwVxhzMU3QmKy+tE6j2Zvq=U9aTodvDTFdvA@mail.gmail.com>
+From: guohanjun@huawei.com (Hanjun Guo)
+Date: Tue, 7 Mar 2017 20:40:08 +0800
+Subject: [PATCH v9 13/15] irqchip: mbigen: drop module owner
+In-Reply-To: <1488890410-15503-1-git-send-email-guohanjun@huawei.com>
+References: <1488890410-15503-1-git-send-email-guohanjun@huawei.com>
+Message-ID: <1488890410-15503-14-git-send-email-guohanjun@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 6, 2017 at 10:02 PM, Robin Murphy <robin.murphy@arm.com> wrote:
-> On 06/03/17 12:57, Sunil Kovvuri wrote:
->>>>
->>>> We are seeing a 0.75Mpps drop with IP forwarding rate due to that.
->>>> Hence I have restricted calling DMA interfaces to only when IOMMU is enabled.
->>>
->>> What's 0.07Mpps as a percentage of baseline? On a correctly configured
->>> coherent arm64 system, in the absence of an IOMMU, dma_map_*() is
->>> essentially just virt_to_phys() behind a function call or two, so I'd be
->>> interested to know where any non-trivial overhead might be coming from.
->>
->> It's a 5% drop and yes device is configured as coherent.
->> And the drop is due to additional function calls.
->
-> OK, interesting - sounds like there's potential for some optimisation
-> there as well. AFAICS the callchain goes:
->
-> dma_map_single_attrs (inline)
-> - ops->map_page (__swiotlb_map_page)
->   - swiotlb_map_page
->     - phys_to_dma (inline)
->     - dma_capable (inline)
->
-> Do you happen to have a breakdown of where the time goes? If it's mostly
-> just in the indirect branch our options are limited (I'm guessing
-> ThunderX doesn't have a particularly fancy branch predictor, if it's not
-> even got a data prefetcher), but if it's in the SWIOTLB code then
-> there's certainly room for improvement (which will hopefully tie in with
-> some DMA ops work I'm planning to do soon anyway).
+From: Kefeng Wang <wangkefeng.wang@huawei.com>
 
-It's the branching which is costing the performance, as you said nothing
-much can be done in the common code for this. Anyway I have submitted
-new patch without conditional calling of DMA APIs, will look into reducing
-performance impact (if possible implement recycling) a bit later.
+Module owner will be set by driver core, so drop it.
 
-Thanks,
-Sunil.
+Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+Reviewed-by: Ma Jun <majun258@huawei.com>
+Tested-by: Ming Lei <ming.lei@canonical.com>
+Tested-by: Wei Xu <xuwei5@hisilicon.com>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+---
+ drivers/irqchip/irq-mbigen.c | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/drivers/irqchip/irq-mbigen.c b/drivers/irqchip/irq-mbigen.c
+index 03b79b0..c01ab41 100644
+--- a/drivers/irqchip/irq-mbigen.c
++++ b/drivers/irqchip/irq-mbigen.c
+@@ -293,7 +293,6 @@ static int mbigen_device_probe(struct platform_device *pdev)
+ static struct platform_driver mbigen_platform_driver = {
+ 	.driver = {
+ 		.name		= "Hisilicon MBIGEN-V2",
+-		.owner		= THIS_MODULE,
+ 		.of_match_table	= mbigen_of_match,
+ 	},
+ 	.probe			= mbigen_device_probe,
+-- 
+1.7.12.4
