@@ -1,9 +1,9 @@
 From: labbott@redhat.com (Laura Abbott)
-Date: Tue,  7 Mar 2017 12:55:30 -0800
-Subject: [PATCHv3 13/16] ALSA: Use set_memory.h header
+Date: Tue,  7 Mar 2017 12:55:31 -0800
+Subject: [PATCHv3 14/16] misc: sram: Use set_memory.h header
 In-Reply-To: <1488920133-27229-1-git-send-email-labbott@redhat.com>
 References: <1488920133-27229-1-git-send-email-labbott@redhat.com>
-Message-ID: <1488920133-27229-14-git-send-email-labbott@redhat.com>
+Message-ID: <1488920133-27229-15-git-send-email-labbott@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,53 +12,26 @@ explicitly.
 
 Signed-off-by: Laura Abbott <labbott@redhat.com>
 ---
-v3: Add a few other files caught by 0day bot
+V3: New file which was not caught in the first pass.
 ---
- sound/pci/hda/hda_intel.c    | 2 +-
- sound/pci/intel8x0.c         | 4 +++-
- sound/x86/intel_hdmi_audio.c | 2 +-
- 3 files changed, 5 insertions(+), 3 deletions(-)
+ drivers/misc/sram-exec.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/sound/pci/hda/hda_intel.c b/sound/pci/hda/hda_intel.c
-index c8256a8..64d6a34 100644
---- a/sound/pci/hda/hda_intel.c
-+++ b/sound/pci/hda/hda_intel.c
-@@ -53,7 +53,7 @@
- #ifdef CONFIG_X86
- /* for snoop control */
- #include <asm/pgtable.h>
--#include <asm/cacheflush.h>
-+#include <asm/set_memory.h>
- #include <asm/cpufeature.h>
- #endif
- #include <sound/core.h>
-diff --git a/sound/pci/intel8x0.c b/sound/pci/intel8x0.c
-index 9720a30..6d17b17 100644
---- a/sound/pci/intel8x0.c
-+++ b/sound/pci/intel8x0.c
-@@ -40,7 +40,9 @@
- #include <sound/initval.h>
- /* for 440MX workaround */
- #include <asm/pgtable.h>
--#include <asm/cacheflush.h>
-+#ifdef CONFIG_X86
-+#include <asm/set_memory.h>
-+#endif
+diff --git a/drivers/misc/sram-exec.c b/drivers/misc/sram-exec.c
+index ac52241..3d528a1 100644
+--- a/drivers/misc/sram-exec.c
++++ b/drivers/misc/sram-exec.c
+@@ -16,9 +16,10 @@
  
- MODULE_AUTHOR("Jaroslav Kysela <perex@perex.cz>");
- MODULE_DESCRIPTION("Intel 82801AA,82901AB,i810,i820,i830,i840,i845,MX440; SiS 7012; Ali 5455");
-diff --git a/sound/x86/intel_hdmi_audio.c b/sound/x86/intel_hdmi_audio.c
-index c505b01..664b7fe 100644
---- a/sound/x86/intel_hdmi_audio.c
-+++ b/sound/x86/intel_hdmi_audio.c
-@@ -30,7 +30,7 @@
- #include <linux/pm_runtime.h>
- #include <linux/dma-mapping.h>
- #include <linux/delay.h>
+ #include <linux/device.h>
+ #include <linux/genalloc.h>
++#include <linux/mm.h>
+ #include <linux/sram.h>
+ 
 -#include <asm/cacheflush.h>
 +#include <asm/set_memory.h>
- #include <sound/core.h>
- #include <sound/asoundef.h>
- #include <sound/pcm.h>
+ 
+ #include "sram.h"
+ 
 -- 
 2.7.4
