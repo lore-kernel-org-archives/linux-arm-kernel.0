@@ -1,51 +1,81 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 7 Mar 2017 12:27:23 +0300
-Subject: [PATCH v2 1/6] ARM: dts: r8a73a4: Add INTC-SYS clock to device
- tree
-In-Reply-To: <1488819491-26097-2-git-send-email-geert+renesas@glider.be>
-References: <1488819491-26097-1-git-send-email-geert+renesas@glider.be>
- <1488819491-26097-2-git-send-email-geert+renesas@glider.be>
-Message-ID: <183720b2-003c-efb6-e4b6-5e6151da46fe@cogentembedded.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 07 Mar 2017 09:33:37 +0000
+Subject: [PATCH 0/8] arm64: KVM: Fix PMU exception generation
+In-Reply-To: <20170305150109.GA1502@lvm> (Christoffer Dall's message of "Sun,
+ 5 Mar 2017 07:01:09 -0800")
+References: <20170222114728.2472-1-marc.zyngier@arm.com>
+ <20170305150109.GA1502@lvm>
+Message-ID: <874lz51le6.fsf@on-the-bus.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello!
-
-On 3/6/2017 7:58 PM, Geert Uytterhoeven wrote:
-
-> Link the ARM GIC to the INTC-SYS module clock and the C4 power domain,
-> so it can be power managed using that clock in the future.
+On Sun, Mar 05 2017 at  3:01:09 pm GMT, Christoffer Dall <christoffer.dall@linaro.org> wrote:
+> Hi Marc,
 >
-> Note that currently the GIC-400 driver doesn't support module clocks nor
-> Runtime PM, so this must be handled as a critical clock.
+> On Wed, Feb 22, 2017 at 11:47:20AM +0000, Marc Zyngier wrote:
+>> Running the following code:
+>> 
+>> root at zomby-woof:~# cat test-pmu.c
+>> int main(int argc, char *argv[])
+>> {
+>> 	unsigned int val;
+>> 	asm ("mrc p15, 0, %0, c9, c13, 0\n" : "=r" (val));
+>> 	return val;
+>> }
+>> 
+>> in a 32bit guest (or a 64bit guest with a 32bit userspace) results in
+>> this surprising result:
+>> 
+>> [  120.347497] kvm [1150]: Unsupported guest CP15 access at: ab0945ae
+>> [  120.353689] kvm [1142]:  { Op0( 0), Op1( 0), CRn( 9), CRm(13), Op2( 0), func_read },
+>> 
+>> which is weird, because the guest behaves correctly:
+>> root at zomby-woof:~# ./test-pmu 
+>> [   16.184422] test-pmu[740]: undefined instruction: pc=00000000ab0945ae
+>> [   16.186043] Code: 00340001 b4800000 af00b085 60396078 (3f1dee19) 
+>> Illegal instruction
+>> 
+>> It gets the expected UNDEF, and all is fine. So what?
+>> 
+>> It turns out that the PMU emulation code is a bit lazy, and tells the
+>> rest of KVM that the emulation has failed, so that an exception gets
+>> delivered. Subtle differences in the 32bit vs 64bit handling make it
+>> spit an "Unsupported..." error.
+>> 
+>> This series tries to set things straight:
+>> - Allow an exception to be injected from an emulation handler
+>> - Make all PMU illegal accesses inject an UNDEF
+>> - Make these illegal accesses a successful emulation w.r.t the rest of KVM.
+>> 
+>> In the process, we also squash an interesting bug in the 64bit CP
+>> access. Similar treatment could be applied to the 32bit kernel, except
+>> that we don't ever inject an exception there (no PMU support yet).
 >
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> ---
-> v2:
->   - Add missing "power-domains" property,
->   - Add clock-names property,
->   - Drop RFC status,
->   - Change one-line summary prefix to match current arm-soc practices,
->   - s/GIC driver/GIC-400 driver/,
->   - Document critical clock dependency.
-> ---
->  arch/arm/boot/dts/r8a73a4.dtsi            | 13 +++++++++----
->  include/dt-bindings/clock/r8a73a4-clock.h |  1 +
->  2 files changed, 10 insertions(+), 4 deletions(-)
+> I'm a bit confused about this series and not too thrilled of the
+> approach where we add a side-channel of the sys_reg param in the vcpu
+> structure, which may or may not contain valid data at any given point.
 >
-> diff --git a/arch/arm/boot/dts/r8a73a4.dtsi b/arch/arm/boot/dts/r8a73a4.dtsi
-> index 6fb7eaba91262edf..1f5c9f6dddba9366 100644
-> --- a/arch/arm/boot/dts/r8a73a4.dtsi
-> +++ b/arch/arm/boot/dts/r8a73a4.dtsi
-> @@ -467,6 +467,9 @@
->  			<0 0xf1004000 0 0x2000>,
->  			<0 0xf1006000 0 0x2000>;
->  		interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
-> +		clocks = <&mstp4_clks R8A73A4_CLK_INTC_SYS>;
-> +		clock-names = "clk";
+> Couldn't we use a slightly bigger hammer (with cleaner semantics) and
+> let all system register handling (cp on 32-bit and 64-bit sys regs
+> alike) simply return true if they were emulated, in which case the
+> caller should advance the PC, or false ifsomething else happened, and
+> leave it up to the emulation of the individual registers to decide if
+> any exceptions should be injected.
 
-    Do we really need such "clock-names"?
+So that was my other option - changing the semantics of the return
+value, and considering that an emulation never fails. At that stage, we
+can repurpose the return value form the accessor to simply indicate
+whether or not we should skip the current instruction.
 
-[...]
+> I don't think we have that many places where we want to inject an
+> undefined exception in our handlers, and doing it explicitly might
+> actually be a good idea to make it more clear that we're emulating the
+> architecture properly.  What do you think?
 
-MBR, Sergei
+I think that'd work nicely. I'll rework the series along these lines.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead, it just smell funny.
