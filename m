@@ -1,26 +1,19 @@
 From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 7 Mar 2017 16:11:52 +0530
-Subject: [PATCH 0/3] A/C and Sound device tree nodes for LEGO MINDSTORMS
- EV3
-In-Reply-To: <21109106-99fc-aefb-a7e0-6e668cfde126@ti.com>
-References: <1486495329-2789-1-git-send-email-david@lechnology.com>
- <21109106-99fc-aefb-a7e0-6e668cfde126@ti.com>
-Message-ID: <b12bc88f-5b74-7e30-6e8a-d85cc035ffd6@ti.com>
+Date: Tue, 7 Mar 2017 16:23:42 +0530
+Subject: [PATCH v4 0/6] ARM: davinci: vpif capture & display support
+In-Reply-To: <714e1e90-c266-f792-4af1-d7d95dc6941e@ti.com>
+References: <1488297720-4558-1-git-send-email-bgolaszewski@baylibre.com>
+ <714e1e90-c266-f792-4af1-d7d95dc6941e@ti.com>
+Message-ID: <c7a5ac06-d190-28d0-259b-61a416bd5cbf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 20 February 2017 04:06 PM, Sekhar Nori wrote:
-> On Wednesday 08 February 2017 12:52 AM, David Lechner wrote:
->> This series adds device tree nodes for an analog/digital convert and for sound
->> on LEGO MINDSTORMS EV3. The device tree bindings for these nodes have been acked
->> and the drivers used by these nodes have been in linux-next for a couple weeks
->> now and as far as I know, will be included in mainline v4.11.
->>
->> This series has been tested on LEGO MINDSTORMS EV3 using next-20170207 merged
->> with linux-davinci/master.
+On Wednesday 01 March 2017 06:58 PM, Sekhar Nori wrote:
+> On Tuesday 28 February 2017 09:31 PM, Bartosz Golaszewski wrote:
+>> This series adds pdata quirks and other changes required to make vpif
+>> work on the da850-evm board.
 > 
-> Looks good to me. Will wait for device tree maintainers. And also for
-> v4.11-rc1 to come out.
+> Looks good to me. Will apply once v4.11-rc1 is out.
 
 Applied now.
 
