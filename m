@@ -1,73 +1,53 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Tue, 7 Mar 2017 14:27:26 +0530
-Subject: [PATCH v2 00/12] Add support for the audio codec on Allwinner V3s
-In-Reply-To: <20170305133709.6288-1-icenowy@aosc.xyz>
-References: <20170305133709.6288-1-icenowy@aosc.xyz>
-Message-ID: <20170307085726.GJ2843@localhost>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue,  7 Mar 2017 09:56:25 +0100
+Subject: [PATCH 6/15] dt-bindings: display: sun4i: Add HDMI display bindings
+In-Reply-To: <cover.bc06ffa88f847ddd9ddd7c259415d5f61b55307b.1488876832.git-series.maxime.ripard@free-electrons.com>
+References: <cover.bc06ffa88f847ddd9ddd7c259415d5f61b55307b.1488876832.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <f1d46b79f933df724a6750d557ebe9517b6339b5.1488876832.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 05, 2017 at 09:36:57PM +0800, Icenowy Zheng wrote:
-> Allwinner V3s features a audio codec with dedicated digital and analog parts,
-> like the ones on A23/H3, but much simpler (lack of MIC2, LINE IN and MBIAS).
-> 
-> Add support for it.
-> 
-> In order to make the codec usable, DMA support is also added in this series;
-> the support of Lichee Pi Zero's dock board is also added here, as it's the
-> only board hackable that come with ports connected to the codec.
-> 
-> Patch 1~3 split out parts that is not available on V3s in the analog codec.
-> 
-> Patch 4/5 adds support for V3s in analog/digital codec.
-> 
-> Patch 6 add the gate bit as a common quirk of sun6i-dma driver, as V3s also
-> needs it.
-> 
-> Patch 7 really adds support for V3s in DMA engine.
-> 
-> Patch 8 restores the inclusion of CCU headers in the DTSI file of V3s, as
-> it's removed when merging.
-> 
-> Patch 9/10/11 adds three parts of V3s: DMA engine, codec support and pinmux
-> of mmc1 (used on Lichee Pi Zero dock).
+One of the possible output of the display pipeline, on the SoCs that have
+it, is the HDMI controller.
 
-And are these dependent upon rest, if not can you please send them
-separately!
+Add a binding for it.
 
-> 
-> Patch 12 adds support for Lichee Pi Zero dock, with support of mmc1 and
-> codec.
-> 
-> Icenowy Zheng (12):
->   ASoC: sun8i-codec-analog: split out mic2
->   ASoC: sun8i-codec-analog: split out line in
->   ASoC: sun8i-codec-analog: split out mbias
->   ASoC: sun8i-codec-analog: add support for V3s SoC
->   ASoC: sun4i-codec: Add support for V3s codec
->   dmaengine: sun6i: make gate bit in sun8i's DMA engines a common quirk
->   dmaengine: sun6i: support V3s SoC variant
->   ARM: dts: sun8i: restore the inclusion of ccu headers in V3s DTSI
->   ARM: dts: sun8i: add DMA engine in V3s DTSI
->   ARM: dts: sun8i: add audio codec support into V3s DTSI
->   ARM: dts: sun8i: add pinmux for V3s mmc1
->   ARM: dts: sun8i: add device tree for Lichee Pi Zero with Dock
-> 
->  .../devicetree/bindings/dma/sun6i-dma.txt          |   1 +
->  .../devicetree/bindings/sound/sun4i-codec.txt      |  11 +-
->  .../bindings/sound/sun8i-codec-analog.txt          |   1 +
->  arch/arm/boot/dts/Makefile                         |   3 +-
->  arch/arm/boot/dts/sun8i-v3s-licheepi-zero-dock.dts |  67 +++++++
->  arch/arm/boot/dts/sun8i-v3s.dtsi                   | 103 ++++++----
->  drivers/dma/sun6i-dma.c                            |  22 ++-
->  sound/soc/sunxi/sun4i-codec.c                      |  59 ++++++
->  sound/soc/sunxi/sun8i-codec-analog.c               | 211 +++++++++++++++++----
->  9 files changed, 405 insertions(+), 73 deletions(-)
->  create mode 100644 arch/arm/boot/dts/sun8i-v3s-licheepi-zero-dock.dts
-> 
-> -- 
-> 2.11.1
-> 
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt | 21 +++++++-
+ 1 file changed, 21 insertions(+), 0 deletions(-)
 
+diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+index b82c00449468..4b280672658e 100644
+--- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
++++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+@@ -4,6 +4,27 @@ Allwinner A10 Display Pipeline
+ The Allwinner A10 Display pipeline is composed of several components
+ that are going to be documented below:
+ 
++HDMI Encoder
++------------
++
++The HDMI Encoder supports the HDMI video and audio outputs, and does
++CEC. It is one end of the pipeline.
++
++Required properties:
++  - compatible: value must be one of:
++    * allwinner,sun5i-a10s-hdmi
++  - reg: base address and size of memory-mapped region
++  - clocks: phandles to the clocks feeding the HDMI encoder
++    * ahb: the HDMI interface clock
++    * mod: the HDMI module clock
++    * pll-0: the first video PLL
++    * pll-1: the second video PLL
++  - clock-names: the clock names mentioned above
++
++  - ports: A ports node with endpoint definitions as defined in
++    Documentation/devicetree/bindings/media/video-interfaces.txt. The
++    first port should be the input endpoint.
++
+ TV Encoder
+ ----------
+ 
 -- 
-~Vinod
+git-series 0.8.11
