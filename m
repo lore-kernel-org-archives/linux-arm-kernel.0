@@ -1,165 +1,140 @@
 From: guohanjun@huawei.com (Hanjun Guo)
-Date: Tue, 7 Mar 2017 20:40:10 +0800
-Subject: [PATCH v9 15/15] irqchip: mbigen: Add ACPI support
-In-Reply-To: <1488890410-15503-1-git-send-email-guohanjun@huawei.com>
-References: <1488890410-15503-1-git-send-email-guohanjun@huawei.com>
-Message-ID: <1488890410-15503-16-git-send-email-guohanjun@huawei.com>
+Date: Tue, 7 Mar 2017 20:39:55 +0800
+Subject: [PATCH v9 00/15] ACPI platform MSI support and its example mbigen
+Message-ID: <1488890410-15503-1-git-send-email-guohanjun@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Hanjun Guo <hanjun.guo@linaro.org>
 
-With the preparation of platform msi support and interrupt producer
-in DSDT, we can add mbigen ACPI support now.
+With platform msi support landed in the kernel, and the introduction
+of IORT for GICv3 ITS (PCI MSI) and SMMU, the framework for platform msi
+is ready, this patch set add few patches to enable the ACPI platform
+msi support.
 
-We are using Interrupt resource type in _CRS methd to indicate number
-of irq pins instead of num_pins in DT to avoid _DSD usage in this case.
+For platform device connecting to ITS on arm platform, we have IORT
+table with the named componant node to describe the mappings of paltform
+device and ITS, so we can retrieve the dev id and find its parent
+irqdomain (ITS) from IORT table (simlar with the ACPI ITS support).
 
-For mbigen,
-    Device(MBI0) {
-          Name(_HID, "HISI0152")
-          Name(_UID, Zero)
-          Name(_CRS, ResourceTemplate() {
-                  Memory32Fixed(ReadWrite, 0xa0080000, 0x10000)
-		  Interrupt(ResourceProducer,...) {12,14,....}
-          })
-    }
+v8 -> v9:
+	- Rebased on top of 4.11-rc1 and retest;
+	- Some of patch's commit message was updated by Lorenzo and
+	  it's clearer (thanks!)
 
-For devices,
-   Device(COM0) {
-          Name(_HID, "ACPIIDxx")
-          Name(_UID, Zero)
-          Name(_CRS, ResourceTemplate() {
-                 Memory32Fixed(ReadWrite, 0xb0030000, 0x10000)
-		 Interrupt(ResourceConsumer,..., "\_SB.MBI0") {12}
-          })
-    }
+No update in the code, hope it's the final revision.
 
-With the help of platform msi and interrupt producer, then devices
-will get the virq from mbigen's irqdomain.
+v7 -> v8:
+	- Using _CRS instead of _PRS for Interrupt resources for mbigen
 
-Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Ma Jun <majun258@huawei.com>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Thomas Gleixner <tglx@linutronix.de>
----
- drivers/irqchip/irq-mbigen.c | 70 ++++++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 67 insertions(+), 3 deletions(-)
+	- reshuffle the patch slightly to introduce iort_node_map_platform_id()
+	  first and then retrieve the dev id for platform MSI, no functional
+	  change
 
-diff --git a/drivers/irqchip/irq-mbigen.c b/drivers/irqchip/irq-mbigen.c
-index 3756408..e6bb503 100644
---- a/drivers/irqchip/irq-mbigen.c
-+++ b/drivers/irqchip/irq-mbigen.c
-@@ -16,6 +16,7 @@
-  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
- 
-+#include <linux/acpi.h>
- #include <linux/interrupt.h>
- #include <linux/irqchip.h>
- #include <linux/module.h>
-@@ -180,7 +181,7 @@ static int mbigen_domain_translate(struct irq_domain *d,
- 				    unsigned long *hwirq,
- 				    unsigned int *type)
- {
--	if (is_of_node(fwspec->fwnode)) {
-+	if (is_of_node(fwspec->fwnode) || is_acpi_device_node(fwspec->fwnode)) {
- 		if (fwspec->param_count != 2)
- 			return -EINVAL;
- 
-@@ -271,6 +272,54 @@ static int mbigen_of_create_domain(struct platform_device *pdev,
- 	return 0;
- }
- 
-+#ifdef CONFIG_ACPI
-+static acpi_status mbigen_acpi_process_resource(struct acpi_resource *ares,
-+					     void *context)
-+{
-+	struct acpi_resource_extended_irq *ext_irq;
-+	u32 *num_irqs = context;
-+
-+	switch (ares->type) {
-+	case ACPI_RESOURCE_TYPE_EXTENDED_IRQ:
-+		ext_irq = &ares->data.extended_irq;
-+		*num_irqs += ext_irq->interrupt_count;
-+		break;
-+	default:
-+		break;
-+	}
-+
-+	return AE_OK;
-+}
-+
-+static int mbigen_acpi_create_domain(struct platform_device *pdev,
-+				     struct mbigen_device *mgn_chip)
-+{
-+	struct irq_domain *domain;
-+	u32 num_msis = 0;
-+	acpi_status status;
-+
-+	status = acpi_walk_resources(ACPI_HANDLE(&pdev->dev), METHOD_NAME__CRS,
-+				     mbigen_acpi_process_resource, &num_msis);
-+	if (ACPI_FAILURE(status) || num_msis == 0)
-+		return -EINVAL;
-+
-+	domain = platform_msi_create_device_domain(&pdev->dev, num_msis,
-+						   mbigen_write_msg,
-+						   &mbigen_domain_ops,
-+						   mgn_chip);
-+	if (!domain)
-+		return -ENOMEM;
-+
-+	return 0;
-+}
-+#else
-+static inline int mbigen_acpi_create_domain(struct platform_device *pdev,
-+					    struct mbigen_device *mgn_chip)
-+{
-+	return -ENODEV;
-+}
-+#endif
-+
- static int mbigen_device_probe(struct platform_device *pdev)
- {
- 	struct mbigen_device *mgn_chip;
-@@ -289,9 +338,17 @@ static int mbigen_device_probe(struct platform_device *pdev)
- 	if (IS_ERR(mgn_chip->base))
- 		return PTR_ERR(mgn_chip->base);
- 
--	err = mbigen_of_create_domain(pdev, mgn_chip);
--	if (err)
-+	if (IS_ENABLED(CONFIG_OF) && pdev->dev.of_node)
-+		err = mbigen_of_create_domain(pdev, mgn_chip);
-+	else if (ACPI_COMPANION(&pdev->dev))
-+		err = mbigen_acpi_create_domain(pdev, mgn_chip);
-+	else
-+		err = -EINVAL;
-+
-+	if (err) {
-+		dev_err(&pdev->dev, "Failed to create mbi-gen@%p irqdomain", mgn_chip->base);
- 		return err;
-+	}
- 
- 	platform_set_drvdata(pdev, mgn_chip);
- 	return 0;
-@@ -303,10 +360,17 @@ static int mbigen_device_probe(struct platform_device *pdev)
- };
- MODULE_DEVICE_TABLE(of, mbigen_of_match);
- 
-+static const struct acpi_device_id mbigen_acpi_match[] = {
-+	{ "HISI0152", 0 },
-+	{}
-+};
-+MODULE_DEVICE_TABLE(acpi, mbigen_acpi_match);
-+
- static struct platform_driver mbigen_platform_driver = {
- 	.driver = {
- 		.name		= "Hisilicon MBIGEN-V2",
- 		.of_match_table	= mbigen_of_match,
-+		.acpi_match_table = ACPI_PTR(mbigen_acpi_match),
- 	},
- 	.probe			= mbigen_device_probe,
- };
+	- Fix the compile error with patch "irqchip: gicv3-its: platform-msi:
+	  scan MADT to create platform msi domain", which forgot to add 
+	  <include/acpi_iort.h> (added in later patches in last version).
+
+	- renew some commit message which suggested by Lorenzo
+
+	- address some othe minor issues which commented by Lorenzo
+
+	- Add review and test tag as it's no functional change except
+	  the last patch of mbigen
+
+	- rebase on top of 4.10-rc4 and test it on x86, ia64 and ARM64
+	  platforms (also with Agustin's patch [1-2/3] "[PATCH V9 0/3] irqchip: qcom:
+          Add IRQ combiner driver" and Lorenzo's patch
+          https://patchwork.kernel.org/patch/9507041/)
+
+v6 -> v7: 
+	- Introduce iort_node_map_platform_id() to retrieve the
+	  dev id for both NC (named component) -> ITS/SMMU and
+	  NC -> SMMU -> ITS cases, suggested by Lorenzo;
+
+	- Reorder the patches and rewrite some commit message;
+
+	- Remove the test tags because it has major changes
+	  to retrieve the dev id, Sinan, Majun, Xinwei, could
+	  you please test them again on your platform?
+
+	- rebased on top of 4.10-rc3 and Lorenzo's patch
+          https://patchwork.kernel.org/patch/9507041/
+
+	- Tested against Agustin's patch [1-2/3] "[PATCH V9 0/3] irqchip: qcom:
+          Add IRQ combiner driver"
+
+v5 -> v6:
+        - Call acpi_configure_pmsi_domain() for platform devices in
+          acpi_platform_notify() as it's cleaner (suggested by Rafael)
+        - Remove the "u8 type" for iort_id_map() because it's unused
+        - Rebase on top of 4.10-rc2
+        - Collect test and review tags
+
+v4 -> v5:
+        - Add mbigen support back with tested on with Agustin's patchset,
+          and it's a good example of how ACPI platform MSI works
+        - rebased on top of lastest Linus tree (commit 52bce91 splice: reinstate SIGPIPE/EPIPE handling)
+
+v3 -> v4:
+        - Drop mbi-gen patches to just submit platform msi support because
+          will rebase mbi-gen patches on top of Agustin's patchset, and discusion
+          is going there.
+        - Add a patch to support device topology such as NC(named componant, paltform device)
+          ->SMMU->ITS which suggested by Lorenzo;
+        - rebased on top of Lorenzo's v9 of ACPI IORT ARM SMMU support;
+        - rebased on top of 4.9-rc7
+
+v2 -> v3:
+        - Drop RFC tag
+        - Rebase against v4.9-rc2 and Lorenzo's v6 of ACPI IORT ARM SMMU support [1]
+        - Add 3 cleanup patches (patch 1, 2, 3)
+        - Drop arch_init call patch from last version
+        - Introduce a callback for platform device to set msi domain
+        - Introduce a new API to get paltform device's domain instead of
+          reusing the PCI one in previous version
+        - Add a patch to rework iort_node_get_id()
+
+[1]: http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1251993.html
+
+v1 -> v2:
+        - Fix the bug of if multi Interrupt() resoures in single _PRS,
+          we need to calculate all the irq numbers (I missed it in previous
+          version);
+        - Rebased on Marc's irq/irqchip-4.9 branch and Lorenzo's v5
+          SMMU patches (also Robin's SMMu patches)
+        - Add patch irqchip: mbigen: promote mbigen init.
+
+Hanjun Guo (13):
+  ACPI/IORT: Fix the indentation in iort_scan_node()
+  ACPI/IORT: Add missing comment for iort_dev_find_its_id()
+  ACPI/IORT: Rework iort_match_node_callback() return value handling
+  irqchip: gic-v3-its: keep the include header files in alphabetic
+    order
+  irqchip: gicv3-its: platform-msi: refactor its_pmsi_prepare()
+  irqchip: gicv3-its: platform-msi: refactor its_pmsi_init() to prepare
+    for ACPI
+  irqchip: gicv3-its: platform-msi: scan MADT to create platform msi
+    domain
+  ACPI/IORT: Rename iort_node_map_rid() to make it generic
+  ACPI/IORT: Introduce iort_node_map_platform_id() to retrieve dev id
+  ACPI: platform-msi: retrieve dev id from IORT
+  ACPI: platform: setup MSI domain for ACPI based platform device
+  msi: platform: make platform_msi_create_device_domain() ACPI aware
+  irqchip: mbigen: Add ACPI support
+
+Kefeng Wang (2):
+  irqchip: mbigen: drop module owner
+  irqchip: mbigen: introduce mbigen_of_create_domain()
+
+ drivers/acpi/arm64/iort.c                     | 158 +++++++++++++++++++++-----
+ drivers/acpi/glue.c                           |   6 +
+ drivers/base/platform-msi.c                   |   3 +-
+ drivers/irqchip/irq-gic-v3-its-platform-msi.c | 106 +++++++++++++----
+ drivers/irqchip/irq-gic-v3-its.c              |   2 +-
+ drivers/irqchip/irq-mbigen.c                  | 110 +++++++++++++++---
+ include/linux/acpi_iort.h                     |   8 ++
+ 7 files changed, 317 insertions(+), 76 deletions(-)
+
 -- 
 1.7.12.4
