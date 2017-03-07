@@ -1,104 +1,187 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 7 Mar 2017 14:21:40 +0000
-Subject: [PATCH v4 5/6] arm64: mmu: apply strict permissions to
- .init.text and .init.data
-In-Reply-To: <1488637848-13588-6-git-send-email-ard.biesheuvel@linaro.org>
-References: <1488637848-13588-1-git-send-email-ard.biesheuvel@linaro.org>
- <1488637848-13588-6-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20170307142140.GB3514@leverpostej>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 07 Mar 2017 15:22:10 +0100
+Subject: Applied "spi: davinci: Use SPI framework to handle DMA mapping" to
+ the spi tree
+In-Reply-To: <1487872921-26628-2-git-send-email-fisaksen@baylibre.com>
+Message-ID: <E1clG0A-0006nR-Dq@finisterre>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 04, 2017 at 02:30:47PM +0000, Ard Biesheuvel wrote:
-> diff --git a/arch/arm64/include/asm/sections.h b/arch/arm64/include/asm/sections.h
-> index 4e7e7067afdb..22582819b2e5 100644
-> --- a/arch/arm64/include/asm/sections.h
-> +++ b/arch/arm64/include/asm/sections.h
-> @@ -24,7 +24,8 @@ extern char __hibernate_exit_text_start[], __hibernate_exit_text_end[];
->  extern char __hyp_idmap_text_start[], __hyp_idmap_text_end[];
->  extern char __hyp_text_start[], __hyp_text_end[];
->  extern char __idmap_text_start[], __idmap_text_end[];
-> +extern char __initdata_begin[], __initdata_end[];
-> +extern char __inittext_begin[], __inittext_end[];
->  extern char __irqentry_text_start[], __irqentry_text_end[];
->  extern char __mmuoff_data_start[], __mmuoff_data_end[];
-> -
->  #endif /* __ASM_SECTIONS_H */
+The patch
 
-Unintended whitespace change?
+   spi: davinci: Use SPI framework to handle DMA mapping
 
-Please restore the line above the endif. 
+has been applied to the spi tree at
 
-> diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
-> index b8deffa9e1bf..2c93d259046c 100644
-> --- a/arch/arm64/kernel/vmlinux.lds.S
-> +++ b/arch/arm64/kernel/vmlinux.lds.S
-> @@ -143,12 +143,27 @@ SECTIONS
->  
->  	. = ALIGN(SEGMENT_ALIGN);
->  	__init_begin = .;
-> +	__inittext_begin = .;
->  
->  	INIT_TEXT_SECTION(8)
->  	.exit.text : {
->  		ARM_EXIT_KEEP(EXIT_TEXT)
->  	}
->  
-> +	. = ALIGN(4);
-> +	.altinstructions : {
-> +		__alt_instructions = .;
-> +		*(.altinstructions)
-> +		__alt_instructions_end = .;
-> +	}
-> +	.altinstr_replacement : {
-> +		*(.altinstr_replacement)
-> +	}
-> +
-> +	. = ALIGN(PAGE_SIZE);
+   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git 
 
-Arguably this should be SEGMENT_ALIGN for consitency, but given this is
-just .init* this should be fine.
+All being well this means that it will be integrated into the linux-next
+tree (usually sometime in the next 24 hours) and sent to Linus during
+the next merge window (or sooner if it is a bug fix), however if
+problems are discovered then the patch may be dropped or reverted.  
 
-> +	__inittext_end = .;
-> +	__initdata_begin = .;
-> +
->  	.init.data : {
->  		INIT_DATA
->  		INIT_SETUP(16)
+You may get further e-mails resulting from automated or manual testing
+and review of the tree, please engage with people reporting problems and
+send followup patches addressing any issues that are reported if needed.
 
-[...]
+If any updates are required or you are submitting further changes they
+should be sent as incremental updates against current git, existing
+patches will not be replaced.
 
-> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-> index edd982f88714..0612573ef869 100644
-> --- a/arch/arm64/mm/mmu.c
-> +++ b/arch/arm64/mm/mmu.c
-> @@ -459,14 +459,18 @@ early_param("rodata", parse_rodata);
->   */
->  static void __init map_kernel(pgd_t *pgd)
->  {
-> -	static struct vm_struct vmlinux_text, vmlinux_rodata, vmlinux_init, vmlinux_data;
-> +	static struct vm_struct vmlinux_text, vmlinux_rodata, vmlinux_inittext,
-> +				vmlinux_initdata, vmlinux_data;
->  
->  	pgprot_t text_prot = rodata_enabled ? PAGE_KERNEL_ROX : PAGE_KERNEL_EXEC;
->  
->  	map_kernel_segment(pgd, _text, _etext, text_prot, &vmlinux_text);
-> -	map_kernel_segment(pgd, __start_rodata, __init_begin, PAGE_KERNEL, &vmlinux_rodata);
-> -	map_kernel_segment(pgd, __init_begin, __init_end, PAGE_KERNEL_EXEC,
-> -			   &vmlinux_init);
-> +	map_kernel_segment(pgd, __start_rodata, __inittext_begin, PAGE_KERNEL,
-> +			   &vmlinux_rodata);
-> +	map_kernel_segment(pgd, __inittext_begin, __inittext_end, text_prot,
-> +			   &vmlinux_inittext);
-> +	map_kernel_segment(pgd, __initdata_begin, __initdata_end, PAGE_KERNEL,
-> +			   &vmlinux_initdata);
->  	map_kernel_segment(pgd, _data, _end, PAGE_KERNEL, &vmlinux_data);
+Please add any relevant lists and maintainers to the CCs when replying
+to this mail.
 
+Thanks,
+Mark
 
-This all look fine, given text_prot is used for the init text.
+>From 8aedbf580d21121d2a032e4c8ea12d8d2d85e275 Mon Sep 17 00:00:00 2001
+From: Fabien Parent <fparent@baylibre.com>
+Date: Thu, 23 Feb 2017 19:01:56 +0100
+Subject: [PATCH] spi: davinci: Use SPI framework to handle DMA mapping
 
-With the whitespace restored:
+Uppers layers like MTD can pass vmalloc'd buffers to the SPI driver,
+and the current implementation will fail to map these kind of buffers.
+The SPI framework is able to detect the best way to handle and map
+buffers.
+This commit updates the davinci SPI driver in order to use the SPI
+framework to handle the DMA mapping of buffers coming from an upper
+layer.
 
-Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Fabien Parent <fparent@baylibre.com>
+Signed-off-by: Frode Isaksen <fisaksen@baylibre.com>
+Signed-off-by: Mark Brown <broonie@kernel.org>
+---
+ drivers/spi/spi-davinci.c | 69 +++++++++++++----------------------------------
+ 1 file changed, 18 insertions(+), 51 deletions(-)
 
-Mark.
+diff --git a/drivers/spi/spi-davinci.c b/drivers/spi/spi-davinci.c
+index 02fb96797ac8..164cc719be54 100644
+--- a/drivers/spi/spi-davinci.c
++++ b/drivers/spi/spi-davinci.c
+@@ -467,6 +467,19 @@ static void davinci_spi_cleanup(struct spi_device *spi)
+ 		kfree(spicfg);
+ }
+ 
++static bool davinci_spi_can_dma(struct spi_master *master,
++				struct spi_device *spi,
++				struct spi_transfer *xfer)
++{
++	struct davinci_spi_config *spicfg = spi->controller_data;
++	bool can_dma = false;
++
++	if (spicfg)
++		can_dma = spicfg->io_type == SPI_IO_TYPE_DMA;
++
++	return can_dma;
++}
++
+ static int davinci_spi_check_error(struct davinci_spi *dspi, int int_status)
+ {
+ 	struct device *sdev = dspi->bitbang.master->dev.parent;
+@@ -581,8 +594,6 @@ static int davinci_spi_bufs(struct spi_device *spi, struct spi_transfer *t)
+ 	struct davinci_spi_config *spicfg;
+ 	struct davinci_spi_platform_data *pdata;
+ 	unsigned uninitialized_var(rx_buf_count);
+-	void *dummy_buf = NULL;
+-	struct scatterlist sg_rx, sg_tx;
+ 
+ 	dspi = spi_master_get_devdata(spi->master);
+ 	pdata = &dspi->pdata;
+@@ -630,51 +641,18 @@ static int davinci_spi_bufs(struct spi_device *spi, struct spi_transfer *t)
+ 		};
+ 		struct dma_async_tx_descriptor *rxdesc;
+ 		struct dma_async_tx_descriptor *txdesc;
+-		void *buf;
+-
+-		dummy_buf = kzalloc(t->len, GFP_KERNEL);
+-		if (!dummy_buf)
+-			goto err_alloc_dummy_buf;
+ 
+ 		dmaengine_slave_config(dspi->dma_rx, &dma_rx_conf);
+ 		dmaengine_slave_config(dspi->dma_tx, &dma_tx_conf);
+ 
+-		sg_init_table(&sg_rx, 1);
+-		if (!t->rx_buf)
+-			buf = dummy_buf;
+-		else
+-			buf = t->rx_buf;
+-		t->rx_dma = dma_map_single(&spi->dev, buf,
+-				t->len, DMA_FROM_DEVICE);
+-		if (dma_mapping_error(&spi->dev, !t->rx_dma)) {
+-			ret = -EFAULT;
+-			goto err_rx_map;
+-		}
+-		sg_dma_address(&sg_rx) = t->rx_dma;
+-		sg_dma_len(&sg_rx) = t->len;
+-
+-		sg_init_table(&sg_tx, 1);
+-		if (!t->tx_buf)
+-			buf = dummy_buf;
+-		else
+-			buf = (void *)t->tx_buf;
+-		t->tx_dma = dma_map_single(&spi->dev, buf,
+-				t->len, DMA_TO_DEVICE);
+-		if (dma_mapping_error(&spi->dev, t->tx_dma)) {
+-			ret = -EFAULT;
+-			goto err_tx_map;
+-		}
+-		sg_dma_address(&sg_tx) = t->tx_dma;
+-		sg_dma_len(&sg_tx) = t->len;
+-
+ 		rxdesc = dmaengine_prep_slave_sg(dspi->dma_rx,
+-				&sg_rx, 1, DMA_DEV_TO_MEM,
++				t->rx_sg.sgl, t->rx_sg.nents, DMA_DEV_TO_MEM,
+ 				DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
+ 		if (!rxdesc)
+ 			goto err_desc;
+ 
+ 		txdesc = dmaengine_prep_slave_sg(dspi->dma_tx,
+-				&sg_tx, 1, DMA_MEM_TO_DEV,
++				t->tx_sg.sgl, t->tx_sg.nents, DMA_MEM_TO_DEV,
+ 				DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
+ 		if (!txdesc)
+ 			goto err_desc;
+@@ -710,16 +688,9 @@ static int davinci_spi_bufs(struct spi_device *spi, struct spi_transfer *t)
+ 	}
+ 
+ 	clear_io_bits(dspi->base + SPIINT, SPIINT_MASKALL);
+-	if (spicfg->io_type == SPI_IO_TYPE_DMA) {
++	if (spicfg->io_type == SPI_IO_TYPE_DMA)
+ 		clear_io_bits(dspi->base + SPIINT, SPIINT_DMA_REQ_EN);
+ 
+-		dma_unmap_single(&spi->dev, t->rx_dma,
+-				t->len, DMA_FROM_DEVICE);
+-		dma_unmap_single(&spi->dev, t->tx_dma,
+-				t->len, DMA_TO_DEVICE);
+-		kfree(dummy_buf);
+-	}
+-
+ 	clear_io_bits(dspi->base + SPIGCR1, SPIGCR1_SPIENA_MASK);
+ 	set_io_bits(dspi->base + SPIGCR1, SPIGCR1_POWERDOWN_MASK);
+ 
+@@ -742,12 +713,6 @@ static int davinci_spi_bufs(struct spi_device *spi, struct spi_transfer *t)
+ 	return t->len;
+ 
+ err_desc:
+-	dma_unmap_single(&spi->dev, t->tx_dma, t->len, DMA_TO_DEVICE);
+-err_tx_map:
+-	dma_unmap_single(&spi->dev, t->rx_dma, t->len, DMA_FROM_DEVICE);
+-err_rx_map:
+-	kfree(dummy_buf);
+-err_alloc_dummy_buf:
+ 	return ret;
+ }
+ 
+@@ -988,8 +953,10 @@ static int davinci_spi_probe(struct platform_device *pdev)
+ 	master->bus_num = pdev->id;
+ 	master->num_chipselect = pdata->num_chipselect;
+ 	master->bits_per_word_mask = SPI_BPW_RANGE_MASK(2, 16);
++	master->flags = (SPI_MASTER_MUST_RX | SPI_MASTER_MUST_TX);
+ 	master->setup = davinci_spi_setup;
+ 	master->cleanup = davinci_spi_cleanup;
++	master->can_dma = davinci_spi_can_dma;
+ 
+ 	dspi->bitbang.chipselect = davinci_spi_chipselect;
+ 	dspi->bitbang.setup_transfer = davinci_spi_setup_transfer;
+-- 
+2.11.0
