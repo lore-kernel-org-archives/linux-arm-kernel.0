@@ -1,63 +1,47 @@
 From: guohanjun@huawei.com (Hanjun Guo)
-Date: Tue, 7 Mar 2017 20:39:58 +0800
-Subject: [PATCH v9 03/15] ACPI/IORT: Rework iort_match_node_callback() return
- value handling
+Date: Tue, 7 Mar 2017 20:39:59 +0800
+Subject: [PATCH v9 04/15] irqchip: gic-v3-its: keep the include header files
+ in alphabetic order
 In-Reply-To: <1488890410-15503-1-git-send-email-guohanjun@huawei.com>
 References: <1488890410-15503-1-git-send-email-guohanjun@huawei.com>
-Message-ID: <1488890410-15503-4-git-send-email-guohanjun@huawei.com>
+Message-ID: <1488890410-15503-5-git-send-email-guohanjun@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Hanjun Guo <hanjun.guo@linaro.org>
 
-The return value handling in iort_match_node_callback() is
-too convoluted; update the iort_match_node_callback() return
-value handling to make code easier to read.
+Rearrange header file includes in alphabetic order.
 
 Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-[lorenzo.pieralisi at arm.com: rewrote commit log]
+[lorenzo.pieralisi at arm.com: fixed commit log]
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Tested-by: Ming Lei <ming.lei@canonical.com>
 Tested-by: Wei Xu <xuwei5@hisilicon.com>
 Tested-by: Sinan Kaya <okaya@codeaurora.org>
-Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
 Cc: Tomasz Nowicki <tn@semihalf.com>
 ---
- drivers/acpi/arm64/iort.c | 8 ++------
- 1 file changed, 2 insertions(+), 6 deletions(-)
+ drivers/irqchip/irq-gic-v3-its.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-index abc5774..a6b807d 100644
---- a/drivers/acpi/arm64/iort.c
-+++ b/drivers/acpi/arm64/iort.c
-@@ -253,17 +253,15 @@ static acpi_status iort_match_node_callback(struct acpi_iort_node *node,
- 					    void *context)
- {
- 	struct device *dev = context;
--	acpi_status status;
-+	acpi_status status = AE_NOT_FOUND;
+diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+index 2320100..6fc287fb 100644
+--- a/drivers/irqchip/irq-gic-v3-its.c
++++ b/drivers/irqchip/irq-gic-v3-its.c
+@@ -16,13 +16,13 @@
+  */
  
- 	if (node->type == ACPI_IORT_NODE_NAMED_COMPONENT) {
- 		struct acpi_buffer buf = { ACPI_ALLOCATE_BUFFER, NULL };
- 		struct acpi_device *adev = to_acpi_device_node(dev->fwnode);
- 		struct acpi_iort_named_component *ncomp;
- 
--		if (!adev) {
--			status = AE_NOT_FOUND;
-+		if (!adev)
- 			goto out;
--		}
- 
- 		status = acpi_get_name(adev->handle, ACPI_FULL_PATHNAME, &buf);
- 		if (ACPI_FAILURE(status)) {
-@@ -289,8 +287,6 @@ static acpi_status iort_match_node_callback(struct acpi_iort_node *node,
- 		 */
- 		status = pci_rc->pci_segment_number == pci_domain_nr(bus) ?
- 							AE_OK : AE_NOT_FOUND;
--	} else {
--		status = AE_NOT_FOUND;
- 	}
- out:
- 	return status;
+ #include <linux/acpi.h>
++#include <linux/acpi_iort.h>
+ #include <linux/bitmap.h>
+ #include <linux/cpu.h>
+ #include <linux/delay.h>
+ #include <linux/dma-iommu.h>
+ #include <linux/interrupt.h>
+ #include <linux/irqdomain.h>
+-#include <linux/acpi_iort.h>
+ #include <linux/log2.h>
+ #include <linux/mm.h>
+ #include <linux/msi.h>
 -- 
 1.7.12.4
