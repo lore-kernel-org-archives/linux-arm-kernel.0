@@ -1,182 +1,1008 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue,  7 Mar 2017 09:56:21 +0100
-Subject: [PATCH 2/15] clk: sunxi-ng: Pass the parent and a pointer to the
- clocks round rate
+Date: Tue,  7 Mar 2017 09:56:32 +0100
+Subject: [PATCH 13/15] drm/sun4i: Add HDMI support
 In-Reply-To: <cover.bc06ffa88f847ddd9ddd7c259415d5f61b55307b.1488876832.git-series.maxime.ripard@free-electrons.com>
 References: <cover.bc06ffa88f847ddd9ddd7c259415d5f61b55307b.1488876832.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <263d27de0ef00f042443d10f6d92fb051ac80349.1488876832.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <c63d01aedeccc58bf8d6f5bfd66d8595156e9491.1488876832.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The clocks might need to modify their parent clocks. In order to make that
-possible, give them access to the parent clock being evaluated, and to a
-pointer to the parent rate so that they can modify it if needed.
+The earlier Allwinner SoCs (A10, A10s, A20, A31) have an embedded HDMI
+controller.
+
+That HDMI controller is able to do audio and CEC, but those have been left
+out for now.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/clk/sunxi-ng/ccu_div.c  |  7 ++++---
- drivers/clk/sunxi-ng/ccu_mp.c   |  7 ++++---
- drivers/clk/sunxi-ng/ccu_mult.c | 11 ++++++-----
- drivers/clk/sunxi-ng/ccu_mux.c  |  8 +++++---
- drivers/clk/sunxi-ng/ccu_mux.h  |  3 ++-
- drivers/clk/sunxi-ng/ccu_nkm.c  |  7 ++++---
- 6 files changed, 25 insertions(+), 18 deletions(-)
+ drivers/gpu/drm/sun4i/Makefile              |   5 +-
+ drivers/gpu/drm/sun4i/sun4i_hdmi.h          | 124 ++++++-
+ drivers/gpu/drm/sun4i/sun4i_hdmi_ddc_clk.c  | 128 ++++++-
+ drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c      | 449 +++++++++++++++++++++-
+ drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c | 236 +++++++++++-
+ 5 files changed, 942 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/gpu/drm/sun4i/sun4i_hdmi.h
+ create mode 100644 drivers/gpu/drm/sun4i/sun4i_hdmi_ddc_clk.c
+ create mode 100644 drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c
+ create mode 100644 drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c
 
-diff --git a/drivers/clk/sunxi-ng/ccu_div.c b/drivers/clk/sunxi-ng/ccu_div.c
-index 92855c2b30bb..7f8b06e38636 100644
---- a/drivers/clk/sunxi-ng/ccu_div.c
-+++ b/drivers/clk/sunxi-ng/ccu_div.c
-@@ -14,7 +14,8 @@
- #include "ccu_div.h"
+diff --git a/drivers/gpu/drm/sun4i/Makefile b/drivers/gpu/drm/sun4i/Makefile
+index 59b757350a1f..68a0f6244a59 100644
+--- a/drivers/gpu/drm/sun4i/Makefile
++++ b/drivers/gpu/drm/sun4i/Makefile
+@@ -7,7 +7,12 @@ sun4i-tcon-y += sun4i_dotclock.o
+ sun4i-tcon-y += sun4i_crtc.o
+ sun4i-tcon-y += sun4i_layer.o
  
- static unsigned long ccu_div_round_rate(struct ccu_mux_internal *mux,
--					unsigned long parent_rate,
-+					struct clk_hw *parent,
-+					unsigned long *parent_rate,
- 					unsigned long rate,
- 					void *data)
- {
-@@ -26,10 +27,10 @@ static unsigned long ccu_div_round_rate(struct ccu_mux_internal *mux,
- 	 * several parents, while we might be called to evaluate
- 	 * several different parents.
- 	 */
--	val = divider_get_val(rate, parent_rate, cd->div.table, cd->div.width,
-+	val = divider_get_val(rate, *parent_rate, cd->div.table, cd->div.width,
- 			      cd->div.flags);
- 
--	return divider_recalc_rate(&cd->common.hw, parent_rate, val,
-+	return divider_recalc_rate(&cd->common.hw, *parent_rate, val,
- 				   cd->div.table, cd->div.flags);
- }
- 
-diff --git a/drivers/clk/sunxi-ng/ccu_mp.c b/drivers/clk/sunxi-ng/ccu_mp.c
-index b583f186a804..de02e6c386d8 100644
---- a/drivers/clk/sunxi-ng/ccu_mp.c
-+++ b/drivers/clk/sunxi-ng/ccu_mp.c
-@@ -41,7 +41,8 @@ static void ccu_mp_find_best(unsigned long parent, unsigned long rate,
- }
- 
- static unsigned long ccu_mp_round_rate(struct ccu_mux_internal *mux,
--				       unsigned long parent_rate,
-+				       struct clk_hw *hw,
-+				       unsigned long *parent_rate,
- 				       unsigned long rate,
- 				       void *data)
- {
-@@ -52,9 +53,9 @@ static unsigned long ccu_mp_round_rate(struct ccu_mux_internal *mux,
- 	max_m = cmp->m.max ?: 1 << cmp->m.width;
- 	max_p = cmp->p.max ?: 1 << ((1 << cmp->p.width) - 1);
- 
--	ccu_mp_find_best(parent_rate, rate, max_m, max_p, &m, &p);
-+	ccu_mp_find_best(*parent_rate, rate, max_m, max_p, &m, &p);
- 
--	return parent_rate / p / m;
-+	return *parent_rate / p / m;
- }
- 
- static void ccu_mp_disable(struct clk_hw *hw)
-diff --git a/drivers/clk/sunxi-ng/ccu_mult.c b/drivers/clk/sunxi-ng/ccu_mult.c
-index 8724c01171b1..76d17162366f 100644
---- a/drivers/clk/sunxi-ng/ccu_mult.c
-+++ b/drivers/clk/sunxi-ng/ccu_mult.c
-@@ -33,9 +33,10 @@ static void ccu_mult_find_best(unsigned long parent, unsigned long rate,
- }
- 
- static unsigned long ccu_mult_round_rate(struct ccu_mux_internal *mux,
--					unsigned long parent_rate,
--					unsigned long rate,
--					void *data)
-+					 struct clk_hw *parent,
-+					 unsigned long *parent_rate,
-+					 unsigned long rate,
-+					 void *data)
- {
- 	struct ccu_mult *cm = data;
- 	struct _ccu_mult _cm;
-@@ -47,9 +48,9 @@ static unsigned long ccu_mult_round_rate(struct ccu_mux_internal *mux,
- 	else
- 		_cm.max = (1 << cm->mult.width) + cm->mult.offset - 1;
- 
--	ccu_mult_find_best(parent_rate, rate, &_cm);
-+	ccu_mult_find_best(*parent_rate, rate, &_cm);
- 
--	return parent_rate * _cm.mult;
-+	return *parent_rate * _cm.mult;
- }
- 
- static void ccu_mult_disable(struct clk_hw *hw)
-diff --git a/drivers/clk/sunxi-ng/ccu_mux.c b/drivers/clk/sunxi-ng/ccu_mux.c
-index c6bb1f523232..bae735e252b6 100644
---- a/drivers/clk/sunxi-ng/ccu_mux.c
-+++ b/drivers/clk/sunxi-ng/ccu_mux.c
-@@ -61,7 +61,8 @@ int ccu_mux_helper_determine_rate(struct ccu_common *common,
- 				  struct ccu_mux_internal *cm,
- 				  struct clk_rate_request *req,
- 				  unsigned long (*round)(struct ccu_mux_internal *,
--							 unsigned long,
-+							 struct clk_hw *,
-+							 unsigned long *,
- 							 unsigned long,
- 							 void *),
- 				  void *data)
-@@ -80,7 +81,8 @@ int ccu_mux_helper_determine_rate(struct ccu_common *common,
- 		ccu_mux_helper_adjust_parent_for_prediv(common, cm, -1,
- 							&adj_parent_rate);
- 
--		best_rate = round(cm, adj_parent_rate, req->rate, data);
-+		best_rate = round(cm, best_parent, &adj_parent_rate,
-+				  req->rate, data);
- 
- 		goto out;
- 	}
-@@ -109,7 +111,7 @@ int ccu_mux_helper_determine_rate(struct ccu_common *common,
- 		ccu_mux_helper_adjust_parent_for_prediv(common, cm, i,
- 							&adj_parent_rate);
- 
--		tmp_rate = round(cm, adj_parent_rate, req->rate, data);
-+		tmp_rate = round(cm, parent, &adj_parent_rate, req->rate, data);
- 		if (tmp_rate == req->rate) {
- 			best_parent = parent;
- 			best_parent_rate = parent_rate;
-diff --git a/drivers/clk/sunxi-ng/ccu_mux.h b/drivers/clk/sunxi-ng/ccu_mux.h
-index 47aba3a48245..4be56eee2bfd 100644
---- a/drivers/clk/sunxi-ng/ccu_mux.h
-+++ b/drivers/clk/sunxi-ng/ccu_mux.h
-@@ -86,7 +86,8 @@ int ccu_mux_helper_determine_rate(struct ccu_common *common,
- 				  struct ccu_mux_internal *cm,
- 				  struct clk_rate_request *req,
- 				  unsigned long (*round)(struct ccu_mux_internal *,
--							 unsigned long,
-+							 struct clk_hw *,
-+							 unsigned long *,
- 							 unsigned long,
- 							 void *),
- 				  void *data);
-diff --git a/drivers/clk/sunxi-ng/ccu_nkm.c b/drivers/clk/sunxi-ng/ccu_nkm.c
-index 71f81e95a061..c5e010eb5991 100644
---- a/drivers/clk/sunxi-ng/ccu_nkm.c
-+++ b/drivers/clk/sunxi-ng/ccu_nkm.c
-@@ -102,7 +102,8 @@ static unsigned long ccu_nkm_recalc_rate(struct clk_hw *hw,
- }
- 
- static unsigned long ccu_nkm_round_rate(struct ccu_mux_internal *mux,
--					unsigned long parent_rate,
-+					struct clk_hw *hw,
-+					unsigned long *parent_rate,
- 					unsigned long rate,
- 					void *data)
- {
-@@ -116,9 +117,9 @@ static unsigned long ccu_nkm_round_rate(struct ccu_mux_internal *mux,
- 	_nkm.min_m = 1;
- 	_nkm.max_m = nkm->m.max ?: 1 << nkm->m.width;
- 
--	ccu_nkm_find_best(parent_rate, rate, &_nkm);
-+	ccu_nkm_find_best(*parent_rate, rate, &_nkm);
- 
--	return parent_rate * _nkm.n * _nkm.k / _nkm.m;
-+	return *parent_rate * _nkm.n * _nkm.k / _nkm.m;
- }
- 
- static int ccu_nkm_determine_rate(struct clk_hw *hw,
++sun4i-drm-hdmi-y += sun4i_hdmi_enc.o
++sun4i-drm-hdmi-y += sun4i_hdmi_ddc_clk.o
++sun4i-drm-hdmi-y += sun4i_hdmi_tmds_clk.o
++
+ obj-$(CONFIG_DRM_SUN4I)		+= sun4i-drm.o sun4i-tcon.o
+ obj-$(CONFIG_DRM_SUN4I)		+= sun4i_backend.o
+ obj-$(CONFIG_DRM_SUN4I)		+= sun6i_drc.o
++obj-$(CONFIG_DRM_SUN4I)		+= sun4i-drm-hdmi.o
+ obj-$(CONFIG_DRM_SUN4I)		+= sun4i_tv.o
+diff --git a/drivers/gpu/drm/sun4i/sun4i_hdmi.h b/drivers/gpu/drm/sun4i/sun4i_hdmi.h
+new file mode 100644
+index 000000000000..2ad25b8fd3cd
+--- /dev/null
++++ b/drivers/gpu/drm/sun4i/sun4i_hdmi.h
+@@ -0,0 +1,124 @@
++/*
++ * Copyright (C) 2016 Maxime Ripard
++ *
++ * Maxime Ripard <maxime.ripard@free-electrons.com>
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License as
++ * published by the Free Software Foundation; either version 2 of
++ * the License, or (at your option) any later version.
++ */
++
++#ifndef _SUN4I_HDMI_H_
++#define _SUN4I_HDMI_H_
++
++#include <drm/drm_connector.h>
++#include <drm/drm_encoder.h>
++
++#define SUN4I_HDMI_CTRL_REG		0x004
++#define SUN4I_HDMI_CTRL_ENABLE			BIT(31)
++
++#define SUN4I_HDMI_IRQ_REG		0x008
++#define SUN4I_HDMI_IRQ_STA_MASK			0x73
++#define SUN4I_HDMI_IRQ_STA_FIFO_OF		BIT(1)
++#define SUN4I_HDMI_IRQ_STA_FIFO_UF		BIT(0)
++
++#define SUN4I_HDMI_HPD_REG		0x00c
++#define SUN4I_HDMI_HPD_HIGH			BIT(0)
++
++#define SUN4I_HDMI_VID_CTRL_REG		0x010
++#define SUN4I_HDMI_VID_CTRL_ENABLE		BIT(31)
++#define SUN4I_HDMI_VID_CTRL_HDMI_MODE		BIT(30)
++
++#define SUN4I_HDMI_VID_TIMING_ACT_REG	0x014
++#define SUN4I_HDMI_VID_TIMING_BP_REG	0x018
++#define SUN4I_HDMI_VID_TIMING_FP_REG	0x01c
++#define SUN4I_HDMI_VID_TIMING_SPW_REG	0x020
++
++#define SUN4I_HDMI_VID_TIMING_X(x)		((((x) - 1) & GENMASK(11, 0)))
++#define SUN4I_HDMI_VID_TIMING_Y(y)		((((y) - 1) & GENMASK(11, 0)) << 16)
++
++#define SUN4I_HDMI_VID_TIMING_POL_REG	0x024
++#define SUN4I_HDMI_VID_TIMING_POL_TX_CLK        (0x3e0 << 16)
++#define SUN4I_HDMI_VID_TIMING_POL_VSYNC		BIT(1)
++#define SUN4I_HDMI_VID_TIMING_POL_HSYNC		BIT(0)
++
++#define SUN4I_HDMI_AVI_INFOFRAME_REG(n)	(0x080 + (n))
++
++#define SUN4I_HDMI_PAD_CTRL0_REG	0x200
++
++#define SUN4I_HDMI_PAD_CTRL1_REG	0x204
++#define SUN4I_HDMI_PAD_CTRL1_HALVE_CLK		BIT(6)
++
++#define SUN4I_HDMI_PLL_CTRL_REG		0x208
++#define SUN4I_HDMI_PLL_CTRL_DIV(n)		((n) << 4)
++#define SUN4I_HDMI_PLL_CTRL_DIV_MASK		GENMASK(7, 4)
++
++#define SUN4I_HDMI_PLL_DBG0_REG		0x20c
++#define SUN4I_HDMI_PLL_DBG0_TMDS_PARENT(n)	(((n) & 1) << 21)
++#define SUN4I_HDMI_PLL_DBG0_TMDS_PARENT_MASK	BIT(21)
++#define SUN4I_HDMI_PLL_DBG0_TMDS_PARENT_SHIFT	21
++
++#define SUN4I_HDMI_PKT_CTRL_REG(n)	(0x2f0 + (4 * (n)))
++#define SUN4I_HDMI_PKT_CTRL_TYPE(n, t)		((t) << (((n) % 4) * 4))
++
++#define SUN4I_HDMI_UNKNOWN_REG		0x300
++#define SUN4I_HDMI_UNKNOWN_INPUT_SYNC		BIT(27)
++
++#define SUN4I_HDMI_DDC_CTRL_REG		0x500
++#define SUN4I_HDMI_DDC_CTRL_ENABLE		BIT(31)
++#define SUN4I_HDMI_DDC_CTRL_START_CMD		BIT(30)
++#define SUN4I_HDMI_DDC_CTRL_RESET		BIT(0)
++
++#define SUN4I_HDMI_DDC_ADDR_REG		0x504
++#define SUN4I_HDMI_DDC_ADDR_SEGMENT(seg)	(((seg) & 0xff) << 24)
++#define SUN4I_HDMI_DDC_ADDR_EDDC(addr)		(((addr) & 0xff) << 16)
++#define SUN4I_HDMI_DDC_ADDR_OFFSET(off)		(((off) & 0xff) << 8)
++#define SUN4I_HDMI_DDC_ADDR_SLAVE(addr)		((addr) & 0xff)
++
++#define SUN4I_HDMI_DDC_FIFO_CTRL_REG	0x510
++#define SUN4I_HDMI_DDC_FIFO_CTRL_CLEAR		BIT(31)
++	
++#define SUN4I_HDMI_DDC_FIFO_DATA_REG	0x518
++#define SUN4I_HDMI_DDC_BYTE_COUNT_REG	0x51c
++
++#define SUN4I_HDMI_DDC_CMD_REG		0x520
++#define SUN4I_HDMI_DDC_CMD_EXPLICIT_EDDC_READ	6
++
++#define SUN4I_HDMI_DDC_CLK_REG		0x528
++#define SUN4I_HDMI_DDC_CLK_M(m)			(((m) & 0x7) << 3)
++#define SUN4I_HDMI_DDC_CLK_N(n)			((n) & 0x7)
++
++#define SUN4I_HDMI_DDC_LINE_CTRL_REG	0x540
++#define SUN4I_HDMI_DDC_LINE_CTRL_SDA_ENABLE	BIT(9)
++#define SUN4I_HDMI_DDC_LINE_CTRL_SCL_ENABLE	BIT(8)
++
++#define SUN4I_HDMI_DDC_FIFO_SIZE	16
++
++enum sun4i_hdmi_pkt_type {
++	SUN4I_HDMI_PKT_AVI = 2,
++	SUN4I_HDMI_PKT_END = 15,
++};
++
++struct sun4i_hdmi {
++	struct drm_connector	connector;
++	struct drm_encoder	encoder;
++	struct device		*dev;
++
++	void __iomem		*base;
++	struct clk		*bus_clk;
++	struct clk		*ddc_clk;
++	struct clk		*mod_clk;
++	struct clk		*pll0_clk;
++	struct clk		*pll1_clk;
++	struct clk		*tmds_clk;
++
++	struct sun4i_drv	*drv;
++
++	bool			hdmi_monitor;
++};
++
++int sun4i_ddc_create(struct sun4i_hdmi *hdmi, struct clk *clk);
++int sun4i_tmds_create(struct sun4i_hdmi *hdmi);
++
++#endif /* _SUN4I_HDMI_H_ */
+diff --git a/drivers/gpu/drm/sun4i/sun4i_hdmi_ddc_clk.c b/drivers/gpu/drm/sun4i/sun4i_hdmi_ddc_clk.c
+new file mode 100644
+index 000000000000..5125b14ea7a5
+--- /dev/null
++++ b/drivers/gpu/drm/sun4i/sun4i_hdmi_ddc_clk.c
+@@ -0,0 +1,128 @@
++/*
++ * Copyright (C) 2016 Free Electrons
++ * Copyright (C) 2016 NextThing Co
++ *
++ * Maxime Ripard <maxime.ripard@free-electrons.com>
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License as
++ * published by the Free Software Foundation; either version 2 of
++ * the License, or (at your option) any later version.
++ */
++
++#include <linux/clk-provider.h>
++
++#include "sun4i_tcon.h"
++#include "sun4i_hdmi.h"
++
++struct sun4i_ddc {
++	struct clk_hw		hw;
++	struct sun4i_hdmi	*hdmi;
++};
++
++static inline struct sun4i_ddc *hw_to_ddc(struct clk_hw *hw)
++{
++	return container_of(hw, struct sun4i_ddc, hw);
++}
++
++static unsigned long sun4i_ddc_calc_divider(unsigned long rate,
++					    unsigned long parent_rate,
++					    u8 *m, u8 *n)
++{
++	unsigned long best_rate = 0;
++	u8 best_m = 0, best_n = 0, _m, _n;
++
++	for (_m = 0; _m < 8; _m++) {
++		for (_n = 0; _n < 8; _n++) {
++			unsigned long tmp_rate;
++
++			tmp_rate = (((parent_rate / 2) / 10) >> _n) / (_m + 1);
++
++			if (tmp_rate > rate)
++				continue;
++
++			if (abs(rate - tmp_rate) < abs(rate - best_rate)) {
++				best_rate = tmp_rate;
++				best_m = _m;
++				best_n = _n;
++			}
++		}
++	}
++
++	if (m && n) {
++		*m = best_m;
++		*n = best_n;
++	}
++
++	return best_rate;
++}
++
++static long sun4i_ddc_round_rate(struct clk_hw *hw, unsigned long rate,
++				 unsigned long *prate)
++{
++	return sun4i_ddc_calc_divider(rate, *prate, NULL, NULL);
++}
++
++static unsigned long sun4i_ddc_recalc_rate(struct clk_hw *hw,
++					    unsigned long parent_rate)
++{
++	struct sun4i_ddc *ddc = hw_to_ddc(hw);
++	u32 reg;
++	u8 m, n;
++
++	reg = readl(ddc->hdmi->base + SUN4I_HDMI_DDC_CLK_REG);
++	m = (reg >> 3) & 0x7;
++	n = reg & 0x7;
++
++	return (((parent_rate / 2) / 10) >> n) / (m + 1);
++}
++
++static int sun4i_ddc_set_rate(struct clk_hw *hw, unsigned long rate,
++			      unsigned long parent_rate)
++{
++	struct sun4i_ddc *ddc = hw_to_ddc(hw);
++	u8 div_m, div_n;
++
++	sun4i_ddc_calc_divider(rate, parent_rate, &div_m, &div_n);
++
++	writel(SUN4I_HDMI_DDC_CLK_M(div_m) | SUN4I_HDMI_DDC_CLK_N(div_n),
++	       ddc->hdmi->base + SUN4I_HDMI_DDC_CLK_REG);
++
++	return 0;
++}
++
++static const struct clk_ops sun4i_ddc_ops = {
++	.recalc_rate	= sun4i_ddc_recalc_rate,
++	.round_rate	= sun4i_ddc_round_rate,
++	.set_rate	= sun4i_ddc_set_rate,
++};
++
++int sun4i_ddc_create(struct sun4i_hdmi *hdmi, struct clk *parent)
++{
++	struct clk_init_data init;
++	struct sun4i_ddc *ddc;
++	const char *parent_name;
++
++	parent_name = __clk_get_name(parent);
++	if (!parent_name)
++		return -ENODEV;
++
++	ddc = devm_kzalloc(hdmi->dev, sizeof(*ddc), GFP_KERNEL);
++	if (!ddc)
++		return -ENOMEM;
++
++	init.name = "hdmi-ddc";
++	init.ops = &sun4i_ddc_ops;
++	init.parent_names = &parent_name;
++	init.num_parents = 1;
++	init.flags = CLK_SET_RATE_PARENT;
++
++	ddc->hdmi = hdmi;
++	ddc->hw.init = &init;
++
++	hdmi->ddc_clk = devm_clk_register(hdmi->dev, &ddc->hw);
++	if (IS_ERR(hdmi->ddc_clk))
++		return PTR_ERR(hdmi->ddc_clk);
++
++	return 0;
++}
+diff --git a/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c b/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c
+new file mode 100644
+index 000000000000..33175308c2ed
+--- /dev/null
++++ b/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c
+@@ -0,0 +1,449 @@
++/*
++ * Copyright (C) 2016 Maxime Ripard
++ *
++ * Maxime Ripard <maxime.ripard@free-electrons.com>
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License as
++ * published by the Free Software Foundation; either version 2 of
++ * the License, or (at your option) any later version.
++ */
++
++#include <drm/drmP.h>
++#include <drm/drm_atomic_helper.h>
++#include <drm/drm_crtc_helper.h>
++#include <drm/drm_edid.h>
++#include <drm/drm_encoder.h>
++#include <drm/drm_panel.h>
++
++#include <linux/clk.h>
++#include <linux/component.h>
++#include <linux/iopoll.h>
++#include <linux/of_address.h>
++#include <linux/platform_device.h>
++#include <linux/pm_runtime.h>
++
++#include "sun4i_backend.h"
++#include "sun4i_drv.h"
++#include "sun4i_hdmi.h"
++#include "sun4i_tcon.h"
++
++static inline struct sun4i_hdmi *
++drm_encoder_to_sun4i_hdmi(struct drm_encoder *encoder)
++{
++	return container_of(encoder, struct sun4i_hdmi,
++			    encoder);
++}
++
++static inline struct sun4i_hdmi *
++drm_connector_to_sun4i_hdmi(struct drm_connector *connector)
++{
++	return container_of(connector, struct sun4i_hdmi,
++			    connector);
++}
++
++static int sun4i_hdmi_setup_avi_infoframes(struct sun4i_hdmi *hdmi,
++					   struct drm_display_mode *mode)
++{
++	struct hdmi_avi_infoframe frame;
++	u8 buffer[17];
++	int i, ret;
++
++	ret = drm_hdmi_avi_infoframe_from_display_mode(&frame, mode);
++	if (ret < 0) {
++		DRM_ERROR("Failed to get infoframes from mode\n");
++		return ret;
++	}
++
++	ret = hdmi_avi_infoframe_pack(&frame, buffer, sizeof(buffer));
++	if (ret < 0) {
++		DRM_ERROR("Failed to pack infoframes\n");
++		return ret;
++	}
++
++	for (i = 0; i < sizeof(buffer); i++)
++		writeb(buffer[i], hdmi->base + SUN4I_HDMI_AVI_INFOFRAME_REG(i));
++
++	return 0;
++}
++
++static void sun4i_hdmi_disable(struct drm_encoder *encoder)
++{
++	struct sun4i_hdmi *hdmi = drm_encoder_to_sun4i_hdmi(encoder);
++	struct sun4i_drv *drv = hdmi->drv;
++	struct sun4i_tcon *tcon = drv->tcon;
++	u32 val;
++
++	DRM_DEBUG_DRIVER("Disabling the HDMI Output\n");
++
++	val = readl(hdmi->base + SUN4I_HDMI_VID_CTRL_REG);
++	val &= ~SUN4I_HDMI_VID_CTRL_ENABLE;
++	writel(val, hdmi->base + SUN4I_HDMI_VID_CTRL_REG);
++
++	sun4i_tcon_channel_disable(tcon, 1);
++}
++
++static void sun4i_hdmi_enable(struct drm_encoder *encoder)
++{
++	struct drm_display_mode *mode = &encoder->crtc->state->adjusted_mode;
++	struct sun4i_hdmi *hdmi = drm_encoder_to_sun4i_hdmi(encoder);
++	struct sun4i_drv *drv = hdmi->drv;
++	struct sun4i_tcon *tcon = drv->tcon;
++	u32 val = 0;
++
++	DRM_DEBUG_DRIVER("Enabling the HDMI Output\n");
++
++	sun4i_tcon_channel_enable(tcon, 1);
++
++	sun4i_hdmi_setup_avi_infoframes(hdmi, mode);
++	val |= SUN4I_HDMI_PKT_CTRL_TYPE(0, SUN4I_HDMI_PKT_AVI);
++	val |= SUN4I_HDMI_PKT_CTRL_TYPE(1, SUN4I_HDMI_PKT_END);
++	writel(val, hdmi->base + SUN4I_HDMI_PKT_CTRL_REG(0));
++
++	val = SUN4I_HDMI_VID_CTRL_ENABLE;
++	if (hdmi->hdmi_monitor)
++		val |= SUN4I_HDMI_VID_CTRL_HDMI_MODE;
++
++	writel(val, hdmi->base + SUN4I_HDMI_VID_CTRL_REG);
++}
++
++static void sun4i_hdmi_mode_set(struct drm_encoder *encoder,
++				struct drm_display_mode *mode,
++				struct drm_display_mode *adjusted_mode)
++{
++	struct sun4i_hdmi *hdmi = drm_encoder_to_sun4i_hdmi(encoder);
++	struct sun4i_drv *drv = hdmi->drv;
++	struct sun4i_tcon *tcon = drv->tcon;
++	unsigned int x, y;
++	u32 val;
++
++	sun4i_tcon1_mode_set(tcon, encoder, mode);
++	clk_set_rate(tcon->sclk1, mode->crtc_clock * 1000);
++	clk_set_rate(hdmi->tmds_clk, mode->crtc_clock * 1000);
++
++	/* Set input sync enable */
++	writel(SUN4I_HDMI_UNKNOWN_INPUT_SYNC,
++	       hdmi->base + SUN4I_HDMI_UNKNOWN_REG);
++
++	/* Setup timing registers */
++	writel(SUN4I_HDMI_VID_TIMING_X(mode->hdisplay) |
++	       SUN4I_HDMI_VID_TIMING_Y(mode->vdisplay),
++	       hdmi->base + SUN4I_HDMI_VID_TIMING_ACT_REG);
++
++	x = mode->htotal - mode->hsync_start;
++	y = mode->vtotal - mode->vsync_start;
++	writel(SUN4I_HDMI_VID_TIMING_X(x) | SUN4I_HDMI_VID_TIMING_Y(y),
++	       hdmi->base + SUN4I_HDMI_VID_TIMING_BP_REG);
++
++	x = mode->hsync_start - mode->hdisplay;
++	y = mode->vsync_start - mode->vdisplay;
++	writel(SUN4I_HDMI_VID_TIMING_X(x) | SUN4I_HDMI_VID_TIMING_Y(y),
++	       hdmi->base + SUN4I_HDMI_VID_TIMING_FP_REG);
++
++	x = mode->hsync_end - mode->hsync_start;
++	y = mode->vsync_end - mode->vsync_start;
++	writel(SUN4I_HDMI_VID_TIMING_X(x) | SUN4I_HDMI_VID_TIMING_Y(y),
++	       hdmi->base + SUN4I_HDMI_VID_TIMING_SPW_REG);
++
++	val = SUN4I_HDMI_VID_TIMING_POL_TX_CLK;
++	if (mode->flags & DRM_MODE_FLAG_PHSYNC)
++		val |= SUN4I_HDMI_VID_TIMING_POL_HSYNC;
++
++	if (mode->flags & DRM_MODE_FLAG_PVSYNC)
++		val |= SUN4I_HDMI_VID_TIMING_POL_VSYNC;
++
++	writel(val, hdmi->base + SUN4I_HDMI_VID_TIMING_POL_REG);
++}
++
++static struct drm_encoder_helper_funcs sun4i_hdmi_helper_funcs = {
++	.disable	= sun4i_hdmi_disable,
++	.enable		= sun4i_hdmi_enable,
++	.mode_set	= sun4i_hdmi_mode_set,
++};
++
++static struct drm_encoder_funcs sun4i_hdmi_funcs = {
++	.destroy	= drm_encoder_cleanup,
++};
++
++static int sun4i_hdmi_read_sub_block(struct sun4i_hdmi *hdmi,
++				     unsigned int blk, unsigned int offset,
++				     u8 *buf, unsigned int count)
++{
++	unsigned long reg;
++	int i;
++
++	reg = readl(hdmi->base + SUN4I_HDMI_DDC_FIFO_CTRL_REG);
++	writel(reg | SUN4I_HDMI_DDC_FIFO_CTRL_CLEAR,
++	       hdmi->base + SUN4I_HDMI_DDC_FIFO_CTRL_REG);
++	writel(SUN4I_HDMI_DDC_ADDR_SEGMENT(offset >> 8) |
++	       SUN4I_HDMI_DDC_ADDR_EDDC(0x60) |
++	       SUN4I_HDMI_DDC_ADDR_OFFSET(offset) |
++	       SUN4I_HDMI_DDC_ADDR_SLAVE(0x50),
++	       hdmi->base + SUN4I_HDMI_DDC_ADDR_REG);
++
++	writel(count, hdmi->base + SUN4I_HDMI_DDC_BYTE_COUNT_REG);
++	writel(SUN4I_HDMI_DDC_CMD_EXPLICIT_EDDC_READ,
++	       hdmi->base + SUN4I_HDMI_DDC_CMD_REG);
++
++	reg = readl(hdmi->base + SUN4I_HDMI_DDC_CTRL_REG);
++	writel(reg | SUN4I_HDMI_DDC_CTRL_START_CMD,
++	       hdmi->base + SUN4I_HDMI_DDC_CTRL_REG);
++
++	if (readl_poll_timeout(hdmi->base + SUN4I_HDMI_DDC_CTRL_REG, reg,
++			       !(reg & SUN4I_HDMI_DDC_CTRL_START_CMD),
++			       100, 2000))
++		return -EIO;
++
++	for (i = 0; i < count; i++)
++		buf[i] = readb(hdmi->base + SUN4I_HDMI_DDC_FIFO_DATA_REG);
++
++	return 0;
++}
++
++static int sun4i_hdmi_read_edid_block(void *data, u8 *buf, unsigned int blk,
++				      size_t length)
++{
++	struct sun4i_hdmi *hdmi = data;
++	int retry = 2, i;
++
++	do {
++		for (i = 0; i < length; i += SUN4I_HDMI_DDC_FIFO_SIZE) {
++			unsigned char offset = blk * EDID_LENGTH + i;
++			unsigned int count = min((unsigned int)SUN4I_HDMI_DDC_FIFO_SIZE,
++						 length - i);
++			int ret;
++
++			ret = sun4i_hdmi_read_sub_block(hdmi, blk, offset,
++							buf + i, count);
++			if (ret)
++				return ret;
++		}
++	} while (!drm_edid_block_valid(buf, blk, true, NULL) && (retry--));
++
++	return 0;
++}
++
++static int sun4i_hdmi_get_modes(struct drm_connector *connector)
++{
++	struct sun4i_hdmi *hdmi = drm_connector_to_sun4i_hdmi(connector);
++	unsigned long reg;
++	struct edid *edid;
++	int ret;
++	
++	/* Reset i2c controller */
++	writel(SUN4I_HDMI_DDC_CTRL_ENABLE | SUN4I_HDMI_DDC_CTRL_RESET,
++	       hdmi->base + SUN4I_HDMI_DDC_CTRL_REG);
++	if (readl_poll_timeout(hdmi->base + SUN4I_HDMI_DDC_CTRL_REG, reg,
++			       !(reg & SUN4I_HDMI_DDC_CTRL_RESET),
++			       100, 2000))
++		return -EIO;
++
++	writel(SUN4I_HDMI_DDC_LINE_CTRL_SDA_ENABLE |
++	       SUN4I_HDMI_DDC_LINE_CTRL_SCL_ENABLE,
++	       hdmi->base + SUN4I_HDMI_DDC_LINE_CTRL_REG);
++
++	clk_set_rate(hdmi->ddc_clk, 100000);
++
++	edid = drm_do_get_edid(connector, sun4i_hdmi_read_edid_block, hdmi);
++	if (!edid)
++		return 0;
++
++	hdmi->hdmi_monitor = drm_detect_hdmi_monitor(edid);
++	DRM_DEBUG_DRIVER("Monitor is %s monitor\n",
++			 hdmi->hdmi_monitor ? "an HDMI" : "a DVI");
++
++	drm_mode_connector_update_edid_property(connector, edid);
++	ret = drm_add_edid_modes(connector, edid);
++	kfree(edid);
++
++	return ret;
++}
++
++static struct drm_connector_helper_funcs sun4i_hdmi_connector_helper_funcs = {
++	.get_modes	= sun4i_hdmi_get_modes,
++};
++
++static enum drm_connector_status
++sun4i_hdmi_connector_detect(struct drm_connector *connector, bool force)
++{
++	struct sun4i_hdmi *hdmi = drm_connector_to_sun4i_hdmi(connector);
++	unsigned long reg;
++
++	if (readl_poll_timeout(hdmi->base + SUN4I_HDMI_HPD_REG, reg,
++			       reg & SUN4I_HDMI_HPD_HIGH,
++			       0, 500000))
++		return connector_status_disconnected;
++
++	return connector_status_connected;
++}
++
++static struct drm_connector_funcs sun4i_hdmi_connector_funcs = {
++	.dpms			= drm_atomic_helper_connector_dpms,
++	.detect			= sun4i_hdmi_connector_detect,
++	.fill_modes		= drm_helper_probe_single_connector_modes,
++	.destroy		= drm_connector_cleanup,
++	.reset			= drm_atomic_helper_connector_reset,
++	.atomic_duplicate_state	= drm_atomic_helper_connector_duplicate_state,
++	.atomic_destroy_state	= drm_atomic_helper_connector_destroy_state,
++};
++
++static int sun4i_hdmi_bind(struct device *dev, struct device *master,
++			 void *data)
++{
++	struct drm_device *drm = data;
++	struct sun4i_drv *drv = drm->dev_private;
++	struct sun4i_hdmi *hdmi = dev_get_drvdata(dev);
++	int ret;
++
++	hdmi->drv = drv;
++	drm_encoder_helper_add(&hdmi->encoder,
++			       &sun4i_hdmi_helper_funcs);
++	ret = drm_encoder_init(drm,
++			       &hdmi->encoder,
++			       &sun4i_hdmi_funcs,
++			       DRM_MODE_ENCODER_TMDS,
++			       NULL);
++	if (ret) {
++		dev_err(dev, "Couldn't initialise the HDMI encoder\n");
++		return ret;
++	}
++
++	hdmi->encoder.possible_crtcs = BIT(0);
++
++	drm_connector_helper_add(&hdmi->connector,
++				 &sun4i_hdmi_connector_helper_funcs);
++	ret = drm_connector_init(drm, &hdmi->connector,
++				 &sun4i_hdmi_connector_funcs,
++				 DRM_MODE_CONNECTOR_HDMIA);
++	if (ret) {
++		dev_err(dev,
++			"Couldn't initialise the Composite connector\n");
++		goto err_cleanup_connector;
++	}
++	hdmi->connector.interlace_allowed = true;
++
++	drm_mode_connector_attach_encoder(&hdmi->connector, &hdmi->encoder);
++
++	return 0;
++
++err_cleanup_connector:
++	drm_encoder_cleanup(&hdmi->encoder);
++	return ret;
++}
++
++static void sun4i_hdmi_unbind(struct device *dev, struct device *master,
++			    void *data)
++{
++	struct sun4i_hdmi *hdmi = dev_get_drvdata(dev);
++
++	drm_connector_cleanup(&hdmi->connector);
++	drm_encoder_cleanup(&hdmi->encoder);
++}
++
++static struct component_ops sun4i_hdmi_ops = {
++	.bind	= sun4i_hdmi_bind,
++	.unbind	= sun4i_hdmi_unbind,
++};
++
++static int sun4i_hdmi_probe(struct platform_device *pdev)
++{
++	struct sun4i_hdmi *hdmi;
++	struct resource *res;
++	int ret;
++
++	hdmi = devm_kzalloc(&pdev->dev, sizeof(*hdmi), GFP_KERNEL);
++	if (!hdmi)
++		return -ENOMEM;
++	dev_set_drvdata(&pdev->dev, hdmi);
++	hdmi->dev = &pdev->dev;
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	hdmi->base = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(hdmi->base)) {
++		dev_err(&pdev->dev, "Couldn't map the HDMI encoder registers\n");
++		return PTR_ERR(hdmi->base);
++	}
++
++	hdmi->bus_clk = devm_clk_get(&pdev->dev, "ahb");
++	if (IS_ERR(hdmi->bus_clk)) {
++		dev_err(&pdev->dev, "Couldn't get the HDMI bus clock\n");
++		return PTR_ERR(hdmi->bus_clk);
++	}
++	clk_prepare_enable(hdmi->bus_clk);
++
++	hdmi->mod_clk = devm_clk_get(&pdev->dev, "mod");
++	if (IS_ERR(hdmi->mod_clk)) {
++		dev_err(&pdev->dev, "Couldn't get the HDMI mod clock\n");
++		return PTR_ERR(hdmi->mod_clk);
++	}
++	clk_prepare_enable(hdmi->mod_clk);
++
++	hdmi->pll0_clk = devm_clk_get(&pdev->dev, "pll-0");
++	if (IS_ERR(hdmi->pll0_clk)) {
++		dev_err(&pdev->dev, "Couldn't get the HDMI PLL 0 clock\n");
++		return PTR_ERR(hdmi->pll0_clk);
++	}
++
++	hdmi->pll1_clk = devm_clk_get(&pdev->dev, "pll-1");
++	if (IS_ERR(hdmi->pll1_clk)) {
++		dev_err(&pdev->dev, "Couldn't get the HDMI PLL 1 clock\n");
++		return PTR_ERR(hdmi->pll1_clk);
++	}
++
++	ret = sun4i_tmds_create(hdmi);
++	if (ret) {
++		dev_err(&pdev->dev, "Couldn't create the TMDS clock\n");
++		return ret;
++	}
++
++	writel(SUN4I_HDMI_CTRL_ENABLE, hdmi->base + SUN4I_HDMI_CTRL_REG);
++
++#define SUN4I_HDMI_PAD_CTRL0 0xfe800000
++	
++	writel(SUN4I_HDMI_PAD_CTRL0, hdmi->base + SUN4I_HDMI_PAD_CTRL0_REG);
++
++	/* TODO: defines */
++	writel((6 << 3) | (2 << 10) | BIT(14) | BIT(15) |
++	       BIT(19) | BIT(20) | BIT(22) | BIT(23),
++	       hdmi->base + SUN4I_HDMI_PAD_CTRL1_REG);
++
++	/* TODO: defines */
++	writel((8 << 0) | (7 << 8) | (239 << 12) | (7 << 17) | (4 << 20) |
++	       BIT(25) | BIT(27) | BIT(28) | BIT(29) | BIT(30) | BIT(31),
++	       hdmi->base + SUN4I_HDMI_PLL_CTRL_REG);
++
++	ret = sun4i_ddc_create(hdmi, hdmi->tmds_clk);
++	if (ret) {
++		dev_err(&pdev->dev, "Couldn't create the DDC clock\n");
++		return ret;
++	}
++
++	return component_add(&pdev->dev, &sun4i_hdmi_ops);
++}
++
++static int sun4i_hdmi_remove(struct platform_device *pdev)
++{
++	component_del(&pdev->dev, &sun4i_hdmi_ops);
++
++	return 0;
++}
++
++static const struct of_device_id sun4i_hdmi_of_table[] = {
++	{ .compatible = "allwinner,sun5i-a10s-hdmi" },
++	{ }
++};
++MODULE_DEVICE_TABLE(of, sun4i_hdmi_of_table);
++
++static struct platform_driver sun4i_hdmi_driver = {
++	.probe		= sun4i_hdmi_probe,
++	.remove		= sun4i_hdmi_remove,
++	.driver		= {
++		.name		= "sun4i-hdmi",
++		.of_match_table	= sun4i_hdmi_of_table,
++	},
++};
++module_platform_driver(sun4i_hdmi_driver);
++
++MODULE_AUTHOR("Maxime Ripard <maxime.ripard@free-electrons.com>");
++MODULE_DESCRIPTION("Allwinner A10 HDMI Driver");
++MODULE_LICENSE("GPL");
+diff --git a/drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c b/drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c
+new file mode 100644
+index 000000000000..40f48f1d4685
+--- /dev/null
++++ b/drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.c
+@@ -0,0 +1,236 @@
++/*
++ * Copyright (C) 2016 Free Electrons
++ * Copyright (C) 2016 NextThing Co
++ *
++ * Maxime Ripard <maxime.ripard@free-electrons.com>
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License as
++ * published by the Free Software Foundation; either version 2 of
++ * the License, or (at your option) any later version.
++ */
++
++#include <linux/clk-provider.h>
++
++#include "sun4i_tcon.h"
++#include "sun4i_hdmi.h"
++
++struct sun4i_tmds {
++	struct clk_hw		hw;
++	struct sun4i_hdmi	*hdmi;
++};
++
++static inline struct sun4i_tmds *hw_to_tmds(struct clk_hw *hw)
++{
++	return container_of(hw, struct sun4i_tmds, hw);
++}
++
++
++static unsigned long sun4i_tmds_calc_divider(unsigned long rate,
++					     unsigned long parent_rate,
++					     u8 *div,
++					     bool *half)
++{
++	unsigned long best_rate = 0;
++	u8 best_m = 0, m;
++	bool is_double;
++
++	for (m = 1; m < 16; m++) {
++		u8 d;
++
++		for (d = 1; d < 3; d++) {
++			unsigned long tmp_rate;
++
++			tmp_rate = parent_rate / m / d;
++
++			if (tmp_rate > rate)
++				continue;
++
++			if (!best_rate ||
++			    (rate - tmp_rate) < (rate - best_rate)) {
++				best_rate = tmp_rate;
++				best_m = m;
++				is_double = d;
++			}
++		}
++	}
++
++	if (div && half) {
++		*div = best_m;
++		*half = is_double;
++	}
++
++	return best_rate;
++}
++
++
++static int sun4i_tmds_determine_rate(struct clk_hw *hw,
++				     struct clk_rate_request *req)
++{
++	struct clk_hw *parent;
++	unsigned long best_parent = 0;
++	unsigned long rate = req->rate;
++	int best_div = 1, best_half = 1;
++	int i, j;
++
++	printk("%s %d rate %lu\n", __func__, __LINE__, rate);
++
++	/*
++	 * We only consider PLL3, since the TCON is very likely to be
++	 * clocked from it, and to have the same rate than our HDMI
++	 * clock, so we should not need to do anything.
++	 */
++
++	parent = clk_hw_get_parent_by_index(hw, 0);
++	if (!parent)
++		return -EINVAL;
++
++	for (i = 1; i < 3; i++) {
++		for (j = 1; j < 16; j++) {
++			unsigned long ideal = rate * i * j;
++			unsigned long rounded;
++
++			rounded = clk_hw_round_rate(parent, ideal);
++
++			if (rounded == ideal) {
++				best_parent = rounded;
++				best_half = i;
++				best_div = j;
++				goto out;
++			}
++
++			if (abs(rate - rounded / i) <
++			    abs(rate - best_parent / best_div)) {
++				best_parent = rounded;
++				best_div = i;
++			}
++		}
++	}
++
++out:
++	req->rate = best_parent / best_half / best_div;
++	req->best_parent_rate = best_parent;
++	req->best_parent_hw = parent;
++
++	printk("%s %d rate %lu parent rate %lu (%s) div %d half %d\n",
++	       __func__, __LINE__, req->rate, req->best_parent_rate,
++	       clk_hw_get_name(req->best_parent_hw),
++	       best_div, best_half);
++
++	return 0;
++}
++
++static unsigned long sun4i_tmds_recalc_rate(struct clk_hw *hw,
++					    unsigned long parent_rate)
++{
++	struct sun4i_tmds *tmds = hw_to_tmds(hw);
++	u32 reg;
++
++	reg = readl(tmds->hdmi->base + SUN4I_HDMI_PAD_CTRL1_REG);
++	if (reg & SUN4I_HDMI_PAD_CTRL1_HALVE_CLK)
++		parent_rate /= 2;
++
++	reg = readl(tmds->hdmi->base + SUN4I_HDMI_PLL_CTRL_REG);
++	reg = (reg >> 4) & 0xf;
++	if (!reg)
++		reg = 1;
++
++	return parent_rate / reg;
++}
++
++static int sun4i_tmds_set_rate(struct clk_hw *hw, unsigned long rate,
++			       unsigned long parent_rate)
++{
++	struct sun4i_tmds *tmds = hw_to_tmds(hw);
++	bool half;
++	u32 reg;
++	u8 div;
++
++	sun4i_tmds_calc_divider(rate, parent_rate, &div, &half);
++
++	printk("%s %d rate %lu parent rate %lu div %d half %s\n",
++	       __func__, __LINE__, rate, parent_rate, div,
++	       half ? "yes" : "no");
++
++	reg = readl(tmds->hdmi->base + SUN4I_HDMI_PAD_CTRL1_REG);
++	reg &= ~SUN4I_HDMI_PAD_CTRL1_HALVE_CLK;
++	if (half)
++		reg |= SUN4I_HDMI_PAD_CTRL1_HALVE_CLK;
++	writel(reg, tmds->hdmi->base + SUN4I_HDMI_PAD_CTRL1_REG);
++
++	reg = readl(tmds->hdmi->base + SUN4I_HDMI_PLL_CTRL_REG);
++	reg &= ~SUN4I_HDMI_PLL_CTRL_DIV_MASK;
++	writel(reg | SUN4I_HDMI_PLL_CTRL_DIV(div),
++	       tmds->hdmi->base + SUN4I_HDMI_PLL_CTRL_REG);
++
++	return 0;
++}
++
++static u8 sun4i_tmds_get_parent(struct clk_hw *hw)
++{
++	struct sun4i_tmds *tmds = hw_to_tmds(hw);
++	u32 reg;
++
++	reg = readl(tmds->hdmi->base + SUN4I_HDMI_PLL_DBG0_REG);
++	return ((reg & SUN4I_HDMI_PLL_DBG0_TMDS_PARENT_MASK) >>
++		SUN4I_HDMI_PLL_DBG0_TMDS_PARENT_SHIFT);
++}
++
++static int sun4i_tmds_set_parent(struct clk_hw *hw, u8 index)
++{
++	struct sun4i_tmds *tmds = hw_to_tmds(hw);
++	u32 reg;
++
++	if (index > 1)
++		return -EINVAL;
++
++	reg = readl(tmds->hdmi->base + SUN4I_HDMI_PLL_DBG0_REG);
++	reg &= ~SUN4I_HDMI_PLL_DBG0_TMDS_PARENT_MASK;
++	writel(reg | SUN4I_HDMI_PLL_DBG0_TMDS_PARENT(index),
++	       tmds->hdmi->base + SUN4I_HDMI_PLL_DBG0_REG);
++
++	return 0;
++}
++
++static const struct clk_ops sun4i_tmds_ops = {
++	.determine_rate	= sun4i_tmds_determine_rate,
++	.recalc_rate	= sun4i_tmds_recalc_rate,
++	.set_rate	= sun4i_tmds_set_rate,
++
++	.get_parent	= sun4i_tmds_get_parent,
++	.set_parent	= sun4i_tmds_set_parent,
++};
++
++int sun4i_tmds_create(struct sun4i_hdmi *hdmi)
++{
++	struct clk_init_data init;
++	struct sun4i_tmds *tmds;
++	const char *parents[2];
++
++	parents[0] = __clk_get_name(hdmi->pll0_clk);
++	if (!parents[0])
++		return -ENODEV;
++
++	parents[1] = __clk_get_name(hdmi->pll1_clk);
++	if (!parents[1])
++		return -ENODEV;
++
++	tmds = devm_kzalloc(hdmi->dev, sizeof(*tmds), GFP_KERNEL);
++	if (!tmds)
++		return -ENOMEM;
++
++	init.name = "hdmi-tmds";
++	init.ops = &sun4i_tmds_ops;
++	init.parent_names = parents;
++	init.num_parents = 2;
++	init.flags = CLK_SET_RATE_PARENT;
++
++	tmds->hdmi = hdmi;
++	tmds->hw.init = &init;
++
++	hdmi->tmds_clk = devm_clk_register(hdmi->dev, &tmds->hw);
++	if (IS_ERR(hdmi->tmds_clk))
++		return PTR_ERR(hdmi->tmds_clk);
++
++	return 0;
++}
 -- 
 git-series 0.8.11
