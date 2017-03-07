@@ -1,98 +1,36 @@
-From: wuchengli@chromium.org (Wu-Cheng Li)
-Date: Tue,  7 Mar 2017 14:03:28 +0800
-Subject: [PATCH 1/1] mtk-vcodec: check the vp9 decoder buffer index from VPU.
-In-Reply-To: <20170307060328.114348-1-wuchengli@chromium.org>
-References: <20170307060328.114348-1-wuchengli@chromium.org>
-Message-ID: <20170307060328.114348-2-wuchengli@chromium.org>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 7 Mar 2017 07:46:04 +0100
+Subject: [PATCH 0/8] ARM: dts: renesas: Remove unit-addresses and regs
+ from integrated caches
+In-Reply-To: <1488818443-25196-1-git-send-email-geert+renesas@glider.be>
+References: <1488818443-25196-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <20170307064603.GD14208@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wu-Cheng Li <wuchengli@google.com>
+On Mon, Mar 06, 2017 at 05:40:35PM +0100, Geert Uytterhoeven wrote:
+> 	Hi Simon, Magnus,
+> 
+> This patch series removes the bogus unit-addresses and reg properties
+> from the device nodes representing Cortex-A15/A7 cache controllers.
+> 
+> Note that the latter were added to remove warnings from dtc when using
+> W=1:
+> 
+>     Warning (unit_address_vs_reg): Node /cache-controller at 0 has a unit name, but no reg property
+> 
+> In hindsight, adding the reg properties turned out to be the wrong fix.
+> Indeed, the Cortex-A15/A7 cache controllers are integrated controllers,
+> and thus the device nodes representing them should not have
+> unit-addresses or reg properties.
+> 
+> This series does not have a runtime effect, as Linux doesn't rely much
+> on the properties of the cache-controller nodes.
+> 
+> This series is the arm32 counterpart of "[PATCH 0/2] arm64: dts: renesas:
+> Remove unit-addresses and regs from integrated caches", which you've just
+> applied.
+> 
+> Thanks for applying!
 
-VPU firmware has a bug and may return invalid buffer index for
-some vp9 videos. Check the buffer indexes before accessing the
-buffer.
-
-Signed-off-by: Wu-Cheng Li <wuchengli@chromium.org>
----
- drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c |  6 +++++
- .../media/platform/mtk-vcodec/vdec/vdec_vp9_if.c   | 26 ++++++++++++++++++++++
- drivers/media/platform/mtk-vcodec/vdec_drv_if.h    |  2 ++
- 3 files changed, 34 insertions(+)
-
-diff --git a/drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c b/drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c
-index 502877a4b1df..7ebcf9e57ac7 100644
---- a/drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c
-+++ b/drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c
-@@ -1176,6 +1176,12 @@ static void vb2ops_vdec_buf_queue(struct vb2_buffer *vb)
- 			       "[%d] vdec_if_decode() src_buf=%d, size=%zu, fail=%d, res_chg=%d",
- 			       ctx->id, src_buf->index,
- 			       src_mem.size, ret, res_chg);
-+
-+		if (ret == -EIO) {
-+			mtk_v4l2_err("[%d] Unrecoverable error in vdec_if_decode.",
-+					ctx->id);
-+			ctx->state = MTK_STATE_ABORT;
-+		}
- 		return;
- 	}
- 
-diff --git a/drivers/media/platform/mtk-vcodec/vdec/vdec_vp9_if.c b/drivers/media/platform/mtk-vcodec/vdec/vdec_vp9_if.c
-index e91a3b425b0c..5539b1853f16 100644
---- a/drivers/media/platform/mtk-vcodec/vdec/vdec_vp9_if.c
-+++ b/drivers/media/platform/mtk-vcodec/vdec/vdec_vp9_if.c
-@@ -718,6 +718,26 @@ static void get_free_fb(struct vdec_vp9_inst *inst, struct vdec_fb **out_fb)
- 	*out_fb = fb;
- }
- 
-+static int validate_vsi_array_indexes(struct vdec_vp9_inst *inst,
-+		struct vdec_vp9_vsi *vsi) {
-+	if (vsi->sf_frm_idx >= VP9_MAX_FRM_BUF_NUM - 1) {
-+		mtk_vcodec_err(inst, "Invalid vsi->sf_frm_idx=%u.",
-+				vsi->sf_frm_idx);
-+		return -EIO;
-+	}
-+	if (vsi->frm_to_show_idx >= VP9_MAX_FRM_BUF_NUM) {
-+		mtk_vcodec_err(inst, "Invalid vsi->frm_to_show_idx=%u.",
-+				vsi->frm_to_show_idx);
-+		return -EIO;
-+	}
-+	if (vsi->new_fb_idx >= VP9_MAX_FRM_BUF_NUM) {
-+		mtk_vcodec_err(inst, "Invalid vsi->new_fb_idx=%u.",
-+				vsi->new_fb_idx);
-+		return -EIO;
-+	}
-+	return 0;
-+}
-+
- static void vdec_vp9_deinit(unsigned long h_vdec)
- {
- 	struct vdec_vp9_inst *inst = (struct vdec_vp9_inst *)h_vdec;
-@@ -834,6 +854,12 @@ static int vdec_vp9_decode(unsigned long h_vdec, struct mtk_vcodec_mem *bs,
- 			goto DECODE_ERROR;
- 		}
- 
-+		ret = validate_vsi_array_indexes(inst, vsi);
-+		if (ret) {
-+			mtk_vcodec_err(inst, "Invalid values from VPU.");
-+			goto DECODE_ERROR;
-+		}
-+
- 		if (vsi->resolution_changed) {
- 			if (!vp9_alloc_work_buf(inst)) {
- 				ret = -EINVAL;
-diff --git a/drivers/media/platform/mtk-vcodec/vdec_drv_if.h b/drivers/media/platform/mtk-vcodec/vdec_drv_if.h
-index db6b5205ffb1..ded1154481cd 100644
---- a/drivers/media/platform/mtk-vcodec/vdec_drv_if.h
-+++ b/drivers/media/platform/mtk-vcodec/vdec_drv_if.h
-@@ -85,6 +85,8 @@ void vdec_if_deinit(struct mtk_vcodec_ctx *ctx);
-  * @res_chg	: [out] resolution change happens if current bs have different
-  *	picture width/height
-  * Note: To flush the decoder when reaching EOF, set input bitstream as NULL.
-+ *
-+ * Return: 0 on success. -EIO on unrecoverable error.
-  */
- int vdec_if_decode(struct mtk_vcodec_ctx *ctx, struct mtk_vcodec_mem *bs,
- 		   struct vdec_fb *fb, bool *res_chg);
--- 
-2.12.0.rc1.440.g5b76565f74-goog
+Thanks, done.
