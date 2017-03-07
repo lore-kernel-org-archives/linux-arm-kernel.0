@@ -1,10 +1,10 @@
 From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Wed, 08 Mar 2017 01:33:38 +0800
+Date: Wed, 08 Mar 2017 01:36:43 +0800
 Subject: [PATCH v8 0/6] Allwinner H5 and Orange Pi PC2 support
 In-Reply-To: <20170307170751.n6tvrztet724pxfl@lukather>
 References: <20170306171750.7491-1-icenowy@aosc.xyz>
  <20170307170751.n6tvrztet724pxfl@lukather>
-Message-ID: <5852741488908018@web33j.yandex.ru>
+Message-ID: <2704251488908203@web18o.yandex.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -37,7 +37,9 @@ List-Id: linux-arm-kernel.lists.infradead.org
 > and fixed, but please use the right one next time (and be consistent
 > in your ARM vs arm usage).
 
-My patch uses ARM, Andre's use arm.
+oh I added dts: to the prefix you told me, as they're device tree patches.
+
+Is the usage of "dts:" out-dated?
 
 >
 > Thanks for your work!
