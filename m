@@ -1,25 +1,60 @@
-From: David.Laight@ACULAB.COM (David Laight)
-Date: Tue, 7 Mar 2017 17:24:21 +0000
-Subject: [PATCHv3 net-next 21/22] net: mvpp2: set dma mask and coherent
- dma mask on PPv2.2
-In-Reply-To: <1488902000-2658-22-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1488902000-2658-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1488902000-2658-22-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <063D6719AE5E284EB5DD2968C1650D6DCFE79D2E@AcuExch.aculab.com>
+From: lznuaa@gmail.com (Zhi Li)
+Date: Tue, 7 Mar 2017 11:24:51 -0600
+Subject: [PATCH v2 1/2] ARM: imx: Fix mmdc_pmu_write_accesses event
+ definition
+In-Reply-To: <CAHrpEqQZYEhXoSmEJ-4d+1exUTqFNVfP2mMBiOS3c4wbAOyfdA@mail.gmail.com>
+References: <1487160026-9376-1-git-send-email-andrei-tiberiu.breana@nxp.com>
+ <1487160026-9376-2-git-send-email-andrei-tiberiu.breana@nxp.com>
+ <CAHrpEqTEq+jQkxGpNtpWRbcB=pw36dAxGOxR-xs8iDYGnhE51A@mail.gmail.com>
+ <CAHrpEqQZYEhXoSmEJ-4d+1exUTqFNVfP2mMBiOS3c4wbAOyfdA@mail.gmail.com>
+Message-ID: <CAHrpEqQK11yRvkD+PZ2sG_FPohBeUagm8oWeHJHG=0HVerJPnA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thomas Petazzoni
-> Sent: 07 March 2017 15:53
-> On PPv2.2, the streaming mappings can be anywhere in the first 40 bits
-> of the physical address space. However, for the coherent mappings, we
-> still need them to be in the first 32 bits of the address space,
-> because all BM pools share a single register to store the high 32 bits
-> of the BM pool address, which means all BM pools must be allocated in
-> the same 4GB memory area.
+On Fri, Feb 24, 2017 at 9:47 AM, Zhi Li <lznuaa@gmail.com> wrote:
+> On Wed, Feb 15, 2017 at 8:28 AM, Zhi Li <lznuaa@gmail.com> wrote:
+>> On Wed, Feb 15, 2017 at 6:00 AM,  <andrei-tiberiu.breana@nxp.com> wrote:
+>>> From: Tiberiu Breana <andrei-tiberiu.breana@nxp.com>
+>>>
+>>> Fixed an error in the "write-accesses" event definition.
+>>>
+>>> Signed-off-by: Tiberiu Breana <andrei-tiberiu.breana@nxp.com>
+>>
+>> Acked-by: Frank Li <Frank.li@nxp.com>
+>
+> Shawn:
 
-Are the coherent mappings just used for ring structures?
-If it might be reasonable to allocate them as a single entity,
-thus guaranteeing they all reside in a single 4G region.
+Shawn:
 
-	David
+Ping.
+
+best regards
+Frank Li
+
+>
+> Ping
+>
+> best regards
+> Frank Li
+>
+>>
+>>> ---
+>>>  arch/arm/mach-imx/mmdc.c | 2 +-
+>>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>>
+>>> diff --git a/arch/arm/mach-imx/mmdc.c b/arch/arm/mach-imx/mmdc.c
+>>> index c03bf28..89a926f 100644
+>>> --- a/arch/arm/mach-imx/mmdc.c
+>>> +++ b/arch/arm/mach-imx/mmdc.c
+>>> @@ -87,7 +87,7 @@ static DEFINE_IDA(mmdc_ida);
+>>>  PMU_EVENT_ATTR_STRING(total-cycles, mmdc_pmu_total_cycles, "event=0x00")
+>>>  PMU_EVENT_ATTR_STRING(busy-cycles, mmdc_pmu_busy_cycles, "event=0x01")
+>>>  PMU_EVENT_ATTR_STRING(read-accesses, mmdc_pmu_read_accesses, "event=0x02")
+>>> -PMU_EVENT_ATTR_STRING(write-accesses, mmdc_pmu_write_accesses, "config=0x03")
+>>> +PMU_EVENT_ATTR_STRING(write-accesses, mmdc_pmu_write_accesses, "event=0x03")
+>>>  PMU_EVENT_ATTR_STRING(read-bytes, mmdc_pmu_read_bytes, "event=0x04")
+>>>  PMU_EVENT_ATTR_STRING(read-bytes.unit, mmdc_pmu_read_bytes_unit, "MB");
+>>>  PMU_EVENT_ATTR_STRING(read-bytes.scale, mmdc_pmu_read_bytes_scale, "0.000001");
+>>> --
+>>> 2.7.4
+>>>
