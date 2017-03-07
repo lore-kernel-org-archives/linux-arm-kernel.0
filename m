@@ -1,162 +1,174 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue,  7 Mar 2017 16:53:07 +0100
-Subject: [PATCHv3 net-next 09/22] net: mvpp2: introduce an intermediate union
- for the TX/RX descriptors
+Date: Tue,  7 Mar 2017 16:53:14 +0100
+Subject: [PATCHv3 net-next 16/22] net: mvpp2: handle misc PPv2.1/PPv2.2
+ differences
 In-Reply-To: <1488902000-2658-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1488902000-2658-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1488902000-2658-10-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1488902000-2658-17-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since the format of the HW descriptors is different between PPv2.1 and
-PPv2.2, this commit introduces an intermediate union, with for now
-only the PPv2.1 descriptors. The bulk of the driver code only
-manipulates opaque mvpp2_tx_desc and mvpp2_rx_desc pointers, and the
-descriptors can only be accessed and modified through the accessor
-functions. A follow-up commit will add the descriptor definitions for
-PPv2.2.
+This commit handles a few miscellaneous differences between PPv2.1 and
+PPv2.2 in different areas, where code done for PPv2.1 doesn't apply for
+PPv2.2 or needs to be adjusted (getting the MAC address, disabling PHY
+polling, etc.).
+
+Thanks to Russell King for providing the initial implementation of
+mvpp22_port_mii_set().
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- drivers/net/ethernet/marvell/mvpp2.c | 45 +++++++++++++++++++++++++-----------
- 1 file changed, 31 insertions(+), 14 deletions(-)
+ drivers/net/ethernet/marvell/mvpp2.c | 85 ++++++++++++++++++++++++++++--------
+ 1 file changed, 67 insertions(+), 18 deletions(-)
 
 diff --git a/drivers/net/ethernet/marvell/mvpp2.c b/drivers/net/ethernet/marvell/mvpp2.c
-index 27d8838..e9710e8 100644
+index 2b4b4f0..bd7dc4b6 100644
 --- a/drivers/net/ethernet/marvell/mvpp2.c
 +++ b/drivers/net/ethernet/marvell/mvpp2.c
-@@ -739,7 +739,8 @@ struct mvpp2_port {
- #define MVPP2_RXD_L3_IP6		BIT(30)
- #define MVPP2_RXD_BUF_HDR		BIT(31)
- 
--struct mvpp2_tx_desc {
-+/* HW TX descriptor for PPv2.1 */
-+struct mvpp21_tx_desc {
- 	u32 command;		/* Options used by HW for packet transmitting.*/
- 	u8  packet_offset;	/* the offset from the buffer beginning	*/
- 	u8  phys_txq;		/* destination queue ID			*/
-@@ -750,7 +751,8 @@ struct mvpp2_tx_desc {
- 	u32 reserved2;		/* reserved (for future use)		*/
- };
- 
--struct mvpp2_rx_desc {
-+/* HW RX descriptor for PPv2.1 */
-+struct mvpp21_rx_desc {
- 	u32 status;		/* info about received packet		*/
- 	u16 reserved1;		/* parser_info (for future use, PnC)	*/
- 	u16 data_size;		/* size of received packet in bytes	*/
-@@ -765,6 +767,21 @@ struct mvpp2_rx_desc {
- 	u32 reserved8;
- };
- 
-+/* Opaque type used by the driver to manipulate the HW TX and RX
-+ * descriptors
+@@ -294,6 +294,22 @@
+ #define      MVPP2_GMAC_TX_FIFO_MIN_TH_ALL_MASK	0x1fc0
+ #define      MVPP2_GMAC_TX_FIFO_MIN_TH_MASK(v)	(((v) << 6) & \
+ 					MVPP2_GMAC_TX_FIFO_MIN_TH_ALL_MASK)
++#define MVPP22_GMAC_CTRL_4_REG			0x90
++#define      MVPP22_CTRL4_EXT_PIN_GMII_SEL	BIT(0)
++#define      MVPP22_CTRL4_DP_CLK_SEL		BIT(5)
++#define      MVPP22_CTRL4_SYNC_BYPASS		BIT(6)
++#define      MVPP22_CTRL4_QSGMII_BYPASS_ACTIVE	BIT(7)
++
++/* Per-port XGMAC registers. PPv2.2 only, only for GOP port 0,
++ * relative to port->base.
 + */
-+struct mvpp2_tx_desc {
-+	union {
-+		struct mvpp21_tx_desc pp21;
-+	};
-+};
++#define MVPP22_XLG_CTRL3_REG			0x11c
++#define      MVPP22_XLG_CTRL3_MACMODESELECT_MASK	(7 << 13)
++#define      MVPP22_XLG_CTRL3_MACMODESELECT_GMAC	(0 << 13)
 +
-+struct mvpp2_rx_desc {
-+	union {
-+		struct mvpp21_rx_desc pp21;
-+	};
-+};
++/* SMI registers. PPv2.2 only, relative to priv->iface_base. */
++#define MVPP22_SMI_MISC_CFG_REG			0x1204
++#define      MVPP22_SMI_POLLING_EN		BIT(10)
+ 
+ #define MVPP22_GMAC_BASE(port)		(0x7000 + (port) * 0x1000 + 0xe00)
+ 
+@@ -4128,10 +4144,38 @@ static void mvpp2_interrupts_unmask(void *arg)
+ 
+ /* Port configuration routines */
+ 
++static void mvpp22_port_mii_set(struct mvpp2_port *port)
++{
++	u32 val;
 +
- struct mvpp2_txq_pcpu_buf {
- 	/* Transmitted SKB */
- 	struct sk_buff *skb;
-@@ -952,78 +969,78 @@ static u32 mvpp2_read(struct mvpp2 *priv, u32 offset)
- static dma_addr_t mvpp2_txdesc_dma_addr_get(struct mvpp2_port *port,
- 					    struct mvpp2_tx_desc *tx_desc)
++	return;
++
++	/* Only GOP port 0 has an XLG MAC */
++	if (port->gop_id == 0) {
++		val = readl(port->base + MVPP22_XLG_CTRL3_REG);
++		val &= ~MVPP22_XLG_CTRL3_MACMODESELECT_MASK;
++		val |= MVPP22_XLG_CTRL3_MACMODESELECT_GMAC;
++		writel(val, port->base + MVPP22_XLG_CTRL3_REG);
++	}
++
++	val = readl(port->base + MVPP22_GMAC_CTRL_4_REG);
++	if (port->phy_interface == PHY_INTERFACE_MODE_RGMII)
++		val |= MVPP22_CTRL4_EXT_PIN_GMII_SEL;
++	else
++		val &= ~MVPP22_CTRL4_EXT_PIN_GMII_SEL;
++	val &= ~MVPP22_CTRL4_DP_CLK_SEL;
++	val |= MVPP22_CTRL4_SYNC_BYPASS;
++	val |= MVPP22_CTRL4_QSGMII_BYPASS_ACTIVE;
++	writel(val, port->base + MVPP22_GMAC_CTRL_4_REG);
++}
++
+ static void mvpp2_port_mii_set(struct mvpp2_port *port)
  {
--	return tx_desc->buf_dma_addr;
-+	return tx_desc->pp21.buf_dma_addr;
+ 	u32 val;
+ 
++	if (port->priv->hw_version == MVPP22)
++		mvpp22_port_mii_set(port);
++
+ 	val = readl(port->base + MVPP2_GMAC_CTRL_2_REG);
+ 
+ 	switch (port->phy_interface) {
+@@ -5813,7 +5857,7 @@ static int mvpp2_check_ringparam_valid(struct net_device *dev,
+ 	return 0;
  }
  
- static void mvpp2_txdesc_dma_addr_set(struct mvpp2_port *port,
- 				      struct mvpp2_tx_desc *tx_desc,
- 				      dma_addr_t dma_addr)
+-static void mvpp2_get_mac_address(struct mvpp2_port *port, unsigned char *addr)
++static void mvpp21_get_mac_address(struct mvpp2_port *port, unsigned char *addr)
  {
--	tx_desc->buf_dma_addr = dma_addr;
-+	tx_desc->pp21.buf_dma_addr = dma_addr;
- }
+ 	u32 mac_addr_l, mac_addr_m, mac_addr_h;
  
- static size_t mvpp2_txdesc_size_get(struct mvpp2_port *port,
- 				    struct mvpp2_tx_desc *tx_desc)
+@@ -6258,16 +6302,6 @@ static const struct ethtool_ops mvpp2_eth_tool_ops = {
+ 	.set_link_ksettings = phy_ethtool_set_link_ksettings,
+ };
+ 
+-/* Driver initialization */
+-
+-static void mvpp2_port_power_up(struct mvpp2_port *port)
+-{
+-	mvpp2_port_mii_set(port);
+-	mvpp2_port_periodic_xon_disable(port);
+-	mvpp2_port_fc_adv_enable(port);
+-	mvpp2_port_reset(port);
+-}
+-
+ /* Initialize port HW */
+ static int mvpp2_port_init(struct mvpp2_port *port)
  {
--	return tx_desc->data_size;
-+	return tx_desc->pp21.data_size;
- }
+@@ -6479,7 +6513,8 @@ static int mvpp2_port_probe(struct platform_device *pdev,
+ 		mac_from = "device tree";
+ 		ether_addr_copy(dev->dev_addr, dt_mac_addr);
+ 	} else {
+-		mvpp2_get_mac_address(port, hw_mac_addr);
++		if (priv->hw_version == MVPP21)
++			mvpp21_get_mac_address(port, hw_mac_addr);
+ 		if (is_valid_ether_addr(hw_mac_addr)) {
+ 			mac_from = "hardware";
+ 			ether_addr_copy(dev->dev_addr, hw_mac_addr);
+@@ -6499,7 +6534,14 @@ static int mvpp2_port_probe(struct platform_device *pdev,
+ 		dev_err(&pdev->dev, "failed to init port %d\n", id);
+ 		goto err_free_stats;
+ 	}
+-	mvpp2_port_power_up(port);
++
++	mvpp2_port_mii_set(port);
++	mvpp2_port_periodic_xon_disable(port);
++
++	if (priv->hw_version == MVPP21)
++		mvpp2_port_fc_adv_enable(port);
++
++	mvpp2_port_reset(port);
  
- static void mvpp2_txdesc_size_set(struct mvpp2_port *port,
- 				  struct mvpp2_tx_desc *tx_desc,
- 				  size_t size)
- {
--	tx_desc->data_size = size;
-+	tx_desc->pp21.data_size = size;
- }
+ 	port->pcpu = alloc_percpu(struct mvpp2_port_pcpu);
+ 	if (!port->pcpu) {
+@@ -6642,9 +6684,15 @@ static int mvpp2_init(struct platform_device *pdev, struct mvpp2 *priv)
+ 		mvpp2_conf_mbus_windows(dram_target_info, priv);
  
- static void mvpp2_txdesc_txq_set(struct mvpp2_port *port,
- 				 struct mvpp2_tx_desc *tx_desc,
- 				 unsigned int txq)
- {
--	tx_desc->phys_txq = txq;
-+	tx_desc->pp21.phys_txq = txq;
- }
+ 	/* Disable HW PHY polling */
+-	val = readl(priv->lms_base + MVPP2_PHY_AN_CFG0_REG);
+-	val |= MVPP2_PHY_AN_STOP_SMI0_MASK;
+-	writel(val, priv->lms_base + MVPP2_PHY_AN_CFG0_REG);
++	if (priv->hw_version == MVPP21) {
++		val = readl(priv->lms_base + MVPP2_PHY_AN_CFG0_REG);
++		val |= MVPP2_PHY_AN_STOP_SMI0_MASK;
++		writel(val, priv->lms_base + MVPP2_PHY_AN_CFG0_REG);
++	} else {
++		val = readl(priv->iface_base + MVPP22_SMI_MISC_CFG_REG);
++		val &= ~MVPP22_SMI_POLLING_EN;
++		writel(val, priv->iface_base + MVPP22_SMI_MISC_CFG_REG);
++	}
  
- static void mvpp2_txdesc_cmd_set(struct mvpp2_port *port,
- 				 struct mvpp2_tx_desc *tx_desc,
- 				 unsigned int command)
- {
--	tx_desc->command = command;
-+	tx_desc->pp21.command = command;
- }
+ 	/* Allocate and initialize aggregated TXQs */
+ 	priv->aggr_txqs = devm_kcalloc(&pdev->dev, num_present_cpus(),
+@@ -6669,8 +6717,9 @@ static int mvpp2_init(struct platform_device *pdev, struct mvpp2 *priv)
+ 	for (i = 0; i < MVPP2_MAX_PORTS; i++)
+ 		mvpp2_write(priv, MVPP2_ISR_RXQ_GROUP_REG(i), rxq_number);
  
- static void mvpp2_txdesc_offset_set(struct mvpp2_port *port,
- 				    struct mvpp2_tx_desc *tx_desc,
- 				    unsigned int offset)
- {
--	tx_desc->packet_offset = offset;
-+	tx_desc->pp21.packet_offset = offset;
- }
+-	writel(MVPP2_EXT_GLOBAL_CTRL_DEFAULT,
+-	       priv->lms_base + MVPP2_MNG_EXTENDED_GLOBAL_CTRL_REG);
++	if (priv->hw_version == MVPP21)
++		writel(MVPP2_EXT_GLOBAL_CTRL_DEFAULT,
++		       priv->lms_base + MVPP2_MNG_EXTENDED_GLOBAL_CTRL_REG);
  
- static unsigned int mvpp2_txdesc_offset_get(struct mvpp2_port *port,
- 					    struct mvpp2_tx_desc *tx_desc)
- {
--	return tx_desc->packet_offset;
-+	return tx_desc->pp21.packet_offset;
- }
- 
- static dma_addr_t mvpp2_rxdesc_dma_addr_get(struct mvpp2_port *port,
- 					    struct mvpp2_rx_desc *rx_desc)
- {
--	return rx_desc->buf_dma_addr;
-+	return rx_desc->pp21.buf_dma_addr;
- }
- 
- static unsigned long mvpp2_rxdesc_cookie_get(struct mvpp2_port *port,
- 					     struct mvpp2_rx_desc *rx_desc)
- {
--	return rx_desc->buf_cookie;
-+	return rx_desc->pp21.buf_cookie;
- }
- 
- static size_t mvpp2_rxdesc_size_get(struct mvpp2_port *port,
- 				    struct mvpp2_rx_desc *rx_desc)
- {
--	return rx_desc->data_size;
-+	return rx_desc->pp21.data_size;
- }
- 
- static u32 mvpp2_rxdesc_status_get(struct mvpp2_port *port,
- 				   struct mvpp2_rx_desc *rx_desc)
- {
--	return rx_desc->status;
-+	return rx_desc->pp21.status;
- }
- 
- static void mvpp2_txq_inc_get(struct mvpp2_txq_pcpu *txq_pcpu)
+ 	/* Allow cache snoop when transmiting packets */
+ 	mvpp2_write(priv, MVPP2_TX_SNOOP_REG, 0x1);
 -- 
 2.7.4
