@@ -1,93 +1,157 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 7 Mar 2017 18:35:55 +0000
-Subject: [PATCH] iommu/arm-smmu: Add global SMR masking property
-In-Reply-To: <f26137836bb8416e38390ba68973ae5cd19c2c53.1488910978.git.robin.murphy@arm.com>
-References: <f26137836bb8416e38390ba68973ae5cd19c2c53.1488910978.git.robin.murphy@arm.com>
-Message-ID: <20170307183555.GH3514@leverpostej>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 7 Mar 2017 18:41:33 +0000
+Subject: [PATCH] iommu/arm-smmu: Report smmu type in dmesg
+In-Reply-To: <20170307140607.GY16822@rric.localdomain>
+References: <20170306135833.21455-1-rrichter@cavium.com>
+ <d055d4c2-4d06-caba-4d84-21c22718fe76@arm.com>
+ <20170307140607.GY16822@rric.localdomain>
+Message-ID: <bdf70e78-5ffd-4458-f485-4a508705e3e6@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 07, 2017 at 06:26:28PM +0000, Robin Murphy wrote:
-> The current SMR masking support using a 2-cell iommu-specifier is
-> primarily intended to handle individual masters with large and/or
-> complex Stream ID assignments; it quickly gets a bit clunky in other SMR
-> use-cases where we just want to consistently mask out the same part of
-> every Stream ID (e.g. for MMU-500 configurations where the appended TBU
-> number gets in the way unnecessarily). Let's add a new property to allow
-> a single global mask value to better fit the latter situation.
+On 07/03/17 14:06, Robert Richter wrote:
+> On 06.03.17 18:22:08, Robin Murphy wrote:
+>> On 06/03/17 13:58, Robert Richter wrote:
+>>> The ARM SMMU detection especially depends from system firmware. For
+>>> better diagnostic, log the detected type in dmesg.
+>>
+>> This paragraph especially depends from grammar. I think.
 > 
-> Tested-by: Nipun Gupta <nipun.gupta@nxp.com>
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-> ---
+> Thanks for the mail on you. :)
 > 
-> Time to rekindle the discussion about whether an architecture-level
-> concept with a rather specific name needs a vendor prefix ;)
+>>
+>>> The smmu type's name is now stored in struct arm_smmu_type and ACPI
+>>> code is modified to use that struct too. Rename ARM_SMMU_MATCH_DATA()
+>>> macro to ARM_SMMU_TYPE() for better readability.
+>>>
+>>> Signed-off-by: Robert Richter <rrichter@cavium.com>
+>>> ---
+>>>  drivers/iommu/arm-smmu.c | 61 ++++++++++++++++++++++++------------------------
+>>>  1 file changed, 30 insertions(+), 31 deletions(-)
+>>
+>> That seems a relatively invasive diffstat for the sake of printing a
+>> string once at boot time to what I can only assume is a small audience
+>> of firmware developers who find "cat
+>> /sys/firmware/devicetree/base/iommu*/compatible" (or the ACPI
+>> equivalent) too hard ;)
 > 
-> Robin.
+> Reading firmware data is not really a solution as you don't know what
+> the driver is doing with it. The actual background of this patch is to
+> be sure a certain workaround was enabled in the kernel. ARM's cpu
+> errata framework does this nicely. In case of smmus we just have the
+> internal model implementation type which is not visible in the logs.
+> Right now, there is no way to figure that out without knowing fw
+> specifics and kernel sources.
+
+Ah, now it starts to become clear. In that case, if we want to confirm
+the presence of specific workarounds, we should actually _confirm the
+presence of specific workarounds_. I'd have no complaint with e.g. this:
+
+-----8<-----
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index f7411109670f..9e50a092632c 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -1934,6 +1934,8 @@ static int arm_smmu_device_cfg_probe(struct
+arm_smmu_device *smmu)
+                        atomic_add_return(smmu->num_context_banks,
+                                          &cavium_smmu_context_count);
+                smmu->cavium_id_base -= smmu->num_context_banks;
++               dev_notice(smmu->dev, "\tusing ASID/VMID offset %u\n",
++                          smmu->cavium_id_base);
+        }
+
+        /* ID2 */
+----->8-----
+
+and the equivalent for other things, if need be. If you just print "hey,
+this is SMMU-x", the user is in fact no better off, since they would
+then still have to go and look at the source for whatever kernel they're
+running to find out which particular workarounds for SMMU-x bugs that
+particular kernel implements.
+
+Robin.
+
+> The change is big but most of it is a reasonable rework anyway. I
+> didn't want to split that into a series of patches. But I could do
+> that.
 > 
->  Documentation/devicetree/bindings/iommu/arm,smmu.txt | 10 ++++++++++
->  drivers/iommu/arm-smmu.c                             |  4 +++-
->  2 files changed, 13 insertions(+), 1 deletion(-)
+>> Assuming there is a really good reason somewhere to justify this, I
+>> still wonder if a simple self-contained "smmu->model to string" function
+>> wouldn't do, if we really want to do this? Maybe it's not quite that
+>> simple if the generic case needs to key off smmu->version as well, but
+>> still. Arguably, just searching the of_match_table by model/version and
+>> printing the corresponding DT compatible would do the job (given an
+>> MMU-400 model to disambiguate those).
 > 
-> diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu.txt b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-> index 6cdf32d037fc..d66f355e174f 100644
-> --- a/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-> +++ b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-> @@ -60,6 +60,16 @@ conditions.
->                    aliases of secure registers have to be used during
->                    SMMU configuration.
->  
-> +- stream-match-mask : Specifies a fixed SMR mask value to combine with
-> +                  the Stream ID value from every iommu-specifier. This
-> +                  may be used instead of an "#iommu-cells" value of 2
-> +                  when there is no need for per-master SMR masks, but
-> +                  it is still desired to mask some portion of every
-> +                  Stream ID (e.g. for certain MMU-500 configurations
-> +                  given globally unique external IDs). This property is
-> +                  not valid for SMMUs using stream indexing, and may be
-> +                  ignored if stream matching is not supported.
-> +
-
-Generally, this sounds fine.
-
-However, there is an ambiguity here (inherited from the existing
-#iommu-cells = <2> case), in that it's not clear what is meant by "to
-combine".
-
->From the example at the end of the file, this appears to be a mask of
-bits to not consider for matching purposes?
-
-Would you mind clarifying that in both cases?
-
-This could also do with an example.
-
-Thanks,
-Mark.
-
->  ** Deprecated properties:
->  
->  - mmu-masters (deprecated in favour of the generic "iommus" binding) :
-> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> index abf6496843a6..e394d55146a6 100644
-> --- a/drivers/iommu/arm-smmu.c
-> +++ b/drivers/iommu/arm-smmu.c
-> @@ -1590,13 +1590,15 @@ static int arm_smmu_domain_set_attr(struct iommu_domain *domain,
->  
->  static int arm_smmu_of_xlate(struct device *dev, struct of_phandle_args *args)
->  {
-> -	u32 fwid = 0;
-> +	u32 mask, fwid = 0;
->  
->  	if (args->args_count > 0)
->  		fwid |= (u16)args->args[0];
->  
->  	if (args->args_count > 1)
->  		fwid |= (u16)args->args[1] << SMR_MASK_SHIFT;
-> +	else if (!of_property_read_u32(args->np, "stream-match-mask", &mask))
-> +		fwid |= (u16)mask << SMR_MASK_SHIFT;
->  
->  	return iommu_fwspec_add_ids(dev, &fwid, 1);
->  }
-> -- 
-> 2.11.0.dirty
+> Whatever you prefer. To me a dynamic search makes things more complex
+> for no benefit. And providing DT names in an ACPI context is confusing
+> either.
+> 
+>> Either way it ought to be replacing the "SMMUv%d with:" message in
+>> arm_smmu_device_cfg_probe() - this driver is noisy enough already
+>> without starting to repeat itself.
+>>
+>>> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+>>> index abf6496843a6..5c793b3d3173 100644
+>>> --- a/drivers/iommu/arm-smmu.c
+>>> +++ b/drivers/iommu/arm-smmu.c
+>>> @@ -366,6 +366,7 @@ struct arm_smmu_device {
+>>>  	u32				options;
+>>>  	enum arm_smmu_arch_version	version;
+>>>  	enum arm_smmu_implementation	model;
+>>> +	const char			*name;
+>>
+>> If we are going to add a pointer to static implementation data, it may
+>> as well be a "const arm_smmu_type *type" pointer to subsume version and
+>> model as well.
+> 
+> The name still may change but not the particular string. Both work for
+> me.
+> 
+>>
+>>>  
+>>>  	u32				num_context_banks;
+>>>  	u32				num_s2_context_banks;
+>>> @@ -1955,19 +1956,20 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
+>>>  	return 0;
+>>>  }
+>>>  
+>>> -struct arm_smmu_match_data {
+>>> +struct arm_smmu_type {
+>>>  	enum arm_smmu_arch_version version;
+>>>  	enum arm_smmu_implementation model;
+>>> +	const char *name;
+>>>  };
+>>>  
+>>> -#define ARM_SMMU_MATCH_DATA(name, ver, imp)	\
+>>> -static struct arm_smmu_match_data name = { .version = ver, .model = imp }
+>>> +#define ARM_SMMU_TYPE(var, ver, imp, _name)	\
+>>> +static struct arm_smmu_type var = { .version = ver, .model = imp, .name = _name }
+>>>  
+>>> -ARM_SMMU_MATCH_DATA(smmu_generic_v1, ARM_SMMU_V1, GENERIC_SMMU);
+>>> -ARM_SMMU_MATCH_DATA(smmu_generic_v2, ARM_SMMU_V2, GENERIC_SMMU);
+>>> -ARM_SMMU_MATCH_DATA(arm_mmu401, ARM_SMMU_V1_64K, GENERIC_SMMU);
+>>> -ARM_SMMU_MATCH_DATA(arm_mmu500, ARM_SMMU_V2, ARM_MMU500);
+>>> -ARM_SMMU_MATCH_DATA(cavium_smmuv2, ARM_SMMU_V2, CAVIUM_SMMUV2);
+>>> +ARM_SMMU_TYPE(smmu_generic_v1, ARM_SMMU_V1, GENERIC_SMMU, "smmu-generic-v1");
+>>> +ARM_SMMU_TYPE(smmu_generic_v2, ARM_SMMU_V2, GENERIC_SMMU, "smmu-generic-v2");
+>>> +ARM_SMMU_TYPE(arm_mmu401, ARM_SMMU_V1_64K, GENERIC_SMMU, "arm-mmu401");
+>>
+>> Strictly, I think you mean "ARM? CoreLink? MMU-401". Printing the name
+>> of a driver-internal structure looks like someone left a debugging hack in.
+>>
+>>> +ARM_SMMU_TYPE(arm_mmu500, ARM_SMMU_V2, ARM_MMU500, "arm-mmu500");
+>>
+>> And similarly. Of course, I'm not actually suggesting that using the
+>> full marketing names of things is a great idea, but then again if we do
+>> go naming specific IPs, and anyone gets sniffy about using the names
+>> "properly", then guess what's going to get removed again? You'll always
+>> find me firmly in the "easier not to go there" camp.
+> 
+> A change of naming is unrelated to this patch. I leave this up to you.
+> 
+> Thank you for review.
+> 
+> -Robert
 > 
