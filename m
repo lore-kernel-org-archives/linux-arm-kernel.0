@@ -1,72 +1,61 @@
-From: yong.mao@mediatek.com (Yong Mao)
-Date: Tue, 7 Mar 2017 16:05:07 +0800
-Subject: [PATCH v4 1/3] mmc: dt-bindings: update Mediatek MMC bindings
-In-Reply-To: <1488512995.21451.16.camel@mhfsdcap03>
-References: <1484988923-1543-1-git-send-email-yong.mao@mediatek.com>
- <1484988923-1543-2-git-send-email-yong.mao@mediatek.com>
- <CAPDyKFqo7fMTp3YPJwgoa4u3iAie2U884VUfTnMQ_js8neMqTQ@mail.gmail.com>
- <1487930376.22858.14.camel@mhfsdcap03>
- <CAL_Jsq+eo-Fy8Wf2yZpE3Ufp4V_7Gn+w9fTyjZDP6V7tY-=gdw@mail.gmail.com>
- <1488512995.21451.16.camel@mhfsdcap03>
-Message-ID: <1488873907.10538.3.camel@mhfsdcap03>
+From: alim.akhtar@samsung.com (Alim Akhtar)
+Date: Tue, 07 Mar 2017 13:36:07 +0530
+Subject: [PATCH] irqchip/gic-v3: Fix GICD_CTLR_ARE_NS bit field
+In-Reply-To: <87lgsh1qki.fsf@on-the-bus.cambridge.arm.com>
+References: <CGME20170307041023epcas5p1229831d4cc8541e6c35914508e6e01f0@epcas5p1.samsung.com>
+ <1488859625-7532-1-git-send-email-alim.akhtar@samsung.com>
+ <87lgsh1qki.fsf@on-the-bus.cambridge.arm.com>
+Message-ID: <8c6206e6-85cb-d78c-4de9-8843ddf77053@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2017-03-03 at 11:49 +0800, Yong Mao wrote:
-> On Fri, 2017-02-24 at 16:47 -0600, Rob Herring wrote:
-> > On Fri, Feb 24, 2017 at 3:59 AM, Yong Mao <yong.mao@mediatek.com> wrote:
-> > > Dear Rob,
-> > >
-> > > Could you please help to make comments for this patch?
-> > > Thanks.
-> > 
-> > I already did comment. It's still wrong as Ulf commented. So fix and
-> > send a new version. It has to go to the DT list if you want to be in
-> > my queue.
-> > 
-> > Rob
-> 
-> After reviewing the history, We guess your mentioned Ulf's comments is as below.
->   
-> "> +- mtk-hs200-cmd-int-delay: HS200 command internal delay setting.
-> > + The value is an integer from 0 to 31
-> 
-> Please change to:
-> 
-> mediatek,hs200-cmd-delay
-> 
-> ... and if there is a unit, like ns or us, please add that a suffix.
-> 
-> > +- mtk-hs400-cmd-int-delay: HS400 command internal delay setting
-> > + The value is an integer from 0 to 31
-> 
-> mediatek,hs400-cmd-delay and add unit if applicable.
-> 
-> > +- mtk-hs400-cmd-resp-sel: HS400 command response sample selection
-> > + The value is an integer from 0 to 1
-> 
-> mediatek,hs400-cmd-resp-sel
-> 
-> And make it a boolean value instead!"
-> 
-> ==> We already fix this comment in v4. 
-> We use "mediatek,hs200-cmd-int-delay" to replace "mtk-hs200-cmd-int-delay", 
-> but not use "mediatek,hs200-cmd-delay". This is because "-int-" here means internal.
-> We should not drop it.
-> 
-> And this field does not have unit, it only have total 32 stages.
-> We also change the description in v4.
-> 
-> For comment about "mtk-hs400-cmd-resp-sel", we also make it a boolean value in v4.
-> And re-name it as "mediatek,hs400-cmd-resp-rising".
-> 
-> Please help to point out where we need to modify.
-> Thanks.
-> 
-> 
+Hi Marc,
 
-Please help to point out a bright way for this patch.
-We are anxiously waiting for your response.
+On 03/07/2017 01:11 PM, Marc Zyngier wrote:
+> On Tue, Mar 07 2017 at  4:07:05 am GMT, Alim Akhtar <alim.akhtar@samsung.com> wrote:
+>> From: Alim Akhtar <alim.akhtar@gmail.com>
+>>
+>> As per GICv3 Architecture specification 8.9.4 field descriptions,
+>> GICD_CTLR_ARE_NS is bit[5]. This patch correct the same.
+>>
+>> Fixes: 021f6537 ("irqchip: gic-v3: Initial support for GICv3")
+>> Cc: stable at vger.kernel.org
+>> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
+>> ---
+>>  include/linux/irqchip/arm-gic-v3.h | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+>> index e808f8a..4aaf639 100644
+>> --- a/include/linux/irqchip/arm-gic-v3.h
+>> +++ b/include/linux/irqchip/arm-gic-v3.h
+>> @@ -57,7 +57,7 @@
+>>
+>>  #define GICD_CTLR_RWP			(1U << 31)
+>>  #define GICD_CTLR_DS			(1U << 6)
+>> -#define GICD_CTLR_ARE_NS		(1U << 4)
+>> +#define GICD_CTLR_ARE_NS		(1U << 5)
+>>  #define GICD_CTLR_ENABLE_G1A		(1U << 1)
+>>  #define GICD_CTLR_ENABLE_G1		(1U << 0)
+>
+> No, the issue is much more subtle.
+>
+> - When the access is secure in a system that supports two security
+>   states, this is bit[5] indeed.
+>
+> - When the access is non-secure in a system that supports two security
+>   states, this is bit[4] (so that software written for a single security
+>   mode can run on both side of the security fence).
+>
+> - In a system that only supports a single security state, this is bit[4]
+>   too.
+>
+> Given that Linux is only designed to run on the non-secure side (at
+> least when paired with GICv3), I stand by my original bit layout.
+>
+Ok, got it, thanks for clarification.
 
-Best Regards,
-Yong Mao.
+> Thanks,
+>
+>         M.
+>
