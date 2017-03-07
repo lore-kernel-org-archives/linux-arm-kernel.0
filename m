@@ -1,44 +1,79 @@
-From: tbaicar@codeaurora.org (Baicar, Tyler)
-Date: Tue, 7 Mar 2017 09:37:38 -0700
-Subject: [PATCH V12 00/10] Add UEFI 2.6 and ACPI 6.1 updates for RAS on
- ARM64
-In-Reply-To: <58BE9B6B.3020000@arm.com>
-References: <1488833103-21082-1-git-send-email-tbaicar@codeaurora.org>
- <58BE9B6B.3020000@arm.com>
-Message-ID: <0908a4cc-bb6b-341b-0bde-ccb820d17385@codeaurora.org>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 07 Mar 2017 17:38:18 +0100
+Subject: [PATCH] ARM: DTS armada: Add default trigger for sata led
+In-Reply-To: <1488287750-28626-1-git-send-email-ansuelsmth@gmail.com> (Ansuel
+ Smith's message of "Tue, 28 Feb 2017 14:15:50 +0100")
+References: <1488287750-28626-1-git-send-email-ansuelsmth@gmail.com>
+Message-ID: <87fuipoxdx.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/7/2017 4:37 AM, James Morse wrote:
-> Hi Tyler,
+Hi Ansuel,
+ 
+ On mar., f?vr. 28 2017, Ansuel Smith <ansuelsmth@gmail.com> wrote:
+
+> In others board we have the sata led set to funcion
+> with the sata led trigger by default.
+> This patch makes the same for these board that have sata
+> led but get disabled by not associating it to any trigger.
 >
-> On 06/03/17 20:44, Tyler Baicar wrote:
->> When a memory error, CPU error, PCIe error, or other type of hardware error
->> that's covered by RAS occurs, firmware should populate the shared GHES memory
->> location with the proper GHES structures to notify the OS of the error.
->> For example, platforms that implement firmware first handling may implement
->> separate GHES sources for corrected errors and uncorrected errors. If the
->> error is an uncorrectable error, then the firmware will notify the OS
->> immediately since the error needs to be handled ASAP. The OS will then be able
->> to take the appropriate action needed such as offlining a page. If the error
->> is a corrected error, then the firmware will not interrupt the OS immediately.
->> Instead, the OS will see and report the error the next time it's GHES timer
->> expires. The kernel will first parse the GHES structures and report the errors
->> through the kernel logs and then notify the user space through RAS trace
->> events. This allows user space applications such as RAS Daemon to see the
->> errors and report them however the user desires. This patchset extends the
->> kernel functionality for RAS errors based on updates in the UEFI 2.6 and
->> ACPI 6.1 specifications.
-> This series doesn't apply cleanly to v4.11-rc1, what did you base it on?
->
-> Please base this on a v4.11 release candidate if you want it considered for v4.12.
->
-This was based on 4.10, I will base it on 4.11-rc1 for the next patch set.
+> Signed-off-by: Ansuel Smith <ansuelsmth@gmail.com>
+
+Applied on mvebu/dt (I also fixed the typo on func_t_ion and added the
+acked-by from Jason)
 
 Thanks,
-Tyler
+
+Gregory
+
+> ---
+>  arch/arm/boot/dts/armada-385-linksys-caiman.dts | 1 +
+>  arch/arm/boot/dts/armada-385-linksys-cobra.dts  | 1 +
+>  arch/arm/boot/dts/armada-xp-linksys-mamba.dts   | 1 +
+>  3 files changed, 3 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/armada-385-linksys-caiman.dts b/arch/arm/boot/dts/armada-385-linksys-caiman.dts
+> index f3cee91..a1b6e68 100644
+> --- a/arch/arm/boot/dts/armada-385-linksys-caiman.dts
+> +++ b/arch/arm/boot/dts/armada-385-linksys-caiman.dts
+> @@ -109,6 +109,7 @@
+>  
+>  		sata {
+>  			label = "caiman:white:sata";
+> +			linux,default-trigger = "disk-activity";
+>  		};
+>  	};
+>  };
+> diff --git a/arch/arm/boot/dts/armada-385-linksys-cobra.dts b/arch/arm/boot/dts/armada-385-linksys-cobra.dts
+> index 1110718..a1a75af 100644
+> --- a/arch/arm/boot/dts/armada-385-linksys-cobra.dts
+> +++ b/arch/arm/boot/dts/armada-385-linksys-cobra.dts
+> @@ -109,6 +109,7 @@
+>  
+>  		sata {
+>  			label = "cobra:white:sata";
+> +			linux,default-trigger = "disk-activity";
+>  		};
+>  	};
+>  };
+> diff --git a/arch/arm/boot/dts/armada-xp-linksys-mamba.dts b/arch/arm/boot/dts/armada-xp-linksys-mamba.dts
+> index 83ac884..dcd73ab 100644
+> --- a/arch/arm/boot/dts/armada-xp-linksys-mamba.dts
+> +++ b/arch/arm/boot/dts/armada-xp-linksys-mamba.dts
+> @@ -156,6 +156,7 @@
+>  					esata at 4 {
+>  						label = "mamba:white:esata";
+>  						reg = <0x4>;
+> +						linux,default-trigger = "disk-activity";
+>  					};
+>  
+>  					usb2 at 5 {
+> -- 
+> 1.9.1
+>
 
 -- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project.
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
