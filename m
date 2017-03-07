@@ -1,34 +1,83 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Tue,  7 Mar 2017 14:31:00 +0100
-Subject: [PATCH 1/3] pinctrl: meson-gxbb: Fix typo in i2c ao groups
+Date: Tue,  7 Mar 2017 14:31:02 +0100
+Subject: [PATCH 3/3] ARM64: dts: meson-gxl: Add missing pinctrl pins groups
 In-Reply-To: <1488893462-7016-1-git-send-email-narmstrong@baylibre.com>
 References: <1488893462-7016-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1488893462-7016-2-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1488893462-7016-4-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Add pinctrl pins nodes following the additions of missing pins in the pinctrl
+driver.
+
 Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 ---
- drivers/pinctrl/meson/pinctrl-meson-gxbb.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm64/boot/dts/amlogic/meson-gxl.dtsi | 32 ++++++++++++++++++++++++++++++
+ 1 file changed, 32 insertions(+)
 
-diff --git a/drivers/pinctrl/meson/pinctrl-meson-gxbb.c b/drivers/pinctrl/meson/pinctrl-meson-gxbb.c
-index 7671424..31a3a98 100644
---- a/drivers/pinctrl/meson/pinctrl-meson-gxbb.c
-+++ b/drivers/pinctrl/meson/pinctrl-meson-gxbb.c
-@@ -667,11 +667,11 @@
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
+index 583c7b8..17cd546 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
+@@ -103,6 +103,13 @@
+ 			};
+ 		};
+ 
++		uart_ao_b_0_1_pins: uart_ao_b_0_1 {
++			mux {
++				groups = "uart_tx_ao_b_0", "uart_rx_ao_b_1";
++				function = "uart_ao_b";
++			};
++		};
++
+ 		uart_ao_b_cts_rts_pins: uart_ao_b_cts_rts {
+ 			mux {
+ 				groups = "uart_cts_ao_b",
+@@ -118,6 +125,14 @@
+ 			};
+ 		};
+ 
++		i2c_ao_pins: i2c_ao {
++			mux {
++				groups = "i2c_sck_ao",
++				       "i2c_sda_ao";
++				function = "i2c_ao";
++			};
++		};
++
+ 		pwm_ao_a_3_pins: pwm_ao_a_3 {
+ 			mux {
+ 				groups = "pwm_ao_a_3";
+@@ -138,6 +153,13 @@
+ 				function = "pwm_ao_b";
+ 			};
+ 		};
++
++		pwm_ao_b_6_pins: pwm_ao_b_6 {
++			mux {
++				groups = "pwm_ao_b_6";
++				function = "pwm_ao_b_6";
++			};
++		};
+ 	};
  };
  
- static const char * const i2c_ao_groups[] = {
--	"i2c_sdk_ao", "i2c_sda_ao",
-+	"i2c_sck_ao", "i2c_sda_ao",
- };
+@@ -168,6 +190,16 @@
+ 			};
+ 		};
  
- static const char * const i2c_slave_ao_groups[] = {
--	"i2c_slave_sdk_ao", "i2c_slave_sda_ao",
-+	"i2c_slave_sck_ao", "i2c_slave_sda_ao",
- };
- 
- static const char * const remote_input_ao_groups[] = {
++		nor_pins: nor {
++			mux {
++				groups = "nor_d",
++				       "nor_q",
++				       "nor_c",
++				       "nor_cs";
++				function = "nor";
++			};
++		};
++
+ 		sdcard_pins: sdcard {
+ 			mux {
+ 				groups = "sdcard_d0",
 -- 
 1.9.1
