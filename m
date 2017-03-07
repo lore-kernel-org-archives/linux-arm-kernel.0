@@ -1,66 +1,104 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 07 Mar 2017 15:21:22 +0100
-Subject: Applied "ASoC: atmel-classd: fix audio clock rate" to the asoc tree
-In-Reply-To: <20170224071043.25522-1-songjun.wu@microchip.com>
-Message-ID: <E1clFzO-0006cY-F7@finisterre>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 7 Mar 2017 14:21:40 +0000
+Subject: [PATCH v4 5/6] arm64: mmu: apply strict permissions to
+ .init.text and .init.data
+In-Reply-To: <1488637848-13588-6-git-send-email-ard.biesheuvel@linaro.org>
+References: <1488637848-13588-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1488637848-13588-6-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20170307142140.GB3514@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+On Sat, Mar 04, 2017 at 02:30:47PM +0000, Ard Biesheuvel wrote:
+> diff --git a/arch/arm64/include/asm/sections.h b/arch/arm64/include/asm/sections.h
+> index 4e7e7067afdb..22582819b2e5 100644
+> --- a/arch/arm64/include/asm/sections.h
+> +++ b/arch/arm64/include/asm/sections.h
+> @@ -24,7 +24,8 @@ extern char __hibernate_exit_text_start[], __hibernate_exit_text_end[];
+>  extern char __hyp_idmap_text_start[], __hyp_idmap_text_end[];
+>  extern char __hyp_text_start[], __hyp_text_end[];
+>  extern char __idmap_text_start[], __idmap_text_end[];
+> +extern char __initdata_begin[], __initdata_end[];
+> +extern char __inittext_begin[], __inittext_end[];
+>  extern char __irqentry_text_start[], __irqentry_text_end[];
+>  extern char __mmuoff_data_start[], __mmuoff_data_end[];
+> -
+>  #endif /* __ASM_SECTIONS_H */
 
-   ASoC: atmel-classd: fix audio clock rate
+Unintended whitespace change?
 
-has been applied to the asoc tree at
+Please restore the line above the endif. 
 
-   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
+> diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+> index b8deffa9e1bf..2c93d259046c 100644
+> --- a/arch/arm64/kernel/vmlinux.lds.S
+> +++ b/arch/arm64/kernel/vmlinux.lds.S
+> @@ -143,12 +143,27 @@ SECTIONS
+>  
+>  	. = ALIGN(SEGMENT_ALIGN);
+>  	__init_begin = .;
+> +	__inittext_begin = .;
+>  
+>  	INIT_TEXT_SECTION(8)
+>  	.exit.text : {
+>  		ARM_EXIT_KEEP(EXIT_TEXT)
+>  	}
+>  
+> +	. = ALIGN(4);
+> +	.altinstructions : {
+> +		__alt_instructions = .;
+> +		*(.altinstructions)
+> +		__alt_instructions_end = .;
+> +	}
+> +	.altinstr_replacement : {
+> +		*(.altinstr_replacement)
+> +	}
+> +
+> +	. = ALIGN(PAGE_SIZE);
 
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
+Arguably this should be SEGMENT_ALIGN for consitency, but given this is
+just .init* this should be fine.
 
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
+> +	__inittext_end = .;
+> +	__initdata_begin = .;
+> +
+>  	.init.data : {
+>  		INIT_DATA
+>  		INIT_SETUP(16)
 
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
+[...]
 
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
+> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+> index edd982f88714..0612573ef869 100644
+> --- a/arch/arm64/mm/mmu.c
+> +++ b/arch/arm64/mm/mmu.c
+> @@ -459,14 +459,18 @@ early_param("rodata", parse_rodata);
+>   */
+>  static void __init map_kernel(pgd_t *pgd)
+>  {
+> -	static struct vm_struct vmlinux_text, vmlinux_rodata, vmlinux_init, vmlinux_data;
+> +	static struct vm_struct vmlinux_text, vmlinux_rodata, vmlinux_inittext,
+> +				vmlinux_initdata, vmlinux_data;
+>  
+>  	pgprot_t text_prot = rodata_enabled ? PAGE_KERNEL_ROX : PAGE_KERNEL_EXEC;
+>  
+>  	map_kernel_segment(pgd, _text, _etext, text_prot, &vmlinux_text);
+> -	map_kernel_segment(pgd, __start_rodata, __init_begin, PAGE_KERNEL, &vmlinux_rodata);
+> -	map_kernel_segment(pgd, __init_begin, __init_end, PAGE_KERNEL_EXEC,
+> -			   &vmlinux_init);
+> +	map_kernel_segment(pgd, __start_rodata, __inittext_begin, PAGE_KERNEL,
+> +			   &vmlinux_rodata);
+> +	map_kernel_segment(pgd, __inittext_begin, __inittext_end, text_prot,
+> +			   &vmlinux_inittext);
+> +	map_kernel_segment(pgd, __initdata_begin, __initdata_end, PAGE_KERNEL,
+> +			   &vmlinux_initdata);
+>  	map_kernel_segment(pgd, _data, _end, PAGE_KERNEL, &vmlinux_data);
 
-Thanks,
-Mark
 
->From cd3ac9affc43b44f49d7af70d275f0bd426ba643 Mon Sep 17 00:00:00 2001
-From: Songjun Wu <songjun.wu@microchip.com>
-Date: Fri, 24 Feb 2017 15:10:43 +0800
-Subject: [PATCH] ASoC: atmel-classd: fix audio clock rate
+This all look fine, given text_prot is used for the init text.
 
-Fix the audio clock rate according to the datasheet.
+With the whitespace restored:
 
-Reported-by: Dushara Jayasinghe <dushara@successful.com.au>
-Signed-off-by: Songjun Wu <songjun.wu@microchip.com>
-Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
-Signed-off-by: Mark Brown <broonie@kernel.org>
-Cc: stable at vger.kernel.org
----
- sound/soc/atmel/atmel-classd.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Reviewed-by: Mark Rutland <mark.rutland@arm.com>
 
-diff --git a/sound/soc/atmel/atmel-classd.c b/sound/soc/atmel/atmel-classd.c
-index 89ac5f5a93eb..7ae46c2647d4 100644
---- a/sound/soc/atmel/atmel-classd.c
-+++ b/sound/soc/atmel/atmel-classd.c
-@@ -349,7 +349,7 @@ static int atmel_classd_codec_dai_digital_mute(struct snd_soc_dai *codec_dai,
- }
- 
- #define CLASSD_ACLK_RATE_11M2896_MPY_8 (112896 * 100 * 8)
--#define CLASSD_ACLK_RATE_12M288_MPY_8  (12228 * 1000 * 8)
-+#define CLASSD_ACLK_RATE_12M288_MPY_8  (12288 * 1000 * 8)
- 
- static struct {
- 	int rate;
--- 
-2.11.0
+Mark.
