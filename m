@@ -1,80 +1,96 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 7 Mar 2017 10:48:42 +0530
-Subject: [PATCH v2 08/22] PCI: dwc: designware: Add EP mode support
-In-Reply-To: <45e5288e-d11f-c855-af9b-692a42d878c6@synopsys.com>
-References: <1487325042-28227-1-git-send-email-kishon@ti.com>
- <1487325042-28227-9-git-send-email-kishon@ti.com>
- <45e5288e-d11f-c855-af9b-692a42d878c6@synopsys.com>
-Message-ID: <58BE42B2.20305@ti.com>
+From: bharat.kumar.gogada@xilinx.com (Bharat Kumar Gogada)
+Date: Tue, 7 Mar 2017 05:48:03 +0000
+Subject: [PATCH v5] PCI: Xilinx NWL: Modifying irq chip for legacy
+ interrupts
+References: <1486364596-19699-1-git-send-email-bharatku@xilinx.com>
+ <4b04e834-08b6-a728-8fe5-13106d50b3b2@arm.com>
+ <8520D5D51A55D047800579B094147198263E68AA@XAP-PVEXMBX02.xlnx.xilinx.com>
+ <131228fb-d3f8-3836-3713-e948ed30d398@arm.com>
+ <8520D5D51A55D047800579B094147198263E6AF3@XAP-PVEXMBX02.xlnx.xilinx.com>
+ <2196f028-b834-9d32-cc3a-e3eb5ed6c3b1@arm.com>  
+Message-ID: <8520D5D51A55D047800579B094147198263FBCF4@XAP-PVEXMBX02.xlnx.xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joao,
+Hi Marc,
 
-On Friday 17 February 2017 10:50 PM, Joao Pinto wrote:
-> ?s 9:50 AM de 2/17/2017, Kishon Vijay Abraham I escreveu:
->> Add endpoint mode support to designware driver. This uses the
->> EP Core layer introduced recently to add endpoint mode support.
->> *Any* function driver can now use this designware device
->> in order to achieve the EP functionality.
->>
->> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
->> ---
->>  drivers/pci/dwc/Kconfig              |    5 +
->>  drivers/pci/dwc/Makefile             |    1 +
->>  drivers/pci/dwc/pcie-designware-ep.c |  342 ++++++++++++++++++++++++++++++++++
->>  drivers/pci/dwc/pcie-designware.c    |   51 +++++
->>  drivers/pci/dwc/pcie-designware.h    |   72 +++++++
->>  5 files changed, 471 insertions(+)
->>  create mode 100644 drivers/pci/dwc/pcie-designware-ep.c
->>
+can you please look into my last comments ?
 
-<snip>
-
->> diff --git a/drivers/pci/dwc/pcie-designware.c b/drivers/pci/dwc/pcie-designware.c
->> index 686945d..49b28c8 100644
->> --- a/drivers/pci/dwc/pcie-designware.c
->> +++ b/drivers/pci/dwc/pcie-designware.c
->> @@ -173,6 +173,57 @@ void dw_pcie_prog_outbound_atu(struct dw_pcie *pci, int index, int type,
->>  	dev_err(pci->dev, "iATU is not being enabled\n");
->>  }
->>  
->> +int dw_pcie_prog_inbound_atu(struct dw_pcie *pci, int index, int bar,
->> +			     u64 cpu_addr, enum dw_pcie_as_type as_type)
->> +{
->> +	int type;
->> +	void __iomem *base = pci->dbi_base;
->> +
->> +	dw_pcie_write_dbi(pci, base, PCIE_ATU_VIEWPORT, 0x4,
->> +			  PCIE_ATU_REGION_INBOUND | index);
->> +	dw_pcie_write_dbi(pci, base, PCIE_ATU_LOWER_TARGET, 0x4,
->> +			  lower_32_bits(cpu_addr));
->> +	dw_pcie_write_dbi(pci, base, PCIE_ATU_UPPER_TARGET, 0x4,
->> +			  upper_32_bits(cpu_addr));
->> +
->> +	switch (as_type) {
->> +	case DW_PCIE_AS_MEM:
->> +		type = PCIE_ATU_TYPE_MEM;
->> +		break;
->> +	case DW_PCIE_AS_IO:
->> +		type = PCIE_ATU_TYPE_IO;
->> +		break;
->> +	default:
->> +		return -EINVAL;
->> +	}
->> +
->> +	dw_pcie_write_dbi(pci, base, PCIE_ATU_CR1, 0x4, type);
->> +	dw_pcie_write_dbi(pci, base, PCIE_ATU_CR2, 0x4, PCIE_ATU_ENABLE |
->> +			  PCIE_ATU_BAR_MODE_ENABLE | (bar << 8));
->> +	return 0;
->> +}
->> +
+Regards,
+Bharat
+> Subject: RE: [PATCH v5] PCI: Xilinx NWL: Modifying irq chip for legacy interrupts
 > 
-> This Atu programming is for PCI Cores <= 4.70. Please follow the same approach as:
-> https://git.kernel.org/cgit/linux/kernel/git/helgaas/pci.git/tree/drivers/pci/dwc/pcie-designware.c?h=pci/host-designware#n95
-
-Can you provide PCIE_GET_ATU_INB_UNR_REG_OFFSET (similar to
-PCIE_GET_ATU_OUTB_UNR_REG_OFFSET)?
-
-Thanks
-Kishon
+> Waiting for Marc's Reply...
+> 
+> > > -----Original Message-----
+> > > From: Marc Zyngier [mailto:marc.zyngier at arm.com]
+> > > Sent: Thursday, February 09, 2017 9:33 PM
+> > > To: Bharat Kumar Gogada <bharatku@xilinx.com>; bhelgaas at google.com;
+> > > robh at kernel.org; paul.gortmaker at windriver.com;
+> > > colin.king at canonical.com; linux-pci at vger.kernel.org
+> > > Cc: linux-arm-kernel at lists.infradead.org;
+> > > linux-kernel at vger.kernel.org; michal.simek at xilinx.com;
+> > > arnd at arndb.de; Ravikiran Gummaluri <rgummal@xilinx.com>
+> > > Subject: Re: [PATCH v5] PCI: Xilinx NWL: Modifying irq chip for
+> > > legacy
+> > interrupts
+> > >
+> > > On 09/02/17 15:16, Bharat Kumar Gogada wrote:
+> > > >>
+> > > >> On 09/02/17 12:01, Bharat Kumar Gogada wrote:
+> > > >>>> On 06/02/17 07:03, Bharat Kumar Gogada wrote:
+> > > >>>>> +static struct irq_chip nwl_leg_irq_chip = {
+> > > >>>>> +	.name = "nwl_pcie:legacy",
+> > > >>>>> +	.irq_enable = nwl_unmask_leg_irq,
+> > > >>>>> +	.irq_disable = nwl_mask_leg_irq,
+> > > >>>>
+> > > >>>> You don't need these two if they are implemented in terms of
+> > > mask/unmask.
+> > > >>>
+> > > >>> These are being invoked by some drivers other than interrupt flow.
+> > > >>> Ex: drivers/net/wireless/ath/ath9k/main.c
+> > > >>> static int ath_reset_internal(struct ath_softc *sc, struct
+> > > >>> ath9k_channel *hchan) {
+> > > >>>          ....
+> > > >>>          disable_irq(sc->irq);
+> > > >>>          tasklet_disable(&sc->intr_tq);
+> > > >>>         ...
+> > > >>>         ...
+> > > >>>         enable_irq(sc->irq);
+> > > >>>         spin_unlock_bh(&sc->sc_pcu_lock); } For us
+> > > >>> masking/unmasking is the way to enable/disable interrupts.
+> > > >>
+> > > >> And if you looked at the way disable_irq is implemented, you
+> > > >> would have found out that it falls back to masking if there is no
+> > > >> disable method, preserving the semantic you expect.
+> > > >>
+> > > > Yes I did see, but this fall back requires extra
+> > > > "IRQ_DISABLE_UNLAZY" flag to
+> > > be set to each virq.
+> > >
+> > > No it doesn't. If you do a disable_irq(), the interrupt is flagged
+> > > as disabled, but nothing gets done. If an interrupt actually fires,
+> > > then the interrupts gets
+> > masked,
+> > > and the handler is not called.
+> > Yes agreed, this is where the problem comes for us. Here is the
+> > scenario Ex:drivers/net/wireless/ath/ath9k/main.c
+> > static int ath_reset_internal(struct ath_softc *sc, struct
+> > ath9k_channel *hchan) {
+> >   ....
+> >    ath9k_hw_set_interrupts(ah);
+> >    ath9k_hw_enable_interrupts(ah);
+> >    ...
+> >   enable_irq(sc->irq);
+> >   ...
+> > }
+> > If you observe this they enable hardware interrupts first and then
+> > call enable_irq, at this point of time virq is in disabled state. So,
+> > if interrupt is raised in this period of time the handler is never
+> > invoked and DEASEERT_INTx will not be seen. As I mentioned in my
+> > subject the irq line between bridge and GIC goes low only after it
+> > sees DEASSERT_INTx. But since DEASSERT_INTx is never seen line is
+> > always high causing cpu stall.
+> > So for this kind of EP's we need those two methods.
+> >
+> > Bharat
