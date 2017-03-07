@@ -1,61 +1,133 @@
-From: alim.akhtar@samsung.com (Alim Akhtar)
-Date: Tue, 07 Mar 2017 13:36:07 +0530
-Subject: [PATCH] irqchip/gic-v3: Fix GICD_CTLR_ARE_NS bit field
-In-Reply-To: <87lgsh1qki.fsf@on-the-bus.cambridge.arm.com>
-References: <CGME20170307041023epcas5p1229831d4cc8541e6c35914508e6e01f0@epcas5p1.samsung.com>
- <1488859625-7532-1-git-send-email-alim.akhtar@samsung.com>
- <87lgsh1qki.fsf@on-the-bus.cambridge.arm.com>
-Message-ID: <8c6206e6-85cb-d78c-4de9-8843ddf77053@samsung.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 7 Mar 2017 08:36:12 +0000
+Subject: [PATCH] arm64: dts: rockchip: remove wrongly added idle states
+ on rk3368
+In-Reply-To: <20170301223849.13401-1-heiko@sntech.de>
+References: <20170301223849.13401-1-heiko@sntech.de>
+Message-ID: <20170307083612.GA27165@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+On Wed, Mar 01, 2017 at 11:38:49PM +0100, Heiko Stuebner wrote:
+> As reported by Lorenzo, the residency/latency values defined in the
+> idle-state for rk3368 "make no sense". When introducing them I
+> simply took the idle-state node from the vendor kernel in error
+> as I didn't look up if these values were sane in the first place.
+> 
+> Talking to people and determining why they were used in this way
+> showed that it was meant to make sure the cpu_suspend callback
+> got initialized which at the 3.10 time was somehow required even
+> for wfi-based idle handling.
+> 
+> Of course the generic arch_cpu_idle() now does wfi-based idle-handling
+> already, so there is no need for this.
+> 
+> Reported-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> ---
+> This has been sitting ere for way to long :-(, but finally I got
+> to finish the change.
 
-On 03/07/2017 01:11 PM, Marc Zyngier wrote:
-> On Tue, Mar 07 2017 at  4:07:05 am GMT, Alim Akhtar <alim.akhtar@samsung.com> wrote:
->> From: Alim Akhtar <alim.akhtar@gmail.com>
->>
->> As per GICv3 Architecture specification 8.9.4 field descriptions,
->> GICD_CTLR_ARE_NS is bit[5]. This patch correct the same.
->>
->> Fixes: 021f6537 ("irqchip: gic-v3: Initial support for GICv3")
->> Cc: stable at vger.kernel.org
->> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
->> ---
->>  include/linux/irqchip/arm-gic-v3.h | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
->> index e808f8a..4aaf639 100644
->> --- a/include/linux/irqchip/arm-gic-v3.h
->> +++ b/include/linux/irqchip/arm-gic-v3.h
->> @@ -57,7 +57,7 @@
->>
->>  #define GICD_CTLR_RWP			(1U << 31)
->>  #define GICD_CTLR_DS			(1U << 6)
->> -#define GICD_CTLR_ARE_NS		(1U << 4)
->> +#define GICD_CTLR_ARE_NS		(1U << 5)
->>  #define GICD_CTLR_ENABLE_G1A		(1U << 1)
->>  #define GICD_CTLR_ENABLE_G1		(1U << 0)
->
-> No, the issue is much more subtle.
->
-> - When the access is secure in a system that supports two security
->   states, this is bit[5] indeed.
->
-> - When the access is non-secure in a system that supports two security
->   states, this is bit[4] (so that software written for a single security
->   mode can run on both side of the security fence).
->
-> - In a system that only supports a single security state, this is bit[4]
->   too.
->
-> Given that Linux is only designed to run on the non-secure side (at
-> least when paired with GICv3), I stand by my original bit layout.
->
-Ok, got it, thanks for clarification.
+Well, the commit log needs updating, you should describe what it does
+and why, if you want to add a link to the discussion in the commit
+log use a Link: tag as per kernel documentation.
 
-> Thanks,
->
->         M.
->
+So, there are not any idle states implemented in this platform ?
+
+I probably asked before, if there are instead of removing the
+states you can just update the latencies with sane values.
+
+If wfi is the only FW/HW implemented quiescent state then:
+
+Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+
+>  arch/arm64/boot/dts/rockchip/rk3368.dtsi | 20 --------------------
+>  1 file changed, 20 deletions(-)
+> 
+> diff --git a/arch/arm64/boot/dts/rockchip/rk3368.dtsi b/arch/arm64/boot/dts/rockchip/rk3368.dtsi
+> index 49d1191..5471ace 100644
+> --- a/arch/arm64/boot/dts/rockchip/rk3368.dtsi
+> +++ b/arch/arm64/boot/dts/rockchip/rk3368.dtsi
+> @@ -107,23 +107,10 @@
+>  			};
+>  		};
+>  
+> -		idle-states {
+> -			entry-method = "psci";
+> -
+> -			cpu_sleep: cpu-sleep-0 {
+> -				compatible = "arm,idle-state";
+> -				arm,psci-suspend-param = <0x1010000>;
+> -				entry-latency-us = <0x3fffffff>;
+> -				exit-latency-us = <0x40000000>;
+> -				min-residency-us = <0xffffffff>;
+> -			};
+> -		};
+> -
+>  		cpu_l0: cpu at 0 {
+>  			device_type = "cpu";
+>  			compatible = "arm,cortex-a53", "arm,armv8";
+>  			reg = <0x0 0x0>;
+> -			cpu-idle-states = <&cpu_sleep>;
+>  			enable-method = "psci";
+>  
+>  			#cooling-cells = <2>; /* min followed by max */
+> @@ -133,7 +120,6 @@
+>  			device_type = "cpu";
+>  			compatible = "arm,cortex-a53", "arm,armv8";
+>  			reg = <0x0 0x1>;
+> -			cpu-idle-states = <&cpu_sleep>;
+>  			enable-method = "psci";
+>  		};
+>  
+> @@ -141,7 +127,6 @@
+>  			device_type = "cpu";
+>  			compatible = "arm,cortex-a53", "arm,armv8";
+>  			reg = <0x0 0x2>;
+> -			cpu-idle-states = <&cpu_sleep>;
+>  			enable-method = "psci";
+>  		};
+>  
+> @@ -149,7 +134,6 @@
+>  			device_type = "cpu";
+>  			compatible = "arm,cortex-a53", "arm,armv8";
+>  			reg = <0x0 0x3>;
+> -			cpu-idle-states = <&cpu_sleep>;
+>  			enable-method = "psci";
+>  		};
+>  
+> @@ -157,7 +141,6 @@
+>  			device_type = "cpu";
+>  			compatible = "arm,cortex-a53", "arm,armv8";
+>  			reg = <0x0 0x100>;
+> -			cpu-idle-states = <&cpu_sleep>;
+>  			enable-method = "psci";
+>  
+>  			#cooling-cells = <2>; /* min followed by max */
+> @@ -167,7 +150,6 @@
+>  			device_type = "cpu";
+>  			compatible = "arm,cortex-a53", "arm,armv8";
+>  			reg = <0x0 0x101>;
+> -			cpu-idle-states = <&cpu_sleep>;
+>  			enable-method = "psci";
+>  		};
+>  
+> @@ -175,7 +157,6 @@
+>  			device_type = "cpu";
+>  			compatible = "arm,cortex-a53", "arm,armv8";
+>  			reg = <0x0 0x102>;
+> -			cpu-idle-states = <&cpu_sleep>;
+>  			enable-method = "psci";
+>  		};
+>  
+> @@ -183,7 +164,6 @@
+>  			device_type = "cpu";
+>  			compatible = "arm,cortex-a53", "arm,armv8";
+>  			reg = <0x0 0x103>;
+> -			cpu-idle-states = <&cpu_sleep>;
+>  			enable-method = "psci";
+>  		};
+>  	};
+> -- 
+> 2.6.4
+> 
