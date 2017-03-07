@@ -1,54 +1,49 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 07 Mar 2017 18:32:42 +0100
-Subject: [PATCH] ARM: dts: mvebu: remove unnecessary PCI range from
- 98dx3236
-In-Reply-To: <20170302224239.10062-1-chris.packham@alliedtelesis.co.nz> (Chris
- Packham's message of "Fri, 3 Mar 2017 11:42:39 +1300")
-References: <20170302224239.10062-1-chris.packham@alliedtelesis.co.nz>
-Message-ID: <87varlngat.fsf@free-electrons.com>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Wed, 08 Mar 2017 01:33:38 +0800
+Subject: [PATCH v8 0/6] Allwinner H5 and Orange Pi PC2 support
+In-Reply-To: <20170307170751.n6tvrztet724pxfl@lukather>
+References: <20170306171750.7491-1-icenowy@aosc.xyz>
+ <20170307170751.n6tvrztet724pxfl@lukather>
+Message-ID: <5852741488908018@web33j.yandex.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chris,
- 
- On jeu., mars 02 2017, Chris Packham <chris.packham@alliedtelesis.co.nz> wrote:
 
-> The Marvell 98dx3236 SoC only has a single PCIe x1 interface. The "Port
-> 0.1 MEM" range was errantly kept when creating a specific dts for the
-> SoC.
+
+08.03.2017, 01:07, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
+> Hi,
 >
-> Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
-
-Applied on mvebu/dt
-
-Thanks,
-
-Gregory
-
-> ---
->  arch/arm/boot/dts/armada-xp-98dx3236.dtsi | 3 +--
->  1 file changed, 1 insertion(+), 2 deletions(-)
+> On Tue, Mar 07, 2017 at 01:17:44AM +0800, Icenowy Zheng wrote:
+>> ?Allwinner H5 is a 64-bit SoC with a design like the 32-bit
+>> ?H3, and it's pin-to-pin compatible with H3.
+>>
+>> ?This patchset adds support for it, along with the first available
+>> ?board -- Orange Pi PC2.
+>>
+>> ?Several H5 boards by Sinovoip Banana Pi and FriendlyARM Nano Pi
+>> ?are coming, so we should get ready for them.
+>>
+>> ?CCU changes are already said to be merged by Maxime Ripard, so
+>> ?this patchset now contains only device tree patches.
+>>
+>> ?Commit messages are changed by the suggestion of Maxime.
+>>
+>> ?This patchset depends on patchset [1] to finally take effect. At
+>> ?least the patch 1 of that patchset is needed if you want to test
+>> ?the kernel image -- without it the pinctrl driver won't be built
+>> ?and the kernel will become unusable without pinctrl.
 >
-> diff --git a/arch/arm/boot/dts/armada-xp-98dx3236.dtsi b/arch/arm/boot/dts/armada-xp-98dx3236.dtsi
-> index f6a03dcee5ef..0e63f927c73d 100644
-> --- a/arch/arm/boot/dts/armada-xp-98dx3236.dtsi
-> +++ b/arch/arm/boot/dts/armada-xp-98dx3236.dtsi
-> @@ -95,8 +95,7 @@
->  			ranges =
->  			       <0x82000000 0 0x40000 MBUS_ID(0xf0, 0x01) 0x40000 0 0x00002000   /* Port 0.0 registers */
->  				0x82000000 0x1 0       MBUS_ID(0x04, 0xe8) 0 1 0 /* Port 0.0 MEM */
-> -				0x81000000 0x1 0       MBUS_ID(0x04, 0xe0) 0 1 0 /* Port 0.0 IO  */
-> -				0x82000000 0x2 0       MBUS_ID(0x04, 0xd8) 0 1 0 /* Port 0.1 MEM */>;
-> +				0x81000000 0x1 0       MBUS_ID(0x04, 0xe0) 0 1 0 /* Port 0.0 IO  */>;
->  
->  			pcie1: pcie at 1,0 {
->  				device_type = "pci";
-> -- 
-> 2.11.0.24.ge6920cf
->
+> It's still not the prefixes I told you to use. I merged your patches
+> and fixed, but please use the right one next time (and be consistent
+> in your ARM vs arm usage).
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+My patch uses ARM, Andre's use arm.
+
+>
+> Thanks for your work!
+> Maxime
+>
+> --
+> Maxime Ripard, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
