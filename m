@@ -1,102 +1,99 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 7 Mar 2017 01:57:10 -0800
-Subject: [PATCH v2] KVM: arm/arm64: Let vcpu thread modify its own active
- state
-In-Reply-To: <CAHyh4xgQDy9t8YD2P_q8MSQfv_1wa9JicZkQKV2OQNG3w48+9A@mail.gmail.com>
-References: <1488807757-86131-1-git-send-email-christoffer.dall@linaro.org>
- <CAHyh4xgQDy9t8YD2P_q8MSQfv_1wa9JicZkQKV2OQNG3w48+9A@mail.gmail.com>
-Message-ID: <20170307095710.GC101711@lvm>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 7 Mar 2017 11:10:14 +0100
+Subject: [PATCH] mmc: sunxi: mask all Response Timeout error messages
+In-Reply-To: <364721488821322@web5o.yandex.ru>
+References: <20170305164535.36259-1-icenowy@aosc.xyz>
+ <20170306100437.sr7mrvssdwnt7aaz@lukather>
+ <1597991488796361@web24m.yandex.ru>
+ <20170306155313.nqxnhtsl4o5yrv33@lukather>
+ <364721488821322@web5o.yandex.ru>
+Message-ID: <20170307101014.qic65pply3c4yxzq@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 06, 2017 at 02:20:44PM -0500, Jintack Lim wrote:
-> Hi Christoffer,
+On Tue, Mar 07, 2017 at 01:28:42AM +0800, Icenowy Zheng wrote:
 > 
-> thanks for submitting this patch.
 > 
-> On Mon, Mar 6, 2017 at 8:42 AM, Christoffer Dall
-> <christoffer.dall@linaro.org> wrote:
-> > From: Jintack Lim <jintack@cs.columbia.edu>
+> 06.03.2017, 23:53, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
+> > On Mon, Mar 06, 2017 at 06:32:41PM +0800, Icenowy Zheng wrote:
+> >> ?06.03.2017, 18:04, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
+> >> ?> Hi,
+> >> ?>
+> >> ?> On Mon, Mar 06, 2017 at 12:45:35AM +0800, Icenowy Zheng wrote:
+> >> ?>> ?Response Timeout is very usual: it will happen when trying to run some
+> >> ?>> ?commands that do not belong to the card; it will happen when some SDIO
+> >> ?>> ?card transfer beyond its SDIO bandwidth; and when the MMC controller is
+> >> ?>> ?set to poll the card with "broken-cd" property (the Lichee Pi series of
+> >> ?>> ?boards do this), it will flood to the console and make the console
+> >> ?>> ?unusable.
+> >> ?>>
+> >> ?>> ?Mask all response-timeout-only error messages, only show it when another
+> >> ?>> ?error happens.
+> >> ?>>
+> >> ?>> ?Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+> >> ?>> ?---
+> >> ?>> ??drivers/mmc/host/sunxi-mmc.c | 13 +++++++++----
+> >> ?>> ??1 file changed, 9 insertions(+), 4 deletions(-)
+> >> ?>>
+> >> ?>> ?diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
+> >> ?>> ?index 6ffcd2838272..7828e1f57cf0 100644
+> >> ?>> ?--- a/drivers/mmc/host/sunxi-mmc.c
+> >> ?>> ?+++ b/drivers/mmc/host/sunxi-mmc.c
+> >> ?>> ?@@ -483,10 +483,15 @@ static void sunxi_mmc_dump_errinfo(struct sunxi_mmc_host *host)
+> >> ?>> ??????????struct mmc_command *cmd = host->mrq->cmd;
+> >> ?>> ??????????struct mmc_data *data = host->mrq->data;
+> >> ?>>
+> >> ?>> ?- /* For some cmds timeout is normal with sd/mmc cards */
+> >> ?>> ?- if ((host->int_sum & SDXC_INTERRUPT_ERROR_BIT) ==
+> >> ?>> ?- SDXC_RESP_TIMEOUT && (cmd->opcode == SD_IO_SEND_OP_COND ||
+> >> ?>> ?- cmd->opcode == SD_IO_RW_DIRECT))
+> >> ?>> ?+ /*
+> >> ?>> ?+ * Reading timeout is usually normal, especially when doing
+> >> ?>> ?+ * card-polling with "broken-cd" in device tree.
+> >> ?>> ?+ * If do not mask it, the RTO error message will flood the console
+> >> ?>> ?+ * and even hide useful error messages.
+> >> ?>> ?+ *
+> >> ?>> ?+ * Some SDIO commands will also normally timeout with non-SDIO cards.
+> >> ?>> ?+ */
+> >> ?>> ?+ if ((host->int_sum & SDXC_INTERRUPT_ERROR_BIT) == SDXC_RESP_TIMEOUT)
+> >> ?>
+> >> ?> We really shouldn't silence legit errors.
+> >> ?>
+> >> ?> The actual problem here is that we log them as error, we could
+> >> ?> probably reduce it to debug.
+> >>
+> >> ?Even if it's reduced to debug, it will still flush dmesg buffers.
 > >
-> > Currently, if a vcpu thread tries to change the active state of an
-> > interrupt which is already on the same vcpu's AP list,
+> > No, it will not even be compiled by default.
+> >
+> >> ?Or make it only visible when "debug" parameter is present in kernel
+> >> ?cmdline?
+> >
+> > debug messages are visible in dmesg only if DEBUG is defined, which is
+> > only happening if CONFIG_MMC_DEBUG is set. This won't affect the
+> > general case in any way.
+> >
+> > And it is output only if loglevel is set higher than 7.
 > 
-> "it'll loop forever" is remove accidentally in the commit message in v2?
+> Should I make all error messages debug level or only make "RTO"-only
+> error to debug level like I currently do?
 
-yes, we can fix this up when applying the patch.  Thanks.
+I'd say just change the level of the log of the line coming below that
+one. It doesn't provide any useful clue about what's going on anyway,
+there's nothing the user will be able to do to prevent that, and
+someone willing to debug it will have to turn on the debug options
+anway.
 
-> 
-> > Since the VGIC
-> > mmio handler is called after a vcpu has already synced back the LR state
-> > to the struct vgic_irq, we can just let it proceed safely.
-> >
-> > Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
-> > ---
-> > Changes since v1:
-> >  - Reworked comment
-> >  - Consider userspace accesses
-> >  - Get the right requester VCPU for GICv3 private IRQ accesses
-> >  - Tested using kvm-unit-tests and verified that it deadlocked without
-> >    this patch and passed the test with this patch :)
-> 
-> nice!
-> 
-> >
-> >  virt/kvm/arm/vgic/vgic-mmio.c | 32 ++++++++++++++++++++++++--------
-> >  1 file changed, 24 insertions(+), 8 deletions(-)
-> >
-> > diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
-> > index 3654b4c..2a5db13 100644
-> > --- a/virt/kvm/arm/vgic/vgic-mmio.c
-> > +++ b/virt/kvm/arm/vgic/vgic-mmio.c
-> > @@ -180,21 +180,37 @@ unsigned long vgic_mmio_read_active(struct kvm_vcpu *vcpu,
-> >  static void vgic_mmio_change_active(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
-> >                                     bool new_active_state)
-> >  {
-> > +       struct kvm_vcpu *requester_vcpu;
-> >         spin_lock(&irq->irq_lock);
-> > +
-> > +       /*
-> > +        * The vcpu parameter here can mean multiple things depending on how
-> > +        * this function is called; when handling a trap from the kernel it
-> > +        * depends on the GIC version, and these functions are also called as
-> > +        * part of save/restore from userspace.
-> > +        *
-> > +        * Therefore, we have to figure out the requester in a reliable way.
-> > +        *
-> > +        * When accessing VGIC state from user space, the requester_vcpu is
-> > +        * NULL, which is fine, because we guarantee that no VCPUs are running
-> > +        * when accessing VGIC state from user space so irq->vcpu->cpu is
-> > +        * always -1.
-> > +        */
-> > +       requester_vcpu = kvm_arm_get_running_vcpu();
-> > +
-> >         /*
-> >          * If this virtual IRQ was written into a list register, we
-> >          * have to make sure the CPU that runs the VCPU thread has
-> > -        * synced back LR state to the struct vgic_irq.  We can only
-> > -        * know this for sure, when either this irq is not assigned to
-> > -        * anyone's AP list anymore, or the VCPU thread is not
-> > -        * running on any CPUs.
-> > +        * synced back the LR state to the struct vgic_irq.
-> >          *
-> > -        * In the opposite case, we know the VCPU thread may be on its
-> > -        * way back from the guest and still has to sync back this
-> > -        * IRQ, so we release and re-acquire the spin_lock to let the
-> > -        * other thread sync back the IRQ.
-> > +        * As long as the conditions below are true, we know the VCPU thread
-> > +        * may be on its way back from the guest (we kicked the VCPU thread in
-> > +        * vgic_change_active_prepare)  and still has to sync back this IRQ,
-> > +        * so we release and re-acquire the spin_lock to let the other thread
-> > +        * sync back the IRQ.
-> >          */
-> >         while (irq->vcpu && /* IRQ may have state in an LR somewhere */
-> > +              irq->vcpu != requester_vcpu && /* Current thread is not the VCPU thread */
-> >                irq->vcpu->cpu != -1) /* VCPU thread is running */
-> >                 cond_resched_lock(&irq->irq_lock);
-> >
-> > --
-> > 2.5.0
-> >
-> >
-> 
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170307/d71f2173/attachment.sig>
