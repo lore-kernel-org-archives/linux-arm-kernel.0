@@ -1,331 +1,47 @@
-From: mrkiko.rs@gmail.com (Enrico Mioso)
-Date: Tue, 7 Mar 2017 20:35:43 +0100 (CET)
-Subject: [arm] Lost support for Taskit Stamp9g20 AT91-based board
-Message-ID: <alpine.LNX.2.20.1703072029140.7705@atlantide2>
+From: Chris.Packham@alliedtelesis.co.nz (Chris Packham)
+Date: Tue, 7 Mar 2017 19:38:32 +0000
+Subject: [PATCH v2 0/6] Updates for Marvell Switch SoCs
+References: <20170216085041.28337-1-chris.packham@alliedtelesis.co.nz>
+ <87bmtdovwr.fsf@free-electrons.com>
+Message-ID: <b2dc1865150d46a4b64c0522480bdec6@svr-chch-ex1.atlnz.lc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi to all of you reading this message.
+Hi Gregory,
 
-I am writing to you seeking for help and/or recommendations. I would like to 
-upgrade the kernel on a taskit Stamp9G20 board, which was supported in the 
-kernel, at least until 3.15 or so. The upstream kernel supported this board 
-fine, but the relevant files where removed during the devicetree conversion.
-I would like to add this support back: hence seeking for help on what to do.
+On 08/03/17 06:10, Gregory CLEMENT wrote:
+> Hi Chris,
+>
+>  On jeu., f?vr. 16 2017, Chris Packham <chris.packham@alliedtelesis.co.nz> wrote:
+>
+>> Shortly after I posted my last series I got access to a more recent
+>> Marvell SDK which had some device tree support for the switch SoCs I'd
+>> been wanting. It was still based on an older kernel but it was a huge
+>> improvement over what came before.
+>>
+>> Patch 1/6 is a typo I noticed after my initial series was applied.
+>>
+>> Patch 2/6 is a bit of a cleanup. I did initially struggle with how to
+>> access individual parts of the DFX block as well as retaining a handle on
+>> the entire thing for the switch driver to use.
+>>
+>> Patch 3/6 is a re-jig of the dtsi files which is needed by 5/6. This is
+>> required because I need to use the coreclk label on a different node. It
+>> also means I don't have to disable nodes for blocks that only exist on
+>> the Armada-XP.
+>>
+>> Patch 4/6, 5/6 are split from the previous versions.
+>>
+>> Patch 6/6 is the device tree portion of a change already in clk-next.
+>
+>
+> I applied patches 2, 3 and 6 on mvebu/dt with the acked-by from Rob when
+> he gave it.
+>
+> Patch 1 is already part of 4.11-rc1.
+>
+> For patch 4 and 5 I understand that either we don't need it or it should
+> be a updated version so I skipped them.
+>
 
-I would like to add back the board .c file if possible: or try to convert them 
-to DT with some help.
-What's the best thing I can do to move on?
-Thank you very much for your help, and attention.
-
-Finds here the content of the .c file in question, that was part of upstream 
-at the time of 3.15. Don't know exactly when it got removed, but it should be 
-around that time frame.
-
-Enrico
-board-stamp9g20.c:
-
-------------------------
-/*
-  *  Copyright (C) 2010 Christian Glindkamp <christian.glindkamp@taskit.de>
-  *                     taskit GmbH
-  *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License as published by
-  * the Free Software Foundation; either version 2 of the License, or
-  * (at your option) any later version.
-  *
-  * This program is distributed in the hope that it will be useful,
-  * but WITHOUT ANY WARRANTY; without even the implied warranty of
-  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  * GNU General Public License for more details.
-  *
-  * You should have received a copy of the GNU General Public License
-  * along with this program; if not, write to the Free Software
-  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-  */
-
-#include <linux/mm.h>
-#include <linux/platform_device.h>
-#include <linux/gpio.h>
-#include <linux/w1-gpio.h>
-
-#include <asm/mach-types.h>
-#include <asm/mach/arch.h>
-
-#include <mach/at91sam9_smc.h>
-#include <mach/hardware.h>
-
-#include "at91_aic.h"
-#include "board.h"
-#include "sam9_smc.h"
-#include "generic.h"
-
-
-void __init stamp9g20_init_early(void)
-{
- 	/* Initialize processor: 18.432 MHz crystal */
- 	at91_initialize(18432000);
-}
-
-/*
-  * NAND flash
-  */
-static struct atmel_nand_data __initdata nand_data = {
- 	.ale		= 21,
- 	.cle		= 22,
- 	.rdy_pin	= AT91_PIN_PC13,
- 	.enable_pin	= AT91_PIN_PC14,
- 	.bus_width_16	= 0,
- 	.det_pin	= -EINVAL,
- 	.ecc_mode	= NAND_ECC_SOFT,
-};
-
-static struct sam9_smc_config __initdata nand_smc_config = {
- 	.ncs_read_setup		= 0,
- 	.nrd_setup		= 2,
- 	.ncs_write_setup	= 0,
- 	.nwe_setup		= 2,
-
- 	.ncs_read_pulse		= 4,
- 	.nrd_pulse		= 4,
- 	.ncs_write_pulse	= 4,
- 	.nwe_pulse		= 4,
-
- 	.read_cycle		= 7,
- 	.write_cycle		= 7,
-
- 	.mode			= AT91_SMC_READMODE | AT91_SMC_WRITEMODE | AT91_SMC_EXNWMODE_DISABLE | AT91_SMC_DBW_8,
- 	.tdf_cycles		= 3,
-};
-
-static void __init add_device_nand(void)
-{
- 	/* configure chip-select 3 (NAND) */
- 	sam9_smc_configure(0, 3, &nand_smc_config);
-
- 	at91_add_device_nand(&nand_data);
-}
-
-
-/*
-  * MCI (SD/MMC)
-  * det_pin, wp_pin and vcc_pin are not connected
-  */
-static struct mci_platform_data __initdata mmc_data = {
- 	.slot[0] = {
- 		.bus_width	= 4,
- 		.detect_pin	= -1,
- 		.wp_pin		= -1,
- 	},
-};
-
-
-/*
-  * USB Host port
-  */
-static struct at91_usbh_data __initdata usbh_data = {
- 	.ports		= 2,
- 	.vbus_pin	= {-EINVAL, -EINVAL},
- 	.overcurrent_pin= {-EINVAL, -EINVAL},
-};
-
-
-/*
-  * USB Device port
-  */
-static struct at91_udc_data __initdata portuxg20_udc_data = {
- 	.vbus_pin	= AT91_PIN_PC7,
- 	.pullup_pin	= -EINVAL,		/* pull-up driven by UDC */
-};
-
-static struct at91_udc_data __initdata stamp9g20evb_udc_data = {
- 	.vbus_pin	= AT91_PIN_PA22,
- 	.pullup_pin	= -EINVAL,		/* pull-up driven by UDC */
-};
-
-
-/*
-  * MACB Ethernet device
-  */
-static struct macb_platform_data __initdata macb_data = {
- 	.phy_irq_pin	= AT91_PIN_PA28,
- 	.is_rmii	= 1,
-};
-
-
-/*
-  * LEDs
-  */
-static struct gpio_led portuxg20_leds[] = {
- 	{
- 		.name			= "LED2",
- 		.gpio			= AT91_PIN_PC5,
- 		.default_trigger	= "none",
- 	}, {
- 		.name			= "LED3",
- 		.gpio			= AT91_PIN_PC4,
- 		.default_trigger	= "none",
- 	}, {
- 		.name			= "LED4",
- 		.gpio			= AT91_PIN_PC10,
- 		.default_trigger	= "heartbeat",
- 	}
-};
-
-static struct gpio_led stamp9g20evb_leds[] = {
- 	{
- 		.name			= "D8",
- 		.gpio			= AT91_PIN_PB18,
- 		.active_low		= 1,
- 		.default_trigger	= "none",
- 	}, {
- 		.name			= "D9",
- 		.gpio			= AT91_PIN_PB19,
- 		.active_low		= 1,
- 		.default_trigger	= "none",
- 	}, {
- 		.name			= "D10",
- 		.gpio			= AT91_PIN_PB20,
- 		.active_low		= 1,
- 		.default_trigger	= "heartbeat",
- 	}
-};
-
-
-/*
-  * SPI devices
-  */
-static struct spi_board_info portuxg20_spi_devices[] = {
- 	{
- 		.modalias	= "spidev",
- 		.chip_select	= 0,
- 		.max_speed_hz	= 1 * 1000 * 1000,
- 		.bus_num	= 0,
- 	}, {
- 		.modalias	= "spidev",
- 		.chip_select	= 0,
- 		.max_speed_hz	= 1 * 1000 * 1000,
- 		.bus_num	= 1,
- 	},
-};
-
-
-/*
-  * Dallas 1-Wire
-  */
-static struct w1_gpio_platform_data w1_gpio_pdata = {
- 	.pin		= AT91_PIN_PA29,
- 	.is_open_drain	= 1,
- 	.ext_pullup_enable_pin	= -EINVAL,
-};
-
-static struct platform_device w1_device = {
- 	.name			= "w1-gpio",
- 	.id			= -1,
- 	.dev.platform_data	= &w1_gpio_pdata,
-};
-
-void add_w1(void)
-{
- 	at91_set_GPIO_periph(w1_gpio_pdata.pin, 1);
- 	at91_set_multi_drive(w1_gpio_pdata.pin, 1);
- 	platform_device_register(&w1_device);
-}
-
-
-void __init stamp9g20_board_init(void)
-{
- 	/* Serial */
- 	/* DGBU on ttyS0. (Rx & Tx only) */
- 	at91_register_uart(0, 0, 0);
- 	at91_add_device_serial();
- 	/* NAND */
- 	add_device_nand();
- 	/* MMC */
- 	at91_add_device_mci(0, &mmc_data);
- 	/* W1 */
- 	add_w1();
-}
-
-static void __init portuxg20_board_init(void)
-{
- 	/* USART0 on ttyS1. (Rx, Tx, CTS, RTS, DTR, DSR, DCD, RI) */
- 	at91_register_uart(AT91SAM9260_ID_US0, 1, ATMEL_UART_CTS | ATMEL_UART_RTS
- 						| ATMEL_UART_DTR | ATMEL_UART_DSR
- 						| ATMEL_UART_DCD | ATMEL_UART_RI);
-
- 	/* USART1 on ttyS2. (Rx, Tx, CTS, RTS) */
- 	at91_register_uart(AT91SAM9260_ID_US1, 2, ATMEL_UART_CTS | ATMEL_UART_RTS);
-
- 	/* USART2 on ttyS3. (Rx, Tx, CTS, RTS) */
- 	at91_register_uart(AT91SAM9260_ID_US2, 3, ATMEL_UART_CTS | ATMEL_UART_RTS);
-
- 	/* USART4 on ttyS5. (Rx, Tx only) */
- 	at91_register_uart(AT91SAM9260_ID_US4, 5, 0);
-
- 	/* USART5 on ttyS6. (Rx, Tx only) */
- 	at91_register_uart(AT91SAM9260_ID_US5, 6, 0);
- 	stamp9g20_board_init();
- 	/* USB Host */
- 	at91_add_device_usbh(&usbh_data);
- 	/* USB Device */
- 	at91_add_device_udc(&portuxg20_udc_data);
- 	/* Ethernet */
- 	at91_add_device_eth(&macb_data);
- 	/* I2C */
- 	at91_add_device_i2c(NULL, 0);
- 	/* SPI */
- 	at91_add_device_spi(portuxg20_spi_devices, ARRAY_SIZE(portuxg20_spi_devices));
- 	/* LEDs */
- 	at91_gpio_leds(portuxg20_leds, ARRAY_SIZE(portuxg20_leds));
-}
-
-static void __init stamp9g20evb_board_init(void)
-{
- 	/* USART0 on ttyS1. (Rx, Tx, CTS, RTS, DTR, DSR, DCD, RI) */
- 	at91_register_uart(AT91SAM9260_ID_US0, 1, ATMEL_UART_CTS | ATMEL_UART_RTS
- 						| ATMEL_UART_DTR | ATMEL_UART_DSR
- 						| ATMEL_UART_DCD | ATMEL_UART_RI);
- 	stamp9g20_board_init();
- 	/* USB Host */
- 	at91_add_device_usbh(&usbh_data);
- 	/* USB Device */
- 	at91_add_device_udc(&stamp9g20evb_udc_data);
- 	/* Ethernet */
- 	at91_add_device_eth(&macb_data);
- 	/* I2C */
- 	at91_add_device_i2c(NULL, 0);
- 	/* LEDs */
- 	at91_gpio_leds(stamp9g20evb_leds, ARRAY_SIZE(stamp9g20evb_leds));
-}
-
-MACHINE_START(PORTUXG20, "taskit PortuxG20")
- 	/* Maintainer: taskit GmbH */
- 	.init_time	= at91sam926x_pit_init,
- 	.map_io		= at91_map_io,
- 	.handle_irq	= at91_aic_handle_irq,
- 	.init_early	= stamp9g20_init_early,
- 	.init_irq	= at91_init_irq_default,
- 	.init_machine	= portuxg20_board_init,
-MACHINE_END
-
-MACHINE_START(STAMP9G20, "taskit Stamp9G20")
- 	/* Maintainer: taskit GmbH */
- 	.init_time	= at91sam926x_pit_init,
- 	.map_io		= at91_map_io,
- 	.handle_irq	= at91_aic_handle_irq,
- 	.init_early	= stamp9g20_init_early,
- 	.init_irq	= at91_init_irq_default,
- 	.init_machine	= stamp9g20evb_board_init,
-MACHINE_END
-
-Accompanying stamp9g20.h header, also part of upstrea...
---------------
-#ifndef __MACH_STAMP9G20_H
-#define __MACH_STAMP9G20_H
-
-void stamp9g20_init_early(void);
-void stamp9g20_board_init(void);
-
-#endif
+That's correct, thanks.
