@@ -1,268 +1,73 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue,  7 Mar 2017 09:56:20 +0100
-Subject: [PATCH 1/15] clk: divider: Make divider_round_rate take the parent
- clock
-In-Reply-To: <cover.bc06ffa88f847ddd9ddd7c259415d5f61b55307b.1488876832.git-series.maxime.ripard@free-electrons.com>
-References: <cover.bc06ffa88f847ddd9ddd7c259415d5f61b55307b.1488876832.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <7ebd073b4941e4b7c619f15ff0a375ff7919d403.1488876832.git-series.maxime.ripard@free-electrons.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Tue, 7 Mar 2017 14:27:26 +0530
+Subject: [PATCH v2 00/12] Add support for the audio codec on Allwinner V3s
+In-Reply-To: <20170305133709.6288-1-icenowy@aosc.xyz>
+References: <20170305133709.6288-1-icenowy@aosc.xyz>
+Message-ID: <20170307085726.GJ2843@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-So far, divider_round_rate only considers the parent clock returned by
-clk_hw_get_parent.
+On Sun, Mar 05, 2017 at 09:36:57PM +0800, Icenowy Zheng wrote:
+> Allwinner V3s features a audio codec with dedicated digital and analog parts,
+> like the ones on A23/H3, but much simpler (lack of MIC2, LINE IN and MBIAS).
+> 
+> Add support for it.
+> 
+> In order to make the codec usable, DMA support is also added in this series;
+> the support of Lichee Pi Zero's dock board is also added here, as it's the
+> only board hackable that come with ports connected to the codec.
+> 
+> Patch 1~3 split out parts that is not available on V3s in the analog codec.
+> 
+> Patch 4/5 adds support for V3s in analog/digital codec.
+> 
+> Patch 6 add the gate bit as a common quirk of sun6i-dma driver, as V3s also
+> needs it.
+> 
+> Patch 7 really adds support for V3s in DMA engine.
+> 
+> Patch 8 restores the inclusion of CCU headers in the DTSI file of V3s, as
+> it's removed when merging.
+> 
+> Patch 9/10/11 adds three parts of V3s: DMA engine, codec support and pinmux
+> of mmc1 (used on Lichee Pi Zero dock).
 
-This works fine on clocks that have a single parents, this doesn't work on
-muxes, since we will only consider the first parent, while other parents
-may totally be able to provide a better combination.
+And are these dependent upon rest, if not can you please send them
+separately!
 
-Clocks in that case cannot use divider_round_rate, so would have to come up
-with a very similar logic to work around it. Instead of having to do
-something like this, and duplicate that logic everywhere, give an
-additional parameter for the parent clock to consider.
+> 
+> Patch 12 adds support for Lichee Pi Zero dock, with support of mmc1 and
+> codec.
+> 
+> Icenowy Zheng (12):
+>   ASoC: sun8i-codec-analog: split out mic2
+>   ASoC: sun8i-codec-analog: split out line in
+>   ASoC: sun8i-codec-analog: split out mbias
+>   ASoC: sun8i-codec-analog: add support for V3s SoC
+>   ASoC: sun4i-codec: Add support for V3s codec
+>   dmaengine: sun6i: make gate bit in sun8i's DMA engines a common quirk
+>   dmaengine: sun6i: support V3s SoC variant
+>   ARM: dts: sun8i: restore the inclusion of ccu headers in V3s DTSI
+>   ARM: dts: sun8i: add DMA engine in V3s DTSI
+>   ARM: dts: sun8i: add audio codec support into V3s DTSI
+>   ARM: dts: sun8i: add pinmux for V3s mmc1
+>   ARM: dts: sun8i: add device tree for Lichee Pi Zero with Dock
+> 
+>  .../devicetree/bindings/dma/sun6i-dma.txt          |   1 +
+>  .../devicetree/bindings/sound/sun4i-codec.txt      |  11 +-
+>  .../bindings/sound/sun8i-codec-analog.txt          |   1 +
+>  arch/arm/boot/dts/Makefile                         |   3 +-
+>  arch/arm/boot/dts/sun8i-v3s-licheepi-zero-dock.dts |  67 +++++++
+>  arch/arm/boot/dts/sun8i-v3s.dtsi                   | 103 ++++++----
+>  drivers/dma/sun6i-dma.c                            |  22 ++-
+>  sound/soc/sunxi/sun4i-codec.c                      |  59 ++++++
+>  sound/soc/sunxi/sun8i-codec-analog.c               | 211 +++++++++++++++++----
+>  9 files changed, 405 insertions(+), 73 deletions(-)
+>  create mode 100644 arch/arm/boot/dts/sun8i-v3s-licheepi-zero-dock.dts
+> 
+> -- 
+> 2.11.1
+> 
 
-Current users have been converted using the following coccinelle script
-
-@@
-identifier hw, rate, prate, table, width, flags;
-@@
-
--long divider_round_rate(struct clk_hw *hw,
-+long divider_round_rate(struct clk_hw *hw, struct clk_hw *parent,
-                        unsigned long rate,
-                        unsigned long *prate,
-                        const struct clk_div_table *table,
-                        u8 width,
-                        unsigned long flags) { ... }
-
-@@
-identifier fn, hw;
-expression E2, E3, E4, E5, E6;
-@@
- fn (struct clk_hw *hw, ...) {
- <...
--divider_round_rate(hw, E2, E3, E4, E5, E6)
-+divider_round_rate(hw, clk_hw_get_parent(hw), E2, E3, E4, E5, E6)
- ...>
-}
-
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Cc: Carlo Caione <carlo@caione.org>
-Cc: Kevin Hilman <khilman@baylibre.com>
-Cc: Vladimir Zapolskiy <vz@mleia.com>
-Cc: Sylvain Lemieux <slemieux.tyco@gmail.com>
-Cc: Andy Gross <andy.gross@linaro.org>
-Cc: David Brown <david.brown@linaro.org>
-Cc: Alessandro Zummo <a.zummo@towertech.it>
-Cc: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-Cc: linux-amlogic at lists.infradead.org
-Cc: linux-arm-msm at vger.kernel.org
-Cc: linux-soc at vger.kernel.org
-Cc: rtc-linux at googlegroups.com
----
- drivers/clk/clk-divider.c                 | 18 ++++++++++--------
- drivers/clk/hisilicon/clkdivider-hi6220.c |  5 +++--
- drivers/clk/meson/clk-cpu.c               |  5 +++--
- drivers/clk/nxp/clk-lpc32xx.c             |  5 +++--
- drivers/clk/qcom/clk-alpha-pll.c          |  5 +++--
- drivers/clk/qcom/clk-regmap-divider.c     |  3 ++-
- drivers/clk/sunxi-ng/ccu_div.c            |  6 +++---
- drivers/rtc/rtc-ac100.c                   |  6 ++++--
- include/linux/clk-provider.h              |  5 +++--
- 9 files changed, 34 insertions(+), 24 deletions(-)
-
-diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
-index 96386ffc8483..d8d7dc84956a 100644
---- a/drivers/clk/clk-divider.c
-+++ b/drivers/clk/clk-divider.c
-@@ -275,7 +275,8 @@ static int _next_div(const struct clk_div_table *table, int div,
- 	return div;
- }
- 
--static int clk_divider_bestdiv(struct clk_hw *hw, unsigned long rate,
-+static int clk_divider_bestdiv(struct clk_hw *hw, struct clk_hw *parent,
-+			       unsigned long rate,
- 			       unsigned long *best_parent_rate,
- 			       const struct clk_div_table *table, u8 width,
- 			       unsigned long flags)
-@@ -314,8 +315,7 @@ static int clk_divider_bestdiv(struct clk_hw *hw, unsigned long rate,
- 			*best_parent_rate = parent_rate_saved;
- 			return i;
- 		}
--		parent_rate = clk_hw_round_rate(clk_hw_get_parent(hw),
--					       rate * i);
-+		parent_rate = clk_hw_round_rate(parent, rate * i);
- 		now = DIV_ROUND_UP_ULL((u64)parent_rate, i);
- 		if (_is_best_div(rate, now, best, flags)) {
- 			bestdiv = i;
-@@ -326,19 +326,20 @@ static int clk_divider_bestdiv(struct clk_hw *hw, unsigned long rate,
- 
- 	if (!bestdiv) {
- 		bestdiv = _get_maxdiv(table, width, flags);
--		*best_parent_rate = clk_hw_round_rate(clk_hw_get_parent(hw), 1);
-+		*best_parent_rate = clk_hw_round_rate(parent, 1);
- 	}
- 
- 	return bestdiv;
- }
- 
--long divider_round_rate(struct clk_hw *hw, unsigned long rate,
-+long divider_round_rate(struct clk_hw *hw, struct clk_hw *parent,
-+			unsigned long rate,
- 			unsigned long *prate, const struct clk_div_table *table,
- 			u8 width, unsigned long flags)
- {
- 	int div;
- 
--	div = clk_divider_bestdiv(hw, rate, prate, table, width, flags);
-+	div = clk_divider_bestdiv(hw, parent, rate, prate, table, width, flags);
- 
- 	return DIV_ROUND_UP_ULL((u64)*prate, div);
- }
-@@ -359,8 +360,9 @@ static long clk_divider_round_rate(struct clk_hw *hw, unsigned long rate,
- 		return DIV_ROUND_UP_ULL((u64)*prate, bestdiv);
- 	}
- 
--	return divider_round_rate(hw, rate, prate, divider->table,
--				  divider->width, divider->flags);
-+	return divider_round_rate(hw, clk_hw_get_parent(hw), rate, prate,
-+				  divider->table, divider->width,
-+				  divider->flags);
- }
- 
- int divider_get_val(unsigned long rate, unsigned long parent_rate,
-diff --git a/drivers/clk/hisilicon/clkdivider-hi6220.c b/drivers/clk/hisilicon/clkdivider-hi6220.c
-index a1c1f684ad58..deaa72902555 100644
---- a/drivers/clk/hisilicon/clkdivider-hi6220.c
-+++ b/drivers/clk/hisilicon/clkdivider-hi6220.c
-@@ -64,8 +64,9 @@ static long hi6220_clkdiv_round_rate(struct clk_hw *hw, unsigned long rate,
- {
- 	struct hi6220_clk_divider *dclk = to_hi6220_clk_divider(hw);
- 
--	return divider_round_rate(hw, rate, prate, dclk->table,
--				  dclk->width, CLK_DIVIDER_ROUND_CLOSEST);
-+	return divider_round_rate(hw, clk_hw_get_parent(hw), rate, prate,
-+				  dclk->table, dclk->width,
-+				  CLK_DIVIDER_ROUND_CLOSEST);
- }
- 
- static int hi6220_clkdiv_set_rate(struct clk_hw *hw, unsigned long rate,
-diff --git a/drivers/clk/meson/clk-cpu.c b/drivers/clk/meson/clk-cpu.c
-index f8b2b7efd016..63c44d8c7ea4 100644
---- a/drivers/clk/meson/clk-cpu.c
-+++ b/drivers/clk/meson/clk-cpu.c
-@@ -59,8 +59,9 @@ static long meson_clk_cpu_round_rate(struct clk_hw *hw, unsigned long rate,
- {
- 	struct meson_clk_cpu *clk_cpu = to_meson_clk_cpu_hw(hw);
- 
--	return divider_round_rate(hw, rate, prate, clk_cpu->div_table,
--				  MESON_N_WIDTH, CLK_DIVIDER_ROUND_CLOSEST);
-+	return divider_round_rate(hw, clk_hw_get_parent(hw), rate, prate,
-+				  clk_cpu->div_table, MESON_N_WIDTH,
-+				  CLK_DIVIDER_ROUND_CLOSEST);
- }
- 
- static int meson_clk_cpu_set_rate(struct clk_hw *hw, unsigned long rate,
-diff --git a/drivers/clk/nxp/clk-lpc32xx.c b/drivers/clk/nxp/clk-lpc32xx.c
-index 5b98ff9076f3..73e83a7da7d6 100644
---- a/drivers/clk/nxp/clk-lpc32xx.c
-+++ b/drivers/clk/nxp/clk-lpc32xx.c
-@@ -975,8 +975,9 @@ static long clk_divider_round_rate(struct clk_hw *hw, unsigned long rate,
- 		return DIV_ROUND_UP(*prate, bestdiv);
- 	}
- 
--	return divider_round_rate(hw, rate, prate, divider->table,
--				  divider->width, divider->flags);
-+	return divider_round_rate(hw, clk_hw_get_parent(hw), rate, prate,
-+				  divider->table, divider->width,
-+				  divider->flags);
- }
- 
- static int clk_divider_set_rate(struct clk_hw *hw, unsigned long rate,
-diff --git a/drivers/clk/qcom/clk-alpha-pll.c b/drivers/clk/qcom/clk-alpha-pll.c
-index 47a1da3739ce..7c08afecc811 100644
---- a/drivers/clk/qcom/clk-alpha-pll.c
-+++ b/drivers/clk/qcom/clk-alpha-pll.c
-@@ -478,8 +478,9 @@ clk_alpha_pll_postdiv_round_rate(struct clk_hw *hw, unsigned long rate,
- {
- 	struct clk_alpha_pll_postdiv *pll = to_clk_alpha_pll_postdiv(hw);
- 
--	return divider_round_rate(hw, rate, prate, clk_alpha_div_table,
--				  pll->width, CLK_DIVIDER_POWER_OF_TWO);
-+	return divider_round_rate(hw, clk_hw_get_parent(hw), rate, prate,
-+				  clk_alpha_div_table, pll->width,
-+				  CLK_DIVIDER_POWER_OF_TWO);
- }
- 
- static int clk_alpha_pll_postdiv_set_rate(struct clk_hw *hw, unsigned long rate,
-diff --git a/drivers/clk/qcom/clk-regmap-divider.c b/drivers/clk/qcom/clk-regmap-divider.c
-index 53484912301e..63489f0f2a02 100644
---- a/drivers/clk/qcom/clk-regmap-divider.c
-+++ b/drivers/clk/qcom/clk-regmap-divider.c
-@@ -28,7 +28,8 @@ static long div_round_rate(struct clk_hw *hw, unsigned long rate,
- {
- 	struct clk_regmap_div *divider = to_clk_regmap_div(hw);
- 
--	return divider_round_rate(hw, rate, prate, NULL, divider->width,
-+	return divider_round_rate(hw, clk_hw_get_parent(hw), rate, prate,
-+				  NULL, divider->width,
- 				  CLK_DIVIDER_ROUND_CLOSEST);
- }
- 
-diff --git a/drivers/clk/sunxi-ng/ccu_div.c b/drivers/clk/sunxi-ng/ccu_div.c
-index 4057e6021aa9..92855c2b30bb 100644
---- a/drivers/clk/sunxi-ng/ccu_div.c
-+++ b/drivers/clk/sunxi-ng/ccu_div.c
-@@ -78,10 +78,10 @@ static int ccu_div_determine_rate(struct clk_hw *hw,
- 	struct ccu_div *cd = hw_to_ccu_div(hw);
- 
- 	if (clk_hw_get_num_parents(hw) == 1) {
--		req->rate = divider_round_rate(hw, req->rate,
-+		req->rate = divider_round_rate(hw, clk_hw_get_parent(hw),
-+					       req->rate,
- 					       &req->best_parent_rate,
--					       cd->div.table,
--					       cd->div.width,
-+					       cd->div.table, cd->div.width,
- 					       cd->div.flags);
- 
- 		req->best_parent_hw = clk_hw_get_parent(hw);
-diff --git a/drivers/rtc/rtc-ac100.c b/drivers/rtc/rtc-ac100.c
-index 9e336184491c..0cad1bc41aa7 100644
---- a/drivers/rtc/rtc-ac100.c
-+++ b/drivers/rtc/rtc-ac100.c
-@@ -153,13 +153,15 @@ static long ac100_clkout_round_rate(struct clk_hw *hw, unsigned long rate,
- 	int i;
- 
- 	if (prate == AC100_RTC_32K_RATE)
--		return divider_round_rate(hw, rate, &prate, NULL,
-+		return divider_round_rate(hw, clk_hw_get_parent(hw), rate,
-+					  &prate, NULL,
- 					  AC100_CLKOUT_DIV_WIDTH,
- 					  CLK_DIVIDER_POWER_OF_TWO);
- 
- 	for (i = 0; ac100_clkout_prediv[i].div; i++) {
- 		tmp_prate = DIV_ROUND_UP(prate, ac100_clkout_prediv[i].val);
--		tmp_rate = divider_round_rate(hw, rate, &tmp_prate, NULL,
-+		tmp_rate = divider_round_rate(hw, clk_hw_get_parent(hw), rate,
-+					      &tmp_prate, NULL,
- 					      AC100_CLKOUT_DIV_WIDTH,
- 					      CLK_DIVIDER_POWER_OF_TWO);
- 
-diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index a428aec36ace..e17d4cc7660c 100644
---- a/include/linux/clk-provider.h
-+++ b/include/linux/clk-provider.h
-@@ -412,8 +412,9 @@ extern const struct clk_ops clk_divider_ro_ops;
- unsigned long divider_recalc_rate(struct clk_hw *hw, unsigned long parent_rate,
- 		unsigned int val, const struct clk_div_table *table,
- 		unsigned long flags);
--long divider_round_rate(struct clk_hw *hw, unsigned long rate,
--		unsigned long *prate, const struct clk_div_table *table,
-+long divider_round_rate(struct clk_hw *hw, struct clk_hw *parent,
-+		unsigned long rate, unsigned long *prate,
-+		const struct clk_div_table *table,
- 		u8 width, unsigned long flags);
- int divider_get_val(unsigned long rate, unsigned long parent_rate,
- 		const struct clk_div_table *table, u8 width,
 -- 
-git-series 0.8.11
+~Vinod
