@@ -1,68 +1,199 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue,  7 Mar 2017 16:53:06 +0100
-Subject: [PATCHv3 net-next 08/22] net: mvpp2: add hw_version field in "struct
- mvpp2"
+Date: Tue,  7 Mar 2017 16:53:08 +0100
+Subject: [PATCHv3 net-next 10/22] net: mvpp2: introduce PPv2.2 HW descriptors
+ and adapt accessors
 In-Reply-To: <1488902000-2658-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1488902000-2658-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1488902000-2658-9-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1488902000-2658-11-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In preparation to the introduction for the support of PPv2.2 in the
-mvpp2 driver, this commit adds a hw_version field to the struct
-mvpp2, and uses the .data field of the DT match table to fill it in.
-
-Having the MVPP21 and MVPP22 definitions available will allow to start
-adding the necessary conditional code to support PPv2.2.
+This commit adds the definition of the PPv2.2 HW descriptors, adjusts
+the mvpp2_tx_desc and mvpp2_rx_desc structures accordingly, and adapts
+the accessors to work on both PPv2.1 and PPv2.2.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- drivers/net/ethernet/marvell/mvpp2.c | 12 +++++++++++-
- 1 file changed, 11 insertions(+), 1 deletion(-)
+ drivers/net/ethernet/marvell/mvpp2.c | 88 +++++++++++++++++++++++++++++++-----
+ 1 file changed, 76 insertions(+), 12 deletions(-)
 
 diff --git a/drivers/net/ethernet/marvell/mvpp2.c b/drivers/net/ethernet/marvell/mvpp2.c
-index 2ee066b..27d8838 100644
+index e9710e8..746b5be 100644
 --- a/drivers/net/ethernet/marvell/mvpp2.c
 +++ b/drivers/net/ethernet/marvell/mvpp2.c
-@@ -25,6 +25,7 @@
- #include <linux/of_mdio.h>
- #include <linux/of_net.h>
- #include <linux/of_address.h>
-+#include <linux/of_device.h>
- #include <linux/phy.h>
- #include <linux/clk.h>
- #include <linux/hrtimer.h>
-@@ -643,6 +644,9 @@ struct mvpp2 {
- 
- 	/* Tclk value */
- 	u32 tclk;
-+
-+	/* HW version */
-+	enum { MVPP21, MVPP22 } hw_version;
+@@ -767,18 +767,42 @@ struct mvpp21_rx_desc {
+ 	u32 reserved8;
  };
  
- struct mvpp2_pcpu_stats {
-@@ -6429,6 +6433,9 @@ static int mvpp2_probe(struct platform_device *pdev)
- 	if (!priv)
- 		return -ENOMEM;
- 
-+	priv->hw_version =
-+		(unsigned long)of_device_get_match_data(&pdev->dev);
++/* HW TX descriptor for PPv2.2 */
++struct mvpp22_tx_desc {
++	u32 command;
++	u8  packet_offset;
++	u8  phys_txq;
++	u16 data_size;
++	u64 reserved1;
++	u64 buf_dma_addr_ptp;
++	u64 buf_cookie_misc;
++};
 +
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	priv->base = devm_ioremap_resource(&pdev->dev, res);
- 	if (IS_ERR(priv->base))
-@@ -6533,7 +6540,10 @@ static int mvpp2_remove(struct platform_device *pdev)
++/* HW RX descriptor for PPv2.2 */
++struct mvpp22_rx_desc {
++	u32 status;
++	u16 reserved1;
++	u16 data_size;
++	u32 reserved2;
++	u32 reserved3;
++	u64 buf_dma_addr_key_hash;
++	u64 buf_cookie_misc;
++};
++
+ /* Opaque type used by the driver to manipulate the HW TX and RX
+  * descriptors
+  */
+ struct mvpp2_tx_desc {
+ 	union {
+ 		struct mvpp21_tx_desc pp21;
++		struct mvpp22_tx_desc pp22;
+ 	};
+ };
+ 
+ struct mvpp2_rx_desc {
+ 	union {
+ 		struct mvpp21_rx_desc pp21;
++		struct mvpp22_rx_desc pp22;
+ 	};
+ };
+ 
+@@ -969,78 +993,118 @@ static u32 mvpp2_read(struct mvpp2 *priv, u32 offset)
+ static dma_addr_t mvpp2_txdesc_dma_addr_get(struct mvpp2_port *port,
+ 					    struct mvpp2_tx_desc *tx_desc)
+ {
+-	return tx_desc->pp21.buf_dma_addr;
++	if (port->priv->hw_version == MVPP21)
++		return tx_desc->pp21.buf_dma_addr;
++	else
++		return tx_desc->pp22.buf_dma_addr_ptp & GENMASK_ULL(40, 0);
  }
  
- static const struct of_device_id mvpp2_match[] = {
--	{ .compatible = "marvell,armada-375-pp2" },
-+	{
-+		.compatible = "marvell,armada-375-pp2",
-+		.data = (void *)MVPP21,
-+	},
- 	{ }
- };
- MODULE_DEVICE_TABLE(of, mvpp2_match);
+ static void mvpp2_txdesc_dma_addr_set(struct mvpp2_port *port,
+ 				      struct mvpp2_tx_desc *tx_desc,
+ 				      dma_addr_t dma_addr)
+ {
+-	tx_desc->pp21.buf_dma_addr = dma_addr;
++	if (port->priv->hw_version == MVPP21) {
++		tx_desc->pp21.buf_dma_addr = dma_addr;
++	} else {
++		u64 val = (u64)dma_addr;
++
++		tx_desc->pp22.buf_dma_addr_ptp &= ~GENMASK_ULL(40, 0);
++		tx_desc->pp22.buf_dma_addr_ptp |= val;
++	}
+ }
+ 
+ static size_t mvpp2_txdesc_size_get(struct mvpp2_port *port,
+ 				    struct mvpp2_tx_desc *tx_desc)
+ {
+-	return tx_desc->pp21.data_size;
++	if (port->priv->hw_version == MVPP21)
++		return tx_desc->pp21.data_size;
++	else
++		return tx_desc->pp22.data_size;
+ }
+ 
+ static void mvpp2_txdesc_size_set(struct mvpp2_port *port,
+ 				  struct mvpp2_tx_desc *tx_desc,
+ 				  size_t size)
+ {
+-	tx_desc->pp21.data_size = size;
++	if (port->priv->hw_version == MVPP21)
++		tx_desc->pp21.data_size = size;
++	else
++		tx_desc->pp22.data_size = size;
+ }
+ 
+ static void mvpp2_txdesc_txq_set(struct mvpp2_port *port,
+ 				 struct mvpp2_tx_desc *tx_desc,
+ 				 unsigned int txq)
+ {
+-	tx_desc->pp21.phys_txq = txq;
++	if (port->priv->hw_version == MVPP21)
++		tx_desc->pp21.phys_txq = txq;
++	else
++		tx_desc->pp22.phys_txq = txq;
+ }
+ 
+ static void mvpp2_txdesc_cmd_set(struct mvpp2_port *port,
+ 				 struct mvpp2_tx_desc *tx_desc,
+ 				 unsigned int command)
+ {
+-	tx_desc->pp21.command = command;
++	if (port->priv->hw_version == MVPP21)
++		tx_desc->pp21.command = command;
++	else
++		tx_desc->pp22.command = command;
+ }
+ 
+ static void mvpp2_txdesc_offset_set(struct mvpp2_port *port,
+ 				    struct mvpp2_tx_desc *tx_desc,
+ 				    unsigned int offset)
+ {
+-	tx_desc->pp21.packet_offset = offset;
++	if (port->priv->hw_version == MVPP21)
++		tx_desc->pp21.packet_offset = offset;
++	else
++		tx_desc->pp22.packet_offset = offset;
+ }
+ 
+ static unsigned int mvpp2_txdesc_offset_get(struct mvpp2_port *port,
+ 					    struct mvpp2_tx_desc *tx_desc)
+ {
+-	return tx_desc->pp21.packet_offset;
++	if (port->priv->hw_version == MVPP21)
++		return tx_desc->pp21.packet_offset;
++	else
++		return tx_desc->pp22.packet_offset;
+ }
+ 
+ static dma_addr_t mvpp2_rxdesc_dma_addr_get(struct mvpp2_port *port,
+ 					    struct mvpp2_rx_desc *rx_desc)
+ {
+-	return rx_desc->pp21.buf_dma_addr;
++	if (port->priv->hw_version == MVPP21)
++		return rx_desc->pp21.buf_dma_addr;
++	else
++		return rx_desc->pp22.buf_dma_addr_key_hash & GENMASK_ULL(40, 0);
+ }
+ 
+ static unsigned long mvpp2_rxdesc_cookie_get(struct mvpp2_port *port,
+ 					     struct mvpp2_rx_desc *rx_desc)
+ {
+-	return rx_desc->pp21.buf_cookie;
++	if (port->priv->hw_version == MVPP21)
++		return rx_desc->pp21.buf_cookie;
++	else
++		return rx_desc->pp22.buf_cookie_misc & GENMASK_ULL(40, 0);
+ }
+ 
+ static size_t mvpp2_rxdesc_size_get(struct mvpp2_port *port,
+ 				    struct mvpp2_rx_desc *rx_desc)
+ {
+-	return rx_desc->pp21.data_size;
++	if (port->priv->hw_version == MVPP21)
++		return rx_desc->pp21.data_size;
++	else
++		return rx_desc->pp22.data_size;
+ }
+ 
+ static u32 mvpp2_rxdesc_status_get(struct mvpp2_port *port,
+ 				   struct mvpp2_rx_desc *rx_desc)
+ {
+-	return rx_desc->pp21.status;
++	if (port->priv->hw_version == MVPP21)
++		return rx_desc->pp21.status;
++	else
++		return rx_desc->pp22.status;
+ }
+ 
+ static void mvpp2_txq_inc_get(struct mvpp2_txq_pcpu *txq_pcpu)
 -- 
 2.7.4
