@@ -1,99 +1,113 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 7 Mar 2017 11:10:14 +0100
-Subject: [PATCH] mmc: sunxi: mask all Response Timeout error messages
-In-Reply-To: <364721488821322@web5o.yandex.ru>
-References: <20170305164535.36259-1-icenowy@aosc.xyz>
- <20170306100437.sr7mrvssdwnt7aaz@lukather>
- <1597991488796361@web24m.yandex.ru>
- <20170306155313.nqxnhtsl4o5yrv33@lukather>
- <364721488821322@web5o.yandex.ru>
-Message-ID: <20170307101014.qic65pply3c4yxzq@lukather>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Tue, 07 Mar 2017 11:18:24 +0100
+Subject: [PATCH v1 1/2] clk: rockchip: rk3368: export SCLK_TIMERXX id for
+ timers
+In-Reply-To: <1488880211-21133-1-git-send-email-zhangqing@rock-chips.com>
+References: <1488880211-21133-1-git-send-email-zhangqing@rock-chips.com>
+Message-ID: <15674852.NcXVK0sQHA@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 07, 2017 at 01:28:42AM +0800, Icenowy Zheng wrote:
-> 
-> 
-> 06.03.2017, 23:53, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
-> > On Mon, Mar 06, 2017 at 06:32:41PM +0800, Icenowy Zheng wrote:
-> >> ?06.03.2017, 18:04, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
-> >> ?> Hi,
-> >> ?>
-> >> ?> On Mon, Mar 06, 2017 at 12:45:35AM +0800, Icenowy Zheng wrote:
-> >> ?>> ?Response Timeout is very usual: it will happen when trying to run some
-> >> ?>> ?commands that do not belong to the card; it will happen when some SDIO
-> >> ?>> ?card transfer beyond its SDIO bandwidth; and when the MMC controller is
-> >> ?>> ?set to poll the card with "broken-cd" property (the Lichee Pi series of
-> >> ?>> ?boards do this), it will flood to the console and make the console
-> >> ?>> ?unusable.
-> >> ?>>
-> >> ?>> ?Mask all response-timeout-only error messages, only show it when another
-> >> ?>> ?error happens.
-> >> ?>>
-> >> ?>> ?Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
-> >> ?>> ?---
-> >> ?>> ??drivers/mmc/host/sunxi-mmc.c | 13 +++++++++----
-> >> ?>> ??1 file changed, 9 insertions(+), 4 deletions(-)
-> >> ?>>
-> >> ?>> ?diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
-> >> ?>> ?index 6ffcd2838272..7828e1f57cf0 100644
-> >> ?>> ?--- a/drivers/mmc/host/sunxi-mmc.c
-> >> ?>> ?+++ b/drivers/mmc/host/sunxi-mmc.c
-> >> ?>> ?@@ -483,10 +483,15 @@ static void sunxi_mmc_dump_errinfo(struct sunxi_mmc_host *host)
-> >> ?>> ??????????struct mmc_command *cmd = host->mrq->cmd;
-> >> ?>> ??????????struct mmc_data *data = host->mrq->data;
-> >> ?>>
-> >> ?>> ?- /* For some cmds timeout is normal with sd/mmc cards */
-> >> ?>> ?- if ((host->int_sum & SDXC_INTERRUPT_ERROR_BIT) ==
-> >> ?>> ?- SDXC_RESP_TIMEOUT && (cmd->opcode == SD_IO_SEND_OP_COND ||
-> >> ?>> ?- cmd->opcode == SD_IO_RW_DIRECT))
-> >> ?>> ?+ /*
-> >> ?>> ?+ * Reading timeout is usually normal, especially when doing
-> >> ?>> ?+ * card-polling with "broken-cd" in device tree.
-> >> ?>> ?+ * If do not mask it, the RTO error message will flood the console
-> >> ?>> ?+ * and even hide useful error messages.
-> >> ?>> ?+ *
-> >> ?>> ?+ * Some SDIO commands will also normally timeout with non-SDIO cards.
-> >> ?>> ?+ */
-> >> ?>> ?+ if ((host->int_sum & SDXC_INTERRUPT_ERROR_BIT) == SDXC_RESP_TIMEOUT)
-> >> ?>
-> >> ?> We really shouldn't silence legit errors.
-> >> ?>
-> >> ?> The actual problem here is that we log them as error, we could
-> >> ?> probably reduce it to debug.
-> >>
-> >> ?Even if it's reduced to debug, it will still flush dmesg buffers.
-> >
-> > No, it will not even be compiled by default.
-> >
-> >> ?Or make it only visible when "debug" parameter is present in kernel
-> >> ?cmdline?
-> >
-> > debug messages are visible in dmesg only if DEBUG is defined, which is
-> > only happening if CONFIG_MMC_DEBUG is set. This won't affect the
-> > general case in any way.
-> >
-> > And it is output only if loglevel is set higher than 7.
-> 
-> Should I make all error messages debug level or only make "RTO"-only
-> error to debug level like I currently do?
+Hi Elaine,
 
-I'd say just change the level of the log of the line coming below that
-one. It doesn't provide any useful clue about what's going on anyway,
-there's nothing the user will be able to do to prevent that, and
-someone willing to debug it will have to turn on the debug options
-anway.
+Am Dienstag, 7. M?rz 2017, 17:50:10 CET schrieb Elaine Zhang:
+> Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
+> ---
+>  drivers/clk/rockchip/clk-rk3368.c      | 24 ++++++++++++------------
+>  include/dt-bindings/clock/rk3368-cru.h | 19 ++++++++++++-------
 
-Maxime
+as always, please split clock-id addition and the assignment in the clock-
+driver.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170307/d71f2173/attachment.sig>
+Also, as it looks like the old timer-ids are wrong and also still unused, 
+please also state this in the patch changing the ids.
+
+
+Thanks
+Heiko
+
+>  2 files changed, 24 insertions(+), 19 deletions(-)
+> 
+> diff --git a/drivers/clk/rockchip/clk-rk3368.c
+> b/drivers/clk/rockchip/clk-rk3368.c index 6cb474c593e7..139d418f448e 100644
+> --- a/drivers/clk/rockchip/clk-rk3368.c
+> +++ b/drivers/clk/rockchip/clk-rk3368.c
+> @@ -835,18 +835,18 @@ enum rk3368_plls {
+>  	GATE(PCLK_PMU, "pclk_pmu", "pclk_pd_pmu", CLK_IGNORE_UNUSED,
+> RK3368_CLKGATE_CON(23), 0, GFLAGS),
+> 
+>  	/* timer gates */
+> -	GATE(0, "sclk_timer15", "xin24m", CLK_IGNORE_UNUSED,
+> RK3368_CLKGATE_CON(24), 11, GFLAGS), -	GATE(0, "sclk_timer14", "xin24m",
+> CLK_IGNORE_UNUSED, RK3368_CLKGATE_CON(24), 10, GFLAGS), -	GATE(0,
+> "sclk_timer13", "xin24m", CLK_IGNORE_UNUSED, RK3368_CLKGATE_CON(24), 9,
+> GFLAGS), -	GATE(0, "sclk_timer12", "xin24m", CLK_IGNORE_UNUSED,
+> RK3368_CLKGATE_CON(24), 8, GFLAGS), -	GATE(0, "sclk_timer11", "xin24m",
+> CLK_IGNORE_UNUSED, RK3368_CLKGATE_CON(24), 7, GFLAGS), -	GATE(0,
+> "sclk_timer10", "xin24m", CLK_IGNORE_UNUSED, RK3368_CLKGATE_CON(24), 6,
+> GFLAGS), -	GATE(0, "sclk_timer05", "xin24m", CLK_IGNORE_UNUSED,
+> RK3368_CLKGATE_CON(24), 5, GFLAGS), -	GATE(0, "sclk_timer04", "xin24m",
+> CLK_IGNORE_UNUSED, RK3368_CLKGATE_CON(24), 4, GFLAGS), -	GATE(0,
+> "sclk_timer03", "xin24m", CLK_IGNORE_UNUSED, RK3368_CLKGATE_CON(24), 3,
+> GFLAGS), -	GATE(0, "sclk_timer02", "xin24m", CLK_IGNORE_UNUSED,
+> RK3368_CLKGATE_CON(24), 2, GFLAGS), -	GATE(0, "sclk_timer01", "xin24m",
+> CLK_IGNORE_UNUSED, RK3368_CLKGATE_CON(24), 1, GFLAGS), -	GATE(0,
+> "sclk_timer00", "xin24m", CLK_IGNORE_UNUSED, RK3368_CLKGATE_CON(24), 0,
+> GFLAGS), +	GATE(SCLK_TIMER15, "sclk_timer15", "xin24m", CLK_IGNORE_UNUSED,
+> RK3368_CLKGATE_CON(24), 11, GFLAGS), +	GATE(SCLK_TIMER14, "sclk_timer14",
+> "xin24m", CLK_IGNORE_UNUSED, RK3368_CLKGATE_CON(24), 10, GFLAGS),
+> +	GATE(SCLK_TIMER13, "sclk_timer13", "xin24m", CLK_IGNORE_UNUSED,
+> RK3368_CLKGATE_CON(24), 9, GFLAGS), +	GATE(SCLK_TIMER12, "sclk_timer12",
+> "xin24m", CLK_IGNORE_UNUSED, RK3368_CLKGATE_CON(24), 8, GFLAGS),
+> +	GATE(SCLK_TIMER11, "sclk_timer11", "xin24m", CLK_IGNORE_UNUSED,
+> RK3368_CLKGATE_CON(24), 7, GFLAGS), +	GATE(SCLK_TIMER10, "sclk_timer10",
+> "xin24m", CLK_IGNORE_UNUSED, RK3368_CLKGATE_CON(24), 6, GFLAGS),
+> +	GATE(SCLK_TIMER05, "sclk_timer05", "xin24m", CLK_IGNORE_UNUSED,
+> RK3368_CLKGATE_CON(24), 5, GFLAGS), +	GATE(SCLK_TIMER04, "sclk_timer04",
+> "xin24m", CLK_IGNORE_UNUSED, RK3368_CLKGATE_CON(24), 4, GFLAGS),
+> +	GATE(SCLK_TIMER03, "sclk_timer03", "xin24m", CLK_IGNORE_UNUSED,
+> RK3368_CLKGATE_CON(24), 3, GFLAGS), +	GATE(SCLK_TIMER02, "sclk_timer02",
+> "xin24m", CLK_IGNORE_UNUSED, RK3368_CLKGATE_CON(24), 2, GFLAGS),
+> +	GATE(SCLK_TIMER01, "sclk_timer01", "xin24m", CLK_IGNORE_UNUSED,
+> RK3368_CLKGATE_CON(24), 1, GFLAGS), +	GATE(SCLK_TIMER00, "sclk_timer00",
+> "xin24m", CLK_IGNORE_UNUSED, RK3368_CLKGATE_CON(24), 0, GFLAGS), };
+> 
+>  static const char *const rk3368_critical_clocks[] __initconst = {
+> diff --git a/include/dt-bindings/clock/rk3368-cru.h
+> b/include/dt-bindings/clock/rk3368-cru.h index 9c5dd9ba2f6c..aeb83e581a11
+> 100644
+> --- a/include/dt-bindings/clock/rk3368-cru.h
+> +++ b/include/dt-bindings/clock/rk3368-cru.h
+> @@ -44,13 +44,12 @@
+>  #define SCLK_I2S_8CH		82
+>  #define SCLK_SPDIF_8CH		83
+>  #define SCLK_I2S_2CH		84
+> -#define SCLK_TIMER0		85
+> -#define SCLK_TIMER1		86
+> -#define SCLK_TIMER2		87
+> -#define SCLK_TIMER3		88
+> -#define SCLK_TIMER4		89
+> -#define SCLK_TIMER5		90
+> -#define SCLK_TIMER6		91
+> +#define SCLK_TIMER00		85
+> +#define SCLK_TIMER01		86
+> +#define SCLK_TIMER02		87
+> +#define SCLK_TIMER03		88
+> +#define SCLK_TIMER04		89
+> +#define SCLK_TIMER05		90
+>  #define SCLK_OTGPHY0		93
+>  #define SCLK_OTG_ADP		96
+>  #define SCLK_HSICPHY480M	97
+> @@ -82,6 +81,12 @@
+>  #define SCLK_SFC		126
+>  #define SCLK_MAC		127
+>  #define SCLK_MACREF_OUT		128
+> +#define SCLK_TIMER10		133
+> +#define SCLK_TIMER11		134
+> +#define SCLK_TIMER12		135
+> +#define SCLK_TIMER13		136
+> +#define SCLK_TIMER14		137
+> +#define SCLK_TIMER15		138
+> 
+>  #define DCLK_VOP		190
+>  #define MCLK_CRYPTO		191
