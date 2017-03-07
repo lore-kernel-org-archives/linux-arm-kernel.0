@@ -1,19 +1,21 @@
 From: guohanjun@huawei.com (Hanjun Guo)
-Date: Tue, 7 Mar 2017 20:40:01 +0800
-Subject: [PATCH v9 06/15] irqchip: gicv3-its: platform-msi: refactor
- its_pmsi_init() to prepare for ACPI
+Date: Tue, 7 Mar 2017 20:40:00 +0800
+Subject: [PATCH v9 05/15] irqchip: gicv3-its: platform-msi: refactor
+ its_pmsi_prepare()
 In-Reply-To: <1488890410-15503-1-git-send-email-guohanjun@huawei.com>
 References: <1488890410-15503-1-git-send-email-guohanjun@huawei.com>
-Message-ID: <1488890410-15503-7-git-send-email-guohanjun@huawei.com>
+Message-ID: <1488890410-15503-6-git-send-email-guohanjun@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Hanjun Guo <hanjun.guo@linaro.org>
 
-Introduce its_pmsi_init_one() to separate firmware dependent
-code (ie OF dependent code) and firmware agnostic code so
-that gic3-its code can be made to support other firmware
-bindings easily.
+By adding ACPI support for platform MSI, the gicv3 driver has to
+provide code to retrieve the dev id through ACPI instead of device
+tree bindings; given that its_pmsi_prepare() allows already to get
+the dev id but it is OF dependent, factor OF related code out into
+a single function to make its_pmsi_prepare() ready to be used with
+other firmware interfaces.
 
 Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
 [lorenzo.pieralisi at arm.com: rewrote commit log]
@@ -23,77 +25,60 @@ Tested-by: Ming Lei <ming.lei@canonical.com>
 Tested-by: Wei Xu <xuwei5@hisilicon.com>
 Tested-by: Sinan Kaya <okaya@codeaurora.org>
 Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Cc: Tomasz Nowicki <tn@semihalf.com>
 Cc: Thomas Gleixner <tglx@linutronix.de>
 ---
- drivers/irqchip/irq-gic-v3-its-platform-msi.c | 45 ++++++++++++++++-----------
- 1 file changed, 27 insertions(+), 18 deletions(-)
+ drivers/irqchip/irq-gic-v3-its-platform-msi.c | 23 ++++++++++++++++-------
+ 1 file changed, 16 insertions(+), 7 deletions(-)
 
 diff --git a/drivers/irqchip/irq-gic-v3-its-platform-msi.c b/drivers/irqchip/irq-gic-v3-its-platform-msi.c
-index 3c94278..3d9efd1 100644
+index 470b4aa..3c94278 100644
 --- a/drivers/irqchip/irq-gic-v3-its-platform-msi.c
 +++ b/drivers/irqchip/irq-gic-v3-its-platform-msi.c
-@@ -82,34 +82,43 @@ static int its_pmsi_prepare(struct irq_domain *domain, struct device *dev,
- 	{},
+@@ -24,15 +24,11 @@
+ 	.name			= "ITS-pMSI",
  };
  
--static int __init its_pmsi_init(void)
-+static int __init its_pmsi_init_one(struct fwnode_handle *fwnode,
-+				const char *name)
+-static int its_pmsi_prepare(struct irq_domain *domain, struct device *dev,
+-			    int nvec, msi_alloc_info_t *info)
++static int of_pmsi_get_dev_id(struct irq_domain *domain, struct device *dev,
++				  u32 *dev_id)
  {
--	struct device_node *np;
- 	struct irq_domain *parent;
+-	struct msi_domain_info *msi_info;
+-	u32 dev_id;
+ 	int ret, index = 0;
  
-+	parent = irq_find_matching_fwnode(fwnode, DOMAIN_BUS_NEXUS);
-+	if (!parent || !msi_get_domain_info(parent)) {
-+		pr_err("%s: unable to locate ITS domain\n", name);
-+		return -ENXIO;
-+	}
-+
-+	if (!platform_msi_create_irq_domain(fwnode, &its_pmsi_domain_info,
-+					    parent)) {
-+		pr_err("%s: unable to create platform domain\n", name);
-+		return -ENXIO;
-+	}
-+
-+	pr_info("Platform MSI: %s domain created\n", name);
-+	return 0;
+-	msi_info = msi_get_domain_info(domain->parent);
+-
+ 	/* Suck the DeviceID out of the msi-parent property */
+ 	do {
+ 		struct of_phandle_args args;
+@@ -43,11 +39,24 @@ static int its_pmsi_prepare(struct irq_domain *domain, struct device *dev,
+ 		if (args.np == irq_domain_get_of_node(domain)) {
+ 			if (WARN_ON(args.args_count != 1))
+ 				return -EINVAL;
+-			dev_id = args.args[0];
++			*dev_id = args.args[0];
+ 			break;
+ 		}
+ 	} while (!ret);
+ 
++	return ret;
 +}
 +
-+static void __init its_pmsi_of_init(void)
++static int its_pmsi_prepare(struct irq_domain *domain, struct device *dev,
++			    int nvec, msi_alloc_info_t *info)
 +{
-+	struct device_node *np;
++	struct msi_domain_info *msi_info;
++	u32 dev_id;
++	int ret;
 +
- 	for (np = of_find_matching_node(NULL, its_device_id); np;
- 	     np = of_find_matching_node(np, its_device_id)) {
- 		if (!of_property_read_bool(np, "msi-controller"))
- 			continue;
++	msi_info = msi_get_domain_info(domain->parent);
++
++	ret = of_pmsi_get_dev_id(domain, dev, &dev_id);
+ 	if (ret)
+ 		return ret;
  
--		parent = irq_find_matching_host(np, DOMAIN_BUS_NEXUS);
--		if (!parent || !msi_get_domain_info(parent)) {
--			pr_err("%s: unable to locate ITS domain\n",
--			       np->full_name);
--			continue;
--		}
--
--		if (!platform_msi_create_irq_domain(of_node_to_fwnode(np),
--						    &its_pmsi_domain_info,
--						    parent)) {
--			pr_err("%s: unable to create platform domain\n",
--			       np->full_name);
--			continue;
--		}
--
--		pr_info("Platform MSI: %s domain created\n", np->full_name);
-+		its_pmsi_init_one(of_node_to_fwnode(np), np->full_name);
- 	}
-+}
- 
-+static int __init its_pmsi_init(void)
-+{
-+	its_pmsi_of_init();
- 	return 0;
- }
- early_initcall(its_pmsi_init);
 -- 
 1.7.12.4
