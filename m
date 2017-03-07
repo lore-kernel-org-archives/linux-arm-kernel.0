@@ -1,39 +1,35 @@
-From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Tue, 7 Mar 2017 11:32:22 +0800
-Subject: [PATCH 1/2] usb: xhci-mtk: check hcc_params after adding primary hcd
-Message-ID: <1488857543-9384-1-git-send-email-chunfeng.yun@mediatek.com>
+From: alim.akhtar@samsung.com (Alim Akhtar)
+Date: Tue, 07 Mar 2017 09:37:05 +0530
+Subject: [PATCH] irqchip/gic-v3: Fix GICD_CTLR_ARE_NS bit field
+References: <CGME20170307041023epcas5p1229831d4cc8541e6c35914508e6e01f0@epcas5p1.samsung.com>
+Message-ID: <1488859625-7532-1-git-send-email-alim.akhtar@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hcc_params is set in xhci_gen_setup() called from usb_add_hcd(),
-so checks the Maximum Primary Stream Array Size in the hcc_params
-register after adding primary hcd.
+From: Alim Akhtar <alim.akhtar@gmail.com>
 
-Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+As per GICv3 Architecture specification 8.9.4 field descriptions,
+GICD_CTLR_ARE_NS is bit[5]. This patch correct the same.
+
+Fixes: 021f6537 ("irqchip: gic-v3: Initial support for GICv3")
+Cc: stable at vger.kernel.org
+Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
 ---
- drivers/usb/host/xhci-mtk.c |    6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ include/linux/irqchip/arm-gic-v3.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/usb/host/xhci-mtk.c b/drivers/usb/host/xhci-mtk.c
-index 9066ec9..6ac73a6 100644
---- a/drivers/usb/host/xhci-mtk.c
-+++ b/drivers/usb/host/xhci-mtk.c
-@@ -678,13 +678,13 @@ static int xhci_mtk_probe(struct platform_device *pdev)
- 		goto power_off_phys;
- 	}
+diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+index e808f8a..4aaf639 100644
+--- a/include/linux/irqchip/arm-gic-v3.h
++++ b/include/linux/irqchip/arm-gic-v3.h
+@@ -57,7 +57,7 @@
  
--	if (HCC_MAX_PSA(xhci->hcc_params) >= 4)
--		xhci->shared_hcd->can_do_streams = 1;
--
- 	ret = usb_add_hcd(hcd, irq, IRQF_SHARED);
- 	if (ret)
- 		goto put_usb3_hcd;
+ #define GICD_CTLR_RWP			(1U << 31)
+ #define GICD_CTLR_DS			(1U << 6)
+-#define GICD_CTLR_ARE_NS		(1U << 4)
++#define GICD_CTLR_ARE_NS		(1U << 5)
+ #define GICD_CTLR_ENABLE_G1A		(1U << 1)
+ #define GICD_CTLR_ENABLE_G1		(1U << 0)
  
-+	if (HCC_MAX_PSA(xhci->hcc_params) >= 4)
-+		xhci->shared_hcd->can_do_streams = 1;
-+
- 	ret = usb_add_hcd(xhci->shared_hcd, irq, IRQF_SHARED);
- 	if (ret)
- 		goto dealloc_usb2_hcd;
 -- 
-1.7.9.5
+2.7.4
