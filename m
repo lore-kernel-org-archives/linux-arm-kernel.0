@@ -1,154 +1,151 @@
-From: wuchengli@chromium.org (Wu-Cheng Li)
-Date: Tue,  7 Mar 2017 22:42:07 +0800
-Subject: [PATCH v2 1/1] mtk-vcodec: check the vp9 decoder buffer index from
- VPU.
-In-Reply-To: <20170307144207.133234-1-wuchengli@chromium.org>
-References: <20170307144207.133234-1-wuchengli@chromium.org>
-Message-ID: <20170307144207.133234-2-wuchengli@chromium.org>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 7 Mar 2017 14:43:34 +0000
+Subject: [PATCH v9 00/15] ACPI platform MSI support and its example mbigen
+In-Reply-To: <1488890410-15503-1-git-send-email-guohanjun@huawei.com>
+References: <1488890410-15503-1-git-send-email-guohanjun@huawei.com>
+Message-ID: <20170307144334.GB26990@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wu-Cheng Li <wuchengli@google.com>
+On Tue, Mar 07, 2017 at 08:39:55PM +0800, Hanjun Guo wrote:
+> From: Hanjun Guo <hanjun.guo@linaro.org>
+> 
+> With platform msi support landed in the kernel, and the introduction
+> of IORT for GICv3 ITS (PCI MSI) and SMMU, the framework for platform msi
+> is ready, this patch set add few patches to enable the ACPI platform
+> msi support.
+> 
+> For platform device connecting to ITS on arm platform, we have IORT
+> table with the named componant node to describe the mappings of paltform
+> device and ITS, so we can retrieve the dev id and find its parent
+> irqdomain (ITS) from IORT table (simlar with the ACPI ITS support).
+> 
+> v8 -> v9:
+> 	- Rebased on top of 4.11-rc1 and retest;
+> 	- Some of patch's commit message was updated by Lorenzo and
+> 	  it's clearer (thanks!)
+> 
+> No update in the code, hope it's the final revision.
 
-VPU firmware has a bug and may return invalid buffer index for
-some vp9 videos. Check the buffer indexes before accessing the
-buffer.
+I will be off the radar till -rc3 but I do not expect major changes
+to the series in its current form given that dependencies were merged
+in the merge window (ACPI IRQ probe deferral and IORT fixes).
 
-Signed-off-by: Wu-Cheng Li <wuchengli@chromium.org>
----
- drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c | 23 ++++++++++++++-----
- drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.h |  2 ++
- .../media/platform/mtk-vcodec/vdec/vdec_vp9_if.c   | 26 ++++++++++++++++++++++
- drivers/media/platform/mtk-vcodec/vdec_drv_if.h    |  2 ++
- 4 files changed, 48 insertions(+), 5 deletions(-)
+Thanks,
+Lorenzo
 
-diff --git a/drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c b/drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c
-index 502877a4b1df..8a9285a84d47 100644
---- a/drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c
-+++ b/drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c
-@@ -420,6 +420,11 @@ static void mtk_vdec_worker(struct work_struct *work)
- 			dst_buf->index,
- 			ret, res_chg);
- 		src_buf = v4l2_m2m_src_buf_remove(ctx->m2m_ctx);
-+		if (ret == -EIO) {
-+			mutex_lock(&ctx->lock);
-+			src_buf_info->error = true;
-+			mutex_unlock(&ctx->lock);
-+		}
- 		v4l2_m2m_buf_done(&src_buf_info->vb, VB2_BUF_STATE_ERROR);
- 	} else if (res_chg == false) {
- 		/*
-@@ -1176,6 +1181,11 @@ static void vb2ops_vdec_buf_queue(struct vb2_buffer *vb)
- 			       "[%d] vdec_if_decode() src_buf=%d, size=%zu, fail=%d, res_chg=%d",
- 			       ctx->id, src_buf->index,
- 			       src_mem.size, ret, res_chg);
-+		if (ret == -EIO) {
-+			mtk_v4l2_err("[%d] Unrecoverable error in vdec_if_decode.",
-+					ctx->id);
-+			ctx->state = MTK_STATE_ABORT;
-+		}
- 		return;
- 	}
- 
-@@ -1217,14 +1227,17 @@ static void vb2ops_vdec_buf_finish(struct vb2_buffer *vb)
- 	struct vb2_v4l2_buffer *vb2_v4l2;
- 	struct mtk_video_dec_buf *buf;
- 
--	if (vb->vb2_queue->type != V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE)
--		return;
--
- 	vb2_v4l2 = container_of(vb, struct vb2_v4l2_buffer, vb2_buf);
- 	buf = container_of(vb2_v4l2, struct mtk_video_dec_buf, vb);
- 	mutex_lock(&ctx->lock);
--	buf->queued_in_v4l2 = false;
--	buf->queued_in_vb2 = false;
-+	if (buf->error) {
-+		mtk_v4l2_err("Unrecoverable error on buffer.");
-+		ctx->state = MTK_STATE_ABORT;
-+	}
-+	if (vb->vb2_queue->type == V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE) {
-+		buf->queued_in_v4l2 = false;
-+		buf->queued_in_vb2 = false;
-+	}
- 	mutex_unlock(&ctx->lock);
- }
- 
-diff --git a/drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.h b/drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.h
-index 362f5a85762e..dc4fc1df63c5 100644
---- a/drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.h
-+++ b/drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.h
-@@ -50,6 +50,7 @@ struct vdec_fb {
-  * @queued_in_v4l2:	Capture buffer is in v4l2 driver, but not in vb2
-  *			queue yet
-  * @lastframe:		Intput buffer is last buffer - EOS
-+ * @error:		An unrecoverable error occurs on this buffer.
-  * @frame_buffer:	Decode status, and buffer information of Capture buffer
-  *
-  * Note : These status information help us track and debug buffer state
-@@ -63,6 +64,7 @@ struct mtk_video_dec_buf {
- 	bool	queued_in_vb2;
- 	bool	queued_in_v4l2;
- 	bool	lastframe;
-+	bool	error;
- 	struct vdec_fb	frame_buffer;
- };
- 
-diff --git a/drivers/media/platform/mtk-vcodec/vdec/vdec_vp9_if.c b/drivers/media/platform/mtk-vcodec/vdec/vdec_vp9_if.c
-index e91a3b425b0c..5539b1853f16 100644
---- a/drivers/media/platform/mtk-vcodec/vdec/vdec_vp9_if.c
-+++ b/drivers/media/platform/mtk-vcodec/vdec/vdec_vp9_if.c
-@@ -718,6 +718,26 @@ static void get_free_fb(struct vdec_vp9_inst *inst, struct vdec_fb **out_fb)
- 	*out_fb = fb;
- }
- 
-+static int validate_vsi_array_indexes(struct vdec_vp9_inst *inst,
-+		struct vdec_vp9_vsi *vsi) {
-+	if (vsi->sf_frm_idx >= VP9_MAX_FRM_BUF_NUM - 1) {
-+		mtk_vcodec_err(inst, "Invalid vsi->sf_frm_idx=%u.",
-+				vsi->sf_frm_idx);
-+		return -EIO;
-+	}
-+	if (vsi->frm_to_show_idx >= VP9_MAX_FRM_BUF_NUM) {
-+		mtk_vcodec_err(inst, "Invalid vsi->frm_to_show_idx=%u.",
-+				vsi->frm_to_show_idx);
-+		return -EIO;
-+	}
-+	if (vsi->new_fb_idx >= VP9_MAX_FRM_BUF_NUM) {
-+		mtk_vcodec_err(inst, "Invalid vsi->new_fb_idx=%u.",
-+				vsi->new_fb_idx);
-+		return -EIO;
-+	}
-+	return 0;
-+}
-+
- static void vdec_vp9_deinit(unsigned long h_vdec)
- {
- 	struct vdec_vp9_inst *inst = (struct vdec_vp9_inst *)h_vdec;
-@@ -834,6 +854,12 @@ static int vdec_vp9_decode(unsigned long h_vdec, struct mtk_vcodec_mem *bs,
- 			goto DECODE_ERROR;
- 		}
- 
-+		ret = validate_vsi_array_indexes(inst, vsi);
-+		if (ret) {
-+			mtk_vcodec_err(inst, "Invalid values from VPU.");
-+			goto DECODE_ERROR;
-+		}
-+
- 		if (vsi->resolution_changed) {
- 			if (!vp9_alloc_work_buf(inst)) {
- 				ret = -EINVAL;
-diff --git a/drivers/media/platform/mtk-vcodec/vdec_drv_if.h b/drivers/media/platform/mtk-vcodec/vdec_drv_if.h
-index db6b5205ffb1..ded1154481cd 100644
---- a/drivers/media/platform/mtk-vcodec/vdec_drv_if.h
-+++ b/drivers/media/platform/mtk-vcodec/vdec_drv_if.h
-@@ -85,6 +85,8 @@ void vdec_if_deinit(struct mtk_vcodec_ctx *ctx);
-  * @res_chg	: [out] resolution change happens if current bs have different
-  *	picture width/height
-  * Note: To flush the decoder when reaching EOF, set input bitstream as NULL.
-+ *
-+ * Return: 0 on success. -EIO on unrecoverable error.
-  */
- int vdec_if_decode(struct mtk_vcodec_ctx *ctx, struct mtk_vcodec_mem *bs,
- 		   struct vdec_fb *fb, bool *res_chg);
--- 
-2.12.0.rc1.440.g5b76565f74-goog
+> v7 -> v8:
+> 	- Using _CRS instead of _PRS for Interrupt resources for mbigen
+> 
+> 	- reshuffle the patch slightly to introduce iort_node_map_platform_id()
+> 	  first and then retrieve the dev id for platform MSI, no functional
+> 	  change
+> 
+> 	- Fix the compile error with patch "irqchip: gicv3-its: platform-msi:
+> 	  scan MADT to create platform msi domain", which forgot to add 
+> 	  <include/acpi_iort.h> (added in later patches in last version).
+> 
+> 	- renew some commit message which suggested by Lorenzo
+> 
+> 	- address some othe minor issues which commented by Lorenzo
+> 
+> 	- Add review and test tag as it's no functional change except
+> 	  the last patch of mbigen
+> 
+> 	- rebase on top of 4.10-rc4 and test it on x86, ia64 and ARM64
+> 	  platforms (also with Agustin's patch [1-2/3] "[PATCH V9 0/3] irqchip: qcom:
+>           Add IRQ combiner driver" and Lorenzo's patch
+>           https://patchwork.kernel.org/patch/9507041/)
+> 
+> v6 -> v7: 
+> 	- Introduce iort_node_map_platform_id() to retrieve the
+> 	  dev id for both NC (named component) -> ITS/SMMU and
+> 	  NC -> SMMU -> ITS cases, suggested by Lorenzo;
+> 
+> 	- Reorder the patches and rewrite some commit message;
+> 
+> 	- Remove the test tags because it has major changes
+> 	  to retrieve the dev id, Sinan, Majun, Xinwei, could
+> 	  you please test them again on your platform?
+> 
+> 	- rebased on top of 4.10-rc3 and Lorenzo's patch
+>           https://patchwork.kernel.org/patch/9507041/
+> 
+> 	- Tested against Agustin's patch [1-2/3] "[PATCH V9 0/3] irqchip: qcom:
+>           Add IRQ combiner driver"
+> 
+> v5 -> v6:
+>         - Call acpi_configure_pmsi_domain() for platform devices in
+>           acpi_platform_notify() as it's cleaner (suggested by Rafael)
+>         - Remove the "u8 type" for iort_id_map() because it's unused
+>         - Rebase on top of 4.10-rc2
+>         - Collect test and review tags
+> 
+> v4 -> v5:
+>         - Add mbigen support back with tested on with Agustin's patchset,
+>           and it's a good example of how ACPI platform MSI works
+>         - rebased on top of lastest Linus tree (commit 52bce91 splice: reinstate SIGPIPE/EPIPE handling)
+> 
+> v3 -> v4:
+>         - Drop mbi-gen patches to just submit platform msi support because
+>           will rebase mbi-gen patches on top of Agustin's patchset, and discusion
+>           is going there.
+>         - Add a patch to support device topology such as NC(named componant, paltform device)
+>           ->SMMU->ITS which suggested by Lorenzo;
+>         - rebased on top of Lorenzo's v9 of ACPI IORT ARM SMMU support;
+>         - rebased on top of 4.9-rc7
+> 
+> v2 -> v3:
+>         - Drop RFC tag
+>         - Rebase against v4.9-rc2 and Lorenzo's v6 of ACPI IORT ARM SMMU support [1]
+>         - Add 3 cleanup patches (patch 1, 2, 3)
+>         - Drop arch_init call patch from last version
+>         - Introduce a callback for platform device to set msi domain
+>         - Introduce a new API to get paltform device's domain instead of
+>           reusing the PCI one in previous version
+>         - Add a patch to rework iort_node_get_id()
+> 
+> [1]: http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1251993.html
+> 
+> v1 -> v2:
+>         - Fix the bug of if multi Interrupt() resoures in single _PRS,
+>           we need to calculate all the irq numbers (I missed it in previous
+>           version);
+>         - Rebased on Marc's irq/irqchip-4.9 branch and Lorenzo's v5
+>           SMMU patches (also Robin's SMMu patches)
+>         - Add patch irqchip: mbigen: promote mbigen init.
+> 
+> Hanjun Guo (13):
+>   ACPI/IORT: Fix the indentation in iort_scan_node()
+>   ACPI/IORT: Add missing comment for iort_dev_find_its_id()
+>   ACPI/IORT: Rework iort_match_node_callback() return value handling
+>   irqchip: gic-v3-its: keep the include header files in alphabetic
+>     order
+>   irqchip: gicv3-its: platform-msi: refactor its_pmsi_prepare()
+>   irqchip: gicv3-its: platform-msi: refactor its_pmsi_init() to prepare
+>     for ACPI
+>   irqchip: gicv3-its: platform-msi: scan MADT to create platform msi
+>     domain
+>   ACPI/IORT: Rename iort_node_map_rid() to make it generic
+>   ACPI/IORT: Introduce iort_node_map_platform_id() to retrieve dev id
+>   ACPI: platform-msi: retrieve dev id from IORT
+>   ACPI: platform: setup MSI domain for ACPI based platform device
+>   msi: platform: make platform_msi_create_device_domain() ACPI aware
+>   irqchip: mbigen: Add ACPI support
+> 
+> Kefeng Wang (2):
+>   irqchip: mbigen: drop module owner
+>   irqchip: mbigen: introduce mbigen_of_create_domain()
+> 
+>  drivers/acpi/arm64/iort.c                     | 158 +++++++++++++++++++++-----
+>  drivers/acpi/glue.c                           |   6 +
+>  drivers/base/platform-msi.c                   |   3 +-
+>  drivers/irqchip/irq-gic-v3-its-platform-msi.c | 106 +++++++++++++----
+>  drivers/irqchip/irq-gic-v3-its.c              |   2 +-
+>  drivers/irqchip/irq-mbigen.c                  | 110 +++++++++++++++---
+>  include/linux/acpi_iort.h                     |   8 ++
+>  7 files changed, 317 insertions(+), 76 deletions(-)
+> 
+> -- 
+> 1.7.12.4
+> 
