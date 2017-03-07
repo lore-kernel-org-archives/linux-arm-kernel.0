@@ -1,32 +1,24 @@
-From: treding@nvidia.com (Thierry Reding)
-Date: Tue, 7 Mar 2017 12:02:39 +0100
-Subject: [PATCH 2/2] usb: xhci: remove dummy extra_priv_size for size of
- xhci_hcd struct
-In-Reply-To: <1488857543-9384-2-git-send-email-chunfeng.yun@mediatek.com>
-References: <1488857543-9384-1-git-send-email-chunfeng.yun@mediatek.com>
- <1488857543-9384-2-git-send-email-chunfeng.yun@mediatek.com>
-Message-ID: <20170307110238.GA31069@ulmo.ba.sec>
+From: zhangqing@rock-chips.com (Elaine Zhang)
+Date: Tue,  7 Mar 2017 19:05:14 +0800
+Subject: [PATCH v2 0/5] clk: rockchip: fix up the clk for RK3368 SoC 
+Message-ID: <1488884719-10350-1-git-send-email-zhangqing@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 07, 2017 at 11:32:23AM +0800, Chunfeng Yun wrote:
-> because hcd_priv_size is already size of xhci_hcd struct,
-> extra_priv_size is not needed anymore for MTK and tegra drivers.
-> 
-> Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
-> ---
->  drivers/usb/host/xhci-mtk.c   |    1 -
->  drivers/usb/host/xhci-tegra.c |    1 -
->  2 files changed, 2 deletions(-)
+change in V2:
+split clock-id addition and the assignment in the clock-
+driver.
 
-For Tegra:
+Elaine Zhang (5):
+  clk: rockchip: rk3368: fix up the timer-ids
+  clk: rockchip: rk3368: remove the unused id
+  clk: rockchip: add clock ids for timer10-15 of RK3368 SoCs
+  clk: rockchip: rk3368: export SCLK_TIMERXX id for timers
+  clk: rockchip: rk3368: add some clks as critical
 
-Tested-by: Thierry Reding <treding@nvidia.com>
-Acked-by: Thierry Reding <treding@nvidia.com>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170307/e812618a/attachment.sig>
+ drivers/clk/rockchip/clk-rk3368.c      | 27 +++++++++++++++------------
+ include/dt-bindings/clock/rk3368-cru.h | 19 ++++++++++++-------
+ 2 files changed, 27 insertions(+), 19 deletions(-)
+
+-- 
+1.9.1
