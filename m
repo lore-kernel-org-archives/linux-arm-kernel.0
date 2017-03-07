@@ -1,85 +1,61 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 7 Mar 2017 14:10:14 +0000
-Subject: [PATCH v4 4/6] arm64: mmu: map .text as read-only from the outset
-In-Reply-To: <1488637848-13588-5-git-send-email-ard.biesheuvel@linaro.org>
-References: <1488637848-13588-1-git-send-email-ard.biesheuvel@linaro.org>
- <1488637848-13588-5-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20170307141014.GA3514@leverpostej>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 7 Mar 2017 06:11:57 -0800
+Subject: [PATCH 1/15] clk: divider: Make divider_round_rate take the
+ parent clock
+In-Reply-To: <7ebd073b4941e4b7c619f15ff0a375ff7919d403.1488876832.git-series.maxime.ripard@free-electrons.com>
+References: <cover.bc06ffa88f847ddd9ddd7c259415d5f61b55307b.1488876832.git-series.maxime.ripard@free-electrons.com>
+ <7ebd073b4941e4b7c619f15ff0a375ff7919d403.1488876832.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <20170307141157.GC10239@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 04, 2017 at 02:30:46PM +0000, Ard Biesheuvel wrote:
-> Now that alternatives patching code no longer relies on the primary
-> mapping of .text being writable, we can remove the code that removes
-> the writable permissions post-init time, and map it read-only from
-> the outset.
+On 03/07, Maxime Ripard wrote:
+> So far, divider_round_rate only considers the parent clock returned by
+> clk_hw_get_parent.
 > 
-> To preserve the existing behavior under rodata=off, which is relied
-> upon by external debuggers to manage software breakpoints (as pointed
-> out by Mark), add an early_param() check for rodata=, and use RWX
-> permissions if it set to 'off'.
+> This works fine on clocks that have a single parents, this doesn't work on
+> muxes, since we will only consider the first parent, while other parents
+> may totally be able to provide a better combination.
 > 
-> Reviewed-by: Laura Abbott <labbott@redhat.com>
-> Reviewed-by: Kees Cook <keescook@chromium.org>
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm64/mm/mmu.c | 13 +++++++++----
->  1 file changed, 9 insertions(+), 4 deletions(-)
+> Clocks in that case cannot use divider_round_rate, so would have to come up
+> with a very similar logic to work around it. Instead of having to do
+> something like this, and duplicate that logic everywhere, give an
+> additional parameter for the parent clock to consider.
 > 
-> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-> index df377fbe464e..edd982f88714 100644
-> --- a/arch/arm64/mm/mmu.c
-> +++ b/arch/arm64/mm/mmu.c
-> @@ -416,9 +416,6 @@ void mark_rodata_ro(void)
->  {
->  	unsigned long section_size;
->  
-> -	section_size = (unsigned long)_etext - (unsigned long)_text;
-> -	update_mapping_prot(__pa_symbol(_text), (unsigned long)_text,
-> -			    section_size, PAGE_KERNEL_ROX);
->  	/*
->  	 * mark .rodata as read only. Use __init_begin rather than __end_rodata
->  	 * to cover NOTES and EXCEPTION_TABLE.
-> @@ -451,6 +448,12 @@ static void __init map_kernel_segment(pgd_t *pgd, void *va_start, void *va_end,
->  	vm_area_add_early(vma);
->  }
->  
-> +static int __init parse_rodata(char *arg)
-> +{
-> +	return strtobool(arg, &rodata_enabled);
-> +}
-> +early_param("rodata", parse_rodata);
-> +
->  /*
->   * Create fine-grained mappings for the kernel.
->   */
-> @@ -458,7 +461,9 @@ static void __init map_kernel(pgd_t *pgd)
->  {
->  	static struct vm_struct vmlinux_text, vmlinux_rodata, vmlinux_init, vmlinux_data;
->  
-> -	map_kernel_segment(pgd, _text, _etext, PAGE_KERNEL_EXEC, &vmlinux_text);
-> +	pgprot_t text_prot = rodata_enabled ? PAGE_KERNEL_ROX : PAGE_KERNEL_EXEC;
-> +
-
-It might be worth having a comment as to why, e.g.
-
-	/*
-	 * External debuggers may need to write directly to the text
-	 * mapping to install SW breakpoints. Allow this (only) when
-	 * explicitly requested with rodata=off.
-	 */
-
-... otherwise this looks fine. FWIW, either way:
-
-Reviewed-by: Mark Rutland <mark.rutland@arm.com>
-
-Thanks,
-Mark.
-
-> +	map_kernel_segment(pgd, _text, _etext, text_prot, &vmlinux_text);
->  	map_kernel_segment(pgd, __start_rodata, __init_begin, PAGE_KERNEL, &vmlinux_rodata);
->  	map_kernel_segment(pgd, __init_begin, __init_end, PAGE_KERNEL_EXEC,
->  			   &vmlinux_init);
-> -- 
-> 2.7.4
+> Current users have been converted using the following coccinelle script
 > 
+> @@
+> identifier hw, rate, prate, table, width, flags;
+> @@
+> 
+> -long divider_round_rate(struct clk_hw *hw,
+> +long divider_round_rate(struct clk_hw *hw, struct clk_hw *parent,
+>                         unsigned long rate,
+>                         unsigned long *prate,
+>                         const struct clk_div_table *table,
+>                         u8 width,
+>                         unsigned long flags) { ... }
+> 
+> @@
+> identifier fn, hw;
+> expression E2, E3, E4, E5, E6;
+> @@
+>  fn (struct clk_hw *hw, ...) {
+>  <...
+> -divider_round_rate(hw, E2, E3, E4, E5, E6)
+> +divider_round_rate(hw, clk_hw_get_parent(hw), E2, E3, E4, E5, E6)
+>  ...>
+> }
+
+Why not introduce another function like 
+
+	divider_round_rate_parent()
+	divider_round_rate_mux()
+
+that takes the extra parent argument? Technically, a divider is
+considered to only have one parent, and if it has more than one
+parent, then it is a mux and a divider.
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
