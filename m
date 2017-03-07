@@ -1,151 +1,149 @@
-From: petr.cvek@tul.cz (Petr Cvek)
-Date: Tue, 7 Mar 2017 02:17:55 +0100
-Subject: [PATCH] ARM: pxa: magician: Add support for ADS7846 touchscreen
-Message-ID: <b2805fd9-f208-ab60-a58f-eccc15dceebd@tul.cz>
+From: Wenyou.Yang@microchip.com (Wenyou.Yang at microchip.com)
+Date: Tue, 7 Mar 2017 02:05:55 +0000
+Subject: [PATCH 1/4] watchdog: sama5d4: fix WDDIS handling
+In-Reply-To: <20170302173114.28508-2-alexandre.belloni@free-electrons.com>
+References: <20170302173114.28508-1-alexandre.belloni@free-electrons.com>
+ <20170302173114.28508-2-alexandre.belloni@free-electrons.com>
+Message-ID: <F9F4555C4E01D7469D37975B62D0EFBB4FC50D@CHN-SV-EXMX07.mchp-main.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for ADS7846 touchscreen driver.
 
-The basic functionality was tested, x_plate_ohms and y_plate_ohms were
-physically measured. The value pressure_max was empirically set to match
-the measured range, which is affected by x_plate_ohms and ADS samples.
 
-Signed-off-by: Petr Cvek <petr.cvek@tul.cz>
----
- arch/arm/mach-pxa/magician.c | 85 +++++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 84 insertions(+), 1 deletion(-)
+> -----Original Message-----
+> From: Alexandre Belloni [mailto:alexandre.belloni at free-electrons.com]
+> Sent: 2017?3?3? 1:31
+> To: Guenter Roeck <linux@roeck-us.net>
+> Cc: Wim Van Sebroeck <wim@iguana.be>; Nicolas Ferre - M43238
+> <Nicolas.Ferre@microchip.com>; Wenyou Yang - A41535
+> <Wenyou.Yang@microchip.com>; linux-watchdog at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org; linux-kernel at vger.kernel.org; Alexandre Belloni
+> <alexandre.belloni@free-electrons.com>
+> Subject: [PATCH 1/4] watchdog: sama5d4: fix WDDIS handling
+> 
+> The datasheet states: "When setting the WDDIS bit, and while it is set, the fields
+> WDV and WDD must not be modified."
+> 
+> Because the whole configuration is already cached inside .mr, wait for the user to
+> enable the watchdog to configure it so it is enabled and configured at the same
+> time (what the IP is actually expecting).
+> 
+> When the watchdog is already enabled, it is not an issue to reconfigure it.
 
-diff --git a/arch/arm/mach-pxa/magician.c b/arch/arm/mach-pxa/magician.c
-index b413e36506af..a42eaeab382f 100644
---- a/arch/arm/mach-pxa/magician.c
-+++ b/arch/arm/mach-pxa/magician.c
-@@ -54,6 +54,11 @@
- #include "devices.h"
- #include "generic.h"
- 
-+#include <linux/regulator/fixed.h>
-+#include <linux/spi/spi.h>
-+#include <linux/spi/pxa2xx_spi.h>
-+#include <linux/spi/ads7846.h>
-+
- static unsigned long magician_pin_config[] __initdata = {
- 
- 	/* SDRAM and Static Memory I/O Signals */
-@@ -85,7 +90,7 @@ static unsigned long magician_pin_config[] __initdata = {
- 
- 	/* SSP 2 TSC2046 touchscreen */
- 	GPIO19_SSP2_SCLK,
--	GPIO14_SSP2_SFRM,
-+	MFP_CFG_OUT(GPIO14, AF0, DRIVE_HIGH),	/* frame as GPIO */
- 	GPIO89_SSP2_TXD,
- 	GPIO88_SSP2_RXD,
- 
-@@ -675,6 +680,37 @@ static struct platform_device bq24022 = {
- };
- 
- /*
-+ * fixed regulator for ads7846
-+ */
-+
-+static struct regulator_consumer_supply ads7846_supply =
-+	REGULATOR_SUPPLY("vcc", "spi2.0");
-+
-+static struct regulator_init_data vads7846_regulator = {
-+	.constraints	= {
-+		.valid_ops_mask	= REGULATOR_CHANGE_STATUS,
-+	},
-+	.num_consumer_supplies	= 1,
-+	.consumer_supplies	= &ads7846_supply,
-+};
-+
-+static struct fixed_voltage_config vads7846 = {
-+	.supply_name	= "vads7846",
-+	.microvolts	= 3300000, /* probably */
-+	.gpio	= -EINVAL,
-+	.startup_delay	= 0,
-+	.init_data	= &vads7846_regulator,
-+};
-+
-+static struct platform_device vads7846_device = {
-+	.name	= "reg-fixed-voltage",
-+	.id	= 1,
-+	.dev	= {
-+		.platform_data	= &vads7846,
-+	},
-+};
-+
-+/*
-  * Vcore regulator MAX1587A
-  */
- 
-@@ -852,6 +888,49 @@ static struct i2c_pxa_platform_data magician_i2c_power_info = {
- };
- 
- /*
-+ * Touchscreen
-+ */
-+
-+static struct ads7846_platform_data ads7846_pdata = {
-+	.model		= 7846,
-+	.x_plate_ohms	= 317,
-+	.y_plate_ohms	= 500,
-+	.pressure_max	= 1023,	/* with x plate ohms it will overflow 255 */
-+	.debounce_max	= 3,	/* first readout is always bad */
-+	.debounce_tol	= 30,
-+	.debounce_rep	= 0,
-+	.gpio_pendown	= GPIO115_MAGICIAN_nPEN_IRQ,
-+	.keep_vref_on	= 1,	/* TODO can be off? */
-+	.wakeup		= true,
-+	.vref_delay_usecs		= 100,
-+	.penirq_recheck_delay_usecs	= 100,
-+};
-+
-+struct pxa2xx_spi_chip tsc2046_chip_info = {
-+	.tx_threshold	= 1,
-+	.rx_threshold	= 2,
-+	.timeout	= 64,
-+	/* NOTICE must be GPIO, incompatibility with hw PXA SPI framing */
-+	.gpio_cs	= 14,
-+};
-+
-+static struct pxa2xx_spi_master magician_spi_info = {
-+	.num_chipselect	= 1,
-+	.enable_dma	= 1,
-+};
-+
-+static struct spi_board_info ads7846_spi_board_info[] __initdata = {
-+	{
-+		.modalias		= "ads7846",
-+		.bus_num		= 2,
-+		.max_speed_hz		= 2500000,
-+		.platform_data		= &ads7846_pdata,
-+		.controller_data	= &tsc2046_chip_info,
-+		.irq = PXA_GPIO_TO_IRQ(GPIO115_MAGICIAN_nPEN_IRQ),
-+	},
-+};
-+
-+/*
-  * Platform devices
-  */
- 
-@@ -865,6 +944,7 @@ static struct platform_device *devices[] __initdata = {
- 	&power_supply,
- 	&strataflash,
- 	&leds_gpio,
-+	&vads7846_device,
- };
- 
- static struct gpio magician_global_gpios[] = {
-@@ -922,6 +1002,9 @@ static void __init magician_init(void)
- 	} else
- 		pr_err("LCD detection: CPLD mapping failed\n");
- 
-+	pxa2xx_set_spi_info(2, &magician_spi_info);
-+	spi_register_board_info(ARRAY_AND_SIZE(ads7846_spi_board_info));
-+
- 	regulator_register_always_on(0, "power", pwm_backlight_supply,
- 		ARRAY_SIZE(pwm_backlight_supply), 5000000);
- 
--- 
-2.11.0
+Indeed, thanks.
+Acked-by: Wenyou.Yang <wenyou.yang@microchip.com>
+
+> 
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> ---
+>  drivers/watchdog/sama5d4_wdt.c | 48 ++++++++++++++++++++++++++----------
+> ------
+>  1 file changed, 30 insertions(+), 18 deletions(-)
+> 
+> diff --git a/drivers/watchdog/sama5d4_wdt.c b/drivers/watchdog/sama5d4_wdt.c
+> index f709962018ac..5cee20caca78 100644
+> --- a/drivers/watchdog/sama5d4_wdt.c
+> +++ b/drivers/watchdog/sama5d4_wdt.c
+> @@ -44,6 +44,8 @@ MODULE_PARM_DESC(nowayout,
+>  	"Watchdog cannot be stopped once started (default="
+>  	__MODULE_STRING(WATCHDOG_NOWAYOUT) ")");
+> 
+> +#define wdt_enabled (!(wdt->mr & AT91_WDT_WDDIS))
+> +
+>  #define wdt_read(wdt, field) \
+>  	readl_relaxed((wdt)->reg_base + (field))
+> 
+> @@ -89,7 +91,16 @@ static int sama5d4_wdt_set_timeout(struct
+> watchdog_device *wdd,
+>  	wdt->mr &= ~AT91_WDT_WDD;
+>  	wdt->mr |= AT91_WDT_SET_WDV(value);
+>  	wdt->mr |= AT91_WDT_SET_WDD(value);
+> -	wdt_write(wdt, AT91_WDT_MR, wdt->mr);
+> +
+> +	/*
+> +	 * WDDIS has to be 0 when updating WDD/WDV. The datasheet states:
+> When
+> +	 * setting the WDDIS bit, and while it is set, the fields WDV and WDD
+> +	 * must not be modified.
+> +	 * If the watchdog is enabled, then the timeout can be updated. Else,
+> +	 * wait that the user enables it.
+> +	 */
+> +	if (wdt_enabled)
+> +		wdt_write(wdt, AT91_WDT_MR, wdt->mr &
+> ~AT91_WDT_WDDIS);
+> 
+>  	wdd->timeout = timeout;
+> 
+> @@ -145,23 +156,20 @@ static int of_sama5d4_wdt_init(struct device_node *np,
+> struct sama5d4_wdt *wdt)
+> 
+>  static int sama5d4_wdt_init(struct sama5d4_wdt *wdt)  {
+> -	struct watchdog_device *wdd = &wdt->wdd;
+> -	u32 value = WDT_SEC2TICKS(wdd->timeout);
+>  	u32 reg;
+> -
+>  	/*
+> -	 * Because the fields WDV and WDD must not be modified when the
+> WDDIS
+> -	 * bit is set, so clear the WDDIS bit before writing the WDT_MR.
+> +	 * When booting and resuming, the bootloader may have changed the
+> +	 * watchdog configuration.
+> +	 * If the watchdog is already running, we can safely update it.
+> +	 * Else, we have to disable it properly.
+>  	 */
+> -	reg = wdt_read(wdt, AT91_WDT_MR);
+> -	reg &= ~AT91_WDT_WDDIS;
+> -	wdt_write(wdt, AT91_WDT_MR, reg);
+> -
+> -	wdt->mr |= AT91_WDT_SET_WDD(value);
+> -	wdt->mr |= AT91_WDT_SET_WDV(value);
+> -
+> -	wdt_write(wdt, AT91_WDT_MR, wdt->mr);
+> -
+> +	if (wdt_enabled) {
+> +		wdt_write(wdt, AT91_WDT_MR, wdt->mr);
+> +	} else {
+> +		reg = wdt_read(wdt, AT91_WDT_MR);
+> +		if (!(reg & AT91_WDT_WDDIS))
+> +			wdt_write(wdt, AT91_WDT_MR, reg |
+> AT91_WDT_WDDIS);
+> +	}
+>  	return 0;
+>  }
+> 
+> @@ -172,6 +180,7 @@ static int sama5d4_wdt_probe(struct platform_device
+> *pdev)
+>  	struct resource *res;
+>  	void __iomem *regs;
+>  	u32 irq = 0;
+> +	u32 timeout;
+>  	int ret;
+> 
+>  	wdt = devm_kzalloc(&pdev->dev, sizeof(*wdt), GFP_KERNEL); @@ -
+> 221,6 +230,11 @@ static int sama5d4_wdt_probe(struct platform_device *pdev)
+>  		return ret;
+>  	}
+> 
+> +	timeout = WDT_SEC2TICKS(wdd->timeout);
+> +
+> +	wdt->mr |= AT91_WDT_SET_WDD(timeout);
+> +	wdt->mr |= AT91_WDT_SET_WDV(timeout);
+> +
+>  	ret = sama5d4_wdt_init(wdt);
+>  	if (ret)
+>  		return ret;
+> @@ -263,9 +277,7 @@ static int sama5d4_wdt_resume(struct device *dev)  {
+>  	struct sama5d4_wdt *wdt = dev_get_drvdata(dev);
+> 
+> -	wdt_write(wdt, AT91_WDT_MR, wdt->mr & ~AT91_WDT_WDDIS);
+> -	if (wdt->mr & AT91_WDT_WDDIS)
+> -		wdt_write(wdt, AT91_WDT_MR, wdt->mr);
+> +	sama5d4_wdt_init(wdt);
+> 
+>  	return 0;
+>  }
+> --
+> 2.11.0
+
+Best Regards,
+Wenyou Yang
