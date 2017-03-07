@@ -1,70 +1,20 @@
-From: fcooper@ti.com (Franklin S Cooper Jr)
-Date: Tue, 7 Mar 2017 15:57:51 -0600
-Subject: [PATCH 2/2] ARM: dts: am335x-icev2: Add SPI based NOR
-In-Reply-To: <20170307215751.29266-1-fcooper@ti.com>
-References: <20170307215751.29266-1-fcooper@ti.com>
-Message-ID: <20170307215751.29266-3-fcooper@ti.com>
+From: davem@davemloft.net (David Miller)
+Date: Tue, 07 Mar 2017 14:02:06 -0800 (PST)
+Subject: [PATCH v3 net-next 2/6] drivers: net: xgene-v2: Add mac
+ configuration
+In-Reply-To: <1488589773-28055-3-git-send-email-isubramanian@apm.com>
+References: <1488589773-28055-1-git-send-email-isubramanian@apm.com>
+ <1488589773-28055-3-git-send-email-isubramanian@apm.com>
+Message-ID: <20170307.140206.2169938744916149211.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable support for W25Q64CVSSIG which is a Winbond 64 Mbit SPI NOR.
+From: Iyappan Subramanian <isubramanian@apm.com>
+Date: Fri,  3 Mar 2017 17:09:28 -0800
 
-At boot you will see the following message:
-m25p80 spi1.0: found s25fl064k, expected w25q64
+> +void xge_mac_set_station_addr(struct xge_pdata *pdata)
+> +{
+> +	u32 addr0, addr1;
+> +	u8 *dev_addr = pdata->ndev->dev_addr;
 
-This is because the JEDEC ID for this chip is the same as s25fl064k.
-However, this should be harmless since both chips are essentially the
-same.
-
-Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
-Signed-off-by: Sekhar Nori <nsekhar@ti.com>
----
- arch/arm/boot/dts/am335x-icev2.dts | 33 +++++++++++++++++++++++++++++++++
- 1 file changed, 33 insertions(+)
-
-diff --git a/arch/arm/boot/dts/am335x-icev2.dts b/arch/arm/boot/dts/am335x-icev2.dts
-index a2ad076..1e643dc 100644
---- a/arch/arm/boot/dts/am335x-icev2.dts
-+++ b/arch/arm/boot/dts/am335x-icev2.dts
-@@ -245,6 +245,39 @@
- 		spi-max-frequency = <1000000>;
- 		spi-cpol;
- 	};
-+
-+	spi_nor: flash at 0 {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "winbond,w25q64", "jedec,spi-nor";
-+		spi-max-frequency = <80000000>;
-+		m25p,fast-read;
-+		reg = <0>;
-+
-+		partition at 0 {
-+			label = "u-boot-spl";
-+			reg = <0x0 0x80000>;
-+			read-only;
-+		};
-+
-+		partition at 1 {
-+			label = "u-boot";
-+			reg = <0x80000 0x100000>;
-+			read-only;
-+		};
-+
-+		partition at 2 {
-+			label = "u-boot-env";
-+			reg = <0x180000 0x20000>;
-+			read-only;
-+		};
-+
-+		partition at 3 {
-+			label = "misc";
-+			reg = <0x1A0000 0x660000>;
-+		};
-+	};
-+
- };
- 
- &tscadc {
--- 
-2.10.0
+Please order local variable declarations from longest to shortest line.
