@@ -1,51 +1,57 @@
-From: sunil.kovvuri@gmail.com (Sunil Kovvuri)
-Date: Tue, 7 Mar 2017 18:25:11 +0530
-Subject: IOMMU in bypass mode by default on ARM64,
- instead of command line option
-In-Reply-To: <20170307113237.GB30058@arm.com>
-References: <CA+sq2CdawVNqEjpuzkdmEDbvW69aXufHJAEoH_g55=sr2d1rOw@mail.gmail.com>
- <07f4a3d7-f41b-2459-65c6-729f3a692e7d@arm.com>
- <20170307113237.GB30058@arm.com>
-Message-ID: <CA+sq2CeAKE+fDJhTA_W=bG531b8f7q=NZmgCtEQbXgZsR2RbSA@mail.gmail.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Tue, 7 Mar 2017 20:56:59 +0800
+Subject: [PATCH 00/17] clocksource/arch_timer: Errara workaround
+ infrastructure rework
+In-Reply-To: <20170306112622.13853-1-marc.zyngier@arm.com>
+References: <20170306112622.13853-1-marc.zyngier@arm.com>
+Message-ID: <1b9f55f7-fdb2-289c-13ae-b5911e45b0ed@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 7, 2017 at 5:02 PM, Will Deacon <will.deacon@arm.com> wrote:
-> On Mon, Mar 06, 2017 at 12:34:36PM +0000, Robin Murphy wrote:
->> On 04/03/17 16:59, Sunil Kovvuri wrote:
->> > I did see some patches submitted earlier to enable user to boot kernel
->> > with SMMU in bypass mode using a command line parameter.
->> >
->> > Idea sounds good, but just wondering if it would be better if things are done in
->> > reverse i.e put SMMU in bypass mode by default on host and provide
->> > option to user to enable SMMU via bootargs. Reason i am saying this is
->> > with SMMU
->> > enabled on host, performance of devices drops down to pathetic levels, not
->> > because of HW but mostly because of ARM IOMMU implementation in kernel.
->
-> [...]
->
->> > Performance with SMMU enabled drops to <1/5th on NVMe disk and on NIC
->> > it's down to nothing. Problem seems to be with high contention for
->> > locks which are
->> > being used for IOVA maintenance and while updating translation tables inside
->> > ARM SMMUv2/v3 drivers.
->>
->> Yes, we're well aware that there's a whole load of potential lock
->> contention where there doesn't really need to be. The performance
->> optimisation effort has mostly been waiting for sufficiently big
->> systems/workloads to start appearing in order to measure and justify it.
->> Consider yourself the winner :)
->
-> Yup. Given that you have numbers (thank you!), then we'll bump the priority
-> of this work and try to get something out that you can test.
->
-> I'll also respin my bypass series ASAP.
->
-> Will
+Hi Marc,
 
-Good to know that this is a known problem.
-We will be morethan happy to test your patches.
+On 2017/3/6 19:26, Marc Zyngier wrote:
+> It has recently become obvious that a number of arm64 systems have
+> been blessed with a set of timers that are slightly less than perfect,
+> and require a bit of hand-holding. We already have a bunch of
+> errata-specific code to deal with this, but as we're adding more
+> potential detection methods (DT, ACPI, capability), things are getting
+> a bit out of hands.
+>
+> Instead of adding more ad-hoc fixes to an already difficult code base,
+> let's give ourselves a bit of an infrastructure that can deal with
+> this and hide most of the uggliness behind frendly accessors.
+>
+> The series is structured as such:
+>
+> - The first half of the series rework the existing workarounds,
+>   allowing errata to be matched using a given detection method
+>
+> - Another patch allows a workaround to affect a subset of the CPUs,
+>   and not the whole system
+>
+> - Another set of patches allow the virtual counter to be trapped when
+>   accessed from userspace (something that affects the current set of
+>   broken platform, and that is not worked around yet)
+>
+> - We then work around a Cortex-A73 erratum, whose counter can return a
+>   wrong value if read while crossing a 32bit boundary
+>
+> - Finally, we add some ACPI-specific workarounds for HiSilicon
+>   platforms that have the HISILICON_ERRATUM_161010101 defect.
 
-Thanks,
-Sunil.
+Thanks for doing this, I tested this patch set on D03, and it boots
+OK with log:
+
+[    0.000000] arm_arch_timer: Enabling global workaround for HiSilicon 
+erratum 161010101
+[    0.000000] arm_arch_timer: CPU0: Trapping CNTVCT access
+[    0.000000] arm_arch_timer: Architected cp15 timer(s) running at 
+50.00MHz (phys).
+
+With patches other than Cortex-A73 erratum,
+
+Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
+
+Thanks
+Hanjun
