@@ -1,58 +1,74 @@
-From: linux.amoon@gmail.com (Anand Moon)
-Date: Wed,  8 Mar 2017 02:06:01 +0530
-Subject: [PATCH] ARM64: dts: meson-gxbb-odroidc2: enable USB Host Nodes
-Message-ID: <1488918961-4666-1-git-send-email-linux.amoon@gmail.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Tue, 7 Mar 2017 20:42:00 +0000
+Subject: [PATCH 02/11] arm64: tegra: Add ethernet support for Tegra186
+In-Reply-To: <20170223173053.19701-2-thierry.reding@gmail.com>
+References: <20170223173053.19701-1-thierry.reding@gmail.com>
+ <20170223173053.19701-2-thierry.reding@gmail.com>
+Message-ID: <076c74f2-d0ce-a567-74e9-dcc705c75795@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Anand Moon <linux.amoon@gmail.com>
 
-update the regulator supply nodes for usb host to
-enable usb host on odroid-c2
+On 23/02/17 17:30, Thierry Reding wrote:
+> From: Thierry Reding <treding@nvidia.com>
+> 
+> The NVIDIA Tegra186 SoC contains an instance of the Synopsys DWC
+> ethernet QOS IP block, which supports 10, 100 and 1000 Mbps data
+> transfer rates.
+> 
+> Signed-off-by: Thierry Reding <treding@nvidia.com>
+> ---
+>  arch/arm64/boot/dts/nvidia/tegra186.dtsi | 31 +++++++++++++++++++++++++++++++
+>  1 file changed, 31 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/nvidia/tegra186.dtsi b/arch/arm64/boot/dts/nvidia/tegra186.dtsi
+> index d6955bb46ae0..3ea5e6369bc3 100644
+> --- a/arch/arm64/boot/dts/nvidia/tegra186.dtsi
+> +++ b/arch/arm64/boot/dts/nvidia/tegra186.dtsi
+> @@ -27,6 +27,37 @@
+>  		gpio-controller;
+>  	};
+>  
+> +	ethernet at 2490000 {
+> +		compatible = "nvidia,tegra186-eqos",
+> +			     "snps,dwc-qos-ethernet-4.10";
+> +		reg = <0x0 0x02490000 0x0 0x10000>;
+> +		interrupts = <GIC_SPI 194 IRQ_TYPE_LEVEL_HIGH>, /* common */
+> +			     <GIC_SPI 195 IRQ_TYPE_LEVEL_HIGH>, /* power */
+> +			     <GIC_SPI 190 IRQ_TYPE_LEVEL_HIGH>, /* rx0 */
+> +			     <GIC_SPI 186 IRQ_TYPE_LEVEL_HIGH>, /* tx0 */
+> +			     <GIC_SPI 191 IRQ_TYPE_LEVEL_HIGH>, /* rx1 */
+> +			     <GIC_SPI 187 IRQ_TYPE_LEVEL_HIGH>, /* tx1 */
+> +			     <GIC_SPI 192 IRQ_TYPE_LEVEL_HIGH>, /* rx2 */
+> +			     <GIC_SPI 188 IRQ_TYPE_LEVEL_HIGH>, /* tx2 */
+> +			     <GIC_SPI 193 IRQ_TYPE_LEVEL_HIGH>, /* rx3 */
+> +			     <GIC_SPI 189 IRQ_TYPE_LEVEL_HIGH>; /* tx3 */
+> +		clocks = <&bpmp TEGRA186_CLK_AXI_CBB>,
+> +			 <&bpmp TEGRA186_CLK_EQOS_AXI>,
+> +			 <&bpmp TEGRA186_CLK_EQOS_RX>,
+> +			 <&bpmp TEGRA186_CLK_EQOS_TX>,
+> +			 <&bpmp TEGRA186_CLK_EQOS_PTP_REF>;
+> +		clock-names = "master_bus", "slave_bus", "rx", "tx", "ptp_ref";
+> +		resets = <&bpmp TEGRA186_RESET_EQOS>;
+> +		reset-names = "eqos";
+> +		status = "disabled";
+> +
+> +		snps,write-requests = <1>;
+> +		snps,read-requests = <3>;
+> +		snps,burst-map = <0x7>;
+> +		snps,txpbl = <32>;
+> +		snps,rxpbl = <8>;
+> +	};
+> +
+>  	uarta: serial at 3100000 {
+>  		compatible = "nvidia,tegra186-uart", "nvidia,tegra20-uart";
+>  		reg = <0x0 0x03100000 0x0 0x40>;
+> 
 
-Signed-off-by: Anand Moon <linux.amoon@gmail.com>
----
-root at odroid64:/usr/src/odroidxu3-4.y-devel# lsusb -t
-/:  Bus 01.Port 1: Dev 1, Class=root_hub, Driver=dwc2/1p, 480M
-    |__ Port 1: Dev 2, If 0, Class=Hub, Driver=hub/4p, 480M
-        |__ Port 1: Dev 3, If 0, Class=Human Interface Device, Driver=usbhid, 1.5M
-        |__ Port 1: Dev 3, If 1, Class=Human Interface Device, Driver=usbhid, 1.5M
-        |__ Port 2: Dev 4, If 0, Class=Mass Storage, Driver=usb-storage, 480M
-        |__ Port 4: Dev 5, If 0, Class=Mass Storage, Driver=usb-storage, 480M
----
- arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+Acked-by: Jon Hunter <jonathanh@nvidia.com>
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
-index c59403a..304b676 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
-@@ -64,6 +64,18 @@
- 		reg = <0x0 0x0 0x0 0x80000000>;
- 	};
- 
-+	usb_host_pwr: regulator-usb-pwrs {
-+		compatible = "regulator-fixed";
-+
-+		regulator-name = "USB_HOST_PWR";
-+
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+
-+		gpio = <&gpio_ao GPIOAO_4 GPIO_ACTIVE_HIGH>;
-+		enable-active-high;
-+	};
-+
- 	usb_otg_pwr: regulator-usb-pwrs {
- 		compatible = "regulator-fixed";
- 
-@@ -184,6 +196,7 @@
- 
- &usb1_phy {
- 	status = "okay";
-+	phy-supply = <&usb_host_pwr>;
- };
- 
- &usb0 {
+Cheers
+Jon
+
 -- 
-2.7.4
+nvpublic
