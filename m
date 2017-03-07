@@ -1,112 +1,151 @@
-From: shiju.jose@huawei.com (Shiju Jose)
-Date: Tue, 7 Mar 2017 16:07:27 +0000
-Subject: {RFC PATCH v1 v4.11-rc1 1/1} acpi: apei: common handler in ghes for
- HW errors notified via hed(PNP0C33) driver
-Message-ID: <86258A5CC0A3704780874CF6004BA8A62DCAF445@lhreml502-mbs>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 7 Mar 2017 16:16:07 +0000
+Subject: [PATCH] PCI: Add pci reset quirk for Cavium VNIC
+In-Reply-To: <1488899088-10194-1-git-send-email-rad@semihalf.com>
+References: <1488899088-10194-1-git-send-email-rad@semihalf.com>
+Message-ID: <0bfc40dd-89a2-9b4b-4983-8ecb32734d1d@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add common handler in ghes for HW errors notified via hed(PNP0C33) driver.
-1. Rename ghes_notify_sci() to ghes_notify_hed().
-2. Rename struct notifier_block ghes_notifier_sci to
-   struct notifier_block ghes_notifier_hed.
-3. Rename ghes_sci list to ghes_hed.
-4. Make ghes_notify_hed as common handler for
-   notification types SCI, GSIV and GPIO.
+On 07/03/17 15:04, Radoslaw Biernacki wrote:
+> From: Radoslaw Biernacki <rbiernacki@caviumnetworks.com>
+> 
+> PCI reset quirk is needed for Cavium Function NIC since it does not
+> handle a function level reset.
+> This cause problems when VNIC is used from userspace by vfio.
+> If application (or VM) does not stop the VNIC queues, HW may cause
+> overwrite of memory locations when next application that use it will
+> establish new SMMU mappings. More likely HW it will cause SMMU exception,
+> when network packet will came before new SMMU mappings will be made.
+> 
+> Signed-off-by: Radoslaw Biernacki <rbiernacki@caviumnetworks.com>
+> Reviewed-by: Sunil Goutham <Sunil.Goutham@cavium.com>
+> ---
+>  drivers/pci/quirks.c | 90 ++++++++++++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 90 insertions(+)
+> 
+> diff --git a/drivers/pci/quirks.c b/drivers/pci/quirks.c
+> index f754453..f7cdbe5 100644
+> --- a/drivers/pci/quirks.c
+> +++ b/drivers/pci/quirks.c
+> @@ -3783,10 +3783,98 @@ static int reset_chelsio_generic_dev(struct pci_dev *dev, int probe)
+>  	return 0;
+>  }
+>  
+> +#define CAVIUM_VNIC_QSET_RQ_0_7_CFG		(0x010600)
+> +#define CAVIUM_VNIC_QSET_CQ_0_7_CFG		(0x010400)
+> +#define CAVIUM_VNIC_QSET_CQ_0_7_CFG2		(0x010408)
+> +#define CAVIUM_VNIC_QSET_SQ_0_7_CFG		(0x010800)
+> +#define CAVIUM_VNIC_QSET_SQ_0_7_STATUS		(0x010840)
+> +#define CAVIUM_VNIC_QSET_RBDR_0_1_CFG		(0x010C00)
+> +#define CAVIUM_VNIC_QSET_RBDR_0_1_STATUS0	(0x010C40)
+> +
+> +#define CAVIUM_VNIC_Q_SHIFT		(18)
+> +#define CAVIUM_VNIC_CQ_RESET		(1ULL << 41)
+> +#define CAVIUM_VNIC_SQ_RESET		(1ULL << 17)
+> +#define CAVIUM_VNIC_RBDR_RESET		(1ULL << 43)
+> +#define CAVIUM_VNIC_RBDR_FIFO_STATE_SHIFT (62)
+> +
+> +/* Poll a register for a specific value */
+> +static int cavium_vnic_poll(struct pci_dev *pdev,
+> +			    void __iomem *addr, size_t bit_pos,
+> +			    size_t bits, u64 val)
+> +{
+> +	u64 bit_mask;
+> +	u64 reg_val;
+> +	size_t timeout = 10;
+> +
+> +	bit_mask = (1ULL << bits) - 1;
+> +	bit_mask = (bit_mask << bit_pos);
 
-Signed-off-by: Shiju Jose <shiju.jose@huawei.com>
----
- drivers/acpi/apei/ghes.c | 28 +++++++++++++++++-----------
- 1 file changed, 17 insertions(+), 11 deletions(-)
+GENMASK_ULL(bit_pos, bit_pos + bits - 1)? Admittedly it's not an awful
+lot tidier :/
 
-diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
-index b192b42..fd39929 100644
---- a/drivers/acpi/apei/ghes.c
-+++ b/drivers/acpi/apei/ghes.c
-@@ -89,14 +89,14 @@
- module_param_named(disable, ghes_disable, bool, 0);
- 
- /*
-- * All error sources notified with SCI shares one notifier function,
-+ * All error sources notified with HED shares one notifier function,
-  * so they need to be linked and checked one by one.  This is applied
-  * to NMI too.
-  *
-  * RCU is used for these lists, so ghes_list_mutex is only used for
-  * list changing, not for traversing.
-  */
--static LIST_HEAD(ghes_sci);
-+static LIST_HEAD(ghes_hed);
- static DEFINE_MUTEX(ghes_list_mutex);
- 
- /*
-@@ -702,14 +702,14 @@ static irqreturn_t ghes_irq_func(int irq, void *data)
- 	return IRQ_HANDLED;
- }
- 
--static int ghes_notify_sci(struct notifier_block *this,
-+static int ghes_notify_hed(struct notifier_block *this,
- 				  unsigned long event, void *data)
- {
- 	struct ghes *ghes;
- 	int ret = NOTIFY_DONE;
- 
- 	rcu_read_lock();
--	list_for_each_entry_rcu(ghes, &ghes_sci, list) {
-+	list_for_each_entry_rcu(ghes, &ghes_hed, list) {
- 		if (!ghes_proc(ghes))
- 			ret = NOTIFY_OK;
- 	}
-@@ -718,8 +718,8 @@ static int ghes_notify_sci(struct notifier_block *this,
- 	return ret;
- }
- 
--static struct notifier_block ghes_notifier_sci = {
--	.notifier_call = ghes_notify_sci,
-+static struct notifier_block ghes_notifier_hed = {
-+	.notifier_call = ghes_notify_hed,
- };
- 
- #ifdef CONFIG_HAVE_ACPI_APEI_NMI
-@@ -966,6 +966,8 @@ static int ghes_probe(struct platform_device *ghes_dev)
- 	case ACPI_HEST_NOTIFY_POLLED:
- 	case ACPI_HEST_NOTIFY_EXTERNAL:
- 	case ACPI_HEST_NOTIFY_SCI:
-+	case ACPI_HEST_NOTIFY_GSIV:
-+	case ACPI_HEST_NOTIFY_GPIO:
- 		break;
- 	case ACPI_HEST_NOTIFY_NMI:
- 		if (!IS_ENABLED(CONFIG_HAVE_ACPI_APEI_NMI)) {
-@@ -1026,10 +1028,12 @@ static int ghes_probe(struct platform_device *ghes_dev)
- 		}
- 		break;
- 	case ACPI_HEST_NOTIFY_SCI:
-+	case ACPI_HEST_NOTIFY_GSIV:
-+	case ACPI_HEST_NOTIFY_GPIO:
- 		mutex_lock(&ghes_list_mutex);
--		if (list_empty(&ghes_sci))
--			register_acpi_hed_notifier(&ghes_notifier_sci);
--		list_add_rcu(&ghes->list, &ghes_sci);
-+		if (list_empty(&ghes_hed))
-+			register_acpi_hed_notifier(&ghes_notifier_hed);
-+		list_add_rcu(&ghes->list, &ghes_hed);
- 		mutex_unlock(&ghes_list_mutex);
- 		break;
- 	case ACPI_HEST_NOTIFY_NMI:
-@@ -1068,10 +1072,12 @@ static int ghes_remove(struct platform_device *ghes_dev)
- 		free_irq(ghes->irq, ghes);
- 		break;
- 	case ACPI_HEST_NOTIFY_SCI:
-+	case ACPI_HEST_NOTIFY_GSIV:
-+	case ACPI_HEST_NOTIFY_GPIO:
- 		mutex_lock(&ghes_list_mutex);
- 		list_del_rcu(&ghes->list);
--		if (list_empty(&ghes_sci))
--			unregister_acpi_hed_notifier(&ghes_notifier_sci);
-+		if (list_empty(&ghes_hed))
-+			unregister_acpi_hed_notifier(&ghes_notifier_hed);
- 		mutex_unlock(&ghes_list_mutex);
- 		break;
- 	case ACPI_HEST_NOTIFY_NMI:
--- 
-1.9.1
+> +
+> +	while (timeout) {
+> +		reg_val = readq(addr);
+> +		if (((reg_val & bit_mask) >> bit_pos) == val)
+> +			return 0;
+> +		usleep_range(1000, 2000);
+> +		timeout--;
+> +	}
+
+This is essentially an open-coded version of readq_poll_timeout() from
+<linux/iopoll.h>, which could be used instead. Doing "val <<= bitpos"
+first might help simplify the condition, although since it's only called
+with val == 0 it seems that "(reg_val & bit_mask)" would suffice.
+
+Robin.
+
+> +	dev_err(&pdev->dev, "Poll on addr %p failed\n", addr);
+> +	return -1;
+> +}
+> +
+> +static int cavium_vnic_reset(struct pci_dev *pdev, int probe)
+> +{
+> +	size_t qidx;
+> +	void __iomem *bar_base;
+> +	void __iomem *qset_base;
+> +
+> +	bar_base = pci_iomap(pdev, 0, 0);
+> +	if (!bar_base)
+> +		return -ENOMEM;
+> +
+> +	/* For each of 8 RQ/CQ/SQ (queues) in VF */
+> +	for (qidx = 0; qidx < 8; qidx++) {
+> +		/* Disable receive queue */
+> +		qset_base = bar_base + (qidx << CAVIUM_VNIC_Q_SHIFT);
+> +		writeq(0, qset_base + CAVIUM_VNIC_QSET_RQ_0_7_CFG);
+> +
+> +		/* Disable timer threshold (doesn't get reset upon CQ reset */
+> +		writeq(0, qset_base + CAVIUM_VNIC_QSET_CQ_0_7_CFG2);
+> +		/* Disable completion queue */
+> +		writeq(0, qset_base + CAVIUM_VNIC_QSET_CQ_0_7_CFG);
+> +		/* Reset completion queue */
+> +		writeq(CAVIUM_VNIC_CQ_RESET,
+> +			  qset_base + CAVIUM_VNIC_QSET_CQ_0_7_CFG);
+> +
+> +		/* Disable send queue */
+> +		writeq(0, qset_base + CAVIUM_VNIC_QSET_SQ_0_7_CFG);
+> +		/* Reset send queue */
+> +		writeq(CAVIUM_VNIC_SQ_RESET,
+> +		       qset_base + CAVIUM_VNIC_QSET_SQ_0_7_CFG);
+> +	}
+> +
+> +	/* Reset and disable both RBDR's */
+> +	for (qidx = 0; qidx < 2; qidx++) {
+> +		qset_base = bar_base +
+> +			(qidx << CAVIUM_VNIC_Q_SHIFT);
+> +		writeq(CAVIUM_VNIC_RBDR_RESET,
+> +		       qset_base + CAVIUM_VNIC_QSET_RBDR_0_1_CFG);
+> +		writeq(0, qset_base + CAVIUM_VNIC_QSET_RBDR_0_1_CFG);
+> +		if (cavium_vnic_poll(pdev, qset_base +
+> +				     CAVIUM_VNIC_QSET_RBDR_0_1_STATUS0,
+> +				     CAVIUM_VNIC_RBDR_FIFO_STATE_SHIFT,
+> +				     2, 0x00))
+> +			dev_err(&pdev->dev, "Timeout on RBDR reset sequence");
+> +	}
+> +
+> +	pci_iounmap(pdev, bar_base);
+> +	return 0;
+> +}
+> +
+>  #define PCI_DEVICE_ID_INTEL_82599_SFP_VF   0x10ed
+>  #define PCI_DEVICE_ID_INTEL_IVB_M_VGA      0x0156
+>  #define PCI_DEVICE_ID_INTEL_IVB_M2_VGA     0x0166
+>  
+> +#define PCI_DEVICE_ID_CAVIUM_NIC_VF        0xA034
+> +
+>  static const struct pci_dev_reset_methods pci_dev_reset_methods[] = {
+>  	{ PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82599_SFP_VF,
+>  		 reset_intel_82599_sfp_virtfn },
+> @@ -3796,6 +3884,8 @@ static int reset_chelsio_generic_dev(struct pci_dev *dev, int probe)
+>  		reset_ivb_igd },
+>  	{ PCI_VENDOR_ID_CHELSIO, PCI_ANY_ID,
+>  		reset_chelsio_generic_dev },
+> +	{ PCI_VENDOR_ID_CAVIUM, PCI_DEVICE_ID_CAVIUM_NIC_VF,
+> +		cavium_vnic_reset },
+>  	{ 0 }
+>  };
+>  
+> 
