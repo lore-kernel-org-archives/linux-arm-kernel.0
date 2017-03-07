@@ -1,91 +1,162 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue,  7 Mar 2017 16:53:10 +0100
-Subject: [PATCHv3 net-next 12/22] net: mvpp2: adapt the mvpp2_rxq_*_pool_set
- functions to PPv2.2
+Date: Tue,  7 Mar 2017 16:53:07 +0100
+Subject: [PATCHv3 net-next 09/22] net: mvpp2: introduce an intermediate union
+ for the TX/RX descriptors
 In-Reply-To: <1488902000-2658-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1488902000-2658-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1488902000-2658-13-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1488902000-2658-10-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The MVPP2_RXQ_CONFIG_REG register has a slightly different layout
-between PPv2.1 and PPv2.2, so this commit adapts the functions modifying
-this register to accommodate for both the PPv2.1 and PPv2.2 cases.
+Since the format of the HW descriptors is different between PPv2.1 and
+PPv2.2, this commit introduces an intermediate union, with for now
+only the PPv2.1 descriptors. The bulk of the driver code only
+manipulates opaque mvpp2_tx_desc and mvpp2_rx_desc pointers, and the
+descriptors can only be accessed and modified through the accessor
+functions. A follow-up commit will add the descriptor definitions for
+PPv2.2.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- drivers/net/ethernet/marvell/mvpp2.c | 32 ++++++++++++++++++++------------
- 1 file changed, 20 insertions(+), 12 deletions(-)
+ drivers/net/ethernet/marvell/mvpp2.c | 45 +++++++++++++++++++++++++-----------
+ 1 file changed, 31 insertions(+), 14 deletions(-)
 
 diff --git a/drivers/net/ethernet/marvell/mvpp2.c b/drivers/net/ethernet/marvell/mvpp2.c
-index 36aef5c..91dca01 100644
+index 27d8838..e9710e8 100644
 --- a/drivers/net/ethernet/marvell/mvpp2.c
 +++ b/drivers/net/ethernet/marvell/mvpp2.c
-@@ -50,9 +50,11 @@
- #define     MVPP2_SNOOP_PKT_SIZE_MASK		0x1ff
- #define     MVPP2_SNOOP_BUF_HDR_MASK		BIT(9)
- #define     MVPP2_RXQ_POOL_SHORT_OFFS		20
--#define     MVPP2_RXQ_POOL_SHORT_MASK		0x700000
-+#define     MVPP21_RXQ_POOL_SHORT_MASK		0x700000
-+#define     MVPP22_RXQ_POOL_SHORT_MASK		0xf00000
- #define     MVPP2_RXQ_POOL_LONG_OFFS		24
--#define     MVPP2_RXQ_POOL_LONG_MASK		0x7000000
-+#define     MVPP21_RXQ_POOL_LONG_MASK		0x7000000
-+#define     MVPP22_RXQ_POOL_LONG_MASK		0xf000000
- #define     MVPP2_RXQ_PACKET_OFFSET_OFFS	28
- #define     MVPP2_RXQ_PACKET_OFFSET_MASK	0x70000000
- #define     MVPP2_RXQ_DISABLE_MASK		BIT(31)
-@@ -3718,17 +3720,20 @@ static int mvpp2_bm_init(struct platform_device *pdev, struct mvpp2 *priv)
- static void mvpp2_rxq_long_pool_set(struct mvpp2_port *port,
- 				    int lrxq, int long_pool)
+@@ -739,7 +739,8 @@ struct mvpp2_port {
+ #define MVPP2_RXD_L3_IP6		BIT(30)
+ #define MVPP2_RXD_BUF_HDR		BIT(31)
+ 
+-struct mvpp2_tx_desc {
++/* HW TX descriptor for PPv2.1 */
++struct mvpp21_tx_desc {
+ 	u32 command;		/* Options used by HW for packet transmitting.*/
+ 	u8  packet_offset;	/* the offset from the buffer beginning	*/
+ 	u8  phys_txq;		/* destination queue ID			*/
+@@ -750,7 +751,8 @@ struct mvpp2_tx_desc {
+ 	u32 reserved2;		/* reserved (for future use)		*/
+ };
+ 
+-struct mvpp2_rx_desc {
++/* HW RX descriptor for PPv2.1 */
++struct mvpp21_rx_desc {
+ 	u32 status;		/* info about received packet		*/
+ 	u16 reserved1;		/* parser_info (for future use, PnC)	*/
+ 	u16 data_size;		/* size of received packet in bytes	*/
+@@ -765,6 +767,21 @@ struct mvpp2_rx_desc {
+ 	u32 reserved8;
+ };
+ 
++/* Opaque type used by the driver to manipulate the HW TX and RX
++ * descriptors
++ */
++struct mvpp2_tx_desc {
++	union {
++		struct mvpp21_tx_desc pp21;
++	};
++};
++
++struct mvpp2_rx_desc {
++	union {
++		struct mvpp21_rx_desc pp21;
++	};
++};
++
+ struct mvpp2_txq_pcpu_buf {
+ 	/* Transmitted SKB */
+ 	struct sk_buff *skb;
+@@ -952,78 +969,78 @@ static u32 mvpp2_read(struct mvpp2 *priv, u32 offset)
+ static dma_addr_t mvpp2_txdesc_dma_addr_get(struct mvpp2_port *port,
+ 					    struct mvpp2_tx_desc *tx_desc)
  {
--	u32 val;
-+	u32 val, mask;
- 	int prxq;
- 
- 	/* Get queue physical ID */
- 	prxq = port->rxqs[lrxq]->id;
- 
--	val = mvpp2_read(port->priv, MVPP2_RXQ_CONFIG_REG(prxq));
--	val &= ~MVPP2_RXQ_POOL_LONG_MASK;
--	val |= ((long_pool << MVPP2_RXQ_POOL_LONG_OFFS) &
--		    MVPP2_RXQ_POOL_LONG_MASK);
-+	if (port->priv->hw_version == MVPP21)
-+		mask = MVPP21_RXQ_POOL_LONG_MASK;
-+	else
-+		mask = MVPP22_RXQ_POOL_LONG_MASK;
- 
-+	val = mvpp2_read(port->priv, MVPP2_RXQ_CONFIG_REG(prxq));
-+	val &= ~mask;
-+	val |= (long_pool << MVPP2_RXQ_POOL_LONG_OFFS) & mask;
- 	mvpp2_write(port->priv, MVPP2_RXQ_CONFIG_REG(prxq), val);
+-	return tx_desc->buf_dma_addr;
++	return tx_desc->pp21.buf_dma_addr;
  }
  
-@@ -3736,17 +3741,20 @@ static void mvpp2_rxq_long_pool_set(struct mvpp2_port *port,
- static void mvpp2_rxq_short_pool_set(struct mvpp2_port *port,
- 				     int lrxq, int short_pool)
+ static void mvpp2_txdesc_dma_addr_set(struct mvpp2_port *port,
+ 				      struct mvpp2_tx_desc *tx_desc,
+ 				      dma_addr_t dma_addr)
  {
--	u32 val;
-+	u32 val, mask;
- 	int prxq;
- 
- 	/* Get queue physical ID */
- 	prxq = port->rxqs[lrxq]->id;
- 
--	val = mvpp2_read(port->priv, MVPP2_RXQ_CONFIG_REG(prxq));
--	val &= ~MVPP2_RXQ_POOL_SHORT_MASK;
--	val |= ((short_pool << MVPP2_RXQ_POOL_SHORT_OFFS) &
--		    MVPP2_RXQ_POOL_SHORT_MASK);
-+	if (port->priv->hw_version == MVPP21)
-+		mask = MVPP21_RXQ_POOL_SHORT_MASK;
-+	else
-+		mask = MVPP22_RXQ_POOL_SHORT_MASK;
- 
-+	val = mvpp2_read(port->priv, MVPP2_RXQ_CONFIG_REG(prxq));
-+	val &= ~mask;
-+	val |= (short_pool << MVPP2_RXQ_POOL_SHORT_OFFS) & mask;
- 	mvpp2_write(port->priv, MVPP2_RXQ_CONFIG_REG(prxq), val);
+-	tx_desc->buf_dma_addr = dma_addr;
++	tx_desc->pp21.buf_dma_addr = dma_addr;
  }
  
+ static size_t mvpp2_txdesc_size_get(struct mvpp2_port *port,
+ 				    struct mvpp2_tx_desc *tx_desc)
+ {
+-	return tx_desc->data_size;
++	return tx_desc->pp21.data_size;
+ }
+ 
+ static void mvpp2_txdesc_size_set(struct mvpp2_port *port,
+ 				  struct mvpp2_tx_desc *tx_desc,
+ 				  size_t size)
+ {
+-	tx_desc->data_size = size;
++	tx_desc->pp21.data_size = size;
+ }
+ 
+ static void mvpp2_txdesc_txq_set(struct mvpp2_port *port,
+ 				 struct mvpp2_tx_desc *tx_desc,
+ 				 unsigned int txq)
+ {
+-	tx_desc->phys_txq = txq;
++	tx_desc->pp21.phys_txq = txq;
+ }
+ 
+ static void mvpp2_txdesc_cmd_set(struct mvpp2_port *port,
+ 				 struct mvpp2_tx_desc *tx_desc,
+ 				 unsigned int command)
+ {
+-	tx_desc->command = command;
++	tx_desc->pp21.command = command;
+ }
+ 
+ static void mvpp2_txdesc_offset_set(struct mvpp2_port *port,
+ 				    struct mvpp2_tx_desc *tx_desc,
+ 				    unsigned int offset)
+ {
+-	tx_desc->packet_offset = offset;
++	tx_desc->pp21.packet_offset = offset;
+ }
+ 
+ static unsigned int mvpp2_txdesc_offset_get(struct mvpp2_port *port,
+ 					    struct mvpp2_tx_desc *tx_desc)
+ {
+-	return tx_desc->packet_offset;
++	return tx_desc->pp21.packet_offset;
+ }
+ 
+ static dma_addr_t mvpp2_rxdesc_dma_addr_get(struct mvpp2_port *port,
+ 					    struct mvpp2_rx_desc *rx_desc)
+ {
+-	return rx_desc->buf_dma_addr;
++	return rx_desc->pp21.buf_dma_addr;
+ }
+ 
+ static unsigned long mvpp2_rxdesc_cookie_get(struct mvpp2_port *port,
+ 					     struct mvpp2_rx_desc *rx_desc)
+ {
+-	return rx_desc->buf_cookie;
++	return rx_desc->pp21.buf_cookie;
+ }
+ 
+ static size_t mvpp2_rxdesc_size_get(struct mvpp2_port *port,
+ 				    struct mvpp2_rx_desc *rx_desc)
+ {
+-	return rx_desc->data_size;
++	return rx_desc->pp21.data_size;
+ }
+ 
+ static u32 mvpp2_rxdesc_status_get(struct mvpp2_port *port,
+ 				   struct mvpp2_rx_desc *rx_desc)
+ {
+-	return rx_desc->status;
++	return rx_desc->pp21.status;
+ }
+ 
+ static void mvpp2_txq_inc_get(struct mvpp2_txq_pcpu *txq_pcpu)
 -- 
 2.7.4
