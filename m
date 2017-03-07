@@ -1,151 +1,54 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 7 Mar 2017 16:16:07 +0000
-Subject: [PATCH] PCI: Add pci reset quirk for Cavium VNIC
-In-Reply-To: <1488899088-10194-1-git-send-email-rad@semihalf.com>
-References: <1488899088-10194-1-git-send-email-rad@semihalf.com>
-Message-ID: <0bfc40dd-89a2-9b4b-4983-8ecb32734d1d@arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 07 Mar 2017 17:27:36 +0100
+Subject: [PATCH] ARM: dts: armada-38x: Adjust mbus controller description
+ on Armada 38x
+In-Reply-To: <20170216163826.28071-1-gregory.clement@free-electrons.com>
+ (Gregory CLEMENT's message of "Thu, 16 Feb 2017 17:38:26 +0100")
+References: <20170216163826.28071-1-gregory.clement@free-electrons.com>
+Message-ID: <87k281oxvr.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/03/17 15:04, Radoslaw Biernacki wrote:
-> From: Radoslaw Biernacki <rbiernacki@caviumnetworks.com>
-> 
-> PCI reset quirk is needed for Cavium Function NIC since it does not
-> handle a function level reset.
-> This cause problems when VNIC is used from userspace by vfio.
-> If application (or VM) does not stop the VNIC queues, HW may cause
-> overwrite of memory locations when next application that use it will
-> establish new SMMU mappings. More likely HW it will cause SMMU exception,
-> when network packet will came before new SMMU mappings will be made.
-> 
-> Signed-off-by: Radoslaw Biernacki <rbiernacki@caviumnetworks.com>
-> Reviewed-by: Sunil Goutham <Sunil.Goutham@cavium.com>
+Hi,
+ 
+ On jeu., f?vr. 16 2017, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
+
+> The mbus binding had been extended more than two years ago, but the
+> device tree files for Armada 38x didn't change.
+>
+> Adding this third entry will allow the mbus going to suspend which was
+> the last thing preventing the SoC going to standby mode
+>
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+
+Now applied on mvebu/dt
+
+Gregory
+
 > ---
->  drivers/pci/quirks.c | 90 ++++++++++++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 90 insertions(+)
-> 
-> diff --git a/drivers/pci/quirks.c b/drivers/pci/quirks.c
-> index f754453..f7cdbe5 100644
-> --- a/drivers/pci/quirks.c
-> +++ b/drivers/pci/quirks.c
-> @@ -3783,10 +3783,98 @@ static int reset_chelsio_generic_dev(struct pci_dev *dev, int probe)
->  	return 0;
->  }
+>  arch/arm/boot/dts/armada-38x.dtsi | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
+> index c558a5d6a21f..ba27ec104981 100644
+> --- a/arch/arm/boot/dts/armada-38x.dtsi
+> +++ b/arch/arm/boot/dts/armada-38x.dtsi
+> @@ -360,7 +360,8 @@
 >  
-> +#define CAVIUM_VNIC_QSET_RQ_0_7_CFG		(0x010600)
-> +#define CAVIUM_VNIC_QSET_CQ_0_7_CFG		(0x010400)
-> +#define CAVIUM_VNIC_QSET_CQ_0_7_CFG2		(0x010408)
-> +#define CAVIUM_VNIC_QSET_SQ_0_7_CFG		(0x010800)
-> +#define CAVIUM_VNIC_QSET_SQ_0_7_STATUS		(0x010840)
-> +#define CAVIUM_VNIC_QSET_RBDR_0_1_CFG		(0x010C00)
-> +#define CAVIUM_VNIC_QSET_RBDR_0_1_STATUS0	(0x010C40)
-> +
-> +#define CAVIUM_VNIC_Q_SHIFT		(18)
-> +#define CAVIUM_VNIC_CQ_RESET		(1ULL << 41)
-> +#define CAVIUM_VNIC_SQ_RESET		(1ULL << 17)
-> +#define CAVIUM_VNIC_RBDR_RESET		(1ULL << 43)
-> +#define CAVIUM_VNIC_RBDR_FIFO_STATE_SHIFT (62)
-> +
-> +/* Poll a register for a specific value */
-> +static int cavium_vnic_poll(struct pci_dev *pdev,
-> +			    void __iomem *addr, size_t bit_pos,
-> +			    size_t bits, u64 val)
-> +{
-> +	u64 bit_mask;
-> +	u64 reg_val;
-> +	size_t timeout = 10;
-> +
-> +	bit_mask = (1ULL << bits) - 1;
-> +	bit_mask = (bit_mask << bit_pos);
-
-GENMASK_ULL(bit_pos, bit_pos + bits - 1)? Admittedly it's not an awful
-lot tidier :/
-
-> +
-> +	while (timeout) {
-> +		reg_val = readq(addr);
-> +		if (((reg_val & bit_mask) >> bit_pos) == val)
-> +			return 0;
-> +		usleep_range(1000, 2000);
-> +		timeout--;
-> +	}
-
-This is essentially an open-coded version of readq_poll_timeout() from
-<linux/iopoll.h>, which could be used instead. Doing "val <<= bitpos"
-first might help simplify the condition, although since it's only called
-with val == 0 it seems that "(reg_val & bit_mask)" would suffice.
-
-Robin.
-
-> +	dev_err(&pdev->dev, "Poll on addr %p failed\n", addr);
-> +	return -1;
-> +}
-> +
-> +static int cavium_vnic_reset(struct pci_dev *pdev, int probe)
-> +{
-> +	size_t qidx;
-> +	void __iomem *bar_base;
-> +	void __iomem *qset_base;
-> +
-> +	bar_base = pci_iomap(pdev, 0, 0);
-> +	if (!bar_base)
-> +		return -ENOMEM;
-> +
-> +	/* For each of 8 RQ/CQ/SQ (queues) in VF */
-> +	for (qidx = 0; qidx < 8; qidx++) {
-> +		/* Disable receive queue */
-> +		qset_base = bar_base + (qidx << CAVIUM_VNIC_Q_SHIFT);
-> +		writeq(0, qset_base + CAVIUM_VNIC_QSET_RQ_0_7_CFG);
-> +
-> +		/* Disable timer threshold (doesn't get reset upon CQ reset */
-> +		writeq(0, qset_base + CAVIUM_VNIC_QSET_CQ_0_7_CFG2);
-> +		/* Disable completion queue */
-> +		writeq(0, qset_base + CAVIUM_VNIC_QSET_CQ_0_7_CFG);
-> +		/* Reset completion queue */
-> +		writeq(CAVIUM_VNIC_CQ_RESET,
-> +			  qset_base + CAVIUM_VNIC_QSET_CQ_0_7_CFG);
-> +
-> +		/* Disable send queue */
-> +		writeq(0, qset_base + CAVIUM_VNIC_QSET_SQ_0_7_CFG);
-> +		/* Reset send queue */
-> +		writeq(CAVIUM_VNIC_SQ_RESET,
-> +		       qset_base + CAVIUM_VNIC_QSET_SQ_0_7_CFG);
-> +	}
-> +
-> +	/* Reset and disable both RBDR's */
-> +	for (qidx = 0; qidx < 2; qidx++) {
-> +		qset_base = bar_base +
-> +			(qidx << CAVIUM_VNIC_Q_SHIFT);
-> +		writeq(CAVIUM_VNIC_RBDR_RESET,
-> +		       qset_base + CAVIUM_VNIC_QSET_RBDR_0_1_CFG);
-> +		writeq(0, qset_base + CAVIUM_VNIC_QSET_RBDR_0_1_CFG);
-> +		if (cavium_vnic_poll(pdev, qset_base +
-> +				     CAVIUM_VNIC_QSET_RBDR_0_1_STATUS0,
-> +				     CAVIUM_VNIC_RBDR_FIFO_STATE_SHIFT,
-> +				     2, 0x00))
-> +			dev_err(&pdev->dev, "Timeout on RBDR reset sequence");
-> +	}
-> +
-> +	pci_iounmap(pdev, bar_base);
-> +	return 0;
-> +}
-> +
->  #define PCI_DEVICE_ID_INTEL_82599_SFP_VF   0x10ed
->  #define PCI_DEVICE_ID_INTEL_IVB_M_VGA      0x0156
->  #define PCI_DEVICE_ID_INTEL_IVB_M2_VGA     0x0166
+>  			mbusc: mbus-controller at 20000 {
+>  				compatible = "marvell,mbus-controller";
+> -				reg = <0x20000 0x100>, <0x20180 0x20>;
+> +				reg = <0x20000 0x100>, <0x20180 0x20>,
+> +				      <0x20250 0x8>;
+>  			};
 >  
-> +#define PCI_DEVICE_ID_CAVIUM_NIC_VF        0xA034
-> +
->  static const struct pci_dev_reset_methods pci_dev_reset_methods[] = {
->  	{ PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82599_SFP_VF,
->  		 reset_intel_82599_sfp_virtfn },
-> @@ -3796,6 +3884,8 @@ static int reset_chelsio_generic_dev(struct pci_dev *dev, int probe)
->  		reset_ivb_igd },
->  	{ PCI_VENDOR_ID_CHELSIO, PCI_ANY_ID,
->  		reset_chelsio_generic_dev },
-> +	{ PCI_VENDOR_ID_CAVIUM, PCI_DEVICE_ID_CAVIUM_NIC_VF,
-> +		cavium_vnic_reset },
->  	{ 0 }
->  };
->  
-> 
+>  			mpic: interrupt-controller at 20a00 {
+> -- 
+> 2.11.0
+>
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
