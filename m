@@ -1,39 +1,41 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue,  7 Mar 2017 09:56:31 +0100
-Subject: [PATCH 12/15] drm/sun4i: tcon: multiply the vtotal when not in
- interlace
+Date: Tue,  7 Mar 2017 09:56:29 +0100
+Subject: [PATCH 10/15] drm/sun4i: tcon: Switch mux on only for composite
 In-Reply-To: <cover.bc06ffa88f847ddd9ddd7c259415d5f61b55307b.1488876832.git-series.maxime.ripard@free-electrons.com>
 References: <cover.bc06ffa88f847ddd9ddd7c259415d5f61b55307b.1488876832.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <0b3b516527c42e745ed8a35736948a383411bd50.1488876832.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <3f70bcfe2ec03188c06d54a262d49ad91963a510.1488876832.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It appears that the total vertical resolution needs to be doubled when
-we're not in interlaced. Make sure that is the case.
+Even though that mux is undocumented, it seems like it needs to be set to 1
+when using composite, and 0 when using HDMI.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/gpu/drm/sun4i/sun4i_tcon.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+ drivers/gpu/drm/sun4i/sun4i_tcon.c | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-index e44217fb4f6f..515fa56c1e6a 100644
+index d2335f109601..93249c5ab1e4 100644
 --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
 +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-@@ -248,10 +248,13 @@ void sun4i_tcon1_mode_set(struct sun4i_tcon *tcon, struct drm_encoder *encoder,
- 		     SUN4I_TCON1_BASIC3_H_BACKPORCH(bp));
+@@ -268,11 +268,16 @@ void sun4i_tcon1_mode_set(struct sun4i_tcon *tcon, struct drm_encoder *encoder,
+ 			   SUN4I_TCON_GCTL_IOMAP_MASK,
+ 			   SUN4I_TCON_GCTL_IOMAP_TCON1);
  
- 	bp = mode->crtc_vtotal - mode->crtc_vsync_start;
-+	val = mode->crtc_vtotal;
-+	if (!(mode->flags & DRM_MODE_FLAG_INTERLACE))
-+		val = val * 2;
- 	DRM_DEBUG_DRIVER("Setting vertical total %d, backporch %d\n",
- 			 mode->vtotal, bp);
- 	regmap_write(tcon->regs, SUN4I_TCON1_BASIC4_REG,
--		     SUN4I_TCON1_BASIC4_V_TOTAL(mode->vtotal) |
-+		     SUN4I_TCON1_BASIC4_V_TOTAL(val) |
- 		     SUN4I_TCON1_BASIC4_V_BACKPORCH(bp));
++	if (encoder->encoder_type == DRM_MODE_ENCODER_TVDAC)
++		val = 1;
++	else
++		val = 0;
++
+ 	/*
+ 	 * FIXME: Undocumented bits
+ 	 */
+ 	if (tcon->quirks->has_unknown_mux)
+-		regmap_write(tcon->regs, SUN4I_TCON_MUX_CTRL_REG, 1);
++		regmap_write(tcon->regs, SUN4I_TCON_MUX_CTRL_REG, val);
+ }
+ EXPORT_SYMBOL(sun4i_tcon1_mode_set);
  
- 	/* Set Hsync and Vsync length */
 -- 
 git-series 0.8.11
