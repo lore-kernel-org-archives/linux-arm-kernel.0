@@ -1,28 +1,39 @@
-From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Tue, 7 Mar 2017 12:50:34 +0100
-Subject: [PATCH] media: vpif: use a configurable i2c_adapter_id for vpif
- display
-In-Reply-To: <1487268481-6127-1-git-send-email-bgolaszewski@baylibre.com>
-References: <1487268481-6127-1-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <CAMpxmJXbJn8oEhB8g_6AsDxZPqDQf7eTnqkUwr_dMP=BNL+q+Q@mail.gmail.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Tue, 7 Mar 2017 21:04:50 +0900
+Subject: [PATCH v2 3/3] mtd: nand: Remove unused chip->write_page() hook
+In-Reply-To: <1487593718-20752-4-git-send-email-boris.brezillon@free-electrons.com>
+References: <1487593718-20752-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1487593718-20752-4-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <CAK7LNASNFJ6_LJBS7jyyJ3-Uv_ExTYAj+tkJTCYrpDz8_BXa3Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-02-16 19:08 GMT+01:00 Bartosz Golaszewski <bgolaszewski@baylibre.com>:
-> The vpif display driver uses a static i2c adapter ID of 1 but on the
-> da850-evm board in DT boot mode the i2c adapter ID is actually 0.
+Hi Boris,
+
+2017-02-20 21:28 GMT+09:00 Boris Brezillon <boris.brezillon@free-electrons.com>:
+> The last/only user of the chip->write_page() hook (the Atmel NAND
+> controller driver) has been reworked and is no longer specifying a custom
+> ->write_page() implementation.
+> Drop this hook before someone else start abusing it.
 >
-> Make the adapter ID configurable like it already is for vpif capture.
->
-> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-> Acked-by: Kevin Hilman <khilman@baylibre.com>
-> ---
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 
-Hi Mauro, Prabhakar,
 
-can we get an ack on this? Sekhar already merged the rest of the
-patches that need this to make vpif display work on the da850-evm
-board. I think it's best if it goes through his tree.
+Just a minor comment.
 
-Thanks,
-Bartosz
+
+/**
+ * nand_write_page - [REPLACEABLE] write one page
+ * @mtd: MTD device structure
+
+
+Can you update the comment block for nand_write_page(), too?
+
+  [REPLACEABLE]  ->  [INTERNAL]
+
+
+
+
+-- 
+Best Regards
+Masahiro Yamada
