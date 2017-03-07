@@ -1,26 +1,68 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 7 Mar 2017 16:48:16 +0530
-Subject: [PATCH v3 3/4] ARM: dts: da850-evm: add the UI expander node
-In-Reply-To: <1488298516-14363-4-git-send-email-bgolaszewski@baylibre.com>
-References: <1488298516-14363-1-git-send-email-bgolaszewski@baylibre.com>
- <1488298516-14363-4-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <217ae6a9-9ed4-5044-34ef-66848836d0ba@ti.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Tue, 7 Mar 2017 16:53:50 +0530
+Subject: [PATCH v2 5/7] PCI: dwc: all: Modify dbi accessors to access data
+ of 4/2/1 bytes
+In-Reply-To: <090d9947-8003-4608-5e3a-92f62f90eda6@synopsys.com>
+References: <1488880372-7390-1-git-send-email-kishon@ti.com>
+ <1488880372-7390-6-git-send-email-kishon@ti.com>
+ <090d9947-8003-4608-5e3a-92f62f90eda6@synopsys.com>
+Message-ID: <58BE9846.5090903@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 28 February 2017 09:45 PM, Bartosz Golaszewski wrote:
-> We need the expander to be probed to allow the VPIF controller to
-> receive interrupts from the video decoder.
+
+
+On Tuesday 07 March 2017 04:48 PM, Joao Pinto wrote:
+> ?s 9:52 AM de 3/7/2017, Kishon Vijay Abraham I escreveu:
+>> Previously dbi accessors can be used to access data of size 4
+>> bytes. But there might be situations (like accessing
+>> MSI_MESSAGE_CONTROL in order to set/get the number of required
+>> MSI interrupts in EP mode) where dbi accessors must
+>> be used to access data of size 2. This is in preparation for
+>> adding endpoint mode support to designware driver.
+>>
+>> Cc: Jingoo Han <jingoohan1@gmail.com>
+>> Cc: Richard Zhu <hongxing.zhu@nxp.com>
+>> Cc: Lucas Stach <l.stach@pengutronix.de>
+>> Cc: Murali Karicheri <m-karicheri2@ti.com>
+>> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+>> Cc: Niklas Cassel <niklas.cassel@axis.com>
+>> Cc: Jesper Nilsson <jesper.nilsson@axis.com>
+>> Cc: Joao Pinto <Joao.Pinto@synopsys.com>
+>> Cc: Zhou Wang <wangzhou1@hisilicon.com>
+>> Cc: Gabriele Paoloni <gabriele.paoloni@huawei.com>
+>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+>> ---
+>>  drivers/pci/dwc/Kconfig                |   18 ++++----
+>>  drivers/pci/dwc/pci-dra7xx.c           |    8 ++--
+>>  drivers/pci/dwc/pci-exynos.c           |   16 +++----
+>>  drivers/pci/dwc/pci-imx6.c             |   54 +++++++++++-----------
+>>  drivers/pci/dwc/pci-keystone-dw.c      |   13 +++---
+>>  drivers/pci/dwc/pcie-armada8k.c        |   38 ++++++++--------
+>>  drivers/pci/dwc/pcie-artpec6.c         |    6 +--
+>>  drivers/pci/dwc/pcie-designware-host.c |   18 ++++----
+>>  drivers/pci/dwc/pcie-designware.c      |   77 +++++++++++++++++++-------------
+>>  drivers/pci/dwc/pcie-designware.h      |   14 +++---
+>>  drivers/pci/dwc/pcie-hisi.c            |   14 +++---
+>>  11 files changed, 147 insertions(+), 129 deletions(-)
+>>
+>> diff --git a/drivers/pci/dwc/Kconfig b/drivers/pci/dwc/Kconfig
+>> index dfb8a69..cb3d5d0 100644
+>> --- a/drivers/pci/dwc/Kconfig
+>> +++ b/drivers/pci/dwc/Kconfig
+>> @@ -36,7 +36,7 @@ config PCIE_DW_PLAT
+>>  config PCI_EXYNOS
+>>  	bool "Samsung Exynos PCIe controller"
+>>  	depends on PCI
+>> -	depends on SOC_EXYNOS5440
+>> +	depends on SOC_EXYNOS5440 || COMPILE_TEST
 > 
-> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> Kishon, I have the idea that Bjorn suggested some time ago not to use
+> COMPILE_TEST, because there were some problems in some drivers that needed
+> specific arch stuff.
 
-This is basically an IO expander on UI card. So I modified subject line to:
+sigh.. this spilled through from my testing. This Kconfig changes was
+un-intentional.
 
-"
-ARM: dts: da850-evm: add IO expander node on UI card
-"
-
-while applying.
-
-Thanks,
-Sekhar
+Thanks
+Kishon
