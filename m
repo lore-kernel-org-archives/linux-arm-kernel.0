@@ -1,42 +1,72 @@
-From: slemieux.tyco@gmail.com (Sylvain Lemieux)
-Date: Tue, 07 Mar 2017 13:20:19 -0500
-Subject: [RESEND PATCH 0/3] pwm: lpc32xx: switch driver to one phandle
- argument for PWM consumers
-In-Reply-To: <20170216202749.20653-1-slemieux.tyco@gmail.com>
-References: <20170216202749.20653-1-slemieux.tyco@gmail.com>
-Message-ID: <1488910819.4022.2.camel@gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue,  7 Mar 2017 18:26:28 +0000
+Subject: [PATCH] iommu/arm-smmu: Add global SMR masking property
+Message-ID: <f26137836bb8416e38390ba68973ae5cd19c2c53.1488910978.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2017-02-16 at 15:27 -0500, slemieux.tyco at gmail.com wrote:
-> From: Sylvain Lemieux <slemieux@tycoint.com>
-> 
-> The change adds private of_xlate() function to process one argument given along with a PWM phandle. LPC32xx SoCs have two independent single channel PWM controllers, the argument is used as a description of PWM output frequency, see previous discussion here:
-> 
->   http://www.spinics.net/lists/arm-kernel/msg534068.html
-> 
-> The changes on actual board dts files are not needed at the moment, because all LPC32xx boards in upstream don't describe any PWM consumers.
-> 
-> Please refer to the following URL to view the previous patch #1 review discussion:
->   http://www.spinics.net/lists/arm-kernel/msg549772.html
-> 
-Hi Thierry,
+The current SMR masking support using a 2-cell iommu-specifier is
+primarily intended to handle individual masters with large and/or
+complex Stream ID assignments; it quickly gets a bit clunky in other SMR
+use-cases where we just want to consistently mask out the same part of
+every Stream ID (e.g. for MMU-500 configurations where the appended TBU
+number gets in the way unnecessarily). Let's add a new property to allow
+a single global mask value to better fit the latter situation.
 
-can you take this patchset for 4.12?
+Tested-by: Nipun Gupta <nipun.gupta@nxp.com>
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+---
 
-Let me know if you have more questions.
+Time to rekindle the discussion about whether an architecture-level
+concept with a rather specific name needs a vendor prefix ;)
 
-Regards,
-Sylvain
+Robin.
 
-> The "Reviewed-by" and "Acked-by" from the original posting are added into this resend.
-> 
-> Vladimir Zapolskiy (3):
->   dt: pwm: lpc32xx: add description of clocks and #pwm-cells properties
->   pwm: lpc32xx: switch driver to one phandle argument for PWM consumers
->   pwm: lpc32xx: remove handling of PWM channels
-> 
->  .../devicetree/bindings/pwm/lpc32xx-pwm.txt        |  7 +++++
->  drivers/pwm/pwm-lpc32xx.c                          | 36 +++++++++++++++-------
->  2 files changed, 32 insertions(+), 11 deletions(-)
-> 
+ Documentation/devicetree/bindings/iommu/arm,smmu.txt | 10 ++++++++++
+ drivers/iommu/arm-smmu.c                             |  4 +++-
+ 2 files changed, 13 insertions(+), 1 deletion(-)
+
+diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu.txt b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+index 6cdf32d037fc..d66f355e174f 100644
+--- a/Documentation/devicetree/bindings/iommu/arm,smmu.txt
++++ b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+@@ -60,6 +60,16 @@ conditions.
+                   aliases of secure registers have to be used during
+                   SMMU configuration.
+ 
++- stream-match-mask : Specifies a fixed SMR mask value to combine with
++                  the Stream ID value from every iommu-specifier. This
++                  may be used instead of an "#iommu-cells" value of 2
++                  when there is no need for per-master SMR masks, but
++                  it is still desired to mask some portion of every
++                  Stream ID (e.g. for certain MMU-500 configurations
++                  given globally unique external IDs). This property is
++                  not valid for SMMUs using stream indexing, and may be
++                  ignored if stream matching is not supported.
++
+ ** Deprecated properties:
+ 
+ - mmu-masters (deprecated in favour of the generic "iommus" binding) :
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index abf6496843a6..e394d55146a6 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -1590,13 +1590,15 @@ static int arm_smmu_domain_set_attr(struct iommu_domain *domain,
+ 
+ static int arm_smmu_of_xlate(struct device *dev, struct of_phandle_args *args)
+ {
+-	u32 fwid = 0;
++	u32 mask, fwid = 0;
+ 
+ 	if (args->args_count > 0)
+ 		fwid |= (u16)args->args[0];
+ 
+ 	if (args->args_count > 1)
+ 		fwid |= (u16)args->args[1] << SMR_MASK_SHIFT;
++	else if (!of_property_read_u32(args->np, "stream-match-mask", &mask))
++		fwid |= (u16)mask << SMR_MASK_SHIFT;
+ 
+ 	return iommu_fwspec_add_ids(dev, &fwid, 1);
+ }
+-- 
+2.11.0.dirty
