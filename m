@@ -1,107 +1,72 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 07 Mar 2017 08:03:36 +0000
-Subject: [PATCH] irqchip/gicv3-its: Add workaround for QDF2400 ITS erratum
- 0065
-In-Reply-To: <1488727436-25085-1-git-send-email-shankerd@codeaurora.org>
- (Shanker Donthineni's message of "Sun, 5 Mar 2017 09:23:56 -0600")
-References: <1488727436-25085-1-git-send-email-shankerd@codeaurora.org>
-Message-ID: <878toh1pk7.fsf@on-the-bus.cambridge.arm.com>
+From: yong.mao@mediatek.com (Yong Mao)
+Date: Tue, 7 Mar 2017 16:05:07 +0800
+Subject: [PATCH v4 1/3] mmc: dt-bindings: update Mediatek MMC bindings
+In-Reply-To: <1488512995.21451.16.camel@mhfsdcap03>
+References: <1484988923-1543-1-git-send-email-yong.mao@mediatek.com>
+ <1484988923-1543-2-git-send-email-yong.mao@mediatek.com>
+ <CAPDyKFqo7fMTp3YPJwgoa4u3iAie2U884VUfTnMQ_js8neMqTQ@mail.gmail.com>
+ <1487930376.22858.14.camel@mhfsdcap03>
+ <CAL_Jsq+eo-Fy8Wf2yZpE3Ufp4V_7Gn+w9fTyjZDP6V7tY-=gdw@mail.gmail.com>
+ <1488512995.21451.16.camel@mhfsdcap03>
+Message-ID: <1488873907.10538.3.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 05 2017 at  3:23:56 pm GMT, Shanker Donthineni <shankerd@codeaurora.org> wrote:
-> On Qualcomm Datacenter Technologies QDF2400 SoCs, the ITS hardware
-> implementation uses 16Bytes for Interrupt Translation Entry (ITTE),
+On Fri, 2017-03-03 at 11:49 +0800, Yong Mao wrote:
+> On Fri, 2017-02-24 at 16:47 -0600, Rob Herring wrote:
+> > On Fri, Feb 24, 2017 at 3:59 AM, Yong Mao <yong.mao@mediatek.com> wrote:
+> > > Dear Rob,
+> > >
+> > > Could you please help to make comments for this patch?
+> > > Thanks.
+> > 
+> > I already did comment. It's still wrong as Ulf commented. So fix and
+> > send a new version. It has to go to the DT list if you want to be in
+> > my queue.
+> > 
+> > Rob
+> 
+> After reviewing the history, We guess your mentioned Ulf's comments is as below.
+>   
+> "> +- mtk-hs200-cmd-int-delay: HS200 command internal delay setting.
+> > + The value is an integer from 0 to 31
+> 
+> Please change to:
+> 
+> mediatek,hs200-cmd-delay
+> 
+> ... and if there is a unit, like ns or us, please add that a suffix.
+> 
+> > +- mtk-hs400-cmd-int-delay: HS400 command internal delay setting
+> > + The value is an integer from 0 to 31
+> 
+> mediatek,hs400-cmd-delay and add unit if applicable.
+> 
+> > +- mtk-hs400-cmd-resp-sel: HS400 command response sample selection
+> > + The value is an integer from 0 to 1
+> 
+> mediatek,hs400-cmd-resp-sel
+> 
+> And make it a boolean value instead!"
+> 
+> ==> We already fix this comment in v4. 
+> We use "mediatek,hs200-cmd-int-delay" to replace "mtk-hs200-cmd-int-delay", 
+> but not use "mediatek,hs200-cmd-delay". This is because "-int-" here means internal.
+> We should not drop it.
+> 
+> And this field does not have unit, it only have total 32 stages.
+> We also change the description in v4.
+> 
+> For comment about "mtk-hs400-cmd-resp-sel", we also make it a boolean value in v4.
+> And re-name it as "mediatek,hs400-cmd-resp-rising".
+> 
+> Please help to point out where we need to modify.
+> Thanks.
+> 
+> 
 
-nit: Interrupt Translation Entry is abbreviated as ITE. I know the vITS
-has the ITTE thing all over the place, which I plan to address. No need
-to respin for that.
+Please help to point out a bright way for this patch.
+We are anxiously waiting for your response.
 
-> but reports an incorrect value of 8Bytes in GITS_TYPER.ITTE_size.
->
-> It might cause kernel memory corruption depending on the number
-> of MSI(x) that are configured and the amount of memory that has
-> been allocated for ITTEs in its_create_device().
->
-> This patch fixes the potential memory corruption by setting the
-> correct ITTE size to 16Bytes.
->
-> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
-> ---
->  Documentation/arm64/silicon-errata.txt |  1 +
->  arch/arm64/Kconfig                     | 10 ++++++++++
->  drivers/irqchip/irq-gic-v3-its.c       | 16 ++++++++++++++++
->  3 files changed, 27 insertions(+)
->
-> diff --git a/Documentation/arm64/silicon-errata.txt b/Documentation/arm64/silicon-errata.txt
-> index a71b809..2f66683 100644
-> --- a/Documentation/arm64/silicon-errata.txt
-> +++ b/Documentation/arm64/silicon-errata.txt
-> @@ -68,3 +68,4 @@ stable kernels.
->  |                |                 |                 |                             |
->  | Qualcomm Tech. | Falkor v1       | E1003           | QCOM_FALKOR_ERRATUM_1003    |
->  | Qualcomm Tech. | Falkor v1       | E1009           | QCOM_FALKOR_ERRATUM_1009    |
-> +| Qualcomm Tech. | QDF2400 ITS     | E0065           | QCOM_QDF2400_ERRATUM_0065   |
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 896eba6..6bd51fb 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -509,6 +509,16 @@ config QCOM_FALKOR_ERRATUM_1009
->  
->  	  If unsure, say Y.
->  
-> +config QCOM_QDF2400_ERRATUM_0065
-> +	bool "QDF2400 E0065: Incorrect GITS_TYPER.ITT_Entry_size"
-> +	default y
-> +	help
-> +	  On Qualcomm Datacenter Technologies QDF2400 SoC, ITS hardware reports
-> +	  ITTE size incorrectly. The GITS_TYPER.ITT_Entry_size field should have
-> +	  been indicated as 16Bytes (0xf), not 8Bytes (0x7).
-> +
-> +	  If unsure, say Y.
-> +
->  endmenu
->  
->  
-> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-> index 2320100..86bd428 100644
-> --- a/drivers/irqchip/irq-gic-v3-its.c
-> +++ b/drivers/irqchip/irq-gic-v3-its.c
-> @@ -1601,6 +1601,14 @@ static void __maybe_unused its_enable_quirk_cavium_23144(void *data)
->  	its->flags |= ITS_FLAGS_WORKAROUND_CAVIUM_23144;
->  }
->  
-> +static void __maybe_unused its_enable_quirk_qdf2400_e0065(void *data)
-> +{
-> +	struct its_node *its = data;
-> +
-> +	/* On QDF2400, the size of the ITTE is 16Bytes */
-> +	its->ite_size = 16;
-> +}
-> +
->  static const struct gic_quirk its_quirks[] = {
->  #ifdef CONFIG_CAVIUM_ERRATUM_22375
->  	{
-> @@ -1618,6 +1626,14 @@ static void __maybe_unused its_enable_quirk_cavium_23144(void *data)
->  		.init	= its_enable_quirk_cavium_23144,
->  	},
->  #endif
-> +#ifdef CONFIG_QCOM_QDF2400_ERRATUM_0065
-> +	{
-> +		.desc	= "ITS: QDF2400 erratum 0065",
-> +		.iidr	= 0x00001070, /* QDF2400 ITS rev 1.x */
-> +		.mask	= 0xffffffff,
-> +		.init	= its_enable_quirk_qdf2400_e0065,
-> +	},
-> +#endif
->  	{
->  	}
->  };
-
-OK, that's pretty bad. Should this be CC stable?
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead, it just smell funny.
+Best Regards,
+Yong Mao.
