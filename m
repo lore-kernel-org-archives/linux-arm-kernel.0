@@ -1,67 +1,49 @@
-From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Tue, 7 Mar 2017 14:57:20 +0800
-Subject: [PATCH 1/2] usb: xhci-mtk: rebuild xhci_mtk_setup()
-Message-ID: <1488869841-9959-1-git-send-email-chunfeng.yun@mediatek.com>
+From: j-keerthy@ti.com (Keerthy)
+Date: Tue, 7 Mar 2017 12:43:36 +0530
+Subject: [PATCH 0/7] thermal: ti-soc-thermal: Migrate slope/offset data to
+ device tree
+In-Reply-To: <20170306184215.GO20572@atomide.com>
+References: <1488364190-23488-1-git-send-email-j-keerthy@ti.com>
+ <20170306184215.GO20572@atomide.com>
+Message-ID: <1c47d169-7962-2fe7-0635-570881e85e06@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-simplify xhci_mtk_setup() and add xhci_mtk_start() for
-xhci_driver_overrides struct
 
-Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
----
- drivers/usb/host/xhci-mtk.c |   16 +++++++++++-----
- 1 file changed, 11 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/usb/host/xhci-mtk.c b/drivers/usb/host/xhci-mtk.c
-index 67d5dc7..9636884 100644
---- a/drivers/usb/host/xhci-mtk.c
-+++ b/drivers/usb/host/xhci-mtk.c
-@@ -381,8 +381,10 @@ static int usb_wakeup_of_property_parse(struct xhci_hcd_mtk *mtk,
- }
- 
- static int xhci_mtk_setup(struct usb_hcd *hcd);
-+static int xhci_mtk_start(struct usb_hcd *hcd);
- static const struct xhci_driver_overrides xhci_mtk_overrides __initconst = {
- 	.reset = xhci_mtk_setup,
-+	.start = xhci_mtk_start,
- };
- 
- static struct hc_driver __read_mostly xhci_mtk_hc_driver;
-@@ -492,7 +494,6 @@ static void xhci_mtk_quirks(struct device *dev, struct xhci_hcd *xhci)
- /* called during probe() after chip reset completes */
- static int xhci_mtk_setup(struct usb_hcd *hcd)
- {
--	struct xhci_hcd *xhci = hcd_to_xhci(hcd);
- 	struct xhci_hcd_mtk *mtk = hcd_to_mtk(hcd);
- 	int ret;
- 
-@@ -502,9 +503,14 @@ static int xhci_mtk_setup(struct usb_hcd *hcd)
- 			return ret;
- 	}
- 
--	ret = xhci_gen_setup(hcd, xhci_mtk_quirks);
--	if (ret)
--		return ret;
-+	return xhci_gen_setup(hcd, xhci_mtk_quirks);
-+}
-+
-+static int xhci_mtk_start(struct usb_hcd *hcd)
-+{
-+	struct xhci_hcd *xhci = hcd_to_xhci(hcd);
-+	struct xhci_hcd_mtk *mtk = hcd_to_mtk(hcd);
-+	int ret;
- 
- 	if (usb_hcd_is_primary_hcd(hcd)) {
- 		mtk->num_u3_ports = xhci->num_usb3_ports;
-@@ -514,7 +520,7 @@ static int xhci_mtk_setup(struct usb_hcd *hcd)
- 			return ret;
- 	}
- 
--	return ret;
-+	return xhci_run(hcd);
- }
- 
- static int xhci_mtk_probe(struct platform_device *pdev)
--- 
-1.7.9.5
+On Tuesday 07 March 2017 12:12 AM, Tony Lindgren wrote:
+> * Keerthy <j-keerthy@ti.com> [170301 02:31]:
+>> Currently the slope and offset values for calculating the
+>> hot spot temperature of a particular thermal zone is part
+>> of driver data. Pass them here instead and obtain the values
+>> while of node parsing.
+>>
+>> Tested for the slope and constant values on DRA7-EVM.
+>>
+>> Keerthy (7):
+>>   ARM: DRA7: Thermal: Add slope and offset values
+>>   ARM: OMAP5: Thermal: Add slope and offset values
+>>   ARM: OMAP443x: Thermal: Add slope and offset values
+>>   ARM: OMAP4460: Thermal: Add slope and offset values
+>>   thermal: ti-soc-thermal: Fetch slope and offset from DT
+>>   thermal: ti-soc-thermal: Remove redundant constants
+>>   thermal: ti-soc-thermal: Remove redundant code
+>
+> Are the dts changes safe for me to pick separately into
+> omap-for-v4.12/dt?
+
+Tony,
+
+Seems like omap3 has no thermal_zone node defined in Device Tree.
+It seems like it still uses driver data. I would need to add that as 
+well. Can you confirm that? If yes i will send a new series with the 
+omap3 device tree changes as well.
+
+Thanks,
+Keerthy
+
+>
+> Regards,
+>
+> Tony
+>
