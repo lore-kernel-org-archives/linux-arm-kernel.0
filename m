@@ -1,209 +1,123 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 07 Mar 2017 18:27:21 +0100
-Subject: [PATCH v2] ARM: mvebu: add support for the Linksys WRT1900ACS
- (Shelby)
-In-Reply-To: <87inobcwk3.fsf@free-electrons.com> (Gregory CLEMENT's message of
- "Wed, 15 Feb 2017 16:18:04 +0100")
-References: <20170214191744.9419-1-ralph.sennhauser@gmail.com>
- <87inobcwk3.fsf@free-electrons.com>
-Message-ID: <87zigxngjq.fsf@free-electrons.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Tue, 7 Mar 2017 18:29:41 +0100
+Subject: Warning on boot on SAMA5D2 with Linux 4.11-rc1
+In-Reply-To: <faca2b81-c43d-e6da-701c-903a7157c73f@sysgo.com>
+References: <CAGkQfmPP7w09xutsK5OhfWzNfCyC3Bj8VmoFxDiB5eqAFnZBbQ@mail.gmail.com>
+ <CAGkQfmMxame-m+Te59EnFACqmk9TU-3Mhi6BctQWDPKuy38FXg@mail.gmail.com>
+ <faca2b81-c43d-e6da-701c-903a7157c73f@sysgo.com>
+Message-ID: <20170307182941.3536de7d@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gregory,
- 
- On mer., f?vr. 15 2017, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
+David, Romain,
 
-> Hi Ralph,
->  
->  On mar., f?vr. 14 2017, Ralph Sennhauser <ralph.sennhauser@gmail.com> wrote:
->
->> The Linksys WRT1900ACS (Shelby) is another Armada 385 based router in
->> the Linksys WRT AC Series which got released in October 2015.
->>
->> The file armada-385-linksys-shelby.dts is taken from OpenWrt as-is and
->> originally authored by Imre Kaloz.
->>
->> URL: https://github.com/openwrt/openwrt/blob/8466384db1154a107b86bf3ca10b166a21bd81d0/target/linux/mvebu/files/arch/arm/boot/dts/armada-385-linksys-shelby.dts
->> CC: Imre Kaloz <kaloz@openwrt.org>
->> Signed-off-by: Ralph Sennhauser <ralph.sennhauser@gmail.com>
->> Signed-off-by: Imre Kaloz <kaloz@openwrt.org>
->> Reviewed-by: Andrew Lunn <andrew@lunn.ch>
->> Acked-by: Jason Cooper <jason@lakedaemon.net>
->
-> Applied on mvebu/dt-4.12
+On Tue, 7 Mar 2017 16:17:03 +0100
+David Engraf <david.engraf@sysgo.com> wrote:
 
-It is now in mvebu/dt and in the same time I fixed the title to:
-"ARM: dts: armada-385: add support for the Linksys WRT1900ACS (Shelby)"
+> Am 07.03.2017 um 16:05 schrieb Romain Izard:
+> > 2017-03-06 12:28 GMT+01:00 Romain Izard <romain.izard.pro@gmail.com>:  
+> >>
+> >> While looking for another issue, I tried Linux 4.11-rc1 on a SAMA5D2 Xplained
+> >> board. The boot log contains the following warning:
+> >>
+> >> [    0.100000] ------------[ cut here ]------------
+> >> [    0.100000] WARNING: CPU: 0 PID: 1 at
+> >> ../kernel/time/sched_clock.c:180 sched_clock_register+0x44/0x1e4
+> >> [    0.100000] CPU: 0 PID: 1 Comm: swapper Not tainted 4.11.0-rc1+ #3
+> >> [    0.100000] Hardware name: Atmel SAMA5
+> >> [    0.100000] [<c010c494>] (unwind_backtrace) from [<c010a558>]
+> >> (show_stack+0x10/0x14)
+> >> [    0.100000] [<c010a558>] (show_stack) from [<c0115654>] (__warn+0xe0/0xf8)
+> >> [    0.100000] [<c0115654>] (__warn) from [<c011571c>]
+> >> (warn_slowpath_null+0x20/0x28)
+> >> [    0.100000] [<c011571c>] (warn_slowpath_null) from [<c090b0d0>]
+> >> (sched_clock_register+0x44/0x1e4)
+> >> [    0.100000] [<c090b0d0>] (sched_clock_register) from [<c091fb98>]
+> >> (tcb_clksrc_init+0x1ac/0x360)
+> >> [    0.100000] [<c091fb98>] (tcb_clksrc_init) from [<c0900d8c>]
+> >> (do_one_initcall+0xb4/0x15c)
+> >> [    0.100000] [<c0900d8c>] (do_one_initcall) from [<c0900f68>]
+> >> (kernel_init_freeable+0x134/0x1c4)
+> >> [    0.100000] [<c0900f68>] (kernel_init_freeable) from [<c06bfc64>]
+> >> (kernel_init+0x8/0x10c)
+> >> [    0.100000] [<c06bfc64>] (kernel_init) from [<c0107318>]
+> >> (ret_from_fork+0x14/0x3c)
+> >> [    0.100000] ---[ end trace 7ce9be9d7cf6f800 ]---
+> >> [    0.100012] sched_clock: 32 bits at 10MHz, resolution 96ns, wraps
+> >> every 206986376143ns
+> >>
+> >> This is related to the following commit:
+> >> 7b9f1d16e6d1 clocksource/drivers/tcb_clksrc: Use 32 bit tcb as sched_clock
+> >>
+> >> When we call sched_clock_register from tcb_clksrc_init from
+> >> arch_initcall, we are too late as sched expects all the candidates for
+> >> its clock to be registered before interrupts are enabled. This warning
+> >> does not prevent the tcb clock from being used.  
+> 
+> I have no idea why sched_clock_register complains when interrupts are 
+> already enabled. Form the code it doesn't look like this is a real issue 
+> and it works for me.
+> 
+> > After some more use with 4.11-rc1, I also noticed that the timestamp for
+> > printk rolls over to 0 after only 413s. Reverting the aforementioned commit
+> > fixes it.  
+> 
+> I had this issue as well so I proposed the following patch a few weeks ago.
 
-Gregory
+I think both issues are related: the scheduler expect the sched clock to
+registered before the sched_clock_postinit() exactly to prevent the
+case you're describing below.
 
->
-> Thanks,
->
-> Gregory
->
->> ---
->>
->> Notes:
->>     V1 -> V2:
->>     - Use full instead of shortened URL in commit message (suggested by Jason Cooper)
->>     - add collected tags, thanks to donors ;)
->>
->>  arch/arm/boot/dts/Makefile                      |   1 +
->>  arch/arm/boot/dts/armada-385-linksys-shelby.dts | 114 ++++++++++++++++++++++++
->>  2 files changed, 115 insertions(+)
->>  create mode 100644 arch/arm/boot/dts/armada-385-linksys-shelby.dts
->>
->> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
->> index 0118084..16f1748 100644
->> --- a/arch/arm/boot/dts/Makefile
->> +++ b/arch/arm/boot/dts/Makefile
->> @@ -970,6 +970,7 @@ dtb-$(CONFIG_MACH_ARMADA_38X) += \
->>  	armada-385-db-ap.dtb \
->>  	armada-385-linksys-caiman.dtb \
->>  	armada-385-linksys-cobra.dtb \
->> +	armada-385-linksys-shelby.dtb \
->>  	armada-385-turris-omnia.dtb \
->>  	armada-388-clearfog.dtb \
->>  	armada-388-clearfog-base.dtb \
->> diff --git a/arch/arm/boot/dts/armada-385-linksys-shelby.dts b/arch/arm/boot/dts/armada-385-linksys-shelby.dts
->> new file mode 100644
->> index 0000000..c7a8ddd
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/armada-385-linksys-shelby.dts
->> @@ -0,0 +1,114 @@
->> +/*
->> + * Device Tree file for the Linksys WRT1900ACS (Shelby)
->> + *
->> + * Copyright (C) 2015 Imre Kaloz <kaloz@openwrt.org>
->> + *
->> + *
->> + * This file is dual-licensed: you can use it either under the terms
->> + * of the GPL or the X11 license, at your option. Note that this dual
->> + * licensing only applies to this file, and not this project as a
->> + * whole.
->> + *
->> + *  a) This file is licensed under the terms of the GNU General Public
->> + *     License version 2.  This program is licensed "as is" without
->> + *     any warranty of any kind, whether express or implied.
->> + *
->> + * Or, alternatively,
->> + *
->> + *  b) Permission is hereby granted, free of charge, to any person
->> + *     obtaining a copy of this software and associated documentation
->> + *     files (the "Software"), to deal in the Software without
->> + *     restriction, including without limitation the rights to use,
->> + *     copy, modify, merge, publish, distribute, sublicense, and/or
->> + *     sell copies of the Software, and to permit persons to whom the
->> + *     Software is furnished to do so, subject to the following
->> + *     conditions:
->> + *
->> + *     The above copyright notice and this permission notice shall be
->> + *     included in all copies or substantial portions of the Software.
->> + *
->> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
->> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
->> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
->> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
->> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
->> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
->> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
->> + *     OTHER DEALINGS IN THE SOFTWARE.
->> + */
->> +
->> +/dts-v1/;
->> +#include "armada-385-linksys.dtsi"
->> +
->> +/ {
->> +	model = "Linksys WRT1900ACS";
->> +	compatible = "linksys,shelby", "linksys,armada385", "marvell,armada385",
->> +		     "marvell,armada380";
->> +
->> +	soc {
->> +		internal-regs{
->> +			i2c at 11000 {
->> +
->> +				pca9635 at 68 {
->> +				#address-cells = <1>;
->> +				#size-cells = <0>;
->> +
->> +					wan_amber at 0 {
->> +						label = "shelby:amber:wan";
->> +						reg = <0x0>;
->> +					};
->> +
->> +					wan_white at 1 {
->> +						label = "shelby:white:wan";
->> +						reg = <0x1>;
->> +					};
->> +
->> +					wlan_2g at 2 {
->> +						label = "shelby:white:wlan_2g";
->> +						reg = <0x2>;
->> +					};
->> +
->> +					wlan_5g at 3 {
->> +						label = "shelby:white:wlan_5g";
->> +						reg = <0x3>;
->> +					};
->> +
->> +					usb2 at 5 {
->> +						label = "shelby:white:usb2";
->> +						reg = <0x5>;
->> +					};
->> +
->> +					usb3_1 at 6 {
->> +						label = "shelby:white:usb3_1";
->> +						reg = <0x6>;
->> +					};
->> +
->> +					usb3_2 at 7 {
->> +						label = "shelby:white:usb3_2";
->> +						reg = <0x7>;
->> +					};
->> +
->> +					wps_white at 8 {
->> +						label = "shelby:white:wps";
->> +						reg = <0x8>;
->> +					};
->> +
->> +					wps_amber at 9 {
->> +						label = "shelby:amber:wps";
->> +						reg = <0x9>;
->> +					};
->> +				};
->> +			};
->> +		};
->> +	};
->> +
->> +	gpio-leds {
->> +		power {
->> +			label = "shelby:white:power";
->> +		};
->> +
->> +		sata {
->> +			label = "shelby:white:sata";
->> +		};
->> +	};
->> +};
->> -- 
->> 2.10.2
->>
->
-> -- 
-> Gregory Clement, Free Electrons
-> Kernel, drivers, real-time and embedded Linux
-> development, consulting, training and support.
-> http://free-electrons.com
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+I'd recommend that we revert 7b9f1d16e6d1
+("clocksource/drivers/tcb_clksrc: Use 32 bit tcb as sched_clock")
+until we have a clean solution to update sched clock at runtime (if we
+ever want to support that).
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Note that Alexandre posted a patch series to let the tcb_clksource
+register itself earlier in the boot [1], which should prevent the
+problem we have here.
+
+Regards,
+
+Boris
+
+[1]http://lists.infradead.org/pipermail/linux-arm-kernel/2016-June/435532.html
+
+> 
+> -------- Forwarded Message --------
+> Betreff: [PATCH resend] timers, sched_clock: Update timeout for clock wrap
+> Datum: Thu,  2 Mar 2017 10:02:16 +0100
+> Von: David Engraf <david.engraf@sysgo.com>
+> An: tglx at linutronix.de, john.stultz at linaro.org
+> Kopie (CC): linux-kernel at vger.kernel.org, David Engraf 
+> <david.engraf@sysgo.com>
+> 
+> The scheduler clock framework may not use the correct timeout for the clock
+> wrap. This happens when a new clock driver calls sched_clock_register()
+> after the kernel called sched_clock_postinit(). In this case the clock wrap
+> timeout is too long thus sched_clock_poll() is called too late and the clock
+> already wrapped.
+> 
+> On my ARM system the scheduler was no longer scheduling any other task than
+> the idle task because the sched_clock() wrapped.
+> 
+> Signed-off-by: David Engraf <david.engraf@sysgo.com>
+> ---
+>   kernel/time/sched_clock.c | 5 +++++
+>   1 file changed, 5 insertions(+)
+> 
+> diff --git a/kernel/time/sched_clock.c b/kernel/time/sched_clock.c
+> index a26036d..382b159 100644
+> --- a/kernel/time/sched_clock.c
+> +++ b/kernel/time/sched_clock.c
+> @@ -205,6 +205,11 @@ sched_clock_register(u64 (*read)(void), int bits, 
+> unsigned long rate)
+>    	update_clock_read_data(&rd);
+>   +	if (sched_clock_timer.function != NULL) {
+> +		/* update timeout for clock wrap */
+> +		hrtimer_start(&sched_clock_timer, cd.wrap_kt, HRTIMER_MODE_REL);
+> +	}
+> +
+>   	r = rate;
+>   	if (r >= 4000000) {
+>   		r /= 1000000;
