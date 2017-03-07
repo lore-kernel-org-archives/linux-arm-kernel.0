@@ -1,72 +1,44 @@
-From: mathias.nyman@linux.intel.com (Mathias Nyman)
-Date: Tue, 7 Mar 2017 16:57:15 +0200
-Subject: [PATCH 1/2] usb: xhci-mtk: rebuild xhci_mtk_setup()
-In-Reply-To: <1488869841-9959-1-git-send-email-chunfeng.yun@mediatek.com>
-References: <1488869841-9959-1-git-send-email-chunfeng.yun@mediatek.com>
-Message-ID: <58BECA4B.3010503@linux.intel.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 7 Mar 2017 06:58:21 -0800
+Subject: [PATCH V3 1/4] KVM: Add documentation for KVM_CAP_NR_MEMSLOTS
+In-Reply-To: <1488865964-17346-2-git-send-email-linucherian@gmail.com>
+References: <1488865964-17346-1-git-send-email-linucherian@gmail.com>
+ <1488865964-17346-2-git-send-email-linucherian@gmail.com>
+Message-ID: <20170307145821.GE101711@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07.03.2017 08:57, Chunfeng Yun wrote:
-> simplify xhci_mtk_setup() and add xhci_mtk_start() for
-> xhci_driver_overrides struct
->
+On Tue, Mar 07, 2017 at 11:22:41AM +0530, linucherian at gmail.com wrote:
+> From: Linu Cherian <linu.cherian@cavium.com>
 
-Code itself looks fine, but it's bit unclear for me what the benefit of this is?
+Please add a patch description, even if it just repeats the subject line
+as in this case.
 
-> Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+Otherwise:
+
+Acked-by: Christoffer Dall <cdall@linaro.org>
+
+> 
+> Signed-off-by: Linu Cherian <linu.cherian@cavium.com>
 > ---
->   drivers/usb/host/xhci-mtk.c |   16 +++++++++++-----
->   1 file changed, 11 insertions(+), 5 deletions(-)
->
-> diff --git a/drivers/usb/host/xhci-mtk.c b/drivers/usb/host/xhci-mtk.c
-> index 67d5dc7..9636884 100644
-> --- a/drivers/usb/host/xhci-mtk.c
-> +++ b/drivers/usb/host/xhci-mtk.c
-> @@ -381,8 +381,10 @@ static int usb_wakeup_of_property_parse(struct xhci_hcd_mtk *mtk,
->   }
->
->   static int xhci_mtk_setup(struct usb_hcd *hcd);
-> +static int xhci_mtk_start(struct usb_hcd *hcd);
->   static const struct xhci_driver_overrides xhci_mtk_overrides __initconst = {
->   	.reset = xhci_mtk_setup,
-> +	.start = xhci_mtk_start,
->   };
->
->   static struct hc_driver __read_mostly xhci_mtk_hc_driver;
-> @@ -492,7 +494,6 @@ static void xhci_mtk_quirks(struct device *dev, struct xhci_hcd *xhci)
->   /* called during probe() after chip reset completes */
->   static int xhci_mtk_setup(struct usb_hcd *hcd)
->   {
-> -	struct xhci_hcd *xhci = hcd_to_xhci(hcd);
->   	struct xhci_hcd_mtk *mtk = hcd_to_mtk(hcd);
->   	int ret;
->
-> @@ -502,9 +503,14 @@ static int xhci_mtk_setup(struct usb_hcd *hcd)
->   			return ret;
->   	}
->
-> -	ret = xhci_gen_setup(hcd, xhci_mtk_quirks);
-> -	if (ret)
-> -		return ret;
-> +	return xhci_gen_setup(hcd, xhci_mtk_quirks);
-> +}
-> +
-> +static int xhci_mtk_start(struct usb_hcd *hcd)
-> +{
-> +	struct xhci_hcd *xhci = hcd_to_xhci(hcd);
-> +	struct xhci_hcd_mtk *mtk = hcd_to_mtk(hcd);
-> +	int ret;
->
->   	if (usb_hcd_is_primary_hcd(hcd)) {
->   		mtk->num_u3_ports = xhci->num_usb3_ports;
-
-In theory this causes xhci_mtk_sch_init() to allocate new memory
-for mtk->sch_array every time   .start callback is called.
-
-In practice it should not matter as .start is only called
-when hcd is added in usb core.
-
-Still wondering if there is a reason for this change?
-
--Mathias
+>  Documentation/virtual/kvm/api.txt | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
+> index 03145b7..7b82f1c 100644
+> --- a/Documentation/virtual/kvm/api.txt
+> +++ b/Documentation/virtual/kvm/api.txt
+> @@ -951,6 +951,10 @@ This ioctl allows the user to create or modify a guest physical memory
+>  slot.  When changing an existing slot, it may be moved in the guest
+>  physical memory space, or its flags may be modified.  It may not be
+>  resized.  Slots may not overlap in guest physical address space.
+> +Bits 0-15 of "slot" specifies the slot id and this value should be
+> +less than the maximum number of user memory slots supported per VM.
+> +The maximum allowed slots can be queried using KVM_CAP_NR_MEMSLOTS,
+> +if this capability is supported by the architecture.
+>  
+>  If KVM_CAP_MULTI_ADDRESS_SPACE is available, bits 16-31 of "slot"
+>  specifies the address space which is being modified.  They must be
+> -- 
+> 1.9.1
+> 
