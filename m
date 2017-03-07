@@ -1,168 +1,113 @@
-From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Tue, 7 Mar 2017 10:30:04 +0800
-Subject: [PATCH] ARM: dts: at91: sama5d2: add m_can nodes
-Message-ID: <20170307023004.31424-1-wenyou.yang@atmel.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 7 Mar 2017 10:47:57 +0800
+Subject: [linux-sunxi] [PATCH v3 0/5] Add dual-role OTG support for
+ Allwinner H3
+In-Reply-To: <974021488846293@web19o.yandex.ru>
+References: <20170306223449.21404-1-icenowy@aosc.xyz>
+ <e110a2c0-ee91-b6eb-9e94-e32034aae4d7@megous.com>
+ <974021488846293@web19o.yandex.ru>
+Message-ID: <CAGb2v65POtvUazpDyWrQWTDDPjEQjaHkOYJ878MJ2YsqLuSDAw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add nodes to support the Controller Area Network(M_CAN) on SAMA5D2.
+On Tue, Mar 7, 2017 at 8:24 AM, Icenowy Zheng <icenowy@aosc.xyz> wrote:
+>
+>
+> 07.03.2017, 07:48, "Ond?ej Jirman" <megous@megous.com>:
+>> Hi Icenowy,
+>>
+>> when I was trying to add OTG support I found an issue with powercycling.
+>> When I have USB cable connecting PC and the OTG port on the SBC, when
+>> the board enables the vbus, it would become impossible to power cycle
+>> the board after poweroff. The reason being that when vbus is enabled,
+>> the board is powered from the OTG port even if you disconnect the barrel
+>> plug.
+>>
+>> Should kernel turn off the vbus before shutting down/restarting? What do
+>> you think?
+>
+> It's a good problem.
+>
+> I think this problem can be abstracted into:
+> Some regulators are needed to be shut down before system
+> shutdown.
 
-As said in SAMA5D2 datasheet, the CAN clock is recommended to use
-frequencies of 20, 40 or 80 MHz. To achieve these frequencies,
-PMC GCLK3 must select the UPLLCK(480 MHz) as source clock and
-divide by 24, 12, or 6. So, the "assigned-clock-rates" property
-has three options: 20000000, 40000000, and 80000000.
-The "assigned-clock-parents" property should be referred to utmi
-fixedly.
+Sounds like the board is getting back-powered from VBUS through the enabled
+current regulator. Given that you have it connected to the PC, which I assume
+means peripheral mode, the bigger issue is why is VBUS enabled in peripheral
+mode? It should never ever be so.
 
-The MSBs [bits 31:16] of the CAN Message RAM for CAN0 and CAN1 are
-default configured in 0x00200000. To avoid conflict with SRAM map
-for pm, change them to 0x00210000 in the AT91Bootstrap via setting
-the CAN Memories Address-based Register(SFR_CAN) of SFR.
 
-Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
----
+Regards
+ChenYu
 
- arch/arm/boot/dts/at91-sama5d2_xplained.dts | 24 +++++++++++++
- arch/arm/boot/dts/sama5d2.dtsi              | 56 +++++++++++++++++++++++++++++
- 2 files changed, 80 insertions(+)
-
-diff --git a/arch/arm/boot/dts/at91-sama5d2_xplained.dts b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
-index 9f7f8a7d8ff9..2f19b08dc226 100644
---- a/arch/arm/boot/dts/at91-sama5d2_xplained.dts
-+++ b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
-@@ -257,6 +257,12 @@
- 				status = "okay";
- 			};
- 
-+			can0: can at f8054000 {
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_can0_default>;
-+				status = "okay";
-+			};
-+
- 			uart3: serial at fc008000 {
- 				atmel,use-dma-rx;
- 				atmel,use-dma-tx;
-@@ -321,6 +327,18 @@
- 					bias-disable;
- 				};
- 
-+				pinctrl_can0_default: can0_default {
-+					pinmux = <PIN_PC10__CANTX0>,
-+						 <PIN_PC11__CANRX0>;
-+					bias-disable;
-+				};
-+
-+				pinctrl_can1_default: can1_default {
-+					pinmux = <PIN_PC26__CANTX1>,
-+						 <PIN_PC27__CANRX1>;
-+					bias-disable;
-+				};
-+
- 				pinctrl_charger_chglev: charger_chglev {
- 					pinmux = <PIN_PA12__GPIO>;
- 					bias-disable;
-@@ -468,6 +486,12 @@
- 				};
- 
- 			};
-+
-+			can1: can at fc050000 {
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_can1_default>;
-+				status = "okay";
-+			};
- 		};
- 	};
- 
-diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
-index 22332be72140..d2febea79cfb 100644
---- a/arch/arm/boot/dts/sama5d2.dtsi
-+++ b/arch/arm/boot/dts/sama5d2.dtsi
-@@ -762,6 +762,18 @@
- 						atmel,clk-output-range = <0 83000000>;
- 					};
- 
-+					can0_clk: can0_clk {
-+						#clock-cells = <0>;
-+						reg = <56>;
-+						atmel,clk-output-range = <0 83000000>;
-+					};
-+
-+					can1_clk: can1_clk {
-+						#clock-cells = <0>;
-+						reg = <57>;
-+						atmel,clk-output-range = <0 83000000>;
-+					};
-+
- 					classd_clk: classd_clk {
- 						#clock-cells = <0>;
- 						reg = <59>;
-@@ -890,6 +902,18 @@
- 						#clock-cells = <0>;
- 						reg = <55>;
- 					};
-+
-+					can0_gclk: can0_gclk {
-+						#clock-cells = <0>;
-+						reg = <56>;
-+						atmel,clk-output-range = <0 80000000>;
-+					};
-+
-+					can1_gclk: can1_gclk {
-+						#clock-cells = <0>;
-+						reg = <57>;
-+						atmel,clk-output-range = <0 80000000>;
-+					};
- 				};
- 			};
- 
-@@ -1144,6 +1168,22 @@
- 				clocks = <&clk32k>;
- 			};
- 
-+			can0: can at f8054000 {
-+				compatible = "bosch,m_can";
-+				reg = <0xf8054000 0x4000>, <0x210000 0x4000>;
-+				reg-names = "m_can", "message_ram";
-+				interrupts = <56 IRQ_TYPE_LEVEL_HIGH 7>,
-+					     <64 IRQ_TYPE_LEVEL_HIGH 7>;
-+				interrupt-names = "int0", "int1";
-+				clocks = <&can0_clk>, <&can0_gclk>;
-+				clock-names = "hclk", "cclk";
-+				assigned-clocks = <&can0_gclk>;
-+				assigned-clock-parents = <&utmi>;
-+				assigned-clock-rates = <40000000>;
-+				bosch,mram-cfg = <0x0 0 0 32 0 0 0 1>;
-+				status = "disabled";
-+			};
-+
- 			spi1: spi at fc000000 {
- 				compatible = "atmel,at91rm9200-spi";
- 				reg = <0xfc000000 0x100>;
-@@ -1305,6 +1345,22 @@
- 				status = "okay";
- 			};
- 
-+			can1: can at fc050000 {
-+				compatible = "bosch,m_can";
-+				reg = <0xfc050000 0x4000>, <0x210000 0x4000>;
-+				reg-names = "m_can", "message_ram";
-+				interrupts = <57 IRQ_TYPE_LEVEL_HIGH 7>,
-+					     <65 IRQ_TYPE_LEVEL_HIGH 7>;
-+				interrupt-names = "int0", "int1";
-+				clocks = <&can1_clk>, <&can1_gclk>;
-+				clock-names = "hclk", "cclk";
-+				assigned-clocks = <&can1_gclk>;
-+				assigned-clock-parents = <&utmi>;
-+				assigned-clock-rates = <40000000>;
-+				bosch,mram-cfg = <0x0 0 0 32 0 0 0 1>;
-+				status = "disabled";
-+			};
-+
- 			chipid at fc069000 {
- 				compatible = "atmel,sama5d2-chipid";
- 				reg = <0xfc069000 0x8>;
--- 
-2.11.0
+> Is there any framework for it?
+>
+> Mark,
+> I add you to recipients for the question above.
+>
+> Thanks,
+> Icenowy
+>
+>>
+>> regards,
+>>   o.
+>>
+>> Dne 6.3.2017 v 23:34 Icenowy Zheng napsal(a):
+>>>  Allwinner H3 have a its USB PHY0 routed to two USB controllers: one is
+>>>  a MUSB controller, which can work in peripheral mode, but works badly in
+>>>  host mode (several hardware will fail on the MUSB controller, even connect
+>>>  one MUSB controller in peripheral mode to another one in host mode cannot
+>>>  work); the other is a pair of EHCI/OHCI controller, which can work only
+>>>  in host mode, but have better compatibillity. The route is controlled in
+>>>  a register, which we have set it to HCI only when we do not know about
+>>>  it well.
+>>>
+>>>  Add support to route to the best controller according to current USB mode
+>>>  (host/peripheral).
+>>>
+>>>  Note: Currently even if hardware only support hostmode, we should still
+>>>  enable the MUSB controller, as it controls the USB mode. (Some this kind
+>>>  of hardware can also work in peripheral mode by settings in the sysfs
+>>>  node of MUSB, then connect it to another host via a USB Type-A to Type-A
+>>>  cable.)
+>>>
+>>>  Patch 1 changes the device tree binding to include the "pmu0" for HCI pair.
+>>>
+>>>  Patch 2 adds support for auto routing of PHY0. It's currently only enabled
+>>>  on H3, but it's easy to extend it to other SoCs which feature this
+>>>  route control.
+>>>
+>>>  Patch 3 adds necessary device tree nodes to the H3 DTSI file. Note: The
+>>>  phy is not bind for OHCI/EHCI0, as OHCI/EHCI drivers will keep the VBUS
+>>>  on. Only MUSB driver can properly handle a dual-role PHY.
+>>>
+>>>  Patch 4 enables USB OTG functionality on Orange Pi One board, which is
+>>>  the only H3 board I have that have proper OTG function. It's easy to
+>>>  enable OTG on other boards with their schematics.
+>>>
+>>>  Patch 5 enables USB OTG functionality on Orange Pi Zero board, as the
+>>>  board cannot output power on Vbus, I only enabled peripheral mode by
+>>>  default.
+>>>
+>>>  The USB PHY on V3s/A64 SoCs also feature this capability, and it will
+>>>  be soon enabled on these SoCs after this patchset is merged.
+>>>
+>>>  Icenowy Zheng (5):
+>>>    dt: bindings: add pmu0 regs for USB PHYs on Allwinner H3/V3s/A64
+>>>    phy: sun4i-usb: support automatically switch PHY0 route to MUSB/HCI
+>>>    ARM: dts: sun8i: h3: add usb_otg and OHCI/EHCI for usbc0 on H3
+>>>    ARM: dts: sun8i: h3: enable USB OTG on Orange Pi One
+>>>    ARM: dts: sun8i: h2+: enable USB OTG for Orange Pi Zero board
+>>>
+>>>   .../devicetree/bindings/phy/sun4i-usb-phy.txt | 1 +
+>>>   arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts | 14 ++++++
+>>>   arch/arm/boot/dts/sun8i-h3-orangepi-one.dts | 22 +++++++++-
+>>>   arch/arm/boot/dts/sun8i-h3.dtsi | 32 ++++++++++++++
+>>>   drivers/phy/phy-sun4i-usb.c | 50 ++++++++++++++--------
+>>>   5 files changed, 101 insertions(+), 18 deletions(-)
+>
+> --
+> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
+> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
+> For more options, visit https://groups.google.com/d/optout.
