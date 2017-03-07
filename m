@@ -1,233 +1,336 @@
-From: a.hajda@samsung.com (Andrzej Hajda)
-Date: Tue, 07 Mar 2017 09:48:26 +0100
-Subject: [Patch v2 09/11] v4l2: Add v4l2 control IDs for HEVC encoder
-In-Reply-To: <1488532036-13044-10-git-send-email-smitha.t@samsung.com>
-References: <1488532036-13044-1-git-send-email-smitha.t@samsung.com>
- <CGME20170303090508epcas1p2ff5f5849d680c3558c564e77444fce53@epcas1p2.samsung.com>
- <1488532036-13044-10-git-send-email-smitha.t@samsung.com>
-Message-ID: <0b93b507-ae3b-f580-7c31-ddf814e0f27b@samsung.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Tue, 7 Mar 2017 14:22:53 +0530
+Subject: [PATCH 2/4] dmaengine: mtk_uart_dma: add Mediatek uart DMA support
+In-Reply-To: <1487243251-964-3-git-send-email-long.cheng@mediatek.com>
+References: <1487243251-964-1-git-send-email-long.cheng@mediatek.com>
+ <1487243251-964-3-git-send-email-long.cheng@mediatek.com>
+Message-ID: <20170307085253.GH2843@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03.03.2017 10:07, Smitha T Murthy wrote:
-> Add v4l2 controls for HEVC encoder
->
-> Signed-off-by: Smitha T Murthy <smitha.t@samsung.com>
-> ---
->  drivers/media/v4l2-core/v4l2-ctrls.c |   51 +++++++++++++
->  include/uapi/linux/v4l2-controls.h   |  129 ++++++++++++++++++++++++++++++++++
->  2 files changed, 180 insertions(+), 0 deletions(-)
->
-> diff --git a/drivers/media/v4l2-core/v4l2-ctrls.c b/drivers/media/v4l2-core/v4l2-ctrls.c
-> index 47001e2..b3ec7a3 100644
-> --- a/drivers/media/v4l2-core/v4l2-ctrls.c
-> +++ b/drivers/media/v4l2-core/v4l2-ctrls.c
-> @@ -775,6 +775,57 @@ static bool is_new_manual(const struct v4l2_ctrl *master)
->  	case V4L2_CID_MPEG_VIDEO_VPX_P_FRAME_QP:		return "VPX P-Frame QP Value";
->  	case V4L2_CID_MPEG_VIDEO_VPX_PROFILE:			return "VPX Profile";
->  
-> +	/* HEVC controls */
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_I_FRAME_QP:		return "HEVC I frame QP value";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_P_FRAME_QP:		return "HEVC P frame QP value";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_B_FRAME_QP:		return "HEVC B frame QP value";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_MIN_QP:			return "HEVC Minimum QP value";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_MAX_QP:			return "HEVC Maximum QP value";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_ADAPTIVE_RC_DARK:		return "HEVC Dark region adaptive";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_ADAPTIVE_RC_SMOOTH:	return "HEVC Smooth region adaptive";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_ADAPTIVE_RC_STATIC:	return "HEVC Static region adaptive";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_ADAPTIVE_RC_ACTIVITY:	return "HEVC Region adaptive rate control";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_PROFILE:			return "HEVC Profile";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_LEVEL:			return "HEVC Level";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_TIER_FLAG:		return "HEVC tier_flag default is Main";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_RC_FRAME_RATE:		return "HEVC Frame rate";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_MAX_PARTITION_DEPTH:	return "HEVC Maximum coding unit depth";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_REF_NUMBER_FOR_PFRAMES:	return "HEVC Number of reference frames for P Frames";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_REFRESH_TYPE:		return "HEVC Refresh type";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_CONST_INTRA_PRED_ENABLE:	return "HEVC Constant intra prediction enable";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_LOSSLESS_CU_ENABLE:	return "HEVC Lossless encoding enable";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_WAVEFRONT_ENABLE:		return "HEVC Wavefront enable";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_LF_DISABLE:		return "HEVC Loop filter disable";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_LF_SLICE_BOUNDARY:	return "HEVC Loop filtering across slice boundary or not";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_LTR_ENABLE:		return "HEVC long term reference enable";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_QP_ENABLE:	return "HEVC QP values for temporal layer";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_TYPE:	return "HEVC Hierarchical Coding Type";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER:return "HEVC Hierarchical Coding Layer";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER_QP:return "HEVC Hierarchical Coding Layer QP";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER_BIT0:return "HEVC Hierarchical Coding Layer BIT0";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER_BIT1:return "HEVC Hierarchical Coding Layer BIT1";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER_BIT2:return "HEVC Hierarchical Coding Layer BIT2";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER_BIT3:return "HEVC Hierarchical Coding Layer BIT3";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER_BIT4:return "HEVC Hierarchical Coding Layer BIT4";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER_BIT5:return "HEVC Hierarchical Coding Layer BIT5";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER_BIT6:return "HEVC Hierarchical Coding Layer BIT6";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER_CH:return "HEVC Hierarchical Coding Layer Change";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_SIGN_DATA_HIDING:		return "HEVC Sign data hiding";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_GENERAL_PB_ENABLE:	return "HEVC General pb enable";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_TEMPORAL_ID_ENABLE:	return "HEVC Temporal id enable";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_STRONG_SMOTHING_FLAG:	return "HEVC Strong intra smoothing flag";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_DISABLE_INTRA_PU_SPLIT:	return "HEVC Disable intra pu split";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_DISABLE_TMV_PREDICTION:	return "HEVC Disable tmv prediction";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_MAX_NUM_MERGE_MV_MINUS1:	return "HEVC Max number of candidate MVs";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_WITHOUT_STARTCODE_ENABLE:	return "HEVC ENC without startcode enable";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_REFRESH_PERIOD:		return "HEVC Number of reference picture";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_LF_BETA_OFFSET_DIV2:	return "HEVC Loop filter beta offset";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_LF_TC_OFFSET_DIV2:	return "HEVC Loop filter tc offset";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_SIZE_OF_LENGTH_FIELD:	return "HEVC Size of length field";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_USE_REF:			return "HEVC User long term reference frame";
+On Thu, Feb 16, 2017 at 07:07:29PM +0800, Long Cheng wrote:
+> In DMA engine framework, add 8250 mtk dma to support it.
 
-s/User/Use/
+Can you please describe the controller here
 
-As I said previously I am not HEVC expert, it would be good if someone
-with better skills look at it.
->From my side after fixing typo above you can add:
-Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
+> +/*
+> + * MTK DMAengine support
+> + *
+> + * Copyright (c) 2016 MediaTek Inc.
 
-Regards
-Andrzej
+we are in 2017 now
 
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_STORE_REF:		return "HEVC Store long term reference frame";
-> +	case V4L2_CID_MPEG_VIDEO_HEVC_PREPEND_SPSPPS_TO_IDR:	return "HEVC Prepend SPS/PPS to every IDR";
+> +#define VFF_INT_FLAG_CLR_B	0
+> +/*VFF_INT_EN*/
+> +#define VFF_RX_INT_EN0_B	BIT(0)
+> +#define VFF_RX_INT_EN1_B	BIT(1)
+> +#define VFF_TX_INT_EN_B		BIT(0)
+> +#define VFF_INT_EN_CLR_B	0
+
+empty line after each logical bloock helps in readablity
+
+> +/*VFF_RST*/
+> +#define VFF_WARM_RST_B		BIT(0)
+> +/*VFF_EN*/
+> +#define VFF_EN_B		BIT(0)
+> +/*VFF_STOP*/
+> +#define VFF_STOP_B		BIT(0)
+> +#define VFF_STOP_CLR_B		0
+> +/*VFF_FLUSH*/
+> +#define VFF_FLUSH_B		BIT(0)
+> +#define VFF_FLUSH_CLR_B		0
+
+please align all these
 > +
->  	/* CAMERA controls */
->  	/* Keep the order of the 'case's the same as in v4l2-controls.h! */
->  	case V4L2_CID_CAMERA_CLASS:		return "Camera Controls";
-> diff --git a/include/uapi/linux/v4l2-controls.h b/include/uapi/linux/v4l2-controls.h
-> index 0d2e1e0..11a13c3 100644
-> --- a/include/uapi/linux/v4l2-controls.h
-> +++ b/include/uapi/linux/v4l2-controls.h
-> @@ -579,6 +579,135 @@ enum v4l2_vp8_golden_frame_sel {
->  #define V4L2_CID_MPEG_VIDEO_VPX_P_FRAME_QP		(V4L2_CID_MPEG_BASE+510)
->  #define V4L2_CID_MPEG_VIDEO_VPX_PROFILE			(V4L2_CID_MPEG_BASE+511)
->  
-> +/* CIDs for HEVC encoding. Number gaps are for compatibility */
+> +#define VFF_TX_THRE(n)		((n)*7/8)
+> +#define VFF_RX_THRE(n)		((n)*3/4)
+
+can you describe this
+
+> +static bool mtk_dma_filter_fn(struct dma_chan *chan, void *param);
+
+is there a reason for this, we can move the filer fn here!
+
+> +static int mtk_dma_tx_write(struct dma_chan *chan)
+> +{
+> +	struct mtk_chan *c = to_mtk_dma_chan(chan);
+> +	struct mtk_dmadev *mtkd = to_mtk_dma_dev(chan->device);
+> +	struct timespec a, b;
+> +	int txcount = c->remain_size;
+> +	unsigned int tx_size = c->cfg.dst_addr_width*1024;
+> +	unsigned int len, left;
+> +	unsigned int wpt;
+> +	ktime_t begin, end;
 > +
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_MIN_QP                         \
-> +					(V4L2_CID_MPEG_BASE + 512)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_MAX_QP                         \
-> +					(V4L2_CID_MPEG_BASE + 513)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_I_FRAME_QP                     \
-> +					(V4L2_CID_MPEG_BASE + 514)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_P_FRAME_QP                     \
-> +					(V4L2_CID_MPEG_BASE + 515)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_B_FRAME_QP                     \
-> +					(V4L2_CID_MPEG_BASE + 516)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_QP_ENABLE \
-> +					(V4L2_CID_MPEG_BASE + 517)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_TYPE       \
-> +					(V4L2_CID_MPEG_BASE + 518)
-> +enum v4l2_mpeg_video_hevc_hier_coding_type {
-> +	V4L2_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_B	= 0,
-> +	V4L2_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_P	= 1,
-> +};
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER      \
-> +					(V4L2_CID_MPEG_BASE + 519)
-> +enum v4l2_mpeg_video_hevc_hierarchial_coding_layer {
-> +	V4L2_MPEG_VIDEO_HEVC_HIERARCHIAL_CODING_LAYER0	= 0,
-> +	V4L2_MPEG_VIDEO_HEVC_HIERARCHIAL_CODING_LAYER1	= 1,
-> +	V4L2_MPEG_VIDEO_HEVC_HIERARCHIAL_CODING_LAYER2	= 2,
-> +	V4L2_MPEG_VIDEO_HEVC_HIERARCHIAL_CODING_LAYER3	= 3,
-> +	V4L2_MPEG_VIDEO_HEVC_HIERARCHIAL_CODING_LAYER4	= 4,
-> +	V4L2_MPEG_VIDEO_HEVC_HIERARCHIAL_CODING_LAYER5	= 5,
-> +	V4L2_MPEG_VIDEO_HEVC_HIERARCHIAL_CODING_LAYER6	= 6,
-> +};
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER_QP   \
-> +					(V4L2_CID_MPEG_BASE + 520)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_PROFILE                        \
-> +					(V4L2_CID_MPEG_BASE + 521)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_LEVEL                          \
-> +					(V4L2_CID_MPEG_BASE + 522)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_RC_FRAME_RATE            \
-> +					(V4L2_CID_MPEG_BASE + 523)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_TIER_FLAG                \
-> +					(V4L2_CID_MPEG_BASE + 524)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_MAX_PARTITION_DEPTH      \
-> +					(V4L2_CID_MPEG_BASE + 525)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_REF_NUMBER_FOR_PFRAMES   \
-> +					(V4L2_CID_MPEG_BASE + 526)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_LF_DISABLE               \
-> +					(V4L2_CID_MPEG_BASE + 527)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_LF_SLICE_BOUNDARY        \
-> +					(V4L2_CID_MPEG_BASE + 528)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_LF_BETA_OFFSET_DIV2      \
-> +					(V4L2_CID_MPEG_BASE + 529)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_LF_TC_OFFSET_DIV2        \
-> +					(V4L2_CID_MPEG_BASE + 530)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_REFRESH_TYPE             \
-> +					(V4L2_CID_MPEG_BASE + 531)
-> +enum v4l2_cid_mpeg_video_hevc_refresh_type {
-> +	V4L2_MPEG_VIDEO_HEVC_REFRESH_NONE		= 0,
-> +	V4L2_MPEG_VIDEO_HEVC_REFRESH_CRA		= 1,
-> +	V4L2_MPEG_VIDEO_HEVC_REFRESH_IDR		= 2,
-> +};
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_REFRESH_PERIOD           \
-> +					(V4L2_CID_MPEG_BASE + 532)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_LOSSLESS_CU_ENABLE       \
-> +					(V4L2_CID_MPEG_BASE + 533)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_CONST_INTRA_PRED_ENABLE  \
-> +					(V4L2_CID_MPEG_BASE + 534)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_WAVEFRONT_ENABLE         \
-> +					(V4L2_CID_MPEG_BASE + 535)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_LTR_ENABLE               \
-> +					(V4L2_CID_MPEG_BASE + 536)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_USE_REF                  \
-> +					(V4L2_CID_MPEG_BASE + 537)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_STORE_REF                \
-> +					(V4L2_CID_MPEG_BASE + 538)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_SIGN_DATA_HIDING         \
-> +					(V4L2_CID_MPEG_BASE + 539)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_GENERAL_PB_ENABLE        \
-> +					(V4L2_CID_MPEG_BASE + 540)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_TEMPORAL_ID_ENABLE       \
-> +					(V4L2_CID_MPEG_BASE + 541)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_STRONG_SMOTHING_FLAG     \
-> +					(V4L2_CID_MPEG_BASE + 542)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_MAX_NUM_MERGE_MV_MINUS1  \
-> +					(V4L2_CID_MPEG_BASE + 543)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_ADAPTIVE_RC_DARK         \
-> +					(V4L2_CID_MPEG_BASE + 544)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_ADAPTIVE_RC_SMOOTH       \
-> +					(V4L2_CID_MPEG_BASE + 545)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_ADAPTIVE_RC_STATIC       \
-> +					(V4L2_CID_MPEG_BASE + 546)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_ADAPTIVE_RC_ACTIVITY     \
-> +					(V4L2_CID_MPEG_BASE + 547)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_DISABLE_INTRA_PU_SPLIT   \
-> +					(V4L2_CID_MPEG_BASE + 548)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_DISABLE_TMV_PREDICTION   \
-> +					(V4L2_CID_MPEG_BASE + 549)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_WITHOUT_STARTCODE_ENABLE \
-> +					(V4L2_CID_MPEG_BASE + 550)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_QP_INDEX_CR              \
-> +					(V4L2_CID_MPEG_BASE + 551)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_QP_INDEX_CB              \
-> +					(V4L2_CID_MPEG_BASE + 552)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_SIZE_OF_LENGTH_FIELD     \
-> +					(V4L2_CID_MPEG_BASE + 553)
-> +enum v4l2_cid_mpeg_video_hevc_size_of_length_field {
-> +	V4L2_MPEG_VIDEO_HEVC_SIZE_0		= 0,
-> +	V4L2_MPEG_VIDEO_HEVC_SIZE_1		= 1,
-> +	V4L2_MPEG_VIDEO_HEVC_SIZE_2		= 2,
-> +	V4L2_MPEG_VIDEO_HEVC_SIZE_4		= 3,
-> +};
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_PREPEND_SPSPPS_TO_IDR          \
-> +					(V4L2_CID_MPEG_BASE + 554)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER_CH   \
-> +					(V4L2_CID_MPEG_BASE + 555)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER_BIT0 \
-> +					(V4L2_CID_MPEG_BASE + 556)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER_BIT1 \
-> +					(V4L2_CID_MPEG_BASE + 557)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER_BIT2 \
-> +					(V4L2_CID_MPEG_BASE + 558)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER_BIT3 \
-> +					(V4L2_CID_MPEG_BASE + 559)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER_BIT4 \
-> +					(V4L2_CID_MPEG_BASE + 560)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER_BIT5 \
-> +					(V4L2_CID_MPEG_BASE + 561)
-> +#define V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER_BIT6 \
-> +					(V4L2_CID_MPEG_BASE + 562)
+> +	if (atomic_inc_and_test(&c->entry) > 1) {
+
+why are we using atomic variables
+
+> +		if (vchan_issue_pending(&c->vc) && !c->desc) {
+> +			spin_lock(&mtkd->lock);
+> +			list_add_tail(&c->node, &mtkd->pending);
+> +			spin_unlock(&mtkd->lock);
+> +			tasklet_schedule(&mtkd->task);
+> +		}
+> +	} else {
+> +		while (mtk_dma_chan_read(c, VFF_LEFT_SIZE) >= c->trig) {
+> +			left = tx_size - mtk_dma_chan_read(c, VFF_VALID_SIZE);
+> +			left = (left > 16) ? (left - 16) : (0);
+> +			len = left < c->remain_size ? left : c->remain_size;
+
+?? can you explain this
+
 > +
->  /*  MPEG-class control IDs specific to the CX2341x driver as defined by V4L2 */
->  #define V4L2_CID_MPEG_CX2341X_BASE 				(V4L2_CTRL_CLASS_MPEG | 0x1000)
->  #define V4L2_CID_MPEG_CX2341X_VIDEO_SPATIAL_FILTER_MODE 	(V4L2_CID_MPEG_CX2341X_BASE+0)
+> +			begin = ktime_get();
+> +			a = ktime_to_timespec(begin);
+
+more alarm bells now!
+
+> +			while (len--) {
+> +				/*
+> +				 * DMA limitation.
+> +				 * Workaround: Polling flush bit to zero,
+> +				 * set 1s timeout
+> +				 */
+
+1sec is ***VERY*** large, does the device recommend that?
+
+> +				while (mtk_dma_chan_read(c, VFF_FLUSH)) {
+> +					end = ktime_get();
+> +					b = ktime_to_timespec(end);
+> +					if ((b.tv_sec - a.tv_sec) > 1 ||
+> +						((b.tv_sec - a.tv_sec) == 1 &&
+> +						b.tv_nsec > a.tv_nsec)) {
+> +						dev_info(chan->device->dev,
+> +							"[UART] Polling flush timeout\n");
+> +						return 0;
+> +					}
+> +				}
+
+No this is not how you implement a time out. Hint use jiffes and count them.
+
+> +
+> +				wpt = mtk_dma_chan_read(c, VFF_WPT);
+> +
+> +				if ((wpt & 0x0000ffffl) ==
+
+magic number?
+
+> +static void mtk_dma_start_tx(struct mtk_chan *c)
+> +{
+> +	if (mtk_dma_chan_read(c, VFF_LEFT_SIZE) == 0) {
+> +		dev_info(c->vc.chan.device->dev, "%s maybe need fix? %d @L %d\n",
+> +				__func__, mtk_dma_chan_read(c, VFF_LEFT_SIZE),
+> +				__LINE__);
+> +		mtk_dma_chan_write(c, VFF_INT_EN, VFF_TX_INT_EN_B);
+> +	} else {
+> +		reinit_completion(&c->done);
+> +		atomic_inc(&c->loopcnt);
+> +		atomic_inc(&c->loopcnt);
+
+why would you increment twice
+
+> +static void mtk_dma_reset(struct mtk_chan *c)
+> +{
+> +	struct timespec a, b;
+> +	ktime_t begin, end;
+> +
+> +	mtk_dma_chan_write(c, VFF_ADDR, 0);
+> +	mtk_dma_chan_write(c, VFF_THRE, 0);
+> +	mtk_dma_chan_write(c, VFF_LEN, 0);
+> +	mtk_dma_chan_write(c, VFF_RST, VFF_WARM_RST_B);
+> +
+> +	begin = ktime_get();
+> +	a = ktime_to_timespec(begin);
+> +	while (mtk_dma_chan_read(c, VFF_EN)) {
+> +		end = ktime_get();
+> +		b = ktime_to_timespec(end);
+> +		if ((b.tv_sec - a.tv_sec) > 1 ||
+> +			((b.tv_sec - a.tv_sec) == 1 &&
+> +			b.tv_nsec > a.tv_nsec)) {
+> +			dev_info(c->vc.chan.device->dev,
+> +				"[UART] Polling VFF EN timeout\n");
+> +			return;
+> +		}
+
+and here we go again
+
+> +static void mtk_dma_stop(struct mtk_chan *c)
+> +{
+> +	int polling_cnt;
+> +
+> +	mtk_dma_chan_write(c, VFF_FLUSH, VFF_FLUSH_CLR_B);
+> +
+> +	polling_cnt = 0;
+> +	while (mtk_dma_chan_read(c, VFF_FLUSH))	{
+> +		polling_cnt++;
+> +		if (polling_cnt > MTK_POLLING_CNT) {
+> +			dev_info(c->vc.chan.device->dev, "mtk_uart_stop_dma: polling VFF_FLUSH fail VFF_DEBUG_STATUS=0x%x\n",
+
+126 chars, surely that must be a record!
+
+> +					mtk_dma_chan_read(c, VFF_DEBUG_STATUS));
+> +			break;
+> +		}
+> +	}
+> +
+> +	polling_cnt = 0;
+> +	/*set stop as 1 -> wait until en is 0 -> set stop as 0*/
+> +	mtk_dma_chan_write(c, VFF_STOP, VFF_STOP_B);
+> +	while (mtk_dma_chan_read(c, VFF_EN)) {
+> +		polling_cnt++;
+> +		if (polling_cnt > MTK_POLLING_CNT) {
+> +			dev_info(c->vc.chan.device->dev, "mtk_uart_stop_dma: polling VFF_EN fail VFF_DEBUG_STATUS=0x%x\n",
+
+and here
+
+> +					mtk_dma_chan_read(c, VFF_DEBUG_STATUS));
+> +			break;
+> +		}
+> +	}
+> +	mtk_dma_chan_write(c, VFF_STOP, VFF_STOP_CLR_B);
+> +	mtk_dma_chan_write(c, VFF_INT_EN, VFF_INT_EN_CLR_B);
+> +	mtk_dma_chan_write(c, VFF_INT_FLAG, VFF_INT_FLAG_CLR_B);
+> +
+> +	c->paused = true;
+> +}
+> +
+> +/*
+> + * This callback schedules all pending channels. We could be more
+> + * clever here by postponing allocation of the real DMA channels to
+> + * this point, and freeing them when our virtual channel becomes idle.
+
+yeah sounds good to me :)
+
+> +static int mtk_dma_alloc_chan_resources(struct dma_chan *chan)
+> +{
+> +	struct mtk_dmadev *mtkd = to_mtk_dma_dev(chan->device);
+> +	struct mtk_chan *c = to_mtk_dma_chan(chan);
+> +	int ret;
+> +
+> +	ret = -EBUSY;
+> +
+> +	if (mtkd->lch_map[c->dma_ch] == NULL) {
+> +		c->channel_base = mtkd->base + 0x80 * c->dma_ch;
+
+this should be probe thingy, why are we doing this here?
+
+> +static enum dma_status mtk_dma_tx_status(struct dma_chan *chan,
+> +	dma_cookie_t cookie, struct dma_tx_state *txstate)
+> +{
+> +	struct mtk_chan *c = to_mtk_dma_chan(chan);
+> +	enum dma_status ret;
+> +	unsigned long flags;
+> +
+> +	ret = dma_cookie_status(chan, cookie, txstate);
+> +
+> +	spin_lock_irqsave(&c->vc.lock, flags);
+> +
+> +	if (ret == DMA_IN_PROGRESS) {
+> +		c->rx_ptr = mtk_dma_chan_read(c, VFF_RPT) & 0x0000ffffl;
+
+magic!!
+
+> +		txstate->residue = c->rx_ptr;
+> +	} else if (ret == DMA_COMPLETE && c->cfg.direction == DMA_DEV_TO_MEM) {
+> +		txstate->residue = c->remain_size;
+
+this seems incorrect, if it is complete then why residue?
+
+> +	} else {
+> +		txstate->residue = 0;
+
+which is a no-op
+
+
+> +static struct dma_async_tx_descriptor *mtk_dma_prep_slave_sg(
+> +	struct dma_chan *chan, struct scatterlist *sgl, unsigned int sglen,
+> +	enum dma_transfer_direction dir, unsigned long tx_flags, void *context)
+> +{
+> +	struct mtk_chan *c = to_mtk_dma_chan(chan);
+> +	enum dma_slave_buswidth dev_width;
+> +	struct scatterlist *sgent;
+> +	struct mtk_desc *d;
+> +	dma_addr_t dev_addr;
+> +	unsigned int i, j, en, frame_bytes;
+> +
+> +	en = frame_bytes = 1;
+> +
+> +	if (dir == DMA_DEV_TO_MEM) {
+> +		dev_addr = c->cfg.src_addr;
+> +		dev_width = c->cfg.src_addr_width;
+> +	} else if (dir == DMA_MEM_TO_DEV) {
+> +		dev_addr = c->cfg.dst_addr;
+> +		dev_width = c->cfg.dst_addr_width;
+> +	} else {
+> +		dev_err(chan->device->dev, "%s: bad direction?\n", __func__);
+> +		return NULL;
+> +	}
+> +
+> +	/* Now allocate and setup the descriptor. */
+> +	d = kmalloc(sizeof(*d) + sglen * sizeof(d->sg[0]),
+> +				GFP_KERNEL | ___GFP_ZERO);
+
+why ___GFP_ZERO? why not GFP_NOATOMIC?
+
+> +static int
+> +mtk_dma_slave_config(struct dma_chan *chan, struct dma_slave_config *cfg)
+> +{
+> +	struct mtk_chan *c = to_mtk_dma_chan(chan);
+> +	struct mtk_dmadev *mtkd = to_mtk_dma_dev(c->vc.chan.device);
+> +	int ret;
+> +
+> +	memcpy(&c->cfg, cfg, sizeof(c->cfg));
+> +
+> +	if (cfg->direction == DMA_DEV_TO_MEM) {
+> +		mtk_dma_chan_write(c, VFF_ADDR, cfg->src_addr);
+> +		mtk_dma_chan_write(c, VFF_LEN, cfg->src_addr_width*1024);
+> +		mtk_dma_chan_write(c, VFF_THRE,
+> +					VFF_RX_THRE(cfg->src_addr_width*1024));
+> +		mtk_dma_chan_write(c, VFF_INT_EN,
+> +					VFF_RX_INT_EN0_B | VFF_RX_INT_EN1_B);
+> +		mtk_dma_chan_write(c, VFF_INT_FLAG, VFF_INT_FLAG_CLR_B);
+> +		mtk_dma_chan_write(c, VFF_EN, VFF_EN_B);
+
+this is wrong, you dont program channel here, but upon the descriptor issue.
+The values should be stored locally and used to prepare.
+
+> +static int mtk_dma_pause(struct dma_chan *chan)
+> +{
+> +	/* Pause/Resume only allowed with cyclic mode */
+> +	return -EINVAL;
+> +}
+
+then remove it
+
+> +	dma_cap_set(DMA_SLAVE, mtkd->ddev.cap_mask);
+> +	mtkd->ddev.device_alloc_chan_resources = mtk_dma_alloc_chan_resources;
+> +	mtkd->ddev.device_free_chan_resources = mtk_dma_free_chan_resources;
+> +	mtkd->ddev.device_tx_status = mtk_dma_tx_status;
+> +	mtkd->ddev.device_issue_pending = mtk_dma_issue_pending;
+> +	mtkd->ddev.device_prep_slave_sg = mtk_dma_prep_slave_sg;
+> +	mtkd->ddev.device_config = mtk_dma_slave_config;
+> +	mtkd->ddev.device_pause = mtk_dma_pause;
+> +	mtkd->ddev.device_resume = mtk_dma_resume;
+> +	mtkd->ddev.device_terminate_all = mtk_dma_terminate_all;
+> +	mtkd->ddev.src_addr_widths = BIT(DMA_SLAVE_BUSWIDTH_1_BYTE);
+> +	mtkd->ddev.dst_addr_widths = BIT(DMA_SLAVE_BUSWIDTH_1_BYTE);
+
+1bytes width, are you sure about that?
+
+> +static int mtk_dma_init(void)
+> +{
+> +	return platform_driver_register(&mtk_dma_driver);
+> +}
+> +subsys_initcall(mtk_dma_init);
+> +
+> +static void __exit mtk_dma_exit(void)
+> +{
+> +	platform_driver_unregister(&mtk_dma_driver);
+> +}
+> +module_exit(mtk_dma_exit);
+
+platform_driver_register() pls
+
+-- 
+~Vinod
