@@ -1,113 +1,37 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Tue, 07 Mar 2017 11:18:24 +0100
-Subject: [PATCH v1 1/2] clk: rockchip: rk3368: export SCLK_TIMERXX id for
- timers
-In-Reply-To: <1488880211-21133-1-git-send-email-zhangqing@rock-chips.com>
-References: <1488880211-21133-1-git-send-email-zhangqing@rock-chips.com>
-Message-ID: <15674852.NcXVK0sQHA@diego>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 7 Mar 2017 11:18:52 +0100
+Subject: [PATCH] spi: sun6i: Allow transfers larger than FIFO size
+In-Reply-To: <20170306121443.36954-1-icenowy@aosc.xyz>
+References: <20170306121443.36954-1-icenowy@aosc.xyz>
+Message-ID: <20170307101852.uuxiu5ycd7zbgrxm@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Elaine,
-
-Am Dienstag, 7. M?rz 2017, 17:50:10 CET schrieb Elaine Zhang:
-> Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
-> ---
->  drivers/clk/rockchip/clk-rk3368.c      | 24 ++++++++++++------------
->  include/dt-bindings/clock/rk3368-cru.h | 19 ++++++++++++-------
-
-as always, please split clock-id addition and the assignment in the clock-
-driver.
-
-Also, as it looks like the old timer-ids are wrong and also still unused, 
-please also state this in the patch changing the ids.
-
-
-Thanks
-Heiko
-
->  2 files changed, 24 insertions(+), 19 deletions(-)
+On Mon, Mar 06, 2017 at 08:14:43PM +0800, Icenowy Zheng wrote:
+> The spi-sun6i driver have the same problem that spi-sun4i used to have
+> -- SPI transfers are limited to one FIFO depth.
 > 
-> diff --git a/drivers/clk/rockchip/clk-rk3368.c
-> b/drivers/clk/rockchip/clk-rk3368.c index 6cb474c593e7..139d418f448e 100644
-> --- a/drivers/clk/rockchip/clk-rk3368.c
-> +++ b/drivers/clk/rockchip/clk-rk3368.c
-> @@ -835,18 +835,18 @@ enum rk3368_plls {
->  	GATE(PCLK_PMU, "pclk_pmu", "pclk_pd_pmu", CLK_IGNORE_UNUSED,
-> RK3368_CLKGATE_CON(23), 0, GFLAGS),
+> This commit fixes this problem in the same way it's fixed in spi-sun4i.
+> See commit 196737912da5 ("spi: sun4i: Allow transfers larger than FIFO size")
+> for more information.
 > 
->  	/* timer gates */
-> -	GATE(0, "sclk_timer15", "xin24m", CLK_IGNORE_UNUSED,
-> RK3368_CLKGATE_CON(24), 11, GFLAGS), -	GATE(0, "sclk_timer14", "xin24m",
-> CLK_IGNORE_UNUSED, RK3368_CLKGATE_CON(24), 10, GFLAGS), -	GATE(0,
-> "sclk_timer13", "xin24m", CLK_IGNORE_UNUSED, RK3368_CLKGATE_CON(24), 9,
-> GFLAGS), -	GATE(0, "sclk_timer12", "xin24m", CLK_IGNORE_UNUSED,
-> RK3368_CLKGATE_CON(24), 8, GFLAGS), -	GATE(0, "sclk_timer11", "xin24m",
-> CLK_IGNORE_UNUSED, RK3368_CLKGATE_CON(24), 7, GFLAGS), -	GATE(0,
-> "sclk_timer10", "xin24m", CLK_IGNORE_UNUSED, RK3368_CLKGATE_CON(24), 6,
-> GFLAGS), -	GATE(0, "sclk_timer05", "xin24m", CLK_IGNORE_UNUSED,
-> RK3368_CLKGATE_CON(24), 5, GFLAGS), -	GATE(0, "sclk_timer04", "xin24m",
-> CLK_IGNORE_UNUSED, RK3368_CLKGATE_CON(24), 4, GFLAGS), -	GATE(0,
-> "sclk_timer03", "xin24m", CLK_IGNORE_UNUSED, RK3368_CLKGATE_CON(24), 3,
-> GFLAGS), -	GATE(0, "sclk_timer02", "xin24m", CLK_IGNORE_UNUSED,
-> RK3368_CLKGATE_CON(24), 2, GFLAGS), -	GATE(0, "sclk_timer01", "xin24m",
-> CLK_IGNORE_UNUSED, RK3368_CLKGATE_CON(24), 1, GFLAGS), -	GATE(0,
-> "sclk_timer00", "xin24m", CLK_IGNORE_UNUSED, RK3368_CLKGATE_CON(24), 0,
-> GFLAGS), +	GATE(SCLK_TIMER15, "sclk_timer15", "xin24m", CLK_IGNORE_UNUSED,
-> RK3368_CLKGATE_CON(24), 11, GFLAGS), +	GATE(SCLK_TIMER14, "sclk_timer14",
-> "xin24m", CLK_IGNORE_UNUSED, RK3368_CLKGATE_CON(24), 10, GFLAGS),
-> +	GATE(SCLK_TIMER13, "sclk_timer13", "xin24m", CLK_IGNORE_UNUSED,
-> RK3368_CLKGATE_CON(24), 9, GFLAGS), +	GATE(SCLK_TIMER12, "sclk_timer12",
-> "xin24m", CLK_IGNORE_UNUSED, RK3368_CLKGATE_CON(24), 8, GFLAGS),
-> +	GATE(SCLK_TIMER11, "sclk_timer11", "xin24m", CLK_IGNORE_UNUSED,
-> RK3368_CLKGATE_CON(24), 7, GFLAGS), +	GATE(SCLK_TIMER10, "sclk_timer10",
-> "xin24m", CLK_IGNORE_UNUSED, RK3368_CLKGATE_CON(24), 6, GFLAGS),
-> +	GATE(SCLK_TIMER05, "sclk_timer05", "xin24m", CLK_IGNORE_UNUSED,
-> RK3368_CLKGATE_CON(24), 5, GFLAGS), +	GATE(SCLK_TIMER04, "sclk_timer04",
-> "xin24m", CLK_IGNORE_UNUSED, RK3368_CLKGATE_CON(24), 4, GFLAGS),
-> +	GATE(SCLK_TIMER03, "sclk_timer03", "xin24m", CLK_IGNORE_UNUSED,
-> RK3368_CLKGATE_CON(24), 3, GFLAGS), +	GATE(SCLK_TIMER02, "sclk_timer02",
-> "xin24m", CLK_IGNORE_UNUSED, RK3368_CLKGATE_CON(24), 2, GFLAGS),
-> +	GATE(SCLK_TIMER01, "sclk_timer01", "xin24m", CLK_IGNORE_UNUSED,
-> RK3368_CLKGATE_CON(24), 1, GFLAGS), +	GATE(SCLK_TIMER00, "sclk_timer00",
-> "xin24m", CLK_IGNORE_UNUSED, RK3368_CLKGATE_CON(24), 0, GFLAGS), };
+> The sun6i SPI controllers features changeable interrupt trigger level, but I
+> set it to 3/4 of fifo depth, as same as the the sun4i SPI controllers.
 > 
->  static const char *const rk3368_critical_clocks[] __initconst = {
-> diff --git a/include/dt-bindings/clock/rk3368-cru.h
-> b/include/dt-bindings/clock/rk3368-cru.h index 9c5dd9ba2f6c..aeb83e581a11
-> 100644
-> --- a/include/dt-bindings/clock/rk3368-cru.h
-> +++ b/include/dt-bindings/clock/rk3368-cru.h
-> @@ -44,13 +44,12 @@
->  #define SCLK_I2S_8CH		82
->  #define SCLK_SPDIF_8CH		83
->  #define SCLK_I2S_2CH		84
-> -#define SCLK_TIMER0		85
-> -#define SCLK_TIMER1		86
-> -#define SCLK_TIMER2		87
-> -#define SCLK_TIMER3		88
-> -#define SCLK_TIMER4		89
-> -#define SCLK_TIMER5		90
-> -#define SCLK_TIMER6		91
-> +#define SCLK_TIMER00		85
-> +#define SCLK_TIMER01		86
-> +#define SCLK_TIMER02		87
-> +#define SCLK_TIMER03		88
-> +#define SCLK_TIMER04		89
-> +#define SCLK_TIMER05		90
->  #define SCLK_OTGPHY0		93
->  #define SCLK_OTG_ADP		96
->  #define SCLK_HSICPHY480M	97
-> @@ -82,6 +81,12 @@
->  #define SCLK_SFC		126
->  #define SCLK_MAC		127
->  #define SCLK_MACREF_OUT		128
-> +#define SCLK_TIMER10		133
-> +#define SCLK_TIMER11		134
-> +#define SCLK_TIMER12		135
-> +#define SCLK_TIMER13		136
-> +#define SCLK_TIMER14		137
-> +#define SCLK_TIMER15		138
-> 
->  #define DCLK_VOP		190
->  #define MCLK_CRYPTO		191
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170307/0b9ef3ff/attachment-0001.sig>
