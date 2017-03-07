@@ -1,39 +1,48 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 7 Mar 2017 18:07:51 +0100
-Subject: [PATCH v8 0/6] Allwinner H5 and Orange Pi PC2 support
-In-Reply-To: <20170306171750.7491-1-icenowy@aosc.xyz>
+Date: Tue, 7 Mar 2017 18:09:09 +0100
+Subject: [PATCH v8 6/6] arm64: dts: allwinner: h5: add support for the
+ Orange Pi PC 2 board
+In-Reply-To: <20170306214904.o2zpw3q3fvtrmsmd@localhost>
 References: <20170306171750.7491-1-icenowy@aosc.xyz>
-Message-ID: <20170307170751.n6tvrztet724pxfl@lukather>
+ <20170306171750.7491-7-icenowy@aosc.xyz>
+ <20170306214904.o2zpw3q3fvtrmsmd@localhost>
+Message-ID: <20170307170909.qnjy36yxbz5eiwe4@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Mar 06, 2017 at 10:49:05PM +0100, Rask Ingemann Lambertsen wrote:
+> > diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts
+> > new file mode 100644
+> > index 000000000000..30639729920d
+> > --- /dev/null
+> > +++ b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts
+> > @@ -0,0 +1,163 @@
+> > +/*
+> > + * Copyright (C) 2016 ARM Ltd.
+> > + *
+> > + * This file is dual-licensed: you can use it either under the terms
+> > + * of the GPL or the X11 license, at your option. Note that this dual
+> > + * licensing only applies to this file, and not this project as a
+> > + * whole.
+> 
+> I didn't catch any sort of announcement of it, but it seems as if we've
+> started using SPDX license identifiers in dts files. Thus you can simply
+> include the line
+> SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+> after the copyright notice and omit the license notices themselves. Even
+> though the comment refers to "the X11 license", the license text matches that
+> associated with the MIT license identifier [1] rather than that of the X11
+> license [2]. The same goes for patch 5/6.
+> 
+> [1] https://spdx.org/licenses/MIT.html#licenseText
+> [2] https://spdx.org/licenses/X11.html#licenseText
 
-On Tue, Mar 07, 2017 at 01:17:44AM +0800, Icenowy Zheng wrote:
-> Allwinner H5 is a 64-bit SoC with a design like the 32-bit
-> H3, and it's pin-to-pin compatible with H3.
-> 
-> This patchset adds support for it, along with the first available
-> board -- Orange Pi PC2.
-> 
-> Several H5 boards by Sinovoip Banana Pi and FriendlyARM Nano Pi
-> are coming, so we should get ready for them.
-> 
-> CCU changes are already said to be merged by Maxime Ripard, so
-> this patchset now contains only device tree patches.
-> 
-> Commit messages are changed by the suggestion of Maxime.
-> 
-> This patchset depends on patchset [1] to finally take effect. At
-> least the patch 1 of that patchset is needed if you want to test
-> the kernel image -- without it the pinctrl driver won't be built
-> and the kernel will become unusable without pinctrl.
+For my opinion on the matter, see this mail from RMK:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2017-February/490649.html
 
-It's still not the prefixes I told you to use. I merged your patches
-and fixed, but please use the right one next time (and be consistent
-in your ARM vs arm usage).
+If people want to use it, I'm okay with that, but I really don't want
+to actively enforce it during the reviews.
 
-Thanks for your work!
 Maxime
 
 -- 
@@ -46,4 +55,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170307/624c65b5/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170307/86bee1ea/attachment-0001.sig>
