@@ -1,108 +1,107 @@
-From: tiffany.lin@mediatek.com (Tiffany Lin)
-Date: Tue, 7 Mar 2017 15:59:42 +0800
-Subject: [PATCH 1/1] mtk-vcodec: check the vp9 decoder buffer index from
- VPU.
-In-Reply-To: <20170307060328.114348-2-wuchengli@chromium.org>
-References: <20170307060328.114348-1-wuchengli@chromium.org>
- <20170307060328.114348-2-wuchengli@chromium.org>
-Message-ID: <1488873582.20293.4.camel@mtksdaap41>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 07 Mar 2017 08:03:36 +0000
+Subject: [PATCH] irqchip/gicv3-its: Add workaround for QDF2400 ITS erratum
+ 0065
+In-Reply-To: <1488727436-25085-1-git-send-email-shankerd@codeaurora.org>
+ (Shanker Donthineni's message of "Sun, 5 Mar 2017 09:23:56 -0600")
+References: <1488727436-25085-1-git-send-email-shankerd@codeaurora.org>
+Message-ID: <878toh1pk7.fsf@on-the-bus.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2017-03-07 at 14:03 +0800, Wu-Cheng Li wrote:
-> From: Wu-Cheng Li <wuchengli@google.com>
-> 
-> VPU firmware has a bug and may return invalid buffer index for
-> some vp9 videos. Check the buffer indexes before accessing the
-> buffer.
-> 
-> Signed-off-by: Wu-Cheng Li <wuchengli@chromium.org>
-> ---
->  drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c |  6 +++++
->  .../media/platform/mtk-vcodec/vdec/vdec_vp9_if.c   | 26 ++++++++++++++++++++++
->  drivers/media/platform/mtk-vcodec/vdec_drv_if.h    |  2 ++
->  3 files changed, 34 insertions(+)
-> 
-> diff --git a/drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c b/drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c
-> index 502877a4b1df..7ebcf9e57ac7 100644
-> --- a/drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c
-> +++ b/drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c
-> @@ -1176,6 +1176,12 @@ static void vb2ops_vdec_buf_queue(struct vb2_buffer *vb)
->  			       "[%d] vdec_if_decode() src_buf=%d, size=%zu, fail=%d, res_chg=%d",
->  			       ctx->id, src_buf->index,
->  			       src_mem.size, ret, res_chg);
-> +
-> +		if (ret == -EIO) {
-> +			mtk_v4l2_err("[%d] Unrecoverable error in vdec_if_decode.",
-> +					ctx->id);
-> +			ctx->state = MTK_STATE_ABORT;
-> +		}
-Could we use v4l2_m2m_buf_done(to_vb2_v4l2_buffer(src_buf),
-VB2_BUF_STATE_ERROR); instead ctx->state = MTK_STATE_ABORT;
-In this case, the behavior will be same as vdec_if_decode called in
-mtk_vdec_worker.
-And we could also get information about what output buffer make vpu
-crash.
+On Sun, Mar 05 2017 at  3:23:56 pm GMT, Shanker Donthineni <shankerd@codeaurora.org> wrote:
+> On Qualcomm Datacenter Technologies QDF2400 SoCs, the ITS hardware
+> implementation uses 16Bytes for Interrupt Translation Entry (ITTE),
 
-best regards,
-Tiffany
->  		return;
->  	}
+nit: Interrupt Translation Entry is abbreviated as ITE. I know the vITS
+has the ITTE thing all over the place, which I plan to address. No need
+to respin for that.
+
+> but reports an incorrect value of 8Bytes in GITS_TYPER.ITTE_size.
+>
+> It might cause kernel memory corruption depending on the number
+> of MSI(x) that are configured and the amount of memory that has
+> been allocated for ITTEs in its_create_device().
+>
+> This patch fixes the potential memory corruption by setting the
+> correct ITTE size to 16Bytes.
+>
+> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
+> ---
+>  Documentation/arm64/silicon-errata.txt |  1 +
+>  arch/arm64/Kconfig                     | 10 ++++++++++
+>  drivers/irqchip/irq-gic-v3-its.c       | 16 ++++++++++++++++
+>  3 files changed, 27 insertions(+)
+>
+> diff --git a/Documentation/arm64/silicon-errata.txt b/Documentation/arm64/silicon-errata.txt
+> index a71b809..2f66683 100644
+> --- a/Documentation/arm64/silicon-errata.txt
+> +++ b/Documentation/arm64/silicon-errata.txt
+> @@ -68,3 +68,4 @@ stable kernels.
+>  |                |                 |                 |                             |
+>  | Qualcomm Tech. | Falkor v1       | E1003           | QCOM_FALKOR_ERRATUM_1003    |
+>  | Qualcomm Tech. | Falkor v1       | E1009           | QCOM_FALKOR_ERRATUM_1009    |
+> +| Qualcomm Tech. | QDF2400 ITS     | E0065           | QCOM_QDF2400_ERRATUM_0065   |
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 896eba6..6bd51fb 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -509,6 +509,16 @@ config QCOM_FALKOR_ERRATUM_1009
 >  
-> diff --git a/drivers/media/platform/mtk-vcodec/vdec/vdec_vp9_if.c b/drivers/media/platform/mtk-vcodec/vdec/vdec_vp9_if.c
-> index e91a3b425b0c..5539b1853f16 100644
-> --- a/drivers/media/platform/mtk-vcodec/vdec/vdec_vp9_if.c
-> +++ b/drivers/media/platform/mtk-vcodec/vdec/vdec_vp9_if.c
-> @@ -718,6 +718,26 @@ static void get_free_fb(struct vdec_vp9_inst *inst, struct vdec_fb **out_fb)
->  	*out_fb = fb;
+>  	  If unsure, say Y.
+>  
+> +config QCOM_QDF2400_ERRATUM_0065
+> +	bool "QDF2400 E0065: Incorrect GITS_TYPER.ITT_Entry_size"
+> +	default y
+> +	help
+> +	  On Qualcomm Datacenter Technologies QDF2400 SoC, ITS hardware reports
+> +	  ITTE size incorrectly. The GITS_TYPER.ITT_Entry_size field should have
+> +	  been indicated as 16Bytes (0xf), not 8Bytes (0x7).
+> +
+> +	  If unsure, say Y.
+> +
+>  endmenu
+>  
+>  
+> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+> index 2320100..86bd428 100644
+> --- a/drivers/irqchip/irq-gic-v3-its.c
+> +++ b/drivers/irqchip/irq-gic-v3-its.c
+> @@ -1601,6 +1601,14 @@ static void __maybe_unused its_enable_quirk_cavium_23144(void *data)
+>  	its->flags |= ITS_FLAGS_WORKAROUND_CAVIUM_23144;
 >  }
 >  
-> +static int validate_vsi_array_indexes(struct vdec_vp9_inst *inst,
-> +		struct vdec_vp9_vsi *vsi) {
-> +	if (vsi->sf_frm_idx >= VP9_MAX_FRM_BUF_NUM - 1) {
-> +		mtk_vcodec_err(inst, "Invalid vsi->sf_frm_idx=%u.",
-> +				vsi->sf_frm_idx);
-> +		return -EIO;
-> +	}
-> +	if (vsi->frm_to_show_idx >= VP9_MAX_FRM_BUF_NUM) {
-> +		mtk_vcodec_err(inst, "Invalid vsi->frm_to_show_idx=%u.",
-> +				vsi->frm_to_show_idx);
-> +		return -EIO;
-> +	}
-> +	if (vsi->new_fb_idx >= VP9_MAX_FRM_BUF_NUM) {
-> +		mtk_vcodec_err(inst, "Invalid vsi->new_fb_idx=%u.",
-> +				vsi->new_fb_idx);
-> +		return -EIO;
-> +	}
-> +	return 0;
+> +static void __maybe_unused its_enable_quirk_qdf2400_e0065(void *data)
+> +{
+> +	struct its_node *its = data;
+> +
+> +	/* On QDF2400, the size of the ITTE is 16Bytes */
+> +	its->ite_size = 16;
 > +}
 > +
->  static void vdec_vp9_deinit(unsigned long h_vdec)
->  {
->  	struct vdec_vp9_inst *inst = (struct vdec_vp9_inst *)h_vdec;
-> @@ -834,6 +854,12 @@ static int vdec_vp9_decode(unsigned long h_vdec, struct mtk_vcodec_mem *bs,
->  			goto DECODE_ERROR;
->  		}
->  
-> +		ret = validate_vsi_array_indexes(inst, vsi);
-> +		if (ret) {
-> +			mtk_vcodec_err(inst, "Invalid values from VPU.");
-> +			goto DECODE_ERROR;
-> +		}
-> +
->  		if (vsi->resolution_changed) {
->  			if (!vp9_alloc_work_buf(inst)) {
->  				ret = -EINVAL;
-> diff --git a/drivers/media/platform/mtk-vcodec/vdec_drv_if.h b/drivers/media/platform/mtk-vcodec/vdec_drv_if.h
-> index db6b5205ffb1..ded1154481cd 100644
-> --- a/drivers/media/platform/mtk-vcodec/vdec_drv_if.h
-> +++ b/drivers/media/platform/mtk-vcodec/vdec_drv_if.h
-> @@ -85,6 +85,8 @@ void vdec_if_deinit(struct mtk_vcodec_ctx *ctx);
->   * @res_chg	: [out] resolution change happens if current bs have different
->   *	picture width/height
->   * Note: To flush the decoder when reaching EOF, set input bitstream as NULL.
-> + *
-> + * Return: 0 on success. -EIO on unrecoverable error.
->   */
->  int vdec_if_decode(struct mtk_vcodec_ctx *ctx, struct mtk_vcodec_mem *bs,
->  		   struct vdec_fb *fb, bool *res_chg);
+>  static const struct gic_quirk its_quirks[] = {
+>  #ifdef CONFIG_CAVIUM_ERRATUM_22375
+>  	{
+> @@ -1618,6 +1626,14 @@ static void __maybe_unused its_enable_quirk_cavium_23144(void *data)
+>  		.init	= its_enable_quirk_cavium_23144,
+>  	},
+>  #endif
+> +#ifdef CONFIG_QCOM_QDF2400_ERRATUM_0065
+> +	{
+> +		.desc	= "ITS: QDF2400 erratum 0065",
+> +		.iidr	= 0x00001070, /* QDF2400 ITS rev 1.x */
+> +		.mask	= 0xffffffff,
+> +		.init	= its_enable_quirk_qdf2400_e0065,
+> +	},
+> +#endif
+>  	{
+>  	}
+>  };
+
+OK, that's pretty bad. Should this be CC stable?
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead, it just smell funny.
