@@ -1,97 +1,112 @@
 From: guohanjun@huawei.com (Hanjun Guo)
-Date: Tue, 7 Mar 2017 20:40:02 +0800
-Subject: [PATCH v9 07/15] irqchip: gicv3-its: platform-msi: scan MADT to
- create platform msi domain
+Date: Tue, 7 Mar 2017 20:40:05 +0800
+Subject: [PATCH v9 10/15] ACPI: platform-msi: retrieve dev id from IORT
 In-Reply-To: <1488890410-15503-1-git-send-email-guohanjun@huawei.com>
 References: <1488890410-15503-1-git-send-email-guohanjun@huawei.com>
-Message-ID: <1488890410-15503-8-git-send-email-guohanjun@huawei.com>
+Message-ID: <1488890410-15503-11-git-send-email-guohanjun@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Hanjun Guo <hanjun.guo@linaro.org>
 
-With the introduction of its_pmsi_init_one(), support for ACPI
-firmware interface can be plugged into the gicv3 ITS driver.
+For devices connecting to ITS, the devices need to identify themself
+through a dev id; this dev id is represented in the IORT table in named
+component node [1] for platform devices, so this patch adds code that
+scans the IORT table to retrieve the devices' dev id.
 
-Add code to scan the MADT table to get the ITS entry(ies), then use
-the information to create the platform msi domain for devices
-connected to it, mirroring the ITS PCI MSI code path.
+Leveraging the iort_node_map_platform_id() IORT API, add a new function
+call, iort_pmsi_get_dev_id() and use it in its_pmsi_prepare() to allow
+retrieving dev id in ACPI platforms.
+
+[1]: https://static.docs.arm.com/den0049/b/DEN0049B_IO_Remapping_Table.pdf
 
 Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
 [lorenzo.pieralisi at arm.com: rewrote commit log]
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Reviewed-by: Matthias Brugger <mbrugger@suse.com>
 Tested-by: Ming Lei <ming.lei@canonical.com>
 Tested-by: Wei Xu <xuwei5@hisilicon.com>
 Tested-by: Sinan Kaya <okaya@codeaurora.org>
 Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Cc: Tomasz Nowicki <tn@semihalf.com>
 Cc: Thomas Gleixner <tglx@linutronix.de>
 ---
- drivers/irqchip/irq-gic-v3-its-platform-msi.c | 37 +++++++++++++++++++++++++++
- 1 file changed, 37 insertions(+)
+ drivers/acpi/arm64/iort.c                     | 24 ++++++++++++++++++++++++
+ drivers/irqchip/irq-gic-v3-its-platform-msi.c |  3 ++-
+ include/linux/acpi_iort.h                     |  5 +++++
+ 3 files changed, 31 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/irqchip/irq-gic-v3-its-platform-msi.c b/drivers/irqchip/irq-gic-v3-its-platform-msi.c
-index 3d9efd1..e4ba9f4 100644
---- a/drivers/irqchip/irq-gic-v3-its-platform-msi.c
-+++ b/drivers/irqchip/irq-gic-v3-its-platform-msi.c
-@@ -15,6 +15,7 @@
-  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
- 
-+#include <linux/acpi_iort.h>
- #include <linux/device.h>
- #include <linux/msi.h>
- #include <linux/of.h>
-@@ -103,6 +104,41 @@ static int __init its_pmsi_init_one(struct fwnode_handle *fwnode,
- 	return 0;
+diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
+index 83cd59d..fb95ceb 100644
+--- a/drivers/acpi/arm64/iort.c
++++ b/drivers/acpi/arm64/iort.c
+@@ -468,6 +468,30 @@ u32 iort_msi_map_rid(struct device *dev, u32 req_id)
  }
  
-+#ifdef CONFIG_ACPI
-+static int __init
-+its_pmsi_parse_madt(struct acpi_subtable_header *header,
-+			const unsigned long end)
+ /**
++ * iort_pmsi_get_dev_id() - Get the device id for a device
++ * @dev: The device for which the mapping is to be done.
++ * @dev_id: The device ID found.
++ *
++ * Returns: 0 for successful find a dev id, -ENODEV on error
++ */
++int iort_pmsi_get_dev_id(struct device *dev, u32 *dev_id)
 +{
-+	struct acpi_madt_generic_translator *its_entry;
-+	struct fwnode_handle *domain_handle;
-+	const char *node_name;
-+	int err = -ENXIO;
++	int i;
++	struct acpi_iort_node *node;
 +
-+	its_entry = (struct acpi_madt_generic_translator *)header;
-+	node_name = kasprintf(GFP_KERNEL, "ITS at 0x%lx",
-+			      (long)its_entry->base_address);
-+	domain_handle = iort_find_domain_token(its_entry->translation_id);
-+	if (!domain_handle) {
-+		pr_err("%s: Unable to locate ITS domain handle\n", node_name);
-+		goto out;
++	node = iort_find_dev_node(dev);
++	if (!node)
++		return -ENODEV;
++
++	for (i = 0; i < node->mapping_count; i++) {
++		if (iort_node_map_platform_id(node, dev_id, IORT_MSI_TYPE, i))
++			return 0;
 +	}
 +
-+	err = its_pmsi_init_one(domain_handle, node_name);
-+
-+out:
-+	kfree(node_name);
-+	return err;
++	return -ENODEV;
 +}
 +
-+static void __init its_pmsi_acpi_init(void)
-+{
-+	acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_TRANSLATOR,
-+			      its_pmsi_parse_madt, 0);
-+}
-+#else
-+static inline void its_pmsi_acpi_init(void) { }
-+#endif
++/**
+  * iort_dev_find_its_id() - Find the ITS identifier for a device
+  * @dev: The device.
+  * @req_id: Device's requester ID
+diff --git a/drivers/irqchip/irq-gic-v3-its-platform-msi.c b/drivers/irqchip/irq-gic-v3-its-platform-msi.c
+index e4ba9f4..e801fc0 100644
+--- a/drivers/irqchip/irq-gic-v3-its-platform-msi.c
++++ b/drivers/irqchip/irq-gic-v3-its-platform-msi.c
+@@ -57,7 +57,8 @@ static int its_pmsi_prepare(struct irq_domain *domain, struct device *dev,
+ 
+ 	msi_info = msi_get_domain_info(domain->parent);
+ 
+-	ret = of_pmsi_get_dev_id(domain, dev, &dev_id);
++	ret = dev->of_node ? of_pmsi_get_dev_id(domain, dev, &dev_id) :
++		iort_pmsi_get_dev_id(dev, &dev_id);
+ 	if (ret)
+ 		return ret;
+ 
+diff --git a/include/linux/acpi_iort.h b/include/linux/acpi_iort.h
+index 77e0809..d074c77 100644
+--- a/include/linux/acpi_iort.h
++++ b/include/linux/acpi_iort.h
+@@ -34,6 +34,7 @@
+ bool iort_node_match(u8 type);
+ u32 iort_msi_map_rid(struct device *dev, u32 req_id);
+ struct irq_domain *iort_get_device_domain(struct device *dev, u32 req_id);
++int iort_pmsi_get_dev_id(struct device *dev, u32 *dev_id);
+ /* IOMMU interface */
+ void iort_set_dma_mask(struct device *dev);
+ const struct iommu_ops *iort_iommu_configure(struct device *dev);
+@@ -45,6 +46,10 @@ static inline u32 iort_msi_map_rid(struct device *dev, u32 req_id)
+ static inline struct irq_domain *iort_get_device_domain(struct device *dev,
+ 							u32 req_id)
+ { return NULL; }
 +
- static void __init its_pmsi_of_init(void)
- {
- 	struct device_node *np;
-@@ -119,6 +155,7 @@ static void __init its_pmsi_of_init(void)
- static int __init its_pmsi_init(void)
- {
- 	its_pmsi_of_init();
-+	its_pmsi_acpi_init();
- 	return 0;
- }
- early_initcall(its_pmsi_init);
++static inline int iort_pmsi_get_dev_id(struct device *dev, u32 *dev_id)
++{ return -ENODEV; }
++
+ /* IOMMU interface */
+ static inline void iort_set_dma_mask(struct device *dev) { }
+ static inline
 -- 
 1.7.12.4
