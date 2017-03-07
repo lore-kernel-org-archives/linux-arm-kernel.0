@@ -1,37 +1,37 @@
-From: a.hajda@samsung.com (Andrzej Hajda)
-Date: Tue, 07 Mar 2017 13:08:19 +0100
-Subject: [Patch v2 11/11] Documention: v4l: Documentation for HEVC CIDs
-In-Reply-To: <1488532036-13044-12-git-send-email-smitha.t@samsung.com>
-References: <1488532036-13044-1-git-send-email-smitha.t@samsung.com>
- <CGME20170303090518epcas5p4d50e0bbaae69e93dc931c29ffaaa658b@epcas5p4.samsung.com>
- <1488532036-13044-12-git-send-email-smitha.t@samsung.com>
-Message-ID: <6c537c6a-0b87-0624-6770-73404972fb7a@samsung.com>
+From: sunil.kovvuri@gmail.com (sunil.kovvuri at gmail.com)
+Date: Tue,  7 Mar 2017 18:09:07 +0530
+Subject: [PATCH v2 0/4] net: thunderx: Miscellaneous fixes
+Message-ID: <1488890351-18493-1-git-send-email-sunil.kovvuri@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Sunil Goutham <sgoutham@cavium.com>
 
-On 03.03.2017 10:07, Smitha T Murthy wrote:
-> Added V4l2 controls for HEVC encoder
+This patch set fixes multiple issues such as IOMMU
+translation faults when kernel is booted with IOMMU enabled
+on host, incorrect MAC ID reading from ACPI tables and IPv6
+UDP packet drop due to failure of checksum validation.
 
-It should be rather "Document controls for HEVC encoder" or sth similar.
+Changes from v1:
+- As suggested by David Miller, got rid of conditional
+  calling of DMA map/unmap APIs. Also updated commit message
+  in 'IOMMU translation faults' patch.
 
-In general most of comments are in previous patch.
-Few additional comments:
-- please be careful about control names - they are exported to userspace
-and becomes ABI, so it will be difficult to change them later (this
-comment is rather to previous patch),
-- please provide good documentation as for most users this documentation
-will be the only available source of information,
-- in short: bugs in the driver can be easily fixed(usually), wrong
-control names will be hard to fix, weak documentation will prevent using it.
+Sunil Goutham (3):
+  net: thunderx: Fix IOMMU translation faults
+  net: thunderx: Fix LMAC mode debug prints for QSGMII mode
+  net: thunderx: Fix invalid mac addresses for node1 interfaces
 
-And regarding this patch:
-- please expand all acronyms (pb, tmv, BIT,...),
-- please consider using menu instead of numbers for profile, level,
-tier, types, generally everywhere where control value enumerates
-'things' and is not a pure number (coefficient, counter,...),
-- if control is per-frame please drop it, V4L2 does not support it at
-the moment ( I suppose ),
+Thanneeru Srinivasulu (1):
+  net: thunderx: Allow IPv6 frames with zero UDP checksum
 
-Regards
-Andrzej
+ drivers/net/ethernet/cavium/thunder/nic.h          |   1 +
+ drivers/net/ethernet/cavium/thunder/nicvf_main.c   |  12 +-
+ drivers/net/ethernet/cavium/thunder/nicvf_queues.c | 184 ++++++++++++++++-----
+ drivers/net/ethernet/cavium/thunder/nicvf_queues.h |   4 +-
+ drivers/net/ethernet/cavium/thunder/thunder_bgx.c  |  64 ++++---
+ drivers/net/ethernet/cavium/thunder/thunder_bgx.h  |   1 -
+ 6 files changed, 205 insertions(+), 61 deletions(-)
+
+-- 
+2.7.4
