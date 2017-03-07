@@ -1,187 +1,117 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 07 Mar 2017 15:22:10 +0100
-Subject: Applied "spi: davinci: Use SPI framework to handle DMA mapping" to
- the spi tree
-In-Reply-To: <1487872921-26628-2-git-send-email-fisaksen@baylibre.com>
-Message-ID: <E1clG0A-0006nR-Dq@finisterre>
+From: shankerd@codeaurora.org (Shanker Donthineni)
+Date: Tue, 7 Mar 2017 08:22:57 -0600
+Subject: [PATCH] irqchip/gicv3-its: Add workaround for QDF2400 ITS erratum
+ 0065
+In-Reply-To: <878toh1pk7.fsf@on-the-bus.cambridge.arm.com>
+References: <1488727436-25085-1-git-send-email-shankerd@codeaurora.org>
+ <878toh1pk7.fsf@on-the-bus.cambridge.arm.com>
+Message-ID: <bd313d48-d608-2204-e621-5d74ff1a9d00@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+Hi Marc,
 
-   spi: davinci: Use SPI framework to handle DMA mapping
 
-has been applied to the spi tree at
+On 03/07/2017 02:03 AM, Marc Zyngier wrote:
+> On Sun, Mar 05 2017 at  3:23:56 pm GMT, Shanker Donthineni <shankerd@codeaurora.org> wrote:
+>> On Qualcomm Datacenter Technologies QDF2400 SoCs, the ITS hardware
+>> implementation uses 16Bytes for Interrupt Translation Entry (ITTE),
+> nit: Interrupt Translation Entry is abbreviated as ITE. I know the vITS
+> has the ITTE thing all over the place, which I plan to address. No need
+> to respin for that.
+>
+Yeah, I saw your your patch in GICv4 branch which has change, I posted 
+v2 with your suggestion.
 
-   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git 
+>> but reports an incorrect value of 8Bytes in GITS_TYPER.ITTE_size.
+>>
+>> It might cause kernel memory corruption depending on the number
+>> of MSI(x) that are configured and the amount of memory that has
+>> been allocated for ITTEs in its_create_device().
+>>
+>> This patch fixes the potential memory corruption by setting the
+>> correct ITTE size to 16Bytes.
+>>
+>> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
+>> ---
+>>   Documentation/arm64/silicon-errata.txt |  1 +
+>>   arch/arm64/Kconfig                     | 10 ++++++++++
+>>   drivers/irqchip/irq-gic-v3-its.c       | 16 ++++++++++++++++
+>>   3 files changed, 27 insertions(+)
+>>
+>> diff --git a/Documentation/arm64/silicon-errata.txt b/Documentation/arm64/silicon-errata.txt
+>> index a71b809..2f66683 100644
+>> --- a/Documentation/arm64/silicon-errata.txt
+>> +++ b/Documentation/arm64/silicon-errata.txt
+>> @@ -68,3 +68,4 @@ stable kernels.
+>>   |                |                 |                 |                             |
+>>   | Qualcomm Tech. | Falkor v1       | E1003           | QCOM_FALKOR_ERRATUM_1003    |
+>>   | Qualcomm Tech. | Falkor v1       | E1009           | QCOM_FALKOR_ERRATUM_1009    |
+>> +| Qualcomm Tech. | QDF2400 ITS     | E0065           | QCOM_QDF2400_ERRATUM_0065   |
+>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+>> index 896eba6..6bd51fb 100644
+>> --- a/arch/arm64/Kconfig
+>> +++ b/arch/arm64/Kconfig
+>> @@ -509,6 +509,16 @@ config QCOM_FALKOR_ERRATUM_1009
+>>   
+>>   	  If unsure, say Y.
+>>   
+>> +config QCOM_QDF2400_ERRATUM_0065
+>> +	bool "QDF2400 E0065: Incorrect GITS_TYPER.ITT_Entry_size"
+>> +	default y
+>> +	help
+>> +	  On Qualcomm Datacenter Technologies QDF2400 SoC, ITS hardware reports
+>> +	  ITTE size incorrectly. The GITS_TYPER.ITT_Entry_size field should have
+>> +	  been indicated as 16Bytes (0xf), not 8Bytes (0x7).
+>> +
+>> +	  If unsure, say Y.
+>> +
+>>   endmenu
+>>   
+>>   
+>> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+>> index 2320100..86bd428 100644
+>> --- a/drivers/irqchip/irq-gic-v3-its.c
+>> +++ b/drivers/irqchip/irq-gic-v3-its.c
+>> @@ -1601,6 +1601,14 @@ static void __maybe_unused its_enable_quirk_cavium_23144(void *data)
+>>   	its->flags |= ITS_FLAGS_WORKAROUND_CAVIUM_23144;
+>>   }
+>>   
+>> +static void __maybe_unused its_enable_quirk_qdf2400_e0065(void *data)
+>> +{
+>> +	struct its_node *its = data;
+>> +
+>> +	/* On QDF2400, the size of the ITTE is 16Bytes */
+>> +	its->ite_size = 16;
+>> +}
+>> +
+>>   static const struct gic_quirk its_quirks[] = {
+>>   #ifdef CONFIG_CAVIUM_ERRATUM_22375
+>>   	{
+>> @@ -1618,6 +1626,14 @@ static void __maybe_unused its_enable_quirk_cavium_23144(void *data)
+>>   		.init	= its_enable_quirk_cavium_23144,
+>>   	},
+>>   #endif
+>> +#ifdef CONFIG_QCOM_QDF2400_ERRATUM_0065
+>> +	{
+>> +		.desc	= "ITS: QDF2400 erratum 0065",
+>> +		.iidr	= 0x00001070, /* QDF2400 ITS rev 1.x */
+>> +		.mask	= 0xffffffff,
+>> +		.init	= its_enable_quirk_qdf2400_e0065,
+>> +	},
+>> +#endif
+>>   	{
+>>   	}
+>>   };
+> OK, that's pretty bad. Should this be CC stable?
 
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
+Yes, please do CC stable if there is no merge conflicts.
 
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
+> Thanks,
+>
+> 	M.
 
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
-
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
-
-Thanks,
-Mark
-
->From 8aedbf580d21121d2a032e4c8ea12d8d2d85e275 Mon Sep 17 00:00:00 2001
-From: Fabien Parent <fparent@baylibre.com>
-Date: Thu, 23 Feb 2017 19:01:56 +0100
-Subject: [PATCH] spi: davinci: Use SPI framework to handle DMA mapping
-
-Uppers layers like MTD can pass vmalloc'd buffers to the SPI driver,
-and the current implementation will fail to map these kind of buffers.
-The SPI framework is able to detect the best way to handle and map
-buffers.
-This commit updates the davinci SPI driver in order to use the SPI
-framework to handle the DMA mapping of buffers coming from an upper
-layer.
-
-Signed-off-by: Fabien Parent <fparent@baylibre.com>
-Signed-off-by: Frode Isaksen <fisaksen@baylibre.com>
-Signed-off-by: Mark Brown <broonie@kernel.org>
----
- drivers/spi/spi-davinci.c | 69 +++++++++++++----------------------------------
- 1 file changed, 18 insertions(+), 51 deletions(-)
-
-diff --git a/drivers/spi/spi-davinci.c b/drivers/spi/spi-davinci.c
-index 02fb96797ac8..164cc719be54 100644
---- a/drivers/spi/spi-davinci.c
-+++ b/drivers/spi/spi-davinci.c
-@@ -467,6 +467,19 @@ static void davinci_spi_cleanup(struct spi_device *spi)
- 		kfree(spicfg);
- }
- 
-+static bool davinci_spi_can_dma(struct spi_master *master,
-+				struct spi_device *spi,
-+				struct spi_transfer *xfer)
-+{
-+	struct davinci_spi_config *spicfg = spi->controller_data;
-+	bool can_dma = false;
-+
-+	if (spicfg)
-+		can_dma = spicfg->io_type == SPI_IO_TYPE_DMA;
-+
-+	return can_dma;
-+}
-+
- static int davinci_spi_check_error(struct davinci_spi *dspi, int int_status)
- {
- 	struct device *sdev = dspi->bitbang.master->dev.parent;
-@@ -581,8 +594,6 @@ static int davinci_spi_bufs(struct spi_device *spi, struct spi_transfer *t)
- 	struct davinci_spi_config *spicfg;
- 	struct davinci_spi_platform_data *pdata;
- 	unsigned uninitialized_var(rx_buf_count);
--	void *dummy_buf = NULL;
--	struct scatterlist sg_rx, sg_tx;
- 
- 	dspi = spi_master_get_devdata(spi->master);
- 	pdata = &dspi->pdata;
-@@ -630,51 +641,18 @@ static int davinci_spi_bufs(struct spi_device *spi, struct spi_transfer *t)
- 		};
- 		struct dma_async_tx_descriptor *rxdesc;
- 		struct dma_async_tx_descriptor *txdesc;
--		void *buf;
--
--		dummy_buf = kzalloc(t->len, GFP_KERNEL);
--		if (!dummy_buf)
--			goto err_alloc_dummy_buf;
- 
- 		dmaengine_slave_config(dspi->dma_rx, &dma_rx_conf);
- 		dmaengine_slave_config(dspi->dma_tx, &dma_tx_conf);
- 
--		sg_init_table(&sg_rx, 1);
--		if (!t->rx_buf)
--			buf = dummy_buf;
--		else
--			buf = t->rx_buf;
--		t->rx_dma = dma_map_single(&spi->dev, buf,
--				t->len, DMA_FROM_DEVICE);
--		if (dma_mapping_error(&spi->dev, !t->rx_dma)) {
--			ret = -EFAULT;
--			goto err_rx_map;
--		}
--		sg_dma_address(&sg_rx) = t->rx_dma;
--		sg_dma_len(&sg_rx) = t->len;
--
--		sg_init_table(&sg_tx, 1);
--		if (!t->tx_buf)
--			buf = dummy_buf;
--		else
--			buf = (void *)t->tx_buf;
--		t->tx_dma = dma_map_single(&spi->dev, buf,
--				t->len, DMA_TO_DEVICE);
--		if (dma_mapping_error(&spi->dev, t->tx_dma)) {
--			ret = -EFAULT;
--			goto err_tx_map;
--		}
--		sg_dma_address(&sg_tx) = t->tx_dma;
--		sg_dma_len(&sg_tx) = t->len;
--
- 		rxdesc = dmaengine_prep_slave_sg(dspi->dma_rx,
--				&sg_rx, 1, DMA_DEV_TO_MEM,
-+				t->rx_sg.sgl, t->rx_sg.nents, DMA_DEV_TO_MEM,
- 				DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
- 		if (!rxdesc)
- 			goto err_desc;
- 
- 		txdesc = dmaengine_prep_slave_sg(dspi->dma_tx,
--				&sg_tx, 1, DMA_MEM_TO_DEV,
-+				t->tx_sg.sgl, t->tx_sg.nents, DMA_MEM_TO_DEV,
- 				DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
- 		if (!txdesc)
- 			goto err_desc;
-@@ -710,16 +688,9 @@ static int davinci_spi_bufs(struct spi_device *spi, struct spi_transfer *t)
- 	}
- 
- 	clear_io_bits(dspi->base + SPIINT, SPIINT_MASKALL);
--	if (spicfg->io_type == SPI_IO_TYPE_DMA) {
-+	if (spicfg->io_type == SPI_IO_TYPE_DMA)
- 		clear_io_bits(dspi->base + SPIINT, SPIINT_DMA_REQ_EN);
- 
--		dma_unmap_single(&spi->dev, t->rx_dma,
--				t->len, DMA_FROM_DEVICE);
--		dma_unmap_single(&spi->dev, t->tx_dma,
--				t->len, DMA_TO_DEVICE);
--		kfree(dummy_buf);
--	}
--
- 	clear_io_bits(dspi->base + SPIGCR1, SPIGCR1_SPIENA_MASK);
- 	set_io_bits(dspi->base + SPIGCR1, SPIGCR1_POWERDOWN_MASK);
- 
-@@ -742,12 +713,6 @@ static int davinci_spi_bufs(struct spi_device *spi, struct spi_transfer *t)
- 	return t->len;
- 
- err_desc:
--	dma_unmap_single(&spi->dev, t->tx_dma, t->len, DMA_TO_DEVICE);
--err_tx_map:
--	dma_unmap_single(&spi->dev, t->rx_dma, t->len, DMA_FROM_DEVICE);
--err_rx_map:
--	kfree(dummy_buf);
--err_alloc_dummy_buf:
- 	return ret;
- }
- 
-@@ -988,8 +953,10 @@ static int davinci_spi_probe(struct platform_device *pdev)
- 	master->bus_num = pdev->id;
- 	master->num_chipselect = pdata->num_chipselect;
- 	master->bits_per_word_mask = SPI_BPW_RANGE_MASK(2, 16);
-+	master->flags = (SPI_MASTER_MUST_RX | SPI_MASTER_MUST_TX);
- 	master->setup = davinci_spi_setup;
- 	master->cleanup = davinci_spi_cleanup;
-+	master->can_dma = davinci_spi_can_dma;
- 
- 	dspi->bitbang.chipselect = davinci_spi_chipselect;
- 	dspi->bitbang.setup_transfer = davinci_spi_setup_transfer;
 -- 
-2.11.0
+Shanker Donthineni
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
