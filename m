@@ -1,21 +1,23 @@
 From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 7 Mar 2017 16:23:42 +0530
-Subject: [PATCH v4 0/6] ARM: davinci: vpif capture & display support
-In-Reply-To: <714e1e90-c266-f792-4af1-d7d95dc6941e@ti.com>
+Date: Tue, 7 Mar 2017 16:24:28 +0530
+Subject: [PATCH v4 1/6] ARM: davinci: da8xx: allow having multiple
+ pdata-quirks
+In-Reply-To: <1488297720-4558-2-git-send-email-bgolaszewski@baylibre.com>
 References: <1488297720-4558-1-git-send-email-bgolaszewski@baylibre.com>
- <714e1e90-c266-f792-4af1-d7d95dc6941e@ti.com>
-Message-ID: <c7a5ac06-d190-28d0-259b-61a416bd5cbf@ti.com>
+ <1488297720-4558-2-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <a320742a-dc77-4d73-b3a3-9f3cda66ab04@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 01 March 2017 06:58 PM, Sekhar Nori wrote:
-> On Tuesday 28 February 2017 09:31 PM, Bartosz Golaszewski wrote:
->> This series adds pdata quirks and other changes required to make vpif
->> work on the da850-evm board.
+On Tuesday 28 February 2017 09:31 PM, Bartosz Golaszewski wrote:
+> We currently bail-out after applying a single quirk. We will want
+> to reuse the function doing the vpif capture registration so remove
+> the break; and continue iterating over the quirk array.
 > 
-> Looks good to me. Will apply once v4.11-rc1 is out.
+> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-Applied now.
+This patch is not really da8xx specific, so I dropped the da8xx: in
+subject line while applying.
 
 Thanks,
 Sekhar
