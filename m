@@ -1,53 +1,58 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue,  7 Mar 2017 09:56:23 +0100
-Subject: [PATCH 4/15] clk: sunxi-ng: mux: Don't just rely on the parent for
- CLK_SET_RATE_PARENT
+Date: Tue,  7 Mar 2017 09:56:24 +0100
+Subject: [PATCH 5/15] clk: sunxi-ng: sun5i: Export video PLLs
 In-Reply-To: <cover.bc06ffa88f847ddd9ddd7c259415d5f61b55307b.1488876832.git-series.maxime.ripard@free-electrons.com>
 References: <cover.bc06ffa88f847ddd9ddd7c259415d5f61b55307b.1488876832.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <06becb54f965288aba6df203a369b524d4786a11.1488876832.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <4bb77a9793d4ba25bf633eff6abe41910bb7fc3c.1488876832.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current code only rely on the parent to change its rate in the case
-where CLK_SET_RATE_PARENT is set.
-
-However, some clock rates might be obtained only through a modification of
-the parent and the clock divider. Just rely on the round rate of the clocks
-to give us the best computation that might be achieved for a given rate.
-
-round_rate functions now need to honor CLK_SET_RATE_PARENT, but either the
-functions already do that if they modify the parent, or don't modify the
-praents at all.
+The video PLLs are used directly by the HDMI controller. Export them so
+that we can use them in our DT node.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/clk/sunxi-ng/ccu_mux.c | 14 +-------------
- 1 file changed, 1 insertion(+), 13 deletions(-)
+ drivers/clk/sunxi-ng/ccu-sun5i.h      | 6 ++++--
+ include/dt-bindings/clock/sun5i-ccu.h | 3 +++
+ 2 files changed, 7 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/clk/sunxi-ng/ccu_mux.c b/drivers/clk/sunxi-ng/ccu_mux.c
-index bae735e252b6..58b6e349a0ed 100644
---- a/drivers/clk/sunxi-ng/ccu_mux.c
-+++ b/drivers/clk/sunxi-ng/ccu_mux.c
-@@ -95,19 +95,7 @@ int ccu_mux_helper_determine_rate(struct ccu_common *common,
- 		if (!parent)
- 			continue;
+diff --git a/drivers/clk/sunxi-ng/ccu-sun5i.h b/drivers/clk/sunxi-ng/ccu-sun5i.h
+index 8144487eb7ca..16f7aa92957e 100644
+--- a/drivers/clk/sunxi-ng/ccu-sun5i.h
++++ b/drivers/clk/sunxi-ng/ccu-sun5i.h
+@@ -28,15 +28,17 @@
+ #define CLK_PLL_AUDIO_4X	6
+ #define CLK_PLL_AUDIO_8X	7
+ #define CLK_PLL_VIDEO0		8
+-#define CLK_PLL_VIDEO0_2X	9
++
++/* The PLL_VIDEO0_2X is exported for HDMI */
++
+ #define CLK_PLL_VE		10
+ #define CLK_PLL_DDR_BASE	11
+ #define CLK_PLL_DDR		12
+ #define CLK_PLL_DDR_OTHER	13
+ #define CLK_PLL_PERIPH		14
+ #define CLK_PLL_VIDEO1		15
+-#define CLK_PLL_VIDEO1_2X	16
  
--		if (clk_hw_get_flags(hw) & CLK_SET_RATE_PARENT) {
--			struct clk_rate_request parent_req = *req;
--			int ret = __clk_determine_rate(parent, &parent_req);
--
--			if (ret)
--				continue;
--
--			parent_rate = parent_req.rate;
--		} else {
--			parent_rate = clk_hw_get_rate(parent);
--		}
--
--		adj_parent_rate = parent_rate;
-+		adj_parent_rate = parent_rate = clk_hw_get_rate(parent);
- 		ccu_mux_helper_adjust_parent_for_prediv(common, cm, i,
- 							&adj_parent_rate);
++/* The PLL_VIDEO0_2X is exported for HDMI */
+ /* The CPU clock is exported */
  
+ #define CLK_AXI			18
+diff --git a/include/dt-bindings/clock/sun5i-ccu.h b/include/dt-bindings/clock/sun5i-ccu.h
+index aeb2e2f781fb..81f34d477aeb 100644
+--- a/include/dt-bindings/clock/sun5i-ccu.h
++++ b/include/dt-bindings/clock/sun5i-ccu.h
+@@ -19,6 +19,9 @@
+ 
+ #define CLK_HOSC		1
+ 
++#define CLK_PLL_VIDEO0_2X	9
++
++#define CLK_PLL_VIDEO1_2X	16
+ #define CLK_CPU			17
+ 
+ #define CLK_AHB_OTG		23
 -- 
 git-series 0.8.11
