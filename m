@@ -1,32 +1,88 @@
 From: zhangqing@rock-chips.com (Elaine Zhang)
-Date: Tue,  7 Mar 2017 17:50:11 +0800
-Subject: [PATCH v1 2/2] clk: rockchip: rk3368: add some clks as critical
-In-Reply-To: <1488880211-21133-1-git-send-email-zhangqing@rock-chips.com>
-References: <1488880211-21133-1-git-send-email-zhangqing@rock-chips.com>
-Message-ID: <1488880211-21133-2-git-send-email-zhangqing@rock-chips.com>
+Date: Tue,  7 Mar 2017 17:50:10 +0800
+Subject: [PATCH v1 1/2] clk: rockchip: rk3368: export SCLK_TIMERXX id for
+ timers
+Message-ID: <1488880211-21133-1-git-send-email-zhangqing@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-make pclk_pd_alive, pclk_peri, hclk_peri as critical
-
 Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
 ---
- drivers/clk/rockchip/clk-rk3368.c | 3 +++
- 1 file changed, 3 insertions(+)
+ drivers/clk/rockchip/clk-rk3368.c      | 24 ++++++++++++------------
+ include/dt-bindings/clock/rk3368-cru.h | 19 ++++++++++++-------
+ 2 files changed, 24 insertions(+), 19 deletions(-)
 
 diff --git a/drivers/clk/rockchip/clk-rk3368.c b/drivers/clk/rockchip/clk-rk3368.c
-index 139d418f448e..024762d3214d 100644
+index 6cb474c593e7..139d418f448e 100644
 --- a/drivers/clk/rockchip/clk-rk3368.c
 +++ b/drivers/clk/rockchip/clk-rk3368.c
-@@ -858,6 +858,9 @@ enum rk3368_plls {
- 	 */
- 	"pclk_pwm1",
- 	"pclk_pd_pmu",
-+	"pclk_pd_alive",
-+	"pclk_peri",
-+	"hclk_peri",
+@@ -835,18 +835,18 @@ enum rk3368_plls {
+ 	GATE(PCLK_PMU, "pclk_pmu", "pclk_pd_pmu", CLK_IGNORE_UNUSED, RK3368_CLKGATE_CON(23), 0, GFLAGS),
+ 
+ 	/* timer gates */
+-	GATE(0, "sclk_timer15", "xin24m", CLK_IGNORE_UNUSED, RK3368_CLKGATE_CON(24), 11, GFLAGS),
+-	GATE(0, "sclk_timer14", "xin24m", CLK_IGNORE_UNUSED, RK3368_CLKGATE_CON(24), 10, GFLAGS),
+-	GATE(0, "sclk_timer13", "xin24m", CLK_IGNORE_UNUSED, RK3368_CLKGATE_CON(24), 9, GFLAGS),
+-	GATE(0, "sclk_timer12", "xin24m", CLK_IGNORE_UNUSED, RK3368_CLKGATE_CON(24), 8, GFLAGS),
+-	GATE(0, "sclk_timer11", "xin24m", CLK_IGNORE_UNUSED, RK3368_CLKGATE_CON(24), 7, GFLAGS),
+-	GATE(0, "sclk_timer10", "xin24m", CLK_IGNORE_UNUSED, RK3368_CLKGATE_CON(24), 6, GFLAGS),
+-	GATE(0, "sclk_timer05", "xin24m", CLK_IGNORE_UNUSED, RK3368_CLKGATE_CON(24), 5, GFLAGS),
+-	GATE(0, "sclk_timer04", "xin24m", CLK_IGNORE_UNUSED, RK3368_CLKGATE_CON(24), 4, GFLAGS),
+-	GATE(0, "sclk_timer03", "xin24m", CLK_IGNORE_UNUSED, RK3368_CLKGATE_CON(24), 3, GFLAGS),
+-	GATE(0, "sclk_timer02", "xin24m", CLK_IGNORE_UNUSED, RK3368_CLKGATE_CON(24), 2, GFLAGS),
+-	GATE(0, "sclk_timer01", "xin24m", CLK_IGNORE_UNUSED, RK3368_CLKGATE_CON(24), 1, GFLAGS),
+-	GATE(0, "sclk_timer00", "xin24m", CLK_IGNORE_UNUSED, RK3368_CLKGATE_CON(24), 0, GFLAGS),
++	GATE(SCLK_TIMER15, "sclk_timer15", "xin24m", CLK_IGNORE_UNUSED, RK3368_CLKGATE_CON(24), 11, GFLAGS),
++	GATE(SCLK_TIMER14, "sclk_timer14", "xin24m", CLK_IGNORE_UNUSED, RK3368_CLKGATE_CON(24), 10, GFLAGS),
++	GATE(SCLK_TIMER13, "sclk_timer13", "xin24m", CLK_IGNORE_UNUSED, RK3368_CLKGATE_CON(24), 9, GFLAGS),
++	GATE(SCLK_TIMER12, "sclk_timer12", "xin24m", CLK_IGNORE_UNUSED, RK3368_CLKGATE_CON(24), 8, GFLAGS),
++	GATE(SCLK_TIMER11, "sclk_timer11", "xin24m", CLK_IGNORE_UNUSED, RK3368_CLKGATE_CON(24), 7, GFLAGS),
++	GATE(SCLK_TIMER10, "sclk_timer10", "xin24m", CLK_IGNORE_UNUSED, RK3368_CLKGATE_CON(24), 6, GFLAGS),
++	GATE(SCLK_TIMER05, "sclk_timer05", "xin24m", CLK_IGNORE_UNUSED, RK3368_CLKGATE_CON(24), 5, GFLAGS),
++	GATE(SCLK_TIMER04, "sclk_timer04", "xin24m", CLK_IGNORE_UNUSED, RK3368_CLKGATE_CON(24), 4, GFLAGS),
++	GATE(SCLK_TIMER03, "sclk_timer03", "xin24m", CLK_IGNORE_UNUSED, RK3368_CLKGATE_CON(24), 3, GFLAGS),
++	GATE(SCLK_TIMER02, "sclk_timer02", "xin24m", CLK_IGNORE_UNUSED, RK3368_CLKGATE_CON(24), 2, GFLAGS),
++	GATE(SCLK_TIMER01, "sclk_timer01", "xin24m", CLK_IGNORE_UNUSED, RK3368_CLKGATE_CON(24), 1, GFLAGS),
++	GATE(SCLK_TIMER00, "sclk_timer00", "xin24m", CLK_IGNORE_UNUSED, RK3368_CLKGATE_CON(24), 0, GFLAGS),
  };
  
- static void __init rk3368_clk_init(struct device_node *np)
+ static const char *const rk3368_critical_clocks[] __initconst = {
+diff --git a/include/dt-bindings/clock/rk3368-cru.h b/include/dt-bindings/clock/rk3368-cru.h
+index 9c5dd9ba2f6c..aeb83e581a11 100644
+--- a/include/dt-bindings/clock/rk3368-cru.h
++++ b/include/dt-bindings/clock/rk3368-cru.h
+@@ -44,13 +44,12 @@
+ #define SCLK_I2S_8CH		82
+ #define SCLK_SPDIF_8CH		83
+ #define SCLK_I2S_2CH		84
+-#define SCLK_TIMER0		85
+-#define SCLK_TIMER1		86
+-#define SCLK_TIMER2		87
+-#define SCLK_TIMER3		88
+-#define SCLK_TIMER4		89
+-#define SCLK_TIMER5		90
+-#define SCLK_TIMER6		91
++#define SCLK_TIMER00		85
++#define SCLK_TIMER01		86
++#define SCLK_TIMER02		87
++#define SCLK_TIMER03		88
++#define SCLK_TIMER04		89
++#define SCLK_TIMER05		90
+ #define SCLK_OTGPHY0		93
+ #define SCLK_OTG_ADP		96
+ #define SCLK_HSICPHY480M	97
+@@ -82,6 +81,12 @@
+ #define SCLK_SFC		126
+ #define SCLK_MAC		127
+ #define SCLK_MACREF_OUT		128
++#define SCLK_TIMER10		133
++#define SCLK_TIMER11		134
++#define SCLK_TIMER12		135
++#define SCLK_TIMER13		136
++#define SCLK_TIMER14		137
++#define SCLK_TIMER15		138
+ 
+ #define DCLK_VOP		190
+ #define MCLK_CRYPTO		191
 -- 
 1.9.1
