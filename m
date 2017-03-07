@@ -1,33 +1,80 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 7 Mar 2017 10:17:37 +0530
-Subject: [PATCH 0/5] ARM: OMAP2+: Add and enable operating-points-v2
-In-Reply-To: <1488813822-26042-1-git-send-email-d-gerlach@ti.com>
-References: <1488813822-26042-1-git-send-email-d-gerlach@ti.com>
-Message-ID: <20170307044737.GG8206@vireshk-i7>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Tue, 7 Mar 2017 10:48:42 +0530
+Subject: [PATCH v2 08/22] PCI: dwc: designware: Add EP mode support
+In-Reply-To: <45e5288e-d11f-c855-af9b-692a42d878c6@synopsys.com>
+References: <1487325042-28227-1-git-send-email-kishon@ti.com>
+ <1487325042-28227-9-git-send-email-kishon@ti.com>
+ <45e5288e-d11f-c855-af9b-692a42d878c6@synopsys.com>
+Message-ID: <58BE42B2.20305@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06-03-17, 09:23, Dave Gerlach wrote:
-> Hi,
-> This series adds the necessary changes to get proper operating-points-v2 tables
-> for AM335x/AM437x/DRA7xx/AM57xx TI SoCs. Doing this enables the ti-cpufreq
-> driver and allows the platform to detect which CPU OPPs are valid for the
-> configuration in use and enable them.
-> 
-> This series adds complete tables for am335x and adds 1GHz support for all
-> beaglebone black boards and updates the already merged but unused am437x table
-> to match the finalized DT bindings. It also moves the existing dra7xx/am57xx
-> OPPs to OPPv2 but does not enable 1.5GHz yet as this requires multiregulator
-> support which will come at a later date.
-> 
-> Also, now that so many TI platforms will depend on the ti-cpufreq driver let's
-> add CONFIG_ARM_TI_CPUFREQ to omap2plus_defconfig to enable it as part of the
-> default configuration.
-> 
-> Pushed a branch containing these patches on top of v4.11-rc1 if anyone wants
-> to try it out [1].
+Hi Joao,
 
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+On Friday 17 February 2017 10:50 PM, Joao Pinto wrote:
+> ?s 9:50 AM de 2/17/2017, Kishon Vijay Abraham I escreveu:
+>> Add endpoint mode support to designware driver. This uses the
+>> EP Core layer introduced recently to add endpoint mode support.
+>> *Any* function driver can now use this designware device
+>> in order to achieve the EP functionality.
+>>
+>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+>> ---
+>>  drivers/pci/dwc/Kconfig              |    5 +
+>>  drivers/pci/dwc/Makefile             |    1 +
+>>  drivers/pci/dwc/pcie-designware-ep.c |  342 ++++++++++++++++++++++++++++++++++
+>>  drivers/pci/dwc/pcie-designware.c    |   51 +++++
+>>  drivers/pci/dwc/pcie-designware.h    |   72 +++++++
+>>  5 files changed, 471 insertions(+)
+>>  create mode 100644 drivers/pci/dwc/pcie-designware-ep.c
+>>
 
--- 
-viresh
+<snip>
+
+>> diff --git a/drivers/pci/dwc/pcie-designware.c b/drivers/pci/dwc/pcie-designware.c
+>> index 686945d..49b28c8 100644
+>> --- a/drivers/pci/dwc/pcie-designware.c
+>> +++ b/drivers/pci/dwc/pcie-designware.c
+>> @@ -173,6 +173,57 @@ void dw_pcie_prog_outbound_atu(struct dw_pcie *pci, int index, int type,
+>>  	dev_err(pci->dev, "iATU is not being enabled\n");
+>>  }
+>>  
+>> +int dw_pcie_prog_inbound_atu(struct dw_pcie *pci, int index, int bar,
+>> +			     u64 cpu_addr, enum dw_pcie_as_type as_type)
+>> +{
+>> +	int type;
+>> +	void __iomem *base = pci->dbi_base;
+>> +
+>> +	dw_pcie_write_dbi(pci, base, PCIE_ATU_VIEWPORT, 0x4,
+>> +			  PCIE_ATU_REGION_INBOUND | index);
+>> +	dw_pcie_write_dbi(pci, base, PCIE_ATU_LOWER_TARGET, 0x4,
+>> +			  lower_32_bits(cpu_addr));
+>> +	dw_pcie_write_dbi(pci, base, PCIE_ATU_UPPER_TARGET, 0x4,
+>> +			  upper_32_bits(cpu_addr));
+>> +
+>> +	switch (as_type) {
+>> +	case DW_PCIE_AS_MEM:
+>> +		type = PCIE_ATU_TYPE_MEM;
+>> +		break;
+>> +	case DW_PCIE_AS_IO:
+>> +		type = PCIE_ATU_TYPE_IO;
+>> +		break;
+>> +	default:
+>> +		return -EINVAL;
+>> +	}
+>> +
+>> +	dw_pcie_write_dbi(pci, base, PCIE_ATU_CR1, 0x4, type);
+>> +	dw_pcie_write_dbi(pci, base, PCIE_ATU_CR2, 0x4, PCIE_ATU_ENABLE |
+>> +			  PCIE_ATU_BAR_MODE_ENABLE | (bar << 8));
+>> +	return 0;
+>> +}
+>> +
+> 
+> This Atu programming is for PCI Cores <= 4.70. Please follow the same approach as:
+> https://git.kernel.org/cgit/linux/kernel/git/helgaas/pci.git/tree/drivers/pci/dwc/pcie-designware.c?h=pci/host-designware#n95
+
+Can you provide PCIE_GET_ATU_INB_UNR_REG_OFFSET (similar to
+PCIE_GET_ATU_OUTB_UNR_REG_OFFSET)?
+
+Thanks
+Kishon
