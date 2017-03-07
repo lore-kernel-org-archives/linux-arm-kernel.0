@@ -1,35 +1,33 @@
-From: alim.akhtar@samsung.com (Alim Akhtar)
-Date: Tue, 07 Mar 2017 09:37:05 +0530
-Subject: [PATCH] irqchip/gic-v3: Fix GICD_CTLR_ARE_NS bit field
-References: <CGME20170307041023epcas5p1229831d4cc8541e6c35914508e6e01f0@epcas5p1.samsung.com>
-Message-ID: <1488859625-7532-1-git-send-email-alim.akhtar@samsung.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Tue, 7 Mar 2017 10:17:37 +0530
+Subject: [PATCH 0/5] ARM: OMAP2+: Add and enable operating-points-v2
+In-Reply-To: <1488813822-26042-1-git-send-email-d-gerlach@ti.com>
+References: <1488813822-26042-1-git-send-email-d-gerlach@ti.com>
+Message-ID: <20170307044737.GG8206@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Alim Akhtar <alim.akhtar@gmail.com>
+On 06-03-17, 09:23, Dave Gerlach wrote:
+> Hi,
+> This series adds the necessary changes to get proper operating-points-v2 tables
+> for AM335x/AM437x/DRA7xx/AM57xx TI SoCs. Doing this enables the ti-cpufreq
+> driver and allows the platform to detect which CPU OPPs are valid for the
+> configuration in use and enable them.
+> 
+> This series adds complete tables for am335x and adds 1GHz support for all
+> beaglebone black boards and updates the already merged but unused am437x table
+> to match the finalized DT bindings. It also moves the existing dra7xx/am57xx
+> OPPs to OPPv2 but does not enable 1.5GHz yet as this requires multiregulator
+> support which will come at a later date.
+> 
+> Also, now that so many TI platforms will depend on the ti-cpufreq driver let's
+> add CONFIG_ARM_TI_CPUFREQ to omap2plus_defconfig to enable it as part of the
+> default configuration.
+> 
+> Pushed a branch containing these patches on top of v4.11-rc1 if anyone wants
+> to try it out [1].
 
-As per GICv3 Architecture specification 8.9.4 field descriptions,
-GICD_CTLR_ARE_NS is bit[5]. This patch correct the same.
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 
-Fixes: 021f6537 ("irqchip: gic-v3: Initial support for GICv3")
-Cc: stable at vger.kernel.org
-Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
----
- include/linux/irqchip/arm-gic-v3.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-index e808f8a..4aaf639 100644
---- a/include/linux/irqchip/arm-gic-v3.h
-+++ b/include/linux/irqchip/arm-gic-v3.h
-@@ -57,7 +57,7 @@
- 
- #define GICD_CTLR_RWP			(1U << 31)
- #define GICD_CTLR_DS			(1U << 6)
--#define GICD_CTLR_ARE_NS		(1U << 4)
-+#define GICD_CTLR_ARE_NS		(1U << 5)
- #define GICD_CTLR_ENABLE_G1A		(1U << 1)
- #define GICD_CTLR_ENABLE_G1		(1U << 0)
- 
 -- 
-2.7.4
+viresh
