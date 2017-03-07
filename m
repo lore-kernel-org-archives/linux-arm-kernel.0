@@ -1,36 +1,49 @@
-From: mathias.nyman@linux.intel.com (Mathias Nyman)
-Date: Tue, 7 Mar 2017 17:12:55 +0200
-Subject: [PATCH 2/2] usb: xhci: remove dummy extra_priv_size for size of
- xhci_hcd struct
-In-Reply-To: <20170307110238.GA31069@ulmo.ba.sec>
-References: <1488857543-9384-1-git-send-email-chunfeng.yun@mediatek.com>
- <1488857543-9384-2-git-send-email-chunfeng.yun@mediatek.com>
- <20170307110238.GA31069@ulmo.ba.sec>
-Message-ID: <58BECDF7.80003@linux.intel.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 7 Mar 2017 07:12:28 -0800
+Subject: [PATCH 0/7] thermal: ti-soc-thermal: Migrate slope/offset data
+ to device tree
+In-Reply-To: <1c47d169-7962-2fe7-0635-570881e85e06@ti.com>
+References: <1488364190-23488-1-git-send-email-j-keerthy@ti.com>
+ <20170306184215.GO20572@atomide.com>
+ <1c47d169-7962-2fe7-0635-570881e85e06@ti.com>
+Message-ID: <20170307151227.GR20572@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07.03.2017 13:02, Thierry Reding wrote:
-> On Tue, Mar 07, 2017 at 11:32:23AM +0800, Chunfeng Yun wrote:
->> because hcd_priv_size is already size of xhci_hcd struct,
->> extra_priv_size is not needed anymore for MTK and tegra drivers.
->>
->> Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
->> ---
->>   drivers/usb/host/xhci-mtk.c   |    1 -
->>   drivers/usb/host/xhci-tegra.c |    1 -
->>   2 files changed, 2 deletions(-)
->
+* Keerthy <j-keerthy@ti.com> [170306 23:15]:
+> 
+> 
+> On Tuesday 07 March 2017 12:12 AM, Tony Lindgren wrote:
+> > * Keerthy <j-keerthy@ti.com> [170301 02:31]:
+> > > Currently the slope and offset values for calculating the
+> > > hot spot temperature of a particular thermal zone is part
+> > > of driver data. Pass them here instead and obtain the values
+> > > while of node parsing.
+> > > 
+> > > Tested for the slope and constant values on DRA7-EVM.
+> > > 
+> > > Keerthy (7):
+> > >   ARM: DRA7: Thermal: Add slope and offset values
+> > >   ARM: OMAP5: Thermal: Add slope and offset values
+> > >   ARM: OMAP443x: Thermal: Add slope and offset values
+> > >   ARM: OMAP4460: Thermal: Add slope and offset values
+> > >   thermal: ti-soc-thermal: Fetch slope and offset from DT
+> > >   thermal: ti-soc-thermal: Remove redundant constants
+> > >   thermal: ti-soc-thermal: Remove redundant code
+> > 
+> > Are the dts changes safe for me to pick separately into
+> > omap-for-v4.12/dt?
+> 
+> Tony,
+> 
+> Seems like omap3 has no thermal_zone node defined in Device Tree.
+> It seems like it still uses driver data. I would need to add that as well.
+> Can you confirm that? If yes i will send a new series with the omap3 device
+> tree changes as well.
 
-Nice catch, thanks.
-queued.
+OK cool. It might be worth checking how it was configured with
+the legacy platform data.
 
-> For Tegra:
->
-> Tested-by: Thierry Reding <treding@nvidia.com>
-> Acked-by: Thierry Reding <treding@nvidia.com>
->
+Regards,
 
-adding tags
-
--Mathias
+Tony
