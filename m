@@ -1,40 +1,22 @@
-From: linucherian@gmail.com (linucherian at gmail.com)
-Date: Tue,  7 Mar 2017 11:22:44 +0530
-Subject: [PATCH V3 4/4] KVM: arm64: Increase number of user memslots to 512
-In-Reply-To: <1488865964-17346-1-git-send-email-linucherian@gmail.com>
-References: <1488865964-17346-1-git-send-email-linucherian@gmail.com>
-Message-ID: <1488865964-17346-5-git-send-email-linucherian@gmail.com>
+From: wuchengli@chromium.org (Wu-Cheng Li)
+Date: Tue,  7 Mar 2017 14:03:27 +0800
+Subject: [PATCH v1 0/1] mtk-vcodec: check the vp9 decoder buffer index from VPU
+Message-ID: <20170307060328.114348-1-wuchengli@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linu Cherian <linu.cherian@cavium.com>
+From: Wu-Cheng Li <wuchengli@google.com>
 
-Having only 32 memslots is a real constraint for the maximum
-number of PCI devices that can be assigned to a single guest.
-Assuming each PCI device/virtual function having two memory BAR
-regions, we could assign only 15 devices/virtual functions to a
-guest.
+This patch guards against the invalid buffer index from
+VPU firmware.
 
-Hence increase KVM_USER_MEM_SLOTS to 512 as done in other archs like
-powerpc.
+Wu-Cheng Li (1):
+  mtk-vcodec: check the vp9 decoder buffer index from VPU.
 
-Signed-off-by: Linu Cherian <linu.cherian@cavium.com>
----
- arch/arm64/include/asm/kvm_host.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c |  6 +++++
+ .../media/platform/mtk-vcodec/vdec/vdec_vp9_if.c   | 26 ++++++++++++++++++++++
+ drivers/media/platform/mtk-vcodec/vdec_drv_if.h    |  2 ++
+ 3 files changed, 34 insertions(+)
 
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index a0409b0..4027002 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -30,7 +30,7 @@
- 
- #define __KVM_HAVE_ARCH_INTC_INITIALIZED
- 
--#define KVM_USER_MEM_SLOTS 32
-+#define KVM_USER_MEM_SLOTS 512
- #define KVM_COALESCED_MMIO_PAGE_OFFSET 1
- #define KVM_HALT_POLL_NS_DEFAULT 500000
- 
 -- 
-1.9.1
+2.12.0.rc1.440.g5b76565f74-goog
