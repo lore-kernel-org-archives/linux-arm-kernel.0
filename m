@@ -1,140 +1,28 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Tue,  7 Mar 2017 11:40:22 +0100
-Subject: [PATCH] ARM64: dts: meson-gx: Add Buttons to Q200 and P230 boards
-Message-ID: <1488883222-23320-1-git-send-email-narmstrong@baylibre.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 7 Mar 2017 16:11:52 +0530
+Subject: [PATCH 0/3] A/C and Sound device tree nodes for LEGO MINDSTORMS
+ EV3
+In-Reply-To: <21109106-99fc-aefb-a7e0-6e668cfde126@ti.com>
+References: <1486495329-2789-1-git-send-email-david@lechnology.com>
+ <21109106-99fc-aefb-a7e0-6e668cfde126@ti.com>
+Message-ID: <b12bc88f-5b74-7e30-6e8a-d85cc035ffd6@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for the P230 and Q200 ADC laddered button and
-GPIO button.
+On Monday 20 February 2017 04:06 PM, Sekhar Nori wrote:
+> On Wednesday 08 February 2017 12:52 AM, David Lechner wrote:
+>> This series adds device tree nodes for an analog/digital convert and for sound
+>> on LEGO MINDSTORMS EV3. The device tree bindings for these nodes have been acked
+>> and the drivers used by these nodes have been in linux-next for a couple weeks
+>> now and as far as I know, will be included in mainline v4.11.
+>>
+>> This series has been tested on LEGO MINDSTORMS EV3 using next-20170207 merged
+>> with linux-davinci/master.
+> 
+> Looks good to me. Will wait for device tree maintainers. And also for
+> v4.11-rc1 to come out.
 
-Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
----
- .../boot/dts/amlogic/meson-gxl-s905d-p230.dts      | 40 ++++++++++++++++++++++
- arch/arm64/boot/dts/amlogic/meson-gxm-q200.dts     | 40 ++++++++++++++++++++++
- 2 files changed, 80 insertions(+)
+Applied now.
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p230.dts b/arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p230.dts
-index f66939c..a97d17d 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p230.dts
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p230.dts
-@@ -43,12 +43,47 @@
- 
- /dts-v1/;
- 
-+#include <dt-bindings/input/input.h>
-+
- #include "meson-gxl-s905d.dtsi"
- #include "meson-gx-p23x-q20x.dtsi"
- 
- / {
- 	compatible = "amlogic,p230", "amlogic,s905d", "amlogic,meson-gxl";
- 	model = "Amlogic Meson GXL (S905D) P230 Development Board";
-+
-+	adc-keys {
-+		compatible = "adc-keys";
-+		io-channels = <&saradc 0>;
-+		io-channel-names = "buttons";
-+		keyup-threshold-microvolt = <1710000>;
-+
-+		button-function {
-+			label = "Update";
-+			linux,code = <KEY_VENDOR>;
-+			press-threshold-microvolt = <10000>;
-+		};
-+	};
-+
-+	gpio-keys-polled {
-+		compatible = "gpio-keys-polled";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		poll-interval = <100>;
-+
-+		button at 0 {
-+			label = "power";
-+			linux,code = <KEY_POWER>;
-+			gpios = <&gpio_ao GPIOAO_2 GPIO_ACTIVE_LOW>;
-+		};
-+	};
-+
-+	vddio_ao18: regulator-vddio_ao18 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "VDDIO_AO18";
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <1800000>;
-+	};
- };
- 
- /* P230 has exclusive choice between internal or external PHY */
-@@ -75,3 +110,8 @@
- 		max-speed = <1000>;
- 	};
- };
-+
-+&saradc {
-+	status = "okay";
-+	vref-supply = <&vddio_ao18>;
-+};
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxm-q200.dts b/arch/arm64/boot/dts/amlogic/meson-gxm-q200.dts
-index 5dbc660..a2f2908 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxm-q200.dts
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxm-q200.dts
-@@ -43,12 +43,47 @@
- 
- /dts-v1/;
- 
-+#include <dt-bindings/input/input.h>
-+
- #include "meson-gxm.dtsi"
- #include "meson-gx-p23x-q20x.dtsi"
- 
- / {
- 	compatible = "amlogic,q200", "amlogic,s912", "amlogic,meson-gxm";
- 	model = "Amlogic Meson GXM (S912) Q200 Development Board";
-+
-+	adc-keys {
-+		compatible = "adc-keys";
-+		io-channels = <&saradc 0>;
-+		io-channel-names = "buttons";
-+		keyup-threshold-microvolt = <1710000>;
-+
-+		button-function {
-+			label = "Update";
-+			linux,code = <KEY_VENDOR>;
-+			press-threshold-microvolt = <10000>;
-+		};
-+	};
-+
-+	gpio-keys-polled {
-+		compatible = "gpio-keys-polled";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		poll-interval = <100>;
-+
-+		button at 0 {
-+			label = "power";
-+			linux,code = <KEY_POWER>;
-+			gpios = <&gpio_ao GPIOAO_2 GPIO_ACTIVE_LOW>;
-+		};
-+	};
-+
-+	vddio_ao18: regulator-vddio_ao18 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "VDDIO_AO18";
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <1800000>;
-+	};
- };
- 
- /* Q200 has exclusive choice between internal or external PHY */
-@@ -75,3 +110,8 @@
- 		max-speed = <1000>;
- 	};
- };
-+
-+&saradc {
-+	status = "okay";
-+	vref-supply = <&vddio_ao18>;
-+};
--- 
-1.9.1
+Thanks,
+Sekhar
