@@ -1,36 +1,19 @@
 From: guohanjun@huawei.com (Hanjun Guo)
-Date: Tue, 7 Mar 2017 20:40:04 +0800
-Subject: [PATCH v9 09/15] ACPI/IORT: Introduce iort_node_map_platform_id() to
- retrieve dev id
+Date: Tue, 7 Mar 2017 20:39:58 +0800
+Subject: [PATCH v9 03/15] ACPI/IORT: Rework iort_match_node_callback() return
+ value handling
 In-Reply-To: <1488890410-15503-1-git-send-email-guohanjun@huawei.com>
 References: <1488890410-15503-1-git-send-email-guohanjun@huawei.com>
-Message-ID: <1488890410-15503-10-git-send-email-guohanjun@huawei.com>
+Message-ID: <1488890410-15503-4-git-send-email-guohanjun@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Hanjun Guo <hanjun.guo@linaro.org>
 
-To retrieve dev id for IORT named components nodes there are
-two steps involved (second is optional):
+The return value handling in iort_match_node_callback() is
+too convoluted; update the iort_match_node_callback() return
+value handling to make code easier to read.
 
-(1) Retrieve the initial id (this may well provide the final mapping)
-(2) Map the id (optional if (1) represents the map type we need), this
-    is needed for use cases such as NC (named component) -> SMMU -> ITS
-    mappings.
-
-the iort_node_get_id() function was created for step (1) above and
-iort_node_map_rid() for step (2).
-
-Create a wrapper, named iort_node_map_platform_id(), that encompasses
-the two steps at once to retrieve the dev id to provide steps (1)-(2)
-functionality.
-
-iort_node_map_platform_id() will handle the parent type so type handling
-in iort_node_get_id() is duplicated, remove it and update current
-iort_node_get_id() users to move them over to iort_node_map_platform_id().
-
-Suggested-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Suggested-by: Tomasz Nowicki <tn@semihalf.com>
 Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
 [lorenzo.pieralisi at arm.com: rewrote commit log]
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
@@ -40,87 +23,41 @@ Tested-by: Sinan Kaya <okaya@codeaurora.org>
 Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Cc: Tomasz Nowicki <tn@semihalf.com>
 ---
- drivers/acpi/arm64/iort.c | 43 ++++++++++++++++++++++++++++++++++---------
- 1 file changed, 34 insertions(+), 9 deletions(-)
+ drivers/acpi/arm64/iort.c | 8 ++------
+ 1 file changed, 2 insertions(+), 6 deletions(-)
 
 diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-index 28d0088..83cd59d 100644
+index abc5774..a6b807d 100644
 --- a/drivers/acpi/arm64/iort.c
 +++ b/drivers/acpi/arm64/iort.c
-@@ -318,8 +318,7 @@ static int iort_id_map(struct acpi_iort_id_mapping *map, u8 type, u32 rid_in,
- 
- static
- struct acpi_iort_node *iort_node_get_id(struct acpi_iort_node *node,
--					u32 *id_out, u8 type_mask,
--					int index)
-+					u32 *id_out, int index)
+@@ -253,17 +253,15 @@ static acpi_status iort_match_node_callback(struct acpi_iort_node *node,
+ 					    void *context)
  {
- 	struct acpi_iort_node *parent;
- 	struct acpi_iort_id_mapping *map;
-@@ -341,9 +340,6 @@ struct acpi_iort_node *iort_node_get_id(struct acpi_iort_node *node,
- 	parent = ACPI_ADD_PTR(struct acpi_iort_node, iort_table,
- 			       map->output_reference);
+ 	struct device *dev = context;
+-	acpi_status status;
++	acpi_status status = AE_NOT_FOUND;
  
--	if (!(IORT_TYPE_MASK(parent->type) & type_mask))
--		return NULL;
--
- 	if (map->flags & ACPI_IORT_ID_SINGLE_MAPPING) {
- 		if (node->type == ACPI_IORT_NODE_NAMED_COMPONENT ||
- 		    node->type == ACPI_IORT_NODE_PCI_ROOT_COMPLEX) {
-@@ -406,6 +402,34 @@ static struct acpi_iort_node *iort_node_map_id(struct acpi_iort_node *node,
- 	return NULL;
- }
+ 	if (node->type == ACPI_IORT_NODE_NAMED_COMPONENT) {
+ 		struct acpi_buffer buf = { ACPI_ALLOCATE_BUFFER, NULL };
+ 		struct acpi_device *adev = to_acpi_device_node(dev->fwnode);
+ 		struct acpi_iort_named_component *ncomp;
  
-+static
-+struct acpi_iort_node *iort_node_map_platform_id(struct acpi_iort_node *node,
-+						 u32 *id_out, u8 type_mask,
-+						 int index)
-+{
-+	struct acpi_iort_node *parent;
-+	u32 id;
-+
-+	/* step 1: retrieve the initial dev id */
-+	parent = iort_node_get_id(node, &id, index);
-+	if (!parent)
-+		return NULL;
-+
-+	/*
-+	 * optional step 2: map the initial dev id if its parent is not
-+	 * the target type we want, map it again for the use cases such
-+	 * as NC (named component) -> SMMU -> ITS. If the type is matched,
-+	 * return the initial dev id and its parent pointer directly.
-+	 */
-+	if (!(IORT_TYPE_MASK(parent->type) & type_mask))
-+		parent = iort_node_map_id(parent, id, id_out, type_mask);
-+	else
-+		if (id_out)
-+			*id_out = id;
-+
-+	return parent;
-+}
-+
- static struct acpi_iort_node *iort_find_dev_node(struct device *dev)
- {
- 	struct pci_bus *pbus;
-@@ -604,14 +628,15 @@ const struct iommu_ops *iort_iommu_configure(struct device *dev)
- 		if (!node)
- 			return NULL;
+-		if (!adev) {
+-			status = AE_NOT_FOUND;
++		if (!adev)
+ 			goto out;
+-		}
  
--		parent = iort_node_get_id(node, &streamid,
--					  IORT_IOMMU_TYPE, i++);
-+		parent = iort_node_map_platform_id(node, &streamid,
-+						   IORT_IOMMU_TYPE, i++);
- 
- 		while (parent) {
- 			ops = iort_iommu_xlate(dev, parent, streamid);
- 
--			parent = iort_node_get_id(node, &streamid,
--						  IORT_IOMMU_TYPE, i++);
-+			parent = iort_node_map_platform_id(node, &streamid,
-+							   IORT_IOMMU_TYPE,
-+							   i++);
- 		}
+ 		status = acpi_get_name(adev->handle, ACPI_FULL_PATHNAME, &buf);
+ 		if (ACPI_FAILURE(status)) {
+@@ -289,8 +287,6 @@ static acpi_status iort_match_node_callback(struct acpi_iort_node *node,
+ 		 */
+ 		status = pci_rc->pci_segment_number == pci_domain_nr(bus) ?
+ 							AE_OK : AE_NOT_FOUND;
+-	} else {
+-		status = AE_NOT_FOUND;
  	}
- 
+ out:
+ 	return status;
 -- 
 1.7.12.4
