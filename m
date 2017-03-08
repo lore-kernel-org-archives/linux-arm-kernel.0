@@ -1,38 +1,30 @@
-From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
-Date: Wed, 8 Mar 2017 23:20:36 +0100
-Subject: [PATCH 1/2] ARM: dts: BCM53573: Don't use nonexistent
- "default-off" LED trigger
-In-Reply-To: <42bce8ea-f1dc-2018-33f1-d296ccd7b677@gmail.com>
-References: <20170308064105.26619-1-zajec5@gmail.com>
- <42bce8ea-f1dc-2018-33f1-d296ccd7b677@gmail.com>
-Message-ID: <CACna6rz7Bm4DT4Mo3zgU+14uFHMDbQNEX6ejiY=RD-d1WMKcSA@mail.gmail.com>
+From: luto@amacapital.net (Andy Lutomirski)
+Date: Wed, 8 Mar 2017 14:20:24 -0800
+Subject: [PATCH v1 1/4] syscalls: Restore address limit after a syscall
+In-Reply-To: <20170308215814.GG21222@n2100.armlinux.org.uk>
+References: <20170308213844.131877-1-thgarnie@google.com>
+ <20170308215814.GG21222@n2100.armlinux.org.uk>
+Message-ID: <CALCETrX1RpjZxdo1aauQa8hGQPO1Dzn5gU6NoT1CvSKo8ea1uQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 March 2017 at 18:31, Florian Fainelli <f.fainelli@gmail.com> wrote:
-> On 03/07/2017 10:41 PM, Rafa? Mi?ecki wrote:
->> From: Rafa? Mi?ecki <rafal@milecki.pl>
->>
->> Such a trigger doesn't exist in Linux and is not needed as LED is being
->> turned off by default. This could cause errors in LEDs core code when
->> trying to set default trigger.
->>
->> Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
+On Wed, Mar 8, 2017 at 1:58 PM, Russell King - ARM Linux
+<linux@armlinux.org.uk> wrote:
+> On Wed, Mar 08, 2017 at 01:38:41PM -0800, Thomas Garnier wrote:
+>> This patch prevents a syscall to modify the address limit of the
+>> caller. The address limit is kept by the syscall wrapper and restored
+>> just after the syscall ends.
 >
-> Since you are fixing something, what's the proper Fixes: tag for this
-> commit? Likewise for the second patch.
+> I would much rather architectures were given the opportunity to code up
+> checks like this efficiently (iow, inline in the exit path assembly),
+> rather than having to unconditionally call an additional function on
+> every syscall, with its register saving overheads.
+>
 
-This problem was exposed by the commit f363a870eaef ("leds: core: use
-deferred probing if default trigger isn't available yet") pushed to
-the:
-https://git.kernel.org/cgit/linux/kernel/git/j.anaszewski/linux-leds.git/log/?h=for-next
+Me too.  I think the two config choices should be:
 
-I reported problems caused by this commit in e-mail thread
-New problems after f363a870eaef ("leds: core: use deferred probing if
-default trigger isn't available yet")
-(I can't access linux-leds archive) and it was dropped after my report.
+(a) BUG_ON(!segment_eq(...));
 
-So there is nothing to point in the "Fixes:".
+(b) No generic check at all -- arch code will handle it
 
--- 
-Rafa?
+--Andy
