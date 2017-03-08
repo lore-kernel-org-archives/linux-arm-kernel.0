@@ -1,123 +1,33 @@
-From: peter.senna@collabora.com (Peter Senna Tschudin)
-Date: Wed, 8 Mar 2017 11:10:40 +0100
-Subject: [PATCH V3 4/4] dts/imx6q-b850v3: Use
- megachips-stdpxxxx-ge-b850v3-fw bridges (LVDS-DP++)
-In-Reply-To: <d5c297680eb82fd7ef63f7f5dafffc22b98d2345.1488555615.git.peter.senna@collabora.com>
-References: <cover.1488555615.git.peter.senna@collabora.com>
- <d5c297680eb82fd7ef63f7f5dafffc22b98d2345.1488555615.git.peter.senna@collabora.com>
-Message-ID: <20170308101040.GB25268@collabora.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Wed, 8 Mar 2017 11:20:59 +0100
+Subject: [PATCH 1/2] ARM: dts: BCM53573: Don't use nonexistent
+ "default-off" LED trigger
+In-Reply-To: <20170308064105.26619-1-zajec5@gmail.com>
+References: <20170308064105.26619-1-zajec5@gmail.com>
+Message-ID: <20170308102058.GA7772@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 03, 2017 at 04:57:10PM +0100, Peter Senna Tschudin wrote:
-
-Hi Shawn Guo,
-
-Now that the driver and binding are in, can you pick this up?
-
-Thank you!
-
-> Configures the megachips-stdpxxxx-ge-b850v3-fw bridges on the GE
-> B850v3 dts file.
+On Wed 2017-03-08 07:41:04, Rafa? Mi?ecki wrote:
+> From: Rafa? Mi?ecki <rafal@milecki.pl>
 > 
-> Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> Cc: Martyn Welch <martyn.welch@collabora.co.uk>
-> Cc: Martin Donnelly <martin.donnelly@ge.com>
-> Cc: Javier Martinez Canillas <javier@dowhile0.org>
-> Cc: Enric Balletbo i Serra <enric.balletbo@collabora.com>
-> Cc: Philipp Zabel <p.zabel@pengutronix.de>
-> Cc: Rob Herring <robh@kernel.org>
-> Cc: Fabio Estevam <fabio.estevam@nxp.com>
-> Signed-off-by: Peter Senna Tschudin <peter.senna@collabora.com>
-> ---
-> Unchanged since V1.
+> Such a trigger doesn't exist in Linux and is not needed as LED is being
+> turned off by default. This could cause errors in LEDs core code when
+> trying to set default trigger.
 > 
->  arch/arm/boot/dts/imx6q-b850v3.dts | 68 ++++++++++++++++++++++++++++++++++++++
->  1 file changed, 68 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/imx6q-b850v3.dts b/arch/arm/boot/dts/imx6q-b850v3.dts
-> index b237429..3ec54da 100644
-> --- a/arch/arm/boot/dts/imx6q-b850v3.dts
-> +++ b/arch/arm/boot/dts/imx6q-b850v3.dts
-> @@ -72,6 +72,13 @@
->  		fsl,data-mapping = "spwg";
->  		fsl,data-width = <24>;
->  		status = "okay";
-> +
-> +		port at 4 {
-> +			reg = <4>;
-> +			lvds0_out: endpoint {
-> +				remote-endpoint = <&stdp4028_in>;
-> +			};
-> +		};
->  	};
->  };
->  
-> @@ -146,3 +153,64 @@
->  &usdhc2 {
->  	status = "disabled";
->  };
-> +
-> +&mux2_i2c2 {
-> +	status = "okay";
-> +	clock-frequency = <100000>;
-> +
-> +	stdp4028 at 73 {
-> +		compatible = "megachips,stdp4028-ge-b850v3-fw";
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		reg = <0x73>;
-> +
-> +		interrupt-parent = <&gpio2>;
-> +		interrupts = <0 IRQ_TYPE_LEVEL_HIGH>;
-> +
-> +		ports {
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +
-> +			port at 0 {
-> +				reg = <0>;
-> +				stdp4028_in: endpoint {
-> +					remote-endpoint = <&lvds0_out>;
-> +				};
-> +			};
-> +			port at 1 {
-> +				reg = <1>;
-> +				stdp4028_out: endpoint {
-> +					remote-endpoint = <&stdp2690_in>;
-> +				};
-> +			};
-> +		};
-> +	};
-> +
-> +	stdp2690 at 72 {
-> +		compatible = "megachips,stdp2690-ge-b850v3-fw";
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		reg = <0x72>;
-> +
-> +		ports {
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +
-> +			port at 0 {
-> +				reg = <0>;
-> +				stdp2690_in: endpoint {
-> +					remote-endpoint = <&stdp4028_out>;
-> +				};
-> +			};
-> +
-> +			port at 1 {
-> +				reg = <1>;
-> +				stdp2690_out: endpoint {
-> +					/* Connector for external display */
-> +				};
-> +			};
-> +		};
-> +	};
-> +};
-> -- 
-> 2.9.3
-> 
+> Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
+
+For both patches:
+
+Acked-by: Pavel Machek <pavel@ucw.cz>
+
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170308/1bd05842/attachment.sig>
