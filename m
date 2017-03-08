@@ -1,54 +1,77 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed,  8 Mar 2017 09:00:15 +0100
-Subject: [PATCH RESEND^2] usb: gadget: udc: atmel: fix debug output
-Message-ID: <20170308080032.3848369-1-arnd@arndb.de>
+From: romain.perier@collabora.com (Romain Perier)
+Date: Wed,  8 Mar 2017 09:15:24 +0100
+Subject: [PATCH RESEND] drm: dw_hdmi: Don't rely on the status of the bridge
+ for updating HPD
+Message-ID: <20170308081524.7672-1-romain.perier@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The debug output now contains the wrong variable, as seen from the compiler
-warning:
+Currently, the irq handler that monitores changes for HPD anx RX_SENSE
+relies on the status of the bridge for updating the status of the HPD.
+The update is done only when the bridge is enabled.
 
-drivers/usb/gadget/udc/atmel_usba_udc.c: In function 'usba_ep_enable':
-drivers/usb/gadget/udc/atmel_usba_udc.c:632:550: error: 'ept_cfg' may be used uninitialized in this function [-Werror=maybe-uninitialized]
-  DBG(DBG_ERR, "%s: EPT_CFG = 0x%lx (maxpacket = %lu)\n",
+However, on Rockchip platforms we have found use cases where it could be
+a problem. When HDMI is being used, turning off/on the screen or
+unplugging/re-plugging the cable, the following simplified code path
+will happen:
 
-This changes the debug output the same way as the other code.
+- dw_hdmi_irq() will be triggered by an HPD event, as the bridge is on
+hdmi->disabled is false, then the handler will update the rxsense flag
+accordingly.
+- dw_hdmi_update_power() will be invoked with the mode
+DRM_FORCE_UNSPECIFIED and rxsense == 1, so dw_hdmi_poweroff() will be
+called and the PHY will be desactivated (its pixel clocks and TMDS)
 
-Fixes: 741d2558bf0a ("usb: gadget: udc: atmel: Update endpoint allocation scheme")
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+[...]
+
+- dw_hdmi_bridge_disable() will be invoked, the bridge will be marked as
+disabled.
+
+- dw_hdmi_irq() will be triggered by an HPD event, as the bridge is
+currently disabled the HPD status won't be updated, so hdmi->rxsense
+won't be changed. Even if the data part of the PHY is disabled, this
+information coming from the HDMI Transmitter is correct and should be
+saved.
+
+[...]
+
+- dw_hdmi_bridge_enable() will be invoked, the bridge will be marked as
+enabled.
+- dw_hdmi_update_power() will be called. As hdmi->force will be equal to
+DRM_FORCE_UNSPECIFIED the function will rely on hdmi->rxsense. This
+field has not been updated by the irq handler, so it will be false and
+DRM_FORCE_ON won't be put to hdmi->force.
+
+Consequently, most of the time dw_hdmi_poweron() won't be called in this
+use case, TMDS won't be re-enabled the PHY won't be re-initialized,
+resulting in a "Signal not found".
+
+This commit fixes the issue by removing the check for "!hdmi->disabled".
+As already explained, even if the PHY is partially disabled, information
+coming from HDMI Transmitter about HPD should be saved for a later use.
+
+Signed-off-by: Romain Perier <romain.perier@collabora.com>
 ---
-Originally this broke on Feb 1 and I sent this fix,
-I resent it after it wasn't applied by Feb 22.
 
-This is now one of only two build regressions that made it into
-4.11-rc1 that are still broken on linux-next. Please apply
+Note: Due to an email configuration issue, some of my patches were not
+received on infradead.org or vger.kernel.org. It is now fixed, so I
+resend this patch for this reason.
 
- drivers/usb/gadget/udc/atmel_usba_udc.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/gpu/drm/bridge/dw-hdmi.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.c b/drivers/usb/gadget/udc/atmel_usba_udc.c
-index 11bbce28bc23..2035906b8ced 100644
---- a/drivers/usb/gadget/udc/atmel_usba_udc.c
-+++ b/drivers/usb/gadget/udc/atmel_usba_udc.c
-@@ -610,7 +610,7 @@ usba_ep_enable(struct usb_ep *_ep, const struct usb_endpoint_descriptor *desc)
- {
- 	struct usba_ep *ep = to_usba_ep(_ep);
- 	struct usba_udc *udc = ep->udc;
--	unsigned long flags, ept_cfg, maxpacket;
-+	unsigned long flags, maxpacket;
- 	unsigned int nr_trans;
- 
- 	DBG(DBG_GADGET, "%s: ep_enable: desc=%p\n", ep->ep.name, desc);
-@@ -630,7 +630,7 @@ usba_ep_enable(struct usb_ep *_ep, const struct usb_endpoint_descriptor *desc)
- 	ep->is_in = 0;
- 
- 	DBG(DBG_ERR, "%s: EPT_CFG = 0x%lx (maxpacket = %lu)\n",
--			ep->ep.name, ept_cfg, maxpacket);
-+			ep->ep.name, ep->ept_cfg, maxpacket);
- 
- 	if (usb_endpoint_dir_in(desc)) {
- 		ep->is_in = 1;
+diff --git a/drivers/gpu/drm/bridge/dw-hdmi.c b/drivers/gpu/drm/bridge/dw-hdmi.c
+index 235ce7d..b621fc7 100644
+--- a/drivers/gpu/drm/bridge/dw-hdmi.c
++++ b/drivers/gpu/drm/bridge/dw-hdmi.c
+@@ -1790,7 +1790,7 @@ static irqreturn_t dw_hdmi_irq(int irq, void *dev_id)
+ 	if (intr_stat &
+ 	    (HDMI_IH_PHY_STAT0_RX_SENSE | HDMI_IH_PHY_STAT0_HPD)) {
+ 		mutex_lock(&hdmi->mutex);
+-		if (!hdmi->disabled && !hdmi->force) {
++		if (!hdmi->force) {
+ 			/*
+ 			 * If the RX sense status indicates we're disconnected,
+ 			 * clear the software rxsense status.
 -- 
-2.9.0
+2.9.3
