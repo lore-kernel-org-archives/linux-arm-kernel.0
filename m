@@ -1,84 +1,113 @@
-From: Joao.Pinto@synopsys.com (Joao Pinto)
-Date: Wed, 8 Mar 2017 15:33:36 +0000
-Subject: [PATCH v2 08/22] PCI: dwc: designware: Add EP mode support
-In-Reply-To: <650c53fc-482c-feab-faa3-c30689d3d128@synopsys.com>
-References: <1487325042-28227-1-git-send-email-kishon@ti.com>
- <1487325042-28227-9-git-send-email-kishon@ti.com>
- <45e5288e-d11f-c855-af9b-692a42d878c6@synopsys.com> <58BE42B2.20305@ti.com>
- <02461be2-268d-485a-2bc4-3b148726d37d@synopsys.com>
- <aa9835a7-07f4-d042-d04a-b0d9cc0ea3de@synopsys.com> <58BFEC7D.3090608@ti.com>
- <35d539ba-956f-330e-c28d-b67c3d414578@synopsys.com> <58C00798.1030302@ti.com>
- <650c53fc-482c-feab-faa3-c30689d3d128@synopsys.com>
-Message-ID: <32adcffc-4d63-5953-9e61-3f48773a5e14@synopsys.com>
+From: james.morse@arm.com (James Morse)
+Date: Wed, 08 Mar 2017 16:09:06 +0000
+Subject: [PATCH V12 10/10] arm/arm64: KVM: add guest SEA support
+In-Reply-To: <783e18ac-9495-aaf6-8fbd-5a48c0b68f5b@codeaurora.org>
+References: <1488833103-21082-1-git-send-email-tbaicar@codeaurora.org>
+ <1488833103-21082-11-git-send-email-tbaicar@codeaurora.org>
+ <58BE9E14.6040208@arm.com>
+ <783e18ac-9495-aaf6-8fbd-5a48c0b68f5b@codeaurora.org>
+Message-ID: <58C02CA2.4030601@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-?s 3:32 PM de 3/8/2017, Joao Pinto escreveu:
-> ?s 1:31 PM de 3/8/2017, Kishon Vijay Abraham I escreveu:
->> Hi,
->>
->> On Wednesday 08 March 2017 05:07 PM, Joao Pinto wrote:
->>> ?s 11:35 AM de 3/8/2017, Kishon Vijay Abraham I escreveu:
->>>> Hi,
->>>>
->>>> On Wednesday 08 March 2017 05:02 PM, Joao Pinto wrote:
->>>>>
->>>>> Hi Kishon,
->>>>>
->>>>>>> Can you provide PCIE_GET_ATU_INB_UNR_REG_OFFSET (similar to
->>>>>>> PCIE_GET_ATU_OUTB_UNR_REG_OFFSET)?
->>>>>>
->>>>>> Yes of course, I will send you the definition soon.
->>>>>
->>>>> As promissed here is the definition for Inbound:
->>>>>
->>>>> +/* register address builder */
->>>>> +#define PCIE_GET_ATU_INB_UNR_REG_ADDR(region, register)		\
->>>>> +					((0x3 << 20) | (region << 9) |	\
->>>>> +					(0x1 << 8) | (register << 2))
->>>>
->>>> Cool, thanks!
->>>
->>> No problem! If you have doubts, please let me know.
->>
->> Okay, so this looks slightly different than the outbound macro since it takes
->> the register argument. In the case of outbound PCIE_GET_ATU_OUTB_UNR_REG_OFFSET
->> returns the offset which was used like
->> dw_pcie_write_dbi(pci, base, offset + reg, 0x4, val);
->>
->> How should the value from PCIE_GET_ATU_INB_UNR_REG_ADDR be used?
-> 
-> My original way was this one:
-> 
-> +/* Register address builder */
-> +#define PCIE_GET_ATU_OUTB_UNR_REG_ADDR(region, register)		\
-> +					((0x3 << 20) | (region << 9) |	\
-> +					(register << 2))
-> 
-> Bjorn then converted to offset:
-> 
-> #define PCIE_GET_ATU_OUTB_UNR_REG_OFFSET(region)  ((0x3 << 20) | (region << 9))
-> 
-> and applied the <<2 shift to the ATU registers.
-> 
-> So you can use:
-> 
-> #define PCIE_GET_ATU_INB_UNR_REG_ADDR(region, register)		\
-> 					((0x3 << 20) | (region << 9) |	\
-> 					(0x1 << 8)
-> 
+On 07/03/17 17:58, Baicar, Tyler wrote:
+> On 3/7/2017 4:48 AM, James Morse wrote:
+>> On 06/03/17 20:45, Tyler Baicar wrote:
+>>> Currently external aborts are unsupported by the guest abort
+>>> handling. Add handling for SEAs so that the host kernel reports
+>>> SEAs which occur in the guest kernel.
 
-This one has the right name :)
+>>> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+>>> index a5265ed..f3608c9 100644
+>>> --- a/arch/arm/kvm/mmu.c
+>>> +++ b/arch/arm/kvm/mmu.c
+>>> @@ -1444,8 +1463,21 @@ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu,
+>>> struct kvm_run *run)
+>>>         /* Check the stage-2 fault is trans. fault or write fault */
+>>>       fault_status = kvm_vcpu_trap_get_fault_type(vcpu);
+>>> -    if (fault_status != FSC_FAULT && fault_status != FSC_PERM &&
+>>> -        fault_status != FSC_ACCESS) {
+>>> +
+>>> +    /* The host kernel will handle the synchronous external abort. There
+>>> +     * is no need to pass the error into the guest.
+>>> +     */
+>>> +    if (is_abort_synchronous(fault_status)) {
+>>> +        if(handle_guest_sea((unsigned long)fault_ipa,
+>>> +                    kvm_vcpu_get_hsr(vcpu))) {
+>>
+>> ... Looking further up in this function:
+>>>     is_iabt = kvm_vcpu_trap_is_iabt(vcpu);
+>>>     if (unlikely(!is_iabt && kvm_vcpu_dabt_isextabt(vcpu))) {
+>>>         kvm_inject_vabt(vcpu);
+>>>         return 1;
+>>>     }
+>> ... so external data aborts will have already been 'claimed' by kvm and dealt
+>> with, and we already have a helper for spotting external aborts. (sorry I didn't
+>> spot it earlier).
+>>
+>> We need to do the handle_guest_sea() before this code.
+>>
+>> kvm_inject_vabt() makes an SError interrupt pending for the guest. This makes a
+>> synchronous error asynchronous as the guest may have SError interrupts masked.
+>>
+>> I guess this was the best that could be done at the time of (4055710baca8
+>> "arm/arm64: KVM: Inject virtual abort when guest exits on external abort"), but
+>> in the light of this firmware-first handling, I'm not sure its the right thing
+>> to do.
+>>
+>> Is it possible for handle_guest_sea() to return whether it actually found any
+>> work to do? If there was none I think we should keep this kvm_inject_vabt() as
+>> it is the existing behaviour.
 
-#define PCIE_GET_ATU_INB_UNR_REG_OFFSET(region, register)		\
-					((0x3 << 20) | (region << 9) |	\
-					(0x1 << 8)
+> Yes, I'll move the handle_guest_sea() call above this. My testing didn't call
+> into that if statement for some reason...it made it to the handle_guest_sea()
+> call successfully.
+
+I guess you're not using data aborts for testing then.
 
 
-> Thanks.
-> 
+> If there is no work for the GHES code to do it will return and could still make
+> the kvm_inject_vabt() call. It will also return and do that same thing if the
+> error was not fatal in GHES...would that be an issue?
+
+We might inject a superfluous SError Interrupt in that case.
+
+For memory errors we may do the whole unmapping and signalling thing to handle
+the fault. For recoverable faults, QEMU can generate its own CPER records for
+the guest and do the work to notify the guest. Everything looks fine until the
+guest gets the extra SError interrupt.
+
+If there is firmware-first RAS data, we should skip the injected SError
+Interrupt as the host's RAS code should choose what to do. If this Synchronous
+External Abort was nothing to do with RAS, we should inject the SError interrupt
+as it's the existing behaviour, and not all platforms will have this Synchronous
+External Abort mechanism.
+
+x86's APEI NMI needs to know if the NMI was due to RAS, so we can probably
+borrow the same trick. ghes_notify_nmi() calls ghes_read_estatus() for each
+struct ghes. If they all return an error, there was no work to do.
+
+
+(I assume firmware will only generate one of these at a time, so there is no
+risk of one list-walker processing two entries, then the second finding nothing
+to do?)
+
+
+Thanks,
+
+James
+
+
+>>> +            kvm_err("Failed to handle guest SEA, FSC: EC=%#x xFSC=%#lx
+>>> ESR_EL2=%#lx\n",
+>>> +                kvm_vcpu_trap_get_class(vcpu),
+>>> +                (unsigned long)kvm_vcpu_trap_get_fault(vcpu),
+>>> +                (unsigned long)kvm_vcpu_get_hsr(vcpu));
+>>> +            return -EFAULT;
+>>> +        }
+>>> +    } else if (fault_status != FSC_FAULT && fault_status != FSC_PERM &&
+>>> +           fault_status != FSC_ACCESS) {
+>>>           kvm_err("Unsupported FSC: EC=%#x xFSC=%#lx ESR_EL2=%#lx\n",
+>>>               kvm_vcpu_trap_get_class(vcpu),
+>>>               (unsigned long)kvm_vcpu_trap_get_fault(vcpu),
 >>
->> Thanks
->> Kishon
->>
-> 
