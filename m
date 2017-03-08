@@ -1,78 +1,58 @@
 From: hoegeun.kwon@samsung.com (Hoegeun Kwon)
-Date: Wed, 08 Mar 2017 13:54:10 +0900
-Subject: [PATCH v5 3/5] drm/exynos: dsi: Fix the parse_dt function
-In-Reply-To: <1488948852-5380-1-git-send-email-hoegeun.kwon@samsung.com>
-References: <1488948852-5380-1-git-send-email-hoegeun.kwon@samsung.com>
- <CGME20170308045502epcas1p2d2f7a0f768082b7a54b2ebe260e78436@epcas1p2.samsung.com>
-Message-ID: <1488948852-5380-4-git-send-email-hoegeun.kwon@samsung.com>
+Date: Wed, 08 Mar 2017 13:54:07 +0900
+Subject: [PATCH v5 0/5] Fix the parse_dt of exynos dsi and remove the OF graph
+References: <CGME20170308045502epcas1p29b871888e32bb1e2f870b9fd399d0b06@epcas1p2.samsung.com>
+Message-ID: <1488948852-5380-1-git-send-email-hoegeun.kwon@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi All,
+
 The dsi + panel is a parental relationship, so OF grpah is not needed.
 Therefore, the current dsi_parse_dt function will throw an error,
-because there is no linked OF graph for the case fimd + dsi + panel.
+because there is no linked OF graph for case such as fimd + dsi +
+panel.
 
-Parse the Pll burst and esc clock frequency properties in dsi_parse_dt()
-and create a bridge_node only if there is an OF graph associated with dsi.
+So the 1/5 patch parse the Pll, burst and esc clock frequency
+properties in dsi_parse_dt and modified to create a bridge_node only
+if there is an OF graph associated with dsi.
 
-Signed-off-by: Hoegeun Kwon <hoegeun.kwon@samsung.com>
-Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
-Reviewed-by: Andi Shyti <andi.shyti@samsung.com>
----
- drivers/gpu/drm/exynos/exynos_drm_dsi.c | 32 ++++++++------------------------
- 1 file changed, 8 insertions(+), 24 deletions(-)
+Also fixed the dts, which depend on the 1/5 patch. So removed the
+ports node and move burst and esc clock frequency properties to the
+parent (DSI node).
 
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_dsi.c b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
-index f5c04d0..2d4e118 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_dsi.c
-+++ b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
-@@ -1652,39 +1652,23 @@ static int exynos_dsi_parse_dt(struct exynos_dsi *dsi)
- 	if (ret < 0)
- 		return ret;
- 
--	ep = of_graph_get_endpoint_by_regs(node, DSI_PORT_OUT, 0);
--	if (!ep) {
--		dev_err(dev, "no output port with endpoint specified\n");
--		return -EINVAL;
--	}
--
--	ret = exynos_dsi_of_read_u32(ep, "samsung,burst-clock-frequency",
-+	ret = exynos_dsi_of_read_u32(node, "samsung,burst-clock-frequency",
- 				     &dsi->burst_clk_rate);
- 	if (ret < 0)
--		goto end;
-+		return ret;
- 
--	ret = exynos_dsi_of_read_u32(ep, "samsung,esc-clock-frequency",
-+	ret = exynos_dsi_of_read_u32(node, "samsung,esc-clock-frequency",
- 				     &dsi->esc_clk_rate);
- 	if (ret < 0)
--		goto end;
--
--	of_node_put(ep);
-+		return ret;
- 
- 	ep = of_graph_get_next_endpoint(node, NULL);
--	if (!ep) {
--		ret = -EINVAL;
--		goto end;
--	}
--
--	dsi->bridge_node = of_graph_get_remote_port_parent(ep);
--	if (!dsi->bridge_node) {
--		ret = -EINVAL;
--		goto end;
-+	if (ep) {
-+		dsi->bridge_node = of_graph_get_remote_port_parent(ep);
-+		of_node_put(ep);
- 	}
--end:
--	of_node_put(ep);
- 
--	return ret;
-+	return 0;
- }
- 
- static int exynos_dsi_bind(struct device *dev, struct device *master,
+Changes for V5:
+- Added Reviewed-by: Andi Shyti <andi.shyti@samsung.com> (all patches).
+- Reworded commit messages.
+
+Changes for V4:
+- Squashed patch 2, 3 and 4.
+- Added Reviewed-by: Andrzej Hajda <a.hajda@samsung.com> (all patches).
+
+Changes for V3:
+- Split the patches considering the bisectability problem.
+
+Changes for V2:
+- Added the clear explanation for commit. (1/5 patch)
+- Fixed it to the same subject as the actual work. (2/5 ~ 5/5 patches)
+
+Best Regards,
+Hoegeun
+
+Hoegeun Kwon (5):
+  arm64: dts: exynos: Add the burst and esc clock frequency properties
+    to DSI node
+  arm: dts: Add the burst and esc clock frequency properties to DSI node
+  drm/exynos: dsi: Fix the parse_dt function
+  arm64: dts: exynos: Remove the OF graph from DSI node
+  arm: dts: Remove the OF graph from DSI node
+
+ arch/arm/boot/dts/exynos3250-rinato.dts            | 23 ++--------------
+ arch/arm/boot/dts/exynos4210-trats.dts             | 23 ++--------------
+ arch/arm/boot/dts/exynos4412-trats2.dts            | 23 ++--------------
+ .../boot/dts/exynos/exynos5433-tm2-common.dtsi     | 16 ++---------
+ drivers/gpu/drm/exynos/exynos_drm_dsi.c            | 32 ++++++----------------
+ 5 files changed, 16 insertions(+), 101 deletions(-)
+
 -- 
 1.9.1
