@@ -1,40 +1,53 @@
-From: linucherian@gmail.com (linucherian at gmail.com)
-Date: Wed,  8 Mar 2017 11:38:35 +0530
-Subject: [PATCH v4 4/4] KVM: arm64: Increase number of user memslots to 512
-In-Reply-To: <1488953315-22375-1-git-send-email-linucherian@gmail.com>
-References: <1488953315-22375-1-git-send-email-linucherian@gmail.com>
-Message-ID: <1488953315-22375-5-git-send-email-linucherian@gmail.com>
+From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
+Date: Wed,  8 Mar 2017 07:41:04 +0100
+Subject: [PATCH 1/2] ARM: dts: BCM53573: Don't use nonexistent "default-off"
+ LED trigger
+Message-ID: <20170308064105.26619-1-zajec5@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linu Cherian <linu.cherian@cavium.com>
+From: Rafa? Mi?ecki <rafal@milecki.pl>
 
-Having only 32 memslots is a real constraint for the maximum
-number of PCI devices that can be assigned to a single guest.
-Assuming each PCI device/virtual function having two memory BAR
-regions, we could assign only 15 devices/virtual functions to a
-guest.
+Such a trigger doesn't exist in Linux and is not needed as LED is being
+turned off by default. This could cause errors in LEDs core code when
+trying to set default trigger.
 
-Hence increase KVM_USER_MEM_SLOTS to 512 as done in other archs like
-powerpc.
-
-Signed-off-by: Linu Cherian <linu.cherian@cavium.com>
+Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
 ---
- arch/arm64/include/asm/kvm_host.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/bcm47189-tenda-ac9.dts | 4 ----
+ 1 file changed, 4 deletions(-)
 
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index a0409b0..4027002 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -30,7 +30,7 @@
+diff --git a/arch/arm/boot/dts/bcm47189-tenda-ac9.dts b/arch/arm/boot/dts/bcm47189-tenda-ac9.dts
+index 6bdd79567cbd..34417dac1cd0 100644
+--- a/arch/arm/boot/dts/bcm47189-tenda-ac9.dts
++++ b/arch/arm/boot/dts/bcm47189-tenda-ac9.dts
+@@ -26,19 +26,16 @@
+ 		usb {
+ 			label = "bcm53xx:blue:usb";
+ 			gpios = <&chipcommon 1 GPIO_ACTIVE_HIGH>;
+-			linux,default-trigger = "default-off";
+ 		};
  
- #define __KVM_HAVE_ARCH_INTC_INITIALIZED
+ 		wps {
+ 			label = "bcm53xx:blue:wps";
+ 			gpios = <&chipcommon 10 GPIO_ACTIVE_HIGH>;
+-			linux,default-trigger = "default-off";
+ 		};
  
--#define KVM_USER_MEM_SLOTS 32
-+#define KVM_USER_MEM_SLOTS 512
- #define KVM_COALESCED_MMIO_PAGE_OFFSET 1
- #define KVM_HALT_POLL_NS_DEFAULT 500000
+ 		5ghz {
+ 			label = "bcm53xx:blue:5ghz";
+ 			gpios = <&chipcommon 11 GPIO_ACTIVE_HIGH>;
+-			linux,default-trigger = "default-off";
+ 		};
+ 
+ 		system {
+@@ -54,7 +51,6 @@
+ 		2ghz {
+ 			label = "bcm53xx:blue:2ghz";
+ 			gpios = <&pcie0_chipcommon 3 GPIO_ACTIVE_HIGH>;
+-			linux,default-trigger = "default-off";
+ 		};
+ 	};
  
 -- 
-1.9.1
+2.11.0
