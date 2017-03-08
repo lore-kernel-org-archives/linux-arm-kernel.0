@@ -1,27 +1,19 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 8 Mar 2017 15:01:35 +0100
-Subject: [PATCH] ARM: dts: imx53-qsb: Constrain the TVE DAC voltage
-In-Reply-To: <1486557231-8889-1-git-send-email-fabio.estevam@nxp.com>
-References: <1486557231-8889-1-git-send-email-fabio.estevam@nxp.com>
-Message-ID: <20170308140134.GC19934@x250>
+Date: Wed, 8 Mar 2017 15:06:14 +0100
+Subject: [PATCH 1/2] arm64: dts: added ecc register address to sata node
+ on ls1043a
+In-Reply-To: <1486621755-6567-1-git-send-email-yuantian.tang@nxp.com>
+References: <1486621755-6567-1-git-send-email-yuantian.tang@nxp.com>
+Message-ID: <20170308140613.GD19934@x250>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 08, 2017 at 10:33:51AM -0200, Fabio Estevam wrote:
-> Quoting Philipp Zabel:
-> "Since this regulator is used as the TVDAC analog power supply, this
-> range should at least be limited to the analog power supply range of the
-> TVDAC, listed in Table 74-9. of the i.MX53 reference manual (2.5-2.75V).
+On Thu, Feb 09, 2017 at 02:29:14PM +0800, yuantian.tang at nxp.com wrote:
+> From: Tang Yuantian <Yuantian.Tang@nxp.com>
 > 
-> But since the nominal voltage is 2.75V, which was used to determine the
-> analog gain that is supposed to result in the necessary 0.7V
-> peak-to-peak amplitude on the VGA output, I'd say we should just fix the
-> voltage to 2750000 here."
+> For ls1043 sata, ecc should be disabled due to a erratum.
+> Provide the ecc register address for driver to use.
 > 
-> , so limit the TVDAC analog power supply as suggested.
-> 
-> Suggested-by: Lucas Stach <l.stach@pengutronix.de>
-> Suggested-by: Philipp Zabel <p.zabel@pengutronix.de>
-> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+> Signed-off-by: Tang Yuantian <yuantian.tang@nxp.com>
 
-Applied, thanks.
+Applied both, thanks.
