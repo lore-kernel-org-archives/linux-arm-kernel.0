@@ -1,35 +1,35 @@
 From: linucherian@gmail.com (linucherian at gmail.com)
-Date: Wed,  8 Mar 2017 11:38:32 +0530
-Subject: [PATCH v4 1/4] KVM: Add documentation for KVM_CAP_NR_MEMSLOTS
+Date: Wed,  8 Mar 2017 11:38:33 +0530
+Subject: [PATCH v4 2/4] KVM: arm/arm64: Enable KVM_CAP_NR_MEMSLOTS on arm/arm64
 In-Reply-To: <1488953315-22375-1-git-send-email-linucherian@gmail.com>
 References: <1488953315-22375-1-git-send-email-linucherian@gmail.com>
-Message-ID: <1488953315-22375-2-git-send-email-linucherian@gmail.com>
+Message-ID: <1488953315-22375-3-git-send-email-linucherian@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Linu Cherian <linu.cherian@cavium.com>
 
-Add documentation for KVM_CAP_NR_MEMSLOTS capability.
+Return KVM_USER_MEM_SLOTS for userspace capability query on
+NR_MEMSLOTS.
 
 Signed-off-by: Linu Cherian <linu.cherian@cavium.com>
 ---
- Documentation/virtual/kvm/api.txt | 4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm/kvm/arm.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
-index 03145b7..7b82f1c 100644
---- a/Documentation/virtual/kvm/api.txt
-+++ b/Documentation/virtual/kvm/api.txt
-@@ -951,6 +951,10 @@ This ioctl allows the user to create or modify a guest physical memory
- slot.  When changing an existing slot, it may be moved in the guest
- physical memory space, or its flags may be modified.  It may not be
- resized.  Slots may not overlap in guest physical address space.
-+Bits 0-15 of "slot" specifies the slot id and this value should be
-+less than the maximum number of user memory slots supported per VM.
-+The maximum allowed slots can be queried using KVM_CAP_NR_MEMSLOTS,
-+if this capability is supported by the architecture.
- 
- If KVM_CAP_MULTI_ADDRESS_SPACE is available, bits 16-31 of "slot"
- specifies the address space which is being modified.  They must be
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index 9d74464..b64b47f 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -221,6 +221,9 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
+ 	case KVM_CAP_MAX_VCPUS:
+ 		r = KVM_MAX_VCPUS;
+ 		break;
++	case KVM_CAP_NR_MEMSLOTS:
++		r = KVM_USER_MEM_SLOTS;
++		break;
+ 	case KVM_CAP_MSI_DEVID:
+ 		if (!kvm)
+ 			r = -EINVAL;
 -- 
 1.9.1
