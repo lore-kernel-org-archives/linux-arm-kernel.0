@@ -1,34 +1,31 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed,  8 Mar 2017 18:35:19 +0100
-Subject: [PATCH] ARM64: dts: marvell: armada-3720 add RTC support
-Message-ID: <20170308173519.28685-1-gregory.clement@free-electrons.com>
+From: slemieux.tyco@gmail.com (Sylvain Lemieux)
+Date: Wed,  8 Mar 2017 12:46:36 -0500
+Subject: [PATCH 0/2] [kernel] ARM: lpc32xx: migrate CLCD config to device tree
+Message-ID: <20170308174638.25578-1-slemieux.tyco@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Armada 3720 DB board has an RTC on the I2C bus. It's a PT7C4337A from
-Pericom but which claims to be fully compatible with the ds1337.
+From: Sylvain Lemieux <slemieux@tycoint.com>
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- arch/arm64/boot/dts/marvell/armada-3720-db.dts | 6 ++++++
- 1 file changed, 6 insertions(+)
+Migrate the CLCD configurations to the device tree and
+remove custom functions from board files.
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-3720-db.dts b/arch/arm64/boot/dts/marvell/armada-3720-db.dts
-index 10207f96f090..38fa7a85c28a 100644
---- a/arch/arm64/boot/dts/marvell/armada-3720-db.dts
-+++ b/arch/arm64/boot/dts/marvell/armada-3720-db.dts
-@@ -98,6 +98,12 @@
- 		 * IO0_7: PWR_EN_SGMII	IO1_7: PWR_MCI_PS
- 		 */
- 	};
-+
-+	rtc at 68  {
-+		/* PT7C4337A from pericom fully compatible with the ds1337 */
-+		compatible = "dallas,ds1337";
-+		reg = <0x68>;
-+	};
- };
- 
- /* CON3 */
+This change depends on the following change:
+"video: ARM CLCD: fix dma allocation size"
+https://www.spinics.net/lists/arm-kernel/msg567178.html
+
+Note:
+* We tested a similar change on a custom LPC32xx board with a 480x272 LCD.
+* We did not test this change on hardware;
+  we do not have access to a PHY3250 board with the 240x320 LCD.
+
+Liam Beguin (2):
+  ARM: dts: lpc32xx: phy3250: add clcd configuration
+  ARM: lpc32xx: drop CLCD configuration
+
+ arch/arm/boot/dts/lpc3250-phy3250.dts | 35 ++++++++++++++++++
+ arch/arm/mach-lpc32xx/phy3250.c       | 70 -----------------------------------
+ 2 files changed, 35 insertions(+), 70 deletions(-)
+
 -- 
 2.11.0
