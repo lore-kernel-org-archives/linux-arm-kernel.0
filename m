@@ -1,68 +1,38 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Wed, 8 Mar 2017 14:26:39 +0000
-Subject: [PATCH v2 2/2] arm64: tegra: Enable SD/MMC slot on P2771
-In-Reply-To: <20170308133944.32568-2-thierry.reding@gmail.com>
-References: <20170223173053.19701-7-thierry.reding@gmail.com>
- <20170308133944.32568-1-thierry.reding@gmail.com>
- <20170308133944.32568-2-thierry.reding@gmail.com>
-Message-ID: <08982cb9-f642-a3c5-b630-5fecd3674090@nvidia.com>
+From: David.Laight@ACULAB.COM (David Laight)
+Date: Wed, 8 Mar 2017 14:38:00 +0000
+Subject: Neophyte questions about PCIe
+In-Reply-To: <b735b894-4c6c-5eb0-524e-dccee648d0f8@free.fr>
+References: <ced6a4bf-c94a-c116-1e94-52a8d675d132@free.fr>
+ <063D6719AE5E284EB5DD2968C1650D6DCFE7A70A@AcuExch.aculab.com>
+ <b735b894-4c6c-5eb0-524e-dccee648d0f8@free.fr>
+Message-ID: <063D6719AE5E284EB5DD2968C1650D6DCFE7A879@AcuExch.aculab.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 08/03/17 13:39, Thierry Reding wrote:
-> From: Thierry Reding <treding@nvidia.com>
+From: Mason
+> Sent: 08 March 2017 14:18
+...
+> > Don't think config space fits.
+> > With the 'obvious' mapping the 'bus number' is in the top
+> > 8 bits of the address.
 > 
-> The P3310 processor module makes provisions for exposing the SDMMC1
-> controller via a standard SD/MMC slot, which the P2771 supports. Hook
-> up the power supply provided on the P2771 carrier board and enable
-> the device tree node.
+> https://www.kernel.org/doc/Documentation/devicetree/bindings/pci/host-generic-pci.txt
 > 
-> Signed-off-by: Thierry Reding <treding@nvidia.com>
-> ---
-> Changes in v2:
-> - new patch
+> 	cfg_offset(bus, device, function, register) =
+> 		bus << 20 | device << 15 | function << 12 | register
 > 
->  arch/arm64/boot/dts/nvidia/tegra186-p2771-0000.dts | 23 ++++++++++++++++++++++
->  1 file changed, 23 insertions(+)
+> 8 bits for bus, 5 bits for device, 3 bits for function, 12 bits for reg offset
+> 1 MB per bus, 256 buses max => 256 MB max
 > 
-> diff --git a/arch/arm64/boot/dts/nvidia/tegra186-p2771-0000.dts b/arch/arm64/boot/dts/nvidia/tegra186-p2771-0000.dts
-> index 0d3c0996d832..b80c1c3483db 100644
-> --- a/arch/arm64/boot/dts/nvidia/tegra186-p2771-0000.dts
-> +++ b/arch/arm64/boot/dts/nvidia/tegra186-p2771-0000.dts
-> @@ -5,4 +5,27 @@
->  / {
->  	model = "NVIDIA Tegra186 P2771-0000 Development Board";
->  	compatible = "nvidia,p2771-0000", "nvidia,tegra186";
-> +
-> +	/* SDMMC1 (SD/MMC) */
-> +	sdhci at 3400000 {
-> +		status = "okay";
-> +
-> +		vmmc-supply = <&vdd_sd>;
-> +	};
-> +
-> +	regulators {
-> +		vdd_sd: regulator at 100 {
-> +			compatible = "regulator-fixed";
-> +			reg = <100>;
-> +
-> +			regulator-name = "SD_CARD_SW_PWR";
-> +			regulator-min-microvolt = <3300000>;
-> +			regulator-max-microvolt = <3300000>;
-> +
-> +			gpio = <&gpio TEGRA_MAIN_GPIO(P, 6) GPIO_ACTIVE_HIGH>;
-> +			enable-active-high;
-> +
-> +			vin-supply = <&vdd_3v3_sys>;
-> +		};
-> +	};
->  };
+> Supporting "only" 64 buses is good enough, I believe.
 
-Acked-by: Jon Hunter <jonathanh@nvidia.com>
+I was comparing the PCIe TLP layout for config cycles and normal read/write.
+There bus/dev/fun are in the top 16 bits with 4 reserved bits above the
+register address (effectively allowing 64k of config space per function).
 
-Cheers
-Jon
+Possibly some logic shifting the address across for config cycles.
 
--- 
-nvpublic
+The TLP type also has a bit for type-0 v type-1 config cycles.
+I can't quite remember the difference.
+
+	David
