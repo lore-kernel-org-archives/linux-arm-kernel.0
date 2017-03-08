@@ -1,30 +1,40 @@
-From: mingo@kernel.org (Ingo Molnar)
-Date: Wed, 8 Mar 2017 10:42:03 +0100
-Subject: next build: 208 builds: 21 failed, 187 passed, 53 errors, 406
- warnings (next-20170308)
-In-Reply-To: <CAK8P3a16cpvK3_a0Rxx+XqRw_d97LtVgpzcpvpzmH6U4Ty-fXQ@mail.gmail.com>
-References: <58bf7d43.8173190a.8d21e.1fde@mx.google.com>
- <CAK8P3a16cpvK3_a0Rxx+XqRw_d97LtVgpzcpvpzmH6U4Ty-fXQ@mail.gmail.com>
-Message-ID: <20170308094203.GA1523@gmail.com>
+From: peter.senna@collabora.com (Peter Senna Tschudin)
+Date: Wed, 8 Mar 2017 10:42:23 +0100
+Subject: [PATCH V3 0/4] megachips-stdpxxxx-ge-b850v3-fw
+In-Reply-To: <3583de63-eda5-5d9c-741e-040db1ccee69@codeaurora.org>
+References: <cover.1488555615.git.peter.senna@collabora.com>
+ <3583de63-eda5-5d9c-741e-040db1ccee69@codeaurora.org>
+Message-ID: <20170308094223.GA25268@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Mar 06, 2017 at 03:27:16PM +0530, Archit Taneja wrote:
+Hi Archit,
 
-* Arnd Bergmann <arnd@arndb.de> wrote:
-
-> > bmips_be_defconfig (mips) ? FAIL, 1 error, 1 warning, 0 section mismatches
-> >
-> > Errors:
-> > arch/mips/kernel/smp-bmips.c:183:38: error: implicit declaration of function
-> > 'task_stack_page' [-Werror=implicit-function-declaration]
+> Hi,
 > 
-> A new regression from the end of the merge window, also present in mainline.
-> I sent a fix yesterday, addressing various mips build failures.
+> On 3/3/2017 9:27 PM, Peter Senna Tschudin wrote:
+> > The video processing pipeline on the second output on the GE B850v3:
+> > 
+> >   Host -> LVDS|--(STDP4028)--|DP -> DP|--(STDP2690)--|DP++ -> Video output
+> > 
+> > Each bridge has a dedicated flash containing firmware for supporting the
+> > custom design. The result is that in this design neither the STDP4028
+> > nor the STDP2690 behave as the stock bridges would. The compatible
+> > strings include the suffix "-ge-b850v3-fw" to make it clear that the
+> > driver is for the bridges with the firmware which is specific for the GE
+> > B850v3.
+> > 
+> > The driver is powerless to control the video processing pipeline, as the
+> > two bridges behaves as a single one. The driver is only needed for
+> > telling the host about EDID / HPD, and for giving the host powers to ack
+> > interrupts.
+> 
+> queued Patches 1,2 and 3 to drm-misc-next. Made stdp2690_get_edid static
+> in Patch #3 to fix a sparse warning.
 
-Haven't heard from Ralf yet, so I've applied your patch to tip:core/urgent and 
-will get it to Linus ASAP (i.e. later today), to minimize the size of the 
-build-breakage window.
+What about 4/4, aka the dt change? Do I need an ack from Rob Herring?
 
-Thanks,
+Thanks a lot!
 
-	Ingo
+[...]
