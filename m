@@ -1,89 +1,20 @@
-From: flatmax@flatmax.org (Matt Flax)
-Date: Wed, 8 Mar 2017 22:43:19 +1100
-Subject: [alsa-devel] [PATCH] ASoC: bcm_2835: Simplify mono guard by
- returning error on mono
-In-Reply-To: <20170308113328.GA2545@delle.lan>
-References: <1488970734-6596-1-git-send-email-flatmax@flatmax.org>
- <20170308113328.GA2545@delle.lan>
-Message-ID: <ea5a6008-0cce-e026-0d8f-69783cdc3524@flatmax.org>
+From: bishah@cisco.com (Bijal Shah (bishah))
+Date: Wed, 8 Mar 2017 11:44:12 +0000
+Subject: L2 cache management question
+Message-ID: <bdcc07da22ae43589768d6d4aebbf788@XCH-RTP-013.cisco.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi all,
 
+I hope this is this the right mailer for this question.
 
-On 08/03/17 22:33, Matthias Reichl wrote:
-> On Wed, Mar 08, 2017 at 09:58:54PM +1100, Matt Flax wrote:
->> This patch simplifies the bcm2835_i2s.c code when the driver returns
->> error on mono channel requests. It does this by testing for mono
->> instead of using a switch statement to test for stereo.
->>
->> The bcm2835_i2s driver can only work in stereo mode. Whilst leaving
->> the driver entirel compliant with the I2S protocol, it simplifies the
->> code by removing a few redundant lines of code.
->>
->> Signed-off-by: Matt Flax <flatmax@flatmax.org>
-> I'm against this, it removes the semantics that I2S can only do 2
-> channels from the code part. Without looking at the rest of the code
-> one could get the impression that bcm2835-i2s could support all
-> layouts except 1 channel.
->
+I've been looking into an issue on an ARM platform which seems to revolve around the way the L2 cache is managed by the kernel.
 
-The comment clearly states :
+Looking at l2x0_cache.c file in the arch/arm/mm directory, I see a common pattern for an address range flush where if the address range is larger than the cache size, a flush_all is called almost without question. Is there any specific reason for this? Asking for the project I'm working on, as the address ranges may contain very few if any dirty lines, and a flush_all is expensive and locks out other CPUs while it is going on.
 
-	/*
-	 * Check we aren't setting channel 2 on a mono stream.
-	 * We currently only support stereo
-	 */
+Regards,
+Beej
 
-How could anyone possibly think that it would support  "all layouts 
-except 1 channel" ?
-
-I have reduced the clock cycle count to implement the same logic in 
-code. I have clearly indicated that we ONLY support stereo channel counts.
-
-In my opinion this code is simpler, easier to read and makes more sense.
-
-thanks
-Matt
-
-
->> ---
->>   sound/soc/bcm/bcm2835-i2s.c | 17 +++++++++--------
->>   1 file changed, 9 insertions(+), 8 deletions(-)
->>
->> diff --git a/sound/soc/bcm/bcm2835-i2s.c b/sound/soc/bcm/bcm2835-i2s.c
->> index 6ba2049..1e6a1da 100644
->> --- a/sound/soc/bcm/bcm2835-i2s.c
->> +++ b/sound/soc/bcm/bcm2835-i2s.c
->> @@ -310,15 +310,16 @@ static int bcm2835_i2s_hw_params(struct snd_pcm_substream *substream,
->>   	ch1pos = data_delay;
->>   	ch2pos = bclk_ratio / 2 + data_delay;
->>   
->> -	switch (params_channels(params)) {
->> -	case 2:
->> -		format = BCM2835_I2S_CH1(format) | BCM2835_I2S_CH2(format);
->> -		format |= BCM2835_I2S_CH1(BCM2835_I2S_CHPOS(ch1pos));
->> -		format |= BCM2835_I2S_CH2(BCM2835_I2S_CHPOS(ch2pos));
->> -		break;
->> -	default:
->> +	/* C
->> +	 * Check we aren't setting channel 2 on a mono stream.
->> +	 * We currently only support stereo
->> +	 */
->> +	if (params_channels(params) == 1)
->>   		return -EINVAL;
->> -	}
->> +
->> +	format = BCM2835_I2S_CH1(format) | BCM2835_I2S_CH2(format);
->> +	format |= BCM2835_I2S_CH1(BCM2835_I2S_CHPOS(ch1pos));
->> +	format |= BCM2835_I2S_CH2(BCM2835_I2S_CHPOS(ch2pos));
->>   
->>   	/*
->>   	 * Set format for both streams.
->> -- 
->> 2.7.4
->>
-> _______________________________________________
-> Alsa-devel mailing list
-> Alsa-devel at alsa-project.org
-> http://mailman.alsa-project.org/mailman/listinfo/alsa-devel
+Twenty years from now you will be more disappointed by the things that you didn't do than by the ones you did, so throw off the bowlines, sail away from the safe harbour, catch the trade winds in your sails, explore. Dream. Discover.
+ - - Mark Twain - -
