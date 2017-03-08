@@ -1,53 +1,48 @@
 From: kraxel@redhat.com (Gerd Hoffmann)
-Date: Wed,  8 Mar 2017 10:19:01 +0100
-Subject: [PATCH v4 1/7] dt-bindings: Add binding for brcm,bcm2835-sdhost.
+Date: Wed,  8 Mar 2017 10:19:06 +0100
+Subject: [PATCH 3/4] qxl: read monitors config at boot
 In-Reply-To: <1488964751-22763-1-git-send-email-kraxel@redhat.com>
 References: <1488964751-22763-1-git-send-email-kraxel@redhat.com>
-Message-ID: <1488964751-22763-2-git-send-email-kraxel@redhat.com>
+Message-ID: <1488964751-22763-7-git-send-email-kraxel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Eric Anholt <eric@anholt.net>
+Try to read the client monitors config at driver load time, even without
+explicit notification.  So in case that info was filled before the driver
+loaded and we've missed the notifications because of that the settings
+will still be used.
 
-This is the other SD controller on the platform, which can be swapped
-to the role of SD card host using pin muxing.
+With that place we now have to take care to properly handle a empty client
+monitors config, so we don't trip over an uninitialized client monitors
+config.
 
-Signed-off-by: Eric Anholt <eric@anholt.net>
 Signed-off-by: Gerd Hoffmann <kraxel@redhat.com>
-Acked-by: Rob Herring <robh@kernel.org>
 ---
- .../bindings/mmc/brcm,bcm2835-sdhost.txt           | 23 ++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/mmc/brcm,bcm2835-sdhost.txt
+ drivers/gpu/drm/qxl/qxl_display.c | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/mmc/brcm,bcm2835-sdhost.txt b/Documentation/devicetree/bindings/mmc/brcm,bcm2835-sdhost.txt
-new file mode 100644
-index 0000000..d876580
---- /dev/null
-+++ b/Documentation/devicetree/bindings/mmc/brcm,bcm2835-sdhost.txt
-@@ -0,0 +1,23 @@
-+Broadcom BCM2835 SDHOST controller
-+
-+This file documents differences between the core properties described
-+by mmc.txt and the properties that represent the BCM2835 controller.
-+
-+Required properties:
-+- compatible: Should be "brcm,bcm2835-sdhost".
-+- clocks: The clock feeding the SDHOST controller.
-+
-+Optional properties:
-+- dmas: DMA channel for read and write.
-+          See Documentation/devicetree/bindings/dma/dma.txt for details
-+
-+Example:
-+
-+sdhost: mmc at 7e202000 {
-+	compatible = "brcm,bcm2835-sdhost";
-+	reg = <0x7e202000 0x100>;
-+	interrupts = <2 24>;
-+	clocks = <&clocks BCM2835_CLOCK_VPU>;
-+	dmas = <&dma 13>;
-+	dma-names = "rx-tx";
-+};
+diff --git a/drivers/gpu/drm/qxl/qxl_display.c b/drivers/gpu/drm/qxl/qxl_display.c
+index 2b99496..cf99ace 100644
+--- a/drivers/gpu/drm/qxl/qxl_display.c
++++ b/drivers/gpu/drm/qxl/qxl_display.c
+@@ -81,6 +81,10 @@ static int qxl_display_copy_rom_client_monitors_config(struct qxl_device *qdev)
+ 			   qdev->rom->client_monitors_config_crc);
+ 		return MONITORS_CONFIG_BAD_CRC;
+ 	}
++	if (!num_monitors) {
++		DRM_DEBUG_KMS("no client monitors configured\n");
++		return status;
++	}
+ 	if (num_monitors > qdev->monitors_config->max_allowed) {
+ 		DRM_DEBUG_KMS("client monitors list will be truncated: %d < %d\n",
+ 			      qdev->monitors_config->max_allowed, num_monitors);
+@@ -1192,6 +1196,7 @@ int qxl_modeset_init(struct qxl_device *qdev)
+ 		qdev_output_init(&qdev->ddev, i);
+ 	}
+ 
++	qxl_display_read_client_monitors_config(qdev);
+ 	qdev->mode_info.mode_config_initialized = true;
+ 
+ 	drm_mode_config_reset(&qdev->ddev);
 -- 
 1.8.3.1
