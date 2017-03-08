@@ -1,59 +1,63 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Wed, 8 Mar 2017 22:33:52 +0100
-Subject: [Question] devm_kmalloc() for DMA ?
-In-Reply-To: <20170308211900.GE21222@n2100.armlinux.org.uk>
-References: <CAK7LNARbD262isY7yOgQKAcbWQHV+3dsoRjtu6S+qUpPr98qSQ@mail.gmail.com>
- <b7dd01e6-ddcd-a34a-c26c-05ce6ae4015a@arm.com>
- <CAK7LNAQ3FbicgoV1Q70T2gZQS0j1Z8LffXquSM=v6DYcHP_m4Q@mail.gmail.com>
- <fd2097a1-c9b5-e6ab-f3b3-04b432bda0a3@metafoo.de>
- <20170308195901.GD21222@n2100.armlinux.org.uk>
- <456e0515-b9d7-e1b6-fc25-a2ec5244d9db@metafoo.de>
- <20170308211900.GE21222@n2100.armlinux.org.uk>
-Message-ID: <d941e1cd-1803-ab8a-9dfc-f22650227465@metafoo.de>
+From: thgarnie@google.com (Thomas Garnier)
+Date: Wed,  8 Mar 2017 13:38:43 -0800
+Subject: [PATCH v1 3/4] arm/syscalls: Specific usage of
+ verify_pre_usermode_state
+In-Reply-To: <20170308213844.131877-1-thgarnie@google.com>
+References: <20170308213844.131877-1-thgarnie@google.com>
+Message-ID: <20170308213844.131877-3-thgarnie@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/08/2017 10:19 PM, Russell King - ARM Linux wrote:
-> On Wed, Mar 08, 2017 at 09:44:17PM +0100, Lars-Peter Clausen wrote:
->> On 03/08/2017 08:59 PM, Russell King - ARM Linux wrote:
->>> On Wed, Mar 08, 2017 at 08:48:31PM +0100, Lars-Peter Clausen wrote:
->>>> When the DMA memory is mapped for reading from the device the associated
->>>> cachelines are invalidated without writeback. There is no guarantee that
->>>> the changes made to the devres_node have made it to main memory yet, or
->>>> is there?
->>>
->>> That is incorrect.
->>>
->>> Overlapping cache lines are always written back on transitions from CPU
->>> to device ownership of the buffer (eg, dma_map_*().)
->>
->> On ARM. But my understanding is that this is not a universal requirement
->> according to DMA-API.txt. It says that mappings must be cache line aligned
->> and otherwise behavior is undefined.
-> 
-> There is no use of the term "undefined" in the document you refer to.
-> 
-> There is the recommendation that regions are cache line aligned, but
-> there is quite a bit of history in the kernel where DMA has been to
-> regions that are not cache line aligned, and where the DMA region
-> overlaps with data that has recent accesses made to it.
+Implement specific usage of verify_pre_usermode_state for user-mode
+returns for arm.
+---
+Based on next-20170308
+---
+ arch/arm/Kconfig               | 1 +
+ arch/arm/kernel/entry-common.S | 5 +++++
+ 2 files changed, 6 insertions(+)
 
-I says: "Warnings:  Memory coherency operates at a granularity called the
-cache line width.  In order for memory mapped by this API to operate
-correctly, the mapped region must begin exactly on a cache line
-boundary and end exactly on one." That doesn't sound like a recommendation
-to me. "should" usually implies a recommendation while "must" indicates a
-hard requirement.
-
-I believe e.g. MIPS will align the address by masking the lower bits off,
-without any flushes. Wouldn't be surprised if other architectures do the same.
-
-> 
-> The situation is improving (in that DMA buffers are being allocated
-> separately, rather than being part of some other structure) but that
-> doesn't mean that it's safe to assume that overlapping cache lines can
-> be invalidated.
-> 
-> In any case, DMA with devm allocated buffers really is not a good idea.
-
-I very much agree with that part.
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 0d4e71b42c77..704fd8f197fa 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -12,6 +12,7 @@ config ARM
+ 	select ARCH_HAVE_CUSTOM_GPIO_H
+ 	select ARCH_HAS_GCOV_PROFILE_ALL
+ 	select ARCH_MIGHT_HAVE_PC_PARPORT
++	select ARCH_NO_SYSCALL_VERIFY_PRE_USERMODE_STATE
+ 	select ARCH_OPTIONAL_KERNEL_RWX if ARCH_HAS_STRICT_KERNEL_RWX
+ 	select ARCH_OPTIONAL_KERNEL_RWX_DEFAULT if CPU_V7
+ 	select ARCH_SUPPORTS_ATOMIC_RMW
+diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
+index eb5cd77bf1d8..80cfdc7fabde 100644
+--- a/arch/arm/kernel/entry-common.S
++++ b/arch/arm/kernel/entry-common.S
+@@ -39,6 +39,9 @@
+ ret_fast_syscall:
+  UNWIND(.fnstart	)
+  UNWIND(.cantunwind	)
++	push	{r0}				@ save returned r0
++	bl	verify_pre_usermode_state
++	pop	{r0}				@ restore r0
+ 	disable_irq_notrace			@ disable interrupts
+ 	ldr	r1, [tsk, #TI_FLAGS]		@ re-check for syscall tracing
+ 	tst	r1, #_TIF_SYSCALL_WORK | _TIF_WORK_MASK
+@@ -65,6 +68,7 @@ ret_fast_syscall:
+  UNWIND(.fnstart	)
+  UNWIND(.cantunwind	)
+ 	str	r0, [sp, #S_R0 + S_OFF]!	@ save returned r0
++	bl	verify_pre_usermode_state
+ 	disable_irq_notrace			@ disable interrupts
+ 	ldr	r1, [tsk, #TI_FLAGS]		@ re-check for syscall tracing
+ 	tst	r1, #_TIF_SYSCALL_WORK | _TIF_WORK_MASK
+@@ -263,6 +267,7 @@ __sys_trace:
+ 
+ __sys_trace_return:
+ 	str	r0, [sp, #S_R0 + S_OFF]!	@ save returned r0
++	bl	verify_pre_usermode_state
+ 	mov	r0, sp
+ 	bl	syscall_trace_exit
+ 	b	ret_slow_syscall
+-- 
+2.12.0.246.ga2ecc84866-goog
