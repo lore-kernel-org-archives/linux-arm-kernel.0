@@ -1,17 +1,47 @@
-From: moritz.fischer.private@gmail.com (Moritz Fischer)
-Date: Wed, 8 Mar 2017 12:10:27 -0800
-Subject: [PATCH] ARM: zynq: Add #io-channel-cells to (x)adc node for
+From: mdf@kernel.org (Moritz Fischer)
+Date: Wed,  8 Mar 2017 12:11:24 -0800
+Subject: [PATCH v2] ARM: zynq: Add #io-channel-cells to (x)adc node for
  iio-hwmon
-In-Reply-To: <1489003720-2175-1-git-send-email-mdf@kernel.org>
-References: <1489003720-2175-1-git-send-email-mdf@kernel.org>
-Message-ID: <CAJYdmeONGk1w=cHaBCnV3QCagnwO2NarXq=VRd_b==L=64Q3zg@mail.gmail.com>
+Message-ID: <1489003884-2489-1-git-send-email-mdf@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 8, 2017 at 12:08 PM, Moritz Fischer <mdf@kernel.org> wrote:
-> Fix issue when exposing xadc via iio-hwmon by adding missing
->
-That was messed up ... let me resend that. Sorry for the noise ...
+Fix
 
-Thanks,
-Moritz
+OF: /iio_hwmon: could not get #io-channel-cells for
+/amba/adc at f8007100
+OF: /iio_hwmon: could not get #io-channel-cells for
+/amba/adc at f8007100
+OF: /iio_hwmon: could not get #io-channel-cells for
+/amba/adc at f8007100
+
+by adding the #io-channel-cells property.
+
+Signed-off-by: Moritz Fischer <mdf@kernel.org>
+Cc: Michal Simek <michal.simek@xilinx.com>
+Cc: S?ren Brinkmann <soren.brinkmann@xilinx.com>
+Cc: Julia Cartwright <julia@ni.com>
+Cc: linux-kernel at vger.kernel.org
+Cc: devicetree at vger.kernel.org
+---
+
+Changes from v1:
+- fix messed up commit message
+---
+ arch/arm/boot/dts/zynq-7000.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
+index f3ac9bf..98233a8 100644
+--- a/arch/arm/boot/dts/zynq-7000.dtsi
++++ b/arch/arm/boot/dts/zynq-7000.dtsi
+@@ -72,6 +72,7 @@
+ 			interrupts = <0 7 4>;
+ 			interrupt-parent = <&intc>;
+ 			clocks = <&clkc 12>;
++			#io-channel-cells = <1>;
+ 		};
+ 
+ 		can0: can at e0008000 {
+-- 
+2.7.4
