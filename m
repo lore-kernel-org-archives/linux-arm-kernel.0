@@ -1,114 +1,124 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed,  8 Mar 2017 17:24:21 +0100
-Subject: [PATCH 1/3] usb: orion-echi: Add support for the Armada 3700
-In-Reply-To: <20170308162423.25553-1-gregory.clement@free-electrons.com>
-References: <20170308162423.25553-1-gregory.clement@free-electrons.com>
-Message-ID: <20170308162423.25553-2-gregory.clement@free-electrons.com>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Wed,  8 Mar 2017 16:30:25 +0000
+Subject: [PATCH v2] drm: hdlcd: Fix the calculation of the scanout start
+ address
+In-Reply-To: <20170222153036.GI31595@intel.com>
+References: <20170222153036.GI31595@intel.com>
+Message-ID: <20170308163025.31098-1-Liviu.Dudau@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: jinghua <jinghua@marvell.com>
+The calculation of the framebuffer's start address was wrongly using
+the CRTC's x and y position rather than the one of the source
+framebuffer. To fix that we need to update the plane_check code to
+call drm_plane_helper_check_state() to clip the src and dst coordinates.
+While there so some minor cleanup of redundant freeing of
+devm_alloc-ated memory.
 
-- Add a new compatoble string for the Armada 3700 SoCs
-
-- add sbuscfg support for orion usb controller driver. For the SoCs
-  without hlock, need to program BAWR/BARD/AHBBRST fields in the sbuscfg
-  register to guarantee the AHB master's burst would not overrun or
-  underrun the FIFO.
-
-- the sbuscfg register has to be set after the usb controller reset,
-  otherwise the value would be overridden to 0. In order to do this, the
-  reset callback is registered.
-
-[gregory.clement at free-electrons.com: - reword commit and comments
-				     - fix checkpatch warning]
-Signed-off-by: jinghua <jinghua@marvell.com>
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
 ---
- .../devicetree/bindings/usb/ehci-orion.txt         |  4 ++-
- drivers/usb/host/ehci-orion.c                      | 39 ++++++++++++++++++++++
- 2 files changed, 42 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/usb/ehci-orion.txt b/Documentation/devicetree/bindings/usb/ehci-orion.txt
-index 17c3bc858b86..9dfffc9dffec 100644
---- a/Documentation/devicetree/bindings/usb/ehci-orion.txt
-+++ b/Documentation/devicetree/bindings/usb/ehci-orion.txt
-@@ -1,7 +1,9 @@
- * EHCI controller, Orion Marvell variants
+v1 was discussed here: https://lists.freedesktop.org/archives/dri-devel/2017-February/133379.html
+
+ drivers/gpu/drm/arm/hdlcd_crtc.c | 47 ++++++++++++++++++++++++++--------------
+ 1 file changed, 31 insertions(+), 16 deletions(-)
+
+diff --git a/drivers/gpu/drm/arm/hdlcd_crtc.c b/drivers/gpu/drm/arm/hdlcd_crtc.c
+index 20ebfb4fbdfa..c65116348281 100644
+--- a/drivers/gpu/drm/arm/hdlcd_crtc.c
++++ b/drivers/gpu/drm/arm/hdlcd_crtc.c
+@@ -10,6 +10,7 @@
+  */
  
- Required properties:
--- compatible: must be "marvell,orion-ehci"
-+- compatible: could be one of the following
-+	"marvell,orion-ehci"
-+	"marvell,armada-3700-ehci"
- - reg: physical base address of the controller and length of memory mapped
-   region.
- - interrupts: The EHCI interrupt
-diff --git a/drivers/usb/host/ehci-orion.c b/drivers/usb/host/ehci-orion.c
-index ee8d5faa0194..cf778e166b90 100644
---- a/drivers/usb/host/ehci-orion.c
-+++ b/drivers/usb/host/ehci-orion.c
-@@ -47,6 +47,21 @@
- #define USB_PHY_IVREF_CTRL	0x440
- #define USB_PHY_TST_GRP_CTRL	0x450
+ #include <drm/drmP.h>
++#include <drm/drm_atomic.h>
+ #include <drm/drm_atomic_helper.h>
+ #include <drm/drm_crtc.h>
+ #include <drm/drm_crtc_helper.h>
+@@ -206,16 +207,33 @@ static const struct drm_crtc_helper_funcs hdlcd_crtc_helper_funcs = {
+ static int hdlcd_plane_atomic_check(struct drm_plane *plane,
+ 				    struct drm_plane_state *state)
+ {
+-	u32 src_w, src_h;
++	struct drm_rect clip = { 0 };
++	struct drm_crtc_state *crtc_state;
++	u32 src_h = state->src_h >> 16;
  
-+#define USB_SBUSCFG		0x90
-+#define	    USB_SBUSCFG_BAWR	    0x6
-+#define	    USB_SBUSCFG_BARD	    0x3
-+#define	    USB_SBUSCFG_AHBBRST	    0x0
+-	src_w = state->src_w >> 16;
+-	src_h = state->src_h >> 16;
++	/* only the HDLCD_REG_FB_LINE_COUNT register has a limit */
++	if (src_h >= HDLCD_MAX_YRES) {
++		DRM_DEBUG_KMS("Invalid source width: %d\n", src_h);
++		return -EINVAL;
++	}
 +
-+/* BAWR = BARD = 3 : Align read/write bursts packets larger than 128 bytes */
-+#define USB_SBUSCFG_BAWR_ALIGN_128B	0x3
-+#define USB_SBUSCFG_BARD_ALIGN_128B	0x3
-+/* AHBBRST = 3	   : Align AHB Burst to INCR16 (64 bytes) */
-+#define USB_SBUSCFG_AHBBRST_INCR16	0x3
-+
-+#define USB_SBUSCFG_DEF_VAL ((USB_SBUSCFG_BAWR_ALIGN_128B << USB_SBUSCFG_BAWR) \
-+		     | (USB_SBUSCFG_BARD_ALIGN_128B << USB_SBUSCFG_BARD) \
-+		     | (USB_SBUSCFG_AHBBRST_INCR16 << USB_SBUSCFG_AHBBRST))
-+
- #define DRIVER_DESC "EHCI orion driver"
++	if (!state->fb || !state->crtc)
++		return 0;
  
- #define hcd_to_orion_priv(h) ((struct orion_ehci_hcd *)hcd_to_ehci(h)->priv)
-@@ -151,8 +166,31 @@ ehci_orion_conf_mbus_windows(struct usb_hcd *hcd,
- 	}
+-	/* we can't do any scaling of the plane source */
+-	if ((src_w != state->crtc_w) || (src_h != state->crtc_h))
++	crtc_state = drm_atomic_get_existing_crtc_state(state->state,
++							state->crtc);
++	if (!crtc_state) {
++		DRM_DEBUG_KMS("Invalid crtc state\n");
+ 		return -EINVAL;
++	}
+ 
+-	return 0;
++	clip.x2 = crtc_state->adjusted_mode.hdisplay;
++	clip.y2 = crtc_state->adjusted_mode.vdisplay;
++
++	return drm_plane_helper_check_state(state, &clip,
++					    DRM_PLANE_HELPER_NO_SCALING,
++					    DRM_PLANE_HELPER_NO_SCALING,
++					    false, true);
  }
  
-+static int ehci_orion_drv_reset(struct usb_hcd *hcd)
-+{
-+	struct device *dev = hcd->self.controller;
-+	int retval;
-+
-+	retval = ehci_setup(hcd);
-+	if (retval)
-+		dev_err(dev, "ehci_setup failed %d\n", retval);
-+
-+	/*
-+	 * For SoC without hlock, need to program sbuscfg value to guarantee
-+	 * AHB master's burst would not overrun or underrun FIFO.
-+	 *
-+	 * sbuscfg reg has to be set after usb controller reset, otherwise
-+	 * the value would be override to 0.
-+	 */
-+	if (of_device_is_compatible(dev->of_node, "marvell,armada-3700-ehci"))
-+		wrl(USB_SBUSCFG, USB_SBUSCFG_DEF_VAL);
-+
-+	return retval;
-+}
-+
- static const struct ehci_driver_overrides orion_overrides __initconst = {
- 	.extra_priv_size =	sizeof(struct orion_ehci_hcd),
-+	.reset = ehci_orion_drv_reset,
- };
+ static void hdlcd_plane_atomic_update(struct drm_plane *plane,
+@@ -224,21 +242,20 @@ static void hdlcd_plane_atomic_update(struct drm_plane *plane,
+ 	struct drm_framebuffer *fb = plane->state->fb;
+ 	struct hdlcd_drm_private *hdlcd;
+ 	struct drm_gem_cma_object *gem;
+-	u32 src_w, src_h, dest_w, dest_h;
++	u32 src_x, src_y, dest_h;
+ 	dma_addr_t scanout_start;
  
- static int ehci_orion_drv_probe(struct platform_device *pdev)
-@@ -310,6 +348,7 @@ static int ehci_orion_drv_remove(struct platform_device *pdev)
+ 	if (!fb)
+ 		return;
  
- static const struct of_device_id ehci_orion_dt_ids[] = {
- 	{ .compatible = "marvell,orion-ehci", },
-+	{ .compatible = "marvell,armada-3700-ehci", },
- 	{},
- };
- MODULE_DEVICE_TABLE(of, ehci_orion_dt_ids);
+-	src_w = plane->state->src_w >> 16;
+-	src_h = plane->state->src_h >> 16;
+-	dest_w = plane->state->crtc_w;
+-	dest_h = plane->state->crtc_h;
++	src_x = plane->state->src.x1 >> 16;
++	src_y = plane->state->src.y1 >> 16;
++	dest_h = drm_rect_height(&plane->state->dst);
+ 	gem = drm_fb_cma_get_gem_obj(fb, 0);
++
+ 	scanout_start = gem->paddr + fb->offsets[0] +
+-		plane->state->crtc_y * fb->pitches[0] +
+-		plane->state->crtc_x *
+-		fb->format->cpp[0];
++			src_y * fb->pitches[0] +
++			src_x *	fb->format->cpp[0];
+ 
+ 	hdlcd = plane->dev->dev_private;
+ 	hdlcd_write(hdlcd, HDLCD_REG_FB_LINE_LENGTH, fb->pitches[0]);
+@@ -285,7 +302,6 @@ static struct drm_plane *hdlcd_plane_init(struct drm_device *drm)
+ 				       formats, ARRAY_SIZE(formats),
+ 				       DRM_PLANE_TYPE_PRIMARY, NULL);
+ 	if (ret) {
+-		devm_kfree(drm->dev, plane);
+ 		return ERR_PTR(ret);
+ 	}
+ 
+@@ -309,7 +325,6 @@ int hdlcd_setup_crtc(struct drm_device *drm)
+ 					&hdlcd_crtc_funcs, NULL);
+ 	if (ret) {
+ 		hdlcd_plane_destroy(primary);
+-		devm_kfree(drm->dev, primary);
+ 		return ret;
+ 	}
+ 
 -- 
-2.11.0
+2.12.0
