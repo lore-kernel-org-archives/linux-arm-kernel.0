@@ -1,21 +1,73 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed, 8 Mar 2017 10:26:50 -0500
-Subject: [RFC PATCH 04/30] iommu/arm-smmu-v3: Add support for PCI ATS
-In-Reply-To: <20170227195441.5170-5-jean-philippe.brucker@arm.com>
-References: <20170227195441.5170-1-jean-philippe.brucker@arm.com>
- <20170227195441.5170-5-jean-philippe.brucker@arm.com>
-Message-ID: <c0f74140-f1f6-7c52-295a-5d4722017664@codeaurora.org>
+From: Joao.Pinto@synopsys.com (Joao Pinto)
+Date: Wed, 8 Mar 2017 15:32:03 +0000
+Subject: [PATCH v2 08/22] PCI: dwc: designware: Add EP mode support
+In-Reply-To: <58C00798.1030302@ti.com>
+References: <1487325042-28227-1-git-send-email-kishon@ti.com>
+ <1487325042-28227-9-git-send-email-kishon@ti.com>
+ <45e5288e-d11f-c855-af9b-692a42d878c6@synopsys.com> <58BE42B2.20305@ti.com>
+ <02461be2-268d-485a-2bc4-3b148726d37d@synopsys.com>
+ <aa9835a7-07f4-d042-d04a-b0d9cc0ea3de@synopsys.com> <58BFEC7D.3090608@ti.com>
+ <35d539ba-956f-330e-c28d-b67c3d414578@synopsys.com> <58C00798.1030302@ti.com>
+Message-ID: <650c53fc-482c-feab-faa3-c30689d3d128@synopsys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/27/2017 2:54 PM, Jean-Philippe Brucker wrote:
-> +	ats_enabled = !arm_smmu_enable_ats(master);
-> +
+?s 1:31 PM de 3/8/2017, Kishon Vijay Abraham I escreveu:
+> Hi,
+> 
+> On Wednesday 08 March 2017 05:07 PM, Joao Pinto wrote:
+>> ?s 11:35 AM de 3/8/2017, Kishon Vijay Abraham I escreveu:
+>>> Hi,
+>>>
+>>> On Wednesday 08 March 2017 05:02 PM, Joao Pinto wrote:
+>>>>
+>>>> Hi Kishon,
+>>>>
+>>>>>> Can you provide PCIE_GET_ATU_INB_UNR_REG_OFFSET (similar to
+>>>>>> PCIE_GET_ATU_OUTB_UNR_REG_OFFSET)?
+>>>>>
+>>>>> Yes of course, I will send you the definition soon.
+>>>>
+>>>> As promissed here is the definition for Inbound:
+>>>>
+>>>> +/* register address builder */
+>>>> +#define PCIE_GET_ATU_INB_UNR_REG_ADDR(region, register)		\
+>>>> +					((0x3 << 20) | (region << 9) |	\
+>>>> +					(0x1 << 8) | (register << 2))
+>>>
+>>> Cool, thanks!
+>>
+>> No problem! If you have doubts, please let me know.
+> 
+> Okay, so this looks slightly different than the outbound macro since it takes
+> the register argument. In the case of outbound PCIE_GET_ATU_OUTB_UNR_REG_OFFSET
+> returns the offset which was used like
+> dw_pcie_write_dbi(pci, base, offset + reg, 0x4, val);
+> 
+> How should the value from PCIE_GET_ATU_INB_UNR_REG_ADDR be used?
 
-You should make ats_supported field in IORT table part of the decision
-process for when to enable ATS.
+My original way was this one:
 
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
++/* Register address builder */
++#define PCIE_GET_ATU_OUTB_UNR_REG_ADDR(region, register)		\
++					((0x3 << 20) | (region << 9) |	\
++					(register << 2))
+
+Bjorn then converted to offset:
+
+#define PCIE_GET_ATU_OUTB_UNR_REG_OFFSET(region)  ((0x3 << 20) | (region << 9))
+
+and applied the <<2 shift to the ATU registers.
+
+So you can use:
+
+#define PCIE_GET_ATU_INB_UNR_REG_ADDR(region, register)		\
+					((0x3 << 20) | (region << 9) |	\
+					(0x1 << 8)
+
+Thanks.
+
+> 
+> Thanks
+> Kishon
+> 
