@@ -1,48 +1,44 @@
 From: kraxel@redhat.com (Gerd Hoffmann)
-Date: Wed,  8 Mar 2017 10:19:06 +0100
-Subject: [PATCH 3/4] qxl: read monitors config at boot
+Date: Wed,  8 Mar 2017 10:19:10 +0100
+Subject: [PATCH v4 6/7] arm: dts: bcm283x: switch from &sdhci to &sdhost
 In-Reply-To: <1488964751-22763-1-git-send-email-kraxel@redhat.com>
 References: <1488964751-22763-1-git-send-email-kraxel@redhat.com>
-Message-ID: <1488964751-22763-7-git-send-email-kraxel@redhat.com>
+Message-ID: <1488964751-22763-11-git-send-email-kraxel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Try to read the client monitors config at driver load time, even without
-explicit notification.  So in case that info was filled before the driver
-loaded and we've missed the notifications because of that the settings
-will still be used.
+sdcard access with the sdhost controller is faster.
 
-With that place we now have to take care to properly handle a empty client
-monitors config, so we don't trip over an uninitialized client monitors
-config.
+Read access (dd with 64k blocks on rpi2):
+   CONFIG_MMC_SDHCI_IPROC: 11-12 MB/s
+   CONFIG_MMC_BCM2835:     19-20 MB/s
+
+Differences on write access are pretty much in the noise.
 
 Signed-off-by: Gerd Hoffmann <kraxel@redhat.com>
+Acked-by: Eric Anholt <eric@anholt.net>
 ---
- drivers/gpu/drm/qxl/qxl_display.c | 5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm/boot/dts/bcm2835-rpi.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/gpu/drm/qxl/qxl_display.c b/drivers/gpu/drm/qxl/qxl_display.c
-index 2b99496..cf99ace 100644
---- a/drivers/gpu/drm/qxl/qxl_display.c
-+++ b/drivers/gpu/drm/qxl/qxl_display.c
-@@ -81,6 +81,10 @@ static int qxl_display_copy_rom_client_monitors_config(struct qxl_device *qdev)
- 			   qdev->rom->client_monitors_config_crc);
- 		return MONITORS_CONFIG_BAD_CRC;
- 	}
-+	if (!num_monitors) {
-+		DRM_DEBUG_KMS("no client monitors configured\n");
-+		return status;
-+	}
- 	if (num_monitors > qdev->monitors_config->max_allowed) {
- 		DRM_DEBUG_KMS("client monitors list will be truncated: %d < %d\n",
- 			      qdev->monitors_config->max_allowed, num_monitors);
-@@ -1192,6 +1196,7 @@ int qxl_modeset_init(struct qxl_device *qdev)
- 		qdev_output_init(&qdev->ddev, i);
- 	}
+diff --git a/arch/arm/boot/dts/bcm2835-rpi.dtsi b/arch/arm/boot/dts/bcm2835-rpi.dtsi
+index 8b95832..e36c392 100644
+--- a/arch/arm/boot/dts/bcm2835-rpi.dtsi
++++ b/arch/arm/boot/dts/bcm2835-rpi.dtsi
+@@ -65,13 +65,13 @@
+ &sdhci {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&emmc_gpio48>;
+-	status = "okay";
+ 	bus-width = <4>;
+ };
  
-+	qxl_display_read_client_monitors_config(qdev);
- 	qdev->mode_info.mode_config_initialized = true;
+ &sdhost {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&sdhost_gpio48>;
++	status = "okay";
+ 	bus-width = <4>;
+ };
  
- 	drm_mode_config_reset(&qdev->ddev);
 -- 
 1.8.3.1
