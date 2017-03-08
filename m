@@ -1,44 +1,54 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 8 Mar 2017 08:36:18 +0100
-Subject: [PATCH 0/2] ARM: dts: sunxi: Remove no longer used
- pinctrl/sun4i-a10.h header
-In-Reply-To: <20170308032821.26854-1-wens@csie.org>
-References: <20170308032821.26854-1-wens@csie.org>
-Message-ID: <20170308073618.kslqz3c2wdctexvi@lukather>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed,  8 Mar 2017 09:00:15 +0100
+Subject: [PATCH RESEND^2] usb: gadget: udc: atmel: fix debug output
+Message-ID: <20170308080032.3848369-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 08, 2017 at 11:28:19AM +0800, Chen-Yu Tsai wrote:
-> Hi Maxime,
-> 
-> This series gets rid of the last usage of the Allwinner specific pinconf
-> bindings, and drops inclusion of dt-bindings/pinctrl/sun4i-a10.h across
-> the tree.
-> 
-> Patch 1 gets rid of the last occurrence of Allwinner specific pinconf
-> properties, which is actually a GPIO pinmux.
-> 
-> Patch 2 drops the #include for dt-bindings/pinctrl/sun4i-a10.h with a
-> scripted approach.
-> 
-> A patch to remove the actual header file should be sent after this
-> series is in Linus' tree, to avoid any unwanted cross-tree dependencies.
-> If we want that to happen faster, maybe we could merge these as fixes.
-> 
-> Regards
-> ChenYu
+The debug output now contains the wrong variable, as seen from the compiler
+warning:
 
-Applied both, thanks!
-Maxime
+drivers/usb/gadget/udc/atmel_usba_udc.c: In function 'usba_ep_enable':
+drivers/usb/gadget/udc/atmel_usba_udc.c:632:550: error: 'ept_cfg' may be used uninitialized in this function [-Werror=maybe-uninitialized]
+  DBG(DBG_ERR, "%s: EPT_CFG = 0x%lx (maxpacket = %lu)\n",
 
+This changes the debug output the same way as the other code.
+
+Fixes: 741d2558bf0a ("usb: gadget: udc: atmel: Update endpoint allocation scheme")
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+---
+Originally this broke on Feb 1 and I sent this fix,
+I resent it after it wasn't applied by Feb 22.
+
+This is now one of only two build regressions that made it into
+4.11-rc1 that are still broken on linux-next. Please apply
+
+ drivers/usb/gadget/udc/atmel_usba_udc.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.c b/drivers/usb/gadget/udc/atmel_usba_udc.c
+index 11bbce28bc23..2035906b8ced 100644
+--- a/drivers/usb/gadget/udc/atmel_usba_udc.c
++++ b/drivers/usb/gadget/udc/atmel_usba_udc.c
+@@ -610,7 +610,7 @@ usba_ep_enable(struct usb_ep *_ep, const struct usb_endpoint_descriptor *desc)
+ {
+ 	struct usba_ep *ep = to_usba_ep(_ep);
+ 	struct usba_udc *udc = ep->udc;
+-	unsigned long flags, ept_cfg, maxpacket;
++	unsigned long flags, maxpacket;
+ 	unsigned int nr_trans;
+ 
+ 	DBG(DBG_GADGET, "%s: ep_enable: desc=%p\n", ep->ep.name, desc);
+@@ -630,7 +630,7 @@ usba_ep_enable(struct usb_ep *_ep, const struct usb_endpoint_descriptor *desc)
+ 	ep->is_in = 0;
+ 
+ 	DBG(DBG_ERR, "%s: EPT_CFG = 0x%lx (maxpacket = %lu)\n",
+-			ep->ep.name, ept_cfg, maxpacket);
++			ep->ep.name, ep->ept_cfg, maxpacket);
+ 
+ 	if (usb_endpoint_dir_in(desc)) {
+ 		ep->is_in = 1;
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170308/be7a28d3/attachment.sig>
+2.9.0
