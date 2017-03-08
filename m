@@ -1,133 +1,36 @@
-From: ralph.sennhauser@gmail.com (Ralph Sennhauser)
-Date: Wed,  8 Mar 2017 06:33:12 +0100
-Subject: [PATCH] ARM: dts: mvebu: linksys: enable buffer manager support
-Message-ID: <20170308053312.29243-1-ralph.sennhauser@gmail.com>
+From: sasukewxt@163.com (Caesar Wang)
+Date: Wed, 8 Mar 2017 13:50:04 +0800
+Subject: iommu/rockchip: Fix bugs and enable on ARM64
+In-Reply-To: <20160715161651.GS12639@8bytes.org>
+References: <1466734413-7453-1-git-send-email-zhengsq@rock-chips.com>
+ <20160627125751.GN11432@8bytes.org> <577EFB86.1060502@rock-chips.com>
+ <575f6cd7-6e03-e701-78ed-ea2fe9f7573c@suse.com>
+ <20160715161651.GS12639@8bytes.org>
+Message-ID: <fd2e0b00-bb7f-6383-7f79-f17713cbf244@163.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add appropriate properties to devices in the Linksys WRT AC Series for the
-mvneta driver to use hardware buffer management.
+Shunqian,
+something is depending on these patches, can you resend these patches to 
+solve the
+compile errors?
 
-Also update "soc" ranges property and set the status of bm and bm-bppi
-to "okay" (SRAM).
-
-Signed-off-by: Ralph Sennhauser <ralph.sennhauser@gmail.com>
----
- arch/arm/boot/dts/armada-385-linksys.dtsi     | 17 ++++++++++++++++-
- arch/arm/boot/dts/armada-xp-linksys-mamba.dts | 17 ++++++++++++++++-
- 2 files changed, 32 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/boot/dts/armada-385-linksys.dtsi b/arch/arm/boot/dts/armada-385-linksys.dtsi
-index df47bf1..4aac375 100644
---- a/arch/arm/boot/dts/armada-385-linksys.dtsi
-+++ b/arch/arm/boot/dts/armada-385-linksys.dtsi
-@@ -59,7 +59,8 @@
- 		ranges = <MBUS_ID(0xf0, 0x01) 0 0xf1000000 0x100000
- 			  MBUS_ID(0x01, 0x1d) 0 0xfff00000 0x100000
- 			  MBUS_ID(0x09, 0x19) 0 0xf1100000 0x10000
--			  MBUS_ID(0x09, 0x15) 0 0xf1110000 0x10000>;
-+			  MBUS_ID(0x09, 0x15) 0 0xf1110000 0x10000
-+			  MBUS_ID(0x0c, 0x04) 0 0xf1200000 0x100000>;
- 
- 		internal-regs {
- 			i2c at 11000 {
-@@ -88,6 +89,9 @@
- 			ethernet at 70000 {
- 				status = "okay";
- 				phy-mode = "rgmii-id";
-+				buffer-manager = <&bm>;
-+				bm,pool-long = <1>;
-+				bm,pool-short = <3>;
- 				fixed-link {
- 					speed = <1000>;
- 					full-duplex;
-@@ -97,6 +101,9 @@
- 			ethernet at 34000 {
- 				status = "okay";
- 				phy-mode = "sgmii";
-+				buffer-manager = <&bm>;
-+				bm,pool-long = <0>;
-+				bm,pool-short = <3>;
- 				fixed-link {
- 					speed = <1000>;
- 					full-duplex;
-@@ -159,6 +166,10 @@
- 				status = "okay";
- 			};
- 
-+			bm at c8000 {
-+				status = "okay";
-+			};
-+
- 			/* USB part of the eSATA/USB 2.0 port */
- 			usb at 58000 {
- 				status = "okay";
-@@ -241,6 +252,10 @@
- 			};
- 		};
- 
-+		bm-bppi {
-+			status = "okay";
-+		};
-+
- 		pcie-controller {
- 			status = "okay";
- 
-diff --git a/arch/arm/boot/dts/armada-xp-linksys-mamba.dts b/arch/arm/boot/dts/armada-xp-linksys-mamba.dts
-index 3744ba3..b188a4dc 100644
---- a/arch/arm/boot/dts/armada-xp-linksys-mamba.dts
-+++ b/arch/arm/boot/dts/armada-xp-linksys-mamba.dts
-@@ -71,7 +71,8 @@
- 		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xf1000000 0x100000
- 			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000
- 			  MBUS_ID(0x09, 0x09) 0 0 0xf1100000 0x10000
--			  MBUS_ID(0x09, 0x05) 0 0 0xf1110000 0x10000>;
-+			  MBUS_ID(0x09, 0x05) 0 0 0xf1110000 0x10000
-+			  MBUS_ID(0x0c, 0x04) 0 0 0xf1200000 0x100000>;
- 
- 		internal-regs {
- 
-@@ -95,6 +96,9 @@
- 				pinctrl-names = "default";
- 				status = "okay";
- 				phy-mode = "rgmii-id";
-+				buffer-manager = <&bm>;
-+				bm,pool-long = <0>;
-+				bm,pool-short = <3>;
- 				fixed-link {
- 					speed = <1000>;
- 					full-duplex;
-@@ -106,6 +110,9 @@
- 				pinctrl-names = "default";
- 				status = "okay";
- 				phy-mode = "rgmii-id";
-+				buffer-manager = <&bm>;
-+				bm,pool-long = <1>;
-+				bm,pool-short = <3>;
- 				fixed-link {
- 					speed = <1000>;
- 					full-duplex;
-@@ -186,6 +193,10 @@
- 				};
- 			};
- 
-+			bm at c8000 {
-+				status = "okay";
-+			};
-+
- 			nand at d0000 {
- 				status = "okay";
- 				num-cs = <1>;
-@@ -259,6 +270,10 @@
- 				};
- 			};
- 		};
-+
-+		bm-bppi {
-+			status = "okay";
-+		};
- 	};
- 
- 	gpio_keys {
--- 
-2.10.2
+-Caesar
+? 2016?07?16? 00:16, Joerg Roedel ??:
+> On Fri, Jul 15, 2016 at 05:32:02PM +0200, Matthias Brugger wrote:
+>>> The drm rockchip patches are dependent on iommu/rockchip patches, can
+>>> you also apply these patches together? So that can avoid compile problem.
+>>>
+>> While at it. I don't see patch 8 (iommu/Kconfig) in linux-next.
+>> I suppose you forgot to pick that one.
+> I picked it up first, but it causes compile errors, so I removed it for
+> now.
+>
+>
+> 	Joerg
+>
+>
+> _______________________________________________
+> Linux-rockchip mailing list
+> Linux-rockchip at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-rockchip
