@@ -1,92 +1,48 @@
-From: flatmax@flatmax.org (Matt Flax)
-Date: Wed, 8 Mar 2017 22:35:52 +1100
-Subject: [alsa-devel] [PATCH] ASoC: bcm_2835: Simplify mono guard by
- returning error on mono
-In-Reply-To: <d86dad56-3291-6ac0-5109-eeb83e7f1215@koalo.de>
-References: <1488970734-6596-1-git-send-email-flatmax@flatmax.org>
- <d86dad56-3291-6ac0-5109-eeb83e7f1215@koalo.de>
-Message-ID: <328ff79b-0014-16d0-b222-e61cf6a3d860@flatmax.org>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Wed, 8 Mar 2017 17:05:25 +0530
+Subject: [PATCH v2 08/22] PCI: dwc: designware: Add EP mode support
+In-Reply-To: <aa9835a7-07f4-d042-d04a-b0d9cc0ea3de@synopsys.com>
+References: <1487325042-28227-1-git-send-email-kishon@ti.com>
+ <1487325042-28227-9-git-send-email-kishon@ti.com>
+ <45e5288e-d11f-c855-af9b-692a42d878c6@synopsys.com> <58BE42B2.20305@ti.com>
+ <02461be2-268d-485a-2bc4-3b148726d37d@synopsys.com>
+ <aa9835a7-07f4-d042-d04a-b0d9cc0ea3de@synopsys.com>
+Message-ID: <58BFEC7D.3090608@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-
-On 08/03/17 22:13, Florian Kauer wrote:
-> I don't really see why it simplifies the code.
-> Actually, the number of lines is even increased by this patch.
-> And the logic will fail if ever params_channels would return something
-> larger than 2.
->
->
-
-
-The actual lines of code (excluding comments has shrunk from 9 to 5) - 
-there is no point arguing that. The clock cycle count to execute the 
-same logic has been reduced.
-
-The channel count can't be larger then 2 because channels_min = 
-channels_max = 2, check the bcm2835_i2s.c file.
-
-If channel count is ever != 2 then someone is intentionally hacking - 
-that is beyond our control and in the interests of the hackers - good 
-luck to them.
-
-This patch simplifies the code base and is entirely equivalent to the 
-code it is replacing.
-This patch is still entirely I2S compliant.
-
-Is anyone interested in reducing code complexity ?
-
-Matt
-
-
->
-> On 08.03.2017 11:58, Matt Flax wrote:
->> This patch simplifies the bcm2835_i2s.c code when the driver returns
->> error on mono channel requests. It does this by testing for mono
->> instead of using a switch statement to test for stereo.
+On Wednesday 08 March 2017 05:02 PM, Joao Pinto wrote:
+> 
+> Hi Kishon,
+> 
+>>> Can you provide PCIE_GET_ATU_INB_UNR_REG_OFFSET (similar to
+>>> PCIE_GET_ATU_OUTB_UNR_REG_OFFSET)?
 >>
->> The bcm2835_i2s driver can only work in stereo mode. Whilst leaving
->> the driver entirel compliant with the I2S protocol, it simplifies the
->> code by removing a few redundant lines of code.
+>> Yes of course, I will send you the definition soon.
+> 
+> As promissed here is the definition for Inbound:
+> 
+> +/* register address builder */
+> +#define PCIE_GET_ATU_INB_UNR_REG_ADDR(region, register)		\
+> +					((0x3 << 20) | (region << 9) |	\
+> +					(0x1 << 8) | (register << 2))
+
+Cool, thanks!
+
+-Kishon
+> 
+> Thanks,
+> Joao
+> 
 >>
->> Signed-off-by: Matt Flax <flatmax@flatmax.org>
->> ---
->>  sound/soc/bcm/bcm2835-i2s.c | 17 +++++++++--------
->>  1 file changed, 9 insertions(+), 8 deletions(-)
+>> Thanks,
+>> Joao
 >>
->> diff --git a/sound/soc/bcm/bcm2835-i2s.c b/sound/soc/bcm/bcm2835-i2s.c
->> index 6ba2049..1e6a1da 100644
->> --- a/sound/soc/bcm/bcm2835-i2s.c
->> +++ b/sound/soc/bcm/bcm2835-i2s.c
->> @@ -310,15 +310,16 @@ static int bcm2835_i2s_hw_params(struct 
->> snd_pcm_substream *substream,
->>      ch1pos = data_delay;
->>      ch2pos = bclk_ratio / 2 + data_delay;
+>>>
+>>> Thanks
+>>> Kishon
+>>>
 >>
->> -    switch (params_channels(params)) {
->> -    case 2:
->> -        format = BCM2835_I2S_CH1(format) | BCM2835_I2S_CH2(format);
->> -        format |= BCM2835_I2S_CH1(BCM2835_I2S_CHPOS(ch1pos));
->> -        format |= BCM2835_I2S_CH2(BCM2835_I2S_CHPOS(ch2pos));
->> -        break;
->> -    default:
->> +    /* C
->> +     * Check we aren't setting channel 2 on a mono stream.
->> +     * We currently only support stereo
->> +     */
->> +    if (params_channels(params) == 1)
->>          return -EINVAL;
->> -    }
->> +
->> +    format = BCM2835_I2S_CH1(format) | BCM2835_I2S_CH2(format);
->> +    format |= BCM2835_I2S_CH1(BCM2835_I2S_CHPOS(ch1pos));
->> +    format |= BCM2835_I2S_CH2(BCM2835_I2S_CHPOS(ch2pos));
->>
->>      /*
->>       * Set format for both streams.
->>
-> _______________________________________________
-> Alsa-devel mailing list
-> Alsa-devel at alsa-project.org
-> http://mailman.alsa-project.org/mailman/listinfo/alsa-devel
+> 
