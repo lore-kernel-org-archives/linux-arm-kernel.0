@@ -1,270 +1,90 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Wed, 8 Mar 2017 11:18:15 +0000
-Subject: [PATCH 06/11] arm64: tegra: Add initial power tree for P3310
-In-Reply-To: <20170223173053.19701-6-thierry.reding@gmail.com>
-References: <20170223173053.19701-1-thierry.reding@gmail.com>
- <20170223173053.19701-6-thierry.reding@gmail.com>
-Message-ID: <84d71457-8fb9-f5a3-7a22-f1ae76b0c11b@nvidia.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 8 Mar 2017 11:22:04 +0000
+Subject: [PATCH v4 6/6] arm64: mm: set the contiguous bit for kernel
+ mappings where appropriate
+In-Reply-To: <CAKv+Gu8XBPgsSePG2dc9Z90y79CJsw2p7dKUkRTkzpCd7ch8Qw@mail.gmail.com>
+References: <1488637848-13588-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1488637848-13588-7-git-send-email-ard.biesheuvel@linaro.org>
+ <20170307164648.GC3514@leverpostej>
+ <CAKv+Gu8XBPgsSePG2dc9Z90y79CJsw2p7dKUkRTkzpCd7ch8Qw@mail.gmail.com>
+Message-ID: <20170308112203.GC10899@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 23/02/17 17:30, Thierry Reding wrote:
-> From: Thierry Reding <treding@nvidia.com>
+On Wed, Mar 08, 2017 at 11:57:22AM +0100, Ard Biesheuvel wrote:
+> On 7 March 2017 at 17:46, Mark Rutland <mark.rutland@arm.com> wrote:
+> > Note that I've cheated and made alloc_init_pte() take a phys_addr_t
+> > rather than a pfn, which I think we should do anyhow for consistency. I
+> > have a patch for that, if you agree.
 > 
-> Enable the Maxim MAX77620 PMIC found on P3310 and add some fixed
-> regulators to model the power tree.
-> 
-> Signed-off-by: Thierry Reding <treding@nvidia.com>
-> ---
->  arch/arm64/boot/dts/nvidia/tegra186-p3310.dtsi | 211 +++++++++++++++++++++++++
->  1 file changed, 211 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/nvidia/tegra186-p3310.dtsi b/arch/arm64/boot/dts/nvidia/tegra186-p3310.dtsi
-> index ffbb4be5122e..1a9ac73b4ecb 100644
-> --- a/arch/arm64/boot/dts/nvidia/tegra186-p3310.dtsi
-> +++ b/arch/arm64/boot/dts/nvidia/tegra186-p3310.dtsi
-> @@ -1,5 +1,7 @@
->  #include "tegra186.dtsi"
->  
-> +#include <dt-bindings/mfd/max77620.h>
-> +
->  / {
->  	model = "NVIDIA Tegra186 P3310 Processor Module";
->  	compatible = "nvidia,p3310", "nvidia,tegra186";
-> @@ -115,6 +117,180 @@
->  	bpmp {
->  		i2c {
->  			status = "okay";
-> +
-> +			pmic: pmic at 3c {
-> +				compatible = "maxim,max77620";
-> +				reg = <0x3c>;
-> +
-> +				interrupts = <GIC_SPI 209 IRQ_TYPE_LEVEL_HIGH>;
-> +				#interrupt-cells = <2>;
-> +				interrupt-controller;
-> +
-> +				#gpio-cells = <2>;
-> +				gpio-controller;
-> +
-> +				pinctrl-names = "default";
-> +				pinctrl-0 = <&max77620_default>;
-> +
-> +				max77620_default: pinmux {
-> +					gpio0 {
-> +						pins = "gpio0";
-> +						function = "gpio";
-> +					};
-> +
-> +					gpio1 {
-> +						pins = "gpio1";
-> +						function = "fps-out";
-> +						maxim,active-fps-source = <MAX77620_FPS_SRC_0>;
-> +					};
-> +
-> +					gpio2 {
-> +						pins = "gpio2";
-> +						function = "fps-out";
-> +						maxim,active-fps-source = <MAX77620_FPS_SRC_1>;
-> +					};
-> +
-> +					gpio3 {
-> +						pins = "gpio3";
-> +						function = "fps-out";
-> +						maxim,active-fps-source = <MAX77620_FPS_SRC_1>;
-> +					};
-> +
-> +					gpio4 {
-> +						pins = "gpio4";
-> +						function = "32k-out1";
-> +						drive-push-pull = <1>;
-> +					};
-> +
-> +					gpio5 {
-> +						pins = "gpio5";
-> +						function = "gpio";
-> +						drive-push-pull = <0>;
-> +					};
-> +
-> +					gpio6 {
-> +						pins = "gpio6";
-> +						function = "gpio";
-> +						drive-push-pull = <1>;
-> +					};
-> +
-> +					gpio7 {
-> +						pins = "gpio7";
-> +						function = "gpio";
-> +						drive-push-pull = <0>;
-> +					};
-> +				};
-> +
-> +				fps {
-> +					fps0 {
-> +						maxim,fps-event-source = <MAX77620_FPS_EVENT_SRC_EN0>;
-> +						maxim,shutdown-fps-time-period-us = <640>;
-> +					};
-> +
-> +					fps1 {
-> +						maxim,fps-event-source = <MAX77620_FPS_EVENT_SRC_EN1>;
-> +						maxim,shutdown-fps-time-period-us = <640>;
-> +					};
-> +
-> +					fps2 {
-> +						maxim,fps-event-source = <MAX77620_FPS_EVENT_SRC_EN0>;
-> +						maxim,shutdown-fps-time-period-us = <640>;
-> +					};
-> +				};
-> +
-> +				regulators {
-> +					in-sd0-supply = <&vdd_5v0_sys>;
-> +					in-sd1-supply = <&vdd_5v0_sys>;
-> +					in-sd2-supply = <&vdd_5v0_sys>;
-> +					in-sd3-supply = <&vdd_5v0_sys>;
-> +
-> +					in-ldo0-1-supply = <&vdd_5v0_sys>;
-> +					in-ldo2-supply = <&vdd_5v0_sys>;
-> +					in-ldo3-5-supply = <&vdd_5v0_sys>;
-> +					in-ldo4-6-supply = <&vdd_1v8>;
-> +					in-ldo7-8-supply = <&avdd_dsi_csi>;
-> +
-> +					sd0 {
-> +						regulator-name = "VDD_DDR_1V1_PMIC";
-> +						regulator-min-microvolt = <1100000>;
-> +						regulator-max-microvolt = <1100000>;
-> +						regulator-always-on;
-> +						regulator-boot-on;
-> +					};
-> +
-> +					avdd_dsi_csi: sd1 {
-> +						regulator-name = "AVDD_DSI_CSI_1V2";
-> +						regulator-min-microvolt = <1200000>;
-> +						regulator-max-microvolt = <1200000>;
-> +						/* XXX */
-> +						regulator-always-on;
-> +						regulator-boot-on;
-> +					};
-> +
-> +					vdd_1v8: sd2 {
-> +						regulator-name = "VDD_1V8";
-> +						regulator-min-microvolt = <1800000>;
-> +						regulator-max-microvolt = <1800000>;
-> +						/* XXX */
-> +						regulator-always-on;
-> +						regulator-boot-on;
-> +					};
-> +
-> +					vdd_3v3_sys: sd3 {
-> +						regulator-name = "VDD_3V3_SYS";
-> +						regulator-min-microvolt = <3300000>;
-> +						regulator-max-microvolt = <3300000>;
-> +						/* XXX */
-> +						regulator-always-on;
-> +						regulator-boot-on;
-> +					};
-> +
-> +					ldo0 {
-> +						regulator-name = "VDD_1V8_AP_PLL";
-> +						regulator-min-microvolt = <1800000>;
-> +						regulator-max-microvolt = <1800000>;
-> +						/* XXX */
-> +						regulator-always-on;
-> +						regulator-boot-on;
-> +					};
-> +
-> +					ldo2 {
-> +						regulator-name = "VDDIO_3V3_AOHV";
-> +						regulator-min-microvolt = <3300000>;
-> +						regulator-max-microvolt = <3300000>;
-> +						/* XXX */
-> +						regulator-always-on;
-> +						regulator-boot-on;
-> +					};
-> +
-> +					vddio_sdmmc1: ldo3 {
-> +						regulator-name = "VDDIO_SDMMC1_AP";
-> +						regulator-min-microvolt = <1800000>;
-> +						regulator-max-microvolt = <3300000>;
-> +					};
-> +
-> +					ldo4 {
-> +						regulator-name = "VDD_RTC";
-> +						regulator-min-microvolt = <1000000>;
-> +						regulator-max-microvolt = <1000000>;
-> +					};
-> +
-> +					vddio_sdmmc3: ldo5 {
-> +						regulator-name = "VDDIO_SDMMC3_AP";
-> +						regulator-min-microvolt = <2800000>;
-> +						regulator-max-microvolt = <2800000>;
-> +					};
-> +
-> +					vdd_pex: ldo7 {
-> +						regulator-name = "VDD_PEX_1V05";
-> +						regulator-min-microvolt = <1050000>;
-> +						regulator-max-microvolt = <1050000>;
-> +						/* XXX */
-> +						regulator-always-on;
-> +						regulator-boot-on;
-> +					};
+> Yes, absolutely. I did not spot this before you pointed it out, but it
+> looks a bit sloppy.
 
-On the schematics for I am looking at (for the c03 version) I see:
+Patch below, based on patch 5 of this series.
 
-ldo7 --> VDD_HDMI_1V05
-ldo8 --> VDD_PEX_1V05
+Thanks,
+Mark.
 
-> +				};
-> +			};
->  		};
->  	};
->  
-> @@ -123,4 +299,39 @@
->  		status = "okay";
->  		method = "smc";
->  	};
-> +
-> +	regulators {
-> +		compatible = "simple-bus";
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		vdd_5v0_sys: regulator at 0 {
-> +			compatible = "regulator-fixed";
-> +			reg = <0>;
-> +
-> +			regulator-name = "VDD_5V0_SYS";
-> +			regulator-min-microvolt = <5000000>;
-> +			regulator-max-microvolt = <5000000>;
-> +			regulator-always-on;
-> +			regulator-boot-on;
-> +		};
-> +
-> +		vdd_1v8_ap: regulator at 1 {
-> +			compatible = "regulator-fixed";
-> +			reg = <1>;
-> +
-> +			regulator-name = "VDD_1V8_AP";
-> +			regulator-min-microvolt = <1800000>;
-> +			regulator-max-microvolt = <1800000>;
-> +
-> +			/* XXX */
-> +			regulator-always-on;
-> +			regulator-boot-on;
-> +
-> +			gpio = <&pmic 1 GPIO_ACTIVE_HIGH>;
-> +			enable-active-high;
-> +
-> +			vin-supply = <&vdd_1v8>;
-> +		};
-> +	};
->  };
-> 
+---->8----
+>From 31052898c92711c871ff68aabec01b8b2c415ec1 Mon Sep 17 00:00:00 2001
+From: Mark Rutland <mark.rutland@arm.com>
+Date: Tue, 7 Mar 2017 15:30:13 +0000
+Subject: [PATCH] arm64: mmu: unify alloc_init_p??() prototypes
 
-Otherwise looks good.
+Currently alloc_init_pte() accepts the physical address as a pfn, rather
+than a phys_addr_t as all the other alloc_init_p??() functions do. This
+also makes the structure of alloc_init_pte() unnecessarily different to
+the other functions.
 
-Cheers
-Jon
+This patch updates alloc_init_pte() to take a the physical address as a
+phys_addr_t, following the same pattern as the other alloc_init_p??()
+functions.
 
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm64/mm/mmu.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index 0612573..2aec93ab 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -107,7 +107,7 @@ static bool pgattr_change_is_safe(u64 old, u64 new)
+ }
+ 
+ static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
+-				  unsigned long end, unsigned long pfn,
++				  unsigned long end, phys_addr_t phys,
+ 				  pgprot_t prot,
+ 				  phys_addr_t (*pgtable_alloc)(void))
+ {
+@@ -128,8 +128,7 @@ static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
+ 	do {
+ 		pte_t old_pte = *pte;
+ 
+-		set_pte(pte, pfn_pte(pfn, prot));
+-		pfn++;
++		set_pte(pte, pfn_pte(__phys_to_pfn(phys), prot));
+ 
+ 		/*
+ 		 * After the PTE entry has been populated once, we
+@@ -137,6 +136,7 @@ static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
+ 		 */
+ 		BUG_ON(!pgattr_change_is_safe(pte_val(old_pte), pte_val(*pte)));
+ 
++		phys += PAGE_SIZE;
+ 	} while (pte++, addr += PAGE_SIZE, addr != end);
+ 
+ 	pte_clear_fixmap();
+@@ -182,7 +182,7 @@ static void alloc_init_pmd(pud_t *pud, unsigned long addr, unsigned long end,
+ 			BUG_ON(!pgattr_change_is_safe(pmd_val(old_pmd),
+ 						      pmd_val(*pmd)));
+ 		} else {
+-			alloc_init_pte(pmd, addr, next, __phys_to_pfn(phys),
++			alloc_init_pte(pmd, addr, next, phys,
+ 				       prot, pgtable_alloc);
+ 
+ 			BUG_ON(pmd_val(old_pmd) != 0 &&
 -- 
-nvpublic
+1.9.1
