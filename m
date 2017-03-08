@@ -1,53 +1,60 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Wed, 8 Mar 2017 12:06:31 +0000
-Subject: [PATCH 10/11] arm64: tegra: Add power monitors on P2771
-In-Reply-To: <20170223173053.19701-10-thierry.reding@gmail.com>
-References: <20170223173053.19701-1-thierry.reding@gmail.com>
- <20170223173053.19701-10-thierry.reding@gmail.com>
-Message-ID: <cf553179-11e8-680a-cff0-b52c3a598d56@nvidia.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Wed, 8 Mar 2017 13:11:56 +0100
+Subject: [PATCH v4 3/7] mmc: bcm2835: add sdhost controller to devicetree
+In-Reply-To: <1488964751-22763-6-git-send-email-kraxel@redhat.com>
+References: <1488964751-22763-1-git-send-email-kraxel@redhat.com>
+ <1488964751-22763-6-git-send-email-kraxel@redhat.com>
+Message-ID: <a0cc10b6-b03c-2b61-f31a-f266d39a0d80@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-On 23/02/17 17:30, Thierry Reding wrote:
-> From: Thierry Reding <treding@nvidia.com>
-> 
-> The P2771 development board comes with two power monitors that can be
-> used to determine power consumption in different parts of the board.
-> 
-> Signed-off-by: Thierry Reding <treding@nvidia.com>
+Am 08.03.2017 um 10:19 schrieb Gerd Hoffmann:
+> Signed-off-by: Gerd Hoffmann <kraxel@redhat.com>
+> Acked-by: Eric Anholt <eric@anholt.net>
+
+Acked-by: Stefan Wahren <stefan.wahren@i2se.com>
+
 > ---
->  arch/arm64/boot/dts/nvidia/tegra186-p2771-0000.dts | 12 ++++++++++++
->  1 file changed, 12 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/nvidia/tegra186-p2771-0000.dts b/arch/arm64/boot/dts/nvidia/tegra186-p2771-0000.dts
-> index 1c195d71806d..9485841e3351 100644
-> --- a/arch/arm64/boot/dts/nvidia/tegra186-p2771-0000.dts
-> +++ b/arch/arm64/boot/dts/nvidia/tegra186-p2771-0000.dts
-> @@ -8,6 +8,18 @@
->  	model = "NVIDIA Tegra186 P2771-0000 Development Board";
->  	compatible = "nvidia,p2771-0000", "nvidia,tegra186";
->  
-> +	i2c at 3160000 {
-> +		power-monitor at 42 {
-> +			compatible = "ti,ina3221";
-> +			reg = <0x42>;
+>   arch/arm/boot/dts/bcm2835-rpi.dtsi |  6 ++++++
+>   arch/arm/boot/dts/bcm283x.dtsi     | 10 ++++++++++
+>   2 files changed, 16 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/bcm2835-rpi.dtsi b/arch/arm/boot/dts/bcm2835-rpi.dtsi
+> index 1e00a28..8b95832 100644
+> --- a/arch/arm/boot/dts/bcm2835-rpi.dtsi
+> +++ b/arch/arm/boot/dts/bcm2835-rpi.dtsi
+> @@ -69,6 +69,12 @@
+>   	bus-width = <4>;
+>   };
+>   
+> +&sdhost {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&sdhost_gpio48>;
+> +	bus-width = <4>;
+> +};
+> +
+>   &pwm {
+>   	pinctrl-names = "default";
+>   	pinctrl-0 = <&pwm0_gpio40 &pwm1_gpio45>;
+> diff --git a/arch/arm/boot/dts/bcm283x.dtsi b/arch/arm/boot/dts/bcm283x.dtsi
+> index 9798bc9..19099a5 100644
+> --- a/arch/arm/boot/dts/bcm283x.dtsi
+> +++ b/arch/arm/boot/dts/bcm283x.dtsi
+> @@ -350,6 +350,16 @@
+>   			arm,primecell-periphid = <0x00241011>;
+>   		};
+>   
+> +		sdhost: mmc at 7e202000 {
+> +			compatible = "brcm,bcm2835-sdhost";
+> +			reg = <0x7e202000 0x100>;
+> +			interrupts = <2 24>;
+> +			clocks = <&clocks BCM2835_CLOCK_VPU>;
+> +			dmas = <&dma 13>;
+> +			dma-names = "rx-tx";
+> +			status = "disabled";
 > +		};
 > +
-> +		power-monitor at 43 {
-> +			compatible = "ti,ina3221";
-> +			reg = <0x43>;
-> +		};
-> +	};
-> +
->  	gpio-keys {
->  		compatible = "gpio-keys";
->  
-
-Acked-by: Jon Hunter <jonathanh@nvidia.com>
-
-Cheers
-Jon
-
--- 
-nvpublic
+>   		i2s: i2s at 7e203000 {
+>   			compatible = "brcm,bcm2835-i2s";
+>   			reg = <0x7e203000 0x20>,
