@@ -1,79 +1,53 @@
 From: thgarnie@google.com (Thomas Garnier)
-Date: Wed,  8 Mar 2017 13:38:42 -0800
-Subject: [PATCH v1 2/4] x86/syscalls: Specific usage of
+Date: Wed,  8 Mar 2017 13:38:44 -0800
+Subject: [PATCH v1 4/4] arm64/syscalls: Specific usage of
  verify_pre_usermode_state
 In-Reply-To: <20170308213844.131877-1-thgarnie@google.com>
 References: <20170308213844.131877-1-thgarnie@google.com>
-Message-ID: <20170308213844.131877-2-thgarnie@google.com>
+Message-ID: <20170308213844.131877-4-thgarnie@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Implement specific usage of verify_pre_usermode_state for user-mode
-returns for x86.
+returns for arm64.
 ---
 Based on next-20170308
 ---
- arch/x86/Kconfig          | 1 +
- arch/x86/entry/common.c   | 3 +++
- arch/x86/entry/entry_64.S | 6 ++++++
- 3 files changed, 10 insertions(+)
+ arch/arm64/Kconfig        | 1 +
+ arch/arm64/kernel/entry.S | 2 ++
+ 2 files changed, 3 insertions(+)
 
-diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
-index 005df7c825f5..6d48e18e6f09 100644
---- a/arch/x86/Kconfig
-+++ b/arch/x86/Kconfig
-@@ -63,6 +63,7 @@ config X86
- 	select ARCH_MIGHT_HAVE_ACPI_PDC		if ACPI
- 	select ARCH_MIGHT_HAVE_PC_PARPORT
- 	select ARCH_MIGHT_HAVE_PC_SERIO
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 896eba61e5ed..da54774838d8 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -24,6 +24,7 @@ config ARM64
+ 	select ARCH_WANT_COMPAT_IPC_PARSE_VERSION
+ 	select ARCH_WANT_FRAME_POINTERS
+ 	select ARCH_HAS_UBSAN_SANITIZE_ALL
 +	select ARCH_NO_SYSCALL_VERIFY_PRE_USERMODE_STATE
- 	select ARCH_SUPPORTS_ATOMIC_RMW
- 	select ARCH_SUPPORTS_DEFERRED_STRUCT_PAGE_INIT
- 	select ARCH_SUPPORTS_NUMA_BALANCING	if X86_64
-diff --git a/arch/x86/entry/common.c b/arch/x86/entry/common.c
-index 370c42c7f046..525edbb77f03 100644
---- a/arch/x86/entry/common.c
-+++ b/arch/x86/entry/common.c
-@@ -22,6 +22,7 @@
- #include <linux/context_tracking.h>
- #include <linux/user-return-notifier.h>
- #include <linux/uprobes.h>
-+#include <linux/syscalls.h>
- 
- #include <asm/desc.h>
- #include <asm/traps.h>
-@@ -180,6 +181,8 @@ __visible inline void prepare_exit_to_usermode(struct pt_regs *regs)
- 	struct thread_info *ti = current_thread_info();
- 	u32 cached_flags;
- 
-+	verify_pre_usermode_state();
-+
- 	if (IS_ENABLED(CONFIG_PROVE_LOCKING) && WARN_ON(!irqs_disabled()))
- 		local_irq_disable();
- 
-diff --git a/arch/x86/entry/entry_64.S b/arch/x86/entry/entry_64.S
-index d2b2a2948ffe..795c31eebd09 100644
---- a/arch/x86/entry/entry_64.S
-+++ b/arch/x86/entry/entry_64.S
-@@ -201,6 +201,7 @@ entry_SYSCALL_64_fastpath:
- 	 * It might end up jumping to the slow path.  If it jumps, RAX
- 	 * and all argument registers are clobbered.
- 	 */
-+
- 	call	*sys_call_table(, %rax, 8)
- .Lentry_SYSCALL_64_after_fastpath_call:
- 
-@@ -218,6 +219,11 @@ entry_SYSCALL_64_fastpath:
- 	testl	$_TIF_ALLWORK_MASK, TASK_TI_flags(%r11)
- 	jnz	1f
- 
-+	/*
-+	 * Check user-mode state on fast path return, the same check is done
-+	 * under the slow path through syscall_return_slowpath.
-+	 */
-+	call	verify_pre_usermode_state
- 	LOCKDEP_SYS_EXIT
- 	TRACE_IRQS_ON		/* user mode is traced as IRQs on */
- 	movq	RIP(%rsp), %rcx
+ 	select ARM_AMBA
+ 	select ARM_ARCH_TIMER
+ 	select ARM_GIC
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index 43512d4d7df2..b3d1d9e5c7c1 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -744,6 +744,7 @@ ENDPROC(cpu_switch_to)
+ ret_fast_syscall:
+ 	disable_irq				// disable interrupts
+ 	str	x0, [sp, #S_X0]			// returned x0
++	bl 	verify_pre_usermode_state
+ 	ldr	x1, [tsk, #TSK_TI_FLAGS]	// re-check for syscall tracing
+ 	and	x2, x1, #_TIF_SYSCALL_WORK
+ 	cbnz	x2, ret_fast_syscall_trace
+@@ -771,6 +772,7 @@ work_pending:
+  */
+ ret_to_user:
+ 	disable_irq				// disable interrupts
++	bl 	verify_pre_usermode_state
+ 	ldr	x1, [tsk, #TSK_TI_FLAGS]
+ 	and	x2, x1, #_TIF_WORK_MASK
+ 	cbnz	x2, work_pending
 -- 
 2.12.0.246.ga2ecc84866-goog
