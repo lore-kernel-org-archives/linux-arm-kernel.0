@@ -1,28 +1,53 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 8 Mar 2017 17:10:25 +0100
-Subject: wireless/atmel: remove time_t usage
-In-Reply-To: <20170308151340.9D6E360209@smtp.codeaurora.org>
-References: <20170223161445.19200-1-alexandre.belloni@free-electrons.com>
- <20170308151340.9D6E360209@smtp.codeaurora.org>
-Message-ID: <20170308161025.nxz6puyeo3ezwa43@piout.net>
+From: afzal.mohd.ma@gmail.com (afzal mohammed)
+Date: Wed, 8 Mar 2017 21:52:58 +0530
+Subject: [PATCH v2 2/4] ARM: nommu: dynamic exception base address setting
+In-Reply-To: <314159a7-b664-1256-647d-c05880ad7710@uclinux.org>
+References: <314159a7-b664-1256-647d-c05880ad7710@uclinux.org>
+Message-ID: <20170308162258.GA3515@afzalpc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Greg,
 
-On 08/03/2017 at 15:13:40 +0000, Kalle Valo wrote:
-> Alexandre Belloni <alexandre.belloni@free-electrons.com> wrote:
-> > last_qual never really holds a time. It only holds jiffies. Make it the
-> > same type as jiffies.
-> > 
-> > Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Was standing on one leg & hoping that nothing breaks, knocked down,
+
+On Wed, Mar 08, 2017 at 01:21:36PM +1000, Greg Ungerer wrote:
+
+> This patch (which is in mainline now as commit f8300a0b5d) breaks
+> my patch series to support running the Versatile QEMU target with
+> a nommu configured linux kernel.
+
+Sorry
+
+> > +	return !!cpuid_feature_extract(CPUID_EXT_PFR1, 4);
 > 
-> The title should start with "atmel:", I can fix that during commit.
+> The problem is here. This ends up generating the asm code:
 > 
+>   2ebacc:       ee103f31        mrc     15, 0, r3, cr0, cr1, {1}
 
-If you prefer, I can send a v2
+Thanks for finding the root cause
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+
+i have in mind the diff at the end (need to recheck it's correctness),
+saw your response that Vladimir's fix works for you, either (if this
+works) way, let's fix ASAP.
+
+Regards
+afzal
+
+---8<---
+diff --git a/arch/arm/mm/nommu.c b/arch/arm/mm/nommu.c
+index 3b5c7aaf9c76..081562f5436e 100644
+--- a/arch/arm/mm/nommu.c
++++ b/arch/arm/mm/nommu.c
+@@ -303,7 +303,9 @@ static inline void set_vbar(unsigned long val)
+  */
+ static inline bool security_extensions_enabled(void)
+ {
+-	return !!cpuid_feature_extract(CPUID_EXT_PFR1, 4);
++	if ((read_cpuid_id() & 0x000F0000) == 0x000F0000)
++		return !!cpuid_feature_extract(CPUID_EXT_PFR1, 4);
++	return 0;
+ }
+ 
+ static unsigned long __init setup_vectors_base(void)
