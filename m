@@ -1,149 +1,80 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 8 Mar 2017 14:18:06 +0100
-Subject: [PATCH 07/11] arm64: tegra: Enable SDHCI controllers on P3110
-In-Reply-To: <38bcdf00-d85a-07fc-d557-bdca581eb333@nvidia.com>
-References: <20170223173053.19701-1-thierry.reding@gmail.com>
- <20170223173053.19701-7-thierry.reding@gmail.com>
- <38bcdf00-d85a-07fc-d557-bdca581eb333@nvidia.com>
-Message-ID: <20170308131806.GF29118@ulmo.ba.sec>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 08 Mar 2017 14:22:37 +0100
+Subject: Applied "ASoC: sun8i-codec: Convert to SOC_MIXER_ARRAY" to the asoc
+ tree
+In-Reply-To: <20170210094133.11382-4-mylene.josserand@free-electrons.com>
+Message-ID: <E1clbY5-0000Bz-OU@finisterre>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 08, 2017 at 11:46:10AM +0000, Jon Hunter wrote:
-> 
-> On 23/02/17 17:30, Thierry Reding wrote:
-> > From: Thierry Reding <treding@nvidia.com>
-> > 
-> > The P3110 processor module wires one of the SDHCI controllers to an on-
-> > board eMMC and exposes another set of SD/MMC signals on the connector to
-> > support an external SD/MMC card. A third controller is connected to the
-> > SDIO pins of an M.2 KEY E connector.
-> > 
-> > Signed-off-by: Thierry Reding <treding@nvidia.com>
-> > ---
-> >  arch/arm64/boot/dts/nvidia/tegra186-p3310.dtsi | 42 ++++++++++++++++++++++++++
-> >  1 file changed, 42 insertions(+)
-> > 
-> > diff --git a/arch/arm64/boot/dts/nvidia/tegra186-p3310.dtsi b/arch/arm64/boot/dts/nvidia/tegra186-p3310.dtsi
-> > index 1a9ac73b4ecb..b18e166527d8 100644
-> > --- a/arch/arm64/boot/dts/nvidia/tegra186-p3310.dtsi
-> > +++ b/arch/arm64/boot/dts/nvidia/tegra186-p3310.dtsi
-> > @@ -7,6 +7,8 @@
-> >  	compatible = "nvidia,p3310", "nvidia,tegra186";
-> >  
-> >  	aliases {
-> > +		sdhci0 = "/sdhci at 3460000";
-> > +		sdhci1 = "/sdhci at 3400000";
-> 
-> Any reason why you don't include all 3 sdhci controllers here?
+The patch
 
-It turns out this is completely useless. The intention had been to make
-sdhci at 3460000 appear as mmc0 and sdhci at 3400000 as mmc1 in order to give
-a more natural ordering (built-in eMMC first, then external SD/MMC) but
-there's no code in the kernel that will enforce this.
+   ASoC: sun8i-codec: Convert to SOC_MIXER_ARRAY
 
-This is also the reason why sdhci at 3440000 is not included in this list
-because it connects to a WIFI/Bluetooth module.
+has been applied to the asoc tree at
 
-I'm slightly leaning towards leaving this in and possibly write a patch
-to enforce ordering as given by the aliases. Of course nobody in their
-right mind should be depending on the device names remaining the same
-and use partition UUIDs or labels instead. But having enforcing the
-order would still provide the least surprise.
+   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
 
-> 
-> >  		serial0 = &uarta;
-> >  		i2c0 = "/bpmp/i2c";
-> >  		i2c1 = "/i2c at 3160000";
-> > @@ -72,6 +74,32 @@
-> >  		status = "okay";
-> >  	};
-> >  
-> > +	/* SDMMC1 (SD/MMC) */
-> > +	sdhci at 3400000 {
-> > +		status = "okay";
-> > +
-> > +		cd-gpios = <&gpio TEGRA_MAIN_GPIO(P, 6) GPIO_ACTIVE_LOW>;
-> 
-> I see the CD as P-5 and not P-6 on the schematic.
+All being well this means that it will be integrated into the linux-next
+tree (usually sometime in the next 24 hours) and sent to Linus during
+the next merge window (or sooner if it is a bug fix), however if
+problems are discovered then the patch may be dropped or reverted.  
 
-Urgh... I probably mixed these up by looking at the Parker datasheet
-(not sure if that's publicly available yet) and that says PP.05 actually
-has the SDMMC3_CD special function. But since these are used as plain
-GPIOs that's not where the function is defined. And indeed I see that
-the schematics has PP.05 as the CD for SDMMC1.
+You may get further e-mails resulting from automated or manual testing
+and review of the tree, please engage with people reporting problems and
+send followup patches addressing any issues that are reported if needed.
 
-Strangely I remember card-detect working with the above...
+If any updates are required or you are submitting further changes they
+should be sent as incremental updates against current git, existing
+patches will not be replaced.
 
-> > +		wp-gpios = <&gpio TEGRA_MAIN_GPIO(P, 4) GPIO_ACTIVE_LOW>;
-> > +
-> > +		vqmmc-supply = <&vddio_sdmmc1>;
-> > +		vmmc-supply = <&vdd_sd>;
-> 
-> The card slot is on the carrier board and although the cd and wp pins
-> are allocated on the cvm, I did not see a reference to the vmmc-supply
-> on the cvm. So should the 'vmmc-supply' be in the carrier board file?
-
-Yes, I think it's best to move vmmc-supply to the P2771 board file...
-
-> 
-> > +	};
-> > +
-> > +	/* SDMMC3 (SDIO) */
-> > +	sdhci at 3440000 {
-> > +		status = "okay";
-> > +	};
-> > +
-> > +	/* SDMMC4 (eMMC) */
-> > +	sdhci at 3460000 {
-> > +		status = "okay";
-> > +		bus-width = <8>;
-> > +		non-removable;
-> > +
-> > +		vqmmc-supply = <&vdd_1v8_ap>;
-> > +		vmmc-supply = <&vdd_3v3_sys>;
-> > +	};
-> > +
-> >  	hsp at 3c00000 {
-> >  		status = "okay";
-> >  	};
-> > @@ -333,5 +361,19 @@
-> >  
-> >  			vin-supply = <&vdd_1v8>;
-> >  		};
-> > +
-> > +		vdd_sd: regulator at 2 {
-> > +			compatible = "regulator-fixed";
-> > +			reg = <2>;
-> > +
-> > +			regulator-name = "SD_CARD_SW_PWR";
-> > +			regulator-min-microvolt = <3300000>;
-> > +			regulator-max-microvolt = <3300000>;
-> > +
-> > +			gpio = <&gpio TEGRA_MAIN_GPIO(P, 5) GPIO_ACTIVE_HIGH>;
-> 
-> Here I see the gpio as P-6 and not P-5.
-
-Yes, that also matches the schematics that I have. Strange how this
-would still all work given the mixup...
-
-> > +			enable-active-high;
-> > +
-> > +			vin-supply = <&vdd_3v3_sys>;
-> > +		};
-> >  	};
-> >  };
-> 
-> I also see the above regulator on the carrier board and not on the cvm.
-
-... and move this to the P2771 board file as well.
+Please add any relevant lists and maintainers to the CCs when replying
+to this mail.
 
 Thanks,
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170308/66e5b002/attachment.sig>
+Mark
+
+>From fa22ca4f905d7001ed966bc95bcffb890a1b8d73 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Myl=C3=A8ne=20Josserand?=
+ <mylene.josserand@free-electrons.com>
+Date: Fri, 10 Feb 2017 10:41:32 +0100
+Subject: [PATCH] ASoC: sun8i-codec: Convert to SOC_MIXER_ARRAY
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+SOC_MIXER_ARRAY is a simplified function of SND_SOC_DAPM_MIXER
+which handles automatically the ARRAY_SIZE of controls.
+
+Update the driver to use SOC_MIXER_ARRAY.
+
+Signed-off-by: Myl??ne Josserand <mylene.josserand@free-electrons.com>
+Acked-by: Chen-Yu Tsai <wens@csie.org>
+Signed-off-by: Mark Brown <broonie@kernel.org>
+---
+ sound/soc/sunxi/sun8i-codec.c | 10 ++++------
+ 1 file changed, 4 insertions(+), 6 deletions(-)
+
+diff --git a/sound/soc/sunxi/sun8i-codec.c b/sound/soc/sunxi/sun8i-codec.c
+index 107fa8213600..a75a983974d9 100644
+--- a/sound/soc/sunxi/sun8i-codec.c
++++ b/sound/soc/sunxi/sun8i-codec.c
+@@ -288,12 +288,10 @@ static const struct snd_soc_dapm_widget sun8i_codec_dapm_widgets[] = {
+ 			 SUN8I_AIF1_DACDAT_CTRL_AIF1_DA0R_ENA, 0),
+ 
+ 	/* DAC Mixers */
+-	SND_SOC_DAPM_MIXER("Left Digital DAC Mixer", SND_SOC_NOPM, 0, 0,
+-			   sun8i_dac_mixer_controls,
+-			   ARRAY_SIZE(sun8i_dac_mixer_controls)),
+-	SND_SOC_DAPM_MIXER("Right Digital DAC Mixer", SND_SOC_NOPM, 0, 0,
+-			   sun8i_dac_mixer_controls,
+-			   ARRAY_SIZE(sun8i_dac_mixer_controls)),
++	SOC_MIXER_ARRAY("Left Digital DAC Mixer", SND_SOC_NOPM, 0, 0,
++			sun8i_dac_mixer_controls),
++	SOC_MIXER_ARRAY("Right Digital DAC Mixer", SND_SOC_NOPM, 0, 0,
++			sun8i_dac_mixer_controls),
+ 
+ 	/* Clocks */
+ 	SND_SOC_DAPM_SUPPLY("MODCLK AFI1", SUN8I_MOD_CLK_ENA,
+-- 
+2.11.0
