@@ -1,31 +1,31 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed,  8 Mar 2017 18:33:12 +0100
-Subject: [PATCH 0/3] Fix and improve USB3 support on Armada 37xx
-Message-ID: <20170308173315.28512-1-gregory.clement@free-electrons.com>
+Date: Wed,  8 Mar 2017 18:33:14 +0100
+Subject: [PATCH 2/3] ARM64: dts: marvell: armada-37xx: Add clock resource for
+ USB3
+In-Reply-To: <20170308173315.28512-1-gregory.clement@free-electrons.com>
+References: <20170308173315.28512-1-gregory.clement@free-electrons.com>
+Message-ID: <20170308173315.28512-3-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Now that clocks are available provide a clock resource for xhci node.
 
-The first patch fixes a wrong IRQ number present since the
-introduction of the device tree for this SoC.
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ arch/arm64/boot/dts/marvell/armada-37xx.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
 
-The second and the third ones improve the USB3 representation
-following the add of the clock support on Armada 37xx and the gpio
-expander on Armada 3720 DB.
-
-Thanks,
-
-Gregory
-
-Gregory CLEMENT (3):
-  ARM64: dts: marvell: armada-37xx: Fix interrupt mapping for USB3
-  ARM64: dts: marvell: armada-37xx: Add clock resource for USB3
-  ARM64: dts: marvell: armada-3720-db: Add phy for USB3
-
- arch/arm64/boot/dts/marvell/armada-3720-db.dts | 17 +++++++++++++++++
- arch/arm64/boot/dts/marvell/armada-37xx.dtsi   |  3 ++-
- 2 files changed, 19 insertions(+), 1 deletion(-)
-
+diff --git a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+index 25ae5ccaf1bf..1df9d4e0d943 100644
+--- a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+@@ -201,6 +201,7 @@
+ 				"generic-xhci";
+ 				reg = <0x58000 0x4000>;
+ 				interrupts = <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&sb_periph_clk 12>;
+ 				status = "disabled";
+ 			};
+ 
 -- 
 2.11.0
