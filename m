@@ -1,62 +1,107 @@
-From: florian.kauer@koalo.de (Florian Kauer)
-Date: Wed, 8 Mar 2017 12:13:05 +0100
-Subject: [PATCH] ASoC: bcm_2835: Simplify mono guard by returning error on
- mono
-In-Reply-To: <1488970734-6596-1-git-send-email-flatmax@flatmax.org>
-References: <1488970734-6596-1-git-send-email-flatmax@flatmax.org>
-Message-ID: <d86dad56-3291-6ac0-5109-eeb83e7f1215@koalo.de>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 8 Mar 2017 11:15:39 +0000
+Subject: [Question] devm_kmalloc() for DMA ?
+In-Reply-To: <CAK7LNARbD262isY7yOgQKAcbWQHV+3dsoRjtu6S+qUpPr98qSQ@mail.gmail.com>
+References: <CAK7LNARbD262isY7yOgQKAcbWQHV+3dsoRjtu6S+qUpPr98qSQ@mail.gmail.com>
+Message-ID: <b7dd01e6-ddcd-a34a-c26c-05ce6ae4015a@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I don't really see why it simplifies the code.
-Actually, the number of lines is even increased by this patch.
-And the logic will fail if ever params_channels would return something
-larger than 2.
+On 08/03/17 10:59, Masahiro Yamada wrote:
+> Hi experts,
+> 
+> I have a question about
+> how to allocate DMA-safe buffer.
+> 
+> 
+> In my understanding, kmalloc() returns
+> memory with DMA safe alignment
+> in order to avoid cache-sharing problem when used for DMA.
+> 
+> The alignment is decided by ARCH_DMA_MINALIGN.
+> For example, on modern ARM 32bit boards, this value is typically 64.
+> So, memory returned by kmalloc() has
+> at least 64 byte alignment.
+> 
+> 
+> On the other hand, devm_kmalloc() does not return
+> enough-aligned memory.
 
-Greetings,
-Florian
+How so? If anything returned by kmalloc() is guaranteed to occupy some
+multiple of ARCH_DMA_MINALIGN bytes in order to avoid two allocations
+falling into the same cache line, I don't see how stealing the first 16
+bytes *of a single allocation* could make it start sharing cache lines
+with another? :/
 
-On 08.03.2017 11:58, Matt Flax wrote:
-> This patch simplifies the bcm2835_i2s.c code when the driver returns
-> error on mono channel requests. It does this by testing for mono
-> instead of using a switch statement to test for stereo.
->
-> The bcm2835_i2s driver can only work in stereo mode. Whilst leaving
-> the driver entirel compliant with the I2S protocol, it simplifies the
-> code by removing a few redundant lines of code.
->
-> Signed-off-by: Matt Flax <flatmax@flatmax.org>
-> ---
->  sound/soc/bcm/bcm2835-i2s.c | 17 +++++++++--------
->  1 file changed, 9 insertions(+), 8 deletions(-)
->
-> diff --git a/sound/soc/bcm/bcm2835-i2s.c b/sound/soc/bcm/bcm2835-i2s.c
-> index 6ba2049..1e6a1da 100644
-> --- a/sound/soc/bcm/bcm2835-i2s.c
-> +++ b/sound/soc/bcm/bcm2835-i2s.c
-> @@ -310,15 +310,16 @@ static int bcm2835_i2s_hw_params(struct snd_pcm_substream *substream,
->  	ch1pos = data_delay;
->  	ch2pos = bclk_ratio / 2 + data_delay;
->
-> -	switch (params_channels(params)) {
-> -	case 2:
-> -		format = BCM2835_I2S_CH1(format) | BCM2835_I2S_CH2(format);
-> -		format |= BCM2835_I2S_CH1(BCM2835_I2S_CHPOS(ch1pos));
-> -		format |= BCM2835_I2S_CH2(BCM2835_I2S_CHPOS(ch2pos));
-> -		break;
-> -	default:
-> +	/* C
-> +	 * Check we aren't setting channel 2 on a mono stream.
-> +	 * We currently only support stereo
-> +	 */
-> +	if (params_channels(params) == 1)
->  		return -EINVAL;
-> -	}
-> +
-> +	format = BCM2835_I2S_CH1(format) | BCM2835_I2S_CH2(format);
-> +	format |= BCM2835_I2S_CH1(BCM2835_I2S_CHPOS(ch1pos));
-> +	format |= BCM2835_I2S_CH2(BCM2835_I2S_CHPOS(ch2pos));
->
->  	/*
->  	 * Set format for both streams.
->
+If a particular device has a problem with:
+
+p = kmalloc(...);
+d = dma_map_single(p + 0x10, ...);
+do_something_with(d);
+
+that's a separate issue altogether.
+
+Robin.
+
+> On my board (ARM 32bit), devm_kmalloc() returns
+> (ARCH_DMA_MINALIGN aligned address) + 0x10.
+> 
+> 
+> 
+> The reason of the offset 0x10 is obvious.
+> 
+> struct devres {
+>         struct devres_node node;
+>         /* -- 3 pointers */
+>         unsigned long long data[]; /* guarantee ull alignment */
+> };
+> 
+> 
+> Management data is located at the top of struct devres.
+> Then, devm_kmalloc() returns dr->data.
+> 
+> The "unsigned long long" guarantees
+> the returned memory has 0x10 alignment,
+> but I think this may not be enough for DMA.
+> 
+> I noticed this when I was seeing drivers/mtd/nand/denali.c
+> 
+> The code looks as follows:
+> 
+> 
+>         denali->buf.buf = devm_kzalloc(denali->dev,
+>                              mtd->writesize + mtd->oobsize,
+>                              GFP_KERNEL);
+>         if (!denali->buf.buf) {
+>                 ret = -ENOMEM;
+>                 goto failed_req_irq;
+>         }
+> 
+>         /* Is 32-bit DMA supported? */
+>         ret = dma_set_mask(denali->dev, DMA_BIT_MASK(32));
+>         if (ret) {
+>                 dev_err(denali->dev, "No usable DMA configuration\n");
+>                 goto failed_req_irq;
+>         }
+> 
+>         denali->buf.dma_buf = dma_map_single(denali->dev, denali->buf.buf,
+>                              mtd->writesize + mtd->oobsize,
+>                              DMA_BIDIRECTIONAL);
+> 
+> 
+> 
+> 
+> Memory buffer is allocated by devm_kzalloc(), then
+> passed to dma_map_single().
+> 
+> 
+> 
+> Could this be a potential problem in general?
+> 
+> Is devm_kmalloc() not recommended
+> for buffer that can be DMA-mapped?
+> 
+> 
+> Any advice is appreciated.
+> 
+> 
