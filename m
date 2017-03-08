@@ -1,57 +1,56 @@
 From: kraxel@redhat.com (Gerd Hoffmann)
-Date: Wed,  8 Mar 2017 10:19:04 +0100
-Subject: [PATCH 2/4] qxl: limit monitor config read retries
+Date: Wed,  8 Mar 2017 10:19:05 +0100
+Subject: [PATCH v4 3/7] mmc: bcm2835: add sdhost controller to devicetree
 In-Reply-To: <1488964751-22763-1-git-send-email-kraxel@redhat.com>
 References: <1488964751-22763-1-git-send-email-kraxel@redhat.com>
-Message-ID: <1488964751-22763-5-git-send-email-kraxel@redhat.com>
+Message-ID: <1488964751-22763-6-git-send-email-kraxel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When reading the monitor config fails, don't retry forever.  If it fails
-ten times in a row just give up to avoid the driver hangs.  Also add a
-small delay after each attempt, so the host has a chance to complete a
-partial update.
-
 Signed-off-by: Gerd Hoffmann <kraxel@redhat.com>
+Acked-by: Eric Anholt <eric@anholt.net>
 ---
- drivers/gpu/drm/qxl/qxl_display.c | 20 ++++++++++++--------
- 1 file changed, 12 insertions(+), 8 deletions(-)
+ arch/arm/boot/dts/bcm2835-rpi.dtsi |  6 ++++++
+ arch/arm/boot/dts/bcm283x.dtsi     | 10 ++++++++++
+ 2 files changed, 16 insertions(+)
 
-diff --git a/drivers/gpu/drm/qxl/qxl_display.c b/drivers/gpu/drm/qxl/qxl_display.c
-index 2cd14be..2b99496 100644
---- a/drivers/gpu/drm/qxl/qxl_display.c
-+++ b/drivers/gpu/drm/qxl/qxl_display.c
-@@ -157,19 +157,23 @@ static void qxl_update_offset_props(struct qxl_device *qdev)
+diff --git a/arch/arm/boot/dts/bcm2835-rpi.dtsi b/arch/arm/boot/dts/bcm2835-rpi.dtsi
+index 1e00a28..8b95832 100644
+--- a/arch/arm/boot/dts/bcm2835-rpi.dtsi
++++ b/arch/arm/boot/dts/bcm2835-rpi.dtsi
+@@ -69,6 +69,12 @@
+ 	bus-width = <4>;
+ };
  
- void qxl_display_read_client_monitors_config(struct qxl_device *qdev)
- {
--
- 	struct drm_device *dev = &qdev->ddev;
--	int status;
-+	int status, retries;
++&sdhost {
++	pinctrl-names = "default";
++	pinctrl-0 = <&sdhost_gpio48>;
++	bus-width = <4>;
++};
++
+ &pwm {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pwm0_gpio40 &pwm1_gpio45>;
+diff --git a/arch/arm/boot/dts/bcm283x.dtsi b/arch/arm/boot/dts/bcm283x.dtsi
+index 9798bc9..19099a5 100644
+--- a/arch/arm/boot/dts/bcm283x.dtsi
++++ b/arch/arm/boot/dts/bcm283x.dtsi
+@@ -350,6 +350,16 @@
+ 			arm,primecell-periphid = <0x00241011>;
+ 		};
  
--	status = qxl_display_copy_rom_client_monitors_config(qdev);
--	while (status == MONITORS_CONFIG_BAD_CRC) {
--		qxl_io_log(qdev, "failed crc check for client_monitors_config,"
--				 " retrying\n");
-+	for (retries = 0; retries < 10; retries++) {
- 		status = qxl_display_copy_rom_client_monitors_config(qdev);
-+		if (status != MONITORS_CONFIG_BAD_CRC)
-+			break;
-+		udelay(5);
-+	}
-+	if (status == MONITORS_CONFIG_BAD_CRC) {
-+		qxl_io_log(qdev, "config: bad crc\n");
-+		DRM_DEBUG_KMS("ignoring client monitors config: bad crc");
-+		return;
- 	}
- 	if (status == MONITORS_CONFIG_UNCHANGED) {
--		qxl_io_log(qdev, "config unchanged\n");
--		DRM_DEBUG("ignoring unchanged client monitors config");
-+		qxl_io_log(qdev, "config: unchanged\n");
-+		DRM_DEBUG_KMS("ignoring client monitors config: unchanged");
- 		return;
- 	}
- 
++		sdhost: mmc at 7e202000 {
++			compatible = "brcm,bcm2835-sdhost";
++			reg = <0x7e202000 0x100>;
++			interrupts = <2 24>;
++			clocks = <&clocks BCM2835_CLOCK_VPU>;
++			dmas = <&dma 13>;
++			dma-names = "rx-tx";
++			status = "disabled";
++		};
++
+ 		i2s: i2s at 7e203000 {
+ 			compatible = "brcm,bcm2835-i2s";
+ 			reg = <0x7e203000 0x20>,
 -- 
 1.8.3.1
