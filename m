@@ -1,92 +1,30 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Wed, 8 Mar 2017 19:59:48 +0900
-Subject: [Question] devm_kmalloc() for DMA ?
-Message-ID: <CAK7LNARbD262isY7yOgQKAcbWQHV+3dsoRjtu6S+qUpPr98qSQ@mail.gmail.com>
+From: David.Laight@ACULAB.COM (David Laight)
+Date: Wed, 8 Mar 2017 11:00:10 +0000
+Subject: [PATCHv3 net-next 21/22] net: mvpp2: set dma mask and coherent
+ dma mask on PPv2.2
+In-Reply-To: <20170307191201.645d23b4@free-electrons.com>
+References: <1488902000-2658-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1488902000-2658-22-git-send-email-thomas.petazzoni@free-electrons.com>
+ <063D6719AE5E284EB5DD2968C1650D6DCFE79D2E@AcuExch.aculab.com>
+ <20170307191201.645d23b4@free-electrons.com>
+Message-ID: <063D6719AE5E284EB5DD2968C1650D6DCFE7A585@AcuExch.aculab.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi experts,
+From: Thomas Petazzoni
+> Sent: 07 March 2017 18:12
+> Hello,
+> 
+> On Tue, 7 Mar 2017 17:24:21 +0000, David Laight wrote:
+> 
+> > Are the coherent mappings just used for ring structures?
+> > If it might be reasonable to allocate them as a single entity,
+> > thus guaranteeing they all reside in a single 4G region.
+> 
+> Do we have the guarantee that a DMA coherent allocation will not span a
+> 4G boundary?
 
-I have a question about
-how to allocate DMA-safe buffer.
+I'm pretty sure they are guaranteed not to cross any boundary they don't have to.
+So a 16k buffer won't cross a 16k boundary.
 
-
-In my understanding, kmalloc() returns
-memory with DMA safe alignment
-in order to avoid cache-sharing problem when used for DMA.
-
-The alignment is decided by ARCH_DMA_MINALIGN.
-For example, on modern ARM 32bit boards, this value is typically 64.
-So, memory returned by kmalloc() has
-at least 64 byte alignment.
-
-
-On the other hand, devm_kmalloc() does not return
-enough-aligned memory.
-
-
-On my board (ARM 32bit), devm_kmalloc() returns
-(ARCH_DMA_MINALIGN aligned address) + 0x10.
-
-
-
-The reason of the offset 0x10 is obvious.
-
-struct devres {
-        struct devres_node node;
-        /* -- 3 pointers */
-        unsigned long long data[]; /* guarantee ull alignment */
-};
-
-
-Management data is located at the top of struct devres.
-Then, devm_kmalloc() returns dr->data.
-
-The "unsigned long long" guarantees
-the returned memory has 0x10 alignment,
-but I think this may not be enough for DMA.
-
-I noticed this when I was seeing drivers/mtd/nand/denali.c
-
-The code looks as follows:
-
-
-        denali->buf.buf = devm_kzalloc(denali->dev,
-                             mtd->writesize + mtd->oobsize,
-                             GFP_KERNEL);
-        if (!denali->buf.buf) {
-                ret = -ENOMEM;
-                goto failed_req_irq;
-        }
-
-        /* Is 32-bit DMA supported? */
-        ret = dma_set_mask(denali->dev, DMA_BIT_MASK(32));
-        if (ret) {
-                dev_err(denali->dev, "No usable DMA configuration\n");
-                goto failed_req_irq;
-        }
-
-        denali->buf.dma_buf = dma_map_single(denali->dev, denali->buf.buf,
-                             mtd->writesize + mtd->oobsize,
-                             DMA_BIDIRECTIONAL);
-
-
-
-
-Memory buffer is allocated by devm_kzalloc(), then
-passed to dma_map_single().
-
-
-
-Could this be a potential problem in general?
-
-Is devm_kmalloc() not recommended
-for buffer that can be DMA-mapped?
-
-
-Any advice is appreciated.
-
-
--- 
-Best Regards
-Masahiro Yamada
+	David
