@@ -1,57 +1,67 @@
-From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Wed, 8 Mar 2017 08:51:25 +0800
-Subject: [PATCH 1/2] usb: xhci-mtk: check hcc_params after adding
- primary hcd
-In-Reply-To: <58BECD83.9000205@linux.intel.com>
-References: <1488857543-9384-1-git-send-email-chunfeng.yun@mediatek.com>
- <58BECD83.9000205@linux.intel.com>
-Message-ID: <1488934285.14325.8.camel@mhfsdcap03>
+From: isubramanian@apm.com (Iyappan Subramanian)
+Date: Tue,  7 Mar 2017 17:08:39 -0800
+Subject: [PATCH v4 net-next 0/6] drivers: net: xgene-v2: Add RGMII based 1G
+ driver
+Message-ID: <1488935325-13603-1-git-send-email-isubramanian@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2017-03-07 at 17:10 +0200, Mathias Nyman wrote:
-> On 07.03.2017 05:32, Chunfeng Yun wrote:
-> > hcc_params is set in xhci_gen_setup() called from usb_add_hcd(),
-> > so checks the Maximum Primary Stream Array Size in the hcc_params
-> > register after adding primary hcd.
-> >
-> > Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
-> > ---
-> >   drivers/usb/host/xhci-mtk.c |    6 +++---
-> >   1 file changed, 3 insertions(+), 3 deletions(-)
-> >
-> > diff --git a/drivers/usb/host/xhci-mtk.c b/drivers/usb/host/xhci-mtk.c
-> > index 9066ec9..6ac73a6 100644
-> > --- a/drivers/usb/host/xhci-mtk.c
-> > +++ b/drivers/usb/host/xhci-mtk.c
-> > @@ -678,13 +678,13 @@ static int xhci_mtk_probe(struct platform_device *pdev)
-> >   		goto power_off_phys;
-> >   	}
-> >
-> > -	if (HCC_MAX_PSA(xhci->hcc_params) >= 4)
-> > -		xhci->shared_hcd->can_do_streams = 1;
-> > -
-> >   	ret = usb_add_hcd(hcd, irq, IRQF_SHARED);
-> >   	if (ret)
-> >   		goto put_usb3_hcd;
-> >
-> > +	if (HCC_MAX_PSA(xhci->hcc_params) >= 4)
-> > +		xhci->shared_hcd->can_do_streams = 1;
-> > +
-> >   	ret = usb_add_hcd(xhci->shared_hcd, irq, IRQF_SHARED);
-> >   	if (ret)
-> >   		goto dealloc_usb2_hcd;
-> >
-> 
-> Thanks.
-> Looks like streams check has never worked for Mediatek xHC hosts,
-> 
-> Do you know if this has caused any issues?
-> looks like it should go usb-linus and maybe stable kernels as well.
-No issues on mt8173, because it doesn't support bulk stream. But it
-causes a issue on the newest SoC which is not upstreamed, so I think it
-needn't go stable kernels.
+This patch set adds support for RGMII based 1GbE hardware which uses a linked
+list of DMA descriptor architecture (v2) for APM X-Gene SoCs.
 
-Thank you.
->   
-> -Mathias
+Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
+---
+v4: Address review comments from v3
+	- fixed local variable declarations to reverse christmas tree order
+
+v3: Address review comments from v2
+	- fixed kbuild warnings (this 'if' clause does not guard)
+
+v2: Address review comments from v1
+	- moved create_desc_ring and delete_desc_ring to open() and close()
+	  respectively
+	- changed to use dma_zalloc APIs
+	- fixed tx_timeout()
+	- removed tx completion polling upper bound
+	- added error checking on rx packets
+	- added netif_stop_queue() and netif_wake_queue()
+
+v1:
+	- Initial version
+---
+
+Iyappan Subramanian (6):
+  drivers: net: xgene-v2: Add DMA descriptor
+  drivers: net: xgene-v2: Add mac configuration
+  drivers: net: xgene-v2: Add ethernet hardware configuration
+  drivers: net: xgene-v2: Add base driver
+  drivers: net: xgene-v2: Add transmit and receive
+  MAINTAINERS: Add entry for APM X-Gene SoC Ethernet (v2) driver
+
+ MAINTAINERS                                |   6 +
+ drivers/net/ethernet/apm/Kconfig           |   1 +
+ drivers/net/ethernet/apm/Makefile          |   1 +
+ drivers/net/ethernet/apm/xgene-v2/Kconfig  |  11 +
+ drivers/net/ethernet/apm/xgene-v2/Makefile |   6 +
+ drivers/net/ethernet/apm/xgene-v2/enet.c   |  71 +++
+ drivers/net/ethernet/apm/xgene-v2/enet.h   |  43 ++
+ drivers/net/ethernet/apm/xgene-v2/mac.c    | 116 +++++
+ drivers/net/ethernet/apm/xgene-v2/mac.h    | 110 +++++
+ drivers/net/ethernet/apm/xgene-v2/main.c   | 756 +++++++++++++++++++++++++++++
+ drivers/net/ethernet/apm/xgene-v2/main.h   |  75 +++
+ drivers/net/ethernet/apm/xgene-v2/ring.c   |  81 ++++
+ drivers/net/ethernet/apm/xgene-v2/ring.h   | 119 +++++
+ 13 files changed, 1396 insertions(+)
+ create mode 100644 drivers/net/ethernet/apm/xgene-v2/Kconfig
+ create mode 100644 drivers/net/ethernet/apm/xgene-v2/Makefile
+ create mode 100644 drivers/net/ethernet/apm/xgene-v2/enet.c
+ create mode 100644 drivers/net/ethernet/apm/xgene-v2/enet.h
+ create mode 100644 drivers/net/ethernet/apm/xgene-v2/mac.c
+ create mode 100644 drivers/net/ethernet/apm/xgene-v2/mac.h
+ create mode 100644 drivers/net/ethernet/apm/xgene-v2/main.c
+ create mode 100644 drivers/net/ethernet/apm/xgene-v2/main.h
+ create mode 100644 drivers/net/ethernet/apm/xgene-v2/ring.c
+ create mode 100644 drivers/net/ethernet/apm/xgene-v2/ring.h
+
+-- 
+1.9.1
