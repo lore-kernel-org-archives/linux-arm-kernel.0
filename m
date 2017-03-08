@@ -1,53 +1,38 @@
-From: afzal.mohd.ma@gmail.com (afzal mohammed)
-Date: Wed, 8 Mar 2017 21:52:58 +0530
-Subject: [PATCH v2 2/4] ARM: nommu: dynamic exception base address setting
-In-Reply-To: <314159a7-b664-1256-647d-c05880ad7710@uclinux.org>
-References: <314159a7-b664-1256-647d-c05880ad7710@uclinux.org>
-Message-ID: <20170308162258.GA3515@afzalpc>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed,  8 Mar 2017 17:24:20 +0100
+Subject: [PATCH 0/3] Add EHCI support for Armada 37xx
+Message-ID: <20170308162423.25553-1-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Greg,
+Hi,
 
-Was standing on one leg & hoping that nothing breaks, knocked down,
+The EHCI controller in the Armada 37xx SoCs is the one used on many
+other mvebu SoCs such as the orion5x, the kirkwood, or the
+armada. However, for Armada 37xx an extra initialization step is
+needed: this is the purpose of the first patch.
 
-On Wed, Mar 08, 2017 at 01:21:36PM +1000, Greg Ungerer wrote:
+The second patch allows to build the driver for the ARM64 Armada SoCs.
 
-> This patch (which is in mainline now as commit f8300a0b5d) breaks
-> my patch series to support running the Versatile QEMU target with
-> a nommu configured linux kernel.
+The last one enables the EHCI in the device tree.
 
-Sorry
+Thanks,
 
-> > +	return !!cpuid_feature_extract(CPUID_EXT_PFR1, 4);
-> 
-> The problem is here. This ends up generating the asm code:
-> 
->   2ebacc:       ee103f31        mrc     15, 0, r3, cr0, cr1, {1}
+Gregory
 
-Thanks for finding the root cause
+Gregory CLEMENT (2):
+  usb: host: Allow to build ehci orion with mvebu SoCs
+  ARM64: dts: marvell: armada-37xx: Add USB2 node
 
+jinghua (1):
+  usb: orion-echi: Add support for the Armada 3700
 
-i have in mind the diff at the end (need to recheck it's correctness),
-saw your response that Vladimir's fix works for you, either (if this
-works) way, let's fix ASAP.
+ .../devicetree/bindings/usb/ehci-orion.txt         |  4 ++-
+ arch/arm64/boot/dts/marvell/armada-3720-db.dts     |  6 ++++
+ arch/arm64/boot/dts/marvell/armada-37xx.dtsi       |  7 ++++
+ drivers/usb/host/Kconfig                           |  2 +-
+ drivers/usb/host/ehci-orion.c                      | 39 ++++++++++++++++++++++
+ 5 files changed, 56 insertions(+), 2 deletions(-)
 
-Regards
-afzal
-
----8<---
-diff --git a/arch/arm/mm/nommu.c b/arch/arm/mm/nommu.c
-index 3b5c7aaf9c76..081562f5436e 100644
---- a/arch/arm/mm/nommu.c
-+++ b/arch/arm/mm/nommu.c
-@@ -303,7 +303,9 @@ static inline void set_vbar(unsigned long val)
-  */
- static inline bool security_extensions_enabled(void)
- {
--	return !!cpuid_feature_extract(CPUID_EXT_PFR1, 4);
-+	if ((read_cpuid_id() & 0x000F0000) == 0x000F0000)
-+		return !!cpuid_feature_extract(CPUID_EXT_PFR1, 4);
-+	return 0;
- }
- 
- static unsigned long __init setup_vectors_base(void)
+-- 
+2.11.0
