@@ -1,37 +1,35 @@
 From: linucherian@gmail.com (linucherian at gmail.com)
-Date: Wed,  8 Mar 2017 11:38:31 +0530
-Subject: [PATCH v4 0/4] KVM: arm64: Increase number of user memslots
-Message-ID: <1488953315-22375-1-git-send-email-linucherian@gmail.com>
+Date: Wed,  8 Mar 2017 11:38:32 +0530
+Subject: [PATCH v4 1/4] KVM: Add documentation for KVM_CAP_NR_MEMSLOTS
+In-Reply-To: <1488953315-22375-1-git-send-email-linucherian@gmail.com>
+References: <1488953315-22375-1-git-send-email-linucherian@gmail.com>
+Message-ID: <1488953315-22375-2-git-send-email-linucherian@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Linu Cherian <linu.cherian@cavium.com>
 
-v3 -> v4:
-- Add missing commit messages in patches 1 and 3
+Add documentation for KVM_CAP_NR_MEMSLOTS capability.
 
-v2 -> v3:
-- Added documentation for KVM_CAP_NR_MEMSLOTS
-- Removed KVM_PRIVATE_MEM_SLOTS which is unused
-- KVM_USER_MEM_SLOTS changed to 512 from 508
- 
-v1 -> v2:
-- Enabling KVM_CAP_NR_MEMSLOTS for arm/arm64 moved to separate patch.
-- Updated commit message so that what is reported to userspace is explicit.
-
-
-Linu Cherian (4):
-  KVM: Add documentation for KVM_CAP_NR_MEMSLOTS
-  KVM: arm/arm64: Enable KVM_CAP_NR_MEMSLOTS on arm/arm64
-  KVM: arm/arm64: Remove KVM_PRIVATE_MEM_SLOTS definition that are
-    unused
-  KVM: arm64: Increase number of user memslots to 512
-
+Signed-off-by: Linu Cherian <linu.cherian@cavium.com>
+---
  Documentation/virtual/kvm/api.txt | 4 ++++
- arch/arm/include/asm/kvm_host.h   | 1 -
- arch/arm/kvm/arm.c                | 3 +++
- arch/arm64/include/asm/kvm_host.h | 3 +--
- 4 files changed, 8 insertions(+), 3 deletions(-)
+ 1 file changed, 4 insertions(+)
 
+diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
+index 03145b7..7b82f1c 100644
+--- a/Documentation/virtual/kvm/api.txt
++++ b/Documentation/virtual/kvm/api.txt
+@@ -951,6 +951,10 @@ This ioctl allows the user to create or modify a guest physical memory
+ slot.  When changing an existing slot, it may be moved in the guest
+ physical memory space, or its flags may be modified.  It may not be
+ resized.  Slots may not overlap in guest physical address space.
++Bits 0-15 of "slot" specifies the slot id and this value should be
++less than the maximum number of user memory slots supported per VM.
++The maximum allowed slots can be queried using KVM_CAP_NR_MEMSLOTS,
++if this capability is supported by the architecture.
+ 
+ If KVM_CAP_MULTI_ADDRESS_SPACE is available, bits 16-31 of "slot"
+ specifies the address space which is being modified.  They must be
 -- 
 1.9.1
