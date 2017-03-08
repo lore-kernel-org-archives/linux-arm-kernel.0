@@ -1,83 +1,266 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 08 Mar 2017 14:22:49 +0100
-Subject: Applied "ASoC: sun8i-codec: Remove analog "HP" widget" to the asoc
- tree
-In-Reply-To: <20170210094133.11382-2-mylene.josserand@free-electrons.com>
-Message-ID: <E1clbYH-0000Eb-1z@finisterre>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed,  8 Mar 2017 14:24:17 +0100
+Subject: [PATCH v2] arm64: tegra: Add initial power tree for P3310
+In-Reply-To: <20170223173053.19701-6-thierry.reding@gmail.com>
+References: <20170223173053.19701-6-thierry.reding@gmail.com>
+Message-ID: <20170308132417.30900-1-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+From: Thierry Reding <treding@nvidia.com>
 
-   ASoC: sun8i-codec: Remove analog "HP" widget
+Enable the Maxim MAX77620 PMIC found on P3310 and add some fixed
+regulators to model the power tree.
 
-has been applied to the asoc tree at
-
-   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
-
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
-
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
-
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
-
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
-
-Thanks,
-Mark
-
->From 4aa8146c89f336230de7f449805bd0edfc878fd4 Mon Sep 17 00:00:00 2001
-From: =?UTF-8?q?Myl=C3=A8ne=20Josserand?=
- <mylene.josserand@free-electrons.com>
-Date: Fri, 10 Feb 2017 10:41:30 +0100
-Subject: [PATCH] ASoC: sun8i-codec: Remove analog "HP" widget
-MIME-Version: 1.0
-Content-Type: text/plain; charset=UTF-8
-Content-Transfer-Encoding: 8bit
-
-The "HP" widget is already present and take part to
-the analog part (sun8i-codec-analog).
-
-Remove it from the digital part as it is unnecessary.
-
-Signed-off-by: Myl??ne Josserand <mylene.josserand@free-electrons.com>
-Acked-by: Chen-Yu Tsai <wens@csie.org>
-Signed-off-by: Mark Brown <broonie@kernel.org>
+Signed-off-by: Thierry Reding <treding@nvidia.com>
 ---
- sound/soc/sunxi/sun8i-codec.c | 6 ------
- 1 file changed, 6 deletions(-)
+Changes in v2:
+- update LDO7 and LDO8 for C03 revision (Jon Hunter)
 
-diff --git a/sound/soc/sunxi/sun8i-codec.c b/sound/soc/sunxi/sun8i-codec.c
-index b92bdc8361af..d60f6fbd36a2 100644
---- a/sound/soc/sunxi/sun8i-codec.c
-+++ b/sound/soc/sunxi/sun8i-codec.c
-@@ -321,8 +321,6 @@ static const struct snd_soc_dapm_widget sun8i_codec_dapm_widgets[] = {
- 			    SUN8I_MOD_RST_CTL_AIF1, 0, NULL, 0),
- 	SND_SOC_DAPM_SUPPLY("RST DAC", SUN8I_MOD_RST_CTL,
- 			    SUN8I_MOD_RST_CTL_DAC, 0, NULL, 0),
--
--	SND_SOC_DAPM_OUTPUT("HP"),
- };
+ arch/arm64/boot/dts/nvidia/tegra186-p3310.dtsi | 220 +++++++++++++++++++++++++
+ 1 file changed, 220 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/nvidia/tegra186-p3310.dtsi b/arch/arm64/boot/dts/nvidia/tegra186-p3310.dtsi
+index ffbb4be5122e..69553bde7ef7 100644
+--- a/arch/arm64/boot/dts/nvidia/tegra186-p3310.dtsi
++++ b/arch/arm64/boot/dts/nvidia/tegra186-p3310.dtsi
+@@ -1,5 +1,7 @@
+ #include "tegra186.dtsi"
  
- static const struct snd_soc_dapm_route sun8i_codec_dapm_routes[] = {
-@@ -344,10 +342,6 @@ static const struct snd_soc_dapm_route sun8i_codec_dapm_routes[] = {
- 	/* DAC Mixer Routes */
- 	{ "Left DAC Mixer", "LSlot 0", "Digital Left DAC"},
- 	{ "Right DAC Mixer", "RSlot 0", "Digital Right DAC"},
--
--	/* End of route : HP out */
--	{ "HP", NULL, "Left DAC Mixer" },
--	{ "HP", NULL, "Right DAC Mixer" },
- };
++#include <dt-bindings/mfd/max77620.h>
++
+ / {
+ 	model = "NVIDIA Tegra186 P3310 Processor Module";
+ 	compatible = "nvidia,p3310", "nvidia,tegra186";
+@@ -115,6 +117,189 @@
+ 	bpmp {
+ 		i2c {
+ 			status = "okay";
++
++			pmic: pmic at 3c {
++				compatible = "maxim,max77620";
++				reg = <0x3c>;
++
++				interrupts = <GIC_SPI 209 IRQ_TYPE_LEVEL_HIGH>;
++				#interrupt-cells = <2>;
++				interrupt-controller;
++
++				#gpio-cells = <2>;
++				gpio-controller;
++
++				pinctrl-names = "default";
++				pinctrl-0 = <&max77620_default>;
++
++				max77620_default: pinmux {
++					gpio0 {
++						pins = "gpio0";
++						function = "gpio";
++					};
++
++					gpio1 {
++						pins = "gpio1";
++						function = "fps-out";
++						maxim,active-fps-source = <MAX77620_FPS_SRC_0>;
++					};
++
++					gpio2 {
++						pins = "gpio2";
++						function = "fps-out";
++						maxim,active-fps-source = <MAX77620_FPS_SRC_1>;
++					};
++
++					gpio3 {
++						pins = "gpio3";
++						function = "fps-out";
++						maxim,active-fps-source = <MAX77620_FPS_SRC_1>;
++					};
++
++					gpio4 {
++						pins = "gpio4";
++						function = "32k-out1";
++						drive-push-pull = <1>;
++					};
++
++					gpio5 {
++						pins = "gpio5";
++						function = "gpio";
++						drive-push-pull = <0>;
++					};
++
++					gpio6 {
++						pins = "gpio6";
++						function = "gpio";
++						drive-push-pull = <1>;
++					};
++
++					gpio7 {
++						pins = "gpio7";
++						function = "gpio";
++						drive-push-pull = <0>;
++					};
++				};
++
++				fps {
++					fps0 {
++						maxim,fps-event-source = <MAX77620_FPS_EVENT_SRC_EN0>;
++						maxim,shutdown-fps-time-period-us = <640>;
++					};
++
++					fps1 {
++						maxim,fps-event-source = <MAX77620_FPS_EVENT_SRC_EN1>;
++						maxim,shutdown-fps-time-period-us = <640>;
++					};
++
++					fps2 {
++						maxim,fps-event-source = <MAX77620_FPS_EVENT_SRC_EN0>;
++						maxim,shutdown-fps-time-period-us = <640>;
++					};
++				};
++
++				regulators {
++					in-sd0-supply = <&vdd_5v0_sys>;
++					in-sd1-supply = <&vdd_5v0_sys>;
++					in-sd2-supply = <&vdd_5v0_sys>;
++					in-sd3-supply = <&vdd_5v0_sys>;
++
++					in-ldo0-1-supply = <&vdd_5v0_sys>;
++					in-ldo2-supply = <&vdd_5v0_sys>;
++					in-ldo3-5-supply = <&vdd_5v0_sys>;
++					in-ldo4-6-supply = <&vdd_1v8>;
++					in-ldo7-8-supply = <&avdd_dsi_csi>;
++
++					sd0 {
++						regulator-name = "VDD_DDR_1V1_PMIC";
++						regulator-min-microvolt = <1100000>;
++						regulator-max-microvolt = <1100000>;
++						regulator-always-on;
++						regulator-boot-on;
++					};
++
++					avdd_dsi_csi: sd1 {
++						regulator-name = "AVDD_DSI_CSI_1V2";
++						regulator-min-microvolt = <1200000>;
++						regulator-max-microvolt = <1200000>;
++						/* XXX */
++						regulator-always-on;
++						regulator-boot-on;
++					};
++
++					vdd_1v8: sd2 {
++						regulator-name = "VDD_1V8";
++						regulator-min-microvolt = <1800000>;
++						regulator-max-microvolt = <1800000>;
++						/* XXX */
++						regulator-always-on;
++						regulator-boot-on;
++					};
++
++					vdd_3v3_sys: sd3 {
++						regulator-name = "VDD_3V3_SYS";
++						regulator-min-microvolt = <3300000>;
++						regulator-max-microvolt = <3300000>;
++						/* XXX */
++						regulator-always-on;
++						regulator-boot-on;
++					};
++
++					ldo0 {
++						regulator-name = "VDD_1V8_AP_PLL";
++						regulator-min-microvolt = <1800000>;
++						regulator-max-microvolt = <1800000>;
++						/* XXX */
++						regulator-always-on;
++						regulator-boot-on;
++					};
++
++					ldo2 {
++						regulator-name = "VDDIO_3V3_AOHV";
++						regulator-min-microvolt = <3300000>;
++						regulator-max-microvolt = <3300000>;
++						/* XXX */
++						regulator-always-on;
++						regulator-boot-on;
++					};
++
++					vddio_sdmmc1: ldo3 {
++						regulator-name = "VDDIO_SDMMC1_AP";
++						regulator-min-microvolt = <1800000>;
++						regulator-max-microvolt = <3300000>;
++					};
++
++					ldo4 {
++						regulator-name = "VDD_RTC";
++						regulator-min-microvolt = <1000000>;
++						regulator-max-microvolt = <1000000>;
++					};
++
++					vddio_sdmmc3: ldo5 {
++						regulator-name = "VDDIO_SDMMC3_AP";
++						regulator-min-microvolt = <2800000>;
++						regulator-max-microvolt = <2800000>;
++					};
++
++					vdd_hdmi: ldo7 {
++						regulator-name = "VDD_HDMI_1V05";
++						regulator-min-microvolt = <1050000>;
++						regulator-max-microvolt = <1050000>;
++						/* XXX */
++						regulator-always-on;
++						regulator-boot-on;
++					};
++
++					vdd_pex: ldo8 {
++						regulator-name = "VDD_PEX_1V05";
++						regulator-min-microvolt = <1050000>
++						regulator-max-microvolt = <1050000>;
++						/* XXX */
++						regulator-always-on;
++						regulator-boot-on;
++					};
++				};
++			};
+ 		};
+ 	};
  
- static struct snd_soc_dai_ops sun8i_codec_dai_ops = {
+@@ -123,4 +308,39 @@
+ 		status = "okay";
+ 		method = "smc";
+ 	};
++
++	regulators {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		vdd_5v0_sys: regulator at 0 {
++			compatible = "regulator-fixed";
++			reg = <0>;
++
++			regulator-name = "VDD_5V0_SYS";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++			regulator-always-on;
++			regulator-boot-on;
++		};
++
++		vdd_1v8_ap: regulator at 1 {
++			compatible = "regulator-fixed";
++			reg = <1>;
++
++			regulator-name = "VDD_1V8_AP";
++			regulator-min-microvolt = <1800000>;
++			regulator-max-microvolt = <1800000>;
++
++			/* XXX */
++			regulator-always-on;
++			regulator-boot-on;
++
++			gpio = <&pmic 1 GPIO_ACTIVE_HIGH>;
++			enable-active-high;
++
++			vin-supply = <&vdd_1v8>;
++		};
++	};
+ };
 -- 
-2.11.0
+2.12.0
