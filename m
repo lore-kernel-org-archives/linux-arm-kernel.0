@@ -1,29 +1,31 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 8 Mar 2017 13:33:18 +0100
-Subject: [PATCH] MAINTAINERS: Remove self from Tegra maintainers
-In-Reply-To: <20170306061134.21105-1-acourbot@nvidia.com>
-References: <20170306061134.21105-1-acourbot@nvidia.com>
-Message-ID: <20170308123318.GB29118@ulmo.ba.sec>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Wed, 8 Mar 2017 13:34:17 +0100
+Subject: [PATCH] serial: 8250: 8250_core: Use dev_name() during
+ request_irq()
+In-Reply-To: <20170308121943.29340-1-vigneshr@ti.com>
+References: <20170308121943.29340-1-vigneshr@ti.com>
+Message-ID: <20170308123417.GA3981@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 06, 2017 at 03:11:34PM +0900, Alexandre Courbot wrote:
-> I have not been doing any Tegra maintainance work for a while, and this
-> is unlikely to change in the foreseeable future. Better reflect the
-> actual state of things by removing myself from the list.
+On Wed, Mar 08, 2017 at 05:49:43PM +0530, Vignesh R wrote:
+> Passing "serial" as name during request_irq() results in all serial port
+> irqs have same name. This does not help much to easily identify which
+> irq belongs to which serial port instance. Therefore pass dev_name()
+> during request_irq() so that better identifiable name is listed for
+> serial ports in cat /proc/interrupts output.
 > 
-> Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
-> ---
->  MAINTAINERS | 1 -
->  1 file changed, 1 deletion(-)
+> Output of cat /proc/interrupts
+> Before this patch:
+>  26:        689          0     GICv2 309 Edge      serial
+> After this patch:
+>  26:        696          0     GICv2 309 Edge      2530c00.serial
+> 
+> Signed-off-by: Vignesh R <vigneshr@ti.com>
 
-Applied to for-4.12/misc, thanks.
+I need a "full" name here, unless you really do sign legal documents
+with just one letter as a last/sur-name?
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170308/ce058665/attachment.sig>
+thanks,
+
+greg k-h
