@@ -1,33 +1,53 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Wed, 8 Mar 2017 11:20:59 +0100
-Subject: [PATCH 1/2] ARM: dts: BCM53573: Don't use nonexistent
- "default-off" LED trigger
-In-Reply-To: <20170308064105.26619-1-zajec5@gmail.com>
-References: <20170308064105.26619-1-zajec5@gmail.com>
-Message-ID: <20170308102058.GA7772@amd>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Wed, 8 Mar 2017 16:17:11 +0530
+Subject: [PATCH v3 1/7] PCI: dwc: designware: Add new *ops* for cpu addr fixup
+In-Reply-To: <1488970037-17740-1-git-send-email-kishon@ti.com>
+References: <1488970037-17740-1-git-send-email-kishon@ti.com>
+Message-ID: <1488970037-17740-2-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 2017-03-08 07:41:04, Rafa? Mi?ecki wrote:
-> From: Rafa? Mi?ecki <rafal@milecki.pl>
-> 
-> Such a trigger doesn't exist in Linux and is not needed as LED is being
-> turned off by default. This could cause errors in LEDs core code when
-> trying to set default trigger.
-> 
-> Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
+Some platforms (like dra7xx) require only the least 28 bits of the
+corresponding 32 bit CPU address to be programmed in the address
+translation unit. This modified address is stored in io_base/mem_base/
+cfg0_base/cfg1_base in dra7xx_pcie_host_init. While this is okay for
+host mode where the address range is fixed, device mode requires
+different addresses to be programmed based on the host buffer address.
+Add a new ops to get the least 28 bits of the corresponding 32 bit
+CPU address and invoke it before programming the address translation
+unit.
 
-For both patches:
+Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+---
+ drivers/pci/dwc/pcie-designware.c |    3 +++
+ drivers/pci/dwc/pcie-designware.h |    1 +
+ 2 files changed, 4 insertions(+)
 
-Acked-by: Pavel Machek <pavel@ucw.cz>
-
+diff --git a/drivers/pci/dwc/pcie-designware.c b/drivers/pci/dwc/pcie-designware.c
+index 7e1fb7d..14ee7a3 100644
+--- a/drivers/pci/dwc/pcie-designware.c
++++ b/drivers/pci/dwc/pcie-designware.c
+@@ -97,6 +97,9 @@ void dw_pcie_prog_outbound_atu(struct dw_pcie *pci, int index, int type,
+ {
+ 	u32 retries, val;
+ 
++	if (pp->ops->cpu_addr_fixup)
++		cpu_addr = pp->ops->cpu_addr_fixup(cpu_addr);
++
+ 	if (pci->iatu_unroll_enabled) {
+ 		dw_pcie_writel_unroll(pci, index, PCIE_ATU_UNR_LOWER_BASE,
+ 				      lower_32_bits(cpu_addr));
+diff --git a/drivers/pci/dwc/pcie-designware.h b/drivers/pci/dwc/pcie-designware.h
+index cd3b871..8f3dcb2 100644
+--- a/drivers/pci/dwc/pcie-designware.h
++++ b/drivers/pci/dwc/pcie-designware.h
+@@ -143,6 +143,7 @@ struct pcie_port {
+ };
+ 
+ struct dw_pcie_ops {
++	u64	(*cpu_addr_fixup)(u64 cpu_addr);
+ 	u32	(*readl_dbi)(struct dw_pcie *pcie, u32 reg);
+ 	void	(*writel_dbi)(struct dw_pcie *pcie, u32 reg, u32 val);
+ 	int	(*link_up)(struct dw_pcie *pcie);
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170308/1bd05842/attachment.sig>
+1.7.9.5
