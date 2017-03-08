@@ -1,131 +1,123 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Wed, 8 Mar 2017 09:56:23 +0000
-Subject: [PATCH v2 2/4] ARM: nommu: dynamic exception base address setting
-In-Reply-To: <314159a7-b664-1256-647d-c05880ad7710@uclinux.org>
-References: <314159a7-b664-1256-647d-c05880ad7710@uclinux.org>
-Message-ID: <29b174a1-bd4f-b030-23b7-ff6a7b4c9e83@arm.com>
+From: peter.senna@collabora.com (Peter Senna Tschudin)
+Date: Wed, 8 Mar 2017 11:10:40 +0100
+Subject: [PATCH V3 4/4] dts/imx6q-b850v3: Use
+ megachips-stdpxxxx-ge-b850v3-fw bridges (LVDS-DP++)
+In-Reply-To: <d5c297680eb82fd7ef63f7f5dafffc22b98d2345.1488555615.git.peter.senna@collabora.com>
+References: <cover.1488555615.git.peter.senna@collabora.com>
+ <d5c297680eb82fd7ef63f7f5dafffc22b98d2345.1488555615.git.peter.senna@collabora.com>
+Message-ID: <20170308101040.GB25268@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/03/17 03:21, Greg Ungerer wrote:
-> 
-> Hi Afzal,
-> 
-> On 21/01/17 19:20, afzal mohammed write:
->> No-MMU dynamic exception base address configuration on CP15
->> processors. In the case of low vectors, decision based on whether
->> security extensions are enabled & whether remap vectors to RAM
->> CONFIG option is selected.
->>
->> For no-MMU without CP15, current default value of 0x0 is retained.
->>
->> Signed-off-by: afzal mohammed <afzal.mohd.ma@gmail.com>
-> 
-> This patch (which is in mainline now as commit f8300a0b5d) breaks
-> my patch series to support running the Versatile QEMU target with
-> a nommu configured linux kernel. This series can be found here:
-> 
->  http://lists.infradead.org/pipermail/linux-arm-kernel/2017-February/490653.html
-> 
-> The problem is that QEMU is failing out with:
-> 
->  qemu: fatal: Trying to execute code outside RAM or ROM at 0x41069264
-> 
-> when this your patch is applied.
-> 
-> 
->> diff --git a/arch/arm/mm/nommu.c b/arch/arm/mm/nommu.c
->> index 2740967727e2..20ac52579952 100644
->> --- a/arch/arm/mm/nommu.c
->> +++ b/arch/arm/mm/nommu.c
->> @@ -11,6 +11,7 @@
->>  #include <linux/kernel.h>
->>  
->>  #include <asm/cacheflush.h>
->> +#include <asm/cp15.h>
->>  #include <asm/sections.h>
->>  #include <asm/page.h>
->>  #include <asm/setup.h>
->> @@ -22,6 +23,8 @@
->>  
->>  #include "mm.h"
->>  
->> +unsigned long vectors_base;
->> +
->>  #ifdef CONFIG_ARM_MPU
->>  struct mpu_rgn_info mpu_rgn_info;
->>  
->> @@ -278,15 +281,60 @@ static void sanity_check_meminfo_mpu(void) {}
->>  static void __init mpu_setup(void) {}
->>  #endif /* CONFIG_ARM_MPU */
->>  
->> +#ifdef CONFIG_CPU_CP15
->> +#ifdef CONFIG_CPU_HIGH_VECTOR
->> +static unsigned long __init setup_vectors_base(void)
->> +{
->> +	unsigned long reg = get_cr();
->> +
->> +	set_cr(reg | CR_V);
->> +	return 0xffff0000;
->> +}
->> +#else /* CONFIG_CPU_HIGH_VECTOR */
->> +/* Write exception base address to VBAR */
->> +static inline void set_vbar(unsigned long val)
->> +{
->> +	asm("mcr p15, 0, %0, c12, c0, 0" : : "r" (val) : "cc");
->> +}
->> +
->> +/*
->> + * Security extensions, bits[7:4], permitted values,
->> + * 0b0000 - not implemented, 0b0001/0b0010 - implemented
->> + */
->> +static inline bool security_extensions_enabled(void)
->> +{
->> +	return !!cpuid_feature_extract(CPUID_EXT_PFR1, 4);
-> 
-> The problem is here. This ends up generating the asm code:
-> 
->   2ebacc:       ee103f31        mrc     15, 0, r3, cr0, cr1, {1}
-> 
-> QEMU loses it on running this (confirmed by single stepping here).
-> 
-> Is this valid for an ARM926EJ?
-> Or is it QEMU that is at fault here...
-> 
-> I can see that this would be valid for an ARM11 for example
-> (http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0360f/CHDGIJFB.html)
-> 
-> But I could not see that it is valid on an ARM926
-> (http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0198e/I1003211.html)
-> 
-> Maybe I am looking in the wrong place though.
-> 
-> Thoughts?
+On Fri, Mar 03, 2017 at 04:57:10PM +0100, Peter Senna Tschudin wrote:
 
-I'm wondering if something like bellow would help?
+Hi Shawn Guo,
 
-diff --git a/arch/arm/mm/nommu.c b/arch/arm/mm/nommu.c
-index 3b5c7aa..25542ec 100644
---- a/arch/arm/mm/nommu.c
-+++ b/arch/arm/mm/nommu.c
-@@ -303,7 +303,11 @@ static inline void set_vbar(unsigned long val)
-  */
- static inline bool security_extensions_enabled(void)
- {
-+#if __LINUX_ARM_ARCH__ < 6
-+	return 0;
-+#else
- 	return !!cpuid_feature_extract(CPUID_EXT_PFR1, 4);
-+#endif
- }
- 
- static unsigned long __init setup_vectors_base(void)
+Now that the driver and binding are in, can you pick this up?
 
-Cheers
-Vladimir
+Thank you!
 
+> Configures the megachips-stdpxxxx-ge-b850v3-fw bridges on the GE
+> B850v3 dts file.
 > 
-> Regards
-> Greg
+> Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> Cc: Martyn Welch <martyn.welch@collabora.co.uk>
+> Cc: Martin Donnelly <martin.donnelly@ge.com>
+> Cc: Javier Martinez Canillas <javier@dowhile0.org>
+> Cc: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+> Cc: Philipp Zabel <p.zabel@pengutronix.de>
+> Cc: Rob Herring <robh@kernel.org>
+> Cc: Fabio Estevam <fabio.estevam@nxp.com>
+> Signed-off-by: Peter Senna Tschudin <peter.senna@collabora.com>
+> ---
+> Unchanged since V1.
 > 
+>  arch/arm/boot/dts/imx6q-b850v3.dts | 68 ++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 68 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/imx6q-b850v3.dts b/arch/arm/boot/dts/imx6q-b850v3.dts
+> index b237429..3ec54da 100644
+> --- a/arch/arm/boot/dts/imx6q-b850v3.dts
+> +++ b/arch/arm/boot/dts/imx6q-b850v3.dts
+> @@ -72,6 +72,13 @@
+>  		fsl,data-mapping = "spwg";
+>  		fsl,data-width = <24>;
+>  		status = "okay";
+> +
+> +		port at 4 {
+> +			reg = <4>;
+> +			lvds0_out: endpoint {
+> +				remote-endpoint = <&stdp4028_in>;
+> +			};
+> +		};
+>  	};
+>  };
+>  
+> @@ -146,3 +153,64 @@
+>  &usdhc2 {
+>  	status = "disabled";
+>  };
+> +
+> +&mux2_i2c2 {
+> +	status = "okay";
+> +	clock-frequency = <100000>;
+> +
+> +	stdp4028 at 73 {
+> +		compatible = "megachips,stdp4028-ge-b850v3-fw";
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		reg = <0x73>;
+> +
+> +		interrupt-parent = <&gpio2>;
+> +		interrupts = <0 IRQ_TYPE_LEVEL_HIGH>;
+> +
+> +		ports {
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +
+> +			port at 0 {
+> +				reg = <0>;
+> +				stdp4028_in: endpoint {
+> +					remote-endpoint = <&lvds0_out>;
+> +				};
+> +			};
+> +			port at 1 {
+> +				reg = <1>;
+> +				stdp4028_out: endpoint {
+> +					remote-endpoint = <&stdp2690_in>;
+> +				};
+> +			};
+> +		};
+> +	};
+> +
+> +	stdp2690 at 72 {
+> +		compatible = "megachips,stdp2690-ge-b850v3-fw";
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		reg = <0x72>;
+> +
+> +		ports {
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +
+> +			port at 0 {
+> +				reg = <0>;
+> +				stdp2690_in: endpoint {
+> +					remote-endpoint = <&stdp4028_out>;
+> +				};
+> +			};
+> +
+> +			port at 1 {
+> +				reg = <1>;
+> +				stdp2690_out: endpoint {
+> +					/* Connector for external display */
+> +				};
+> +			};
+> +		};
+> +	};
+> +};
+> -- 
+> 2.9.3
 > 
