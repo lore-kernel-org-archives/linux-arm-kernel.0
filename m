@@ -1,63 +1,119 @@
 From: thgarnie@google.com (Thomas Garnier)
-Date: Wed,  8 Mar 2017 13:38:43 -0800
-Subject: [PATCH v1 3/4] arm/syscalls: Specific usage of
- verify_pre_usermode_state
-In-Reply-To: <20170308213844.131877-1-thgarnie@google.com>
-References: <20170308213844.131877-1-thgarnie@google.com>
-Message-ID: <20170308213844.131877-3-thgarnie@google.com>
+Date: Wed,  8 Mar 2017 13:38:41 -0800
+Subject: [PATCH v1 1/4] syscalls: Restore address limit after a syscall
+Message-ID: <20170308213844.131877-1-thgarnie@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implement specific usage of verify_pre_usermode_state for user-mode
-returns for arm.
+This patch prevents a syscall to modify the address limit of the
+caller. The address limit is kept by the syscall wrapper and restored
+just after the syscall ends.
+
+For example, it would mitigation this bug:
+
+- https://bugs.chromium.org/p/project-zero/issues/detail?id=990
+
+By default, this change warns if the segment is incorrect while
+returning to user-mode and fix it. The
+CONFIG_VERIFY_PRE_USERMODE_STATE_BUG option can be enabled to halt
+instead if needed.
+
+The CONFIG_ARCH_NO_SYSCALL_VERIFY_PRE_USERMODE_STATE option is also
+added so each architecture can optimize how the
+verify_pre_usermode_state function is called.
+
+Signed-off-by: Thomas Garnier <thgarnie@google.com>
 ---
 Based on next-20170308
 ---
- arch/arm/Kconfig               | 1 +
- arch/arm/kernel/entry-common.S | 5 +++++
- 2 files changed, 6 insertions(+)
+ include/linux/syscalls.h | 19 +++++++++++++++++++
+ init/Kconfig             | 16 ++++++++++++++++
+ kernel/sys.c             | 11 +++++++++++
+ 3 files changed, 46 insertions(+)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 0d4e71b42c77..704fd8f197fa 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -12,6 +12,7 @@ config ARM
- 	select ARCH_HAVE_CUSTOM_GPIO_H
- 	select ARCH_HAS_GCOV_PROFILE_ALL
- 	select ARCH_MIGHT_HAVE_PC_PARPORT
-+	select ARCH_NO_SYSCALL_VERIFY_PRE_USERMODE_STATE
- 	select ARCH_OPTIONAL_KERNEL_RWX if ARCH_HAS_STRICT_KERNEL_RWX
- 	select ARCH_OPTIONAL_KERNEL_RWX_DEFAULT if CPU_V7
- 	select ARCH_SUPPORTS_ATOMIC_RMW
-diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
-index eb5cd77bf1d8..80cfdc7fabde 100644
---- a/arch/arm/kernel/entry-common.S
-+++ b/arch/arm/kernel/entry-common.S
-@@ -39,6 +39,9 @@
- ret_fast_syscall:
-  UNWIND(.fnstart	)
-  UNWIND(.cantunwind	)
-+	push	{r0}				@ save returned r0
-+	bl	verify_pre_usermode_state
-+	pop	{r0}				@ restore r0
- 	disable_irq_notrace			@ disable interrupts
- 	ldr	r1, [tsk, #TI_FLAGS]		@ re-check for syscall tracing
- 	tst	r1, #_TIF_SYSCALL_WORK | _TIF_WORK_MASK
-@@ -65,6 +68,7 @@ ret_fast_syscall:
-  UNWIND(.fnstart	)
-  UNWIND(.cantunwind	)
- 	str	r0, [sp, #S_R0 + S_OFF]!	@ save returned r0
-+	bl	verify_pre_usermode_state
- 	disable_irq_notrace			@ disable interrupts
- 	ldr	r1, [tsk, #TI_FLAGS]		@ re-check for syscall tracing
- 	tst	r1, #_TIF_SYSCALL_WORK | _TIF_WORK_MASK
-@@ -263,6 +267,7 @@ __sys_trace:
+diff --git a/include/linux/syscalls.h b/include/linux/syscalls.h
+index 980c3c9b06f8..78a2268ecd6e 100644
+--- a/include/linux/syscalls.h
++++ b/include/linux/syscalls.h
+@@ -191,6 +191,22 @@ extern struct trace_event_functions exit_syscall_print_funcs;
+ 	SYSCALL_METADATA(sname, x, __VA_ARGS__)			\
+ 	__SYSCALL_DEFINEx(x, sname, __VA_ARGS__)
  
- __sys_trace_return:
- 	str	r0, [sp, #S_R0 + S_OFF]!	@ save returned r0
-+	bl	verify_pre_usermode_state
- 	mov	r0, sp
- 	bl	syscall_trace_exit
- 	b	ret_slow_syscall
++asmlinkage void verify_pre_usermode_state(void);
++
++#ifndef CONFIG_ARCH_NO_SYSCALL_VERIFY_PRE_USERMODE_STATE
++static inline bool has_user_ds(void) {
++	bool ret = segment_eq(get_fs(), USER_DS);
++	// Prevent re-ordering the call
++	barrier();
++	return ret;
++}
++#else
++static inline bool has_user_ds(void) {
++	return false;
++}
++#endif
++
++
+ #define __PROTECT(...) asmlinkage_protect(__VA_ARGS__)
+ #define __SYSCALL_DEFINEx(x, name, ...)					\
+ 	asmlinkage long sys##name(__MAP(x,__SC_DECL,__VA_ARGS__))	\
+@@ -199,7 +215,10 @@ extern struct trace_event_functions exit_syscall_print_funcs;
+ 	asmlinkage long SyS##name(__MAP(x,__SC_LONG,__VA_ARGS__));	\
+ 	asmlinkage long SyS##name(__MAP(x,__SC_LONG,__VA_ARGS__))	\
+ 	{								\
++		bool user_caller = has_user_ds();			\
+ 		long ret = SYSC##name(__MAP(x,__SC_CAST,__VA_ARGS__));	\
++		if (user_caller)					\
++			verify_pre_usermode_state();			\
+ 		__MAP(x,__SC_TEST,__VA_ARGS__);				\
+ 		__PROTECT(x, ret,__MAP(x,__SC_ARGS,__VA_ARGS__));	\
+ 		return ret;						\
+diff --git a/init/Kconfig b/init/Kconfig
+index c859c993c26f..ab958b59063f 100644
+--- a/init/Kconfig
++++ b/init/Kconfig
+@@ -1929,6 +1929,22 @@ config PROFILING
+ config TRACEPOINTS
+ 	bool
+ 
++#
++# Set by each architecture that want to optimize how verify_pre_usermode_state
++# is called.
++#
++config ARCH_NO_SYSCALL_VERIFY_PRE_USERMODE_STATE
++	bool
++
++config VERIFY_PRE_USERMODE_STATE_BUG
++	bool "Halt on incorrect state on returning to user-mode"
++	default n
++	help
++	  By default a warning is logged and the state is fixed. This option
++	  crashes the kernel instead.
++
++	  If unsure, say Y.
++
+ source "arch/Kconfig"
+ 
+ endmenu		# General setup
+diff --git a/kernel/sys.c b/kernel/sys.c
+index 196c7134bee6..cc2ebf7fae55 100644
+--- a/kernel/sys.c
++++ b/kernel/sys.c
+@@ -2459,3 +2459,14 @@ COMPAT_SYSCALL_DEFINE1(sysinfo, struct compat_sysinfo __user *, info)
+ 	return 0;
+ }
+ #endif /* CONFIG_COMPAT */
++
++/* Called before coming back to user-mode */
++asmlinkage void verify_pre_usermode_state(void)
++{
++#ifdef CONFIG_VERIFY_PRE_USERMODE_STATE_BUG
++	BUG_ON(!segment_eq(get_fs(), USER_DS));
++#else
++	if (WARN_ON(!segment_eq(get_fs(), USER_DS)))
++		set_fs(USER_DS);
++#endif
++}
 -- 
 2.12.0.246.ga2ecc84866-goog
