@@ -1,45 +1,57 @@
-From: bishah@cisco.com (Bijal Shah (bishah))
-Date: Wed, 8 Mar 2017 18:33:48 +0000
-Subject: L2 cache management question
-In-Reply-To: <20170308180745.GY21222@n2100.armlinux.org.uk>
-References: <bdcc07da22ae43589768d6d4aebbf788@XCH-RTP-013.cisco.com>
- <20170308180745.GY21222@n2100.armlinux.org.uk>
-Message-ID: <6008d9f6f08d46458e106a4ae794ca0b@XCH-RTP-013.cisco.com>
+From: Chris.Brandt@renesas.com (Chris Brandt)
+Date: Wed, 8 Mar 2017 18:53:37 +0000
+Subject: [PATCH v4 0/3] ARM: l2c: add l2c support for RZ/A1
+In-Reply-To: <20170216172128.GS27312@n2100.armlinux.org.uk>
+References: <20170216161742.29320-1-chris.brandt@renesas.com>
+ <20170216164424.GR27312@n2100.armlinux.org.uk>
+ <CAK8P3a1ri2o4An0svxSG4iSvwTkdpM5jiC=SzBq7mE6TpbdhKQ@mail.gmail.com>
+ <20170216172128.GS27312@n2100.armlinux.org.uk>
+Message-ID: <SG2PR06MB11654EAEFECB3AE8849B28BD8A2E0@SG2PR06MB1165.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks. We're working on measurements and will report back when we have data that can be interpreted more widely. At the moment, we're seeing a headline loss of between 2 and 5% of CPU due to the flushes in the application we have, which seems like a lot.
+On Thursday, February 16, 2017, Russell King wrote:
+> On Thu, Feb 16, 2017 at 05:57:53PM +0100, Arnd Bergmann wrote:
+> > On Thu, Feb 16, 2017 at 5:44 PM, Russell King - ARM Linux
+> > <linux@armlinux.org.uk> wrote:
+> > > On Thu, Feb 16, 2017 at 11:17:39AM -0500, Chris Brandt wrote:
+> > >> The PL310 in the Renesas RZ/A1 SoC (R7S72100) does not have the
+> > >> sideband signals connected between the CPU and L2C. According the
+> > >> PL310 TRM, sideband signals are optional.
+> > >>
+> > >> If a PL310 is added to a system, but the sideband signals are not
+> > >> connected, some Cortex A9 optimizations cannot be used. In
+> > >> particular, enabling Full Line Zeros in the CA9 without sidebands
+> > >> connected will crash the system since the CA9 will expect the L2C
+> > >> to perform operations, yet the L2C never gets the commands.
+> > >>
+> > >> This series adds the option to not enable anything in the PL310
+> > >> that uses sidebands, and then adds L2C support to the RZ/A1 DT.
+> > >>
+> > >> v4:
+> > >> * changed l2x0_bresp_dis to l2x0_bresp_disable
+> > >> * changed l2x0_flz_dis to l2x0_flz_disable
+> > >
+> > > Looks good, thanks.
+> > >
+> > > I'll want to merge patch 1, but I suspect the other two patches need
+> > > to go through arm-soc, which will cause a problem due to being
+> > > merged independently...  Arnd?
+> >
+> > I just checked what we have queued up in next/dt for this platform,
+> > and I'm fairly sure that there are no conflicts, so you can pick up
+> > all three and add
+> >
+> > Acked-by: Arnd Bergmann <arnd@arndb.de>
+> 
+> Chris, can you put all three in the patch system, preferably with Arnd's
+> ack for the last two please?
+> 
+> Thanks.
 
-Your explanation makes sense, and we wouldn't want to bork the general case for this application. My observation boils down to the choice on flushing the entire cache is based on the range size rather than whether the anything in the range has been cached which surprised me a bit. I guess that check would be time consuming in itself though.
 
------Original Message-----
-From: linux-arm-kernel [mailto:linux-arm-kernel-bounces at lists.infradead.org] On Behalf Of Russell King - ARM Linux
-Sent: 08 March 2017 18:08
-To: Bijal Shah (bishah) <bishah@cisco.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Subject: Re: L2 cache management question
+These are still sitting in the patch system. Was there something wrong with
+them that they would not go into 4.11?
 
-On Wed, Mar 08, 2017 at 11:44:12AM +0000, Bijal Shah (bishah) wrote:
-> Looking at l2x0_cache.c file in the arch/arm/mm directory, I see a 
-> common pattern for an address range flush where if the address range 
-> is larger than the cache size, a flush_all is called almost without 
-> question. Is there any specific reason for this? Asking for the 
-> project I'm working on, as the address ranges may contain very few if 
-> any dirty lines, and a flush_all is expensive and locks out other CPUs 
-> while it is going on.
 
-Flushing by cache line for large address ranges is also very expensive.
-As with everything like this, the threshold is a balance between the relative expenses of the alternatives.
-
-We're not going to change the threshold without a fully justified reason to change it - which implies that performance measurements are needed to back up any case.
-
-As it'll be workload specific, so picking one particular workload that justifies a spefific case won't be all that persuasive - we optimise for the general case and _maybe_ if there's good reason provide a tuning knob to allow the threshold to be adjusted.
-
---
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up according to speedtest.net.
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel at lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Chris
