@@ -1,80 +1,71 @@
-From: slash.tmp@free.fr (Mason)
-Date: Wed, 8 Mar 2017 14:39:09 +0100
-Subject: Neophyte questions about PCIe
-In-Reply-To: <ced6a4bf-c94a-c116-1e94-52a8d675d132@free.fr>
-References: <ced6a4bf-c94a-c116-1e94-52a8d675d132@free.fr>
-Message-ID: <0cd311b9-b621-432d-f95f-fafc5016bce0@free.fr>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed,  8 Mar 2017 14:39:43 +0100
+Subject: [PATCH v2 1/2] arm64: tegra: Enable SDHCI controllers on P3110
+In-Reply-To: <20170223173053.19701-7-thierry.reding@gmail.com>
+References: <20170223173053.19701-7-thierry.reding@gmail.com>
+Message-ID: <20170308133944.32568-1-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/03/2017 23:45, Mason wrote:
+From: Thierry Reding <treding@nvidia.com>
 
-> 3) What happens if a device requires more than 256 MB of
-> mem space? (Is that common? What kind of device? GPUs?)
-> Our controller supports a remapping "facility" to add an
-> offset to the bus address. Is such a feature supported
-> by Linux at all?  The problem is that this creates
-> another race condition, as setting the offset register
-> before an access may occur concurrently on two cores.
-> Perhaps 256 MB is plenty on a 32-bit embedded device?
+The P3110 processor module wires one of the SDHCI controllers to an on-
+board eMMC and exposes another set of SD/MMC signals on the connector to
+support an external SD/MMC card. A third controller is connected to the
+SDIO pins of an M.2 KEY E connector.
 
-I was told that Linux does not support this kind of "dynamic remapping",
-because access to PCI memory region is not handled through a call-back;
-the driver just calls readl/writel directly on the pointer.
+Signed-off-by: Thierry Reding <treding@nvidia.com>
+---
+Changes in v2:
+- move SD_CARD_SW_PWR regulator to carrier board (separate patch)
+- move status = "okay" to carrier board
+- fix card-detect GPIO for SDMMC1
 
-"We expect that any device we map into the address space is reachable
-through static page table entries set up by ioremap() or pci_iomap()."
+ arch/arm64/boot/dts/nvidia/tegra186-p3310.dtsi | 25 +++++++++++++++++++++++++
+ 1 file changed, 25 insertions(+)
 
-
-On a related subject, I asked about the max size of I/O space.
-
-/**
- *	pci_remap_iospace - Remap the memory mapped I/O space
- *	@res: Resource describing the I/O space
- *	@phys_addr: physical address of range to be mapped
- *
- *	Remap the memory mapped I/O space described by the @res
- *	and the CPU physical address @phys_addr into virtual address space.
- *	Only architectures that have memory mapped IO functions defined
- *	(and the PCI_IOBASE value defined) should call this function.
- */
-int __weak pci_remap_iospace(const struct resource *res, phys_addr_t phys_addr)
-{
-#if defined(PCI_IOBASE) && defined(CONFIG_MMU)
-	unsigned long vaddr = (unsigned long)PCI_IOBASE + res->start;
-
-	if (!(res->flags & IORESOURCE_IO))
-		return -EINVAL;
-
-	if (res->end > IO_SPACE_LIMIT)
-		return -EINVAL;
-
-	return ioremap_page_range(vaddr, vaddr + resource_size(res), phys_addr,
-				  pgprot_device(PAGE_KERNEL));
-#else
-	/* this architecture does not have memory mapped I/O space,
-	   so this function should never be called */
-	WARN_ONCE(1, "This architecture does not support memory mapped I/O\n");
-	return -ENODEV;
-#endif
-}
-
-/* PCI fixed i/o mapping */
-#define PCI_IO_VIRT_BASE	0xfee00000
-#define PCI_IOBASE		((void __iomem *)PCI_IO_VIRT_BASE)
-
-http://lxr.free-electrons.com/source/arch/arm/include/asm/io.h?v=4.9#L188
-
-#ifdef CONFIG_NEED_MACH_IO_H
-#include <mach/io.h>
-#elif defined(CONFIG_PCI)
-#define IO_SPACE_LIMIT	((resource_size_t)0xfffff)
-#define __io(a)		__typesafe_io(PCI_IO_VIRT_BASE + ((a) & IO_SPACE_LIMIT))
-#else
-#define __io(a)		__typesafe_io((a) & IO_SPACE_LIMIT)
-#endif
-
-So the default seems to be 1 MB on arm32. But the platform seems allowed
-to define a larger or a smaller space.
-
-Regards.
+diff --git a/arch/arm64/boot/dts/nvidia/tegra186-p3310.dtsi b/arch/arm64/boot/dts/nvidia/tegra186-p3310.dtsi
+index 69553bde7ef7..847e7db59b47 100644
+--- a/arch/arm64/boot/dts/nvidia/tegra186-p3310.dtsi
++++ b/arch/arm64/boot/dts/nvidia/tegra186-p3310.dtsi
+@@ -7,6 +7,8 @@
+ 	compatible = "nvidia,p3310", "nvidia,tegra186";
+ 
+ 	aliases {
++		sdhci0 = "/sdhci at 3460000";
++		sdhci1 = "/sdhci at 3400000";
+ 		serial0 = &uarta;
+ 		i2c0 = "/bpmp/i2c";
+ 		i2c1 = "/i2c at 3160000";
+@@ -72,6 +74,29 @@
+ 		status = "okay";
+ 	};
+ 
++	/* SDMMC1 (SD/MMC) */
++	sdhci at 3400000 {
++		cd-gpios = <&gpio TEGRA_MAIN_GPIO(P, 5) GPIO_ACTIVE_LOW>;
++		wp-gpios = <&gpio TEGRA_MAIN_GPIO(P, 4) GPIO_ACTIVE_LOW>;
++
++		vqmmc-supply = <&vddio_sdmmc1>;
++	};
++
++	/* SDMMC3 (SDIO) */
++	sdhci at 3440000 {
++		status = "okay";
++	};
++
++	/* SDMMC4 (eMMC) */
++	sdhci at 3460000 {
++		status = "okay";
++		bus-width = <8>;
++		non-removable;
++
++		vqmmc-supply = <&vdd_1v8_ap>;
++		vmmc-supply = <&vdd_3v3_sys>;
++	};
++
+ 	hsp at 3c00000 {
+ 		status = "okay";
+ 	};
+-- 
+2.12.0
