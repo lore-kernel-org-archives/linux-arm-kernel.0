@@ -1,42 +1,44 @@
-From: jagan@openedev.com (Jagan Teki)
-Date: Wed,  8 Mar 2017 12:47:57 +0530
-Subject: [PATCH v4 7/7] arm: imx_v6_v7_defconfig: Select hid-multitouchdriver
-In-Reply-To: <1488957477-5621-1-git-send-email-jagan@openedev.com>
-References: <1488957477-5621-1-git-send-email-jagan@openedev.com>
-Message-ID: <1488957477-5621-7-git-send-email-jagan@openedev.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 8 Mar 2017 08:36:18 +0100
+Subject: [PATCH 0/2] ARM: dts: sunxi: Remove no longer used
+ pinctrl/sun4i-a10.h header
+In-Reply-To: <20170308032821.26854-1-wens@csie.org>
+References: <20170308032821.26854-1-wens@csie.org>
+Message-ID: <20170308073618.kslqz3c2wdctexvi@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jagan Teki <jagan@amarulasolutions.com>
+On Wed, Mar 08, 2017 at 11:28:19AM +0800, Chen-Yu Tsai wrote:
+> Hi Maxime,
+> 
+> This series gets rid of the last usage of the Allwinner specific pinconf
+> bindings, and drops inclusion of dt-bindings/pinctrl/sun4i-a10.h across
+> the tree.
+> 
+> Patch 1 gets rid of the last occurrence of Allwinner specific pinconf
+> properties, which is actually a GPIO pinmux.
+> 
+> Patch 2 drops the #include for dt-bindings/pinctrl/sun4i-a10.h with a
+> scripted approach.
+> 
+> A patch to remove the actual header file should be sent after this
+> series is in Linus' tree, to avoid any unwanted cross-tree dependencies.
+> If we want that to happen faster, maybe we could merge these as fixes.
+> 
+> Regards
+> ChenYu
 
-Select CONFIG_HID_MULTITOUCH so that we can have multi touchscreen
-funtionality via USB by default on Engicam i.CoreM6 Quad with
-OpenFrame Cap 10.1 display boards.
+Applied both, thanks!
+Maxime
 
-Cc: Matteo Lisi <matteo.lisi@engicam.com>
-Cc: Michael Trimarchi <michael@amarulasolutions.com>
-Cc: Shawn Guo <shawnguo@kernel.org>
-Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
----
-Changes for v4:
-- Newly added patch.
-
- arch/arm/boot/dts/imx6q-icore.dts | 9 +++++++++
- 1 file changed, 9 insertions(+)
- arch/arm/configs/imx_v6_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index 842168f..914e8cb 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -174,6 +174,7 @@ CONFIG_TOUCHSCREEN_SX8654=y
- CONFIG_TOUCHSCREEN_COLIBRI_VF50=y
- CONFIG_INPUT_MISC=y
- CONFIG_INPUT_MMA8450=y
-+CONFIG_HID_MULTITOUCH=y
- CONFIG_SERIO_SERPORT=m
- # CONFIG_LEGACY_PTYS is not set
- CONFIG_SERIAL_IMX=y
 -- 
-1.9.1
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170308/be7a28d3/attachment.sig>
