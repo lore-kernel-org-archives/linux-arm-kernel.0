@@ -1,63 +1,35 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Thu, 9 Mar 2017 03:06:34 +0900
-Subject: [Question] devm_kmalloc() for DMA ?
-In-Reply-To: <b7dd01e6-ddcd-a34a-c26c-05ce6ae4015a@arm.com>
-References: <CAK7LNARbD262isY7yOgQKAcbWQHV+3dsoRjtu6S+qUpPr98qSQ@mail.gmail.com>
- <b7dd01e6-ddcd-a34a-c26c-05ce6ae4015a@arm.com>
-Message-ID: <CAK7LNAQ3FbicgoV1Q70T2gZQS0j1Z8LffXquSM=v6DYcHP_m4Q@mail.gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 8 Mar 2017 18:07:45 +0000
+Subject: L2 cache management question
+In-Reply-To: <bdcc07da22ae43589768d6d4aebbf788@XCH-RTP-013.cisco.com>
+References: <bdcc07da22ae43589768d6d4aebbf788@XCH-RTP-013.cisco.com>
+Message-ID: <20170308180745.GY21222@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
+On Wed, Mar 08, 2017 at 11:44:12AM +0000, Bijal Shah (bishah) wrote:
+> Looking at l2x0_cache.c file in the arch/arm/mm directory, I see a
+> common pattern for an address range flush where if the address range
+> is larger than the cache size, a flush_all is called almost without
+> question. Is there any specific reason for this? Asking for the
+> project I'm working on, as the address ranges may contain very few
+> if any dirty lines, and a flush_all is expensive and locks out other
+> CPUs while it is going on.
 
+Flushing by cache line for large address ranges is also very expensive.
+As with everything like this, the threshold is a balance between the
+relative expenses of the alternatives.
 
-2017-03-08 20:15 GMT+09:00 Robin Murphy <robin.murphy@arm.com>:
-> On 08/03/17 10:59, Masahiro Yamada wrote:
->> Hi experts,
->>
->> I have a question about
->> how to allocate DMA-safe buffer.
->>
->>
->> In my understanding, kmalloc() returns
->> memory with DMA safe alignment
->> in order to avoid cache-sharing problem when used for DMA.
->>
->> The alignment is decided by ARCH_DMA_MINALIGN.
->> For example, on modern ARM 32bit boards, this value is typically 64.
->> So, memory returned by kmalloc() has
->> at least 64 byte alignment.
->>
->>
->> On the other hand, devm_kmalloc() does not return
->> enough-aligned memory.
->
-> How so? If anything returned by kmalloc() is guaranteed to occupy some
-> multiple of ARCH_DMA_MINALIGN bytes in order to avoid two allocations
-> falling into the same cache line, I don't see how stealing the first 16
-> bytes *of a single allocation* could make it start sharing cache lines
-> with another? :/
+We're not going to change the threshold without a fully justified reason
+to change it - which implies that performance measurements are needed to
+back up any case.
 
-I just thought of traverse of the linked list of devres_node
-on a different thread, but it should not happen.
-
-Please forget my stupid question.
-
-
-> If a particular device has a problem with:
->
-> p = kmalloc(...);
-> d = dma_map_single(p + 0x10, ...);
-> do_something_with(d);
->
-> that's a separate issue altogether.
-
-Right.
-Each device has own requirement for DMA alignment.
-
-Thanks!
-
+As it'll be workload specific, so picking one particular workload that
+justifies a spefific case won't be all that persuasive - we optimise
+for the general case and _maybe_ if there's good reason provide a
+tuning knob to allow the threshold to be adjusted.
 
 -- 
-Best Regards
-Masahiro Yamada
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
