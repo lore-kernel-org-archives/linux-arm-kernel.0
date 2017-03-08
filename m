@@ -1,115 +1,45 @@
-From: marco.franchi@nxp.com (Marco Franchi)
-Date: Wed, 8 Mar 2017 15:32:29 -0300
-Subject: [PATCH] ARM: dts: imx7d-sdb: Add sht11 Click Board support
-Message-ID: <1488997949-17160-1-git-send-email-marco.franchi@nxp.com>
+From: bishah@cisco.com (Bijal Shah (bishah))
+Date: Wed, 8 Mar 2017 18:33:48 +0000
+Subject: L2 cache management question
+In-Reply-To: <20170308180745.GY21222@n2100.armlinux.org.uk>
+References: <bdcc07da22ae43589768d6d4aebbf788@XCH-RTP-013.cisco.com>
+ <20170308180745.GY21222@n2100.armlinux.org.uk>
+Message-ID: <6008d9f6f08d46458e106a4ae794ca0b@XCH-RTP-013.cisco.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The imx7d-sdb has a mickro bus connector that can be connected to a 
-Sensirion SHT11 click board (temperature and humidity sensor):
+Thanks. We're working on measurements and will report back when we have data that can be interpreted more widely. At the moment, we're seeing a headline loss of between 2 and 5% of CPU due to the flushes in the application we have, which seems like a lot.
 
-https://shop.mikroe.com/click/sensors/sht1x
+Your explanation makes sense, and we wouldn't want to bork the general case for this application. My observation boils down to the choice on flushing the entire cache is based on the range size rather than whether the anything in the range has been cached which surprised me a bit. I guess that check would be time consuming in itself though.
 
-Add a new device tree file to describe such hardware.
+-----Original Message-----
+From: linux-arm-kernel [mailto:linux-arm-kernel-bounces at lists.infradead.org] On Behalf Of Russell King - ARM Linux
+Sent: 08 March 2017 18:08
+To: Bijal Shah (bishah) <bishah@cisco.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Subject: Re: L2 cache management question
 
-Signed-off-by: Marco Franchi <marco.franchi@nxp.com>
----
- arch/arm/boot/dts/Makefile            |  1 +
- arch/arm/boot/dts/imx7d-sdb-sht11.dts | 74 +++++++++++++++++++++++++++++++++++
- 2 files changed, 75 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx7d-sdb-sht11.dts
+On Wed, Mar 08, 2017 at 11:44:12AM +0000, Bijal Shah (bishah) wrote:
+> Looking at l2x0_cache.c file in the arch/arm/mm directory, I see a 
+> common pattern for an address range flush where if the address range 
+> is larger than the cache size, a flush_all is called almost without 
+> question. Is there any specific reason for this? Asking for the 
+> project I'm working on, as the address ranges may contain very few if 
+> any dirty lines, and a flush_all is expensive and locks out other CPUs 
+> while it is going on.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 0118084..7009856 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -458,6 +458,7 @@ dtb-$(CONFIG_SOC_IMX7D) += \
- 	imx7d-nitrogen7.dtb \
- 	imx7d-sbc-imx7.dtb \
- 	imx7d-sdb.dtb \
-+	imx7d-sdb-sht11.dtb \
- 	imx7s-colibri-eval-v3.dtb \
- 	imx7s-warp.dtb
- dtb-$(CONFIG_SOC_LS1021A) += \
-diff --git a/arch/arm/boot/dts/imx7d-sdb-sht11.dts b/arch/arm/boot/dts/imx7d-sdb-sht11.dts
-new file mode 100644
-index 0000000..2f6f801
---- /dev/null
-+++ b/arch/arm/boot/dts/imx7d-sdb-sht11.dts
-@@ -0,0 +1,74 @@
-+/*
-+ * Copyright (C) 2015 Freescale Semiconductor, Inc.
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+#include "imx7d-sdb.dts"
-+
-+/ {
-+	sensor {
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_sensor>;
-+		compatible = "sensirion,sht15";
-+		clk-gpios = <&gpio4 12 0>;
-+		data-gpios = <&gpio4 13 0>;
-+		vcc-supply = <&reg_sht15>;
-+	};
-+
-+	reg_sht15: reg-sht15 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "reg_sht15";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+	};
-+};
-+
-+&i2c3 {
-+	status = "disabled";
-+};
-+
-+&iomuxc {
-+	pinctrl_sensor: sensorgrp {
-+		fsl,pins = <
-+			MX7D_PAD_I2C3_SDA__GPIO4_IO13	0x4000007f
-+			MX7D_PAD_I2C3_SCL__GPIO4_IO12	0x4000007f
-+		>;
-+	};
-+};
--- 
-2.7.4
+Flushing by cache line for large address ranges is also very expensive.
+As with everything like this, the threshold is a balance between the relative expenses of the alternatives.
+
+We're not going to change the threshold without a fully justified reason to change it - which implies that performance measurements are needed to back up any case.
+
+As it'll be workload specific, so picking one particular workload that justifies a spefific case won't be all that persuasive - we optimise for the general case and _maybe_ if there's good reason provide a tuning knob to allow the threshold to be adjusted.
+
+--
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up according to speedtest.net.
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel at lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
