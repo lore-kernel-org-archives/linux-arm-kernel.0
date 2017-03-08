@@ -1,80 +1,41 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Wed, 08 Mar 2017 17:43:19 +0100
-Subject: [BUG] dmaengine: pxa_dma: + mmc: pxamci: race condition with DMA
- error on tx channel
-In-Reply-To: <e749aff1-0ffc-c9ed-42b2-82397b4e8ba2@tul.cz> (Petr Cvek's
- message of "Wed, 8 Mar 2017 07:57:08 +0100")
-References: <e749aff1-0ffc-c9ed-42b2-82397b4e8ba2@tul.cz>
-Message-ID: <877f3zwwgo.fsf@belgarion.home>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Wed, 8 Mar 2017 10:50:03 -0600
+Subject: [PATCH] arm64: mm: Add workaround for Qualcomm Technologies
+ Falkor erratum E1029
+In-Reply-To: <20170303122703.GA12945@leverpostej>
+References: <1488500355-7199-1-git-send-email-timur@codeaurora.org>
+ <20170303122703.GA12945@leverpostej>
+Message-ID: <646fee0b-13b4-85d7-63d5-26e450bd2e2d@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Petr Cvek <petr.cvek@tul.cz> writes:
-
-Hi Petr,
-> I wasn't able to track the problem to a single patch as the problem occurs at
-> random time (from the boot to like a half an hour) and it's maybe dependent on a
-> level of a battery charge (maybe because of kernel log writes of charging
-> messages).
-Mmmh, long reproduction time, that will be bad.
-
-> It seems that most occurrency is during writes on an SD card. Using an SDHC
-> card decreases the time to fail. After failure the OS is unavailable (rootfs
-> in on the card).
-Okay, let me try to make write loop on my SD card to see if I manage to
-reproduce this.
-
-> From my poking in the kernel source code it seems there is a probability that pxamci_irq() takes longer to call and its subsequent call pxamci_data_done() isn't fast enough to set [1]
-> 	host->data = NULL;
-
-> From the DMA side, the DMA done interrupt is generated:
-> 	pxad_chan_handler() -> vchan_cookie_complete()
-> ...where a tasklet for vchan_complete() is scheduled
-At least that seems to hint the DMA part is sound so for.
-The bothering part is the log error "mmc0: DMA error on tx channel". I would
-need a bit of guidance here, with the same log with [1] applied.
-
-> , where finally with interrupts enabled (can pxamci_irq() be called here?) the
-> callback pxamci_dma_irq() is called.
-When DMA completes, there is a tiny window, before pxamci_dma_irq() is called,
-when pxamci_irq() can be called, yes. As soon as the spinlock is taken in
-pxamci_dma_irq() is taken, no more races.
-
-> From my tests it seems at this point [2] the host->data is always NULL and rest
-> of the callback is never called. It is called once with a nonempty host->data
-> only just before the failure.
+On 03/03/2017 06:27 AM, Mark Rutland wrote:
+> The idle loop is not the only place where WFI can occur.
 >
-> During the testing I put udelay(100) at the start of pxamci_dma_irq() and fail
-> occurred after like 2 hours (when I for the first time tapped the touchscreen -
-> higher CPU usage and interrupts).
-Mmm I would need more data here.
+> Notably, firmware is within its rights to use WFI, as is userspace given
+> that SCTLR_EL1.nTWI is set at boot time. So IIUC, userspace can deadlock
+> a core, which makes this sound very serious.
+>
+> Can this *only* happen for the PMU interrupt?
+>
+> I assume that as mentioned for other Falkor workarounds "the affected
+> chips are pre-production and are only available to select customers for
+> a limited time"?
+>
+> Given that we're having to a fair amount of the arm64 core code, for
+> parts that QC don't even intend to support long term, it's increasingly
+> difficult to care about this upstream.
+>
+> Are additional workarounds necessary for these parts?
 
-The biggest help I could get would be the pxa dma traces here :
-echo -n 'file pxa_dma.c +p' > /sys/kernel/debug/dynamic_debug/control
-echo -n 'file virt-dma.c +p' > /sys/kernel/debug/dynamic_debug/control
+We are withdrawing this patch.  We acknowledge your concerns.
 
-And then capture the last traces and send them to me.
-
-Cheers.
+There are other errata affected by this patch that we have submitted, but 
+this is the only one that is unacceptable.  The affected chips are 
+pre-production, and so we'll just keep this work-around internally until 
+those chips have been replaced.
 
 -- 
-Robert
-
-[1] Small debug patch
----8>---
-diff --git a/drivers/mmc/host/pxamci.c b/drivers/mmc/host/pxamci.c
-index c763b404510f..ed3812b2a34d 100644
---- a/drivers/mmc/host/pxamci.c
-+++ b/drivers/mmc/host/pxamci.c
-@@ -571,8 +571,9 @@ static void pxamci_dma_irq(void *param)
- 	if (likely(status == DMA_COMPLETE)) {
- 		writel(BUF_PART_FULL, host->base + MMC_PRTBUF);
- 	} else {
--		pr_err("%s: DMA error on %s channel\n", mmc_hostname(host->mmc),
--			host->data->flags & MMC_DATA_READ ? "rx" : "tx");
-+		pr_err("%s: DMA error on %s channel: %d\n",
-+		       mmc_hostname(host->mmc),
-+		       host->data->flags & MMC_DATA_READ ? "rx" : "tx", status);
- 		host->data->error = -EIO;
- 		pxamci_data_done(host, 0);
- 	}
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
+Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
