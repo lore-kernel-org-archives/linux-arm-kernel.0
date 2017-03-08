@@ -1,84 +1,45 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Wed, 8 Mar 2017 12:03:34 +0000
-Subject: [PATCH 09/11] arm64: tegra: Add GPIO keys on P2771
-In-Reply-To: <20170223173053.19701-9-thierry.reding@gmail.com>
-References: <20170223173053.19701-1-thierry.reding@gmail.com>
- <20170223173053.19701-9-thierry.reding@gmail.com>
-Message-ID: <6e9043ac-0e3c-6b17-fd76-5792820d55b1@nvidia.com>
+From: balbi@kernel.org (Felipe Balbi)
+Date: Wed, 08 Mar 2017 14:06:00 +0200
+Subject: [PATCH RESEND^2] usb: gadget: udc: atmel: fix debug output
+In-Reply-To: <20170308080032.3848369-1-arnd@arndb.de>
+References: <20170308080032.3848369-1-arnd@arndb.de>
+Message-ID: <87efy80y8n.fsf@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
+Hi,
 
-On 23/02/17 17:30, Thierry Reding wrote:
-> From: Thierry Reding <treding@nvidia.com>
-> 
-> The P2771 has three keys (power, volume up and volume down) that are
-> connected to pins on the AON GPIO controller.
-> 
-> Signed-off-by: Thierry Reding <treding@nvidia.com>
+Arnd Bergmann <arnd@arndb.de> writes:
+> The debug output now contains the wrong variable, as seen from the compiler
+> warning:
+>
+> drivers/usb/gadget/udc/atmel_usba_udc.c: In function 'usba_ep_enable':
+> drivers/usb/gadget/udc/atmel_usba_udc.c:632:550: error: 'ept_cfg' may be used uninitialized in this function [-Werror=maybe-uninitialized]
+>   DBG(DBG_ERR, "%s: EPT_CFG = 0x%lx (maxpacket = %lu)\n",
+>
+> This changes the debug output the same way as the other code.
+>
+> Fixes: 741d2558bf0a ("usb: gadget: udc: atmel: Update endpoint allocation scheme")
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
 > ---
->  arch/arm64/boot/dts/nvidia/tegra186-p2771-0000.dts | 34 ++++++++++++++++++++++
->  1 file changed, 34 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/nvidia/tegra186-p2771-0000.dts b/arch/arm64/boot/dts/nvidia/tegra186-p2771-0000.dts
-> index 0d3c0996d832..1c195d71806d 100644
-> --- a/arch/arm64/boot/dts/nvidia/tegra186-p2771-0000.dts
-> +++ b/arch/arm64/boot/dts/nvidia/tegra186-p2771-0000.dts
-> @@ -1,8 +1,42 @@
->  /dts-v1/;
->  
-> +#include <dt-bindings/input/linux-event-codes.h>
-> +
->  #include "tegra186-p3310.dtsi"
->  
->  / {
->  	model = "NVIDIA Tegra186 P2771-0000 Development Board";
->  	compatible = "nvidia,p2771-0000", "nvidia,tegra186";
-> +
-> +	gpio-keys {
-> +		compatible = "gpio-keys";
-> +
-> +		power {
-> +			label = "Power";
-> +			gpios = <&gpio_aon TEGRA_AON_GPIO(FF, 0)
-> +					   GPIO_ACTIVE_LOW>;
-> +			linux,input-type = <EV_KEY>;
-> +			linux,code = <KEY_POWER>;
-> +			debounce-interval = <10>;
-> +			wakeup-source;
-> +		};
-> +
-> +		volume-up {
-> +			label = "Volume Up";
-> +			gpios = <&gpio_aon TEGRA_AON_GPIO(FF, 1)
-> +					   GPIO_ACTIVE_LOW>;
-> +			linux,input-type = <EV_KEY>;
-> +			linux,code = <KEY_VOLUMEUP>;
-> +			debounce-interval = <10>;
-> +		};
+> Originally this broke on Feb 1 and I sent this fix,
+> I resent it after it wasn't applied by Feb 22.
+>
+> This is now one of only two build regressions that made it into
+> 4.11-rc1 that are still broken on linux-next. Please apply
 
-My schematic shows this pin as 'force-recovery'.
-
-> +
-> +		volume-down {
-> +			label = "Volume Down";
-> +			gpios = <&gpio_aon TEGRA_AON_GPIO(FF, 2)
-> +					   GPIO_ACTIVE_LOW>;
-> +			linux,input-type = <EV_KEY>;
-> +			linux,code = <KEY_VOLUMEDOWN>;
-> +			debounce-interval = <10>;
-> +		};
-> +	};
->  };
-
-And this one as 'sleep_l'.
-
-Are these being re-used after boot? I did not find any documentation
-about them being used as volume keys.
-
-Cheers
-Jon
+heh, it's in my queue. Just gimme time, I have a day job that's 100%
+dedicated to mainline ;-)
 
 -- 
-nvpublic
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170308/cec8d438/attachment.sig>
