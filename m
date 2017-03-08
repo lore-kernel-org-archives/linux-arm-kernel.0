@@ -1,117 +1,80 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 7 Mar 2017 17:22:26 -0800
-Subject: [PATCH v4 net-next 4/6] drivers: net: xgene-v2: Add base driver
-In-Reply-To: <1488935325-13603-5-git-send-email-isubramanian@apm.com>
-References: <1488935325-13603-1-git-send-email-isubramanian@apm.com>
- <1488935325-13603-5-git-send-email-isubramanian@apm.com>
-Message-ID: <88abbf29-9762-b5d1-86db-291159978269@gmail.com>
+From: chunfeng.yun@mediatek.com (Chunfeng Yun)
+Date: Wed, 8 Mar 2017 09:24:10 +0800
+Subject: [PATCH 1/2] usb: xhci-mtk: rebuild xhci_mtk_setup()
+In-Reply-To: <58BECA4B.3010503@linux.intel.com>
+References: <1488869841-9959-1-git-send-email-chunfeng.yun@mediatek.com>
+ <58BECA4B.3010503@linux.intel.com>
+Message-ID: <1488936250.14325.11.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/07/2017 05:08 PM, Iyappan Subramanian wrote:
-> This patch adds,
+On Tue, 2017-03-07 at 16:57 +0200, Mathias Nyman wrote:
+> On 07.03.2017 08:57, Chunfeng Yun wrote:
+> > simplify xhci_mtk_setup() and add xhci_mtk_start() for
+> > xhci_driver_overrides struct
+> >
 > 
->      - probe, remove, shutdown
->      - open, close and stats
->      - create and delete ring
->      - request and delete irq
+> Code itself looks fine, but it's bit unclear for me what the benefit of this is?
 > 
-> Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
-> Signed-off-by: Keyur Chudgar <kchudgar@apm.com>
-> ---
+> > Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+> > ---
+> >   drivers/usb/host/xhci-mtk.c |   16 +++++++++++-----
+> >   1 file changed, 11 insertions(+), 5 deletions(-)
+> >
+> > diff --git a/drivers/usb/host/xhci-mtk.c b/drivers/usb/host/xhci-mtk.c
+> > index 67d5dc7..9636884 100644
+> > --- a/drivers/usb/host/xhci-mtk.c
+> > +++ b/drivers/usb/host/xhci-mtk.c
+> > @@ -381,8 +381,10 @@ static int usb_wakeup_of_property_parse(struct xhci_hcd_mtk *mtk,
+> >   }
+> >
+> >   static int xhci_mtk_setup(struct usb_hcd *hcd);
+> > +static int xhci_mtk_start(struct usb_hcd *hcd);
+> >   static const struct xhci_driver_overrides xhci_mtk_overrides __initconst = {
+> >   	.reset = xhci_mtk_setup,
+> > +	.start = xhci_mtk_start,
+> >   };
+> >
+> >   static struct hc_driver __read_mostly xhci_mtk_hc_driver;
+> > @@ -492,7 +494,6 @@ static void xhci_mtk_quirks(struct device *dev, struct xhci_hcd *xhci)
+> >   /* called during probe() after chip reset completes */
+> >   static int xhci_mtk_setup(struct usb_hcd *hcd)
+> >   {
+> > -	struct xhci_hcd *xhci = hcd_to_xhci(hcd);
+> >   	struct xhci_hcd_mtk *mtk = hcd_to_mtk(hcd);
+> >   	int ret;
+> >
+> > @@ -502,9 +503,14 @@ static int xhci_mtk_setup(struct usb_hcd *hcd)
+> >   			return ret;
+> >   	}
+> >
+> > -	ret = xhci_gen_setup(hcd, xhci_mtk_quirks);
+> > -	if (ret)
+> > -		return ret;
+> > +	return xhci_gen_setup(hcd, xhci_mtk_quirks);
+> > +}
+> > +
+> > +static int xhci_mtk_start(struct usb_hcd *hcd)
+> > +{
+> > +	struct xhci_hcd *xhci = hcd_to_xhci(hcd);
+> > +	struct xhci_hcd_mtk *mtk = hcd_to_mtk(hcd);
+> > +	int ret;
+> >
+> >   	if (usb_hcd_is_primary_hcd(hcd)) {
+> >   		mtk->num_u3_ports = xhci->num_usb3_ports;
+> 
+> In theory this causes xhci_mtk_sch_init() to allocate new memory
+> for mtk->sch_array every time   .start callback is called.
+> 
+I agree with you, it indeed a problem no matter called in .reset
+or .start in theory. Maybe it's better to call it in probe().
 
-> +	pdata->resources.phy_mode = phy_mode;
-> +
-> +	if (pdata->resources.phy_mode != PHY_INTERFACE_MODE_RGMII) {
-> +		dev_err(dev, "Incorrect phy-connection-type specified\n");
-> +		return -ENODEV;
-> +	}
-
-This does not take into account all other PHY_INTERFACE_MODE_RGMII
-variants, is that really intentional here?
-
-> +
-> +	ret = platform_get_irq(pdev, 0);
-> +	if (ret <= 0) {
-
-0 can be a valid interrupt on some platforms AFAIR, so you may want to
-just check < 0.
-
-> +		dev_err(dev, "Unable to get ENET IRQ\n");
-> +		ret = ret ? : -ENXIO;
-> +		return ret;
-> +	}
-> +	pdata->resources.irq = ret;
-> +
-
-> +static int xge_request_irq(struct net_device *ndev)
-> +{
-> +	struct xge_pdata *pdata = netdev_priv(ndev);
-> +	struct device *dev = &pdata->pdev->dev;
-> +	int ret;
-> +
-> +	snprintf(pdata->irq_name, IRQ_ID_SIZE, "%s", ndev->name);
-> +
-> +	ret = devm_request_irq(dev, pdata->resources.irq, xge_irq,
-> +			       0, pdata->irq_name, pdata);
-> +	if (ret)
-> +		netdev_err(ndev, "Failed to request irq %s\n", pdata->irq_name);
-
-The preference for network driver is to manage the request_irq() in the
-ndo_open() callback and free_irq() in the ndo_close() which kind of
-defeats the purpose of using devm_* functions for that purpose.
-
-
-> +static int xge_open(struct net_device *ndev)
-> +{
-> +	struct xge_pdata *pdata = netdev_priv(ndev);
-> +	int ret;
-> +
-> +	ret = xge_create_desc_rings(ndev);
-> +	if (ret)
-> +		return ret;
-> +
-> +	napi_enable(&pdata->napi);
-> +	ret = xge_request_irq(ndev);
-> +	if (ret)
-> +		return ret;
-> +
-> +	xge_intr_enable(pdata);
-> +	xge_wr_csr(pdata, DMARXCTRL, 1);
-> +	xge_mac_enable(pdata);
-> +	netif_start_queue(ndev);
-> +	netif_carrier_on(ndev);
-
-Can't you use PHYLIB to get the link indication and not manage the link
-state manually here? Setting netif_carrier_on() without checking the
-actualy physical medium is just plain wrong/
-
-
-> +static void xge_timeout(struct net_device *ndev)
-> +{
-> +	struct xge_pdata *pdata = netdev_priv(ndev);
-> +
-> +	rtnl_lock();
-> +
-> +	if (netif_running(ndev)) {
-
-Reduce indention here.
-
-> +		netif_carrier_off(ndev);
-> +		netif_stop_queue(ndev);
-> +		xge_intr_disable(pdata);
-> +		napi_disable(&pdata->napi);
-> +
-
-> +static int xge_probe(struct platform_device *pdev)
-> +{
-> +	struct device *dev = &pdev->dev;
-> +	struct net_device *ndev;
-> +	struct xge_pdata *pdata;
-> +	int ret;
-> +
-> +	ndev = alloc_etherdev(sizeof(struct xge_pdata));
-
-sizeof(*pdata).
--- 
-Florian
+> In practice it should not matter as .start is only called
+> when hcd is added in usb core.
+> 
+> Still wondering if there is a reason for this change?
+Just make xhci_mtk_setup() look simple.
+> 
+> -Mathias
+> 
+> 
