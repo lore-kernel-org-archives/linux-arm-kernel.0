@@ -1,23 +1,26 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 8 Mar 2017 12:45:11 +0100
-Subject: [PATCH] ARM: dts: imx6sx-udoo-neo: Fix reboot hang
-In-Reply-To: <1486494854-30802-1-git-send-email-festevam@gmail.com>
-References: <1486494854-30802-1-git-send-email-festevam@gmail.com>
-Message-ID: <20170308114509.GD12997@x250>
+Date: Wed, 8 Mar 2017 12:49:26 +0100
+Subject: [PATCH v2] ARM: dts: imx6q-cm-fx6: add analog audio support
+In-Reply-To: <c53afd927fae4a1dbd84ab8122e6c794@rwthex-s1-b.rwth-ad.de>
+References: <c53afd927fae4a1dbd84ab8122e6c794@rwthex-s1-b.rwth-ad.de>
+Message-ID: <20170308114925.GE12997@x250>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 07, 2017 at 05:14:14PM -0200, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@nxp.com>
+On Wed, Feb 08, 2017 at 09:44:04PM +0100, christopher.spinrath at rwth-aachen.de wrote:
+> From: Valentin Raevsky <valentin@compulab.co.il>
 > 
-> After issuing a 'reboot' command the imx6sx-udoo-neo board does not
-> reboot as expected and it just hangs instead.
+> The cm-fx6 module has an onboard Wolfson wm8731 codec which is muxed
+> to the ssi2 controller. Unlike most (all?) supported i.MX6 board/codec
+> combinations the wm8731 is operated in slave mode and the clock setup
+> is static.
 > 
-> In mainline kernel only LDO enabled mode is supported. Do not provide
-> arm-supply/soc-supply nodes in the device tree, so that the board operates
-> in LDO enabled mode and can then successfully reboot via watchdog.
+> Add support for it.
 > 
-> Fixes: 76e691fc7653b85d39 ("ARM: dts: imx6sx: Add UDOO Neo support")
-> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+> Signed-off-by: Valentin Raevsky <valentin@compulab.co.il>
+> [christopher.spinrath at rwth-aachen.de: enhanced commit message, ported
+>   to upstream and some cleanup]
+> Signed-off-by: Christopher Spinrath <christopher.spinrath@rwth-aachen.de>
+> Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
 
 Applied, thanks.
