@@ -1,33 +1,43 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Wed, 8 Mar 2017 08:47:58 +0200
-Subject: [PATCH v11 3/3] arm64: dts: exynos: Add support for S6E3HA2
- panel device on TM2 board
-In-Reply-To: <1488937357-5623-4-git-send-email-hoegeun.kwon@samsung.com>
-References: <1488937357-5623-1-git-send-email-hoegeun.kwon@samsung.com>
- <CGME20170308014258epcas5p3eb57787aee92913e79bd467d5b285c0e@epcas5p3.samsung.com>
- <1488937357-5623-4-git-send-email-hoegeun.kwon@samsung.com>
-Message-ID: <20170308064758.i6b6zu6rmmjrlo4w@kozik-lap>
+From: petr.cvek@tul.cz (Petr Cvek)
+Date: Wed, 8 Mar 2017 07:57:08 +0100
+Subject: [BUG] dmaengine: pxa_dma: + mmc: pxamci: race condition with DMA
+ error on tx channel
+Message-ID: <e749aff1-0ffc-c9ed-42b2-82397b4e8ba2@tul.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 08, 2017 at 10:42:37AM +0900, Hoegeun Kwon wrote:
-> From: Hyungwon Hwang <human.hwang@samsung.com>
-> 
-> This patch add the panel device tree node for S6E3HA2 display
-> controller to TM2 dts.
-> 
-> Signed-off-by: Hyungwon Hwang <human.hwang@samsung.com>
-> Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
-> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-> Signed-off-by: Hoegeun Kwon <hoegeun.kwon@samsung.com>
-> Tested-by: Chanwoo Choi <cw00.choi@samsung.com>
-> Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
-> ---
->  arch/arm64/boot/dts/exynos/exynos5433-tm2.dts | 12 ++++++++++++
->  1 file changed, 12 insertions(+)
-> 
+Hello,
 
-Thanks, applied.
+PXA27x DMA changes between:
+
+	v4.7
+	d52bd54db8be8999df6df5a776f38c4f8b5e9cea
+and
+	v4.10-rc5
+	a4685d2f58e2230d4e27fb2ee581d7ea35e5d046
+
+seems to expose a race condition while using PXA MMC driver on a PXA27x (magician.c machine).
+
+The failure causes one line in the kernel log, after which the filesystem on SD card is inaccessible (and machine too).
+
+	mmc0: DMA error on tx channel
+
+I wasn't able to track the problem to a single patch as the problem occurs at random time (from the boot to like a half an hour) and it's maybe dependent on a level of a battery charge (maybe because of kernel log writes of charging messages).
+
+It seems that most occurrency is during writes on an SD card. Using an SDHC card decreases the time to fail. After failure the OS is unavailable (rootfs in on the card).
+
+>From my poking in the kernel source code it seems there is a probability that pxamci_irq() takes longer to call and its subsequent call pxamci_data_done() isn't fast enough to set [1]
+	host->data = NULL;
+>From the DMA side, the DMA done interrupt is generated:
+	pxad_chan_handler() -> vchan_cookie_complete()
+...where a tasklet for vchan_complete() is scheduled, where finally with interrupts enabled (can pxamci_irq() be called here?) the callback pxamci_dma_irq() is called.
+
+>From my tests it seems at this point [2] the host->data is always NULL and rest of the callback is never called. It is called once with a nonempty host->data only just before the failure.
+
+During the testing I put udelay(100) at the start of pxamci_dma_irq() and fail occurred after like 2 hours (when I for the first time tapped the touchscreen - higher CPU usage and interrupts).
+
+[1] http://elixir.free-electrons.com/source/drivers/mmc/host/pxamci.c?v=4.10#L385
+[2] http://elixir.free-electrons.com/source/drivers/mmc/host/pxamci.c?v=4.10#L561
 
 Best regards,
-Krzysztof
+Petr
