@@ -1,80 +1,43 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 8 Mar 2017 09:24:01 +0100
-Subject: next build: 208 builds: 21 failed, 187 passed, 53 errors, 406
- warnings (next-20170308)
-In-Reply-To: <58bf7d43.8173190a.8d21e.1fde@mx.google.com>
-References: <58bf7d43.8173190a.8d21e.1fde@mx.google.com>
-Message-ID: <CAK8P3a16cpvK3_a0Rxx+XqRw_d97LtVgpzcpvpzmH6U4Ty-fXQ@mail.gmail.com>
+From: carlo@caione.org (Carlo Caione)
+Date: Wed, 8 Mar 2017 09:24:38 +0100
+Subject: [PATCH v2 0/2] scpi-sensors: Fix SCP sensor readings scale
+In-Reply-To: <20170303091449.3512-1-carlo@caione.org>
+References: <20170303091449.3512-1-carlo@caione.org>
+Message-ID: <CAOQ7t2bj29EG3z6uRQ=nBUeLXF4ODB4yayw3+Eohstg3aaA1_g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 8, 2017 at 4:40 AM, kernelci.org bot <bot@kernelci.org> wrote:
-> next build: 208 builds: 21 failed, 187 passed, 53 errors, 406 warnings
+On Fri, Mar 3, 2017 at 10:14 AM, Carlo Caione <carlo@caione.org> wrote:
+> From: Carlo Caione <carlo@endlessm.com>
 >
-> allmodconfig (arm) ? PASS, 0 errors, 6 warnings, 0 section mismatches
+> The implementation details for SCPI seems to suggest that the sensor
+> readings must be reported by SCP using a well defined scale
+> (millidegree Celsius for temperature, millivolts for voltage,
+> milliamperes for current, microwatts for power and microjoules for
+> energy).
 >
-> Warnings:
-> :1325:2: warning: #warning syscall statx not implemented [-Wcpp]
-
-The syscall was added to 4.11, and the warning will be resolved as soon
-as all architectures add it to their tables.
-
-> drivers/usb/gadget/udc/atmel_usba_udc.c:632:554: warning: 'ept_cfg' may be
-> used uninitialized in this function [-Wmaybe-uninitialized]
-
-I just resent my fix for the second time
-
-> drivers/staging/vc04_services/bcm2835-camera/bcm2835-camera.c:743:178:
-> warning: the address of '__func__' will always evaluate as 'true'
-> [-Waddress]
-
-A new regresssion as of today, won't be able to look myself, but this
-should be trivial to address.
-
-> bmips_be_defconfig (mips) ? FAIL, 1 error, 1 warning, 0 section mismatches
+> This is also important for the interaction with other subsystems: for
+> example both the thermal sub-system and the hwmon sysfs interface expect
+> the temperature expressed in millidegree Celsius.
 >
-> Errors:
-> arch/mips/kernel/smp-bmips.c:183:38: error: implicit declaration of function
-> 'task_stack_page' [-Werror=implicit-function-declaration]
-
-A new regression from the end of the merge window, also present in mainline.
-I sent a fix yesterday, addressing various mips build failures.
-
-> cavium_octeon_defconfig (mips) ? FAIL, 4 errors, 4 warnings, 0 section
-> mismatches
-> Warnings:
-> drivers/staging/octeon/ethernet-rx.c:339:28: warning: unused variable 'priv'
-> [-Wunused-variable]
-
-I sent the patch on Feb 17, resent the same one today
-
-> defconfig (arm64) ? PASS, 0 errors, 4 warnings, 0 section mismatches
+> Unfortunately since this behaviour is dependent on the firmware
+> implementation there are cases where the sensor readings are reported
+> using a different scale. For example in the Amlogic SoCs the
+> temperature is reported in degree and not millidegree Celsius.
 >
-> Warnings:
-> :1325:2: warning: #warning syscall statx not implemented [-Wcpp]
-> fs/overlayfs/inode.c:322:30: warning: 'ovl_i_mutex_key' defined but not used
-> [-Wunused-variable]
-> fs/overlayfs/inode.c:323:30: warning: 'ovl_i_mutex_dir_key' defined but not
-> used [-Wunused-variable]
-
-New regression as of today, haven't looked but seems trivial
-
-> defconfig+CONFIG_KASAN=y (x86) ? PASS, 0 errors, 5 warnings, 0 section
-> mismatches
+> In this patchset we introduce a new DT property `scpi,sensors-scale` that is
+> used by the scpi-hwmon driver to convert the sensor readings to the expected
+> scale.
 >
-> Warnings:
-> net/wireless/nl80211.c:1415:1: warning: the frame size of 2232 bytes is
-> larger than 2048 bytes [-Wframe-larger-than=]
-> net/wireless/nl80211.c:4443:1: warning: the frame size of 2232 bytes is
-> larger than 2048 bytes [-Wframe-larger-than=]
-> net/wireless/nl80211.c:5743:1: warning: the frame size of 2064 bytes is
-> larger than 2048 bytes [-Wframe-larger-than=]
-> net/wireless/nl80211.c:1904:1: warning: the frame size of 3784 bytes is
-> larger than 2048 bytes [-Wframe-larger-than=]
-> drivers/tty/vt/keyboard.c:1472:1: warning: the frame size of 2344 bytes is
-> larger than 2048 bytes [-Wframe-larger-than=]
+> v2:
+>  - Added data validation (scale != 0)
+>  - s/unsigned int/u32/ for the array
+>  - Switched to array initialiser notation
+>  - Introduced scpi_scale_reading()
 
-This is an old bug, I sent a first version of a longer patch series last
-week, will need to be updated next week, but I hope to get this into v4.11.
+gentle ping
 
-    Arnd
+
+
+-- 
+Carlo Caione
