@@ -1,23 +1,37 @@
-From: wuchengli@chromium.org (Wu-Cheng Li)
-Date: Wed,  8 Mar 2017 11:40:57 +0800
-Subject: [PATCH v3 0/1] mtk-vcodec: check the vp9 decoder buffer index from VPU
-Message-ID: <20170308034058.99886-1-wuchengli@chromium.org>
+From: roszenrami@gmail.com (Rami Rosen)
+Date: Wed, 8 Mar 2017 05:43:04 +0200
+Subject: [PATCH v4 net-next 4/6] drivers: net: xgene-v2: Add base driver
+In-Reply-To: <1488935325-13603-5-git-send-email-isubramanian@apm.com>
+References: <1488935325-13603-1-git-send-email-isubramanian@apm.com>
+ <1488935325-13603-5-git-send-email-isubramanian@apm.com>
+Message-ID: <CAKoUArkOj-RvWZB-Gy6GC2C3yHFvsEGgoauQcAxYhBAurdjH0A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wu-Cheng Li <wuchengli@google.com>
+Hi,
+One minor comment:
 
-v2: also check the result of vdec_if_decode in mtk_vdec_worker.
-v3: set buffer status to VB2_BUF_STATE_ERROR. Move printk out of lock.
+The return type of xge_init_hw() should be changed to be void, as
+the method xge_port_reset() always returns 0;  and also the return type
+of xge_port_reset() should be changed to be void, it never fails; see
+in [PATCH v4 net-next 3/6] drivers: net: xgene-v2: Add ethernet
+hardware configuration.
 
-Wu-Cheng Li (1):
-  mtk-vcodec: check the vp9 decoder buffer index from VPU.
 
- drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c | 33 +++++++++++++++++-----
- drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.h |  2 ++
- .../media/platform/mtk-vcodec/vdec/vdec_vp9_if.c   | 26 +++++++++++++++++
- drivers/media/platform/mtk-vcodec/vdec_drv_if.h    |  2 ++
- 4 files changed, 56 insertions(+), 7 deletions(-)
++static int xge_init_hw(struct net_device *ndev)
++{
++       struct xge_pdata *pdata = netdev_priv(ndev);
++       int ret;
++
++       ret = xge_port_reset(ndev);
++       if (ret)
++               return ret;
++
++       xge_port_init(ndev);
++       pdata->nbufs = NUM_BUFS;
++
++       return 0;
++}
 
--- 
-2.12.0.246.ga2ecc84866-goog
+Regards,
+Rami Rosen
