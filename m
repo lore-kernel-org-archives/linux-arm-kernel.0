@@ -1,61 +1,62 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Wed, 08 Mar 2017 12:09:45 +0100
-Subject: [PATCH v3 4/4] ARM: imx6: adopt DT to new GPC binding
-In-Reply-To: <20170308110600.GB17029@x250>
-References: <20170217190246.14881-1-l.stach@pengutronix.de>
- <20170217190246.14881-4-l.stach@pengutronix.de>
- <20170308110600.GB17029@x250>
-Message-ID: <1488971385.32329.34.camel@pengutronix.de>
+From: florian.kauer@koalo.de (Florian Kauer)
+Date: Wed, 8 Mar 2017 12:13:05 +0100
+Subject: [PATCH] ASoC: bcm_2835: Simplify mono guard by returning error on
+ mono
+In-Reply-To: <1488970734-6596-1-git-send-email-flatmax@flatmax.org>
+References: <1488970734-6596-1-git-send-email-flatmax@flatmax.org>
+Message-ID: <d86dad56-3291-6ac0-5109-eeb83e7f1215@koalo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, den 08.03.2017, 12:06 +0100 schrieb Shawn Guo:
-> On Fri, Feb 17, 2017 at 08:02:46PM +0100, Lucas Stach wrote:
-> > Adopt the i.MX6Q/DL DT to the new and more flexible GPC binding.
-> > 
-> > Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
-> 
-> I don't want to introduce a dependency between branches, so please
-> remind me to apply it after GPC driver changes land on mainline.  And
-> one small comment below ...
+I don't really see why it simplifies the code.
+Actually, the number of lines is even increased by this patch.
+And the logic will fail if ever params_channels would return something
+larger than 2.
 
-Okay, going to resend with the below fixed, once the GPC driver has
-landed.
+Greetings,
+Florian
 
-Thanks,
-Lucas
-
-> 
-> > ---
-> > v2: adapt to changed domain supply name
-> > ---
-> >  arch/arm/boot/dts/imx6q.dtsi   |  2 +-
-> >  arch/arm/boot/dts/imx6qdl.dtsi | 38 +++++++++++++++++++++++++++-----------
-> >  2 files changed, 28 insertions(+), 12 deletions(-)
-> > 
-> > diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-> > index e9a5d0b8c7b0..dd33849335b2 100644
-> > --- a/arch/arm/boot/dts/imx6q.dtsi
-> > +++ b/arch/arm/boot/dts/imx6q.dtsi
-> > @@ -125,7 +125,7 @@
-> >  			clocks = <&clks IMX6QDL_CLK_OPENVG_AXI>,
-> >  				 <&clks IMX6QDL_CLK_GPU2D_CORE>;
-> >  			clock-names = "bus", "core";
-> > -			power-domains = <&gpc 1>;
-> > +			power-domains = <&pd_pu>;
-> >  		};
-> >  
-> >  		ipu2: ipu at 02800000 {
-> > diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-> > index 53e6e63cbb02..8538b04af097 100644
-> > --- a/arch/arm/boot/dts/imx6qdl.dtsi
-> > +++ b/arch/arm/boot/dts/imx6qdl.dtsi
-> > @@ -1,3 +1,4 @@
-> > +
-> >  /*
-> >   * Copyright 2011 Freescale Semiconductor, Inc.
-> >   * Copyright 2011 Linaro Ltd.
-> 
-> This is an unrelated change.
-> 
-> Shawn
+On 08.03.2017 11:58, Matt Flax wrote:
+> This patch simplifies the bcm2835_i2s.c code when the driver returns
+> error on mono channel requests. It does this by testing for mono
+> instead of using a switch statement to test for stereo.
+>
+> The bcm2835_i2s driver can only work in stereo mode. Whilst leaving
+> the driver entirel compliant with the I2S protocol, it simplifies the
+> code by removing a few redundant lines of code.
+>
+> Signed-off-by: Matt Flax <flatmax@flatmax.org>
+> ---
+>  sound/soc/bcm/bcm2835-i2s.c | 17 +++++++++--------
+>  1 file changed, 9 insertions(+), 8 deletions(-)
+>
+> diff --git a/sound/soc/bcm/bcm2835-i2s.c b/sound/soc/bcm/bcm2835-i2s.c
+> index 6ba2049..1e6a1da 100644
+> --- a/sound/soc/bcm/bcm2835-i2s.c
+> +++ b/sound/soc/bcm/bcm2835-i2s.c
+> @@ -310,15 +310,16 @@ static int bcm2835_i2s_hw_params(struct snd_pcm_substream *substream,
+>  	ch1pos = data_delay;
+>  	ch2pos = bclk_ratio / 2 + data_delay;
+>
+> -	switch (params_channels(params)) {
+> -	case 2:
+> -		format = BCM2835_I2S_CH1(format) | BCM2835_I2S_CH2(format);
+> -		format |= BCM2835_I2S_CH1(BCM2835_I2S_CHPOS(ch1pos));
+> -		format |= BCM2835_I2S_CH2(BCM2835_I2S_CHPOS(ch2pos));
+> -		break;
+> -	default:
+> +	/* C
+> +	 * Check we aren't setting channel 2 on a mono stream.
+> +	 * We currently only support stereo
+> +	 */
+> +	if (params_channels(params) == 1)
+>  		return -EINVAL;
+> -	}
+> +
+> +	format = BCM2835_I2S_CH1(format) | BCM2835_I2S_CH2(format);
+> +	format |= BCM2835_I2S_CH1(BCM2835_I2S_CHPOS(ch1pos));
+> +	format |= BCM2835_I2S_CH2(BCM2835_I2S_CHPOS(ch2pos));
+>
+>  	/*
+>  	 * Set format for both streams.
+>
