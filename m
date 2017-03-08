@@ -1,100 +1,47 @@
-From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
-Date: Thu, 9 Mar 2017 00:28:47 +0100
-Subject: pcie-iproc: broken 2nd (& 3rd?) controller support by
- c3245a566400 ("PCI: iproc: Request host bridge window resources")
-In-Reply-To: <88dc6a0e-8989-d09f-1f93-6673a31664c1@broadcom.com>
-References: <faab6b85-58e8-3e62-8763-56a94b13fba1@gmail.com>
- <88dc6a0e-8989-d09f-1f93-6673a31664c1@broadcom.com>
-Message-ID: <4acf85df-d5d0-6a01-b331-3158d0233a0e@gmail.com>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Wed, 8 Mar 2017 17:32:53 -0600
+Subject: [PATCH v2] efi/libstub/arm*: Set default address and size cells
+ values for an empty dtb
+In-Reply-To: <9084badb-3340-fdca-9b41-8ab657d4bb15@codeaurora.org>
+References: <1486502360-18071-1-git-send-email-jhugo@codeaurora.org>
+ <b901a792-5ca0-1489-6dcf-b17a66920bc6@arm.com>
+ <9084badb-3340-fdca-9b41-8ab657d4bb15@codeaurora.org>
+Message-ID: <CAOZdJXX+tUeqq=CbwJ6oect2RLuB-VD5Ugzf6m6esmtPjJH5qw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/08/2017 06:22 PM, Ray Jui wrote:
-> On 3/8/2017 4:56 AM, Rafa? Mi?ecki wrote:
->> I just tried upgrading BCM5301X from 4.4 to 4.9 and noticed I don't see
->> card
->> connected to the 2nd controller.
->>
->> [    2.593534] pcie_iproc_bcma bcma0:7: PCI host bridge to bus 0000:00
->> [    2.599786] pci_bus 0000:00: root bus resource [mem
->> 0x08000000-0x0fffffff]
->> [    2.606663] pcie_iproc_bcma bcma0:7: link: UP
->> [    2.611316] PCI: bus0: Fast back to back transfers disabled
->> [    2.616899] pci 0000:00:00.0: bridge configuration invalid ([bus
->> 00-00]), reconfiguring
->> [    2.625395] PCI: bus1: Fast back to back transfers disabled
->> [    2.631011] pci 0000:00:00.0: BAR 8: assigned [mem
->> 0x08000000-0x080fffff]
->> [    2.637795] pci 0000:01:00.0: BAR 0: assigned [mem
->> 0x08000000-0x08007fff 64bit]
->> [    2.645091] pci 0000:00:00.0: PCI bridge to [bus 01]
->> [    2.650042] pci 0000:00:00.0:   bridge window [mem
->> 0x08000000-0x080fffff]
->>
->> [    2.657199] pcie_iproc_bcma bcma0:8: resource collision: [mem
->> 0x40000000-0x47ffffff] conflicts with PCIe MEM space [mem
->> 0x40000000-0x47ffffff]
->> [    2.669946] pcie_iproc_bcma bcma0:8: PCIe controller setup failed
->> [    2.676032] pcie_iproc_bcma: probe of bcma0:8 failed with error -16
->>
->
-> Would you be able to add some debugging trace to see when the resource
-> was allocated the first time, and when the resource was allocated the
-> second time and therefore results in the conflict?
->
-> In addition, I'm puzzled why this resource conflict issue for BCMA is
-> not seen with the first controller with outbound memory in the range of
-> 0x08000000 - 0x0fffffff? Maybe that provides a valuable data point here.
+On Thu, Mar 2, 2017 at 9:23 AM, Goel, Sameer <sgoel@codeaurora.org> wrote:
 
-This is clearly a conflict between iproc on 1st controller and iproc on 2nd controller.
+> Any tool making the device tree update should be checking for the cell sizes before
+> assuming a 32 bit or a 64 bit value.
 
-I added following code to the pcie-iproc-bcma.c:
-if (bdev->core_unit == 0) {
-	dev_info(dev, "[%s] aborting\n", __func__);
-	return -ENOTSUPP;
-}
+To be clear, Akashi's patches already look at the cell sizes:
 
-And it resulted in 2nd controller (bcma0:8) working again:
-[    2.472562] pcie_iproc_bcma bcma0:7: [iproc_pcie_bcma_probe] aborting
-[    2.479027] pcie_iproc_bcma: probe of bcma0:7 failed with error -524
-[    2.607425] pcie_iproc_bcma bcma0:8: PCI host bridge to bus 0000:00
-[    2.613678] pci_bus 0000:00: root bus resource [mem 0x40000000-0x47ffffff]
-[    2.620557] pcie_iproc_bcma bcma0:8: link: UP
-[    2.625206] PCI: bus0: Fast back to back transfers disabled
-[    2.630789] pci 0000:00:00.0: bridge configuration invalid ([bus 00-00]), reconfiguring
-[    2.639260] PCI: bus1: Fast back to back transfers disabled
-[    2.644871] pci 0000:00:00.0: BAR 8: assigned [mem 0x40000000-0x400fffff]
-[    2.651665] pci 0000:01:00.0: BAR 0: assigned [mem 0x40000000-0x40007fff 64bit]
-[    2.658962] pci 0000:00:00.0: PCI bridge to [bus 01]
-[    2.663911] pci 0000:00:00.0:   bridge window [mem 0x40000000-0x400fffff]
++static int __init early_init_dt_scan_usablemem(unsigned long node,
++               const char *uname, int depth, void *data)
++{
++       struct memblock_region *usablemem = data;
++       const __be32 *reg;
++       int len;
++
++       if (depth != 1 || strcmp(uname, "chosen") != 0)
++               return 0;
++
++       reg = of_get_flat_dt_prop(node, "linux,usable-memory-range", &len);
++       if (!reg || (len < (dt_root_addr_cells + dt_root_size_cells)))
++               return 1;
++
++       usablemem->base = dt_mem_next_cell(dt_root_addr_cells, &reg);
++       usablemem->size = dt_mem_next_cell(dt_root_size_cells, &reg);
++
++       return 1;
++}
 
-I'm not exactly sure where this conflict is coming from. For debugging purposes I added:
-dev_info(dev, "[%s] res_mem:%pR\n", __func__, &res_mem);
+This function uses dt_root_addr_cells and dt_root_size_cells.  With
+Sameer's patch, those values should be 2 and 2, respectively, on ARM64
+systems.
 
-Which resulted in:
-[    2.474558] pcie_iproc_bcma bcma0:7: [iproc_pcie_bcma_probe] res_mem:[mem 0x08000000-0x0fffffff]
-[    2.597246] pcie_iproc_bcma bcma0:7: PCI host bridge to bus 0000:00
-[    2.603500] pci_bus 0000:00: root bus resource [mem 0x08000000-0x0fffffff]
-[    2.610382] pcie_iproc_bcma bcma0:7: link: UP
-[    2.615032] PCI: bus0: Fast back to back transfers disabled
-[    2.620619] pci 0000:00:00.0: bridge configuration invalid ([bus 00-00]), reconfiguring
-[    2.629131] PCI: bus1: Fast back to back transfers disabled
-[    2.634745] pci 0000:00:00.0: BAR 8: assigned [mem 0x08000000-0x080fffff]
-[    2.641537] pci 0000:01:00.0: BAR 0: assigned [mem 0x08000000-0x08007fff 64bit]
-[    2.648835] pci 0000:00:00.0: PCI bridge to [bus 01]
-[    2.653783] pci 0000:00:00.0:   bridge window [mem 0x08000000-0x080fffff]
-[    2.660947] pcie_iproc_bcma bcma0:8: [iproc_pcie_bcma_probe] res_mem:[mem 0x40000000-0x47ffffff]
-[    2.669732] pcie_iproc_bcma bcma0:8: resource collision: [mem 0x40000000-0x47ffffff] conflicts with PCIe MEM space [mem 0x40000000-0x47ffffff]
-[    2.682470] pcie_iproc_bcma bcma0:8: PCIe controller setup failed
-[    2.688559] pcie_iproc_bcma: probe of bcma0:8 failed with error -16
-
-There shouldn't be any conflict between 0x08000000-0x0fffffff and 0x40000000-0x47ffffff, right?
-
-For bcma we do this:
-res_mem.start = bdev->addr_s[0];
-res_mem.end = bdev->addr_s[0] + SZ_128M - 1;
-
-In case of BCM4708 there are following addresses:
-[    2.285430] bcma: bus0: Core 7 found: PCIe Gen 2 (manuf 0x4BF, id 0x501, rev 0x01, class 0x0)	addr:0x18012000 wrap:0x18101000 addr_s[0]:0x08000000 addr_s[1]:0x00000000
-[    2.300384] bcma: bus0: Core 8 found: PCIe Gen 2 (manuf 0x4BF, id 0x501, rev 0x01, class 0x0)	addr:0x18013000 wrap:0x18102000 addr_s[0]:0x40000000 addr_s[1]:0x00000000
-which matches what we see in the boot log.
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
