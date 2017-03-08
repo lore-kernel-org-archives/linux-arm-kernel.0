@@ -1,57 +1,82 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 8 Mar 2017 11:52:53 -0800
-Subject: Creating kernel mappings for memory initially marked with bootmem
- NOMAP?
-In-Reply-To: <98B5CAFC-C183-42C5-935A-E9E0C30867E8@linaro.org>
-References: <c17b0a16-fde5-9254-f84a-418972201eae@gmail.com>
- <98B5CAFC-C183-42C5-935A-E9E0C30867E8@linaro.org>
-Message-ID: <91620f16-7c0f-970e-eefb-d92cc948656f@gmail.com>
+From: Stuart.Yoder@arm.com (Stuart Yoder)
+Date: Wed, 8 Mar 2017 19:56:05 +0000
+Subject: [PATCH v15 3/5] tee: add OP-TEE driver
+In-Reply-To: <CALRxmdDNdCXztby5Kf5BUsmw8zX5+0-g9M=hjAbpUxFvVRDfJw@mail.gmail.com>
+References: <1485605984-30064-1-git-send-email-jens.wiklander@linaro.org>
+ <1485605984-30064-4-git-send-email-jens.wiklander@linaro.org>
+ <CALRxmdDNdCXztby5Kf5BUsmw8zX5+0-g9M=hjAbpUxFvVRDfJw@mail.gmail.com>
+Message-ID: <4C0FFCAE-756B-4432-9791-290337A2F5AA@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/08/2017 11:14 AM, Ard Biesheuvel wrote:
-> 
->> On 8 Mar 2017, at 20:03, Florian Fainelli <f.fainelli@gmail.com> wrote:
->>
->> Hi,
->>
->> On our platforms (brcmstb) we have an use case where we boot with some
->> (a lot actually) memory carved out and marked initially with bootmem
->> NOMAP in order for this memory not to be mapped in the kernel's linear
->> mapping.
->>
->> Now, we have some peripherals that want large chunks of physically and
->> virtually contiguous memory that belong to these memblock NOMAP ranges.
->> I have no problems using mmap() against this memory, because the kernel
->> will do what is necessary for a process to map it for me. The struggle
->> is for a kernel driver which specifies a range of physical memory and
->> size, and expects a virtually contiguous mapping in return (not using
->> DMA-API, because reasons).
->>
->> Essentially the problem is that there are no PTEs created for these
->> memory regions (and pfn_valid() returns 0, since this is NOMAP memory),
->> so I have been playing with __add_pages() from the memory hotplug code
->> in an attempt to get proper page references to this memory, but I am
->> clearly missing something.
->>
->> Yes I know it's a terrible idea, but what if I wanted to get that working?
->>
-> 
-> Did you try memremap?
+[cut]
+> +static struct optee *optee_probe(struct device_node *np)
+> +{
+> +       optee_invoke_fn *invoke_fn;
+> +       struct tee_shm_pool *pool;
+> +       struct optee *optee = NULL;
+> +       void *memremaped_shm = NULL;
+> +       struct tee_device *teedev;
+> +       u32 sec_caps;
+> +       int rc;
+> +
+> +       invoke_fn = get_invoke_func(np);
+> +       if (IS_ERR(invoke_fn))
+> +               return (void *)invoke_fn;
+> +
+> +       if (!optee_msg_api_uid_is_optee_api(invoke_fn)) {
+> +               pr_warn("api uid mismatch\n");
+> +               return ERR_PTR(-EINVAL);
+> +       }
+> +
+> +       if (!optee_msg_api_revision_is_compatible(invoke_fn)) {
+> +               pr_warn("api revision mismatch\n");
+> +               return ERR_PTR(-EINVAL);
+> +       }
+> +
+> +       if (!optee_msg_exchange_capabilities(invoke_fn, &sec_caps)) {
+> +               pr_warn("capabilities mismatch\n");
+> +               return ERR_PTR(-EINVAL);
+> +       }
+> +
+> +       /*
+> +        * We have no other option for shared memory, if secure world
+> +        * doesn't have any reserved memory we can use we can't continue.
+> +        */
+> +       if (!(sec_caps & OPTEE_SMC_SEC_CAP_HAVE_RESERVERED_SHM))
+> +               return ERR_PTR(-EINVAL);
 
-Not yet, because this is done on 4.1 at the moment, but I will
-definitively give this a try, thanks a lot!
+Typo?  RESERVERED_SHM should be RESERVED_SHM
 
-Side note: on a kernel that does not have memremap() (such as 4.1),
-would not an ioremap_cache() on the physical range marked as NOMAP
-result in the same behavior anyway? ioremap() won't catch the fact that
-we are mapping RAM, since this is NOMAP, pfn_valid() returns 0.
+> diff --git a/drivers/tee/optee/optee_smc.h b/drivers/tee/optee/optee_smc.h
+> +/*
+> + * Exchanges capabilities between normal world and secure world
+> + *
+> + * Call register usage:
+> + * a0  SMC Function ID, OPTEE_SMC_EXCHANGE_CAPABILITIES
+> + * a1  bitfield of normal world capabilities OPTEE_SMC_NSEC_CAP_*
+> + * a2-6        Not used
+> + * a7  Hypervisor Client ID register
+> + *
+> + * Normal return register usage:
+> + * a0  OPTEE_SMC_RETURN_OK
+> + * a1  bitfield of secure world capabilities OPTEE_SMC_SEC_CAP_*
+> + * a2-7        Preserved
+> + *
+> + * Error return register usage:
+> + * a0  OPTEE_SMC_RETURN_ENOTAVAIL, can't use the capabilities from normal world
+> + * a1  bitfield of secure world capabilities OPTEE_SMC_SEC_CAP_*
+> + * a2-7 Preserved
+> + */
+> +/* Normal world works as a uniprocessor system */
+> +#define OPTEE_SMC_NSEC_CAP_UNIPROCESSOR                BIT(0)
+> +/* Secure world has reserved shared memory for normal world to use */
+> +#define OPTEE_SMC_SEC_CAP_HAVE_RESERVERED_SHM  BIT(0)
 
-My understanding of the pfn_valid() check for ioremap() is to avoid
-mapping the same DRAM location twice with potentially conflicting
-attributes, but if it has not been mapped at all, as is the case with
-NOMAP, does not that get me the same results?
+Same typo?  s/RESERVERED_SHM/RESERVED_SHM/
 
-Thanks!
--- 
-Florian
+Thanks,
+Stuart
+
+
+IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
