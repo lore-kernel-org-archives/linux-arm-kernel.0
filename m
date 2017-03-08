@@ -1,41 +1,79 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Wed, 8 Mar 2017 09:26:01 +0000
-Subject: [PATCH] reset: sunxi: fix for 64-bit compilation
-In-Reply-To: <CAGb2v64SozB9vUpotkEOyUK33ba8hq9M-QRQUEzEQ565Bhd93g@mail.gmail.com>
-References: <1488764156-22197-1-git-send-email-andre.przywara@arm.com>
- <CAGb2v64SozB9vUpotkEOyUK33ba8hq9M-QRQUEzEQ565Bhd93g@mail.gmail.com>
-Message-ID: <6a0e362b-8ebf-6254-6387-12967ec8c484@arm.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Wed, 08 Mar 2017 10:26:17 +0100
+Subject: [GIT PULL] Reset controller changes for v4.12
+Message-ID: <1488965177.2467.7.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Dear arm-soc maintainers,
 
-On 08/03/17 04:28, Chen-Yu Tsai wrote:
-> On Mon, Mar 6, 2017 at 9:35 AM, Andre Przywara <andre.przywara@arm.com> wrote:
->> The Allwinner reset controller has 32-bit registers, so translating
->> the reset cell number into a register and bit offset should not use
->> any architecture dependent data size. Otherwise this breaks for 64-bit
->> architectures like arm64.
->> Fix this by making it clear that it's the hardware register width which
->> matters here in the calculation.
->>
->> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> 
-> Acked-by: Chen-Yu Tsai <wens@csie.org>
+Please consider merging this tag, which adds new drivers for i.MX7 and
+Arria10, removes module code from non-modular drivers, and fixes a build
+warning in the uniphier driver and the nr_resets property usage of the
+socfpga driver.
 
-Thanks a lot!
+regards
+Philipp
 
-> Though I don't expect this driver to be used with arm64 chips.
+The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
 
-Well, weren't we toying with the idea of using this for the A64 PRCM
-support?
+  Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
 
-Also the driver is actually pretty generic, and I have (renaming)
-patches lying around to make this obvious. This is partly driven by a
-side project for some (arm64) SoC support, which can happily use that
-driver to tackle its device reset support.
+are available in the git repository at:
 
-So as this is an obvious bug, I'd rather see this fixed now.
+  git://git.pengutronix.de/git/pza/linux.git tags/reset-for-4.12
 
-Cheers,
-Andre.
+for you to fetch changes up to 2fd14a1f3d3a1835c401a21f2d813030a97eab7d:
+
+  reset: Add Altera Arria10 SR Reset Controller (2017-03-08 09:36:45 +0100)
+
+----------------------------------------------------------------
+Reset controller changes for v4.12
+
+- make reset drivers with bool Kconfig options explicitly non-modular
+- fix uniphier non-static symbol warnings
+- fix socfpga nr_resets property
+- new drivers for the Arria10 and i.MX7 system reset controllers
+
+----------------------------------------------------------------
+Andrey Smirnov (1):
+      reset: Add i.MX7 SRC reset driver
+
+Paul Gortmaker (4):
+      reset: meson: make it explicitly non-modular
+      reset: oxnas: make it explicitly non-modular
+      reset: ath79: make it explicitly non-modular
+      reset: pistachio: make it explicitly non-modular
+
+Rojhalat Ibrahim (1):
+      reset-socfpga: Fix nr_resets property
+
+Thor Thayer (3):
+      dt-bindings: mfd: Add Altera Arria10 SR Reset Controller bindings
+      dt-bindings: reset: a10sr: Add Arria10 SR Reset Controller offsets
+      reset: Add Altera Arria10 SR Reset Controller
+
+Wei Yongjun (1):
+      reset: uniphier: fix non static symbol warnings
+
+ .../devicetree/bindings/mfd/altera-a10sr.txt       |  11 ++
+ .../devicetree/bindings/reset/fsl,imx7-src.txt     |  47 ++++++
+ MAINTAINERS                                        |   2 +
+ drivers/reset/Kconfig                              |  14 ++
+ drivers/reset/Makefile                             |   3 +
+ drivers/reset/reset-a10sr.c                        | 138 ++++++++++++++++++
+ drivers/reset/reset-ath79.c                        |  27 ++--
+ drivers/reset/reset-imx7.c                         | 158 +++++++++++++++++++++
+ drivers/reset/reset-meson.c                        |  12 +-
+ drivers/reset/reset-oxnas.c                        |   6 +-
+ drivers/reset/reset-pistachio.c                    |   9 +-
+ drivers/reset/reset-socfpga.c                      |  13 +-
+ drivers/reset/reset-uniphier.c                     |  20 +--
+ include/dt-bindings/reset/altr,rst-mgr-a10sr.h     |  33 +++++
+ include/dt-bindings/reset/imx7-reset.h             |  62 ++++++++
+ 15 files changed, 501 insertions(+), 54 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/reset/fsl,imx7-src.txt
+ create mode 100644 drivers/reset/reset-a10sr.c
+ create mode 100644 drivers/reset/reset-imx7.c
+ create mode 100644 include/dt-bindings/reset/altr,rst-mgr-a10sr.h
+ create mode 100644 include/dt-bindings/reset/imx7-reset.h
