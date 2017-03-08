@@ -1,29 +1,27 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 8 Mar 2017 14:57:53 +0100
-Subject: i.MX7 pinctrl driver writing to non existent registers
-In-Reply-To: <20170208090817.omm2dydhqukdzgqy@pengutronix.de>
-References: <20170208090817.omm2dydhqukdzgqy@pengutronix.de>
-Message-ID: <20170308135751.GB19934@x250>
+Date: Wed, 8 Mar 2017 15:01:35 +0100
+Subject: [PATCH] ARM: dts: imx53-qsb: Constrain the TVE DAC voltage
+In-Reply-To: <1486557231-8889-1-git-send-email-fabio.estevam@nxp.com>
+References: <1486557231-8889-1-git-send-email-fabio.estevam@nxp.com>
+Message-ID: <20170308140134.GC19934@x250>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 08, 2017 at 10:08:17AM +0100, Sascha Hauer wrote:
-> Hi All,
+On Wed, Feb 08, 2017 at 10:33:51AM -0200, Fabio Estevam wrote:
+> Quoting Philipp Zabel:
+> "Since this regulator is used as the TVDAC analog power supply, this
+> range should at least be limited to the analog power supply range of the
+> TVDAC, listed in Table 74-9. of the i.MX53 reference manual (2.5-2.75V).
 > 
-> The i.MX7 has two pinmux controllers, the LPSR and the regular one. We
-> instantiate a driver for each one. Now the driver assumes that the pins
-> are completely configured with one iomux controller, but for the LPSR
-> pins this is not true: The MUX_CTL and PAD_CTL registers are indeed
-> in the LPSR controller, but the SELECT_INPUT registers for the same
-> pin are found in the regular controller.
+> But since the nominal voltage is 2.75V, which was used to determine the
+> analog gain that is supposed to result in the necessary 0.7V
+> peak-to-peak amplitude on the VGA output, I'd say we should just fix the
+> voltage to 2750000 here."
 > 
-> The result is that with this pin for example:
+> , so limit the TVDAC analog power supply as suggested.
 > 
-> #define MX7D_PAD_GPIO1_IO06__UART5_DCE_RX                         0x0018 0x0048 0x0714 0x3 0x4
-> 
-> The LPSR controller writes to LPSR_BASE + 0x714 where it should really
-> be IOMUX_BASE + 0x714.
+> Suggested-by: Lucas Stach <l.stach@pengutronix.de>
+> Suggested-by: Philipp Zabel <p.zabel@pengutronix.de>
+> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 
-Isn't property fsl,input-sel being there for addressing that?
-
-Shawn
+Applied, thanks.
