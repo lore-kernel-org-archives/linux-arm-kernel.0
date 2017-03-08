@@ -1,70 +1,67 @@
-From: linux.amoon@gmail.com (Anand Moon)
-Date: Wed, 8 Mar 2017 22:52:32 +0530
-Subject: [PATCH] ARM64: dts: meson-gxbb-odroidc2: enable USB Host Nodes
-In-Reply-To: <1488918961-4666-1-git-send-email-linux.amoon@gmail.com>
-References: <1488918961-4666-1-git-send-email-linux.amoon@gmail.com>
-Message-ID: <CANAwSgTUPpYvFWcZOf+j6K+1rDZJNUeu9K1fGAB8TC6TgzRXCg@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 08 Mar 2017 18:24:15 +0100
+Subject: [PATCH 2/3] usb: host: Allow to build ehci orion with mvebu SoCs
+In-Reply-To: <20170308170136.GC32355@lunn.ch> (Andrew Lunn's message of "Wed,
+ 8 Mar 2017 18:01:36 +0100")
+References: <20170308162423.25553-1-gregory.clement@free-electrons.com>
+ <20170308162423.25553-3-gregory.clement@free-electrons.com>
+ <20170308170136.GC32355@lunn.ch>
+Message-ID: <87o9xblm0w.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
+Hi Andrew,
+ 
+ On mer., mars 08 2017, Andrew Lunn <andrew@lunn.ch> wrote:
 
-On 8 March 2017 at 02:06, Anand Moon <linux.amoon@gmail.com> wrote:
-> From: Anand Moon <linux.amoon@gmail.com>
+> On Wed, Mar 08, 2017 at 05:24:22PM +0100, Gregory CLEMENT wrote:
+>> The mvebu ARM64 SoCs no more select PLAT_ORION but some of them as the
+>> Armada 37xx use the EHCI orion controller. This patch allow to build
+>> the driver when ARCH_MVEBU is selected.
 >
-> update the regulator supply nodes for usb host to
-> enable usb host on odroid-c2
->
-> Signed-off-by: Anand Moon <linux.amoon@gmail.com>
-> ---
-> root at odroid64:/usr/src/odroidxu3-4.y-devel# lsusb -t
-> /:  Bus 01.Port 1: Dev 1, Class=root_hub, Driver=dwc2/1p, 480M
->     |__ Port 1: Dev 2, If 0, Class=Hub, Driver=hub/4p, 480M
->         |__ Port 1: Dev 3, If 0, Class=Human Interface Device, Driver=usbhid, 1.5M
->         |__ Port 1: Dev 3, If 1, Class=Human Interface Device, Driver=usbhid, 1.5M
->         |__ Port 2: Dev 4, If 0, Class=Mass Storage, Driver=usb-storage, 480M
->         |__ Port 4: Dev 5, If 0, Class=Mass Storage, Driver=usb-storage, 480M
-> ---
->  arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts | 13 +++++++++++++
->  1 file changed, 13 insertions(+)
->
-> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
-> index c59403a..304b676 100644
-> --- a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
-> +++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
-> @@ -64,6 +64,18 @@
->                 reg = <0x0 0x0 0x0 0x80000000>;
->         };
->
-> +       usb_host_pwr: regulator-usb-pwrs {
-> +               compatible = "regulator-fixed";
-> +
-> +               regulator-name = "USB_HOST_PWR";
-> +
-> +               regulator-min-microvolt = <5000000>;
-> +               regulator-max-microvolt = <5000000>;
-> +
-> +               gpio = <&gpio_ao GPIOAO_4 GPIO_ACTIVE_HIGH>;
-> +               enable-active-high;
-> +       };
-> +
->         usb_otg_pwr: regulator-usb-pwrs {
->                 compatible = "regulator-fixed";
->
-> @@ -184,6 +196,7 @@
->
->  &usb1_phy {
->         status = "okay";
-> +       phy-supply = <&usb_host_pwr>;
->  };
->
->  &usb0 {
-> --
-> 2.7.4
->
+> The mvebu ARM64 SoCs no longer selects PLAT_ORION.  However Armada
+> 37xx use the Orion EHCI controller. This patch allows the Orion EHCI
+> driver to be built when ARCH_MVEBU is selected.
 
-Please ignore this patch, It not working.
-I will try to submit a new patch.
+Thanks for this enhancement!
 
-Best Regards
--Anand Moon
+>
+>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>> ---
+>>  drivers/usb/host/Kconfig | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>> 
+>> diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
+>> index 407d947b34ea..870c42d89298 100644
+>> --- a/drivers/usb/host/Kconfig
+>> +++ b/drivers/usb/host/Kconfig
+>> @@ -188,7 +188,7 @@ config USB_EHCI_HCD_OMAP
+>>  
+>>  config USB_EHCI_HCD_ORION
+>>  	tristate  "Support for Marvell EBU on-chip EHCI USB controller"
+>> -	depends on USB_EHCI_HCD && PLAT_ORION
+>> +	depends on USB_EHCI_HCD && PLAT_ORION || ARCH_MVEBU
+>
+> I don't know the Kconfig language too well. Should this be:
+>
+>> +	depends on USB_EHCI_HCD && (PLAT_ORION || ARCH_MVEBU)
+
+Your version seems better.
+
+Thanks,
+
+Gregory
+
+>
+>   Andrew
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
