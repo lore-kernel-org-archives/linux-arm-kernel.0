@@ -1,22 +1,51 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 8 Mar 2017 11:57:58 +0100
-Subject: [PATCH v3 3/4] soc/imx: add new GPC driver
-In-Reply-To: <20170217190246.14881-3-l.stach@pengutronix.de>
-References: <20170217190246.14881-1-l.stach@pengutronix.de>
- <20170217190246.14881-3-l.stach@pengutronix.de>
-Message-ID: <20170308105756.GA17029@x250>
+From: flatmax@flatmax.org (Matt Flax)
+Date: Wed,  8 Mar 2017 21:58:54 +1100
+Subject: [PATCH] ASoC: bcm_2835: Simplify mono guard by returning error on mono
+Message-ID: <1488970734-6596-1-git-send-email-flatmax@flatmax.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 17, 2017 at 08:02:45PM +0100, Lucas Stach wrote:
-> This is an almost complete re-write of the previous GPC power gating control
-> code found in the IMX architecture code. It supports both the old and the new
-> DT binding, allowing more domains to be added later and generally makes the
-> driver easier to extend, while keeping compatibility with existing DTBs.
-> 
-> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+This patch simplifies the bcm2835_i2s.c code when the driver returns
+error on mono channel requests. It does this by testing for mono
+instead of using a switch statement to test for stereo.
 
-I applied #1 ~ #3, with #2 and #3 merged into one to avoid possible
-git bisect issue.
+The bcm2835_i2s driver can only work in stereo mode. Whilst leaving
+the driver entirel compliant with the I2S protocol, it simplifies the
+code by removing a few redundant lines of code.
 
-Shawn
+Signed-off-by: Matt Flax <flatmax@flatmax.org>
+---
+ sound/soc/bcm/bcm2835-i2s.c | 17 +++++++++--------
+ 1 file changed, 9 insertions(+), 8 deletions(-)
+
+diff --git a/sound/soc/bcm/bcm2835-i2s.c b/sound/soc/bcm/bcm2835-i2s.c
+index 6ba2049..1e6a1da 100644
+--- a/sound/soc/bcm/bcm2835-i2s.c
++++ b/sound/soc/bcm/bcm2835-i2s.c
+@@ -310,15 +310,16 @@ static int bcm2835_i2s_hw_params(struct snd_pcm_substream *substream,
+ 	ch1pos = data_delay;
+ 	ch2pos = bclk_ratio / 2 + data_delay;
+ 
+-	switch (params_channels(params)) {
+-	case 2:
+-		format = BCM2835_I2S_CH1(format) | BCM2835_I2S_CH2(format);
+-		format |= BCM2835_I2S_CH1(BCM2835_I2S_CHPOS(ch1pos));
+-		format |= BCM2835_I2S_CH2(BCM2835_I2S_CHPOS(ch2pos));
+-		break;
+-	default:
++	/* C
++	 * Check we aren't setting channel 2 on a mono stream.
++	 * We currently only support stereo
++	 */
++	if (params_channels(params) == 1)
+ 		return -EINVAL;
+-	}
++
++	format = BCM2835_I2S_CH1(format) | BCM2835_I2S_CH2(format);
++	format |= BCM2835_I2S_CH1(BCM2835_I2S_CHPOS(ch1pos));
++	format |= BCM2835_I2S_CH2(BCM2835_I2S_CHPOS(ch2pos));
+ 
+ 	/*
+ 	 * Set format for both streams.
+-- 
+2.7.4
