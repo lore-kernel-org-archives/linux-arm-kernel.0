@@ -1,49 +1,80 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 8 Mar 2017 19:01:04 +0530
-Subject: [PATCH v2 08/22] PCI: dwc: designware: Add EP mode support
-In-Reply-To: <35d539ba-956f-330e-c28d-b67c3d414578@synopsys.com>
-References: <1487325042-28227-1-git-send-email-kishon@ti.com>
- <1487325042-28227-9-git-send-email-kishon@ti.com>
- <45e5288e-d11f-c855-af9b-692a42d878c6@synopsys.com> <58BE42B2.20305@ti.com>
- <02461be2-268d-485a-2bc4-3b148726d37d@synopsys.com>
- <aa9835a7-07f4-d042-d04a-b0d9cc0ea3de@synopsys.com> <58BFEC7D.3090608@ti.com>
- <35d539ba-956f-330e-c28d-b67c3d414578@synopsys.com>
-Message-ID: <58C00798.1030302@ti.com>
+From: slash.tmp@free.fr (Mason)
+Date: Wed, 8 Mar 2017 14:39:09 +0100
+Subject: Neophyte questions about PCIe
+In-Reply-To: <ced6a4bf-c94a-c116-1e94-52a8d675d132@free.fr>
+References: <ced6a4bf-c94a-c116-1e94-52a8d675d132@free.fr>
+Message-ID: <0cd311b9-b621-432d-f95f-fafc5016bce0@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 07/03/2017 23:45, Mason wrote:
 
-On Wednesday 08 March 2017 05:07 PM, Joao Pinto wrote:
-> ?s 11:35 AM de 3/8/2017, Kishon Vijay Abraham I escreveu:
->> Hi,
->>
->> On Wednesday 08 March 2017 05:02 PM, Joao Pinto wrote:
->>>
->>> Hi Kishon,
->>>
->>>>> Can you provide PCIE_GET_ATU_INB_UNR_REG_OFFSET (similar to
->>>>> PCIE_GET_ATU_OUTB_UNR_REG_OFFSET)?
->>>>
->>>> Yes of course, I will send you the definition soon.
->>>
->>> As promissed here is the definition for Inbound:
->>>
->>> +/* register address builder */
->>> +#define PCIE_GET_ATU_INB_UNR_REG_ADDR(region, register)		\
->>> +					((0x3 << 20) | (region << 9) |	\
->>> +					(0x1 << 8) | (register << 2))
->>
->> Cool, thanks!
-> 
-> No problem! If you have doubts, please let me know.
+> 3) What happens if a device requires more than 256 MB of
+> mem space? (Is that common? What kind of device? GPUs?)
+> Our controller supports a remapping "facility" to add an
+> offset to the bus address. Is such a feature supported
+> by Linux at all?  The problem is that this creates
+> another race condition, as setting the offset register
+> before an access may occur concurrently on two cores.
+> Perhaps 256 MB is plenty on a 32-bit embedded device?
 
-Okay, so this looks slightly different than the outbound macro since it takes
-the register argument. In the case of outbound PCIE_GET_ATU_OUTB_UNR_REG_OFFSET
-returns the offset which was used like
-dw_pcie_write_dbi(pci, base, offset + reg, 0x4, val);
+I was told that Linux does not support this kind of "dynamic remapping",
+because access to PCI memory region is not handled through a call-back;
+the driver just calls readl/writel directly on the pointer.
 
-How should the value from PCIE_GET_ATU_INB_UNR_REG_ADDR be used?
+"We expect that any device we map into the address space is reachable
+through static page table entries set up by ioremap() or pci_iomap()."
 
-Thanks
-Kishon
+
+On a related subject, I asked about the max size of I/O space.
+
+/**
+ *	pci_remap_iospace - Remap the memory mapped I/O space
+ *	@res: Resource describing the I/O space
+ *	@phys_addr: physical address of range to be mapped
+ *
+ *	Remap the memory mapped I/O space described by the @res
+ *	and the CPU physical address @phys_addr into virtual address space.
+ *	Only architectures that have memory mapped IO functions defined
+ *	(and the PCI_IOBASE value defined) should call this function.
+ */
+int __weak pci_remap_iospace(const struct resource *res, phys_addr_t phys_addr)
+{
+#if defined(PCI_IOBASE) && defined(CONFIG_MMU)
+	unsigned long vaddr = (unsigned long)PCI_IOBASE + res->start;
+
+	if (!(res->flags & IORESOURCE_IO))
+		return -EINVAL;
+
+	if (res->end > IO_SPACE_LIMIT)
+		return -EINVAL;
+
+	return ioremap_page_range(vaddr, vaddr + resource_size(res), phys_addr,
+				  pgprot_device(PAGE_KERNEL));
+#else
+	/* this architecture does not have memory mapped I/O space,
+	   so this function should never be called */
+	WARN_ONCE(1, "This architecture does not support memory mapped I/O\n");
+	return -ENODEV;
+#endif
+}
+
+/* PCI fixed i/o mapping */
+#define PCI_IO_VIRT_BASE	0xfee00000
+#define PCI_IOBASE		((void __iomem *)PCI_IO_VIRT_BASE)
+
+http://lxr.free-electrons.com/source/arch/arm/include/asm/io.h?v=4.9#L188
+
+#ifdef CONFIG_NEED_MACH_IO_H
+#include <mach/io.h>
+#elif defined(CONFIG_PCI)
+#define IO_SPACE_LIMIT	((resource_size_t)0xfffff)
+#define __io(a)		__typesafe_io(PCI_IO_VIRT_BASE + ((a) & IO_SPACE_LIMIT))
+#else
+#define __io(a)		__typesafe_io((a) & IO_SPACE_LIMIT)
+#endif
+
+So the default seems to be 1 MB on arm32. But the platform seems allowed
+to define a larger or a smaller space.
+
+Regards.
