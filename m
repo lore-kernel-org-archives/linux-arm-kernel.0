@@ -1,161 +1,52 @@
-From: tiffany.lin@mediatek.com (Tiffany Lin)
-Date: Wed, 8 Mar 2017 11:11:20 +0800
-Subject: [PATCH v2 1/1] mtk-vcodec: check the vp9 decoder buffer index
- from VPU.
-In-Reply-To: <20170307144207.133234-2-wuchengli@chromium.org>
-References: <20170307144207.133234-1-wuchengli@chromium.org>
- <20170307144207.133234-2-wuchengli@chromium.org>
-Message-ID: <1488942680.4522.2.camel@mtksdaap41>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed,  8 Mar 2017 11:28:20 +0800
+Subject: [PATCH 1/2] ARM: dts: sun8i-a23-q8-tablet: Drop pinmux setting for
+ codec PA gpio
+In-Reply-To: <20170308032821.26854-1-wens@csie.org>
+References: <20170308032821.26854-1-wens@csie.org>
+Message-ID: <20170308032821.26854-2-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2017-03-07 at 22:42 +0800, Wu-Cheng Li wrote:
-> From: Wu-Cheng Li <wuchengli@google.com>
-> 
-> VPU firmware has a bug and may return invalid buffer index for
-> some vp9 videos. Check the buffer indexes before accessing the
-> buffer.
-> 
-> Signed-off-by: Wu-Cheng Li <wuchengli@chromium.org>
-> ---
->  drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c | 23 ++++++++++++++-----
->  drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.h |  2 ++
->  .../media/platform/mtk-vcodec/vdec/vdec_vp9_if.c   | 26 ++++++++++++++++++++++
->  drivers/media/platform/mtk-vcodec/vdec_drv_if.h    |  2 ++
->  4 files changed, 48 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c b/drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c
-> index 502877a4b1df..8a9285a84d47 100644
-> --- a/drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c
-> +++ b/drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c
-> @@ -420,6 +420,11 @@ static void mtk_vdec_worker(struct work_struct *work)
->  			dst_buf->index,
->  			ret, res_chg);
->  		src_buf = v4l2_m2m_src_buf_remove(ctx->m2m_ctx);
-> +		if (ret == -EIO) {
-> +			mutex_lock(&ctx->lock);
-> +			src_buf_info->error = true;
-> +			mutex_unlock(&ctx->lock);
-> +		}
->  		v4l2_m2m_buf_done(&src_buf_info->vb, VB2_BUF_STATE_ERROR);
->  	} else if (res_chg == false) {
->  		/*
-> @@ -1176,6 +1181,11 @@ static void vb2ops_vdec_buf_queue(struct vb2_buffer *vb)
->  			       "[%d] vdec_if_decode() src_buf=%d, size=%zu, fail=%d, res_chg=%d",
->  			       ctx->id, src_buf->index,
->  			       src_mem.size, ret, res_chg);
-> +		if (ret == -EIO) {
-> +			mtk_v4l2_err("[%d] Unrecoverable error in vdec_if_decode.",
-> +					ctx->id);
-> +			ctx->state = MTK_STATE_ABORT;
-> +		}
-Should we set buf status to VB2_BUF_STATE_ERROR in this case?
+The old sunxi specific pinctrl bindings are deprecated, in favor of
+the new generic pinconf bindings. Also, we are moving towards handling
+GPIO pinmux settings that don't require extra bias or drive strength
+settings to use the GPIO bindings only.
 
->  		return;
->  	}
->  
-> @@ -1217,14 +1227,17 @@ static void vb2ops_vdec_buf_finish(struct vb2_buffer *vb)
->  	struct vb2_v4l2_buffer *vb2_v4l2;
->  	struct mtk_video_dec_buf *buf;
->  
-> -	if (vb->vb2_queue->type != V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE)
-> -		return;
-> -
->  	vb2_v4l2 = container_of(vb, struct vb2_v4l2_buffer, vb2_buf);
->  	buf = container_of(vb2_v4l2, struct mtk_video_dec_buf, vb);
->  	mutex_lock(&ctx->lock);
-> -	buf->queued_in_v4l2 = false;
-> -	buf->queued_in_vb2 = false;
-> +	if (buf->error) {
-> +		mtk_v4l2_err("Unrecoverable error on buffer.");
-Remove mtk_v4l2_err out of mutex_lock/mutex_unlock?
+This patch removes the last instance of the sunxi specific pinctrl
+bindings that use the pinctrl header by dropping the pinmux setting
+for the audio codec's PA (external amplifier) control GPIO. The pin
+is pulled down externally.
 
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ arch/arm/boot/dts/sun8i-a23-q8-tablet.dts | 10 ----------
+ 1 file changed, 10 deletions(-)
 
-best regards,
-Tiffany
-> +		ctx->state = MTK_STATE_ABORT;
-> +	}
-> +	if (vb->vb2_queue->type == V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE) {
-> +		buf->queued_in_v4l2 = false;
-> +		buf->queued_in_vb2 = false;
-> +	}
->  	mutex_unlock(&ctx->lock);
->  }
->  
-> diff --git a/drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.h b/drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.h
-> index 362f5a85762e..dc4fc1df63c5 100644
-> --- a/drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.h
-> +++ b/drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.h
-> @@ -50,6 +50,7 @@ struct vdec_fb {
->   * @queued_in_v4l2:	Capture buffer is in v4l2 driver, but not in vb2
->   *			queue yet
->   * @lastframe:		Intput buffer is last buffer - EOS
-> + * @error:		An unrecoverable error occurs on this buffer.
->   * @frame_buffer:	Decode status, and buffer information of Capture buffer
->   *
->   * Note : These status information help us track and debug buffer state
-> @@ -63,6 +64,7 @@ struct mtk_video_dec_buf {
->  	bool	queued_in_vb2;
->  	bool	queued_in_v4l2;
->  	bool	lastframe;
-> +	bool	error;
->  	struct vdec_fb	frame_buffer;
->  };
->  
-> diff --git a/drivers/media/platform/mtk-vcodec/vdec/vdec_vp9_if.c b/drivers/media/platform/mtk-vcodec/vdec/vdec_vp9_if.c
-> index e91a3b425b0c..5539b1853f16 100644
-> --- a/drivers/media/platform/mtk-vcodec/vdec/vdec_vp9_if.c
-> +++ b/drivers/media/platform/mtk-vcodec/vdec/vdec_vp9_if.c
-> @@ -718,6 +718,26 @@ static void get_free_fb(struct vdec_vp9_inst *inst, struct vdec_fb **out_fb)
->  	*out_fb = fb;
->  }
->  
-> +static int validate_vsi_array_indexes(struct vdec_vp9_inst *inst,
-> +		struct vdec_vp9_vsi *vsi) {
-> +	if (vsi->sf_frm_idx >= VP9_MAX_FRM_BUF_NUM - 1) {
-> +		mtk_vcodec_err(inst, "Invalid vsi->sf_frm_idx=%u.",
-> +				vsi->sf_frm_idx);
-> +		return -EIO;
-> +	}
-> +	if (vsi->frm_to_show_idx >= VP9_MAX_FRM_BUF_NUM) {
-> +		mtk_vcodec_err(inst, "Invalid vsi->frm_to_show_idx=%u.",
-> +				vsi->frm_to_show_idx);
-> +		return -EIO;
-> +	}
-> +	if (vsi->new_fb_idx >= VP9_MAX_FRM_BUF_NUM) {
-> +		mtk_vcodec_err(inst, "Invalid vsi->new_fb_idx=%u.",
-> +				vsi->new_fb_idx);
-> +		return -EIO;
-> +	}
-> +	return 0;
-> +}
-> +
->  static void vdec_vp9_deinit(unsigned long h_vdec)
->  {
->  	struct vdec_vp9_inst *inst = (struct vdec_vp9_inst *)h_vdec;
-> @@ -834,6 +854,12 @@ static int vdec_vp9_decode(unsigned long h_vdec, struct mtk_vcodec_mem *bs,
->  			goto DECODE_ERROR;
->  		}
->  
-> +		ret = validate_vsi_array_indexes(inst, vsi);
-> +		if (ret) {
-> +			mtk_vcodec_err(inst, "Invalid values from VPU.");
-> +			goto DECODE_ERROR;
-> +		}
-> +
->  		if (vsi->resolution_changed) {
->  			if (!vp9_alloc_work_buf(inst)) {
->  				ret = -EINVAL;
-> diff --git a/drivers/media/platform/mtk-vcodec/vdec_drv_if.h b/drivers/media/platform/mtk-vcodec/vdec_drv_if.h
-> index db6b5205ffb1..ded1154481cd 100644
-> --- a/drivers/media/platform/mtk-vcodec/vdec_drv_if.h
-> +++ b/drivers/media/platform/mtk-vcodec/vdec_drv_if.h
-> @@ -85,6 +85,8 @@ void vdec_if_deinit(struct mtk_vcodec_ctx *ctx);
->   * @res_chg	: [out] resolution change happens if current bs have different
->   *	picture width/height
->   * Note: To flush the decoder when reaching EOF, set input bitstream as NULL.
-> + *
-> + * Return: 0 on success. -EIO on unrecoverable error.
->   */
->  int vdec_if_decode(struct mtk_vcodec_ctx *ctx, struct mtk_vcodec_mem *bs,
->  		   struct vdec_fb *fb, bool *res_chg);
+diff --git a/arch/arm/boot/dts/sun8i-a23-q8-tablet.dts b/arch/arm/boot/dts/sun8i-a23-q8-tablet.dts
+index 3ab5c0c09d93..b6958e8f2f01 100644
+--- a/arch/arm/boot/dts/sun8i-a23-q8-tablet.dts
++++ b/arch/arm/boot/dts/sun8i-a23-q8-tablet.dts
+@@ -50,7 +50,6 @@
+ };
+ 
+ &codec {
+-	pinctrl-0 = <&codec_pa_pin>;
+ 	allwinner,pa-gpios = <&pio 7 9 GPIO_ACTIVE_HIGH>; /* PH9 */
+ 	allwinner,audio-routing =
+ 		"Headphone", "HP",
+@@ -62,12 +61,3 @@
+ 		"Headset Mic", "HBIAS";
+ 	status = "okay";
+ };
+-
+-&pio {
+-	codec_pa_pin: codec_pa_pin at 0 {
+-		allwinner,pins = "PH9";
+-		allwinner,function = "gpio_out";
+-		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+-		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+-	};
+-};
+-- 
+2.11.0
