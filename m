@@ -1,39 +1,40 @@
-From: vigneshr@ti.com (Vignesh R)
-Date: Wed, 8 Mar 2017 17:49:43 +0530
-Subject: [PATCH] serial: 8250: 8250_core: Use dev_name() during request_irq()
-Message-ID: <20170308121943.29340-1-vigneshr@ti.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 8 Mar 2017 12:20:16 +0000
+Subject: [PATCH] arm64/sve: Reserve HWCAP and ELF note numbers for SVE
+In-Reply-To: <20170306152447.GD22810@e104818-lin.cambridge.arm.com>
+References: <1488550406-11204-1-git-send-email-Dave.Martin@arm.com>
+ <20170306152447.GD22810@e104818-lin.cambridge.arm.com>
+Message-ID: <20170308121948.GA3750@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Passing "serial" as name during request_irq() results in all serial port
-irqs have same name. This does not help much to easily identify which
-irq belongs to which serial port instance. Therefore pass dev_name()
-during request_irq() so that better identifiable name is listed for
-serial ports in cat /proc/interrupts output.
+On Mon, Mar 06, 2017 at 03:24:47PM +0000, Catalin Marinas wrote:
+> On Fri, Mar 03, 2017 at 02:13:26PM +0000, Dave P Martin wrote:
+> > --- a/include/uapi/linux/elf.h
+> > +++ b/include/uapi/linux/elf.h
+> > @@ -414,6 +414,7 @@ typedef struct elf64_shdr {
+> >  #define NT_ARM_HW_BREAK	0x402		/* ARM hardware breakpoint registers */
+> >  #define NT_ARM_HW_WATCH	0x403		/* ARM hardware watchpoint registers */
+> >  #define NT_ARM_SYSTEM_CALL	0x404	/* ARM system call number */
+> > +					/* 0x405 reserved for SVE */
+> 
+> Just a nitpick: given that this is generic file, even if it's in the
+> ARM-specific section, it might be worth adding "ARM" to the comment:
+> "reserved for ARM SVE" (not needed for hwcap).
 
-Output of cat /proc/interrupts
-Before this patch:
- 26:        689          0     GICv2 309 Edge      serial
-After this patch:
- 26:        696          0     GICv2 309 Edge      2530c00.serial
+Will do.
 
-Signed-off-by: Vignesh R <vigneshr@ti.com>
----
- drivers/tty/serial/8250/8250_core.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+> Depending on the SVE merging timescales, this patch may go in together
+> with the rest ;).
 
-diff --git a/drivers/tty/serial/8250/8250_core.c b/drivers/tty/serial/8250/8250_core.c
-index 76e03a7de9cc..f83b69f30987 100644
---- a/drivers/tty/serial/8250/8250_core.c
-+++ b/drivers/tty/serial/8250/8250_core.c
-@@ -218,7 +218,7 @@ static int serial_link_irq_chain(struct uart_8250_port *up)
- 		spin_unlock_irq(&i->lock);
- 		irq_flags |= up->port.irqflags;
- 		ret = request_irq(up->port.irq, serial8250_interrupt,
--				  irq_flags, "serial", i);
-+				  irq_flags, dev_name(up->port.dev), i);
- 		if (ret < 0)
- 			serial_do_unlink(i, up);
- 	}
--- 
-2.11.0
+I need to respin this, because HWCAP_CPUID and HWCAP_ASIMDRDM went in
+first (my bad, should have seen those in flight) -- since we are only
+at -rc1 those could be renumbered, but it's probably not worth the
+associated risks.
+
+In any case, NT_ARM_SVE was the more important reservation.
+
+Yao, Alan, does gdb make any use of HWCAP_SVE?
+
+Cheers
+---Dave 
