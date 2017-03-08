@@ -1,38 +1,33 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed,  8 Mar 2017 17:24:20 +0100
-Subject: [PATCH 0/3] Add EHCI support for Armada 37xx
-Message-ID: <20170308162423.25553-1-gregory.clement@free-electrons.com>
+Date: Wed,  8 Mar 2017 17:24:22 +0100
+Subject: [PATCH 2/3] usb: host: Allow to build ehci orion with mvebu SoCs
+In-Reply-To: <20170308162423.25553-1-gregory.clement@free-electrons.com>
+References: <20170308162423.25553-1-gregory.clement@free-electrons.com>
+Message-ID: <20170308162423.25553-3-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The mvebu ARM64 SoCs no more select PLAT_ORION but some of them as the
+Armada 37xx use the EHCI orion controller. This patch allow to build
+the driver when ARCH_MVEBU is selected.
 
-The EHCI controller in the Armada 37xx SoCs is the one used on many
-other mvebu SoCs such as the orion5x, the kirkwood, or the
-armada. However, for Armada 37xx an extra initialization step is
-needed: this is the purpose of the first patch.
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ drivers/usb/host/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-The second patch allows to build the driver for the ARM64 Armada SoCs.
-
-The last one enables the EHCI in the device tree.
-
-Thanks,
-
-Gregory
-
-Gregory CLEMENT (2):
-  usb: host: Allow to build ehci orion with mvebu SoCs
-  ARM64: dts: marvell: armada-37xx: Add USB2 node
-
-jinghua (1):
-  usb: orion-echi: Add support for the Armada 3700
-
- .../devicetree/bindings/usb/ehci-orion.txt         |  4 ++-
- arch/arm64/boot/dts/marvell/armada-3720-db.dts     |  6 ++++
- arch/arm64/boot/dts/marvell/armada-37xx.dtsi       |  7 ++++
- drivers/usb/host/Kconfig                           |  2 +-
- drivers/usb/host/ehci-orion.c                      | 39 ++++++++++++++++++++++
- 5 files changed, 56 insertions(+), 2 deletions(-)
-
+diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
+index 407d947b34ea..870c42d89298 100644
+--- a/drivers/usb/host/Kconfig
++++ b/drivers/usb/host/Kconfig
+@@ -188,7 +188,7 @@ config USB_EHCI_HCD_OMAP
+ 
+ config USB_EHCI_HCD_ORION
+ 	tristate  "Support for Marvell EBU on-chip EHCI USB controller"
+-	depends on USB_EHCI_HCD && PLAT_ORION
++	depends on USB_EHCI_HCD && PLAT_ORION || ARCH_MVEBU
+ 	default y
+ 	---help---
+ 	  Enables support for the on-chip EHCI controller on Marvell's
 -- 
 2.11.0
