@@ -1,116 +1,190 @@
 From: xiexiuqi@huawei.com (Xie XiuQi)
-Date: Wed, 8 Mar 2017 12:09:41 +0800
-Subject: [PATCH v2 3/3] arm64: KVM: add guest SEI support
+Date: Wed, 8 Mar 2017 12:09:40 +0800
+Subject: [PATCH v2 2/3] acpi: apei: handle SEI notification type for ARMv8
 In-Reply-To: <1488946181-130774-1-git-send-email-xiexiuqi@huawei.com>
 References: <1488946181-130774-1-git-send-email-xiexiuqi@huawei.com>
-Message-ID: <1488946181-130774-4-git-send-email-xiexiuqi@huawei.com>
+Message-ID: <1488946181-130774-3-git-send-email-xiexiuqi@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add ghes handling for SEI so that the host kernel could parse and
-report detailed error information for SEI which occur in the guest
-kernel.
+ARM APEI extension proposal added SEI (asynchronous SError interrupt)
+notification type for ARMv8.
+
+Add a new GHES error source handling function for SEI. In firmware
+first mode, if an error source's notification type is SEI. Then GHES
+could parse and report the detail error information.
 
 Signed-off-by: Xie XiuQi <xiexiuqi@huawei.com>
 ---
- arch/arm64/include/asm/system_misc.h |  1 +
- arch/arm64/kernel/traps.c            | 18 ++++++++++++++++++
- arch/arm64/kvm/handle_exit.c         | 22 ++++++++++++++++++++--
- 3 files changed, 39 insertions(+), 2 deletions(-)
+ arch/arm64/kernel/traps.c | 13 +++++++++++
+ drivers/acpi/apei/Kconfig | 14 ++++++++++++
+ drivers/acpi/apei/ghes.c  | 58 ++++++++++++++++++++++++++++++++++++++++++++++-
+ include/acpi/ghes.h       |  1 +
+ 4 files changed, 85 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/include/asm/system_misc.h b/arch/arm64/include/asm/system_misc.h
-index 5b2cecd..d68d61f 100644
---- a/arch/arm64/include/asm/system_misc.h
-+++ b/arch/arm64/include/asm/system_misc.h
-@@ -59,5 +59,6 @@ void hook_debug_fault_code(int nr, int (*fn)(unsigned long, unsigned int,
- #endif	/* __ASSEMBLY__ */
- 
- int handle_guest_sea(unsigned long addr, unsigned int esr);
-+int handle_guest_sei(unsigned long addr, unsigned int esr);
- 
- #endif	/* __ASM_SYSTEM_MISC_H */
 diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-index 65dbfa9..cf9f569 100644
+index e52be6a..65dbfa9 100644
 --- a/arch/arm64/kernel/traps.c
 +++ b/arch/arm64/kernel/traps.c
-@@ -616,6 +616,24 @@ const char *esr_get_class_string(u32 esr)
- }
+@@ -47,6 +47,8 @@
+ #include <asm/system_misc.h>
+ #include <asm/sysreg.h>
  
- /*
-+ * Handle asynchronous SError interrupt that occur in a guest kernel.
-+ */
-+int handle_guest_sei(unsigned long addr, unsigned int esr)
++#include <acpi/ghes.h>
++
+ static const char *handler[]= {
+ 	"Synchronous Abort",
+ 	"IRQ",
+@@ -625,6 +627,17 @@ asmlinkage void bad_mode(struct pt_regs *regs, int reason, unsigned int esr)
+ 		handler[reason], smp_processor_id(), esr,
+ 		esr_get_class_string(esr));
+ 
++	/*
++	 * Synchronous aborts may interrupt code which had interrupts masked.
++	 * Before calling out into the wider kernel tell the interested
++	 * subsystems.
++	 */
++	if (IS_ENABLED(CONFIG_ACPI_APEI_SEI) && ESR_ELx_EC(esr) == ESR_ELx_EC_SERROR) {
++		nmi_enter();
++		ghes_notify_sei();
++		nmi_exit();
++	}
++
+ 	die("Oops - bad mode", regs, 0);
+ 	local_irq_disable();
+ 	panic("bad mode");
+diff --git a/drivers/acpi/apei/Kconfig b/drivers/acpi/apei/Kconfig
+index 8ff0518..277deb8 100644
+--- a/drivers/acpi/apei/Kconfig
++++ b/drivers/acpi/apei/Kconfig
+@@ -55,6 +55,20 @@ config ACPI_APEI_SEA
+ 	  option allows the OS to look for such hardware error record, and
+ 	  take appropriate action.
+ 
++config ACPI_APEI_SEI
++	bool "APEI Asynchronous SError Interrupt logging/recovering support"
++	depends on ARM64 && ACPI_APEI_GHES
++	help
++	  This option should be enabled if the system supports
++	  firmware first handling of SEI (asynchronous SError interrupt).
++
++	  SEI happens with invalid instruction access or asynchronous exceptions
++	  on ARMv8 systems. If a system supports firmware first handling of SEI,
++	  the platform analyzes and handles hardware error notifications from
++	  SEI, and it may then form a HW error record for the OS to parse and
++	  handle. This option allows the OS to look for such hardware error
++	  record, and take appropriate action.
++
+ config ACPI_APEI_MEMORY_FAILURE
+ 	bool "APEI memory error recovering support"
+ 	depends on ACPI_APEI && MEMORY_FAILURE
+diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
+index ea5b118..251d7e0 100644
+--- a/drivers/acpi/apei/ghes.c
++++ b/drivers/acpi/apei/ghes.c
+@@ -851,6 +851,50 @@ static inline void ghes_sea_remove(struct ghes *ghes)
+ }
+ #endif /* CONFIG_ACPI_APEI_SEA */
+ 
++#ifdef CONFIG_ACPI_APEI_SEI
++static LIST_HEAD(ghes_sei);
++
++void ghes_notify_sei(void)
 +{
++	struct ghes *ghes;
++
 +	/*
 +	 * synchronize_rcu() will wait for nmi_exit(), so no need to
 +	 * rcu_read_lock().
 +	 */
-+	if(IS_ENABLED(CONFIG_ACPI_APEI_SEI)) {
-+		rcu_read_lock();
-+		ghes_notify_sei();
-+		rcu_read_unlock();
++	list_for_each_entry_rcu(ghes, &ghes_sei, list) {
++		ghes_proc(ghes);
 +	}
-+
-+	return 0;
 +}
 +
-+/*
-  * bad_mode handles the impossible case in the exception vector. This is always
-  * fatal.
-  */
-diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
-index 1bfe30d..8c7dba0 100644
---- a/arch/arm64/kvm/handle_exit.c
-+++ b/arch/arm64/kvm/handle_exit.c
-@@ -28,6 +28,7 @@
- #include <asm/kvm_emulate.h>
- #include <asm/kvm_mmu.h>
- #include <asm/kvm_psci.h>
-+#include <asm/system_misc.h>
- 
- #define CREATE_TRACE_POINTS
- #include "trace.h"
-@@ -172,6 +173,23 @@ static exit_handle_fn kvm_get_exit_handler(struct kvm_vcpu *vcpu)
- 	return arm_exit_handlers[hsr_ec];
++static void ghes_sei_add(struct ghes *ghes)
++{
++	mutex_lock(&ghes_list_mutex);
++	list_add_rcu(&ghes->list, &ghes_sei);
++	mutex_unlock(&ghes_list_mutex);
++}
++
++static void ghes_sei_remove(struct ghes *ghes)
++{
++	mutex_lock(&ghes_list_mutex);
++	list_del_rcu(&ghes->list);
++	mutex_unlock(&ghes_list_mutex);
++	synchronize_rcu();
++}
++#else /* CONFIG_ACPI_APEI_SEI */
++static inline void ghes_sei_add(struct ghes *ghes)
++{
++	pr_err(GHES_PFX "ID: %d, trying to add SEI notification which is not supported\n",
++	       ghes->generic->header.source_id);
++}
++
++static inline void ghes_sei_remove(struct ghes *ghes)
++{
++	pr_err(GHES_PFX "ID: %d, trying to remove SEI notification which is not supported\n",
++	       ghes->generic->header.source_id);
++}
++#endif /* CONFIG_HAVE_ACPI_APEI_SEI */
++
+ #ifdef CONFIG_HAVE_ACPI_APEI_NMI
+ /*
+  * printk is not safe in NMI context.  So in NMI handler, we allocate
+@@ -1100,6 +1144,13 @@ static int ghes_probe(struct platform_device *ghes_dev)
+ 			goto err;
+ 		}
+ 		break;
++	case ACPI_HEST_NOTIFY_SEI:
++		if (!IS_ENABLED(CONFIG_HAVE_ACPI_APEI_SEI)) {
++			pr_warn(GHES_PFX "Generic hardware error source: %d notified via SEI is not supported!\n",
++				generic->header.source_id);
++			goto err;
++		}
++		break;
+ 	case ACPI_HEST_NOTIFY_NMI:
+ 		if (!IS_ENABLED(CONFIG_HAVE_ACPI_APEI_NMI)) {
+ 			pr_warn(GHES_PFX "Generic hardware error source: %d notified via NMI interrupt is not supported!\n",
+@@ -1112,7 +1163,6 @@ static int ghes_probe(struct platform_device *ghes_dev)
+ 			   generic->header.source_id);
+ 		goto err;
+ 	case ACPI_HEST_NOTIFY_GPIO:
+-	case ACPI_HEST_NOTIFY_SEI:
+ 	case ACPI_HEST_NOTIFY_GSIV:
+ 		pr_warn(GHES_PFX "Generic hardware error source: %d notified via notification type %u is not supported\n",
+ 			generic->header.source_id, generic->header.source_id);
+@@ -1175,6 +1225,9 @@ static int ghes_probe(struct platform_device *ghes_dev)
+ 	case ACPI_HEST_NOTIFY_SEA:
+ 		ghes_sea_add(ghes);
+ 		break;
++	case ACPI_HEST_NOTIFY_SEI:
++		ghes_sei_add(ghes);
++		break;
+ 	case ACPI_HEST_NOTIFY_NMI:
+ 		ghes_nmi_add(ghes);
+ 		break;
+@@ -1220,6 +1273,9 @@ static int ghes_remove(struct platform_device *ghes_dev)
+ 	case ACPI_HEST_NOTIFY_SEA:
+ 		ghes_sea_remove(ghes);
+ 		break;
++	case ACPI_HEST_NOTIFY_SEI:
++		ghes_sei_remove(ghes);
++		break;
+ 	case ACPI_HEST_NOTIFY_NMI:
+ 		ghes_nmi_remove(ghes);
+ 		break;
+diff --git a/include/acpi/ghes.h b/include/acpi/ghes.h
+index 18bc935..7554658 100644
+--- a/include/acpi/ghes.h
++++ b/include/acpi/ghes.h
+@@ -100,5 +100,6 @@ static inline void *acpi_hest_generic_data_payload(struct acpi_hest_generic_data
  }
  
-+static int kvm_handle_guest_sei(struct kvm_vcpu *vcpu, struct kvm_run *run)
-+{
-+	unsigned long fault_ipa = kvm_vcpu_get_fault_ipa(vcpu);
-+
-+	if (handle_guest_sei((unsigned long)fault_ipa,
-+				kvm_vcpu_get_hsr(vcpu))) {
-+		kvm_err("Failed to handle guest SEI, FSC: EC=%#x xFSC=%#lx ESR_EL2=%#lx\n",
-+				kvm_vcpu_trap_get_class(vcpu),
-+				(unsigned long)kvm_vcpu_trap_get_fault(vcpu),
-+				(unsigned long)kvm_vcpu_get_hsr(vcpu));
-+	}
-+
-+	kvm_inject_vabt(vcpu);
-+
-+	return 0;
-+}
-+
- /*
-  * Return > 0 to return to guest, < 0 on error, 0 (and set exit_reason) on
-  * proper exit to userspace.
-@@ -195,7 +213,7 @@ int handle_exit(struct kvm_vcpu *vcpu, struct kvm_run *run,
- 			*vcpu_pc(vcpu) -= adj;
- 		}
+ void ghes_notify_sea(void);
++void ghes_notify_sei(void);
  
--		kvm_inject_vabt(vcpu);
-+		kvm_handle_guest_sei(vcpu, run);
- 		return 1;
- 	}
- 
-@@ -205,7 +223,7 @@ int handle_exit(struct kvm_vcpu *vcpu, struct kvm_run *run,
- 	case ARM_EXCEPTION_IRQ:
- 		return 1;
- 	case ARM_EXCEPTION_EL1_SERROR:
--		kvm_inject_vabt(vcpu);
-+		kvm_handle_guest_sei(vcpu, run);
- 		return 1;
- 	case ARM_EXCEPTION_TRAP:
- 		/*
+ #endif /* GHES_H */
 -- 
 1.8.3.1
