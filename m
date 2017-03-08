@@ -1,22 +1,37 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 8 Mar 2017 12:28:23 +0800
-Subject: [PATCH] reset: sunxi: fix for 64-bit compilation
-In-Reply-To: <1488764156-22197-1-git-send-email-andre.przywara@arm.com>
-References: <1488764156-22197-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <CAGb2v64SozB9vUpotkEOyUK33ba8hq9M-QRQUEzEQ565Bhd93g@mail.gmail.com>
+From: hoegeun.kwon@samsung.com (Hoegeun Kwon)
+Date: Wed, 08 Mar 2017 13:54:08 +0900
+Subject: [PATCH v5 1/5] arm64: dts: exynos: Add the burst and esc clock
+ frequency properties to DSI node
+In-Reply-To: <1488948852-5380-1-git-send-email-hoegeun.kwon@samsung.com>
+References: <1488948852-5380-1-git-send-email-hoegeun.kwon@samsung.com>
+ <CGME20170308045502epcas1p2b16df118e0ad91dbd2446687dc5ee843@epcas1p2.samsung.com>
+Message-ID: <1488948852-5380-2-git-send-email-hoegeun.kwon@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 6, 2017 at 9:35 AM, Andre Przywara <andre.przywara@arm.com> wrote:
-> The Allwinner reset controller has 32-bit registers, so translating
-> the reset cell number into a register and bit offset should not use
-> any architecture dependent data size. Otherwise this breaks for 64-bit
-> architectures like arm64.
-> Fix this by making it clear that it's the hardware register width which
-> matters here in the calculation.
->
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+Add the burst and esc clock frequency properties to the parent (DSI node).
+Currently the clock is parsed from the port node, while it should be
+taken from the dsi node.
 
-Acked-by: Chen-Yu Tsai <wens@csie.org>
+Signed-off-by: Hoegeun Kwon <hoegeun.kwon@samsung.com>
+Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
+Reviewed-by: Andi Shyti <andi.shyti@samsung.com>
+---
+ arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi | 2 ++
+ 1 file changed, 2 insertions(+)
 
-Though I don't expect this driver to be used with arm64 chips.
+diff --git a/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi b/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi
+index 6ce93a3..e31e20c 100644
+--- a/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi
++++ b/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi
+@@ -298,6 +298,8 @@
+ 	status = "okay";
+ 	vddcore-supply = <&ldo6_reg>;
+ 	vddio-supply = <&ldo7_reg>;
++	samsung,burst-clock-frequency = <512000000>;
++	samsung,esc-clock-frequency = <16000000>;
+ 	samsung,pll-clock-frequency = <24000000>;
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&te_irq>;
+-- 
+1.9.1
