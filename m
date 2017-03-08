@@ -1,30 +1,52 @@
-From: David.Laight@ACULAB.COM (David Laight)
-Date: Wed, 8 Mar 2017 11:00:10 +0000
-Subject: [PATCHv3 net-next 21/22] net: mvpp2: set dma mask and coherent
- dma mask on PPv2.2
-In-Reply-To: <20170307191201.645d23b4@free-electrons.com>
-References: <1488902000-2658-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1488902000-2658-22-git-send-email-thomas.petazzoni@free-electrons.com>
- <063D6719AE5E284EB5DD2968C1650D6DCFE79D2E@AcuExch.aculab.com>
- <20170307191201.645d23b4@free-electrons.com>
-Message-ID: <063D6719AE5E284EB5DD2968C1650D6DCFE7A585@AcuExch.aculab.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Wed, 8 Mar 2017 12:06:03 +0100
+Subject: [PATCH v3 4/4] ARM: imx6: adopt DT to new GPC binding
+In-Reply-To: <20170217190246.14881-4-l.stach@pengutronix.de>
+References: <20170217190246.14881-1-l.stach@pengutronix.de>
+ <20170217190246.14881-4-l.stach@pengutronix.de>
+Message-ID: <20170308110600.GB17029@x250>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thomas Petazzoni
-> Sent: 07 March 2017 18:12
-> Hello,
+On Fri, Feb 17, 2017 at 08:02:46PM +0100, Lucas Stach wrote:
+> Adopt the i.MX6Q/DL DT to the new and more flexible GPC binding.
 > 
-> On Tue, 7 Mar 2017 17:24:21 +0000, David Laight wrote:
-> 
-> > Are the coherent mappings just used for ring structures?
-> > If it might be reasonable to allocate them as a single entity,
-> > thus guaranteeing they all reside in a single 4G region.
-> 
-> Do we have the guarantee that a DMA coherent allocation will not span a
-> 4G boundary?
+> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
 
-I'm pretty sure they are guaranteed not to cross any boundary they don't have to.
-So a 16k buffer won't cross a 16k boundary.
+I don't want to introduce a dependency between branches, so please
+remind me to apply it after GPC driver changes land on mainline.  And
+one small comment below ...
 
-	David
+> ---
+> v2: adapt to changed domain supply name
+> ---
+>  arch/arm/boot/dts/imx6q.dtsi   |  2 +-
+>  arch/arm/boot/dts/imx6qdl.dtsi | 38 +++++++++++++++++++++++++++-----------
+>  2 files changed, 28 insertions(+), 12 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+> index e9a5d0b8c7b0..dd33849335b2 100644
+> --- a/arch/arm/boot/dts/imx6q.dtsi
+> +++ b/arch/arm/boot/dts/imx6q.dtsi
+> @@ -125,7 +125,7 @@
+>  			clocks = <&clks IMX6QDL_CLK_OPENVG_AXI>,
+>  				 <&clks IMX6QDL_CLK_GPU2D_CORE>;
+>  			clock-names = "bus", "core";
+> -			power-domains = <&gpc 1>;
+> +			power-domains = <&pd_pu>;
+>  		};
+>  
+>  		ipu2: ipu at 02800000 {
+> diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+> index 53e6e63cbb02..8538b04af097 100644
+> --- a/arch/arm/boot/dts/imx6qdl.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl.dtsi
+> @@ -1,3 +1,4 @@
+> +
+>  /*
+>   * Copyright 2011 Freescale Semiconductor, Inc.
+>   * Copyright 2011 Linaro Ltd.
+
+This is an unrelated change.
+
+Shawn
