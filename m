@@ -1,71 +1,100 @@
-From: thgarnie@google.com (Thomas Garnier)
-Date: Wed, 8 Mar 2017 14:33:47 -0800
-Subject: [PATCH v1 3/4] arm/syscalls: Specific usage of
- verify_pre_usermode_state
-In-Reply-To: <alpine.LFD.2.20.1703082256480.23532@knanqh.ubzr>
-References: <20170308213844.131877-1-thgarnie@google.com>
- <20170308213844.131877-3-thgarnie@google.com>
- <alpine.LFD.2.20.1703082256480.23532@knanqh.ubzr>
-Message-ID: <CAJcbSZFCKVVQAXu2WGojnjHmJp05sRCQQpv=dCSTYjezE+aeeQ@mail.gmail.com>
+From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
+Date: Thu, 9 Mar 2017 00:28:47 +0100
+Subject: pcie-iproc: broken 2nd (& 3rd?) controller support by
+ c3245a566400 ("PCI: iproc: Request host bridge window resources")
+In-Reply-To: <88dc6a0e-8989-d09f-1f93-6673a31664c1@broadcom.com>
+References: <faab6b85-58e8-3e62-8763-56a94b13fba1@gmail.com>
+ <88dc6a0e-8989-d09f-1f93-6673a31664c1@broadcom.com>
+Message-ID: <4acf85df-d5d0-6a01-b331-3158d0233a0e@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make sense, as discussed on patch number one, I will write custom
-assembly for each architecture when BUG_ON is not required. I will try
-to use macros to make it easier to read.
-
-On Wed, Mar 8, 2017 at 2:05 PM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> On Wed, 8 Mar 2017, Thomas Garnier wrote:
->
->> Implement specific usage of verify_pre_usermode_state for user-mode
->> returns for arm.
->> ---
->> Based on next-20170308
->> ---
->>  arch/arm/Kconfig               | 1 +
->>  arch/arm/kernel/entry-common.S | 5 +++++
->>  2 files changed, 6 insertions(+)
+On 03/08/2017 06:22 PM, Ray Jui wrote:
+> On 3/8/2017 4:56 AM, Rafa? Mi?ecki wrote:
+>> I just tried upgrading BCM5301X from 4.4 to 4.9 and noticed I don't see
+>> card
+>> connected to the 2nd controller.
 >>
->> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
->> index 0d4e71b42c77..704fd8f197fa 100644
->> --- a/arch/arm/Kconfig
->> +++ b/arch/arm/Kconfig
->> @@ -12,6 +12,7 @@ config ARM
->>       select ARCH_HAVE_CUSTOM_GPIO_H
->>       select ARCH_HAS_GCOV_PROFILE_ALL
->>       select ARCH_MIGHT_HAVE_PC_PARPORT
->> +     select ARCH_NO_SYSCALL_VERIFY_PRE_USERMODE_STATE
->>       select ARCH_OPTIONAL_KERNEL_RWX if ARCH_HAS_STRICT_KERNEL_RWX
->>       select ARCH_OPTIONAL_KERNEL_RWX_DEFAULT if CPU_V7
->>       select ARCH_SUPPORTS_ATOMIC_RMW
->> diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
->> index eb5cd77bf1d8..80cfdc7fabde 100644
->> --- a/arch/arm/kernel/entry-common.S
->> +++ b/arch/arm/kernel/entry-common.S
->> @@ -39,6 +39,9 @@
->>  ret_fast_syscall:
->>   UNWIND(.fnstart     )
->>   UNWIND(.cantunwind  )
->> +     push    {r0}                            @ save returned r0
->> +     bl      verify_pre_usermode_state
->> +     pop     {r0}                            @ restore r0
->>       disable_irq_notrace                     @ disable interrupts
->>       ldr     r1, [tsk, #TI_FLAGS]            @ re-check for syscall tracing
->>       tst     r1, #_TIF_SYSCALL_WORK | _TIF_WORK_MASK
+>> [    2.593534] pcie_iproc_bcma bcma0:7: PCI host bridge to bus 0000:00
+>> [    2.599786] pci_bus 0000:00: root bus resource [mem
+>> 0x08000000-0x0fffffff]
+>> [    2.606663] pcie_iproc_bcma bcma0:7: link: UP
+>> [    2.611316] PCI: bus0: Fast back to back transfers disabled
+>> [    2.616899] pci 0000:00:00.0: bridge configuration invalid ([bus
+>> 00-00]), reconfiguring
+>> [    2.625395] PCI: bus1: Fast back to back transfers disabled
+>> [    2.631011] pci 0000:00:00.0: BAR 8: assigned [mem
+>> 0x08000000-0x080fffff]
+>> [    2.637795] pci 0000:01:00.0: BAR 0: assigned [mem
+>> 0x08000000-0x08007fff 64bit]
+>> [    2.645091] pci 0000:00:00.0: PCI bridge to [bus 01]
+>> [    2.650042] pci 0000:00:00.0:   bridge window [mem
+>> 0x08000000-0x080fffff]
+>>
+>> [    2.657199] pcie_iproc_bcma bcma0:8: resource collision: [mem
+>> 0x40000000-0x47ffffff] conflicts with PCIe MEM space [mem
+>> 0x40000000-0x47ffffff]
+>> [    2.669946] pcie_iproc_bcma bcma0:8: PCIe controller setup failed
+>> [    2.676032] pcie_iproc_bcma: probe of bcma0:8 failed with error -16
+>>
 >
-> This feature is configurable, right?
+> Would you be able to add some debugging trace to see when the resource
+> was allocated the first time, and when the resource was allocated the
+> second time and therefore results in the conflict?
 >
-> Here the branch overhead is imposed even if the feature is configured
-> out. You should consider conditionally defining a macro like some other
-> features do.
->
-> Furthermore I think we still support old toolchains that don't know what
-> push and pop mean. You should use the legacy syntax instead.
->
->
-> Nicolas
+> In addition, I'm puzzled why this resource conflict issue for BCMA is
+> not seen with the first controller with outbound memory in the range of
+> 0x08000000 - 0x0fffffff? Maybe that provides a valuable data point here.
 
+This is clearly a conflict between iproc on 1st controller and iproc on 2nd controller.
 
+I added following code to the pcie-iproc-bcma.c:
+if (bdev->core_unit == 0) {
+	dev_info(dev, "[%s] aborting\n", __func__);
+	return -ENOTSUPP;
+}
 
--- 
-Thomas
+And it resulted in 2nd controller (bcma0:8) working again:
+[    2.472562] pcie_iproc_bcma bcma0:7: [iproc_pcie_bcma_probe] aborting
+[    2.479027] pcie_iproc_bcma: probe of bcma0:7 failed with error -524
+[    2.607425] pcie_iproc_bcma bcma0:8: PCI host bridge to bus 0000:00
+[    2.613678] pci_bus 0000:00: root bus resource [mem 0x40000000-0x47ffffff]
+[    2.620557] pcie_iproc_bcma bcma0:8: link: UP
+[    2.625206] PCI: bus0: Fast back to back transfers disabled
+[    2.630789] pci 0000:00:00.0: bridge configuration invalid ([bus 00-00]), reconfiguring
+[    2.639260] PCI: bus1: Fast back to back transfers disabled
+[    2.644871] pci 0000:00:00.0: BAR 8: assigned [mem 0x40000000-0x400fffff]
+[    2.651665] pci 0000:01:00.0: BAR 0: assigned [mem 0x40000000-0x40007fff 64bit]
+[    2.658962] pci 0000:00:00.0: PCI bridge to [bus 01]
+[    2.663911] pci 0000:00:00.0:   bridge window [mem 0x40000000-0x400fffff]
+
+I'm not exactly sure where this conflict is coming from. For debugging purposes I added:
+dev_info(dev, "[%s] res_mem:%pR\n", __func__, &res_mem);
+
+Which resulted in:
+[    2.474558] pcie_iproc_bcma bcma0:7: [iproc_pcie_bcma_probe] res_mem:[mem 0x08000000-0x0fffffff]
+[    2.597246] pcie_iproc_bcma bcma0:7: PCI host bridge to bus 0000:00
+[    2.603500] pci_bus 0000:00: root bus resource [mem 0x08000000-0x0fffffff]
+[    2.610382] pcie_iproc_bcma bcma0:7: link: UP
+[    2.615032] PCI: bus0: Fast back to back transfers disabled
+[    2.620619] pci 0000:00:00.0: bridge configuration invalid ([bus 00-00]), reconfiguring
+[    2.629131] PCI: bus1: Fast back to back transfers disabled
+[    2.634745] pci 0000:00:00.0: BAR 8: assigned [mem 0x08000000-0x080fffff]
+[    2.641537] pci 0000:01:00.0: BAR 0: assigned [mem 0x08000000-0x08007fff 64bit]
+[    2.648835] pci 0000:00:00.0: PCI bridge to [bus 01]
+[    2.653783] pci 0000:00:00.0:   bridge window [mem 0x08000000-0x080fffff]
+[    2.660947] pcie_iproc_bcma bcma0:8: [iproc_pcie_bcma_probe] res_mem:[mem 0x40000000-0x47ffffff]
+[    2.669732] pcie_iproc_bcma bcma0:8: resource collision: [mem 0x40000000-0x47ffffff] conflicts with PCIe MEM space [mem 0x40000000-0x47ffffff]
+[    2.682470] pcie_iproc_bcma bcma0:8: PCIe controller setup failed
+[    2.688559] pcie_iproc_bcma: probe of bcma0:8 failed with error -16
+
+There shouldn't be any conflict between 0x08000000-0x0fffffff and 0x40000000-0x47ffffff, right?
+
+For bcma we do this:
+res_mem.start = bdev->addr_s[0];
+res_mem.end = bdev->addr_s[0] + SZ_128M - 1;
+
+In case of BCM4708 there are following addresses:
+[    2.285430] bcma: bus0: Core 7 found: PCIe Gen 2 (manuf 0x4BF, id 0x501, rev 0x01, class 0x0)	addr:0x18012000 wrap:0x18101000 addr_s[0]:0x08000000 addr_s[1]:0x00000000
+[    2.300384] bcma: bus0: Core 8 found: PCIe Gen 2 (manuf 0x4BF, id 0x501, rev 0x01, class 0x0)	addr:0x18013000 wrap:0x18102000 addr_s[0]:0x40000000 addr_s[1]:0x00000000
+which matches what we see in the boot log.
