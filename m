@@ -1,51 +1,57 @@
 From: kraxel@redhat.com (Gerd Hoffmann)
-Date: Wed,  8 Mar 2017 10:19:07 +0100
-Subject: [PATCH v4 4/7] arm: set CONFIG_MMC_BCM2835=y in bcm2835_defconfig and
- multi_v7_defconfig
+Date: Wed,  8 Mar 2017 10:19:04 +0100
+Subject: [PATCH 2/4] qxl: limit monitor config read retries
 In-Reply-To: <1488964751-22763-1-git-send-email-kraxel@redhat.com>
 References: <1488964751-22763-1-git-send-email-kraxel@redhat.com>
-Message-ID: <1488964751-22763-8-git-send-email-kraxel@redhat.com>
+Message-ID: <1488964751-22763-5-git-send-email-kraxel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We need to enable this controller so that we can switch the SD card's
-pinmux over to it by default, which will improve storage performance.
-
-Read access (dd with 64k blocks on rpi2):
-  CONFIG_MMC_SDHCI_IPROC: 11-12 MB/s
-  CONFIG_MMC_BCM2835:     19-20 MB/s
-
-Differences on write access are pretty much in the noise.
+When reading the monitor config fails, don't retry forever.  If it fails
+ten times in a row just give up to avoid the driver hangs.  Also add a
+small delay after each attempt, so the host has a chance to complete a
+partial update.
 
 Signed-off-by: Gerd Hoffmann <kraxel@redhat.com>
 ---
- arch/arm/configs/bcm2835_defconfig  | 1 +
- arch/arm/configs/multi_v7_defconfig | 1 +
- 2 files changed, 2 insertions(+)
+ drivers/gpu/drm/qxl/qxl_display.c | 20 ++++++++++++--------
+ 1 file changed, 12 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/configs/bcm2835_defconfig b/arch/arm/configs/bcm2835_defconfig
-index 4b89f4e..3767c24 100644
---- a/arch/arm/configs/bcm2835_defconfig
-+++ b/arch/arm/configs/bcm2835_defconfig
-@@ -92,6 +92,7 @@ CONFIG_MMC=y
- CONFIG_MMC_SDHCI=y
- CONFIG_MMC_SDHCI_PLTFM=y
- CONFIG_MMC_SDHCI_IPROC=y
-+CONFIG_MMC_BCM2835=y
- CONFIG_NEW_LEDS=y
- CONFIG_LEDS_CLASS=y
- CONFIG_LEDS_GPIO=y
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index a94126f..63b94d0 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -730,6 +730,7 @@ CONFIG_MMC_DW_EXYNOS=y
- CONFIG_MMC_DW_ROCKCHIP=y
- CONFIG_MMC_SH_MMCIF=y
- CONFIG_MMC_SUNXI=y
-+CONFIG_MMC_BCM2835=y
- CONFIG_NEW_LEDS=y
- CONFIG_LEDS_CLASS=y
- CONFIG_LEDS_CLASS_FLASH=m
+diff --git a/drivers/gpu/drm/qxl/qxl_display.c b/drivers/gpu/drm/qxl/qxl_display.c
+index 2cd14be..2b99496 100644
+--- a/drivers/gpu/drm/qxl/qxl_display.c
++++ b/drivers/gpu/drm/qxl/qxl_display.c
+@@ -157,19 +157,23 @@ static void qxl_update_offset_props(struct qxl_device *qdev)
+ 
+ void qxl_display_read_client_monitors_config(struct qxl_device *qdev)
+ {
+-
+ 	struct drm_device *dev = &qdev->ddev;
+-	int status;
++	int status, retries;
+ 
+-	status = qxl_display_copy_rom_client_monitors_config(qdev);
+-	while (status == MONITORS_CONFIG_BAD_CRC) {
+-		qxl_io_log(qdev, "failed crc check for client_monitors_config,"
+-				 " retrying\n");
++	for (retries = 0; retries < 10; retries++) {
+ 		status = qxl_display_copy_rom_client_monitors_config(qdev);
++		if (status != MONITORS_CONFIG_BAD_CRC)
++			break;
++		udelay(5);
++	}
++	if (status == MONITORS_CONFIG_BAD_CRC) {
++		qxl_io_log(qdev, "config: bad crc\n");
++		DRM_DEBUG_KMS("ignoring client monitors config: bad crc");
++		return;
+ 	}
+ 	if (status == MONITORS_CONFIG_UNCHANGED) {
+-		qxl_io_log(qdev, "config unchanged\n");
+-		DRM_DEBUG("ignoring unchanged client monitors config");
++		qxl_io_log(qdev, "config: unchanged\n");
++		DRM_DEBUG_KMS("ignoring client monitors config: unchanged");
+ 		return;
+ 	}
+ 
 -- 
 1.8.3.1
