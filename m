@@ -1,71 +1,41 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 08 Mar 2017 10:21:20 +0100
-Subject: [PATCH 2/3] ARM64: dts: marvell: armada-3720-db: add gpio expander
-In-Reply-To: <20170222173146.30993-3-gregory.clement@free-electrons.com>
- (Gregory CLEMENT's message of "Wed, 22 Feb 2017 18:31:45 +0100")
-References: <20170222173146.30993-1-gregory.clement@free-electrons.com>
- <20170222173146.30993-3-gregory.clement@free-electrons.com>
-Message-ID: <87pohsm8dr.fsf@free-electrons.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Wed, 8 Mar 2017 09:26:01 +0000
+Subject: [PATCH] reset: sunxi: fix for 64-bit compilation
+In-Reply-To: <CAGb2v64SozB9vUpotkEOyUK33ba8hq9M-QRQUEzEQ565Bhd93g@mail.gmail.com>
+References: <1488764156-22197-1-git-send-email-andre.przywara@arm.com>
+ <CAGb2v64SozB9vUpotkEOyUK33ba8hq9M-QRQUEzEQ565Bhd93g@mail.gmail.com>
+Message-ID: <6a0e362b-8ebf-6254-6387-12967ec8c484@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
- 
- On mer., f?vr. 22 2017, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
 
-> A gpio expander is present on the i2c bus on the Armada 3720 DB board. This
-> patch add it to the device tree.
->
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+On 08/03/17 04:28, Chen-Yu Tsai wrote:
+> On Mon, Mar 6, 2017 at 9:35 AM, Andre Przywara <andre.przywara@arm.com> wrote:
+>> The Allwinner reset controller has 32-bit registers, so translating
+>> the reset cell number into a register and bit offset should not use
+>> any architecture dependent data size. Otherwise this breaks for 64-bit
+>> architectures like arm64.
+>> Fix this by making it clear that it's the hardware register width which
+>> matters here in the calculation.
+>>
+>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> 
+> Acked-by: Chen-Yu Tsai <wens@csie.org>
 
-Applied on mvebu/dt64
+Thanks a lot!
 
-Gregory
+> Though I don't expect this driver to be used with arm64 chips.
 
-> ---
->  arch/arm64/boot/dts/marvell/armada-3720-db.dts | 18 ++++++++++++++++++
->  1 file changed, 18 insertions(+)
->
-> diff --git a/arch/arm64/boot/dts/marvell/armada-3720-db.dts b/arch/arm64/boot/dts/marvell/armada-3720-db.dts
-> index 86602c907a61..864936acc316 100644
-> --- a/arch/arm64/boot/dts/marvell/armada-3720-db.dts
-> +++ b/arch/arm64/boot/dts/marvell/armada-3720-db.dts
-> @@ -64,6 +64,24 @@
->  
->  &i2c0 {
->  	status = "okay";
-> +
-> +	gpio_exp: pca9555 at 22 {
-> +		compatible = "nxp,pca9555";
-> +		gpio-controller;
-> +		#gpio-cells = <2>;
-> +
-> +		reg = <0x22>;
-> +		/*
-> +		 * IO0_0: PWR_EN_USB2	IO1_0: PWR_EN_VTT
-> +		 * IO0_1: PWR_EN_USB23	IO1_1: MPCIE_WDISABLE
-> +		 * IO0_2: PWR_EN_SATA	IO1_2: RGMII_DEV_RSTN
-> +		 * IO0_3: PWR_EN_PCIE	IO1_3: SGMII_DEV_RSTN
-> +		 * IO0_4: PWR_EN_SD
-> +		 * IO0_5: PWR_EN_EMMC
-> +		 * IO0_6: PWR_EN_RGMII	IO1_6: SATA_USB3.0_SEL
-> +		 * IO0_7: PWR_EN_SGMII	IO1_7: PWR_MCI_PS
-> +		 */
-> +	};
->  };
->  
->  /* CON3 */
-> -- 
-> 2.11.0
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Well, weren't we toying with the idea of using this for the A64 PRCM
+support?
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Also the driver is actually pretty generic, and I have (renaming)
+patches lying around to make this obvious. This is partly driven by a
+side project for some (arm64) SoC support, which can happily use that
+driver to tackle its device reset support.
+
+So as this is an obvious bug, I'd rather see this fixed now.
+
+Cheers,
+Andre.
