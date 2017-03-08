@@ -1,117 +1,63 @@
-From: slemieux.tyco@gmail.com (Sylvain Lemieux)
-Date: Wed,  8 Mar 2017 12:46:38 -0500
-Subject: [PATCH 2/2] [kernel] ARM: lpc32xx: drop CLCD configuration
-In-Reply-To: <20170308174638.25578-1-slemieux.tyco@gmail.com>
-References: <20170308174638.25578-1-slemieux.tyco@gmail.com>
-Message-ID: <20170308174638.25578-3-slemieux.tyco@gmail.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Thu, 9 Mar 2017 03:06:34 +0900
+Subject: [Question] devm_kmalloc() for DMA ?
+In-Reply-To: <b7dd01e6-ddcd-a34a-c26c-05ce6ae4015a@arm.com>
+References: <CAK7LNARbD262isY7yOgQKAcbWQHV+3dsoRjtu6S+qUpPr98qSQ@mail.gmail.com>
+ <b7dd01e6-ddcd-a34a-c26c-05ce6ae4015a@arm.com>
+Message-ID: <CAK7LNAQ3FbicgoV1Q70T2gZQS0j1Z8LffXquSM=v6DYcHP_m4Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Liam Beguin <lbeguin@tycoint.com>
+Hi Robin,
 
-Drop the CLCD configurations and custom functions
-since it's now done using the devicetree.
 
-Signed-off-by: Liam Beguin <lbeguin@tycoint.com>
-Signed-off-by: Sylvain Lemieux <slemieux@tycoint.com>
----
- arch/arm/mach-lpc32xx/phy3250.c | 70 -----------------------------------------
- 1 file changed, 70 deletions(-)
+2017-03-08 20:15 GMT+09:00 Robin Murphy <robin.murphy@arm.com>:
+> On 08/03/17 10:59, Masahiro Yamada wrote:
+>> Hi experts,
+>>
+>> I have a question about
+>> how to allocate DMA-safe buffer.
+>>
+>>
+>> In my understanding, kmalloc() returns
+>> memory with DMA safe alignment
+>> in order to avoid cache-sharing problem when used for DMA.
+>>
+>> The alignment is decided by ARCH_DMA_MINALIGN.
+>> For example, on modern ARM 32bit boards, this value is typically 64.
+>> So, memory returned by kmalloc() has
+>> at least 64 byte alignment.
+>>
+>>
+>> On the other hand, devm_kmalloc() does not return
+>> enough-aligned memory.
+>
+> How so? If anything returned by kmalloc() is guaranteed to occupy some
+> multiple of ARCH_DMA_MINALIGN bytes in order to avoid two allocations
+> falling into the same cache line, I don't see how stealing the first 16
+> bytes *of a single allocation* could make it start sharing cache lines
+> with another? :/
 
-diff --git a/arch/arm/mach-lpc32xx/phy3250.c b/arch/arm/mach-lpc32xx/phy3250.c
-index 6c52bd32610e..97bffd9324f3 100644
---- a/arch/arm/mach-lpc32xx/phy3250.c
-+++ b/arch/arm/mach-lpc32xx/phy3250.c
-@@ -24,8 +24,6 @@
- #include <linux/irq.h>
- #include <linux/dma-mapping.h>
- #include <linux/gpio.h>
--#include <linux/amba/bus.h>
--#include <linux/amba/clcd.h>
- #include <linux/amba/pl08x.h>
- #include <linux/amba/mmci.h>
- #include <linux/of.h>
-@@ -45,73 +43,6 @@
- #include <mach/board.h>
- #include "common.h"
- 
--/*
-- * AMBA LCD controller
-- */
--static struct clcd_panel conn_lcd_panel = {
--	.mode		= {
--		.name		= "QVGA portrait",
--		.refresh	= 60,
--		.xres		= 240,
--		.yres		= 320,
--		.pixclock	= 191828,
--		.left_margin	= 22,
--		.right_margin	= 11,
--		.upper_margin	= 2,
--		.lower_margin	= 1,
--		.hsync_len	= 5,
--		.vsync_len	= 2,
--		.sync		= 0,
--		.vmode		= FB_VMODE_NONINTERLACED,
--	},
--	.width		= -1,
--	.height		= -1,
--	.tim2		= (TIM2_IVS | TIM2_IHS),
--	.cntl		= (CNTL_BGR | CNTL_LCDTFT | CNTL_LCDVCOMP(1) |
--				CNTL_LCDBPP16_565),
--	.bpp		= 16,
--};
--#define PANEL_SIZE (3 * SZ_64K)
--
--static int lpc32xx_clcd_setup(struct clcd_fb *fb)
--{
--	dma_addr_t dma;
--
--	fb->fb.screen_base = dma_alloc_wc(&fb->dev->dev, PANEL_SIZE, &dma,
--					  GFP_KERNEL);
--	if (!fb->fb.screen_base) {
--		printk(KERN_ERR "CLCD: unable to map framebuffer\n");
--		return -ENOMEM;
--	}
--
--	fb->fb.fix.smem_start = dma;
--	fb->fb.fix.smem_len = PANEL_SIZE;
--	fb->panel = &conn_lcd_panel;
--
--	return 0;
--}
--
--static int lpc32xx_clcd_mmap(struct clcd_fb *fb, struct vm_area_struct *vma)
--{
--	return dma_mmap_wc(&fb->dev->dev, vma, fb->fb.screen_base,
--			   fb->fb.fix.smem_start, fb->fb.fix.smem_len);
--}
--
--static void lpc32xx_clcd_remove(struct clcd_fb *fb)
--{
--	dma_free_wc(&fb->dev->dev, fb->fb.fix.smem_len, fb->fb.screen_base,
--		    fb->fb.fix.smem_start);
--}
--
--static struct clcd_board lpc32xx_clcd_data = {
--	.name		= "Phytec LCD",
--	.check		= clcdfb_check,
--	.decode		= clcdfb_decode,
--	.setup		= lpc32xx_clcd_setup,
--	.mmap		= lpc32xx_clcd_mmap,
--	.remove		= lpc32xx_clcd_remove,
--};
--
- static struct pl08x_channel_data pl08x_slave_channels[] = {
- 	{
- 		.bus_id = "nand-slc",
-@@ -161,7 +92,6 @@ static struct lpc32xx_mlc_platform_data lpc32xx_mlc_data = {
- static const struct of_dev_auxdata lpc32xx_auxdata_lookup[] __initconst = {
- 	OF_DEV_AUXDATA("arm,pl022", 0x20084000, "dev:ssp0", NULL),
- 	OF_DEV_AUXDATA("arm,pl022", 0x2008C000, "dev:ssp1", NULL),
--	OF_DEV_AUXDATA("arm,pl110", 0x31040000, "dev:clcd", &lpc32xx_clcd_data),
- 	OF_DEV_AUXDATA("arm,pl080", 0x31000000, "pl08xdmac", &pl08x_pd),
- 	OF_DEV_AUXDATA("arm,pl18x", 0x20098000, "20098000.sd",
- 		       &lpc32xx_mmci_data),
+I just thought of traverse of the linked list of devres_node
+on a different thread, but it should not happen.
+
+Please forget my stupid question.
+
+
+> If a particular device has a problem with:
+>
+> p = kmalloc(...);
+> d = dma_map_single(p + 0x10, ...);
+> do_something_with(d);
+>
+> that's a separate issue altogether.
+
+Right.
+Each device has own requirement for DMA alignment.
+
+Thanks!
+
+
 -- 
-2.11.0
+Best Regards
+Masahiro Yamada
