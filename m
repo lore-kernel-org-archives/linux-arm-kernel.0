@@ -1,63 +1,36 @@
-From: gerg@uclinux.org (Greg Ungerer)
-Date: Thu, 9 Mar 2017 09:51:58 +1000
-Subject: [PATCH v2 2/4] ARM: nommu: dynamic exception base address setting
-In-Reply-To: <20170308162258.GA3515@afzalpc>
-References: <314159a7-b664-1256-647d-c05880ad7710@uclinux.org>
- <20170308162258.GA3515@afzalpc>
-Message-ID: <7ab1dfbd-9240-4f4b-70e2-d09ffc1039de@uclinux.org>
+From: ebiggers3@gmail.com (Eric Biggers)
+Date: Wed,  8 Mar 2017 16:27:04 -0800
+Subject: [PATCH] arm64: support keyctl() system call in 32-bit mode
+Message-ID: <20170309002704.68115-1-ebiggers3@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Afzal,
+From: Eric Biggers <ebiggers@google.com>
 
-On 09/03/17 02:22, afzal mohammed wrote:
-> Was standing on one leg & hoping that nothing breaks, knocked down,
+As is the case for a number of other architectures that have a 32-bit
+compat mode, enable KEYS_COMPAT if both COMPAT and KEYS are enabled.
+This allows AArch32 programs to use the keyctl() system call when
+running on an AArch64 kernel.
 
-I think you are still standing... Breaking an out-of-tree patch
-is a bit like the tree that falls in the forest that no-one hears :-)
+Signed-off-by: Eric Biggers <ebiggers@google.com>
+---
+ arch/arm64/Kconfig | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-
-> On Wed, Mar 08, 2017 at 01:21:36PM +1000, Greg Ungerer wrote:
-> 
->> This patch (which is in mainline now as commit f8300a0b5d) breaks
->> my patch series to support running the Versatile QEMU target with
->> a nommu configured linux kernel.
-> 
-> Sorry
->
->>> +	return !!cpuid_feature_extract(CPUID_EXT_PFR1, 4);
->>
->> The problem is here. This ends up generating the asm code:
->>
->>   2ebacc:       ee103f31        mrc     15, 0, r3, cr0, cr1, {1}
-> 
-> Thanks for finding the root cause
-> 
-> 
-> i have in mind the diff at the end (need to recheck it's correctness),
-> saw your response that Vladimir's fix works for you, either (if this
-> works) way, let's fix ASAP.
-
-The patch below works too. Thanks for the quick response.
-
-Regards
-Greg
-
-
-> ---8<---
-> diff --git a/arch/arm/mm/nommu.c b/arch/arm/mm/nommu.c
-> index 3b5c7aaf9c76..081562f5436e 100644
-> --- a/arch/arm/mm/nommu.c
-> +++ b/arch/arm/mm/nommu.c
-> @@ -303,7 +303,9 @@ static inline void set_vbar(unsigned long val)
->   */
->  static inline bool security_extensions_enabled(void)
->  {
-> -	return !!cpuid_feature_extract(CPUID_EXT_PFR1, 4);
-> +	if ((read_cpuid_id() & 0x000F0000) == 0x000F0000)
-> +		return !!cpuid_feature_extract(CPUID_EXT_PFR1, 4);
-> +	return 0;
->  }
->  
->  static unsigned long __init setup_vectors_base(void)
-> 
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index a39029b5414e..f21e9a76ff67 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -1063,6 +1063,10 @@ config SYSVIPC_COMPAT
+ 	def_bool y
+ 	depends on COMPAT && SYSVIPC
+ 
++config KEYS_COMPAT
++	def_bool y
++	depends on COMPAT && KEYS
++
+ endmenu
+ 
+ menu "Power management options"
+-- 
+2.12.0.246.ga2ecc84866-goog
