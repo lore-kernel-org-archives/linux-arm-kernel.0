@@ -1,105 +1,60 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Thu, 9 Mar 2017 15:28:31 +0000
-Subject: [v3 2/5] coresight: refactor with function of_coresight_get_cpu
-In-Reply-To: <1489057304-1851-1-git-send-email-suzuki.poulose@arm.com>
-References: <1489057304-1851-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <75112177-e5c1-0532-04b1-842a985b077d@arm.com>
+From: romain.izard.pro@gmail.com (Romain Izard)
+Date: Thu,  9 Mar 2017 16:18:20 +0100
+Subject: [PATCH] mmc: sdhci-of-at91: Support external regulators
+Message-ID: <20170309151820.7510-1-romain.izard.pro@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/03/17 11:01, Suzuki K Poulose wrote:
-> On 03/03/17 06:00, Leo Yan wrote:
->> This is refactor to add function of_coresight_get_cpu(), so it's used to
->> retrieve CPU id for coresight component. Finally can use it as a common
->> function for multiple places.
->>
->> Suggested-by: Mathieu Poirier <mathieu.poirier@linaro.org>
->> Signed-off-by: Leo Yan <leo.yan@linaro.org>
->> ---
->>  drivers/hwtracing/coresight/of_coresight.c | 37 ++++++++++++++++++++----------
->>  include/linux/coresight.h                  |  2 ++
->>  2 files changed, 27 insertions(+), 12 deletions(-)
->>
->> diff --git a/drivers/hwtracing/coresight/of_coresight.c b/drivers/hwtracing/coresight/of_coresight.c
->> index 629e031..d9a12fb 100644
->> --- a/drivers/hwtracing/coresight/of_coresight.c
->> +++ b/drivers/hwtracing/coresight/of_coresight.c
->> @@ -101,14 +101,36 @@ static int of_coresight_alloc_memory(struct device *dev,
->>  	return 0;
->>  }
->>
->> +int of_coresight_get_cpu(struct device_node *node)
->> +{
->> +	int cpu;
->> +	struct device_node *dn;
->> +
->> +	dn = of_parse_phandle(node, "cpu", 0);
->> +
->> +	/* Affinity defaults to CPU0 */
->> +	if (!dn)
->> +		return 0;
->> +
->> +	for_each_possible_cpu(cpu) {
->> +		if (dn == of_get_cpu_node(cpu, NULL)) {
->
-> We should do of_node_put() on the node returned by of_get_cpu_node,
-> and I accept that this was there before the refactoring. We could do
-> something like :
->
->
-> ----8>------
->
->
->
-> [PATCH] coresight: of_coresight_get_cpu: Add missing of_node_put
->
-> The of_coresight_get_cpu iterates over the possible CPU nodes
-> to find a given cpu phandle. However it does not drop the reference
-> to the node pointer returned by the of_get_cpu_node.
->
-> Cc: Leo Yan <leo.yan@linaro.org>
-> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> ---
->  drivers/hwtracing/coresight/of_coresight.c | 16 +++++++++-------
->  1 file changed, 9 insertions(+), 7 deletions(-)
->
-> diff --git a/drivers/hwtracing/coresight/of_coresight.c b/drivers/hwtracing/coresight/of_coresight.c
-> index d9a12fb..8c6f4a0 100644
-> --- a/drivers/hwtracing/coresight/of_coresight.c
-> +++ b/drivers/hwtracing/coresight/of_coresight.c
-> @@ -104,7 +104,8 @@ static int of_coresight_alloc_memory(struct device *dev,
->  int of_coresight_get_cpu(struct device_node *node)
->  {
->  	int cpu;
-> -	struct device_node *dn;
-> +	bool found;
-> +	struct device_node *dn, *np;
->
->  	dn = of_parse_phandle(node, "cpu", 0);
->
-> @@ -113,15 +114,16 @@ int of_coresight_get_cpu(struct device_node *node)
->  		return 0;
->
->  	for_each_possible_cpu(cpu) {
-> -		if (dn == of_get_cpu_node(cpu, NULL)) {
-> -			of_node_put(dn);
-> -			return cpu;
-> -		}
-> +		np = of_get_cpu_node(cpu, NULL);
-> +		found = (dn == np);
-> +		of_node_put(np);
-> +		if (found)
-> +			break;
->  	}
->
-> -	/* Affinity to CPU0 if no cpu nodes are found */
->  	of_node_put(dn);
-> -	return 0;
-> +	/* Affinity to CPU0 if no cpu nodes are found */
-> +	return cpu_possible(cpu) ? cpu : 0;
+The SDHCI controller in the SAMA5D2 chip requires a valid voltage set
+in the power control register, otherwise commands will fail with a
+timeout error.
 
-This could be even :
-	return found ? cpu : 0;
+When using the regulator framework to specify the regulator used by the
+mmc device, the voltage is not configured, and it is not possible to use
+the connected device.
 
-Suzuki
+Implement a custom 'set_power' function for this specific hardware, that
+configures the voltage in the register in all cases.
+
+Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
+---
+ drivers/mmc/host/sdhci-of-at91.c | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
+
+diff --git a/drivers/mmc/host/sdhci-of-at91.c b/drivers/mmc/host/sdhci-of-at91.c
+index 2f9ad213377a..291a74955a4c 100644
+--- a/drivers/mmc/host/sdhci-of-at91.c
++++ b/drivers/mmc/host/sdhci-of-at91.c
+@@ -85,11 +85,30 @@ static void sdhci_at91_set_clock(struct sdhci_host *host, unsigned int clock)
+ 	sdhci_writew(host, clk, SDHCI_CLOCK_CONTROL);
+ }
+ 
++/*
++ * In this specific implementation of the SDHCI contoller, the power register
++ * needs to have a valid voltage set even when the power supply is managed by
++ * an external regulator.
++ */
++static void sdhci_at91_set_power(struct sdhci_host *host, unsigned char mode,
++		     unsigned short vdd)
++{
++	if (!IS_ERR(host->mmc->supply.vmmc)) {
++		struct mmc_host *mmc = host->mmc;
++
++		spin_unlock_irq(&host->lock);
++		mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, vdd);
++		spin_lock_irq(&host->lock);
++	}
++	sdhci_set_power_noreg(host, mode, vdd);
++}
++
+ static const struct sdhci_ops sdhci_at91_sama5d2_ops = {
+ 	.set_clock		= sdhci_at91_set_clock,
+ 	.set_bus_width		= sdhci_set_bus_width,
+ 	.reset			= sdhci_reset,
+ 	.set_uhs_signaling	= sdhci_set_uhs_signaling,
++	.set_power		= sdhci_at91_set_power,
+ };
+ 
+ static const struct sdhci_pltfm_data soc_data_sama5d2 = {
+-- 
+2.9.3
