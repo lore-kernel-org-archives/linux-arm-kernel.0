@@ -1,42 +1,43 @@
-From: andy.tang@nxp.com (Yuantian Tang)
-Date: Thu, 9 Mar 2017 17:13:29 +0800
-Subject: [PATCH] ahci: qoriq: correct the sata ecc setting error
-Message-ID: <1489050809-15265-1-git-send-email-andy.tang@nxp.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 9 Mar 2017 10:32:36 +0100
+Subject: stmmac still supporting spear600 ?
+In-Reply-To: <373e2760-94c5-4349-33aa-158bc8f4b19e@st.com>
+References: <20170309093412.33c0277d@free-electrons.com>
+ <373e2760-94c5-4349-33aa-158bc8f4b19e@st.com>
+Message-ID: <20170309103236.3e16304f@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sata ecc is controlled by only 1 bit which is 24bit in big-endian
-in ecc register. So only setting 24bit to disable sata ecc prevents
-other bits from being overwritten in ecc register.
+Hello Giuseppe,
 
-Signed-off-by: Tang Yuantian <andy.tang@nxp.com>
----
- drivers/ata/ahci_qoriq.c | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+Thanks for your answer.
 
-diff --git a/drivers/ata/ahci_qoriq.c b/drivers/ata/ahci_qoriq.c
-index 85d8332..4c96f3a 100644
---- a/drivers/ata/ahci_qoriq.c
-+++ b/drivers/ata/ahci_qoriq.c
-@@ -177,7 +177,8 @@ static int ahci_qoriq_phy_init(struct ahci_host_priv *hpriv)
- 	case AHCI_LS1043A:
- 		if (!qpriv->ecc_addr)
- 			return -EINVAL;
--		writel(ECC_DIS_ARMV8_CH2, qpriv->ecc_addr);
-+		writel(readl(qpriv->ecc_addr) | ECC_DIS_ARMV8_CH2,
-+				qpriv->ecc_addr);
- 		writel(AHCI_PORT_PHY_1_CFG, reg_base + PORT_PHY1);
- 		writel(AHCI_PORT_TRANS_CFG, reg_base + PORT_TRANS);
- 		if (qpriv->is_dmacoherent)
-@@ -194,7 +195,8 @@ static int ahci_qoriq_phy_init(struct ahci_host_priv *hpriv)
- 	case AHCI_LS1046A:
- 		if (!qpriv->ecc_addr)
- 			return -EINVAL;
--		writel(ECC_DIS_ARMV8_CH2, qpriv->ecc_addr);
-+		writel(readl(qpriv->ecc_addr) | ECC_DIS_ARMV8_CH2,
-+				qpriv->ecc_addr);
- 		writel(AHCI_PORT_PHY_1_CFG, reg_base + PORT_PHY1);
- 		writel(AHCI_PORT_TRANS_CFG, reg_base + PORT_TRANS);
- 		if (qpriv->is_dmacoherent)
+On Thu, 9 Mar 2017 10:09:02 +0100, Giuseppe CAVALLARO wrote:
+
+> We do not test stmmac on this spear board since many years
+> and I guess you have to provide parameters from the platform.
+
+Ok, that's what I was afraid of :-/
+
+> In fact, stmmac is recently tested with DT.
+
+I'm also using the DT, so this is definitely not the problem.
+
+> IIRC, the mac on spear600 could not have the HW cap register
+
+Correct.
+
+> so it is mandatory to provide all the right parameters and
+> configurations for this HW.
+
+OK, I'll have a look. However, I'm still confused by this DMA_RESET bit
+that never clears, contrary to what the datasheet says. Are there some
+erratas?
+
+Best regards,
+
+Thomas
 -- 
-2.1.0.27.g96db324
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
