@@ -1,19 +1,62 @@
-From: davem@davemloft.net (David Miller)
-Date: Thu, 09 Mar 2017 13:25:25 -0800 (PST)
-Subject: [PATCH v4 net-next 0/6] drivers: net: xgene-v2: Add RGMII
- based 1G driver
-In-Reply-To: <1488935325-13603-1-git-send-email-isubramanian@apm.com>
-References: <1488935325-13603-1-git-send-email-isubramanian@apm.com>
-Message-ID: <20170309.132525.936435093296208313.davem@davemloft.net>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu,  9 Mar 2017 21:52:04 +0100
+Subject: [PATCH v6 06/11] arm64/mmu: align alloc_init_pte prototype with
+ pmd/pud versions
+In-Reply-To: <1489092729-16871-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1489092729-16871-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1489092729-16871-7-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Iyappan Subramanian <isubramanian@apm.com>
-Date: Tue,  7 Mar 2017 17:08:39 -0800
+Align the function prototype of alloc_init_pte() with its pmd and pud
+counterparts by replacing the pfn parameter with the equivalent physical
+address.
 
-> This patch set adds support for RGMII based 1GbE hardware which uses a linked
-> list of DMA descriptor architecture (v2) for APM X-Gene SoCs.
-> 
-> Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
+Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm64/mm/mmu.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-Series applied, thanks.
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index 75e21c33caff..bb9179084217 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -107,7 +107,7 @@ static bool pgattr_change_is_safe(u64 old, u64 new)
+ }
+ 
+ static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
+-				  unsigned long end, unsigned long pfn,
++				  unsigned long end, phys_addr_t phys,
+ 				  pgprot_t prot,
+ 				  phys_addr_t (*pgtable_alloc)(void))
+ {
+@@ -128,8 +128,7 @@ static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
+ 	do {
+ 		pte_t old_pte = *pte;
+ 
+-		set_pte(pte, pfn_pte(pfn, prot));
+-		pfn++;
++		set_pte(pte, pfn_pte(__phys_to_pfn(phys), prot));
+ 
+ 		/*
+ 		 * After the PTE entry has been populated once, we
+@@ -137,6 +136,7 @@ static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
+ 		 */
+ 		BUG_ON(!pgattr_change_is_safe(pte_val(old_pte), pte_val(*pte)));
+ 
++		phys += PAGE_SIZE;
+ 	} while (pte++, addr += PAGE_SIZE, addr != end);
+ 
+ 	pte_clear_fixmap();
+@@ -182,7 +182,7 @@ static void alloc_init_pmd(pud_t *pud, unsigned long addr, unsigned long end,
+ 			BUG_ON(!pgattr_change_is_safe(pmd_val(old_pmd),
+ 						      pmd_val(*pmd)));
+ 		} else {
+-			alloc_init_pte(pmd, addr, next, __phys_to_pfn(phys),
++			alloc_init_pte(pmd, addr, next, phys,
+ 				       prot, pgtable_alloc);
+ 
+ 			BUG_ON(pmd_val(old_pmd) != 0 &&
+-- 
+2.7.4
