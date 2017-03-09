@@ -1,79 +1,61 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Thu, 09 Mar 2017 16:41:29 +0100
-Subject: [RESEND PATCH] arm: assabet_defconfig: disable IDE subsystem
-In-Reply-To: <20170309150829.GM21222@n2100.armlinux.org.uk>
-References: <1467991490-24895-1-git-send-email-b.zolnierkie@samsung.com>
- <3001681.2O13sqAj0p@amdc3058> <20170309150829.GM21222@n2100.armlinux.org.uk>
- <CGME20170309154131epcas5p1f9c668855ee33c1634d4491d8664848b@epcas5p1.samsung.com>
-Message-ID: <38186948.tezz7FzVrI@amdc3058>
+From: thgarnie@google.com (Thomas Garnier)
+Date: Thu, 9 Mar 2017 07:48:03 -0800
+Subject: [PATCH v2 1/4] syscalls: Restore address limit after a syscall
+In-Reply-To: <20170309084208.ims3ehcnieo7uqew@pd.tnic>
+References: <20170309012456.5631-1-thgarnie@google.com>
+ <20170309084208.ims3ehcnieo7uqew@pd.tnic>
+Message-ID: <CAJcbSZHwfG3e+nZySpCFronRG08p=Rs4VvY7SC6QLpUCpyy+_A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, March 09, 2017 03:08:29 PM Russell King - ARM Linux wrote:
-> On Thu, Mar 09, 2017 at 03:57:37PM +0100, Bartlomiej Zolnierkiewicz wrote:
-> > On Thursday, March 09, 2017 02:51:47 PM Russell King - ARM Linux wrote:
-> > > On Thu, Mar 09, 2017 at 03:42:49PM +0100, Bartlomiej Zolnierkiewicz wrote:
-> > > > 
-> > > > Hi,
-> > > > 
-> > > > On Thursday, March 09, 2017 01:57:15 PM Russell King - ARM Linux wrote:
-> > > > > On Thu, Mar 09, 2017 at 03:24:56PM +0300, Sergei Shtylyov wrote:
-> > > > > > On 03/09/2017 03:20 PM, Sekhar Nori wrote:
-> > > > > > 
-> > > > > > >[...]
-> > > > > > 
-> > > > > > >>>diff --git a/arch/arm/mach-davinci/board-dm644x-evm.c
-> > > > > > >>>b/arch/arm/mach-davinci/board-dm644x-evm.c
-> > > > > > >>>index 023480b75244..60a1f23890cd 100644
-> > > > > > >>>--- a/arch/arm/mach-davinci/board-dm644x-evm.c
-> > > > > > >>>+++ b/arch/arm/mach-davinci/board-dm644x-evm.c
-> > > > > > >>>@@ -744,7 +744,7 @@ static int davinci_phy_fixup(struct phy_device
-> > > > > > >>>*phydev)
-> > > > > > >>>     return 0;
-> > > > > > >>> }
-> > > > > > >>>
-> > > > > > >>>-#define HAS_ATA        IS_ENABLED(CONFIG_BLK_DEV_PALMCHIP_BK3710)
-> > > > > > >>>+#define HAS_ATA        IS_ENABLED(CONFIG_PATA_BK3710)
-> > > > > > >>
-> > > > > > >>   I think it would be more correct to check for both libata and IDE
-> > > > > > >>drivers here...
-> > > > > > >
-> > > > > > >As I understand, the plan is to remove the IDE driver soon.
-> > > > > > 
-> > > > > >    I'm not sure DaveM would support any removals in drivers/ide/. He has
-> > > > > > explicitly expressed his will to maintain the IDE driuver forever.
-> > > > > 
-> > > > > As I keep saying, there are ARM machines where the IDE driver works but
-> > > > > the PATA driver doesn't.  EBSA110's PCMCIA slots for instance.
-> > > > 
-> > > > Please be more specific, I'll be happy to help with migrating this
-> > > > machines to libata PATA.
-> > > > 
-> > > > BTW the example you're giving has never worked with the old IDE
-> > > > driver in the upstream kernel.
-> > > 
-> > > That's where you are wrong.  It worked for 10+ years with no
-> > > modifications in the upstream IDE driver or ide-cs driver - only the
-> > > patch I quoted was required.
-> > 
-> > ..and the patch you quoted is in which upstream kernel version exactly?
-> 
-> I don't claim that it works with the upstream kernel as a whole.  I claim
-> that it works with the ide-cs driver _unmodified_ in the upstream kernel,
-> but with a simple two line patch which is private to the ARM architecture.
-> 
-> Please pay attention to what I write, thanks.
+On Thu, Mar 9, 2017 at 12:42 AM, Borislav Petkov <bp@alien8.de> wrote:
+> On Wed, Mar 08, 2017 at 05:24:53PM -0800, Thomas Garnier wrote:
+>> @@ -191,6 +191,22 @@ extern struct trace_event_functions exit_syscall_print_funcs;
+>>       SYSCALL_METADATA(sname, x, __VA_ARGS__)                 \
+>>       __SYSCALL_DEFINEx(x, sname, __VA_ARGS__)
+>>
+>> +asmlinkage void verify_pre_usermode_state(void);
+>> +
+>> +#ifndef CONFIG_ARCH_NO_SYSCALL_VERIFY_PRE_USERMODE_STATE
+>> +static inline bool has_user_ds(void) {
+>> +     bool ret = segment_eq(get_fs(), USER_DS);
+>> +     // Prevent re-ordering the call
+>
+> This is not the kernel comments style. Use /* */ instead.
+>
+>> +     barrier();
+>> +     return ret;
+>> +}
+>> +#else
+>> +static inline bool has_user_ds(void) {
+>> +     return false;
+>> +}
+>> +#endif
+>
+> ... and then you could slim down the ifdeffery a bit:
+>
+> static inline bool has_user_ds(void) {
+>         bool ret = false;
+>
+> #ifndef CONFIG_ARCH_NO_SYSCALL_VERIFY_PRE_USERMODE_STATE
+>         ret = segment_eq(get_fs(), USER_DS);
+>         /* Prevent re-ordering the call. */
+>         barrier();
+> #endif
+>
+>         return ret;
+> }
+>
 
-Out-of-tree patches are on their own, as kernel evolves they need
-to adapt, nothing new here.  For 10+ years you were just extremely
-lucky with your out-of-tree patch. 8)
+I agree, cleaner. I will look to do this change on next iteration.
 
-Anyway, if you ever get to running current upstream on your EBSA110
-please ping me and I will provide you with the draft pata_pcmcia
-patch to make EBSA110 work with libata.
+> --
+> Regards/Gruss,
+>     Boris.
+>
+> Good mailing practices for 400: avoid top-posting and trim the reply.
 
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+
+
+-- 
+Thomas
