@@ -1,252 +1,138 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 9 Mar 2017 01:16:47 -0800
-Subject: [PATCH v2] arm64: kvm: Use has_vhe() instead of
- hyp_alternate_select()
-In-Reply-To: <1488767598-2055-1-git-send-email-shankerd@codeaurora.org>
-References: <1488767598-2055-1-git-send-email-shankerd@codeaurora.org>
-Message-ID: <20170309091514.GB114347@lvm>
+From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
+Date: Thu, 9 Mar 2017 10:17:36 +0100
+Subject: [PATCH for-4.11 1/2] Revert "phy: Add USB3 PHY support for
+ Broadcom NSP SoC"
+In-Reply-To: <58C10E2C.8080107@ti.com>
+References: <20170208233023.31922-1-zajec5@gmail.com>
+ <82b47a03-c41b-378b-2d7c-f263eff514a9@gmail.com>
+ <1b66f9ab3a9efd1bd0817a114e5b9ec9@milecki.pl>
+ <06b6461c-9f43-3482-352f-374490056e90@gmail.com>
+ <b715c193196fb2de2b95cc3d15102e1b@milecki.pl>
+ <b2bdc1a7-4e5c-a13e-0cda-c90759d7308c@gmail.com>
+ <CAC3K-4o+ARP=_hg2XQszQh6v+ySpubyKRspCF38SLUUx4mXQDA@mail.gmail.com>
+ <CACna6rwN2JpvDX3Lk9G3vP=YrWygUNkjsC_VRcQf+o38ZjXAfA@mail.gmail.com>
+ <58BFF88F.8080008@ti.com> <58C10E2C.8080107@ti.com>
+Message-ID: <CACna6rxJ3tqV0FuETh29-AJ6=eR5kqkJixKZ0J=4fgXZuoYgyg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shanker,
+On 9 March 2017 at 09:11, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+>
+>
+> On Wednesday 08 March 2017 05:56 PM, Kishon Vijay Abraham I wrote:
+>> Hi Rafal,
+>>
+>> On Wednesday 08 March 2017 05:43 PM, Rafa? Mi?ecki wrote:
+>>> On 10 February 2017 at 01:27, Jon Mason <jon.mason@broadcom.com> wrote:
+>>>> On Thu, Feb 9, 2017 at 2:18 PM, Florian Fainelli <f.fainelli@gmail.com>
+>>>> wrote:
+>>>>>
+>>>>> On 02/08/2017 11:21 PM, Rafa? Mi?ecki wrote:
+>>>>>> On 2017-02-09 00:44, Florian Fainelli wrote:
+>>>>>>> On 02/08/2017 03:39 PM, Rafa? Mi?ecki wrote:
+>>>>>>>> On 2017-02-09 00:32, Florian Fainelli wrote:
+>>>>>>>>> On 02/08/2017 03:30 PM, Rafa? Mi?ecki wrote:
+>>>>>>>>>> From: Rafa? Mi?ecki <rafal@milecki.pl>
+>>>>>>>>>>
+>>>>>>>>>> This reverts commit d7bc1a7d41bf ("phy: Add USB3 PHY support for
+>>>>>>>>>> Broadcom NSP SoC") as we already have driver for this PHY (shared
+>>>>>>>>>> by NS
+>>>>>>>>>> and NSP). It was added in commit e5666281d9ea ("phy: bcm-ns-usb3:
+>>>>>>>>>> new
+>>>>>>>>>> driver for USB 3.0 PHY on Northstar").
+>>>>>>>>>>
+>>>>>>>>>> Instead of adding separated driver & duplicating code we should
+>>>>>>>>>> work on
+>>>>>>>>>> improving existing (old) one. Thanks to work done by Broadcom we
+>>>>>>>>>> know
+>>>>>>>>>> there is MDIO bus we weren't aware of & we know register names which
+>>>>>>>>>> makes initialization more clear. This is very valuable info and we
+>>>>>>>>>> should work on using it in existing driver afterwards.
+>>>>>>>>>
+>>>>>>>>> Should not we first extend the old driver to support NSP and then
+>>>>>>>>> revert
+>>>>>>>>> d7bc1a7d41bf ("phy: Add USB3 PHY support for Broadcom NSP SoC")?
+>>>>>>>>
+>>>>>>>> Sounds like a weird / dirty development method to me: adding
+>>>>>>>> duplicated
+>>>>>>>> code
+>>>>>>>> first then working on cleaning it. Unless you mean drivers/staging/.
+>>>>>>>
+>>>>>>> There was clearly a mistake in submitting this NSP USB PHY driver, and
+>>>>>>> it should have been a patch against the existing NS USB PHY driver, but
+>>>>>>> it was not, okay fair enough.
+>>>>>>>
+>>>>>>> It's one thing to address that in the future, and it's another thing to
+>>>>>>> flat out revert the driver just because you don't like the duplication.
+>>>>>>>
+>>>>>>> I don't like that either, and we can discuss on how to improve things
+>>>>>>> (like have the maintainer review that too), but duplication is a lesser
+>>>>>>> evil than not having the hardware supported at all, and even more so,
+>>>>>>> purposely reverting in the name of removing that duplication, that's
+>>>>>>> intentionally breaking working hardware!
+>>>>>>
+>>>>>> Hardware support is not excuse and I don't think it ever was in the
+>>>>>> Linux.
+>>>>>>
+>>>>>> We don't accept badly designed drivers just because they provide new hw
+>>>>>> support.
+>>>>>> We have various standards (for quality, style, design, code) at kernel
+>>>>>> and we
+>>>>>> stick to them unless it's drivers/staging/. As you said this driver
+>>>>>> shouldn't be
+>>>>>> pushed in the first place.
+>>>>>>
+>>>>>> Dropping hardware support in kernel happens. Sometimes it's about
+>>>>>> ancient
+>>>>>> devices, sometimes about code quality (some forgotten staging drivers
+>>>>>> used to be
+>>>>>> dropped AFAIK).
+>>>>>>
+>>>>>> Additionally you're talking about support that was *just* added and
+>>>>>> isn't used
+>>>>>> by anyone in the wild world yet.
+>>>>>
+>>>>> Except people working on it at Broadcom, but fair enough.
+>>>>>
+>>>>>>
+>>>>>> This hardware was missing upstream support for 4 years so 2 extra months
+>>>>>> won't
+>>>>>> really hurt anyone.
+>>>>>>
+>>>>>> I really don't see excusee or need for keeping this driver.
+>>>>>>
+>>>>>> If you want to (and you feel it's well designed), we can keep
+>>>>>> brcm,nsp-usb3-phy.txt
+>>>>>
+>>>>> No it's fine, let's drop it all and replace it with whatever you and Jon
+>>>>> come up with next.
+>>>>>
+>>>>>>
+>>>>>> I vote for focusing on existing driver improvements instead of looking
+>>>>>> for
+>>>>>> excuses for keeping driver that shouldn't be added in the first place.
+>>>>>> Jon seems to be already working on this, I'm willing to help him, I'm
+>>>>>> sure we
+>>>>>> can get you a proper support for the next merge window.
+>>>>>
+>>>>> Fair enough, I dropped Dhanajay's changes ("ARM: dts: NSP: Add USB nodes
+>>>>> for Northstar Plus") from devicetree/next so you and Jon can figure out
+>>>>> what is the best thing to move forward and we minimize the amount of
+>>>>> incompatible DT stuff to be sorted out later on. So as far as I am
+>>>>> concerned, there are no board/SoC DTS changes to be patched later on, we
+>>>>> could re-apply this patch as-is, or we could have to define a new binding.
+>>>>
+>>>> Per the discussion with Rafal, this is acceptable
+>>>>
+>>>> Acked-by: Jon Mason <jon.mason@broadcom.com>
+>>>
+>>> Hi Kishon, what's the status of this?
+>>
+>> Will be merging this in a day or so.
+>
+> merged, thanks.
 
-On Sun, Mar 05, 2017 at 08:33:18PM -0600, Shanker Donthineni wrote:
-> Now all the cpu_hwcaps features have their own static keys. We don't
-> need a separate function hyp_alternate_select() to patch the vhe/nvhe
-> code. We can achieve the same functionality by using has_vhe(). It
-> improves the code readability, uses the jump label instructions, and
-> also compiler generates the better code with a fewer instructions.
-> 
-> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
+Thank you!
 
-I have no objections against this patch as such, but I have a number of
-more substantial changes which will get rid of most of the
-hyp_alternate_select later, and since there's no immediate need to merge
-this patch, and there's the risk that it may slow down some things on
-certain platforms with older compilers, I'd like to hold off on merging
-this patch until the next merge window and revisit this issue at that
-point.
-
-Thanks,
--Christoffer
-
-> ---
-> v2: removed 'Change-Id: Ia8084189833f2081ff13c392deb5070c46a64038' from commit
-> 
->  arch/arm64/kvm/hyp/debug-sr.c  | 12 ++++++----
->  arch/arm64/kvm/hyp/switch.c    | 50 +++++++++++++++++++-----------------------
->  arch/arm64/kvm/hyp/sysreg-sr.c | 23 +++++++++----------
->  3 files changed, 43 insertions(+), 42 deletions(-)
-> 
-> diff --git a/arch/arm64/kvm/hyp/debug-sr.c b/arch/arm64/kvm/hyp/debug-sr.c
-> index f5154ed..e5642c2 100644
-> --- a/arch/arm64/kvm/hyp/debug-sr.c
-> +++ b/arch/arm64/kvm/hyp/debug-sr.c
-> @@ -109,9 +109,13 @@ static void __hyp_text __debug_save_spe_nvhe(u64 *pmscr_el1)
->  	dsb(nsh);
->  }
->  
-> -static hyp_alternate_select(__debug_save_spe,
-> -			    __debug_save_spe_nvhe, __debug_save_spe_vhe,
-> -			    ARM64_HAS_VIRT_HOST_EXTN);
-> +static void __hyp_text __debug_save_spe(u64 *pmscr_el1)
-> +{
-> +	if (has_vhe())
-> +		__debug_save_spe_vhe(pmscr_el1);
-> +	else
-> +		__debug_save_spe_nvhe(pmscr_el1);
-> +}
->  
->  static void __hyp_text __debug_restore_spe(u64 pmscr_el1)
->  {
-> @@ -180,7 +184,7 @@ void __hyp_text __debug_cond_save_host_state(struct kvm_vcpu *vcpu)
->  
->  	__debug_save_state(vcpu, &vcpu->arch.host_debug_state.regs,
->  			   kern_hyp_va(vcpu->arch.host_cpu_context));
-> -	__debug_save_spe()(&vcpu->arch.host_debug_state.pmscr_el1);
-> +	__debug_save_spe(&vcpu->arch.host_debug_state.pmscr_el1);
->  }
->  
->  void __hyp_text __debug_cond_restore_host_state(struct kvm_vcpu *vcpu)
-> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-> index aede165..c5c77b8 100644
-> --- a/arch/arm64/kvm/hyp/switch.c
-> +++ b/arch/arm64/kvm/hyp/switch.c
-> @@ -33,13 +33,9 @@ static bool __hyp_text __fpsimd_enabled_vhe(void)
->  	return !!(read_sysreg(cpacr_el1) & CPACR_EL1_FPEN);
->  }
->  
-> -static hyp_alternate_select(__fpsimd_is_enabled,
-> -			    __fpsimd_enabled_nvhe, __fpsimd_enabled_vhe,
-> -			    ARM64_HAS_VIRT_HOST_EXTN);
-> -
->  bool __hyp_text __fpsimd_enabled(void)
->  {
-> -	return __fpsimd_is_enabled()();
-> +	return has_vhe() ? __fpsimd_enabled_vhe() : __fpsimd_enabled_nvhe();
->  }
->  
->  static void __hyp_text __activate_traps_vhe(void)
-> @@ -63,9 +59,10 @@ static void __hyp_text __activate_traps_nvhe(void)
->  	write_sysreg(val, cptr_el2);
->  }
->  
-> -static hyp_alternate_select(__activate_traps_arch,
-> -			    __activate_traps_nvhe, __activate_traps_vhe,
-> -			    ARM64_HAS_VIRT_HOST_EXTN);
-> +static void __hyp_text __activate_traps_arch(void)
-> +{
-> +	has_vhe() ? __activate_traps_vhe() : __activate_traps_nvhe();
-> +}
->  
->  static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu)
->  {
-> @@ -97,7 +94,7 @@ static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu)
->  	write_sysreg(0, pmselr_el0);
->  	write_sysreg(ARMV8_PMU_USERENR_MASK, pmuserenr_el0);
->  	write_sysreg(vcpu->arch.mdcr_el2, mdcr_el2);
-> -	__activate_traps_arch()();
-> +	__activate_traps_arch();
->  }
->  
->  static void __hyp_text __deactivate_traps_vhe(void)
-> @@ -127,9 +124,10 @@ static void __hyp_text __deactivate_traps_nvhe(void)
->  	write_sysreg(CPTR_EL2_DEFAULT, cptr_el2);
->  }
->  
-> -static hyp_alternate_select(__deactivate_traps_arch,
-> -			    __deactivate_traps_nvhe, __deactivate_traps_vhe,
-> -			    ARM64_HAS_VIRT_HOST_EXTN);
-> +static void __hyp_text __deactivate_traps_arch(void)
-> +{
-> +	has_vhe() ? __deactivate_traps_vhe() : __deactivate_traps_nvhe();
-> +}
->  
->  static void __hyp_text __deactivate_traps(struct kvm_vcpu *vcpu)
->  {
-> @@ -142,7 +140,7 @@ static void __hyp_text __deactivate_traps(struct kvm_vcpu *vcpu)
->  	if (vcpu->arch.hcr_el2 & HCR_VSE)
->  		vcpu->arch.hcr_el2 = read_sysreg(hcr_el2);
->  
-> -	__deactivate_traps_arch()();
-> +	__deactivate_traps_arch();
->  	write_sysreg(0, hstr_el2);
->  	write_sysreg(0, pmuserenr_el0);
->  }
-> @@ -183,20 +181,14 @@ static void __hyp_text __vgic_restore_state(struct kvm_vcpu *vcpu)
->  		__vgic_v2_restore_state(vcpu);
->  }
->  
-> -static bool __hyp_text __true_value(void)
-> +static bool __check_arm_834220(void)
->  {
-> -	return true;
-> -}
-> +	if (cpus_have_const_cap(ARM64_WORKAROUND_834220))
-> +		return true;
->  
-> -static bool __hyp_text __false_value(void)
-> -{
->  	return false;
->  }
->  
-> -static hyp_alternate_select(__check_arm_834220,
-> -			    __false_value, __true_value,
-> -			    ARM64_WORKAROUND_834220);
-> -
->  static bool __hyp_text __translate_far_to_hpfar(u64 far, u64 *hpfar)
->  {
->  	u64 par, tmp;
-> @@ -251,7 +243,7 @@ static bool __hyp_text __populate_fault_info(struct kvm_vcpu *vcpu)
->  	 * resolve the IPA using the AT instruction.
->  	 */
->  	if (!(esr & ESR_ELx_S1PTW) &&
-> -	    (__check_arm_834220()() || (esr & ESR_ELx_FSC_TYPE) == FSC_PERM)) {
-> +	    (__check_arm_834220() || (esr & ESR_ELx_FSC_TYPE) == FSC_PERM)) {
->  		if (!__translate_far_to_hpfar(far, &hpfar))
->  			return false;
->  	} else {
-> @@ -406,9 +398,13 @@ static void __hyp_text __hyp_call_panic_vhe(u64 spsr, u64 elr, u64 par)
->  	      (void *)read_sysreg(tpidr_el2));
->  }
->  
-> -static hyp_alternate_select(__hyp_call_panic,
-> -			    __hyp_call_panic_nvhe, __hyp_call_panic_vhe,
-> -			    ARM64_HAS_VIRT_HOST_EXTN);
-> +static void __hyp_text __hyp_call_panic(u64 spsr, u64 elr, u64 par)
-> +{
-> +	if (has_vhe())
-> +		__hyp_call_panic_vhe(spsr, elr, par);
-> +	else
-> +		__hyp_call_panic_nvhe(spsr, elr, par);
-> +}
->  
->  void __hyp_text __noreturn __hyp_panic(void)
->  {
-> @@ -428,7 +424,7 @@ void __hyp_text __noreturn __hyp_panic(void)
->  	}
->  
->  	/* Call panic for real */
-> -	__hyp_call_panic()(spsr, elr, par);
-> +	__hyp_call_panic(spsr, elr, par);
->  
->  	unreachable();
->  }
-> diff --git a/arch/arm64/kvm/hyp/sysreg-sr.c b/arch/arm64/kvm/hyp/sysreg-sr.c
-> index 9341376..2a6cb27 100644
-> --- a/arch/arm64/kvm/hyp/sysreg-sr.c
-> +++ b/arch/arm64/kvm/hyp/sysreg-sr.c
-> @@ -21,9 +21,6 @@
->  #include <asm/kvm_asm.h>
->  #include <asm/kvm_hyp.h>
->  
-> -/* Yes, this does nothing, on purpose */
-> -static void __hyp_text __sysreg_do_nothing(struct kvm_cpu_context *ctxt) { }
-> -
->  /*
->   * Non-VHE: Both host and guest must save everything.
->   *
-> @@ -68,13 +65,15 @@ static void __hyp_text __sysreg_save_state(struct kvm_cpu_context *ctxt)
->  	ctxt->gp_regs.spsr[KVM_SPSR_EL1]= read_sysreg_el1(spsr);
->  }
->  
-> -static hyp_alternate_select(__sysreg_call_save_host_state,
-> -			    __sysreg_save_state, __sysreg_do_nothing,
-> -			    ARM64_HAS_VIRT_HOST_EXTN);
-> +static void __hyp_text __sysreg_call_save_host_state(struct kvm_cpu_context *ctxt)
-> +{
-> +	if (!has_vhe())
-> +		__sysreg_save_state(ctxt);
-> +}
->  
->  void __hyp_text __sysreg_save_host_state(struct kvm_cpu_context *ctxt)
->  {
-> -	__sysreg_call_save_host_state()(ctxt);
-> +	__sysreg_call_save_host_state(ctxt);
->  	__sysreg_save_common_state(ctxt);
->  }
->  
-> @@ -121,13 +120,15 @@ static void __hyp_text __sysreg_restore_state(struct kvm_cpu_context *ctxt)
->  	write_sysreg_el1(ctxt->gp_regs.spsr[KVM_SPSR_EL1],spsr);
->  }
->  
-> -static hyp_alternate_select(__sysreg_call_restore_host_state,
-> -			    __sysreg_restore_state, __sysreg_do_nothing,
-> -			    ARM64_HAS_VIRT_HOST_EXTN);
-> +static void __hyp_text __sysreg_call_restore_host_state(struct kvm_cpu_context *ctxt)
-> +{
-> +	if (!has_vhe())
-> +		__sysreg_restore_state(ctxt);
-> +}
->  
->  void __hyp_text __sysreg_restore_host_state(struct kvm_cpu_context *ctxt)
->  {
-> -	__sysreg_call_restore_host_state()(ctxt);
-> +	__sysreg_call_restore_host_state(ctxt);
->  	__sysreg_restore_common_state(ctxt);
->  }
->  
-> -- 
-> Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm Technologies, Inc.
-> Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
-> 
+-- 
+Rafa?
