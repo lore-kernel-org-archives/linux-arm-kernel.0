@@ -1,79 +1,60 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu,  9 Mar 2017 17:07:12 +0000
-Subject: [PATCH 00/15] arm64/kvm: use common sysreg definitions
-Message-ID: <1489079247-31092-1-git-send-email-mark.rutland@arm.com>
+Date: Thu,  9 Mar 2017 17:07:14 +0000
+Subject: [PATCH 02/15] arm64: sysreg: add debug system registers
+In-Reply-To: <1489079247-31092-1-git-send-email-mark.rutland@arm.com>
+References: <1489079247-31092-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <1489079247-31092-3-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently we duplicate effort in maintaining system register encodings across
-arm64's <asm/sysreg.h>, KVM's sysreg tables, and other places. This redundancy
-is unfortunate, and as encodings are encoded in-place without any mnemonic,
-this ends up more painful to read than necessary.
+This patch adds sysreg definitions for system registers in the debug and
+trace system register encoding space. Subsequent patches will make use
+of these definitions.
 
-This series ameliorates this by making <asm/sysreg.h> the canonical location
-for (architected) system register encodings, with other users building atop of
-this, e.g. with KVM deriving its sysreg table values from the common mnemonics.
+The encodings were taken from ARM DDI 0487A.k_iss10775, Table C5-5.
 
-I've only attacked AArch64-native SYS encodings, and ignored CP{15,14}
-registers for now, but these could be handled similarly. Largely, I've stuck to
-only what KVM needs, though for the debug and perfmon groups it was easier to
-take the whole group from the ARM ARM than to filter them to only what KVM
-needed today.
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/include/asm/sysreg.h | 23 +++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
 
-To verify that I haven't accidentally broken KVM, I've diffed sys_regs.o and
-sys_regs_generic_v8.o on a section-by-section basis before and after the series
-is applied. The .text, .data, and .rodata sections (and most others) are
-identical. The __bug_table section, and some .debug* sections differ, and this
-appears to be due to line numbers changing due to removed lines.
-
-One thing I wasn't sure how to address was banks of registers such as
-PMEVCNTR<n>_EL0. We currently enumerate all cases for our GICv3 definitions,
-but it seemed painful to expand ~30 cases for PMEVCNTR<n>_EL0 and friends, and
-for these I've made the macros take an 'n' parameter. It would be nice to be
-consistent either way, and I'm happy to expand those cases.
-
-I've pushed thes series out to a branch [1] based on v4.11-rc1. It looks like
-git rebase is also happy to apply the patches atop of the kvm-arm-for-4.11-rc2
-tag.
-
-Thanks,
-Mark.
-
-Since RFC [2]:
-* Rebase to v4.11-rc1, solving a trivial conflict.
-* Handle the physical counter registers.
-* Verified section differences again.
-
-Thanks,
-Mark.
-
-[1] git://git.kernel.org/pub/scm/linux/kernel/git/mark/linux.git arm64/common-sysreg
-[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-January/484693.html
-
-Mark Rutland (15):
-  arm64: sysreg: sort by encoding
-  arm64: sysreg: add debug system registers
-  arm64: sysreg: add performance monitor registers
-  arm64: sysreg: subsume GICv3 sysreg definitions
-  arm64: sysreg: add physical timer registers
-  arm64: sysreg: add register encodings used by KVM
-  arm64: sysreg: add Set/Way sys encodings
-  KVM: arm64: add SYS_DESC()
-  KVM: arm64: Use common debug sysreg definitions
-  KVM: arm64: Use common performance monitor sysreg definitions
-  KVM: arm64: Use common GICv3 sysreg definitions
-  KVM: arm64: Use common physical timer sysreg definitions
-  KVM: arm64: use common invariant sysreg definitions
-  KVM: arm64: Use common sysreg definitions
-  KVM: arm64: Use common Set/Way sys definitions
-
- arch/arm64/include/asm/arch_gicv3.h  |  81 ++------
- arch/arm64/include/asm/sysreg.h      | 162 +++++++++++++++-
- arch/arm64/kernel/head.S             |   8 +-
- arch/arm64/kvm/sys_regs.c            | 358 +++++++++++------------------------
- arch/arm64/kvm/sys_regs.h            |   5 +
- arch/arm64/kvm/sys_regs_generic_v8.c |   4 +-
- 6 files changed, 284 insertions(+), 334 deletions(-)
-
+diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+index e6498ac..b54f8a4 100644
+--- a/arch/arm64/include/asm/sysreg.h
++++ b/arch/arm64/include/asm/sysreg.h
+@@ -89,6 +89,29 @@
+ #define SET_PSTATE_UAO(x) __emit_inst(0xd5000000 | REG_PSTATE_UAO_IMM |	\
+ 				      (!!x)<<8 | 0x1f)
+ 
++#define SYS_OSDTRRX_EL1			sys_reg(2, 0, 0, 0, 2)
++#define SYS_MDCCINT_EL1			sys_reg(2, 0, 0, 2, 0)
++#define SYS_MDSCR_EL1			sys_reg(2, 0, 0, 2, 2)
++#define SYS_OSDTRTX_EL1			sys_reg(2, 0, 0, 3, 2)
++#define SYS_OSECCR_EL1			sys_reg(2, 0, 0, 6, 2)
++#define SYS_DBGBVRn_EL1(n)		sys_reg(2, 0, 0, n, 4)
++#define SYS_DBGBCRn_EL1(n)		sys_reg(2, 0, 0, n, 5)
++#define SYS_DBGWVRn_EL1(n)		sys_reg(2, 0, 0, n, 6)
++#define SYS_DBGWCRn_EL1(n)		sys_reg(2, 0, 0, n, 7)
++#define SYS_MDRAR_EL1			sys_reg(2, 0, 1, 0, 0)
++#define SYS_OSLAR_EL1			sys_reg(2, 0, 1, 0, 4)
++#define SYS_OSLSR_EL1			sys_reg(2, 0, 1, 1, 4)
++#define SYS_OSDLR_EL1			sys_reg(2, 0, 1, 3, 4)
++#define SYS_DBGPRCR_EL1			sys_reg(2, 0, 1, 4, 4)
++#define SYS_DBGCLAIMSET_EL1		sys_reg(2, 0, 7, 8, 6)
++#define SYS_DBGCLAIMCLR_EL1		sys_reg(2, 0, 7, 9, 6)
++#define SYS_DBGAUTHSTATUS_EL1		sys_reg(2, 0, 7, 14, 6)
++#define SYS_MDCCSR_EL0			sys_reg(2, 3, 0, 1, 0)
++#define SYS_DBGDTR_EL0			sys_reg(2, 3, 0, 4, 0)
++#define SYS_DBGDTRRX_EL0		sys_reg(2, 3, 0, 5, 0)
++#define SYS_DBGDTRTX_EL0		sys_reg(2, 3, 0, 5, 0)
++#define SYS_DBGVCR32_EL2		sys_reg(2, 4, 0, 7, 0)
++
+ #define SYS_MIDR_EL1			sys_reg(3, 0, 0, 0, 0)
+ #define SYS_MPIDR_EL1			sys_reg(3, 0, 0, 0, 5)
+ #define SYS_REVIDR_EL1			sys_reg(3, 0, 0, 0, 6)
 -- 
 1.9.1
