@@ -1,50 +1,79 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 9 Mar 2017 00:53:26 -0800
-Subject: [PATCH v4 0/4] KVM: arm64: Increase number of user memslots
-In-Reply-To: <87zigux4i3.fsf@on-the-bus.cambridge.arm.com>
-References: <1488953315-22375-1-git-send-email-linucherian@gmail.com>
- <87zigux4i3.fsf@on-the-bus.cambridge.arm.com>
-Message-ID: <20170309085326.GA114347@lvm>
+From: peppe.cavallaro@st.com (Giuseppe CAVALLARO)
+Date: Thu, 9 Mar 2017 10:09:02 +0100
+Subject: stmmac still supporting spear600 ?
+In-Reply-To: <20170309093412.33c0277d@free-electrons.com>
+References: <20170309093412.33c0277d@free-electrons.com>
+Message-ID: <373e2760-94c5-4349-33aa-158bc8f4b19e@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 09, 2017 at 08:01:56AM +0000, Marc Zyngier wrote:
-> On Wed, Mar 08 2017 at  6:08:31 am GMT, linucherian at gmail.com wrote:
-> > From: Linu Cherian <linu.cherian@cavium.com>
-> >
-> > v3 -> v4:
-> > - Add missing commit messages in patches 1 and 3
-> >
-> > v2 -> v3:
-> > - Added documentation for KVM_CAP_NR_MEMSLOTS
-> > - Removed KVM_PRIVATE_MEM_SLOTS which is unused
-> > - KVM_USER_MEM_SLOTS changed to 512 from 508
-> >  
-> > v1 -> v2:
-> > - Enabling KVM_CAP_NR_MEMSLOTS for arm/arm64 moved to separate patch.
-> > - Updated commit message so that what is reported to userspace is explicit.
-> >
-> >
-> > Linu Cherian (4):
-> >   KVM: Add documentation for KVM_CAP_NR_MEMSLOTS
-> >   KVM: arm/arm64: Enable KVM_CAP_NR_MEMSLOTS on arm/arm64
-> >   KVM: arm/arm64: Remove KVM_PRIVATE_MEM_SLOTS definition that are
-> >     unused
-> >   KVM: arm64: Increase number of user memslots to 512
-> >
-> >  Documentation/virtual/kvm/api.txt | 4 ++++
-> >  arch/arm/include/asm/kvm_host.h   | 1 -
-> >  arch/arm/kvm/arm.c                | 3 +++
-> >  arch/arm64/include/asm/kvm_host.h | 3 +--
-> >  4 files changed, 8 insertions(+), 3 deletions(-)
-> 
-> For the whole series:
-> 
-> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-> 
-> Christoffer: if you're happy with this series, I'll take it as part of
-> the next batch of fixes.
-> 
-Yes:
+Hello
 
-Reviewed-by: Christoffer Dall <cdall@linaro.org>
+We do not test stmmac on this spear board since many years
+and I guess you have to provide parameters from the platform.
+In fact, stmmac is recently tested with DT.
+IIRC, the mac on spear600 could not have the HW cap register
+so it is mandatory to provide all the right parameters and
+configurations for this HW.
+
+Regards
+Peppe
+
+On 3/9/2017 9:34 AM, Thomas Petazzoni wrote:
+> Hello,
+>
+> I'm porting Linux to an old spear600 based platform, and therefore
+> trying to use the stmmac driver on this SoC. Unfortunately, it doesn't
+> work quite well and I'm wondering if the stmmac driver still properly
+> supports the old version of the IP that is used in this SoC. I'm
+> testing with v4.11-rc1.
+>
+> First, the logs:
+>
+> Linux version 4.11.0-rc1 (thomas at skate) (gcc version 5.4.0 20160609 (Ubuntu/Linaro 5.4.0-6ubuntu1~16.04.4) ) #18 Thu Mar 9 09:18:01 CET 2017
+> [...]
+> libphy: Fixed MDIO Bus: probed
+> stmmaceth e0800000.ethernet: no reset control found
+> stmmac - user ID: 0x10, Synopsys ID: 0x32
+> stmmaceth e0800000.ethernet: Ring mode enabled
+> stmmaceth e0800000.ethernet: DMA HW capability register supported
+> stmmaceth e0800000.ethernet: Normal descriptors
+> libphy: stmmac: probed
+> stmmaceth e0800000.ethernet (unnamed net_device) (uninitialized): PHY ID 0007c0c4 at 31 IRQ POLL (stmmac-0:1f) active
+> [...]
+> # ifconfig eth0 192.168.1.89
+> stmmaceth e0800000.ethernet eth0: device MAC address 00:30:d3:21:22:60
+> Generic PHY stmmac-0:1f: attached PHY driver [Generic PHY] (mii_bus:phy_addr=stmmac-0:1f, irq=-1)
+> stmmaceth e0800000.ethernet: Failed to reset the dma
+> stmmaceth e0800000.ethernet eth0: stmmac_hw_setup: DMA engine initialization failed
+> stmmaceth e0800000.ethernet eth0: stmmac_open: Hw setup failed
+> ifconfig: SIOCSIFFLAGS: Device or resource busy
+>
+> So the reason why it fails to reset the DMA is because
+> dwmac_dma_reset() sets bit DMA_BUS_MODE_SFT_RESET in register
+> DMA_BUS_MODE and waits for this bit to clear, but that never happens.
+>
+> The reason why I'm not sure if this IP is still supported is because
+> dwmac1000_get_hw_feature() reads the DMA_HW_FEATURE register (offset
+> 0x00001058), and my spear600 datasheet doesn't mention this register at
+> all.
+>
+> It is worth mentioning that:
+>
+>  - Ethernet is working fine under U-Boot (it's an old 2010.03 U-Boot
+>    version, with a good number of patches), so I'm sure the HW is
+>    working.
+>
+>  - Setting bit 1 in the DMA_BUS_MODE register from U-Boot also leaves
+>    this bit set forever, it apparently never clears (unless my tests
+>    were wrong, which is very possible).
+>
+> In terms of Device Tree, I'm simply using spear600.dtsi, and enabling
+> the gmac node, nothing else.
+>
+> Has the stmmac driver been recently used/tested on spear600 ?
+>
+> Thanks,
+>
+> Thomas Petazzoni
+>
