@@ -1,122 +1,105 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 9 Mar 2017 13:27:16 +0530
-Subject: [PATCH v3 05/23] PCI: endpoint: Create configfs entry for EPC device
- and EPF driver
+Date: Thu, 9 Mar 2017 13:27:17 +0530
+Subject: [PATCH v3 06/23] Documentation: PCI: Add specification for the *pci
+ test* function device
 In-Reply-To: <1489046254-19919-1-git-send-email-kishon@ti.com>
 References: <1489046254-19919-1-git-send-email-kishon@ti.com>
-Message-ID: <1489046254-19919-6-git-send-email-kishon@ti.com>
+Message-ID: <1489046254-19919-7-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Invoke API's provided by pci-ep-cfs to create configfs entry for
-every EPC device and EPF driver to help users in creating EPF device
-and binding the EPF device to the EPC device.
+Add specification for the *pci test* virtual function device. The endpoint
+function driver and the host pci driver should be created based on this
+specification.
 
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- drivers/pci/endpoint/pci-epc-core.c |    4 ++++
- drivers/pci/endpoint/pci-epf-core.c |    4 ++++
- include/linux/pci-epc.h             |    2 ++
- include/linux/pci-epf.h             |    2 ++
- 4 files changed, 12 insertions(+)
+ Documentation/PCI/00-INDEX                       |    2 +
+ Documentation/PCI/endpoint/pci-test-function.txt |   66 ++++++++++++++++++++++
+ 2 files changed, 68 insertions(+)
+ create mode 100644 Documentation/PCI/endpoint/pci-test-function.txt
 
-diff --git a/drivers/pci/endpoint/pci-epc-core.c b/drivers/pci/endpoint/pci-epc-core.c
-index 06808ed..29cbe9a 100644
---- a/drivers/pci/endpoint/pci-epc-core.c
-+++ b/drivers/pci/endpoint/pci-epc-core.c
-@@ -24,6 +24,7 @@
- 
- #include <linux/pci-epc.h>
- #include <linux/pci-epf.h>
-+#include <linux/pci-ep-cfs.h>
- 
- static struct class *pci_epc_class;
- 
-@@ -441,6 +442,7 @@ void pci_epc_linkup(struct pci_epc *epc)
-  */
- void pci_epc_destroy(struct pci_epc *epc)
- {
-+	pci_ep_cfs_remove_epc_group(epc->group);
- 	device_unregister(&epc->dev);
- 	kfree(epc);
- }
-@@ -507,6 +509,8 @@ struct pci_epc *
- 	if (ret)
- 		goto put_dev;
- 
-+	epc->group = pci_ep_cfs_add_epc_group(dev_name(dev));
+diff --git a/Documentation/PCI/00-INDEX b/Documentation/PCI/00-INDEX
+index f84a23c..4e5a283 100644
+--- a/Documentation/PCI/00-INDEX
++++ b/Documentation/PCI/00-INDEX
+@@ -16,3 +16,5 @@ endpoint/pci-endpoint.txt
+ 	- guide to add endpoint controller driver and endpoint function driver.
+ endpoint/pci-endpoint-cfs.txt
+ 	- guide to use configfs to configure the pci endpoint function.
++endpoint/pci-test-function.txt
++	- specification of *pci test* function device.
+diff --git a/Documentation/PCI/endpoint/pci-test-function.txt b/Documentation/PCI/endpoint/pci-test-function.txt
+new file mode 100644
+index 0000000..1324376
+--- /dev/null
++++ b/Documentation/PCI/endpoint/pci-test-function.txt
+@@ -0,0 +1,66 @@
++				PCI TEST
++		    Kishon Vijay Abraham I <kishon@ti.com>
 +
- 	return epc;
- 
- put_dev:
-diff --git a/drivers/pci/endpoint/pci-epf-core.c b/drivers/pci/endpoint/pci-epf-core.c
-index 4c903fc..9ec1639 100644
---- a/drivers/pci/endpoint/pci-epf-core.c
-+++ b/drivers/pci/endpoint/pci-epf-core.c
-@@ -24,6 +24,7 @@
- 
- #include <linux/pci-epc.h>
- #include <linux/pci-epf.h>
-+#include <linux/pci-ep-cfs.h>
- 
- static struct bus_type pci_epf_bus_type;
- static struct device_type pci_epf_type;
-@@ -143,6 +144,7 @@ void *pci_epf_alloc_space(struct pci_epf *epf, size_t size, enum pci_barno bar)
-  */
- void pci_epf_unregister_driver(struct pci_epf_driver *driver)
- {
-+	pci_ep_cfs_remove_epf_group(driver->group);
- 	driver_unregister(&driver->driver);
- }
- EXPORT_SYMBOL_GPL(pci_epf_unregister_driver);
-@@ -172,6 +174,8 @@ int __pci_epf_register_driver(struct pci_epf_driver *driver,
- 	if (ret)
- 		return ret;
- 
-+	driver->group = pci_ep_cfs_add_epf_group(driver->driver.name);
++Traditionally PCI RC has always been validated by using standard
++PCI cards like ethernet PCI cards or USB PCI cards or SATA PCI cards.
++However with the addition of EP-core in linux kernel, it is possible
++to configure a PCI controller that can operate in EP mode to work as
++a test device.
 +
- 	return 0;
- }
- EXPORT_SYMBOL_GPL(__pci_epf_register_driver);
-diff --git a/include/linux/pci-epc.h b/include/linux/pci-epc.h
-index ad0cd46..d6eb322 100644
---- a/include/linux/pci-epc.h
-+++ b/include/linux/pci-epc.h
-@@ -77,6 +77,7 @@ struct pci_epc_mem {
-  * @ops: function pointers for performing endpoint operations
-  * @mem: address space of the endpoint controller
-  * @max_functions: max number of functions that can be configured in this EPC
-+ * @group: configfs group representing the PCI EPC device
-  * @lock: spinlock to protect pci_epc ops
-  */
- struct pci_epc {
-@@ -85,6 +86,7 @@ struct pci_epc {
- 	const struct pci_epc_ops	*ops;
- 	struct pci_epc_mem		*mem;
- 	u8				max_functions;
-+	struct config_group		*group;
- 	/* spinlock to protect against concurrent access of EP controller */
- 	spinlock_t			lock;
- };
-diff --git a/include/linux/pci-epf.h b/include/linux/pci-epf.h
-index 54f1338..5ff2c5a 100644
---- a/include/linux/pci-epf.h
-+++ b/include/linux/pci-epf.h
-@@ -82,6 +82,7 @@ struct pci_epf_ops {
-  * @driver: PCI EPF driver
-  * @ops: set of function pointers for performing EPF operations
-  * @owner: the owner of the module that registers the PCI EPF driver
-+ * @group: configfs group corresponding to the PCI EPF driver
-  * @id_table: identifies EPF devices for probing
-  */
- struct pci_epf_driver {
-@@ -91,6 +92,7 @@ struct pci_epf_driver {
- 	struct device_driver	driver;
- 	struct pci_epf_ops	*ops;
- 	struct module		*owner;
-+	struct config_group	*group;
- 	const struct pci_epf_device_id	*id_table;
- };
- 
++The PCI endpoint test device is a virtual device (defined in software)
++used to test the endpoint functionality and serve as a sample driver
++for other PCI endpoint devices (to use the EP framework).
++
++The PCI endpoint test device has the following registers:
++
++	1) PCI_ENDPOINT_TEST_MAGIC
++	2) PCI_ENDPOINT_TEST_COMMAND
++	3) PCI_ENDPOINT_TEST_STATUS
++	4) PCI_ENDPOINT_TEST_SRC_ADDR
++	5) PCI_ENDPOINT_TEST_DST_ADDR
++	6) PCI_ENDPOINT_TEST_SIZE
++	7) PCI_ENDPOINT_TEST_CHECKSUM
++
++*) PCI_ENDPOINT_TEST_MAGIC
++
++This register will be used to test BAR0. A known pattern will be written
++and read back from MAGIC register to verify BAR0.
++
++*) PCI_ENDPOINT_TEST_COMMAND:
++
++This register will be used by the host driver to indicate the function
++that the endpoint device must perform.
++
++Bitfield Description:
++  Bit 0		: raise legacy irq
++  Bit 1		: raise MSI irq
++  Bit 2 - 7	: MSI interrupt number
++  Bit 8		: read command (read data from RC buffer)
++  Bit 9		: write command (write data to RC buffer)
++  Bit 10	: copy command (copy data from one RC buffer to another
++		  RC buffer)
++
++*) PCI_ENDPOINT_TEST_STATUS
++
++This register reflects the status of the PCI endpoint device.
++
++Bitfield Description:
++  Bit 0		: read success
++  Bit 1		: read fail
++  Bit 2		: write success
++  Bit 3		: write fail
++  Bit 4		: copy success
++  Bit 5		: copy fail
++  Bit 6		: irq raised
++  Bit 7		: source address is invalid
++  Bit 8		: destination address is invalid
++
++*) PCI_ENDPOINT_TEST_SRC_ADDR
++
++This register contains the source address (RC buffer address) for the
++COPY/READ command.
++
++*) PCI_ENDPOINT_TEST_DST_ADDR
++
++This register contains the destination address (RC buffer address) for
++the COPY/WRITE command.
 -- 
 1.7.9.5
