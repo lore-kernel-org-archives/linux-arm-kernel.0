@@ -1,63 +1,61 @@
-From: andy.tang@nxp.com (YuanTian Tang)
-Date: Thu, 9 Mar 2017 16:15:06 +0800
-Subject: [PATCH] cpufreq: qoriq: enhance bus frequency calculation
-Message-ID: <1489047306-31818-1-git-send-email-andy.tang@nxp.com>
+From: a.hajda@samsung.com (Andrzej Hajda)
+Date: Thu, 09 Mar 2017 09:29:40 +0100
+Subject: linux-4.11-rc1/drivers/gpu/drm/exynos/exynos5433_drm_decon.c:681:
+ suspicious mask ?
+In-Reply-To: <58C10571.9050107@samsung.com>
+References: <CGME20170306100527epcas1p349cea73e30f7720a65d312808c4b2cc3@epcas1p3.samsung.com>
+ <DB5PR08MB0967CD7B84545DE129126A619C2C0@DB5PR08MB0967.eurprd08.prod.outlook.com>
+ <58C10571.9050107@samsung.com>
+Message-ID: <4809303a-ab12-6246-63b5-b92e928eae2a@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tang Yuantian <Yuantian.Tang@nxp.com>
+On 09.03.2017 08:34, Inki Dae wrote:
+> Hello David,
+>
+> Thanks for report.
+>
+> 2017? 03? 06? 19:05? David Binderman ?(?) ? ?:
+>> Hello there,
+>>
+>> linux-4.11-rc1/drivers/gpu/drm/exynos/exynos5433_drm_decon.c:681]: (warning) Result of operator '|' is always true if one operand is non-zero. Did you intend to use '&'?
+>>
+> Right. this is known issue and below patch fixes this,
+> http://www.spinics.net/lists/dri-devel/msg132589.html
+>
+> This patch will go to -fixes.
+>
+>> Source code is
+>>
+>>     if (ctx->out_type | I80_HW_TRG) {
+>>
+>> Also in the same file:
+>>
+>> [drivers/gpu/drm/exynos/exynos5433_drm_decon.c:131]: (style) Same expression on both sides of '|'.
+>>
+>> Source code is
+>>
+>>        writel(TRIGCON_TE_AUTO_MASK | TRIGCON_SWTRIGEN
+>>                | TRIGCON_TE_AUTO_MASK | TRIGCON_SWTRIGEN,
+> In this case, only problem is two flags are set in duplicate. This should be cleaned up. Thanks. :)
 
-On some platforms, property device-type may be missed in soc node
-in dts which caused the bus-frequency can not be obtained correctly.
+Wrong copy/paste removed two other flags and duplicated these above. It
+did not hurt to much as it affects only software trigger which is not
+used atm.
+Fix sent yesterday [1].
 
-This patch enhanced the bus-frequency calculation. When property
-device-type is missed in dts, bus-frequency will be obtained by
-looking up clock table to get platform clock and hence get its
-frequency.
+[1]: http://www.spinics.net/lists/dri-devel/msg134877.html
 
-Signed-off-by: Tang Yuantian <yuantian.tang@nxp.com>
----
- drivers/cpufreq/qoriq-cpufreq.c | 24 +++++++++++++++++-------
- 1 file changed, 17 insertions(+), 7 deletions(-)
+Regards
+Andrzej
 
-diff --git a/drivers/cpufreq/qoriq-cpufreq.c b/drivers/cpufreq/qoriq-cpufreq.c
-index bfec1bc..0f22e40 100644
---- a/drivers/cpufreq/qoriq-cpufreq.c
-+++ b/drivers/cpufreq/qoriq-cpufreq.c
-@@ -52,17 +52,27 @@ static u32 get_bus_freq(void)
- {
- 	struct device_node *soc;
- 	u32 sysfreq;
-+	struct clk *pltclk;
-+	int ret;
- 
-+	/* get platform freq by searching bus-frequency property */
- 	soc = of_find_node_by_type(NULL, "soc");
--	if (!soc)
--		return 0;
--
--	if (of_property_read_u32(soc, "bus-frequency", &sysfreq))
--		sysfreq = 0;
-+	if (soc) {
-+		ret = of_property_read_u32(soc, "bus-frequency", &sysfreq);
-+		of_node_put(soc);
-+		if (!ret)
-+			return sysfreq;
-+	}
- 
--	of_node_put(soc);
-+	/* get platform freq by its clock name */
-+	pltclk = clk_get(NULL, "cg-pll0-div1");
-+	if (IS_ERR(pltclk)) {
-+		pr_err("%s: can't get bus frequency %ld\n",
-+		__func__, PTR_ERR(pltclk));
-+		return PTR_ERR(pltclk);
-+	}
- 
--	return sysfreq;
-+	return clk_get_rate(pltclk);
- }
- 
- static struct clk *cpu_to_clk(int cpu)
--- 
-2.1.0.27.g96db324
+>
+>> Regards
+>>
+>> David Binderman
+>>
+>>
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
