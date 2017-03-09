@@ -1,109 +1,92 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu,  9 Mar 2017 17:07:18 +0000
-Subject: [PATCH 06/15] arm64: sysreg: add register encodings used by KVM
+Date: Thu,  9 Mar 2017 17:07:25 +0000
+Subject: [PATCH 13/15] KVM: arm64: use common invariant sysreg definitions
 In-Reply-To: <1489079247-31092-1-git-send-email-mark.rutland@arm.com>
 References: <1489079247-31092-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1489079247-31092-7-git-send-email-mark.rutland@arm.com>
+Message-ID: <1489079247-31092-14-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds sysreg definitions for registers which KVM needs the
-encodings for, which are not currently describe in <asm/sysregs.h>.
-Subsequent patches will make use of these definitions.
-
-The encodings were taken from ARM DDI 0487A.k_iss10775, Table C5-6, but
-this is not an exhaustive addition. Additions are only made for
-registers used today by KVM.
+Now that we have common definitions for the register encodings used by
+KVM, make the KVM code uses thse for invariant sysreg definitions. This
+makes said definitions a reasonable amount shorter, especially as many
+comments are rendered redundant and can be removed.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Christoffer Dall <christoffer.dall@linaro.org>
 Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
+Cc: kvmarm at lists.cs.columbia.edu
 ---
- arch/arm64/include/asm/sysreg.h | 37 +++++++++++++++++++++++++++++++++++++
- 1 file changed, 37 insertions(+)
+ arch/arm64/kvm/sys_regs.c | 57 ++++++++++++++++-------------------------------
+ 1 file changed, 19 insertions(+), 38 deletions(-)
 
-diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-index 3e281b1..f623320 100644
---- a/arch/arm64/include/asm/sysreg.h
-+++ b/arch/arm64/include/asm/sysreg.h
-@@ -119,6 +119,7 @@
- #define SYS_ID_PFR0_EL1			sys_reg(3, 0, 0, 1, 0)
- #define SYS_ID_PFR1_EL1			sys_reg(3, 0, 0, 1, 1)
- #define SYS_ID_DFR0_EL1			sys_reg(3, 0, 0, 1, 2)
-+#define SYS_ID_AFR0_EL1			sys_reg(3, 0, 0, 1, 3)
- #define SYS_ID_MMFR0_EL1		sys_reg(3, 0, 0, 1, 4)
- #define SYS_ID_MMFR1_EL1		sys_reg(3, 0, 0, 1, 5)
- #define SYS_ID_MMFR2_EL1		sys_reg(3, 0, 0, 1, 6)
-@@ -149,11 +150,30 @@
- #define SYS_ID_AA64MMFR1_EL1		sys_reg(3, 0, 0, 7, 1)
- #define SYS_ID_AA64MMFR2_EL1		sys_reg(3, 0, 0, 7, 2)
+diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+index 860707f..e637e1d 100644
+--- a/arch/arm64/kvm/sys_regs.c
++++ b/arch/arm64/kvm/sys_regs.c
+@@ -1857,44 +1857,25 @@ static const struct sys_reg_desc *index_to_sys_reg_desc(struct kvm_vcpu *vcpu,
  
-+#define SYS_SCTLR_EL1			sys_reg(3, 0, 1, 0, 0)
-+#define SYS_ACTLR_EL1			sys_reg(3, 0, 1, 0, 1)
-+#define SYS_CPACR_EL1			sys_reg(3, 0, 1, 0, 2)
-+
-+#define SYS_TTBR0_EL1			sys_reg(3, 0, 2, 0, 0)
-+#define SYS_TTBR1_EL1			sys_reg(3, 0, 2, 0, 1)
-+#define SYS_TCR_EL1			sys_reg(3, 0, 2, 0, 2)
-+
- #define SYS_ICC_PMR_EL1			sys_reg(3, 0, 4, 6, 0)
+ /* ->val is filled in by kvm_sys_reg_table_init() */
+ static struct sys_reg_desc invariant_sys_regs[] = {
+-	{ Op0(0b11), Op1(0b000), CRn(0b0000), CRm(0b0000), Op2(0b000),
+-	  NULL, get_midr_el1 },
+-	{ Op0(0b11), Op1(0b000), CRn(0b0000), CRm(0b0000), Op2(0b110),
+-	  NULL, get_revidr_el1 },
+-	{ Op0(0b11), Op1(0b000), CRn(0b0000), CRm(0b0001), Op2(0b000),
+-	  NULL, get_id_pfr0_el1 },
+-	{ Op0(0b11), Op1(0b000), CRn(0b0000), CRm(0b0001), Op2(0b001),
+-	  NULL, get_id_pfr1_el1 },
+-	{ Op0(0b11), Op1(0b000), CRn(0b0000), CRm(0b0001), Op2(0b010),
+-	  NULL, get_id_dfr0_el1 },
+-	{ Op0(0b11), Op1(0b000), CRn(0b0000), CRm(0b0001), Op2(0b011),
+-	  NULL, get_id_afr0_el1 },
+-	{ Op0(0b11), Op1(0b000), CRn(0b0000), CRm(0b0001), Op2(0b100),
+-	  NULL, get_id_mmfr0_el1 },
+-	{ Op0(0b11), Op1(0b000), CRn(0b0000), CRm(0b0001), Op2(0b101),
+-	  NULL, get_id_mmfr1_el1 },
+-	{ Op0(0b11), Op1(0b000), CRn(0b0000), CRm(0b0001), Op2(0b110),
+-	  NULL, get_id_mmfr2_el1 },
+-	{ Op0(0b11), Op1(0b000), CRn(0b0000), CRm(0b0001), Op2(0b111),
+-	  NULL, get_id_mmfr3_el1 },
+-	{ Op0(0b11), Op1(0b000), CRn(0b0000), CRm(0b0010), Op2(0b000),
+-	  NULL, get_id_isar0_el1 },
+-	{ Op0(0b11), Op1(0b000), CRn(0b0000), CRm(0b0010), Op2(0b001),
+-	  NULL, get_id_isar1_el1 },
+-	{ Op0(0b11), Op1(0b000), CRn(0b0000), CRm(0b0010), Op2(0b010),
+-	  NULL, get_id_isar2_el1 },
+-	{ Op0(0b11), Op1(0b000), CRn(0b0000), CRm(0b0010), Op2(0b011),
+-	  NULL, get_id_isar3_el1 },
+-	{ Op0(0b11), Op1(0b000), CRn(0b0000), CRm(0b0010), Op2(0b100),
+-	  NULL, get_id_isar4_el1 },
+-	{ Op0(0b11), Op1(0b000), CRn(0b0000), CRm(0b0010), Op2(0b101),
+-	  NULL, get_id_isar5_el1 },
+-	{ Op0(0b11), Op1(0b001), CRn(0b0000), CRm(0b0000), Op2(0b001),
+-	  NULL, get_clidr_el1 },
+-	{ Op0(0b11), Op1(0b001), CRn(0b0000), CRm(0b0000), Op2(0b111),
+-	  NULL, get_aidr_el1 },
+-	{ Op0(0b11), Op1(0b011), CRn(0b0000), CRm(0b0000), Op2(0b001),
+-	  NULL, get_ctr_el0 },
++	{ SYS_DESC(SYS_MIDR_EL1), NULL, get_midr_el1 },
++	{ SYS_DESC(SYS_REVIDR_EL1), NULL, get_revidr_el1 },
++	{ SYS_DESC(SYS_ID_PFR0_EL1), NULL, get_id_pfr0_el1 },
++	{ SYS_DESC(SYS_ID_PFR1_EL1), NULL, get_id_pfr1_el1 },
++	{ SYS_DESC(SYS_ID_DFR0_EL1), NULL, get_id_dfr0_el1 },
++	{ SYS_DESC(SYS_ID_AFR0_EL1), NULL, get_id_afr0_el1 },
++	{ SYS_DESC(SYS_ID_MMFR0_EL1), NULL, get_id_mmfr0_el1 },
++	{ SYS_DESC(SYS_ID_MMFR1_EL1), NULL, get_id_mmfr1_el1 },
++	{ SYS_DESC(SYS_ID_MMFR2_EL1), NULL, get_id_mmfr2_el1 },
++	{ SYS_DESC(SYS_ID_MMFR3_EL1), NULL, get_id_mmfr3_el1 },
++	{ SYS_DESC(SYS_ID_ISAR0_EL1), NULL, get_id_isar0_el1 },
++	{ SYS_DESC(SYS_ID_ISAR1_EL1), NULL, get_id_isar1_el1 },
++	{ SYS_DESC(SYS_ID_ISAR2_EL1), NULL, get_id_isar2_el1 },
++	{ SYS_DESC(SYS_ID_ISAR3_EL1), NULL, get_id_isar3_el1 },
++	{ SYS_DESC(SYS_ID_ISAR4_EL1), NULL, get_id_isar4_el1 },
++	{ SYS_DESC(SYS_ID_ISAR5_EL1), NULL, get_id_isar5_el1 },
++	{ SYS_DESC(SYS_CLIDR_EL1), NULL, get_clidr_el1 },
++	{ SYS_DESC(SYS_AIDR_EL1), NULL, get_aidr_el1 },
++	{ SYS_DESC(SYS_CTR_EL0), NULL, get_ctr_el0 },
+ };
  
-+#define SYS_AFSR0_EL1			sys_reg(3, 0, 5, 1, 0)
-+#define SYS_AFSR1_EL1			sys_reg(3, 0, 5, 1, 1)
-+#define SYS_ESR_EL1			sys_reg(3, 0, 5, 2, 0)
-+#define SYS_FAR_EL1			sys_reg(3, 0, 6, 0, 0)
-+#define SYS_PAR_EL1			sys_reg(3, 0, 7, 4, 0)
-+
- #define SYS_PMINTENSET_EL1		sys_reg(3, 0, 9, 14, 1)
- #define SYS_PMINTENCLR_EL1		sys_reg(3, 0, 9, 14, 2)
- 
-+#define SYS_MAIR_EL1			sys_reg(3, 0, 10, 2, 0)
-+#define SYS_AMAIR_EL1			sys_reg(3, 0, 10, 3, 0)
-+
-+#define SYS_VBAR_EL1			sys_reg(3, 0, 12, 0, 0)
-+
- #define SYS_ICC_DIR_EL1			sys_reg(3, 0, 12, 11, 1)
- #define SYS_ICC_SGI1R_EL1		sys_reg(3, 0, 12, 11, 5)
- #define SYS_ICC_IAR1_EL1		sys_reg(3, 0, 12, 12, 0)
-@@ -163,6 +183,16 @@
- #define SYS_ICC_SRE_EL1			sys_reg(3, 0, 12, 12, 5)
- #define SYS_ICC_GRPEN1_EL1		sys_reg(3, 0, 12, 12, 7)
- 
-+#define SYS_CONTEXTIDR_EL1		sys_reg(3, 0, 13, 0, 1)
-+#define SYS_TPIDR_EL1			sys_reg(3, 0, 13, 0, 4)
-+
-+#define SYS_CNTKCTL_EL1			sys_reg(3, 0, 14, 1, 0)
-+
-+#define SYS_CLIDR_EL1			sys_reg(3, 1, 0, 0, 1)
-+#define SYS_AIDR_EL1			sys_reg(3, 1, 0, 0, 7)
-+
-+#define SYS_CSSELR_EL1			sys_reg(3, 2, 0, 0, 0)
-+
- #define SYS_CTR_EL0			sys_reg(3, 3, 0, 0, 1)
- #define SYS_DCZID_EL0			sys_reg(3, 3, 0, 0, 7)
- 
-@@ -180,6 +210,9 @@
- #define SYS_PMUSERENR_EL0		sys_reg(3, 3, 9, 14, 0)
- #define SYS_PMOVSSET_EL0		sys_reg(3, 3, 9, 14, 3)
- 
-+#define SYS_TPIDR_EL0			sys_reg(3, 3, 13, 0, 2)
-+#define SYS_TPIDRRO_EL0			sys_reg(3, 3, 13, 0, 3)
-+
- #define SYS_CNTFRQ_EL0			sys_reg(3, 3, 14, 0, 0)
- 
- #define SYS_CNTP_TVAL_EL0		sys_reg(3, 3, 14, 2, 0)
-@@ -194,6 +227,10 @@
- 
- #define SYS_PMCCFILTR_EL0		sys_reg (3, 3, 14, 15, 7)
- 
-+#define SYS_DACR32_EL2			sys_reg(3, 4, 3, 0, 0)
-+#define SYS_IFSR32_EL2			sys_reg(3, 4, 5, 0, 1)
-+#define SYS_FPEXC32_EL2			sys_reg(3, 4, 5, 3, 0)
-+
- #define __SYS__AP0Rx_EL2(x)		sys_reg(3, 4, 12, 8, x)
- #define SYS_ICH_AP0R0_EL2		__SYS__AP0Rx_EL2(0)
- #define SYS_ICH_AP0R1_EL2		__SYS__AP0Rx_EL2(1)
+ static int reg_from_user(u64 *val, const void __user *uaddr, u64 id)
 -- 
 1.9.1
