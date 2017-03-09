@@ -1,147 +1,122 @@
-From: thgarnie@google.com (Thomas Garnier)
-Date: Wed, 8 Mar 2017 17:13:41 -0800
-Subject: [PATCH v1 1/4] syscalls: Restore address limit after a syscall
-In-Reply-To: <CAGXu5jJw2XW30NUnoNOMunZMhZ5V-3K9rspOFTOnyt5bxnkA+A@mail.gmail.com>
-References: <20170308213844.131877-1-thgarnie@google.com>
- <CAGXu5jJw2XW30NUnoNOMunZMhZ5V-3K9rspOFTOnyt5bxnkA+A@mail.gmail.com>
-Message-ID: <CAJcbSZF5Ya6jhh+bweL1r5o7ajK70VRUyRB0U7WjnbSxN_kEsQ@mail.gmail.com>
+From: zyw@rock-chips.com (Chris Zhong)
+Date: Thu, 9 Mar 2017 10:19:28 +0800
+Subject: [PATCH 3/4] phy: rockchip-typec: support DP phy switch
+In-Reply-To: <11032198.PxydffNNDT@diego>
+References: <1486712654-15431-1-git-send-email-zyw@rock-chips.com>
+ <1486712654-15431-4-git-send-email-zyw@rock-chips.com>
+ <20170309003921.GA101174@google.com> <11032198.PxydffNNDT@diego>
+Message-ID: <58C0BBB0.6080204@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 8, 2017 at 1:57 PM, Kees Cook <keescook@chromium.org> wrote:
-> On Wed, Mar 8, 2017 at 1:38 PM, Thomas Garnier <thgarnie@google.com> wrote:
->> This patch prevents a syscall to modify the address limit of the
->> caller. The address limit is kept by the syscall wrapper and restored
->> just after the syscall ends.
->>
->> For example, it would mitigation this bug:
->>
->> - https://bugs.chromium.org/p/project-zero/issues/detail?id=990
->>
->> By default, this change warns if the segment is incorrect while
->> returning to user-mode and fix it. The
->> CONFIG_VERIFY_PRE_USERMODE_STATE_BUG option can be enabled to halt
->> instead if needed.
->
-> Instead of this new config, please reuse the CHECK_DATA_CORRUPTION
-> test instead, which already controls very similar WARN vs BUG
-> behavior. Example below...
->
->>
->> The CONFIG_ARCH_NO_SYSCALL_VERIFY_PRE_USERMODE_STATE option is also
->> added so each architecture can optimize how the
->> verify_pre_usermode_state function is called.
->>
->> Signed-off-by: Thomas Garnier <thgarnie@google.com>
->> ---
->> Based on next-20170308
->> ---
->>  include/linux/syscalls.h | 19 +++++++++++++++++++
->>  init/Kconfig             | 16 ++++++++++++++++
->>  kernel/sys.c             | 11 +++++++++++
->>  3 files changed, 46 insertions(+)
->>
->> diff --git a/include/linux/syscalls.h b/include/linux/syscalls.h
->> index 980c3c9b06f8..78a2268ecd6e 100644
->> --- a/include/linux/syscalls.h
->> +++ b/include/linux/syscalls.h
->> @@ -191,6 +191,22 @@ extern struct trace_event_functions exit_syscall_print_funcs;
->>         SYSCALL_METADATA(sname, x, __VA_ARGS__)                 \
->>         __SYSCALL_DEFINEx(x, sname, __VA_ARGS__)
->>
->> +asmlinkage void verify_pre_usermode_state(void);
->> +
->> +#ifndef CONFIG_ARCH_NO_SYSCALL_VERIFY_PRE_USERMODE_STATE
->> +static inline bool has_user_ds(void) {
->> +       bool ret = segment_eq(get_fs(), USER_DS);
->> +       // Prevent re-ordering the call
->> +       barrier();
->> +       return ret;
->> +}
->> +#else
->> +static inline bool has_user_ds(void) {
->> +       return false;
->> +}
->> +#endif
->> +
->> +
->>  #define __PROTECT(...) asmlinkage_protect(__VA_ARGS__)
->>  #define __SYSCALL_DEFINEx(x, name, ...)                                        \
->>         asmlinkage long sys##name(__MAP(x,__SC_DECL,__VA_ARGS__))       \
->> @@ -199,7 +215,10 @@ extern struct trace_event_functions exit_syscall_print_funcs;
->>         asmlinkage long SyS##name(__MAP(x,__SC_LONG,__VA_ARGS__));      \
->>         asmlinkage long SyS##name(__MAP(x,__SC_LONG,__VA_ARGS__))       \
->>         {                                                               \
->> +               bool user_caller = has_user_ds();                       \
->>                 long ret = SYSC##name(__MAP(x,__SC_CAST,__VA_ARGS__));  \
->> +               if (user_caller)                                        \
->> +                       verify_pre_usermode_state();                    \
->>                 __MAP(x,__SC_TEST,__VA_ARGS__);                         \
->>                 __PROTECT(x, ret,__MAP(x,__SC_ARGS,__VA_ARGS__));       \
->>                 return ret;                                             \
->> diff --git a/init/Kconfig b/init/Kconfig
->> index c859c993c26f..ab958b59063f 100644
->> --- a/init/Kconfig
->> +++ b/init/Kconfig
->> @@ -1929,6 +1929,22 @@ config PROFILING
->>  config TRACEPOINTS
->>         bool
->>
->> +#
->> +# Set by each architecture that want to optimize how verify_pre_usermode_state
->> +# is called.
->> +#
->> +config ARCH_NO_SYSCALL_VERIFY_PRE_USERMODE_STATE
->> +       bool
->> +
->> +config VERIFY_PRE_USERMODE_STATE_BUG
->> +       bool "Halt on incorrect state on returning to user-mode"
->> +       default n
->> +       help
->> +         By default a warning is logged and the state is fixed. This option
->> +         crashes the kernel instead.
->> +
->> +         If unsure, say Y.
->> +
->>  source "arch/Kconfig"
->>
->>  endmenu                # General setup
->> diff --git a/kernel/sys.c b/kernel/sys.c
->> index 196c7134bee6..cc2ebf7fae55 100644
->> --- a/kernel/sys.c
->> +++ b/kernel/sys.c
->> @@ -2459,3 +2459,14 @@ COMPAT_SYSCALL_DEFINE1(sysinfo, struct compat_sysinfo __user *, info)
->>         return 0;
->>  }
->>  #endif /* CONFIG_COMPAT */
->> +
->> +/* Called before coming back to user-mode */
->> +asmlinkage void verify_pre_usermode_state(void)
->> +{
->> +#ifdef CONFIG_VERIFY_PRE_USERMODE_STATE_BUG
->> +       BUG_ON(!segment_eq(get_fs(), USER_DS));
->> +#else
->> +       if (WARN_ON(!segment_eq(get_fs(), USER_DS)))
->> +               set_fs(USER_DS);
->> +#endif
->
-> I would just make this:
->
-> if (CHECK_DATA_CORRUPTION(!segment_eq(get_fs(), USER_DS))
->     set_fs(USER_DS);
->
+Hi Heiko and Brain
 
-Make sense, I will remove my custom CONFIG and use that one instead
-(still doing inline assembly if not set).
-
-> -Kees
+On 03/09/2017 09:02 AM, Heiko St?bner wrote:
+> Am Mittwoch, 8. M?rz 2017, 16:39:23 CET schrieb Brian Norris:
+>> On Fri, Feb 10, 2017 at 03:44:13PM +0800, Chris Zhong wrote:
+>>> There are 2 Type-c PHYs in RK3399, but only one DP controller. Hence
+>>> only one PHY can connect to DP controller at one time, the other should
+>>> be disconnected. The GRF_SOC_CON26 register has a switch bit to do it,
+>>> set this bit means enable PHY 1, clear this bit means enable PHY 0.
+>>>
+>>> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+>>> ---
+>>>
+>>>   drivers/phy/phy-rockchip-typec.c | 9 +++++++++
+>>>   1 file changed, 9 insertions(+)
+>>>
+>>> diff --git a/drivers/phy/phy-rockchip-typec.c
+>>> b/drivers/phy/phy-rockchip-typec.c index 7cfb0f8..1604aaa 100644
+>>> --- a/drivers/phy/phy-rockchip-typec.c
+>>> +++ b/drivers/phy/phy-rockchip-typec.c
+>>> @@ -267,6 +267,7 @@ struct rockchip_usb3phy_port_cfg {
+>>>
+>>>   	struct usb3phy_reg usb3tousb2_en;
+>>>   	struct usb3phy_reg external_psm;
+>>>   	struct usb3phy_reg pipe_status;
+>>>
+>>> +	struct usb3phy_reg uphy_dp_sel;
+>>>
+>>>   };
+>>>   
+>>>   struct rockchip_typec_phy {
+>>>
+>>> @@ -736,6 +737,7 @@ static const struct phy_ops rockchip_usb3_phy_ops = {
+>>>
+>>>   static int rockchip_dp_phy_power_on(struct phy *phy)
+>>>   {
+>>>   
+>>>   	struct rockchip_typec_phy *tcphy = phy_get_drvdata(phy);
+>>>
+>>> +	struct rockchip_usb3phy_port_cfg *cfg = &tcphy->port_cfgs;
+>>>
+>>>   	int new_mode, ret = 0;
+>>>   	u32 val;
+>>>
+>>> @@ -766,6 +768,8 @@ static int rockchip_dp_phy_power_on(struct phy *phy)
+>>>
+>>>   		tcphy_phy_init(tcphy, new_mode);
+>>>   	
+>>>   	}
+>>>
+>>> +	property_enable(tcphy, &cfg->uphy_dp_sel, 1);
+>>> +
+>>>
+>>>   	ret = readx_poll_timeout(readl, tcphy->base + DP_MODE_CTL,
+>> Idea for future work: this should just be readl_poll_timeout() here, and
+>> throughout the driver.
+Yes, the readl_poll_timeout is better, if next version series is needed, 
+I am going to
+add it in a separate patch behind this patch.
+>>>   				 val, val & DP_MODE_A2, 1000,
+>>>   				 PHY_MODE_SET_TIMEOUT);
+>>>
+>>> @@ -869,6 +873,11 @@ static int tcphy_parse_dt(struct rockchip_typec_phy
+>>> *tcphy,>
+>>>   	if (ret)
+>>>   	
+>>>   		return ret;
+>>>
+>>> +	ret = tcphy_get_param(dev, &cfg->uphy_dp_sel,
+>>> +			      "rockchip,uphy-dp-sel");
+>>> +	if (ret)
+>>> +		return ret;
+>> What about existing device trees? You're essentially adding this
+>> new property and requiring it at the same time.
+>>
+>> Or are we considering no RK3399 DP stable at the moment? I guess we
+>> haven't actually merged any device trees that support this yet, no?
+> An interesting situation we're in here. On the one hand, you're right this
+> breaks "backwards compatiblity".
+>
+> But on the other hand, the type-c phy is currently very much unused. The only
+> current board rk3399-evb.dts does not enable them (so they're disabled
+> everywhere) and we have neither dwc3 nor dp nodes in any rk3399 devicetrees so
+> far. Also Rob was ok with the binding change :-) .
+>
+> So from my pov, I'd say it _should_ be ok, as nothing is using the phys at all
+> yet and thus there is nothing that could get broken.
 >
 >
-> --
-> Kees Cook
-> Pixel Security
+> Heiko
+Thanks Heiko. On the other hand, these is no any display node at rk3399 
+dtsi,
+so I can not add the DP node, do you or Mark.Yao have plan to complete it?
 
-
+>
+>> Brian
+>>
+>>> +
+>>>
+>>>   	tcphy->grf_regs = syscon_regmap_lookup_by_phandle(dev->of_node,
+>>>   	
+>>>   							  "rockchip,grf");
+>>>   	
+>>>   	if (IS_ERR(tcphy->grf_regs)) {
+>
+>
+>
+>
 
 -- 
-Thomas
+Chris Zhong
