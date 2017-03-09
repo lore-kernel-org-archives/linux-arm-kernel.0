@@ -1,36 +1,59 @@
 From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 9 Mar 2017 14:48:37 +0000
-Subject: [PATCH RESEND] drm: dw_hdmi: Don't rely on the status of the
- bridge for updating HPD
-In-Reply-To: <20170308081524.7672-1-romain.perier@collabora.com>
-References: <20170308081524.7672-1-romain.perier@collabora.com>
-Message-ID: <20170309144837.GK21222@n2100.armlinux.org.uk>
+Date: Thu, 9 Mar 2017 14:51:47 +0000
+Subject: [RESEND PATCH] arm: assabet_defconfig: disable IDE subsystem
+In-Reply-To: <3285453.g1rFzTv5DW@amdc3058>
+References: <1467991490-24895-1-git-send-email-b.zolnierkie@samsung.com>
+ <a8eab3b1-8867-00dd-08e4-bcece23010a6@cogentembedded.com>
+ <20170309135714.GJ21222@n2100.armlinux.org.uk>
+ <CGME20170309144256epcas1p25b4c18f7ced857f71e2f8c53ce7b2345@epcas1p2.samsung.com>
+ <3285453.g1rFzTv5DW@amdc3058>
+Message-ID: <20170309145147.GL21222@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 08, 2017 at 09:15:24AM +0100, Romain Perier wrote:
-> - dw_hdmi_update_power() will be called. As hdmi->force will be equal to
-> DRM_FORCE_UNSPECIFIED the function will rely on hdmi->rxsense. This
-> field has not been updated by the irq handler, so it will be false and
-> DRM_FORCE_ON won't be put to hdmi->force.
+On Thu, Mar 09, 2017 at 03:42:49PM +0100, Bartlomiej Zolnierkiewicz wrote:
+> 
+> Hi,
+> 
+> On Thursday, March 09, 2017 01:57:15 PM Russell King - ARM Linux wrote:
+> > On Thu, Mar 09, 2017 at 03:24:56PM +0300, Sergei Shtylyov wrote:
+> > > On 03/09/2017 03:20 PM, Sekhar Nori wrote:
+> > > 
+> > > >[...]
+> > > 
+> > > >>>diff --git a/arch/arm/mach-davinci/board-dm644x-evm.c
+> > > >>>b/arch/arm/mach-davinci/board-dm644x-evm.c
+> > > >>>index 023480b75244..60a1f23890cd 100644
+> > > >>>--- a/arch/arm/mach-davinci/board-dm644x-evm.c
+> > > >>>+++ b/arch/arm/mach-davinci/board-dm644x-evm.c
+> > > >>>@@ -744,7 +744,7 @@ static int davinci_phy_fixup(struct phy_device
+> > > >>>*phydev)
+> > > >>>     return 0;
+> > > >>> }
+> > > >>>
+> > > >>>-#define HAS_ATA        IS_ENABLED(CONFIG_BLK_DEV_PALMCHIP_BK3710)
+> > > >>>+#define HAS_ATA        IS_ENABLED(CONFIG_PATA_BK3710)
+> > > >>
+> > > >>   I think it would be more correct to check for both libata and IDE
+> > > >>drivers here...
+> > > >
+> > > >As I understand, the plan is to remove the IDE driver soon.
+> > > 
+> > >    I'm not sure DaveM would support any removals in drivers/ide/. He has
+> > > explicitly expressed his will to maintain the IDE driuver forever.
+> > 
+> > As I keep saying, there are ARM machines where the IDE driver works but
+> > the PATA driver doesn't.  EBSA110's PCMCIA slots for instance.
+> 
+> Please be more specific, I'll be happy to help with migrating this
+> machines to libata PATA.
+> 
+> BTW the example you're giving has never worked with the old IDE
+> driver in the upstream kernel.
 
-Right, and wrong.
-
-Your initial part is correct, but the latter sentence is incorrect -
-we only ever update hdmi->force according to the user's force requests,
-never as a result of the current state of the driver.
-
-hdmi->force exists to allow the user to say "I want to force this connector
-to always report disconnected or connected" to work around stupid monitors
-that pulse everything from HPD to RXSENSE when in standby mode.
-
-> This commit fixes the issue by removing the check for "!hdmi->disabled".
-> As already explained, even if the PHY is partially disabled, information
-> coming from HDMI Transmitter about HPD should be saved for a later use.
-
-Your fix looks fine to me, as both dw_hdmi_update_power() and
-dw_hdmi_update_phy_mask() effectively ignore attempts to update the
-state while hdmi->disabled is true.
+That's where you are wrong.  It worked for 10+ years with no
+modifications in the upstream IDE driver or ide-cs driver - only the
+patch I quoted was required.
 
 -- 
 RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
