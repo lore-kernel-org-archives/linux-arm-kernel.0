@@ -1,67 +1,105 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Thu,  9 Mar 2017 15:27:12 +0000
-Subject: [PATCH 2/2] coresight: Fix reference count for software sources
-In-Reply-To: <1489073232-5093-1-git-send-email-suzuki.poulose@arm.com>
-References: <1489073232-5093-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1489073232-5093-3-git-send-email-suzuki.poulose@arm.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Thu, 9 Mar 2017 15:28:31 +0000
+Subject: [v3 2/5] coresight: refactor with function of_coresight_get_cpu
+In-Reply-To: <1489057304-1851-1-git-send-email-suzuki.poulose@arm.com>
+References: <1489057304-1851-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <75112177-e5c1-0532-04b1-842a985b077d@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For software sources (i.e STM), there could be multiple agents
-generating the trace data, unlike the ETMs. So we need to
-properly do the accounting for the active number of users
-to disable the device when the last user goes away. Right
-now, the reference counting is broken for sources as we skip
-the actions when we detect that the source is enabled.
+On 09/03/17 11:01, Suzuki K Poulose wrote:
+> On 03/03/17 06:00, Leo Yan wrote:
+>> This is refactor to add function of_coresight_get_cpu(), so it's used to
+>> retrieve CPU id for coresight component. Finally can use it as a common
+>> function for multiple places.
+>>
+>> Suggested-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+>> Signed-off-by: Leo Yan <leo.yan@linaro.org>
+>> ---
+>>  drivers/hwtracing/coresight/of_coresight.c | 37 ++++++++++++++++++++----------
+>>  include/linux/coresight.h                  |  2 ++
+>>  2 files changed, 27 insertions(+), 12 deletions(-)
+>>
+>> diff --git a/drivers/hwtracing/coresight/of_coresight.c b/drivers/hwtracing/coresight/of_coresight.c
+>> index 629e031..d9a12fb 100644
+>> --- a/drivers/hwtracing/coresight/of_coresight.c
+>> +++ b/drivers/hwtracing/coresight/of_coresight.c
+>> @@ -101,14 +101,36 @@ static int of_coresight_alloc_memory(struct device *dev,
+>>  	return 0;
+>>  }
+>>
+>> +int of_coresight_get_cpu(struct device_node *node)
+>> +{
+>> +	int cpu;
+>> +	struct device_node *dn;
+>> +
+>> +	dn = of_parse_phandle(node, "cpu", 0);
+>> +
+>> +	/* Affinity defaults to CPU0 */
+>> +	if (!dn)
+>> +		return 0;
+>> +
+>> +	for_each_possible_cpu(cpu) {
+>> +		if (dn == of_get_cpu_node(cpu, NULL)) {
+>
+> We should do of_node_put() on the node returned by of_get_cpu_node,
+> and I accept that this was there before the refactoring. We could do
+> something like :
+>
+>
+> ----8>------
+>
+>
+>
+> [PATCH] coresight: of_coresight_get_cpu: Add missing of_node_put
+>
+> The of_coresight_get_cpu iterates over the possible CPU nodes
+> to find a given cpu phandle. However it does not drop the reference
+> to the node pointer returned by the of_get_cpu_node.
+>
+> Cc: Leo Yan <leo.yan@linaro.org>
+> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> ---
+>  drivers/hwtracing/coresight/of_coresight.c | 16 +++++++++-------
+>  1 file changed, 9 insertions(+), 7 deletions(-)
+>
+> diff --git a/drivers/hwtracing/coresight/of_coresight.c b/drivers/hwtracing/coresight/of_coresight.c
+> index d9a12fb..8c6f4a0 100644
+> --- a/drivers/hwtracing/coresight/of_coresight.c
+> +++ b/drivers/hwtracing/coresight/of_coresight.c
+> @@ -104,7 +104,8 @@ static int of_coresight_alloc_memory(struct device *dev,
+>  int of_coresight_get_cpu(struct device_node *node)
+>  {
+>  	int cpu;
+> -	struct device_node *dn;
+> +	bool found;
+> +	struct device_node *dn, *np;
+>
+>  	dn = of_parse_phandle(node, "cpu", 0);
+>
+> @@ -113,15 +114,16 @@ int of_coresight_get_cpu(struct device_node *node)
+>  		return 0;
+>
+>  	for_each_possible_cpu(cpu) {
+> -		if (dn == of_get_cpu_node(cpu, NULL)) {
+> -			of_node_put(dn);
+> -			return cpu;
+> -		}
+> +		np = of_get_cpu_node(cpu, NULL);
+> +		found = (dn == np);
+> +		of_node_put(np);
+> +		if (found)
+> +			break;
+>  	}
+>
+> -	/* Affinity to CPU0 if no cpu nodes are found */
+>  	of_node_put(dn);
+> -	return 0;
+> +	/* Affinity to CPU0 if no cpu nodes are found */
+> +	return cpu_possible(cpu) ? cpu : 0;
 
-This patch fixes the problem by adding the refcounting for
-software sources, even when they are enabled.
+This could be even :
+	return found ? cpu : 0;
 
-Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-Reported-by: Robert Walker <robert.walker@arm.com>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
----
- drivers/hwtracing/coresight/coresight.c | 13 +++++++++++--
- 1 file changed, 11 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/hwtracing/coresight/coresight.c b/drivers/hwtracing/coresight/coresight.c
-index 34cd1ed..2da9e39 100644
---- a/drivers/hwtracing/coresight/coresight.c
-+++ b/drivers/hwtracing/coresight/coresight.c
-@@ -552,6 +552,7 @@ int coresight_enable(struct coresight_device *csdev)
- 	int cpu, ret = 0;
- 	struct coresight_device *sink;
- 	struct list_head *path;
-+	enum coresight_dev_subtype_source subtype = csdev->subtype.source_subtype;
- 
- 	mutex_lock(&coresight_mutex);
- 
-@@ -559,8 +560,16 @@ int coresight_enable(struct coresight_device *csdev)
- 	if (ret)
- 		goto out;
- 
--	if (csdev->enable)
-+	if (csdev->enable) {
-+		/*
-+		 * There could be multiple applications driving the software
-+		 * source. So keep the refcount for each such user when the
-+		 * source is already enabled.
-+		 */
-+		if (subtype == CORESIGHT_DEV_SUBTYPE_SOURCE_SOFTWARE)
-+			atomic_inc(csdev->refcnt);
- 		goto out;
-+	}
- 
- 	/*
- 	 * Search for a valid sink for this session but don't reset the
-@@ -587,7 +596,7 @@ int coresight_enable(struct coresight_device *csdev)
- 	if (ret)
- 		goto err_source;
- 
--	switch (csdev->subtype.source_subtype) {
-+	switch (subtype) {
- 	case CORESIGHT_DEV_SUBTYPE_SOURCE_PROC:
- 		/*
- 		 * When working from sysFS it is important to keep track
--- 
-2.7.4
+Suzuki
