@@ -1,90 +1,197 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Thu, 09 Mar 2017 09:31:33 +0100
-Subject: [PATCH 3/4] phy: rockchip-typec: support DP phy switch
-In-Reply-To: <20170309031049.GA122422@google.com>
-References: <1486712654-15431-1-git-send-email-zyw@rock-chips.com>
- <11032198.PxydffNNDT@diego> <20170309031049.GA122422@google.com>
-Message-ID: <1626236.28xlsfuSeg@diego>
+From: j-keerthy@ti.com (Keerthy)
+Date: Thu, 9 Mar 2017 13:36:01 +0530
+Subject: [PATCH v2 7/8] thermal: ti-soc-thermal: Remove redundant constants
+In-Reply-To: <1489046762-11288-1-git-send-email-j-keerthy@ti.com>
+References: <1489046762-11288-1-git-send-email-j-keerthy@ti.com>
+Message-ID: <1489046762-11288-8-git-send-email-j-keerthy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Brian,
+Now that slope and offset data are being passed from
+device tree no need to populate in driver data.
 
-Am Mittwoch, 8. M?rz 2017, 19:10:50 CET schrieb Brian Norris:
-> On Thu, Mar 09, 2017 at 02:02:54AM +0100, Heiko Stuebner wrote:
-> > Am Mittwoch, 8. M?rz 2017, 16:39:23 CET schrieb Brian Norris:
-> > > On Fri, Feb 10, 2017 at 03:44:13PM +0800, Chris Zhong wrote:
-> > > > There are 2 Type-c PHYs in RK3399, but only one DP controller. Hence
-> > > > only one PHY can connect to DP controller at one time, the other
-> > > > should
-> > > > be disconnected. The GRF_SOC_CON26 register has a switch bit to do it,
-> > > > set this bit means enable PHY 1, clear this bit means enable PHY 0.
-> > > > 
-> > > > Signed-off-by: Chris Zhong <zyw@rock-chips.com>
-> > > > ---
-> > > > 
-> > > >  drivers/phy/phy-rockchip-typec.c | 9 +++++++++
-> > > >  1 file changed, 9 insertions(+)
-> > > > 
-> > > > diff --git a/drivers/phy/phy-rockchip-typec.c
-> > > > b/drivers/phy/phy-rockchip-typec.c index 7cfb0f8..1604aaa 100644
-> > > > --- a/drivers/phy/phy-rockchip-typec.c
-> > > > +++ b/drivers/phy/phy-rockchip-typec.c
-> 
-> ...
-> 
-> > > > @@ -869,6 +873,11 @@ static int tcphy_parse_dt(struct
-> > > > rockchip_typec_phy
-> > > > *tcphy,>
-> > > > 
-> > > >  	if (ret)
-> > > >  	
-> > > >  		return ret;
-> > > > 
-> > > > +	ret = tcphy_get_param(dev, &cfg->uphy_dp_sel,
-> > > > +			      "rockchip,uphy-dp-sel");
-> > > > +	if (ret)
-> > > > +		return ret;
-> > > 
-> > > What about existing device trees? You're essentially adding this
-> > > new property and requiring it at the same time.
-> > > 
-> > > Or are we considering no RK3399 DP stable at the moment? I guess we
-> > > haven't actually merged any device trees that support this yet, no?
-> > 
-> > An interesting situation we're in here. On the one hand, you're right this
-> > breaks "backwards compatiblity".
-> > 
-> > But on the other hand, the type-c phy is currently very much unused. The
-> > only current board rk3399-evb.dts does not enable them (so they're
-> > disabled everywhere) and we have neither dwc3 nor dp nodes in any rk3399
-> > devicetrees so far. Also Rob was ok with the binding change :-) .
-> > 
-> > So from my pov, I'd say it _should_ be ok, as nothing is using the phys at
-> > all yet and thus there is nothing that could get broken.
-> 
-> Yeah, I guess it's OK... but BTW out-of-tree DTs are perfectly
-> legit, once the bindings are accepted.
-> 
-> Another random point of contention (not worth too much, as the pattern
-> is already set), but why do these deserve DT properties at all? The
-> device already has a "rk3399" compatible property, so can't we derive
-> GRF offsets from that?
+Signed-off-by: Keerthy <j-keerthy@ti.com>
+---
+ drivers/thermal/ti-soc-thermal/dra752-thermal-data.c | 10 ----------
+ drivers/thermal/ti-soc-thermal/omap3-thermal-data.c  |  4 ----
+ drivers/thermal/ti-soc-thermal/omap4-thermal-data.c  |  6 ------
+ drivers/thermal/ti-soc-thermal/omap5-thermal-data.c  |  4 ----
+ drivers/thermal/ti-soc-thermal/ti-bandgap.h          |  4 ----
+ drivers/thermal/ti-soc-thermal/ti-thermal.h          | 16 ----------------
+ 6 files changed, 44 deletions(-)
 
-I'm definitly with you in this regard.
-
-But it seems like there is some sort of current trend of moving more stuff 
-into the dt again. I vaguely remember phy and (or) dt-maintainers preferring 
-to have these definitions in the dt for the typec-phy.
-
-See also the recent mail from Olof concerning the grf initialization and maybe 
-not having per-soc definitions in the driver, where I'm trying to keep things 
-out of the dt a bit more strongly :-) .
-
-So yes, personally I would definitly prefer not having to much GRF-stuff leak 
-into the dt. Simply because the GRF has always been very unstable over time 
-[=you always find one more bit that needs tuning] and to not cause things like 
-the above. But as you said I guess we're to late for the typec-phy.
-
-
-Heiko
+diff --git a/drivers/thermal/ti-soc-thermal/dra752-thermal-data.c b/drivers/thermal/ti-soc-thermal/dra752-thermal-data.c
+index 118d7d8..4167373 100644
+--- a/drivers/thermal/ti-soc-thermal/dra752-thermal-data.c
++++ b/drivers/thermal/ti-soc-thermal/dra752-thermal-data.c
+@@ -410,8 +410,6 @@
+ 		.domain = "cpu",
+ 		.register_cooling = ti_thermal_register_cpu_cooling,
+ 		.unregister_cooling = ti_thermal_unregister_cpu_cooling,
+-		.slope = DRA752_GRADIENT_SLOPE,
+-		.constant = DRA752_GRADIENT_CONST,
+ 		.slope_pcb = DRA752_GRADIENT_SLOPE_W_PCB,
+ 		.constant_pcb = DRA752_GRADIENT_CONST_W_PCB,
+ 		},
+@@ -419,8 +417,6 @@
+ 		.registers = &dra752_gpu_temp_sensor_registers,
+ 		.ts_data = &dra752_gpu_temp_sensor_data,
+ 		.domain = "gpu",
+-		.slope = DRA752_GRADIENT_SLOPE,
+-		.constant = DRA752_GRADIENT_CONST,
+ 		.slope_pcb = DRA752_GRADIENT_SLOPE_W_PCB,
+ 		.constant_pcb = DRA752_GRADIENT_CONST_W_PCB,
+ 		},
+@@ -428,8 +424,6 @@
+ 		.registers = &dra752_core_temp_sensor_registers,
+ 		.ts_data = &dra752_core_temp_sensor_data,
+ 		.domain = "core",
+-		.slope = DRA752_GRADIENT_SLOPE,
+-		.constant = DRA752_GRADIENT_CONST,
+ 		.slope_pcb = DRA752_GRADIENT_SLOPE_W_PCB,
+ 		.constant_pcb = DRA752_GRADIENT_CONST_W_PCB,
+ 		},
+@@ -437,8 +431,6 @@
+ 		.registers = &dra752_dspeve_temp_sensor_registers,
+ 		.ts_data = &dra752_dspeve_temp_sensor_data,
+ 		.domain = "dspeve",
+-		.slope = DRA752_GRADIENT_SLOPE,
+-		.constant = DRA752_GRADIENT_CONST,
+ 		.slope_pcb = DRA752_GRADIENT_SLOPE_W_PCB,
+ 		.constant_pcb = DRA752_GRADIENT_CONST_W_PCB,
+ 		},
+@@ -446,8 +438,6 @@
+ 		.registers = &dra752_iva_temp_sensor_registers,
+ 		.ts_data = &dra752_iva_temp_sensor_data,
+ 		.domain = "iva",
+-		.slope = DRA752_GRADIENT_SLOPE,
+-		.constant = DRA752_GRADIENT_CONST,
+ 		.slope_pcb = DRA752_GRADIENT_SLOPE_W_PCB,
+ 		.constant_pcb = DRA752_GRADIENT_CONST_W_PCB,
+ 		},
+diff --git a/drivers/thermal/ti-soc-thermal/omap3-thermal-data.c b/drivers/thermal/ti-soc-thermal/omap3-thermal-data.c
+index 3ee3434..c6d2179 100644
+--- a/drivers/thermal/ti-soc-thermal/omap3-thermal-data.c
++++ b/drivers/thermal/ti-soc-thermal/omap3-thermal-data.c
+@@ -91,8 +91,6 @@
+ 		.registers = &omap34xx_mpu_temp_sensor_registers,
+ 		.ts_data = &omap34xx_mpu_temp_sensor_data,
+ 		.domain = "cpu",
+-		.slope = 0,
+-		.constant = 20000,
+ 		.slope_pcb = 0,
+ 		.constant_pcb = 20000,
+ 		.register_cooling = NULL,
+@@ -164,8 +162,6 @@
+ 		.registers = &omap36xx_mpu_temp_sensor_registers,
+ 		.ts_data = &omap36xx_mpu_temp_sensor_data,
+ 		.domain = "cpu",
+-		.slope = 0,
+-		.constant = 20000,
+ 		.slope_pcb = 0,
+ 		.constant_pcb = 20000,
+ 		.register_cooling = NULL,
+diff --git a/drivers/thermal/ti-soc-thermal/omap4-thermal-data.c b/drivers/thermal/ti-soc-thermal/omap4-thermal-data.c
+index d255d33..fd11133 100644
+--- a/drivers/thermal/ti-soc-thermal/omap4-thermal-data.c
++++ b/drivers/thermal/ti-soc-thermal/omap4-thermal-data.c
+@@ -82,8 +82,6 @@
+ 		.registers = &omap4430_mpu_temp_sensor_registers,
+ 		.ts_data = &omap4430_mpu_temp_sensor_data,
+ 		.domain = "cpu",
+-		.slope = OMAP_GRADIENT_SLOPE_4430,
+-		.constant = OMAP_GRADIENT_CONST_4430,
+ 		.slope_pcb = OMAP_GRADIENT_SLOPE_W_PCB_4430,
+ 		.constant_pcb = OMAP_GRADIENT_CONST_W_PCB_4430,
+ 		.register_cooling = ti_thermal_register_cpu_cooling,
+@@ -222,8 +220,6 @@
+ 		.registers = &omap4460_mpu_temp_sensor_registers,
+ 		.ts_data = &omap4460_mpu_temp_sensor_data,
+ 		.domain = "cpu",
+-		.slope = OMAP_GRADIENT_SLOPE_4460,
+-		.constant = OMAP_GRADIENT_CONST_4460,
+ 		.slope_pcb = OMAP_GRADIENT_SLOPE_W_PCB_4460,
+ 		.constant_pcb = OMAP_GRADIENT_CONST_W_PCB_4460,
+ 		.register_cooling = ti_thermal_register_cpu_cooling,
+@@ -255,8 +251,6 @@
+ 		.registers = &omap4460_mpu_temp_sensor_registers,
+ 		.ts_data = &omap4460_mpu_temp_sensor_data,
+ 		.domain = "cpu",
+-		.slope = OMAP_GRADIENT_SLOPE_4470,
+-		.constant = OMAP_GRADIENT_CONST_4470,
+ 		.slope_pcb = OMAP_GRADIENT_SLOPE_W_PCB_4470,
+ 		.constant_pcb = OMAP_GRADIENT_CONST_W_PCB_4470,
+ 		.register_cooling = ti_thermal_register_cpu_cooling,
+diff --git a/drivers/thermal/ti-soc-thermal/omap5-thermal-data.c b/drivers/thermal/ti-soc-thermal/omap5-thermal-data.c
+index 79ff70c..cd9a304 100644
+--- a/drivers/thermal/ti-soc-thermal/omap5-thermal-data.c
++++ b/drivers/thermal/ti-soc-thermal/omap5-thermal-data.c
+@@ -336,8 +336,6 @@
+ 		.domain = "cpu",
+ 		.register_cooling = ti_thermal_register_cpu_cooling,
+ 		.unregister_cooling = ti_thermal_unregister_cpu_cooling,
+-		.slope = OMAP_GRADIENT_SLOPE_5430_CPU,
+-		.constant = OMAP_GRADIENT_CONST_5430_CPU,
+ 		.slope_pcb = OMAP_GRADIENT_SLOPE_W_PCB_5430_CPU,
+ 		.constant_pcb = OMAP_GRADIENT_CONST_W_PCB_5430_CPU,
+ 		},
+@@ -345,8 +343,6 @@
+ 		.registers = &omap5430_gpu_temp_sensor_registers,
+ 		.ts_data = &omap5430_gpu_temp_sensor_data,
+ 		.domain = "gpu",
+-		.slope = OMAP_GRADIENT_SLOPE_5430_GPU,
+-		.constant = OMAP_GRADIENT_CONST_5430_GPU,
+ 		.slope_pcb = OMAP_GRADIENT_SLOPE_W_PCB_5430_GPU,
+ 		.constant_pcb = OMAP_GRADIENT_CONST_W_PCB_5430_GPU,
+ 		},
+diff --git a/drivers/thermal/ti-soc-thermal/ti-bandgap.h b/drivers/thermal/ti-soc-thermal/ti-bandgap.h
+index fe0adb8..209c664 100644
+--- a/drivers/thermal/ti-soc-thermal/ti-bandgap.h
++++ b/drivers/thermal/ti-soc-thermal/ti-bandgap.h
+@@ -254,8 +254,6 @@ struct ti_bandgap {
+  * @ts_data: pointer to struct with thresholds, limits of temperature sensor
+  * @registers: pointer to the list of register offsets and bitfields
+  * @domain: the name of the domain where the sensor is located
+- * @slope: sensor gradient slope info for hotspot extrapolation equation
+- * @constant: sensor gradient const info for hotspot extrapolation equation
+  * @slope_pcb: sensor gradient slope info for hotspot extrapolation equation
+  *             with no external influence
+  * @constant_pcb: sensor gradient const info for hotspot extrapolation equation
+@@ -274,8 +272,6 @@ struct ti_temp_sensor {
+ 	struct temp_sensor_registers	*registers;
+ 	char				*domain;
+ 	/* for hotspot extrapolation */
+-	const int			slope;
+-	const int			constant;
+ 	const int			slope_pcb;
+ 	const int			constant_pcb;
+ 	int (*register_cooling)(struct ti_bandgap *bgp, int id);
+diff --git a/drivers/thermal/ti-soc-thermal/ti-thermal.h b/drivers/thermal/ti-soc-thermal/ti-thermal.h
+index f8b7ffe..8e85ca9 100644
+--- a/drivers/thermal/ti-soc-thermal/ti-thermal.h
++++ b/drivers/thermal/ti-soc-thermal/ti-thermal.h
+@@ -25,22 +25,6 @@
+ 
+ #include "ti-bandgap.h"
+ 
+-/* sensors gradient and offsets */
+-#define OMAP_GRADIENT_SLOPE_4430				0
+-#define OMAP_GRADIENT_CONST_4430				20000
+-#define OMAP_GRADIENT_SLOPE_4460				348
+-#define OMAP_GRADIENT_CONST_4460				-9301
+-#define OMAP_GRADIENT_SLOPE_4470				308
+-#define OMAP_GRADIENT_CONST_4470				-7896
+-
+-#define OMAP_GRADIENT_SLOPE_5430_CPU				65
+-#define OMAP_GRADIENT_CONST_5430_CPU				-1791
+-#define OMAP_GRADIENT_SLOPE_5430_GPU				117
+-#define OMAP_GRADIENT_CONST_5430_GPU				-2992
+-
+-#define DRA752_GRADIENT_SLOPE					0
+-#define DRA752_GRADIENT_CONST					2000
+-
+ /* PCB sensor calculation constants */
+ #define OMAP_GRADIENT_SLOPE_W_PCB_4430				0
+ #define OMAP_GRADIENT_CONST_W_PCB_4430				20000
+-- 
+1.9.1
