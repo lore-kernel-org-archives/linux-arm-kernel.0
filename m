@@ -1,177 +1,233 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 9 Mar 2017 20:40:55 +0100
-Subject: [PATCH v5 10/10] arm64: mm: set the contiguous bit for kernel
- mappings where appropriate
-In-Reply-To: <20170309193343.GG11966@leverpostej>
-References: <1489047912-642-1-git-send-email-ard.biesheuvel@linaro.org>
- <1489047912-642-11-git-send-email-ard.biesheuvel@linaro.org>
- <20170309193343.GG11966@leverpostej>
-Message-ID: <CAKv+Gu8DJvs7=hR_bnJct3=P_1utZ31rxuVKUrjVnD1MWveHHw@mail.gmail.com>
+From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
+Date: Thu, 9 Mar 2017 20:44:29 +0100
+Subject: [PATCH 2/2] phy: meson: add USB2 PHY support for Meson GXL and GXM
+In-Reply-To: <58C11204.902@ti.com>
+References: <20170304222231.14496-1-martin.blumenstingl@googlemail.com>
+ <20170304222231.14496-3-martin.blumenstingl@googlemail.com>
+ <58C11204.902@ti.com>
+Message-ID: <CAFBinCCuhMHw3V6vU7Fgb2hEnkfvBPXPFXfqfozrDN1=PnXc2w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9 March 2017 at 20:33, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Thu, Mar 09, 2017 at 09:25:12AM +0100, Ard Biesheuvel wrote:
->> +static inline u64 pte_cont_addr_end(u64 addr, u64 end)
+Hi Kishon,
+
+On Thu, Mar 9, 2017 at 9:27 AM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+> Hi,
+>
+> On Sunday 05 March 2017 03:52 AM, Martin Blumenstingl wrote:
+>> This adds a new driver for the USB2 PHYs found on Meson GXL and GXM SoCs
+>> (both SoCs are using the same USB PHY register layout).
+>>
+>> The USB2 PHY is a simple PHY which only has a few registers to configure
+>> the mode (host/device) and a reset register (to enable/disable the PHY).
+>>
+>> Unfortunately there are no datasheets available for any of these PHYs.
+>> Both drivers were written by reading the reference drivers provided by
+>> Amlogic and analyzing the registers on the kernel that was shipped on
+>> the boards I have.
+>>
+>> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+>> ---
+>>  drivers/phy/Kconfig              |  13 ++
+>>  drivers/phy/Makefile             |   1 +
+>>  drivers/phy/phy-meson-gxl-usb2.c | 263 +++++++++++++++++++++++++++++++++++++++
+>>  3 files changed, 277 insertions(+)
+>>  create mode 100644 drivers/phy/phy-meson-gxl-usb2.c
+>>
+>> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+>> index e8eb7f225a88..7d64711a837f 100644
+>> --- a/drivers/phy/Kconfig
+>> +++ b/drivers/phy/Kconfig
+>> @@ -486,4 +486,17 @@ config PHY_MESON8B_USB2
+>>         and GXBB SoCs.
+>>         If unsure, say N.
+>>
+>> +config PHY_MESON_GXL_USB
+>> +     tristate "Meson GXL and GXM USB2 PHY drivers"
+>> +     default ARCH_MESON
+>> +     depends on OF && (ARCH_MESON || COMPILE_TEST)
+>> +     depends on USB_SUPPORT
+>> +     select USB_COMMON
+>> +     select GENERIC_PHY
+>> +     select REGMAP_MMIO
+>> +     help
+>> +       Enable this to support the Meson USB2 PHYs found in Meson
+>> +       GXL and GXM SoCs.
+>> +       If unsure, say N.
+>> +
+>>  endmenu
+>> diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
+>> index 65eb2f436a41..a3a2c7dd5c06 100644
+>> --- a/drivers/phy/Makefile
+>> +++ b/drivers/phy/Makefile
+>> @@ -59,3 +59,4 @@ obj-$(CONFIG_PHY_CYGNUS_PCIE)               += phy-bcm-cygnus-pcie.o
+>>  obj-$(CONFIG_ARCH_TEGRA) += tegra/
+>>  obj-$(CONFIG_PHY_NS2_PCIE)           += phy-bcm-ns2-pcie.o
+>>  obj-$(CONFIG_PHY_MESON8B_USB2)               += phy-meson8b-usb2.o
+>> +obj-$(CONFIG_PHY_MESON_GXL_USB)              += phy-meson-gxl-usb2.o
+>> diff --git a/drivers/phy/phy-meson-gxl-usb2.c b/drivers/phy/phy-meson-gxl-usb2.c
+>> new file mode 100644
+>> index 000000000000..841a6d9722d4
+>> --- /dev/null
+>> +++ b/drivers/phy/phy-meson-gxl-usb2.c
+>> @@ -0,0 +1,263 @@
+>> +/*
+>> + * Meson GXL and GXM USB2 PHY driver
+>> + *
+>> + * Copyright (C) 2017 Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + *
+>> + * You should have received a copy of the GNU General Public License
+>> + * along with this program. If not, see <http://www.gnu.org/licenses/>.
+>> + */
+>> +
+>> +#include <linux/delay.h>
+>> +#include <linux/io.h>
+>> +#include <linux/module.h>
+>> +#include <linux/of_device.h>
+>> +#include <linux/regmap.h>
+>> +#include <linux/phy/phy.h>
+>> +#include <linux/platform_device.h>
+>> +#include <linux/usb/of.h>
+>> +
+>> +/* bits [31:27] are read-only */
+>> +#define U2P_R0                                                       0x0
+>> +     #define U2P_R0_BYPASS_SEL                               BIT(0)
+>> +     #define U2P_R0_BYPASS_DM_EN                             BIT(1)
+>> +     #define U2P_R0_BYPASS_DP_EN                             BIT(2)
+>> +     #define U2P_R0_TXBITSTUFF_ENH                           BIT(3)
+>> +     #define U2P_R0_TXBITSTUFF_EN                            BIT(4)
+>> +     #define U2P_R0_DM_PULLDOWN                              BIT(5)
+>> +     #define U2P_R0_DP_PULLDOWN                              BIT(6)
+>> +     #define U2P_R0_DP_VBUS_VLD_EXT_SEL                      BIT(7)
+>> +     #define U2P_R0_DP_VBUS_VLD_EXT                          BIT(8)
+>> +     #define U2P_R0_ADP_PRB_EN                               BIT(9)
+>> +     #define U2P_R0_ADP_DISCHARGE                            BIT(10)
+>> +     #define U2P_R0_ADP_CHARGE                               BIT(11)
+>> +     #define U2P_R0_DRV_VBUS                                 BIT(12)
+>> +     #define U2P_R0_ID_PULLUP                                BIT(13)
+>> +     #define U2P_R0_LOOPBACK_EN_B                            BIT(14)
+>> +     #define U2P_R0_OTG_DISABLE                              BIT(15)
+>> +     #define U2P_R0_COMMON_ONN                               BIT(16)
+>> +     #define U2P_R0_FSEL_MASK                                GENMASK(19, 17)
+>> +     #define U2P_R0_REF_CLK_SEL_MASK                         GENMASK(21, 20)
+>> +     #define U2P_R0_POWER_ON_RESET                           BIT(22)
+>> +     #define U2P_R0_V_ATE_TEST_EN_B_MASK                     GENMASK(24, 23)
+>> +     #define U2P_R0_ID_SET_ID_DQ                             BIT(25)
+>> +     #define U2P_R0_ATE_RESET                                BIT(26)
+>> +     #define U2P_R0_FSV_MINUS                                BIT(27)
+>> +     #define U2P_R0_FSV_PLUS                                 BIT(28)
+>> +     #define U2P_R0_BYPASS_DM_DATA                           BIT(29)
+>> +     #define U2P_R0_BYPASS_DP_DATA                           BIT(30)
+>> +
+>> +#define U2P_R1                                                       0x4
+>> +     #define U2P_R1_BURN_IN_TEST                             BIT(0)
+>> +     #define U2P_R1_ACA_ENABLE                               BIT(1)
+>> +     #define U2P_R1_DCD_ENABLE                               BIT(2)
+>> +     #define U2P_R1_VDAT_SRC_EN_B                            BIT(3)
+>> +     #define U2P_R1_VDAT_DET_EN_B                            BIT(4)
+>> +     #define U2P_R1_CHARGES_SEL                              BIT(5)
+>> +     #define U2P_R1_TX_PREEMP_PULSE_TUNE                     BIT(6)
+>> +     #define U2P_R1_TX_PREEMP_AMP_TUNE_MASK                  GENMASK(8, 7)
+>> +     #define U2P_R1_TX_RES_TUNE_MASK                         GENMASK(10, 9)
+>> +     #define U2P_R1_TX_RISE_TUNE_MASK                        GENMASK(12, 11)
+>> +     #define U2P_R1_TX_VREF_TUNE_MASK                        GENMASK(16, 13)
+>> +     #define U2P_R1_TX_FSLS_TUNE_MASK                        GENMASK(20, 17)
+>> +     #define U2P_R1_TX_HSXV_TUNE_MASK                        GENMASK(22, 21)
+>> +     #define U2P_R1_OTG_TUNE_MASK                            GENMASK(25, 23)
+>> +     #define U2P_R1_SQRX_TUNE_MASK                           GENMASK(28, 26)
+>> +     #define U2P_R1_COMP_DIS_TUNE_MASK                       GENMASK(31, 29)
+>> +
+>> +/* bits [31:14] are read-only */
+>> +#define U2P_R2                                                       0x8
+>> +     #define U2P_R2_DATA_IN_MASK                             GENMASK(3, 0)
+>> +     #define U2P_R2_DATA_IN_EN_MASK                          GENMASK(7, 4)
+>> +     #define U2P_R2_ADDR_MASK                                GENMASK(11, 8)
+>> +     #define U2P_R2_DATA_OUT_SEL                             BIT(12)
+>> +     #define U2P_R2_CLK                                      BIT(13)
+>> +     #define U2P_R2_DATA_OUT_MASK                            GENMASK(17, 14)
+>> +     #define U2P_R2_ACA_PIN_RANGE_C                          BIT(18)
+>> +     #define U2P_R2_ACA_PIN_RANGE_B                          BIT(19)
+>> +     #define U2P_R2_ACA_PIN_RANGE_A                          BIT(20)
+>> +     #define U2P_R2_ACA_PIN_GND                              BIT(21)
+>> +     #define U2P_R2_ACA_PIN_FLOAT                            BIT(22)
+>> +     #define U2P_R2_CHARGE_DETECT                            BIT(23)
+>> +     #define U2P_R2_DEVICE_SESSION_VALID                     BIT(24)
+>> +     #define U2P_R2_ADP_PROBE                                BIT(25)
+>> +     #define U2P_R2_ADP_SENSE                                BIT(26)
+>> +     #define U2P_R2_SESSION_END                              BIT(27)
+>> +     #define U2P_R2_VBUS_VALID                               BIT(28)
+>> +     #define U2P_R2_B_VALID                                  BIT(29)
+>> +     #define U2P_R2_A_VALID                                  BIT(30)
+>> +     #define U2P_R2_ID_DIG                                   BIT(31)
+>> +
+>> +#define U2P_R3                                                       0xc
+>> +
+>> +#define RESET_COMPLETE_TIME                          500
+>> +
+>> +struct phy_meson_gxl_usb2_priv {
+>> +     struct regmap           *regmap;
+>> +     enum phy_mode           mode;
+>> +     int                     is_enabled;
+>> +};
+>> +
+>> +static const struct regmap_config phy_meson_gxl_usb2_regmap_conf = {
+>> +     .reg_bits = 8,
+>> +     .val_bits = 32,
+>> +     .reg_stride = 4,
+>> +     .max_register = U2P_R3,
+>> +};
+>> +
+>> +static int phy_meson_gxl_usb2_set_mode(struct phy *phy, enum phy_mode mode)
 >> +{
->> +     return min((addr + CONT_PTE_SIZE) & CONT_PTE_MASK, end);
->> +}
+>> +     struct phy_meson_gxl_usb2_priv *priv = phy_get_drvdata(phy);
 >> +
->> +static inline u64 pmd_cont_addr_end(u64 addr, u64 end)
->> +{
->> +     return min((addr + CONT_PMD_SIZE) & CONT_PMD_MASK, end);
->> +}
->
-> These differ structurally from the usual p??_addr_end() macros defined
-> in include/asm-generic/pgtable.h. I agree the asm-generic macros aren't
-> pretty, but it would be nice to be consistent.
->
-> I don't think the above handle a partial contiguous span at the end of
-> the address space (e.g. where end is initial PAGE_SIZE away from 2^64),
-> whereas the asm-generic form does, AFAICT.
->
-> Can we please use:
->
-> #define pte_cont_addr_end(addr, end)                                            \
-> ({      unsigned long __boundary = ((addr) + CONT_PTE_SIZE) & CONT_PTE_MASK;    \
->         (__boundary - 1 < (end) - 1)? __boundary: (end);                        \
-> })
->
-> #define pmd_cont_addr_end(addr, end)                                            \
-> ({      unsigned long __boundary = ((addr) + CONT_PMD_SIZE) & CONT_PMD_MASK;    \
->         (__boundary - 1 < (end) - 1)? __boundary: (end);                        \
-> })
->
-> ... instead?
->
-
-OK, so that's what the -1 is for. Either version is fine by me.
-
-> [...]
->
->> +static void init_pte(pte_t *pte, unsigned long addr, unsigned long end,
->> +                  phys_addr_t phys, pgprot_t prot)
->>  {
->> +     do {
->> +             pte_t old_pte = *pte;
+>> +     switch (mode) {
+>> +     case PHY_MODE_USB_HOST:
+>> +     case PHY_MODE_USB_OTG:
+>> +             regmap_update_bits(priv->regmap, U2P_R0, U2P_R0_DM_PULLDOWN,
+>> +                                U2P_R0_DM_PULLDOWN);
+>> +             regmap_update_bits(priv->regmap, U2P_R0, U2P_R0_DP_PULLDOWN,
+>> +                                U2P_R0_DP_PULLDOWN);
+>> +             regmap_update_bits(priv->regmap, U2P_R0, U2P_R0_ID_PULLUP, 0);
+>> +             break;
 >> +
->> +             set_pte(pte, pfn_pte(__phys_to_pfn(phys), prot));
+>> +     case PHY_MODE_USB_DEVICE:
+>> +             regmap_update_bits(priv->regmap, U2P_R0, U2P_R0_DM_PULLDOWN,
+>> +                                0);
+>> +             regmap_update_bits(priv->regmap, U2P_R0, U2P_R0_DP_PULLDOWN,
+>> +                                0);
+>> +             regmap_update_bits(priv->regmap, U2P_R0, U2P_R0_ID_PULLUP,
+>> +                                U2P_R0_ID_PULLUP);
+>> +             break;
 >> +
->> +             /*
->> +              * After the PTE entry has been populated once, we
->> +              * only allow updates to the permission attributes.
->> +              */
->> +             BUG_ON(!pgattr_change_is_safe(pte_val(old_pte), pte_val(*pte)));
->> +
->> +     } while (pte++, addr += PAGE_SIZE, phys += PAGE_SIZE, addr != end);
->> +}
->> +
->> +static void alloc_init_cont_pte(pmd_t *pmd, unsigned long addr,
->> +                             unsigned long end, phys_addr_t phys,
->> +                             pgprot_t prot,
->> +                             phys_addr_t (*pgtable_alloc)(void),
->> +                             int flags)
->> +{
->> +     unsigned long next;
->>       pte_t *pte;
->>
->>       BUG_ON(pmd_sect(*pmd));
->> @@ -136,45 +156,30 @@ static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
->>
->>       pte = pte_set_fixmap_offset(pmd, addr);
->>       do {
->> -             pte_t old_pte = *pte;
->> +             pgprot_t __prot = prot;
->>
->> -             set_pte(pte, pfn_pte(__phys_to_pfn(phys), prot));
->> -             phys += PAGE_SIZE;
->> +             next = pte_cont_addr_end(addr, end);
->>
->> -             /*
->> -              * After the PTE entry has been populated once, we
->> -              * only allow updates to the permission attributes.
->> -              */
->> -             BUG_ON(!pgattr_change_is_safe(pte_val(old_pte), pte_val(*pte)));
->> +             /* use a contiguous mapping if the range is suitably aligned */
->> +             if ((((addr | next | phys) & ~CONT_PTE_MASK) == 0) &&
->> +                 (flags & NO_CONT_MAPPINGS) == 0)
->> +                     __prot = __pgprot(pgprot_val(prot) | PTE_CONT);
->>
->> -     } while (pte++, addr += PAGE_SIZE, addr != end);
->> +             init_pte(pte, addr, next, phys, __prot);
->> +
->> +             phys += next - addr;
->> +             pte += (next - addr) / PAGE_SIZE;
->> +     } while (addr = next, addr != end);
->>
->>       pte_clear_fixmap();
->>  }
->
-> I think it would be preferable to pass the pmd down into
-> alloc_init_pte(), so that we don't have to mess with the pte in both
-> alloc_init_cont_pte() and alloc_init_pte().
->
-> Likewise for alloc_init_cont_pmd() and alloc_init_pmd(), regarding the
-> pmd.
->
-> I realise we'll redundantly map/unmap the PTE for each contiguous span,
-> but I doubt there's a case it has a noticeable impact.
->
-
-OK
-
-> With lots of memory we'll use blocks at a higher level, and for
-> debug_pagealloc we'll pass the whole pte down to init_pte() as we
-> currently do.
->
-> [...]
->
->> +     if (pud_none(*pud)) {
->> +             phys_addr_t pmd_phys;
->> +             BUG_ON(!pgtable_alloc);
->> +             pmd_phys = pgtable_alloc();
->> +             pmd = pmd_set_fixmap(pmd_phys);
->> +             __pud_populate(pud, pmd_phys, PUD_TYPE_TABLE);
->> +             pmd_clear_fixmap();
+>> +     default:
+>> +             return -EINVAL;
 >> +     }
+>> +
+>> +     if (priv->is_enabled) {
 >
-> It looks like when the splitting logic was removed, we forgot to remove
-> the fixmapping here (and for the pmd_none() case). The __p?d_populate
-> functions don't touch the next level table, so there's no reason to
-> fixmap it.
+> Should set_mode be always called after power_on? or reset of phy should be done
+> if set_mode is called after power_on?
 >
-> Would you mind spinning a patch to rip those out?
->
+> Either case I think it's better to move this reset in phy reset ops and invoke
+> it from this phys users.
+unfortunately I can only guess (change code -> boot kernel with
+changed code -> human testing) here as there's no public datasheet.
+however, the "consumer" of this PHY will be quite generic: it'll be
+powered on by the xhci-plat driver (or some utility around that). that
+might be a bit of a problem: it would mean that we have to decide when
+to call phy_reset (before or after phy_power_on/phy_set_mode) and
+define this once for all PHYs that are passed to xhci-plat.
+what do you think Kishon?
 
-Ah right, pmd is not even referenced in the __pud_populate invocation.
-Yes, I will add a patch before this one to remove that.
+apart from that Hendrik is right, but I think I should call
+phy_meson_gxl_usb2_power_off instead of stetting is_enabled to false.
+thanks for spotting this though!
 
-> [...]
->
->>  void __init create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
->>                              unsigned long virt, phys_addr_t size,
->>                              pgprot_t prot, bool page_mappings_only)
->>  {
->> -     int flags;
->> +     int flags = NO_CONT_MAPPINGS;
->>
->>       BUG_ON(mm == &init_mm);
->>
->>       if (page_mappings_only)
->> -             flags = NO_BLOCK_MAPPINGS;
->> +             flags |= NO_BLOCK_MAPPINGS;
->
-> Why is it never safe to use cont mappings here?
->
-> EFI's the only caller of this, and the only case I can see that we need
-> to avoid contiguous entries for are the runtime services data/code, due
-> to efi_set_mapping_permissions(). We map those with page_mappings_only
-> set.
->
-> I couldn't spot why we'd need to avoid cont entries otherwise.
->
-> What am I missing?
->
 
-Nothing. It is erring on the side of caution, really, since there is
-no performance concern here.
+Regards,
+Martin
