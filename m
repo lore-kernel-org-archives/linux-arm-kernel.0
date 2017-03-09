@@ -1,53 +1,33 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Thu, 09 Mar 2017 12:47:53 +0100
-Subject: [RESEND PATCH] arm: assabet_defconfig: disable IDE subsystem
-In-Reply-To: <a3161cfc-56f7-4577-c37f-3798cdb03713@ti.com>
-References: <1467991490-24895-1-git-send-email-b.zolnierkie@samsung.com>
- <1fd840c5-b0bb-726b-6357-669977c4ae5f@ti.com>
- <a3161cfc-56f7-4577-c37f-3798cdb03713@ti.com>
- <CGME20170309114756epcas5p3761bce85d5a8e3a095cb3a876c484ea6@epcas5p3.samsung.com>
-Message-ID: <1821488.fi4Ak6Xj0W@amdc3058>
+From: Joao.Pinto@synopsys.com (Joao Pinto)
+Date: Thu, 9 Mar 2017 11:55:01 +0000
+Subject: [PATCH v2 08/22] PCI: dwc: designware: Add EP mode support
+In-Reply-To: <20170308191419.GA12085@infradead.org>
+References: <1487325042-28227-1-git-send-email-kishon@ti.com>
+ <1487325042-28227-9-git-send-email-kishon@ti.com>
+ <45e5288e-d11f-c855-af9b-692a42d878c6@synopsys.com> <58BE42B2.20305@ti.com>
+ <02461be2-268d-485a-2bc4-3b148726d37d@synopsys.com>
+ <aa9835a7-07f4-d042-d04a-b0d9cc0ea3de@synopsys.com> <58BFEC7D.3090608@ti.com>
+ <35d539ba-956f-330e-c28d-b67c3d414578@synopsys.com> <58C00798.1030302@ti.com>
+ <650c53fc-482c-feab-faa3-c30689d3d128@synopsys.com>
+ <20170308191419.GA12085@infradead.org>
+Message-ID: <af4dd1db-dc24-1797-a43a-8487a95e47f9@synopsys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Christoph,
 
-Hi Sekhar,
-
-On Thursday, March 09, 2017 02:09:30 PM Sekhar Nori wrote:
-> Hi Bartlomiej,
+?s 7:14 PM de 3/8/2017, Christoph Hellwig escreveu:
+> On Wed, Mar 08, 2017 at 03:32:03PM +0000, Joao Pinto wrote:
+>> #define PCIE_GET_ATU_INB_UNR_REG_ADDR(region, register)		\
+>> 					((0x3 << 20) | (region << 9) |	\
+>> 					(0x1 << 8)
 > 
-> On Wednesday 08 March 2017 08:30 PM, Sekhar Nori wrote:
+> Can you turn this and any similar macro into inline functions?
 > 
-> >> It took a while to get to it but here is the draft driver patch
-> >> against v4.11-rc1.  Please test.
-> > 
-> > I tested this on DM6446 EVM. I was able to mount existing partitions on 
-> > the hard disk and see that the directory listing looks good[1]. I will do 
-> > more tests (including comparing performance with old driver) tomorrow. I 
-> 
-> I completed the tests I wanted to, including some read/write/data 
-> integrity tests. Performance is same as before too.
-> 
-> Tested-by: Sekhar Nori <nsekhar@ti.com>
 
-Thanks for testing!
+Use an inline functions instead of macro is fine by me. In the initial patch I
+implemented as a macro since it only does simple bit shifts and nothing else and
+seemed simpler as a macro.
 
-> Here are the additional changes I did. These changes do not clash with 
-
-I'll split the draft patch on ATA & platform changes and make a proper
-submission.  I'll also include your changes (can I have your Signed-by
-for them?).
-
-> what I have already queued for v4.12. That said, its probably better if 
-> I carry the platform pieces through my tree. Let me know how you want 
-> to proceed.
-
-I think that it would be the best to ask Tejun to make a separate branch
-with a pata_bk3710 driver so it can be pulled into your tree to preserve
-bisectability.
-
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+Thanks,
+Joao
