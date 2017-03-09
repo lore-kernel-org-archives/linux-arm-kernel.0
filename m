@@ -1,71 +1,56 @@
-From: niklas.cassel@axis.com (Niklas Cassel)
-Date: Thu, 9 Mar 2017 11:21:32 +0100
-Subject: [RESEND PATCH v3 3/7] PCI: dwc: artpec6: Populate cpu_addr_fixup
- ops
-In-Reply-To: <1489041545-15730-4-git-send-email-kishon@ti.com>
-References: <1489041545-15730-1-git-send-email-kishon@ti.com>
- <1489041545-15730-4-git-send-email-kishon@ti.com>
-Message-ID: <6607274e-5486-c9c8-8e97-aba7591bbfc3@axis.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 9 Mar 2017 11:29:58 +0100
+Subject: [PATCH 00/11] drm/sun4i: Support two display pipelines
+In-Reply-To: <20170309100534.14023-1-wens@csie.org>
+References: <20170309100534.14023-1-wens@csie.org>
+Message-ID: <20170309102958.mlbpoklamob4ptfq@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Acked-by: Niklas Cassel <niklas.cassel@axis.com>
+On Thu, Mar 09, 2017 at 06:05:23PM +0800, Chen-Yu Tsai wrote:
+> Hi Maxime,
+> 
+> This is part 3 of my sun4i drm clean up series. In this part support
+> for 2 display pipelines is added, after some more code cleanups and
+> restructuring.
+> 
+> While this series enables the second display pipeline, there's no
+> usable output at the moment. For the A31, the second TCON's panel
+> interface uses the same pins as the Ethernet controller. However
+> Ethernet is used on most boards. We will have to wait for HDMI
+> support to actually use it.
+> 
+> Patch 1 fixes the TCON's clock and regmap initialization sequence,
+> splitting out the dot clock init part till after the regmap.
+> 
+> Patch 2 fixes a comment spotted while reviewing Maxime's HDMI patches.
+> 
+> Patch 3 makes the crtc init code use the tcon pointer embedded in the
+> crtc structure, instead of the sun4i_drv structure, to get the tcon's
+> output port node. This should have been a part of the last batch of
+> patches.
+> 
+> Patch 4 makes the tv encoder code get the tcon and backend pointers
+> from its attached crtc.
+> 
+> Patch 5 makes the crtc init function take tcon and backend pointers.
+> 
+> Patch 6 makes the layer init functions take a backend pointer.
 
-On 03/09/2017 07:39 AM, Kishon Vijay Abraham I wrote:
-> Populate cpu_addr_fixup ops to extract the least 28 bits of the
-> corresponding cpu address.
->
-> Cc: Niklas Cassel <niklas.cassel@axis.com>
-> Acked-by: Joao Pinto <jpinto@synopsys.com>
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-> ---
->  drivers/pci/dwc/pcie-artpec6.c |   15 ++++++++++-----
->  1 file changed, 10 insertions(+), 5 deletions(-)
->
-> diff --git a/drivers/pci/dwc/pcie-artpec6.c b/drivers/pci/dwc/pcie-artpec6.c
-> index fcd3ef8..5b3b3af 100644
-> --- a/drivers/pci/dwc/pcie-artpec6.c
-> +++ b/drivers/pci/dwc/pcie-artpec6.c
-> @@ -78,6 +78,11 @@ static void artpec6_pcie_writel(struct artpec6_pcie *artpec6_pcie, u32 offset, u
->  	regmap_write(artpec6_pcie->regmap, offset, val);
->  }
->  
-> +static u64 artpec6_pcie_cpu_addr_fixup(u64 pci_addr)
-> +{
-> +	return pci_addr & ARTPEC6_CPU_TO_BUS_ADDR;
-> +}
-> +
->  static int artpec6_pcie_establish_link(struct artpec6_pcie *artpec6_pcie)
->  {
->  	struct dw_pcie *pci = artpec6_pcie->pci;
-> @@ -142,11 +147,6 @@ static int artpec6_pcie_establish_link(struct artpec6_pcie *artpec6_pcie)
->  	 */
->  	dw_pcie_writel_dbi(pci, MISC_CONTROL_1_OFF, DBI_RO_WR_EN);
->  
-> -	pp->io_base &= ARTPEC6_CPU_TO_BUS_ADDR;
-> -	pp->mem_base &= ARTPEC6_CPU_TO_BUS_ADDR;
-> -	pp->cfg0_base &= ARTPEC6_CPU_TO_BUS_ADDR;
-> -	pp->cfg1_base &= ARTPEC6_CPU_TO_BUS_ADDR;
-> -
->  	/* setup root complex */
->  	dw_pcie_setup_rc(pp);
->  
-> @@ -234,6 +234,10 @@ static int artpec6_add_pcie_port(struct artpec6_pcie *artpec6_pcie,
->  	return 0;
->  }
->  
-> +static const struct dw_pcie_ops dw_pcie_ops = {
-> +	.cpu_addr_fixup = artpec6_pcie_cpu_addr_fixup,
-> +};
-> +
->  static int artpec6_pcie_probe(struct platform_device *pdev)
->  {
->  	struct device *dev = &pdev->dev;
-> @@ -252,6 +256,7 @@ static int artpec6_pcie_probe(struct platform_device *pdev)
->  		return -ENOMEM;
->  
->  	pci->dev = dev;
-> +	pci->ops = &dw_pcie_ops;
->  
->  	artpec6_pcie->pci = pci;
->  
+Applied the patches up to this one, see my comments for the rest of
+the patches.
+
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170309/fb8651f7/attachment.sig>
