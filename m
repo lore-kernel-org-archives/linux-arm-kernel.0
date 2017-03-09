@@ -1,69 +1,65 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 9 Mar 2017 11:55:35 +0100
-Subject: [PATCH 1/15] clk: divider: Make divider_round_rate take the
- parent clock
-In-Reply-To: <20170307141157.GC10239@codeaurora.org>
+Date: Thu, 9 Mar 2017 11:58:00 +0100
+Subject: [PATCH 10/15] drm/sun4i: tcon: Switch mux on only for composite
+In-Reply-To: <CAGb2v67iTOV-=u5rReu6_wi6NFoCoJkbJKshTpmFYUmJ=ggKUw@mail.gmail.com>
 References: <cover.bc06ffa88f847ddd9ddd7c259415d5f61b55307b.1488876832.git-series.maxime.ripard@free-electrons.com>
- <7ebd073b4941e4b7c619f15ff0a375ff7919d403.1488876832.git-series.maxime.ripard@free-electrons.com>
- <20170307141157.GC10239@codeaurora.org>
-Message-ID: <20170309105535.wdypl3j2ha4ekzyb@lukather>
+ <3f70bcfe2ec03188c06d54a262d49ad91963a510.1488876832.git-series.maxime.ripard@free-electrons.com>
+ <CAGb2v67iTOV-=u5rReu6_wi6NFoCoJkbJKshTpmFYUmJ=ggKUw@mail.gmail.com>
+Message-ID: <20170309105800.mnzhvnky6na7d5vn@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
-
-On Tue, Mar 07, 2017 at 06:11:57AM -0800, Stephen Boyd wrote:
-> On 03/07, Maxime Ripard wrote:
-> > So far, divider_round_rate only considers the parent clock returned by
-> > clk_hw_get_parent.
-> > 
-> > This works fine on clocks that have a single parents, this doesn't work on
-> > muxes, since we will only consider the first parent, while other parents
-> > may totally be able to provide a better combination.
-> > 
-> > Clocks in that case cannot use divider_round_rate, so would have to come up
-> > with a very similar logic to work around it. Instead of having to do
-> > something like this, and duplicate that logic everywhere, give an
-> > additional parameter for the parent clock to consider.
-> > 
-> > Current users have been converted using the following coccinelle script
-> > 
-> > @@
-> > identifier hw, rate, prate, table, width, flags;
-> > @@
-> > 
-> > -long divider_round_rate(struct clk_hw *hw,
-> > +long divider_round_rate(struct clk_hw *hw, struct clk_hw *parent,
-> >                         unsigned long rate,
-> >                         unsigned long *prate,
-> >                         const struct clk_div_table *table,
-> >                         u8 width,
-> >                         unsigned long flags) { ... }
-> > 
-> > @@
-> > identifier fn, hw;
-> > expression E2, E3, E4, E5, E6;
-> > @@
-> >  fn (struct clk_hw *hw, ...) {
-> >  <...
-> > -divider_round_rate(hw, E2, E3, E4, E5, E6)
-> > +divider_round_rate(hw, clk_hw_get_parent(hw), E2, E3, E4, E5, E6)
-> >  ...>
-> > }
+On Wed, Mar 08, 2017 at 11:51:39AM +0800, Chen-Yu Tsai wrote:
+> On Tue, Mar 7, 2017 at 4:56 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > Even though that mux is undocumented, it seems like it needs to be set to 1
+> > when using composite, and 0 when using HDMI.
+> >
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > ---
+> >  drivers/gpu/drm/sun4i/sun4i_tcon.c | 7 ++++++-
+> >  1 file changed, 6 insertions(+), 1 deletion(-)
+> >
+> > diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+> > index d2335f109601..93249c5ab1e4 100644
+> > --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
+> > +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+> > @@ -268,11 +268,16 @@ void sun4i_tcon1_mode_set(struct sun4i_tcon *tcon, struct drm_encoder *encoder,
+> >                            SUN4I_TCON_GCTL_IOMAP_MASK,
+> >                            SUN4I_TCON_GCTL_IOMAP_TCON1);
+> >
+> > +       if (encoder->encoder_type == DRM_MODE_ENCODER_TVDAC)
+> > +               val = 1;
+> > +       else
+> > +               val = 0;
+> > +
+> >         /*
+> >          * FIXME: Undocumented bits
+> >          */
+> >         if (tcon->quirks->has_unknown_mux)
+> > -               regmap_write(tcon->regs, SUN4I_TCON_MUX_CTRL_REG, 1);
+> > +               regmap_write(tcon->regs, SUN4I_TCON_MUX_CTRL_REG, val);
 > 
-> Why not introduce another function like 
+> We might want to do this the other way around, i.e. exporting
 > 
-> 	divider_round_rate_parent()
-> 	divider_round_rate_mux()
+>     int sun4i_tcon_mux_set(struct drm_device *drm, int encoder_type,
+>                            int pipeline)
 > 
-> that takes the extra parent argument? Technically, a divider is
-> considered to only have one parent, and if it has more than one
-> parent, then it is a mux and a divider.
+> and have downstream encoders call it. For the A31, the mux is not exclusively
+> used for channel 1; there is a mux setting for MIPI DSI as well, but AFAIK
+> DSI is connected to channel 0.
 
-Yes, that would work too, without needing the cross tree change. I'll
-do that in the next version.
+We could make it part of sun4i_tcon_channel_enable too, though. What
+do you think?
 
-Thanks!
+> Additionally, the mux registers are only valid in the first TCON, meaning
+> it must available be active in 2 pipeline chips. It's also why we'd pass
+> "struct drm_device *" instead of "struct sun4i_tcon *".
+
+Hmmmm. That's going to be tricky to support. Has this been confirmed
+somehow? Is the register used for something else on TCON1?
+
+Thanks,
 Maxime
 
 -- 
@@ -76,4 +72,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170309/a0d9c6db/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170309/1751d012/attachment.sig>
