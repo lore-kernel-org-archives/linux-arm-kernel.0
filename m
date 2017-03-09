@@ -1,101 +1,42 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu,  9 Mar 2017 18:05:24 +0800
-Subject: [PATCH 01/11] drm/sun4i: Fix TCON clock and regmap initialization
- sequence
+Date: Thu,  9 Mar 2017 18:05:26 +0800
+Subject: [PATCH 03/11] drm/sun4i: Use embedded tcon pointer to get the tcon's
+ output port node
 In-Reply-To: <20170309100534.14023-1-wens@csie.org>
 References: <20170309100534.14023-1-wens@csie.org>
-Message-ID: <20170309100534.14023-2-wens@csie.org>
+Message-ID: <20170309100534.14023-4-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The TCON driver calls sun4i_tcon_init_regmap and sun4i_tcon_init_clocks
-in its bind function. The former creates a regmap and writes to several
-register to clear its configuration to a known default. The latter
-initializes various clocks. This includes enabling the bus clock for
-register access and creating the dotclock.
+A pointer to the underlying tcon of the crtc was added to the sun4i_crtc
+structure in "drm/sun4i: Add backend and tcon pointers to sun4i_crtc".
+However the crtc init function was still using the copy from sun4i_drv
+to set drm_crtc.port. This was an oversight when the patches were
+reordered.
 
-In order for the first step's writes to work, the bus clock must be
-enabled which is done in the second step. but the dotclock's ops use
-the regmap created in the first step.
+Switch to using the embedded tcon pointer to get the tcon's ouptut port
+and assign it to drm_crtc.port.
 
-Rearrange the function calls such that the clocks are initialized before
-the regmap, and split out the dot clock creation to after the regmap is
-initialized.
+This makes it possible to remove the usage of sun4i_drv completely in
+subsequent patches.
 
-Fixes: 9026e0d122ac ("drm: Add Allwinner A10 Display Engine support")
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- drivers/gpu/drm/sun4i/sun4i_tcon.c | 22 +++++++++++++++-------
- 1 file changed, 15 insertions(+), 7 deletions(-)
+ drivers/gpu/drm/sun4i/sun4i_crtc.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-index 505520baa585..ee51d7e77a6a 100644
---- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-@@ -335,12 +335,11 @@ static int sun4i_tcon_init_clocks(struct device *dev,
- 		}
- 	}
+diff --git a/drivers/gpu/drm/sun4i/sun4i_crtc.c b/drivers/gpu/drm/sun4i/sun4i_crtc.c
+index 7bbcedff9f07..5323e3485988 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_crtc.c
++++ b/drivers/gpu/drm/sun4i/sun4i_crtc.c
+@@ -183,7 +183,7 @@ struct sun4i_crtc *sun4i_crtc_init(struct drm_device *drm)
+ 	drm_crtc_helper_add(&scrtc->crtc, &sun4i_crtc_helper_funcs);
  
--	return sun4i_dclk_create(dev, tcon);
-+	return 0;
- }
+ 	/* Set crtc.port to output port node of the tcon */
+-	scrtc->crtc.port = of_graph_get_port_by_id(drv->tcon->dev->of_node,
++	scrtc->crtc.port = of_graph_get_port_by_id(scrtc->tcon->dev->of_node,
+ 						   1);
  
- static void sun4i_tcon_free_clocks(struct sun4i_tcon *tcon)
- {
--	sun4i_dclk_free(tcon);
- 	clk_disable_unprepare(tcon->clk);
- }
- 
-@@ -505,22 +504,28 @@ static int sun4i_tcon_bind(struct device *dev, struct device *master,
- 		return ret;
- 	}
- 
-+	ret = sun4i_tcon_init_clocks(dev, tcon);
-+	if (ret) {
-+		dev_err(dev, "Couldn't init our TCON clocks\n");
-+		goto err_assert_reset;
-+	}
-+
- 	ret = sun4i_tcon_init_regmap(dev, tcon);
- 	if (ret) {
- 		dev_err(dev, "Couldn't init our TCON regmap\n");
--		goto err_assert_reset;
-+		goto err_free_clocks;
- 	}
- 
--	ret = sun4i_tcon_init_clocks(dev, tcon);
-+	ret = sun4i_dclk_create(dev, tcon);
- 	if (ret) {
--		dev_err(dev, "Couldn't init our TCON clocks\n");
--		goto err_assert_reset;
-+		dev_err(dev, "Couldn't create our TCON dot clock\n");
-+		goto err_free_clocks;
- 	}
- 
- 	ret = sun4i_tcon_init_irq(dev, tcon);
- 	if (ret) {
- 		dev_err(dev, "Couldn't init our TCON interrupts\n");
--		goto err_free_clocks;
-+		goto err_free_dotclock;
- 	}
- 
- 	tcon->crtc = sun4i_crtc_init(drm);
-@@ -536,6 +541,8 @@ static int sun4i_tcon_bind(struct device *dev, struct device *master,
- 
- 	return 0;
- 
-+err_free_dotclock:
-+	sun4i_dclk_free(tcon);
- err_free_clocks:
- 	sun4i_tcon_free_clocks(tcon);
- err_assert_reset:
-@@ -548,6 +555,7 @@ static void sun4i_tcon_unbind(struct device *dev, struct device *master,
- {
- 	struct sun4i_tcon *tcon = dev_get_drvdata(dev);
- 
-+	sun4i_dclk_free(tcon);
- 	sun4i_tcon_free_clocks(tcon);
- }
- 
+ 	/* Set possible_crtcs to this crtc for overlay planes */
 -- 
 2.11.0
