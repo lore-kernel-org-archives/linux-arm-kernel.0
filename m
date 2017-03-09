@@ -1,23 +1,20 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 9 Mar 2017 12:33:46 -0800
-Subject: [PATCH 2/2] ARM: dts: BCM5301X: Don't use nonexistent
- "default-off" LED trigger
-In-Reply-To: <20170308064105.26619-2-zajec5@gmail.com>
-References: <20170308064105.26619-1-zajec5@gmail.com>
- <20170308064105.26619-2-zajec5@gmail.com>
-Message-ID: <b0dc618c-5fd3-e2a0-570d-bbd901a2d137@gmail.com>
+From: julia.lawall@lip6.fr (Julia Lawall)
+Date: Thu, 9 Mar 2017 21:36:50 +0100 (CET)
+Subject: outreachy
+Message-ID: <alpine.DEB.2.20.1703092133340.2306@hadrien>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/07/2017 10:41 PM, Rafa? Mi?ecki wrote:
-> From: Rafa? Mi?ecki <rafal@milecki.pl>
-> 
-> Such a trigger doesn't exist in Linux and is not needed as LED is being
-> turned off by default. This could cause errors in LEDs core code when
-> trying to set default trigger.
-> 
-> Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
+Hello,
 
-Applied, thanks!
--- 
-Florian
+I discussed the issue of outreachy patches for bcm with Greg, and we are
+not convinced that not having the patches CCd to you is such a good idea.
+While we don't want to spam you with noise, some of the applicants are
+starting to make more significant changes that it could be useful for you
+to be aware of.
+
+Could we try a compromise where you are not CCd on whitespace patches, but
+you are CCd on patches that actually modify the code?
+
+thanks,
+julia
