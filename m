@@ -1,63 +1,20 @@
-From: roy.pledge@nxp.com (Roy Pledge)
-Date: Thu, 9 Mar 2017 16:00:54 -0500
-Subject: [PATCH] soc/qbman: Disable IRQs for deferred QBMan work
-Message-ID: <1489093254-8032-1-git-send-email-roy.pledge@nxp.com>
+From: davem@davemloft.net (David Miller)
+Date: Thu, 09 Mar 2017 13:12:56 -0800 (PST)
+Subject: [PATCH v2 0/4] net: thunderx: Miscellaneous fixes
+In-Reply-To: <1488890351-18493-1-git-send-email-sunil.kovvuri@gmail.com>
+References: <1488890351-18493-1-git-send-email-sunil.kovvuri@gmail.com>
+Message-ID: <20170309.131256.1923856751370789132.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Work for Congestion State Notifications (CSCN) and Message Ring (MR)
-handling is handled via the workqueue mechanism. This requires the
-driver to disable those IRQs before scheduling the work and re-enabling
-it once the work is completed so that the interrupt doesn't continually
-fire.
+From: sunil.kovvuri@gmail.com
+Date: Tue,  7 Mar 2017 18:09:07 +0530
 
-Signed-off-by: Roy Pledge <roy.pledge@nxp.com>
----
- drivers/soc/fsl/qbman/qman.c |    5 +++++
- 1 file changed, 5 insertions(+)
+> From: Sunil Goutham <sgoutham@cavium.com>
+> 
+> This patch set fixes multiple issues such as IOMMU
+> translation faults when kernel is booted with IOMMU enabled
+> on host, incorrect MAC ID reading from ACPI tables and IPv6
+> UDP packet drop due to failure of checksum validation.
 
-diff --git a/drivers/soc/fsl/qbman/qman.c b/drivers/soc/fsl/qbman/qman.c
-index d67b8e1..f1a242a 100644
---- a/drivers/soc/fsl/qbman/qman.c
-+++ b/drivers/soc/fsl/qbman/qman.c
-@@ -1382,6 +1382,7 @@ static void qm_congestion_task(struct work_struct *work)
- 	if (!qm_mc_result_timeout(&p->p, &mcr)) {
- 		spin_unlock(&p->cgr_lock);
- 		dev_crit(p->config->dev, "QUERYCONGESTION timeout\n");
-+		qman_p_irqsource_add(p, QM_PIRQ_CSCI);
- 		return;
- 	}
- 	/* mask out the ones I'm not interested in */
-@@ -1396,6 +1397,7 @@ static void qm_congestion_task(struct work_struct *work)
- 		if (cgr->cb && qman_cgrs_get(&c, cgr->cgrid))
- 			cgr->cb(p, cgr, qman_cgrs_get(&rr, cgr->cgrid));
- 	spin_unlock(&p->cgr_lock);
-+	qman_p_irqsource_add(p, QM_PIRQ_CSCI);
- }
- 
- static void qm_mr_process_task(struct work_struct *work)
-@@ -1455,12 +1457,14 @@ static void qm_mr_process_task(struct work_struct *work)
- 	}
- 
- 	qm_mr_cci_consume(&p->p, num);
-+	qman_p_irqsource_add(p, QM_PIRQ_MRI);
- 	preempt_enable();
- }
- 
- static u32 __poll_portal_slow(struct qman_portal *p, u32 is)
- {
- 	if (is & QM_PIRQ_CSCI) {
-+		qman_p_irqsource_remove(p, QM_PIRQ_CSCI);
- 		queue_work_on(smp_processor_id(), qm_portal_wq,
- 			      &p->congestion_work);
- 	}
-@@ -1472,6 +1476,7 @@ static u32 __poll_portal_slow(struct qman_portal *p, u32 is)
- 	}
- 
- 	if (is & QM_PIRQ_MRI) {
-+		qman_p_irqsource_remove(p, QM_PIRQ_MRI);
- 		queue_work_on(smp_processor_id(), qm_portal_wq,
- 			      &p->mr_work);
- 	}
--- 
-1.7.9.5
+Series applied, thanks.
