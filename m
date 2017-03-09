@@ -1,80 +1,61 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 9 Mar 2017 13:57:15 +0000
-Subject: [RESEND PATCH] arm: assabet_defconfig: disable IDE subsystem
-In-Reply-To: <a8eab3b1-8867-00dd-08e4-bcece23010a6@cogentembedded.com>
-References: <1467991490-24895-1-git-send-email-b.zolnierkie@samsung.com>
- <CGME20161212135537epcas5p440bbb93d40f0c41b3754635733b09879@epcas5p4.samsung.com>
- <8ea5971a-338d-e8b9-6be8-8fe2658fc04d@ti.com>
- <1709119.SQyio4Ct6n@amdc3058>
- <1fd840c5-b0bb-726b-6357-669977c4ae5f@ti.com>
- <a3161cfc-56f7-4577-c37f-3798cdb03713@ti.com>
- <ab44a3c1-f078-4476-4583-de92ee68632c@cogentembedded.com>
- <98031160-f7b4-3cff-043a-1f2ee62c8a01@ti.com>
- <a8eab3b1-8867-00dd-08e4-bcece23010a6@cogentembedded.com>
-Message-ID: <20170309135714.GJ21222@n2100.armlinux.org.uk>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Thu,  9 Mar 2017 11:05:33 -0300
+Subject: [PATCH] i2c: exynos5: Avoid transaction timeouts due
+ TRANSFER_DONE_AUTO not set
+Message-ID: <20170309140533.24618-1-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 09, 2017 at 03:24:56PM +0300, Sergei Shtylyov wrote:
-> On 03/09/2017 03:20 PM, Sekhar Nori wrote:
-> 
-> >[...]
-> 
-> >>>diff --git a/arch/arm/mach-davinci/board-dm644x-evm.c
-> >>>b/arch/arm/mach-davinci/board-dm644x-evm.c
-> >>>index 023480b75244..60a1f23890cd 100644
-> >>>--- a/arch/arm/mach-davinci/board-dm644x-evm.c
-> >>>+++ b/arch/arm/mach-davinci/board-dm644x-evm.c
-> >>>@@ -744,7 +744,7 @@ static int davinci_phy_fixup(struct phy_device
-> >>>*phydev)
-> >>>     return 0;
-> >>> }
-> >>>
-> >>>-#define HAS_ATA        IS_ENABLED(CONFIG_BLK_DEV_PALMCHIP_BK3710)
-> >>>+#define HAS_ATA        IS_ENABLED(CONFIG_PATA_BK3710)
-> >>
-> >>   I think it would be more correct to check for both libata and IDE
-> >>drivers here...
-> >
-> >As I understand, the plan is to remove the IDE driver soon.
-> 
->    I'm not sure DaveM would support any removals in drivers/ide/. He has
-> explicitly expressed his will to maintain the IDE driuver forever.
+After commit 7999eecb7e56 ("i2c: exynos5: fix arbitration lost handling"),
+some I2C transactions are failing because the TRANSFER_DONE_AUTO field is
+not set in the I2C_TRANS_STATUS register so the i2c->status value is left
+to -EINVAL causing the i2c->msg_complete completion to never be signaled.
 
-As I keep saying, there are ARM machines where the IDE driver works but
-the PATA driver doesn't.  EBSA110's PCMCIA slots for instance.
+For example, when reading the time of an I2C rtc on an Exynos5800 machine:
 
-Yes, it's very obscure - but what it comes down to is the silly way the
-"ISA" IO is handled on the platform (which depends whether it's an 8-bit
-or 16-bit ISA-style peripheral.)  The old IDE CS driver _could_ be bent
-to work via a patch like this:
+$ cat /sys/class/rtc/rtc0/time
+[   25.924594] exynos5-hsi2c 12e10000.i2c: rx timeout
+[   65.028365] max77686-rtc max77802-rtc: Fail to read time reg(-22)
+cat: /sys/class/rtc/rtc0/time: Invalid argument
 
-ARM: EBSA110: Enable 16-bit IO type for ide-iops
+The Exynos5422 manual states clearly that most I2C_TRANS_STATUS reg bits
+(including TRANSFER_DONE_AUTO) are cleared after the register is read. So
+reading has side effects and should only be done if HSI2C_INT_I2C was set.
 
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index 047a20780fc1..2eb501d6b5fe 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -217,7 +217,8 @@ ifeq ($(CONFIG_ARCH_EBSA110),y)
- # This is what happens if you forget the IOCS16 line.
- # PCMCIA cards stop working.
- CFLAGS_3c589_cs.o :=-DISA_SIXTEEN_BIT_PERIPHERAL
--export CFLAGS_3c589_cs.o
-+CFLAGS_ide-io-std.o :=-DISA_SIXTEEN_BIT_PERIPHERAL
-+export CFLAGS_3c589_cs.o CFLAGS_ide-io-std.o
- endif
+Fixes: 7999eecb7e56 ("i2c: exynos5: fix arbitration lost handling")
+Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
 
- # The byte offset of the kernel image in RAM from the start of RAM.
+---
 
-but the PATA driver is much harder.
+ drivers/i2c/busses/i2c-exynos5.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-That said, the EBSA110 is now a prime museum piece, and towards the
-end of the time I was using it, the kernel was becoming more and more
-inefficient on the hardware - as in, it appeared it could route
-network packets _or_ run userspace, but not both, even with drivers
-converted to NAPI.
-
+diff --git a/drivers/i2c/busses/i2c-exynos5.c b/drivers/i2c/busses/i2c-exynos5.c
+index cbd93ce0661f..736a82472101 100644
+--- a/drivers/i2c/busses/i2c-exynos5.c
++++ b/drivers/i2c/busses/i2c-exynos5.c
+@@ -457,7 +457,6 @@ static irqreturn_t exynos5_i2c_irq(int irqno, void *dev_id)
+ 
+ 	int_status = readl(i2c->regs + HSI2C_INT_STATUS);
+ 	writel(int_status, i2c->regs + HSI2C_INT_STATUS);
+-	trans_status = readl(i2c->regs + HSI2C_TRANS_STATUS);
+ 
+ 	/* handle interrupt related to the transfer status */
+ 	if (i2c->variant->hw == HSI2C_EXYNOS7) {
+@@ -482,11 +481,13 @@ static irqreturn_t exynos5_i2c_irq(int irqno, void *dev_id)
+ 			goto stop;
+ 		}
+ 
++		trans_status = readl(i2c->regs + HSI2C_TRANS_STATUS);
+ 		if ((trans_status & HSI2C_MASTER_ST_MASK) == HSI2C_MASTER_ST_LOSE) {
+ 			i2c->state = -EAGAIN;
+ 			goto stop;
+ 		}
+ 	} else if (int_status & HSI2C_INT_I2C) {
++		trans_status = readl(i2c->regs + HSI2C_TRANS_STATUS);
+ 		if (trans_status & HSI2C_NO_DEV_ACK) {
+ 			dev_dbg(i2c->dev, "No ACK from device\n");
+ 			i2c->state = -ENXIO;
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+2.9.3
