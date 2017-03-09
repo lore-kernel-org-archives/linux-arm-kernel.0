@@ -1,45 +1,105 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 9 Mar 2017 20:05:46 +0300
-Subject: [PATCH 1/3] ata: add Palmchip BK3710 PATA controller driver
-In-Reply-To: <1489064496-6270-2-git-send-email-b.zolnierkie@samsung.com>
-References: <1489064496-6270-1-git-send-email-b.zolnierkie@samsung.com>
- <CGME20170309130216epcas5p276d211cfa5ed9f87b11a73ebe6fcdc7c@epcas5p2.samsung.com>
- <1489064496-6270-2-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <38ee4af3-b2cf-e9a8-1339-d7d904b7dc15@cogentembedded.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 9 Mar 2017 17:05:53 +0000
+Subject: [PATCH v2 4/4] arm64/syscalls: Specific usage of
+ verify_pre_usermode_state
+In-Reply-To: <CAJcbSZEBu1KnXc-aROvp+EbLpDSAcJV8PUCmNj05OCOtCfSqfA@mail.gmail.com>
+References: <20170309012456.5631-1-thgarnie@google.com>
+ <20170309012456.5631-4-thgarnie@google.com>
+ <20170309122354.GB6320@leverpostej>
+ <CAJcbSZGCFhUx79=bMkOxDRvbfuHmVBWU02HBgEU9T2s7mTChAw@mail.gmail.com>
+ <20170309162613.GN21222@n2100.armlinux.org.uk>
+ <CAJcbSZEBu1KnXc-aROvp+EbLpDSAcJV8PUCmNj05OCOtCfSqfA@mail.gmail.com>
+Message-ID: <20170309170553.GO21222@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/09/2017 04:01 PM, Bartlomiej Zolnierkiewicz wrote:
+On Thu, Mar 09, 2017 at 08:35:30AM -0800, Thomas Garnier wrote:
+> On Thu, Mar 9, 2017 at 8:26 AM, Russell King - ARM Linux
+> <linux@armlinux.org.uk> wrote:
+> > I wouldn't call what you've done on ARM an "optimisation", because my
+> > comment about making the fast path worthless still stands.
+> 
+> Why does it still stands on the latest proposal?
 
-> Add Palmchip BK3710 PATA controller driver.
->
-> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> ---
->  drivers/ata/Kconfig       |   9 ++
->  drivers/ata/Makefile      |   1 +
->  drivers/ata/pata_bk3710.c | 395 ++++++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 405 insertions(+)
->  create mode 100644 drivers/ata/pata_bk3710.c
->
-> diff --git a/drivers/ata/Kconfig b/drivers/ata/Kconfig
-> index 7e0fc98..c23ee65 100644
-> --- a/drivers/ata/Kconfig
-> +++ b/drivers/ata/Kconfig
-> @@ -509,6 +509,15 @@ config PATA_BF54X
->
->  	  If unsure, say N.
->
-> +config PATA_BK3710
-> +	tristate "Palmchip BK3710 PATA support"
-> +	depends on ARCH_DAVINCI
-> +	help
-> +	  This option enables support for the integrated IDE controller on
-> +	  the TI DaVinci SoC.
+It's still having to needlessly save stuff when there's nothing wrong.
+Remember, syscalls are a fast path, so the minimum we can do is good.
+Calling into C functions is not ideal, because they will tend to be
+_very_ expensive compared to hand crafted assembly, especially for
+something like this.
 
-    Strictly speaking, Palmchip BK3710 is Mentor Graphics' IDE core, used on 
-the original DaVinci's. Mentor's documentation was never publicly available 
-though...
+It's possible to check the address limit in just three instructions,
+which is way less than will be incurred by calling a C function.
 
-[...]
+Note: This patch is completely untested.
 
-MBR, Sergei
+ arch/arm/kernel/entry-common.S | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
+
+diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
+index eb5cd77bf1d8..6b43c6d73117 100644
+--- a/arch/arm/kernel/entry-common.S
++++ b/arch/arm/kernel/entry-common.S
+@@ -41,8 +41,11 @@
+  UNWIND(.cantunwind	)
+ 	disable_irq_notrace			@ disable interrupts
+ 	ldr	r1, [tsk, #TI_FLAGS]		@ re-check for syscall tracing
++	ldr	r2, [tsk, #TI_ADDR_LIMIT]
+ 	tst	r1, #_TIF_SYSCALL_WORK | _TIF_WORK_MASK
+ 	bne	fast_work_pending
++	cmp	r2, #TASK_SIZE
++	blgt	addr_limit_fail
+ 
+ 	/* perform architecture specific actions before user return */
+ 	arch_ret_to_user r1, lr
+@@ -67,6 +70,7 @@ ENDPROC(ret_fast_syscall)
+ 	str	r0, [sp, #S_R0 + S_OFF]!	@ save returned r0
+ 	disable_irq_notrace			@ disable interrupts
+ 	ldr	r1, [tsk, #TI_FLAGS]		@ re-check for syscall tracing
++	ldr	r2, [tsk, #TI_ADDR_LIMIT]
+ 	tst	r1, #_TIF_SYSCALL_WORK | _TIF_WORK_MASK
+ 	beq	no_work_pending
+  UNWIND(.fnend		)
+@@ -82,6 +86,7 @@ ENDPROC(ret_fast_syscall)
+ 	mov	r2, why				@ 'syscall'
+ 	bl	do_work_pending
+ 	cmp	r0, #0
++	ldreq	r2, [tsk, #TI_ADDR_LIMIT]
+ 	beq	no_work_pending
+ 	movlt	scno, #(__NR_restart_syscall - __NR_SYSCALL_BASE)
+ 	ldmia	sp, {r0 - r6}			@ have to reload r0 - r6
+@@ -99,9 +104,12 @@ ENTRY(ret_to_user)
+ 	disable_irq_notrace			@ disable interrupts
+ ENTRY(ret_to_user_from_irq)
+ 	ldr	r1, [tsk, #TI_FLAGS]
++	ldr	r2, [tsk, #TI_ADDR_LIMIT]
+ 	tst	r1, #_TIF_WORK_MASK
+ 	bne	slow_work_pending
+ no_work_pending:
++	cmp	r2, #TASK_SIZE
++	blgt	addr_limit_fail
+ 	asm_trace_hardirqs_on save = 0
+ 
+ 	/* perform architecture specific actions before user return */
+@@ -125,6 +133,16 @@ ENTRY(ret_from_fork)
+ 	b	ret_slow_syscall
+ ENDPROC(ret_from_fork)
+ 
++addr_limit_fail:
++#ifdef CONFIG_BUG_ON_DATA_CORRUPTION
++	stmfd	sp!, {r0, lr}
++	bl	verify_pre_usermode_state
++	ldmfd	sp!, {r0, lr}
++#endif
++	mov	r2, #TASK_SIZE
++	str	r2, [tsk, #TI_ADDR_LIMIT]
++	ret	lr
++
+ /*=============================================================================
+  * SWI handler
+  *-----------------------------------------------------------------------------
+
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
