@@ -1,81 +1,101 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu,  9 Mar 2017 18:05:27 +0800
-Subject: [PATCH 04/11] drm/sun4i: tv: Get tcon and backend pointers from
- associated crtc
+Date: Thu,  9 Mar 2017 18:05:24 +0800
+Subject: [PATCH 01/11] drm/sun4i: Fix TCON clock and regmap initialization
+ sequence
 In-Reply-To: <20170309100534.14023-1-wens@csie.org>
 References: <20170309100534.14023-1-wens@csie.org>
-Message-ID: <20170309100534.14023-5-wens@csie.org>
+Message-ID: <20170309100534.14023-2-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The drm_encoder structure provides us with a pointer to the crtc
-currently tied to the encoder. Subsequently we can extract the
-tcon and backend pointers from our crtc structure, instead of
-getting it directly from the sun4i_drv structure.
+The TCON driver calls sun4i_tcon_init_regmap and sun4i_tcon_init_clocks
+in its bind function. The former creates a regmap and writes to several
+register to clear its configuration to a known default. The latter
+initializes various clocks. This includes enabling the bus clock for
+register access and creating the dotclock.
 
+In order for the first step's writes to work, the bus clock must be
+enabled which is done in the second step. but the dotclock's ops use
+the regmap created in the first step.
+
+Rearrange the function calls such that the clocks are initialized before
+the regmap, and split out the dot clock creation to after the regmap is
+initialized.
+
+Fixes: 9026e0d122ac ("drm: Add Allwinner A10 Display Engine support")
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- drivers/gpu/drm/sun4i/sun4i_tv.c | 19 +++++++++++--------
- 1 file changed, 11 insertions(+), 8 deletions(-)
+ drivers/gpu/drm/sun4i/sun4i_tcon.c | 22 +++++++++++++++-------
+ 1 file changed, 15 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_tv.c b/drivers/gpu/drm/sun4i/sun4i_tv.c
-index 32ed5fdf0c4d..49c49431a053 100644
---- a/drivers/gpu/drm/sun4i/sun4i_tv.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_tv.c
-@@ -23,6 +23,7 @@
- #include <drm/drm_panel.h>
+diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+index 505520baa585..ee51d7e77a6a 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
++++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+@@ -335,12 +335,11 @@ static int sun4i_tcon_init_clocks(struct device *dev,
+ 		}
+ 	}
  
- #include "sun4i_backend.h"
-+#include "sun4i_crtc.h"
- #include "sun4i_drv.h"
- #include "sun4i_tcon.h"
- 
-@@ -350,8 +351,9 @@ static int sun4i_tv_atomic_check(struct drm_encoder *encoder,
- static void sun4i_tv_disable(struct drm_encoder *encoder)
- {
- 	struct sun4i_tv *tv = drm_encoder_to_sun4i_tv(encoder);
--	struct sun4i_drv *drv = tv->drv;
--	struct sun4i_tcon *tcon = drv->tcon;
-+	struct sun4i_crtc *crtc = drm_crtc_to_sun4i_crtc(encoder->crtc);
-+	struct sun4i_tcon *tcon = crtc->tcon;
-+	struct sun4i_backend *backend = crtc->backend;
- 
- 	DRM_DEBUG_DRIVER("Disabling the TV Output\n");
- 
-@@ -360,18 +362,19 @@ static void sun4i_tv_disable(struct drm_encoder *encoder)
- 	regmap_update_bits(tv->regs, SUN4I_TVE_EN_REG,
- 			   SUN4I_TVE_EN_ENABLE,
- 			   0);
--	sun4i_backend_disable_color_correction(drv->backend);
-+	sun4i_backend_disable_color_correction(backend);
+-	return sun4i_dclk_create(dev, tcon);
++	return 0;
  }
  
- static void sun4i_tv_enable(struct drm_encoder *encoder)
+ static void sun4i_tcon_free_clocks(struct sun4i_tcon *tcon)
  {
- 	struct sun4i_tv *tv = drm_encoder_to_sun4i_tv(encoder);
--	struct sun4i_drv *drv = tv->drv;
--	struct sun4i_tcon *tcon = drv->tcon;
-+	struct sun4i_crtc *crtc = drm_crtc_to_sun4i_crtc(encoder->crtc);
-+	struct sun4i_tcon *tcon = crtc->tcon;
-+	struct sun4i_backend *backend = crtc->backend;
+-	sun4i_dclk_free(tcon);
+ 	clk_disable_unprepare(tcon->clk);
+ }
  
- 	DRM_DEBUG_DRIVER("Enabling the TV Output\n");
+@@ -505,22 +504,28 @@ static int sun4i_tcon_bind(struct device *dev, struct device *master,
+ 		return ret;
+ 	}
  
--	sun4i_backend_apply_color_correction(drv->backend);
-+	sun4i_backend_apply_color_correction(backend);
++	ret = sun4i_tcon_init_clocks(dev, tcon);
++	if (ret) {
++		dev_err(dev, "Couldn't init our TCON clocks\n");
++		goto err_assert_reset;
++	}
++
+ 	ret = sun4i_tcon_init_regmap(dev, tcon);
+ 	if (ret) {
+ 		dev_err(dev, "Couldn't init our TCON regmap\n");
+-		goto err_assert_reset;
++		goto err_free_clocks;
+ 	}
  
- 	regmap_update_bits(tv->regs, SUN4I_TVE_EN_REG,
- 			   SUN4I_TVE_EN_ENABLE,
-@@ -385,8 +388,8 @@ static void sun4i_tv_mode_set(struct drm_encoder *encoder,
- 			      struct drm_display_mode *adjusted_mode)
+-	ret = sun4i_tcon_init_clocks(dev, tcon);
++	ret = sun4i_dclk_create(dev, tcon);
+ 	if (ret) {
+-		dev_err(dev, "Couldn't init our TCON clocks\n");
+-		goto err_assert_reset;
++		dev_err(dev, "Couldn't create our TCON dot clock\n");
++		goto err_free_clocks;
+ 	}
+ 
+ 	ret = sun4i_tcon_init_irq(dev, tcon);
+ 	if (ret) {
+ 		dev_err(dev, "Couldn't init our TCON interrupts\n");
+-		goto err_free_clocks;
++		goto err_free_dotclock;
+ 	}
+ 
+ 	tcon->crtc = sun4i_crtc_init(drm);
+@@ -536,6 +541,8 @@ static int sun4i_tcon_bind(struct device *dev, struct device *master,
+ 
+ 	return 0;
+ 
++err_free_dotclock:
++	sun4i_dclk_free(tcon);
+ err_free_clocks:
+ 	sun4i_tcon_free_clocks(tcon);
+ err_assert_reset:
+@@ -548,6 +555,7 @@ static void sun4i_tcon_unbind(struct device *dev, struct device *master,
  {
- 	struct sun4i_tv *tv = drm_encoder_to_sun4i_tv(encoder);
--	struct sun4i_drv *drv = tv->drv;
--	struct sun4i_tcon *tcon = drv->tcon;
-+	struct sun4i_crtc *crtc = drm_crtc_to_sun4i_crtc(encoder->crtc);
-+	struct sun4i_tcon *tcon = crtc->tcon;
- 	const struct tv_mode *tv_mode = sun4i_tv_find_tv_by_mode(mode);
+ 	struct sun4i_tcon *tcon = dev_get_drvdata(dev);
  
- 	sun4i_tcon1_mode_set(tcon, mode);
++	sun4i_dclk_free(tcon);
+ 	sun4i_tcon_free_clocks(tcon);
+ }
+ 
 -- 
 2.11.0
