@@ -1,242 +1,159 @@
 From: sricharan@codeaurora.org (Sricharan R)
-Date: Thu,  9 Mar 2017 21:05:46 +0530
-Subject: [PATCH V3 3/5] drivers: arm-smmu: Add clock support for QCOM_SMMUV2
+Date: Thu,  9 Mar 2017 21:05:47 +0530
+Subject: [PATCH V3 4/5] iommu/arm-smmu: Invoke pm_runtime during probe,
+ add/remove device
 In-Reply-To: <1489073748-3659-1-git-send-email-sricharan@codeaurora.org>
 References: <1489073748-3659-1-git-send-email-sricharan@codeaurora.org>
-Message-ID: <1489073748-3659-4-git-send-email-sricharan@codeaurora.org>
+Message-ID: <1489073748-3659-5-git-send-email-sricharan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The QCOM_SMMUV2 is an implementation of the arm,smmu-v2 architecture.
-The qcom,smmu is instantiated for each of the multimedia cores (for eg)
-Venus (video encoder/decoder), mdp (display) etc, and they are connected
-to the Multimedia Aggregator Interconnect (MMAGIC). So the access to
-any of the MMU's registers, as well as MMU's downstream bus access,
-requires the specified MMAGIC clocks to be enabled. So adding a new
-binding for the qcom,smmu-v2 and the required mmagic clock bindings for
-the same. Also adding the support for enabling the qcom,smmu-v2 clocks in
-the driver.
-
-               -------------  ---------
-               |   VENUS   |  | MDP   |
-	       |	   |  |       |
-	       -------------  --------
-		     |           |
-		     |           |
-                  ------      ---------
-                  |SMMU |     | SMMU  |
-                  |	|     |       |
-                  ------      --------
-		    |            |
-		    |            |
-       -----------------------------------------
-       |	MMAGIC INTERCONNECT (MMSS NOC) |
-       |                                       |
-       -----------------------------------------
-                   |                 |
-		   |           ----------------------------------
-                 -----         | 	SYSTEM NOC		|
-                 |DDR|	       |				|
-                 -----         ---------------------------------
-		   |		    |
-                   |               ------
-		   |<-------------| CPU|
-				  ------
+The smmu device probe/remove and add/remove master device callbacks
+gets called when the smmu is not linked to its master, that is without
+the context of the master device. So calling runtime apis in those places
+separately.
 
 Signed-off-by: Sricharan R <sricharan@codeaurora.org>
 ---
- .../devicetree/bindings/iommu/arm,smmu.txt         |   8 ++
- drivers/iommu/arm-smmu.c                           | 124 +++++++++++++++++++++
- 2 files changed, 132 insertions(+)
+ drivers/iommu/arm-smmu.c | 47 +++++++++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 45 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu.txt b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-index b369c13..88e02d6 100644
---- a/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-+++ b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-@@ -17,6 +17,7 @@ conditions.
-                         "arm,mmu-401"
-                         "arm,mmu-500"
-                         "cavium,smmu-v2"
-+			"qcom,smmu-v2"
- 
-                   depending on the particular implementation and/or the
-                   version of the architecture implemented.
-@@ -74,6 +75,13 @@ conditions.
-                   "cfg_clk" is optional if required to access the TCU's programming
-                   interface, apart from the "tcu_clk".
- 
-+		  Should have "mmagic_ahb_clk", "mmagic_cfg_ahb_clk",
-+                              "smmu_core_ahb_clk", "smmu_core_axi_clk",
-+                              "mmagic_core_axi_clk" for "qcom,smmu-v2"
-+
-+		  "mmagic_core_axi_clk" is required for smmu's access to the
-+                   downstream bus and rest for the smmu's register group access.
-+
- - clocks:         Phandles for respective clocks described by clock-names.
- 
- - power-domains:  Phandles to SMMU's power domain specifier. This is
 diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index 720a1ef..f29e28bf 100644
+index f29e28bf..6370421 100644
 --- a/drivers/iommu/arm-smmu.c
 +++ b/drivers/iommu/arm-smmu.c
-@@ -309,6 +309,7 @@ enum arm_smmu_implementation {
- 	GENERIC_SMMU,
- 	ARM_MMU500,
- 	CAVIUM_SMMUV2,
-+	QCOM_SMMUV2,
- };
+@@ -1216,11 +1216,16 @@ static void arm_smmu_destroy_domain_context(struct iommu_domain *domain)
+ 	struct arm_smmu_device *smmu = smmu_domain->smmu;
+ 	struct arm_smmu_cfg *cfg = &smmu_domain->cfg;
+ 	void __iomem *cb_base;
++	unsigned long ret;
+ 	int irq;
  
- struct arm_smmu_s2cr {
-@@ -341,6 +342,14 @@ struct arm_smmu_master_cfg {
- #define for_each_cfg_sme(fw, i, idx) \
- 	for (i = 0; idx = fwspec_smendx(fw, i), i < fw->num_ids; ++i)
+ 	if (!smmu)
+ 		return;
  
-+struct qcom_smmu_clk {
-+	struct clk *mmagic_ahb_clk;
-+	struct clk *mmagic_cfg_ahb_clk;
-+	struct clk *smmu_core_ahb_clk;
-+	struct clk *smmu_core_axi_clk;
-+	struct clk *mmagic_core_axi_clk;
-+};
++	ret = pm_runtime_get_sync(smmu->dev);
++	if (IS_ERR_VALUE(ret))
++		dev_warn(smmu->dev, "runtime resume failed");
 +
- struct mmu500_clk {
- 	struct clk *cfg_clk;
- 	struct clk *tcu_clk;
-@@ -547,6 +556,117 @@ static int mmu500_init_clocks(struct arm_smmu_device *smmu)
+ 	/*
+ 	 * Disable the context bank and free the page tables before freeing
+ 	 * it.
+@@ -1235,6 +1240,10 @@ static void arm_smmu_destroy_domain_context(struct iommu_domain *domain)
+ 
+ 	free_io_pgtable_ops(smmu_domain->pgtbl_ops);
+ 	__arm_smmu_free_bitmap(smmu->context_map, cfg->cbndx);
++
++	ret = pm_runtime_put_sync(smmu->dev);
++	if (IS_ERR_VALUE(ret))
++		dev_warn(smmu->dev, "runtime suspend failed");
+ }
+ 
+ static struct iommu_domain *arm_smmu_domain_alloc(unsigned type)
+@@ -1663,6 +1672,7 @@ static int arm_smmu_add_device(struct device *dev)
+ 	struct arm_smmu_master_cfg *cfg;
+ 	struct iommu_fwspec *fwspec = dev->iommu_fwspec;
+ 	int i, ret;
++	unsigned long err;
+ 
+ 	if (using_legacy_binding) {
+ 		ret = arm_smmu_register_legacy_master(dev, &smmu);
+@@ -1703,12 +1713,20 @@ static int arm_smmu_add_device(struct device *dev)
+ 	while (i--)
+ 		cfg->smendx[i] = INVALID_SMENDX;
+ 
++	err = pm_runtime_get_sync(smmu->dev);
++	if (IS_ERR_VALUE(err))
++		goto out_free;
++
+ 	ret = arm_smmu_master_alloc_smes(dev);
+ 	if (ret)
+ 		goto out_free;
+ 
+ 	iommu_device_link(&smmu->iommu, dev);
+ 
++	err = pm_runtime_put_sync(smmu->dev);
++	if (IS_ERR_VALUE(err))
++		goto out_free;
++
+ 	return 0;
+ 
+ out_free:
+@@ -1723,7 +1741,7 @@ static void arm_smmu_remove_device(struct device *dev)
+ 	struct iommu_fwspec *fwspec = dev->iommu_fwspec;
+ 	struct arm_smmu_master_cfg *cfg;
+ 	struct arm_smmu_device *smmu;
+-
++	unsigned long ret;
+ 
+ 	if (!fwspec || fwspec->ops != &arm_smmu_ops)
+ 		return;
+@@ -1731,8 +1749,23 @@ static void arm_smmu_remove_device(struct device *dev)
+ 	cfg  = fwspec->iommu_priv;
+ 	smmu = cfg->smmu;
+ 
++	/*
++	 * The device link between the master device and
++	 * smmu is already purged at this point.
++	 * So enable the power to smmu explicitly.
++	 */
++
++	ret = pm_runtime_get_sync(smmu->dev);
++	if (IS_ERR_VALUE(ret))
++		dev_warn(smmu->dev, "runtime resume failed");
++
+ 	iommu_device_unlink(&smmu->iommu, dev);
+ 	arm_smmu_master_free_smes(fwspec);
++
++	ret = pm_runtime_put_sync(smmu->dev);
++	if (IS_ERR_VALUE(ret))
++		dev_warn(smmu->dev, "runtime suspend failed");
++
+ 	iommu_group_remove_device(dev);
+ 	kfree(fwspec->iommu_priv);
+ 	iommu_fwspec_free(dev);
+@@ -2316,6 +2349,7 @@ static int arm_smmu_device_probe(struct platform_device *pdev)
+ 	struct arm_smmu_device *smmu;
+ 	struct device *dev = &pdev->dev;
+ 	int num_irqs, i, err;
++	unsigned long ret;
+ 
+ 	smmu = devm_kzalloc(dev, sizeof(*smmu), GFP_KERNEL);
+ 	if (!smmu) {
+@@ -2375,7 +2409,12 @@ static int arm_smmu_device_probe(struct platform_device *pdev)
+ 			return err;
+ 	}
+ 
++	platform_set_drvdata(pdev, smmu);
+ 	pm_runtime_enable(dev);
++	ret = pm_runtime_get_sync(dev);
++	if (IS_ERR_VALUE(ret))
++		return ret;
++
+ 	err = arm_smmu_device_cfg_probe(smmu);
+ 	if (err)
+ 		return err;
+@@ -2417,9 +2456,11 @@ static int arm_smmu_device_probe(struct platform_device *pdev)
+ 		return err;
+ 	}
+ 
+-	platform_set_drvdata(pdev, smmu);
+ 	arm_smmu_device_reset(smmu);
+ 	arm_smmu_test_smr_masks(smmu);
++	ret = pm_runtime_put_sync(dev);
++	if (IS_ERR_VALUE(ret))
++		return err;
+ 
+ 	/* Oh, for a proper bus abstraction */
+ 	if (!iommu_present(&platform_bus_type))
+@@ -2449,6 +2490,8 @@ static int arm_smmu_device_remove(struct platform_device *pdev)
+ 
+ 	/* Turn the thing off */
+ 	writel(sCR0_CLIENTPD, ARM_SMMU_GR0_NS(smmu) + ARM_SMMU_GR0_sCR0);
++	pm_runtime_force_suspend(smmu->dev);
++
  	return 0;
  }
  
-+static int qcom_smmu_init_clocks(struct arm_smmu_device *smmu)
-+{
-+	struct device *dev = smmu->dev;
-+	struct qcom_smmu_clk *sclks;
-+
-+	if (!of_find_property(dev->of_node, "clocks", NULL))
-+		return 0;
-+
-+	sclks = devm_kzalloc(dev, sizeof(*sclks), GFP_KERNEL);
-+	if (!sclks)
-+		return -ENOMEM;
-+
-+	sclks->mmagic_ahb_clk = devm_clk_get(dev, "mmagic_ahb_clk");
-+	if (IS_ERR(sclks->mmagic_ahb_clk)) {
-+		dev_err(dev, "Couldn't get mmagic_ahb_clk");
-+		return PTR_ERR(sclks->mmagic_ahb_clk);
-+	}
-+
-+	sclks->mmagic_cfg_ahb_clk = devm_clk_get(dev, "mmagic_cfg_ahb_clk");
-+	if (IS_ERR(sclks->mmagic_cfg_ahb_clk)) {
-+		dev_err(dev, "Couldn't get mmagic_cfg_ahb_clk");
-+		return PTR_ERR(sclks->mmagic_cfg_ahb_clk);
-+	}
-+
-+	sclks->smmu_core_ahb_clk = devm_clk_get(dev, "smmu_core_ahb_clk");
-+	if (IS_ERR(sclks->smmu_core_ahb_clk)) {
-+		dev_err(dev, "Couldn't get smmu_core_ahb_clk");
-+		return PTR_ERR(sclks->smmu_core_ahb_clk);
-+	}
-+
-+	sclks->smmu_core_axi_clk = devm_clk_get(dev, "smmu_core_axi_clk");
-+	if (IS_ERR(sclks->smmu_core_axi_clk)) {
-+		dev_err(dev, "Couldn't get smmu_core_axi_clk");
-+		return PTR_ERR(sclks->smmu_core_axi_clk);
-+	}
-+
-+	sclks->mmagic_core_axi_clk = devm_clk_get(dev, "mmagic_core_axi_clk");
-+	if (IS_ERR(sclks->mmagic_core_axi_clk)) {
-+		dev_err(dev, "Couldn't get mmagic_core_axi_clk");
-+		return PTR_ERR(sclks->mmagic_core_axi_clk);
-+	}
-+
-+	smmu->smmu_clks.clks = sclks;
-+	return 0;
-+}
-+
-+static int qcom_smmu_enable_clocks(struct arm_smmu_device *smmu)
-+{
-+	int ret = 0;
-+	struct qcom_smmu_clk *sclks = smmu->smmu_clks.clks;
-+
-+	if (!sclks)
-+		return 0;
-+
-+	ret = clk_prepare_enable(sclks->mmagic_ahb_clk);
-+	if (ret) {
-+		dev_err(smmu->dev, "Couldn't enable mmagic_ahb_clk");
-+		goto ahb_clk_fail;
-+	}
-+
-+	ret = clk_prepare_enable(sclks->mmagic_cfg_ahb_clk);
-+	if (ret) {
-+		dev_err(smmu->dev, "Couln't enable mmagic_cfg_ahb_clk");
-+		goto cfg_ahb_clk_fail;
-+	}
-+
-+	ret = clk_prepare_enable(sclks->smmu_core_ahb_clk);
-+	if (ret) {
-+		dev_err(smmu->dev, "Couln't enable smmu_core_ahb_clk");
-+		goto core_ahb_clk_fail;
-+	}
-+
-+	ret = clk_prepare_enable(sclks->smmu_core_axi_clk);
-+	if (ret) {
-+		dev_err(smmu->dev, "Couln't enable smmu_core_axi_clk");
-+		goto smmu_core_axi_clk_fail;
-+	}
-+
-+	ret = clk_prepare_enable(sclks->mmagic_core_axi_clk);
-+	if (ret) {
-+		dev_err(smmu->dev, "Couln't enable mmagic_core_axi_clk");
-+		goto core_axi_clk_fail;
-+	}
-+
-+	return 0;
-+
-+core_axi_clk_fail:
-+	clk_disable_unprepare(sclks->smmu_core_axi_clk);
-+smmu_core_axi_clk_fail:
-+	clk_disable_unprepare(sclks->smmu_core_ahb_clk);
-+core_ahb_clk_fail:
-+	clk_disable_unprepare(sclks->mmagic_cfg_ahb_clk);
-+cfg_ahb_clk_fail:
-+	clk_disable_unprepare(sclks->mmagic_ahb_clk);
-+ahb_clk_fail:
-+	return ret;
-+}
-+
-+static void qcom_smmu_disable_clocks(struct arm_smmu_device *smmu)
-+{
-+	struct qcom_smmu_clk *sclks = smmu->smmu_clks.clks;
-+
-+	if (!sclks) {
-+		clk_disable_unprepare(sclks->mmagic_core_axi_clk);
-+		clk_disable_unprepare(sclks->smmu_core_axi_clk);
-+		clk_disable_unprepare(sclks->smmu_core_ahb_clk);
-+		clk_disable_unprepare(sclks->mmagic_cfg_ahb_clk);
-+		clk_disable_unprepare(sclks->mmagic_ahb_clk);
-+	}
-+}
-+
- static void parse_driver_options(struct arm_smmu_device *smmu)
- {
- 	int i = 0;
-@@ -2077,6 +2197,9 @@ struct arm_smmu_match_data {
- 		    mmu500_enable_clocks, mmu500_disable_clocks);
- ARM_SMMU_MATCH_DATA(cavium_smmuv2, ARM_SMMU_V2, CAVIUM_SMMUV2,
- 		    NULL, NULL, NULL);
-+ARM_SMMU_MATCH_DATA(qcom_smmuv2, ARM_SMMU_V2, QCOM_SMMUV2,
-+		    qcom_smmu_init_clocks, qcom_smmu_enable_clocks,
-+		    qcom_smmu_disable_clocks);
- 
- static const struct of_device_id arm_smmu_of_match[] = {
- 	{ .compatible = "arm,smmu-v1", .data = &smmu_generic_v1 },
-@@ -2085,6 +2208,7 @@ struct arm_smmu_match_data {
- 	{ .compatible = "arm,mmu-401", .data = &arm_mmu401 },
- 	{ .compatible = "arm,mmu-500", .data = &arm_mmu500 },
- 	{ .compatible = "cavium,smmu-v2", .data = &cavium_smmuv2 },
-+	{ .compatible = "qcom,smmu-v2", .data = &qcom_smmuv2 },
- 	{ },
- };
- MODULE_DEVICE_TABLE(of, arm_smmu_of_match);
 -- 
 QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
