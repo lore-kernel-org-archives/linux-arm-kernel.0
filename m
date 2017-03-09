@@ -1,9 +1,9 @@
 From: j-keerthy@ti.com (Keerthy)
-Date: Thu, 9 Mar 2017 13:35:56 +0530
-Subject: [PATCH v2 2/8] ARM: DRA7: Thermal: Add slope and offset values
+Date: Thu, 9 Mar 2017 13:35:59 +0530
+Subject: [PATCH v2 5/8] ARM: OMAP4460: Thermal: Add slope and offset values
 In-Reply-To: <1489046762-11288-1-git-send-email-j-keerthy@ti.com>
 References: <1489046762-11288-1-git-send-email-j-keerthy@ti.com>
-Message-ID: <1489046762-11288-3-git-send-email-j-keerthy@ti.com>
+Message-ID: <1489046762-11288-6-git-send-email-j-keerthy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,36 +14,21 @@ while of node parsing.
 
 Signed-off-by: Keerthy <j-keerthy@ti.com>
 ---
- arch/arm/boot/dts/dra7.dtsi | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+ arch/arm/boot/dts/omap4460.dtsi | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-index 2c9e56f..10e09dc 100644
---- a/arch/arm/boot/dts/dra7.dtsi
-+++ b/arch/arm/boot/dts/dra7.dtsi
-@@ -1982,6 +1982,23 @@
+diff --git a/arch/arm/boot/dts/omap4460.dtsi b/arch/arm/boot/dts/omap4460.dtsi
+index ef66e12..c43f2a2 100644
+--- a/arch/arm/boot/dts/omap4460.dtsi
++++ b/arch/arm/boot/dts/omap4460.dtsi
+@@ -90,4 +90,8 @@
  
- &cpu_thermal {
- 	polling-delay = <500>; /* milliseconds */
-+	coefficients = <0 2000>;
-+};
-+
-+&gpu_thermal {
-+	coefficients = <0 2000>;
-+};
-+
-+&core_thermal {
-+	coefficients = <0 2000>;
-+};
-+
-+&dspeve_thermal {
-+	coefficients = <0 2000>;
-+};
-+
-+&iva_thermal {
-+	coefficients = <0 2000>;
  };
  
- /include/ "dra7xx-clocks.dtsi"
++&cpu_thermal {
++	coefficients = <348 (-9301)>;
++};
++
+ /include/ "omap446x-clocks.dtsi"
 -- 
 1.9.1
