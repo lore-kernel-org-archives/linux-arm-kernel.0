@@ -1,48 +1,109 @@
 From: j-keerthy@ti.com (Keerthy)
-Date: Thu, 9 Mar 2017 13:35:54 +0530
-Subject: [PATCH v2 0/8] thermal: ti-soc-thermal: Migrate slope/offset data to
- device tree
-Message-ID: <1489046762-11288-1-git-send-email-j-keerthy@ti.com>
+Date: Thu, 9 Mar 2017 13:35:55 +0530
+Subject: [PATCH v2 1/8] arm: dts: omap3: Add cpu_thermal zone
+In-Reply-To: <1489046762-11288-1-git-send-email-j-keerthy@ti.com>
+References: <1489046762-11288-1-git-send-email-j-keerthy@ti.com>
+Message-ID: <1489046762-11288-2-git-send-email-j-keerthy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently the slope and offset values for calculating the
-hot spot temperature of a particular thermal zone is part
-of driver data. Pass them here instead and obtain the values
-while of node parsing.
+Add cpu_thermal zone.
 
-Tested for the slope and constant values on DRA7-EVM, OMAP3-BEAGLE. 
-
-Changes in v2:
-
-  * Added OMAP3 changes along with DRA7/OMAP4/OMAP5.
-
-Keerthy (8):
-  arm: dts: omap3: Add cpu_thermal zone
-  ARM: DRA7: Thermal: Add slope and offset values
-  ARM: OMAP5: Thermal: Add slope and offset values
-  ARM: OMAP443x: Thermal: Add slope and offset values
-  ARM: OMAP4460: Thermal: Add slope and offset values
-  thermal: ti-soc-thermal: Fetch slope and offset from DT
-  thermal: ti-soc-thermal: Remove redundant constants
-  thermal: ti-soc-thermal: Remove redundant code
-
- arch/arm/boot/dts/dra7.dtsi                        |  17 +++
- arch/arm/boot/dts/omap3-cpu-thermal.dtsi           |  20 +++
- arch/arm/boot/dts/omap34xx.dtsi                    |   8 +-
- arch/arm/boot/dts/omap36xx.dtsi                    |   8 +-
- arch/arm/boot/dts/omap443x.dtsi                    |   4 +
- arch/arm/boot/dts/omap4460.dtsi                    |   4 +
- arch/arm/boot/dts/omap5.dtsi                       |   9 ++
- .../thermal/ti-soc-thermal/dra752-thermal-data.c   |  10 --
- .../thermal/ti-soc-thermal/omap3-thermal-data.c    |   4 -
- .../thermal/ti-soc-thermal/omap4-thermal-data.c    |   6 -
- .../thermal/ti-soc-thermal/omap5-thermal-data.c    |   4 -
- drivers/thermal/ti-soc-thermal/ti-bandgap.h        |   4 -
- drivers/thermal/ti-soc-thermal/ti-thermal-common.c | 158 +--------------------
- drivers/thermal/ti-soc-thermal/ti-thermal.h        |  16 ---
- 14 files changed, 71 insertions(+), 201 deletions(-)
+Signed-off-by: Keerthy <j-keerthy@ti.com>
+---
+ arch/arm/boot/dts/omap3-cpu-thermal.dtsi | 20 ++++++++++++++++++++
+ arch/arm/boot/dts/omap34xx.dtsi          |  8 ++++++--
+ arch/arm/boot/dts/omap36xx.dtsi          |  8 ++++++--
+ 3 files changed, 32 insertions(+), 4 deletions(-)
  create mode 100644 arch/arm/boot/dts/omap3-cpu-thermal.dtsi
 
+diff --git a/arch/arm/boot/dts/omap3-cpu-thermal.dtsi b/arch/arm/boot/dts/omap3-cpu-thermal.dtsi
+new file mode 100644
+index 0000000..8dc3aa5
+--- /dev/null
++++ b/arch/arm/boot/dts/omap3-cpu-thermal.dtsi
+@@ -0,0 +1,20 @@
++/*
++ * Device Tree Source for OMAP3 SoC CPU thermal
++ *
++ * Copyright (C) 2017 Texas Instruments Incorporated - http://www.ti.com/
++ *
++ * This file is licensed under the terms of the GNU General Public License
++ * version 2.  This program is licensed "as is" without any warranty of any
++ * kind, whether express or implied.
++ */
++
++#include <dt-bindings/thermal/thermal.h>
++
++cpu_thermal: cpu_thermal {
++	polling-delay-passive = <250>; /* milliseconds */
++	polling-delay = <1000>; /* milliseconds */
++	coefficients = <0 20000>;
++
++			/* sensor       ID */
++	thermal-sensors = <&bandgap     0>;
++};
+diff --git a/arch/arm/boot/dts/omap34xx.dtsi b/arch/arm/boot/dts/omap34xx.dtsi
+index 834fdf1..ac4f879 100644
+--- a/arch/arm/boot/dts/omap34xx.dtsi
++++ b/arch/arm/boot/dts/omap34xx.dtsi
+@@ -14,7 +14,7 @@
+ 
+ / {
+ 	cpus {
+-		cpu at 0 {
++		cpu: cpu at 0 {
+ 			/* OMAP343x/OMAP35xx variants OPP1-5 */
+ 			operating-points = <
+ 				/* kHz    uV */
+@@ -56,12 +56,16 @@
+ 			};
+ 		};
+ 
+-		bandgap at 48002524 {
++		bandgap: bandgap@48002524 {
+ 			reg = <0x48002524 0x4>;
+ 			compatible = "ti,omap34xx-bandgap";
+ 			#thermal-sensor-cells = <0>;
+ 		};
+ 	};
++
++	thermal_zones: thermal-zones {
++		#include "omap3-cpu-thermal.dtsi"
++	};
+ };
+ 
+ &ssi {
+diff --git a/arch/arm/boot/dts/omap36xx.dtsi b/arch/arm/boot/dts/omap36xx.dtsi
+index d1a3e56..ade31d7 100644
+--- a/arch/arm/boot/dts/omap36xx.dtsi
++++ b/arch/arm/boot/dts/omap36xx.dtsi
+@@ -19,7 +19,7 @@
+ 
+ 	cpus {
+ 		/* OMAP3630/OMAP37xx 'standard device' variants OPP50 to OPP130 */
+-		cpu at 0 {
++		cpu: cpu at 0 {
+ 			operating-points = <
+ 				/* kHz    uV */
+ 				300000  1012500
+@@ -88,12 +88,16 @@
+ 			};
+ 		};
+ 
+-		bandgap at 48002524 {
++		bandgap: bandgap@48002524 {
+ 			reg = <0x48002524 0x4>;
+ 			compatible = "ti,omap36xx-bandgap";
+ 			#thermal-sensor-cells = <0>;
+ 		};
+ 	};
++
++	thermal_zones: thermal-zones {
++		#include "omap3-cpu-thermal.dtsi"
++	};
+ };
+ 
+ /* OMAP3630 needs dss_96m_fck for VENC */
 -- 
 1.9.1
