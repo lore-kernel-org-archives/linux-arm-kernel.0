@@ -1,62 +1,81 @@
-From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
-Date: Thu, 9 Mar 2017 11:00:39 +0100
-Subject: [RFC PATCH 00/12] Ion cleanup in preparation for moving out of
- staging
-In-Reply-To: <20170306160437.sf7bksorlnw7u372@phenom.ffwll.local>
-References: <1488491084-17252-1-git-send-email-labbott@redhat.com>
- <20170303132949.GC31582@dhcp22.suse.cz>
- <cf383b9b-3cbc-0092-a071-f120874c053c@redhat.com>
- <20170306074258.GA27953@dhcp22.suse.cz>
- <20170306104041.zghsicrnadoap7lp@phenom.ffwll.local>
- <20170306105805.jsq44kfxhsvazkm6@sirena.org.uk>
- <20170306160437.sf7bksorlnw7u372@phenom.ffwll.local>
-Message-ID: <CA+M3ks77Am3Fx-ZNmgeM5tCqdM7SzV7rby4Es-p2F2aOhUco9g@mail.gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu,  9 Mar 2017 18:05:27 +0800
+Subject: [PATCH 04/11] drm/sun4i: tv: Get tcon and backend pointers from
+ associated crtc
+In-Reply-To: <20170309100534.14023-1-wens@csie.org>
+References: <20170309100534.14023-1-wens@csie.org>
+Message-ID: <20170309100534.14023-5-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-03-06 17:04 GMT+01:00 Daniel Vetter <daniel@ffwll.ch>:
-> On Mon, Mar 06, 2017 at 11:58:05AM +0100, Mark Brown wrote:
->> On Mon, Mar 06, 2017 at 11:40:41AM +0100, Daniel Vetter wrote:
->>
->> > No one gave a thing about android in upstream, so Greg KH just dumped it
->> > all into staging/android/. We've discussed ION a bunch of times, recorded
->> > anything we'd like to fix in staging/android/TODO, and Laura's patch
->> > series here addresses a big chunk of that.
->>
->> > This is pretty much the same approach we (gpu folks) used to de-stage the
->> > syncpt stuff.
->>
->> Well, there's also the fact that quite a few people have issues with the
->> design (like Laurent).  It seems like a lot of them have either got more
->> comfortable with it over time, or at least not managed to come up with
->> any better ideas in the meantime.
->
-> See the TODO, it has everything a really big group (look at the patch for
-> the full Cc: list) figured needs to be improved at LPC 2015. We don't just
-> merge stuff because merging stuff is fun :-)
->
-> Laurent was even in that group ...
-> -Daniel
+The drm_encoder structure provides us with a pointer to the crtc
+currently tied to the encoder. Subsequently we can extract the
+tcon and backend pointers from our crtc structure, instead of
+getting it directly from the sun4i_drv structure.
 
-For me those patches are going in the right direction.
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ drivers/gpu/drm/sun4i/sun4i_tv.c | 19 +++++++++++--------
+ 1 file changed, 11 insertions(+), 8 deletions(-)
 
-I still have few questions:
-- since alignment management has been remove from ion-core, should it
-be also removed from ioctl structure ?
-- can you we ride off ion_handle (at least in userland) and only
-export a dma-buf descriptor ?
-
-In the future how can we add new heaps ?
-Some platforms have very specific memory allocation
-requirements (just have a look in the number of gem custom allocator in drm)
-Do you plan to add heap type/mask for each ?
-
-Benjamin
-
-> --
-> Daniel Vetter
-> Software Engineer, Intel Corporation
-> http://blog.ffwll.ch
-
-
-Follow Linaro: Facebook | Twitter | Blog
+diff --git a/drivers/gpu/drm/sun4i/sun4i_tv.c b/drivers/gpu/drm/sun4i/sun4i_tv.c
+index 32ed5fdf0c4d..49c49431a053 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_tv.c
++++ b/drivers/gpu/drm/sun4i/sun4i_tv.c
+@@ -23,6 +23,7 @@
+ #include <drm/drm_panel.h>
+ 
+ #include "sun4i_backend.h"
++#include "sun4i_crtc.h"
+ #include "sun4i_drv.h"
+ #include "sun4i_tcon.h"
+ 
+@@ -350,8 +351,9 @@ static int sun4i_tv_atomic_check(struct drm_encoder *encoder,
+ static void sun4i_tv_disable(struct drm_encoder *encoder)
+ {
+ 	struct sun4i_tv *tv = drm_encoder_to_sun4i_tv(encoder);
+-	struct sun4i_drv *drv = tv->drv;
+-	struct sun4i_tcon *tcon = drv->tcon;
++	struct sun4i_crtc *crtc = drm_crtc_to_sun4i_crtc(encoder->crtc);
++	struct sun4i_tcon *tcon = crtc->tcon;
++	struct sun4i_backend *backend = crtc->backend;
+ 
+ 	DRM_DEBUG_DRIVER("Disabling the TV Output\n");
+ 
+@@ -360,18 +362,19 @@ static void sun4i_tv_disable(struct drm_encoder *encoder)
+ 	regmap_update_bits(tv->regs, SUN4I_TVE_EN_REG,
+ 			   SUN4I_TVE_EN_ENABLE,
+ 			   0);
+-	sun4i_backend_disable_color_correction(drv->backend);
++	sun4i_backend_disable_color_correction(backend);
+ }
+ 
+ static void sun4i_tv_enable(struct drm_encoder *encoder)
+ {
+ 	struct sun4i_tv *tv = drm_encoder_to_sun4i_tv(encoder);
+-	struct sun4i_drv *drv = tv->drv;
+-	struct sun4i_tcon *tcon = drv->tcon;
++	struct sun4i_crtc *crtc = drm_crtc_to_sun4i_crtc(encoder->crtc);
++	struct sun4i_tcon *tcon = crtc->tcon;
++	struct sun4i_backend *backend = crtc->backend;
+ 
+ 	DRM_DEBUG_DRIVER("Enabling the TV Output\n");
+ 
+-	sun4i_backend_apply_color_correction(drv->backend);
++	sun4i_backend_apply_color_correction(backend);
+ 
+ 	regmap_update_bits(tv->regs, SUN4I_TVE_EN_REG,
+ 			   SUN4I_TVE_EN_ENABLE,
+@@ -385,8 +388,8 @@ static void sun4i_tv_mode_set(struct drm_encoder *encoder,
+ 			      struct drm_display_mode *adjusted_mode)
+ {
+ 	struct sun4i_tv *tv = drm_encoder_to_sun4i_tv(encoder);
+-	struct sun4i_drv *drv = tv->drv;
+-	struct sun4i_tcon *tcon = drv->tcon;
++	struct sun4i_crtc *crtc = drm_crtc_to_sun4i_crtc(encoder->crtc);
++	struct sun4i_tcon *tcon = crtc->tcon;
+ 	const struct tv_mode *tv_mode = sun4i_tv_find_tv_by_mode(mode);
+ 
+ 	sun4i_tcon1_mode_set(tcon, mode);
+-- 
+2.11.0
