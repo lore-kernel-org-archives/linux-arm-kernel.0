@@ -1,617 +1,253 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 9 Mar 2017 13:27:14 +0530
-Subject: [PATCH v3 03/23] PCI: endpoint: Introduce configfs entry for
- configuring EP functions
+Date: Thu, 9 Mar 2017 13:27:13 +0530
+Subject: [PATCH v3 02/23] Documentation: PCI: Guide to use PCI Endpoint Core
+ Layer
 In-Reply-To: <1489046254-19919-1-git-send-email-kishon@ti.com>
 References: <1489046254-19919-1-git-send-email-kishon@ti.com>
-Message-ID: <1489046254-19919-4-git-send-email-kishon@ti.com>
+Message-ID: <1489046254-19919-3-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce a new configfs entry to configure the EP function (like
-configuring the standard configuration header entries) and to
-bind the EP function with EP controller.
+Add Documentation to help users use endpoint library to enable endpoint
+mode in the PCI controller and add new PCI endpoint functions.
 
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- drivers/pci/endpoint/Kconfig      |    9 +
- drivers/pci/endpoint/Makefile     |    1 +
- drivers/pci/endpoint/pci-ep-cfs.c |  509 +++++++++++++++++++++++++++++++++++++
- include/linux/pci-ep-cfs.h        |   41 +++
- 4 files changed, 560 insertions(+)
- create mode 100644 drivers/pci/endpoint/pci-ep-cfs.c
- create mode 100644 include/linux/pci-ep-cfs.h
+ Documentation/PCI/00-INDEX                  |    2 +
+ Documentation/PCI/endpoint/pci-endpoint.txt |  215 +++++++++++++++++++++++++++
+ 2 files changed, 217 insertions(+)
+ create mode 100644 Documentation/PCI/endpoint/pci-endpoint.txt
 
-diff --git a/drivers/pci/endpoint/Kconfig b/drivers/pci/endpoint/Kconfig
-index a5442ac..c86bca9 100644
---- a/drivers/pci/endpoint/Kconfig
-+++ b/drivers/pci/endpoint/Kconfig
-@@ -17,4 +17,13 @@ config PCI_ENDPOINT
- 
- 	   If in doubt, say "N" to disable Endpoint support.
- 
-+config PCI_ENDPOINT_CONFIGFS
-+	bool "PCI Endpoint Configfs Support"
-+	depends on PCI_ENDPOINT
-+	select CONFIGFS_FS
-+	help
-+	   This will enable the configfs entry that can be used to
-+	   configure the endpoint function and used to bind the
-+	   function with a endpoint controller.
-+
- endmenu
-diff --git a/drivers/pci/endpoint/Makefile b/drivers/pci/endpoint/Makefile
-index dc1bc16..7219d51 100644
---- a/drivers/pci/endpoint/Makefile
-+++ b/drivers/pci/endpoint/Makefile
-@@ -2,5 +2,6 @@
- # Makefile for PCI Endpoint Support
- #
- 
-+obj-$(CONFIG_PCI_ENDPOINT_CONFIGFS)	+= pci-ep-cfs.o
- obj-$(CONFIG_PCI_ENDPOINT)		+= pci-epc-core.o pci-epf-core.o\
- 					   pci-epc-mem.o
-diff --git a/drivers/pci/endpoint/pci-ep-cfs.c b/drivers/pci/endpoint/pci-ep-cfs.c
+diff --git a/Documentation/PCI/00-INDEX b/Documentation/PCI/00-INDEX
+index 147231f..ba950b2 100644
+--- a/Documentation/PCI/00-INDEX
++++ b/Documentation/PCI/00-INDEX
+@@ -12,3 +12,5 @@ pci.txt
+ 	- info on the PCI subsystem for device driver authors
+ pcieaer-howto.txt
+ 	- the PCI Express Advanced Error Reporting Driver Guide HOWTO
++endpoint/pci-endpoint.txt
++	- guide to add endpoint controller driver and endpoint function driver.
+diff --git a/Documentation/PCI/endpoint/pci-endpoint.txt b/Documentation/PCI/endpoint/pci-endpoint.txt
 new file mode 100644
-index 0000000..424fdd6
+index 0000000..4a3e438
 --- /dev/null
-+++ b/drivers/pci/endpoint/pci-ep-cfs.c
-@@ -0,0 +1,509 @@
-+/**
-+ * configfs to configure the PCI endpoint
-+ *
-+ * Copyright (C) 2017 Texas Instruments
-+ * Author: Kishon Vijay Abraham I <kishon@ti.com>
-+ *
-+ * This program is free software: you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 of
-+ * the License as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#include <linux/module.h>
-+#include <linux/slab.h>
-+
-+#include <linux/pci-epc.h>
-+#include <linux/pci-epf.h>
-+#include <linux/pci-ep-cfs.h>
-+
-+static struct config_group *functions_group;
-+static struct config_group *controllers_group;
-+
-+struct pci_epf_group {
-+	struct config_group group;
-+	struct pci_epf *epf;
-+};
-+
-+struct pci_epc_group {
-+	struct config_group group;
-+	struct pci_epc *epc;
-+	bool start;
-+	unsigned long function_num_map;
-+};
-+
-+static inline struct pci_epf_group *to_pci_epf_group(struct config_item *item)
-+{
-+	return container_of(to_config_group(item), struct pci_epf_group, group);
-+}
-+
-+static inline struct pci_epc_group *to_pci_epc_group(struct config_item *item)
-+{
-+	return container_of(to_config_group(item), struct pci_epc_group, group);
-+}
-+
-+static ssize_t pci_epc_start_store(struct config_item *item, const char *page,
-+				   size_t len)
-+{
-+	int ret;
-+	bool start;
-+	struct pci_epc *epc;
-+	struct pci_epc_group *epc_group = to_pci_epc_group(item);
-+
-+	epc = epc_group->epc;
-+
-+	ret = kstrtobool(page, &start);
-+	if (ret)
-+		return ret;
-+
-+	if (!start) {
-+		pci_epc_stop(epc);
-+		return len;
-+	}
-+
-+	ret = pci_epc_start(epc);
-+	if (ret) {
-+		dev_err(&epc->dev, "failed to start endpoint controller\n");
-+		return -EINVAL;
-+	}
-+
-+	epc_group->start = start;
-+
-+	return len;
-+}
-+
-+static ssize_t pci_epc_start_show(struct config_item *item, char *page)
-+{
-+	return sprintf(page, "%d\n",
-+		       to_pci_epc_group(item)->start);
-+}
-+
-+CONFIGFS_ATTR(pci_epc_, start);
-+
-+static struct configfs_attribute *pci_epc_attrs[] = {
-+	&pci_epc_attr_start,
-+	NULL,
-+};
-+
-+static int pci_epc_epf_link(struct config_item *epc_item,
-+			    struct config_item *epf_item)
-+{
-+	int ret;
-+	u32 func_no = 0;
-+	struct pci_epc *epc;
-+	struct pci_epf *epf;
-+	struct pci_epf_group *epf_group = to_pci_epf_group(epf_item);
-+	struct pci_epc_group *epc_group = to_pci_epc_group(epc_item);
-+
-+	epc = epc_group->epc;
-+	epf = epf_group->epf;
-+	ret = pci_epc_add_epf(epc, epf);
-+	if (ret)
-+		goto err_add_epf;
-+
-+	func_no = find_first_zero_bit(&epc_group->function_num_map,
-+				      sizeof(epc_group->function_num_map));
-+	set_bit(func_no, &epc_group->function_num_map);
-+	epf->func_no = func_no;
-+
-+	ret = pci_epf_bind(epf);
-+	if (ret)
-+		goto err_epf_bind;
-+
-+	return 0;
-+
-+err_epf_bind:
-+	pci_epc_remove_epf(epc, epf);
-+
-+err_add_epf:
-+	clear_bit(func_no, &epc_group->function_num_map);
-+
-+	return ret;
-+}
-+
-+static void pci_epc_epf_unlink(struct config_item *epc_item,
-+			       struct config_item *epf_item)
-+{
-+	struct pci_epc *epc;
-+	struct pci_epf *epf;
-+	struct pci_epf_group *epf_group = to_pci_epf_group(epf_item);
-+	struct pci_epc_group *epc_group = to_pci_epc_group(epc_item);
-+
-+	WARN_ON_ONCE(epc_group->start);
-+
-+	epc = epc_group->epc;
-+	epf = epf_group->epf;
-+	clear_bit(epf->func_no, &epc_group->function_num_map);
-+	pci_epf_unbind(epf);
-+	pci_epc_remove_epf(epc, epf);
-+}
-+
-+static struct configfs_item_operations pci_epc_item_ops = {
-+	.allow_link	= pci_epc_epf_link,
-+	.drop_link	= pci_epc_epf_unlink,
-+};
-+
-+static struct config_item_type pci_epc_type = {
-+	.ct_item_ops	= &pci_epc_item_ops,
-+	.ct_attrs	= pci_epc_attrs,
-+	.ct_owner	= THIS_MODULE,
-+};
-+
-+struct config_group *pci_ep_cfs_add_epc_group(const char *name)
-+{
-+	int ret;
-+	struct pci_epc *epc;
-+	struct config_group *group;
-+	struct pci_epc_group *epc_group;
-+
-+	epc_group = kzalloc(sizeof(*epc_group), GFP_KERNEL);
-+	if (!epc_group) {
-+		ret = -ENOMEM;
-+		goto err;
-+	}
-+
-+	group = &epc_group->group;
-+
-+	config_group_init_type_name(group, name, &pci_epc_type);
-+	ret = configfs_register_group(controllers_group, group);
-+	if (ret) {
-+		pr_err("failed to register configfs group for %s\n", name);
-+		goto err_register_group;
-+	}
-+
-+	epc = pci_epc_get(name);
-+	if (IS_ERR(epc)) {
-+		ret = PTR_ERR(epc);
-+		goto err_epc_get;
-+	}
-+
-+	epc_group->epc = epc;
-+
-+	return group;
-+
-+err_epc_get:
-+	configfs_unregister_group(group);
-+
-+err_register_group:
-+	kfree(epc_group);
-+
-+err:
-+	return ERR_PTR(ret);
-+}
-+EXPORT_SYMBOL(pci_ep_cfs_add_epc_group);
-+
-+void pci_ep_cfs_remove_epc_group(struct config_group *group)
-+{
-+	struct pci_epc_group *epc_group;
-+
-+	if (!group)
-+		return;
-+
-+	epc_group = container_of(group, struct pci_epc_group, group);
-+	pci_epc_put(epc_group->epc);
-+	configfs_unregister_group(&epc_group->group);
-+	kfree(epc_group);
-+}
-+EXPORT_SYMBOL(pci_ep_cfs_remove_epc_group);
-+
-+#define PCI_EPF_HEADER_R(_name)						       \
-+static ssize_t pci_epf_##_name##_show(struct config_item *item,	char *page)    \
-+{									       \
-+	struct pci_epf *epf = to_pci_epf_group(item)->epf;		       \
-+	if (WARN_ON_ONCE(!epf->header))					       \
-+		return -EINVAL;						       \
-+	return sprintf(page, "0x%04x\n", epf->header->_name);		       \
-+}
-+
-+#define PCI_EPF_HEADER_W_u32(_name)					       \
-+static ssize_t pci_epf_##_name##_store(struct config_item *item,	       \
-+				       const char *page, size_t len)	       \
-+{									       \
-+	u32 val;							       \
-+	int ret;							       \
-+	struct pci_epf *epf = to_pci_epf_group(item)->epf;		       \
-+	if (WARN_ON_ONCE(!epf->header))					       \
-+		return -EINVAL;						       \
-+	ret = kstrtou32(page, 0, &val);					       \
-+	if (ret)							       \
-+		return ret;						       \
-+	epf->header->_name = val;					       \
-+	return len;							       \
-+}
-+
-+#define PCI_EPF_HEADER_W_u16(_name)					       \
-+static ssize_t pci_epf_##_name##_store(struct config_item *item,	       \
-+				       const char *page, size_t len)	       \
-+{									       \
-+	u16 val;							       \
-+	int ret;							       \
-+	struct pci_epf *epf = to_pci_epf_group(item)->epf;		       \
-+	if (WARN_ON_ONCE(!epf->header))					       \
-+		return -EINVAL;						       \
-+	ret = kstrtou16(page, 0, &val);					       \
-+	if (ret)							       \
-+		return ret;						       \
-+	epf->header->_name = val;					       \
-+	return len;							       \
-+}
-+
-+#define PCI_EPF_HEADER_W_u8(_name)					       \
-+static ssize_t pci_epf_##_name##_store(struct config_item *item,	       \
-+				       const char *page, size_t len)	       \
-+{									       \
-+	u8 val;								       \
-+	int ret;							       \
-+	struct pci_epf *epf = to_pci_epf_group(item)->epf;		       \
-+	if (WARN_ON_ONCE(!epf->header))					       \
-+		return -EINVAL;						       \
-+	ret = kstrtou8(page, 0, &val);					       \
-+	if (ret)							       \
-+		return ret;						       \
-+	epf->header->_name = val;					       \
-+	return len;							       \
-+}
-+
-+static ssize_t pci_epf_msi_interrupts_store(struct config_item *item,
-+					    const char *page, size_t len)
-+{
-+	u8 val;
-+	int ret;
-+
-+	ret = kstrtou8(page, 0, &val);
-+	if (ret)
-+		return ret;
-+
-+	to_pci_epf_group(item)->epf->msi_interrupts = val;
-+
-+	return len;
-+}
-+
-+static ssize_t pci_epf_msi_interrupts_show(struct config_item *item,
-+					   char *page)
-+{
-+	return sprintf(page, "%d\n",
-+		       to_pci_epf_group(item)->epf->msi_interrupts);
-+}
-+
-+PCI_EPF_HEADER_R(vendorid)
-+PCI_EPF_HEADER_W_u16(vendorid)
-+
-+PCI_EPF_HEADER_R(deviceid)
-+PCI_EPF_HEADER_W_u16(deviceid)
-+
-+PCI_EPF_HEADER_R(revid)
-+PCI_EPF_HEADER_W_u8(revid)
-+
-+PCI_EPF_HEADER_R(progif_code)
-+PCI_EPF_HEADER_W_u8(progif_code)
-+
-+PCI_EPF_HEADER_R(subclass_code)
-+PCI_EPF_HEADER_W_u8(subclass_code)
-+
-+PCI_EPF_HEADER_R(baseclass_code)
-+PCI_EPF_HEADER_W_u8(baseclass_code)
-+
-+PCI_EPF_HEADER_R(cache_line_size)
-+PCI_EPF_HEADER_W_u8(cache_line_size)
-+
-+PCI_EPF_HEADER_R(subsys_vendor_id)
-+PCI_EPF_HEADER_W_u16(subsys_vendor_id)
-+
-+PCI_EPF_HEADER_R(subsys_id)
-+PCI_EPF_HEADER_W_u16(subsys_id)
-+
-+PCI_EPF_HEADER_R(interrupt_pin)
-+PCI_EPF_HEADER_W_u8(interrupt_pin)
-+
-+CONFIGFS_ATTR(pci_epf_, vendorid);
-+CONFIGFS_ATTR(pci_epf_, deviceid);
-+CONFIGFS_ATTR(pci_epf_, revid);
-+CONFIGFS_ATTR(pci_epf_, progif_code);
-+CONFIGFS_ATTR(pci_epf_, subclass_code);
-+CONFIGFS_ATTR(pci_epf_, baseclass_code);
-+CONFIGFS_ATTR(pci_epf_, cache_line_size);
-+CONFIGFS_ATTR(pci_epf_, subsys_vendor_id);
-+CONFIGFS_ATTR(pci_epf_, subsys_id);
-+CONFIGFS_ATTR(pci_epf_, interrupt_pin);
-+CONFIGFS_ATTR(pci_epf_, msi_interrupts);
-+
-+static struct configfs_attribute *pci_epf_attrs[] = {
-+	&pci_epf_attr_vendorid,
-+	&pci_epf_attr_deviceid,
-+	&pci_epf_attr_revid,
-+	&pci_epf_attr_progif_code,
-+	&pci_epf_attr_subclass_code,
-+	&pci_epf_attr_baseclass_code,
-+	&pci_epf_attr_cache_line_size,
-+	&pci_epf_attr_subsys_vendor_id,
-+	&pci_epf_attr_subsys_id,
-+	&pci_epf_attr_interrupt_pin,
-+	&pci_epf_attr_msi_interrupts,
-+	NULL,
-+};
-+
-+static void pci_epf_release(struct config_item *item)
-+{
-+	struct pci_epf_group *epf_group = to_pci_epf_group(item);
-+
-+	pci_epf_destroy(epf_group->epf);
-+	kfree(epf_group);
-+}
-+
-+static struct configfs_item_operations pci_epf_ops = {
-+	.release		= pci_epf_release,
-+};
-+
-+static struct config_item_type pci_epf_type = {
-+	.ct_item_ops	= &pci_epf_ops,
-+	.ct_attrs	= pci_epf_attrs,
-+	.ct_owner	= THIS_MODULE,
-+};
-+
-+static struct config_group *pci_epf_make(struct config_group *group,
-+					 const char *name)
-+{
-+	struct pci_epf_group *epf_group;
-+	struct pci_epf *epf;
-+
-+	epf_group = kzalloc(sizeof(*epf_group), GFP_KERNEL);
-+	if (!epf_group)
-+		return ERR_PTR(-ENOMEM);
-+
-+	config_group_init_type_name(&epf_group->group, name, &pci_epf_type);
-+
-+	epf = pci_epf_create(group->cg_item.ci_name);
-+	if (IS_ERR(epf)) {
-+		pr_err("failed to create endpoint function device\n");
-+		return ERR_PTR(-EINVAL);
-+	}
-+
-+	epf_group->epf = epf;
-+
-+	return &epf_group->group;
-+}
-+
-+static void pci_epf_drop(struct config_group *group, struct config_item *item)
-+{
-+	config_item_put(item);
-+}
-+
-+static struct configfs_group_operations pci_epf_group_ops = {
-+	.make_group     = &pci_epf_make,
-+	.drop_item      = &pci_epf_drop,
-+};
-+
-+static struct config_item_type pci_epf_group_type = {
-+	.ct_group_ops	= &pci_epf_group_ops,
-+	.ct_owner	= THIS_MODULE,
-+};
-+
-+struct config_group *pci_ep_cfs_add_epf_group(const char *name)
-+{
-+	struct config_group *group;
-+
-+	group = configfs_register_default_group(functions_group, name,
-+						&pci_epf_group_type);
-+	if (IS_ERR(group))
-+		pr_err("failed to register configfs group for %s function\n",
-+		       name);
-+
-+	return group;
-+}
-+EXPORT_SYMBOL(pci_ep_cfs_add_epf_group);
-+
-+void pci_ep_cfs_remove_epf_group(struct config_group *group)
-+{
-+	if (IS_ERR_OR_NULL(group))
-+		return;
-+
-+	configfs_unregister_default_group(group);
-+}
-+EXPORT_SYMBOL(pci_ep_cfs_remove_epf_group);
-+
-+static struct config_item_type pci_functions_type = {
-+	.ct_owner	= THIS_MODULE,
-+};
-+
-+static struct config_item_type pci_controllers_type = {
-+	.ct_owner	= THIS_MODULE,
-+};
-+
-+static struct config_item_type pci_ep_type = {
-+	.ct_owner	= THIS_MODULE,
-+};
-+
-+static struct configfs_subsystem pci_ep_cfs_subsys = {
-+	.su_group = {
-+		.cg_item = {
-+			.ci_namebuf = "pci_ep",
-+			.ci_type = &pci_ep_type,
-+		},
-+	},
-+	.su_mutex = __MUTEX_INITIALIZER(pci_ep_cfs_subsys.su_mutex),
-+};
-+
-+static int __init pci_ep_cfs_init(void)
-+{
-+	int ret;
-+	struct config_group *root = &pci_ep_cfs_subsys.su_group;
-+
-+	config_group_init(root);
-+
-+	ret = configfs_register_subsystem(&pci_ep_cfs_subsys);
-+	if (ret) {
-+		pr_err("Error %d while registering subsystem %s\n",
-+		       ret, root->cg_item.ci_namebuf);
-+		goto err;
-+	}
-+
-+	functions_group = configfs_register_default_group(root, "functions",
-+							  &pci_functions_type);
-+	if (IS_ERR(functions_group)) {
-+		ret = PTR_ERR(functions_group);
-+		pr_err("Error %d while registering functions group\n",
-+		       ret);
-+		goto err_functions_group;
-+	}
-+
-+	controllers_group =
-+		configfs_register_default_group(root, "controllers",
-+						&pci_controllers_type);
-+	if (IS_ERR(controllers_group)) {
-+		ret = PTR_ERR(controllers_group);
-+		pr_err("Error %d while registering controllers group\n",
-+		       ret);
-+		goto err_controllers_group;
-+	}
-+
-+	return 0;
-+
-+err_controllers_group:
-+	configfs_unregister_default_group(functions_group);
-+
-+err_functions_group:
-+	configfs_unregister_subsystem(&pci_ep_cfs_subsys);
-+
-+err:
-+	return ret;
-+}
-+module_init(pci_ep_cfs_init);
-+
-+static void __exit pci_ep_cfs_exit(void)
-+{
-+	configfs_unregister_default_group(controllers_group);
-+	configfs_unregister_default_group(functions_group);
-+	configfs_unregister_subsystem(&pci_ep_cfs_subsys);
-+}
-+module_exit(pci_ep_cfs_exit);
-+
-+MODULE_DESCRIPTION("PCI EP CONFIGFS");
-+MODULE_AUTHOR("Kishon Vijay Abraham I <kishon@ti.com>");
-+MODULE_LICENSE("GPL v2");
-diff --git a/include/linux/pci-ep-cfs.h b/include/linux/pci-ep-cfs.h
-new file mode 100644
-index 0000000..263b89e
---- /dev/null
-+++ b/include/linux/pci-ep-cfs.h
-@@ -0,0 +1,41 @@
-+/**
-+ * PCI Endpoint ConfigFS header file
-+ *
-+ * Copyright (C) 2017 Texas Instruments
-+ * Author: Kishon Vijay Abraham I <kishon@ti.com>
-+ *
-+ * This program is free software: you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 of
-+ * the License as published by the Free Software Foundation.
-+ */
-+
-+#ifndef __LINUX_PCI_EP_CFS_H
-+#define __LINUX_PCI_EP_CFS_H
-+
-+#include <linux/configfs.h>
-+
-+#ifdef CONFIG_PCI_ENDPOINT_CONFIGFS
-+struct config_group *pci_ep_cfs_add_epc_group(const char *name);
-+void pci_ep_cfs_remove_epc_group(struct config_group *group);
-+struct config_group *pci_ep_cfs_add_epf_group(const char *name);
-+void pci_ep_cfs_remove_epf_group(struct config_group *group);
-+#else
-+static inline struct config_group *pci_ep_cfs_add_epc_group(const char *name)
-+{
-+	return 0;
-+}
-+
-+static inline void pci_ep_cfs_remove_epc_group(struct config_group *group)
-+{
-+}
-+
-+static inline struct config_group *pci_ep_cfs_add_epf_group(const char *name)
-+{
-+	return 0;
-+}
-+
-+static inline void pci_ep_cfs_remove_epf_group(struct config_group *group)
-+{
-+}
-+#endif
-+#endif /* __LINUX_PCI_EP_CFS_H */
++++ b/Documentation/PCI/endpoint/pci-endpoint.txt
+@@ -0,0 +1,215 @@
++			    PCI ENDPOINT FRAMEWORK
++		    Kishon Vijay Abraham I <kishon@ti.com>
++
++This document is a guide to use the PCI Endpoint Framework in order to create
++endpoint controller driver, endpoint function driver and using configfs
++interface to bind the function driver to the controller driver.
++
++1. Introduction
++
++*Linux* has a comprehensive PCI subsystem to support PCI controllers that
++operates in Root Complex mode. The subsystem has capability to scan PCI bus,
++assign memory resources and irq resources, load PCI driver (based on
++vendorid, deviceid), support other services like hot-plug, power management,
++advanced error reporting and virtual channels.
++
++However PCI controller IPs integrated in certain SoC is capable of operating
++either in Root Complex mode or Endpoint mode. PCI Endpoint Framework will
++add endpoint mode support in *Linux*. This will help to run Linux in an
++EP system which can have a wide variety of use cases from testing or
++validation, co-processor accelerator etc..
++
++2. PCI Endpoint Core
++
++The PCI Endpoint Core layer comprises of 3 components: the Endpoint Controller
++library, the Endpoint Function library and the configfs layer to bind the
++endpoint function with the endpoint controller.
++
++2.1 PCI Endpoint Controller(EPC) Library
++
++The EPC library provides APIs to be used by the controller that can operate
++in endpoint mode. It also provides APIs to be used by function driver/library
++in order to implement a particular endpoint function.
++
++2.1.1 APIs for the PCI controller Driver
++
++This section lists the APIs that the PCI Endpoint core provides to be used
++by the PCI controller driver.
++
++*) devm_pci_epc_create()/pci_epc_create()
++
++   The PCI controller driver should implement the following ops:
++	 * write_header: ops to populate configuration space header
++	 * set_bar: ops to configure the BAR
++	 * clear_bar: ops to reset the BAR
++	 * alloc_addr_space: ops to allocate *in* PCI controller address space
++	 * free_addr_space: ops to free the allocated address space
++	 * raise_irq: ops to raise a legacy or MSI interrupt
++	 * start: ops to start the PCI link
++	 * stop: ops to stop the PCI link
++
++   The PCI controller driver can then create a new EPC device by invoking
++   devm_pci_epc_create/pci_epc_create.
++
++*) devm_pci_epc_destroy()/pci_epc_destroy()
++
++   The PCI controller driver can destroy the EPC device created by either
++   devm_pci_epc_create or pci_epc_create using devm_pci_epc_destroy() or
++   /pci_epc_destroy()
++
++*) pci_epc_linkup()
++
++   In order to notify all the function devices that the EPC device to which
++   they are linked has established a link with the host, the PCI controller
++   driver should invoke pci_epc_linkup().
++
++*) pci_epc_mem_init()
++
++   Initialize the pci_epc_mem structure used for allocating EPC addr space.
++
++*) pci_epc_mem_exit()
++
++   Cleanup the pci_epc_mem structure allocated during pci_epc_mem_init().
++
++2.1.2 APIs for the PCI Endpoint Function Driver
++
++This section lists the APIs that the PCI Endpoint core provides to be used
++by the PCI endpoint function driver.
++
++*) pci_epc_write_header()
++
++   The PCI endpoint function driver should use pci_epc_write_header() to
++   write the standard configuration header to the endpoint controller.
++
++*) pci_epc_set_bar()
++
++   The PCI endpoint function driver should use pci_epc_set_bar() to configure
++   the Base Address Register in order for the host to assign PCI addr space.
++   Register space of the function driver is usually configured
++   using this API.
++
++*) pci_epc_clear_bar()
++
++   The PCI endpoint function driver should use pci_epc_clear_bar() to reset
++   the BAR.
++
++*) pci_epc_raise_irq()
++
++   The PCI endpoint function driver should use pci_epc_raise_irq() to raise
++   Legacy Interrupt or MSI Interrupt.
++
++*) pci_epc_mem_alloc_addr()
++
++   The PCI endpoint function driver should use pci_epc_mem_alloc_addr(), to
++   allocate memory address from EPC addr space which is required to access
++   RC's buffer
++
++*) pci_epc_mem_free_addr()
++
++   The PCI endpoint function driver should use pci_epc_mem_free_addr() to
++   free the memory space allocated using pci_epc_mem_alloc_addr().
++
++2.1.3 Other APIs
++
++There are other APIs provided by the EPC library. These are used for binding
++the epf device with epc device. pci-ep-cfs.c can be used as reference for
++using these APIs.
++
++*) pci_epc_get()
++
++   Get a reference to the pci endpoint controller based on the device name of
++   the controller.
++
++*) pci_epc_put()
++
++   Release the reference to the pci endpoint controller obtained using
++   pci_epc_get()
++
++*) pci_epc_add_epf()
++
++   Add a pci endpoint function to a pci endpoint controller. A pcie device
++   can have upto 8 functions according to the specification.
++
++*) pci_epc_remove_epf()
++
++   Remove the pci endpoint function from pci endpoint controller.
++
++*) pci_epc_start()
++
++   The PCI endpoint function driver should invoke pci_epc_start() once it
++   has configured the endpoint function and wants to start the PCI link.
++
++*) pci_epc_stop()
++
++   The PCI endpoint function driver should invoke pci_epc_stop() to stop
++   the PCI LINK.
++
++2.2 PCI Endpoint Function(EPF) Library
++
++The EPF library provides APIs to be used by the function driver and the EPC
++library in order to provide endpoint mode functionality.
++
++2.2.1 APIs for the PCI Endpoint Function Driver
++
++This section lists the APIs that the PCI Endpoint core provides to be used
++by the PCI endpoint function driver.
++
++*) pci_epf_register_driver()
++
++   The PCI Endpoint Function driver should implement the following ops:
++	 * bind: ops to perform when a EPC device has been bound to EPF device
++	 * unbind: ops to perform when a binding has been lost between a EPC
++	   device and EPF device
++	 * linkup: ops to perform when the EPC device has established a
++	   connection with a host system
++
++  The PCI Function driver can then register the PCI EPF driver by using
++  pci_epf_register_driver().
++
++*) pci_epf_unregister_driver()
++
++  The PCI Function driver can unregister the PCI EPF driver by using
++  pci_epf_unregister_driver().
++
++*) pci_epf_alloc_space()
++
++  The PCI Function driver can allocate space for a particular BAR using
++  pci_epf_alloc_space().
++
++*) pci_epf_free_space()
++
++  The PCI Function driver can free the allocated space
++  (using pci_epf_alloc_space) by invoking pci_epf_free_space().
++
++2.2.2 APIs for the PCI Endpoint Controller Library
++This section lists the APIs that the PCI Endpoint core provides to be used
++by the PCI endpoint controller library.
++
++*) pci_epf_linkup()
++
++   The PCI endpoint controller library invokes pci_epf_linkup() when the
++   EPC device has established the connection to the host.
++
++2.2.2 Other APIs
++There are other APIs provided by the EPF library. These are used to notify
++the function driver when the EPF device is bound to the EPC device.
++pci-ep-cfs.c can be used as reference for using these APIs.
++
++*) pci_epf_create()
++
++   Create a new PCI EPF device by passing the name of the PCI EPF device.
++   This name will be used to bind the the EPF device to a EPF driver.
++
++*) pci_epf_destroy()
++
++   Destroy the created PCI EPF device.
++
++*) pci_epf_bind()
++
++   pci_epf_bind() should be invoked when the EPF device has been bound to
++   a EPC device.
++
++*) pci_epf_unbind()
++
++   pci_epf_unbind() should be invoked when the binding between EPC device
++   and EPF device is lost.
 -- 
 1.7.9.5
