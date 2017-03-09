@@ -1,82 +1,44 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Thu,  9 Mar 2017 15:52:45 +0100
-Subject: [PATCH 1/2] ARM64: dts: meson-gxbb-odroidc2: Add GPIO lines names
-In-Reply-To: <1489071166-11476-1-git-send-email-narmstrong@baylibre.com>
-References: <1489071166-11476-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1489071166-11476-2-git-send-email-narmstrong@baylibre.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 9 Mar 2017 15:55:39 +0100
+Subject: [linux-sunxi] Re: [PATCH 10/15] drm/sun4i: tcon: Switch mux on
+ only for composite
+In-Reply-To: <CAGb2v67XkaC2+AxubaUF9nPcoGZcAzny7LKVD6C+-9BM5Fi+9g@mail.gmail.com>
+References: <cover.bc06ffa88f847ddd9ddd7c259415d5f61b55307b.1488876832.git-series.maxime.ripard@free-electrons.com>
+ <3f70bcfe2ec03188c06d54a262d49ad91963a510.1488876832.git-series.maxime.ripard@free-electrons.com>
+ <CAGb2v67iTOV-=u5rReu6_wi6NFoCoJkbJKshTpmFYUmJ=ggKUw@mail.gmail.com>
+ <20170309105800.mnzhvnky6na7d5vn@lukather>
+ <CAGb2v67XkaC2+AxubaUF9nPcoGZcAzny7LKVD6C+-9BM5Fi+9g@mail.gmail.com>
+Message-ID: <20170309145539.43eequth2ej7wvqk@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch describes the GPIO lines usage on the Odroid-C2 board.
+On Thu, Mar 09, 2017 at 07:31:27PM +0800, Chen-Yu Tsai wrote:
+> >> Additionally, the mux registers are only valid in the first TCON, meaning
+> >> it must available be active in 2 pipeline chips. It's also why we'd pass
+> >> "struct drm_device *" instead of "struct sun4i_tcon *".
+> >
+> > Hmmmm. That's going to be tricky to support. Has this been confirmed
+> > somehow? Is the register used for something else on TCON1?
+> 
+> At this point, the only reference is Allwinner's kernel, and the old 3.4
+> kernel for A10/A20. I could try getting HDMI working on the A31 to get
+> some real results.
+> 
+> FWIW, the registers do not seem to be aliased across the two TCONs.
 
-This is useful in the debugfs gpio file and using the cdev gpio API.
+Then maybe we don't need to care, and we can just always write to the
+mux?
 
-Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
----
- .../arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts | 51 ++++++++++++++++++++++
- 1 file changed, 51 insertions(+)
+Maxime
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
-index c59403a..def5aed 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
-@@ -165,6 +165,57 @@
- 	};
- };
- 
-+&pinctrl_aobus {
-+	gpio-line-names = "UART TX", "UART RX", "VCCK En", "TF 3V3/1V8 En",
-+			  "USB HUB nRESET", "USB OTG Power En",
-+			  "J7 Header Pin2", "IR In", "J7 Header Pin4",
-+			  "J7 Header Pin6", "J7 Header Pin5", "J7 Header Pin7",
-+			  "HDMI CEC", "SYS LED";
-+};
-+
-+&pinctrl_periphs {
-+	gpio-line-names = /* Bank GPIOZ */
-+			  "Eth MDIO", "Eth MDC", "Eth RGMII RX Clk",
-+			  "Eth RX DV", "Eth RX D0", "Eth RX D1", "Eth RX D2",
-+			  "Eth RX D3", "Eth RGMII TX Clk", "Eth TX En",
-+			  "Eth TX D0", "Eth TX D1", "Eth TX D2", "Eth TX D3",
-+			  "Eth PHY nRESET", "Eth PHY Intc",
-+			  /* Bank GPIOH */
-+			  "HDMI HPD", "HDMI DDC SDA", "HDMI DDC SCL", "",
-+			  /* Bank BOOT */
-+			  "eMMC D0", "eMMC D1", "eMMC D2", "eMMC D3", "eMMC D4",
-+			  "eMMC D5", "eMMC D6", "eMMC D7", "eMMC Clk",
-+			  "eMMC Reset", "eMMC CMD",
-+			  "", "", "", "", "", "", "",
-+			  /* Bank CARD */
-+			  "SDCard D1", "SDCard D0", "SDCard CLK", "SDCard CMD",
-+			  "SDCard D3", "SDCard D2", "SDCard Det",
-+			  /* Bank GPIODV */
-+			  "", "", "", "", "", "", "", "", "", "", "", "", "",
-+			  "", "", "", "", "", "", "", "", "", "", "",
-+			  "I2C A SDA", "I2C A SCK", "I2C B SDA", "I2C B SCK",
-+			  "PWM D", "PWM B",
-+			  /* Bank GPIOY */
-+			  "Revision Bit0", "Revision Bit1", "",
-+			  "J2 Header Pin35", "", "", "", "J2 Header Pin36",
-+			  "J2 Header Pin31", "", "", "", "TF VDD En",
-+			  "J2 Header Pin32", "J2 Header Pin26", "", "",
-+			  /* Bank GPIOX */
-+			  "J2 Header Pin29", "J2 Header Pin24",
-+			  "J2 Header Pin23", "J2 Header Pin22",
-+			  "J2 Header Pin21", "J2 Header Pin18",
-+			  "J2 Header Pin33", "J2 Header Pin19",
-+			  "J2 Header Pin16", "J2 Header Pin15",
-+			  "J2 Header Pin12", "J2 Header Pin13",
-+			  "J2 Header Pin8", "J2 Header Pin10",
-+			  "", "", "", "", "",
-+			  "J2 Header Pin11", "", "J2 Header Pin7",
-+			  /* Bank GPIOCLK */
-+			  "", "", "", "",
-+			  /* GPIO_TEST_N */
-+			  "";
-+};
-+
- &ir {
- 	status = "okay";
- 	pinctrl-0 = <&remote_input_ao_pins>;
 -- 
-1.9.1
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170309/2f3b1816/attachment.sig>
