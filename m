@@ -1,83 +1,51 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 9 Mar 2017 13:27:31 +0530
-Subject: [PATCH v3 20/23] tools: PCI: Add sample test script to invoke pcitest
-In-Reply-To: <1489046254-19919-1-git-send-email-kishon@ti.com>
-References: <1489046254-19919-1-git-send-email-kishon@ti.com>
-Message-ID: <1489046254-19919-21-git-send-email-kishon@ti.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 09 Mar 2017 08:01:56 +0000
+Subject: [PATCH v4 0/4] KVM: arm64: Increase number of user memslots
+In-Reply-To: <1488953315-22375-1-git-send-email-linucherian@gmail.com>
+ (linucherian@gmail.com's message of "Wed, 8 Mar 2017 11:38:31 +0530")
+References: <1488953315-22375-1-git-send-email-linucherian@gmail.com>
+Message-ID: <87zigux4i3.fsf@on-the-bus.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a simple test script that invokes the pcitest userspace tool
-to perform all the PCI endpoint tests (BAR tests, interrupt tests,
-read tests, write tests and copy tests).
+On Wed, Mar 08 2017 at  6:08:31 am GMT, linucherian at gmail.com wrote:
+> From: Linu Cherian <linu.cherian@cavium.com>
+>
+> v3 -> v4:
+> - Add missing commit messages in patches 1 and 3
+>
+> v2 -> v3:
+> - Added documentation for KVM_CAP_NR_MEMSLOTS
+> - Removed KVM_PRIVATE_MEM_SLOTS which is unused
+> - KVM_USER_MEM_SLOTS changed to 512 from 508
+>  
+> v1 -> v2:
+> - Enabling KVM_CAP_NR_MEMSLOTS for arm/arm64 moved to separate patch.
+> - Updated commit message so that what is reported to userspace is explicit.
+>
+>
+> Linu Cherian (4):
+>   KVM: Add documentation for KVM_CAP_NR_MEMSLOTS
+>   KVM: arm/arm64: Enable KVM_CAP_NR_MEMSLOTS on arm/arm64
+>   KVM: arm/arm64: Remove KVM_PRIVATE_MEM_SLOTS definition that are
+>     unused
+>   KVM: arm64: Increase number of user memslots to 512
+>
+>  Documentation/virtual/kvm/api.txt | 4 ++++
+>  arch/arm/include/asm/kvm_host.h   | 1 -
+>  arch/arm/kvm/arm.c                | 3 +++
+>  arch/arm64/include/asm/kvm_host.h | 3 +--
+>  4 files changed, 8 insertions(+), 3 deletions(-)
 
-Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
----
- tools/pci/pcitest.sh |   56 ++++++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 56 insertions(+)
- create mode 100644 tools/pci/pcitest.sh
+For the whole series:
 
-diff --git a/tools/pci/pcitest.sh b/tools/pci/pcitest.sh
-new file mode 100644
-index 0000000..5442bbe
---- /dev/null
-+++ b/tools/pci/pcitest.sh
-@@ -0,0 +1,56 @@
-+#!/bin/sh
-+
-+echo "BAR tests"
-+echo
-+
-+bar=0
-+
-+while [ $bar -lt 6 ]
-+do
-+	pcitest -b $bar
-+	bar=`expr $bar + 1`
-+done
-+echo
-+
-+echo "Interrupt tests"
-+echo
-+
-+pcitest -l
-+msi=1
-+
-+while [ $msi -lt 33 ]
-+do
-+        pcitest -m $msi
-+        msi=`expr $msi + 1`
-+done
-+echo
-+
-+echo "Read Tests"
-+echo
-+
-+pcitest -r -s 1
-+pcitest -r -s 1024
-+pcitest -r -s 1025
-+pcitest -r -s 1024000
-+pcitest -r -s 1024001
-+echo
-+
-+echo "Write Tests"
-+echo
-+
-+pcitest -w -s 1
-+pcitest -w -s 1024
-+pcitest -w -s 1025
-+pcitest -w -s 1024000
-+pcitest -w -s 1024001
-+echo
-+
-+echo "Copy Tests"
-+echo
-+
-+pcitest -c -s 1
-+pcitest -c -s 1024
-+pcitest -c -s 1025
-+pcitest -c -s 1024000
-+pcitest -c -s 1024001
-+echo
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+
+Christoffer: if you're happy with this series, I'll take it as part of
+the next batch of fixes.
+
+Thanks,
+
+	M.
 -- 
-1.7.9.5
+Jazz is not dead, it just smell funny.
