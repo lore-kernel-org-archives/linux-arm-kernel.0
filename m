@@ -1,105 +1,68 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 9 Mar 2017 17:05:53 +0000
-Subject: [PATCH v2 4/4] arm64/syscalls: Specific usage of
- verify_pre_usermode_state
-In-Reply-To: <CAJcbSZEBu1KnXc-aROvp+EbLpDSAcJV8PUCmNj05OCOtCfSqfA@mail.gmail.com>
-References: <20170309012456.5631-1-thgarnie@google.com>
- <20170309012456.5631-4-thgarnie@google.com>
- <20170309122354.GB6320@leverpostej>
- <CAJcbSZGCFhUx79=bMkOxDRvbfuHmVBWU02HBgEU9T2s7mTChAw@mail.gmail.com>
- <20170309162613.GN21222@n2100.armlinux.org.uk>
- <CAJcbSZEBu1KnXc-aROvp+EbLpDSAcJV8PUCmNj05OCOtCfSqfA@mail.gmail.com>
-Message-ID: <20170309170553.GO21222@n2100.armlinux.org.uk>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu,  9 Mar 2017 17:07:13 +0000
+Subject: [PATCH 01/15] arm64: sysreg: sort by encoding
+In-Reply-To: <1489079247-31092-1-git-send-email-mark.rutland@arm.com>
+References: <1489079247-31092-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <1489079247-31092-2-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 09, 2017 at 08:35:30AM -0800, Thomas Garnier wrote:
-> On Thu, Mar 9, 2017 at 8:26 AM, Russell King - ARM Linux
-> <linux@armlinux.org.uk> wrote:
-> > I wouldn't call what you've done on ARM an "optimisation", because my
-> > comment about making the fast path worthless still stands.
-> 
-> Why does it still stands on the latest proposal?
+Out sysreg definitions are largely (but not entirely) in ascending order
+of op0:op1:CRn:CRm:op2.
 
-It's still having to needlessly save stuff when there's nothing wrong.
-Remember, syscalls are a fast path, so the minimum we can do is good.
-Calling into C functions is not ideal, because they will tend to be
-_very_ expensive compared to hand crafted assembly, especially for
-something like this.
+It would be preferable to enforce this sort, as this makes it easier to
+verify the set of encodings against documentation, and provides an
+obvious location for each addition in future, minimising conflicts.
 
-It's possible to check the address limit in just three instructions,
-which is way less than will be incurred by calling a C function.
+This patch enforces this order, by moving the few items that break it.
+There should be no functional change.
 
-Note: This patch is completely untested.
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/include/asm/sysreg.h | 17 +++++++++--------
+ 1 file changed, 9 insertions(+), 8 deletions(-)
 
- arch/arm/kernel/entry-common.S | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
-
-diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
-index eb5cd77bf1d8..6b43c6d73117 100644
---- a/arch/arm/kernel/entry-common.S
-+++ b/arch/arm/kernel/entry-common.S
-@@ -41,8 +41,11 @@
-  UNWIND(.cantunwind	)
- 	disable_irq_notrace			@ disable interrupts
- 	ldr	r1, [tsk, #TI_FLAGS]		@ re-check for syscall tracing
-+	ldr	r2, [tsk, #TI_ADDR_LIMIT]
- 	tst	r1, #_TIF_SYSCALL_WORK | _TIF_WORK_MASK
- 	bne	fast_work_pending
-+	cmp	r2, #TASK_SIZE
-+	blgt	addr_limit_fail
+diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+index ac24b6e..e6498ac 100644
+--- a/arch/arm64/include/asm/sysreg.h
++++ b/arch/arm64/include/asm/sysreg.h
+@@ -81,6 +81,14 @@
  
- 	/* perform architecture specific actions before user return */
- 	arch_ret_to_user r1, lr
-@@ -67,6 +70,7 @@ ENDPROC(ret_fast_syscall)
- 	str	r0, [sp, #S_R0 + S_OFF]!	@ save returned r0
- 	disable_irq_notrace			@ disable interrupts
- 	ldr	r1, [tsk, #TI_FLAGS]		@ re-check for syscall tracing
-+	ldr	r2, [tsk, #TI_ADDR_LIMIT]
- 	tst	r1, #_TIF_SYSCALL_WORK | _TIF_WORK_MASK
- 	beq	no_work_pending
-  UNWIND(.fnend		)
-@@ -82,6 +86,7 @@ ENDPROC(ret_fast_syscall)
- 	mov	r2, why				@ 'syscall'
- 	bl	do_work_pending
- 	cmp	r0, #0
-+	ldreq	r2, [tsk, #TI_ADDR_LIMIT]
- 	beq	no_work_pending
- 	movlt	scno, #(__NR_restart_syscall - __NR_SYSCALL_BASE)
- 	ldmia	sp, {r0 - r6}			@ have to reload r0 - r6
-@@ -99,9 +104,12 @@ ENTRY(ret_to_user)
- 	disable_irq_notrace			@ disable interrupts
- ENTRY(ret_to_user_from_irq)
- 	ldr	r1, [tsk, #TI_FLAGS]
-+	ldr	r2, [tsk, #TI_ADDR_LIMIT]
- 	tst	r1, #_TIF_WORK_MASK
- 	bne	slow_work_pending
- no_work_pending:
-+	cmp	r2, #TASK_SIZE
-+	blgt	addr_limit_fail
- 	asm_trace_hardirqs_on save = 0
+ #endif	/* CONFIG_BROKEN_GAS_INST */
  
- 	/* perform architecture specific actions before user return */
-@@ -125,6 +133,16 @@ ENTRY(ret_from_fork)
- 	b	ret_slow_syscall
- ENDPROC(ret_from_fork)
- 
-+addr_limit_fail:
-+#ifdef CONFIG_BUG_ON_DATA_CORRUPTION
-+	stmfd	sp!, {r0, lr}
-+	bl	verify_pre_usermode_state
-+	ldmfd	sp!, {r0, lr}
-+#endif
-+	mov	r2, #TASK_SIZE
-+	str	r2, [tsk, #TI_ADDR_LIMIT]
-+	ret	lr
++#define REG_PSTATE_PAN_IMM		sys_reg(0, 0, 4, 0, 4)
++#define REG_PSTATE_UAO_IMM		sys_reg(0, 0, 4, 0, 3)
 +
- /*=============================================================================
-  * SWI handler
-  *-----------------------------------------------------------------------------
-
-
++#define SET_PSTATE_PAN(x) __emit_inst(0xd5000000 | REG_PSTATE_PAN_IMM |	\
++				      (!!x)<<8 | 0x1f)
++#define SET_PSTATE_UAO(x) __emit_inst(0xd5000000 | REG_PSTATE_UAO_IMM |	\
++				      (!!x)<<8 | 0x1f)
++
+ #define SYS_MIDR_EL1			sys_reg(3, 0, 0, 0, 0)
+ #define SYS_MPIDR_EL1			sys_reg(3, 0, 0, 0, 5)
+ #define SYS_REVIDR_EL1			sys_reg(3, 0, 0, 0, 6)
+@@ -118,17 +126,10 @@
+ #define SYS_ID_AA64MMFR1_EL1		sys_reg(3, 0, 0, 7, 1)
+ #define SYS_ID_AA64MMFR2_EL1		sys_reg(3, 0, 0, 7, 2)
+ 
+-#define SYS_CNTFRQ_EL0			sys_reg(3, 3, 14, 0, 0)
+ #define SYS_CTR_EL0			sys_reg(3, 3, 0, 0, 1)
+ #define SYS_DCZID_EL0			sys_reg(3, 3, 0, 0, 7)
+ 
+-#define REG_PSTATE_PAN_IMM		sys_reg(0, 0, 4, 0, 4)
+-#define REG_PSTATE_UAO_IMM		sys_reg(0, 0, 4, 0, 3)
+-
+-#define SET_PSTATE_PAN(x) __emit_inst(0xd5000000 | REG_PSTATE_PAN_IMM |	\
+-				      (!!x)<<8 | 0x1f)
+-#define SET_PSTATE_UAO(x) __emit_inst(0xd5000000 | REG_PSTATE_UAO_IMM |	\
+-				      (!!x)<<8 | 0x1f)
++#define SYS_CNTFRQ_EL0			sys_reg(3, 3, 14, 0, 0)
+ 
+ /* Common SCTLR_ELx flags. */
+ #define SCTLR_ELx_EE    (1 << 25)
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+1.9.1
