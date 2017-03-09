@@ -1,57 +1,86 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 9 Mar 2017 17:27:12 +0530
-Subject: [RESEND PATCH] arm: assabet_defconfig: disable IDE subsystem
-In-Reply-To: <1821488.fi4Ak6Xj0W@amdc3058>
-References: <1467991490-24895-1-git-send-email-b.zolnierkie@samsung.com>
- <1fd840c5-b0bb-726b-6357-669977c4ae5f@ti.com>
- <a3161cfc-56f7-4577-c37f-3798cdb03713@ti.com>
- <CGME20170309114756epcas5p3761bce85d5a8e3a095cb3a876c484ea6@epcas5p3.samsung.com>
- <1821488.fi4Ak6Xj0W@amdc3058>
-Message-ID: <bca846c5-6fb8-7e60-f5c5-24772c57803b@ti.com>
+From: robert.richter@cavium.com (Robert Richter)
+Date: Thu, 9 Mar 2017 13:02:06 +0100
+Subject: [PATCH] iommu/arm-smmu: Report smmu type in dmesg
+In-Reply-To: <bdf70e78-5ffd-4458-f485-4a508705e3e6@arm.com>
+References: <20170306135833.21455-1-rrichter@cavium.com>
+ <d055d4c2-4d06-caba-4d84-21c22718fe76@arm.com>
+ <20170307140607.GY16822@rric.localdomain>
+ <bdf70e78-5ffd-4458-f485-4a508705e3e6@arm.com>
+Message-ID: <20170309120206.GP16822@rric.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 09 March 2017 05:17 PM, Bartlomiej Zolnierkiewicz wrote:
+On 07.03.17 18:41:33, Robin Murphy wrote:
+> On 07/03/17 14:06, Robert Richter wrote:
+> > On 06.03.17 18:22:08, Robin Murphy wrote:
+> >> On 06/03/17 13:58, Robert Richter wrote:
+> >>> The ARM SMMU detection especially depends from system firmware. For
+> >>> better diagnostic, log the detected type in dmesg.
+> >>
+> >> This paragraph especially depends from grammar. I think.
+> > 
+> > Thanks for the mail on you. :)
+> > 
+> >>
+> >>> The smmu type's name is now stored in struct arm_smmu_type and ACPI
+> >>> code is modified to use that struct too. Rename ARM_SMMU_MATCH_DATA()
+> >>> macro to ARM_SMMU_TYPE() for better readability.
+> >>>
+> >>> Signed-off-by: Robert Richter <rrichter@cavium.com>
+> >>> ---
+> >>>  drivers/iommu/arm-smmu.c | 61 ++++++++++++++++++++++++------------------------
+> >>>  1 file changed, 30 insertions(+), 31 deletions(-)
+> >>
+> >> That seems a relatively invasive diffstat for the sake of printing a
+> >> string once at boot time to what I can only assume is a small audience
+> >> of firmware developers who find "cat
+> >> /sys/firmware/devicetree/base/iommu*/compatible" (or the ACPI
+> >> equivalent) too hard ;)
+> > 
+> > Reading firmware data is not really a solution as you don't know what
+> > the driver is doing with it. The actual background of this patch is to
+> > be sure a certain workaround was enabled in the kernel. ARM's cpu
+> > errata framework does this nicely. In case of smmus we just have the
+> > internal model implementation type which is not visible in the logs.
+> > Right now, there is no way to figure that out without knowing fw
+> > specifics and kernel sources.
 > 
-> Hi Sekhar,
+> Ah, now it starts to become clear. In that case, if we want to confirm
+> the presence of specific workarounds, we should actually _confirm the
+> presence of specific workarounds_. I'd have no complaint with e.g. this:
 > 
-> On Thursday, March 09, 2017 02:09:30 PM Sekhar Nori wrote:
->> Hi Bartlomiej,
->>
->> On Wednesday 08 March 2017 08:30 PM, Sekhar Nori wrote:
->>
->>>> It took a while to get to it but here is the draft driver patch
->>>> against v4.11-rc1.  Please test.
->>>
->>> I tested this on DM6446 EVM. I was able to mount existing partitions on 
->>> the hard disk and see that the directory listing looks good[1]. I will do 
->>> more tests (including comparing performance with old driver) tomorrow. I 
->>
->> I completed the tests I wanted to, including some read/write/data 
->> integrity tests. Performance is same as before too.
->>
->> Tested-by: Sekhar Nori <nsekhar@ti.com>
+> -----8<-----
+> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> index f7411109670f..9e50a092632c 100644
+> --- a/drivers/iommu/arm-smmu.c
+> +++ b/drivers/iommu/arm-smmu.c
+> @@ -1934,6 +1934,8 @@ static int arm_smmu_device_cfg_probe(struct
+> arm_smmu_device *smmu)
+>                         atomic_add_return(smmu->num_context_banks,
+>                                           &cavium_smmu_context_count);
+>                 smmu->cavium_id_base -= smmu->num_context_banks;
+> +               dev_notice(smmu->dev, "\tusing ASID/VMID offset %u\n",
+> +                          smmu->cavium_id_base);
+>         }
 > 
-> Thanks for testing!
+>         /* ID2 */
+> ----->8-----
 > 
->> Here are the additional changes I did. These changes do not clash with 
-> 
-> I'll split the draft patch on ATA & platform changes and make a proper
-> submission.  I'll also include your changes (can I have your Signed-by
-> for them?).
+> and the equivalent for other things, if need be. If you just print "hey,
+> this is SMMU-x", the user is in fact no better off, since they would
+> then still have to go and look at the source for whatever kernel they're
+> running to find out which particular workarounds for SMMU-x bugs that
+> particular kernel implements.
 
-Signed-of-by: Sekhar Nori <nsekhar@ti.com>
+I don't understand why you don't want to expose in some way the smmu
+type. There are a lot of things that can go wrong, esp. with firmware,
+to detect the proper smmu type.
 
->> what I have already queued for v4.12. That said, its probably better if 
->> I carry the platform pieces through my tree. Let me know how you want 
->> to proceed.
-> 
-> I think that it would be the best to ask Tejun to make a separate branch
-> with a pata_bk3710 driver so it can be pulled into your tree to preserve
-> bisectability.
+The above change is not a general solution too for reporting the
+enablement of smmu errata workarounds. The check could be done
+multiple times and in the fast path. For the particular problem the
+above would work, but still some message on the type detected would be
+fine. I could rework my patch in a way that .name is not permanently
+stored in struct arm_smmu_device.
 
-Sounds good. What about removal of IDE driver? Do you want to have both
-drivers existing in v4.12 and get rid of the IDE driver in v4.13 ?
-
-Thanks,
-Sekhar
+-Robert
