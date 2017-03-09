@@ -1,67 +1,62 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 9 Mar 2017 15:53:21 +0000
-Subject: [PATCH v5 06/10] arm64/mmu: align alloc_init_pte prototype with
- pmd/pud versions
-In-Reply-To: <1489047912-642-7-git-send-email-ard.biesheuvel@linaro.org>
-References: <1489047912-642-1-git-send-email-ard.biesheuvel@linaro.org>
- <1489047912-642-7-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20170309155321.GB11966@leverpostej>
+From: thgarnie@google.com (Thomas Garnier)
+Date: Thu, 9 Mar 2017 07:54:40 -0800
+Subject: [PATCH v2 1/4] syscalls: Restore address limit after a syscall
+In-Reply-To: <20170309152144.GA11966@leverpostej>
+References: <20170309012456.5631-1-thgarnie@google.com>
+ <20170309120955.GA6320@leverpostej>
+ <20170309134456.GI21222@n2100.armlinux.org.uk>
+ <20170309152144.GA11966@leverpostej>
+Message-ID: <CAJcbSZHQnS+THRy3B+OmZAotjC4CW-giv+i+YJKF36wOgSZtYQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 09, 2017 at 09:25:08AM +0100, Ard Biesheuvel wrote:
-> Align the function prototype of alloc_init_pte() with its pmd and pud
-> counterparts by replacing the pfn parameter with the equivalent physical
-> address.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm64/mm/mmu.c | 8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-> index 75e21c33caff..c3963c592ec3 100644
-> --- a/arch/arm64/mm/mmu.c
-> +++ b/arch/arm64/mm/mmu.c
-> @@ -107,7 +107,7 @@ static bool pgattr_change_is_safe(u64 old, u64 new)
->  }
->  
->  static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
-> -				  unsigned long end, unsigned long pfn,
-> +				  unsigned long end, phys_addr_t phys,
->  				  pgprot_t prot,
->  				  phys_addr_t (*pgtable_alloc)(void))
->  {
-> @@ -128,8 +128,8 @@ static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
->  	do {
->  		pte_t old_pte = *pte;
->  
-> -		set_pte(pte, pfn_pte(pfn, prot));
-> -		pfn++;
-> +		set_pte(pte, pfn_pte(__phys_to_pfn(phys), prot));
-> +		phys += PAGE_SIZE;
+On Thu, Mar 9, 2017 at 7:21 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Thu, Mar 09, 2017 at 01:44:56PM +0000, Russell King - ARM Linux wrote:
+>> On Thu, Mar 09, 2017 at 12:09:55PM +0000, Mark Rutland wrote:
+>> > On Wed, Mar 08, 2017 at 05:24:53PM -0800, Thomas Garnier wrote:
+>
+>> > It would be simpler to wrap the call entirely, e.g. have:
+>> >
+>> > #ifdef CONFIG_WHATEVER
+>> > static inline void verify_pre_usermode_state(void)
+>> > {
+>> >     if (segment_eq(get_fs(), USER_DS))
+>> >             __verify_pre_usermode_state();
+>> > }
+>> > #else
+>> > static inline void verify_pre_usermode_state(void) { }
+>> > #endif
+>>
+>> That's utterly pointless - you've missed a detail.
+>>
+>> > > @@ -199,7 +215,10 @@ extern struct trace_event_functions exit_syscall_print_funcs;
+>> > >   asmlinkage long SyS##name(__MAP(x,__SC_LONG,__VA_ARGS__));      \
+>> > >   asmlinkage long SyS##name(__MAP(x,__SC_LONG,__VA_ARGS__))       \
+>> > >   {                                                               \
+>> > > +         bool user_caller = has_user_ds();                       \
+>> > >           long ret = SYSC##name(__MAP(x,__SC_CAST,__VA_ARGS__));  \
+>> > > +         if (user_caller)                                        \
+>> > > +                 verify_pre_usermode_state();                    \
+>> >
+>> > ... then we can unconditionally use verify_pre_usermode_state() here ...
+>>
+>> Look at this closely.  has_user_ds() is called _before_ the syscall code
+>> is invoked.  It's checking what conditions the syscall was entered from.
+>> If the syscall was entered with the user segment selected, then we run
+>> a check on the system state _after_ the syscall code has returned.
+>
+> Indeed; I clearly did not consider this correctly.
+>
+> Sorry for the noise.
+>
 
-Minor nit: so as to align the strucutre of the loop with the other
-functions, it'd be nice to have this on the final line of the loop body.
+No problem, I missed that reply so discard my question on the email
+few seconds ago.
 
-Either way:
+> Thanks,
+> Mark.
 
-Reviewed-by: Mark Rutland <mark.rutland@arm.com>
 
-Mark.
 
->  
->  		/*
->  		 * After the PTE entry has been populated once, we
-> @@ -182,7 +182,7 @@ static void alloc_init_pmd(pud_t *pud, unsigned long addr, unsigned long end,
->  			BUG_ON(!pgattr_change_is_safe(pmd_val(old_pmd),
->  						      pmd_val(*pmd)));
->  		} else {
-> -			alloc_init_pte(pmd, addr, next, __phys_to_pfn(phys),
-> +			alloc_init_pte(pmd, addr, next, phys,
->  				       prot, pgtable_alloc);
->  
->  			BUG_ON(pmd_val(old_pmd) != 0 &&
-> -- 
-> 2.7.4
-> 
+-- 
+Thomas
