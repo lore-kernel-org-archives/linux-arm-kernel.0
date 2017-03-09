@@ -1,54 +1,42 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu,  9 Mar 2017 09:25:08 +0100
-Subject: [PATCH v5 06/10] arm64/mmu: align alloc_init_pte prototype with
- pmd/pud versions
+Date: Thu,  9 Mar 2017 09:25:10 +0100
+Subject: [PATCH v5 08/10] arm64/mmu: add contiguous bit to sanity bug check
 In-Reply-To: <1489047912-642-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1489047912-642-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1489047912-642-7-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1489047912-642-9-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Align the function prototype of alloc_init_pte() with its pmd and pud
-counterparts by replacing the pfn parameter with the equivalent physical
-address.
+A mapping with the contiguous bit cannot be safely manipulated while
+live, regardless of whether the bit changes between the old and new
+mapping. So take this into account when deciding whether the change
+is safe.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/mm/mmu.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ arch/arm64/mm/mmu.c | 10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
 
 diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index 75e21c33caff..c3963c592ec3 100644
+index d3fecd20a136..a6d7a86dd2b8 100644
 --- a/arch/arm64/mm/mmu.c
 +++ b/arch/arm64/mm/mmu.c
-@@ -107,7 +107,7 @@ static bool pgattr_change_is_safe(u64 old, u64 new)
+@@ -103,7 +103,15 @@ static bool pgattr_change_is_safe(u64 old, u64 new)
+ 	 */
+ 	static const pteval_t mask = PTE_PXN | PTE_RDONLY | PTE_WRITE;
+ 
+-	return old  == 0 || new  == 0 || ((old ^ new) & ~mask) == 0;
++	/* creating or taking down mappings is always safe */
++	if (old == 0 || new == 0)
++		return true;
++
++	/* live contiguous mappings may not be manipulated at all */
++	if ((old | new) & PTE_CONT)
++		return false;
++
++	return ((old ^ new) & ~mask) == 0;
  }
  
  static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
--				  unsigned long end, unsigned long pfn,
-+				  unsigned long end, phys_addr_t phys,
- 				  pgprot_t prot,
- 				  phys_addr_t (*pgtable_alloc)(void))
- {
-@@ -128,8 +128,8 @@ static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
- 	do {
- 		pte_t old_pte = *pte;
- 
--		set_pte(pte, pfn_pte(pfn, prot));
--		pfn++;
-+		set_pte(pte, pfn_pte(__phys_to_pfn(phys), prot));
-+		phys += PAGE_SIZE;
- 
- 		/*
- 		 * After the PTE entry has been populated once, we
-@@ -182,7 +182,7 @@ static void alloc_init_pmd(pud_t *pud, unsigned long addr, unsigned long end,
- 			BUG_ON(!pgattr_change_is_safe(pmd_val(old_pmd),
- 						      pmd_val(*pmd)));
- 		} else {
--			alloc_init_pte(pmd, addr, next, __phys_to_pfn(phys),
-+			alloc_init_pte(pmd, addr, next, phys,
- 				       prot, pgtable_alloc);
- 
- 			BUG_ON(pmd_val(old_pmd) != 0 &&
 -- 
 2.7.4
