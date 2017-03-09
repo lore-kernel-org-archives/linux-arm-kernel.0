@@ -1,111 +1,112 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu,  9 Mar 2017 18:05:30 +0800
-Subject: [PATCH 07/11] drm/sun4i: Fetch backend ID from device tree
+Date: Thu,  9 Mar 2017 18:05:29 +0800
+Subject: [PATCH 06/11] drm/sun4i: Pass pointer for underlying backend into
+ layer init
 In-Reply-To: <20170309100534.14023-1-wens@csie.org>
 References: <20170309100534.14023-1-wens@csie.org>
-Message-ID: <20170309100534.14023-8-wens@csie.org>
+Message-ID: <20170309100534.14023-7-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some Allwinner SoCs have 2 display pipelines, as in 2 of each
-components, including the frontend, backend, TCON, and any other
-extras.
+sun4i_layer only controls the backend hardware block of the display
+pipeline.
 
-As the backend and TCON are always paired together and form the CRTC,
-we need to know which backend or TCON we are currently probing, so we
-can pair them when initializing the CRTC.
-
-This patch figures out the backend's ID from the device tree and stores
-it in the backend's data structure. It does this by looking at the "reg"
-property of any remote endpoints connected to the backend's input port.
+Pass pointers to the underlying backend in the layer init function,
+instead of trying to fetch it from the drm_device structure. This
+avoids the headache of trying to figure out which device the layers
+actually belong to.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- drivers/gpu/drm/sun4i/sun4i_backend.c | 44 +++++++++++++++++++++++++++++++++++
- drivers/gpu/drm/sun4i/sun4i_backend.h |  2 ++
- 2 files changed, 46 insertions(+)
+ drivers/gpu/drm/sun4i/sun4i_crtc.c  |  2 +-
+ drivers/gpu/drm/sun4i/sun4i_layer.c | 13 ++++++-------
+ drivers/gpu/drm/sun4i/sun4i_layer.h |  3 ++-
+ 3 files changed, 9 insertions(+), 9 deletions(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
-index d660741ba475..f3c92d54c8e4 100644
---- a/drivers/gpu/drm/sun4i/sun4i_backend.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
-@@ -19,6 +19,7 @@
- #include <drm/drm_plane_helper.h>
+diff --git a/drivers/gpu/drm/sun4i/sun4i_crtc.c b/drivers/gpu/drm/sun4i/sun4i_crtc.c
+index 221e6d5ee970..3c876c3a356a 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_crtc.c
++++ b/drivers/gpu/drm/sun4i/sun4i_crtc.c
+@@ -149,7 +149,7 @@ struct sun4i_crtc *sun4i_crtc_init(struct drm_device *drm,
+ 	scrtc->tcon = tcon;
  
- #include <linux/component.h>
-+#include <linux/of_graph.h>
- #include <linux/reset.h>
+ 	/* Create our layers */
+-	scrtc->layers = sun4i_layers_init(drm);
++	scrtc->layers = sun4i_layers_init(drm, scrtc->backend);
+ 	if (IS_ERR(scrtc->layers)) {
+ 		dev_err(drm->dev, "Couldn't create the planes\n");
+ 		return NULL;
+diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.c b/drivers/gpu/drm/sun4i/sun4i_layer.c
+index 6feaf85a5942..f26bde5b9117 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_layer.c
++++ b/drivers/gpu/drm/sun4i/sun4i_layer.c
+@@ -16,7 +16,6 @@
+ #include <drm/drmP.h>
  
  #include "sun4i_backend.h"
-@@ -288,6 +289,45 @@ static int sun4i_backend_free_sat(struct device *dev) {
- 	return 0;
- }
+-#include "sun4i_drv.h"
+ #include "sun4i_layer.h"
  
-+/*
-+ * The display backend can take video output from the display frontend, or
-+ * the display enhancement unit on the A80, as input for one it its layers.
-+ * This relationship within the display pipeline is encoded in the device
-+ * tree with of_graph, and we use it here to figure out which backend, if
-+ * there are 2 or more, we are currently probing. The number would be in
-+ * the "reg" property of the upstream output port endpoint.
-+ */
-+static int sun4i_backend_of_get_id(struct device_node *node)
-+{
-+	struct device_node *port, *ep;
-+	int ret = -EINVAL;
-+
-+	/* input is port 0 */
-+	port = of_graph_get_port_by_id(node, 0);
-+	if (!port)
-+		return -EINVAL;
-+
-+	/* try finding an upstream endpoint */
-+	for_each_available_child_of_node(port, ep) {
-+		struct device_node *remote;
-+		u32 reg;
-+
-+		remote = of_parse_phandle(ep, "remote-endpoint", 0);
-+		if (!remote)
-+			continue;
-+
-+		ret = of_property_read_u32(remote, "reg", &reg);
-+		if (ret)
-+			continue;
-+
-+		ret = reg;
-+	}
-+
-+	of_node_put(port);
-+
-+	return ret;
-+}
-+
- static struct regmap_config sun4i_backend_regmap_config = {
- 	.reg_bits	= 32,
- 	.val_bits	= 32,
-@@ -312,6 +352,10 @@ static int sun4i_backend_bind(struct device *dev, struct device *master,
- 	dev_set_drvdata(dev, backend);
- 	drv->backend = backend;
- 
-+	backend->id = sun4i_backend_of_get_id(dev->of_node);
-+	if (backend->id < 0)
-+		return backend->id;
-+
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	regs = devm_ioremap_resource(dev, res);
- 	if (IS_ERR(regs))
-diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.h b/drivers/gpu/drm/sun4i/sun4i_backend.h
-index 83e63cc702b4..d9a7df55c63f 100644
---- a/drivers/gpu/drm/sun4i/sun4i_backend.h
-+++ b/drivers/gpu/drm/sun4i/sun4i_backend.h
-@@ -149,6 +149,8 @@ struct sun4i_backend {
- 
- 	struct clk		*sat_clk;
- 	struct reset_control	*sat_reset;
-+
-+	int			id;
+ struct sun4i_plane_desc {
+@@ -102,9 +101,9 @@ static const struct sun4i_plane_desc sun4i_backend_planes[] = {
  };
  
- void sun4i_backend_apply_color_correction(struct sun4i_backend *backend);
+ static struct sun4i_layer *sun4i_layer_init_one(struct drm_device *drm,
++						struct sun4i_backend *backend,
+ 						const struct sun4i_plane_desc *plane)
+ {
+-	struct sun4i_drv *drv = drm->dev_private;
+ 	struct sun4i_layer *layer;
+ 	int ret;
+ 
+@@ -124,14 +123,14 @@ static struct sun4i_layer *sun4i_layer_init_one(struct drm_device *drm,
+ 
+ 	drm_plane_helper_add(&layer->plane,
+ 			     &sun4i_backend_layer_helper_funcs);
+-	layer->backend = drv->backend;
++	layer->backend = backend;
+ 
+ 	return layer;
+ }
+ 
+-struct sun4i_layer **sun4i_layers_init(struct drm_device *drm)
++struct sun4i_layer **sun4i_layers_init(struct drm_device *drm,
++				       struct sun4i_backend *backend)
+ {
+-	struct sun4i_drv *drv = drm->dev_private;
+ 	struct sun4i_layer **layers;
+ 	int i;
+ 
+@@ -165,7 +164,7 @@ struct sun4i_layer **sun4i_layers_init(struct drm_device *drm)
+ 		const struct sun4i_plane_desc *plane = &sun4i_backend_planes[i];
+ 		struct sun4i_layer *layer;
+ 
+-		layer = sun4i_layer_init_one(drm, plane);
++		layer = sun4i_layer_init_one(drm, backend, plane);
+ 		if (IS_ERR(layer)) {
+ 			dev_err(drm->dev, "Couldn't initialize %s plane\n",
+ 				i ? "overlay" : "primary");
+@@ -174,7 +173,7 @@ struct sun4i_layer **sun4i_layers_init(struct drm_device *drm)
+ 
+ 		DRM_DEBUG_DRIVER("Assigning %s plane to pipe %d\n",
+ 				 i ? "overlay" : "primary", plane->pipe);
+-		regmap_update_bits(drv->backend->regs, SUN4I_BACKEND_ATTCTL_REG0(i),
++		regmap_update_bits(backend->regs, SUN4I_BACKEND_ATTCTL_REG0(i),
+ 				   SUN4I_BACKEND_ATTCTL_REG0_LAY_PIPESEL_MASK,
+ 				   SUN4I_BACKEND_ATTCTL_REG0_LAY_PIPESEL(plane->pipe));
+ 
+diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.h b/drivers/gpu/drm/sun4i/sun4i_layer.h
+index a97e376bae17..4be1f0919df2 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_layer.h
++++ b/drivers/gpu/drm/sun4i/sun4i_layer.h
+@@ -26,6 +26,7 @@ plane_to_sun4i_layer(struct drm_plane *plane)
+ 	return container_of(plane, struct sun4i_layer, plane);
+ }
+ 
+-struct sun4i_layer **sun4i_layers_init(struct drm_device *drm);
++struct sun4i_layer **sun4i_layers_init(struct drm_device *drm,
++				       struct sun4i_backend *backend);
+ 
+ #endif /* _SUN4I_LAYER_H_ */
 -- 
 2.11.0
