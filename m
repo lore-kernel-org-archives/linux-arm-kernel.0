@@ -1,94 +1,51 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 9 Mar 2017 14:09:30 +0530
-Subject: [RESEND PATCH] arm: assabet_defconfig: disable IDE subsystem
-In-Reply-To: <1fd840c5-b0bb-726b-6357-669977c4ae5f@ti.com>
-References: <1467991490-24895-1-git-send-email-b.zolnierkie@samsung.com>
- <CGME20161212135537epcas5p440bbb93d40f0c41b3754635733b09879@epcas5p4.samsung.com>
- <8ea5971a-338d-e8b9-6be8-8fe2658fc04d@ti.com> <1709119.SQyio4Ct6n@amdc3058>
- <1fd840c5-b0bb-726b-6357-669977c4ae5f@ti.com>
-Message-ID: <a3161cfc-56f7-4577-c37f-3798cdb03713@ti.com>
+From: bp@alien8.de (Borislav Petkov)
+Date: Thu, 9 Mar 2017 09:42:08 +0100
+Subject: [PATCH v2 1/4] syscalls: Restore address limit after a syscall
+In-Reply-To: <20170309012456.5631-1-thgarnie@google.com>
+References: <20170309012456.5631-1-thgarnie@google.com>
+Message-ID: <20170309084208.ims3ehcnieo7uqew@pd.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bartlomiej,
+On Wed, Mar 08, 2017 at 05:24:53PM -0800, Thomas Garnier wrote:
+> @@ -191,6 +191,22 @@ extern struct trace_event_functions exit_syscall_print_funcs;
+>  	SYSCALL_METADATA(sname, x, __VA_ARGS__)			\
+>  	__SYSCALL_DEFINEx(x, sname, __VA_ARGS__)
+>  
+> +asmlinkage void verify_pre_usermode_state(void);
+> +
+> +#ifndef CONFIG_ARCH_NO_SYSCALL_VERIFY_PRE_USERMODE_STATE
+> +static inline bool has_user_ds(void) {
+> +	bool ret = segment_eq(get_fs(), USER_DS);
+> +	// Prevent re-ordering the call
 
-On Wednesday 08 March 2017 08:30 PM, Sekhar Nori wrote:
+This is not the kernel comments style. Use /* */ instead.
 
->> It took a while to get to it but here is the draft driver patch
->> against v4.11-rc1.  Please test.
-> 
-> I tested this on DM6446 EVM. I was able to mount existing partitions on 
-> the hard disk and see that the directory listing looks good[1]. I will do 
-> more tests (including comparing performance with old driver) tomorrow. I 
+> +	barrier();
+> +	return ret;
+> +}
+> +#else
+> +static inline bool has_user_ds(void) {
+> +	return false;
+> +}
+> +#endif
 
-I completed the tests I wanted to, including some read/write/data 
-integrity tests. Performance is same as before too.
+... and then you could slim down the ifdeffery a bit:
 
-Tested-by: Sekhar Nori <nsekhar@ti.com>
+static inline bool has_user_ds(void) {
+	bool ret = false;
 
-Here are the additional changes I did. These changes do not clash with 
-what I have already queued for v4.12. That said, its probably better if 
-I carry the platform pieces through my tree. Let me know how you want 
-to proceed.
+#ifndef CONFIG_ARCH_NO_SYSCALL_VERIFY_PRE_USERMODE_STATE
+	ret = segment_eq(get_fs(), USER_DS);
+	/* Prevent re-ordering the call. */
+	barrier();
+#endif
 
-Thanks,
-Sekhar
+	return ret;
+}
 
----8<---
-diff --git a/arch/arm/configs/davinci_all_defconfig b/arch/arm/configs/davinci_all_defconfig
-index b9a7cb98ffda..67db82999c06 100644
---- a/arch/arm/configs/davinci_all_defconfig
-+++ b/arch/arm/configs/davinci_all_defconfig
-@@ -74,12 +74,10 @@ CONFIG_BLK_DEV_RAM=y
- CONFIG_BLK_DEV_RAM_COUNT=1
- CONFIG_BLK_DEV_RAM_SIZE=32768
- CONFIG_EEPROM_AT24=y
--CONFIG_IDE=m
--CONFIG_BLK_DEV_PALMCHIP_BK3710=m
--CONFIG_SCSI=m
- CONFIG_BLK_DEV_SD=m
- CONFIG_ATA=m
- CONFIG_AHCI_DA850=m
-+CONFIG_PATA_BK3710=m
- CONFIG_NETDEVICES=y
- CONFIG_NETCONSOLE=y
- CONFIG_TUN=m
-diff --git a/arch/arm/mach-davinci/board-dm644x-evm.c b/arch/arm/mach-davinci/board-dm644x-evm.c
-index 023480b75244..60a1f23890cd 100644
---- a/arch/arm/mach-davinci/board-dm644x-evm.c
-+++ b/arch/arm/mach-davinci/board-dm644x-evm.c
-@@ -744,7 +744,7 @@ static int davinci_phy_fixup(struct phy_device *phydev)
- 	return 0;
- }
- 
--#define HAS_ATA		IS_ENABLED(CONFIG_BLK_DEV_PALMCHIP_BK3710)
-+#define HAS_ATA		IS_ENABLED(CONFIG_PATA_BK3710)
- 
- #define HAS_NOR		IS_ENABLED(CONFIG_MTD_PHYSMAP)
- 
-diff --git a/arch/arm/mach-davinci/board-dm646x-evm.c b/arch/arm/mach-davinci/board-dm646x-evm.c
-index f702d4fc8eb8..589f3c33c4a0 100644
---- a/arch/arm/mach-davinci/board-dm646x-evm.c
-+++ b/arch/arm/mach-davinci/board-dm646x-evm.c
-@@ -119,7 +119,7 @@ static struct platform_device davinci_nand_device = {
- 	},
- };
- 
--#define HAS_ATA		IS_ENABLED(CONFIG_BLK_DEV_PALMCHIP_BK3710)
-+#define HAS_ATA		IS_ENABLED(CONFIG_PATA_BK3710)
- 
- #ifdef CONFIG_I2C
- /* CPLD Register 0 bits to control ATA */
-diff --git a/arch/arm/mach-davinci/board-neuros-osd2.c b/arch/arm/mach-davinci/board-neuros-osd2.c
-index 0a7838852649..075e304ce7be 100644
---- a/arch/arm/mach-davinci/board-neuros-osd2.c
-+++ b/arch/arm/mach-davinci/board-neuros-osd2.c
-@@ -163,7 +163,7 @@ static struct davinci_mmc_config davinci_ntosd2_mmc_config = {
- 	.wires		= 4,
- };
- 
--#define HAS_ATA		IS_ENABLED(CONFIG_BLK_DEV_PALMCHIP_BK3710)
-+#define HAS_ATA		IS_ENABLED(CONFIG_PATA_BK3710)
- 
- #define HAS_NAND	IS_ENABLED(CONFIG_MTD_NAND_DAVINCI)
- 
+-- 
+Regards/Gruss,
+    Boris.
+
+Good mailing practices for 400: avoid top-posting and trim the reply.
