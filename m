@@ -1,38 +1,34 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu,  9 Mar 2017 17:07:20 +0000
-Subject: [PATCH 08/15] KVM: arm64: add SYS_DESC()
-In-Reply-To: <1489079247-31092-1-git-send-email-mark.rutland@arm.com>
-References: <1489079247-31092-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1489079247-31092-9-git-send-email-mark.rutland@arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu,  9 Mar 2017 18:28:26 +0100
+Subject: [PATCH v3 2/3] usb: host: Allow to build ehci orion with mvebu SoCs
+In-Reply-To: <20170309172827.17874-1-gregory.clement@free-electrons.com>
+References: <20170309172827.17874-1-gregory.clement@free-electrons.com>
+Message-ID: <20170309172827.17874-3-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a macro enabling us to initialise sys_reg_desc
-structures based on common sysreg encoding definitions in
-<asm/sysreg.h>. Subsequent patches will use this to simplify the KVM
-code.
+The mvebu ARM64 SoCs no longer select PLAT_ORION. However Armada 37xx use
+the Orion EHCI controller. This patch allows the Orion EHCI driver to be
+built when ARCH_MVEBU is selected.
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Christoffer Dall <christoffer.dall@linaro.org>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: kvmarm at lists.cs.columbia.edu
+Reviewed-by: Andrew Lunn <andrew@lunn.ch>
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm64/kvm/sys_regs.h | 5 +++++
- 1 file changed, 5 insertions(+)
+ drivers/usb/host/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm64/kvm/sys_regs.h b/arch/arm64/kvm/sys_regs.h
-index 9c6ffd0..66859a5 100644
---- a/arch/arm64/kvm/sys_regs.h
-+++ b/arch/arm64/kvm/sys_regs.h
-@@ -147,4 +147,9 @@ const struct sys_reg_desc *find_reg_by_id(u64 id,
- #define CRm(_x) 	.CRm = _x
- #define Op2(_x) 	.Op2 = _x
+diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
+index 407d947b34ea..54bdd76c7f03 100644
+--- a/drivers/usb/host/Kconfig
++++ b/drivers/usb/host/Kconfig
+@@ -188,7 +188,7 @@ config USB_EHCI_HCD_OMAP
  
-+#define SYS_DESC(reg)					\
-+	Op0(sys_reg_Op0(reg)), Op1(sys_reg_Op1(reg)),	\
-+	CRn(sys_reg_CRn(reg)), CRm(sys_reg_CRm(reg)),	\
-+	Op2(sys_reg_Op2(reg))
-+
- #endif /* __ARM64_KVM_SYS_REGS_LOCAL_H__ */
+ config USB_EHCI_HCD_ORION
+ 	tristate  "Support for Marvell EBU on-chip EHCI USB controller"
+-	depends on USB_EHCI_HCD && PLAT_ORION
++	depends on USB_EHCI_HCD && (PLAT_ORION || ARCH_MVEBU)
+ 	default y
+ 	---help---
+ 	  Enables support for the on-chip EHCI controller on Marvell's
 -- 
-1.9.1
+2.11.0
