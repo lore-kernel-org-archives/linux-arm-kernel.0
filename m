@@ -1,56 +1,64 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu,  9 Mar 2017 18:52:58 +0100
-Subject: [PATCH v4 3/3] ARM64: dts: marvell: armada-37xx: Add USB2 node
-In-Reply-To: <20170309175258.20076-1-gregory.clement@free-electrons.com>
-References: <20170309175258.20076-1-gregory.clement@free-electrons.com>
-Message-ID: <20170309175258.20076-4-gregory.clement@free-electrons.com>
+Date: Thu,  9 Mar 2017 18:52:55 +0100
+Subject: [PATCH v4 0/3] Add EHCI support for Armada 37xx
+Message-ID: <20170309175258.20076-1-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Armada 37xx SoC embedded an EHCI controller. This patch adds the device
-tree node enabling its support.
+Hi,
 
-Reviewed-by: Andrew Lunn <andrew@lunn.ch>
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- arch/arm64/boot/dts/marvell/armada-3720-db.dts | 6 ++++++
- arch/arm64/boot/dts/marvell/armada-37xx.dtsi   | 7 +++++++
- 2 files changed, 13 insertions(+)
+The EHCI controller in the Armada 37xx SoCs is the one used on many
+other mvebu SoCs such as the orion5x, the kirkwood, or the
+armada. However, for Armada 37xx an extra initialization step is
+needed: this is the purpose of the first patch.
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-3720-db.dts b/arch/arm64/boot/dts/marvell/armada-3720-db.dts
-index 864936acc316..aa39339b6582 100644
---- a/arch/arm64/boot/dts/marvell/armada-3720-db.dts
-+++ b/arch/arm64/boot/dts/marvell/armada-3720-db.dts
-@@ -134,6 +134,12 @@
- 	status = "okay";
- };
- 
-+/* CON27 */
-+&usb2 {
-+	status = "okay";
-+};
-+
-+
- &mdio {
- 	status = "okay";
- 	phy0: ethernet-phy at 0 {
-diff --git a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-index cf0c2f9ebd7d..7639518d8ee1 100644
---- a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-@@ -204,6 +204,13 @@
- 				status = "disabled";
- 			};
- 
-+			usb2: usb at 5e000 {
-+				compatible = "marvell,armada-3700-ehci";
-+				reg = <0x5e000 0x2000>;
-+				interrupts = <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
-+				status = "disabled";
-+			};
-+
- 			xor at 60900 {
- 				compatible = "marvell,armada-3700-xor";
- 				reg = <0x60900 0x100
+The second patch allows to build the driver for the ARM64 Armada SoCs.
+
+The last one enables the EHCI in the device tree.
+
+This forth version really takes into account the review from Alan Stern.
+Again sorry for the noise.
+
+Thanks,
+
+Gregory
+
+Changelog:
+v3-> v4:
+- Remove the _SHIFT define and use their value directly, suggested by
+  Alan Stern
+- Remove unnecessary error message in ehci_orion_drv_reset() ,
+  suggested by Alan Stern
+- Exit ehci_orion_drv_reset() if ehci_setup() failed, suggested by
+  Alan Stern
+
+v2-> v3:
+- Add Reviewed-by flag from  Andrew Lunn
+
+v1 -> v2:
+- Fix typo in commit log of the patch 1, suggested by Andrew Lunn
+- Fix wording in the device tree binding documenation, suggested by
+  Andrew Lunn
+- Make new define symbol name more clear by adding _SHIFT to the end,
+  suggested by Andrew Lunn
+- Use a full first name + last name for the Signed-off-by and the
+  Authorship i oatch 1, suggested by Thomas Petazzoni.
+- Improve the commit log of the patch 2, suggested by Andrew Lunn
+- Fix Kconfig logic, suggested by Andrew Lunn
+
+Gregory CLEMENT (2):
+  usb: host: Allow to build ehci orion with mvebu SoCs
+  ARM64: dts: marvell: armada-37xx: Add USB2 node
+
+Hua Jing (1):
+  usb: orion-echi: Add support for the Armada 3700
+
+ .../devicetree/bindings/usb/ehci-orion.txt         |  4 ++-
+ arch/arm64/boot/dts/marvell/armada-3720-db.dts     |  6 ++++
+ arch/arm64/boot/dts/marvell/armada-37xx.dtsi       |  7 +++++
+ drivers/usb/host/Kconfig                           |  2 +-
+ drivers/usb/host/ehci-orion.c                      | 36 ++++++++++++++++++++++
+ 5 files changed, 53 insertions(+), 2 deletions(-)
+
 -- 
 2.11.0
