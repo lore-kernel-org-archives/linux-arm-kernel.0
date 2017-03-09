@@ -1,58 +1,120 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Thu, 09 Mar 2017 15:52:11 +0100
-Subject: [RESEND PATCH] arm: assabet_defconfig: disable IDE subsystem
-In-Reply-To: <3285453.g1rFzTv5DW@amdc3058>
-References: <1467991490-24895-1-git-send-email-b.zolnierkie@samsung.com>
- <20170309135714.GJ21222@n2100.armlinux.org.uk> <3285453.g1rFzTv5DW@amdc3058>
- <CGME20170309145219epcas5p38b1af654dd0a4b04bd02a488051c065f@epcas5p3.samsung.com>
-Message-ID: <2925309.c9ir13Bff9@amdc3058>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Thu,  9 Mar 2017 15:52:44 +0100
+Subject: [PATCH 0/2] ARM64: dts: meson-gxbb-odroidc2: Add GPIO lines names
+Message-ID: <1489071166-11476-1-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, March 09, 2017 03:42:49 PM Bartlomiej Zolnierkiewicz wrote:
+This patchset adds the GPIO lines names to describe the /real/ GPIO usage on
+the Odroid-C2 board. These names are useful to have a clear and human readable
+decription of the line usage.
 
-> > Yes, it's very obscure - but what it comes down to is the silly way the
-> > "ISA" IO is handled on the platform (which depends whether it's an 8-bit
-> > or 16-bit ISA-style peripheral.)  The old IDE CS driver _could_ be bent
-> > to work via a patch like this:
-> > 
-> > ARM: EBSA110: Enable 16-bit IO type for ide-iops
-> > 
-> > diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-> > index 047a20780fc1..2eb501d6b5fe 100644
-> > --- a/arch/arm/Makefile
-> > +++ b/arch/arm/Makefile
-> > @@ -217,7 +217,8 @@ ifeq ($(CONFIG_ARCH_EBSA110),y)
-> >  # This is what happens if you forget the IOCS16 line.
-> >  # PCMCIA cards stop working.
-> >  CFLAGS_3c589_cs.o :=-DISA_SIXTEEN_BIT_PERIPHERAL
-> > -export CFLAGS_3c589_cs.o
-> > +CFLAGS_ide-io-std.o :=-DISA_SIXTEEN_BIT_PERIPHERAL
-> > +export CFLAGS_3c589_cs.o CFLAGS_ide-io-std.o
-> >  endif
-> 
-> As I've already explained in the past, the proper fix for the problem
-> (for both old IDE and libata) is to define custom transport ops in
-> ide-cs.c/ata_pcmcia.c and use them on affected platforms.
-> 
-> >  # The byte offset of the kernel image in RAM from the start of RAM.
-> > 
-> > but the PATA driver is much harder.
-> 
-> There are a lot examples of using your own transport operations in
-> existing code (i.e. pata_octeon_cf.c or drivers/ata/sata_rcar.c).
+The second patch is not specifically tied to the names but was found using
+these descriptions since they did not match.
 
-Basically it should come down to copypasting all transport ops
-from libata-sff.c and replacing all ioread8()/iowrite8() with
-__inb16()__outb16(). Then you need to add detection of EBSA1100
-which should also be as simple as using machine_is_ebsa110() in
-the proper place.
+Here is an extract of the GPIO debugfs output :
 
-If you ever get to running current upstream on your EBSA110
-I can provide you with the draft patch doing this.
+# cat /sys/kernel/debug/gpio 
+gpiochip0: GPIOs 0-13, parent: platform/c8100000.aobus:pinctrl at 14, aobus-banks:
+ gpio-0   (UART_TX_AO_A        )
+ gpio-1   (UART_RX_AO_A        )
+ gpio-2   (VCCK En             )
+ gpio-3   (TF 3V3/1V8 En       |?                   ) out lo    
+ gpio-4   (USB HUB nRESET      )
+ gpio-5   (USB OTG Power En    |USB_OTG_PWR         ) out lo    
+ gpio-6   (J7 Header Pin2      )
+ gpio-7   (IR In               )
+ gpio-8   (J7 Header Pin4      )
+ gpio-9   (J7 Header Pin6      )
+ gpio-10  (J7 Header Pin5    )
+ gpio-11  (J7 Header Pin7      )
+ gpio-12  (HDMI CEC            )
+ gpio-13  (SYS LED             |c2:blue:alive       ) out hi    
+gpiochip1: GPIOs 14-132, parent: platform/c8834000.periphs:pinctrl at 4b0, periphs-banks:
+ gpio-14  (Eth MDIO            )
+ gpio-15  (Eth MDC             )
+ gpio-16  (Eth RGMII RX Clk    )
+ gpio-17  (Eth RX DV           )
+ gpio-18  (Eth RX D0           )
+ gpio-19  (Eth RX D1           )
+ gpio-20  (Eth RX D2           )
+ gpio-21  (Eth RX D3           )
+ gpio-22  (Eth RGMII TX Clk    )
+[...]
+ gpio-115 (J2 Header Pin15     )
+ gpio-116 (J2 Header Pin12     )
+ gpio-117 (J2 Header Pin13     )
+ gpio-118 (J2 Header Pin8      )
+ gpio-119 (J2 Header Pin10     )
+ gpio-120 (                    )
+ gpio-121 (                    )
+ gpio-122 (                    )
+ gpio-123 (                    )
+ gpio-124 (                    )
+ gpio-125 (J2 Header Pin11     )
+ gpio-126 (                    )
+ gpio-127 (J2 Header Pin7      )
+ gpio-128 (                    )
+ gpio-129 (                    )
+ gpio-130 (                    )
+ gpio-131 (                  )
+ gpio-132 (                    )
 
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+And the 'lsgpio' tool using the new char interface for GPIO handling :
+# lsgpio 
+GPIO chip: gpiochip1, "periphs-banks", 119 GPIO lines
+	line  0: "Eth MDIO" unused
+	line  1: "Eth MDC" unused
+	line  2: "Eth RGMII RX Clk" unused
+	line  3: "Eth RX DV" unused
+	line  4: "Eth RX D0" unused
+	line  5: "Eth RX D1" unused
+	line  6: "Eth RX D2" unused
+	line  7: "Eth RX D3" unused
+	line  8: "Eth RGMII TX Clk" unused
+	line  9: "Eth TX En" unused
+	line 10: "Eth TX D0" unused
+	line 11: "Eth TX D1" unused
+	line 12: "Eth TX D2" unused
+	line 13: "Eth TX D3" unused
+	line 14: "Eth PHY nRESET" unused
+	line 15: "Eth PHY Intc" unused
+	line 16: "HDMI HPD" unused
+	line 17: "HDMI DDC SDA" unused
+	line 18: "HDMI DDC SCL" unused
+	line 19: unnamed unused
+	line 20: "eMMC D0" unused
+	line 21: "eMMC D1" unused
+	line 22: "eMMC D2" unused
+	line 23: "eMMC D3" unused
+	line 24: "eMMC D4" unused
+[...]
+	line 115: unnamed unused
+	line 116: unnamed unused
+	line 117: unnamed unused
+	line 118: unnamed unused
+GPIO chip: gpiochip0, "aobus-banks", 14 GPIO lines
+	line  0: "UART_TX_AO_A" unused
+	line  1: "UART_RX_AO_A" unused
+	line  2: "VCCK En" unused
+	line  3: "TF 3V3/1V8 En" "?" [kernel output]
+	line  4: "USB HUB nRESET" unused
+	line  5: "USB OTG Power En" "USB_OTG_PWR" [kernel output]
+	line  6: "J7 Header Pin2" unused
+	line  7: "IR In" unused
+	line  8: "J7 Header Pin4" unused
+	line  9: "J7 Header Pin6" unused
+	line 10: "J7 Header Pin5" unused
+	line 11: "J7 Header Pin7" unused
+	line 12: "HDMI CEC" unused
+	line 13: "SYS LED" "c2:blue:alive" [kernel output active-low]
+
+Neil Armstrong (2):
+  ARM64: dts: meson-gxbb-odroidc2: Add GPIO lines names
+  ARM64: dts: meson-gxbb-odroidc2: Fix TFLASH VDD regulator GPIO line
+
+ .../arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts | 53 +++++++++++++++++++++-
+ 1 file changed, 52 insertions(+), 1 deletion(-)
+
+-- 
+1.9.1
