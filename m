@@ -1,73 +1,39 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Thu, 9 Mar 2017 08:42:59 +0200
-Subject: [PATCH] pinctrl: samsung: fix segfault when using external
- interrupts on s3c24xx
-In-Reply-To: <CA+Ln22FEYfO2EmvLKTRSHNFPpKSOw38vSDvg-nPv_j08cApqCw@mail.gmail.com>
-References: <1488489799-18136-1-git-send-email-sergio.prado@e-labworks.com>
- <20170304081504.unv6sihbmp76ynfy@kozik-lap> <20170306131516.GA6095@n1>
- <20170308163434.obhtg6fwmjwqv7jm@kozik-lap>
- <CA+Ln22FEYfO2EmvLKTRSHNFPpKSOw38vSDvg-nPv_j08cApqCw@mail.gmail.com>
-Message-ID: <CAJKOXPdUQ8DSPR_4cDs8WyrV9Mmy6isncW72BNiTyiRb79qf7g@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 9 Mar 2017 08:21:30 +0100
+Subject: i.MX7 pinctrl driver writing to non existent registers
+In-Reply-To: <20170308135751.GB19934@x250>
+References: <20170208090817.omm2dydhqukdzgqy@pengutronix.de>
+ <20170308135751.GB19934@x250>
+Message-ID: <20170309072130.sdb6dbqvwyxn6idh@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 9, 2017 at 7:56 AM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
-> 2017-03-09 1:34 GMT+09:00 Krzysztof Kozlowski <krzk@kernel.org>:
->> On Mon, Mar 06, 2017 at 09:15:16AM -0400, Sergio Prado wrote:
->>> Hi Krzysztof,
->>>
->>> > > This is a regression from commit 8b1bd11c1f8f529057369c5b3702d13fd24e2765.
->>> >
->>> > Checkpatch should complain here about commit format.
->>> >
->>> > >
->>> > > Tested on FriendlyARM mini2440.
->>> > >
->>> >
->>> > Please add:
->>> >   Fixes: 8b1bd11c1f8f ("pinctrl: samsung: Add the support the multiple IORESOURCE_MEM for one pin-bank")
->>> >   Cc: <stable@vger.kernel.org>
->>> >
->>>
->>> OK.
->>>
->>> > > Signed-off-by: Sergio Prado <sergio.prado@e-labworks.com>
->>> > > ---
->>> > >  drivers/pinctrl/samsung/pinctrl-s3c24xx.c | 4 ++--
->>> > >  1 file changed, 2 insertions(+), 2 deletions(-)
->>> > >
->>> > > diff --git a/drivers/pinctrl/samsung/pinctrl-s3c24xx.c b/drivers/pinctrl/samsung/pinctrl-s3c24xx.c
->>> > > index b82a003546ae..1b8d887796e8 100644
->>> > > --- a/drivers/pinctrl/samsung/pinctrl-s3c24xx.c
->>> > > +++ b/drivers/pinctrl/samsung/pinctrl-s3c24xx.c
->>> > > @@ -356,8 +356,8 @@ static inline void s3c24xx_demux_eint(struct irq_desc *desc,
->>> > >  {
->>> > >   struct s3c24xx_eint_data *data = irq_desc_get_handler_data(desc);
->>> > >   struct irq_chip *chip = irq_desc_get_chip(desc);
->>> > > - struct irq_data *irqd = irq_desc_get_irq_data(desc);
->>> > > - struct samsung_pin_bank *bank = irq_data_get_irq_chip_data(irqd);
->>> > > + struct samsung_pinctrl_drv_data *d = data->drvdata;
->>> > > + struct samsung_pin_bank *bank = d->pin_banks;
->>> >
->>> > I think 'pin_banks' point to all banks of given controller not to the
->>> > currently accessed one.
->>>
->>> Understood. I think it worked in my tests because on s3c2440 all banks
->>> have the same eint base address.
->>>
->>> So what do you think is the best approach to solve this problem?
->>
->> Maybe you can get to this through:
->>         s3c24xx_eint_domain_data = s3c24xx_eint_data->domains[virq].host_data;
->>         s3c24xx_eint_domain_data->bank
->>
->> It is getting slightly more complicated...
->
-> How about the suggestions I made in my reply from March 4 (JST)?
+On Wed, Mar 08, 2017 at 02:57:53PM +0100, Shawn Guo wrote:
+> On Wed, Feb 08, 2017 at 10:08:17AM +0100, Sascha Hauer wrote:
+> > Hi All,
+> > 
+> > The i.MX7 has two pinmux controllers, the LPSR and the regular one. We
+> > instantiate a driver for each one. Now the driver assumes that the pins
+> > are completely configured with one iomux controller, but for the LPSR
+> > pins this is not true: The MUX_CTL and PAD_CTL registers are indeed
+> > in the LPSR controller, but the SELECT_INPUT registers for the same
+> > pin are found in the regular controller.
+> > 
+> > The result is that with this pin for example:
+> > 
+> > #define MX7D_PAD_GPIO1_IO06__UART5_DCE_RX                         0x0018 0x0048 0x0714 0x3 0x4
+> > 
+> > The LPSR controller writes to LPSR_BASE + 0x714 where it should really
+> > be IOMUX_BASE + 0x714.
+> 
+> Isn't property fsl,input-sel being there for addressing that?
 
-Yes, this also looks like solution. I am not sure how much you would
-like to revert but wouldn't it create duplicated members in pinctrl
-structures? One for Exynos and other for S3C?
+Indeed, I have overlooked that. Sorry for the noise.
 
-Best regards,
-Krzysztof
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
