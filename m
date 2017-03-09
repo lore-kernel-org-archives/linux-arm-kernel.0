@@ -1,61 +1,42 @@
-From: thgarnie@google.com (Thomas Garnier)
-Date: Thu, 9 Mar 2017 07:48:03 -0800
-Subject: [PATCH v2 1/4] syscalls: Restore address limit after a syscall
-In-Reply-To: <20170309084208.ims3ehcnieo7uqew@pd.tnic>
-References: <20170309012456.5631-1-thgarnie@google.com>
- <20170309084208.ims3ehcnieo7uqew@pd.tnic>
-Message-ID: <CAJcbSZHwfG3e+nZySpCFronRG08p=Rs4VvY7SC6QLpUCpyy+_A@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 09 Mar 2017 15:52:23 +0000
+Subject: [PATCH 00/10] KVM/ARM fixes for 4.11-rc2
+In-Reply-To: <20170309151652.GA3210@potion> ("Radim
+ \=\?utf-8\?B\?S3LEjW3DocWZ\?\=
+ \=\?utf-8\?B\?Iidz\?\= message of "Thu,
+ 9 Mar 2017 16:16:52 +0100")
+References: <20170309095539.14512-1-marc.zyngier@arm.com>
+ <20170309151652.GA3210@potion>
+Message-ID: <87a88uwiq0.fsf@on-the-bus.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 9, 2017 at 12:42 AM, Borislav Petkov <bp@alien8.de> wrote:
-> On Wed, Mar 08, 2017 at 05:24:53PM -0800, Thomas Garnier wrote:
->> @@ -191,6 +191,22 @@ extern struct trace_event_functions exit_syscall_print_funcs;
->>       SYSCALL_METADATA(sname, x, __VA_ARGS__)                 \
->>       __SYSCALL_DEFINEx(x, sname, __VA_ARGS__)
->>
->> +asmlinkage void verify_pre_usermode_state(void);
->> +
->> +#ifndef CONFIG_ARCH_NO_SYSCALL_VERIFY_PRE_USERMODE_STATE
->> +static inline bool has_user_ds(void) {
->> +     bool ret = segment_eq(get_fs(), USER_DS);
->> +     // Prevent re-ordering the call
+On Thu, Mar 09 2017 at  3:16:52 pm GMT, Radim Kr?m?? <rkrcmar@redhat.com> wrote:
+> 2017-03-09 09:55+0000, Marc Zyngier:
+>> Paolo, Radim,
+>> 
+>> Here's the KVM/ARM updates for 4.11-rc2. The usual bag of vgic
+>> updates, making the memslot array large enough to handle guests with
+>> tons of devices assigned to them, a tidying up of exception handling,
+>> and a rather annoying TLB handling issue on VHE systems.
 >
-> This is not the kernel comments style. Use /* */ instead.
+> Pulled, but what made you change the GPG key into a revoked one?
 >
->> +     barrier();
->> +     return ret;
->> +}
->> +#else
->> +static inline bool has_user_ds(void) {
->> +     return false;
->> +}
->> +#endif
->
-> ... and then you could slim down the ifdeffery a bit:
->
-> static inline bool has_user_ds(void) {
->         bool ret = false;
->
-> #ifndef CONFIG_ARCH_NO_SYSCALL_VERIFY_PRE_USERMODE_STATE
->         ret = segment_eq(get_fs(), USER_DS);
->         /* Prevent re-ordering the call. */
->         barrier();
-> #endif
->
->         return ret;
-> }
->
+>   # gpg: Signature made Thu 09 Mar 2017 10:36:07 AM CET
+>   # gpg:                using RSA key AB309C74B93B1EA1
+>   # gpg: Good signature from "Marc Zyngier <marc.zyngier@arm.com>"
+>   # gpg: WARNING: This key has been revoked by its owner!
+>   # gpg:          This could mean that the signature is forged.
+>   # gpg: reason for revocation: Key has been compromised
+>   # gpg: revocation comment: Revoked after kernel.org hacking
+>   # Primary key fingerprint: 6958 C9F2 233C 5E9D 6CCA  818A AB30 9C74 B93B 1EA1
 
-I agree, cleaner. I will look to do this change on next iteration.
+Gahhh... New laptop, keyring restored from a backup containing the
+revoked key, gpg-agent picking the revoked key as a default, idiot
+sitting behind the keyboard not paying attention :-(. Now fixed.
 
-> --
-> Regards/Gruss,
->     Boris.
->
-> Good mailing practices for 400: avoid top-posting and trim the reply.
+Sorry about that.
 
-
-
+	M.
 -- 
-Thomas
+Jazz is not dead, it just smell funny.
