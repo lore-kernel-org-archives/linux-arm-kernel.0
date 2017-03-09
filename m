@@ -1,107 +1,88 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 9 Mar 2017 15:27:12 +0100
-Subject: [PATCH 2/3] thermal: add support for the thermal sensor on
- Allwinner new SoCs
-In-Reply-To: <8250311489019784@web18g.yandex.ru>
-References: <20170301190220.2EgSha6N@smtp3o.mail.yandex.net>
- <20170302141105.5fr3ru72rtdyv4pd@lukather>
- <8250311489019784@web18g.yandex.ru>
-Message-ID: <20170309142712.tfmfrbbhagskrtaf@lukather>
+From: Jose.Abreu@synopsys.com (Jose Abreu)
+Date: Thu, 9 Mar 2017 14:28:46 +0000
+Subject: [PATCH RESEND] drm: dw_hdmi: Don't rely on the status of the
+ bridge for updating HPD
+In-Reply-To: <20170308081524.7672-1-romain.perier@collabora.com>
+References: <20170308081524.7672-1-romain.perier@collabora.com>
+Message-ID: <e6fa89a3-3f4a-6dfc-3ef9-e5b487994104@synopsys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 09, 2017 at 08:36:24AM +0800, Icenowy Zheng wrote:
-> 
-> 
-> 02.03.2017, 22:11, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
-> > On Thu, Mar 02, 2017 at 12:02:13AM +0800, Icenowy Zheng wrote:
-> >> ?2017?3?1? 23:56? Maxime Ripard <maxime.ripard@free-electrons.com>???
-> >> ?>
-> >> ?> On Wed, Mar 01, 2017 at 06:20:51PM +0800, Icenowy Zheng wrote:
-> >> ?> >
-> >> ?> > 2017?3?1? 18:14? Maxime Ripard <maxime.ripard@free-electrons.com>???
-> >> ?> > >
-> >> ?> > > On Tue, Feb 28, 2017 at 03:18:13PM +0800, Icenowy Zheng wrote:
-> >> ?> > > >
-> >> ?> > > > 2017?2?28? 14:44? Maxime Ripard <maxime.ripard@free-electrons.com>???
-> >> ?> > > > >
-> >> ?> > > > > On Tue, Feb 28, 2017 at 03:40:53AM +0800, Icenowy Zheng wrote:
-> >> ?> > > > > > From: Ondrej Jirman <megous@megous.com>
-> >> ?> > > > > >
-> >> ?> > > > > > Allwinner SoCs from H3 (including H5, A64, etc) have a new version of
-> >> ?> > > > > > thermal sensor, and needs a new driver for it.
-> >> ?> > > > > >
-> >> ?> > > > > > Add such a driver.
-> >> ?> > > > > >
-> >> ?> > > > > > Currently only H3 is supported, but other SoCs are easily to be
-> >> ?> > > > > > supported by adding new formula and set the sensor number.
-> >> ?> > > > > >
-> >> ?> > > > > > Signed-off-by: Ond?ej Jirman <megous@megous.com>
-> >> ?> > > > > > [Icenowy: extend to support further multiple-sensor SoCs, change commit
-> >> ?> > > > > >? message]
-> >> ?> > > > > > Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
-> >> ?> > > > >
-> >> ?> > > > > There's no need to create a new driver for that. This can be handled
-> >> ?> > > > > by the GPADC driver we already have.
-> >> ?> > > >
-> >> ?> > > > sun8i-ths is not GPADC at all.
-> >> ?> > > >
-> >> ?> > > > The latest SoC I know that use GPADC as thermal sensor is A33.
-> >> ?> > >
-> >> ?> > > It's not called the same way, but it definitely is an evolution of the
-> >> ?> > > same controller. There's no need for a new driver, only reworking what
-> >> ?> > > is already there.
-> >> ?> >
-> >> ?> > I don't think so -- here's some evidence:
-> >>
-> >> ?But the H3 THS have many new IRQs, functions, different sampling
-> >> ?rate set method and a quite different register layout.
-> >>
-> >> ?Doing this in GPADC driver is possible but meaningless.
-> >>
-> >> ?> >
-> >> ?> > 1. The old GPADC do not have module clock.
-> >> ?>
-> >> ?> The A33 could use a PLL.
-> >>
-> >> ?But it's a dedicated mod clk on new generation THS.
-> >
-> > And all of this really are evolutions. The block is still driven in
-> > the exact same way. And this is where there is value in having the
-> > same driver: you share the logic, which is mostly common, instead of
-> > duplicating it.
-> 
-> After some thinking, I can accept a common driver for A23/A33 thermal
-> sensor and H3/A64/H5 ones, but I cannot accept use iio-sun4i-gpadc
-> driver for it, as now H3/A64/H5 thermal sensors are not just an ADC --
-> they features hardware alarm levels, and in some SoC it become a
-> multiple channel thermal sensor.
+Hi Romain,
 
-The A23 and A33 is trivial to support on the already existing GPADC
-driver. If you have it already working on the A33, then the amount of
-work for your driver to support the A33, or for the GPADC to support
-the newer SoC is strictly the same.
 
-Except in one case, we have a common, debugged, already reviewed and
-already merged driver. In the other case, we have no such things.
+On 08-03-2017 08:15, Romain Perier wrote:
+> Currently, the irq handler that monitores changes for HPD anx RX_SENSE
+> relies on the status of the bridge for updating the status of the HPD.
+> The update is done only when the bridge is enabled.
+>
+> However, on Rockchip platforms we have found use cases where it could be
+> a problem. When HDMI is being used, turning off/on the screen or
+> unplugging/re-plugging the cable, the following simplified code path
+> will happen:
+>
+> - dw_hdmi_irq() will be triggered by an HPD event, as the bridge is on
+> hdmi->disabled is false, then the handler will update the rxsense flag
+> accordingly.
+> - dw_hdmi_update_power() will be invoked with the mode
+> DRM_FORCE_UNSPECIFIED and rxsense == 1, so dw_hdmi_poweroff() will be
+> called and the PHY will be desactivated (its pixel clocks and TMDS)
+>
+> [...]
+>
+> - dw_hdmi_bridge_disable() will be invoked, the bridge will be marked as
+> disabled.
+>
+> - dw_hdmi_irq() will be triggered by an HPD event, as the bridge is
+> currently disabled the HPD status won't be updated, so hdmi->rxsense
+> won't be changed. Even if the data part of the PHY is disabled, this
+> information coming from the HDMI Transmitter is correct and should be
+> saved.
+>
+> [...]
+>
+> - dw_hdmi_bridge_enable() will be invoked, the bridge will be marked as
+> enabled.
+> - dw_hdmi_update_power() will be called. As hdmi->force will be equal to
+> DRM_FORCE_UNSPECIFIED the function will rely on hdmi->rxsense. This
+> field has not been updated by the irq handler, so it will be false and
+> DRM_FORCE_ON won't be put to hdmi->force.
+>
+> Consequently, most of the time dw_hdmi_poweron() won't be called in this
+> use case, TMDS won't be re-enabled the PHY won't be re-initialized,
+> resulting in a "Signal not found".
+>
+> This commit fixes the issue by removing the check for "!hdmi->disabled".
+> As already explained, even if the PHY is partially disabled, information
+> coming from HDMI Transmitter about HPD should be saved for a later use.
+>
+> Signed-off-by: Romain Perier <romain.perier@collabora.com>
+> ---
+>
+> Note: Due to an email configuration issue, some of my patches were not
+> received on infradead.org or vger.kernel.org. It is now fixed, so I
+> resend this patch for this reason.
+>
+>  drivers/gpu/drm/bridge/dw-hdmi.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/gpu/drm/bridge/dw-hdmi.c b/drivers/gpu/drm/bridge/dw-hdmi.c
+> index 235ce7d..b621fc7 100644
+> --- a/drivers/gpu/drm/bridge/dw-hdmi.c
+> +++ b/drivers/gpu/drm/bridge/dw-hdmi.c
+> @@ -1790,7 +1790,7 @@ static irqreturn_t dw_hdmi_irq(int irq, void *dev_id)
+>  	if (intr_stat &
+>  	    (HDMI_IH_PHY_STAT0_RX_SENSE | HDMI_IH_PHY_STAT0_HPD)) {
+>  		mutex_lock(&hdmi->mutex);
+> -		if (!hdmi->disabled && !hdmi->force) {
+> +		if (!hdmi->force) {
+>  			/*
+>  			 * If the RX sense status indicates we're disconnected,
+>  			 * clear the software rxsense status.
 
-> I will insist on doing a dedicated driver for it, or if you like, I can add
-> A23/A33 support to this driver. (Considering no one have already posted
-> any patches for A23/A33 thermal sensor, except my old ones, so my
-> work at least won't conflict with anything merged)
+Makes sense but I think you need to make sure that phy will not
+be enabled when bridge is disabled i.e. you should update rxsense
+only.
 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2016-December/474821.html
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170309/5f9f1aa9/attachment-0001.sig>
+Best regards,
+Jose Miguel Abreu
