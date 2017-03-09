@@ -1,90 +1,63 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 9 Mar 2017 12:09:55 +0000
-Subject: [PATCH v2 1/4] syscalls: Restore address limit after a syscall
-In-Reply-To: <20170309012456.5631-1-thgarnie@google.com>
-References: <20170309012456.5631-1-thgarnie@google.com>
-Message-ID: <20170309120955.GA6320@leverpostej>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Thu, 09 Mar 2017 13:14:19 +0100
+Subject: [RESEND PATCH] arm: assabet_defconfig: disable IDE subsystem
+In-Reply-To: <bca846c5-6fb8-7e60-f5c5-24772c57803b@ti.com>
+References: <1467991490-24895-1-git-send-email-b.zolnierkie@samsung.com>
+ <1821488.fi4Ak6Xj0W@amdc3058> <bca846c5-6fb8-7e60-f5c5-24772c57803b@ti.com>
+ <CGME20170309121425epcas1p119ed8e5e27e3f7d8bfc71d0173cd301b@epcas1p1.samsung.com>
+Message-ID: <1924455.PnXtBOmdyf@amdc3058>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Wed, Mar 08, 2017 at 05:24:53PM -0800, Thomas Garnier wrote:
-> This patch ensures a syscall does not return to user-mode with a kernel
-> address limit. If that happened, a process can corrupt kernel-mode
-> memory and elevate privileges.
+On Thursday, March 09, 2017 05:27:12 PM Sekhar Nori wrote:
+> On Thursday 09 March 2017 05:17 PM, Bartlomiej Zolnierkiewicz wrote:
+> > 
+> > Hi Sekhar,
+> > 
+> > On Thursday, March 09, 2017 02:09:30 PM Sekhar Nori wrote:
+> >> Hi Bartlomiej,
+> >>
+> >> On Wednesday 08 March 2017 08:30 PM, Sekhar Nori wrote:
+> >>
+> >>>> It took a while to get to it but here is the draft driver patch
+> >>>> against v4.11-rc1.  Please test.
+> >>>
+> >>> I tested this on DM6446 EVM. I was able to mount existing partitions on 
+> >>> the hard disk and see that the directory listing looks good[1]. I will do 
+> >>> more tests (including comparing performance with old driver) tomorrow. I 
+> >>
+> >> I completed the tests I wanted to, including some read/write/data 
+> >> integrity tests. Performance is same as before too.
+> >>
+> >> Tested-by: Sekhar Nori <nsekhar@ti.com>
+> > 
+> > Thanks for testing!
+> > 
+> >> Here are the additional changes I did. These changes do not clash with 
+> > 
+> > I'll split the draft patch on ATA & platform changes and make a proper
+> > submission.  I'll also include your changes (can I have your Signed-by
+> > for them?).
 > 
-> For example, it would mitigation this bug:
+> Signed-of-by: Sekhar Nori <nsekhar@ti.com>
+
+Thanks.
+
+> >> what I have already queued for v4.12. That said, its probably better if 
+> >> I carry the platform pieces through my tree. Let me know how you want 
+> >> to proceed.
+> > 
+> > I think that it would be the best to ask Tejun to make a separate branch
+> > with a pata_bk3710 driver so it can be pulled into your tree to preserve
+> > bisectability.
 > 
-> - https://bugs.chromium.org/p/project-zero/issues/detail?id=990
-> 
-> If the CONFIG_BUG_ON_DATA_CORRUPTION option is enabled, an incorrect
-> state will result in a BUG_ON.
-> 
-> The CONFIG_ARCH_NO_SYSCALL_VERIFY_PRE_USERMODE_STATE option is also
-> added so each architecture can optimize this change.
+> Sounds good. What about removal of IDE driver? Do you want to have both
+> drivers existing in v4.12 and get rid of the IDE driver in v4.13 ?
 
-> +#ifndef CONFIG_ARCH_NO_SYSCALL_VERIFY_PRE_USERMODE_STATE
-> +static inline bool has_user_ds(void) {
-> +	bool ret = segment_eq(get_fs(), USER_DS);
-> +	// Prevent re-ordering the call
-> +	barrier();
+Sounds good to me.
 
-What ordering are we trying to ensure, that isn't otherwise given?
-
-We expect get_fs() and set_fs() to be ordered w.r.t. each other and
-w.r.t. uaccess uses, or we'd need barriers all over the place.
-
-Given that, I can't see why we need a barrier here. So this needs a
-better comment, at least.
-
-> +	return ret;
-> +}
-> +#else
-> +static inline bool has_user_ds(void) {
-> +	return false;
-> +}
-> +#endif
-
-It would be simpler to wrap the call entirely, e.g. have:
-
-#ifdef CONFIG_WHATEVER
-static inline void verify_pre_usermode_state(void)
-{
-	if (segment_eq(get_fs(), USER_DS))
-		__verify_pre_usermode_state();
-}
-#else
-static inline void verify_pre_usermode_state(void) { }
-#endif
-
-> @@ -199,7 +215,10 @@ extern struct trace_event_functions exit_syscall_print_funcs;
->  	asmlinkage long SyS##name(__MAP(x,__SC_LONG,__VA_ARGS__));	\
->  	asmlinkage long SyS##name(__MAP(x,__SC_LONG,__VA_ARGS__))	\
->  	{								\
-> +		bool user_caller = has_user_ds();			\
->  		long ret = SYSC##name(__MAP(x,__SC_CAST,__VA_ARGS__));	\
-> +		if (user_caller)					\
-> +			verify_pre_usermode_state();			\
-
-... then we can unconditionally use verify_pre_usermode_state() here ... 
-
->  		__MAP(x,__SC_TEST,__VA_ARGS__);				\
->  		__PROTECT(x, ret,__MAP(x,__SC_ARGS,__VA_ARGS__));	\
->  		return ret;						\
-
-[...]
-
-> +/* Called before coming back to user-mode */
-> +asmlinkage void verify_pre_usermode_state(void)
-
-... and we just prepend a couple of underscores here.
-
-> +{
-> +	if (CHECK_DATA_CORRUPTION(!segment_eq(get_fs(), USER_DS),
-> +				  "incorrect get_fs() on user-mode return"))
-> +		set_fs(USER_DS);
-> +}
-
-Thanks,
-Mark.
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
