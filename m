@@ -1,79 +1,29 @@
-From: peppe.cavallaro@st.com (Giuseppe CAVALLARO)
-Date: Thu, 9 Mar 2017 10:09:02 +0100
-Subject: stmmac still supporting spear600 ?
-In-Reply-To: <20170309093412.33c0277d@free-electrons.com>
-References: <20170309093412.33c0277d@free-electrons.com>
-Message-ID: <373e2760-94c5-4349-33aa-158bc8f4b19e@st.com>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Thu, 9 Mar 2017 10:14:07 +0100
+Subject: [PATCH 0/3] Add RTC support on STM32F746
+In-Reply-To: <1484833519-9298-1-git-send-email-amelie.delaunay@st.com>
+References: <1484833519-9298-1-git-send-email-amelie.delaunay@st.com>
+Message-ID: <92beeacd-5d2e-7c4c-7070-56885ebeeca4@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello
+Hi Am?lie,
 
-We do not test stmmac on this spear board since many years
-and I guess you have to provide parameters from the platform.
-In fact, stmmac is recently tested with DT.
-IIRC, the mac on spear600 could not have the HW cap register
-so it is mandatory to provide all the right parameters and
-configurations for this HW.
+On 01/19/2017 02:45 PM, Amelie Delaunay wrote:
+> This patchset enables STM32 RTC on STM32F746 MCU.
+>
+> Amelie Delaunay (3):
+>   ARM: dts: stm32: set HSE_RTC clock frequency to 1 MHz on stm32f746
+>   ARM: dts: stm32: Add RTC support for STM32F746 MCU
+>   ARM: dts: stm32: enable RTC on stm32746g-eval
+>
 
-Regards
-Peppe
+Can you please rebase this series on 4.11-rc1 and resend ?
 
-On 3/9/2017 9:34 AM, Thomas Petazzoni wrote:
-> Hello,
->
-> I'm porting Linux to an old spear600 based platform, and therefore
-> trying to use the stmmac driver on this SoC. Unfortunately, it doesn't
-> work quite well and I'm wondering if the stmmac driver still properly
-> supports the old version of the IP that is used in this SoC. I'm
-> testing with v4.11-rc1.
->
-> First, the logs:
->
-> Linux version 4.11.0-rc1 (thomas at skate) (gcc version 5.4.0 20160609 (Ubuntu/Linaro 5.4.0-6ubuntu1~16.04.4) ) #18 Thu Mar 9 09:18:01 CET 2017
-> [...]
-> libphy: Fixed MDIO Bus: probed
-> stmmaceth e0800000.ethernet: no reset control found
-> stmmac - user ID: 0x10, Synopsys ID: 0x32
-> stmmaceth e0800000.ethernet: Ring mode enabled
-> stmmaceth e0800000.ethernet: DMA HW capability register supported
-> stmmaceth e0800000.ethernet: Normal descriptors
-> libphy: stmmac: probed
-> stmmaceth e0800000.ethernet (unnamed net_device) (uninitialized): PHY ID 0007c0c4 at 31 IRQ POLL (stmmac-0:1f) active
-> [...]
-> # ifconfig eth0 192.168.1.89
-> stmmaceth e0800000.ethernet eth0: device MAC address 00:30:d3:21:22:60
-> Generic PHY stmmac-0:1f: attached PHY driver [Generic PHY] (mii_bus:phy_addr=stmmac-0:1f, irq=-1)
-> stmmaceth e0800000.ethernet: Failed to reset the dma
-> stmmaceth e0800000.ethernet eth0: stmmac_hw_setup: DMA engine initialization failed
-> stmmaceth e0800000.ethernet eth0: stmmac_open: Hw setup failed
-> ifconfig: SIOCSIFFLAGS: Device or resource busy
->
-> So the reason why it fails to reset the DMA is because
-> dwmac_dma_reset() sets bit DMA_BUS_MODE_SFT_RESET in register
-> DMA_BUS_MODE and waits for this bit to clear, but that never happens.
->
-> The reason why I'm not sure if this IP is still supported is because
-> dwmac1000_get_hw_feature() reads the DMA_HW_FEATURE register (offset
-> 0x00001058), and my spear600 datasheet doesn't mention this register at
-> all.
->
-> It is worth mentioning that:
->
->  - Ethernet is working fine under U-Boot (it's an old 2010.03 U-Boot
->    version, with a good number of patches), so I'm sure the HW is
->    working.
->
->  - Setting bit 1 in the DMA_BUS_MODE register from U-Boot also leaves
->    this bit set forever, it apparently never clears (unless my tests
->    were wrong, which is very possible).
->
-> In terms of Device Tree, I'm simply using spear600.dtsi, and enabling
-> the gmac node, nothing else.
->
-> Has the stmmac driver been recently used/tested on spear600 ?
->
-> Thanks,
->
-> Thomas Petazzoni
+Thanks in advance
+
+
+>  arch/arm/boot/dts/stm32746g-eval.dts |  4 ++++
+>  arch/arm/boot/dts/stm32f746.dtsi     | 16 ++++++++++++++++
+>  2 files changed, 20 insertions(+)
 >
