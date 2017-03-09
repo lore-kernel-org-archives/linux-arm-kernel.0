@@ -1,150 +1,146 @@
-From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
-Date: Thu, 9 Mar 2017 08:39:07 +0100
-Subject: pcie-iproc: broken 2nd (& 3rd?) controller support by
- c3245a566400 ("PCI: iproc: Request host bridge window resources")
-In-Reply-To: <faab6b85-58e8-3e62-8763-56a94b13fba1@gmail.com>
-References: <faab6b85-58e8-3e62-8763-56a94b13fba1@gmail.com>
-Message-ID: <f40bbf2f-3ba9-3992-d417-6588085f3d62@gmail.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Thu, 9 Mar 2017 13:27:11 +0530
+Subject: [PATCH v3 00/23] PCI: Support for configurable PCI endpoint
+Message-ID: <1489046254-19919-1-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/08/2017 01:56 PM, Rafa? Mi?ecki wrote:
-> I just tried upgrading BCM5301X from 4.4 to 4.9 and noticed I don't see card
-> connected to the 2nd controller.
->
-> [    2.593534] pcie_iproc_bcma bcma0:7: PCI host bridge to bus 0000:00
-> [    2.599786] pci_bus 0000:00: root bus resource [mem 0x08000000-0x0fffffff]
-> [    2.606663] pcie_iproc_bcma bcma0:7: link: UP
-> [    2.611316] PCI: bus0: Fast back to back transfers disabled
-> [    2.616899] pci 0000:00:00.0: bridge configuration invalid ([bus 00-00]), reconfiguring
-> [    2.625395] PCI: bus1: Fast back to back transfers disabled
-> [    2.631011] pci 0000:00:00.0: BAR 8: assigned [mem 0x08000000-0x080fffff]
-> [    2.637795] pci 0000:01:00.0: BAR 0: assigned [mem 0x08000000-0x08007fff 64bit]
-> [    2.645091] pci 0000:00:00.0: PCI bridge to [bus 01]
-> [    2.650042] pci 0000:00:00.0:   bridge window [mem 0x08000000-0x080fffff]
->
-> [    2.657199] pcie_iproc_bcma bcma0:8: resource collision: [mem 0x40000000-0x47ffffff] conflicts with PCIe MEM space [mem 0x40000000-0x47ffffff]
-> [    2.669946] pcie_iproc_bcma bcma0:8: PCIe controller setup failed
-> [    2.676032] pcie_iproc_bcma: probe of bcma0:8 failed with error -16
->
->
-> This used to work with older kernels because there wasn't any collision check:
->
-> [    2.587117] pcie_iproc_bcma bcma0:7: PCI host bridge to bus 0000:00
-> [    2.593378] pci_bus 0000:00: root bus resource [mem 0x08000000-0x0fffffff]
-> [    2.600256] pcie_iproc_bcma bcma0:7: link: UP
-> [    2.604888] PCI: bus0: Fast back to back transfers disabled
-> [    2.610474] pci 0000:00:00.0: bridge configuration invalid ([bus 00-00]), reconfiguring
-> [    2.618973] PCI: bus1: Fast back to back transfers disabled
-> [    2.624591] pci 0000:00:00.0: BAR 8: assigned [mem 0x08000000-0x080fffff]
-> [    2.631382] pci 0000:01:00.0: BAR 0: assigned [mem 0x08000000-0x08007fff 64bit]
-> [    2.638686] pci 0000:00:00.0: PCI bridge to [bus 01]
-> [    2.643633] pci 0000:00:00.0:   bridge window [mem 0x08000000-0x080fffff]
->
-> [    2.777118] pcie_iproc_bcma bcma0:8: PCI host bridge to bus 0001:00
-> [    2.783367] pci_bus 0001:00: root bus resource [mem 0x40000000-0x47ffffff]
-> [    2.790245] pcie_iproc_bcma bcma0:8: link: UP
-> [    2.794862] PCI: bus0: Fast back to back transfers disabled
-> [    2.800452] pci 0001:00:00.0: bridge configuration invalid ([bus 00-00]), reconfiguring
-> [    2.808946] PCI: bus1: Fast back to back transfers disabled
-> [    2.814558] pci 0001:00:00.0: BAR 8: assigned [mem 0x40000000-0x400fffff]
-> [    2.821352] pci 0001:01:00.0: BAR 0: assigned [mem 0x40000000-0x40007fff 64bit]
-> [    2.828650] pci 0001:00:00.0: PCI bridge to [bus 01]
-> [    2.833600] pci 0001:00:00.0:   bridge window [mem 0x40000000-0x400fffff]
->
->
-> I guess the check is OK after all and the real problem is iproc driver assigning
-> the same resource.
->
-> Broadcom team: could you take a look at this, please?
+This patch series
+ *) add PCI endpoint core layer
+ *) modify designware and dra7xx driver to be configured in EP mode
+ *) add a PCI endpoint *test* function driver and corresponding host
+    driver
 
-I found a reason of this conflict (and probably random crashes I started
-seeing with 4.9). I believe we have a memory corruption.
+Changes from v2:
+*) changed the configfs structure as suggested by Christoph Hellwig. With
+   this change the framework creates configfs entry for EP function driver
+   and EP controller. Previously these entries have to be created by the
+   the user. (Haven't changed the epc core or epf core except for invoking
+   configfs APIs to create entries for EP function driver and EP controller.
+   That's mostly because the EP function device can still be created by
+   directly invoking the epf core API without using configfs).
+*) Now the user has to use configfs entry 'start' to start the link.
+   This was previously done by the function driver. However in the case of
+   multi function EP, the function driver shouldn't start the link.
 
-So that commit c3245a566400 ("PCI: iproc: Request host bridge window
-resources") adds call to the devm_request_pci_bus_resources passing "res"
-pointer. The problem is "res" points to the *local* variable of
-iproc_pcie_bcma_probe function.
-As soon as the iproc_pcie_bcma_probe exits that resource variable is not
-accessible anymore, yet it's used as a child for &iomem_resource. Things go
-even worse on another iproc_pcie_bcma_probe call. Its local variable res_mem
-gets the same memory address as the one already used for &iomem_resource. We
-modify local variable modifying already-added resource at the same time!
+Changes from v1:
+*) The preparation patches for adding EP support is removed and is sent
+   separately
+*) Added device ID for DRA74x/DRA72x and used it instead of
+   using "PCI_ANY_ID"
+*) Added userguide for PCI endpoint test function
 
-So this is where this whole conflicts comes from. What is stored as resource
-for [mem 0x08000000-0x0fffffff] range gets modified as "local" variable to the
-[mem 0x40000000-0x47ffffff] and then we try to re-request the same resource.
+Major Improvements from RFC:
+ *) support multi-function devices (hw supported not virtual)
+ *) Access host side buffers
+ *) Raise MSI interrupts
+ *) Add user space program to use the host side PCI driver
+ *) Adapt all other users of designware to use the new design (only
+    compile tested. Since I have only dra7xx boards, the new design
+    has only been tested in dra7xx. I'd require the help of others
+    to test the platforms they have access to).
 
-I'm pasting log & patch that allowed me to debug & notice this problem so you
-can confirm my observations.
+This series has been developed over 4.11-rc1 + [1]
+This series has also been pushed to [2]
 
-[    2.615055] resource: [__request_resource] root:[mem 0x00000000-0xffffffff]
-[    2.621995] resource: [__request_resource]  new:c7839be0 new:[mem 0x08000000-0x0fffffff]
-[    2.630060] resource: [__request_resource]  tmp:c7ffee00 tmp:[mem 0x00000000-0x07ffffff]
-[    2.638122] resource: [__request_resource]  tmp:c7adf180 tmp:[mem 0x18000300-0x180003ff]
-[    2.764941] pcie_iproc_bcma bcma0:7: PCI host bridge to bus 0000:00
-[    2.771194] pci_bus 0000:00: root bus resource [mem 0x08000000-0x0fffffff]
-[    2.778066] pcie_iproc_bcma bcma0:7: link: UP
-[    2.782693] PCI: bus0: Fast back to back transfers disabled
-[    2.788267] pci 0000:00:00.0: bridge configuration invalid ([bus 00-00]), reconfiguring
-[    2.796767] PCI: bus1: Fast back to back transfers disabled
-[    2.802375] resource: [__request_resource] root:[mem 0x08000000-0x0fffffff]
-[    2.809324] resource: [__request_resource]  new:c7b08e64 new:[mem size 0x00100000]
-[    2.816865] resource: [__request_resource]  tmp:  (null) tmp:  (null)
-[    2.823282] pci 0000:00:00.0: BAR 8: assigned [mem 0x08000000-0x080fffff]
-[    2.830049] resource: [__request_resource] root:[mem 0x08000000-0x080fffff]
-[    2.836986] resource: [__request_resource]  new:c7b09164 new:[mem size 0x00008000 64bit]
-[    2.845047] resource: [__request_resource]  tmp:  (null) tmp:  (null)
-[    2.851464] pci 0000:01:00.0: BAR 0: assigned [mem 0x08000000-0x08007fff 64bit]
-[    2.858758] pci 0000:00:00.0: PCI bridge to [bus 01]
-[    2.863700] pci 0000:00:00.0:   bridge window [mem 0x08000000-0x080fffff]
+[1] -> https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1348667.html
+[2] -> git://git.kernel.org/pub/scm/linux/kernel/git/kishon/pci-endpoint.git
 
-[    2.870834] resource: [__request_resource] root:[mem 0x00000000-0xffffffff]
-[    2.877791] resource: [__request_resource]  new:c7839be0 new:[mem 0x40000000-0x47ffffff]
-[    2.885855] resource: [__request_resource]  tmp:c7ffee00 tmp:[mem 0x00000000-0x07ffffff]
-[    2.893911] resource: [__request_resource]  tmp:c7839be0 tmp:[mem 0x40000000-0x47ffffff]
-[    2.901971] resource: [__request_resource] Found collision with tmp
-[    2.908225] pcie_iproc_bcma bcma0:8: resource collision: [mem 0x40000000-0x47ffffff] conflicts with PCIe MEM space [mem 0x40000000-0x47ffffff]
-[    2.920952] pcie_iproc_bcma bcma0:8: PCIe controller setup failed
-[    2.927037] pcie_iproc_bcma: probe of bcma0:8 failed with error -16
+Kishon Vijay Abraham I (23):
+  PCI: endpoint: Add EP core layer to enable EP controller and EP
+    functions
+  Documentation: PCI: Guide to use PCI Endpoint Core Layer
+  PCI: endpoint: Introduce configfs entry for configuring EP functions
+  Documentation: PCI: Guide to use pci endpoint configfs
+  PCI: endpoint: Create configfs entry for EPC device and EPF driver
+  Documentation: PCI: Add specification for the *pci test* function
+    device
+  PCI: endpoint: functions: Add an EP function to test PCI
+  Documentation: PCI: Add binding documentation for pci-test endpoint
+    function
+  PCI: dwc: designware: Add EP mode support
+  dt-bindings: PCI: Add dt bindings for pci designware EP mode
+  PCI: dwc: dra7xx: Facilitate wrapper and msi interrupts to be enabled
+    independently
+  PCI: dwc: dra7xx: Add EP mode support
+  dt-bindings: PCI: dra7xx: Add dt bindings for pci dra7xx EP mode
+  PCI: dwc: dra7xx: Workaround for errata id i870
+  dt-bindings: PCI: dra7xx: Add dt bindings to enable unaligned access
+  PCI: Add device IDs for DRA74x and DRA72x
+  misc: Add host side pci driver for pci test function device
+  Documentation: misc-devices: Add Documentation for pci-endpoint-test
+    driver
+  tools: PCI: Add a userspace tool to test PCI endpoint
+  tools: PCI: Add sample test script to invoke pcitest
+  Documentation: PCI: Add userguide for PCI endpoint test function
+  MAINTAINERS: add PCI EP maintainer
+  ARM: DRA7: clockdomain: Change the CLKTRCTRL of CM_PCIE_CLKSTCTRL to
+    SW_WKUP
 
-As you can see, for the first controller following resource has been requested:
-c7839be0 [mem 0x08000000-0x0fffffff]
+ Documentation/PCI/00-INDEX                         |   10 +
+ .../PCI/endpoint/function/binding/pci-test.txt     |   17 +
+ Documentation/PCI/endpoint/pci-endpoint-cfs.txt    |  105 ++++
+ Documentation/PCI/endpoint/pci-endpoint.txt        |  215 ++++++++
+ Documentation/PCI/endpoint/pci-test-function.txt   |   66 +++
+ Documentation/PCI/endpoint/pci-test-howto.txt      |  179 ++++++
+ .../devicetree/bindings/pci/designware-pcie.txt    |   26 +-
+ Documentation/devicetree/bindings/pci/ti-pci.txt   |   42 +-
+ Documentation/misc-devices/pci-endpoint-test.txt   |   35 ++
+ MAINTAINERS                                        |    9 +
+ arch/arm/mach-omap2/clockdomains7xx_data.c         |    2 +-
+ drivers/Makefile                                   |    2 +
+ drivers/misc/Kconfig                               |    7 +
+ drivers/misc/Makefile                              |    1 +
+ drivers/misc/pci_endpoint_test.c                   |  534 ++++++++++++++++++
+ drivers/pci/Kconfig                                |    1 +
+ drivers/pci/dwc/Kconfig                            |   36 +-
+ drivers/pci/dwc/Makefile                           |    5 +-
+ drivers/pci/dwc/pci-dra7xx.c                       |  274 ++++++++-
+ drivers/pci/dwc/pcie-designware-ep.c               |  340 ++++++++++++
+ drivers/pci/dwc/pcie-designware.c                  |  136 +++++
+ drivers/pci/dwc/pcie-designware.h                  |   82 +++
+ drivers/pci/endpoint/Kconfig                       |   31 ++
+ drivers/pci/endpoint/Makefile                      |    7 +
+ drivers/pci/endpoint/functions/Kconfig             |   12 +
+ drivers/pci/endpoint/functions/Makefile            |    5 +
+ drivers/pci/endpoint/functions/pci-epf-test.c      |  510 +++++++++++++++++
+ drivers/pci/endpoint/pci-ep-cfs.c                  |  509 +++++++++++++++++
+ drivers/pci/endpoint/pci-epc-core.c                |  579 ++++++++++++++++++++
+ drivers/pci/endpoint/pci-epc-mem.c                 |  143 +++++
+ drivers/pci/endpoint/pci-epf-core.c                |  351 ++++++++++++
+ include/linux/mod_devicetable.h                    |   10 +
+ include/linux/pci-ep-cfs.h                         |   41 ++
+ include/linux/pci-epc.h                            |  144 +++++
+ include/linux/pci-epf.h                            |  162 ++++++
+ include/linux/pci_ids.h                            |    2 +
+ include/uapi/linux/Kbuild                          |    1 +
+ include/uapi/linux/pcitest.h                       |   19 +
+ tools/pci/pcitest.c                                |  186 +++++++
+ tools/pci/pcitest.sh                               |   56 ++
+ 40 files changed, 4852 insertions(+), 40 deletions(-)
+ create mode 100644 Documentation/PCI/endpoint/function/binding/pci-test.txt
+ create mode 100644 Documentation/PCI/endpoint/pci-endpoint-cfs.txt
+ create mode 100644 Documentation/PCI/endpoint/pci-endpoint.txt
+ create mode 100644 Documentation/PCI/endpoint/pci-test-function.txt
+ create mode 100644 Documentation/PCI/endpoint/pci-test-howto.txt
+ create mode 100644 Documentation/misc-devices/pci-endpoint-test.txt
+ create mode 100644 drivers/misc/pci_endpoint_test.c
+ create mode 100644 drivers/pci/dwc/pcie-designware-ep.c
+ create mode 100644 drivers/pci/endpoint/Kconfig
+ create mode 100644 drivers/pci/endpoint/Makefile
+ create mode 100644 drivers/pci/endpoint/functions/Kconfig
+ create mode 100644 drivers/pci/endpoint/functions/Makefile
+ create mode 100644 drivers/pci/endpoint/functions/pci-epf-test.c
+ create mode 100644 drivers/pci/endpoint/pci-ep-cfs.c
+ create mode 100644 drivers/pci/endpoint/pci-epc-core.c
+ create mode 100644 drivers/pci/endpoint/pci-epc-mem.c
+ create mode 100644 drivers/pci/endpoint/pci-epf-core.c
+ create mode 100644 include/linux/pci-ep-cfs.h
+ create mode 100644 include/linux/pci-epc.h
+ create mode 100644 include/linux/pci-epf.h
+ create mode 100644 include/uapi/linux/pcitest.h
+ create mode 100644 tools/pci/pcitest.c
+ create mode 100644 tools/pci/pcitest.sh
 
-Then when we try to probe second controller there are following resources
-already in use:
-c7ffee00 [mem 0x00000000-0x07ffffff]
-c7839be0 [mem 0x40000000-0x47ffffff]
-and we try to request:
-c7839be0 [mem 0x40000000-0x47ffffff]
-
-
-diff --git a/kernel/resource.c b/kernel/resource.c
-index 9b5f044..fab9405 100644
---- a/kernel/resource.c
-+++ b/kernel/resource.c
-@@ -220,6 +220,8 @@ static struct resource * __request_resource(struct resource *root, struct resour
-  	resource_size_t end = new->end;
-  	struct resource *tmp, **p;
-
-+	if (new->flags & IORESOURCE_MEM) pr_info("[%s] root:%pR\n", __func__, root);
-+	if (new->flags & IORESOURCE_MEM) pr_info("[%s]  new:%p new:%pR\n", __func__, new, new);
-  	if (end < start)
-  		return root;
-  	if (start < root->start)
-@@ -229,6 +231,7 @@ static struct resource * __request_resource(struct resource *root, struct resour
-  	p = &root->child;
-  	for (;;) {
-  		tmp = *p;
-+		if (new->flags & IORESOURCE_MEM) pr_info("[%s]  tmp:%p tmp:%pR\n", __func__, tmp, tmp);
-  		if (!tmp || tmp->start > end) {
-  			new->sibling = tmp;
-  			*p = new;
-@@ -238,6 +241,7 @@ static struct resource * __request_resource(struct resource *root, struct resour
-  		p = &tmp->sibling;
-  		if (tmp->end < start)
-  			continue;
-+		if (new->flags & IORESOURCE_MEM) pr_info("[%s] Found collision with tmp\n", __func__);
-  		return tmp;
-  	}
-  }
+-- 
+1.7.9.5
