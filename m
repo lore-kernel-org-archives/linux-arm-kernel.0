@@ -1,62 +1,26 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu,  9 Mar 2017 21:52:04 +0100
-Subject: [PATCH v6 06/11] arm64/mmu: align alloc_init_pte prototype with
- pmd/pud versions
-In-Reply-To: <1489092729-16871-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1489092729-16871-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1489092729-16871-7-git-send-email-ard.biesheuvel@linaro.org>
+From: roszenrami@gmail.com (Rami Rosen)
+Date: Thu, 9 Mar 2017 23:59:18 +0200
+Subject: [PATCH v3 08/23] Documentation: PCI: Add binding documentation
+ for pci-test endpoint function
+In-Reply-To: <1489046254-19919-9-git-send-email-kishon@ti.com>
+References: <1489046254-19919-1-git-send-email-kishon@ti.com>
+ <1489046254-19919-9-git-send-email-kishon@ti.com>
+Message-ID: <CAKoUArkTXbMvfTmNjA_VGWodbP5JxVNBP1DNUTYND2LvUfKsJQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Align the function prototype of alloc_init_pte() with its pmd and pud
-counterparts by replacing the pfn parameter with the equivalent physical
-address.
+Hi,
+Minor comment: typo, should be: don't care:
 
-Reviewed-by: Mark Rutland <mark.rutland@arm.com>
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/mm/mmu.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+> +revid           : dont't care
+> +progif_code     : don't care
+> +subclass_code   : don't care
+> +baseclass_code  : should be 0xff
+> +cache_line_size         : don't care
+> +subsys_vendor_id : don't care
+> +subsys_id       : don't care
+> +interrupt_pin   : Should be 1 - INTA, 2 - INTB, 3 - INTC, 4 -INTD
+> +msi_interrupts  : Should be 1 to 32 depending on the number of msi
 
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index 75e21c33caff..bb9179084217 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -107,7 +107,7 @@ static bool pgattr_change_is_safe(u64 old, u64 new)
- }
- 
- static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
--				  unsigned long end, unsigned long pfn,
-+				  unsigned long end, phys_addr_t phys,
- 				  pgprot_t prot,
- 				  phys_addr_t (*pgtable_alloc)(void))
- {
-@@ -128,8 +128,7 @@ static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
- 	do {
- 		pte_t old_pte = *pte;
- 
--		set_pte(pte, pfn_pte(pfn, prot));
--		pfn++;
-+		set_pte(pte, pfn_pte(__phys_to_pfn(phys), prot));
- 
- 		/*
- 		 * After the PTE entry has been populated once, we
-@@ -137,6 +136,7 @@ static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
- 		 */
- 		BUG_ON(!pgattr_change_is_safe(pte_val(old_pte), pte_val(*pte)));
- 
-+		phys += PAGE_SIZE;
- 	} while (pte++, addr += PAGE_SIZE, addr != end);
- 
- 	pte_clear_fixmap();
-@@ -182,7 +182,7 @@ static void alloc_init_pmd(pud_t *pud, unsigned long addr, unsigned long end,
- 			BUG_ON(!pgattr_change_is_safe(pmd_val(old_pmd),
- 						      pmd_val(*pmd)));
- 		} else {
--			alloc_init_pte(pmd, addr, next, __phys_to_pfn(phys),
-+			alloc_init_pte(pmd, addr, next, phys,
- 				       prot, pgtable_alloc);
- 
- 			BUG_ON(pmd_val(old_pmd) != 0 &&
--- 
-2.7.4
+Regards,
+Rami Rosen
