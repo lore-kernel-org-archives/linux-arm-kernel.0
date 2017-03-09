@@ -1,77 +1,50 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu,  9 Mar 2017 09:55:34 +0000
-Subject: [PATCH 05/10] arm64: KVM: Survive unknown traps from guests
-In-Reply-To: <20170309095539.14512-1-marc.zyngier@arm.com>
-References: <20170309095539.14512-1-marc.zyngier@arm.com>
-Message-ID: <20170309095539.14512-6-marc.zyngier@arm.com>
+From: mylene.josserand@free-electrons.com (=?UTF-8?q?Myl=C3=A8ne=20Josserand?=)
+Date: Thu,  9 Mar 2017 10:55:59 +0100
+Subject: [PATCH v2 0/3] ASoC: sun8i-codec: Clean-up
+Message-ID: <20170309095602.13809-1-mylene.josserand@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mark Rutland <mark.rutland@arm.com>
+Hello everyone,
 
-Currently we BUG() if we see an ESR_EL2.EC value we don't recognise. As
-configurable disables/enables are added to the architecture (controlled
-by RES1/RES0 bits respectively), with associated synchronous exceptions,
-it may be possible for a guest to trigger exceptions with classes that
-we don't recognise.
+Thanks to Chen-Yu's review [1], a first version of this patchset to
+clean-up my sun8i A33 audio driver has been sent and merged.
+One patch [2] needs a rework so this cover-letter is for its V2.
 
-While we can't service these exceptions in a manner useful to the guest,
-we can avoid bringing down the host. Per ARM DDI 0487A.k_iss10775, page
-D7-1937, EC values within the range 0x00 - 0x2c are reserved for future
-use with synchronous exceptions, and EC values within the range 0x2d -
-0x3f may be used for either synchronous or asynchronous exceptions.
+Changes with v1:
+	- Remove patches 01, 02 and 03 as they are merged in asoc/for-next.
+	- Added a patch to fix an error on an widget name
+	- Split the patch 04 into two patches to separate the device tree
+	modifications with the codec driver's one.
 
-The patch makes KVM handle any unknown EC by injecting an UNDEFINED
-exception into the guest, with a corresponding (ratelimited) warning in
-the host dmesg. We could later improve on this with with a new (opt-in)
-exit to the host userspace.
+Patches tested on asoc/for-next branch, last commit: 698b3eb9af.
 
-Cc: Dave Martin <dave.martin@arm.com>
-Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm64/kvm/handle_exit.c | 19 ++++++++++++-------
- 1 file changed, 12 insertions(+), 7 deletions(-)
+Patch 1: Fix a dapm routing error because of an unwanted space.
+Patch 2: Convert SND_SOC_DAPM_DAC to SND_SOC_DAPM_AIF_IN definition.
+The AIF interfaces are renamed to be more precise.
+Patch 3: Update the audio-routing's device tree to use the AIF interfaces
+renamed in patch 01.
 
-diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
-index 1bfe30dfbfe7..fa1b18e364fc 100644
---- a/arch/arm64/kvm/handle_exit.c
-+++ b/arch/arm64/kvm/handle_exit.c
-@@ -135,7 +135,19 @@ static int kvm_handle_guest_debug(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 	return ret;
- }
- 
-+static int kvm_handle_unknown_ec(struct kvm_vcpu *vcpu, struct kvm_run *run)
-+{
-+	u32 hsr = kvm_vcpu_get_hsr(vcpu);
-+
-+	kvm_pr_unimpl("Unknown exception class: hsr: %#08x -- %s\n",
-+		      hsr, esr_get_class_string(hsr));
-+
-+	kvm_inject_undefined(vcpu);
-+	return 1;
-+}
-+
- static exit_handle_fn arm_exit_handlers[] = {
-+	[0 ... ESR_ELx_EC_MAX]	= kvm_handle_unknown_ec,
- 	[ESR_ELx_EC_WFx]	= kvm_handle_wfx,
- 	[ESR_ELx_EC_CP15_32]	= kvm_handle_cp15_32,
- 	[ESR_ELx_EC_CP15_64]	= kvm_handle_cp15_64,
-@@ -162,13 +174,6 @@ static exit_handle_fn kvm_get_exit_handler(struct kvm_vcpu *vcpu)
- 	u32 hsr = kvm_vcpu_get_hsr(vcpu);
- 	u8 hsr_ec = ESR_ELx_EC(hsr);
- 
--	if (hsr_ec >= ARRAY_SIZE(arm_exit_handlers) ||
--	    !arm_exit_handlers[hsr_ec]) {
--		kvm_err("Unknown exception class: hsr: %#08x -- %s\n",
--			hsr, esr_get_class_string(hsr));
--		BUG();
--	}
--
- 	return arm_exit_handlers[hsr_ec];
- }
- 
+After this series, amixer commands to test an audio file:
+	amixer set 'Headphone' 75%
+   	amixer set 'Headphone' on
+	amixer set 'DAC' on
+	amixer set 'AIF1 Slot 0 Digital DAC' on
+
+[1] https://lkml.org/lkml/2017/2/7/103
+[2] https://patchwork.kernel.org/patch/9566325/
+
+Thank you in advance,
+Best regards,
+
+Myl?ne Josserand (3):
+  ASoC: sun8i-codec: Fix space on audio-routing widget
+  ASoC: sun8i-codec: Convert to use SND_SOC_DAPM_AIF_IN
+  ARM: dts: sun8i: Update audio-routing with renamed widgets
+
+ arch/arm/boot/dts/sun8i-a33.dtsi |  4 ++--
+ sound/soc/sunxi/sun8i-codec.c    | 22 ++++++++++++----------
+ 2 files changed, 14 insertions(+), 12 deletions(-)
+
 -- 
 2.11.0
