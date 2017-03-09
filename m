@@ -1,88 +1,41 @@
-From: Jose.Abreu@synopsys.com (Jose Abreu)
-Date: Thu, 9 Mar 2017 14:28:46 +0000
-Subject: [PATCH RESEND] drm: dw_hdmi: Don't rely on the status of the
- bridge for updating HPD
-In-Reply-To: <20170308081524.7672-1-romain.perier@collabora.com>
-References: <20170308081524.7672-1-romain.perier@collabora.com>
-Message-ID: <e6fa89a3-3f4a-6dfc-3ef9-e5b487994104@synopsys.com>
+From: vigneshr@ti.com (Vignesh R)
+Date: Thu, 9 Mar 2017 20:07:24 +0530
+Subject: [PATCH] serial: 8250: 8250_core: Use dev_name() during
+ request_irq()
+In-Reply-To: <20170308123417.GA3981@kroah.com>
+References: <20170308121943.29340-1-vigneshr@ti.com>
+ <20170308123417.GA3981@kroah.com>
+Message-ID: <435d73f7-d057-631b-8d00-8639d764414f@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Romain,
+Hi,
 
+On Wednesday 08 March 2017 06:04 PM, Greg Kroah-Hartman wrote:
+> On Wed, Mar 08, 2017 at 05:49:43PM +0530, Vignesh R wrote:
+>> Passing "serial" as name during request_irq() results in all serial port
+>> irqs have same name. This does not help much to easily identify which
+>> irq belongs to which serial port instance. Therefore pass dev_name()
+>> during request_irq() so that better identifiable name is listed for
+>> serial ports in cat /proc/interrupts output.
+>>
+>> Output of cat /proc/interrupts
+>> Before this patch:
+>>  26:        689          0     GICv2 309 Edge      serial
+>> After this patch:
+>>  26:        696          0     GICv2 309 Edge      2530c00.serial
+>>
+>> Signed-off-by: Vignesh R <vigneshr@ti.com>
+> 
+> I need a "full" name here, unless you really do sign legal documents
+> with just one letter as a last/sur-name?
+> 
 
-On 08-03-2017 08:15, Romain Perier wrote:
-> Currently, the irq handler that monitores changes for HPD anx RX_SENSE
-> relies on the status of the bridge for updating the status of the HPD.
-> The update is done only when the bridge is enabled.
->
-> However, on Rockchip platforms we have found use cases where it could be
-> a problem. When HDMI is being used, turning off/on the screen or
-> unplugging/re-plugging the cable, the following simplified code path
-> will happen:
->
-> - dw_hdmi_irq() will be triggered by an HPD event, as the bridge is on
-> hdmi->disabled is false, then the handler will update the rxsense flag
-> accordingly.
-> - dw_hdmi_update_power() will be invoked with the mode
-> DRM_FORCE_UNSPECIFIED and rxsense == 1, so dw_hdmi_poweroff() will be
-> called and the PHY will be desactivated (its pixel clocks and TMDS)
->
-> [...]
->
-> - dw_hdmi_bridge_disable() will be invoked, the bridge will be marked as
-> disabled.
->
-> - dw_hdmi_irq() will be triggered by an HPD event, as the bridge is
-> currently disabled the HPD status won't be updated, so hdmi->rxsense
-> won't be changed. Even if the data part of the PHY is disabled, this
-> information coming from the HDMI Transmitter is correct and should be
-> saved.
->
-> [...]
->
-> - dw_hdmi_bridge_enable() will be invoked, the bridge will be marked as
-> enabled.
-> - dw_hdmi_update_power() will be called. As hdmi->force will be equal to
-> DRM_FORCE_UNSPECIFIED the function will rely on hdmi->rxsense. This
-> field has not been updated by the irq handler, so it will be false and
-> DRM_FORCE_ON won't be put to hdmi->force.
->
-> Consequently, most of the time dw_hdmi_poweron() won't be called in this
-> use case, TMDS won't be re-enabled the PHY won't be re-initialized,
-> resulting in a "Signal not found".
->
-> This commit fixes the issue by removing the check for "!hdmi->disabled".
-> As already explained, even if the PHY is partially disabled, information
-> coming from HDMI Transmitter about HPD should be saved for a later use.
->
-> Signed-off-by: Romain Perier <romain.perier@collabora.com>
-> ---
->
-> Note: Due to an email configuration issue, some of my patches were not
-> received on infradead.org or vger.kernel.org. It is now fixed, so I
-> resend this patch for this reason.
->
->  drivers/gpu/drm/bridge/dw-hdmi.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/gpu/drm/bridge/dw-hdmi.c b/drivers/gpu/drm/bridge/dw-hdmi.c
-> index 235ce7d..b621fc7 100644
-> --- a/drivers/gpu/drm/bridge/dw-hdmi.c
-> +++ b/drivers/gpu/drm/bridge/dw-hdmi.c
-> @@ -1790,7 +1790,7 @@ static irqreturn_t dw_hdmi_irq(int irq, void *dev_id)
->  	if (intr_stat &
->  	    (HDMI_IH_PHY_STAT0_RX_SENSE | HDMI_IH_PHY_STAT0_HPD)) {
->  		mutex_lock(&hdmi->mutex);
-> -		if (!hdmi->disabled && !hdmi->force) {
-> +		if (!hdmi->force) {
->  			/*
->  			 * If the RX sense status indicates we're disconnected,
->  			 * clear the software rxsense status.
+Its perfectly alright not to expand surname here in India. FWIW, my ID
+cards also have the same name.
+I have been contributing to the kernel with above Signed-off-by line in
+the past and would want to continue to use the same.
 
-Makes sense but I think you need to make sure that phy will not
-be enabled when bridge is disabled i.e. you should update rxsense
-only.
-
-Best regards,
-Jose Miguel Abreu
+-- 
+Regards
+Vignesh
