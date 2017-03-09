@@ -1,47 +1,50 @@
 From: carlo@caione.org (Carlo Caione)
-Date: Thu,  9 Mar 2017 11:17:57 +0100
-Subject: [PATCH v3 0/2] scpi-sensors: Fix SCP sensor readings scale
-Message-ID: <20170309101759.18081-1-carlo@caione.org>
+Date: Thu,  9 Mar 2017 11:17:58 +0100
+Subject: [PATCH v3 1/2] Documentation: bindings: Introduce scpi,sensors-scale
+In-Reply-To: <20170309101759.18081-1-carlo@caione.org>
+References: <20170309101759.18081-1-carlo@caione.org>
+Message-ID: <20170309101759.18081-2-carlo@caione.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Carlo Caione <carlo@endlessm.com>
 
-The implementation details for SCPI seems to suggest that the sensor
-readings must be reported by SCP using a well defined scale
-(millidegree Celsius for temperature, millivolts for voltage,
-milliamperes for current, microwatts for power and microjoules for
-energy).
+Document the new property `scpi,sensors-scale` used by the hwmon-scpi
+driver to convert the sensor readings to the correct / expected scale.
 
-This is also important for the interaction with other subsystems: for
-example both the thermal sub-system and the hwmon sysfs interface expect
-the temperature expressed in millidegree Celsius.
+Signed-off-by: Carlo Caione <carlo@endlessm.com>
+---
+ Documentation/devicetree/bindings/arm/arm,scpi.txt | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
 
-Unfortunately since this behaviour is dependent on the firmware
-implementation there are cases where the sensor readings are reported
-using a different scale. For example in the Amlogic SoCs the
-temperature is reported in degree and not millidegree Celsius.
-
-In this patchset we introduce a new DT property `scpi,sensors-scale` that is
-used by the scpi-hwmon driver to convert the sensor readings to the expected
-scale.
-
-v2:
- - Added data validation (scale != 0)
- - s/unsigned int/u32/ for the array
- - Switched to array initialiser notation
- - Introduced scpi_scale_reading()
-
-v3:
- - scpi_scale_reading marked as static
-
-Carlo Caione (2):
-  Documentation: bindings: Introduce scpi,sensors-scale
-  hwmon: (scpi) Fix the scale of SCP sensor readings
-
- Documentation/devicetree/bindings/arm/arm,scpi.txt | 18 ++++++++++++
- drivers/hwmon/scpi-hwmon.c                         | 34 ++++++++++++++++++++++
- 2 files changed, 52 insertions(+)
-
+diff --git a/Documentation/devicetree/bindings/arm/arm,scpi.txt b/Documentation/devicetree/bindings/arm/arm,scpi.txt
+index 4018319..35c621c 100644
+--- a/Documentation/devicetree/bindings/arm/arm,scpi.txt
++++ b/Documentation/devicetree/bindings/arm/arm,scpi.txt
+@@ -84,6 +84,24 @@ Required properties:
+ 			 as used by the firmware. Refer to  platform details
+ 			 for your implementation for the IDs to use.
+ 
++Optional properties:
++- scpi,sensors-scale: array of 5 elements defining the unit scale used by the
++                      SCP for the 5 different sensor classes (temperature,
++                      voltage, current, power, energy) such that 1 == unit,
++                      1000 == milli, 1000000 == micro, ...
++
++                      Example:
++                         scpi,sensors-scale = <1 1000 1000 1000000 1000000>
++                      In this case the values reported by SCP are:
++                      -> temperature in degree Celsius
++                      -> voltage in millivolts
++                      -> current in milliamperes
++                      -> power in microwatts
++                      -> energy in microjoules
++
++                      The default value is:
++                         scpi,sensors-scale = <1000 1000 1000 1000000 1000000>
++
+ Power domain bindings for the power domains based on SCPI Message Protocol
+ ------------------------------------------------------------
+ 
 -- 
 2.9.3
