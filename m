@@ -1,67 +1,56 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Thu, 9 Mar 2017 14:56:37 +0900
-Subject: [PATCH] pinctrl: samsung: fix segfault when using external
- interrupts on s3c24xx
-In-Reply-To: <20170308163434.obhtg6fwmjwqv7jm@kozik-lap>
-References: <1488489799-18136-1-git-send-email-sergio.prado@e-labworks.com>
- <20170304081504.unv6sihbmp76ynfy@kozik-lap> <20170306131516.GA6095@n1>
- <20170308163434.obhtg6fwmjwqv7jm@kozik-lap>
-Message-ID: <CA+Ln22FEYfO2EmvLKTRSHNFPpKSOw38vSDvg-nPv_j08cApqCw@mail.gmail.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Thu, 9 Mar 2017 12:09:00 +0530
+Subject: [RESEND PATCH v3 2/7] PCI: dwc: dra7xx: Populate cpu_addr_fixup ops
+In-Reply-To: <1489041545-15730-1-git-send-email-kishon@ti.com>
+References: <1489041545-15730-1-git-send-email-kishon@ti.com>
+Message-ID: <1489041545-15730-3-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-03-09 1:34 GMT+09:00 Krzysztof Kozlowski <krzk@kernel.org>:
-> On Mon, Mar 06, 2017 at 09:15:16AM -0400, Sergio Prado wrote:
->> Hi Krzysztof,
->>
->> > > This is a regression from commit 8b1bd11c1f8f529057369c5b3702d13fd24e2765.
->> >
->> > Checkpatch should complain here about commit format.
->> >
->> > >
->> > > Tested on FriendlyARM mini2440.
->> > >
->> >
->> > Please add:
->> >   Fixes: 8b1bd11c1f8f ("pinctrl: samsung: Add the support the multiple IORESOURCE_MEM for one pin-bank")
->> >   Cc: <stable@vger.kernel.org>
->> >
->>
->> OK.
->>
->> > > Signed-off-by: Sergio Prado <sergio.prado@e-labworks.com>
->> > > ---
->> > >  drivers/pinctrl/samsung/pinctrl-s3c24xx.c | 4 ++--
->> > >  1 file changed, 2 insertions(+), 2 deletions(-)
->> > >
->> > > diff --git a/drivers/pinctrl/samsung/pinctrl-s3c24xx.c b/drivers/pinctrl/samsung/pinctrl-s3c24xx.c
->> > > index b82a003546ae..1b8d887796e8 100644
->> > > --- a/drivers/pinctrl/samsung/pinctrl-s3c24xx.c
->> > > +++ b/drivers/pinctrl/samsung/pinctrl-s3c24xx.c
->> > > @@ -356,8 +356,8 @@ static inline void s3c24xx_demux_eint(struct irq_desc *desc,
->> > >  {
->> > >   struct s3c24xx_eint_data *data = irq_desc_get_handler_data(desc);
->> > >   struct irq_chip *chip = irq_desc_get_chip(desc);
->> > > - struct irq_data *irqd = irq_desc_get_irq_data(desc);
->> > > - struct samsung_pin_bank *bank = irq_data_get_irq_chip_data(irqd);
->> > > + struct samsung_pinctrl_drv_data *d = data->drvdata;
->> > > + struct samsung_pin_bank *bank = d->pin_banks;
->> >
->> > I think 'pin_banks' point to all banks of given controller not to the
->> > currently accessed one.
->>
->> Understood. I think it worked in my tests because on s3c2440 all banks
->> have the same eint base address.
->>
->> So what do you think is the best approach to solve this problem?
->
-> Maybe you can get to this through:
->         s3c24xx_eint_domain_data = s3c24xx_eint_data->domains[virq].host_data;
->         s3c24xx_eint_domain_data->bank
->
-> It is getting slightly more complicated...
+Populate cpu_addr_fixup ops to extract the least 28 bits of the
+corresponding cpu address.
 
-How about the suggestions I made in my reply from March 4 (JST)?
+Acked-by: Joao Pinto <jpinto@synopsys.com>
+Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+---
+ drivers/pci/dwc/pci-dra7xx.c |   11 ++++++-----
+ 1 file changed, 6 insertions(+), 5 deletions(-)
 
-Best regards,
-Tomasz
+diff --git a/drivers/pci/dwc/pci-dra7xx.c b/drivers/pci/dwc/pci-dra7xx.c
+index 0984baf..07c45ec 100644
+--- a/drivers/pci/dwc/pci-dra7xx.c
++++ b/drivers/pci/dwc/pci-dra7xx.c
+@@ -88,6 +88,11 @@ static inline void dra7xx_pcie_writel(struct dra7xx_pcie *pcie, u32 offset,
+ 	writel(value, pcie->base + offset);
+ }
+ 
++static u64 dra7xx_pcie_cpu_addr_fixup(u64 pci_addr)
++{
++	return pci_addr & DRA7XX_CPU_TO_BUS_ADDR;
++}
++
+ static int dra7xx_pcie_link_up(struct dw_pcie *pci)
+ {
+ 	struct dra7xx_pcie *dra7xx = to_dra7xx_pcie(pci);
+@@ -152,11 +157,6 @@ static void dra7xx_pcie_host_init(struct pcie_port *pp)
+ 	struct dw_pcie *pci = to_dw_pcie_from_pp(pp);
+ 	struct dra7xx_pcie *dra7xx = to_dra7xx_pcie(pci);
+ 
+-	pp->io_base &= DRA7XX_CPU_TO_BUS_ADDR;
+-	pp->mem_base &= DRA7XX_CPU_TO_BUS_ADDR;
+-	pp->cfg0_base &= DRA7XX_CPU_TO_BUS_ADDR;
+-	pp->cfg1_base &= DRA7XX_CPU_TO_BUS_ADDR;
+-
+ 	dw_pcie_setup_rc(pp);
+ 
+ 	dra7xx_pcie_establish_link(dra7xx);
+@@ -329,6 +329,7 @@ static int __init dra7xx_add_pcie_port(struct dra7xx_pcie *dra7xx,
+ }
+ 
+ static const struct dw_pcie_ops dw_pcie_ops = {
++	.cpu_addr_fixup = dra7xx_pcie_cpu_addr_fixup,
+ 	.link_up = dra7xx_pcie_link_up,
+ };
+ 
+-- 
+1.7.9.5
