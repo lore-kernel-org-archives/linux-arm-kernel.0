@@ -1,40 +1,47 @@
-From: robert.richter@cavium.com (Robert Richter)
-Date: Thu, 9 Mar 2017 13:02:46 +0100
-Subject: [PATCH] iommu/arm-smmu: Report smmu type in dmesg
-In-Reply-To: <4a991323-1059-5f3c-0aa3-0ab0cb7bd3f1@linaro.org>
-References: <20170306135833.21455-1-rrichter@cavium.com>
- <4a991323-1059-5f3c-0aa3-0ab0cb7bd3f1@linaro.org>
-Message-ID: <20170309120246.GQ16822@rric.localdomain>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Thu, 9 Mar 2017 13:05:14 +0100
+Subject: [PATCH 00/10] ARM: davinci: add vpif display support
+In-Reply-To: <CAMpxmJUZ3KCV2zjpPWD02rVpok_XV-fGdk8PNpN7FGt3RDbMEw@mail.gmail.com>
+References: <1486485683-11427-1-git-send-email-bgolaszewski@baylibre.com>
+ <77ced65d-e350-02ba-6dae-b20dcb3faa32@xs4all.nl>
+ <CAMpxmJUZ3KCV2zjpPWD02rVpok_XV-fGdk8PNpN7FGt3RDbMEw@mail.gmail.com>
+Message-ID: <4b8381d2-25b5-2d46-9575-2e1182cd276c@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08.03.17 16:25:24, Aleksey Makarov wrote:
-
-> >-#define ARM_SMMU_MATCH_DATA(name, ver, imp)	\
-> >-static struct arm_smmu_match_data name = { .version = ver, .model = imp }
-> >+#define ARM_SMMU_TYPE(var, ver, imp, _name)	\
-> >+static struct arm_smmu_type var = { .version = ver, .model = imp, .name = _name }
+On 09/03/17 12:00, Bartosz Golaszewski wrote:
+> 2017-03-09 11:53 GMT+01:00 Hans Verkuil <hverkuil@xs4all.nl>:
+>> On 07/02/17 17:41, Bartosz Golaszewski wrote:
+>>> The following series adds support for v4l2 display on da850-evm with
+>>> a UI board in device tree boot mode.
+>>
+>> As far as I could tell from the comments this patch series will see a
+>> second version, so I am marking it as 'Changes Requested' in patchwork.
+>>
+>> If I'm wrong, then please let me know.
+>>
+>> Regards,
+>>
+>>         Hans
+>>
 > 
-> Can we infer the _name from the name of var?
+> Hi Hans,
 > 
-> #define ARM_SMMU_TYPE(var, ver, imp)	\
-> static struct arm_smmu_type var = { .version = ver, .model = imp, .name = #var }
+> this series has since been split into several smaller ones and most of
+> the code is already merged into Sekhar Nori's DaVinci tree.
 > 
-> >-ARM_SMMU_MATCH_DATA(smmu_generic_v1, ARM_SMMU_V1, GENERIC_SMMU);
-> >-ARM_SMMU_MATCH_DATA(smmu_generic_v2, ARM_SMMU_V2, GENERIC_SMMU);
-> >-ARM_SMMU_MATCH_DATA(arm_mmu401, ARM_SMMU_V1_64K, GENERIC_SMMU);
-> >-ARM_SMMU_MATCH_DATA(arm_mmu500, ARM_SMMU_V2, ARM_MMU500);
-> >-ARM_SMMU_MATCH_DATA(cavium_smmuv2, ARM_SMMU_V2, CAVIUM_SMMUV2);
-> >+ARM_SMMU_TYPE(smmu_generic_v1, ARM_SMMU_V1, GENERIC_SMMU, "smmu-generic-v1");
-> >+ARM_SMMU_TYPE(smmu_generic_v2, ARM_SMMU_V2, GENERIC_SMMU, "smmu-generic-v2");
-> >+ARM_SMMU_TYPE(arm_mmu401, ARM_SMMU_V1_64K, GENERIC_SMMU, "arm-mmu401");
-> >+ARM_SMMU_TYPE(arm_mmu500, ARM_SMMU_V2, ARM_MMU500, "arm-mmu500");
-> >+ARM_SMMU_TYPE(cavium_smmuv2, ARM_SMMU_V2, CAVIUM_SMMUV2, "cavium-smmuv2");
+> There are two series that still need merging with the media tree[1][2].
 
-I thought about this but underscore names are not typical. Adding some
-strings as names looks straighforward to me.
+Merged, thanks!
 
--Robert
+Regards,
+
+	Hans
 
 > 
-> So that this change will not be required?
+> Thanks,
+> Bartosz Golaszewski
+> 
+> [1] https://lkml.org/lkml/2017/2/28/426
+> [2] https://patchwork.kernel.org/patch/9577965/
+> 
