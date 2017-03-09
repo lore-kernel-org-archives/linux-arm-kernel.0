@@ -1,33 +1,67 @@
-From: ho.jia.jie@intel.com (ho.jia.jie at intel.com)
-Date: Thu,  9 Mar 2017 13:49:36 +0800
-Subject: [PATCH v2] ARM: socfpga: updates for socfpga_defconfig
-Message-ID: <1489038576-32280-1-git-send-email-ho.jia.jie@intel.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Thu, 9 Mar 2017 14:56:37 +0900
+Subject: [PATCH] pinctrl: samsung: fix segfault when using external
+ interrupts on s3c24xx
+In-Reply-To: <20170308163434.obhtg6fwmjwqv7jm@kozik-lap>
+References: <1488489799-18136-1-git-send-email-sergio.prado@e-labworks.com>
+ <20170304081504.unv6sihbmp76ynfy@kozik-lap> <20170306131516.GA6095@n1>
+ <20170308163434.obhtg6fwmjwqv7jm@kozik-lap>
+Message-ID: <CA+Ln22FEYfO2EmvLKTRSHNFPpKSOw38vSDvg-nPv_j08cApqCw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jia Jie Ho <ho.jia.jie@intel.com>
+2017-03-09 1:34 GMT+09:00 Krzysztof Kozlowski <krzk@kernel.org>:
+> On Mon, Mar 06, 2017 at 09:15:16AM -0400, Sergio Prado wrote:
+>> Hi Krzysztof,
+>>
+>> > > This is a regression from commit 8b1bd11c1f8f529057369c5b3702d13fd24e2765.
+>> >
+>> > Checkpatch should complain here about commit format.
+>> >
+>> > >
+>> > > Tested on FriendlyARM mini2440.
+>> > >
+>> >
+>> > Please add:
+>> >   Fixes: 8b1bd11c1f8f ("pinctrl: samsung: Add the support the multiple IORESOURCE_MEM for one pin-bank")
+>> >   Cc: <stable@vger.kernel.org>
+>> >
+>>
+>> OK.
+>>
+>> > > Signed-off-by: Sergio Prado <sergio.prado@e-labworks.com>
+>> > > ---
+>> > >  drivers/pinctrl/samsung/pinctrl-s3c24xx.c | 4 ++--
+>> > >  1 file changed, 2 insertions(+), 2 deletions(-)
+>> > >
+>> > > diff --git a/drivers/pinctrl/samsung/pinctrl-s3c24xx.c b/drivers/pinctrl/samsung/pinctrl-s3c24xx.c
+>> > > index b82a003546ae..1b8d887796e8 100644
+>> > > --- a/drivers/pinctrl/samsung/pinctrl-s3c24xx.c
+>> > > +++ b/drivers/pinctrl/samsung/pinctrl-s3c24xx.c
+>> > > @@ -356,8 +356,8 @@ static inline void s3c24xx_demux_eint(struct irq_desc *desc,
+>> > >  {
+>> > >   struct s3c24xx_eint_data *data = irq_desc_get_handler_data(desc);
+>> > >   struct irq_chip *chip = irq_desc_get_chip(desc);
+>> > > - struct irq_data *irqd = irq_desc_get_irq_data(desc);
+>> > > - struct samsung_pin_bank *bank = irq_data_get_irq_chip_data(irqd);
+>> > > + struct samsung_pinctrl_drv_data *d = data->drvdata;
+>> > > + struct samsung_pin_bank *bank = d->pin_banks;
+>> >
+>> > I think 'pin_banks' point to all banks of given controller not to the
+>> > currently accessed one.
+>>
+>> Understood. I think it worked in my tests because on s3c2440 all banks
+>> have the same eint base address.
+>>
+>> So what do you think is the best approach to solve this problem?
+>
+> Maybe you can get to this through:
+>         s3c24xx_eint_domain_data = s3c24xx_eint_data->domains[virq].host_data;
+>         s3c24xx_eint_domain_data->bank
+>
+> It is getting slightly more complicated...
 
-This patch enables Altera TSE support in socfpga_defconfig
+How about the suggestions I made in my reply from March 4 (JST)?
 
-Signed-off-by: Jia Jie Ho <ho.jia.jie@intel.com>
----
-v2:
- * Adding the TSE support as a module for Arria10
-
- arch/arm/configs/socfpga_defconfig |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/configs/socfpga_defconfig b/arch/arm/configs/socfpga_defconfig
-index 030264c..2620ce7 100644
---- a/arch/arm/configs/socfpga_defconfig
-+++ b/arch/arm/configs/socfpga_defconfig
-@@ -71,6 +71,7 @@ CONFIG_SCSI=y
- CONFIG_BLK_DEV_SD=y
- # CONFIG_SCSI_LOWLEVEL is not set
- CONFIG_NETDEVICES=y
-+CONFIG_ALTERA_TSE=m
- CONFIG_E1000E=m
- CONFIG_IGB=m
- CONFIG_IXGBE=m
--- 
-1.7.7.4
+Best regards,
+Tomasz
