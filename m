@@ -1,179 +1,112 @@
-From: Joao.Pinto@synopsys.com (Joao Pinto)
-Date: Thu, 9 Mar 2017 12:25:05 +0000
-Subject: [RESEND PATCH v3 6/7] PCI: dwc: designware: Move _unroll
- configurations to a separate function
-In-Reply-To: <1489041545-15730-7-git-send-email-kishon@ti.com>
-References: <1489041545-15730-1-git-send-email-kishon@ti.com>
- <1489041545-15730-7-git-send-email-kishon@ti.com>
-Message-ID: <e4cf80f5-08f3-5ebc-ef55-8d43f8e02104@synopsys.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 9 Mar 2017 12:25:46 +0000
+Subject: [PATCH] iommu/arm-smmu: Report smmu type in dmesg
+In-Reply-To: <20170309120206.GP16822@rric.localdomain>
+References: <20170306135833.21455-1-rrichter@cavium.com>
+ <d055d4c2-4d06-caba-4d84-21c22718fe76@arm.com>
+ <20170307140607.GY16822@rric.localdomain>
+ <bdf70e78-5ffd-4458-f485-4a508705e3e6@arm.com>
+ <20170309120206.GP16822@rric.localdomain>
+Message-ID: <56bfa59e-b387-90e8-c2cc-1628495bf2af@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-?s 6:39 AM de 3/9/2017, Kishon Vijay Abraham I escreveu:
-> No functional change. Rename dw_pcie_writel_unroll/dw_pcie_readl_unroll
-> to dw_pcie_writel_ob_unroll/dw_pcie_readl_ob_unroll respectively as these
-> functions are used to perform only outbound configurations. Also move
-> these _unroll configurations to a separate function.
+On 09/03/17 12:02, Robert Richter wrote:
+> On 07.03.17 18:41:33, Robin Murphy wrote:
+>> On 07/03/17 14:06, Robert Richter wrote:
+>>> On 06.03.17 18:22:08, Robin Murphy wrote:
+>>>> On 06/03/17 13:58, Robert Richter wrote:
+>>>>> The ARM SMMU detection especially depends from system firmware. For
+>>>>> better diagnostic, log the detected type in dmesg.
+>>>>
+>>>> This paragraph especially depends from grammar. I think.
+>>>
+>>> Thanks for the mail on you. :)
+>>>
+>>>>
+>>>>> The smmu type's name is now stored in struct arm_smmu_type and ACPI
+>>>>> code is modified to use that struct too. Rename ARM_SMMU_MATCH_DATA()
+>>>>> macro to ARM_SMMU_TYPE() for better readability.
+>>>>>
+>>>>> Signed-off-by: Robert Richter <rrichter@cavium.com>
+>>>>> ---
+>>>>>  drivers/iommu/arm-smmu.c | 61 ++++++++++++++++++++++++------------------------
+>>>>>  1 file changed, 30 insertions(+), 31 deletions(-)
+>>>>
+>>>> That seems a relatively invasive diffstat for the sake of printing a
+>>>> string once at boot time to what I can only assume is a small audience
+>>>> of firmware developers who find "cat
+>>>> /sys/firmware/devicetree/base/iommu*/compatible" (or the ACPI
+>>>> equivalent) too hard ;)
+>>>
+>>> Reading firmware data is not really a solution as you don't know what
+>>> the driver is doing with it. The actual background of this patch is to
+>>> be sure a certain workaround was enabled in the kernel. ARM's cpu
+>>> errata framework does this nicely. In case of smmus we just have the
+>>> internal model implementation type which is not visible in the logs.
+>>> Right now, there is no way to figure that out without knowing fw
+>>> specifics and kernel sources.
+>>
+>> Ah, now it starts to become clear. In that case, if we want to confirm
+>> the presence of specific workarounds, we should actually _confirm the
+>> presence of specific workarounds_. I'd have no complaint with e.g. this:
+>>
+>> -----8<-----
+>> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+>> index f7411109670f..9e50a092632c 100644
+>> --- a/drivers/iommu/arm-smmu.c
+>> +++ b/drivers/iommu/arm-smmu.c
+>> @@ -1934,6 +1934,8 @@ static int arm_smmu_device_cfg_probe(struct
+>> arm_smmu_device *smmu)
+>>                         atomic_add_return(smmu->num_context_banks,
+>>                                           &cavium_smmu_context_count);
+>>                 smmu->cavium_id_base -= smmu->num_context_banks;
+>> +               dev_notice(smmu->dev, "\tusing ASID/VMID offset %u\n",
+>> +                          smmu->cavium_id_base);
+>>         }
+>>
+>>         /* ID2 */
+>> ----->8-----
+>>
+>> and the equivalent for other things, if need be. If you just print "hey,
+>> this is SMMU-x", the user is in fact no better off, since they would
+>> then still have to go and look at the source for whatever kernel they're
+>> running to find out which particular workarounds for SMMU-x bugs that
+>> particular kernel implements.
 > 
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-> ---
->  drivers/pci/dwc/pcie-designware.c |  112 ++++++++++++++++++++++---------------
->  1 file changed, 67 insertions(+), 45 deletions(-)
-> 
-> diff --git a/drivers/pci/dwc/pcie-designware.c b/drivers/pci/dwc/pcie-designware.c
-> index 557ee53..6657a84 100644
-> --- a/drivers/pci/dwc/pcie-designware.c
-> +++ b/drivers/pci/dwc/pcie-designware.c
-> @@ -92,22 +92,64 @@ void dw_pcie_write_dbi(struct dw_pcie *pci, void __iomem *base, u32 reg,
->  		dev_err(pci->dev, "write DBI address failed\n");
->  }
->  
-> -static u32 dw_pcie_readl_unroll(struct dw_pcie *pci, void __iomem *base,
-> -				u32 index, u32 reg)
-> +static u32 dw_pcie_readl_ob_unroll(struct dw_pcie *pci, void __iomem *base,
-> +				   u32 index, u32 reg)
->  {
->  	u32 offset = PCIE_GET_ATU_OUTB_UNR_REG_OFFSET(index);
->  
->  	return dw_pcie_read_dbi(pci, base, offset + reg, 0x4);
->  }
->  
-> -static void dw_pcie_writel_unroll(struct dw_pcie *pci, void __iomem *base,
-> -				  u32 index, u32 reg, u32 val)
-> +static void dw_pcie_writel_ob_unroll(struct dw_pcie *pci, void __iomem *base,
-> +				     u32 index, u32 reg, u32 val)
->  {
->  	u32 offset = PCIE_GET_ATU_OUTB_UNR_REG_OFFSET(index);
->  
->  	dw_pcie_write_dbi(pci, base, offset + reg, 0x4, val);
->  }
->  
-> +void dw_pcie_prog_outbound_atu_unroll(struct dw_pcie *pci, int index, int type,
-> +				      u64 cpu_addr, u64 pci_addr, u32 size)
-> +{
-> +	u32 retries, val;
-> +	void __iomem *base = pci->dbi_base;
-> +
-> +	dw_pcie_writel_ob_unroll(pci, base, index,
-> +				 PCIE_ATU_UNR_LOWER_BASE,
-> +				 lower_32_bits(cpu_addr));
-> +	dw_pcie_writel_ob_unroll(pci, base, index,
-> +				 PCIE_ATU_UNR_UPPER_BASE,
-> +				 upper_32_bits(cpu_addr));
-> +	dw_pcie_writel_ob_unroll(pci, base, index, PCIE_ATU_UNR_LIMIT,
-> +				 lower_32_bits(cpu_addr + size - 1));
-> +	dw_pcie_writel_ob_unroll(pci, base, index,
-> +				 PCIE_ATU_UNR_LOWER_TARGET,
-> +				 lower_32_bits(pci_addr));
-> +	dw_pcie_writel_ob_unroll(pci, base, index,
-> +				 PCIE_ATU_UNR_UPPER_TARGET,
-> +				 upper_32_bits(pci_addr));
-> +	dw_pcie_writel_ob_unroll(pci, base, index,
-> +				 PCIE_ATU_UNR_REGION_CTRL1,
-> +				 type);
-> +	dw_pcie_writel_ob_unroll(pci, base, index,
-> +				 PCIE_ATU_UNR_REGION_CTRL2,
-> +				 PCIE_ATU_ENABLE);
-> +
-> +	/*
-> +	 * Make sure ATU enable takes effect before any subsequent config
-> +	 * and I/O accesses.
-> +	 */
-> +	for (retries = 0; retries < LINK_WAIT_MAX_IATU_RETRIES; retries++) {
-> +		val = dw_pcie_readl_ob_unroll(pci, base, index,
-> +					      PCIE_ATU_UNR_REGION_CTRL2);
-> +		if (val & PCIE_ATU_ENABLE)
-> +			return;
-> +
-> +		usleep_range(LINK_WAIT_IATU_MIN, LINK_WAIT_IATU_MAX);
-> +	}
-> +	dev_err(pci->dev, "outbound iATU is not being enabled\n");
-> +}
-> +
->  void dw_pcie_prog_outbound_atu(struct dw_pcie *pci, int index, int type,
->  			       u64 cpu_addr, u64 pci_addr, u32 size)
->  {
-> @@ -118,59 +160,39 @@ void dw_pcie_prog_outbound_atu(struct dw_pcie *pci, int index, int type,
->  		cpu_addr = pci->ops->cpu_addr_fixup(cpu_addr);
->  
->  	if (pci->iatu_unroll_enabled) {
-> -		dw_pcie_writel_unroll(pci, base, index, PCIE_ATU_UNR_LOWER_BASE,
-> -				      lower_32_bits(cpu_addr));
-> -		dw_pcie_writel_unroll(pci, base, index, PCIE_ATU_UNR_UPPER_BASE,
-> -				      upper_32_bits(cpu_addr));
-> -		dw_pcie_writel_unroll(pci, base, index, PCIE_ATU_UNR_LIMIT,
-> -				      lower_32_bits(cpu_addr + size - 1));
-> -		dw_pcie_writel_unroll(pci, base, index,
-> -				      PCIE_ATU_UNR_LOWER_TARGET,
-> -				      lower_32_bits(pci_addr));
-> -		dw_pcie_writel_unroll(pci, base, index,
-> -				      PCIE_ATU_UNR_UPPER_TARGET,
-> -				      upper_32_bits(pci_addr));
-> -		dw_pcie_writel_unroll(pci, base, index,
-> -				      PCIE_ATU_UNR_REGION_CTRL1,
-> -				      type);
-> -		dw_pcie_writel_unroll(pci, base, index,
-> -				      PCIE_ATU_UNR_REGION_CTRL2,
-> -				      PCIE_ATU_ENABLE);
-> -	} else {
-> -		dw_pcie_write_dbi(pci, base, PCIE_ATU_VIEWPORT, 0x4,
-> -				  PCIE_ATU_REGION_OUTBOUND | index);
-> -		dw_pcie_write_dbi(pci, base, PCIE_ATU_LOWER_BASE, 0x4,
-> -				  lower_32_bits(cpu_addr));
-> -		dw_pcie_write_dbi(pci, base, PCIE_ATU_UPPER_BASE, 0x4,
-> -				  upper_32_bits(cpu_addr));
-> -		dw_pcie_write_dbi(pci, base, PCIE_ATU_LIMIT, 0x4,
-> -				  lower_32_bits(cpu_addr + size - 1));
-> -		dw_pcie_write_dbi(pci, base, PCIE_ATU_LOWER_TARGET, 0x4,
-> -				  lower_32_bits(pci_addr));
-> -		dw_pcie_write_dbi(pci, base, PCIE_ATU_UPPER_TARGET, 0x4,
-> -				  upper_32_bits(pci_addr));
-> -		dw_pcie_write_dbi(pci, base, PCIE_ATU_CR1, 0x4, type);
-> -		dw_pcie_write_dbi(pci, base, PCIE_ATU_CR2, 0x4,
-> -				  PCIE_ATU_ENABLE);
-> +		dw_pcie_prog_outbound_atu_unroll(pci, index, type, cpu_addr,
-> +						 pci_addr, size);
-> +		return;
->  	}
->  
-> +	dw_pcie_write_dbi(pci, base, PCIE_ATU_VIEWPORT, 0x4,
-> +			  PCIE_ATU_REGION_OUTBOUND | index);
-> +	dw_pcie_write_dbi(pci, base, PCIE_ATU_LOWER_BASE, 0x4,
-> +			  lower_32_bits(cpu_addr));
-> +	dw_pcie_write_dbi(pci, base, PCIE_ATU_UPPER_BASE, 0x4,
-> +			  upper_32_bits(cpu_addr));
-> +	dw_pcie_write_dbi(pci, base, PCIE_ATU_LIMIT, 0x4,
-> +			  lower_32_bits(cpu_addr + size - 1));
-> +	dw_pcie_write_dbi(pci, base, PCIE_ATU_LOWER_TARGET, 0x4,
-> +			  lower_32_bits(pci_addr));
-> +	dw_pcie_write_dbi(pci, base, PCIE_ATU_UPPER_TARGET, 0x4,
-> +			  upper_32_bits(pci_addr));
-> +	dw_pcie_write_dbi(pci, base, PCIE_ATU_CR1, 0x4, type);
-> +	dw_pcie_write_dbi(pci, base, PCIE_ATU_CR2, 0x4,
-> +			  PCIE_ATU_ENABLE);
-> +
->  	/*
->  	 * Make sure ATU enable takes effect before any subsequent config
->  	 * and I/O accesses.
->  	 */
->  	for (retries = 0; retries < LINK_WAIT_MAX_IATU_RETRIES; retries++) {
-> -		if (pci->iatu_unroll_enabled)
-> -			val = dw_pcie_readl_unroll(pci, base, index,
-> -						   PCIE_ATU_UNR_REGION_CTRL2);
-> -		else
-> -			val = dw_pcie_read_dbi(pci, base, PCIE_ATU_CR2, 0x4);
-> -
-> +		val = dw_pcie_read_dbi(pci, base, PCIE_ATU_CR2, 0x4);
->  		if (val == PCIE_ATU_ENABLE)
->  			return;
->  
->  		usleep_range(LINK_WAIT_IATU_MIN, LINK_WAIT_IATU_MAX);
->  	}
-> -	dev_err(pci->dev, "iATU is not being enabled\n");
-> +	dev_err(pci->dev, "outbound iATU is not being enabled\n");
->  }
->  
->  int dw_pcie_wait_for_link(struct dw_pcie *pci)
-> 
+> I don't understand why you don't want to expose in some way the smmu
+> type. There are a lot of things that can go wrong, esp. with firmware,
+> to detect the proper smmu type.
 
-Acked-By: Joao Pinto <jpinto@synopsys.com>
+Because there is only one reason for which detecting the "proper SMMU
+type" matters - implementation-specific workarounds for areas in which a
+given hardware implementation deviates from the architecture assumed by
+the driver.
+
+OK, let's print the model name. Now, if I give you this:
+
+[    0.475009] arm-smmu 2b500000.iommu: probing hardware configuration...
+[    0.481650] arm-smmu 2b500000.iommu: ARM MMU-401 r0p0 with:
+[    0.486436] arm-smmu 2b500000.iommu: 	stage 2 translation
+[    0.491925] arm-smmu 2b500000.iommu: 	coherent table walk
+[    0.497420] arm-smmu 2b500000.iommu: 	stream matching with 32
+register groups
+[    0.504678] arm-smmu 2b500000.iommu: 	4 context banks (4 stage-2 only)
+[    0.511312] arm-smmu 2b500000.iommu: 	Supported page sizes: 0x60211000
+[    0.517943] arm-smmu 2b500000.iommu: 	Stage-2: 40-bit IPA -> 40-bit PA
+
+please tell me which hardware problems this system has kernel
+workarounds in place for, and which it doesn't. If you want another
+hint, the version is 4.11.0-rc1+. Note the "+".
+
+Robin.
+
+> The above change is not a general solution too for reporting the
+> enablement of smmu errata workarounds. The check could be done
+> multiple times and in the fast path. For the particular problem the
+> above would work, but still some message on the type detected would be
+> fine. I could rework my patch in a way that .name is not permanently
+> stored in struct arm_smmu_device.
+> 
+> -Robert
+> 
