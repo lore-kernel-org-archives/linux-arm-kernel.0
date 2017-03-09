@@ -1,43 +1,78 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 9 Mar 2017 10:32:36 +0100
-Subject: stmmac still supporting spear600 ?
-In-Reply-To: <373e2760-94c5-4349-33aa-158bc8f4b19e@st.com>
-References: <20170309093412.33c0277d@free-electrons.com>
- <373e2760-94c5-4349-33aa-158bc8f4b19e@st.com>
-Message-ID: <20170309103236.3e16304f@free-electrons.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Thu, 9 Mar 2017 15:09:17 +0530
+Subject: [PATCH] cpufreq: qoriq: enhance bus frequency calculation
+In-Reply-To: <1489047306-31818-1-git-send-email-andy.tang@nxp.com>
+References: <1489047306-31818-1-git-send-email-andy.tang@nxp.com>
+Message-ID: <20170309093917.GB3341@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Giuseppe,
+On 09-03-17, 16:15, YuanTian Tang wrote:
+> From: Tang Yuantian <Yuantian.Tang@nxp.com>
+> 
+> On some platforms, property device-type may be missed in soc node
+> in dts which caused the bus-frequency can not be obtained correctly.
+> 
+> This patch enhanced the bus-frequency calculation. When property
+> device-type is missed in dts, bus-frequency will be obtained by
+> looking up clock table to get platform clock and hence get its
+> frequency.
+> 
+> Signed-off-by: Tang Yuantian <yuantian.tang@nxp.com>
+> ---
+>  drivers/cpufreq/qoriq-cpufreq.c | 24 +++++++++++++++++-------
+>  1 file changed, 17 insertions(+), 7 deletions(-)
+> 
+> diff --git a/drivers/cpufreq/qoriq-cpufreq.c b/drivers/cpufreq/qoriq-cpufreq.c
+> index bfec1bc..0f22e40 100644
+> --- a/drivers/cpufreq/qoriq-cpufreq.c
+> +++ b/drivers/cpufreq/qoriq-cpufreq.c
+> @@ -52,17 +52,27 @@ static u32 get_bus_freq(void)
+>  {
+>  	struct device_node *soc;
+>  	u32 sysfreq;
+> +	struct clk *pltclk;
+> +	int ret;
+>  
+> +	/* get platform freq by searching bus-frequency property */
+>  	soc = of_find_node_by_type(NULL, "soc");
+> -	if (!soc)
+> -		return 0;
+> -
+> -	if (of_property_read_u32(soc, "bus-frequency", &sysfreq))
+> -		sysfreq = 0;
+> +	if (soc) {
+> +		ret = of_property_read_u32(soc, "bus-frequency", &sysfreq);
+> +		of_node_put(soc);
+> +		if (!ret)
+> +			return sysfreq;
+> +	}
+>  
+> -	of_node_put(soc);
+> +	/* get platform freq by its clock name */
+> +	pltclk = clk_get(NULL, "cg-pll0-div1");
 
-Thanks for your answer.
+Will this always work? If yes, then what about dropping the code parsing DT
+completely ? That is, just rely on clk_get_rate() in all cases.
 
-On Thu, 9 Mar 2017 10:09:02 +0100, Giuseppe CAVALLARO wrote:
+> +	if (IS_ERR(pltclk)) {
+> +		pr_err("%s: can't get bus frequency %ld\n",
+> +		__func__, PTR_ERR(pltclk));
 
-> We do not test stmmac on this spear board since many years
-> and I guess you have to provide parameters from the platform.
+You need to properly align this. Try running checkpatch over this patch or:
 
-Ok, that's what I was afraid of :-/
+checkpatch --strict
 
-> In fact, stmmac is recently tested with DT.
+> +		return PTR_ERR(pltclk);
+> +	}
+>  
+> -	return sysfreq;
+> +	return clk_get_rate(pltclk);
+>  }
+>  
+>  static struct clk *cpu_to_clk(int cpu)
+> -- 
+> 2.1.0.27.g96db324
 
-I'm also using the DT, so this is definitely not the problem.
-
-> IIRC, the mac on spear600 could not have the HW cap register
-
-Correct.
-
-> so it is mandatory to provide all the right parameters and
-> configurations for this HW.
-
-OK, I'll have a look. However, I'm still confused by this DMA_RESET bit
-that never clears, contrary to what the datasheet says. Are there some
-erratas?
-
-Best regards,
-
-Thomas
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+viresh
