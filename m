@@ -1,44 +1,179 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 9 Mar 2017 15:24:56 +0300
-Subject: [RESEND PATCH] arm: assabet_defconfig: disable IDE subsystem
-In-Reply-To: <98031160-f7b4-3cff-043a-1f2ee62c8a01@ti.com>
-References: <1467991490-24895-1-git-send-email-b.zolnierkie@samsung.com>
- <CGME20161212135537epcas5p440bbb93d40f0c41b3754635733b09879@epcas5p4.samsung.com>
- <8ea5971a-338d-e8b9-6be8-8fe2658fc04d@ti.com> <1709119.SQyio4Ct6n@amdc3058>
- <1fd840c5-b0bb-726b-6357-669977c4ae5f@ti.com>
- <a3161cfc-56f7-4577-c37f-3798cdb03713@ti.com>
- <ab44a3c1-f078-4476-4583-de92ee68632c@cogentembedded.com>
- <98031160-f7b4-3cff-043a-1f2ee62c8a01@ti.com>
-Message-ID: <a8eab3b1-8867-00dd-08e4-bcece23010a6@cogentembedded.com>
+From: Joao.Pinto@synopsys.com (Joao Pinto)
+Date: Thu, 9 Mar 2017 12:25:05 +0000
+Subject: [RESEND PATCH v3 6/7] PCI: dwc: designware: Move _unroll
+ configurations to a separate function
+In-Reply-To: <1489041545-15730-7-git-send-email-kishon@ti.com>
+References: <1489041545-15730-1-git-send-email-kishon@ti.com>
+ <1489041545-15730-7-git-send-email-kishon@ti.com>
+Message-ID: <e4cf80f5-08f3-5ebc-ef55-8d43f8e02104@synopsys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/09/2017 03:20 PM, Sekhar Nori wrote:
+?s 6:39 AM de 3/9/2017, Kishon Vijay Abraham I escreveu:
+> No functional change. Rename dw_pcie_writel_unroll/dw_pcie_readl_unroll
+> to dw_pcie_writel_ob_unroll/dw_pcie_readl_ob_unroll respectively as these
+> functions are used to perform only outbound configurations. Also move
+> these _unroll configurations to a separate function.
+> 
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> ---
+>  drivers/pci/dwc/pcie-designware.c |  112 ++++++++++++++++++++++---------------
+>  1 file changed, 67 insertions(+), 45 deletions(-)
+> 
+> diff --git a/drivers/pci/dwc/pcie-designware.c b/drivers/pci/dwc/pcie-designware.c
+> index 557ee53..6657a84 100644
+> --- a/drivers/pci/dwc/pcie-designware.c
+> +++ b/drivers/pci/dwc/pcie-designware.c
+> @@ -92,22 +92,64 @@ void dw_pcie_write_dbi(struct dw_pcie *pci, void __iomem *base, u32 reg,
+>  		dev_err(pci->dev, "write DBI address failed\n");
+>  }
+>  
+> -static u32 dw_pcie_readl_unroll(struct dw_pcie *pci, void __iomem *base,
+> -				u32 index, u32 reg)
+> +static u32 dw_pcie_readl_ob_unroll(struct dw_pcie *pci, void __iomem *base,
+> +				   u32 index, u32 reg)
+>  {
+>  	u32 offset = PCIE_GET_ATU_OUTB_UNR_REG_OFFSET(index);
+>  
+>  	return dw_pcie_read_dbi(pci, base, offset + reg, 0x4);
+>  }
+>  
+> -static void dw_pcie_writel_unroll(struct dw_pcie *pci, void __iomem *base,
+> -				  u32 index, u32 reg, u32 val)
+> +static void dw_pcie_writel_ob_unroll(struct dw_pcie *pci, void __iomem *base,
+> +				     u32 index, u32 reg, u32 val)
+>  {
+>  	u32 offset = PCIE_GET_ATU_OUTB_UNR_REG_OFFSET(index);
+>  
+>  	dw_pcie_write_dbi(pci, base, offset + reg, 0x4, val);
+>  }
+>  
+> +void dw_pcie_prog_outbound_atu_unroll(struct dw_pcie *pci, int index, int type,
+> +				      u64 cpu_addr, u64 pci_addr, u32 size)
+> +{
+> +	u32 retries, val;
+> +	void __iomem *base = pci->dbi_base;
+> +
+> +	dw_pcie_writel_ob_unroll(pci, base, index,
+> +				 PCIE_ATU_UNR_LOWER_BASE,
+> +				 lower_32_bits(cpu_addr));
+> +	dw_pcie_writel_ob_unroll(pci, base, index,
+> +				 PCIE_ATU_UNR_UPPER_BASE,
+> +				 upper_32_bits(cpu_addr));
+> +	dw_pcie_writel_ob_unroll(pci, base, index, PCIE_ATU_UNR_LIMIT,
+> +				 lower_32_bits(cpu_addr + size - 1));
+> +	dw_pcie_writel_ob_unroll(pci, base, index,
+> +				 PCIE_ATU_UNR_LOWER_TARGET,
+> +				 lower_32_bits(pci_addr));
+> +	dw_pcie_writel_ob_unroll(pci, base, index,
+> +				 PCIE_ATU_UNR_UPPER_TARGET,
+> +				 upper_32_bits(pci_addr));
+> +	dw_pcie_writel_ob_unroll(pci, base, index,
+> +				 PCIE_ATU_UNR_REGION_CTRL1,
+> +				 type);
+> +	dw_pcie_writel_ob_unroll(pci, base, index,
+> +				 PCIE_ATU_UNR_REGION_CTRL2,
+> +				 PCIE_ATU_ENABLE);
+> +
+> +	/*
+> +	 * Make sure ATU enable takes effect before any subsequent config
+> +	 * and I/O accesses.
+> +	 */
+> +	for (retries = 0; retries < LINK_WAIT_MAX_IATU_RETRIES; retries++) {
+> +		val = dw_pcie_readl_ob_unroll(pci, base, index,
+> +					      PCIE_ATU_UNR_REGION_CTRL2);
+> +		if (val & PCIE_ATU_ENABLE)
+> +			return;
+> +
+> +		usleep_range(LINK_WAIT_IATU_MIN, LINK_WAIT_IATU_MAX);
+> +	}
+> +	dev_err(pci->dev, "outbound iATU is not being enabled\n");
+> +}
+> +
+>  void dw_pcie_prog_outbound_atu(struct dw_pcie *pci, int index, int type,
+>  			       u64 cpu_addr, u64 pci_addr, u32 size)
+>  {
+> @@ -118,59 +160,39 @@ void dw_pcie_prog_outbound_atu(struct dw_pcie *pci, int index, int type,
+>  		cpu_addr = pci->ops->cpu_addr_fixup(cpu_addr);
+>  
+>  	if (pci->iatu_unroll_enabled) {
+> -		dw_pcie_writel_unroll(pci, base, index, PCIE_ATU_UNR_LOWER_BASE,
+> -				      lower_32_bits(cpu_addr));
+> -		dw_pcie_writel_unroll(pci, base, index, PCIE_ATU_UNR_UPPER_BASE,
+> -				      upper_32_bits(cpu_addr));
+> -		dw_pcie_writel_unroll(pci, base, index, PCIE_ATU_UNR_LIMIT,
+> -				      lower_32_bits(cpu_addr + size - 1));
+> -		dw_pcie_writel_unroll(pci, base, index,
+> -				      PCIE_ATU_UNR_LOWER_TARGET,
+> -				      lower_32_bits(pci_addr));
+> -		dw_pcie_writel_unroll(pci, base, index,
+> -				      PCIE_ATU_UNR_UPPER_TARGET,
+> -				      upper_32_bits(pci_addr));
+> -		dw_pcie_writel_unroll(pci, base, index,
+> -				      PCIE_ATU_UNR_REGION_CTRL1,
+> -				      type);
+> -		dw_pcie_writel_unroll(pci, base, index,
+> -				      PCIE_ATU_UNR_REGION_CTRL2,
+> -				      PCIE_ATU_ENABLE);
+> -	} else {
+> -		dw_pcie_write_dbi(pci, base, PCIE_ATU_VIEWPORT, 0x4,
+> -				  PCIE_ATU_REGION_OUTBOUND | index);
+> -		dw_pcie_write_dbi(pci, base, PCIE_ATU_LOWER_BASE, 0x4,
+> -				  lower_32_bits(cpu_addr));
+> -		dw_pcie_write_dbi(pci, base, PCIE_ATU_UPPER_BASE, 0x4,
+> -				  upper_32_bits(cpu_addr));
+> -		dw_pcie_write_dbi(pci, base, PCIE_ATU_LIMIT, 0x4,
+> -				  lower_32_bits(cpu_addr + size - 1));
+> -		dw_pcie_write_dbi(pci, base, PCIE_ATU_LOWER_TARGET, 0x4,
+> -				  lower_32_bits(pci_addr));
+> -		dw_pcie_write_dbi(pci, base, PCIE_ATU_UPPER_TARGET, 0x4,
+> -				  upper_32_bits(pci_addr));
+> -		dw_pcie_write_dbi(pci, base, PCIE_ATU_CR1, 0x4, type);
+> -		dw_pcie_write_dbi(pci, base, PCIE_ATU_CR2, 0x4,
+> -				  PCIE_ATU_ENABLE);
+> +		dw_pcie_prog_outbound_atu_unroll(pci, index, type, cpu_addr,
+> +						 pci_addr, size);
+> +		return;
+>  	}
+>  
+> +	dw_pcie_write_dbi(pci, base, PCIE_ATU_VIEWPORT, 0x4,
+> +			  PCIE_ATU_REGION_OUTBOUND | index);
+> +	dw_pcie_write_dbi(pci, base, PCIE_ATU_LOWER_BASE, 0x4,
+> +			  lower_32_bits(cpu_addr));
+> +	dw_pcie_write_dbi(pci, base, PCIE_ATU_UPPER_BASE, 0x4,
+> +			  upper_32_bits(cpu_addr));
+> +	dw_pcie_write_dbi(pci, base, PCIE_ATU_LIMIT, 0x4,
+> +			  lower_32_bits(cpu_addr + size - 1));
+> +	dw_pcie_write_dbi(pci, base, PCIE_ATU_LOWER_TARGET, 0x4,
+> +			  lower_32_bits(pci_addr));
+> +	dw_pcie_write_dbi(pci, base, PCIE_ATU_UPPER_TARGET, 0x4,
+> +			  upper_32_bits(pci_addr));
+> +	dw_pcie_write_dbi(pci, base, PCIE_ATU_CR1, 0x4, type);
+> +	dw_pcie_write_dbi(pci, base, PCIE_ATU_CR2, 0x4,
+> +			  PCIE_ATU_ENABLE);
+> +
+>  	/*
+>  	 * Make sure ATU enable takes effect before any subsequent config
+>  	 * and I/O accesses.
+>  	 */
+>  	for (retries = 0; retries < LINK_WAIT_MAX_IATU_RETRIES; retries++) {
+> -		if (pci->iatu_unroll_enabled)
+> -			val = dw_pcie_readl_unroll(pci, base, index,
+> -						   PCIE_ATU_UNR_REGION_CTRL2);
+> -		else
+> -			val = dw_pcie_read_dbi(pci, base, PCIE_ATU_CR2, 0x4);
+> -
+> +		val = dw_pcie_read_dbi(pci, base, PCIE_ATU_CR2, 0x4);
+>  		if (val == PCIE_ATU_ENABLE)
+>  			return;
+>  
+>  		usleep_range(LINK_WAIT_IATU_MIN, LINK_WAIT_IATU_MAX);
+>  	}
+> -	dev_err(pci->dev, "iATU is not being enabled\n");
+> +	dev_err(pci->dev, "outbound iATU is not being enabled\n");
+>  }
+>  
+>  int dw_pcie_wait_for_link(struct dw_pcie *pci)
+> 
 
-> [...]
-
->>> diff --git a/arch/arm/mach-davinci/board-dm644x-evm.c
->>> b/arch/arm/mach-davinci/board-dm644x-evm.c
->>> index 023480b75244..60a1f23890cd 100644
->>> --- a/arch/arm/mach-davinci/board-dm644x-evm.c
->>> +++ b/arch/arm/mach-davinci/board-dm644x-evm.c
->>> @@ -744,7 +744,7 @@ static int davinci_phy_fixup(struct phy_device
->>> *phydev)
->>>      return 0;
->>>  }
->>>
->>> -#define HAS_ATA        IS_ENABLED(CONFIG_BLK_DEV_PALMCHIP_BK3710)
->>> +#define HAS_ATA        IS_ENABLED(CONFIG_PATA_BK3710)
->>
->>    I think it would be more correct to check for both libata and IDE
->> drivers here...
->
-> As I understand, the plan is to remove the IDE driver soon.
-
-    I'm not sure DaveM would support any removals in drivers/ide/. He has 
-explicitly expressed his will to maintain the IDE driuver forever.
-
-> Thanks,
-> Sekhar
-
-MBR, Sergei
+Acked-By: Joao Pinto <jpinto@synopsys.com>
