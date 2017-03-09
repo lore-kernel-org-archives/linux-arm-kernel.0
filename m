@@ -1,124 +1,97 @@
-From: xiexiuqi@huawei.com (Xie XiuQi)
-Date: Thu, 9 Mar 2017 17:41:22 +0800
-Subject: [PATCH V12 09/10] trace, ras: add ARM processor error trace event
-In-Reply-To: <1488833103-21082-10-git-send-email-tbaicar@codeaurora.org>
-References: <1488833103-21082-1-git-send-email-tbaicar@codeaurora.org>
- <1488833103-21082-10-git-send-email-tbaicar@codeaurora.org>
-Message-ID: <58C12342.2090701@huawei.com>
+From: sricharan@codeaurora.org (sricharan)
+Date: Thu, 9 Mar 2017 15:22:47 +0530
+Subject: [PATCH V8 01/11] iommu/of: Refactor of_iommu_configure() for
+ error handling
+In-Reply-To: <76844d3e-ae7a-5113-1a76-18312e9f51ce@arm.com>
+References: <1486136933-20328-1-git-send-email-sricharan@codeaurora.org>
+ <1486136933-20328-2-git-send-email-sricharan@codeaurora.org>
+ <8701bfbe-e52e-0e26-2a71-f5f81684de70@arm.com>
+ <76844d3e-ae7a-5113-1a76-18312e9f51ce@arm.com>
+Message-ID: <1cba01d298ba$ee931000$cbb93000$@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tyler Baicar,
+Hi Robin,
 
-On 2017/3/7 4:45, Tyler Baicar wrote:
-> Currently there are trace events for the various RAS
-> errors with the exception of ARM processor type errors.
-> Add a new trace event for such errors so that the user
-> will know when they occur. These trace events are
-> consistent with the ARM processor error section type
-> defined in UEFI 2.6 spec section N.2.4.4.
-> 
-> Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
-> Acked-by: Steven Rostedt <rostedt@goodmis.org>
-> ---
->  drivers/acpi/apei/ghes.c    |  8 +++++++-
->  drivers/firmware/efi/cper.c |  1 +
->  drivers/ras/ras.c           |  1 +
->  include/ras/ras_event.h     | 34 ++++++++++++++++++++++++++++++++++
->  4 files changed, 43 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
-> index 842c0cc..81d7b79 100644
-> --- a/drivers/acpi/apei/ghes.c
-> +++ b/drivers/acpi/apei/ghes.c
-> @@ -514,7 +514,13 @@ static void ghes_do_proc(struct ghes *ghes,
->  		}
->  #endif
->  #ifdef CONFIG_RAS
-> -		else if (trace_unknown_sec_event_enabled()) {
-> +		else if (!uuid_le_cmp(sec_type, CPER_SEC_PROC_ARM) &&
-> +			 trace_arm_event_enabled()) {
-> +			struct cper_sec_proc_arm *arm_err;
-> +
-> +			arm_err = acpi_hest_generic_data_payload(gdata);
-> +			trace_arm_event(arm_err);
-> +		} else if (trace_unknown_sec_event_enabled()) {
->  			void *unknown_err = acpi_hest_generic_data_payload(gdata);
->  			trace_unknown_sec_event(&sec_type,
->  					fru_id, fru_text, sec_sev,
-> diff --git a/drivers/firmware/efi/cper.c b/drivers/firmware/efi/cper.c
-> index 545a6c2..e9fb56a 100644
-> --- a/drivers/firmware/efi/cper.c
-> +++ b/drivers/firmware/efi/cper.c
-> @@ -35,6 +35,7 @@
->  #include <linux/printk.h>
->  #include <linux/bcd.h>
->  #include <acpi/ghes.h>
-> +#include <ras/ras_event.h>
->  
->  #define INDENT_SP	" "
->  
-> diff --git a/drivers/ras/ras.c b/drivers/ras/ras.c
-> index fb2500b..8ba5a94 100644
-> --- a/drivers/ras/ras.c
-> +++ b/drivers/ras/ras.c
-> @@ -28,3 +28,4 @@ static int __init ras_init(void)
->  #endif
->  EXPORT_TRACEPOINT_SYMBOL_GPL(mc_event);
->  EXPORT_TRACEPOINT_SYMBOL_GPL(unknown_sec_event);
-> +EXPORT_TRACEPOINT_SYMBOL_GPL(arm_event);
-> diff --git a/include/ras/ras_event.h b/include/ras/ras_event.h
-> index 5861b6f..b36db48 100644
-> --- a/include/ras/ras_event.h
-> +++ b/include/ras/ras_event.h
-> @@ -162,6 +162,40 @@
->  );
->  
->  /*
-> + * ARM Processor Events Report
-> + *
-> + * This event is generated when hardware detects an ARM processor error
-> + * has occurred. UEFI 2.6 spec section N.2.4.4.
-> + */
-> +TRACE_EVENT(arm_event,
-> +
-> +	TP_PROTO(const struct cper_sec_proc_arm *proc),
-> +
-> +	TP_ARGS(proc),
-> +
-> +	TP_STRUCT__entry(
-> +		__field(u64, mpidr)
-> +		__field(u64, midr)
-> +		__field(u32, running_state)
-> +		__field(u32, psci_state)
-> +		__field(u8, affinity)
-> +	),
-> +
-> +	TP_fast_assign(
-> +		__entry->affinity = proc->affinity_level;
-> +		__entry->mpidr = proc->mpidr;
-> +		__entry->midr = proc->midr;
-> +		__entry->running_state = proc->running_state;
-> +		__entry->psci_state = proc->psci_state;
-> +	),
-> +
-> +	TP_printk("affinity level: %d; MPIDR: %016llx; MIDR: %016llx; "
-> +		  "running state: %d; PSCI state: %d",
-> +		  __entry->affinity, __entry->mpidr, __entry->midr,
-> +		  __entry->running_state, __entry->psci_state)
-> +);
-> +
+>On 08/03/17 18:58, Jean-Philippe Brucker wrote:
+>[...]
+>>>  static const struct iommu_ops
+>>> -*of_pci_iommu_configure(struct pci_dev *pdev, struct device_node
+>>> *bridge_np)
+>>> +*of_pci_iommu_init(struct pci_dev *pdev, struct device_node
+>>> +*bridge_np)
+>>>  {
+>>>  	const struct iommu_ops *ops;
+>>>  	struct of_phandle_args iommu_spec;
+>>> +	int err;
+>>>
+>>>  	/*
+>>>  	 * Start by tracing the RID alias down the PCI topology as @@
+>>> -123,56 +146,56 @@ static int __get_pci_rid(struct pci_dev *pdev, u16
+>alias, void *data)
+>>>  	 * bus into the system beyond, and which IOMMU it ends up at.
+>>>  	 */
+>>>  	iommu_spec.np = NULL;
+>>> -	if (of_pci_map_rid(bridge_np, iommu_spec.args[0], "iommu-map",
+>>> -			   "iommu-map-mask", &iommu_spec.np,
+>iommu_spec.args))
+>>> -		return NULL;
+>>> +	err = of_pci_map_rid(bridge_np, iommu_spec.args[0], "iommu-map",
+>>> +			     "iommu-map-mask", &iommu_spec.np,
+>>> +			     iommu_spec.args);
+>>> +	if (err)
+>>> +		return ERR_PTR(err);
+>>
+>> This change doesn't work with of_pci_map_rid when the PCI RC isn't
+>> behind an IOMMU:
+>>
+>>         map = of_get_property(np, map_name, &map_len);
+>>         if (!map) {
+>>                 if (target)
+>>                         return -ENODEV;
+>>                 /* Otherwise, no map implies no translation */
+>>                 *id_out = rid;
+>>                 return 0;
+>>         }
+>>
+>> Previously with no iommu-map, we returned -ENODEV but it was discarded
+>> by of_pci_iommu_configure. Now it is propagated and the whole device
+>> probing fails. Instead, maybe of_pci_map_rid should always return 0 if
+>> no iommu-map, and the caller should check if *target is still NULL?
+>
+>Ah yes, Tomasz had found breakages with the "mmu-masters" binding
+>before, and I'd already pushed out a fixup for this one[1], but I forgot
+that
+>that discussion was all off-list (out of diplomatic concern that the
+breakage
+>might have been intentional - it wasn't, honest!)
+>
+>Now that rc1 is out I should re-do that branch with v8 of this series plus
+the
+>fixups folded in, unless Sricharan beats me to it.
+>
 
-I think these fields are not enough, we need also export arm processor error
-information (UEFI 2.6 spec section N.2.4.4.1), or at least the error type,
-address, etc. So that the userspace (such as rasdaemon tool) could know what
-error occurred.
+Right, I had this one [1] as V9 which had all your fixes that we discussed
+offline as
+well.  I was about to post a V9 today on top of -rc1 today as well.
 
-Thanks,
-Xie XiuQi
+[1] https://github.com/sricharanaz/iommu/tree/pd_v9
 
-> +/*
->   * Unknown Section Report
->   *
->   * This event is generated when hardware detected a hardware
-> 
+Regards,
+ Sricharan
+
+
+>Thanks for the reminder,
+>Robin.
+>
+>[1]:http://www.linux-arm.org/git?p=linux-
+>rm.git;a=commitdiff;h=0049a34e523506813995c05766f5e2c16d616354
+>
+>>
+>> Thanks,
+>> Jean-Philippe
+>
+>--
+>To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
+>the body of a message to majordomo at vger.kernel.org More majordomo info
+>at  http://vger.kernel.org/majordomo-info.html
