@@ -1,73 +1,71 @@
-From: yangbo.lu@nxp.com (Y.B. Lu)
-Date: Thu, 9 Mar 2017 02:22:36 +0000
-Subject: [v2, 0/7] Add SD UHS-I and eMMC HS200 support for eSDHC
-In-Reply-To: <1488529129-23560-1-git-send-email-yangbo.lu@nxp.com>
-References: <1488529129-23560-1-git-send-email-yangbo.lu@nxp.com>
-Message-ID: <DB6PR0401MB253672A97F3E14C2BEFF946EF8210@DB6PR0401MB2536.eurprd04.prod.outlook.com>
+From: briannorris@chromium.org (Brian Norris)
+Date: Wed, 8 Mar 2017 19:10:50 -0800
+Subject: [PATCH 3/4] phy: rockchip-typec: support DP phy switch
+In-Reply-To: <11032198.PxydffNNDT@diego>
+References: <1486712654-15431-1-git-send-email-zyw@rock-chips.com>
+ <1486712654-15431-4-git-send-email-zyw@rock-chips.com>
+ <20170309003921.GA101174@google.com> <11032198.PxydffNNDT@diego>
+Message-ID: <20170309031049.GA122422@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Any comments on this patchset ?
-Thanks :)
+Hi,
 
+On Thu, Mar 09, 2017 at 02:02:54AM +0100, Heiko Stuebner wrote:
+> Am Mittwoch, 8. M?rz 2017, 16:39:23 CET schrieb Brian Norris:
+> > On Fri, Feb 10, 2017 at 03:44:13PM +0800, Chris Zhong wrote:
+> > > There are 2 Type-c PHYs in RK3399, but only one DP controller. Hence
+> > > only one PHY can connect to DP controller at one time, the other should
+> > > be disconnected. The GRF_SOC_CON26 register has a switch bit to do it,
+> > > set this bit means enable PHY 1, clear this bit means enable PHY 0.
+> > > 
+> > > Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+> > > ---
+> > > 
+> > >  drivers/phy/phy-rockchip-typec.c | 9 +++++++++
+> > >  1 file changed, 9 insertions(+)
+> > > 
+> > > diff --git a/drivers/phy/phy-rockchip-typec.c
+> > > b/drivers/phy/phy-rockchip-typec.c index 7cfb0f8..1604aaa 100644
+> > > --- a/drivers/phy/phy-rockchip-typec.c
+> > > +++ b/drivers/phy/phy-rockchip-typec.c
 
-Best regards,
-Yangbo Lu
+...
 
-> -----Original Message-----
-> From: Yangbo Lu [mailto:yangbo.lu at nxp.com]
-> Sent: Friday, March 03, 2017 4:19 PM
-> To: linux-mmc at vger.kernel.org; ulf.hansson at linaro.org; Adrian Hunter; Rob
-> Herring; Mark Rutland; Catalin Marinas; Will Deacon
-> Cc: devicetree at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> Xiaobo Xie; Y.B. Lu
-> Subject: [v2, 0/7] Add SD UHS-I and eMMC HS200 support for eSDHC
+> > > @@ -869,6 +873,11 @@ static int tcphy_parse_dt(struct rockchip_typec_phy
+> > > *tcphy,> 
+> > >  	if (ret)
+> > >  	
+> > >  		return ret;
+> > > 
+> > > +	ret = tcphy_get_param(dev, &cfg->uphy_dp_sel,
+> > > +			      "rockchip,uphy-dp-sel");
+> > > +	if (ret)
+> > > +		return ret;
+> > 
+> > What about existing device trees? You're essentially adding this
+> > new property and requiring it at the same time.
+> > 
+> > Or are we considering no RK3399 DP stable at the moment? I guess we
+> > haven't actually merged any device trees that support this yet, no?
 > 
-> It's complicated to support SD UHS-I and eMMC HS200 for eSDHC because
-> there're many differences between eSDHC and SD/eMMC spec. Several
-> differences as below must be considered:
-> 1. Peripheral clock must be used instead of platform clock.
->     - eSDHC could select peripheral clock or platform clock as its clock
->       source. According to RM, UHS-I/HS200 must use peripheral clock
-> since
->       it supports higher frequency than platform clock.
->     - Patch 1 and patch 6 is to support this.
-> 2. Signal voltage switching requires a control circuit out of eSDHC.
->     - eSDHC supports signal voltage switch from 3.3v to 1.8v by
->       eSDHC_PROCTL[VOLT_SEL] bit. This bit changes the value of output
->       signal SDHC_VS, and there must be a control circuit out of eSDHC
->       to change the signal voltage according to SDHC_VS output signal.
->     - Patch 2 is to support this.
-> 3. eSDHC uses tuning block for tuning procedure.
->     - Tuning clock control register must be configured before tuning.
->     - Patch 3 is to support this.
-> 4. Delay is needed between tuning cycles for HS200 tuning.
->     - Once a patch removed mdelay between tuning cycles.
->       But eSDHC needs it.
->     - Patch 4 and patch 5 is to support this.
-> 5. UHS-I/HS200 modes could be enabled in dts node.
->     - Patch 7 is to support this.
+> An interesting situation we're in here. On the one hand, you're right this 
+> breaks "backwards compatiblity".
 > 
-> Please review and merge these patches on mmc git tree if no changes are
-> required.
+> But on the other hand, the type-c phy is currently very much unused. The only 
+> current board rk3399-evb.dts does not enable them (so they're disabled 
+> everywhere) and we have neither dwc3 nor dp nodes in any rk3399 devicetrees so 
+> far. Also Rob was ok with the binding change :-) .
 > 
-> Yangbo Lu (7):
->   mmc: sdhci-of-esdhc: add peripheral clock support
->   mmc: sdhci-of-esdhc: add support for signal voltage switch
->   mmc: sdhci-of-esdhc: add tuning support
->   mmc: sdhci: add a quirk to restore delay in tuning
->   mmc: sdhci-of-esdhc: add delay between tuning cycles
->   arm64: dts: ls1046a: add clocks property and compatible for eSDHC node
->   arm64: dts: ls1046ardb: add MMC HS200/UHS-1 modes support
-> 
->  arch/arm64/boot/dts/freescale/fsl-ls1046a-rdb.dts |   8 ++
->  arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi    |   3 +-
->  drivers/mmc/host/sdhci-esdhc.h                    |   7 +
->  drivers/mmc/host/sdhci-of-esdhc.c                 | 167
-> +++++++++++++++++++++-
->  drivers/mmc/host/sdhci.c                          |   3 +-
->  drivers/mmc/host/sdhci.h                          |   2 +
->  6 files changed, 186 insertions(+), 4 deletions(-)
-> 
-> --
-> 2.1.0.27.g96db324
+> So from my pov, I'd say it _should_ be ok, as nothing is using the phys at all 
+> yet and thus there is nothing that could get broken.
+
+Yeah, I guess it's OK... but BTW out-of-tree DTs are perfectly
+legit, once the bindings are accepted.
+
+Another random point of contention (not worth too much, as the pattern
+is already set), but why do these deserve DT properties at all? The
+device already has a "rk3399" compatible property, so can't we derive
+GRF offsets from that?
+
+Brian
