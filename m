@@ -1,51 +1,63 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 9 Mar 2017 13:56:49 -0700
-Subject: outreachy
-In-Reply-To: <443f0143-aec1-2559-a2c2-73b245632948@broadcom.com>
-References: <alpine.DEB.2.20.1703092133340.2306@hadrien>
- <443f0143-aec1-2559-a2c2-73b245632948@broadcom.com>
-Message-ID: <2da12619-5fcb-9e0f-b6c1-c83cbf491e8d@wwwdotorg.org>
+From: roy.pledge@nxp.com (Roy Pledge)
+Date: Thu, 9 Mar 2017 16:00:54 -0500
+Subject: [PATCH] soc/qbman: Disable IRQs for deferred QBMan work
+Message-ID: <1489093254-8032-1-git-send-email-roy.pledge@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/09/2017 01:51 PM, Scott Branden wrote:
-> Hi Julia,
->
-> On 17-03-09 12:36 PM, Julia Lawall wrote:
->> Hello,
->>
->> I discussed the issue of outreachy patches for bcm with Greg, and we are
->> not convinced that not having the patches CCd to you is such a good idea.
->> While we don't want to spam you with noise, some of the applicants are
->> starting to make more significant changes that it could be useful for you
->> to be aware of.
->>
->> Could we try a compromise where you are not CCd on whitespace patches,
->> but
->> you are CCd on patches that actually modify the code?
- >
-> All I'm asking is you work through your outreachy patches internal first
-> to get rid of the most basic mistakes and email traffic it is geerating.
->  Once that learning process is through then they can be sent out like
-> any other patches to the kernel mailing lists and maintainers.
+Work for Congestion State Notifications (CSCN) and Message Ring (MR)
+handling is handled via the workqueue mechanism. This requires the
+driver to disable those IRQs before scheduling the work and re-enabling
+it once the work is completed so that the interrupt doesn't continually
+fire.
 
-+1 from me too; I find these patches rather high volume and had to add a 
-filter to keep them out of my primary inbox. I don't know what process 
-is in place, but I would suggest:
+Signed-off-by: Roy Pledge <roy.pledge@nxp.com>
+---
+ drivers/soc/fsl/qbman/qman.c |    5 +++++
+ 1 file changed, 5 insertions(+)
 
-1) Senders send everything to the outreachy list, where they are 
-reviewed for basic issues, like learning to use git send-email, learning 
-checkpatch, etc. In this case, only send the patch to the outreachy 
-mailing list and nowhere else.
-
-2) Once a patch has passed review there, then send the patch to the 
-regular kernel mailing list just like any other patch; follow the output 
-of get_maintainers.pl.
-
-We have something like (1) inside NVIDIA for new contributors and 
-pre-upstreaming IP review. It helps all the newcomers, but without 
-requiring anyone involved in (2) to change behaviour.
-
-The process I suggest is very much inline with the typically suggested 
-"asking questions" process: (1) read docs yourself (2) ask local 
-contacts for help, (3) start asking wider audiences for help.
+diff --git a/drivers/soc/fsl/qbman/qman.c b/drivers/soc/fsl/qbman/qman.c
+index d67b8e1..f1a242a 100644
+--- a/drivers/soc/fsl/qbman/qman.c
++++ b/drivers/soc/fsl/qbman/qman.c
+@@ -1382,6 +1382,7 @@ static void qm_congestion_task(struct work_struct *work)
+ 	if (!qm_mc_result_timeout(&p->p, &mcr)) {
+ 		spin_unlock(&p->cgr_lock);
+ 		dev_crit(p->config->dev, "QUERYCONGESTION timeout\n");
++		qman_p_irqsource_add(p, QM_PIRQ_CSCI);
+ 		return;
+ 	}
+ 	/* mask out the ones I'm not interested in */
+@@ -1396,6 +1397,7 @@ static void qm_congestion_task(struct work_struct *work)
+ 		if (cgr->cb && qman_cgrs_get(&c, cgr->cgrid))
+ 			cgr->cb(p, cgr, qman_cgrs_get(&rr, cgr->cgrid));
+ 	spin_unlock(&p->cgr_lock);
++	qman_p_irqsource_add(p, QM_PIRQ_CSCI);
+ }
+ 
+ static void qm_mr_process_task(struct work_struct *work)
+@@ -1455,12 +1457,14 @@ static void qm_mr_process_task(struct work_struct *work)
+ 	}
+ 
+ 	qm_mr_cci_consume(&p->p, num);
++	qman_p_irqsource_add(p, QM_PIRQ_MRI);
+ 	preempt_enable();
+ }
+ 
+ static u32 __poll_portal_slow(struct qman_portal *p, u32 is)
+ {
+ 	if (is & QM_PIRQ_CSCI) {
++		qman_p_irqsource_remove(p, QM_PIRQ_CSCI);
+ 		queue_work_on(smp_processor_id(), qm_portal_wq,
+ 			      &p->congestion_work);
+ 	}
+@@ -1472,6 +1476,7 @@ static u32 __poll_portal_slow(struct qman_portal *p, u32 is)
+ 	}
+ 
+ 	if (is & QM_PIRQ_MRI) {
++		qman_p_irqsource_remove(p, QM_PIRQ_MRI);
+ 		queue_work_on(smp_processor_id(), qm_portal_wq,
+ 			      &p->mr_work);
+ 	}
+-- 
+1.7.9.5
