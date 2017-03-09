@@ -1,113 +1,112 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu,  9 Mar 2017 18:52:56 +0100
-Subject: [PATCH v4 1/3] usb: orion-echi: Add support for the Armada 3700
-In-Reply-To: <20170309175258.20076-1-gregory.clement@free-electrons.com>
-References: <20170309175258.20076-1-gregory.clement@free-electrons.com>
-Message-ID: <20170309175258.20076-2-gregory.clement@free-electrons.com>
+From: linux.amoon@gmail.com (Anand Moon)
+Date: Thu, 9 Mar 2017 23:28:05 +0530
+Subject: [PATCH] ARM64: dts: meson-gxbb-odroidc2: enable USB Host Nodes
+In-Reply-To: <0204bbde-c437-e11b-cb3b-d9f4b55a5810@baylibre.com>
+References: <1488918961-4666-1-git-send-email-linux.amoon@gmail.com>
+ <CANAwSgTUPpYvFWcZOf+j6K+1rDZJNUeu9K1fGAB8TC6TgzRXCg@mail.gmail.com>
+ <0204bbde-c437-e11b-cb3b-d9f4b55a5810@baylibre.com>
+Message-ID: <CANAwSgTuP_OGp+0sdR9sVuq-SOkBfQxYKONZPB7Vo=+GFdrHfw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Hua Jing <jinghua@marvell.com>
+Hi Neil,
 
-- Add a new compatible string for the Armada 3700 SoCs
+On 9 March 2017 at 18:43, Neil Armstrong <narmstrong@baylibre.com> wrote:
+> On 03/08/2017 06:22 PM, Anand Moon wrote:
+>> Hi All,
+>>
+>> On 8 March 2017 at 02:06, Anand Moon <linux.amoon@gmail.com> wrote:
+>>> From: Anand Moon <linux.amoon@gmail.com>
+>>>
+>>> update the regulator supply nodes for usb host to
+>>> enable usb host on odroid-c2
+>>>
+>>> Signed-off-by: Anand Moon <linux.amoon@gmail.com>
+>>> ---
+>>> root at odroid64:/usr/src/odroidxu3-4.y-devel# lsusb -t
+>>> /:  Bus 01.Port 1: Dev 1, Class=root_hub, Driver=dwc2/1p, 480M
+>>>     |__ Port 1: Dev 2, If 0, Class=Hub, Driver=hub/4p, 480M
+>>>         |__ Port 1: Dev 3, If 0, Class=Human Interface Device, Driver=usbhid, 1.5M
+>>>         |__ Port 1: Dev 3, If 1, Class=Human Interface Device, Driver=usbhid, 1.5M
+>>>         |__ Port 2: Dev 4, If 0, Class=Mass Storage, Driver=usb-storage, 480M
+>>>         |__ Port 4: Dev 5, If 0, Class=Mass Storage, Driver=usb-storage, 480M
+>>> ---
+>>>  arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts | 13 +++++++++++++
+>>>  1 file changed, 13 insertions(+)
+>>>
+>>> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
+>>> index c59403a..304b676 100644
+>>> --- a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
+>>> +++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
+>>> @@ -64,6 +64,18 @@
+>>>                 reg = <0x0 0x0 0x0 0x80000000>;
+>>>         };
+>>>
+>>> +       usb_host_pwr: regulator-usb-pwrs {
+>>> +               compatible = "regulator-fixed";
+>>> +
+>>> +               regulator-name = "USB_HOST_PWR";
+>>> +
+>>> +               regulator-min-microvolt = <5000000>;
+>>> +               regulator-max-microvolt = <5000000>;
+>>> +
+>>> +               gpio = <&gpio_ao GPIOAO_4 GPIO_ACTIVE_HIGH>;
+>>> +               enable-active-high;
+>>> +       };
+>>> +
+>>>         usb_otg_pwr: regulator-usb-pwrs {
+>>>                 compatible = "regulator-fixed";
+>>>
+>>> @@ -184,6 +196,7 @@
+>>>
+>>>  &usb1_phy {
+>>>         status = "okay";
+>>> +       phy-supply = <&usb_host_pwr>;
+>>>  };
+>>>
+>>>  &usb0 {
+>>> --
+>>> 2.7.4
+>>>
+>>
+>> Please ignore this patch, It not working.
+>> I will try to submit a new patch.
+>>
+>> Best Regards
+>> -Anand Moon
+>>
+>
+> Hi Anand,
+>
+> For this specific use case, the only way to manage this is to use the Work-In-Progress
+> Power Sequence Library proposer by Peter Chen at :
+> https://lkml.org/lkml/2016/11/13/315
+>
+> Since this is the USB Hub reset link and has no direct link with either the USB controller
+> or the USB PHY, and the USB Hus cannot be modeled (yet ?) in the DT.
+>
+> One intermediate, but crappy, solution would be to add a GPIO hog until the power
+> sequence code has been merged, with a proper big fat warning in the dts file.
+>
+> You can find doc about the gpio-hog in :
+> Documentation/devicetree/bindings/gpio/gpio.txt
+>
+> It should look like :
+>
+> usb-hub {
+>         gpio-hog;
+>         gpios = <GPIOAO_4 GPIO_ACTIVE_HIGH>;
+>         output-high;
+>         line-name = "usb-hub-reset";
+> };
+>
+> in the gpio_ao controller node.
+>
+> Neil
 
-- add sbuscfg support for orion usb controller driver. For the SoCs
-  without hlock, need to program BAWR/BARD/AHBBRST fields in the sbuscfg
-  register to guarantee the AHB master's burst would not overrun or
-  underrun the FIFO.
+Thanks for this input.
 
-- the sbuscfg register has to be set after the usb controller reset,
-  otherwise the value would be overridden to 0. In order to do this, the
-  reset callback is registered.
+I will check this series of patches, and work on this new approach.
 
-[gregory.clement at free-electrons.com: - reword commit and comments
-				     - fix error path in ehci_orion_drv_reset()
-				     - fix checkpatch warning]
-Signed-off-by: Hua Jing <jinghua@marvell.com>
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Reviewed-by: Andrew Lunn <andrew@lunn.ch>
----
- .../devicetree/bindings/usb/ehci-orion.txt         |  4 ++-
- drivers/usb/host/ehci-orion.c                      | 36 ++++++++++++++++++++++
- 2 files changed, 39 insertions(+), 1 deletion(-)
-
-diff --git a/Documentation/devicetree/bindings/usb/ehci-orion.txt b/Documentation/devicetree/bindings/usb/ehci-orion.txt
-index 17c3bc858b86..2855bae79fda 100644
---- a/Documentation/devicetree/bindings/usb/ehci-orion.txt
-+++ b/Documentation/devicetree/bindings/usb/ehci-orion.txt
-@@ -1,7 +1,9 @@
- * EHCI controller, Orion Marvell variants
- 
- Required properties:
--- compatible: must be "marvell,orion-ehci"
-+- compatible: must be one of the following
-+	"marvell,orion-ehci"
-+	"marvell,armada-3700-ehci"
- - reg: physical base address of the controller and length of memory mapped
-   region.
- - interrupts: The EHCI interrupt
-diff --git a/drivers/usb/host/ehci-orion.c b/drivers/usb/host/ehci-orion.c
-index ee8d5faa0194..1aec87ec68df 100644
---- a/drivers/usb/host/ehci-orion.c
-+++ b/drivers/usb/host/ehci-orion.c
-@@ -47,6 +47,18 @@
- #define USB_PHY_IVREF_CTRL	0x440
- #define USB_PHY_TST_GRP_CTRL	0x450
- 
-+#define USB_SBUSCFG		0x90
-+
-+/* BAWR = BARD = 3 : Align read/write bursts packets larger than 128 bytes */
-+#define USB_SBUSCFG_BAWR_ALIGN_128B	(0x3 << 6)
-+#define USB_SBUSCFG_BARD_ALIGN_128B	(0x3 << 3)
-+/* AHBBRST = 3	   : Align AHB Burst to INCR16 (64 bytes) */
-+#define USB_SBUSCFG_AHBBRST_INCR16	(0x3 << 0)
-+
-+#define USB_SBUSCFG_DEF_VAL (USB_SBUSCFG_BAWR_ALIGN_128B	\
-+			     | USB_SBUSCFG_BARD_ALIGN_128B	\
-+			     | USB_SBUSCFG_AHBBRST_INCR16)
-+
- #define DRIVER_DESC "EHCI orion driver"
- 
- #define hcd_to_orion_priv(h) ((struct orion_ehci_hcd *)hcd_to_ehci(h)->priv)
-@@ -151,8 +163,31 @@ ehci_orion_conf_mbus_windows(struct usb_hcd *hcd,
- 	}
- }
- 
-+static int ehci_orion_drv_reset(struct usb_hcd *hcd)
-+{
-+	struct device *dev = hcd->self.controller;
-+	int ret;
-+
-+	ret = ehci_setup(hcd);
-+	if (ret)
-+		return ret;
-+
-+	/*
-+	 * For SoC without hlock, need to program sbuscfg value to guarantee
-+	 * AHB master's burst would not overrun or underrun FIFO.
-+	 *
-+	 * sbuscfg reg has to be set after usb controller reset, otherwise
-+	 * the value would be override to 0.
-+	 */
-+	if (of_device_is_compatible(dev->of_node, "marvell,armada-3700-ehci"))
-+		wrl(USB_SBUSCFG, USB_SBUSCFG_DEF_VAL);
-+
-+	return ret;
-+}
-+
- static const struct ehci_driver_overrides orion_overrides __initconst = {
- 	.extra_priv_size =	sizeof(struct orion_ehci_hcd),
-+	.reset = ehci_orion_drv_reset,
- };
- 
- static int ehci_orion_drv_probe(struct platform_device *pdev)
-@@ -310,6 +345,7 @@ static int ehci_orion_drv_remove(struct platform_device *pdev)
- 
- static const struct of_device_id ehci_orion_dt_ids[] = {
- 	{ .compatible = "marvell,orion-ehci", },
-+	{ .compatible = "marvell,armada-3700-ehci", },
- 	{},
- };
- MODULE_DEVICE_TABLE(of, ehci_orion_dt_ids);
--- 
-2.11.0
+-Best Regards
+Anand Moon
