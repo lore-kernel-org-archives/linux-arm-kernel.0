@@ -1,55 +1,115 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu,  9 Mar 2017 12:04:24 +0100
-Subject: [PATCH v2 3/3] ARM64: dts: marvell: armada-37xx: Add USB2 node
-In-Reply-To: <20170309110424.2187-1-gregory.clement@free-electrons.com>
-References: <20170309110424.2187-1-gregory.clement@free-electrons.com>
-Message-ID: <20170309110424.2187-4-gregory.clement@free-electrons.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 9 Mar 2017 19:10:37 +0800
+Subject: [linux-sunxi] [PATCH 14/15] ARM: sun5i: a10s: Add the HDMI
+ controller node
+In-Reply-To: <20170309105934.ahsussan6p36lrzn@lukather>
+References: <cover.bc06ffa88f847ddd9ddd7c259415d5f61b55307b.1488876832.git-series.maxime.ripard@free-electrons.com>
+ <61406c0ba992f2fa5b5180b790a1ef3fa38d9567.1488876832.git-series.maxime.ripard@free-electrons.com>
+ <CAGb2v64KKp0cYB3u0=bSVcq0gB41LkurCeiTJ3OEzn7UjdSPpQ@mail.gmail.com>
+ <20170309105934.ahsussan6p36lrzn@lukather>
+Message-ID: <CAGb2v674TKUho1tsq6KSyWS_=+dn_8CFuM31uxR7akZSXAjeHA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Armada 37xx SoC embedded an EHCI controller. This patch adds the device
-tree node enabling its support.
+On Thu, Mar 9, 2017 at 6:59 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> 1;4601;0c
+> On Wed, Mar 08, 2017 at 11:35:39AM +0800, Chen-Yu Tsai wrote:
+>> Hi,
+>>
+>> On Tue, Mar 7, 2017 at 4:56 PM, Maxime Ripard
+>> <maxime.ripard@free-electrons.com> wrote:
+>> > The A10s has an HDMI controller connected to the second TCON channel. Add
+>> > it to our DT.
+>> >
+>> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+>> > ---
+>> >  arch/arm/boot/dts/sun5i-a10s.dtsi | 34 ++++++++++++++++++++++++++++++++-
+>> >  arch/arm/boot/dts/sun5i.dtsi      |  1 +-
+>> >  2 files changed, 35 insertions(+), 0 deletions(-)
+>> >
+>> > diff --git a/arch/arm/boot/dts/sun5i-a10s.dtsi b/arch/arm/boot/dts/sun5i-a10s.dtsi
+>> > index 074485782a4a..3482c9d2b120 100644
+>> > --- a/arch/arm/boot/dts/sun5i-a10s.dtsi
+>> > +++ b/arch/arm/boot/dts/sun5i-a10s.dtsi
+>> > @@ -72,7 +72,33 @@
+>> >                 };
+>> >         };
+>> >
+>> > +       display-engine {
+>> > +               compatible = "allwinner,sun5i-a10s-display-engine",
+>> > +                            "allwinner,sun5i-a13-display-engine";
+>> > +               allwinner,pipelines = <&fe0>;
+>> > +       };
+>> > +
+>> >         soc at 01c00000 {
+>> > +               hdmi0: hdmi at 01c16000 {
+>>
+>> Nit: is the 0 suffix needed? I don't see any indication that there is
+>> a second controller.
+>>
+>> > +                       compatible = "allwinner,sun5i-a10s-hdmi";
+>> > +                       reg = <0x01c16000 0x1000>;
+>> > +                       clocks = <&ccu CLK_AHB_HDMI>, <&ccu CLK_HDMI>,
+>> > +                                <&ccu CLK_PLL_VIDEO0_2X>,
+>> > +                                <&ccu CLK_PLL_VIDEO1_2X>;
+>> > +                       clock-names = "ahb", "mod", "pll-0", "pll-1";
+>> > +                       status = "disabled";
+>> > +
+>> > +                       port {
+>> > +                               #address-cells = <1>;
+>> > +                               #size-cells = <0>;
+>> > +
+>> > +                               hdmi0_in_tcon0: endpoint at 0 {
+>> > +                                       reg = <0>;
+>> > +                                       remote-endpoint = <&tcon0_out_hdmi0>;
+>> > +                               };
+>> > +                       };
+>> > +               };
+>> > +
+>> >                 pwm: pwm at 01c20e00 {
+>> >                         compatible = "allwinner,sun5i-a10s-pwm";
+>> >                         reg = <0x01c20e00 0xc>;
+>> > @@ -129,3 +155,11 @@
+>> >
+>> >  &sram_a {
+>> >  };
+>> > +
+>> > +&tcon0_out {
+>> > +       tcon0_out_hdmi0: endpoint at 2 {
+>> > +               reg = <2>;
+>> > +               remote-endpoint = <&hdmi0_in_tcon0>;
+>> > +               allwinner,tcon-channel = <1>;
+>> > +       };
+>> > +};
+>> > diff --git a/arch/arm/boot/dts/sun5i.dtsi b/arch/arm/boot/dts/sun5i.dtsi
+>> > index f3b6e19244f9..3d009b2aa42a 100644
+>> > --- a/arch/arm/boot/dts/sun5i.dtsi
+>> > +++ b/arch/arm/boot/dts/sun5i.dtsi
+>> > @@ -273,6 +273,7 @@
+>> >                                         tcon0_out_tve0: endpoint at 1 {
+>> >                                                 reg = <1>;
+>> >                                                 remote-endpoint = <&tve0_in_tcon0>;
+>> > +                                               allwinner,tcon-channel = <1>;
+>>
+>> This looks like a separate patch, probably following the binding
+>> change?
+>
+> I don't know, the binding says that without anything specified, reg
+> would be used. I was assuming that we only needed it once we had the
+> new endpoint to make it consistent, therefore it didn't need an extra
+> patch.
+>
+> But I can definitely create one if you want.
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- arch/arm64/boot/dts/marvell/armada-3720-db.dts | 6 ++++++
- arch/arm64/boot/dts/marvell/armada-37xx.dtsi   | 7 +++++++
- 2 files changed, 13 insertions(+)
+It just seems a bit out of place, that's all. Mentioning it in the
+commit message would be good enough for me.
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-3720-db.dts b/arch/arm64/boot/dts/marvell/armada-3720-db.dts
-index 864936acc316..aa39339b6582 100644
---- a/arch/arm64/boot/dts/marvell/armada-3720-db.dts
-+++ b/arch/arm64/boot/dts/marvell/armada-3720-db.dts
-@@ -134,6 +134,12 @@
- 	status = "okay";
- };
- 
-+/* CON27 */
-+&usb2 {
-+	status = "okay";
-+};
-+
-+
- &mdio {
- 	status = "okay";
- 	phy0: ethernet-phy at 0 {
-diff --git a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-index cf0c2f9ebd7d..7639518d8ee1 100644
---- a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-@@ -204,6 +204,13 @@
- 				status = "disabled";
- 			};
- 
-+			usb2: usb at 5e000 {
-+				compatible = "marvell,armada-3700-ehci";
-+				reg = <0x5e000 0x2000>;
-+				interrupts = <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
-+				status = "disabled";
-+			};
-+
- 			xor at 60900 {
- 				compatible = "marvell,armada-3700-xor";
- 				reg = <0x60900 0x100
--- 
-2.11.0
+ChenYu
+
+> Maxime
+>
+> --
+> Maxime Ripard, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
