@@ -1,78 +1,67 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 9 Mar 2017 15:09:17 +0530
-Subject: [PATCH] cpufreq: qoriq: enhance bus frequency calculation
-In-Reply-To: <1489047306-31818-1-git-send-email-andy.tang@nxp.com>
-References: <1489047306-31818-1-git-send-email-andy.tang@nxp.com>
-Message-ID: <20170309093917.GB3341@vireshk-i7>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 9 Mar 2017 09:34:12 +0100
+Subject: stmmac still supporting spear600 ?
+Message-ID: <20170309093412.33c0277d@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09-03-17, 16:15, YuanTian Tang wrote:
-> From: Tang Yuantian <Yuantian.Tang@nxp.com>
-> 
-> On some platforms, property device-type may be missed in soc node
-> in dts which caused the bus-frequency can not be obtained correctly.
-> 
-> This patch enhanced the bus-frequency calculation. When property
-> device-type is missed in dts, bus-frequency will be obtained by
-> looking up clock table to get platform clock and hence get its
-> frequency.
-> 
-> Signed-off-by: Tang Yuantian <yuantian.tang@nxp.com>
-> ---
->  drivers/cpufreq/qoriq-cpufreq.c | 24 +++++++++++++++++-------
->  1 file changed, 17 insertions(+), 7 deletions(-)
-> 
-> diff --git a/drivers/cpufreq/qoriq-cpufreq.c b/drivers/cpufreq/qoriq-cpufreq.c
-> index bfec1bc..0f22e40 100644
-> --- a/drivers/cpufreq/qoriq-cpufreq.c
-> +++ b/drivers/cpufreq/qoriq-cpufreq.c
-> @@ -52,17 +52,27 @@ static u32 get_bus_freq(void)
->  {
->  	struct device_node *soc;
->  	u32 sysfreq;
-> +	struct clk *pltclk;
-> +	int ret;
->  
-> +	/* get platform freq by searching bus-frequency property */
->  	soc = of_find_node_by_type(NULL, "soc");
-> -	if (!soc)
-> -		return 0;
-> -
-> -	if (of_property_read_u32(soc, "bus-frequency", &sysfreq))
-> -		sysfreq = 0;
-> +	if (soc) {
-> +		ret = of_property_read_u32(soc, "bus-frequency", &sysfreq);
-> +		of_node_put(soc);
-> +		if (!ret)
-> +			return sysfreq;
-> +	}
->  
-> -	of_node_put(soc);
-> +	/* get platform freq by its clock name */
-> +	pltclk = clk_get(NULL, "cg-pll0-div1");
+Hello,
 
-Will this always work? If yes, then what about dropping the code parsing DT
-completely ? That is, just rely on clk_get_rate() in all cases.
+I'm porting Linux to an old spear600 based platform, and therefore
+trying to use the stmmac driver on this SoC. Unfortunately, it doesn't
+work quite well and I'm wondering if the stmmac driver still properly
+supports the old version of the IP that is used in this SoC. I'm
+testing with v4.11-rc1.
 
-> +	if (IS_ERR(pltclk)) {
-> +		pr_err("%s: can't get bus frequency %ld\n",
-> +		__func__, PTR_ERR(pltclk));
+First, the logs:
 
-You need to properly align this. Try running checkpatch over this patch or:
+Linux version 4.11.0-rc1 (thomas at skate) (gcc version 5.4.0 20160609 (Ubuntu/Linaro 5.4.0-6ubuntu1~16.04.4) ) #18 Thu Mar 9 09:18:01 CET 2017
+[...]
+libphy: Fixed MDIO Bus: probed
+stmmaceth e0800000.ethernet: no reset control found
+stmmac - user ID: 0x10, Synopsys ID: 0x32
+stmmaceth e0800000.ethernet: Ring mode enabled
+stmmaceth e0800000.ethernet: DMA HW capability register supported
+stmmaceth e0800000.ethernet: Normal descriptors
+libphy: stmmac: probed
+stmmaceth e0800000.ethernet (unnamed net_device) (uninitialized): PHY ID 0007c0c4 at 31 IRQ POLL (stmmac-0:1f) active
+[...]
+# ifconfig eth0 192.168.1.89
+stmmaceth e0800000.ethernet eth0: device MAC address 00:30:d3:21:22:60
+Generic PHY stmmac-0:1f: attached PHY driver [Generic PHY] (mii_bus:phy_addr=stmmac-0:1f, irq=-1)
+stmmaceth e0800000.ethernet: Failed to reset the dma
+stmmaceth e0800000.ethernet eth0: stmmac_hw_setup: DMA engine initialization failed
+stmmaceth e0800000.ethernet eth0: stmmac_open: Hw setup failed
+ifconfig: SIOCSIFFLAGS: Device or resource busy
 
-checkpatch --strict
+So the reason why it fails to reset the DMA is because
+dwmac_dma_reset() sets bit DMA_BUS_MODE_SFT_RESET in register
+DMA_BUS_MODE and waits for this bit to clear, but that never happens.
 
-> +		return PTR_ERR(pltclk);
-> +	}
->  
-> -	return sysfreq;
-> +	return clk_get_rate(pltclk);
->  }
->  
->  static struct clk *cpu_to_clk(int cpu)
-> -- 
-> 2.1.0.27.g96db324
+The reason why I'm not sure if this IP is still supported is because
+dwmac1000_get_hw_feature() reads the DMA_HW_FEATURE register (offset
+0x00001058), and my spear600 datasheet doesn't mention this register at
+all.
 
+It is worth mentioning that:
+
+ - Ethernet is working fine under U-Boot (it's an old 2010.03 U-Boot
+   version, with a good number of patches), so I'm sure the HW is
+   working.
+
+ - Setting bit 1 in the DMA_BUS_MODE register from U-Boot also leaves
+   this bit set forever, it apparently never clears (unless my tests
+   were wrong, which is very possible).
+
+In terms of Device Tree, I'm simply using spear600.dtsi, and enabling
+the gmac node, nothing else.
+
+Has the stmmac driver been recently used/tested on spear600 ?
+
+Thanks,
+
+Thomas Petazzoni
 -- 
-viresh
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
