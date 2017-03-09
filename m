@@ -1,73 +1,64 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 9 Mar 2017 13:27:21 +0530
-Subject: [PATCH v3 10/23] dt-bindings: PCI: Add dt bindings for pci designware
- EP mode
+Date: Thu, 9 Mar 2017 13:27:22 +0530
+Subject: [PATCH v3 11/23] PCI: dwc: dra7xx: Facilitate wrapper and msi
+ interrupts to be enabled independently
 In-Reply-To: <1489046254-19919-1-git-send-email-kishon@ti.com>
 References: <1489046254-19919-1-git-send-email-kishon@ti.com>
-Message-ID: <1489046254-19919-11-git-send-email-kishon@ti.com>
+Message-ID: <1489046254-19919-12-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add device tree binding documentation for pci designware EP mode.
+No functional change. Split dra7xx_pcie_enable_interrupts into
+dra7xx_pcie_enable_wrapper_interrupts and dra7xx_pcie_enable_msi_interrupts
+so that wrapper interrupts and msi interrupts can be enabled independently.
+This is in preparation for adding EP mode support to dra7xx driver since
+EP mode doesn't have to enable msi_interrupts.
 
-Acked-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- .../devicetree/bindings/pci/designware-pcie.txt    |   26 ++++++++++++++------
- 1 file changed, 18 insertions(+), 8 deletions(-)
+ drivers/pci/dwc/pci-dra7xx.c |   24 ++++++++++++++++++------
+ 1 file changed, 18 insertions(+), 6 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/pci/designware-pcie.txt b/Documentation/devicetree/bindings/pci/designware-pcie.txt
-index 1392c70..b2480dd 100644
---- a/Documentation/devicetree/bindings/pci/designware-pcie.txt
-+++ b/Documentation/devicetree/bindings/pci/designware-pcie.txt
-@@ -6,30 +6,40 @@ Required properties:
- - reg-names: Must be "config" for the PCIe configuration space.
-     (The old way of getting the configuration address space from "ranges"
-     is deprecated and should be avoided.)
-+- num-lanes: number of lanes to use
-+RC mode:
- - #address-cells: set to <3>
- - #size-cells: set to <2>
- - device_type: set to "pci"
- - ranges: ranges for the PCI memory and I/O regions
- - #interrupt-cells: set to <1>
--- interrupt-map-mask and interrupt-map: standard PCI properties
--	to define the mapping of the PCIe interface to interrupt
-+- interrupt-map-mask and interrupt-map: standard PCI
-+	properties to define the mapping of the PCIe interface to interrupt
- 	numbers.
--- num-lanes: number of lanes to use
-+EP mode:
-+- num-ib-windows: number of inbound address translation
-+        windows
-+- num-ob-windows: number of outbound address translation
-+        windows
+diff --git a/drivers/pci/dwc/pci-dra7xx.c b/drivers/pci/dwc/pci-dra7xx.c
+index 8c53233..be5ebfa 100644
+--- a/drivers/pci/dwc/pci-dra7xx.c
++++ b/drivers/pci/dwc/pci-dra7xx.c
+@@ -140,18 +140,30 @@ static int dra7xx_pcie_establish_link(struct dra7xx_pcie *dra7xx)
+ 	return dw_pcie_wait_for_link(pci);
+ }
  
- Optional properties:
--- num-viewport: number of view ports configured in hardware.  If a platform
--  does not specify it, the driver assumes 2.
- - num-lanes: number of lanes to use (this property should be specified unless
-   the link is brought already up in BIOS)
- - reset-gpio: gpio pin number of power good signal
--- bus-range: PCI bus numbers covered (it is recommended for new devicetrees to
--  specify this property, to keep backwards compatibility a range of 0x00-0xff
--  is assumed if not present)
- - clocks: Must contain an entry for each entry in clock-names.
- 	See ../clocks/clock-bindings.txt for details.
- - clock-names: Must include the following entries:
- 	- "pcie"
- 	- "pcie_bus"
-+RC mode:
-+- num-viewport: number of view ports configured in
-+  hardware. If a platform does not specify it, the driver assumes 2.
-+- bus-range: PCI bus numbers covered (it is recommended
-+  for new devicetrees to specify this property, to keep backwards
-+  compatibility a range of 0x00-0xff is assumed if not present)
-+EP mode:
-+- max-functions: maximum number of functions that can be
-+  configured
+-static void dra7xx_pcie_enable_interrupts(struct dra7xx_pcie *dra7xx)
++static void dra7xx_pcie_enable_msi_interrupts(struct dra7xx_pcie *dra7xx)
+ {
+-	dra7xx_pcie_writel(dra7xx, PCIECTRL_DRA7XX_CONF_IRQSTATUS_MAIN,
+-			   ~INTERRUPTS);
+-	dra7xx_pcie_writel(dra7xx,
+-			   PCIECTRL_DRA7XX_CONF_IRQENABLE_SET_MAIN, INTERRUPTS);
+ 	dra7xx_pcie_writel(dra7xx, PCIECTRL_DRA7XX_CONF_IRQSTATUS_MSI,
+ 			   ~LEG_EP_INTERRUPTS & ~MSI);
+-	dra7xx_pcie_writel(dra7xx, PCIECTRL_DRA7XX_CONF_IRQENABLE_SET_MSI,
++
++	dra7xx_pcie_writel(dra7xx,
++			   PCIECTRL_DRA7XX_CONF_IRQENABLE_SET_MSI,
+ 			   MSI | LEG_EP_INTERRUPTS);
+ }
  
- Example configuration:
- 
++static void dra7xx_pcie_enable_wrapper_interrupts(struct dra7xx_pcie *dra7xx)
++{
++	dra7xx_pcie_writel(dra7xx, PCIECTRL_DRA7XX_CONF_IRQSTATUS_MAIN,
++			   ~INTERRUPTS);
++	dra7xx_pcie_writel(dra7xx, PCIECTRL_DRA7XX_CONF_IRQENABLE_SET_MAIN,
++			   INTERRUPTS);
++}
++
++static void dra7xx_pcie_enable_interrupts(struct dra7xx_pcie *dra7xx)
++{
++	dra7xx_pcie_enable_wrapper_interrupts(dra7xx);
++	dra7xx_pcie_enable_msi_interrupts(dra7xx);
++}
++
+ static void dra7xx_pcie_host_init(struct pcie_port *pp)
+ {
+ 	struct dw_pcie *pci = to_dw_pcie_from_pp(pp);
 -- 
 1.7.9.5
