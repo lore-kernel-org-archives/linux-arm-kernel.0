@@ -1,49 +1,52 @@
 From: briannorris@chromium.org (Brian Norris)
-Date: Thu, 9 Mar 2017 15:28:54 -0800
-Subject: [PATCH v2 2/3] soc: rockchip: add driver handling grf setup
-In-Reply-To: <2206970.JAebETMOV6@phil>
-References: <20161115223900.30728-1-heiko@sntech.de> <7144543.znLMLUJXpB@phil>
- <CAOesGMj_RdxVDzirT97KLkXRsyVcFh3Z8jZLNjn0ehAv0Qhmhg@mail.gmail.com>
- <2206970.JAebETMOV6@phil>
-Message-ID: <20170309232852.GA15605@google.com>
+Date: Thu, 9 Mar 2017 15:35:06 -0800
+Subject: [PATCH 3/4] phy: rockchip-typec: support DP phy switch
+In-Reply-To: <1626236.28xlsfuSeg@diego>
+References: <1486712654-15431-1-git-send-email-zyw@rock-chips.com>
+ <11032198.PxydffNNDT@diego> <20170309031049.GA122422@google.com>
+ <1626236.28xlsfuSeg@diego>
+Message-ID: <20170309233505.GA18026@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To throw my unwanted 2-cents in:
-
-On Mon, Feb 27, 2017 at 06:30:08AM +0100, Heiko Stuebner wrote:
-> Am Sonntag, 29. Januar 2017, 16:41:46 CET schrieb Olof Johansson:
-> > On Sun, Jan 29, 2017 at 3:36 PM, Heiko Stuebner <heiko@sntech.de> wrote:
-> > Or, if you're firmly deciding to keep updating kernel code for all
-> > SoCs, could also just add one platform quirk file in
-> > drivers/soc/rockchip with the postcore_initcall that matches toplevel
-> > compatible per SoC, finds the device node, maps the address range,
-> > sets the value.
-> > 
-> > That'll give you a place for other platform quirks, if they ever come
-> > up. In one place, even if the other quirks might be in other register
-> > ranges.
+On Thu, Mar 09, 2017 at 09:31:33AM +0100, Heiko Stuebner wrote:
+> Am Mittwoch, 8. M?rz 2017, 19:10:50 CET schrieb Brian Norris:
+> > Another random point of contention (not worth too much, as the pattern
+> > is already set), but why do these deserve DT properties at all? The
+> > device already has a "rk3399" compatible property, so can't we derive
+> > GRF offsets from that?
 > 
-> I would very much prefer going this route, as I really don't trust the GRF to 
-> keep conforming to any devicetree binding (or anything at all) and this way, 
-> stuff is completely reversable / redoable if the need arises (hopefully not) 
-> and we don't have to live with an inadequate bindings forever :-) .
+> I'm definitly with you in this regard.
+> 
+> But it seems like there is some sort of current trend of moving more stuff 
+> into the dt again. I vaguely remember phy and (or) dt-maintainers preferring 
+> to have these definitions in the dt for the typec-phy.
 
-Agreed, FWIW (though I'm not sure why a top-level chip driver is better
-than a GRF driver). Rockchip's GRF is basically "designed" (that's
-probably not an accurate word) to need updating on every chip revision.
-I'm also not very confident in any given binding around it. DT bindings
-are notoriously hard to modify after they've been accepted, and I don't
-see much actual value in foolishly codifying every bit of GRF in the
-device tree bindings.
+Hmm, not sure I understand that one. You're just going to multiply the
+variations of DT props you have to support, instead of simply
+multiplying a (non-ABI) table within the driver. The latter seems much
+more stable. Oh well, not my subsystem.
 
-I think this pattern applies elsewhere too -- for instance, on the
-Type-C PHY controller [1], which currently defies the above and instead
-tries to list each GRF offset it needs in the DT; this is, IMO, quite
-unscalable. We're already nearly breaking backward compatibility, and
-we've only supported one SoC there!!
+> See also the recent mail from Olof concerning the grf initialization and maybe 
+> not having per-soc definitions in the driver, where I'm trying to keep things 
+> out of the dt a bit more strongly :-) .
+
+Thanks for the pointer. I looked up (and replied to) that one.
+
+Either I don't understand exactly what he's saying or... I'd like to
+know what he's smoking. You can't just wish away the fact that the GRF
+is truly a "general register file" and will change forever (and so will
+our understanding of how to use it). Kernels always need to update for
+new chipsets. Device Tree Bindings Are Forever (TM).
+
+Now let's see if Olof reads my reply which points back to this
+thread...and now to the above comment :)
+
+> So yes, personally I would definitly prefer not having to much GRF-stuff leak 
+> into the dt. Simply because the GRF has always been very unstable over time 
+> [=you always find one more bit that needs tuning] and to not cause things like 
+> the above. But as you said I guess we're to late for the typec-phy.
+
+I'm with you.
 
 Brian
-
-[1] https://patchwork.kernel.org/patch/9566079/
-    [PATCH 3/4] phy: rockchip-typec: support DP phy switch
