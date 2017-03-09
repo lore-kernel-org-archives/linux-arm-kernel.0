@@ -1,115 +1,74 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu,  9 Mar 2017 18:28:25 +0100
-Subject: [PATCH v3 1/3] usb: orion-echi: Add support for the Armada 3700
-In-Reply-To: <20170309172827.17874-1-gregory.clement@free-electrons.com>
-References: <20170309172827.17874-1-gregory.clement@free-electrons.com>
-Message-ID: <20170309172827.17874-2-gregory.clement@free-electrons.com>
+From: labbott@redhat.com (Laura Abbott)
+Date: Thu, 9 Mar 2017 09:38:49 -0800
+Subject: [RFC PATCH 00/12] Ion cleanup in preparation for moving out of
+ staging
+In-Reply-To: <CA+M3ks77Am3Fx-ZNmgeM5tCqdM7SzV7rby4Es-p2F2aOhUco9g@mail.gmail.com>
+References: <1488491084-17252-1-git-send-email-labbott@redhat.com>
+ <20170303132949.GC31582@dhcp22.suse.cz>
+ <cf383b9b-3cbc-0092-a071-f120874c053c@redhat.com>
+ <20170306074258.GA27953@dhcp22.suse.cz>
+ <20170306104041.zghsicrnadoap7lp@phenom.ffwll.local>
+ <20170306105805.jsq44kfxhsvazkm6@sirena.org.uk>
+ <20170306160437.sf7bksorlnw7u372@phenom.ffwll.local>
+ <CA+M3ks77Am3Fx-ZNmgeM5tCqdM7SzV7rby4Es-p2F2aOhUco9g@mail.gmail.com>
+Message-ID: <26bc57ae-d88f-4ea0-d666-2c1a02bf866f@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Hua Jing <jinghua@marvell.com>
+On 03/09/2017 02:00 AM, Benjamin Gaignard wrote:
+> 2017-03-06 17:04 GMT+01:00 Daniel Vetter <daniel@ffwll.ch>:
+>> On Mon, Mar 06, 2017 at 11:58:05AM +0100, Mark Brown wrote:
+>>> On Mon, Mar 06, 2017 at 11:40:41AM +0100, Daniel Vetter wrote:
+>>>
+>>>> No one gave a thing about android in upstream, so Greg KH just dumped it
+>>>> all into staging/android/. We've discussed ION a bunch of times, recorded
+>>>> anything we'd like to fix in staging/android/TODO, and Laura's patch
+>>>> series here addresses a big chunk of that.
+>>>
+>>>> This is pretty much the same approach we (gpu folks) used to de-stage the
+>>>> syncpt stuff.
+>>>
+>>> Well, there's also the fact that quite a few people have issues with the
+>>> design (like Laurent).  It seems like a lot of them have either got more
+>>> comfortable with it over time, or at least not managed to come up with
+>>> any better ideas in the meantime.
+>>
+>> See the TODO, it has everything a really big group (look at the patch for
+>> the full Cc: list) figured needs to be improved at LPC 2015. We don't just
+>> merge stuff because merging stuff is fun :-)
+>>
+>> Laurent was even in that group ...
+>> -Daniel
+> 
+> For me those patches are going in the right direction.
+> 
+> I still have few questions:
+> - since alignment management has been remove from ion-core, should it
+> be also removed from ioctl structure ?
 
-- Add a new compatible string for the Armada 3700 SoCs
+Yes, I think I'm going to go with the suggestion to fixup the ABI
+so we don't need the compat layer and as part of that I'm also
+dropping the align argument.
 
-- add sbuscfg support for orion usb controller driver. For the SoCs
-  without hlock, need to program BAWR/BARD/AHBBRST fields in the sbuscfg
-  register to guarantee the AHB master's burst would not overrun or
-  underrun the FIFO.
+> - can you we ride off ion_handle (at least in userland) and only
+> export a dma-buf descriptor ?
 
-- the sbuscfg register has to be set after the usb controller reset,
-  otherwise the value would be overridden to 0. In order to do this, the
-  reset callback is registered.
+Yes, I think this is the right direction given we're breaking
+everything anyway. I was debating trying to keep the two but
+moving to only dma bufs is probably cleaner. The only reason
+I could see for keeping the handles is running out of file
+descriptors for dma-bufs but that seems unlikely.
+> 
+> In the future how can we add new heaps ?
+> Some platforms have very specific memory allocation
+> requirements (just have a look in the number of gem custom allocator in drm)
+> Do you plan to add heap type/mask for each ?
 
-[gregory.clement at free-electrons.com: - reword commit and comments
-				     - fix checkpatch warning]
-Signed-off-by: Hua Jing <jinghua@marvell.com>
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Reviewed-by: Andrew Lunn <andrew@lunn.ch>
----
- .../devicetree/bindings/usb/ehci-orion.txt         |  4 ++-
- drivers/usb/host/ehci-orion.c                      | 39 ++++++++++++++++++++++
- 2 files changed, 42 insertions(+), 1 deletion(-)
+Yes, that was my thinking. 
 
-diff --git a/Documentation/devicetree/bindings/usb/ehci-orion.txt b/Documentation/devicetree/bindings/usb/ehci-orion.txt
-index 17c3bc858b86..2855bae79fda 100644
---- a/Documentation/devicetree/bindings/usb/ehci-orion.txt
-+++ b/Documentation/devicetree/bindings/usb/ehci-orion.txt
-@@ -1,7 +1,9 @@
- * EHCI controller, Orion Marvell variants
- 
- Required properties:
--- compatible: must be "marvell,orion-ehci"
-+- compatible: must be one of the following
-+	"marvell,orion-ehci"
-+	"marvell,armada-3700-ehci"
- - reg: physical base address of the controller and length of memory mapped
-   region.
- - interrupts: The EHCI interrupt
-diff --git a/drivers/usb/host/ehci-orion.c b/drivers/usb/host/ehci-orion.c
-index ee8d5faa0194..762bba41e06d 100644
---- a/drivers/usb/host/ehci-orion.c
-+++ b/drivers/usb/host/ehci-orion.c
-@@ -47,6 +47,21 @@
- #define USB_PHY_IVREF_CTRL	0x440
- #define USB_PHY_TST_GRP_CTRL	0x450
- 
-+#define USB_SBUSCFG		0x90
-+#define	    USB_SBUSCFG_BAWR_SHIFT	    0x6
-+#define	    USB_SBUSCFG_BARD_SHIFT	    0x3
-+#define	    USB_SBUSCFG_AHBBRST_SHIFT	    0x0
-+
-+/* BAWR = BARD = 3 : Align read/write bursts packets larger than 128 bytes */
-+#define USB_SBUSCFG_BAWR_ALIGN_128B	(0x3 << USB_SBUSCFG_BAWR_SHIFT)
-+#define USB_SBUSCFG_BARD_ALIGN_128B	(0x3 << USB_SBUSCFG_BARD_SHIFT)
-+/* AHBBRST = 3	   : Align AHB Burst to INCR16 (64 bytes) */
-+#define USB_SBUSCFG_AHBBRST_INCR16	(0x3 << USB_SBUSCFG_AHBBRST_SHIFT)
-+
-+#define USB_SBUSCFG_DEF_VAL (USB_SBUSCFG_BAWR_ALIGN_128B	\
-+			     | USB_SBUSCFG_BARD_ALIGN_128B	\
-+			     | USB_SBUSCFG_AHBBRST_INCR16)
-+
- #define DRIVER_DESC "EHCI orion driver"
- 
- #define hcd_to_orion_priv(h) ((struct orion_ehci_hcd *)hcd_to_ehci(h)->priv)
-@@ -151,8 +166,31 @@ ehci_orion_conf_mbus_windows(struct usb_hcd *hcd,
- 	}
- }
- 
-+static int ehci_orion_drv_reset(struct usb_hcd *hcd)
-+{
-+	struct device *dev = hcd->self.controller;
-+	int retval;
-+
-+	retval = ehci_setup(hcd);
-+	if (retval)
-+		dev_err(dev, "ehci_setup failed %d\n", retval);
-+
-+	/*
-+	 * For SoC without hlock, need to program sbuscfg value to guarantee
-+	 * AHB master's burst would not overrun or underrun FIFO.
-+	 *
-+	 * sbuscfg reg has to be set after usb controller reset, otherwise
-+	 * the value would be override to 0.
-+	 */
-+	if (of_device_is_compatible(dev->of_node, "marvell,armada-3700-ehci"))
-+		wrl(USB_SBUSCFG, USB_SBUSCFG_DEF_VAL);
-+
-+	return retval;
-+}
-+
- static const struct ehci_driver_overrides orion_overrides __initconst = {
- 	.extra_priv_size =	sizeof(struct orion_ehci_hcd),
-+	.reset = ehci_orion_drv_reset,
- };
- 
- static int ehci_orion_drv_probe(struct platform_device *pdev)
-@@ -310,6 +348,7 @@ static int ehci_orion_drv_remove(struct platform_device *pdev)
- 
- static const struct of_device_id ehci_orion_dt_ids[] = {
- 	{ .compatible = "marvell,orion-ehci", },
-+	{ .compatible = "marvell,armada-3700-ehci", },
- 	{},
- };
- MODULE_DEVICE_TABLE(of, ehci_orion_dt_ids);
--- 
-2.11.0
+> 
+> Benjamin
+> 
+
+Thanks,
+Laura
