@@ -1,77 +1,80 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu,  9 Mar 2017 21:51:58 +0100
-Subject: [PATCH v6 00/11] arm64: mmu: avoid W+X mappings and re-enable
- PTE_CONT for kernel
-Message-ID: <1489092729-16871-1-git-send-email-ard.biesheuvel@linaro.org>
+Date: Thu,  9 Mar 2017 21:52:00 +0100
+Subject: [PATCH v6 02/11] arm64: mmu: move TLB maintenance from callers to
+ create_mapping_late()
+In-Reply-To: <1489092729-16871-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1489092729-16871-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1489092729-16871-3-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Having memory that is writable and executable at the same time is a
-security hazard, and so we tend to avoid those when we can. However,
-at boot time, we keep .text mapped writable during the entire init
-phase, and the init region itself is mapped rwx as well.
+In preparation of refactoring the kernel mapping logic so that text regions
+are never mapped writable, which would require adding explicit TLB
+maintenance to new call sites of create_mapping_late() (which is currently
+invoked twice from the same function), move the TLB maintenance from the
+call site into create_mapping_late() itself, and change it from a full
+TLB flush into a flush by VA, which is more appropriate here.
 
-Let's improve the situation by:
-- making the alternatives patching use the linear mapping
-- splitting the init region into separate text and data regions
+Also, given that create_mapping_late() has evolved into a routine that only
+updates protection bits on existing mappings, rename it to
+update_mapping_prot()
 
-This removes all RWX mappings except the really early one created
-in head.S (which we could perhaps fix in the future as well). Due to
-these changes, it is also possible to make another attempt at re-enabling
-the use of contiguous mappings at the PMD and PTE levels.
+Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+Tested-by: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm64/mm/mmu.c | 16 ++++++++--------
+ 1 file changed, 8 insertions(+), 8 deletions(-)
 
-Changes since v5:
-- add patch to remove pointless mapping/unmapping of translation table pages
-  when the higher level table entry pointing to it is created
-- fix unitialized flags var in #9
-- allow contiguous ranges for mappings created via create_pgd_mapping (ie., EFI)
-- refactor pud/pmd/pte recursion logic so we don't iterate over pmds and ptes
-  at two separate levels concurrently (ie., cont and non-cont)
-- use macros rather than static inlines for pmd_/pte_cont_addr_end()
-- add Mark's R-b to #6 - #9
-
-Changes since v4:
-- the PTE_CONT patch has now spawned four more preparatory patches that clean
-  up some of the page table creation code before reintroducing the contiguous
-  attribute management
-- add Mark's R-b to #4 and #5
-
-Changes since v3:
-- use linear alias only when patching the core kernel, and not for modules
-- add patch to reintroduce the use of PTE_CONT for kernel mappings, except
-  for regions that are remapped read-only later on (i.e, .rodata and the
-  linear alias of .text+.rodata)
-
-Changes since v2:
-  - ensure that text mappings remain writable under rodata=off
-  - rename create_mapping_late() to update_mapping_prot()
-  - clarify commit log of #2
-  - add acks
-
-Ard Biesheuvel (11):
-  arm: kvm: move kvm_vgic_global_state out of .text section
-  arm64: mmu: move TLB maintenance from callers to create_mapping_late()
-  arm64: alternatives: apply boot time fixups via the linear mapping
-  arm64: mmu: map .text as read-only from the outset
-  arm64: mmu: apply strict permissions to .init.text and .init.data
-  arm64/mmu: align alloc_init_pte prototype with pmd/pud versions
-  arm64/mmu: ignore debug_pagealloc for kernel segments
-  arm64/mmu: add contiguous bit to sanity bug check
-  arm64/mmu: replace 'page_mappings_only' parameter with flags argument
-  arm64/mm: remove pointless map/unmap sequences when creating page
-    tables
-  arm64: mm: set the contiguous bit for kernel mappings where
-    appropriate
-
- arch/arm64/include/asm/mmu.h      |   1 +
- arch/arm64/include/asm/pgtable.h  |  10 +
- arch/arm64/include/asm/sections.h |   2 +
- arch/arm64/kernel/alternative.c   |  11 +-
- arch/arm64/kernel/smp.c           |   1 +
- arch/arm64/kernel/vmlinux.lds.S   |  25 +-
- arch/arm64/mm/mmu.c               | 246 ++++++++++++++------
- virt/kvm/arm/vgic/vgic.c          |   4 +-
- 8 files changed, 208 insertions(+), 92 deletions(-)
-
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index d28dbcf596b6..6cafd8723d1a 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -319,17 +319,20 @@ void __init create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
+ 			     pgd_pgtable_alloc, page_mappings_only);
+ }
+ 
+-static void create_mapping_late(phys_addr_t phys, unsigned long virt,
+-				  phys_addr_t size, pgprot_t prot)
++static void update_mapping_prot(phys_addr_t phys, unsigned long virt,
++				phys_addr_t size, pgprot_t prot)
+ {
+ 	if (virt < VMALLOC_START) {
+-		pr_warn("BUG: not creating mapping for %pa at 0x%016lx - outside kernel range\n",
++		pr_warn("BUG: not updating mapping for %pa@0x%016lx - outside kernel range\n",
+ 			&phys, virt);
+ 		return;
+ 	}
+ 
+ 	__create_pgd_mapping(init_mm.pgd, phys, virt, size, prot,
+ 			     NULL, debug_pagealloc_enabled());
++
++	/* flush the TLBs after updating live kernel mappings */
++	flush_tlb_kernel_range(virt, virt + size);
+ }
+ 
+ static void __init __map_memblock(pgd_t *pgd, phys_addr_t start, phys_addr_t end)
+@@ -402,19 +405,16 @@ void mark_rodata_ro(void)
+ 	unsigned long section_size;
+ 
+ 	section_size = (unsigned long)_etext - (unsigned long)_text;
+-	create_mapping_late(__pa_symbol(_text), (unsigned long)_text,
++	update_mapping_prot(__pa_symbol(_text), (unsigned long)_text,
+ 			    section_size, PAGE_KERNEL_ROX);
+ 	/*
+ 	 * mark .rodata as read only. Use __init_begin rather than __end_rodata
+ 	 * to cover NOTES and EXCEPTION_TABLE.
+ 	 */
+ 	section_size = (unsigned long)__init_begin - (unsigned long)__start_rodata;
+-	create_mapping_late(__pa_symbol(__start_rodata), (unsigned long)__start_rodata,
++	update_mapping_prot(__pa_symbol(__start_rodata), (unsigned long)__start_rodata,
+ 			    section_size, PAGE_KERNEL_RO);
+ 
+-	/* flush the TLBs after updating live kernel mappings */
+-	flush_tlb_all();
+-
+ 	debug_checkwx();
+ }
+ 
 -- 
 2.7.4
