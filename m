@@ -1,10 +1,11 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 9 Mar 2017 12:33:28 -0800
-Subject: [PATCH 1/2] ARM: dts: BCM53573: Don't use nonexistent
+Date: Thu, 9 Mar 2017 12:33:46 -0800
+Subject: [PATCH 2/2] ARM: dts: BCM5301X: Don't use nonexistent
  "default-off" LED trigger
-In-Reply-To: <20170308064105.26619-1-zajec5@gmail.com>
+In-Reply-To: <20170308064105.26619-2-zajec5@gmail.com>
 References: <20170308064105.26619-1-zajec5@gmail.com>
-Message-ID: <80dbc17b-c250-5027-e2cf-9e0e372ae6e4@gmail.com>
+ <20170308064105.26619-2-zajec5@gmail.com>
+Message-ID: <b0dc618c-5fd3-e2a0-570d-bbd901a2d137@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
