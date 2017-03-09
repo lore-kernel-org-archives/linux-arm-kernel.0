@@ -1,168 +1,64 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Thu,  9 Mar 2017 11:39:06 +0100
-Subject: [PATCH 1/3] ARM64: dts: meson-gx: Finally move common nodes to GX dtsi
-In-Reply-To: <1489055948-10656-1-git-send-email-narmstrong@baylibre.com>
-References: <1489055948-10656-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1489055948-10656-2-git-send-email-narmstrong@baylibre.com>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Thu, 9 Mar 2017 11:53:49 +0100
+Subject: [PATCH 00/10] ARM: davinci: add vpif display support
+In-Reply-To: <1486485683-11427-1-git-send-email-bgolaszewski@baylibre.com>
+References: <1486485683-11427-1-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <77ced65d-e350-02ba-6dae-b20dcb3faa32@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
----
- arch/arm64/boot/dts/amlogic/meson-gx.dtsi   | 24 ++++++++++++++++
- arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 43 ++++++-----------------------
- arch/arm64/boot/dts/amlogic/meson-gxl.dtsi  |  8 ++++++
- 3 files changed, 40 insertions(+), 35 deletions(-)
+On 07/02/17 17:41, Bartosz Golaszewski wrote:
+> The following series adds support for v4l2 display on da850-evm with
+> a UI board in device tree boot mode.
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
-index 5d995f7..2d8dc6f 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
-@@ -296,6 +296,14 @@
- 				status = "disabled";
- 			};
- 
-+			spifc: spi at 8c80 {
-+				compatible = "amlogic,meson-gxbb-spifc";
-+				reg = <0x0 0x08c80 0x0 0x80>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				status = "disabled";
-+			};
-+
- 			watchdog at 98d0 {
- 				compatible = "amlogic,meson-gx-wdt", "amlogic,meson-gxbb-wdt";
- 				reg = <0x0 0x098d0 0x0 0x10>;
-@@ -342,6 +350,13 @@
- 			#size-cells = <2>;
- 			ranges = <0x0 0x0 0x0 0xc8100000 0x0 0x100000>;
- 
-+			clkc_AO: clock-controller at 040 {
-+				compatible = "amlogic,gx-aoclkc", "amlogic,gxbb-aoclkc";
-+				reg = <0x0 0x00040 0x0 0x4>;
-+				#clock-cells = <1>;
-+				#reset-cells = <1>;
-+			};
-+
- 			uart_AO: serial at 4c0 {
- 				compatible = "amlogic,meson-uart";
- 				reg = <0x0 0x004c0 0x0 0x14>;
-@@ -358,6 +373,15 @@
- 				status = "disabled";
- 			};
- 
-+			i2c_AO: i2c at 500 {
-+				compatible = "amlogic,meson-gx-i2c", "amlogic,meson-gxbb-i2c";
-+				reg = <0x0 0x500 0x0 0x20>;
-+				interrupts = <GIC_SPI 195 IRQ_TYPE_EDGE_RISING>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				status = "disabled";
-+			};
-+
- 			pwm_AO_ab: pwm at 550 {
- 				compatible = "amlogic,meson-gx-pwm", "amlogic,meson-gxbb-pwm";
- 				reg = <0x0 0x00550 0x0 0x10>;
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-index 04b3324..c2c41aa 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-@@ -97,17 +97,6 @@
- 	};
- };
- 
--&cbus {
--	spifc: spi at 8c80 {
--		compatible = "amlogic,meson-gxbb-spifc";
--		reg = <0x0 0x08c80 0x0 0x80>;
--		#address-cells = <1>;
--		#size-cells = <0>;
--		clocks = <&clkc CLKID_SPI>;
--		status = "disabled";
--	};
--};
--
- &ethmac {
- 	clocks = <&clkc CLKID_ETH>,
- 		 <&clkc CLKID_FCLK_DIV2>,
-@@ -204,30 +193,6 @@
- 			};
- 		};
- 	};
--
--	clkc_AO: clock-controller at 040 {
--		compatible = "amlogic,gxbb-aoclkc";
--		reg = <0x0 0x00040 0x0 0x4>;
--		#clock-cells = <1>;
--		#reset-cells = <1>;
--	};
--
--	pwm_ab_AO: pwm at 550 {
--		compatible = "amlogic,meson-gxbb-pwm";
--		reg = <0x0 0x0550 0x0 0x10>;
--		#pwm-cells = <3>;
--		status = "disabled";
--	};
--
--	i2c_AO: i2c at 500 {
--		compatible = "amlogic,meson-gxbb-i2c";
--		reg = <0x0 0x500 0x0 0x20>;
--		interrupts = <GIC_SPI 195 IRQ_TYPE_EDGE_RISING>;
--		clocks = <&clkc CLKID_AO_I2C>;
--		#address-cells = <1>;
--		#size-cells = <0>;
--		status = "disabled";
--	};
- };
- 
- &periphs {
-@@ -482,6 +447,10 @@
- 	clocks = <&clkc CLKID_I2C>;
- };
- 
-+&i2c_AO {
-+	clocks = <&clkc CLKID_AO_I2C>;
-+};
-+
- &i2c_B {
- 	clocks = <&clkc CLKID_I2C>;
- };
-@@ -521,6 +490,10 @@
- 	clock-names = "core", "clkin0", "clkin1";
- };
- 
-+&spifc {
-+	clocks = <&clkc CLKID_SPI>;
-+};
-+
- &vpu {
- 	compatible = "amlogic,meson-gxbb-vpu", "amlogic,meson-gx-vpu";
- };
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
-index 17cd546..37ed7a0 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
-@@ -427,6 +427,10 @@
- 	clocks = <&clkc CLKID_I2C>;
- };
- 
-+&i2c_AO {
-+	clocks = <&clkc CLKID_AO_I2C>;
-+};
-+
- &i2c_B {
- 	clocks = <&clkc CLKID_I2C>;
- };
-@@ -466,6 +470,10 @@
- 	clock-names = "core", "clkin0", "clkin1";
- };
- 
-+&spifc {
-+	clocks = <&clkc CLKID_SPI>;
-+};
-+
- &vpu {
- 	compatible = "amlogic,meson-gxl-vpu", "amlogic,meson-gx-vpu";
- };
--- 
-1.9.1
+As far as I could tell from the comments this patch series will see a
+second version, so I am marking it as 'Changes Requested' in patchwork.
+
+If I'm wrong, then please let me know.
+
+Regards,
+
+	Hans
+
+> 
+> Patches 1/10 - 5/10 deal with the device tree: we fix whitespace
+> errors in dts files and bindings, extend the example and the dts for
+> da850-evm with the output port and address the pinmuxing.
+> 
+> Patch 6/10 enables the relevant modules in the defconfig file.
+> 
+> Patches 7/10 and 8/10 fix two already existing bugs encountered
+> during development.
+> 
+> Patch 9/10 make it possible to use a different i2c adapter in the
+> vpif display driver.
+> 
+> The last patch adds the pdata quirks necessary to enable v4l2 display.
+> 
+> Tested with a modified version of yavta[1] as gstreamer support for
+> v4l2 seems to be broken and results in picture artifacts.
+> 
+> [1] https://github.com/brgl/yavta davinci/vpif-display
+> 
+> Bartosz Golaszewski (10):
+>   media: dt-bindings: vpif: fix whitespace errors
+>   ARM: dts: da850-evm: fix whitespace errors
+>   media: dt-bindings: vpif: extend the example with an output port
+>   ARM: dts: da850-evm: add the output port to the vpif node
+>   ARM: dts: da850: add vpif video display pins
+>   ARM: davinci_all_defconfig: enable VPIF display modules
+>   ARM: davinci: fix a whitespace error
+>   ARM: davinci: fix the DT boot on da850-evm
+>   media: vpif: use a configurable i2c_adapter_id for vpif display
+>   ARM: davinci: add pdata-quirks for da850-evm vpif display
+> 
+>  .../devicetree/bindings/media/ti,da850-vpif.txt    | 45 ++++++++---
+>  arch/arm/boot/dts/da850-evm.dts                    | 26 +++---
+>  arch/arm/boot/dts/da850.dtsi                       | 25 +++++-
+>  arch/arm/configs/davinci_all_defconfig             |  2 +
+>  arch/arm/mach-davinci/board-da850-evm.c            |  1 +
+>  arch/arm/mach-davinci/pdata-quirks.c               | 92 ++++++++++++++++++++--
+>  drivers/media/platform/davinci/vpif_display.c      |  2 +-
+>  include/media/davinci/vpif_types.h                 |  1 +
+>  8 files changed, 164 insertions(+), 30 deletions(-)
+> 
