@@ -1,37 +1,33 @@
-From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Thu, 9 Mar 2017 12:00:01 +0100
-Subject: [PATCH 00/10] ARM: davinci: add vpif display support
-In-Reply-To: <77ced65d-e350-02ba-6dae-b20dcb3faa32@xs4all.nl>
-References: <1486485683-11427-1-git-send-email-bgolaszewski@baylibre.com>
- <77ced65d-e350-02ba-6dae-b20dcb3faa32@xs4all.nl>
-Message-ID: <CAMpxmJUZ3KCV2zjpPWD02rVpok_XV-fGdk8PNpN7FGt3RDbMEw@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu,  9 Mar 2017 12:04:23 +0100
+Subject: [PATCH v2 2/3] usb: host: Allow to build ehci orion with mvebu SoCs
+In-Reply-To: <20170309110424.2187-1-gregory.clement@free-electrons.com>
+References: <20170309110424.2187-1-gregory.clement@free-electrons.com>
+Message-ID: <20170309110424.2187-3-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-03-09 11:53 GMT+01:00 Hans Verkuil <hverkuil@xs4all.nl>:
-> On 07/02/17 17:41, Bartosz Golaszewski wrote:
->> The following series adds support for v4l2 display on da850-evm with
->> a UI board in device tree boot mode.
->
-> As far as I could tell from the comments this patch series will see a
-> second version, so I am marking it as 'Changes Requested' in patchwork.
->
-> If I'm wrong, then please let me know.
->
-> Regards,
->
->         Hans
->
+The mvebu ARM64 SoCs no longer select PLAT_ORION. However Armada 37xx use
+the Orion EHCI controller. This patch allows the Orion EHCI driver to be
+built when ARCH_MVEBU is selected.
 
-Hi Hans,
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ drivers/usb/host/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-this series has since been split into several smaller ones and most of
-the code is already merged into Sekhar Nori's DaVinci tree.
-
-There are two series that still need merging with the media tree[1][2].
-
-Thanks,
-Bartosz Golaszewski
-
-[1] https://lkml.org/lkml/2017/2/28/426
-[2] https://patchwork.kernel.org/patch/9577965/
+diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
+index 407d947b34ea..54bdd76c7f03 100644
+--- a/drivers/usb/host/Kconfig
++++ b/drivers/usb/host/Kconfig
+@@ -188,7 +188,7 @@ config USB_EHCI_HCD_OMAP
+ 
+ config USB_EHCI_HCD_ORION
+ 	tristate  "Support for Marvell EBU on-chip EHCI USB controller"
+-	depends on USB_EHCI_HCD && PLAT_ORION
++	depends on USB_EHCI_HCD && (PLAT_ORION || ARCH_MVEBU)
+ 	default y
+ 	---help---
+ 	  Enables support for the on-chip EHCI controller on Marvell's
+-- 
+2.11.0
