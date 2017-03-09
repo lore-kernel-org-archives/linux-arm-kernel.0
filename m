@@ -1,232 +1,224 @@
 From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Thu, 9 Mar 2017 20:44:29 +0100
-Subject: [PATCH 2/2] phy: meson: add USB2 PHY support for Meson GXL and GXM
-In-Reply-To: <58C11204.902@ti.com>
-References: <20170304222231.14496-1-martin.blumenstingl@googlemail.com>
- <20170304222231.14496-3-martin.blumenstingl@googlemail.com>
- <58C11204.902@ti.com>
-Message-ID: <CAFBinCCuhMHw3V6vU7Fgb2hEnkfvBPXPFXfqfozrDN1=PnXc2w@mail.gmail.com>
+Date: Thu, 9 Mar 2017 20:47:03 +0100
+Subject: [PATCH 1/2] pinctrl: meson: gxl: add the missing PWM pin
+ definitions
+In-Reply-To: <1488811357.2420.18.camel@baylibre.com>
+References: <20170304212318.27076-1-martin.blumenstingl@googlemail.com>
+ <20170304212318.27076-2-martin.blumenstingl@googlemail.com>
+ <1488811357.2420.18.camel@baylibre.com>
+Message-ID: <CAFBinCDty8v80tLxHJPR+SHv32LX834dPJUruRNqr6angx3OOQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kishon,
+Hi Linus,
 
-On Thu, Mar 9, 2017 at 9:27 AM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
-> Hi,
->
-> On Sunday 05 March 2017 03:52 AM, Martin Blumenstingl wrote:
->> This adds a new driver for the USB2 PHYs found on Meson GXL and GXM SoCs
->> (both SoCs are using the same USB PHY register layout).
+On Mon, Mar 6, 2017 at 3:42 PM, Jerome Brunet <jbrunet@baylibre.com> wrote:
+> On Sat, 2017-03-04 at 22:23 +0100, Martin Blumenstingl wrote:
+>> This adds support for the missing PWM pins on Meson GXL SoCs, namely:
+>> - PWM_A
+>> - PWM_B
+>> - PWM_C
+>> - PWM_F (GPIOX_7 and GPIOCLK_1 can be selected as output)
+>> - PWM_AO_A (GPIOAO_3 and GPIOAO_8 can be selected as output)
 >>
->> The USB2 PHY is a simple PHY which only has a few registers to configure
->> the mode (host/device) and a reset register (to enable/disable the PHY).
->>
->> Unfortunately there are no datasheets available for any of these PHYs.
->> Both drivers were written by reading the reference drivers provided by
->> Amlogic and analyzing the registers on the kernel that was shipped on
->> the boards I have.
->>
->> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+>> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.co
+>> m>
 >> ---
->>  drivers/phy/Kconfig              |  13 ++
->>  drivers/phy/Makefile             |   1 +
->>  drivers/phy/phy-meson-gxl-usb2.c | 263 +++++++++++++++++++++++++++++++++++++++
->>  3 files changed, 277 insertions(+)
->>  create mode 100644 drivers/phy/phy-meson-gxl-usb2.c
+>>  drivers/pinctrl/meson/pinctrl-meson-gxl.c | 64
+>> +++++++++++++++++++++++++++++++
+>>  1 file changed, 64 insertions(+)
 >>
->> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
->> index e8eb7f225a88..7d64711a837f 100644
->> --- a/drivers/phy/Kconfig
->> +++ b/drivers/phy/Kconfig
->> @@ -486,4 +486,17 @@ config PHY_MESON8B_USB2
->>         and GXBB SoCs.
->>         If unsure, say N.
+>> diff --git a/drivers/pinctrl/meson/pinctrl-meson-gxl.c
+>> b/drivers/pinctrl/meson/pinctrl-meson-gxl.c
+>> index 4ab94a85e306..91dfc498780b 100644
+>> --- a/drivers/pinctrl/meson/pinctrl-meson-gxl.c
+>> +++ b/drivers/pinctrl/meson/pinctrl-meson-gxl.c
+>> @@ -195,8 +195,19 @@ static const unsigned int eth_txd1_pins[]
+>> = { PIN(GPIOZ_11, EE_OFF) };
+>>  static const unsigned int eth_txd2_pins[]    = { PIN(GPIOZ_12,
+>> EE_OFF) };
+>>  static const unsigned int eth_txd3_pins[]    = { PIN(GPIOZ_13,
+>> EE_OFF) };
 >>
->> +config PHY_MESON_GXL_USB
->> +     tristate "Meson GXL and GXM USB2 PHY drivers"
->> +     default ARCH_MESON
->> +     depends on OF && (ARCH_MESON || COMPILE_TEST)
->> +     depends on USB_SUPPORT
->> +     select USB_COMMON
->> +     select GENERIC_PHY
->> +     select REGMAP_MMIO
->> +     help
->> +       Enable this to support the Meson USB2 PHYs found in Meson
->> +       GXL and GXM SoCs.
->> +       If unsure, say N.
+>> +static const unsigned int pwm_a_pins[]               = {
+>> PIN(GPIOX_6, EE_OFF) };
 >> +
->>  endmenu
->> diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
->> index 65eb2f436a41..a3a2c7dd5c06 100644
->> --- a/drivers/phy/Makefile
->> +++ b/drivers/phy/Makefile
->> @@ -59,3 +59,4 @@ obj-$(CONFIG_PHY_CYGNUS_PCIE)               += phy-bcm-cygnus-pcie.o
->>  obj-$(CONFIG_ARCH_TEGRA) += tegra/
->>  obj-$(CONFIG_PHY_NS2_PCIE)           += phy-bcm-ns2-pcie.o
->>  obj-$(CONFIG_PHY_MESON8B_USB2)               += phy-meson8b-usb2.o
->> +obj-$(CONFIG_PHY_MESON_GXL_USB)              += phy-meson-gxl-usb2.o
->> diff --git a/drivers/phy/phy-meson-gxl-usb2.c b/drivers/phy/phy-meson-gxl-usb2.c
->> new file mode 100644
->> index 000000000000..841a6d9722d4
->> --- /dev/null
->> +++ b/drivers/phy/phy-meson-gxl-usb2.c
->> @@ -0,0 +1,263 @@
->> +/*
->> + * Meson GXL and GXM USB2 PHY driver
->> + *
->> + * Copyright (C) 2017 Martin Blumenstingl <martin.blumenstingl@googlemail.com>
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + *
->> + * You should have received a copy of the GNU General Public License
->> + * along with this program. If not, see <http://www.gnu.org/licenses/>.
->> + */
+>> +static const unsigned int pwm_b_pins[]               = {
+>> PIN(GPIODV_29, EE_OFF) };
 >> +
->> +#include <linux/delay.h>
->> +#include <linux/io.h>
->> +#include <linux/module.h>
->> +#include <linux/of_device.h>
->> +#include <linux/regmap.h>
->> +#include <linux/phy/phy.h>
->> +#include <linux/platform_device.h>
->> +#include <linux/usb/of.h>
+>> +static const unsigned int pwm_c_pins[]               = {
+>> PIN(GPIOZ_15, EE_OFF) };
 >> +
->> +/* bits [31:27] are read-only */
->> +#define U2P_R0                                                       0x0
->> +     #define U2P_R0_BYPASS_SEL                               BIT(0)
->> +     #define U2P_R0_BYPASS_DM_EN                             BIT(1)
->> +     #define U2P_R0_BYPASS_DP_EN                             BIT(2)
->> +     #define U2P_R0_TXBITSTUFF_ENH                           BIT(3)
->> +     #define U2P_R0_TXBITSTUFF_EN                            BIT(4)
->> +     #define U2P_R0_DM_PULLDOWN                              BIT(5)
->> +     #define U2P_R0_DP_PULLDOWN                              BIT(6)
->> +     #define U2P_R0_DP_VBUS_VLD_EXT_SEL                      BIT(7)
->> +     #define U2P_R0_DP_VBUS_VLD_EXT                          BIT(8)
->> +     #define U2P_R0_ADP_PRB_EN                               BIT(9)
->> +     #define U2P_R0_ADP_DISCHARGE                            BIT(10)
->> +     #define U2P_R0_ADP_CHARGE                               BIT(11)
->> +     #define U2P_R0_DRV_VBUS                                 BIT(12)
->> +     #define U2P_R0_ID_PULLUP                                BIT(13)
->> +     #define U2P_R0_LOOPBACK_EN_B                            BIT(14)
->> +     #define U2P_R0_OTG_DISABLE                              BIT(15)
->> +     #define U2P_R0_COMMON_ONN                               BIT(16)
->> +     #define U2P_R0_FSEL_MASK                                GENMASK(19, 17)
->> +     #define U2P_R0_REF_CLK_SEL_MASK                         GENMASK(21, 20)
->> +     #define U2P_R0_POWER_ON_RESET                           BIT(22)
->> +     #define U2P_R0_V_ATE_TEST_EN_B_MASK                     GENMASK(24, 23)
->> +     #define U2P_R0_ID_SET_ID_DQ                             BIT(25)
->> +     #define U2P_R0_ATE_RESET                                BIT(26)
->> +     #define U2P_R0_FSV_MINUS                                BIT(27)
->> +     #define U2P_R0_FSV_PLUS                                 BIT(28)
->> +     #define U2P_R0_BYPASS_DM_DATA                           BIT(29)
->> +     #define U2P_R0_BYPASS_DP_DATA                           BIT(30)
+>> +static const unsigned int pwm_d_pins[]               = {
+>> PIN(GPIODV_28, EE_OFF) };
 >> +
->> +#define U2P_R1                                                       0x4
->> +     #define U2P_R1_BURN_IN_TEST                             BIT(0)
->> +     #define U2P_R1_ACA_ENABLE                               BIT(1)
->> +     #define U2P_R1_DCD_ENABLE                               BIT(2)
->> +     #define U2P_R1_VDAT_SRC_EN_B                            BIT(3)
->> +     #define U2P_R1_VDAT_DET_EN_B                            BIT(4)
->> +     #define U2P_R1_CHARGES_SEL                              BIT(5)
->> +     #define U2P_R1_TX_PREEMP_PULSE_TUNE                     BIT(6)
->> +     #define U2P_R1_TX_PREEMP_AMP_TUNE_MASK                  GENMASK(8, 7)
->> +     #define U2P_R1_TX_RES_TUNE_MASK                         GENMASK(10, 9)
->> +     #define U2P_R1_TX_RISE_TUNE_MASK                        GENMASK(12, 11)
->> +     #define U2P_R1_TX_VREF_TUNE_MASK                        GENMASK(16, 13)
->> +     #define U2P_R1_TX_FSLS_TUNE_MASK                        GENMASK(20, 17)
->> +     #define U2P_R1_TX_HSXV_TUNE_MASK                        GENMASK(22, 21)
->> +     #define U2P_R1_OTG_TUNE_MASK                            GENMASK(25, 23)
->> +     #define U2P_R1_SQRX_TUNE_MASK                           GENMASK(28, 26)
->> +     #define U2P_R1_COMP_DIS_TUNE_MASK                       GENMASK(31, 29)
+>>  static const unsigned int pwm_e_pins[]               = {
+>> PIN(GPIOX_16, EE_OFF) };
+>>
+>> +static const unsigned int pwm_f_clk_pins[]   = { PIN(GPIOCLK_1,
+>> EE_OFF) };
+>> +static const unsigned int pwm_f_x_pins[]     = { PIN(GPIOX_7,
+>> EE_OFF) };
 >> +
->> +/* bits [31:14] are read-only */
->> +#define U2P_R2                                                       0x8
->> +     #define U2P_R2_DATA_IN_MASK                             GENMASK(3, 0)
->> +     #define U2P_R2_DATA_IN_EN_MASK                          GENMASK(7, 4)
->> +     #define U2P_R2_ADDR_MASK                                GENMASK(11, 8)
->> +     #define U2P_R2_DATA_OUT_SEL                             BIT(12)
->> +     #define U2P_R2_CLK                                      BIT(13)
->> +     #define U2P_R2_DATA_OUT_MASK                            GENMASK(17, 14)
->> +     #define U2P_R2_ACA_PIN_RANGE_C                          BIT(18)
->> +     #define U2P_R2_ACA_PIN_RANGE_B                          BIT(19)
->> +     #define U2P_R2_ACA_PIN_RANGE_A                          BIT(20)
->> +     #define U2P_R2_ACA_PIN_GND                              BIT(21)
->> +     #define U2P_R2_ACA_PIN_FLOAT                            BIT(22)
->> +     #define U2P_R2_CHARGE_DETECT                            BIT(23)
->> +     #define U2P_R2_DEVICE_SESSION_VALID                     BIT(24)
->> +     #define U2P_R2_ADP_PROBE                                BIT(25)
->> +     #define U2P_R2_ADP_SENSE                                BIT(26)
->> +     #define U2P_R2_SESSION_END                              BIT(27)
->> +     #define U2P_R2_VBUS_VALID                               BIT(28)
->> +     #define U2P_R2_B_VALID                                  BIT(29)
->> +     #define U2P_R2_A_VALID                                  BIT(30)
->> +     #define U2P_R2_ID_DIG                                   BIT(31)
+>>  static const unsigned int hdmi_hpd_pins[]    = { PIN(GPIOH_0,
+>> EE_OFF) };
+>>  static const unsigned int hdmi_sda_pins[]    = { PIN(GPIOH_1,
+>> EE_OFF) };
+>>  static const unsigned int hdmi_scl_pins[]    = { PIN(GPIOH_2,
+>> EE_OFF) };
+>> @@ -225,6 +236,9 @@ static const unsigned int uart_rts_ao_b_pins[]
+>> = { PIN(GPIOAO_3, 0) };
+>>
+>>  static const unsigned int remote_input_ao_pins[] = {PIN(GPIOAO_7, 0)
+>> };
+>>
+>> +static const unsigned int pwm_ao_a_3_pins[]  = { PIN(GPIOAO_3,
+>> 0) };
+>> +static const unsigned int pwm_ao_a_8_pins[]  = { PIN(GPIOAO_8,
+>> 0) };
 >> +
->> +#define U2P_R3                                                       0xc
+>>  static const unsigned int pwm_ao_b_pins[]    = { PIN(GPIOAO_9,
+>> 0) };
+>>
+>>  static struct meson_pmx_group meson_gxl_periphs_groups[] = {
+>> @@ -350,7 +364,9 @@ static struct meson_pmx_group
+>> meson_gxl_periphs_groups[] = {
+>>       GROUP(uart_rts_a,       5,      16),
+>>       GROUP(uart_tx_c,        5,      13),
+>>       GROUP(uart_rx_c,        5,      12),
+>> +     GROUP(pwm_a,            5,      25),
+>>       GROUP(pwm_e,            5,      15),
+>> +     GROUP(pwm_f_x,          5,      14),
+>>
+>>       /* Bank Z */
+>>       GROUP(eth_mdio,         4,      22),
+>> @@ -367,6 +383,7 @@ static struct meson_pmx_group
+>> meson_gxl_periphs_groups[] = {
+>>       GROUP(eth_txd1,         4,      12),
+>>       GROUP(eth_txd2,         4,      11),
+>>       GROUP(eth_txd3,         4,      10),
+>> +     GROUP(pwm_c,            3,      20),
+>>
+>>       /* Bank H */
+>>       GROUP(hdmi_hpd,         6,      31),
+>> @@ -382,6 +399,8 @@ static struct meson_pmx_group
+>> meson_gxl_periphs_groups[] = {
+>>       GROUP(i2c_sda_b,        1,      12),
+>>       GROUP(i2c_sck_c,        1,      11),
+>>       GROUP(i2c_sda_c,        1,      10),
+>> +     GROUP(pwm_b,            2,      11),
+>> +     GROUP(pwm_d,            2,      12),
+>>
+>>       /* Bank BOOT */
+>>       GROUP(emmc_nand_d07,    7,      31),
+>> @@ -404,6 +423,9 @@ static struct meson_pmx_group
+>> meson_gxl_periphs_groups[] = {
+>>       GROUP(sdcard_d2,        6,      0),
+>>       GROUP(sdcard_cmd,       6,      2),
+>>       GROUP(sdcard_clk,       6,      3),
 >> +
->> +#define RESET_COMPLETE_TIME                          500
->> +
->> +struct phy_meson_gxl_usb2_priv {
->> +     struct regmap           *regmap;
->> +     enum phy_mode           mode;
->> +     int                     is_enabled;
+>> +     /* Bank CLK */
+>> +     GROUP(pwm_f_clk,        8,      30),
+>>  };
+>>
+>>  static struct meson_pmx_group meson_gxl_aobus_groups[] = {
+>> @@ -428,6 +450,8 @@ static struct meson_pmx_group
+>> meson_gxl_aobus_groups[] = {
+>>       GROUP(uart_cts_ao_b,    0,      8),
+>>       GROUP(uart_rts_ao_b,    0,      7),
+>>       GROUP(remote_input_ao,  0,      0),
+>> +     GROUP(pwm_ao_a_3,       0,      22),
+>> +     GROUP(pwm_ao_a_8,       0,      17),
+>>       GROUP(pwm_ao_b,         0,      3),
+>>  };
+>>
+>> @@ -513,10 +537,34 @@ static const char * const eth_groups[] = {
+>>       "eth_txd0", "eth_txd1", "eth_txd2", "eth_txd3",
+>>  };
+>>
+>> +static const char * const pwm_a_groups[] = {
+>> +     "pwm_a",
 >> +};
 >> +
->> +static const struct regmap_config phy_meson_gxl_usb2_regmap_conf = {
->> +     .reg_bits = 8,
->> +     .val_bits = 32,
->> +     .reg_stride = 4,
->> +     .max_register = U2P_R3,
+>> +static const char * const pwm_b_groups[] = {
+>> +     "pwm_b",
 >> +};
 >> +
->> +static int phy_meson_gxl_usb2_set_mode(struct phy *phy, enum phy_mode mode)
->> +{
->> +     struct phy_meson_gxl_usb2_priv *priv = phy_get_drvdata(phy);
+>> +static const char * const pwm_c_groups[] = {
+>> +     "pwm_c",
+>> +};
 >> +
->> +     switch (mode) {
->> +     case PHY_MODE_USB_HOST:
->> +     case PHY_MODE_USB_OTG:
->> +             regmap_update_bits(priv->regmap, U2P_R0, U2P_R0_DM_PULLDOWN,
->> +                                U2P_R0_DM_PULLDOWN);
->> +             regmap_update_bits(priv->regmap, U2P_R0, U2P_R0_DP_PULLDOWN,
->> +                                U2P_R0_DP_PULLDOWN);
->> +             regmap_update_bits(priv->regmap, U2P_R0, U2P_R0_ID_PULLUP, 0);
->> +             break;
+>> +static const char * const pwm_d_groups[] = {
+>> +     "pwm_d",
+>> +};
 >> +
->> +     case PHY_MODE_USB_DEVICE:
->> +             regmap_update_bits(priv->regmap, U2P_R0, U2P_R0_DM_PULLDOWN,
->> +                                0);
->> +             regmap_update_bits(priv->regmap, U2P_R0, U2P_R0_DP_PULLDOWN,
->> +                                0);
->> +             regmap_update_bits(priv->regmap, U2P_R0, U2P_R0_ID_PULLUP,
->> +                                U2P_R0_ID_PULLUP);
->> +             break;
+>>  static const char * const pwm_e_groups[] = {
+>>       "pwm_e",
+>>  };
+>>
+>> +static const char * const pwm_f_clk_groups[] = {
+>> +     "pwm_f_clk",
+>> +};
 >> +
->> +     default:
->> +             return -EINVAL;
->> +     }
+>> +static const char * const pwm_f_x_groups[] = {
+>> +     "pwm_f_x",
+>> +};
 >> +
->> +     if (priv->is_enabled) {
+>>  static const char * const hdmi_hpd_groups[] = {
+>>       "hdmi_hpd",
+>>  };
+>> @@ -542,6 +590,14 @@ static const char * const
+>> remote_input_ao_groups[] = {
+>>       "remote_input_ao",
+>>  };
+>>
+>> +static const char * const pwm_ao_a_3_groups[] = {
+>> +     "pwm_ao_a_3",
+>> +};
+>> +
+>> +static const char * const pwm_ao_a_8_groups[] = {
+>> +     "pwm_ao_a_8",
+>> +};
+>> +
+>>  static const char * const pwm_ao_b_groups[] = {
+>>       "pwm_ao_b",
+>>  };
+>> @@ -559,7 +615,13 @@ static struct meson_pmx_func
+>> meson_gxl_periphs_functions[] = {
+>>       FUNCTION(i2c_b),
+>>       FUNCTION(i2c_c),
+>>       FUNCTION(eth),
+>> +     FUNCTION(pwm_a),
+>> +     FUNCTION(pwm_b),
+>> +     FUNCTION(pwm_c),
+>> +     FUNCTION(pwm_d),
+>>       FUNCTION(pwm_e),
+>> +     FUNCTION(pwm_f_clk),
+>> +     FUNCTION(pwm_f_x),
 >
-> Should set_mode be always called after power_on? or reset of phy should be done
-> if set_mode is called after power_on?
+> I wonder if having function named "pwm_f_clk" really makes sense ?
+> Shouldn't it be just "pwm_f" ? This is real function, isn't it ?
+> The actual pin used will be provided in the dt. Here, I suppose we
+> could have this:
 >
-> Either case I think it's better to move this reset in phy reset ops and invoke
-> it from this phys users.
-unfortunately I can only guess (change code -> boot kernel with
-changed code -> human testing) here as there's no public datasheet.
-however, the "consumer" of this PHY will be quite generic: it'll be
-powered on by the xhci-plat driver (or some utility around that). that
-might be a bit of a problem: it would mean that we have to decide when
-to call phy_reset (before or after phy_power_on/phy_set_mode) and
-define this once for all PHYs that are passed to xhci-plat.
-what do you think Kishon?
-
-apart from that Hendrik is right, but I think I should call
-phy_meson_gxl_usb2_power_off instead of stetting is_enabled to false.
-thanks for spotting this though!
+> +static const char * const pwm_f_groups[] = {
+> +       "pwm_f_x", "pwm_f_clk",
+> +};
+>
+> Has far as I can see, on meson arch, the function does not carry much
+> information anyway, except for prints.
+>
+> To be clear, I'm not questioning this change in particular. It looks
+> good, and follows what has been done in the past on meson. I know we
+> have been this a lot already, but I'm questioning whether we should
+> continue to do so ?
+>
+> I asking because I also have a lot case like this coming up on audio
+> for gxl and gxbb, where the same function can use different pins.
+could you please look into Jerome's question?
+personally I'm fine with either way, and changing my patch would be
+quite trivial. but I'd like to know what's "the way to go" before
+changing anything (and reverting that afterwards again).
 
 
 Regards,
