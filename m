@@ -1,51 +1,46 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 9 Mar 2017 15:21:45 +0000
-Subject: [PATCH v2 1/4] syscalls: Restore address limit after a syscall
-In-Reply-To: <20170309134456.GI21222@n2100.armlinux.org.uk>
-References: <20170309012456.5631-1-thgarnie@google.com>
- <20170309120955.GA6320@leverpostej>
- <20170309134456.GI21222@n2100.armlinux.org.uk>
-Message-ID: <20170309152144.GA11966@leverpostej>
+From: nicolas.ferre@microchip.com (Nicolas Ferre)
+Date: Thu, 9 Mar 2017 16:22:47 +0100
+Subject: [arm] Lost support for Taskit Stamp9g20 AT91-based board
+In-Reply-To: <2115594.QrpeoqLsjO@ada>
+References: <alpine.LNX.2.20.1703072029140.7705@atlantide2>
+ <2115594.QrpeoqLsjO@ada>
+Message-ID: <51e538a6-0e81-0209-79a3-06da9cde843e@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 09, 2017 at 01:44:56PM +0000, Russell King - ARM Linux wrote:
-> On Thu, Mar 09, 2017 at 12:09:55PM +0000, Mark Rutland wrote:
-> > On Wed, Mar 08, 2017 at 05:24:53PM -0800, Thomas Garnier wrote:
-
-> > It would be simpler to wrap the call entirely, e.g. have:
-> > 
-> > #ifdef CONFIG_WHATEVER
-> > static inline void verify_pre_usermode_state(void)
-> > {
-> > 	if (segment_eq(get_fs(), USER_DS))
-> > 		__verify_pre_usermode_state();
-> > }
-> > #else
-> > static inline void verify_pre_usermode_state(void) { }
-> > #endif
+Le 09/03/2017 ? 09:20, Alexander Dahl a ?crit :
+> Hei hei,
 > 
-> That's utterly pointless - you've missed a detail.
+> Am Dienstag, 7. M?rz 2017, 20:35:43 schrieb Enrico Mioso:
+>> I would like to add back the board .c file if possible: or try to
+>> convert them to DT with some help.
 > 
-> > > @@ -199,7 +215,10 @@ extern struct trace_event_functions exit_syscall_print_funcs;
-> > >  	asmlinkage long SyS##name(__MAP(x,__SC_LONG,__VA_ARGS__));	\
-> > >  	asmlinkage long SyS##name(__MAP(x,__SC_LONG,__VA_ARGS__))	\
-> > >  	{								\
-> > > +		bool user_caller = has_user_ds();			\
-> > >  		long ret = SYSC##name(__MAP(x,__SC_CAST,__VA_ARGS__));	\
-> > > +		if (user_caller)					\
-> > > +			verify_pre_usermode_state();			\
-> > 
-> > ... then we can unconditionally use verify_pre_usermode_state() here ... 
+> I just had a quick view over the c file you attached. This looks like it 
+> would be sufficient to create a proper dts file and activate the 
+> necessary drivers in your kernel config.
 > 
-> Look at this closely.  has_user_ds() is called _before_ the syscall code
-> is invoked.  It's checking what conditions the syscall was entered from.
-> If the syscall was entered with the user segment selected, then we run
-> a check on the system state _after_ the syscall code has returned.
+>> What's the best thing I can do to move on?
+> 
+> Have a look at the other dts files in arch/arm/boot/dts named at91-* ? I 
+> could assemble a running dts file from that for a at91sam9g20 based 
+> board few weeks ago.
 
-Indeed; I clearly did not consider this correctly. 
+Yes, DT is the only way forward.
 
-Sorry for the noise.
+>> Finds here the content of the .c file in question, that was part of
+>> upstream at the time of 3.15. Don't know exactly when it got removed,
+>> but it should be around that time frame.
+> 
+> AFAIK devicetree for at91 became mandatory with 3.19. Those board files 
+> were still in kernel with 3.18 IIRC. Maybe ? 1 version.
 
-Thanks,
-Mark.
+Absolutely, here is the announcement sent back then:
+"[ANNOUNCE] ARM: at91: removal of board files"
+https://lkml.org/lkml/2014/9/10/293
+
+And the actual pull-request that finished the work for 3.19:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2014-December/309707.html
+
+Best regards,
+-- 
+Nicolas Ferre
