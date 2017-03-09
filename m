@@ -1,71 +1,44 @@
-From: briannorris@chromium.org (Brian Norris)
-Date: Wed, 8 Mar 2017 19:10:50 -0800
-Subject: [PATCH 3/4] phy: rockchip-typec: support DP phy switch
-In-Reply-To: <11032198.PxydffNNDT@diego>
-References: <1486712654-15431-1-git-send-email-zyw@rock-chips.com>
- <1486712654-15431-4-git-send-email-zyw@rock-chips.com>
- <20170309003921.GA101174@google.com> <11032198.PxydffNNDT@diego>
-Message-ID: <20170309031049.GA122422@google.com>
+From: jun.gao@mediatek.com (Jun Gao)
+Date: Thu, 9 Mar 2017 11:13:04 +0800
+Subject: [RESEND PATCH v3 1/2] dt-bindings: i2c: Add Mediatek MT2701 i2c
+ binding
+In-Reply-To: <1489029185-21447-1-git-send-email-jun.gao@mediatek.com>
+References: <1489029185-21447-1-git-send-email-jun.gao@mediatek.com>
+Message-ID: <1489029185-21447-2-git-send-email-jun.gao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Jun Gao <jun.gao@mediatek.com>
 
-On Thu, Mar 09, 2017 at 02:02:54AM +0100, Heiko Stuebner wrote:
-> Am Mittwoch, 8. M?rz 2017, 16:39:23 CET schrieb Brian Norris:
-> > On Fri, Feb 10, 2017 at 03:44:13PM +0800, Chris Zhong wrote:
-> > > There are 2 Type-c PHYs in RK3399, but only one DP controller. Hence
-> > > only one PHY can connect to DP controller at one time, the other should
-> > > be disconnected. The GRF_SOC_CON26 register has a switch bit to do it,
-> > > set this bit means enable PHY 1, clear this bit means enable PHY 0.
-> > > 
-> > > Signed-off-by: Chris Zhong <zyw@rock-chips.com>
-> > > ---
-> > > 
-> > >  drivers/phy/phy-rockchip-typec.c | 9 +++++++++
-> > >  1 file changed, 9 insertions(+)
-> > > 
-> > > diff --git a/drivers/phy/phy-rockchip-typec.c
-> > > b/drivers/phy/phy-rockchip-typec.c index 7cfb0f8..1604aaa 100644
-> > > --- a/drivers/phy/phy-rockchip-typec.c
-> > > +++ b/drivers/phy/phy-rockchip-typec.c
+Add MT2701 i2c binding to i2c-mt6577.txt and there is no need to
+modify i2c driver.
 
-...
+Signed-off-by: Jun Gao <jun.gao@mediatek.com>
+---
+ .../devicetree/bindings/i2c/i2c-mt6577.txt         |   11 ++++++-----
+ 1 file changed, 6 insertions(+), 5 deletions(-)
 
-> > > @@ -869,6 +873,11 @@ static int tcphy_parse_dt(struct rockchip_typec_phy
-> > > *tcphy,> 
-> > >  	if (ret)
-> > >  	
-> > >  		return ret;
-> > > 
-> > > +	ret = tcphy_get_param(dev, &cfg->uphy_dp_sel,
-> > > +			      "rockchip,uphy-dp-sel");
-> > > +	if (ret)
-> > > +		return ret;
-> > 
-> > What about existing device trees? You're essentially adding this
-> > new property and requiring it at the same time.
-> > 
-> > Or are we considering no RK3399 DP stable at the moment? I guess we
-> > haven't actually merged any device trees that support this yet, no?
-> 
-> An interesting situation we're in here. On the one hand, you're right this 
-> breaks "backwards compatiblity".
-> 
-> But on the other hand, the type-c phy is currently very much unused. The only 
-> current board rk3399-evb.dts does not enable them (so they're disabled 
-> everywhere) and we have neither dwc3 nor dp nodes in any rk3399 devicetrees so 
-> far. Also Rob was ok with the binding change :-) .
-> 
-> So from my pov, I'd say it _should_ be ok, as nothing is using the phys at all 
-> yet and thus there is nothing that could get broken.
-
-Yeah, I guess it's OK... but BTW out-of-tree DTs are perfectly
-legit, once the bindings are accepted.
-
-Another random point of contention (not worth too much, as the pattern
-is already set), but why do these deserve DT properties at all? The
-device already has a "rk3399" compatible property, so can't we derive
-GRF offsets from that?
-
-Brian
+diff --git a/Documentation/devicetree/bindings/i2c/i2c-mt6577.txt b/Documentation/devicetree/bindings/i2c/i2c-mt6577.txt
+index 0ce6fa3..27dbbf9 100644
+--- a/Documentation/devicetree/bindings/i2c/i2c-mt6577.txt
++++ b/Documentation/devicetree/bindings/i2c/i2c-mt6577.txt
+@@ -4,11 +4,12 @@ The Mediatek's I2C controller is used to interface with I2C devices.
+ 
+ Required properties:
+   - compatible: value should be either of the following.
+-      (a) "mediatek,mt6577-i2c", for i2c compatible with mt6577 i2c.
+-      (b) "mediatek,mt6589-i2c", for i2c compatible with mt6589 i2c.
+-      (c) "mediatek,mt8127-i2c", for i2c compatible with mt8127 i2c.
+-      (d) "mediatek,mt8135-i2c", for i2c compatible with mt8135 i2c.
+-      (e) "mediatek,mt8173-i2c", for i2c compatible with mt8173 i2c.
++	"mediatek,mt2701-i2c"
++	"mediatek,mt6577-i2c"
++	"mediatek,mt6589-i2c"
++	"mediatek,mt8127-i2c"
++	"mediatek,mt8135-i2c"
++	"mediatek,mt8173-i2c"
+   - reg: physical base address of the controller and dma base, length of memory
+     mapped region.
+   - interrupts: interrupt number to the cpu.
+-- 
+1.7.9.5
