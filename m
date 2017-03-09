@@ -1,64 +1,63 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Thu, 9 Mar 2017 11:53:49 +0100
-Subject: [PATCH 00/10] ARM: davinci: add vpif display support
-In-Reply-To: <1486485683-11427-1-git-send-email-bgolaszewski@baylibre.com>
-References: <1486485683-11427-1-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <77ced65d-e350-02ba-6dae-b20dcb3faa32@xs4all.nl>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 9 Mar 2017 11:53:58 +0100
+Subject: [PATCH v8 0/6] Allwinner H5 and Orange Pi PC2 support
+In-Reply-To: <2704251488908203@web18o.yandex.ru>
+References: <20170306171750.7491-1-icenowy@aosc.xyz>
+ <20170307170751.n6tvrztet724pxfl@lukather>
+ <2704251488908203@web18o.yandex.ru>
+Message-ID: <20170309105358.jmbzlenu3tcljrlc@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/02/17 17:41, Bartosz Golaszewski wrote:
-> The following series adds support for v4l2 display on da850-evm with
-> a UI board in device tree boot mode.
+On Wed, Mar 08, 2017 at 01:36:43AM +0800, Icenowy Zheng wrote:
+> 
+> 
+> 08.03.2017, 01:07, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
+> > Hi,
+> >
+> > On Tue, Mar 07, 2017 at 01:17:44AM +0800, Icenowy Zheng wrote:
+> >> ?Allwinner H5 is a 64-bit SoC with a design like the 32-bit
+> >> ?H3, and it's pin-to-pin compatible with H3.
+> >>
+> >> ?This patchset adds support for it, along with the first available
+> >> ?board -- Orange Pi PC2.
+> >>
+> >> ?Several H5 boards by Sinovoip Banana Pi and FriendlyARM Nano Pi
+> >> ?are coming, so we should get ready for them.
+> >>
+> >> ?CCU changes are already said to be merged by Maxime Ripard, so
+> >> ?this patchset now contains only device tree patches.
+> >>
+> >> ?Commit messages are changed by the suggestion of Maxime.
+> >>
+> >> ?This patchset depends on patchset [1] to finally take effect. At
+> >> ?least the patch 1 of that patchset is needed if you want to test
+> >> ?the kernel image -- without it the pinctrl driver won't be built
+> >> ?and the kernel will become unusable without pinctrl.
+> >
+> > It's still not the prefixes I told you to use. I merged your patches
+> > and fixed, but please use the right one next time (and be consistent
+> > in your ARM vs arm usage).
+> 
+> oh I added dts: to the prefix you told me, as they're device tree patches.
+> 
+> Is the usage of "dts:" out-dated?
 
-As far as I could tell from the comments this patch series will see a
-second version, so I am marking it as 'Changes Requested' in patchwork.
+I'd like to at least have a common scheme across regular contributors,
+and not the current mess that we have. So, yes, kind of. And it
+doesn't make much sense these days where all our changes are either
+drivers or dts.
 
-If I'm wrong, then please let me know.
+Maxime
 
-Regards,
-
-	Hans
-
-> 
-> Patches 1/10 - 5/10 deal with the device tree: we fix whitespace
-> errors in dts files and bindings, extend the example and the dts for
-> da850-evm with the output port and address the pinmuxing.
-> 
-> Patch 6/10 enables the relevant modules in the defconfig file.
-> 
-> Patches 7/10 and 8/10 fix two already existing bugs encountered
-> during development.
-> 
-> Patch 9/10 make it possible to use a different i2c adapter in the
-> vpif display driver.
-> 
-> The last patch adds the pdata quirks necessary to enable v4l2 display.
-> 
-> Tested with a modified version of yavta[1] as gstreamer support for
-> v4l2 seems to be broken and results in picture artifacts.
-> 
-> [1] https://github.com/brgl/yavta davinci/vpif-display
-> 
-> Bartosz Golaszewski (10):
->   media: dt-bindings: vpif: fix whitespace errors
->   ARM: dts: da850-evm: fix whitespace errors
->   media: dt-bindings: vpif: extend the example with an output port
->   ARM: dts: da850-evm: add the output port to the vpif node
->   ARM: dts: da850: add vpif video display pins
->   ARM: davinci_all_defconfig: enable VPIF display modules
->   ARM: davinci: fix a whitespace error
->   ARM: davinci: fix the DT boot on da850-evm
->   media: vpif: use a configurable i2c_adapter_id for vpif display
->   ARM: davinci: add pdata-quirks for da850-evm vpif display
-> 
->  .../devicetree/bindings/media/ti,da850-vpif.txt    | 45 ++++++++---
->  arch/arm/boot/dts/da850-evm.dts                    | 26 +++---
->  arch/arm/boot/dts/da850.dtsi                       | 25 +++++-
->  arch/arm/configs/davinci_all_defconfig             |  2 +
->  arch/arm/mach-davinci/board-da850-evm.c            |  1 +
->  arch/arm/mach-davinci/pdata-quirks.c               | 92 ++++++++++++++++++++--
->  drivers/media/platform/davinci/vpif_display.c      |  2 +-
->  include/media/davinci/vpif_types.h                 |  1 +
->  8 files changed, 164 insertions(+), 30 deletions(-)
-> 
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170309/3314fce4/attachment-0001.sig>
