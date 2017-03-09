@@ -1,112 +1,223 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu,  9 Mar 2017 18:05:29 +0800
-Subject: [PATCH 06/11] drm/sun4i: Pass pointer for underlying backend into
- layer init
+Date: Thu,  9 Mar 2017 18:05:33 +0800
+Subject: [PATCH 10/11] ARM: dts: sun6i: Add second display pipeline device
+ nodes
 In-Reply-To: <20170309100534.14023-1-wens@csie.org>
 References: <20170309100534.14023-1-wens@csie.org>
-Message-ID: <20170309100534.14023-7-wens@csie.org>
+Message-ID: <20170309100534.14023-11-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-sun4i_layer only controls the backend hardware block of the display
-pipeline.
+The Allwinner A31/A31s SoCs have 2 display pipelines, as in 2 display
+frontends, backends, and tcons each. The relationship between the
+backends and tcons are 1:1, but the frontends can feed either backend.
 
-Pass pointers to the underlying backend in the layer init function,
-instead of trying to fetch it from the drm_device structure. This
-avoids the headache of trying to figure out which device the layers
-actually belong to.
+Add device nodes and of graph nodes describing this relationship.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- drivers/gpu/drm/sun4i/sun4i_crtc.c  |  2 +-
- drivers/gpu/drm/sun4i/sun4i_layer.c | 13 ++++++-------
- drivers/gpu/drm/sun4i/sun4i_layer.h |  3 ++-
- 3 files changed, 9 insertions(+), 9 deletions(-)
+ arch/arm/boot/dts/sun6i-a31.dtsi | 168 ++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 167 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_crtc.c b/drivers/gpu/drm/sun4i/sun4i_crtc.c
-index 221e6d5ee970..3c876c3a356a 100644
---- a/drivers/gpu/drm/sun4i/sun4i_crtc.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_crtc.c
-@@ -149,7 +149,7 @@ struct sun4i_crtc *sun4i_crtc_init(struct drm_device *drm,
- 	scrtc->tcon = tcon;
+diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
+index a4b96184cac1..40f020824ccc 100644
+--- a/arch/arm/boot/dts/sun6i-a31.dtsi
++++ b/arch/arm/boot/dts/sun6i-a31.dtsi
+@@ -233,7 +233,7 @@
  
- 	/* Create our layers */
--	scrtc->layers = sun4i_layers_init(drm);
-+	scrtc->layers = sun4i_layers_init(drm, scrtc->backend);
- 	if (IS_ERR(scrtc->layers)) {
- 		dev_err(drm->dev, "Couldn't create the planes\n");
- 		return NULL;
-diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.c b/drivers/gpu/drm/sun4i/sun4i_layer.c
-index 6feaf85a5942..f26bde5b9117 100644
---- a/drivers/gpu/drm/sun4i/sun4i_layer.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_layer.c
-@@ -16,7 +16,6 @@
- #include <drm/drmP.h>
+ 	de: display-engine {
+ 		compatible = "allwinner,sun6i-a31-display-engine";
+-		allwinner,pipelines = <&fe0>;
++		allwinner,pipelines = <&fe0>, <&fe1>;
+ 		status = "disabled";
+ 	};
  
- #include "sun4i_backend.h"
--#include "sun4i_drv.h"
- #include "sun4i_layer.h"
+@@ -290,6 +290,43 @@
+ 			};
+ 		};
  
- struct sun4i_plane_desc {
-@@ -102,9 +101,9 @@ static const struct sun4i_plane_desc sun4i_backend_planes[] = {
- };
++		tcon1: lcd-controller at 01c0d000 {
++			compatible = "allwinner,sun6i-a31-tcon";
++			reg = <0x01c0d000 0x1000>;
++			interrupts = <GIC_SPI 87 IRQ_TYPE_LEVEL_HIGH>;
++			resets = <&ccu RST_AHB1_LCD1>;
++			reset-names = "lcd";
++			clocks = <&ccu CLK_AHB1_LCD1>,
++				 <&ccu CLK_LCD1_CH0>,
++				 <&ccu CLK_LCD1_CH1>;
++			clock-names = "ahb",
++				      "tcon-ch0",
++				      "tcon-ch1";
++			clock-output-names = "tcon1-pixel-clock";
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				tcon1_in: port at 0 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++					reg = <0>;
++
++					tcon1_in_drc1: endpoint at 0 {
++						reg = <0>;
++						remote-endpoint = <&drc1_out_tcon1>;
++					};
++				};
++
++				tcon1_out: port at 1 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++					reg = <1>;
++				};
++			};
++		};
++
+ 		mmc0: mmc at 01c0f000 {
+ 			compatible = "allwinner,sun7i-a20-mmc";
+ 			reg = <0x01c0f000 0x1000>;
+@@ -897,6 +934,130 @@
+ 						reg = <0>;
+ 						remote-endpoint = <&be0_in_fe0>;
+ 					};
++
++					fe0_out_be1: endpoint at 1 {
++						reg = <1>;
++						remote-endpoint = <&be1_in_fe0>;
++					};
++				};
++			};
++		};
++
++		fe1: display-frontend at 01e20000 {
++			compatible = "allwinner,sun6i-a31-display-frontend";
++			reg = <0x01e20000 0x20000>;
++			interrupts = <GIC_SPI 94 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&ccu CLK_AHB1_FE1>, <&ccu CLK_FE1>,
++				 <&ccu CLK_DRAM_FE1>;
++			clock-names = "ahb", "mod",
++				      "ram";
++			resets = <&ccu RST_AHB1_FE1>;
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				fe1_out: port at 1 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++					reg = <1>;
++
++					fe1_out_be0: endpoint at 0 {
++						reg = <0>;
++						remote-endpoint = <&be0_in_fe1>;
++					};
++
++					fe1_out_be1: endpoint at 1 {
++						reg = <1>;
++						remote-endpoint = <&be1_in_fe1>;
++					};
++				};
++			};
++		};
++
++		be1: display-backend at 01e40000 {
++			compatible = "allwinner,sun6i-a31-display-backend";
++			reg = <0x01e40000 0x10000>;
++			interrupts = <GIC_SPI 96 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&ccu CLK_AHB1_BE1>, <&ccu CLK_BE1>,
++				 <&ccu CLK_DRAM_BE1>;
++			clock-names = "ahb", "mod",
++				      "ram";
++			resets = <&ccu RST_AHB1_BE1>;
++
++			assigned-clocks = <&ccu CLK_BE1>;
++			assigned-clock-rates = <300000000>;
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				be1_in: port at 0 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++					reg = <0>;
++
++					be1_in_fe0: endpoint at 0 {
++						reg = <0>;
++						remote-endpoint = <&fe0_out_be1>;
++					};
++
++					be1_in_fe1: endpoint at 1 {
++						reg = <1>;
++						remote-endpoint = <&fe1_out_be1>;
++					};
++				};
++
++				be1_out: port at 1 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++					reg = <1>;
++
++					be1_out_drc1: endpoint at 0 {
++						reg = <0>;
++						remote-endpoint = <&drc1_in_be1>;
++					};
++				};
++			};
++		};
++
++		drc1: drc at 01e50000 {
++			compatible = "allwinner,sun6i-a31-drc";
++			reg = <0x01e50000 0x10000>;
++			interrupts = <GIC_SPI 91 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&ccu CLK_AHB1_DRC1>, <&ccu CLK_IEP_DRC1>,
++				 <&ccu CLK_DRAM_DRC1>;
++			clock-names = "ahb", "mod",
++				      "ram";
++			resets = <&ccu RST_AHB1_DRC1>;
++
++			assigned-clocks = <&ccu CLK_IEP_DRC1>;
++			assigned-clock-rates = <300000000>;
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				drc1_in: port at 0 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++					reg = <0>;
++
++					drc1_in_be1: endpoint at 0 {
++						reg = <0>;
++						remote-endpoint = <&be1_out_drc1>;
++					};
++				};
++
++				drc1_out: port at 1 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++					reg = <1>;
++
++					drc1_out_tcon1: endpoint at 0 {
++						reg = <0>;
++						remote-endpoint = <&tcon1_in_drc1>;
++					};
+ 				};
+ 			};
+ 		};
+@@ -927,6 +1088,11 @@
+ 						reg = <0>;
+ 						remote-endpoint = <&fe0_out_be0>;
+ 					};
++
++					be0_in_fe1: endpoint at 1 {
++						reg = <1>;
++						remote-endpoint = <&fe1_out_be0>;
++					};
+ 				};
  
- static struct sun4i_layer *sun4i_layer_init_one(struct drm_device *drm,
-+						struct sun4i_backend *backend,
- 						const struct sun4i_plane_desc *plane)
- {
--	struct sun4i_drv *drv = drm->dev_private;
- 	struct sun4i_layer *layer;
- 	int ret;
- 
-@@ -124,14 +123,14 @@ static struct sun4i_layer *sun4i_layer_init_one(struct drm_device *drm,
- 
- 	drm_plane_helper_add(&layer->plane,
- 			     &sun4i_backend_layer_helper_funcs);
--	layer->backend = drv->backend;
-+	layer->backend = backend;
- 
- 	return layer;
- }
- 
--struct sun4i_layer **sun4i_layers_init(struct drm_device *drm)
-+struct sun4i_layer **sun4i_layers_init(struct drm_device *drm,
-+				       struct sun4i_backend *backend)
- {
--	struct sun4i_drv *drv = drm->dev_private;
- 	struct sun4i_layer **layers;
- 	int i;
- 
-@@ -165,7 +164,7 @@ struct sun4i_layer **sun4i_layers_init(struct drm_device *drm)
- 		const struct sun4i_plane_desc *plane = &sun4i_backend_planes[i];
- 		struct sun4i_layer *layer;
- 
--		layer = sun4i_layer_init_one(drm, plane);
-+		layer = sun4i_layer_init_one(drm, backend, plane);
- 		if (IS_ERR(layer)) {
- 			dev_err(drm->dev, "Couldn't initialize %s plane\n",
- 				i ? "overlay" : "primary");
-@@ -174,7 +173,7 @@ struct sun4i_layer **sun4i_layers_init(struct drm_device *drm)
- 
- 		DRM_DEBUG_DRIVER("Assigning %s plane to pipe %d\n",
- 				 i ? "overlay" : "primary", plane->pipe);
--		regmap_update_bits(drv->backend->regs, SUN4I_BACKEND_ATTCTL_REG0(i),
-+		regmap_update_bits(backend->regs, SUN4I_BACKEND_ATTCTL_REG0(i),
- 				   SUN4I_BACKEND_ATTCTL_REG0_LAY_PIPESEL_MASK,
- 				   SUN4I_BACKEND_ATTCTL_REG0_LAY_PIPESEL(plane->pipe));
- 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.h b/drivers/gpu/drm/sun4i/sun4i_layer.h
-index a97e376bae17..4be1f0919df2 100644
---- a/drivers/gpu/drm/sun4i/sun4i_layer.h
-+++ b/drivers/gpu/drm/sun4i/sun4i_layer.h
-@@ -26,6 +26,7 @@ plane_to_sun4i_layer(struct drm_plane *plane)
- 	return container_of(plane, struct sun4i_layer, plane);
- }
- 
--struct sun4i_layer **sun4i_layers_init(struct drm_device *drm);
-+struct sun4i_layer **sun4i_layers_init(struct drm_device *drm,
-+				       struct sun4i_backend *backend);
- 
- #endif /* _SUN4I_LAYER_H_ */
+ 				be0_out: port at 1 {
 -- 
 2.11.0
