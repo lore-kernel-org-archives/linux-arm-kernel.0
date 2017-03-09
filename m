@@ -1,97 +1,83 @@
-From: sricharan@codeaurora.org (sricharan)
-Date: Thu, 9 Mar 2017 15:22:47 +0530
-Subject: [PATCH V8 01/11] iommu/of: Refactor of_iommu_configure() for
- error handling
-In-Reply-To: <76844d3e-ae7a-5113-1a76-18312e9f51ce@arm.com>
-References: <1486136933-20328-1-git-send-email-sricharan@codeaurora.org>
- <1486136933-20328-2-git-send-email-sricharan@codeaurora.org>
- <8701bfbe-e52e-0e26-2a71-f5f81684de70@arm.com>
- <76844d3e-ae7a-5113-1a76-18312e9f51ce@arm.com>
-Message-ID: <1cba01d298ba$ee931000$cbb93000$@codeaurora.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu,  9 Mar 2017 09:55:29 +0000
+Subject: [PATCH 00/10] KVM/ARM fixes for 4.11-rc2
+Message-ID: <20170309095539.14512-1-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
+Paolo, Radim,
 
->On 08/03/17 18:58, Jean-Philippe Brucker wrote:
->[...]
->>>  static const struct iommu_ops
->>> -*of_pci_iommu_configure(struct pci_dev *pdev, struct device_node
->>> *bridge_np)
->>> +*of_pci_iommu_init(struct pci_dev *pdev, struct device_node
->>> +*bridge_np)
->>>  {
->>>  	const struct iommu_ops *ops;
->>>  	struct of_phandle_args iommu_spec;
->>> +	int err;
->>>
->>>  	/*
->>>  	 * Start by tracing the RID alias down the PCI topology as @@
->>> -123,56 +146,56 @@ static int __get_pci_rid(struct pci_dev *pdev, u16
->alias, void *data)
->>>  	 * bus into the system beyond, and which IOMMU it ends up at.
->>>  	 */
->>>  	iommu_spec.np = NULL;
->>> -	if (of_pci_map_rid(bridge_np, iommu_spec.args[0], "iommu-map",
->>> -			   "iommu-map-mask", &iommu_spec.np,
->iommu_spec.args))
->>> -		return NULL;
->>> +	err = of_pci_map_rid(bridge_np, iommu_spec.args[0], "iommu-map",
->>> +			     "iommu-map-mask", &iommu_spec.np,
->>> +			     iommu_spec.args);
->>> +	if (err)
->>> +		return ERR_PTR(err);
->>
->> This change doesn't work with of_pci_map_rid when the PCI RC isn't
->> behind an IOMMU:
->>
->>         map = of_get_property(np, map_name, &map_len);
->>         if (!map) {
->>                 if (target)
->>                         return -ENODEV;
->>                 /* Otherwise, no map implies no translation */
->>                 *id_out = rid;
->>                 return 0;
->>         }
->>
->> Previously with no iommu-map, we returned -ENODEV but it was discarded
->> by of_pci_iommu_configure. Now it is propagated and the whole device
->> probing fails. Instead, maybe of_pci_map_rid should always return 0 if
->> no iommu-map, and the caller should check if *target is still NULL?
->
->Ah yes, Tomasz had found breakages with the "mmu-masters" binding
->before, and I'd already pushed out a fixup for this one[1], but I forgot
-that
->that discussion was all off-list (out of diplomatic concern that the
-breakage
->might have been intentional - it wasn't, honest!)
->
->Now that rc1 is out I should re-do that branch with v8 of this series plus
-the
->fixups folded in, unless Sricharan beats me to it.
->
+Here's the KVM/ARM updates for 4.11-rc2. The usual bag of vgic
+updates, making the memslot array large enough to handle guests with
+tons of devices assigned to them, a tidying up of exception handling,
+and a rather annoying TLB handling issue on VHE systems.
 
-Right, I had this one [1] as V9 which had all your fixes that we discussed
-offline as
-well.  I was about to post a V9 today on top of -rc1 today as well.
+Please pull,
 
-[1] https://github.com/sricharanaz/iommu/tree/pd_v9
+Thanks,
 
-Regards,
- Sricharan
+	M.
 
+The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
 
->Thanks for the reminder,
->Robin.
->
->[1]:http://www.linux-arm.org/git?p=linux-
->rm.git;a=commitdiff;h=0049a34e523506813995c05766f5e2c16d616354
->
->>
->> Thanks,
->> Jean-Philippe
->
->--
->To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
->the body of a message to majordomo at vger.kernel.org More majordomo info
->at  http://vger.kernel.org/majordomo-info.html
+  Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git tags/kvm-arm-for-4.11-rc2
+
+for you to fetch changes up to 955a3fc6d2a1c11d6d00bce4f3816100ce0530cf:
+
+  KVM: arm64: Increase number of user memslots to 512 (2017-03-09 09:13:50 +0000)
+
+----------------------------------------------------------------
+KVM/ARM updates for v4.11-rc2
+
+vgic updates:
+- Honour disabling the ITS
+- Don't deadlock when deactivating own interrupts via MMIO
+- Correctly expose the lact of IRQ/FIQ bypass on GICv3
+
+I/O virtualization:
+- Make KVM_CAP_NR_MEMSLOTS big enough for large guests with
+  many PCIe devices
+
+General bug fixes:
+- Gracefully handle exception generated with syndroms that
+  the host doesn't understand
+- Properly invalidate TLBs on VHE systems
+
+----------------------------------------------------------------
+Andre Przywara (1):
+      KVM: arm/arm64: VGIC: Fix command handling while ITS being disabled
+
+Jintack Lim (1):
+      KVM: arm/arm64: Let vcpu thread modify its own active state
+
+Linu Cherian (4):
+      KVM: Add documentation for KVM_CAP_NR_MEMSLOTS
+      KVM: arm/arm64: Enable KVM_CAP_NR_MEMSLOTS on arm/arm64
+      KVM: arm/arm64: Remove KVM_PRIVATE_MEM_SLOTS definition that are unused
+      KVM: arm64: Increase number of user memslots to 512
+
+Marc Zyngier (2):
+      arm64: KVM: VHE: Clear HCR_TGE when invalidating guest TLBs
+      KVM: arm/arm64: vgic-v3: Don't pretend to support IRQ/FIQ bypass
+
+Mark Rutland (2):
+      arm: KVM: Survive unknown traps from guests
+      arm64: KVM: Survive unknown traps from guests
+
+ Documentation/virtual/kvm/api.txt  |   4 ++
+ arch/arm/include/asm/kvm_arm.h     |   1 +
+ arch/arm/include/asm/kvm_host.h    |   1 -
+ arch/arm/kvm/arm.c                 |   3 +
+ arch/arm/kvm/handle_exit.c         |  19 ++++---
+ arch/arm64/include/asm/kvm_host.h  |   3 +-
+ arch/arm64/kvm/handle_exit.c       |  19 ++++---
+ arch/arm64/kvm/hyp/tlb.c           |  64 +++++++++++++++++++---
+ include/linux/irqchip/arm-gic-v3.h |   2 +
+ virt/kvm/arm/vgic/vgic-its.c       | 109 ++++++++++++++++++++++---------------
+ virt/kvm/arm/vgic/vgic-mmio.c      |  32 ++++++++---
+ virt/kvm/arm/vgic/vgic-v3.c        |   5 +-
+ 12 files changed, 183 insertions(+), 79 deletions(-)
