@@ -1,52 +1,151 @@
-From: briannorris@chromium.org (Brian Norris)
-Date: Thu, 9 Mar 2017 15:35:06 -0800
-Subject: [PATCH 3/4] phy: rockchip-typec: support DP phy switch
-In-Reply-To: <1626236.28xlsfuSeg@diego>
-References: <1486712654-15431-1-git-send-email-zyw@rock-chips.com>
- <11032198.PxydffNNDT@diego> <20170309031049.GA122422@google.com>
- <1626236.28xlsfuSeg@diego>
-Message-ID: <20170309233505.GA18026@google.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Thu, 9 Mar 2017 16:27:51 -0600
+Subject: [PATCH V3] PCI/ASPM: reconfigure ASPM following hotplug for
+ POLICY_DEFAULT
+In-Reply-To: <1489005551-23598-1-git-send-email-okaya@codeaurora.org>
+References: <1489005551-23598-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <20170309222751.GD19517@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 09, 2017 at 09:31:33AM +0100, Heiko Stuebner wrote:
-> Am Mittwoch, 8. M?rz 2017, 19:10:50 CET schrieb Brian Norris:
-> > Another random point of contention (not worth too much, as the pattern
-> > is already set), but why do these deserve DT properties at all? The
-> > device already has a "rk3399" compatible property, so can't we derive
-> > GRF offsets from that?
+Hi Sinan,
+
+On Wed, Mar 08, 2017 at 03:39:11PM -0500, Sinan Kaya wrote:
+> When the operating system is booted with the default ASPM policy
+> (POLICY_DEFAULT), current code is querying the enable/disable
+> states from ASPM registers to determine the policy.
 > 
-> I'm definitly with you in this regard.
+> For example, a BIOS could set the power saving state to performance
+> and clear all ASPM control registers. A balanced ASPM policy could
+> enable L0s and disable L1. A power conscious BIOS could enable both
+> L0s and L1 to trade off latency and performance vs. power.
 > 
-> But it seems like there is some sort of current trend of moving more stuff 
-> into the dt again. I vaguely remember phy and (or) dt-maintainers preferring 
-> to have these definitions in the dt for the typec-phy.
+> After hotplug removal, pcie_aspm_exit_link_state() function clears
+> the ASPM registers. An insertion following hotplug removal reads
+> incorrect policy as ASPM disabled even though ASPM was enabled
+> during boot.
+> 
+> This is caused by the fact that same function is used for reconfiguring
+> ASPM regardless of the of the power on state.
+> 
+> This patch builds some state info into pcie_aspm_cap_init() function.
+> 
+> Adding a flag and a counter to the struct pci_dev to save the
+> power up policy in the bridge during boot. ASPM enable counter is
+> used as a switch to determine when to use saved value.
+> 
+> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+> Signed-off-by: Mayurkumar Patel <mayurkumar.patel@intel.com>
+> ---
+>  drivers/pci/pcie/aspm.c | 21 +++++++++++++++++----
+>  include/linux/pci.h     |  2 ++
+>  2 files changed, 19 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/pci/pcie/aspm.c b/drivers/pci/pcie/aspm.c
+> index 17ac1dc..63435b0 100644
+> --- a/drivers/pci/pcie/aspm.c
+> +++ b/drivers/pci/pcie/aspm.c
+> @@ -338,8 +338,9 @@ static void pcie_aspm_check_latency(struct pci_dev *endpoint)
+>  	}
+>  }
+>  
+> -static void pcie_aspm_cap_init(struct pcie_link_state *link, int blacklist)
+> +static void pcie_aspm_cap_init(struct pci_dev *pdev, int blacklist)
+>  {
+> +	struct pcie_link_state *link = pdev->link_state;
+>  	struct pci_dev *child, *parent = link->pdev;
+>  	struct pci_bus *linkbus = parent->subordinate;
+>  	struct aspm_register_info upreg, dwreg;
+> @@ -397,8 +398,20 @@ static void pcie_aspm_cap_init(struct pcie_link_state *link, int blacklist)
+>  	link->latency_up.l1 = calc_l1_latency(upreg.latency_encoding_l1);
+>  	link->latency_dw.l1 = calc_l1_latency(dwreg.latency_encoding_l1);
+>  
+> -	/* Save default state */
+> -	link->aspm_default = link->aspm_enabled;
+> +	/*
+> +	 * Save default state from FW when enabling ASPM for the first time
+> +	 * during boot by looking at the calculated link->aspm_enabled bits
+> +	 * above and aspm_enable_cnt will be zero.
+> +	 *
+> +	 * If this path is getting called for the second/third time
+> +	 * (aspm_enable_cnt will be non-zero). Assume that the current state
+> +	 * of the ASPM registers may not necessarily match what FW asked us to
+> +	 * do as in the case of hotplug insertion/removal.
+> +	 */
+> +	if (atomic_inc_return(&pdev->aspm_enable_cnt) == 1)
+> +		pdev->aspm_default = link->aspm_default = link->aspm_enabled;
+> +	else
+> +		link->aspm_default = pdev->aspm_default;
 
-Hmm, not sure I understand that one. You're just going to multiply the
-variations of DT props you have to support, instead of simply
-multiplying a (non-ABI) table within the driver. The latter seems much
-more stable. Oh well, not my subsystem.
+This is an aspect of the ASPM design that I don't like:
 
-> See also the recent mail from Olof concerning the grf initialization and maybe 
-> not having per-soc definitions in the driver, where I'm trying to keep things 
-> out of the dt a bit more strongly :-) .
+  - pcie_aspm_init_link_state() is called on a *bridge* after we've
+    enumerated any devices below the bridge, and we allocate the
+    link_state.
 
-Thanks for the pointer. I looked up (and replied to) that one.
+  - pcie_aspm_exit_link_state() is called on an *endpoint*, and if
+    we're removing the last endpoint below a bridge, we release the
+    *parent's* link_state.
 
-Either I don't understand exactly what he's saying or... I'd like to
-know what he's smoking. You can't just wish away the fact that the GRF
-is truly a "general register file" and will change forever (and so will
-our understanding of how to use it). Kernels always need to update for
-new chipsets. Device Tree Bindings Are Forever (TM).
+This leads to the problem you're trying to solve here: we throw away
+all the bridge's ASPM information when the child is removed, so we
+lose the original settings from firmware.
 
-Now let's see if Olof reads my reply which points back to this
-thread...and now to the above comment :)
+Your solution is to add some state outside the link_state structure,
+and initialize it the first time we enable ASPM for the link.  With
+the current design, you don't really have much choice, but I think it
+ends up being more complicated than it should be.
 
-> So yes, personally I would definitly prefer not having to much GRF-stuff leak 
-> into the dt. Simply because the GRF has always been very unstable over time 
-> [=you always find one more bit that needs tuning] and to not cause things like 
-> the above. But as you said I guess we're to late for the typec-phy.
+How hard do you think it would be to rework this path slightly so we:
 
-I'm with you.
+  - call pcie_aspm_init_link_state() for every device, maybe from
+    pci_init_capabilities()
 
-Brian
+  - for bridges, have pcie_aspm_init_link_state() allocate a
+    link_state, regardless of whether it currently has any children,
+    and save the ASPM settings done by firmware
+
+  - for endpoints, have pcie_aspm_init_link_state() do the actual ASPM
+    setup of the link as it currently does
+
+  - for endpoints, change pcie_aspm_exit_link_state() so it cleans up
+    the device's own state and disables ASPM if necessary, but doesn't
+    remove the parent's link_state
+
+  - for bridges, change pcie_aspm_exit_link_state() so it frees the
+    bridge's own link_state
+
+?
+
+>  	/* Setup initial capable state. Will be updated later */
+>  	link->aspm_capable = link->aspm_support;
+> @@ -599,7 +612,7 @@ void pcie_aspm_init_link_state(struct pci_dev *pdev)
+>  	 * upstream links also because capable state of them can be
+>  	 * update through pcie_aspm_cap_init().
+>  	 */
+> -	pcie_aspm_cap_init(link, blacklist);
+> +	pcie_aspm_cap_init(pdev, blacklist);
+>  
+>  	/* Setup initial Clock PM state */
+>  	pcie_clkpm_cap_init(link, blacklist);
+> diff --git a/include/linux/pci.h b/include/linux/pci.h
+> index e2d1a12..aa7bd7e 100644
+> --- a/include/linux/pci.h
+> +++ b/include/linux/pci.h
+> @@ -321,6 +321,8 @@ struct pci_dev {
+>  
+>  #ifdef CONFIG_PCIEASPM
+>  	struct pcie_link_state	*link_state;	/* ASPM link state */
+> +	unsigned int	aspm_default;		/* ASPM policy set by BIOS */
+> +	atomic_t	aspm_enable_cnt;	/* ASPM policy initialization */
+>  #endif
+>  
+>  	pci_channel_state_t error_state;	/* current connectivity state */
+> -- 
+> 1.9.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
