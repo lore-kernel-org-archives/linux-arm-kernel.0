@@ -1,68 +1,206 @@
-From: thgarnie@google.com (Thomas Garnier)
-Date: Thu, 9 Mar 2017 08:19:31 -0800
-Subject: [PATCH v2 4/4] arm64/syscalls: Specific usage of
- verify_pre_usermode_state
-In-Reply-To: <20170309160551.GC11966@leverpostej>
-References: <20170309012456.5631-1-thgarnie@google.com>
- <20170309012456.5631-4-thgarnie@google.com>
- <20170309122354.GB6320@leverpostej>
- <CAJcbSZGCFhUx79=bMkOxDRvbfuHmVBWU02HBgEU9T2s7mTChAw@mail.gmail.com>
- <20170309160551.GC11966@leverpostej>
-Message-ID: <CAJcbSZFbcGrAEoV8KpYKH-6PgpFDQ-cBt_P7MqX2_hShAPjvvg@mail.gmail.com>
+From: julia@ni.com (Julia Cartwright)
+Date: Thu, 9 Mar 2017 10:22:05 -0600
+Subject: [PATCH 18/19] pinctrl: sirf: atlas7: make use of raw_spinlock variants
+In-Reply-To: <cover.1489015238.git.julia@ni.com>
+References: <cover.1489015238.git.julia@ni.com>
+Message-ID: <c68b030b8903bb1ca2f501b2e5c651d9206b1133.1489015238.git.julia@ni.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 9, 2017 at 8:05 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Thu, Mar 09, 2017 at 07:56:49AM -0800, Thomas Garnier wrote:
->> On Thu, Mar 9, 2017 at 4:23 AM, Mark Rutland <mark.rutland@arm.com> wrote:
->> > We generally stick to lower case for the arm64 assembly macros. If we
->> > need this, we should stick to the existing convention.
->> >
->> >> +/* Similar to set_fs(USER_DS) in verify_pre_usermode_state without a warning. */
->> >> +.macro VERIFY_PRE_USERMODE_STATE
->> >> +     mov     x1, #TASK_SIZE_64
->> >> +     str     x1, [tsk, #TSK_TI_ADDR_LIMIT]
->> >> +.endm
->> >
->> > We need arm64's set_fs() to configure UAO, too, so this is much weaker
->> > than set_fs(), and will leave __{get,put}_user and
->> > __copy_{to,from}_user() able to access kernel memory.
->> >
->> > We don't currently have an asm helper to clear UAO, and unconditionally
->> > poking that on exception return is liable to be somewhat expensive.
->> >
->> > Also, given we're only trying to catch this in syscalls, I'm afraid I
->> > don't see what we gain by doing this in the entry assembly.
->>
->> I optimized all architectures from the arm (32-bit) discussion. I will
->> come back to a simple bl to the verify function. Thanks!
->
-> What I was trying to ask was do we need to touch the assembly at all
-> here?
+The sirf atlas7 pinctrl drivers currently implement an irq_chip for
+handling interrupts; due to how irq_chip handling is done, it's
+necessary for the irq_chip methods to be invoked from hardirq context,
+even on a a real-time kernel.  Because the spinlock_t type becomes a
+"sleeping" spinlock w/ RT kernels, it is not suitable to be used with
+irq_chips.
 
-You don't but he generic solution add code to every single syscall.
+A quick audit of the operations under the lock reveal that they do only
+minimal, bounded work, and are therefore safe to do under a raw spinlock.
 
-> Are we trying to protect the non-syscall cases by doing this in
-> assembly? If so, it'd be worth calling out in the commit message.
+Signed-off-by: Julia Cartwright <julia@ni.com>
+---
+ drivers/pinctrl/sirf/pinctrl-atlas7.c | 44 +++++++++++++++++------------------
+ 1 file changed, 22 insertions(+), 22 deletions(-)
 
-It is an added benefit but not required.
-
-> If so, we could add the necessary helper to clear UAO.
-
-I can look at set_fs and fix it on the next iteraiton.
-
-> If not, doing this in the entry assembly only saves the small overhead
-> of reading and comparing the addr_limit for in-kernel use of the
-> syscalls (e.g. in the compat wrappers), and we may as well rely on the
-> common !ARCH_NO_SYSCALL_VERIFY_PRE_USERMODE_STATE implementation.
-
-You also don't have the code added for each syscall and a call.
-
->
-> Thanks,
-> Mark.
-
-
-
+diff --git a/drivers/pinctrl/sirf/pinctrl-atlas7.c b/drivers/pinctrl/sirf/pinctrl-atlas7.c
+index 600d6427a978..1efa315a7dbe 100644
+--- a/drivers/pinctrl/sirf/pinctrl-atlas7.c
++++ b/drivers/pinctrl/sirf/pinctrl-atlas7.c
+@@ -352,7 +352,7 @@ struct atlas7_gpio_chip {
+ 	void __iomem *reg;
+ 	struct clk *clk;
+ 	int nbank;
+-	spinlock_t lock;
++	raw_spinlock_t lock;
+ 	struct gpio_chip chip;
+ 	struct atlas7_gpio_bank banks[0];
+ };
+@@ -5650,13 +5650,13 @@ static void atlas7_gpio_irq_ack(struct irq_data *d)
+ 	pin_in_bank = d->hwirq - bank->gpio_offset;
+ 	ctrl_reg = ATLAS7_GPIO_CTRL(bank, pin_in_bank);
+ 
+-	spin_lock_irqsave(&a7gc->lock, flags);
++	raw_spin_lock_irqsave(&a7gc->lock, flags);
+ 
+ 	val = readl(ctrl_reg);
+ 	/* clear interrupt status */
+ 	writel(val, ctrl_reg);
+ 
+-	spin_unlock_irqrestore(&a7gc->lock, flags);
++	raw_spin_unlock_irqrestore(&a7gc->lock, flags);
+ }
+ 
+ static void __atlas7_gpio_irq_mask(struct atlas7_gpio_chip *a7gc, int idx)
+@@ -5681,11 +5681,11 @@ static void atlas7_gpio_irq_mask(struct irq_data *d)
+ 	struct atlas7_gpio_chip *a7gc = gpiochip_get_data(gc);
+ 	unsigned long flags;
+ 
+-	spin_lock_irqsave(&a7gc->lock, flags);
++	raw_spin_lock_irqsave(&a7gc->lock, flags);
+ 
+ 	__atlas7_gpio_irq_mask(a7gc, d->hwirq);
+ 
+-	spin_unlock_irqrestore(&a7gc->lock, flags);
++	raw_spin_unlock_irqrestore(&a7gc->lock, flags);
+ }
+ 
+ static void atlas7_gpio_irq_unmask(struct irq_data *d)
+@@ -5701,14 +5701,14 @@ static void atlas7_gpio_irq_unmask(struct irq_data *d)
+ 	pin_in_bank = d->hwirq - bank->gpio_offset;
+ 	ctrl_reg = ATLAS7_GPIO_CTRL(bank, pin_in_bank);
+ 
+-	spin_lock_irqsave(&a7gc->lock, flags);
++	raw_spin_lock_irqsave(&a7gc->lock, flags);
+ 
+ 	val = readl(ctrl_reg);
+ 	val &= ~ATLAS7_GPIO_CTL_INTR_STATUS_MASK;
+ 	val |= ATLAS7_GPIO_CTL_INTR_EN_MASK;
+ 	writel(val, ctrl_reg);
+ 
+-	spin_unlock_irqrestore(&a7gc->lock, flags);
++	raw_spin_unlock_irqrestore(&a7gc->lock, flags);
+ }
+ 
+ static int atlas7_gpio_irq_type(struct irq_data *d,
+@@ -5725,7 +5725,7 @@ static int atlas7_gpio_irq_type(struct irq_data *d,
+ 	pin_in_bank = d->hwirq - bank->gpio_offset;
+ 	ctrl_reg = ATLAS7_GPIO_CTRL(bank, pin_in_bank);
+ 
+-	spin_lock_irqsave(&a7gc->lock, flags);
++	raw_spin_lock_irqsave(&a7gc->lock, flags);
+ 
+ 	val = readl(ctrl_reg);
+ 	val &= ~(ATLAS7_GPIO_CTL_INTR_STATUS_MASK |
+@@ -5768,7 +5768,7 @@ static int atlas7_gpio_irq_type(struct irq_data *d,
+ 
+ 	writel(val, ctrl_reg);
+ 
+-	spin_unlock_irqrestore(&a7gc->lock, flags);
++	raw_spin_unlock_irqrestore(&a7gc->lock, flags);
+ 
+ 	return 0;
+ }
+@@ -5863,7 +5863,7 @@ static int atlas7_gpio_request(struct gpio_chip *chip,
+ 	if (pinctrl_request_gpio(chip->base + gpio))
+ 		return -ENODEV;
+ 
+-	spin_lock_irqsave(&a7gc->lock, flags);
++	raw_spin_lock_irqsave(&a7gc->lock, flags);
+ 
+ 	/*
+ 	 * default status:
+@@ -5872,7 +5872,7 @@ static int atlas7_gpio_request(struct gpio_chip *chip,
+ 	__atlas7_gpio_set_input(a7gc, gpio);
+ 	__atlas7_gpio_irq_mask(a7gc, gpio);
+ 
+-	spin_unlock_irqrestore(&a7gc->lock, flags);
++	raw_spin_unlock_irqrestore(&a7gc->lock, flags);
+ 
+ 	return 0;
+ }
+@@ -5883,12 +5883,12 @@ static void atlas7_gpio_free(struct gpio_chip *chip,
+ 	struct atlas7_gpio_chip *a7gc = gpiochip_get_data(chip);
+ 	unsigned long flags;
+ 
+-	spin_lock_irqsave(&a7gc->lock, flags);
++	raw_spin_lock_irqsave(&a7gc->lock, flags);
+ 
+ 	__atlas7_gpio_irq_mask(a7gc, gpio);
+ 	__atlas7_gpio_set_input(a7gc, gpio);
+ 
+-	spin_unlock_irqrestore(&a7gc->lock, flags);
++	raw_spin_unlock_irqrestore(&a7gc->lock, flags);
+ 
+ 	pinctrl_free_gpio(chip->base + gpio);
+ }
+@@ -5899,11 +5899,11 @@ static int atlas7_gpio_direction_input(struct gpio_chip *chip,
+ 	struct atlas7_gpio_chip *a7gc = gpiochip_get_data(chip);
+ 	unsigned long flags;
+ 
+-	spin_lock_irqsave(&a7gc->lock, flags);
++	raw_spin_lock_irqsave(&a7gc->lock, flags);
+ 
+ 	__atlas7_gpio_set_input(a7gc, gpio);
+ 
+-	spin_unlock_irqrestore(&a7gc->lock, flags);
++	raw_spin_unlock_irqrestore(&a7gc->lock, flags);
+ 
+ 	return 0;
+ }
+@@ -5936,11 +5936,11 @@ static int atlas7_gpio_direction_output(struct gpio_chip *chip,
+ 	struct atlas7_gpio_chip *a7gc = gpiochip_get_data(chip);
+ 	unsigned long flags;
+ 
+-	spin_lock_irqsave(&a7gc->lock, flags);
++	raw_spin_lock_irqsave(&a7gc->lock, flags);
+ 
+ 	__atlas7_gpio_set_output(a7gc, gpio, value);
+ 
+-	spin_unlock_irqrestore(&a7gc->lock, flags);
++	raw_spin_unlock_irqrestore(&a7gc->lock, flags);
+ 
+ 	return 0;
+ }
+@@ -5956,11 +5956,11 @@ static int atlas7_gpio_get_value(struct gpio_chip *chip,
+ 	bank = atlas7_gpio_to_bank(a7gc, gpio);
+ 	pin_in_bank = gpio - bank->gpio_offset;
+ 
+-	spin_lock_irqsave(&a7gc->lock, flags);
++	raw_spin_lock_irqsave(&a7gc->lock, flags);
+ 
+ 	val = readl(ATLAS7_GPIO_CTRL(bank, pin_in_bank));
+ 
+-	spin_unlock_irqrestore(&a7gc->lock, flags);
++	raw_spin_unlock_irqrestore(&a7gc->lock, flags);
+ 
+ 	return !!(val & ATLAS7_GPIO_CTL_DATAIN_MASK);
+ }
+@@ -5978,7 +5978,7 @@ static void atlas7_gpio_set_value(struct gpio_chip *chip,
+ 	pin_in_bank = gpio - bank->gpio_offset;
+ 	ctrl_reg = ATLAS7_GPIO_CTRL(bank, pin_in_bank);
+ 
+-	spin_lock_irqsave(&a7gc->lock, flags);
++	raw_spin_lock_irqsave(&a7gc->lock, flags);
+ 
+ 	ctrl = readl(ctrl_reg);
+ 	if (value)
+@@ -5987,7 +5987,7 @@ static void atlas7_gpio_set_value(struct gpio_chip *chip,
+ 		ctrl &= ~ATLAS7_GPIO_CTL_DATAOUT_MASK;
+ 	writel(ctrl, ctrl_reg);
+ 
+-	spin_unlock_irqrestore(&a7gc->lock, flags);
++	raw_spin_unlock_irqrestore(&a7gc->lock, flags);
+ }
+ 
+ static const struct of_device_id atlas7_gpio_ids[] = {
+@@ -6036,7 +6036,7 @@ static int atlas7_gpio_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	a7gc->nbank = nbank;
+-	spin_lock_init(&a7gc->lock);
++	raw_spin_lock_init(&a7gc->lock);
+ 
+ 	/* Setup GPIO Chip */
+ 	chip = &a7gc->chip;
 -- 
-Thomas
+2.11.1
