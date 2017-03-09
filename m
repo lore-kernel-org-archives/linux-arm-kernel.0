@@ -1,105 +1,78 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 9 Mar 2017 11:21:05 +0000
-Subject: [PATCH V8 01/11] iommu/of: Refactor of_iommu_configure() for
- error handling
-In-Reply-To: <1cba01d298ba$ee931000$cbb93000$@codeaurora.org>
-References: <1486136933-20328-1-git-send-email-sricharan@codeaurora.org>
- <1486136933-20328-2-git-send-email-sricharan@codeaurora.org>
- <8701bfbe-e52e-0e26-2a71-f5f81684de70@arm.com>
- <76844d3e-ae7a-5113-1a76-18312e9f51ce@arm.com>
- <1cba01d298ba$ee931000$cbb93000$@codeaurora.org>
-Message-ID: <ee887c44-b3c3-f9e3-8e94-1619bf34dd5b@arm.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 9 Mar 2017 19:31:27 +0800
+Subject: [linux-sunxi] Re: [PATCH 10/15] drm/sun4i: tcon: Switch mux on
+ only for composite
+In-Reply-To: <20170309105800.mnzhvnky6na7d5vn@lukather>
+References: <cover.bc06ffa88f847ddd9ddd7c259415d5f61b55307b.1488876832.git-series.maxime.ripard@free-electrons.com>
+ <3f70bcfe2ec03188c06d54a262d49ad91963a510.1488876832.git-series.maxime.ripard@free-electrons.com>
+ <CAGb2v67iTOV-=u5rReu6_wi6NFoCoJkbJKshTpmFYUmJ=ggKUw@mail.gmail.com>
+ <20170309105800.mnzhvnky6na7d5vn@lukather>
+Message-ID: <CAGb2v67XkaC2+AxubaUF9nPcoGZcAzny7LKVD6C+-9BM5Fi+9g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/03/17 09:52, sricharan wrote:
-> Hi Robin,
-> 
->> On 08/03/17 18:58, Jean-Philippe Brucker wrote:
->> [...]
->>>>  static const struct iommu_ops
->>>> -*of_pci_iommu_configure(struct pci_dev *pdev, struct device_node
->>>> *bridge_np)
->>>> +*of_pci_iommu_init(struct pci_dev *pdev, struct device_node
->>>> +*bridge_np)
->>>>  {
->>>>  	const struct iommu_ops *ops;
->>>>  	struct of_phandle_args iommu_spec;
->>>> +	int err;
->>>>
->>>>  	/*
->>>>  	 * Start by tracing the RID alias down the PCI topology as @@
->>>> -123,56 +146,56 @@ static int __get_pci_rid(struct pci_dev *pdev, u16
->> alias, void *data)
->>>>  	 * bus into the system beyond, and which IOMMU it ends up at.
->>>>  	 */
->>>>  	iommu_spec.np = NULL;
->>>> -	if (of_pci_map_rid(bridge_np, iommu_spec.args[0], "iommu-map",
->>>> -			   "iommu-map-mask", &iommu_spec.np,
->> iommu_spec.args))
->>>> -		return NULL;
->>>> +	err = of_pci_map_rid(bridge_np, iommu_spec.args[0], "iommu-map",
->>>> +			     "iommu-map-mask", &iommu_spec.np,
->>>> +			     iommu_spec.args);
->>>> +	if (err)
->>>> +		return ERR_PTR(err);
->>>
->>> This change doesn't work with of_pci_map_rid when the PCI RC isn't
->>> behind an IOMMU:
->>>
->>>         map = of_get_property(np, map_name, &map_len);
->>>         if (!map) {
->>>                 if (target)
->>>                         return -ENODEV;
->>>                 /* Otherwise, no map implies no translation */
->>>                 *id_out = rid;
->>>                 return 0;
->>>         }
->>>
->>> Previously with no iommu-map, we returned -ENODEV but it was discarded
->>> by of_pci_iommu_configure. Now it is propagated and the whole device
->>> probing fails. Instead, maybe of_pci_map_rid should always return 0 if
->>> no iommu-map, and the caller should check if *target is still NULL?
+On Thu, Mar 9, 2017 at 6:58 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Wed, Mar 08, 2017 at 11:51:39AM +0800, Chen-Yu Tsai wrote:
+>> On Tue, Mar 7, 2017 at 4:56 PM, Maxime Ripard
+>> <maxime.ripard@free-electrons.com> wrote:
+>> > Even though that mux is undocumented, it seems like it needs to be set to 1
+>> > when using composite, and 0 when using HDMI.
+>> >
+>> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+>> > ---
+>> >  drivers/gpu/drm/sun4i/sun4i_tcon.c | 7 ++++++-
+>> >  1 file changed, 6 insertions(+), 1 deletion(-)
+>> >
+>> > diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+>> > index d2335f109601..93249c5ab1e4 100644
+>> > --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
+>> > +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+>> > @@ -268,11 +268,16 @@ void sun4i_tcon1_mode_set(struct sun4i_tcon *tcon, struct drm_encoder *encoder,
+>> >                            SUN4I_TCON_GCTL_IOMAP_MASK,
+>> >                            SUN4I_TCON_GCTL_IOMAP_TCON1);
+>> >
+>> > +       if (encoder->encoder_type == DRM_MODE_ENCODER_TVDAC)
+>> > +               val = 1;
+>> > +       else
+>> > +               val = 0;
+>> > +
+>> >         /*
+>> >          * FIXME: Undocumented bits
+>> >          */
+>> >         if (tcon->quirks->has_unknown_mux)
+>> > -               regmap_write(tcon->regs, SUN4I_TCON_MUX_CTRL_REG, 1);
+>> > +               regmap_write(tcon->regs, SUN4I_TCON_MUX_CTRL_REG, val);
 >>
->> Ah yes, Tomasz had found breakages with the "mmu-masters" binding
->> before, and I'd already pushed out a fixup for this one[1], but I forgot
-> that
->> that discussion was all off-list (out of diplomatic concern that the
-> breakage
->> might have been intentional - it wasn't, honest!)
+>> We might want to do this the other way around, i.e. exporting
 >>
->> Now that rc1 is out I should re-do that branch with v8 of this series plus
-> the
->> fixups folded in, unless Sricharan beats me to it.
+>>     int sun4i_tcon_mux_set(struct drm_device *drm, int encoder_type,
+>>                            int pipeline)
 >>
-> 
-> Right, I had this one [1] as V9 which had all your fixes that we discussed
-> offline as
-> well.  I was about to post a V9 today on top of -rc1 today as well.
-> 
-> [1] https://github.com/sricharanaz/iommu/tree/pd_v9
+>> and have downstream encoders call it. For the A31, the mux is not exclusively
+>> used for channel 1; there is a mux setting for MIPI DSI as well, but AFAIK
+>> DSI is connected to channel 0.
+>
+> We could make it part of sun4i_tcon_channel_enable too, though. What
+> do you think?
 
-Awesome, I'll try to get on with testing that ASAP. Thanks!
+We still need some way of figuring out what mux value to set for those
+cases. Let's keep your solution for now. We can work on it later when
+we have an actual use case to deal with.
 
-Robin.
+>
+>> Additionally, the mux registers are only valid in the first TCON, meaning
+>> it must available be active in 2 pipeline chips. It's also why we'd pass
+>> "struct drm_device *" instead of "struct sun4i_tcon *".
+>
+> Hmmmm. That's going to be tricky to support. Has this been confirmed
+> somehow? Is the register used for something else on TCON1?
 
-> 
-> Regards,
->  Sricharan
-> 
-> 
->> Thanks for the reminder,
->> Robin.
->>
->> [1]:http://www.linux-arm.org/git?p=linux-
->> rm.git;a=commitdiff;h=0049a34e523506813995c05766f5e2c16d616354
->>
->>>
->>> Thanks,
->>> Jean-Philippe
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
->> the body of a message to majordomo at vger.kernel.org More majordomo info
->> at  http://vger.kernel.org/majordomo-info.html
-> 
+At this point, the only reference is Allwinner's kernel, and the old 3.4
+kernel for A10/A20. I could try getting HDMI working on the A31 to get
+some real results.
+
+FWIW, the registers do not seem to be aliased across the two TCONs.
+
+Regards
+ChenYu
