@@ -1,82 +1,167 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu,  9 Mar 2017 18:05:28 +0800
-Subject: [PATCH 05/11] drm/sun4i: Pass pointers for associated backend and
- tcon into crtc init
+Date: Thu,  9 Mar 2017 18:05:32 +0800
+Subject: [PATCH 09/11] drm/sun4i: Support two display pipelines
 In-Reply-To: <20170309100534.14023-1-wens@csie.org>
 References: <20170309100534.14023-1-wens@csie.org>
-Message-ID: <20170309100534.14023-6-wens@csie.org>
+Message-ID: <20170309100534.14023-10-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-sun4i_crtc controls the backend and tcon hardware blocks of the display
-pipeline.
+Some Allwinner SoCs have two display pipelines (frontend -> backend ->
+tcon).
 
-Pass pointers to the underlying devices into the crtc init function,
-instead of trying to fetch them from the drm_device structure. This
-avoids the headache of trying to figure out which devices the crtc
-is actually associated with.
+Previously we only supported one pipeline. This patch extends the
+current driver to support two. It extends the tcon and backend pointers
+in sun4i_drv into arrays, and makes the related bind functions store
+the pointer into said arrays based on the id fetched from the device
+tree. In the case of the tcons, it falls back to a first come order
+if no encoders that can be used for differentiating the tcons are
+defined. The driver's depth-first traversal of the of graph, coupled
+with the increasing address ordering of the of graph endpoints, and
+the fact that tcon0 should always be enabled for the tcon/encoder
+mux to be accessible, means that tcon1 would always come after tcon0.
+
+Assignment of the device structure into sun4i_drv is moved to the end
+of the bind function, when all possible error checks have passed.
+
+This patch also drops a trailing 0 in one of the backend probe messages.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- drivers/gpu/drm/sun4i/sun4i_crtc.c | 9 +++++----
- drivers/gpu/drm/sun4i/sun4i_crtc.h | 4 +++-
- drivers/gpu/drm/sun4i/sun4i_tcon.c | 2 +-
- 3 files changed, 9 insertions(+), 6 deletions(-)
+ drivers/gpu/drm/sun4i/sun4i_backend.c |  9 +++++++--
+ drivers/gpu/drm/sun4i/sun4i_drv.c     |  2 +-
+ drivers/gpu/drm/sun4i/sun4i_drv.h     |  6 ++++--
+ drivers/gpu/drm/sun4i/sun4i_tcon.c    | 25 +++++++++++++++++--------
+ 4 files changed, 29 insertions(+), 13 deletions(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_crtc.c b/drivers/gpu/drm/sun4i/sun4i_crtc.c
-index 5323e3485988..221e6d5ee970 100644
---- a/drivers/gpu/drm/sun4i/sun4i_crtc.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_crtc.c
-@@ -134,9 +134,10 @@ static const struct drm_crtc_funcs sun4i_crtc_funcs = {
- 	.disable_vblank		= sun4i_crtc_disable_vblank,
+diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
+index f3c92d54c8e4..8d22efd5a9cc 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_backend.c
++++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
+@@ -350,12 +350,15 @@ static int sun4i_backend_bind(struct device *dev, struct device *master,
+ 	if (!backend)
+ 		return -ENOMEM;
+ 	dev_set_drvdata(dev, backend);
+-	drv->backend = backend;
+ 
+ 	backend->id = sun4i_backend_of_get_id(dev->of_node);
+ 	if (backend->id < 0)
+ 		return backend->id;
+ 
++	/* We only support SUN4I_DRM_MAX_PIPELINES number of backends */
++	if (backend->id >= SUN4I_DRM_MAX_PIPELINES)
++		return -EINVAL;
++
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	regs = devm_ioremap_resource(dev, res);
+ 	if (IS_ERR(regs))
+@@ -364,7 +367,7 @@ static int sun4i_backend_bind(struct device *dev, struct device *master,
+ 	backend->regs = devm_regmap_init_mmio(dev, regs,
+ 					      &sun4i_backend_regmap_config);
+ 	if (IS_ERR(backend->regs)) {
+-		dev_err(dev, "Couldn't create the backend0 regmap\n");
++		dev_err(dev, "Couldn't create the backend regmap\n");
+ 		return PTR_ERR(backend->regs);
+ 	}
+ 
+@@ -413,6 +416,8 @@ static int sun4i_backend_bind(struct device *dev, struct device *master,
+ 		}
+ 	}
+ 
++	drv->backend[backend->id] = backend;
++
+ 	/* Reset the registers */
+ 	for (i = 0x800; i < 0x1000; i += 4)
+ 		regmap_write(backend->regs, i, 0);
+diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c b/drivers/gpu/drm/sun4i/sun4i_drv.c
+index 767bbadcc85d..c15ecb8343d7 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_drv.c
++++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
+@@ -271,7 +271,7 @@ static int sun4i_drv_probe(struct platform_device *pdev)
+ 	struct device_node *np = pdev->dev.of_node;
+ 	int i, count = 0;
+ 
+-	for (i = 0;; i++) {
++	for (i = 0; i < SUN4I_DRM_MAX_PIPELINES; i++) {
+ 		struct device_node *pipeline = of_parse_phandle(np,
+ 								"allwinner,pipelines",
+ 								i);
+diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.h b/drivers/gpu/drm/sun4i/sun4i_drv.h
+index 5df50126ff52..ec1c08af47e1 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_drv.h
++++ b/drivers/gpu/drm/sun4i/sun4i_drv.h
+@@ -16,9 +16,11 @@
+ #include <linux/clk.h>
+ #include <linux/regmap.h>
+ 
++#define SUN4I_DRM_MAX_PIPELINES		2
++
+ struct sun4i_drv {
+-	struct sun4i_backend	*backend;
+-	struct sun4i_tcon	*tcon;
++	struct sun4i_backend	*backend[SUN4I_DRM_MAX_PIPELINES];
++	struct sun4i_tcon	*tcon[SUN4I_DRM_MAX_PIPELINES];
+ 
+ 	struct drm_fbdev_cma	*fbdev;
  };
- 
--struct sun4i_crtc *sun4i_crtc_init(struct drm_device *drm)
-+struct sun4i_crtc *sun4i_crtc_init(struct drm_device *drm,
-+				   struct sun4i_backend *backend,
-+				   struct sun4i_tcon *tcon)
- {
--	struct sun4i_drv *drv = drm->dev_private;
- 	struct sun4i_crtc *scrtc;
- 	struct drm_plane *primary = NULL, *cursor = NULL;
- 	int ret, i;
-@@ -144,8 +145,8 @@ struct sun4i_crtc *sun4i_crtc_init(struct drm_device *drm)
- 	scrtc = devm_kzalloc(drm->dev, sizeof(*scrtc), GFP_KERNEL);
- 	if (!scrtc)
- 		return ERR_PTR(-ENOMEM);
--	scrtc->backend = drv->backend;
--	scrtc->tcon = drv->tcon;
-+	scrtc->backend = backend;
-+	scrtc->tcon = tcon;
- 
- 	/* Create our layers */
- 	scrtc->layers = sun4i_layers_init(drm);
-diff --git a/drivers/gpu/drm/sun4i/sun4i_crtc.h b/drivers/gpu/drm/sun4i/sun4i_crtc.h
-index cd0e633cce3a..230cb8f0d601 100644
---- a/drivers/gpu/drm/sun4i/sun4i_crtc.h
-+++ b/drivers/gpu/drm/sun4i/sun4i_crtc.h
-@@ -27,6 +27,8 @@ static inline struct sun4i_crtc *drm_crtc_to_sun4i_crtc(struct drm_crtc *crtc)
- 	return container_of(crtc, struct sun4i_crtc, crtc);
- }
- 
--struct sun4i_crtc *sun4i_crtc_init(struct drm_device *drm);
-+struct sun4i_crtc *sun4i_crtc_init(struct drm_device *drm,
-+				   struct sun4i_backend *backend,
-+				   struct sun4i_tcon *tcon);
- 
- #endif /* _SUN4I_CRTC_H_ */
 diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-index c52c482c8fd0..3ced0b1cef6e 100644
+index b774c9a50c55..7749c3133f38 100644
 --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
 +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-@@ -528,7 +528,7 @@ static int sun4i_tcon_bind(struct device *dev, struct device *master,
+@@ -532,7 +532,6 @@ static int sun4i_tcon_bind(struct device *dev, struct device *master,
+ 	if (!tcon)
+ 		return -ENOMEM;
+ 	dev_set_drvdata(dev, tcon);
+-	drv->tcon = tcon;
+ 	tcon->drm = drm;
+ 	tcon->dev = dev;
+ 	tcon->quirks = of_device_get_match_data(dev);
+@@ -540,14 +539,22 @@ static int sun4i_tcon_bind(struct device *dev, struct device *master,
+ 	/* This can fail if the DT does not have any downstream encoders. */
+ 	tcon->id = sun4i_tcon_of_get_id(dev->of_node);
+ 	if (tcon->id < 0) {
+-		/*
+-		 * TODO We currently support only 1 TCON, so we can
+-		 * safely set this to 0. This should be revisited
+-		 * when we add support for multiple pipelines.
+-		 */
+-		tcon->id = 0;
++		int i;
++
++		/* find the first empty tcon in sun4i_drv */
++		for (i = 0; i < SUN4I_DRM_MAX_PIPELINES; i++)
++			if (!drv->tcon[i])
++				tcon->id = i;
++
++		/* bail out if that failed */
++		if (tcon->id < 0)
++			return tcon->id;
+ 	}
+ 
++	/* We only support SUN4I_DRM_MAX_PIPELINES number of tcons */
++	if (tcon->id >= SUN4I_DRM_MAX_PIPELINES)
++		return -EINVAL;
++
+ 	tcon->lcd_rst = devm_reset_control_get(dev, "lcd");
+ 	if (IS_ERR(tcon->lcd_rst)) {
+ 		dev_err(dev, "Couldn't get our reset line\n");
+@@ -588,7 +595,7 @@ static int sun4i_tcon_bind(struct device *dev, struct device *master,
  		goto err_free_dotclock;
  	}
  
--	tcon->crtc = sun4i_crtc_init(drm);
-+	tcon->crtc = sun4i_crtc_init(drm, drv->backend, tcon);
+-	tcon->crtc = sun4i_crtc_init(drm, drv->backend, tcon);
++	tcon->crtc = sun4i_crtc_init(drm, drv->backend[tcon->id], tcon);
  	if (IS_ERR(tcon->crtc)) {
  		dev_err(dev, "Couldn't create our CRTC\n");
  		ret = PTR_ERR(tcon->crtc);
+@@ -599,6 +606,8 @@ static int sun4i_tcon_bind(struct device *dev, struct device *master,
+ 	if (ret < 0)
+ 		goto err_free_clocks;
+ 
++	drv->tcon[tcon->id] = tcon;
++
+ 	return 0;
+ 
+ err_free_dotclock:
 -- 
 2.11.0
