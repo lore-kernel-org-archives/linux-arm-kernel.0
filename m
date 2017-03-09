@@ -1,38 +1,94 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 9 Mar 2017 17:50:21 +0530
-Subject: [RESEND PATCH] arm: assabet_defconfig: disable IDE subsystem
-In-Reply-To: <ab44a3c1-f078-4476-4583-de92ee68632c@cogentembedded.com>
-References: <1467991490-24895-1-git-send-email-b.zolnierkie@samsung.com>
- <CGME20161212135537epcas5p440bbb93d40f0c41b3754635733b09879@epcas5p4.samsung.com>
- <8ea5971a-338d-e8b9-6be8-8fe2658fc04d@ti.com> <1709119.SQyio4Ct6n@amdc3058>
- <1fd840c5-b0bb-726b-6357-669977c4ae5f@ti.com>
- <a3161cfc-56f7-4577-c37f-3798cdb03713@ti.com>
- <ab44a3c1-f078-4476-4583-de92ee68632c@cogentembedded.com>
-Message-ID: <98031160-f7b4-3cff-043a-1f2ee62c8a01@ti.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 9 Mar 2017 12:23:54 +0000
+Subject: [PATCH v2 4/4] arm64/syscalls: Specific usage of
+ verify_pre_usermode_state
+In-Reply-To: <20170309012456.5631-4-thgarnie@google.com>
+References: <20170309012456.5631-1-thgarnie@google.com>
+ <20170309012456.5631-4-thgarnie@google.com>
+Message-ID: <20170309122354.GB6320@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 09 March 2017 02:55 PM, Sergei Shtylyov wrote:
-
-[...]
-
->> diff --git a/arch/arm/mach-davinci/board-dm644x-evm.c
->> b/arch/arm/mach-davinci/board-dm644x-evm.c
->> index 023480b75244..60a1f23890cd 100644
->> --- a/arch/arm/mach-davinci/board-dm644x-evm.c
->> +++ b/arch/arm/mach-davinci/board-dm644x-evm.c
->> @@ -744,7 +744,7 @@ static int davinci_phy_fixup(struct phy_device
->> *phydev)
->>      return 0;
->>  }
->>
->> -#define HAS_ATA        IS_ENABLED(CONFIG_BLK_DEV_PALMCHIP_BK3710)
->> +#define HAS_ATA        IS_ENABLED(CONFIG_PATA_BK3710)
+On Wed, Mar 08, 2017 at 05:24:56PM -0800, Thomas Garnier wrote:
+> Implement specific usage of verify_pre_usermode_state for user-mode
+> returns for arm64.
+> ---
+> Based on next-20170308
+> ---
+>  arch/arm64/Kconfig        |  1 +
+>  arch/arm64/kernel/entry.S | 15 +++++++++++++++
+>  2 files changed, 16 insertions(+)
 > 
->    I think it would be more correct to check for both libata and IDE
-> drivers here...
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 896eba61e5ed..da54774838d8 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -24,6 +24,7 @@ config ARM64
+>  	select ARCH_WANT_COMPAT_IPC_PARSE_VERSION
+>  	select ARCH_WANT_FRAME_POINTERS
+>  	select ARCH_HAS_UBSAN_SANITIZE_ALL
+> +	select ARCH_NO_SYSCALL_VERIFY_PRE_USERMODE_STATE
+>  	select ARM_AMBA
+>  	select ARM_ARCH_TIMER
+>  	select ARM_GIC
+> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+> index 43512d4d7df2..eca392ae63e9 100644
+> --- a/arch/arm64/kernel/entry.S
+> +++ b/arch/arm64/kernel/entry.S
+> @@ -737,6 +737,19 @@ ENTRY(cpu_switch_to)
+>  	ret
+>  ENDPROC(cpu_switch_to)
+>  
+> +#ifdef CONFIG_BUG_ON_DATA_CORRUPTION
+> +.macro VERIFY_PRE_USERMODE_STATE
+> +	bl	verify_pre_usermode_state
+> +.endm
+> +#else
 
-As I understand, the plan is to remove the IDE driver soon.
+We generally stick to lower case for the arm64 assembly macros. If we
+need this, we should stick to the existing convention.
+
+> +/* Similar to set_fs(USER_DS) in verify_pre_usermode_state without a warning. */
+> +.macro VERIFY_PRE_USERMODE_STATE
+> +	mov	x1, #TASK_SIZE_64
+> +	str	x1, [tsk, #TSK_TI_ADDR_LIMIT]
+> +.endm
+
+We need arm64's set_fs() to configure UAO, too, so this is much weaker
+than set_fs(), and will leave __{get,put}_user and
+__copy_{to,from}_user() able to access kernel memory.
+
+We don't currently have an asm helper to clear UAO, and unconditionally
+poking that on exception return is liable to be somewhat expensive.
+
+Also, given we're only trying to catch this in syscalls, I'm afraid I
+don't see what we gain by doing this in the entry assembly.
 
 Thanks,
-Sekhar
+Mark.
+
+> +#endif
+> +
+> +
+>  /*
+>   * This is the fast syscall return path.  We do as little as possible here,
+>   * and this includes saving x0 back into the kernel stack.
+> @@ -744,6 +757,7 @@ ENDPROC(cpu_switch_to)
+>  ret_fast_syscall:
+>  	disable_irq				// disable interrupts
+>  	str	x0, [sp, #S_X0]			// returned x0
+> +	VERIFY_PRE_USERMODE_STATE
+>  	ldr	x1, [tsk, #TSK_TI_FLAGS]	// re-check for syscall tracing
+>  	and	x2, x1, #_TIF_SYSCALL_WORK
+>  	cbnz	x2, ret_fast_syscall_trace
+> @@ -771,6 +785,7 @@ work_pending:
+>   */
+>  ret_to_user:
+>  	disable_irq				// disable interrupts
+> +	VERIFY_PRE_USERMODE_STATE
+>  	ldr	x1, [tsk, #TSK_TI_FLAGS]
+>  	and	x2, x1, #_TIF_WORK_MASK
+>  	cbnz	x2, work_pending
+> -- 
+> 2.12.0.246.ga2ecc84866-goog
+> 
