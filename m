@@ -1,139 +1,109 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Thu, 9 Mar 2017 10:13:19 -0500 (EST)
-Subject: [PATCH v2 1/3] usb: orion-echi: Add support for the Armada 3700
-In-Reply-To: <20170309110424.2187-2-gregory.clement@free-electrons.com>
-Message-ID: <Pine.LNX.4.44L0.1703091006390.1912-100000@iolanthe.rowland.org>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Thu, 09 Mar 2017 23:31:54 +0800
+Subject: [PATCH 2/3] thermal: add support for the thermal sensor on
+ Allwinner new SoCs
+In-Reply-To: <20170309142712.tfmfrbbhagskrtaf@lukather>
+References: <20170301190220.2EgSha6N@smtp3o.mail.yandex.net>
+ <20170302141105.5fr3ru72rtdyv4pd@lukather>
+ <8250311489019784@web18g.yandex.ru> <20170309142712.tfmfrbbhagskrtaf@lukather>
+Message-ID: <21361489073514@web39j.yandex.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 9 Mar 2017, Gregory CLEMENT wrote:
-
-> From: Hua Jing <jinghua@marvell.com>
-> 
-> - Add a new compatible string for the Armada 3700 SoCs
-> 
-> - add sbuscfg support for orion usb controller driver. For the SoCs
->   without hlock, need to program BAWR/BARD/AHBBRST fields in the sbuscfg
->   register to guarantee the AHB master's burst would not overrun or
->   underrun the FIFO.
-> 
-> - the sbuscfg register has to be set after the usb controller reset,
->   otherwise the value would be overridden to 0. In order to do this, the
->   reset callback is registered.
-> 
-> [gregory.clement at free-electrons.com: - reword commit and comments
-> 				     - fix checkpatch warning]
-> Signed-off-by: Hua Jing <jinghua@marvell.com>
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> ---
->  .../devicetree/bindings/usb/ehci-orion.txt         |  4 ++-
->  drivers/usb/host/ehci-orion.c                      | 39 ++++++++++++++++++++++
->  2 files changed, 42 insertions(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/usb/ehci-orion.txt b/Documentation/devicetree/bindings/usb/ehci-orion.txt
-> index 17c3bc858b86..2855bae79fda 100644
-> --- a/Documentation/devicetree/bindings/usb/ehci-orion.txt
-> +++ b/Documentation/devicetree/bindings/usb/ehci-orion.txt
-> @@ -1,7 +1,9 @@
->  * EHCI controller, Orion Marvell variants
->  
->  Required properties:
-> -- compatible: must be "marvell,orion-ehci"
-> +- compatible: must be one of the following
-> +	"marvell,orion-ehci"
-> +	"marvell,armada-3700-ehci"
->  - reg: physical base address of the controller and length of memory mapped
->    region.
->  - interrupts: The EHCI interrupt
-> diff --git a/drivers/usb/host/ehci-orion.c b/drivers/usb/host/ehci-orion.c
-> index ee8d5faa0194..762bba41e06d 100644
-> --- a/drivers/usb/host/ehci-orion.c
-> +++ b/drivers/usb/host/ehci-orion.c
-> @@ -47,6 +47,21 @@
->  #define USB_PHY_IVREF_CTRL	0x440
->  #define USB_PHY_TST_GRP_CTRL	0x450
->  
-> +#define USB_SBUSCFG		0x90
-> +#define	    USB_SBUSCFG_BAWR_SHIFT	    0x6
-> +#define	    USB_SBUSCFG_BARD_SHIFT	    0x3
-> +#define	    USB_SBUSCFG_AHBBRST_SHIFT	    0x0
-
-Shift amounts are just regular numbers.  Giving them in hex is 
-confusing because it leads people to think the bit pattern has some 
-particular significance, which it doesn't.  Which would you rather see: 
-(0x24 << 0x12) or (0x24 << 18)?
-
-> +
-> +/* BAWR = BARD = 3 : Align read/write bursts packets larger than 128 bytes */
-> +#define USB_SBUSCFG_BAWR_ALIGN_128B	(0x3 << USB_SBUSCFG_BAWR_SHIFT)
-> +#define USB_SBUSCFG_BARD_ALIGN_128B	(0x3 << USB_SBUSCFG_BARD_SHIFT)
-> +/* AHBBRST = 3	   : Align AHB Burst to INCR16 (64 bytes) */
-> +#define USB_SBUSCFG_AHBBRST_INCR16	(0x3 << USB_SBUSCFG_AHBBRST_SHIFT)
-
-Besides, since these shift amounts are each used only once, it would be
-simpler (and easier to read!) to do:
-
-+#define USB_SBUSCFG_BAWR_ALIGN_128B  (0x3 << 6)
-+#define USB_SBUSCFG_BARD_ALIGN_128B  (0x3 << 3)
-+/* AHBBRST = 3          : Align AHB Burst to INCR16 (64 bytes) */
-+#define USB_SBUSCFG_AHBBRST_INCR16   (0x3 << 0)
 
 
-> +
-> +#define USB_SBUSCFG_DEF_VAL (USB_SBUSCFG_BAWR_ALIGN_128B	\
-> +			     | USB_SBUSCFG_BARD_ALIGN_128B	\
-> +			     | USB_SBUSCFG_AHBBRST_INCR16)
-> +
->  #define DRIVER_DESC "EHCI orion driver"
->  
->  #define hcd_to_orion_priv(h) ((struct orion_ehci_hcd *)hcd_to_ehci(h)->priv)
-> @@ -151,8 +166,31 @@ ehci_orion_conf_mbus_windows(struct usb_hcd *hcd,
->  	}
->  }
->  
-> +static int ehci_orion_drv_reset(struct usb_hcd *hcd)
-> +{
-> +	struct device *dev = hcd->self.controller;
-> +	int retval;
-> +
-> +	retval = ehci_setup(hcd);
-> +	if (retval)
-> +		dev_err(dev, "ehci_setup failed %d\n", retval);
+09.03.2017, 22:27, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
+> On Thu, Mar 09, 2017 at 08:36:24AM +0800, Icenowy Zheng wrote:
+>> ?02.03.2017, 22:11, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
+>> ?> On Thu, Mar 02, 2017 at 12:02:13AM +0800, Icenowy Zheng wrote:
+>> ?>> ?2017?3?1? 23:56? Maxime Ripard <maxime.ripard@free-electrons.com>???
+>> ?>> ?>
+>> ?>> ?> On Wed, Mar 01, 2017 at 06:20:51PM +0800, Icenowy Zheng wrote:
+>> ?>> ?> >
+>> ?>> ?> > 2017?3?1? 18:14? Maxime Ripard <maxime.ripard@free-electrons.com>???
+>> ?>> ?> > >
+>> ?>> ?> > > On Tue, Feb 28, 2017 at 03:18:13PM +0800, Icenowy Zheng wrote:
+>> ?>> ?> > > >
+>> ?>> ?> > > > 2017?2?28? 14:44? Maxime Ripard <maxime.ripard@free-electrons.com>???
+>> ?>> ?> > > > >
+>> ?>> ?> > > > > On Tue, Feb 28, 2017 at 03:40:53AM +0800, Icenowy Zheng wrote:
+>> ?>> ?> > > > > > From: Ondrej Jirman <megous@megous.com>
+>> ?>> ?> > > > > >
+>> ?>> ?> > > > > > Allwinner SoCs from H3 (including H5, A64, etc) have a new version of
+>> ?>> ?> > > > > > thermal sensor, and needs a new driver for it.
+>> ?>> ?> > > > > >
+>> ?>> ?> > > > > > Add such a driver.
+>> ?>> ?> > > > > >
+>> ?>> ?> > > > > > Currently only H3 is supported, but other SoCs are easily to be
+>> ?>> ?> > > > > > supported by adding new formula and set the sensor number.
+>> ?>> ?> > > > > >
+>> ?>> ?> > > > > > Signed-off-by: Ond?ej Jirman <megous@megous.com>
+>> ?>> ?> > > > > > [Icenowy: extend to support further multiple-sensor SoCs, change commit
+>> ?>> ?> > > > > >? message]
+>> ?>> ?> > > > > > Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+>> ?>> ?> > > > >
+>> ?>> ?> > > > > There's no need to create a new driver for that. This can be handled
+>> ?>> ?> > > > > by the GPADC driver we already have.
+>> ?>> ?> > > >
+>> ?>> ?> > > > sun8i-ths is not GPADC at all.
+>> ?>> ?> > > >
+>> ?>> ?> > > > The latest SoC I know that use GPADC as thermal sensor is A33.
+>> ?>> ?> > >
+>> ?>> ?> > > It's not called the same way, but it definitely is an evolution of the
+>> ?>> ?> > > same controller. There's no need for a new driver, only reworking what
+>> ?>> ?> > > is already there.
+>> ?>> ?> >
+>> ?>> ?> > I don't think so -- here's some evidence:
+>> ?>>
+>> ?>> ?But the H3 THS have many new IRQs, functions, different sampling
+>> ?>> ?rate set method and a quite different register layout.
+>> ?>>
+>> ?>> ?Doing this in GPADC driver is possible but meaningless.
+>> ?>>
+>> ?>> ?> >
+>> ?>> ?> > 1. The old GPADC do not have module clock.
+>> ?>> ?>
+>> ?>> ?> The A33 could use a PLL.
+>> ?>>
+>> ?>> ?But it's a dedicated mod clk on new generation THS.
+>> ?>
+>> ?> And all of this really are evolutions. The block is still driven in
+>> ?> the exact same way. And this is where there is value in having the
+>> ?> same driver: you share the logic, which is mostly common, instead of
+>> ?> duplicating it.
+>>
+>> ?After some thinking, I can accept a common driver for A23/A33 thermal
+>> ?sensor and H3/A64/H5 ones, but I cannot accept use iio-sun4i-gpadc
+>> ?driver for it, as now H3/A64/H5 thermal sensors are not just an ADC --
+>> ?they features hardware alarm levels, and in some SoC it become a
+>> ?multiple channel thermal sensor.
+>
+> The A23 and A33 is trivial to support on the already existing GPADC
+> driver. If you have it already working on the A33, then the amount of
+> work for your driver to support the A33, or for the GPADC to support
+> the newer SoC is strictly the same.
+>
+> Except in one case, we have a common, debugged, already reviewed and
+> already merged driver. In the other case, we have no such things.
 
-Was lack of this error message in the original driver a source of 
-problems?  If not, I submit that there's no good reason to add it.
+I didn't see sun4i-gpadc iio driver in linux-next now, only the GPADC MFD.
 
-> +
-> +	/*
-> +	 * For SoC without hlock, need to program sbuscfg value to guarantee
-> +	 * AHB master's burst would not overrun or underrun FIFO.
-> +	 *
-> +	 * sbuscfg reg has to be set after usb controller reset, otherwise
-> +	 * the value would be override to 0.
-> +	 */
-> +	if (of_device_is_compatible(dev->of_node, "marvell,armada-3700-ehci"))
-> +		wrl(USB_SBUSCFG, USB_SBUSCFG_DEF_VAL);
+And abstract a thermal-only ADC as a GPADC is not proper, especially when
+it comes with some thermal-specific functions (hardware trip points).
 
-Do you want to do this even when retval != 0?
+So I do not accept it to be implemented as IIO ADC driver.
 
-Alan Stern
-
-> +
-> +	return retval;
-> +}
-> +
->  static const struct ehci_driver_overrides orion_overrides __initconst = {
->  	.extra_priv_size =	sizeof(struct orion_ehci_hcd),
-> +	.reset = ehci_orion_drv_reset,
->  };
->  
->  static int ehci_orion_drv_probe(struct platform_device *pdev)
-> @@ -310,6 +348,7 @@ static int ehci_orion_drv_remove(struct platform_device *pdev)
->  
->  static const struct of_device_id ehci_orion_dt_ids[] = {
->  	{ .compatible = "marvell,orion-ehci", },
-> +	{ .compatible = "marvell,armada-3700-ehci", },
->  	{},
->  };
->  MODULE_DEVICE_TABLE(of, ehci_orion_dt_ids);
-> 
+>
+>> ?I will insist on doing a dedicated driver for it, or if you like, I can add
+>> ?A23/A33 support to this driver. (Considering no one have already posted
+>> ?any patches for A23/A33 thermal sensor, except my old ones, so my
+>> ?work at least won't conflict with anything merged)
+>
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2016-December/474821.html
+>
+> Maxime
+>
+> --
+> Maxime Ripard, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
