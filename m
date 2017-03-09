@@ -1,182 +1,196 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 9 Mar 2017 11:19:56 +0000
-Subject: [Question] devm_kmalloc() for DMA ?
-In-Reply-To: <CAK7LNAQ3FbicgoV1Q70T2gZQS0j1Z8LffXquSM=v6DYcHP_m4Q@mail.gmail.com>
-References: <CAK7LNARbD262isY7yOgQKAcbWQHV+3dsoRjtu6S+qUpPr98qSQ@mail.gmail.com>
- <b7dd01e6-ddcd-a34a-c26c-05ce6ae4015a@arm.com>
- <CAK7LNAQ3FbicgoV1Q70T2gZQS0j1Z8LffXquSM=v6DYcHP_m4Q@mail.gmail.com>
-Message-ID: <894e8867-57b5-39ab-4dbd-3761d485cb62@arm.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 9 Mar 2017 19:20:30 +0800
+Subject: [PATCH 09/11] drm/sun4i: Support two display pipelines
+In-Reply-To: <20170309103636.j5jtjhwjztzchr6u@lukather>
+References: <20170309100534.14023-1-wens@csie.org>
+ <20170309100534.14023-10-wens@csie.org>
+ <20170309103636.j5jtjhwjztzchr6u@lukather>
+Message-ID: <CAGb2v66gFtEiESQHC9sU-XmNOoR3gCJAyQ+ZWozQmuvtWaaJMQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/03/17 18:06, Masahiro Yamada wrote:
-> Hi Robin,
-> 
-> 
-> 2017-03-08 20:15 GMT+09:00 Robin Murphy <robin.murphy@arm.com>:
->> On 08/03/17 10:59, Masahiro Yamada wrote:
->>> Hi experts,
->>>
->>> I have a question about
->>> how to allocate DMA-safe buffer.
->>>
->>>
->>> In my understanding, kmalloc() returns
->>> memory with DMA safe alignment
->>> in order to avoid cache-sharing problem when used for DMA.
->>>
->>> The alignment is decided by ARCH_DMA_MINALIGN.
->>> For example, on modern ARM 32bit boards, this value is typically 64.
->>> So, memory returned by kmalloc() has
->>> at least 64 byte alignment.
->>>
->>>
->>> On the other hand, devm_kmalloc() does not return
->>> enough-aligned memory.
+On Thu, Mar 9, 2017 at 6:36 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Hi,
+>
+> On Thu, Mar 09, 2017 at 06:05:32PM +0800, Chen-Yu Tsai wrote:
+>> Some Allwinner SoCs have two display pipelines (frontend -> backend ->
+>> tcon).
 >>
->> How so? If anything returned by kmalloc() is guaranteed to occupy some
->> multiple of ARCH_DMA_MINALIGN bytes in order to avoid two allocations
->> falling into the same cache line, I don't see how stealing the first 16
->> bytes *of a single allocation* could make it start sharing cache lines
->> with another? :/
-> 
-> I just thought of traverse of the linked list of devres_node
-> on a different thread, but it should not happen.
-> 
-> Please forget my stupid question.
+>> Previously we only supported one pipeline. This patch extends the
+>> current driver to support two. It extends the tcon and backend pointers
+>> in sun4i_drv into arrays, and makes the related bind functions store
+>> the pointer into said arrays based on the id fetched from the device
+>> tree. In the case of the tcons, it falls back to a first come order
+>> if no encoders that can be used for differentiating the tcons are
+>> defined. The driver's depth-first traversal of the of graph, coupled
+>> with the increasing address ordering of the of graph endpoints, and
+>> the fact that tcon0 should always be enabled for the tcon/encoder
+>> mux to be accessible, means that tcon1 would always come after tcon0.
+>>
+>> Assignment of the device structure into sun4i_drv is moved to the end
+>> of the bind function, when all possible error checks have passed.
+>>
+>> This patch also drops a trailing 0 in one of the backend probe messages.
+>>
+>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>> ---
+>>  drivers/gpu/drm/sun4i/sun4i_backend.c |  9 +++++++--
+>>  drivers/gpu/drm/sun4i/sun4i_drv.c     |  2 +-
+>>  drivers/gpu/drm/sun4i/sun4i_drv.h     |  6 ++++--
+>>  drivers/gpu/drm/sun4i/sun4i_tcon.c    | 25 +++++++++++++++++--------
+>>  4 files changed, 29 insertions(+), 13 deletions(-)
+>>
+>> diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
+>> index f3c92d54c8e4..8d22efd5a9cc 100644
+>> --- a/drivers/gpu/drm/sun4i/sun4i_backend.c
+>> +++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
+>> @@ -350,12 +350,15 @@ static int sun4i_backend_bind(struct device *dev, struct device *master,
+>>       if (!backend)
+>>               return -ENOMEM;
+>>       dev_set_drvdata(dev, backend);
+>> -     drv->backend = backend;
+>>
+>>       backend->id = sun4i_backend_of_get_id(dev->of_node);
+>>       if (backend->id < 0)
+>>               return backend->id;
+>>
+>> +     /* We only support SUN4I_DRM_MAX_PIPELINES number of backends */
+>> +     if (backend->id >= SUN4I_DRM_MAX_PIPELINES)
+>> +             return -EINVAL;
+>> +
+>>       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>>       regs = devm_ioremap_resource(dev, res);
+>>       if (IS_ERR(regs))
+>> @@ -364,7 +367,7 @@ static int sun4i_backend_bind(struct device *dev, struct device *master,
+>>       backend->regs = devm_regmap_init_mmio(dev, regs,
+>>                                             &sun4i_backend_regmap_config);
+>>       if (IS_ERR(backend->regs)) {
+>> -             dev_err(dev, "Couldn't create the backend0 regmap\n");
+>> +             dev_err(dev, "Couldn't create the backend regmap\n");
+>>               return PTR_ERR(backend->regs);
+>>       }
+>>
+>> @@ -413,6 +416,8 @@ static int sun4i_backend_bind(struct device *dev, struct device *master,
+>>               }
+>>       }
+>>
+>> +     drv->backend[backend->id] = backend;
+>> +
+>>       /* Reset the registers */
+>>       for (i = 0x800; i < 0x1000; i += 4)
+>>               regmap_write(backend->regs, i, 0);
+>> diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c b/drivers/gpu/drm/sun4i/sun4i_drv.c
+>> index 767bbadcc85d..c15ecb8343d7 100644
+>> --- a/drivers/gpu/drm/sun4i/sun4i_drv.c
+>> +++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
+>> @@ -271,7 +271,7 @@ static int sun4i_drv_probe(struct platform_device *pdev)
+>>       struct device_node *np = pdev->dev.of_node;
+>>       int i, count = 0;
+>>
+>> -     for (i = 0;; i++) {
+>> +     for (i = 0; i < SUN4I_DRM_MAX_PIPELINES; i++) {
+>>               struct device_node *pipeline = of_parse_phandle(np,
+>>                                                               "allwinner,pipelines",
+>>                                                               i);
+>> diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.h b/drivers/gpu/drm/sun4i/sun4i_drv.h
+>> index 5df50126ff52..ec1c08af47e1 100644
+>> --- a/drivers/gpu/drm/sun4i/sun4i_drv.h
+>> +++ b/drivers/gpu/drm/sun4i/sun4i_drv.h
+>> @@ -16,9 +16,11 @@
+>>  #include <linux/clk.h>
+>>  #include <linux/regmap.h>
+>>
+>> +#define SUN4I_DRM_MAX_PIPELINES              2
+>> +
+>>  struct sun4i_drv {
+>> -     struct sun4i_backend    *backend;
+>> -     struct sun4i_tcon       *tcon;
+>> +     struct sun4i_backend    *backend[SUN4I_DRM_MAX_PIPELINES];
+>> +     struct sun4i_tcon       *tcon[SUN4I_DRM_MAX_PIPELINES];
+>>
+>>       struct drm_fbdev_cma    *fbdev;
+>>  };
+>> diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+>> index b774c9a50c55..7749c3133f38 100644
+>> --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
+>> +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+>> @@ -532,7 +532,6 @@ static int sun4i_tcon_bind(struct device *dev, struct device *master,
+>>       if (!tcon)
+>>               return -ENOMEM;
+>>       dev_set_drvdata(dev, tcon);
+>> -     drv->tcon = tcon;
+>>       tcon->drm = drm;
+>>       tcon->dev = dev;
+>>       tcon->quirks = of_device_get_match_data(dev);
+>> @@ -540,14 +539,22 @@ static int sun4i_tcon_bind(struct device *dev, struct device *master,
+>>       /* This can fail if the DT does not have any downstream encoders. */
+>>       tcon->id = sun4i_tcon_of_get_id(dev->of_node);
+>>       if (tcon->id < 0) {
+>> -             /*
+>> -              * TODO We currently support only 1 TCON, so we can
+>> -              * safely set this to 0. This should be revisited
+>> -              * when we add support for multiple pipelines.
+>> -              */
+>> -             tcon->id = 0;
+>> +             int i;
+>> +
+>> +             /* find the first empty tcon in sun4i_drv */
+>> +             for (i = 0; i < SUN4I_DRM_MAX_PIPELINES; i++)
+>> +                     if (!drv->tcon[i])
+>> +                             tcon->id = i;
+>> +
+>> +             /* bail out if that failed */
+>> +             if (tcon->id < 0)
+>> +                     return tcon->id;
+>>       }
+>>
+>> +     /* We only support SUN4I_DRM_MAX_PIPELINES number of tcons */
+>> +     if (tcon->id >= SUN4I_DRM_MAX_PIPELINES)
+>> +             return -EINVAL;
+>> +
+>>       tcon->lcd_rst = devm_reset_control_get(dev, "lcd");
+>>       if (IS_ERR(tcon->lcd_rst)) {
+>>               dev_err(dev, "Couldn't get our reset line\n");
+>> @@ -588,7 +595,7 @@ static int sun4i_tcon_bind(struct device *dev, struct device *master,
+>>               goto err_free_dotclock;
+>>       }
+>>
+>> -     tcon->crtc = sun4i_crtc_init(drm, drv->backend, tcon);
+>> +     tcon->crtc = sun4i_crtc_init(drm, drv->backend[tcon->id], tcon);
+>
+> I'm not a big fan of those IDs. The heuristic seems to be a bit
+> fragile since we really never enforced any order in our bindings.
 
-On the contrary, my apologies for overlooking the subtlety here and
-speaking too soon. It's not strictly the alignment of the allocation
-that's at issue, it's more that the streaming DMA notion of "ownership"
-of that particular allocation can be unwittingly violated by other agents.
+Yes. I seem to have forgotten that bit which I had intended to add.
+The endpoint IDs would ideally match the actual mux values used.
 
-Another thread traversing the list isn't actually a problem, as it's
-effectively no different from the cache itself doing a speculative
-prefetch, which we have to accommodate anyway. However, there could in
-theory be a potential data loss if the devres node is *modified* (e.g.
-an adjacent entry is added or removed) whilst the buffer is mapped for
-DMA_FROM_DEVICE.
+On the TCON side that's not doable, so we might have to just require
+them being in an increasing order.
 
-Now, as Russell says, doing streaming DMA on a managed allocation tied
-to the device's lifetime doesn't make a great deal of sense, and if
-you're allocating or freeing device-lifetime resources *while DMA is
-active* you're almost certainly doing something wrong, so thankfully I
-don't think we should need to worry about this in practice.
+> You seem to use it for two things:
+>  - to match a TCON to its backend in our code
+>  - to not step on each others' toes when registering the backends/tcons
+>
+> I think the second could be easily addressed using a linked list, and
+> the first one by storing the of_node. Then we just need to follow the
+> OF graph to our input of_node, and then iterate through our registered
+> backend list to find the one with the same of_node.
 
-Looking at the Denali driver specifically, it does indeed look a bit
-bogus. At least it's not doing DMA with a uint8-aligned array in the
-middle of a live structure as it apparently once did, but in terms of
-how it's actually using that buffer I think something along the lines of
-the below would be appropriate (if anyone wants to try spinning a proper
-patch out of it, feel free - I have no way of testing and am not
-familiar with MTD in general).
+Yes that would work for the above purposes.
 
-Robin.
+For getting the first TCON to access the mux registers, it kind of falls
+short. We also need something like this for the TV encoders on A10/A20.
+They too have a mux, which seems to be in the first TV encoder. This
+controls how the 8 DACs are mapped to the 4 external pins.
 
------>8-----
-diff --git a/drivers/mtd/nand/denali.c b/drivers/mtd/nand/denali.c
-index 73b9d4e2dca0..b2b4650a3923 100644
---- a/drivers/mtd/nand/denali.c
-+++ b/drivers/mtd/nand/denali.c
-@@ -1046,8 +1046,6 @@ static int write_page(struct mtd_info *mtd, struct
-nand_chip *chip,
- 			mtd->oobsize);
- 	}
+Regards
+ChenYu
 
--	dma_sync_single_for_device(denali->dev, addr, size, DMA_TO_DEVICE);
--
- 	clear_interrupts(denali);
- 	denali_enable_dma(denali, true);
-
-@@ -1063,7 +1061,6 @@ static int write_page(struct mtd_info *mtd, struct
-nand_chip *chip,
- 	}
-
- 	denali_enable_dma(denali, false);
--	dma_sync_single_for_cpu(denali->dev, addr, size, DMA_TO_DEVICE);
-
- 	return 0;
- }
-@@ -1139,7 +1136,6 @@ static int denali_read_page(struct mtd_info *mtd,
-struct nand_chip *chip,
- 	setup_ecc_for_xfer(denali, true, false);
-
- 	denali_enable_dma(denali, true);
--	dma_sync_single_for_device(denali->dev, addr, size, DMA_FROM_DEVICE);
-
- 	clear_interrupts(denali);
- 	denali_setup_dma(denali, DENALI_READ);
-@@ -1147,8 +1143,6 @@ static int denali_read_page(struct mtd_info *mtd,
-struct nand_chip *chip,
- 	/* wait for operation to complete */
- 	irq_status = wait_for_irq(denali, irq_mask);
-
--	dma_sync_single_for_cpu(denali->dev, addr, size, DMA_FROM_DEVICE);
--
- 	memcpy(buf, denali->buf.buf, mtd->writesize);
-
- 	check_erased_page = handle_ecc(denali, buf, irq_status, &max_bitflips);
-@@ -1186,16 +1180,12 @@ static int denali_read_page_raw(struct mtd_info
-*mtd, struct nand_chip *chip,
- 	setup_ecc_for_xfer(denali, false, true);
- 	denali_enable_dma(denali, true);
-
--	dma_sync_single_for_device(denali->dev, addr, size, DMA_FROM_DEVICE);
--
- 	clear_interrupts(denali);
- 	denali_setup_dma(denali, DENALI_READ);
-
- 	/* wait for operation to complete */
- 	wait_for_irq(denali, irq_mask);
-
--	dma_sync_single_for_cpu(denali->dev, addr, size, DMA_FROM_DEVICE);
--
- 	denali_enable_dma(denali, false);
-
- 	memcpy(buf, denali->buf.buf, mtd->writesize);
-@@ -1466,16 +1456,6 @@ int denali_init(struct denali_nand_info *denali)
- 	if (ret)
- 		goto failed_req_irq;
-
--	/* allocate the right size buffer now */
--	devm_kfree(denali->dev, denali->buf.buf);
--	denali->buf.buf = devm_kzalloc(denali->dev,
--			     mtd->writesize + mtd->oobsize,
--			     GFP_KERNEL);
--	if (!denali->buf.buf) {
--		ret = -ENOMEM;
--		goto failed_req_irq;
--	}
--
- 	/* Is 32-bit DMA supported? */
- 	ret = dma_set_mask(denali->dev, DMA_BIT_MASK(32));
- 	if (ret) {
-@@ -1483,12 +1463,14 @@ int denali_init(struct denali_nand_info *denali)
- 		goto failed_req_irq;
- 	}
-
--	denali->buf.dma_buf = dma_map_single(denali->dev, denali->buf.buf,
--			     mtd->writesize + mtd->oobsize,
--			     DMA_BIDIRECTIONAL);
--	if (dma_mapping_error(denali->dev, denali->buf.dma_buf)) {
--		dev_err(denali->dev, "Failed to map DMA buffer\n");
--		ret = -EIO;
-+	/* allocate the right size buffer now */
-+	devm_kfree(denali->dev, denali->buf.buf);
-+	denali->buf.buf = dmam_alloc_coherent(denali->dev,
-+					      mtd->writesize + mtd->oobsize,
-+					      &denali->buf.dma_buf,
-+					      GFP_KERNEL);
-+	if (!denali->buf.buf) {
-+		ret = -ENOMEM;
- 		goto failed_req_irq;
- 	}
-
-@@ -1598,7 +1580,5 @@ void denali_remove(struct denali_nand_info *denali)
-
- 	nand_release(mtd);
- 	denali_irq_cleanup(denali->irq, denali);
--	dma_unmap_single(denali->dev, denali->buf.dma_buf, bufsize,
--			 DMA_BIDIRECTIONAL);
- }
- EXPORT_SYMBOL(denali_remove);
+>
+> Maxime
+>
+> --
+> Maxime Ripard, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
