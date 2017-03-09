@@ -1,45 +1,45 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 9 Mar 2017 19:22:50 +0300
-Subject: [RESEND PATCH] arm: assabet_defconfig: disable IDE subsystem
-In-Reply-To: <a8eab3b1-8867-00dd-08e4-bcece23010a6@cogentembedded.com>
-References: <1467991490-24895-1-git-send-email-b.zolnierkie@samsung.com>
- <CGME20161212135537epcas5p440bbb93d40f0c41b3754635733b09879@epcas5p4.samsung.com>
- <8ea5971a-338d-e8b9-6be8-8fe2658fc04d@ti.com> <1709119.SQyio4Ct6n@amdc3058>
- <1fd840c5-b0bb-726b-6357-669977c4ae5f@ti.com>
- <a3161cfc-56f7-4577-c37f-3798cdb03713@ti.com>
- <ab44a3c1-f078-4476-4583-de92ee68632c@cogentembedded.com>
- <98031160-f7b4-3cff-043a-1f2ee62c8a01@ti.com>
- <a8eab3b1-8867-00dd-08e4-bcece23010a6@cogentembedded.com>
-Message-ID: <580cabb1-90aa-418d-6ac8-a363d54dabe3@cogentembedded.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 9 Mar 2017 16:26:13 +0000
+Subject: [PATCH v2 4/4] arm64/syscalls: Specific usage of
+ verify_pre_usermode_state
+In-Reply-To: <CAJcbSZGCFhUx79=bMkOxDRvbfuHmVBWU02HBgEU9T2s7mTChAw@mail.gmail.com>
+References: <20170309012456.5631-1-thgarnie@google.com>
+ <20170309012456.5631-4-thgarnie@google.com>
+ <20170309122354.GB6320@leverpostej>
+ <CAJcbSZGCFhUx79=bMkOxDRvbfuHmVBWU02HBgEU9T2s7mTChAw@mail.gmail.com>
+Message-ID: <20170309162613.GN21222@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/09/2017 03:24 PM, Sergei Shtylyov wrote:
+On Thu, Mar 09, 2017 at 07:56:49AM -0800, Thomas Garnier wrote:
+> On Thu, Mar 9, 2017 at 4:23 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+> > We generally stick to lower case for the arm64 assembly macros. If we
+> > need this, we should stick to the existing convention.
+> >
+> >> +/* Similar to set_fs(USER_DS) in verify_pre_usermode_state without a warning. */
+> >> +.macro VERIFY_PRE_USERMODE_STATE
+> >> +     mov     x1, #TASK_SIZE_64
+> >> +     str     x1, [tsk, #TSK_TI_ADDR_LIMIT]
+> >> +.endm
+> >
+> > We need arm64's set_fs() to configure UAO, too, so this is much weaker
+> > than set_fs(), and will leave __{get,put}_user and
+> > __copy_{to,from}_user() able to access kernel memory.
+> >
+> > We don't currently have an asm helper to clear UAO, and unconditionally
+> > poking that on exception return is liable to be somewhat expensive.
+> >
+> > Also, given we're only trying to catch this in syscalls, I'm afraid I
+> > don't see what we gain by doing this in the entry assembly.
+> >
+> 
+> I optimized all architectures from the arm (32-bit) discussion. I will
+> come back to a simple bl to the verify function. Thanks!
 
->>>> diff --git a/arch/arm/mach-davinci/board-dm644x-evm.c
->>>> b/arch/arm/mach-davinci/board-dm644x-evm.c
->>>> index 023480b75244..60a1f23890cd 100644
->>>> --- a/arch/arm/mach-davinci/board-dm644x-evm.c
->>>> +++ b/arch/arm/mach-davinci/board-dm644x-evm.c
->>>> @@ -744,7 +744,7 @@ static int davinci_phy_fixup(struct phy_device
->>>> *phydev)
->>>>      return 0;
->>>>  }
->>>>
->>>> -#define HAS_ATA        IS_ENABLED(CONFIG_BLK_DEV_PALMCHIP_BK3710)
->>>> +#define HAS_ATA        IS_ENABLED(CONFIG_PATA_BK3710)
->>>
->>>    I think it would be more correct to check for both libata and IDE
->>> drivers here...
->>
->> As I understand, the plan is to remove the IDE driver soon.
->
->    I'm not sure DaveM would support any removals in drivers/ide/. He has
-> explicitly expressed his will to maintain the IDE driuver forever.
+I wouldn't call what you've done on ARM an "optimisation", because my
+comment about making the fast path worthless still stands.
 
-    s/driuver/drivers/, sorry. :-)
-
->> Thanks,
->> Sekhar
-
-MBR, Sergei
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
