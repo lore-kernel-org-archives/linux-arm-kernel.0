@@ -1,27 +1,25 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu,  9 Mar 2017 09:55:33 +0000
-Subject: [PATCH 04/10] arm: KVM: Survive unknown traps from guests
+Date: Thu,  9 Mar 2017 09:55:34 +0000
+Subject: [PATCH 05/10] arm64: KVM: Survive unknown traps from guests
 In-Reply-To: <20170309095539.14512-1-marc.zyngier@arm.com>
 References: <20170309095539.14512-1-marc.zyngier@arm.com>
-Message-ID: <20170309095539.14512-5-marc.zyngier@arm.com>
+Message-ID: <20170309095539.14512-6-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Mark Rutland <mark.rutland@arm.com>
 
-Currently we BUG() if we see a HSR.EC value we don't recognise. As
+Currently we BUG() if we see an ESR_EL2.EC value we don't recognise. As
 configurable disables/enables are added to the architecture (controlled
 by RES1/RES0 bits respectively), with associated synchronous exceptions,
 it may be possible for a guest to trigger exceptions with classes that
 we don't recognise.
 
 While we can't service these exceptions in a manner useful to the guest,
-we can avoid bringing down the host. Per ARM DDI 0406C.c, all currently
-unallocated HSR EC encodings are reserved, and per ARM DDI
-0487A.k_iss10775, page G6-4395, EC values within the range 0x00 - 0x2c
-are reserved for future use with synchronous exceptions, and EC values
-within the range 0x2d - 0x3f may be used for either synchronous or
-asynchronous exceptions.
+we can avoid bringing down the host. Per ARM DDI 0487A.k_iss10775, page
+D7-1937, EC values within the range 0x00 - 0x2c are reserved for future
+use with synchronous exceptions, and EC values within the range 0x2d -
+0x3f may be used for either synchronous or asynchronous exceptions.
 
 The patch makes KVM handle any unknown EC by injecting an UNDEFINED
 exception into the guest, with a corresponding (ratelimited) warning in
@@ -34,54 +32,41 @@ Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/asm/kvm_arm.h |  1 +
- arch/arm/kvm/handle_exit.c     | 19 ++++++++++++-------
- 2 files changed, 13 insertions(+), 7 deletions(-)
+ arch/arm64/kvm/handle_exit.c | 19 ++++++++++++-------
+ 1 file changed, 12 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/include/asm/kvm_arm.h b/arch/arm/include/asm/kvm_arm.h
-index e22089fb44dc..a3f0b3d50089 100644
---- a/arch/arm/include/asm/kvm_arm.h
-+++ b/arch/arm/include/asm/kvm_arm.h
-@@ -209,6 +209,7 @@
- #define HSR_EC_IABT_HYP	(0x21)
- #define HSR_EC_DABT	(0x24)
- #define HSR_EC_DABT_HYP	(0x25)
-+#define HSR_EC_MAX	(0x3f)
- 
- #define HSR_WFI_IS_WFE		(_AC(1, UL) << 0)
- 
-diff --git a/arch/arm/kvm/handle_exit.c b/arch/arm/kvm/handle_exit.c
-index 4e40d1955e35..96af65a30d78 100644
---- a/arch/arm/kvm/handle_exit.c
-+++ b/arch/arm/kvm/handle_exit.c
-@@ -79,7 +79,19 @@ static int kvm_handle_wfx(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 	return 1;
+diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
+index 1bfe30dfbfe7..fa1b18e364fc 100644
+--- a/arch/arm64/kvm/handle_exit.c
++++ b/arch/arm64/kvm/handle_exit.c
+@@ -135,7 +135,19 @@ static int kvm_handle_guest_debug(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 	return ret;
  }
  
 +static int kvm_handle_unknown_ec(struct kvm_vcpu *vcpu, struct kvm_run *run)
 +{
 +	u32 hsr = kvm_vcpu_get_hsr(vcpu);
 +
-+	kvm_pr_unimpl("Unknown exception class: hsr: %#08x\n",
-+		      hsr);
++	kvm_pr_unimpl("Unknown exception class: hsr: %#08x -- %s\n",
++		      hsr, esr_get_class_string(hsr));
 +
 +	kvm_inject_undefined(vcpu);
 +	return 1;
 +}
 +
  static exit_handle_fn arm_exit_handlers[] = {
-+	[0 ... HSR_EC_MAX]	= kvm_handle_unknown_ec,
- 	[HSR_EC_WFI]		= kvm_handle_wfx,
- 	[HSR_EC_CP15_32]	= kvm_handle_cp15_32,
- 	[HSR_EC_CP15_64]	= kvm_handle_cp15_64,
-@@ -98,13 +110,6 @@ static exit_handle_fn kvm_get_exit_handler(struct kvm_vcpu *vcpu)
- {
- 	u8 hsr_ec = kvm_vcpu_trap_get_class(vcpu);
++	[0 ... ESR_ELx_EC_MAX]	= kvm_handle_unknown_ec,
+ 	[ESR_ELx_EC_WFx]	= kvm_handle_wfx,
+ 	[ESR_ELx_EC_CP15_32]	= kvm_handle_cp15_32,
+ 	[ESR_ELx_EC_CP15_64]	= kvm_handle_cp15_64,
+@@ -162,13 +174,6 @@ static exit_handle_fn kvm_get_exit_handler(struct kvm_vcpu *vcpu)
+ 	u32 hsr = kvm_vcpu_get_hsr(vcpu);
+ 	u8 hsr_ec = ESR_ELx_EC(hsr);
  
 -	if (hsr_ec >= ARRAY_SIZE(arm_exit_handlers) ||
 -	    !arm_exit_handlers[hsr_ec]) {
--		kvm_err("Unknown exception class: hsr: %#08x\n",
--			(unsigned int)kvm_vcpu_get_hsr(vcpu));
+-		kvm_err("Unknown exception class: hsr: %#08x -- %s\n",
+-			hsr, esr_get_class_string(hsr));
 -		BUG();
 -	}
 -
