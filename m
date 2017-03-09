@@ -1,142 +1,61 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu,  9 Mar 2017 09:55:30 +0000
-Subject: [PATCH 01/10] arm64: KVM: VHE: Clear HCR_TGE when invalidating guest
- TLBs
+Date: Thu,  9 Mar 2017 09:55:31 +0000
+Subject: [PATCH 02/10] KVM: arm/arm64: vgic-v3: Don't pretend to support
+ IRQ/FIQ bypass
 In-Reply-To: <20170309095539.14512-1-marc.zyngier@arm.com>
 References: <20170309095539.14512-1-marc.zyngier@arm.com>
-Message-ID: <20170309095539.14512-2-marc.zyngier@arm.com>
+Message-ID: <20170309095539.14512-3-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When invalidating guest TLBs, special care must be taken to
-actually shoot the guest TLBs and not the host ones if we're
-running on a VHE system.  This is controlled by the HCR_EL2.TGE
-bit, which we forget to clear before invalidating TLBs.
+Our GICv3 emulation always presents ICC_SRE_EL1 with DIB/DFB set to
+zero, which implies that there is a way to bypass the GIC and
+inject raw IRQ/FIQ by driving the CPU pins.
 
-Address the issue by introducing two wrappers (__tlb_switch_to_guest
-and __tlb_switch_to_host) that take care of both the VTTBR_EL2
-and HCR_EL2.TGE switching.
+Of course, we don't allow that when the GIC is configured, but
+we fail to indicate that to the guest. The obvious fix is to
+set these bits (and never let them being changed again).
 
-Reported-by: Tomasz Nowicki <tnowicki@caviumnetworks.com>
-Tested-by: Tomasz Nowicki <tnowicki@caviumnetworks.com>
-Reviewed-by: Christoffer Dall <cdall@linaro.org>
-Cc: stable at vger.kernel.org
+Reported-by: Peter Maydell <peter.maydell@linaro.org>
+Acked-by: Christoffer Dall <cdall@linaro.org>
+Reviewed-by: Eric Auger <eric.auger@redhat.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/kvm/hyp/tlb.c | 64 +++++++++++++++++++++++++++++++++++++++++-------
- 1 file changed, 55 insertions(+), 9 deletions(-)
+ include/linux/irqchip/arm-gic-v3.h | 2 ++
+ virt/kvm/arm/vgic/vgic-v3.c        | 5 ++++-
+ 2 files changed, 6 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/kvm/hyp/tlb.c b/arch/arm64/kvm/hyp/tlb.c
-index e8e7ba2bc11f..9e1d2b75eecd 100644
---- a/arch/arm64/kvm/hyp/tlb.c
-+++ b/arch/arm64/kvm/hyp/tlb.c
-@@ -18,14 +18,62 @@
- #include <asm/kvm_hyp.h>
- #include <asm/tlbflush.h>
+diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+index 672cfef72fc8..97cbca19430d 100644
+--- a/include/linux/irqchip/arm-gic-v3.h
++++ b/include/linux/irqchip/arm-gic-v3.h
+@@ -373,6 +373,8 @@
+ #define ICC_IGRPEN0_EL1_MASK		(1 << ICC_IGRPEN0_EL1_SHIFT)
+ #define ICC_IGRPEN1_EL1_SHIFT		0
+ #define ICC_IGRPEN1_EL1_MASK		(1 << ICC_IGRPEN1_EL1_SHIFT)
++#define ICC_SRE_EL1_DIB			(1U << 2)
++#define ICC_SRE_EL1_DFB			(1U << 1)
+ #define ICC_SRE_EL1_SRE			(1U << 0)
  
-+static void __hyp_text __tlb_switch_to_guest_vhe(struct kvm *kvm)
-+{
-+	u64 val;
-+
-+	/*
-+	 * With VHE enabled, we have HCR_EL2.{E2H,TGE} = {1,1}, and
-+	 * most TLB operations target EL2/EL0. In order to affect the
-+	 * guest TLBs (EL1/EL0), we need to change one of these two
-+	 * bits. Changing E2H is impossible (goodbye TTBR1_EL2), so
-+	 * let's flip TGE before executing the TLB operation.
-+	 */
-+	write_sysreg(kvm->arch.vttbr, vttbr_el2);
-+	val = read_sysreg(hcr_el2);
-+	val &= ~HCR_TGE;
-+	write_sysreg(val, hcr_el2);
-+	isb();
-+}
-+
-+static void __hyp_text __tlb_switch_to_guest_nvhe(struct kvm *kvm)
-+{
-+	write_sysreg(kvm->arch.vttbr, vttbr_el2);
-+	isb();
-+}
-+
-+static hyp_alternate_select(__tlb_switch_to_guest,
-+			    __tlb_switch_to_guest_nvhe,
-+			    __tlb_switch_to_guest_vhe,
-+			    ARM64_HAS_VIRT_HOST_EXTN);
-+
-+static void __hyp_text __tlb_switch_to_host_vhe(struct kvm *kvm)
-+{
-+	/*
-+	 * We're done with the TLB operation, let's restore the host's
-+	 * view of HCR_EL2.
-+	 */
-+	write_sysreg(0, vttbr_el2);
-+	write_sysreg(HCR_HOST_VHE_FLAGS, hcr_el2);
-+}
-+
-+static void __hyp_text __tlb_switch_to_host_nvhe(struct kvm *kvm)
-+{
-+	write_sysreg(0, vttbr_el2);
-+}
-+
-+static hyp_alternate_select(__tlb_switch_to_host,
-+			    __tlb_switch_to_host_nvhe,
-+			    __tlb_switch_to_host_vhe,
-+			    ARM64_HAS_VIRT_HOST_EXTN);
-+
- void __hyp_text __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
- {
- 	dsb(ishst);
- 
- 	/* Switch to requested VMID */
- 	kvm = kern_hyp_va(kvm);
--	write_sysreg(kvm->arch.vttbr, vttbr_el2);
--	isb();
-+	__tlb_switch_to_guest()(kvm);
- 
+ /*
+diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
+index edc6ee2dc852..be0f4c3e0142 100644
+--- a/virt/kvm/arm/vgic/vgic-v3.c
++++ b/virt/kvm/arm/vgic/vgic-v3.c
+@@ -229,10 +229,13 @@ void vgic_v3_enable(struct kvm_vcpu *vcpu)
  	/*
- 	 * We could do so much better if we had the VA as well.
-@@ -46,7 +94,7 @@ void __hyp_text __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
- 	dsb(ish);
- 	isb();
- 
--	write_sysreg(0, vttbr_el2);
-+	__tlb_switch_to_host()(kvm);
- }
- 
- void __hyp_text __kvm_tlb_flush_vmid(struct kvm *kvm)
-@@ -55,14 +103,13 @@ void __hyp_text __kvm_tlb_flush_vmid(struct kvm *kvm)
- 
- 	/* Switch to requested VMID */
- 	kvm = kern_hyp_va(kvm);
--	write_sysreg(kvm->arch.vttbr, vttbr_el2);
--	isb();
-+	__tlb_switch_to_guest()(kvm);
- 
- 	__tlbi(vmalls12e1is);
- 	dsb(ish);
- 	isb();
- 
--	write_sysreg(0, vttbr_el2);
-+	__tlb_switch_to_host()(kvm);
- }
- 
- void __hyp_text __kvm_tlb_flush_local_vmid(struct kvm_vcpu *vcpu)
-@@ -70,14 +117,13 @@ void __hyp_text __kvm_tlb_flush_local_vmid(struct kvm_vcpu *vcpu)
- 	struct kvm *kvm = kern_hyp_va(kern_hyp_va(vcpu)->kvm);
- 
- 	/* Switch to requested VMID */
--	write_sysreg(kvm->arch.vttbr, vttbr_el2);
--	isb();
-+	__tlb_switch_to_guest()(kvm);
- 
- 	__tlbi(vmalle1);
- 	dsb(nsh);
- 	isb();
- 
--	write_sysreg(0, vttbr_el2);
-+	__tlb_switch_to_host()(kvm);
- }
- 
- void __hyp_text __kvm_flush_vm_context(void)
+ 	 * If we are emulating a GICv3, we do it in an non-GICv2-compatible
+ 	 * way, so we force SRE to 1 to demonstrate this to the guest.
++	 * Also, we don't support any form of IRQ/FIQ bypass.
+ 	 * This goes with the spec allowing the value to be RAO/WI.
+ 	 */
+ 	if (vcpu->kvm->arch.vgic.vgic_model == KVM_DEV_TYPE_ARM_VGIC_V3) {
+-		vgic_v3->vgic_sre = ICC_SRE_EL1_SRE;
++		vgic_v3->vgic_sre = (ICC_SRE_EL1_DIB |
++				     ICC_SRE_EL1_DFB |
++				     ICC_SRE_EL1_SRE);
+ 		vcpu->arch.vgic_cpu.pendbaser = INITIAL_PENDBASER_VALUE;
+ 	} else {
+ 		vgic_v3->vgic_sre = 0;
 -- 
 2.11.0
