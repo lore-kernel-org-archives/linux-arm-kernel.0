@@ -1,51 +1,48 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 09 Mar 2017 08:01:56 +0000
-Subject: [PATCH v4 0/4] KVM: arm64: Increase number of user memslots
-In-Reply-To: <1488953315-22375-1-git-send-email-linucherian@gmail.com>
- (linucherian@gmail.com's message of "Wed, 8 Mar 2017 11:38:31 +0530")
-References: <1488953315-22375-1-git-send-email-linucherian@gmail.com>
-Message-ID: <87zigux4i3.fsf@on-the-bus.cambridge.arm.com>
+From: j-keerthy@ti.com (Keerthy)
+Date: Thu, 9 Mar 2017 13:35:54 +0530
+Subject: [PATCH v2 0/8] thermal: ti-soc-thermal: Migrate slope/offset data to
+ device tree
+Message-ID: <1489046762-11288-1-git-send-email-j-keerthy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 08 2017 at  6:08:31 am GMT, linucherian at gmail.com wrote:
-> From: Linu Cherian <linu.cherian@cavium.com>
->
-> v3 -> v4:
-> - Add missing commit messages in patches 1 and 3
->
-> v2 -> v3:
-> - Added documentation for KVM_CAP_NR_MEMSLOTS
-> - Removed KVM_PRIVATE_MEM_SLOTS which is unused
-> - KVM_USER_MEM_SLOTS changed to 512 from 508
->  
-> v1 -> v2:
-> - Enabling KVM_CAP_NR_MEMSLOTS for arm/arm64 moved to separate patch.
-> - Updated commit message so that what is reported to userspace is explicit.
->
->
-> Linu Cherian (4):
->   KVM: Add documentation for KVM_CAP_NR_MEMSLOTS
->   KVM: arm/arm64: Enable KVM_CAP_NR_MEMSLOTS on arm/arm64
->   KVM: arm/arm64: Remove KVM_PRIVATE_MEM_SLOTS definition that are
->     unused
->   KVM: arm64: Increase number of user memslots to 512
->
->  Documentation/virtual/kvm/api.txt | 4 ++++
->  arch/arm/include/asm/kvm_host.h   | 1 -
->  arch/arm/kvm/arm.c                | 3 +++
->  arch/arm64/include/asm/kvm_host.h | 3 +--
->  4 files changed, 8 insertions(+), 3 deletions(-)
+Currently the slope and offset values for calculating the
+hot spot temperature of a particular thermal zone is part
+of driver data. Pass them here instead and obtain the values
+while of node parsing.
 
-For the whole series:
+Tested for the slope and constant values on DRA7-EVM, OMAP3-BEAGLE. 
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Changes in v2:
 
-Christoffer: if you're happy with this series, I'll take it as part of
-the next batch of fixes.
+  * Added OMAP3 changes along with DRA7/OMAP4/OMAP5.
 
-Thanks,
+Keerthy (8):
+  arm: dts: omap3: Add cpu_thermal zone
+  ARM: DRA7: Thermal: Add slope and offset values
+  ARM: OMAP5: Thermal: Add slope and offset values
+  ARM: OMAP443x: Thermal: Add slope and offset values
+  ARM: OMAP4460: Thermal: Add slope and offset values
+  thermal: ti-soc-thermal: Fetch slope and offset from DT
+  thermal: ti-soc-thermal: Remove redundant constants
+  thermal: ti-soc-thermal: Remove redundant code
 
-	M.
+ arch/arm/boot/dts/dra7.dtsi                        |  17 +++
+ arch/arm/boot/dts/omap3-cpu-thermal.dtsi           |  20 +++
+ arch/arm/boot/dts/omap34xx.dtsi                    |   8 +-
+ arch/arm/boot/dts/omap36xx.dtsi                    |   8 +-
+ arch/arm/boot/dts/omap443x.dtsi                    |   4 +
+ arch/arm/boot/dts/omap4460.dtsi                    |   4 +
+ arch/arm/boot/dts/omap5.dtsi                       |   9 ++
+ .../thermal/ti-soc-thermal/dra752-thermal-data.c   |  10 --
+ .../thermal/ti-soc-thermal/omap3-thermal-data.c    |   4 -
+ .../thermal/ti-soc-thermal/omap4-thermal-data.c    |   6 -
+ .../thermal/ti-soc-thermal/omap5-thermal-data.c    |   4 -
+ drivers/thermal/ti-soc-thermal/ti-bandgap.h        |   4 -
+ drivers/thermal/ti-soc-thermal/ti-thermal-common.c | 158 +--------------------
+ drivers/thermal/ti-soc-thermal/ti-thermal.h        |  16 ---
+ 14 files changed, 71 insertions(+), 201 deletions(-)
+ create mode 100644 arch/arm/boot/dts/omap3-cpu-thermal.dtsi
+
 -- 
-Jazz is not dead, it just smell funny.
+1.9.1
