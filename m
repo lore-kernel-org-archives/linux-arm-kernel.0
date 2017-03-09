@@ -1,65 +1,103 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 9 Mar 2017 11:58:00 +0100
-Subject: [PATCH 10/15] drm/sun4i: tcon: Switch mux on only for composite
-In-Reply-To: <CAGb2v67iTOV-=u5rReu6_wi6NFoCoJkbJKshTpmFYUmJ=ggKUw@mail.gmail.com>
+Date: Thu, 9 Mar 2017 11:59:34 +0100
+Subject: [linux-sunxi] [PATCH 14/15] ARM: sun5i: a10s: Add the HDMI
+ controller node
+In-Reply-To: <CAGb2v64KKp0cYB3u0=bSVcq0gB41LkurCeiTJ3OEzn7UjdSPpQ@mail.gmail.com>
 References: <cover.bc06ffa88f847ddd9ddd7c259415d5f61b55307b.1488876832.git-series.maxime.ripard@free-electrons.com>
- <3f70bcfe2ec03188c06d54a262d49ad91963a510.1488876832.git-series.maxime.ripard@free-electrons.com>
- <CAGb2v67iTOV-=u5rReu6_wi6NFoCoJkbJKshTpmFYUmJ=ggKUw@mail.gmail.com>
-Message-ID: <20170309105800.mnzhvnky6na7d5vn@lukather>
+ <61406c0ba992f2fa5b5180b790a1ef3fa38d9567.1488876832.git-series.maxime.ripard@free-electrons.com>
+ <CAGb2v64KKp0cYB3u0=bSVcq0gB41LkurCeiTJ3OEzn7UjdSPpQ@mail.gmail.com>
+Message-ID: <20170309105934.ahsussan6p36lrzn@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 08, 2017 at 11:51:39AM +0800, Chen-Yu Tsai wrote:
+1;4601;0c
+On Wed, Mar 08, 2017 at 11:35:39AM +0800, Chen-Yu Tsai wrote:
+> Hi,
+> 
 > On Tue, Mar 7, 2017 at 4:56 PM, Maxime Ripard
 > <maxime.ripard@free-electrons.com> wrote:
-> > Even though that mux is undocumented, it seems like it needs to be set to 1
-> > when using composite, and 0 when using HDMI.
+> > The A10s has an HDMI controller connected to the second TCON channel. Add
+> > it to our DT.
 > >
 > > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 > > ---
-> >  drivers/gpu/drm/sun4i/sun4i_tcon.c | 7 ++++++-
-> >  1 file changed, 6 insertions(+), 1 deletion(-)
+> >  arch/arm/boot/dts/sun5i-a10s.dtsi | 34 ++++++++++++++++++++++++++++++++-
+> >  arch/arm/boot/dts/sun5i.dtsi      |  1 +-
+> >  2 files changed, 35 insertions(+), 0 deletions(-)
 > >
-> > diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> > index d2335f109601..93249c5ab1e4 100644
-> > --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> > +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> > @@ -268,11 +268,16 @@ void sun4i_tcon1_mode_set(struct sun4i_tcon *tcon, struct drm_encoder *encoder,
-> >                            SUN4I_TCON_GCTL_IOMAP_MASK,
-> >                            SUN4I_TCON_GCTL_IOMAP_TCON1);
+> > diff --git a/arch/arm/boot/dts/sun5i-a10s.dtsi b/arch/arm/boot/dts/sun5i-a10s.dtsi
+> > index 074485782a4a..3482c9d2b120 100644
+> > --- a/arch/arm/boot/dts/sun5i-a10s.dtsi
+> > +++ b/arch/arm/boot/dts/sun5i-a10s.dtsi
+> > @@ -72,7 +72,33 @@
+> >                 };
+> >         };
 > >
-> > +       if (encoder->encoder_type == DRM_MODE_ENCODER_TVDAC)
-> > +               val = 1;
-> > +       else
-> > +               val = 0;
+> > +       display-engine {
+> > +               compatible = "allwinner,sun5i-a10s-display-engine",
+> > +                            "allwinner,sun5i-a13-display-engine";
+> > +               allwinner,pipelines = <&fe0>;
+> > +       };
 > > +
-> >         /*
-> >          * FIXME: Undocumented bits
-> >          */
-> >         if (tcon->quirks->has_unknown_mux)
-> > -               regmap_write(tcon->regs, SUN4I_TCON_MUX_CTRL_REG, 1);
-> > +               regmap_write(tcon->regs, SUN4I_TCON_MUX_CTRL_REG, val);
+> >         soc at 01c00000 {
+> > +               hdmi0: hdmi at 01c16000 {
 > 
-> We might want to do this the other way around, i.e. exporting
+> Nit: is the 0 suffix needed? I don't see any indication that there is
+> a second controller.
 > 
->     int sun4i_tcon_mux_set(struct drm_device *drm, int encoder_type,
->                            int pipeline)
+> > +                       compatible = "allwinner,sun5i-a10s-hdmi";
+> > +                       reg = <0x01c16000 0x1000>;
+> > +                       clocks = <&ccu CLK_AHB_HDMI>, <&ccu CLK_HDMI>,
+> > +                                <&ccu CLK_PLL_VIDEO0_2X>,
+> > +                                <&ccu CLK_PLL_VIDEO1_2X>;
+> > +                       clock-names = "ahb", "mod", "pll-0", "pll-1";
+> > +                       status = "disabled";
+> > +
+> > +                       port {
+> > +                               #address-cells = <1>;
+> > +                               #size-cells = <0>;
+> > +
+> > +                               hdmi0_in_tcon0: endpoint at 0 {
+> > +                                       reg = <0>;
+> > +                                       remote-endpoint = <&tcon0_out_hdmi0>;
+> > +                               };
+> > +                       };
+> > +               };
+> > +
+> >                 pwm: pwm at 01c20e00 {
+> >                         compatible = "allwinner,sun5i-a10s-pwm";
+> >                         reg = <0x01c20e00 0xc>;
+> > @@ -129,3 +155,11 @@
+> >
+> >  &sram_a {
+> >  };
+> > +
+> > +&tcon0_out {
+> > +       tcon0_out_hdmi0: endpoint at 2 {
+> > +               reg = <2>;
+> > +               remote-endpoint = <&hdmi0_in_tcon0>;
+> > +               allwinner,tcon-channel = <1>;
+> > +       };
+> > +};
+> > diff --git a/arch/arm/boot/dts/sun5i.dtsi b/arch/arm/boot/dts/sun5i.dtsi
+> > index f3b6e19244f9..3d009b2aa42a 100644
+> > --- a/arch/arm/boot/dts/sun5i.dtsi
+> > +++ b/arch/arm/boot/dts/sun5i.dtsi
+> > @@ -273,6 +273,7 @@
+> >                                         tcon0_out_tve0: endpoint at 1 {
+> >                                                 reg = <1>;
+> >                                                 remote-endpoint = <&tve0_in_tcon0>;
+> > +                                               allwinner,tcon-channel = <1>;
 > 
-> and have downstream encoders call it. For the A31, the mux is not exclusively
-> used for channel 1; there is a mux setting for MIPI DSI as well, but AFAIK
-> DSI is connected to channel 0.
+> This looks like a separate patch, probably following the binding
+> change?
 
-We could make it part of sun4i_tcon_channel_enable too, though. What
-do you think?
+I don't know, the binding says that without anything specified, reg
+would be used. I was assuming that we only needed it once we had the
+new endpoint to make it consistent, therefore it didn't need an extra
+patch.
 
-> Additionally, the mux registers are only valid in the first TCON, meaning
-> it must available be active in 2 pipeline chips. It's also why we'd pass
-> "struct drm_device *" instead of "struct sun4i_tcon *".
-
-Hmmmm. That's going to be tricky to support. Has this been confirmed
-somehow? Is the register used for something else on TCON1?
-
-Thanks,
+But I can definitely create one if you want.
 Maxime
 
 -- 
@@ -72,4 +110,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170309/1751d012/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170309/5e9389e8/attachment.sig>
