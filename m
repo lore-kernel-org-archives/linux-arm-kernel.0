@@ -1,55 +1,197 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Thu,  9 Mar 2017 13:53:45 +0100
-Subject: [PATCH v3 1/3] clk: meson-gxbb: Add MALI clock IDS
+Date: Thu,  9 Mar 2017 13:53:46 +0100
+Subject: [PATCH v3 2/3] clk: meson-gxbb: Add MALI clocks
 In-Reply-To: <1489064027-18004-1-git-send-email-narmstrong@baylibre.com>
 References: <1489064027-18004-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1489064027-18004-2-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1489064027-18004-3-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add missing MALI clock IDs and expose the muxes and gates in the dt-bindings.
+The Mali is clocked by two identical clock paths behind a glitch free mux
+to safely change frequency while running.
+
+The two "mali_0" and "mali_1" clocks are composed of a mux, divider and gate.
+Expose these two clocks trees using generic clocks.
+Finally the glitch free mux is added as "mali" clock.
 
 Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 ---
- drivers/clk/meson/gxbb.h              | 9 ++++++++-
- include/dt-bindings/clock/gxbb-clkc.h | 5 +++++
- 2 files changed, 13 insertions(+), 1 deletion(-)
+ drivers/clk/meson/gxbb.c | 139 +++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 139 insertions(+)
 
-diff --git a/drivers/clk/meson/gxbb.h b/drivers/clk/meson/gxbb.h
-index 274f587..73efdc3 100644
---- a/drivers/clk/meson/gxbb.h
-+++ b/drivers/clk/meson/gxbb.h
-@@ -268,8 +268,15 @@
- /* CLKID_SAR_ADC_CLK */
- /* CLKID_SAR_ADC_SEL */
- #define CLKID_SAR_ADC_DIV	  99
-+/* CLKID_MALI_0_SEL */
-+#define CLKID_MALI_0_DIV	 101
-+/* CLKID_MALI_0	*/
-+/* CLKID_MALI_1_SEL */
-+#define CLKID_MALI_1_DIV	 104
-+/* CLKID_MALI_1	*/
-+/* CLKID_MALI	*/
+diff --git a/drivers/clk/meson/gxbb.c b/drivers/clk/meson/gxbb.c
+index 5059c7b..d9f7fef 100644
+--- a/drivers/clk/meson/gxbb.c
++++ b/drivers/clk/meson/gxbb.c
+@@ -634,6 +634,131 @@
+ 	},
+ };
  
--#define NR_CLKS			  100
-+#define NR_CLKS			  107
++/*
++ * The MALI IP is clocked by two identical clocks (mali_0 and mali_1)
++ * muxed by a glitch-free switch.
++ */
++
++static u32 mux_table_mali_0_1[] = {0, 1, 2, 3, 4, 5, 6, 7};
++static const char *gxbb_mali_0_1_parent_names[] = {
++	"xtal", "gp0_pll", "mpll2", "mpll1", "fclk_div7",
++	"fclk_div4", "fclk_div3", "fclk_div5"
++};
++
++static struct clk_mux gxbb_mali_0_sel = {
++	.reg = (void *)HHI_MALI_CLK_CNTL,
++	.mask = 0x7,
++	.shift = 9,
++	.table = mux_table_mali_0_1,
++	.lock = &clk_lock,
++	.hw.init = &(struct clk_init_data){
++		.name = "mali_0_sel",
++		.ops = &clk_mux_ops,
++		/*
++		 * bits 10:9 selects from 8 possible parents:
++		 * xtal, gp0_pll, mpll2, mpll1, fclk_div7,
++		 * fclk_div4, fclk_div3, fclk_div5
++		 */
++		.parent_names = gxbb_mali_0_1_parent_names,
++		.num_parents = 8,
++		.flags = (CLK_SET_RATE_NO_REPARENT | CLK_IGNORE_UNUSED),
++	},
++};
++
++static struct clk_divider gxbb_mali_0_div = {
++	.reg = (void *)HHI_MALI_CLK_CNTL,
++	.shift = 0,
++	.width = 7,
++	.lock = &clk_lock,
++	.hw.init = &(struct clk_init_data){
++		.name = "mali_0_div",
++		.ops = &clk_divider_ops,
++		.parent_names = (const char *[]){ "mali_0_sel" },
++		.num_parents = 1,
++		.flags = (CLK_SET_RATE_NO_REPARENT | CLK_IGNORE_UNUSED),
++	},
++};
++
++static struct clk_gate gxbb_mali_0 = {
++	.reg = (void *)HHI_MALI_CLK_CNTL,
++	.bit_idx = 8,
++	.lock = &clk_lock,
++	.hw.init = &(struct clk_init_data){
++		.name = "mali_0",
++		.ops = &clk_gate_ops,
++		.parent_names = (const char *[]){ "mali_0_div" },
++		.num_parents = 1,
++		.flags = (CLK_SET_RATE_PARENT | CLK_IGNORE_UNUSED),
++	},
++};
++
++static struct clk_mux gxbb_mali_1_sel = {
++	.reg = (void *)HHI_MALI_CLK_CNTL,
++	.mask = 0x7,
++	.shift = 25,
++	.table = mux_table_mali_0_1,
++	.lock = &clk_lock,
++	.hw.init = &(struct clk_init_data){
++		.name = "mali_1_sel",
++		.ops = &clk_mux_ops,
++		/*
++		 * bits 10:9 selects from 8 possible parents:
++		 * xtal, gp0_pll, mpll2, mpll1, fclk_div7,
++		 * fclk_div4, fclk_div3, fclk_div5
++		 */
++		.parent_names = gxbb_mali_0_1_parent_names,
++		.num_parents = 8,
++		.flags = (CLK_SET_RATE_NO_REPARENT | CLK_IGNORE_UNUSED),
++	},
++};
++
++static struct clk_divider gxbb_mali_1_div = {
++	.reg = (void *)HHI_MALI_CLK_CNTL,
++	.shift = 16,
++	.width = 7,
++	.lock = &clk_lock,
++	.hw.init = &(struct clk_init_data){
++		.name = "mali_1_div",
++		.ops = &clk_divider_ops,
++		.parent_names = (const char *[]){ "mali_1_sel" },
++		.num_parents = 1,
++		.flags = (CLK_SET_RATE_NO_REPARENT | CLK_IGNORE_UNUSED),
++	},
++};
++
++static struct clk_gate gxbb_mali_1 = {
++	.reg = (void *)HHI_MALI_CLK_CNTL,
++	.bit_idx = 24,
++	.lock = &clk_lock,
++	.hw.init = &(struct clk_init_data){
++		.name = "mali_1",
++		.ops = &clk_gate_ops,
++		.parent_names = (const char *[]){ "mali_1_div" },
++		.num_parents = 1,
++		.flags = (CLK_SET_RATE_PARENT | CLK_IGNORE_UNUSED),
++	},
++};
++
++static u32 mux_table_mali[] = {0, 1};
++static const char *gxbb_mali_parent_names[] = {
++	"mali_0", "mali_1"
++};
++
++static struct clk_mux gxbb_mali = {
++	.reg = (void *)HHI_MALI_CLK_CNTL,
++	.mask = 1,
++	.shift = 31,
++	.table = mux_table_mali,
++	.lock = &clk_lock,
++	.hw.init = &(struct clk_init_data){
++		.name = "mali",
++		.ops = &clk_mux_ops,
++		.parent_names = gxbb_mali_parent_names,
++		.num_parents = 2,
++		.flags = (CLK_SET_RATE_NO_REPARENT | CLK_IGNORE_UNUSED),
++	},
++};
++
+ /* Everything Else (EE) domain gates */
+ static MESON_GATE(gxbb_ddr, HHI_GCLK_MPEG0, 0);
+ static MESON_GATE(gxbb_dos, HHI_GCLK_MPEG0, 1);
+@@ -827,6 +952,13 @@
+ 		[CLKID_SAR_ADC_CLK]	    = &gxbb_sar_adc_clk.hw,
+ 		[CLKID_SAR_ADC_SEL]	    = &gxbb_sar_adc_clk_sel.hw,
+ 		[CLKID_SAR_ADC_DIV]	    = &gxbb_sar_adc_clk_div.hw,
++		[CLKID_MALI_0_SEL]	    = &gxbb_mali_0_sel.hw,
++		[CLKID_MALI_0_DIV]	    = &gxbb_mali_0_div.hw,
++		[CLKID_MALI_0]		    = &gxbb_mali_0.hw,
++		[CLKID_MALI_1_SEL]	    = &gxbb_mali_1_sel.hw,
++		[CLKID_MALI_1_DIV]	    = &gxbb_mali_1_div.hw,
++		[CLKID_MALI_1]		    = &gxbb_mali_1.hw,
++		[CLKID_MALI]		    = &gxbb_mali.hw,
+ 	},
+ 	.num = NR_CLKS,
+ };
+@@ -930,16 +1062,23 @@
+ 	&gxbb_emmc_b,
+ 	&gxbb_emmc_c,
+ 	&gxbb_sar_adc_clk,
++	&gxbb_mali_0,
++	&gxbb_mali_1,
+ };
  
- /* include the CLKIDs that have been made part of the stable DT binding */
- #include <dt-bindings/clock/gxbb-clkc.h>
-diff --git a/include/dt-bindings/clock/gxbb-clkc.h b/include/dt-bindings/clock/gxbb-clkc.h
-index f08f06d..ef7d6b7 100644
---- a/include/dt-bindings/clock/gxbb-clkc.h
-+++ b/include/dt-bindings/clock/gxbb-clkc.h
-@@ -35,5 +35,10 @@
- #define CLKID_SD_EMMC_C		96
- #define CLKID_SAR_ADC_CLK	97
- #define CLKID_SAR_ADC_SEL	98
-+#define CLKID_MALI_0_SEL	100
-+#define CLKID_MALI_0		102
-+#define CLKID_MALI_1_SEL	103
-+#define CLKID_MALI_1		105
-+#define CLKID_MALI		106
+ static struct clk_mux *const gxbb_clk_muxes[] = {
+ 	&gxbb_mpeg_clk_sel,
+ 	&gxbb_sar_adc_clk_sel,
++	&gxbb_mali_0_sel,
++	&gxbb_mali_1_sel,
++	&gxbb_mali,
+ };
  
- #endif /* __GXBB_CLKC_H */
+ static struct clk_divider *const gxbb_clk_dividers[] = {
+ 	&gxbb_mpeg_clk_div,
+ 	&gxbb_sar_adc_clk_div,
++	&gxbb_mali_0_div,
++	&gxbb_mali_1_div,
+ };
+ 
+ static int gxbb_clkc_probe(struct platform_device *pdev)
 -- 
 1.9.1
