@@ -1,82 +1,91 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 9 Mar 2017 09:20:42 +0000
-Subject: [Question] devm_kmalloc() for DMA ?
-In-Reply-To: <CAK7LNARYbqmwgYftjZeBkWsETczLUWdeLoTZRugLUJos_eyWNQ@mail.gmail.com>
-References: <CAK7LNARbD262isY7yOgQKAcbWQHV+3dsoRjtu6S+qUpPr98qSQ@mail.gmail.com>
- <b7dd01e6-ddcd-a34a-c26c-05ce6ae4015a@arm.com>
- <CAK7LNAQ3FbicgoV1Q70T2gZQS0j1Z8LffXquSM=v6DYcHP_m4Q@mail.gmail.com>
- <fd2097a1-c9b5-e6ab-f3b3-04b432bda0a3@metafoo.de>
- <20170308195901.GD21222@n2100.armlinux.org.uk>
- <456e0515-b9d7-e1b6-fc25-a2ec5244d9db@metafoo.de>
- <20170308211900.GE21222@n2100.armlinux.org.uk>
- <d941e1cd-1803-ab8a-9dfc-f22650227465@metafoo.de>
- <CAK7LNARYbqmwgYftjZeBkWsETczLUWdeLoTZRugLUJos_eyWNQ@mail.gmail.com>
-Message-ID: <20170309092042.GH21222@n2100.armlinux.org.uk>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 9 Mar 2017 12:25:47 +0300
+Subject: [RESEND PATCH] arm: assabet_defconfig: disable IDE subsystem
+In-Reply-To: <a3161cfc-56f7-4577-c37f-3798cdb03713@ti.com>
+References: <1467991490-24895-1-git-send-email-b.zolnierkie@samsung.com>
+ <CGME20161212135537epcas5p440bbb93d40f0c41b3754635733b09879@epcas5p4.samsung.com>
+ <8ea5971a-338d-e8b9-6be8-8fe2658fc04d@ti.com> <1709119.SQyio4Ct6n@amdc3058>
+ <1fd840c5-b0bb-726b-6357-669977c4ae5f@ti.com>
+ <a3161cfc-56f7-4577-c37f-3798cdb03713@ti.com>
+Message-ID: <ab44a3c1-f078-4476-4583-de92ee68632c@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 09, 2017 at 12:25:07PM +0900, Masahiro Yamada wrote:
-> (c) Use kmalloc() and kfree().   (be careful for memory leak)
+Hello!
 
-This is quite simple.  For the first one, it doesn't seem that it's
-DMA'd into, so there's no need to use GFP_DMA.
+On 3/9/2017 11:39 AM, Sekhar Nori wrote:
 
--	/* allocate a temporary buffer for nand_scan_ident() */
--	denali->buf.buf = devm_kzalloc(denali->dev, PAGE_SIZE,
--					GFP_DMA | GFP_KERNEL);
--	if (!denali->buf.buf)
--		return -ENOMEM;
+>>> It took a while to get to it but here is the draft driver patch
+>>> against v4.11-rc1.  Please test.
+>>
+>> I tested this on DM6446 EVM. I was able to mount existing partitions on
+>> the hard disk and see that the directory listing looks good[1]. I will do
+>> more tests (including comparing performance with old driver) tomorrow. I
+>
+> I completed the tests I wanted to, including some read/write/data
+> integrity tests. Performance is same as before too.
+>
+> Tested-by: Sekhar Nori <nsekhar@ti.com>
+>
+> Here are the additional changes I did. These changes do not clash with
+> what I have already queued for v4.12. That said, its probably better if
+> I carry the platform pieces through my tree. Let me know how you want
+> to proceed.
+>
+> Thanks,
+> Sekhar
+>
+> ---8<---
+> diff --git a/arch/arm/configs/davinci_all_defconfig b/arch/arm/configs/davinci_all_defconfig
+> index b9a7cb98ffda..67db82999c06 100644
+> --- a/arch/arm/configs/davinci_all_defconfig
+> +++ b/arch/arm/configs/davinci_all_defconfig
+[...]
+> diff --git a/arch/arm/mach-davinci/board-dm644x-evm.c b/arch/arm/mach-davinci/board-dm644x-evm.c
+> index 023480b75244..60a1f23890cd 100644
+> --- a/arch/arm/mach-davinci/board-dm644x-evm.c
+> +++ b/arch/arm/mach-davinci/board-dm644x-evm.c
+> @@ -744,7 +744,7 @@ static int davinci_phy_fixup(struct phy_device *phydev)
+>  	return 0;
+>  }
+>
+> -#define HAS_ATA		IS_ENABLED(CONFIG_BLK_DEV_PALMCHIP_BK3710)
+> +#define HAS_ATA		IS_ENABLED(CONFIG_PATA_BK3710)
 
-...
+    I think it would be more correct to check for both libata and IDE drivers 
+here...
 
-+	denali->buf.buf = kzalloc(PAGE_SIZE, GFP_KERNEL);
-+	if (!denali->buf.buf)
-+		return -ENOMEM;
-+
-	/*
-	 * scan for NAND devices attached to the controller
-	 * this is the first stage in a two step process to register
-	 * with the nand subsystem
-	 */
-	ret = nand_scan_ident(mtd, denali->max_banks, NULL);
-+	kfree(denali->buf.buf);
-+
-	if (ret)
-		goto failed_req_irq;
+>  #define HAS_NOR		IS_ENABLED(CONFIG_MTD_PHYSMAP)
+>
+> diff --git a/arch/arm/mach-davinci/board-dm646x-evm.c b/arch/arm/mach-davinci/board-dm646x-evm.c
+> index f702d4fc8eb8..589f3c33c4a0 100644
+> --- a/arch/arm/mach-davinci/board-dm646x-evm.c
+> +++ b/arch/arm/mach-davinci/board-dm646x-evm.c
+> @@ -119,7 +119,7 @@ static struct platform_device davinci_nand_device = {
+>  	},
+>  };
+>
+> -#define HAS_ATA		IS_ENABLED(CONFIG_BLK_DEV_PALMCHIP_BK3710)
+> +#define HAS_ATA		IS_ENABLED(CONFIG_PATA_BK3710)
 
--	/* allocate the right size buffer now */
--	devm_kfree(denali->dev, denali->buf.buf);
+    And here...
 
-For the second one, I think the first thing to do is to move the
-dma_set_mask() to the very beginning of the probe function - if that
-fails, then we can't use DMA, and it's not something that requires
-any cleanup.
+>
+>  #ifdef CONFIG_I2C
+>  /* CPLD Register 0 bits to control ATA */
+> diff --git a/arch/arm/mach-davinci/board-neuros-osd2.c b/arch/arm/mach-davinci/board-neuros-osd2.c
+> index 0a7838852649..075e304ce7be 100644
+> --- a/arch/arm/mach-davinci/board-neuros-osd2.c
+> +++ b/arch/arm/mach-davinci/board-neuros-osd2.c
+> @@ -163,7 +163,7 @@ static struct davinci_mmc_config davinci_ntosd2_mmc_config = {
+>  	.wires		= 4,
+>  };
+>
+> -#define HAS_ATA		IS_ENABLED(CONFIG_BLK_DEV_PALMCHIP_BK3710)
+> +#define HAS_ATA		IS_ENABLED(CONFIG_PATA_BK3710)
 
-With that gone, convert the other devm_kzalloc() there for buf.buf to
-kzalloc(), and ensure that it's appropriately freed.  Note that this
-driver is _already_ buggy in that if:
+    And here...
 
-        } else if (mtd->oobsize < (denali->bbtskipbytes +
-                        ECC_8BITS * (mtd->writesize /
-                        ECC_SECTOR_SIZE))) {
-                pr_err("Your NAND chip OOB is not large enough to contain 8bit ECC correction codes");
-                goto failed_req_irq;
+[...]
 
-fails, or these:
-
-        ret = nand_scan_tail(mtd);
-        if (ret)
-                goto failed_req_irq;
-
-        ret = mtd_device_register(mtd, NULL, 0);
-        if (ret) {
-                dev_err(denali->dev, "Failed to register MTD: %d\n", ret);
-                goto failed_req_irq;
-        }
-
-it doesn't unmap the buffer.  So, the driver is already broken.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+MBR, Sergei
