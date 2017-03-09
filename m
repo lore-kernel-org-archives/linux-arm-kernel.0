@@ -1,112 +1,40 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 9 Mar 2017 12:25:46 +0000
-Subject: [PATCH] iommu/arm-smmu: Report smmu type in dmesg
-In-Reply-To: <20170309120206.GP16822@rric.localdomain>
-References: <20170306135833.21455-1-rrichter@cavium.com>
- <d055d4c2-4d06-caba-4d84-21c22718fe76@arm.com>
- <20170307140607.GY16822@rric.localdomain>
- <bdf70e78-5ffd-4458-f485-4a508705e3e6@arm.com>
- <20170309120206.GP16822@rric.localdomain>
-Message-ID: <56bfa59e-b387-90e8-c2cc-1628495bf2af@arm.com>
+From: afzal.mohd.ma@gmail.com (afzal mohammed)
+Date: Thu, 9 Mar 2017 18:16:40 +0530
+Subject: [PATCH v2 2/4] ARM: nommu: dynamic exception base address setting
+In-Reply-To: <7ab1dfbd-9240-4f4b-70e2-d09ffc1039de@uclinux.org>
+References: <314159a7-b664-1256-647d-c05880ad7710@uclinux.org>
+ <20170308162258.GA3515@afzalpc>
+ <7ab1dfbd-9240-4f4b-70e2-d09ffc1039de@uclinux.org>
+Message-ID: <20170309124640.GA8369@afzalpc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/03/17 12:02, Robert Richter wrote:
-> On 07.03.17 18:41:33, Robin Murphy wrote:
->> On 07/03/17 14:06, Robert Richter wrote:
->>> On 06.03.17 18:22:08, Robin Murphy wrote:
->>>> On 06/03/17 13:58, Robert Richter wrote:
->>>>> The ARM SMMU detection especially depends from system firmware. For
->>>>> better diagnostic, log the detected type in dmesg.
->>>>
->>>> This paragraph especially depends from grammar. I think.
->>>
->>> Thanks for the mail on you. :)
->>>
->>>>
->>>>> The smmu type's name is now stored in struct arm_smmu_type and ACPI
->>>>> code is modified to use that struct too. Rename ARM_SMMU_MATCH_DATA()
->>>>> macro to ARM_SMMU_TYPE() for better readability.
->>>>>
->>>>> Signed-off-by: Robert Richter <rrichter@cavium.com>
->>>>> ---
->>>>>  drivers/iommu/arm-smmu.c | 61 ++++++++++++++++++++++++------------------------
->>>>>  1 file changed, 30 insertions(+), 31 deletions(-)
->>>>
->>>> That seems a relatively invasive diffstat for the sake of printing a
->>>> string once at boot time to what I can only assume is a small audience
->>>> of firmware developers who find "cat
->>>> /sys/firmware/devicetree/base/iommu*/compatible" (or the ACPI
->>>> equivalent) too hard ;)
->>>
->>> Reading firmware data is not really a solution as you don't know what
->>> the driver is doing with it. The actual background of this patch is to
->>> be sure a certain workaround was enabled in the kernel. ARM's cpu
->>> errata framework does this nicely. In case of smmus we just have the
->>> internal model implementation type which is not visible in the logs.
->>> Right now, there is no way to figure that out without knowing fw
->>> specifics and kernel sources.
->>
->> Ah, now it starts to become clear. In that case, if we want to confirm
->> the presence of specific workarounds, we should actually _confirm the
->> presence of specific workarounds_. I'd have no complaint with e.g. this:
->>
->> -----8<-----
->> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
->> index f7411109670f..9e50a092632c 100644
->> --- a/drivers/iommu/arm-smmu.c
->> +++ b/drivers/iommu/arm-smmu.c
->> @@ -1934,6 +1934,8 @@ static int arm_smmu_device_cfg_probe(struct
->> arm_smmu_device *smmu)
->>                         atomic_add_return(smmu->num_context_banks,
->>                                           &cavium_smmu_context_count);
->>                 smmu->cavium_id_base -= smmu->num_context_banks;
->> +               dev_notice(smmu->dev, "\tusing ASID/VMID offset %u\n",
->> +                          smmu->cavium_id_base);
->>         }
->>
->>         /* ID2 */
->> ----->8-----
->>
->> and the equivalent for other things, if need be. If you just print "hey,
->> this is SMMU-x", the user is in fact no better off, since they would
->> then still have to go and look at the source for whatever kernel they're
->> running to find out which particular workarounds for SMMU-x bugs that
->> particular kernel implements.
-> 
-> I don't understand why you don't want to expose in some way the smmu
-> type. There are a lot of things that can go wrong, esp. with firmware,
-> to detect the proper smmu type.
+Hi,
 
-Because there is only one reason for which detecting the "proper SMMU
-type" matters - implementation-specific workarounds for areas in which a
-given hardware implementation deviates from the architecture assumed by
-the driver.
+On Thu, Mar 09, 2017 at 09:51:58AM +1000, Greg Ungerer wrote:
+> The patch below works too. Thanks for the quick response.
 
-OK, let's print the model name. Now, if I give you this:
+Thanks Greg for verifying
 
-[    0.475009] arm-smmu 2b500000.iommu: probing hardware configuration...
-[    0.481650] arm-smmu 2b500000.iommu: ARM MMU-401 r0p0 with:
-[    0.486436] arm-smmu 2b500000.iommu: 	stage 2 translation
-[    0.491925] arm-smmu 2b500000.iommu: 	coherent table walk
-[    0.497420] arm-smmu 2b500000.iommu: 	stream matching with 32
-register groups
-[    0.504678] arm-smmu 2b500000.iommu: 	4 context banks (4 stage-2 only)
-[    0.511312] arm-smmu 2b500000.iommu: 	Supported page sizes: 0x60211000
-[    0.517943] arm-smmu 2b500000.iommu: 	Stage-2: 40-bit IPA -> 40-bit PA
+Vladimir, would the diff like below okay ?
 
-please tell me which hardware problems this system has kernel
-workarounds in place for, and which it doesn't. If you want another
-hint, the version is 4.11.0-rc1+. Note the "+".
+Regards
+afzal
 
-Robin.
-
-> The above change is not a general solution too for reporting the
-> enablement of smmu errata workarounds. The check could be done
-> multiple times and in the fast path. For the particular problem the
-> above would work, but still some message on the type detected would be
-> fine. I could rework my patch in a way that .name is not permanently
-> stored in struct arm_smmu_device.
-> 
-> -Robert
-> 
+> > ---8<---
+> > diff --git a/arch/arm/mm/nommu.c b/arch/arm/mm/nommu.c
+> > index 3b5c7aaf9c76..081562f5436e 100644
+> > --- a/arch/arm/mm/nommu.c
+> > +++ b/arch/arm/mm/nommu.c
+> > @@ -303,7 +303,9 @@ static inline void set_vbar(unsigned long val)
+> >   */
+> >  static inline bool security_extensions_enabled(void)
+> >  {
+> > -	return !!cpuid_feature_extract(CPUID_EXT_PFR1, 4);
+> > +	if ((read_cpuid_id() & 0x000F0000) == 0x000F0000)
+> > +		return !!cpuid_feature_extract(CPUID_EXT_PFR1, 4);
+> > +	return 0;
+> >  }
+> >  
+> >  static unsigned long __init setup_vectors_base(void)
+> > 
