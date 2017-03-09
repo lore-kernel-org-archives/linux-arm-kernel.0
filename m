@@ -1,32 +1,36 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 9 Mar 2017 13:27:27 +0530
-Subject: [PATCH v3 16/23] PCI: Add device IDs for DRA74x and DRA72x
+Date: Thu, 9 Mar 2017 13:27:26 +0530
+Subject: [PATCH v3 15/23] dt-bindings: PCI: dra7xx: Add dt bindings to enable
+ unaligned access
 In-Reply-To: <1489046254-19919-1-git-send-email-kishon@ti.com>
 References: <1489046254-19919-1-git-send-email-kishon@ti.com>
-Message-ID: <1489046254-19919-17-git-send-email-kishon@ti.com>
+Message-ID: <1489046254-19919-16-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add device IDs for DRA74x and DRA72x devices. These devices have
-configurable PCI endpoint.
+Update device tree binding documentation of TI's dra7xx PCI
+controller to include property for enabling unaligned mem access.
 
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- include/linux/pci_ids.h |    2 ++
- 1 file changed, 2 insertions(+)
+ Documentation/devicetree/bindings/pci/ti-pci.txt |    5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/include/linux/pci_ids.h b/include/linux/pci_ids.h
-index a4f77fe..5f6b71d 100644
---- a/include/linux/pci_ids.h
-+++ b/include/linux/pci_ids.h
-@@ -862,6 +862,8 @@
- #define PCI_DEVICE_ID_TI_X620		0xac8d
- #define PCI_DEVICE_ID_TI_X420		0xac8e
- #define PCI_DEVICE_ID_TI_XX20_FM	0xac8f
-+#define PCI_DEVICE_ID_TI_DRA74x		0xb500
-+#define PCI_DEVICE_ID_TI_DRA72x		0xb501
+diff --git a/Documentation/devicetree/bindings/pci/ti-pci.txt b/Documentation/devicetree/bindings/pci/ti-pci.txt
+index 190828a..b69dd7d 100644
+--- a/Documentation/devicetree/bindings/pci/ti-pci.txt
++++ b/Documentation/devicetree/bindings/pci/ti-pci.txt
+@@ -39,6 +39,11 @@ DEVICE MODE
+  - interrupts : one interrupt entries must be specified for main interrupt.
+  - num-ib-windows : number of inbound address translation windows
+  - num-ob-windows : number of outbound address translation windows
++ - ti,syscon-unaligned-access: phandle to the syscon dt node. The 1st argument
++			       should contain the register offset within syscon
++			       and the 2nd argument should contain the bit field
++			       for setting the bit to enable unaligned
++			       access.
  
- #define PCI_VENDOR_ID_SONY		0x104d
- 
+ Optional Property:
+  - gpios : Should be added if a gpio line is required to drive PERST# line
 -- 
 1.7.9.5
