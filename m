@@ -1,138 +1,119 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 9 Mar 2017 13:41:24 +0530
-Subject: [PATCH for-4.11 1/2] Revert "phy: Add USB3 PHY support for
- Broadcom NSP SoC"
-In-Reply-To: <58BFF88F.8080008@ti.com>
-References: <20170208233023.31922-1-zajec5@gmail.com>
- <82b47a03-c41b-378b-2d7c-f263eff514a9@gmail.com>
- <1b66f9ab3a9efd1bd0817a114e5b9ec9@milecki.pl>
- <06b6461c-9f43-3482-352f-374490056e90@gmail.com>
- <b715c193196fb2de2b95cc3d15102e1b@milecki.pl>
- <b2bdc1a7-4e5c-a13e-0cda-c90759d7308c@gmail.com>
- <CAC3K-4o+ARP=_hg2XQszQh6v+ySpubyKRspCF38SLUUx4mXQDA@mail.gmail.com>
- <CACna6rwN2JpvDX3Lk9G3vP=YrWygUNkjsC_VRcQf+o38ZjXAfA@mail.gmail.com>
- <58BFF88F.8080008@ti.com>
-Message-ID: <58C10E2C.8080107@ti.com>
+From: mylene.josserand@free-electrons.com (Mylene Josserand)
+Date: Thu, 9 Mar 2017 09:20:54 +0100
+Subject: [PATCH 4/4] ASoC: sun8i-codec: Convert to use SND_SOC_DAPM_AIF_IN
+In-Reply-To: <CAGb2v64Q0LysCPq2SpoNSqpyWDzNQ_CDhNipOGjW43dfnDABpw@mail.gmail.com>
+References: <20170210094133.11382-1-mylene.josserand@free-electrons.com>
+ <20170210094133.11382-5-mylene.josserand@free-electrons.com>
+ <CAGb2v64Q0LysCPq2SpoNSqpyWDzNQ_CDhNipOGjW43dfnDABpw@mail.gmail.com>
+Message-ID: <21d377a3-8e9d-34fa-b5c7-da6456bf31e8@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Chen-Yu,
 
+Thank you for the review.
 
-On Wednesday 08 March 2017 05:56 PM, Kishon Vijay Abraham I wrote:
-> Hi Rafal,
-> 
-> On Wednesday 08 March 2017 05:43 PM, Rafa? Mi?ecki wrote:
->> On 10 February 2017 at 01:27, Jon Mason <jon.mason@broadcom.com> wrote:
->>> On Thu, Feb 9, 2017 at 2:18 PM, Florian Fainelli <f.fainelli@gmail.com>
->>> wrote:
->>>>
->>>> On 02/08/2017 11:21 PM, Rafa? Mi?ecki wrote:
->>>>> On 2017-02-09 00:44, Florian Fainelli wrote:
->>>>>> On 02/08/2017 03:39 PM, Rafa? Mi?ecki wrote:
->>>>>>> On 2017-02-09 00:32, Florian Fainelli wrote:
->>>>>>>> On 02/08/2017 03:30 PM, Rafa? Mi?ecki wrote:
->>>>>>>>> From: Rafa? Mi?ecki <rafal@milecki.pl>
->>>>>>>>>
->>>>>>>>> This reverts commit d7bc1a7d41bf ("phy: Add USB3 PHY support for
->>>>>>>>> Broadcom NSP SoC") as we already have driver for this PHY (shared
->>>>>>>>> by NS
->>>>>>>>> and NSP). It was added in commit e5666281d9ea ("phy: bcm-ns-usb3:
->>>>>>>>> new
->>>>>>>>> driver for USB 3.0 PHY on Northstar").
->>>>>>>>>
->>>>>>>>> Instead of adding separated driver & duplicating code we should
->>>>>>>>> work on
->>>>>>>>> improving existing (old) one. Thanks to work done by Broadcom we
->>>>>>>>> know
->>>>>>>>> there is MDIO bus we weren't aware of & we know register names which
->>>>>>>>> makes initialization more clear. This is very valuable info and we
->>>>>>>>> should work on using it in existing driver afterwards.
->>>>>>>>
->>>>>>>> Should not we first extend the old driver to support NSP and then
->>>>>>>> revert
->>>>>>>> d7bc1a7d41bf ("phy: Add USB3 PHY support for Broadcom NSP SoC")?
->>>>>>>
->>>>>>> Sounds like a weird / dirty development method to me: adding
->>>>>>> duplicated
->>>>>>> code
->>>>>>> first then working on cleaning it. Unless you mean drivers/staging/.
->>>>>>
->>>>>> There was clearly a mistake in submitting this NSP USB PHY driver, and
->>>>>> it should have been a patch against the existing NS USB PHY driver, but
->>>>>> it was not, okay fair enough.
->>>>>>
->>>>>> It's one thing to address that in the future, and it's another thing to
->>>>>> flat out revert the driver just because you don't like the duplication.
->>>>>>
->>>>>> I don't like that either, and we can discuss on how to improve things
->>>>>> (like have the maintainer review that too), but duplication is a lesser
->>>>>> evil than not having the hardware supported at all, and even more so,
->>>>>> purposely reverting in the name of removing that duplication, that's
->>>>>> intentionally breaking working hardware!
->>>>>
->>>>> Hardware support is not excuse and I don't think it ever was in the
->>>>> Linux.
->>>>>
->>>>> We don't accept badly designed drivers just because they provide new hw
->>>>> support.
->>>>> We have various standards (for quality, style, design, code) at kernel
->>>>> and we
->>>>> stick to them unless it's drivers/staging/. As you said this driver
->>>>> shouldn't be
->>>>> pushed in the first place.
->>>>>
->>>>> Dropping hardware support in kernel happens. Sometimes it's about
->>>>> ancient
->>>>> devices, sometimes about code quality (some forgotten staging drivers
->>>>> used to be
->>>>> dropped AFAIK).
->>>>>
->>>>> Additionally you're talking about support that was *just* added and
->>>>> isn't used
->>>>> by anyone in the wild world yet.
->>>>
->>>> Except people working on it at Broadcom, but fair enough.
->>>>
->>>>>
->>>>> This hardware was missing upstream support for 4 years so 2 extra months
->>>>> won't
->>>>> really hurt anyone.
->>>>>
->>>>> I really don't see excusee or need for keeping this driver.
->>>>>
->>>>> If you want to (and you feel it's well designed), we can keep
->>>>> brcm,nsp-usb3-phy.txt
->>>>
->>>> No it's fine, let's drop it all and replace it with whatever you and Jon
->>>> come up with next.
->>>>
->>>>>
->>>>> I vote for focusing on existing driver improvements instead of looking
->>>>> for
->>>>> excuses for keeping driver that shouldn't be added in the first place.
->>>>> Jon seems to be already working on this, I'm willing to help him, I'm
->>>>> sure we
->>>>> can get you a proper support for the next merge window.
->>>>
->>>> Fair enough, I dropped Dhanajay's changes ("ARM: dts: NSP: Add USB nodes
->>>> for Northstar Plus") from devicetree/next so you and Jon can figure out
->>>> what is the best thing to move forward and we minimize the amount of
->>>> incompatible DT stuff to be sorted out later on. So as far as I am
->>>> concerned, there are no board/SoC DTS changes to be patched later on, we
->>>> could re-apply this patch as-is, or we could have to define a new binding.
->>>
->>> Per the discussion with Rafal, this is acceptable
->>>
->>> Acked-by: Jon Mason <jon.mason@broadcom.com>
+On 06/03/2017 10:56, Chen-Yu Tsai wrote:
+> On Fri, Feb 10, 2017 at 5:41 PM, Myl?ne Josserand
+> <mylene.josserand@free-electrons.com> wrote:
+>> Update the driver to use SND_SOC_DAPM_AIF_IN instead of
+>> SND_SOC_DAPM_DAC.
 >>
->> Hi Kishon, what's the status of this?
-> 
-> Will be merging this in a day or so.
+>> Set the route names so it must be updated on the device tree too.
+>>
+>> Signed-off-by: Myl?ne Josserand <mylene.josserand@free-electrons.com>
+>> ---
+>>  arch/arm/boot/dts/sun8i-a33.dtsi |  4 ++--
+>
+> This patch looks OK, but having the DTS changes in the same patch
+> probably isn't a good idea. I would really like to see this series
+> merged for 4.11, so we can expose a good mixer interface to userspace
+> during the first kernel release supporting the A33 codec. That likely
+> means some breakage between when the asoc bits and the dts bits land
+> though.
 
-merged, thanks.
+Yes, as it means some breakage, I did not know if 2 patches will be fine 
+or not.
 
--Kishon
-> 
-> Thanks
-> Kishon
-> 
+>
+> Maxime, any ideas?
+>
+
+I asked him directly and he agrees.
+
+It is fine for me so I will send a v2 with this patch split.
+
+Best regards,
+
+-- 
+Myl?ne Josserand, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+
+>
+> Regards
+> ChenYu
+>
+>>  sound/soc/sunxi/sun8i-codec.c    | 20 +++++++++++---------
+>>  2 files changed, 13 insertions(+), 11 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/sun8i-a33.dtsi b/arch/arm/boot/dts/sun8i-a33.dtsi
+>> index 4e34ec6613a0..e9e2e7312460 100644
+>> --- a/arch/arm/boot/dts/sun8i-a33.dtsi
+>> +++ b/arch/arm/boot/dts/sun8i-a33.dtsi
+>> @@ -78,8 +78,8 @@
+>>                 simple-audio-card,mclk-fs = <512>;
+>>                 simple-audio-card,aux-devs = <&codec_analog>;
+>>                 simple-audio-card,routing =
+>> -                       "Left DAC", "Digital Left DAC",
+>> -                       "Right DAC", "Digital Right DAC";
+>> +                       "Left DAC", "AIF1 Slot 0 Left",
+>> +                       "Right DAC", "AIF1 Slot 0 Right";
+>>                 status = "disabled";
+>>
+>>                 simple-audio-card,cpu {
+>> diff --git a/sound/soc/sunxi/sun8i-codec.c b/sound/soc/sunxi/sun8i-codec.c
+>> index a75a983974d9..9b15a5ee235f 100644
+>> --- a/sound/soc/sunxi/sun8i-codec.c
+>> +++ b/sound/soc/sunxi/sun8i-codec.c
+>> @@ -281,11 +281,13 @@ static const struct snd_soc_dapm_widget sun8i_codec_dapm_widgets[] = {
+>>         SND_SOC_DAPM_SUPPLY("DAC", SUN8I_DAC_DIG_CTRL, SUN8I_DAC_DIG_CTRL_ENDA,
+>>                             0, NULL, 0),
+>>
+>> -       /* Analog DAC */
+>> -       SND_SOC_DAPM_DAC("Digital Left DAC", "Playback", SUN8I_AIF1_DACDAT_CTRL,
+>> -                        SUN8I_AIF1_DACDAT_CTRL_AIF1_DA0L_ENA, 0),
+>> -       SND_SOC_DAPM_DAC("Digital Right DAC", "Playback", SUN8I_AIF1_DACDAT_CTRL,
+>> -                        SUN8I_AIF1_DACDAT_CTRL_AIF1_DA0R_ENA, 0),
+>> +       /* Analog DAC AIF */
+>> +       SND_SOC_DAPM_AIF_IN("AIF1 Slot 0 Left", "Playback", 0,
+>> +                           SUN8I_AIF1_DACDAT_CTRL,
+>> +                           SUN8I_AIF1_DACDAT_CTRL_AIF1_DA0L_ENA, 0),
+>> +       SND_SOC_DAPM_AIF_IN("AIF1 Slot 0 Right", "Playback", 0,
+>> +                           SUN8I_AIF1_DACDAT_CTRL,
+>> +                           SUN8I_AIF1_DACDAT_CTRL_AIF1_DA0R_ENA, 0),
+>>
+>>         /* DAC Mixers */
+>>         SOC_MIXER_ARRAY("Left Digital DAC Mixer", SND_SOC_NOPM, 0, 0,
+>> @@ -329,14 +331,14 @@ static const struct snd_soc_dapm_route sun8i_codec_dapm_routes[] = {
+>>         { "DAC", NULL, "MODCLK DAC" },
+>>
+>>         /* DAC Routes */
+>> -       { "Digital Left DAC", NULL, "DAC" },
+>> -       { "Digital Right DAC", NULL, "DAC" },
+>> +       { "AIF1 Slot 0 Right", NULL, "DAC" },
+>> +       { "AIF1 Slot 0 Left", NULL, "DAC" },
+>>
+>>         /* DAC Mixer Routes */
+>>         { "Left Digital DAC Mixer", "AIF1 Slot 0 Digital DAC Playback Switch",
+>> -         "Digital Left DAC"},
+>> +         "AIF1 Slot 0 Left"},
+>>         { "Right Digital DAC Mixer", "AIF1 Slot 0 Digital DAC Playback Switch ",
+>> -         "Digital Right DAC"},
+>> +         "AIF1 Slot 0 Right"},
+>>  };
+>>
+>>  static struct snd_soc_dai_ops sun8i_codec_dai_ops = {
+>> --
+>> 2.11.0
+>>
