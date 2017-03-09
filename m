@@ -1,42 +1,107 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 09 Mar 2017 15:52:23 +0000
-Subject: [PATCH 00/10] KVM/ARM fixes for 4.11-rc2
-In-Reply-To: <20170309151652.GA3210@potion> ("Radim
- \=\?utf-8\?B\?S3LEjW3DocWZ\?\=
- \=\?utf-8\?B\?Iidz\?\= message of "Thu,
- 9 Mar 2017 16:16:52 +0100")
-References: <20170309095539.14512-1-marc.zyngier@arm.com>
- <20170309151652.GA3210@potion>
-Message-ID: <87a88uwiq0.fsf@on-the-bus.cambridge.arm.com>
+From: thgarnie@google.com (Thomas Garnier)
+Date: Thu, 9 Mar 2017 07:52:30 -0800
+Subject: [PATCH v2 1/4] syscalls: Restore address limit after a syscall
+In-Reply-To: <20170309120955.GA6320@leverpostej>
+References: <20170309012456.5631-1-thgarnie@google.com>
+ <20170309120955.GA6320@leverpostej>
+Message-ID: <CAJcbSZHY5Et+EqjbQPx4KfgAiaYCo29vFfSbX2Aj=BZBg8i0Gg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 09 2017 at  3:16:52 pm GMT, Radim Kr?m?? <rkrcmar@redhat.com> wrote:
-> 2017-03-09 09:55+0000, Marc Zyngier:
->> Paolo, Radim,
->> 
->> Here's the KVM/ARM updates for 4.11-rc2. The usual bag of vgic
->> updates, making the memslot array large enough to handle guests with
->> tons of devices assigned to them, a tidying up of exception handling,
->> and a rather annoying TLB handling issue on VHE systems.
+On Thu, Mar 9, 2017 at 4:09 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+> Hi,
 >
-> Pulled, but what made you change the GPG key into a revoked one?
+> On Wed, Mar 08, 2017 at 05:24:53PM -0800, Thomas Garnier wrote:
+>> This patch ensures a syscall does not return to user-mode with a kernel
+>> address limit. If that happened, a process can corrupt kernel-mode
+>> memory and elevate privileges.
+>>
+>> For example, it would mitigation this bug:
+>>
+>> - https://bugs.chromium.org/p/project-zero/issues/detail?id=990
+>>
+>> If the CONFIG_BUG_ON_DATA_CORRUPTION option is enabled, an incorrect
+>> state will result in a BUG_ON.
+>>
+>> The CONFIG_ARCH_NO_SYSCALL_VERIFY_PRE_USERMODE_STATE option is also
+>> added so each architecture can optimize this change.
 >
->   # gpg: Signature made Thu 09 Mar 2017 10:36:07 AM CET
->   # gpg:                using RSA key AB309C74B93B1EA1
->   # gpg: Good signature from "Marc Zyngier <marc.zyngier@arm.com>"
->   # gpg: WARNING: This key has been revoked by its owner!
->   # gpg:          This could mean that the signature is forged.
->   # gpg: reason for revocation: Key has been compromised
->   # gpg: revocation comment: Revoked after kernel.org hacking
->   # Primary key fingerprint: 6958 C9F2 233C 5E9D 6CCA  818A AB30 9C74 B93B 1EA1
+>> +#ifndef CONFIG_ARCH_NO_SYSCALL_VERIFY_PRE_USERMODE_STATE
+>> +static inline bool has_user_ds(void) {
+>> +     bool ret = segment_eq(get_fs(), USER_DS);
+>> +     // Prevent re-ordering the call
+>> +     barrier();
+>
+> What ordering are we trying to ensure, that isn't otherwise given?
+>
+> We expect get_fs() and set_fs() to be ordered w.r.t. each other and
+> w.r.t. uaccess uses, or we'd need barriers all over the place.
+>
+> Given that, I can't see why we need a barrier here. So this needs a
+> better comment, at least.
+>
 
-Gahhh... New laptop, keyring restored from a backup containing the
-revoked key, gpg-agent picking the revoked key as a default, idiot
-sitting behind the keyboard not paying attention :-(. Now fixed.
+I was half sure of that so that's why I added the barrier. If it is
+not needed then I can remove it. Thanks!
 
-Sorry about that.
+>> +     return ret;
+>> +}
+>> +#else
+>> +static inline bool has_user_ds(void) {
+>> +     return false;
+>> +}
+>> +#endif
+>
+> It would be simpler to wrap the call entirely, e.g. have:
+>
+> #ifdef CONFIG_WHATEVER
+> static inline void verify_pre_usermode_state(void)
+> {
+>         if (segment_eq(get_fs(), USER_DS))
+>                 __verify_pre_usermode_state();
+> }
+> #else
+> static inline void verify_pre_usermode_state(void) { }
+> #endif
+>
+>> @@ -199,7 +215,10 @@ extern struct trace_event_functions exit_syscall_print_funcs;
+>>       asmlinkage long SyS##name(__MAP(x,__SC_LONG,__VA_ARGS__));      \
+>>       asmlinkage long SyS##name(__MAP(x,__SC_LONG,__VA_ARGS__))       \
+>>       {                                                               \
+>> +             bool user_caller = has_user_ds();                       \
+>>               long ret = SYSC##name(__MAP(x,__SC_CAST,__VA_ARGS__));  \
+>> +             if (user_caller)                                        \
+>> +                     verify_pre_usermode_state();                    \
+>
+> ... then we can unconditionally use verify_pre_usermode_state() here ...
 
-	M.
+Not sure I understood that point. The goal is to see if get_fs was
+changed, that's why I check before the syscall and I want to ensure
+the call is not shuffled after the syscall, therefore the original
+barrier.
+
+>
+>>               __MAP(x,__SC_TEST,__VA_ARGS__);                         \
+>>               __PROTECT(x, ret,__MAP(x,__SC_ARGS,__VA_ARGS__));       \
+>>               return ret;                                             \
+>
+> [...]
+>
+>> +/* Called before coming back to user-mode */
+>> +asmlinkage void verify_pre_usermode_state(void)
+>
+> ... and we just prepend a couple of underscores here.
+>
+>> +{
+>> +     if (CHECK_DATA_CORRUPTION(!segment_eq(get_fs(), USER_DS),
+>> +                               "incorrect get_fs() on user-mode return"))
+>> +             set_fs(USER_DS);
+>> +}
+>
+> Thanks,
+> Mark.
+
+
+
 -- 
-Jazz is not dead, it just smell funny.
+Thomas
