@@ -1,41 +1,45 @@
-From: romain.izard.pro@gmail.com (Romain Izard)
-Date: Thu,  9 Mar 2017 18:02:43 +0100
-Subject: [PATCH v1] usb: gadget: udc: atmel: Remove an unused local variable
-Message-ID: <20170309170243.27388-1-romain.izard.pro@gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 9 Mar 2017 20:05:46 +0300
+Subject: [PATCH 1/3] ata: add Palmchip BK3710 PATA controller driver
+In-Reply-To: <1489064496-6270-2-git-send-email-b.zolnierkie@samsung.com>
+References: <1489064496-6270-1-git-send-email-b.zolnierkie@samsung.com>
+ <CGME20170309130216epcas5p276d211cfa5ed9f87b11a73ebe6fcdc7c@epcas5p2.samsung.com>
+ <1489064496-6270-2-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <38ee4af3-b2cf-e9a8-1339-d7d904b7dc15@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The local variable ept_cfg is not used anymore in usba_ep_enable.
-Use ep->ept_cfg in the debug function to remove a warning when building
-with dynamic debug enabled.
+On 03/09/2017 04:01 PM, Bartlomiej Zolnierkiewicz wrote:
 
-Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
-Fixes: 741d2558bf0a ("usb: gadget: udc: atmel: Update endpoint allocation scheme")
----
- drivers/usb/gadget/udc/atmel_usba_udc.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+> Add Palmchip BK3710 PATA controller driver.
+>
+> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> ---
+>  drivers/ata/Kconfig       |   9 ++
+>  drivers/ata/Makefile      |   1 +
+>  drivers/ata/pata_bk3710.c | 395 ++++++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 405 insertions(+)
+>  create mode 100644 drivers/ata/pata_bk3710.c
+>
+> diff --git a/drivers/ata/Kconfig b/drivers/ata/Kconfig
+> index 7e0fc98..c23ee65 100644
+> --- a/drivers/ata/Kconfig
+> +++ b/drivers/ata/Kconfig
+> @@ -509,6 +509,15 @@ config PATA_BF54X
+>
+>  	  If unsure, say N.
+>
+> +config PATA_BK3710
+> +	tristate "Palmchip BK3710 PATA support"
+> +	depends on ARCH_DAVINCI
+> +	help
+> +	  This option enables support for the integrated IDE controller on
+> +	  the TI DaVinci SoC.
 
-diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.c b/drivers/usb/gadget/udc/atmel_usba_udc.c
-index 11bbce28bc23..2035906b8ced 100644
---- a/drivers/usb/gadget/udc/atmel_usba_udc.c
-+++ b/drivers/usb/gadget/udc/atmel_usba_udc.c
-@@ -610,7 +610,7 @@ usba_ep_enable(struct usb_ep *_ep, const struct usb_endpoint_descriptor *desc)
- {
- 	struct usba_ep *ep = to_usba_ep(_ep);
- 	struct usba_udc *udc = ep->udc;
--	unsigned long flags, ept_cfg, maxpacket;
-+	unsigned long flags, maxpacket;
- 	unsigned int nr_trans;
- 
- 	DBG(DBG_GADGET, "%s: ep_enable: desc=%p\n", ep->ep.name, desc);
-@@ -630,7 +630,7 @@ usba_ep_enable(struct usb_ep *_ep, const struct usb_endpoint_descriptor *desc)
- 	ep->is_in = 0;
- 
- 	DBG(DBG_ERR, "%s: EPT_CFG = 0x%lx (maxpacket = %lu)\n",
--			ep->ep.name, ept_cfg, maxpacket);
-+			ep->ep.name, ep->ept_cfg, maxpacket);
- 
- 	if (usb_endpoint_dir_in(desc)) {
- 		ep->is_in = 1;
--- 
-2.9.3
+    Strictly speaking, Palmchip BK3710 is Mentor Graphics' IDE core, used on 
+the original DaVinci's. Mentor's documentation was never publicly available 
+though...
+
+[...]
+
+MBR, Sergei
