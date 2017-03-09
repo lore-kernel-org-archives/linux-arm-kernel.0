@@ -1,167 +1,123 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu,  9 Mar 2017 18:05:32 +0800
-Subject: [PATCH 09/11] drm/sun4i: Support two display pipelines
+Date: Thu,  9 Mar 2017 18:05:31 +0800
+Subject: [PATCH 08/11] drm/sun4i: Fetch TCON ID from device tree
 In-Reply-To: <20170309100534.14023-1-wens@csie.org>
 References: <20170309100534.14023-1-wens@csie.org>
-Message-ID: <20170309100534.14023-10-wens@csie.org>
+Message-ID: <20170309100534.14023-9-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some Allwinner SoCs have two display pipelines (frontend -> backend ->
-tcon).
+Some Allwinner SoCs have 2 display pipelines, as in 2 of each
+components, including the frontend, backend, TCON, and any other
+extras.
 
-Previously we only supported one pipeline. This patch extends the
-current driver to support two. It extends the tcon and backend pointers
-in sun4i_drv into arrays, and makes the related bind functions store
-the pointer into said arrays based on the id fetched from the device
-tree. In the case of the tcons, it falls back to a first come order
-if no encoders that can be used for differentiating the tcons are
-defined. The driver's depth-first traversal of the of graph, coupled
-with the increasing address ordering of the of graph endpoints, and
-the fact that tcon0 should always be enabled for the tcon/encoder
-mux to be accessible, means that tcon1 would always come after tcon0.
+As the backend and TCON are always paired together and form the CRTC,
+we need to know which backend or TCON we are currently probing, so we
+can pair them when initializing the CRTC.
 
-Assignment of the device structure into sun4i_drv is moved to the end
-of the bind function, when all possible error checks have passed.
+This patch figures out the TCON's ID from the device tree and stores
+it in the TCON's data structure. It does this by looking at the "reg"
+property of any remote endpoints connected to the TCON's output port,
+except LCD panels or external bridges on the RGB interface.
 
-This patch also drops a trailing 0 in one of the backend probe messages.
+If none are found, it assumes the system only has 1 TCON.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- drivers/gpu/drm/sun4i/sun4i_backend.c |  9 +++++++--
- drivers/gpu/drm/sun4i/sun4i_drv.c     |  2 +-
- drivers/gpu/drm/sun4i/sun4i_drv.h     |  6 ++++--
- drivers/gpu/drm/sun4i/sun4i_tcon.c    | 25 +++++++++++++++++--------
- 4 files changed, 29 insertions(+), 13 deletions(-)
+ drivers/gpu/drm/sun4i/sun4i_tcon.c | 60 ++++++++++++++++++++++++++++++++++++++
+ drivers/gpu/drm/sun4i/sun4i_tcon.h |  2 ++
+ 2 files changed, 62 insertions(+)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
-index f3c92d54c8e4..8d22efd5a9cc 100644
---- a/drivers/gpu/drm/sun4i/sun4i_backend.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
-@@ -350,12 +350,15 @@ static int sun4i_backend_bind(struct device *dev, struct device *master,
- 	if (!backend)
- 		return -ENOMEM;
- 	dev_set_drvdata(dev, backend);
--	drv->backend = backend;
- 
- 	backend->id = sun4i_backend_of_get_id(dev->of_node);
- 	if (backend->id < 0)
- 		return backend->id;
- 
-+	/* We only support SUN4I_DRM_MAX_PIPELINES number of backends */
-+	if (backend->id >= SUN4I_DRM_MAX_PIPELINES)
-+		return -EINVAL;
-+
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	regs = devm_ioremap_resource(dev, res);
- 	if (IS_ERR(regs))
-@@ -364,7 +367,7 @@ static int sun4i_backend_bind(struct device *dev, struct device *master,
- 	backend->regs = devm_regmap_init_mmio(dev, regs,
- 					      &sun4i_backend_regmap_config);
- 	if (IS_ERR(backend->regs)) {
--		dev_err(dev, "Couldn't create the backend0 regmap\n");
-+		dev_err(dev, "Couldn't create the backend regmap\n");
- 		return PTR_ERR(backend->regs);
- 	}
- 
-@@ -413,6 +416,8 @@ static int sun4i_backend_bind(struct device *dev, struct device *master,
- 		}
- 	}
- 
-+	drv->backend[backend->id] = backend;
-+
- 	/* Reset the registers */
- 	for (i = 0x800; i < 0x1000; i += 4)
- 		regmap_write(backend->regs, i, 0);
-diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c b/drivers/gpu/drm/sun4i/sun4i_drv.c
-index 767bbadcc85d..c15ecb8343d7 100644
---- a/drivers/gpu/drm/sun4i/sun4i_drv.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
-@@ -271,7 +271,7 @@ static int sun4i_drv_probe(struct platform_device *pdev)
- 	struct device_node *np = pdev->dev.of_node;
- 	int i, count = 0;
- 
--	for (i = 0;; i++) {
-+	for (i = 0; i < SUN4I_DRM_MAX_PIPELINES; i++) {
- 		struct device_node *pipeline = of_parse_phandle(np,
- 								"allwinner,pipelines",
- 								i);
-diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.h b/drivers/gpu/drm/sun4i/sun4i_drv.h
-index 5df50126ff52..ec1c08af47e1 100644
---- a/drivers/gpu/drm/sun4i/sun4i_drv.h
-+++ b/drivers/gpu/drm/sun4i/sun4i_drv.h
-@@ -16,9 +16,11 @@
- #include <linux/clk.h>
- #include <linux/regmap.h>
- 
-+#define SUN4I_DRM_MAX_PIPELINES		2
-+
- struct sun4i_drv {
--	struct sun4i_backend	*backend;
--	struct sun4i_tcon	*tcon;
-+	struct sun4i_backend	*backend[SUN4I_DRM_MAX_PIPELINES];
-+	struct sun4i_tcon	*tcon[SUN4I_DRM_MAX_PIPELINES];
- 
- 	struct drm_fbdev_cma	*fbdev;
- };
 diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-index b774c9a50c55..7749c3133f38 100644
+index 3ced0b1cef6e..b774c9a50c55 100644
 --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
 +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-@@ -532,7 +532,6 @@ static int sun4i_tcon_bind(struct device *dev, struct device *master,
- 	if (!tcon)
- 		return -ENOMEM;
- 	dev_set_drvdata(dev, tcon);
--	drv->tcon = tcon;
- 	tcon->drm = drm;
+@@ -471,6 +471,55 @@ struct drm_bridge *sun4i_tcon_find_bridge(struct device_node *node)
+ 	return of_drm_find_bridge(remote) ?: ERR_PTR(-EPROBE_DEFER);
+ }
+ 
++/*
++ * The tcon can output video to an tv or hdmi encoder. When there are 2
++ * tcons, on older SoCs with DE 1.0, either tcon can be muxed to the
++ * encoder.
++ *
++ * This relationship within the display pipeline is encoded in the device
++ * tree with of_graph. Here we use it to figure out which tcon, if there
++ * are 2 or more, we are currently probing. The number would be in the
++ * "reg" property of the downstream input port endpoint.
++ */
++static int sun4i_tcon_of_get_id(struct device_node *node)
++{
++	struct device_node *port, *ep;
++	int ret = -EINVAL;
++
++	/* output is port 1 */
++	port = of_graph_get_port_by_id(node, 1);
++	if (!port)
++		return -EINVAL;
++
++	/* try finding a downstream endpoint */
++	for_each_available_child_of_node(port, ep) {
++		struct device_node *remote;
++		u32 reg;
++
++		ret = of_property_read_u32(ep, "reg", &reg);
++		if (ret)
++			continue;
++
++		/* Skip endpoint 0, the LCD panel interface */
++		if (!reg)
++			continue;
++
++		remote = of_parse_phandle(ep, "remote-endpoint", 0);
++		if (!remote)
++			continue;
++
++		ret = of_property_read_u32(remote, "reg", &reg);
++		if (ret)
++			continue;
++
++		ret = reg;
++	}
++
++	of_node_put(port);
++
++	return ret;
++}
++
+ static int sun4i_tcon_bind(struct device *dev, struct device *master,
+ 			   void *data)
+ {
+@@ -488,6 +537,17 @@ static int sun4i_tcon_bind(struct device *dev, struct device *master,
  	tcon->dev = dev;
  	tcon->quirks = of_device_get_match_data(dev);
-@@ -540,14 +539,22 @@ static int sun4i_tcon_bind(struct device *dev, struct device *master,
- 	/* This can fail if the DT does not have any downstream encoders. */
- 	tcon->id = sun4i_tcon_of_get_id(dev->of_node);
- 	if (tcon->id < 0) {
--		/*
--		 * TODO We currently support only 1 TCON, so we can
--		 * safely set this to 0. This should be revisited
--		 * when we add support for multiple pipelines.
--		 */
--		tcon->id = 0;
-+		int i;
-+
-+		/* find the first empty tcon in sun4i_drv */
-+		for (i = 0; i < SUN4I_DRM_MAX_PIPELINES; i++)
-+			if (!drv->tcon[i])
-+				tcon->id = i;
-+
-+		/* bail out if that failed */
-+		if (tcon->id < 0)
-+			return tcon->id;
- 	}
  
-+	/* We only support SUN4I_DRM_MAX_PIPELINES number of tcons */
-+	if (tcon->id >= SUN4I_DRM_MAX_PIPELINES)
-+		return -EINVAL;
++	/* This can fail if the DT does not have any downstream encoders. */
++	tcon->id = sun4i_tcon_of_get_id(dev->of_node);
++	if (tcon->id < 0) {
++		/*
++		 * TODO We currently support only 1 TCON, so we can
++		 * safely set this to 0. This should be revisited
++		 * when we add support for multiple pipelines.
++		 */
++		tcon->id = 0;
++	}
 +
  	tcon->lcd_rst = devm_reset_control_get(dev, "lcd");
  	if (IS_ERR(tcon->lcd_rst)) {
  		dev_err(dev, "Couldn't get our reset line\n");
-@@ -588,7 +595,7 @@ static int sun4i_tcon_bind(struct device *dev, struct device *master,
- 		goto err_free_dotclock;
- 	}
+diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.h b/drivers/gpu/drm/sun4i/sun4i_tcon.h
+index f636343a935d..28b8da1e6c18 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_tcon.h
++++ b/drivers/gpu/drm/sun4i/sun4i_tcon.h
+@@ -172,6 +172,8 @@ struct sun4i_tcon {
  
--	tcon->crtc = sun4i_crtc_init(drm, drv->backend, tcon);
-+	tcon->crtc = sun4i_crtc_init(drm, drv->backend[tcon->id], tcon);
- 	if (IS_ERR(tcon->crtc)) {
- 		dev_err(dev, "Couldn't create our CRTC\n");
- 		ret = PTR_ERR(tcon->crtc);
-@@ -599,6 +606,8 @@ static int sun4i_tcon_bind(struct device *dev, struct device *master,
- 	if (ret < 0)
- 		goto err_free_clocks;
- 
-+	drv->tcon[tcon->id] = tcon;
+ 	/* Associated crtc */
+ 	struct sun4i_crtc		*crtc;
 +
- 	return 0;
++	int				id;
+ };
  
- err_free_dotclock:
+ struct drm_bridge *sun4i_tcon_find_bridge(struct device_node *node);
 -- 
 2.11.0
