@@ -1,9 +1,9 @@
 From: j-keerthy@ti.com (Keerthy)
-Date: Thu, 9 Mar 2017 13:35:58 +0530
-Subject: [PATCH v2 4/8] ARM: OMAP443x: Thermal: Add slope and offset values
+Date: Thu, 9 Mar 2017 13:35:57 +0530
+Subject: [PATCH v2 3/8] ARM: OMAP5: Thermal: Add slope and offset values
 In-Reply-To: <1489046762-11288-1-git-send-email-j-keerthy@ti.com>
 References: <1489046762-11288-1-git-send-email-j-keerthy@ti.com>
-Message-ID: <1489046762-11288-5-git-send-email-j-keerthy@ti.com>
+Message-ID: <1489046762-11288-4-git-send-email-j-keerthy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,21 +14,28 @@ while of node parsing.
 
 Signed-off-by: Keerthy <j-keerthy@ti.com>
 ---
- arch/arm/boot/dts/omap443x.dtsi | 4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm/boot/dts/omap5.dtsi | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/arch/arm/boot/dts/omap443x.dtsi b/arch/arm/boot/dts/omap443x.dtsi
-index fc6a861..03c8ad9 100644
---- a/arch/arm/boot/dts/omap443x.dtsi
-+++ b/arch/arm/boot/dts/omap443x.dtsi
-@@ -71,4 +71,8 @@
+diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
+index 222155c..eaff2a5 100644
+--- a/arch/arm/boot/dts/omap5.dtsi
++++ b/arch/arm/boot/dts/omap5.dtsi
+@@ -1127,6 +1127,15 @@
  
+ &cpu_thermal {
+ 	polling-delay = <500>; /* milliseconds */
++	coefficients = <65 (-1791)>;
  };
  
-+&cpu_thermal {
-+	coefficients = <0 20000>;
+ /include/ "omap54xx-clocks.dtsi"
++
++&gpu_thermal {
++	coefficients = <117 (-2992)>;
 +};
 +
- /include/ "omap443x-clocks.dtsi"
++&core_thermal {
++	coefficients = <0 2000>;
++};
 -- 
 1.9.1
