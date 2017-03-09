@@ -1,82 +1,49 @@
-From: andy@greyhouse.net (Andy Gospodarek)
-Date: Thu,  9 Mar 2017 18:18:12 -0500
-Subject: [RFC arm64] samples/bpf: explicitly exclude sysreg sections with asm
- macros
-Message-ID: <1489101492-15653-1-git-send-email-andy@greyhouse.net>
+From: briannorris@chromium.org (Brian Norris)
+Date: Thu, 9 Mar 2017 15:28:54 -0800
+Subject: [PATCH v2 2/3] soc: rockchip: add driver handling grf setup
+In-Reply-To: <2206970.JAebETMOV6@phil>
+References: <20161115223900.30728-1-heiko@sntech.de> <7144543.znLMLUJXpB@phil>
+ <CAOesGMj_RdxVDzirT97KLkXRsyVcFh3Z8jZLNjn0ehAv0Qhmhg@mail.gmail.com>
+ <2206970.JAebETMOV6@phil>
+Message-ID: <20170309232852.GA15605@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The previous fix to workaround compilation issues for samples/bpf on arm64 was
-to prevent inclusion of code in sysregs.h.  This is not sustainable at this
-point since other header files need access to sysregs.h for multiple
-defintions.  The fact that the bpf samples cannot be compiled on arm64 is
-fairly well documented on the iovisor-dev mailing and other places without a
-clear-cut solution other than waiting for the llvm fix.  This attempts to
-resolve that by dropping the fix to define _ASM_SYSREG_H on the clang command
-line, and replace it with one that is wrapped around the offending code.  I
-recognize this feels a bit fragile, but the current situation is not great
-either and it seems that we are more likely to see users if the current code
-actually compiles and runs.
+To throw my unwanted 2-cents in:
 
-Despite now being able to compile and run bpf programs on arm64 there
-are still known warnings when building:
+On Mon, Feb 27, 2017 at 06:30:08AM +0100, Heiko Stuebner wrote:
+> Am Sonntag, 29. Januar 2017, 16:41:46 CET schrieb Olof Johansson:
+> > On Sun, Jan 29, 2017 at 3:36 PM, Heiko Stuebner <heiko@sntech.de> wrote:
+> > Or, if you're firmly deciding to keep updating kernel code for all
+> > SoCs, could also just add one platform quirk file in
+> > drivers/soc/rockchip with the postcore_initcall that matches toplevel
+> > compatible per SoC, finds the device node, maps the address range,
+> > sets the value.
+> > 
+> > That'll give you a place for other platform quirks, if they ever come
+> > up. In one place, even if the other quirks might be in other register
+> > ranges.
+> 
+> I would very much prefer going this route, as I really don't trust the GRF to 
+> keep conforming to any devicetree binding (or anything at all) and this way, 
+> stuff is completely reversable / redoable if the need arises (hopefully not) 
+> and we don't have to live with an inadequate bindings forever :-) .
 
-./include/net/sock.h:2322:35: warning: value size does not match
-register size specified by the constraint and modifier
-[-Wasm-operand-widths]
-        smp_store_release(&sk->sk_state, newstate);
-                                         ^
-./include/net/sock.h:2322:2: note: use constraint modifier "w"
-        smp_store_release(&sk->sk_state, newstate);
-        ^
-./include/asm-generic/barrier.h:157:33: note: expanded from macro
-                                ^
-./arch/arm64/include/asm/barrier.h:62:23: note: expanded from macro
-'__smp_store_release'
-                asm volatile ("stlr %1, %0"                     \
-                                    ^
-Discussed here: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=63359
+Agreed, FWIW (though I'm not sure why a top-level chip driver is better
+than a GRF driver). Rockchip's GRF is basically "designed" (that's
+probably not an accurate word) to need updating on every chip revision.
+I'm also not very confident in any given binding around it. DT bindings
+are notoriously hard to modify after they've been accepted, and I don't
+see much actual value in foolishly codifying every bit of GRF in the
+device tree bindings.
 
-Fixes: 30b50aa61201 ("bpf: samples: exclude asm/sysreg.h for arm64")
-Signed-off-by: Andy Gospodarek <gospo@broadcom.com>
----
- arch/arm64/include/asm/sysreg.h | 3 ++-
- samples/bpf/Makefile            | 2 +-
- 2 files changed, 3 insertions(+), 2 deletions(-)
+I think this pattern applies elsewhere too -- for instance, on the
+Type-C PHY controller [1], which currently defies the above and instead
+tries to list each GRF offset it needs in the DT; this is, IMO, quite
+unscalable. We're already nearly breaking backward compatibility, and
+we've only supported one SoC there!!
 
-diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-index ac24b6e..91ee2db 100644
---- a/arch/arm64/include/asm/sysreg.h
-+++ b/arch/arm64/include/asm/sysreg.h
-@@ -287,6 +287,7 @@
- #else
- 
- #include <linux/types.h>
-+#ifndef __AVOID_ASM_MACROS__
- 
- asm(
- "	.irp	num,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30\n"
-@@ -302,7 +303,7 @@ asm(
- 	__emit_inst(0xd5000000|(\\sreg)|(.L__reg_num_\\rt))
- "	.endm\n"
- );
--
-+#endif
- /*
-  * Unlike read_cpuid, calls to read_sysreg are never expected to be
-  * optimized away or replaced with synthetic values.
-diff --git a/samples/bpf/Makefile b/samples/bpf/Makefile
-index 09e9d53..fca2c13 100644
---- a/samples/bpf/Makefile
-+++ b/samples/bpf/Makefile
-@@ -178,7 +178,7 @@ $(src)/*.c: verify_target_bpf
- # useless for BPF samples.
- $(obj)/%.o: $(src)/%.c
- 	$(CLANG) $(NOSTDINC_FLAGS) $(LINUXINCLUDE) $(EXTRA_CFLAGS) \
--		-D__KERNEL__ -D__ASM_SYSREG_H -Wno-unused-value -Wno-pointer-sign \
-+		-D__KERNEL__ -D__AVOID_ASM_MACROS__ -Wno-unused-value -Wno-pointer-sign \
- 		-Wno-compare-distinct-pointer-types \
- 		-Wno-gnu-variable-sized-type-not-at-end \
- 		-Wno-address-of-packed-member -Wno-tautological-compare \
--- 
-2.7.4
+Brian
+
+[1] https://patchwork.kernel.org/patch/9566079/
+    [PATCH 3/4] phy: rockchip-typec: support DP phy switch
