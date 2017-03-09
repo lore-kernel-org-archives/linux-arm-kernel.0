@@ -1,44 +1,30 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 9 Mar 2017 15:55:39 +0100
-Subject: [linux-sunxi] Re: [PATCH 10/15] drm/sun4i: tcon: Switch mux on
- only for composite
-In-Reply-To: <CAGb2v67XkaC2+AxubaUF9nPcoGZcAzny7LKVD6C+-9BM5Fi+9g@mail.gmail.com>
-References: <cover.bc06ffa88f847ddd9ddd7c259415d5f61b55307b.1488876832.git-series.maxime.ripard@free-electrons.com>
- <3f70bcfe2ec03188c06d54a262d49ad91963a510.1488876832.git-series.maxime.ripard@free-electrons.com>
- <CAGb2v67iTOV-=u5rReu6_wi6NFoCoJkbJKshTpmFYUmJ=ggKUw@mail.gmail.com>
- <20170309105800.mnzhvnky6na7d5vn@lukather>
- <CAGb2v67XkaC2+AxubaUF9nPcoGZcAzny7LKVD6C+-9BM5Fi+9g@mail.gmail.com>
-Message-ID: <20170309145539.43eequth2ej7wvqk@lukather>
+From: peppe.cavallaro@st.com (Giuseppe CAVALLARO)
+Date: Thu, 9 Mar 2017 15:56:31 +0100
+Subject: stmmac still supporting spear600 ?
+In-Reply-To: <20170309103236.3e16304f@free-electrons.com>
+References: <20170309093412.33c0277d@free-electrons.com>
+ <373e2760-94c5-4349-33aa-158bc8f4b19e@st.com>
+ <20170309103236.3e16304f@free-electrons.com>
+Message-ID: <79049eda-5d37-6b70-8945-2d3ab55e56b8@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 09, 2017 at 07:31:27PM +0800, Chen-Yu Tsai wrote:
-> >> Additionally, the mux registers are only valid in the first TCON, meaning
-> >> it must available be active in 2 pipeline chips. It's also why we'd pass
-> >> "struct drm_device *" instead of "struct sun4i_tcon *".
-> >
-> > Hmmmm. That's going to be tricky to support. Has this been confirmed
-> > somehow? Is the register used for something else on TCON1?
-> 
-> At this point, the only reference is Allwinner's kernel, and the old 3.4
-> kernel for A10/A20. I could try getting HDMI working on the A31 to get
-> some real results.
-> 
-> FWIW, the registers do not seem to be aliased across the two TCONs.
+Hello Thomas
 
-Then maybe we don't need to care, and we can just always write to the
-mux?
+On 3/9/2017 10:32 AM, Thomas Petazzoni wrote:
 
-Maxime
+> OK, I'll have a look. However, I'm still confused by this DMA_RESET bit
+> that never clears, contrary to what the datasheet says. Are there some
+> erratas?
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170309/2f3b1816/attachment.sig>
+I suggest you to take a look at the tx/rx clocks from PHY.
+You have to provide these otherwise you cannot reset the engine.
+
+Best Regards
+Peppe
+
+>
+> Best regards,
+>
+> Thomas
+>
