@@ -1,75 +1,34 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 9 Mar 2017 17:51:17 +0000
-Subject: [PATCH v5 07/10] arm64/mmu: ignore debug_pagealloc for kernel
- segments
-In-Reply-To: <1489047912-642-8-git-send-email-ard.biesheuvel@linaro.org>
-References: <1489047912-642-1-git-send-email-ard.biesheuvel@linaro.org>
- <1489047912-642-8-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20170309175116.GD11966@leverpostej>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu,  9 Mar 2017 18:52:57 +0100
+Subject: [PATCH v4 2/3] usb: host: Allow to build ehci orion with mvebu SoCs
+In-Reply-To: <20170309175258.20076-1-gregory.clement@free-electrons.com>
+References: <20170309175258.20076-1-gregory.clement@free-electrons.com>
+Message-ID: <20170309175258.20076-3-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 09, 2017 at 09:25:09AM +0100, Ard Biesheuvel wrote:
-> The debug_pagealloc facility manipulates kernel mappings in the linear
-> region at page granularity to detect out of bounds or use-after-free
-> accesses. Since the kernel segments are not allocated dynamically,
-> there is no point in taking the debug_pagealloc_enabled flag into
-> account for them, and we can use block mappings unconditionally.
-> 
-> Note that this applies equally to the linear alias of text/rodata:
-> we will never have dynamic allocations there given that the same
-> memory is statically in use by the kernel image.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+The mvebu ARM64 SoCs no longer select PLAT_ORION. However Armada 37xx use
+the Orion EHCI controller. This patch allows the Orion EHCI driver to be
+built when ARCH_MVEBU is selected.
 
-This makes sense to me, and I haven't found anything this breaks.
+Reviewed-by: Andrew Lunn <andrew@lunn.ch>
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ drivers/usb/host/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-It may be worth noting that a similar reasoning already applies the the
-FDT mapping, where we use create_mapping_noalloc(), and never mandate
-page mappings.
-
-Regardless:
-
-Reviewed-by: Mark Rutland <mark.rutland@arm.com>
-
-Mark.
-
-> ---
->  arch/arm64/mm/mmu.c | 7 +++----
->  1 file changed, 3 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-> index c3963c592ec3..d3fecd20a136 100644
-> --- a/arch/arm64/mm/mmu.c
-> +++ b/arch/arm64/mm/mmu.c
-> @@ -328,8 +328,7 @@ static void update_mapping_prot(phys_addr_t phys, unsigned long virt,
->  		return;
->  	}
->  
-> -	__create_pgd_mapping(init_mm.pgd, phys, virt, size, prot,
-> -			     NULL, debug_pagealloc_enabled());
-> +	__create_pgd_mapping(init_mm.pgd, phys, virt, size, prot, NULL, false);
->  
->  	/* flush the TLBs after updating live kernel mappings */
->  	flush_tlb_kernel_range(virt, virt + size);
-> @@ -381,7 +380,7 @@ static void __init __map_memblock(pgd_t *pgd, phys_addr_t start, phys_addr_t end
->  	 */
->  	__create_pgd_mapping(pgd, kernel_start, __phys_to_virt(kernel_start),
->  			     kernel_end - kernel_start, PAGE_KERNEL,
-> -			     early_pgtable_alloc, debug_pagealloc_enabled());
-> +			     early_pgtable_alloc, false);
->  }
->  
->  void __init mark_linear_text_alias_ro(void)
-> @@ -437,7 +436,7 @@ static void __init map_kernel_segment(pgd_t *pgd, void *va_start, void *va_end,
->  	BUG_ON(!PAGE_ALIGNED(size));
->  
->  	__create_pgd_mapping(pgd, pa_start, (unsigned long)va_start, size, prot,
-> -			     early_pgtable_alloc, debug_pagealloc_enabled());
-> +			     early_pgtable_alloc, false);
->  
->  	vma->addr	= va_start;
->  	vma->phys_addr	= pa_start;
-> -- 
-> 2.7.4
-> 
+diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
+index 407d947b34ea..54bdd76c7f03 100644
+--- a/drivers/usb/host/Kconfig
++++ b/drivers/usb/host/Kconfig
+@@ -188,7 +188,7 @@ config USB_EHCI_HCD_OMAP
+ 
+ config USB_EHCI_HCD_ORION
+ 	tristate  "Support for Marvell EBU on-chip EHCI USB controller"
+-	depends on USB_EHCI_HCD && PLAT_ORION
++	depends on USB_EHCI_HCD && (PLAT_ORION || ARCH_MVEBU)
+ 	default y
+ 	---help---
+ 	  Enables support for the on-chip EHCI controller on Marvell's
+-- 
+2.11.0
