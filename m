@@ -1,77 +1,79 @@
-From: Ramiro.Oliveira@synopsys.com (Ramiro Oliveira)
-Date: Thu, 9 Mar 2017 09:55:59 +0000
-Subject: [PATCH] dma: xilinx: Make Xilinx VDMA support ARC
-In-Reply-To: <1ff465a7-69ed-6cd1-0e02-4b9ff752b3cd@topic.nl>
-References: <ec057c7b16c414a1cf9a9eba87c33f8bcf9f01f9.1488803103.git.roliveir@synopsys.com>
- <1ff465a7-69ed-6cd1-0e02-4b9ff752b3cd@topic.nl>
-Message-ID: <c1285d07-f925-2c3a-c90c-1ef9ee948b80@synopsys.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu,  9 Mar 2017 09:55:32 +0000
+Subject: [PATCH 03/10] KVM: arm/arm64: Let vcpu thread modify its own active
+ state
+In-Reply-To: <20170309095539.14512-1-marc.zyngier@arm.com>
+References: <20170309095539.14512-1-marc.zyngier@arm.com>
+Message-ID: <20170309095539.14512-4-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike
+From: Jintack Lim <jintack@cs.columbia.edu>
 
-On 3/9/2017 7:37 AM, Mike Looijmans wrote:
-> On 06-03-17 13:27, Ramiro Oliveira wrote:
->> Add option in Kconfig to use Xilinx VDMA in ARC processors.
->>
->> Signed-off-by: Ramiro Oliveira <roliveir@synopsys.com>
->> ---
->>  drivers/dma/Kconfig | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
->> index 263495d0adbd..b6b6c0581ad7 100644
->> --- a/drivers/dma/Kconfig
->> +++ b/drivers/dma/Kconfig
->> @@ -546,7 +546,7 @@ config XGENE_DMA
->>
->>  config XILINX_DMA
->>      tristate "Xilinx AXI DMAS Engine"
->> -    depends on (ARCH_ZYNQ || MICROBLAZE || ARM64)
->> +    depends on (ARCH_ZYNQ || MICROBLAZE || ARM64|| ARC)
-> 
-> One can put a Xilinx FPGA on a PCIe card, instantiate a PCIe-AXI bridge and then
-> use it on any platform that supports PCIe.
-> 
-> I've had to remove this line in order to be able to use the engine on an x86
-> desktop.
-> 
-> How about plainly removing this "depends on" line and be done with it, instead
-> of adding platforms one by one?
-> 
-> 
+Currently, if a vcpu thread tries to change the active state of an
+interrupt which is already on the same vcpu's AP list, it will loop
+forever. Since the VGIC mmio handler is called after a vcpu has
+already synced back the LR state to the struct vgic_irq, we can just
+let it proceed safely.
 
-I agree with you. From my point of view it would be better to remove this line
-entirely. I'm just not sure if everyone agrees.
+Cc: stable at vger.kernel.org
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
+Signed-off-by: Christoffer Dall <cdall@linaro.org>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ virt/kvm/arm/vgic/vgic-mmio.c | 32 ++++++++++++++++++++++++--------
+ 1 file changed, 24 insertions(+), 8 deletions(-)
 
->>      select DMA_ENGINE
->>      help
->>        Enable support for Xilinx AXI VDMA Soft IP.
->>
-> 
-> 
-> 
-> Kind regards,
-> 
-> Mike Looijmans
-> System Expert
-> 
-> TOPIC Products
-> Materiaalweg 4, NL-5681 RJ Best
-> Postbus 440, NL-5680 AK Best
-> Telefoon: +31 (0) 499 33 69 79
-> E-mail: mike.looijmans at topicproducts.com
-> Website: www.topicproducts.com
-> 
-> Please consider the environment before printing this e-mail
-> 
-> 
-> 
-> 
-> 
-
+diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
+index 3654b4c835ef..2a5db1352722 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio.c
++++ b/virt/kvm/arm/vgic/vgic-mmio.c
+@@ -180,21 +180,37 @@ unsigned long vgic_mmio_read_active(struct kvm_vcpu *vcpu,
+ static void vgic_mmio_change_active(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
+ 				    bool new_active_state)
+ {
++	struct kvm_vcpu *requester_vcpu;
+ 	spin_lock(&irq->irq_lock);
++
++	/*
++	 * The vcpu parameter here can mean multiple things depending on how
++	 * this function is called; when handling a trap from the kernel it
++	 * depends on the GIC version, and these functions are also called as
++	 * part of save/restore from userspace.
++	 *
++	 * Therefore, we have to figure out the requester in a reliable way.
++	 *
++	 * When accessing VGIC state from user space, the requester_vcpu is
++	 * NULL, which is fine, because we guarantee that no VCPUs are running
++	 * when accessing VGIC state from user space so irq->vcpu->cpu is
++	 * always -1.
++	 */
++	requester_vcpu = kvm_arm_get_running_vcpu();
++
+ 	/*
+ 	 * If this virtual IRQ was written into a list register, we
+ 	 * have to make sure the CPU that runs the VCPU thread has
+-	 * synced back LR state to the struct vgic_irq.  We can only
+-	 * know this for sure, when either this irq is not assigned to
+-	 * anyone's AP list anymore, or the VCPU thread is not
+-	 * running on any CPUs.
++	 * synced back the LR state to the struct vgic_irq.
+ 	 *
+-	 * In the opposite case, we know the VCPU thread may be on its
+-	 * way back from the guest and still has to sync back this
+-	 * IRQ, so we release and re-acquire the spin_lock to let the
+-	 * other thread sync back the IRQ.
++	 * As long as the conditions below are true, we know the VCPU thread
++	 * may be on its way back from the guest (we kicked the VCPU thread in
++	 * vgic_change_active_prepare)  and still has to sync back this IRQ,
++	 * so we release and re-acquire the spin_lock to let the other thread
++	 * sync back the IRQ.
+ 	 */
+ 	while (irq->vcpu && /* IRQ may have state in an LR somewhere */
++	       irq->vcpu != requester_vcpu && /* Current thread is not the VCPU thread */
+ 	       irq->vcpu->cpu != -1) /* VCPU thread is running */
+ 		cond_resched_lock(&irq->irq_lock);
+ 
 -- 
-Best Regards
-
-Ramiro Oliveira
-Ramiro.Oliveira at synopsys.com
+2.11.0
