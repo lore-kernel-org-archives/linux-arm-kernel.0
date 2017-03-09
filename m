@@ -1,71 +1,41 @@
 From: romain.izard.pro@gmail.com (Romain Izard)
-Date: Thu,  9 Mar 2017 17:58:38 +0100
-Subject: [PATCH v1] Revert "clocksource/drivers/tcb_clksrc: Use 32 bit tcb as
- sched_clock"
-Message-ID: <20170309165838.7683-1-romain.izard.pro@gmail.com>
+Date: Thu,  9 Mar 2017 18:02:43 +0100
+Subject: [PATCH v1] usb: gadget: udc: atmel: Remove an unused local variable
+Message-ID: <20170309170243.27388-1-romain.izard.pro@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This reverts commit 7b9f1d16e6d1 ("clocksource/drivers/tcb_clksrc: Use
-32 bit tcb as sched_clock"). In the current state, the kernel warns
-against a late registration of the new sched_clock, the printk clock
-resets after only a few minutes, and it seems that scheduling can be
-affected as well.
+The local variable ept_cfg is not used anymore in usba_ep_enable.
+Use ep->ept_cfg in the debug function to remove a warning when building
+with dynamic debug enabled.
 
 Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
+Fixes: 741d2558bf0a ("usb: gadget: udc: atmel: Update endpoint allocation scheme")
 ---
- drivers/clocksource/tcb_clksrc.c | 16 +---------------
- 1 file changed, 1 insertion(+), 15 deletions(-)
+ drivers/usb/gadget/udc/atmel_usba_udc.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/clocksource/tcb_clksrc.c b/drivers/clocksource/tcb_clksrc.c
-index 745844ee973e..d4ca9962a759 100644
---- a/drivers/clocksource/tcb_clksrc.c
-+++ b/drivers/clocksource/tcb_clksrc.c
-@@ -10,7 +10,6 @@
- #include <linux/io.h>
- #include <linux/platform_device.h>
- #include <linux/atmel_tc.h>
--#include <linux/sched_clock.h>
- 
- 
- /*
-@@ -57,14 +56,9 @@ static u64 tc_get_cycles(struct clocksource *cs)
- 	return (upper << 16) | lower;
- }
- 
--static u32 tc_get_cv32(void)
--{
--	return __raw_readl(tcaddr + ATMEL_TC_REG(0, CV));
--}
--
- static u64 tc_get_cycles32(struct clocksource *cs)
+diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.c b/drivers/usb/gadget/udc/atmel_usba_udc.c
+index 11bbce28bc23..2035906b8ced 100644
+--- a/drivers/usb/gadget/udc/atmel_usba_udc.c
++++ b/drivers/usb/gadget/udc/atmel_usba_udc.c
+@@ -610,7 +610,7 @@ usba_ep_enable(struct usb_ep *_ep, const struct usb_endpoint_descriptor *desc)
  {
--	return tc_get_cv32();
-+	return __raw_readl(tcaddr + ATMEL_TC_REG(0, CV));
- }
+ 	struct usba_ep *ep = to_usba_ep(_ep);
+ 	struct usba_udc *udc = ep->udc;
+-	unsigned long flags, ept_cfg, maxpacket;
++	unsigned long flags, maxpacket;
+ 	unsigned int nr_trans;
  
- static struct clocksource clksrc = {
-@@ -75,11 +69,6 @@ static struct clocksource clksrc = {
- 	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
- };
+ 	DBG(DBG_GADGET, "%s: ep_enable: desc=%p\n", ep->ep.name, desc);
+@@ -630,7 +630,7 @@ usba_ep_enable(struct usb_ep *_ep, const struct usb_endpoint_descriptor *desc)
+ 	ep->is_in = 0;
  
--static u64 notrace tc_read_sched_clock(void)
--{
--	return tc_get_cv32();
--}
--
- #ifdef CONFIG_GENERIC_CLOCKEVENTS
+ 	DBG(DBG_ERR, "%s: EPT_CFG = 0x%lx (maxpacket = %lu)\n",
+-			ep->ep.name, ept_cfg, maxpacket);
++			ep->ep.name, ep->ept_cfg, maxpacket);
  
- struct tc_clkevt_device {
-@@ -350,9 +339,6 @@ static int __init tcb_clksrc_init(void)
- 		clksrc.read = tc_get_cycles32;
- 		/* setup ony channel 0 */
- 		tcb_setup_single_chan(tc, best_divisor_idx);
--
--		/* register sched_clock on chips with single 32 bit counter */
--		sched_clock_register(tc_read_sched_clock, 32, divided_rate);
- 	} else {
- 		/* tclib will give us three clocks no matter what the
- 		 * underlying platform supports.
+ 	if (usb_endpoint_dir_in(desc)) {
+ 		ep->is_in = 1;
 -- 
 2.9.3
