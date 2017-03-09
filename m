@@ -1,92 +1,78 @@
 From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 9 Mar 2017 13:44:56 +0000
-Subject: [PATCH v2 1/4] syscalls: Restore address limit after a syscall
-In-Reply-To: <20170309120955.GA6320@leverpostej>
-References: <20170309012456.5631-1-thgarnie@google.com>
- <20170309120955.GA6320@leverpostej>
-Message-ID: <20170309134456.GI21222@n2100.armlinux.org.uk>
+Date: Thu, 9 Mar 2017 13:57:15 +0000
+Subject: [RESEND PATCH] arm: assabet_defconfig: disable IDE subsystem
+In-Reply-To: <a8eab3b1-8867-00dd-08e4-bcece23010a6@cogentembedded.com>
+References: <1467991490-24895-1-git-send-email-b.zolnierkie@samsung.com>
+ <CGME20161212135537epcas5p440bbb93d40f0c41b3754635733b09879@epcas5p4.samsung.com>
+ <8ea5971a-338d-e8b9-6be8-8fe2658fc04d@ti.com>
+ <1709119.SQyio4Ct6n@amdc3058>
+ <1fd840c5-b0bb-726b-6357-669977c4ae5f@ti.com>
+ <a3161cfc-56f7-4577-c37f-3798cdb03713@ti.com>
+ <ab44a3c1-f078-4476-4583-de92ee68632c@cogentembedded.com>
+ <98031160-f7b4-3cff-043a-1f2ee62c8a01@ti.com>
+ <a8eab3b1-8867-00dd-08e4-bcece23010a6@cogentembedded.com>
+Message-ID: <20170309135714.GJ21222@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 09, 2017 at 12:09:55PM +0000, Mark Rutland wrote:
-> Hi,
+On Thu, Mar 09, 2017 at 03:24:56PM +0300, Sergei Shtylyov wrote:
+> On 03/09/2017 03:20 PM, Sekhar Nori wrote:
 > 
-> On Wed, Mar 08, 2017 at 05:24:53PM -0800, Thomas Garnier wrote:
-> > This patch ensures a syscall does not return to user-mode with a kernel
-> > address limit. If that happened, a process can corrupt kernel-mode
-> > memory and elevate privileges.
-> > 
-> > For example, it would mitigation this bug:
-> > 
-> > - https://bugs.chromium.org/p/project-zero/issues/detail?id=990
-> > 
-> > If the CONFIG_BUG_ON_DATA_CORRUPTION option is enabled, an incorrect
-> > state will result in a BUG_ON.
-> > 
-> > The CONFIG_ARCH_NO_SYSCALL_VERIFY_PRE_USERMODE_STATE option is also
-> > added so each architecture can optimize this change.
+> >[...]
 > 
-> > +#ifndef CONFIG_ARCH_NO_SYSCALL_VERIFY_PRE_USERMODE_STATE
-> > +static inline bool has_user_ds(void) {
-> > +	bool ret = segment_eq(get_fs(), USER_DS);
-> > +	// Prevent re-ordering the call
-> > +	barrier();
+> >>>diff --git a/arch/arm/mach-davinci/board-dm644x-evm.c
+> >>>b/arch/arm/mach-davinci/board-dm644x-evm.c
+> >>>index 023480b75244..60a1f23890cd 100644
+> >>>--- a/arch/arm/mach-davinci/board-dm644x-evm.c
+> >>>+++ b/arch/arm/mach-davinci/board-dm644x-evm.c
+> >>>@@ -744,7 +744,7 @@ static int davinci_phy_fixup(struct phy_device
+> >>>*phydev)
+> >>>     return 0;
+> >>> }
+> >>>
+> >>>-#define HAS_ATA        IS_ENABLED(CONFIG_BLK_DEV_PALMCHIP_BK3710)
+> >>>+#define HAS_ATA        IS_ENABLED(CONFIG_PATA_BK3710)
+> >>
+> >>   I think it would be more correct to check for both libata and IDE
+> >>drivers here...
+> >
+> >As I understand, the plan is to remove the IDE driver soon.
 > 
-> What ordering are we trying to ensure, that isn't otherwise given?
-> 
-> We expect get_fs() and set_fs() to be ordered w.r.t. each other and
-> w.r.t. uaccess uses, or we'd need barriers all over the place.
-> 
-> Given that, I can't see why we need a barrier here. So this needs a
-> better comment, at least.
-> 
-> > +	return ret;
-> > +}
-> > +#else
-> > +static inline bool has_user_ds(void) {
-> > +	return false;
-> > +}
-> > +#endif
-> 
-> It would be simpler to wrap the call entirely, e.g. have:
-> 
-> #ifdef CONFIG_WHATEVER
-> static inline void verify_pre_usermode_state(void)
-> {
-> 	if (segment_eq(get_fs(), USER_DS))
-> 		__verify_pre_usermode_state();
-> }
-> #else
-> static inline void verify_pre_usermode_state(void) { }
-> #endif
+>    I'm not sure DaveM would support any removals in drivers/ide/. He has
+> explicitly expressed his will to maintain the IDE driuver forever.
 
-That's utterly pointless - you've missed a detail.
+As I keep saying, there are ARM machines where the IDE driver works but
+the PATA driver doesn't.  EBSA110's PCMCIA slots for instance.
 
-> > @@ -199,7 +215,10 @@ extern struct trace_event_functions exit_syscall_print_funcs;
-> >  	asmlinkage long SyS##name(__MAP(x,__SC_LONG,__VA_ARGS__));	\
-> >  	asmlinkage long SyS##name(__MAP(x,__SC_LONG,__VA_ARGS__))	\
-> >  	{								\
-> > +		bool user_caller = has_user_ds();			\
-> >  		long ret = SYSC##name(__MAP(x,__SC_CAST,__VA_ARGS__));	\
-> > +		if (user_caller)					\
-> > +			verify_pre_usermode_state();			\
-> 
-> ... then we can unconditionally use verify_pre_usermode_state() here ... 
+Yes, it's very obscure - but what it comes down to is the silly way the
+"ISA" IO is handled on the platform (which depends whether it's an 8-bit
+or 16-bit ISA-style peripheral.)  The old IDE CS driver _could_ be bent
+to work via a patch like this:
 
-Look at this closely.  has_user_ds() is called _before_ the syscall code
-is invoked.  It's checking what conditions the syscall was entered from.
-If the syscall was entered with the user segment selected, then we run
-a check on the system state _after_ the syscall code has returned.
+ARM: EBSA110: Enable 16-bit IO type for ide-iops
 
-Putting both after the syscall code has returned is completely pointless -
-it turns it into this code:
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index 047a20780fc1..2eb501d6b5fe 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -217,7 +217,8 @@ ifeq ($(CONFIG_ARCH_EBSA110),y)
+ # This is what happens if you forget the IOCS16 line.
+ # PCMCIA cards stop working.
+ CFLAGS_3c589_cs.o :=-DISA_SIXTEEN_BIT_PERIPHERAL
+-export CFLAGS_3c589_cs.o
++CFLAGS_ide-io-std.o :=-DISA_SIXTEEN_BIT_PERIPHERAL
++export CFLAGS_3c589_cs.o CFLAGS_ide-io-std.o
+ endif
 
-	if (segment_eq(get_fs(), USER_DS))
-		if (CHECK_DATA_CORRUPTION(!segment_eq(get_fs(), USER_DS),
-					  "incorrect get_fs() on user-mode return"))
-			set_fs(USER_DS);
+ # The byte offset of the kernel image in RAM from the start of RAM.
 
-which is obviously bogus (it'll never fire.)
+but the PATA driver is much harder.
+
+That said, the EBSA110 is now a prime museum piece, and towards the
+end of the time I was using it, the kernel was becoming more and more
+inefficient on the hardware - as in, it appeared it could route
+network packets _or_ run userspace, but not both, even with drivers
+converted to NAPI.
 
 -- 
 RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
