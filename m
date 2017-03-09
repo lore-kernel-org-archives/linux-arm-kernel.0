@@ -1,123 +1,78 @@
-From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Thu, 9 Mar 2017 16:01:36 -0600
-Subject: Neophyte questions about PCIe
-In-Reply-To: <063D6719AE5E284EB5DD2968C1650D6DCFE7A70A@AcuExch.aculab.com>
-References: <ced6a4bf-c94a-c116-1e94-52a8d675d132@free.fr>
- <063D6719AE5E284EB5DD2968C1650D6DCFE7A70A@AcuExch.aculab.com>
-Message-ID: <d908b221-a557-41fe-2d7c-3e1c7e2fbac4@arm.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Thu, 9 Mar 2017 14:15:21 -0800
+Subject: outreachy
+In-Reply-To: <20170309212021.GA24433@kroah.com>
+References: <alpine.DEB.2.20.1703092133340.2306@hadrien>
+ <443f0143-aec1-2559-a2c2-73b245632948@broadcom.com>
+ <2da12619-5fcb-9e0f-b6c1-c83cbf491e8d@wwwdotorg.org>
+ <20170309212021.GA24433@kroah.com>
+Message-ID: <c165d5f0-e087-9677-70ad-9db602d8c51f@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 03/08/2017 07:54 AM, David Laight wrote:
-> From: Mason
->> Sent: 07 March 2017 22:45
->> Hello,
+On 03/09/2017 01:20 PM, Greg KH wrote:
+> On Thu, Mar 09, 2017 at 01:56:49PM -0700, Stephen Warren wrote:
+>> On 03/09/2017 01:51 PM, Scott Branden wrote:
+>>> Hi Julia,
+>>>
+>>> On 17-03-09 12:36 PM, Julia Lawall wrote:
+>>>> Hello,
+>>>>
+>>>> I discussed the issue of outreachy patches for bcm with Greg, and we are
+>>>> not convinced that not having the patches CCd to you is such a good idea.
+>>>> While we don't want to spam you with noise, some of the applicants are
+>>>> starting to make more significant changes that it could be useful for you
+>>>> to be aware of.
+>>>>
+>>>> Could we try a compromise where you are not CCd on whitespace patches,
+>>>> but
+>>>> you are CCd on patches that actually modify the code?
+>>>
+>>> All I'm asking is you work through your outreachy patches internal first
+>>> to get rid of the most basic mistakes and email traffic it is geerating.
+>>>  Once that learning process is through then they can be sent out like
+>>> any other patches to the kernel mailing lists and maintainers.
 >>
->> I've been working with the Linux PCIe framework for a few weeks,
->> and there are still a few things that remain unclear to me.
->> I thought I'd group them in a single message.
->>
->> 1) If I understand correctly, PCI defines 3 types of (address?) "spaces"
->> 	- configuration
->> 	- memory
->> 	- I/O
->>
->> I think PCI has its roots in x86, where there are separate
->> instructions for I/O accesses and memory accesses (with MMIO
->> sitting somewhere in the middle). I'm on ARMv7 which doesn't
->> have I/O instructions AFAIK. I'm not sure what the I/O address
->> space is used for in PCIe, especially since I was told that
->> one may map I/O-type registers (in my understanding, registers
->> for which accesses cause side effects) within mem space.
->
-> There isn't much difference between a memory BAR and an IO BAR.
-> Both are used for accesses to device registers.
-> There are subtle differences in the PCIe TLPs (I think io writes
-> get a completion TLP).
-> Memory space (maybe only 64bit address??) can be 'pre-fetchable'
-> but generally the driver maps everything uncachable.
->
->
->> 2) On my platform, there are two revisions of the PCIe controller.
->> Rev1 muxes config and mem inside a 256 MB window, and doesn't support
->> I/O space.
->> Rev2 muxes all 3 spaces inside a 256 MB window.
->
-> Don't think config space fits.
-> With the 'obvious' mapping the 'bus number' is in the top
-> 8 bits of the address.
-> IIRC x86 uses two 32bit addresses for config space.
-> One is used to hold the 'address' for the cycle, the other
-> to perform the cycle.
->
->> Ard has stated that this model is not supported by Linux.
->> AFAIU, the reason is that accesses may occur concurrently
->> (especially on SMP systems). Thus tweaking a bit before
->> the actual access necessarily creates a race condition.
->>
->> I wondered if there might be (reasonable) software
->> work-arounds, in your experience?
->
-> Remember some drivers let applications mmap PCIe addresses
-> directly into the user page tables.
-> So you have to stop absolutely everything if you change
-> your mux.
->
->> 3) What happens if a device requires more than 256 MB of
->> mem space? (Is that common? What kind of device? GPUs?)
->> Our controller supports a remapping "facility" to add an
->> offset to the bus address. Is such a feature supported
->> by Linux at all?  The problem is that this creates
->> another race condition, as setting the offset register
->> before an access may occur concurrently on two cores.
->> Perhaps 256 MB is plenty on a 32-bit embedded device?
->
-> GPUs tend to have their own paging scheme.
-> So don't need humongous windows.
-> I'm not sure how much space is really needed.
+>> +1 from me too; I find these patches rather high volume and had to add a
+>> filter to keep them out of my primary inbox.
+> 
+> Hah!  That's the joy of being a maintainer of a driver in staging.  Even
+> if you filter out outreachy, you are going to get a lot of "basic
+> mistakes" and other type patches cc:ed to you.
+> 
+> I strongly suggest, that if you all don't like this type of stuff,
+> either:
+> 	- work to get the code out of staging as soon as possible (i.e.
+> 	  send me coding style fixes for everything right now, and then
+> 	  fix up the rest of the stuff.)
+> 	- take yourself off the maintainer list for this code.
 
-The server class (tesla/etc) GPU's use 64-bit BAR's for a while and in 
-the case of something like the K80 require two 16G mappings per board.
+Keep in mind that most people on this CC list are getting these patches
+because of the bcm283* regular expression, and maybe that's what needs
+fixing here in the first place.
 
-(see the comment at the bottom of this link)
+Incidentally, Stephen did send a patch to get him removed from the
+MAINTAINERS entry for Raspberry Pi stuff, so I guess, problem solved for
+him. We still have a ton of people from Broadcom who are going to
+receive these emails, with mild interest in staging patches.
 
-https://devtalk.nvidia.com/default/topic/865872/driver-installing-problem-for-nvidia-tesla-k80-under-linux/
+> 
+> It's your choice, outreachy right now is a lot of patches, but again,
+> it's not going to keep you from getting the "basic" stuff sent to you
+> in ways that is totally wrong.
 
+That is absolutely true, but the thing is that we really got a big spike
+of patch submissions lately, and that was totally not accepted. I am not
+asking for a "heads-up" email telling people that they are going to
+receive more traffic than usual (because that would be too much over
+head), but if there was an internal review first on the outreachy
+mailing-list and second a proper submission which is going to pass your
+acceptance criteria, we would be de facto reducing the amount of emails
+that we received.
 
-> 32bit x86 reserve the top 1GB of physical address for PCI(e).
->
->> 4) The HW dev is considering the following fix.
->> Instead of muxing the address spaces, provide smaller
->> exclusive spaces. For example
->> [0x5000_0000, 0x5400_0000] for config (64MB)
->> [0x5400_0000, 0x5800_0000] for I/O (64MB)
->> [0x5800_0000, 0x6000_0000] for mem (128MB)
->
-> You almost certainly don't need more than 64k of IO.
->
->> That way, bits 26:27 implicitly select the address space
->> 	00 = config
->> 	01 = I/O
->> 	1x = mem
->>
->> This would be more in line with what Linux expects, right?
->> Are these sizes acceptable? 64 MB config is probably overkill
->> (we'll never have 64 devices on this board). 64 MB for I/O
->> is probably plenty. The issue might be mem space?
->
-> Config space isn't dense, you (probably) need 25 bits to get a 2nd bus number.
-> Even 256MB constrains you to 16 bus numbers.
->
-> Is this an ARM cpu inside an altera (now intel) fpga??
-> There is a nasty bug in their PCIe to avalon bridge logic (fixed in quartus 16.1).
->
-> 	David
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+The outreachy list obviously has people like you and Julia who are
+willing to help and provide feedback, so I really don't see what's the
+problem in setting up a two tier review here, it does not change
+anything for you, but it does change a lot for us.
+-- 
+Florian
