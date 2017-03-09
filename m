@@ -1,61 +1,77 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu,  9 Mar 2017 09:55:31 +0000
-Subject: [PATCH 02/10] KVM: arm/arm64: vgic-v3: Don't pretend to support
- IRQ/FIQ bypass
-In-Reply-To: <20170309095539.14512-1-marc.zyngier@arm.com>
-References: <20170309095539.14512-1-marc.zyngier@arm.com>
-Message-ID: <20170309095539.14512-3-marc.zyngier@arm.com>
+From: Ramiro.Oliveira@synopsys.com (Ramiro Oliveira)
+Date: Thu, 9 Mar 2017 09:55:59 +0000
+Subject: [PATCH] dma: xilinx: Make Xilinx VDMA support ARC
+In-Reply-To: <1ff465a7-69ed-6cd1-0e02-4b9ff752b3cd@topic.nl>
+References: <ec057c7b16c414a1cf9a9eba87c33f8bcf9f01f9.1488803103.git.roliveir@synopsys.com>
+ <1ff465a7-69ed-6cd1-0e02-4b9ff752b3cd@topic.nl>
+Message-ID: <c1285d07-f925-2c3a-c90c-1ef9ee948b80@synopsys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Our GICv3 emulation always presents ICC_SRE_EL1 with DIB/DFB set to
-zero, which implies that there is a way to bypass the GIC and
-inject raw IRQ/FIQ by driving the CPU pins.
+Hi Mike
 
-Of course, we don't allow that when the GIC is configured, but
-we fail to indicate that to the guest. The obvious fix is to
-set these bits (and never let them being changed again).
+On 3/9/2017 7:37 AM, Mike Looijmans wrote:
+> On 06-03-17 13:27, Ramiro Oliveira wrote:
+>> Add option in Kconfig to use Xilinx VDMA in ARC processors.
+>>
+>> Signed-off-by: Ramiro Oliveira <roliveir@synopsys.com>
+>> ---
+>>  drivers/dma/Kconfig | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
+>> index 263495d0adbd..b6b6c0581ad7 100644
+>> --- a/drivers/dma/Kconfig
+>> +++ b/drivers/dma/Kconfig
+>> @@ -546,7 +546,7 @@ config XGENE_DMA
+>>
+>>  config XILINX_DMA
+>>      tristate "Xilinx AXI DMAS Engine"
+>> -    depends on (ARCH_ZYNQ || MICROBLAZE || ARM64)
+>> +    depends on (ARCH_ZYNQ || MICROBLAZE || ARM64|| ARC)
+> 
+> One can put a Xilinx FPGA on a PCIe card, instantiate a PCIe-AXI bridge and then
+> use it on any platform that supports PCIe.
+> 
+> I've had to remove this line in order to be able to use the engine on an x86
+> desktop.
+> 
+> How about plainly removing this "depends on" line and be done with it, instead
+> of adding platforms one by one?
+> 
+> 
 
-Reported-by: Peter Maydell <peter.maydell@linaro.org>
-Acked-by: Christoffer Dall <cdall@linaro.org>
-Reviewed-by: Eric Auger <eric.auger@redhat.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- include/linux/irqchip/arm-gic-v3.h | 2 ++
- virt/kvm/arm/vgic/vgic-v3.c        | 5 ++++-
- 2 files changed, 6 insertions(+), 1 deletion(-)
+I agree with you. From my point of view it would be better to remove this line
+entirely. I'm just not sure if everyone agrees.
 
-diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-index 672cfef72fc8..97cbca19430d 100644
---- a/include/linux/irqchip/arm-gic-v3.h
-+++ b/include/linux/irqchip/arm-gic-v3.h
-@@ -373,6 +373,8 @@
- #define ICC_IGRPEN0_EL1_MASK		(1 << ICC_IGRPEN0_EL1_SHIFT)
- #define ICC_IGRPEN1_EL1_SHIFT		0
- #define ICC_IGRPEN1_EL1_MASK		(1 << ICC_IGRPEN1_EL1_SHIFT)
-+#define ICC_SRE_EL1_DIB			(1U << 2)
-+#define ICC_SRE_EL1_DFB			(1U << 1)
- #define ICC_SRE_EL1_SRE			(1U << 0)
- 
- /*
-diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-index edc6ee2dc852..be0f4c3e0142 100644
---- a/virt/kvm/arm/vgic/vgic-v3.c
-+++ b/virt/kvm/arm/vgic/vgic-v3.c
-@@ -229,10 +229,13 @@ void vgic_v3_enable(struct kvm_vcpu *vcpu)
- 	/*
- 	 * If we are emulating a GICv3, we do it in an non-GICv2-compatible
- 	 * way, so we force SRE to 1 to demonstrate this to the guest.
-+	 * Also, we don't support any form of IRQ/FIQ bypass.
- 	 * This goes with the spec allowing the value to be RAO/WI.
- 	 */
- 	if (vcpu->kvm->arch.vgic.vgic_model == KVM_DEV_TYPE_ARM_VGIC_V3) {
--		vgic_v3->vgic_sre = ICC_SRE_EL1_SRE;
-+		vgic_v3->vgic_sre = (ICC_SRE_EL1_DIB |
-+				     ICC_SRE_EL1_DFB |
-+				     ICC_SRE_EL1_SRE);
- 		vcpu->arch.vgic_cpu.pendbaser = INITIAL_PENDBASER_VALUE;
- 	} else {
- 		vgic_v3->vgic_sre = 0;
+>>      select DMA_ENGINE
+>>      help
+>>        Enable support for Xilinx AXI VDMA Soft IP.
+>>
+> 
+> 
+> 
+> Kind regards,
+> 
+> Mike Looijmans
+> System Expert
+> 
+> TOPIC Products
+> Materiaalweg 4, NL-5681 RJ Best
+> Postbus 440, NL-5680 AK Best
+> Telefoon: +31 (0) 499 33 69 79
+> E-mail: mike.looijmans at topicproducts.com
+> Website: www.topicproducts.com
+> 
+> Please consider the environment before printing this e-mail
+> 
+> 
+> 
+> 
+> 
+
 -- 
-2.11.0
+Best Regards
+
+Ramiro Oliveira
+Ramiro.Oliveira at synopsys.com
