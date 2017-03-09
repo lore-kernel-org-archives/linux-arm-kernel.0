@@ -1,47 +1,90 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Thu, 9 Mar 2017 13:05:14 +0100
-Subject: [PATCH 00/10] ARM: davinci: add vpif display support
-In-Reply-To: <CAMpxmJUZ3KCV2zjpPWD02rVpok_XV-fGdk8PNpN7FGt3RDbMEw@mail.gmail.com>
-References: <1486485683-11427-1-git-send-email-bgolaszewski@baylibre.com>
- <77ced65d-e350-02ba-6dae-b20dcb3faa32@xs4all.nl>
- <CAMpxmJUZ3KCV2zjpPWD02rVpok_XV-fGdk8PNpN7FGt3RDbMEw@mail.gmail.com>
-Message-ID: <4b8381d2-25b5-2d46-9575-2e1182cd276c@xs4all.nl>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 9 Mar 2017 12:09:55 +0000
+Subject: [PATCH v2 1/4] syscalls: Restore address limit after a syscall
+In-Reply-To: <20170309012456.5631-1-thgarnie@google.com>
+References: <20170309012456.5631-1-thgarnie@google.com>
+Message-ID: <20170309120955.GA6320@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/03/17 12:00, Bartosz Golaszewski wrote:
-> 2017-03-09 11:53 GMT+01:00 Hans Verkuil <hverkuil@xs4all.nl>:
->> On 07/02/17 17:41, Bartosz Golaszewski wrote:
->>> The following series adds support for v4l2 display on da850-evm with
->>> a UI board in device tree boot mode.
->>
->> As far as I could tell from the comments this patch series will see a
->> second version, so I am marking it as 'Changes Requested' in patchwork.
->>
->> If I'm wrong, then please let me know.
->>
->> Regards,
->>
->>         Hans
->>
-> 
-> Hi Hans,
-> 
-> this series has since been split into several smaller ones and most of
-> the code is already merged into Sekhar Nori's DaVinci tree.
-> 
-> There are two series that still need merging with the media tree[1][2].
+Hi,
 
-Merged, thanks!
-
-Regards,
-
-	Hans
-
+On Wed, Mar 08, 2017 at 05:24:53PM -0800, Thomas Garnier wrote:
+> This patch ensures a syscall does not return to user-mode with a kernel
+> address limit. If that happened, a process can corrupt kernel-mode
+> memory and elevate privileges.
 > 
-> Thanks,
-> Bartosz Golaszewski
+> For example, it would mitigation this bug:
 > 
-> [1] https://lkml.org/lkml/2017/2/28/426
-> [2] https://patchwork.kernel.org/patch/9577965/
+> - https://bugs.chromium.org/p/project-zero/issues/detail?id=990
 > 
+> If the CONFIG_BUG_ON_DATA_CORRUPTION option is enabled, an incorrect
+> state will result in a BUG_ON.
+> 
+> The CONFIG_ARCH_NO_SYSCALL_VERIFY_PRE_USERMODE_STATE option is also
+> added so each architecture can optimize this change.
+
+> +#ifndef CONFIG_ARCH_NO_SYSCALL_VERIFY_PRE_USERMODE_STATE
+> +static inline bool has_user_ds(void) {
+> +	bool ret = segment_eq(get_fs(), USER_DS);
+> +	// Prevent re-ordering the call
+> +	barrier();
+
+What ordering are we trying to ensure, that isn't otherwise given?
+
+We expect get_fs() and set_fs() to be ordered w.r.t. each other and
+w.r.t. uaccess uses, or we'd need barriers all over the place.
+
+Given that, I can't see why we need a barrier here. So this needs a
+better comment, at least.
+
+> +	return ret;
+> +}
+> +#else
+> +static inline bool has_user_ds(void) {
+> +	return false;
+> +}
+> +#endif
+
+It would be simpler to wrap the call entirely, e.g. have:
+
+#ifdef CONFIG_WHATEVER
+static inline void verify_pre_usermode_state(void)
+{
+	if (segment_eq(get_fs(), USER_DS))
+		__verify_pre_usermode_state();
+}
+#else
+static inline void verify_pre_usermode_state(void) { }
+#endif
+
+> @@ -199,7 +215,10 @@ extern struct trace_event_functions exit_syscall_print_funcs;
+>  	asmlinkage long SyS##name(__MAP(x,__SC_LONG,__VA_ARGS__));	\
+>  	asmlinkage long SyS##name(__MAP(x,__SC_LONG,__VA_ARGS__))	\
+>  	{								\
+> +		bool user_caller = has_user_ds();			\
+>  		long ret = SYSC##name(__MAP(x,__SC_CAST,__VA_ARGS__));	\
+> +		if (user_caller)					\
+> +			verify_pre_usermode_state();			\
+
+... then we can unconditionally use verify_pre_usermode_state() here ... 
+
+>  		__MAP(x,__SC_TEST,__VA_ARGS__);				\
+>  		__PROTECT(x, ret,__MAP(x,__SC_ARGS,__VA_ARGS__));	\
+>  		return ret;						\
+
+[...]
+
+> +/* Called before coming back to user-mode */
+> +asmlinkage void verify_pre_usermode_state(void)
+
+... and we just prepend a couple of underscores here.
+
+> +{
+> +	if (CHECK_DATA_CORRUPTION(!segment_eq(get_fs(), USER_DS),
+> +				  "incorrect get_fs() on user-mode return"))
+> +		set_fs(USER_DS);
+> +}
+
+Thanks,
+Mark.
