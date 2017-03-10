@@ -1,71 +1,63 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Fri, 10 Mar 2017 12:49:23 +0100
-Subject: [PATCH v5 22/39] media: Add userspace header file for i.MX
-In-Reply-To: <1489121599-23206-23-git-send-email-steve_longerbeam@mentor.com>
-References: <1489121599-23206-1-git-send-email-steve_longerbeam@mentor.com>
- <1489121599-23206-23-git-send-email-steve_longerbeam@mentor.com>
-Message-ID: <11cd06ca-1ce1-3fd0-36d5-926b7c336649@xs4all.nl>
+From: ben@decadent.org.uk (Ben Hutchings)
+Date: Fri, 10 Mar 2017 11:46:23 +0000
+Subject: [PATCH 3.16 229/370] clocksource/exynos_mct: Clear interrupt when
+ cpu is shut down
+In-Reply-To: <lsq.1489146380.780052105@decadent.org.uk>
+Message-ID: <lsq.1489146383.332922970@decadent.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/03/17 05:53, Steve Longerbeam wrote:
-> This adds a header file for use by userspace programs wanting to interact
-> with the i.MX media driver. It defines custom v4l2 controls for the
-> i.MX v4l2 subdevices.
-> 
-> Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
+3.16.42-rc1 review patch.  If anyone has any objections, please let me know.
 
-I would not export this while the imx driver is in staging.
+------------------
 
-Also, traditionally exported media headers are in linux, not media.
+From: Joonyoung Shim <jy0922.shim@samsung.com>
 
-I would like to have a discussion about that before deciding where to
-place this header.
+commit bc7c36eedb0c7004aa06c2afc3c5385adada8fa3 upstream.
 
-For the record: I am not opposed to placing this in media.
+When a CPU goes offline a potentially pending timer interrupt is not
+cleared. When the CPU comes online again then the pending interrupt is
+delivered before the per cpu clockevent device is initialized. As a
+consequence the tick interrupt handler dereferences a NULL pointer.
 
-Regards,
+[   51.251378] Unable to handle kernel NULL pointer dereference at virtual address 00000040
+[   51.289348] task: ee942d00 task.stack: ee960000
+[   51.293861] PC is at tick_periodic+0x38/0xb0
+[   51.298102] LR is at tick_handle_periodic+0x1c/0x90
 
-	Hans
+Clear the pending interrupt in the cpu dying path.
 
-> ---
->  include/uapi/media/Kbuild |  1 +
->  include/uapi/media/imx.h  | 21 +++++++++++++++++++++
->  2 files changed, 22 insertions(+)
->  create mode 100644 include/uapi/media/imx.h
-> 
-> diff --git a/include/uapi/media/Kbuild b/include/uapi/media/Kbuild
-> index aafaa5a..fa78958 100644
-> --- a/include/uapi/media/Kbuild
-> +++ b/include/uapi/media/Kbuild
-> @@ -1 +1,2 @@
->  # UAPI Header export list
-> +header-y += imx.h
-> diff --git a/include/uapi/media/imx.h b/include/uapi/media/imx.h
-> new file mode 100644
-> index 0000000..f573de4
-> --- /dev/null
-> +++ b/include/uapi/media/imx.h
-> @@ -0,0 +1,21 @@
-> +/*
-> + * Copyright (c) 2014-2015 Mentor Graphics Inc.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by the
-> + * Free Software Foundation; either version 2 of the
-> + * License, or (at your option) any later version
-> + */
-> +
-> +#ifndef __UAPI_MEDIA_IMX_H__
-> +#define __UAPI_MEDIA_IMX_H__
-> +
-> +enum imx_ctrl_id {
-> +	V4L2_CID_IMX_FIM_ENABLE = (V4L2_CID_USER_IMX_BASE + 0),
-> +	V4L2_CID_IMX_FIM_NUM,
-> +	V4L2_CID_IMX_FIM_TOLERANCE_MIN,
-> +	V4L2_CID_IMX_FIM_TOLERANCE_MAX,
-> +	V4L2_CID_IMX_FIM_NUM_SKIP,
-> +};
-> +
-> +#endif
-> 
+Fixes: 56a94f13919c ("clocksource: exynos_mct: Avoid blocking calls in the cpu hotplug notifier")
+Reported-by: Seung-Woo Kim <sw0312.kim@samsung.com>
+Signed-off-by: Joonyoung Shim <jy0922.shim@samsung.com>
+Cc: linux-samsung-soc at vger.kernel.org
+Cc: cw00.choi at samsung.com
+Cc: daniel.lezcano at linaro.org
+Cc: javier at osg.samsung.com
+Cc: kgene at kernel.org
+Cc: krzk at kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Link: http://lkml.kernel.org/r/1484628876-22065-1-git-send-email-jy0922.shim at samsung.com
+Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+[bwh: Backported to 3.16: add definition of the 'mevt' variable, added earlier
+ upstream]
+Signed-off-by: Ben Hutchings <ben@decadent.org.uk>
+---
+--- a/drivers/clocksource/exynos_mct.c
++++ b/drivers/clocksource/exynos_mct.c
+@@ -458,10 +458,15 @@ static int exynos4_local_timer_setup(str
+ 
+ static void exynos4_local_timer_stop(struct clock_event_device *evt)
+ {
++	struct mct_clock_event_device *mevt;
++
++	mevt = container_of(evt, struct mct_clock_event_device, evt);
++
+ 	evt->set_mode(CLOCK_EVT_MODE_UNUSED, evt);
+ 	if (mct_int_type == MCT_INT_SPI) {
+ 		if (evt->irq != -1)
+ 			disable_irq_nosync(evt->irq);
++		exynos4_mct_write(0x1, mevt->base + MCT_L_INT_CSTAT_OFFSET);
+ 	} else {
+ 		disable_percpu_irq(mct_irqs[MCT_L0_IRQ]);
+ 	}
