@@ -1,111 +1,127 @@
-From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Fri, 10 Mar 2017 10:37:21 -0800
-Subject: [PATCH v5 15/39] [media] v4l2: add a frame interval error event
-In-Reply-To: <5b0a0e76-2524-4140-5ccc-380a8f949cfa@xs4all.nl>
-References: <1489121599-23206-1-git-send-email-steve_longerbeam@mentor.com>
- <1489121599-23206-16-git-send-email-steve_longerbeam@mentor.com>
- <5b0a0e76-2524-4140-5ccc-380a8f949cfa@xs4all.nl>
-Message-ID: <ec05e6e0-79f2-2db2-bde9-4aed00d76faa@gmail.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Fri, 10 Mar 2017 18:37:21 +0000
+Subject: kvm/arm64: use-after-free in kvm_vm_ioctl/vmacache_update
+In-Reply-To: <CAAeHK+wLjS5ZGdNb4W3UkWO8HsFB=s1+a-1boN_F0boM1-bxUg@mail.gmail.com>
+References: <CAAeHK+wha3wr=HraKtGMqeEnZUU6-jboowG5PWRMHtqwTQC7FQ@mail.gmail.com>
+ <CAAeHK+wLjS5ZGdNb4W3UkWO8HsFB=s1+a-1boN_F0boM1-bxUg@mail.gmail.com>
+Message-ID: <3a57c408-8aa5-d339-4176-add4924e817d@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hans,
-
-On 03/10/2017 04:03 AM, Hans Verkuil wrote:
-> On 10/03/17 05:52, Steve Longerbeam wrote:
->> Add a new FRAME_INTERVAL_ERROR event to signal that a video capture or
->> output device has measured an interval between the reception or transmit
->> completion of two consecutive frames of video that is outside the nominal
->> frame interval by some tolerance value.
->
-> Reading back what was said on this I agree with Sakari that this doesn't
-> belong here.
->
-> Userspace can detect this just as easily (if not easier) with a timeout.
->
-
-
-Unfortunately measuring frame intervals from userland is not accurate
-enough for i.MX6.
-
-The issue here is that the IPUv3, specifically the CSI unit, can
-permanently lose vertical sync if there are truncated frames sent
-on the bt.656 bus. We have seen a single missing line of video cause
-loss of vertical sync. The only way to correct this is to shutdown
-the IPU capture hardware and restart, which can be accomplished
-simply by restarting streaming from userland.
-
-There are no other indicators from the sensor about these short
-frame events (believe me, we've exhausted all avenues with the ADV718x).
-And the IPUv3 DMA engine has no status indicators for short frames
-either. So the only way to detect them is by measuring frame intervals.
-
-The intervals have to be able to resolve a single line of missing video.
-With a PAL video source that requires better than 58 usec accuracy.
-
-There is too much uncertainty to resolve this at user level. The
-driver is able to resolve this by measuring intervals between hardware
-interrupts as long as interrupt latency is reasonably low, and we
-have another method using the i.MX6 hardware input capture support
-that can measure these intervals very accurately with no errors
-introduced by interrupt latency.
-
-I made this event a private event to imx-media driver in a previous
-iteration, so I can return it to a private event, but this can't be
-done at user level.
-
-Steve
-
-
->
+On 10/03/17 15:50, Andrey Konovalov wrote:
+> On Fri, Mar 10, 2017 at 2:38 PM, Andrey Konovalov <andreyknvl@google.com> wrote:
+>> Hi,
 >>
->> Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
->> ---
->>  Documentation/media/uapi/v4l/vidioc-dqevent.rst | 6 ++++++
->>  Documentation/media/videodev2.h.rst.exceptions  | 1 +
->>  include/uapi/linux/videodev2.h                  | 1 +
->>  3 files changed, 8 insertions(+)
+>> I've got the following error report while fuzzing the kernel with syzkaller.
 >>
->> diff --git a/Documentation/media/uapi/v4l/vidioc-dqevent.rst b/Documentation/media/uapi/v4l/vidioc-dqevent.rst
->> index 8d663a7..dc77363 100644
->> --- a/Documentation/media/uapi/v4l/vidioc-dqevent.rst
->> +++ b/Documentation/media/uapi/v4l/vidioc-dqevent.rst
->> @@ -197,6 +197,12 @@ call.
->>  	the regions changes. This event has a struct
->>  	:c:type:`v4l2_event_motion_det`
->>  	associated with it.
->> +    * - ``V4L2_EVENT_FRAME_INTERVAL_ERROR``
->> +      - 7
->> +      - This event is triggered when the video capture or output device
->> +	has measured an interval between the reception or transmit
->> +	completion of two consecutive frames of video that is outside
->> +	the nominal frame interval by some tolerance value.
->>      * - ``V4L2_EVENT_PRIVATE_START``
->>        - 0x08000000
->>        - Base event number for driver-private events.
->> diff --git a/Documentation/media/videodev2.h.rst.exceptions b/Documentation/media/videodev2.h.rst.exceptions
->> index e11a0d0..c7d8fad 100644
->> --- a/Documentation/media/videodev2.h.rst.exceptions
->> +++ b/Documentation/media/videodev2.h.rst.exceptions
->> @@ -459,6 +459,7 @@ replace define V4L2_EVENT_CTRL event-type
->>  replace define V4L2_EVENT_FRAME_SYNC event-type
->>  replace define V4L2_EVENT_SOURCE_CHANGE event-type
->>  replace define V4L2_EVENT_MOTION_DET event-type
->> +replace define V4L2_EVENT_FRAME_INTERVAL_ERROR event-type
->>  replace define V4L2_EVENT_PRIVATE_START event-type
+>> On linux-next commit 56b8bad5e066c23e8fa273ef5fba50bd3da2ace8 (Mar 8).
 >>
->>  replace define V4L2_EVENT_CTRL_CH_VALUE ctrl-changes-flags
->> diff --git a/include/uapi/linux/videodev2.h b/include/uapi/linux/videodev2.h
->> index 45184a2..cf5a0d0 100644
->> --- a/include/uapi/linux/videodev2.h
->> +++ b/include/uapi/linux/videodev2.h
->> @@ -2131,6 +2131,7 @@ struct v4l2_streamparm {
->>  #define V4L2_EVENT_FRAME_SYNC			4
->>  #define V4L2_EVENT_SOURCE_CHANGE		5
->>  #define V4L2_EVENT_MOTION_DET			6
->> +#define V4L2_EVENT_FRAME_INTERVAL_ERROR		7
->>  #define V4L2_EVENT_PRIVATE_START		0x08000000
+>> Unfortunately I can't reproduce it.
 >>
->>  /* Payload for V4L2_EVENT_VSYNC */
+>> ==================================================================
+>> BUG: KASAN: use-after-free in vmacache_update+0x114/0x118 mm/vmacache.c:63
+>> Read of size 8 at addr ffff80003b9a2040 by task syz-executor/26615
 >>
+>> CPU: 1 PID: 26615 Comm: syz-executor Not tainted
+>> 4.11.0-rc1-next-20170308-xc2-dirty #3
+>> Hardware name: Hardkernel ODROID-C2 (DT)
+>> Call trace:
+>> [<ffff20000808fbb0>] dump_backtrace+0x0/0x440 arch/arm64/kernel/traps.c:505
+>> [<ffff200008090010>] show_stack+0x20/0x30 arch/arm64/kernel/traps.c:228
+>> [<ffff2000088e9578>] __dump_stack lib/dump_stack.c:16 [inline]
+>> [<ffff2000088e9578>] dump_stack+0x110/0x168 lib/dump_stack.c:52
+>> [<ffff200008414018>] print_address_description+0x60/0x248 mm/kasan/report.c:250
+>> [<ffff2000084142e8>] kasan_report_error+0xe8/0x250 mm/kasan/report.c:349
+>> [<ffff200008414564>] kasan_report mm/kasan/report.c:372 [inline]
+>> [<ffff200008414564>] __asan_report_load8_noabort+0x3c/0x48 mm/kasan/report.c:393
+>> [<ffff200008383f64>] vmacache_update+0x114/0x118 mm/vmacache.c:63
+>> [<ffff2000083a9000>] find_vma+0xf8/0x150 mm/mmap.c:2124
+>> [<ffff2000080dc19c>] kvm_arch_prepare_memory_region+0x2ac/0x488
+>> arch/arm64/kvm/../../../arch/arm/kvm/mmu.c:1817
+>> [<ffff2000080c2920>] __kvm_set_memory_region+0x3d8/0x12b8
+>> arch/arm64/kvm/../../../virt/kvm/kvm_main.c:1026
+>> [<ffff2000080c3838>] kvm_set_memory_region+0x38/0x58
+>> arch/arm64/kvm/../../../virt/kvm/kvm_main.c:1075
+>> [<ffff2000080c747c>] kvm_vm_ioctl_set_memory_region
+>> arch/arm64/kvm/../../../virt/kvm/kvm_main.c:1087 [inline]
+>> [<ffff2000080c747c>] kvm_vm_ioctl+0xb94/0x1308
+>> arch/arm64/kvm/../../../virt/kvm/kvm_main.c:2960
+>> [<ffff20000848f928>] vfs_ioctl fs/ioctl.c:45 [inline]
+>> [<ffff20000848f928>] do_vfs_ioctl+0x128/0xfc0 fs/ioctl.c:685
+>> [<ffff200008490868>] SYSC_ioctl fs/ioctl.c:700 [inline]
+>> [<ffff200008490868>] SyS_ioctl+0xa8/0xb8 fs/ioctl.c:691
+>> [<ffff200008083f70>] el0_svc_naked+0x24/0x28
+>>
+>> Allocated by task 26657:
+>>  save_stack_trace_tsk+0x0/0x330 arch/arm64/kernel/stacktrace.c:133
+>>  save_stack_trace+0x20/0x30 arch/arm64/kernel/stacktrace.c:216
+>>  save_stack mm/kasan/kasan.c:515 [inline]
+>>  set_track mm/kasan/kasan.c:527 [inline]
+>>  kasan_kmalloc+0xd4/0x180 mm/kasan/kasan.c:619
+>>  kasan_slab_alloc+0x14/0x20 mm/kasan/kasan.c:557
+>>  slab_post_alloc_hook mm/slab.h:456 [inline]
+>>  slab_alloc_node mm/slub.c:2718 [inline]
+>>  slab_alloc mm/slub.c:2726 [inline]
+>>  kmem_cache_alloc+0x144/0x230 mm/slub.c:2731
+>>  __split_vma+0x118/0x608 mm/mmap.c:2515
+>>  do_munmap+0x194/0x9b0 mm/mmap.c:2636
+>> Freed by task 26657:
+>>  save_stack_trace_tsk+0x0/0x330 arch/arm64/kernel/stacktrace.c:133
+>>  save_stack_trace+0x20/0x30 arch/arm64/kernel/stacktrace.c:216
+>>  save_stack mm/kasan/kasan.c:515 [inline]
+>>  set_track mm/kasan/kasan.c:527 [inline]
+>>  kasan_slab_free+0x84/0x198 mm/kasan/kasan.c:592
+>>  slab_free_hook mm/slub.c:1357 [inline]
+>>  slab_free_freelist_hook mm/slub.c:1379 [inline]
+>>  slab_free mm/slub.c:2961 [inline]
+>>  kmem_cache_free+0x80/0x258 mm/slub.c:2983
+>>  __vma_adjust+0x6b0/0xf mm/mmap.c:890]  el0_svc_naked+0x24/0x28
+>>
+>> The buggy address belongs to the object at ffff80003b9a2000
+>>  which belongs to the cache vm_area_struct(647:session-6.scope) of size 184
+>> The buggy address is located 64 bytes inside of
+>>  184-byte region [ffff80003b9a2000, ffff80003b9a20b8)
+>> The buggy address belongs to the page:
+>> page:ffff7e0000ee6880 count:1 mapcount:0 mapping:          (null) index:0x0
+>> flags: 0xfffc00000000100(slab)
+>> raw: 0fffc00000000100 0000000000000000 0000000000000000 0000000180100010
+>> raw: 0000000000000000 0000000c00000001 ffff80005a5cc600 ffff80005ac99980
+>> page dumped because: kasan: bad access detected
+>> page->mem_cgroup:ffff80005ac99980
+>>
+>> Memory state around the buggy address:
+>>  ffff80003b9a1f00: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff
+>>  ffff80003b9a1f80: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff
+>>> ffff80003b9a2000: fb fb fb fb fb fb fb fb fb fb fb fb fb fb fb fb
+>>                                            ^
+>>  ffff80003b9a2080: fb fb fb fb fb fb fb fc fc fc fc fc fc fc fc fb
+>>  ffff80003b9a2100: fb fb fb fb fb fb fb fb fb fb fb fb fb fb fb fb
+>> ==================================================================
 >
+> Another one that looks related and doesn't have parts of stack traces missing:
+>
+> ==================================================================
+> BUG: KASAN: use-after-free in find_vma+0x140/0x150 mm/mmap.c:2114
+> Read of size 8 at addr ffff800031a03e90 by task syz-executor/4360
+>
+> CPU: 2 PID: 4360 Comm: syz-executor Not tainted
+> 4.11.0-rc1-next-20170308-xc2-dirty #3
+> Hardware name: Hardkernel ODROID-C2 (DT)
+> Call trace:
+> [<ffff20000808fbb0>] dump_backtrace+0x0/0x440 arch/arm64/kernel/traps.c:505
+> [<ffff200008090010>] show_stack+0x20/0x30 arch/arm64/kernel/traps.c:228
+> [<ffff2000088e9578>] __dump_stack lib/dump_stack.c:16 [inline]
+> [<ffff2000088e9578>] dump_stack+0x110/0x168 lib/dump_stack.c:52
+> [<ffff200008414018>] print_address_description+0x60/0x248 mm/kasan/report.c:250
+> [<ffff2000084142e8>] kasan_report_error+0xe8/0x250 mm/kasan/report.c:349
+> [<ffff200008414564>] kasan_report mm/kasan/report.c:372 [inline]
+> [<ffff200008414564>] __asan_report_load8_noabort+0x3c/0x48 mm/kasan/report.c:393
+> [<ffff2000083a9048>] find_vma+0x140/0x150 mm/mmap.c:2114
+> [<ffff2000080dc19c>] kvm_arch_prepare_memory_region+0x2ac/0x488
+> arch/arm64/kvm/../../../arch/arm/kvm/mmu.c:1817
+
+It looks like we don't take the mmap_sem before calling find_vma() in
+stage2_unmap_memslot() and in kvm_arch_prepare_memory_region(), which is causing
+the race, with probably the test trying to unmap ranges in between.
+
+Suzuki
