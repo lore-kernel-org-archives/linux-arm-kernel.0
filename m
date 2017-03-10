@@ -1,117 +1,155 @@
 From: seanpaul@chromium.org (Sean Paul)
-Date: Thu,  9 Mar 2017 23:32:28 -0500
-Subject: [PATCH 13/41] drm/rockchip: pre dither down when output bpc is 8bit
+Date: Thu,  9 Mar 2017 23:32:42 -0500
+Subject: [PATCH 27/41] drm/rockchip: Restore psr->state when enable/disable
+ psr failed
 In-Reply-To: <20170310043305.17216-1-seanpaul@chromium.org>
 References: <20170310043305.17216-1-seanpaul@chromium.org>
-Message-ID: <20170310043305.17216-14-seanpaul@chromium.org>
+Message-ID: <20170310043305.17216-28-seanpaul@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mark Yao <mark.yao@rock-chips.com>
+From: zain wang <wzz@rock-chips.com>
 
-Some encoder have a crc verification check, crc check fail if
-input and output data is not equal.
+If we failed disable psr, it would hang the display until next psr
+cycle coming. So we should restore psr->state when it failed.
 
-That means encoder input and output need use same color depth,
-vop can output 10bit data to encoder, but some panel only support
-8bit depth, that would make crc check die.
-
-So pre dither down vop data to 8bit if panel's bpc is 8.
-
-Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
+Cc: Tomasz Figa <tfiga@chromium.org>
+Signed-off-by: zain wang <wzz@rock-chips.com>
+Signed-off-by: Douglas Anderson <dianders@chromium.org>
 Signed-off-by: Sean Paul <seanpaul@chromium.org>
 ---
- drivers/gpu/drm/rockchip/analogix_dp-rockchip.c | 4 ++++
- drivers/gpu/drm/rockchip/rockchip_drm_drv.h     | 1 +
- drivers/gpu/drm/rockchip/rockchip_drm_vop.c     | 4 ++++
- drivers/gpu/drm/rockchip/rockchip_drm_vop.h     | 1 +
- drivers/gpu/drm/rockchip/rockchip_vop_reg.c     | 6 ++++--
- 5 files changed, 14 insertions(+), 2 deletions(-)
+ drivers/gpu/drm/bridge/analogix/analogix_dp_core.c |  4 +++-
+ drivers/gpu/drm/rockchip/analogix_dp-rockchip.c    | 12 ++++++------
+ drivers/gpu/drm/rockchip/rockchip_drm_psr.c        | 20 +++++++++++++-------
+ drivers/gpu/drm/rockchip/rockchip_drm_psr.h        |  2 +-
+ 4 files changed, 23 insertions(+), 15 deletions(-)
 
+diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
+index dcf39ea0d14b..35ea04ff4078 100644
+--- a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
++++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
+@@ -156,8 +156,10 @@ int analogix_dp_disable_psr(struct device *dev)
+ 	psr_vsc.DB1 = 0;
+ 
+ 	ret = drm_dp_dpcd_writeb(&dp->aux, DP_SET_POWER, DP_SET_POWER_D0);
+-	if (ret != 1)
++	if (ret != 1) {
+ 		dev_err(dp->dev, "Failed to set DP Power0 %d\n", ret);
++		return ret;
++	}
+ 
+ 	return analogix_dp_send_psr_spd(dp, &psr_vsc, false);
+ }
 diff --git a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
-index f44756029478..b6c6d6d09d7e 100644
+index b6c6d6d09d7e..0614d32c5435 100644
 --- a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
 +++ b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
-@@ -225,6 +225,7 @@ rockchip_dp_drm_encoder_atomic_check(struct drm_encoder *encoder,
+@@ -76,7 +76,7 @@ struct rockchip_dp_device {
+ 	struct analogix_dp_plat_data plat_data;
+ };
+ 
+-static void analogix_dp_psr_set(struct drm_encoder *encoder, bool enabled)
++static int analogix_dp_psr_set(struct drm_encoder *encoder, bool enabled)
  {
- 	struct rockchip_crtc_state *s = to_rockchip_crtc_state(crtc_state);
  	struct rockchip_dp_device *dp = to_dp(encoder);
-+	struct drm_display_info *di = &conn_state->connector->display_info;
+ 	struct drm_crtc *crtc = dp->encoder.crtc;
+@@ -84,12 +84,12 @@ static void analogix_dp_psr_set(struct drm_encoder *encoder, bool enabled)
  	int ret;
  
- 	/*
-@@ -248,6 +249,9 @@ rockchip_dp_drm_encoder_atomic_check(struct drm_encoder *encoder,
- 			s->output_mode = ROCKCHIP_OUT_MODE_P888;
+ 	if (!analogix_dp_psr_enabled(dp->dev))
+-		return;
++		return 0;
+ 
+ 	dev_dbg(dp->dev, "%s PSR...\n", enabled ? "enable" : "disable");
+ 
+ 	if (!crtc)
+-		return;
++		return -EINVAL;
+ 
+ 	vact_end = crtc->mode.vtotal - crtc->mode.vsync_start + crtc->mode.vdisplay;
+ 
+@@ -97,13 +97,13 @@ static void analogix_dp_psr_set(struct drm_encoder *encoder, bool enabled)
+ 					  PSR_WAIT_LINE_FLAG_TIMEOUT_MS);
+ 	if (ret) {
+ 		dev_err(dp->dev, "line flag interrupt did not arrive\n");
+-		return;
++		return -ETIMEDOUT;
  	}
  
-+	s->output_bpc = di->bpc;
-+	s->output_type = DRM_MODE_CONNECTOR_eDP;
-+
- 	return 0;
+ 	if (enabled)
+-		analogix_dp_enable_psr(dp->dev);
++		return analogix_dp_enable_psr(dp->dev);
+ 	else
+-		analogix_dp_disable_psr(dp->dev);
++		return analogix_dp_disable_psr(dp->dev);
  }
  
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.h b/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
-index 1844951118da..a966d1d37378 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
-@@ -36,6 +36,7 @@ struct rockchip_crtc_state {
- 	struct drm_crtc_state base;
- 	int output_type;
- 	int output_mode;
-+	int output_bpc;
- };
- #define to_rockchip_crtc_state(s) \
- 		container_of(s, struct rockchip_crtc_state, base)
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-index aa5c528c59fc..ea3fff4170d9 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-@@ -968,6 +968,10 @@ static void vop_crtc_enable(struct drm_crtc *crtc)
- 		DRM_DEV_ERROR(vop->dev, "unsupported connector_type [%d]\n",
- 			      s->output_type);
- 	}
-+	if (s->output_mode == ROCKCHIP_OUT_MODE_AAAA && s->output_bpc == 8)
-+		VOP_CTRL_SET(vop, pre_dither_down, 1);
-+	else
-+		VOP_CTRL_SET(vop, pre_dither_down, 0);
- 	VOP_CTRL_SET(vop, out_mode, s->output_mode);
+ static int rockchip_dp_pre_init(struct rockchip_dp_device *dp)
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_psr.c b/drivers/gpu/drm/rockchip/rockchip_drm_psr.c
+index b339ca943139..9376f4396b6b 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_psr.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_psr.c
+@@ -36,7 +36,7 @@ struct psr_drv {
  
- 	VOP_CTRL_SET(vop, htotal_pw, (htotal << 16) | hsync_len);
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.h b/drivers/gpu/drm/rockchip/rockchip_drm_vop.h
-index 5a4faa85dbd2..9a1eb83271eb 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.h
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.h
-@@ -47,6 +47,7 @@ struct vop_ctrl {
- 	struct vop_reg mipi_en;
- 	struct vop_reg dp_en;
- 	struct vop_reg out_mode;
-+	struct vop_reg pre_dither_down;
- 	struct vop_reg dither_down;
- 	struct vop_reg dither_up;
- 	struct vop_reg pin_pol;
-diff --git a/drivers/gpu/drm/rockchip/rockchip_vop_reg.c b/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
-index 91fbc7b52147..e645a9621721 100644
---- a/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
-@@ -212,7 +212,8 @@ static const struct vop_ctrl rk3288_ctrl_data = {
- 	.hdmi_en = VOP_REG(RK3288_SYS_CTRL, 0x1, 13),
- 	.edp_en = VOP_REG(RK3288_SYS_CTRL, 0x1, 14),
- 	.mipi_en = VOP_REG(RK3288_SYS_CTRL, 0x1, 15),
--	.dither_down = VOP_REG(RK3288_DSP_CTRL1, 0xf, 1),
-+	.pre_dither_down = VOP_REG(RK3288_DSP_CTRL1, 0x1, 1),
-+	.dither_down = VOP_REG(RK3288_DSP_CTRL1, 0x7, 2),
- 	.dither_up = VOP_REG(RK3288_DSP_CTRL1, 0x1, 6),
- 	.data_blank = VOP_REG(RK3288_DSP_CTRL0, 0x1, 19),
- 	.out_mode = VOP_REG(RK3288_DSP_CTRL0, 0xf, 0),
-@@ -289,7 +290,8 @@ static const struct vop_ctrl rk3399_ctrl_data = {
- 	.hdmi_en = VOP_REG(RK3399_SYS_CTRL, 0x1, 13),
- 	.edp_en = VOP_REG(RK3399_SYS_CTRL, 0x1, 14),
- 	.mipi_en = VOP_REG(RK3399_SYS_CTRL, 0x1, 15),
--	.dither_down = VOP_REG(RK3399_DSP_CTRL1, 0xf, 1),
-+	.pre_dither_down = VOP_REG(RK3399_DSP_CTRL1, 0x1, 1),
-+	.dither_down = VOP_REG(RK3399_DSP_CTRL1, 0x7, 2),
- 	.dither_up = VOP_REG(RK3399_DSP_CTRL1, 0x1, 6),
- 	.data_blank = VOP_REG(RK3399_DSP_CTRL0, 0x1, 19),
- 	.out_mode = VOP_REG(RK3399_DSP_CTRL0, 0xf, 0),
+ 	struct delayed_work	flush_work;
+ 
+-	void (*set)(struct drm_encoder *encoder, bool enable);
++	int (*set)(struct drm_encoder *encoder, bool enable);
+ };
+ 
+ static struct psr_drv *find_psr_by_crtc(struct drm_crtc *crtc)
+@@ -93,19 +93,25 @@ static void psr_set_state_locked(struct psr_drv *psr, enum psr_state state)
+ 		return;
+ 	}
+ 
+-	psr->state = state;
+-
+ 	/* Actually commit the state change to hardware */
+-	switch (psr->state) {
++	switch (state) {
+ 	case PSR_ENABLE:
+-		psr->set(psr->encoder, true);
++		if (psr->set(psr->encoder, true))
++			return;
+ 		break;
+ 
+ 	case PSR_DISABLE:
+ 	case PSR_FLUSH:
+-		psr->set(psr->encoder, false);
++		if (psr->set(psr->encoder, false))
++			return;
+ 		break;
++
++	default:
++		pr_err("%s: Unknown state %d\n", __func__, state);
++		return;
+ 	}
++
++	psr->state = state;
+ }
+ 
+ static void psr_set_state(struct psr_drv *psr, enum psr_state state)
+@@ -229,7 +235,7 @@ EXPORT_SYMBOL(rockchip_drm_psr_flush_all);
+  * Zero on success, negative errno on failure.
+  */
+ int rockchip_drm_psr_register(struct drm_encoder *encoder,
+-			void (*psr_set)(struct drm_encoder *, bool enable))
++			int (*psr_set)(struct drm_encoder *, bool enable))
+ {
+ 	struct rockchip_drm_private *drm_drv = encoder->dev->dev_private;
+ 	struct psr_drv *psr;
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_psr.h b/drivers/gpu/drm/rockchip/rockchip_drm_psr.h
+index b1ea0155e57c..06537ee27565 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_psr.h
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_psr.h
+@@ -22,7 +22,7 @@ int rockchip_drm_psr_activate(struct drm_encoder *encoder);
+ int rockchip_drm_psr_deactivate(struct drm_encoder *encoder);
+ 
+ int rockchip_drm_psr_register(struct drm_encoder *encoder,
+-			void (*psr_set)(struct drm_encoder *, bool enable));
++			int (*psr_set)(struct drm_encoder *, bool enable));
+ void rockchip_drm_psr_unregister(struct drm_encoder *encoder);
+ 
+ #endif /* __ROCKCHIP_DRM_PSR__ */
 -- 
 2.12.0.246.ga2ecc84866-goog
