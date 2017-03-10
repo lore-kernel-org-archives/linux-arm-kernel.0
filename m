@@ -1,48 +1,150 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Fri, 10 Mar 2017 18:11:50 +0100
-Subject: [RESEND PATCH] arm: assabet_defconfig: disable IDE subsystem
-In-Reply-To: <a8eab3b1-8867-00dd-08e4-bcece23010a6@cogentembedded.com>
-References: <1467991490-24895-1-git-send-email-b.zolnierkie@samsung.com>
- <98031160-f7b4-3cff-043a-1f2ee62c8a01@ti.com>
- <a8eab3b1-8867-00dd-08e4-bcece23010a6@cogentembedded.com>
- <CGME20170310171153epcas5p259bf9353fd1194dd131350fc59c3423a@epcas5p2.samsung.com>
-Message-ID: <1717246.ZXLvBCRMKf@amdc3058>
+From: james.morse@arm.com (James Morse)
+Date: Fri, 10 Mar 2017 17:16:28 +0000
+Subject: {RFC PATCH v1 v4.11-rc1 1/1} acpi: apei: common handler in ghes
+ for HW errors notified via hed(PNP0C33) driver
+In-Reply-To: <86258A5CC0A3704780874CF6004BA8A62DCAF445@lhreml502-mbs>
+References: <86258A5CC0A3704780874CF6004BA8A62DCAF445@lhreml502-mbs>
+Message-ID: <58C2DF6C.6000900@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, March 09, 2017 03:24:56 PM Sergei Shtylyov wrote:
-> On 03/09/2017 03:20 PM, Sekhar Nori wrote:
-> 
-> > [...]
-> 
-> >>> diff --git a/arch/arm/mach-davinci/board-dm644x-evm.c
-> >>> b/arch/arm/mach-davinci/board-dm644x-evm.c
-> >>> index 023480b75244..60a1f23890cd 100644
-> >>> --- a/arch/arm/mach-davinci/board-dm644x-evm.c
-> >>> +++ b/arch/arm/mach-davinci/board-dm644x-evm.c
-> >>> @@ -744,7 +744,7 @@ static int davinci_phy_fixup(struct phy_device
-> >>> *phydev)
-> >>>      return 0;
-> >>>  }
-> >>>
-> >>> -#define HAS_ATA        IS_ENABLED(CONFIG_BLK_DEV_PALMCHIP_BK3710)
-> >>> +#define HAS_ATA        IS_ENABLED(CONFIG_PATA_BK3710)
-> >>
-> >>    I think it would be more correct to check for both libata and IDE
-> >> drivers here...
-> >
-> > As I understand, the plan is to remove the IDE driver soon.
-> 
->     I'm not sure DaveM would support any removals in drivers/ide/. He has 
-> explicitly expressed his will to maintain the IDE driuver forever.
+Hi Shiju,
 
-Well, he can always change his opinion. :-)
+On 07/03/17 16:07, Shiju Jose wrote:
+> Add common handler in ghes for HW errors notified via hed(PNP0C33) driver.
+> 1. Rename ghes_notify_sci() to ghes_notify_hed().
+> 2. Rename struct notifier_block ghes_notifier_sci to
+>    struct notifier_block ghes_notifier_hed.
+> 3. Rename ghes_sci list to ghes_hed.
+> 4. Make ghes_notify_hed as common handler for
+>    notification types SCI, GSIV and GPIO.
+> 
 
-Especially if the request for removal is for platform specific code only
-and it is agreed with the maintainers of the given platform..
+I think the code here is fine, but we need to put this in front of the ACPI
+maintainers, and if we can, make their job easy.
 
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+How did you come up with the CC list for this patch? scripts/get_maintainer.pl
+lists:
+> "Rafael J. Wysocki" <rjw@rjwysocki.net> (supporter:ACPI,commit_signer:2/4=50%)
+> Len Brown <lenb@kernel.org> (supporter:ACPI)
+
+as the maintainers for the file changed by this patch, but they weren't CCd.
+
+Did you use git format-patch to create this? All the other patches on the list
+have subjects of the form "[PATCH] acpi: apei....", the {}s confuse 'git am'
+meaning whoever applies this would have to edit your patch before applying it.
+
+
+Your commit message doesn't add anything that wasn't in the subject-line. It
+should describe the reason for the change. Based on Hanjun's explanation I can
+offer:
+---
+System Controller Interrupts are received by ACPI's error device, which in turn
+notifies the GHES code. The same is true of APEI's GSIV and GPIO notification types.
+Add support for GSIV and GPIO sharing the SCI register/unregister/notifier code.
+Rename the list and notifier to show this is no longer just SCI, but anything
+from the Hardware Error Device.
+
+---
+
+If you're confident you solved this the right way, (which I think we are), you
+should drop the 'RFC' from the subject. RFC indicates you don't think this
+should be merged you just want feedback.
+
+
+
+Thanks,
+
+James
+
+
+> diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
+> index b192b42..fd39929 100644
+> --- a/drivers/acpi/apei/ghes.c
+> +++ b/drivers/acpi/apei/ghes.c
+> @@ -89,14 +89,14 @@
+>  module_param_named(disable, ghes_disable, bool, 0);
+>  
+>  /*
+> - * All error sources notified with SCI shares one notifier function,
+> + * All error sources notified with HED shares one notifier function,
+>   * so they need to be linked and checked one by one.  This is applied
+>   * to NMI too.
+>   *
+>   * RCU is used for these lists, so ghes_list_mutex is only used for
+>   * list changing, not for traversing.
+>   */
+> -static LIST_HEAD(ghes_sci);
+> +static LIST_HEAD(ghes_hed);
+>  static DEFINE_MUTEX(ghes_list_mutex);
+>  
+>  /*
+> @@ -702,14 +702,14 @@ static irqreturn_t ghes_irq_func(int irq, void *data)
+>  	return IRQ_HANDLED;
+>  }
+>  
+> -static int ghes_notify_sci(struct notifier_block *this,
+> +static int ghes_notify_hed(struct notifier_block *this,
+>  				  unsigned long event, void *data)
+>  {
+>  	struct ghes *ghes;
+>  	int ret = NOTIFY_DONE;
+>  
+>  	rcu_read_lock();
+> -	list_for_each_entry_rcu(ghes, &ghes_sci, list) {
+> +	list_for_each_entry_rcu(ghes, &ghes_hed, list) {
+>  		if (!ghes_proc(ghes))
+>  			ret = NOTIFY_OK;
+>  	}
+> @@ -718,8 +718,8 @@ static int ghes_notify_sci(struct notifier_block *this,
+>  	return ret;
+>  }
+>  
+> -static struct notifier_block ghes_notifier_sci = {
+> -	.notifier_call = ghes_notify_sci,
+> +static struct notifier_block ghes_notifier_hed = {
+> +	.notifier_call = ghes_notify_hed,
+>  };
+>  
+>  #ifdef CONFIG_HAVE_ACPI_APEI_NMI
+> @@ -966,6 +966,8 @@ static int ghes_probe(struct platform_device *ghes_dev)
+>  	case ACPI_HEST_NOTIFY_POLLED:
+>  	case ACPI_HEST_NOTIFY_EXTERNAL:
+>  	case ACPI_HEST_NOTIFY_SCI:
+> +	case ACPI_HEST_NOTIFY_GSIV:
+> +	case ACPI_HEST_NOTIFY_GPIO:
+>  		break;
+>  	case ACPI_HEST_NOTIFY_NMI:
+>  		if (!IS_ENABLED(CONFIG_HAVE_ACPI_APEI_NMI)) {
+> @@ -1026,10 +1028,12 @@ static int ghes_probe(struct platform_device *ghes_dev)
+>  		}
+>  		break;
+>  	case ACPI_HEST_NOTIFY_SCI:
+> +	case ACPI_HEST_NOTIFY_GSIV:
+> +	case ACPI_HEST_NOTIFY_GPIO:
+>  		mutex_lock(&ghes_list_mutex);
+> -		if (list_empty(&ghes_sci))
+> -			register_acpi_hed_notifier(&ghes_notifier_sci);
+> -		list_add_rcu(&ghes->list, &ghes_sci);
+> +		if (list_empty(&ghes_hed))
+> +			register_acpi_hed_notifier(&ghes_notifier_hed);
+> +		list_add_rcu(&ghes->list, &ghes_hed);
+>  		mutex_unlock(&ghes_list_mutex);
+>  		break;
+>  	case ACPI_HEST_NOTIFY_NMI:
+> @@ -1068,10 +1072,12 @@ static int ghes_remove(struct platform_device *ghes_dev)
+>  		free_irq(ghes->irq, ghes);
+>  		break;
+>  	case ACPI_HEST_NOTIFY_SCI:
+> +	case ACPI_HEST_NOTIFY_GSIV:
+> +	case ACPI_HEST_NOTIFY_GPIO:
+>  		mutex_lock(&ghes_list_mutex);
+>  		list_del_rcu(&ghes->list);
+> -		if (list_empty(&ghes_sci))
+> -			unregister_acpi_hed_notifier(&ghes_notifier_sci);
+> +		if (list_empty(&ghes_hed))
+> +			unregister_acpi_hed_notifier(&ghes_notifier_hed);
+>  		mutex_unlock(&ghes_list_mutex);
+>  		break;
+>  	case ACPI_HEST_NOTIFY_NMI:
+> 
