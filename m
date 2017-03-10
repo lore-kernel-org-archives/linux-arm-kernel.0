@@ -1,71 +1,55 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 10 Mar 2017 17:52:30 +0000
-Subject: [RFC arm64] samples/bpf: explicitly exclude sysreg sections with
- asm macros
-In-Reply-To: <1489101492-15653-1-git-send-email-andy@greyhouse.net>
-References: <1489101492-15653-1-git-send-email-andy@greyhouse.net>
-Message-ID: <20170310175229.GC18894@arm.com>
+Date: Fri, 10 Mar 2017 17:58:55 +0000
+Subject: [PATCH 1/6] arm64: Use full path in KBUILD_IMAGE definition
+In-Reply-To: <20161122213434.14788-1-mmarek@suse.com>
+References: <20161122213434.14788-1-mmarek@suse.com>
+Message-ID: <20170310175854.GE18894@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andy,
+Hi Michael,
 
-On Thu, Mar 09, 2017 at 06:18:12PM -0500, Andy Gospodarek wrote:
-> The previous fix to workaround compilation issues for samples/bpf on arm64 was
-> to prevent inclusion of code in sysregs.h.  This is not sustainable at this
-> point since other header files need access to sysregs.h for multiple
-> defintions.  The fact that the bpf samples cannot be compiled on arm64 is
-> fairly well documented on the iovisor-dev mailing and other places without a
-> clear-cut solution other than waiting for the llvm fix.  This attempts to
-> resolve that by dropping the fix to define _ASM_SYSREG_H on the clang command
-> line, and replace it with one that is wrapped around the offending code.  I
-> recognize this feels a bit fragile, but the current situation is not great
-> either and it seems that we are more likely to see users if the current code
-> actually compiles and runs.
-
-Why does asm cause compilation to fail?
-
-> Despite now being able to compile and run bpf programs on arm64 there
-> are still known warnings when building:
+On Tue, Nov 22, 2016 at 10:34:29PM +0100, Michal Marek wrote:
+> The KBUILD_IMAGE variable is used by the rpm and deb-pkg targets, which
+> expect it to point to the image file in the build directory. The
+> builddeb script has a workaround for architectures which only provide
+> the basename, but let's provide a clean interface for packaging tools.
 > 
-> ./include/net/sock.h:2322:35: warning: value size does not match
-> register size specified by the constraint and modifier
-> [-Wasm-operand-widths]
->         smp_store_release(&sk->sk_state, newstate);
->                                          ^
-> ./include/net/sock.h:2322:2: note: use constraint modifier "w"
->         smp_store_release(&sk->sk_state, newstate);
->         ^
-> ./include/asm-generic/barrier.h:157:33: note: expanded from macro
->                                 ^
-> ./arch/arm64/include/asm/barrier.h:62:23: note: expanded from macro
-> '__smp_store_release'
->                 asm volatile ("stlr %1, %0"                     \
-
-I don't think this is relevant to the message for this commit.
-
-> Discussed here: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=63359
-> 
-> Fixes: 30b50aa61201 ("bpf: samples: exclude asm/sysreg.h for arm64")
-> Signed-off-by: Andy Gospodarek <gospo@broadcom.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Signed-off-by: Michal Marek <mmarek@suse.com>
 > ---
->  arch/arm64/include/asm/sysreg.h | 3 ++-
->  samples/bpf/Makefile            | 2 +-
->  2 files changed, 3 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-> index ac24b6e..91ee2db 100644
-> --- a/arch/arm64/include/asm/sysreg.h
-> +++ b/arch/arm64/include/asm/sysreg.h
-> @@ -287,6 +287,7 @@
->  #else
->  
->  #include <linux/types.h>
-> +#ifndef __AVOID_ASM_MACROS__
+>  arch/arm64/Makefile | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
 
-Yeah, this is pretty horrible. It would prefer to have a script that
-generates the header files needed by clang, without adding these ifdefs
-whenever something new fails to compile, but I don't understand why things
-are failing at all at the moment.
+What's the plan for this patch? I'm happy to merge it, but I don't see
+the rest of the series queued anywhere.
+
+Thanks,
 
 Will
+
+> diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+> index 3635b8662724..80b6866bcacb 100644
+> --- a/arch/arm64/Makefile
+> +++ b/arch/arm64/Makefile
+> @@ -94,12 +94,12 @@ libs-y		:= arch/arm64/lib/ $(libs-y)
+>  core-$(CONFIG_EFI_STUB) += $(objtree)/drivers/firmware/efi/libstub/lib.a
+>  
+>  # Default target when executing plain make
+> -KBUILD_IMAGE	:= Image.gz
+> +boot		:= arch/arm64/boot
+> +KBUILD_IMAGE	:= $(boot)/Image.gz
+>  KBUILD_DTBS	:= dtbs
+>  
+> -all:	$(KBUILD_IMAGE) $(KBUILD_DTBS)
+> +all:	Image.gz $(KBUILD_DTBS)
+>  
+> -boot := arch/arm64/boot
+>  
+>  Image: vmlinux
+>  	$(Q)$(MAKE) $(build)=$(boot) $(boot)/$@
+> -- 
+> 2.10.0
+> 
