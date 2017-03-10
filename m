@@ -1,98 +1,81 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Fri, 10 Mar 2017 09:23:59 +0000
-Subject: [PATCH v3 7/7] ARM: dma-mapping: Remove traces of NOMMU code
-In-Reply-To: <1489137839-549-1-git-send-email-vladimir.murzin@arm.com>
-References: <1489137839-549-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <1489137839-549-8-git-send-email-vladimir.murzin@arm.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Fri, 10 Mar 2017 10:08:01 +0100
+Subject: [PATCH 4.10 038/167] coresight: fix kernel panic caused by invalid CPU
+In-Reply-To: <20170310083956.767605269@linuxfoundation.org>
+References: <20170310083956.767605269@linuxfoundation.org>
+Message-ID: <20170310083959.417193928@linuxfoundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DMA operations for NOMMU case have been just factored out into
-separate compilation unit, so don't keep dead code.
+4.10-stable review patch.  If anyone has any objections, please let me know.
 
-Tested-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
-Tested-by: Andras Szemzo <sza@esh.hu>
-Tested-by: Alexandre TORGUE <alexandre.torgue@st.com>
-Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+------------------
+
+From: Wang Nan <wangnan0@huawei.com>
+
+commit f09444639099584bc4784dfcd85ada67c6f33e0f upstream.
+
+Commit d52c9750f150 ("coresight: reset "enable_sink" flag when need be")
+caused a kernel panic because of the using of an invalid value: after
+'for_each_cpu(cpu, mask)', value of local variable 'cpu' become invalid,
+causes following 'cpu_to_node' access invalid memory area.
+
+This patch brings the deleted 'cpu = cpumask_first(mask)' back.
+
+Panic log:
+
+ $ perf record -e cs_etm// ls
+
+ Unable to handle kernel paging request at virtual address fffe801804af4f10
+ pgd = ffff8017ce031600
+ [fffe801804af4f10] *pgd=0000000000000000, *pud=0000000000000000
+ Internal error: Oops: 96000004 [#1] SMP
+ Modules linked in:
+ CPU: 33 PID: 1619 Comm: perf Not tainted 4.7.1+ #16
+ Hardware name: Huawei Taishan 2280 /CH05TEVBA, BIOS 1.10 11/24/2016
+ task: ffff8017cb0c8400 ti: ffff8017cb154000 task.ti: ffff8017cb154000
+ PC is at tmc_alloc_etf_buffer+0x60/0xd4
+ LR is at tmc_alloc_etf_buffer+0x44/0xd4
+ pc : [<ffff000008633df8>] lr : [<ffff000008633ddc>] pstate: 60000145
+ sp : ffff8017cb157b40
+ x29: ffff8017cb157b40 x28: 0000000000000000
+ ...skip...
+ 7a60: ffff000008c64dc8 0000000000000006 0000000000000253 ffffffffffffffff
+ 7a80: 0000000000000000 0000000000000000 ffff0000080872cc 0000000000000001
+ [<ffff000008633df8>] tmc_alloc_etf_buffer+0x60/0xd4
+ [<ffff000008632b9c>] etm_setup_aux+0x1dc/0x1e8
+ [<ffff00000816eed4>] rb_alloc_aux+0x2b0/0x338
+ [<ffff00000816a5e4>] perf_mmap+0x414/0x568
+ [<ffff0000081ab694>] mmap_region+0x324/0x544
+ [<ffff0000081abbe8>] do_mmap+0x334/0x3e0
+ [<ffff000008191150>] vm_mmap_pgoff+0xa4/0xc8
+ [<ffff0000081a9a30>] SyS_mmap_pgoff+0xb0/0x22c
+ [<ffff0000080872e4>] sys_mmap+0x18/0x28
+ [<ffff0000080843f0>] el0_svc_naked+0x24/0x28
+ Code: 912040a5 d0001c00 f873d821 911c6000 (b8656822)
+ ---[ end trace 98933da8f92b0c9a ]---
+
+Signed-off-by: Wang Nan <wangnan0@huawei.com>
+Cc: Xia Kaixu <xiakaixu@huawei.com>
+Cc: Li Zefan <lizefan@huawei.com>
+Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+Fixes: d52c9750f150 ("coresight: reset "enable_sink" flag when need be")
+Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+
 ---
- arch/arm/mm/dma-mapping.c | 29 ++---------------------------
- 1 file changed, 2 insertions(+), 27 deletions(-)
+ drivers/hwtracing/coresight/coresight-etm-perf.c |    1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index 63eabb0..e61d387 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -344,8 +344,6 @@ static void __dma_free_buffer(struct page *page, size_t size)
- 	}
- }
+--- a/drivers/hwtracing/coresight/coresight-etm-perf.c
++++ b/drivers/hwtracing/coresight/coresight-etm-perf.c
+@@ -242,6 +242,7 @@ static void *etm_setup_aux(int event_cpu
+ 	if (!sink_ops(sink)->alloc_buffer)
+ 		goto err;
  
--#ifdef CONFIG_MMU
--
- static void *__alloc_from_contiguous(struct device *dev, size_t size,
- 				     pgprot_t prot, struct page **ret_page,
- 				     const void *caller, bool want_vaddr,
-@@ -647,22 +645,6 @@ static inline pgprot_t __get_dma_pgprot(unsigned long attrs, pgprot_t prot)
- 	return prot;
- }
- 
--#define nommu() 0
--
--#else	/* !CONFIG_MMU */
--
--#define nommu() 1
--
--#define __get_dma_pgprot(attrs, prot)				__pgprot(0)
--#define __alloc_remap_buffer(dev, size, gfp, prot, ret, c, wv)	NULL
--#define __alloc_from_pool(size, ret_page)			NULL
--#define __alloc_from_contiguous(dev, size, prot, ret, c, wv, coherent_flag, gfp)	NULL
--#define __free_from_pool(cpu_addr, size)			do { } while (0)
--#define __free_from_contiguous(dev, page, cpu_addr, size, wv)	do { } while (0)
--#define __dma_free_remap(cpu_addr, size)			do { } while (0)
--
--#endif	/* CONFIG_MMU */
--
- static void *__alloc_simple_buffer(struct device *dev, size_t size, gfp_t gfp,
- 				   struct page **ret_page)
- {
-@@ -805,7 +787,7 @@ static void *__dma_alloc(struct device *dev, size_t size, dma_addr_t *handle,
- 
- 	if (cma)
- 		buf->allocator = &cma_allocator;
--	else if (nommu() || is_coherent)
-+	else if (is_coherent)
- 		buf->allocator = &simple_allocator;
- 	else if (allowblock)
- 		buf->allocator = &remap_allocator;
-@@ -854,8 +836,7 @@ static int __arm_dma_mmap(struct device *dev, struct vm_area_struct *vma,
- 		 void *cpu_addr, dma_addr_t dma_addr, size_t size,
- 		 unsigned long attrs)
- {
--	int ret = -ENXIO;
--#ifdef CONFIG_MMU
-+	int ret;
- 	unsigned long nr_vma_pages = (vma->vm_end - vma->vm_start) >> PAGE_SHIFT;
- 	unsigned long nr_pages = PAGE_ALIGN(size) >> PAGE_SHIFT;
- 	unsigned long pfn = dma_to_pfn(dev, dma_addr);
-@@ -870,10 +851,6 @@ static int __arm_dma_mmap(struct device *dev, struct vm_area_struct *vma,
- 				      vma->vm_end - vma->vm_start,
- 				      vma->vm_page_prot);
- 	}
--#else
--	ret = vm_iomap_memory(vma, vma->vm_start,
--			      (vma->vm_end - vma->vm_start));
--#endif	/* CONFIG_MMU */
- 
- 	return ret;
- }
-@@ -892,9 +869,7 @@ int arm_dma_mmap(struct device *dev, struct vm_area_struct *vma,
- 		 void *cpu_addr, dma_addr_t dma_addr, size_t size,
- 		 unsigned long attrs)
- {
--#ifdef CONFIG_MMU
- 	vma->vm_page_prot = __get_dma_pgprot(attrs, vma->vm_page_prot);
--#endif	/* CONFIG_MMU */
- 	return __arm_dma_mmap(dev, vma, cpu_addr, dma_addr, size, attrs);
- }
- 
--- 
-2.0.0
++	cpu = cpumask_first(mask);
+ 	/* Get the AUX specific data from the sink buffer */
+ 	event_data->snk_config =
+ 			sink_ops(sink)->alloc_buffer(sink, cpu, pages,
