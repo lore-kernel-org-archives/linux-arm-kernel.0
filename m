@@ -1,68 +1,62 @@
 From: pavel@ucw.cz (Pavel Machek)
-Date: Fri, 10 Mar 2017 22:55:16 +0100
-Subject: [PATCH v4 14/36] [media] v4l2-mc: add a function to inherit
- controls from a pipeline
-In-Reply-To: <20170310174228.3fe39100@vento.lan>
-References: <1487211578-11360-1-git-send-email-steve_longerbeam@mentor.com>
- <1487211578-11360-15-git-send-email-steve_longerbeam@mentor.com>
- <20170302160257.GK3220@valkosipuli.retiisi.org.uk>
- <20170303230645.GR21222@n2100.armlinux.org.uk>
- <20170304131329.GV3220@valkosipuli.retiisi.org.uk>
- <a7b8e095-a95c-24bd-b1e9-e983f18061c4@xs4all.nl>
- <20170310130733.GU21222@n2100.armlinux.org.uk>
- <20170310122634.0ffda7c6@vento.lan>
- <20170310155708.GX21222@n2100.armlinux.org.uk>
- <20170310174228.3fe39100@vento.lan>
-Message-ID: <20170310215515.GA6540@amd>
+Date: Fri, 10 Mar 2017 22:57:32 +0100
+Subject: [PATCH v5 07/39] ARM: dts: imx6qdl-sabrelite: remove erratum
+ ERR006687 workaround
+In-Reply-To: <CAOMZO5BNrSEyrbWbCBCbsy4yTrh4AHfk2Too0qHuffxqUCgADg@mail.gmail.com>
+References: <1489121599-23206-1-git-send-email-steve_longerbeam@mentor.com>
+ <1489121599-23206-8-git-send-email-steve_longerbeam@mentor.com>
+ <9f5d0ac4-0602-c729-5c00-1d9ef49247c1@boundarydevices.com>
+ <CAOMZO5BNrSEyrbWbCBCbsy4yTrh4AHfk2Too0qHuffxqUCgADg@mail.gmail.com>
+Message-ID: <20170310215731.GB6540@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On Fri 2017-03-10 16:17:28, Fabio Estevam wrote:
+> On Fri, Mar 10, 2017 at 3:59 PM, Troy Kisky
+> <troy.kisky@boundarydevices.com> wrote:
+> > On 3/9/2017 8:52 PM, Steve Longerbeam wrote:
+> >> There is a pin conflict with GPIO_6. This pin functions as a power
+> >> input pin to the OV5642 camera sensor, but ENET uses it as the h/w
+> >> workaround for erratum ERR006687, to wake-up the ARM cores on normal
+> >> RX and TX packet done events. So we need to remove the h/w workaround
+> >> to support the OV5642. The result is that the CPUidle driver will no
+> >> longer allow entering the deep idle states on the sabrelite.
+> >>
+> >> This is a partial revert of
+> >>
+> >> commit 6261c4c8f13e ("ARM: dts: imx6qdl-sabrelite: use GPIO_6 for FEC
+> >>                       interrupt.")
+> >> commit a28eeb43ee57 ("ARM: dts: imx6: tag boards that have the HW workaround
+> >>                       for ERR006687")
+> >>
+> >> Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
+> >> ---
+> >>  arch/arm/boot/dts/imx6qdl-sabrelite.dtsi | 4 ----
+> >>  1 file changed, 4 deletions(-)
+> >>
+> >> diff --git a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
+> >> index 8413179..89dce27 100644
+> >> --- a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
+> >> +++ b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
+> >> @@ -270,9 +270,6 @@
+> >>       txd1-skew-ps = <0>;
+> >>       txd2-skew-ps = <0>;
+> >>       txd3-skew-ps = <0>;
+> >
+> > How about
+> >
+> > +#if !IS_ENABLED(CONFIG_VIDEO_OV5642)
 
-> Argh! that is indeed a bug at libv4l (and maybe at gstreamer).
-> 
-> I guess that the always_needs_conversion logic was meant to be used to
-> really odd proprietary formats, e. g:
-> 	
-> /*  Vendor-specific formats   */
-> #define V4L2_PIX_FMT_CPIA1    v4l2_fourcc('C', 'P', 'I', 'A') /* cpia1 YUV */
-> #define V4L2_PIX_FMT_WNVA     v4l2_fourcc('W', 'N', 'V', 'A') /* Winnov hw compress */
-> #define V4L2_PIX_FMT_SN9C10X  v4l2_fourcc('S', '9', '1', '0') /* SN9C10x compression */
-> ...
-> 
-> I suspect that nobody uses libv4l2 with MC-based V4L2 devices. That's
-> likely why nobody reported this bug before (that I know of).
-> 
-> In any case, for non-proprietary formats, the default should be to
-> always offer both the emulated format and the original one.
-> 
-> I suspect that the enclosed patch should fix the issue with bayer formats.
+dts is supposed to be hardware description.
 
-...
-> @@ -178,7 +178,7 @@ struct v4lconvert_data *v4lconvert_create_with_dev_ops(int fd, void *dev_ops_pri
->  	/* This keeps tracks of devices which have only formats for which apps
->  	   most likely will need conversion and we can thus safely add software
->  	   processing controls without a performance impact. */
-> -	int always_needs_conversion = 1;
-> +	int always_needs_conversion = 0;
->  
->  	if (!data) {
->  		fprintf(stderr, "libv4lconvert: error: out of memory!\n");
-> @@ -208,8 +208,8 @@ struct v4lconvert_data *v4lconvert_create_with_dev_ops(int fd, void *dev_ops_pri
->  		if (j < ARRAY_SIZE(supported_src_pixfmts)) {
->  			data->supported_src_formats |= 1ULL << j;
->  			v4lconvert_get_framesizes(data, fmt.pixelformat, j);
-> -			if (!supported_src_pixfmts[j].needs_conversion)
-> -				always_needs_conversion = 0;
-> +			if (supported_src_pixfmts[j].needs_conversion)
-> +				always_needs_conversion = 1;
->  		} else
->  			always_needs_conversion = 0;
->  	}
+> Or maybe just create a new device tree for using the camera, like
+> imx6q-sabrelite-camera.dts.
 
-Is the else still needed? You changed default to 0...
+And it should not depend on configuration. Hardware vendor should be
+able to ship board with working device tree...
 
-										Pavel
+									Pavel
+
 -- 
 (english) http://www.livejournal.com/~pavelmachek
 (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
@@ -72,4 +66,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 181 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170310/9f4e10d8/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170310/f0ee59e9/attachment.sig>
