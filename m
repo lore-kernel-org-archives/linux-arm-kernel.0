@@ -1,62 +1,108 @@
-From: josh.beavers@gmail.com (Josh Beavers)
-Date: Fri, 10 Mar 2017 14:20:45 -0500
-Subject: Managing shared buffers on VIVT cache systems
-In-Reply-To: <20170310105922.GS21222@n2100.armlinux.org.uk>
-References: <CAE=AiOO4J1qGjZb5dqhniQ04aV+WBh4HU+TLsDbXgkrATB8iiw@mail.gmail.com>
- <20170310105922.GS21222@n2100.armlinux.org.uk>
-Message-ID: <CAE=AiOOwycY2XcFESotYaFuZ4gazU9HvQoQBGebZJZ73dASDCw@mail.gmail.com>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Sat, 11 Mar 2017 03:25:02 +0800
+Subject: [PATCH v2 05/11] Documentation: DT: bindings: mfd: add A33 GPADC
+ binding
+In-Reply-To: <20170310103921.19469-6-quentin.schulz@free-electrons.com>
+References: <20170310103921.19469-1-quentin.schulz@free-electrons.com>
+ <20170310103921.19469-6-quentin.schulz@free-electrons.com>
+Message-ID: <5798131489173902@web12o.yandex.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russel,
-
-Thank you for the fast and outstanding explanation!  I did not expect
-such a thorough response.
 
 
-On Fri, Mar 10, 2017 at 5:59 AM, Russell King - ARM Linux
-<linux@armlinux.org.uk> wrote:
-> There are essentially two options:
-> (a) flush the cache for _each_ virtual alias whenever you modify the
->     data via one of those aliases.
-> (b) map the memory uncacheable, so that aliases do not happen in the
->     first place.
+10.03.2017, 18:56, "Quentin Schulz" <quentin.schulz@free-electrons.com>:
+> This patch adds documentation for the A33 GPADC binding.
 >
-> Under Linux on ARM with VIVT caches, we do a mixture of both with the
-> page cache and multiple userspace mmap()s.  The page cache tends to
-> always have a kernel mapping which aliases with any userspace mapping.
-> Whenever the kernel writes to its mapping, it calls flush_dcache_page(),
-> which flushes the kernel mapping, and then calls into
-> __flush_dcache_aliases() to flush all the currently visible userspace
-> aliases.
+> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+> ---
 >
-> When userspace sets up multiple mmap()s for the same _shared mapping_
-> memory in the same process address space, then the code in
-> make_coherent() triggers to make the mappings uncacheable, since
-> userspace is allowed to write to any alias and read the updated data
-> from any alias without issuing cache flushes.
+> added in v2
+>
+> ?.../devicetree/bindings/mfd/sun4i-gpadc.txt | 59 ++++++++++++++++++++++
+> ?1 file changed, 59 insertions(+)
+> ?create mode 100644 Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt
+>
+> diff --git a/Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt b/Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt
+> new file mode 100644
+> index 0000000..17242c8
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt
+> @@ -0,0 +1,59 @@
+> +Allwinner SoCs' GPADC Device Tree bindings
+> +------------------------------------------
+> +The Allwinner SoCs all have an ADC that can also act as a thermal sensor
+> +and sometimes as a touchscreen controller.
+> +
+> +Required properties:
+> + - compatible: "sun8i-a33-gpadc-iio",
+> + - reg: mmio address range of the chip,
+> + - #thermal-sensor-cells: shall be 0,
+> + - #io-channel-cells: shall be 0,
+> +
+> +Example:
+> + rtp: rtp at 01c25000 {
 
-I can manually call flush_dcache_page() (which calls
-__flush_dcache_aliases()) after the kernel writes to a shared buffer
-and before the kernel reads from a shared buffer.  Am I understanding
-correctly that this is a proper solution even on a VIVT system, as
-long as vmalloc() / vmalloc_user() are not used?
+I think we'd better call it ths.
 
-I did not realize it was possible to make mappings uncatchable with
-make_coherent().  Is this something that will happen automatically
-when a properly mapped buffer is used, or something that requires
-careful userspace sequencing (mapping / unmapping on the fly, etc.)?
-I do not fully grasp the make_coherent() path, though I am about to
-instrument up a calltrace.
+And can you make thermal-sensor-cells become 1?
 
+Maxime Ripard wants to base H3/H5/A64 thermal driver on this patchset, and
+for H5/A64 there's 2/3 thermal sensors.
 
-> Now for the bit you're not going to like: There is no support in Linux
-> for coherency between vmalloc() mappings and userspace mappings on VIVT
-> systems.
+Thus for A33/H3 we will have thermal-sensor-cells to 1, but only have
+<&ths 0>.
 
-Are there any particular allocation paradigms that would be best for
-refactoring vmalloc_user() out of a driver?
-
-
-Thanks again,
--J
+> + compatible = "allwinner,sun8i-a33-gpadc-iio";
+> + reg = <0x01c25000 0x100>;
+> + #thermal-sensor-cells = <0>;
+> + #io-channel-cells = <0>;
+> + };
+> +
+> +sun4i, sun5i and sun6i SoCs are also supported via the older binding:
+> +
+> +sun4i resistive touchscreen controller
+> +--------------------------------------
+> +
+> +Required properties:
+> + - compatible: "allwinner,sun4i-a10-ts", "allwinner,sun5i-a13-ts" or
+> + "allwinner,sun6i-a31-ts"
+> + - reg: mmio address range of the chip
+> + - interrupts: interrupt to which the chip is connected
+> + - #thermal-sensor-cells: shall be 0
+> +
+> +Optional properties:
+> + - allwinner,ts-attached : boolean indicating that an actual touchscreen
+> + is attached to the controller
+> + - allwinner,tp-sensitive-adjust : integer (4 bits)
+> + adjust sensitivity of pen down detection
+> + between 0 (least sensitive) and 15
+> + (defaults to 15)
+> + - allwinner,filter-type : integer (2 bits)
+> + select median and averaging filter
+> + samples used for median / averaging filter
+> + 0: 4/2
+> + 1: 5/3
+> + 2: 8/4
+> + 3: 16/8
+> + (defaults to 1)
+> +
+> +Example:
+> +
+> + rtp: rtp at 01c25000 {
+> + compatible = "allwinner,sun4i-a10-ts";
+> + reg = <0x01c25000 0x100>;
+> + interrupts = <29>;
+> + allwinner,ts-attached;
+> + #thermal-sensor-cells = <0>;
+> + /* sensitive/noisy touch panel */
+> + allwinner,tp-sensitive-adjust = <0>;
+> + allwinner,filter-type = <3>;
+> + };
+> --
+> 2.9.3
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
