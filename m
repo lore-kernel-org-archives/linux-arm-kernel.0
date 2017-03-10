@@ -1,52 +1,39 @@
-From: sumit.semwal@linaro.org (Sumit Semwal)
-Date: Fri, 10 Mar 2017 14:23:53 +0530
-Subject: [RFC PATCH 08/12] cma: Store a name in the cma structure
-In-Reply-To: <1488491084-17252-9-git-send-email-labbott@redhat.com>
-References: <1488491084-17252-1-git-send-email-labbott@redhat.com>
- <1488491084-17252-9-git-send-email-labbott@redhat.com>
-Message-ID: <CAO_48GEHxuMMwZO71ytaVhRkapMYaAWBWd1gW+ktspnQg=b8Sw@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 10 Mar 2017 10:21:59 +0100
+Subject: [PATCH v2 0/6] ARM: dts: renesas: Add INTC-SYS clock to device
+ tree
+In-Reply-To: <1488819491-26097-1-git-send-email-geert+renesas@glider.be>
+References: <1488819491-26097-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <20170310092159.GE21820@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laura,
+On Mon, Mar 06, 2017 at 05:58:05PM +0100, Geert Uytterhoeven wrote:
+> 	Hi Simon, Magnus,
+> 
+> This patch series improves the topology description in DT of the ARM GIC
+> on Renesas SoCs using the legacy CPG/MSTP bindings (R-Mobile APE6 and
+> R-Car Gen2).  It describes the INTC-SYS clock, links the GIC to its
+> module clock, and adds the GIC to the SYSC "always on" PM Domain.
+> 
+> Note that currently the GIC-400 driver doesn't support module clocks nor
+> Runtime PM, so this must be handled as a critical clock.  Hence this
+> series depends on commit e34084fb9a023d1d ("clk: renesas: mstp: Make
+> INTC-SYS a critical clock"), which is in v4.11-rc1.
+> 
+> This series is the counterpart of "[PATCH 0/4] ARM/arm64: dts: renesas:
+> Link ARM GIC to clock and clock domain" for SoCs not yet migrated to the
+> new CPG/MSSR driver.  The latter is already part of v4.11-rc1 as it had
+> less dependencies.
+> 
+> Changes compared to v1:
+>   - Add missing "power-domains" property,
+>   - Add clock-names property,
+>   - Rebased on top of CPG Clock Domain and R-Car SYSC PM Domain support,
+>   - Add r8a7792 patch,
+>   - Please refer to the individual patch changelogs for more details
+>     (v1 dates back to 2014).
+> 
+> Thanks for applying!
 
-Thanks for the patch.
-
-On 3 March 2017 at 03:14, Laura Abbott <labbott@redhat.com> wrote:
->
-> Frameworks that may want to enumerate CMA heaps (e.g. Ion) will find it
-> useful to have an explicit name attached to each region. Store the name
-> in each CMA structure.
->
-> Signed-off-by: Laura Abbott <labbott@redhat.com>
-> ---
->  drivers/base/dma-contiguous.c |  5 +++--
->  include/linux/cma.h           |  4 +++-
->  mm/cma.c                      | 11 +++++++++--
->  mm/cma.h                      |  1 +
->  mm/cma_debug.c                |  2 +-
->  5 files changed, 17 insertions(+), 6 deletions(-)
->
-<snip>
-> +const char *cma_get_name(const struct cma *cma)
-> +{
-> +       return cma->name ? cma->name : "(undefined)";
-> +}
-> +
-Would it make sense to perhaps have the idx stored as the name,
-instead of 'undefined'? That would make sure that the various cma
-names are still unique.
-
->  static unsigned long cma_bitmap_aligned_mask(const struct cma *cma,
->                                              int align_order)
->  {
-> @@ -168,6 +173,7 @@ core_initcall(cma_init_reserved_areas);
->   */
->  int __init cma_init_reserved_mem(phys_addr_t base, phys_addr_t size,
->                                  unsigned int order_per_bit,
-> +                                const char *name,
->                                  struct cma **res_cma)
->  {
-
-Best regards,
-Sumit.
+Thanks, done.
