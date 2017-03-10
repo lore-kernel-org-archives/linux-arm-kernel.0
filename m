@@ -1,94 +1,72 @@
-From: slash.tmp@free.fr (Mason)
-Date: Fri, 10 Mar 2017 15:53:24 +0100
-Subject: Neophyte questions about PCIe
-In-Reply-To: <1092d971-5d81-2da7-4b34-0a88637c0ec5@arm.com>
-References: <ced6a4bf-c94a-c116-1e94-52a8d675d132@free.fr>
- <20170308151724.GA20780@bhelgaas-glaptop.roam.corp.google.com>
- <f964ee05-db7f-c381-c91c-82897175da6d@free.fr>
- <1092d971-5d81-2da7-4b34-0a88637c0ec5@arm.com>
-Message-ID: <18b339ae-d8da-25ac-0eea-2e147a7e29d2@free.fr>
+From: niklas.cassel@axis.com (Niklas Cassel)
+Date: Fri, 10 Mar 2017 15:59:04 +0100
+Subject: [RESEND PATCH v3 5/7] PCI: dwc: all: Modify dbi accessors to
+ access data of 4/2/1 bytes
+In-Reply-To: <58C2A46D.2080907@ti.com>
+References: <1489041545-15730-1-git-send-email-kishon@ti.com>
+ <1489041545-15730-6-git-send-email-kishon@ti.com>
+ <a56e462d-83ee-194f-1f9f-3f4c339cad46@axis.com> <58C29648.5020708@ti.com>
+ <61f90a03-7164-8e79-f1c2-0ae48b5892a8@axis.com> <58C2A46D.2080907@ti.com>
+Message-ID: <90b8c0de-e3e8-546f-9327-2e1a21376c88@axis.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/03/2017 14:15, Robin Murphy wrote:
-> On 09/03/17 23:43, Mason wrote:
->> On 08/03/2017 16:17, Bjorn Helgaas wrote:
->> [snip excellent in-depth overview]
+On 03/10/2017 02:04 PM, Kishon Vijay Abraham I wrote:
+> Hi,
+>
+> On Friday 10 March 2017 06:26 PM, Niklas Cassel wrote:
+>> On 03/10/2017 01:04 PM, Kishon Vijay Abraham I wrote:
+>>> Hi,
+>>>
+>>> On Thursday 09 March 2017 08:18 PM, Niklas Cassel wrote:
+>>>> On 03/09/2017 07:39 AM, Kishon Vijay Abraham I wrote:
+>>>>> Previously dbi accessors can be used to access data of size 4
+>>>>> bytes. But there might be situations (like accessing
+>>>>> MSI_MESSAGE_CONTROL in order to set/get the number of required
+>>>>> MSI interrupts in EP mode) where dbi accessors must
+>>>>> be used to access data of size 2. This is in preparation for
+>>>>> adding endpoint mode support to designware driver.
+>>>> Hello Kishon
+>>>>
+>>>> I don't really like the idea of adding an extra argument to every existing read/write.
+>>>> Will not a read/write of length != 32 be quite uncommon compared to
+>>>> a read/write of length == 32?
+>>>>
+>>>> How about adding some defines to pcie-designware.h:
+>>>>
+>>>> #define dw_pcie_writel_dbi(pci, base, reg, val) dw_pcie_write_dbi(pci, base, reg, 0x4, val)
+>>>> #define dw_pcie_readl_dbi(pci, base, reg) dw_pcie_read_dbi(pci, base, reg, 0x4)
+>>>>
+>>>> That way we don't have to change every existing read/write.
+>>>>
+>>>>
+>>>>
+>>>> Is there a reason why we can't just do:
+>>>>
+>>>> vial = dw_pcie_readl_dbi(pci, base, MSI_MESSAGE_CONTROL);
+>>> MSI_MESSAGE_CONTROL is 0x52 (MSI capability offset + 2). I'm not sure if we can
+>>> do a readl that crosses the alignment boundary in all platforms. The other
+>>> option is to readl from "MSI capability offset + 0" and extract the last 16
+>>> bits. I felt this is more clear since we are interested only in the
+>>> MSI_MESSAGE_CONTROL.
+>>>
+>>>> <shifting+masking the bits we need to get/set>
+>>>> dw_pcie_writel_dbi(pci, base, MSI_MESSAGE_CONTROL, val);
+>>>>
+>>>> Or are we going to be doing read/writes of length != 32 so often that
+>>>> you think that it's cleaner to have this abstraction?
+>>> it's used mainly for accessing configuration space header fields. Even the pci
+>>> core uses *pci_read_config_word* for accessing such fields.
+>> I see. Adding an extra size argument is a good thing then,
+>> since it's consistent with the pci generic code.
 >>
->> I think I'm making progress, in that I now have a better
->> idea of what I don't understand. So I'm able to ask
->> (hopefully) less vague questions.
->>
->> Take the USB3 PCIe adapter I've been testing with. At some
->> point during init, the XHCI driver request some memory
->> (via kmalloc?) in order to exchange data with the host, right?
->>
->> On my SoC, the RAM used by Linux lives at physical range
->> [0x8000_0000, 0x8800_0000[ => 128 MB
->>
->> How does the XHCI driver make the adapter aware of where
->> it can scribble data? The XHCI driver has no notion that
->> the device is behind a bus, does it?
->>
->> At some point, the physical addresses must be converted
->> to PCI bus addresses, right? Is it computed subtracting
->> the offset defined in the DT?
->>
->> Then suppose the USB3 card wants to write to an address
->> in RAM. It sends a packet on the PCIe bus, targeting
->> the PCI bus address of that RAM, right? Is this address
->> supposed to be in BAR0 of the root complex? I guess not,
->> since Bjorn said that it was unusual for a RC to have
->> a BAR at all. So I'll hand-wave, and decree that, by some
->> protocol magic, the packet arrives at the PCIe controller.
->> And this controller knows to forward this write request
->> over the memory bus. Does that look about right?
-> 
-> Generally, yes - if an area of memory space *is* claimed by a BAR, then
-> another PCI device accessing that would be treated as peer-to-peer DMA,
-> which may or may not be allowed (or supported at all). For mem space
-> which isn't claimed by BARs, it's up to the RC to decide what to do. As
-> a concrete example (which might possibly be relevant) the PLDA XR3-AXI
-> IP which we have in the ARM Juno SoC has the ATR_PCIE_WINx registers in
-> its root port configuration block that control what ranges of mem space
-> are mapped to the external AXI master interface and how.
+>> However, I still think that having defines for writel/readl is a
+>> good thing :)
+> sure, having defines is fine. How about something like below (readl, readw: to
+> differentiate 4byte and 2 byte access?)
+>
+> #define dw_pcie_readl_dbi(pci, base, reg) __dw_pcie_read_dbi(pci, base, reg, 0x4)
+> #define dw_pcie_readw_dbi(pci, base, reg) __dw_pcie_read_dbi(pci, base, reg, 0x2)
 
-The HW dev told me that the Verilog code for the RC considers
-packets not targeted at RC BAR0 an error, and drops it.
-
-
->> My problem is that, in the current implementation of the
->> PCIe controller, the USB device that wants to write to
->> memory is supposed to target BAR0 of the RC.
-> 
-> That doesn't sound right at all. If the RC has a BAR, I'd expect it to
-> be for poking the guts of the RC device itself (since this prompted me
-> to go and compare, I see the Juno RC does indeed have it own enigmatic
-> 16KB BAR, which reads as ever-changing random junk; no idea what that's
-> about).
-
-That's not how our RC works. If I want to poke its guts, I have
-some MMIO addresses on the global bus. RC BAR0 is strictly used
-as a window to the global bus.
-
-
->> Since my mem space is limited to 256 MB, then BAR0 is
->> limited to 256 MB (or even 128 MB, since I also need
->> to mapthe device's BAR into the same mem space).
-> 
-> Your window into mem space *from the CPU's point of view* is limited to
-> 256MB. The relationship between mem space and the system (AXI) memory
-> map from the point of view of PCI devices is a separate issue; if it's
-> configurable at all, it probably makes sense to have the firmware set an
-> outbound window to at least cover DRAM 1:1, then forget about it (this
-> is essentially what Juno UEFI does, for example).
-
-The size of RC BAR0 is limited to 1 GB, so best case I can map
-1 GB back to the system RAM. Well, actually best case is 896 MB
-since 1/8 of the window must map the MSI doorbell region.
-
-I'll see what I can come up with.
-
-Thanks a lot for your comments.
-
-Regards.
+Looks good to me.
+But if we add readw, we might as well add readb :P
