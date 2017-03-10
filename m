@@ -1,130 +1,113 @@
 From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Thu,  9 Mar 2017 20:52:57 -0800
-Subject: [PATCH v5 17/39] [media] v4l2-mc: add a function to inherit controls
- from a pipeline
+Date: Thu,  9 Mar 2017 20:52:58 -0800
+Subject: [PATCH v5 18/39] [media] v4l: subdev: Add function to validate frame
+ interval
 In-Reply-To: <1489121599-23206-1-git-send-email-steve_longerbeam@mentor.com>
 References: <1489121599-23206-1-git-send-email-steve_longerbeam@mentor.com>
-Message-ID: <1489121599-23206-18-git-send-email-steve_longerbeam@mentor.com>
+Message-ID: <1489121599-23206-19-git-send-email-steve_longerbeam@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-v4l2_pipeline_inherit_controls() will add the v4l2 controls from
-all subdev entities in a pipeline to a given video device.
+If the pads on both sides of a link specify a frame interval, then
+those frame intervals should match. Create the exported function
+v4l2_subdev_link_validate_frame_interval() to verify this. This
+function can be called in a subdevice's media_entity_operations
+or v4l2_subdev_pad_ops link_validate callbacks.
 
 Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
 ---
- drivers/media/v4l2-core/v4l2-mc.c | 48 +++++++++++++++++++++++++++++++++++++++
- include/media/v4l2-mc.h           | 25 ++++++++++++++++++++
- 2 files changed, 73 insertions(+)
+ drivers/media/v4l2-core/v4l2-subdev.c | 50 +++++++++++++++++++++++++++++++++++
+ include/media/v4l2-subdev.h           | 10 +++++++
+ 2 files changed, 60 insertions(+)
 
-diff --git a/drivers/media/v4l2-core/v4l2-mc.c b/drivers/media/v4l2-core/v4l2-mc.c
-index 303980b..09d4d97 100644
---- a/drivers/media/v4l2-core/v4l2-mc.c
-+++ b/drivers/media/v4l2-core/v4l2-mc.c
-@@ -22,6 +22,7 @@
- #include <linux/usb.h>
- #include <media/media-device.h>
- #include <media/media-entity.h>
-+#include <media/v4l2-ctrls.h>
- #include <media/v4l2-fh.h>
- #include <media/v4l2-mc.h>
- #include <media/v4l2-subdev.h>
-@@ -238,6 +239,53 @@ int v4l_vb2q_enable_media_source(struct vb2_queue *q)
- }
- EXPORT_SYMBOL_GPL(v4l_vb2q_enable_media_source);
+diff --git a/drivers/media/v4l2-core/v4l2-subdev.c b/drivers/media/v4l2-core/v4l2-subdev.c
+index da78497..7a0f387 100644
+--- a/drivers/media/v4l2-core/v4l2-subdev.c
++++ b/drivers/media/v4l2-core/v4l2-subdev.c
+@@ -521,6 +521,25 @@ int v4l2_subdev_link_validate_default(struct v4l2_subdev *sd,
+ EXPORT_SYMBOL_GPL(v4l2_subdev_link_validate_default);
  
-+int __v4l2_pipeline_inherit_controls(struct video_device *vfd,
-+				     struct media_entity *start_entity)
+ static int
++v4l2_subdev_link_validate_get_fi(struct media_pad *pad,
++				 struct v4l2_subdev_frame_interval *fi)
 +{
-+	struct media_device *mdev = start_entity->graph_obj.mdev;
-+	struct media_entity *entity;
-+	struct media_graph graph;
-+	struct v4l2_subdev *sd;
-+	int ret;
++	if (is_media_entity_v4l2_subdev(pad->entity)) {
++		struct v4l2_subdev *sd =
++			media_entity_to_v4l2_subdev(pad->entity);
 +
-+	ret = media_graph_walk_init(&graph, mdev);
-+	if (ret)
-+		return ret;
-+
-+	media_graph_walk_start(&graph, start_entity);
-+
-+	while ((entity = media_graph_walk_next(&graph))) {
-+		if (!is_media_entity_v4l2_subdev(entity))
-+			continue;
-+
-+		sd = media_entity_to_v4l2_subdev(entity);
-+
-+		ret = v4l2_ctrl_add_handler(vfd->ctrl_handler,
-+					    sd->ctrl_handler,
-+					    NULL);
-+		if (ret)
-+			break;
++		fi->pad = pad->index;
++		return v4l2_subdev_call(sd, video, g_frame_interval, fi);
 +	}
 +
-+	media_graph_walk_cleanup(&graph);
-+	return ret;
++	WARN(pad->entity->function != MEDIA_ENT_F_IO_V4L,
++	     "Driver bug! Wrong media entity type 0x%08x, entity %s\n",
++	     pad->entity->function, pad->entity->name);
++
++	return -EINVAL;
 +}
-+EXPORT_SYMBOL_GPL(__v4l2_pipeline_inherit_controls);
 +
-+int v4l2_pipeline_inherit_controls(struct video_device *vfd,
-+				   struct media_entity *start_entity)
-+{
-+	struct media_device *mdev = start_entity->graph_obj.mdev;
-+	int ret;
-+
-+	mutex_lock(&mdev->graph_mutex);
-+	ret = __v4l2_pipeline_inherit_controls(vfd, start_entity);
-+	mutex_unlock(&mdev->graph_mutex);
-+
-+	return ret;
-+}
-+EXPORT_SYMBOL_GPL(v4l2_pipeline_inherit_controls);
-+
- /* -----------------------------------------------------------------------------
-  * Pipeline power management
-  *
-diff --git a/include/media/v4l2-mc.h b/include/media/v4l2-mc.h
-index 2634d9d..9848e77 100644
---- a/include/media/v4l2-mc.h
-+++ b/include/media/v4l2-mc.h
-@@ -171,6 +171,17 @@ void v4l_disable_media_source(struct video_device *vdev);
-  */
- int v4l_vb2q_enable_media_source(struct vb2_queue *q);
- 
-+/**
-+ * v4l2_pipeline_inherit_controls - Add the v4l2 controls from all
-+ *				    subdev entities in a pipeline to
-+ *				    the given video device.
-+ * @vfd: the video device
-+ * @start_entity: Starting entity
-+ */
-+int __v4l2_pipeline_inherit_controls(struct video_device *vfd,
-+				     struct media_entity *start_entity);
-+int v4l2_pipeline_inherit_controls(struct video_device *vfd,
-+				   struct media_entity *start_entity);
- 
- /**
-  * v4l2_pipeline_pm_use - Update the use count of an entity
-@@ -231,6 +242,20 @@ static inline int v4l_vb2q_enable_media_source(struct vb2_queue *q)
- 	return 0;
++static int
+ v4l2_subdev_link_validate_get_format(struct media_pad *pad,
+ 				     struct v4l2_subdev_format *fmt)
+ {
+@@ -540,6 +559,37 @@ v4l2_subdev_link_validate_get_format(struct media_pad *pad,
+ 	return -EINVAL;
  }
  
-+static inline int __v4l2_pipeline_inherit_controls(
-+	struct video_device *vfd,
-+	struct media_entity *start_entity)
++int v4l2_subdev_link_validate_frame_interval(struct media_link *link)
 +{
-+	return 0;
-+}
++	struct v4l2_subdev_frame_interval src_fi, sink_fi;
++	unsigned long src_usec, sink_usec;
++	int rval;
 +
-+static inline int v4l2_pipeline_inherit_controls(
-+	struct video_device *vfd,
-+	struct media_entity *start_entity)
-+{
-+	return 0;
-+}
++	rval = v4l2_subdev_link_validate_get_fi(link->source, &src_fi);
++	if (rval < 0)
++		return 0;
 +
- static inline int v4l2_pipeline_pm_use(struct media_entity *entity, int use)
++	rval = v4l2_subdev_link_validate_get_fi(link->sink, &sink_fi);
++	if (rval < 0)
++		return 0;
++
++	if (src_fi.interval.numerator == 0   ||
++	    src_fi.interval.denominator == 0 ||
++	    sink_fi.interval.numerator == 0  ||
++	    sink_fi.interval.denominator == 0)
++		return -EPIPE;
++
++	src_usec = DIV_ROUND_CLOSEST_ULL(
++		(u64)src_fi.interval.numerator * USEC_PER_SEC,
++		src_fi.interval.denominator);
++	sink_usec = DIV_ROUND_CLOSEST_ULL(
++		(u64)sink_fi.interval.numerator * USEC_PER_SEC,
++		sink_fi.interval.denominator);
++
++	return (src_usec != sink_usec) ? -EPIPE : 0;
++}
++EXPORT_SYMBOL_GPL(v4l2_subdev_link_validate_frame_interval);
++
+ int v4l2_subdev_link_validate(struct media_link *link)
  {
- 	return 0;
+ 	struct v4l2_subdev *sink;
+diff --git a/include/media/v4l2-subdev.h b/include/media/v4l2-subdev.h
+index 0ab1c5d..60c941d 100644
+--- a/include/media/v4l2-subdev.h
++++ b/include/media/v4l2-subdev.h
+@@ -929,6 +929,16 @@ int v4l2_subdev_link_validate_default(struct v4l2_subdev *sd,
+ 				      struct v4l2_subdev_format *sink_fmt);
+ 
+ /**
++ * v4l2_subdev_link_validate_frame_interval - validates a media link
++ *
++ * @link: pointer to &struct media_link
++ *
++ * This function ensures that the frame intervals, if specified by
++ * both the source and sink subdevs of the link, are equal.
++ */
++int v4l2_subdev_link_validate_frame_interval(struct media_link *link);
++
++/**
+  * v4l2_subdev_link_validate - validates a media link
+  *
+  * @link: pointer to &struct media_link
 -- 
 2.7.4
