@@ -1,55 +1,450 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 10 Mar 2017 10:46:12 +0000
-Subject: [PATCHv4 0/3] drivers/perf: arm_pmu: rework IRQ management
-Message-ID: <1489142775-11290-1-git-send-email-mark.rutland@arm.com>
+Date: Fri, 10 Mar 2017 10:46:14 +0000
+Subject: [PATCHv4 2/3] drivers/perf: arm_pmu: manage interrupts per-cpu
+In-Reply-To: <1489142775-11290-1-git-send-email-mark.rutland@arm.com>
+References: <1489142775-11290-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <1489142775-11290-3-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For historical reasons, we lazily request and free interrupts in the
-arm_pmu driver, managing affinity at request time. Unfortunately, this
-is not well balanced w.r.t. CPU hotplug, resulting in a number of
-issues.
+When requesting or freeing interrupts, we use platform_get_irq() to find
+relevant irqs, backing this up with additional information in an
+optional irq_affinity table.
 
-This series addresses this by reworking the way we manage interrupts,
-splitting request/free from affinity management. This renders some code
-redundant, and said code is removed.
+This means that our irq request and free paths are tied to a
+platform_device, and our request path must jump through a number of
+hoops in order to determine the required affinity of each interrupt.
 
-I've given this a spin on a Juno R1 system, a Cortex-A9 based system, and
-another system which uses PPIs. I've verified that the IRQ affinity is as
-expected after CPUs are brought online. I've also run basic perf queries and
-the perf fuzzer, both in parallel with random hotplug events.
+Given that the affinity must be static, we can compute the affinity once
+up-front at probe time, simplifying the irq request and free paths. By
+recording interrupts in a per-cpu data structure, we simplify a few
+paths, and permit a subsequent rework of the request and free paths.
 
-I've pushed this out to the arm/perf/irq-rework branch [1] of my kernel.org
-repo.
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+ drivers/perf/arm_pmu.c       | 314 ++++++++++++++++++++++---------------------
+ include/linux/perf/arm_pmu.h |   3 +-
+ 2 files changed, 166 insertions(+), 151 deletions(-)
 
-Since v1 [2]:
-* Free resources correctly.
-* Remove unused fields from struct arm_pmu.
-* Improve messages when parsing IRQs.
-
-Since v2 [3]:
-* Fix broken pdev handling
-* Improve probe-time error reporting
-
-Since v3 [4]:
-* Rebase to v4.11-rc1
-
-Thanks,
-Mark.
-
-[1] git://git.kernel.org/pub/scm/linux/kernel/git/mark/linux.git arm/perf/irq-rework
-[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-January/484285.html
-[3] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-February/485610.html
-[4] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-February/487204.html
-
-Mark Rutland (3):
-  drivers/perf: arm_pmu: rework per-cpu allocation
-  drivers/perf: arm_pmu: manage interrupts per-cpu
-  drivers/perf: arm_pmu: split irq request from enable
-
- drivers/perf/arm_pmu.c       | 487 +++++++++++++++++++++----------------------
- include/linux/perf/arm_pmu.h |   7 +-
- 2 files changed, 237 insertions(+), 257 deletions(-)
-
+diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
+index dd0f3b2..68d9f08 100644
+--- a/drivers/perf/arm_pmu.c
++++ b/drivers/perf/arm_pmu.c
+@@ -617,94 +617,76 @@ static void cpu_pmu_disable_percpu_irq(void *data)
+ 
+ static void cpu_pmu_free_irq(struct arm_pmu *cpu_pmu)
+ {
+-	int i, irq, irqs;
+-	struct platform_device *pmu_device = cpu_pmu->plat_device;
++	int cpu;
+ 	struct pmu_hw_events __percpu *hw_events = cpu_pmu->hw_events;
+ 
+-	irqs = min(pmu_device->num_resources, num_possible_cpus());
+-
+-	irq = platform_get_irq(pmu_device, 0);
+-	if (irq > 0 && irq_is_percpu(irq)) {
+-		on_each_cpu_mask(&cpu_pmu->supported_cpus,
+-				 cpu_pmu_disable_percpu_irq, &irq, 1);
+-		free_percpu_irq(irq, &hw_events->percpu_pmu);
+-	} else {
+-		for (i = 0; i < irqs; ++i) {
+-			int cpu = i;
+-
+-			if (cpu_pmu->irq_affinity)
+-				cpu = cpu_pmu->irq_affinity[i];
+-
+-			if (!cpumask_test_and_clear_cpu(cpu, &cpu_pmu->active_irqs))
+-				continue;
+-			irq = platform_get_irq(pmu_device, i);
+-			if (irq > 0)
+-				free_irq(irq, per_cpu_ptr(&hw_events->percpu_pmu, cpu));
++	for_each_cpu(cpu, &cpu_pmu->supported_cpus) {
++		int irq = per_cpu(hw_events->irq, cpu);
++		if (!irq)
++			continue;
++
++		if (irq_is_percpu(irq)) {
++			on_each_cpu_mask(&cpu_pmu->supported_cpus,
++					 cpu_pmu_disable_percpu_irq, &irq, 1);
++			free_percpu_irq(irq, &hw_events->percpu_pmu);
++
++			break;
+ 		}
++
++		if (!cpumask_test_and_clear_cpu(cpu, &cpu_pmu->active_irqs))
++			continue;
++
++		free_irq(irq, per_cpu_ptr(&hw_events->percpu_pmu, cpu));
+ 	}
+ }
+ 
+ static int cpu_pmu_request_irq(struct arm_pmu *cpu_pmu, irq_handler_t handler)
+ {
+-	int i, err, irq, irqs;
+-	struct platform_device *pmu_device = cpu_pmu->plat_device;
++	int cpu, err;
+ 	struct pmu_hw_events __percpu *hw_events = cpu_pmu->hw_events;
+ 
+-	if (!pmu_device)
+-		return -ENODEV;
+-
+-	irqs = min(pmu_device->num_resources, num_possible_cpus());
+-	if (irqs < 1) {
+-		pr_warn_once("perf/ARM: No irqs for PMU defined, sampling events not supported\n");
+-		return 0;
+-	}
+-
+-	irq = platform_get_irq(pmu_device, 0);
+-	if (irq > 0 && irq_is_percpu(irq)) {
+-		err = request_percpu_irq(irq, handler, "arm-pmu",
+-					 &hw_events->percpu_pmu);
+-		if (err) {
+-			pr_err("unable to request IRQ%d for ARM PMU counters\n",
+-				irq);
+-			return err;
+-		}
+-
+-		on_each_cpu_mask(&cpu_pmu->supported_cpus,
+-				 cpu_pmu_enable_percpu_irq, &irq, 1);
+-	} else {
+-		for (i = 0; i < irqs; ++i) {
+-			int cpu = i;
+-
+-			err = 0;
+-			irq = platform_get_irq(pmu_device, i);
+-			if (irq < 0)
+-				continue;
+-
+-			if (cpu_pmu->irq_affinity)
+-				cpu = cpu_pmu->irq_affinity[i];
+-
+-			/*
+-			 * If we have a single PMU interrupt that we can't shift,
+-			 * assume that we're running on a uniprocessor machine and
+-			 * continue. Otherwise, continue without this interrupt.
+-			 */
+-			if (irq_set_affinity(irq, cpumask_of(cpu)) && irqs > 1) {
+-				pr_warn("unable to set irq affinity (irq=%d, cpu=%u)\n",
+-					irq, cpu);
+-				continue;
+-			}
++	for_each_cpu(cpu, &cpu_pmu->supported_cpus) {
++		int irq = per_cpu(hw_events->irq, cpu);
++		if (!irq)
++			continue;
+ 
+-			err = request_irq(irq, handler,
+-					  IRQF_NOBALANCING | IRQF_NO_THREAD, "arm-pmu",
+-					  per_cpu_ptr(&hw_events->percpu_pmu, cpu));
++		if (irq_is_percpu(irq)) {
++			err = request_percpu_irq(irq, handler, "arm-pmu",
++						 &hw_events->percpu_pmu);
+ 			if (err) {
+ 				pr_err("unable to request IRQ%d for ARM PMU counters\n",
+ 					irq);
+ 				return err;
+ 			}
+ 
+-			cpumask_set_cpu(cpu, &cpu_pmu->active_irqs);
++			on_each_cpu_mask(&cpu_pmu->supported_cpus,
++					 cpu_pmu_enable_percpu_irq, &irq, 1);
++
++			break;
+ 		}
++
++		/*
++		 * If we have a single PMU interrupt that we can't shift,
++		 * assume that we're running on a uniprocessor machine and
++		 * continue. Otherwise, continue without this interrupt.
++		 */
++		if (irq_set_affinity(irq, cpumask_of(cpu)) &&
++		    num_possible_cpus() > 1) {
++			pr_warn("unable to set irq affinity (irq=%d, cpu=%u)\n",
++				irq, cpu);
++			continue;
++		}
++
++		err = request_irq(irq, handler,
++				  IRQF_NOBALANCING | IRQF_NO_THREAD, "arm-pmu",
++				  per_cpu_ptr(&hw_events->percpu_pmu, cpu));
++		if (err) {
++			pr_err("unable to request IRQ%d for ARM PMU counters\n",
++				irq);
++			return err;
++		}
++
++		cpumask_set_cpu(cpu, &cpu_pmu->active_irqs);
+ 	}
+ 
+ 	return 0;
+@@ -846,10 +828,6 @@ static int cpu_pmu_init(struct arm_pmu *cpu_pmu)
+ 		on_each_cpu_mask(&cpu_pmu->supported_cpus, cpu_pmu->reset,
+ 			 cpu_pmu, 1);
+ 
+-	/* If no interrupts available, set the corresponding capability flag */
+-	if (!platform_get_irq(cpu_pmu->plat_device, 0))
+-		cpu_pmu->pmu.capabilities |= PERF_PMU_CAP_NO_INTERRUPT;
+-
+ 	/*
+ 	 * This is a CPU PMU potentially in a heterogeneous configuration (e.g.
+ 	 * big.LITTLE). This is not an uncore PMU, and we have taken ctx
+@@ -897,98 +875,133 @@ static int probe_current_pmu(struct arm_pmu *pmu,
+ 	return ret;
+ }
+ 
+-static int of_pmu_irq_cfg(struct arm_pmu *pmu)
++static int pmu_parse_percpu_irq(struct arm_pmu *pmu, int irq)
+ {
+-	int *irqs, i = 0;
+-	bool using_spi = false;
+-	struct platform_device *pdev = pmu->plat_device;
++	int cpu, ret;
++	struct pmu_hw_events __percpu *hw_events = pmu->hw_events;
+ 
+-	irqs = kcalloc(pdev->num_resources, sizeof(*irqs), GFP_KERNEL);
+-	if (!irqs)
+-		return -ENOMEM;
++	ret = irq_get_percpu_devid_partition(irq, &pmu->supported_cpus);
++	if (ret)
++		return ret;
+ 
+-	do {
+-		struct device_node *dn;
+-		int cpu, irq;
++	for_each_cpu(cpu, &pmu->supported_cpus)
++		per_cpu(hw_events->irq, cpu) = irq;
+ 
+-		/* See if we have an affinity entry */
+-		dn = of_parse_phandle(pdev->dev.of_node, "interrupt-affinity", i);
+-		if (!dn)
+-			break;
++	return 0;
++}
+ 
+-		/* Check the IRQ type and prohibit a mix of PPIs and SPIs */
+-		irq = platform_get_irq(pdev, i);
+-		if (irq > 0) {
+-			bool spi = !irq_is_percpu(irq);
+-
+-			if (i > 0 && spi != using_spi) {
+-				pr_err("PPI/SPI IRQ type mismatch for %s!\n",
+-					dn->name);
+-				of_node_put(dn);
+-				kfree(irqs);
+-				return -EINVAL;
+-			}
++static bool pmu_has_irq_affinity(struct device_node *node)
++{
++	return !!of_find_property(node, "interrupt-affinity", NULL);
++}
+ 
+-			using_spi = spi;
+-		}
++static int pmu_parse_irq_affinity(struct device_node *node, int i)
++{
++	struct device_node *dn;
++	int cpu;
+ 
+-		/* Now look up the logical CPU number */
+-		for_each_possible_cpu(cpu) {
+-			struct device_node *cpu_dn;
++	/*
++	 * If we don't have an interrupt-affinity property, we guess irq
++	 * affinity matches our logical CPU order, as we used to assume.
++	 * This is fragile, so we'll warn in pmu_parse_irqs().
++	 */
++	if (!pmu_has_irq_affinity(node))
++		return i;
+ 
+-			cpu_dn = of_cpu_device_node_get(cpu);
+-			of_node_put(cpu_dn);
++	dn = of_parse_phandle(node, "interrupt-affinity", i);
++	if (!dn) {
++		pr_warn("failed to parse interrupt-affinity[%d] for %s\n",
++			i, node->name);
++		return -EINVAL;
++	}
+ 
+-			if (dn == cpu_dn)
+-				break;
+-		}
++	/* Now look up the logical CPU number */
++	for_each_possible_cpu(cpu) {
++		struct device_node *cpu_dn;
++
++		cpu_dn = of_cpu_device_node_get(cpu);
++		of_node_put(cpu_dn);
+ 
+-		if (cpu >= nr_cpu_ids) {
+-			pr_warn("Failed to find logical CPU for %s\n",
+-				dn->name);
+-			of_node_put(dn);
+-			cpumask_setall(&pmu->supported_cpus);
++		if (dn == cpu_dn)
+ 			break;
+-		}
+-		of_node_put(dn);
++	}
+ 
+-		/* For SPIs, we need to track the affinity per IRQ */
+-		if (using_spi) {
+-			if (i >= pdev->num_resources)
+-				break;
++	if (cpu >= nr_cpu_ids) {
++		pr_warn("failed to find logical CPU for %s\n", dn->name);
++	}
+ 
+-			irqs[i] = cpu;
+-		}
++	of_node_put(dn);
+ 
+-		/* Keep track of the CPUs containing this PMU type */
+-		cpumask_set_cpu(cpu, &pmu->supported_cpus);
+-		i++;
+-	} while (1);
++	return cpu;
++}
++
++static int pmu_parse_irqs(struct arm_pmu *pmu)
++{
++	int i = 0, nr_irqs;
++	struct platform_device *pdev = pmu->plat_device;
++	struct pmu_hw_events __percpu *hw_events = pmu->hw_events;
++
++	nr_irqs = platform_irq_count(pdev);
++	if (nr_irqs < 0) {
++		pr_err("unable to count PMU IRQs\n");
++		return nr_irqs;
++	}
++
++	/*
++	 * In this case we have no idea which CPUs are covered by the PMU.
++	 * To match our prior behaviour, we assume all CPUs in this case.
++	 */
++	if (nr_irqs == 0) {
++		pr_warn("no irqs for PMU, sampling events not supported\n");
++		pmu->pmu.capabilities |= PERF_PMU_CAP_NO_INTERRUPT;
++		cpumask_setall(&pmu->supported_cpus);
++		return 0;
++	}
+ 
+-	/* If we didn't manage to parse anything, try the interrupt affinity */
+-	if (cpumask_weight(&pmu->supported_cpus) == 0) {
++	if (nr_irqs == 1) {
+ 		int irq = platform_get_irq(pdev, 0);
++		if (irq && irq_is_percpu(irq))
++			return pmu_parse_percpu_irq(pmu, irq);
++	}
+ 
+-		if (irq > 0 && irq_is_percpu(irq)) {
+-			/* If using PPIs, check the affinity of the partition */
+-			int ret;
++	if (!pmu_has_irq_affinity(pdev->dev.of_node)) {
++		pr_warn("no interrupt-affinity property for %s, guessing.\n",
++			of_node_full_name(pdev->dev.of_node));
++	}
+ 
+-			ret = irq_get_percpu_devid_partition(irq, &pmu->supported_cpus);
+-			if (ret) {
+-				kfree(irqs);
+-				return ret;
+-			}
+-		} else {
+-			/* Otherwise default to all CPUs */
+-			cpumask_setall(&pmu->supported_cpus);
++	/*
++	 * Some platforms have all PMU IRQs OR'd into a single IRQ, with a
++	 * special platdata function that attempts to demux them.
++	 */
++	if (dev_get_platdata(&pdev->dev))
++		cpumask_setall(&pmu->supported_cpus);
++
++	for (i = 0; i < nr_irqs; i++) {
++		int cpu, irq;
++
++		irq = platform_get_irq(pdev, i);
++		if (WARN_ON(irq <= 0))
++			continue;
++
++		if (irq_is_percpu(irq)) {
++			pr_warn("multiple PPIs or mismatched SPI/PPI detected\n");
++			return -EINVAL;
+ 		}
+-	}
+ 
+-	/* If we matched up the IRQ affinities, use them to route the SPIs */
+-	if (using_spi && i == pdev->num_resources)
+-		pmu->irq_affinity = irqs;
+-	else
+-		kfree(irqs);
++		cpu = pmu_parse_irq_affinity(pdev->dev.of_node, i);
++		if (cpu < 0)
++			return cpu;
++		if (cpu >= nr_cpu_ids)
++			continue;
++
++		if (per_cpu(hw_events->irq, cpu)) {
++			pr_warn("multiple PMU IRQs for the same CPU detected\n");
++			return -EINVAL;
++		}
++
++		per_cpu(hw_events->irq, cpu) = irq;
++		cpumask_set_cpu(cpu, &pmu->supported_cpus);
++	}
+ 
+ 	return 0;
+ }
+@@ -1050,6 +1063,10 @@ int arm_pmu_device_probe(struct platform_device *pdev,
+ 
+ 	pmu->plat_device = pdev;
+ 
++	ret = pmu_parse_irqs(pmu);
++	if (ret)
++		goto out_free;
++
+ 	if (node && (of_id = of_match_node(of_table, pdev->dev.of_node))) {
+ 		init_fn = of_id->data;
+ 
+@@ -1062,9 +1079,7 @@ int arm_pmu_device_probe(struct platform_device *pdev,
+ 			pmu->secure_access = false;
+ 		}
+ 
+-		ret = of_pmu_irq_cfg(pmu);
+-		if (!ret)
+-			ret = init_fn(pmu);
++		ret = init_fn(pmu);
+ 	} else if (probe_table) {
+ 		cpumask_setall(&pmu->supported_cpus);
+ 		ret = probe_current_pmu(pmu, probe_table);
+@@ -1097,7 +1112,6 @@ int arm_pmu_device_probe(struct platform_device *pdev,
+ out_free:
+ 	pr_info("%s: failed to register PMU devices!\n",
+ 		of_node_full_name(node));
+-	kfree(pmu->irq_affinity);
+ 	armpmu_free(pmu);
+ 	return ret;
+ }
+diff --git a/include/linux/perf/arm_pmu.h b/include/linux/perf/arm_pmu.h
+index 8462da2..05a3eb4 100644
+--- a/include/linux/perf/arm_pmu.h
++++ b/include/linux/perf/arm_pmu.h
+@@ -75,6 +75,8 @@ struct pmu_hw_events {
+ 	 * already have to allocate this struct per cpu.
+ 	 */
+ 	struct arm_pmu		*percpu_pmu;
++
++	int irq;
+ };
+ 
+ enum armpmu_attr_groups {
+@@ -88,7 +90,6 @@ struct arm_pmu {
+ 	struct pmu	pmu;
+ 	cpumask_t	active_irqs;
+ 	cpumask_t	supported_cpus;
+-	int		*irq_affinity;
+ 	char		*name;
+ 	irqreturn_t	(*handle_irq)(int irq_num, void *dev);
+ 	void		(*enable)(struct perf_event *event);
 -- 
 1.9.1
