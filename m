@@ -1,150 +1,106 @@
-From: james.morse@arm.com (James Morse)
-Date: Fri, 10 Mar 2017 17:16:28 +0000
-Subject: {RFC PATCH v1 v4.11-rc1 1/1} acpi: apei: common handler in ghes
- for HW errors notified via hed(PNP0C33) driver
-In-Reply-To: <86258A5CC0A3704780874CF6004BA8A62DCAF445@lhreml502-mbs>
-References: <86258A5CC0A3704780874CF6004BA8A62DCAF445@lhreml502-mbs>
-Message-ID: <58C2DF6C.6000900@arm.com>
+From: ray.jui@broadcom.com (Ray Jui)
+Date: Fri, 10 Mar 2017 09:21:35 -0800
+Subject: pcie-iproc: broken 2nd (& 3rd?) controller support by
+ c3245a566400 ("PCI: iproc: Request host bridge window resources")
+In-Reply-To: <04f747ef-0f39-33ec-0cea-2e9fb85d46e8@gmail.com>
+References: <faab6b85-58e8-3e62-8763-56a94b13fba1@gmail.com>
+ <f40bbf2f-3ba9-3992-d417-6588085f3d62@gmail.com>
+ <20170309182205.GB3685@bhelgaas-glaptop.roam.corp.google.com>
+ <04f747ef-0f39-33ec-0cea-2e9fb85d46e8@gmail.com>
+Message-ID: <dedad8f7-28e7-a728-8b39-8fe29453ae09@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shiju,
+Hi Bjorn,
 
-On 07/03/17 16:07, Shiju Jose wrote:
-> Add common handler in ghes for HW errors notified via hed(PNP0C33) driver.
-> 1. Rename ghes_notify_sci() to ghes_notify_hed().
-> 2. Rename struct notifier_block ghes_notifier_sci to
->    struct notifier_block ghes_notifier_hed.
-> 3. Rename ghes_sci list to ghes_hed.
-> 4. Make ghes_notify_hed as common handler for
->    notification types SCI, GSIV and GPIO.
+Thanks for helping take care of this.
+
+Ray
+
+On 3/10/2017 8:02 AM, Rafa? Mi?ecki wrote:
+> On 03/09/2017 07:22 PM, Bjorn Helgaas wrote:
+>> On Thu, Mar 09, 2017 at 08:39:07AM +0100, Rafa? Mi?ecki wrote:
+>>> On 03/08/2017 01:56 PM, Rafa? Mi?ecki wrote:
+>>>> I just tried upgrading BCM5301X from 4.4 to 4.9 and noticed I don't
+>>>> see card
+>>>> connected to the 2nd controller.
+>>>>
+>>>> pcie_iproc_bcma bcma0:7: PCI host bridge to bus 0000:00
+>>>> pci_bus 0000:00: root bus resource [mem 0x08000000-0x0fffffff]
+>>>> pcie_iproc_bcma bcma0:7: link: UP
+>>>> PCI: bus0: Fast back to back transfers disabled
+>>>> pci 0000:00:00.0: bridge configuration invalid ([bus 00-00]),
+>>>> reconfiguring
+>>>> PCI: bus1: Fast back to back transfers disabled
+>>>> pci 0000:00:00.0: BAR 8: assigned [mem 0x08000000-0x080fffff]
+>>>> pci 0000:01:00.0: BAR 0: assigned [mem 0x08000000-0x08007fff 64bit]
+>>>> pci 0000:00:00.0: PCI bridge to [bus 01]
+>>>> pci 0000:00:00.0:   bridge window [mem 0x08000000-0x080fffff]
+>>>>
+>>>> pcie_iproc_bcma bcma0:8: resource collision: [mem
+>>>> 0x40000000-0x47ffffff] conflicts with PCIe MEM space [mem
+>>>> 0x40000000-0x47ffffff]
+>>>> pcie_iproc_bcma bcma0:8: PCIe controller setup failed
+>>>> pcie_iproc_bcma: probe of bcma0:8 failed with error -16
+>>>>
+>>>>
+>>>> This used to work with older kernels because there wasn't any
+>>>> collision check:
+>>>>
+>>>> pcie_iproc_bcma bcma0:7: PCI host bridge to bus 0000:00
+>>>> pci_bus 0000:00: root bus resource [mem 0x08000000-0x0fffffff]
+>>>> pcie_iproc_bcma bcma0:7: link: UP
+>>>> PCI: bus0: Fast back to back transfers disabled
+>>>> pci 0000:00:00.0: bridge configuration invalid ([bus 00-00]),
+>>>> reconfiguring
+>>>> PCI: bus1: Fast back to back transfers disabled
+>>>> pci 0000:00:00.0: BAR 8: assigned [mem 0x08000000-0x080fffff]
+>>>> pci 0000:01:00.0: BAR 0: assigned [mem 0x08000000-0x08007fff 64bit]
+>>>> pci 0000:00:00.0: PCI bridge to [bus 01]
+>>>> pci 0000:00:00.0:   bridge window [mem 0x08000000-0x080fffff]
+>>>>
+>>>> pcie_iproc_bcma bcma0:8: PCI host bridge to bus 0001:00
+>>>> pci_bus 0001:00: root bus resource [mem 0x40000000-0x47ffffff]
+>>>> pcie_iproc_bcma bcma0:8: link: UP
+>>>> PCI: bus0: Fast back to back transfers disabled
+>>>> pci 0001:00:00.0: bridge configuration invalid ([bus 00-00]),
+>>>> reconfiguring
+>>>> PCI: bus1: Fast back to back transfers disabled
+>>>> pci 0001:00:00.0: BAR 8: assigned [mem 0x40000000-0x400fffff]
+>>>> pci 0001:01:00.0: BAR 0: assigned [mem 0x40000000-0x40007fff 64bit]
+>>>> pci 0001:00:00.0: PCI bridge to [bus 01]
+>>>> pci 0001:00:00.0:   bridge window [mem 0x40000000-0x400fffff]
+>>>>
+>>>>
+>>>> I guess the check is OK after all and the real problem is iproc
+>>>> driver assigning
+>>>> the same resource.
+>>>>
+>>>> Broadcom team: could you take a look at this, please?
+>>>
+>>> I found a reason of this conflict (and probably random crashes I started
+>>> seeing with 4.9). I believe we have a memory corruption.
+>>
+>> Yep, we're using a resource structure on the stack when we shouldn't. 
+>> Can
+>> you try the patch below?
 > 
-
-I think the code here is fine, but we need to put this in front of the ACPI
-maintainers, and if we can, make their job easy.
-
-How did you come up with the CC list for this patch? scripts/get_maintainer.pl
-lists:
-> "Rafael J. Wysocki" <rjw@rjwysocki.net> (supporter:ACPI,commit_signer:2/4=50%)
-> Len Brown <lenb@kernel.org> (supporter:ACPI)
-
-as the maintainers for the file changed by this patch, but they weren't CCd.
-
-Did you use git format-patch to create this? All the other patches on the list
-have subjects of the form "[PATCH] acpi: apei....", the {}s confuse 'git am'
-meaning whoever applies this would have to edit your patch before applying it.
-
-
-Your commit message doesn't add anything that wasn't in the subject-line. It
-should describe the reason for the change. Based on Hanjun's explanation I can
-offer:
----
-System Controller Interrupts are received by ACPI's error device, which in turn
-notifies the GHES code. The same is true of APEI's GSIV and GPIO notification types.
-Add support for GSIV and GPIO sharing the SCI register/unregister/notifier code.
-Rename the list and notifier to show this is no longer just SCI, but anything
-from the Hardware Error Device.
-
----
-
-If you're confident you solved this the right way, (which I think we are), you
-should drop the 'RFC' from the subject. RFC indicates you don't think this
-should be merged you just want feedback.
-
-
-
-Thanks,
-
-James
-
-
-> diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
-> index b192b42..fd39929 100644
-> --- a/drivers/acpi/apei/ghes.c
-> +++ b/drivers/acpi/apei/ghes.c
-> @@ -89,14 +89,14 @@
->  module_param_named(disable, ghes_disable, bool, 0);
->  
->  /*
-> - * All error sources notified with SCI shares one notifier function,
-> + * All error sources notified with HED shares one notifier function,
->   * so they need to be linked and checked one by one.  This is applied
->   * to NMI too.
->   *
->   * RCU is used for these lists, so ghes_list_mutex is only used for
->   * list changing, not for traversing.
->   */
-> -static LIST_HEAD(ghes_sci);
-> +static LIST_HEAD(ghes_hed);
->  static DEFINE_MUTEX(ghes_list_mutex);
->  
->  /*
-> @@ -702,14 +702,14 @@ static irqreturn_t ghes_irq_func(int irq, void *data)
->  	return IRQ_HANDLED;
->  }
->  
-> -static int ghes_notify_sci(struct notifier_block *this,
-> +static int ghes_notify_hed(struct notifier_block *this,
->  				  unsigned long event, void *data)
->  {
->  	struct ghes *ghes;
->  	int ret = NOTIFY_DONE;
->  
->  	rcu_read_lock();
-> -	list_for_each_entry_rcu(ghes, &ghes_sci, list) {
-> +	list_for_each_entry_rcu(ghes, &ghes_hed, list) {
->  		if (!ghes_proc(ghes))
->  			ret = NOTIFY_OK;
->  	}
-> @@ -718,8 +718,8 @@ static int ghes_notify_sci(struct notifier_block *this,
->  	return ret;
->  }
->  
-> -static struct notifier_block ghes_notifier_sci = {
-> -	.notifier_call = ghes_notify_sci,
-> +static struct notifier_block ghes_notifier_hed = {
-> +	.notifier_call = ghes_notify_hed,
->  };
->  
->  #ifdef CONFIG_HAVE_ACPI_APEI_NMI
-> @@ -966,6 +966,8 @@ static int ghes_probe(struct platform_device *ghes_dev)
->  	case ACPI_HEST_NOTIFY_POLLED:
->  	case ACPI_HEST_NOTIFY_EXTERNAL:
->  	case ACPI_HEST_NOTIFY_SCI:
-> +	case ACPI_HEST_NOTIFY_GSIV:
-> +	case ACPI_HEST_NOTIFY_GPIO:
->  		break;
->  	case ACPI_HEST_NOTIFY_NMI:
->  		if (!IS_ENABLED(CONFIG_HAVE_ACPI_APEI_NMI)) {
-> @@ -1026,10 +1028,12 @@ static int ghes_probe(struct platform_device *ghes_dev)
->  		}
->  		break;
->  	case ACPI_HEST_NOTIFY_SCI:
-> +	case ACPI_HEST_NOTIFY_GSIV:
-> +	case ACPI_HEST_NOTIFY_GPIO:
->  		mutex_lock(&ghes_list_mutex);
-> -		if (list_empty(&ghes_sci))
-> -			register_acpi_hed_notifier(&ghes_notifier_sci);
-> -		list_add_rcu(&ghes->list, &ghes_sci);
-> +		if (list_empty(&ghes_hed))
-> +			register_acpi_hed_notifier(&ghes_notifier_hed);
-> +		list_add_rcu(&ghes->list, &ghes_hed);
->  		mutex_unlock(&ghes_list_mutex);
->  		break;
->  	case ACPI_HEST_NOTIFY_NMI:
-> @@ -1068,10 +1072,12 @@ static int ghes_remove(struct platform_device *ghes_dev)
->  		free_irq(ghes->irq, ghes);
->  		break;
->  	case ACPI_HEST_NOTIFY_SCI:
-> +	case ACPI_HEST_NOTIFY_GSIV:
-> +	case ACPI_HEST_NOTIFY_GPIO:
->  		mutex_lock(&ghes_list_mutex);
->  		list_del_rcu(&ghes->list);
-> -		if (list_empty(&ghes_sci))
-> -			unregister_acpi_hed_notifier(&ghes_notifier_sci);
-> +		if (list_empty(&ghes_hed))
-> +			unregister_acpi_hed_notifier(&ghes_notifier_hed);
->  		mutex_unlock(&ghes_list_mutex);
->  		break;
->  	case ACPI_HEST_NOTIFY_NMI:
+> Works great! Will you push it with
+> Cc: stable at vger.kernel.org # v4.8+
+> please?
 > 
+> Thanks for looking at this!
+> 
+> Also see below...
+> 
+> 
+>> (...)
+>>      if (ret)
+>>          dev_err(dev, "PCIe controller setup failed\n");
+>> -
+>> -    pci_free_resource_list(&res);
+>> +        pci_free_resource_list(&resources);
+>> +        return ret;
+>> +    }
+> 
+> Works great, except it doesn't compile (braces) ;)
