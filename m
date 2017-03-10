@@ -1,106 +1,88 @@
-From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Fri, 10 Mar 2017 16:14:57 -0600
-Subject: [PATCH 00/14] arm_pmu: ACPI support
-In-Reply-To: <1489143891-11596-1-git-send-email-mark.rutland@arm.com>
-References: <1489143891-11596-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <5b5dca5f-0ea3-d7e7-63c9-dba57969d4be@arm.com>
+From: sakari.ailus@iki.fi (Sakari Ailus)
+Date: Sat, 11 Mar 2017 00:37:14 +0200
+Subject: [PATCH v4 14/36] [media] v4l2-mc: add a function to inherit
+ controls from a pipeline
+In-Reply-To: <20170310125342.7f047acf@vento.lan>
+References: <1487211578-11360-15-git-send-email-steve_longerbeam@mentor.com>
+ <20170302160257.GK3220@valkosipuli.retiisi.org.uk>
+ <20170303230645.GR21222@n2100.armlinux.org.uk>
+ <20170304131329.GV3220@valkosipuli.retiisi.org.uk>
+ <a7b8e095-a95c-24bd-b1e9-e983f18061c4@xs4all.nl>
+ <20170310130733.GU21222@n2100.armlinux.org.uk>
+ <c679f755-52a6-3c6f-3d65-277db46676cc@xs4all.nl>
+ <20170310140124.GV21222@n2100.armlinux.org.uk>
+ <cc8900b0-c091-b14b-96f4-01f8fa72431c@xs4all.nl>
+ <20170310125342.7f047acf@vento.lan>
+Message-ID: <20170310223714.GI3220@valkosipuli.retiisi.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Mauro (and others),
 
-On 03/10/2017 05:04 AM, Mark Rutland wrote:
-> Hi,
->
-> This series implements ACPI support in the ARM PMU code. It borrows some code
-> from Jeremy's series [1], but takes a different approach to probing and
-> association, using the usual hotplug state machine, minimising external changes
-> required, and simplifying the relationship with the common arm_pmu code.
->
-> The first few patches are preparatory cleanup/refactoring, with the latter half
-> of the series being specific to ACPI support.
->
-> The series is based on my IRQ rework patches [2]. I've pushed the whole series
-> out to the arm/perf/acpi branch [3] of my kernel.org repo.
->
-> Due to the innards of the hotplug callback framework, it's not entirely
-> safe to register a PMU in a hotplug callback. Due to this, we can only
-> associated hotplugged CPUs with a PMU if a matching CPU was around at
-> probe time. A similar restriction already applies to DT systems. We may
-> be able to relax this with some future work.
+On Fri, Mar 10, 2017 at 12:53:42PM -0300, Mauro Carvalho Chehab wrote:
+> Em Fri, 10 Mar 2017 15:20:48 +0100
+> Hans Verkuil <hverkuil@xs4all.nl> escreveu:
+> 
+> > 
+> > > As I've already mentioned, from talking about this with Mauro, it seems
+> > > Mauro is in agreement with permitting the control inheritence... I wish
+> > > Mauro would comment for himself, as I can't quote our private discussion
+> > > on the subject.  
+> > 
+> > I can't comment either, not having seen his mail and reasoning.
+> 
+> The rationale is that we should support the simplest use cases first.
+> 
+> In the case of the first MC-based driver (and several subsequent
+> ones), the simplest use case required MC, as it was meant to suport
+> a custom-made sophisticated application that required fine control
+> on each component of the pipeline and to allow their advanced
+> proprietary AAA userspace-based algorithms to work.
 
-Which is disappointing, as I thought that was one of Lorenzo's 
-complaints about the last patch series.
+The first MC based driver (omap3isp) supports what the hardware can do, it
+does not support applications as such.
 
->
-> I've given this some testing on a Juno platform (using SPIs). To see that IRQs
-> are correctly associated, I've tested with the following:
->
->   $ taskset -c ${SOME_CPU_HERE} perf record \
->     -e armv8_pmuv3_0/cpu_cycles/ \
->     -e armv8_pmuv3_1/cpu_cycles/ \
->     cat /proc/interrupts
->
-> I've also booted with nr_cpus temporarily capped (passing maxcpus=) to test the
-> association logic. This has also been tested in a VM using PPIs; I do not have
-> access to a host machine which itself uses PPIs.
+Adding support to drivers for different "operation modes" --- this is
+essentially what is being asked for --- is not an approach which could serve
+either purpose (some functionality with simple interface vs. fully support
+what the hardware can do, with interfaces allowing that) adequately in the
+short or the long run.
 
-I tried these patches on a m400 (which uses PPIs), and the kernel fails 
-to come up enough to login via the network (which works with 4.11rc1 
-without these patches). So, I suspect there is something wrong with 
-them. Although its quite possibly PEBCAK.
+If we are missing pieces in the puzzle --- in this case the missing pieces
+in the puzzle are a generic pipeline configuration library and another
+library that, with the help of pipeline autoconfiguration would implement
+"best effort" service for regular V4L2 on top of the MC + V4L2 subdev + V4L2
+--- then these pieces need to be impelemented. The solution is
+*not* to attempt to support different types of applications in each driver
+separately. That will make writing drivers painful, error prone and is
+unlikely ever deliver what either purpose requires.
 
-Given that SPCR/etc is also broken and the kernel itself seems to fail 
-if I give it a full earlycon line, I can't pin down whats going on with 
-the PMU code until I fix the console.
+So let's continue to implement the functionality that the hardware supports.
+Making a different choice here is bound to create a lasting conflict between
+having to change kernel interface behaviour and the requirement of
+supporting new functionality that hasn't been previously thought of, pushing
+away SoC vendors from V4L2 ecosystem. This is what we all do want to avoid.
 
-About the only thing it says with any meaning when earlycon is passed is:
-[   10.965147] Serial: 8250/16550 driver, 32 ports, IRQ sharing enabled
-[   11.064193] dw-apb-uart APMC0D08:00: cannot get irq
+As far as i.MX6 driver goes, it is always possible to implement i.MX6 plugin
+for libv4l to perform this. This should be much easier than getting the
+automatic pipe configuration library and the rest working, and as it is
+custom for i.MX6, the resulting plugin may make informed technical choices
+for better functionality. Jacek has been working on such a plugin for
+Samsung Exynos hardware, but I don't think he has quite finished it yey.
 
-and promptly hangs up.
+The original plan was and continues to be sound, it's just that there have
+always been too few hands to implement it. :-(
 
-I'm OOO for the next week, and will debug this further when I return if 
-no one else makes any progress.
+> 
+> That's not true, for example, for the UVC driver. There, MC
+> is optional, as it should be.
 
+UVC is different. The device simply provides additional information through
+MC to the user but MC (or V4L2 sub-device interface) is not used for
+controlling the device.
 
+-- 
+Kind regards,
 
->
-> Thanks,
-> Mark.
->
-> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-January/482397.html
-> [2] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-March/492891.html
-> [3] git://git.kernel.org/pub/scm/linux/kernel/git/mark/linux.git arm/perf/acpi
->
-> Mark Rutland (14):
->   drivers/perf: arm_pmu: remove pointless PMU disabling
->   drivers/perf: arm_pmu: define armpmu_init_fn
->   drivers/perf: arm_pmu: fold init into alloc
->   drivers/perf: arm_pmu: factor out pmu registration
->   drivers/perf: arm_pmu: simplify cpu_pmu_request_irqs()
->   drivers/perf: arm_pmu: handle no platform_device
->   drivers/perf: arm_pmu: rename irq request/free functions
->   drivers/perf: arm_pmu: split cpu-local irq request/free
->   drivers/perf: arm_pmu: move irq request/free into probe
->   drivers/perf: arm_pmu: split out platform device probe logic
->   arm64: add function to get a cpu's MADT GICC table
->   arm64: kill acpi_set_mailbox_entry()
->   drivers/perf: arm_pmu: add ACPI framework
->   arm64: pmuv3: use arm_pmu ACPI framework
->
->  arch/arm64/include/asm/acpi.h             |   7 +-
->  arch/arm64/kernel/acpi_parking_protocol.c |  38 +--
->  arch/arm64/kernel/perf_event.c            |  26 +-
->  arch/arm64/kernel/smp.c                   |  19 +-
->  drivers/perf/Kconfig                      |   4 +
->  drivers/perf/Makefile                     |   3 +-
->  drivers/perf/arm_pmu.c                    | 383 ++++++++----------------------
->  drivers/perf/arm_pmu_acpi.c               | 237 ++++++++++++++++++
->  drivers/perf/arm_pmu_platform.c           | 235 ++++++++++++++++++
->  include/linux/cpuhotplug.h                |   1 +
->  include/linux/perf/arm_pmu.h              |  22 +-
->  11 files changed, 626 insertions(+), 349 deletions(-)
->  create mode 100644 drivers/perf/arm_pmu_acpi.c
->  create mode 100644 drivers/perf/arm_pmu_platform.c
->
+Sakari Ailus
+e-mail: sakari.ailus at iki.fi	XMPP: sailus at retiisi.org.uk
