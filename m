@@ -1,32 +1,34 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 10 Mar 2017 10:40:26 +0100
-Subject: [PATCH] arm64: defconfig: Enable SH Mobile I2C controller
-In-Reply-To: <cover.1489138765.git.horms+renesas@verge.net.au>
-References: <cover.1489138765.git.horms+renesas@verge.net.au>
-Message-ID: <58e7696e0e3c085804fb6754a7dadf7267d0fa77.1489138765.git.horms+renesas@verge.net.au>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 10 Mar 2017 09:46:13 +0000
+Subject: [PATCH] drm: dw_hdmi: Gate audio sampler clock from the
+ enablement functions
+In-Reply-To: <20170310093509.19044-1-romain.perier@collabora.com>
+References: <20170310093509.19044-1-romain.perier@collabora.com>
+Message-ID: <20170310094613.GQ21222@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable SH Mobile I2C controller for use on R-Car Gen3 SoCs.
+On Fri, Mar 10, 2017 at 10:35:09AM +0100, Romain Perier wrote:
+> Currently, the audio sampler clock is enabled from dw_hdmi_setup() at
+> step E. and is kept enabled for later use. This clock should be enabled
+> and disabled along with the actual audio stream and not always on (that
+> is bad for PM). Futhermore, this might cause sound glitches with some
+> HDMI devices, as the CTS+N is forced to zero when the stream is disabled
+> while the audio clock is still running.
+> 
+> This commit adds a parameter to hdmi_audio_enable_clk() that controls
+> when the audio sample clock must be enabled or disabled. Then, it moves
+> the call to this function into dw_hdmi_audio_enable() and
+> dw_hdmi_audio_disable().
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm64/configs/defconfig | 1 +
- 1 file changed, 1 insertion(+)
+How does this interact with the workaround given in my commit introducing
+these functions?  (Commit b90120a96608).
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 7c48028ec64a..95aa53112da5 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -251,6 +251,7 @@ CONFIG_I2C_MESON=y
- CONFIG_I2C_MV64XXX=y
- CONFIG_I2C_QUP=y
- CONFIG_I2C_RK3X=y
-+CONFIG_I2C_SH_MOBILE=y
- CONFIG_I2C_TEGRA=y
- CONFIG_I2C_UNIPHIER_F=y
- CONFIG_I2C_RCAR=y
+Setting N=0 is a work-around for iMX6, and we need the audio FIFO to be
+loaded with data prior to setting N non-zero.  If disabling the audio
+clock prevents the audio FIFO being loaded, your patch will break iMX6.
+
 -- 
-2.7.0.rc3.207.g0ac5344
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
