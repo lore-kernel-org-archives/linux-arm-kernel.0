@@ -1,101 +1,95 @@
 From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Thu,  9 Mar 2017 20:53:12 -0800
-Subject: [PATCH v5 32/39] media: imx: csi: fix crop rectangle changes in
- set_fmt
+Date: Thu,  9 Mar 2017 20:53:13 -0800
+Subject: [PATCH v5 33/39] media: imx: mipi-csi2: enable setting and getting of
+ frame rates
 In-Reply-To: <1489121599-23206-1-git-send-email-steve_longerbeam@mentor.com>
 References: <1489121599-23206-1-git-send-email-steve_longerbeam@mentor.com>
-Message-ID: <1489121599-23206-33-git-send-email-steve_longerbeam@mentor.com>
+Message-ID: <1489121599-23206-34-git-send-email-steve_longerbeam@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Philipp Zabel <p.zabel@pengutronix.de>
+From: Russell King <rmk+kernel@armlinux.org.uk>
 
-The cropping rectangle was being modified by the output pad's
-set_fmt, which is the wrong pad to do this. The crop rectangle
-should not be modified by the output pad set_fmt. It instead
-should be reset to the full input frame when the input pad format
-is set.
+Setting and getting frame rates is part of the negotiation mechanism
+between subdevs.  The lack of support means that a frame rate at the
+sensor can't be negotiated through the subdev path.
 
-The output pad set_fmt should set width/height to the current
-crop dimensions, or 1/2 the crop width/height to enable
-downscaling.
+Add support at MIPI CSI2 level for handling this part of the
+negotiation.
 
-So the other part of this patch is to enable downscaling if
-the output pad dimension(s) are 1/2 the crop dimension(s) at
-csi_setup() time.
-
-Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
 ---
- drivers/staging/media/imx/imx-media-csi.c | 35 ++++++++++++++++++++-----------
- 1 file changed, 23 insertions(+), 12 deletions(-)
+ drivers/staging/media/imx/imx6-mipi-csi2.c | 36 ++++++++++++++++++++++++++++++
+ 1 file changed, 36 insertions(+)
 
-diff --git a/drivers/staging/media/imx/imx-media-csi.c b/drivers/staging/media/imx/imx-media-csi.c
-index a7d04e4..577038e 100644
---- a/drivers/staging/media/imx/imx-media-csi.c
-+++ b/drivers/staging/media/imx/imx-media-csi.c
-@@ -536,6 +536,10 @@ static int csi_setup(struct csi_priv *priv)
+diff --git a/drivers/staging/media/imx/imx6-mipi-csi2.c b/drivers/staging/media/imx/imx6-mipi-csi2.c
+index 1a71b40..d8f931e 100644
+--- a/drivers/staging/media/imx/imx6-mipi-csi2.c
++++ b/drivers/staging/media/imx/imx6-mipi-csi2.c
+@@ -49,6 +49,7 @@ struct csi2_dev {
+ 	struct mutex lock;
  
- 	ipu_csi_set_window(priv->csi, &priv->crop);
+ 	struct v4l2_mbus_framefmt format_mbus;
++	struct v4l2_fract frame_interval;
  
-+	ipu_csi_set_downsize(priv->csi,
-+			     priv->crop.width == 2 * outfmt->width,
-+			     priv->crop.height == 2 * outfmt->height);
+ 	int                     power_count;
+ 	bool                    stream_on;
+@@ -487,6 +488,35 @@ static int csi2_set_fmt(struct v4l2_subdev *sd,
+ 	return ret;
+ }
+ 
++static int csi2_g_frame_interval(struct v4l2_subdev *sd,
++				 struct v4l2_subdev_frame_interval *fi)
++{
++	struct csi2_dev *csi2 = sd_to_dev(sd);
 +
- 	ipu_csi_init_interface(priv->csi, &sensor_mbus_cfg, &if_fmt);
- 
- 	ipu_csi_set_dest(priv->csi, priv->dest);
-@@ -932,15 +936,15 @@ static int csi_set_fmt(struct v4l2_subdev *sd,
- 	switch (sdformat->pad) {
- 	case CSI_SRC_PAD_DIRECT:
- 	case CSI_SRC_PAD_IDMAC:
--		crop.left = priv->crop.left;
--		crop.top = priv->crop.top;
--		crop.width = sdformat->format.width;
--		crop.height = sdformat->format.height;
--		ret = csi_try_crop(priv, &crop, sensor);
--		if (ret)
--			goto out;
--		sdformat->format.width = crop.width;
--		sdformat->format.height = crop.height;
-+		if (sdformat->format.width < priv->crop.width * 3 / 4)
-+			sdformat->format.width = priv->crop.width / 2;
-+		else
-+			sdformat->format.width = priv->crop.width;
++	mutex_lock(&csi2->lock);
++	fi->interval = csi2->frame_interval;
++	mutex_unlock(&csi2->lock);
 +
-+		if (sdformat->format.height < priv->crop.height * 3 / 4)
-+			sdformat->format.height = priv->crop.height / 2;
-+		else
-+			sdformat->format.height = priv->crop.height;
- 
- 		if (sdformat->pad == CSI_SRC_PAD_IDMAC) {
- 			cc = imx_media_find_format(0, sdformat->format.code,
-@@ -986,6 +990,14 @@ static int csi_set_fmt(struct v4l2_subdev *sd,
- 		}
- 		break;
- 	case CSI_SINK_PAD:
-+		crop.left = 0;
-+		crop.top = 0;
-+		crop.width = sdformat->format.width;
-+		crop.height = sdformat->format.height;
-+		ret = csi_try_crop(priv, &crop, sensor);
-+		if (ret)
-+			goto out;
++	return 0;
++}
 +
- 		cc = imx_media_find_format(0, sdformat->format.code,
- 					   true, false);
- 		if (!cc) {
-@@ -1004,9 +1016,8 @@ static int csi_set_fmt(struct v4l2_subdev *sd,
- 	} else {
- 		priv->format_mbus[sdformat->pad] = sdformat->format;
- 		priv->cc[sdformat->pad] = cc;
--		/* Update the crop window if this is an output pad  */
--		if (sdformat->pad == CSI_SRC_PAD_DIRECT ||
--		    sdformat->pad == CSI_SRC_PAD_IDMAC)
-+		/* Reset the crop window if this is the input pad */
-+		if (sdformat->pad == CSI_SINK_PAD)
- 			priv->crop = crop;
- 	}
++static int csi2_s_frame_interval(struct v4l2_subdev *sd,
++				 struct v4l2_subdev_frame_interval *fi)
++{
++	struct csi2_dev *csi2 = sd_to_dev(sd);
++
++	mutex_lock(&csi2->lock);
++
++	/* Output pads mirror active input pad, no limits on input pads */
++	if (fi->pad != CSI2_SINK_PAD)
++		fi->interval = csi2->frame_interval;
++
++	csi2->frame_interval = fi->interval;
++
++	mutex_unlock(&csi2->lock);
++	return 0;
++}
++
+ static int csi2_link_validate(struct v4l2_subdev *sd,
+ 			      struct media_link *link,
+ 			      struct v4l2_subdev_format *source_fmt,
+@@ -535,6 +565,8 @@ static struct v4l2_subdev_core_ops csi2_core_ops = {
  
+ static struct v4l2_subdev_video_ops csi2_video_ops = {
+ 	.s_stream = csi2_s_stream,
++	.g_frame_interval = csi2_g_frame_interval,
++	.s_frame_interval = csi2_s_frame_interval,
+ };
+ 
+ static struct v4l2_subdev_pad_ops csi2_pad_ops = {
+@@ -603,6 +635,10 @@ static int csi2_probe(struct platform_device *pdev)
+ 	csi2->sd.entity.function = MEDIA_ENT_F_VID_IF_BRIDGE;
+ 	csi2->sd.grp_id = IMX_MEDIA_GRP_ID_CSI2;
+ 
++	/* init default frame interval */
++	csi2->frame_interval.numerator = 1;
++	csi2->frame_interval.denominator = 30;
++
+ 	ret = csi2_parse_endpoints(csi2);
+ 	if (ret)
+ 		return ret;
 -- 
 2.7.4
