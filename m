@@ -1,86 +1,73 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 10 Mar 2017 11:04:48 +0000
-Subject: [PATCH 11/14] arm64: add function to get a cpu's MADT GICC table
-In-Reply-To: <1489143891-11596-1-git-send-email-mark.rutland@arm.com>
-References: <1489143891-11596-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1489143891-11596-12-git-send-email-mark.rutland@arm.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 10 Mar 2017 11:15:04 +0000
+Subject: [PATCH] drm: dw_hdmi: Gate audio sampler clock from the
+ enablement functions
+In-Reply-To: <202cd871-eb1c-d8f4-62d6-bed479f0eece@collabora.com>
+References: <20170310093509.19044-1-romain.perier@collabora.com>
+ <20170310094613.GQ21222@n2100.armlinux.org.uk>
+ <7888eb1f-2781-d4ed-6f26-cb76e1ead4d2@collabora.com>
+ <20170310102753.GR21222@n2100.armlinux.org.uk>
+ <202cd871-eb1c-d8f4-62d6-bed479f0eece@collabora.com>
+Message-ID: <20170310111504.GT21222@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently the ACPI parking protocol code needs to parse each CPU's MADT
-GICC table to extract the mailbox address and so on. Each time we parse
-a GICC table, we call back to the parking protocol code to parse it.
+On Fri, Mar 10, 2017 at 11:58:19AM +0100, Romain Perier wrote:
+> Hello,
+> 
+> Le 10/03/2017 ? 11:27, Russell King - ARM Linux a ?crit :
+> > I also would not think that it's platform specific - remember that
+> > this is Designware IP, and it's likely that other platforms with
+> > exactly the same IP would suffer from the same problem.  It's
+> > probably revision specific, but we need Synopsis' input on that.
+> >
+> > However, I do believe that your patch probably doesn't have much
+> > merit in any case: on a mode set, you enable the audio clock, and
+> > it will remain enabled until the audio device is first opened and
+> > then closed.  If another mode set comes along, then exactly the
+> > same situation happens again.  So, really it isn't achieving all
+> > that much.
+>
+> The fact is we still have sound glitches caused by this workaround on
+> Rockchip, we probably have a revision
+> of the IP without this issue. If CTS+N is not forced to zero we no
+> longer have the glitches :/ (with or without touching the clock)
 
-This has been fine so far, but we're about to have more code that needs
-to extract data from the GICC tables, and adding a callback for each
-user is going to get unwieldy.
+Are you sure that removing the workaround just doesn't result in the
+same bug as on iMX6 appearing?  The bug concerned is the ordering of
+the channels, so unless you're (eg0 monitoring left/right separately
+or directing audio to just one channel, you may not (with modern TVs)
+realise that the channels are swapped.  I'll include the errata
+description and impact below.
 
-Instead, this patch ensures that we stash a copy of each CPU's GICC
-table at boot time, such that anything needing to parse it can later
-request it. This will allow for other parsers of GICC, and for
-simplification to the ACPI parking protocol code. Note that we must
-store a copy, rather than a pointer, since the core ACPI code
-temporarily maps/unmaps tables while iterating over them.
+There are occasional issues on iMX6 as well despite this work-around,
+but I don't clearly remember what devmem2 tweaks I've done in the past
+to get it to resolve itself, nor could I describe them from memory
+any better than "burbling audio".
 
-Since we parse the MADT before we know how many CPUs we have (and hence
-before we setup the percpu areas), we must use an NR_CPUS sized array.
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/include/asm/acpi.h |  2 ++
- arch/arm64/kernel/smp.c       | 10 ++++++++++
- 2 files changed, 12 insertions(+)
+  When the AHB Audio DMA is started, by setting to 1'b1 for the first
+  time the register field AHB_DMA_START.data_buffer_ready, the AHB
+  Audio DMA will request data from the AHB bus to fill its internal
+  AHB DMA FIFO. It is possible that a AHB DMA FIFO read action occurs
+  during the time window between the first sample stored on the AHB
+  DMA FIFO and when the AHB DMA FIFO has stored, at least, the number
+  of configured audio channels in samples. If this happens, the AHB
+  DMA FIFO will reply with samples that are currently on the AHB
+  Audio FIFO and will repeat the last sample after the empty condition
+  is reached.
 
-diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
-index c1976c0..0e99978 100644
---- a/arch/arm64/include/asm/acpi.h
-+++ b/arch/arm64/include/asm/acpi.h
-@@ -85,6 +85,8 @@ static inline bool acpi_has_cpu_in_madt(void)
- 	return true;
- }
- 
-+struct acpi_madt_generic_interrupt *acpi_cpu_get_madt_gicc(int cpu);
-+
- static inline void arch_fix_phys_package_id(int num, u32 slot) { }
- void __init acpi_init_cpus(void);
- 
-diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-index ef1caae..390c277 100644
---- a/arch/arm64/kernel/smp.c
-+++ b/arch/arm64/kernel/smp.c
-@@ -518,6 +518,13 @@ static int __init smp_cpu_setup(int cpu)
- static unsigned int cpu_count = 1;
- 
- #ifdef CONFIG_ACPI
-+static struct acpi_madt_generic_interrupt cpu_madt_gicc[NR_CPUS];
-+
-+struct acpi_madt_generic_interrupt *acpi_cpu_get_madt_gicc(int cpu)
-+{
-+	return &cpu_madt_gicc[cpu];
-+}
-+
- /*
-  * acpi_map_gic_cpu_interface - parse processor MADT entry
-  *
-@@ -552,6 +559,7 @@ static int __init smp_cpu_setup(int cpu)
- 			return;
- 		}
- 		bootcpu_valid = true;
-+		cpu_madt_gicc[0] = *processor;
- 		early_map_cpu_to_node(0, acpi_numa_get_nid(0, hwid));
- 		return;
- 	}
-@@ -562,6 +570,8 @@ static int __init smp_cpu_setup(int cpu)
- 	/* map the logical cpu id to cpu MPIDR */
- 	cpu_logical_map(cpu_count) = hwid;
- 
-+	cpu_madt_gicc[cpu_count] = *processor;
-+
- 	/*
- 	 * Set-up the ACPI parking protocol cpu entries
- 	 * while initializing the cpu_logical_map to
+  Projected Impact:
+  This will miss-align the audio stream, causing a shift in the
+  distribution of audio on the channels on the HDMI sink side, with no
+  knowledge of the DWC_hdmi_tx enabled system.
+
+
+If you know that this definitely does not apply to your version, then
+we need to split the audio enable/disable functions between the AHB
+and I2S variants.
+
 -- 
-1.9.1
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
