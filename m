@@ -1,113 +1,78 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 10 Mar 2017 10:59:22 +0000
-Subject: Managing shared buffers on VIVT cache systems
-In-Reply-To: <CAE=AiOO4J1qGjZb5dqhniQ04aV+WBh4HU+TLsDbXgkrATB8iiw@mail.gmail.com>
-References: <CAE=AiOO4J1qGjZb5dqhniQ04aV+WBh4HU+TLsDbXgkrATB8iiw@mail.gmail.com>
-Message-ID: <20170310105922.GS21222@n2100.armlinux.org.uk>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 10 Mar 2017 11:04:37 +0000
+Subject: [PATCH 00/14] arm_pmu: ACPI support
+Message-ID: <1489143891-11596-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 10, 2017 at 12:45:55AM -0500, Josh Beavers wrote:
-> I am debugging a driver that shared buffers between the kernel and
-> userspace.  These buffers are allocated by vmalloc_user() and mapped
-> by arch_get_unmapped_area_topdown() in arch/arm.
+Hi,
 
-... which means, as soon as you have two mappings of the same memory,
-you have cache aliases.
+This series implements ACPI support in the ARM PMU code. It borrows some code
+from Jeremy's series [1], but takes a different approach to probing and
+association, using the usual hotplug state machine, minimising external changes
+required, and simplifying the relationship with the common arm_pmu code.
 
-> This driver works on other platforms, but on VIVT (Virtually Indexed
-> Virtually Tagged) cache systems inconsistent data seems to be
-> observed.  This is presumably due to cache aliasing (multiple virtual
-> mappings of a single physical memory location).
+The first few patches are preparatory cleanup/refactoring, with the latter half
+of the series being specific to ACPI support.
 
-Correct.
+The series is based on my IRQ rework patches [2]. I've pushed the whole series
+out to the arm/perf/acpi branch [3] of my kernel.org repo.
 
-> Attempts at manually flushing the dcache and using a cache coloring
-> approach both seem to have failed me.  In particular, I am interested
-> in why arch/arm/mm/mmap.c has the comment "We unconditionally provide
-> this function for all cases, however in the VIVT case, we optimize out
-> the alignment rules."  Both arch_get_unmapped_area() and
-> arch_get_unmapped_area_topdown() have aliasing code that is
-> conditional on a VIPT cache existing, but not VIVT.
+Due to the innards of the hotplug callback framework, it's not entirely
+safe to register a PMU in a hotplug callback. Due to this, we can only
+associated hotplugged CPUs with a PMU if a matching CPU was around at
+probe time. A similar restriction already applies to DT systems. We may
+be able to relax this with some future work.
 
-Cache colouring only works when you have colours.  VIVT caches are not
-coloured.  To understand how this all works, look at the address
-structure (the numbers here are just for illustration):
+I've given this some testing on a Juno platform (using SPIs). To see that IRQs
+are correctly associated, I've tested with the following:
 
-   31                        12 11                    0
-  +----------------------------+-----------------------+
-  |         page number        |      page offset      |
-  +----------------------------+-----------------------+
+  $ taskset -c ${SOME_CPU_HERE} perf record \
+    -e armv8_pmuv3_0/cpu_cycles/ \
+    -e armv8_pmuv3_1/cpu_cycles/ \
+    cat /proc/interrupts
+ 
+I've also booted with nr_cpus temporarily capped (passing maxcpus=) to test the
+association logic. This has also been tested in a VM using PPIs; I do not have
+access to a host machine which itself uses PPIs.
 
-For either a physical address or a virtual address, the page offset part
-of the address are equivalent - the MMU maps a virtual page number to a
-physical page number.
+Thanks,
+Mark.
 
-The address that a cache sees is made up of three basic parts:
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-January/482397.html
+[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-March/492891.html
+[3] git://git.kernel.org/pub/scm/linux/kernel/git/mark/linux.git arm/perf/acpi
 
-   31                     15 14              5 4      0
-  +-------------------------+-----------------+--------+
-  |   Tag                   |  Index          | offset |
-  +-------------------------+-----------------+--------+
+Mark Rutland (14):
+  drivers/perf: arm_pmu: remove pointless PMU disabling
+  drivers/perf: arm_pmu: define armpmu_init_fn
+  drivers/perf: arm_pmu: fold init into alloc
+  drivers/perf: arm_pmu: factor out pmu registration
+  drivers/perf: arm_pmu: simplify cpu_pmu_request_irqs()
+  drivers/perf: arm_pmu: handle no platform_device
+  drivers/perf: arm_pmu: rename irq request/free functions
+  drivers/perf: arm_pmu: split cpu-local irq request/free
+  drivers/perf: arm_pmu: move irq request/free into probe
+  drivers/perf: arm_pmu: split out platform device probe logic
+  arm64: add function to get a cpu's MADT GICC table
+  arm64: kill acpi_set_mailbox_entry()
+  drivers/perf: arm_pmu: add ACPI framework
+  arm64: pmuv3: use arm_pmu ACPI framework
 
-Where the offset comes from is largely irrelevant for this discussion,
-because it's the lower bits of the page offset.
-
-The Index and Tag can be sourced from either the physical address or
-the virtual address.  The index is sourced from bits 5 to 11,
-corresponding to the page offset, and bits 12 to 14, corresponding to 
-he LSBs of the page number.  The tag will be sourced from bits 31 to 15,
-corresponding to the page number.
-
-For a cache hit to occur the cache is looked up for a line matching the
-tag in the specified index (an single index can contain multiple cache
-lines, only one line has to match the tag for a hit to occur.)
-
-In a VIPT system, the entire virtual index is sourced from the virtual
-address, which means that it's made up of the virtual page number and
-virtual page offset, whereas the tag is made up of the physical page
-number.
-
-The overlap bits between the virtual page number and index introduce
-the cache colouring effect - if these bits are indentical for each and
-every mapping of the same physical page, the index used to look up in
-the cache will be the same, and so multiple different virtual mappings
-of the same colour hit the same place in the cache.
-
-With a VIVT system, both the tag and the index are sourced from the
-virtual address.  This means that the tag is different for the various
-virtual mappings of the same physical address, which means that it
-has no knowledge of the translation, and so aliasing happens.
-
-So, what this means is that in VIVT systems, if you have more than one
-mapping of the same physical address, you immediately have cache aliasing
-issues to deal with, and there are no software tricks to get around it.
-
-There are essentially two options:
-(a) flush the cache for _each_ virtual alias whenever you modify the
-    data via one of those aliases.
-(b) map the memory uncacheable, so that aliases do not happen in the
-    first place.
-
-Under Linux on ARM with VIVT caches, we do a mixture of both with the
-page cache and multiple userspace mmap()s.  The page cache tends to
-always have a kernel mapping which aliases with any userspace mapping.
-Whenever the kernel writes to its mapping, it calls flush_dcache_page(),
-which flushes the kernel mapping, and then calls into
-__flush_dcache_aliases() to flush all the currently visible userspace
-aliases.
-
-When userspace sets up multiple mmap()s for the same _shared mapping_
-memory in the same process address space, then the code in
-make_coherent() triggers to make the mappings uncacheable, since
-userspace is allowed to write to any alias and read the updated data
-from any alias without issuing cache flushes.
-
-Now for the bit you're not going to like: There is no support in Linux
-for coherency between vmalloc() mappings and userspace mappings on VIVT
-systems.
+ arch/arm64/include/asm/acpi.h             |   7 +-
+ arch/arm64/kernel/acpi_parking_protocol.c |  38 +--
+ arch/arm64/kernel/perf_event.c            |  26 +-
+ arch/arm64/kernel/smp.c                   |  19 +-
+ drivers/perf/Kconfig                      |   4 +
+ drivers/perf/Makefile                     |   3 +-
+ drivers/perf/arm_pmu.c                    | 383 ++++++++----------------------
+ drivers/perf/arm_pmu_acpi.c               | 237 ++++++++++++++++++
+ drivers/perf/arm_pmu_platform.c           | 235 ++++++++++++++++++
+ include/linux/cpuhotplug.h                |   1 +
+ include/linux/perf/arm_pmu.h              |  22 +-
+ 11 files changed, 626 insertions(+), 349 deletions(-)
+ create mode 100644 drivers/perf/arm_pmu_acpi.c
+ create mode 100644 drivers/perf/arm_pmu_platform.c
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+1.9.1
