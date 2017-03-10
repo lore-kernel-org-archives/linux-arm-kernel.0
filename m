@@ -1,73 +1,54 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 10 Mar 2017 18:34:45 +0530
-Subject: [RESEND PATCH v3 5/7] PCI: dwc: all: Modify dbi accessors to
- access data of 4/2/1 bytes
-In-Reply-To: <61f90a03-7164-8e79-f1c2-0ae48b5892a8@axis.com>
-References: <1489041545-15730-1-git-send-email-kishon@ti.com>
- <1489041545-15730-6-git-send-email-kishon@ti.com>
- <a56e462d-83ee-194f-1f9f-3f4c339cad46@axis.com> <58C29648.5020708@ti.com>
- <61f90a03-7164-8e79-f1c2-0ae48b5892a8@axis.com>
-Message-ID: <58C2A46D.2080907@ti.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 10 Mar 2017 13:07:33 +0000
+Subject: [PATCH v4 14/36] [media] v4l2-mc: add a function to inherit
+ controls from a pipeline
+In-Reply-To: <a7b8e095-a95c-24bd-b1e9-e983f18061c4@xs4all.nl>
+References: <1487211578-11360-1-git-send-email-steve_longerbeam@mentor.com>
+ <1487211578-11360-15-git-send-email-steve_longerbeam@mentor.com>
+ <20170302160257.GK3220@valkosipuli.retiisi.org.uk>
+ <20170303230645.GR21222@n2100.armlinux.org.uk>
+ <20170304131329.GV3220@valkosipuli.retiisi.org.uk>
+ <a7b8e095-a95c-24bd-b1e9-e983f18061c4@xs4all.nl>
+Message-ID: <20170310130733.GU21222@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Mar 10, 2017 at 01:54:28PM +0100, Hans Verkuil wrote:
+> But there was always meant to be a layer (libv4l plugin) that could be
+> used to setup a 'default scenario' that existing applications could use,
+> but that was never enforced, sadly.
 
-On Friday 10 March 2017 06:26 PM, Niklas Cassel wrote:
-> On 03/10/2017 01:04 PM, Kishon Vijay Abraham I wrote:
->> Hi,
->>
->> On Thursday 09 March 2017 08:18 PM, Niklas Cassel wrote:
->>> On 03/09/2017 07:39 AM, Kishon Vijay Abraham I wrote:
->>>> Previously dbi accessors can be used to access data of size 4
->>>> bytes. But there might be situations (like accessing
->>>> MSI_MESSAGE_CONTROL in order to set/get the number of required
->>>> MSI interrupts in EP mode) where dbi accessors must
->>>> be used to access data of size 2. This is in preparation for
->>>> adding endpoint mode support to designware driver.
->>> Hello Kishon
->>>
->>> I don't really like the idea of adding an extra argument to every existing read/write.
->>> Will not a read/write of length != 32 be quite uncommon compared to
->>> a read/write of length == 32?
->>>
->>> How about adding some defines to pcie-designware.h:
->>>
->>> #define dw_pcie_writel_dbi(pci, base, reg, val) dw_pcie_write_dbi(pci, base, reg, 0x4, val)
->>> #define dw_pcie_readl_dbi(pci, base, reg) dw_pcie_read_dbi(pci, base, reg, 0x4)
->>>
->>> That way we don't have to change every existing read/write.
->>>
->>>
->>>
->>> Is there a reason why we can't just do:
->>>
->>> vial = dw_pcie_readl_dbi(pci, base, MSI_MESSAGE_CONTROL);
->> MSI_MESSAGE_CONTROL is 0x52 (MSI capability offset + 2). I'm not sure if we can
->> do a readl that crosses the alignment boundary in all platforms. The other
->> option is to readl from "MSI capability offset + 0" and extract the last 16
->> bits. I felt this is more clear since we are interested only in the
->> MSI_MESSAGE_CONTROL.
->>
->>> <shifting+masking the bits we need to get/set>
->>> dw_pcie_writel_dbi(pci, base, MSI_MESSAGE_CONTROL, val);
->>>
->>> Or are we going to be doing read/writes of length != 32 so often that
->>> you think that it's cleaner to have this abstraction?
->> it's used mainly for accessing configuration space header fields. Even the pci
->> core uses *pci_read_config_word* for accessing such fields.
-> 
-> I see. Adding an extra size argument is a good thing then,
-> since it's consistent with the pci generic code.
-> 
-> However, I still think that having defines for writel/readl is a
-> good thing :)
+However, there's other painful issues lurking in userspace, particularly
+to do with the v4l libraries.
 
-sure, having defines is fine. How about something like below (readl, readw: to
-differentiate 4byte and 2 byte access?)
+The idea that the v4l libraries should intercept the format negotiation
+between the application and kernel is a particularly painful one - the
+default gstreamer build detects the v4l libraries, and links against it.
+That much is fine.
 
-#define dw_pcie_readl_dbi(pci, base, reg) __dw_pcie_read_dbi(pci, base, reg, 0x4)
-#define dw_pcie_readw_dbi(pci, base, reg) __dw_pcie_read_dbi(pci, base, reg, 0x2)
+However, the problem comes when you're trying to use bayer formats. The
+v4l libraries "helpfully" (or rather unhelpfully) intercept the format
+negotiation, and decide that they'll invoke v4lconvert to convert the
+bayer to RGB for you, whether you want them to do that or not.
 
-Thanks
-Kishon
+v4lconvert may not be the most efficient way to convert, or even what
+is desired (eg, you may want to receive the raw bayer image.)  However,
+since the v4l libraries/v4lconvert gives you no option but to have its
+conversion forced into the pipeline, other options (such as using the
+gstreamer neon accelerated de-bayer plugin) isn't an option without
+rebuilding gstreamer _without_ linking against the v4l libraries.
+
+At that point, saying "this should be done in a libv4l plugin" becomes
+a total nonsense, because if you need to avoid libv4l due to its
+stupidities, you don't get the benefit of subdevs, and it yet again
+_forces_ people down the route of custom applications.
+
+So, I really don't agree with pushing this into a userspace library
+plugin - at least not with the current state there.
+
+_At least_ the debayering in the v4l libraries needs to become optional.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
