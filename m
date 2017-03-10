@@ -1,73 +1,55 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 10 Mar 2017 11:15:04 +0000
-Subject: [PATCH] drm: dw_hdmi: Gate audio sampler clock from the
- enablement functions
-In-Reply-To: <202cd871-eb1c-d8f4-62d6-bed479f0eece@collabora.com>
-References: <20170310093509.19044-1-romain.perier@collabora.com>
- <20170310094613.GQ21222@n2100.armlinux.org.uk>
- <7888eb1f-2781-d4ed-6f26-cb76e1ead4d2@collabora.com>
- <20170310102753.GR21222@n2100.armlinux.org.uk>
- <202cd871-eb1c-d8f4-62d6-bed479f0eece@collabora.com>
-Message-ID: <20170310111504.GT21222@n2100.armlinux.org.uk>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 10 Mar 2017 12:19:07 +0100
+Subject: [PATCH v2 0/6] ARM: dts: renesas: Add INTC-SYS clock to device
+ tree
+In-Reply-To: <20170310092159.GE21820@verge.net.au>
+References: <1488819491-26097-1-git-send-email-geert+renesas@glider.be>
+ <20170310092159.GE21820@verge.net.au>
+Message-ID: <CAMuHMdVmd5+QW00XRL4qzO85RrCsu_7Bu15ah1rcFZ=eGgDSug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 10, 2017 at 11:58:19AM +0100, Romain Perier wrote:
-> Hello,
-> 
-> Le 10/03/2017 ? 11:27, Russell King - ARM Linux a ?crit :
-> > I also would not think that it's platform specific - remember that
-> > this is Designware IP, and it's likely that other platforms with
-> > exactly the same IP would suffer from the same problem.  It's
-> > probably revision specific, but we need Synopsis' input on that.
-> >
-> > However, I do believe that your patch probably doesn't have much
-> > merit in any case: on a mode set, you enable the audio clock, and
-> > it will remain enabled until the audio device is first opened and
-> > then closed.  If another mode set comes along, then exactly the
-> > same situation happens again.  So, really it isn't achieving all
-> > that much.
+Hi Simon,
+
+On Fri, Mar 10, 2017 at 10:21 AM, Simon Horman <horms@verge.net.au> wrote:
+> On Mon, Mar 06, 2017 at 05:58:05PM +0100, Geert Uytterhoeven wrote:
+>> This patch series improves the topology description in DT of the ARM GIC
+>> on Renesas SoCs using the legacy CPG/MSTP bindings (R-Mobile APE6 and
+>> R-Car Gen2).  It describes the INTC-SYS clock, links the GIC to its
+>> module clock, and adds the GIC to the SYSC "always on" PM Domain.
+>>
+>> Note that currently the GIC-400 driver doesn't support module clocks nor
+>> Runtime PM, so this must be handled as a critical clock.  Hence this
+>> series depends on commit e34084fb9a023d1d ("clk: renesas: mstp: Make
+>> INTC-SYS a critical clock"), which is in v4.11-rc1.
+>>
+>> This series is the counterpart of "[PATCH 0/4] ARM/arm64: dts: renesas:
+>> Link ARM GIC to clock and clock domain" for SoCs not yet migrated to the
+>> new CPG/MSSR driver.  The latter is already part of v4.11-rc1 as it had
+>> less dependencies.
+>>
+>> Changes compared to v1:
+>>   - Add missing "power-domains" property,
+>>   - Add clock-names property,
+>>   - Rebased on top of CPG Clock Domain and R-Car SYSC PM Domain support,
+>>   - Add r8a7792 patch,
+>>   - Please refer to the individual patch changelogs for more details
+>>     (v1 dates back to 2014).
+>>
+>> Thanks for applying!
 >
-> The fact is we still have sound glitches caused by this workaround on
-> Rockchip, we probably have a revision
-> of the IP without this issue. If CTS+N is not forced to zero we no
-> longer have the glitches :/ (with or without touching the clock)
+> Thanks, done.
 
-Are you sure that removing the workaround just doesn't result in the
-same bug as on iMX6 appearing?  The bug concerned is the ordering of
-the channels, so unless you're (eg0 monitoring left/right separately
-or directing audio to just one channel, you may not (with modern TVs)
-realise that the channels are swapped.  I'll include the errata
-description and impact below.
+Thanks, but it seems you forgot "ARM: dts: r8a7793: Add INTC-SYS clock to
+device tree"?
 
-There are occasional issues on iMX6 as well despite this work-around,
-but I don't clearly remember what devmem2 tweaks I've done in the past
-to get it to resolve itself, nor could I describe them from memory
-any better than "burbling audio".
+Gr{oetje,eeting}s,
 
+                        Geert
 
-  When the AHB Audio DMA is started, by setting to 1'b1 for the first
-  time the register field AHB_DMA_START.data_buffer_ready, the AHB
-  Audio DMA will request data from the AHB bus to fill its internal
-  AHB DMA FIFO. It is possible that a AHB DMA FIFO read action occurs
-  during the time window between the first sample stored on the AHB
-  DMA FIFO and when the AHB DMA FIFO has stored, at least, the number
-  of configured audio channels in samples. If this happens, the AHB
-  DMA FIFO will reply with samples that are currently on the AHB
-  Audio FIFO and will repeat the last sample after the empty condition
-  is reached.
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-  Projected Impact:
-  This will miss-align the audio stream, causing a shift in the
-  distribution of audio on the channels on the HDMI sink side, with no
-  knowledge of the DWC_hdmi_tx enabled system.
-
-
-If you know that this definitely does not apply to your version, then
-we need to split the audio enable/disable functions between the AHB
-and I2S variants.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
