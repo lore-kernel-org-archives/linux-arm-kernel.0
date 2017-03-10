@@ -1,59 +1,106 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 10 Mar 2017 10:27:54 +0000
-Subject: [PATCH] drm: dw_hdmi: Gate audio sampler clock from the
- enablement functions
-In-Reply-To: <7888eb1f-2781-d4ed-6f26-cb76e1ead4d2@collabora.com>
-References: <20170310093509.19044-1-romain.perier@collabora.com>
- <20170310094613.GQ21222@n2100.armlinux.org.uk>
- <7888eb1f-2781-d4ed-6f26-cb76e1ead4d2@collabora.com>
-Message-ID: <20170310102753.GR21222@n2100.armlinux.org.uk>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Fri, 10 Mar 2017 11:31:08 +0100
+Subject: [PATCH v6 1/2] [media] exynos-gsc: Use user configured colorspace
+ if provided
+In-Reply-To: <20170301115108.14187-2-thibault.saunier@osg.samsung.com>
+References: <20170301115108.14187-1-thibault.saunier@osg.samsung.com>
+ <20170301115108.14187-2-thibault.saunier@osg.samsung.com>
+Message-ID: <624d41f9-bdcb-3a9d-b462-109d1442bd7f@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 10, 2017 at 11:21:53AM +0100, Romain Perier wrote:
-> Hello,
+On 01/03/17 12:51, Thibault Saunier wrote:
+> Use colorspace provided by the user as we are only doing scaling and
+> color encoding conversion, we won't be able to transform the colorspace
+> itself and the colorspace won't mater in that operation.
 > 
-> Le 10/03/2017 ? 10:46, Russell King - ARM Linux a ?crit :
-> > On Fri, Mar 10, 2017 at 10:35:09AM +0100, Romain Perier wrote:
-> >> Currently, the audio sampler clock is enabled from dw_hdmi_setup() at
-> >> step E. and is kept enabled for later use. This clock should be enabled
-> >> and disabled along with the actual audio stream and not always on (that
-> >> is bad for PM). Futhermore, this might cause sound glitches with some
-> >> HDMI devices, as the CTS+N is forced to zero when the stream is disabled
-> >> while the audio clock is still running.
-> >>
-> >> This commit adds a parameter to hdmi_audio_enable_clk() that controls
-> >> when the audio sample clock must be enabled or disabled. Then, it moves
-> >> the call to this function into dw_hdmi_audio_enable() and
-> >> dw_hdmi_audio_disable().
-> > How does this interact with the workaround given in my commit introducing
-> > these functions?  (Commit b90120a96608).
-> >
-> > Setting N=0 is a work-around for iMX6, and we need the audio FIFO to be
-> > loaded with data prior to setting N non-zero.  If disabling the audio
-> > clock prevents the audio FIFO being loaded, your patch will break iMX6.
-> >
-> Mhhh, the fact is I have no IMX6 devices here (only Rockchip). So
-> I only tested on Rockchip devices. An approach might be to introduce an
-> option for handling this errata, because that's platform specific and
-> other platforms (like Rockchip) are in conflict with this.
+> Also always use output colorspace on the capture side.
+> 
+> If the user does not provide a colorspace do no make it up, we might
+> later while processing need to figure out the colorspace, which
+> is possible depending on the frame size but do not ever guess and
+> leak that guess to the userspace.
+> 
+> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> Signed-off-by: Thibault Saunier <thibault.saunier@osg.samsung.com>
+> Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
+> 
+> ---
+> 
+> Changes in v6:
+> - Do not ever guess colorspace
+> 
+> Changes in v5:
+> - Squash commit to always use output colorspace on the capture side
+>   inside this one
+> - Fix typo in commit message
+> 
+> Changes in v4:
+> - Reword commit message to better back our assumptions on specifications
+> 
+> Changes in v3:
+> - Do not check values in the g_fmt functions as Andrzej explained in previous review
+> - Added 'Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>'
+> 
+> Changes in v2: None
+> 
+>  drivers/media/platform/exynos-gsc/gsc-core.c | 9 ++++-----
+>  drivers/media/platform/exynos-gsc/gsc-core.h | 1 +
+>  2 files changed, 5 insertions(+), 5 deletions(-)
+> 
+> diff --git a/drivers/media/platform/exynos-gsc/gsc-core.c b/drivers/media/platform/exynos-gsc/gsc-core.c
+> index 59a634201830..0241168c85af 100644
+> --- a/drivers/media/platform/exynos-gsc/gsc-core.c
+> +++ b/drivers/media/platform/exynos-gsc/gsc-core.c
+> @@ -454,6 +454,7 @@ int gsc_try_fmt_mplane(struct gsc_ctx *ctx, struct v4l2_format *f)
+>  	} else {
+>  		min_w = variant->pix_min->target_rot_dis_w;
+>  		min_h = variant->pix_min->target_rot_dis_h;
+> +		pix_mp->colorspace = ctx->out_colorspace;
+>  	}
+>  
+>  	pr_debug("mod_x: %d, mod_y: %d, max_w: %d, max_h = %d",
+> @@ -472,10 +473,8 @@ int gsc_try_fmt_mplane(struct gsc_ctx *ctx, struct v4l2_format *f)
+>  
+>  	pix_mp->num_planes = fmt->num_planes;
+>  
+> -	if (pix_mp->width >= 1280) /* HD */
+> -		pix_mp->colorspace = V4L2_COLORSPACE_REC709;
+> -	else /* SD */
+> -		pix_mp->colorspace = V4L2_COLORSPACE_SMPTE170M;
+> +	if (V4L2_TYPE_IS_OUTPUT(f->type))
+> +		ctx->out_colorspace = pix_mp->colorspace;
+>  
+>  	for (i = 0; i < pix_mp->num_planes; ++i) {
+>  		struct v4l2_plane_pix_format *plane_fmt = &pix_mp->plane_fmt[i];
+> @@ -519,8 +518,8 @@ int gsc_g_fmt_mplane(struct gsc_ctx *ctx, struct v4l2_format *f)
+>  	pix_mp->height		= frame->f_height;
+>  	pix_mp->field		= V4L2_FIELD_NONE;
+>  	pix_mp->pixelformat	= frame->fmt->pixelformat;
+> -	pix_mp->colorspace	= V4L2_COLORSPACE_REC709;
+>  	pix_mp->num_planes	= frame->fmt->num_planes;
+> +	pix_mp->colorspace = ctx->out_colorspace;
 
-I'd say that they _aren't_ in conflict with it - or are you saying
-that the I2S driver was never functionally tested as working?
+You need to do the same for the ycbcr_enc, xfer_func and quantization fields.
+With that in place it is fully 'colorspace compliant' :-)
 
-I also would not think that it's platform specific - remember that
-this is Designware IP, and it's likely that other platforms with
-exactly the same IP would suffer from the same problem.  It's
-probably revision specific, but we need Synopsis' input on that.
+Regards,
 
-However, I do believe that your patch probably doesn't have much
-merit in any case: on a mode set, you enable the audio clock, and
-it will remain enabled until the audio device is first opened and
-then closed.  If another mode set comes along, then exactly the
-same situation happens again.  So, really it isn't achieving all
-that much.
+	Hans
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+>  
+>  	for (i = 0; i < pix_mp->num_planes; ++i) {
+>  		pix_mp->plane_fmt[i].bytesperline = (frame->f_width *
+> diff --git a/drivers/media/platform/exynos-gsc/gsc-core.h b/drivers/media/platform/exynos-gsc/gsc-core.h
+> index 696217e9af66..715d9c9d8d30 100644
+> --- a/drivers/media/platform/exynos-gsc/gsc-core.h
+> +++ b/drivers/media/platform/exynos-gsc/gsc-core.h
+> @@ -376,6 +376,7 @@ struct gsc_ctx {
+>  	struct v4l2_ctrl_handler ctrl_handler;
+>  	struct gsc_ctrls	gsc_ctrls;
+>  	bool			ctrls_rdy;
+> +	enum v4l2_colorspace out_colorspace;
+>  };
+>  
+>  void gsc_set_prefbuf(struct gsc_dev *gsc, struct gsc_frame *frm);
+> 
