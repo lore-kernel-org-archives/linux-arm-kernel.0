@@ -1,78 +1,65 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Fri, 10 Mar 2017 12:49:30 -0600
-Subject: Neophyte questions about PCIe
-In-Reply-To: <c4712e19-863c-16b8-6920-5ad7dd178929@free.fr>
-References: <ced6a4bf-c94a-c116-1e94-52a8d675d132@free.fr>
- <20170308151724.GA20780@bhelgaas-glaptop.roam.corp.google.com>
- <f964ee05-db7f-c381-c91c-82897175da6d@free.fr>
- <1092d971-5d81-2da7-4b34-0a88637c0ec5@arm.com>
- <063D6719AE5E284EB5DD2968C1650D6DCFE7C8BA@AcuExch.aculab.com>
- <c4712e19-863c-16b8-6920-5ad7dd178929@free.fr>
-Message-ID: <20170310184930.GG19517@bhelgaas-glaptop.roam.corp.google.com>
+From: troy.kisky@boundarydevices.com (Troy Kisky)
+Date: Fri, 10 Mar 2017 10:59:11 -0800
+Subject: [PATCH v5 07/39] ARM: dts: imx6qdl-sabrelite: remove erratum
+ ERR006687 workaround
+In-Reply-To: <1489121599-23206-8-git-send-email-steve_longerbeam@mentor.com>
+References: <1489121599-23206-1-git-send-email-steve_longerbeam@mentor.com>
+ <1489121599-23206-8-git-send-email-steve_longerbeam@mentor.com>
+Message-ID: <9f5d0ac4-0602-c729-5c00-1d9ef49247c1@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 10, 2017 at 04:05:50PM +0100, Mason wrote:
-> On 10/03/2017 15:06, David Laight wrote:
+On 3/9/2017 8:52 PM, Steve Longerbeam wrote:
+> There is a pin conflict with GPIO_6. This pin functions as a power
+> input pin to the OV5642 camera sensor, but ENET uses it as the h/w
+> workaround for erratum ERR006687, to wake-up the ARM cores on normal
+> RX and TX packet done events. So we need to remove the h/w workaround
+> to support the OV5642. The result is that the CPUidle driver will no
+> longer allow entering the deep idle states on the sabrelite.
 > 
-> > Robin Murphy wrote:
-> >
-> >> On 09/03/17 23:43, Mason wrote:
-> >>
-> >>> I think I'm making progress, in that I now have a better
-> >>> idea of what I don't understand. So I'm able to ask
-> >>> (hopefully) less vague questions.
-> >>>
-> >>> Take the USB3 PCIe adapter I've been testing with. At some
-> >>> point during init, the XHCI driver request some memory
-> >>> (via kmalloc?) in order to exchange data with the host, right?
-> >>>
-> >>> On my SoC, the RAM used by Linux lives at physical range
-> >>> [0x8000_0000, 0x8800_0000[ => 128 MB
-> >>>
-> >>> How does the XHCI driver make the adapter aware of where
-> >>> it can scribble data? The XHCI driver has no notion that
-> >>> the device is behind a bus, does it?
-> >>>
-> >>> At some point, the physical addresses must be converted
-> >>> to PCI bus addresses, right? Is it computed subtracting
-> >>> the offset defined in the DT?
-> > 
-> > The driver should call dma_alloc_coherent() which returns both the
-> > kernel virtual address and the device (xhci controller) has
-> > to use to access it.
-> > The cpu physical address is irrelevant (although it might be
-> > calculated in the middle somewhere).
+> This is a partial revert of
 > 
-> Thank you for that missing piece of the puzzle.
-> I see some relevant action in drivers/usb/host/xhci-mem.c
+> commit 6261c4c8f13e ("ARM: dts: imx6qdl-sabrelite: use GPIO_6 for FEC
+> 			interrupt.")
+> commit a28eeb43ee57 ("ARM: dts: imx6: tag boards that have the HW workaround
+> 			for ERR006687")
 > 
-> And I now see this log:
+> Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
+> ---
+>  arch/arm/boot/dts/imx6qdl-sabrelite.dtsi | 4 ----
+>  1 file changed, 4 deletions(-)
 > 
-> [    2.499320] xhci_hcd 0000:01:00.0: // Device context base array address = 0x8e07e000 (DMA), d0855000 (virt)
-> [    2.509156] xhci_hcd 0000:01:00.0: Allocated command ring at cfb04200
-> [    2.515640] xhci_hcd 0000:01:00.0: First segment DMA is 0x8e07f000
-> [    2.521863] xhci_hcd 0000:01:00.0: // Setting command ring address to 0x20
-> [    2.528786] xhci_hcd 0000:01:00.0: // xHC command ring deq ptr low bits + flags = @00000000
-> [    2.537188] xhci_hcd 0000:01:00.0: // xHC command ring deq ptr high bits = @00000000
-> [    2.545002] xhci_hcd 0000:01:00.0: // Doorbell array is located at offset 0x800 from cap regs base addr
-> [    2.554455] xhci_hcd 0000:01:00.0: // xHCI capability registers at d0852000:
-> [    2.561550] xhci_hcd 0000:01:00.0: // @d0852000 = 0x1000020 (CAPLENGTH AND HCIVERSION)
-> 
-> I believe 0x8e07e000 is a CPU address, not a PCI bus address.
+> diff --git a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
+> index 8413179..89dce27 100644
+> --- a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
+> @@ -270,9 +270,6 @@
+>  	txd1-skew-ps = <0>;
+>  	txd2-skew-ps = <0>;
+>  	txd3-skew-ps = <0>;
 
-Sounds like you've made good progress since this email, but I think
-0x8e07e000 is a PCI bus address, not a CPU address.  The code in
-xhci_mem_init() is this:
+How about
 
-  xhci->dcbaa = dma_alloc_coherent(dev, sizeof(*xhci->dcbaa), &dma, flags);
-  xhci->dcbaa->dma = dma;
-  xhci_dbg_trace("Device context base array address = 0x%llx (DMA), %p (virt)",
-                 (unsigned long long)xhci->dcbaa->dma, xhci->dcbaa);
++#if !IS_ENABLED(CONFIG_VIDEO_OV5642)
 
-dma_alloc_coherent() allocates a buffer and returns two values: the
-CPU virtual address ("xhci->dcbaa" here) for use by the driver and the
-corresponding DMA address the device can use to reach the buffer
-("dma").
+> -	interrupts-extended = <&gpio1 6 IRQ_TYPE_LEVEL_HIGH>,
+> -			      <&intc 0 119 IRQ_TYPE_LEVEL_HIGH>;
+> -	fsl,err006687-workaround-present;
 
-Documentation/DMA-API-HOWTO.txt has more details that might be useful.
++#endif
+
+Is that allowed ?
+
+
+>  	status = "okay";
+>  };
+>  
+> @@ -373,7 +370,6 @@
+>  				MX6QDL_PAD_RGMII_RX_CTL__RGMII_RX_CTL	0x1b030
+>  				/* Phy reset */
+>  				MX6QDL_PAD_EIM_D23__GPIO3_IO23		0x000b0
+> -				MX6QDL_PAD_GPIO_6__ENET_IRQ		0x000b1
+>  			>;
+>  		};
+>  
+> 
