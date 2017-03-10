@@ -1,59 +1,76 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 10 Mar 2017 17:34:24 +0530
-Subject: [RESEND PATCH v3 5/7] PCI: dwc: all: Modify dbi accessors to
- access data of 4/2/1 bytes
-In-Reply-To: <a56e462d-83ee-194f-1f9f-3f4c339cad46@axis.com>
-References: <1489041545-15730-1-git-send-email-kishon@ti.com>
- <1489041545-15730-6-git-send-email-kishon@ti.com>
- <a56e462d-83ee-194f-1f9f-3f4c339cad46@axis.com>
-Message-ID: <58C29648.5020708@ti.com>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Fri, 10 Mar 2017 13:07:26 +0100
+Subject: [PATCH v5 16/39] [media] v4l2: add a new-frame before
+ end-of-frame event
+In-Reply-To: <1489121599-23206-17-git-send-email-steve_longerbeam@mentor.com>
+References: <1489121599-23206-1-git-send-email-steve_longerbeam@mentor.com>
+ <1489121599-23206-17-git-send-email-steve_longerbeam@mentor.com>
+Message-ID: <72a06329-7f65-fef9-3153-573d9abb2689@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 10/03/17 05:52, Steve Longerbeam wrote:
+> Add a NEW_FRAME_BEFORE_EOF event to signal that a video capture or
+> output device has signaled a new frame is ready before a previous
+> frame has completed reception or transmission. This usually indicates
+> a DMA read/write channel is having trouble gaining bus access.
 
-On Thursday 09 March 2017 08:18 PM, Niklas Cassel wrote:
-> On 03/09/2017 07:39 AM, Kishon Vijay Abraham I wrote:
->> Previously dbi accessors can be used to access data of size 4
->> bytes. But there might be situations (like accessing
->> MSI_MESSAGE_CONTROL in order to set/get the number of required
->> MSI interrupts in EP mode) where dbi accessors must
->> be used to access data of size 2. This is in preparation for
->> adding endpoint mode support to designware driver.
-> 
-> Hello Kishon
-> 
-> I don't really like the idea of adding an extra argument to every existing read/write.
-> Will not a read/write of length != 32 be quite uncommon compared to
-> a read/write of length == 32?
-> 
-> How about adding some defines to pcie-designware.h:
-> 
-> #define dw_pcie_writel_dbi(pci, base, reg, val) dw_pcie_write_dbi(pci, base, reg, 0x4, val)
-> #define dw_pcie_readl_dbi(pci, base, reg) dw_pcie_read_dbi(pci, base, reg, 0x4)
-> 
-> That way we don't have to change every existing read/write.
-> 
-> 
-> 
-> Is there a reason why we can't just do:
-> 
-> vial = dw_pcie_readl_dbi(pci, base, MSI_MESSAGE_CONTROL);
+This too is a weird event. Based on what you describe this basically means
+that the previous frame is incomplete, in which case you would typically
+return the buffer with the V4L2_BUF_FLAG_ERROR bit set.
 
-MSI_MESSAGE_CONTROL is 0x52 (MSI capability offset + 2). I'm not sure if we can
-do a readl that crosses the alignment boundary in all platforms. The other
-option is to readl from "MSI capability offset + 0" and extract the last 16
-bits. I felt this is more clear since we are interested only in the
-MSI_MESSAGE_CONTROL.
+Using an event for this is not a good idea.
 
-> <shifting+masking the bits we need to get/set>
-> dw_pcie_writel_dbi(pci, base, MSI_MESSAGE_CONTROL, val);
+Regards,
+
+	Hans
+
+> Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
+> ---
+>  Documentation/media/uapi/v4l/vidioc-dqevent.rst | 6 ++++++
+>  Documentation/media/videodev2.h.rst.exceptions  | 1 +
+>  include/uapi/linux/videodev2.h                  | 1 +
+>  3 files changed, 8 insertions(+)
 > 
-> Or are we going to be doing read/writes of length != 32 so often that
-> you think that it's cleaner to have this abstraction?
-
-it's used mainly for accessing configuration space header fields. Even the pci
-core uses *pci_read_config_word* for accessing such fields.
-
-Thanks
-Kishon
+> diff --git a/Documentation/media/uapi/v4l/vidioc-dqevent.rst b/Documentation/media/uapi/v4l/vidioc-dqevent.rst
+> index dc77363..54bc7ae 100644
+> --- a/Documentation/media/uapi/v4l/vidioc-dqevent.rst
+> +++ b/Documentation/media/uapi/v4l/vidioc-dqevent.rst
+> @@ -203,6 +203,12 @@ call.
+>  	has measured an interval between the reception or transmit
+>  	completion of two consecutive frames of video that is outside
+>  	the nominal frame interval by some tolerance value.
+> +    * - ``V4L2_EVENT_NEW_FRAME_BEFORE_EOF``
+> +      - 8
+> +      - This event is triggered when the video capture or output device
+> +	has signaled a new frame is ready before a previous frame has
+> +	completed reception or transmission. This usually indicates a
+> +	DMA read/write channel is having trouble gaining bus access.
+>      * - ``V4L2_EVENT_PRIVATE_START``
+>        - 0x08000000
+>        - Base event number for driver-private events.
+> diff --git a/Documentation/media/videodev2.h.rst.exceptions b/Documentation/media/videodev2.h.rst.exceptions
+> index c7d8fad..be6f332 100644
+> --- a/Documentation/media/videodev2.h.rst.exceptions
+> +++ b/Documentation/media/videodev2.h.rst.exceptions
+> @@ -460,6 +460,7 @@ replace define V4L2_EVENT_FRAME_SYNC event-type
+>  replace define V4L2_EVENT_SOURCE_CHANGE event-type
+>  replace define V4L2_EVENT_MOTION_DET event-type
+>  replace define V4L2_EVENT_FRAME_INTERVAL_ERROR event-type
+> +replace define V4L2_EVENT_NEW_FRAME_BEFORE_EOF event-type
+>  replace define V4L2_EVENT_PRIVATE_START event-type
+>  
+>  replace define V4L2_EVENT_CTRL_CH_VALUE ctrl-changes-flags
+> diff --git a/include/uapi/linux/videodev2.h b/include/uapi/linux/videodev2.h
+> index cf5a0d0..f54a82a 100644
+> --- a/include/uapi/linux/videodev2.h
+> +++ b/include/uapi/linux/videodev2.h
+> @@ -2132,6 +2132,7 @@ struct v4l2_streamparm {
+>  #define V4L2_EVENT_SOURCE_CHANGE		5
+>  #define V4L2_EVENT_MOTION_DET			6
+>  #define V4L2_EVENT_FRAME_INTERVAL_ERROR		7
+> +#define V4L2_EVENT_NEW_FRAME_BEFORE_EOF		8
+>  #define V4L2_EVENT_PRIVATE_START		0x08000000
+>  
+>  /* Payload for V4L2_EVENT_VSYNC */
+> 
