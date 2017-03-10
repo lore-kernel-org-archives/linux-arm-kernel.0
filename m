@@ -1,76 +1,58 @@
-From: romain.perier@collabora.com (Romain Perier)
-Date: Fri, 10 Mar 2017 10:31:29 +0100
-Subject: [PATCH v2] drm: dw_hdmi: Don't rely on the status of the bridge for
- updating HPD
-Message-ID: <20170310093129.16890-1-romain.perier@collabora.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 10 Mar 2017 09:33:38 +0000
+Subject: [PATCH v4 13/36] [media] v4l2: add a frame timeout event
+In-Reply-To: <b739319b-61d7-3d9d-a64f-7650ab5cd4b0@gmail.com>
+References: <1487211578-11360-1-git-send-email-steve_longerbeam@mentor.com>
+ <1487211578-11360-14-git-send-email-steve_longerbeam@mentor.com>
+ <20170302155342.GJ3220@valkosipuli.retiisi.org.uk>
+ <4b2bcee1-8da0-776e-4455-8d8e7a7abf0a@gmail.com>
+ <20170303114506.GM3220@valkosipuli.retiisi.org.uk>
+ <59663ea1-b277-1543-e770-6a102ac733a4@gmail.com>
+ <20170304105600.GS3220@valkosipuli.retiisi.org.uk>
+ <03c9b05c-d3ba-c890-f9fa-ad5e1a49430c@gmail.com>
+ <20170305224114.GV21222@n2100.armlinux.org.uk>
+ <b739319b-61d7-3d9d-a64f-7650ab5cd4b0@gmail.com>
+Message-ID: <20170310093338.GP21222@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, the irq handler that monitores changes for HPD anx RX_SENSE
-relies on the status of the bridge for updating the status of the HPD.
-The update is done only when the bridge is enabled.
+On Thu, Mar 09, 2017 at 06:38:18PM -0800, Steve Longerbeam wrote:
+> On 03/05/2017 02:41 PM, Russell King - ARM Linux wrote:
+> >I'm not sure that statement is entirely accurate.  With the IMX219
+> >camera, I _could_ (with previous iterations of the iMX capture code)
+> >stop it streaming, wait a while, and restart it, and everything
+> >continues to work.
+> 
+> Hi Russell, did you see the "EOF timeout" kernel error message when you
+> stopped the IMX219 from streaming? Only a "EOF timeout" message
+> indicates the unrecoverable case.
 
-However, on Rockchip platforms we have found use cases where it could be
-a problem. When HDMI is being used, turning off/on the screen or
-unplugging/re-plugging the cable, the following simplified code path
-will happen:
+I really couldn't tell you anymore - I can't go back and test at all,
+because:
 
-- dw_hdmi_irq() will be triggered by an HPD event, as the bridge is on
-hdmi->disabled is false, then the handler will update the rxsense flag
-accordingly.
-- dw_hdmi_update_power() will be invoked with the mode
-DRM_FORCE_UNSPECIFIED and rxsense == 1, so dw_hdmi_poweroff() will be
-called and the PHY will be desactivated (its pixel clocks and TMDS)
+(a) your v4 patch set never worked for me
+(b) I've now moved forward to v4.11-rc1, which conflicts with your v4
+    and older patch sets.
 
-[...]
+In any case, I'm in complete disagreement with many of the points that
+Sakari has been bringing up, and I'm finding the direction that things
+are progressing to be abhorrent.
 
-- dw_hdmi_bridge_disable() will be invoked, the bridge will be marked as
-disabled.
+I've discussed with Mauro about (eg) the application interface, and
+unsurprisingly to me, Mauro immediately said about control inheritence
+to the main v4l2 device, contradicting what Sakari has been saying.
+The subdev API is supposed to be there to allow for finer control, it's
+not a "one or the other" thing.  The controls are still supposed to be
+exposed through the main v4l2 subdev device.
 
-- dw_hdmi_irq() will be triggered by an HPD event, as the bridge is
-currently disabled the HPD status won't be updated, so hdmi->rxsense
-won't be changed. Even if the data part of the PHY is disabled, this
-information coming from the HDMI Transmitter is correct and should be
-saved.
+Since the v4l2 stuff is becoming abhorrent, and I've also come to
+realise that I'm going to have to write an entirely new userspace
+application to capture, debayer and encode efficiently, I'm finding
+that I've little motivation to take much of a further interest in
+iMX6 capture, or indeed continue my reverse engineering efforts of
+the IMX219 sensor.
 
-[...]
-
-- dw_hdmi_bridge_enable() will be invoked, the bridge will be marked as
-enabled.
-- dw_hdmi_update_power() will be called. When hdmi->force is equal to
-DRM_FORCE_UNSPECIFIED the function will rely on hdmi->rxsense. If this
-field has not been updated by the irq handler, it will be false and
-DRM_FORCE_ON won't be put to hdmi->force.
-
-Consequently, most of the time dw_hdmi_poweron() won't be called in this
-use case, TMDS won't be re-enabled the PHY won't be re-initialized,
-resulting in a "Signal not found".
-
-This commit fixes the issue by removing the check for "!hdmi->disabled".
-As already explained, even if the PHY is partially disabled, information
-coming from HDMI Transmitter about HPD should be saved for a later use.
-
-Signed-off-by: Romain Perier <romain.perier@collabora.com>
----
-
-Changes in v2:
-- I have re-worded the commit message, as suggested by Russel
-
- drivers/gpu/drm/bridge/dw-hdmi.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/gpu/drm/bridge/dw-hdmi.c b/drivers/gpu/drm/bridge/dw-hdmi.c
-index 3a70016..5b6090c 100644
---- a/drivers/gpu/drm/bridge/dw-hdmi.c
-+++ b/drivers/gpu/drm/bridge/dw-hdmi.c
-@@ -1793,7 +1793,7 @@ static irqreturn_t dw_hdmi_irq(int irq, void *dev_id)
- 	if (intr_stat &
- 	    (HDMI_IH_PHY_STAT0_RX_SENSE | HDMI_IH_PHY_STAT0_HPD)) {
- 		mutex_lock(&hdmi->mutex);
--		if (!hdmi->disabled && !hdmi->force) {
-+		if (!hdmi->force) {
- 			/*
- 			 * If the RX sense status indicates we're disconnected,
- 			 * clear the software rxsense status.
 -- 
-2.9.3
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
