@@ -1,58 +1,122 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 10 Mar 2017 08:17:22 +0000
-Subject: [PATCH 00/15] arm64/kvm: use common sysreg definitions
-In-Reply-To: <1489079247-31092-1-git-send-email-mark.rutland@arm.com> (Mark
- Rutland's message of "Thu, 9 Mar 2017 17:07:12 +0000")
-References: <1489079247-31092-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <87a88tv94d.fsf@on-the-bus.cambridge.arm.com>
+From: andy.tang@nxp.com (Yuantian Tang)
+Date: Fri, 10 Mar 2017 16:12:13 +0800
+Subject: [PATCH] arm64: dts: updated sata node on ls1012a dts
+Message-ID: <1489133533-39352-1-git-send-email-andy.tang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 09 2017 at  5:07:12 pm GMT, Mark Rutland <mark.rutland@arm.com> wrote:
-> Currently we duplicate effort in maintaining system register encodings across
-> arm64's <asm/sysreg.h>, KVM's sysreg tables, and other places. This redundancy
-> is unfortunate, and as encodings are encoded in-place without any mnemonic,
-> this ends up more painful to read than necessary.
->
-> This series ameliorates this by making <asm/sysreg.h> the canonical location
-> for (architected) system register encodings, with other users building atop of
-> this, e.g. with KVM deriving its sysreg table values from the common mnemonics.
->
-> I've only attacked AArch64-native SYS encodings, and ignored CP{15,14}
-> registers for now, but these could be handled similarly. Largely, I've stuck to
-> only what KVM needs, though for the debug and perfmon groups it was easier to
-> take the whole group from the ARM ARM than to filter them to only what KVM
-> needed today.
->
-> To verify that I haven't accidentally broken KVM, I've diffed sys_regs.o and
-> sys_regs_generic_v8.o on a section-by-section basis before and after the series
-> is applied. The .text, .data, and .rodata sections (and most others) are
-> identical. The __bug_table section, and some .debug* sections differ, and this
-> appears to be due to line numbers changing due to removed lines.
->
-> One thing I wasn't sure how to address was banks of registers such as
-> PMEVCNTR<n>_EL0. We currently enumerate all cases for our GICv3 definitions,
-> but it seemed painful to expand ~30 cases for PMEVCNTR<n>_EL0 and friends, and
-> for these I've made the macros take an 'n' parameter. It would be nice to be
-> consistent either way, and I'm happy to expand those cases.
->
-> I've pushed thes series out to a branch [1] based on v4.11-rc1. It looks like
-> git rebase is also happy to apply the patches atop of the kvm-arm-for-4.11-rc2
-> tag.
+On ls1012a soc, sata ecc should be disabled. So added sata ecc
+register address so that driver can get this information.
 
-I had a quick glance at this series, and this looks like a very good
-piece of work - thanks for doing this.
+Signed-off-by: Tang Yuantian <andy.tang@nxp.com>
+---
+ arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi | 80 +++++++++++++++++++++++++-
+ 1 file changed, 79 insertions(+), 1 deletion(-)
 
-The next question is how do we merge this. Obviously, we can't split it
-between trees, and this is very likely to clash with anything that we
-will merge on the KVM side (the sysreg table is a popular place).
-
-Will, Catalin: Would it make sense to create a stable branch with these
-patches, and merge it into both the arm64 and KVM trees? That'd make
-things easier...
-
-Thanks,
-
-	M.
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
+index cffebb4..1870dde 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
+@@ -43,6 +43,7 @@
+  */
+ 
+ #include <dt-bindings/interrupt-controller/irq.h>
++#include <dt-bindings/thermal/thermal.h>
+ 
+ / {
+ 	compatible = "fsl,ls1012a";
+@@ -126,6 +127,81 @@
+ 			#clock-cells = <2>;
+ 			clocks = <&sysclk>;
+ 		};
++		tmu: tmu at 1f00000 {
++			compatible = "fsl,qoriq-tmu";
++			reg = <0x0 0x1f00000 0x0 0x10000>;
++			interrupts = <0 33 0x4>;
++			fsl,tmu-range = <0xb0000 0x9002a 0x6004c 0x30062>;
++			fsl,tmu-calibration = <0x00000000 0x00000026
++					       0x00000001 0x0000002d
++					       0x00000002 0x00000032
++					       0x00000003 0x00000039
++					       0x00000004 0x0000003f
++					       0x00000005 0x00000046
++					       0x00000006 0x0000004d
++					       0x00000007 0x00000054
++					       0x00000008 0x0000005a
++					       0x00000009 0x00000061
++					       0x0000000a 0x0000006a
++					       0x0000000b 0x00000071
++
++					       0x00010000 0x00000025
++					       0x00010001 0x0000002c
++					       0x00010002 0x00000035
++					       0x00010003 0x0000003d
++					       0x00010004 0x00000045
++					       0x00010005 0x0000004e
++					       0x00010006 0x00000057
++					       0x00010007 0x00000061
++					       0x00010008 0x0000006b
++					       0x00010009 0x00000076
++
++					       0x00020000 0x00000029
++					       0x00020001 0x00000033
++					       0x00020002 0x0000003d
++					       0x00020003 0x00000049
++					       0x00020004 0x00000056
++					       0x00020005 0x00000061
++					       0x00020006 0x0000006d
++
++					       0x00030000 0x00000021
++					       0x00030001 0x0000002a
++					       0x00030002 0x0000003c
++					       0x00030003 0x0000004e>;
++			big-endian;
++			#thermal-sensor-cells = <1>;
++		};
++
++		thermal-zones {
++			cpu_thermal: cpu-thermal {
++				polling-delay-passive = <1000>;
++				polling-delay = <5000>;
++
++				thermal-sensors = <&tmu 0>;
++
++				trips {
++					cpu_alert: cpu-alert {
++						temperature = <85000>;
++						hysteresis = <2000>;
++						type = "passive";
++					};
++					cpu_crit: cpu-crit {
++						temperature = <95000>;
++						hysteresis = <2000>;
++						type = "critical";
++					};
++				};
++
++				cooling-maps {
++					map0 {
++						trip = <&cpu_alert>;
++						cooling-device =
++							<&cpu0 THERMAL_NO_LIMIT
++							THERMAL_NO_LIMIT>;
++					};
++				};
++			};
++		};
+ 
+ 		i2c0: i2c at 2180000 {
+ 			compatible = "fsl,vf610-i2c";
+@@ -238,7 +314,9 @@
+ 
+ 		sata: sata at 3200000 {
+ 			compatible = "fsl,ls1012a-ahci", "fsl,ls1043a-ahci";
+-			reg = <0x0 0x3200000 0x0 0x10000>;
++			reg = <0x0 0x3200000 0x0 0x10000>,
++				<0x0 0x20140520 0x0 0x4>;
++			reg-names = "ahci", "sata-ecc";
+ 			interrupts = <0 69 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&clockgen 4 0>;
+ 			status = "disabled";
 -- 
-Jazz is not dead, it just smell funny.
+2.1.0.27.g96db324
