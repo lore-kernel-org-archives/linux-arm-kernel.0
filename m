@@ -1,53 +1,54 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 10 Mar 2017 17:06:44 +0530
-Subject: [RESEND PATCH v3 4/7] PCI: dwc: all: Modify dbi accessors to take
- dbi_base as argument
-In-Reply-To: <595fab62-fb7a-888a-f898-7b59030585f1@axis.com>
-References: <1489041545-15730-1-git-send-email-kishon@ti.com>
- <1489041545-15730-5-git-send-email-kishon@ti.com>
- <4e13580d-2625-5eed-bcbc-2ffd7493b073@axis.com>
- <595fab62-fb7a-888a-f898-7b59030585f1@axis.com>
-Message-ID: <58C28FCC.4070100@ti.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 10 Mar 2017 11:25:22 +0000
+Subject: [PATCH v6 10/11] arm64/mm: remove pointless map/unmap sequences
+ when creating page tables
+In-Reply-To: <1489092729-16871-11-git-send-email-ard.biesheuvel@linaro.org>
+References: <1489092729-16871-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1489092729-16871-11-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20170310112521.GA11356@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thursday 09 March 2017 08:35 PM, Niklas Cassel wrote:
+On Thu, Mar 09, 2017 at 09:52:08PM +0100, Ard Biesheuvel wrote:
+> The routines __pud_populate and __pmd_populate only create a table
+> entry at their respective level which refers to the next level page
+> by its physical address, so there is no reason to map this page and
+> then unmap it immediately after.
 > 
-> 
-> On 03/09/2017 03:48 PM, Niklas Cassel wrote:
->> On 03/09/2017 07:39 AM, Kishon Vijay Abraham I wrote:
->>> dwc has 2 dbi address space labeled dbics and dbics2. The existing
->>> helper to access dbi address space can access only dbics. However
->>> dbics2 has to be accessed for programming the BAR registers in the
->>> case of EP mode. This is in preparation for adding EP mode support
->>> to dwc driver.
->> Hello Kishon
->>
->> I don't really like the idea of adding an extra argument to every existing read/write.
->> Will not a read/write using dbi2 be quite uncommon compared to a read/write
->> using dbi?
->>
->> How about something like this:
->>
->> void __dw_pcie_writel(struct dw_pcie *pci, void __iomem *base, u32 reg, u32 val)
->> {
->>     if (pci->ops->writel_dbi)
->>         pci->ops->writel_dbi(pci, base, reg, val);
->>     else
->>         writel(val, base + reg);
->> }
->>
->> #define dw_pcie_writel_dbi(pci, reg, val) __dw_pcie_writel(pci, pci->dbi_base, reg, val)
->> #define dw_pcie_writel_dbi2(pci, reg, val) __dw_pcie_writel(pci, pci->dbi_base2, reg, val)
-> 
-> Perhaps make dw_pcie_writel_dbi2 a function rather than a define,
-> so we can return an error if pci->dbi_base2 == NULL.
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-Should we return an error? We don't return error for dbi_base either. I think
-it should be sufficient to return errors while populating dbi_base or
-dbi_base2. Otherwise it's a bug and should result in abort. Joao?
+Reviewed-by: Mark Rutland <mark.rutland@arm.com>
 
-Thanks
-Kishon
+Mark.
+
+> ---
+>  arch/arm64/mm/mmu.c | 4 ----
+>  1 file changed, 4 deletions(-)
+> 
+> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+> index bc9d5eb7bfa2..85ab82f5a0bc 100644
+> --- a/arch/arm64/mm/mmu.c
+> +++ b/arch/arm64/mm/mmu.c
+> @@ -128,9 +128,7 @@ static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
+>  		phys_addr_t pte_phys;
+>  		BUG_ON(!pgtable_alloc);
+>  		pte_phys = pgtable_alloc();
+> -		pte = pte_set_fixmap(pte_phys);
+>  		__pmd_populate(pmd, pte_phys, PMD_TYPE_TABLE);
+> -		pte_clear_fixmap();
+>  	}
+>  	BUG_ON(pmd_bad(*pmd));
+>  
+> @@ -168,9 +166,7 @@ static void alloc_init_pmd(pud_t *pud, unsigned long addr, unsigned long end,
+>  		phys_addr_t pmd_phys;
+>  		BUG_ON(!pgtable_alloc);
+>  		pmd_phys = pgtable_alloc();
+> -		pmd = pmd_set_fixmap(pmd_phys);
+>  		__pud_populate(pud, pmd_phys, PUD_TYPE_TABLE);
+> -		pmd_clear_fixmap();
+>  	}
+>  	BUG_ON(pud_bad(*pud));
+>  
+> -- 
+> 2.7.4
+> 
