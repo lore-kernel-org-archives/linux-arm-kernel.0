@@ -1,88 +1,172 @@
-From: brian.starkey@arm.com (Brian Starkey)
-Date: Fri, 10 Mar 2017 14:27:09 +0000
-Subject: [RFC PATCH 00/12] Ion cleanup in preparation for moving out of
- staging
-In-Reply-To: <2e295c28-04d6-a071-cf16-164d02d679c5@arm.com>
-References: <20170303132949.GC31582@dhcp22.suse.cz>
- <cf383b9b-3cbc-0092-a071-f120874c053c@redhat.com>
- <20170306074258.GA27953@dhcp22.suse.cz>
- <20170306104041.zghsicrnadoap7lp@phenom.ffwll.local>
- <20170306105805.jsq44kfxhsvazkm6@sirena.org.uk>
- <20170306160437.sf7bksorlnw7u372@phenom.ffwll.local>
- <CA+M3ks77Am3Fx-ZNmgeM5tCqdM7SzV7rby4Es-p2F2aOhUco9g@mail.gmail.com>
- <26bc57ae-d88f-4ea0-d666-2c1a02bf866f@redhat.com>
- <20170310103112.GA15945@e106950-lin.cambridge.arm.com>
- <2e295c28-04d6-a071-cf16-164d02d679c5@arm.com>
-Message-ID: <20170310142709.GB15945@e106950-lin.cambridge.arm.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Fri, 10 Mar 2017 14:29:53 +0000
+Subject: [v3 3/5] coresight: add support for debug module
+In-Reply-To: <20170309175915.GA964@leoy-linaro>
+References: <1488520809-31670-4-git-send-email-leo.yan@linaro.org>
+ <011fdac0-59bf-b539-2de3-0b59a41bc922@arm.com>
+ <20170309175915.GA964@leoy-linaro>
+Message-ID: <3f27efee-3b63-81fd-eb96-73fd7e6f5e92@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 10, 2017 at 11:46:42AM +0000, Robin Murphy wrote:
->On 10/03/17 10:31, Brian Starkey wrote:
->> Hi,
+On 09/03/17 17:59, Leo Yan wrote:
+> Hi Suziku,
+  
+>> The problem is, it is not guaranteed that the EDPCSR_Hi, EDCIDSR & EDVIDSR are
+>> updated as a side effect of a memory mapped access (which is what we do here) to the
+>> EDPCSR_Lo.
 >>
->> On Thu, Mar 09, 2017 at 09:38:49AM -0800, Laura Abbott wrote:
->>> On 03/09/2017 02:00 AM, Benjamin Gaignard wrote:
+>> Section H.7.1.2 : Reads of EDPCSRs (in ARM DDI 0487A.k) :
 >>
->> [snip]
+>> "The indirect writes to EDCIDSR, EDVIDSR, and EDPCSRhi might not occur for a memory-mapped access
+>> to the external debug interface. For more information, see Memory-mapped accesses to the external debug
+>> interface on page H8-4968."
 >>
->>>>
->>>> For me those patches are going in the right direction.
->>>>
->>>> I still have few questions:
->>>> - since alignment management has been remove from ion-core, should it
->>>> be also removed from ioctl structure ?
+>> So we cannot really rely on the values in EDVIDSR which we use to make further decisions. So I
+>> am wondering if this is really guranteed to be useful.
+>
+> So this is caused by Software lock is locked?
+>
+> Section H8.4.1:
+>
+> "Reads and writes have no side-effects. A side-effect is where a
+> direct read or a direct write of a register creates
+> an indirect write of the same or another register. When the Software
+> Lock is locked, the indirect write does
+> not occur."
+
+Yes, thats correct, further :
+
+Section H9.2.32: EDPCSR
+
+"For a read of EDPCSRlo from the memory-mapped interface, if EDLSR.SLK == 1, meaning
+the Software Lock is locked, then the access has no side-effects. That is, EDCIDSR,
+EDVIDSR, and EDPCSRhi are unchanged."
+
+And since we do a CS_UNLOCK, that should be fine. Please ignore my comment.
+
+>>> diff --git a/drivers/hwtracing/coresight/Kconfig b/drivers/hwtracing/coresight/Kconfig
+>>> index 130cb21..3ed651e 100644
+>>> --- a/drivers/hwtracing/coresight/Kconfig
+>>> +++ b/drivers/hwtracing/coresight/Kconfig
+>>> @@ -89,4 +89,14 @@ config CORESIGHT_STM
+>>> 	  logging useful software events or data coming from various entities
+>>> 	  in the system, possibly running different OSs
 >>>
->>> Yes, I think I'm going to go with the suggestion to fixup the ABI
->>> so we don't need the compat layer and as part of that I'm also
->>> dropping the align argument.
->>>
+>>> +config CORESIGHT_DEBUG
 >>
->> Is the only motivation for removing the alignment parameter that
->> no-one got around to using it for something useful yet?
->> The original comment was true - different devices do have different
->> alignment requirements.
+>> To make it more specific, may be CORESIGHT_CPU_DEBUG ?
+>
+> Will fix.
+>
+>>> +	bool "CoreSight debug driver"
 >>
->> Better alignment can help SMMUs use larger blocks when mapping,
->> reducing TLB pressure and the chance of a page table walk causing
->> display underruns.
+>> "Coresight CPU Debug driver"
 >
->For that use-case, though, alignment alone doesn't necessarily help -
->you need the whole allocation granularity to match your block size (i.e.
->given a 1MB block size, asking for 17KB and getting back 17KB starting
->at a 1MB boundary doesn't help much - that whole 1MB needs to be
->allocated and everyone needs to know it to ensure that the whole lot can
->be mapped safely). Now, whether it's down to the callers or the heap
->implementations to decide and enforce that granularity is another
->question, but provided allocations are at least naturally aligned to
->whatever the granularity is (which is a reasonable assumption to bake
->in) then it's all good.
+> Will fix.
 >
->Robin.
-
-Agreed, alignment alone isn't enough. But lets assume that an app
-knows what a "good" granularity is, and always asks for allocation
-sizes which are suitably rounded to allow blocks to be used. Currently
-it looks like a "standard" ION_HEAP_TYPE_CARVEOUT heap would give me
-back just a PAGE_SIZE aligned buffer. So even *if* the caller knows
-its desired block size, there's no way for it to get guaranteed better
-alignment, which wouldn't be a bad feature to have.
-
-Anyway as Daniel and Rob say, if the interface is designed properly
-this kind of extension would be possible later, or you can have a
-special heap with a larger granule.
-
-I suppose it makes sense to remove it while there's no-one actually
-implementing it, in case an alternate method proves more usable.
-
--Brian
-
->
+>>> +	depends on ARM || ARM64
+>>> +	help
+>>> +	  This driver provides support for coresight debugging module. This
+>>> +	  is primarily used to dump sample-based profiling registers for
+>>> +	  panic. To avoid lockups when accessing debug module registers,
+>>> +	  it is safer to disable CPU low power states (like "nohlt" on the
+>>> +	  kernel command line) when using this feature.
+>>> +
 >>
->> -Brian
+>>> +#define EDPCSR_THUMB			BIT(0)
+>>> +#define EDPCSR_ARM_INST_MASK		GENMASK(31, 2)
+>>> +#define EDPCSR_THUMB_INST_MASK		GENMASK(31, 1)
 >>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>> We don't need two different masks. {ED/DBG}PCSR has only bit 0 reserved
+>> for instruction set indication.
 >
+> I think we need this two different masks. Please review below extra doc
+> for PC offset analysis in ARM ARM.
+
+You're correct. Thanks for the pointer. I got confused, as there was no bit
+dedicated in the DBGPCSR bit assignment figure.
+
+>>> +	/*
+>>> +	 * Handle arm instruction offset, if the arm instruction
+>>> +	 * is not 4 byte alignment then it's possible the case
+>>> +	 * for implementation defined; keep original value for this
+>>> +	 * case and print info for notice.
+>>> +	 */
+>>> +	if (pc & BIT(1))
+>>> +		pr_emerg("Instruction offset is implementation defined\n");
+>>
+>> I am struggling to find the any mention about this in the ARM ARM. Please could
+>> you point me to it.
+>
+> Sure, please see ARM DDI 0406C.b, chapter C11.11.34 "
+> DBGPCSR, Program Counter Sampling Register":
+>
+> A profiling tool can use the value of the T bit to calculate the
+> instruction address as follows:
+>
+> When an offset is applied to the sampled address
+> - if T is 0 and DBGPCSR[1] is 0, ((DBGPCSR[31:2] << 2) - 8) is the
+> address of the sampled ARM instruction
+> - if T is 0 and DBGPCSR[1] is 1, the instruction address is
+> IMPLEMENTATION DEFINED
+> - if T is 1, ((DBGPCSR[31:1] << 1) - 4) is the address of the sampled
+> Thumb or ThumbEE instruction.
+>
+> When no offset is applied to the sampled address
+> -  if T is 0 and DBGPCSR[1] is 0, (DBGPCSR[31:2] << 2) is the address
+> of the sampled ARM instruction
+> -  if T is 0 and DBGPCSR[1] is 1, the instruction address is
+> IMPLEMENTATION DEFINED
+> - if T is 1, (DBGPCSR[31:1] << 1) is the address of the sampled Thumb
+> or ThumbEE instruction.
+>
+
+Ok.
+
+
+>>> +
+>>> +	put_online_cpus();
+>>> +
+>>> +	if (!debug_count++)
+>>> +		atomic_notifier_chain_register(&panic_notifier_list,
+>>> +					       &debug_notifier);
+>>> +
+>>
+>>> +	sprintf(buf, (char *)id->data, drvdata->cpu);
+>>> +	dev_info(dev, "%s initialized\n", buf);
+>>
+>> This could simply be :
+>> 	dev_info(dev, "Coresight debug-CPU%d initialized\n", drvdata->cpu);
+>>
+>> and get rid of the static string and the buffer, see below.
+
+Also we need pm_runtime_put() here to balance the pm_runtime_get_ from AMBA
+device probe. More on that below.
+
+>>
+>>> +	return 0;
+>>> +}
+>>> +
+>>> +static struct amba_id debug_ids[] = {
+>>> +	{       /* Debug for Cortex-A53 */
+>>> +		.id	= 0x000bbd03,
+>>> +		.mask	= 0x000fffff,
+>>
+>> ...
+>>
+>>> +		.data   = "Coresight debug-CPU%d",
+>>
+>> I think this is pointless, as the debug area we are interested in is always associated
+>> with a CPU, we could as well figure out what to print from the drvdata->cpu above.
+>
+> I prefer to follow your suggestion for upper two comments; but I'd like
+> check with Mathieu, due I followed up Mathieu's suggestion to write
+> current code.
+
+Btw, I don't see any PM calls to make sure the power domain (at least the debug domain)
+is up, which could cause problems with accesses to some of these registers (leave alone the
+ones in CPU power domain), especially the EDPRSR. We could also do pm_runtime_get on the
+CPU's power domain, if the CPU is online, before we access the pcsr.
+
+Suzuki
