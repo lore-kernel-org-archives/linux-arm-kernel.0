@@ -1,110 +1,31 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
 Date: Fri, 10 Mar 2017 11:45:36 +0100
-Subject: [PATCH v6 2/2] [media] s5p-mfc: Handle 'v4l2_pix_format:field' in
- try_fmt and g_fmt
-In-Reply-To: <20170301115108.14187-3-thibault.saunier@osg.samsung.com>
-References: <20170301115108.14187-1-thibault.saunier@osg.samsung.com>
- <20170301115108.14187-3-thibault.saunier@osg.samsung.com>
-Message-ID: <6b5a86c8-e82f-8541-0029-3310b563677f@xs4all.nl>
+Subject: [PATCH v2 0/5] clk: rockchip: fix up the clk for RK3368 SoC
+In-Reply-To: <1488884719-10350-1-git-send-email-zhangqing@rock-chips.com>
+References: <1488884719-10350-1-git-send-email-zhangqing@rock-chips.com>
+Message-ID: <3564953.RFZXb1jYdB@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/03/17 12:51, Thibault Saunier wrote:
-> It is required by the standard that the field order is set by the
-> driver, default to NONE in case any is provided, but we can basically
-> accept any value provided by the userspace as we will anyway not
-> be able to do any deinterlacing.
+Am Dienstag, 7. M?rz 2017, 19:05:14 CET schrieb Elaine Zhang:
+> change in V2:
+> split clock-id addition and the assignment in the clock-
+> driver.
 > 
-> In this patch we also make sure to pass the interlacing mode provided
-> by userspace from the output to the capture side of the device so
-> that the information is given back to userspace. This way it can
-> handle it and potentially deinterlace afterward.
-> 
-> Signed-off-by: Thibault Saunier <thibault.saunier@osg.samsung.com>
-> 
-> ---
-> 
-> Changes in v6:
-> - Pass user output field value to the capture as the device is not
->   doing any deinterlacing and thus decoded content will still be
->   interlaced on the output.
-> 
-> Changes in v5:
-> - Just adapt the field and never error out.
-> 
-> Changes in v4: None
-> Changes in v3:
-> - Do not check values in the g_fmt functions as Andrzej explained in previous review
-> 
-> Changes in v2:
-> - Fix a silly build error that slipped in while rebasing the patches
-> 
->  drivers/media/platform/s5p-mfc/s5p_mfc_common.h | 2 ++
->  drivers/media/platform/s5p-mfc/s5p_mfc_dec.c    | 6 +++++-
->  2 files changed, 7 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_common.h b/drivers/media/platform/s5p-mfc/s5p_mfc_common.h
-> index ab23236aa942..3816a37de4bc 100644
-> --- a/drivers/media/platform/s5p-mfc/s5p_mfc_common.h
-> +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_common.h
-> @@ -652,6 +652,8 @@ struct s5p_mfc_ctx {
->  	size_t me_buffer_size;
->  	size_t tmv_buffer_size;
->  
-> +	enum v4l2_field field;
-> +
->  	enum v4l2_mpeg_mfc51_video_force_frame_type force_frame_type;
->  
->  	struct list_head ref_queue;
-> diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-> index 367ef8e8dbf0..6e5ca86fb331 100644
-> --- a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-> +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-> @@ -345,7 +345,7 @@ static int vidioc_g_fmt(struct file *file, void *priv, struct v4l2_format *f)
->  		   rectangle. */
->  		pix_mp->width = ctx->buf_width;
->  		pix_mp->height = ctx->buf_height;
-> -		pix_mp->field = V4L2_FIELD_NONE;
-> +		pix_mp->field = ctx->field;
->  		pix_mp->num_planes = 2;
->  		/* Set pixelformat to the format in which MFC
->  		   outputs the decoded frame */
-> @@ -380,6 +380,9 @@ static int vidioc_try_fmt(struct file *file, void *priv, struct v4l2_format *f)
->  	struct s5p_mfc_dev *dev = video_drvdata(file);
->  	struct s5p_mfc_fmt *fmt;
->  
-> +	if (f->fmt.pix.field == V4L2_FIELD_ANY)
-> +		f->fmt.pix.field = V4L2_FIELD_NONE;
-> +
->  	mfc_debug(2, "Type is %d\n", f->type);
->  	if (f->type == V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE) {
->  		fmt = find_format(f, MFC_FMT_DEC);
-> @@ -436,6 +439,7 @@ static int vidioc_s_fmt(struct file *file, void *priv, struct v4l2_format *f)
->  		goto out;
->  	} else if (f->type == V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE) {
->  		/* src_fmt is validated by call to vidioc_try_fmt */
-> +		ctx->field = f->fmt.pix.field;
+> Elaine Zhang (5):
+>   clk: rockchip: rk3368: fix up the timer-ids
+>   clk: rockchip: rk3368: remove the unused id
 
-Doing this means that you also allow for V4L2_FIELD_ALTERNATE. If you do that, then there
-are additional requirements when you queue up buffers in that the 'field' has to be set to
-TOP or BOTTOM in struct v4l2_buffer. I am sure that is a requirement for the encoder, how
-this would work for a decoder I am not sure.
+folded this into the first patch and added a commit message explaining the 
+timer-id circumstances
 
-Also, values like V4L2_FIELD_SEQ_TB/BT would not behave well if you pass them through a
-decoder.
+>   clk: rockchip: add clock ids for timer10-15 of RK3368 SoCs
+>   clk: rockchip: rk3368: export SCLK_TIMERXX id for timers
+>   clk: rockchip: rk3368: add some clks as critical
 
-Frankly I think the only 'reasonable' values would be FIELD_NONE, FIELD_INTERLACED and
-possibly FIELD_ALTERNATE. I don't know enough about how codecs handle interlaced formats,
-so I can't tell how much sense FIELD_ALTERNATE would make.
+applied with some minor corrections to the subject (rk3368 in the regular 
+wording) for 4.12
 
-Properly supporting interlaced formats should only be done if you actually tested it and
-know how it works and what exactly is supported.
 
-Regards,
-
-	Hans
-
->  		ctx->src_fmt = find_format(f, MFC_FMT_DEC);
->  		ctx->codec_mode = ctx->src_fmt->codec_mode;
->  		mfc_debug(2, "The codec number is: %d\n", ctx->codec_mode);
-> 
+Thanks
+Heiko
