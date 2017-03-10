@@ -1,115 +1,233 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Fri, 10 Mar 2017 23:38:50 +0100
-Subject: [BUG] v4.11-rc1: CPUFREQ Circular locking dependency
-In-Reply-To: <BY2PR21MB00361C512E03B09DBCE715D3CB200@BY2PR21MB0036.namprd21.prod.outlook.com>
-References: <20170310150218.GW21222@n2100.armlinux.org.uk>
- <CAJZ5v0jGRH_hwvvm9OLsaYgbghqWKOke9PyGNnkvP_ZiMqAxSw@mail.gmail.com>
- <BY2PR21MB00362E60448FD2E00C120FFCCB200@BY2PR21MB0036.namprd21.prod.outlook.com>
- <BY2PR21MB00361C512E03B09DBCE715D3CB200@BY2PR21MB0036.namprd21.prod.outlook.com>
-Message-ID: <CAJZ5v0gWA7fYRMSdpsRA8n8_9A4jBAKCZYHJRBB9dKFMKa09ag@mail.gmail.com>
+From: mdf@kernel.org (Moritz Fischer)
+Date: Fri, 10 Mar 2017 14:42:01 -0800
+Subject: [PATCH 2/2] fpga: Add support for Xilinx LogiCORE PR Decoupler
+In-Reply-To: <1489181435-3151-2-git-send-email-mdf@kernel.org>
+References: <1489181435-3151-1-git-send-email-mdf@kernel.org>
+ <1489181435-3151-2-git-send-email-mdf@kernel.org>
+Message-ID: <CAAtXAHe-AMq9Ux2LZZEWLcg8Dk6jTiHhrot4RhEVrxTBhnLE0g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 10, 2017 at 7:33 PM, Matthew Wilcox <mawilcox@microsoft.com> wrote:
-> (compile tested only ... obviously)
+On Fri, Mar 10, 2017 at 1:30 PM, Moritz Fischer <mdf@kernel.org> wrote:
+> This adds support for the Xilinx LogiCORE PR Decoupler
+> soft-ip that does decoupling of PR regions in the FPGA
+> fabric during partial reconfiguration.
 >
-> From cd5401d81633d5e48e39d67d4e65156e6759537e Mon Sep 17 00:00:00 2001
-> From: Matthew Wilcox <mawilcox@microsoft.com>
-> Date: Fri, 10 Mar 2017 13:22:53 -0500
-> Subject: [PATCH] thermal: Fix potential deadlock in cpu_cooling
->
-> I expanded the scope of cooling_list_lock a little too far; it was
-> not just covering cpufreq_dev_count, it was also covering the calls
-> to cpufreq_register_notifier() and cpufreq_unregister_notifier().
-> Since cooling_list_lock is also used within cpufreq_thermal_notifier(),
-> lockdep reports a potential deadlock.  I don't think that's actually
-> possible, but it's easy enough to make it impossible by testing the
-> condition under cooling_list_lock and dropping the lock before calling
-> cpufreq_register_notifier().
->
-> As a bonus, I noticed that cpufreq_dev_count is only used for the purpose
-> of knowing whether this is the first or last cooling device registered,
-> and we know that anyway because we know whether the list transitioned
-> between empty and not-empty.  So we can delete that variable too.
->
-> Fixes: ae606089621ef0349402cfcbeca33a82abbd0fd0
-> Reported-by: Russell King <linux@armlinux.org.uk>
-> Signed-off-by: Matthew Wilcox <mawilcox@microsoft.com>
-
-Looks good to me.
-
-Acked-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
-
+> Signed-off-by: Moritz Fischer <mdf@kernel.org>
+> Cc: Michal Simek <michal.simek@xilinx.com>
+> Cc: S?ren Brinkmann <soren.brinkmann@xilinx.com>
+> Cc: linux-kernel at vger.kernel.org
+> Cc: devicetree at vger.kernel.org
 > ---
->  drivers/thermal/cpu_cooling.c | 20 +++++++++++---------
->  1 file changed, 11 insertions(+), 9 deletions(-)
+>  drivers/fpga/Kconfig               |   9 +++
+>  drivers/fpga/Makefile              |   1 +
+>  drivers/fpga/xilinx-pr-decoupler.c | 156 +++++++++++++++++++++++++++++++++++++
+>  3 files changed, 166 insertions(+)
+>  create mode 100644 drivers/fpga/xilinx-pr-decoupler.c
 >
-> diff --git a/drivers/thermal/cpu_cooling.c b/drivers/thermal/cpu_cooling.c
-> index 91048eeca28b..11b5ea685518 100644
-> --- a/drivers/thermal/cpu_cooling.c
-> +++ b/drivers/thermal/cpu_cooling.c
-> @@ -107,8 +107,6 @@ struct cpufreq_cooling_device {
->  };
->  static DEFINE_IDA(cpufreq_ida);
+> diff --git a/drivers/fpga/Kconfig b/drivers/fpga/Kconfig
+> index 967cda4..e42c7dc 100644
+> --- a/drivers/fpga/Kconfig
+> +++ b/drivers/fpga/Kconfig
+> @@ -69,6 +69,15 @@ config ALTERA_FREEZE_BRIDGE
+>           isolate one region of the FPGA from the busses while that
+>           region is being reprogrammed.
 >
-> -static unsigned int cpufreq_dev_count;
-> -
->  static DEFINE_MUTEX(cooling_list_lock);
->  static LIST_HEAD(cpufreq_dev_list);
->
-> @@ -771,6 +769,7 @@ __cpufreq_cooling_register(struct device_node *np,
->         unsigned int freq, i, num_cpus;
->         int ret;
->         struct thermal_cooling_device_ops *cooling_ops;
-> +       bool first;
->
->         if (!alloc_cpumask_var(&temp_mask, GFP_KERNEL))
->                 return ERR_PTR(-ENOMEM);
-> @@ -874,13 +873,14 @@ __cpufreq_cooling_register(struct device_node *np,
->         cpufreq_dev->cool_dev = cool_dev;
->
->         mutex_lock(&cooling_list_lock);
-> +       /* Register the notifier for first cpufreq cooling device */
-> +       first = list_empty(&cpufreq_dev_list);
->         list_add(&cpufreq_dev->node, &cpufreq_dev_list);
-> +       mutex_unlock(&cooling_list_lock);
->
-> -       /* Register the notifier for first cpufreq cooling device */
-> -       if (!cpufreq_dev_count++)
-> +       if (first)
->                 cpufreq_register_notifier(&thermal_cpufreq_notifier_block,
->                                           CPUFREQ_POLICY_NOTIFIER);
-> -       mutex_unlock(&cooling_list_lock);
->
->         goto put_policy;
->
-> @@ -1021,6 +1021,7 @@ EXPORT_SYMBOL(of_cpufreq_power_cooling_register);
->  void cpufreq_cooling_unregister(struct thermal_cooling_device *cdev)
->  {
->         struct cpufreq_cooling_device *cpufreq_dev;
-> +       bool last;
->
->         if (!cdev)
->                 return;
-> @@ -1028,14 +1029,15 @@ void cpufreq_cooling_unregister(struct thermal_cooling_device *cdev)
->         cpufreq_dev = cdev->devdata;
->
->         mutex_lock(&cooling_list_lock);
-> +       list_del(&cpufreq_dev->node);
->         /* Unregister the notifier for the last cpufreq cooling device */
-> -       if (!--cpufreq_dev_count)
-> +       last = list_empty(&cpufreq_dev_list);
-> +       mutex_unlock(&cooling_list_lock);
+> +config XILINX_PR_DECOUPLER
+> +       tristate "Xilinx LogiCORE PR Decoupler"
+> +       depends on FPGA_BRIDGE
+> +       help
+> +         Say Y to enable drivers for Xilinx LogiCORE PR Decoupler.
+> +         The PR Decoupler exists in the FPGA fabric to isolate one
+> +         region of the FPGA from the busses while that region is
+> +         being reprogrammed during partial reconfig.
 > +
-> +       if (last)
->                 cpufreq_unregister_notifier(&thermal_cpufreq_notifier_block,
->                                             CPUFREQ_POLICY_NOTIFIER);
+>  endif # FPGA
 >
-> -       list_del(&cpufreq_dev->node);
-> -       mutex_unlock(&cooling_list_lock);
-> -
->         thermal_cooling_device_unregister(cpufreq_dev->cool_dev);
->         ida_simple_remove(&cpufreq_ida, cpufreq_dev->id);
->         kfree(cpufreq_dev->dyn_power_table);
+>  endmenu
+> diff --git a/drivers/fpga/Makefile b/drivers/fpga/Makefile
+> index cc0d364..3f04bcf 100644
+> --- a/drivers/fpga/Makefile
+> +++ b/drivers/fpga/Makefile
+> @@ -15,6 +15,7 @@ obj-$(CONFIG_FPGA_MGR_ZYNQ_FPGA)      += zynq-fpga.o
+>  obj-$(CONFIG_FPGA_BRIDGE)              += fpga-bridge.o
+>  obj-$(CONFIG_SOCFPGA_FPGA_BRIDGE)      += altera-hps2fpga.o altera-fpga2sdram.o
+>  obj-$(CONFIG_ALTERA_FREEZE_BRIDGE)     += altera-freeze-bridge.o
+> +obj-$(CONFIG_XILINX_PR_DECOUPLER)      += xilinx-pr-decoupler.o
+>
+>  # High Level Interfaces
+>  obj-$(CONFIG_FPGA_REGION)              += fpga-region.o
+> diff --git a/drivers/fpga/xilinx-pr-decoupler.c b/drivers/fpga/xilinx-pr-decoupler.c
+> new file mode 100644
+> index 0000000..07afdd6
+> --- /dev/null
+> +++ b/drivers/fpga/xilinx-pr-decoupler.c
+> @@ -0,0 +1,156 @@
+> +/*
+> + * Copyright (c) 2017, National Instruments Corp.
+> + *
+> + * FPGA Bridge Driver for the Xilinx LogiCORE Partial Reconfiguration
+> + * Decoupler IP Core.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; version 2 of the License.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/clk.h>
+> +#include <linux/io.h>
+> +#include <linux/kernel.h>
+> +#include <linux/of_device.h>
+> +#include <linux/module.h>
+> +#include <linux/fpga/fpga-bridge.h>
+> +
+> +#define CTRL_OFFSET 0x00
+> +#define STATUS_OFFSET 0x00
+> +
+> +#define CTRL_CMD_MASK          BIT(0)
+> +#define CTRL_CMD_DECOUPLE      BIT(0)
+> +#define CTRL_CMD_COUPLE                ~BIT(0)
+> +
+> +#define STATUS_STATE_MASK      BIT(0)
+> +#define STATUS_STATE_COUPLED   ~BIT(0)
+> +#define STATUS_STATE_DECOUPLED BIT(0)
+> +
+> +struct xlnx_pr_decoupler_data {
+> +       void __iomem *io_base;
+> +       struct clk *clk;
+> +       bool enable;
+> +};
+> +
+> +static inline void xlnx_pr_decoupler_write(struct xlnx_pr_decoupler_data *p,
+> +                                          u32 offset, u32 val)
+> +{
+> +       writel(val, p->io_base + offset);
+> +}
+> +
+> +static inline u32 xlnx_pr_decoupler_read(const struct xlnx_pr_decoupler_data *p,
+> +                                        u32 offset)
+> +{
+> +       return readl(p->io_base + offset);
+> +}
+> +
+> +static int xlnx_pr_decoupler_enable_set(struct fpga_bridge *bridge, bool enable)
+> +{
+> +       int err;
+> +       struct xlnx_pr_decoupler_data *priv = bridge->priv;
+> +
+> +       if (priv->enable != enable) {
+> +               err = clk_enable(priv->clk);
+> +               if (err)
+> +                       return err;
+> +
+> +               xlnx_pr_decoupler_write(priv, CTRL_OFFSET,
+> +                                       enable ? CTRL_CMD_COUPLE :
+> +                                       CTRL_CMD_DECOUPLE);
+Needs:
+
++ priv->enable = enable;
+
+This is obviously garbage, priv->enable doesn't get set ...
+
+> +               clk_disable(priv->clk);
+> +       }
+> +
+> +       return 0;
+> +}
+> +
+> +static int xlnx_pr_decoupler_enable_show(struct fpga_bridge *bridge)
+> +{
+> +       const struct xlnx_pr_decoupler_data *p = bridge->priv;
+> +
+> +       return p->enable;
+> +}
+> +
+> +static struct fpga_bridge_ops xlnx_pr_decoupler_br_ops = {
+> +       .enable_set = xlnx_pr_decoupler_enable_set,
+> +       .enable_show = xlnx_pr_decoupler_enable_show,
+> +};
+> +
+> +static const struct of_device_id xlnx_pr_decoupler_of_match[] = {
+> +       { .compatible = "xlnx,pr-decoupler-1.00", },
+> +       {},
+> +};
+> +MODULE_DEVICE_TABLE(of, xlnx_pr_decoupler_of_match);
+> +
+> +static int xlnx_pr_decoupler_probe(struct platform_device *pdev)
+> +{
+> +       struct xlnx_pr_decoupler_data *priv;
+> +       u32 status;
+> +       int err;
+> +       struct resource *res;
+> +
+> +       priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
+> +       if (!priv)
+> +               return -ENOMEM;
+> +
+> +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +       priv->io_base = devm_ioremap_resource(&pdev->dev, res);
+> +       if (IS_ERR(priv->io_base))
+> +               return PTR_ERR(priv->io_base);
+> +
+> +       priv->clk = devm_clk_get(&pdev->dev, "ref_clk");
+> +       if (IS_ERR(priv->clk)) {
+> +               dev_err(&pdev->dev, "input clock not found\n");
+> +               return PTR_ERR(priv->clk);
+> +       }
+> +
+> +       err = clk_prepare_enable(priv->clk);
+> +       if (err) {
+> +               dev_err(&pdev->dev, "unable to enable clock\n");
+> +               return err;
+> +       }
+> +
+> +       status = xlnx_pr_decoupler_read(priv, STATUS_OFFSET);
+> +       priv->enable = !!(status & STATUS_STATE_MASK);
+> +
+> +       clk_disable(priv->clk);
+> +
+> +       err = fpga_bridge_register(&pdev->dev, "Xilinx PR Decoupler",
+> +                                  &xlnx_pr_decoupler_br_ops, priv);
+> +
+> +       if (err) {
+> +               dev_err(&pdev->dev, "unable to register Xilinx PR Decoupler");
+> +               clk_unprepare(priv->clk);
+> +               return err;
+> +       }
+> +
+> +       return 0;
+> +}
+> +
+> +static int xlnx_pr_decoupler_remove(struct platform_device *pdev)
+> +{
+> +       fpga_bridge_unregister(&pdev->dev);
+> +
+> +       return 0;
+> +}
+> +
+> +static struct platform_driver xlnx_pr_decoupler_driver = {
+> +       .probe = xlnx_pr_decoupler_probe,
+> +       .remove = xlnx_pr_decoupler_remove,
+> +       .driver = {
+> +               .name = "xlnx_pr_decoupler",
+> +               .of_match_table = of_match_ptr(xlnx_pr_decoupler_of_match),
+> +       },
+> +};
+> +
+> +module_platform_driver(xlnx_pr_decoupler_driver);
+> +
+> +MODULE_DESCRIPTION("Xilinx Partial Reconfiguration Decoupler");
+> +MODULE_AUTHOR("Moritz Fischer <mdf@kernel.org>");
+> +MODULE_LICENSE("GPL v2");
 > --
-> 2.11.0
+> 2.7.4
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-fpga" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
