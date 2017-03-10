@@ -1,57 +1,94 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Fri, 10 Mar 2017 15:50:30 +0100
-Subject: [PATCH v4 1/3] usb: orion-echi: Add support for the Armada 3700
-In-Reply-To: <87o9x9jw1g.fsf@free-electrons.com>
-References: <Pine.LNX.4.44L0.1703091318010.1560-100000@iolanthe.rowland.org>
- <87o9x9jw1g.fsf@free-electrons.com>
-Message-ID: <20170310145030.GA3731@kroah.com>
+From: slash.tmp@free.fr (Mason)
+Date: Fri, 10 Mar 2017 15:53:24 +0100
+Subject: Neophyte questions about PCIe
+In-Reply-To: <1092d971-5d81-2da7-4b34-0a88637c0ec5@arm.com>
+References: <ced6a4bf-c94a-c116-1e94-52a8d675d132@free.fr>
+ <20170308151724.GA20780@bhelgaas-glaptop.roam.corp.google.com>
+ <f964ee05-db7f-c381-c91c-82897175da6d@free.fr>
+ <1092d971-5d81-2da7-4b34-0a88637c0ec5@arm.com>
+Message-ID: <18b339ae-d8da-25ac-0eea-2e147a7e29d2@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 10, 2017 at 10:55:23AM +0100, Gregory CLEMENT wrote:
-> Hi Alan,
->  
->  On jeu., mars 09 2017, Alan Stern <stern@rowland.harvard.edu> wrote:
+On 10/03/2017 14:15, Robin Murphy wrote:
+> On 09/03/17 23:43, Mason wrote:
+>> On 08/03/2017 16:17, Bjorn Helgaas wrote:
+>> [snip excellent in-depth overview]
+>>
+>> I think I'm making progress, in that I now have a better
+>> idea of what I don't understand. So I'm able to ask
+>> (hopefully) less vague questions.
+>>
+>> Take the USB3 PCIe adapter I've been testing with. At some
+>> point during init, the XHCI driver request some memory
+>> (via kmalloc?) in order to exchange data with the host, right?
+>>
+>> On my SoC, the RAM used by Linux lives at physical range
+>> [0x8000_0000, 0x8800_0000[ => 128 MB
+>>
+>> How does the XHCI driver make the adapter aware of where
+>> it can scribble data? The XHCI driver has no notion that
+>> the device is behind a bus, does it?
+>>
+>> At some point, the physical addresses must be converted
+>> to PCI bus addresses, right? Is it computed subtracting
+>> the offset defined in the DT?
+>>
+>> Then suppose the USB3 card wants to write to an address
+>> in RAM. It sends a packet on the PCIe bus, targeting
+>> the PCI bus address of that RAM, right? Is this address
+>> supposed to be in BAR0 of the root complex? I guess not,
+>> since Bjorn said that it was unusual for a RC to have
+>> a BAR at all. So I'll hand-wave, and decree that, by some
+>> protocol magic, the packet arrives at the PCIe controller.
+>> And this controller knows to forward this write request
+>> over the memory bus. Does that look about right?
 > 
-> > On Thu, 9 Mar 2017, Gregory CLEMENT wrote:
-> >
-> >> From: Hua Jing <jinghua@marvell.com>
-> >> 
-> >> - Add a new compatible string for the Armada 3700 SoCs
-> >> 
-> >> - add sbuscfg support for orion usb controller driver. For the SoCs
-> >>   without hlock, need to program BAWR/BARD/AHBBRST fields in the sbuscfg
-> >>   register to guarantee the AHB master's burst would not overrun or
-> >>   underrun the FIFO.
-> >> 
-> >> - the sbuscfg register has to be set after the usb controller reset,
-> >>   otherwise the value would be overridden to 0. In order to do this, the
-> >>   reset callback is registered.
-> >> 
-> >> [gregory.clement at free-electrons.com: - reword commit and comments
-> >> 				     - fix error path in ehci_orion_drv_reset()
-> >> 				     - fix checkpatch warning]
-> >> Signed-off-by: Hua Jing <jinghua@marvell.com>
-> >> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> >> Reviewed-by: Andrew Lunn <andrew@lunn.ch>
-> >
-> > Acked-by: Alan Stern <stern@rowland.harvard.edu>
-> 
-> Thanks!
-> 
-> And what about the second patch "usb: host: Allow to build ehci orion
-> with mvebu SoCs " ?
-> 
-> I don't remember what is the workflow for the usb subsystem. Will you do
-> a pull request to GKH? Or maybe he collects himself the patch once you
-> give your acked-by.
-> 
-> I will take care of the third patch and apply on the mvebu/dt64 branch
-> now that you agree the extension for the driver.
+> Generally, yes - if an area of memory space *is* claimed by a BAR, then
+> another PCI device accessing that would be treated as peer-to-peer DMA,
+> which may or may not be allowed (or supported at all). For mem space
+> which isn't claimed by BARs, it's up to the RC to decide what to do. As
+> a concrete example (which might possibly be relevant) the PLDA XR3-AXI
+> IP which we have in the ARM Juno SoC has the ATR_PCIE_WINx registers in
+> its root port configuration block that control what ranges of mem space
+> are mapped to the external AXI master interface and how.
 
-I'll take all of these once they look "good enough".  Give me a week or
-so to get to all of the pending patches in my queue...
+The HW dev told me that the Verilog code for the RC considers
+packets not targeted at RC BAR0 an error, and drops it.
 
-thanks,
 
-greg k-h
+>> My problem is that, in the current implementation of the
+>> PCIe controller, the USB device that wants to write to
+>> memory is supposed to target BAR0 of the RC.
+> 
+> That doesn't sound right at all. If the RC has a BAR, I'd expect it to
+> be for poking the guts of the RC device itself (since this prompted me
+> to go and compare, I see the Juno RC does indeed have it own enigmatic
+> 16KB BAR, which reads as ever-changing random junk; no idea what that's
+> about).
+
+That's not how our RC works. If I want to poke its guts, I have
+some MMIO addresses on the global bus. RC BAR0 is strictly used
+as a window to the global bus.
+
+
+>> Since my mem space is limited to 256 MB, then BAR0 is
+>> limited to 256 MB (or even 128 MB, since I also need
+>> to mapthe device's BAR into the same mem space).
+> 
+> Your window into mem space *from the CPU's point of view* is limited to
+> 256MB. The relationship between mem space and the system (AXI) memory
+> map from the point of view of PCI devices is a separate issue; if it's
+> configurable at all, it probably makes sense to have the firmware set an
+> outbound window to at least cover DRAM 1:1, then forget about it (this
+> is essentially what Juno UEFI does, for example).
+
+The size of RC BAR0 is limited to 1 GB, so best case I can map
+1 GB back to the system RAM. Well, actually best case is 896 MB
+since 1/8 of the window must map the MSI doorbell region.
+
+I'll see what I can come up with.
+
+Thanks a lot for your comments.
+
+Regards.
