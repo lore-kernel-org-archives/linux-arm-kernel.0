@@ -1,88 +1,88 @@
 From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Fri, 10 Mar 2017 11:39:21 +0100
-Subject: [PATCH v2 11/11] ARM: sun8i: a33: Add devfreq-based GPU cooling
+Date: Fri, 10 Mar 2017 11:39:15 +0100
+Subject: [PATCH v2 05/11] Documentation: DT: bindings: mfd: add A33 GPADC
+ binding
 In-Reply-To: <20170310103921.19469-1-quentin.schulz@free-electrons.com>
 References: <20170310103921.19469-1-quentin.schulz@free-electrons.com>
-Message-ID: <20170310103921.19469-12-quentin.schulz@free-electrons.com>
+Message-ID: <20170310103921.19469-6-quentin.schulz@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Maxime Ripard <maxime.ripard@free-electrons.com>
+This patch adds documentation for the A33 GPADC binding.
 
-This adds GPU thermal throttling for the Allwinner A33.
-
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
 ---
 
 added in v2
 
- arch/arm/boot/dts/sun8i-a23-a33.dtsi |  3 +++
- arch/arm/boot/dts/sun8i-a33.dtsi     | 24 ++++++++++++++++++++++++
- 2 files changed, 27 insertions(+)
+ .../devicetree/bindings/mfd/sun4i-gpadc.txt        | 59 ++++++++++++++++++++++
+ 1 file changed, 59 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt
 
-diff --git a/arch/arm/boot/dts/sun8i-a23-a33.dtsi b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-index 5e8725d..dc4e942 100644
---- a/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-@@ -495,6 +495,9 @@
- 
- 			assigned-clocks = <&ccu CLK_GPU>;
- 			assigned-clock-rates = <384000000>;
-+			cooling-min-level = <0>;
-+			cooling-max-level = <2>;
-+			#cooling-cells = <2>;
- 		};
- 
- 		gic: interrupt-controller at 01c81000 {
-diff --git a/arch/arm/boot/dts/sun8i-a33.dtsi b/arch/arm/boot/dts/sun8i-a33.dtsi
-index df6e77f..6552762 100644
---- a/arch/arm/boot/dts/sun8i-a33.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a33.dtsi
-@@ -202,6 +202,16 @@
- 					trip = <&cpu_alert1>;
- 					cooling-device = <&cpu0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
- 				};
+diff --git a/Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt b/Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt
+new file mode 100644
+index 0000000..17242c8
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt
+@@ -0,0 +1,59 @@
++Allwinner SoCs' GPADC Device Tree bindings
++------------------------------------------
++The Allwinner SoCs all have an ADC that can also act as a thermal sensor
++and sometimes as a touchscreen controller.
 +
-+				map2 {
-+					trip = <&gpu_alert0>;
-+					cooling-device = <&mali 1 THERMAL_NO_LIMIT>;
-+				};
++Required properties:
++  - compatible: "sun8i-a33-gpadc-iio",
++  - reg: mmio address range of the chip,
++  - #thermal-sensor-cells: shall be 0,
++  - #io-channel-cells: shall be 0,
 +
-+				map3 {
-+					trip = <&gpu_alert1>;
-+					cooling-device = <&mali 2 THERMAL_NO_LIMIT>;
-+				};
- 			};
- 
- 			trips {
-@@ -212,6 +222,13 @@
- 					type = "passive";
- 				};
- 
-+				gpu_alert0: gpu_alert0 {
-+					/* milliCelsius */
-+					temperature = <85000>;
-+					hysteresis = <2000>;
-+					type = "passive";
-+				};
++Example:
++	rtp: rtp at 01c25000 {
++		compatible = "allwinner,sun8i-a33-gpadc-iio";
++		reg = <0x01c25000 0x100>;
++		#thermal-sensor-cells = <0>;
++		#io-channel-cells = <0>;
++	};
 +
- 				cpu_alert1: cpu_alert1 {
- 					/* milliCelsius */
- 					temperature = <90000>;
-@@ -219,6 +236,13 @@
- 					type = "hot";
- 				};
- 
-+				gpu_alert1: gpu_alert1 {
-+					/* milliCelsius */
-+					temperature = <95000>;
-+					hysteresis = <2000>;
-+					type = "hot";
-+				};
++sun4i, sun5i and sun6i SoCs are also supported via the older binding:
 +
- 				cpu_crit: cpu_crit {
- 					/* milliCelsius */
- 					temperature = <110000>;
++sun4i resistive touchscreen controller
++--------------------------------------
++
++Required properties:
++ - compatible: "allwinner,sun4i-a10-ts", "allwinner,sun5i-a13-ts" or
++   "allwinner,sun6i-a31-ts"
++ - reg: mmio address range of the chip
++ - interrupts: interrupt to which the chip is connected
++ - #thermal-sensor-cells: shall be 0
++
++Optional properties:
++ - allwinner,ts-attached	 : boolean indicating that an actual touchscreen
++				   is attached to the controller
++ - allwinner,tp-sensitive-adjust : integer (4 bits)
++				   adjust sensitivity of pen down detection
++				   between 0 (least sensitive) and 15
++				   (defaults to 15)
++ - allwinner,filter-type	 : integer (2 bits)
++				   select median and averaging filter
++				   samples used for median / averaging filter
++				   0: 4/2
++				   1: 5/3
++				   2: 8/4
++				   3: 16/8
++				   (defaults to 1)
++
++Example:
++
++	rtp: rtp at 01c25000 {
++		compatible = "allwinner,sun4i-a10-ts";
++		reg = <0x01c25000 0x100>;
++		interrupts = <29>;
++		allwinner,ts-attached;
++		#thermal-sensor-cells = <0>;
++		/* sensitive/noisy touch panel */
++		allwinner,tp-sensitive-adjust = <0>;
++		allwinner,filter-type = <3>;
++	};
 -- 
 2.9.3
