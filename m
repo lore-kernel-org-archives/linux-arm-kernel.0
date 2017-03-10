@@ -1,88 +1,115 @@
-From: sakari.ailus@iki.fi (Sakari Ailus)
-Date: Sat, 11 Mar 2017 00:37:14 +0200
-Subject: [PATCH v4 14/36] [media] v4l2-mc: add a function to inherit
- controls from a pipeline
-In-Reply-To: <20170310125342.7f047acf@vento.lan>
-References: <1487211578-11360-15-git-send-email-steve_longerbeam@mentor.com>
- <20170302160257.GK3220@valkosipuli.retiisi.org.uk>
- <20170303230645.GR21222@n2100.armlinux.org.uk>
- <20170304131329.GV3220@valkosipuli.retiisi.org.uk>
- <a7b8e095-a95c-24bd-b1e9-e983f18061c4@xs4all.nl>
- <20170310130733.GU21222@n2100.armlinux.org.uk>
- <c679f755-52a6-3c6f-3d65-277db46676cc@xs4all.nl>
- <20170310140124.GV21222@n2100.armlinux.org.uk>
- <cc8900b0-c091-b14b-96f4-01f8fa72431c@xs4all.nl>
- <20170310125342.7f047acf@vento.lan>
-Message-ID: <20170310223714.GI3220@valkosipuli.retiisi.org.uk>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Fri, 10 Mar 2017 23:38:50 +0100
+Subject: [BUG] v4.11-rc1: CPUFREQ Circular locking dependency
+In-Reply-To: <BY2PR21MB00361C512E03B09DBCE715D3CB200@BY2PR21MB0036.namprd21.prod.outlook.com>
+References: <20170310150218.GW21222@n2100.armlinux.org.uk>
+ <CAJZ5v0jGRH_hwvvm9OLsaYgbghqWKOke9PyGNnkvP_ZiMqAxSw@mail.gmail.com>
+ <BY2PR21MB00362E60448FD2E00C120FFCCB200@BY2PR21MB0036.namprd21.prod.outlook.com>
+ <BY2PR21MB00361C512E03B09DBCE715D3CB200@BY2PR21MB0036.namprd21.prod.outlook.com>
+Message-ID: <CAJZ5v0gWA7fYRMSdpsRA8n8_9A4jBAKCZYHJRBB9dKFMKa09ag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mauro (and others),
+On Fri, Mar 10, 2017 at 7:33 PM, Matthew Wilcox <mawilcox@microsoft.com> wrote:
+> (compile tested only ... obviously)
+>
+> From cd5401d81633d5e48e39d67d4e65156e6759537e Mon Sep 17 00:00:00 2001
+> From: Matthew Wilcox <mawilcox@microsoft.com>
+> Date: Fri, 10 Mar 2017 13:22:53 -0500
+> Subject: [PATCH] thermal: Fix potential deadlock in cpu_cooling
+>
+> I expanded the scope of cooling_list_lock a little too far; it was
+> not just covering cpufreq_dev_count, it was also covering the calls
+> to cpufreq_register_notifier() and cpufreq_unregister_notifier().
+> Since cooling_list_lock is also used within cpufreq_thermal_notifier(),
+> lockdep reports a potential deadlock.  I don't think that's actually
+> possible, but it's easy enough to make it impossible by testing the
+> condition under cooling_list_lock and dropping the lock before calling
+> cpufreq_register_notifier().
+>
+> As a bonus, I noticed that cpufreq_dev_count is only used for the purpose
+> of knowing whether this is the first or last cooling device registered,
+> and we know that anyway because we know whether the list transitioned
+> between empty and not-empty.  So we can delete that variable too.
+>
+> Fixes: ae606089621ef0349402cfcbeca33a82abbd0fd0
+> Reported-by: Russell King <linux@armlinux.org.uk>
+> Signed-off-by: Matthew Wilcox <mawilcox@microsoft.com>
 
-On Fri, Mar 10, 2017 at 12:53:42PM -0300, Mauro Carvalho Chehab wrote:
-> Em Fri, 10 Mar 2017 15:20:48 +0100
-> Hans Verkuil <hverkuil@xs4all.nl> escreveu:
-> 
-> > 
-> > > As I've already mentioned, from talking about this with Mauro, it seems
-> > > Mauro is in agreement with permitting the control inheritence... I wish
-> > > Mauro would comment for himself, as I can't quote our private discussion
-> > > on the subject.  
-> > 
-> > I can't comment either, not having seen his mail and reasoning.
-> 
-> The rationale is that we should support the simplest use cases first.
-> 
-> In the case of the first MC-based driver (and several subsequent
-> ones), the simplest use case required MC, as it was meant to suport
-> a custom-made sophisticated application that required fine control
-> on each component of the pipeline and to allow their advanced
-> proprietary AAA userspace-based algorithms to work.
+Looks good to me.
 
-The first MC based driver (omap3isp) supports what the hardware can do, it
-does not support applications as such.
+Acked-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
 
-Adding support to drivers for different "operation modes" --- this is
-essentially what is being asked for --- is not an approach which could serve
-either purpose (some functionality with simple interface vs. fully support
-what the hardware can do, with interfaces allowing that) adequately in the
-short or the long run.
-
-If we are missing pieces in the puzzle --- in this case the missing pieces
-in the puzzle are a generic pipeline configuration library and another
-library that, with the help of pipeline autoconfiguration would implement
-"best effort" service for regular V4L2 on top of the MC + V4L2 subdev + V4L2
---- then these pieces need to be impelemented. The solution is
-*not* to attempt to support different types of applications in each driver
-separately. That will make writing drivers painful, error prone and is
-unlikely ever deliver what either purpose requires.
-
-So let's continue to implement the functionality that the hardware supports.
-Making a different choice here is bound to create a lasting conflict between
-having to change kernel interface behaviour and the requirement of
-supporting new functionality that hasn't been previously thought of, pushing
-away SoC vendors from V4L2 ecosystem. This is what we all do want to avoid.
-
-As far as i.MX6 driver goes, it is always possible to implement i.MX6 plugin
-for libv4l to perform this. This should be much easier than getting the
-automatic pipe configuration library and the rest working, and as it is
-custom for i.MX6, the resulting plugin may make informed technical choices
-for better functionality. Jacek has been working on such a plugin for
-Samsung Exynos hardware, but I don't think he has quite finished it yey.
-
-The original plan was and continues to be sound, it's just that there have
-always been too few hands to implement it. :-(
-
-> 
-> That's not true, for example, for the UVC driver. There, MC
-> is optional, as it should be.
-
-UVC is different. The device simply provides additional information through
-MC to the user but MC (or V4L2 sub-device interface) is not used for
-controlling the device.
-
--- 
-Kind regards,
-
-Sakari Ailus
-e-mail: sakari.ailus at iki.fi	XMPP: sailus at retiisi.org.uk
+> ---
+>  drivers/thermal/cpu_cooling.c | 20 +++++++++++---------
+>  1 file changed, 11 insertions(+), 9 deletions(-)
+>
+> diff --git a/drivers/thermal/cpu_cooling.c b/drivers/thermal/cpu_cooling.c
+> index 91048eeca28b..11b5ea685518 100644
+> --- a/drivers/thermal/cpu_cooling.c
+> +++ b/drivers/thermal/cpu_cooling.c
+> @@ -107,8 +107,6 @@ struct cpufreq_cooling_device {
+>  };
+>  static DEFINE_IDA(cpufreq_ida);
+>
+> -static unsigned int cpufreq_dev_count;
+> -
+>  static DEFINE_MUTEX(cooling_list_lock);
+>  static LIST_HEAD(cpufreq_dev_list);
+>
+> @@ -771,6 +769,7 @@ __cpufreq_cooling_register(struct device_node *np,
+>         unsigned int freq, i, num_cpus;
+>         int ret;
+>         struct thermal_cooling_device_ops *cooling_ops;
+> +       bool first;
+>
+>         if (!alloc_cpumask_var(&temp_mask, GFP_KERNEL))
+>                 return ERR_PTR(-ENOMEM);
+> @@ -874,13 +873,14 @@ __cpufreq_cooling_register(struct device_node *np,
+>         cpufreq_dev->cool_dev = cool_dev;
+>
+>         mutex_lock(&cooling_list_lock);
+> +       /* Register the notifier for first cpufreq cooling device */
+> +       first = list_empty(&cpufreq_dev_list);
+>         list_add(&cpufreq_dev->node, &cpufreq_dev_list);
+> +       mutex_unlock(&cooling_list_lock);
+>
+> -       /* Register the notifier for first cpufreq cooling device */
+> -       if (!cpufreq_dev_count++)
+> +       if (first)
+>                 cpufreq_register_notifier(&thermal_cpufreq_notifier_block,
+>                                           CPUFREQ_POLICY_NOTIFIER);
+> -       mutex_unlock(&cooling_list_lock);
+>
+>         goto put_policy;
+>
+> @@ -1021,6 +1021,7 @@ EXPORT_SYMBOL(of_cpufreq_power_cooling_register);
+>  void cpufreq_cooling_unregister(struct thermal_cooling_device *cdev)
+>  {
+>         struct cpufreq_cooling_device *cpufreq_dev;
+> +       bool last;
+>
+>         if (!cdev)
+>                 return;
+> @@ -1028,14 +1029,15 @@ void cpufreq_cooling_unregister(struct thermal_cooling_device *cdev)
+>         cpufreq_dev = cdev->devdata;
+>
+>         mutex_lock(&cooling_list_lock);
+> +       list_del(&cpufreq_dev->node);
+>         /* Unregister the notifier for the last cpufreq cooling device */
+> -       if (!--cpufreq_dev_count)
+> +       last = list_empty(&cpufreq_dev_list);
+> +       mutex_unlock(&cooling_list_lock);
+> +
+> +       if (last)
+>                 cpufreq_unregister_notifier(&thermal_cpufreq_notifier_block,
+>                                             CPUFREQ_POLICY_NOTIFIER);
+>
+> -       list_del(&cpufreq_dev->node);
+> -       mutex_unlock(&cooling_list_lock);
+> -
+>         thermal_cooling_device_unregister(cpufreq_dev->cool_dev);
+>         ida_simple_remove(&cpufreq_ida, cpufreq_dev->id);
+>         kfree(cpufreq_dev->dyn_power_table);
+> --
+> 2.11.0
