@@ -1,23 +1,88 @@
-From: slash.tmp@free.fr (Mason)
-Date: Fri, 10 Mar 2017 17:45:23 +0100
-Subject: Neophyte questions about PCIe
-In-Reply-To: <f964ee05-db7f-c381-c91c-82897175da6d@free.fr>
-References: <ced6a4bf-c94a-c116-1e94-52a8d675d132@free.fr>
- <20170308151724.GA20780@bhelgaas-glaptop.roam.corp.google.com>
- <f964ee05-db7f-c381-c91c-82897175da6d@free.fr>
-Message-ID: <9ba05c2c-57ef-b2c0-6a7c-457c392d98b5@free.fr>
+From: labbott@redhat.com (Laura Abbott)
+Date: Fri, 10 Mar 2017 08:46:12 -0800
+Subject: [RFC PATCH 00/12] Ion cleanup in preparation for moving out of
+ staging
+In-Reply-To: <20170310142709.GB15945@e106950-lin.cambridge.arm.com>
+References: <20170303132949.GC31582@dhcp22.suse.cz>
+ <cf383b9b-3cbc-0092-a071-f120874c053c@redhat.com>
+ <20170306074258.GA27953@dhcp22.suse.cz>
+ <20170306104041.zghsicrnadoap7lp@phenom.ffwll.local>
+ <20170306105805.jsq44kfxhsvazkm6@sirena.org.uk>
+ <20170306160437.sf7bksorlnw7u372@phenom.ffwll.local>
+ <CA+M3ks77Am3Fx-ZNmgeM5tCqdM7SzV7rby4Es-p2F2aOhUco9g@mail.gmail.com>
+ <26bc57ae-d88f-4ea0-d666-2c1a02bf866f@redhat.com>
+ <20170310103112.GA15945@e106950-lin.cambridge.arm.com>
+ <2e295c28-04d6-a071-cf16-164d02d679c5@arm.com>
+ <20170310142709.GB15945@e106950-lin.cambridge.arm.com>
+Message-ID: <24938e5e-db2b-f06a-2006-ae9b96e8cc9e@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/03/2017 00:43, Mason wrote:
+On 03/10/2017 06:27 AM, Brian Starkey wrote:
+> On Fri, Mar 10, 2017 at 11:46:42AM +0000, Robin Murphy wrote:
+>> On 10/03/17 10:31, Brian Starkey wrote:
+>>> Hi,
+>>>
+>>> On Thu, Mar 09, 2017 at 09:38:49AM -0800, Laura Abbott wrote:
+>>>> On 03/09/2017 02:00 AM, Benjamin Gaignard wrote:
+>>>
+>>> [snip]
+>>>
+>>>>>
+>>>>> For me those patches are going in the right direction.
+>>>>>
+>>>>> I still have few questions:
+>>>>> - since alignment management has been remove from ion-core, should it
+>>>>> be also removed from ioctl structure ?
+>>>>
+>>>> Yes, I think I'm going to go with the suggestion to fixup the ABI
+>>>> so we don't need the compat layer and as part of that I'm also
+>>>> dropping the align argument.
+>>>>
+>>>
+>>> Is the only motivation for removing the alignment parameter that
+>>> no-one got around to using it for something useful yet?
+>>> The original comment was true - different devices do have different
+>>> alignment requirements.
+>>>
+>>> Better alignment can help SMMUs use larger blocks when mapping,
+>>> reducing TLB pressure and the chance of a page table walk causing
+>>> display underruns.
+>>
+>> For that use-case, though, alignment alone doesn't necessarily help -
+>> you need the whole allocation granularity to match your block size (i.e.
+>> given a 1MB block size, asking for 17KB and getting back 17KB starting
+>> at a 1MB boundary doesn't help much - that whole 1MB needs to be
+>> allocated and everyone needs to know it to ensure that the whole lot can
+>> be mapped safely). Now, whether it's down to the callers or the heap
+>> implementations to decide and enforce that granularity is another
+>> question, but provided allocations are at least naturally aligned to
+>> whatever the granularity is (which is a reasonable assumption to bake
+>> in) then it's all good.
+>>
+>> Robin.
+> 
+> Agreed, alignment alone isn't enough. But lets assume that an app
+> knows what a "good" granularity is, and always asks for allocation
+> sizes which are suitably rounded to allow blocks to be used. Currently
+> it looks like a "standard" ION_HEAP_TYPE_CARVEOUT heap would give me
+> back just a PAGE_SIZE aligned buffer. So even *if* the caller knows
+> its desired block size, there's no way for it to get guaranteed better
+> alignment, which wouldn't be a bad feature to have.
+> 
+> Anyway as Daniel and Rob say, if the interface is designed properly
+> this kind of extension would be possible later, or you can have a
+> special heap with a larger granule.
+> 
+> I suppose it makes sense to remove it while there's no-one actually
+> implementing it, in case an alternate method proves more usable.
+> 
+> -Brian
 
-> I think I'm making progress [...]
+Part of the reason I want to remove it is to avoid confusion over
+callers thinking it will do anything on most heaps. I agree being
+able to specify a larger granularity would be beneficial but I
+don't think a dedicated field in the ABI is the right approach.
 
-Yes! I was able to plug a USB3 Flash drive, mount it,
-and read its contents. A million thanks, my head was
-starting to hurt from too much banging.
-
-Time to clean up a million hacks to be able to discuss
-the finer points.
-
-Regards.
+Thanks,
+Laura
