@@ -1,21 +1,31 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 10 Mar 2017 19:05:02 -0300
-Subject: [PATCH v5 07/39] ARM: dts: imx6qdl-sabrelite: remove erratum
- ERR006687 workaround
-In-Reply-To: <20170310215731.GB6540@amd>
-References: <1489121599-23206-1-git-send-email-steve_longerbeam@mentor.com>
- <1489121599-23206-8-git-send-email-steve_longerbeam@mentor.com>
- <9f5d0ac4-0602-c729-5c00-1d9ef49247c1@boundarydevices.com>
- <CAOMZO5BNrSEyrbWbCBCbsy4yTrh4AHfk2Too0qHuffxqUCgADg@mail.gmail.com>
- <20170310215731.GB6540@amd>
-Message-ID: <CAOMZO5DjiJGXXOg2sw79=sO6zvP7iO634AE1Zds=tuWe7jWadg@mail.gmail.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Fri, 10 Mar 2017 14:13:54 -0800
+Subject: [PATCH v3 0/2] Add support for HwaCom AmazeTV
+In-Reply-To: <20170304202624.29682-1-carlo@caione.org> (Carlo Caione's message
+ of "Sat, 4 Mar 2017 21:26:22 +0100")
+References: <20170304202624.29682-1-carlo@caione.org>
+Message-ID: <m237ekeq59.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 10, 2017 at 6:57 PM, Pavel Machek <pavel@ucw.cz> wrote:
+Carlo Caione <carlo@caione.org> writes:
 
-> And it should not depend on configuration. Hardware vendor should be
-> able to ship board with working device tree...
+> From: Carlo Caione <carlo@endlessm.com>
+>
+> New DTS to support the HwaCom AmazeTV based on the Meson S905X SoC.
+>
+> Changelog:
+>  v2:
+>   - Changed DTS name to meson-gxl-s905x-hwacom-amazetv.dts
+>  v3:
+>   - Split patchset in two parts: DTS and documentation update
+>   - Makefile now sorted alphabetically
+>   - DTS nodes now sorted alphabetically
+>
+> Carlo Caione (2):
+>   dt-bindings: amlogic: Add HwaCom board
+>   ARM64: dts: meson-gxl: Add support for HwaCom AmazeTV
 
-We are talking about pin conflict here. Please read the commit log of
-this patch for details.
+Applied to v4.12/dt64
+
+Kevin
