@@ -1,39 +1,63 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 10 Mar 2017 10:21:59 +0100
-Subject: [PATCH v2 0/6] ARM: dts: renesas: Add INTC-SYS clock to device
- tree
-In-Reply-To: <1488819491-26097-1-git-send-email-geert+renesas@glider.be>
-References: <1488819491-26097-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <20170310092159.GE21820@verge.net.au>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Fri, 10 Mar 2017 09:23:54 +0000
+Subject: [PATCH v3 2/7] dma: Add simple dma_noop_mmap
+In-Reply-To: <1489137839-549-1-git-send-email-vladimir.murzin@arm.com>
+References: <1489137839-549-1-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <1489137839-549-3-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 06, 2017 at 05:58:05PM +0100, Geert Uytterhoeven wrote:
-> 	Hi Simon, Magnus,
-> 
-> This patch series improves the topology description in DT of the ARM GIC
-> on Renesas SoCs using the legacy CPG/MSTP bindings (R-Mobile APE6 and
-> R-Car Gen2).  It describes the INTC-SYS clock, links the GIC to its
-> module clock, and adds the GIC to the SYSC "always on" PM Domain.
-> 
-> Note that currently the GIC-400 driver doesn't support module clocks nor
-> Runtime PM, so this must be handled as a critical clock.  Hence this
-> series depends on commit e34084fb9a023d1d ("clk: renesas: mstp: Make
-> INTC-SYS a critical clock"), which is in v4.11-rc1.
-> 
-> This series is the counterpart of "[PATCH 0/4] ARM/arm64: dts: renesas:
-> Link ARM GIC to clock and clock domain" for SoCs not yet migrated to the
-> new CPG/MSSR driver.  The latter is already part of v4.11-rc1 as it had
-> less dependencies.
-> 
-> Changes compared to v1:
->   - Add missing "power-domains" property,
->   - Add clock-names property,
->   - Rebased on top of CPG Clock Domain and R-Car SYSC PM Domain support,
->   - Add r8a7792 patch,
->   - Please refer to the individual patch changelogs for more details
->     (v1 dates back to 2014).
-> 
-> Thanks for applying!
+This patch adds a simple implementation of mmap to dma_noop_ops.
 
-Thanks, done.
+Cc: Joerg Roedel <jroedel@suse.de>
+Cc: Christian Borntraeger <borntraeger@de.ibm.com>
+Reported-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
+Tested-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
+Tested-by: Andras Szemzo <sza@esh.hu>
+Tested-by: Alexandre TORGUE <alexandre.torgue@st.com>
+Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+---
+ lib/dma-noop.c | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
+
+diff --git a/lib/dma-noop.c b/lib/dma-noop.c
+index ff4ef5e..0acc3f6 100644
+--- a/lib/dma-noop.c
++++ b/lib/dma-noop.c
+@@ -66,6 +66,26 @@ static int dma_noop_supported(struct device *dev, u64 mask)
+ 	return 1;
+ }
+ 
++static int dma_noop_mmap(struct device *dev, struct vm_area_struct *vma,
++			 void *cpu_addr, dma_addr_t dma_addr, size_t size,
++			 unsigned long attrs)
++{
++	unsigned long user_count = vma_pages(vma);
++	unsigned long count = PAGE_ALIGN(size) >> PAGE_SHIFT;
++	unsigned long pfn = page_to_pfn(virt_to_page(cpu_addr));
++	unsigned long off = vma->vm_pgoff;
++	int ret = -ENXIO;
++
++	if (off < count && user_count <= (count - off)) {
++		ret = remap_pfn_range(vma, vma->vm_start,
++				      pfn + off,
++				      user_count << PAGE_SHIFT,
++				      vma->vm_page_prot);
++	}
++
++	return ret;
++}
++
+ const struct dma_map_ops dma_noop_ops = {
+ 	.alloc			= dma_noop_alloc,
+ 	.free			= dma_noop_free,
+@@ -73,6 +93,7 @@ const struct dma_map_ops dma_noop_ops = {
+ 	.map_sg			= dma_noop_map_sg,
+ 	.mapping_error		= dma_noop_mapping_error,
+ 	.dma_supported		= dma_noop_supported,
++	.mmap			= dma_noop_mmap,
+ };
+ 
+ EXPORT_SYMBOL(dma_noop_ops);
+-- 
+2.0.0
