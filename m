@@ -1,105 +1,24 @@
-From: David.Laight@ACULAB.COM (David Laight)
-Date: Fri, 10 Mar 2017 14:06:07 +0000
-Subject: Neophyte questions about PCIe
-In-Reply-To: <1092d971-5d81-2da7-4b34-0a88637c0ec5@arm.com>
-References: <ced6a4bf-c94a-c116-1e94-52a8d675d132@free.fr>
- <20170308151724.GA20780@bhelgaas-glaptop.roam.corp.google.com>
- <f964ee05-db7f-c381-c91c-82897175da6d@free.fr>
- <1092d971-5d81-2da7-4b34-0a88637c0ec5@arm.com>
-Message-ID: <063D6719AE5E284EB5DD2968C1650D6DCFE7C8BA@AcuExch.aculab.com>
+From: afzal.mohd.ma@gmail.com (afzal mohammed)
+Date: Fri, 10 Mar 2017 19:38:09 +0530
+Subject: [PATCH v2 2/4] ARM: nommu: dynamic exception base address setting
+In-Reply-To: <49b9120d-bafa-e6ba-53c5-5bedd328d628@arm.com>
+References: <314159a7-b664-1256-647d-c05880ad7710@uclinux.org>
+ <20170308162258.GA3515@afzalpc>
+ <7ab1dfbd-9240-4f4b-70e2-d09ffc1039de@uclinux.org>
+ <20170309124640.GA8369@afzalpc>
+ <49b9120d-bafa-e6ba-53c5-5bedd328d628@arm.com>
+Message-ID: <20170310140809.GA15554@afzalpc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Robin Murphy
-> Sent: 10 March 2017 13:16
-> On 09/03/17 23:43, Mason wrote:
-> > On 08/03/2017 16:17, Bjorn Helgaas wrote:
-> > [snip excellent in-depth overview]
-> >
-> > I think I'm making progress, in that I now have a better
-> > idea of what I don't understand. So I'm able to ask
-> > (hopefully) less vague questions.
-> >
-> > Take the USB3 PCIe adapter I've been testing with. At some
-> > point during init, the XHCI driver request some memory
-> > (via kmalloc?) in order to exchange data with the host, right?
-> >
-> > On my SoC, the RAM used by Linux lives at physical range
-> > [0x8000_0000, 0x8800_0000[ => 128 MB
-> >
-> > How does the XHCI driver make the adapter aware of where
-> > it can scribble data? The XHCI driver has no notion that
-> > the device is behind a bus, does it?
-> >
-> > At some point, the physical addresses must be converted
-> > to PCI bus addresses, right? Is it computed subtracting
-> > the offset defined in the DT?
+Hi,
 
-The driver should call dma_alloc_coherent() which returns both the
-kernel virtual address and the device (xhci controller) has
-to use to access it.
-The cpu physical address is irrelevant (although it might be
-calculated in the middle somewhere).
+i was thinking of sending a patch to fix the Greg's issue today as
+will be losing access to the boards shortly for a few days, and then
+came to know that -next won't be there next week, so once back after a
+few days plan to post the fix unless some one overtakes me. And
+perhaps more suggestion/feedback can be obtained by that time, rather
+an excuse for laziness ;)
 
-
-> > Then suppose the USB3 card wants to write to an address
-> > in RAM. It sends a packet on the PCIe bus, targeting
-> > the PCI bus address of that RAM, right? Is this address
-> > supposed to be in BAR0 of the root complex? I guess not,
-> > since Bjorn said that it was unusual for a RC to have
-> > a BAR at all. So I'll hand-wave, and decree that, by some
-> > protocol magic, the packet arrives at the PCIe controller.
-> > And this controller knows to forward this write request
-> > over the memory bus. Does that look about right?
-> 
-> Generally, yes - if an area of memory space *is* claimed by a BAR, then
-> another PCI device accessing that would be treated as peer-to-peer DMA,
-> which may or may not be allowed (or supported at all).
-
-So PCIe addresses that refer to the host memory addresses are
-just forwarded to the memory subsystem.
-In practise this is almost everything.
-
-The only other PCIe writes the host will see are likely to be associated
-with MIS and MSI-X interrupt support.
-
-Some PCIe root complex support peer-to-peer writes but not reads.
-Write are normally 'posted' (so are 'fire and forget') reads need the
-completion TLP (containing the data) sent back - all hard and difficult.
-
-> For mem space
-> which isn't claimed by BARs, it's up to the RC to decide what to do. As
-> a concrete example (which might possibly be relevant) the PLDA XR3-AXI
-> IP which we have in the ARM Juno SoC has the ATR_PCIE_WINx registers in
-> its root port configuration block that control what ranges of mem space
-> are mapped to the external AXI master interface and how.
-> 
-> > My problem is that, in the current implementation of the
-> > PCIe controller, the USB device that wants to write to
-> > memory is supposed to target BAR0 of the RC.
-> 
-> That doesn't sound right at all. If the RC has a BAR, I'd expect it to
-> be for poking the guts of the RC device itself (since this prompted me
-> to go and compare, I see the Juno RC does indeed have it own enigmatic
-> 16KB BAR, which reads as ever-changing random junk; no idea what that's
-> about).
-> 
-> > Since my mem space is limited to 256 MB, then BAR0 is
-> > limited to 256 MB (or even 128 MB, since I also need
-> > to mapthe device's BAR into the same mem space).
-> 
-> Your window into mem space *from the CPU's point of view* is limited to
-> 256MB. The relationship between mem space and the system (AXI) memory
-> map from the point of view of PCI devices is a separate issue; if it's
-> configurable at all, it probably makes sense to have the firmware set an
-> outbound window to at least cover DRAM 1:1, then forget about it (this
-> is essentially what Juno UEFI does, for example).
-
-So you have 128MB (max) of system memory that has cpu physical
-addresses 0x80000000 upwards.
-I'd expect it all to be accessible from any PCIe card at some PCIe
-address, it might be at address 0, 0x80000000 or any other offset.
-
-I don't know which DT entry controls that offset.
-
-	David
+Regards
+afzal
