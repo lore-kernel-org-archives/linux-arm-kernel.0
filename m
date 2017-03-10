@@ -1,142 +1,174 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 10 Mar 2017 20:32:22 +0000
-Subject: [PATCH 3/6] arm64: cache: Remove support for ASID-tagged VIVT I-caches
+Date: Fri, 10 Mar 2017 20:32:23 +0000
+Subject: [PATCH 4/6] arm64: cache: Merge cachetype.h into cache.h
 In-Reply-To: <1489177945-8590-1-git-send-email-will.deacon@arm.com>
 References: <1489177945-8590-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1489177945-8590-3-git-send-email-will.deacon@arm.com>
+Message-ID: <1489177945-8590-4-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As a recent change to ARMv8, ASID-tagged VIVT I-caches are removed
-retrospectively from the architecture. Consequently, we don't need to
-support them in Linux either.
+cachetype.h and cache.h are small and both obviously related to caches.
+Merge them together to reduce clutter.
 
 Acked-by: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/cachetype.h | 8 --------
- arch/arm64/include/asm/kvm_mmu.h   | 2 +-
- arch/arm64/kernel/cpufeature.c     | 4 ++--
- arch/arm64/kernel/cpuinfo.c        | 9 +++------
- arch/arm64/mm/context.c            | 3 ---
- arch/arm64/mm/flush.c              | 2 --
- 6 files changed, 6 insertions(+), 22 deletions(-)
+ arch/arm64/include/asm/cache.h     | 31 ++++++++++++++++++++-
+ arch/arm64/include/asm/cachetype.h | 55 --------------------------------------
+ arch/arm64/include/asm/kvm_mmu.h   |  2 +-
+ arch/arm64/kernel/cpuinfo.c        |  2 +-
+ arch/arm64/mm/flush.c              |  2 +-
+ 5 files changed, 33 insertions(+), 59 deletions(-)
+ delete mode 100644 arch/arm64/include/asm/cachetype.h
 
+diff --git a/arch/arm64/include/asm/cache.h b/arch/arm64/include/asm/cache.h
+index 5082b30bc2c0..7acb52634299 100644
+--- a/arch/arm64/include/asm/cache.h
++++ b/arch/arm64/include/asm/cache.h
+@@ -16,7 +16,17 @@
+ #ifndef __ASM_CACHE_H
+ #define __ASM_CACHE_H
+ 
+-#include <asm/cachetype.h>
++#include <asm/cputype.h>
++
++#define CTR_L1IP_SHIFT		14
++#define CTR_L1IP_MASK		3
++#define CTR_CWG_SHIFT		24
++#define CTR_CWG_MASK		15
++
++#define CTR_L1IP(ctr)		(((ctr) >> CTR_L1IP_SHIFT) & CTR_L1IP_MASK)
++
++#define ICACHE_POLICY_VIPT	2
++#define ICACHE_POLICY_PIPT	3
+ 
+ #define L1_CACHE_SHIFT		7
+ #define L1_CACHE_BYTES		(1 << L1_CACHE_SHIFT)
+@@ -32,6 +42,25 @@
+ 
+ #ifndef __ASSEMBLY__
+ 
++#include <linux/bitops.h>
++
++#define ICACHEF_ALIASING	0
++extern unsigned long __icache_flags;
++
++/*
++ * Whilst the D-side always behaves as PIPT on AArch64, aliasing is
++ * permitted in the I-cache.
++ */
++static inline int icache_is_aliasing(void)
++{
++	return test_bit(ICACHEF_ALIASING, &__icache_flags);
++}
++
++static inline u32 cache_type_cwg(void)
++{
++	return (read_cpuid_cachetype() >> CTR_CWG_SHIFT) & CTR_CWG_MASK;
++}
++
+ #define __read_mostly __attribute__((__section__(".data..read_mostly")))
+ 
+ static inline int cache_line_size(void)
 diff --git a/arch/arm64/include/asm/cachetype.h b/arch/arm64/include/asm/cachetype.h
-index 212a0f3d4ecb..fbab37c669a0 100644
+deleted file mode 100644
+index fbab37c669a0..000000000000
 --- a/arch/arm64/include/asm/cachetype.h
-+++ b/arch/arm64/include/asm/cachetype.h
-@@ -23,8 +23,6 @@
- #define CTR_CWG_SHIFT		24
- #define CTR_CWG_MASK		15
- 
--#define ICACHE_POLICY_RESERVED	0
--#define ICACHE_POLICY_AIVIVT	1
- #define ICACHE_POLICY_VIPT	2
- #define ICACHE_POLICY_PIPT	3
- 
-@@ -35,7 +33,6 @@
- #define CTR_L1IP(ctr)	(((ctr) >> CTR_L1IP_SHIFT) & CTR_L1IP_MASK)
- 
- #define ICACHEF_ALIASING	0
--#define ICACHEF_AIVIVT		1
- 
- extern unsigned long __icache_flags;
- 
-@@ -48,11 +45,6 @@ static inline int icache_is_aliasing(void)
- 	return test_bit(ICACHEF_ALIASING, &__icache_flags);
- }
- 
--static inline int icache_is_aivivt(void)
++++ /dev/null
+@@ -1,55 +0,0 @@
+-/*
+- * Copyright (C) 2012 ARM Ltd.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+- */
+-#ifndef __ASM_CACHETYPE_H
+-#define __ASM_CACHETYPE_H
+-
+-#include <asm/cputype.h>
+-
+-#define CTR_L1IP_SHIFT		14
+-#define CTR_L1IP_MASK		3
+-#define CTR_CWG_SHIFT		24
+-#define CTR_CWG_MASK		15
+-
+-#define ICACHE_POLICY_VIPT	2
+-#define ICACHE_POLICY_PIPT	3
+-
+-#ifndef __ASSEMBLY__
+-
+-#include <linux/bitops.h>
+-
+-#define CTR_L1IP(ctr)	(((ctr) >> CTR_L1IP_SHIFT) & CTR_L1IP_MASK)
+-
+-#define ICACHEF_ALIASING	0
+-
+-extern unsigned long __icache_flags;
+-
+-/*
+- * Whilst the D-side always behaves as PIPT on AArch64, aliasing is
+- * permitted in the I-cache.
+- */
+-static inline int icache_is_aliasing(void)
 -{
--	return test_bit(ICACHEF_AIVIVT, &__icache_flags);
+-	return test_bit(ICACHEF_ALIASING, &__icache_flags);
 -}
 -
- static inline u32 cache_type_cwg(void)
- {
- 	return (read_cpuid_cachetype() >> CTR_CWG_SHIFT) & CTR_CWG_MASK;
+-static inline u32 cache_type_cwg(void)
+-{
+-	return (read_cpuid_cachetype() >> CTR_CWG_SHIFT) & CTR_CWG_MASK;
+-}
+-
+-#endif	/* __ASSEMBLY__ */
+-
+-#endif	/* __ASM_CACHETYPE_H */
 diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index ed1246014901..4be5773d4606 100644
+index 4be5773d4606..dc3624d8b9db 100644
 --- a/arch/arm64/include/asm/kvm_mmu.h
 +++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -245,7 +245,7 @@ static inline void __coherent_cache_guest_page(struct kvm_vcpu *vcpu,
- 	if (!icache_is_aliasing()) {		/* PIPT */
- 		flush_icache_range((unsigned long)va,
- 				   (unsigned long)va + size);
--	} else if (!icache_is_aivivt()) {	/* non ASID-tagged VIVT */
-+	} else {
- 		/* any kind of VIPT cache */
- 		__flush_icache_all();
- 	}
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index abda8e861865..073a6c641730 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -153,9 +153,9 @@ static const struct arm64_ftr_bits ftr_ctr[] = {
- 	/*
- 	 * Linux can handle differing I-cache policies. Userspace JITs will
- 	 * make use of *minLine.
--	 * If we have differing I-cache policies, report it as the weakest - AIVIVT.
-+	 * If we have differing I-cache policies, report it as the weakest - VIPT.
- 	 */
--	ARM64_FTR_BITS(FTR_VISIBLE, FTR_NONSTRICT, FTR_EXACT, 14, 2, ICACHE_POLICY_AIVIVT),	/* L1Ip */
-+	ARM64_FTR_BITS(FTR_VISIBLE, FTR_NONSTRICT, FTR_EXACT, 14, 2, ICACHE_POLICY_VIPT),	/* L1Ip */
- 	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, 0, 4, 0),	/* IminLine */
- 	ARM64_FTR_END,
- };
+@@ -108,7 +108,7 @@ alternative_else_nop_endif
+ #else
+ 
+ #include <asm/pgalloc.h>
+-#include <asm/cachetype.h>
++#include <asm/cache.h>
+ #include <asm/cacheflush.h>
+ #include <asm/mmu_context.h>
+ #include <asm/pgtable.h>
 diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
-index 155ddd8ad56a..efe74ecc9738 100644
+index efe74ecc9738..260b54f415b8 100644
 --- a/arch/arm64/kernel/cpuinfo.c
 +++ b/arch/arm64/kernel/cpuinfo.c
-@@ -43,10 +43,9 @@ DEFINE_PER_CPU(struct cpuinfo_arm64, cpu_data);
- static struct cpuinfo_arm64 boot_cpu_data;
- 
- static char *icache_policy_str[] = {
--	[ICACHE_POLICY_RESERVED] = "RESERVED/UNKNOWN",
--	[ICACHE_POLICY_AIVIVT] = "AIVIVT",
--	[ICACHE_POLICY_VIPT] = "VIPT",
--	[ICACHE_POLICY_PIPT] = "PIPT",
-+	[0 ... ICACHE_POLICY_PIPT]	= "RESERVED/UNKNOWN",
-+	[ICACHE_POLICY_VIPT]		= "VIPT",
-+	[ICACHE_POLICY_PIPT]		= "PIPT",
- };
- 
- unsigned long __icache_flags;
-@@ -293,8 +292,6 @@ static void cpuinfo_detect_icache_policy(struct cpuinfo_arm64 *info)
- 	case ICACHE_POLICY_PIPT:
- 		break;
- 	default:
--	case ICACHE_POLICY_AIVIVT:
--		set_bit(ICACHEF_AIVIVT, &__icache_flags);
- 		/* Fallthrough */
- 	case ICACHE_POLICY_VIPT:
- 		/* Assume aliasing */
-diff --git a/arch/arm64/mm/context.c b/arch/arm64/mm/context.c
-index 68634c630cdd..ab9f5f0fb2c7 100644
---- a/arch/arm64/mm/context.c
-+++ b/arch/arm64/mm/context.c
-@@ -119,9 +119,6 @@ static void flush_context(unsigned int cpu)
- 
- 	/* Queue a TLB invalidate and flush the I-cache if necessary. */
- 	cpumask_setall(&tlb_flush_pending);
--
--	if (icache_is_aivivt())
--		__flush_icache_all();
- }
- 
- static bool check_update_reserved_asid(u64 asid, u64 newasid)
+@@ -15,7 +15,7 @@
+  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  */
+ #include <asm/arch_timer.h>
+-#include <asm/cachetype.h>
++#include <asm/cache.h>
+ #include <asm/cpu.h>
+ #include <asm/cputype.h>
+ #include <asm/cpufeature.h>
 diff --git a/arch/arm64/mm/flush.c b/arch/arm64/mm/flush.c
-index 554a2558c12e..1e968222a544 100644
+index 1e968222a544..21a8d828cbf4 100644
 --- a/arch/arm64/mm/flush.c
 +++ b/arch/arm64/mm/flush.c
-@@ -65,8 +65,6 @@ void __sync_icache_dcache(pte_t pte, unsigned long addr)
- 	if (!test_and_set_bit(PG_dcache_clean, &page->flags))
- 		sync_icache_aliases(page_address(page),
- 				    PAGE_SIZE << compound_order(page));
--	else if (icache_is_aivivt())
--		__flush_icache_all();
- }
+@@ -22,7 +22,7 @@
+ #include <linux/pagemap.h>
  
- /*
+ #include <asm/cacheflush.h>
+-#include <asm/cachetype.h>
++#include <asm/cache.h>
+ #include <asm/tlbflush.h>
+ 
+ void sync_icache_aliases(void *kaddr, unsigned long len)
 -- 
 2.1.4
