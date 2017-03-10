@@ -1,67 +1,44 @@
-From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Fri, 10 Mar 2017 15:42:22 -0800
-Subject: [PATCH v5 15/39] [media] v4l2: add a frame interval error event
-In-Reply-To: <20170310233008.GC6540@amd>
-References: <1489121599-23206-1-git-send-email-steve_longerbeam@mentor.com>
- <1489121599-23206-16-git-send-email-steve_longerbeam@mentor.com>
- <5b0a0e76-2524-4140-5ccc-380a8f949cfa@xs4all.nl>
- <ec05e6e0-79f2-2db2-bde9-4aed00d76faa@gmail.com> <20170310233008.GC6540@amd>
-Message-ID: <899f1c0a-ba3d-02cd-507b-dba71bfcb637@gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 10 Mar 2017 23:43:25 +0000
+Subject: [BUG] v4.11-rc1: CPUFREQ Circular locking dependency
+In-Reply-To: <BY2PR21MB00361C512E03B09DBCE715D3CB200@BY2PR21MB0036.namprd21.prod.outlook.com>
+References: <20170310150218.GW21222@n2100.armlinux.org.uk>
+ <CAJZ5v0jGRH_hwvvm9OLsaYgbghqWKOke9PyGNnkvP_ZiMqAxSw@mail.gmail.com>
+ <BY2PR21MB00362E60448FD2E00C120FFCCB200@BY2PR21MB0036.namprd21.prod.outlook.com>
+ <BY2PR21MB00361C512E03B09DBCE715D3CB200@BY2PR21MB0036.namprd21.prod.outlook.com>
+Message-ID: <20170310234325.GB21222@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Mar 10, 2017 at 06:33:28PM +0000, Matthew Wilcox wrote:
+> From cd5401d81633d5e48e39d67d4e65156e6759537e Mon Sep 17 00:00:00 2001
+> From: Matthew Wilcox <mawilcox@microsoft.com>
+> Date: Fri, 10 Mar 2017 13:22:53 -0500
+> Subject: [PATCH] thermal: Fix potential deadlock in cpu_cooling
+> 
+> I expanded the scope of cooling_list_lock a little too far; it was
+> not just covering cpufreq_dev_count, it was also covering the calls
+> to cpufreq_register_notifier() and cpufreq_unregister_notifier().
+> Since cooling_list_lock is also used within cpufreq_thermal_notifier(),
+> lockdep reports a potential deadlock.  I don't think that's actually
+> possible, but it's easy enough to make it impossible by testing the
+> condition under cooling_list_lock and dropping the lock before calling
+> cpufreq_register_notifier().
+> 
+> As a bonus, I noticed that cpufreq_dev_count is only used for the purpose
+> of knowing whether this is the first or last cooling device registered,
+> and we know that anyway because we know whether the list transitioned
+> between empty and not-empty.  So we can delete that variable too.
+> 
+> Fixes: ae606089621ef0349402cfcbeca33a82abbd0fd0
+> Reported-by: Russell King <linux@armlinux.org.uk>
+> Signed-off-by: Matthew Wilcox <mawilcox@microsoft.com>
 
+Thanks Matthew, appears to solve the problem.
 
-On 03/10/2017 03:30 PM, Pavel Machek wrote:
-> On Fri 2017-03-10 10:37:21, Steve Longerbeam wrote:
->> Hi Hans,
->>
->> On 03/10/2017 04:03 AM, Hans Verkuil wrote:
->>> On 10/03/17 05:52, Steve Longerbeam wrote:
->>>> Add a new FRAME_INTERVAL_ERROR event to signal that a video capture or
->>>> output device has measured an interval between the reception or transmit
->>>> completion of two consecutive frames of video that is outside the nominal
->>>> frame interval by some tolerance value.
->>>
->>> Reading back what was said on this I agree with Sakari that this doesn't
->>> belong here.
->>>
->>> Userspace can detect this just as easily (if not easier) with a timeout.
->>>
->>
->>
->> Unfortunately measuring frame intervals from userland is not accurate
->> enough for i.MX6.
->>
->> The issue here is that the IPUv3, specifically the CSI unit, can
->> permanently lose vertical sync if there are truncated frames sent
->> on the bt.656 bus. We have seen a single missing line of video cause
->> loss of vertical sync. The only way to correct this is to shutdown
->> the IPU capture hardware and restart, which can be accomplished
->> simply by restarting streaming from userland.
->>
->> There are no other indicators from the sensor about these short
->> frame events (believe me, we've exhausted all avenues with the ADV718x).
->> And the IPUv3 DMA engine has no status indicators for short frames
->> either. So the only way to detect them is by measuring frame intervals.
->>
->> The intervals have to be able to resolve a single line of missing video.
->> With a PAL video source that requires better than 58 usec accuracy.
->>
->> There is too much uncertainty to resolve this at user level. The
->> driver is able to resolve this by measuring intervals between hardware
->> interrupts as long as interrupt latency is reasonably low, and we
->> have another method using the i.MX6 hardware input capture support
->> that can measure these intervals very accurately with no errors
->> introduced by interrupt latency.
->
-> Requiring < 58 usec interrupt latency for correct operation is a
-> little too optimistic, no?
+Tested-by: Russell King <rmk+kernel@armlinux.org.uk>
 
-
-No it's not too optimistic, from experience the imx6 kernel has irq
-latency less than 10 usec under normal system load. False events can be
-generated if the latency gets bad, it's true, and that's why there is
-the imx6 timer input capture approach.
-
-Steve
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
