@@ -1,125 +1,101 @@
 From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Thu,  9 Mar 2017 20:53:11 -0800
-Subject: [PATCH v5 31/39] media: imx: csi: add support for bayer formats
+Date: Thu,  9 Mar 2017 20:53:12 -0800
+Subject: [PATCH v5 32/39] media: imx: csi: fix crop rectangle changes in
+ set_fmt
 In-Reply-To: <1489121599-23206-1-git-send-email-steve_longerbeam@mentor.com>
 References: <1489121599-23206-1-git-send-email-steve_longerbeam@mentor.com>
-Message-ID: <1489121599-23206-32-git-send-email-steve_longerbeam@mentor.com>
+Message-ID: <1489121599-23206-33-git-send-email-steve_longerbeam@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Russell King <rmk+kernel@armlinux.org.uk>
+From: Philipp Zabel <p.zabel@pengutronix.de>
 
-Bayer formats must be treated as generic data and passthrough mode must
-be used.  Add the correct setup for these formats.
+The cropping rectangle was being modified by the output pad's
+set_fmt, which is the wrong pad to do this. The crop rectangle
+should not be modified by the output pad set_fmt. It instead
+should be reset to the full input frame when the input pad format
+is set.
 
-Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+The output pad set_fmt should set width/height to the current
+crop dimensions, or 1/2 the crop width/height to enable
+downscaling.
 
-- added check to csi_link_validate() to verify that destination is
-  IDMAC output pad when passthrough conditions exist: bayer formats
-  and 16-bit parallel buses.
+So the other part of this patch is to enable downscaling if
+the output pad dimension(s) are 1/2 the crop dimension(s) at
+csi_setup() time.
 
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
 Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
 ---
- drivers/staging/media/imx/imx-media-csi.c | 52 +++++++++++++++++++++++++------
- 1 file changed, 43 insertions(+), 9 deletions(-)
+ drivers/staging/media/imx/imx-media-csi.c | 35 ++++++++++++++++++++-----------
+ 1 file changed, 23 insertions(+), 12 deletions(-)
 
 diff --git a/drivers/staging/media/imx/imx-media-csi.c b/drivers/staging/media/imx/imx-media-csi.c
-index ab78ff7..a7d04e4 100644
+index a7d04e4..577038e 100644
 --- a/drivers/staging/media/imx/imx-media-csi.c
 +++ b/drivers/staging/media/imx/imx-media-csi.c
-@@ -276,10 +276,11 @@ static int csi_idmac_setup_channel(struct csi_priv *priv)
- 	struct imx_media_video_dev *vdev = priv->vdev;
- 	struct v4l2_of_endpoint *sensor_ep;
- 	struct v4l2_mbus_framefmt *infmt;
--	unsigned int burst_size;
- 	struct ipu_image image;
-+	u32 passthrough_bits;
- 	dma_addr_t phys[2];
- 	bool passthrough;
-+	u32 burst_size;
- 	int ret;
+@@ -536,6 +536,10 @@ static int csi_setup(struct csi_priv *priv)
  
- 	infmt = &priv->format_mbus[CSI_SINK_PAD];
-@@ -306,15 +307,38 @@ static int csi_idmac_setup_channel(struct csi_priv *priv)
- 	ipu_cpmem_set_burstsize(priv->idmac_ch, burst_size);
+ 	ipu_csi_set_window(priv->csi, &priv->crop);
  
- 	/*
--	 * If the sensor uses 16-bit parallel CSI bus, we must handle
--	 * the data internally in the IPU as 16-bit generic, aka
--	 * passthrough mode.
-+	 * Check for conditions that require the IPU to handle the
-+	 * data internally as generic data, aka passthrough mode:
-+	 * - raw bayer formats
-+	 * - the sensor bus is 16-bit parallel
- 	 */
--	passthrough = (sensor_ep->bus_type != V4L2_MBUS_CSI2 &&
--		       sensor_ep->bus.parallel.bus_width >= 16);
-+	switch (image.pix.pixelformat) {
-+	case V4L2_PIX_FMT_SBGGR8:
-+	case V4L2_PIX_FMT_SGBRG8:
-+	case V4L2_PIX_FMT_SGRBG8:
-+	case V4L2_PIX_FMT_SRGGB8:
-+		burst_size = 8;
-+		passthrough = true;
-+		passthrough_bits = 8;
-+		break;
-+	case V4L2_PIX_FMT_SBGGR16:
-+	case V4L2_PIX_FMT_SGBRG16:
-+	case V4L2_PIX_FMT_SGRBG16:
-+	case V4L2_PIX_FMT_SRGGB16:
-+		burst_size = 4;
-+		passthrough = true;
-+		passthrough_bits = 16;
-+		break;
-+	default:
-+		passthrough = (sensor_ep->bus_type != V4L2_MBUS_CSI2 &&
-+			       sensor_ep->bus.parallel.bus_width >= 16);
-+		passthrough_bits = 16;
-+		break;
-+	}
- 
- 	if (passthrough)
--		ipu_cpmem_set_format_passthrough(priv->idmac_ch, 16);
-+		ipu_cpmem_set_format_passthrough(priv->idmac_ch,
-+						 passthrough_bits);
- 
- 	/*
- 	 * Set the channel for the direct CSI-->memory via SMFC
-@@ -725,6 +749,7 @@ static int csi_link_validate(struct v4l2_subdev *sd,
- 			     struct v4l2_subdev_format *sink_fmt)
- {
- 	struct csi_priv *priv = v4l2_get_subdevdata(sd);
-+	const struct imx_media_pixfmt *incc;
- 	struct v4l2_of_endpoint *sensor_ep;
- 	struct imx_media_subdev *sensor;
- 	bool is_csi2;
-@@ -749,8 +774,17 @@ static int csi_link_validate(struct v4l2_subdev *sd,
- 
- 	priv->sensor = sensor;
- 	sensor_ep = &priv->sensor->sensor_ep;
--
- 	is_csi2 = (sensor_ep->bus_type == V4L2_MBUS_CSI2);
-+	incc = priv->cc[CSI_SINK_PAD];
++	ipu_csi_set_downsize(priv->csi,
++			     priv->crop.width == 2 * outfmt->width,
++			     priv->crop.height == 2 * outfmt->height);
 +
-+	if (priv->dest != IPU_CSI_DEST_IDMAC &&
-+	    (incc->bayer || (!is_csi2 &&
-+			     sensor_ep->bus.parallel.bus_width >= 16))) {
-+		v4l2_err(&priv->sd,
-+			 "bayer/16-bit parallel buses must go to IDMAC pad\n");
-+		ret = -EINVAL;
-+		goto out;
-+	}
+ 	ipu_csi_init_interface(priv->csi, &sensor_mbus_cfg, &if_fmt);
  
- 	if (is_csi2) {
- 		int vc_num = 0;
-@@ -775,7 +809,7 @@ static int csi_link_validate(struct v4l2_subdev *sd,
+ 	ipu_csi_set_dest(priv->csi, priv->dest);
+@@ -932,15 +936,15 @@ static int csi_set_fmt(struct v4l2_subdev *sd,
+ 	switch (sdformat->pad) {
+ 	case CSI_SRC_PAD_DIRECT:
+ 	case CSI_SRC_PAD_IDMAC:
+-		crop.left = priv->crop.left;
+-		crop.top = priv->crop.top;
+-		crop.width = sdformat->format.width;
+-		crop.height = sdformat->format.height;
+-		ret = csi_try_crop(priv, &crop, sensor);
+-		if (ret)
+-			goto out;
+-		sdformat->format.width = crop.width;
+-		sdformat->format.height = crop.height;
++		if (sdformat->format.width < priv->crop.width * 3 / 4)
++			sdformat->format.width = priv->crop.width / 2;
++		else
++			sdformat->format.width = priv->crop.width;
++
++		if (sdformat->format.height < priv->crop.height * 3 / 4)
++			sdformat->format.height = priv->crop.height / 2;
++		else
++			sdformat->format.height = priv->crop.height;
  
- 	/* select either parallel or MIPI-CSI2 as input to CSI */
- 	ipu_set_csi_src_mux(priv->ipu, priv->csi_id, is_csi2);
--
-+out:
- 	mutex_unlock(&priv->lock);
- 	return ret;
- }
+ 		if (sdformat->pad == CSI_SRC_PAD_IDMAC) {
+ 			cc = imx_media_find_format(0, sdformat->format.code,
+@@ -986,6 +990,14 @@ static int csi_set_fmt(struct v4l2_subdev *sd,
+ 		}
+ 		break;
+ 	case CSI_SINK_PAD:
++		crop.left = 0;
++		crop.top = 0;
++		crop.width = sdformat->format.width;
++		crop.height = sdformat->format.height;
++		ret = csi_try_crop(priv, &crop, sensor);
++		if (ret)
++			goto out;
++
+ 		cc = imx_media_find_format(0, sdformat->format.code,
+ 					   true, false);
+ 		if (!cc) {
+@@ -1004,9 +1016,8 @@ static int csi_set_fmt(struct v4l2_subdev *sd,
+ 	} else {
+ 		priv->format_mbus[sdformat->pad] = sdformat->format;
+ 		priv->cc[sdformat->pad] = cc;
+-		/* Update the crop window if this is an output pad  */
+-		if (sdformat->pad == CSI_SRC_PAD_DIRECT ||
+-		    sdformat->pad == CSI_SRC_PAD_IDMAC)
++		/* Reset the crop window if this is the input pad */
++		if (sdformat->pad == CSI_SINK_PAD)
+ 			priv->crop = crop;
+ 	}
+ 
 -- 
 2.7.4
