@@ -1,83 +1,170 @@
 From: seanpaul@chromium.org (Sean Paul)
-Date: Thu,  9 Mar 2017 23:32:47 -0500
-Subject: [PATCH 32/41] drm/rockchip: Flush PSR before committing modeset
- disables/enables
+Date: Thu,  9 Mar 2017 23:32:48 -0500
+Subject: [PATCH 33/41] drm/rockchip: Disable VOP windows when PSR is active
 In-Reply-To: <20170310043305.17216-1-seanpaul@chromium.org>
 References: <20170310043305.17216-1-seanpaul@chromium.org>
-Message-ID: <20170310043305.17216-33-seanpaul@chromium.org>
+Message-ID: <20170310043305.17216-34-seanpaul@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tomasz Figa <tfiga@chromium.org>
+From: zain wang <wzz@rock-chips.com>
 
-Currently PSR flush is triggered from CRTC's .atomic_begin() callback,
-which is executed after modeset disables and enables and before plane
-updates are committed. Since PSR flush and re-enable can be triggered
-asynchronously by external sources (input event, delayed work), it can
-race with hardware programming done in the aforementioned stages.
-
-To avoid the race, we can trigger PSR flush before committing modeset
-disables/enables. This also has the advantage of removing some
-PSR-specific knowledge from the VOP driver.
+We do not have to drive the display when it is in PSR mode, so we can
+save some power by disabling active VOP windows, until a next PSR flush
+turns them back on.
 
 Cc: Kristian H. Kristensen <hoegsberg@chromium.org>
+Signed-off-by: zain wang <wzz@rock-chips.com>
 Signed-off-by: Tomasz Figa <tfiga@chromium.org>
+Signed-off-by: Douglas Anderson <dianders@chromium.org>
 Signed-off-by: Sean Paul <seanpaul@chromium.org>
 ---
- drivers/gpu/drm/rockchip/rockchip_drm_fb.c  | 13 +++++++++++++
- drivers/gpu/drm/rockchip/rockchip_drm_vop.c |  7 -------
- 2 files changed, 13 insertions(+), 7 deletions(-)
+ drivers/gpu/drm/rockchip/analogix_dp-rockchip.c | 34 +++++++++++++++++--------
+ drivers/gpu/drm/rockchip/rockchip_drm_drv.h     |  1 +
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.c     | 31 ++++++++++++++++++++++
+ 3 files changed, 55 insertions(+), 11 deletions(-)
 
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_fb.c b/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
-index 81f9548672b0..2067f4afadf3 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
-@@ -175,10 +175,23 @@ static void rockchip_drm_output_poll_changed(struct drm_device *dev)
+diff --git a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
+index 0614d32c5435..de23cc6fd05d 100644
+--- a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
++++ b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
+@@ -91,19 +91,31 @@ static int analogix_dp_psr_set(struct drm_encoder *encoder, bool enabled)
+ 	if (!crtc)
+ 		return -EINVAL;
+ 
+-	vact_end = crtc->mode.vtotal - crtc->mode.vsync_start + crtc->mode.vdisplay;
++	if (enabled) {
++		vact_end = crtc->mode.vtotal - crtc->mode.vsync_start +
++			crtc->mode.vdisplay;
++		ret = rockchip_drm_wait_line_flag(dp->encoder.crtc, vact_end,
++						PSR_WAIT_LINE_FLAG_TIMEOUT_MS);
++		if (ret) {
++			dev_err(dp->dev, "line flag interrupt did not arrive\n");
++			return -ETIMEDOUT;
++		}
+ 
+-	ret = rockchip_drm_wait_line_flag(dp->encoder.crtc, vact_end,
+-					  PSR_WAIT_LINE_FLAG_TIMEOUT_MS);
+-	if (ret) {
+-		dev_err(dp->dev, "line flag interrupt did not arrive\n");
+-		return -ETIMEDOUT;
++		ret = analogix_dp_enable_psr(dp->dev);
++		if (ret) {
++			dev_err(dp->dev, "failed to enable psr %d\n", ret);
++			return ret;
++		}
++		rockchip_drm_set_win_enabled(crtc, false);
++	} else {
++		rockchip_drm_set_win_enabled(crtc, true);
++		ret = analogix_dp_disable_psr(dp->dev);
++		if (ret) {
++			dev_err(dp->dev, "failed to disable psr %d\n", ret);
++			return ret;
++		}
+ 	}
+-
+-	if (enabled)
+-		return analogix_dp_enable_psr(dp->dev);
+-	else
+-		return analogix_dp_disable_psr(dp->dev);
++	return 0;
  }
  
- static void
-+rockchip_drm_psr_flush_state(struct drm_atomic_state *state)
-+{
-+	struct drm_crtc_state *crtc_state;
-+	struct drm_crtc *crtc;
-+	int i;
-+
-+	for_each_crtc_in_state(state, crtc, crtc_state, i)
-+		rockchip_drm_psr_flush(crtc);
-+}
-+
-+static void
- rockchip_atomic_commit_tail(struct drm_atomic_state *state)
- {
- 	struct drm_device *dev = state->dev;
+ static int rockchip_dp_pre_init(struct rockchip_dp_device *dp)
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.h b/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
+index a966d1d37378..be4ad9b670cf 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
+@@ -65,5 +65,6 @@ void rockchip_drm_dma_detach_device(struct drm_device *drm_dev,
+ 				    struct device *dev);
+ int rockchip_drm_wait_line_flag(struct drm_crtc *crtc, unsigned int line_num,
+ 				unsigned int mstimeout);
++void rockchip_drm_set_win_enabled(struct drm_crtc *ctrc, bool enabled);
  
-+	rockchip_drm_psr_flush_state(state);
-+
- 	drm_atomic_helper_commit_modeset_disables(dev, state);
- 
- 	drm_atomic_helper_commit_modeset_enables(dev, state);
+ #endif /* _ROCKCHIP_DRM_DRV_H_ */
 diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-index ea3fff4170d9..879efc3a6c67 100644
+index 879efc3a6c67..e90a32ee5a36 100644
 --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
 +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-@@ -1067,18 +1067,11 @@ static void vop_crtc_atomic_flush(struct drm_crtc *crtc,
- 	}
+@@ -89,6 +89,9 @@
+ #define VOP_WIN_GET_YRGBADDR(vop, win) \
+ 		vop_readl(vop, win->base + win->phy->yrgb_mst.offset)
+ 
++#define VOP_WIN_TO_INDEX(vop_win) \
++	((vop_win) - (vop_win)->vop->win)
++
+ #define to_vop(x) container_of(x, struct vop, crtc)
+ #define to_vop_win(x) container_of(x, struct vop_win, base)
+ 
+@@ -108,6 +111,8 @@ struct vop {
+ 	struct drm_device *drm_dev;
+ 	bool is_enabled;
+ 
++	unsigned int win_enabled;
++
+ 	struct completion dsp_hold_completion;
+ 
+ 	/* protected by dev->event_lock */
+@@ -562,6 +567,27 @@ static int vop_enable(struct drm_crtc *crtc)
+ 	return ret;
  }
  
--static void vop_crtc_atomic_begin(struct drm_crtc *crtc,
--				  struct drm_crtc_state *old_crtc_state)
--{
--	rockchip_drm_psr_flush(crtc);
--}
--
- static const struct drm_crtc_helper_funcs vop_crtc_helper_funcs = {
- 	.enable = vop_crtc_enable,
- 	.disable = vop_crtc_disable,
- 	.mode_fixup = vop_crtc_mode_fixup,
- 	.atomic_flush = vop_crtc_atomic_flush,
--	.atomic_begin = vop_crtc_atomic_begin,
- };
++void rockchip_drm_set_win_enabled(struct drm_crtc *crtc, bool enabled)
++{
++	struct vop *vop = to_vop(crtc);
++	int i;
++
++	spin_lock(&vop->reg_lock);
++
++	for (i = 0; i < vop->data->win_size; i++) {
++		struct vop_win *vop_win = &vop->win[i];
++		const struct vop_win_data *win = vop_win->data;
++
++		VOP_WIN_SET(vop, win, enable,
++			    enabled && (vop->win_enabled & BIT(i)));
++	}
++
++	vop_cfg_done(vop);
++
++	spin_unlock(&vop->reg_lock);
++}
++EXPORT_SYMBOL(rockchip_drm_set_win_enabled);
++
+ static void vop_crtc_disable(struct drm_crtc *crtc)
+ {
+ 	struct vop *vop = to_vop(crtc);
+@@ -581,6 +607,7 @@ static void vop_crtc_disable(struct drm_crtc *crtc)
  
- static void vop_crtc_destroy(struct drm_crtc *crtc)
+ 		spin_lock(&vop->reg_lock);
+ 		VOP_WIN_SET(vop, win, enable, 0);
++		vop->win_enabled &= ~BIT(i);
+ 		spin_unlock(&vop->reg_lock);
+ 	}
+ 
+@@ -700,6 +727,7 @@ static void vop_plane_atomic_disable(struct drm_plane *plane,
+ 	spin_lock(&vop->reg_lock);
+ 
+ 	VOP_WIN_SET(vop, win, enable, 0);
++	vop->win_enabled &= ~BIT(VOP_WIN_TO_INDEX(vop_win));
+ 
+ 	spin_unlock(&vop->reg_lock);
+ }
+@@ -807,6 +835,8 @@ static void vop_plane_atomic_update(struct drm_plane *plane,
+ 	}
+ 
+ 	VOP_WIN_SET(vop, win, enable, 1);
++	vop->win_enabled |= BIT(VOP_WIN_TO_INDEX(vop_win));
++
+ 	spin_unlock(&vop->reg_lock);
+ }
+ 
+@@ -1443,6 +1473,7 @@ static int vop_initial(struct vop *vop)
+ 		const struct vop_win_data *win = &vop_data->win[i];
+ 
+ 		VOP_WIN_SET(vop, win, enable, 0);
++		vop->win_enabled &= ~BIT(i);
+ 	}
+ 
+ 	vop_cfg_done(vop);
 -- 
 2.12.0.246.ga2ecc84866-goog
