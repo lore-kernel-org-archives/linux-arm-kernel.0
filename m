@@ -1,94 +1,76 @@
-From: andreyknvl@google.com (Andrey Konovalov)
-Date: Fri, 10 Mar 2017 14:38:16 +0100
-Subject: kvm/arm64: use-after-free in kvm_vm_ioctl/vmacache_update
-Message-ID: <CAAeHK+wha3wr=HraKtGMqeEnZUU6-jboowG5PWRMHtqwTQC7FQ@mail.gmail.com>
+From: robdclark@gmail.com (Rob Clark)
+Date: Fri, 10 Mar 2017 08:56:32 -0500
+Subject: [RFC PATCH 00/12] Ion cleanup in preparation for moving out of
+ staging
+In-Reply-To: <20170310124043.45hdu64wd4acf4it@phenom.ffwll.local>
+References: <1488491084-17252-1-git-send-email-labbott@redhat.com>
+ <20170303132949.GC31582@dhcp22.suse.cz>
+ <cf383b9b-3cbc-0092-a071-f120874c053c@redhat.com>
+ <20170306074258.GA27953@dhcp22.suse.cz>
+ <20170306104041.zghsicrnadoap7lp@phenom.ffwll.local>
+ <20170306105805.jsq44kfxhsvazkm6@sirena.org.uk>
+ <20170306160437.sf7bksorlnw7u372@phenom.ffwll.local>
+ <CA+M3ks77Am3Fx-ZNmgeM5tCqdM7SzV7rby4Es-p2F2aOhUco9g@mail.gmail.com>
+ <26bc57ae-d88f-4ea0-d666-2c1a02bf866f@redhat.com>
+ <20170310103112.GA15945@e106950-lin.cambridge.arm.com>
+ <20170310124043.45hdu64wd4acf4it@phenom.ffwll.local>
+Message-ID: <CAF6AEGtTicaJnApMSrmdQnriQd_rwQBW4H8rH+Xe9evkwZy8eg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Mar 10, 2017 at 7:40 AM, Daniel Vetter <daniel@ffwll.ch> wrote:
+> On Fri, Mar 10, 2017 at 10:31:13AM +0000, Brian Starkey wrote:
+>> Hi,
+>>
+>> On Thu, Mar 09, 2017 at 09:38:49AM -0800, Laura Abbott wrote:
+>> > On 03/09/2017 02:00 AM, Benjamin Gaignard wrote:
+>>
+>> [snip]
+>>
+>> > >
+>> > > For me those patches are going in the right direction.
+>> > >
+>> > > I still have few questions:
+>> > > - since alignment management has been remove from ion-core, should it
+>> > > be also removed from ioctl structure ?
+>> >
+>> > Yes, I think I'm going to go with the suggestion to fixup the ABI
+>> > so we don't need the compat layer and as part of that I'm also
+>> > dropping the align argument.
+>> >
+>>
+>> Is the only motivation for removing the alignment parameter that
+>> no-one got around to using it for something useful yet?
+>> The original comment was true - different devices do have different
+>> alignment requirements.
+>>
+>> Better alignment can help SMMUs use larger blocks when mapping,
+>> reducing TLB pressure and the chance of a page table walk causing
+>> display underruns.
+>
+> Extending ioctl uapi is easy, trying to get rid of bad uapi is much
+> harder. Given that right now we don't have an ion allocator that does
+> alignment I think removing it makes sense. And if we go with lots of
+> heaps, we might as well have an ion heap per alignment that your hw needs,
+> so there's different ways to implement this in the future.
 
-I've got the following error report while fuzzing the kernel with syzkaller.
+slight correction:  if you plan ahead (and do things like zero init if
+userspace passes in a smaller ioctl struct like drm_ioctl does),
+extending ioctl uapi is easy.. might be something worth fixing from
+the get-go..
 
-On linux-next commit 56b8bad5e066c23e8fa273ef5fba50bd3da2ace8 (Mar 8).
+BR,
+-R
 
-Unfortunately I can't reproduce it.
-
-==================================================================
-BUG: KASAN: use-after-free in vmacache_update+0x114/0x118 mm/vmacache.c:63
-Read of size 8 at addr ffff80003b9a2040 by task syz-executor/26615
-
-CPU: 1 PID: 26615 Comm: syz-executor Not tainted
-4.11.0-rc1-next-20170308-xc2-dirty #3
-Hardware name: Hardkernel ODROID-C2 (DT)
-Call trace:
-[<ffff20000808fbb0>] dump_backtrace+0x0/0x440 arch/arm64/kernel/traps.c:505
-[<ffff200008090010>] show_stack+0x20/0x30 arch/arm64/kernel/traps.c:228
-[<ffff2000088e9578>] __dump_stack lib/dump_stack.c:16 [inline]
-[<ffff2000088e9578>] dump_stack+0x110/0x168 lib/dump_stack.c:52
-[<ffff200008414018>] print_address_description+0x60/0x248 mm/kasan/report.c:250
-[<ffff2000084142e8>] kasan_report_error+0xe8/0x250 mm/kasan/report.c:349
-[<ffff200008414564>] kasan_report mm/kasan/report.c:372 [inline]
-[<ffff200008414564>] __asan_report_load8_noabort+0x3c/0x48 mm/kasan/report.c:393
-[<ffff200008383f64>] vmacache_update+0x114/0x118 mm/vmacache.c:63
-[<ffff2000083a9000>] find_vma+0xf8/0x150 mm/mmap.c:2124
-[<ffff2000080dc19c>] kvm_arch_prepare_memory_region+0x2ac/0x488
-arch/arm64/kvm/../../../arch/arm/kvm/mmu.c:1817
-[<ffff2000080c2920>] __kvm_set_memory_region+0x3d8/0x12b8
-arch/arm64/kvm/../../../virt/kvm/kvm_main.c:1026
-[<ffff2000080c3838>] kvm_set_memory_region+0x38/0x58
-arch/arm64/kvm/../../../virt/kvm/kvm_main.c:1075
-[<ffff2000080c747c>] kvm_vm_ioctl_set_memory_region
-arch/arm64/kvm/../../../virt/kvm/kvm_main.c:1087 [inline]
-[<ffff2000080c747c>] kvm_vm_ioctl+0xb94/0x1308
-arch/arm64/kvm/../../../virt/kvm/kvm_main.c:2960
-[<ffff20000848f928>] vfs_ioctl fs/ioctl.c:45 [inline]
-[<ffff20000848f928>] do_vfs_ioctl+0x128/0xfc0 fs/ioctl.c:685
-[<ffff200008490868>] SYSC_ioctl fs/ioctl.c:700 [inline]
-[<ffff200008490868>] SyS_ioctl+0xa8/0xb8 fs/ioctl.c:691
-[<ffff200008083f70>] el0_svc_naked+0x24/0x28
-
-Allocated by task 26657:
- save_stack_trace_tsk+0x0/0x330 arch/arm64/kernel/stacktrace.c:133
- save_stack_trace+0x20/0x30 arch/arm64/kernel/stacktrace.c:216
- save_stack mm/kasan/kasan.c:515 [inline]
- set_track mm/kasan/kasan.c:527 [inline]
- kasan_kmalloc+0xd4/0x180 mm/kasan/kasan.c:619
- kasan_slab_alloc+0x14/0x20 mm/kasan/kasan.c:557
- slab_post_alloc_hook mm/slab.h:456 [inline]
- slab_alloc_node mm/slub.c:2718 [inline]
- slab_alloc mm/slub.c:2726 [inline]
- kmem_cache_alloc+0x144/0x230 mm/slub.c:2731
- __split_vma+0x118/0x608 mm/mmap.c:2515
- do_munmap+0x194/0x9b0 mm/mmap.c:2636
-Freed by task 26657:
- save_stack_trace_tsk+0x0/0x330 arch/arm64/kernel/stacktrace.c:133
- save_stack_trace+0x20/0x30 arch/arm64/kernel/stacktrace.c:216
- save_stack mm/kasan/kasan.c:515 [inline]
- set_track mm/kasan/kasan.c:527 [inline]
- kasan_slab_free+0x84/0x198 mm/kasan/kasan.c:592
- slab_free_hook mm/slub.c:1357 [inline]
- slab_free_freelist_hook mm/slub.c:1379 [inline]
- slab_free mm/slub.c:2961 [inline]
- kmem_cache_free+0x80/0x258 mm/slub.c:2983
- __vma_adjust+0x6b0/0xf mm/mmap.c:890]  el0_svc_naked+0x24/0x28
-
-The buggy address belongs to the object at ffff80003b9a2000
- which belongs to the cache vm_area_struct(647:session-6.scope) of size 184
-The buggy address is located 64 bytes inside of
- 184-byte region [ffff80003b9a2000, ffff80003b9a20b8)
-The buggy address belongs to the page:
-page:ffff7e0000ee6880 count:1 mapcount:0 mapping:          (null) index:0x0
-flags: 0xfffc00000000100(slab)
-raw: 0fffc00000000100 0000000000000000 0000000000000000 0000000180100010
-raw: 0000000000000000 0000000c00000001 ffff80005a5cc600 ffff80005ac99980
-page dumped because: kasan: bad access detected
-page->mem_cgroup:ffff80005ac99980
-
-Memory state around the buggy address:
- ffff80003b9a1f00: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff
- ffff80003b9a1f80: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff
->ffff80003b9a2000: fb fb fb fb fb fb fb fb fb fb fb fb fb fb fb fb
-                                           ^
- ffff80003b9a2080: fb fb fb fb fb fb fb fc fc fc fc fc fc fc fc fb
- ffff80003b9a2100: fb fb fb fb fb fb fb fb fb fb fb fb fb fb fb fb
-==================================================================
+> At least from the unix device memory allocator pov it's probably simpler
+> to encode stuff like this into the heap name, instead of having to pass
+> heap + list of additional properties/constraints.
+> -Daniel
+> --
+> Daniel Vetter
+> Software Engineer, Intel Corporation
+> http://blog.ffwll.ch
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
