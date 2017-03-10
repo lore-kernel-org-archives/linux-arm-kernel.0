@@ -1,92 +1,69 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri, 10 Mar 2017 12:43:43 -0800
-Subject: [PATCH] ARM: dts: imx: add Gateworks Ventana GW5904 support
-In-Reply-To: <1489178411-6559-1-git-send-email-tharvey@gateworks.com>
-References: <1489178411-6559-1-git-send-email-tharvey@gateworks.com>
-Message-ID: <04584d61-f1e2-3722-1f13-ff133edc0c22@gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 10 Mar 2017 20:49:34 +0000
+Subject: [PATCH v2 3/5] iommu/arm-smmu-v3: Make arm_smmu_install_ste_for_dev
+ return void
+In-Reply-To: <1489178976-15353-1-git-send-email-will.deacon@arm.com>
+References: <1489178976-15353-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1489178976-15353-4-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/10/2017 12:40 PM, Tim Harvey wrote:
-> The Gateworks Ventana GW5904 is a single-board computer based on the NXP
-> IMX6 SoC with the following features:
->  * IMX6 DualLite Soc (supports IMX6S,IMX6DL,IMX6Q)
->  * 2048MB DDR3 DRAM (4x64bit) (options up to 4GiB)
->  * 8GB eMMC
->  * Gateworks System Controller:
->   - hardware watchdog
->   - hardware monitor
->   - pushbutton controller
->   - EEPROM storage
->   - power control
->  * JTAG programmable
->  * 1x miniPCIe socket (with PCIe, USB)
->  * 1x miniPCIe socket (USB)
->  * 1x M.2 socket (USB, 2x SIM)
->  * Inertial Module (LSM9DS1 9DOF: 3x acc, 3x rate, 3x mag)
->  * GPS (optional uBlox EVA-M8M)
->  * Application headers:
->   - 2x RS232 UART (TX/RX/CTS/RTS)
->   - 8x TTL GPIO (3x configurable as PWM)
->   - 1x LVDS display 3D+C with i2c touch and PWM backlight
->  * MV88E6176 GbE Switch (uplink to IMX FEC)
->  * Front panel connectors:
->   - 1x user programmable LED
->   - 1x configurable user pushbutton
->   - 1x USB OTG
->   - 4x GbE LAN
-> 
-> Signed-off-by: Tim Harvey <tharvey@gateworks.com>
-> ---
+arm_smmu_install_ste_for_dev cannot fail and always returns 0, however
+the fact that it returns int means that callers end up implementing
+redundant error handling code which complicates STE tracking and is
+never executed.
 
-> +	dsa {
-> +		compatible = "marvell,dsa";
-> +		#address-cells = <2>;
-> +		#size-cells = <0>;
-> +
-> +		dsa,ethernet = <&fec>;
-> +		dsa,mii-bus = <&mdio>;
-> +
+This patch changes the return type of arm_smmu_install_ste_for_dev
+to avoid, to make it explicit that it cannot fail.
 
-Please consider using the new binding for DSA switches, see:
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ drivers/iommu/arm-smmu-v3.c | 12 +++---------
+ 1 file changed, 3 insertions(+), 9 deletions(-)
 
-https://patchwork.kernel.org/patch/9493037/
-
-> +		switch at 0 {
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +			reg = <0 0>; /* MDIO address 0, switch 0 in tree */
-> +
-> +			port at 0 {
-> +				reg = <0>;
-> +				label = "lan4";
-> +			};
-> +
-> +			port at 1 {
-> +				reg = <1>;
-> +				label = "lan3";
-> +			};
-> +
-> +			port at 2 {
-> +				reg = <2>;
-> +				label = "lan2";
-> +			};
-> +
-> +			port at 3 {
-> +				reg = <3>;
-> +				label = "lan1";
-> +			};
-> +
-> +			port at 5 {
-> +				reg = <5>;
-> +				label = "cpu";
-> +				fixed-link {
-> +					speed = <1000>;
-> +					full-duplex;
-> +				};
-> +			};
-> +		};
-> +	};
-> +};
+diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+index 3d38e682071a..e18dbcd26f66 100644
+--- a/drivers/iommu/arm-smmu-v3.c
++++ b/drivers/iommu/arm-smmu-v3.c
+@@ -1579,7 +1579,7 @@ static __le64 *arm_smmu_get_step_for_sid(struct arm_smmu_device *smmu, u32 sid)
+ 	return step;
+ }
+ 
+-static int arm_smmu_install_ste_for_dev(struct iommu_fwspec *fwspec)
++static void arm_smmu_install_ste_for_dev(struct iommu_fwspec *fwspec)
+ {
+ 	int i;
+ 	struct arm_smmu_master_data *master = fwspec->iommu_priv;
+@@ -1591,8 +1591,6 @@ static int arm_smmu_install_ste_for_dev(struct iommu_fwspec *fwspec)
+ 
+ 		arm_smmu_write_strtab_ent(smmu, sid, step, &master->ste);
+ 	}
+-
+-	return 0;
+ }
+ 
+ static void arm_smmu_detach_dev(struct device *dev)
+@@ -1600,8 +1598,7 @@ static void arm_smmu_detach_dev(struct device *dev)
+ 	struct arm_smmu_master_data *master = dev->iommu_fwspec->iommu_priv;
+ 
+ 	master->ste.bypass = true;
+-	if (arm_smmu_install_ste_for_dev(dev->iommu_fwspec) < 0)
+-		dev_warn(dev, "failed to install bypass STE\n");
++	arm_smmu_install_ste_for_dev(dev->iommu_fwspec);
+ }
+ 
+ static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
+@@ -1653,10 +1650,7 @@ static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
+ 		ste->s2_cfg = &smmu_domain->s2_cfg;
+ 	}
+ 
+-	ret = arm_smmu_install_ste_for_dev(dev->iommu_fwspec);
+-	if (ret < 0)
+-		ste->valid = false;
+-
++	arm_smmu_install_ste_for_dev(dev->iommu_fwspec);
+ out_unlock:
+ 	mutex_unlock(&smmu_domain->init_mutex);
+ 	return ret;
 -- 
-Florian
+2.1.4
