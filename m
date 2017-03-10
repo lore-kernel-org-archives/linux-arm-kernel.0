@@ -1,72 +1,86 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 10 Mar 2017 11:04:51 +0000
-Subject: [PATCH 14/14] arm64: pmuv3: use arm_pmu ACPI framework
+Date: Fri, 10 Mar 2017 11:04:48 +0000
+Subject: [PATCH 11/14] arm64: add function to get a cpu's MADT GICC table
 In-Reply-To: <1489143891-11596-1-git-send-email-mark.rutland@arm.com>
 References: <1489143891-11596-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1489143891-11596-15-git-send-email-mark.rutland@arm.com>
+Message-ID: <1489143891-11596-12-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have a framework to handle the ACPI bits, make the PMUv3
-code use this. The framework is a little different to what was
-originally envisaged, and we can drop some unused support code in the
-process of moving over to it.
+Currently the ACPI parking protocol code needs to parse each CPU's MADT
+GICC table to extract the mailbox address and so on. Each time we parse
+a GICC table, we call back to the parking protocol code to parse it.
+
+This has been fine so far, but we're about to have more code that needs
+to extract data from the GICC tables, and adding a callback for each
+user is going to get unwieldy.
+
+Instead, this patch ensures that we stash a copy of each CPU's GICC
+table at boot time, such that anything needing to parse it can later
+request it. This will allow for other parsers of GICC, and for
+simplification to the ACPI parking protocol code. Note that we must
+store a copy, rather than a pointer, since the core ACPI code
+temporarily maps/unmaps tables while iterating over them.
+
+Since we parse the MADT before we know how many CPUs we have (and hence
+before we setup the percpu areas), we must use an NR_CPUS sized array.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Jeremy Linton <jeremy.linton@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/kernel/perf_event.c | 26 +++++++++-----------------
- 1 file changed, 9 insertions(+), 17 deletions(-)
+ arch/arm64/include/asm/acpi.h |  2 ++
+ arch/arm64/kernel/smp.c       | 10 ++++++++++
+ 2 files changed, 12 insertions(+)
 
-One thing I'm not sure about here is how to verify that PMUv3 is supported. I
-can put a test in armv8_pmuv3_init(), but it feels like that should be verified
-earlier.
-
-Mark.
-
-diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
-index 57ae9d9..daf95919 100644
---- a/arch/arm64/kernel/perf_event.c
-+++ b/arch/arm64/kernel/perf_event.c
-@@ -1081,24 +1081,9 @@ static int armv8_vulcan_pmu_init(struct arm_pmu *cpu_pmu)
- 	{},
- };
- 
--/*
-- * Non DT systems have their micro/arch events probed at run-time.
-- * A fairly complete list of generic events are provided and ones that
-- * aren't supported by the current PMU are disabled.
-- */
--static const struct pmu_probe_info armv8_pmu_probe_table[] = {
--	PMU_PROBE(0, 0, armv8_pmuv3_init), /* enable all defined counters */
--	{ /* sentinel value */ }
--};
--
- static int armv8_pmu_device_probe(struct platform_device *pdev)
- {
--	if (acpi_disabled)
--		return arm_pmu_device_probe(pdev, armv8_pmu_of_device_ids,
--					    NULL);
--
--	return arm_pmu_device_probe(pdev, armv8_pmu_of_device_ids,
--				    armv8_pmu_probe_table);
-+	return arm_pmu_device_probe(pdev, armv8_pmu_of_device_ids, NULL);
+diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
+index c1976c0..0e99978 100644
+--- a/arch/arm64/include/asm/acpi.h
++++ b/arch/arm64/include/asm/acpi.h
+@@ -85,6 +85,8 @@ static inline bool acpi_has_cpu_in_madt(void)
+ 	return true;
  }
  
- static struct platform_driver armv8_pmu_driver = {
-@@ -1109,4 +1094,11 @@ static int armv8_pmu_device_probe(struct platform_device *pdev)
- 	.probe		= armv8_pmu_device_probe,
- };
++struct acpi_madt_generic_interrupt *acpi_cpu_get_madt_gicc(int cpu);
++
+ static inline void arch_fix_phys_package_id(int num, u32 slot) { }
+ void __init acpi_init_cpus(void);
  
--builtin_platform_driver(armv8_pmu_driver);
-+int __init armv8_pmu_driver_init(void)
+diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+index ef1caae..390c277 100644
+--- a/arch/arm64/kernel/smp.c
++++ b/arch/arm64/kernel/smp.c
+@@ -518,6 +518,13 @@ static int __init smp_cpu_setup(int cpu)
+ static unsigned int cpu_count = 1;
+ 
+ #ifdef CONFIG_ACPI
++static struct acpi_madt_generic_interrupt cpu_madt_gicc[NR_CPUS];
++
++struct acpi_madt_generic_interrupt *acpi_cpu_get_madt_gicc(int cpu)
 +{
-+	if (acpi_disabled)
-+		return platform_driver_register(&armv8_pmu_driver);
-+	else
-+		return arm_pmu_acpi_probe(armv8_pmuv3_init);
++	return &cpu_madt_gicc[cpu];
 +}
-+device_initcall(armv8_pmu_driver_init)
++
+ /*
+  * acpi_map_gic_cpu_interface - parse processor MADT entry
+  *
+@@ -552,6 +559,7 @@ static int __init smp_cpu_setup(int cpu)
+ 			return;
+ 		}
+ 		bootcpu_valid = true;
++		cpu_madt_gicc[0] = *processor;
+ 		early_map_cpu_to_node(0, acpi_numa_get_nid(0, hwid));
+ 		return;
+ 	}
+@@ -562,6 +570,8 @@ static int __init smp_cpu_setup(int cpu)
+ 	/* map the logical cpu id to cpu MPIDR */
+ 	cpu_logical_map(cpu_count) = hwid;
+ 
++	cpu_madt_gicc[cpu_count] = *processor;
++
+ 	/*
+ 	 * Set-up the ACPI parking protocol cpu entries
+ 	 * while initializing the cpu_logical_map to
 -- 
 1.9.1
