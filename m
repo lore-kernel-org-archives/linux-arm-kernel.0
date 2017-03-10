@@ -1,40 +1,57 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Fri, 10 Mar 2017 09:36:09 -0500
-Subject: [PATCH V3] PCI/ASPM: reconfigure ASPM following hotplug for
- POLICY_DEFAULT
-In-Reply-To: <20170309222751.GD19517@bhelgaas-glaptop.roam.corp.google.com>
-References: <1489005551-23598-1-git-send-email-okaya@codeaurora.org>
- <20170309222751.GD19517@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <ec7ee607-60f3-7e1a-b1cd-8e4534ab98eb@codeaurora.org>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Fri, 10 Mar 2017 15:50:30 +0100
+Subject: [PATCH v4 1/3] usb: orion-echi: Add support for the Armada 3700
+In-Reply-To: <87o9x9jw1g.fsf@free-electrons.com>
+References: <Pine.LNX.4.44L0.1703091318010.1560-100000@iolanthe.rowland.org>
+ <87o9x9jw1g.fsf@free-electrons.com>
+Message-ID: <20170310145030.GA3731@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
+On Fri, Mar 10, 2017 at 10:55:23AM +0100, Gregory CLEMENT wrote:
+> Hi Alan,
+>  
+>  On jeu., mars 09 2017, Alan Stern <stern@rowland.harvard.edu> wrote:
+> 
+> > On Thu, 9 Mar 2017, Gregory CLEMENT wrote:
+> >
+> >> From: Hua Jing <jinghua@marvell.com>
+> >> 
+> >> - Add a new compatible string for the Armada 3700 SoCs
+> >> 
+> >> - add sbuscfg support for orion usb controller driver. For the SoCs
+> >>   without hlock, need to program BAWR/BARD/AHBBRST fields in the sbuscfg
+> >>   register to guarantee the AHB master's burst would not overrun or
+> >>   underrun the FIFO.
+> >> 
+> >> - the sbuscfg register has to be set after the usb controller reset,
+> >>   otherwise the value would be overridden to 0. In order to do this, the
+> >>   reset callback is registered.
+> >> 
+> >> [gregory.clement at free-electrons.com: - reword commit and comments
+> >> 				     - fix error path in ehci_orion_drv_reset()
+> >> 				     - fix checkpatch warning]
+> >> Signed-off-by: Hua Jing <jinghua@marvell.com>
+> >> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> >> Reviewed-by: Andrew Lunn <andrew@lunn.ch>
+> >
+> > Acked-by: Alan Stern <stern@rowland.harvard.edu>
+> 
+> Thanks!
+> 
+> And what about the second patch "usb: host: Allow to build ehci orion
+> with mvebu SoCs " ?
+> 
+> I don't remember what is the workflow for the usb subsystem. Will you do
+> a pull request to GKH? Or maybe he collects himself the patch once you
+> give your acked-by.
+> 
+> I will take care of the third patch and apply on the mvebu/dt64 branch
+> now that you agree the extension for the driver.
 
-On 3/9/2017 5:27 PM, Bjorn Helgaas wrote:
-> How hard do you think it would be to rework this path slightly so we:
-> 
->   - call pcie_aspm_init_link_state() for every device, maybe from
->     pci_init_capabilities()
-> 
->   - for bridges, have pcie_aspm_init_link_state() allocate a
->     link_state, regardless of whether it currently has any children,
->     and save the ASPM settings done by firmware
-> 
->   - for endpoints, have pcie_aspm_init_link_state() do the actual ASPM
->     setup of the link as it currently does
-> 
->   - for endpoints, change pcie_aspm_exit_link_state() so it cleans up
->     the device's own state and disables ASPM if necessary, but doesn't
->     remove the parent's link_state
-> 
->   - for bridges, change pcie_aspm_exit_link_state() so it frees the
->     bridge's own link_state
+I'll take all of these once they look "good enough".  Give me a week or
+so to get to all of the pending patches in my queue...
 
-Thanks for the feedback, Let me take a stab at this. 
-Sinan
+thanks,
 
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+greg k-h
