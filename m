@@ -1,76 +1,89 @@
-From: robdclark@gmail.com (Rob Clark)
-Date: Fri, 10 Mar 2017 08:56:32 -0500
-Subject: [RFC PATCH 00/12] Ion cleanup in preparation for moving out of
- staging
-In-Reply-To: <20170310124043.45hdu64wd4acf4it@phenom.ffwll.local>
-References: <1488491084-17252-1-git-send-email-labbott@redhat.com>
- <20170303132949.GC31582@dhcp22.suse.cz>
- <cf383b9b-3cbc-0092-a071-f120874c053c@redhat.com>
- <20170306074258.GA27953@dhcp22.suse.cz>
- <20170306104041.zghsicrnadoap7lp@phenom.ffwll.local>
- <20170306105805.jsq44kfxhsvazkm6@sirena.org.uk>
- <20170306160437.sf7bksorlnw7u372@phenom.ffwll.local>
- <CA+M3ks77Am3Fx-ZNmgeM5tCqdM7SzV7rby4Es-p2F2aOhUco9g@mail.gmail.com>
- <26bc57ae-d88f-4ea0-d666-2c1a02bf866f@redhat.com>
- <20170310103112.GA15945@e106950-lin.cambridge.arm.com>
- <20170310124043.45hdu64wd4acf4it@phenom.ffwll.local>
-Message-ID: <CAF6AEGtTicaJnApMSrmdQnriQd_rwQBW4H8rH+Xe9evkwZy8eg@mail.gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 10 Mar 2017 14:01:24 +0000
+Subject: [PATCH v4 14/36] [media] v4l2-mc: add a function to inherit
+ controls from a pipeline
+In-Reply-To: <c679f755-52a6-3c6f-3d65-277db46676cc@xs4all.nl>
+References: <1487211578-11360-1-git-send-email-steve_longerbeam@mentor.com>
+ <1487211578-11360-15-git-send-email-steve_longerbeam@mentor.com>
+ <20170302160257.GK3220@valkosipuli.retiisi.org.uk>
+ <20170303230645.GR21222@n2100.armlinux.org.uk>
+ <20170304131329.GV3220@valkosipuli.retiisi.org.uk>
+ <a7b8e095-a95c-24bd-b1e9-e983f18061c4@xs4all.nl>
+ <20170310130733.GU21222@n2100.armlinux.org.uk>
+ <c679f755-52a6-3c6f-3d65-277db46676cc@xs4all.nl>
+Message-ID: <20170310140124.GV21222@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 10, 2017 at 7:40 AM, Daniel Vetter <daniel@ffwll.ch> wrote:
-> On Fri, Mar 10, 2017 at 10:31:13AM +0000, Brian Starkey wrote:
->> Hi,
->>
->> On Thu, Mar 09, 2017 at 09:38:49AM -0800, Laura Abbott wrote:
->> > On 03/09/2017 02:00 AM, Benjamin Gaignard wrote:
->>
->> [snip]
->>
->> > >
->> > > For me those patches are going in the right direction.
->> > >
->> > > I still have few questions:
->> > > - since alignment management has been remove from ion-core, should it
->> > > be also removed from ioctl structure ?
->> >
->> > Yes, I think I'm going to go with the suggestion to fixup the ABI
->> > so we don't need the compat layer and as part of that I'm also
->> > dropping the align argument.
->> >
->>
->> Is the only motivation for removing the alignment parameter that
->> no-one got around to using it for something useful yet?
->> The original comment was true - different devices do have different
->> alignment requirements.
->>
->> Better alignment can help SMMUs use larger blocks when mapping,
->> reducing TLB pressure and the chance of a page table walk causing
->> display underruns.
->
-> Extending ioctl uapi is easy, trying to get rid of bad uapi is much
-> harder. Given that right now we don't have an ion allocator that does
-> alignment I think removing it makes sense. And if we go with lots of
-> heaps, we might as well have an ion heap per alignment that your hw needs,
-> so there's different ways to implement this in the future.
+On Fri, Mar 10, 2017 at 02:22:29PM +0100, Hans Verkuil wrote:
+> And nobody of the media core developers has the time to work on the docs,
+> utilities and libraries you need to make this all work cleanly and reliably.
 
-slight correction:  if you plan ahead (and do things like zero init if
-userspace passes in a smaller ioctl struct like drm_ioctl does),
-extending ioctl uapi is easy.. might be something worth fixing from
-the get-go..
+Well, talking about docs, and in connection to control inheritence,
+this is already documented in at least three separate places:
 
-BR,
--R
+Documentation/media/uapi/v4l/dev-subdev.rst:
 
-> At least from the unix device memory allocator pov it's probably simpler
-> to encode stuff like this into the heap name, instead of having to pass
-> heap + list of additional properties/constraints.
-> -Daniel
-> --
-> Daniel Vetter
-> Software Engineer, Intel Corporation
-> http://blog.ffwll.ch
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+  Controls
+  ========
+  ...
+  Depending on the driver, those controls might also be exposed through
+  one (or several) V4L2 device nodes.
+
+Documentation/media/kapi/v4l2-subdev.rst:
+
+  ``VIDIOC_QUERYCTRL``,
+  ``VIDIOC_QUERYMENU``,
+  ``VIDIOC_G_CTRL``,
+  ``VIDIOC_S_CTRL``,
+  ``VIDIOC_G_EXT_CTRLS``,
+  ``VIDIOC_S_EXT_CTRLS`` and
+  ``VIDIOC_TRY_EXT_CTRLS``:
+  
+          The controls ioctls are identical to the ones defined in V4L2. They
+          behave identically, with the only exception that they deal only with
+          controls implemented in the sub-device. Depending on the driver, those
+          controls can be also be accessed through one (or several) V4L2 device
+          nodes.
+
+Then there's Documentation/media/kapi/v4l2-controls.rst, which gives a
+step by step approach to the main video device inheriting controls from
+its subdevices, and it says:
+
+  Inheriting Controls
+  -------------------
+  
+  When a sub-device is registered with a V4L2 driver by calling
+  v4l2_device_register_subdev() and the ctrl_handler fields of both v4l2_subdev
+  and v4l2_device are set, then the controls of the subdev will become
+  automatically available in the V4L2 driver as well. If the subdev driver
+  contains controls that already exist in the V4L2 driver, then those will be
+  skipped (so a V4L2 driver can always override a subdev control).
+  
+  What happens here is that v4l2_device_register_subdev() calls
+  v4l2_ctrl_add_handler() adding the controls of the subdev to the controls
+  of v4l2_device.
+
+So, either the docs are wrong, or the advice being mentioned in emails
+about subdev control inheritence is misleading.  Whatever, the two are
+currently inconsistent.
+
+As I've already mentioned, from talking about this with Mauro, it seems
+Mauro is in agreement with permitting the control inheritence... I wish
+Mauro would comment for himself, as I can't quote our private discussion
+on the subject.
+
+Right now, my view is that v4l2 is currently being screwed up by people
+with different opinions - there is no unified concensus on how any of
+this stuff is supposed to work, everyone is pulling in different
+directions.  That needs solving _really_ quickly, so I suggest that
+v4l2 people urgently talk to each other and thrash out some of the
+issues that Steve's patch set has brought up, and settle on a way
+forward, rather than what is seemingly happening today - which is
+everyone working in isolation of everyone else with their own bias on
+how things should be done.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
