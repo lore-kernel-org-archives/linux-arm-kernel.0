@@ -1,130 +1,107 @@
-From: slash.tmp@free.fr (Mason)
-Date: Fri, 10 Mar 2017 16:05:50 +0100
-Subject: Neophyte questions about PCIe
-In-Reply-To: <063D6719AE5E284EB5DD2968C1650D6DCFE7C8BA@AcuExch.aculab.com>
-References: <ced6a4bf-c94a-c116-1e94-52a8d675d132@free.fr>
- <20170308151724.GA20780@bhelgaas-glaptop.roam.corp.google.com>
- <f964ee05-db7f-c381-c91c-82897175da6d@free.fr>
- <1092d971-5d81-2da7-4b34-0a88637c0ec5@arm.com>
- <063D6719AE5E284EB5DD2968C1650D6DCFE7C8BA@AcuExch.aculab.com>
-Message-ID: <c4712e19-863c-16b8-6920-5ad7dd178929@free.fr>
+From: mchehab@s-opensource.com (Mauro Carvalho Chehab)
+Date: Fri, 10 Mar 2017 12:09:02 -0300
+Subject: [PATCH v4 14/36] [media] v4l2-mc: add a function to inherit
+ controls from a pipeline
+In-Reply-To: <a7b8e095-a95c-24bd-b1e9-e983f18061c4@xs4all.nl>
+References: <1487211578-11360-1-git-send-email-steve_longerbeam@mentor.com>
+ <1487211578-11360-15-git-send-email-steve_longerbeam@mentor.com>
+ <20170302160257.GK3220@valkosipuli.retiisi.org.uk>
+ <20170303230645.GR21222@n2100.armlinux.org.uk>
+ <20170304131329.GV3220@valkosipuli.retiisi.org.uk>
+ <a7b8e095-a95c-24bd-b1e9-e983f18061c4@xs4all.nl>
+Message-ID: <20170310120902.1daebc7b@vento.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/03/2017 15:06, David Laight wrote:
+Em Fri, 10 Mar 2017 13:54:28 +0100
+Hans Verkuil <hverkuil@xs4all.nl> escreveu:
 
-> Robin Murphy wrote:
->
->> On 09/03/17 23:43, Mason wrote:
->>
->>> I think I'm making progress, in that I now have a better
->>> idea of what I don't understand. So I'm able to ask
->>> (hopefully) less vague questions.
->>>
->>> Take the USB3 PCIe adapter I've been testing with. At some
->>> point during init, the XHCI driver request some memory
->>> (via kmalloc?) in order to exchange data with the host, right?
->>>
->>> On my SoC, the RAM used by Linux lives at physical range
->>> [0x8000_0000, 0x8800_0000[ => 128 MB
->>>
->>> How does the XHCI driver make the adapter aware of where
->>> it can scribble data? The XHCI driver has no notion that
->>> the device is behind a bus, does it?
->>>
->>> At some point, the physical addresses must be converted
->>> to PCI bus addresses, right? Is it computed subtracting
->>> the offset defined in the DT?
+> > Devices that have complex pipeline that do essentially require using the
+> > Media controller interface to configure them are out of that scope.
+> >   
 > 
-> The driver should call dma_alloc_coherent() which returns both the
-> kernel virtual address and the device (xhci controller) has
-> to use to access it.
-> The cpu physical address is irrelevant (although it might be
-> calculated in the middle somewhere).
+> Way too much of how the MC devices should be used is in the minds of developers.
+> There is a major lack for good detailed documentation, utilities, compliance
+> test (really needed!) and libv4l plugins.
 
-Thank you for that missing piece of the puzzle.
-I see some relevant action in drivers/usb/host/xhci-mem.c
+Unfortunately, we merged an incomplete MC support at the Kernel. We knew
+all the problems with MC-based drivers and V4L2 applications by the time
+it was developed, and we requested Nokia developers (with was sponsoring MC
+develoment, on that time) to work on a solution to allow standard V4L2
+applications to work with MC based boards.
 
-And I now see this log:
+Unfortunately, we took the decision to merge MC without that, because 
+Nokia was giving up on Linux development, and we didn't want to lose the
+2 years of discussions and work around it, as Nokia employers were leaving
+the company. Also, on that time, there was already some patches floating
+around adding backward support via libv4l. Unfortunately, those patches
+were never finished.
 
-[    2.499320] xhci_hcd 0000:01:00.0: // Device context base array address = 0x8e07e000 (DMA), d0855000 (virt)
-[    2.509156] xhci_hcd 0000:01:00.0: Allocated command ring at cfb04200
-[    2.515640] xhci_hcd 0000:01:00.0: First segment DMA is 0x8e07f000
-[    2.521863] xhci_hcd 0000:01:00.0: // Setting command ring address to 0x20
-[    2.528786] xhci_hcd 0000:01:00.0: // xHC command ring deq ptr low bits + flags = @00000000
-[    2.537188] xhci_hcd 0000:01:00.0: // xHC command ring deq ptr high bits = @00000000
-[    2.545002] xhci_hcd 0000:01:00.0: // Doorbell array is located at offset 0x800 from cap regs base addr
-[    2.554455] xhci_hcd 0000:01:00.0: // xHCI capability registers at d0852000:
-[    2.561550] xhci_hcd 0000:01:00.0: // @d0852000 = 0x1000020 (CAPLENGTH AND HCIVERSION)
+The net result is that MC was merged with some huge gaps, including
+the lack of a proper solution for a generic V4L2 program to work
+with V4L2 devices that use the subdev API.
 
-I believe 0x8e07e000 is a CPU address, not a PCI bus address.
+That was not that bad by then, as MC was used only on cell phones
+that run custom-made applications. 
 
+The reallity changed, as now, we have lots of low cost SoC based
+boards, used for all sort of purposes. So, we need a quick solution
+for it.
 
->>> Then suppose the USB3 card wants to write to an address
->>> in RAM. It sends a packet on the PCIe bus, targeting
->>> the PCI bus address of that RAM, right? Is this address
->>> supposed to be in BAR0 of the root complex? I guess not,
->>> since Bjorn said that it was unusual for a RC to have
->>> a BAR at all. So I'll hand-wave, and decree that, by some
->>> protocol magic, the packet arrives at the PCIe controller.
->>> And this controller knows to forward this write request
->>> over the memory bus. Does that look about right?
->>
->> Generally, yes - if an area of memory space *is* claimed by a BAR, then
->> another PCI device accessing that would be treated as peer-to-peer DMA,
->> which may or may not be allowed (or supported at all).
-> 
-> So PCIe addresses that refer to the host memory addresses are
-> just forwarded to the memory subsystem.
-> In practise this is almost everything.
+In other words, while that would be acceptable support special apps
+on really embedded systems, it is *not OK* for general purpose SoC
+harware[1].
 
-My RC drops packets not targeting its BAR0.
+[1] I'm calling "general purpose SoC harware" those ARM boards
+like Raspberry Pi that are shipped to the mass and used by a wide
+range of hobbyists and other people that just wants to run Linux on
+ARM. It is possible to buy such boards for a very cheap price,
+making them to be used not only on special projects, where a custom
+made application could be interesting, but also for a lot of
+users that just want to run Linux on a low cost ARM board, while
+keeping using standard V4L2 apps, like "camorama".
 
-> The only other PCIe writes the host will see are likely to be associated
-> with MIS and MSI-X interrupt support.
+That's perhaps one of the reasons why it took a long time for us to
+start receiving drivers upstream for such hardware: it is quite 
+intimidating and not logical to require developers to implement
+on their drivers 2 complex APIs (MC, subdev) for those
+hardware that most users won't care. From user's perspective,
+being able to support generic applications like "camorama" and
+"zbar" is all they want.
 
-Rev 1 of the PCIe controller is supposed to forward MSI doorbell
-writes over the global bus to the PCIe controller's MMIO register.
+In summary, I'm pretty sure we need to support standard V4L2 
+applications on boards like Raspberry Pi and those low-cost 
+SoC-based boards that are shipped to end users.
 
-> Some PCIe root complex support peer-to-peer writes but not reads.
-> Write are normally 'posted' (so are 'fire and forget') reads need the
-> completion TLP (containing the data) sent back - all hard and difficult.
-> 
->> For mem space
->> which isn't claimed by BARs, it's up to the RC to decide what to do. As
->> a concrete example (which might possibly be relevant) the PLDA XR3-AXI
->> IP which we have in the ARM Juno SoC has the ATR_PCIE_WINx registers in
->> its root port configuration block that control what ranges of mem space
->> are mapped to the external AXI master interface and how.
->>
->>> My problem is that, in the current implementation of the
->>> PCIe controller, the USB device that wants to write to
->>> memory is supposed to target BAR0 of the RC.
->>
->> That doesn't sound right at all. If the RC has a BAR, I'd expect it to
->> be for poking the guts of the RC device itself (since this prompted me
->> to go and compare, I see the Juno RC does indeed have it own enigmatic
->> 16KB BAR, which reads as ever-changing random junk; no idea what that's
->> about).
->>
->>> Since my mem space is limited to 256 MB, then BAR0 is
->>> limited to 256 MB (or even 128 MB, since I also need
->>> to mapthe device's BAR into the same mem space).
->>
->> Your window into mem space *from the CPU's point of view* is limited to
->> 256MB. The relationship between mem space and the system (AXI) memory
->> map from the point of view of PCI devices is a separate issue; if it's
->> configurable at all, it probably makes sense to have the firmware set an
->> outbound window to at least cover DRAM 1:1, then forget about it (this
->> is essentially what Juno UEFI does, for example).
-> 
-> So you have 128MB (max) of system memory that has cpu physical
-> addresses 0x80000000 upwards.
-> I'd expect it all to be accessible from any PCIe card at some PCIe
-> address, it might be at address 0, 0x80000000 or any other offset.
-> 
-> I don't know which DT entry controls that offset.
+> Anyway, regarding this specific patch and for this MC-aware driver: no, you
+> shouldn't inherit controls from subdevs. It defeats the purpose.
 
-This is a crucial point, I think.
+Sorry, but I don't agree with that. The subdev API is an optional API
+(and even the MC API can be optional).
 
-Regards.
+I see the rationale for using MC and subdev APIs on cell phones,
+ISV and other embedded hardware, as it will allow fine-tuning
+the driver's support to allow providing the required quality for
+certain custom-made applications. but on general SoC hardware,
+supporting standard V4L2 applications is a need.
+
+Ok, perhaps supporting both subdev API and V4L2 API at the same
+time doesn't make much sense. We could disable one in favor of the
+other, either at compilation time or at runtime.
+
+This way, if the subdev API is disabled, the driver will be
+functional for V4L2-based applications that don't support neither
+MC or subdev APIs.
+
+> As mentioned, I will attempt to try and get some time to work on this
+> later this year. Fingers crossed.
+
+That will be good, and, once we have a solution that works, we can
+work on cleanup the code, but, until then, drivers for arm-based boards
+sold to end consumers should work out of the box with standard V4L2 apps.
+
+While we don't have that, I'm OK to merge patches adding such support
+upstream.
+
+Thanks,
+Mauro
