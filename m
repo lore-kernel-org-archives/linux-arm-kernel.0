@@ -1,62 +1,139 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Fri, 10 Mar 2017 13:40:43 +0100
-Subject: [RFC PATCH 00/12] Ion cleanup in preparation for moving out of
- staging
-In-Reply-To: <20170310103112.GA15945@e106950-lin.cambridge.arm.com>
-References: <1488491084-17252-1-git-send-email-labbott@redhat.com>
- <20170303132949.GC31582@dhcp22.suse.cz>
- <cf383b9b-3cbc-0092-a071-f120874c053c@redhat.com>
- <20170306074258.GA27953@dhcp22.suse.cz>
- <20170306104041.zghsicrnadoap7lp@phenom.ffwll.local>
- <20170306105805.jsq44kfxhsvazkm6@sirena.org.uk>
- <20170306160437.sf7bksorlnw7u372@phenom.ffwll.local>
- <CA+M3ks77Am3Fx-ZNmgeM5tCqdM7SzV7rby4Es-p2F2aOhUco9g@mail.gmail.com>
- <26bc57ae-d88f-4ea0-d666-2c1a02bf866f@redhat.com>
- <20170310103112.GA15945@e106950-lin.cambridge.arm.com>
-Message-ID: <20170310124043.45hdu64wd4acf4it@phenom.ffwll.local>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Fri, 10 Mar 2017 13:54:28 +0100
+Subject: [PATCH v4 14/36] [media] v4l2-mc: add a function to inherit
+ controls from a pipeline
+In-Reply-To: <20170304131329.GV3220@valkosipuli.retiisi.org.uk>
+References: <1487211578-11360-1-git-send-email-steve_longerbeam@mentor.com>
+ <1487211578-11360-15-git-send-email-steve_longerbeam@mentor.com>
+ <20170302160257.GK3220@valkosipuli.retiisi.org.uk>
+ <20170303230645.GR21222@n2100.armlinux.org.uk>
+ <20170304131329.GV3220@valkosipuli.retiisi.org.uk>
+Message-ID: <a7b8e095-a95c-24bd-b1e9-e983f18061c4@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 10, 2017 at 10:31:13AM +0000, Brian Starkey wrote:
-> Hi,
+On 04/03/17 14:13, Sakari Ailus wrote:
+> Hi Russell,
 > 
-> On Thu, Mar 09, 2017 at 09:38:49AM -0800, Laura Abbott wrote:
-> > On 03/09/2017 02:00 AM, Benjamin Gaignard wrote:
+> On Fri, Mar 03, 2017 at 11:06:45PM +0000, Russell King - ARM Linux wrote:
+>> On Thu, Mar 02, 2017 at 06:02:57PM +0200, Sakari Ailus wrote:
+>>> Hi Steve,
+>>>
+>>> On Wed, Feb 15, 2017 at 06:19:16PM -0800, Steve Longerbeam wrote:
+>>>> v4l2_pipeline_inherit_controls() will add the v4l2 controls from
+>>>> all subdev entities in a pipeline to a given video device.
+>>>>
+>>>> Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
+>>>> ---
+>>>>  drivers/media/v4l2-core/v4l2-mc.c | 48 +++++++++++++++++++++++++++++++++++++++
+>>>>  include/media/v4l2-mc.h           | 25 ++++++++++++++++++++
+>>>>  2 files changed, 73 insertions(+)
+>>>>
+>>>> diff --git a/drivers/media/v4l2-core/v4l2-mc.c b/drivers/media/v4l2-core/v4l2-mc.c
+>>>> index 303980b..09d4d97 100644
+>>>> --- a/drivers/media/v4l2-core/v4l2-mc.c
+>>>> +++ b/drivers/media/v4l2-core/v4l2-mc.c
+>>>> @@ -22,6 +22,7 @@
+>>>>  #include <linux/usb.h>
+>>>>  #include <media/media-device.h>
+>>>>  #include <media/media-entity.h>
+>>>> +#include <media/v4l2-ctrls.h>
+>>>>  #include <media/v4l2-fh.h>
+>>>>  #include <media/v4l2-mc.h>
+>>>>  #include <media/v4l2-subdev.h>
+>>>> @@ -238,6 +239,53 @@ int v4l_vb2q_enable_media_source(struct vb2_queue *q)
+>>>>  }
+>>>>  EXPORT_SYMBOL_GPL(v4l_vb2q_enable_media_source);
+>>>>  
+>>>> +int __v4l2_pipeline_inherit_controls(struct video_device *vfd,
+>>>> +				     struct media_entity *start_entity)
+>>>
+>>> I have a few concerns / questions:
+>>>
+>>> - What's the purpose of this patch? Why not to access the sub-device node
+>>>   directly?
+>>
+>> What tools are in existance _today_ to provide access to these controls
+>> via the sub-device nodes?
 > 
-> [snip]
+> yavta, for instance:
 > 
-> > > 
-> > > For me those patches are going in the right direction.
-> > > 
-> > > I still have few questions:
-> > > - since alignment management has been remove from ion-core, should it
-> > > be also removed from ioctl structure ?
-> > 
-> > Yes, I think I'm going to go with the suggestion to fixup the ABI
-> > so we don't need the compat layer and as part of that I'm also
-> > dropping the align argument.
-> > 
+> <URL:http://git.ideasonboard.org/yavta.git>
 > 
-> Is the only motivation for removing the alignment parameter that
-> no-one got around to using it for something useful yet?
-> The original comment was true - different devices do have different
-> alignment requirements.
-> 
-> Better alignment can help SMMUs use larger blocks when mapping,
-> reducing TLB pressure and the chance of a page table walk causing
-> display underruns.
+> VIDIOC_QUERYCAP isn't supported on sub-devices and v4l2-ctl appears to be
+> checking for that. That check should be removed (with possible other
+> implications taken into account).
 
-Extending ioctl uapi is easy, trying to get rid of bad uapi is much
-harder. Given that right now we don't have an ion allocator that does
-alignment I think removing it makes sense. And if we go with lots of
-heaps, we might as well have an ion heap per alignment that your hw needs,
-so there's different ways to implement this in the future.
+No, the subdev API should get a similar QUERYCAP ioctl. There isn't a single
+ioctl that is guaranteed to be available for all subdev devices. I've made
+proposals for this in the past, and those have all been shot down.
 
-At least from the unix device memory allocator pov it's probably simpler
-to encode stuff like this into the heap name, instead of having to pass
-heap + list of additional properties/constraints.
--Daniel
--- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
+Add that, and I'll add support for subdevs in v4l2-ctl.
+
+> 
+>>
+>> v4l-tools doesn't last time I looked - in fact, the only tool in v4l-tools
+>> which is capable of accessing the subdevices is media-ctl, and that only
+>> provides functionality for configuring the pipeline.
+>>
+>> So, pointing people at vapourware userspace is really quite rediculous.
+> 
+> Do bear in mind that there are other programs that can make use of these
+> interfaces. It's not just the test programs, or a test program you attempted
+> to use.
+> 
+>>
+>> The established way to control video capture is through the main video
+>> capture device, not through the sub-devices.  Yes, the controls are
+>> exposed through sub-devices too, but that does not mean that is the
+>> correct way to access them.
+> 
+> It is. That's the very purpose of the sub-devices: to provide access to the
+> hardware independently of how the links are configured.
+> 
+>>
+>> The v4l2 documentation (Documentation/media/kapi/v4l2-controls.rst)
+>> even disagrees with your statements.  That talks about control
+>> inheritence from sub-devices to the main video device, and the core
+>> v4l2 code provides _automatic_ support for this - see
+>> v4l2_device_register_subdev():
+>>
+>>         /* This just returns 0 if either of the two args is NULL */
+>>         err = v4l2_ctrl_add_handler(v4l2_dev->ctrl_handler, sd->ctrl_handler, NULL);
+>>
+>> which merges the subdev's controls into the main device's control
+>> handler.
+> 
+> That's done on different kind of devices: those that provide plain V4L2 API
+> to control the entire device. V4L2 sub-device interface is used *in kernel*
+> as an interface to control sub-devices that do not need to be exposed to the
+> user space.
+> 
+> Devices that have complex pipeline that do essentially require using the
+> Media controller interface to configure them are out of that scope.
+> 
+
+Way too much of how the MC devices should be used is in the minds of developers.
+There is a major lack for good detailed documentation, utilities, compliance
+test (really needed!) and libv4l plugins.
+
+Russell's comments are spot on and it is a thorn in my side that this still
+hasn't been addressed.
+
+I want to see if I can get time from my boss to work on this this summer, but
+there is no guarantee.
+
+The main reason this hasn't been a much bigger problem is that most end-users
+make custom applications for this hardware. It makes sense, if you need full
+control over everything you make the application yourself, that's the whole point.
+
+But there was always meant to be a layer (libv4l plugin) that could be used to
+setup a 'default scenario' that existing applications could use, but that was
+never enforced, sadly.
+
+Anyway, regarding this specific patch and for this MC-aware driver: no, you
+shouldn't inherit controls from subdevs. It defeats the purpose.
+
+Regards,
+
+	Hans
