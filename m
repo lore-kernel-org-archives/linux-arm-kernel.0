@@ -1,55 +1,47 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Fri, 10 Mar 2017 10:03:11 +0530
-Subject: [PATCH] dma: xilinx: Make Xilinx VDMA support ARC
-In-Reply-To: <c1285d07-f925-2c3a-c90c-1ef9ee948b80@synopsys.com>
-References: <ec057c7b16c414a1cf9a9eba87c33f8bcf9f01f9.1488803103.git.roliveir@synopsys.com>
- <1ff465a7-69ed-6cd1-0e02-4b9ff752b3cd@topic.nl>
- <c1285d07-f925-2c3a-c90c-1ef9ee948b80@synopsys.com>
-Message-ID: <20170310043311.GV2843@localhost>
+From: seanpaul@chromium.org (Sean Paul)
+Date: Thu,  9 Mar 2017 23:32:17 -0500
+Subject: [PATCH 02/41] drm/rockchip: Get rid of some unnecessary code
+In-Reply-To: <20170310043305.17216-1-seanpaul@chromium.org>
+References: <20170310043305.17216-1-seanpaul@chromium.org>
+Message-ID: <20170310043305.17216-3-seanpaul@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 09, 2017 at 09:55:59AM +0000, Ramiro Oliveira wrote:
-> Hi Mike
-> 
-> On 3/9/2017 7:37 AM, Mike Looijmans wrote:
-> > On 06-03-17 13:27, Ramiro Oliveira wrote:
-> >> Add option in Kconfig to use Xilinx VDMA in ARC processors.
-> >>
-> >> Signed-off-by: Ramiro Oliveira <roliveir@synopsys.com>
-> >> ---
-> >>  drivers/dma/Kconfig | 2 +-
-> >>  1 file changed, 1 insertion(+), 1 deletion(-)
-> >>
-> >> diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
-> >> index 263495d0adbd..b6b6c0581ad7 100644
-> >> --- a/drivers/dma/Kconfig
-> >> +++ b/drivers/dma/Kconfig
-> >> @@ -546,7 +546,7 @@ config XGENE_DMA
-> >>
-> >>  config XILINX_DMA
-> >>      tristate "Xilinx AXI DMAS Engine"
-> >> -    depends on (ARCH_ZYNQ || MICROBLAZE || ARM64)
-> >> +    depends on (ARCH_ZYNQ || MICROBLAZE || ARM64|| ARC)
-> > 
-> > One can put a Xilinx FPGA on a PCIe card, instantiate a PCIe-AXI bridge and then
-> > use it on any platform that supports PCIe.
-> > 
-> > I've had to remove this line in order to be able to use the engine on an x86
-> > desktop.
-> > 
-> > How about plainly removing this "depends on" line and be done with it, instead
-> > of adding platforms one by one?
-> > 
-> > 
-> 
-> I agree with you. From my point of view it would be better to remove this line
-> entirely. I'm just not sure if everyone agrees.
+From: Tomasz Figa <tfiga@chromium.org>
 
-if it works on others, compiles fine then there should not be an issue to
-remove.
+Current code implements prepare_fb and cleanup_fb callbacks only to
+grab/release fb references, which is already done by atomic framework
+when creating/destryoing plane state. Also there are some unused fields
+vop and vop_win structs. Let's remove these unused bits.
 
-Feel free to send the patch.
+Signed-off-by: Tomasz Figa <tfiga@chromium.org>
+Signed-off-by: Sean Paul <seanpaul@chromium.org>
+---
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 5 -----
+ 1 file changed, 5 deletions(-)
 
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+index 2151e1cee4b4..0539afb6b7c8 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+@@ -108,9 +108,6 @@ struct vop {
+ 	struct drm_device *drm_dev;
+ 	bool is_enabled;
+ 
+-	/* mutex vsync_ work */
+-	struct mutex vsync_mutex;
+-	bool vsync_work_pending;
+ 	struct completion dsp_hold_completion;
+ 
+ 	/* protected by dev->event_lock */
+@@ -1592,8 +1589,6 @@ static int vop_bind(struct device *dev, struct device *master, void *data)
+ 	spin_lock_init(&vop->reg_lock);
+ 	spin_lock_init(&vop->irq_lock);
+ 
+-	mutex_init(&vop->vsync_mutex);
+-
+ 	ret = devm_request_irq(dev, vop->irq, vop_isr,
+ 			       IRQF_SHARED, dev_name(dev), vop);
+ 	if (ret)
 -- 
-~Vinod
+2.12.0.246.ga2ecc84866-goog
