@@ -1,68 +1,94 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 10 Mar 2017 18:26:44 +0530
-Subject: [RESEND PATCH v3 4/7] PCI: dwc: all: Modify dbi accessors to take
- dbi_base as argument
-In-Reply-To: <d920d892-af48-b94f-6eb7-e9e0ff5d40c0@axis.com>
-References: <1489041545-15730-1-git-send-email-kishon@ti.com>
- <1489041545-15730-5-git-send-email-kishon@ti.com>
- <4e13580d-2625-5eed-bcbc-2ffd7493b073@axis.com>
- <595fab62-fb7a-888a-f898-7b59030585f1@axis.com> <58C28FCC.4070100@ti.com>
- <d920d892-af48-b94f-6eb7-e9e0ff5d40c0@axis.com>
-Message-ID: <58C2A28C.60703@ti.com>
+From: romain.perier@collabora.com (Romain Perier)
+Date: Fri, 10 Mar 2017 13:58:58 +0100
+Subject: [PATCH] drm: dw_hdmi: Gate audio sampler clock from the
+ enablement functions
+In-Reply-To: <20170310111504.GT21222@n2100.armlinux.org.uk>
+References: <20170310093509.19044-1-romain.perier@collabora.com>
+ <20170310094613.GQ21222@n2100.armlinux.org.uk>
+ <7888eb1f-2781-d4ed-6f26-cb76e1ead4d2@collabora.com>
+ <20170310102753.GR21222@n2100.armlinux.org.uk>
+ <202cd871-eb1c-d8f4-62d6-bed479f0eece@collabora.com>
+ <20170310111504.GT21222@n2100.armlinux.org.uk>
+Message-ID: <4e8de49b-427f-2a7b-18c6-9224835c1f56@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Niklas,
+Hello,
 
-On Friday 10 March 2017 06:01 PM, Niklas Cassel wrote:
-> On 03/10/2017 12:36 PM, Kishon Vijay Abraham I wrote:
->> Hi,
+
+Le 10/03/2017 ? 12:15, Russell King - ARM Linux a ?crit :
+> On Fri, Mar 10, 2017 at 11:58:19AM +0100, Romain Perier wrote:
+>> Hello,
 >>
->> On Thursday 09 March 2017 08:35 PM, Niklas Cassel wrote:
+>> Le 10/03/2017 ? 11:27, Russell King - ARM Linux a ?crit :
+>>> I also would not think that it's platform specific - remember that
+>>> this is Designware IP, and it's likely that other platforms with
+>>> exactly the same IP would suffer from the same problem.  It's
+>>> probably revision specific, but we need Synopsis' input on that.
 >>>
->>> On 03/09/2017 03:48 PM, Niklas Cassel wrote:
->>>> On 03/09/2017 07:39 AM, Kishon Vijay Abraham I wrote:
->>>>> dwc has 2 dbi address space labeled dbics and dbics2. The existing
->>>>> helper to access dbi address space can access only dbics. However
->>>>> dbics2 has to be accessed for programming the BAR registers in the
->>>>> case of EP mode. This is in preparation for adding EP mode support
->>>>> to dwc driver.
->>>> Hello Kishon
->>>>
->>>> I don't really like the idea of adding an extra argument to every existing read/write.
->>>> Will not a read/write using dbi2 be quite uncommon compared to a read/write
->>>> using dbi?
->>>>
->>>> How about something like this:
->>>>
->>>> void __dw_pcie_writel(struct dw_pcie *pci, void __iomem *base, u32 reg, u32 val)
->>>> {
->>>>     if (pci->ops->writel_dbi)
->>>>         pci->ops->writel_dbi(pci, base, reg, val);
->>>>     else
->>>>         writel(val, base + reg);
->>>> }
->>>>
->>>> #define dw_pcie_writel_dbi(pci, reg, val) __dw_pcie_writel(pci, pci->dbi_base, reg, val)
->>>> #define dw_pcie_writel_dbi2(pci, reg, val) __dw_pcie_writel(pci, pci->dbi_base2, reg, val)
->>> Perhaps make dw_pcie_writel_dbi2 a function rather than a define,
->>> so we can return an error if pci->dbi_base2 == NULL.
->> Should we return an error? We don't return error for dbi_base either. I think
->> it should be sufficient to return errors while populating dbi_base or
->> dbi_base2. Otherwise it's a bug and should result in abort. Joao?
-> 
-> Sorry for previous empty email.
-> 
-> 
-> What I meant to write:
-> 
-> Right now we do error checking for dbi_base in platform specific code
-> and in pcie-designware-host.c:dw_pcie_host_init.
+>>> However, I do believe that your patch probably doesn't have much
+>>> merit in any case: on a mode set, you enable the audio clock, and
+>>> it will remain enabled until the audio device is first opened and
+>>> then closed.  If another mode set comes along, then exactly the
+>>> same situation happens again.  So, really it isn't achieving all
+>>> that much.
+>> The fact is we still have sound glitches caused by this workaround on
+>> Rockchip, we probably have a revision
+>> of the IP without this issue. If CTS+N is not forced to zero we no
+>> longer have the glitches :/ (with or without touching the clock)
+> Are you sure that removing the workaround just doesn't result in the
+> same bug as on iMX6 appearing?  The bug concerned is the ordering of
+> the channels, so unless you're (eg0 monitoring left/right separately
+> or directing audio to just one channel, you may not (with modern TVs)
+> realise that the channels are swapped.  I'll include the errata
+> description and impact below.
+>
+> There are occasional issues on iMX6 as well despite this work-around,
+> but I don't clearly remember what devmem2 tweaks I've done in the past
+> to get it to resolve itself, nor could I describe them from memory
+> any better than "burbling audio".
 
-it's been done in dw_pcie_host_init not as an error checking but since it's
-*optional* for certain platforms to populate dbi_base (i.e where dbi_base is
-mapped to configuration space), host_init takes care of assigning dbi_base to
-configuration space address.
+Well, I have reverted locally your patch (I did it quickly by hand
+because it did not work via git revert... anyway...),
+And I no longer have the issue at all. It's working fine all the time
+and it's truly deterministic (see attachment)
 
-Thanks
-Kishon
+Also, I have found that the version of the IP is not exactly the same.
+On Rockchip it's 0x20:0xa:0xa0:0xc1, on IMX.6 it's  0x13:0xa:0xa0:0xc1.
+>
+>
+>   When the AHB Audio DMA is started, by setting to 1'b1 for the first
+>   time the register field AHB_DMA_START.data_buffer_ready, the AHB
+>   Audio DMA will request data from the AHB bus to fill its internal
+>   AHB DMA FIFO. It is possible that a AHB DMA FIFO read action occurs
+>   during the time window between the first sample stored on the AHB
+>   DMA FIFO and when the AHB DMA FIFO has stored, at least, the number
+>   of configured audio channels in samples. If this happens, the AHB
+>   DMA FIFO will reply with samples that are currently on the AHB
+>   Audio FIFO and will repeat the last sample after the empty condition
+>   is reached.
+>
+>   Projected Impact:
+>   This will miss-align the audio stream, causing a shift in the
+>   distribution of audio on the channels on the HDMI sink side, with no
+>   knowledge of the DWC_hdmi_tx enabled system.
+
+Thanks for this, it helps!
+It looks specific to AHB audio
+
+>
+>
+> If you know that this definitely does not apply to your version, then
+> we need to split the audio enable/disable functions between the AHB
+> and I2S variants.
+Mhhh, yeah both seem to work differently.
+
+Romain
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: revert.patch
+Type: text/x-patch
+Size: 3551 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170310/f920ffa6/attachment.bin>
