@@ -1,160 +1,72 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 10 Mar 2017 11:04:49 +0000
-Subject: [PATCH 12/14] arm64: kill acpi_set_mailbox_entry()
+Date: Fri, 10 Mar 2017 11:04:51 +0000
+Subject: [PATCH 14/14] arm64: pmuv3: use arm_pmu ACPI framework
 In-Reply-To: <1489143891-11596-1-git-send-email-mark.rutland@arm.com>
 References: <1489143891-11596-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1489143891-11596-13-git-send-email-mark.rutland@arm.com>
+Message-ID: <1489143891-11596-15-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have acpi_cpu_get_madt_gicc(), we can use values from the
-MADT GICC table directly, and no longer need to stash a copy in our own
-datastructure.
-
-This allows us to kill off the acpi_set_mailbox_entry() callback, too.
+Now that we have a framework to handle the ACPI bits, make the PMUv3
+code use this. The framework is a little different to what was
+originally envisaged, and we can drop some unused support code in the
+process of moving over to it.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: Jeremy Linton <jeremy.linton@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/acpi.h             |  5 ----
- arch/arm64/kernel/acpi_parking_protocol.c | 38 +++++++++----------------------
- arch/arm64/kernel/smp.c                   | 11 ---------
- 3 files changed, 11 insertions(+), 43 deletions(-)
+ arch/arm64/kernel/perf_event.c | 26 +++++++++-----------------
+ 1 file changed, 9 insertions(+), 17 deletions(-)
 
-diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
-index 0e99978..ebf88e3 100644
---- a/arch/arm64/include/asm/acpi.h
-+++ b/arch/arm64/include/asm/acpi.h
-@@ -96,13 +96,8 @@ static inline void acpi_init_cpus(void) { }
- 
- #ifdef CONFIG_ARM64_ACPI_PARKING_PROTOCOL
- bool acpi_parking_protocol_valid(int cpu);
--void __init
--acpi_set_mailbox_entry(int cpu, struct acpi_madt_generic_interrupt *processor);
- #else
- static inline bool acpi_parking_protocol_valid(int cpu) { return false; }
--static inline void
--acpi_set_mailbox_entry(int cpu, struct acpi_madt_generic_interrupt *processor)
--{}
- #endif
- 
- static inline const char *acpi_get_enable_method(int cpu)
-diff --git a/arch/arm64/kernel/acpi_parking_protocol.c b/arch/arm64/kernel/acpi_parking_protocol.c
-index 1f5655c..700a83a 100644
---- a/arch/arm64/kernel/acpi_parking_protocol.c
-+++ b/arch/arm64/kernel/acpi_parking_protocol.c
-@@ -28,36 +28,21 @@ struct parking_protocol_mailbox {
- 	__le64 entry_point;
+One thing I'm not sure about here is how to verify that PMUv3 is supported. I
+can put a test in armv8_pmuv3_init(), but it feels like that should be verified
+earlier.
+
+Mark.
+
+diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
+index 57ae9d9..daf95919 100644
+--- a/arch/arm64/kernel/perf_event.c
++++ b/arch/arm64/kernel/perf_event.c
+@@ -1081,24 +1081,9 @@ static int armv8_vulcan_pmu_init(struct arm_pmu *cpu_pmu)
+ 	{},
  };
  
--struct cpu_mailbox_entry {
--	struct parking_protocol_mailbox __iomem *mailbox;
--	phys_addr_t mailbox_addr;
--	u8 version;
--	u8 gic_cpu_id;
+-/*
+- * Non DT systems have their micro/arch events probed at run-time.
+- * A fairly complete list of generic events are provided and ones that
+- * aren't supported by the current PMU are disabled.
+- */
+-static const struct pmu_probe_info armv8_pmu_probe_table[] = {
+-	PMU_PROBE(0, 0, armv8_pmuv3_init), /* enable all defined counters */
+-	{ /* sentinel value */ }
 -};
 -
--static struct cpu_mailbox_entry cpu_mailbox_entries[NR_CPUS];
--
--void __init acpi_set_mailbox_entry(int cpu,
--				   struct acpi_madt_generic_interrupt *p)
--{
--	struct cpu_mailbox_entry *cpu_entry = &cpu_mailbox_entries[cpu];
--
--	cpu_entry->mailbox_addr = p->parked_address;
--	cpu_entry->version = p->parking_version;
--	cpu_entry->gic_cpu_id = p->cpu_interface_number;
--}
-+static struct parking_protocol_mailbox __iomem *mailboxes[NR_CPUS];
- 
- bool acpi_parking_protocol_valid(int cpu)
+ static int armv8_pmu_device_probe(struct platform_device *pdev)
  {
--	struct cpu_mailbox_entry *cpu_entry = &cpu_mailbox_entries[cpu];
-+	struct acpi_madt_generic_interrupt *p = acpi_cpu_get_madt_gicc(cpu);
- 
--	return cpu_entry->mailbox_addr && cpu_entry->version;
-+	return p->parked_address && p->parking_version;
+-	if (acpi_disabled)
+-		return arm_pmu_device_probe(pdev, armv8_pmu_of_device_ids,
+-					    NULL);
+-
+-	return arm_pmu_device_probe(pdev, armv8_pmu_of_device_ids,
+-				    armv8_pmu_probe_table);
++	return arm_pmu_device_probe(pdev, armv8_pmu_of_device_ids, NULL);
  }
  
- static int acpi_parking_protocol_cpu_init(unsigned int cpu)
- {
-+	struct acpi_madt_generic_interrupt *p = acpi_cpu_get_madt_gicc(cpu);
-+
- 	pr_debug("%s: ACPI parked addr=%llx\n", __func__,
--		  cpu_mailbox_entries[cpu].mailbox_addr);
-+		 p->parked_address);
+ static struct platform_driver armv8_pmu_driver = {
+@@ -1109,4 +1094,11 @@ static int armv8_pmu_device_probe(struct platform_device *pdev)
+ 	.probe		= armv8_pmu_device_probe,
+ };
  
- 	return 0;
- }
-@@ -69,7 +54,7 @@ static int acpi_parking_protocol_cpu_prepare(unsigned int cpu)
- 
- static int acpi_parking_protocol_cpu_boot(unsigned int cpu)
- {
--	struct cpu_mailbox_entry *cpu_entry = &cpu_mailbox_entries[cpu];
-+	struct acpi_madt_generic_interrupt *p = acpi_cpu_get_madt_gicc(cpu);
- 	struct parking_protocol_mailbox __iomem *mailbox;
- 	__le32 cpu_id;
- 
-@@ -84,7 +69,7 @@ static int acpi_parking_protocol_cpu_boot(unsigned int cpu)
- 	 * by the kernel (it clashes with the linear mapping attributes
- 	 * specifications).
- 	 */
--	mailbox = ioremap(cpu_entry->mailbox_addr, sizeof(*mailbox));
-+	mailbox = ioremap(p->parked_address, sizeof(*mailbox));
- 	if (!mailbox)
- 		return -EIO;
- 
-@@ -102,7 +87,7 @@ static int acpi_parking_protocol_cpu_boot(unsigned int cpu)
- 	 * stash the mailbox address mapping to use it for further FW
- 	 * checks in the postboot method
- 	 */
--	cpu_entry->mailbox = mailbox;
-+	mailboxes[cpu] = mailbox;
- 
- 	/*
- 	 * We write the entry point and cpu id as LE regardless of the
-@@ -111,7 +96,7 @@ static int acpi_parking_protocol_cpu_boot(unsigned int cpu)
- 	 * Boot-Loader's endianness before jumping.
- 	 */
- 	writeq_relaxed(__pa_symbol(secondary_entry), &mailbox->entry_point);
--	writel_relaxed(cpu_entry->gic_cpu_id, &mailbox->cpu_id);
-+	writel_relaxed(p->cpu_interface_number, &mailbox->cpu_id);
- 
- 	arch_send_wakeup_ipi_mask(cpumask_of(cpu));
- 
-@@ -121,8 +106,7 @@ static int acpi_parking_protocol_cpu_boot(unsigned int cpu)
- static void acpi_parking_protocol_cpu_postboot(void)
- {
- 	int cpu = smp_processor_id();
--	struct cpu_mailbox_entry *cpu_entry = &cpu_mailbox_entries[cpu];
--	struct parking_protocol_mailbox __iomem *mailbox = cpu_entry->mailbox;
-+	struct parking_protocol_mailbox __iomem *mailbox = mailboxes[cpu];
- 	__le64 entry_point;
- 
- 	entry_point = readl_relaxed(&mailbox->entry_point);
-diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-index 390c277..b37dd83 100644
---- a/arch/arm64/kernel/smp.c
-+++ b/arch/arm64/kernel/smp.c
-@@ -572,17 +572,6 @@ struct acpi_madt_generic_interrupt *acpi_cpu_get_madt_gicc(int cpu)
- 
- 	cpu_madt_gicc[cpu_count] = *processor;
- 
--	/*
--	 * Set-up the ACPI parking protocol cpu entries
--	 * while initializing the cpu_logical_map to
--	 * avoid parsing MADT entries multiple times for
--	 * nothing (ie a valid cpu_logical_map entry should
--	 * contain a valid parking protocol data set to
--	 * initialize the cpu if the parking protocol is
--	 * the only available enable method).
--	 */
--	acpi_set_mailbox_entry(cpu_count, processor);
--
- 	early_map_cpu_to_node(cpu_count, acpi_numa_get_nid(cpu_count, hwid));
- 
- 	cpu_count++;
+-builtin_platform_driver(armv8_pmu_driver);
++int __init armv8_pmu_driver_init(void)
++{
++	if (acpi_disabled)
++		return platform_driver_register(&armv8_pmu_driver);
++	else
++		return arm_pmu_acpi_probe(armv8_pmuv3_init);
++}
++device_initcall(armv8_pmu_driver_init)
 -- 
 1.9.1
