@@ -1,51 +1,62 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 10 Mar 2017 16:17:28 -0300
-Subject: [PATCH v5 07/39] ARM: dts: imx6qdl-sabrelite: remove erratum
- ERR006687 workaround
-In-Reply-To: <9f5d0ac4-0602-c729-5c00-1d9ef49247c1@boundarydevices.com>
-References: <1489121599-23206-1-git-send-email-steve_longerbeam@mentor.com>
- <1489121599-23206-8-git-send-email-steve_longerbeam@mentor.com>
- <9f5d0ac4-0602-c729-5c00-1d9ef49247c1@boundarydevices.com>
-Message-ID: <CAOMZO5BNrSEyrbWbCBCbsy4yTrh4AHfk2Too0qHuffxqUCgADg@mail.gmail.com>
+From: josh.beavers@gmail.com (Josh Beavers)
+Date: Fri, 10 Mar 2017 14:20:45 -0500
+Subject: Managing shared buffers on VIVT cache systems
+In-Reply-To: <20170310105922.GS21222@n2100.armlinux.org.uk>
+References: <CAE=AiOO4J1qGjZb5dqhniQ04aV+WBh4HU+TLsDbXgkrATB8iiw@mail.gmail.com>
+ <20170310105922.GS21222@n2100.armlinux.org.uk>
+Message-ID: <CAE=AiOOwycY2XcFESotYaFuZ4gazU9HvQoQBGebZJZ73dASDCw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 10, 2017 at 3:59 PM, Troy Kisky
-<troy.kisky@boundarydevices.com> wrote:
-> On 3/9/2017 8:52 PM, Steve Longerbeam wrote:
->> There is a pin conflict with GPIO_6. This pin functions as a power
->> input pin to the OV5642 camera sensor, but ENET uses it as the h/w
->> workaround for erratum ERR006687, to wake-up the ARM cores on normal
->> RX and TX packet done events. So we need to remove the h/w workaround
->> to support the OV5642. The result is that the CPUidle driver will no
->> longer allow entering the deep idle states on the sabrelite.
->>
->> This is a partial revert of
->>
->> commit 6261c4c8f13e ("ARM: dts: imx6qdl-sabrelite: use GPIO_6 for FEC
->>                       interrupt.")
->> commit a28eeb43ee57 ("ARM: dts: imx6: tag boards that have the HW workaround
->>                       for ERR006687")
->>
->> Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
->> ---
->>  arch/arm/boot/dts/imx6qdl-sabrelite.dtsi | 4 ----
->>  1 file changed, 4 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
->> index 8413179..89dce27 100644
->> --- a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
->> +++ b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
->> @@ -270,9 +270,6 @@
->>       txd1-skew-ps = <0>;
->>       txd2-skew-ps = <0>;
->>       txd3-skew-ps = <0>;
->
-> How about
->
-> +#if !IS_ENABLED(CONFIG_VIDEO_OV5642)
+Russel,
 
-Or maybe just create a new device tree for using the camera, like
-imx6q-sabrelite-camera.dts.
+Thank you for the fast and outstanding explanation!  I did not expect
+such a thorough response.
 
-This way we can keep the FEC erratum for the existing sabrelite dtb's.
+
+On Fri, Mar 10, 2017 at 5:59 AM, Russell King - ARM Linux
+<linux@armlinux.org.uk> wrote:
+> There are essentially two options:
+> (a) flush the cache for _each_ virtual alias whenever you modify the
+>     data via one of those aliases.
+> (b) map the memory uncacheable, so that aliases do not happen in the
+>     first place.
+>
+> Under Linux on ARM with VIVT caches, we do a mixture of both with the
+> page cache and multiple userspace mmap()s.  The page cache tends to
+> always have a kernel mapping which aliases with any userspace mapping.
+> Whenever the kernel writes to its mapping, it calls flush_dcache_page(),
+> which flushes the kernel mapping, and then calls into
+> __flush_dcache_aliases() to flush all the currently visible userspace
+> aliases.
+>
+> When userspace sets up multiple mmap()s for the same _shared mapping_
+> memory in the same process address space, then the code in
+> make_coherent() triggers to make the mappings uncacheable, since
+> userspace is allowed to write to any alias and read the updated data
+> from any alias without issuing cache flushes.
+
+I can manually call flush_dcache_page() (which calls
+__flush_dcache_aliases()) after the kernel writes to a shared buffer
+and before the kernel reads from a shared buffer.  Am I understanding
+correctly that this is a proper solution even on a VIVT system, as
+long as vmalloc() / vmalloc_user() are not used?
+
+I did not realize it was possible to make mappings uncatchable with
+make_coherent().  Is this something that will happen automatically
+when a properly mapped buffer is used, or something that requires
+careful userspace sequencing (mapping / unmapping on the fly, etc.)?
+I do not fully grasp the make_coherent() path, though I am about to
+instrument up a calltrace.
+
+
+> Now for the bit you're not going to like: There is no support in Linux
+> for coherency between vmalloc() mappings and userspace mappings on VIVT
+> systems.
+
+Are there any particular allocation paradigms that would be best for
+refactoring vmalloc_user() out of a driver?
+
+
+Thanks again,
+-J
