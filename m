@@ -1,63 +1,75 @@
-From: ben@decadent.org.uk (Ben Hutchings)
-Date: Fri, 10 Mar 2017 11:46:23 +0000
-Subject: [PATCH 3.16 229/370] clocksource/exynos_mct: Clear interrupt when
- cpu is shut down
-In-Reply-To: <lsq.1489146380.780052105@decadent.org.uk>
-Message-ID: <lsq.1489146383.332922970@decadent.org.uk>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Fri, 10 Mar 2017 13:03:30 +0100
+Subject: [PATCH v5 15/39] [media] v4l2: add a frame interval error event
+In-Reply-To: <1489121599-23206-16-git-send-email-steve_longerbeam@mentor.com>
+References: <1489121599-23206-1-git-send-email-steve_longerbeam@mentor.com>
+ <1489121599-23206-16-git-send-email-steve_longerbeam@mentor.com>
+Message-ID: <5b0a0e76-2524-4140-5ccc-380a8f949cfa@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-3.16.42-rc1 review patch.  If anyone has any objections, please let me know.
+On 10/03/17 05:52, Steve Longerbeam wrote:
+> Add a new FRAME_INTERVAL_ERROR event to signal that a video capture or
+> output device has measured an interval between the reception or transmit
+> completion of two consecutive frames of video that is outside the nominal
+> frame interval by some tolerance value.
 
-------------------
+Reading back what was said on this I agree with Sakari that this doesn't
+belong here.
 
-From: Joonyoung Shim <jy0922.shim@samsung.com>
+Userspace can detect this just as easily (if not easier) with a timeout.
 
-commit bc7c36eedb0c7004aa06c2afc3c5385adada8fa3 upstream.
+Regards,
 
-When a CPU goes offline a potentially pending timer interrupt is not
-cleared. When the CPU comes online again then the pending interrupt is
-delivered before the per cpu clockevent device is initialized. As a
-consequence the tick interrupt handler dereferences a NULL pointer.
+	Hans
 
-[   51.251378] Unable to handle kernel NULL pointer dereference at virtual address 00000040
-[   51.289348] task: ee942d00 task.stack: ee960000
-[   51.293861] PC is at tick_periodic+0x38/0xb0
-[   51.298102] LR is at tick_handle_periodic+0x1c/0x90
-
-Clear the pending interrupt in the cpu dying path.
-
-Fixes: 56a94f13919c ("clocksource: exynos_mct: Avoid blocking calls in the cpu hotplug notifier")
-Reported-by: Seung-Woo Kim <sw0312.kim@samsung.com>
-Signed-off-by: Joonyoung Shim <jy0922.shim@samsung.com>
-Cc: linux-samsung-soc at vger.kernel.org
-Cc: cw00.choi at samsung.com
-Cc: daniel.lezcano at linaro.org
-Cc: javier at osg.samsung.com
-Cc: kgene at kernel.org
-Cc: krzk at kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Link: http://lkml.kernel.org/r/1484628876-22065-1-git-send-email-jy0922.shim at samsung.com
-Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
-[bwh: Backported to 3.16: add definition of the 'mevt' variable, added earlier
- upstream]
-Signed-off-by: Ben Hutchings <ben@decadent.org.uk>
----
---- a/drivers/clocksource/exynos_mct.c
-+++ b/drivers/clocksource/exynos_mct.c
-@@ -458,10 +458,15 @@ static int exynos4_local_timer_setup(str
- 
- static void exynos4_local_timer_stop(struct clock_event_device *evt)
- {
-+	struct mct_clock_event_device *mevt;
-+
-+	mevt = container_of(evt, struct mct_clock_event_device, evt);
-+
- 	evt->set_mode(CLOCK_EVT_MODE_UNUSED, evt);
- 	if (mct_int_type == MCT_INT_SPI) {
- 		if (evt->irq != -1)
- 			disable_irq_nosync(evt->irq);
-+		exynos4_mct_write(0x1, mevt->base + MCT_L_INT_CSTAT_OFFSET);
- 	} else {
- 		disable_percpu_irq(mct_irqs[MCT_L0_IRQ]);
- 	}
+> 
+> Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
+> ---
+>  Documentation/media/uapi/v4l/vidioc-dqevent.rst | 6 ++++++
+>  Documentation/media/videodev2.h.rst.exceptions  | 1 +
+>  include/uapi/linux/videodev2.h                  | 1 +
+>  3 files changed, 8 insertions(+)
+> 
+> diff --git a/Documentation/media/uapi/v4l/vidioc-dqevent.rst b/Documentation/media/uapi/v4l/vidioc-dqevent.rst
+> index 8d663a7..dc77363 100644
+> --- a/Documentation/media/uapi/v4l/vidioc-dqevent.rst
+> +++ b/Documentation/media/uapi/v4l/vidioc-dqevent.rst
+> @@ -197,6 +197,12 @@ call.
+>  	the regions changes. This event has a struct
+>  	:c:type:`v4l2_event_motion_det`
+>  	associated with it.
+> +    * - ``V4L2_EVENT_FRAME_INTERVAL_ERROR``
+> +      - 7
+> +      - This event is triggered when the video capture or output device
+> +	has measured an interval between the reception or transmit
+> +	completion of two consecutive frames of video that is outside
+> +	the nominal frame interval by some tolerance value.
+>      * - ``V4L2_EVENT_PRIVATE_START``
+>        - 0x08000000
+>        - Base event number for driver-private events.
+> diff --git a/Documentation/media/videodev2.h.rst.exceptions b/Documentation/media/videodev2.h.rst.exceptions
+> index e11a0d0..c7d8fad 100644
+> --- a/Documentation/media/videodev2.h.rst.exceptions
+> +++ b/Documentation/media/videodev2.h.rst.exceptions
+> @@ -459,6 +459,7 @@ replace define V4L2_EVENT_CTRL event-type
+>  replace define V4L2_EVENT_FRAME_SYNC event-type
+>  replace define V4L2_EVENT_SOURCE_CHANGE event-type
+>  replace define V4L2_EVENT_MOTION_DET event-type
+> +replace define V4L2_EVENT_FRAME_INTERVAL_ERROR event-type
+>  replace define V4L2_EVENT_PRIVATE_START event-type
+>  
+>  replace define V4L2_EVENT_CTRL_CH_VALUE ctrl-changes-flags
+> diff --git a/include/uapi/linux/videodev2.h b/include/uapi/linux/videodev2.h
+> index 45184a2..cf5a0d0 100644
+> --- a/include/uapi/linux/videodev2.h
+> +++ b/include/uapi/linux/videodev2.h
+> @@ -2131,6 +2131,7 @@ struct v4l2_streamparm {
+>  #define V4L2_EVENT_FRAME_SYNC			4
+>  #define V4L2_EVENT_SOURCE_CHANGE		5
+>  #define V4L2_EVENT_MOTION_DET			6
+> +#define V4L2_EVENT_FRAME_INTERVAL_ERROR		7
+>  #define V4L2_EVENT_PRIVATE_START		0x08000000
+>  
+>  /* Payload for V4L2_EVENT_VSYNC */
+> 
