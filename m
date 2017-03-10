@@ -1,95 +1,76 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 10 Mar 2017 15:57:09 +0000
-Subject: [PATCH v4 14/36] [media] v4l2-mc: add a function to inherit
- controls from a pipeline
-In-Reply-To: <20170310122634.0ffda7c6@vento.lan>
-References: <1487211578-11360-1-git-send-email-steve_longerbeam@mentor.com>
- <1487211578-11360-15-git-send-email-steve_longerbeam@mentor.com>
- <20170302160257.GK3220@valkosipuli.retiisi.org.uk>
- <20170303230645.GR21222@n2100.armlinux.org.uk>
- <20170304131329.GV3220@valkosipuli.retiisi.org.uk>
- <a7b8e095-a95c-24bd-b1e9-e983f18061c4@xs4all.nl>
- <20170310130733.GU21222@n2100.armlinux.org.uk>
- <20170310122634.0ffda7c6@vento.lan>
-Message-ID: <20170310155708.GX21222@n2100.armlinux.org.uk>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 10 Mar 2017 16:00:32 +0000
+Subject: Neophyte questions about PCIe
+In-Reply-To: <063D6719AE5E284EB5DD2968C1650D6DCFE7C9B9@AcuExch.aculab.com>
+References: <ced6a4bf-c94a-c116-1e94-52a8d675d132@free.fr>
+ <20170308151724.GA20780@bhelgaas-glaptop.roam.corp.google.com>
+ <f964ee05-db7f-c381-c91c-82897175da6d@free.fr>
+ <1092d971-5d81-2da7-4b34-0a88637c0ec5@arm.com>
+ <063D6719AE5E284EB5DD2968C1650D6DCFE7C8BA@AcuExch.aculab.com>
+ <c4712e19-863c-16b8-6920-5ad7dd178929@free.fr>
+ <4f37cc08-d4fd-b207-63d2-4ac038d2fcec@arm.com>
+ <063D6719AE5E284EB5DD2968C1650D6DCFE7C9B9@AcuExch.aculab.com>
+Message-ID: <504fdb97-f058-e1fb-0fe2-7f01c46db513@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 10, 2017 at 12:26:34PM -0300, Mauro Carvalho Chehab wrote:
-> Hi Russell,
+On 10/03/17 15:35, David Laight wrote:
+> From: Robin Murphy 
+>> Sent: 10 March 2017 15:23
+> ...
+>>>> So you have 128MB (max) of system memory that has cpu physical
+>>>> addresses 0x80000000 upwards.
+>>>> I'd expect it all to be accessible from any PCIe card at some PCIe
+>>>> address, it might be at address 0, 0x80000000 or any other offset.
+>>>>
+>>>> I don't know which DT entry controls that offset.
+>>>
+>>> This is a crucial point, I think.
+>>
+>> The appropriate DT property would be "dma-ranges", i.e.
+>>
+>> pci at ... {
+>> 	...
+>> 	dma-ranges = <(PCI bus address) (CPU phys address) (size)>;
+>> }
 > 
-> Em Fri, 10 Mar 2017 13:07:33 +0000
-> Russell King - ARM Linux <linux@armlinux.org.uk> escreveu:
+> Isn't that just saying which physical addresses the cpu can assign
+> for buffers for those devices?
+> There is also an offset between the 'cpu physical address' and the
+> 'dma address'.
+
+That offset is inherent in what "dma-ranges" describes. Say (for ease of
+calculation) that BAR0 has been put at a mem space address of 0x20000000
+and maps the first 1GB of physical DRAM. That would give us:
+
+	dma-ranges = <0x20000000 0x80000000 0x40000000>;
+
+Then a "virt = dma_alloc_coherent(..., &handle, ...)", borrowing the
+numbers from earlier in the thread, would automatically end up with:
+
+	virt == 0xd0855000;
+	handle == 0x2e07e000;
+
+(with the physical address of 0x8e07e000 in between being irrelevant to
+the consuming driver)
+
+It is true that the device's DMA mask assignment is also part and parcel
+of this, whereby we will limit what physical addresses the kernel
+considers valid for DMA involving devices behind this range to the lower
+3GB (i.e. 0x80000000 + 0x40000000 - 1). With a bit of luck,
+CONFIG_DMABOUNCE should do the rest of the job of working around that
+where necessary.
+
+Robin.
+
+> This might be implicit in the 'BAR0' base address register.
+>  
+>> The fun part is that that will only actually match the hardware once the
+>> magic BAR has actually been programmed with (bus address), so you end up
+>> with this part of your DT being more of a prophecy than a property :)
 > 
-> > The idea that the v4l libraries should intercept the format negotiation
-> > between the application and kernel is a particularly painful one - the
-> > default gstreamer build detects the v4l libraries, and links against it.
-> > That much is fine.
-> > 
-> > However, the problem comes when you're trying to use bayer formats. The
-> > v4l libraries "helpfully" (or rather unhelpfully) intercept the format
-> > negotiation, and decide that they'll invoke v4lconvert to convert the
-> > bayer to RGB for you, whether you want them to do that or not.
-> > 
-> > v4lconvert may not be the most efficient way to convert, or even what
-> > is desired (eg, you may want to receive the raw bayer image.)  However,
-> > since the v4l libraries/v4lconvert gives you no option but to have its
-> > conversion forced into the pipeline, other options (such as using the
-> > gstreamer neon accelerated de-bayer plugin) isn't an option 
+> The BAR0 values could easily be programmed into the cpld/fpga - so
+> not need writing by the cpu at all.
 > 
-> That's not true. There is an special flag, used only by libv4l2
-> emulated formats, that indicates when a video format is handled
-> via v4lconvert:
-
-I'm afraid that my statement comes from trying to use gstreamer with
-libv4l2 and _not_ being able to use the 8-bit bayer formats there at
-all - they are simply not passed across to the application through
-libv4l2/v4lconvert.
-
-Instead, the formats that are passed across are the emulated formats.
-As I said above, that forces applications to use only the v4lconvert
-formats, the raw formats are not available.
-
-So, the presence or absence of the V4L2_FMT_FLAG_EMULATED is quite
-meaningless if you can't even enumerate the non-converted formats.
-
-The problem comes from the "always needs conversion" stuff in
-v4lconvert coupled with the way this subdev stuff works - since it
-requires manual configuration of all the pads within the kernel
-media pipeline, the kernel ends up only advertising _one_ format
-to userspace - in my case, that's RGGB8.
-
-When v4lconvert_create_with_dev_ops() enumerates the formats from
-the kernel, it gets only RGGB8.  That causes always_needs_conversion
-in there to remain true, so the special v4l control which enables/
-disables conversion gets created with a default value of "true".
-The RGGB8 bit is also set in data->supported_src_formats.
-
-This causes v4lconvert_supported_dst_fmt_only() to return true.
-
-What this all means is that v4lconvert_enum_fmt() will _not_ return
-any of the kernel formats, only the faked formats.
-
-Ergo, the RGGB8 format from the kernel is completely hidden from the
-application, and only the emulated format is made available.  As I
-said above, this forces v4lconvert's debayering on the application,
-whether you want it or not.
-
-In the gstreamer case, it knows nothing about this special control,
-which means that trying to use this gstreamer pipeline:
-
-$ gst-launch-1.0 v4l2src device=/dev/video6 ! bayer2rgbneon ! xvimagesink
-
-is completely impossible without first rebuilding gstreamer _without_
-libv4l support.  Build gstreamer without libv4l support, and the above
-works.
-
-Enabling debug output in gstreamer's v4l2src plugin confirms that
-the kernel's bayer format are totally hidden from gstreamer when
-linked with libv4l2, but are present when it isn't linked with
-libv4l2.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+> 	David
+> 
