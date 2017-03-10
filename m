@@ -1,106 +1,88 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Fri, 10 Mar 2017 15:20:48 +0100
-Subject: [PATCH v4 14/36] [media] v4l2-mc: add a function to inherit
- controls from a pipeline
-In-Reply-To: <20170310140124.GV21222@n2100.armlinux.org.uk>
-References: <1487211578-11360-1-git-send-email-steve_longerbeam@mentor.com>
- <1487211578-11360-15-git-send-email-steve_longerbeam@mentor.com>
- <20170302160257.GK3220@valkosipuli.retiisi.org.uk>
- <20170303230645.GR21222@n2100.armlinux.org.uk>
- <20170304131329.GV3220@valkosipuli.retiisi.org.uk>
- <a7b8e095-a95c-24bd-b1e9-e983f18061c4@xs4all.nl>
- <20170310130733.GU21222@n2100.armlinux.org.uk>
- <c679f755-52a6-3c6f-3d65-277db46676cc@xs4all.nl>
- <20170310140124.GV21222@n2100.armlinux.org.uk>
-Message-ID: <cc8900b0-c091-b14b-96f4-01f8fa72431c@xs4all.nl>
+From: brian.starkey@arm.com (Brian Starkey)
+Date: Fri, 10 Mar 2017 14:27:09 +0000
+Subject: [RFC PATCH 00/12] Ion cleanup in preparation for moving out of
+ staging
+In-Reply-To: <2e295c28-04d6-a071-cf16-164d02d679c5@arm.com>
+References: <20170303132949.GC31582@dhcp22.suse.cz>
+ <cf383b9b-3cbc-0092-a071-f120874c053c@redhat.com>
+ <20170306074258.GA27953@dhcp22.suse.cz>
+ <20170306104041.zghsicrnadoap7lp@phenom.ffwll.local>
+ <20170306105805.jsq44kfxhsvazkm6@sirena.org.uk>
+ <20170306160437.sf7bksorlnw7u372@phenom.ffwll.local>
+ <CA+M3ks77Am3Fx-ZNmgeM5tCqdM7SzV7rby4Es-p2F2aOhUco9g@mail.gmail.com>
+ <26bc57ae-d88f-4ea0-d666-2c1a02bf866f@redhat.com>
+ <20170310103112.GA15945@e106950-lin.cambridge.arm.com>
+ <2e295c28-04d6-a071-cf16-164d02d679c5@arm.com>
+Message-ID: <20170310142709.GB15945@e106950-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/03/17 15:01, Russell King - ARM Linux wrote:
-> On Fri, Mar 10, 2017 at 02:22:29PM +0100, Hans Verkuil wrote:
->> And nobody of the media core developers has the time to work on the docs,
->> utilities and libraries you need to make this all work cleanly and reliably.
-> 
-> Well, talking about docs, and in connection to control inheritence,
-> this is already documented in at least three separate places:
-> 
-> Documentation/media/uapi/v4l/dev-subdev.rst:
-> 
->   Controls
->   ========
->   ...
->   Depending on the driver, those controls might also be exposed through
->   one (or several) V4L2 device nodes.
-> 
-> Documentation/media/kapi/v4l2-subdev.rst:
-> 
->   ``VIDIOC_QUERYCTRL``,
->   ``VIDIOC_QUERYMENU``,
->   ``VIDIOC_G_CTRL``,
->   ``VIDIOC_S_CTRL``,
->   ``VIDIOC_G_EXT_CTRLS``,
->   ``VIDIOC_S_EXT_CTRLS`` and
->   ``VIDIOC_TRY_EXT_CTRLS``:
->   
->           The controls ioctls are identical to the ones defined in V4L2. They
->           behave identically, with the only exception that they deal only with
->           controls implemented in the sub-device. Depending on the driver, those
->           controls can be also be accessed through one (or several) V4L2 device
->           nodes.
-> 
-> Then there's Documentation/media/kapi/v4l2-controls.rst, which gives a
-> step by step approach to the main video device inheriting controls from
-> its subdevices, and it says:
-> 
->   Inheriting Controls
->   -------------------
->   
->   When a sub-device is registered with a V4L2 driver by calling
->   v4l2_device_register_subdev() and the ctrl_handler fields of both v4l2_subdev
->   and v4l2_device are set, then the controls of the subdev will become
->   automatically available in the V4L2 driver as well. If the subdev driver
->   contains controls that already exist in the V4L2 driver, then those will be
->   skipped (so a V4L2 driver can always override a subdev control).
->   
->   What happens here is that v4l2_device_register_subdev() calls
->   v4l2_ctrl_add_handler() adding the controls of the subdev to the controls
->   of v4l2_device.
-> 
-> So, either the docs are wrong, or the advice being mentioned in emails
-> about subdev control inheritence is misleading.  Whatever, the two are
-> currently inconsistent.
+On Fri, Mar 10, 2017 at 11:46:42AM +0000, Robin Murphy wrote:
+>On 10/03/17 10:31, Brian Starkey wrote:
+>> Hi,
+>>
+>> On Thu, Mar 09, 2017 at 09:38:49AM -0800, Laura Abbott wrote:
+>>> On 03/09/2017 02:00 AM, Benjamin Gaignard wrote:
+>>
+>> [snip]
+>>
+>>>>
+>>>> For me those patches are going in the right direction.
+>>>>
+>>>> I still have few questions:
+>>>> - since alignment management has been remove from ion-core, should it
+>>>> be also removed from ioctl structure ?
+>>>
+>>> Yes, I think I'm going to go with the suggestion to fixup the ABI
+>>> so we don't need the compat layer and as part of that I'm also
+>>> dropping the align argument.
+>>>
+>>
+>> Is the only motivation for removing the alignment parameter that
+>> no-one got around to using it for something useful yet?
+>> The original comment was true - different devices do have different
+>> alignment requirements.
+>>
+>> Better alignment can help SMMUs use larger blocks when mapping,
+>> reducing TLB pressure and the chance of a page table walk causing
+>> display underruns.
+>
+>For that use-case, though, alignment alone doesn't necessarily help -
+>you need the whole allocation granularity to match your block size (i.e.
+>given a 1MB block size, asking for 17KB and getting back 17KB starting
+>at a 1MB boundary doesn't help much - that whole 1MB needs to be
+>allocated and everyone needs to know it to ensure that the whole lot can
+>be mapped safely). Now, whether it's down to the callers or the heap
+>implementations to decide and enforce that granularity is another
+>question, but provided allocations are at least naturally aligned to
+>whatever the granularity is (which is a reasonable assumption to bake
+>in) then it's all good.
+>
+>Robin.
 
-These docs were written for non-MC drivers, and for those the documentation
-is correct. Unfortunately, this was never updated for MC drivers.
+Agreed, alignment alone isn't enough. But lets assume that an app
+knows what a "good" granularity is, and always asks for allocation
+sizes which are suitably rounded to allow blocks to be used. Currently
+it looks like a "standard" ION_HEAP_TYPE_CARVEOUT heap would give me
+back just a PAGE_SIZE aligned buffer. So even *if* the caller knows
+its desired block size, there's no way for it to get guaranteed better
+alignment, which wouldn't be a bad feature to have.
 
-> As I've already mentioned, from talking about this with Mauro, it seems
-> Mauro is in agreement with permitting the control inheritence... I wish
-> Mauro would comment for himself, as I can't quote our private discussion
-> on the subject.
+Anyway as Daniel and Rob say, if the interface is designed properly
+this kind of extension would be possible later, or you can have a
+special heap with a larger granule.
 
-I can't comment either, not having seen his mail and reasoning.
+I suppose it makes sense to remove it while there's no-one actually
+implementing it, in case an alternate method proves more usable.
 
-> Right now, my view is that v4l2 is currently being screwed up by people
-> with different opinions - there is no unified concensus on how any of
-> this stuff is supposed to work, everyone is pulling in different
-> directions.  That needs solving _really_ quickly, so I suggest that
-> v4l2 people urgently talk to each other and thrash out some of the
-> issues that Steve's patch set has brought up, and settle on a way
-> forward, rather than what is seemingly happening today - which is
-> everyone working in isolation of everyone else with their own bias on
-> how things should be done.
+-Brian
 
-The simple fact is that to my knowledge no other MC applications inherit
-controls from subdevs. Suddenly doing something different here seems very
-wrong to me and needs very good reasons.
-
-But yes, the current situation sucks. Yelling doesn't help though if nobody
-has time and there are several other high-prio projects that need our
-attention as well.
-
-If you know a good kernel developer who has a few months to spare, please
-point him/her in our direction!
-
-Regards,
-
-	Hans
+>
+>>
+>> -Brian
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
