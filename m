@@ -1,68 +1,62 @@
-From: niklas.cassel@axis.com (Niklas Cassel)
-Date: Fri, 10 Mar 2017 13:31:27 +0100
-Subject: [RESEND PATCH v3 4/7] PCI: dwc: all: Modify dbi accessors to take
- dbi_base as argument
-In-Reply-To: <58C28FCC.4070100@ti.com>
-References: <1489041545-15730-1-git-send-email-kishon@ti.com>
- <1489041545-15730-5-git-send-email-kishon@ti.com>
- <4e13580d-2625-5eed-bcbc-2ffd7493b073@axis.com>
- <595fab62-fb7a-888a-f898-7b59030585f1@axis.com> <58C28FCC.4070100@ti.com>
-Message-ID: <d920d892-af48-b94f-6eb7-e9e0ff5d40c0@axis.com>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Fri, 10 Mar 2017 13:40:43 +0100
+Subject: [RFC PATCH 00/12] Ion cleanup in preparation for moving out of
+ staging
+In-Reply-To: <20170310103112.GA15945@e106950-lin.cambridge.arm.com>
+References: <1488491084-17252-1-git-send-email-labbott@redhat.com>
+ <20170303132949.GC31582@dhcp22.suse.cz>
+ <cf383b9b-3cbc-0092-a071-f120874c053c@redhat.com>
+ <20170306074258.GA27953@dhcp22.suse.cz>
+ <20170306104041.zghsicrnadoap7lp@phenom.ffwll.local>
+ <20170306105805.jsq44kfxhsvazkm6@sirena.org.uk>
+ <20170306160437.sf7bksorlnw7u372@phenom.ffwll.local>
+ <CA+M3ks77Am3Fx-ZNmgeM5tCqdM7SzV7rby4Es-p2F2aOhUco9g@mail.gmail.com>
+ <26bc57ae-d88f-4ea0-d666-2c1a02bf866f@redhat.com>
+ <20170310103112.GA15945@e106950-lin.cambridge.arm.com>
+Message-ID: <20170310124043.45hdu64wd4acf4it@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/10/2017 12:36 PM, Kishon Vijay Abraham I wrote:
+On Fri, Mar 10, 2017 at 10:31:13AM +0000, Brian Starkey wrote:
 > Hi,
->
-> On Thursday 09 March 2017 08:35 PM, Niklas Cassel wrote:
->>
->> On 03/09/2017 03:48 PM, Niklas Cassel wrote:
->>> On 03/09/2017 07:39 AM, Kishon Vijay Abraham I wrote:
->>>> dwc has 2 dbi address space labeled dbics and dbics2. The existing
->>>> helper to access dbi address space can access only dbics. However
->>>> dbics2 has to be accessed for programming the BAR registers in the
->>>> case of EP mode. This is in preparation for adding EP mode support
->>>> to dwc driver.
->>> Hello Kishon
->>>
->>> I don't really like the idea of adding an extra argument to every existing read/write.
->>> Will not a read/write using dbi2 be quite uncommon compared to a read/write
->>> using dbi?
->>>
->>> How about something like this:
->>>
->>> void __dw_pcie_writel(struct dw_pcie *pci, void __iomem *base, u32 reg, u32 val)
->>> {
->>>     if (pci->ops->writel_dbi)
->>>         pci->ops->writel_dbi(pci, base, reg, val);
->>>     else
->>>         writel(val, base + reg);
->>> }
->>>
->>> #define dw_pcie_writel_dbi(pci, reg, val) __dw_pcie_writel(pci, pci->dbi_base, reg, val)
->>> #define dw_pcie_writel_dbi2(pci, reg, val) __dw_pcie_writel(pci, pci->dbi_base2, reg, val)
->> Perhaps make dw_pcie_writel_dbi2 a function rather than a define,
->> so we can return an error if pci->dbi_base2 == NULL.
-> Should we return an error? We don't return error for dbi_base either. I think
-> it should be sufficient to return errors while populating dbi_base or
-> dbi_base2. Otherwise it's a bug and should result in abort. Joao?
+> 
+> On Thu, Mar 09, 2017 at 09:38:49AM -0800, Laura Abbott wrote:
+> > On 03/09/2017 02:00 AM, Benjamin Gaignard wrote:
+> 
+> [snip]
+> 
+> > > 
+> > > For me those patches are going in the right direction.
+> > > 
+> > > I still have few questions:
+> > > - since alignment management has been remove from ion-core, should it
+> > > be also removed from ioctl structure ?
+> > 
+> > Yes, I think I'm going to go with the suggestion to fixup the ABI
+> > so we don't need the compat layer and as part of that I'm also
+> > dropping the align argument.
+> > 
+> 
+> Is the only motivation for removing the alignment parameter that
+> no-one got around to using it for something useful yet?
+> The original comment was true - different devices do have different
+> alignment requirements.
+> 
+> Better alignment can help SMMUs use larger blocks when mapping,
+> reducing TLB pressure and the chance of a page table walk causing
+> display underruns.
 
-Sorry for previous empty email.
+Extending ioctl uapi is easy, trying to get rid of bad uapi is much
+harder. Given that right now we don't have an ion allocator that does
+alignment I think removing it makes sense. And if we go with lots of
+heaps, we might as well have an ion heap per alignment that your hw needs,
+so there's different ways to implement this in the future.
 
-
-What I meant to write:
-
-Right now we do error checking for dbi_base in platform specific code
-and in pcie-designware-host.c:dw_pcie_host_init.
-
-For dbi_base2, you've added error checking in platform specific code
-(pci-dra7xx.c), but I don't see any error checking in your patch proposal
-pcie-designware-ep.c:dw_pcie_ep_init.
-If you add error checking in dw_pcie_ep_init, then I agree,
-we don't need any error checking in dw_pcie_writel_dbi2.
-
-
-
->
-> Thanks
-> Kishon
+At least from the unix device memory allocator pov it's probably simpler
+to encode stuff like this into the heap name, instead of having to pass
+heap + list of additional properties/constraints.
+-Daniel
+-- 
+Daniel Vetter
+Software Engineer, Intel Corporation
+http://blog.ffwll.ch
