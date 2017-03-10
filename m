@@ -1,81 +1,36 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Fri, 10 Mar 2017 10:08:01 +0100
-Subject: [PATCH 4.10 038/167] coresight: fix kernel panic caused by invalid CPU
-In-Reply-To: <20170310083956.767605269@linuxfoundation.org>
-References: <20170310083956.767605269@linuxfoundation.org>
-Message-ID: <20170310083959.417193928@linuxfoundation.org>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 10 Mar 2017 10:28:50 +0100
+Subject: [PATCH v2 0/5] arm64: dts: r8a7796: Add Secondary CPU Cores
+In-Reply-To: <1488909806-3322-1-git-send-email-geert+renesas@glider.be>
+References: <1488909806-3322-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <20170310092850.GG21820@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-4.10-stable review patch.  If anyone has any objections, please let me know.
+On Tue, Mar 07, 2017 at 07:03:21PM +0100, Geert Uytterhoeven wrote:
+> 	Hi Simon, Magnus,
+> 
+> This patch series adds the second Cortex-A57 CPU core, the Cortex-A57
+> PMU, and the Cortex-A53 L2 cache-controller, CPU, and PMU nodes on the
+> Renesas R-Car M3-W SoC to its DTS file.
+> 
+> Note that these patches add hardware description; actual enabling of the
+> CPU depends on the PSCI firmware.
+> 
+> With the current firmware version (v2.16.0), only the CA57 CPU cores are
+> enabled, hence the last patch does not introduce undeterministic
+> scheduling behavior due to migration between big and LITTLE cores.
+> 
+> Changes compared to v1:
+>   - Add Cortex-A57 and Cortex-A53 PMU nodes,
+>   - Drop unit address and reg property for integrated cache-controller.
+> 
+> Tested on r8a7796/salvator-x, with CPU hot(un)plug and system suspend.
+> 
+> Thanks for applying!
 
-------------------
+Thanks.
 
-From: Wang Nan <wangnan0@huawei.com>
-
-commit f09444639099584bc4784dfcd85ada67c6f33e0f upstream.
-
-Commit d52c9750f150 ("coresight: reset "enable_sink" flag when need be")
-caused a kernel panic because of the using of an invalid value: after
-'for_each_cpu(cpu, mask)', value of local variable 'cpu' become invalid,
-causes following 'cpu_to_node' access invalid memory area.
-
-This patch brings the deleted 'cpu = cpumask_first(mask)' back.
-
-Panic log:
-
- $ perf record -e cs_etm// ls
-
- Unable to handle kernel paging request at virtual address fffe801804af4f10
- pgd = ffff8017ce031600
- [fffe801804af4f10] *pgd=0000000000000000, *pud=0000000000000000
- Internal error: Oops: 96000004 [#1] SMP
- Modules linked in:
- CPU: 33 PID: 1619 Comm: perf Not tainted 4.7.1+ #16
- Hardware name: Huawei Taishan 2280 /CH05TEVBA, BIOS 1.10 11/24/2016
- task: ffff8017cb0c8400 ti: ffff8017cb154000 task.ti: ffff8017cb154000
- PC is at tmc_alloc_etf_buffer+0x60/0xd4
- LR is at tmc_alloc_etf_buffer+0x44/0xd4
- pc : [<ffff000008633df8>] lr : [<ffff000008633ddc>] pstate: 60000145
- sp : ffff8017cb157b40
- x29: ffff8017cb157b40 x28: 0000000000000000
- ...skip...
- 7a60: ffff000008c64dc8 0000000000000006 0000000000000253 ffffffffffffffff
- 7a80: 0000000000000000 0000000000000000 ffff0000080872cc 0000000000000001
- [<ffff000008633df8>] tmc_alloc_etf_buffer+0x60/0xd4
- [<ffff000008632b9c>] etm_setup_aux+0x1dc/0x1e8
- [<ffff00000816eed4>] rb_alloc_aux+0x2b0/0x338
- [<ffff00000816a5e4>] perf_mmap+0x414/0x568
- [<ffff0000081ab694>] mmap_region+0x324/0x544
- [<ffff0000081abbe8>] do_mmap+0x334/0x3e0
- [<ffff000008191150>] vm_mmap_pgoff+0xa4/0xc8
- [<ffff0000081a9a30>] SyS_mmap_pgoff+0xb0/0x22c
- [<ffff0000080872e4>] sys_mmap+0x18/0x28
- [<ffff0000080843f0>] el0_svc_naked+0x24/0x28
- Code: 912040a5 d0001c00 f873d821 911c6000 (b8656822)
- ---[ end trace 98933da8f92b0c9a ]---
-
-Signed-off-by: Wang Nan <wangnan0@huawei.com>
-Cc: Xia Kaixu <xiakaixu@huawei.com>
-Cc: Li Zefan <lizefan@huawei.com>
-Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
-Fixes: d52c9750f150 ("coresight: reset "enable_sink" flag when need be")
-Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-
----
- drivers/hwtracing/coresight/coresight-etm-perf.c |    1 +
- 1 file changed, 1 insertion(+)
-
---- a/drivers/hwtracing/coresight/coresight-etm-perf.c
-+++ b/drivers/hwtracing/coresight/coresight-etm-perf.c
-@@ -242,6 +242,7 @@ static void *etm_setup_aux(int event_cpu
- 	if (!sink_ops(sink)->alloc_buffer)
- 		goto err;
- 
-+	cpu = cpumask_first(mask);
- 	/* Get the AUX specific data from the sink buffer */
- 	event_data->snk_config =
- 			sink_ops(sink)->alloc_buffer(sink, cpu, pages,
+This is appears to be in keeping with the discussion between Magnus,
+yourself, myself and others in Brussels last month. Accordingly I have
+queued-up these changes.
