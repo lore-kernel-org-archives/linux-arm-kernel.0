@@ -1,33 +1,78 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 10 Mar 2017 18:42:24 +0000
-Subject: [PATCH 00/15] arm64/kvm: use common sysreg definitions
-In-Reply-To: <20170310183555.GB6271@arm.com>
-References: <1489079247-31092-1-git-send-email-mark.rutland@arm.com>
- <87a88tv94d.fsf@on-the-bus.cambridge.arm.com>
- <20170310183555.GB6271@arm.com>
-Message-ID: <20170310184224.GE24571@leverpostej>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Fri, 10 Mar 2017 12:49:30 -0600
+Subject: Neophyte questions about PCIe
+In-Reply-To: <c4712e19-863c-16b8-6920-5ad7dd178929@free.fr>
+References: <ced6a4bf-c94a-c116-1e94-52a8d675d132@free.fr>
+ <20170308151724.GA20780@bhelgaas-glaptop.roam.corp.google.com>
+ <f964ee05-db7f-c381-c91c-82897175da6d@free.fr>
+ <1092d971-5d81-2da7-4b34-0a88637c0ec5@arm.com>
+ <063D6719AE5E284EB5DD2968C1650D6DCFE7C8BA@AcuExch.aculab.com>
+ <c4712e19-863c-16b8-6920-5ad7dd178929@free.fr>
+Message-ID: <20170310184930.GG19517@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 10, 2017 at 06:35:55PM +0000, Will Deacon wrote:
-> On Fri, Mar 10, 2017 at 08:17:22AM +0000, Marc Zyngier wrote:
-> > On Thu, Mar 09 2017 at  5:07:12 pm GMT, Mark Rutland <mark.rutland@arm.com> wrote:
-> > The next question is how do we merge this. Obviously, we can't split it
-> > between trees, and this is very likely to clash with anything that we
-> > will merge on the KVM side (the sysreg table is a popular place).
-> > 
-> > Will, Catalin: Would it make sense to create a stable branch with these
-> > patches, and merge it into both the arm64 and KVM trees? That'd make
-> > things easier...
+On Fri, Mar 10, 2017 at 04:05:50PM +0100, Mason wrote:
+> On 10/03/2017 15:06, David Laight wrote:
 > 
-> I think the scope for conflict on our side is pretty high too, so a shared
-> branch might be the best way to go. I don't want to branch just yet though,
-> so I'll probably wait a week or so before setting something in stone.
+> > Robin Murphy wrote:
+> >
+> >> On 09/03/17 23:43, Mason wrote:
+> >>
+> >>> I think I'm making progress, in that I now have a better
+> >>> idea of what I don't understand. So I'm able to ask
+> >>> (hopefully) less vague questions.
+> >>>
+> >>> Take the USB3 PCIe adapter I've been testing with. At some
+> >>> point during init, the XHCI driver request some memory
+> >>> (via kmalloc?) in order to exchange data with the host, right?
+> >>>
+> >>> On my SoC, the RAM used by Linux lives at physical range
+> >>> [0x8000_0000, 0x8800_0000[ => 128 MB
+> >>>
+> >>> How does the XHCI driver make the adapter aware of where
+> >>> it can scribble data? The XHCI driver has no notion that
+> >>> the device is behind a bus, does it?
+> >>>
+> >>> At some point, the physical addresses must be converted
+> >>> to PCI bus addresses, right? Is it computed subtracting
+> >>> the offset defined in the DT?
+> > 
+> > The driver should call dma_alloc_coherent() which returns both the
+> > kernel virtual address and the device (xhci controller) has
+> > to use to access it.
+> > The cpu physical address is irrelevant (although it might be
+> > calculated in the middle somewhere).
+> 
+> Thank you for that missing piece of the puzzle.
+> I see some relevant action in drivers/usb/host/xhci-mem.c
+> 
+> And I now see this log:
+> 
+> [    2.499320] xhci_hcd 0000:01:00.0: // Device context base array address = 0x8e07e000 (DMA), d0855000 (virt)
+> [    2.509156] xhci_hcd 0000:01:00.0: Allocated command ring at cfb04200
+> [    2.515640] xhci_hcd 0000:01:00.0: First segment DMA is 0x8e07f000
+> [    2.521863] xhci_hcd 0000:01:00.0: // Setting command ring address to 0x20
+> [    2.528786] xhci_hcd 0000:01:00.0: // xHC command ring deq ptr low bits + flags = @00000000
+> [    2.537188] xhci_hcd 0000:01:00.0: // xHC command ring deq ptr high bits = @00000000
+> [    2.545002] xhci_hcd 0000:01:00.0: // Doorbell array is located at offset 0x800 from cap regs base addr
+> [    2.554455] xhci_hcd 0000:01:00.0: // xHCI capability registers at d0852000:
+> [    2.561550] xhci_hcd 0000:01:00.0: // @d0852000 = 0x1000020 (CAPLENGTH AND HCIVERSION)
+> 
+> I believe 0x8e07e000 is a CPU address, not a PCI bus address.
 
-Sure thing.
+Sounds like you've made good progress since this email, but I think
+0x8e07e000 is a PCI bus address, not a CPU address.  The code in
+xhci_mem_init() is this:
 
-Let me know if you want me to rebase this, otherwise I'll leave my
-current branch as-is.
+  xhci->dcbaa = dma_alloc_coherent(dev, sizeof(*xhci->dcbaa), &dma, flags);
+  xhci->dcbaa->dma = dma;
+  xhci_dbg_trace("Device context base array address = 0x%llx (DMA), %p (virt)",
+                 (unsigned long long)xhci->dcbaa->dma, xhci->dcbaa);
 
-Thanks,
-Mark.
+dma_alloc_coherent() allocates a buffer and returns two values: the
+CPU virtual address ("xhci->dcbaa" here) for use by the driver and the
+corresponding DMA address the device can use to reach the buffer
+("dma").
+
+Documentation/DMA-API-HOWTO.txt has more details that might be useful.
