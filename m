@@ -1,59 +1,67 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 10 Mar 2017 11:04:43 +0000
-Subject: [PATCH 06/14] drivers/perf: arm_pmu: handle no platform_device
+Date: Fri, 10 Mar 2017 11:04:46 +0000
+Subject: [PATCH 09/14] drivers/perf: arm_pmu: move irq request/free into probe
 In-Reply-To: <1489143891-11596-1-git-send-email-mark.rutland@arm.com>
 References: <1489143891-11596-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1489143891-11596-7-git-send-email-mark.rutland@arm.com>
+Message-ID: <1489143891-11596-10-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In armpmu_dispatch_irq() we look at arm_pmu::plat_device to acquire
-platdata, so that we can defer to platform-specific IRQ handling,
-required on some 32-bit parts. With the advent of ACPI we won't always
-have a platform_device, and so we must avoid trying to dereference
-fields from it.
+Currently we request (and potentially free) all IRQs for a given PMU in
+cpu_pmu_init(). This works for platform/DT probing today, but it doesn't
+fit ACPI well as we don't have all our affinity data up-front.
 
-This patch fixes up armpmu_dispatch_irq() to avoid doing so, introducing
-a new armpmu_get_platdata() helper.
+In preparation for ACPI support, fold the IRQ request/free into
+arm_pmu_device_probe(), which will remain specific to platform/DT
+probing.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- drivers/perf/arm_pmu.c | 12 +++++++++---
- 1 file changed, 9 insertions(+), 3 deletions(-)
+ drivers/perf/arm_pmu.c | 11 ++++++-----
+ 1 file changed, 6 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
-index 6196777..02fc70e 100644
+index 5e5ea12..d202a73 100644
 --- a/drivers/perf/arm_pmu.c
 +++ b/drivers/perf/arm_pmu.c
-@@ -316,10 +316,16 @@ static void armpmu_start(struct perf_event *event, int flags)
- 	return 0;
+@@ -758,10 +758,6 @@ static int cpu_pmu_init(struct arm_pmu *cpu_pmu)
+ {
+ 	int err;
+ 
+-	err = armpmu_request_irqs(cpu_pmu);
+-	if (err)
+-		goto out;
+-
+ 	err = cpuhp_state_add_instance(CPUHP_AP_PERF_ARM_STARTING,
+ 				       &cpu_pmu->node);
+ 	if (err)
+@@ -777,7 +773,6 @@ static int cpu_pmu_init(struct arm_pmu *cpu_pmu)
+ 	cpuhp_state_remove_instance_nocalls(CPUHP_AP_PERF_ARM_STARTING,
+ 					    &cpu_pmu->node);
+ out:
+-	armpmu_free_irqs(cpu_pmu);
+ 	return err;
  }
  
-+static struct arm_pmu_platdata *armpmu_get_platdata(struct arm_pmu *armpmu)
-+{
-+	struct platform_device *pdev = armpmu->plat_device;
-+
-+	return pdev ? dev_get_platdata(&pdev->dev) : NULL;
-+}
-+
- static irqreturn_t armpmu_dispatch_irq(int irq, void *dev)
- {
- 	struct arm_pmu *armpmu;
--	struct platform_device *plat_device;
- 	struct arm_pmu_platdata *plat;
- 	int ret;
- 	u64 start_clock, finish_clock;
-@@ -331,8 +337,8 @@ static irqreturn_t armpmu_dispatch_irq(int irq, void *dev)
- 	 * dereference.
- 	 */
- 	armpmu = *(void **)dev;
--	plat_device = armpmu->plat_device;
--	plat = dev_get_platdata(&plat_device->dev);
-+
-+	plat = armpmu_get_platdata(armpmu);
+@@ -1073,12 +1068,18 @@ int arm_pmu_device_probe(struct platform_device *pdev,
+ 		goto out_free;
+ 	}
  
- 	start_clock = sched_clock();
- 	if (plat && plat->handle_irq)
++	ret = armpmu_request_irqs(pmu);
++	if (ret)
++		goto out_free_irqs;
++
+ 	ret = armpmu_register(pmu);
+ 	if (ret)
+ 		goto out_free;
+ 
+ 	return 0;
+ 
++out_free_irqs:
++	armpmu_free_irqs(pmu);
+ out_free:
+ 	pr_info("%s: failed to register PMU devices!\n",
+ 		of_node_full_name(node));
 -- 
 1.9.1
