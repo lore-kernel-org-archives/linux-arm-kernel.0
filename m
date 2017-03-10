@@ -1,33 +1,89 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri, 10 Mar 2017 09:44:42 -0800
-Subject: [PATCH 1/2] ARM: dts: BCM53573: Don't use nonexistent
- "default-off" LED trigger
-In-Reply-To: <20170310132049.GC11875@amd>
-References: <20170308064105.26619-1-zajec5@gmail.com>
- <42bce8ea-f1dc-2018-33f1-d296ccd7b677@gmail.com> <20170310132049.GC11875@amd>
-Message-ID: <3414f628-6b78-dc5a-4abf-ec5f40e7a4ee@gmail.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Fri, 10 Mar 2017 11:47:40 -0600
+Subject: pcie-iproc: broken 2nd (& 3rd?) controller support by
+ c3245a566400 ("PCI: iproc: Request host bridge window resources")
+In-Reply-To: <04f747ef-0f39-33ec-0cea-2e9fb85d46e8@gmail.com>
+References: <faab6b85-58e8-3e62-8763-56a94b13fba1@gmail.com>
+ <f40bbf2f-3ba9-3992-d417-6588085f3d62@gmail.com>
+ <20170309182205.GB3685@bhelgaas-glaptop.roam.corp.google.com>
+ <04f747ef-0f39-33ec-0cea-2e9fb85d46e8@gmail.com>
+Message-ID: <20170310174740.GF19517@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/10/2017 05:20 AM, Pavel Machek wrote:
-> On Wed 2017-03-08 09:31:44, Florian Fainelli wrote:
->> On 03/07/2017 10:41 PM, Rafa? Mi?ecki wrote:
->>> From: Rafa? Mi?ecki <rafal@milecki.pl>
->>>
->>> Such a trigger doesn't exist in Linux and is not needed as LED is being
->>> turned off by default. This could cause errors in LEDs core code when
->>> trying to set default trigger.
->>>
->>> Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
->>
->> Since you are fixing something, what's the proper Fixes: tag for this
->> commit? Likewise for the second patch.
+On Fri, Mar 10, 2017 at 05:02:48PM +0100, Rafa? Mi?ecki wrote:
+> On 03/09/2017 07:22 PM, Bjorn Helgaas wrote:
+> >On Thu, Mar 09, 2017 at 08:39:07AM +0100, Rafa? Mi?ecki wrote:
+> >>On 03/08/2017 01:56 PM, Rafa? Mi?ecki wrote:
+> >>>I just tried upgrading BCM5301X from 4.4 to 4.9 and noticed I don't see card
+> >>>connected to the 2nd controller.
+> >>>
+> >>>pcie_iproc_bcma bcma0:7: PCI host bridge to bus 0000:00
+> >>>pci_bus 0000:00: root bus resource [mem 0x08000000-0x0fffffff]
+> >>>pcie_iproc_bcma bcma0:7: link: UP
+> >>>PCI: bus0: Fast back to back transfers disabled
+> >>>pci 0000:00:00.0: bridge configuration invalid ([bus 00-00]), reconfiguring
+> >>>PCI: bus1: Fast back to back transfers disabled
+> >>>pci 0000:00:00.0: BAR 8: assigned [mem 0x08000000-0x080fffff]
+> >>>pci 0000:01:00.0: BAR 0: assigned [mem 0x08000000-0x08007fff 64bit]
+> >>>pci 0000:00:00.0: PCI bridge to [bus 01]
+> >>>pci 0000:00:00.0:   bridge window [mem 0x08000000-0x080fffff]
+> >>>
+> >>>pcie_iproc_bcma bcma0:8: resource collision: [mem 0x40000000-0x47ffffff] conflicts with PCIe MEM space [mem 0x40000000-0x47ffffff]
+> >>>pcie_iproc_bcma bcma0:8: PCIe controller setup failed
+> >>>pcie_iproc_bcma: probe of bcma0:8 failed with error -16
+> >>>
+> >>>
+> >>>This used to work with older kernels because there wasn't any collision check:
+> >>>
+> >>>pcie_iproc_bcma bcma0:7: PCI host bridge to bus 0000:00
+> >>>pci_bus 0000:00: root bus resource [mem 0x08000000-0x0fffffff]
+> >>>pcie_iproc_bcma bcma0:7: link: UP
+> >>>PCI: bus0: Fast back to back transfers disabled
+> >>>pci 0000:00:00.0: bridge configuration invalid ([bus 00-00]), reconfiguring
+> >>>PCI: bus1: Fast back to back transfers disabled
+> >>>pci 0000:00:00.0: BAR 8: assigned [mem 0x08000000-0x080fffff]
+> >>>pci 0000:01:00.0: BAR 0: assigned [mem 0x08000000-0x08007fff 64bit]
+> >>>pci 0000:00:00.0: PCI bridge to [bus 01]
+> >>>pci 0000:00:00.0:   bridge window [mem 0x08000000-0x080fffff]
+> >>>
+> >>>pcie_iproc_bcma bcma0:8: PCI host bridge to bus 0001:00
+> >>>pci_bus 0001:00: root bus resource [mem 0x40000000-0x47ffffff]
+> >>>pcie_iproc_bcma bcma0:8: link: UP
+> >>>PCI: bus0: Fast back to back transfers disabled
+> >>>pci 0001:00:00.0: bridge configuration invalid ([bus 00-00]), reconfiguring
+> >>>PCI: bus1: Fast back to back transfers disabled
+> >>>pci 0001:00:00.0: BAR 8: assigned [mem 0x40000000-0x400fffff]
+> >>>pci 0001:01:00.0: BAR 0: assigned [mem 0x40000000-0x40007fff 64bit]
+> >>>pci 0001:00:00.0: PCI bridge to [bus 01]
+> >>>pci 0001:00:00.0:   bridge window [mem 0x40000000-0x400fffff]
+> >>>
+> >>>
+> >>>I guess the check is OK after all and the real problem is iproc driver assigning
+> >>>the same resource.
+> >>>
+> >>>Broadcom team: could you take a look at this, please?
+> >>
+> >>I found a reason of this conflict (and probably random crashes I started
+> >>seeing with 4.9). I believe we have a memory corruption.
+> >
+> >Yep, we're using a resource structure on the stack when we shouldn't.  Can
+> >you try the patch below?
 > 
-> Lets not make submitting patches any harder than it already is.
+> Works great! Will you push it with
+> Cc: stable at vger.kernel.org # v4.8+
+> please?
 
-If it was fixing something that was already in Linus' tree, it's
-important to know so I can queue the patch for the appropriate pull
-request targeting e.g: v4.11-rcX, this is not needed here as Rafal later
-indicated.
--- 
-Florian
+Thanks for testing this.  I applied the patch (with the braces fix) to
+for-linus for v4.11.
+
+> >(...)
+> > 	if (ret)
+> > 		dev_err(dev, "PCIe controller setup failed\n");
+> >-
+> >-	pci_free_resource_list(&res);
+> >+		pci_free_resource_list(&resources);
+> >+		return ret;
+> >+	}
+> 
+> Works great, except it doesn't compile (braces) ;)
