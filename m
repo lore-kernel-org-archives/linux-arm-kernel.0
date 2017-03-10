@@ -1,95 +1,172 @@
 From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Thu,  9 Mar 2017 20:53:13 -0800
-Subject: [PATCH v5 33/39] media: imx: mipi-csi2: enable setting and getting of
- frame rates
+Date: Thu,  9 Mar 2017 20:53:14 -0800
+Subject: [PATCH v5 34/39] media: imx: csi: add __csi_get_fmt
 In-Reply-To: <1489121599-23206-1-git-send-email-steve_longerbeam@mentor.com>
 References: <1489121599-23206-1-git-send-email-steve_longerbeam@mentor.com>
-Message-ID: <1489121599-23206-34-git-send-email-steve_longerbeam@mentor.com>
+Message-ID: <1489121599-23206-35-git-send-email-steve_longerbeam@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Russell King <rmk+kernel@armlinux.org.uk>
+Add __csi_get_fmt() and use it to return the correct mbus format
+(active or try) in get_fmt. Use it in other places as well.
 
-Setting and getting frame rates is part of the negotiation mechanism
-between subdevs.  The lack of support means that a frame rate at the
-sensor can't be negotiated through the subdev path.
-
-Add support at MIPI CSI2 level for handling this part of the
-negotiation.
-
-Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
+Suggested-by: Russell King <linux@armlinux.org.uk>
 ---
- drivers/staging/media/imx/imx6-mipi-csi2.c | 36 ++++++++++++++++++++++++++++++
- 1 file changed, 36 insertions(+)
+ drivers/staging/media/imx/imx-media-csi.c | 61 ++++++++++++++++++++++++-------
+ 1 file changed, 47 insertions(+), 14 deletions(-)
 
-diff --git a/drivers/staging/media/imx/imx6-mipi-csi2.c b/drivers/staging/media/imx/imx6-mipi-csi2.c
-index 1a71b40..d8f931e 100644
---- a/drivers/staging/media/imx/imx6-mipi-csi2.c
-+++ b/drivers/staging/media/imx/imx6-mipi-csi2.c
-@@ -49,6 +49,7 @@ struct csi2_dev {
- 	struct mutex lock;
- 
- 	struct v4l2_mbus_framefmt format_mbus;
-+	struct v4l2_fract frame_interval;
- 
- 	int                     power_count;
- 	bool                    stream_on;
-@@ -487,6 +488,35 @@ static int csi2_set_fmt(struct v4l2_subdev *sd,
- 	return ret;
+diff --git a/drivers/staging/media/imx/imx-media-csi.c b/drivers/staging/media/imx/imx-media-csi.c
+index 577038e..6640869 100644
+--- a/drivers/staging/media/imx/imx-media-csi.c
++++ b/drivers/staging/media/imx/imx-media-csi.c
+@@ -830,13 +830,26 @@ static int csi_eof_isr(struct v4l2_subdev *sd, u32 status, bool *handled)
+ 	return 0;
  }
  
-+static int csi2_g_frame_interval(struct v4l2_subdev *sd,
-+				 struct v4l2_subdev_frame_interval *fi)
+-static int csi_try_crop(struct csi_priv *priv, struct v4l2_rect *crop,
++static struct v4l2_mbus_framefmt *
++__csi_get_fmt(struct csi_priv *priv, struct v4l2_subdev_pad_config *cfg,
++	      unsigned int pad, enum v4l2_subdev_format_whence which)
 +{
-+	struct csi2_dev *csi2 = sd_to_dev(sd);
-+
-+	mutex_lock(&csi2->lock);
-+	fi->interval = csi2->frame_interval;
-+	mutex_unlock(&csi2->lock);
-+
-+	return 0;
++	if (which == V4L2_SUBDEV_FORMAT_TRY)
++		return v4l2_subdev_get_try_format(&priv->sd, cfg, pad);
++	else
++		return &priv->format_mbus[pad];
 +}
 +
-+static int csi2_s_frame_interval(struct v4l2_subdev *sd,
-+				 struct v4l2_subdev_frame_interval *fi)
-+{
-+	struct csi2_dev *csi2 = sd_to_dev(sd);
-+
-+	mutex_lock(&csi2->lock);
-+
-+	/* Output pads mirror active input pad, no limits on input pads */
-+	if (fi->pad != CSI2_SINK_PAD)
-+		fi->interval = csi2->frame_interval;
-+
-+	csi2->frame_interval = fi->interval;
-+
-+	mutex_unlock(&csi2->lock);
-+	return 0;
-+}
-+
- static int csi2_link_validate(struct v4l2_subdev *sd,
- 			      struct media_link *link,
- 			      struct v4l2_subdev_format *source_fmt,
-@@ -535,6 +565,8 @@ static struct v4l2_subdev_core_ops csi2_core_ops = {
++static int csi_try_crop(struct csi_priv *priv,
++			struct v4l2_rect *crop,
++			struct v4l2_subdev_pad_config *cfg,
++			enum v4l2_subdev_format_whence which,
+ 			struct imx_media_subdev *sensor)
+ {
+ 	struct v4l2_of_endpoint *sensor_ep;
+ 	struct v4l2_mbus_framefmt *infmt;
  
- static struct v4l2_subdev_video_ops csi2_video_ops = {
- 	.s_stream = csi2_s_stream,
-+	.g_frame_interval = csi2_g_frame_interval,
-+	.s_frame_interval = csi2_s_frame_interval,
- };
+-	infmt = &priv->format_mbus[CSI_SINK_PAD];
++	infmt = __csi_get_fmt(priv, cfg, CSI_SINK_PAD, which);
+ 	sensor_ep = &sensor->sensor_ep;
  
- static struct v4l2_subdev_pad_ops csi2_pad_ops = {
-@@ -603,6 +635,10 @@ static int csi2_probe(struct platform_device *pdev)
- 	csi2->sd.entity.function = MEDIA_ENT_F_VID_IF_BRIDGE;
- 	csi2->sd.grp_id = IMX_MEDIA_GRP_ID_CSI2;
+ 	crop->width = min_t(__u32, infmt->width, crop->width);
+@@ -886,17 +899,24 @@ static int csi_get_fmt(struct v4l2_subdev *sd,
+ 		       struct v4l2_subdev_format *sdformat)
+ {
+ 	struct csi_priv *priv = v4l2_get_subdevdata(sd);
++	struct v4l2_mbus_framefmt *fmt;
++	int ret = 0;
  
-+	/* init default frame interval */
-+	csi2->frame_interval.numerator = 1;
-+	csi2->frame_interval.denominator = 30;
+ 	if (sdformat->pad >= CSI_NUM_PADS)
+ 		return -EINVAL;
+ 
+ 	mutex_lock(&priv->lock);
+ 
+-	sdformat->format = priv->format_mbus[sdformat->pad];
++	fmt = __csi_get_fmt(priv, cfg, sdformat->pad, sdformat->which);
++	if (!fmt) {
++		ret = -EINVAL;
++		goto out;
++	}
+ 
++	sdformat->format = *fmt;
++out:
+ 	mutex_unlock(&priv->lock);
+-
+-	return 0;
++	return ret;
+ }
+ 
+ static int csi_set_fmt(struct v4l2_subdev *sd,
+@@ -927,8 +947,6 @@ static int csi_set_fmt(struct v4l2_subdev *sd,
+ 		goto out;
+ 	}
+ 
+-	infmt = &priv->format_mbus[CSI_SINK_PAD];
+-
+ 	v4l_bound_align_image(&sdformat->format.width, MIN_W, MAX_W,
+ 			      W_ALIGN, &sdformat->format.height,
+ 			      MIN_H, MAX_H, H_ALIGN, S_ALIGN);
+@@ -936,6 +954,8 @@ static int csi_set_fmt(struct v4l2_subdev *sd,
+ 	switch (sdformat->pad) {
+ 	case CSI_SRC_PAD_DIRECT:
+ 	case CSI_SRC_PAD_IDMAC:
++		infmt = __csi_get_fmt(priv, cfg, CSI_SINK_PAD, sdformat->which);
 +
- 	ret = csi2_parse_endpoints(csi2);
+ 		if (sdformat->format.width < priv->crop.width * 3 / 4)
+ 			sdformat->format.width = priv->crop.width / 2;
+ 		else
+@@ -994,7 +1014,8 @@ static int csi_set_fmt(struct v4l2_subdev *sd,
+ 		crop.top = 0;
+ 		crop.width = sdformat->format.width;
+ 		crop.height = sdformat->format.height;
+-		ret = csi_try_crop(priv, &crop, sensor);
++		ret = csi_try_crop(priv, &crop, cfg,
++				   sdformat->which, sensor);
+ 		if (ret)
+ 			goto out;
+ 
+@@ -1039,7 +1060,11 @@ static int csi_get_selection(struct v4l2_subdev *sd,
+ 
+ 	mutex_lock(&priv->lock);
+ 
+-	infmt = &priv->format_mbus[CSI_SINK_PAD];
++	infmt = __csi_get_fmt(priv, cfg, CSI_SINK_PAD, sel->which);
++	if (!infmt) {
++		ret = -EINVAL;
++		goto out;
++	}
+ 
+ 	switch (sel->target) {
+ 	case V4L2_SEL_TGT_CROP_BOUNDS:
+@@ -1049,12 +1074,20 @@ static int csi_get_selection(struct v4l2_subdev *sd,
+ 		sel->r.height = infmt->height;
+ 		break;
+ 	case V4L2_SEL_TGT_CROP:
+-		sel->r = priv->crop;
++		if (sel->which == V4L2_SUBDEV_FORMAT_TRY) {
++			struct v4l2_rect *try_crop =
++				v4l2_subdev_get_try_crop(&priv->sd,
++							 cfg, sel->pad);
++			sel->r = *try_crop;
++		} else {
++			sel->r = priv->crop;
++		}
+ 		break;
+ 	default:
+ 		ret = -EINVAL;
+ 	}
+ 
++out:
+ 	mutex_unlock(&priv->lock);
+ 	return ret;
+ }
+@@ -1064,7 +1097,6 @@ static int csi_set_selection(struct v4l2_subdev *sd,
+ 			     struct v4l2_subdev_selection *sel)
+ {
+ 	struct csi_priv *priv = v4l2_get_subdevdata(sd);
+-	struct v4l2_mbus_framefmt *outfmt;
+ 	struct imx_media_subdev *sensor;
+ 	int ret = 0;
+ 
+@@ -1098,15 +1130,16 @@ static int csi_set_selection(struct v4l2_subdev *sd,
+ 		goto out;
+ 	}
+ 
+-	outfmt = &priv->format_mbus[sel->pad];
+-
+-	ret = csi_try_crop(priv, &sel->r, sensor);
++	ret = csi_try_crop(priv, &sel->r, cfg, sel->which, sensor);
  	if (ret)
- 		return ret;
+ 		goto out;
+ 
+ 	if (sel->which == V4L2_SUBDEV_FORMAT_TRY) {
+ 		cfg->try_crop = sel->r;
+ 	} else {
++		struct v4l2_mbus_framefmt *outfmt =
++			&priv->format_mbus[sel->pad];
++
+ 		priv->crop = sel->r;
+ 		/* Update the source format */
+ 		outfmt->width = sel->r.width;
 -- 
 2.7.4
