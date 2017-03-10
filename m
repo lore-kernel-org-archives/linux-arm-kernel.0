@@ -1,76 +1,37 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Fri, 10 Mar 2017 13:07:26 +0100
-Subject: [PATCH v5 16/39] [media] v4l2: add a new-frame before
- end-of-frame event
-In-Reply-To: <1489121599-23206-17-git-send-email-steve_longerbeam@mentor.com>
-References: <1489121599-23206-1-git-send-email-steve_longerbeam@mentor.com>
- <1489121599-23206-17-git-send-email-steve_longerbeam@mentor.com>
-Message-ID: <72a06329-7f65-fef9-3153-573d9abb2689@xs4all.nl>
+From: niklas.cassel@axis.com (Niklas Cassel)
+Date: Fri, 10 Mar 2017 13:23:23 +0100
+Subject: [RESEND PATCH v3 4/7] PCI: dwc: all: Modify dbi accessors to take
+ dbi_base as argument
+In-Reply-To: <58C28FCC.4070100@ti.com>
+References: <1489041545-15730-1-git-send-email-kishon@ti.com>
+ <1489041545-15730-5-git-send-email-kishon@ti.com>
+ <4e13580d-2625-5eed-bcbc-2ffd7493b073@axis.com>
+ <595fab62-fb7a-888a-f898-7b59030585f1@axis.com> <58C28FCC.4070100@ti.com>
+Message-ID: <789eb88c-982e-9581-49a6-a337251bf781@axis.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/03/17 05:52, Steve Longerbeam wrote:
-> Add a NEW_FRAME_BEFORE_EOF event to signal that a video capture or
-> output device has signaled a new frame is ready before a previous
-> frame has completed reception or transmission. This usually indicates
-> a DMA read/write channel is having trouble gaining bus access.
-
-This too is a weird event. Based on what you describe this basically means
-that the previous frame is incomplete, in which case you would typically
-return the buffer with the V4L2_BUF_FLAG_ERROR bit set.
-
-Using an event for this is not a good idea.
-
-Regards,
-
-	Hans
-
-> Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
-> ---
->  Documentation/media/uapi/v4l/vidioc-dqevent.rst | 6 ++++++
->  Documentation/media/videodev2.h.rst.exceptions  | 1 +
->  include/uapi/linux/videodev2.h                  | 1 +
->  3 files changed, 8 insertions(+)
-> 
-> diff --git a/Documentation/media/uapi/v4l/vidioc-dqevent.rst b/Documentation/media/uapi/v4l/vidioc-dqevent.rst
-> index dc77363..54bc7ae 100644
-> --- a/Documentation/media/uapi/v4l/vidioc-dqevent.rst
-> +++ b/Documentation/media/uapi/v4l/vidioc-dqevent.rst
-> @@ -203,6 +203,12 @@ call.
->  	has measured an interval between the reception or transmit
->  	completion of two consecutive frames of video that is outside
->  	the nominal frame interval by some tolerance value.
-> +    * - ``V4L2_EVENT_NEW_FRAME_BEFORE_EOF``
-> +      - 8
-> +      - This event is triggered when the video capture or output device
-> +	has signaled a new frame is ready before a previous frame has
-> +	completed reception or transmission. This usually indicates a
-> +	DMA read/write channel is having trouble gaining bus access.
->      * - ``V4L2_EVENT_PRIVATE_START``
->        - 0x08000000
->        - Base event number for driver-private events.
-> diff --git a/Documentation/media/videodev2.h.rst.exceptions b/Documentation/media/videodev2.h.rst.exceptions
-> index c7d8fad..be6f332 100644
-> --- a/Documentation/media/videodev2.h.rst.exceptions
-> +++ b/Documentation/media/videodev2.h.rst.exceptions
-> @@ -460,6 +460,7 @@ replace define V4L2_EVENT_FRAME_SYNC event-type
->  replace define V4L2_EVENT_SOURCE_CHANGE event-type
->  replace define V4L2_EVENT_MOTION_DET event-type
->  replace define V4L2_EVENT_FRAME_INTERVAL_ERROR event-type
-> +replace define V4L2_EVENT_NEW_FRAME_BEFORE_EOF event-type
->  replace define V4L2_EVENT_PRIVATE_START event-type
->  
->  replace define V4L2_EVENT_CTRL_CH_VALUE ctrl-changes-flags
-> diff --git a/include/uapi/linux/videodev2.h b/include/uapi/linux/videodev2.h
-> index cf5a0d0..f54a82a 100644
-> --- a/include/uapi/linux/videodev2.h
-> +++ b/include/uapi/linux/videodev2.h
-> @@ -2132,6 +2132,7 @@ struct v4l2_streamparm {
->  #define V4L2_EVENT_SOURCE_CHANGE		5
->  #define V4L2_EVENT_MOTION_DET			6
->  #define V4L2_EVENT_FRAME_INTERVAL_ERROR		7
-> +#define V4L2_EVENT_NEW_FRAME_BEFORE_EOF		8
->  #define V4L2_EVENT_PRIVATE_START		0x08000000
->  
->  /* Payload for V4L2_EVENT_VSYNC */
-> 
+On 03/10/2017 12:36 PM, Kishon Vijay Abraham I wrote:
+> Hi,
+>
+> On Thursday 09 March 2017 08:35 PM, Niklas Cassel wrote:
+>>
+>> On 03/09/2017 03:48 PM, Niklas Cassel wrote:
+>>> On 03/09/2017 07:39 AM, Kishon Vijay Abraham I wrote:
+>>>> dwc has 2 dbi address space labeled dbics and dbics2. The existing
+>>>> helper to access dbi address space can access only dbics. However
+>>>> dbics2 has to be accessed for programming the BAR registers in the
+>>>> case of EP mode. This is in preparation for adding EP mode support
+>>>> to dwc driver.
+>>> Hello Kishon
+>>>
+>>> I don't really like the idea of adding an extra argument to every existing read/write.
+>>> Will not a read/write using dbi2 be quite uncommon compared to a read/write
+>>> using dbi?
+>>>
+>>> How about something like this:
+>>>
+>>> void __dw_pcie_writel(struct dw_pcie *pci, void __iomem *base, u32 reg, u32 val)
+>>> {
+>>>     if (pci->ops->writel_dbi)
+>>>         pci->ops->writel_dbi(pci, base, reg, val);x?W?R
