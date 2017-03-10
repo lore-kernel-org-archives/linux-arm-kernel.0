@@ -1,76 +1,89 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 10 Mar 2017 16:00:32 +0000
-Subject: Neophyte questions about PCIe
-In-Reply-To: <063D6719AE5E284EB5DD2968C1650D6DCFE7C9B9@AcuExch.aculab.com>
-References: <ced6a4bf-c94a-c116-1e94-52a8d675d132@free.fr>
- <20170308151724.GA20780@bhelgaas-glaptop.roam.corp.google.com>
- <f964ee05-db7f-c381-c91c-82897175da6d@free.fr>
- <1092d971-5d81-2da7-4b34-0a88637c0ec5@arm.com>
- <063D6719AE5E284EB5DD2968C1650D6DCFE7C8BA@AcuExch.aculab.com>
- <c4712e19-863c-16b8-6920-5ad7dd178929@free.fr>
- <4f37cc08-d4fd-b207-63d2-4ac038d2fcec@arm.com>
- <063D6719AE5E284EB5DD2968C1650D6DCFE7C9B9@AcuExch.aculab.com>
-Message-ID: <504fdb97-f058-e1fb-0fe2-7f01c46db513@arm.com>
+From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
+Date: Fri, 10 Mar 2017 17:02:48 +0100
+Subject: pcie-iproc: broken 2nd (& 3rd?) controller support by
+ c3245a566400 ("PCI: iproc: Request host bridge window resources")
+In-Reply-To: <20170309182205.GB3685@bhelgaas-glaptop.roam.corp.google.com>
+References: <faab6b85-58e8-3e62-8763-56a94b13fba1@gmail.com>
+ <f40bbf2f-3ba9-3992-d417-6588085f3d62@gmail.com>
+ <20170309182205.GB3685@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <04f747ef-0f39-33ec-0cea-2e9fb85d46e8@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/03/17 15:35, David Laight wrote:
-> From: Robin Murphy 
->> Sent: 10 March 2017 15:23
-> ...
->>>> So you have 128MB (max) of system memory that has cpu physical
->>>> addresses 0x80000000 upwards.
->>>> I'd expect it all to be accessible from any PCIe card at some PCIe
->>>> address, it might be at address 0, 0x80000000 or any other offset.
->>>>
->>>> I don't know which DT entry controls that offset.
+On 03/09/2017 07:22 PM, Bjorn Helgaas wrote:
+> On Thu, Mar 09, 2017 at 08:39:07AM +0100, Rafa? Mi?ecki wrote:
+>> On 03/08/2017 01:56 PM, Rafa? Mi?ecki wrote:
+>>> I just tried upgrading BCM5301X from 4.4 to 4.9 and noticed I don't see card
+>>> connected to the 2nd controller.
 >>>
->>> This is a crucial point, I think.
+>>> pcie_iproc_bcma bcma0:7: PCI host bridge to bus 0000:00
+>>> pci_bus 0000:00: root bus resource [mem 0x08000000-0x0fffffff]
+>>> pcie_iproc_bcma bcma0:7: link: UP
+>>> PCI: bus0: Fast back to back transfers disabled
+>>> pci 0000:00:00.0: bridge configuration invalid ([bus 00-00]), reconfiguring
+>>> PCI: bus1: Fast back to back transfers disabled
+>>> pci 0000:00:00.0: BAR 8: assigned [mem 0x08000000-0x080fffff]
+>>> pci 0000:01:00.0: BAR 0: assigned [mem 0x08000000-0x08007fff 64bit]
+>>> pci 0000:00:00.0: PCI bridge to [bus 01]
+>>> pci 0000:00:00.0:   bridge window [mem 0x08000000-0x080fffff]
+>>>
+>>> pcie_iproc_bcma bcma0:8: resource collision: [mem 0x40000000-0x47ffffff] conflicts with PCIe MEM space [mem 0x40000000-0x47ffffff]
+>>> pcie_iproc_bcma bcma0:8: PCIe controller setup failed
+>>> pcie_iproc_bcma: probe of bcma0:8 failed with error -16
+>>>
+>>>
+>>> This used to work with older kernels because there wasn't any collision check:
+>>>
+>>> pcie_iproc_bcma bcma0:7: PCI host bridge to bus 0000:00
+>>> pci_bus 0000:00: root bus resource [mem 0x08000000-0x0fffffff]
+>>> pcie_iproc_bcma bcma0:7: link: UP
+>>> PCI: bus0: Fast back to back transfers disabled
+>>> pci 0000:00:00.0: bridge configuration invalid ([bus 00-00]), reconfiguring
+>>> PCI: bus1: Fast back to back transfers disabled
+>>> pci 0000:00:00.0: BAR 8: assigned [mem 0x08000000-0x080fffff]
+>>> pci 0000:01:00.0: BAR 0: assigned [mem 0x08000000-0x08007fff 64bit]
+>>> pci 0000:00:00.0: PCI bridge to [bus 01]
+>>> pci 0000:00:00.0:   bridge window [mem 0x08000000-0x080fffff]
+>>>
+>>> pcie_iproc_bcma bcma0:8: PCI host bridge to bus 0001:00
+>>> pci_bus 0001:00: root bus resource [mem 0x40000000-0x47ffffff]
+>>> pcie_iproc_bcma bcma0:8: link: UP
+>>> PCI: bus0: Fast back to back transfers disabled
+>>> pci 0001:00:00.0: bridge configuration invalid ([bus 00-00]), reconfiguring
+>>> PCI: bus1: Fast back to back transfers disabled
+>>> pci 0001:00:00.0: BAR 8: assigned [mem 0x40000000-0x400fffff]
+>>> pci 0001:01:00.0: BAR 0: assigned [mem 0x40000000-0x40007fff 64bit]
+>>> pci 0001:00:00.0: PCI bridge to [bus 01]
+>>> pci 0001:00:00.0:   bridge window [mem 0x40000000-0x400fffff]
+>>>
+>>>
+>>> I guess the check is OK after all and the real problem is iproc driver assigning
+>>> the same resource.
+>>>
+>>> Broadcom team: could you take a look at this, please?
 >>
->> The appropriate DT property would be "dma-ranges", i.e.
->>
->> pci at ... {
->> 	...
->> 	dma-ranges = <(PCI bus address) (CPU phys address) (size)>;
->> }
-> 
-> Isn't that just saying which physical addresses the cpu can assign
-> for buffers for those devices?
-> There is also an offset between the 'cpu physical address' and the
-> 'dma address'.
+>> I found a reason of this conflict (and probably random crashes I started
+>> seeing with 4.9). I believe we have a memory corruption.
+>
+> Yep, we're using a resource structure on the stack when we shouldn't.  Can
+> you try the patch below?
 
-That offset is inherent in what "dma-ranges" describes. Say (for ease of
-calculation) that BAR0 has been put at a mem space address of 0x20000000
-and maps the first 1GB of physical DRAM. That would give us:
+Works great! Will you push it with
+Cc: stable at vger.kernel.org # v4.8+
+please?
 
-	dma-ranges = <0x20000000 0x80000000 0x40000000>;
+Thanks for looking at this!
 
-Then a "virt = dma_alloc_coherent(..., &handle, ...)", borrowing the
-numbers from earlier in the thread, would automatically end up with:
+Also see below...
 
-	virt == 0xd0855000;
-	handle == 0x2e07e000;
 
-(with the physical address of 0x8e07e000 in between being irrelevant to
-the consuming driver)
+> (...)
+>  	if (ret)
+>  		dev_err(dev, "PCIe controller setup failed\n");
+> -
+> -	pci_free_resource_list(&res);
+> +		pci_free_resource_list(&resources);
+> +		return ret;
+> +	}
 
-It is true that the device's DMA mask assignment is also part and parcel
-of this, whereby we will limit what physical addresses the kernel
-considers valid for DMA involving devices behind this range to the lower
-3GB (i.e. 0x80000000 + 0x40000000 - 1). With a bit of luck,
-CONFIG_DMABOUNCE should do the rest of the job of working around that
-where necessary.
-
-Robin.
-
-> This might be implicit in the 'BAR0' base address register.
->  
->> The fun part is that that will only actually match the hardware once the
->> magic BAR has actually been programmed with (bus address), so you end up
->> with this part of your DT being more of a prophecy than a property :)
-> 
-> The BAR0 values could easily be programmed into the cpld/fpga - so
-> not need writing by the cpu at all.
-> 
-> 	David
-> 
+Works great, except it doesn't compile (braces) ;)
