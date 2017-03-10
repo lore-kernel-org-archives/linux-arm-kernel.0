@@ -1,40 +1,52 @@
-From: patrice.chotard@st.com (Patrice CHOTARD)
-Date: Fri, 10 Mar 2017 08:40:10 +0000
-Subject: [PATCH 3/3] mmc: sdhci-st: remove unnecessary
- platform_set_drvdata() call
-In-Reply-To: <20170310031733.812-4-jszhang@marvell.com>
-References: <20170310031733.812-1-jszhang@marvell.com>
- <20170310031733.812-4-jszhang@marvell.com>
-Message-ID: <7e8b38e3-16a3-b00d-b30b-e24aa0f9d85a@st.com>
+From: sumit.semwal@linaro.org (Sumit Semwal)
+Date: Fri, 10 Mar 2017 14:23:53 +0530
+Subject: [RFC PATCH 08/12] cma: Store a name in the cma structure
+In-Reply-To: <1488491084-17252-9-git-send-email-labbott@redhat.com>
+References: <1488491084-17252-1-git-send-email-labbott@redhat.com>
+ <1488491084-17252-9-git-send-email-labbott@redhat.com>
+Message-ID: <CAO_48GEHxuMMwZO71ytaVhRkapMYaAWBWd1gW+ktspnQg=b8Sw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jisheng
+Hi Laura,
 
-On 03/10/2017 04:17 AM, Jisheng Zhang wrote:
-> sdhci_pltfm_init() has already set the platform drvdata for us, remove
-> the unnecessary platform_set_drvdata() call.
+Thanks for the patch.
+
+On 3 March 2017 at 03:14, Laura Abbott <labbott@redhat.com> wrote:
 >
-> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> Frameworks that may want to enumerate CMA heaps (e.g. Ion) will find it
+> useful to have an explicit name attached to each region. Store the name
+> in each CMA structure.
+>
+> Signed-off-by: Laura Abbott <labbott@redhat.com>
 > ---
->  drivers/mmc/host/sdhci-st.c | 2 --
->  1 file changed, 2 deletions(-)
+>  drivers/base/dma-contiguous.c |  5 +++--
+>  include/linux/cma.h           |  4 +++-
+>  mm/cma.c                      | 11 +++++++++--
+>  mm/cma.h                      |  1 +
+>  mm/cma_debug.c                |  2 +-
+>  5 files changed, 17 insertions(+), 6 deletions(-)
 >
-> diff --git a/drivers/mmc/host/sdhci-st.c b/drivers/mmc/host/sdhci-st.c
-> index ed92ce729dde..7fff6490855c 100644
-> --- a/drivers/mmc/host/sdhci-st.c
-> +++ b/drivers/mmc/host/sdhci-st.c
-> @@ -418,8 +418,6 @@ static int sdhci_st_probe(struct platform_device *pdev)
->  		goto err_out;
->  	}
->
-> -	platform_set_drvdata(pdev, host);
-> -
->  	host_version = readw_relaxed((host->ioaddr + SDHCI_HOST_VERSION));
->
->  	dev_info(&pdev->dev, "SDHCI ST Initialised: Host Version: 0x%x Vendor Version 0x%x\n",
->
+<snip>
+> +const char *cma_get_name(const struct cma *cma)
+> +{
+> +       return cma->name ? cma->name : "(undefined)";
+> +}
+> +
+Would it make sense to perhaps have the idx stored as the name,
+instead of 'undefined'? That would make sure that the various cma
+names are still unique.
 
-Acked-by: Patrice Chotard <patrice.chotard@st.com>
+>  static unsigned long cma_bitmap_aligned_mask(const struct cma *cma,
+>                                              int align_order)
+>  {
+> @@ -168,6 +173,7 @@ core_initcall(cma_init_reserved_areas);
+>   */
+>  int __init cma_init_reserved_mem(phys_addr_t base, phys_addr_t size,
+>                                  unsigned int order_per_bit,
+> +                                const char *name,
+>                                  struct cma **res_cma)
+>  {
 
-Thanks
+Best regards,
+Sumit.
