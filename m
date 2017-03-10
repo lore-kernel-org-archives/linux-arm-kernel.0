@@ -1,63 +1,74 @@
-From: roy.pledge@nxp.com (Roy Pledge)
-Date: Fri, 10 Mar 2017 15:15:04 -0500
-Subject: [RESEND PATCH] soc/qbman: Disable IRQs for deferred QBMan work
-Message-ID: <1489176904-16297-1-git-send-email-roy.pledge@nxp.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 10 Mar 2017 20:32:24 +0000
+Subject: [PATCH 5/6] arm64: cache: Identify VPIPT I-caches
+In-Reply-To: <1489177945-8590-1-git-send-email-will.deacon@arm.com>
+References: <1489177945-8590-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1489177945-8590-5-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Work for Congestion State Notifications (CSCN) and Message Ring (MR)
-handling is handled via the workqueue mechanism. This requires the
-driver to disable those IRQs before scheduling the work and re-enabling
-it once the work is completed so that the interrupt doesn't continually
-fire.
+Add support for detecting VPIPT I-caches, as introduced by ARMv8.2.
 
-Signed-off-by: Roy Pledge <roy.pledge@nxp.com>
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- drivers/soc/fsl/qbman/qman.c |    5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm64/include/asm/cache.h | 7 +++++++
+ arch/arm64/kernel/cpuinfo.c    | 4 ++++
+ 2 files changed, 11 insertions(+)
 
-diff --git a/drivers/soc/fsl/qbman/qman.c b/drivers/soc/fsl/qbman/qman.c
-index d67b8e1..f1a242a 100644
---- a/drivers/soc/fsl/qbman/qman.c
-+++ b/drivers/soc/fsl/qbman/qman.c
-@@ -1382,6 +1382,7 @@ static void qm_congestion_task(struct work_struct *work)
- 	if (!qm_mc_result_timeout(&p->p, &mcr)) {
- 		spin_unlock(&p->cgr_lock);
- 		dev_crit(p->config->dev, "QUERYCONGESTION timeout\n");
-+		qman_p_irqsource_add(p, QM_PIRQ_CSCI);
- 		return;
- 	}
- 	/* mask out the ones I'm not interested in */
-@@ -1396,6 +1397,7 @@ static void qm_congestion_task(struct work_struct *work)
- 		if (cgr->cb && qman_cgrs_get(&c, cgr->cgrid))
- 			cgr->cb(p, cgr, qman_cgrs_get(&rr, cgr->cgrid));
- 	spin_unlock(&p->cgr_lock);
-+	qman_p_irqsource_add(p, QM_PIRQ_CSCI);
+diff --git a/arch/arm64/include/asm/cache.h b/arch/arm64/include/asm/cache.h
+index 7acb52634299..ea9bb4e0e9bb 100644
+--- a/arch/arm64/include/asm/cache.h
++++ b/arch/arm64/include/asm/cache.h
+@@ -25,6 +25,7 @@
+ 
+ #define CTR_L1IP(ctr)		(((ctr) >> CTR_L1IP_SHIFT) & CTR_L1IP_MASK)
+ 
++#define ICACHE_POLICY_VPIPT	0
+ #define ICACHE_POLICY_VIPT	2
+ #define ICACHE_POLICY_PIPT	3
+ 
+@@ -45,6 +46,7 @@
+ #include <linux/bitops.h>
+ 
+ #define ICACHEF_ALIASING	0
++#define ICACHEF_VPIPT		1
+ extern unsigned long __icache_flags;
+ 
+ /*
+@@ -56,6 +58,11 @@ static inline int icache_is_aliasing(void)
+ 	return test_bit(ICACHEF_ALIASING, &__icache_flags);
  }
  
- static void qm_mr_process_task(struct work_struct *work)
-@@ -1455,12 +1457,14 @@ static void qm_mr_process_task(struct work_struct *work)
- 	}
- 
- 	qm_mr_cci_consume(&p->p, num);
-+	qman_p_irqsource_add(p, QM_PIRQ_MRI);
- 	preempt_enable();
- }
- 
- static u32 __poll_portal_slow(struct qman_portal *p, u32 is)
++static inline int icache_is_vpipt(void)
++{
++	return test_bit(ICACHEF_VPIPT, &__icache_flags);
++}
++
+ static inline u32 cache_type_cwg(void)
  {
- 	if (is & QM_PIRQ_CSCI) {
-+		qman_p_irqsource_remove(p, QM_PIRQ_CSCI);
- 		queue_work_on(smp_processor_id(), qm_portal_wq,
- 			      &p->congestion_work);
- 	}
-@@ -1472,6 +1476,7 @@ static u32 __poll_portal_slow(struct qman_portal *p, u32 is)
- 	}
+ 	return (read_cpuid_cachetype() >> CTR_CWG_SHIFT) & CTR_CWG_MASK;
+diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
+index 260b54f415b8..7d27f4b4881e 100644
+--- a/arch/arm64/kernel/cpuinfo.c
++++ b/arch/arm64/kernel/cpuinfo.c
+@@ -46,6 +46,7 @@ static char *icache_policy_str[] = {
+ 	[0 ... ICACHE_POLICY_PIPT]	= "RESERVED/UNKNOWN",
+ 	[ICACHE_POLICY_VIPT]		= "VIPT",
+ 	[ICACHE_POLICY_PIPT]		= "PIPT",
++	[ICACHE_POLICY_VPIPT]		= "VPIPT",
+ };
  
- 	if (is & QM_PIRQ_MRI) {
-+		qman_p_irqsource_remove(p, QM_PIRQ_MRI);
- 		queue_work_on(smp_processor_id(), qm_portal_wq,
- 			      &p->mr_work);
- 	}
+ unsigned long __icache_flags;
+@@ -291,6 +292,9 @@ static void cpuinfo_detect_icache_policy(struct cpuinfo_arm64 *info)
+ 	switch (l1ip) {
+ 	case ICACHE_POLICY_PIPT:
+ 		break;
++	case ICACHE_POLICY_VPIPT:
++		set_bit(ICACHEF_VPIPT, &__icache_flags);
++		break;
+ 	default:
+ 		/* Fallthrough */
+ 	case ICACHE_POLICY_VIPT:
 -- 
-1.7.9.5
+2.1.4
