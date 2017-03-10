@@ -1,208 +1,122 @@
 From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Thu,  9 Mar 2017 20:52:49 -0800
-Subject: [PATCH v5 09/39] ARM: dts: imx6-sabresd: add OV5642 and OV5640 camera
- sensors
+Date: Thu,  9 Mar 2017 20:52:50 -0800
+Subject: [PATCH v5 10/39] ARM: dts: imx6-sabreauto: create i2cmux for i2c3
 In-Reply-To: <1489121599-23206-1-git-send-email-steve_longerbeam@mentor.com>
 References: <1489121599-23206-1-git-send-email-steve_longerbeam@mentor.com>
-Message-ID: <1489121599-23206-10-git-send-email-steve_longerbeam@mentor.com>
+Message-ID: <1489121599-23206-11-git-send-email-steve_longerbeam@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enables the OV5642 parallel-bus sensor, and the OV5640 MIPI CSI-2 sensor.
+The sabreauto uses a steering pin to select between the SDA signal on
+i2c3 bus, and a data-in pin for an SPI NOR chip. Use i2cmux to control
+this steering pin. Idle state of the i2cmux selects SPI NOR. This is not
+a classic way to use i2cmux, since one side of the mux selects something
+other than an i2c bus, but it works and is probably the cleanest
+solution. Note that if one thread is attempting to access SPI NOR while
+another thread is accessing i2c3, the SPI NOR access will fail since the
+i2cmux has selected the SDA pin rather than SPI NOR data-in. This couldn't
+be avoided in any case, the board is not designed to allow concurrent
+i2c3 and SPI NOR functions (and the default device-tree does not enable
+SPI NOR anyway).
 
-The OV5642 connects to the parallel-bus mux input port on ipu1_csi0_mux.
-
-The OV5640 connects to the input port on the MIPI CSI-2 receiver on
-mipi_csi.
-
-Until the OV5652 sensor module compatible with the SabreSD becomes
-available for testing, the ov5642 node is currently disabled.
+Devices hanging off i2c3 should now be defined under i2cmux, so
+that the steering pin can be properly controlled to access those
+devices. The port expanders (MAX7310) are thus moved into i2cmux.
 
 Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
 ---
- arch/arm/boot/dts/imx6dl-sabresd.dts   |   5 ++
- arch/arm/boot/dts/imx6q-sabresd.dts    |   5 ++
- arch/arm/boot/dts/imx6qdl-sabresd.dtsi | 114 ++++++++++++++++++++++++++++++++-
- 3 files changed, 123 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/imx6qdl-sabreauto.dtsi | 65 +++++++++++++++++++++-----------
+ 1 file changed, 44 insertions(+), 21 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6dl-sabresd.dts b/arch/arm/boot/dts/imx6dl-sabresd.dts
-index 1e45f2f..9607afe 100644
---- a/arch/arm/boot/dts/imx6dl-sabresd.dts
-+++ b/arch/arm/boot/dts/imx6dl-sabresd.dts
-@@ -15,3 +15,8 @@
- 	model = "Freescale i.MX6 DualLite SABRE Smart Device Board";
- 	compatible = "fsl,imx6dl-sabresd", "fsl,imx6dl";
- };
-+
-+&ipu1_csi1_from_ipu1_csi1_mux {
-+	clock-lanes = <0>;
-+	data-lanes = <1 2>;
-+};
-diff --git a/arch/arm/boot/dts/imx6q-sabresd.dts b/arch/arm/boot/dts/imx6q-sabresd.dts
-index 9cbdfe7..527772b 100644
---- a/arch/arm/boot/dts/imx6q-sabresd.dts
-+++ b/arch/arm/boot/dts/imx6q-sabresd.dts
-@@ -23,3 +23,8 @@
- &sata {
- 	status = "okay";
- };
-+
-+&ipu1_csi1_from_mipi_vc1 {
-+	clock-lanes = <0>;
-+	data-lanes = <1 2>;
-+};
-diff --git a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-index 63bf95e..643c1d4 100644
---- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-@@ -10,6 +10,7 @@
-  * http://www.gnu.org/copyleft/gpl.html
-  */
- 
-+#include <dt-bindings/clock/imx6qdl-clock.h>
- #include <dt-bindings/gpio/gpio.h>
- #include <dt-bindings/input/input.h>
- 
-@@ -146,6 +147,36 @@
+diff --git a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+index a2a714d..c8e35c4 100644
+--- a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+@@ -108,6 +108,44 @@
+ 		default-brightness-level = <7>;
+ 		status = "okay";
  	};
- };
- 
-+&ipu1_csi0_from_ipu1_csi0_mux {
-+	bus-width = <8>;
-+	data-shift = <12>; /* Lines 19:12 used */
-+	hsync-active = <1>;
-+	vsync-active = <1>;
-+};
 +
-+&ipu1_csi0_mux_from_parallel_sensor {
-+	remote-endpoint = <&ov5642_to_ipu1_csi0_mux>;
-+};
-+
-+&ipu1_csi0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_ipu1_csi0>;
-+};
-+
-+&mipi_csi {
-+	status = "okay";
-+
-+	port at 0 {
-+		reg = <0>;
-+
-+		mipi_csi2_in: endpoint {
-+			remote-endpoint = <&ov5640_to_mipi_csi2>;
-+			clock-lanes = <0>;
-+			data-lanes = <1 2>;
-+		};
-+	};
-+};
-+
- &audmux {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_audmux>;
-@@ -213,7 +244,32 @@
- 			0x8014 /* 4:FN_DMICCDAT */
- 			0x0000 /* 5:Default */
- 		>;
--       };
-+	};
-+
-+	ov5642: camera at 3c {
-+		compatible = "ovti,ov5642";
++	i2cmux {
++		compatible = "i2c-mux-gpio";
++		#address-cells = <1>;
++		#size-cells = <0>;
 +		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_ov5642>;
-+		clocks = <&clks IMX6QDL_CLK_CKO>;
-+		clock-names = "xclk";
-+		reg = <0x3c>;
-+		DOVDD-supply = <&vgen4_reg>; /* 1.8v */
-+		AVDD-supply = <&vgen3_reg>;  /* 2.8v, rev C board is VGEN3
-+						rev B board is VGEN5 */
-+		DVDD-supply = <&vgen2_reg>;  /* 1.5v*/
-+		powerdown-gpios = <&gpio1 16 GPIO_ACTIVE_HIGH>;
-+		reset-gpios = <&gpio1 17 GPIO_ACTIVE_LOW>;
-+		status = "disabled";
++		pinctrl-0 = <&pinctrl_i2c3mux>;
++		mux-gpios = <&gpio5 4 0>;
++		i2c-parent = <&i2c3>;
++		idle-state = <0>;
 +
-+		port {
-+			ov5642_to_ipu1_csi0_mux: endpoint {
-+				remote-endpoint = <&ipu1_csi0_mux_from_parallel_sensor>;
-+				bus-width = <8>;
-+				hsync-active = <1>;
-+				vsync-active = <1>;
-+			};
-+		};
-+	};
- };
- 
- &i2c2 {
-@@ -222,6 +278,32 @@
- 	pinctrl-0 = <&pinctrl_i2c2>;
- 	status = "okay";
- 
-+	ov5640: camera at 3c {
-+		compatible = "ovti,ov5640";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_ov5640>;
-+		reg = <0x3c>;
-+		clocks = <&clks IMX6QDL_CLK_CKO>;
-+		clock-names = "xclk";
-+		DOVDD-supply = <&vgen4_reg>; /* 1.8v */
-+		AVDD-supply = <&vgen3_reg>;  /* 2.8v, rev C board is VGEN3
-+						rev B board is VGEN5 */
-+		DVDD-supply = <&vgen2_reg>;  /* 1.5v*/
-+		powerdown-gpios = <&gpio1 19 GPIO_ACTIVE_HIGH>;
-+		reset-gpios = <&gpio1 20 GPIO_ACTIVE_LOW>;
-+
-+		port {
++		i2c at 1 {
 +			#address-cells = <1>;
 +			#size-cells = <0>;
++			reg = <1>;
 +
-+			ov5640_to_mipi_csi2: endpoint {
-+				remote-endpoint = <&mipi_csi2_in>;
-+				clock-lanes = <0>;
-+				data-lanes = <1 2>;
++			max7310_a: gpio at 30 {
++				compatible = "maxim,max7310";
++				reg = <0x30>;
++				gpio-controller;
++				#gpio-cells = <2>;
++			};
++
++			max7310_b: gpio at 32 {
++				compatible = "maxim,max7310";
++				reg = <0x32>;
++				gpio-controller;
++				#gpio-cells = <2>;
++			};
++
++			max7310_c: gpio at 34 {
++				compatible = "maxim,max7310";
++				reg = <0x34>;
++				gpio-controller;
++				#gpio-cells = <2>;
 +			};
 +		};
 +	};
-+
- 	pmic: pfuze100 at 08 {
- 		compatible = "fsl,pfuze100";
- 		reg = <0x08>;
-@@ -425,6 +507,36 @@
+ };
+ 
+ &clks {
+@@ -290,27 +328,6 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_i2c3>;
+ 	status = "okay";
+-
+-	max7310_a: gpio at 30 {
+-		compatible = "maxim,max7310";
+-		reg = <0x30>;
+-		gpio-controller;
+-		#gpio-cells = <2>;
+-	};
+-
+-	max7310_b: gpio at 32 {
+-		compatible = "maxim,max7310";
+-		reg = <0x32>;
+-		gpio-controller;
+-		#gpio-cells = <2>;
+-	};
+-
+-	max7310_c: gpio at 34 {
+-		compatible = "maxim,max7310";
+-		reg = <0x34>;
+-		gpio-controller;
+-		#gpio-cells = <2>;
+-	};
+ };
+ 
+ &iomuxc {
+@@ -418,6 +435,12 @@
  			>;
  		};
  
-+		pinctrl_ipu1_csi0: ipu1csi0grp {
++		pinctrl_i2c3mux: i2c3muxgrp {
 +			fsl,pins = <
-+				MX6QDL_PAD_CSI0_DAT12__IPU1_CSI0_DATA12    0x1b0b0
-+				MX6QDL_PAD_CSI0_DAT13__IPU1_CSI0_DATA13    0x1b0b0
-+				MX6QDL_PAD_CSI0_DAT14__IPU1_CSI0_DATA14    0x1b0b0
-+				MX6QDL_PAD_CSI0_DAT15__IPU1_CSI0_DATA15    0x1b0b0
-+				MX6QDL_PAD_CSI0_DAT16__IPU1_CSI0_DATA16    0x1b0b0
-+				MX6QDL_PAD_CSI0_DAT17__IPU1_CSI0_DATA17    0x1b0b0
-+				MX6QDL_PAD_CSI0_DAT18__IPU1_CSI0_DATA18    0x1b0b0
-+				MX6QDL_PAD_CSI0_DAT19__IPU1_CSI0_DATA19    0x1b0b0
-+				MX6QDL_PAD_CSI0_PIXCLK__IPU1_CSI0_PIXCLK   0x1b0b0
-+				MX6QDL_PAD_CSI0_MCLK__IPU1_CSI0_HSYNC      0x1b0b0
-+				MX6QDL_PAD_CSI0_VSYNC__IPU1_CSI0_VSYNC     0x1b0b0
++				MX6QDL_PAD_EIM_A24__GPIO5_IO04 0x0b0b1
 +			>;
 +		};
 +
-+		pinctrl_ov5640: ov5640grp {
-+			fsl,pins = <
-+				MX6QDL_PAD_SD1_DAT2__GPIO1_IO19 0x1b0b0
-+				MX6QDL_PAD_SD1_CLK__GPIO1_IO20  0x1b0b0
-+			>;
-+		};
-+
-+		pinctrl_ov5642: ov5642grp {
-+			fsl,pins = <
-+				MX6QDL_PAD_SD1_DAT0__GPIO1_IO16 0x1b0b0
-+				MX6QDL_PAD_SD1_DAT1__GPIO1_IO17 0x1b0b0
-+			>;
-+		};
-+
- 		pinctrl_pcie: pciegrp {
+ 		pinctrl_pwm3: pwm1grp {
  			fsl,pins = <
- 				MX6QDL_PAD_GPIO_17__GPIO7_IO12	0x1b0b0
+ 				MX6QDL_PAD_SD4_DAT1__PWM3_OUT		0x1b0b1
 -- 
 2.7.4
