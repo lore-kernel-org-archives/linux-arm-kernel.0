@@ -1,122 +1,105 @@
 From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Thu,  9 Mar 2017 20:52:50 -0800
-Subject: [PATCH v5 10/39] ARM: dts: imx6-sabreauto: create i2cmux for i2c3
+Date: Thu,  9 Mar 2017 20:52:53 -0800
+Subject: [PATCH v5 13/39] ARM: dts: imx6-sabreauto: add the ADV7180 video
+ decoder
 In-Reply-To: <1489121599-23206-1-git-send-email-steve_longerbeam@mentor.com>
 References: <1489121599-23206-1-git-send-email-steve_longerbeam@mentor.com>
-Message-ID: <1489121599-23206-11-git-send-email-steve_longerbeam@mentor.com>
+Message-ID: <1489121599-23206-14-git-send-email-steve_longerbeam@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The sabreauto uses a steering pin to select between the SDA signal on
-i2c3 bus, and a data-in pin for an SPI NOR chip. Use i2cmux to control
-this steering pin. Idle state of the i2cmux selects SPI NOR. This is not
-a classic way to use i2cmux, since one side of the mux selects something
-other than an i2c bus, but it works and is probably the cleanest
-solution. Note that if one thread is attempting to access SPI NOR while
-another thread is accessing i2c3, the SPI NOR access will fail since the
-i2cmux has selected the SDA pin rather than SPI NOR data-in. This couldn't
-be avoided in any case, the board is not designed to allow concurrent
-i2c3 and SPI NOR functions (and the default device-tree does not enable
-SPI NOR anyway).
+Enables the ADV7180 decoder sensor. The ADV7180 connects to the
+parallel-bus mux input on ipu1_csi0_mux.
 
-Devices hanging off i2c3 should now be defined under i2cmux, so
-that the steering pin can be properly controlled to access those
-devices. The port expanders (MAX7310) are thus moved into i2cmux.
+The ADV7180 power pin is via max7310_b port expander.
 
 Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
 ---
- arch/arm/boot/dts/imx6qdl-sabreauto.dtsi | 65 +++++++++++++++++++++-----------
- 1 file changed, 44 insertions(+), 21 deletions(-)
+ arch/arm/boot/dts/imx6qdl-sabreauto.dtsi | 58 ++++++++++++++++++++++++++++++++
+ 1 file changed, 58 insertions(+)
 
 diff --git a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-index a2a714d..c8e35c4 100644
+index 1212f82..a712ff1 100644
 --- a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
 +++ b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-@@ -108,6 +108,44 @@
- 		default-brightness-level = <7>;
- 		status = "okay";
+@@ -124,6 +124,21 @@
+ 			#size-cells = <0>;
+ 			reg = <1>;
+ 
++			adv7180: camera at 21 {
++				compatible = "adi,adv7180";
++				reg = <0x21>;
++				powerdown-gpios = <&max7310_b 2 GPIO_ACTIVE_LOW>;
++				interrupt-parent = <&gpio1>;
++				interrupts = <27 0x8>;
++
++				port {
++					adv7180_to_ipu1_csi0_mux: endpoint {
++						remote-endpoint = <&ipu1_csi0_mux_from_parallel_sensor>;
++						bus-width = <8>;
++					};
++				};
++			};
++
+ 			max7310_a: gpio at 30 {
+ 				compatible = "maxim,max7310";
+ 				reg = <0x30>;
+@@ -151,6 +166,25 @@
  	};
+ };
+ 
++&ipu1_csi0_from_ipu1_csi0_mux {
++	bus-width = <8>;
++};
 +
-+	i2cmux {
-+		compatible = "i2c-mux-gpio";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_i2c3mux>;
-+		mux-gpios = <&gpio5 4 0>;
-+		i2c-parent = <&i2c3>;
-+		idle-state = <0>;
++&ipu1_csi0_mux_from_parallel_sensor {
++	remote-endpoint = <&adv7180_to_ipu1_csi0_mux>;
++	bus-width = <8>;
++};
 +
-+		i2c at 1 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <1>;
++&ipu1_csi0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_ipu1_csi0>;
 +
-+			max7310_a: gpio at 30 {
-+				compatible = "maxim,max7310";
-+				reg = <0x30>;
-+				gpio-controller;
-+				#gpio-cells = <2>;
-+			};
-+
-+			max7310_b: gpio at 32 {
-+				compatible = "maxim,max7310";
-+				reg = <0x32>;
-+				gpio-controller;
-+				#gpio-cells = <2>;
-+			};
-+
-+			max7310_c: gpio at 34 {
-+				compatible = "maxim,max7310";
-+				reg = <0x34>;
-+				gpio-controller;
-+				#gpio-cells = <2>;
-+			};
-+		};
++	/* enable frame interval monitor on this port */
++	fim {
++		status = "okay";
 +	};
- };
- 
++};
++
  &clks {
-@@ -290,27 +328,6 @@
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_i2c3>;
- 	status = "okay";
--
--	max7310_a: gpio at 30 {
--		compatible = "maxim,max7310";
--		reg = <0x30>;
--		gpio-controller;
--		#gpio-cells = <2>;
--	};
--
--	max7310_b: gpio at 32 {
--		compatible = "maxim,max7310";
--		reg = <0x32>;
--		gpio-controller;
--		#gpio-cells = <2>;
--	};
--
--	max7310_c: gpio at 34 {
--		compatible = "maxim,max7310";
--		reg = <0x34>;
--		gpio-controller;
--		#gpio-cells = <2>;
--	};
- };
- 
- &iomuxc {
-@@ -418,6 +435,12 @@
+ 	assigned-clocks = <&clks IMX6QDL_PLL4_BYPASS_SRC>,
+ 			  <&clks IMX6QDL_PLL4_BYPASS>,
+@@ -444,6 +478,30 @@
  			>;
  		};
  
-+		pinctrl_i2c3mux: i2c3muxgrp {
++		pinctrl_ipu1_csi0: ipu1csi0grp {
 +			fsl,pins = <
-+				MX6QDL_PAD_EIM_A24__GPIO5_IO04 0x0b0b1
++				MX6QDL_PAD_CSI0_DAT4__IPU1_CSI0_DATA04   0x1b0b0
++				MX6QDL_PAD_CSI0_DAT5__IPU1_CSI0_DATA05   0x1b0b0
++				MX6QDL_PAD_CSI0_DAT6__IPU1_CSI0_DATA06   0x1b0b0
++				MX6QDL_PAD_CSI0_DAT7__IPU1_CSI0_DATA07   0x1b0b0
++				MX6QDL_PAD_CSI0_DAT8__IPU1_CSI0_DATA08   0x1b0b0
++				MX6QDL_PAD_CSI0_DAT9__IPU1_CSI0_DATA09   0x1b0b0
++				MX6QDL_PAD_CSI0_DAT10__IPU1_CSI0_DATA10  0x1b0b0
++				MX6QDL_PAD_CSI0_DAT11__IPU1_CSI0_DATA11  0x1b0b0
++				MX6QDL_PAD_CSI0_DAT12__IPU1_CSI0_DATA12  0x1b0b0
++				MX6QDL_PAD_CSI0_DAT13__IPU1_CSI0_DATA13  0x1b0b0
++				MX6QDL_PAD_CSI0_DAT14__IPU1_CSI0_DATA14  0x1b0b0
++				MX6QDL_PAD_CSI0_DAT15__IPU1_CSI0_DATA15  0x1b0b0
++				MX6QDL_PAD_CSI0_DAT16__IPU1_CSI0_DATA16  0x1b0b0
++				MX6QDL_PAD_CSI0_DAT17__IPU1_CSI0_DATA17  0x1b0b0
++				MX6QDL_PAD_CSI0_DAT18__IPU1_CSI0_DATA18  0x1b0b0
++				MX6QDL_PAD_CSI0_DAT19__IPU1_CSI0_DATA19  0x1b0b0
++				MX6QDL_PAD_CSI0_PIXCLK__IPU1_CSI0_PIXCLK 0x1b0b0
++				MX6QDL_PAD_CSI0_MCLK__IPU1_CSI0_HSYNC    0x1b0b0
++				MX6QDL_PAD_CSI0_VSYNC__IPU1_CSI0_VSYNC   0x1b0b0
 +			>;
 +		};
 +
- 		pinctrl_pwm3: pwm1grp {
+ 		pinctrl_max7310: max7310grp {
  			fsl,pins = <
- 				MX6QDL_PAD_SD4_DAT1__PWM3_OUT		0x1b0b1
+ 				MX6QDL_PAD_SD2_DAT0__GPIO1_IO15 0x1b0b0
 -- 
 2.7.4
