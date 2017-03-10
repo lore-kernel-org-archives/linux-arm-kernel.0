@@ -1,8 +1,8 @@
-From: mchehab@s-opensource.com (Mauro Carvalho Chehab)
-Date: Fri, 10 Mar 2017 12:53:42 -0300
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 10 Mar 2017 15:57:09 +0000
 Subject: [PATCH v4 14/36] [media] v4l2-mc: add a function to inherit
  controls from a pipeline
-In-Reply-To: <cc8900b0-c091-b14b-96f4-01f8fa72431c@xs4all.nl>
+In-Reply-To: <20170310122634.0ffda7c6@vento.lan>
 References: <1487211578-11360-1-git-send-email-steve_longerbeam@mentor.com>
  <1487211578-11360-15-git-send-email-steve_longerbeam@mentor.com>
  <20170302160257.GK3220@valkosipuli.retiisi.org.uk>
@@ -10,51 +10,86 @@ References: <1487211578-11360-1-git-send-email-steve_longerbeam@mentor.com>
  <20170304131329.GV3220@valkosipuli.retiisi.org.uk>
  <a7b8e095-a95c-24bd-b1e9-e983f18061c4@xs4all.nl>
  <20170310130733.GU21222@n2100.armlinux.org.uk>
- <c679f755-52a6-3c6f-3d65-277db46676cc@xs4all.nl>
- <20170310140124.GV21222@n2100.armlinux.org.uk>
- <cc8900b0-c091-b14b-96f4-01f8fa72431c@xs4all.nl>
-Message-ID: <20170310125342.7f047acf@vento.lan>
+ <20170310122634.0ffda7c6@vento.lan>
+Message-ID: <20170310155708.GX21222@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Fri, 10 Mar 2017 15:20:48 +0100
-Hans Verkuil <hverkuil@xs4all.nl> escreveu:
-
+On Fri, Mar 10, 2017 at 12:26:34PM -0300, Mauro Carvalho Chehab wrote:
+> Hi Russell,
 > 
-> > As I've already mentioned, from talking about this with Mauro, it seems
-> > Mauro is in agreement with permitting the control inheritence... I wish
-> > Mauro would comment for himself, as I can't quote our private discussion
-> > on the subject.  
+> Em Fri, 10 Mar 2017 13:07:33 +0000
+> Russell King - ARM Linux <linux@armlinux.org.uk> escreveu:
 > 
-> I can't comment either, not having seen his mail and reasoning.
-
-The rationale is that we should support the simplest use cases first.
-
-In the case of the first MC-based driver (and several subsequent
-ones), the simplest use case required MC, as it was meant to suport
-a custom-made sophisticated application that required fine control
-on each component of the pipeline and to allow their advanced
-proprietary AAA userspace-based algorithms to work.
-
-That's not true, for example, for the UVC driver. There, MC
-is optional, as it should be.
-
-> > Right now, my view is that v4l2 is currently being screwed up by people
-> > with different opinions - there is no unified concensus on how any of
-> > this stuff is supposed to work, everyone is pulling in different
-> > directions.  That needs solving _really_ quickly, so I suggest that
-> > v4l2 people urgently talk to each other and thrash out some of the
-> > issues that Steve's patch set has brought up, and settle on a way
-> > forward, rather than what is seemingly happening today - which is
-> > everyone working in isolation of everyone else with their own bias on
-> > how things should be done.  
+> > The idea that the v4l libraries should intercept the format negotiation
+> > between the application and kernel is a particularly painful one - the
+> > default gstreamer build detects the v4l libraries, and links against it.
+> > That much is fine.
+> > 
+> > However, the problem comes when you're trying to use bayer formats. The
+> > v4l libraries "helpfully" (or rather unhelpfully) intercept the format
+> > negotiation, and decide that they'll invoke v4lconvert to convert the
+> > bayer to RGB for you, whether you want them to do that or not.
+> > 
+> > v4lconvert may not be the most efficient way to convert, or even what
+> > is desired (eg, you may want to receive the raw bayer image.)  However,
+> > since the v4l libraries/v4lconvert gives you no option but to have its
+> > conversion forced into the pipeline, other options (such as using the
+> > gstreamer neon accelerated de-bayer plugin) isn't an option 
 > 
-> The simple fact is that to my knowledge no other MC applications inherit
-> controls from subdevs. Suddenly doing something different here seems very
-> wrong to me and needs very good reasons.
+> That's not true. There is an special flag, used only by libv4l2
+> emulated formats, that indicates when a video format is handled
+> via v4lconvert:
 
-That's because it was not needed before, as other subdev-based drivers
-are meant to be used only on complex scenarios with custom-made apps.
+I'm afraid that my statement comes from trying to use gstreamer with
+libv4l2 and _not_ being able to use the 8-bit bayer formats there at
+all - they are simply not passed across to the application through
+libv4l2/v4lconvert.
 
-Thanks,
-Mauro
+Instead, the formats that are passed across are the emulated formats.
+As I said above, that forces applications to use only the v4lconvert
+formats, the raw formats are not available.
+
+So, the presence or absence of the V4L2_FMT_FLAG_EMULATED is quite
+meaningless if you can't even enumerate the non-converted formats.
+
+The problem comes from the "always needs conversion" stuff in
+v4lconvert coupled with the way this subdev stuff works - since it
+requires manual configuration of all the pads within the kernel
+media pipeline, the kernel ends up only advertising _one_ format
+to userspace - in my case, that's RGGB8.
+
+When v4lconvert_create_with_dev_ops() enumerates the formats from
+the kernel, it gets only RGGB8.  That causes always_needs_conversion
+in there to remain true, so the special v4l control which enables/
+disables conversion gets created with a default value of "true".
+The RGGB8 bit is also set in data->supported_src_formats.
+
+This causes v4lconvert_supported_dst_fmt_only() to return true.
+
+What this all means is that v4lconvert_enum_fmt() will _not_ return
+any of the kernel formats, only the faked formats.
+
+Ergo, the RGGB8 format from the kernel is completely hidden from the
+application, and only the emulated format is made available.  As I
+said above, this forces v4lconvert's debayering on the application,
+whether you want it or not.
+
+In the gstreamer case, it knows nothing about this special control,
+which means that trying to use this gstreamer pipeline:
+
+$ gst-launch-1.0 v4l2src device=/dev/video6 ! bayer2rgbneon ! xvimagesink
+
+is completely impossible without first rebuilding gstreamer _without_
+libv4l support.  Build gstreamer without libv4l support, and the above
+works.
+
+Enabling debug output in gstreamer's v4l2src plugin confirms that
+the kernel's bayer format are totally hidden from gstreamer when
+linked with libv4l2, but are present when it isn't linked with
+libv4l2.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
