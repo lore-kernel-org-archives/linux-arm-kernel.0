@@ -1,49 +1,33 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 10 Mar 2017 17:44:18 +0000
-Subject: [PATCH] arm64: use const cap for system_uses_ttbr0_pan()
-Message-ID: <1489167858-24867-1-git-send-email-mark.rutland@arm.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Fri, 10 Mar 2017 09:44:42 -0800
+Subject: [PATCH 1/2] ARM: dts: BCM53573: Don't use nonexistent
+ "default-off" LED trigger
+In-Reply-To: <20170310132049.GC11875@amd>
+References: <20170308064105.26619-1-zajec5@gmail.com>
+ <42bce8ea-f1dc-2018-33f1-d296ccd7b677@gmail.com> <20170310132049.GC11875@amd>
+Message-ID: <3414f628-6b78-dc5a-4abf-ec5f40e7a4ee@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since commit 4b65a5db362783ab ("arm64: Introduce
-uaccess_{disable,enable} functionality based on TTBR0_EL1"),
-system_uses_ttbr0_pan() has used cpus_have_cap() to determine whether
-PAN is present.
+On 03/10/2017 05:20 AM, Pavel Machek wrote:
+> On Wed 2017-03-08 09:31:44, Florian Fainelli wrote:
+>> On 03/07/2017 10:41 PM, Rafa? Mi?ecki wrote:
+>>> From: Rafa? Mi?ecki <rafal@milecki.pl>
+>>>
+>>> Such a trigger doesn't exist in Linux and is not needed as LED is being
+>>> turned off by default. This could cause errors in LEDs core code when
+>>> trying to set default trigger.
+>>>
+>>> Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
+>>
+>> Since you are fixing something, what's the proper Fixes: tag for this
+>> commit? Likewise for the second patch.
+> 
+> Lets not make submitting patches any harder than it already is.
 
-Since commit a4023f682739439b ("arm64: Add hypervisor safe helper for
-checking constant capabilities"), which was introduced around the same
-time, cpus_have_cap() doesn't try to use a static key, and must always
-perform a load, test, and consitional branch (likely a tbnz for the
-latter two).
-
-Elsewhere, we moved to using cpus_have_const_cap(), which can use a
-static key (i.e. a non-conditional branch), which is patched at runtime
-when the feature is detected.
-
-This patch makes system_uses_ttbr0_pan() use cpus_have_const_cap(). The
-static key is likely a win for hot-paths like the uacccess primitives,
-and this makes our usage consistent regardless.
-
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/include/asm/cpufeature.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-index 05310ad..f31c48d 100644
---- a/arch/arm64/include/asm/cpufeature.h
-+++ b/arch/arm64/include/asm/cpufeature.h
-@@ -251,7 +251,7 @@ static inline bool system_supports_fpsimd(void)
- static inline bool system_uses_ttbr0_pan(void)
- {
- 	return IS_ENABLED(CONFIG_ARM64_SW_TTBR0_PAN) &&
--		!cpus_have_cap(ARM64_HAS_PAN);
-+		!cpus_have_const_cap(ARM64_HAS_PAN);
- }
- 
- #endif /* __ASSEMBLY__ */
+If it was fixing something that was already in Linus' tree, it's
+important to know so I can queue the patch for the appropriate pull
+request targeting e.g: v4.11-rcX, this is not needed here as Rafal later
+indicated.
 -- 
-1.9.1
+Florian
