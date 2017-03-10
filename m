@@ -1,244 +1,110 @@
-From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Fri, 10 Mar 2017 11:39:18 +0100
-Subject: [PATCH v2 08/11] iio: adc: sun4i-gpadc-iio: add support for A33
- thermal sensor
-In-Reply-To: <20170310103921.19469-1-quentin.schulz@free-electrons.com>
-References: <20170310103921.19469-1-quentin.schulz@free-electrons.com>
-Message-ID: <20170310103921.19469-9-quentin.schulz@free-electrons.com>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Fri, 10 Mar 2017 11:45:36 +0100
+Subject: [PATCH v6 2/2] [media] s5p-mfc: Handle 'v4l2_pix_format:field' in
+ try_fmt and g_fmt
+In-Reply-To: <20170301115108.14187-3-thibault.saunier@osg.samsung.com>
+References: <20170301115108.14187-1-thibault.saunier@osg.samsung.com>
+ <20170301115108.14187-3-thibault.saunier@osg.samsung.com>
+Message-ID: <6b5a86c8-e82f-8541-0029-3310b563677f@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds support for the Allwinner A33 thermal sensor.
+On 01/03/17 12:51, Thibault Saunier wrote:
+> It is required by the standard that the field order is set by the
+> driver, default to NONE in case any is provided, but we can basically
+> accept any value provided by the userspace as we will anyway not
+> be able to do any deinterlacing.
+> 
+> In this patch we also make sure to pass the interlacing mode provided
+> by userspace from the output to the capture side of the device so
+> that the information is given back to userspace. This way it can
+> handle it and potentially deinterlace afterward.
+> 
+> Signed-off-by: Thibault Saunier <thibault.saunier@osg.samsung.com>
+> 
+> ---
+> 
+> Changes in v6:
+> - Pass user output field value to the capture as the device is not
+>   doing any deinterlacing and thus decoded content will still be
+>   interlaced on the output.
+> 
+> Changes in v5:
+> - Just adapt the field and never error out.
+> 
+> Changes in v4: None
+> Changes in v3:
+> - Do not check values in the g_fmt functions as Andrzej explained in previous review
+> 
+> Changes in v2:
+> - Fix a silly build error that slipped in while rebasing the patches
+> 
+>  drivers/media/platform/s5p-mfc/s5p_mfc_common.h | 2 ++
+>  drivers/media/platform/s5p-mfc/s5p_mfc_dec.c    | 6 +++++-
+>  2 files changed, 7 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_common.h b/drivers/media/platform/s5p-mfc/s5p_mfc_common.h
+> index ab23236aa942..3816a37de4bc 100644
+> --- a/drivers/media/platform/s5p-mfc/s5p_mfc_common.h
+> +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_common.h
+> @@ -652,6 +652,8 @@ struct s5p_mfc_ctx {
+>  	size_t me_buffer_size;
+>  	size_t tmv_buffer_size;
+>  
+> +	enum v4l2_field field;
+> +
+>  	enum v4l2_mpeg_mfc51_video_force_frame_type force_frame_type;
+>  
+>  	struct list_head ref_queue;
+> diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+> index 367ef8e8dbf0..6e5ca86fb331 100644
+> --- a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+> +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+> @@ -345,7 +345,7 @@ static int vidioc_g_fmt(struct file *file, void *priv, struct v4l2_format *f)
+>  		   rectangle. */
+>  		pix_mp->width = ctx->buf_width;
+>  		pix_mp->height = ctx->buf_height;
+> -		pix_mp->field = V4L2_FIELD_NONE;
+> +		pix_mp->field = ctx->field;
+>  		pix_mp->num_planes = 2;
+>  		/* Set pixelformat to the format in which MFC
+>  		   outputs the decoded frame */
+> @@ -380,6 +380,9 @@ static int vidioc_try_fmt(struct file *file, void *priv, struct v4l2_format *f)
+>  	struct s5p_mfc_dev *dev = video_drvdata(file);
+>  	struct s5p_mfc_fmt *fmt;
+>  
+> +	if (f->fmt.pix.field == V4L2_FIELD_ANY)
+> +		f->fmt.pix.field = V4L2_FIELD_NONE;
+> +
+>  	mfc_debug(2, "Type is %d\n", f->type);
+>  	if (f->type == V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE) {
+>  		fmt = find_format(f, MFC_FMT_DEC);
+> @@ -436,6 +439,7 @@ static int vidioc_s_fmt(struct file *file, void *priv, struct v4l2_format *f)
+>  		goto out;
+>  	} else if (f->type == V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE) {
+>  		/* src_fmt is validated by call to vidioc_try_fmt */
+> +		ctx->field = f->fmt.pix.field;
 
-Unlike the A10, A13 and A31, the Allwinner A33 only has one channel
-which is dedicated to the thermal sensor. Moreover, its thermal sensor
-does not generate interruptions, thus we only need to directly read the
-register storing the temperature value.
+Doing this means that you also allow for V4L2_FIELD_ALTERNATE. If you do that, then there
+are additional requirements when you queue up buffers in that the 'field' has to be set to
+TOP or BOTTOM in struct v4l2_buffer. I am sure that is a requirement for the encoder, how
+this would work for a decoder I am not sure.
 
-The MFD used by the A10, A13 and A31, was created to avoid breaking the
-DT binding, but since the nodes for the ADC weren't there for the A33,
-it is not needed.
+Also, values like V4L2_FIELD_SEQ_TB/BT would not behave well if you pass them through a
+decoder.
 
-Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
----
+Frankly I think the only 'reasonable' values would be FIELD_NONE, FIELD_INTERLACED and
+possibly FIELD_ALTERNATE. I don't know enough about how codecs handle interlaced formats,
+so I can't tell how much sense FIELD_ALTERNATE would make.
 
-v2:
-  - removed added comments in Kconfig,
-  - simplified Kconfig depends on condition,
-  - removed THERMAL_OF requirement for sun8i,
-  - renamed sun8i_gpadc_channels to sun8i_a33_gpadc_channels,
-  - renamed use_dt boolean in no_irq as it reflects better why we need it,
-  - removed spurious/unneeded modifications done in v1,
+Properly supporting interlaced formats should only be done if you actually tested it and
+know how it works and what exactly is supported.
 
- drivers/iio/adc/Kconfig           |   2 +-
- drivers/iio/adc/sun4i-gpadc-iio.c | 100 ++++++++++++++++++++++++++++++++++++--
- include/linux/mfd/sun4i-gpadc.h   |   4 ++
- 3 files changed, 102 insertions(+), 4 deletions(-)
+Regards,
 
-diff --git a/drivers/iio/adc/Kconfig b/drivers/iio/adc/Kconfig
-index 9f8b4b1..8c8ead6 100644
---- a/drivers/iio/adc/Kconfig
-+++ b/drivers/iio/adc/Kconfig
-@@ -562,7 +562,7 @@ config STX104
- config SUN4I_GPADC
- 	tristate "Support for the Allwinner SoCs GPADC"
- 	depends on IIO
--	depends on MFD_SUN4I_GPADC
-+	depends on MFD_SUN4I_GPADC || MACH_SUN8I
- 	help
- 	  Say yes here to build support for Allwinner (A10, A13 and A31) SoCs
- 	  GPADC. This ADC provides 4 channels which can be used as an ADC or as
-diff --git a/drivers/iio/adc/sun4i-gpadc-iio.c b/drivers/iio/adc/sun4i-gpadc-iio.c
-index 7cb997a..70684cd 100644
---- a/drivers/iio/adc/sun4i-gpadc-iio.c
-+++ b/drivers/iio/adc/sun4i-gpadc-iio.c
-@@ -85,6 +85,12 @@ static const struct gpadc_data sun6i_gpadc_data = {
- 	.adc_chan_mask = SUN6I_GPADC_CTRL1_ADC_CHAN_MASK,
- };
- 
-+static const struct gpadc_data sun8i_a33_gpadc_data = {
-+	.temp_offset = -1662,
-+	.temp_scale = 162,
-+	.tp_mode_en = SUN8I_GPADC_CTRL1_CHOP_TEMP_EN,
-+};
-+
- struct sun4i_gpadc_iio {
- 	struct iio_dev			*indio_dev;
- 	struct completion		completion;
-@@ -96,6 +102,7 @@ struct sun4i_gpadc_iio {
- 	unsigned int			temp_data_irq;
- 	atomic_t			ignore_temp_data_irq;
- 	const struct gpadc_data		*data;
-+	bool				no_irq;
- 	/* prevents concurrent reads of temperature and ADC */
- 	struct mutex			mutex;
- };
-@@ -138,6 +145,23 @@ static const struct iio_chan_spec sun4i_gpadc_channels_no_temp[] = {
- 	SUN4I_GPADC_ADC_CHANNEL(3, "adc_chan3"),
- };
- 
-+static const struct iio_chan_spec sun8i_a33_gpadc_channels[] = {
-+	{
-+		.type = IIO_TEMP,
-+		.info_mask_separate = BIT(IIO_CHAN_INFO_RAW) |
-+				      BIT(IIO_CHAN_INFO_SCALE) |
-+				      BIT(IIO_CHAN_INFO_OFFSET),
-+		.datasheet_name = "temp_adc",
-+	},
-+};
-+
-+static const struct regmap_config sun4i_gpadc_regmap_config = {
-+	.reg_bits = 32,
-+	.val_bits = 32,
-+	.reg_stride = 4,
-+	.fast_io = true,
-+};
-+
- static int sun4i_prepare_for_irq(struct iio_dev *indio_dev, int channel,
- 				 unsigned int irq)
- {
-@@ -247,6 +271,17 @@ static int sun4i_gpadc_temp_read(struct iio_dev *indio_dev, int *val)
- {
- 	struct sun4i_gpadc_iio *info = iio_priv(indio_dev);
- 
-+	if (info->no_irq) {
-+		pm_runtime_get_sync(indio_dev->dev.parent);
-+
-+		regmap_read(info->regmap, SUN4I_GPADC_TEMP_DATA, val);
-+
-+		pm_runtime_mark_last_busy(indio_dev->dev.parent);
-+		pm_runtime_put_autosuspend(indio_dev->dev.parent);
-+
-+		return 0;
-+	}
-+
- 	return sun4i_gpadc_read(indio_dev, 0, val, info->temp_data_irq);
- }
- 
-@@ -454,6 +489,58 @@ static int sun4i_irq_init(struct platform_device *pdev, const char *name,
- 	return 0;
- }
- 
-+static const struct of_device_id sun4i_gpadc_of_id[] = {
-+	{
-+		.compatible = "allwinner,sun8i-a33-gpadc-iio",
-+		.data = &sun8i_a33_gpadc_data,
-+	},
-+	{ /* sentinel */ }
-+};
-+
-+static int sun4i_gpadc_probe_dt(struct platform_device *pdev,
-+				struct iio_dev *indio_dev)
-+{
-+	struct sun4i_gpadc_iio *info = iio_priv(indio_dev);
-+	const struct of_device_id *of_dev;
-+	struct thermal_zone_device *tzd;
-+	struct resource *mem;
-+	void __iomem *base;
-+	int ret;
-+
-+	of_dev = of_match_device(sun4i_gpadc_of_id, &pdev->dev);
-+	if (!of_dev)
-+		return -ENODEV;
-+
-+	info->no_irq = true;
-+	info->data = (struct gpadc_data *)of_dev->data;
-+	indio_dev->num_channels = ARRAY_SIZE(sun8i_a33_gpadc_channels);
-+	indio_dev->channels = sun8i_a33_gpadc_channels;
-+
-+	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	base = devm_ioremap_resource(&pdev->dev, mem);
-+	if (IS_ERR(base))
-+		return PTR_ERR(base);
-+
-+	info->regmap = devm_regmap_init_mmio(&pdev->dev, base,
-+					     &sun4i_gpadc_regmap_config);
-+	if (IS_ERR(info->regmap)) {
-+		ret = PTR_ERR(info->regmap);
-+		dev_err(&pdev->dev, "failed to init regmap: %d\n", ret);
-+		return ret;
-+	}
-+
-+	if (!IS_ENABLED(THERMAL_OF))
-+		return 0;
-+
-+	tzd = devm_thermal_zone_of_sensor_register(&pdev->dev, 0, info,
-+						   &sun4i_ts_tz_ops);
-+	if (IS_ERR(tzd))
-+		dev_err(&pdev->dev, "could not register thermal sensor: %ld\n",
-+			PTR_ERR(tzd));
-+
-+	return PTR_ERR_OR_ZERO(tzd);
-+}
-+
- static int sun4i_gpadc_probe_mfd(struct platform_device *pdev,
- 				 struct iio_dev *indio_dev)
- {
-@@ -462,6 +549,7 @@ static int sun4i_gpadc_probe_mfd(struct platform_device *pdev,
- 		dev_get_drvdata(pdev->dev.parent);
- 	int ret;
- 
-+	info->no_irq = false;
- 	info->regmap = sun4i_gpadc_dev->regmap;
- 
- 	indio_dev->num_channels = ARRAY_SIZE(sun4i_gpadc_channels);
-@@ -561,7 +649,11 @@ static int sun4i_gpadc_probe(struct platform_device *pdev)
- 	indio_dev->info = &sun4i_gpadc_iio_info;
- 	indio_dev->modes = INDIO_DIRECT_MODE;
- 
--	ret = sun4i_gpadc_probe_mfd(pdev, indio_dev);
-+	if (pdev->dev.of_node)
-+		ret = sun4i_gpadc_probe_dt(pdev, indio_dev);
-+	else
-+		ret = sun4i_gpadc_probe_mfd(pdev, indio_dev);
-+
- 	if (ret)
- 		return ret;
- 
-@@ -580,7 +672,7 @@ static int sun4i_gpadc_probe(struct platform_device *pdev)
- 	return 0;
- 
- err_map:
--	if (IS_ENABLED(CONFIG_THERMAL_OF))
-+	if (!info->no_irq && IS_ENABLED(CONFIG_THERMAL_OF))
- 		iio_map_array_unregister(indio_dev);
- 
- 	pm_runtime_put(&pdev->dev);
-@@ -592,10 +684,11 @@ static int sun4i_gpadc_probe(struct platform_device *pdev)
- static int sun4i_gpadc_remove(struct platform_device *pdev)
- {
- 	struct iio_dev *indio_dev = platform_get_drvdata(pdev);
-+	struct sun4i_gpadc_iio *info = iio_priv(indio_dev);
- 
- 	pm_runtime_put(&pdev->dev);
- 	pm_runtime_disable(&pdev->dev);
--	if (IS_ENABLED(CONFIG_THERMAL_OF))
-+	if (!info->no_irq && IS_ENABLED(CONFIG_THERMAL_OF))
- 		iio_map_array_unregister(indio_dev);
- 
- 	return 0;
-@@ -611,6 +704,7 @@ static const struct platform_device_id sun4i_gpadc_id[] = {
- static struct platform_driver sun4i_gpadc_driver = {
- 	.driver = {
- 		.name = "sun4i-gpadc-iio",
-+		.of_match_table = sun4i_gpadc_of_id,
- 		.pm = &sun4i_gpadc_pm_ops,
- 	},
- 	.id_table = sun4i_gpadc_id,
-diff --git a/include/linux/mfd/sun4i-gpadc.h b/include/linux/mfd/sun4i-gpadc.h
-index 509e736..139872c 100644
---- a/include/linux/mfd/sun4i-gpadc.h
-+++ b/include/linux/mfd/sun4i-gpadc.h
-@@ -38,6 +38,10 @@
- #define SUN6I_GPADC_CTRL1_ADC_CHAN_SELECT(x)		(GENMASK(3, 0) & BIT(x))
- #define SUN6I_GPADC_CTRL1_ADC_CHAN_MASK			GENMASK(3, 0)
- 
-+/* TP_CTRL1 bits for sun8i SoCs */
-+#define SUN8I_GPADC_CTRL1_CHOP_TEMP_EN			BIT(8)
-+#define SUN8I_GPADC_CTRL1_GPADC_CALI_EN			BIT(7)
-+
- #define SUN4I_GPADC_CTRL2				0x08
- 
- #define SUN4I_GPADC_CTRL2_TP_SENSITIVE_ADJUST(x)	((GENMASK(3, 0) & (x)) << 28)
--- 
-2.9.3
+	Hans
+
+>  		ctx->src_fmt = find_format(f, MFC_FMT_DEC);
+>  		ctx->codec_mode = ctx->src_fmt->codec_mode;
+>  		mfc_debug(2, "The codec number is: %d\n", ctx->codec_mode);
+> 
