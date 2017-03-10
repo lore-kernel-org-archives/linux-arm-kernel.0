@@ -1,89 +1,51 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 10 Mar 2017 11:04:41 +0000
-Subject: [PATCH 04/14] drivers/perf: arm_pmu: factor out pmu registration
+Date: Fri, 10 Mar 2017 11:04:42 +0000
+Subject: [PATCH 05/14] drivers/perf: arm_pmu: simplify cpu_pmu_request_irqs()
 In-Reply-To: <1489143891-11596-1-git-send-email-mark.rutland@arm.com>
 References: <1489143891-11596-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1489143891-11596-5-git-send-email-mark.rutland@arm.com>
+Message-ID: <1489143891-11596-6-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently arm_pmu_device_probe contains probing logic specific to the
-platform_device infrastructure, and some logic required to safely
-register the PMU with various systems.
+The ARM PMU framework code always uses armpmu_dispatch_irq as its common
+IRQ handler. Passing this down from cpu_pmu_init() is somewhat
+pointless, and gets in the way of refactoring.
 
-This patch factors out the logic relating to the registration of the
-PMU. This makes arm_pmu_device_probe a little easier to read, and will
-make it easier to reuse the logic for an ACPI-specific probing
-mechanism.
+This patch makes cpu_pmu_request_irqs() always use armpmu_dispatch_irq
+as the handler when requesting IRQs, and removes the handler parameter
+from its prototype.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- drivers/perf/arm_pmu.c | 40 ++++++++++++++++++++++++++--------------
- 1 file changed, 26 insertions(+), 14 deletions(-)
+ drivers/perf/arm_pmu.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
-index e7529a0..4ae9c49 100644
+index 4ae9c49..6196777 100644
 --- a/drivers/perf/arm_pmu.c
 +++ b/drivers/perf/arm_pmu.c
-@@ -982,6 +982,31 @@ void armpmu_free(struct arm_pmu *pmu)
- 	kfree(pmu);
+@@ -543,10 +543,11 @@ static void cpu_pmu_free_irqs(struct arm_pmu *cpu_pmu)
+ 	}
  }
  
-+int armpmu_register(struct arm_pmu *pmu)
-+{
-+	int ret;
-+
-+	ret = cpu_pmu_init(pmu);
-+	if (ret)
-+		return ret;
-+
-+	ret = perf_pmu_register(&pmu->pmu, pmu->name, -1);
-+	if (ret)
-+		goto out_destroy;
-+
-+	if (!__oprofile_cpu_pmu)
-+		__oprofile_cpu_pmu = pmu;
-+
-+	pr_info("enabled with %s PMU driver, %d counters available\n",
-+		pmu->name, pmu->num_events);
-+
-+	return 0;
-+
-+out_destroy:
-+	cpu_pmu_destroy(pmu);
-+	return ret;
-+}
-+
- int arm_pmu_device_probe(struct platform_device *pdev,
- 			 const struct of_device_id *of_table,
- 			 const struct pmu_probe_info *probe_table)
-@@ -1025,25 +1050,12 @@ int arm_pmu_device_probe(struct platform_device *pdev,
- 		goto out_free;
- 	}
+-static int cpu_pmu_request_irqs(struct arm_pmu *cpu_pmu, irq_handler_t handler)
++static int cpu_pmu_request_irqs(struct arm_pmu *cpu_pmu)
+ {
+ 	int cpu, err;
+ 	struct pmu_hw_events __percpu *hw_events = cpu_pmu->hw_events;
++	const irq_handler_t handler = armpmu_dispatch_irq;
  
--
--	ret = cpu_pmu_init(pmu);
-+	ret = armpmu_register(pmu);
- 	if (ret)
- 		goto out_free;
+ 	for_each_cpu(cpu, &cpu_pmu->supported_cpus) {
+ 		int irq = per_cpu(hw_events->irq, cpu);
+@@ -735,7 +736,7 @@ static int cpu_pmu_init(struct arm_pmu *cpu_pmu)
+ {
+ 	int err;
  
--	ret = perf_pmu_register(&pmu->pmu, pmu->name, -1);
--	if (ret)
--		goto out_destroy;
--
--	if (!__oprofile_cpu_pmu)
--		__oprofile_cpu_pmu = pmu;
--
--	pr_info("enabled with %s PMU driver, %d counters available\n",
--			pmu->name, pmu->num_events);
--
- 	return 0;
+-	err = cpu_pmu_request_irqs(cpu_pmu, armpmu_dispatch_irq);
++	err = cpu_pmu_request_irqs(cpu_pmu);
+ 	if (err)
+ 		goto out;
  
--out_destroy:
--	cpu_pmu_destroy(pmu);
- out_free:
- 	pr_info("%s: failed to register PMU devices!\n",
- 		of_node_full_name(node));
 -- 
 1.9.1
