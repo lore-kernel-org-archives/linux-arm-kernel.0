@@ -1,94 +1,73 @@
-From: romain.perier@collabora.com (Romain Perier)
-Date: Fri, 10 Mar 2017 13:58:58 +0100
-Subject: [PATCH] drm: dw_hdmi: Gate audio sampler clock from the
- enablement functions
-In-Reply-To: <20170310111504.GT21222@n2100.armlinux.org.uk>
-References: <20170310093509.19044-1-romain.perier@collabora.com>
- <20170310094613.GQ21222@n2100.armlinux.org.uk>
- <7888eb1f-2781-d4ed-6f26-cb76e1ead4d2@collabora.com>
- <20170310102753.GR21222@n2100.armlinux.org.uk>
- <202cd871-eb1c-d8f4-62d6-bed479f0eece@collabora.com>
- <20170310111504.GT21222@n2100.armlinux.org.uk>
-Message-ID: <4e8de49b-427f-2a7b-18c6-9224835c1f56@collabora.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Fri, 10 Mar 2017 18:34:45 +0530
+Subject: [RESEND PATCH v3 5/7] PCI: dwc: all: Modify dbi accessors to
+ access data of 4/2/1 bytes
+In-Reply-To: <61f90a03-7164-8e79-f1c2-0ae48b5892a8@axis.com>
+References: <1489041545-15730-1-git-send-email-kishon@ti.com>
+ <1489041545-15730-6-git-send-email-kishon@ti.com>
+ <a56e462d-83ee-194f-1f9f-3f4c339cad46@axis.com> <58C29648.5020708@ti.com>
+ <61f90a03-7164-8e79-f1c2-0ae48b5892a8@axis.com>
+Message-ID: <58C2A46D.2080907@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi,
 
-
-Le 10/03/2017 ? 12:15, Russell King - ARM Linux a ?crit :
-> On Fri, Mar 10, 2017 at 11:58:19AM +0100, Romain Perier wrote:
->> Hello,
+On Friday 10 March 2017 06:26 PM, Niklas Cassel wrote:
+> On 03/10/2017 01:04 PM, Kishon Vijay Abraham I wrote:
+>> Hi,
 >>
->> Le 10/03/2017 ? 11:27, Russell King - ARM Linux a ?crit :
->>> I also would not think that it's platform specific - remember that
->>> this is Designware IP, and it's likely that other platforms with
->>> exactly the same IP would suffer from the same problem.  It's
->>> probably revision specific, but we need Synopsis' input on that.
+>> On Thursday 09 March 2017 08:18 PM, Niklas Cassel wrote:
+>>> On 03/09/2017 07:39 AM, Kishon Vijay Abraham I wrote:
+>>>> Previously dbi accessors can be used to access data of size 4
+>>>> bytes. But there might be situations (like accessing
+>>>> MSI_MESSAGE_CONTROL in order to set/get the number of required
+>>>> MSI interrupts in EP mode) where dbi accessors must
+>>>> be used to access data of size 2. This is in preparation for
+>>>> adding endpoint mode support to designware driver.
+>>> Hello Kishon
 >>>
->>> However, I do believe that your patch probably doesn't have much
->>> merit in any case: on a mode set, you enable the audio clock, and
->>> it will remain enabled until the audio device is first opened and
->>> then closed.  If another mode set comes along, then exactly the
->>> same situation happens again.  So, really it isn't achieving all
->>> that much.
->> The fact is we still have sound glitches caused by this workaround on
->> Rockchip, we probably have a revision
->> of the IP without this issue. If CTS+N is not forced to zero we no
->> longer have the glitches :/ (with or without touching the clock)
-> Are you sure that removing the workaround just doesn't result in the
-> same bug as on iMX6 appearing?  The bug concerned is the ordering of
-> the channels, so unless you're (eg0 monitoring left/right separately
-> or directing audio to just one channel, you may not (with modern TVs)
-> realise that the channels are swapped.  I'll include the errata
-> description and impact below.
->
-> There are occasional issues on iMX6 as well despite this work-around,
-> but I don't clearly remember what devmem2 tweaks I've done in the past
-> to get it to resolve itself, nor could I describe them from memory
-> any better than "burbling audio".
+>>> I don't really like the idea of adding an extra argument to every existing read/write.
+>>> Will not a read/write of length != 32 be quite uncommon compared to
+>>> a read/write of length == 32?
+>>>
+>>> How about adding some defines to pcie-designware.h:
+>>>
+>>> #define dw_pcie_writel_dbi(pci, base, reg, val) dw_pcie_write_dbi(pci, base, reg, 0x4, val)
+>>> #define dw_pcie_readl_dbi(pci, base, reg) dw_pcie_read_dbi(pci, base, reg, 0x4)
+>>>
+>>> That way we don't have to change every existing read/write.
+>>>
+>>>
+>>>
+>>> Is there a reason why we can't just do:
+>>>
+>>> vial = dw_pcie_readl_dbi(pci, base, MSI_MESSAGE_CONTROL);
+>> MSI_MESSAGE_CONTROL is 0x52 (MSI capability offset + 2). I'm not sure if we can
+>> do a readl that crosses the alignment boundary in all platforms. The other
+>> option is to readl from "MSI capability offset + 0" and extract the last 16
+>> bits. I felt this is more clear since we are interested only in the
+>> MSI_MESSAGE_CONTROL.
+>>
+>>> <shifting+masking the bits we need to get/set>
+>>> dw_pcie_writel_dbi(pci, base, MSI_MESSAGE_CONTROL, val);
+>>>
+>>> Or are we going to be doing read/writes of length != 32 so often that
+>>> you think that it's cleaner to have this abstraction?
+>> it's used mainly for accessing configuration space header fields. Even the pci
+>> core uses *pci_read_config_word* for accessing such fields.
+> 
+> I see. Adding an extra size argument is a good thing then,
+> since it's consistent with the pci generic code.
+> 
+> However, I still think that having defines for writel/readl is a
+> good thing :)
 
-Well, I have reverted locally your patch (I did it quickly by hand
-because it did not work via git revert... anyway...),
-And I no longer have the issue at all. It's working fine all the time
-and it's truly deterministic (see attachment)
+sure, having defines is fine. How about something like below (readl, readw: to
+differentiate 4byte and 2 byte access?)
 
-Also, I have found that the version of the IP is not exactly the same.
-On Rockchip it's 0x20:0xa:0xa0:0xc1, on IMX.6 it's  0x13:0xa:0xa0:0xc1.
->
->
->   When the AHB Audio DMA is started, by setting to 1'b1 for the first
->   time the register field AHB_DMA_START.data_buffer_ready, the AHB
->   Audio DMA will request data from the AHB bus to fill its internal
->   AHB DMA FIFO. It is possible that a AHB DMA FIFO read action occurs
->   during the time window between the first sample stored on the AHB
->   DMA FIFO and when the AHB DMA FIFO has stored, at least, the number
->   of configured audio channels in samples. If this happens, the AHB
->   DMA FIFO will reply with samples that are currently on the AHB
->   Audio FIFO and will repeat the last sample after the empty condition
->   is reached.
->
->   Projected Impact:
->   This will miss-align the audio stream, causing a shift in the
->   distribution of audio on the channels on the HDMI sink side, with no
->   knowledge of the DWC_hdmi_tx enabled system.
+#define dw_pcie_readl_dbi(pci, base, reg) __dw_pcie_read_dbi(pci, base, reg, 0x4)
+#define dw_pcie_readw_dbi(pci, base, reg) __dw_pcie_read_dbi(pci, base, reg, 0x2)
 
-Thanks for this, it helps!
-It looks specific to AHB audio
-
->
->
-> If you know that this definitely does not apply to your version, then
-> we need to split the audio enable/disable functions between the AHB
-> and I2S variants.
-Mhhh, yeah both seem to work differently.
-
-Romain
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: revert.patch
-Type: text/x-patch
-Size: 3551 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170310/f920ffa6/attachment.bin>
+Thanks
+Kishon
