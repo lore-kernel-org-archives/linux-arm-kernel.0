@@ -1,50 +1,53 @@
-From: balbi@kernel.org (Felipe Balbi)
-Date: Fri, 10 Mar 2017 13:26:48 +0200
-Subject: [PATCH v4 3/3] USB3/DWC3: Enable undefined length INCR burst type
-In-Reply-To: <DB5PR0401MB1813AAB5AA84B0B310ED1B10FE440@DB5PR0401MB1813.eurprd04.prod.outlook.com>
-References: <1484727138-3264-1-git-send-email-jerry.huang@nxp.com>
- <1484727138-3264-3-git-send-email-jerry.huang@nxp.com>
- <DB5PR0401MB1813965DDC8CC6CD0BD85980FE440@DB5PR0401MB1813.eurprd04.prod.outlook.com>
- <87y3xeqvsl.fsf@linux.intel.com>
- <DB5PR0401MB1813AAB5AA84B0B310ED1B10FE440@DB5PR0401MB1813.eurprd04.prod.outlook.com>
-Message-ID: <87tw71xthj.fsf@linux.intel.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Fri, 10 Mar 2017 17:06:44 +0530
+Subject: [RESEND PATCH v3 4/7] PCI: dwc: all: Modify dbi accessors to take
+ dbi_base as argument
+In-Reply-To: <595fab62-fb7a-888a-f898-7b59030585f1@axis.com>
+References: <1489041545-15730-1-git-send-email-kishon@ti.com>
+ <1489041545-15730-5-git-send-email-kishon@ti.com>
+ <4e13580d-2625-5eed-bcbc-2ffd7493b073@axis.com>
+ <595fab62-fb7a-888a-f898-7b59030585f1@axis.com>
+Message-ID: <58C28FCC.4070100@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
 Hi,
 
-Jerry Huang <jerry.huang@nxp.com> writes:
->> >> --
->> >> 1.7.9.5
->> > Hi, Balbi and all guys,
->> > Any comment for these patches? Can they be accepted?
->> 
->> Rob had comments which you didn't reply yet. I cannot take this patchset
->> yet ;-)
->> 
-> Balbi,
->
-> I look into his mail again, which was based v3, and I replied it.
->
-> He had different understanding for undefined length burst mode.
->
-> It seems he think for this mode, just setting bit[0] (INCRBrstEna) and
-> don't need to set other field.
->
-> However, according to the DWC USB3.0 controller databook, when it is
-> undefined length INCR burst mode, we still need to set one max burst
-> type, such as INCR8, which means controller will use any length less
-> than or equal to this INCR8.
+On Thursday 09 March 2017 08:35 PM, Niklas Cassel wrote:
+> 
+> 
+> On 03/09/2017 03:48 PM, Niklas Cassel wrote:
+>> On 03/09/2017 07:39 AM, Kishon Vijay Abraham I wrote:
+>>> dwc has 2 dbi address space labeled dbics and dbics2. The existing
+>>> helper to access dbi address space can access only dbics. However
+>>> dbics2 has to be accessed for programming the BAR registers in the
+>>> case of EP mode. This is in preparation for adding EP mode support
+>>> to dwc driver.
+>> Hello Kishon
+>>
+>> I don't really like the idea of adding an extra argument to every existing read/write.
+>> Will not a read/write using dbi2 be quite uncommon compared to a read/write
+>> using dbi?
+>>
+>> How about something like this:
+>>
+>> void __dw_pcie_writel(struct dw_pcie *pci, void __iomem *base, u32 reg, u32 val)
+>> {
+>>     if (pci->ops->writel_dbi)
+>>         pci->ops->writel_dbi(pci, base, reg, val);
+>>     else
+>>         writel(val, base + reg);
+>> }
+>>
+>> #define dw_pcie_writel_dbi(pci, reg, val) __dw_pcie_writel(pci, pci->dbi_base, reg, val)
+>> #define dw_pcie_writel_dbi2(pci, reg, val) __dw_pcie_writel(pci, pci->dbi_base2, reg, val)
+> 
+> Perhaps make dw_pcie_writel_dbi2 a function rather than a define,
+> so we can return an error if pci->dbi_base2 == NULL.
 
-Rob, do you agree with the patch now?
+Should we return an error? We don't return error for dbi_base either. I think
+it should be sufficient to return errors while populating dbi_base or
+dbi_base2. Otherwise it's a bug and should result in abort. Joao?
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170310/13354915/attachment.sig>
+Thanks
+Kishon
