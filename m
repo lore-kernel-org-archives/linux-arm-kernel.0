@@ -1,148 +1,170 @@
-From: guohanjun@huawei.com (Hanjun Guo)
-Date: Sat, 11 Mar 2017 16:56:02 +0800
-Subject: [PATCH v9 10/15] ACPI: platform-msi: retrieve dev id from IORT
-In-Reply-To: <20170307143525.GA26990@red-moon>
-References: <1488890410-15503-1-git-send-email-guohanjun@huawei.com>
- <1488890410-15503-11-git-send-email-guohanjun@huawei.com>
- <20170307143525.GA26990@red-moon>
-Message-ID: <58C3BBA2.1090600@huawei.com>
+From: slash.tmp@free.fr (Mason)
+Date: Sat, 11 Mar 2017 11:57:56 +0100
+Subject: Neophyte questions about PCIe
+In-Reply-To: <df517167-d692-38a8-9c8f-a1112c7f578d@free.fr>
+References: <ced6a4bf-c94a-c116-1e94-52a8d675d132@free.fr>
+ <20170308151724.GA20780@bhelgaas-glaptop.roam.corp.google.com>
+ <f964ee05-db7f-c381-c91c-82897175da6d@free.fr>
+ <9ba05c2c-57ef-b2c0-6a7c-457c392d98b5@free.fr>
+ <df517167-d692-38a8-9c8f-a1112c7f578d@free.fr>
+Message-ID: <c0a353cb-aa1f-25db-eccd-7a1618e655b3@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017/3/7 22:35, Lorenzo Pieralisi wrote:
-> On Tue, Mar 07, 2017 at 08:40:05PM +0800, Hanjun Guo wrote:
->> From: Hanjun Guo <hanjun.guo@linaro.org>
->>
->> For devices connecting to ITS, the devices need to identify themself
->> through a dev id; this dev id is represented in the IORT table in named
->> component node [1] for platform devices, so this patch adds code that
->> scans the IORT table to retrieve the devices' dev id.
->>
->> Leveraging the iort_node_map_platform_id() IORT API, add a new function
->> call, iort_pmsi_get_dev_id() and use it in its_pmsi_prepare() to allow
->> retrieving dev id in ACPI platforms.
->>
->> [1]: https://static.docs.arm.com/den0049/b/DEN0049B_IO_Remapping_Table.pdf
->>
->> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
->> [lorenzo.pieralisi at arm.com: rewrote commit log]
->> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->> Tested-by: Ming Lei <ming.lei@canonical.com>
->> Tested-by: Wei Xu <xuwei5@hisilicon.com>
->> Tested-by: Sinan Kaya <okaya@codeaurora.org>
->> Cc: Marc Zyngier <marc.zyngier@arm.com>
->> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->> Cc: Tomasz Nowicki <tn@semihalf.com>
->> Cc: Thomas Gleixner <tglx@linutronix.de>
->> ---
->>  drivers/acpi/arm64/iort.c                     | 24 ++++++++++++++++++++++++
->>  drivers/irqchip/irq-gic-v3-its-platform-msi.c |  3 ++-
->>  include/linux/acpi_iort.h                     |  5 +++++
->>  3 files changed, 31 insertions(+), 1 deletion(-)
->>
->> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
->> index 83cd59d..fb95ceb 100644
->> --- a/drivers/acpi/arm64/iort.c
->> +++ b/drivers/acpi/arm64/iort.c
->> @@ -468,6 +468,30 @@ u32 iort_msi_map_rid(struct device *dev, u32 req_id)
->>  }
->>  
->>  /**
->> + * iort_pmsi_get_dev_id() - Get the device id for a device
->> + * @dev: The device for which the mapping is to be done.
->> + * @dev_id: The device ID found.
->> + *
->> + * Returns: 0 for successful find a dev id, -ENODEV on error
->> + */
->> +int iort_pmsi_get_dev_id(struct device *dev, u32 *dev_id)
->> +{
->> +	int i;
->> +	struct acpi_iort_node *node;
->> +
->> +	node = iort_find_dev_node(dev);
->> +	if (!node)
->> +		return -ENODEV;
-> I think that when specs are updated so that we can enable SMMU MSIs we
-> shall have to find a way to get the acpi_iort_node for a device that is
-> not a named component here (ie SMMU), I reckon we can use the
-> fwnode_handle but I have to have a deeper look.
+On 10/03/2017 18:49, Mason wrote:
 
-Seems we can do this as follows:
+> And my current code, to work-around the silicon bugs:
+> 
+> #include <linux/kernel.h>
+> #include <linux/init.h>
+> #include <linux/ioport.h>
+> #include <linux/of_pci.h>
+> #include <linux/of.h>
+> #include <linux/pci-ecam.h>
+> #include <linux/platform_device.h>
+> 
+> //#define DEBUG_CONFIG
+> 
+> static int tango_config_read(struct pci_bus *bus, unsigned int devfn,
+> 				    int where, int size, u32 *val)
+> {
+> 	int ret;
+> 	void __iomem *pci_conf = (void *)0xf002e048;
+> 
+> #ifdef DEBUG_CONFIG
+> 	if (where == PCI_BASE_ADDRESS_0)
+> 		dump_stack();
+> #endif
+> 
+> 	writel(1, pci_conf);
 
----
- drivers/acpi/arm64/iort.c | 43 ++++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 42 insertions(+), 1 deletion(-)
+This sets the config/mem mux to CONFIG SPACE.
 
-diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-index 22e08d2..c794219 100644
---- a/drivers/acpi/arm64/iort.c
-+++ b/drivers/acpi/arm64/iort.c
-@@ -121,6 +121,31 @@ static inline void iort_delete_fwnode(struct acpi_iort_node *node)
-        spin_unlock(&iort_fwnode_lock);
- }
- 
-+/**
-+ * iort_get_iort_node() - Retrieve iort_node associated with an fwnode
-+ *
-+ * @fwnode: fwnode associated with device to be looked-up
-+ *
-+ * Returns: iort_node pointer on success, NULL on failure
-+ */
-+static inline
-+struct acpi_iort_node *iort_get_iort_node(struct fwnode_handle *fwnode)
-+{
-+ struct iort_fwnode *curr;
-+ struct acpi_iort_node *iort_node = NULL;
-+
-+ spin_lock(&iort_fwnode_lock);
-+ list_for_each_entry(curr, &iort_fwnode_list, list) {
-+         if (curr->fwnode == fwnode) {
-+                 iort_node = curr->iort_node;
-+                 break;
-+         }
-+ }
-+ spin_unlock(&iort_fwnode_lock);
-+
-+ return iort_node;
-+}
-+
- typedef acpi_status (*iort_find_node_callback)
-        (struct acpi_iort_node *node, void *context);
- 
-@@ -434,9 +459,25 @@ static struct acpi_iort_node *iort_find_dev_node(struct device *dev)
- {
-        struct pci_bus *pbus;
- 
--   if (!dev_is_pci(dev))
-+ if (!dev_is_pci(dev)) {
-+         struct acpi_iort_node *node;
-+         /*
-+          * scan iort_fwnode_list to see if it's an iort platform
-+          * device (such as SMMU, PMCG),its iort node already cached
-+          * and associated with fwnode when iort platform devices
-+          * were initialized.
-+          */
-+         node = iort_get_iort_node(dev->fwnode);
-+         if (node)
-+                 return node;
-+
-+         /*
-+          * if not, then it should be a platform device defined in
-+          * DSDT (with Named Component node in IORT)
-+          */
-                return iort_scan_node(ACPI_IORT_NODE_NAMED_COMPONENT,
-                                      iort_match_node_callback, dev);
-+ }
- 
-        /* Find a PCI root bus */
-        pbus = to_pci_dev(dev)->bus;
+> 	if (devfn != 0) {
+> 		*val = ~0;
+> 		return PCIBIOS_DEVICE_NOT_FOUND;
+> 	}
 
+This works around a silicon bug, where accesses to devices or
+functions not 0 return garbage.
 
->
-> This does not affect the patchset in its current form, just scanning
-> the code to make sure we will be able to support SMMU MSIs too when
-> time comes.
+> 	ret = pci_generic_config_read(bus, devfn, where, size, val);
+> 
+> 	writel(0, pci_conf);
 
-Sure, thanks!
+This resets the config/mem mux back to MEM SPACE.
 
-Hanjun
+If anything tries to access MEM in that time frame, we're toast.
+
+> #ifdef DEBUG_CONFIG
+> 	printk("%s: bus=%d where=%d size=%d val=0x%x\n",
+> 			__func__, bus->number, where, size, *val);
+> #endif
+> 
+> 	return ret;
+> }
+> 
+> static int tango_config_write(struct pci_bus *bus, unsigned int devfn,
+> 				     int where, int size, u32 val)
+> {
+> 	int ret;
+> 	void __iomem *pci_conf = (void *)0xf002e048;
+> 
+> #ifdef DEBUG_CONFIG
+> 	if (where == PCI_BASE_ADDRESS_0)
+> 		dump_stack();
+> #endif
+> 
+> #ifdef DEBUG_CONFIG
+> 	printk("%s: bus=%d where=%d size=%d val=0x%x\n",
+> 			__func__, bus->number, where, size, val);
+> #endif
+> 
+> 	writel(1, pci_conf);
+> 
+> 	ret = pci_generic_config_write(bus, devfn, where, size, val);
+> 
+> 	writel(0, pci_conf);
+> 
+> 	return ret;
+> }
+> 
+> static struct pci_ecam_ops tango_pci_ops = {
+> 	.bus_shift	= 20,
+> 	.pci_ops	= {
+> 		.map_bus        = pci_ecam_map_bus,
+> 		.read           = tango_config_read,
+> 		.write          = tango_config_write,
+> 	}
+> };
+> 
+> static const struct of_device_id tango_pci_ids[] = {
+> 	{ .compatible = "sigma,smp8759-pcie" },
+> 	{ /* sentinel */ },
+> };
+> 
+> static int tango_pci_probe(struct platform_device *pdev)
+> {
+> 	return pci_host_common_probe(pdev, &tango_pci_ops);
+> }
+> 
+> static struct platform_driver tango_pci_driver = {
+> 	.probe = tango_pci_probe,
+> 	.driver = {
+> 		.name = KBUILD_MODNAME,
+> 		.of_match_table = tango_pci_ids,
+> 	},
+> };
+> 
+> builtin_platform_driver(tango_pci_driver);
+> 
+> #define RIESLING_B 0x24
+> 
+> /* Root complex reports incorrect device class */
+> static void tango_pcie_fixup_class(struct pci_dev *dev)
+> {
+> 	dev->class = PCI_CLASS_BRIDGE_PCI << 8;
+> }
+> DECLARE_PCI_FIXUP_EARLY(0x1105, RIESLING_B, tango_pcie_fixup_class);
+
+This works around another silicon bug.
+
+> static void tango_pcie_bar_quirk(struct pci_dev *dev)
+> {
+> 	struct pci_bus *bus = dev->bus;
+> 
+> 	printk("%s: bus=%d devfn=%d\n", __func__, bus->number, dev->devfn);
+> 
+>         pci_write_config_dword(dev, PCI_BASE_ADDRESS_0, 0x80000004);
+> }
+> DECLARE_PCI_FIXUP_FINAL(0x1105, PCI_ANY_ID, tango_pcie_bar_quirk);
+
+And this is where the elusive "black magic" happens.
+
+Is it "safe" to configure a BAR behind Linux's back?
+
+Basically, there seems to be an identity map between RAM and PCI space.
+(Is that, perhaps, some kind of default? I would think that the default
+would have been defined by the "ranges" prop in the pci DT node.)
+
+So PCI address 0x8000_0000 maps to CPU address 0x8000_0000, i.e. the
+start of system RAM. And when dev 1 accesses RAM, the RC correctly
+forwards the packet to the memory bus.
+
+However, RC BAR0 is limited to 1 GB (split across 8 x 128 MB "region").
+
+Thus, to properly set this up, I need to account for what memory
+Linux is managing, i.e. the mem= command line argument.
+(I don't know how to access that at run-time.)
+
+For example, if we have 2 x 512 MB of RAM.
+DRAM0 is at [0x8000_0000, 0xa000_0000[
+DRAM1 is at [0xc000_0000, 0xe000_0000[
+
+But a different situation is 1 x 1 GB of RAM.
+DRAM0 is at [0x8000_0000, 0xc000_0000[
+
+I need to program different region targets.
+How to do that in a way that is acceptable upstream?
+
+Regards.
