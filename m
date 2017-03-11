@@ -1,33 +1,46 @@
-From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Sat, 11 Mar 2017 10:20:39 -0800
-Subject: [PATCH v5 21/39] UAPI: Add media UAPI Kbuild file
-In-Reply-To: <20170311134931.GP3220@valkosipuli.retiisi.org.uk>
-References: <1489121599-23206-1-git-send-email-steve_longerbeam@mentor.com>
- <1489121599-23206-22-git-send-email-steve_longerbeam@mentor.com>
- <20170311134931.GP3220@valkosipuli.retiisi.org.uk>
-Message-ID: <184c02bf-782d-6dbe-e603-a82ac8dcc8b6@gmail.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Sat, 11 Mar 2017 20:25:30 +0200
+Subject: [PATCH v2 0/4] phy/mfd/soc: exynos: Header cleanup
+Message-ID: <20170311182534.13345-1-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Suggested by Marek, continuation of cleanup of PMU register defines
+in headers.
+
+Let's keep all of them in include/linux/soc/samsung/exynos-regs-pmu.h.
+
+Merging strategy: probably through phy tree (in that case they have
+samsung-soc's ack).
+I can also take it through samsung-soc - please let me know.
 
 
-On 03/11/2017 05:49 AM, Sakari Ailus wrote:
-> Hi Steve,
->
-> On Thu, Mar 09, 2017 at 08:53:01PM -0800, Steve Longerbeam wrote:
->> Add an empty UAPI Kbuild file for media UAPI headers.
->>
->> Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
->
-> The existing V4L2 UAPI headers are under include/uapi/linux. Could you use
-> that directory instead?
->
-> I actually wouldn't really object doing this but it should have been done in
-> 2002 or so when the first V4L2 header was added. Now the benefit is
-> questionable.
->
+Changes since v1:
+=================
+1. Rebase - dependencies should be already in.
+2. Add Lee's acks.
 
-Agreed, I think the current headers should be moved to uapi/media
-eventually, but for now I'll go ahead and put under uapi/linux.
 
-Steve
+
+Best regards,
+Krzysztof
+
+
+Krzysztof Kozlowski (4):
+  phy: exynos4: Remove duplicated defines of PHY register defines
+  phy: exynos5: Remove duplicated defines of PHY register defines
+  phy: exynos-mipi-video: Use consistent method to address phy registers
+  phy: exynos: Use one define for enable bit
+
+ drivers/phy/phy-exynos-dp-video.c           |  6 +--
+ drivers/phy/phy-exynos-mipi-video.c         | 71 ++++++++++++++---------------
+ drivers/phy/phy-exynos5-usbdrd.c            |  6 +--
+ include/linux/mfd/syscon/exynos4-pmu.h      | 21 ---------
+ include/linux/mfd/syscon/exynos5-pmu.h      | 52 ---------------------
+ include/linux/soc/samsung/exynos-regs-pmu.h | 16 ++++++-
+ 6 files changed, 56 insertions(+), 116 deletions(-)
+ delete mode 100644 include/linux/mfd/syscon/exynos4-pmu.h
+ delete mode 100644 include/linux/mfd/syscon/exynos5-pmu.h
+
+-- 
+2.9.3
