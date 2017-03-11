@@ -1,162 +1,49 @@
 From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Sat, 11 Mar 2017 10:54:55 -0800
-Subject: [PATCH v4 14/36] [media] v4l2-mc: add a function to inherit
- controls from a pipeline
-In-Reply-To: <20170311184551.GD21222@n2100.armlinux.org.uk>
-References: <1487211578-11360-15-git-send-email-steve_longerbeam@mentor.com>
- <20170302160257.GK3220@valkosipuli.retiisi.org.uk>
- <20170303230645.GR21222@n2100.armlinux.org.uk>
- <20170304131329.GV3220@valkosipuli.retiisi.org.uk>
- <a7b8e095-a95c-24bd-b1e9-e983f18061c4@xs4all.nl>
- <20170310120902.1daebc7b@vento.lan>
- <5e1183f4-774f-413a-628a-96e0df321faf@xs4all.nl>
- <20170311101408.272a9187@vento.lan>
- <20170311153229.yrdjmggb3p2suhdw@ihha.localdomain>
- <acfb5eca-ff00-6d57-339a-3322034cbdb3@gmail.com>
- <20170311184551.GD21222@n2100.armlinux.org.uk>
-Message-ID: <1f1b350a-5523-34bc-07b7-f3cd2d1fd4c1@gmail.com>
+Date: Sat, 11 Mar 2017 10:58:46 -0800
+Subject: [PATCH v5 15/39] [media] v4l2: add a frame interval error event
+In-Reply-To: <20170311185137.GE21222@n2100.armlinux.org.uk>
+References: <1489121599-23206-1-git-send-email-steve_longerbeam@mentor.com>
+ <1489121599-23206-16-git-send-email-steve_longerbeam@mentor.com>
+ <5b0a0e76-2524-4140-5ccc-380a8f949cfa@xs4all.nl>
+ <ec05e6e0-79f2-2db2-bde9-4aed00d76faa@gmail.com>
+ <6b574476-77df-0e25-a4d1-32d4fe0aec12@xs4all.nl>
+ <5d5cf4a4-a4d3-586e-cd16-54f543dfcce9@gmail.com>
+ <20170311185137.GE21222@n2100.armlinux.org.uk>
+Message-ID: <a570a8c9-0f0b-b6f4-de87-18b628ce8136@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 03/11/2017 10:45 AM, Russell King - ARM Linux wrote:
-> On Sat, Mar 11, 2017 at 10:08:23AM -0800, Steve Longerbeam wrote:
->> On 03/11/2017 07:32 AM, Sakari Ailus wrote:
->>> Hi Mauro and Hans,
->>>
->>> On Sat, Mar 11, 2017 at 10:14:08AM -0300, Mauro Carvalho Chehab wrote:
->>>> Em Sat, 11 Mar 2017 12:32:43 +0100
->>>> Hans Verkuil <hverkuil@xs4all.nl> escreveu:
->>>>
->>>>> On 10/03/17 16:09, Mauro Carvalho Chehab wrote:
->>>>>> Em Fri, 10 Mar 2017 13:54:28 +0100
->>>>>> Hans Verkuil <hverkuil@xs4all.nl> escreveu:
->>>>>>
->>>>>>>> Devices that have complex pipeline that do essentially require using the
->>>>>>>> Media controller interface to configure them are out of that scope.
->>>>>>>>
->>>>>>>
->>>>>>> Way too much of how the MC devices should be used is in the minds of developers.
->>>>>>> There is a major lack for good detailed documentation, utilities, compliance
->>>>>>> test (really needed!) and libv4l plugins.
->>>>>>
->>>>>> Unfortunately, we merged an incomplete MC support at the Kernel. We knew
->>>>>> all the problems with MC-based drivers and V4L2 applications by the time
->>>>>> it was developed, and we requested Nokia developers (with was sponsoring MC
->>>>>> develoment, on that time) to work on a solution to allow standard V4L2
->>>>>> applications to work with MC based boards.
->>>>>>
->>>>>> Unfortunately, we took the decision to merge MC without that, because
->>>>>> Nokia was giving up on Linux development, and we didn't want to lose the
->>>>>> 2 years of discussions and work around it, as Nokia employers were leaving
->>>>>> the company. Also, on that time, there was already some patches floating
->>>>>> around adding backward support via libv4l. Unfortunately, those patches
->>>>>> were never finished.
->>>>>>
->>>>>> The net result is that MC was merged with some huge gaps, including
->>>>>> the lack of a proper solution for a generic V4L2 program to work
->>>>>> with V4L2 devices that use the subdev API.
->>>>>>
->>>>>> That was not that bad by then, as MC was used only on cell phones
->>>>>> that run custom-made applications.
->>>>>>
->>>>>> The reallity changed, as now, we have lots of low cost SoC based
->>>>>> boards, used for all sort of purposes. So, we need a quick solution
->>>>>> for it.
->>>>>>
->>>>>> In other words, while that would be acceptable support special apps
->>>>>> on really embedded systems, it is *not OK* for general purpose SoC
->>>>>> harware[1].
->>>>>>
->>>>>> [1] I'm calling "general purpose SoC harware" those ARM boards
->>>>>> like Raspberry Pi that are shipped to the mass and used by a wide
->>>>>> range of hobbyists and other people that just wants to run Linux on
->>>>>> ARM. It is possible to buy such boards for a very cheap price,
->>>>>> making them to be used not only on special projects, where a custom
->>>>>> made application could be interesting, but also for a lot of
->>>>>> users that just want to run Linux on a low cost ARM board, while
->>>>>> keeping using standard V4L2 apps, like "camorama".
->>>>>>
->>>>>> That's perhaps one of the reasons why it took a long time for us to
->>>>>> start receiving drivers upstream for such hardware: it is quite
->>>>>> intimidating and not logical to require developers to implement
->>>>>> on their drivers 2 complex APIs (MC, subdev) for those
->>>>>> hardware that most users won't care. From user's perspective,
->>>>>> being able to support generic applications like "camorama" and
->>>>>> "zbar" is all they want.
->>>>>>
->>>>>> In summary, I'm pretty sure we need to support standard V4L2
->>>>>> applications on boards like Raspberry Pi and those low-cost
->>>>>> SoC-based boards that are shipped to end users.
->>>>>>
->>>>>>> Anyway, regarding this specific patch and for this MC-aware driver: no, you
->>>>>>> shouldn't inherit controls from subdevs. It defeats the purpose.
->>>>>>
->>>>>> Sorry, but I don't agree with that. The subdev API is an optional API
->>>>>> (and even the MC API can be optional).
->>>>>>
->>>>>> I see the rationale for using MC and subdev APIs on cell phones,
->>>>>> ISV and other embedded hardware, as it will allow fine-tuning
->>>>>> the driver's support to allow providing the required quality for
->>>>>> certain custom-made applications. but on general SoC hardware,
->>>>>> supporting standard V4L2 applications is a need.
->>>>>>
->>>>>> Ok, perhaps supporting both subdev API and V4L2 API at the same
->>>>>> time doesn't make much sense. We could disable one in favor of the
->>>>>> other, either at compilation time or at runtime.
->>>>>
->>>>> Right. If the subdev API is disabled, then you have to inherit the subdev
->>>>> controls in the bridge driver (how else would you be able to access them?).
->>>>> And that's the usual case.
->>>>>
->>>>> If you do have the subdev API enabled, AND you use the MC, then the
->>>>> intention clearly is to give userspace full control and inheriting controls
->>>>> no longer makes any sense (and is highly confusing IMHO).
->>>>
->>>> I tend to agree with that.
->>>
->>> I agree as well.
->>>
->>> This is in line with how existing drivers behave, too.
+On 03/11/2017 10:51 AM, Russell King - ARM Linux wrote:
+> On Sat, Mar 11, 2017 at 10:14:49AM -0800, Steve Longerbeam wrote:
+>> On 03/11/2017 03:39 AM, Hans Verkuil wrote:
+>>> It's fine to use an internal event as long as the end-user doesn't
+>>> see it. But if you lose vsyncs, then you never capture another frame,
+>>> right?
 >>
->> Well, sounds like there is consensus on this topic. I guess I'll
->> go ahead and remove the control inheritance support. I suppose
->> having a control appear in two places (subdev and video nodes) can
->> be confusing.
+>> No, that's not correct. By loss of vertical sync, I mean the IPU
+>> captures portions of two different frames, resulting in a permanent
+>> "split image", with one frame containing portions of two consecutive
+>> images. Or, the video rolls continuously, if you remember the old CRT
+>> television sets of yore, it's the same rolling effect.
 >
-> I would say _don't_ do that until there are tools/libraries in place
-> that are able to support controlling subdevs, otherwise it's just
-> going to be another reason for me to walk away from this stuff, and
-> stick with a version that does work sensibly.
->
->> As for the configurability vs. ease-of-use debate, I added the
->> control inheritance to make it a little easier on the user, but,
->> as the dot graphs below will show, the user already needs quite
->> a lot of knowledge of the architecture already, in order to setup
->> the different pipelines. So perhaps the control inheritance is
->> rather pointless anyway.
->
-> I really don't think expecting the user to understand and configure
-> the pipeline is a sane way forward.  Think about it - should the
-> user need to know that, because they have a bayer-only CSI data
-> source, that there is only one path possible, and if they try to
-> configure a different path, then things will just error out?
->
-> For the case of imx219 connected to iMX6, it really is as simple as
-> "there is only one possible path" and all the complexity of the media
-> interfaces/subdevs is completely unnecessary.  Every other block in
-> the graph is just noise.
->
-> The fact is that these dot graphs show a complex picture, but reality
-> is somewhat different - there's only relatively few paths available
-> depending on the connected source and the rest of the paths are
-> completely useless.
->
+> I have seen that rolling effect, but the iMX6 regains correct sync
+> within one complete "roll" just fine here with IMX219.  However, it
+> has always recovered.
 
-I totally disagree there. Raw bayer requires passthrough yes, but for
-all other media bus formats on a mipi csi-2 bus, and all other media
-bus formats on 8-bit parallel buses, the conersion pipelines can be
-used for scaling, CSC, rotation, and motion-compensated de-interlacing.
+I've seen permanent split images, and rolling that continues for
+minutes.
+
+
+>
+> So, I don't think there's a problem with the iMX6 part of the
+> processing, and so I don't think we should cripple the iMX6 capture
+> drivers for this problem.
+>
+> It seems to me that the problem is with the source.
+
+The the problem is almost surely in the CSI. It's handling of the
+bt.656 sync codes is broken in some way.
 
 Steve
