@@ -1,71 +1,176 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Sat, 11 Mar 2017 11:06:11 +0000
-Subject: [PATCH 00/15] arm64/kvm: use common sysreg definitions
-In-Reply-To: <20170310183555.GB6271@arm.com> (Will Deacon's message of "Fri,
- 10 Mar 2017 18:35:55 +0000")
-References: <1489079247-31092-1-git-send-email-mark.rutland@arm.com>
- <87a88tv94d.fsf@on-the-bus.cambridge.arm.com>
- <20170310183555.GB6271@arm.com>
-Message-ID: <87tw70t6n0.fsf@on-the-bus.cambridge.arm.com>
+From: mchehab@s-opensource.com (Mauro Carvalho Chehab)
+Date: Sat, 11 Mar 2017 08:25:49 -0300
+Subject: [PATCH v4 14/36] [media] v4l2-mc: add a function to inherit
+ controls from a pipeline
+In-Reply-To: <20170310223714.GI3220@valkosipuli.retiisi.org.uk>
+References: <1487211578-11360-15-git-send-email-steve_longerbeam@mentor.com>
+ <20170302160257.GK3220@valkosipuli.retiisi.org.uk>
+ <20170303230645.GR21222@n2100.armlinux.org.uk>
+ <20170304131329.GV3220@valkosipuli.retiisi.org.uk>
+ <a7b8e095-a95c-24bd-b1e9-e983f18061c4@xs4all.nl>
+ <20170310130733.GU21222@n2100.armlinux.org.uk>
+ <c679f755-52a6-3c6f-3d65-277db46676cc@xs4all.nl>
+ <20170310140124.GV21222@n2100.armlinux.org.uk>
+ <cc8900b0-c091-b14b-96f4-01f8fa72431c@xs4all.nl>
+ <20170310125342.7f047acf@vento.lan>
+ <20170310223714.GI3220@valkosipuli.retiisi.org.uk>
+Message-ID: <20170311082549.576531d0@vento.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 10 2017 at  6:35:55 pm GMT, Will Deacon <will.deacon@arm.com> wrote:
-> On Fri, Mar 10, 2017 at 08:17:22AM +0000, Marc Zyngier wrote:
->> On Thu, Mar 09 2017 at  5:07:12 pm GMT, Mark Rutland <mark.rutland@arm.com> wrote:
->> > Currently we duplicate effort in maintaining system register encodings across
->> > arm64's <asm/sysreg.h>, KVM's sysreg tables, and other places. This redundancy
->> > is unfortunate, and as encodings are encoded in-place without any mnemonic,
->> > this ends up more painful to read than necessary.
->> >
->> > This series ameliorates this by making <asm/sysreg.h> the canonical location
->> > for (architected) system register encodings, with other users building atop of
->> > this, e.g. with KVM deriving its sysreg table values from the common mnemonics.
->> >
->> > I've only attacked AArch64-native SYS encodings, and ignored CP{15,14}
->> > registers for now, but these could be handled similarly. Largely, I've stuck to
->> > only what KVM needs, though for the debug and perfmon groups it was easier to
->> > take the whole group from the ARM ARM than to filter them to only what KVM
->> > needed today.
->> >
->> > To verify that I haven't accidentally broken KVM, I've diffed sys_regs.o and
->> > sys_regs_generic_v8.o on a section-by-section basis before and after the series
->> > is applied. The .text, .data, and .rodata sections (and most others) are
->> > identical. The __bug_table section, and some .debug* sections differ, and this
->> > appears to be due to line numbers changing due to removed lines.
->> >
->> > One thing I wasn't sure how to address was banks of registers such as
->> > PMEVCNTR<n>_EL0. We currently enumerate all cases for our GICv3 definitions,
->> > but it seemed painful to expand ~30 cases for PMEVCNTR<n>_EL0 and friends, and
->> > for these I've made the macros take an 'n' parameter. It would be nice to be
->> > consistent either way, and I'm happy to expand those cases.
->> >
->> > I've pushed thes series out to a branch [1] based on v4.11-rc1. It looks like
->> > git rebase is also happy to apply the patches atop of the kvm-arm-for-4.11-rc2
->> > tag.
->> 
->> I had a quick glance at this series, and this looks like a very good
->> piece of work - thanks for doing this.
->> 
->> The next question is how do we merge this. Obviously, we can't split it
->> between trees, and this is very likely to clash with anything that we
->> will merge on the KVM side (the sysreg table is a popular place).
->> 
->> Will, Catalin: Would it make sense to create a stable branch with these
->> patches, and merge it into both the arm64 and KVM trees? That'd make
->> things easier...
->
-> I think the scope for conflict on our side is pretty high too, so a shared
-> branch might be the best way to go. I don't want to branch just yet though,
-> so I'll probably wait a week or so before setting something in stone.
+Em Sat, 11 Mar 2017 00:37:14 +0200
+Sakari Ailus <sakari.ailus@iki.fi> escreveu:
 
-Yup, that's absolutely fine. We're still mopping the outcome of the
-merge window, and I won't queue any 4.12 material before another couple
-of weeks. We can always point people to Mark's branch as a base for the
-time being.
+> Hi Mauro (and others),
+> 
+> On Fri, Mar 10, 2017 at 12:53:42PM -0300, Mauro Carvalho Chehab wrote:
+> > Em Fri, 10 Mar 2017 15:20:48 +0100
+> > Hans Verkuil <hverkuil@xs4all.nl> escreveu:
+> >   
+> > >   
+> > > > As I've already mentioned, from talking about this with Mauro, it seems
+> > > > Mauro is in agreement with permitting the control inheritence... I wish
+> > > > Mauro would comment for himself, as I can't quote our private discussion
+> > > > on the subject.    
+> > > 
+> > > I can't comment either, not having seen his mail and reasoning.  
+> > 
+> > The rationale is that we should support the simplest use cases first.
+> > 
+> > In the case of the first MC-based driver (and several subsequent
+> > ones), the simplest use case required MC, as it was meant to suport
+> > a custom-made sophisticated application that required fine control
+> > on each component of the pipeline and to allow their advanced
+> > proprietary AAA userspace-based algorithms to work.  
+> 
+> The first MC based driver (omap3isp) supports what the hardware can do, it
+> does not support applications as such.
+
+All media drivers support a subset of what the hardware can do. The
+question is if such subset covers the use cases or not.
+
+The current MC-based drivers (except for uvc) took a patch to offer a
+more advanced API, to allow direct control to each IP module, as it was
+said, by the time we merged the OMAP3 driver, that, for the N9/N900 camera
+to work, it was mandatory to access the pipeline's individual components.
+
+Such approach require that some userspace software will have knowledge
+about some hardware details, in order to setup pipelines and send controls
+to the right components. That makes really hard to have a generic user
+friendly application to use such devices.
+
+Non-MC based drivers control the hardware via a portable interface with
+doesn't require any knowledge about the hardware specifics, as either the
+Kernel or some firmware at the device will set any needed pipelines.
+
+In the case of V4L2 controls, when there's no subdev API, the main
+driver (e. g. the driver that creates the /dev/video nodes) sends a
+multicast message to all bound I2C drivers. The driver(s) that need 
+them handle it. When the same control may be implemented on different
+drivers, the main driver sends a unicast message to just one driver[1].
+
+[1] There are several non-MC drivers that have multiple ways to
+control some things, like doing scaling or adjust volume levels at
+either the bridge driver or at a subdriver.
+
+There's nothing wrong with this approach: it works, it is simpler,
+it is generic. So, if it covers most use cases, why not allowing it
+for usecases where a finer control is not a requirement?
+
+> Adding support to drivers for different "operation modes" --- this is
+> essentially what is being asked for --- is not an approach which could serve
+> either purpose (some functionality with simple interface vs. fully support
+> what the hardware can do, with interfaces allowing that) adequately in the
+> short or the long run.
+
+Why not?
+
+> If we are missing pieces in the puzzle --- in this case the missing pieces
+> in the puzzle are a generic pipeline configuration library and another
+> library that, with the help of pipeline autoconfiguration would implement
+> "best effort" service for regular V4L2 on top of the MC + V4L2 subdev + V4L2
+> --- then these pieces need to be impelemented. The solution is
+> *not* to attempt to support different types of applications in each driver
+> separately. That will make writing drivers painful, error prone and is
+> unlikely ever deliver what either purpose requires.
+> 
+> So let's continue to implement the functionality that the hardware supports.
+> Making a different choice here is bound to create a lasting conflict between
+> having to change kernel interface behaviour and the requirement of
+> supporting new functionality that hasn't been previously thought of, pushing
+> away SoC vendors from V4L2 ecosystem. This is what we all do want to avoid.
+
+This situation is there since 2009. If I remember well, you tried to write
+such generic plugin in the past, but never finished it, apparently because
+it is too complex. Others tried too over the years. 
+
+The last trial was done by Jacek, trying to cover just the exynos4 driver. 
+Yet, even such limited scope plugin was not good enough, as it was never
+merged upstream. Currently, there's no such plugins upstream.
+
+If we can't even merge a plugin that solves it for just *one* driver,
+I have no hope that we'll be able to do it for the generic case.
+
+That's why I'm saying that I'm OK on merging any patch that would allow
+setting controls via the /dev/video interface on MC-based drivers when
+compiled without subdev API. I may also consider merging patches allowing
+to change the behavior on runtime, when compiled with subdev API.
+
+> As far as i.MX6 driver goes, it is always possible to implement i.MX6 plugin
+> for libv4l to perform this. This should be much easier than getting the
+> automatic pipe configuration library and the rest working, and as it is
+> custom for i.MX6, the resulting plugin may make informed technical choices
+> for better functionality.
+
+I wouldn't call "much easier" something that experienced media
+developers failed to do over the last 8 years.
+
+It is just the opposite: broadcasting a control via I2C is very easy:
+there are several examples about how to do that all over the media
+drivers.
+
+> Jacek has been working on such a plugin for
+> Samsung Exynos hardware, but I don't think he has quite finished it yey.
+
+As Jacek answered when questioned about the merge status:
+
+	Hi Hans,
+
+	On 11/03/2016 12:51 PM, Hans Verkuil wrote:
+	> Hi all,
+	>
+	> Is there anything that blocks me from merging this?
+	>
+	> This plugin work has been ongoing for years and unless there are serious
+	> objections I propose that this is merged.
+	>
+	> Jacek, is there anything missing that would prevent merging this?  
+
+	There were issues raised by Sakari during last review, related to
+	the way how v4l2 control bindings are defined. That discussion wasn't
+	finished, so I stayed by my approach. Other than that - I've tested it
+	and it works fine both with GStreamer and my test app.
+
+After that, he sent a new version (v7.1), but never got reviews.
+
+> The original plan was and continues to be sound, it's just that there have
+> always been too few hands to implement it. :-(
+
+If there are no people to implement a plan, it doesn't matter how good
+the plan is, it won't work.
+
+> > That's not true, for example, for the UVC driver. There, MC
+> > is optional, as it should be.  
+> 
+> UVC is different. The device simply provides additional information through
+> MC to the user but MC (or V4L2 sub-device interface) is not used for
+> controlling the device.
+
+It is not different. If the Kernel is compiled without the V4L2
+subdev interface, the i.MX6 driver (or whatever other driver)
+won't receive any control via the subdev interface. So, it has to
+handle the control logic control via the only interface that
+supports it, e. g. via the video devnode.
 
 Thanks,
-
-	M.
--- 
-Jazz is not dead, it just smell funny.
+Mauro
