@@ -1,76 +1,137 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Sat, 11 Mar 2017 13:03:48 +0100
-Subject: [PATCH v1] soc: rockchip: power-domain: Fix clang warning about
- negative shift count
-In-Reply-To: <20170311022153.139362-1-mka@chromium.org>
-References: <20170311022153.139362-1-mka@chromium.org>
-Message-ID: <1715023.AuHs9buZxh@phil>
+From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
+Date: Sat, 11 Mar 2017 13:14:53 +0100
+Subject: [PATCH] ARM: dts: BCM5301X: Add support for TP-LINK Archer C5 V2
+Message-ID: <20170311121453.18534-1-zajec5@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Matthias,
+From: Rafa? Mi?ecki <rafal@milecki.pl>
 
-Am Freitag, 10. M?rz 2017, 18:21:53 CET schrieb Matthias Kaehlcke:
-> The following warning is generated when building with clang:
-> 
-> drivers/soc/rockchip/pm_domains.c:726:22: error: shift count is negative
-> [-Werror,-Wshift-count-negative] [RK3399_PD_TCPD0]       = DOMAIN_RK3399(8,
-> 8, -1, false),
->                                   ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-> drivers/soc/rockchip/pm_domains.c:101:2: note: expanded from macro
-> 'DOMAIN_RK3399' DOMAIN(pwr, status, req, req, req, wakeup)
->         ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-> drivers/soc/rockchip/pm_domains.c:88:27: note: expanded from macro 'DOMAIN'
->         .req_mask = (req >= 0) ? BIT(req) : 0,          \
->                                  ^~~~~~~~
-> include/linux/bitops.h:6:24: note: expanded from macro 'BIT'
-> 
-> The BIT macro is evaluated with the negative value -1, even though the
-> resulting value would not be assigned. To fix this we only pass values
-> between 0 and 63 to BIT(). Unfortunately this means that we lose the
-> benefit of the compiler checking for out of bounds errors.
+This is BCM47081A0 based home router with BCM43217 and BCM4352 wireless
+chipsets.
 
-I tend to disagree here. This looks more like a case of "fix your compiler".
+Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
+---
+ arch/arm/boot/dts/Makefile                         |  1 +
+ arch/arm/boot/dts/bcm47081-tplink-archer-c5-v2.dts | 98 ++++++++++++++++++++++
+ 2 files changed, 99 insertions(+)
+ create mode 100644 arch/arm/boot/dts/bcm47081-tplink-archer-c5-v2.dts
 
-That conditional seems perfectly valid as the BIT(req) will never be reached 
-if req < 0 - your clang simply doesn't recognize the pattern somehow, while 
-for example gcc does.
-
-Catering to specific whims of specific compilers feels somehow wrong, as what 
-will happen if some imaginary third compiler requires another different hack 
-to be satisfied?
-
-
-Heiko
-
-> Signed-off-by: Matthias Kaehlcke <mka@chromium.org>
-> ---
->  drivers/soc/rockchip/pm_domains.c | 14 ++++++++------
->  1 file changed, 8 insertions(+), 6 deletions(-)
-> 
-> diff --git a/drivers/soc/rockchip/pm_domains.c
-> b/drivers/soc/rockchip/pm_domains.c index 1c78c42416c6..6f2bb1222992 100644
-> --- a/drivers/soc/rockchip/pm_domains.c
-> +++ b/drivers/soc/rockchip/pm_domains.c
-> @@ -77,13 +77,15 @@ struct rockchip_pmu {
-> 
->  #define to_rockchip_pd(gpd) container_of(gpd, struct rockchip_pm_domain,
-> genpd)
-> 
-> +#define RK_MASK(bit) ((bit >= 0) ? BIT(bit & 0x3f) : 0)
-> +
->  #define DOMAIN(pwr, status, req, idle, ack, wakeup)	\
-> -{						\
-> -	.pwr_mask = (pwr >= 0) ? BIT(pwr) : 0,		\
-> -	.status_mask = (status >= 0) ? BIT(status) : 0,	\
-> -	.req_mask = (req >= 0) ? BIT(req) : 0,		\
-> -	.idle_mask = (idle >= 0) ? BIT(idle) : 0,	\
-> -	.ack_mask = (ack >= 0) ? BIT(ack) : 0,		\
-> +{							\
-> +	.pwr_mask = RK_MASK(pwr),			\
-> +	.status_mask = RK_MASK(status),			\
-> +	.req_mask = RK_MASK(req),			\
-> +	.idle_mask = RK_MASK(idle),			\
-> +	.ack_mask = RK_MASK(ack),			\
->  	.active_wakeup = wakeup,			\
->  }
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 595c74a35a7b..1e24f5db4835 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -88,6 +88,7 @@ dtb-$(CONFIG_ARCH_BCM_5301X) += \
+ 	bcm47081-buffalo-wzr-900dhp.dtb \
+ 	bcm47081-luxul-xap-1410.dtb \
+ 	bcm47081-luxul-xwr-1200.dtb \
++	bcm47081-tplink-archer-c5-v2.dtb \
+ 	bcm4709-asus-rt-ac87u.dtb \
+ 	bcm4709-buffalo-wxr-1900dhp.dtb \
+ 	bcm4709-linksys-ea9200.dtb \
+diff --git a/arch/arm/boot/dts/bcm47081-tplink-archer-c5-v2.dts b/arch/arm/boot/dts/bcm47081-tplink-archer-c5-v2.dts
+new file mode 100644
+index 000000000000..dc2af20fba9f
+--- /dev/null
++++ b/arch/arm/boot/dts/bcm47081-tplink-archer-c5-v2.dts
+@@ -0,0 +1,98 @@
++/*
++ * Copyright (C) 2017 Rafa? Mi?ecki <rafal@milecki.pl>
++ *
++ * Licensed under the ISC license.
++ */
++
++/dts-v1/;
++
++#include "bcm47081.dtsi"
++
++/ {
++	compatible = "tplink,archer-c5-v2", "brcm,bcm47081", "brcm,bcm4708";
++	model = "TP-LINK Archer C5 V2";
++
++	chosen {
++		bootargs = "console=ttyS0,115200 earlycon";
++	};
++
++	memory {
++		reg = <0x00000000 0x08000000>;
++	};
++
++	leds {
++		compatible = "gpio-leds";
++
++		2ghz {
++			label = "bcm53xx:green:2ghz";
++			gpios = <&chipcommon 0 GPIO_ACTIVE_HIGH>;
++		};
++
++		lan {
++			label = "bcm53xx:green:lan";
++			gpios = <&chipcommon 1 GPIO_ACTIVE_HIGH>;
++		};
++
++		usb2-port1 {
++			label = "bcm53xx:green:usb2-port1";
++			gpios = <&chipcommon 2 GPIO_ACTIVE_HIGH>;
++		};
++
++		power {
++			label = "bcm53xx:green:power";
++			gpios = <&chipcommon 4 GPIO_ACTIVE_HIGH>;
++			linux,default-trigger = "default-on";
++		};
++
++		wan-green {
++			label = "bcm53xx:green:wan";
++			gpios = <&chipcommon 5 GPIO_ACTIVE_HIGH>;
++		};
++
++		wps {
++			label = "bcm53xx:green:wps";
++			gpios = <&chipcommon 6 GPIO_ACTIVE_HIGH>;
++		};
++
++		wan-amber {
++			label = "bcm53xx:amber:wan";
++			gpios = <&chipcommon 8 GPIO_ACTIVE_HIGH>;
++		};
++
++		5ghz {
++			label = "bcm53xx:green:5ghz";
++			gpios = <&chipcommon 12 GPIO_ACTIVE_HIGH>;
++		};
++
++		usb2-port2 {
++			label = "bcm53xx:green:usb2-port2";
++			gpios = <&chipcommon 13 GPIO_ACTIVE_HIGH>;
++		};
++	};
++
++	gpio-keys {
++		compatible = "gpio-keys";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		rfkill {
++			label = "WiFi";
++			linux,code = <KEY_RFKILL>;
++			gpios = <&chipcommon 3 GPIO_ACTIVE_LOW>;
++		};
++
++		restart {
++			label = "Reset";
++			linux,code = <KEY_RESTART>;
++			gpios = <&chipcommon 7 GPIO_ACTIVE_LOW>;
++		};
++	};
++};
++
++&spi_nor {
++	status = "okay";
++};
++
++&usb2 {
++	vcc-gpio = <&chipcommon 9 GPIO_ACTIVE_HIGH>;
++};
+-- 
+2.11.0
