@@ -1,275 +1,155 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Sat, 11 Mar 2017 20:25:34 +0200
-Subject: [PATCH v2 4/4] phy: exynos: Use one define for enable bit
-In-Reply-To: <20170311182534.13345-1-krzk@kernel.org>
-References: <20170311182534.13345-1-krzk@kernel.org>
-Message-ID: <20170311182534.13345-5-krzk@kernel.org>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Sat, 11 Mar 2017 18:45:51 +0000
+Subject: [PATCH v4 14/36] [media] v4l2-mc: add a function to inherit
+ controls from a pipeline
+In-Reply-To: <acfb5eca-ff00-6d57-339a-3322034cbdb3@gmail.com>
+References: <1487211578-11360-15-git-send-email-steve_longerbeam@mentor.com>
+ <20170302160257.GK3220@valkosipuli.retiisi.org.uk>
+ <20170303230645.GR21222@n2100.armlinux.org.uk>
+ <20170304131329.GV3220@valkosipuli.retiisi.org.uk>
+ <a7b8e095-a95c-24bd-b1e9-e983f18061c4@xs4all.nl>
+ <20170310120902.1daebc7b@vento.lan>
+ <5e1183f4-774f-413a-628a-96e0df321faf@xs4all.nl>
+ <20170311101408.272a9187@vento.lan>
+ <20170311153229.yrdjmggb3p2suhdw@ihha.localdomain>
+ <acfb5eca-ff00-6d57-339a-3322034cbdb3@gmail.com>
+Message-ID: <20170311184551.GD21222@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is no need for separate defines for Exynos4 and Exynos5 phy enable
-bit and MIPI phy reset bits.  In both cases there are the same so
-simplify it.
+On Sat, Mar 11, 2017 at 10:08:23AM -0800, Steve Longerbeam wrote:
+> On 03/11/2017 07:32 AM, Sakari Ailus wrote:
+> >Hi Mauro and Hans,
+> >
+> >On Sat, Mar 11, 2017 at 10:14:08AM -0300, Mauro Carvalho Chehab wrote:
+> >>Em Sat, 11 Mar 2017 12:32:43 +0100
+> >>Hans Verkuil <hverkuil@xs4all.nl> escreveu:
+> >>
+> >>>On 10/03/17 16:09, Mauro Carvalho Chehab wrote:
+> >>>>Em Fri, 10 Mar 2017 13:54:28 +0100
+> >>>>Hans Verkuil <hverkuil@xs4all.nl> escreveu:
+> >>>>
+> >>>>>>Devices that have complex pipeline that do essentially require using the
+> >>>>>>Media controller interface to configure them are out of that scope.
+> >>>>>>
+> >>>>>
+> >>>>>Way too much of how the MC devices should be used is in the minds of developers.
+> >>>>>There is a major lack for good detailed documentation, utilities, compliance
+> >>>>>test (really needed!) and libv4l plugins.
+> >>>>
+> >>>>Unfortunately, we merged an incomplete MC support at the Kernel. We knew
+> >>>>all the problems with MC-based drivers and V4L2 applications by the time
+> >>>>it was developed, and we requested Nokia developers (with was sponsoring MC
+> >>>>develoment, on that time) to work on a solution to allow standard V4L2
+> >>>>applications to work with MC based boards.
+> >>>>
+> >>>>Unfortunately, we took the decision to merge MC without that, because
+> >>>>Nokia was giving up on Linux development, and we didn't want to lose the
+> >>>>2 years of discussions and work around it, as Nokia employers were leaving
+> >>>>the company. Also, on that time, there was already some patches floating
+> >>>>around adding backward support via libv4l. Unfortunately, those patches
+> >>>>were never finished.
+> >>>>
+> >>>>The net result is that MC was merged with some huge gaps, including
+> >>>>the lack of a proper solution for a generic V4L2 program to work
+> >>>>with V4L2 devices that use the subdev API.
+> >>>>
+> >>>>That was not that bad by then, as MC was used only on cell phones
+> >>>>that run custom-made applications.
+> >>>>
+> >>>>The reallity changed, as now, we have lots of low cost SoC based
+> >>>>boards, used for all sort of purposes. So, we need a quick solution
+> >>>>for it.
+> >>>>
+> >>>>In other words, while that would be acceptable support special apps
+> >>>>on really embedded systems, it is *not OK* for general purpose SoC
+> >>>>harware[1].
+> >>>>
+> >>>>[1] I'm calling "general purpose SoC harware" those ARM boards
+> >>>>like Raspberry Pi that are shipped to the mass and used by a wide
+> >>>>range of hobbyists and other people that just wants to run Linux on
+> >>>>ARM. It is possible to buy such boards for a very cheap price,
+> >>>>making them to be used not only on special projects, where a custom
+> >>>>made application could be interesting, but also for a lot of
+> >>>>users that just want to run Linux on a low cost ARM board, while
+> >>>>keeping using standard V4L2 apps, like "camorama".
+> >>>>
+> >>>>That's perhaps one of the reasons why it took a long time for us to
+> >>>>start receiving drivers upstream for such hardware: it is quite
+> >>>>intimidating and not logical to require developers to implement
+> >>>>on their drivers 2 complex APIs (MC, subdev) for those
+> >>>>hardware that most users won't care. From user's perspective,
+> >>>>being able to support generic applications like "camorama" and
+> >>>>"zbar" is all they want.
+> >>>>
+> >>>>In summary, I'm pretty sure we need to support standard V4L2
+> >>>>applications on boards like Raspberry Pi and those low-cost
+> >>>>SoC-based boards that are shipped to end users.
+> >>>>
+> >>>>>Anyway, regarding this specific patch and for this MC-aware driver: no, you
+> >>>>>shouldn't inherit controls from subdevs. It defeats the purpose.
+> >>>>
+> >>>>Sorry, but I don't agree with that. The subdev API is an optional API
+> >>>>(and even the MC API can be optional).
+> >>>>
+> >>>>I see the rationale for using MC and subdev APIs on cell phones,
+> >>>>ISV and other embedded hardware, as it will allow fine-tuning
+> >>>>the driver's support to allow providing the required quality for
+> >>>>certain custom-made applications. but on general SoC hardware,
+> >>>>supporting standard V4L2 applications is a need.
+> >>>>
+> >>>>Ok, perhaps supporting both subdev API and V4L2 API at the same
+> >>>>time doesn't make much sense. We could disable one in favor of the
+> >>>>other, either at compilation time or at runtime.
+> >>>
+> >>>Right. If the subdev API is disabled, then you have to inherit the subdev
+> >>>controls in the bridge driver (how else would you be able to access them?).
+> >>>And that's the usual case.
+> >>>
+> >>>If you do have the subdev API enabled, AND you use the MC, then the
+> >>>intention clearly is to give userspace full control and inheriting controls
+> >>>no longer makes any sense (and is highly confusing IMHO).
+> >>
+> >>I tend to agree with that.
+> >
+> >I agree as well.
+> >
+> >This is in line with how existing drivers behave, too.
+> 
+> Well, sounds like there is consensus on this topic. I guess I'll
+> go ahead and remove the control inheritance support. I suppose
+> having a control appear in two places (subdev and video nodes) can
+> be confusing.
 
-This reduces number of defines and allows removal of one header file.
+I would say _don't_ do that until there are tools/libraries in place
+that are able to support controlling subdevs, otherwise it's just
+going to be another reason for me to walk away from this stuff, and
+stick with a version that does work sensibly.
 
-Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
-Acked-by: Lee Jones <lee.jones@linaro.org>
----
- drivers/phy/phy-exynos-dp-video.c           |  5 ++--
- drivers/phy/phy-exynos-mipi-video.c         | 39 ++++++++++++++---------------
- drivers/phy/phy-exynos5-usbdrd.c            |  5 ++--
- include/linux/mfd/syscon/exynos5-pmu.h      | 22 ----------------
- include/linux/soc/samsung/exynos-regs-pmu.h |  3 ++-
- 5 files changed, 25 insertions(+), 49 deletions(-)
- delete mode 100644 include/linux/mfd/syscon/exynos5-pmu.h
+> As for the configurability vs. ease-of-use debate, I added the
+> control inheritance to make it a little easier on the user, but,
+> as the dot graphs below will show, the user already needs quite
+> a lot of knowledge of the architecture already, in order to setup
+> the different pipelines. So perhaps the control inheritance is
+> rather pointless anyway.
 
-diff --git a/drivers/phy/phy-exynos-dp-video.c b/drivers/phy/phy-exynos-dp-video.c
-index d72193188980..bb3279dbf88c 100644
---- a/drivers/phy/phy-exynos-dp-video.c
-+++ b/drivers/phy/phy-exynos-dp-video.c
-@@ -14,7 +14,6 @@
- #include <linux/kernel.h>
- #include <linux/module.h>
- #include <linux/mfd/syscon.h>
--#include <linux/mfd/syscon/exynos5-pmu.h>
- #include <linux/of.h>
- #include <linux/of_address.h>
- #include <linux/phy/phy.h>
-@@ -37,7 +36,7 @@ static int exynos_dp_video_phy_power_on(struct phy *phy)
- 
- 	/* Disable power isolation on DP-PHY */
- 	return regmap_update_bits(state->regs, state->drvdata->phy_ctrl_offset,
--				  EXYNOS5_PHY_ENABLE, EXYNOS5_PHY_ENABLE);
-+				  EXYNOS4_PHY_ENABLE, EXYNOS4_PHY_ENABLE);
- }
- 
- static int exynos_dp_video_phy_power_off(struct phy *phy)
-@@ -46,7 +45,7 @@ static int exynos_dp_video_phy_power_off(struct phy *phy)
- 
- 	/* Enable power isolation on DP-PHY */
- 	return regmap_update_bits(state->regs, state->drvdata->phy_ctrl_offset,
--				  EXYNOS5_PHY_ENABLE, 0);
-+				  EXYNOS4_PHY_ENABLE, 0);
- }
- 
- static const struct phy_ops exynos_dp_video_phy_ops = {
-diff --git a/drivers/phy/phy-exynos-mipi-video.c b/drivers/phy/phy-exynos-mipi-video.c
-index acef1d92691e..c198886f80a3 100644
---- a/drivers/phy/phy-exynos-mipi-video.c
-+++ b/drivers/phy/phy-exynos-mipi-video.c
-@@ -12,7 +12,6 @@
- #include <linux/err.h>
- #include <linux/io.h>
- #include <linux/kernel.h>
--#include <linux/mfd/syscon/exynos5-pmu.h>
- #include <linux/module.h>
- #include <linux/of.h>
- #include <linux/of_address.h>
-@@ -64,7 +63,7 @@ static const struct mipi_phy_device_desc s5pv210_mipi_phy = {
- 		{
- 			/* EXYNOS_MIPI_PHY_ID_CSIS0 */
- 			.coupled_phy_id = EXYNOS_MIPI_PHY_ID_DSIM0,
--			.enable_val = EXYNOS4_MIPI_PHY_ENABLE,
-+			.enable_val = EXYNOS4_PHY_ENABLE,
- 			.enable_reg = EXYNOS4_MIPI_PHY_CONTROL(0),
- 			.enable_map = EXYNOS_MIPI_REGMAP_PMU,
- 			.resetn_val = EXYNOS4_MIPI_PHY_SRESETN,
-@@ -73,7 +72,7 @@ static const struct mipi_phy_device_desc s5pv210_mipi_phy = {
- 		}, {
- 			/* EXYNOS_MIPI_PHY_ID_DSIM0 */
- 			.coupled_phy_id = EXYNOS_MIPI_PHY_ID_CSIS0,
--			.enable_val = EXYNOS4_MIPI_PHY_ENABLE,
-+			.enable_val = EXYNOS4_PHY_ENABLE,
- 			.enable_reg = EXYNOS4_MIPI_PHY_CONTROL(0),
- 			.enable_map = EXYNOS_MIPI_REGMAP_PMU,
- 			.resetn_val = EXYNOS4_MIPI_PHY_MRESETN,
-@@ -82,7 +81,7 @@ static const struct mipi_phy_device_desc s5pv210_mipi_phy = {
- 		}, {
- 			/* EXYNOS_MIPI_PHY_ID_CSIS1 */
- 			.coupled_phy_id = EXYNOS_MIPI_PHY_ID_DSIM1,
--			.enable_val = EXYNOS4_MIPI_PHY_ENABLE,
-+			.enable_val = EXYNOS4_PHY_ENABLE,
- 			.enable_reg = EXYNOS4_MIPI_PHY_CONTROL(1),
- 			.enable_map = EXYNOS_MIPI_REGMAP_PMU,
- 			.resetn_val = EXYNOS4_MIPI_PHY_SRESETN,
-@@ -91,7 +90,7 @@ static const struct mipi_phy_device_desc s5pv210_mipi_phy = {
- 		}, {
- 			/* EXYNOS_MIPI_PHY_ID_DSIM1 */
- 			.coupled_phy_id = EXYNOS_MIPI_PHY_ID_CSIS1,
--			.enable_val = EXYNOS4_MIPI_PHY_ENABLE,
-+			.enable_val = EXYNOS4_PHY_ENABLE,
- 			.enable_reg = EXYNOS4_MIPI_PHY_CONTROL(1),
- 			.enable_map = EXYNOS_MIPI_REGMAP_PMU,
- 			.resetn_val = EXYNOS4_MIPI_PHY_MRESETN,
-@@ -109,46 +108,46 @@ static const struct mipi_phy_device_desc exynos5420_mipi_phy = {
- 		{
- 			/* EXYNOS_MIPI_PHY_ID_CSIS0 */
- 			.coupled_phy_id = EXYNOS_MIPI_PHY_ID_DSIM0,
--			.enable_val = EXYNOS5_PHY_ENABLE,
-+			.enable_val = EXYNOS4_PHY_ENABLE,
- 			.enable_reg = EXYNOS5420_MIPI_PHY_CONTROL(0),
- 			.enable_map = EXYNOS_MIPI_REGMAP_PMU,
--			.resetn_val = EXYNOS5_MIPI_PHY_S_RESETN,
-+			.resetn_val = EXYNOS4_MIPI_PHY_SRESETN,
- 			.resetn_reg = EXYNOS5420_MIPI_PHY_CONTROL(0),
- 			.resetn_map = EXYNOS_MIPI_REGMAP_PMU,
- 		}, {
- 			/* EXYNOS_MIPI_PHY_ID_DSIM0 */
- 			.coupled_phy_id = EXYNOS_MIPI_PHY_ID_CSIS0,
--			.enable_val = EXYNOS5_PHY_ENABLE,
-+			.enable_val = EXYNOS4_PHY_ENABLE,
- 			.enable_reg = EXYNOS5420_MIPI_PHY_CONTROL(0),
- 			.enable_map = EXYNOS_MIPI_REGMAP_PMU,
--			.resetn_val = EXYNOS5_MIPI_PHY_M_RESETN,
-+			.resetn_val = EXYNOS4_MIPI_PHY_MRESETN,
- 			.resetn_reg = EXYNOS5420_MIPI_PHY_CONTROL(0),
- 			.resetn_map = EXYNOS_MIPI_REGMAP_PMU,
- 		}, {
- 			/* EXYNOS_MIPI_PHY_ID_CSIS1 */
- 			.coupled_phy_id = EXYNOS_MIPI_PHY_ID_DSIM1,
--			.enable_val = EXYNOS5_PHY_ENABLE,
-+			.enable_val = EXYNOS4_PHY_ENABLE,
- 			.enable_reg = EXYNOS5420_MIPI_PHY_CONTROL(1),
- 			.enable_map = EXYNOS_MIPI_REGMAP_PMU,
--			.resetn_val = EXYNOS5_MIPI_PHY_S_RESETN,
-+			.resetn_val = EXYNOS4_MIPI_PHY_SRESETN,
- 			.resetn_reg = EXYNOS5420_MIPI_PHY_CONTROL(1),
- 			.resetn_map = EXYNOS_MIPI_REGMAP_PMU,
- 		}, {
- 			/* EXYNOS_MIPI_PHY_ID_DSIM1 */
- 			.coupled_phy_id = EXYNOS_MIPI_PHY_ID_CSIS1,
--			.enable_val = EXYNOS5_PHY_ENABLE,
-+			.enable_val = EXYNOS4_PHY_ENABLE,
- 			.enable_reg = EXYNOS5420_MIPI_PHY_CONTROL(1),
- 			.enable_map = EXYNOS_MIPI_REGMAP_PMU,
--			.resetn_val = EXYNOS5_MIPI_PHY_M_RESETN,
-+			.resetn_val = EXYNOS4_MIPI_PHY_MRESETN,
- 			.resetn_reg = EXYNOS5420_MIPI_PHY_CONTROL(1),
- 			.resetn_map = EXYNOS_MIPI_REGMAP_PMU,
- 		}, {
- 			/* EXYNOS_MIPI_PHY_ID_CSIS2 */
- 			.coupled_phy_id = EXYNOS_MIPI_PHY_ID_NONE,
--			.enable_val = EXYNOS5_PHY_ENABLE,
-+			.enable_val = EXYNOS4_PHY_ENABLE,
- 			.enable_reg = EXYNOS5420_MIPI_PHY_CONTROL(2),
- 			.enable_map = EXYNOS_MIPI_REGMAP_PMU,
--			.resetn_val = EXYNOS5_MIPI_PHY_S_RESETN,
-+			.resetn_val = EXYNOS4_MIPI_PHY_SRESETN,
- 			.resetn_reg = EXYNOS5420_MIPI_PHY_CONTROL(2),
- 			.resetn_map = EXYNOS_MIPI_REGMAP_PMU,
- 		},
-@@ -172,7 +171,7 @@ static const struct mipi_phy_device_desc exynos5433_mipi_phy = {
- 		{
- 			/* EXYNOS_MIPI_PHY_ID_CSIS0 */
- 			.coupled_phy_id = EXYNOS_MIPI_PHY_ID_DSIM0,
--			.enable_val = EXYNOS5_PHY_ENABLE,
-+			.enable_val = EXYNOS4_PHY_ENABLE,
- 			.enable_reg = EXYNOS4_MIPI_PHY_CONTROL(0),
- 			.enable_map = EXYNOS_MIPI_REGMAP_PMU,
- 			.resetn_val = BIT(0),
-@@ -181,7 +180,7 @@ static const struct mipi_phy_device_desc exynos5433_mipi_phy = {
- 		}, {
- 			/* EXYNOS_MIPI_PHY_ID_DSIM0 */
- 			.coupled_phy_id = EXYNOS_MIPI_PHY_ID_CSIS0,
--			.enable_val = EXYNOS5_PHY_ENABLE,
-+			.enable_val = EXYNOS4_PHY_ENABLE,
- 			.enable_reg = EXYNOS4_MIPI_PHY_CONTROL(0),
- 			.enable_map = EXYNOS_MIPI_REGMAP_PMU,
- 			.resetn_val = BIT(0),
-@@ -190,7 +189,7 @@ static const struct mipi_phy_device_desc exynos5433_mipi_phy = {
- 		}, {
- 			/* EXYNOS_MIPI_PHY_ID_CSIS1 */
- 			.coupled_phy_id = EXYNOS_MIPI_PHY_ID_NONE,
--			.enable_val = EXYNOS5_PHY_ENABLE,
-+			.enable_val = EXYNOS4_PHY_ENABLE,
- 			.enable_reg = EXYNOS4_MIPI_PHY_CONTROL(1),
- 			.enable_map = EXYNOS_MIPI_REGMAP_PMU,
- 			.resetn_val = BIT(1),
-@@ -199,7 +198,7 @@ static const struct mipi_phy_device_desc exynos5433_mipi_phy = {
- 		}, {
- 			/* EXYNOS_MIPI_PHY_ID_DSIM1 */
- 			.coupled_phy_id = EXYNOS_MIPI_PHY_ID_NONE,
--			.enable_val = EXYNOS5_PHY_ENABLE,
-+			.enable_val = EXYNOS4_PHY_ENABLE,
- 			.enable_reg = EXYNOS4_MIPI_PHY_CONTROL(1),
- 			.enable_map = EXYNOS_MIPI_REGMAP_PMU,
- 			.resetn_val = BIT(1),
-@@ -208,7 +207,7 @@ static const struct mipi_phy_device_desc exynos5433_mipi_phy = {
- 		}, {
- 			/* EXYNOS_MIPI_PHY_ID_CSIS2 */
- 			.coupled_phy_id = EXYNOS_MIPI_PHY_ID_NONE,
--			.enable_val = EXYNOS5_PHY_ENABLE,
-+			.enable_val = EXYNOS4_PHY_ENABLE,
- 			.enable_reg = EXYNOS4_MIPI_PHY_CONTROL(2),
- 			.enable_map = EXYNOS_MIPI_REGMAP_PMU,
- 			.resetn_val = BIT(0),
-diff --git a/drivers/phy/phy-exynos5-usbdrd.c b/drivers/phy/phy-exynos5-usbdrd.c
-index 7c896d0cda18..7c41daa2c625 100644
---- a/drivers/phy/phy-exynos5-usbdrd.c
-+++ b/drivers/phy/phy-exynos5-usbdrd.c
-@@ -22,7 +22,6 @@
- #include <linux/platform_device.h>
- #include <linux/mutex.h>
- #include <linux/mfd/syscon.h>
--#include <linux/mfd/syscon/exynos5-pmu.h>
- #include <linux/regmap.h>
- #include <linux/regulator/consumer.h>
- #include <linux/soc/samsung/exynos-regs-pmu.h>
-@@ -236,10 +235,10 @@ static void exynos5_usbdrd_phy_isol(struct phy_usb_instance *inst,
- 	if (!inst->reg_pmu)
- 		return;
- 
--	val = on ? 0 : EXYNOS5_PHY_ENABLE;
-+	val = on ? 0 : EXYNOS4_PHY_ENABLE;
- 
- 	regmap_update_bits(inst->reg_pmu, inst->pmu_offset,
--			   EXYNOS5_PHY_ENABLE, val);
-+			   EXYNOS4_PHY_ENABLE, val);
- }
- 
- /*
-diff --git a/include/linux/mfd/syscon/exynos5-pmu.h b/include/linux/mfd/syscon/exynos5-pmu.h
-deleted file mode 100644
-index 0a4ddabc395e..000000000000
---- a/include/linux/mfd/syscon/exynos5-pmu.h
-+++ /dev/null
-@@ -1,22 +0,0 @@
--/*
-- * Exynos5 SoC series Power Management Unit (PMU) register offsets
-- * and bit definitions.
-- *
-- * Copyright (C) 2014 Samsung Electronics Co., Ltd.
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- */
--
--#ifndef _LINUX_MFD_SYSCON_PMU_EXYNOS5_H_
--#define _LINUX_MFD_SYSCON_PMU_EXYNOS5_H_
--
--#define EXYNOS5_PHY_ENABLE			BIT(0)
--#define EXYNOS5_MIPI_PHY_S_RESETN		BIT(1)
--#define EXYNOS5_MIPI_PHY_M_RESETN		BIT(2)
--
--#define EXYNOS5433_PAD_RETENTION_AUD_OPTION		(0x3028)
--#define EXYNOS5433_PAD_INITIATE_WAKEUP_FROM_LOWPWR	BIT(28)
--
--#endif /* _LINUX_MFD_SYSCON_PMU_EXYNOS5_H_ */
-diff --git a/include/linux/soc/samsung/exynos-regs-pmu.h b/include/linux/soc/samsung/exynos-regs-pmu.h
-index c261ed927e1e..bebdde5dccd6 100644
---- a/include/linux/soc/samsung/exynos-regs-pmu.h
-+++ b/include/linux/soc/samsung/exynos-regs-pmu.h
-@@ -52,7 +52,8 @@
- 
- /* MIPI_PHYn_CONTROL, valid for Exynos3250, Exynos4, Exynos5250 and Exynos5433 */
- #define EXYNOS4_MIPI_PHY_CONTROL(n)		(0x0710 + (n) * 4)
--#define EXYNOS4_MIPI_PHY_ENABLE			(1 << 0)
-+/* Phy enable bit, common for all phy registers, not only MIPI */
-+#define EXYNOS4_PHY_ENABLE			(1 << 0)
- #define EXYNOS4_MIPI_PHY_SRESETN		(1 << 1)
- #define EXYNOS4_MIPI_PHY_MRESETN		(1 << 2)
- #define EXYNOS4_MIPI_PHY_RESET_MASK		(3 << 1)
+I really don't think expecting the user to understand and configure
+the pipeline is a sane way forward.  Think about it - should the
+user need to know that, because they have a bayer-only CSI data
+source, that there is only one path possible, and if they try to
+configure a different path, then things will just error out?
+
+For the case of imx219 connected to iMX6, it really is as simple as
+"there is only one possible path" and all the complexity of the media
+interfaces/subdevs is completely unnecessary.  Every other block in
+the graph is just noise.
+
+The fact is that these dot graphs show a complex picture, but reality
+is somewhat different - there's only relatively few paths available
+depending on the connected source and the rest of the paths are
+completely useless.
+
 -- 
-2.9.3
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
