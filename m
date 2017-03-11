@@ -1,40 +1,63 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Sat, 11 Mar 2017 19:29:09 +0200
-Subject: [PATCH v2 2/8] watchdog: s3c2410: Fix infinite interrupt in soft
- mode
-In-Reply-To: <20170311172527.16368-3-krzk@kernel.org>
-References: <20170311172527.16368-1-krzk@kernel.org>
- <20170311172527.16368-3-krzk@kernel.org>
-Message-ID: <20170311172909.5brghl4szwijumtt@kozik-lap>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Sat, 11 Mar 2017 17:32:54 +0000
+Subject: [PATCH v4 14/36] [media] v4l2-mc: add a function to inherit
+ controls from a pipeline
+In-Reply-To: <20170311153229.yrdjmggb3p2suhdw@ihha.localdomain>
+References: <1487211578-11360-1-git-send-email-steve_longerbeam@mentor.com>
+ <1487211578-11360-15-git-send-email-steve_longerbeam@mentor.com>
+ <20170302160257.GK3220@valkosipuli.retiisi.org.uk>
+ <20170303230645.GR21222@n2100.armlinux.org.uk>
+ <20170304131329.GV3220@valkosipuli.retiisi.org.uk>
+ <a7b8e095-a95c-24bd-b1e9-e983f18061c4@xs4all.nl>
+ <20170310120902.1daebc7b@vento.lan>
+ <5e1183f4-774f-413a-628a-96e0df321faf@xs4all.nl>
+ <20170311101408.272a9187@vento.lan>
+ <20170311153229.yrdjmggb3p2suhdw@ihha.localdomain>
+Message-ID: <20170311173254.GC21222@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 11, 2017 at 07:25:21PM +0200, Krzysztof Kozlowski wrote:
-> In soft (no-reboot) mode, the driver self-pings watchdog upon expiration
-> of an interrupt.  However the interrupt itself was not cleared thus on
-> first hit, the system enters infinite interrupt handling loop.
-> 
-> On Odroid U3 (Exynos4412), when booted with s3c2410_wdt.soft_noboot=1
-> argument the console is flooded:
-> 	# killall -9 watchdog
-> 	[   60.523760] s3c2410-wdt 10060000.watchdog: watchdog timer expired (irq)
-> 	[   60.536744] s3c2410-wdt 10060000.watchdog: watchdog timer expired (irq)
-> 
-> Fix this by writing something to the WTCLRINT register to clear the
-> interrupt.  The register WTCLRINT however appeared in S3C6410 so a new
-> watchdog quirk and flavor are needed.
-> 
-> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
-> Reviewed-by: Guenter Roeck <linux@roeck-us.net>
-> Acked-by: Rob Herring <robh@kernel.org>
-> ---
->  .../devicetree/bindings/watchdog/samsung-wdt.txt    |  9 +++++----
->  drivers/watchdog/s3c2410_wdt.c                      | 21 ++++++++++++++++++---
->  2 files changed, 23 insertions(+), 7 deletions(-)
->
+On Sat, Mar 11, 2017 at 05:32:29PM +0200, Sakari Ailus wrote:
+> My understanding of the i.MX6 case is the hardware is configurable enough
+> to warrant the use of the Media controller API. Some patches indicate
+> there are choices to be made in data routing.
 
-This can be ignored, already applied.
+The iMX6 does have configurable data routing, but in some scenarios
+(eg, when receiving bayer data) there's only one possible routing.
 
+> Steve: could you enlighten us on the topic, by e.g. doing media-ctl
+> --print-dot and sending the results to the list? What kind of different IP
+> blocks are there and what do they do? A pointer to hardware documentation
+> wouldn't hurt either (if it's available).
 
-Best regards,
-Krzysztof
+Attached for the imx219 camera.  Note that although the CSI2 block has
+four outputs, each output is dedicated to a CSI virtual channel, so
+they can not be arbitarily assigned without configuring the sensor.
+
+Since the imx219 only produces bayer, the graph is also showing the
+_only_ possible routing for the imx219 configured for CSI virtual
+channel 0.
+
+The iMX6 manuals are available on the 'net.
+
+	https://community.nxp.com/docs/DOC-101840
+
+There are several chapters that cover the capture side:
+
+* MIPI CSI2
+* IPU CSI2 gasket
+* IPU
+
+The IPU not only performs capture, but also display as well.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: imx219.dot
+Type: text/vnd.graphviz
+Size: 4557 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170311/dfafb712/attachment.dot>
