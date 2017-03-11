@@ -1,23 +1,49 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Sat, 11 Mar 2017 22:30:11 +0100
-Subject: [PATCH v1] Revert "clocksource/drivers/tcb_clksrc: Use 32 bit
- tcb as sched_clock"
-In-Reply-To: <20170309165838.7683-1-romain.izard.pro@gmail.com>
-References: <20170309165838.7683-1-romain.izard.pro@gmail.com>
-Message-ID: <20170311213011.GB1753@mai>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sat, 11 Mar 2017 22:30:54 +0100
+Subject: [PATCH v4 14/36] [media] v4l2-mc: add a function to inherit
+ controls from a pipeline
+In-Reply-To: <20170311101408.272a9187@vento.lan>
+References: <1487211578-11360-1-git-send-email-steve_longerbeam@mentor.com>
+ <1487211578-11360-15-git-send-email-steve_longerbeam@mentor.com>
+ <20170302160257.GK3220@valkosipuli.retiisi.org.uk>
+ <20170303230645.GR21222@n2100.armlinux.org.uk>
+ <20170304131329.GV3220@valkosipuli.retiisi.org.uk>
+ <a7b8e095-a95c-24bd-b1e9-e983f18061c4@xs4all.nl>
+ <20170310120902.1daebc7b@vento.lan>
+ <5e1183f4-774f-413a-628a-96e0df321faf@xs4all.nl>
+ <20170311101408.272a9187@vento.lan>
+Message-ID: <20170311213054.GA7319@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 09, 2017 at 05:58:38PM +0100, Romain Izard wrote:
-> This reverts commit 7b9f1d16e6d1 ("clocksource/drivers/tcb_clksrc: Use
-> 32 bit tcb as sched_clock"). In the current state, the kernel warns
-> against a late registration of the new sched_clock, the printk clock
-> resets after only a few minutes, and it seems that scheduling can be
-> affected as well.
+Hi!
+
+> > > Ok, perhaps supporting both subdev API and V4L2 API at the same
+> > > time doesn't make much sense. We could disable one in favor of the
+> > > other, either at compilation time or at runtime.  
+> > 
+> > Right. If the subdev API is disabled, then you have to inherit the subdev
+> > controls in the bridge driver (how else would you be able to access them?).
+> > And that's the usual case.
+> > 
+> > If you do have the subdev API enabled, AND you use the MC, then the
+> > intention clearly is to give userspace full control and inheriting controls
+> > no longer makes any sense (and is highly confusing IMHO).
 > 
-> Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
-> ---
+> I tend to agree with that.
 
-Applied, thanks.
+Well, having different userspace interface according to config options
+is strange. I believe the right solution is to make complex drivers
+depend on CONFIG_VIDEO_V4L2_SUBDEV_API...
 
-  -- Daniel
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170311/e1dd4344/attachment-0001.sig>
