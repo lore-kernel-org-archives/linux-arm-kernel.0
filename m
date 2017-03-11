@@ -1,170 +1,71 @@
-From: slash.tmp@free.fr (Mason)
-Date: Sat, 11 Mar 2017 11:57:56 +0100
-Subject: Neophyte questions about PCIe
-In-Reply-To: <df517167-d692-38a8-9c8f-a1112c7f578d@free.fr>
-References: <ced6a4bf-c94a-c116-1e94-52a8d675d132@free.fr>
- <20170308151724.GA20780@bhelgaas-glaptop.roam.corp.google.com>
- <f964ee05-db7f-c381-c91c-82897175da6d@free.fr>
- <9ba05c2c-57ef-b2c0-6a7c-457c392d98b5@free.fr>
- <df517167-d692-38a8-9c8f-a1112c7f578d@free.fr>
-Message-ID: <c0a353cb-aa1f-25db-eccd-7a1618e655b3@free.fr>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Sat, 11 Mar 2017 11:06:11 +0000
+Subject: [PATCH 00/15] arm64/kvm: use common sysreg definitions
+In-Reply-To: <20170310183555.GB6271@arm.com> (Will Deacon's message of "Fri,
+ 10 Mar 2017 18:35:55 +0000")
+References: <1489079247-31092-1-git-send-email-mark.rutland@arm.com>
+ <87a88tv94d.fsf@on-the-bus.cambridge.arm.com>
+ <20170310183555.GB6271@arm.com>
+Message-ID: <87tw70t6n0.fsf@on-the-bus.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/03/2017 18:49, Mason wrote:
+On Fri, Mar 10 2017 at  6:35:55 pm GMT, Will Deacon <will.deacon@arm.com> wrote:
+> On Fri, Mar 10, 2017 at 08:17:22AM +0000, Marc Zyngier wrote:
+>> On Thu, Mar 09 2017 at  5:07:12 pm GMT, Mark Rutland <mark.rutland@arm.com> wrote:
+>> > Currently we duplicate effort in maintaining system register encodings across
+>> > arm64's <asm/sysreg.h>, KVM's sysreg tables, and other places. This redundancy
+>> > is unfortunate, and as encodings are encoded in-place without any mnemonic,
+>> > this ends up more painful to read than necessary.
+>> >
+>> > This series ameliorates this by making <asm/sysreg.h> the canonical location
+>> > for (architected) system register encodings, with other users building atop of
+>> > this, e.g. with KVM deriving its sysreg table values from the common mnemonics.
+>> >
+>> > I've only attacked AArch64-native SYS encodings, and ignored CP{15,14}
+>> > registers for now, but these could be handled similarly. Largely, I've stuck to
+>> > only what KVM needs, though for the debug and perfmon groups it was easier to
+>> > take the whole group from the ARM ARM than to filter them to only what KVM
+>> > needed today.
+>> >
+>> > To verify that I haven't accidentally broken KVM, I've diffed sys_regs.o and
+>> > sys_regs_generic_v8.o on a section-by-section basis before and after the series
+>> > is applied. The .text, .data, and .rodata sections (and most others) are
+>> > identical. The __bug_table section, and some .debug* sections differ, and this
+>> > appears to be due to line numbers changing due to removed lines.
+>> >
+>> > One thing I wasn't sure how to address was banks of registers such as
+>> > PMEVCNTR<n>_EL0. We currently enumerate all cases for our GICv3 definitions,
+>> > but it seemed painful to expand ~30 cases for PMEVCNTR<n>_EL0 and friends, and
+>> > for these I've made the macros take an 'n' parameter. It would be nice to be
+>> > consistent either way, and I'm happy to expand those cases.
+>> >
+>> > I've pushed thes series out to a branch [1] based on v4.11-rc1. It looks like
+>> > git rebase is also happy to apply the patches atop of the kvm-arm-for-4.11-rc2
+>> > tag.
+>> 
+>> I had a quick glance at this series, and this looks like a very good
+>> piece of work - thanks for doing this.
+>> 
+>> The next question is how do we merge this. Obviously, we can't split it
+>> between trees, and this is very likely to clash with anything that we
+>> will merge on the KVM side (the sysreg table is a popular place).
+>> 
+>> Will, Catalin: Would it make sense to create a stable branch with these
+>> patches, and merge it into both the arm64 and KVM trees? That'd make
+>> things easier...
+>
+> I think the scope for conflict on our side is pretty high too, so a shared
+> branch might be the best way to go. I don't want to branch just yet though,
+> so I'll probably wait a week or so before setting something in stone.
 
-> And my current code, to work-around the silicon bugs:
-> 
-> #include <linux/kernel.h>
-> #include <linux/init.h>
-> #include <linux/ioport.h>
-> #include <linux/of_pci.h>
-> #include <linux/of.h>
-> #include <linux/pci-ecam.h>
-> #include <linux/platform_device.h>
-> 
-> //#define DEBUG_CONFIG
-> 
-> static int tango_config_read(struct pci_bus *bus, unsigned int devfn,
-> 				    int where, int size, u32 *val)
-> {
-> 	int ret;
-> 	void __iomem *pci_conf = (void *)0xf002e048;
-> 
-> #ifdef DEBUG_CONFIG
-> 	if (where == PCI_BASE_ADDRESS_0)
-> 		dump_stack();
-> #endif
-> 
-> 	writel(1, pci_conf);
+Yup, that's absolutely fine. We're still mopping the outcome of the
+merge window, and I won't queue any 4.12 material before another couple
+of weeks. We can always point people to Mark's branch as a base for the
+time being.
 
-This sets the config/mem mux to CONFIG SPACE.
+Thanks,
 
-> 	if (devfn != 0) {
-> 		*val = ~0;
-> 		return PCIBIOS_DEVICE_NOT_FOUND;
-> 	}
-
-This works around a silicon bug, where accesses to devices or
-functions not 0 return garbage.
-
-> 	ret = pci_generic_config_read(bus, devfn, where, size, val);
-> 
-> 	writel(0, pci_conf);
-
-This resets the config/mem mux back to MEM SPACE.
-
-If anything tries to access MEM in that time frame, we're toast.
-
-> #ifdef DEBUG_CONFIG
-> 	printk("%s: bus=%d where=%d size=%d val=0x%x\n",
-> 			__func__, bus->number, where, size, *val);
-> #endif
-> 
-> 	return ret;
-> }
-> 
-> static int tango_config_write(struct pci_bus *bus, unsigned int devfn,
-> 				     int where, int size, u32 val)
-> {
-> 	int ret;
-> 	void __iomem *pci_conf = (void *)0xf002e048;
-> 
-> #ifdef DEBUG_CONFIG
-> 	if (where == PCI_BASE_ADDRESS_0)
-> 		dump_stack();
-> #endif
-> 
-> #ifdef DEBUG_CONFIG
-> 	printk("%s: bus=%d where=%d size=%d val=0x%x\n",
-> 			__func__, bus->number, where, size, val);
-> #endif
-> 
-> 	writel(1, pci_conf);
-> 
-> 	ret = pci_generic_config_write(bus, devfn, where, size, val);
-> 
-> 	writel(0, pci_conf);
-> 
-> 	return ret;
-> }
-> 
-> static struct pci_ecam_ops tango_pci_ops = {
-> 	.bus_shift	= 20,
-> 	.pci_ops	= {
-> 		.map_bus        = pci_ecam_map_bus,
-> 		.read           = tango_config_read,
-> 		.write          = tango_config_write,
-> 	}
-> };
-> 
-> static const struct of_device_id tango_pci_ids[] = {
-> 	{ .compatible = "sigma,smp8759-pcie" },
-> 	{ /* sentinel */ },
-> };
-> 
-> static int tango_pci_probe(struct platform_device *pdev)
-> {
-> 	return pci_host_common_probe(pdev, &tango_pci_ops);
-> }
-> 
-> static struct platform_driver tango_pci_driver = {
-> 	.probe = tango_pci_probe,
-> 	.driver = {
-> 		.name = KBUILD_MODNAME,
-> 		.of_match_table = tango_pci_ids,
-> 	},
-> };
-> 
-> builtin_platform_driver(tango_pci_driver);
-> 
-> #define RIESLING_B 0x24
-> 
-> /* Root complex reports incorrect device class */
-> static void tango_pcie_fixup_class(struct pci_dev *dev)
-> {
-> 	dev->class = PCI_CLASS_BRIDGE_PCI << 8;
-> }
-> DECLARE_PCI_FIXUP_EARLY(0x1105, RIESLING_B, tango_pcie_fixup_class);
-
-This works around another silicon bug.
-
-> static void tango_pcie_bar_quirk(struct pci_dev *dev)
-> {
-> 	struct pci_bus *bus = dev->bus;
-> 
-> 	printk("%s: bus=%d devfn=%d\n", __func__, bus->number, dev->devfn);
-> 
->         pci_write_config_dword(dev, PCI_BASE_ADDRESS_0, 0x80000004);
-> }
-> DECLARE_PCI_FIXUP_FINAL(0x1105, PCI_ANY_ID, tango_pcie_bar_quirk);
-
-And this is where the elusive "black magic" happens.
-
-Is it "safe" to configure a BAR behind Linux's back?
-
-Basically, there seems to be an identity map between RAM and PCI space.
-(Is that, perhaps, some kind of default? I would think that the default
-would have been defined by the "ranges" prop in the pci DT node.)
-
-So PCI address 0x8000_0000 maps to CPU address 0x8000_0000, i.e. the
-start of system RAM. And when dev 1 accesses RAM, the RC correctly
-forwards the packet to the memory bus.
-
-However, RC BAR0 is limited to 1 GB (split across 8 x 128 MB "region").
-
-Thus, to properly set this up, I need to account for what memory
-Linux is managing, i.e. the mem= command line argument.
-(I don't know how to access that at run-time.)
-
-For example, if we have 2 x 512 MB of RAM.
-DRAM0 is at [0x8000_0000, 0xa000_0000[
-DRAM1 is at [0xc000_0000, 0xe000_0000[
-
-But a different situation is 1 x 1 GB of RAM.
-DRAM0 is at [0x8000_0000, 0xc000_0000[
-
-I need to program different region targets.
-How to do that in a way that is acceptable upstream?
-
-Regards.
+	M.
+-- 
+Jazz is not dead, it just smell funny.
