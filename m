@@ -1,137 +1,116 @@
-From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
-Date: Sat, 11 Mar 2017 13:14:53 +0100
-Subject: [PATCH] ARM: dts: BCM5301X: Add support for TP-LINK Archer C5 V2
-Message-ID: <20170311121453.18534-1-zajec5@gmail.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Sat, 11 Mar 2017 14:49:53 +0200
+Subject: [PATCHv2 02/15] clk: ti: add support for automatic clock alias
+ generation
+In-Reply-To: <1489236606-24023-1-git-send-email-t-kristo@ti.com>
+References: <1489236606-24023-1-git-send-email-t-kristo@ti.com>
+Message-ID: <1489236606-24023-3-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rafa? Mi?ecki <rafal@milecki.pl>
+Large portions of the OMAP framework still depend on the support of
+having clock aliases in place, so add support functions for generating
+these automatically.
 
-This is BCM47081A0 based home router with BCM43217 and BCM4352 wireless
-chipsets.
-
-Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
+Signed-off-by: Tero Kristo <t-kristo@ti.com>
+Acked-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/boot/dts/Makefile                         |  1 +
- arch/arm/boot/dts/bcm47081-tplink-archer-c5-v2.dts | 98 ++++++++++++++++++++++
- 2 files changed, 99 insertions(+)
- create mode 100644 arch/arm/boot/dts/bcm47081-tplink-archer-c5-v2.dts
+ drivers/clk/ti/clk.c   | 64 ++++++++++++++++++++++++++++++++++++++++++++++++++
+ drivers/clk/ti/clock.h |  3 +++
+ 2 files changed, 67 insertions(+)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 595c74a35a7b..1e24f5db4835 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -88,6 +88,7 @@ dtb-$(CONFIG_ARCH_BCM_5301X) += \
- 	bcm47081-buffalo-wzr-900dhp.dtb \
- 	bcm47081-luxul-xap-1410.dtb \
- 	bcm47081-luxul-xwr-1200.dtb \
-+	bcm47081-tplink-archer-c5-v2.dtb \
- 	bcm4709-asus-rt-ac87u.dtb \
- 	bcm4709-buffalo-wxr-1900dhp.dtb \
- 	bcm4709-linksys-ea9200.dtb \
-diff --git a/arch/arm/boot/dts/bcm47081-tplink-archer-c5-v2.dts b/arch/arm/boot/dts/bcm47081-tplink-archer-c5-v2.dts
-new file mode 100644
-index 000000000000..dc2af20fba9f
---- /dev/null
-+++ b/arch/arm/boot/dts/bcm47081-tplink-archer-c5-v2.dts
-@@ -0,0 +1,98 @@
-+/*
-+ * Copyright (C) 2017 Rafa? Mi?ecki <rafal@milecki.pl>
+diff --git a/drivers/clk/ti/clk.c b/drivers/clk/ti/clk.c
+index 5fcf247..91bad55 100644
+--- a/drivers/clk/ti/clk.c
++++ b/drivers/clk/ti/clk.c
+@@ -24,6 +24,7 @@
+ #include <linux/list.h>
+ #include <linux/regmap.h>
+ #include <linux/bootmem.h>
++#include <linux/device.h>
+ 
+ #include "clock.h"
+ 
+@@ -453,3 +454,66 @@ void omap2_clk_enable_init_clocks(const char **clk_names, u8 num_clocks)
+ 		clk_prepare_enable(init_clk);
+ 	}
+ }
++
++/**
++ * ti_clk_add_alias - add a clock alias for a TI clock
++ * @dev: device alias for this clock
++ * @clk: clock handle to create alias for
++ * @con: connection ID for this clock
 + *
-+ * Licensed under the ISC license.
++ * Creates a clock alias for a TI clock. Allocates the clock lookup entry
++ * and assigns the data to it. Returns 0 if successful, negative error
++ * value otherwise.
 + */
++int ti_clk_add_alias(struct device *dev, struct clk *clk, const char *con)
++{
++	struct clk_lookup *cl;
 +
-+/dts-v1/;
++	if (!clk)
++		return 0;
 +
-+#include "bcm47081.dtsi"
++	if (IS_ERR(clk))
++		return PTR_ERR(clk);
 +
-+/ {
-+	compatible = "tplink,archer-c5-v2", "brcm,bcm47081", "brcm,bcm4708";
-+	model = "TP-LINK Archer C5 V2";
++	cl = kzalloc(sizeof(*cl), GFP_KERNEL);
++	if (!cl)
++		return -ENOMEM;
 +
-+	chosen {
-+		bootargs = "console=ttyS0,115200 earlycon";
-+	};
++	if (dev)
++		cl->dev_id = dev_name(dev);
++	cl->con_id = con;
++	cl->clk = clk;
 +
-+	memory {
-+		reg = <0x00000000 0x08000000>;
-+	};
++	clkdev_add(cl);
 +
-+	leds {
-+		compatible = "gpio-leds";
++	return 0;
++}
 +
-+		2ghz {
-+			label = "bcm53xx:green:2ghz";
-+			gpios = <&chipcommon 0 GPIO_ACTIVE_HIGH>;
-+		};
++/**
++ * ti_clk_register - register a TI clock to the common clock framework
++ * @dev: device for this clock
++ * @hw: hardware clock handle
++ * @con: connection ID for this clock
++ *
++ * Registers a TI clock to the common clock framework, and adds a clock
++ * alias for it. Returns a handle to the registered clock if successful,
++ * ERR_PTR value in failure.
++ */
++struct clk *ti_clk_register(struct device *dev, struct clk_hw *hw,
++			    const char *con)
++{
++	struct clk *clk;
++	int ret;
 +
-+		lan {
-+			label = "bcm53xx:green:lan";
-+			gpios = <&chipcommon 1 GPIO_ACTIVE_HIGH>;
-+		};
++	clk = clk_register(dev, hw);
++	if (IS_ERR(clk))
++		return clk;
 +
-+		usb2-port1 {
-+			label = "bcm53xx:green:usb2-port1";
-+			gpios = <&chipcommon 2 GPIO_ACTIVE_HIGH>;
-+		};
++	ret = ti_clk_add_alias(dev, clk, con);
++	if (ret) {
++		clk_unregister(clk);
++		return ERR_PTR(ret);
++	}
 +
-+		power {
-+			label = "bcm53xx:green:power";
-+			gpios = <&chipcommon 4 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "default-on";
-+		};
-+
-+		wan-green {
-+			label = "bcm53xx:green:wan";
-+			gpios = <&chipcommon 5 GPIO_ACTIVE_HIGH>;
-+		};
-+
-+		wps {
-+			label = "bcm53xx:green:wps";
-+			gpios = <&chipcommon 6 GPIO_ACTIVE_HIGH>;
-+		};
-+
-+		wan-amber {
-+			label = "bcm53xx:amber:wan";
-+			gpios = <&chipcommon 8 GPIO_ACTIVE_HIGH>;
-+		};
-+
-+		5ghz {
-+			label = "bcm53xx:green:5ghz";
-+			gpios = <&chipcommon 12 GPIO_ACTIVE_HIGH>;
-+		};
-+
-+		usb2-port2 {
-+			label = "bcm53xx:green:usb2-port2";
-+			gpios = <&chipcommon 13 GPIO_ACTIVE_HIGH>;
-+		};
-+	};
-+
-+	gpio-keys {
-+		compatible = "gpio-keys";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		rfkill {
-+			label = "WiFi";
-+			linux,code = <KEY_RFKILL>;
-+			gpios = <&chipcommon 3 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		restart {
-+			label = "Reset";
-+			linux,code = <KEY_RESTART>;
-+			gpios = <&chipcommon 7 GPIO_ACTIVE_LOW>;
-+		};
-+	};
-+};
-+
-+&spi_nor {
-+	status = "okay";
-+};
-+
-+&usb2 {
-+	vcc-gpio = <&chipcommon 9 GPIO_ACTIVE_HIGH>;
-+};
++	return clk;
++}
+diff --git a/drivers/clk/ti/clock.h b/drivers/clk/ti/clock.h
+index 13c37f4..c38de6d 100644
+--- a/drivers/clk/ti/clock.h
++++ b/drivers/clk/ti/clock.h
+@@ -189,6 +189,9 @@ struct ti_dt_clk {
+ struct clk *ti_clk_register_divider(struct ti_clk *setup);
+ struct clk *ti_clk_register_composite(struct ti_clk *setup);
+ struct clk *ti_clk_register_dpll(struct ti_clk *setup);
++struct clk *ti_clk_register(struct device *dev, struct clk_hw *hw,
++			    const char *con);
++int ti_clk_add_alias(struct device *dev, struct clk *clk, const char *con);
+ 
+ struct clk_hw *ti_clk_build_component_div(struct ti_clk_divider *setup);
+ struct clk_hw *ti_clk_build_component_gate(struct ti_clk_gate *setup);
 -- 
-2.11.0
+1.9.1
