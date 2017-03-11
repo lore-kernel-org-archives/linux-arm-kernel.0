@@ -1,241 +1,179 @@
 From: khilman@baylibre.com (Kevin Hilman)
-Date: Fri, 10 Mar 2017 16:16:17 -0800
-Subject: [PATCH 1/2] pinctrl: meson: gxl: add the missing PWM pin
- definitions
-In-Reply-To: <CAFBinCDty8v80tLxHJPR+SHv32LX834dPJUruRNqr6angx3OOQ@mail.gmail.com>
- (Martin Blumenstingl's message of "Thu, 9 Mar 2017 20:47:03 +0100")
-References: <20170304212318.27076-1-martin.blumenstingl@googlemail.com>
- <20170304212318.27076-2-martin.blumenstingl@googlemail.com>
- <1488811357.2420.18.camel@baylibre.com>
- <CAFBinCDty8v80tLxHJPR+SHv32LX834dPJUruRNqr6angx3OOQ@mail.gmail.com>
-Message-ID: <m2d1dod5wu.fsf@baylibre.com>
+Date: Fri, 10 Mar 2017 16:23:18 -0800
+Subject: [PATCH 1/3] ARM64: dts: meson-gx: Finally move common nodes to GX
+ dtsi
+In-Reply-To: <1489055948-10656-2-git-send-email-narmstrong@baylibre.com> (Neil
+ Armstrong's message of "Thu, 9 Mar 2017 11:39:06 +0100")
+References: <1489055948-10656-1-git-send-email-narmstrong@baylibre.com>
+ <1489055948-10656-2-git-send-email-narmstrong@baylibre.com>
+Message-ID: <m24lz0d5l5.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Martin Blumenstingl <martin.blumenstingl@googlemail.com> writes:
+Neil Armstrong <narmstrong@baylibre.com> writes:
 
-> Hi Linus,
->
-> On Mon, Mar 6, 2017 at 3:42 PM, Jerome Brunet <jbrunet@baylibre.com> wrote:
->> On Sat, 2017-03-04 at 22:23 +0100, Martin Blumenstingl wrote:
->>> This adds support for the missing PWM pins on Meson GXL SoCs, namely:
->>> - PWM_A
->>> - PWM_B
->>> - PWM_C
->>> - PWM_F (GPIOX_7 and GPIOCLK_1 can be selected as output)
->>> - PWM_AO_A (GPIOAO_3 and GPIOAO_8 can be selected as output)
->>>
->>> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.co
->>> m>
->>> ---
->>>  drivers/pinctrl/meson/pinctrl-meson-gxl.c | 64
->>> +++++++++++++++++++++++++++++++
->>>  1 file changed, 64 insertions(+)
->>>
->>> diff --git a/drivers/pinctrl/meson/pinctrl-meson-gxl.c
->>> b/drivers/pinctrl/meson/pinctrl-meson-gxl.c
->>> index 4ab94a85e306..91dfc498780b 100644
->>> --- a/drivers/pinctrl/meson/pinctrl-meson-gxl.c
->>> +++ b/drivers/pinctrl/meson/pinctrl-meson-gxl.c
->>> @@ -195,8 +195,19 @@ static const unsigned int eth_txd1_pins[]
->>> = { PIN(GPIOZ_11, EE_OFF) };
->>>  static const unsigned int eth_txd2_pins[]    = { PIN(GPIOZ_12,
->>> EE_OFF) };
->>>  static const unsigned int eth_txd3_pins[]    = { PIN(GPIOZ_13,
->>> EE_OFF) };
->>>
->>> +static const unsigned int pwm_a_pins[]               = {
->>> PIN(GPIOX_6, EE_OFF) };
->>> +
->>> +static const unsigned int pwm_b_pins[]               = {
->>> PIN(GPIODV_29, EE_OFF) };
->>> +
->>> +static const unsigned int pwm_c_pins[]               = {
->>> PIN(GPIOZ_15, EE_OFF) };
->>> +
->>> +static const unsigned int pwm_d_pins[]               = {
->>> PIN(GPIODV_28, EE_OFF) };
->>> +
->>>  static const unsigned int pwm_e_pins[]               = {
->>> PIN(GPIOX_16, EE_OFF) };
->>>
->>> +static const unsigned int pwm_f_clk_pins[]   = { PIN(GPIOCLK_1,
->>> EE_OFF) };
->>> +static const unsigned int pwm_f_x_pins[]     = { PIN(GPIOX_7,
->>> EE_OFF) };
->>> +
->>>  static const unsigned int hdmi_hpd_pins[]    = { PIN(GPIOH_0,
->>> EE_OFF) };
->>>  static const unsigned int hdmi_sda_pins[]    = { PIN(GPIOH_1,
->>> EE_OFF) };
->>>  static const unsigned int hdmi_scl_pins[]    = { PIN(GPIOH_2,
->>> EE_OFF) };
->>> @@ -225,6 +236,9 @@ static const unsigned int uart_rts_ao_b_pins[]
->>> = { PIN(GPIOAO_3, 0) };
->>>
->>>  static const unsigned int remote_input_ao_pins[] = {PIN(GPIOAO_7, 0)
->>> };
->>>
->>> +static const unsigned int pwm_ao_a_3_pins[]  = { PIN(GPIOAO_3,
->>> 0) };
->>> +static const unsigned int pwm_ao_a_8_pins[]  = { PIN(GPIOAO_8,
->>> 0) };
->>> +
->>>  static const unsigned int pwm_ao_b_pins[]    = { PIN(GPIOAO_9,
->>> 0) };
->>>
->>>  static struct meson_pmx_group meson_gxl_periphs_groups[] = {
->>> @@ -350,7 +364,9 @@ static struct meson_pmx_group
->>> meson_gxl_periphs_groups[] = {
->>>       GROUP(uart_rts_a,       5,      16),
->>>       GROUP(uart_tx_c,        5,      13),
->>>       GROUP(uart_rx_c,        5,      12),
->>> +     GROUP(pwm_a,            5,      25),
->>>       GROUP(pwm_e,            5,      15),
->>> +     GROUP(pwm_f_x,          5,      14),
->>>
->>>       /* Bank Z */
->>>       GROUP(eth_mdio,         4,      22),
->>> @@ -367,6 +383,7 @@ static struct meson_pmx_group
->>> meson_gxl_periphs_groups[] = {
->>>       GROUP(eth_txd1,         4,      12),
->>>       GROUP(eth_txd2,         4,      11),
->>>       GROUP(eth_txd3,         4,      10),
->>> +     GROUP(pwm_c,            3,      20),
->>>
->>>       /* Bank H */
->>>       GROUP(hdmi_hpd,         6,      31),
->>> @@ -382,6 +399,8 @@ static struct meson_pmx_group
->>> meson_gxl_periphs_groups[] = {
->>>       GROUP(i2c_sda_b,        1,      12),
->>>       GROUP(i2c_sck_c,        1,      11),
->>>       GROUP(i2c_sda_c,        1,      10),
->>> +     GROUP(pwm_b,            2,      11),
->>> +     GROUP(pwm_d,            2,      12),
->>>
->>>       /* Bank BOOT */
->>>       GROUP(emmc_nand_d07,    7,      31),
->>> @@ -404,6 +423,9 @@ static struct meson_pmx_group
->>> meson_gxl_periphs_groups[] = {
->>>       GROUP(sdcard_d2,        6,      0),
->>>       GROUP(sdcard_cmd,       6,      2),
->>>       GROUP(sdcard_clk,       6,      3),
->>> +
->>> +     /* Bank CLK */
->>> +     GROUP(pwm_f_clk,        8,      30),
->>>  };
->>>
->>>  static struct meson_pmx_group meson_gxl_aobus_groups[] = {
->>> @@ -428,6 +450,8 @@ static struct meson_pmx_group
->>> meson_gxl_aobus_groups[] = {
->>>       GROUP(uart_cts_ao_b,    0,      8),
->>>       GROUP(uart_rts_ao_b,    0,      7),
->>>       GROUP(remote_input_ao,  0,      0),
->>> +     GROUP(pwm_ao_a_3,       0,      22),
->>> +     GROUP(pwm_ao_a_8,       0,      17),
->>>       GROUP(pwm_ao_b,         0,      3),
->>>  };
->>>
->>> @@ -513,10 +537,34 @@ static const char * const eth_groups[] = {
->>>       "eth_txd0", "eth_txd1", "eth_txd2", "eth_txd3",
->>>  };
->>>
->>> +static const char * const pwm_a_groups[] = {
->>> +     "pwm_a",
->>> +};
->>> +
->>> +static const char * const pwm_b_groups[] = {
->>> +     "pwm_b",
->>> +};
->>> +
->>> +static const char * const pwm_c_groups[] = {
->>> +     "pwm_c",
->>> +};
->>> +
->>> +static const char * const pwm_d_groups[] = {
->>> +     "pwm_d",
->>> +};
->>> +
->>>  static const char * const pwm_e_groups[] = {
->>>       "pwm_e",
->>>  };
->>>
->>> +static const char * const pwm_f_clk_groups[] = {
->>> +     "pwm_f_clk",
->>> +};
->>> +
->>> +static const char * const pwm_f_x_groups[] = {
->>> +     "pwm_f_x",
->>> +};
->>> +
->>>  static const char * const hdmi_hpd_groups[] = {
->>>       "hdmi_hpd",
->>>  };
->>> @@ -542,6 +590,14 @@ static const char * const
->>> remote_input_ao_groups[] = {
->>>       "remote_input_ao",
->>>  };
->>>
->>> +static const char * const pwm_ao_a_3_groups[] = {
->>> +     "pwm_ao_a_3",
->>> +};
->>> +
->>> +static const char * const pwm_ao_a_8_groups[] = {
->>> +     "pwm_ao_a_8",
->>> +};
->>> +
->>>  static const char * const pwm_ao_b_groups[] = {
->>>       "pwm_ao_b",
->>>  };
->>> @@ -559,7 +615,13 @@ static struct meson_pmx_func
->>> meson_gxl_periphs_functions[] = {
->>>       FUNCTION(i2c_b),
->>>       FUNCTION(i2c_c),
->>>       FUNCTION(eth),
->>> +     FUNCTION(pwm_a),
->>> +     FUNCTION(pwm_b),
->>> +     FUNCTION(pwm_c),
->>> +     FUNCTION(pwm_d),
->>>       FUNCTION(pwm_e),
->>> +     FUNCTION(pwm_f_clk),
->>> +     FUNCTION(pwm_f_x),
->>
->> I wonder if having function named "pwm_f_clk" really makes sense ?
->> Shouldn't it be just "pwm_f" ? This is real function, isn't it ?
->> The actual pin used will be provided in the dt. Here, I suppose we
->> could have this:
->>
->> +static const char * const pwm_f_groups[] = {
->> +       "pwm_f_x", "pwm_f_clk",
->> +};
->>
->> Has far as I can see, on meson arch, the function does not carry much
->> information anyway, except for prints.
->>
->> To be clear, I'm not questioning this change in particular. It looks
->> good, and follows what has been done in the past on meson. I know we
->> have been this a lot already, but I'm questioning whether we should
->> continue to do so ?
->>
->> I asking because I also have a lot case like this coming up on audio
->> for gxl and gxbb, where the same function can use different pins.
->
-> could you please look into Jerome's question?
-> personally I'm fine with either way, and changing my patch would be
-> quite trivial. but I'd like to know what's "the way to go" before
-> changing anything (and reverting that afterwards again).
+> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 
-I think Jerome is right.
+Could use a bit more changelog here (probably what you have in the cover
+letter.)
 
-Taking the PWM_F example, my (admittedely limited) understanding of
-pinctrl/pinux is that there should be a single function (namely PWM_F)
-but it could have multiple "groups" (namely GPIO_X and GPIOCLK).  It's
-up to the board specific DT to select the right group.
-
-If that's the case, we've already let in some cases of doing this the
-wrong way.
-
-If I'm understanding things correctly, and after some clarification from
-Linus, we should fix up the existing cases first.
+Otherwise, looks good.  Thanks for the cleanup.
 
 Kevin
+
+> ---
+>  arch/arm64/boot/dts/amlogic/meson-gx.dtsi   | 24 ++++++++++++++++
+>  arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 43 ++++++-----------------------
+>  arch/arm64/boot/dts/amlogic/meson-gxl.dtsi  |  8 ++++++
+>  3 files changed, 40 insertions(+), 35 deletions(-)
+>
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
+> index 5d995f7..2d8dc6f 100644
+> --- a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
+> +++ b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
+> @@ -296,6 +296,14 @@
+>  				status = "disabled";
+>  			};
+>  
+> +			spifc: spi at 8c80 {
+> +				compatible = "amlogic,meson-gxbb-spifc";
+> +				reg = <0x0 0x08c80 0x0 0x80>;
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +				status = "disabled";
+> +			};
+> +
+>  			watchdog at 98d0 {
+>  				compatible = "amlogic,meson-gx-wdt", "amlogic,meson-gxbb-wdt";
+>  				reg = <0x0 0x098d0 0x0 0x10>;
+> @@ -342,6 +350,13 @@
+>  			#size-cells = <2>;
+>  			ranges = <0x0 0x0 0x0 0xc8100000 0x0 0x100000>;
+>  
+> +			clkc_AO: clock-controller at 040 {
+> +				compatible = "amlogic,gx-aoclkc", "amlogic,gxbb-aoclkc";
+> +				reg = <0x0 0x00040 0x0 0x4>;
+> +				#clock-cells = <1>;
+> +				#reset-cells = <1>;
+> +			};
+> +
+>  			uart_AO: serial at 4c0 {
+>  				compatible = "amlogic,meson-uart";
+>  				reg = <0x0 0x004c0 0x0 0x14>;
+> @@ -358,6 +373,15 @@
+>  				status = "disabled";
+>  			};
+>  
+> +			i2c_AO: i2c at 500 {
+> +				compatible = "amlogic,meson-gx-i2c", "amlogic,meson-gxbb-i2c";
+> +				reg = <0x0 0x500 0x0 0x20>;
+> +				interrupts = <GIC_SPI 195 IRQ_TYPE_EDGE_RISING>;
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +				status = "disabled";
+> +			};
+> +
+>  			pwm_AO_ab: pwm at 550 {
+>  				compatible = "amlogic,meson-gx-pwm", "amlogic,meson-gxbb-pwm";
+>  				reg = <0x0 0x00550 0x0 0x10>;
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+> index 04b3324..c2c41aa 100644
+> --- a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+> +++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+> @@ -97,17 +97,6 @@
+>  	};
+>  };
+>  
+> -&cbus {
+> -	spifc: spi at 8c80 {
+> -		compatible = "amlogic,meson-gxbb-spifc";
+> -		reg = <0x0 0x08c80 0x0 0x80>;
+> -		#address-cells = <1>;
+> -		#size-cells = <0>;
+> -		clocks = <&clkc CLKID_SPI>;
+> -		status = "disabled";
+> -	};
+> -};
+> -
+>  &ethmac {
+>  	clocks = <&clkc CLKID_ETH>,
+>  		 <&clkc CLKID_FCLK_DIV2>,
+> @@ -204,30 +193,6 @@
+>  			};
+>  		};
+>  	};
+> -
+> -	clkc_AO: clock-controller at 040 {
+> -		compatible = "amlogic,gxbb-aoclkc";
+> -		reg = <0x0 0x00040 0x0 0x4>;
+> -		#clock-cells = <1>;
+> -		#reset-cells = <1>;
+> -	};
+> -
+> -	pwm_ab_AO: pwm at 550 {
+> -		compatible = "amlogic,meson-gxbb-pwm";
+> -		reg = <0x0 0x0550 0x0 0x10>;
+> -		#pwm-cells = <3>;
+> -		status = "disabled";
+> -	};
+> -
+> -	i2c_AO: i2c at 500 {
+> -		compatible = "amlogic,meson-gxbb-i2c";
+> -		reg = <0x0 0x500 0x0 0x20>;
+> -		interrupts = <GIC_SPI 195 IRQ_TYPE_EDGE_RISING>;
+> -		clocks = <&clkc CLKID_AO_I2C>;
+> -		#address-cells = <1>;
+> -		#size-cells = <0>;
+> -		status = "disabled";
+> -	};
+>  };
+>  
+>  &periphs {
+> @@ -482,6 +447,10 @@
+>  	clocks = <&clkc CLKID_I2C>;
+>  };
+>  
+> +&i2c_AO {
+> +	clocks = <&clkc CLKID_AO_I2C>;
+> +};
+> +
+>  &i2c_B {
+>  	clocks = <&clkc CLKID_I2C>;
+>  };
+> @@ -521,6 +490,10 @@
+>  	clock-names = "core", "clkin0", "clkin1";
+>  };
+>  
+> +&spifc {
+> +	clocks = <&clkc CLKID_SPI>;
+> +};
+> +
+>  &vpu {
+>  	compatible = "amlogic,meson-gxbb-vpu", "amlogic,meson-gx-vpu";
+>  };
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
+> index 17cd546..37ed7a0 100644
+> --- a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
+> +++ b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
+> @@ -427,6 +427,10 @@
+>  	clocks = <&clkc CLKID_I2C>;
+>  };
+>  
+> +&i2c_AO {
+> +	clocks = <&clkc CLKID_AO_I2C>;
+> +};
+> +
+>  &i2c_B {
+>  	clocks = <&clkc CLKID_I2C>;
+>  };
+> @@ -466,6 +470,10 @@
+>  	clock-names = "core", "clkin0", "clkin1";
+>  };
+>  
+> +&spifc {
+> +	clocks = <&clkc CLKID_SPI>;
+> +};
+> +
+>  &vpu {
+>  	compatible = "amlogic,meson-gxl-vpu", "amlogic,meson-gx-vpu";
+>  };
