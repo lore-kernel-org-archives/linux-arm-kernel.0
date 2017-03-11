@@ -1,63 +1,66 @@
 From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Sat, 11 Mar 2017 17:42:34 +0000
-Subject: [PATCH 2/2] clocksource: orion: add delay_timer implementation
-Message-ID: <E1cml2I-0007CQ-Q1@rmk-PC.armlinux.org.uk>
+Date: Sat, 11 Mar 2017 17:42:29 +0000
+Subject: [PATCH 1/2] clocksource: orion: read clock rate once
+Message-ID: <E1cml2D-0007CJ-Iv@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add an implementation for the ARM delay timer, which is used for
-udelay().  This provides less CPU dependent and more accurate delays -
-the CPU loop on Marvell Dove appears to calibrate to around 6% too
-short.
+Rather than reading the clock rate three times, read it once - we are
+about to add a fourth usage.
 
 Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 ---
- drivers/clocksource/time-orion.c | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+ drivers/clocksource/time-orion.c | 11 +++++++----
+ 1 file changed, 7 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/clocksource/time-orion.c b/drivers/clocksource/time-orion.c
-index c4818a5dc8e5..7eb2ab0bd114 100644
+index a28f496e97cf..c4818a5dc8e5 100644
 --- a/drivers/clocksource/time-orion.c
 +++ b/drivers/clocksource/time-orion.c
-@@ -15,6 +15,7 @@
- #include <linux/bitops.h>
- #include <linux/clk.h>
- #include <linux/clockchips.h>
-+#include <linux/delay.h>
- #include <linux/interrupt.h>
- #include <linux/of_address.h>
- #include <linux/of_irq.h>
-@@ -36,6 +37,21 @@
+@@ -106,6 +106,7 @@ static struct irqaction orion_clkevt_irq = {
  
- static void __iomem *timer_base;
+ static int __init orion_timer_init(struct device_node *np)
+ {
++	unsigned long rate;
+ 	struct clk *clk;
+ 	int irq, ret;
  
-+static unsigned long notrace orion_read_timer(void)
-+{
-+	return ~readl(timer_base + TIMER0_VAL);
-+}
+@@ -135,6 +136,8 @@ static int __init orion_timer_init(struct device_node *np)
+ 		return -EINVAL;
+ 	}
+ 
++	rate = clk_get_rate(clk);
 +
-+static struct delay_timer orion_delay_timer = {
-+	.read_current_timer = orion_read_timer,
-+};
-+
-+static void orion_delay_timer_init(unsigned long rate)
-+{
-+	orion_delay_timer.freq = rate;
-+	register_current_timer_delay(&orion_delay_timer);
-+}
-+
- /*
-  * Free-running clocksource handling.
-  */
-@@ -168,6 +184,9 @@ static int __init orion_timer_init(struct device_node *np)
- 	clockevents_config_and_register(&orion_clkevt, rate,
+ 	/* setup timer0 as free-running clocksource */
+ 	writel(~0, timer_base + TIMER0_VAL);
+ 	writel(~0, timer_base + TIMER0_RELOAD);
+@@ -142,15 +145,15 @@ static int __init orion_timer_init(struct device_node *np)
+ 		TIMER0_RELOAD_EN | TIMER0_EN,
+ 		TIMER0_RELOAD_EN | TIMER0_EN);
+ 
+-	ret = clocksource_mmio_init(timer_base + TIMER0_VAL, "orion_clocksource",
+-				    clk_get_rate(clk), 300, 32,
++	ret = clocksource_mmio_init(timer_base + TIMER0_VAL,
++				    "orion_clocksource", rate, 300, 32,
+ 				    clocksource_mmio_readl_down);
+ 	if (ret) {
+ 		pr_err("Failed to initialize mmio timer");
+ 		return ret;
+ 	}
+ 
+-	sched_clock_register(orion_read_sched_clock, 32, clk_get_rate(clk));
++	sched_clock_register(orion_read_sched_clock, 32, rate);
+ 
+ 	/* setup timer1 as clockevent timer */
+ 	ret = setup_irq(irq, &orion_clkevt_irq);
+@@ -162,7 +165,7 @@ static int __init orion_timer_init(struct device_node *np)
+ 	ticks_per_jiffy = (clk_get_rate(clk) + HZ/2) / HZ;
+ 	orion_clkevt.cpumask = cpumask_of(0);
+ 	orion_clkevt.irq = irq;
+-	clockevents_config_and_register(&orion_clkevt, clk_get_rate(clk),
++	clockevents_config_and_register(&orion_clkevt, rate,
  					ORION_ONESHOT_MIN, ORION_ONESHOT_MAX);
  
-+
-+	orion_delay_timer_init(rate);
-+
  	return 0;
- }
- CLOCKSOURCE_OF_DECLARE(orion_timer, "marvell,orion-timer", orion_timer_init);
 -- 
 2.7.4
