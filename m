@@ -1,144 +1,31 @@
-From: sakari.ailus@iki.fi (Sakari Ailus)
-Date: Sat, 11 Mar 2017 17:32:29 +0200
-Subject: [PATCH v4 14/36] [media] v4l2-mc: add a function to inherit
- controls from a pipeline
-In-Reply-To: <20170311101408.272a9187@vento.lan>
-References: <1487211578-11360-1-git-send-email-steve_longerbeam@mentor.com>
- <1487211578-11360-15-git-send-email-steve_longerbeam@mentor.com>
- <20170302160257.GK3220@valkosipuli.retiisi.org.uk>
- <20170303230645.GR21222@n2100.armlinux.org.uk>
- <20170304131329.GV3220@valkosipuli.retiisi.org.uk>
- <a7b8e095-a95c-24bd-b1e9-e983f18061c4@xs4all.nl>
- <20170310120902.1daebc7b@vento.lan>
- <5e1183f4-774f-413a-628a-96e0df321faf@xs4all.nl>
- <20170311101408.272a9187@vento.lan>
-Message-ID: <20170311153229.yrdjmggb3p2suhdw@ihha.localdomain>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Sun, 12 Mar 2017 00:36:56 +0900
+Subject: [PATCH] ARM: dts: uniphier: fix pin groups of eMMC pin-mux node
+Message-ID: <1489246616-8060-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mauro and Hans,
+The eMMC devices on UniPhier boards are generally used in the 8-bit
+mode.  So, DAT4-7 pins should be controlled.
 
-On Sat, Mar 11, 2017 at 10:14:08AM -0300, Mauro Carvalho Chehab wrote:
-> Em Sat, 11 Mar 2017 12:32:43 +0100
-> Hans Verkuil <hverkuil@xs4all.nl> escreveu:
-> 
-> > On 10/03/17 16:09, Mauro Carvalho Chehab wrote:
-> > > Em Fri, 10 Mar 2017 13:54:28 +0100
-> > > Hans Verkuil <hverkuil@xs4all.nl> escreveu:
-> > >   
-> > >>> Devices that have complex pipeline that do essentially require using the
-> > >>> Media controller interface to configure them are out of that scope.
-> > >>>     
-> > >>
-> > >> Way too much of how the MC devices should be used is in the minds of developers.
-> > >> There is a major lack for good detailed documentation, utilities, compliance
-> > >> test (really needed!) and libv4l plugins.  
-> > > 
-> > > Unfortunately, we merged an incomplete MC support at the Kernel. We knew
-> > > all the problems with MC-based drivers and V4L2 applications by the time
-> > > it was developed, and we requested Nokia developers (with was sponsoring MC
-> > > develoment, on that time) to work on a solution to allow standard V4L2
-> > > applications to work with MC based boards.
-> > > 
-> > > Unfortunately, we took the decision to merge MC without that, because 
-> > > Nokia was giving up on Linux development, and we didn't want to lose the
-> > > 2 years of discussions and work around it, as Nokia employers were leaving
-> > > the company. Also, on that time, there was already some patches floating
-> > > around adding backward support via libv4l. Unfortunately, those patches
-> > > were never finished.
-> > > 
-> > > The net result is that MC was merged with some huge gaps, including
-> > > the lack of a proper solution for a generic V4L2 program to work
-> > > with V4L2 devices that use the subdev API.
-> > > 
-> > > That was not that bad by then, as MC was used only on cell phones
-> > > that run custom-made applications. 
-> > > 
-> > > The reallity changed, as now, we have lots of low cost SoC based
-> > > boards, used for all sort of purposes. So, we need a quick solution
-> > > for it.
-> > > 
-> > > In other words, while that would be acceptable support special apps
-> > > on really embedded systems, it is *not OK* for general purpose SoC
-> > > harware[1].
-> > > 
-> > > [1] I'm calling "general purpose SoC harware" those ARM boards
-> > > like Raspberry Pi that are shipped to the mass and used by a wide
-> > > range of hobbyists and other people that just wants to run Linux on
-> > > ARM. It is possible to buy such boards for a very cheap price,
-> > > making them to be used not only on special projects, where a custom
-> > > made application could be interesting, but also for a lot of
-> > > users that just want to run Linux on a low cost ARM board, while
-> > > keeping using standard V4L2 apps, like "camorama".
-> > > 
-> > > That's perhaps one of the reasons why it took a long time for us to
-> > > start receiving drivers upstream for such hardware: it is quite 
-> > > intimidating and not logical to require developers to implement
-> > > on their drivers 2 complex APIs (MC, subdev) for those
-> > > hardware that most users won't care. From user's perspective,
-> > > being able to support generic applications like "camorama" and
-> > > "zbar" is all they want.
-> > > 
-> > > In summary, I'm pretty sure we need to support standard V4L2 
-> > > applications on boards like Raspberry Pi and those low-cost 
-> > > SoC-based boards that are shipped to end users.
-> > >   
-> > >> Anyway, regarding this specific patch and for this MC-aware driver: no, you
-> > >> shouldn't inherit controls from subdevs. It defeats the purpose.  
-> > > 
-> > > Sorry, but I don't agree with that. The subdev API is an optional API
-> > > (and even the MC API can be optional).
-> > > 
-> > > I see the rationale for using MC and subdev APIs on cell phones,
-> > > ISV and other embedded hardware, as it will allow fine-tuning
-> > > the driver's support to allow providing the required quality for
-> > > certain custom-made applications. but on general SoC hardware,
-> > > supporting standard V4L2 applications is a need.
-> > > 
-> > > Ok, perhaps supporting both subdev API and V4L2 API at the same
-> > > time doesn't make much sense. We could disable one in favor of the
-> > > other, either at compilation time or at runtime.  
-> > 
-> > Right. If the subdev API is disabled, then you have to inherit the subdev
-> > controls in the bridge driver (how else would you be able to access them?).
-> > And that's the usual case.
-> > 
-> > If you do have the subdev API enabled, AND you use the MC, then the
-> > intention clearly is to give userspace full control and inheriting controls
-> > no longer makes any sense (and is highly confusing IMHO).
-> 
-> I tend to agree with that.
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+---
 
-I agree as well.
+ arch/arm/boot/dts/uniphier-pinctrl.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-This is in line with how existing drivers behave, too.
-
-> 
-> > > 
-> > > This way, if the subdev API is disabled, the driver will be
-> > > functional for V4L2-based applications that don't support neither
-> > > MC or subdev APIs.  
-> > 
-> > I'm not sure if it makes sense for the i.MX driver to behave differently
-> > depending on whether the subdev API is enabled or disabled. I don't know
-> > enough of the hardware to tell if it would ever make sense to disable the
-> > subdev API.
-> 
-> Yeah, I don't know enough about it either. The point is: this is
-> something that the driver maintainer and driver users should
-> decide if it either makes sense or not, based on the expected use cases.
-
-My understanding of the i.MX6 case is the hardware is configurable enough
-to warrant the use of the Media controller API. Some patches indicate
-there are choices to be made in data routing.
-
-Steve: could you enlighten us on the topic, by e.g. doing media-ctl
---print-dot and sending the results to the list? What kind of different IP
-blocks are there and what do they do? A pointer to hardware documentation
-wouldn't hurt either (if it's available).
-
+diff --git a/arch/arm/boot/dts/uniphier-pinctrl.dtsi b/arch/arm/boot/dts/uniphier-pinctrl.dtsi
+index 8ee79da..246f35f 100644
+--- a/arch/arm/boot/dts/uniphier-pinctrl.dtsi
++++ b/arch/arm/boot/dts/uniphier-pinctrl.dtsi
+@@ -45,7 +45,7 @@
+ 
+ &pinctrl {
+ 	pinctrl_emmc: emmc_grp {
+-		groups = "emmc";
++		groups = "emmc", "emmc_dat8";
+ 		function = "emmc";
+ 	};
+ 
 -- 
-Kind regards,
-
-Sakari Ailus
-e-mail: sakari.ailus at iki.fi	XMPP: sailus at retiisi.org.uk
+2.7.4
