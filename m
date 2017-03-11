@@ -1,12 +1,12 @@
 From: khilman@baylibre.com (Kevin Hilman)
-Date: Fri, 10 Mar 2017 16:23:18 -0800
-Subject: [PATCH 1/3] ARM64: dts: meson-gx: Finally move common nodes to GX
- dtsi
-In-Reply-To: <1489055948-10656-2-git-send-email-narmstrong@baylibre.com> (Neil
- Armstrong's message of "Thu, 9 Mar 2017 11:39:06 +0100")
+Date: Fri, 10 Mar 2017 16:24:21 -0800
+Subject: [PATCH 3/3] ARM64: dts: meson-gx: Prepend GX generic compatible
+ like other nodes
+In-Reply-To: <1489055948-10656-4-git-send-email-narmstrong@baylibre.com> (Neil
+ Armstrong's message of "Thu, 9 Mar 2017 11:39:08 +0100")
 References: <1489055948-10656-1-git-send-email-narmstrong@baylibre.com>
- <1489055948-10656-2-git-send-email-narmstrong@baylibre.com>
-Message-ID: <m24lz0d5l5.fsf@baylibre.com>
+ <1489055948-10656-4-git-send-email-narmstrong@baylibre.com>
+Message-ID: <m2zigsbqyy.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,166 +14,85 @@ Neil Armstrong <narmstrong@baylibre.com> writes:
 
 > Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 
-Could use a bit more changelog here (probably what you have in the cover
-letter.)
-
-Otherwise, looks good.  Thanks for the cleanup.
+Could use a bit more changelog here  (in order to support generic
+drivers that work for all GX family, blah, blah...)
 
 Kevin
 
 > ---
->  arch/arm64/boot/dts/amlogic/meson-gx.dtsi   | 24 ++++++++++++++++
->  arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 43 ++++++-----------------------
->  arch/arm64/boot/dts/amlogic/meson-gxl.dtsi  |  8 ++++++
->  3 files changed, 40 insertions(+), 35 deletions(-)
+>  arch/arm64/boot/dts/amlogic/meson-gx.dtsi | 16 ++++++++--------
+>  1 file changed, 8 insertions(+), 8 deletions(-)
 >
 > diff --git a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
-> index 5d995f7..2d8dc6f 100644
+> index 06d70bf..a010ab9 100644
 > --- a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
 > +++ b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
-> @@ -296,6 +296,14 @@
->  				status = "disabled";
+> @@ -233,7 +233,7 @@
 >  			};
 >  
-> +			spifc: spi at 8c80 {
-> +				compatible = "amlogic,meson-gxbb-spifc";
-> +				reg = <0x0 0x08c80 0x0 0x80>;
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +				status = "disabled";
-> +			};
-> +
->  			watchdog at 98d0 {
->  				compatible = "amlogic,meson-gx-wdt", "amlogic,meson-gxbb-wdt";
->  				reg = <0x0 0x098d0 0x0 0x10>;
-> @@ -342,6 +350,13 @@
->  			#size-cells = <2>;
->  			ranges = <0x0 0x0 0x0 0xc8100000 0x0 0x100000>;
->  
-> +			clkc_AO: clock-controller at 040 {
-> +				compatible = "amlogic,gx-aoclkc", "amlogic,gxbb-aoclkc";
-> +				reg = <0x0 0x00040 0x0 0x4>;
-> +				#clock-cells = <1>;
-> +				#reset-cells = <1>;
-> +			};
-> +
->  			uart_AO: serial at 4c0 {
->  				compatible = "amlogic,meson-uart";
->  				reg = <0x0 0x004c0 0x0 0x14>;
-> @@ -358,6 +373,15 @@
->  				status = "disabled";
->  			};
->  
-> +			i2c_AO: i2c at 500 {
+>  			i2c_A: i2c at 8500 {
+> -				compatible = "amlogic,meson-gxbb-i2c";
 > +				compatible = "amlogic,meson-gx-i2c", "amlogic,meson-gxbb-i2c";
-> +				reg = <0x0 0x500 0x0 0x20>;
-> +				interrupts = <GIC_SPI 195 IRQ_TYPE_EDGE_RISING>;
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +				status = "disabled";
-> +			};
-> +
->  			pwm_AO_ab: pwm at 550 {
->  				compatible = "amlogic,meson-gx-pwm", "amlogic,meson-gxbb-pwm";
->  				reg = <0x0 0x00550 0x0 0x10>;
-> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-> index 04b3324..c2c41aa 100644
-> --- a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-> +++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-> @@ -97,17 +97,6 @@
->  	};
->  };
+>  				reg = <0x0 0x08500 0x0 0x20>;
+>  				interrupts = <GIC_SPI 21 IRQ_TYPE_EDGE_RISING>;
+>  				#address-cells = <1>;
+> @@ -279,7 +279,7 @@
+>  			};
 >  
-> -&cbus {
-> -	spifc: spi at 8c80 {
-> -		compatible = "amlogic,meson-gxbb-spifc";
-> -		reg = <0x0 0x08c80 0x0 0x80>;
-> -		#address-cells = <1>;
-> -		#size-cells = <0>;
-> -		clocks = <&clkc CLKID_SPI>;
-> -		status = "disabled";
-> -	};
-> -};
-> -
->  &ethmac {
->  	clocks = <&clkc CLKID_ETH>,
->  		 <&clkc CLKID_FCLK_DIV2>,
-> @@ -204,30 +193,6 @@
+>  			i2c_B: i2c at 87c0 {
+> -				compatible = "amlogic,meson-gxbb-i2c";
+> +				compatible = "amlogic,meson-gx-i2c", "amlogic,meson-gxbb-i2c";
+>  				reg = <0x0 0x087c0 0x0 0x20>;
+>  				interrupts = <GIC_SPI 214 IRQ_TYPE_EDGE_RISING>;
+>  				#address-cells = <1>;
+> @@ -288,7 +288,7 @@
+>  			};
+>  
+>  			i2c_C: i2c at 87e0 {
+> -				compatible = "amlogic,meson-gxbb-i2c";
+> +				compatible = "amlogic,meson-gx-i2c", "amlogic,meson-gxbb-i2c";
+>  				reg = <0x0 0x087e0 0x0 0x20>;
+>  				interrupts = <GIC_SPI 215 IRQ_TYPE_EDGE_RISING>;
+>  				#address-cells = <1>;
+> @@ -297,7 +297,7 @@
+>  			};
+>  
+>  			spifc: spi at 8c80 {
+> -				compatible = "amlogic,meson-gxbb-spifc";
+> +				compatible = "amlogic,meson-gx-spifc", "amlogic,meson-gxbb-spifc";
+>  				reg = <0x0 0x08c80 0x0 0x80>;
+>  				#address-cells = <1>;
+>  				#size-cells = <0>;
+> @@ -325,7 +325,7 @@
+>  		};
+>  
+>  		sram: sram at c8000000 {
+> -			compatible = "amlogic,meson-gxbb-sram", "mmio-sram";
+> +			compatible = "amlogic,meson-gx-sram", "amlogic,meson-gxbb-sram", "mmio-sram";
+>  			reg = <0x0 0xc8000000 0x0 0x14000>;
+>  
+>  			#address-cells = <1>;
+> @@ -333,12 +333,12 @@
+>  			ranges = <0 0x0 0xc8000000 0x14000>;
+>  
+>  			cpu_scp_lpri: scp-shmem at 0 {
+> -				compatible = "amlogic,meson-gxbb-scp-shmem";
+> +				compatible = "amlogic,meson-gx-scp-shmem", "amlogic,meson-gxbb-scp-shmem";
+>  				reg = <0x13000 0x400>;
+>  			};
+>  
+>  			cpu_scp_hpri: scp-shmem at 200 {
+> -				compatible = "amlogic,meson-gxbb-scp-shmem";
+> +				compatible = "amlogic,meson-gx-scp-shmem", "amlogic,meson-gxbb-scp-shmem";
+>  				reg = <0x13400 0x400>;
 >  			};
 >  		};
->  	};
-> -
-> -	clkc_AO: clock-controller at 040 {
-> -		compatible = "amlogic,gxbb-aoclkc";
-> -		reg = <0x0 0x00040 0x0 0x4>;
-> -		#clock-cells = <1>;
-> -		#reset-cells = <1>;
-> -	};
-> -
-> -	pwm_ab_AO: pwm at 550 {
-> -		compatible = "amlogic,meson-gxbb-pwm";
-> -		reg = <0x0 0x0550 0x0 0x10>;
-> -		#pwm-cells = <3>;
-> -		status = "disabled";
-> -	};
-> -
-> -	i2c_AO: i2c at 500 {
-> -		compatible = "amlogic,meson-gxbb-i2c";
-> -		reg = <0x0 0x500 0x0 0x20>;
-> -		interrupts = <GIC_SPI 195 IRQ_TYPE_EDGE_RISING>;
-> -		clocks = <&clkc CLKID_AO_I2C>;
-> -		#address-cells = <1>;
-> -		#size-cells = <0>;
-> -		status = "disabled";
-> -	};
->  };
+> @@ -390,7 +390,7 @@
+>  			};
 >  
->  &periphs {
-> @@ -482,6 +447,10 @@
->  	clocks = <&clkc CLKID_I2C>;
->  };
->  
-> +&i2c_AO {
-> +	clocks = <&clkc CLKID_AO_I2C>;
-> +};
-> +
->  &i2c_B {
->  	clocks = <&clkc CLKID_I2C>;
->  };
-> @@ -521,6 +490,10 @@
->  	clock-names = "core", "clkin0", "clkin1";
->  };
->  
-> +&spifc {
-> +	clocks = <&clkc CLKID_SPI>;
-> +};
-> +
->  &vpu {
->  	compatible = "amlogic,meson-gxbb-vpu", "amlogic,meson-gx-vpu";
->  };
-> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
-> index 17cd546..37ed7a0 100644
-> --- a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
-> +++ b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
-> @@ -427,6 +427,10 @@
->  	clocks = <&clkc CLKID_I2C>;
->  };
->  
-> +&i2c_AO {
-> +	clocks = <&clkc CLKID_AO_I2C>;
-> +};
-> +
->  &i2c_B {
->  	clocks = <&clkc CLKID_I2C>;
->  };
-> @@ -466,6 +470,10 @@
->  	clock-names = "core", "clkin0", "clkin1";
->  };
->  
-> +&spifc {
-> +	clocks = <&clkc CLKID_SPI>;
-> +};
-> +
->  &vpu {
->  	compatible = "amlogic,meson-gxl-vpu", "amlogic,meson-gx-vpu";
->  };
+>  			ir: ir at 580 {
+> -				compatible = "amlogic,meson-gxbb-ir";
+> +				compatible = "amlogic,meson-gx-ir", "amlogic,meson-gxbb-ir";
+>  				reg = <0x0 0x00580 0x0 0x40>;
+>  				interrupts = <GIC_SPI 196 IRQ_TYPE_EDGE_RISING>;
+>  				status = "disabled";
