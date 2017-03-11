@@ -1,129 +1,127 @@
 From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Sat, 11 Mar 2017 12:32:43 +0100
-Subject: [PATCH v4 14/36] [media] v4l2-mc: add a function to inherit
- controls from a pipeline
-In-Reply-To: <20170310120902.1daebc7b@vento.lan>
-References: <1487211578-11360-1-git-send-email-steve_longerbeam@mentor.com>
- <1487211578-11360-15-git-send-email-steve_longerbeam@mentor.com>
- <20170302160257.GK3220@valkosipuli.retiisi.org.uk>
- <20170303230645.GR21222@n2100.armlinux.org.uk>
- <20170304131329.GV3220@valkosipuli.retiisi.org.uk>
- <a7b8e095-a95c-24bd-b1e9-e983f18061c4@xs4all.nl>
- <20170310120902.1daebc7b@vento.lan>
-Message-ID: <5e1183f4-774f-413a-628a-96e0df321faf@xs4all.nl>
+Date: Sat, 11 Mar 2017 12:39:51 +0100
+Subject: [PATCH v5 15/39] [media] v4l2: add a frame interval error event
+In-Reply-To: <ec05e6e0-79f2-2db2-bde9-4aed00d76faa@gmail.com>
+References: <1489121599-23206-1-git-send-email-steve_longerbeam@mentor.com>
+ <1489121599-23206-16-git-send-email-steve_longerbeam@mentor.com>
+ <5b0a0e76-2524-4140-5ccc-380a8f949cfa@xs4all.nl>
+ <ec05e6e0-79f2-2db2-bde9-4aed00d76faa@gmail.com>
+Message-ID: <6b574476-77df-0e25-a4d1-32d4fe0aec12@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/03/17 16:09, Mauro Carvalho Chehab wrote:
-> Em Fri, 10 Mar 2017 13:54:28 +0100
-> Hans Verkuil <hverkuil@xs4all.nl> escreveu:
+On 10/03/17 19:37, Steve Longerbeam wrote:
+> Hi Hans,
 > 
->>> Devices that have complex pipeline that do essentially require using the
->>> Media controller interface to configure them are out of that scope.
->>>   
+> On 03/10/2017 04:03 AM, Hans Verkuil wrote:
+>> On 10/03/17 05:52, Steve Longerbeam wrote:
+>>> Add a new FRAME_INTERVAL_ERROR event to signal that a video capture or
+>>> output device has measured an interval between the reception or transmit
+>>> completion of two consecutive frames of video that is outside the nominal
+>>> frame interval by some tolerance value.
 >>
->> Way too much of how the MC devices should be used is in the minds of developers.
->> There is a major lack for good detailed documentation, utilities, compliance
->> test (really needed!) and libv4l plugins.
+>> Reading back what was said on this I agree with Sakari that this doesn't
+>> belong here.
+>>
+>> Userspace can detect this just as easily (if not easier) with a timeout.
+>>
 > 
-> Unfortunately, we merged an incomplete MC support at the Kernel. We knew
-> all the problems with MC-based drivers and V4L2 applications by the time
-> it was developed, and we requested Nokia developers (with was sponsoring MC
-> develoment, on that time) to work on a solution to allow standard V4L2
-> applications to work with MC based boards.
 > 
-> Unfortunately, we took the decision to merge MC without that, because 
-> Nokia was giving up on Linux development, and we didn't want to lose the
-> 2 years of discussions and work around it, as Nokia employers were leaving
-> the company. Also, on that time, there was already some patches floating
-> around adding backward support via libv4l. Unfortunately, those patches
-> were never finished.
+> Unfortunately measuring frame intervals from userland is not accurate
+> enough for i.MX6.
 > 
-> The net result is that MC was merged with some huge gaps, including
-> the lack of a proper solution for a generic V4L2 program to work
-> with V4L2 devices that use the subdev API.
+> The issue here is that the IPUv3, specifically the CSI unit, can
+> permanently lose vertical sync if there are truncated frames sent
+> on the bt.656 bus. We have seen a single missing line of video cause
+> loss of vertical sync. The only way to correct this is to shutdown
+> the IPU capture hardware and restart, which can be accomplished
+> simply by restarting streaming from userland.
 > 
-> That was not that bad by then, as MC was used only on cell phones
-> that run custom-made applications. 
+> There are no other indicators from the sensor about these short
+> frame events (believe me, we've exhausted all avenues with the ADV718x).
+> And the IPUv3 DMA engine has no status indicators for short frames
+> either. So the only way to detect them is by measuring frame intervals.
 > 
-> The reallity changed, as now, we have lots of low cost SoC based
-> boards, used for all sort of purposes. So, we need a quick solution
-> for it.
+> The intervals have to be able to resolve a single line of missing video.
+> With a PAL video source that requires better than 58 usec accuracy.
 > 
-> In other words, while that would be acceptable support special apps
-> on really embedded systems, it is *not OK* for general purpose SoC
-> harware[1].
+> There is too much uncertainty to resolve this at user level. The
+> driver is able to resolve this by measuring intervals between hardware
+> interrupts as long as interrupt latency is reasonably low, and we
+> have another method using the i.MX6 hardware input capture support
+> that can measure these intervals very accurately with no errors
+> introduced by interrupt latency.
 > 
-> [1] I'm calling "general purpose SoC harware" those ARM boards
-> like Raspberry Pi that are shipped to the mass and used by a wide
-> range of hobbyists and other people that just wants to run Linux on
-> ARM. It is possible to buy such boards for a very cheap price,
-> making them to be used not only on special projects, where a custom
-> made application could be interesting, but also for a lot of
-> users that just want to run Linux on a low cost ARM board, while
-> keeping using standard V4L2 apps, like "camorama".
-> 
-> That's perhaps one of the reasons why it took a long time for us to
-> start receiving drivers upstream for such hardware: it is quite 
-> intimidating and not logical to require developers to implement
-> on their drivers 2 complex APIs (MC, subdev) for those
-> hardware that most users won't care. From user's perspective,
-> being able to support generic applications like "camorama" and
-> "zbar" is all they want.
-> 
-> In summary, I'm pretty sure we need to support standard V4L2 
-> applications on boards like Raspberry Pi and those low-cost 
-> SoC-based boards that are shipped to end users.
-> 
->> Anyway, regarding this specific patch and for this MC-aware driver: no, you
->> shouldn't inherit controls from subdevs. It defeats the purpose.
-> 
-> Sorry, but I don't agree with that. The subdev API is an optional API
-> (and even the MC API can be optional).
-> 
-> I see the rationale for using MC and subdev APIs on cell phones,
-> ISV and other embedded hardware, as it will allow fine-tuning
-> the driver's support to allow providing the required quality for
-> certain custom-made applications. but on general SoC hardware,
-> supporting standard V4L2 applications is a need.
-> 
-> Ok, perhaps supporting both subdev API and V4L2 API at the same
-> time doesn't make much sense. We could disable one in favor of the
-> other, either at compilation time or at runtime.
+> I made this event a private event to imx-media driver in a previous
+> iteration, so I can return it to a private event, but this can't be
+> done at user level.
 
-Right. If the subdev API is disabled, then you have to inherit the subdev
-controls in the bridge driver (how else would you be able to access them?).
-And that's the usual case.
+It's fine to use an internal event as long as the end-user doesn't
+see it. But if you lose vsyncs, then you never capture another frame,
+right? So userspace can detect that (i.e. no new frames arrive) and
+it can timeout on that. Or you detect it in the driver and restart there,
+or call vb2_queue_error().
 
-If you do have the subdev API enabled, AND you use the MC, then the
-intention clearly is to give userspace full control and inheriting controls
-no longer makes any sense (and is highly confusing IMHO).
-
-> 
-> This way, if the subdev API is disabled, the driver will be
-> functional for V4L2-based applications that don't support neither
-> MC or subdev APIs.
-
-I'm not sure if it makes sense for the i.MX driver to behave differently
-depending on whether the subdev API is enabled or disabled. I don't know
-enough of the hardware to tell if it would ever make sense to disable the
-subdev API.
+Anything really as long as this event isn't user-visible :-)
 
 Regards,
 
 	Hans
 
 > 
->> As mentioned, I will attempt to try and get some time to work on this
->> later this year. Fingers crossed.
+> Steve
 > 
-> That will be good, and, once we have a solution that works, we can
-> work on cleanup the code, but, until then, drivers for arm-based boards
-> sold to end consumers should work out of the box with standard V4L2 apps.
 > 
-> While we don't have that, I'm OK to merge patches adding such support
-> upstream.
-> 
-> Thanks,
-> Mauro
+>>
+>>>
+>>> Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
+>>> ---
+>>>  Documentation/media/uapi/v4l/vidioc-dqevent.rst | 6 ++++++
+>>>  Documentation/media/videodev2.h.rst.exceptions  | 1 +
+>>>  include/uapi/linux/videodev2.h                  | 1 +
+>>>  3 files changed, 8 insertions(+)
+>>>
+>>> diff --git a/Documentation/media/uapi/v4l/vidioc-dqevent.rst b/Documentation/media/uapi/v4l/vidioc-dqevent.rst
+>>> index 8d663a7..dc77363 100644
+>>> --- a/Documentation/media/uapi/v4l/vidioc-dqevent.rst
+>>> +++ b/Documentation/media/uapi/v4l/vidioc-dqevent.rst
+>>> @@ -197,6 +197,12 @@ call.
+>>>      the regions changes. This event has a struct
+>>>      :c:type:`v4l2_event_motion_det`
+>>>      associated with it.
+>>> +    * - ``V4L2_EVENT_FRAME_INTERVAL_ERROR``
+>>> +      - 7
+>>> +      - This event is triggered when the video capture or output device
+>>> +    has measured an interval between the reception or transmit
+>>> +    completion of two consecutive frames of video that is outside
+>>> +    the nominal frame interval by some tolerance value.
+>>>      * - ``V4L2_EVENT_PRIVATE_START``
+>>>        - 0x08000000
+>>>        - Base event number for driver-private events.
+>>> diff --git a/Documentation/media/videodev2.h.rst.exceptions b/Documentation/media/videodev2.h.rst.exceptions
+>>> index e11a0d0..c7d8fad 100644
+>>> --- a/Documentation/media/videodev2.h.rst.exceptions
+>>> +++ b/Documentation/media/videodev2.h.rst.exceptions
+>>> @@ -459,6 +459,7 @@ replace define V4L2_EVENT_CTRL event-type
+>>>  replace define V4L2_EVENT_FRAME_SYNC event-type
+>>>  replace define V4L2_EVENT_SOURCE_CHANGE event-type
+>>>  replace define V4L2_EVENT_MOTION_DET event-type
+>>> +replace define V4L2_EVENT_FRAME_INTERVAL_ERROR event-type
+>>>  replace define V4L2_EVENT_PRIVATE_START event-type
+>>>
+>>>  replace define V4L2_EVENT_CTRL_CH_VALUE ctrl-changes-flags
+>>> diff --git a/include/uapi/linux/videodev2.h b/include/uapi/linux/videodev2.h
+>>> index 45184a2..cf5a0d0 100644
+>>> --- a/include/uapi/linux/videodev2.h
+>>> +++ b/include/uapi/linux/videodev2.h
+>>> @@ -2131,6 +2131,7 @@ struct v4l2_streamparm {
+>>>  #define V4L2_EVENT_FRAME_SYNC            4
+>>>  #define V4L2_EVENT_SOURCE_CHANGE        5
+>>>  #define V4L2_EVENT_MOTION_DET            6
+>>> +#define V4L2_EVENT_FRAME_INTERVAL_ERROR        7
+>>>  #define V4L2_EVENT_PRIVATE_START        0x08000000
+>>>
+>>>  /* Payload for V4L2_EVENT_VSYNC */
+>>>
+>>
 > 
