@@ -1,36 +1,27 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Sat, 11 Mar 2017 19:25:27 +0200
-Subject: [PATCH v2 8/8] ARM: dts: s5pv210: Fix infinite interrupt in soft mode
-In-Reply-To: <20170311172527.16368-1-krzk@kernel.org>
+Date: Sat, 11 Mar 2017 19:28:41 +0200
+Subject: [PATCH v2 1/8] watchdog: s3c2410: Remove confusing CONFIG prefix
+ from local defines
+In-Reply-To: <20170311172527.16368-2-krzk@kernel.org>
 References: <20170311172527.16368-1-krzk@kernel.org>
-Message-ID: <20170311172527.16368-9-krzk@kernel.org>
+ <20170311172527.16368-2-krzk@kernel.org>
+Message-ID: <20170311172841.plxclb45qyp6yyqd@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In soft (no-reboot) mode, the driver self-pings watchdog upon expiration
-of an interrupt.  The interrupt has to be cleared, because otherwise
-system enters infinite interrupt handling loop.
+On Sat, Mar 11, 2017 at 07:25:20PM +0200, Krzysztof Kozlowski wrote:
+> The CONFIG prefix from defines in the s3c2410_wdt.c might suggest that
+> these constants come from Kconfig.
+> 
+> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+> Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+> ---
+>  drivers/watchdog/s3c2410_wdt.c | 16 ++++++++--------
+>  1 file changed, 8 insertions(+), 8 deletions(-)
+>
 
-Use a samsung,s3c6410-wdt compatible to select appropriate quirk for
-clearing the watchdog interrupt.
+Ah, my mistake, I looked at watchdog-master but this is already in
+watchdog-next. Sorry for confusion.
 
-Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
----
- arch/arm/boot/dts/s5pv210.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/s5pv210.dtsi b/arch/arm/boot/dts/s5pv210.dtsi
-index a853918be43f..726c5d0dbd5b 100644
---- a/arch/arm/boot/dts/s5pv210.dtsi
-+++ b/arch/arm/boot/dts/s5pv210.dtsi
-@@ -310,7 +310,7 @@
- 		};
- 
- 		watchdog: watchdog at e2700000 {
--			compatible = "samsung,s3c2410-wdt";
-+			compatible = "samsung,s3c6410-wdt";
- 			reg = <0xe2700000 0x1000>;
- 			interrupt-parent = <&vic0>;
- 			interrupts = <26>;
--- 
-2.9.3
+Best regards,
+Krzysztof
