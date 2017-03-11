@@ -1,198 +1,124 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 12 Mar 2017 00:15:05 +0100
-Subject: [PATCH 4/4] RFT: irqchip: replace moxa with ftintc010
-Message-ID: <20170311231505.16056-1-linus.walleij@linaro.org>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Sat, 11 Mar 2017 23:14:56 +0000
+Subject: [PATCH v4 14/36] [media] v4l2-mc: add a function to inherit
+ controls from a pipeline
+In-Reply-To: <20170311082549.576531d0@vento.lan>
+References: <20170303230645.GR21222@n2100.armlinux.org.uk>
+ <20170304131329.GV3220@valkosipuli.retiisi.org.uk>
+ <a7b8e095-a95c-24bd-b1e9-e983f18061c4@xs4all.nl>
+ <20170310130733.GU21222@n2100.armlinux.org.uk>
+ <c679f755-52a6-3c6f-3d65-277db46676cc@xs4all.nl>
+ <20170310140124.GV21222@n2100.armlinux.org.uk>
+ <cc8900b0-c091-b14b-96f4-01f8fa72431c@xs4all.nl>
+ <20170310125342.7f047acf@vento.lan>
+ <20170310223714.GI3220@valkosipuli.retiisi.org.uk>
+ <20170311082549.576531d0@vento.lan>
+Message-ID: <20170311231456.GH21222@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Moxa Art interrupt controller is very very likely just an instance
-of the Faraday FTINTC010 interrupt controller from Faraday Technology.
-An indication would be its close association with the FA526 ARM core
-and the fact that the register layout is the same.
+On Sat, Mar 11, 2017 at 08:25:49AM -0300, Mauro Carvalho Chehab wrote:
+> This situation is there since 2009. If I remember well, you tried to write
+> such generic plugin in the past, but never finished it, apparently because
+> it is too complex. Others tried too over the years. 
+> 
+> The last trial was done by Jacek, trying to cover just the exynos4 driver. 
+> Yet, even such limited scope plugin was not good enough, as it was never
+> merged upstream. Currently, there's no such plugins upstream.
+> 
+> If we can't even merge a plugin that solves it for just *one* driver,
+> I have no hope that we'll be able to do it for the generic case.
 
-The implementation in irq-moxart.c can probably be right off replaced
-with the irq-ftintc010.c driver by adding a compatible string, selecting
-this irqchip from the machine and run.
+This is what really worries me right now about the current proposal for
+iMX6.  What's being proposed is to make the driver exclusively MC-based.
 
-As a bonus we have an irqchip driver supporting high/low and
-rising/falling edges for the Moxa Art, and shared code with the Gemini
-platform.
+What that means is that existing applications are _not_ going to work
+until we have some answer for libv4l2, and from what you've said above,
+it seems that this has been attempted multiple times over the last _8_
+years, and each time it's failed.
 
-Cc: arm at kernel.org
-Cc: Jonas Jensen <jonas.jensen@gmail.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-Jonas: it would be great if you could test this so we can unify the
-drivers.
+When thinking about it, it's quite obvious why merely trying to push
+the problem into userspace fails:
 
-ARM SoC maintainers: if allright with you, please ACK the oneline
-change in the moxart Kconfig so we can merge the patch with the rest
-of the Faraday refactorings into the irqchip tree.
----
- arch/arm/mach-moxart/Kconfig    |   2 +-
- drivers/irqchip/Makefile        |   1 -
- drivers/irqchip/irq-ftintc010.c |   2 +
- drivers/irqchip/irq-moxart.c    | 116 ----------------------------------------
- 4 files changed, 3 insertions(+), 118 deletions(-)
- delete mode 100644 drivers/irqchip/irq-moxart.c
+  If we assert that the kernel does not have sufficient information to
+  make decisions about how to route and control the hardware, then under
+  what scenario does a userspace library have sufficient information to
+  make those decisions?
 
-diff --git a/arch/arm/mach-moxart/Kconfig b/arch/arm/mach-moxart/Kconfig
-index f69e28b85e88..70db2abf6163 100644
---- a/arch/arm/mach-moxart/Kconfig
-+++ b/arch/arm/mach-moxart/Kconfig
-@@ -3,8 +3,8 @@ menuconfig ARCH_MOXART
- 	depends on ARCH_MULTI_V4
- 	select CPU_FA526
- 	select ARM_DMA_MEM_BUFFERABLE
-+	select FARADAY_FTINTC010
- 	select MOXART_TIMER
--	select GENERIC_IRQ_CHIP
- 	select GPIOLIB
- 	select PHYLIB if NETDEVICES
- 	help
-diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
-index cdf3474d3851..d80bc3e9d511 100644
---- a/drivers/irqchip/Makefile
-+++ b/drivers/irqchip/Makefile
-@@ -16,7 +16,6 @@ obj-$(CONFIG_ARCH_S3C24XX)		+= irq-s3c24xx.o
- obj-$(CONFIG_DW_APB_ICTL)		+= irq-dw-apb-ictl.o
- obj-$(CONFIG_METAG)			+= irq-metag-ext.o
- obj-$(CONFIG_METAG_PERFCOUNTER_IRQS)	+= irq-metag.o
--obj-$(CONFIG_ARCH_MOXART)		+= irq-moxart.o
- obj-$(CONFIG_CLPS711X_IRQCHIP)		+= irq-clps711x.o
- obj-$(CONFIG_OR1K_PIC)			+= irq-or1k-pic.o
- obj-$(CONFIG_ORION_IRQCHIP)		+= irq-orion.o
-diff --git a/drivers/irqchip/irq-ftintc010.c b/drivers/irqchip/irq-ftintc010.c
-index 8c52450b5075..1c6eefa79099 100644
---- a/drivers/irqchip/irq-ftintc010.c
-+++ b/drivers/irqchip/irq-ftintc010.c
-@@ -190,3 +190,5 @@ IRQCHIP_DECLARE(faraday, "faraday,ftintc010",
- 		ft010_of_init_irq);
- IRQCHIP_DECLARE(gemini, "cortina,gemini-interrupt-controller",
- 		ft010_of_init_irq);
-+IRQCHIP_DECLARE(moxa, "moxa,moxart-ic",
-+		ft010_of_init_irq);
-diff --git a/drivers/irqchip/irq-moxart.c b/drivers/irqchip/irq-moxart.c
-deleted file mode 100644
-index a24b06a1718b..000000000000
---- a/drivers/irqchip/irq-moxart.c
-+++ /dev/null
-@@ -1,116 +0,0 @@
--/*
-- * MOXA ART SoCs IRQ chip driver.
-- *
-- * Copyright (C) 2013 Jonas Jensen
-- *
-- * Jonas Jensen <jonas.jensen@gmail.com>
-- *
-- * This file is licensed under the terms of the GNU General Public
-- * License version 2.  This program is licensed "as is" without any
-- * warranty of any kind, whether express or implied.
-- */
--
--#include <linux/io.h>
--#include <linux/irq.h>
--#include <linux/irqchip.h>
--#include <linux/of.h>
--#include <linux/of_address.h>
--#include <linux/of_irq.h>
--#include <linux/irqdomain.h>
--
--#include <asm/exception.h>
--
--#define IRQ_SOURCE_REG		0
--#define IRQ_MASK_REG		0x04
--#define IRQ_CLEAR_REG		0x08
--#define IRQ_MODE_REG		0x0c
--#define IRQ_LEVEL_REG		0x10
--#define IRQ_STATUS_REG		0x14
--
--#define FIQ_SOURCE_REG		0x20
--#define FIQ_MASK_REG		0x24
--#define FIQ_CLEAR_REG		0x28
--#define FIQ_MODE_REG		0x2c
--#define FIQ_LEVEL_REG		0x30
--#define FIQ_STATUS_REG		0x34
--
--
--struct moxart_irq_data {
--	void __iomem *base;
--	struct irq_domain *domain;
--	unsigned int interrupt_mask;
--};
--
--static struct moxart_irq_data intc;
--
--static void __exception_irq_entry handle_irq(struct pt_regs *regs)
--{
--	u32 irqstat;
--	int hwirq;
--
--	irqstat = readl(intc.base + IRQ_STATUS_REG);
--
--	while (irqstat) {
--		hwirq = ffs(irqstat) - 1;
--		handle_IRQ(irq_linear_revmap(intc.domain, hwirq), regs);
--		irqstat &= ~(1 << hwirq);
--	}
--}
--
--static int __init moxart_of_intc_init(struct device_node *node,
--				      struct device_node *parent)
--{
--	unsigned int clr = IRQ_NOREQUEST | IRQ_NOPROBE | IRQ_NOAUTOEN;
--	int ret;
--	struct irq_chip_generic *gc;
--
--	intc.base = of_iomap(node, 0);
--	if (!intc.base) {
--		pr_err("%s: unable to map IC registers\n",
--		       node->full_name);
--		return -EINVAL;
--	}
--
--	intc.domain = irq_domain_add_linear(node, 32, &irq_generic_chip_ops,
--					    intc.base);
--	if (!intc.domain) {
--		pr_err("%s: unable to create IRQ domain\n", node->full_name);
--		return -EINVAL;
--	}
--
--	ret = irq_alloc_domain_generic_chips(intc.domain, 32, 1,
--					     "MOXARTINTC", handle_edge_irq,
--					     clr, 0, IRQ_GC_INIT_MASK_CACHE);
--	if (ret) {
--		pr_err("%s: could not allocate generic chip\n",
--		       node->full_name);
--		irq_domain_remove(intc.domain);
--		return -EINVAL;
--	}
--
--	ret = of_property_read_u32(node, "interrupt-mask",
--				   &intc.interrupt_mask);
--	if (ret)
--		pr_err("%s: could not read interrupt-mask DT property\n",
--		       node->full_name);
--
--	gc = irq_get_domain_generic_chip(intc.domain, 0);
--
--	gc->reg_base = intc.base;
--	gc->chip_types[0].regs.mask = IRQ_MASK_REG;
--	gc->chip_types[0].regs.ack = IRQ_CLEAR_REG;
--	gc->chip_types[0].chip.irq_ack = irq_gc_ack_set_bit;
--	gc->chip_types[0].chip.irq_mask = irq_gc_mask_clr_bit;
--	gc->chip_types[0].chip.irq_unmask = irq_gc_mask_set_bit;
--
--	writel(0, intc.base + IRQ_MASK_REG);
--	writel(0xffffffff, intc.base + IRQ_CLEAR_REG);
--
--	writel(intc.interrupt_mask, intc.base + IRQ_MODE_REG);
--	writel(intc.interrupt_mask, intc.base + IRQ_LEVEL_REG);
--
--	set_handle_irq(handle_irq);
--
--	return 0;
--}
--IRQCHIP_DECLARE(moxa_moxart_ic, "moxa,moxart-ic", moxart_of_intc_init);
+So, merely moving the problem into userspace doesn't solve anything.
+
+Loading the problem onto the user in the hope that the user knows
+enough to properly configure it also doesn't work - who is going to
+educate the user about the various quirks of the hardware they're
+dealing with?
+
+I don't think pushing it into platform specific libv4l2 plugins works
+either - as you say above, even just trying to develop a plugin for
+exynos4 seems to have failed, so what makes us think that developing
+a plugin for iMX6 is going to succeed?  Actually, that's exactly where
+the problem lies.
+
+Is "iMX6 plugin" even right?  That only deals with the complexity of
+one part of the system - what about the source device, which as we
+have already seen can be a tuner or a camera with its own multiple
+sub-devices.  What if there's a video improvement chip in the chain
+as well - how is a "generic" iMX6 plugin supposed to know how to deal
+with that?
+
+It seems to me that what's required is not an "iMX6 plugin" but a
+separate plugin for each platform - or worse.  Consider boards like
+the Raspberry Pi, where users can attach a variety of cameras.  I
+don't think this approach scales.  (This is relevant: the iMX6 board
+I have here has a RPi compatible connector for a MIPI CSI2 camera.
+In fact, the IMX219 module I'm using _is_ a RPi camera, it's the RPi
+NoIR Camera V2.)
+
+The iMX6 problem is way larger than just "which subdev do I need to
+configure for control X" - if you look at the dot graphs both Steve
+and myself have supplied, you'll notice that there are eight (yes,
+8) video capture devices.  Let's say that we can solve the subdev
+problem in libv4l2.  There's another problem lurking here - libv4l2
+is /dev/video* based.  How does it know which /dev/video* device to
+open?
+
+We don't open by sensor, we open by /dev/video*.  In my case, there
+is only one correct /dev/video* node for the attached sensor, the
+other seven are totally irrelevant.  For other situations, there may
+be the choice of three functional /dev/video* nodes.
+
+Right now, for my case, there isn't the information exported from the
+kernel to know which is the correct one, since that requires knowing
+which virtual channel the data is going to be sent over the CSI2
+interface.  That information is not present in DT, or anywhere.  It
+only comes from system knowledge - in my case, I know that the IMX219
+is currently being configured to use virtual channel 0.  SMIA cameras
+are also configurable.  Then there's CSI2 cameras that can produce
+different formats via different virtual channels (eg, JPEG compressed
+image on one channel while streaming a RGB image via the other channel.)
+
+Whether you can use one or three in _this_ scenario depends on the
+source format - again, another bit of implementation specific
+information that userspace would need to know.  Kernel space should
+know that, and it's discoverable by testing which paths accept the
+source format - but that doesn't tell you ahead of time which
+/dev/video* node to open.
+
+So, the problem space we have here is absolutely huge, and merely
+having a plugin that activates when you open a /dev/video* node
+really doesn't solve it.
+
+All in all, I really don't think "lets hope someone writes a v4l2
+plugin to solve it" is ever going to be successful.  I don't even
+see that there will ever be a userspace application that is anything
+more than a representation of the dot graphs that users can use to
+manually configure the capture system with system knowledge.
+
+I think everyone needs to take a step back and think long and hard
+about this from the system usability perspective - I seriously
+doubt that we will ever see any kind of solution to this if we
+continue to progress with "we'll sort it in userspace some day."
+
 -- 
-2.9.3
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
