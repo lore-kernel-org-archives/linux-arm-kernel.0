@@ -1,35 +1,77 @@
-From: robh@kernel.org (Rob Herring)
-Date: Sun, 12 Mar 2017 07:06:59 -0500
-Subject: [PATCH] dt-bindings: display: rk3288-mipi-dsi: add reset property
-In-Reply-To: <20170303113945.3bd2cbd9.john@metanate.com>
-References: <20170224125506.21533-1-john@metanate.com>
- <20170224125506.21533-24-john@metanate.com>
- <20170302215643.GA49163@google.com>
- <20170303113945.3bd2cbd9.john@metanate.com>
-Message-ID: <20170312120659.hpiwnsto6hkxs5yh@rob-hp-laptop>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Sun, 12 Mar 2017 20:23:45 +0800
+Subject: [arm:clearfog 30/55] drivers/net/phy/phylink.c:141:11: error: too
+ few arguments to function 'fwnode_get_named_gpiod'
+Message-ID: <201703122040.bisMEQHh%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 03, 2017 at 11:39:45AM +0000, John Keeping wrote:
-> This reset is required in order to fully reset the internal state of the
-> MIPI controller.
-> 
-> Signed-off-by: John Keeping <john@metanate.com>
-> ---
-> On Thu, 2 Mar 2017 13:56:46 -0800, Brian Norris wrote:
-> > On Fri, Feb 24, 2017 at 12:55:06PM +0000, John Keeping wrote:
-> > > +	/*
-> > > +	 * Note that the reset was not defined in the initial device tree, so
-> > > +	 * we have to be prepared for it not being found.
-> > > +	 */
-> > > +	apb_rst = devm_reset_control_get(dev, "apb");  
-> > 
-> > Did this reset ever get documented in the device tree bindings? I
-> > couldn't find it. Perhaps a follow-up patch is in order?
-> 
-> Here's a patch to do that.
-> 
->  .../devicetree/bindings/display/rockchip/dw_mipi_dsi_rockchip.txt  | 7 +++++++
->  1 file changed, 7 insertions(+)
+Hi Russell,
 
-Acked-by: Rob Herring <robh@kernel.org>
+First bad commit (maybe != root cause):
+
+tree:   git://git.armlinux.org.uk/~rmk/linux-arm.git clearfog
+head:   b625d1fc5880eb7b86e82b28a12ab0d7a60bf94a
+commit: e70e0c9c207478ad1b0884a5690d6839b21d0f92 [30/55] net: mvneta: convert to phylink
+config: i386-allmodconfig (attached as .config)
+compiler: gcc-6 (Debian 6.2.0-3) 6.2.0 20160901
+reproduce:
+        git checkout e70e0c9c207478ad1b0884a5690d6839b21d0f92
+        # save the attached .config to linux build tree
+        make ARCH=i386 
+
+All errors (new ones prefixed by >>):
+
+   drivers/net/phy/phylink.c: In function 'phylink_parse_fixedlink':
+>> drivers/net/phy/phylink.c:141:11: error: too few arguments to function 'fwnode_get_named_gpiod'
+       desc = fwnode_get_named_gpiod(&fixed_node->fwnode,
+              ^~~~~~~~~~~~~~~~~~~~~~
+   In file included from drivers/net/phy/phylink.c:13:0:
+   include/linux/gpio/consumer.h:137:19: note: declared here
+    struct gpio_desc *fwnode_get_named_gpiod(struct fwnode_handle *fwnode,
+                      ^~~~~~~~~~~~~~~~~~~~~~
+
+vim +/fwnode_get_named_gpiod +141 drivers/net/phy/phylink.c
+
+018b64cf Russell King 2015-09-22  125  
+018b64cf Russell King 2015-09-22  126  	fixed_node = of_get_child_by_name(np, "fixed-link");
+018b64cf Russell King 2015-09-22  127  	if (fixed_node) {
+018b64cf Russell King 2015-09-22  128  		ret = of_property_read_u32(fixed_node, "speed", &speed);
+018b64cf Russell King 2015-09-22  129  
+018b64cf Russell King 2015-09-22  130  		pl->link_config.speed = speed;
+018b64cf Russell King 2015-09-22  131  		pl->link_config.duplex = DUPLEX_HALF;
+018b64cf Russell King 2015-09-22  132  
+018b64cf Russell King 2015-09-22  133  		if (of_property_read_bool(fixed_node, "full-duplex"))
+018b64cf Russell King 2015-09-22  134  			pl->link_config.duplex = DUPLEX_FULL;
+018b64cf Russell King 2015-09-22  135  		if (of_property_read_bool(fixed_node, "pause"))
+018b64cf Russell King 2015-09-22  136  			pl->link_config.pause |= MLO_PAUSE_SYM;
+018b64cf Russell King 2015-09-22  137  		if (of_property_read_bool(fixed_node, "asym-pause"))
+018b64cf Russell King 2015-09-22  138  			pl->link_config.pause |= MLO_PAUSE_ASYM;
+018b64cf Russell King 2015-09-22  139  
+018b64cf Russell King 2015-09-22  140  		if (ret == 0) {
+018b64cf Russell King 2015-09-22 @141  			desc = fwnode_get_named_gpiod(&fixed_node->fwnode,
+018b64cf Russell King 2015-09-22  142  						      "link-gpios");
+018b64cf Russell King 2015-09-22  143  
+018b64cf Russell King 2015-09-22  144  			if (!IS_ERR(desc))
+018b64cf Russell King 2015-09-22  145  				pl->link_gpio = desc;
+018b64cf Russell King 2015-09-22  146  			else if (desc == ERR_PTR(-EPROBE_DEFER))
+018b64cf Russell King 2015-09-22  147  				ret = -EPROBE_DEFER;
+018b64cf Russell King 2015-09-22  148  		}
+018b64cf Russell King 2015-09-22  149  		of_node_put(fixed_node);
+
+:::::: The code at line 141 was first introduced by commit
+:::::: 018b64cf9beec1fab91333bfb2dbfe2a90ba4c0a phylink: add phylink infrastructure
+
+:::::: TO: Russell King <rmk+kernel@arm.linux.org.uk>
+:::::: CC: Russell King <rmk+kernel@armlinux.org.uk>
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 59007 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170312/850f5f3e/attachment-0001.gz>
