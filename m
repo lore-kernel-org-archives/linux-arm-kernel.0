@@ -1,83 +1,124 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Sun, 12 Mar 2017 22:29:04 +0100
-Subject: [PATCH v4 14/36] [media] v4l2-mc: add a function to inherit
- controls from a pipeline
-In-Reply-To: <20170311231456.GH21222@n2100.armlinux.org.uk>
-References: <20170304131329.GV3220@valkosipuli.retiisi.org.uk>
- <a7b8e095-a95c-24bd-b1e9-e983f18061c4@xs4all.nl>
- <20170310130733.GU21222@n2100.armlinux.org.uk>
- <c679f755-52a6-3c6f-3d65-277db46676cc@xs4all.nl>
- <20170310140124.GV21222@n2100.armlinux.org.uk>
- <cc8900b0-c091-b14b-96f4-01f8fa72431c@xs4all.nl>
- <20170310125342.7f047acf@vento.lan>
- <20170310223714.GI3220@valkosipuli.retiisi.org.uk>
- <20170311082549.576531d0@vento.lan>
- <20170311231456.GH21222@n2100.armlinux.org.uk>
-Message-ID: <20170312212904.GA7995@amd>
+From: gmbnomis@gmail.com (Simon Baatz)
+Date: Sun, 12 Mar 2017 22:34:06 +0100
+Subject: [PATCH] mtd: nand: orion: fix clk handling
+Message-ID: <20170312213406.20987-1-gmbnomis@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat 2017-03-11 23:14:56, Russell King - ARM Linux wrote:
-> On Sat, Mar 11, 2017 at 08:25:49AM -0300, Mauro Carvalho Chehab wrote:
-> > This situation is there since 2009. If I remember well, you tried to write
-> > such generic plugin in the past, but never finished it, apparently because
-> > it is too complex. Others tried too over the years. 
-> > 
-> > The last trial was done by Jacek, trying to cover just the exynos4 driver. 
-> > Yet, even such limited scope plugin was not good enough, as it was never
-> > merged upstream. Currently, there's no such plugins upstream.
-> > 
-> > If we can't even merge a plugin that solves it for just *one* driver,
-> > I have no hope that we'll be able to do it for the generic case.
-> 
-> This is what really worries me right now about the current proposal for
-> iMX6.  What's being proposed is to make the driver exclusively MC-based.
-> 
-> What that means is that existing applications are _not_ going to work
-> until we have some answer for libv4l2, and from what you've said above,
-> it seems that this has been attempted multiple times over the last _8_
-> years, and each time it's failed.
+The clk handling in orion_nand.c had two problems:
 
-Yeah. We need a mid-layer between legacy applications and MC
-devices. Such layer does not exist in userspace or in kernel.
+- In the probe function, clk_put() was called for an enabled clock,
+  which violates the API (see documentation for clk_put() in
+  include/linux/clk.h)
 
-> Loading the problem onto the user in the hope that the user knows
-> enough to properly configure it also doesn't work - who is going to
-> educate the user about the various quirks of the hardware they're
-> dealing with?
+- In the error path of the probe function, clk_put() could be called
+  twice for the same clock.
 
-We have docs. Users can write shell scripts. Still, mid-layer would be
-nice.
+In order to clean this up, use the managed function devm_clk_get() and
+store the pointer to the clk in the driver data.
 
-> So, the problem space we have here is absolutely huge, and merely
-> having a plugin that activates when you open a /dev/video* node
-> really doesn't solve it.
-> 
-> All in all, I really don't think "lets hope someone writes a v4l2
-> plugin to solve it" is ever going to be successful.  I don't even
-> see that there will ever be a userspace application that is anything
-> more than a representation of the dot graphs that users can use to
-> manually configure the capture system with system knowledge.
-> 
-> I think everyone needs to take a step back and think long and hard
-> about this from the system usability perspective - I seriously
-> doubt that we will ever see any kind of solution to this if we
-> continue to progress with "we'll sort it in userspace some day."
+Fixes: baffab28b13120694fa3ebab08d3e99667a851d2 ('ARM: Orion: fix driver probe error handling with respect to clk')
+Cc: <stable@vger.kernel.org> # v4.5+
+Signed-off-by: Simon Baatz <gmbnomis@gmail.com>
+---
+ drivers/mtd/nand/orion_nand.c | 42 +++++++++++++++++++++---------------------
+ 1 file changed, 21 insertions(+), 21 deletions(-)
 
-Mid-layer is difficult... there are _hundreds_ of possible
-pipeline setups. If it should live in kernel or in userspace is a
-question... but I don't think having it in kernel helps in any way.
-
-Best regards,
-									Pavel
-
+diff --git a/drivers/mtd/nand/orion_nand.c b/drivers/mtd/nand/orion_nand.c
+index 4a91c5d000be..b355aa738fae 100644
+--- a/drivers/mtd/nand/orion_nand.c
++++ b/drivers/mtd/nand/orion_nand.c
+@@ -23,6 +23,11 @@
+ #include <asm/sizes.h>
+ #include <linux/platform_data/mtd-orion_nand.h>
+ 
++struct orion_nand_info {
++	struct nand_chip chip;
++	struct clk       *clk;
++};
++
+ static void orion_nand_cmd_ctrl(struct mtd_info *mtd, int cmd, unsigned int ctrl)
+ {
+ 	struct nand_chip *nc = mtd_to_nand(mtd);
+@@ -75,20 +80,21 @@ static void orion_nand_read_buf(struct mtd_info *mtd, uint8_t *buf, int len)
+ 
+ static int __init orion_nand_probe(struct platform_device *pdev)
+ {
++	struct orion_nand_info *info;
+ 	struct mtd_info *mtd;
+ 	struct nand_chip *nc;
+ 	struct orion_nand_data *board;
+ 	struct resource *res;
+-	struct clk *clk;
+ 	void __iomem *io_base;
+ 	int ret = 0;
+ 	u32 val = 0;
+ 
+-	nc = devm_kzalloc(&pdev->dev,
+-			sizeof(struct nand_chip),
++	info = devm_kzalloc(&pdev->dev,
++			sizeof(struct orion_nand_info),
+ 			GFP_KERNEL);
+-	if (!nc)
++	if (!info)
+ 		return -ENOMEM;
++	nc = &info->chip;
+ 	mtd = nand_to_mtd(nc);
+ 
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+@@ -145,15 +151,13 @@ static int __init orion_nand_probe(struct platform_device *pdev)
+ 	if (board->dev_ready)
+ 		nc->dev_ready = board->dev_ready;
+ 
+-	platform_set_drvdata(pdev, mtd);
++	platform_set_drvdata(pdev, info);
+ 
+ 	/* Not all platforms can gate the clock, so it is not
+ 	   an error if the clock does not exists. */
+-	clk = clk_get(&pdev->dev, NULL);
+-	if (!IS_ERR(clk)) {
+-		clk_prepare_enable(clk);
+-		clk_put(clk);
+-	}
++	info->clk = devm_clk_get(&pdev->dev, NULL);
++	if (!IS_ERR(info->clk))
++		clk_prepare_enable(info->clk);
+ 
+ 	ret = nand_scan(mtd, 1);
+ 	if (ret)
+@@ -169,26 +173,22 @@ static int __init orion_nand_probe(struct platform_device *pdev)
+ 	return 0;
+ 
+ no_dev:
+-	if (!IS_ERR(clk)) {
+-		clk_disable_unprepare(clk);
+-		clk_put(clk);
+-	}
++	if (!IS_ERR(info->clk))
++		clk_disable_unprepare(info->clk);
+ 
+ 	return ret;
+ }
+ 
+ static int orion_nand_remove(struct platform_device *pdev)
+ {
+-	struct mtd_info *mtd = platform_get_drvdata(pdev);
+-	struct clk *clk;
++	struct orion_nand_info *info = platform_get_drvdata(pdev);
++	struct nand_chip *chip = &info->chip;
++	struct mtd_info *mtd = nand_to_mtd(chip);
+ 
+ 	nand_release(mtd);
+ 
+-	clk = clk_get(&pdev->dev, NULL);
+-	if (!IS_ERR(clk)) {
+-		clk_disable_unprepare(clk);
+-		clk_put(clk);
+-	}
++	if (!IS_ERR(info->clk))
++		clk_disable_unprepare(info->clk);
+ 
+ 	return 0;
+ }
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170312/493191de/attachment-0001.sig>
+2.9.3
