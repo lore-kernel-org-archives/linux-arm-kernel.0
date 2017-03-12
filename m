@@ -1,31 +1,35 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 12 Mar 2017 12:32:22 +0100
-Subject: [GIT PULL] Gemini device tree and multiplatform conversion
-In-Reply-To: <CACRpkdbcJKgk2GzBKQg2zwcrLWVH4=oFQ6bDJ8O-pnhiUUS+Ww@mail.gmail.com>
-References: <CACRpkdbcJKgk2GzBKQg2zwcrLWVH4=oFQ6bDJ8O-pnhiUUS+Ww@mail.gmail.com>
-Message-ID: <CACRpkdY0Oe9t32Onx9wA1P8oQstBdcKDwy=K3RMzJaGXHDYwQQ@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Sun, 12 Mar 2017 07:06:59 -0500
+Subject: [PATCH] dt-bindings: display: rk3288-mipi-dsi: add reset property
+In-Reply-To: <20170303113945.3bd2cbd9.john@metanate.com>
+References: <20170224125506.21533-1-john@metanate.com>
+ <20170224125506.21533-24-john@metanate.com>
+ <20170302215643.GA49163@google.com>
+ <20170303113945.3bd2cbd9.john@metanate.com>
+Message-ID: <20170312120659.hpiwnsto6hkxs5yh@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 12, 2017 at 11:41 AM, Linus Walleij
-<linus.walleij@linaro.org> wrote:
+On Fri, Mar 03, 2017 at 11:39:45AM +0000, John Keeping wrote:
+> This reset is required in order to fully reset the internal state of the
+> MIPI controller.
+> 
+> Signed-off-by: John Keeping <john@metanate.com>
+> ---
+> On Thu, 2 Mar 2017 13:56:46 -0800, Brian Norris wrote:
+> > On Fri, Feb 24, 2017 at 12:55:06PM +0000, John Keeping wrote:
+> > > +	/*
+> > > +	 * Note that the reset was not defined in the initial device tree, so
+> > > +	 * we have to be prepared for it not being found.
+> > > +	 */
+> > > +	apb_rst = devm_reset_control_get(dev, "apb");  
+> > 
+> > Did this reset ever get documented in the device tree bindings? I
+> > couldn't find it. Perhaps a follow-up patch is in order?
+> 
+> Here's a patch to do that.
+> 
+>  .../devicetree/bindings/display/rockchip/dw_mipi_dsi_rockchip.txt  | 7 +++++++
+>  1 file changed, 7 insertions(+)
 
-> The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
->
->   Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
->
-> are available in the git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-nomadik.git
-> tags/gemini-multiplat-dt
->
-> for you to fetch changes up to 47d2549ac9be843c7aa1d9472389c644674b218c:
-
-I had to retag this because I accidentally left a changelog in there,
-the contents are the same but the top commit now has hash
-6dbb708a8fb8eef552d8de2b7574d92741b3bb31
-
-Sorry for the mess.
-
-Yours,
-Linus Walleij
+Acked-by: Rob Herring <robh@kernel.org>
