@@ -1,97 +1,105 @@
-From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
-Date: Sun, 12 Mar 2017 14:34:14 +0100
-Subject: [RFC PATCH 00/12] Ion cleanup in preparation for moving out of
- staging
-In-Reply-To: <26bc57ae-d88f-4ea0-d666-2c1a02bf866f@redhat.com>
-References: <1488491084-17252-1-git-send-email-labbott@redhat.com>
- <20170303132949.GC31582@dhcp22.suse.cz>
- <cf383b9b-3cbc-0092-a071-f120874c053c@redhat.com>
- <20170306074258.GA27953@dhcp22.suse.cz>
- <20170306104041.zghsicrnadoap7lp@phenom.ffwll.local>
- <20170306105805.jsq44kfxhsvazkm6@sirena.org.uk>
- <20170306160437.sf7bksorlnw7u372@phenom.ffwll.local>
- <CA+M3ks77Am3Fx-ZNmgeM5tCqdM7SzV7rby4Es-p2F2aOhUco9g@mail.gmail.com>
- <26bc57ae-d88f-4ea0-d666-2c1a02bf866f@redhat.com>
-Message-ID: <CA+M3ks6R=n4n54wofK7pYcWoQKUhzyWQytBO90+pRDRrAhi3ww@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Sun, 12 Mar 2017 09:04:48 -0500
+Subject: [PATCH v5 1/4] dt-bindings: leds: Add document bindings for
+ leds-mt6323
+In-Reply-To: <1488549385-19899-2-git-send-email-sean.wang@mediatek.com>
+References: <1488549385-19899-1-git-send-email-sean.wang@mediatek.com>
+ <1488549385-19899-2-git-send-email-sean.wang@mediatek.com>
+Message-ID: <20170312140448.v2jenx6olstscq3e@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-03-09 18:38 GMT+01:00 Laura Abbott <labbott@redhat.com>:
-> On 03/09/2017 02:00 AM, Benjamin Gaignard wrote:
->> 2017-03-06 17:04 GMT+01:00 Daniel Vetter <daniel@ffwll.ch>:
->>> On Mon, Mar 06, 2017 at 11:58:05AM +0100, Mark Brown wrote:
->>>> On Mon, Mar 06, 2017 at 11:40:41AM +0100, Daniel Vetter wrote:
->>>>
->>>>> No one gave a thing about android in upstream, so Greg KH just dumped it
->>>>> all into staging/android/. We've discussed ION a bunch of times, recorded
->>>>> anything we'd like to fix in staging/android/TODO, and Laura's patch
->>>>> series here addresses a big chunk of that.
->>>>
->>>>> This is pretty much the same approach we (gpu folks) used to de-stage the
->>>>> syncpt stuff.
->>>>
->>>> Well, there's also the fact that quite a few people have issues with the
->>>> design (like Laurent).  It seems like a lot of them have either got more
->>>> comfortable with it over time, or at least not managed to come up with
->>>> any better ideas in the meantime.
->>>
->>> See the TODO, it has everything a really big group (look at the patch for
->>> the full Cc: list) figured needs to be improved at LPC 2015. We don't just
->>> merge stuff because merging stuff is fun :-)
->>>
->>> Laurent was even in that group ...
->>> -Daniel
->>
->> For me those patches are going in the right direction.
->>
->> I still have few questions:
->> - since alignment management has been remove from ion-core, should it
->> be also removed from ioctl structure ?
->
-> Yes, I think I'm going to go with the suggestion to fixup the ABI
-> so we don't need the compat layer and as part of that I'm also
-> dropping the align argument.
->
->> - can you we ride off ion_handle (at least in userland) and only
->> export a dma-buf descriptor ?
->
-> Yes, I think this is the right direction given we're breaking
-> everything anyway. I was debating trying to keep the two but
-> moving to only dma bufs is probably cleaner. The only reason
-> I could see for keeping the handles is running out of file
-> descriptors for dma-bufs but that seems unlikely.
->>
->> In the future how can we add new heaps ?
->> Some platforms have very specific memory allocation
->> requirements (just have a look in the number of gem custom allocator in drm)
->> Do you plan to add heap type/mask for each ?
->
-> Yes, that was my thinking.
+On Fri, Mar 03, 2017 at 09:56:22PM +0800, sean.wang at mediatek.com wrote:
+> From: Sean Wang <sean.wang@mediatek.com>
+> 
+> This patch adds documentation for devicetree bindings
+> for LED support on MT6323 PMIC
+> 
+> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+> ---
+>  .../devicetree/bindings/leds/leds-mt6323.txt       | 63 ++++++++++++++++++++++
+>  1 file changed, 63 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/leds/leds-mt6323.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/leds/leds-mt6323.txt b/Documentation/devicetree/bindings/leds/leds-mt6323.txt
+> new file mode 100644
+> index 0000000..135c441
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/leds/leds-mt6323.txt
+> @@ -0,0 +1,63 @@
+> +Device Tree Bindings for LED support on MT6323 PMIC
+> +
+> +MT6323 LED controller is subfunction provided by
+> +MT6323 PMIC, so the LED controllers are defined as
+> +the subnode of the function node provided by MT6323
+> +PMIC controller that is being defined as one kind of
+> +Muti-Function Device (MFD) using shared bus called
+> +PMIC wrapper for each subfunction to access remote
+> +MT6323 PMIC hardware.
 
-My concern is about the policy to adding heaps, will you accept
-"customs" heap per
-platforms ? per devices ? or only generic ones ?
-If you are too strict, we will have lot of out-of-tree heaps and if
-you accept of of them
-it will be a nightmare to maintain....
+Your line wrap is kind of short. Fix you line wrap to 72-80 char.
 
-Another point is how can we put secure rules (like selinux policy) on
-heaps since all the allocations
-go to the same device (/dev/ion) ? For example, until now, in Android
-we have to give the same
-access rights to all the process that use ION.
-It will become problem when we will add secure heaps because we won't
-be able to distinguish secure
-processes to standard ones or set specific policy per heaps.
-Maybe I'm wrong here but I have never see selinux policy checking an
-ioctl field but if that
-exist it could be a solution.
+> +
+> +For MT6323 MFD bindings see:
+> +Documentation/devicetree/bindings/mfd/mt6397.txt
+> +For MediaTek PMIC wrapper bindings see:
+> +Documentation/devicetree/bindings/soc/mediatek/pwrap.txt
+> +
+> +There's sub-node for the LED controller that describes
+> +the initial behavior for each LED physically and currently
+> +only four LED sub-nodes can be supported.
+> +
+> +Required properties:
+> +- compatible : Must be "mediatek,mt6323-led"
+> +- address-cells : Must be 1
+> +- size-cells : Must be 0
+> +
+> +LED sub-node properties:
+> +- reg : LED channel number (0..3)
+> +- label : (optional)
+> +  see Documentation/devicetree/bindings/leds/common.txt
+> +- linux,default-trigger : (optional)
+> +  see Documentation/devicetree/bindings/leds/common.txt
+> +- default-state: (optional) The initial state of the LED
+> +  see Documentation/devicetree/bindings/leds/common.txt
 
->
->>
->> Benjamin
->>
->
-> Thanks,
-> Laura
->
+Group these by required and optional. You can drop "The initial state of 
+the LED".
+
+> +
+> +Example:
+> +
+> +	pmic: mt6323 {
+
+mt6323: pmic {
+
+> +		compatible = "mediatek,mt6323";
+> +
+> +		...
+> +
+> +		mt6323led: leds {
+> +			compatible = "mediatek,mt6323-led";
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +
+> +			led at 0 {
+> +				reg = <0>;
+> +				label = "LED0";
+> +				linux,default-trigger = "timer";
+> +				default-state = "on";
+> +			};
+> +			led at 1 {
+> +				reg = <1>;
+> +				label = "LED1";
+> +				default-state = "off";
+> +			};
+> +			led at 2 {
+> +				reg = <2>;
+> +				label = "LED2";
+> +				default-state = "on";
+> +			};
+> +		};
+> +	};
+> -- 
+> 1.9.1
+> 
