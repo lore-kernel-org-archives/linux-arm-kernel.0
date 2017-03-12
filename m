@@ -1,58 +1,83 @@
-From: mchehab@s-opensource.com (Mauro Carvalho Chehab)
-Date: Sun, 12 Mar 2017 19:37:56 -0300
-Subject: [PATCH v4 14/36] [media] v4l2-mc: add a function to inherit
- controls from a pipeline
-In-Reply-To: <20170312212904.GA7995@amd>
-References: <20170304131329.GV3220@valkosipuli.retiisi.org.uk>
- <a7b8e095-a95c-24bd-b1e9-e983f18061c4@xs4all.nl>
- <20170310130733.GU21222@n2100.armlinux.org.uk>
- <c679f755-52a6-3c6f-3d65-277db46676cc@xs4all.nl>
- <20170310140124.GV21222@n2100.armlinux.org.uk>
- <cc8900b0-c091-b14b-96f4-01f8fa72431c@xs4all.nl>
- <20170310125342.7f047acf@vento.lan>
- <20170310223714.GI3220@valkosipuli.retiisi.org.uk>
- <20170311082549.576531d0@vento.lan>
- <20170311231456.GH21222@n2100.armlinux.org.uk>
- <20170312212904.GA7995@amd>
-Message-ID: <20170312193745.636df0bf@vento.lan>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 13 Mar 2017 00:28:13 +0100
+Subject: [PATCH 1/6] gpio: gemini: augment DT bindings
+Message-ID: <20170312232818.26304-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Sun, 12 Mar 2017 22:29:04 +0100
-Pavel Machek <pavel@ucw.cz> escreveu:
+The DT bindings assumed that this IP block was coming from
+Cortina Systems, which turns out not to be true. It is a
+standard IP block from Faraday Technology and also used in the
+Moxa moxart SoC.
 
-> Mid-layer is difficult... there are _hundreds_ of possible
-> pipeline setups. If it should live in kernel or in userspace is a
-> question... but I don't think having it in kernel helps in any way.
+We augment the bindings to cover all existing parts and rename
+it after the IP block. This involves deleting the old Moxa
+bindings that now are contained in this binding.
 
-Mid-layer is difficult, because we either need to feed some
-library with knowledge for all kernel drivers or we need to improve
-the MC API to provide more details.
+Cc: devicetree at vger.kernel.org
+Cc: Jonas Jensen <jonas.jensen@gmail.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ ...{cortina,gemini-gpio.txt => faraday,ftgpio010.txt} |  9 ++++++---
+ .../devicetree/bindings/gpio/moxa,moxart-gpio.txt     | 19 -------------------
+ 2 files changed, 6 insertions(+), 22 deletions(-)
+ rename Documentation/devicetree/bindings/gpio/{cortina,gemini-gpio.txt => faraday,ftgpio010.txt} (70%)
+ delete mode 100644 Documentation/devicetree/bindings/gpio/moxa,moxart-gpio.txt
 
-For example, several drivers used to expose entities via the
-generic MEDIA_ENT_T_DEVNODE to represent entities of different
-types. See, for example, entities 1, 5 and 7 (and others) at:
-	https://mchehab.fedorapeople.org/mc-next-gen/igepv2_omap3isp.png
-
-A device-specific code could either be hardcoding the entity number
-or checking for the entity strings to add some logic to setup
-controls on those "unknown" entities, a generic app won't be able 
-to do anything with them, as it doesn't know what function(s) such
-entity provide.
-
-Also, on some devices, like the analog TV decoder at:
-	https://mchehab.fedorapeople.org/mc-next-gen/au0828_test/mc_nextgen_test-output.png
-
-May have pads with different signals on their output. In such
-case, pads 1 and 2 provide video, while pad 3 provides audio using a
-different type of output.
-
-The application needs to know such kind of things in order to be able
-to properly setup the pipeline [1].
-
-[1] this specific device has a fixed pipeline, but I'm aware of SoC with
-flexible pipelines that have this kind of issue (nobody upstreamed the
-V4L part of those devices yet).
-
-Thanks,
-Mauro
+diff --git a/Documentation/devicetree/bindings/gpio/cortina,gemini-gpio.txt b/Documentation/devicetree/bindings/gpio/faraday,ftgpio010.txt
+similarity index 70%
+rename from Documentation/devicetree/bindings/gpio/cortina,gemini-gpio.txt
+rename to Documentation/devicetree/bindings/gpio/faraday,ftgpio010.txt
+index 5c9246c054e5..d04236558619 100644
+--- a/Documentation/devicetree/bindings/gpio/cortina,gemini-gpio.txt
++++ b/Documentation/devicetree/bindings/gpio/faraday,ftgpio010.txt
+@@ -1,8 +1,11 @@
+-Cortina Systems Gemini GPIO Controller
++Faraday Technology FTGPIO010 GPIO Controller
+ 
+ Required properties:
+ 
+-- compatible : Must be "cortina,gemini-gpio"
++- compatible : Should be one of
++  "cortina,gemini-gpio", "faraday,ftgpio010"
++  "moxa,moxart-gpio", "faraday,ftgpio010"
++  "faraday,ftgpio010"
+ - reg : Should contain registers location and length
+ - interrupts : Should contain the interrupt line for the GPIO block
+ - gpio-controller : marks this as a GPIO controller
+@@ -14,7 +17,7 @@ Required properties:
+ Example:
+ 
+ gpio at 4d000000 {
+-	compatible = "cortina,gemini-gpio";
++	compatible = "cortina,gemini-gpio", "faraday,ftgpio010";
+ 	reg = <0x4d000000 0x100>;
+ 	interrupts = <22 IRQ_TYPE_LEVEL_HIGH>;
+ 	gpio-controller;
+diff --git a/Documentation/devicetree/bindings/gpio/moxa,moxart-gpio.txt b/Documentation/devicetree/bindings/gpio/moxa,moxart-gpio.txt
+deleted file mode 100644
+index f8e8f185a3db..000000000000
+--- a/Documentation/devicetree/bindings/gpio/moxa,moxart-gpio.txt
++++ /dev/null
+@@ -1,19 +0,0 @@
+-MOXA ART GPIO Controller
+-
+-Required properties:
+-
+-- #gpio-cells : Should be 2, The first cell is the pin number,
+-		the second cell is used to specify polarity:
+-			0 = active high
+-			1 = active low
+-- compatible : Must be "moxa,moxart-gpio"
+-- reg : Should contain registers location and length
+-
+-Example:
+-
+-	gpio: gpio at 98700000 {
+-		gpio-controller;
+-		#gpio-cells = <2>;
+-		compatible = "moxa,moxart-gpio";
+-		reg =	<0x98700000 0xC>;
+-	};
+-- 
+2.9.3
