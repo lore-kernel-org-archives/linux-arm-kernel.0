@@ -1,44 +1,74 @@
 From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Sat, 11 Mar 2017 16:30:53 -0800
-Subject: [PATCH v5 00/39] i.MX Media Driver
-In-Reply-To: <20170310201356.GA21222@n2100.armlinux.org.uk>
-References: <1489121599-23206-1-git-send-email-steve_longerbeam@mentor.com>
- <20170310201356.GA21222@n2100.armlinux.org.uk>
-Message-ID: <47542ef8-3e91-b4cd-cc65-95000105f172@gmail.com>
+Date: Sat, 11 Mar 2017 19:31:18 -0800
+Subject: [PATCH v4 14/36] [media] v4l2-mc: add a function to inherit
+ controls from a pipeline
+In-Reply-To: <20170311185959.GF21222@n2100.armlinux.org.uk>
+References: <20170303230645.GR21222@n2100.armlinux.org.uk>
+ <20170304131329.GV3220@valkosipuli.retiisi.org.uk>
+ <a7b8e095-a95c-24bd-b1e9-e983f18061c4@xs4all.nl>
+ <20170310120902.1daebc7b@vento.lan>
+ <5e1183f4-774f-413a-628a-96e0df321faf@xs4all.nl>
+ <20170311101408.272a9187@vento.lan>
+ <20170311153229.yrdjmggb3p2suhdw@ihha.localdomain>
+ <acfb5eca-ff00-6d57-339a-3322034cbdb3@gmail.com>
+ <20170311184551.GD21222@n2100.armlinux.org.uk>
+ <1f1b350a-5523-34bc-07b7-f3cd2d1fd4c1@gmail.com>
+ <20170311185959.GF21222@n2100.armlinux.org.uk>
+Message-ID: <4917d7fb-2f48-17cd-aa2f-d54b0f19ed6e@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 03/10/2017 12:13 PM, Russell King - ARM Linux wrote:
-> Version 5 gives me no v4l2 controls exposed through the video device
-> interface.
+On 03/11/2017 10:59 AM, Russell King - ARM Linux wrote:
+> On Sat, Mar 11, 2017 at 10:54:55AM -0800, Steve Longerbeam wrote:
+>>
+>>
+>> On 03/11/2017 10:45 AM, Russell King - ARM Linux wrote:
+>>> I really don't think expecting the user to understand and configure
+>>> the pipeline is a sane way forward.  Think about it - should the
+>>> user need to know that, because they have a bayer-only CSI data
+>>> source, that there is only one path possible, and if they try to
+>>> configure a different path, then things will just error out?
+>>>
+>>> For the case of imx219 connected to iMX6, it really is as simple as
+>>> "there is only one possible path" and all the complexity of the media
+>>> interfaces/subdevs is completely unnecessary.  Every other block in
+>>> the graph is just noise.
+>>>
+>>> The fact is that these dot graphs show a complex picture, but reality
+>>> is somewhat different - there's only relatively few paths available
+>>> depending on the connected source and the rest of the paths are
+>>> completely useless.
+>>>
+>>
+>> I totally disagree there. Raw bayer requires passthrough yes, but for
+>> all other media bus formats on a mipi csi-2 bus, and all other media
+>> bus formats on 8-bit parallel buses, the conersion pipelines can be
+>> used for scaling, CSC, rotation, and motion-compensated de-interlacing.
 >
-> Just like with version 4, version 5 is completely useless with IMX219:
+> ... which only makes sense _if_ your source can produce those formats.
+> We don't actually disagree on that.
+
+...and there are lots of those sources! You should try getting out of
+your imx219 shell some time, and have a look around! :)
+
 >
-> imx6-mipi-csi2: LP-11 timeout, phy_state = 0x00000200
-> ipu1_csi0: pipeline start failed with -110
-> imx6-mipi-csi2: LP-11 timeout, phy_state = 0x00000200
-> ipu1_csi0: pipeline start failed with -110
-> imx6-mipi-csi2: LP-11 timeout, phy_state = 0x00000200
-> ipu1_csi0: pipeline start failed with -110
+> Let me re-state.  If the source can _only_ produce bayer, then there is
+> _only_ _one_ possible path, and all the overhead of the media controller
+> stuff is totally unnecessary.
 >
+> Or, are you going to tell me that the user should have the right to
+> configure paths through the iMX6 hardware that are not permitted by the
+> iMX6 manuals for the data format being produced by the sensor?
 
-If it's too difficult to get the imx219 csi-2 transmitter into the
-LP-11 state on power on, perhaps the csi-2 receiver can be a little
-more lenient on the transmitter and make the LP-11 timeout a warning
-instead of error-out.
+Anyway, no the user is not allowed to configure a path that is not
+allowed by the hardware, such as attempting to pass raw bayer through
+an Image Converter path.
 
-Can you try the attached change on top of the version 5 patchset?
-
-If that doesn't work then you're just going to have to fix the bug
-in imx219.
+I guess you are simply commenting that for users of bayer sensors, the
+other pipelines can be "confusing". But I trust you're not saying those
+other pipelines should therefore not be present, which would be a
+completely nutty argument.
 
 Steve
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: warn-on-lp-11-timeout.diff
-Type: text/x-patch
-Size: 611 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170311/3b438f44/attachment.bin>
