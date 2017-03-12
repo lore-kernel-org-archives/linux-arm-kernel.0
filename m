@@ -1,58 +1,81 @@
-From: frowand.list@gmail.com (Frank Rowand)
-Date: Sat, 11 Mar 2017 22:27:08 -0800
-Subject: [RFC/PATCH] of: Mark property::value as const
-In-Reply-To: <58AF6B88.6020709@gmail.com>
-References: <20170214025040.23955-1-stephen.boyd@linaro.org>
- <58AF6B88.6020709@gmail.com>
-Message-ID: <58C4EA3C.4070503@gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Sun, 12 Mar 2017 07:37:45 +0000
+Subject: [PATCH v4 14/36] [media] v4l2-mc: add a function to inherit
+ controls from a pipeline
+In-Reply-To: <4917d7fb-2f48-17cd-aa2f-d54b0f19ed6e@gmail.com>
+References: <a7b8e095-a95c-24bd-b1e9-e983f18061c4@xs4all.nl>
+ <20170310120902.1daebc7b@vento.lan>
+ <5e1183f4-774f-413a-628a-96e0df321faf@xs4all.nl>
+ <20170311101408.272a9187@vento.lan>
+ <20170311153229.yrdjmggb3p2suhdw@ihha.localdomain>
+ <acfb5eca-ff00-6d57-339a-3322034cbdb3@gmail.com>
+ <20170311184551.GD21222@n2100.armlinux.org.uk>
+ <1f1b350a-5523-34bc-07b7-f3cd2d1fd4c1@gmail.com>
+ <20170311185959.GF21222@n2100.armlinux.org.uk>
+ <4917d7fb-2f48-17cd-aa2f-d54b0f19ed6e@gmail.com>
+Message-ID: <20170312073745.GI21222@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+On Sat, Mar 11, 2017 at 07:31:18PM -0800, Steve Longerbeam wrote:
+> 
+> 
+> On 03/11/2017 10:59 AM, Russell King - ARM Linux wrote:
+> >On Sat, Mar 11, 2017 at 10:54:55AM -0800, Steve Longerbeam wrote:
+> >>
+> >>
+> >>On 03/11/2017 10:45 AM, Russell King - ARM Linux wrote:
+> >>>I really don't think expecting the user to understand and configure
+> >>>the pipeline is a sane way forward.  Think about it - should the
+> >>>user need to know that, because they have a bayer-only CSI data
+> >>>source, that there is only one path possible, and if they try to
+> >>>configure a different path, then things will just error out?
+> >>>
+> >>>For the case of imx219 connected to iMX6, it really is as simple as
+> >>>"there is only one possible path" and all the complexity of the media
+> >>>interfaces/subdevs is completely unnecessary.  Every other block in
+> >>>the graph is just noise.
+> >>>
+> >>>The fact is that these dot graphs show a complex picture, but reality
+> >>>is somewhat different - there's only relatively few paths available
+> >>>depending on the connected source and the rest of the paths are
+> >>>completely useless.
+> >>>
+> >>
+> >>I totally disagree there. Raw bayer requires passthrough yes, but for
+> >>all other media bus formats on a mipi csi-2 bus, and all other media
+> >>bus formats on 8-bit parallel buses, the conersion pipelines can be
+> >>used for scaling, CSC, rotation, and motion-compensated de-interlacing.
+> >
+> >... which only makes sense _if_ your source can produce those formats.
+> >We don't actually disagree on that.
+> 
+> ...and there are lots of those sources! You should try getting out of
+> your imx219 shell some time, and have a look around! :)
 
-On 02/23/17 15:08, Frank Rowand wrote:
-> On 02/13/17 18:50, Stephen Boyd wrote:
->> The 'blob' we pass into populate_properties() is marked as const,
->> but we cast that const away when we assign the result of
->> fdt_getprop_by_offset() to pp->value. Let's mark value as const
->> instead, so that code can't mistakenly write to the value of the
->> property that we've so far advertised as const.
-> 
-> Instead of struct property field value being a pointer into the
-> FDT, I would rather copy the data to newly allocated memory and
-> have value be a pointer to that memory.  This is required if we
-> want to make /sys/firmware/fdt optional, which would allow us to
-> free the memory containing the initial boot FDT.
-> 
-> I also do not want overlay live subtrees to have any pointers
-> into the FDT that was used to populate the overlay, so copying
-> the data solves that problem also.
-> 
-> 
->> Unfortunately, this exposes a problem with the fdt resolver code,
->> where we overwrite the value member of properties of phandles to
->> update them with their final value. Add a comment for now to
->> indicate where we're potentially writing over const data.
-> 
-> Yes, the resolver code needs to adjust phandle values.
-> 
-> I think I can get rid of the resolver modifying the various phandle
-> values, and instead just modify the phandle value in struct
-> device_node.  At the same time, I think I can also remove all
-> instances of the phandle properties ('linux,phandle', 'ibm,phandle',
-> 'phandle') in the live tree.  These properties should not be
-> accessed directly by any code outside of the device tree framework
-> since the phandle is located in the struct device_node.  A quick
-> grep does not show any such accesses of the phandle properties,
-> but I want to look more closely.
+If you think that, you are insulting me.  I've been thinking about this
+from the "big picture" point of view.  If you think I'm only thinking
+about this from only the bayer point of view, you're wrong.
 
-After reading through a bit of code, I am confident that I can
-modify the resolver code to not modify the various phandle
-property values.  There are a few tentacles reaching out to
-other areas that I will have to fix also.  The biggest task
-for me will be to create some good test code.
+Given what Mauro has said, I'm convinced that the media controller stuff
+is a complete failure for usability, and adding further drivers using it
+is a mistake.
 
-I'll be unavailable this week, so I'll start on it in about
-a week.
+I counter your accusation by saying that you are actually so focused on
+the media controller way of doing things that you can't see the bigger
+picture here.
 
--Frank
+So, tell me how the user can possibly use iMX6 video capture without
+resorting to opening up a terminal and using media-ctl to manually
+configure the pipeline.  How is the user going to control the source
+device without using media-ctl to find the subdev node, and then using
+v4l2-ctl on it.  How is the user supposed to know which /dev/video*
+node they should be opening with their capture application?
+
+If you can actually respond to the points that I've been raising about
+end user usability, then we can have a discussion.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
