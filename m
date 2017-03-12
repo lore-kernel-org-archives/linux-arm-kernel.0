@@ -1,24 +1,54 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Sun, 12 Mar 2017 12:26:10 +0000
-Subject: [arm:clearfog 30/55] drivers/net/phy/phylink.c:141:11: error:
- too few arguments to function 'fwnode_get_named_gpiod'
-In-Reply-To: <201703122040.bisMEQHh%fengguang.wu@intel.com>
-References: <201703122040.bisMEQHh%fengguang.wu@intel.com>
-Message-ID: <20170312122610.GK21222@n2100.armlinux.org.uk>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Sun, 12 Mar 2017 14:17:03 +0100
+Subject: [PATCH v2 19/23] MAINTAINERS: Add file patterns for ti device tree
+ bindings
+In-Reply-To: <1489324627-19126-1-git-send-email-geert@linux-m68k.org>
+References: <1489324627-19126-1-git-send-email-geert@linux-m68k.org>
+Message-ID: <1489324627-19126-20-git-send-email-geert@linux-m68k.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 12, 2017 at 08:23:45PM +0800, kbuild test robot wrote:
-> Hi Russell,
-> 
-> First bad commit (maybe != root cause):
+Submitters of device tree binding documentation may forget to CC
+the subsystem maintainer if this is missing.
 
-I've just fixed this - fwnode_get_named_gpiod() changed its prototype
-between v4.10 and v4.11-rc1, and I've yet to finish fixing everything
-up for the merge window changes.  This now takes me many hours spread
-over many days to find and fix everything.
+Signed-off-by: Geert Uytterhoeven <geert@linux-m68k.org>
+Acked-by: Santosh Shilimkar <ssantosh@kernel.org>
+Cc: Santosh Shilimkar <ssantosh@kernel.org>
+Cc: linux-kernel at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+---
+Please apply this patch directly if you want to be involved in device
+tree binding documentation for your subsystem.
 
+v2:
+  - Add Acked-by.
+
+Impact on next-20170310:
+
+-Rob Herring <robh+dt@kernel.org> (maintainer:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS,commit_signer:1/1=100%)
++Santosh Shilimkar <ssantosh@kernel.org> (maintainer:TI KEYSTONE MULTICORE NAVIGATOR DRIVERS)
++Rob Herring <robh+dt@kernel.org> (maintainer:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS)
+ Mark Rutland <mark.rutland@arm.com> (maintainer:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS)
+-Eric Engestrom <eric@engestrom.ch> (commit_signer:1/1=100%,authored:1/1=100%)
++linux-kernel at vger.kernel.org (open list:TI KEYSTONE MULTICORE NAVIGATOR DRIVERS)
++linux-arm-kernel at lists.infradead.org (moderated list:TI KEYSTONE MULTICORE NAVIGATOR DRIVERS)
+ devicetree at vger.kernel.org (open list:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS)
+-linux-kernel at vger.kernel.org (open list)
+---
+ MAINTAINERS | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 271b2df4bc27f28b..6cd9daf3a2f9a44a 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -12493,6 +12493,7 @@ M:	Santosh Shilimkar <ssantosh@kernel.org>
+ L:	linux-kernel at vger.kernel.org
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ S:	Maintained
++F:	Documentation/devicetree/bindings/soc/ti/
+ F:	drivers/soc/ti/*
+ T:	git git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git
+ 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+2.7.4
