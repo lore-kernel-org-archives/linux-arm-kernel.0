@@ -1,16 +1,20 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sun, 12 Mar 2017 18:10:32 +0100
-Subject: [PATCH] ARM: dts: BCM5301X: Add support for TP-LINK Archer C5 V2
-In-Reply-To: <20170311121453.18534-1-zajec5@gmail.com>
-References: <20170311121453.18534-1-zajec5@gmail.com>
-Message-ID: <20170312171032.GK15842@lunn.ch>
+From: santosh.shilimkar@oracle.com (santosh.shilimkar at oracle.com)
+Date: Sun, 12 Mar 2017 10:20:22 -0700
+Subject: [PATCH v4 5/5] ARM: keystone: Drop PM domain support for k2g
+In-Reply-To: <1488882154-21485-6-git-send-email-d-gerlach@ti.com>
+References: <1488882154-21485-1-git-send-email-d-gerlach@ti.com>
+ <1488882154-21485-6-git-send-email-d-gerlach@ti.com>
+Message-ID: <4c1a6b75-357a-a02d-acfe-046a5ab913db@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> +	chosen {
-> +		bootargs = "console=ttyS0,115200 earlycon";
-
-Using bootargs to pass the serial settings has been deprecated for a
-while. Please use stdout-path instead.
-
-       Andrew
+On 3/7/17 2:22 AM, Dave Gerlach wrote:
+> K2G will use a different power domain driver than the rest of the
+> keystone family in order to make use of the TI SCI protocol so prevent
+> the standard keystone pm_domain code from registering itself in
+> preparation for a new driver.
+>
+> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+> ---
+Acked-by: Santosh Shilimkar <ssantosh@kernel.org>
