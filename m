@@ -1,48 +1,57 @@
-From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Sun, 12 Mar 2017 13:05:06 -0700
-Subject: [PATCH v5 00/39] i.MX Media Driver
-In-Reply-To: <20170312195741.GS21222@n2100.armlinux.org.uk>
-References: <1489121599-23206-1-git-send-email-steve_longerbeam@mentor.com>
- <20170310201356.GA21222@n2100.armlinux.org.uk>
- <47542ef8-3e91-b4cd-cc65-95000105f172@gmail.com>
- <20170312195741.GS21222@n2100.armlinux.org.uk>
-Message-ID: <ea3ccdb8-903f-93ab-6875-90da440fc52a@gmail.com>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Sun, 12 Mar 2017 22:05:38 +0200
+Subject: [PATCH] serial: 8250: 8250_core: Use dev_name() during
+ request_irq()
+In-Reply-To: <20170308121943.29340-1-vigneshr@ti.com>
+References: <20170308121943.29340-1-vigneshr@ti.com>
+Message-ID: <CAHp75VeFKSbk9hvoJXdK6uOz+JYATD8D057iNv0JDuEnBFS=yw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 03/12/2017 12:57 PM, Russell King - ARM Linux wrote:
-> On Sat, Mar 11, 2017 at 04:30:53PM -0800, Steve Longerbeam wrote:
->> If it's too difficult to get the imx219 csi-2 transmitter into the
->> LP-11 state on power on, perhaps the csi-2 receiver can be a little
->> more lenient on the transmitter and make the LP-11 timeout a warning
->> instead of error-out.
->>
->> Can you try the attached change on top of the version 5 patchset?
->>
->> If that doesn't work then you're just going to have to fix the bug
->> in imx219.
+On Wed, Mar 8, 2017 at 2:19 PM, Vignesh R <vigneshr@ti.com> wrote:
+> Passing "serial" as name during request_irq() results in all serial port
+> irqs have same name. This does not help much to easily identify which
+> irq belongs to which serial port instance. Therefore pass dev_name()
+> during request_irq() so that better identifiable name is listed for
+> serial ports in cat /proc/interrupts output.
 >
-> That patch gets me past that hurdle, only to reveal that there's another
-> issue:
+> Output of cat /proc/interrupts
+> Before this patch:
+>  26:        689          0     GICv2 309 Edge      serial
+> After this patch:
+>  26:        696          0     GICv2 309 Edge      2530c00.serial
 
-Yeah, ipu_cpmem_set_image() failed because it doesn't recognize the
-bayer formats. Wait, didn't we fix this already? I've lost track.
-Ah, right, we were going to move this support into the IPUv3 driver,
-but in the meantime I think you had some patches to get around this.
-
-Steve
-
+I don't know if it worth to mention that some (testing) tools may
+depend on this name.
+Besides that imagine what would be the name of PCI device here. I
+would suggest adding ID if you need one in a form like
+"serial%d", where ID may or may not be supplied by the actual 8250 drivers.
 
 >
-> imx6-mipi-csi2: LP-11 timeout, phy_state = 0x00000200
-> imx219 0-0010: VT: pixclk 139200000Hz line 80742Hz frame 30.0Hz
-> imx219 0-0010: VT: line period 12385ns
-> imx219 0-0010: OP: pixclk 38500000Hz, 2 lanes, 308Mbps peak each
-> imx219 0-0010: OP: 3288 bits/line/lane act=10675ns lp/idle=1710ns
-> ipu1_csi0: csi_idmac_setup failed: -22
-> ipu1_csi0: pipeline start failed with -22
-> ------------[ cut here ]------------
-> WARNING: CPU: 0 PID: 1860 at /home/rmk/git/linux-rmk/drivers/media/v4l2-core/videobuf2-core.c:1340 vb2_start_streaming+0x124/0x1b4 [videobuf2_core]
+> Signed-off-by: Vignesh R <vigneshr@ti.com>
+> ---
+>  drivers/tty/serial/8250/8250_core.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 >
+> diff --git a/drivers/tty/serial/8250/8250_core.c b/drivers/tty/serial/8250/8250_core.c
+> index 76e03a7de9cc..f83b69f30987 100644
+> --- a/drivers/tty/serial/8250/8250_core.c
+> +++ b/drivers/tty/serial/8250/8250_core.c
+> @@ -218,7 +218,7 @@ static int serial_link_irq_chain(struct uart_8250_port *up)
+>                 spin_unlock_irq(&i->lock);
+>                 irq_flags |= up->port.irqflags;
+>                 ret = request_irq(up->port.irq, serial8250_interrupt,
+> -                                 irq_flags, "serial", i);
+> +                                 irq_flags, dev_name(up->port.dev), i);
+>                 if (ret < 0)
+>                         serial_do_unlink(i, up);
+>         }
+> --
+> 2.11.0
+>
+
+
+
+-- 
+With Best Regards,
+Andy Shevchenko
