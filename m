@@ -1,53 +1,32 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Sun, 12 Mar 2017 14:16:59 +0100
-Subject: [PATCH v2 15/23] MAINTAINERS: Add file patterns for perf device tree
- bindings
-In-Reply-To: <1489324627-19126-1-git-send-email-geert@linux-m68k.org>
-References: <1489324627-19126-1-git-send-email-geert@linux-m68k.org>
-Message-ID: <1489324627-19126-16-git-send-email-geert@linux-m68k.org>
+From: menschel.p@posteo.de (Patrick Menschel)
+Date: Sun, 12 Mar 2017 14:28:09 +0100
+Subject: [PATCH 0/2] ARM: dts: sunxi: Add CAN node and can0_pins_a pinctrl
+ setting
+Message-ID: <1489325291-6298-1-git-send-email-menschel.p@posteo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Submitters of device tree binding documentation may forget to CC
-the subsystem maintainer if this is missing.
+The Allwinner A10/A20 SoCs have an on-board CAN (Controller Area Network)
+controller. This patch adds the CAN core to the SoC's include files,
+sun4i-a10.dtsi and sun7i-a20.dtsi.
 
-Signed-off-by: Geert Uytterhoeven <geert@linux-m68k.org>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: linux-arm-kernel at lists.infradead.org
----
-Please apply this patch directly if you want to be involved in device
-tree binding documentation for your subsystem.
+On linux-can mailing list was a discussion about updating the device tree bindings
+https://lkml.org/lkml/2015/9/17/220
+but it did not progress past writing the documentation file.
+Documentation/devicetree/bindings/net/can/sun4i_can.txt
 
-v2:
-  - New.
+The CAN controller can be enabled in a board specific dts file as
+described in the documentation file or by using a device tree overlay.
 
-Impact on next-20170310:
+I have tested the patch on a Banana Pi (A20 SoC) with mainline kernel 4.9.13.
 
--Rob Herring <robh+dt@kernel.org> (maintainer:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS,commit_signer:1/1=100%)
--Mark Rutland <mark.rutland@arm.com> (maintainer:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS)
--Tai Nguyen <ttnguyen@apm.com> (commit_signer:1/1=100%,authored:1/1=100%)
-+Will Deacon <will.deacon@arm.com> (maintainer:ARM PMU PROFILING AND DEBUGGING)
-+Mark Rutland <mark.rutland@arm.com> (maintainer:ARM PMU PROFILING AND DEBUGGING)
-+Rob Herring <robh+dt@kernel.org> (maintainer:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS)
-+linux-arm-kernel at lists.infradead.org (moderated list:ARM PMU PROFILING AND DEBUGGING)
- devicetree at vger.kernel.org (open list:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS)
- linux-kernel at vger.kernel.org (open list)
----
- MAINTAINERS | 1 +
- 1 file changed, 1 insertion(+)
+Patrick Menschel (2):
+  ARM: dts: sun4i: Add CAN node and can0_pins_a pinctrl settings
+  ARM: dts: sun7i: Add CAN node and can0_pins_a pinctrl settings
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index dfa07200386cd012..896d7238f3f3f4e5 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -976,6 +976,7 @@ F:	arch/arm*/include/asm/perf_event.h
- F:	drivers/perf/*
- F:	include/linux/perf/arm_pmu.h
- F:	Documentation/devicetree/bindings/arm/pmu.txt
-+F:	Documentation/devicetree/bindings/perf/
- 
- ARM PORT
- M:	Russell King <linux@armlinux.org.uk>
+ arch/arm/boot/dts/sun4i-a10.dtsi | 15 +++++++++++++++
+ arch/arm/boot/dts/sun7i-a20.dtsi | 15 +++++++++++++++
+ 2 files changed, 30 insertions(+)
+
 -- 
-2.7.4
+1.9.1
