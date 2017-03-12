@@ -1,54 +1,83 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Sun, 12 Mar 2017 21:13:24 +0000
-Subject: [PATCH v5 00/39] i.MX Media Driver
-In-Reply-To: <20170312175923.6ad86dff@vento.lan>
-References: <1489121599-23206-1-git-send-email-steve_longerbeam@mentor.com>
- <20170312194700.GR21222@n2100.armlinux.org.uk>
- <20170312175923.6ad86dff@vento.lan>
-Message-ID: <20170312211324.GW21222@n2100.armlinux.org.uk>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sun, 12 Mar 2017 22:29:04 +0100
+Subject: [PATCH v4 14/36] [media] v4l2-mc: add a function to inherit
+ controls from a pipeline
+In-Reply-To: <20170311231456.GH21222@n2100.armlinux.org.uk>
+References: <20170304131329.GV3220@valkosipuli.retiisi.org.uk>
+ <a7b8e095-a95c-24bd-b1e9-e983f18061c4@xs4all.nl>
+ <20170310130733.GU21222@n2100.armlinux.org.uk>
+ <c679f755-52a6-3c6f-3d65-277db46676cc@xs4all.nl>
+ <20170310140124.GV21222@n2100.armlinux.org.uk>
+ <cc8900b0-c091-b14b-96f4-01f8fa72431c@xs4all.nl>
+ <20170310125342.7f047acf@vento.lan>
+ <20170310223714.GI3220@valkosipuli.retiisi.org.uk>
+ <20170311082549.576531d0@vento.lan>
+ <20170311231456.GH21222@n2100.armlinux.org.uk>
+Message-ID: <20170312212904.GA7995@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 12, 2017 at 05:59:28PM -0300, Mauro Carvalho Chehab wrote:
-> Yet, udev/systemd has some rules that provide an unique name for V4L
-> devices at /lib/udev/rules.d/60-persistent-v4l.rules. Basically, it
-> runs a small application (v4l_id) with creates a persistent symling
-> using rules like this:
+On Sat 2017-03-11 23:14:56, Russell King - ARM Linux wrote:
+> On Sat, Mar 11, 2017 at 08:25:49AM -0300, Mauro Carvalho Chehab wrote:
+> > This situation is there since 2009. If I remember well, you tried to write
+> > such generic plugin in the past, but never finished it, apparently because
+> > it is too complex. Others tried too over the years. 
+> > 
+> > The last trial was done by Jacek, trying to cover just the exynos4 driver. 
+> > Yet, even such limited scope plugin was not good enough, as it was never
+> > merged upstream. Currently, there's no such plugins upstream.
+> > 
+> > If we can't even merge a plugin that solves it for just *one* driver,
+> > I have no hope that we'll be able to do it for the generic case.
 > 
-> 	KERNEL=="video*", ENV{ID_SERIAL}=="?*", SYMLINK+="v4l/by-id/$env{ID_BUS}-$env{ID_SERIAL}-video-index$attr{index}"
+> This is what really worries me right now about the current proposal for
+> iMX6.  What's being proposed is to make the driver exclusively MC-based.
 > 
-> Those names are stored at /dev/v4l/by-path.
+> What that means is that existing applications are _not_ going to work
+> until we have some answer for libv4l2, and from what you've said above,
+> it seems that this has been attempted multiple times over the last _8_
+> years, and each time it's failed.
 
-This doesn't help:
+Yeah. We need a mid-layer between legacy applications and MC
+devices. Such layer does not exist in userspace or in kernel.
 
-$ ls -Al /dev/v4l/by-id/
-total 0
-lrwxrwxrwx 1 root root 13 Mar 12 19:54 usb-Sonix_Technology_Co.__Ltd._USB_2.0_Camera-video-index0 -> ../../video10
-$ ls -Al /dev/v4l/by-path/
-total 0
-lrwxrwxrwx 1 root root 12 Mar 12 19:54 platform-2040000.vpu-video-index0 -> ../../video0
-lrwxrwxrwx 1 root root 12 Mar 12 19:54 platform-2040000.vpu-video-index1 -> ../../video1
-lrwxrwxrwx 1 root root 12 Mar 12 20:53 platform-capture-subsystem-video-index0 -> ../../video2
-lrwxrwxrwx 1 root root 12 Mar 12 20:53 platform-capture-subsystem-video-index1 -> ../../video3
-lrwxrwxrwx 1 root root 12 Mar 12 20:53 platform-capture-subsystem-video-index2 -> ../../video4
-lrwxrwxrwx 1 root root 12 Mar 12 20:53 platform-capture-subsystem-video-index3 -> ../../video5
-lrwxrwxrwx 1 root root 12 Mar 12 20:53 platform-capture-subsystem-video-index4 -> ../../video6
-lrwxrwxrwx 1 root root 12 Mar 12 20:53 platform-capture-subsystem-video-index5 -> ../../video7
-lrwxrwxrwx 1 root root 12 Mar 12 20:53 platform-capture-subsystem-video-index6 -> ../../video8
-lrwxrwxrwx 1 root root 12 Mar 12 20:53 platform-capture-subsystem-video-index7 -> ../../video9
-lrwxrwxrwx 1 root root 13 Mar 12 19:54 platform-ci_hdrc.0-usb-0:1:1.0-video-index0 -> ../../video10
+> Loading the problem onto the user in the hope that the user knows
+> enough to properly configure it also doesn't work - who is going to
+> educate the user about the various quirks of the hardware they're
+> dealing with?
 
-The problem is the "platform-capture-subsystem-video-index" entries.
-These themselves change order.  For instance, I now have:
+We have docs. Users can write shell scripts. Still, mid-layer would be
+nice.
 
-- entity 72: ipu1_csi0 capture (1 pad, 1 link)
-             type Node subtype V4L flags 0
-             device node name /dev/video6
+> So, the problem space we have here is absolutely huge, and merely
+> having a plugin that activates when you open a /dev/video* node
+> really doesn't solve it.
+> 
+> All in all, I really don't think "lets hope someone writes a v4l2
+> plugin to solve it" is ever going to be successful.  I don't even
+> see that there will ever be a userspace application that is anything
+> more than a representation of the dot graphs that users can use to
+> manually configure the capture system with system knowledge.
+> 
+> I think everyone needs to take a step back and think long and hard
+> about this from the system usability perspective - I seriously
+> doubt that we will ever see any kind of solution to this if we
+> continue to progress with "we'll sort it in userspace some day."
 
-which means it's platform-capture-subsystem-video-index4.  Before, it
-was platform-capture-subsystem-video-index2.
+Mid-layer is difficult... there are _hundreds_ of possible
+pipeline setups. If it should live in kernel or in userspace is a
+question... but I don't think having it in kernel helps in any way.
+
+Best regards,
+									Pavel
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170312/493191de/attachment-0001.sig>
