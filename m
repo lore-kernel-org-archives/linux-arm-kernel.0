@@ -1,57 +1,49 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Sun, 12 Mar 2017 22:05:38 +0200
-Subject: [PATCH] serial: 8250: 8250_core: Use dev_name() during
- request_irq()
-In-Reply-To: <20170308121943.29340-1-vigneshr@ti.com>
-References: <20170308121943.29340-1-vigneshr@ti.com>
-Message-ID: <CAHp75VeFKSbk9hvoJXdK6uOz+JYATD8D057iNv0JDuEnBFS=yw@mail.gmail.com>
+From: jeremy.lefaure@lse.epita.fr (=?UTF-8?q?J=C3=A9r=C3=A9my=20Lefaure?=)
+Date: Sun, 12 Mar 2017 16:13:29 -0400
+Subject: [PATCH] [media] vcodev: mediatek: add missing include in JPEG decoder
+ driver
+Message-ID: <20170312201329.28357-1-jeremy.lefaure@lse.epita.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 8, 2017 at 2:19 PM, Vignesh R <vigneshr@ti.com> wrote:
-> Passing "serial" as name during request_irq() results in all serial port
-> irqs have same name. This does not help much to easily identify which
-> irq belongs to which serial port instance. Therefore pass dev_name()
-> during request_irq() so that better identifiable name is listed for
-> serial ports in cat /proc/interrupts output.
->
-> Output of cat /proc/interrupts
-> Before this patch:
->  26:        689          0     GICv2 309 Edge      serial
-> After this patch:
->  26:        696          0     GICv2 309 Edge      2530c00.serial
+The driver uses kzalloc and kfree functions. So it should include
+linux/slab.h. This header file is implicitly included by v4l2-common.h
+if CONFIG_SPI is enabled. But when it is disabled, slab.h is not
+included. In this case, the driver does not compile:
 
-I don't know if it worth to mention that some (testing) tools may
-depend on this name.
-Besides that imagine what would be the name of PCI device here. I
-would suggest adding ID if you need one in a form like
-"serial%d", where ID may or may not be supplied by the actual 8250 drivers.
+drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c: In function ?mtk_jpeg_open?:
+drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c:1017:8: error: implicit
+declaration of function ?kzalloc?
+[-Werror=implicit-function-declaration]
+  ctx = kzalloc(sizeof(*ctx), GFP_KERNEL);
+        ^~~~~~~
+drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c:1017:6: warning:
+assignment makes pointer from integer without a cast [-Wint-conversion]
+  ctx = kzalloc(sizeof(*ctx), GFP_KERNEL);
+      ^
+drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c:1047:2: error: implicit
+declaration of function ?kfree? [-Werror=implicit-function-declaration]
+  kfree(ctx);
+  ^~~~~
 
->
-> Signed-off-by: Vignesh R <vigneshr@ti.com>
-> ---
->  drivers/tty/serial/8250/8250_core.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/tty/serial/8250/8250_core.c b/drivers/tty/serial/8250/8250_core.c
-> index 76e03a7de9cc..f83b69f30987 100644
-> --- a/drivers/tty/serial/8250/8250_core.c
-> +++ b/drivers/tty/serial/8250/8250_core.c
-> @@ -218,7 +218,7 @@ static int serial_link_irq_chain(struct uart_8250_port *up)
->                 spin_unlock_irq(&i->lock);
->                 irq_flags |= up->port.irqflags;
->                 ret = request_irq(up->port.irq, serial8250_interrupt,
-> -                                 irq_flags, "serial", i);
-> +                                 irq_flags, dev_name(up->port.dev), i);
->                 if (ret < 0)
->                         serial_do_unlink(i, up);
->         }
-> --
-> 2.11.0
->
+This patch adds the missing include to fix this issue.
 
+Signed-off-by: J?r?my Lefaure <jeremy.lefaure@lse.epita.fr>
+---
+ drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-
+diff --git a/drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c b/drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c
+index b10183f7942b..f9bd58ce7d32 100644
+--- a/drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c
++++ b/drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c
+@@ -22,6 +22,7 @@
+ #include <linux/of_platform.h>
+ #include <linux/platform_device.h>
+ #include <linux/pm_runtime.h>
++#include <linux/slab.h>
+ #include <linux/spinlock.h>
+ #include <media/v4l2-event.h>
+ #include <media/v4l2-mem2mem.h>
 -- 
-With Best Regards,
-Andy Shevchenko
+2.12.0
