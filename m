@@ -1,23 +1,26 @@
 From: robh@kernel.org (Rob Herring)
-Date: Sun, 12 Mar 2017 09:05:44 -0500
-Subject: [PATCH v5 2/4] dt-bindings: mfd: Add LED subnode binding for
- MT6323 PMIC
-In-Reply-To: <1488549385-19899-3-git-send-email-sean.wang@mediatek.com>
-References: <1488549385-19899-1-git-send-email-sean.wang@mediatek.com>
- <1488549385-19899-3-git-send-email-sean.wang@mediatek.com>
-Message-ID: <20170312140544.37h6sklywmqhfa5w@rob-hp-laptop>
+Date: Sun, 12 Mar 2017 09:35:15 -0500
+Subject: [PATCH V5 1/9] PM / Domains: Ignore domain-idle-states that are
+ not compatible
+In-Reply-To: <1488573695-106680-2-git-send-email-lina.iyer@linaro.org>
+References: <1488573695-106680-1-git-send-email-lina.iyer@linaro.org>
+ <1488573695-106680-2-git-send-email-lina.iyer@linaro.org>
+Message-ID: <20170312143515.aodwv66ltyznrjj5@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 03, 2017 at 09:56:23PM +0800, sean.wang at mediatek.com wrote:
-> From: Sean Wang <sean.wang@mediatek.com>
+On Fri, Mar 03, 2017 at 12:41:27PM -0800, Lina Iyer wrote:
+> domain-idle-states property may have phandles to idle state bindings
+> that may not be compatible with idle state definition defined in [1].
+> Such phandles would just be ignored and not throw and error when read by
+> the domain core.
 > 
-> This patch adds documentation for devicetree bindings
-> for LED support as the subnode of MT6323 PMIC
-> 
-> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+> Cc: <devicetree@vger.kernel.org>
+> Cc: Rob Herring <robh@kernel.org>
+> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
 > ---
->  Documentation/devicetree/bindings/mfd/mt6397.txt | 5 +++++
->  1 file changed, 5 insertions(+)
+>  Documentation/devicetree/bindings/power/power_domain.txt |  4 +++-
+>  drivers/base/power/domain.c                              | 16 +++++++++-------
+>  2 files changed, 12 insertions(+), 8 deletions(-)
 
 Acked-by: Rob Herring <robh@kernel.org>
