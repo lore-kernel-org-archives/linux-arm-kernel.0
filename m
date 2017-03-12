@@ -1,47 +1,37 @@
 From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Sun, 12 Mar 2017 19:47:00 +0000
+Date: Sun, 12 Mar 2017 19:57:41 +0000
 Subject: [PATCH v5 00/39] i.MX Media Driver
-In-Reply-To: <1489121599-23206-1-git-send-email-steve_longerbeam@mentor.com>
+In-Reply-To: <47542ef8-3e91-b4cd-cc65-95000105f172@gmail.com>
 References: <1489121599-23206-1-git-send-email-steve_longerbeam@mentor.com>
-Message-ID: <20170312194700.GR21222@n2100.armlinux.org.uk>
+ <20170310201356.GA21222@n2100.armlinux.org.uk>
+ <47542ef8-3e91-b4cd-cc65-95000105f172@gmail.com>
+Message-ID: <20170312195741.GS21222@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Another issue.
+On Sat, Mar 11, 2017 at 04:30:53PM -0800, Steve Longerbeam wrote:
+> If it's too difficult to get the imx219 csi-2 transmitter into the
+> LP-11 state on power on, perhaps the csi-2 receiver can be a little
+> more lenient on the transmitter and make the LP-11 timeout a warning
+> instead of error-out.
+> 
+> Can you try the attached change on top of the version 5 patchset?
+> 
+> If that doesn't work then you're just going to have to fix the bug
+> in imx219.
 
-The "reboot and the /dev/video* devices come up in a completely
-different order" problem seems to exist with this version.
+That patch gets me past that hurdle, only to reveal that there's another
+issue:
 
-The dot graph I supplied previously had "ipu1_csi0 capture" on
-/dev/video4.  I've just rebooted, and now I find it's on
-/dev/video2 instead.
-
-Here's the extract from the .dot file of the old listing:
-
-        n00000018 [label="ipu1_ic_prpenc capture\n/dev/video0", shape=box, style=filled, fillcolor=yellow]
-        n00000021 [label="ipu1_ic_prpvf capture\n/dev/video1", shape=box, style=filled, fillcolor=yellow]
-        n0000002e [label="ipu2_ic_prpenc capture\n/dev/video2", shape=box, style=filled, fillcolor=yellow]
-        n00000037 [label="ipu2_ic_prpvf capture\n/dev/video3", shape=box, style=filled, fillcolor=yellow]
-        n00000048 [label="ipu1_csi0 capture\n/dev/video4", shape=box, style=filled, fillcolor=yellow]
-        n00000052 [label="ipu1_csi1 capture\n/dev/video5", shape=box, style=filled, fillcolor=yellow]
-        n00000062 [label="ipu2_csi0 capture\n/dev/video6", shape=box, style=filled, fillcolor=yellow]
-        n0000006c [label="ipu2_csi1 capture\n/dev/video7", shape=box, style=filled, fillcolor=yellow]
-
-and here's the same after reboot:
-
-        n00000014 [label="ipu1_csi0 capture\n/dev/video2", shape=box, style=filled, fillcolor=yellow]
-        n0000001e [label="ipu1_csi1 capture\n/dev/video3", shape=box, style=filled, fillcolor=yellow]
-        n00000028 [label="ipu2_csi0 capture\n/dev/video4", shape=box, style=filled, fillcolor=yellow]
-        n00000035 [label="ipu1_ic_prpenc capture\n/dev/video5", shape=box, style=filled, fillcolor=yellow]
-        n0000003e [label="ipu1_ic_prpvf capture\n/dev/video6", shape=box, style=filled, fillcolor=yellow]
-        n0000004c [label="ipu2_csi1 capture\n/dev/video7", shape=box, style=filled, fillcolor=yellow]
-        n00000059 [label="ipu2_ic_prpenc capture\n/dev/video8", shape=box, style=filled, fillcolor=yellow]
-        n00000062 [label="ipu2_ic_prpvf capture\n/dev/video9", shape=box, style=filled, fillcolor=yellow]
-
-(/dev/video0 and /dev/video1 are taken up by CODA, since I updated the
-names of the firmware files, and now CODA initialises... seems the
-back-compat filenames don't work, but that's not a problem with imx6
-capture.)
+imx6-mipi-csi2: LP-11 timeout, phy_state = 0x00000200
+imx219 0-0010: VT: pixclk 139200000Hz line 80742Hz frame 30.0Hz
+imx219 0-0010: VT: line period 12385ns
+imx219 0-0010: OP: pixclk 38500000Hz, 2 lanes, 308Mbps peak each
+imx219 0-0010: OP: 3288 bits/line/lane act=10675ns lp/idle=1710ns
+ipu1_csi0: csi_idmac_setup failed: -22
+ipu1_csi0: pipeline start failed with -22
+------------[ cut here ]------------
+WARNING: CPU: 0 PID: 1860 at /home/rmk/git/linux-rmk/drivers/media/v4l2-core/videobuf2-core.c:1340 vb2_start_streaming+0x124/0x1b4 [videobuf2_core]
 
 -- 
 RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
