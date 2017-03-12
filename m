@@ -1,124 +1,141 @@
-From: gmbnomis@gmail.com (Simon Baatz)
-Date: Sun, 12 Mar 2017 22:34:06 +0100
-Subject: [PATCH] mtd: nand: orion: fix clk handling
-Message-ID: <20170312213406.20987-1-gmbnomis@gmail.com>
+From: mchehab@s-opensource.com (Mauro Carvalho Chehab)
+Date: Sun, 12 Mar 2017 18:58:45 -0300
+Subject: [PATCH v4 14/36] [media] v4l2-mc: add a function to inherit
+ controls from a pipeline
+In-Reply-To: <fba73c10-4b95-f0d2-e681-0b14ef1fbc1c@gmail.com>
+References: <a7b8e095-a95c-24bd-b1e9-e983f18061c4@xs4all.nl>
+ <20170310120902.1daebc7b@vento.lan>
+ <5e1183f4-774f-413a-628a-96e0df321faf@xs4all.nl>
+ <20170311101408.272a9187@vento.lan>
+ <20170311153229.yrdjmggb3p2suhdw@ihha.localdomain>
+ <acfb5eca-ff00-6d57-339a-3322034cbdb3@gmail.com>
+ <20170311184551.GD21222@n2100.armlinux.org.uk>
+ <1f1b350a-5523-34bc-07b7-f3cd2d1fd4c1@gmail.com>
+ <20170311185959.GF21222@n2100.armlinux.org.uk>
+ <4917d7fb-2f48-17cd-aa2f-d54b0f19ed6e@gmail.com>
+ <20170312073745.GI21222@n2100.armlinux.org.uk>
+ <fba73c10-4b95-f0d2-e681-0b14ef1fbc1c@gmail.com>
+Message-ID: <20170312185845.5c18ffd0@vento.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The clk handling in orion_nand.c had two problems:
+Em Sun, 12 Mar 2017 10:56:53 -0700
+Steve Longerbeam <slongerbeam@gmail.com> escreveu:
 
-- In the probe function, clk_put() was called for an enabled clock,
-  which violates the API (see documentation for clk_put() in
-  include/linux/clk.h)
+> On 03/11/2017 11:37 PM, Russell King - ARM Linux wrote:
+> > On Sat, Mar 11, 2017 at 07:31:18PM -0800, Steve Longerbeam wrote:  
 
-- In the error path of the probe function, clk_put() could be called
-  twice for the same clock.
+> > Given what Mauro has said, I'm convinced that the media controller stuff
+> > is a complete failure for usability, and adding further drivers using it
+> > is a mistake.
 
-In order to clean this up, use the managed function devm_clk_get() and
-store the pointer to the clk in the driver data.
+I never said that. The thing is that the V4L2 API was designed in
+1999, when the video hardware were a way simpler: just one DMA engine
+on a PCI device, one video/audio input switch and a few video entries.
 
-Fixes: baffab28b13120694fa3ebab08d3e99667a851d2 ('ARM: Orion: fix driver probe error handling with respect to clk')
-Cc: <stable@vger.kernel.org> # v4.5+
-Signed-off-by: Simon Baatz <gmbnomis@gmail.com>
----
- drivers/mtd/nand/orion_nand.c | 42 +++++++++++++++++++++---------------------
- 1 file changed, 21 insertions(+), 21 deletions(-)
+On those days, setting up a pipeline on such devices is simple, and can be
+done via VIDIOC_*_INPUT ioctls.
 
-diff --git a/drivers/mtd/nand/orion_nand.c b/drivers/mtd/nand/orion_nand.c
-index 4a91c5d000be..b355aa738fae 100644
---- a/drivers/mtd/nand/orion_nand.c
-+++ b/drivers/mtd/nand/orion_nand.c
-@@ -23,6 +23,11 @@
- #include <asm/sizes.h>
- #include <linux/platform_data/mtd-orion_nand.h>
- 
-+struct orion_nand_info {
-+	struct nand_chip chip;
-+	struct clk       *clk;
-+};
-+
- static void orion_nand_cmd_ctrl(struct mtd_info *mtd, int cmd, unsigned int ctrl)
- {
- 	struct nand_chip *nc = mtd_to_nand(mtd);
-@@ -75,20 +80,21 @@ static void orion_nand_read_buf(struct mtd_info *mtd, uint8_t *buf, int len)
- 
- static int __init orion_nand_probe(struct platform_device *pdev)
- {
-+	struct orion_nand_info *info;
- 	struct mtd_info *mtd;
- 	struct nand_chip *nc;
- 	struct orion_nand_data *board;
- 	struct resource *res;
--	struct clk *clk;
- 	void __iomem *io_base;
- 	int ret = 0;
- 	u32 val = 0;
- 
--	nc = devm_kzalloc(&pdev->dev,
--			sizeof(struct nand_chip),
-+	info = devm_kzalloc(&pdev->dev,
-+			sizeof(struct orion_nand_info),
- 			GFP_KERNEL);
--	if (!nc)
-+	if (!info)
- 		return -ENOMEM;
-+	nc = &info->chip;
- 	mtd = nand_to_mtd(nc);
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-@@ -145,15 +151,13 @@ static int __init orion_nand_probe(struct platform_device *pdev)
- 	if (board->dev_ready)
- 		nc->dev_ready = board->dev_ready;
- 
--	platform_set_drvdata(pdev, mtd);
-+	platform_set_drvdata(pdev, info);
- 
- 	/* Not all platforms can gate the clock, so it is not
- 	   an error if the clock does not exists. */
--	clk = clk_get(&pdev->dev, NULL);
--	if (!IS_ERR(clk)) {
--		clk_prepare_enable(clk);
--		clk_put(clk);
--	}
-+	info->clk = devm_clk_get(&pdev->dev, NULL);
-+	if (!IS_ERR(info->clk))
-+		clk_prepare_enable(info->clk);
- 
- 	ret = nand_scan(mtd, 1);
- 	if (ret)
-@@ -169,26 +173,22 @@ static int __init orion_nand_probe(struct platform_device *pdev)
- 	return 0;
- 
- no_dev:
--	if (!IS_ERR(clk)) {
--		clk_disable_unprepare(clk);
--		clk_put(clk);
--	}
-+	if (!IS_ERR(info->clk))
-+		clk_disable_unprepare(info->clk);
- 
- 	return ret;
- }
- 
- static int orion_nand_remove(struct platform_device *pdev)
- {
--	struct mtd_info *mtd = platform_get_drvdata(pdev);
--	struct clk *clk;
-+	struct orion_nand_info *info = platform_get_drvdata(pdev);
-+	struct nand_chip *chip = &info->chip;
-+	struct mtd_info *mtd = nand_to_mtd(chip);
- 
- 	nand_release(mtd);
- 
--	clk = clk_get(&pdev->dev, NULL);
--	if (!IS_ERR(clk)) {
--		clk_disable_unprepare(clk);
--		clk_put(clk);
--	}
-+	if (!IS_ERR(info->clk))
-+		clk_disable_unprepare(info->clk);
- 
- 	return 0;
- }
--- 
-2.9.3
+Nowadays hardware used on SoC devices are a way more complex.
+
+SoC devices comes with several DMA engines for buffer transfers, plus
+video transform blocks whose pipeline can be set dynamically.
+
+The MC API is a need to allow setting a complex pipeline, as
+VIDIOC_*_INPUT cannot work with such complexity.
+
+The subdev API solves a different issue. On a "traditional" device,
+we usually have a pipeline like:
+
+<video input> ==> <processing> ==> /dev/video0
+
+Where <processing> controls something at the device (like
+bright and/or resolution) if you change something at the /dev/video0 
+node, it is clear that the <processing> block should handle it.
+
+On complex devices, with a pipeline like:
+<camera> ==> <processing0> ==> <CSI bus> ==> <processing1> ==> /dev/video0
+
+If you send a command to adjust the something at /dev/video0, it is
+not clear for the device driver to do it at processing0 or at
+processing1. Ok, the driver can decide it, but this can be sub-optimal.
+
+Yet, several drivers do that. For example, with em28xx-based drivers
+several parameters can be adjusted either at the em28xx driver or at
+the video decoder driver (saa711x). There's a logic inside the driver
+that decides it. The pipeline there is fixed, though, so it is
+easy to hardcode a logic for that.
+
+So, I've no doubt that both MC and subdev APIs are needed when full
+hardware control is required.
+
+I don't know about how much flexibility the i.MX6 hardware gives,
+nor if all such flexibility is needed for most use case applications.
+
+If I were to code a driver for such hardware, though, I would try to
+provide a subset of the functionality that would work without the
+subdev API, allowing it to work with standard V4L applications.
+
+That doesn't sound hard to do, as the driver may limit the pipelines
+to a subset that would make sense, in order to make easier for the
+driver to take the right decision about to where send a control
+to setup some parameter.
+
+> I do agree with you that MC places a lot of burden on the user to
+> attain a lot of knowledge of the system's architecture.
+
+Setting up the pipeline is not the hard part. One could write a
+script to do that. 
+
+> That's really  why I included that control inheritance patch, to 
+> ease the burden somewhat.
+
+IMHO, that makes sense, as, once some script sets the pipeline, any
+V4L2 application can work, if you forward the controls to the right
+I2C devices.
+
+> On the other hand, I also think this just requires that MC drivers have
+> very good user documentation.
+
+No, it is not a matter of just documentation. It is a matter of having
+to rewrite applications for each device, as the information exposed by
+MC are not enough for an application to do what's needed.
+
+For a generic application to work properly with MC, we need to have to
+add more stuff to MC, in order to allow applications to know more about
+the features of each subdevice and to things like discovering what kind
+of signal is present on each PAD. We're calling it as "properties API"[1].
+
+[1] we discussed about that at the ML and at the MC workshop:
+	https://linuxtv.org/news.php?entry=2015-08-17.mchehab
+
+Unfortunately, nobody sent any patches implementing it so far :-(
+
+> And my other point is, I think most people who have a need to work with
+> the media framework on a particular platform will likely already be
+> quite familiar with that platform.
+
+I disagree. The most popular platform device currently is Raspberry PI.
+
+I doubt that almost all owners of RPi + camera module know anything
+about MC. They just use Raspberry's official driver with just provides
+the V4L2 interface.
+
+I have a strong opinion that, for hardware like RPi, just the V4L2
+API is enough for more than 90% of the cases.
+
+> The media graph for imx6 is fairly self-explanatory in my opinion.
+> Yes that graph has to be generated, but just with a simple 'media-ctl
+> --print-dot', I don't see how that is difficult for the user.
+
+Again, IMHO, the problem is not how to setup the pipeline, but, instead,
+the need to forward controls to the subdevices.
+
+To use a camera, the user needs to set up a set of controls for the
+image to make sense (bright, contrast, focus, etc). If the driver
+doesn't forward those controls to the subdevs, an application like
+"camorama" won't actually work for real, as the user won't be able
+to adjust those parameters via GUI.
+
+Thanks,
+Mauro
