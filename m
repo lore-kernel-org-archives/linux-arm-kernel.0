@@ -1,10 +1,9 @@
-From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Sun, 12 Mar 2017 10:56:53 -0700
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sun, 12 Mar 2017 19:14:10 +0100
 Subject: [PATCH v4 14/36] [media] v4l2-mc: add a function to inherit
  controls from a pipeline
 In-Reply-To: <20170312073745.GI21222@n2100.armlinux.org.uk>
-References: <a7b8e095-a95c-24bd-b1e9-e983f18061c4@xs4all.nl>
- <20170310120902.1daebc7b@vento.lan>
+References: <20170310120902.1daebc7b@vento.lan>
  <5e1183f4-774f-413a-628a-96e0df321faf@xs4all.nl>
  <20170311101408.272a9187@vento.lan>
  <20170311153229.yrdjmggb3p2suhdw@ihha.localdomain>
@@ -14,86 +13,61 @@ References: <a7b8e095-a95c-24bd-b1e9-e983f18061c4@xs4all.nl>
  <20170311185959.GF21222@n2100.armlinux.org.uk>
  <4917d7fb-2f48-17cd-aa2f-d54b0f19ed6e@gmail.com>
  <20170312073745.GI21222@n2100.armlinux.org.uk>
-Message-ID: <fba73c10-4b95-f0d2-e681-0b14ef1fbc1c@gmail.com>
+Message-ID: <20170312181410.GA3124@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 03/11/2017 11:37 PM, Russell King - ARM Linux wrote:
+On Sun 2017-03-12 07:37:45, Russell King - ARM Linux wrote:
 > On Sat, Mar 11, 2017 at 07:31:18PM -0800, Steve Longerbeam wrote:
->>
->>
->> On 03/11/2017 10:59 AM, Russell King - ARM Linux wrote:
->>> On Sat, Mar 11, 2017 at 10:54:55AM -0800, Steve Longerbeam wrote:
->>>>
->>>>
->>>> On 03/11/2017 10:45 AM, Russell King - ARM Linux wrote:
->>>>> I really don't think expecting the user to understand and configure
->>>>> the pipeline is a sane way forward.  Think about it - should the
->>>>> user need to know that, because they have a bayer-only CSI data
->>>>> source, that there is only one path possible, and if they try to
->>>>> configure a different path, then things will just error out?
->>>>>
->>>>> For the case of imx219 connected to iMX6, it really is as simple as
->>>>> "there is only one possible path" and all the complexity of the media
->>>>> interfaces/subdevs is completely unnecessary.  Every other block in
->>>>> the graph is just noise.
->>>>>
->>>>> The fact is that these dot graphs show a complex picture, but reality
->>>>> is somewhat different - there's only relatively few paths available
->>>>> depending on the connected source and the rest of the paths are
->>>>> completely useless.
->>>>>
->>>>
->>>> I totally disagree there. Raw bayer requires passthrough yes, but for
->>>> all other media bus formats on a mipi csi-2 bus, and all other media
->>>> bus formats on 8-bit parallel buses, the conersion pipelines can be
->>>> used for scaling, CSC, rotation, and motion-compensated de-interlacing.
->>>
->>> ... which only makes sense _if_ your source can produce those formats.
->>> We don't actually disagree on that.
->>
->> ...and there are lots of those sources! You should try getting out of
->> your imx219 shell some time, and have a look around! :)
->
+> > 
+> > 
+> > On 03/11/2017 10:59 AM, Russell King - ARM Linux wrote:
+> > >On Sat, Mar 11, 2017 at 10:54:55AM -0800, Steve Longerbeam wrote:
+> > >>
+> > >>
+> > >>On 03/11/2017 10:45 AM, Russell King - ARM Linux wrote:
+> > >>>I really don't think expecting the user to understand and configure
+> > >>>the pipeline is a sane way forward.  Think about it - should the
+> > >>>user need to know that, because they have a bayer-only CSI data
+> > >>>source, that there is only one path possible, and if they try to
+> > >>>configure a different path, then things will just error out?
+> > >>>
+> > >>>For the case of imx219 connected to iMX6, it really is as simple as
+> > >>>"there is only one possible path" and all the complexity of the media
+> > >>>interfaces/subdevs is completely unnecessary.  Every other block in
+> > >>>the graph is just noise.
+> > >>>
+> > >>>The fact is that these dot graphs show a complex picture, but reality
+> > >>>is somewhat different - there's only relatively few paths available
+> > >>>depending on the connected source and the rest of the paths are
+> > >>>completely useless.
+> > >>>
+> > >>
+> > >>I totally disagree there. Raw bayer requires passthrough yes, but for
+> > >>all other media bus formats on a mipi csi-2 bus, and all other media
+> > >>bus formats on 8-bit parallel buses, the conersion pipelines can be
+> > >>used for scaling, CSC, rotation, and motion-compensated de-interlacing.
+> > >
+> > >... which only makes sense _if_ your source can produce those formats.
+> > >We don't actually disagree on that.
+> > 
+> > ...and there are lots of those sources! You should try getting out of
+> > your imx219 shell some time, and have a look around! :)
+> 
 > If you think that, you are insulting me.  I've been thinking about this
 > from the "big picture" point of view.  If you think I'm only thinking
 > about this from only the bayer point of view, you're wrong.
 
-No insult there, you have my utmost respect Russel. Me gives you the
-Ali-G "respec!" :)
+Can you stop that insults nonsense?
 
-It was just a light-hearted attempt at suggesting you might be too
-entangled with the imx219 (or short on hardware access, which I can
-certainly understand).
-
-
->
 > Given what Mauro has said, I'm convinced that the media controller stuff
 > is a complete failure for usability, and adding further drivers using it
 > is a mistake.
->
 
-I do agree with you that MC places a lot of burden on the user to
-attain a lot of knowledge of the system's architecture. That's really
-why I included that control inheritance patch, to ease the burden
-somewhat.
-
-On the other hand, I also think this just requires that MC drivers have
-very good user documentation.
-
-And my other point is, I think most people who have a need to work with
-the media framework on a particular platform will likely already be
-quite familiar with that platform.
-
-> I counter your accusation by saying that you are actually so focused on
-> the media controller way of doing things that you can't see the bigger
-> picture here.
->
-
-Yeah I've been too mired in the details of this driver.
-
+Hmm. But you did not present any alternative. Seems some hardware is
+simply complex. So either we don't add complex drivers (_that_ would
+be a mistake), or some userspace solution will need to be
+done. Shell-script running media-ctl does not seem that hard.
 
 > So, tell me how the user can possibly use iMX6 video capture without
 > resorting to opening up a terminal and using media-ctl to manually
@@ -102,34 +76,20 @@ Yeah I've been too mired in the details of this driver.
 > v4l2-ctl on it.  How is the user supposed to know which /dev/video*
 > node they should be opening with their capture application?
 
-The media graph for imx6 is fairly self-explanatory in my opinion.
-Yes that graph has to be generated, but just with a simple 'media-ctl
---print-dot', I don't see how that is difficult for the user.
+Complex hardware sometimes requires userspace configuration. Running a
+shell script on startup does not seem that hard.
 
-The graph makes it quite clear which subdev node belongs to which
-entity.
+And maybe we could do some kind of default setup in kernel, but that
+does not really solve the problem.
 
-As for which /dev/videoX node to use, I hope I made it fairly clear
-in the user doc what functions each node performs. But I will review
-the doc again and make sure it's been made explicitly clear.
-
-
->
-> If you can actually respond to the points that I've been raising about
-> end user usability, then we can have a discussion.
-
-Right, I haven't added my input to the middle-ware discussions (libv4l,
-v4lconvert, and the auto-pipeline-configuration library work). I can
-only say at this point that v4lconvert does indeed sound broken w.r.t
-bayer formats from your description. But it also sounds like an isolated
-problem and it just needs a patch to allow passing bayer through without
-software conversion.
-
-I wish I had the IMX219 to help you debug these bayer issues. I don't
-have any bayer sources.
-
-In summary, I do like the media framework, it's a good abstraction of
-hardware pipelines. It does require a lot of system level knowledge to
-configure, but as I said that is a matter of good documentation.
-
-Steve
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170312/1776bfee/attachment.sig>
