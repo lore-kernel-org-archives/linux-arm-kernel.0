@@ -1,74 +1,58 @@
-From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Sat, 11 Mar 2017 19:31:18 -0800
-Subject: [PATCH v4 14/36] [media] v4l2-mc: add a function to inherit
- controls from a pipeline
-In-Reply-To: <20170311185959.GF21222@n2100.armlinux.org.uk>
-References: <20170303230645.GR21222@n2100.armlinux.org.uk>
- <20170304131329.GV3220@valkosipuli.retiisi.org.uk>
- <a7b8e095-a95c-24bd-b1e9-e983f18061c4@xs4all.nl>
- <20170310120902.1daebc7b@vento.lan>
- <5e1183f4-774f-413a-628a-96e0df321faf@xs4all.nl>
- <20170311101408.272a9187@vento.lan>
- <20170311153229.yrdjmggb3p2suhdw@ihha.localdomain>
- <acfb5eca-ff00-6d57-339a-3322034cbdb3@gmail.com>
- <20170311184551.GD21222@n2100.armlinux.org.uk>
- <1f1b350a-5523-34bc-07b7-f3cd2d1fd4c1@gmail.com>
- <20170311185959.GF21222@n2100.armlinux.org.uk>
-Message-ID: <4917d7fb-2f48-17cd-aa2f-d54b0f19ed6e@gmail.com>
+From: frowand.list@gmail.com (Frank Rowand)
+Date: Sat, 11 Mar 2017 22:27:08 -0800
+Subject: [RFC/PATCH] of: Mark property::value as const
+In-Reply-To: <58AF6B88.6020709@gmail.com>
+References: <20170214025040.23955-1-stephen.boyd@linaro.org>
+ <58AF6B88.6020709@gmail.com>
+Message-ID: <58C4EA3C.4070503@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Stephen,
 
+On 02/23/17 15:08, Frank Rowand wrote:
+> On 02/13/17 18:50, Stephen Boyd wrote:
+>> The 'blob' we pass into populate_properties() is marked as const,
+>> but we cast that const away when we assign the result of
+>> fdt_getprop_by_offset() to pp->value. Let's mark value as const
+>> instead, so that code can't mistakenly write to the value of the
+>> property that we've so far advertised as const.
+> 
+> Instead of struct property field value being a pointer into the
+> FDT, I would rather copy the data to newly allocated memory and
+> have value be a pointer to that memory.  This is required if we
+> want to make /sys/firmware/fdt optional, which would allow us to
+> free the memory containing the initial boot FDT.
+> 
+> I also do not want overlay live subtrees to have any pointers
+> into the FDT that was used to populate the overlay, so copying
+> the data solves that problem also.
+> 
+> 
+>> Unfortunately, this exposes a problem with the fdt resolver code,
+>> where we overwrite the value member of properties of phandles to
+>> update them with their final value. Add a comment for now to
+>> indicate where we're potentially writing over const data.
+> 
+> Yes, the resolver code needs to adjust phandle values.
+> 
+> I think I can get rid of the resolver modifying the various phandle
+> values, and instead just modify the phandle value in struct
+> device_node.  At the same time, I think I can also remove all
+> instances of the phandle properties ('linux,phandle', 'ibm,phandle',
+> 'phandle') in the live tree.  These properties should not be
+> accessed directly by any code outside of the device tree framework
+> since the phandle is located in the struct device_node.  A quick
+> grep does not show any such accesses of the phandle properties,
+> but I want to look more closely.
 
-On 03/11/2017 10:59 AM, Russell King - ARM Linux wrote:
-> On Sat, Mar 11, 2017 at 10:54:55AM -0800, Steve Longerbeam wrote:
->>
->>
->> On 03/11/2017 10:45 AM, Russell King - ARM Linux wrote:
->>> I really don't think expecting the user to understand and configure
->>> the pipeline is a sane way forward.  Think about it - should the
->>> user need to know that, because they have a bayer-only CSI data
->>> source, that there is only one path possible, and if they try to
->>> configure a different path, then things will just error out?
->>>
->>> For the case of imx219 connected to iMX6, it really is as simple as
->>> "there is only one possible path" and all the complexity of the media
->>> interfaces/subdevs is completely unnecessary.  Every other block in
->>> the graph is just noise.
->>>
->>> The fact is that these dot graphs show a complex picture, but reality
->>> is somewhat different - there's only relatively few paths available
->>> depending on the connected source and the rest of the paths are
->>> completely useless.
->>>
->>
->> I totally disagree there. Raw bayer requires passthrough yes, but for
->> all other media bus formats on a mipi csi-2 bus, and all other media
->> bus formats on 8-bit parallel buses, the conersion pipelines can be
->> used for scaling, CSC, rotation, and motion-compensated de-interlacing.
->
-> ... which only makes sense _if_ your source can produce those formats.
-> We don't actually disagree on that.
+After reading through a bit of code, I am confident that I can
+modify the resolver code to not modify the various phandle
+property values.  There are a few tentacles reaching out to
+other areas that I will have to fix also.  The biggest task
+for me will be to create some good test code.
 
-...and there are lots of those sources! You should try getting out of
-your imx219 shell some time, and have a look around! :)
+I'll be unavailable this week, so I'll start on it in about
+a week.
 
->
-> Let me re-state.  If the source can _only_ produce bayer, then there is
-> _only_ _one_ possible path, and all the overhead of the media controller
-> stuff is totally unnecessary.
->
-> Or, are you going to tell me that the user should have the right to
-> configure paths through the iMX6 hardware that are not permitted by the
-> iMX6 manuals for the data format being produced by the sensor?
-
-Anyway, no the user is not allowed to configure a path that is not
-allowed by the hardware, such as attempting to pass raw bayer through
-an Image Converter path.
-
-I guess you are simply commenting that for users of bayer sensors, the
-other pipelines can be "confusing". But I trust you're not saying those
-other pipelines should therefore not be present, which would be a
-completely nutty argument.
-
-Steve
+-Frank
