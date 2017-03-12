@@ -1,141 +1,89 @@
 From: mchehab@s-opensource.com (Mauro Carvalho Chehab)
-Date: Sun, 12 Mar 2017 18:58:45 -0300
-Subject: [PATCH v4 14/36] [media] v4l2-mc: add a function to inherit
- controls from a pipeline
-In-Reply-To: <fba73c10-4b95-f0d2-e681-0b14ef1fbc1c@gmail.com>
-References: <a7b8e095-a95c-24bd-b1e9-e983f18061c4@xs4all.nl>
- <20170310120902.1daebc7b@vento.lan>
- <5e1183f4-774f-413a-628a-96e0df321faf@xs4all.nl>
- <20170311101408.272a9187@vento.lan>
- <20170311153229.yrdjmggb3p2suhdw@ihha.localdomain>
- <acfb5eca-ff00-6d57-339a-3322034cbdb3@gmail.com>
- <20170311184551.GD21222@n2100.armlinux.org.uk>
- <1f1b350a-5523-34bc-07b7-f3cd2d1fd4c1@gmail.com>
- <20170311185959.GF21222@n2100.armlinux.org.uk>
- <4917d7fb-2f48-17cd-aa2f-d54b0f19ed6e@gmail.com>
- <20170312073745.GI21222@n2100.armlinux.org.uk>
- <fba73c10-4b95-f0d2-e681-0b14ef1fbc1c@gmail.com>
-Message-ID: <20170312185845.5c18ffd0@vento.lan>
+Date: Sun, 12 Mar 2017 19:10:02 -0300
+Subject: [PATCH v5 00/39] i.MX Media Driver
+In-Reply-To: <20170312211324.GW21222@n2100.armlinux.org.uk>
+References: <1489121599-23206-1-git-send-email-steve_longerbeam@mentor.com>
+ <20170312194700.GR21222@n2100.armlinux.org.uk>
+ <20170312175923.6ad86dff@vento.lan>
+ <20170312211324.GW21222@n2100.armlinux.org.uk>
+Message-ID: <20170312191002.5f0a2cff@vento.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Sun, 12 Mar 2017 10:56:53 -0700
-Steve Longerbeam <slongerbeam@gmail.com> escreveu:
+Em Sun, 12 Mar 2017 21:13:24 +0000
+Russell King - ARM Linux <linux@armlinux.org.uk> escreveu:
 
-> On 03/11/2017 11:37 PM, Russell King - ARM Linux wrote:
-> > On Sat, Mar 11, 2017 at 07:31:18PM -0800, Steve Longerbeam wrote:  
+> On Sun, Mar 12, 2017 at 05:59:28PM -0300, Mauro Carvalho Chehab wrote:
+> > Yet, udev/systemd has some rules that provide an unique name for V4L
+> > devices at /lib/udev/rules.d/60-persistent-v4l.rules. Basically, it
+> > runs a small application (v4l_id) with creates a persistent symling
+> > using rules like this:
+> > 
+> > 	KERNEL=="video*", ENV{ID_SERIAL}=="?*", SYMLINK+="v4l/by-id/$env{ID_BUS}-$env{ID_SERIAL}-video-index$attr{index}"
+> > 
+> > Those names are stored at /dev/v4l/by-path.  
+> 
+> This doesn't help:
+> 
+> $ ls -Al /dev/v4l/by-id/
+> total 0
+> lrwxrwxrwx 1 root root 13 Mar 12 19:54 usb-Sonix_Technology_Co.__Ltd._USB_2.0_Camera-video-index0 -> ../../video10
+> $ ls -Al /dev/v4l/by-path/
+> total 0
+> lrwxrwxrwx 1 root root 12 Mar 12 19:54 platform-2040000.vpu-video-index0 -> ../../video0
+> lrwxrwxrwx 1 root root 12 Mar 12 19:54 platform-2040000.vpu-video-index1 -> ../../video1
+> lrwxrwxrwx 1 root root 12 Mar 12 20:53 platform-capture-subsystem-video-index0 -> ../../video2
+> lrwxrwxrwx 1 root root 12 Mar 12 20:53 platform-capture-subsystem-video-index1 -> ../../video3
+> lrwxrwxrwx 1 root root 12 Mar 12 20:53 platform-capture-subsystem-video-index2 -> ../../video4
+> lrwxrwxrwx 1 root root 12 Mar 12 20:53 platform-capture-subsystem-video-index3 -> ../../video5
+> lrwxrwxrwx 1 root root 12 Mar 12 20:53 platform-capture-subsystem-video-index4 -> ../../video6
+> lrwxrwxrwx 1 root root 12 Mar 12 20:53 platform-capture-subsystem-video-index5 -> ../../video7
+> lrwxrwxrwx 1 root root 12 Mar 12 20:53 platform-capture-subsystem-video-index6 -> ../../video8
+> lrwxrwxrwx 1 root root 12 Mar 12 20:53 platform-capture-subsystem-video-index7 -> ../../video9
+> lrwxrwxrwx 1 root root 13 Mar 12 19:54 platform-ci_hdrc.0-usb-0:1:1.0-video-index0 -> ../../video10
+> 
+> The problem is the "platform-capture-subsystem-video-index" entries.
+> These themselves change order.  For instance, I now have:
+> 
+> - entity 72: ipu1_csi0 capture (1 pad, 1 link)
+>              type Node subtype V4L flags 0
+>              device node name /dev/video6
+> 
+> which means it's platform-capture-subsystem-video-index4.  Before, it
+> was platform-capture-subsystem-video-index2.
 
-> > Given what Mauro has said, I'm convinced that the media controller stuff
-> > is a complete failure for usability, and adding further drivers using it
-> > is a mistake.
+That's a driver problem. v4l_id gets information to build the persistent
+name from the result of VIDIOC_QUERYCAP.
 
-I never said that. The thing is that the V4L2 API was designed in
-1999, when the video hardware were a way simpler: just one DMA engine
-on a PCI device, one video/audio input switch and a few video entries.
+In the case of Exynos gsc driver, for example, the information is here:
 
-On those days, setting up a pipeline on such devices is simple, and can be
-done via VIDIOC_*_INPUT ioctls.
+static int gsc_m2m_querycap(struct file *file, void *fh,
+			   struct v4l2_capability *cap)
+{
+	struct gsc_ctx *ctx = fh_to_ctx(fh);
+	struct gsc_dev *gsc = ctx->gsc_dev;
 
-Nowadays hardware used on SoC devices are a way more complex.
+	strlcpy(cap->driver, GSC_MODULE_NAME, sizeof(cap->driver));
+	strlcpy(cap->card, GSC_MODULE_NAME " gscaler", sizeof(cap->card));
+	snprintf(cap->bus_info, sizeof(cap->bus_info), "platform:%s",
+		 dev_name(&gsc->pdev->dev));
+	cap->device_caps = V4L2_CAP_STREAMING | V4L2_CAP_VIDEO_M2M_MPLANE |
+		V4L2_CAP_VIDEO_CAPTURE_MPLANE |	V4L2_CAP_VIDEO_OUTPUT_MPLANE;
 
-SoC devices comes with several DMA engines for buffer transfers, plus
-video transform blocks whose pipeline can be set dynamically.
+	cap->capabilities = cap->device_caps | V4L2_CAP_DEVICE_CAPS;
+	return 0;
+}
 
-The MC API is a need to allow setting a complex pipeline, as
-VIDIOC_*_INPUT cannot work with such complexity.
+See that the bus_info there is filled with:
 
-The subdev API solves a different issue. On a "traditional" device,
-we usually have a pipeline like:
+	snprintf(cap->bus_info, sizeof(cap->bus_info), "platform:%s", dev_name(&gsc->pdev->dev));
 
-<video input> ==> <processing> ==> /dev/video0
+>From the output you printed, it seems that the i.MX6 is just doing:
+	snprintf(cap->bus_info, sizeof(cap->bus_info), "platform:");
+for some devices.
 
-Where <processing> controls something at the device (like
-bright and/or resolution) if you change something at the /dev/video0 
-node, it is clear that the <processing> block should handle it.
+If you change the i.MX6 driver to do the same, you'll likely be able to
+have unique names there too.
 
-On complex devices, with a pipeline like:
-<camera> ==> <processing0> ==> <CSI bus> ==> <processing1> ==> /dev/video0
-
-If you send a command to adjust the something at /dev/video0, it is
-not clear for the device driver to do it at processing0 or at
-processing1. Ok, the driver can decide it, but this can be sub-optimal.
-
-Yet, several drivers do that. For example, with em28xx-based drivers
-several parameters can be adjusted either at the em28xx driver or at
-the video decoder driver (saa711x). There's a logic inside the driver
-that decides it. The pipeline there is fixed, though, so it is
-easy to hardcode a logic for that.
-
-So, I've no doubt that both MC and subdev APIs are needed when full
-hardware control is required.
-
-I don't know about how much flexibility the i.MX6 hardware gives,
-nor if all such flexibility is needed for most use case applications.
-
-If I were to code a driver for such hardware, though, I would try to
-provide a subset of the functionality that would work without the
-subdev API, allowing it to work with standard V4L applications.
-
-That doesn't sound hard to do, as the driver may limit the pipelines
-to a subset that would make sense, in order to make easier for the
-driver to take the right decision about to where send a control
-to setup some parameter.
-
-> I do agree with you that MC places a lot of burden on the user to
-> attain a lot of knowledge of the system's architecture.
-
-Setting up the pipeline is not the hard part. One could write a
-script to do that. 
-
-> That's really  why I included that control inheritance patch, to 
-> ease the burden somewhat.
-
-IMHO, that makes sense, as, once some script sets the pipeline, any
-V4L2 application can work, if you forward the controls to the right
-I2C devices.
-
-> On the other hand, I also think this just requires that MC drivers have
-> very good user documentation.
-
-No, it is not a matter of just documentation. It is a matter of having
-to rewrite applications for each device, as the information exposed by
-MC are not enough for an application to do what's needed.
-
-For a generic application to work properly with MC, we need to have to
-add more stuff to MC, in order to allow applications to know more about
-the features of each subdevice and to things like discovering what kind
-of signal is present on each PAD. We're calling it as "properties API"[1].
-
-[1] we discussed about that at the ML and at the MC workshop:
-	https://linuxtv.org/news.php?entry=2015-08-17.mchehab
-
-Unfortunately, nobody sent any patches implementing it so far :-(
-
-> And my other point is, I think most people who have a need to work with
-> the media framework on a particular platform will likely already be
-> quite familiar with that platform.
-
-I disagree. The most popular platform device currently is Raspberry PI.
-
-I doubt that almost all owners of RPi + camera module know anything
-about MC. They just use Raspberry's official driver with just provides
-the V4L2 interface.
-
-I have a strong opinion that, for hardware like RPi, just the V4L2
-API is enough for more than 90% of the cases.
-
-> The media graph for imx6 is fairly self-explanatory in my opinion.
-> Yes that graph has to be generated, but just with a simple 'media-ctl
-> --print-dot', I don't see how that is difficult for the user.
-
-Again, IMHO, the problem is not how to setup the pipeline, but, instead,
-the need to forward controls to the subdevices.
-
-To use a camera, the user needs to set up a set of controls for the
-image to make sense (bright, contrast, focus, etc). If the driver
-doesn't forward those controls to the subdevs, an application like
-"camorama" won't actually work for real, as the user won't be able
-to adjust those parameters via GUI.
-
-Thanks,
+Regards,
 Mauro
