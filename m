@@ -1,92 +1,66 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 13 Mar 2017 13:10:53 +0000
-Subject: [PATCH] drm: dw_hdmi: Gate audio sampler clock from the
- enablement functions
-In-Reply-To: <724d599e-7285-3feb-9a18-d3fbc4000eb5@synopsys.com>
-References: <20170310093509.19044-1-romain.perier@collabora.com>
- <25ad96a7-d907-2bcb-3a96-15a2956e7652@baylibre.com>
- <20170313093630.GE21222@n2100.armlinux.org.uk>
- <724d599e-7285-3feb-9a18-d3fbc4000eb5@synopsys.com>
-Message-ID: <20170313131053.GI21222@n2100.armlinux.org.uk>
+From: sakari.ailus@iki.fi (Sakari Ailus)
+Date: Mon, 13 Mar 2017 15:16:48 +0200
+Subject: [PATCH v4 29/36] media: imx: mipi-csi2: enable setting and
+ getting of frame rates
+In-Reply-To: <1487667023.2331.8.camel@pengutronix.de>
+References: <1487211578-11360-1-git-send-email-steve_longerbeam@mentor.com>
+ <1487211578-11360-30-git-send-email-steve_longerbeam@mentor.com>
+ <20170220220409.GX16975@valkosipuli.retiisi.org.uk>
+ <20170221001332.GS21222@n2100.armlinux.org.uk>
+ <25596b21-70de-5e46-f149-f9ce3a86ecb7@gmail.com>
+ <1487667023.2331.8.camel@pengutronix.de>
+Message-ID: <20170313131647.GB10701@valkosipuli.retiisi.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 13, 2017 at 12:55:58PM +0000, Jose Abreu wrote:
-> Hi,
-> 
-> 
-> On 13-03-2017 09:36, Russell King - ARM Linux wrote:
-> > On Mon, Mar 13, 2017 at 10:27:08AM +0100, Neil Armstrong wrote:
-> >> On 03/10/2017 10:35 AM, Romain Perier wrote:
-> >>> Currently, the audio sampler clock is enabled from dw_hdmi_setup() at
-> >>> step E. and is kept enabled for later use. This clock should be enabled
-> >>> and disabled along with the actual audio stream and not always on (that
-> >>> is bad for PM). Futhermore, this might cause sound glitches with some
-> >>> HDMI devices, as the CTS+N is forced to zero when the stream is disabled
-> >>> while the audio clock is still running.
-> >>>
-> >>> This commit adds a parameter to hdmi_audio_enable_clk() that controls
-> >>> when the audio sample clock must be enabled or disabled. Then, it moves
-> >>> the call to this function into dw_hdmi_audio_enable() and
-> >>> dw_hdmi_audio_disable().
-> >>>
-> >>> Signed-off-by: Romain Perier <romain.perier@collabora.com>
-> >>> ---
-> >>>  drivers/gpu/drm/bridge/dw-hdmi.c | 15 +++++++++------
-> >>>  1 file changed, 9 insertions(+), 6 deletions(-)
-> >>>
-> >> Hi Romain, Russell, Jose,
-> >>
-> >> This is a little out of scope, but I was wondering why the CTS calculation
-> >> was not left in AUTO mode in the dw-hdmi driver ?
-> > There is no indication in the iMX6 manuals that the iMX6 supports
-> > automatic CTS calculation.  Bits 7:4 of the AUD_CTS3 register are
-> > marked as "reserved".
-> >
-> > We're reliant on the information in the iMX6 manuals as we don't have
-> > access to Synopsis' databooks for these parts (I understand you have
-> > to be a customer to have access to that.)
-> >
-> 
-> (Synopsis -> Synopsys :))
-> 
-> Trying to catch up with the conversation:
-> 
-> 1) In AHB audio mode the bits are always reserved.
-> 2) I think we should enable/disable clock instead of just forcing
-> N/CTS, though, I don't know what could be the implications for
-> iMX platform. I remember at the time I tested this using I2S
-> (I've never used AHB), and HDMI protocol analyzers were
-> complaining about the N/CTS being forced to zero.
+Hi Philipp,
 
-What you're recommending is to basically ignore the published workaround,
-which, presumably, was arrived at by proper analysis of the issue both
-by Freescale engineers and Synopsys engineers, and instead try some other
-solution.
+On Tue, Feb 21, 2017 at 09:50:23AM +0100, Philipp Zabel wrote:
+...
+> > > Then there's the issue where, if you have this setup:
+> > >
+> > >  camera --> csi2 receiver --> csi --> capture
+> > >
+> > > and the "csi" subdev can skip frames, you need to know (a) at the CSI
+> > > sink pad what the frame rate is of the source (b) what the desired
+> > > source pad frame rate is, so you can configure the frame skipping.
+> > > So, does the csi subdev have to walk back through the media graph
+> > > looking for the frame rate?  Does the capture device have to walk back
+> > > through the media graph looking for some subdev to tell it what the
+> > > frame rate is - the capture device certainly can't go straight to the
+> > > sensor to get an answer to that question, because that bypasses the
+> > > effect of the CSI frame skipping (which will lower the frame rate.)
+> > >
+> > > IMHO, frame rate is just another format property, just like the
+> > > resolution and data format itself, and v4l2 should be treating it no
+> > > differently.
+> > >
+> > 
+> > I agree, frame rate, if indicated/specified by both sides of a link,
+> > should match. So maybe this should be part of v4l2 link validation.
+> > 
+> > This might be a good time to propose the following patch.
+> 
+> I agree with Steve and Russell. I don't see why the (nominal) frame
+> interval should be handled differently than resolution, data format, and
+> colorspace information. I think it should just be propagated in the same
+> way, and there is no reason to have two connected pads set to a
+> different interval. That would make implementing the g/s_frame_interval
+> subdev calls mandatory.
 
-I'm not sure that's a good idea.  Only those with knowledge of the IP can
-say what effect disabling the audio clock will have: will it still allow
-the FIFO to be loaded, as required by the errata?  If not, it's not a
-solution that AHB can use.  I would imagine that _if_ it was as simple as
-disabling the audio clock, that simple approach would have been documented
-in Freescale's errata documents, rather than the rather more complex
-method of zeroing the CTS/N values.
+The vast majority of existing drivers do not implement them nor the user
+space expects having to set them. Making that mandatory would break existing
+user space.
 
-I think there are two choices here:
-
-1) get some definitive information about the IP and the errata for AHB,
-   and determine whether the solution you propose would work.  (That's
-   out of scope for me, I've no contacts with FSL/NXP and I'm not a
-   Synopsys customer.)
-
-2) the I2S audio support stops re-using the AHB audio support functions,
-   switching to their own implementation that behaves correctly for them.
-   (Remember, it was I2S's choice to re-use the AHB audio support functions
-   I added which we're now discussing - they didn't have to do that, and
-   regressing AHB audio just for I2S is not something we should ever
-   consider doing.)
+In addition, that does not belong to link validation either: link validation
+should only include static properties of the link that are required for
+correct hardware operation. Frame rate is not such property: hardware that
+supports the MC interface generally does not recognise such concept (with
+the exception of some sensors). Additionally, it is dynamic: the frame rate
+can change during streaming, making its validation at streamon time useless.
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Regards,
+
+Sakari Ailus
+e-mail: sakari.ailus at iki.fi	XMPP: sailus at retiisi.org.uk
