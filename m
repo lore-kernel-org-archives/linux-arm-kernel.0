@@ -1,63 +1,57 @@
-From: gmbnomis@gmail.com (Simon Baatz)
-Date: Mon, 13 Mar 2017 21:43:44 +0100
-Subject: [PATCH] mtd: nand: orion: fix clk handling
-In-Reply-To: <20170313071241.y5ydl274t22awrys@pengutronix.de>
-References: <20170312213406.20987-1-gmbnomis@gmail.com>
- <20170313071241.y5ydl274t22awrys@pengutronix.de>
-Message-ID: <20170313204344.GA24471@gandalf>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Mon, 13 Mar 2017 16:48:02 -0400
+Subject: [PATCH V4 0/3] PCI/ASPM: reconfigure ASPM following hotplug for
+ POLICY_DEFAULT
+Message-ID: <1489438085-2055-1-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Uwe,
+y
+(POLICY_DEFAULT), current code is querying the enable/disable
+states from ASPM registers to determine the policy.
 
-On Mon, Mar 13, 2017 at 08:12:41AM +0100, Uwe Kleine-K?nig wrote:
-> Hello Simon,
-> 
-> On Sun, Mar 12, 2017 at 10:34:06PM +0100, Simon Baatz wrote:
-> > The clk handling in orion_nand.c had two problems:
-> > 
-> > - In the probe function, clk_put() was called for an enabled clock,
-> >   which violates the API (see documentation for clk_put() in
-> >   include/linux/clk.h)
-> > 
-> > - In the error path of the probe function, clk_put() could be called
-> >   twice for the same clock.
-> > 
-> > In order to clean this up, use the managed function devm_clk_get() and
-> > store the pointer to the clk in the driver data.
+For example, a BIOS could set the power saving state to performance
+and clear all ASPM control registers. A balanced ASPM policy could
+enable L0s and disable L1. A power conscious BIOS could enable both
+L0s and L1 to trade off latency and performance vs. power.
 
-...
+After hotplug removal, pcie_aspm_exit_link_state() function clears
+the ASPM registers. An insertion following hotplug removal reads
+incorrect policy as ASPM disabled even though ASPM was enabled
+during boot.
 
-> >  	/* Not all platforms can gate the clock, so it is not
-> >  	   an error if the clock does not exists. */
-> > -	clk = clk_get(&pdev->dev, NULL);
-> > -	if (!IS_ERR(clk)) {
-> > -		clk_prepare_enable(clk);
-> > -		clk_put(clk);
-> > -	}
-> > +	info->clk = devm_clk_get(&pdev->dev, NULL);
-> > +	if (!IS_ERR(info->clk))
-> > +		clk_prepare_enable(info->clk);
-> 
-> Orthogonal to your patch I suggest:
-> 
-> -	info->clk = devm_clk_get(&pdev->dev, NULL);
-> -	if (!IS_ERR(info->clk))
-> -		clk_prepare_enable(info->clk);
-> +	info->clk = devm_clk_get_optional(&pdev->dev, NULL);
-> +	if (IS_ERR(info->clk)) {
-> +		ret = PTR_ERR(info->clk);
-> +		if (ret != -EPROBE_DEFER)
-> +			dev_err(...);
-> +		return ret;
-> +	}
-> 
-> to correct error handling.
-> (I didn't check if a plain return is right here, and also other users of
-> info->clk need adaption.)
+This is caused by the fact that same function is used for reconfiguring
+ASPM regardless of the of the power on state.
 
-Nice! However, I can't find a devm_clk_get_optional() anywhere(?) Is
-it in some upcoming patch?
+------------------------
+Changes from v3 (https://lkml.org/lkml/2017/3/8/670)
+------------------------
+- call pcie_aspm_init_link_state() for every device, maybe from
+pci_init_capabilities()
 
+- for bridges, have pcie_aspm_init_link_state() allocate a
+link_state, regardless of whether it currently has any children,
+and save the ASPM settings done by firmware
 
-- Simon
+- for endpoints, have pcie_aspm_init_link_state() do the actual ASPM
+setup of the link as it currently does
+
+- for endpoints, change pcie_aspm_exit_link_state() so it cleans up
+the device's own state and disables ASPM if necessary, but doesn't
+remove the parent's link_state
+
+- for bridges, change pcie_aspm_exit_link_state() so it frees the
+bridge's own link_state
+
+Sinan Kaya (3):
+  PCI/ASPM: divide ASPM capability init into pre and post init
+  PCI/ASPM: move part of ASPM initialization to pci_init_capabilities
+  PCI/ASPM: move link_state cleanup to bridge remove
+
+ drivers/pci/pcie/aspm.c | 175 +++++++++++++++++++++++++++++++++++-------------
+ drivers/pci/probe.c     |   3 +
+ include/linux/pci.h     |   6 ++
+ 3 files changed, 136 insertions(+), 48 deletions(-)
+
+-- 
+1.9.1
