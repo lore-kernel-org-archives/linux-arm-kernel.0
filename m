@@ -1,5 +1,5 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Mon, 13 Mar 2017 12:08:14 +0100
+From: mchehab@s-opensource.com (Mauro Carvalho Chehab)
+Date: Mon, 13 Mar 2017 08:42:15 -0300
 Subject: [PATCH v4 14/36] [media] v4l2-mc: add a function to inherit
  controls from a pipeline
 In-Reply-To: <20170313105842.GG21222@n2100.armlinux.org.uk>
@@ -14,58 +14,49 @@ References: <20170311101408.272a9187@vento.lan>
  <fba73c10-4b95-f0d2-e681-0b14ef1fbc1c@gmail.com>
  <734a1731-3fb6-b8cd-6806-5405bd21bf83@xs4all.nl>
  <20170313105842.GG21222@n2100.armlinux.org.uk>
-Message-ID: <cb64ae8e-2047-61fb-81bd-2373decbd45e@xs4all.nl>
+Message-ID: <20170313084215.7eb6a054@vento.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/13/2017 11:58 AM, Russell King - ARM Linux wrote:
+Em Mon, 13 Mar 2017 10:58:42 +0000
+Russell King - ARM Linux <linux@armlinux.org.uk> escreveu:
+
 > On Mon, Mar 13, 2017 at 11:44:50AM +0100, Hans Verkuil wrote:
->> On 03/12/2017 06:56 PM, Steve Longerbeam wrote:
->>> In summary, I do like the media framework, it's a good abstraction of
->>> hardware pipelines. It does require a lot of system level knowledge to
->>> configure, but as I said that is a matter of good documentation.
->>
->> And the reason we went into this direction is that the end-users that use
->> these SoCs with complex pipelines actually *need* this functionality. Which
->> is also part of the reason why work on improved userspace support gets
->> little attention: they don't need to have a plugin that allows generic V4L2
->> applications to work (at least with simple scenarios).
+> > On 03/12/2017 06:56 PM, Steve Longerbeam wrote:  
+> > > In summary, I do like the media framework, it's a good abstraction of
+> > > hardware pipelines. It does require a lot of system level knowledge to
+> > > configure, but as I said that is a matter of good documentation.  
+> > 
+> > And the reason we went into this direction is that the end-users that use
+> > these SoCs with complex pipelines actually *need* this functionality. Which
+> > is also part of the reason why work on improved userspace support gets
+> > little attention: they don't need to have a plugin that allows generic V4L2
+> > applications to work (at least with simple scenarios).  
 > 
 > If you stop inheriting controls from the capture sensor to the v4l2
 > capture device, then this breaks - generic v4l2 applications are not
 > going to be able to show the controls, because they're not visible at
 > the v4l2 capture device anymore.  They're only visible through the
 > subdev interfaces, which these generic applications know nothing about.
-> 
->> If you want to blame anyone for this, blame Nokia who set fire to
->> their linux-based phones and thus to the funding for this work.
-> 
-> No, I think that's completely unfair to Nokia.  If the MC approach is
-> the way you want to go, you should be thanking Nokia for the amount of
-> effort that they have put in to it, and recognising that it was rather
-> unfortunate that the market had changed, which meant that they weren't
-> able to continue.
-> 
-> No one has any right to require any of us to finish what we start
-> coding up in open source, unless there is a contractual obligation in
-> place.  That goes for Nokia too.
-> 
-> Nokia's decision had ramifications far and wide (resulting in knock on
-> effects in TI and further afield), so don't think for a moment I wasn't
-> affected by what happened in Nokia.  Even so, it was a decision for
-> Nokia to make, they had the right to make it, and we have no right to
-> attribute "blame" to Nokia for having made that decision.
-> 
-> To even suggest that Nokia should be blamed is absurd.
-> 
-> Open source gives rights to everyone.  It gives rights to contribute
-> and use, but it also gives rights to walk away without notice (remember
-> the "as is" and "no warranty" clauses?)
 
-Sorry, unfortunate choice of words. While it lasted they did great work.
-But the reason why MC development stopped for quite some time (esp. the
-work on userspace software) was because the funding from Nokia dried up.
+True. That's why IMHO, the best is to do control inheritance when
+there are use cases for generic applications and is possible for
+the driver to do it (e. g. when the pipeline is not too complex
+to prevent it to work).
 
-Regards,
+As Hans said, for the drivers currently upstreamed at drivers/media,
+there are currently very little interest on running generic apps 
+there, as they're meant to be used inside embedded hardware using
+specialized applications.
 
-	Hans
+I don't have myself any hardware with i.MX6. Yet, I believe that
+a low cost board like SolidRun Hummingboard - with comes with a 
+CSI interface compatible with RPi camera modules - will likely
+attract users who need to run generic applications on their
+devices.
+
+So, I believe that it makes sense for i.MX6 driver to inherit
+controls from video devnode.
+
+Thanks,
+Mauro
