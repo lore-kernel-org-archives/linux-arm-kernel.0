@@ -1,37 +1,61 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 13 Mar 2017 14:36:41 +0100
-Subject: [PATCH] ARM: dts: imx: add Gateworks Ventana GW5904 support
-In-Reply-To: <CAJ+vNU0JNQuQEmG_oCu86cbG_wisVFRETNtCO1bC2ytMM+N2Vg@mail.gmail.com>
-References: <1489178411-6559-1-git-send-email-tharvey@gateworks.com>
- <04584d61-f1e2-3722-1f13-ff133edc0c22@gmail.com>
- <CAJ+vNU1NcW=y_c-jJBnAaOozrzYJAekd9BEiMdd2=Bpx=Ng79Q@mail.gmail.com>
- <b105d1ea-7975-bd21-0aa0-762060ceb62a@gmail.com>
- <20170311030426.GB6677@lunn.ch>
- <CAJ+vNU0JNQuQEmG_oCu86cbG_wisVFRETNtCO1bC2ytMM+N2Vg@mail.gmail.com>
-Message-ID: <20170313133641.GC748@lunn.ch>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Mon, 13 Mar 2017 19:13:21 +0530
+Subject: [PATCH v4 0/7] PCI: dwc: Miscellaneous fixes and cleanups
+Message-ID: <20170313134328.1588-1-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Thanks for the hint on the compatibility. I wonder if
-> Documentation/devicetree/bindings/net/dsa/marvell.txt should have some
-> notes added about switch device compatibility? It wasn't clear to me
-> that these would be compatible.
+This should be the final set of cleanups/fixes before endpoint
+support can be merged.
 
-Hi Tim
+Keerthy's patch is a general fix in dra7xx driver and is not
+directly related to endpoint mode.
 
-This keeps coming up, so i plan on submitting a patch. I thought it
-would be obvious. The driver supports over 20 Marvell switches, yet
-only has two compatible strings. It is not too big a leap to figure
-out they must all be compatible, or there would be 20 compatible
-strings....
+This v1 of this series was previously sent with a different
+cover letter $subject [1]
 
-> What is the convention, if any, of the naming of the 'lan' ports (0
-> based vs 1 based, eth vs lan)? Is it strictly up to the board vendor?
-> The board I'm supporting has a silkscreen that shows 'Port 1' through
-> 'Port 4' so I was leaning towards 1 based.
+Changes from v3:
+*) instead of changing all the callers of dbi accessors (taking
+   dbi_base and size), manage it using static inline as suggested
+   by Niklas (used static inline instead of macros because of
+   checkpatch error).
 
-I recommend following what the label on the housing says. If you don't
-have a housing, just a board, follow the silk screen, and hope the
-designer of the housing also follows the silk screen.
+Changes from v2:
+*) Kconfig changes that was spilled into a patch is removed.
+*) In addition to renaming _unroll() to _ob_unroll(), all the
+   _unroll configurations is also moved a separate function.
 
-	 Andrew
+Changes from v1:
+*) included a patch to rename _unroll() to _ob_unroll() as
+   similar thing has to be done for inbound window in the case
+   of EP mode.
+*) used 'size_t' instead of 'int' for specifying the size
+   in read_dbi/write_dbi function arguments.
+*) Populate cpu_addr_fixup ops for artpec6 as suggested by
+   Niklas
+
+This series is based on 4.11-rc1
+
+[1] -> https://lkml.org/lkml/2017/2/16/270
+
+Keerthy (1):
+  PCI: dwc: dra7xx: Push request_irq call to the bottom of probe
+
+Kishon Vijay Abraham I (6):
+  PCI: dwc: designware: Add new *ops* for cpu addr fixup
+  PCI: dwc: dra7xx: Populate cpu_addr_fixup ops
+  PCI: dwc: artpec6: Populate cpu_addr_fixup ops
+  PCI: dwc: all: Modify dbi accessors to take dbi_base as argument
+  PCI: dwc: all: Modify dbi accessors to access data of  4/2/1 bytes
+  PCI: dwc: designware: Move _unroll configurations to a separate
+    function
+
+ drivers/pci/dwc/pci-dra7xx.c      |  25 +++----
+ drivers/pci/dwc/pci-exynos.c      |  14 ++--
+ drivers/pci/dwc/pcie-artpec6.c    |  15 +++--
+ drivers/pci/dwc/pcie-designware.c | 133 ++++++++++++++++++++++++--------------
+ drivers/pci/dwc/pcie-designware.h |  23 +++++--
+ 5 files changed, 135 insertions(+), 75 deletions(-)
+
+-- 
+2.11.0
