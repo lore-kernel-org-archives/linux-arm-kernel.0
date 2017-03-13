@@ -1,64 +1,76 @@
-From: thor.thayer@linux.intel.com (Thor Thayer)
-Date: Mon, 13 Mar 2017 10:27:13 -0500
-Subject: [PATCHv2 4/5] mfd: altr_a10sr: Add Arria10 DevKit Reset Controller
-In-Reply-To: <1489416132.2288.70.camel@pengutronix.de>
-References: <1487783419-10912-1-git-send-email-thor.thayer@linux.intel.com>
- <1487783419-10912-5-git-send-email-thor.thayer@linux.intel.com>
- <1488292941.2288.55.camel@pengutronix.de>
- <31abf03e-a3e6-70ef-58f9-dc2950da5ee7@linux.intel.com>
- <1489416132.2288.70.camel@pengutronix.de>
-Message-ID: <f3435665-5152-e2fb-9aa0-7cdd2180e7f0@linux.intel.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 13 Mar 2017 16:55:12 +0100
+Subject: [PATCH V5 2/9] drivers: cpu: Setup CPU devices to do runtime PM
+In-Reply-To: <1488573695-106680-3-git-send-email-lina.iyer@linaro.org>
+References: <1488573695-106680-1-git-send-email-lina.iyer@linaro.org>
+ <1488573695-106680-3-git-send-email-lina.iyer@linaro.org>
+Message-ID: <CAPDyKFq6NP9uKPQJ7y6w9a3u071L-4e3e4hPaS8nuhnexKnJbA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/13/2017 09:42 AM, Philipp Zabel wrote:
-> On Thu, 2017-03-09 at 10:03 -0600, Thor Thayer wrote:
->> Hi Lee,
->>
->> On 02/28/2017 08:42 AM, Philipp Zabel wrote:
->>> On Wed, 2017-02-22 at 11:10 -0600, thor.thayer at linux.intel.com wrote:
->>>> From: Thor Thayer <thor.thayer@linux.intel.com>
->>>>
->>>> Add Peripheral PHY Reset Controller to the Arria10
->>>> Development Kit System Resource Chip's MFD.
->>>>
->>>> Signed-off-by: Thor Thayer <thor.thayer@linux.intel.com>
->>>> ---
->>>> v2  Changes to commit header & body for clarification.
->>>> ---
->>>>  drivers/mfd/altera-a10sr.c | 4 ++++
->>>>  1 file changed, 4 insertions(+)
->>>>
->>>> diff --git a/drivers/mfd/altera-a10sr.c b/drivers/mfd/altera-a10sr.c
->>>> index 06e1f7f..96e7d2c 100644
->>>> --- a/drivers/mfd/altera-a10sr.c
->>>> +++ b/drivers/mfd/altera-a10sr.c
->>>> @@ -33,6 +33,10 @@
->>>>  		.name = "altr_a10sr_gpio",
->>>>  		.of_compatible = "altr,a10sr-gpio",
->>>>  	},
->>>> +	{
->>>> +		.name = "altr_a10sr_reset",
->>>> +		.of_compatible = "altr,a10sr-reset",
->>>> +	},
->>>>  };
->>>>
->>>>  static bool altr_a10sr_reg_readable(struct device *dev, unsigned int reg)
->>>
->>> Lee, should this be merged through the reset tree? Otherwise I'll just
->>> pick up patches 1-3.
+On 3 March 2017 at 21:41, Lina Iyer <lina.iyer@linaro.org> wrote:
+> CPU devices just like any other device, can do runtime PM. However, CPU
+> devices may only do runtime only when IRQs are disabled. The devices
+> must be set as IRQ safe.
 >
-> I have picked up patches 1-3, but I only just noticed that patch 1 also
-> would require Lee's ack for me to submit this.
+> Cc: Kevin Hilman <khilman@kernel.org>
+> Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
+> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+> ---
+>  drivers/base/cpu.c | 15 +++++++++++++++
+>  1 file changed, 15 insertions(+)
 >
-> regards
-> Philipp
+> diff --git a/drivers/base/cpu.c b/drivers/base/cpu.c
+> index 2c3b359..77451ad 100644
+> --- a/drivers/base/cpu.c
+> +++ b/drivers/base/cpu.c
+> @@ -18,6 +18,7 @@
+>  #include <linux/cpufeature.h>
+>  #include <linux/tick.h>
+>  #include <linux/pm_qos.h>
+> +#include <linux/pm_runtime.h>
 >
-OK. Thanks Philipp.
+>  #include "base.h"
+>
+> @@ -345,6 +346,19 @@ static int cpu_uevent(struct device *dev, struct kobj_uevent_env *env)
+>  }
+>  #endif
+>
+> +#ifdef CONFIG_PM
+> +static void cpu_runtime_pm_init(struct device *dev)
+> +{
+> +       pm_runtime_irq_safe(dev);
+> +       pm_runtime_enable(dev);
+> +       if (cpu_online(dev->id))
+> +               pm_runtime_set_active(dev);
 
-FWIW, Patch 1 was acked by Rob Herring on 2/27/2017 although I 
-understand that Lee may want a say in this as well.
+You shouldn't change the runtime PM status of the device when runtime
+PM is enabled. Instead do that before you call pm_runtime_enable().
 
-Thanks again for reviewing and picking up those patches!
+> +}
+> +#else
+> +static void cpu_runtime_pm_init(struct device *dev)
 
-Thor
+There is no need for a stub function, as the runtime PM API already
+provides stubs for when CONFIG_PM is unset.
+
+> +{ }
+> +#endif
+> +
+>  /*
+>   * register_cpu - Setup a sysfs device for a CPU.
+>   * @cpu - cpu->hotpluggable field set to 1 will generate a control file in
+> @@ -379,6 +393,7 @@ int register_cpu(struct cpu *cpu, int num)
+>         register_cpu_under_node(num, cpu_to_node(num));
+>         dev_pm_qos_expose_latency_limit(&cpu->dev, 0);
+>
+> +       cpu_runtime_pm_init(&cpu->dev);
+>         return 0;
+>  }
+>
+> --
+> 2.7.4
+>
+
+Kind regards
+Uffe
