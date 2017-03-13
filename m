@@ -1,122 +1,144 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Mon, 13 Mar 2017 19:52:41 +0530
-Subject: [PATCH v4 05/23] PCI: endpoint: Create configfs entry for EPC device
- and EPF driver
+Date: Mon, 13 Mar 2017 19:52:40 +0530
+Subject: [PATCH v4 04/23] Documentation: PCI: Guide to use pci endpoint
+ configfs
 In-Reply-To: <20170313142259.25397-1-kishon@ti.com>
 References: <20170313142259.25397-1-kishon@ti.com>
-Message-ID: <20170313142259.25397-6-kishon@ti.com>
+Message-ID: <20170313142259.25397-5-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Invoke API's provided by pci-ep-cfs to create configfs entry for
-every EPC device and EPF driver to help users in creating EPF device
-and binding the EPF device to the EPC device.
+Add Documentation to help users use pci endpoint to configure
+pci endpoint function and to bind the endpoint function
+with endpoint controller.
 
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- drivers/pci/endpoint/pci-epc-core.c | 4 ++++
- drivers/pci/endpoint/pci-epf-core.c | 4 ++++
- include/linux/pci-epc.h             | 2 ++
- include/linux/pci-epf.h             | 2 ++
- 4 files changed, 12 insertions(+)
+ Documentation/PCI/00-INDEX                      |   2 +
+ Documentation/PCI/endpoint/pci-endpoint-cfs.txt | 105 ++++++++++++++++++++++++
+ 2 files changed, 107 insertions(+)
+ create mode 100644 Documentation/PCI/endpoint/pci-endpoint-cfs.txt
 
-diff --git a/drivers/pci/endpoint/pci-epc-core.c b/drivers/pci/endpoint/pci-epc-core.c
-index 06808ed7ee1f..29cbe9a73b30 100644
---- a/drivers/pci/endpoint/pci-epc-core.c
-+++ b/drivers/pci/endpoint/pci-epc-core.c
-@@ -24,6 +24,7 @@
- 
- #include <linux/pci-epc.h>
- #include <linux/pci-epf.h>
-+#include <linux/pci-ep-cfs.h>
- 
- static struct class *pci_epc_class;
- 
-@@ -441,6 +442,7 @@ EXPORT_SYMBOL_GPL(pci_epc_linkup);
-  */
- void pci_epc_destroy(struct pci_epc *epc)
- {
-+	pci_ep_cfs_remove_epc_group(epc->group);
- 	device_unregister(&epc->dev);
- 	kfree(epc);
- }
-@@ -507,6 +509,8 @@ __pci_epc_create(struct device *dev, const struct pci_epc_ops *ops,
- 	if (ret)
- 		goto put_dev;
- 
-+	epc->group = pci_ep_cfs_add_epc_group(dev_name(dev));
+diff --git a/Documentation/PCI/00-INDEX b/Documentation/PCI/00-INDEX
+index ba950b296bd8..f84a23c7c74b 100644
+--- a/Documentation/PCI/00-INDEX
++++ b/Documentation/PCI/00-INDEX
+@@ -14,3 +14,5 @@ pcieaer-howto.txt
+ 	- the PCI Express Advanced Error Reporting Driver Guide HOWTO
+ endpoint/pci-endpoint.txt
+ 	- guide to add endpoint controller driver and endpoint function driver.
++endpoint/pci-endpoint-cfs.txt
++	- guide to use configfs to configure the pci endpoint function.
+diff --git a/Documentation/PCI/endpoint/pci-endpoint-cfs.txt b/Documentation/PCI/endpoint/pci-endpoint-cfs.txt
+new file mode 100644
+index 000000000000..8b2a8280b131
+--- /dev/null
++++ b/Documentation/PCI/endpoint/pci-endpoint-cfs.txt
+@@ -0,0 +1,105 @@
++                   CONFIGURING PCI ENDPOINT USING CONFIGFS
++                    Kishon Vijay Abraham I <kishon@ti.com>
 +
- 	return epc;
- 
- put_dev:
-diff --git a/drivers/pci/endpoint/pci-epf-core.c b/drivers/pci/endpoint/pci-epf-core.c
-index 4c903fc1cd30..9ec1639ef749 100644
---- a/drivers/pci/endpoint/pci-epf-core.c
-+++ b/drivers/pci/endpoint/pci-epf-core.c
-@@ -24,6 +24,7 @@
- 
- #include <linux/pci-epc.h>
- #include <linux/pci-epf.h>
-+#include <linux/pci-ep-cfs.h>
- 
- static struct bus_type pci_epf_bus_type;
- static struct device_type pci_epf_type;
-@@ -143,6 +144,7 @@ EXPORT_SYMBOL_GPL(pci_epf_alloc_space);
-  */
- void pci_epf_unregister_driver(struct pci_epf_driver *driver)
- {
-+	pci_ep_cfs_remove_epf_group(driver->group);
- 	driver_unregister(&driver->driver);
- }
- EXPORT_SYMBOL_GPL(pci_epf_unregister_driver);
-@@ -172,6 +174,8 @@ int __pci_epf_register_driver(struct pci_epf_driver *driver,
- 	if (ret)
- 		return ret;
- 
-+	driver->group = pci_ep_cfs_add_epf_group(driver->driver.name);
++The PCI Endpoint Core exposes configfs entry (pci_ep) in order to configure the
++PCI endpoint function and in order to bind the endpoint function
++with the endpoint controller. (For introducing other mechanisms to
++configure the PCI Endpoint Function refer [1]).
 +
- 	return 0;
- }
- EXPORT_SYMBOL_GPL(__pci_epf_register_driver);
-diff --git a/include/linux/pci-epc.h b/include/linux/pci-epc.h
-index ad0cd465737e..d6eb32291462 100644
---- a/include/linux/pci-epc.h
-+++ b/include/linux/pci-epc.h
-@@ -77,6 +77,7 @@ struct pci_epc_mem {
-  * @ops: function pointers for performing endpoint operations
-  * @mem: address space of the endpoint controller
-  * @max_functions: max number of functions that can be configured in this EPC
-+ * @group: configfs group representing the PCI EPC device
-  * @lock: spinlock to protect pci_epc ops
-  */
- struct pci_epc {
-@@ -85,6 +86,7 @@ struct pci_epc {
- 	const struct pci_epc_ops	*ops;
- 	struct pci_epc_mem		*mem;
- 	u8				max_functions;
-+	struct config_group		*group;
- 	/* spinlock to protect against concurrent access of EP controller */
- 	spinlock_t			lock;
- };
-diff --git a/include/linux/pci-epf.h b/include/linux/pci-epf.h
-index 54f133868a6e..5ff2c5a592c3 100644
---- a/include/linux/pci-epf.h
-+++ b/include/linux/pci-epf.h
-@@ -82,6 +82,7 @@ struct pci_epf_ops {
-  * @driver: PCI EPF driver
-  * @ops: set of function pointers for performing EPF operations
-  * @owner: the owner of the module that registers the PCI EPF driver
-+ * @group: configfs group corresponding to the PCI EPF driver
-  * @id_table: identifies EPF devices for probing
-  */
- struct pci_epf_driver {
-@@ -91,6 +92,7 @@ struct pci_epf_driver {
- 	struct device_driver	driver;
- 	struct pci_epf_ops	*ops;
- 	struct module		*owner;
-+	struct config_group	*group;
- 	const struct pci_epf_device_id	*id_table;
- };
- 
++*) Mounting configfs
++
++The PCI Endpoint Core layer creates pci_ep directory in the mounted configfs
++directory. configfs can be mounted using the following command.
++
++	mount -t configfs none /sys/kernel/config
++
++*) Directory Structure
++
++The pci_ep configfs has two directories at its root: controllers and
++functions. Every EPC device present in the system will have an entry in
++the *controllers* directory and and every EPF driver present in the system
++will have an entry in the *functions* directory.
++
++/sys/kernel/config/pci_ep/
++	.. controllers/
++	.. functions/
++
++*) Creating EPF Device
++
++Every registered EPF driver will be listed in controllers directory. The
++entries corresponding to EPF driver will be created by the EPF core.
++
++/sys/kernel/config/pci_ep/functions/
++	.. <EPF Driver1>/
++		... <EPF Device 11>/
++		... <EPF Device 21>/
++	.. <EPF Driver2>/
++		... <EPF Device 12>/
++		... <EPF Device 22>/
++
++In order to create a <EPF device> of the type probed by <EPF Driver>, the
++user has to create a directory inside <EPF DriverN>.
++
++Every <EPF device> directory consists of the following entries that can be
++used to configure the standard configuration header of the endpoint function.
++(These entries are created by the framework when any new <EPF Device> is
++created)
++
++	.. <EPF Driver1>/
++		... <EPF Device 11>/
++			... vendorid
++			... deviceid
++			... revid
++			... progif_code
++			... subclass_code
++			... baseclass_code
++			... cache_line_size
++			... subsys_vendor_id
++			... subsys_id
++			... interrupt_pin
++
++*) EPC Device
++
++Every registered EPC device will be listed in controllers directory. The
++entries corresponding to EPC device will be created by the EPC core.
++
++/sys/kernel/config/pci_ep/controllers/
++	.. <EPC Device1>/
++		... <Symlink EPF Device11>/
++		... <Symlink EPF Device12>/
++		... start
++	.. <EPC Device2>/
++		... <Symlink EPF Device21>/
++		... <Symlink EPF Device22>/
++		... start
++
++The <EPC Device> directory will have a list of symbolic links to
++<EPF Device>. These symbolic links should be created by the user to
++represent the functions present in the endpoint device.
++
++The <EPC Device> directory will also have a *start* field. Once
++"1" is written to this field, the endpoint device will be ready to
++establish the link with the host. This is usually done after
++all the EPF devices are created and linked with the EPC device.
++
++
++			 | controllers/
++				| <Directory: EPC name>/
++					| <Symbolic Link: Function>
++					| start
++			 | functions/
++				| <Directory: EPF driver>/
++					| <Directory: EPF device>/
++						| vendorid
++						| deviceid
++						| revid
++						| progif_code
++						| subclass_code
++						| baseclass_code
++						| cache_line_size
++						| subsys_vendor_id
++						| subsys_id
++						| interrupt_pin
++						| function
++
++[1] -> Documentation/PCI/endpoint/pci-endpoint.txt
 -- 
 2.11.0
