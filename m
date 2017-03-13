@@ -1,57 +1,135 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon, 13 Mar 2017 16:48:02 -0400
-Subject: [PATCH V4 0/3] PCI/ASPM: reconfigure ASPM following hotplug for
- POLICY_DEFAULT
-Message-ID: <1489438085-2055-1-git-send-email-okaya@codeaurora.org>
+Date: Mon, 13 Mar 2017 16:48:03 -0400
+Subject: [PATCH V4 1/3] PCI/ASPM: divide ASPM capability init into pre and
+ post init
+In-Reply-To: <1489438085-2055-1-git-send-email-okaya@codeaurora.org>
+References: <1489438085-2055-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <1489438085-2055-2-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-y
-(POLICY_DEFAULT), current code is querying the enable/disable
-states from ASPM registers to determine the policy.
+The ASPM capability initialization is done in one pass where both
+the current settings such as capable/enable/supported field are set
+and also all children are scanned for latencies.
 
-For example, a BIOS could set the power saving state to performance
-and clear all ASPM control registers. A balanced ASPM policy could
-enable L0s and disable L1. A power conscious BIOS could enable both
-L0s and L1 to trade off latency and performance vs. power.
+Divide the init into two so that part of the code that needs
+scan finished is obvious.
 
-After hotplug removal, pcie_aspm_exit_link_state() function clears
-the ASPM registers. An insertion following hotplug removal reads
-incorrect policy as ASPM disabled even though ASPM was enabled
-during boot.
+Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+---
+ drivers/pci/pcie/aspm.c | 76 +++++++++++++++++++++++++++----------------------
+ 1 file changed, 42 insertions(+), 34 deletions(-)
 
-This is caused by the fact that same function is used for reconfiguring
-ASPM regardless of the of the power on state.
-
-------------------------
-Changes from v3 (https://lkml.org/lkml/2017/3/8/670)
-------------------------
-- call pcie_aspm_init_link_state() for every device, maybe from
-pci_init_capabilities()
-
-- for bridges, have pcie_aspm_init_link_state() allocate a
-link_state, regardless of whether it currently has any children,
-and save the ASPM settings done by firmware
-
-- for endpoints, have pcie_aspm_init_link_state() do the actual ASPM
-setup of the link as it currently does
-
-- for endpoints, change pcie_aspm_exit_link_state() so it cleans up
-the device's own state and disables ASPM if necessary, but doesn't
-remove the parent's link_state
-
-- for bridges, change pcie_aspm_exit_link_state() so it frees the
-bridge's own link_state
-
-Sinan Kaya (3):
-  PCI/ASPM: divide ASPM capability init into pre and post init
-  PCI/ASPM: move part of ASPM initialization to pci_init_capabilities
-  PCI/ASPM: move link_state cleanup to bridge remove
-
- drivers/pci/pcie/aspm.c | 175 +++++++++++++++++++++++++++++++++++-------------
- drivers/pci/probe.c     |   3 +
- include/linux/pci.h     |   6 ++
- 3 files changed, 136 insertions(+), 48 deletions(-)
-
+diff --git a/drivers/pci/pcie/aspm.c b/drivers/pci/pcie/aspm.c
+index 3dd8bcb..453558d 100644
+--- a/drivers/pci/pcie/aspm.c
++++ b/drivers/pci/pcie/aspm.c
+@@ -338,11 +338,10 @@ static void pcie_aspm_check_latency(struct pci_dev *endpoint)
+ 	}
+ }
+ 
+-static void pcie_aspm_cap_init(struct pcie_link_state *link, int blacklist)
++static void pcie_aspm_cap_post_scan(struct pcie_link_state *link, int blacklist)
+ {
+ 	struct pci_dev *child, *parent = link->pdev;
+ 	struct pci_bus *linkbus = parent->subordinate;
+-	struct aspm_register_info upreg, dwreg;
+ 
+ 	if (blacklist) {
+ 		/* Set enabled/disable so that we will disable ASPM later */
+@@ -351,6 +350,45 @@ static void pcie_aspm_cap_init(struct pcie_link_state *link, int blacklist)
+ 		return;
+ 	}
+ 
++	/*
++	 * If the downstream component has pci bridge function, don't
++	 * do ASPM for now.
++	 */
++	list_for_each_entry(child, &linkbus->devices, bus_list) {
++		if (pci_pcie_type(child) == PCI_EXP_TYPE_PCI_BRIDGE) {
++			link->aspm_disable = ASPM_STATE_ALL;
++			break;
++		}
++	}
++
++	/* Get and check endpoint acceptable latencies */
++	list_for_each_entry(child, &linkbus->devices, bus_list) {
++		u32 reg32, encoding;
++		struct aspm_latency *acceptable =
++			&link->acceptable[PCI_FUNC(child->devfn)];
++
++		if (pci_pcie_type(child) != PCI_EXP_TYPE_ENDPOINT &&
++		    pci_pcie_type(child) != PCI_EXP_TYPE_LEG_END)
++			continue;
++
++		pcie_capability_read_dword(child, PCI_EXP_DEVCAP, &reg32);
++		/* Calculate endpoint L0s acceptable latency */
++		encoding = (reg32 & PCI_EXP_DEVCAP_L0S) >> 6;
++		acceptable->l0s = calc_l0s_acceptable(encoding);
++		/* Calculate endpoint L1 acceptable latency */
++		encoding = (reg32 & PCI_EXP_DEVCAP_L1) >> 9;
++		acceptable->l1 = calc_l1_acceptable(encoding);
++
++		pcie_aspm_check_latency(child);
++	}
++}
++
++static void pcie_aspm_cap_init(struct pcie_link_state *link)
++{
++	struct pci_dev *child, *parent = link->pdev;
++	struct pci_bus *linkbus = parent->subordinate;
++	struct aspm_register_info upreg, dwreg;
++
+ 	/* Get upstream/downstream components' register state */
+ 	pcie_get_aspm_reg(parent, &upreg);
+ 	child = list_entry(linkbus->devices.next, struct pci_dev, bus_list);
+@@ -402,37 +440,6 @@ static void pcie_aspm_cap_init(struct pcie_link_state *link, int blacklist)
+ 
+ 	/* Setup initial capable state. Will be updated later */
+ 	link->aspm_capable = link->aspm_support;
+-	/*
+-	 * If the downstream component has pci bridge function, don't
+-	 * do ASPM for now.
+-	 */
+-	list_for_each_entry(child, &linkbus->devices, bus_list) {
+-		if (pci_pcie_type(child) == PCI_EXP_TYPE_PCI_BRIDGE) {
+-			link->aspm_disable = ASPM_STATE_ALL;
+-			break;
+-		}
+-	}
+-
+-	/* Get and check endpoint acceptable latencies */
+-	list_for_each_entry(child, &linkbus->devices, bus_list) {
+-		u32 reg32, encoding;
+-		struct aspm_latency *acceptable =
+-			&link->acceptable[PCI_FUNC(child->devfn)];
+-
+-		if (pci_pcie_type(child) != PCI_EXP_TYPE_ENDPOINT &&
+-		    pci_pcie_type(child) != PCI_EXP_TYPE_LEG_END)
+-			continue;
+-
+-		pcie_capability_read_dword(child, PCI_EXP_DEVCAP, &reg32);
+-		/* Calculate endpoint L0s acceptable latency */
+-		encoding = (reg32 & PCI_EXP_DEVCAP_L0S) >> 6;
+-		acceptable->l0s = calc_l0s_acceptable(encoding);
+-		/* Calculate endpoint L1 acceptable latency */
+-		encoding = (reg32 & PCI_EXP_DEVCAP_L1) >> 9;
+-		acceptable->l1 = calc_l1_acceptable(encoding);
+-
+-		pcie_aspm_check_latency(child);
+-	}
+ }
+ 
+ static void pcie_config_aspm_dev(struct pci_dev *pdev, u32 val)
+@@ -606,7 +613,8 @@ void pcie_aspm_init_link_state(struct pci_dev *pdev)
+ 	 * upstream links also because capable state of them can be
+ 	 * update through pcie_aspm_cap_init().
+ 	 */
+-	pcie_aspm_cap_init(link, blacklist);
++	pcie_aspm_cap_init(link);
++	pcie_aspm_cap_post_scan(link, blacklist);
+ 
+ 	/* Setup initial Clock PM state */
+ 	pcie_clkpm_cap_init(link, blacklist);
 -- 
 1.9.1
