@@ -1,88 +1,290 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon, 13 Mar 2017 16:48:05 -0400
-Subject: [PATCH V4 3/3] PCI/ASPM: move link_state cleanup to bridge remove
-In-Reply-To: <1489438085-2055-1-git-send-email-okaya@codeaurora.org>
-References: <1489438085-2055-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1489438085-2055-4-git-send-email-okaya@codeaurora.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 13 Mar 2017 13:52:31 -0700
+Subject: [PATCH] ARM: omap2+: Revert omap-smp.c changes resetting CPU1 during
+ boot
+Message-ID: <20170313205231.1593-1-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For endpoints, change pcie_aspm_exit_link_state() so it cleans up
-the device's own state and disables ASPM if necessary, but doesn't
-remove the parent's link_state.
+Commit 3251885285e1 ("ARM: OMAP4+: Reset CPU1 properly for kexec") started
+unconditionally resetting CPU1 because of a kexec boot issue I was seeing
+earlier on omap4 when doing kexec boot between two different kernel
+versions.
 
-For bridges, change pcie_aspm_exit_link_state() so it frees the
-bridge's own link_state.
+This caused issues on some systems. We should only reset CPU1 as a last
+resort option, and try to avoid it where possible. Doing an unconditional
+CPU1 reset causes issues for example when booting a bootloader configured
+secure OS running on CPU1 as reported by Andrew F. Davis <afd@ti.com>.
 
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+We can't completely remove the reset of CPU1 as it would break
+kexec booting from older kernels. Also it looks like omap4 suspend/resume
+cycle occasionally fails to bring up CPU1 without the reset of CPU1.
+
+The ideal fix is to park CPU1 to the bootrom loop during CPU hot-unplug.
+This way we can be assured that the CPU1 is properly configured by
+bootloader or the previous kernel. However, we can't do that for the
+earlier kernels out there capable of kexec booting new kernels.
+
+So let's fix the issue reported by Andrew by making CPU1 reset conditional
+and only do it if CPU1 is configured to boot at an address that is within
+the booting kernel. In these cases we know for sure that we just overwrote
+the configured boot_secondary() during booting and that it's invalid.
+
+And while at it, let's replace legacy cpu_is usage with soc_is to avoid
+confusion with mixed use of both checks.
+
+Additionally we also need to fix the hot-unplug code to properly park CPU1
+to the bootrom loop so it's not affected by SDRAM changes done by kexec
+booting kernel.
+
+Fixes: 3251885285e1 ("ARM: OMAP4+: Reset CPU1 properly for kexec")
+Reported-by: Andrew F. Davis <afd@ti.com>
+Cc: Andrew F. Davis <afd@ti.com>
+Cc: Keerthy <j-keerthy@ti.com>
+Cc: Russell King <rmk+kernel@armlinux.org.uk>
+Cc: Tero Kristo <t-kristo@ti.com>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- drivers/pci/pcie/aspm.c | 25 +++++++++++++++++--------
- 1 file changed, 17 insertions(+), 8 deletions(-)
+ arch/arm/mach-omap2/common.h              |  1 +
+ arch/arm/mach-omap2/omap-mpuss-lowpower.c | 30 +++++++++----
+ arch/arm/mach-omap2/omap-smp.c            | 70 +++++++++++++++++++++++++------
+ 3 files changed, 80 insertions(+), 21 deletions(-)
 
-diff --git a/drivers/pci/pcie/aspm.c b/drivers/pci/pcie/aspm.c
-index ed67710..6c2d7ea 100644
---- a/drivers/pci/pcie/aspm.c
-+++ b/drivers/pci/pcie/aspm.c
-@@ -419,8 +419,10 @@ static void pcie_aspm_cap_init(struct pcie_link_state *link,
- 	 */
- 	if (dwreg.support & upreg.support & PCIE_LINK_STATE_L0S)
- 		link->aspm_support |= ASPM_STATE_L0S;
--	if (dwreg.enabled & PCIE_LINK_STATE_L0S)
-+	if (dwreg.enabled & PCIE_LINK_STATE_L0S) {
- 		link->aspm_enabled |= ASPM_STATE_L0S_UP;
-+		link->aspm_default |= ASPM_STATE_L0S_UP;
-+	}
- 	if (upreg.enabled & PCIE_LINK_STATE_L0S)
- 		link->aspm_enabled |= ASPM_STATE_L0S_DW;
- 	link->latency_up.l0s = calc_l0s_latency(upreg.latency_encoding_l0s);
-@@ -434,9 +436,6 @@ static void pcie_aspm_cap_init(struct pcie_link_state *link,
- 	link->latency_up.l1 = calc_l1_latency(upreg.latency_encoding_l1);
- 	link->latency_dw.l1 = calc_l1_latency(dwreg.latency_encoding_l1);
+diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
+--- a/arch/arm/mach-omap2/common.h
++++ b/arch/arm/mach-omap2/common.h
+@@ -270,6 +270,7 @@ extern const struct smp_operations omap4_smp_ops;
+ extern int omap4_mpuss_init(void);
+ extern int omap4_enter_lowpower(unsigned int cpu, unsigned int power_state);
+ extern int omap4_hotplug_cpu(unsigned int cpu, unsigned int power_state);
++extern u32 omap4_get_cpu1_ns_pa_addr(void);
+ #else
+ static inline int omap4_enter_lowpower(unsigned int cpu,
+ 					unsigned int power_state)
+diff --git a/arch/arm/mach-omap2/omap-mpuss-lowpower.c b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
+--- a/arch/arm/mach-omap2/omap-mpuss-lowpower.c
++++ b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
+@@ -64,6 +64,7 @@
+ #include "prm-regbits-44xx.h"
  
--	/* Save default state */
--	link->aspm_default = link->aspm_enabled;
--
- 	/* Setup initial capable state. Will be updated later */
- 	link->aspm_capable = link->aspm_support;
- }
-@@ -579,6 +578,7 @@ int pci_aspm_init(struct pci_dev *pdev)
+ static void __iomem *sar_base;
++static u32 old_cpu1_ns_pa_addr;
+ 
+ #if defined(CONFIG_PM) && defined(CONFIG_SMP)
+ 
+@@ -212,6 +213,11 @@ static void __init save_l2x0_context(void)
+ {}
+ #endif
+ 
++u32 omap4_get_cpu1_ns_pa_addr(void)
++{
++	return old_cpu1_ns_pa_addr;
++}
++
+ /**
+  * omap4_enter_lowpower: OMAP4 MPUSS Low Power Entry Function
+  * The purpose of this function is to manage low power programming
+@@ -371,7 +377,7 @@ int __init omap4_mpuss_init(void)
+ 	pm_info = &per_cpu(omap4_pm_info, 0x0);
+ 	if (sar_base) {
+ 		pm_info->scu_sar_addr = sar_base + SCU_OFFSET0;
+-		if (cpu_is_omap44xx())
++		if (soc_is_omap44xx())
+ 			pm_info->wkup_sar_addr = sar_base +
+ 				CPU0_WAKEUP_NS_PA_ADDR_OFFSET;
+ 		else
+@@ -395,7 +401,7 @@ int __init omap4_mpuss_init(void)
+ 	pm_info = &per_cpu(omap4_pm_info, 0x1);
+ 	if (sar_base) {
+ 		pm_info->scu_sar_addr = sar_base + SCU_OFFSET1;
+-		if (cpu_is_omap44xx())
++		if (soc_is_omap44xx())
+ 			pm_info->wkup_sar_addr = sar_base +
+ 				CPU1_WAKEUP_NS_PA_ADDR_OFFSET;
+ 		else
+@@ -432,7 +438,7 @@ int __init omap4_mpuss_init(void)
+ 		save_l2x0_context();
+ 	}
+ 
+-	if (cpu_is_omap44xx()) {
++	if (soc_is_omap44xx()) {
+ 		omap_pm_ops.finish_suspend = omap4_finish_suspend;
+ 		omap_pm_ops.resume = omap4_cpu_resume;
+ 		omap_pm_ops.scu_prepare = scu_pwrst_prepare;
+@@ -443,7 +449,7 @@ int __init omap4_mpuss_init(void)
+ 		enable_mercury_retention_mode();
+ 	}
+ 
+-	if (cpu_is_omap446x())
++	if (soc_is_omap446x())
+ 		omap_pm_ops.hotplug_restart = omap4460_secondary_startup;
+ 
+ 	return 0;
+@@ -460,22 +466,30 @@ int __init omap4_mpuss_init(void)
+ void __init omap4_mpuss_early_init(void)
  {
- 	int ret;
- 	struct pcie_link_state *link;
-+	struct aspm_register_info upreg;
+ 	unsigned long startup_pa;
++	void __iomem *ns_pa_addr;
  
- 	if (!aspm_support_enabled)
- 		return 0;
-@@ -601,6 +601,13 @@ int pci_aspm_init(struct pci_dev *pdev)
- 			ret = -ENOMEM;
- 			goto unlock;
- 		}
+-	if (!(cpu_is_omap44xx() || soc_is_omap54xx()))
++	if (!(soc_is_omap44xx() || soc_is_omap54xx()))
+ 		return;
+ 
+ 	sar_base = omap4_get_sar_ram_base();
+ 
+-	if (cpu_is_omap443x())
++	/* Save old NS_PA_ADDR for validity checks later on */
++	if (soc_is_omap44xx())
++		ns_pa_addr = sar_base + CPU1_WAKEUP_NS_PA_ADDR_OFFSET;
++	else
++		ns_pa_addr = sar_base + OMAP5_CPU1_WAKEUP_NS_PA_ADDR_OFFSET;
++	old_cpu1_ns_pa_addr = readl_relaxed(ns_pa_addr);
 +
-+		pcie_get_aspm_reg(pdev, &upreg);
-+		if (upreg.enabled & PCIE_LINK_STATE_L0S)
-+			link->aspm_default |= ASPM_STATE_L0S_DW;
-+		if (upreg.enabled & PCIE_LINK_STATE_L1)
-+			link->aspm_default |= ASPM_STATE_L1;
++	if (soc_is_omap443x())
+ 		startup_pa = __pa_symbol(omap4_secondary_startup);
+-	else if (cpu_is_omap446x())
++	else if (soc_is_omap446x())
+ 		startup_pa = __pa_symbol(omap4460_secondary_startup);
+ 	else if ((__boot_cpu_mode & MODE_MASK) == HYP_MODE)
+ 		startup_pa = __pa_symbol(omap5_secondary_hyp_startup);
+ 	else
+ 		startup_pa = __pa_symbol(omap5_secondary_startup);
+ 
+-	if (cpu_is_omap44xx())
++	if (soc_is_omap44xx())
+ 		writel_relaxed(startup_pa, sar_base +
+ 			       CPU1_WAKEUP_NS_PA_ADDR_OFFSET);
+ 	else
+diff --git a/arch/arm/mach-omap2/omap-smp.c b/arch/arm/mach-omap2/omap-smp.c
+--- a/arch/arm/mach-omap2/omap-smp.c
++++ b/arch/arm/mach-omap2/omap-smp.c
+@@ -21,6 +21,7 @@
+ #include <linux/io.h>
+ #include <linux/irqchip/arm-gic.h>
+ 
++#include <asm/sections.h>
+ #include <asm/smp_scu.h>
+ #include <asm/virt.h>
+ 
+@@ -44,6 +45,7 @@ struct omap_smp_config {
+ 	unsigned long cpu1_rstctrl_pa;
+ 	void __iomem *cpu1_rstctrl_va;
+ 	void __iomem *scu_base;
++	void __iomem *wakeupgen_base;
+ 	void *startup_addr;
+ };
+ 
+@@ -140,7 +142,6 @@ static int omap4_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ 	static struct clockdomain *cpu1_clkdm;
+ 	static bool booted;
+ 	static struct powerdomain *cpu1_pwrdm;
+-	void __iomem *base = omap_get_wakeupgen_base();
+ 
+ 	/*
+ 	 * Set synchronisation state between this boot processor
+@@ -157,7 +158,7 @@ static int omap4_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ 	if (omap_secure_apis_support())
+ 		omap_modify_auxcoreboot0(0x200, 0xfffffdff);
+ 	else
+-		writel_relaxed(0x20, base + OMAP_AUX_CORE_BOOT_0);
++		writel_relaxed(0x20, cfg.wakeupgen_base + OMAP_AUX_CORE_BOOT_0);
+ 
+ 	if (!cpu1_clkdm && !cpu1_pwrdm) {
+ 		cpu1_clkdm = clkdm_lookup("mpu1_clkdm");
+@@ -261,9 +262,59 @@ static void __init omap4_smp_init_cpus(void)
+ 		set_cpu_possible(i, true);
+ }
+ 
++/*
++ * For now, just make sure the start-up address is not within the booting
++ * kernel space as that means we just overwrote whatever secondary_startup()
++ * code there was.
++ */
++static bool __init omap4_smp_cpu1_startup_valid(unsigned long addr)
++{
++	if ((addr >= __pa(PAGE_OFFSET)) && (addr <= __pa(__bss_start)))
++		return false;
 +
- 	} else {
- 		WARN_ON(!pdev->bus);
- 		if (!pdev->bus) {
-@@ -748,10 +755,12 @@ void pcie_aspm_exit_link_state(struct pci_dev *pdev)
++	return true;
++}
++
++/*
++ * We may need to reset CPU1 before configuring, otherwise kexec boot can end
++ * up trying to use old kernel startup address or suspend-resume will
++ * occasionally fail to bring up CPU1 on 4430 if CPU1 fails to enter deeper
++ * idle states.
++ */
++static void __init omap4_smp_maybe_reset_cpu1(struct omap_smp_config *c)
++{
++	unsigned long cpu1_startup_pa, cpu1_ns_pa_addr;
++	bool needs_reset = false;
++
++	cpu1_startup_pa = readl_relaxed(cfg.wakeupgen_base +
++					OMAP_AUX_CORE_BOOT_1);
++	cpu1_ns_pa_addr = omap4_get_cpu1_ns_pa_addr();
++
++	/* Did the configured secondary_startup() get overwritten? */
++	if (!omap4_smp_cpu1_startup_valid(cpu1_startup_pa))
++		needs_reset = true;
++
++	/*
++	 * If omap4 or 5 has NS_PA_ADDR configured, CPU1 may be in a
++	 * deeper idle state in WFI and wake to an invalid address.
++	 */
++	if ((soc_is_omap44xx() || soc_is_omap54xx()) &&
++	    !omap4_smp_cpu1_startup_valid(cpu1_ns_pa_addr))
++		needs_reset = true;
++
++	if (!needs_reset || !c->cpu1_rstctrl_va)
++		return;
++
++	pr_info("smp: Already configured CPU1, needs reset (0x%lx 0x%lx)\n",
++		cpu1_startup_pa, cpu1_ns_pa_addr);
++
++	writel_relaxed(1, c->cpu1_rstctrl_va);
++	readl_relaxed(c->cpu1_rstctrl_va);
++	writel_relaxed(0, c->cpu1_rstctrl_va);
++}
++
+ static void __init omap4_smp_prepare_cpus(unsigned int max_cpus)
+ {
+-	void __iomem *base = omap_get_wakeupgen_base();
+ 	const struct omap_smp_config *c = NULL;
  
- 	/* All functions are removed, so just disable ASPM for the link */
- 	pcie_config_aspm_link(link, 0);
--	list_del(&link->sibling);
--	list_del(&link->link);
--	/* Clock PM is for endpoint device */
--	free_link_state(link);
-+	if (pdev->has_secondary_link) {
-+		list_del(&link->sibling);
-+		list_del(&link->link);
-+		/* Clock PM is for endpoint device */
-+		free_link_state(link);
-+	}
+ 	if (soc_is_omap443x())
+@@ -281,6 +332,7 @@ static void __init omap4_smp_prepare_cpus(unsigned int max_cpus)
+ 	/* Must preserve cfg.scu_base set earlier */
+ 	cfg.cpu1_rstctrl_pa = c->cpu1_rstctrl_pa;
+ 	cfg.startup_addr = c->startup_addr;
++	cfg.wakeupgen_base = omap_get_wakeupgen_base();
  
- 	/* Recheck latencies and configure upstream links */
- 	if (parent_link) {
+ 	if (soc_is_dra74x() || soc_is_omap54xx()) {
+ 		if ((__boot_cpu_mode & MODE_MASK) == HYP_MODE)
+@@ -299,15 +351,7 @@ static void __init omap4_smp_prepare_cpus(unsigned int max_cpus)
+ 	if (cfg.scu_base)
+ 		scu_enable(cfg.scu_base);
+ 
+-	/*
+-	 * Reset CPU1 before configuring, otherwise kexec will
+-	 * end up trying to use old kernel startup address.
+-	 */
+-	if (cfg.cpu1_rstctrl_va) {
+-		writel_relaxed(1, cfg.cpu1_rstctrl_va);
+-		readl_relaxed(cfg.cpu1_rstctrl_va);
+-		writel_relaxed(0, cfg.cpu1_rstctrl_va);
+-	}
++	omap4_smp_maybe_reset_cpu1(&cfg);
+ 
+ 	/*
+ 	 * Write the address of secondary startup routine into the
+@@ -319,7 +363,7 @@ static void __init omap4_smp_prepare_cpus(unsigned int max_cpus)
+ 		omap_auxcoreboot_addr(__pa_symbol(cfg.startup_addr));
+ 	else
+ 		writel_relaxed(__pa_symbol(cfg.startup_addr),
+-			       base + OMAP_AUX_CORE_BOOT_1);
++			       cfg.wakeupgen_base + OMAP_AUX_CORE_BOOT_1);
+ }
+ 
+ const struct smp_operations omap4_smp_ops __initconst = {
 -- 
-1.9.1
+2.11.1
