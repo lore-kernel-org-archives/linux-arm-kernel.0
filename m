@@ -1,56 +1,33 @@
-From: slash.tmp@free.fr (Mason)
-Date: Mon, 13 Mar 2017 18:39:55 +0100
-Subject: Legacy features in PCI Express devices
-In-Reply-To: <96b57ba5-641d-46c8-6ba0-cee2c0613a6f@arm.com>
-References: <ef5c9778-fbae-9f4f-ac2e-29b8597537a5@free.fr>
- <96b57ba5-641d-46c8-6ba0-cee2c0613a6f@arm.com>
-Message-ID: <58fb1386-fa94-dde3-b361-597f9486fa41@free.fr>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 13 Mar 2017 18:51:53 +0100
+Subject: [PATCH] clocksource: add missing line break to error messages
+In-Reply-To: <20170309094710.31003-1-zajec5@gmail.com>
+References: <20170309094710.31003-1-zajec5@gmail.com>
+Message-ID: <20170313175153.GC19679@ulmo.ba.sec>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/03/2017 18:12, Robin Murphy wrote:
+On Thu, Mar 09, 2017 at 10:47:10AM +0100, Rafa? Mi?ecki wrote:
+[...]
+> diff --git a/drivers/clocksource/tegra20_timer.c b/drivers/clocksource/tegra20_timer.c
+> index f960891aa04e..b9990b9c98c5 100644
+> --- a/drivers/clocksource/tegra20_timer.c
+> +++ b/drivers/clocksource/tegra20_timer.c
+> @@ -245,7 +245,7 @@ static int __init tegra20_init_rtc(struct device_node *np)
+>  
+>  	rtc_base = of_iomap(np, 0);
+>  	if (!rtc_base) {
+> -		pr_err("Can't map RTC registers");
+> +		pr_err("Can't map RTC registers\n");
+>  		return -ENXIO;
+>  	}
+>  
 
-> On 13/03/17 16:10, Mason wrote:
->
->> There are two revisions of our PCI Express controller.
->>
->> Rev 1 did not support the following features:
->>
->>   1) legacy PCI interrupt delivery (INTx signals)
->>   2) I/O address space
->>
->> Internally, someone stated that such missing support would prevent
->> some PCIe cards from working with our controller.
->>
->> Are there really modern PCIe cards that require 1) and/or 2)
->> to function?
->>
->> Can someone provide examples of such cards, so that I may test them
->> on both revisions?
->>
->> I was told to check ath9k-based cards. Any other examples?
->>
->> Looking around, I came across this thread:
->> http://lists.infradead.org/pipermail/linux-arm-kernel/2016-March/418254.html
->> "i.MX6 PCIe: Fix imx6_pcie_deassert_core_reset() polarity"
->>
->> IIUC, although some PCIe boards do support MSI, the driver might not
->> put in the work to use that infrastructure, and instead reverts to
->> legacy interrupts. (So it is a SW issue, in a sense.)
-> 
-> Secondary to that category is endpoints which nominally support MSI, but
-> in a way which is unreliable or otherwise broken. My experience shows
-> that the Silicon Image SiI 3132 (as integrated on ARM Juno boards, but
-> seemingly also relatively common on 'generic' 2-port SATA cards) falls
-> into that category - using the command-line parameter to force MSIs
-> instead of legacy interrupts leads to the the machine barely reaching
-> userspace before something goes horribly wrong:
-
-Do drivers typically support *both* MSI and INTx?
-
-Specifically, would the xhci driver support both?
-
-If I remove MSI support from my kernel, I might be able to test
-legacy interrupt support that way, right?
-
-Regards.
+Acked-by: Thierry Reding <treding@nvidia.com>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170313/3dc1fe2c/attachment.sig>
