@@ -1,84 +1,96 @@
-From: yuanzhichang@hisilicon.com (zhichang.yuan)
-Date: Mon, 13 Mar 2017 10:42:41 +0800
-Subject: [PATCH V7 5/7] ACPI: Delay the enumeration on the devices whose
- dependency has not met
-In-Reply-To: <1489372963-9000-1-git-send-email-yuanzhichang@hisilicon.com>
-References: <1489372963-9000-1-git-send-email-yuanzhichang@hisilicon.com>
-Message-ID: <1489372963-9000-6-git-send-email-yuanzhichang@hisilicon.com>
+From: peter.chen@nxp.com (Peter Chen)
+Date: Mon, 13 Mar 2017 10:18:42 +0800
+Subject: [PATCH 2/5] usb: chipidea: use bus->sysdev for DMA configuration
+In-Reply-To: <1489371525-18928-1-git-send-email-peter.chen@nxp.com>
+References: <1489371525-18928-1-git-send-email-peter.chen@nxp.com>
+Message-ID: <1489371525-18928-3-git-send-email-peter.chen@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In commit 40e7fcb1929(ACPI: Add _DEP support to fix battery issue on Asus
-T100TA), the '_DEP' was supported to solve the dependency of Asus battery. But
-this patch is specific to Asus battery device.
-In the real world, there are other devices which need the dependency to play the
-role on the enumeration order. For example, all the Hip06 LPC
-periperals(IPMI-BT, uart, etc) must be scanned after the LPC host driver
-finished the probing. So, it makes sense to add a checking whether the ACPI
-device meet all the dependencies during its enumeration slot, if not, the
-enumeration will be delayed till all dependency master finish their work.
+From: Arnd Bergmann <arnd@arndb.de>
 
-This patch adds the dependency checking in ACPI enumeration, also the
-corresponding handling to retrigger the Hip06 LPC peripherals' scanning.
+Set the dma for chipidea from sysdev. This is inherited from its
+parent node. Also, do not set dma mask for child as it is not required
+now.
 
-Signed-off-by: zhichang.yuan <yuanzhichang@hisilicon.com>
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Sriram Dash <sriram.dash@nxp.com>
+Acked-by: Peter Chen <peter.chen@nxp.com>
+Signed-off-by: Mathias Nyman <mathias.nyman@linux.intel.com>
+Signed-off-by: Peter Chen <peter.chen@nxp.com>
 ---
- drivers/acpi/battery.c |  3 ---
- drivers/acpi/scan.c    |  3 +++
- drivers/bus/hisi_lpc.c | 12 +++++++++++-
- 3 files changed, 14 insertions(+), 4 deletions(-)
+ drivers/usb/chipidea/core.c |  3 ---
+ drivers/usb/chipidea/host.c |  3 ++-
+ drivers/usb/chipidea/udc.c  | 10 ++++++----
+ 3 files changed, 8 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/acpi/battery.c b/drivers/acpi/battery.c
-index 4ef1e46..e8d1af1 100644
---- a/drivers/acpi/battery.c
-+++ b/drivers/acpi/battery.c
-@@ -1210,9 +1210,6 @@ static int acpi_battery_add(struct acpi_device *device)
- 	if (!device)
- 		return -EINVAL;
+diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
+index 79ad8e9..b4a78b2 100644
+--- a/drivers/usb/chipidea/core.c
++++ b/drivers/usb/chipidea/core.c
+@@ -783,9 +783,6 @@ struct platform_device *ci_hdrc_add_device(struct device *dev,
+ 	}
  
--	if (device->dep_unmet)
--		return -EPROBE_DEFER;
--
- 	battery = kzalloc(sizeof(struct acpi_battery), GFP_KERNEL);
- 	if (!battery)
+ 	pdev->dev.parent = dev;
+-	pdev->dev.dma_mask = dev->dma_mask;
+-	pdev->dev.dma_parms = dev->dma_parms;
+-	dma_set_coherent_mask(&pdev->dev, dev->coherent_dma_mask);
+ 
+ 	ret = platform_device_add_resources(pdev, res, nres);
+ 	if (ret)
+diff --git a/drivers/usb/chipidea/host.c b/drivers/usb/chipidea/host.c
+index 915f3e9..18cb8e4 100644
+--- a/drivers/usb/chipidea/host.c
++++ b/drivers/usb/chipidea/host.c
+@@ -123,7 +123,8 @@ static int host_start(struct ci_hdrc *ci)
+ 	if (usb_disabled())
+ 		return -ENODEV;
+ 
+-	hcd = usb_create_hcd(&ci_ehci_hc_driver, ci->dev, dev_name(ci->dev));
++	hcd = __usb_create_hcd(&ci_ehci_hc_driver, ci->dev->parent,
++			       ci->dev, dev_name(ci->dev), NULL);
+ 	if (!hcd)
  		return -ENOMEM;
-diff --git a/drivers/acpi/scan.c b/drivers/acpi/scan.c
-index 1926918..97721b1 100644
---- a/drivers/acpi/scan.c
-+++ b/drivers/acpi/scan.c
-@@ -1843,6 +1843,9 @@ static void acpi_bus_attach(struct acpi_device *device)
- 	if (device->handler)
- 		goto ok;
  
-+	if (device->dep_unmet)
-+		return;
-+
- 	if (!device->flags.initialized) {
- 		device->flags.power_manageable =
- 			device->power.states[ACPI_STATE_D0].flags.valid;
-diff --git a/drivers/bus/hisi_lpc.c b/drivers/bus/hisi_lpc.c
-index 03cf19a..345ea12 100644
---- a/drivers/bus/hisi_lpc.c
-+++ b/drivers/bus/hisi_lpc.c
-@@ -516,8 +516,18 @@ static int hisilpc_probe(struct platform_device *pdev)
+diff --git a/drivers/usb/chipidea/udc.c b/drivers/usb/chipidea/udc.c
+index be166c6..50a86c6 100644
+--- a/drivers/usb/chipidea/udc.c
++++ b/drivers/usb/chipidea/udc.c
+@@ -423,7 +423,8 @@ static int _hardware_enqueue(struct ci_hw_ep *hwep, struct ci_hw_req *hwreq)
  
- 	/*
- 	 * It is time to start the children scannings....
-+	 * For ACPI children, the corresponding devices will be created after
-+	 * retriggering the ACPI scanning by removing the dependency blocking.
- 	 */
--	if (!has_acpi_companion(dev)) {
-+	if (has_acpi_companion(dev)) {
-+		struct acpi_device *adev;
-+
-+		adev = to_acpi_device_node(dev->fwnode);
-+		if (!adev)
-+			ret = -ENODEV;
-+		else
-+			acpi_walk_dep_device_list(adev->handle);
-+	} else {
- 		ret = of_platform_populate(dev->of_node, NULL, NULL, dev);
- 		if (ret)
- 			dev_err(dev, "OF: enumerate LPC bus fail(%d)\n", ret);
+ 	hwreq->req.status = -EALREADY;
+ 
+-	ret = usb_gadget_map_request(&ci->gadget, &hwreq->req, hwep->dir);
++	ret = usb_gadget_map_request_by_dev(ci->dev->parent,
++					    &hwreq->req, hwep->dir);
+ 	if (ret)
+ 		return ret;
+ 
+@@ -603,7 +604,8 @@ static int _hardware_dequeue(struct ci_hw_ep *hwep, struct ci_hw_req *hwreq)
+ 		list_del_init(&node->td);
+ 	}
+ 
+-	usb_gadget_unmap_request(&hwep->ci->gadget, &hwreq->req, hwep->dir);
++	usb_gadget_unmap_request_by_dev(hwep->ci->dev->parent,
++					&hwreq->req, hwep->dir);
+ 
+ 	hwreq->req.actual += actual;
+ 
+@@ -1904,13 +1906,13 @@ static int udc_start(struct ci_hdrc *ci)
+ 	INIT_LIST_HEAD(&ci->gadget.ep_list);
+ 
+ 	/* alloc resources */
+-	ci->qh_pool = dma_pool_create("ci_hw_qh", dev,
++	ci->qh_pool = dma_pool_create("ci_hw_qh", dev->parent,
+ 				       sizeof(struct ci_hw_qh),
+ 				       64, CI_HDRC_PAGE_SIZE);
+ 	if (ci->qh_pool == NULL)
+ 		return -ENOMEM;
+ 
+-	ci->td_pool = dma_pool_create("ci_hw_td", dev,
++	ci->td_pool = dma_pool_create("ci_hw_td", dev->parent,
+ 				       sizeof(struct ci_hw_td),
+ 				       64, CI_HDRC_PAGE_SIZE);
+ 	if (ci->td_pool == NULL) {
 -- 
-1.9.1
+2.7.4
