@@ -1,23 +1,65 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Tue, 14 Mar 2017 05:43:18 +0800
-Subject: [PATCH] [for 4.11]xhci: plat: Register shutdown for xhci_plat
-In-Reply-To: <1489440074-23966-1-git-send-email-awallis@codeaurora.org>
-References: <1489440074-23966-1-git-send-email-awallis@codeaurora.org>
-Message-ID: <20170313214318.GA5539@kroah.com>
+From: labbott@redhat.com (Laura Abbott)
+Date: Mon, 13 Mar 2017 14:45:00 -0700
+Subject: [RFC PATCH 00/12] Ion cleanup in preparation for moving out of
+ staging
+In-Reply-To: <20170313132150.324h7em7c3iowmwj@sirena.org.uk>
+References: <20170303132949.GC31582@dhcp22.suse.cz>
+ <cf383b9b-3cbc-0092-a071-f120874c053c@redhat.com>
+ <20170306074258.GA27953@dhcp22.suse.cz>
+ <20170306104041.zghsicrnadoap7lp@phenom.ffwll.local>
+ <20170306105805.jsq44kfxhsvazkm6@sirena.org.uk>
+ <20170306160437.sf7bksorlnw7u372@phenom.ffwll.local>
+ <CA+M3ks77Am3Fx-ZNmgeM5tCqdM7SzV7rby4Es-p2F2aOhUco9g@mail.gmail.com>
+ <26bc57ae-d88f-4ea0-d666-2c1a02bf866f@redhat.com>
+ <CA+M3ks6R=n4n54wofK7pYcWoQKUhzyWQytBO90+pRDRrAhi3ww@mail.gmail.com>
+ <20170313105433.GA12980@e106950-lin.cambridge.arm.com>
+ <20170313132150.324h7em7c3iowmwj@sirena.org.uk>
+Message-ID: <8ff814f9-3351-b164-e1e2-42f0dce456b6@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 13, 2017 at 05:21:14PM -0400, Adam Wallis wrote:
-> Shutdown should be called for xhci_plat devices especially for
-> situations where kexec might be used by stopping DMA
-> transactions.
+On 03/13/2017 06:21 AM, Mark Brown wrote:
+> On Mon, Mar 13, 2017 at 10:54:33AM +0000, Brian Starkey wrote:
+>> On Sun, Mar 12, 2017 at 02:34:14PM +0100, Benjamin Gaignard wrote:
 > 
-> Signed-off-by: Adam Wallis <awallis@codeaurora.org>
-> ---
->  drivers/usb/host/xhci-plat.c | 1 +
->  1 file changed, 1 insertion(+)
+>>> Another point is how can we put secure rules (like selinux policy) on
+>>> heaps since all the allocations
+>>> go to the same device (/dev/ion) ? For example, until now, in Android
+>>> we have to give the same
+>>> access rights to all the process that use ION.
+>>> It will become problem when we will add secure heaps because we won't
+>>> be able to distinguish secure
+>>> processes to standard ones or set specific policy per heaps.
+>>> Maybe I'm wrong here but I have never see selinux policy checking an
+>>> ioctl field but if that
+>>> exist it could be a solution.
+> 
+>> I might be thinking of a different type of "secure", but...
+> 
+>> Should the security of secure heaps be enforced by OS-level
+>> permissions? I don't know about other architectures, but at least on
+>> arm/arm64 this is enforced in hardware; it doesn't matter who has
+>> access to the ion heap, because only secure devices (or the CPU
+>> running a secure process) is physically able to access the memory
+>> backing the buffer.
+> 3
+>> In fact, in the use-cases I know of, the process asking for the ion
+>> allocation is not a secure process, and so we wouldn't *want* to
+>> restrict the secure heap to be allocated from only by secure
+>> processes.
+> 
+> I think there's an orthogonal level of OS level security that can be
+> applied here - it's reasonable for it to want to say things like "only
+> processes that are supposed to be implementing functionality X should be
+> able to try to allocate memory set aside for that functionality".  This
+> mitigates against escallation attacks and so on, it's not really
+> directly related to secure memory as such though.
+> 
 
-$ ./scripts/get_maintainer.pl --file drivers/usb/host/xhci-plat.c
-Mathias Nyman <mathias.nyman@intel.com> (supporter:USB XHCI DRIVER)
+Ion also makes it pretty trivial to allocate large amounts of kernel
+memory and possibly DoS the system. I'd like to have as little
+policy in Ion as possible but more important would be a general
+security review and people shouting "bad idea ahead".
 
-:(
+Thanks,
+Laura
