@@ -1,110 +1,37 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 13 Mar 2017 14:34:00 +0100
-Subject: [PATCH v5 2/4] clk: samsung: Add support for runtime PM
-In-Reply-To: <1485345194-3196-3-git-send-email-m.szyprowski@samsung.com>
-References: <CGME20170125115329eucas1p1fc59d9be3421bc763d16aa331375b9f6@eucas1p1.samsung.com>
- <1485345194-3196-1-git-send-email-m.szyprowski@samsung.com>
- <1485345194-3196-3-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <CAPDyKFpCkzq6A-QcWuaG+k_R-fcnoJCJqYJNGEWHTaeT-8bZhA@mail.gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 13 Mar 2017 14:36:41 +0100
+Subject: [PATCH] ARM: dts: imx: add Gateworks Ventana GW5904 support
+In-Reply-To: <CAJ+vNU0JNQuQEmG_oCu86cbG_wisVFRETNtCO1bC2ytMM+N2Vg@mail.gmail.com>
+References: <1489178411-6559-1-git-send-email-tharvey@gateworks.com>
+ <04584d61-f1e2-3722-1f13-ff133edc0c22@gmail.com>
+ <CAJ+vNU1NcW=y_c-jJBnAaOozrzYJAekd9BEiMdd2=Bpx=Ng79Q@mail.gmail.com>
+ <b105d1ea-7975-bd21-0aa0-762060ceb62a@gmail.com>
+ <20170311030426.GB6677@lunn.ch>
+ <CAJ+vNU0JNQuQEmG_oCu86cbG_wisVFRETNtCO1bC2ytMM+N2Vg@mail.gmail.com>
+Message-ID: <20170313133641.GC748@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 January 2017 at 12:53, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
-> This patch adds struct device pointer to samsung_clk_provider and forwarding it
-> to clk_register_* functions, so drivers can register clocks, which use runtime
-> pm feature.
->
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Thanks for the hint on the compatibility. I wonder if
+> Documentation/devicetree/bindings/net/dsa/marvell.txt should have some
+> notes added about switch device compatibility? It wasn't clear to me
+> that these would be compatible.
 
-Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
+Hi Tim
 
-> ---
->  drivers/clk/samsung/clk-pll.c |  2 +-
->  drivers/clk/samsung/clk.c     | 12 ++++++------
->  drivers/clk/samsung/clk.h     |  1 +
->  3 files changed, 8 insertions(+), 7 deletions(-)
->
-> diff --git a/drivers/clk/samsung/clk-pll.c b/drivers/clk/samsung/clk-pll.c
-> index 52290894857a..74c9ce89538a 100644
-> --- a/drivers/clk/samsung/clk-pll.c
-> +++ b/drivers/clk/samsung/clk-pll.c
-> @@ -1376,7 +1376,7 @@ static void __init _samsung_clk_register_pll(struct samsung_clk_provider *ctx,
->         pll->lock_reg = base + pll_clk->lock_offset;
->         pll->con_reg = base + pll_clk->con_offset;
->
-> -       clk = clk_register(NULL, &pll->hw);
-> +       clk = clk_register(ctx->dev, &pll->hw);
->         if (IS_ERR(clk)) {
->                 pr_err("%s: failed to register pll clock %s : %ld\n",
->                         __func__, pll_clk->name, PTR_ERR(clk));
-> diff --git a/drivers/clk/samsung/clk.c b/drivers/clk/samsung/clk.c
-> index b7d87d6db9dc..e6923714f024 100644
-> --- a/drivers/clk/samsung/clk.c
-> +++ b/drivers/clk/samsung/clk.c
-> @@ -143,7 +143,7 @@ void __init samsung_clk_register_fixed_rate(struct samsung_clk_provider *ctx,
->         unsigned int idx, ret;
->
->         for (idx = 0; idx < nr_clk; idx++, list++) {
-> -               clk = clk_register_fixed_rate(NULL, list->name,
-> +               clk = clk_register_fixed_rate(ctx->dev, list->name,
->                         list->parent_name, list->flags, list->fixed_rate);
->                 if (IS_ERR(clk)) {
->                         pr_err("%s: failed to register clock %s\n", __func__,
-> @@ -172,7 +172,7 @@ void __init samsung_clk_register_fixed_factor(struct samsung_clk_provider *ctx,
->         unsigned int idx;
->
->         for (idx = 0; idx < nr_clk; idx++, list++) {
-> -               clk = clk_register_fixed_factor(NULL, list->name,
-> +               clk = clk_register_fixed_factor(ctx->dev, list->name,
->                         list->parent_name, list->flags, list->mult, list->div);
->                 if (IS_ERR(clk)) {
->                         pr_err("%s: failed to register clock %s\n", __func__,
-> @@ -193,7 +193,7 @@ void __init samsung_clk_register_mux(struct samsung_clk_provider *ctx,
->         unsigned int idx, ret;
->
->         for (idx = 0; idx < nr_clk; idx++, list++) {
-> -               clk = clk_register_mux(NULL, list->name, list->parent_names,
-> +               clk = clk_register_mux(ctx->dev, list->name, list->parent_names,
->                         list->num_parents, list->flags,
->                         ctx->reg_base + list->offset,
->                         list->shift, list->width, list->mux_flags, &ctx->lock);
-> @@ -226,13 +226,13 @@ void __init samsung_clk_register_div(struct samsung_clk_provider *ctx,
->
->         for (idx = 0; idx < nr_clk; idx++, list++) {
->                 if (list->table)
-> -                       clk = clk_register_divider_table(NULL, list->name,
-> +                       clk = clk_register_divider_table(ctx->dev, list->name,
->                                 list->parent_name, list->flags,
->                                 ctx->reg_base + list->offset,
->                                 list->shift, list->width, list->div_flags,
->                                 list->table, &ctx->lock);
->                 else
-> -                       clk = clk_register_divider(NULL, list->name,
-> +                       clk = clk_register_divider(ctx->dev, list->name,
->                                 list->parent_name, list->flags,
->                                 ctx->reg_base + list->offset, list->shift,
->                                 list->width, list->div_flags, &ctx->lock);
-> @@ -264,7 +264,7 @@ void __init samsung_clk_register_gate(struct samsung_clk_provider *ctx,
->         unsigned int idx, ret;
->
->         for (idx = 0; idx < nr_clk; idx++, list++) {
-> -               clk = clk_register_gate(NULL, list->name, list->parent_name,
-> +               clk = clk_register_gate(ctx->dev, list->name, list->parent_name,
->                                 list->flags, ctx->reg_base + list->offset,
->                                 list->bit_idx, list->gate_flags, &ctx->lock);
->                 if (IS_ERR(clk)) {
-> diff --git a/drivers/clk/samsung/clk.h b/drivers/clk/samsung/clk.h
-> index da3bdebabf1e..9263d8a27c6b 100644
-> --- a/drivers/clk/samsung/clk.h
-> +++ b/drivers/clk/samsung/clk.h
-> @@ -26,6 +26,7 @@
->   */
->  struct samsung_clk_provider {
->         void __iomem *reg_base;
-> +       struct device *dev;
->         struct clk_onecell_data clk_data;
->         spinlock_t lock;
->  };
-> --
-> 1.9.1
->
+This keeps coming up, so i plan on submitting a patch. I thought it
+would be obvious. The driver supports over 20 Marvell switches, yet
+only has two compatible strings. It is not too big a leap to figure
+out they must all be compatible, or there would be 20 compatible
+strings....
+
+> What is the convention, if any, of the naming of the 'lan' ports (0
+> based vs 1 based, eth vs lan)? Is it strictly up to the board vendor?
+> The board I'm supporting has a silkscreen that shows 'Port 1' through
+> 'Port 4' so I was leaning towards 1 based.
+
+I recommend following what the label on the housing says. If you don't
+have a housing, just a board, follow the silk screen, and hope the
+designer of the housing also follows the silk screen.
+
+	 Andrew
