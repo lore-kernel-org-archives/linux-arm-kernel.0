@@ -1,70 +1,166 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 13 Mar 2017 13:01:38 +0000
-Subject: [PATCH v2 05/23] MAINTAINERS: Add file patterns for dove device
- tree bindings
-In-Reply-To: <1489324627-19126-6-git-send-email-geert@linux-m68k.org>
-References: <1489324627-19126-1-git-send-email-geert@linux-m68k.org>
- <1489324627-19126-6-git-send-email-geert@linux-m68k.org>
-Message-ID: <20170313130138.GV11350@io.lakedaemon.net>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Mon, 13 Mar 2017 14:08:21 +0100
+Subject: [PATCH v3 01/19] KVM: arm/arm64: Add vITS save/restore API
+ documentation
+In-Reply-To: <1488800074-21991-2-git-send-email-eric.auger@redhat.com>
+References: <1488800074-21991-1-git-send-email-eric.auger@redhat.com>
+ <1488800074-21991-2-git-send-email-eric.auger@redhat.com>
+Message-ID: <CAFEAcA_hobSQZvOQHGgdoJYw9q099GNrY=5ffjYO5YeePtKdNA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert,
+On 6 March 2017 at 12:34, Eric Auger <eric.auger@redhat.com> wrote:
+> Add description for how to access vITS registers and how to flush/restore
+> vITS tables into/from memory
+>
+> Signed-off-by: Eric Auger <eric.auger@redhat.com>
 
-On Sun, Mar 12, 2017 at 02:16:49PM +0100, Geert Uytterhoeven wrote:
-> Submitters of device tree binding documentation may forget to CC
-> the subsystem maintainer if this is missing.
-> 
-> Signed-off-by: Geert Uytterhoeven <geert@linux-m68k.org>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> Cc: Gregory Clement <gregory.clement@free-electrons.com>
-> Cc: linux-arm-kernel at lists.infradead.org
+I've had a look through this; a mix of typo corrections
+and other questions below. I'm not very familiar with the ITS
+so mostly it's requests for clarification...
+
 > ---
-> Please apply this patch directly if you want to be involved in device
-> tree binding documentation for your subsystem.
-> 
-> v2:
->   - No changes.
-> 
-> Impact on next-20170310:
-> 
-> +Jason Cooper <jason@lakedaemon.net> (maintainer:ARM/Marvell Dove/MV78xx0/Orion SOC support)
-> +Andrew Lunn <andrew@lunn.ch> (maintainer:ARM/Marvell Dove/MV78xx0/Orion SOC support)
-> +Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> (maintainer:ARM/Marvell Dove/MV78xx0/Orion SOC support)
-> +Gregory Clement <gregory.clement@free-electrons.com> (maintainer:ARM/Marvell Dove/MV78xx0/Orion SOC support)
->  Rob Herring <robh+dt@kernel.org> (maintainer:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS)
->  Mark Rutland <mark.rutland@arm.com> (maintainer:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS)
-> +linux-arm-kernel at lists.infradead.org (moderated list:ARM/Marvell Dove/MV78xx0/Orion SOC support)
->  devicetree at vger.kernel.org (open list:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS)
->  linux-kernel at vger.kernel.org (open list)
+>
+> v1 -> v2:
+> - DTE and ITE now are 8 bytes
+> - DTE and ITE now indexed by deviceid/eventid
+> - use ITE name instead of ITTE
+> - mentions ITT_addr matches bits [51:8] of the actual address
+> - mentions LE layout
 > ---
->  MAINTAINERS | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 6428d3c82fce9670..ce461fefec6c9463 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -1486,6 +1486,7 @@ M:	Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
->  M:	Gregory Clement <gregory.clement@free-electrons.com>
->  L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
->  S:	Maintained
-> +F:	Documentation/devicetree/bindings/soc/dove/
+>  Documentation/virtual/kvm/devices/arm-vgic-its.txt | 78 ++++++++++++++++++++++
+>  1 file changed, 78 insertions(+)
+>
+> diff --git a/Documentation/virtual/kvm/devices/arm-vgic-its.txt b/Documentation/virtual/kvm/devices/arm-vgic-its.txt
+> index 6081a5b..49ade0c 100644
+> --- a/Documentation/virtual/kvm/devices/arm-vgic-its.txt
+> +++ b/Documentation/virtual/kvm/devices/arm-vgic-its.txt
+> @@ -36,3 +36,81 @@ Groups:
+>      -ENXIO:  ITS not properly configured as required prior to setting
+>               this attribute
+>      -ENOMEM: Memory shortage when allocating ITS internal data
+> +
+> +  KVM_DEV_ARM_VGIC_GRP_ITS_REGS
+> +  Attributes:
+> +      The attr field of kvm_device_attr encodes the offset of the
+> +      ITS register, relative to the ITS control frame base address
+> +      (ITS_base).
+> +
+> +      kvm_device_attr.addr points to a __u64 value whatever the width
+> +      of the addressed register (32/64 bits).
+> +
+> +      Writes to read-only registers are ignored by the kernel except
+> +      for a single register, GITS_READR. Normally this register is RO
+> +      but it needs to be restored otherwise commands in the queue will
+> +      be re-executed after CWRITER setting.
+> +
+> +      For other registers, Getting or setting a register has the same
 
-I'm not opposed to the idea, but I'm not seeing how we can do this
-completely.  What you've added only covers dove soc bindings.  There's
-orion5x, kirkwood, and all the newer mvebu socs.  Not to mention a lot
-of IP blocks we care about that aren't SoC- or Marvell-specific.
+"getting"
 
-The dts files have a much more clear file pattern -> maintainer pairing.
-Perhaps we should make checkpatch smarter?  e.g. compatible strings
-found in changed binding docs are searched for in dts{i} files.  Hits
-are mapped to maintainers.
+> +      effect as reading/writing the register on real hardware.
+> +  Errors:
+> +    -ENXIO: Offset does not correspond to any supported register
+> +    -EFAULT: Invalid user pointer for attr->addr
+> +    -EINVAL: Offset is not 64-bit aligned
+> +
+> +  KVM_DEV_ARM_VGIC_GRP_ITS_TABLES
+> +  Attributes
+> +       The attr field of kvm_device_attr is not used.
 
-thoughts?
+I think we should say "must be zero, or the call fails with -ESOMETHING",
+so we have the option of using attr for something in future if needed.
 
-thx,
+> +
+> +       request the flush-save/restore of the ITS tables, namely
+> +       the device table, the collection table, all the ITT tables,
+> +       the LPI pending tables. On save, the tables are flushed
+> +       into guest memory at the location provisioned by the guest
+> +       in GITS_BASER (device and collection tables), on MAPD command
 
-Jason.
+should this be "in the MAPD command" ?
+
+> +       (ITT_addr), GICR_PENDBASERs (pending tables).
+> +
+> +       This means the GIC should be restored before the ITS and all
+> +       ITS registers but the GITS_CTRL must be restored before
+
+"GITS_CTLR".
+
+> +       restoring the ITS tables.
+> +
+> +       Note the LPI configuration table is read-only for the
+> +       in-kernel ITS and its save/restore goes through the standard
+> +       RAM save/restore.
+> +
+> +       The layout of the tables in guest memory defines an ABI.
+> +       The entries are laid in little endian format as follows;
+> +
+> +    The device table and ITE are respectively indexed by device id and
+> +    eventid. The collection table however is not indexed by collection id:
+> +    CTE are written at the beginning of the buffer.
+> +
+> +    Device Table Entry (DTE) layout: entry size = 8 bytes
+> +
+> +    bits:     | 63 ... 45 | 44 ... 5 | 4 ... 0 |
+> +    values:   |   next    | ITT_addr |  Size   |
+> +
+> +    where
+> +    - ITT_addr matches bits [48:8] of the ITT address (256B aligned).
+> +    - next field is meaningful only if the entry is valid (ITT_addr != NULL).
+
+Probably clearer as != 0, since it's a field rather than a pointer.
+
+The MAPD command lets the guest specify bits [50:8] of
+ITT address -- any reason for not storing bits [50:49] here?
+(in fact you can see the format of MAPD has more reserved
+bits for wider physical address sizes in future -- should
+we be trying to future proof our format too?)
+
+I don't see anything in the spec for MAPD that forbids the guest
+from using physical address 0 as the ITT_addr, though maybe I
+missed it.
+
+> +    It equals to 0 if this entry is the last one; otherwise it corresponds
+> +    to the minimum between the offset to the next device id and 2^19 -1.
+> +
+> +    Collection Table Entry (CTE) layout: entry size = 8 bytes
+> +
+> +    bits:     | 63| 62 ..  52  | 51 ... 16 | 15  ...   0 |
+> +    values:   | V |    RES0    |  RDBase   |    ICID     |
+> +
+
+We should document the meanings of the CTE fields here.
+
+> +    Interrupt Translation Entry (ITE) layout: entry size = 8 bytes
+> +
+> +    bits:     | 63 ... 48 | 47 ... 16 | 15 ... 0 |
+> +    values:   |    next   |   pINTID  |  ICID    |
+> +
+> +    - next field is meaningful only if the entry is valid (pINTID != NULL).
+> +    It equals to 0 if this entry is the last one; otherwise it corresponds
+> +    to the minimum between the eventid offset to the next ITE and 2^16 -1.
+
+This seems to be missing some of the fields in the suggested
+ITE contents in the GIC spec table 6-3. Is that OK?
+In particular it's missing the virtual-interrupt related fields.
+Is pINTID==0 really not a valid interrupt ID value?
+
+
+These CTE/ITE/DTE formats don't seem to have any kind of
+"escape hatch" for allowing backwards compatible extensions
+to the format. Do we need one? (I think that's particularly
+likely to be useful where there's an ITS feature we don't
+currently implement but might perhaps want to in future,
+like GICv4 virtual interrupt injection.)
+
+> +    LPI Pending Table layout:
+> +
+> +    As specified in the ARM Generic Interrupt Controller Architecture
+> +    Specification GIC Architecture version 3.0 and version 4. The first
+> +    1kB is not modified and therefore should contain zeroes.
+> --
+> 2.5.5
+
+thanks
+-- PMM
