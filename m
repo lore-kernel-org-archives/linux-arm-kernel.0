@@ -1,58 +1,30 @@
-From: moritz.fischer.private@gmail.com (Moritz Fischer)
-Date: Mon, 13 Mar 2017 09:18:31 -0700
-Subject: [PATCH 2/2] fpga: Add support for Xilinx LogiCORE PR Decoupler
-In-Reply-To: <2f21aeb3-dd4e-e170-729a-a785077b6f28@xilinx.com>
-References: <1489181435-3151-1-git-send-email-mdf@kernel.org>
- <1489181435-3151-2-git-send-email-mdf@kernel.org>
- <CAAtXAHe-AMq9Ux2LZZEWLcg8Dk6jTiHhrot4RhEVrxTBhnLE0g@mail.gmail.com>
- <2f21aeb3-dd4e-e170-729a-a785077b6f28@xilinx.com>
-Message-ID: <CAJYdmeM+OkvNHtXR7o7R7s418Q52KGDFH5B-oKWeMq-tkmwW2Q@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 13 Mar 2017 17:24:10 +0100
+Subject: [PATCH] clk: sunxi: ccu-sun5i needs nkmp
+In-Reply-To: <20170216175318.fuj375743jt43um4@lukather>
+References: <20170214213005.2848151-1-arnd@arndb.de>
+ <20170216175318.fuj375743jt43um4@lukather>
+Message-ID: <CAK8P3a13rqommB90NP_aNPgcoYXb9u=LYs7ep3U=c3C6-3wPHA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 13, 2017 at 3:27 AM, Michal Simek <michal.simek@xilinx.com> wrote:
-> Hi Moritz,
+On Thu, Feb 16, 2017 at 6:53 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Tue, Feb 14, 2017 at 10:29:45PM +0100, Arnd Bergmann wrote:
+>> A randconfig build ran into this rare link error:
+>>
+>> drivers/clk/sunxi-ng/ccu-sun5i.o:(.data.__compound_literal.1+0x4): undefined reference to `ccu_nkmp_ops'
+>> drivers/clk/sunxi-ng/ccu-sun5i.o:(.data.__compound_literal.7+0x4): undefined reference to `ccu_nkmp_ops'
+>>
+>> This adds the missing 'select'.
+>>
+>> Fixes: 5e73761786d6 ("clk: sunxi-ng: Add sun5i CCU driver")
+>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 >
-> On 10.3.2017 23:42, Moritz Fischer wrote:
->> On Fri, Mar 10, 2017 at 1:30 PM, Moritz Fischer <mdf@kernel.org> wrote:
->>> This adds support for the Xilinx LogiCORE PR Decoupler
->>> soft-ip that does decoupling of PR regions in the FPGA
->>> fabric during partial reconfiguration.
->>>
->>> Signed-off-by: Moritz Fischer <mdf@kernel.org>
->>> Cc: Michal Simek <michal.simek@xilinx.com>
->>> Cc: S?ren Brinkmann <soren.brinkmann@xilinx.com>
->>> Cc: linux-kernel at vger.kernel.org
->>> Cc: devicetree at vger.kernel.org
->>> ---
->>>  drivers/fpga/Kconfig               |   9 +++
->>>  drivers/fpga/Makefile              |   1 +
->>>  drivers/fpga/xilinx-pr-decoupler.c | 156 +++++++++++++++++++++++++++++++++++++
->>>  3 files changed, 166 insertions(+)
->>>  create mode 100644 drivers/fpga/xilinx-pr-decoupler.c
->
-> I have written very similar driver some week ago but didn't sent it out.
+> Queued as a fix for 4.11, thanks!
 
-Hah. I'll take a look.
+I just checked my old patches and this seems to still be required as of
+4.11-rc2. I see it in linux-next through sunxi/sunxi/for-next, but not as
+part of a clk-fixes merge.
 
-> Here it is.
-> https://github.com/Xilinx/linux-xlnx/blob/master/drivers/fpga/xilinx-pr-decoupler.c
->
-> Your clk handling is better and my enable_show is better.
-> You shouldn't rely on setting status before. It is better to read that
-> reg again. The reason is you can connect status signal from one PR
-> decoupler to decouple input which can change status
-
-I will just merge them together and add you to author's list if that's
-fine with you?
-
-> There is another topic I wanted to open in connection to this. There
-> should be gpio based bridge because this pr decoupler can be without axi
-> interface and for that gpio driver would be useful.
-
-That's a good idea. I can look at that. This can be pretty generic
-code I suppose.
-
-Cheers,
-
-Moritz
+    Arnd
