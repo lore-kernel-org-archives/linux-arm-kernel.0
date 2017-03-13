@@ -1,70 +1,34 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 13 Mar 2017 17:55:46 +0000
-Subject: Legacy features in PCI Express devices
-In-Reply-To: <58fb1386-fa94-dde3-b361-597f9486fa41@free.fr>
-References: <ef5c9778-fbae-9f4f-ac2e-29b8597537a5@free.fr>
- <96b57ba5-641d-46c8-6ba0-cee2c0613a6f@arm.com>
- <58fb1386-fa94-dde3-b361-597f9486fa41@free.fr>
-Message-ID: <2d8365c0-f46e-981f-beba-1331bd00b707@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 13 Mar 2017 18:03:00 +0000
+Subject: [PATCH v3 02/25] arm64: KVM: Implement HVC_RESET_VECTORS stub
+ hypercall
+In-Reply-To: <58C6DCB7.1010705@arm.com> (James Morse's message of "Mon, 13 Mar
+ 2017 17:53:59 +0000")
+References: <20170306142458.8875-1-marc.zyngier@arm.com>
+ <20170306142458.8875-3-marc.zyngier@arm.com>
+ <58C6DCB7.1010705@arm.com>
+Message-ID: <87a88pt5pn.fsf@on-the-bus.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/03/17 17:39, Mason wrote:
-> On 13/03/2017 18:12, Robin Murphy wrote:
-> 
->> On 13/03/17 16:10, Mason wrote:
->>
->>> There are two revisions of our PCI Express controller.
->>>
->>> Rev 1 did not support the following features:
->>>
->>>   1) legacy PCI interrupt delivery (INTx signals)
->>>   2) I/O address space
->>>
->>> Internally, someone stated that such missing support would prevent
->>> some PCIe cards from working with our controller.
->>>
->>> Are there really modern PCIe cards that require 1) and/or 2)
->>> to function?
->>>
->>> Can someone provide examples of such cards, so that I may test them
->>> on both revisions?
->>>
->>> I was told to check ath9k-based cards. Any other examples?
->>>
->>> Looking around, I came across this thread:
->>> http://lists.infradead.org/pipermail/linux-arm-kernel/2016-March/418254.html
->>> "i.MX6 PCIe: Fix imx6_pcie_deassert_core_reset() polarity"
->>>
->>> IIUC, although some PCIe boards do support MSI, the driver might not
->>> put in the work to use that infrastructure, and instead reverts to
->>> legacy interrupts. (So it is a SW issue, in a sense.)
->>
->> Secondary to that category is endpoints which nominally support MSI, but
->> in a way which is unreliable or otherwise broken. My experience shows
->> that the Silicon Image SiI 3132 (as integrated on ARM Juno boards, but
->> seemingly also relatively common on 'generic' 2-port SATA cards) falls
->> into that category - using the command-line parameter to force MSIs
->> instead of legacy interrupts leads to the the machine barely reaching
->> userspace before something goes horribly wrong:
-> 
-> Do drivers typically support *both* MSI and INTx?
+On Mon, Mar 13 2017 at  5:53:59 pm GMT, James Morse <james.morse@arm.com> wrote:
+> On 06/03/17 14:24, Marc Zyngier wrote:
+>> In order to restore HYP mode to its original condition, KVM currently
+>> implements __kvm_hyp_reset(). As we're moving towards a hyp-stub
+>> defined API, it becomes necessary to implement HVC_RESET_VECTORS.
+>> 
+>> This patch adds the HVC_RESET_VECTORS hypercall to the KVM init
+>> code, which so far lacked any form of hypercall support.
+>
+> (Nit: other patches to the init code in this series have 'init' in the subject,
+> this one doesn't.)
 
-I'm not sure about "typically", but it certainly happens. For example,
-the Intel e1000e NIC driver is one I know of which can fall back from
-MSI-X to MSI to legacy dynamically.
+Good point, I'll update the series locally to reflect this.
 
-> Specifically, would the xhci driver support both?
+> Reviewed-by: James Morse <james.morse@arm.com>
 
-Line 415 of xhci.c would appear to imply so.
+Thanks!
 
-> If I remove MSI support from my kernel, I might be able to test
-> legacy interrupt support that way, right?
-
-Indeed, disabling CONFIG_PCI_MSI should leave drivers with no other choice.
-
-Robin.
-
-> 
-> Regards.
-> 
+	M.
+-- 
+Jazz is not dead, it just smell funny.
