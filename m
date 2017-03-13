@@ -1,36 +1,32 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Mon, 13 Mar 2017 19:52:51 +0530
-Subject: [PATCH v4 15/23] dt-bindings: PCI: dra7xx: Add dt bindings to enable
- unaligned access
+Date: Mon, 13 Mar 2017 19:52:52 +0530
+Subject: [PATCH v4 16/23] PCI: Add device IDs for DRA74x and DRA72x
 In-Reply-To: <20170313142259.25397-1-kishon@ti.com>
 References: <20170313142259.25397-1-kishon@ti.com>
-Message-ID: <20170313142259.25397-16-kishon@ti.com>
+Message-ID: <20170313142259.25397-17-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update device tree binding documentation of TI's dra7xx PCI
-controller to include property for enabling unaligned mem access.
+Add device IDs for DRA74x and DRA72x devices. These devices have
+configurable PCI endpoint.
 
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- Documentation/devicetree/bindings/pci/ti-pci.txt | 5 +++++
- 1 file changed, 5 insertions(+)
+ include/linux/pci_ids.h | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/pci/ti-pci.txt b/Documentation/devicetree/bindings/pci/ti-pci.txt
-index 190828a5f32a..b69dd7dbd29e 100644
---- a/Documentation/devicetree/bindings/pci/ti-pci.txt
-+++ b/Documentation/devicetree/bindings/pci/ti-pci.txt
-@@ -39,6 +39,11 @@ DEVICE MODE
-  - interrupts : one interrupt entries must be specified for main interrupt.
-  - num-ib-windows : number of inbound address translation windows
-  - num-ob-windows : number of outbound address translation windows
-+ - ti,syscon-unaligned-access: phandle to the syscon dt node. The 1st argument
-+			       should contain the register offset within syscon
-+			       and the 2nd argument should contain the bit field
-+			       for setting the bit to enable unaligned
-+			       access.
+diff --git a/include/linux/pci_ids.h b/include/linux/pci_ids.h
+index a4f77feecbb0..5f6b71d15393 100644
+--- a/include/linux/pci_ids.h
++++ b/include/linux/pci_ids.h
+@@ -862,6 +862,8 @@
+ #define PCI_DEVICE_ID_TI_X620		0xac8d
+ #define PCI_DEVICE_ID_TI_X420		0xac8e
+ #define PCI_DEVICE_ID_TI_XX20_FM	0xac8f
++#define PCI_DEVICE_ID_TI_DRA74x		0xb500
++#define PCI_DEVICE_ID_TI_DRA72x		0xb501
  
- Optional Property:
-  - gpios : Should be added if a gpio line is required to drive PERST# line
+ #define PCI_VENDOR_ID_SONY		0x104d
+ 
 -- 
 2.11.0
