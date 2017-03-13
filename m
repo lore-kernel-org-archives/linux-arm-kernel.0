@@ -1,56 +1,42 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 13 Mar 2017 20:22:53 +0800
-Subject: [PATCH v4 5/7] arm: dts: imx6q-icore: Add touchscreen node
-In-Reply-To: <1488957477-5621-5-git-send-email-jagan@openedev.com>
-References: <1488957477-5621-1-git-send-email-jagan@openedev.com>
- <1488957477-5621-5-git-send-email-jagan@openedev.com>
-Message-ID: <20170313122252.GE3618@dragon>
+From: dingtianhong@huawei.com (Ding Tianhong)
+Date: Mon, 13 Mar 2017 20:03:08 +0800
+Subject: [PATCH] arm64: enable ARCH_WANT_RELAX_ORDER for aarch64
+Message-ID: <35233df0-3406-e66f-d9d2-bf7ed7814386@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 08, 2017 at 12:47:55PM +0530, Jagan Teki wrote:
-> From: Jagan Teki <jagan@amarulasolutions.com>
-> 
-> max11801 touchscreen on Engicam iCoreM6 Quad module is
-> connected via i2c1, so add tc: max11801 at 48 on i2c1.
-> 
-> Cc: Domenico Acri <domenico.acri@engicam.com>
-> Cc: Matteo Lisi <matteo.lisi@engicam.com>
-> Cc: Michael Trimarchi <michael@amarulasolutions.com>
-> Cc: Shawn Guo <shawnguo@kernel.org>
-> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-> ---
-> Changes for v4:
-> - Newly added patch.
-> 
->  arch/arm/boot/dts/imx6q-icore.dts | 9 +++++++++
->  1 file changed, 9 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/imx6q-icore.dts b/arch/arm/boot/dts/imx6q-icore.dts
-> index 73f34d1..8c1a572 100644
-> --- a/arch/arm/boot/dts/imx6q-icore.dts
-> +++ b/arch/arm/boot/dts/imx6q-icore.dts
-> @@ -58,6 +58,15 @@
->  	status = "okay";
->  };
->  
-> +&i2c1 {
-> +	ts: max11801 at 48 {
-> +		compatible = "max11801";
+The ARCH_WANT_RELAX_ORDER will enable Relaxed Ordering (RO) which allows
+transactions that do not have any order of completion requirements to
+complete more efficiently compare to the Stricted Ordering (SO) for ixbge
+nic card. The system will see high write-to-memory performance when RO is
+enabled on the data transactions just like the SPARC did.
 
-Undocumented compatible?
+The aarch64 pcie controller could both support Relaxed Ordering (RO)
+and Stricted Ordering (SO), so enable ARCH_WANT_RELAX_ORDER for ixgbe
+nic card to get much more better performance, and didn't see any
+adverse effects.
 
-Shawn
+Nic Card(Ixgbe)			Disable RO	|	Enable RO
+Performance(Per thread)		8.4Gb/s		|	9.4Gb/s
 
-> +		reg = <0x48>;
-> +		interrupt-parent = <&gpio3>;
-> +		interrupts = <31 IRQ_TYPE_EDGE_FALLING>;
-> +	};
-> +};
-> +
->  &ldb {
->  	status = "okay";
->  
-> -- 
-> 1.9.1
-> 
+Tested by Iperf on Hip06/Hip07 Soc Board.
+
+Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
+---
+ arch/arm64/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 8c7c244..36249a3 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -115,6 +115,7 @@ config ARM64
+ 	select SPARSE_IRQ
+ 	select SYSCTL_EXCEPTION_TRACE
+ 	select THREAD_INFO_IN_TASK
++	select ARCH_WANT_RELAX_ORDER
+ 	help
+ 	  ARM 64-bit (AArch64) Linux support.
+
+-- 
+1.9.0
