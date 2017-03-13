@@ -1,81 +1,98 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 13 Mar 2017 21:58:08 +0100
-Subject: [PATCH] mtd: nand: orion: fix clk handling
-In-Reply-To: <20170313204344.GA24471@gandalf>
-References: <20170312213406.20987-1-gmbnomis@gmail.com>
- <20170313071241.y5ydl274t22awrys@pengutronix.de>
- <20170313204344.GA24471@gandalf>
-Message-ID: <20170313205808.tpov2l4cd7b7b54p@pengutronix.de>
+From: sakari.ailus@iki.fi (Sakari Ailus)
+Date: Mon, 13 Mar 2017 23:03:50 +0200
+Subject: [PATCH v4 29/36] media: imx: mipi-csi2: enable setting and
+ getting of frame rates
+In-Reply-To: <27397114-7d77-2353-c526-bddd5f5297d9@gmail.com>
+References: <1487211578-11360-1-git-send-email-steve_longerbeam@mentor.com>
+ <1487211578-11360-30-git-send-email-steve_longerbeam@mentor.com>
+ <20170220220409.GX16975@valkosipuli.retiisi.org.uk>
+ <20170221001332.GS21222@n2100.armlinux.org.uk>
+ <25596b21-70de-5e46-f149-f9ce3a86ecb7@gmail.com>
+ <1487667023.2331.8.camel@pengutronix.de>
+ <20170313131647.GB10701@valkosipuli.retiisi.org.uk>
+ <20170313132701.GJ21222@n2100.armlinux.org.uk>
+ <1489413301.2288.53.camel@pengutronix.de>
+ <27397114-7d77-2353-c526-bddd5f5297d9@gmail.com>
+Message-ID: <20170313210349.GD10701@valkosipuli.retiisi.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Simon,
+Hi Steve,
 
-On Mon, Mar 13, 2017 at 09:43:44PM +0100, Simon Baatz wrote:
-> Hello Uwe,
+On Mon, Mar 13, 2017 at 11:06:22AM -0700, Steve Longerbeam wrote:
 > 
-> On Mon, Mar 13, 2017 at 08:12:41AM +0100, Uwe Kleine-K?nig wrote:
-> > Hello Simon,
-> > 
-> > On Sun, Mar 12, 2017 at 10:34:06PM +0100, Simon Baatz wrote:
-> > > The clk handling in orion_nand.c had two problems:
-> > > 
-> > > - In the probe function, clk_put() was called for an enabled clock,
-> > >   which violates the API (see documentation for clk_put() in
-> > >   include/linux/clk.h)
-> > > 
-> > > - In the error path of the probe function, clk_put() could be called
-> > >   twice for the same clock.
-> > > 
-> > > In order to clean this up, use the managed function devm_clk_get() and
-> > > store the pointer to the clk in the driver data.
 > 
-> ...
+> On 03/13/2017 06:55 AM, Philipp Zabel wrote:
+> >On Mon, 2017-03-13 at 13:27 +0000, Russell King - ARM Linux wrote:
+> >>On Mon, Mar 13, 2017 at 03:16:48PM +0200, Sakari Ailus wrote:
+> >>>The vast majority of existing drivers do not implement them nor the user
+> >>>space expects having to set them. Making that mandatory would break existing
+> >>>user space.
+> >>>
+> >>>In addition, that does not belong to link validation either: link validation
+> >>>should only include static properties of the link that are required for
+> >>>correct hardware operation. Frame rate is not such property: hardware that
+> >>>supports the MC interface generally does not recognise such concept (with
+> >>>the exception of some sensors). Additionally, it is dynamic: the frame rate
+> >>>can change during streaming, making its validation at streamon time useless.
+> >>
+> >>So how do we configure the CSI, which can do frame skipping?
+> >>
+> >>With what you're proposing, it means it's possible to configure the
+> >>camera sensor source pad to do 50fps.  Configure the CSI sink pad to
+> >>an arbitary value, such as 30fps, and configure the CSI source pad to
+> >>15fps.
+> >>
+> >>What you actually get out of the CSI is 25fps, which bears very little
+> >>with the actual values used on the CSI source pad.
+> >>
+> >>You could say "CSI should ask the camera sensor" - well, that's fine
+> >>if it's immediately downstream, but otherwise we'd need to go walking
+> >>down the graph to find something that resembles its source - there may
+> >>be mux and CSI2 interface subdev blocks in that path.  Or we just accept
+> >>that frame rates are completely arbitary and bear no useful meaning what
+> >>so ever.
+> >
+> >Which would include the frame interval returned by VIDIOC_G_PARM on the
+> >connected video device, as that gets its information from the CSI output
+> >pad's frame interval.
+> >
 > 
-> > >  	/* Not all platforms can gate the clock, so it is not
-> > >  	   an error if the clock does not exists. */
-> > > -	clk = clk_get(&pdev->dev, NULL);
-> > > -	if (!IS_ERR(clk)) {
-> > > -		clk_prepare_enable(clk);
-> > > -		clk_put(clk);
-> > > -	}
-> > > +	info->clk = devm_clk_get(&pdev->dev, NULL);
-> > > +	if (!IS_ERR(info->clk))
-> > > +		clk_prepare_enable(info->clk);
-> > 
-> > Orthogonal to your patch I suggest:
-> > 
-> > -	info->clk = devm_clk_get(&pdev->dev, NULL);
-> > -	if (!IS_ERR(info->clk))
-> > -		clk_prepare_enable(info->clk);
-> > +	info->clk = devm_clk_get_optional(&pdev->dev, NULL);
-> > +	if (IS_ERR(info->clk)) {
-> > +		ret = PTR_ERR(info->clk);
-> > +		if (ret != -EPROBE_DEFER)
-> > +			dev_err(...);
-> > +		return ret;
-> > +	}
-> > 
-> > to correct error handling.
-> > (I didn't check if a plain return is right here, and also other users of
-> > info->clk need adaption.)
+> I'm kinda in the middle on this topic. I agree with Sakari that
+> frame rate can fluctuate, but that should only be temporary. If
+> the frame rate permanently shifts from what a subdev reports via
+> g_frame_interval, then that is a system problem. So I agree with
+> Phillip and Russell that a link validation of frame interval still
+> makes sense.
 > 
-> Nice! However, I can't find a devm_clk_get_optional() anywhere(?) Is
-> it in some upcoming patch?
+> But I also have to agree with Sakari that a subdev that has no
+> control over frame rate has no business implementing those ops.
+> 
+> And then I agree with Russell that for subdevs that do have control
+> over frame rate, they would have to walk the graph to find the frame
+> rate source.
+> 
+> So we're stuck in a broken situation: either the subdevs have to walk
+> the graph to find the source of frame rate, or s_frame_interval
+> would have to be mandatory and validated between pads, same as set_fmt.
 
-Oh really. I was sure I already made use of it. Probably consfused it
-with the gpio or regulator API which have such variants. (But be aware,
-they are sematically different. If you look for a place to copy from
-please stick to the gpio sematic.)
+It's not broken; what we are missing though is documentation on how to
+control devices that can change the frame rate i.e. presumably drop frames
+occasionally.
 
-Then either send a patch creating clk_get_optional and friends, or only
-ignore -ENODEV but propagate the other error values. (Maybe the most
-rational path is to do both and switch the driver once clk_get_optional
-is available.)
+If you're doing something that hasn't been done before, it may be that new
+documentation needs to be written to accomodate that use case. As we have an
+existing interface (VIDIOC_SUBDEV_[GS]_FRAME_INTERVAL) it does make sense
+to use that. What is not possible, though, is to mandate its use in link
+validation everywhere.
 
-Best regards
-Uwe
+If you had a hardware limitation that would require that the frame rate is
+constant, then we'd need to handle that in link validation for that
+particular piece of hardware. But there really is no case for doing that for
+everything else.
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Kind regards,
+
+Sakari Ailus
+e-mail: sakari.ailus at iki.fi	XMPP: sailus at retiisi.org.uk
