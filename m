@@ -1,38 +1,53 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 13 Mar 2017 16:41:31 +0800
-Subject: [PATCH 1/4] arm: defconfig: imx6: Added CONFIG_FHANDLE
-In-Reply-To: <20170219202801.2082-2-plaes@plaes.org>
-References: <20170219202801.2082-1-plaes@plaes.org>
- <20170219202801.2082-2-plaes@plaes.org>
-Message-ID: <20170313084129.GA3618@dragon>
+From: mayurkumar.patel@intel.com (Patel, Mayurkumar)
+Date: Mon, 13 Mar 2017 08:49:30 +0000
+Subject: [PATCH V3] PCI/ASPM: reconfigure ASPM following hotplug for
+ POLICY_DEFAULT
+In-Reply-To: <ec7ee607-60f3-7e1a-b1cd-8e4534ab98eb@codeaurora.org>
+References: <1489005551-23598-1-git-send-email-okaya@codeaurora.org>
+ <20170309222751.GD19517@bhelgaas-glaptop.roam.corp.google.com>
+ <ec7ee607-60f3-7e1a-b1cd-8e4534ab98eb@codeaurora.org>
+Message-ID: <92EBB4272BF81E4089A7126EC1E7B28466670D75@IRSMSX101.ger.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 19, 2017 at 10:27:58PM +0200, Priit Laes wrote:
-> CONFIG_FHANDLE is a must-have for newer distributions with systemd
-> support (including Debian stable).
-> 
-> Signed-off-by: Priit Laes <plaes@plaes.org>
 
-'ARM: imx_v6_v7_defconfig: ...' for subject prefix.
+>
+>Hi Bjorn,
+>
+>On 3/9/2017 5:27 PM, Bjorn Helgaas wrote:
+>> How hard do you think it would be to rework this path slightly so we:
+>>
+>>   - call pcie_aspm_init_link_state() for every device, maybe from
+>>     pci_init_capabilities()
+>>
+>>   - for bridges, have pcie_aspm_init_link_state() allocate a
+>>     link_state, regardless of whether it currently has any children,
+>>     and save the ASPM settings done by firmware
+>>
+>>   - for endpoints, have pcie_aspm_init_link_state() do the actual ASPM
+>>     setup of the link as it currently does
+>>
+>>   - for endpoints, change pcie_aspm_exit_link_state() so it cleans up
+>>     the device's own state and disables ASPM if necessary, but doesn't
+>>     remove the parent's link_state
+>>
+>>   - for bridges, change pcie_aspm_exit_link_state() so it frees the
+>>     bridge's own link_state
+>
+>Thanks for the feedback, Let me take a stab at this.
+>Sinan
 
-Shawn
+Thanks Bjorn and Sinan. I will wait for new patch-sets from Sinan.
 
-> ---
->  arch/arm/configs/imx_v6_v7_defconfig | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-> index cbe7faf..701db9a 100644
-> --- a/arch/arm/configs/imx_v6_v7_defconfig
-> +++ b/arch/arm/configs/imx_v6_v7_defconfig
-> @@ -1,5 +1,6 @@
->  CONFIG_KERNEL_LZO=y
->  CONFIG_SYSVIPC=y
-> +CONFIG_FHANDLE=y
->  CONFIG_NO_HZ=y
->  CONFIG_HIGH_RES_TIMERS=y
->  CONFIG_IKCONFIG=y
-> -- 
-> 2.9.3
-> 
+>
+>--
+>Sinan Kaya
+>Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+>Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Intel Deutschland GmbH
+Registered Address: Am Campeon 10-12, 85579 Neubiberg, Germany
+Tel: +49 89 99 8853-0, www.intel.de
+Managing Directors: Christin Eisenschmid, Christian Lamprechter
+Chairperson of the Supervisory Board: Nicole Lau
+Registered Office: Munich
+Commercial Register: Amtsgericht Muenchen HRB 186928
