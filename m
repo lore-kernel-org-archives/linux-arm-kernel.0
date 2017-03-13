@@ -1,47 +1,59 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon, 13 Mar 2017 17:06:46 -0400
-Subject: [PATCH V3] PCI/ASPM: reconfigure ASPM following hotplug for
- POLICY_DEFAULT
-In-Reply-To: <20170309222751.GD19517@bhelgaas-glaptop.roam.corp.google.com>
-References: <1489005551-23598-1-git-send-email-okaya@codeaurora.org>
- <20170309222751.GD19517@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <48b14a37-3b5c-e128-aa96-b924d05b7636@codeaurora.org>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Mon, 13 Mar 2017 22:07:42 +0100
+Subject: [PATCH] ARM: at91: pm: cpu_idle: switch DDR to power-down mode
+In-Reply-To: <20170313171450.18681-1-nicolas.ferre@microchip.com>
+References: <20170313171450.18681-1-nicolas.ferre@microchip.com>
+Message-ID: <20170313210742.r7jdbuyp72ma76vl@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
-
-On 3/9/2017 5:27 PM, Bjorn Helgaas wrote:
-> This is an aspect of the ASPM design that I don't like:
+On 13/03/2017 at 18:14:50 +0100, Nicolas Ferre wrote:
+> On some DDR controllers, compatible with the sama5d3 one,
+> the sequence to enter/exit/re-enter the self-refresh mode adds
+> more constrains than what is currently written in the at91_idle
+> driver. An actual access to the DDR chip is needed between exit
+> and re-enter of this mode which is somehow difficult to implement.
+> This sequence can completely hang the SoC. It is particularly
+> experienced on parts which embed a L2 cache if the code run
+> between IDLE calls fits in it...
 > 
->   - pcie_aspm_init_link_state() is called on a *bridge* after we've
->     enumerated any devices below the bridge, and we allocate the
->     link_state.
+> Moreover, as the intention is to enter and exit pretty rapidly
+> from IDLE, the power-down mode is a good candidate.
 > 
->   - pcie_aspm_exit_link_state() is called on an *endpoint*, and if
->     we're removing the last endpoint below a bridge, we release the
->     *parent's* link_state.
+> So now we use power-down instead of self-refresh. As we can
+> simplify the funciton for sama5d3 compatible DDR controllers,
+              typo ^
 
-I just posted V4 a minute ago. I divided ASPM init into two so that the
-ASPM registers are captured in device_add path. 
+> we instanciate a new sama5d3_ddr_standby() function.
+> 
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+> ---
+>  arch/arm/mach-at91/pm.c | 19 ++++++++++++++++++-
+>  1 file changed, 18 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
+> index 3d89b7905bd9..63e7df8ec815 100644
+> --- a/arch/arm/mach-at91/pm.c
+> +++ b/arch/arm/mach-at91/pm.c
+> @@ -289,6 +289,23 @@ static void at91_ddr_standby(void)
+>  		at91_ramc_write(1, AT91_DDRSDRC_LPR, saved_lpr1);
+>  }
+>  
+> +static void sama5d3_ddr_standby(void)
+> +{
+> +	u32 lpr0;
+> +	u32 saved_lpr0;
+> +
+> +	saved_lpr0 = at91_ramc_read(0, AT91_DDRSDRC_LPR);
+> +	lpr0 = saved_lpr0 & ~AT91_DDRSDRC_LPCB;
+> +	lpr0 |= AT91_DDRSDRC_LPCB_POWER_DOWN;
+> +
+> +	/* self-refresh mode now */
 
-There is a section of the ASPM init code that needs to walk all the devices
-under the bridge. 
-
-This section of the code is not working in device_add path as the link list
-for child devices has not been set up yet. 
-
-Unless you tell me there is a better way to handle this, I don't see how
-we can remove the call from scan_slot. 
-
-After further review, I think I can split PATCH V4 3/3 into two. Before
-diving into too much clean up, I wanted to get some feedback as it is
-obvious from the messed up cover letter.
-
-Sinan
+So this is not self refresh anymore
 
 
 -- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
