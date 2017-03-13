@@ -1,72 +1,235 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 13 Mar 2017 13:31:12 +0000
-Subject: [PATCH] arm64: enable ARCH_WANT_RELAX_ORDER for aarch64
-In-Reply-To: <35233df0-3406-e66f-d9d2-bf7ed7814386@huawei.com>
-References: <35233df0-3406-e66f-d9d2-bf7ed7814386@huawei.com>
-Message-ID: <d97d0876-3e00-1979-72de-35fd81bfedf5@arm.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 13 Mar 2017 14:31:32 +0100
+Subject: [PATCH v5 3/4] clk: samsung: exynos5433: Add runtime PM support
+In-Reply-To: <1485345194-3196-4-git-send-email-m.szyprowski@samsung.com>
+References: <CGME20170125115329eucas1p1f42bbb54d5973b6192e964dc8b3a8081@eucas1p1.samsung.com>
+ <1485345194-3196-1-git-send-email-m.szyprowski@samsung.com>
+ <1485345194-3196-4-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <CAPDyKFotSo5qcJPt9w99Rf3i_kvQnBZE36iBbfDfuBkiKhsoTw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/03/17 12:03, Ding Tianhong wrote:
-> The ARCH_WANT_RELAX_ORDER will enable Relaxed Ordering (RO) which allows
-> transactions that do not have any order of completion requirements to
-> complete more efficiently compare to the Stricted Ordering (SO) for ixbge
-> nic card.
-
-Which ixgbe NIC? As far as I can see we have an arch-level config option
-here which applies to one single driver, and doesn't even cover all the
-hardware supported by that driver (82598, for example, still has the
-#ifndef CONFIG_SPARC in the equivalent place). Looking at the history,
-I'd prefer to at least know what the "various issues with certain
-chipsets" were, and why they wouldn't affect ARM systems,  before making
-any judgement about whether this could be considered universally safe
-for arm64.
-
-> The system will see high write-to-memory performance when RO is
-> enabled on the data transactions just like the SPARC did.
-> 
-> The aarch64 pcie controller could both support Relaxed Ordering (RO)
-
-What is "the AArch64 PCIe controller", exactly? Disregarding that
-talking of PCIe in terms of the CPU ISA makes little sense, I can barely
-name two ARMv8-based systems which nominally use the same PCIe IP, and
-the amount of various quirks and incompatibilities I'm aware of leaves
-me with the default assumption that any such unqualified blanket
-statement is probably wrong. I think we need some much more considered
-reasoning here.
-
-> and Stricted Ordering (SO), so enable ARCH_WANT_RELAX_ORDER for ixgbe
-> nic card to get much more better performance, and didn't see any
-> adverse effects.
-> 
-> Nic Card(Ixgbe)			Disable RO	|	Enable RO
-> Performance(Per thread)		8.4Gb/s		|	9.4Gb/s
-> 
-> Tested by Iperf on Hip06/Hip07 Soc Board.
-> 
-> Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
+On 25 January 2017 at 12:53, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+> Add runtime pm support for all clock controller units (CMU), which belongs
+> to power domains and require special handling during on/off operations.
+> Typically special values has to be written to MUX registers to change
+> internal clocks parents to OSC clock before turning power off. During such
+> operation all clocks, which enters CMU has to be enabled to let MUX to
+> stabilize. Also for each CMU there is one special parent clock, which has
+> to be enabled all the time when any access to CMU registers is done.
+>
+> This patch solves most of the mysterious external abort and freeze issues
+> caused by a lack of proper parent CMU clock enabled or incorrect turn off
+> procedure.
+>
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 > ---
->  arch/arm64/Kconfig | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 8c7c244..36249a3 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -115,6 +115,7 @@ config ARM64
->  	select SPARSE_IRQ
->  	select SYSCTL_EXCEPTION_TRACE
->  	select THREAD_INFO_IN_TASK
-> +	select ARCH_WANT_RELAX_ORDER
 
-I'd say the first order of business is to rename this config option to
-IXBGE_82599_WANT_RELAXED_ORDER so that it's not entirely misleading and
-ambiguous. At first glance it looks far more like something scary to do
-with memory barriers than a network driver option. Howcome this isn't
-just in drivers/net/intel/Kconfig as a "default y if SPARC" bool anyway?
+[...]
 
-Robin.
+> --- a/drivers/clk/samsung/clk-exynos5433.c
+> +++ b/drivers/clk/samsung/clk-exynos5433.c
+> @@ -9,9 +9,14 @@
+>   * Common Clock Framework support for Exynos5443 SoC.
+>   */
+>
+> +#include <linux/clk.h>
+>  #include <linux/clk-provider.h>
+>  #include <linux/of.h>
+>  #include <linux/of_address.h>
+> +#include <linux/of_device.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/pm_runtime.h>
+> +#include <linux/slab.h>
+>
+>  #include <dt-bindings/clock/exynos5433.h>
+>
 
->  	help
->  	  ARM 64-bit (AArch64) Linux support.
-> 
+[...]
+
+> +struct exynos5433_cmu_data {
+> +       struct samsung_clk_provider ctx;
+> +
+> +       struct samsung_clk_reg_dump *clk_save;
+> +       unsigned int nr_clk_save;
+> +       const struct samsung_clk_reg_dump *clk_suspend;
+> +       unsigned int nr_clk_suspend;
+> +
+> +       struct clk *clk;
+> +       struct clk **pclks;
+> +       int nr_pclks;
+> +};
+> +
+> +static int exynos5433_cmu_suspend(struct device *dev)
+> +{
+> +       struct exynos5433_cmu_data *data = dev_get_drvdata(dev);
+> +       int i;
+> +
+> +       samsung_clk_save(data->ctx.reg_base, data->clk_save,
+> +                        data->nr_clk_save);
+> +
+> +       for (i = 0; i < data->nr_pclks; i++)
+> +               clk_enable(data->pclks[i]);
+> +
+> +       samsung_clk_restore(data->ctx.reg_base, data->clk_suspend,
+> +                           data->nr_clk_suspend);
+> +
+> +       for (i = 0; i < data->nr_pclks; i++)
+> +               clk_disable(data->pclks[i]);
+> +
+> +       clk_disable(data->clk);
+> +
+> +       return 0;
+> +}
+> +
+> +static int exynos5433_cmu_resume(struct device *dev)
+> +{
+> +       struct exynos5433_cmu_data *data = dev_get_drvdata(dev);
+> +       int i;
+> +
+> +       clk_enable(data->clk);
+> +
+> +       for (i = 0; i < data->nr_pclks; i++)
+> +               clk_enable(data->pclks[i]);
+> +
+> +       samsung_clk_restore(data->ctx.reg_base, data->clk_save,
+> +                           data->nr_clk_save);
+> +
+> +       for (i = 0; i < data->nr_pclks; i++)
+> +               clk_disable(data->pclks[i]);
+> +
+> +       return 0;
+> +}
+> +
+> +static int __init exynos5433_cmu_probe(struct platform_device *pdev)
+> +{
+> +       const struct samsung_cmu_info *info;
+> +       struct exynos5433_cmu_data *data;
+> +       struct samsung_clk_provider *ctx;
+> +       struct device *dev = &pdev->dev;
+> +       struct resource *res;
+> +       void __iomem *reg_base;
+> +       struct clk **clk_table;
+> +       int i;
+> +
+> +       info = of_device_get_match_data(dev);
+> +
+> +       data = devm_kzalloc(dev, sizeof(*data), GFP_KERNEL);
+> +       if (!data)
+> +               return -ENOMEM;
+> +       ctx = &data->ctx;
+> +
+> +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +       reg_base = devm_ioremap_resource(dev, res);
+> +       if (!reg_base) {
+> +               dev_err(dev, "failed to map registers\n");
+> +               return -ENOMEM;
+> +       }
+> +
+> +       clk_table = devm_kcalloc(dev, info->nr_clk_ids, sizeof(struct clk *),
+> +                                GFP_KERNEL);
+> +       if (!clk_table)
+> +               return -ENOMEM;
+> +
+> +       for (i = 0; i < info->nr_clk_ids; ++i)
+> +               clk_table[i] = ERR_PTR(-ENOENT);
+> +
+> +       ctx->clk_data.clks = clk_table;
+> +       ctx->clk_data.clk_num = info->nr_clk_ids;
+> +       ctx->reg_base = reg_base;
+> +       ctx->dev = dev;
+> +       spin_lock_init(&ctx->lock);
+> +
+> +       data->clk_save = samsung_clk_alloc_reg_dump(info->clk_regs,
+> +                                                   info->nr_clk_regs);
+> +       data->nr_clk_save = info->nr_clk_regs;
+> +       data->clk_suspend = info->suspend_regs;
+> +       data->nr_clk_suspend = info->nr_suspend_regs;
+> +       data->nr_pclks = of_count_phandle_with_args(dev->of_node, "clocks",
+> +                                                   "#clock-cells");
+> +       if (data->nr_pclks > 0) {
+> +               data->pclks = devm_kcalloc(dev, sizeof(struct clk *),
+> +                                          data->nr_pclks, GFP_KERNEL);
+> +
+> +               for (i = 0; i < data->nr_pclks; i++) {
+> +                       struct clk *clk = of_clk_get(dev->of_node, i);
+> +
+> +                       if (IS_ERR(clk))
+> +                               return PTR_ERR(clk);
+> +                       data->pclks[i] = clk;
+> +               }
+> +       }
+> +
+> +       /*
+> +        * Prepare all parent clocks here to avoid potential deadlock caused
+> +        * by global clock "prepare lock" grabbed by runtime pm callbacks
+> +        * from pm workers.
+> +        */
+
+I don't understand why this potentially could cause a deadlock. Can
+you please elaborate.
+
+To me, I think you should be fine doing clk_prepare_enable() and
+clk_disable_unprepare() from exynos5433_cmu_suspend|resume(), but I
+may be missing something.
+
+> +       for (i = 0; i < data->nr_pclks; i++)
+> +               clk_prepare(data->pclks[i]);
+> +
+> +       if (info->clk_name)
+> +               data->clk = clk_get(dev, info->clk_name);
+> +       clk_prepare_enable(data->clk);
+> +
+> +       platform_set_drvdata(pdev, data);
+> +
+> +       /*
+> +        * Enable runtime pm here, so clock core with use runtime pm for all
+> +        * registered clocks. Additionally call pm_runtime_get_sync to ensure
+> +        * that clock core will not runtime suspend our clock controller in
+> +        * the middle of clock registration (clock core might call runtime pm
+> +        * on newly registered clocks, for example to recalculate clock rate).
+> +        */
+
+Instead of the rather confusing comment about the call to
+pm_runtime_get_sync(), let's instead state that we increase the
+runtime PM usage count during the clock registration, to avoid the
+clock core from runtime suspending the device.
+
+In other words, before calling pm_runtime_set_active(), add a call
+pm_runtime_get_noresume() and then remove the latter call to
+pm_runtime_get_sync().
+
+> +       pm_runtime_set_active(dev);
+> +       pm_runtime_enable(dev);
+> +       pm_runtime_get_sync(dev);
+> +
+> +       if (info->pll_clks)
+> +               samsung_clk_register_pll(ctx, info->pll_clks, info->nr_pll_clks,
+> +                                        reg_base);
+> +       if (info->mux_clks)
+> +               samsung_clk_register_mux(ctx, info->mux_clks,
+> +                                        info->nr_mux_clks);
+> +       if (info->div_clks)
+> +               samsung_clk_register_div(ctx, info->div_clks,
+> +                                        info->nr_div_clks);
+> +       if (info->gate_clks)
+> +               samsung_clk_register_gate(ctx, info->gate_clks,
+> +                                         info->nr_gate_clks);
+> +       if (info->fixed_clks)
+> +               samsung_clk_register_fixed_rate(ctx, info->fixed_clks,
+> +                                               info->nr_fixed_clks);
+> +       if (info->fixed_factor_clks)
+> +               samsung_clk_register_fixed_factor(ctx, info->fixed_factor_clks,
+> +                                                 info->nr_fixed_factor_clks);
+> +
+> +       samsung_clk_of_add_provider(dev->of_node, ctx);
+> +       pm_runtime_put(dev);
+> +
+> +       return 0;
+> +}
+>
+
+[...]
+
+Kind regards
+Uffe
