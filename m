@@ -1,89 +1,124 @@
-From: mka@chromium.org (Matthias Kaehlcke)
-Date: Mon, 13 Mar 2017 10:22:22 -0700
-Subject: [PATCH v1] soc: rockchip: power-domain: Fix clang warning about
- negative shift count
-In-Reply-To: <1715023.AuHs9buZxh@phil>
-References: <20170311022153.139362-1-mka@chromium.org>
- <1715023.AuHs9buZxh@phil>
-Message-ID: <20170313172222.GA50582@google.com>
+From: ddaney.cavm@gmail.com (David Daney)
+Date: Mon, 13 Mar 2017 10:24:53 -0700
+Subject: Legacy features in PCI Express devices
+In-Reply-To: <ef5c9778-fbae-9f4f-ac2e-29b8597537a5@free.fr>
+References: <ef5c9778-fbae-9f4f-ac2e-29b8597537a5@free.fr>
+Message-ID: <b26272ff-346a-9774-405f-f1238a89aa8b@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-El Sat, Mar 11, 2017 at 01:03:48PM +0100 Heiko Stuebner ha dit:
+On 03/13/2017 09:10 AM, Mason wrote:
+> Hello,
+>
+> There are two revisions of our PCI Express controller.
+>
+> Rev 1 did not support the following features:
+>
+>   1) legacy PCI interrupt delivery (INTx signals)
+>   2) I/O address space
+>
+> Internally, someone stated that such missing support would prevent
+> some PCIe cards from working with our controller.
+>
+> Are there really modern PCIe cards that require 1) and/or 2)
+> to function?
 
-> Hi Matthias,
-> 
-> Am Freitag, 10. M?rz 2017, 18:21:53 CET schrieb Matthias Kaehlcke:
-> > The following warning is generated when building with clang:
-> > 
-> > drivers/soc/rockchip/pm_domains.c:726:22: error: shift count is negative
-> > [-Werror,-Wshift-count-negative] [RK3399_PD_TCPD0]       = DOMAIN_RK3399(8,
-> > 8, -1, false),
-> >                                   ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-> > drivers/soc/rockchip/pm_domains.c:101:2: note: expanded from macro
-> > 'DOMAIN_RK3399' DOMAIN(pwr, status, req, req, req, wakeup)
-> >         ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-> > drivers/soc/rockchip/pm_domains.c:88:27: note: expanded from macro 'DOMAIN'
-> >         .req_mask = (req >= 0) ? BIT(req) : 0,          \
-> >                                  ^~~~~~~~
-> > include/linux/bitops.h:6:24: note: expanded from macro 'BIT'
-> > 
-> > The BIT macro is evaluated with the negative value -1, even though the
-> > resulting value would not be assigned. To fix this we only pass values
-> > between 0 and 63 to BIT(). Unfortunately this means that we lose the
-> > benefit of the compiler checking for out of bounds errors.
-> 
-> I tend to disagree here. This looks more like a case of "fix your compiler".
-> 
-> That conditional seems perfectly valid as the BIT(req) will never be reached 
-> if req < 0 - your clang simply doesn't recognize the pattern somehow, while 
-> for example gcc does.
+It depends on your definition of "modern".  I have some JMicron AHCI 
+SATA controllers that support legacy interrupts only.  These are cheap 
+$20 PCIe devices I picked up at Fry's a couple of years ago.  Do they 
+count as modern?
 
-My interpretation is that with clang the '(req >= 0) ?' condition is
-not evaluated by the preprocessor, but only by the compiler. This seems to
-be different with gcc.
+I/O address space is probably less important I would say.
 
-> Catering to specific whims of specific compilers feels somehow wrong, as what 
-> will happen if some imaginary third compiler requires another different hack 
-> to be satisfied?
+David.
 
-I'll check with the clang developers if clang can be changed to behave
-like gcc in this aspect.
+>
+> Can someone provide examples of such cards, so that I may test them
+> on both revisions?
 
-Thanks
 
-Matthias
+[root at localhost ddaney]# lspci -s 0005:90:00.0 -vvv
+0005:90:00.0 SATA controller: JMicron Technology Corp. JMB363 SATA/IDE 
+Controller (rev 03) (prog-if 01 [AHCI 1.0])
+	Subsystem: JMicron Technology Corp. JMB363 SATA/IDE Controller
+	Control: I/O- Mem+ BusMaster+ SpecCycle- MemWINV- VGASnoop- ParErr- 
+Stepping- SERR- FastB2B- DisINTx-
+	Status: Cap+ 66MHz- UDF- FastB2B- ParErr- DEVSEL=fast >TAbort- <TAbort- 
+<MAbort- >SERR- <PERR- INTx-
+	Latency: 0
+	Interrupt: pin A routed to IRQ 26
+	NUMA node: 0
+	Region 5: Memory at 899010010000 (32-bit, non-prefetchable) [size=8K]
+	Expansion ROM at 899010000000 [disabled] [size=64K]
+	Capabilities: [68] Power Management version 2
+		Flags: PMEClk- DSI- D1- D2- AuxCurrent=0mA PME(D0-,D1-,D2-,D3hot+,D3cold-)
+		Status: D0 NoSoftRst- PME-Enable- DSel=0 DScale=0 PME-
+	Capabilities: [50] Express (v1) Legacy Endpoint, MSI 01
+		DevCap:	MaxPayload 128 bytes, PhantFunc 0, Latency L0s <64ns, L1 <1us
+			ExtTag- AttnBtn- AttnInd- PwrInd- RBE- FLReset-
+		DevCtl:	Report errors: Correctable- Non-Fatal- Fatal- Unsupported-
+			RlxdOrd- ExtTag- PhantFunc- AuxPwr- NoSnoop-
+			MaxPayload 128 bytes, MaxReadReq 512 bytes
+		DevSta:	CorrErr- UncorrErr- FatalErr+ UnsuppReq+ AuxPwr- TransPend-
+		LnkCap:	Port #1, Speed 2.5GT/s, Width x1, ASPM L0s, Exit Latency L0s 
+unlimited, L1 unlimited
+			ClockPM- Surprise- LLActRep- BwNot- ASPMOptComp-
+		LnkCtl:	ASPM Disabled; RCB 64 bytes Disabled- CommClk-
+			ExtSynch- ClockPM- AutWidDis- BWInt- AutBWInt-
+		LnkSta:	Speed 2.5GT/s, Width x1, TrErr- Train- SlotClk+ DLActive- 
+BWMgmt- ABWMgmt-
+	Kernel driver in use: ahci
 
-> > Signed-off-by: Matthias Kaehlcke <mka@chromium.org>
-> > ---
-> >  drivers/soc/rockchip/pm_domains.c | 14 ++++++++------
-> >  1 file changed, 8 insertions(+), 6 deletions(-)
-> > 
-> > diff --git a/drivers/soc/rockchip/pm_domains.c
-> > b/drivers/soc/rockchip/pm_domains.c index 1c78c42416c6..6f2bb1222992 100644
-> > --- a/drivers/soc/rockchip/pm_domains.c
-> > +++ b/drivers/soc/rockchip/pm_domains.c
-> > @@ -77,13 +77,15 @@ struct rockchip_pmu {
-> > 
-> >  #define to_rockchip_pd(gpd) container_of(gpd, struct rockchip_pm_domain,
-> > genpd)
-> > 
-> > +#define RK_MASK(bit) ((bit >= 0) ? BIT(bit & 0x3f) : 0)
-> > +
-> >  #define DOMAIN(pwr, status, req, idle, ack, wakeup)	\
-> > -{						\
-> > -	.pwr_mask = (pwr >= 0) ? BIT(pwr) : 0,		\
-> > -	.status_mask = (status >= 0) ? BIT(status) : 0,	\
-> > -	.req_mask = (req >= 0) ? BIT(req) : 0,		\
-> > -	.idle_mask = (idle >= 0) ? BIT(idle) : 0,	\
-> > -	.ack_mask = (ack >= 0) ? BIT(ack) : 0,		\
-> > +{							\
-> > +	.pwr_mask = RK_MASK(pwr),			\
-> > +	.status_mask = RK_MASK(status),			\
-> > +	.req_mask = RK_MASK(req),			\
-> > +	.idle_mask = RK_MASK(idle),			\
-> > +	.ack_mask = RK_MASK(ack),			\
-> >  	.active_wakeup = wakeup,			\
-> >  }
-> 
-> 
+[root@localhost ddaney]# lspci -s 0005:90:00.0 -vvv -n
+0005:90:00.0 0106: 197b:2363 (rev 03) (prog-if 01 [AHCI 1.0])
+	Subsystem: 197b:2363
+	Control: I/O- Mem+ BusMaster+ SpecCycle- MemWINV- VGASnoop- ParErr- 
+Stepping- SERR- FastB2B- DisINTx-
+	Status: Cap+ 66MHz- UDF- FastB2B- ParErr- DEVSEL=fast >TAbort- <TAbort- 
+<MAbort- >SERR- <PERR- INTx-
+	Latency: 0
+	Interrupt: pin A routed to IRQ 26
+	NUMA node: 0
+	Region 5: Memory at 899010010000 (32-bit, non-prefetchable) [size=8K]
+	Expansion ROM@899010000000 [disabled] [size=64K]
+	Capabilities: [68] Power Management version 2
+		Flags: PMEClk- DSI- D1- D2- AuxCurrent=0mA PME(D0-,D1-,D2-,D3hot+,D3cold-)
+		Status: D0 NoSoftRst- PME-Enable- DSel=0 DScale=0 PME-
+	Capabilities: [50] Express (v1) Legacy Endpoint, MSI 01
+		DevCap:	MaxPayload 128 bytes, PhantFunc 0, Latency L0s <64ns, L1 <1us
+			ExtTag- AttnBtn- AttnInd- PwrInd- RBE- FLReset-
+		DevCtl:	Report errors: Correctable- Non-Fatal- Fatal- Unsupported-
+			RlxdOrd- ExtTag- PhantFunc- AuxPwr- NoSnoop-
+			MaxPayload 128 bytes, MaxReadReq 512 bytes
+		DevSta:	CorrErr- UncorrErr- FatalErr+ UnsuppReq+ AuxPwr- TransPend-
+		LnkCap:	Port #1, Speed 2.5GT/s, Width x1, ASPM L0s, Exit Latency L0s 
+unlimited, L1 unlimited
+			ClockPM- Surprise- LLActRep- BwNot- ASPMOptComp-
+		LnkCtl:	ASPM Disabled; RCB 64 bytes Disabled- CommClk-
+			ExtSynch- ClockPM- AutWidDis- BWInt- AutBWInt-
+		LnkSta:	Speed 2.5GT/s, Width x1, TrErr- Train- SlotClk+ DLActive- 
+BWMgmt- ABWMgmt-
+	Kernel driver in use: ahci
+
+
+
+Look!  No MSI.
+
+>
+> I was told to check ath9k-based cards. Any other examples?
+>
+> Looking around, I came across this thread:
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2016-March/418254.html
+> "i.MX6 PCIe: Fix imx6_pcie_deassert_core_reset() polarity"
+>
+> IIUC, although some PCIe boards do support MSI, the driver might not
+> put in the work to use that infrastructure, and instead reverts to
+> legacy interrupts. (So it is a SW issue, in a sense.)
+>
+> Regards.
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
