@@ -1,65 +1,88 @@
-From: jacek.anaszewski@gmail.com (Jacek Anaszewski)
-Date: Mon, 13 Mar 2017 19:35:42 +0100
-Subject: [PATCH v5 2/4] dt-bindings: mfd: Add LED subnode binding for
- MT6323 PMIC
-In-Reply-To: <c86eacdb-d5c8-2f0a-11f1-1a3bc623b4b0@gmail.com>
-References: <1488549385-19899-1-git-send-email-sean.wang@mediatek.com>
- <1488549385-19899-3-git-send-email-sean.wang@mediatek.com>
- <c86eacdb-d5c8-2f0a-11f1-1a3bc623b4b0@gmail.com>
-Message-ID: <d7b7119d-678f-ca91-3a5b-7d56c9071385@gmail.com>
+From: john@metanate.com (John Keeping)
+Date: Mon, 13 Mar 2017 18:38:12 +0000
+Subject: [RFC PATCH 3/4] pinctrl: rockchip: split out verification of mux
+ settings
+In-Reply-To: <20170313183813.3582-1-john@metanate.com>
+References: <20170313183813.3582-1-john@metanate.com>
+Message-ID: <20170313183813.3582-4-john@metanate.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Matthias,
+We need to avoid calling regmap functions from irq handlers, so the next
+commit is going to move the call to rockchip_set_mux() into an
+irq_bus_sync_unlock handler.  But we can't return an error from there so
+we still need to check the settings from rockchip_irq_set_type() and we
+will use this new rockchip_verify_mux() function from there.
 
-On 03/13/2017 01:00 PM, Matthias Brugger wrote:
-> 
-> 
-> On 03/03/17 14:56, sean.wang at mediatek.com wrote:
->> From: Sean Wang <sean.wang@mediatek.com>
->>
->> This patch adds documentation for devicetree bindings
->> for LED support as the subnode of MT6323 PMIC
->>
->> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
->> ---
->>  Documentation/devicetree/bindings/mfd/mt6397.txt | 5 +++++
->>  1 file changed, 5 insertions(+)
->>
->> diff --git a/Documentation/devicetree/bindings/mfd/mt6397.txt
->> b/Documentation/devicetree/bindings/mfd/mt6397.txt
->> index 949c85f..522a3bb 100644
->> --- a/Documentation/devicetree/bindings/mfd/mt6397.txt
->> +++ b/Documentation/devicetree/bindings/mfd/mt6397.txt
->> @@ -6,6 +6,7 @@ MT6397/MT6323 is a multifunction device with the
->> following sub modules:
->>  - Audio codec
->>  - GPIO
->>  - Clock
->> +- LED
->>
->>  It is interfaced to host controller using SPI interface by a
->> proprietary hardware
->>  called PMIC wrapper or pwrap. MT6397/MT6323 MFD is a child device of
->> pwrap.
->> @@ -34,6 +35,10 @@ Optional subnodes:
->>  - clk
->>      Required properties:
->>          - compatible: "mediatek,mt6397-clk"
->> +- led
->> +    Required properties:
->> +        - compatible: "mediatek,mt6323-led"
->> +    see Documentation/devicetree/bindings/leds/leds-mt6323.txt
-> 
-> Part of this patch is already part of linux-next:
-> 05daab3 ("Documentation: devicetree: Add LED subnode binding for MT6323
-> PMIC")
+Signed-off-by: John Keeping <john@metanate.com>
+---
+ drivers/pinctrl/pinctrl-rockchip.c | 46 +++++++++++++++++++++++++-------------
+ 1 file changed, 30 insertions(+), 16 deletions(-)
 
-Yes, it's been merged via mfd tree. It doesn't break anything besides
-that it points to non-existent file. Hopefully we will manage to merge
-the LED part before merge window, otherwise the mfd part will have to
-be dropped.
-
+diff --git a/drivers/pinctrl/pinctrl-rockchip.c b/drivers/pinctrl/pinctrl-rockchip.c
+index 2f963aea64b2..52e70c4aef7c 100644
+--- a/drivers/pinctrl/pinctrl-rockchip.c
++++ b/drivers/pinctrl/pinctrl-rockchip.c
+@@ -629,6 +629,31 @@ static int rockchip_get_mux(struct rockchip_pin_bank *bank, int pin)
+ 	return ((val >> bit) & mask);
+ }
+ 
++static int rockchip_verify_mux(struct rockchip_pin_bank *bank,
++			       int pin, int mux)
++{
++	struct rockchip_pinctrl *info = bank->drvdata;
++	int iomux_num = (pin / 8);
++
++	if (iomux_num > 3)
++		return -EINVAL;
++
++	if (bank->iomux[iomux_num].type & IOMUX_UNROUTED) {
++		dev_err(info->dev, "pin %d is unrouted\n", pin);
++		return -EINVAL;
++	}
++
++	if (bank->iomux[iomux_num].type & IOMUX_GPIO_ONLY) {
++		if (mux != RK_FUNC_GPIO) {
++			dev_err(info->dev,
++				"pin %d only supports a gpio mux\n", pin);
++			return -ENOTSUPP;
++		}
++	}
++
++	return 0;
++}
++
+ /*
+  * Set a new mux function for a pin.
+  *
+@@ -652,23 +677,12 @@ static int rockchip_set_mux(struct rockchip_pin_bank *bank, int pin, int mux)
+ 	u8 bit;
+ 	u32 data, rmask;
+ 
+-	if (iomux_num > 3)
+-		return -EINVAL;
+-
+-	if (bank->iomux[iomux_num].type & IOMUX_UNROUTED) {
+-		dev_err(info->dev, "pin %d is unrouted\n", pin);
+-		return -EINVAL;
+-	}
++	ret = rockchip_verify_mux(bank, pin, mux);
++	if (ret < 0)
++		return ret;
+ 
+-	if (bank->iomux[iomux_num].type & IOMUX_GPIO_ONLY) {
+-		if (mux != RK_FUNC_GPIO) {
+-			dev_err(info->dev,
+-				"pin %d only supports a gpio mux\n", pin);
+-			return -ENOTSUPP;
+-		} else {
+-			return 0;
+-		}
+-	}
++	if (bank->iomux[iomux_num].type & IOMUX_GPIO_ONLY)
++		return 0;
+ 
+ 	dev_dbg(info->dev, "setting mux of GPIO%d-%d to %d\n",
+ 						bank->bank_num, pin, mux);
 -- 
-Best regards,
-Jacek Anaszewski
+2.12.0.377.gf910686b23.dirty
