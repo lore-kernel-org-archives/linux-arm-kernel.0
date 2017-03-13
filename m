@@ -1,166 +1,81 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Mon, 13 Mar 2017 20:58:06 +0000
-Subject: [PATCH v2 07/11] iio: adc: sun4i-gpadc-iio: move code used in MFD
- probing to new function
-In-Reply-To: <20170310103921.19469-8-quentin.schulz@free-electrons.com>
-References: <20170310103921.19469-1-quentin.schulz@free-electrons.com>
- <20170310103921.19469-8-quentin.schulz@free-electrons.com>
-Message-ID: <4d3b0b84-446a-721c-9767-5eb151a05d4d@kernel.org>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 13 Mar 2017 21:58:08 +0100
+Subject: [PATCH] mtd: nand: orion: fix clk handling
+In-Reply-To: <20170313204344.GA24471@gandalf>
+References: <20170312213406.20987-1-gmbnomis@gmail.com>
+ <20170313071241.y5ydl274t22awrys@pengutronix.de>
+ <20170313204344.GA24471@gandalf>
+Message-ID: <20170313205808.tpov2l4cd7b7b54p@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/03/17 10:39, Quentin Schulz wrote:
-> This moves code used in MFD probing to a new sun4i_gpadc_probe_mfd
-> function.
-> 
-> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
-Looks sane to me - though a hint on why in the explanation wouldn't go
-amiss!
+Hello Simon,
 
-We'll have to figure out the path for this series at somepoint.
-In meantime
+On Mon, Mar 13, 2017 at 09:43:44PM +0100, Simon Baatz wrote:
+> Hello Uwe,
+> 
+> On Mon, Mar 13, 2017 at 08:12:41AM +0100, Uwe Kleine-K?nig wrote:
+> > Hello Simon,
+> > 
+> > On Sun, Mar 12, 2017 at 10:34:06PM +0100, Simon Baatz wrote:
+> > > The clk handling in orion_nand.c had two problems:
+> > > 
+> > > - In the probe function, clk_put() was called for an enabled clock,
+> > >   which violates the API (see documentation for clk_put() in
+> > >   include/linux/clk.h)
+> > > 
+> > > - In the error path of the probe function, clk_put() could be called
+> > >   twice for the same clock.
+> > > 
+> > > In order to clean this up, use the managed function devm_clk_get() and
+> > > store the pointer to the clk in the driver data.
+> 
+> ...
+> 
+> > >  	/* Not all platforms can gate the clock, so it is not
+> > >  	   an error if the clock does not exists. */
+> > > -	clk = clk_get(&pdev->dev, NULL);
+> > > -	if (!IS_ERR(clk)) {
+> > > -		clk_prepare_enable(clk);
+> > > -		clk_put(clk);
+> > > -	}
+> > > +	info->clk = devm_clk_get(&pdev->dev, NULL);
+> > > +	if (!IS_ERR(info->clk))
+> > > +		clk_prepare_enable(info->clk);
+> > 
+> > Orthogonal to your patch I suggest:
+> > 
+> > -	info->clk = devm_clk_get(&pdev->dev, NULL);
+> > -	if (!IS_ERR(info->clk))
+> > -		clk_prepare_enable(info->clk);
+> > +	info->clk = devm_clk_get_optional(&pdev->dev, NULL);
+> > +	if (IS_ERR(info->clk)) {
+> > +		ret = PTR_ERR(info->clk);
+> > +		if (ret != -EPROBE_DEFER)
+> > +			dev_err(...);
+> > +		return ret;
+> > +	}
+> > 
+> > to correct error handling.
+> > (I didn't check if a plain return is right here, and also other users of
+> > info->clk need adaption.)
+> 
+> Nice! However, I can't find a devm_clk_get_optional() anywhere(?) Is
+> it in some upcoming patch?
 
-Acked-by: Jonathan Cameron <jic23@kernel.org>
-> ---
-> 
-> added in v2
-> 
->  drivers/iio/adc/sun4i-gpadc-iio.c | 78 ++++++++++++++++++++++-----------------
->  1 file changed, 45 insertions(+), 33 deletions(-)
-> 
-> diff --git a/drivers/iio/adc/sun4i-gpadc-iio.c b/drivers/iio/adc/sun4i-gpadc-iio.c
-> index a8e134f..7cb997a 100644
-> --- a/drivers/iio/adc/sun4i-gpadc-iio.c
-> +++ b/drivers/iio/adc/sun4i-gpadc-iio.c
-> @@ -454,31 +454,16 @@ static int sun4i_irq_init(struct platform_device *pdev, const char *name,
->  	return 0;
->  }
->  
-> -static int sun4i_gpadc_probe(struct platform_device *pdev)
-> +static int sun4i_gpadc_probe_mfd(struct platform_device *pdev,
-> +				 struct iio_dev *indio_dev)
->  {
-> -	struct sun4i_gpadc_iio *info;
-> -	struct iio_dev *indio_dev;
-> +	struct sun4i_gpadc_iio *info = iio_priv(indio_dev);
-> +	struct sun4i_gpadc_dev *sun4i_gpadc_dev =
-> +		dev_get_drvdata(pdev->dev.parent);
->  	int ret;
-> -	struct sun4i_gpadc_dev *sun4i_gpadc_dev;
-> -
-> -	sun4i_gpadc_dev = dev_get_drvdata(pdev->dev.parent);
-> -
-> -	indio_dev = devm_iio_device_alloc(&pdev->dev, sizeof(*info));
-> -	if (!indio_dev)
-> -		return -ENOMEM;
->  
-> -	info = iio_priv(indio_dev);
-> -	platform_set_drvdata(pdev, indio_dev);
-> -
-> -	mutex_init(&info->mutex);
->  	info->regmap = sun4i_gpadc_dev->regmap;
-> -	info->indio_dev = indio_dev;
-> -	init_completion(&info->completion);
-> -	indio_dev->name = dev_name(&pdev->dev);
-> -	indio_dev->dev.parent = &pdev->dev;
-> -	indio_dev->dev.of_node = pdev->dev.of_node;
-> -	indio_dev->info = &sun4i_gpadc_iio_info;
-> -	indio_dev->modes = INDIO_DIRECT_MODE;
-> +
->  	indio_dev->num_channels = ARRAY_SIZE(sun4i_gpadc_channels);
->  	indio_dev->channels = sun4i_gpadc_channels;
->  
-> @@ -519,8 +504,7 @@ static int sun4i_gpadc_probe(struct platform_device *pdev)
->  			dev_err(&pdev->dev,
->  				"could not register thermal sensor: %ld\n",
->  				PTR_ERR(tzd));
-> -			ret = PTR_ERR(tzd);
-> -			goto err;
-> +			return PTR_ERR(tzd);
->  		}
->  	} else {
->  		indio_dev->num_channels =
-> @@ -528,36 +512,65 @@ static int sun4i_gpadc_probe(struct platform_device *pdev)
->  		indio_dev->channels = sun4i_gpadc_channels_no_temp;
->  	}
->  
-> -	pm_runtime_set_autosuspend_delay(&pdev->dev,
-> -					 SUN4I_GPADC_AUTOSUSPEND_DELAY);
-> -	pm_runtime_use_autosuspend(&pdev->dev);
-> -	pm_runtime_set_suspended(&pdev->dev);
-> -	pm_runtime_enable(&pdev->dev);
-> -
->  	if (IS_ENABLED(CONFIG_THERMAL_OF)) {
->  		ret = sun4i_irq_init(pdev, "TEMP_DATA_PENDING",
->  				     sun4i_gpadc_temp_data_irq_handler,
->  				     "temp_data", &info->temp_data_irq,
->  				     &info->ignore_temp_data_irq);
->  		if (ret < 0)
-> -			goto err;
-> +			return ret;
->  	}
->  
->  	ret = sun4i_irq_init(pdev, "FIFO_DATA_PENDING",
->  			     sun4i_gpadc_fifo_data_irq_handler, "fifo_data",
->  			     &info->fifo_data_irq, &info->ignore_fifo_data_irq);
->  	if (ret < 0)
-> -		goto err;
-> +		return ret;
->  
->  	if (IS_ENABLED(CONFIG_THERMAL_OF)) {
->  		ret = iio_map_array_register(indio_dev, sun4i_gpadc_hwmon_maps);
->  		if (ret < 0) {
->  			dev_err(&pdev->dev,
->  				"failed to register iio map array\n");
-> -			goto err;
-> +			return ret;
->  		}
->  	}
->  
-> +	return 0;
-> +}
-> +
-> +static int sun4i_gpadc_probe(struct platform_device *pdev)
-> +{
-> +	struct sun4i_gpadc_iio *info;
-> +	struct iio_dev *indio_dev;
-> +	int ret;
-> +
-> +	indio_dev = devm_iio_device_alloc(&pdev->dev, sizeof(*info));
-> +	if (!indio_dev)
-> +		return -ENOMEM;
-> +
-> +	info = iio_priv(indio_dev);
-> +	platform_set_drvdata(pdev, indio_dev);
-> +
-> +	mutex_init(&info->mutex);
-> +	info->indio_dev = indio_dev;
-> +	init_completion(&info->completion);
-> +	indio_dev->name = dev_name(&pdev->dev);
-> +	indio_dev->dev.parent = &pdev->dev;
-> +	indio_dev->dev.of_node = pdev->dev.of_node;
-> +	indio_dev->info = &sun4i_gpadc_iio_info;
-> +	indio_dev->modes = INDIO_DIRECT_MODE;
-> +
-> +	ret = sun4i_gpadc_probe_mfd(pdev, indio_dev);
-> +	if (ret)
-> +		return ret;
-> +
-> +	pm_runtime_set_autosuspend_delay(&pdev->dev,
-> +					 SUN4I_GPADC_AUTOSUSPEND_DELAY);
-> +	pm_runtime_use_autosuspend(&pdev->dev);
-> +	pm_runtime_set_suspended(&pdev->dev);
-> +	pm_runtime_enable(&pdev->dev);
-> +
->  	ret = devm_iio_device_register(&pdev->dev, indio_dev);
->  	if (ret < 0) {
->  		dev_err(&pdev->dev, "could not register the device\n");
-> @@ -570,7 +583,6 @@ static int sun4i_gpadc_probe(struct platform_device *pdev)
->  	if (IS_ENABLED(CONFIG_THERMAL_OF))
->  		iio_map_array_unregister(indio_dev);
->  
-> -err:
->  	pm_runtime_put(&pdev->dev);
->  	pm_runtime_disable(&pdev->dev);
->  
-> 
+Oh really. I was sure I already made use of it. Probably consfused it
+with the gpio or regulator API which have such variants. (But be aware,
+they are sematically different. If you look for a place to copy from
+please stick to the gpio sematic.)
+
+Then either send a patch creating clk_get_optional and friends, or only
+ignore -ENODEV but propagate the other error values. (Maybe the most
+rational path is to do both and switch the driver once clk_get_optional
+is available.)
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
