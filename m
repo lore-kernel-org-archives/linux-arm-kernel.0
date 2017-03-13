@@ -1,43 +1,84 @@
-From: peter.chen@nxp.com (Peter Chen)
-Date: Mon, 13 Mar 2017 10:18:40 +0800
-Subject: [PATCH 0/5] usb: introduce sysdev 
-Message-ID: <1489371525-18928-1-git-send-email-peter.chen@nxp.com>
+From: yuanzhichang@hisilicon.com (zhichang.yuan)
+Date: Mon, 13 Mar 2017 10:42:41 +0800
+Subject: [PATCH V7 5/7] ACPI: Delay the enumeration on the devices whose
+ dependency has not met
+In-Reply-To: <1489372963-9000-1-git-send-email-yuanzhichang@hisilicon.com>
+References: <1489372963-9000-1-git-send-email-yuanzhichang@hisilicon.com>
+Message-ID: <1489372963-9000-6-git-send-email-yuanzhichang@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Greg,
+In commit 40e7fcb1929(ACPI: Add _DEP support to fix battery issue on Asus
+T100TA), the '_DEP' was supported to solve the dependency of Asus battery. But
+this patch is specific to Asus battery device.
+In the real world, there are other devices which need the dependency to play the
+role on the enumeration order. For example, all the Hip06 LPC
+periperals(IPMI-BT, uart, etc) must be scanned after the LPC host driver
+finished the probing. So, it makes sense to add a checking whether the ACPI
+device meet all the dependencies during its enumeration slot, if not, the
+enumeration will be delayed till all dependency master finish their work.
 
-This series adds supporting USB gets correct DMA configuration from firmware
-eg, Device Tree, and the patches are well discussed at mail list, since it
-changes a lot, I think it should be a new feature than a bug-fix.
+This patch adds the dependency checking in ACPI enumeration, also the
+corresponding handling to retrigger the Hip06 LPC peripherals' scanning.
 
-The series is based on the latest usb-next branch.
+Signed-off-by: zhichang.yuan <yuanzhichang@hisilicon.com>
+---
+ drivers/acpi/battery.c |  3 ---
+ drivers/acpi/scan.c    |  3 +++
+ drivers/bus/hisi_lpc.c | 12 +++++++++++-
+ 3 files changed, 14 insertions(+), 4 deletions(-)
 
-Thanks.
-
-Arnd Bergmann (4):
-  usb: separate out sysdev pointer from usb_bus
-  usb: chipidea: use bus->sysdev for DMA configuration
-  usb: ehci: fsl: use bus->sysdev for DMA configuration
-  usb: xhci: use bus->sysdev for DMA configuration
-
-Peter Chen (1):
-  usb: ehci: use bus->sysdev for DMA configuration
-
- drivers/usb/chipidea/core.c  |  3 --
- drivers/usb/chipidea/host.c  |  3 +-
- drivers/usb/chipidea/udc.c   | 10 +++---
- drivers/usb/core/buffer.c    | 12 +++----
- drivers/usb/core/hcd.c       | 80 +++++++++++++++++++++++++-------------------
- drivers/usb/core/usb.c       | 18 +++++-----
- drivers/usb/host/ehci-fsl.c  |  4 +--
- drivers/usb/host/ehci-mem.c  | 12 +++----
- drivers/usb/host/xhci-mem.c  | 12 +++----
- drivers/usb/host/xhci-plat.c | 35 ++++++++++++++-----
- drivers/usb/host/xhci.c      | 15 ++++++---
- include/linux/usb.h          |  1 +
- include/linux/usb/hcd.h      |  3 ++
- 13 files changed, 124 insertions(+), 84 deletions(-)
-
+diff --git a/drivers/acpi/battery.c b/drivers/acpi/battery.c
+index 4ef1e46..e8d1af1 100644
+--- a/drivers/acpi/battery.c
++++ b/drivers/acpi/battery.c
+@@ -1210,9 +1210,6 @@ static int acpi_battery_add(struct acpi_device *device)
+ 	if (!device)
+ 		return -EINVAL;
+ 
+-	if (device->dep_unmet)
+-		return -EPROBE_DEFER;
+-
+ 	battery = kzalloc(sizeof(struct acpi_battery), GFP_KERNEL);
+ 	if (!battery)
+ 		return -ENOMEM;
+diff --git a/drivers/acpi/scan.c b/drivers/acpi/scan.c
+index 1926918..97721b1 100644
+--- a/drivers/acpi/scan.c
++++ b/drivers/acpi/scan.c
+@@ -1843,6 +1843,9 @@ static void acpi_bus_attach(struct acpi_device *device)
+ 	if (device->handler)
+ 		goto ok;
+ 
++	if (device->dep_unmet)
++		return;
++
+ 	if (!device->flags.initialized) {
+ 		device->flags.power_manageable =
+ 			device->power.states[ACPI_STATE_D0].flags.valid;
+diff --git a/drivers/bus/hisi_lpc.c b/drivers/bus/hisi_lpc.c
+index 03cf19a..345ea12 100644
+--- a/drivers/bus/hisi_lpc.c
++++ b/drivers/bus/hisi_lpc.c
+@@ -516,8 +516,18 @@ static int hisilpc_probe(struct platform_device *pdev)
+ 
+ 	/*
+ 	 * It is time to start the children scannings....
++	 * For ACPI children, the corresponding devices will be created after
++	 * retriggering the ACPI scanning by removing the dependency blocking.
+ 	 */
+-	if (!has_acpi_companion(dev)) {
++	if (has_acpi_companion(dev)) {
++		struct acpi_device *adev;
++
++		adev = to_acpi_device_node(dev->fwnode);
++		if (!adev)
++			ret = -ENODEV;
++		else
++			acpi_walk_dep_device_list(adev->handle);
++	} else {
+ 		ret = of_platform_populate(dev->of_node, NULL, NULL, dev);
+ 		if (ret)
+ 			dev_err(dev, "OF: enumerate LPC bus fail(%d)\n", ret);
 -- 
-2.7.4
+1.9.1
