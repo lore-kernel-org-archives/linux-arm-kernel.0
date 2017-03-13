@@ -1,80 +1,106 @@
-From: peter.chen@nxp.com (Peter Chen)
-Date: Mon, 13 Mar 2017 10:18:45 +0800
-Subject: [PATCH 5/5] usb: ehci: use bus->sysdev for DMA configuration
-In-Reply-To: <1489371525-18928-1-git-send-email-peter.chen@nxp.com>
-References: <1489371525-18928-1-git-send-email-peter.chen@nxp.com>
-Message-ID: <1489371525-18928-6-git-send-email-peter.chen@nxp.com>
+From: xiexiuqi@huawei.com (Xie XiuQi)
+Date: Mon, 13 Mar 2017 10:31:33 +0800
+Subject: [PATCH V12 09/10] trace, ras: add ARM processor error trace event
+In-Reply-To: <14545228-7ff1-b31c-1fa5-daacf89a44b9@codeaurora.org>
+References: <1488833103-21082-1-git-send-email-tbaicar@codeaurora.org>
+ <1488833103-21082-10-git-send-email-tbaicar@codeaurora.org>
+ <58C12342.2090701@huawei.com>
+ <14545228-7ff1-b31c-1fa5-daacf89a44b9@codeaurora.org>
+Message-ID: <58C60485.2070509@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Set the dma for ehci from sysdev. The sysdev is pointing to device that
-is known to the system firmware or hardware.
+Hi Baicar Tyler,
 
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Sriram Dash <sriram.dash@nxp.com>
-Signed-off-by: Peter Chen <peter.chen@nxp.com>
-Acked-by: Alan Stern <stern@rowland.harvard.edu>
----
- drivers/usb/host/ehci-mem.c | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+On 2017/3/11 2:23, Baicar, Tyler wrote:
+> Hello Xie XiuQi,
+> 
+> 
+> On 3/9/2017 2:41 AM, Xie XiuQi wrote:
+>> On 2017/3/7 4:45, Tyler Baicar wrote:
+>>> Currently there are trace events for the various RAS
+>>> errors with the exception of ARM processor type errors.
+>>> Add a new trace event for such errors so that the user
+>>> will know when they occur. These trace events are
+>>> consistent with the ARM processor error section type
+>>> defined in UEFI 2.6 spec section N.2.4.4.
+>>>
+>>> Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
+>>> Acked-by: Steven Rostedt <rostedt@goodmis.org>
+>>> ---
+>>>   drivers/acpi/apei/ghes.c    |  8 +++++++-
+>>>   drivers/firmware/efi/cper.c |  1 +
+>>>   drivers/ras/ras.c           |  1 +
+>>>   include/ras/ras_event.h     | 34 ++++++++++++++++++++++++++++++++++
+>>>   4 files changed, 43 insertions(+), 1 deletion(-)
+> 
+>>> diff --git a/include/ras/ras_event.h b/include/ras/ras_event.h
+>>> index 5861b6f..b36db48 100644
+>>> --- a/include/ras/ras_event.h
+>>> +++ b/include/ras/ras_event.h
+>>> @@ -162,6 +162,40 @@
+>>>   );
+>>>     /*
+>>> + * ARM Processor Events Report
+>>> + *
+>>> + * This event is generated when hardware detects an ARM processor error
+>>> + * has occurred. UEFI 2.6 spec section N.2.4.4.
+>>> + */
+>>> +TRACE_EVENT(arm_event,
+>>> +
+>>> +    TP_PROTO(const struct cper_sec_proc_arm *proc),
+>>> +
+>>> +    TP_ARGS(proc),
+>>> +
+>>> +    TP_STRUCT__entry(
+>>> +        __field(u64, mpidr)
+>>> +        __field(u64, midr)
+>>> +        __field(u32, running_state)
+>>> +        __field(u32, psci_state)
+>>> +        __field(u8, affinity)
+>>> +    ),
+>>> +
+>>> +    TP_fast_assign(
+>>> +        __entry->affinity = proc->affinity_level;
+>>> +        __entry->mpidr = proc->mpidr;
+>>> +        __entry->midr = proc->midr;
+>>> +        __entry->running_state = proc->running_state;
+>>> +        __entry->psci_state = proc->psci_state;
+>>> +    ),
+>>> +
+>>> +    TP_printk("affinity level: %d; MPIDR: %016llx; MIDR: %016llx; "
+>>> +          "running state: %d; PSCI state: %d",
+>>> +          __entry->affinity, __entry->mpidr, __entry->midr,
+>>> +          __entry->running_state, __entry->psci_state)
+>>> +);
+>>> +
+>> I think these fields are not enough, we need also export arm processor error
+>> information (UEFI 2.6 spec section N.2.4.4.1), or at least the error type,
+>> address, etc. So that the userspace (such as rasdaemon tool) could know what
+>> error occurred.
+>
+> This is something I am planning on adding in later. It is not clear to me how to
+> actually do this at this point. If you look at the spec, there is not a single
+> error information structure. There is at least one, but possibly a lot. There is
+> also an unknown amount of context information structures. In "Table 260. ARM Processor
+> Error Section" there are ERR_INFO_NUM and CONTEXT_INFO_NUM which give the number of these
+> structures. I think there will need to be separate trace events added in for each of
+> these structures because I don't think there is a way to have variable amounts of
+> structures inside of a trace event.
 
-diff --git a/drivers/usb/host/ehci-mem.c b/drivers/usb/host/ehci-mem.c
-index 4de4301..9b7e639 100644
---- a/drivers/usb/host/ehci-mem.c
-+++ b/drivers/usb/host/ehci-mem.c
-@@ -138,7 +138,7 @@ static void ehci_mem_cleanup (struct ehci_hcd *ehci)
- 	ehci->sitd_pool = NULL;
- 
- 	if (ehci->periodic)
--		dma_free_coherent (ehci_to_hcd(ehci)->self.controller,
-+		dma_free_coherent(ehci_to_hcd(ehci)->self.sysdev,
- 			ehci->periodic_size * sizeof (u32),
- 			ehci->periodic, ehci->periodic_dma);
- 	ehci->periodic = NULL;
-@@ -155,7 +155,7 @@ static int ehci_mem_init (struct ehci_hcd *ehci, gfp_t flags)
- 
- 	/* QTDs for control/bulk/intr transfers */
- 	ehci->qtd_pool = dma_pool_create ("ehci_qtd",
--			ehci_to_hcd(ehci)->self.controller,
-+			ehci_to_hcd(ehci)->self.sysdev,
- 			sizeof (struct ehci_qtd),
- 			32 /* byte alignment (for hw parts) */,
- 			4096 /* can't cross 4K */);
-@@ -165,7 +165,7 @@ static int ehci_mem_init (struct ehci_hcd *ehci, gfp_t flags)
- 
- 	/* QHs for control/bulk/intr transfers */
- 	ehci->qh_pool = dma_pool_create ("ehci_qh",
--			ehci_to_hcd(ehci)->self.controller,
-+			ehci_to_hcd(ehci)->self.sysdev,
- 			sizeof(struct ehci_qh_hw),
- 			32 /* byte alignment (for hw parts) */,
- 			4096 /* can't cross 4K */);
-@@ -179,7 +179,7 @@ static int ehci_mem_init (struct ehci_hcd *ehci, gfp_t flags)
- 
- 	/* ITD for high speed ISO transfers */
- 	ehci->itd_pool = dma_pool_create ("ehci_itd",
--			ehci_to_hcd(ehci)->self.controller,
-+			ehci_to_hcd(ehci)->self.sysdev,
- 			sizeof (struct ehci_itd),
- 			32 /* byte alignment (for hw parts) */,
- 			4096 /* can't cross 4K */);
-@@ -189,7 +189,7 @@ static int ehci_mem_init (struct ehci_hcd *ehci, gfp_t flags)
- 
- 	/* SITD for full/low speed split ISO transfers */
- 	ehci->sitd_pool = dma_pool_create ("ehci_sitd",
--			ehci_to_hcd(ehci)->self.controller,
-+			ehci_to_hcd(ehci)->self.sysdev,
- 			sizeof (struct ehci_sitd),
- 			32 /* byte alignment (for hw parts) */,
- 			4096 /* can't cross 4K */);
-@@ -199,7 +199,7 @@ static int ehci_mem_init (struct ehci_hcd *ehci, gfp_t flags)
- 
- 	/* Hardware periodic table */
- 	ehci->periodic = (__le32 *)
--		dma_alloc_coherent (ehci_to_hcd(ehci)->self.controller,
-+		dma_alloc_coherent(ehci_to_hcd(ehci)->self.sysdev,
- 			ehci->periodic_size * sizeof(__le32),
- 			&ehci->periodic_dma, flags);
- 	if (ehci->periodic == NULL) {
--- 
-2.7.4
+Yes, I agree.
+
+Additional, cper_sec_proc_arm has validation bit, which indicates whether or not each of
+the fields is valid in this section. How could we show it in this trace event? If the filed
+is invalid, we would get a wrong value here.
+
+--
+Thanks,
+Xie XiuQi
+
+> 
+> The ARM processor error section also has a vendor specific error info buffer which will need to be exposed to userspace. This may be something that can reuse the unknown section type trace event or have it's own trace event for.
+> 
+> Thanks,
+> Tyler
+> 
