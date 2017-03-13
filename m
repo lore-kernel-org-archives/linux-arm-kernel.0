@@ -1,282 +1,236 @@
 From: yuanzhichang@hisilicon.com (zhichang.yuan)
-Date: Mon, 13 Mar 2017 10:42:42 +0800
-Subject: [PATCH V7 6/7] LIBIO: Support the dynamically logical PIO
- registration of ACPI host I/O
+Date: Mon, 13 Mar 2017 10:42:38 +0800
+Subject: [PATCH V7 2/7] PCI: Apply the new generic I/O management on PCI IO
+ hosts
 In-Reply-To: <1489372963-9000-1-git-send-email-yuanzhichang@hisilicon.com>
 References: <1489372963-9000-1-git-send-email-yuanzhichang@hisilicon.com>
-Message-ID: <1489372963-9000-7-git-send-email-yuanzhichang@hisilicon.com>
+Message-ID: <1489372963-9000-3-git-send-email-yuanzhichang@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For those hosts which access I/O based on the host/bus local I/O addresses,
-their I/O range must be registered and translated as unique logical PIO before
-the ACPI enumeration on the devices under the hosts. Otherwise, there is no
-available I/O resources allocated for those devices.
-This patch implements the interfaces in LIBIO to perform the host local I/O
-translation and set the logical IO mapped as ACPI I/O resources.
+After introducing the new generic I/O space management(LIBIO), the original PCI
+MMIO relevant helpers need to be updated based on the new interfaces defined in
+LIBIO.
+This patch adapts the corresponding code to match the changes introduced by
+LIBIO.
 
 Signed-off-by: zhichang.yuan <yuanzhichang@hisilicon.com>
 Signed-off-by: Gabriele Paoloni <gabriele.paoloni@huawei.com>
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>        #earlier draft
+Acked-by: Bjorn Helgaas <bhelgaas@google.com>       #drivers/pci parts
 ---
- include/linux/libio.h |   4 +
- lib/libio.c           | 224 ++++++++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 228 insertions(+)
+ drivers/acpi/pci_root.c |  8 +++--
+ drivers/of/address.c    |  4 ++-
+ drivers/pci/pci.c       | 96 +++++++++++--------------------------------------
+ include/linux/pci.h     |  3 +-
+ 4 files changed, 30 insertions(+), 81 deletions(-)
 
-diff --git a/include/linux/libio.h b/include/linux/libio.h
-index 91038aa..95c5f3e 100644
---- a/include/linux/libio.h
-+++ b/include/linux/libio.h
-@@ -20,6 +20,7 @@
- 
- #ifdef __KERNEL__
- 
-+#include <linux/acpi.h>
- #include <linux/fwnode.h>
- 
- /* This is compatible to PCI MMIO. */
-@@ -90,5 +91,8 @@ static inline unsigned long libio_translate_hwaddr(struct fwnode_handle *fwnode,
- 
- extern unsigned long libio_translate_cpuaddr(resource_size_t hw_addr);
- 
-+extern int acpi_set_libio_resource(struct acpi_device *adev,
-+			struct acpi_device *host);
-+
- #endif /* __KERNEL__ */
- #endif /* __LINUX_LIBIO_H */
-diff --git a/lib/libio.c b/lib/libio.c
-index e42f50b..b60ec9c 100644
---- a/lib/libio.c
-+++ b/lib/libio.c
-@@ -242,6 +242,230 @@ resource_size_t libio_to_hwaddr(unsigned long pio)
- 	return -1;
+diff --git a/drivers/acpi/pci_root.c b/drivers/acpi/pci_root.c
+index 919be0a..4d8cc24 100644
+--- a/drivers/acpi/pci_root.c
++++ b/drivers/acpi/pci_root.c
+@@ -730,7 +730,8 @@ static void acpi_pci_root_validate_resources(struct device *dev,
+ 	}
  }
  
-+#ifdef	CONFIG_ACPI
-+static inline bool acpi_libio_supported_resource(struct acpi_resource *res)
-+{
-+	switch (res->type) {
-+	case ACPI_RESOURCE_TYPE_ADDRESS32:
-+	case ACPI_RESOURCE_TYPE_ADDRESS64:
-+		return true;
-+	}
-+	return false;
-+}
-+
-+static acpi_status acpi_count_libiores(struct acpi_resource *res,
-+					   void *data)
-+{
-+	int *res_cnt = data;
-+
-+	if (acpi_libio_supported_resource(res) &&
-+		!acpi_dev_filter_resource_type(res, IORESOURCE_IO))
-+		(*res_cnt)++;
-+
-+	return AE_OK;
-+}
-+
-+static acpi_status acpi_read_one_libiores(struct acpi_resource *res,
-+		void *data)
-+{
-+	struct acpi_resource **resource = data;
-+
-+	if (acpi_libio_supported_resource(res) &&
-+		!acpi_dev_filter_resource_type(res, IORESOURCE_IO)) {
-+		memcpy((*resource), res, sizeof(struct acpi_resource));
-+		(*resource)->length = sizeof(struct acpi_resource);
-+		(*resource)->type = res->type;
-+		(*resource)++;
-+	}
-+
-+	return AE_OK;
-+}
-+
-+static acpi_status
-+acpi_build_libiores_template(struct acpi_device *adev,
-+			struct acpi_buffer *buffer)
-+{
-+	acpi_handle handle = adev->handle;
-+	struct acpi_resource *resource;
-+	acpi_status status;
-+	int res_cnt = 0;
-+
-+	status = acpi_walk_resources(handle, METHOD_NAME__CRS,
-+				     acpi_count_libiores, &res_cnt);
-+	if (ACPI_FAILURE(status) || !res_cnt) {
-+		dev_err(&adev->dev, "can't evaluate _CRS: %d\n", status);
-+		return -EINVAL;
-+	}
-+
-+	buffer->length = sizeof(struct acpi_resource) * (res_cnt + 1) + 1;
-+	buffer->pointer = kzalloc(buffer->length - 1, GFP_KERNEL);
-+	if (!buffer->pointer)
-+		return -ENOMEM;
-+
-+	resource = (struct acpi_resource *)buffer->pointer;
-+	status = acpi_walk_resources(handle, METHOD_NAME__CRS,
-+				     acpi_read_one_libiores, &resource);
-+	if (ACPI_FAILURE(status)) {
-+		kfree(buffer->pointer);
-+		dev_err(&adev->dev, "can't evaluate _CRS: %d\n", status);
-+		return -EINVAL;
-+	}
-+
-+	resource->type = ACPI_RESOURCE_TYPE_END_TAG;
-+	resource->length = sizeof(struct acpi_resource);
-+
-+	return 0;
-+}
-+
-+static int acpi_translate_libiores(struct acpi_device *adev,
-+		struct acpi_device *host, struct acpi_buffer *buffer)
-+{
-+	int res_cnt = (buffer->length - 1) / sizeof(struct acpi_resource) - 1;
-+	struct acpi_resource *resource = buffer->pointer;
-+	struct acpi_resource_address64 addr;
-+	unsigned long sys_port;
-+	struct device *dev = &adev->dev;
-+
-+	/* only one I/O resource now */
-+	if (res_cnt != 1) {
-+		dev_err(dev, "encode %d resources whose type is(%d)!\n",
-+			res_cnt, resource->type);
-+		return -EINVAL;
-+	}
-+
-+	if (ACPI_FAILURE(acpi_resource_to_address64(resource, &addr))) {
-+		dev_err(dev, "convert acpi resource(%d) as addr64 FAIL!\n",
-+			resource->type);
-+		return -EFAULT;
-+	}
-+
-+	/* For indirect-IO, addr length must be fixed. (>0, 0/1, 0/1)(0,0,0) */
-+	if (addr.min_address_fixed != addr.max_address_fixed) {
-+		dev_warn(dev, "variable I/O resource is invalid!\n");
-+		return -EINVAL;
-+	}
-+
-+	dev_dbg(dev, "CRS IO: len=0x%llx [0x%llx - 0x%llx]\n",
-+			addr.address.address_length, addr.address.minimum,
-+			addr.address.maximum);
-+	sys_port = libio_translate_hwaddr(&host->fwnode, addr.address.minimum);
-+	if (sys_port == -1) {
-+		dev_err(dev, "translate bus-addr(0x%llx) fail!\n",
-+			addr.address.minimum);
-+		return -EFAULT;
-+	}
-+
-+	switch (resource->type) {
-+	case ACPI_RESOURCE_TYPE_ADDRESS32:
-+	{
-+		struct acpi_resource_address32 *out_res;
-+
-+		out_res = &resource->data.address32;
-+		if (!addr.address.address_length)
-+			addr.address.address_length = out_res->address.maximum -
-+				out_res->address.minimum + 1;
-+		out_res->address.minimum = sys_port;
-+		out_res->address.maximum = sys_port +
-+				addr.address.address_length - 1;
-+		out_res->address.address_length = addr.address.address_length;
-+
-+		dev_info(dev, "_SRS 32IO: [0x%x - 0x%x] len = 0x%x\n",
-+			out_res->address.minimum,
-+			out_res->address.maximum,
-+			out_res->address.address_length);
-+
-+		break;
-+	}
-+
-+	case ACPI_RESOURCE_TYPE_ADDRESS64:
-+	{
-+		struct acpi_resource_address64 *out_res;
-+
-+		out_res = &resource->data.address64;
-+		if (!addr.address.address_length)
-+			addr.address.address_length = out_res->address.maximum -
-+				out_res->address.minimum + 1;
-+		out_res->address.minimum = sys_port;
-+		out_res->address.maximum = sys_port +
-+				addr.address.address_length - 1;
-+		out_res->address.address_length = addr.address.address_length;
-+
-+		dev_info(dev, "_SRS 64IO: [0x%llx - 0x%llx] len = 0x%llx\n",
-+			out_res->address.minimum,
-+			out_res->address.maximum,
-+			out_res->address.address_length);
-+
-+		break;
-+	}
-+
-+	default:
-+		return -EINVAL;
-+
-+	}
-+
-+	return 0;
-+}
-+
-+/*
-+ * update/set the current I/O resource of the designated device node.
-+ * after this calling, the enumeration can be started as the I/O resource
-+ * had been translated to logicial I/O from bus-local I/O.
-+ *
-+ * @adev: the device node to be updated the I/O resource;
-+ * @host: the device node where 'adev' is attached, which can be not
-+ *	the parent of 'adev';
-+ *
-+ * return 0 when successful, negative is for failure.
-+ */
-+int acpi_set_libio_resource(struct acpi_device *adev,
-+		struct acpi_device *host)
-+{
-+	struct device *dev = &adev->dev;
-+	struct acpi_buffer buffer;
-+	acpi_status status;
-+	int ret;
-+
-+	if (!host)
-+		return -EINVAL;
-+
-+	/* check the device state */
-+	if (!adev->status.present) {
-+		dev_info(dev, "ACPI: device is not present!\n");
-+		return 0;
-+	}
-+	/* whether the child had been enumerated? */
-+	if (acpi_device_enumerated(adev)) {
-+		dev_info(dev, "ACPI: had been enumerated!\n");
-+		return 0;
-+	}
-+
-+	/* read the _CRS and convert as acpi_buffer */
-+	status = acpi_build_libiores_template(adev, &buffer);
-+	if (ACPI_FAILURE(status)) {
-+		dev_warn(dev, "Failure evaluating %s\n", METHOD_NAME__CRS);
-+		return -ENODEV;
-+	}
-+
-+	/* translate the I/O resources */
-+	ret = acpi_translate_libiores(adev, host, &buffer);
-+	if (ret) {
-+		kfree(buffer.pointer);
-+		dev_err(dev, "Translate I/O range FAIL!\n");
-+		return ret;
-+	}
-+
-+	/* set current resource... */
-+	status = acpi_set_current_resources(adev->handle, &buffer);
-+	kfree(buffer.pointer);
-+	if (ACPI_FAILURE(status)) {
-+		dev_err(dev, "Error evaluating _SRS (0x%x)\n", status);
-+		ret = -EIO;
-+	}
-+
-+	return ret;
-+}
-+#endif
-+
- #ifdef PCI_IOBASE
- static struct libio_range *find_io_range(unsigned long pio)
+-static void acpi_pci_root_remap_iospace(struct resource_entry *entry)
++static void acpi_pci_root_remap_iospace(struct fwnode_handle *fwnode,
++			struct resource_entry *entry)
  {
+ #ifdef PCI_IOBASE
+ 	struct resource *res = entry->res;
+@@ -739,7 +740,7 @@ static void acpi_pci_root_remap_iospace(struct resource_entry *entry)
+ 	resource_size_t length = resource_size(res);
+ 	unsigned long port;
+ 
+-	if (pci_register_io_range(cpu_addr, length))
++	if (pci_register_io_range(fwnode, cpu_addr, length))
+ 		goto err;
+ 
+ 	port = pci_address_to_pio(cpu_addr);
+@@ -781,7 +782,8 @@ int acpi_pci_probe_root_resources(struct acpi_pci_root_info *info)
+ 	else {
+ 		resource_list_for_each_entry_safe(entry, tmp, list) {
+ 			if (entry->res->flags & IORESOURCE_IO)
+-				acpi_pci_root_remap_iospace(entry);
++				acpi_pci_root_remap_iospace(&device->fwnode,
++						entry);
+ 
+ 			if (entry->res->flags & IORESOURCE_DISABLED)
+ 				resource_list_destroy_entry(entry);
+diff --git a/drivers/of/address.c b/drivers/of/address.c
+index 02b2903..fb5d16a 100644
+--- a/drivers/of/address.c
++++ b/drivers/of/address.c
+@@ -2,6 +2,7 @@
+ #define pr_fmt(fmt)	"OF: " fmt
+ 
+ #include <linux/device.h>
++#include <linux/fwnode.h>
+ #include <linux/io.h>
+ #include <linux/ioport.h>
+ #include <linux/module.h>
+@@ -323,7 +324,8 @@ int of_pci_range_to_resource(struct of_pci_range *range,
+ 
+ 	if (res->flags & IORESOURCE_IO) {
+ 		unsigned long port;
+-		err = pci_register_io_range(range->cpu_addr, range->size);
++		err = pci_register_io_range(&np->fwnode, range->cpu_addr,
++				range->size);
+ 		if (err)
+ 			goto invalid_range;
+ 		port = pci_address_to_pio(range->cpu_addr);
+diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+index 7904d02..079319f 100644
+--- a/drivers/pci/pci.c
++++ b/drivers/pci/pci.c
+@@ -3238,65 +3238,37 @@ int pci_request_regions_exclusive(struct pci_dev *pdev, const char *res_name)
+ }
+ EXPORT_SYMBOL(pci_request_regions_exclusive);
+ 
+-#ifdef PCI_IOBASE
+-struct io_range {
+-	struct list_head list;
+-	phys_addr_t start;
+-	resource_size_t size;
+-};
+-
+-static LIST_HEAD(io_range_list);
+-static DEFINE_SPINLOCK(io_range_lock);
+-#endif
+-
+ /*
+  * Record the PCI IO range (expressed as CPU physical address + size).
+  * Return a negative value if an error has occured, zero otherwise
+  */
+-int __weak pci_register_io_range(phys_addr_t addr, resource_size_t size)
++int pci_register_io_range(struct fwnode_handle *fwnode, phys_addr_t addr,
++			resource_size_t	size)
+ {
+ 	int err = 0;
+ 
+ #ifdef PCI_IOBASE
+-	struct io_range *range;
+-	resource_size_t allocated_size = 0;
+-
+-	/* check if the range hasn't been previously recorded */
+-	spin_lock(&io_range_lock);
+-	list_for_each_entry(range, &io_range_list, list) {
+-		if (addr >= range->start && addr + size <= range->start + size) {
+-			/* range already registered, bail out */
+-			goto end_register;
+-		}
+-		allocated_size += range->size;
+-	}
+-
+-	/* range not registed yet, check for available space */
+-	if (allocated_size + size - 1 > IO_SPACE_LIMIT) {
+-		/* if it's too big check if 64K space can be reserved */
+-		if (allocated_size + SZ_64K - 1 > IO_SPACE_LIMIT) {
+-			err = -E2BIG;
+-			goto end_register;
+-		}
++	struct libio_range *range, *tmprange;
+ 
+-		size = SZ_64K;
+-		pr_warn("Requested IO range too big, new size set to 64K\n");
+-	}
++	if (!size || addr + size < addr)
++		return -EINVAL;
+ 
+-	/* add the range to the list */
+-	range = kzalloc(sizeof(*range), GFP_ATOMIC);
+-	if (!range) {
+-		err = -ENOMEM;
+-		goto end_register;
+-	}
++	WARN_ON(!PAGE_ALIGNED(addr) || !PAGE_ALIGNED(size));
+ 
+-	range->start = addr;
++	range = kzalloc(sizeof(*range), GFP_KERNEL);
++	if (!range)
++		return -ENOMEM;
++	range->node = fwnode;
++	range->flags = IO_CPU_MMIO;
+ 	range->size = size;
++	range->hw_start = addr;
+ 
+-	list_add_tail(&range->list, &io_range_list);
+-
+-end_register:
+-	spin_unlock(&io_range_lock);
++	tmprange = register_libio_range(range);
++	if (tmprange != range) {
++		kfree(range);
++		if (!IS_ERR(tmprange))
++			err = 0;
++	}
+ #endif
+ 
+ 	return err;
+@@ -3307,21 +3279,10 @@ phys_addr_t pci_pio_to_address(unsigned long pio)
+ 	phys_addr_t address = (phys_addr_t)OF_BAD_ADDR;
+ 
+ #ifdef PCI_IOBASE
+-	struct io_range *range;
+-	resource_size_t allocated_size = 0;
+-
+ 	if (pio > IO_SPACE_LIMIT)
+ 		return address;
+ 
+-	spin_lock(&io_range_lock);
+-	list_for_each_entry(range, &io_range_list, list) {
+-		if (pio >= allocated_size && pio < allocated_size + range->size) {
+-			address = range->start + pio - allocated_size;
+-			break;
+-		}
+-		allocated_size += range->size;
+-	}
+-	spin_unlock(&io_range_lock);
++	address = libio_to_hwaddr(pio);
+ #endif
+ 
+ 	return address;
+@@ -3330,25 +3291,8 @@ phys_addr_t pci_pio_to_address(unsigned long pio)
+ unsigned long __weak pci_address_to_pio(phys_addr_t address)
+ {
+ #ifdef PCI_IOBASE
+-	struct io_range *res;
+-	resource_size_t offset = 0;
+-	unsigned long addr = -1;
+-
+-	spin_lock(&io_range_lock);
+-	list_for_each_entry(res, &io_range_list, list) {
+-		if (address >= res->start && address < res->start + res->size) {
+-			addr = address - res->start + offset;
+-			break;
+-		}
+-		offset += res->size;
+-	}
+-	spin_unlock(&io_range_lock);
+-
+-	return addr;
++	return libio_translate_cpuaddr(address);
+ #else
+-	if (address > IO_SPACE_LIMIT)
+-		return (unsigned long)-1;
+-
+ 	return (unsigned long) address;
+ #endif
+ }
+diff --git a/include/linux/pci.h b/include/linux/pci.h
+index eb3da1a..6401327 100644
+--- a/include/linux/pci.h
++++ b/include/linux/pci.h
+@@ -1194,7 +1194,8 @@ int __must_check pci_bus_alloc_resource(struct pci_bus *bus,
+ 			void *alignf_data);
+ 
+ 
+-int pci_register_io_range(phys_addr_t addr, resource_size_t size);
++int pci_register_io_range(struct fwnode_handle *fwnode, phys_addr_t addr,
++			resource_size_t size);
+ unsigned long pci_address_to_pio(phys_addr_t addr);
+ phys_addr_t pci_pio_to_address(unsigned long pio);
+ int pci_remap_iospace(const struct resource *res, phys_addr_t phys_addr);
 -- 
 1.9.1
