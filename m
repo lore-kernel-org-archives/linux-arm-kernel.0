@@ -1,130 +1,130 @@
 From: john@metanate.com (John Keeping)
-Date: Mon, 13 Mar 2017 18:38:10 +0000
-Subject: [RFC PATCH 1/4] pinctrl: rockchip: remove unnecessary locking
+Date: Mon, 13 Mar 2017 18:38:13 +0000
+Subject: [RFC PATCH 4/4] pinctrl: rockchip: avoid hardirq-unsafe functions in
+ irq_chip
 In-Reply-To: <20170313183813.3582-1-john@metanate.com>
 References: <20170313183813.3582-1-john@metanate.com>
-Message-ID: <20170313183813.3582-2-john@metanate.com>
+Message-ID: <20170313183813.3582-5-john@metanate.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-regmap_update_bits does its own locking and everything else accessed
-here is a local variable so there is no need to lock around it.
+With real-time preemption, regmap functions cannot be used in the
+implementation of irq_chip since they use spinlocks which may sleep.
 
-I originally wrote this on to of v4.4 which doesn't have the split
-registers for drive strength, where some additional locking might be
-necessary.  But I don't think it can be "slock" given that the following
-patches will convert that to a raw spinlock and regmap uses a normal
-spinlock internally.
+Move the setting of the mux for IRQs to an irq_bus_sync_unlock handler
+where we are allowed to sleep.
 
 Signed-off-by: John Keeping <john@metanate.com>
 ---
- drivers/pinctrl/pinctrl-rockchip.c | 20 +-------------------
- 1 file changed, 1 insertion(+), 19 deletions(-)
+ drivers/pinctrl/pinctrl-rockchip.c | 44 ++++++++++++++++++++++++++++++++++----
+ 1 file changed, 40 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/pinctrl/pinctrl-rockchip.c b/drivers/pinctrl/pinctrl-rockchip.c
-index a838c8bb3129..1defe83a5c4d 100644
+index 52e70c4aef7c..80f7c23d12d4 100644
 --- a/drivers/pinctrl/pinctrl-rockchip.c
 +++ b/drivers/pinctrl/pinctrl-rockchip.c
-@@ -649,7 +649,6 @@ static int rockchip_set_mux(struct rockchip_pin_bank *bank, int pin, int mux)
- 	int iomux_num = (pin / 8);
- 	struct regmap *regmap;
- 	int reg, ret, mask, mux_type;
--	unsigned long flags;
- 	u8 bit;
- 	u32 data, rmask;
+@@ -143,6 +143,9 @@ struct rockchip_drv {
+  * @gpio_chip: gpiolib chip
+  * @grange: gpio range
+  * @slock: spinlock for the gpio bank
++ * @irq_lock: bus lock for irq chip
++ * @new_irqs: newly configured irqs which must be muxed as GPIOs in
++ *	irq_bus_sync_unlock()
+  */
+ struct rockchip_pin_bank {
+ 	void __iomem			*reg_base;
+@@ -165,6 +168,8 @@ struct rockchip_pin_bank {
+ 	struct pinctrl_gpio_range	grange;
+ 	raw_spinlock_t			slock;
+ 	u32				toggle_edge_mode;
++	struct mutex			irq_lock;
++	u32				new_irqs;
+ };
  
-@@ -698,15 +697,11 @@ static int rockchip_set_mux(struct rockchip_pin_bank *bank, int pin, int mux)
- 	if (ctrl->iomux_recalc && (mux_type & IOMUX_RECALCED))
- 		ctrl->iomux_recalc(bank->bank_num, pin, &reg, &bit, &mask);
+ #define PIN_BANK(id, pins, label)			\
+@@ -2045,11 +2050,12 @@ static int rockchip_irq_set_type(struct irq_data *d, unsigned int type)
+ 	int ret;
  
--	spin_lock_irqsave(&bank->slock, flags);
--
- 	data = (mask << (bit + 16));
- 	rmask = data | (data >> 16);
- 	data |= (mux & mask) << bit;
- 	ret = regmap_update_bits(regmap, reg, rmask, data);
- 
--	spin_unlock_irqrestore(&bank->slock, flags);
--
- 	return ret;
- }
- 
-@@ -1132,7 +1127,6 @@ static int rockchip_set_drive_perpin(struct rockchip_pin_bank *bank,
- 	struct rockchip_pinctrl *info = bank->drvdata;
- 	struct rockchip_pin_ctrl *ctrl = info->ctrl;
- 	struct regmap *regmap;
--	unsigned long flags;
- 	int reg, ret, i;
- 	u32 data, rmask, rmask_bits, temp;
- 	u8 bit;
-@@ -1160,8 +1154,6 @@ static int rockchip_set_drive_perpin(struct rockchip_pin_bank *bank,
+ 	/* make sure the pin is configured as gpio input */
+-	ret = rockchip_set_mux(bank, d->hwirq, RK_FUNC_GPIO);
++	ret = rockchip_verify_mux(bank, d->hwirq, RK_FUNC_GPIO);
+ 	if (ret < 0)
  		return ret;
+ 
+-	clk_enable(bank->clk);
++	bank->new_irqs |= mask;
++
+ 	raw_spin_lock_irqsave(&bank->slock, flags);
+ 
+ 	data = readl_relaxed(bank->reg_base + GPIO_SWPORT_DDR);
+@@ -2107,7 +2113,6 @@ static int rockchip_irq_set_type(struct irq_data *d, unsigned int type)
+ 	default:
+ 		irq_gc_unlock(gc);
+ 		raw_spin_unlock_irqrestore(&bank->slock, flags);
+-		clk_disable(bank->clk);
+ 		return -EINVAL;
  	}
  
--	spin_lock_irqsave(&bank->slock, flags);
--
- 	switch (drv_type) {
- 	case DRV_TYPE_IO_1V8_3V0_AUTO:
- 	case DRV_TYPE_IO_3V3_ONLY:
-@@ -1182,17 +1174,14 @@ static int rockchip_set_drive_perpin(struct rockchip_pin_bank *bank,
- 			rmask = BIT(15) | BIT(31);
- 			data |= BIT(31);
- 			ret = regmap_update_bits(regmap, reg, rmask, data);
--			if (ret) {
--				spin_unlock_irqrestore(&bank->slock, flags);
-+			if (ret)
- 				return ret;
--			}
+@@ -2116,7 +2121,6 @@ static int rockchip_irq_set_type(struct irq_data *d, unsigned int type)
  
- 			rmask = 0x3 | (0x3 << 16);
- 			temp |= (0x3 << 16);
- 			reg += 0x4;
- 			ret = regmap_update_bits(regmap, reg, rmask, temp);
+ 	irq_gc_unlock(gc);
+ 	raw_spin_unlock_irqrestore(&bank->slock, flags);
+-	clk_disable(bank->clk);
  
--			spin_unlock_irqrestore(&bank->slock, flags);
- 			return ret;
- 		case 18 ... 21:
- 			/* setting fully enclosed in the second register */
-@@ -1200,7 +1189,6 @@ static int rockchip_set_drive_perpin(struct rockchip_pin_bank *bank,
- 			bit -= 16;
- 			break;
- 		default:
--			spin_unlock_irqrestore(&bank->slock, flags);
- 			dev_err(info->dev, "unsupported bit: %d for pinctrl drive type: %d\n",
- 				bit, drv_type);
- 			return -EINVAL;
-@@ -1212,7 +1200,6 @@ static int rockchip_set_drive_perpin(struct rockchip_pin_bank *bank,
- 		rmask_bits = RK3288_DRV_BITS_PER_PIN;
- 		break;
- 	default:
--		spin_unlock_irqrestore(&bank->slock, flags);
- 		dev_err(info->dev, "unsupported pinctrl drive type: %d\n",
- 			drv_type);
- 		return -EINVAL;
-@@ -1224,7 +1211,6 @@ static int rockchip_set_drive_perpin(struct rockchip_pin_bank *bank,
- 	data |= (ret << bit);
- 
- 	ret = regmap_update_bits(regmap, reg, rmask, data);
--	spin_unlock_irqrestore(&bank->slock, flags);
- 
- 	return ret;
+ 	return 0;
  }
-@@ -1336,16 +1322,12 @@ static int rockchip_set_pull(struct rockchip_pin_bank *bank,
- 			return ret;
- 		}
+@@ -2160,6 +2164,34 @@ static void rockchip_irq_gc_mask_set_bit(struct irq_data *d)
+ 	clk_disable(bank->clk);
+ }
  
--		spin_lock_irqsave(&bank->slock, flags);
--
- 		/* enable the write to the equivalent lower bits */
- 		data = ((1 << RK3188_PULL_BITS_PER_PIN) - 1) << (bit + 16);
- 		rmask = data | (data >> 16);
- 		data |= (ret << bit);
++static void rockchip_irq_bus_lock(struct irq_data *d)
++{
++	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
++	struct rockchip_pin_bank *bank = gc->private;
++
++	clk_enable(bank->clk);
++	mutex_lock(&bank->irq_lock);
++}
++
++static void rockchip_irq_bus_sync_unlock(struct irq_data *d)
++{
++	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
++	struct rockchip_pin_bank *bank = gc->private;
++
++	while (bank->new_irqs) {
++		unsigned int irq = __ffs(bank->new_irqs);
++		int ret;
++
++		ret = rockchip_set_mux(bank, irq, RK_FUNC_GPIO);
++		WARN_ON(ret < 0);
++
++		bank->new_irqs &= ~BIT(irq);
++	}
++
++	mutex_unlock(&bank->irq_lock);
++	clk_disable(bank->clk);
++}
++
+ static int rockchip_interrupts_register(struct platform_device *pdev,
+ 						struct rockchip_pinctrl *info)
+ {
+@@ -2225,6 +2257,9 @@ static int rockchip_interrupts_register(struct platform_device *pdev,
+ 		gc->chip_types[0].chip.irq_suspend = rockchip_irq_suspend;
+ 		gc->chip_types[0].chip.irq_resume = rockchip_irq_resume;
+ 		gc->chip_types[0].chip.irq_set_type = rockchip_irq_set_type;
++		gc->chip_types[0].chip.irq_bus_lock = rockchip_irq_bus_lock;
++		gc->chip_types[0].chip.irq_bus_sync_unlock =
++						rockchip_irq_bus_sync_unlock;
+ 		gc->wake_enabled = IRQ_MSK(bank->nr_pins);
  
- 		ret = regmap_update_bits(regmap, reg, rmask, data);
--
--		spin_unlock_irqrestore(&bank->slock, flags);
- 		break;
- 	default:
- 		dev_err(info->dev, "unsupported pinctrl type\n");
+ 		irq_set_chained_handler_and_data(bank->irq,
+@@ -2398,6 +2433,7 @@ static struct rockchip_pin_ctrl *rockchip_pinctrl_get_soc_data(
+ 		int bank_pins = 0;
+ 
+ 		raw_spin_lock_init(&bank->slock);
++		mutex_init(&bank->irq_lock);
+ 		bank->drvdata = d;
+ 		bank->pin_base = ctrl->nr_pins;
+ 		ctrl->nr_pins += bank->nr_pins;
 -- 
 2.12.0.377.gf910686b23.dirty
