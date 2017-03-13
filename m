@@ -1,64 +1,51 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Mon, 13 Mar 2017 16:46:16 -0500
-Subject: [PATCH V4 0/3] PCI/ASPM: reconfigure ASPM following hotplug for
- POLICY_DEFAULT
-In-Reply-To: <1489438085-2055-1-git-send-email-okaya@codeaurora.org>
-References: <1489438085-2055-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <20170313214616.GE8232@bhelgaas-glaptop.roam.corp.google.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 13 Mar 2017 14:47:16 -0700
+Subject: [PATCH] ARM: omap2+: Revert omap-smp.c changes resetting CPU1
+ during boot
+In-Reply-To: <c6d992fc-5468-8124-f1ee-558889147b72@ti.com>
+References: <20170313205231.1593-1-tony@atomide.com>
+ <c6d992fc-5468-8124-f1ee-558889147b72@ti.com>
+Message-ID: <20170313214716.GY20572@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 13, 2017 at 04:48:02PM -0400, Sinan Kaya wrote:
-> y
-> (POLICY_DEFAULT), current code is querying the enable/disable
-> states from ASPM registers to determine the policy.
+* Andrew F. Davis <afd@ti.com> [170313 14:30]:
+> On 03/13/2017 03:52 PM, Tony Lindgren wrote:
+> > So let's fix the issue reported by Andrew by making CPU1 reset conditional
+> > and only do it if CPU1 is configured to boot at an address that is within
+> > the booting kernel. In these cases we know for sure that we just overwrote
+> > the configured boot_secondary() during booting and that it's invalid.
 > 
-> For example, a BIOS could set the power saving state to performance
-> and clear all ASPM control registers. A balanced ASPM policy could
-> enable L0s and disable L1. A power conscious BIOS could enable both
-> L0s and L1 to trade off latency and performance vs. power.
-> 
-> After hotplug removal, pcie_aspm_exit_link_state() function clears
-> the ASPM registers. An insertion following hotplug removal reads
-> incorrect policy as ASPM disabled even though ASPM was enabled
-> during boot.
-> 
-> This is caused by the fact that same function is used for reconfiguring
-> ASPM regardless of the of the power on state.
-> 
-> ------------------------
-> Changes from v3 (https://lkml.org/lkml/2017/3/8/670)
-> ------------------------
-> - call pcie_aspm_init_link_state() for every device, maybe from
-> pci_init_capabilities()
-> 
-> - for bridges, have pcie_aspm_init_link_state() allocate a
-> link_state, regardless of whether it currently has any children,
-> and save the ASPM settings done by firmware
-> 
-> - for endpoints, have pcie_aspm_init_link_state() do the actual ASPM
-> setup of the link as it currently does
-> 
-> - for endpoints, change pcie_aspm_exit_link_state() so it cleans up
-> the device's own state and disables ASPM if necessary, but doesn't
-> remove the parent's link_state
-> 
-> - for bridges, change pcie_aspm_exit_link_state() so it frees the
-> bridge's own link_state
-> 
-> Sinan Kaya (3):
->   PCI/ASPM: divide ASPM capability init into pre and post init
->   PCI/ASPM: move part of ASPM initialization to pci_init_capabilities
->   PCI/ASPM: move link_state cleanup to bridge remove
-> 
->  drivers/pci/pcie/aspm.c | 175 +++++++++++++++++++++++++++++++++++-------------
->  drivers/pci/probe.c     |   3 +
->  include/linux/pci.h     |   6 ++
->  3 files changed, 136 insertions(+), 48 deletions(-)
+> One thing that worries me is the false negatives, what happens if the
+> boot address register (WAKEUP_NS_PA_ADDR) is pointing outside the new
+> kernel (which will most likely be the case as it probably will be
+> pointing to the old kernel), but the core is not correctly parked (lets
+> say it is in WFI idle loop in old kernel), we will fail to reboot it
+> when in this case we should.
 
-What is this series based on?  Unless they depend on other in-flight
-patches, I apply patches to branches based on my "master" branch,
-which is typically -rc1 or -rc2 (it's currently v4.11-rc1).  These
-don't apply to either.
+Yup this won't handle all the cases for sure. The case you're describing
+always happens with u-boot, I think it parks CPU1 to the end of DDR.
+And then we just blindly assume CPU1 is properly configured.
 
-Bjorn
+For kexec booting, the old parked address will be almost certainly
+overlapping with the new kernel and the code gets overwritten. I don't
+think the kexec case of WAKEUP_NS_PA_ADDR being outside the booted
+kernel can happen without patched kernel. But it probably can with
+crashkernel configurations, and properly parking the kernel is the
+real fix there.
+
+Or do you have some specific check in mind we could add?
+
+> I think the best way to handle this is to set WAKEUP_NS_PA_ADDR to zero
+> when we park it, for all other cases we can assume it is not parked. As
+> long as we remember in the bootloader and kernel to zero that register
+> when parking it, then we shouldn't have any false positives or any
+> failures to reset when we should have.
+
+Yeah makes sense. So for CPU1 hot-unplug, we also need to bring up
+CPU1 from idle and park it to bootrom to also prevent CPU1 waking
+from idle to a wrong address.
+
+Regards,
+
+Tony
