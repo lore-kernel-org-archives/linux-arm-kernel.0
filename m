@@ -1,47 +1,65 @@
 From: michal.simek@xilinx.com (Michal Simek)
-Date: Mon, 13 Mar 2017 11:27:36 +0100
-Subject: [PATCH 2/2] fpga: Add support for Xilinx LogiCORE PR Decoupler
-In-Reply-To: <CAAtXAHe-AMq9Ux2LZZEWLcg8Dk6jTiHhrot4RhEVrxTBhnLE0g@mail.gmail.com>
+Date: Mon, 13 Mar 2017 11:29:06 +0100
+Subject: [PATCH 1/2] doc: Add bindings document for Xilinx LogiCore PR
+ Decoupler
+In-Reply-To: <1489181435-3151-1-git-send-email-mdf@kernel.org>
 References: <1489181435-3151-1-git-send-email-mdf@kernel.org>
- <1489181435-3151-2-git-send-email-mdf@kernel.org>
- <CAAtXAHe-AMq9Ux2LZZEWLcg8Dk6jTiHhrot4RhEVrxTBhnLE0g@mail.gmail.com>
-Message-ID: <2f21aeb3-dd4e-e170-729a-a785077b6f28@xilinx.com>
+Message-ID: <91f745a9-5ab5-345c-3e46-cac7191012f9@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Moritz,
+On 10.3.2017 22:30, Moritz Fischer wrote:
+> This adds the binding documentation for the Xilinx LogiCORE PR
+> Decoupler soft core.
+> 
+> Signed-off-by: Moritz Fischer <mdf@kernel.org>
+> Cc: Michal Simek <michal.simek@xilinx.com>
+> Cc: S?ren Brinkmann <soren.brinkmann@xilinx.com>
+> Cc: linux-kernel at vger.kernel.org
+> Cc: devicetree at vger.kernel.org
+> ---
+>  .../bindings/fpga/xilinx-pr-decoupler.txt          | 24 ++++++++++++++++++++++
+>  1 file changed, 24 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/fpga/xilinx-pr-decoupler.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/fpga/xilinx-pr-decoupler.txt b/Documentation/devicetree/bindings/fpga/xilinx-pr-decoupler.txt
+> new file mode 100644
+> index 0000000..b82b928
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/fpga/xilinx-pr-decoupler.txt
+> @@ -0,0 +1,24 @@
+> +Xilinx LogiCORE Partial Reconfig Decoupler Softcore
+> +
+> +The Xilinx LogiCORE Partial Reconfig Decoupler  manages one or more
+> +decouplers / fpga bridges.
+> +The controller can decouple/disable the bridges which prevents signal
+> +changes from passing through the bridge.  The controller can also
+> +couple /enable the bridges which allows traffic to pass through the
+> +bridge normally.
+> +
+> +Required properties:
+> +- compatible		: Should contain "xlnx,pr-decoupler-1.00"
+> +- regs			: base address and size for decoupler module
+> +
+> +Optional properties:
+> +- bridge-enable		: 0 if driver should disable bridge at startup
+> +			  1 if driver should enable bridge at startup
+> +			  Default is to leave bridge in current state.
+> +
+> +Example:
+> +	fpga-bridge at 100000450 {
+> +		compatible = "xlnx,pr-decoupler-1.00";
+> +		regs = <0x1000 0x10>;
+> +		bridge-enable = <0>;
+> +	};
+> 
 
-On 10.3.2017 23:42, Moritz Fischer wrote:
-> On Fri, Mar 10, 2017 at 1:30 PM, Moritz Fischer <mdf@kernel.org> wrote:
->> This adds support for the Xilinx LogiCORE PR Decoupler
->> soft-ip that does decoupling of PR regions in the FPGA
->> fabric during partial reconfiguration.
->>
->> Signed-off-by: Moritz Fischer <mdf@kernel.org>
->> Cc: Michal Simek <michal.simek@xilinx.com>
->> Cc: S?ren Brinkmann <soren.brinkmann@xilinx.com>
->> Cc: linux-kernel at vger.kernel.org
->> Cc: devicetree at vger.kernel.org
->> ---
->>  drivers/fpga/Kconfig               |   9 +++
->>  drivers/fpga/Makefile              |   1 +
->>  drivers/fpga/xilinx-pr-decoupler.c | 156 +++++++++++++++++++++++++++++++++++++
->>  3 files changed, 166 insertions(+)
->>  create mode 100644 drivers/fpga/xilinx-pr-decoupler.c
+Look at.
+https://github.com/Xilinx/linux-xlnx/blob/master/Documentation/devicetree/bindings/fpga/xilinx-pr-decoupler.txt
 
-I have written very similar driver some week ago but didn't sent it out.
 
-Here it is.
-https://github.com/Xilinx/linux-xlnx/blob/master/drivers/fpga/xilinx-pr-decoupler.c
-
-Your clk handling is better and my enable_show is better.
-You shouldn't rely on setting status before. It is better to read that
-reg again. The reason is you can connect status signal from one PR
-decoupler to decouple input which can change status
-
-There is another topic I wanted to open in connection to this. There
-should be gpio based bridge because this pr decoupler can be without axi
-interface and for that gpio driver would be useful.
+And you miss above required clk property. I do use aclk because this is
+what it is shown in vivado.
 
 Thanks,
 Michal
