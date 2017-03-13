@@ -1,53 +1,128 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Mon, 13 Mar 2017 09:58:52 -0400
-Subject: [PATCH V12 09/10] trace, ras: add ARM processor error trace event
-In-Reply-To: <58C65FCB.3040508@huawei.com>
-References: <1488833103-21082-1-git-send-email-tbaicar@codeaurora.org>
- <1488833103-21082-10-git-send-email-tbaicar@codeaurora.org>
- <58C12342.2090701@huawei.com>
- <14545228-7ff1-b31c-1fa5-daacf89a44b9@codeaurora.org>
- <58C60485.2070509@huawei.com> <58C65FCB.3040508@huawei.com>
-Message-ID: <20170313095852.0c424d53@gandalf.local.home>
+From: brendan.jackman@arm.com (Brendan Jackman)
+Date: Mon, 13 Mar 2017 13:58:56 +0000
+Subject: [PATCH V5 1/6] drivers: cpuidle: Read CPU's idle state from PM
+ domain
+In-Reply-To: <1488577697-127445-2-git-send-email-lina.iyer@linaro.org>
+References: <1488577697-127445-1-git-send-email-lina.iyer@linaro.org>
+ <1488577697-127445-2-git-send-email-lina.iyer@linaro.org>
+Message-ID: <8760jds2fz.fsf@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 13 Mar 2017 17:00:59 +0800
-Xie XiuQi <xiexiuqi@huawei.com> wrote:
 
+Hi Lina,
+
+On Fri, Mar 03 2017 at 21:48, Lina Iyer wrote:
+> Currently CPUs idle states and idle states of its parent are represented
+> in a flattened model by the cpu-dile-states property of the CPU node.
+> The CPUs idle states are followed by its cluster idle states. With the
+> introduction of CPU PM domains, the CPUs and domain idle states may be
+> represented hierarchically as part of the domain DT definition. This
+> would mean presenting idle state information in 2 places - CPU nodes for
+> the CPU and the cluster's with the PM domains.
+>
+> Also, it makes sense to define domains around each individual CPU since
+> each of them is a power domain in its own right. The CPU idle states can
+> now be represented as its domain's idle state, defined by the
+> domain-idle-states property. This avoids presenting idle states in
+> multiple places in the DT.
+>
+> Modify the DT-based cpuidle driver to check for the presence of a CPU's
+> domain and if present read the domain-idle-states of the PM domain and
+> if the CPU's domain is absent, revert to reading in the cpu-idle-states
+> property of the CPU DT node.
+>
+> Suggested-by: Sudeep Holla <sudeep.holla@qrm.com>
+s/qrm/arm/
+
+> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
 > ---
->  drivers/acpi/apei/ghes.c |  8 +++++
->  include/linux/cper.h     |  5 +++
->  include/ras/ras_event.h  | 87 ++++++++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 100 insertions(+)
-> 
-> diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
-> index 251d7e0..6d34c26 100644
-> --- a/drivers/acpi/apei/ghes.c
-> +++ b/drivers/acpi/apei/ghes.c
-> @@ -518,9 +518,17 @@ static void ghes_do_proc(struct ghes *ghes,
->  		else if (!uuid_le_cmp(sec_type, CPER_SEC_PROC_ARM) &&
->  			 trace_arm_event_enabled()) {
->  			struct cper_sec_proc_arm *arm_err;
-> +			struct cper_arm_err_info *err_info;
-> +			int i;
-> 
->  			arm_err = acpi_hest_generic_data_payload(gdata);
->  			trace_arm_event(arm_err);
+>  drivers/cpuidle/dt_idle_states.c | 38 +++++++++++++++++++++++++++++++++++---
+>  1 file changed, 35 insertions(+), 3 deletions(-)
+>
+> diff --git a/drivers/cpuidle/dt_idle_states.c b/drivers/cpuidle/dt_idle_states.c
+> index ffca4fc..4df7d45 100644
+> --- a/drivers/cpuidle/dt_idle_states.c
+> +++ b/drivers/cpuidle/dt_idle_states.c
+> @@ -98,6 +98,39 @@ static int init_state_node(struct cpuidle_state *idle_state,
+>  }
+>
+>  /*
+> + * Get the state node at @idx. State node may be defined as domain's idle state
+> + * if the CPU has its own domain or defined as CPU's idle state if it doesn't
+> + * have a domain provider.
+> + */
+> +static struct device_node *get_state_node(struct device_node *cpu_node,
+> +				unsigned int idx)
+> +{
+> +	struct device_node *dn;
+> +	bool cpu_has_domain = false;
+> +	struct of_phandle_args args;
+> +	const char *property;
+> +	int err;
 > +
+> +	err = of_parse_phandle_with_args(cpu_node, "power-domains",
+> +					"#power-domain-cells", 0, &args);
+Should probably have an of_node_put to match this.
+> +	if (!err) {
+> +		dn = args.np;
+> +		err = of_count_phandle_with_args(dn, "domain-idle-states",
+> +								NULL);
+> +		cpu_has_domain = (err > 0);
 
-		if (trace_arm_proc_err_enabled()) {
+So if a CPU has a power domain but that domain doesn't have any idle
+states, then we fall back to cpu-idle-states?
 
-> +			err_info = (struct cper_arm_err_info *)(arm_err + 1);
-> +			for (i = 0; i < arm_err->err_info_num; i++) {
-> +				trace_arm_proc_err(err_info);
-> +				err_info += 1;
-> +			}
+I think the presence of a power domain for a CPU should mean
+cpu-idle-states is totally ignored, and this should be made clear in the
+power_domain.txt binding doc.
 
-		}
+(I have had this conversation with someone before, I think it was
+ internal at ARM but if I'm wrong and we've already discussed it then
+ I'm sorry!)
+> +	}
+> +
+> +	if (cpu_has_domain) {
+> +		property = "domain-idle-states";
+> +	} else {
+> +		property = "cpu-idle-states";
+> +		dn = cpu_node;
+> +	}
+> +
+> +	return of_parse_phandle(dn, property, idx);
+> +}
+> +
+> +/*
+>   * Check that the idle state is uniform across all CPUs in the CPUidle driver
+>   * cpumask
+>   */
+> @@ -118,8 +151,7 @@ static bool idle_state_valid(struct device_node *state_node, unsigned int idx,
+>  	for (cpu = cpumask_next(cpumask_first(cpumask), cpumask);
+>  	     cpu < nr_cpu_ids; cpu = cpumask_next(cpu, cpumask)) {
+>  		cpu_node = of_cpu_device_node_get(cpu);
+> -		curr_state_node = of_parse_phandle(cpu_node, "cpu-idle-states",
+> -						   idx);
+> +		curr_state_node = get_state_node(cpu_node, idx);
+>  		if (state_node != curr_state_node)
+>  			valid = false;
+>
+> @@ -176,7 +208,7 @@ int dt_init_idle_driver(struct cpuidle_driver *drv,
+>  	cpu_node = of_cpu_device_node_get(cpumask_first(cpumask));
+>
+>  	for (i = 0; ; i++) {
+> -		state_node = of_parse_phandle(cpu_node, "cpu-idle-states", i);
+> +		state_node = get_state_node(cpu_node, i);
+>  		if (!state_node)
+>  			break;
 
--- Steve
+This patch only supports using domain-idle-states for the CPU-level idle
+states, i.e. it only looks at one level of the power-domains graph
+rather than walking it and "linearising"/"flattening" the discovered
+states into a cpuidle-friendly list.
 
->  		} else if (trace_unknown_sec_event_enabled()) {
->  			void *unknown_err = acpi_hest_generic_data_payload(gdata);
->  			trace_unknown_sec_event(&sec_type,
-> diff --git a/include/linux/cper.h b/include/linux/cper.h
+That's not a reason against merging this patch but we should note the
+limitation and maybe even print a warning in if we find a parent for the
+CPU's power domain but we're using cpuidle rather than runtime PM.
+
+Cheers,
+Brendan
