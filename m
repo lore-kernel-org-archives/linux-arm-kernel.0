@@ -1,72 +1,89 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 13 Mar 2017 17:12:41 +0000
-Subject: Legacy features in PCI Express devices
-In-Reply-To: <ef5c9778-fbae-9f4f-ac2e-29b8597537a5@free.fr>
-References: <ef5c9778-fbae-9f4f-ac2e-29b8597537a5@free.fr>
-Message-ID: <96b57ba5-641d-46c8-6ba0-cee2c0613a6f@arm.com>
+From: mka@chromium.org (Matthias Kaehlcke)
+Date: Mon, 13 Mar 2017 10:22:22 -0700
+Subject: [PATCH v1] soc: rockchip: power-domain: Fix clang warning about
+ negative shift count
+In-Reply-To: <1715023.AuHs9buZxh@phil>
+References: <20170311022153.139362-1-mka@chromium.org>
+ <1715023.AuHs9buZxh@phil>
+Message-ID: <20170313172222.GA50582@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/03/17 16:10, Mason wrote:
-> Hello,
-> 
-> There are two revisions of our PCI Express controller.
-> 
-> Rev 1 did not support the following features:
-> 
->   1) legacy PCI interrupt delivery (INTx signals)
->   2) I/O address space
-> 
-> Internally, someone stated that such missing support would prevent
-> some PCIe cards from working with our controller.
-> 
-> Are there really modern PCIe cards that require 1) and/or 2)
-> to function?
-> 
-> Can someone provide examples of such cards, so that I may test them
-> on both revisions?
-> 
-> I was told to check ath9k-based cards. Any other examples?
-> 
-> Looking around, I came across this thread:
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2016-March/418254.html
-> "i.MX6 PCIe: Fix imx6_pcie_deassert_core_reset() polarity"
-> 
-> IIUC, although some PCIe boards do support MSI, the driver might not
-> put in the work to use that infrastructure, and instead reverts to
-> legacy interrupts. (So it is a SW issue, in a sense.)
+El Sat, Mar 11, 2017 at 01:03:48PM +0100 Heiko Stuebner ha dit:
 
-Secondary to that category is endpoints which nominally support MSI, but
-in a way which is unreliable or otherwise broken. My experience shows
-that the Silicon Image SiI 3132 (as integrated on ARM Juno boards, but
-seemingly also relatively common on 'generic' 2-port SATA cards) falls
-into that category - using the command-line parameter to force MSIs
-instead of legacy interrupts leads to the the machine barely reaching
-userspace before something goes horribly wrong:
+> Hi Matthias,
+> 
+> Am Freitag, 10. M?rz 2017, 18:21:53 CET schrieb Matthias Kaehlcke:
+> > The following warning is generated when building with clang:
+> > 
+> > drivers/soc/rockchip/pm_domains.c:726:22: error: shift count is negative
+> > [-Werror,-Wshift-count-negative] [RK3399_PD_TCPD0]       = DOMAIN_RK3399(8,
+> > 8, -1, false),
+> >                                   ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+> > drivers/soc/rockchip/pm_domains.c:101:2: note: expanded from macro
+> > 'DOMAIN_RK3399' DOMAIN(pwr, status, req, req, req, wakeup)
+> >         ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+> > drivers/soc/rockchip/pm_domains.c:88:27: note: expanded from macro 'DOMAIN'
+> >         .req_mask = (req >= 0) ? BIT(req) : 0,          \
+> >                                  ^~~~~~~~
+> > include/linux/bitops.h:6:24: note: expanded from macro 'BIT'
+> > 
+> > The BIT macro is evaluated with the negative value -1, even though the
+> > resulting value would not be assigned. To fix this we only pass values
+> > between 0 and 63 to BIT(). Unfortunately this means that we lose the
+> > benefit of the compiler checking for out of bounds errors.
+> 
+> I tend to disagree here. This looks more like a case of "fix your compiler".
+> 
+> That conditional seems perfectly valid as the BIT(req) will never be reached 
+> if req < 0 - your clang simply doesn't recognize the pattern somehow, while 
+> for example gcc does.
 
-...
-         Activating swap Swap Partition...
-[   10.817806] Adding 524284k swap on /dev/sda2.  Priority:-1 extents:1
-across:524284k SS
-         Starting File System Check on /dev/disk/by-uuid/1000-9346...
-[  OK  ] Activated swap Swap Partition.
-[  OK  ] Activated swap
-/dev/disk/by-partuui?6cda4-9f73-4e26-bf19-e71f9319b5ce.
-[  OK  ] Reached target Swap.
-         Mounting Temporary Directory...
-[  OK  ] Mounted Temporary Directory.
-[  OK  ] Started File System Check on /dev/disk/by-uuid/1000-9346.
-[   46.036065] Unhandled fault: synchronous external abort (0x96000210)
-at 0xffff0000092f5000
-[   46.044273] Internal error: : 96000210 [#1] PREEMPT SMP
-[   46.049445] Modules linked in:
-[   46.052474] CPU: 0 PID: 122 Comm: scsi_eh_0 Not tainted 4.11.0-rc1+ #1753
-[   46.059192] Hardware name: ARM Juno development board (r1) (DT)
-[   46.065052] task: ffff8009763b8000 task.stack: ffff800975f70000
-[   46.070918] PC is at ata_wait_register+0x2c/0xa0
-[   46.075491] LR is at sil24_init_port+0x60/0x110
-[   46.079974] pc : [<ffff0000085b342c>] lr : [<ffff0000085d2b78>]
-pstate: 40000145
-...
+My interpretation is that with clang the '(req >= 0) ?' condition is
+not evaluated by the preprocessor, but only by the compiler. This seems to
+be different with gcc.
 
-Robin.
+> Catering to specific whims of specific compilers feels somehow wrong, as what 
+> will happen if some imaginary third compiler requires another different hack 
+> to be satisfied?
+
+I'll check with the clang developers if clang can be changed to behave
+like gcc in this aspect.
+
+Thanks
+
+Matthias
+
+> > Signed-off-by: Matthias Kaehlcke <mka@chromium.org>
+> > ---
+> >  drivers/soc/rockchip/pm_domains.c | 14 ++++++++------
+> >  1 file changed, 8 insertions(+), 6 deletions(-)
+> > 
+> > diff --git a/drivers/soc/rockchip/pm_domains.c
+> > b/drivers/soc/rockchip/pm_domains.c index 1c78c42416c6..6f2bb1222992 100644
+> > --- a/drivers/soc/rockchip/pm_domains.c
+> > +++ b/drivers/soc/rockchip/pm_domains.c
+> > @@ -77,13 +77,15 @@ struct rockchip_pmu {
+> > 
+> >  #define to_rockchip_pd(gpd) container_of(gpd, struct rockchip_pm_domain,
+> > genpd)
+> > 
+> > +#define RK_MASK(bit) ((bit >= 0) ? BIT(bit & 0x3f) : 0)
+> > +
+> >  #define DOMAIN(pwr, status, req, idle, ack, wakeup)	\
+> > -{						\
+> > -	.pwr_mask = (pwr >= 0) ? BIT(pwr) : 0,		\
+> > -	.status_mask = (status >= 0) ? BIT(status) : 0,	\
+> > -	.req_mask = (req >= 0) ? BIT(req) : 0,		\
+> > -	.idle_mask = (idle >= 0) ? BIT(idle) : 0,	\
+> > -	.ack_mask = (ack >= 0) ? BIT(ack) : 0,		\
+> > +{							\
+> > +	.pwr_mask = RK_MASK(pwr),			\
+> > +	.status_mask = RK_MASK(status),			\
+> > +	.req_mask = RK_MASK(req),			\
+> > +	.idle_mask = RK_MASK(idle),			\
+> > +	.ack_mask = RK_MASK(ack),			\
+> >  	.active_wakeup = wakeup,			\
+> >  }
+> 
+> 
