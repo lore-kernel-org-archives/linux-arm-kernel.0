@@ -1,74 +1,28 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 13 Mar 2017 21:07:51 +0000
-Subject: [PATCH v4 29/36] media: imx: mipi-csi2: enable setting and
- getting of frame rates
-In-Reply-To: <20170313205646.GC10701@valkosipuli.retiisi.org.uk>
-References: <1487211578-11360-1-git-send-email-steve_longerbeam@mentor.com>
- <1487211578-11360-30-git-send-email-steve_longerbeam@mentor.com>
- <20170220220409.GX16975@valkosipuli.retiisi.org.uk>
- <20170221001332.GS21222@n2100.armlinux.org.uk>
- <25596b21-70de-5e46-f149-f9ce3a86ecb7@gmail.com>
- <1487667023.2331.8.camel@pengutronix.de>
- <20170313131647.GB10701@valkosipuli.retiisi.org.uk>
- <20170313132701.GJ21222@n2100.armlinux.org.uk>
- <20170313205646.GC10701@valkosipuli.retiisi.org.uk>
-Message-ID: <20170313210751.GN21222@n2100.armlinux.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 13 Mar 2017 14:15:21 -0700
+Subject: [PATCH 3/4] ARM: dts: dm8168-evm: add SATA node
+In-Reply-To: <1489423399-3824-4-git-send-email-bgolaszewski@baylibre.com>
+References: <1489423399-3824-1-git-send-email-bgolaszewski@baylibre.com>
+ <1489423399-3824-4-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <20170313211520.GW20572@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 13, 2017 at 10:56:46PM +0200, Sakari Ailus wrote:
-> Hi Russell,
-> 
-> On Mon, Mar 13, 2017 at 01:27:02PM +0000, Russell King - ARM Linux wrote:
-> > On Mon, Mar 13, 2017 at 03:16:48PM +0200, Sakari Ailus wrote:
-> > > The vast majority of existing drivers do not implement them nor the user
-> > > space expects having to set them. Making that mandatory would break existing
-> > > user space.
-> > > 
-> > > In addition, that does not belong to link validation either: link validation
-> > > should only include static properties of the link that are required for
-> > > correct hardware operation. Frame rate is not such property: hardware that
-> > > supports the MC interface generally does not recognise such concept (with
-> > > the exception of some sensors). Additionally, it is dynamic: the frame rate
-> > > can change during streaming, making its validation at streamon time useless.
-> > 
-> > So how do we configure the CSI, which can do frame skipping?
-> > 
-> > With what you're proposing, it means it's possible to configure the
-> > camera sensor source pad to do 50fps.  Configure the CSI sink pad to
-> > an arbitary value, such as 30fps, and configure the CSI source pad to
-> > 15fps.
-> > 
-> > What you actually get out of the CSI is 25fps, which bears very little
-> > with the actual values used on the CSI source pad.
-> > 
-> > You could say "CSI should ask the camera sensor" - well, that's fine
-> > if it's immediately downstream, but otherwise we'd need to go walking
-> > down the graph to find something that resembles its source - there may
-> > be mux and CSI2 interface subdev blocks in that path.  Or we just accept
-> > that frame rates are completely arbitary and bear no useful meaning what
-> > so ever.
-> 
-> The user is responsible for configuring the pipeline. It is thus not
-> unreasonable to as the user to configure the frame rate as well if there are
-> device in the pipeline that can affect the frame rate. The way I proposed to
-> implement it is compliant with the existing API and entirely deterministic,
-> contrary to what you're saying.
+* Bartosz Golaszewski <bgolaszewski@baylibre.com> [170313 09:45]:
+> Add the SATA controller node to the dm8168-evm device tree.
+> --- a/arch/arm/boot/dts/dm816x.dtsi
+> +++ b/arch/arm/boot/dts/dm816x.dtsi
+> @@ -293,6 +293,13 @@
+>  			phy-handle = <&phy1>;
+>  		};
+>  
+> +		sata: sata at 4a140000 {
+> +			compatible = "ti,dm816-ahci";
+> +			reg = <0x4a140000 0xffff>;
+> +			interrupts = <16>;
+> +			ti,hwmods = "sata";
+> +		};
 
-You haven't really addressed my point at all.
+The size should be 0x10000 instead of 0xffff, right?
 
-What you seem to be saying is that you're quite happy for the situation
-(which is a total misconfiguration) to exist.  Given the vapourware of
-userspace (which I don't see changing in any kind of reasonable timeline)
-I think this is completely absurd.
-
-I'll state clearly now: everything that we've discussed so far, I'm
-finding very hard to take anything you've said seriously.  I think we
-have very different and incompatible point of views about what is
-acceptable from a user point of view, so much so that we're never going
-to agree on any point.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Tony
