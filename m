@@ -1,45 +1,23 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Mon, 13 Mar 2017 16:40:24 -0500
-Subject: Neophyte questions about PCIe
-In-Reply-To: <c0a353cb-aa1f-25db-eccd-7a1618e655b3@free.fr>
-References: <ced6a4bf-c94a-c116-1e94-52a8d675d132@free.fr>
- <20170308151724.GA20780@bhelgaas-glaptop.roam.corp.google.com>
- <f964ee05-db7f-c381-c91c-82897175da6d@free.fr>
- <9ba05c2c-57ef-b2c0-6a7c-457c392d98b5@free.fr>
- <df517167-d692-38a8-9c8f-a1112c7f578d@free.fr>
- <c0a353cb-aa1f-25db-eccd-7a1618e655b3@free.fr>
-Message-ID: <20170313214024.GD8232@bhelgaas-glaptop.roam.corp.google.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Tue, 14 Mar 2017 05:43:18 +0800
+Subject: [PATCH] [for 4.11]xhci: plat: Register shutdown for xhci_plat
+In-Reply-To: <1489440074-23966-1-git-send-email-awallis@codeaurora.org>
+References: <1489440074-23966-1-git-send-email-awallis@codeaurora.org>
+Message-ID: <20170313214318.GA5539@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 11, 2017 at 11:57:56AM +0100, Mason wrote:
-> On 10/03/2017 18:49, Mason wrote:
-
-> > static void tango_pcie_bar_quirk(struct pci_dev *dev)
-> > {
-> > 	struct pci_bus *bus = dev->bus;
-> > 
-> > 	printk("%s: bus=%d devfn=%d\n", __func__, bus->number, dev->devfn);
-> > 
-> >         pci_write_config_dword(dev, PCI_BASE_ADDRESS_0, 0x80000004);
-> > }
-> > DECLARE_PCI_FIXUP_FINAL(0x1105, PCI_ANY_ID, tango_pcie_bar_quirk);
+On Mon, Mar 13, 2017 at 05:21:14PM -0400, Adam Wallis wrote:
+> Shutdown should be called for xhci_plat devices especially for
+> situations where kexec might be used by stopping DMA
+> transactions.
 > 
-> And this is where the elusive "black magic" happens.
-> 
-> Is it "safe" to configure a BAR behind Linux's back?
+> Signed-off-by: Adam Wallis <awallis@codeaurora.org>
+> ---
+>  drivers/usb/host/xhci-plat.c | 1 +
+>  1 file changed, 1 insertion(+)
 
-No.  Linux maintains a struct resource for every BAR.  This quirk
-makes the BAR out of sync with the resource, so Linux no longer has an
-accurate idea of what bus address space is consumed and what is
-available.
+$ ./scripts/get_maintainer.pl --file drivers/usb/host/xhci-plat.c
+Mathias Nyman <mathias.nyman@intel.com> (supporter:USB XHCI DRIVER)
 
-Normally a BAR is for mapping device registers into PCI bus address
-space.  If this BAR controls how the RC forwards PCI DMA transactions
-to RAM, then it's not really a BAR and you should prevent Linux from
-seeing it as a BAR.  You could do this by special-casing it in the
-config accessor so reads return 0 and writes are dropped.  Then you
-could write the register in your host bridge driver safely because the
-PCI core would think the BAR is not implemented.
-
-Bjorn
+:(
