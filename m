@@ -1,166 +1,92 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Mon, 13 Mar 2017 14:08:21 +0100
-Subject: [PATCH v3 01/19] KVM: arm/arm64: Add vITS save/restore API
- documentation
-In-Reply-To: <1488800074-21991-2-git-send-email-eric.auger@redhat.com>
-References: <1488800074-21991-1-git-send-email-eric.auger@redhat.com>
- <1488800074-21991-2-git-send-email-eric.auger@redhat.com>
-Message-ID: <CAFEAcA_hobSQZvOQHGgdoJYw9q099GNrY=5ffjYO5YeePtKdNA@mail.gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 13 Mar 2017 13:10:53 +0000
+Subject: [PATCH] drm: dw_hdmi: Gate audio sampler clock from the
+ enablement functions
+In-Reply-To: <724d599e-7285-3feb-9a18-d3fbc4000eb5@synopsys.com>
+References: <20170310093509.19044-1-romain.perier@collabora.com>
+ <25ad96a7-d907-2bcb-3a96-15a2956e7652@baylibre.com>
+ <20170313093630.GE21222@n2100.armlinux.org.uk>
+ <724d599e-7285-3feb-9a18-d3fbc4000eb5@synopsys.com>
+Message-ID: <20170313131053.GI21222@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 March 2017 at 12:34, Eric Auger <eric.auger@redhat.com> wrote:
-> Add description for how to access vITS registers and how to flush/restore
-> vITS tables into/from memory
->
-> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+On Mon, Mar 13, 2017 at 12:55:58PM +0000, Jose Abreu wrote:
+> Hi,
+> 
+> 
+> On 13-03-2017 09:36, Russell King - ARM Linux wrote:
+> > On Mon, Mar 13, 2017 at 10:27:08AM +0100, Neil Armstrong wrote:
+> >> On 03/10/2017 10:35 AM, Romain Perier wrote:
+> >>> Currently, the audio sampler clock is enabled from dw_hdmi_setup() at
+> >>> step E. and is kept enabled for later use. This clock should be enabled
+> >>> and disabled along with the actual audio stream and not always on (that
+> >>> is bad for PM). Futhermore, this might cause sound glitches with some
+> >>> HDMI devices, as the CTS+N is forced to zero when the stream is disabled
+> >>> while the audio clock is still running.
+> >>>
+> >>> This commit adds a parameter to hdmi_audio_enable_clk() that controls
+> >>> when the audio sample clock must be enabled or disabled. Then, it moves
+> >>> the call to this function into dw_hdmi_audio_enable() and
+> >>> dw_hdmi_audio_disable().
+> >>>
+> >>> Signed-off-by: Romain Perier <romain.perier@collabora.com>
+> >>> ---
+> >>>  drivers/gpu/drm/bridge/dw-hdmi.c | 15 +++++++++------
+> >>>  1 file changed, 9 insertions(+), 6 deletions(-)
+> >>>
+> >> Hi Romain, Russell, Jose,
+> >>
+> >> This is a little out of scope, but I was wondering why the CTS calculation
+> >> was not left in AUTO mode in the dw-hdmi driver ?
+> > There is no indication in the iMX6 manuals that the iMX6 supports
+> > automatic CTS calculation.  Bits 7:4 of the AUD_CTS3 register are
+> > marked as "reserved".
+> >
+> > We're reliant on the information in the iMX6 manuals as we don't have
+> > access to Synopsis' databooks for these parts (I understand you have
+> > to be a customer to have access to that.)
+> >
+> 
+> (Synopsis -> Synopsys :))
+> 
+> Trying to catch up with the conversation:
+> 
+> 1) In AHB audio mode the bits are always reserved.
+> 2) I think we should enable/disable clock instead of just forcing
+> N/CTS, though, I don't know what could be the implications for
+> iMX platform. I remember at the time I tested this using I2S
+> (I've never used AHB), and HDMI protocol analyzers were
+> complaining about the N/CTS being forced to zero.
 
-I've had a look through this; a mix of typo corrections
-and other questions below. I'm not very familiar with the ITS
-so mostly it's requests for clarification...
+What you're recommending is to basically ignore the published workaround,
+which, presumably, was arrived at by proper analysis of the issue both
+by Freescale engineers and Synopsys engineers, and instead try some other
+solution.
 
-> ---
->
-> v1 -> v2:
-> - DTE and ITE now are 8 bytes
-> - DTE and ITE now indexed by deviceid/eventid
-> - use ITE name instead of ITTE
-> - mentions ITT_addr matches bits [51:8] of the actual address
-> - mentions LE layout
-> ---
->  Documentation/virtual/kvm/devices/arm-vgic-its.txt | 78 ++++++++++++++++++++++
->  1 file changed, 78 insertions(+)
->
-> diff --git a/Documentation/virtual/kvm/devices/arm-vgic-its.txt b/Documentation/virtual/kvm/devices/arm-vgic-its.txt
-> index 6081a5b..49ade0c 100644
-> --- a/Documentation/virtual/kvm/devices/arm-vgic-its.txt
-> +++ b/Documentation/virtual/kvm/devices/arm-vgic-its.txt
-> @@ -36,3 +36,81 @@ Groups:
->      -ENXIO:  ITS not properly configured as required prior to setting
->               this attribute
->      -ENOMEM: Memory shortage when allocating ITS internal data
-> +
-> +  KVM_DEV_ARM_VGIC_GRP_ITS_REGS
-> +  Attributes:
-> +      The attr field of kvm_device_attr encodes the offset of the
-> +      ITS register, relative to the ITS control frame base address
-> +      (ITS_base).
-> +
-> +      kvm_device_attr.addr points to a __u64 value whatever the width
-> +      of the addressed register (32/64 bits).
-> +
-> +      Writes to read-only registers are ignored by the kernel except
-> +      for a single register, GITS_READR. Normally this register is RO
-> +      but it needs to be restored otherwise commands in the queue will
-> +      be re-executed after CWRITER setting.
-> +
-> +      For other registers, Getting or setting a register has the same
+I'm not sure that's a good idea.  Only those with knowledge of the IP can
+say what effect disabling the audio clock will have: will it still allow
+the FIFO to be loaded, as required by the errata?  If not, it's not a
+solution that AHB can use.  I would imagine that _if_ it was as simple as
+disabling the audio clock, that simple approach would have been documented
+in Freescale's errata documents, rather than the rather more complex
+method of zeroing the CTS/N values.
 
-"getting"
+I think there are two choices here:
 
-> +      effect as reading/writing the register on real hardware.
-> +  Errors:
-> +    -ENXIO: Offset does not correspond to any supported register
-> +    -EFAULT: Invalid user pointer for attr->addr
-> +    -EINVAL: Offset is not 64-bit aligned
-> +
-> +  KVM_DEV_ARM_VGIC_GRP_ITS_TABLES
-> +  Attributes
-> +       The attr field of kvm_device_attr is not used.
+1) get some definitive information about the IP and the errata for AHB,
+   and determine whether the solution you propose would work.  (That's
+   out of scope for me, I've no contacts with FSL/NXP and I'm not a
+   Synopsys customer.)
 
-I think we should say "must be zero, or the call fails with -ESOMETHING",
-so we have the option of using attr for something in future if needed.
+2) the I2S audio support stops re-using the AHB audio support functions,
+   switching to their own implementation that behaves correctly for them.
+   (Remember, it was I2S's choice to re-use the AHB audio support functions
+   I added which we're now discussing - they didn't have to do that, and
+   regressing AHB audio just for I2S is not something we should ever
+   consider doing.)
 
-> +
-> +       request the flush-save/restore of the ITS tables, namely
-> +       the device table, the collection table, all the ITT tables,
-> +       the LPI pending tables. On save, the tables are flushed
-> +       into guest memory at the location provisioned by the guest
-> +       in GITS_BASER (device and collection tables), on MAPD command
-
-should this be "in the MAPD command" ?
-
-> +       (ITT_addr), GICR_PENDBASERs (pending tables).
-> +
-> +       This means the GIC should be restored before the ITS and all
-> +       ITS registers but the GITS_CTRL must be restored before
-
-"GITS_CTLR".
-
-> +       restoring the ITS tables.
-> +
-> +       Note the LPI configuration table is read-only for the
-> +       in-kernel ITS and its save/restore goes through the standard
-> +       RAM save/restore.
-> +
-> +       The layout of the tables in guest memory defines an ABI.
-> +       The entries are laid in little endian format as follows;
-> +
-> +    The device table and ITE are respectively indexed by device id and
-> +    eventid. The collection table however is not indexed by collection id:
-> +    CTE are written at the beginning of the buffer.
-> +
-> +    Device Table Entry (DTE) layout: entry size = 8 bytes
-> +
-> +    bits:     | 63 ... 45 | 44 ... 5 | 4 ... 0 |
-> +    values:   |   next    | ITT_addr |  Size   |
-> +
-> +    where
-> +    - ITT_addr matches bits [48:8] of the ITT address (256B aligned).
-> +    - next field is meaningful only if the entry is valid (ITT_addr != NULL).
-
-Probably clearer as != 0, since it's a field rather than a pointer.
-
-The MAPD command lets the guest specify bits [50:8] of
-ITT address -- any reason for not storing bits [50:49] here?
-(in fact you can see the format of MAPD has more reserved
-bits for wider physical address sizes in future -- should
-we be trying to future proof our format too?)
-
-I don't see anything in the spec for MAPD that forbids the guest
-from using physical address 0 as the ITT_addr, though maybe I
-missed it.
-
-> +    It equals to 0 if this entry is the last one; otherwise it corresponds
-> +    to the minimum between the offset to the next device id and 2^19 -1.
-> +
-> +    Collection Table Entry (CTE) layout: entry size = 8 bytes
-> +
-> +    bits:     | 63| 62 ..  52  | 51 ... 16 | 15  ...   0 |
-> +    values:   | V |    RES0    |  RDBase   |    ICID     |
-> +
-
-We should document the meanings of the CTE fields here.
-
-> +    Interrupt Translation Entry (ITE) layout: entry size = 8 bytes
-> +
-> +    bits:     | 63 ... 48 | 47 ... 16 | 15 ... 0 |
-> +    values:   |    next   |   pINTID  |  ICID    |
-> +
-> +    - next field is meaningful only if the entry is valid (pINTID != NULL).
-> +    It equals to 0 if this entry is the last one; otherwise it corresponds
-> +    to the minimum between the eventid offset to the next ITE and 2^16 -1.
-
-This seems to be missing some of the fields in the suggested
-ITE contents in the GIC spec table 6-3. Is that OK?
-In particular it's missing the virtual-interrupt related fields.
-Is pINTID==0 really not a valid interrupt ID value?
-
-
-These CTE/ITE/DTE formats don't seem to have any kind of
-"escape hatch" for allowing backwards compatible extensions
-to the format. Do we need one? (I think that's particularly
-likely to be useful where there's an ITS feature we don't
-currently implement but might perhaps want to in future,
-like GICv4 virtual interrupt injection.)
-
-> +    LPI Pending Table layout:
-> +
-> +    As specified in the ARM Generic Interrupt Controller Architecture
-> +    Specification GIC Architecture version 3.0 and version 4. The first
-> +    1kB is not modified and therefore should contain zeroes.
-> --
-> 2.5.5
-
-thanks
--- PMM
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
