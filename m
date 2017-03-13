@@ -1,75 +1,114 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Mon, 13 Mar 2017 08:47:13 +0200
-Subject: [PATCH v2 1/3] watchdog: s3c2410: Constify local structures
-In-Reply-To: <d91a14cc-d741-f4ff-7411-64d4862b6e50@roeck-us.net>
-References: <20170311174255.23327-1-krzk@kernel.org>
- <20170311174255.23327-2-krzk@kernel.org>
- <d91a14cc-d741-f4ff-7411-64d4862b6e50@roeck-us.net>
-Message-ID: <CAJKOXPdg4eUUB64GZJK2+AOfsQxLHPh6qceZGJfYfhOA=Gvqbw@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 13 Mar 2017 08:12:41 +0100
+Subject: [PATCH] mtd: nand: orion: fix clk handling
+In-Reply-To: <20170312213406.20987-1-gmbnomis@gmail.com>
+References: <20170312213406.20987-1-gmbnomis@gmail.com>
+Message-ID: <20170313071241.y5ydl274t22awrys@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 12, 2017 at 10:56 PM, Guenter Roeck <linux@roeck-us.net> wrote:
-> On 03/11/2017 09:42 AM, Krzysztof Kozlowski wrote:
->>
->> Structures watchdog_device, watchdog_ops and s3c2410_wdt_variant are not
->> modified so they can be made const to increase code safeness.
->>
->> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
->> ---
->>  drivers/watchdog/s3c2410_wdt.c | 10 +++++-----
->>  1 file changed, 5 insertions(+), 5 deletions(-)
->>
->> diff --git a/drivers/watchdog/s3c2410_wdt.c
->> b/drivers/watchdog/s3c2410_wdt.c
->> index 6ed97596ca80..5eaec319e499 100644
->> --- a/drivers/watchdog/s3c2410_wdt.c
->> +++ b/drivers/watchdog/s3c2410_wdt.c
->> @@ -131,7 +131,7 @@ struct s3c2410_wdt {
->>         unsigned long           wtdat_save;
->>         struct watchdog_device  wdt_device;
->>         struct notifier_block   freq_transition;
->> -       struct s3c2410_wdt_variant *drv_data;
->> +       const struct s3c2410_wdt_variant *drv_data;
->>         struct regmap *pmureg;
->>  };
->>
->> @@ -401,7 +401,7 @@ static const struct watchdog_ops s3c2410wdt_ops = {
->>         .restart = s3c2410wdt_restart,
->>  };
->>
->> -static struct watchdog_device s3c2410_wdd = {
->> +static const struct watchdog_device s3c2410_wdd = {
->>         .info = &s3c2410_wdt_ident,
->>         .ops = &s3c2410wdt_ops,
->>         .timeout = S3C2410_WATCHDOG_DEFAULT_TIME,
->> @@ -507,15 +507,15 @@ static inline unsigned int
->> s3c2410wdt_get_bootstatus(struct s3c2410_wdt *wdt)
->>         return 0;
->>  }
->>
->> -static inline struct s3c2410_wdt_variant *
->> +static inline const struct s3c2410_wdt_variant *
->>  s3c2410_get_wdt_drv_data(struct platform_device *pdev)
->>  {
->>         if (pdev->dev.of_node) {
->>                 const struct of_device_id *match;
->>                 match = of_match_node(s3c2410_wdt_match,
->> pdev->dev.of_node);
->> -               return (struct s3c2410_wdt_variant *)match->data;
->> +               return (const struct s3c2410_wdt_variant *)match->data;
->
->
-> The const in this typecast isn't necessary.
->
->>         } else {
->> -               return (struct s3c2410_wdt_variant *)
->> +               return (const struct s3c2410_wdt_variant *)
->
->
-> Same here. Transition to const is automatic.
+Hello Simon,
 
-Right, I'll fix this and resend.
+On Sun, Mar 12, 2017 at 10:34:06PM +0100, Simon Baatz wrote:
+> The clk handling in orion_nand.c had two problems:
+> 
+> - In the probe function, clk_put() was called for an enabled clock,
+>   which violates the API (see documentation for clk_put() in
+>   include/linux/clk.h)
+> 
+> - In the error path of the probe function, clk_put() could be called
+>   twice for the same clock.
+> 
+> In order to clean this up, use the managed function devm_clk_get() and
+> store the pointer to the clk in the driver data.
+> 
+> Fixes: baffab28b13120694fa3ebab08d3e99667a851d2 ('ARM: Orion: fix driver probe error handling with respect to clk')
+> Cc: <stable@vger.kernel.org> # v4.5+
+> Signed-off-by: Simon Baatz <gmbnomis@gmail.com>
+> ---
+>  drivers/mtd/nand/orion_nand.c | 42 +++++++++++++++++++++---------------------
+>  1 file changed, 21 insertions(+), 21 deletions(-)
+> 
+> diff --git a/drivers/mtd/nand/orion_nand.c b/drivers/mtd/nand/orion_nand.c
+> index 4a91c5d000be..b355aa738fae 100644
+> --- a/drivers/mtd/nand/orion_nand.c
+> +++ b/drivers/mtd/nand/orion_nand.c
+> @@ -23,6 +23,11 @@
+>  #include <asm/sizes.h>
+>  #include <linux/platform_data/mtd-orion_nand.h>
+>  
+> +struct orion_nand_info {
+> +	struct nand_chip chip;
+> +	struct clk       *clk;
+> +};
+> +
+>  static void orion_nand_cmd_ctrl(struct mtd_info *mtd, int cmd, unsigned int ctrl)
+>  {
+>  	struct nand_chip *nc = mtd_to_nand(mtd);
+> @@ -75,20 +80,21 @@ static void orion_nand_read_buf(struct mtd_info *mtd, uint8_t *buf, int len)
+>  
+>  static int __init orion_nand_probe(struct platform_device *pdev)
+>  {
+> +	struct orion_nand_info *info;
+>  	struct mtd_info *mtd;
+>  	struct nand_chip *nc;
+>  	struct orion_nand_data *board;
+>  	struct resource *res;
+> -	struct clk *clk;
+>  	void __iomem *io_base;
+>  	int ret = 0;
+>  	u32 val = 0;
+>  
+> -	nc = devm_kzalloc(&pdev->dev,
+> -			sizeof(struct nand_chip),
+> +	info = devm_kzalloc(&pdev->dev,
+> +			sizeof(struct orion_nand_info),
+>  			GFP_KERNEL);
+> -	if (!nc)
+> +	if (!info)
+>  		return -ENOMEM;
+> +	nc = &info->chip;
+>  	mtd = nand_to_mtd(nc);
+>  
+>  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> @@ -145,15 +151,13 @@ static int __init orion_nand_probe(struct platform_device *pdev)
+>  	if (board->dev_ready)
+>  		nc->dev_ready = board->dev_ready;
+>  
+> -	platform_set_drvdata(pdev, mtd);
+> +	platform_set_drvdata(pdev, info);
+>  
+>  	/* Not all platforms can gate the clock, so it is not
+>  	   an error if the clock does not exists. */
+> -	clk = clk_get(&pdev->dev, NULL);
+> -	if (!IS_ERR(clk)) {
+> -		clk_prepare_enable(clk);
+> -		clk_put(clk);
+> -	}
+> +	info->clk = devm_clk_get(&pdev->dev, NULL);
+> +	if (!IS_ERR(info->clk))
+> +		clk_prepare_enable(info->clk);
 
-Best regards,
-Krzysztof
+Orthogonal to your patch I suggest:
+
+-	info->clk = devm_clk_get(&pdev->dev, NULL);
+-	if (!IS_ERR(info->clk))
+-		clk_prepare_enable(info->clk);
++	info->clk = devm_clk_get_optional(&pdev->dev, NULL);
++	if (IS_ERR(info->clk)) {
++		ret = PTR_ERR(info->clk);
++		if (ret != -EPROBE_DEFER)
++			dev_err(...);
++		return ret;
++	}
+
+to correct error handling.
+(I didn't check if a plain return is right here, and also other users of
+info->clk need adaption.)
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
