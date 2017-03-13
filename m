@@ -1,51 +1,150 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Mon, 13 Mar 2017 10:27:08 +0100
-Subject: [PATCH] drm: dw_hdmi: Gate audio sampler clock from the
- enablement functions
-In-Reply-To: <20170310093509.19044-1-romain.perier@collabora.com>
-References: <20170310093509.19044-1-romain.perier@collabora.com>
-Message-ID: <25ad96a7-d907-2bcb-3a96-15a2956e7652@baylibre.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 13 Mar 2017 09:30:07 +0000
+Subject: [PATCH v5 00/39] i.MX Media Driver
+In-Reply-To: <20170313081625.GX21222@n2100.armlinux.org.uk>
+References: <1489121599-23206-1-git-send-email-steve_longerbeam@mentor.com>
+ <20170310201356.GA21222@n2100.armlinux.org.uk>
+ <47542ef8-3e91-b4cd-cc65-95000105f172@gmail.com>
+ <20170312195741.GS21222@n2100.armlinux.org.uk>
+ <ea3ccdb8-903f-93ab-6875-90da440fc52a@gmail.com>
+ <20170312202240.GT21222@n2100.armlinux.org.uk>
+ <f1807742-012f-249e-1ad8-22d8434695cb@gmail.com>
+ <20170313081625.GX21222@n2100.armlinux.org.uk>
+Message-ID: <20170313093007.GD21222@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/10/2017 10:35 AM, Romain Perier wrote:
-> Currently, the audio sampler clock is enabled from dw_hdmi_setup() at
-> step E. and is kept enabled for later use. This clock should be enabled
-> and disabled along with the actual audio stream and not always on (that
-> is bad for PM). Futhermore, this might cause sound glitches with some
-> HDMI devices, as the CTS+N is forced to zero when the stream is disabled
-> while the audio clock is still running.
+On Mon, Mar 13, 2017 at 08:16:25AM +0000, Russell King - ARM Linux wrote:
+> On Sun, Mar 12, 2017 at 09:26:41PM -0700, Steve Longerbeam wrote:
+> > On 03/12/2017 01:22 PM, Russell King - ARM Linux wrote:
+> > >What I had was this patch for your v3.  I never got to testing your
+> > >v4 because of the LP-11 problem.
+> > >
+> > >In v5, you've changed to propagate the ipu_cpmem_set_image() error
+> > >code to avoid the resulting corruption, but that leaves the other bits
+> > >of this patch unaddressed, along my "media: imx: smfc: add support
+> > >for bayer formats" patch.
+> > >
+> > >Your driver basically has no support for bayer formats.
+> > 
+> > You added the patches to this driver that adds the bayer support,
+> > I don't think there is anything more required of the driver at this
+> > point to support bayer, the remaining work needs to happen in the IPUv3
+> > driver.
 > 
-> This commit adds a parameter to hdmi_audio_enable_clk() that controls
-> when the audio sample clock must be enabled or disabled. Then, it moves
-> the call to this function into dw_hdmi_audio_enable() and
-> dw_hdmi_audio_disable().
+> There is more work, because the way you've merged my changes to
+> imx_smfc_setup_channel() into csi_idmac_setup_channel() is wrong with
+> respect to the burst size.
 > 
-> Signed-off-by: Romain Perier <romain.perier@collabora.com>
-> ---
->  drivers/gpu/drm/bridge/dw-hdmi.c | 15 +++++++++------
->  1 file changed, 9 insertions(+), 6 deletions(-)
+> You always set it to 8 or 16 depending on the width:
 > 
+> 	burst_size = (image.pix.width & 0xf) ? 8 : 16;
+> 
+> 	ipu_cpmem_set_burstsize(priv->idmac_ch, burst_size);
+> 
+> and then you have my switch() statement which assigns burst_size.
+> My _tested_ code removed the above, added the switch, which had
+> a default case which reflected the above setting:
+> 
+> 	default:
+> 		burst_size = (outfmt->width & 0xf) ? 8 : 16;
+> 
+> and then went on to set the burst size _after_ the switch statement:
+> 
+> 	ipu_cpmem_set_burstsize(priv->smfc_ch, burst_size);
+> 
+> The effect is unchanged for non-bayer formats.  For bayer formats, the
+> burst size is determined by the bayer data size.
+> 
+> So, even if it's appropriate to fix ipu_cpmem_set_image(), fixing the
+> above is still required.
+> 
+> I'm not convinced that fixing ipu_cpmem_set_image() is even the best
+> solution - it's not as trivial as it looks on the surface:
+> 
+>         ipu_cpmem_set_resolution(ch, image->rect.width, image->rect.height);
+>         ipu_cpmem_set_stride(ch, pix->bytesperline);
+> 
+> this is fine, it doesn't depend on the format.  However, the next line:
+> 
+>         ipu_cpmem_set_fmt(ch, v4l2_pix_fmt_to_drm_fourcc(pix->pixelformat));
+> 
+> does - v4l2_pix_fmt_to_drm_fourcc() is a locally defined function (it
+> isn't v4l2 code) that converts a v4l2 pixel format to a DRM fourcc.
+> DRM knows nothing about bayer formats, there aren't fourcc codes in
+> DRM for it.  The result is that v4l2_pix_fmt_to_drm_fourcc() returns
+> -EINVAL cast to a u32, which gets passed unchecked into ipu_cpmem_set_fmt().
+> 
+> ipu_cpmem_set_fmt() won't recognise that, and also returns -EINVAL - and
+> it's a bug that this is not checked and propagated.  If it is checked and
+> propagated, then we need this to support bayer formats, and I don't see
+> DRM people wanting bayer format fourcc codes added without there being
+> a real DRM driver wanting to use them.
+> 
+> Then there's the business of calculating the top-left offset of the image,
+> which for bayer always needs to be an even number of pixels - as this
+> function takes the top-left offset, it ought to respect it, but if it
+> doesn't meet this criteria, what should it do?  csi_idmac_setup_channel()
+> always sets them to zero, but that's not really something that
+> ipu_cpmem_set_image() should assume.
 
-Hi Romain, Russell, Jose,
+For the time being, I've restored the functionality along the same lines
+as I originally had.  This seems to get me working capture, but might
+break non-bayer passthrough mode:
 
-This is a little out of scope, but I was wondering why the CTS calculation was not left
-in AUTO mode in the dw-hdmi driver ?
+diff --git a/drivers/staging/media/imx/imx-media-csi.c b/drivers/staging/media/imx/imx-media-csi.c
+index fc0036aa84d0..df336971a009 100644
+--- a/drivers/staging/media/imx/imx-media-csi.c
++++ b/drivers/staging/media/imx/imx-media-csi.c
+@@ -314,14 +314,6 @@ static int csi_idmac_setup_channel(struct csi_priv *priv)
+ 	image.phys0 = phys[0];
+ 	image.phys1 = phys[1];
+ 
+-	ret = ipu_cpmem_set_image(priv->idmac_ch, &image);
+-	if (ret)
+-		return ret;
+-
+-	burst_size = (image.pix.width & 0xf) ? 8 : 16;
+-
+-	ipu_cpmem_set_burstsize(priv->idmac_ch, burst_size);
+-
+ 	/*
+ 	 * Check for conditions that require the IPU to handle the
+ 	 * data internally as generic data, aka passthrough mode:
+@@ -346,15 +338,29 @@ static int csi_idmac_setup_channel(struct csi_priv *priv)
+ 		passthrough_bits = 16;
+ 		break;
+ 	default:
++		burst_size = (image.pix.width & 0xf) ? 8 : 16;
+ 		passthrough = (sensor_ep->bus_type != V4L2_MBUS_CSI2 &&
+ 			       sensor_ep->bus.parallel.bus_width >= 16);
+ 		passthrough_bits = 16;
+ 		break;
+ 	}
+ 
+-	if (passthrough)
++	if (passthrough) {
++		ipu_cpmem_set_resolution(priv->idmac_ch, image.rect.width,
++					 image.rect.height);
++		ipu_cpmem_set_stride(priv->idmac_ch, image.pix.bytesperline);
++		ipu_cpmem_set_buffer(priv->idmac_ch, 0, image.phys0);
++		ipu_cpmem_set_buffer(priv->idmac_ch, 1, image.phys1);
++		ipu_cpmem_set_burstsize(priv->idmac_ch, burst_size);
+ 		ipu_cpmem_set_format_passthrough(priv->idmac_ch,
+ 						 passthrough_bits);
++	} else {
++		ret = ipu_cpmem_set_image(priv->idmac_ch, &image);
++		if (ret)
++			return ret;
++
++		ipu_cpmem_set_burstsize(priv->idmac_ch, burst_size);
++	}
+ 
+ 	/*
+ 	 * Set the channel for the direct CSI-->memory via SMFC
 
-In the Amlogic Vendor tree, they don't set the HDMI_AUD_CTS3_CTS_MANUAL bit and leave
-the CTS value to 0.
 
-I am wondering if the AUTO feature is specific to newer IP version, or it was disabled
-in the iMX.6 IP configuration ? or simply tied to the AHB audio specificity.
-
-It would be simpler and smarter to leave the AUTO feature enabled for I2S and S/PDIF
-input when the IP supports it.
-
-Jose, is there a config bit for this feature, or a specific IP version where it landed ?
-
-Anyway, we should really differentiate the AHB audio and I2S/SPDIF audio in the CTS/N calculation,
-since the I2S/SPDIF depends on an different clock for audio input and the AUTO CTS calculation
-feature will certainly offer a better clock synchronization.
-
-Thanks,
-Neil
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
