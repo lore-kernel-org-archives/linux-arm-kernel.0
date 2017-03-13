@@ -1,54 +1,138 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Mon, 13 Mar 2017 19:13:22 +0530
-Subject: [PATCH v4 1/7] PCI: dwc: designware: Add new *ops* for cpu addr fixup
+Date: Mon, 13 Mar 2017 19:13:25 +0530
+Subject: [PATCH v4 4/7] PCI: dwc: all: Modify dbi accessors to take dbi_base
+ as argument
 In-Reply-To: <20170313134328.1588-1-kishon@ti.com>
 References: <20170313134328.1588-1-kishon@ti.com>
-Message-ID: <20170313134328.1588-2-kishon@ti.com>
+Message-ID: <20170313134328.1588-5-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some platforms (like dra7xx) require only the least 28 bits of the
-corresponding 32 bit CPU address to be programmed in the address
-translation unit. This modified address is stored in io_base/mem_base/
-cfg0_base/cfg1_base in dra7xx_pcie_host_init. While this is okay for
-host mode where the address range is fixed, device mode requires
-different addresses to be programmed based on the host buffer address.
-Add a new ops to get the least 28 bits of the corresponding 32 bit
-CPU address and invoke it before programming the address translation
-unit.
+dwc has 2 dbi address space labeled dbics and dbics2. The existing
+helper to access dbi address space can access only dbics. However
+dbics2 has to be accessed for programming the BAR registers in the
+case of EP mode. This is in preparation for adding EP mode support
+to dwc driver.
 
-Acked-by: Joao Pinto <jpinto@synopsys.com>
+Cc: Jingoo Han <jingoohan1@gmail.com>
+Cc: Joao Pinto <Joao.Pinto@synopsys.com>
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- drivers/pci/dwc/pcie-designware.c | 3 +++
- drivers/pci/dwc/pcie-designware.h | 1 +
- 2 files changed, 4 insertions(+)
+ drivers/pci/dwc/pci-exynos.c      | 10 ++++++----
+ drivers/pci/dwc/pcie-designware.c | 13 +++++++------
+ drivers/pci/dwc/pcie-designware.h | 20 ++++++++++++++++----
+ 3 files changed, 29 insertions(+), 14 deletions(-)
 
+diff --git a/drivers/pci/dwc/pci-exynos.c b/drivers/pci/dwc/pci-exynos.c
+index 993b650ef275..a0d40f74b88d 100644
+--- a/drivers/pci/dwc/pci-exynos.c
++++ b/drivers/pci/dwc/pci-exynos.c
+@@ -521,23 +521,25 @@ static void exynos_pcie_enable_interrupts(struct exynos_pcie *ep)
+ 		exynos_pcie_msi_init(ep);
+ }
+ 
+-static u32 exynos_pcie_readl_dbi(struct dw_pcie *pci, u32 reg)
++static u32 exynos_pcie_readl_dbi(struct dw_pcie *pci, void __iomem *base,
++				 u32 reg)
+ {
+ 	struct exynos_pcie *ep = to_exynos_pcie(pci);
+ 	u32 val;
+ 
+ 	exynos_pcie_sideband_dbi_r_mode(ep, true);
+-	val = readl(pci->dbi_base + reg);
++	val = readl(base + reg);
+ 	exynos_pcie_sideband_dbi_r_mode(ep, false);
+ 	return val;
+ }
+ 
+-static void exynos_pcie_writel_dbi(struct dw_pcie *pci, u32 reg, u32 val)
++static void exynos_pcie_writel_dbi(struct dw_pcie *pci, void __iomem *base,
++				   u32 reg, u32 val)
+ {
+ 	struct exynos_pcie *ep = to_exynos_pcie(pci);
+ 
+ 	exynos_pcie_sideband_dbi_w_mode(ep, true);
+-	writel(val, pci->dbi_base + reg);
++	writel(val, base + reg);
+ 	exynos_pcie_sideband_dbi_w_mode(ep, false);
+ }
+ 
 diff --git a/drivers/pci/dwc/pcie-designware.c b/drivers/pci/dwc/pcie-designware.c
-index 7e1fb7d6643c..3eaf3ccdc118 100644
+index 3eaf3ccdc118..ea403e2240cf 100644
 --- a/drivers/pci/dwc/pcie-designware.c
 +++ b/drivers/pci/dwc/pcie-designware.c
-@@ -97,6 +97,9 @@ void dw_pcie_prog_outbound_atu(struct dw_pcie *pci, int index, int type,
- {
- 	u32 retries, val;
+@@ -61,20 +61,21 @@ int dw_pcie_write(void __iomem *addr, int size, u32 val)
+ 	return PCIBIOS_SUCCESSFUL;
+ }
  
-+	if (pci->ops->cpu_addr_fixup)
-+		cpu_addr = pci->ops->cpu_addr_fixup(cpu_addr);
-+
- 	if (pci->iatu_unroll_enabled) {
- 		dw_pcie_writel_unroll(pci, index, PCIE_ATU_UNR_LOWER_BASE,
- 				      lower_32_bits(cpu_addr));
+-u32 dw_pcie_readl_dbi(struct dw_pcie *pci, u32 reg)
++u32 __dw_pcie_readl_dbi(struct dw_pcie *pci, void __iomem *base, u32 reg)
+ {
+ 	if (pci->ops->readl_dbi)
+-		return pci->ops->readl_dbi(pci, reg);
++		return pci->ops->readl_dbi(pci, base, reg);
+ 
+-	return readl(pci->dbi_base + reg);
++	return readl(base + reg);
+ }
+ 
+-void dw_pcie_writel_dbi(struct dw_pcie *pci, u32 reg, u32 val)
++void __dw_pcie_writel_dbi(struct dw_pcie *pci, void __iomem *base, u32 reg,
++			  u32 val)
+ {
+ 	if (pci->ops->writel_dbi)
+-		pci->ops->writel_dbi(pci, reg, val);
++		pci->ops->writel_dbi(pci, base, reg, val);
+ 	else
+-		writel(val, pci->dbi_base + reg);
++		writel(val, base + reg);
+ }
+ 
+ static u32 dw_pcie_readl_unroll(struct dw_pcie *pci, u32 index, u32 reg)
 diff --git a/drivers/pci/dwc/pcie-designware.h b/drivers/pci/dwc/pcie-designware.h
-index cd3b8713fe50..8f3dcb2b099b 100644
+index 8f3dcb2b099b..e97fc4ce7d49 100644
 --- a/drivers/pci/dwc/pcie-designware.h
 +++ b/drivers/pci/dwc/pcie-designware.h
-@@ -143,6 +143,7 @@ struct pcie_port {
- };
+@@ -144,8 +144,9 @@ struct pcie_port {
  
  struct dw_pcie_ops {
-+	u64	(*cpu_addr_fixup)(u64 cpu_addr);
- 	u32	(*readl_dbi)(struct dw_pcie *pcie, u32 reg);
- 	void	(*writel_dbi)(struct dw_pcie *pcie, u32 reg, u32 val);
+ 	u64	(*cpu_addr_fixup)(u64 cpu_addr);
+-	u32	(*readl_dbi)(struct dw_pcie *pcie, u32 reg);
+-	void	(*writel_dbi)(struct dw_pcie *pcie, u32 reg, u32 val);
++	u32	(*readl_dbi)(struct dw_pcie *pcie, void __iomem *base, u32 reg);
++	void	(*writel_dbi)(struct dw_pcie *pcie, void __iomem *base, u32 reg,
++			      u32 val);
  	int	(*link_up)(struct dw_pcie *pcie);
+ };
+ 
+@@ -163,8 +164,9 @@ struct dw_pcie {
+ int dw_pcie_read(void __iomem *addr, int size, u32 *val);
+ int dw_pcie_write(void __iomem *addr, int size, u32 val);
+ 
+-u32 dw_pcie_readl_dbi(struct dw_pcie *pci, u32 reg);
+-void dw_pcie_writel_dbi(struct dw_pcie *pci, u32 reg, u32 val);
++u32 __dw_pcie_readl_dbi(struct dw_pcie *pci, void __iomem *base, u32 reg);
++void __dw_pcie_writel_dbi(struct dw_pcie *pci, void __iomem *base, u32 reg,
++			  u32 val);
+ int dw_pcie_link_up(struct dw_pcie *pci);
+ int dw_pcie_wait_for_link(struct dw_pcie *pci);
+ void dw_pcie_prog_outbound_atu(struct dw_pcie *pci, int index,
+@@ -172,6 +174,16 @@ void dw_pcie_prog_outbound_atu(struct dw_pcie *pci, int index,
+ 			       u32 size);
+ void dw_pcie_setup(struct dw_pcie *pci);
+ 
++static inline dw_pcie_writel_dbi(struct dw_pcie *pci, u32 reg, u32 val)
++{
++	__dw_pcie_writel_dbi(pci, pci->dbi_base, reg, val);
++}
++
++static inline u32 dw_pcie_readl_dbi(struct dw_pcie *pci, u32 reg)
++{
++	return  __dw_pcie_readl_dbi(pci, pci->dbi_base, reg);
++}
++
+ #ifdef CONFIG_PCIE_DW_HOST
+ irqreturn_t dw_handle_msi_irq(struct pcie_port *pp);
+ void dw_pcie_msi_init(struct pcie_port *pp);
 -- 
 2.11.0
