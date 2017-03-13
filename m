@@ -1,49 +1,39 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 13 Mar 2017 13:27:02 +0000
-Subject: [PATCH v4 29/36] media: imx: mipi-csi2: enable setting and
- getting of frame rates
-In-Reply-To: <20170313131647.GB10701@valkosipuli.retiisi.org.uk>
-References: <1487211578-11360-1-git-send-email-steve_longerbeam@mentor.com>
- <1487211578-11360-30-git-send-email-steve_longerbeam@mentor.com>
- <20170220220409.GX16975@valkosipuli.retiisi.org.uk>
- <20170221001332.GS21222@n2100.armlinux.org.uk>
- <25596b21-70de-5e46-f149-f9ce3a86ecb7@gmail.com>
- <1487667023.2331.8.camel@pengutronix.de>
- <20170313131647.GB10701@valkosipuli.retiisi.org.uk>
-Message-ID: <20170313132701.GJ21222@n2100.armlinux.org.uk>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 13 Mar 2017 14:28:54 +0100
+Subject: [PATCH] ARM: dts: imx: add Gateworks Ventana GW5904 support
+In-Reply-To: <CAJ+vNU1JAp3=bxrKY9cNac8=aEG4MMh01Cb6iwb-dV+gyNPn_g@mail.gmail.com>
+References: <1489178411-6559-1-git-send-email-tharvey@gateworks.com>
+ <04584d61-f1e2-3722-1f13-ff133edc0c22@gmail.com>
+ <CAJ+vNU1NcW=y_c-jJBnAaOozrzYJAekd9BEiMdd2=Bpx=Ng79Q@mail.gmail.com>
+ <b105d1ea-7975-bd21-0aa0-762060ceb62a@gmail.com>
+ <CAJ+vNU1JAp3=bxrKY9cNac8=aEG4MMh01Cb6iwb-dV+gyNPn_g@mail.gmail.com>
+Message-ID: <20170313132854.GB748@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 13, 2017 at 03:16:48PM +0200, Sakari Ailus wrote:
-> The vast majority of existing drivers do not implement them nor the user
-> space expects having to set them. Making that mandatory would break existing
-> user space.
+> >> &fec {
+> >>         pinctrl-names = "default";
+> >>         pinctrl-0 = <&pinctrl_enet>;
+> >>         phy-mode = "rgmii-id";
+> >>         status = "okay";
+> >
+> > You most likely need to declare a fixed PHY for the FEC to be setting up
+> > the link, speed and duplex?
 > 
-> In addition, that does not belong to link validation either: link validation
-> should only include static properties of the link that are required for
-> correct hardware operation. Frame rate is not such property: hardware that
-> supports the MC interface generally does not recognise such concept (with
-> the exception of some sensors). Additionally, it is dynamic: the frame rate
-> can change during streaming, making its validation at streamon time useless.
+> Florian,
+> 
+> Thanks - this appears to be the issue. I declared the fixed-phy down
+> in the cpu port but I guess it needs to be done in the net device.
 
-So how do we configure the CSI, which can do frame skipping?
+Hi Tim
 
-With what you're proposing, it means it's possible to configure the
-camera sensor source pad to do 50fps.  Configure the CSI sink pad to
-an arbitary value, such as 30fps, and configure the CSI source pad to
-15fps.
+There are two different MACs here. The switch CPU port MAC, and the
+FEC MAC. You need to force the FEC MAC to 1Gbps, hence the fixed-phy
+needs to be in the FEC node.
 
-What you actually get out of the CSI is 25fps, which bears very little
-with the actual values used on the CSI source pad.
+DSA will configure the CPU switch port to its fastest mode. You only
+need a fixed-phy if you need it to run slower, e.g. it is connected to
+a 100Mbps port of the vf610, or you need to set a phy-mode in order to
+set RGMII delays, etc.
 
-You could say "CSI should ask the camera sensor" - well, that's fine
-if it's immediately downstream, but otherwise we'd need to go walking
-down the graph to find something that resembles its source - there may
-be mux and CSI2 interface subdev blocks in that path.  Or we just accept
-that frame rates are completely arbitary and bear no useful meaning what
-so ever.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+    Andrew
