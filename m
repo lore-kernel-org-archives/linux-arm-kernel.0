@@ -1,81 +1,92 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Mon, 13 Mar 2017 16:12:14 +0800
-Subject: [v3 3/5] coresight: add support for debug module
-In-Reply-To: <3f27efee-3b63-81fd-eb96-73fd7e6f5e92@arm.com>
-References: <1488520809-31670-4-git-send-email-leo.yan@linaro.org>
- <011fdac0-59bf-b539-2de3-0b59a41bc922@arm.com>
- <20170309175915.GA964@leoy-linaro>
- <3f27efee-3b63-81fd-eb96-73fd7e6f5e92@arm.com>
-Message-ID: <20170313081214.GC22706@leoy-linaro>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 13 Mar 2017 08:16:25 +0000
+Subject: [PATCH v5 00/39] i.MX Media Driver
+In-Reply-To: <f1807742-012f-249e-1ad8-22d8434695cb@gmail.com>
+References: <1489121599-23206-1-git-send-email-steve_longerbeam@mentor.com>
+ <20170310201356.GA21222@n2100.armlinux.org.uk>
+ <47542ef8-3e91-b4cd-cc65-95000105f172@gmail.com>
+ <20170312195741.GS21222@n2100.armlinux.org.uk>
+ <ea3ccdb8-903f-93ab-6875-90da440fc52a@gmail.com>
+ <20170312202240.GT21222@n2100.armlinux.org.uk>
+ <f1807742-012f-249e-1ad8-22d8434695cb@gmail.com>
+Message-ID: <20170313081625.GX21222@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Suzuki,
-
-On Fri, Mar 10, 2017 at 02:29:53PM +0000, Suzuki K Poulose wrote:
-
-[...]
-
-> >>So we cannot really rely on the values in EDVIDSR which we use to make further decisions. So I
-> >>am wondering if this is really guranteed to be useful.
+On Sun, Mar 12, 2017 at 09:26:41PM -0700, Steve Longerbeam wrote:
+> On 03/12/2017 01:22 PM, Russell King - ARM Linux wrote:
+> >What I had was this patch for your v3.  I never got to testing your
+> >v4 because of the LP-11 problem.
 > >
-> >So this is caused by Software lock is locked?
+> >In v5, you've changed to propagate the ipu_cpmem_set_image() error
+> >code to avoid the resulting corruption, but that leaves the other bits
+> >of this patch unaddressed, along my "media: imx: smfc: add support
+> >for bayer formats" patch.
 > >
-> >Section H8.4.1:
-> >
-> >"Reads and writes have no side-effects. A side-effect is where a
-> >direct read or a direct write of a register creates
-> >an indirect write of the same or another register. When the Software
-> >Lock is locked, the indirect write does
-> >not occur."
+> >Your driver basically has no support for bayer formats.
 > 
-> Yes, thats correct, further :
-> 
-> Section H9.2.32: EDPCSR
-> 
-> "For a read of EDPCSRlo from the memory-mapped interface, if EDLSR.SLK == 1, meaning
-> the Software Lock is locked, then the access has no side-effects. That is, EDCIDSR,
-> EDVIDSR, and EDPCSRhi are unchanged."
-> 
-> And since we do a CS_UNLOCK, that should be fine. Please ignore my comment.
+> You added the patches to this driver that adds the bayer support,
+> I don't think there is anything more required of the driver at this
+> point to support bayer, the remaining work needs to happen in the IPUv3
+> driver.
 
-Thanks a lot for confirmation.
+There is more work, because the way you've merged my changes to
+imx_smfc_setup_channel() into csi_idmac_setup_channel() is wrong with
+respect to the burst size.
 
-[...]
+You always set it to 8 or 16 depending on the width:
 
-> >>>+
-> >>>+	put_online_cpus();
-> >>>+
-> >>>+	if (!debug_count++)
-> >>>+		atomic_notifier_chain_register(&panic_notifier_list,
-> >>>+					       &debug_notifier);
-> >>>+
-> >>
-> >>>+	sprintf(buf, (char *)id->data, drvdata->cpu);
-> >>>+	dev_info(dev, "%s initialized\n", buf);
-> >>
-> >>This could simply be :
-> >>	dev_info(dev, "Coresight debug-CPU%d initialized\n", drvdata->cpu);
-> >>
-> >>and get rid of the static string and the buffer, see below.
-> 
-> Also we need pm_runtime_put() here to balance the pm_runtime_get_ from AMBA
-> device probe. More on that below.
+	burst_size = (image.pix.width & 0xf) ? 8 : 16;
 
-[...]
+	ipu_cpmem_set_burstsize(priv->idmac_ch, burst_size);
 
-> Btw, I don't see any PM calls to make sure the power domain (at least the debug domain)
-> is up, which could cause problems with accesses to some of these registers (leave alone the
-> ones in CPU power domain), especially the EDPRSR. We could also do pm_runtime_get on the
-> CPU's power domain, if the CPU is online, before we access the pcsr.
+and then you have my switch() statement which assigns burst_size.
+My _tested_ code removed the above, added the switch, which had
+a default case which reflected the above setting:
 
-I will add pm_runtime_get/pm_runtime_put for apb clock.
+	default:
+		burst_size = (outfmt->width & 0xf) ? 8 : 16;
 
-But for CPU power domain, AFAIK this part is managed by PSCI but is not
-controlled by pm_runtime_{put|get} pairs. So at beginning, we suggest
-to use "nohlt" to ensure CPU power domain is enabled.
+and then went on to set the burst size _after_ the switch statement:
 
-Please let me know if I miss some thing for this?
+	ipu_cpmem_set_burstsize(priv->smfc_ch, burst_size);
 
-Thanks,
-Leo Yan
+The effect is unchanged for non-bayer formats.  For bayer formats, the
+burst size is determined by the bayer data size.
+
+So, even if it's appropriate to fix ipu_cpmem_set_image(), fixing the
+above is still required.
+
+I'm not convinced that fixing ipu_cpmem_set_image() is even the best
+solution - it's not as trivial as it looks on the surface:
+
+        ipu_cpmem_set_resolution(ch, image->rect.width, image->rect.height);
+        ipu_cpmem_set_stride(ch, pix->bytesperline);
+
+this is fine, it doesn't depend on the format.  However, the next line:
+
+        ipu_cpmem_set_fmt(ch, v4l2_pix_fmt_to_drm_fourcc(pix->pixelformat));
+
+does - v4l2_pix_fmt_to_drm_fourcc() is a locally defined function (it
+isn't v4l2 code) that converts a v4l2 pixel format to a DRM fourcc.
+DRM knows nothing about bayer formats, there aren't fourcc codes in
+DRM for it.  The result is that v4l2_pix_fmt_to_drm_fourcc() returns
+-EINVAL cast to a u32, which gets passed unchecked into ipu_cpmem_set_fmt().
+
+ipu_cpmem_set_fmt() won't recognise that, and also returns -EINVAL - and
+it's a bug that this is not checked and propagated.  If it is checked and
+propagated, then we need this to support bayer formats, and I don't see
+DRM people wanting bayer format fourcc codes added without there being
+a real DRM driver wanting to use them.
+
+Then there's the business of calculating the top-left offset of the image,
+which for bayer always needs to be an even number of pixels - as this
+function takes the top-left offset, it ought to respect it, but if it
+doesn't meet this criteria, what should it do?  csi_idmac_setup_channel()
+always sets them to zero, but that's not really something that
+ipu_cpmem_set_image() should assume.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
