@@ -1,111 +1,159 @@
-From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Sun, 12 Mar 2017 21:26:41 -0700
-Subject: [PATCH v5 00/39] i.MX Media Driver
-In-Reply-To: <20170312202240.GT21222@n2100.armlinux.org.uk>
-References: <1489121599-23206-1-git-send-email-steve_longerbeam@mentor.com>
- <20170310201356.GA21222@n2100.armlinux.org.uk>
- <47542ef8-3e91-b4cd-cc65-95000105f172@gmail.com>
- <20170312195741.GS21222@n2100.armlinux.org.uk>
- <ea3ccdb8-903f-93ab-6875-90da440fc52a@gmail.com>
- <20170312202240.GT21222@n2100.armlinux.org.uk>
-Message-ID: <f1807742-012f-249e-1ad8-22d8434695cb@gmail.com>
+From: j-keerthy@ti.com (Keerthy)
+Date: Mon, 13 Mar 2017 10:57:20 +0530
+Subject: [PATCH RFC 2/3] thermal: dove: convert to a thermal OF sensor
+ device
+In-Reply-To: <E1cn8qH-0002v6-SE@rmk-PC.armlinux.org.uk>
+References: <E1cn8qH-0002v6-SE@rmk-PC.armlinux.org.uk>
+Message-ID: <08ea53ed-d7be-2206-57f4-65c06d5e4a40@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 03/12/2017 01:22 PM, Russell King - ARM Linux wrote:
-> On Sun, Mar 12, 2017 at 01:05:06PM -0700, Steve Longerbeam wrote:
->>
->>
->> On 03/12/2017 12:57 PM, Russell King - ARM Linux wrote:
->>> On Sat, Mar 11, 2017 at 04:30:53PM -0800, Steve Longerbeam wrote:
->>>> If it's too difficult to get the imx219 csi-2 transmitter into the
->>>> LP-11 state on power on, perhaps the csi-2 receiver can be a little
->>>> more lenient on the transmitter and make the LP-11 timeout a warning
->>>> instead of error-out.
->>>>
->>>> Can you try the attached change on top of the version 5 patchset?
->>>>
->>>> If that doesn't work then you're just going to have to fix the bug
->>>> in imx219.
->>>
->>> That patch gets me past that hurdle, only to reveal that there's another
->>> issue:
->>
->> Yeah, ipu_cpmem_set_image() failed because it doesn't recognize the
->> bayer formats. Wait, didn't we fix this already? I've lost track.
->> Ah, right, we were going to move this support into the IPUv3 driver,
->> but in the meantime I think you had some patches to get around this.
+On Monday 13 March 2017 12:37 AM, Russell King wrote:
+> Convert the dove thermal infrastructure to an OF sensor device, and add
+> the thermal zones for the SoC, with a critical trip point of 120?C.
+> This allows us to specify thermal zones and couple them to cooling
+> devices in DT.
 >
-> What I had was this patch for your v3.  I never got to testing your
-> v4 because of the LP-11 problem.
+> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+> ---
+>  arch/arm/boot/dts/dove.dtsi    | 17 +++++++++++++++++
+>  drivers/thermal/dove_thermal.c | 33 +++++++++++++++++++++++++--------
+>  2 files changed, 42 insertions(+), 8 deletions(-)
 >
-> In v5, you've changed to propagate the ipu_cpmem_set_image() error
-> code to avoid the resulting corruption, but that leaves the other bits
-> of this patch unaddressed, along my "media: imx: smfc: add support
-> for bayer formats" patch.
+> diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
+> index 698d58cea20d..40fb98687230 100644
+> --- a/arch/arm/boot/dts/dove.dtsi
+> +++ b/arch/arm/boot/dts/dove.dtsi
+> @@ -455,6 +455,7 @@
+>  				};
 >
-> Your driver basically has no support for bayer formats.
-
-You added the patches to this driver that adds the bayer support,
-I don't think there is anything more required of the driver at this
-point to support bayer, the remaining work needs to happen in the IPUv3
-driver.
-
-I'll see if I have time to write that patch to IPUv3, but it's simple,
-in fact what you wrote below can be translate directly into
-ipu_cpmem_set_image(). There's a few other places bayer needs to be
-treated in IPUv3, but it should be obvious by grepping for the
-reference to pixel formats.
-
-Steve
-
-
->
-> diff --git a/drivers/staging/media/imx/imx-smfc.c b/drivers/staging/media/imx/imx-smfc.c
-> index 313732201a52..4351c0365cf4 100644
-> --- a/drivers/staging/media/imx/imx-smfc.c
-> +++ b/drivers/staging/media/imx/imx-smfc.c
-> @@ -234,11 +234,6 @@ static void imx_smfc_setup_channel(struct imx_smfc_priv *priv)
->  	buf1 = imx_media_dma_buf_get_next_queued(priv->out_ring);
->  	priv->next = buf1;
->
-> -	image.phys0 = buf0->phys;
-> -	image.phys1 = buf1->phys;
-> -	ipu_cpmem_set_image(priv->smfc_ch, &image);
-> -
-> -
->  	switch (image.pix.pixelformat) {
->  	case V4L2_PIX_FMT_SBGGR8:
->  	case V4L2_PIX_FMT_SGBRG8:
-> @@ -247,6 +242,10 @@ static void imx_smfc_setup_channel(struct imx_smfc_priv *priv)
->  		burst_size = 8;
->  		passthrough = true;
->  		passthrough_bits = 8;
-> +		ipu_cpmem_set_resolution(priv->smfc_ch, image.rect.width, image.rect.height);
-> +		ipu_cpmem_set_stride(priv->smfc_ch, image.pix.bytesperline);
-> +		ipu_cpmem_set_buffer(priv->smfc_ch, 0, buf0->phys);
-> +		ipu_cpmem_set_buffer(priv->smfc_ch, 1, buf1->phys);
->  		break;
->
->  	case V4L2_PIX_FMT_SBGGR16:
-> @@ -256,9 +255,17 @@ static void imx_smfc_setup_channel(struct imx_smfc_priv *priv)
->  		burst_size = 4;
->  		passthrough = true;
->  		passthrough_bits = 16;
-> +		ipu_cpmem_set_resolution(priv->smfc_ch, image.rect.width, image.rect.height);
-> +		ipu_cpmem_set_stride(priv->smfc_ch, image.pix.bytesperline);
-> +		ipu_cpmem_set_buffer(priv->smfc_ch, 0, buf0->phys);
-> +		ipu_cpmem_set_buffer(priv->smfc_ch, 1, buf1->phys);
->  		break;
->
->  	default:
-> +		image.phys0 = buf0->phys;
-> +		image.phys1 = buf1->phys;
-> +		ipu_cpmem_set_image(priv->smfc_ch, &image);
+>  				thermal: thermal-diode at 001c {
+> +					#thermal-sensor-cells = <0>;
+>  					compatible = "marvell,dove-thermal";
+>  					reg = <0x001c 0x0c>, <0x005c 0x08>;
+>  				};
+> @@ -800,4 +801,20 @@
+>  			};
+>  		};
+>  	};
 > +
->  		burst_size = (outfmt->width & 0xf) ? 8 : 16;
+> +	thermal-zones {
+> +		soc-thermal {
+> +			polling-delay-passive = <250>; /* ms */
+> +			polling-delay = <1000>; /* ms */
+> +			thermal-sensors = <&thermal>;
+> +
+> +			soc_trips: trips {
+> +				soc_trip_crit: soc-crit {
+> +					temperature = <120000>; /* ?mC */
+> +					hysteresis = <2000>; /* ?mC */
+> +					type = "critical";
+> +				};
+> +			};
+> +		};
+> +	};
+>  };
+> diff --git a/drivers/thermal/dove_thermal.c b/drivers/thermal/dove_thermal.c
+> index a0bc9de42553..51b1a9e78576 100644
+> --- a/drivers/thermal/dove_thermal.c
+> +++ b/drivers/thermal/dove_thermal.c
+> @@ -46,6 +46,7 @@
+>  struct dove_thermal_priv {
+>  	void __iomem *sensor;
+>  	void __iomem *control;
+> +	struct device *dev;
+>  };
 >
->  		/*
+>  static int dove_init_sensor(const struct dove_thermal_priv *priv)
+> @@ -92,17 +93,15 @@ static int dove_init_sensor(const struct dove_thermal_priv *priv)
+>  	return 0;
+>  }
+>
+> -static int dove_get_temp(struct thermal_zone_device *thermal,
+> -			  int *temp)
+> +static int dove_of_get_temp(void *data, int *temp)
+>  {
+> +	struct dove_thermal_priv *priv = data;
+>  	unsigned long reg;
+> -	struct dove_thermal_priv *priv = thermal->devdata;
+>
+>  	/* Valid check */
+>  	reg = readl_relaxed(priv->control + PMU_TEMP_DIOD_CTRL1_REG);
+>  	if ((reg & PMU_TDC1_TEMP_VALID_MASK) == 0x0) {
+> -		dev_err(&thermal->device,
+> -			"Temperature sensor reading not valid\n");
+> +		dev_err(priv->dev, "Temperature sensor reading not valid\n");
+>  		return -EIO;
+>  	}
+>
+> @@ -118,10 +117,22 @@ static int dove_get_temp(struct thermal_zone_device *thermal,
+>  	return 0;
+>  }
+>
+> +static int dove_get_temp(struct thermal_zone_device *thermal,
+> +			  int *temp)
+> +{
+> +	struct dove_thermal_priv *priv = thermal->devdata;
+> +
+> +	return dove_of_get_temp(priv, temp);
+> +}
+> +
+>  static struct thermal_zone_device_ops ops = {
+>  	.get_temp = dove_get_temp,
+>  };
+>
+> +static const struct thermal_zone_of_device_ops of_ops = {
+> +	.get_temp = dove_of_get_temp,
+> +};
+> +
+>  static const struct of_device_id dove_thermal_id_table[] = {
+>  	{ .compatible = "marvell,dove-thermal" },
+>  	{}
+> @@ -138,6 +149,8 @@ static int dove_thermal_probe(struct platform_device *pdev)
+>  	if (!priv)
+>  		return -ENOMEM;
+>
+> +	priv->dev = &pdev->dev;
+> +
+>  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>  	priv->sensor = devm_ioremap_resource(&pdev->dev, res);
+>  	if (IS_ERR(priv->sensor))
+> @@ -154,8 +167,11 @@ static int dove_thermal_probe(struct platform_device *pdev)
+>  		return ret;
+>  	}
+>
+> -	thermal = thermal_zone_device_register("dove_thermal", 0, 0,
+> -					       priv, &ops, NULL, 0, 0);
+> +	thermal = devm_thermal_zone_of_sensor_register(&pdev->dev, 0,
+> +						       priv, &of_ops);
+> +	if (IS_ERR(thermal))
+> +		thermal = thermal_zone_device_register("dove_thermal", 0, 0,
+> +						       priv, &ops, NULL, 0, 0);
+>  	if (IS_ERR(thermal)) {
+>  		dev_err(&pdev->dev,
+>  			"Failed to register thermal zone device\n");
+> @@ -172,7 +188,8 @@ static int dove_thermal_exit(struct platform_device *pdev)
+>  	struct thermal_zone_device *dove_thermal =
+>  		platform_get_drvdata(pdev);
+>
+> -	thermal_zone_device_unregister(dove_thermal);
+> +	if (!pdev->dev.of_node)
+> +		thermal_zone_device_unregister(dove_thermal);
+
+Russell,
+
+Now that thermal-zones is defined in dove.dtsi do you see any need to 
+call thermal_zone_device_register? Is there a case where in 
+devm_thermal_zone_of_sensor_register is known to fail?
+
+If not then we can even get rid of ops, dove_get_temp function.
+
+Regards,
+Keerthy
+
+>
+>  	return 0;
+>  }
 >
