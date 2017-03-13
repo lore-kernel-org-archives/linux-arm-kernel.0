@@ -1,39 +1,78 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 13 Mar 2017 15:12:24 -0700
-Subject: [GIT PULL] Broadcom devicetree fixes for 4.11
-In-Reply-To: <20170306013240.21734-1-f.fainelli@gmail.com>
-References: <20170306013240.21734-1-f.fainelli@gmail.com>
-Message-ID: <20170313221224.GD13064@localhost>
+Date: Mon, 13 Mar 2017 15:06:09 -0700
+Subject: [GIT PULL 6/7] ARM: 64-bit DT updates for v4.11
+In-Reply-To: <3de0acea-bf24-b2c7-f86d-4d3934b20330@baylibre.com>
+References: <8729461.VkrRdW7LzJ@wuerfel> <5992784.pTmbu8UWnt@wuerfel>
+ <3de0acea-bf24-b2c7-f86d-4d3934b20330@baylibre.com>
+Message-ID: <20170313220609.GA13064@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 05, 2017 at 05:32:40PM -0800, Florian Fainelli wrote:
-> The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
-> 
->   Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
-> 
-> are available in the git repository at:
-> 
->   http://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.11/devicetree-fixes
-> 
-> for you to fetch changes up to 0c2bf9f95983fe30aa2f6463cb761cd42c2d521a:
-> 
->   ARM: dts: BCM5301X: Correct GIC_PPI interrupt flags (2017-03-05 17:10:55 -0800)
-> 
-> ----------------------------------------------------------------
-> This pull request contains Broadcom ARM-based SoC Device Tree fixes for 4.11,
-> please pull the following:
-> 
-> - Jon fixes the UART output on the Broadcom bcm953012k reference board by
->   using the proper clock reference instead of hard-coding the baud rate
-> 
-> - Jon also fixes the memory map on the bcm953012k reference board by using
->   the appropriate physical RAM start address
-> 
-> - Jon finally fixes the interrupt type for the Cortex A9 global and local
->   timers found in the BCM5301X SoC (Norsthar).
+Hi,
 
-Olof merges the pull request.
+On Thu, Feb 23, 2017 at 03:20:19PM -0800, Neil Armstrong wrote:
+> On 02/23/2017 03:10 PM, Arnd Bergmann wrote:
+> > The following changes since commit a121103c922847ba5010819a3f250f1f7fc84ab8:
+> > 
+> >   Linux 4.10-rc3 (2017-01-08 14:18:17 -0800)
+> > 
+> > are available in the git repository at:
+> > 
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/armsoc-dt64
+> > 
+> > for you to fetch changes up to cbab31977008a9eb9eb241879befc2e20285740c:
+> > 
+> >   Merge tag 'mvebu-dt64-4.11-3' of git://git.infradead.org/linux-mvebu into next/dt64 (2017-02-09 16:20:23 +0100)
+> > 
+> > ----------------------------------------------------------------
+> > ARM: 64-bit DT updates for v4.11
+> > 
+> > ARM64 DT updates are fairly small this time, only two new SoCs and a handful
+> > of new machines get added, all of them similar to other hardware we already
+> > support.
+> > 
+> > New SoC:
+> >   - HiSilicon Kirin960/Hi3660 and HiKey960 development board
+> >   - NXP LS1012a with three reference boards
+> >     http://www.nxp.com/products/microcontrollers-and-processors/arm-processors/qoriq-layerscape-arm-processors/qoriq-layerscape-1012a-low-power-communication-processor:LS1012A
+> > 
+> > New development board:
+> >   - Banana Pi M64, based on Allwinner A64
+> >     http://www.banana-pi.org/m64.html
+> >   - SolidRun MACCHIATOBin based on Marvell Armada 8K
+> >     https://www.solid-run.com/marvell-armada-family/armada-8040-community-board/
+> >   - Broadcom BCM958712DxXMC NorthStar2 reference board (another one)
+> > 
+> > A lot of platforms improve support for existing machines by adding
+> > extra devices for which a binding and driver is availabe:
+> > 
+> > Allwinner: MMC, USB
+> > ARM Juno: Coresight, STM
+> > Broadcom: NS2 GICv2m irqchip and PCIe
+> > Marvell: Armada 3700 SPI, I2C, ethernet switch
+> > Mediatek: MT8173 thermal
+> > NXP i.MX: LS1046A thermal
+> > Qualcomm: coresight on MSM8916, HDMI, WCNSS, SCM
+> > Renesas: r8a779[56] thermal, powerdomain, ethernet, sound, pwm, can, can fd
+> > Rockchip: thermal, eDP, pinctrl enhancements
+> > Samsung: TM2 touchkey, Exynos5433 HDMI and power management improvements
+> > UniPhier: SD reset, eMMC controller
+> > ZTE: oppv2 cpufreq
+> > 
+> 
+> Hi Arnd,
+> 
+> I think the Amlogic patches are missing in these PRs for 4.11.
+
+Unfortunately it's a little late to come reporting that by the time we
+send pull requests. In the future, if you get a reply that a branch
+was merged but it didn't show up in linux-next in the next cycle (or two),
+please let us know as soon as possible. We also have an index in
+arch/arm/arm-soc-for-next-contents.txt in linux-next of what we've merged.
+
+For anything that wasn't in 4.11-rc1, please send us a fresh pull request for
+4.12 and we'll queue it up. (I'm going through old email so if you've sent one
+between this email and today I'll get to it shortly).
 
 
 -Olof
