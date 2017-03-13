@@ -1,67 +1,23 @@
 From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Mon, 13 Mar 2017 17:46:20 -0500
-Subject: Neophyte questions about PCIe
-In-Reply-To: <826d0a3f-753f-0330-5792-e11beb78d6bf@free.fr>
-References: <ced6a4bf-c94a-c116-1e94-52a8d675d132@free.fr>
- <20170308151724.GA20780@bhelgaas-glaptop.roam.corp.google.com>
- <f964ee05-db7f-c381-c91c-82897175da6d@free.fr>
- <9ba05c2c-57ef-b2c0-6a7c-457c392d98b5@free.fr>
- <df517167-d692-38a8-9c8f-a1112c7f578d@free.fr>
- <c0a353cb-aa1f-25db-eccd-7a1618e655b3@free.fr>
- <20170313214024.GD8232@bhelgaas-glaptop.roam.corp.google.com>
- <826d0a3f-753f-0330-5792-e11beb78d6bf@free.fr>
-Message-ID: <20170313224619.GF8232@bhelgaas-glaptop.roam.corp.google.com>
+Date: Mon, 13 Mar 2017 18:08:55 -0500
+Subject: [PATCH V4 0/3] PCI/ASPM: reconfigure ASPM following hotplug for
+ POLICY_DEFAULT
+In-Reply-To: <c6b78903-ea09-9719-7073-c679b0b64a05@codeaurora.org>
+References: <1489438085-2055-1-git-send-email-okaya@codeaurora.org>
+ <20170313214616.GE8232@bhelgaas-glaptop.roam.corp.google.com>
+ <c6b78903-ea09-9719-7073-c679b0b64a05@codeaurora.org>
+Message-ID: <20170313230855.GG8232@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 13, 2017 at 10:57:48PM +0100, Mason wrote:
-> On 13/03/2017 22:40, Bjorn Helgaas wrote:
+On Mon, Mar 13, 2017 at 06:05:55PM -0400, Sinan Kaya wrote:
+> On 3/13/2017 5:46 PM, Bjorn Helgaas wrote:
+> > What is this series based on?  Unless they depend on other in-flight
+> > patches, I apply patches to branches based on my "master" branch,
+> > which is typically -rc1 or -rc2 (it's currently v4.11-rc1).  These
+> > don't apply to either.
 > 
-> > On Sat, Mar 11, 2017 at 11:57:56AM +0100, Mason wrote:
-> >
-> >> On 10/03/2017 18:49, Mason wrote:
-> >> 
-> >>> static void tango_pcie_bar_quirk(struct pci_dev *dev)
-> >>> {
-> >>> 	struct pci_bus *bus = dev->bus;
-> >>>
-> >>> 	printk("%s: bus=%d devfn=%d\n", __func__, bus->number, dev->devfn);
-> >>>
-> >>>         pci_write_config_dword(dev, PCI_BASE_ADDRESS_0, 0x80000004);
-> >>> }
-> >>> DECLARE_PCI_FIXUP_FINAL(0x1105, PCI_ANY_ID, tango_pcie_bar_quirk);
-> >>
-> >> And this is where the elusive "black magic" happens.
-> >>
-> >> Is it "safe" to configure a BAR behind Linux's back?
-> > 
-> > No.  Linux maintains a struct resource for every BAR.  This quirk
-> > makes the BAR out of sync with the resource, so Linux no longer has an
-> > accurate idea of what bus address space is consumed and what is
-> > available.
-> 
-> Even when Linux is not able to map the BAR, since it's too
-> large to fit in the mem window?
+> It looks like I am on 4.10. I can rebase and post again. 
 
-I don't think there's much point in advertising a BAR that isn't
-really a BAR and making assumptions about how Linux will handle it.
-So my answer remains "No, I don't think it's a good idea to change a
-BAR behind the back of the PCI core.  It might work now, but there's
-no guarantee it will keep working."
-
-> > Normally a BAR is for mapping device registers into PCI bus address
-> > space.  If this BAR controls how the RC forwards PCI DMA transactions
-> > to RAM, then it's not really a BAR and you should prevent Linux from
-> > seeing it as a BAR.  You could do this by special-casing it in the
-> > config accessor so reads return 0 and writes are dropped.  Then you
-> > could write the register in your host bridge driver safely because the
-> > PCI core would think the BAR is not implemented.
-> 
-> In fact, that's what I used to do in a previous version :-)
-> 
-> I'd like to push support for this PCIe controller upstream.
-> 
-> Is the code I posted on the right track?
-> Maybe I can post a RFC patch tomorrow?
-
-No need to ask before posting a patch :)
+Rebasing would be good, but I can give you some comments on your v4,
+now that I can apply it and see what it looks like.
