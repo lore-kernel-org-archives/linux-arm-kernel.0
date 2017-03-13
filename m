@@ -1,59 +1,61 @@
-From: slash.tmp@free.fr (Mason)
-Date: Mon, 13 Mar 2017 22:57:48 +0100
-Subject: Neophyte questions about PCIe
-In-Reply-To: <20170313214024.GD8232@bhelgaas-glaptop.roam.corp.google.com>
-References: <ced6a4bf-c94a-c116-1e94-52a8d675d132@free.fr>
- <20170308151724.GA20780@bhelgaas-glaptop.roam.corp.google.com>
- <f964ee05-db7f-c381-c91c-82897175da6d@free.fr>
- <9ba05c2c-57ef-b2c0-6a7c-457c392d98b5@free.fr>
- <df517167-d692-38a8-9c8f-a1112c7f578d@free.fr>
- <c0a353cb-aa1f-25db-eccd-7a1618e655b3@free.fr>
- <20170313214024.GD8232@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <826d0a3f-753f-0330-5792-e11beb78d6bf@free.fr>
+From: labbott@redhat.com (Laura Abbott)
+Date: Mon, 13 Mar 2017 14:59:23 -0700
+Subject: [RFC PATCH 00/12] Ion cleanup in preparation for moving out of
+ staging
+In-Reply-To: <CAF6AEGvs0qVr_=pSp5FYoxM4XNaKLtYB-uhBmDheYcgxgv1_2g@mail.gmail.com>
+References: <1488491084-17252-1-git-send-email-labbott@redhat.com>
+ <20170303132949.GC31582@dhcp22.suse.cz>
+ <cf383b9b-3cbc-0092-a071-f120874c053c@redhat.com>
+ <20170306074258.GA27953@dhcp22.suse.cz>
+ <20170306104041.zghsicrnadoap7lp@phenom.ffwll.local>
+ <20170306105805.jsq44kfxhsvazkm6@sirena.org.uk>
+ <20170306160437.sf7bksorlnw7u372@phenom.ffwll.local>
+ <CA+M3ks77Am3Fx-ZNmgeM5tCqdM7SzV7rby4Es-p2F2aOhUco9g@mail.gmail.com>
+ <26bc57ae-d88f-4ea0-d666-2c1a02bf866f@redhat.com>
+ <CA+M3ks6R=n4n54wofK7pYcWoQKUhzyWQytBO90+pRDRrAhi3ww@mail.gmail.com>
+ <CAKMK7uH9NemeM2z-tQvge_B=kABop6O7UQFK3PirpJminMCPqw@mail.gmail.com>
+ <6d3d52ba-29a9-701f-2948-00ce28282975@redhat.com>
+ <CAF6AEGvs0qVr_=pSp5FYoxM4XNaKLtYB-uhBmDheYcgxgv1_2g@mail.gmail.com>
+Message-ID: <ef8ae526-d0e8-83dd-c2d8-656d356ebd91@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/03/2017 22:40, Bjorn Helgaas wrote:
-
-> On Sat, Mar 11, 2017 at 11:57:56AM +0100, Mason wrote:
->
->> On 10/03/2017 18:49, Mason wrote:
->> 
->>> static void tango_pcie_bar_quirk(struct pci_dev *dev)
->>> {
->>> 	struct pci_bus *bus = dev->bus;
+On 03/13/2017 02:29 PM, Rob Clark wrote:
+> On Mon, Mar 13, 2017 at 5:09 PM, Laura Abbott <labbott@redhat.com> wrote:
+>>> Hm, we might want to expose all the heaps as individual
+>>> /dev/ion_$heapname nodes? Should we do this from the start, since
+>>> we're massively revamping the uapi anyway (imo not needed, current
+>>> state seems to work too)?
+>>> -Daniel
 >>>
->>> 	printk("%s: bus=%d devfn=%d\n", __func__, bus->number, dev->devfn);
->>>
->>>         pci_write_config_dword(dev, PCI_BASE_ADDRESS_0, 0x80000004);
->>> }
->>> DECLARE_PCI_FIXUP_FINAL(0x1105, PCI_ANY_ID, tango_pcie_bar_quirk);
 >>
->> And this is where the elusive "black magic" happens.
->>
->> Is it "safe" to configure a BAR behind Linux's back?
+>> I thought about that. One advantage with separate /dev/ion_$heap
+>> is that we don't have to worry about a limit of 32 possible
+>> heaps per system (32-bit heap id allocation field). But dealing
+>> with an ioctl seems easier than names. Userspace might be less
+>> likely to hardcode random id numbers vs. names as well.
 > 
-> No.  Linux maintains a struct resource for every BAR.  This quirk
-> makes the BAR out of sync with the resource, so Linux no longer has an
-> accurate idea of what bus address space is consumed and what is
-> available.
+> 
+> other advantage, I think, is selinux (brought up elsewhere on this
+> thread).. heaps at known fixed PAs are useful for certain sorts of
+> attacks so being able to restrict access more easily seems like a good
+> thing
+> 
+> BR,
+> -R
+> 
 
-Even when Linux is not able to map the BAR, since it's too
-large to fit in the mem window?
+Some other kind of filtering (BPF/LSM/???) might work as well
+(http://kernsec.org/files/lss2015/vanderstoep.pdf ?)
 
-> Normally a BAR is for mapping device registers into PCI bus address
-> space.  If this BAR controls how the RC forwards PCI DMA transactions
-> to RAM, then it's not really a BAR and you should prevent Linux from
-> seeing it as a BAR.  You could do this by special-casing it in the
-> config accessor so reads return 0 and writes are dropped.  Then you
-> could write the register in your host bridge driver safely because the
-> PCI core would think the BAR is not implemented.
+The fixed PA issue is a larger problem. We're never going to
+be able to get away from "this heap must exist at address X"
+problems but the location of CMA in general should be
+randomized. I haven't actually come up with a good proposal
+to this though.
 
-In fact, that's what I used to do in a previous version :-)
+I'd like for Ion to be a framework for memory allocation and
+not security exploits. Hopefully this isn't a pipe dream.
 
-I'd like to push support for this PCIe controller upstream.
-
-Is the code I posted on the right track?
-Maybe I can post a RFC patch tomorrow?
-
-Regards.
+Thanks,
+Laura
