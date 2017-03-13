@@ -1,42 +1,31 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 13 Mar 2017 15:10:54 -0700
-Subject: [PATCH] ARM: ux500: resume the second core properly
-In-Reply-To: <20170227091338.9800-1-linus.walleij@linaro.org>
-References: <20170227091338.9800-1-linus.walleij@linaro.org>
-Message-ID: <20170313221054.GC13064@localhost>
+Date: Mon, 13 Mar 2017 15:08:52 -0700
+Subject: [PATCH] ARM: dts: add the AB8500 clocks to the device tree
+In-Reply-To: <20170226000209.20534-1-linus.walleij@linaro.org>
+References: <20170226000209.20534-1-linus.walleij@linaro.org>
+Message-ID: <20170313220852.GB13064@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 27, 2017 at 10:13:38AM +0100, Linus Walleij wrote:
-> The pen hold/release scheme was copied over to Ux500 from the ARM
-> reference designs like most of these at the time. It is not needed
-> at all, and was mostly removed in commit c00def71efd9
-> "ARM: ux500: simplify secondary CPU boot".
+On Sun, Feb 26, 2017 at 01:02:09AM +0100, Linus Walleij wrote:
+> This adds the AB8500 clocks to the device tree using the new
+> bindings from the clk subsystem, making audio work again.
 > 
-> However on the suspend/resume path and hot plug/unplug of CPUs,
-> the .cpu_die() callback was still waiting for the pen to be
-> released which made it spin forever and the second core never come
-> back online after suspend/resume.
-> 
-> Fix this by simply replacing the strange custom .cpu_die() with
-> a oneline wfi() just like e.g. the qcom platform does. This fixes
-> the issue and makes the second core come up properly after
-> suspend/resume.
-> 
-> As a side effect, this rids us of the completely surplus local
-> setup.h and hotplug.c files, and we just compile this into platsmp.c
-> with everything else SMP.
-> 
-> Cc: stable at vger.kernel.org
-> Fixes: c00def71efd9 ("ARM: ux500: simplify secondary CPU boot")
+> Cc: Lee Jones <lee.jones@linaro.org>
 > Cc: Ulf Hansson <ulf.hansson@linaro.org>
 > Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 > ---
-> ARM SoC folks: please apply this directly for fixes. The bug
-> has been around for a while, it is nice to have both CPUs
-> online after suspend/resume.
+> ARM SoC guys: please consider this for late merge/early fix.
+> 
+> Lee had audio working at some point in the past, but there is no
+> way of fixing it backward or for stable. However: applying this
+> fixes it for v4.11.
+> 
+> ChangeLog v1->v2:
+> - Rename DT node to clock-controller.
 
-Looks like this one was included in next/late merge by Arnd.
+Thanks, I'm interpreting this as a fix (at least this early in the release
+cycle, and merging it for 4.11 fixes).
 
 
 -Olof
