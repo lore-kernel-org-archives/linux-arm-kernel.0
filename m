@@ -1,290 +1,253 @@
-From: cedric.madianga@gmail.com (M'boumba Cedric Madianga)
-Date: Mon, 13 Mar 2017 15:15:58 +0100
-Subject: [PATCH 2/5] dmaengine: Add STM32 DMAMUX driver
-In-Reply-To: <1489414561-28912-1-git-send-email-cedric.madianga@gmail.com>
-References: <1489414561-28912-1-git-send-email-cedric.madianga@gmail.com>
-Message-ID: <1489414561-28912-3-git-send-email-cedric.madianga@gmail.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Mon, 13 Mar 2017 19:52:38 +0530
+Subject: [PATCH v4 02/23] Documentation: PCI: Guide to use PCI Endpoint Core
+ Layer
+In-Reply-To: <20170313142259.25397-1-kishon@ti.com>
+References: <20170313142259.25397-1-kishon@ti.com>
+Message-ID: <20170313142259.25397-3-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch implements the STM32 DMAMUX driver
+Add Documentation to help users use endpoint library to enable endpoint
+mode in the PCI controller and add new PCI endpoint functions.
 
-Signed-off-by: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
+Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- drivers/dma/Kconfig        |   9 ++
- drivers/dma/Makefile       |   1 +
- drivers/dma/stm32-dmamux.c | 231 +++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 241 insertions(+)
- create mode 100644 drivers/dma/stm32-dmamux.c
+ Documentation/PCI/00-INDEX                  |   2 +
+ Documentation/PCI/endpoint/pci-endpoint.txt | 215 ++++++++++++++++++++++++++++
+ 2 files changed, 217 insertions(+)
+ create mode 100644 Documentation/PCI/endpoint/pci-endpoint.txt
 
-diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
-index fc3435c..6ab80c9 100644
---- a/drivers/dma/Kconfig
-+++ b/drivers/dma/Kconfig
-@@ -461,6 +461,15 @@ config STM32_DMA
- 	  If you have a board based on such a MCU and wish to use DMA say Y
- 	  here.
- 
-+config STM32_DMAMUX
-+	bool "STMicroelectronics STM32 dma multiplexer support"
-+	depends on STM32_DMA
-+	help
-+	  Enable support for the on-chip DMA multiplexer on STMicroelectronics
-+	  STM32 MCUs.
-+	  If you have a board based on such a MCU and wish to use DMAMUX say Y
-+	  here.
-+
- config S3C24XX_DMAC
- 	bool "Samsung S3C24XX DMA support"
- 	depends on ARCH_S3C24XX || COMPILE_TEST
-diff --git a/drivers/dma/Makefile b/drivers/dma/Makefile
-index 0b723e9..449c7a3 100644
---- a/drivers/dma/Makefile
-+++ b/drivers/dma/Makefile
-@@ -57,6 +57,7 @@ obj-$(CONFIG_RENESAS_DMA) += sh/
- obj-$(CONFIG_SIRF_DMA) += sirf-dma.o
- obj-$(CONFIG_STE_DMA40) += ste_dma40.o ste_dma40_ll.o
- obj-$(CONFIG_STM32_DMA) += stm32-dma.o
-+obj-$(CONFIG_STM32_DMAMUX) += stm32-dmamux.o
- obj-$(CONFIG_S3C24XX_DMAC) += s3c24xx-dma.o
- obj-$(CONFIG_TXX9_DMAC) += txx9dmac.o
- obj-$(CONFIG_TEGRA20_APB_DMA) += tegra20-apb-dma.o
-diff --git a/drivers/dma/stm32-dmamux.c b/drivers/dma/stm32-dmamux.c
+diff --git a/Documentation/PCI/00-INDEX b/Documentation/PCI/00-INDEX
+index 147231f1613e..ba950b296bd8 100644
+--- a/Documentation/PCI/00-INDEX
++++ b/Documentation/PCI/00-INDEX
+@@ -12,3 +12,5 @@ pci.txt
+ 	- info on the PCI subsystem for device driver authors
+ pcieaer-howto.txt
+ 	- the PCI Express Advanced Error Reporting Driver Guide HOWTO
++endpoint/pci-endpoint.txt
++	- guide to add endpoint controller driver and endpoint function driver.
+diff --git a/Documentation/PCI/endpoint/pci-endpoint.txt b/Documentation/PCI/endpoint/pci-endpoint.txt
 new file mode 100644
-index 0000000..3003546
+index 000000000000..4a3e4388b37b
 --- /dev/null
-+++ b/drivers/dma/stm32-dmamux.c
-@@ -0,0 +1,231 @@
-+/*
-+ * DMA Router driver for STM32 DMA MUX
-+ *
-+ * Copyright (C) 2015 M'Boumba Cedric Madianga <cedric.madianga@gmail.com>
-+ *
-+ * Based on LPC18xx/43xx DMA MUX and TI DMA XBAR
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ */
++++ b/Documentation/PCI/endpoint/pci-endpoint.txt
+@@ -0,0 +1,215 @@
++			    PCI ENDPOINT FRAMEWORK
++		    Kishon Vijay Abraham I <kishon@ti.com>
 +
-+#include <linux/clk.h>
-+#include <linux/delay.h>
-+#include <linux/err.h>
-+#include <linux/init.h>
-+#include <linux/of_device.h>
-+#include <linux/of_dma.h>
-+#include <linux/reset.h>
-+#include <linux/slab.h>
++This document is a guide to use the PCI Endpoint Framework in order to create
++endpoint controller driver, endpoint function driver and using configfs
++interface to bind the function driver to the controller driver.
 +
-+#define STM32_DMAMUX_CCR(x)		(0x4 * (x))
-+#define STM32_DMAMUX_MAX_CHANNELS	32
-+#define STM32_DMAMUX_MAX_REQUESTS	255
++1. Introduction
 +
-+struct stm32_dmamux {
-+	u32 chan_id;
-+	u32 request;
-+	bool busy;
-+};
++*Linux* has a comprehensive PCI subsystem to support PCI controllers that
++operates in Root Complex mode. The subsystem has capability to scan PCI bus,
++assign memory resources and irq resources, load PCI driver (based on
++vendorid, deviceid), support other services like hot-plug, power management,
++advanced error reporting and virtual channels.
 +
-+struct stm32_dmamux_data {
-+	struct dma_router dmarouter;
-+	struct stm32_dmamux *muxes;
-+	struct clk *clk;
-+	void __iomem *iomem;
-+	u32 dmamux_requests; /* number of DMA requests connected to DMAMUX */
-+	u32 dmamux_channels; /* Number of DMA channels supported */
-+};
++However PCI controller IPs integrated in certain SoC is capable of operating
++either in Root Complex mode or Endpoint mode. PCI Endpoint Framework will
++add endpoint mode support in *Linux*. This will help to run Linux in an
++EP system which can have a wide variety of use cases from testing or
++validation, co-processor accelerator etc..
 +
-+static inline u32 stm32_dmamux_read(void __iomem *iomem, u32 reg)
-+{
-+	return readl_relaxed(iomem + reg);
-+}
++2. PCI Endpoint Core
 +
-+static inline void stm32_dmamux_write(void __iomem *iomem, u32 reg, u32 val)
-+{
-+	writel_relaxed(val, iomem + reg);
-+}
++The PCI Endpoint Core layer comprises of 3 components: the Endpoint Controller
++library, the Endpoint Function library and the configfs layer to bind the
++endpoint function with the endpoint controller.
 +
-+static void stm32_dmamux_free(struct device *dev, void *route_data)
-+{
-+	struct stm32_dmamux_data *dmamux = dev_get_drvdata(dev);
-+	struct stm32_dmamux *mux = route_data;
++2.1 PCI Endpoint Controller(EPC) Library
 +
-+	/* Clear dma request for the right channel */
-+	stm32_dmamux_write(dmamux->iomem, STM32_DMAMUX_CCR(mux->chan_id), 0);
-+	clk_disable(dmamux->clk);
-+	mux->busy = false;
++The EPC library provides APIs to be used by the controller that can operate
++in endpoint mode. It also provides APIs to be used by function driver/library
++in order to implement a particular endpoint function.
 +
-+	dev_dbg(dev, "Unmapping dma-router%dchan%d (was routed to request%d)\n",
-+		dev->id, mux->chan_id, mux->request);
-+}
++2.1.1 APIs for the PCI controller Driver
 +
-+static void *stm32_dmamux_route_allocate(struct of_phandle_args *dma_spec,
-+					 struct of_dma *ofdma)
-+{
-+	struct platform_device *pdev = of_find_device_by_node(ofdma->of_node);
-+	struct stm32_dmamux_data *dmamux = platform_get_drvdata(pdev);
-+	struct stm32_dmamux *mux;
-+	u32 chan_id;
-+	int ret;
++This section lists the APIs that the PCI Endpoint core provides to be used
++by the PCI controller driver.
 +
-+	if (dma_spec->args_count != 4) {
-+		dev_err(&pdev->dev, "invalid number of dma mux args\n");
-+		return ERR_PTR(-EINVAL);
-+	}
++*) devm_pci_epc_create()/pci_epc_create()
 +
-+	if (dma_spec->args[0] >= dmamux->dmamux_channels) {
-+		dev_err(&pdev->dev, "invalid channel id: %d\n",
-+			dma_spec->args[0]);
-+		return ERR_PTR(-EINVAL);
-+	}
++   The PCI controller driver should implement the following ops:
++	 * write_header: ops to populate configuration space header
++	 * set_bar: ops to configure the BAR
++	 * clear_bar: ops to reset the BAR
++	 * alloc_addr_space: ops to allocate *in* PCI controller address space
++	 * free_addr_space: ops to free the allocated address space
++	 * raise_irq: ops to raise a legacy or MSI interrupt
++	 * start: ops to start the PCI link
++	 * stop: ops to stop the PCI link
 +
-+	if (dma_spec->args[1] > dmamux->dmamux_requests) {
-+		dev_err(&pdev->dev, "invalid mux request number: %d\n",
-+			dma_spec->args[1]);
-+		return ERR_PTR(-EINVAL);
-+	}
++   The PCI controller driver can then create a new EPC device by invoking
++   devm_pci_epc_create/pci_epc_create.
 +
-+	/* The of_node_put() will be done in of_dma_router_xlate function */
-+	dma_spec->np = of_parse_phandle(ofdma->of_node, "dma-masters", 0);
-+	if (!dma_spec->np) {
-+		dev_err(&pdev->dev, "can't get dma master\n");
-+		return ERR_PTR(-EINVAL);
-+	}
++*) devm_pci_epc_destroy()/pci_epc_destroy()
 +
-+	chan_id = dma_spec->args[0];
-+	mux = &dmamux->muxes[chan_id];
-+	mux->chan_id = chan_id;
-+	mux->request = dma_spec->args[1];
++   The PCI controller driver can destroy the EPC device created by either
++   devm_pci_epc_create or pci_epc_create using devm_pci_epc_destroy() or
++   /pci_epc_destroy()
 +
-+	if (mux->busy) {
-+		dev_err(&pdev->dev, "dma channel %d busy with request %d\n",
-+			chan_id, mux->request);
-+		return ERR_PTR(-EBUSY);
-+	}
++*) pci_epc_linkup()
 +
-+	ret = clk_enable(dmamux->clk);
-+	if (ret < 0) {
-+		dev_err(&pdev->dev, "clk_enable failed: %d\n", ret);
-+		return ERR_PTR(ret);
-+	}
++   In order to notify all the function devices that the EPC device to which
++   they are linked has established a link with the host, the PCI controller
++   driver should invoke pci_epc_linkup().
 +
-+	stm32_dmamux_write(dmamux->iomem, STM32_DMAMUX_CCR(mux->chan_id),
-+			   mux->request);
-+	mux->busy = true;
++*) pci_epc_mem_init()
 +
-+	dev_dbg(&pdev->dev, "Mapping dma-router%dchan%d to request%d\n",
-+		pdev->dev.id, mux->chan_id, mux->request);
++   Initialize the pci_epc_mem structure used for allocating EPC addr space.
 +
-+	return mux;
-+}
++*) pci_epc_mem_exit()
 +
-+static int stm32_dmamux_probe(struct platform_device *pdev)
-+{
-+	struct device_node *dma_node, *node = pdev->dev.of_node;
-+	struct stm32_dmamux_data *dmamux;
-+	struct reset_control *rst;
-+	struct resource *res;
-+	int ret;
++   Cleanup the pci_epc_mem structure allocated during pci_epc_mem_init().
 +
-+	if (!node)
-+		return -ENODEV;
++2.1.2 APIs for the PCI Endpoint Function Driver
 +
-+	dmamux = devm_kzalloc(&pdev->dev, sizeof(struct stm32_dmamux_data),
-+			      GFP_KERNEL);
-+	if (!dmamux)
-+		return -ENOMEM;
++This section lists the APIs that the PCI Endpoint core provides to be used
++by the PCI endpoint function driver.
 +
-+	dma_node = of_parse_phandle(node, "dma-masters", 0);
-+	if (!dma_node) {
-+		dev_err(&pdev->dev, "Can't get DMA master node\n");
-+		return -ENODEV;
-+	}
-+	of_node_put(dma_node);
++*) pci_epc_write_header()
 +
-+	ret = of_property_read_u32(node, "dma-channels",
-+				   &dmamux->dmamux_channels);
-+	if (ret)
-+		dmamux->dmamux_channels = STM32_DMAMUX_MAX_CHANNELS;
++   The PCI endpoint function driver should use pci_epc_write_header() to
++   write the standard configuration header to the endpoint controller.
 +
-+	ret = of_property_read_u32(node, "dma-requests",
-+				   &dmamux->dmamux_requests);
-+	if (ret)
-+		dmamux->dmamux_requests = STM32_DMAMUX_MAX_REQUESTS;
++*) pci_epc_set_bar()
 +
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (!res)
-+		return -ENODEV;
++   The PCI endpoint function driver should use pci_epc_set_bar() to configure
++   the Base Address Register in order for the host to assign PCI addr space.
++   Register space of the function driver is usually configured
++   using this API.
 +
-+	dmamux->iomem = devm_ioremap_resource(&pdev->dev, res);
-+	if (!dmamux->iomem)
-+		return -ENOMEM;
++*) pci_epc_clear_bar()
 +
-+	dmamux->clk = devm_clk_get(&pdev->dev, NULL);
-+	if (IS_ERR(dmamux->clk)) {
-+		dev_err(&pdev->dev, "Missing controller clock\n");
-+		return PTR_ERR(dmamux->clk);
-+	}
-+	ret = clk_prepare(dmamux->clk);
-+	if (ret < 0) {
-+		dev_err(&pdev->dev, "clk_prep failed: %d\n", ret);
-+		return ret;
-+	}
++   The PCI endpoint function driver should use pci_epc_clear_bar() to reset
++   the BAR.
 +
-+	dmamux->muxes = devm_kcalloc(&pdev->dev, dmamux->dmamux_channels,
-+				     sizeof(struct stm32_dmamux),
-+				     GFP_KERNEL);
-+	if (!dmamux->muxes)
-+		return -ENOMEM;
++*) pci_epc_raise_irq()
 +
-+	rst = devm_reset_control_get(&pdev->dev, NULL);
-+	if (!IS_ERR(rst)) {
-+		ret = clk_enable(dmamux->clk);
-+		if (ret < 0) {
-+			dev_err(&pdev->dev, "clk_enable failed: %d\n", ret);
-+			return ret;
-+		}
-+		reset_control_assert(rst);
-+		udelay(2);
-+		reset_control_deassert(rst);
-+		clk_disable(dmamux->clk);
-+	}
++   The PCI endpoint function driver should use pci_epc_raise_irq() to raise
++   Legacy Interrupt or MSI Interrupt.
 +
-+	dmamux->dmarouter.dev = &pdev->dev;
-+	dmamux->dmarouter.route_free = stm32_dmamux_free;
-+	platform_set_drvdata(pdev, dmamux);
++*) pci_epc_mem_alloc_addr()
 +
-+	ret = of_dma_router_register(node, stm32_dmamux_route_allocate,
-+				     &dmamux->dmarouter);
-+	if (ret < 0) {
-+		dev_err(&pdev->dev,
-+			"STM32 DMAMUX DMA OF registration failed %d\n", ret);
-+		return ret;
-+	}
++   The PCI endpoint function driver should use pci_epc_mem_alloc_addr(), to
++   allocate memory address from EPC addr space which is required to access
++   RC's buffer
 +
-+	dev_info(&pdev->dev, "STM32 DMAMUX driver registered\n");
++*) pci_epc_mem_free_addr()
 +
-+	return 0;
-+}
++   The PCI endpoint function driver should use pci_epc_mem_free_addr() to
++   free the memory space allocated using pci_epc_mem_alloc_addr().
 +
-+static const struct of_device_id stm32_dmamux_match[] = {
-+	{ .compatible = "st,stm32-dmamux" },
-+	{},
-+};
++2.1.3 Other APIs
 +
-+static struct platform_driver stm32_dmamux_driver = {
-+	.probe	= stm32_dmamux_probe,
-+	.driver = {
-+		.name = "stm32-dmamux",
-+		.of_match_table = stm32_dmamux_match,
-+	},
-+};
++There are other APIs provided by the EPC library. These are used for binding
++the epf device with epc device. pci-ep-cfs.c can be used as reference for
++using these APIs.
 +
-+static int __init stm32_dmamux_init(void)
-+{
-+	return platform_driver_register(&stm32_dmamux_driver);
-+}
-+arch_initcall(stm32_dmamux_init);
++*) pci_epc_get()
++
++   Get a reference to the pci endpoint controller based on the device name of
++   the controller.
++
++*) pci_epc_put()
++
++   Release the reference to the pci endpoint controller obtained using
++   pci_epc_get()
++
++*) pci_epc_add_epf()
++
++   Add a pci endpoint function to a pci endpoint controller. A pcie device
++   can have upto 8 functions according to the specification.
++
++*) pci_epc_remove_epf()
++
++   Remove the pci endpoint function from pci endpoint controller.
++
++*) pci_epc_start()
++
++   The PCI endpoint function driver should invoke pci_epc_start() once it
++   has configured the endpoint function and wants to start the PCI link.
++
++*) pci_epc_stop()
++
++   The PCI endpoint function driver should invoke pci_epc_stop() to stop
++   the PCI LINK.
++
++2.2 PCI Endpoint Function(EPF) Library
++
++The EPF library provides APIs to be used by the function driver and the EPC
++library in order to provide endpoint mode functionality.
++
++2.2.1 APIs for the PCI Endpoint Function Driver
++
++This section lists the APIs that the PCI Endpoint core provides to be used
++by the PCI endpoint function driver.
++
++*) pci_epf_register_driver()
++
++   The PCI Endpoint Function driver should implement the following ops:
++	 * bind: ops to perform when a EPC device has been bound to EPF device
++	 * unbind: ops to perform when a binding has been lost between a EPC
++	   device and EPF device
++	 * linkup: ops to perform when the EPC device has established a
++	   connection with a host system
++
++  The PCI Function driver can then register the PCI EPF driver by using
++  pci_epf_register_driver().
++
++*) pci_epf_unregister_driver()
++
++  The PCI Function driver can unregister the PCI EPF driver by using
++  pci_epf_unregister_driver().
++
++*) pci_epf_alloc_space()
++
++  The PCI Function driver can allocate space for a particular BAR using
++  pci_epf_alloc_space().
++
++*) pci_epf_free_space()
++
++  The PCI Function driver can free the allocated space
++  (using pci_epf_alloc_space) by invoking pci_epf_free_space().
++
++2.2.2 APIs for the PCI Endpoint Controller Library
++This section lists the APIs that the PCI Endpoint core provides to be used
++by the PCI endpoint controller library.
++
++*) pci_epf_linkup()
++
++   The PCI endpoint controller library invokes pci_epf_linkup() when the
++   EPC device has established the connection to the host.
++
++2.2.2 Other APIs
++There are other APIs provided by the EPF library. These are used to notify
++the function driver when the EPF device is bound to the EPC device.
++pci-ep-cfs.c can be used as reference for using these APIs.
++
++*) pci_epf_create()
++
++   Create a new PCI EPF device by passing the name of the PCI EPF device.
++   This name will be used to bind the the EPF device to a EPF driver.
++
++*) pci_epf_destroy()
++
++   Destroy the created PCI EPF device.
++
++*) pci_epf_bind()
++
++   pci_epf_bind() should be invoked when the EPF device has been bound to
++   a EPC device.
++
++*) pci_epf_unbind()
++
++   pci_epf_unbind() should be invoked when the binding between EPC device
++   and EPF device is lost.
 -- 
-1.9.1
+2.11.0
