@@ -1,109 +1,38 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Mon, 13 Mar 2017 19:52:50 +0530
-Subject: [PATCH v4 14/23] PCI: dwc: dra7xx: Workaround for errata id i870
+Date: Mon, 13 Mar 2017 19:52:58 +0530
+Subject: [PATCH v4 22/23] MAINTAINERS: add PCI EP maintainer
 In-Reply-To: <20170313142259.25397-1-kishon@ti.com>
 References: <20170313142259.25397-1-kishon@ti.com>
-Message-ID: <20170313142259.25397-15-kishon@ti.com>
+Message-ID: <20170313142259.25397-23-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to errata i870, access to the PCIe slave port
-that are not 32-bit aligned will result in incorrect mapping
-to TLP Address and Byte enable fields.
-
-Accessing non 32-bit aligned data causes incorrect data in the target
-buffer if memcpy is used. Implement the workaround for this
-errata here.
+Add maintainer for the newly introduced PCI EP framework.
 
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- drivers/pci/dwc/pci-dra7xx.c | 53 ++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 53 insertions(+)
+ MAINTAINERS | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/drivers/pci/dwc/pci-dra7xx.c b/drivers/pci/dwc/pci-dra7xx.c
-index 35c18534469c..147d37a7fe58 100644
---- a/drivers/pci/dwc/pci-dra7xx.c
-+++ b/drivers/pci/dwc/pci-dra7xx.c
-@@ -26,6 +26,8 @@
- #include <linux/pm_runtime.h>
- #include <linux/resource.h>
- #include <linux/types.h>
-+#include <linux/mfd/syscon.h>
-+#include <linux/regmap.h>
+diff --git a/MAINTAINERS b/MAINTAINERS
+index c265a5fe4848..3c1b947811e2 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -9581,6 +9581,15 @@ F:	include/linux/pci*
+ F:	arch/x86/pci/
+ F:	arch/x86/kernel/quirks.c
  
- #include "pcie-designware.h"
- 
-@@ -528,6 +530,51 @@ static const struct of_device_id of_dra7xx_pcie_match[] = {
- 	{},
- };
- 
-+/*
-+ * dra7xx_pcie_ep_unaligned_memaccess: workaround for AM572x/AM571x Errata i870
-+ * @dra7xx: the dra7xx device where the workaround should be applied
-+ *
-+ * Access to the PCIe slave port that are not 32-bit aligned will result
-+ * in incorrect mapping to TLP Address and Byte enable fields. Therefore,
-+ * byte and half-word accesses are not possible to byte offset 0x1, 0x2, or
-+ * 0x3.
-+ *
-+ * To avoid this issue set PCIE_SS1_AXI2OCP_LEGACY_MODE_ENABLE to 1.
-+ */
-+static int dra7xx_pcie_ep_unaligned_memaccess(struct device *dev)
-+{
-+	int ret;
-+	struct device_node *np = dev->of_node;
-+	struct regmap *regmap;
-+	unsigned int reg;
-+	unsigned int field;
++PCI EP SUBSYSTEM
++M:	Kishon Vijay Abraham I <kishon@ti.com>
++L:	linux-pci at vger.kernel.org
++T:	git git://git.kernel.org/pub/scm/linux/kernel/git/kishon/pci-endpoint.git
++S:	Supported
++F:	drivers/pci/endpoint/
++F:	drivers/misc/pci_endpoint_test.c
++F:	tools/pci/
 +
-+	regmap = syscon_regmap_lookup_by_phandle(np,
-+						 "ti,syscon-unaligned-access");
-+	if (IS_ERR(regmap)) {
-+		dev_dbg(dev, "can't get ti,syscon-unaligned-access\n");
-+		return -EINVAL;
-+	}
-+
-+	if (of_property_read_u32_index(np, "ti,syscon-unaligned-access", 1,
-+				       &reg)) {
-+		dev_err(dev, "couldn't get legacy mode register offset\n");
-+		return -EINVAL;
-+	}
-+
-+	if (of_property_read_u32_index(np, "ti,syscon-unaligned-access", 2,
-+				       &field)) {
-+		dev_err(dev, "can't get bit field for setting legacy mode\n");
-+		return -EINVAL;
-+	}
-+
-+	ret = regmap_update_bits(regmap, reg, field, field);
-+	if (ret)
-+		dev_err(dev, "failed to enable unaligned access\n");
-+
-+	return ret;
-+}
-+
- static int __init dra7xx_pcie_probe(struct platform_device *pdev)
- {
- 	u32 reg;
-@@ -637,6 +684,7 @@ static int __init dra7xx_pcie_probe(struct platform_device *pdev)
- 	case DW_PCIE_RC_TYPE:
- 		dra7xx_pcie_writel(dra7xx, PCIECTRL_TI_CONF_DEVICE_TYPE,
- 				   DEVICE_TYPE_RC);
-+
- 		ret = dra7xx_add_pcie_port(dra7xx, pdev);
- 		if (ret < 0)
- 			goto err_gpio;
-@@ -644,6 +692,11 @@ static int __init dra7xx_pcie_probe(struct platform_device *pdev)
- 	case DW_PCIE_EP_TYPE:
- 		dra7xx_pcie_writel(dra7xx, PCIECTRL_TI_CONF_DEVICE_TYPE,
- 				   DEVICE_TYPE_EP);
-+
-+		ret = dra7xx_pcie_ep_unaligned_memaccess(dev);
-+		if (ret)
-+			goto err_gpio;
-+
- 		ret = dra7xx_add_pcie_ep(dra7xx, pdev);
- 		if (ret < 0)
- 			goto err_gpio;
+ PCI DRIVER FOR ALTERA PCIE IP
+ M:	Ley Foon Tan <lftan@altera.com>
+ L:	rfi at lists.rocketboards.org (moderated for non-subscribers)
 -- 
 2.11.0
