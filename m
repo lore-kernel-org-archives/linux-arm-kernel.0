@@ -1,70 +1,166 @@
-From: sakari.ailus@iki.fi (Sakari Ailus)
-Date: Mon, 13 Mar 2017 22:56:46 +0200
-Subject: [PATCH v4 29/36] media: imx: mipi-csi2: enable setting and
- getting of frame rates
-In-Reply-To: <20170313132701.GJ21222@n2100.armlinux.org.uk>
-References: <1487211578-11360-1-git-send-email-steve_longerbeam@mentor.com>
- <1487211578-11360-30-git-send-email-steve_longerbeam@mentor.com>
- <20170220220409.GX16975@valkosipuli.retiisi.org.uk>
- <20170221001332.GS21222@n2100.armlinux.org.uk>
- <25596b21-70de-5e46-f149-f9ce3a86ecb7@gmail.com>
- <1487667023.2331.8.camel@pengutronix.de>
- <20170313131647.GB10701@valkosipuli.retiisi.org.uk>
- <20170313132701.GJ21222@n2100.armlinux.org.uk>
-Message-ID: <20170313205646.GC10701@valkosipuli.retiisi.org.uk>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Mon, 13 Mar 2017 20:58:06 +0000
+Subject: [PATCH v2 07/11] iio: adc: sun4i-gpadc-iio: move code used in MFD
+ probing to new function
+In-Reply-To: <20170310103921.19469-8-quentin.schulz@free-electrons.com>
+References: <20170310103921.19469-1-quentin.schulz@free-electrons.com>
+ <20170310103921.19469-8-quentin.schulz@free-electrons.com>
+Message-ID: <4d3b0b84-446a-721c-9767-5eb151a05d4d@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
-
-On Mon, Mar 13, 2017 at 01:27:02PM +0000, Russell King - ARM Linux wrote:
-> On Mon, Mar 13, 2017 at 03:16:48PM +0200, Sakari Ailus wrote:
-> > The vast majority of existing drivers do not implement them nor the user
-> > space expects having to set them. Making that mandatory would break existing
-> > user space.
-> > 
-> > In addition, that does not belong to link validation either: link validation
-> > should only include static properties of the link that are required for
-> > correct hardware operation. Frame rate is not such property: hardware that
-> > supports the MC interface generally does not recognise such concept (with
-> > the exception of some sensors). Additionally, it is dynamic: the frame rate
-> > can change during streaming, making its validation at streamon time useless.
+On 10/03/17 10:39, Quentin Schulz wrote:
+> This moves code used in MFD probing to a new sun4i_gpadc_probe_mfd
+> function.
 > 
-> So how do we configure the CSI, which can do frame skipping?
+> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+Looks sane to me - though a hint on why in the explanation wouldn't go
+amiss!
+
+We'll have to figure out the path for this series at somepoint.
+In meantime
+
+Acked-by: Jonathan Cameron <jic23@kernel.org>
+> ---
 > 
-> With what you're proposing, it means it's possible to configure the
-> camera sensor source pad to do 50fps.  Configure the CSI sink pad to
-> an arbitary value, such as 30fps, and configure the CSI source pad to
-> 15fps.
+> added in v2
 > 
-> What you actually get out of the CSI is 25fps, which bears very little
-> with the actual values used on the CSI source pad.
+>  drivers/iio/adc/sun4i-gpadc-iio.c | 78 ++++++++++++++++++++++-----------------
+>  1 file changed, 45 insertions(+), 33 deletions(-)
 > 
-> You could say "CSI should ask the camera sensor" - well, that's fine
-> if it's immediately downstream, but otherwise we'd need to go walking
-> down the graph to find something that resembles its source - there may
-> be mux and CSI2 interface subdev blocks in that path.  Or we just accept
-> that frame rates are completely arbitary and bear no useful meaning what
-> so ever.
-
-The user is responsible for configuring the pipeline. It is thus not
-unreasonable to as the user to configure the frame rate as well if there are
-device in the pipeline that can affect the frame rate. The way I proposed to
-implement it is compliant with the existing API and entirely deterministic,
-contrary to what you're saying.
-
-It's not the job of the CSI sub-device to figure it out.
-
-S_PARM and G_PARM function as interface on the V4L2 API to access the frame
-rate on plain V4L2 devices. The i.MX6 IPU is not a plain V4L2 device.
-Essentially the V4L2 device node you have there is an interface to a rather
-plain DMA engine, no more.
-
-There have been plans to add device profiles to the documentation but that
-work has not yet been done.
-
--- 
-Regards,
-
-Sakari Ailus
-e-mail: sakari.ailus at iki.fi	XMPP: sailus at retiisi.org.uk
+> diff --git a/drivers/iio/adc/sun4i-gpadc-iio.c b/drivers/iio/adc/sun4i-gpadc-iio.c
+> index a8e134f..7cb997a 100644
+> --- a/drivers/iio/adc/sun4i-gpadc-iio.c
+> +++ b/drivers/iio/adc/sun4i-gpadc-iio.c
+> @@ -454,31 +454,16 @@ static int sun4i_irq_init(struct platform_device *pdev, const char *name,
+>  	return 0;
+>  }
+>  
+> -static int sun4i_gpadc_probe(struct platform_device *pdev)
+> +static int sun4i_gpadc_probe_mfd(struct platform_device *pdev,
+> +				 struct iio_dev *indio_dev)
+>  {
+> -	struct sun4i_gpadc_iio *info;
+> -	struct iio_dev *indio_dev;
+> +	struct sun4i_gpadc_iio *info = iio_priv(indio_dev);
+> +	struct sun4i_gpadc_dev *sun4i_gpadc_dev =
+> +		dev_get_drvdata(pdev->dev.parent);
+>  	int ret;
+> -	struct sun4i_gpadc_dev *sun4i_gpadc_dev;
+> -
+> -	sun4i_gpadc_dev = dev_get_drvdata(pdev->dev.parent);
+> -
+> -	indio_dev = devm_iio_device_alloc(&pdev->dev, sizeof(*info));
+> -	if (!indio_dev)
+> -		return -ENOMEM;
+>  
+> -	info = iio_priv(indio_dev);
+> -	platform_set_drvdata(pdev, indio_dev);
+> -
+> -	mutex_init(&info->mutex);
+>  	info->regmap = sun4i_gpadc_dev->regmap;
+> -	info->indio_dev = indio_dev;
+> -	init_completion(&info->completion);
+> -	indio_dev->name = dev_name(&pdev->dev);
+> -	indio_dev->dev.parent = &pdev->dev;
+> -	indio_dev->dev.of_node = pdev->dev.of_node;
+> -	indio_dev->info = &sun4i_gpadc_iio_info;
+> -	indio_dev->modes = INDIO_DIRECT_MODE;
+> +
+>  	indio_dev->num_channels = ARRAY_SIZE(sun4i_gpadc_channels);
+>  	indio_dev->channels = sun4i_gpadc_channels;
+>  
+> @@ -519,8 +504,7 @@ static int sun4i_gpadc_probe(struct platform_device *pdev)
+>  			dev_err(&pdev->dev,
+>  				"could not register thermal sensor: %ld\n",
+>  				PTR_ERR(tzd));
+> -			ret = PTR_ERR(tzd);
+> -			goto err;
+> +			return PTR_ERR(tzd);
+>  		}
+>  	} else {
+>  		indio_dev->num_channels =
+> @@ -528,36 +512,65 @@ static int sun4i_gpadc_probe(struct platform_device *pdev)
+>  		indio_dev->channels = sun4i_gpadc_channels_no_temp;
+>  	}
+>  
+> -	pm_runtime_set_autosuspend_delay(&pdev->dev,
+> -					 SUN4I_GPADC_AUTOSUSPEND_DELAY);
+> -	pm_runtime_use_autosuspend(&pdev->dev);
+> -	pm_runtime_set_suspended(&pdev->dev);
+> -	pm_runtime_enable(&pdev->dev);
+> -
+>  	if (IS_ENABLED(CONFIG_THERMAL_OF)) {
+>  		ret = sun4i_irq_init(pdev, "TEMP_DATA_PENDING",
+>  				     sun4i_gpadc_temp_data_irq_handler,
+>  				     "temp_data", &info->temp_data_irq,
+>  				     &info->ignore_temp_data_irq);
+>  		if (ret < 0)
+> -			goto err;
+> +			return ret;
+>  	}
+>  
+>  	ret = sun4i_irq_init(pdev, "FIFO_DATA_PENDING",
+>  			     sun4i_gpadc_fifo_data_irq_handler, "fifo_data",
+>  			     &info->fifo_data_irq, &info->ignore_fifo_data_irq);
+>  	if (ret < 0)
+> -		goto err;
+> +		return ret;
+>  
+>  	if (IS_ENABLED(CONFIG_THERMAL_OF)) {
+>  		ret = iio_map_array_register(indio_dev, sun4i_gpadc_hwmon_maps);
+>  		if (ret < 0) {
+>  			dev_err(&pdev->dev,
+>  				"failed to register iio map array\n");
+> -			goto err;
+> +			return ret;
+>  		}
+>  	}
+>  
+> +	return 0;
+> +}
+> +
+> +static int sun4i_gpadc_probe(struct platform_device *pdev)
+> +{
+> +	struct sun4i_gpadc_iio *info;
+> +	struct iio_dev *indio_dev;
+> +	int ret;
+> +
+> +	indio_dev = devm_iio_device_alloc(&pdev->dev, sizeof(*info));
+> +	if (!indio_dev)
+> +		return -ENOMEM;
+> +
+> +	info = iio_priv(indio_dev);
+> +	platform_set_drvdata(pdev, indio_dev);
+> +
+> +	mutex_init(&info->mutex);
+> +	info->indio_dev = indio_dev;
+> +	init_completion(&info->completion);
+> +	indio_dev->name = dev_name(&pdev->dev);
+> +	indio_dev->dev.parent = &pdev->dev;
+> +	indio_dev->dev.of_node = pdev->dev.of_node;
+> +	indio_dev->info = &sun4i_gpadc_iio_info;
+> +	indio_dev->modes = INDIO_DIRECT_MODE;
+> +
+> +	ret = sun4i_gpadc_probe_mfd(pdev, indio_dev);
+> +	if (ret)
+> +		return ret;
+> +
+> +	pm_runtime_set_autosuspend_delay(&pdev->dev,
+> +					 SUN4I_GPADC_AUTOSUSPEND_DELAY);
+> +	pm_runtime_use_autosuspend(&pdev->dev);
+> +	pm_runtime_set_suspended(&pdev->dev);
+> +	pm_runtime_enable(&pdev->dev);
+> +
+>  	ret = devm_iio_device_register(&pdev->dev, indio_dev);
+>  	if (ret < 0) {
+>  		dev_err(&pdev->dev, "could not register the device\n");
+> @@ -570,7 +583,6 @@ static int sun4i_gpadc_probe(struct platform_device *pdev)
+>  	if (IS_ENABLED(CONFIG_THERMAL_OF))
+>  		iio_map_array_unregister(indio_dev);
+>  
+> -err:
+>  	pm_runtime_put(&pdev->dev);
+>  	pm_runtime_disable(&pdev->dev);
+>  
+> 
