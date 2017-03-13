@@ -1,53 +1,169 @@
-From: mayurkumar.patel@intel.com (Patel, Mayurkumar)
-Date: Mon, 13 Mar 2017 08:49:30 +0000
-Subject: [PATCH V3] PCI/ASPM: reconfigure ASPM following hotplug for
- POLICY_DEFAULT
-In-Reply-To: <ec7ee607-60f3-7e1a-b1cd-8e4534ab98eb@codeaurora.org>
-References: <1489005551-23598-1-git-send-email-okaya@codeaurora.org>
- <20170309222751.GD19517@bhelgaas-glaptop.roam.corp.google.com>
- <ec7ee607-60f3-7e1a-b1cd-8e4534ab98eb@codeaurora.org>
-Message-ID: <92EBB4272BF81E4089A7126EC1E7B28466670D75@IRSMSX101.ger.corp.intel.com>
+From: j-keerthy@ti.com (Keerthy)
+Date: Mon, 13 Mar 2017 14:31:42 +0530
+Subject: [PATCH RFC 2/3] thermal: dove: convert to a thermal OF sensor
+ device
+In-Reply-To: <20170313082109.GY21222@n2100.armlinux.org.uk>
+References: <E1cn8qH-0002v6-SE@rmk-PC.armlinux.org.uk>
+ <08ea53ed-d7be-2206-57f4-65c06d5e4a40@ti.com>
+ <20170313082109.GY21222@n2100.armlinux.org.uk>
+Message-ID: <c22ff77f-57f3-93cd-acb9-2bad21a82d67@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
->
->Hi Bjorn,
->
->On 3/9/2017 5:27 PM, Bjorn Helgaas wrote:
->> How hard do you think it would be to rework this path slightly so we:
->>
->>   - call pcie_aspm_init_link_state() for every device, maybe from
->>     pci_init_capabilities()
->>
->>   - for bridges, have pcie_aspm_init_link_state() allocate a
->>     link_state, regardless of whether it currently has any children,
->>     and save the ASPM settings done by firmware
->>
->>   - for endpoints, have pcie_aspm_init_link_state() do the actual ASPM
->>     setup of the link as it currently does
->>
->>   - for endpoints, change pcie_aspm_exit_link_state() so it cleans up
->>     the device's own state and disables ASPM if necessary, but doesn't
->>     remove the parent's link_state
->>
->>   - for bridges, change pcie_aspm_exit_link_state() so it frees the
->>     bridge's own link_state
->
->Thanks for the feedback, Let me take a stab at this.
->Sinan
 
-Thanks Bjorn and Sinan. I will wait for new patch-sets from Sinan.
+On Monday 13 March 2017 01:51 PM, Russell King - ARM Linux wrote:
+> On Mon, Mar 13, 2017 at 10:57:20AM +0530, Keerthy wrote:
+>>
+>>
+>> On Monday 13 March 2017 12:37 AM, Russell King wrote:
+>>> Convert the dove thermal infrastructure to an OF sensor device, and add
+>>> the thermal zones for the SoC, with a critical trip point of 120?C.
+>>> This allows us to specify thermal zones and couple them to cooling
+>>> devices in DT.
+>>>
+>>> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+>>> ---
+>>> arch/arm/boot/dts/dove.dtsi    | 17 +++++++++++++++++
+>>> drivers/thermal/dove_thermal.c | 33 +++++++++++++++++++++++++--------
+>>> 2 files changed, 42 insertions(+), 8 deletions(-)
+>>>
+>>> diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
+>>> index 698d58cea20d..40fb98687230 100644
+>>> --- a/arch/arm/boot/dts/dove.dtsi
+>>> +++ b/arch/arm/boot/dts/dove.dtsi
+>>> @@ -455,6 +455,7 @@
+>>> 				};
+>>>
+>>> 				thermal: thermal-diode at 001c {
+>>> +					#thermal-sensor-cells = <0>;
+>>> 					compatible = "marvell,dove-thermal";
+>>> 					reg = <0x001c 0x0c>, <0x005c 0x08>;
+>>> 				};
+>>> @@ -800,4 +801,20 @@
+>>> 			};
+>>> 		};
+>>> 	};
+>>> +
+>>> +	thermal-zones {
+>>> +		soc-thermal {
+>>> +			polling-delay-passive = <250>; /* ms */
+>>> +			polling-delay = <1000>; /* ms */
+>>> +			thermal-sensors = <&thermal>;
+>>> +
+>>> +			soc_trips: trips {
+>>> +				soc_trip_crit: soc-crit {
+>>> +					temperature = <120000>; /* ?mC */
+>>> +					hysteresis = <2000>; /* ?mC */
+>>> +					type = "critical";
+>>> +				};
+>>> +			};
+>>> +		};
+>>> +	};
+>>> };
+>>> diff --git a/drivers/thermal/dove_thermal.c b/drivers/thermal/dove_thermal.c
+>>> index a0bc9de42553..51b1a9e78576 100644
+>>> --- a/drivers/thermal/dove_thermal.c
+>>> +++ b/drivers/thermal/dove_thermal.c
+>>> @@ -46,6 +46,7 @@
+>>> struct dove_thermal_priv {
+>>> 	void __iomem *sensor;
+>>> 	void __iomem *control;
+>>> +	struct device *dev;
+>>> };
+>>>
+>>> static int dove_init_sensor(const struct dove_thermal_priv *priv)
+>>> @@ -92,17 +93,15 @@ static int dove_init_sensor(const struct dove_thermal_priv *priv)
+>>> 	return 0;
+>>> }
+>>>
+>>> -static int dove_get_temp(struct thermal_zone_device *thermal,
+>>> -			  int *temp)
+>>> +static int dove_of_get_temp(void *data, int *temp)
+>>> {
+>>> +	struct dove_thermal_priv *priv = data;
+>>> 	unsigned long reg;
+>>> -	struct dove_thermal_priv *priv = thermal->devdata;
+>>>
+>>> 	/* Valid check */
+>>> 	reg = readl_relaxed(priv->control + PMU_TEMP_DIOD_CTRL1_REG);
+>>> 	if ((reg & PMU_TDC1_TEMP_VALID_MASK) == 0x0) {
+>>> -		dev_err(&thermal->device,
+>>> -			"Temperature sensor reading not valid\n");
+>>> +		dev_err(priv->dev, "Temperature sensor reading not valid\n");
+>>> 		return -EIO;
+>>> 	}
+>>>
+>>> @@ -118,10 +117,22 @@ static int dove_get_temp(struct thermal_zone_device *thermal,
+>>> 	return 0;
+>>> }
+>>>
+>>> +static int dove_get_temp(struct thermal_zone_device *thermal,
+>>> +			  int *temp)
+>>> +{
+>>> +	struct dove_thermal_priv *priv = thermal->devdata;
+>>> +
+>>> +	return dove_of_get_temp(priv, temp);
+>>> +}
+>>> +
+>>> static struct thermal_zone_device_ops ops = {
+>>> 	.get_temp = dove_get_temp,
+>>> };
+>>>
+>>> +static const struct thermal_zone_of_device_ops of_ops = {
+>>> +	.get_temp = dove_of_get_temp,
+>>> +};
+>>> +
+>>> static const struct of_device_id dove_thermal_id_table[] = {
+>>> 	{ .compatible = "marvell,dove-thermal" },
+>>> 	{}
+>>> @@ -138,6 +149,8 @@ static int dove_thermal_probe(struct platform_device *pdev)
+>>> 	if (!priv)
+>>> 		return -ENOMEM;
+>>>
+>>> +	priv->dev = &pdev->dev;
+>>> +
+>>> 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>>> 	priv->sensor = devm_ioremap_resource(&pdev->dev, res);
+>>> 	if (IS_ERR(priv->sensor))
+>>> @@ -154,8 +167,11 @@ static int dove_thermal_probe(struct platform_device *pdev)
+>>> 		return ret;
+>>> 	}
+>>>
+>>> -	thermal = thermal_zone_device_register("dove_thermal", 0, 0,
+>>> -					       priv, &ops, NULL, 0, 0);
+>>> +	thermal = devm_thermal_zone_of_sensor_register(&pdev->dev, 0,
+>>> +						       priv, &of_ops);
+>>> +	if (IS_ERR(thermal))
+>>> +		thermal = thermal_zone_device_register("dove_thermal", 0, 0,
+>>> +						       priv, &ops, NULL, 0, 0);
+>>> 	if (IS_ERR(thermal)) {
+>>> 		dev_err(&pdev->dev,
+>>> 			"Failed to register thermal zone device\n");
+>>> @@ -172,7 +188,8 @@ static int dove_thermal_exit(struct platform_device *pdev)
+>>> 	struct thermal_zone_device *dove_thermal =
+>>> 		platform_get_drvdata(pdev);
+>>>
+>>> -	thermal_zone_device_unregister(dove_thermal);
+>>> +	if (!pdev->dev.of_node)
+>>> +		thermal_zone_device_unregister(dove_thermal);
+>>
+>> Russell,
+>>
+>> Now that thermal-zones is defined in dove.dtsi do you see any need to call
+>> thermal_zone_device_register? Is there a case where in
+>> devm_thermal_zone_of_sensor_register is known to fail?
+>>
+>> If not then we can even get rid of ops, dove_get_temp function.
+>
+> That's there because I also boot non-DT from time to time, and having
+> the thermal driver still register means that I don't have to carry the
+> older hwmon implementation of the same around.  However, it can probably
+> be dropped for mainline at the expense of an additional small patch
+> carried locally.
+
+Okay. If there is still a non-DT case then it makes sense to keep it the 
+way it is now and may be add that point in the commit log that there is 
+fall back mechanism in place for non-DT.
 
 >
->--
->Sinan Kaya
->Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
->Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
-Intel Deutschland GmbH
-Registered Address: Am Campeon 10-12, 85579 Neubiberg, Germany
-Tel: +49 89 99 8853-0, www.intel.de
-Managing Directors: Christin Eisenschmid, Christian Lamprechter
-Chairperson of the Supervisory Board: Nicole Lau
-Registered Office: Munich
-Commercial Register: Amtsgericht Muenchen HRB 186928
