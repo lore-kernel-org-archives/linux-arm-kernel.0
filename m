@@ -1,67 +1,55 @@
-From: nicolas.ferre@microchip.com (Nicolas Ferre)
-Date: Mon, 13 Mar 2017 18:14:50 +0100
-Subject: [PATCH] ARM: at91: pm: cpu_idle: switch DDR to power-down mode
-Message-ID: <20170313171450.18681-1-nicolas.ferre@microchip.com>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Mon, 13 Mar 2017 18:38:32 +0100
+Subject: [PATCH v3 01/19] KVM: arm/arm64: Add vITS save/restore API
+ documentation
+In-Reply-To: <6f86ec3f-6b9e-34ba-628a-c2ef7b8c3529@redhat.com>
+References: <1488800074-21991-1-git-send-email-eric.auger@redhat.com>
+ <1488800074-21991-2-git-send-email-eric.auger@redhat.com>
+ <CAFEAcA_hobSQZvOQHGgdoJYw9q099GNrY=5ffjYO5YeePtKdNA@mail.gmail.com>
+ <6f86ec3f-6b9e-34ba-628a-c2ef7b8c3529@redhat.com>
+Message-ID: <CAFEAcA_VqJQ-BFQPpdnK07x6B=cN-HcPY7pBr7=J5UGXm4iSnQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On some DDR controllers, compatible with the sama5d3 one,
-the sequence to enter/exit/re-enter the self-refresh mode adds
-more constrains than what is currently written in the at91_idle
-driver. An actual access to the DDR chip is needed between exit
-and re-enter of this mode which is somehow difficult to implement.
-This sequence can completely hang the SoC. It is particularly
-experienced on parts which embed a L2 cache if the code run
-between IDLE calls fits in it...
+On 13 March 2017 at 15:42, Auger Eric <eric.auger@redhat.com> wrote:
+> On 13/03/2017 14:08, Peter Maydell wrote:
+>> These CTE/ITE/DTE formats don't seem to have any kind of
+>> "escape hatch" for allowing backwards compatible extensions
+>> to the format. Do we need one? (I think that's particularly
+>> likely to be useful where there's an ITS feature we don't
+>> currently implement but might perhaps want to in future,
+>> like GICv4 virtual interrupt injection.)
+>
+> Maybe we could rely on the ITS registers (that must be restored before
+> the tables) to get any info about the format used to encode the table
+> entries. We have GITS_CTLR[1] that can help discriminate between GICv3/
+> GICv4. GITS_BASER.Entry_size can be 8B for current implementation and
+> 16B for an enhanced implementation. CTE[52:62] can be used to encode a
+> format version.
 
-Moreover, as the intention is to enter and exit pretty rapidly
-from IDLE, the power-down mode is a good candidate.
+Using the registers seems like a good idea, though I
+don't know about the specific fields. The most obvious
+place to keep something like this would be GITS_IIDR.Revision
+I suppose. Using the "size of the table entry" fields would
+work too.
 
-So now we use power-down instead of self-refresh. As we can
-simplify the funciton for sama5d3 compatible DDR controllers,
-we instanciate a new sama5d3_ddr_standby() function.
+If we have to make all these tables double the size if
+we move to 16b/entry in future, is that a significant
+increase in memory used, or a don't-really-care increase?
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@microchip.com>
----
- arch/arm/mach-at91/pm.c | 19 ++++++++++++++++++-
- 1 file changed, 18 insertions(+), 1 deletion(-)
+I guess what we should do is:
+ * identify obviously imminently upcoming features (like
+   GICv4 support, wider physaddrs) and make sure the format
+   supports them
+   [let's say, anything we think we're definitely likely
+   to be adding in the next 12 months]
+ * decide on our 'escape hatch' plan for anything
+   more vague
+ * test that we do correctly fail migration for an
+   incoming ITS state that asks for an unsupported Revision
+ * document how the 'escape hatch' is intended to work
+   so we don't then invent a different approach in the
+   future :-)
 
-diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
-index 3d89b7905bd9..63e7df8ec815 100644
---- a/arch/arm/mach-at91/pm.c
-+++ b/arch/arm/mach-at91/pm.c
-@@ -289,6 +289,23 @@ static void at91_ddr_standby(void)
- 		at91_ramc_write(1, AT91_DDRSDRC_LPR, saved_lpr1);
- }
- 
-+static void sama5d3_ddr_standby(void)
-+{
-+	u32 lpr0;
-+	u32 saved_lpr0;
-+
-+	saved_lpr0 = at91_ramc_read(0, AT91_DDRSDRC_LPR);
-+	lpr0 = saved_lpr0 & ~AT91_DDRSDRC_LPCB;
-+	lpr0 |= AT91_DDRSDRC_LPCB_POWER_DOWN;
-+
-+	/* self-refresh mode now */
-+	at91_ramc_write(0, AT91_DDRSDRC_LPR, lpr0);
-+
-+	cpu_do_idle();
-+
-+	at91_ramc_write(0, AT91_DDRSDRC_LPR, saved_lpr0);
-+}
-+
- /* We manage both DDRAM/SDRAM controllers, we need more than one value to
-  * remember.
-  */
-@@ -323,7 +340,7 @@ static const struct of_device_id const ramc_ids[] __initconst = {
- 	{ .compatible = "atmel,at91rm9200-sdramc", .data = at91rm9200_standby },
- 	{ .compatible = "atmel,at91sam9260-sdramc", .data = at91sam9_sdram_standby },
- 	{ .compatible = "atmel,at91sam9g45-ddramc", .data = at91_ddr_standby },
--	{ .compatible = "atmel,sama5d3-ddramc", .data = at91_ddr_standby },
-+	{ .compatible = "atmel,sama5d3-ddramc", .data = sama5d3_ddr_standby },
- 	{ /*sentinel*/ }
- };
- 
--- 
-2.9.0
+thanks
+-- PMM
