@@ -1,159 +1,94 @@
-From: j-keerthy@ti.com (Keerthy)
-Date: Mon, 13 Mar 2017 10:57:20 +0530
-Subject: [PATCH RFC 2/3] thermal: dove: convert to a thermal OF sensor
- device
-In-Reply-To: <E1cn8qH-0002v6-SE@rmk-PC.armlinux.org.uk>
-References: <E1cn8qH-0002v6-SE@rmk-PC.armlinux.org.uk>
-Message-ID: <08ea53ed-d7be-2206-57f4-65c06d5e4a40@ti.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Mon, 13 Mar 2017 11:00:02 +0530
+Subject: [RESEND PATCH v3 4/7] PCI: dwc: all: Modify dbi accessors to take
+ dbi_base as argument
+In-Reply-To: <6d667068-81af-5ce4-3d94-c5aa987632a4@axis.com>
+References: <1489041545-15730-1-git-send-email-kishon@ti.com>
+ <1489041545-15730-5-git-send-email-kishon@ti.com>
+ <4e13580d-2625-5eed-bcbc-2ffd7493b073@axis.com>
+ <595fab62-fb7a-888a-f898-7b59030585f1@axis.com> <58C28FCC.4070100@ti.com>
+ <d920d892-af48-b94f-6eb7-e9e0ff5d40c0@axis.com> <58C2A28C.60703@ti.com>
+ <6d667068-81af-5ce4-3d94-c5aa987632a4@axis.com>
+Message-ID: <58C62E5A.2050908@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Niklas,
 
+On Friday 10 March 2017 09:17 PM, Niklas Cassel wrote:
+> 
+> 
+> On 03/10/2017 01:56 PM, Kishon Vijay Abraham I wrote:
+>> Hi Niklas,
+>>
+>> On Friday 10 March 2017 06:01 PM, Niklas Cassel wrote:
+>>> On 03/10/2017 12:36 PM, Kishon Vijay Abraham I wrote:
+>>>> Hi,
+>>>>
+>>>> On Thursday 09 March 2017 08:35 PM, Niklas Cassel wrote:
+>>>>> On 03/09/2017 03:48 PM, Niklas Cassel wrote:
+>>>>>> On 03/09/2017 07:39 AM, Kishon Vijay Abraham I wrote:
+>>>>>>> dwc has 2 dbi address space labeled dbics and dbics2. The existing
+>>>>>>> helper to access dbi address space can access only dbics. However
+>>>>>>> dbics2 has to be accessed for programming the BAR registers in the
+>>>>>>> case of EP mode. This is in preparation for adding EP mode support
+>>>>>>> to dwc driver.
+>>>>>> Hello Kishon
+>>>>>>
+>>>>>> I don't really like the idea of adding an extra argument to every existing read/write.
+>>>>>> Will not a read/write using dbi2 be quite uncommon compared to a read/write
+>>>>>> using dbi?
+>>>>>>
+>>>>>> How about something like this:
+>>>>>>
+>>>>>> void __dw_pcie_writel(struct dw_pcie *pci, void __iomem *base, u32 reg, u32 val)
+>>>>>> {
+>>>>>>     if (pci->ops->writel_dbi)
+>>>>>>         pci->ops->writel_dbi(pci, base, reg, val);
+>>>>>>     else
+>>>>>>         writel(val, base + reg);
+>>>>>> }
+>>>>>>
+>>>>>> #define dw_pcie_writel_dbi(pci, reg, val) __dw_pcie_writel(pci, pci->dbi_base, reg, val)
+>>>>>> #define dw_pcie_writel_dbi2(pci, reg, val) __dw_pcie_writel(pci, pci->dbi_base2, reg, val)
+>>>>> Perhaps make dw_pcie_writel_dbi2 a function rather than a define,
+>>>>> so we can return an error if pci->dbi_base2 == NULL.
+>>>> Should we return an error? We don't return error for dbi_base either. I think
+>>>> it should be sufficient to return errors while populating dbi_base or
+>>>> dbi_base2. Otherwise it's a bug and should result in abort. Joao?
+>>> Sorry for previous empty email.
+>>>
+>>>
+>>> What I meant to write:
+>>>
+>>> Right now we do error checking for dbi_base in platform specific code
+>>> and in pcie-designware-host.c:dw_pcie_host_init.
+>> it's been done in dw_pcie_host_init not as an error checking but since it's
+>> *optional* for certain platforms to populate dbi_base (i.e where dbi_base is
+>> mapped to configuration space), host_init takes care of assigning dbi_base to
+>> configuration space address.
+> 
+> What I'm afraid of is that we might get a NULL ptr dereference
+> when using dw_pcie_writel_dbi2, if platform specific code has
+> not populated dbi_base2.
+> 
+> Having a NULL check in generic code is just a fail safe if some
+> platform specific code failed to NULL check.
+> 
+> The code in dw_pcie_host_init might have been written just
+> to populate dbi_base when dbi is mapped to config space,
+> but the end result is that if platform specific code did not
+> populate dbi_base (and did not populate pp->cfg),
+> we will return -ENOMEM.
+> Which means that we can never get a NULL ptr dereference
+> when using dw_pcie_writel_dbi.
+> 
+> It might be a good idea to have a NULL check in generic code,
+> just as a fail safe, also for dw_pcie_ep_init.
+> That way we know that we will not get a NULL ptr dereference
+> when using dw_pcie_writel_dbi2.
 
-On Monday 13 March 2017 12:37 AM, Russell King wrote:
-> Convert the dove thermal infrastructure to an OF sensor device, and add
-> the thermal zones for the SoC, with a critical trip point of 120?C.
-> This allows us to specify thermal zones and couple them to cooling
-> devices in DT.
->
-> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
-> ---
->  arch/arm/boot/dts/dove.dtsi    | 17 +++++++++++++++++
->  drivers/thermal/dove_thermal.c | 33 +++++++++++++++++++++++++--------
->  2 files changed, 42 insertions(+), 8 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
-> index 698d58cea20d..40fb98687230 100644
-> --- a/arch/arm/boot/dts/dove.dtsi
-> +++ b/arch/arm/boot/dts/dove.dtsi
-> @@ -455,6 +455,7 @@
->  				};
->
->  				thermal: thermal-diode at 001c {
-> +					#thermal-sensor-cells = <0>;
->  					compatible = "marvell,dove-thermal";
->  					reg = <0x001c 0x0c>, <0x005c 0x08>;
->  				};
-> @@ -800,4 +801,20 @@
->  			};
->  		};
->  	};
-> +
-> +	thermal-zones {
-> +		soc-thermal {
-> +			polling-delay-passive = <250>; /* ms */
-> +			polling-delay = <1000>; /* ms */
-> +			thermal-sensors = <&thermal>;
-> +
-> +			soc_trips: trips {
-> +				soc_trip_crit: soc-crit {
-> +					temperature = <120000>; /* ?mC */
-> +					hysteresis = <2000>; /* ?mC */
-> +					type = "critical";
-> +				};
-> +			};
-> +		};
-> +	};
->  };
-> diff --git a/drivers/thermal/dove_thermal.c b/drivers/thermal/dove_thermal.c
-> index a0bc9de42553..51b1a9e78576 100644
-> --- a/drivers/thermal/dove_thermal.c
-> +++ b/drivers/thermal/dove_thermal.c
-> @@ -46,6 +46,7 @@
->  struct dove_thermal_priv {
->  	void __iomem *sensor;
->  	void __iomem *control;
-> +	struct device *dev;
->  };
->
->  static int dove_init_sensor(const struct dove_thermal_priv *priv)
-> @@ -92,17 +93,15 @@ static int dove_init_sensor(const struct dove_thermal_priv *priv)
->  	return 0;
->  }
->
-> -static int dove_get_temp(struct thermal_zone_device *thermal,
-> -			  int *temp)
-> +static int dove_of_get_temp(void *data, int *temp)
->  {
-> +	struct dove_thermal_priv *priv = data;
->  	unsigned long reg;
-> -	struct dove_thermal_priv *priv = thermal->devdata;
->
->  	/* Valid check */
->  	reg = readl_relaxed(priv->control + PMU_TEMP_DIOD_CTRL1_REG);
->  	if ((reg & PMU_TDC1_TEMP_VALID_MASK) == 0x0) {
-> -		dev_err(&thermal->device,
-> -			"Temperature sensor reading not valid\n");
-> +		dev_err(priv->dev, "Temperature sensor reading not valid\n");
->  		return -EIO;
->  	}
->
-> @@ -118,10 +117,22 @@ static int dove_get_temp(struct thermal_zone_device *thermal,
->  	return 0;
->  }
->
-> +static int dove_get_temp(struct thermal_zone_device *thermal,
-> +			  int *temp)
-> +{
-> +	struct dove_thermal_priv *priv = thermal->devdata;
-> +
-> +	return dove_of_get_temp(priv, temp);
-> +}
-> +
->  static struct thermal_zone_device_ops ops = {
->  	.get_temp = dove_get_temp,
->  };
->
-> +static const struct thermal_zone_of_device_ops of_ops = {
-> +	.get_temp = dove_of_get_temp,
-> +};
-> +
->  static const struct of_device_id dove_thermal_id_table[] = {
->  	{ .compatible = "marvell,dove-thermal" },
->  	{}
-> @@ -138,6 +149,8 @@ static int dove_thermal_probe(struct platform_device *pdev)
->  	if (!priv)
->  		return -ENOMEM;
->
-> +	priv->dev = &pdev->dev;
-> +
->  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->  	priv->sensor = devm_ioremap_resource(&pdev->dev, res);
->  	if (IS_ERR(priv->sensor))
-> @@ -154,8 +167,11 @@ static int dove_thermal_probe(struct platform_device *pdev)
->  		return ret;
->  	}
->
-> -	thermal = thermal_zone_device_register("dove_thermal", 0, 0,
-> -					       priv, &ops, NULL, 0, 0);
-> +	thermal = devm_thermal_zone_of_sensor_register(&pdev->dev, 0,
-> +						       priv, &of_ops);
-> +	if (IS_ERR(thermal))
-> +		thermal = thermal_zone_device_register("dove_thermal", 0, 0,
-> +						       priv, &ops, NULL, 0, 0);
->  	if (IS_ERR(thermal)) {
->  		dev_err(&pdev->dev,
->  			"Failed to register thermal zone device\n");
-> @@ -172,7 +188,8 @@ static int dove_thermal_exit(struct platform_device *pdev)
->  	struct thermal_zone_device *dove_thermal =
->  		platform_get_drvdata(pdev);
->
-> -	thermal_zone_device_unregister(dove_thermal);
-> +	if (!pdev->dev.of_node)
-> +		thermal_zone_device_unregister(dove_thermal);
+All right, will add it then.
 
-Russell,
-
-Now that thermal-zones is defined in dove.dtsi do you see any need to 
-call thermal_zone_device_register? Is there a case where in 
-devm_thermal_zone_of_sensor_register is known to fail?
-
-If not then we can even get rid of ops, dove_get_temp function.
-
-Regards,
-Keerthy
-
->
->  	return 0;
->  }
->
+Thanks
+Kishon
