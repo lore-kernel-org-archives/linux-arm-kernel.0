@@ -1,59 +1,47 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Mon, 13 Mar 2017 11:17:33 +0100
-Subject: [PATCH] [media] vcodev: mediatek: add missing include in JPEG
- decoder driver
-In-Reply-To: <20170312201329.28357-1-jeremy.lefaure@lse.epita.fr>
-References: <20170312201329.28357-1-jeremy.lefaure@lse.epita.fr>
-Message-ID: <27eb2dc3-cc98-d41f-ed4f-71b2660702aa@xs4all.nl>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Mon, 13 Mar 2017 11:27:36 +0100
+Subject: [PATCH 2/2] fpga: Add support for Xilinx LogiCORE PR Decoupler
+In-Reply-To: <CAAtXAHe-AMq9Ux2LZZEWLcg8Dk6jTiHhrot4RhEVrxTBhnLE0g@mail.gmail.com>
+References: <1489181435-3151-1-git-send-email-mdf@kernel.org>
+ <1489181435-3151-2-git-send-email-mdf@kernel.org>
+ <CAAtXAHe-AMq9Ux2LZZEWLcg8Dk6jTiHhrot4RhEVrxTBhnLE0g@mail.gmail.com>
+Message-ID: <2f21aeb3-dd4e-e170-729a-a785077b6f28@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/12/2017 09:13 PM, J?r?my Lefaure wrote:
-> The driver uses kzalloc and kfree functions. So it should include
-> linux/slab.h. This header file is implicitly included by v4l2-common.h
-> if CONFIG_SPI is enabled. But when it is disabled, slab.h is not
-> included. In this case, the driver does not compile:
-> 
-> drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c: In function ?mtk_jpeg_open?:
-> drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c:1017:8: error: implicit
-> declaration of function ?kzalloc?
-> [-Werror=implicit-function-declaration]
->   ctx = kzalloc(sizeof(*ctx), GFP_KERNEL);
->         ^~~~~~~
-> drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c:1017:6: warning:
-> assignment makes pointer from integer without a cast [-Wint-conversion]
->   ctx = kzalloc(sizeof(*ctx), GFP_KERNEL);
->       ^
-> drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c:1047:2: error: implicit
-> declaration of function ?kfree? [-Werror=implicit-function-declaration]
->   kfree(ctx);
->   ^~~~~
-> 
-> This patch adds the missing include to fix this issue.
+Hi Moritz,
 
-Thanks for the patch, but someone else made the same fix already and it is
-queued up for 4.12.
+On 10.3.2017 23:42, Moritz Fischer wrote:
+> On Fri, Mar 10, 2017 at 1:30 PM, Moritz Fischer <mdf@kernel.org> wrote:
+>> This adds support for the Xilinx LogiCORE PR Decoupler
+>> soft-ip that does decoupling of PR regions in the FPGA
+>> fabric during partial reconfiguration.
+>>
+>> Signed-off-by: Moritz Fischer <mdf@kernel.org>
+>> Cc: Michal Simek <michal.simek@xilinx.com>
+>> Cc: S?ren Brinkmann <soren.brinkmann@xilinx.com>
+>> Cc: linux-kernel at vger.kernel.org
+>> Cc: devicetree at vger.kernel.org
+>> ---
+>>  drivers/fpga/Kconfig               |   9 +++
+>>  drivers/fpga/Makefile              |   1 +
+>>  drivers/fpga/xilinx-pr-decoupler.c | 156 +++++++++++++++++++++++++++++++++++++
+>>  3 files changed, 166 insertions(+)
+>>  create mode 100644 drivers/fpga/xilinx-pr-decoupler.c
 
-Regards,
+I have written very similar driver some week ago but didn't sent it out.
 
-	Hans
+Here it is.
+https://github.com/Xilinx/linux-xlnx/blob/master/drivers/fpga/xilinx-pr-decoupler.c
 
-> 
-> Signed-off-by: J?r?my Lefaure <jeremy.lefaure@lse.epita.fr>
-> ---
->  drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c b/drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c
-> index b10183f7942b..f9bd58ce7d32 100644
-> --- a/drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c
-> +++ b/drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c
-> @@ -22,6 +22,7 @@
->  #include <linux/of_platform.h>
->  #include <linux/platform_device.h>
->  #include <linux/pm_runtime.h>
-> +#include <linux/slab.h>
->  #include <linux/spinlock.h>
->  #include <media/v4l2-event.h>
->  #include <media/v4l2-mem2mem.h>
-> 
+Your clk handling is better and my enable_show is better.
+You shouldn't rely on setting status before. It is better to read that
+reg again. The reason is you can connect status signal from one PR
+decoupler to decouple input which can change status
+
+There is another topic I wanted to open in connection to this. There
+should be gpio based bridge because this pr decoupler can be without axi
+interface and for that gpio driver would be useful.
+
+Thanks,
+Michal
