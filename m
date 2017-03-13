@@ -1,55 +1,61 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Mon, 13 Mar 2017 19:52:44 +0530
-Subject: [PATCH v4 08/23] Documentation: PCI: Add binding documentation for
- pci-test endpoint function
+Date: Mon, 13 Mar 2017 19:52:54 +0530
+Subject: [PATCH v4 18/23] Documentation: misc-devices: Add Documentation for
+ pci-endpoint-test driver
 In-Reply-To: <20170313142259.25397-1-kishon@ti.com>
 References: <20170313142259.25397-1-kishon@ti.com>
-Message-ID: <20170313142259.25397-9-kishon@ti.com>
+Message-ID: <20170313142259.25397-19-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add binding documentation for pci-test endpoint function that helps in
-adding and configuring pci-test endpoint function.
+Add Documentation for pci-endpoint-test driver.
 
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- Documentation/PCI/00-INDEX                              |  2 ++
- .../PCI/endpoint/function/binding/pci-test.txt          | 17 +++++++++++++++++
- 2 files changed, 19 insertions(+)
- create mode 100644 Documentation/PCI/endpoint/function/binding/pci-test.txt
+ Documentation/misc-devices/pci-endpoint-test.txt | 35 ++++++++++++++++++++++++
+ 1 file changed, 35 insertions(+)
+ create mode 100644 Documentation/misc-devices/pci-endpoint-test.txt
 
-diff --git a/Documentation/PCI/00-INDEX b/Documentation/PCI/00-INDEX
-index 4e5a2832f4e7..53717b7fcdd4 100644
---- a/Documentation/PCI/00-INDEX
-+++ b/Documentation/PCI/00-INDEX
-@@ -18,3 +18,5 @@ endpoint/pci-endpoint-cfs.txt
- 	- guide to use configfs to configure the pci endpoint function.
- endpoint/pci-test-function.txt
- 	- specification of *pci test* function device.
-+endpoint/function/binding/
-+	- binding documentation for pci endpoint function
-diff --git a/Documentation/PCI/endpoint/function/binding/pci-test.txt b/Documentation/PCI/endpoint/function/binding/pci-test.txt
+diff --git a/Documentation/misc-devices/pci-endpoint-test.txt b/Documentation/misc-devices/pci-endpoint-test.txt
 new file mode 100644
-index 000000000000..c44fc18d78cc
+index 000000000000..438571898d27
 --- /dev/null
-+++ b/Documentation/PCI/endpoint/function/binding/pci-test.txt
-@@ -0,0 +1,17 @@
-+PCI TEST ENDPOINT FUNCTION
++++ b/Documentation/misc-devices/pci-endpoint-test.txt
+@@ -0,0 +1,35 @@
++Driver for PCI Endpoint Test Function
 +
-+name: Should be "pci_epf_test" to bind to the pci_epf_test driver.
++This driver should be used as a host side driver if the root complex is
++connected to a configurable pci endpoint running *pci_epf_test* function
++driver configured according to [1].
 +
-+Configurable Fields:
-+vendorid	 : should be 0x104c
-+deviceid	 : should be 0xb500 for DRA74x and 0xb501 for DRA72x
-+revid		 : don't care
-+progif_code	 : don't care
-+subclass_code	 : don't care
-+baseclass_code	 : should be 0xff
-+cache_line_size	 : don't care
-+subsys_vendor_id : don't care
-+subsys_id	 : don't care
-+interrupt_pin	 : Should be 1 - INTA, 2 - INTB, 3 - INTC, 4 -INTD
-+msi_interrupts	 : Should be 1 to 32 depending on the number of msi interrupts
-+		   to test
++The "pci_endpoint_test" driver can be used to perform the following tests.
++
++The PCI driver for the test device performs the following tests
++	*) verifying addresses programmed in BAR
++	*) raise legacy IRQ
++	*) raise MSI IRQ
++	*) read data
++	*) write data
++	*) copy data
++
++This misc driver creates /dev/pci-endpoint-test.<num> for every
++*pci_epf_test* function connected to the root complex and "ioctls"
++should be used to perform the above tests.
++
++ioctl
++-----
++ PCITEST_BAR: Tests the BAR. The number of the BAR that has to be tested
++	      should be passed as argument.
++ PCITEST_LEGACY_IRQ: Tests legacy IRQ
++ PCITEST_MSI: Tests message signalled interrupts. The MSI number that has
++	      to be tested should be passed as argument.
++ PCITEST_WRITE: Perform write tests. The size of the buffer should be passed
++		as argument.
++ PCITEST_READ: Perform read tests. The size of the buffer should be passed
++	       as argument.
++ PCITEST_COPY: Perform read tests. The size of the buffer should be passed
++	       as argument.
++
++[1] -> Documentation/PCI/endpoint/function/binding/pci-test.txt
 -- 
 2.11.0
