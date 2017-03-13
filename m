@@ -1,17 +1,33 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 13 Mar 2017 16:02:49 -0700
-Subject: [GIT PULL] Renesas ARM64 Based SoC Defconfig Updates for v4.12
-In-Reply-To: <cover.1489138765.git.horms+renesas@verge.net.au>
-References: <cover.1489138765.git.horms+renesas@verge.net.au>
-Message-ID: <20170313230249.GH13064@localhost>
+Date: Mon, 13 Mar 2017 16:06:10 -0700
+Subject: [GIT PULL] Gemini device tree and multiplatform conversion
+In-Reply-To: <CACRpkdbcJKgk2GzBKQg2zwcrLWVH4=oFQ6bDJ8O-pnhiUUS+Ww@mail.gmail.com>
+References: <CACRpkdbcJKgk2GzBKQg2zwcrLWVH4=oFQ6bDJ8O-pnhiUUS+Ww@mail.gmail.com>
+Message-ID: <20170313230610.GJ13064@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 10, 2017 at 10:40:21AM +0100, Simon Horman wrote:
-> Hi Olof, Hi Kevin, Hi Arnd,
+On Sun, Mar 12, 2017 at 11:41:54AM +0100, Linus Walleij wrote:
+> We now have the driver changes upstream to convert the
+> Gemini to device tree and multiplatform in one swift strike.
 > 
-> Please consider these Renesas ARM64 based SoC defconfig updates for v4.12.
+> I have not included the device tree and bindings in this pull
+> request, they will be sent in a follow-on pull request.
 > 
+> You can merge this separately or with the device tree
+> underneath or on top or however you like, what is best for
+> your patch flow.
+> 
+> As there are some new drivers (based on out-of-tree code
+> from OpenWRT) we will maybe send more pull requests on
+> top of this one for these as they get merged into proper
+> subsystems.
+> 
+> Please pull this into the ARM SoC tree. The DTS pull request
+> comes soon after this.
+> 
+> Yours,
+> Linus Walleij
 > 
 > The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
 > 
@@ -19,18 +35,23 @@ On Fri, Mar 10, 2017 at 10:40:21AM +0100, Simon Horman wrote:
 > 
 > are available in the git repository at:
 > 
->   https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-arm64-defconfig-for-v4.12
+>   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-nomadik.git
+> tags/gemini-multiplat-dt
 > 
-> for you to fetch changes up to 58e7696e0e3c085804fb6754a7dadf7267d0fa77:
+> for you to fetch changes up to 47d2549ac9be843c7aa1d9472389c644674b218c:
 > 
->   arm64: defconfig: Enable SH Mobile I2C controller (2017-03-06 10:03:53 +0100)
+>   ARM: gemini: convert to ARMv4 multiplatform (2017-03-12 11:27:53 +0100)
 > 
 > ----------------------------------------------------------------
-> Renesas ARM64 Based SoC Defconfig Updates for v4.12
+> This patchset:
 > 
-> * Enable SH Mobile I2C controller
+> - Converts the Gemini platform to device tree.
+> - Deletes all the board files.
+> - Fixes the prerequisities for a multiplatform boot and
+>   switches to multiplatform.
 
-Merged, thanks.
+Awesome, thanks for doing this. I've merged this into next/soc since we don't
+really track multiplatform changes as a category any more.
 
 
 -Olof
