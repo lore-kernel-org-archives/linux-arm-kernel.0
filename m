@@ -1,75 +1,64 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 13 Mar 2017 16:18:12 +0100
-Subject: [PATCH v2] ARM: at91: Document new TCB bindings
-In-Reply-To: <20170125161129.41acaa9a@bbrezillon>
-References: <1467039901-11297-1-git-send-email-alexandre.belloni@free-electrons.com>
- <20160701012743.GA16698@rob-hp-laptop> <20160704151058.44b679bf@bbrezillon>
- <CAL_JsqL2Kjtf-BuCjK8ZHcDdbgVDy-L-_AN+=4HmxVAwy3ucdA@mail.gmail.com>
- <20170125161129.41acaa9a@bbrezillon>
-Message-ID: <fd4a2797-d8eb-ac80-36fc-01240fb0e944@atmel.com>
+From: thor.thayer@linux.intel.com (Thor Thayer)
+Date: Mon, 13 Mar 2017 10:27:13 -0500
+Subject: [PATCHv2 4/5] mfd: altr_a10sr: Add Arria10 DevKit Reset Controller
+In-Reply-To: <1489416132.2288.70.camel@pengutronix.de>
+References: <1487783419-10912-1-git-send-email-thor.thayer@linux.intel.com>
+ <1487783419-10912-5-git-send-email-thor.thayer@linux.intel.com>
+ <1488292941.2288.55.camel@pengutronix.de>
+ <31abf03e-a3e6-70ef-58f9-dc2950da5ee7@linux.intel.com>
+ <1489416132.2288.70.camel@pengutronix.de>
+Message-ID: <f3435665-5152-e2fb-9aa0-7cdd2180e7f0@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 25/01/2017 ? 16:11, Boris Brezillon a ?crit :
-> Hi Rob,
-> 
-> Sorry to revive this old discussion, but there's still one aspect I'm
-> not sure about.
-> 
-> On Tue, 5 Jul 2016 10:40:22 -0500
-> Rob Herring <robh@kernel.org> wrote:
-> 
->>>>> +   - compatible: Should be "atmel,tcb-free-running-timer"
->>>>> +   - reg: Should contain the TCB channels to be used. If the
->>>>> +     counter width is 16 bits (at91rm9200-tcb), two consecutive
->>>>> +     channels are needed. Else, only one channel will be used.
->>>>> +
->>>>> + * a clockevent device
->>>>> +   - compatible: Should be "atmel,tcb-programmable-timer"  
->>>>
->>>> This still looks like assigning usage in DT. As I'm willing to accept
->>>> that for PWM, either timer channels should be whatever channels are not
->>>> assigned to PWM (i.e. not in DT) or they should just be "timer" and let
->>>> the kernel decide their usage.  
->>>
->>> I just reviewed Alexandre's new binding, and it makes the whole thing
->>> a lot more obscure: on older SoCs, we have to chain 2 channels to
->>> create an acceptable wraparound time (16 bits at 5MHz is generating too
->>> much interrupts to be acceptable).
->>>
->>> If we don't assign the mode from the DT, how should we know which
->>> channels should be chained to create the free-running timer? Note that
->>> not all channels can be chained together: they have to be part of the
->>> same timer counter block and have to be consecutive (0+1, 1+2 or 3+0).  
+On 03/13/2017 09:42 AM, Philipp Zabel wrote:
+> On Thu, 2017-03-09 at 10:03 -0600, Thor Thayer wrote:
+>> Hi Lee,
 >>
->> The driver can have this knowledge if it is just picking 2 consecutive
->> timers. It should already know it has 16-bit timers based on the
->> compatible string. If it gets more complicated then the features or
->> limitations of the channels should be listed so the driver can make a
->> choice. OMAP is a good example of lots of timers with differing
->> features.
-> 
-> Yes it's possible to do that, but what about DT overlays then? Say you
-> have some TCB channels you'd like to reserve because they are connected
-> to pins that are exposed on your board. Those pins are not connected to
-> any device yet, but extension boards can be added, and in this case you
-> might want to expose new PWM devices by dynamically loading DT overlays.
-> 
-> If your clksource/clkevent driver parsed the initial DT and picked X
-> free channels randomly, it may conflicts with the one requested by the
-> DT overlay.
-> 
-> What's your solution for this case?
+>> On 02/28/2017 08:42 AM, Philipp Zabel wrote:
+>>> On Wed, 2017-02-22 at 11:10 -0600, thor.thayer at linux.intel.com wrote:
+>>>> From: Thor Thayer <thor.thayer@linux.intel.com>
+>>>>
+>>>> Add Peripheral PHY Reset Controller to the Arria10
+>>>> Development Kit System Resource Chip's MFD.
+>>>>
+>>>> Signed-off-by: Thor Thayer <thor.thayer@linux.intel.com>
+>>>> ---
+>>>> v2  Changes to commit header & body for clarification.
+>>>> ---
+>>>>  drivers/mfd/altera-a10sr.c | 4 ++++
+>>>>  1 file changed, 4 insertions(+)
+>>>>
+>>>> diff --git a/drivers/mfd/altera-a10sr.c b/drivers/mfd/altera-a10sr.c
+>>>> index 06e1f7f..96e7d2c 100644
+>>>> --- a/drivers/mfd/altera-a10sr.c
+>>>> +++ b/drivers/mfd/altera-a10sr.c
+>>>> @@ -33,6 +33,10 @@
+>>>>  		.name = "altr_a10sr_gpio",
+>>>>  		.of_compatible = "altr,a10sr-gpio",
+>>>>  	},
+>>>> +	{
+>>>> +		.name = "altr_a10sr_reset",
+>>>> +		.of_compatible = "altr,a10sr-reset",
+>>>> +	},
+>>>>  };
+>>>>
+>>>>  static bool altr_a10sr_reg_readable(struct device *dev, unsigned int reg)
+>>>
+>>> Lee, should this be merged through the reset tree? Otherwise I'll just
+>>> pick up patches 1-3.
+>
+> I have picked up patches 1-3, but I only just noticed that patch 1 also
+> would require Lee's ack for me to submit this.
+>
+> regards
+> Philipp
+>
+OK. Thanks Philipp.
 
-It seems that we don't have any progress on this topic for more than 6
-months which is a pity as we now experience an issue that would have
-been addressed completely by the TC rework [1].
+FWIW, Patch 1 was acked by Rob Herring on 2/27/2017 although I 
+understand that Lee may want a say in this as well.
 
-aka "ping"... ;-)
+Thanks again for reviewing and picking up those patches!
 
-Best regards,
-
-[1]
-http://lists.infradead.org/pipermail/linux-arm-kernel/2017-March/492080.html
--- 
-Nicolas Ferre
+Thor
