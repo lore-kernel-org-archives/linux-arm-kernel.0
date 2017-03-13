@@ -1,159 +1,86 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Mon, 13 Mar 2017 11:44:50 +0100
-Subject: [PATCH v4 14/36] [media] v4l2-mc: add a function to inherit
- controls from a pipeline
-In-Reply-To: <fba73c10-4b95-f0d2-e681-0b14ef1fbc1c@gmail.com>
-References: <a7b8e095-a95c-24bd-b1e9-e983f18061c4@xs4all.nl>
- <20170310120902.1daebc7b@vento.lan>
- <5e1183f4-774f-413a-628a-96e0df321faf@xs4all.nl>
- <20170311101408.272a9187@vento.lan>
- <20170311153229.yrdjmggb3p2suhdw@ihha.localdomain>
- <acfb5eca-ff00-6d57-339a-3322034cbdb3@gmail.com>
- <20170311184551.GD21222@n2100.armlinux.org.uk>
- <1f1b350a-5523-34bc-07b7-f3cd2d1fd4c1@gmail.com>
- <20170311185959.GF21222@n2100.armlinux.org.uk>
- <4917d7fb-2f48-17cd-aa2f-d54b0f19ed6e@gmail.com>
- <20170312073745.GI21222@n2100.armlinux.org.uk>
- <fba73c10-4b95-f0d2-e681-0b14ef1fbc1c@gmail.com>
-Message-ID: <734a1731-3fb6-b8cd-6806-5405bd21bf83@xs4all.nl>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 13 Mar 2017 10:45:38 +0000
+Subject: [PATCH v5 15/39] [media] v4l2: add a frame interval error event
+In-Reply-To: <aa6a5a1d-18fd-8bed-a349-2654d2d1abe0@xs4all.nl>
+References: <1489121599-23206-1-git-send-email-steve_longerbeam@mentor.com>
+ <1489121599-23206-16-git-send-email-steve_longerbeam@mentor.com>
+ <5b0a0e76-2524-4140-5ccc-380a8f949cfa@xs4all.nl>
+ <ec05e6e0-79f2-2db2-bde9-4aed00d76faa@gmail.com>
+ <6b574476-77df-0e25-a4d1-32d4fe0aec12@xs4all.nl>
+ <5d5cf4a4-a4d3-586e-cd16-54f543dfcce9@gmail.com>
+ <aa6a5a1d-18fd-8bed-a349-2654d2d1abe0@xs4all.nl>
+Message-ID: <20170313104538.GF21222@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/12/2017 06:56 PM, Steve Longerbeam wrote:
+On Mon, Mar 13, 2017 at 11:02:34AM +0100, Hans Verkuil wrote:
+> On 03/11/2017 07:14 PM, Steve Longerbeam wrote:
+> > The event must be user visible, otherwise the user has no indication
+> > the error, and can't correct it by stream restart.
 > 
+> In that case the driver can detect this and call vb2_queue_error. It's
+> what it is there for.
 > 
-> On 03/11/2017 11:37 PM, Russell King - ARM Linux wrote:
->> On Sat, Mar 11, 2017 at 07:31:18PM -0800, Steve Longerbeam wrote:
->>>
->>>
->>> On 03/11/2017 10:59 AM, Russell King - ARM Linux wrote:
->>>> On Sat, Mar 11, 2017 at 10:54:55AM -0800, Steve Longerbeam wrote:
->>>>>
->>>>>
->>>>> On 03/11/2017 10:45 AM, Russell King - ARM Linux wrote:
->>>>>> I really don't think expecting the user to understand and configure
->>>>>> the pipeline is a sane way forward.  Think about it - should the
->>>>>> user need to know that, because they have a bayer-only CSI data
->>>>>> source, that there is only one path possible, and if they try to
->>>>>> configure a different path, then things will just error out?
->>>>>>
->>>>>> For the case of imx219 connected to iMX6, it really is as simple as
->>>>>> "there is only one possible path" and all the complexity of the media
->>>>>> interfaces/subdevs is completely unnecessary.  Every other block in
->>>>>> the graph is just noise.
->>>>>>
->>>>>> The fact is that these dot graphs show a complex picture, but reality
->>>>>> is somewhat different - there's only relatively few paths available
->>>>>> depending on the connected source and the rest of the paths are
->>>>>> completely useless.
->>>>>>
->>>>>
->>>>> I totally disagree there. Raw bayer requires passthrough yes, but for
->>>>> all other media bus formats on a mipi csi-2 bus, and all other media
->>>>> bus formats on 8-bit parallel buses, the conersion pipelines can be
->>>>> used for scaling, CSC, rotation, and motion-compensated de-interlacing.
->>>>
->>>> ... which only makes sense _if_ your source can produce those formats.
->>>> We don't actually disagree on that.
->>>
->>> ...and there are lots of those sources! You should try getting out of
->>> your imx219 shell some time, and have a look around! :)
->>
->> If you think that, you are insulting me.  I've been thinking about this
->> from the "big picture" point of view.  If you think I'm only thinking
->> about this from only the bayer point of view, you're wrong.
+> The event doesn't help you since only this driver has this issue. So nobody
+> will watch this event, unless it is sw specifically written for this SoC.
 > 
-> No insult there, you have my utmost respect Russel. Me gives you the
-> Ali-G "respec!" :)
-> 
-> It was just a light-hearted attempt at suggesting you might be too
-> entangled with the imx219 (or short on hardware access, which I can
-> certainly understand).
-> 
-> 
->>
->> Given what Mauro has said, I'm convinced that the media controller stuff
->> is a complete failure for usability, and adding further drivers using it
->> is a mistake.
->>
-> 
-> I do agree with you that MC places a lot of burden on the user to
-> attain a lot of knowledge of the system's architecture. That's really
-> why I included that control inheritance patch, to ease the burden
-> somewhat.
-> 
-> On the other hand, I also think this just requires that MC drivers have
-> very good user documentation.
-> 
-> And my other point is, I think most people who have a need to work with
-> the media framework on a particular platform will likely already be
-> quite familiar with that platform.
-> 
->> I counter your accusation by saying that you are actually so focused on
->> the media controller way of doing things that you can't see the bigger
->> picture here.
->>
-> 
-> Yeah I've been too mired in the details of this driver.
-> 
-> 
->> So, tell me how the user can possibly use iMX6 video capture without
->> resorting to opening up a terminal and using media-ctl to manually
->> configure the pipeline.  How is the user going to control the source
->> device without using media-ctl to find the subdev node, and then using
->> v4l2-ctl on it.  How is the user supposed to know which /dev/video*
->> node they should be opening with their capture application?
-> 
-> The media graph for imx6 is fairly self-explanatory in my opinion.
-> Yes that graph has to be generated, but just with a simple 'media-ctl
-> --print-dot', I don't see how that is difficult for the user.
-> 
-> The graph makes it quite clear which subdev node belongs to which
-> entity.
-> 
-> As for which /dev/videoX node to use, I hope I made it fairly clear
-> in the user doc what functions each node performs. But I will review
-> the doc again and make sure it's been made explicitly clear.
-> 
-> 
->>
->> If you can actually respond to the points that I've been raising about
->> end user usability, then we can have a discussion.
-> 
-> Right, I haven't added my input to the middle-ware discussions (libv4l,
-> v4lconvert, and the auto-pipeline-configuration library work). I can
-> only say at this point that v4lconvert does indeed sound broken w.r.t
-> bayer formats from your description. But it also sounds like an isolated
-> problem and it just needs a patch to allow passing bayer through without
-> software conversion.
-> 
-> I wish I had the IMX219 to help you debug these bayer issues. I don't
-> have any bayer sources.
-> 
-> In summary, I do like the media framework, it's a good abstraction of
-> hardware pipelines. It does require a lot of system level knowledge to
-> configure, but as I said that is a matter of good documentation.
+> Much better to call vb2_queue_error to signal a fatal error (which this
+> apparently is) since there are more drivers that do this, and vivid supports
+> triggering this condition as well.
 
-And the reason we went into this direction is that the end-users that use
-these SoCs with complex pipelines actually *need* this functionality. Which
-is also part of the reason why work on improved userspace support gets
-little attention: they don't need to have a plugin that allows generic V4L2
-applications to work (at least with simple scenarios).
+So today, I can fiddle around with the IMX219 registers to help gain
+an understanding of how this sensor works.  Several of the registers
+(such as the PLL setup [*]) require me to disable streaming on the
+sensor while changing them.
 
-If they would need it, it would have been done (and paid for) before.
+This is something I've done many times while testing various ideas,
+and is my primary way of figuring out and testing such things.
 
-And improving userspace support for this isn't even at the top of our prio
-list: getting the request API and stateless codec support in is our highest
-priority. And that's a big job as well.
+Whenever I resume streaming (provided I've let the sensor stop
+streaming at a frame boundary) it resumes as if nothing happened.  If I
+stop the sensor mid-frame, then I get the rolling issue that Steve
+reports, but once the top of the frame becomes aligned with the top of
+the capture, everything then becomes stable again as if nothing happened.
 
-If you want to blame anyone for this, blame Nokia who set fire to their linux-based
-phones and thus to the funding for this work.
+The side effect of what you're proposing is that when I disable streaming
+at the sensor by poking at its registers, rather than the capture just
+stopping, an error is going to be delivered to gstreamer, and gstreamer
+is going to exit, taking the entire capture process down.
 
-Yes, I am very unhappy with the current state, but given the limited resources
-I understand why it is as it is. I will try to get time to work on this this summer,
-but there is no guarantee that that will be granted. If someone else is interested
-in doing this and can get funding for it, then that would be very welcome.
+This severely restricts the ability to be able to develop and test
+sensor drivers.
 
-Regards,
+So, I strongly disagree with you.
 
-	Hans
+Loss of capture frames is not necessarily a fatal error - as I have been
+saying repeatedly.  In Steve's case, there's some unknown interaction
+between the source and iMX6 hardware that is causing the instability,
+but that is simply not true of other sources, and I oppose any idea that
+we should cripple the iMX6 side of the capture based upon just one
+hardware combination where this is a problem.
+
+Steve suggested that the problem could be in the iMX6 CSI block - and I
+note comparing Steve's code with the code in FSL's repository that there
+are some changes that are missing in Steve's code to do with the CCIR656
+sync code setup, particularly for >8 bit.  The progressive CCIR656 8-bit
+setup looks pretty similar though - but I think what needs to be asked
+is whether the same problem is visible using the FSL/NXP vendor kernel.
+
+
+* - the PLL setup is something that requires research at the moment.
+Sony's official position (even to their customers) is that they do not
+supply the necessary information, instead they expect customers to tell
+them the capture settings they want, and Sony will throw the values into
+a spreadsheet, and they'll supply the register settings back to the
+customer.  Hence, the only way to proceed with a generic driver for
+this sensor is to experiment, and experimenting requires the ability to
+pause the stream at the sensor while making changes.  Take this away,
+and we're stuck with the tables-of-register-settings-for-set-of-fixed-
+capture-settings approach.  I've made a lot of progress away from this
+which is all down to the flexibility afforded by _not_ killing the
+capture process.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
