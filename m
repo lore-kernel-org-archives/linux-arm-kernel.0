@@ -1,171 +1,81 @@
-From: petr.cvek@tul.cz (Petr Cvek)
-Date: Mon, 13 Mar 2017 09:05:49 +0100
-Subject: [PATCH v3] ARM: pxa: magician: Add support for ADS7846 touchscreen
-Message-ID: <bca1b7cc-e4d6-d101-0591-61694c07bfd8@tul.cz>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Mon, 13 Mar 2017 16:12:14 +0800
+Subject: [v3 3/5] coresight: add support for debug module
+In-Reply-To: <3f27efee-3b63-81fd-eb96-73fd7e6f5e92@arm.com>
+References: <1488520809-31670-4-git-send-email-leo.yan@linaro.org>
+ <011fdac0-59bf-b539-2de3-0b59a41bc922@arm.com>
+ <20170309175915.GA964@leoy-linaro>
+ <3f27efee-3b63-81fd-eb96-73fd7e6f5e92@arm.com>
+Message-ID: <20170313081214.GC22706@leoy-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a support for ADS7846 touchscreen driver.
+Hi Suzuki,
 
-The basic functionality was tested, x_plate_ohms and y_plate_ohms were
-physically measured. The value pressure_max was empirically set to match
-the measured range, which is affected by x_plate_ohms and ADS samples.
+On Fri, Mar 10, 2017 at 02:29:53PM +0000, Suzuki K Poulose wrote:
 
-The value of keep_vref_on should be set. A tested model (T-Mobile MDA
-Compact PM10A) doesn't seem to use Vref pin as the input from an external
-source. On this model the unset keep_vref_on cause high jitter of measured
-values.
+[...]
 
-SPI framing pin (gpio_cs) must be used in GPIO mode due to an incompatible
-autoframing of PXA27x controller and ADS7846 device.
+> >>So we cannot really rely on the values in EDVIDSR which we use to make further decisions. So I
+> >>am wondering if this is really guranteed to be useful.
+> >
+> >So this is caused by Software lock is locked?
+> >
+> >Section H8.4.1:
+> >
+> >"Reads and writes have no side-effects. A side-effect is where a
+> >direct read or a direct write of a register creates
+> >an indirect write of the same or another register. When the Software
+> >Lock is locked, the indirect write does
+> >not occur."
+> 
+> Yes, thats correct, further :
+> 
+> Section H9.2.32: EDPCSR
+> 
+> "For a read of EDPCSRlo from the memory-mapped interface, if EDLSR.SLK == 1, meaning
+> the Software Lock is locked, then the access has no side-effects. That is, EDCIDSR,
+> EDVIDSR, and EDPCSRhi are unchanged."
+> 
+> And since we do a CS_UNLOCK, that should be fine. Please ignore my comment.
 
-Signed-off-by: Petr Cvek <petr.cvek@tul.cz>
----
- arch/arm/mach-pxa/include/mach/magician.h |  1 +
- arch/arm/mach-pxa/magician.c              | 84 ++++++++++++++++++++++++++++++-
- 2 files changed, 84 insertions(+), 1 deletion(-)
+Thanks a lot for confirmation.
 
-diff --git a/arch/arm/mach-pxa/include/mach/magician.h b/arch/arm/mach-pxa/include/mach/magician.h
-index 5f6b850ebe33..c48b54d0f331 100644
---- a/arch/arm/mach-pxa/include/mach/magician.h
-+++ b/arch/arm/mach-pxa/include/mach/magician.h
-@@ -24,6 +24,7 @@
- #define GPIO10_MAGICIAN_GSM_IRQ			10
- #define GPIO11_MAGICIAN_GSM_OUT1		11
- #define GPIO13_MAGICIAN_CPLD_IRQ		13
-+#define GPIO14_MAGICIAN_TSC2046_CS		14
- #define GPIO18_MAGICIAN_UNKNOWN			18
- #define GPIO22_MAGICIAN_VIBRA_EN		22
- #define GPIO26_MAGICIAN_GSM_POWER		26
-diff --git a/arch/arm/mach-pxa/magician.c b/arch/arm/mach-pxa/magician.c
-index b413e36506af..7f3566c93733 100644
---- a/arch/arm/mach-pxa/magician.c
-+++ b/arch/arm/mach-pxa/magician.c
-@@ -54,6 +54,10 @@
- #include "devices.h"
- #include "generic.h"
- 
-+#include <linux/spi/spi.h>
-+#include <linux/spi/pxa2xx_spi.h>
-+#include <linux/spi/ads7846.h>
-+
- static unsigned long magician_pin_config[] __initdata = {
- 
- 	/* SDRAM and Static Memory I/O Signals */
-@@ -85,7 +89,7 @@ static unsigned long magician_pin_config[] __initdata = {
- 
- 	/* SSP 2 TSC2046 touchscreen */
- 	GPIO19_SSP2_SCLK,
--	GPIO14_SSP2_SFRM,
-+	MFP_CFG_OUT(GPIO14, AF0, DRIVE_HIGH),	/* frame as GPIO */
- 	GPIO89_SSP2_TXD,
- 	GPIO88_SSP2_RXD,
- 
-@@ -675,6 +679,37 @@ static struct platform_device bq24022 = {
- };
- 
- /*
-+ * fixed regulator for ads7846
-+ */
-+
-+static struct regulator_consumer_supply ads7846_supply =
-+	REGULATOR_SUPPLY("vcc", "spi2.0");
-+
-+static struct regulator_init_data vads7846_regulator = {
-+	.constraints	= {
-+		.valid_ops_mask	= REGULATOR_CHANGE_STATUS,
-+	},
-+	.num_consumer_supplies	= 1,
-+	.consumer_supplies	= &ads7846_supply,
-+};
-+
-+static struct fixed_voltage_config vads7846 = {
-+	.supply_name	= "vads7846",
-+	.microvolts	= 3300000, /* probably */
-+	.gpio		= -EINVAL,
-+	.startup_delay	= 0,
-+	.init_data	= &vads7846_regulator,
-+};
-+
-+static struct platform_device vads7846_device = {
-+	.name	= "reg-fixed-voltage",
-+	.id	= -1,
-+	.dev	= {
-+		.platform_data	= &vads7846,
-+	},
-+};
-+
-+/*
-  * Vcore regulator MAX1587A
-  */
- 
-@@ -852,6 +887,49 @@ static struct i2c_pxa_platform_data magician_i2c_power_info = {
- };
- 
- /*
-+ * Touchscreen
-+ */
-+
-+static struct ads7846_platform_data ads7846_pdata = {
-+	.model		= 7846,
-+	.x_plate_ohms	= 317,
-+	.y_plate_ohms	= 500,
-+	.pressure_max	= 1023,	/* with x plate ohms it will overflow 255 */
-+	.debounce_max	= 3,	/* first readout is always bad */
-+	.debounce_tol	= 30,
-+	.debounce_rep	= 0,
-+	.gpio_pendown	= GPIO115_MAGICIAN_nPEN_IRQ,
-+	.keep_vref_on	= 1,
-+	.wakeup		= true,
-+	.vref_delay_usecs		= 100,
-+	.penirq_recheck_delay_usecs	= 100,
-+};
-+
-+struct pxa2xx_spi_chip tsc2046_chip_info = {
-+	.tx_threshold	= 1,
-+	.rx_threshold	= 2,
-+	.timeout	= 64,
-+	/* NOTICE must be GPIO, incompatibility with hw PXA SPI framing */
-+	.gpio_cs	= GPIO14_MAGICIAN_TSC2046_CS,
-+};
-+
-+static struct pxa2xx_spi_master magician_spi_info = {
-+	.num_chipselect	= 1,
-+	.enable_dma	= 1,
-+};
-+
-+static struct spi_board_info ads7846_spi_board_info[] __initdata = {
-+	{
-+		.modalias		= "ads7846",
-+		.bus_num		= 2,
-+		.max_speed_hz		= 2500000,
-+		.platform_data		= &ads7846_pdata,
-+		.controller_data	= &tsc2046_chip_info,
-+		.irq = PXA_GPIO_TO_IRQ(GPIO115_MAGICIAN_nPEN_IRQ),
-+	},
-+};
-+
-+/*
-  * Platform devices
-  */
- 
-@@ -865,6 +943,7 @@ static struct platform_device *devices[] __initdata = {
- 	&power_supply,
- 	&strataflash,
- 	&leds_gpio,
-+	&vads7846_device,
- };
- 
- static struct gpio magician_global_gpios[] = {
-@@ -922,6 +1001,9 @@ static void __init magician_init(void)
- 	} else
- 		pr_err("LCD detection: CPLD mapping failed\n");
- 
-+	pxa2xx_set_spi_info(2, &magician_spi_info);
-+	spi_register_board_info(ARRAY_AND_SIZE(ads7846_spi_board_info));
-+
- 	regulator_register_always_on(0, "power", pwm_backlight_supply,
- 		ARRAY_SIZE(pwm_backlight_supply), 5000000);
- 
--- 
-2.11.0
+[...]
+
+> >>>+
+> >>>+	put_online_cpus();
+> >>>+
+> >>>+	if (!debug_count++)
+> >>>+		atomic_notifier_chain_register(&panic_notifier_list,
+> >>>+					       &debug_notifier);
+> >>>+
+> >>
+> >>>+	sprintf(buf, (char *)id->data, drvdata->cpu);
+> >>>+	dev_info(dev, "%s initialized\n", buf);
+> >>
+> >>This could simply be :
+> >>	dev_info(dev, "Coresight debug-CPU%d initialized\n", drvdata->cpu);
+> >>
+> >>and get rid of the static string and the buffer, see below.
+> 
+> Also we need pm_runtime_put() here to balance the pm_runtime_get_ from AMBA
+> device probe. More on that below.
+
+[...]
+
+> Btw, I don't see any PM calls to make sure the power domain (at least the debug domain)
+> is up, which could cause problems with accesses to some of these registers (leave alone the
+> ones in CPU power domain), especially the EDPRSR. We could also do pm_runtime_get on the
+> CPU's power domain, if the CPU is online, before we access the pcsr.
+
+I will add pm_runtime_get/pm_runtime_put for apb clock.
+
+But for CPU power domain, AFAIK this part is managed by PSCI but is not
+controlled by pm_runtime_{put|get} pairs. So at beginning, we suggest
+to use "nohlt" to ensure CPU power domain is enabled.
+
+Please let me know if I miss some thing for this?
+
+Thanks,
+Leo Yan
