@@ -1,204 +1,56 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 13 Mar 2017 13:20:14 +0100
-Subject: [PATCH v5 1/4] clk: Add support for runtime PM
-In-Reply-To: <1485345194-3196-2-git-send-email-m.szyprowski@samsung.com>
-References: <CGME20170125115328eucas1p1d97fac29286805b58039f8aec2b9bfe6@eucas1p1.samsung.com>
- <1485345194-3196-1-git-send-email-m.szyprowski@samsung.com>
- <1485345194-3196-2-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <CAPDyKFpe1ujO+ZMJ=pYG+NupxSAgY6WjgDkybkUhD1g6YpEfkg@mail.gmail.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 13 Mar 2017 20:22:53 +0800
+Subject: [PATCH v4 5/7] arm: dts: imx6q-icore: Add touchscreen node
+In-Reply-To: <1488957477-5621-5-git-send-email-jagan@openedev.com>
+References: <1488957477-5621-1-git-send-email-jagan@openedev.com>
+ <1488957477-5621-5-git-send-email-jagan@openedev.com>
+Message-ID: <20170313122252.GE3618@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 January 2017 at 12:53, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
-> Registers for some clocks might be located in the SOC area, which are under the
-> power domain. To enable access to those registers respective domain has to be
-> turned on. Additionally, registers for such clocks will usually loose its
-> contents when power domain is turned off, so additional saving and restoring of
-> them might be needed in the clock controller driver.
->
-> This patch adds basic infrastructure in the clocks core to allow implementing
-> driver for such clocks under power domains. Clock provider can supply a
-> struct device pointer, which is the used by clock core for tracking and managing
-> clock's controller runtime pm state. Each clk_prepare() operation
-> will first call pm_runtime_get_sync() on the supplied device, while
-> clk_unprepare() will do pm_runtime_put() at the end.
->
-> Additional calls to pm_runtime_get/put functions are required to ensure that any
-> register access (like calculating/changing clock rates and unpreparing/disabling
-> unused clocks on boot) will be done with clock controller in runtime resumend
-> state.
->
-> When one wants to register clock controller, which make use of this feature, he
-> has to:
-> 1. Provide a struct device to the core when registering the provider.
-> 2. Ensure to enable runtime PM for that device before registering clocks.
-> 3. Make sure that the runtime PM status of the controller device reflects
->    the HW state.
->
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+On Wed, Mar 08, 2017 at 12:47:55PM +0530, Jagan Teki wrote:
+> From: Jagan Teki <jagan@amarulasolutions.com>
+> 
+> max11801 touchscreen on Engicam iCoreM6 Quad module is
+> connected via i2c1, so add tc: max11801 at 48 on i2c1.
+> 
+> Cc: Domenico Acri <domenico.acri@engicam.com>
+> Cc: Matteo Lisi <matteo.lisi@engicam.com>
+> Cc: Michael Trimarchi <michael@amarulasolutions.com>
+> Cc: Shawn Guo <shawnguo@kernel.org>
+> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 > ---
->  drivers/clk/clk.c | 132 +++++++++++++++++++++++++++++++++++++++++++++++-------
->  1 file changed, 117 insertions(+), 15 deletions(-)
->
-> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> index 0fb39fe217d1..5b9d52c8185b 100644
-> --- a/drivers/clk/clk.c
-> +++ b/drivers/clk/clk.c
-> @@ -21,6 +21,7 @@
->  #include <linux/of.h>
->  #include <linux/device.h>
->  #include <linux/init.h>
-> +#include <linux/pm_runtime.h>
->  #include <linux/sched.h>
->  #include <linux/clkdev.h>
->
-> @@ -46,6 +47,7 @@ struct clk_core {
->         const struct clk_ops    *ops;
->         struct clk_hw           *hw;
->         struct module           *owner;
-> +       struct device           *dev;
->         struct clk_core         *parent;
->         const char              **parent_names;
->         struct clk_core         **parents;
-> @@ -87,6 +89,26 @@ struct clk {
->         struct hlist_node clks_node;
+> Changes for v4:
+> - Newly added patch.
+> 
+>  arch/arm/boot/dts/imx6q-icore.dts | 9 +++++++++
+>  1 file changed, 9 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/imx6q-icore.dts b/arch/arm/boot/dts/imx6q-icore.dts
+> index 73f34d1..8c1a572 100644
+> --- a/arch/arm/boot/dts/imx6q-icore.dts
+> +++ b/arch/arm/boot/dts/imx6q-icore.dts
+> @@ -58,6 +58,15 @@
+>  	status = "okay";
 >  };
->
-> +/***           runtime pm          ***/
-> +static int clk_pm_runtime_get(struct clk_core *core)
-> +{
-> +       int ret = 0;
+>  
+> +&i2c1 {
+> +	ts: max11801 at 48 {
+> +		compatible = "max11801";
+
+Undocumented compatible?
+
+Shawn
+
+> +		reg = <0x48>;
+> +		interrupt-parent = <&gpio3>;
+> +		interrupts = <31 IRQ_TYPE_EDGE_FALLING>;
+> +	};
+> +};
 > +
-> +       if (!core->dev)
-> +               return 0;
-> +
-> +       ret = pm_runtime_get_sync(core->dev);
-> +       return ret < 0 ? ret : 0;
-> +}
-> +
-> +static void clk_pm_runtime_put(struct clk_core *core)
-> +{
-> +       if (!core->dev)
-> +               return;
-> +
-> +       pm_runtime_put(core->dev);
-
-I would rather change this to a pm_runtime_put_sync().
-
-The reason is that users of clocks (drivers being clock consumers),
-which has runtime PM support deployed, often performs clock
-gating/ungating from their runtime PM callbacks.
-
-In other words, using async or sync runtime PM APIs, is better decided
-by the user of the clock itself.
-
-
-> +}
-> +
->  /***           locking             ***/
->  static void clk_prepare_lock(void)
->  {
-> @@ -150,6 +172,8 @@ static void clk_enable_unlock(unsigned long flags)
->
->  static bool clk_core_is_prepared(struct clk_core *core)
->  {
-> +       bool status;
-> +
->         /*
->          * .is_prepared is optional for clocks that can prepare
->          * fall back to software usage counter if it is missing
-> @@ -157,11 +181,20 @@ static bool clk_core_is_prepared(struct clk_core *core)
->         if (!core->ops->is_prepared)
->                 return core->prepare_count;
->
-> -       return core->ops->is_prepared(core->hw);
-> +       if (clk_pm_runtime_get(core) == 0) {
-> +               status = core->ops->is_prepared(core->hw);
-> +               clk_pm_runtime_put(core);
-> +       } else {
-> +               status = false;
-
-To simplify this, you could assign status to false when defining it.
-Perhaps also rename it from "status" to "ret", as that name is more
-commonly used, I think.
-
-> +       }
-> +
-> +       return status;
->  }
->
->  static bool clk_core_is_enabled(struct clk_core *core)
->  {
-> +       bool status;
-
-Maybe name the variable ret instead, to be more consistent.
-
-> +
->         /*
->          * .is_enabled is only mandatory for clocks that gate
->          * fall back to software usage counter if .is_enabled is missing
-> @@ -169,7 +202,30 @@ static bool clk_core_is_enabled(struct clk_core *core)
->         if (!core->ops->is_enabled)
->                 return core->enable_count;
->
-> -       return core->ops->is_enabled(core->hw);
-> +       /*
-> +        * Check if clock controller's device is runtime active before
-> +        * calling .is_enabled callback. If not, assume that clock is
-> +        * disabled, because we might be called from atomic context, from
-> +        * which pm_runtime_get() is not allowed.
-> +        * This function is called mainly from clk_disable_unused_subtree,
-> +        * which ensures proper runtime pm activation of controller before
-> +        * taking enable spinlock, but the below check is needed if one tries
-> +        * to call it from other places.
-> +        */
-> +       if (core->dev) {
-> +               pm_runtime_get_noresume(core->dev);
-> +               if (!pm_runtime_active(core->dev)) {
-> +                       status = false;
-> +                       goto done;
-> +               }
-> +       }
-> +
-> +       status = core->ops->is_enabled(core->hw);
-> +done:
-> +       if (core->dev)
-> +               pm_runtime_put(core->dev);
-
-Let's use clk_pm_runtime_put() here instead.
-
-> +
-> +       return status;
->  }
->
-
-[...]
-
-> @@ -1036,9 +1111,13 @@ long clk_get_accuracy(struct clk *clk)
->  static unsigned long clk_recalc(struct clk_core *core,
->                                 unsigned long parent_rate)
->  {
-> -       if (core->ops->recalc_rate)
-> -               return core->ops->recalc_rate(core->hw, parent_rate);
-> -       return parent_rate;
-> +       unsigned long rate = parent_rate;
-> +
-> +       if (core->ops->recalc_rate && clk_pm_runtime_get(core) == 0) {
-
-To be consistent, let's not check against "== 0", but instead just use
-a "!" before the expression.
-
-> +               rate = core->ops->recalc_rate(core->hw, parent_rate);
-> +               clk_pm_runtime_put(core);
-> +       }
-> +       return rate;
->  }
->
-
-[...]
-
-Overall, this looks good to me. So with the minor changes suggested
-above, feel free to add my reviewed-by tag.
-
-Kind regards
-Uffe
+>  &ldb {
+>  	status = "okay";
+>  
+> -- 
+> 1.9.1
+> 
