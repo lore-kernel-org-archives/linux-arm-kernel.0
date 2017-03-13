@@ -1,130 +1,55 @@
-From: john@metanate.com (John Keeping)
-Date: Mon, 13 Mar 2017 18:38:13 +0000
-Subject: [RFC PATCH 4/4] pinctrl: rockchip: avoid hardirq-unsafe functions in
- irq_chip
-In-Reply-To: <20170313183813.3582-1-john@metanate.com>
-References: <20170313183813.3582-1-john@metanate.com>
-Message-ID: <20170313183813.3582-5-john@metanate.com>
+From: rafal@milecki.pl (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
+Date: Mon, 13 Mar 2017 19:48:26 +0100
+Subject: [PATCH] ARM: dts: BCM5301X: Add support for TP-LINK Archer C5 V2
+In-Reply-To: <20170312171032.GK15842@lunn.ch>
+References: <20170311121453.18534-1-zajec5@gmail.com>
+ <20170312171032.GK15842@lunn.ch>
+Message-ID: <437d898d-b0f4-a4b5-cb51-8ea88ba7a35a@milecki.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With real-time preemption, regmap functions cannot be used in the
-implementation of irq_chip since they use spinlocks which may sleep.
+On 03/12/2017 06:10 PM, Andrew Lunn wrote:
+>> +	chosen {
+>> +		bootargs = "console=ttyS0,115200 earlycon";
+>
+> Using bootargs to pass the serial settings has been deprecated for a
+> while. Please use stdout-path instead.
 
-Move the setting of the mux for IRQs to an irq_bus_sync_unlock handler
-where we are allowed to sleep.
+I tried following patch with my SR400ac (I put Archer C5 aside for now).
 
-Signed-off-by: John Keeping <john@metanate.com>
----
- drivers/pinctrl/pinctrl-rockchip.c | 44 ++++++++++++++++++++++++++++++++++----
- 1 file changed, 40 insertions(+), 4 deletions(-)
+While serial console seems to work:
+1) I keep seeing boot log messages after:
+[    0.402309] 18000300.serial: ttyS0 at MMIO 0x18000300 (irq = 18, base_baud = 6250000) is a 16550
+2) Typed chars come back to my serial console
 
-diff --git a/drivers/pinctrl/pinctrl-rockchip.c b/drivers/pinctrl/pinctrl-rockchip.c
-index 52e70c4aef7c..80f7c23d12d4 100644
---- a/drivers/pinctrl/pinctrl-rockchip.c
-+++ b/drivers/pinctrl/pinctrl-rockchip.c
-@@ -143,6 +143,9 @@ struct rockchip_drv {
-  * @gpio_chip: gpiolib chip
-  * @grange: gpio range
-  * @slock: spinlock for the gpio bank
-+ * @irq_lock: bus lock for irq chip
-+ * @new_irqs: newly configured irqs which must be muxed as GPIOs in
-+ *	irq_bus_sync_unlock()
-  */
- struct rockchip_pin_bank {
- 	void __iomem			*reg_base;
-@@ -165,6 +168,8 @@ struct rockchip_pin_bank {
- 	struct pinctrl_gpio_range	grange;
- 	raw_spinlock_t			slock;
- 	u32				toggle_edge_mode;
-+	struct mutex			irq_lock;
-+	u32				new_irqs;
- };
- 
- #define PIN_BANK(id, pins, label)			\
-@@ -2045,11 +2050,12 @@ static int rockchip_irq_set_type(struct irq_data *d, unsigned int type)
- 	int ret;
- 
- 	/* make sure the pin is configured as gpio input */
--	ret = rockchip_set_mux(bank, d->hwirq, RK_FUNC_GPIO);
-+	ret = rockchip_verify_mux(bank, d->hwirq, RK_FUNC_GPIO);
- 	if (ret < 0)
- 		return ret;
- 
--	clk_enable(bank->clk);
-+	bank->new_irqs |= mask;
-+
- 	raw_spin_lock_irqsave(&bank->slock, flags);
- 
- 	data = readl_relaxed(bank->reg_base + GPIO_SWPORT_DDR);
-@@ -2107,7 +2113,6 @@ static int rockchip_irq_set_type(struct irq_data *d, unsigned int type)
- 	default:
- 		irq_gc_unlock(gc);
- 		raw_spin_unlock_irqrestore(&bank->slock, flags);
--		clk_disable(bank->clk);
- 		return -EINVAL;
- 	}
- 
-@@ -2116,7 +2121,6 @@ static int rockchip_irq_set_type(struct irq_data *d, unsigned int type)
- 
- 	irq_gc_unlock(gc);
- 	raw_spin_unlock_irqrestore(&bank->slock, flags);
--	clk_disable(bank->clk);
- 
- 	return 0;
- }
-@@ -2160,6 +2164,34 @@ static void rockchip_irq_gc_mask_set_bit(struct irq_data *d)
- 	clk_disable(bank->clk);
- }
- 
-+static void rockchip_irq_bus_lock(struct irq_data *d)
-+{
-+	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
-+	struct rockchip_pin_bank *bank = gc->private;
-+
-+	clk_enable(bank->clk);
-+	mutex_lock(&bank->irq_lock);
-+}
-+
-+static void rockchip_irq_bus_sync_unlock(struct irq_data *d)
-+{
-+	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
-+	struct rockchip_pin_bank *bank = gc->private;
-+
-+	while (bank->new_irqs) {
-+		unsigned int irq = __ffs(bank->new_irqs);
-+		int ret;
-+
-+		ret = rockchip_set_mux(bank, irq, RK_FUNC_GPIO);
-+		WARN_ON(ret < 0);
-+
-+		bank->new_irqs &= ~BIT(irq);
-+	}
-+
-+	mutex_unlock(&bank->irq_lock);
-+	clk_disable(bank->clk);
-+}
-+
- static int rockchip_interrupts_register(struct platform_device *pdev,
- 						struct rockchip_pinctrl *info)
- {
-@@ -2225,6 +2257,9 @@ static int rockchip_interrupts_register(struct platform_device *pdev,
- 		gc->chip_types[0].chip.irq_suspend = rockchip_irq_suspend;
- 		gc->chip_types[0].chip.irq_resume = rockchip_irq_resume;
- 		gc->chip_types[0].chip.irq_set_type = rockchip_irq_set_type;
-+		gc->chip_types[0].chip.irq_bus_lock = rockchip_irq_bus_lock;
-+		gc->chip_types[0].chip.irq_bus_sync_unlock =
-+						rockchip_irq_bus_sync_unlock;
- 		gc->wake_enabled = IRQ_MSK(bank->nr_pins);
- 
- 		irq_set_chained_handler_and_data(bank->irq,
-@@ -2398,6 +2433,7 @@ static struct rockchip_pin_ctrl *rockchip_pinctrl_get_soc_data(
- 		int bank_pins = 0;
- 
- 		raw_spin_lock_init(&bank->slock);
-+		mutex_init(&bank->irq_lock);
- 		bank->drvdata = d;
- 		bank->pin_base = ctrl->nr_pins;
- 		ctrl->nr_pins += bank->nr_pins;
--- 
-2.12.0.377.gf910686b23.dirty
+I can't log in. I press ENTER but I'm not getting prompt for entering user name.
+
+Do you know why this change could have such an effect?
+
+
+diff --git a/arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts b/arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts
+index 36b628b..a5442a9 100644
+--- a/arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts
++++ b/arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts
+@@ -17,7 +17,7 @@
+  	model = "SmartRG SR400ac";
+
+  	chosen {
+-		bootargs = "console=ttyS0,115200 earlycon";
++		bootargs = "earlycon";
+  	};
+
+  	memory {
+diff --git a/arch/arm/boot/dts/bcm5301x.dtsi b/arch/arm/boot/dts/bcm5301x.dtsi
+index 4fbb089..66c6d2a 100644
+--- a/arch/arm/boot/dts/bcm5301x.dtsi
++++ b/arch/arm/boot/dts/bcm5301x.dtsi
+@@ -19,7 +19,7 @@
+  	interrupt-parent = <&gic>;
+
+  	chosen {
+-		stdout-path = &uart0;
++		stdout-path = "/chipcommonA/serial at 0300:115200";
+  	};
+
+  	chipcommonA {
