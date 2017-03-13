@@ -1,90 +1,72 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Mon, 13 Mar 2017 18:12:33 +0100
-Subject: [PATCH v2 4/4] clk: renesas: rcar-gen3-cpg: Add support for RCLK on
- R-Car H3 ES2.0
-In-Reply-To: <1489425153-22623-1-git-send-email-geert+renesas@glider.be>
-References: <1489425153-22623-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1489425153-22623-5-git-send-email-geert+renesas@glider.be>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Mon, 13 Mar 2017 17:12:41 +0000
+Subject: Legacy features in PCI Express devices
+In-Reply-To: <ef5c9778-fbae-9f4f-ac2e-29b8597537a5@free.fr>
+References: <ef5c9778-fbae-9f4f-ac2e-29b8597537a5@free.fr>
+Message-ID: <96b57ba5-641d-46c8-6ba0-cee2c0613a6f@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Starting with R-Car H3 ES2.0, the parent of RCLK is selected using MD28.
+On 13/03/17 16:10, Mason wrote:
+> Hello,
+> 
+> There are two revisions of our PCI Express controller.
+> 
+> Rev 1 did not support the following features:
+> 
+>   1) legacy PCI interrupt delivery (INTx signals)
+>   2) I/O address space
+> 
+> Internally, someone stated that such missing support would prevent
+> some PCIe cards from working with our controller.
+> 
+> Are there really modern PCIe cards that require 1) and/or 2)
+> to function?
+> 
+> Can someone provide examples of such cards, so that I may test them
+> on both revisions?
+> 
+> I was told to check ath9k-based cards. Any other examples?
+> 
+> Looking around, I came across this thread:
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2016-March/418254.html
+> "i.MX6 PCIe: Fix imx6_pcie_deassert_core_reset() polarity"
+> 
+> IIUC, although some PCIe boards do support MSI, the driver might not
+> put in the work to use that infrastructure, and instead reverts to
+> legacy interrupts. (So it is a SW issue, in a sense.)
 
-Add support for that, but retain the old behavior for R-Car H3 ES1.x and
-M3-W ES1.0 using a quirk.
+Secondary to that category is endpoints which nominally support MSI, but
+in a way which is unreliable or otherwise broken. My experience shows
+that the Silicon Image SiI 3132 (as integrated on ARM Juno boards, but
+seemingly also relatively common on 'generic' 2-port SATA cards) falls
+into that category - using the command-line parameter to force MSIs
+instead of legacy interrupts leads to the the machine barely reaching
+userspace before something goes horribly wrong:
 
-Inspired by a patch by Takeshi Kihara in the BSP.
+...
+         Activating swap Swap Partition...
+[   10.817806] Adding 524284k swap on /dev/sda2.  Priority:-1 extents:1
+across:524284k SS
+         Starting File System Check on /dev/disk/by-uuid/1000-9346...
+[  OK  ] Activated swap Swap Partition.
+[  OK  ] Activated swap
+/dev/disk/by-partuui?6cda4-9f73-4e26-bf19-e71f9319b5ce.
+[  OK  ] Reached target Swap.
+         Mounting Temporary Directory...
+[  OK  ] Mounted Temporary Directory.
+[  OK  ] Started File System Check on /dev/disk/by-uuid/1000-9346.
+[   46.036065] Unhandled fault: synchronous external abort (0x96000210)
+at 0xffff0000092f5000
+[   46.044273] Internal error: : 96000210 [#1] PREEMPT SMP
+[   46.049445] Modules linked in:
+[   46.052474] CPU: 0 PID: 122 Comm: scsi_eh_0 Not tainted 4.11.0-rc1+ #1753
+[   46.059192] Hardware name: ARM Juno development board (r1) (DT)
+[   46.065052] task: ffff8009763b8000 task.stack: ffff800975f70000
+[   46.070918] PC is at ata_wait_register+0x2c/0xa0
+[   46.075491] LR is at sil24_init_port+0x60/0x110
+[   46.079974] pc : [<ffff0000085b342c>] lr : [<ffff0000085d2b78>]
+pstate: 40000145
+...
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Cc: Takeshi Kihara <takeshi.kihara.df@renesas.com>
----
-v2:
-  - New.
----
- drivers/clk/renesas/rcar-gen3-cpg.c | 38 ++++++++++++++++++++++++++-----------
- 1 file changed, 27 insertions(+), 11 deletions(-)
-
-diff --git a/drivers/clk/renesas/rcar-gen3-cpg.c b/drivers/clk/renesas/rcar-gen3-cpg.c
-index e5247e3dc897f9f4..3dee900522b703bd 100644
---- a/drivers/clk/renesas/rcar-gen3-cpg.c
-+++ b/drivers/clk/renesas/rcar-gen3-cpg.c
-@@ -252,11 +252,20 @@ static u32 cpg_mode __initdata;
- static u32 cpg_quirks __initdata;
- 
- #define PLL_ERRATA	BIT(0)		/* Missing PLL0/2/4 post-divider */
-+#define RCKCR_CKSEL	BIT(1)		/* Manual RCLK parent selection */
- 
- static const struct soc_device_attribute cpg_quirks_match[] __initconst = {
- 	{
- 		.soc_id = "r8a7795", .revision = "ES1.0",
--		.data = (void *)PLL_ERRATA,
-+		.data = (void *)(PLL_ERRATA | RCKCR_CKSEL),
-+	},
-+	{
-+		.soc_id = "r8a7795", .revision = "ES1.*",
-+		.data = (void *)RCKCR_CKSEL,
-+	},
-+	{
-+		.soc_id = "r8a7796", .revision = "ES1.0",
-+		.data = (void *)RCKCR_CKSEL,
- 	},
- 	{ /* sentinel */ }
- };
-@@ -330,18 +339,25 @@ struct clk * __init rcar_gen3_cpg_clk_register(struct device *dev,
- 		return cpg_sd_clk_register(core, base, __clk_get_name(parent));
- 
- 	case CLK_TYPE_GEN3_R:
--		/*
--		 * RINT is default.
--		 * Only if EXTALR is populated, we switch to it.
--		 */
--		value = readl(base + CPG_RCKCR) & 0x3f;
--
--		if (clk_get_rate(clks[cpg_clk_extalr])) {
--			parent = clks[cpg_clk_extalr];
--			value |= BIT(15);
-+		if (cpg_quirks & RCKCR_CKSEL) {
-+			/*
-+			 * RINT is default.
-+			 * Only if EXTALR is populated, we switch to it.
-+			 */
-+			value = readl(base + CPG_RCKCR) & 0x3f;
-+
-+			if (clk_get_rate(clks[cpg_clk_extalr])) {
-+				parent = clks[cpg_clk_extalr];
-+				value |= BIT(15);
-+			}
-+
-+			writel(value, base + CPG_RCKCR);
-+			break;
- 		}
- 
--		writel(value, base + CPG_RCKCR);
-+		/* Select parent clock of RCLK by MD28 */
-+		if (cpg_mode & BIT(28))
-+			parent = clks[cpg_clk_extalr];
- 		break;
- 
- 	default:
--- 
-2.7.4
+Robin.
