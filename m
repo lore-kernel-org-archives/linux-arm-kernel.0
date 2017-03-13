@@ -1,94 +1,64 @@
-From: rafal@milecki.pl (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
-Date: Mon, 13 Mar 2017 22:46:00 +0100
-Subject: [PATCH] ARM: dts: BCM5301X: Add support for TP-LINK Archer C5 V2
-In-Reply-To: <20170313193517.GC10397@lunn.ch>
-References: <20170311121453.18534-1-zajec5@gmail.com>
- <20170312171032.GK15842@lunn.ch>
- <437d898d-b0f4-a4b5-cb51-8ea88ba7a35a@milecki.pl>
- <20170313191416.GB10397@lunn.ch>
- <89081716-c0e3-236f-4291-e700dbedbd34@milecki.pl>
- <20170313193517.GC10397@lunn.ch>
-Message-ID: <361a3978-d762-b252-43b9-9739ceedc128@milecki.pl>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Mon, 13 Mar 2017 16:46:16 -0500
+Subject: [PATCH V4 0/3] PCI/ASPM: reconfigure ASPM following hotplug for
+ POLICY_DEFAULT
+In-Reply-To: <1489438085-2055-1-git-send-email-okaya@codeaurora.org>
+References: <1489438085-2055-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <20170313214616.GE8232@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/13/2017 08:35 PM, Andrew Lunn wrote:
-> On Mon, Mar 13, 2017 at 08:15:27PM +0100, Rafa?? Mi??ecki wrote:
->> On 03/13/2017 08:14 PM, Andrew Lunn wrote:
->>> On Mon, Mar 13, 2017 at 07:48:26PM +0100, Rafa?? Mi??ecki wrote:
->>>> On 03/12/2017 06:10 PM, Andrew Lunn wrote:
->>>>>> +	chosen {
->>>>>> +		bootargs = "console=ttyS0,115200 earlycon";
->>>>>
->>>>> Using bootargs to pass the serial settings has been deprecated for a
->>>>> while. Please use stdout-path instead.
->>>>
->>>> I tried following patch with my SR400ac (I put Archer C5 aside for now).
->>>
->>> Hi Rafael
->>>
->>> Take a look at for example the bcm911360k.dts
->>>
->>>        aliases {
->>>                serial0 = &uart3;
->>>        };
->>>
->>>        chosen {
->>>                stdout-path = "serial0:115200n8";
->>>        };
->>>
->>> You need an alias to the serial device you want to us, and you should
->>> list the speed, parity, bits etc.
->>
->> That was actually my first try (just with s/uart3/uart0) and I got the same problem.
->
-> Hi Rafael
->
-> Try decompiling the generate .dtb file back to a dts and see if it
-> looks correct.
+On Mon, Mar 13, 2017 at 04:48:02PM -0400, Sinan Kaya wrote:
+> y
+> (POLICY_DEFAULT), current code is querying the enable/disable
+> states from ASPM registers to determine the policy.
+> 
+> For example, a BIOS could set the power saving state to performance
+> and clear all ASPM control registers. A balanced ASPM policy could
+> enable L0s and disable L1. A power conscious BIOS could enable both
+> L0s and L1 to trade off latency and performance vs. power.
+> 
+> After hotplug removal, pcie_aspm_exit_link_state() function clears
+> the ASPM registers. An insertion following hotplug removal reads
+> incorrect policy as ASPM disabled even though ASPM was enabled
+> during boot.
+> 
+> This is caused by the fact that same function is used for reconfiguring
+> ASPM regardless of the of the power on state.
+> 
+> ------------------------
+> Changes from v3 (https://lkml.org/lkml/2017/3/8/670)
+> ------------------------
+> - call pcie_aspm_init_link_state() for every device, maybe from
+> pci_init_capabilities()
+> 
+> - for bridges, have pcie_aspm_init_link_state() allocate a
+> link_state, regardless of whether it currently has any children,
+> and save the ASPM settings done by firmware
+> 
+> - for endpoints, have pcie_aspm_init_link_state() do the actual ASPM
+> setup of the link as it currently does
+> 
+> - for endpoints, change pcie_aspm_exit_link_state() so it cleans up
+> the device's own state and disables ASPM if necessary, but doesn't
+> remove the parent's link_state
+> 
+> - for bridges, change pcie_aspm_exit_link_state() so it frees the
+> bridge's own link_state
+> 
+> Sinan Kaya (3):
+>   PCI/ASPM: divide ASPM capability init into pre and post init
+>   PCI/ASPM: move part of ASPM initialization to pci_init_capabilities
+>   PCI/ASPM: move link_state cleanup to bridge remove
+> 
+>  drivers/pci/pcie/aspm.c | 175 +++++++++++++++++++++++++++++++++++-------------
+>  drivers/pci/probe.c     |   3 +
+>  include/linux/pci.h     |   6 ++
+>  3 files changed, 136 insertions(+), 48 deletions(-)
 
-I decompiled dtb, it looks OK to me, let me paste relevant part:
+What is this series based on?  Unless they depend on other in-flight
+patches, I apply patches to branches based on my "master" branch,
+which is typically -rc1 or -rc2 (it's currently v4.11-rc1).  These
+don't apply to either.
 
-	chosen {
-		stdout-path = "serial0:115200n8";
-		bootargs = "earlycon";
-	};
-
-	aliases {
-		serial0 = "/chipcommonA/serial at 0300";
-	};
-
-	memory {
-		device_type = "memory";
-		reg = <0x0 0x8000000 0x88000000 0x8000000>;
-	};
-
-	chipcommonA {
-		compatible = "simple-bus";
-		ranges = <0x0 0x18000000 0x1000>;
-		#address-cells = <0x1>;
-		#size-cells = <0x1>;
-
-		serial at 0300 {
-			compatible = "ns16550";
-			reg = <0x300 0x100>;
-			interrupts = <0x0 0x55 0x4>;
-			clocks = <0x2>;
-			status = "okay";
-		};
-
-		serial at 0400 {
-			compatible = "ns16550";
-			reg = <0x400 0x100>;
-			interrupts = <0x0 0x55 0x4>;
-			clocks = <0x2>;
-			status = "disabled";
-		};
-	};
-
-I got some warnings, but I don't think they are critical:
-Warning (unit_address_vs_reg): Node /memory has a reg or ranges property, but no unit name
-Warning (unit_address_vs_reg): Node /chipcommonA has a reg or ranges property, but no unit name
-Warning (unit_address_vs_reg): Node /mpcore has a reg or ranges property, but no unit name
-Warning (unit_address_vs_reg): Node /usb2-phy has a reg or ranges property, but no unit name
-Warning (unit_address_vs_reg): Node /usb3-phy has a reg or ranges property, but no unit name
+Bjorn
