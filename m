@@ -1,55 +1,56 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Mon, 13 Mar 2017 18:38:32 +0100
-Subject: [PATCH v3 01/19] KVM: arm/arm64: Add vITS save/restore API
- documentation
-In-Reply-To: <6f86ec3f-6b9e-34ba-628a-c2ef7b8c3529@redhat.com>
-References: <1488800074-21991-1-git-send-email-eric.auger@redhat.com>
- <1488800074-21991-2-git-send-email-eric.auger@redhat.com>
- <CAFEAcA_hobSQZvOQHGgdoJYw9q099GNrY=5ffjYO5YeePtKdNA@mail.gmail.com>
- <6f86ec3f-6b9e-34ba-628a-c2ef7b8c3529@redhat.com>
-Message-ID: <CAFEAcA_VqJQ-BFQPpdnK07x6B=cN-HcPY7pBr7=J5UGXm4iSnQ@mail.gmail.com>
+From: slash.tmp@free.fr (Mason)
+Date: Mon, 13 Mar 2017 18:39:55 +0100
+Subject: Legacy features in PCI Express devices
+In-Reply-To: <96b57ba5-641d-46c8-6ba0-cee2c0613a6f@arm.com>
+References: <ef5c9778-fbae-9f4f-ac2e-29b8597537a5@free.fr>
+ <96b57ba5-641d-46c8-6ba0-cee2c0613a6f@arm.com>
+Message-ID: <58fb1386-fa94-dde3-b361-597f9486fa41@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 March 2017 at 15:42, Auger Eric <eric.auger@redhat.com> wrote:
-> On 13/03/2017 14:08, Peter Maydell wrote:
->> These CTE/ITE/DTE formats don't seem to have any kind of
->> "escape hatch" for allowing backwards compatible extensions
->> to the format. Do we need one? (I think that's particularly
->> likely to be useful where there's an ITS feature we don't
->> currently implement but might perhaps want to in future,
->> like GICv4 virtual interrupt injection.)
+On 13/03/2017 18:12, Robin Murphy wrote:
+
+> On 13/03/17 16:10, Mason wrote:
 >
-> Maybe we could rely on the ITS registers (that must be restored before
-> the tables) to get any info about the format used to encode the table
-> entries. We have GITS_CTLR[1] that can help discriminate between GICv3/
-> GICv4. GITS_BASER.Entry_size can be 8B for current implementation and
-> 16B for an enhanced implementation. CTE[52:62] can be used to encode a
-> format version.
+>> There are two revisions of our PCI Express controller.
+>>
+>> Rev 1 did not support the following features:
+>>
+>>   1) legacy PCI interrupt delivery (INTx signals)
+>>   2) I/O address space
+>>
+>> Internally, someone stated that such missing support would prevent
+>> some PCIe cards from working with our controller.
+>>
+>> Are there really modern PCIe cards that require 1) and/or 2)
+>> to function?
+>>
+>> Can someone provide examples of such cards, so that I may test them
+>> on both revisions?
+>>
+>> I was told to check ath9k-based cards. Any other examples?
+>>
+>> Looking around, I came across this thread:
+>> http://lists.infradead.org/pipermail/linux-arm-kernel/2016-March/418254.html
+>> "i.MX6 PCIe: Fix imx6_pcie_deassert_core_reset() polarity"
+>>
+>> IIUC, although some PCIe boards do support MSI, the driver might not
+>> put in the work to use that infrastructure, and instead reverts to
+>> legacy interrupts. (So it is a SW issue, in a sense.)
+> 
+> Secondary to that category is endpoints which nominally support MSI, but
+> in a way which is unreliable or otherwise broken. My experience shows
+> that the Silicon Image SiI 3132 (as integrated on ARM Juno boards, but
+> seemingly also relatively common on 'generic' 2-port SATA cards) falls
+> into that category - using the command-line parameter to force MSIs
+> instead of legacy interrupts leads to the the machine barely reaching
+> userspace before something goes horribly wrong:
 
-Using the registers seems like a good idea, though I
-don't know about the specific fields. The most obvious
-place to keep something like this would be GITS_IIDR.Revision
-I suppose. Using the "size of the table entry" fields would
-work too.
+Do drivers typically support *both* MSI and INTx?
 
-If we have to make all these tables double the size if
-we move to 16b/entry in future, is that a significant
-increase in memory used, or a don't-really-care increase?
+Specifically, would the xhci driver support both?
 
-I guess what we should do is:
- * identify obviously imminently upcoming features (like
-   GICv4 support, wider physaddrs) and make sure the format
-   supports them
-   [let's say, anything we think we're definitely likely
-   to be adding in the next 12 months]
- * decide on our 'escape hatch' plan for anything
-   more vague
- * test that we do correctly fail migration for an
-   incoming ITS state that asks for an unsupported Revision
- * document how the 'escape hatch' is intended to work
-   so we don't then invent a different approach in the
-   future :-)
+If I remove MSI support from my kernel, I might be able to test
+legacy interrupt support that way, right?
 
-thanks
--- PMM
+Regards.
