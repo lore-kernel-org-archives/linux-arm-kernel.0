@@ -1,33 +1,24 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 13 Mar 2017 18:51:53 +0100
-Subject: [PATCH] clocksource: add missing line break to error messages
-In-Reply-To: <20170309094710.31003-1-zajec5@gmail.com>
-References: <20170309094710.31003-1-zajec5@gmail.com>
-Message-ID: <20170313175153.GC19679@ulmo.ba.sec>
+From: james.morse@arm.com (James Morse)
+Date: Mon, 13 Mar 2017 17:53:39 +0000
+Subject: [PATCH v3 01/25] arm64: hyp-stub: Implement HVC_RESET_VECTORS
+ stub hypercall
+In-Reply-To: <20170306142458.8875-2-marc.zyngier@arm.com>
+References: <20170306142458.8875-1-marc.zyngier@arm.com>
+ <20170306142458.8875-2-marc.zyngier@arm.com>
+Message-ID: <58C6DCA3.9050403@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 09, 2017 at 10:47:10AM +0100, Rafa? Mi?ecki wrote:
-[...]
-> diff --git a/drivers/clocksource/tegra20_timer.c b/drivers/clocksource/tegra20_timer.c
-> index f960891aa04e..b9990b9c98c5 100644
-> --- a/drivers/clocksource/tegra20_timer.c
-> +++ b/drivers/clocksource/tegra20_timer.c
-> @@ -245,7 +245,7 @@ static int __init tegra20_init_rtc(struct device_node *np)
->  
->  	rtc_base = of_iomap(np, 0);
->  	if (!rtc_base) {
-> -		pr_err("Can't map RTC registers");
-> +		pr_err("Can't map RTC registers\n");
->  		return -ENXIO;
->  	}
->  
+On 06/03/17 14:24, Marc Zyngier wrote:
+> Let's define a new stub hypercall that resets the HYP configuration
+> to its default: hyp-stub vectors, and MMU disabled.
+> 
+> Of course, for the hyp-stub itself, this is a trivial no-op.
+> Hypervisors will have a bit more work to do.
 
-Acked-by: Thierry Reding <treding@nvidia.com>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170313/3dc1fe2c/attachment.sig>
+Reviewed-by: James Morse <james.morse@arm.com>
+
+
+Thanks,
+
+James
