@@ -1,43 +1,83 @@
-From: robdclark@gmail.com (Rob Clark)
-Date: Mon, 13 Mar 2017 17:29:31 -0400
-Subject: [RFC PATCH 00/12] Ion cleanup in preparation for moving out of
- staging
-In-Reply-To: <6d3d52ba-29a9-701f-2948-00ce28282975@redhat.com>
-References: <1488491084-17252-1-git-send-email-labbott@redhat.com>
- <20170303132949.GC31582@dhcp22.suse.cz>
- <cf383b9b-3cbc-0092-a071-f120874c053c@redhat.com>
- <20170306074258.GA27953@dhcp22.suse.cz>
- <20170306104041.zghsicrnadoap7lp@phenom.ffwll.local>
- <20170306105805.jsq44kfxhsvazkm6@sirena.org.uk>
- <20170306160437.sf7bksorlnw7u372@phenom.ffwll.local>
- <CA+M3ks77Am3Fx-ZNmgeM5tCqdM7SzV7rby4Es-p2F2aOhUco9g@mail.gmail.com>
- <26bc57ae-d88f-4ea0-d666-2c1a02bf866f@redhat.com>
- <CA+M3ks6R=n4n54wofK7pYcWoQKUhzyWQytBO90+pRDRrAhi3ww@mail.gmail.com>
- <CAKMK7uH9NemeM2z-tQvge_B=kABop6O7UQFK3PirpJminMCPqw@mail.gmail.com>
- <6d3d52ba-29a9-701f-2948-00ce28282975@redhat.com>
-Message-ID: <CAF6AEGvs0qVr_=pSp5FYoxM4XNaKLtYB-uhBmDheYcgxgv1_2g@mail.gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 13 Mar 2017 21:29:55 +0000
+Subject: [PATCH v4 29/36] media: imx: mipi-csi2: enable setting and
+ getting of frame rates
+In-Reply-To: <20170313210349.GD10701@valkosipuli.retiisi.org.uk>
+References: <1487211578-11360-30-git-send-email-steve_longerbeam@mentor.com>
+ <20170220220409.GX16975@valkosipuli.retiisi.org.uk>
+ <20170221001332.GS21222@n2100.armlinux.org.uk>
+ <25596b21-70de-5e46-f149-f9ce3a86ecb7@gmail.com>
+ <1487667023.2331.8.camel@pengutronix.de>
+ <20170313131647.GB10701@valkosipuli.retiisi.org.uk>
+ <20170313132701.GJ21222@n2100.armlinux.org.uk>
+ <1489413301.2288.53.camel@pengutronix.de>
+ <27397114-7d77-2353-c526-bddd5f5297d9@gmail.com>
+ <20170313210349.GD10701@valkosipuli.retiisi.org.uk>
+Message-ID: <20170313212955.GO21222@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 13, 2017 at 5:09 PM, Laura Abbott <labbott@redhat.com> wrote:
->> Hm, we might want to expose all the heaps as individual
->> /dev/ion_$heapname nodes? Should we do this from the start, since
->> we're massively revamping the uapi anyway (imo not needed, current
->> state seems to work too)?
->> -Daniel
->>
->
-> I thought about that. One advantage with separate /dev/ion_$heap
-> is that we don't have to worry about a limit of 32 possible
-> heaps per system (32-bit heap id allocation field). But dealing
-> with an ioctl seems easier than names. Userspace might be less
-> likely to hardcode random id numbers vs. names as well.
+On Mon, Mar 13, 2017 at 11:03:50PM +0200, Sakari Ailus wrote:
+> Hi Steve,
+> 
+> On Mon, Mar 13, 2017 at 11:06:22AM -0700, Steve Longerbeam wrote:
+> > I'm kinda in the middle on this topic. I agree with Sakari that
+> > frame rate can fluctuate, but that should only be temporary. If
+> > the frame rate permanently shifts from what a subdev reports via
+> > g_frame_interval, then that is a system problem. So I agree with
+> > Phillip and Russell that a link validation of frame interval still
+> > makes sense.
+> > 
+> > But I also have to agree with Sakari that a subdev that has no
+> > control over frame rate has no business implementing those ops.
+> > 
+> > And then I agree with Russell that for subdevs that do have control
+> > over frame rate, they would have to walk the graph to find the frame
+> > rate source.
+> > 
+> > So we're stuck in a broken situation: either the subdevs have to walk
+> > the graph to find the source of frame rate, or s_frame_interval
+> > would have to be mandatory and validated between pads, same as set_fmt.
+> 
+> It's not broken; what we are missing though is documentation on how to
+> control devices that can change the frame rate i.e. presumably drop frames
+> occasionally.
 
+It's not about "presumably drop frames occasionally."  The definition
+of "occasional" is "occurring or appearing at irregular or infrequent
+intervals".  Another word which describes what you're saying would be
+"randomly drop frames" which would be a quite absurd "feature" to
+include in hardware.
 
-other advantage, I think, is selinux (brought up elsewhere on this
-thread).. heaps at known fixed PAs are useful for certain sorts of
-attacks so being able to restrict access more easily seems like a good
-thing
+It's about _deterministically_ omitting frames from the capture.
 
-BR,
--R
+The hardware provides two controls:
+1. the size of a group of frames - between 1 and 5 frames
+2. select which frames within the group are dropped using a bitmask
+
+This gives a _regular_ pattern of dropped frames.
+
+The rate scaling is given by: hweight(bitmask) / group size.
+
+So, for example, if you're receiving a 50fps TV broadcast, and want to
+capture at 25fps, you can set the group size to 2, and set the frame
+drop to binary "01" or "10" - if it's interlaced, this would have the
+effect of selecting one field, or skipping every other frame if
+progressive.
+
+That's not "we'll occasionally drop some frames", that's frame rate
+scaling.  Just like you can scale the size of an image by omitting
+every other pixel and every other line, this hardware allows omitting
+every other frame or more.
+
+So, to configure this feature, CSI needs to know two bits of information:
+
+1. The _source_ frame rate.
+2. The desired _sink_ frame rate.
+
+>From that, it can compute how many frames to drop, and size of the group.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
