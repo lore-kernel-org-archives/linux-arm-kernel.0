@@ -1,32 +1,23 @@
-From: awallis@codeaurora.org (Adam Wallis)
-Date: Mon, 13 Mar 2017 17:59:00 -0400
-Subject: [PATCH] [for 4.11]xhci: plat: Register shutdown for xhci_plat
-Message-ID: <1489442340-27084-1-git-send-email-awallis@codeaurora.org>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Mon, 13 Mar 2017 18:05:55 -0400
+Subject: [PATCH V4 0/3] PCI/ASPM: reconfigure ASPM following hotplug for
+ POLICY_DEFAULT
+In-Reply-To: <20170313214616.GE8232@bhelgaas-glaptop.roam.corp.google.com>
+References: <1489438085-2055-1-git-send-email-okaya@codeaurora.org>
+ <20170313214616.GE8232@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <c6b78903-ea09-9719-7073-c679b0b64a05@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shutdown should be called for xhci_plat devices especially for
-situations where kexec might be used by stopping DMA
-transactions.
+On 3/13/2017 5:46 PM, Bjorn Helgaas wrote:
+> What is this series based on?  Unless they depend on other in-flight
+> patches, I apply patches to branches based on my "master" branch,
+> which is typically -rc1 or -rc2 (it's currently v4.11-rc1).  These
+> don't apply to either.
 
-Signed-off-by: Adam Wallis <awallis@codeaurora.org>
----
- drivers/usb/host/xhci-plat.c | 1 +
- 1 file changed, 1 insertion(+)
+It looks like I am on 4.10. I can rebase and post again. 
 
-diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
-index bd02a6c..6ed468f 100644
---- a/drivers/usb/host/xhci-plat.c
-+++ b/drivers/usb/host/xhci-plat.c
-@@ -344,6 +344,7 @@ static int xhci_plat_resume(struct device *dev)
- static struct platform_driver usb_xhci_driver = {
- 	.probe	= xhci_plat_probe,
- 	.remove	= xhci_plat_remove,
-+	.shutdown	= usb_hcd_platform_shutdown,
- 	.driver	= {
- 		.name = "xhci-hcd",
- 		.pm = DEV_PM_OPS,
 -- 
-Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
