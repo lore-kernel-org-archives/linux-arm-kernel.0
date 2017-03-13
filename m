@@ -1,106 +1,56 @@
-From: xiexiuqi@huawei.com (Xie XiuQi)
-Date: Mon, 13 Mar 2017 10:31:33 +0800
-Subject: [PATCH V12 09/10] trace, ras: add ARM processor error trace event
-In-Reply-To: <14545228-7ff1-b31c-1fa5-daacf89a44b9@codeaurora.org>
-References: <1488833103-21082-1-git-send-email-tbaicar@codeaurora.org>
- <1488833103-21082-10-git-send-email-tbaicar@codeaurora.org>
- <58C12342.2090701@huawei.com>
- <14545228-7ff1-b31c-1fa5-daacf89a44b9@codeaurora.org>
-Message-ID: <58C60485.2070509@huawei.com>
+From: rui.zhang@intel.com (Zhang Rui)
+Date: Mon, 13 Mar 2017 10:44:48 +0800
+Subject: [BUG] v4.11-rc1: CPUFREQ Circular locking dependency
+In-Reply-To: <20170310234325.GB21222@n2100.armlinux.org.uk>
+References: <20170310150218.GW21222@n2100.armlinux.org.uk>
+ <CAJZ5v0jGRH_hwvvm9OLsaYgbghqWKOke9PyGNnkvP_ZiMqAxSw@mail.gmail.com>
+ <BY2PR21MB00362E60448FD2E00C120FFCCB200@BY2PR21MB0036.namprd21.prod.outlook.com>
+ <BY2PR21MB00361C512E03B09DBCE715D3CB200@BY2PR21MB0036.namprd21.prod.outlook.com>
+ <20170310234325.GB21222@n2100.armlinux.org.uk>
+Message-ID: <1489373088.5841.15.camel@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Baicar Tyler,
 
-On 2017/3/11 2:23, Baicar, Tyler wrote:
-> Hello Xie XiuQi,
-> 
-> 
-> On 3/9/2017 2:41 AM, Xie XiuQi wrote:
->> On 2017/3/7 4:45, Tyler Baicar wrote:
->>> Currently there are trace events for the various RAS
->>> errors with the exception of ARM processor type errors.
->>> Add a new trace event for such errors so that the user
->>> will know when they occur. These trace events are
->>> consistent with the ARM processor error section type
->>> defined in UEFI 2.6 spec section N.2.4.4.
->>>
->>> Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
->>> Acked-by: Steven Rostedt <rostedt@goodmis.org>
->>> ---
->>>   drivers/acpi/apei/ghes.c    |  8 +++++++-
->>>   drivers/firmware/efi/cper.c |  1 +
->>>   drivers/ras/ras.c           |  1 +
->>>   include/ras/ras_event.h     | 34 ++++++++++++++++++++++++++++++++++
->>>   4 files changed, 43 insertions(+), 1 deletion(-)
-> 
->>> diff --git a/include/ras/ras_event.h b/include/ras/ras_event.h
->>> index 5861b6f..b36db48 100644
->>> --- a/include/ras/ras_event.h
->>> +++ b/include/ras/ras_event.h
->>> @@ -162,6 +162,40 @@
->>>   );
->>>     /*
->>> + * ARM Processor Events Report
->>> + *
->>> + * This event is generated when hardware detects an ARM processor error
->>> + * has occurred. UEFI 2.6 spec section N.2.4.4.
->>> + */
->>> +TRACE_EVENT(arm_event,
->>> +
->>> +    TP_PROTO(const struct cper_sec_proc_arm *proc),
->>> +
->>> +    TP_ARGS(proc),
->>> +
->>> +    TP_STRUCT__entry(
->>> +        __field(u64, mpidr)
->>> +        __field(u64, midr)
->>> +        __field(u32, running_state)
->>> +        __field(u32, psci_state)
->>> +        __field(u8, affinity)
->>> +    ),
->>> +
->>> +    TP_fast_assign(
->>> +        __entry->affinity = proc->affinity_level;
->>> +        __entry->mpidr = proc->mpidr;
->>> +        __entry->midr = proc->midr;
->>> +        __entry->running_state = proc->running_state;
->>> +        __entry->psci_state = proc->psci_state;
->>> +    ),
->>> +
->>> +    TP_printk("affinity level: %d; MPIDR: %016llx; MIDR: %016llx; "
->>> +          "running state: %d; PSCI state: %d",
->>> +          __entry->affinity, __entry->mpidr, __entry->midr,
->>> +          __entry->running_state, __entry->psci_state)
->>> +);
->>> +
->> I think these fields are not enough, we need also export arm processor error
->> information (UEFI 2.6 spec section N.2.4.4.1), or at least the error type,
->> address, etc. So that the userspace (such as rasdaemon tool) could know what
->> error occurred.
->
-> This is something I am planning on adding in later. It is not clear to me how to
-> actually do this at this point. If you look at the spec, there is not a single
-> error information structure. There is at least one, but possibly a lot. There is
-> also an unknown amount of context information structures. In "Table 260. ARM Processor
-> Error Section" there are ERR_INFO_NUM and CONTEXT_INFO_NUM which give the number of these
-> structures. I think there will need to be separate trace events added in for each of
-> these structures because I don't think there is a way to have variable amounts of
-> structures inside of a trace event.
 
-Yes, I agree.
-
-Additional, cper_sec_proc_arm has validation bit, which indicates whether or not each of
-the fields is valid in this section. How could we show it in this trace event? If the filed
-is invalid, we would get a wrong value here.
-
---
-Thanks,
-Xie XiuQi
-
+On Fri, 2017-03-10 at 23:43 +0000, Russell King - ARM Linux wrote:
+> On Fri, Mar 10, 2017 at 06:33:28PM +0000, Matthew Wilcox wrote:
+> > 
+> > From cd5401d81633d5e48e39d67d4e65156e6759537e Mon Sep 17 00:00:00
+> > 2001
+> > From: Matthew Wilcox <mawilcox@microsoft.com>
+> > Date: Fri, 10 Mar 2017 13:22:53 -0500
+> > Subject: [PATCH] thermal: Fix potential deadlock in cpu_cooling
+> > 
+> > I expanded the scope of cooling_list_lock a little too far; it was
+> > not just covering cpufreq_dev_count, it was also covering the calls
+> > to cpufreq_register_notifier() and cpufreq_unregister_notifier().
+> > Since cooling_list_lock is also used within
+> > cpufreq_thermal_notifier(),
+> > lockdep reports a potential deadlock.??I don't think that's
+> > actually
+> > possible, but it's easy enough to make it impossible by testing the
+> > condition under cooling_list_lock and dropping the lock before
+> > calling
+> > cpufreq_register_notifier().
+> > 
+> > As a bonus, I noticed that cpufreq_dev_count is only used for the
+> > purpose
+> > of knowing whether this is the first or last cooling device
+> > registered,
+> > and we know that anyway because we know whether the list
+> > transitioned
+> > between empty and not-empty.??So we can delete that variable too.
+> > 
+> > Fixes: ae606089621ef0349402cfcbeca33a82abbd0fd0
+> > Reported-by: Russell King <linux@armlinux.org.uk>
+> > Signed-off-by: Matthew Wilcox <mawilcox@microsoft.com>
+> Thanks Matthew, appears to solve the problem.
 > 
-> The ARM processor error section also has a vendor specific error info buffer which will need to be exposed to userspace. This may be something that can reuse the unknown section type trace event or have it's own trace event for.
+> Tested-by: Russell King <rmk+kernel@armlinux.org.uk>
 > 
-> Thanks,
-> Tyler
-> 
+
+patch applied.
+
+thanks,
+rui
