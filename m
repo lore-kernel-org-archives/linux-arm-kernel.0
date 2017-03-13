@@ -1,68 +1,70 @@
-From: Jose.Abreu@synopsys.com (Jose Abreu)
-Date: Mon, 13 Mar 2017 12:55:58 +0000
-Subject: [PATCH] drm: dw_hdmi: Gate audio sampler clock from the
- enablement functions
-In-Reply-To: <20170313093630.GE21222@n2100.armlinux.org.uk>
-References: <20170310093509.19044-1-romain.perier@collabora.com>
- <25ad96a7-d907-2bcb-3a96-15a2956e7652@baylibre.com>
- <20170313093630.GE21222@n2100.armlinux.org.uk>
-Message-ID: <724d599e-7285-3feb-9a18-d3fbc4000eb5@synopsys.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 13 Mar 2017 13:01:38 +0000
+Subject: [PATCH v2 05/23] MAINTAINERS: Add file patterns for dove device
+ tree bindings
+In-Reply-To: <1489324627-19126-6-git-send-email-geert@linux-m68k.org>
+References: <1489324627-19126-1-git-send-email-geert@linux-m68k.org>
+ <1489324627-19126-6-git-send-email-geert@linux-m68k.org>
+Message-ID: <20170313130138.GV11350@io.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Geert,
 
+On Sun, Mar 12, 2017 at 02:16:49PM +0100, Geert Uytterhoeven wrote:
+> Submitters of device tree binding documentation may forget to CC
+> the subsystem maintainer if this is missing.
+> 
+> Signed-off-by: Geert Uytterhoeven <geert@linux-m68k.org>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Andrew Lunn <andrew@lunn.ch>
+> Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> Cc: Gregory Clement <gregory.clement@free-electrons.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> ---
+> Please apply this patch directly if you want to be involved in device
+> tree binding documentation for your subsystem.
+> 
+> v2:
+>   - No changes.
+> 
+> Impact on next-20170310:
+> 
+> +Jason Cooper <jason@lakedaemon.net> (maintainer:ARM/Marvell Dove/MV78xx0/Orion SOC support)
+> +Andrew Lunn <andrew@lunn.ch> (maintainer:ARM/Marvell Dove/MV78xx0/Orion SOC support)
+> +Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> (maintainer:ARM/Marvell Dove/MV78xx0/Orion SOC support)
+> +Gregory Clement <gregory.clement@free-electrons.com> (maintainer:ARM/Marvell Dove/MV78xx0/Orion SOC support)
+>  Rob Herring <robh+dt@kernel.org> (maintainer:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS)
+>  Mark Rutland <mark.rutland@arm.com> (maintainer:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS)
+> +linux-arm-kernel at lists.infradead.org (moderated list:ARM/Marvell Dove/MV78xx0/Orion SOC support)
+>  devicetree at vger.kernel.org (open list:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS)
+>  linux-kernel at vger.kernel.org (open list)
+> ---
+>  MAINTAINERS | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 6428d3c82fce9670..ce461fefec6c9463 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -1486,6 +1486,7 @@ M:	Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+>  M:	Gregory Clement <gregory.clement@free-electrons.com>
+>  L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+>  S:	Maintained
+> +F:	Documentation/devicetree/bindings/soc/dove/
 
-On 13-03-2017 09:36, Russell King - ARM Linux wrote:
-> On Mon, Mar 13, 2017 at 10:27:08AM +0100, Neil Armstrong wrote:
->> On 03/10/2017 10:35 AM, Romain Perier wrote:
->>> Currently, the audio sampler clock is enabled from dw_hdmi_setup() at
->>> step E. and is kept enabled for later use. This clock should be enabled
->>> and disabled along with the actual audio stream and not always on (that
->>> is bad for PM). Futhermore, this might cause sound glitches with some
->>> HDMI devices, as the CTS+N is forced to zero when the stream is disabled
->>> while the audio clock is still running.
->>>
->>> This commit adds a parameter to hdmi_audio_enable_clk() that controls
->>> when the audio sample clock must be enabled or disabled. Then, it moves
->>> the call to this function into dw_hdmi_audio_enable() and
->>> dw_hdmi_audio_disable().
->>>
->>> Signed-off-by: Romain Perier <romain.perier@collabora.com>
->>> ---
->>>  drivers/gpu/drm/bridge/dw-hdmi.c | 15 +++++++++------
->>>  1 file changed, 9 insertions(+), 6 deletions(-)
->>>
->> Hi Romain, Russell, Jose,
->>
->> This is a little out of scope, but I was wondering why the CTS calculation
->> was not left in AUTO mode in the dw-hdmi driver ?
-> There is no indication in the iMX6 manuals that the iMX6 supports
-> automatic CTS calculation.  Bits 7:4 of the AUD_CTS3 register are
-> marked as "reserved".
->
-> We're reliant on the information in the iMX6 manuals as we don't have
-> access to Synopsis' databooks for these parts (I understand you have
-> to be a customer to have access to that.)
->
+I'm not opposed to the idea, but I'm not seeing how we can do this
+completely.  What you've added only covers dove soc bindings.  There's
+orion5x, kirkwood, and all the newer mvebu socs.  Not to mention a lot
+of IP blocks we care about that aren't SoC- or Marvell-specific.
 
-(Synopsis -> Synopsys :))
+The dts files have a much more clear file pattern -> maintainer pairing.
+Perhaps we should make checkpatch smarter?  e.g. compatible strings
+found in changed binding docs are searched for in dts{i} files.  Hits
+are mapped to maintainers.
 
-Trying to catch up with the conversation:
+thoughts?
 
-1) In AHB audio mode the bits are always reserved.
-2) I think we should enable/disable clock instead of just forcing
-N/CTS, though, I don't know what could be the implications for
-iMX platform. I remember at the time I tested this using I2S
-(I've never used AHB), and HDMI protocol analyzers were
-complaining about the N/CTS being forced to zero.
-3) I also remember that there was something wrong with the N
-calculations (I had to remove the if for pixel clock ==
-25175000). I never submited a patch to that because I was running
-out of time and didn't investigate this further (it could be for
-example a problem specific to my setup).
+thx,
 
-Hope it helps a little bit.
-
-Best regards,
-Jose Miguel Abreu
+Jason.
