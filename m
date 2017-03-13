@@ -1,31 +1,69 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 13 Mar 2017 15:08:52 -0700
-Subject: [PATCH] ARM: dts: add the AB8500 clocks to the device tree
-In-Reply-To: <20170226000209.20534-1-linus.walleij@linaro.org>
-References: <20170226000209.20534-1-linus.walleij@linaro.org>
-Message-ID: <20170313220852.GB13064@localhost>
+Date: Mon, 13 Mar 2017 15:14:50 -0700
+Subject: [GIT PULL] Reset controller changes for v4.12
+In-Reply-To: <1489416089.2288.69.camel@pengutronix.de>
+References: <1488965177.2467.7.camel@pengutronix.de>
+ <1489416089.2288.69.camel@pengutronix.de>
+Message-ID: <20170313221450.GF13064@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 26, 2017 at 01:02:09AM +0100, Linus Walleij wrote:
-> This adds the AB8500 clocks to the device tree using the new
-> bindings from the clk subsystem, making audio work again.
+On Mon, Mar 13, 2017 at 03:41:29PM +0100, Philipp Zabel wrote:
+> On Wed, 2017-03-08 at 10:26 +0100, Philipp Zabel wrote:
+> > Dear arm-soc maintainers,
+> > 
+> > Please consider merging this tag, which adds new drivers for i.MX7 and
+> > Arria10, removes module code from non-modular drivers, and fixes a build
+> > warning in the uniphier driver and the nr_resets property usage of the
+> > socfpga driver.
+> > 
+> > regards
+> > Philipp
+> > 
+> > The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
+> > 
+> >   Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
+> > 
+> > are available in the git repository at:
+> > 
+> >   git://git.pengutronix.de/git/pza/linux.git tags/reset-for-4.12
+> > 
+> > for you to fetch changes up to 2fd14a1f3d3a1835c401a21f2d813030a97eab7d:
+> > 
+> >   reset: Add Altera Arria10 SR Reset Controller (2017-03-08 09:36:45 +0100)
+> > 
+> > ----------------------------------------------------------------
+> > Reset controller changes for v4.12
+> > 
+> > - make reset drivers with bool Kconfig options explicitly non-modular
+> > - fix uniphier non-static symbol warnings
+> > - fix socfpga nr_resets property
+> > - new drivers for the Arria10 and i.MX7 system reset controllers
+> > 
+> > ----------------------------------------------------------------
+> > Andrey Smirnov (1):
+> >       reset: Add i.MX7 SRC reset driver
+> > 
+> > Paul Gortmaker (4):
+> >       reset: meson: make it explicitly non-modular
+> >       reset: oxnas: make it explicitly non-modular
+> >       reset: ath79: make it explicitly non-modular
+> >       reset: pistachio: make it explicitly non-modular
+> > 
+> > Rojhalat Ibrahim (1):
+> >       reset-socfpga: Fix nr_resets property
+> > 
+> > Thor Thayer (3):
+> >       dt-bindings: mfd: Add Altera Arria10 SR Reset Controller bindings
 > 
-> Cc: Lee Jones <lee.jones@linaro.org>
-> Cc: Ulf Hansson <ulf.hansson@linaro.org>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> ARM SoC guys: please consider this for late merge/early fix.
+>                     ^^^
 > 
-> Lee had audio working at some point in the past, but there is no
-> way of fixing it backward or for stable. However: applying this
-> fixes it for v4.11.
-> 
-> ChangeLog v1->v2:
-> - Rename DT node to clock-controller.
+> I just noticed that technically this patch would need MFD maintainer
+> approval for me to merge it through the reset tree. So if you have not
+> acted on this pull request yet, please hold back and I'll send a new one
+> without that patch or with the necessary approval.
 
-Thanks, I'm interpreting this as a fix (at least this early in the release
-cycle, and merging it for 4.11 fixes).
+Ok, holding off. Please send fresh pull request when it's sorted.
 
 
 -Olof
