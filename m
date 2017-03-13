@@ -1,154 +1,53 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Mon, 13 Mar 2017 14:26:40 +0100
-Subject: [PATCH 1/5] clk: meson: Add support for parameters for specific PLLs
+Date: Mon, 13 Mar 2017 14:26:41 +0100
+Subject: [PATCH 2/5] clk: meson-gxbb: Add GP0 PLL init parameters
 In-Reply-To: <1489411604-18700-1-git-send-email-narmstrong@baylibre.com>
 References: <1489411604-18700-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1489411604-18700-2-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1489411604-18700-3-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In recent Amlogic GXBB, GXL and GXM SoCs, the GP0 PLL needs some specific
-parameters in order to initialize and lock correctly.
+Tha Amlogic GXBB SoC GP0 PLL needs some vendor provided parameters to be
+initializated in the the GP0 control registers before configuring the rate
+with the rate table provided parameters.
 
-This patch adds an optional PARAM table used to initialize the PLL to a
-default value with it's parameters in order to achieve to desired frequency.
-
-The GP0 PLL in GXBB, GXL/GXM also needs some tweaks in the initialization
-steps, and these are exposed along the PARAM table.
+GXBB GP0 PLL tweaks are also selected to respect the vendor init procedure.
 
 Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 ---
- drivers/clk/meson/clk-pll.c | 52 +++++++++++++++++++++++++++++++++++++++++++--
- drivers/clk/meson/clkc.h    | 23 ++++++++++++++++++++
- 2 files changed, 73 insertions(+), 2 deletions(-)
+ drivers/clk/meson/gxbb.c | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-diff --git a/drivers/clk/meson/clk-pll.c b/drivers/clk/meson/clk-pll.c
-index 4adc1e8..aff223b 100644
---- a/drivers/clk/meson/clk-pll.c
-+++ b/drivers/clk/meson/clk-pll.c
-@@ -116,6 +116,29 @@ static const struct pll_rate_table *meson_clk_get_pll_settings(struct meson_clk_
- 	return NULL;
- }
+diff --git a/drivers/clk/meson/gxbb.c b/drivers/clk/meson/gxbb.c
+index 1c1ec13..5e1a7dc4 100644
+--- a/drivers/clk/meson/gxbb.c
++++ b/drivers/clk/meson/gxbb.c
+@@ -352,6 +352,13 @@
+ 	},
+ };
  
-+/* Specific wait loop for GXL/GXM GP0 PLL */
-+static int meson_clk_pll_wait_lock_reset(struct meson_clk_pll *pll,
-+					 struct parm *p_n)
-+{
-+	int delay = 100;
-+	u32 reg;
-+
-+	while (delay > 0) {
-+		reg = readl(pll->base + p_n->reg_off);
-+		writel(reg | MESON_PLL_RESET, pll->base + p_n->reg_off);
-+		udelay(10);
-+		writel(reg & ~MESON_PLL_RESET, pll->base + p_n->reg_off);
-+
-+		mdelay(1);
-+
-+		reg = readl(pll->base + p_n->reg_off);
-+		if (reg & MESON_PLL_LOCK)
-+			return 0;
-+		delay--;
-+	}
-+	return -ETIMEDOUT;
-+}
-+
- static int meson_clk_pll_wait_lock(struct meson_clk_pll *pll,
- 				   struct parm *p_n)
- {
-@@ -132,6 +155,15 @@ static int meson_clk_pll_wait_lock(struct meson_clk_pll *pll,
- 	return -ETIMEDOUT;
- }
- 
-+static void meson_clk_pll_init_params(struct meson_clk_pll *pll)
-+{
-+	int i;
-+
-+	for (i = 0 ; i < pll->params.params_count ; ++i)
-+		writel(pll->params.params_table[i].value,
-+		       pll->base + pll->params.params_table[i].reg_off);
-+}
-+
- static int meson_clk_pll_set_rate(struct clk_hw *hw, unsigned long rate,
- 				  unsigned long parent_rate)
- {
-@@ -151,10 +183,16 @@ static int meson_clk_pll_set_rate(struct clk_hw *hw, unsigned long rate,
- 	if (!rate_set)
- 		return -EINVAL;
- 
-+	/* Initialize the PLL in a clean state if specified */
-+	if (pll->params.params_count)
-+		meson_clk_pll_init_params(pll);
-+
- 	/* PLL reset */
- 	p = &pll->n;
- 	reg = readl(pll->base + p->reg_off);
--	writel(reg | MESON_PLL_RESET, pll->base + p->reg_off);
-+	/* If no_init_reset is provided, avoid resetting at this point */
-+	if (!pll->params.no_init_reset)
-+		writel(reg | MESON_PLL_RESET, pll->base + p->reg_off);
- 
- 	reg = PARM_SET(p->width, p->shift, reg, rate_set->n);
- 	writel(reg, pll->base + p->reg_off);
-@@ -184,7 +222,17 @@ static int meson_clk_pll_set_rate(struct clk_hw *hw, unsigned long rate,
- 	}
- 
- 	p = &pll->n;
--	ret = meson_clk_pll_wait_lock(pll, p);
-+	/* If unreset_for_lock is provided, remove the reset bit here */
-+	if (pll->params.unreset_for_lock) {
-+		reg = readl(pll->base + p->reg_off);
-+		writel(reg & ~MESON_PLL_RESET, pll->base + p->reg_off);
-+	}
-+
-+	/* If reset_lock_loop, use a special loop including resetting */
-+	if (pll->params.reset_lock_loop)
-+		ret = meson_clk_pll_wait_lock_reset(pll, p);
-+	else
-+		ret = meson_clk_pll_wait_lock(pll, p);
- 	if (ret) {
- 		pr_warn("%s: pll did not lock, trying to restore old rate %lu\n",
- 			__func__, old_rate);
-diff --git a/drivers/clk/meson/clkc.h b/drivers/clk/meson/clkc.h
-index 9bb70e7..5f1c12d 100644
---- a/drivers/clk/meson/clkc.h
-+++ b/drivers/clk/meson/clkc.h
-@@ -62,6 +62,28 @@ struct pll_rate_table {
- 		.frac		= (_frac),				\
- 	}								\
- 
-+struct pll_params_table {
-+	unsigned int reg_off;
-+	unsigned int value;
++struct pll_params_table gxbb_gp0_params_table[] = {
++	PLL_PARAM(HHI_GP0_PLL_CNTL, 0x6a000228),
++	PLL_PARAM(HHI_GP0_PLL_CNTL2, 0x69c80000),
++	PLL_PARAM(HHI_GP0_PLL_CNTL3, 0x0a5590c4),
++	PLL_PARAM(HHI_GP0_PLL_CNTL4, 0x0000500d),
 +};
 +
-+#define PLL_PARAM(_reg, _val)						\
-+	{								\
-+		.reg_off	= (_reg),				\
-+		.value		= (_val),				\
-+	}
-+
-+struct pll_setup_params {
-+	struct pll_params_table *params_table;
-+	unsigned int params_count;
-+	/* Workaround for GP0, do not reset before configuring */
-+	bool no_init_reset;
-+	/* Workaround for GP0, unreset right before checking for lock */
-+	bool unreset_for_lock;
-+	/* Workaround for GXL GP0, reset in the lock checking loop */
-+	bool reset_lock_loop;
-+};
-+
- struct meson_clk_pll {
- 	struct clk_hw hw;
- 	void __iomem *base;
-@@ -70,6 +92,7 @@ struct meson_clk_pll {
- 	struct parm frac;
- 	struct parm od;
- 	struct parm od2;
-+	const struct pll_setup_params params;
- 	const struct pll_rate_table *rate_table;
- 	unsigned int rate_count;
- 	spinlock_t *lock;
+ static struct meson_clk_pll gxbb_gp0_pll = {
+ 	.m = {
+ 		.reg_off = HHI_GP0_PLL_CNTL,
+@@ -368,6 +375,12 @@
+ 		.shift   = 16,
+ 		.width   = 2,
+ 	},
++	.params = {
++		.params_table = gxbb_gp0_params_table,
++		.params_count =	ARRAY_SIZE(gxbb_gp0_params_table),
++		.no_init_reset = true,
++		.unreset_for_lock = true,
++	},
+ 	.rate_table = gp0_pll_rate_table,
+ 	.rate_count = ARRAY_SIZE(gp0_pll_rate_table),
+ 	.lock = &clk_lock,
 -- 
 1.9.1
