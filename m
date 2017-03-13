@@ -1,496 +1,252 @@
-From: seanpaul@chromium.org (Sean Paul)
-Date: Mon, 13 Mar 2017 17:06:22 -0400
-Subject: [PATCH] drm/rockchip: Refactor the component match logic.
-In-Reply-To: <1488952694-30020-1-git-send-email-jeffy.chen@rock-chips.com>
-References: <1488952694-30020-1-git-send-email-jeffy.chen@rock-chips.com>
-Message-ID: <20170313210621.GY20329@art_vandelay>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Mon, 13 Mar 2017 21:06:38 +0000
+Subject: [PATCH v2 08/11] iio: adc: sun4i-gpadc-iio: add support for A33
+ thermal sensor
+In-Reply-To: <20170310103921.19469-9-quentin.schulz@free-electrons.com>
+References: <20170310103921.19469-1-quentin.schulz@free-electrons.com>
+ <20170310103921.19469-9-quentin.schulz@free-electrons.com>
+Message-ID: <c70640c7-7dd9-dc7c-b751-430b2ad59245@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 08, 2017 at 01:58:14PM +0800, Jeffy Chen wrote:
-> Currently we are adding all components from the dts, if one of their
-> drivers been disabled, we would not be able to bring up others.
+On 10/03/17 10:39, Quentin Schulz wrote:
+> This adds support for the Allwinner A33 thermal sensor.
 > 
-> Refactor component match logic, follow exynos drm.
+> Unlike the A10, A13 and A31, the Allwinner A33 only has one channel
+> which is dedicated to the thermal sensor. Moreover, its thermal sensor
+> does not generate interruptions, thus we only need to directly read the
+> register storing the temperature value.
 > 
-> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+> The MFD used by the A10, A13 and A31, was created to avoid breaking the
+> DT binding, but since the nodes for the ADC weren't there for the A33,
+> it is not needed.
 > 
+> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+
+Talk me through why it makes sense to do this rather than simply spin out
+a really simple thermal driver for the A33?
+
+I'm not against what you have here, but don't feel it has been fully argued.
+
+Jonathan
 > ---
 > 
->  drivers/gpu/drm/rockchip/Kconfig                |  10 +-
->  drivers/gpu/drm/rockchip/Makefile               |  16 +--
->  drivers/gpu/drm/rockchip/analogix_dp-rockchip.c |   9 +-
->  drivers/gpu/drm/rockchip/cdn-dp-core.c          |   8 +-
->  drivers/gpu/drm/rockchip/dw-mipi-dsi.c          |   8 +-
->  drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c     |  10 +-
->  drivers/gpu/drm/rockchip/inno_hdmi.c            |  10 +-
->  drivers/gpu/drm/rockchip/rockchip_drm_drv.c     | 156 ++++++++++++++++--------
->  drivers/gpu/drm/rockchip/rockchip_drm_drv.h     |   6 +
->  drivers/gpu/drm/rockchip/rockchip_vop_reg.c     |   8 +-
->  10 files changed, 133 insertions(+), 108 deletions(-)
+> v2:
+>   - removed added comments in Kconfig,
+>   - simplified Kconfig depends on condition,
+>   - removed THERMAL_OF requirement for sun8i,
+>   - renamed sun8i_gpadc_channels to sun8i_a33_gpadc_channels,
+>   - renamed use_dt boolean in no_irq as it reflects better why we need it,
+>   - removed spurious/unneeded modifications done in v1,
 > 
-> diff --git a/drivers/gpu/drm/rockchip/Kconfig b/drivers/gpu/drm/rockchip/Kconfig
-> index 0e4eb84..50c41c0 100644
-> --- a/drivers/gpu/drm/rockchip/Kconfig
-> +++ b/drivers/gpu/drm/rockchip/Kconfig
-> @@ -13,7 +13,7 @@ config DRM_ROCKCHIP
->  	  IP found on the SoC.
->  
->  config ROCKCHIP_ANALOGIX_DP
-> -	tristate "Rockchip specific extensions for Analogix DP driver"
-> +	bool "Rockchip specific extensions for Analogix DP driver"
->  	depends on DRM_ROCKCHIP
->  	select DRM_ANALOGIX_DP
+>  drivers/iio/adc/Kconfig           |   2 +-
+>  drivers/iio/adc/sun4i-gpadc-iio.c | 100 ++++++++++++++++++++++++++++++++++++--
+>  include/linux/mfd/sun4i-gpadc.h   |   4 ++
+>  3 files changed, 102 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/iio/adc/Kconfig b/drivers/iio/adc/Kconfig
+> index 9f8b4b1..8c8ead6 100644
+> --- a/drivers/iio/adc/Kconfig
+> +++ b/drivers/iio/adc/Kconfig
+> @@ -562,7 +562,7 @@ config STX104
+>  config SUN4I_GPADC
+>  	tristate "Support for the Allwinner SoCs GPADC"
+>  	depends on IIO
+> -	depends on MFD_SUN4I_GPADC
+> +	depends on MFD_SUN4I_GPADC || MACH_SUN8I
 >  	help
-> @@ -22,7 +22,7 @@ config ROCKCHIP_ANALOGIX_DP
->  	  on RK3288 based SoC, you should selet this option.
->  
->  config ROCKCHIP_CDN_DP
-> -        tristate "Rockchip cdn DP"
-> +        bool "Rockchip cdn DP"
->          depends on DRM_ROCKCHIP
->  	depends on EXTCON
->  	select SND_SOC_HDMI_CODEC if SND_SOC
-> @@ -33,7 +33,7 @@ config ROCKCHIP_CDN_DP
->  	  option.
->  
->  config ROCKCHIP_DW_HDMI
-> -        tristate "Rockchip specific extensions for Synopsys DW HDMI"
-> +        bool "Rockchip specific extensions for Synopsys DW HDMI"
->          depends on DRM_ROCKCHIP
->          select DRM_DW_HDMI
->          help
-> @@ -43,7 +43,7 @@ config ROCKCHIP_DW_HDMI
->  	  option.
->  
->  config ROCKCHIP_DW_MIPI_DSI
-> -	tristate "Rockchip specific extensions for Synopsys DW MIPI DSI"
-> +	bool "Rockchip specific extensions for Synopsys DW MIPI DSI"
->  	depends on DRM_ROCKCHIP
->  	select DRM_MIPI_DSI
->  	help
-> @@ -53,7 +53,7 @@ config ROCKCHIP_DW_MIPI_DSI
->  	 option.
->  
->  config ROCKCHIP_INNO_HDMI
-> -	tristate "Rockchip specific extensions for Innosilicon HDMI"
-> +	bool "Rockchip specific extensions for Innosilicon HDMI"
->  	depends on DRM_ROCKCHIP
->  	help
->  	  This selects support for Rockchip SoC specific extensions
-> diff --git a/drivers/gpu/drm/rockchip/Makefile b/drivers/gpu/drm/rockchip/Makefile
-> index c931e2a..fa8dc9d 100644
-> --- a/drivers/gpu/drm/rockchip/Makefile
-> +++ b/drivers/gpu/drm/rockchip/Makefile
-> @@ -3,14 +3,14 @@
->  # Direct Rendering Infrastructure (DRI) in XFree86 4.1.0 and higher.
->  
->  rockchipdrm-y := rockchip_drm_drv.o rockchip_drm_fb.o \
-> -		rockchip_drm_gem.o rockchip_drm_psr.o rockchip_drm_vop.o
-> +		rockchip_drm_gem.o rockchip_drm_psr.o \
-> +		rockchip_drm_vop.o rockchip_vop_reg.o
->  rockchipdrm-$(CONFIG_DRM_FBDEV_EMULATION) += rockchip_drm_fbdev.o
->  
-> -obj-$(CONFIG_ROCKCHIP_ANALOGIX_DP) += analogix_dp-rockchip.o
-> -obj-$(CONFIG_ROCKCHIP_CDN_DP) += cdn-dp.o
-> -cdn-dp-objs := cdn-dp-core.o cdn-dp-reg.o
-> -obj-$(CONFIG_ROCKCHIP_DW_HDMI) += dw_hdmi-rockchip.o
-> -obj-$(CONFIG_ROCKCHIP_DW_MIPI_DSI) += dw-mipi-dsi.o
-> -obj-$(CONFIG_ROCKCHIP_INNO_HDMI) += inno_hdmi.o
-> +rockchipdrm-$(CONFIG_ROCKCHIP_ANALOGIX_DP) += analogix_dp-rockchip.o
-> +rockchipdrm-$(CONFIG_ROCKCHIP_CDN_DP) += cdn-dp-core.o cdn-dp-reg.o
-> +rockchipdrm-$(CONFIG_ROCKCHIP_DW_HDMI) += dw_hdmi-rockchip.o
-> +rockchipdrm-$(CONFIG_ROCKCHIP_DW_MIPI_DSI) += dw-mipi-dsi.o
-> +rockchipdrm-$(CONFIG_ROCKCHIP_INNO_HDMI) += inno_hdmi.o
->  
-> -obj-$(CONFIG_DRM_ROCKCHIP) += rockchipdrm.o rockchip_vop_reg.o
-> +obj-$(CONFIG_DRM_ROCKCHIP) += rockchipdrm.o
-> diff --git a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
-> index 8548e82..91ebe5c 100644
-> --- a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
-> +++ b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
-> @@ -507,7 +507,7 @@ static const struct of_device_id rockchip_dp_dt_ids[] = {
->  };
->  MODULE_DEVICE_TABLE(of, rockchip_dp_dt_ids);
->  
-> -static struct platform_driver rockchip_dp_driver = {
-> +struct platform_driver rockchip_dp_driver = {
->  	.probe = rockchip_dp_probe,
->  	.remove = rockchip_dp_remove,
->  	.driver = {
-> @@ -516,10 +516,3 @@ static struct platform_driver rockchip_dp_driver = {
->  		   .of_match_table = of_match_ptr(rockchip_dp_dt_ids),
->  	},
->  };
-> -
-> -module_platform_driver(rockchip_dp_driver);
-> -
-> -MODULE_AUTHOR("Yakir Yang <ykk@rock-chips.com>");
-> -MODULE_AUTHOR("Jeff chen <jeff.chen@rock-chips.com>");
-> -MODULE_DESCRIPTION("Rockchip Specific Analogix-DP Driver Extension");
-> -MODULE_LICENSE("GPL v2");
-> diff --git a/drivers/gpu/drm/rockchip/cdn-dp-core.c b/drivers/gpu/drm/rockchip/cdn-dp-core.c
-> index fd79a70..e1796d0 100644
-> --- a/drivers/gpu/drm/rockchip/cdn-dp-core.c
-> +++ b/drivers/gpu/drm/rockchip/cdn-dp-core.c
-> @@ -1243,7 +1243,7 @@ static const struct dev_pm_ops cdn_dp_pm_ops = {
->  				cdn_dp_resume)
+>  	  Say yes here to build support for Allwinner (A10, A13 and A31) SoCs
+>  	  GPADC. This ADC provides 4 channels which can be used as an ADC or as
+> diff --git a/drivers/iio/adc/sun4i-gpadc-iio.c b/drivers/iio/adc/sun4i-gpadc-iio.c
+> index 7cb997a..70684cd 100644
+> --- a/drivers/iio/adc/sun4i-gpadc-iio.c
+> +++ b/drivers/iio/adc/sun4i-gpadc-iio.c
+> @@ -85,6 +85,12 @@ static const struct gpadc_data sun6i_gpadc_data = {
+>  	.adc_chan_mask = SUN6I_GPADC_CTRL1_ADC_CHAN_MASK,
 >  };
 >  
-> -static struct platform_driver cdn_dp_driver = {
-> +struct platform_driver cdn_dp_driver = {
->  	.probe = cdn_dp_probe,
->  	.remove = cdn_dp_remove,
->  	.shutdown = cdn_dp_shutdown,
-> @@ -1254,9 +1254,3 @@ static struct platform_driver cdn_dp_driver = {
->  		   .pm = &cdn_dp_pm_ops,
->  	},
->  };
-> -
-> -module_platform_driver(cdn_dp_driver);
-> -
-> -MODULE_AUTHOR("Chris Zhong <zyw@rock-chips.com>");
-> -MODULE_DESCRIPTION("cdn DP Driver");
-> -MODULE_LICENSE("GPL v2");
-> diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> index d9aa382..65a474f 100644
-> --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> @@ -1165,7 +1165,7 @@ static int dw_mipi_dsi_remove(struct platform_device *pdev)
->  	return 0;
->  }
->  
-> -static struct platform_driver dw_mipi_dsi_driver = {
-> +struct platform_driver dw_mipi_dsi_driver = {
->  	.probe		= dw_mipi_dsi_probe,
->  	.remove		= dw_mipi_dsi_remove,
->  	.driver		= {
-> @@ -1173,9 +1173,3 @@ static struct platform_driver dw_mipi_dsi_driver = {
->  		.name	= DRIVER_NAME,
->  	},
->  };
-> -module_platform_driver(dw_mipi_dsi_driver);
-> -
-> -MODULE_DESCRIPTION("ROCKCHIP MIPI DSI host controller driver");
-> -MODULE_AUTHOR("Chris Zhong <zyw@rock-chips.com>");
-> -MODULE_LICENSE("GPL");
-> -MODULE_ALIAS("platform:" DRIVER_NAME);
-> diff --git a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
-> index a6d4a02..976ea79 100644
-> --- a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
-> +++ b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
-> @@ -326,7 +326,7 @@ static int dw_hdmi_rockchip_remove(struct platform_device *pdev)
->  	return 0;
->  }
->  
-> -static struct platform_driver dw_hdmi_rockchip_pltfm_driver = {
-> +struct platform_driver dw_hdmi_rockchip_pltfm_driver = {
->  	.probe  = dw_hdmi_rockchip_probe,
->  	.remove = dw_hdmi_rockchip_remove,
->  	.driver = {
-> @@ -334,11 +334,3 @@ static struct platform_driver dw_hdmi_rockchip_pltfm_driver = {
->  		.of_match_table = dw_hdmi_rockchip_dt_ids,
->  	},
->  };
-> -
-> -module_platform_driver(dw_hdmi_rockchip_pltfm_driver);
-> -
-> -MODULE_AUTHOR("Andy Yan <andy.yan@rock-chips.com>");
-> -MODULE_AUTHOR("Yakir Yang <ykk@rock-chips.com>");
-> -MODULE_DESCRIPTION("Rockchip Specific DW-HDMI Driver Extension");
-> -MODULE_LICENSE("GPL");
-> -MODULE_ALIAS("platform:dwhdmi-rockchip");
-> diff --git a/drivers/gpu/drm/rockchip/inno_hdmi.c b/drivers/gpu/drm/rockchip/inno_hdmi.c
-> index 006260d..7d9b75e 100644
-> --- a/drivers/gpu/drm/rockchip/inno_hdmi.c
-> +++ b/drivers/gpu/drm/rockchip/inno_hdmi.c
-> @@ -923,7 +923,7 @@ static const struct of_device_id inno_hdmi_dt_ids[] = {
->  };
->  MODULE_DEVICE_TABLE(of, inno_hdmi_dt_ids);
->  
-> -static struct platform_driver inno_hdmi_driver = {
-> +struct platform_driver inno_hdmi_driver = {
->  	.probe  = inno_hdmi_probe,
->  	.remove = inno_hdmi_remove,
->  	.driver = {
-> @@ -931,11 +931,3 @@ static struct platform_driver inno_hdmi_driver = {
->  		.of_match_table = inno_hdmi_dt_ids,
->  	},
->  };
-> -
-> -module_platform_driver(inno_hdmi_driver);
-> -
-> -MODULE_AUTHOR("Zheng Yang <zhengyang@rock-chips.com>");
-> -MODULE_AUTHOR("Yakir Yang <ykk@rock-chips.com>");
-> -MODULE_DESCRIPTION("Rockchip Specific INNO-HDMI Driver");
-> -MODULE_LICENSE("GPL v2");
-> -MODULE_ALIAS("platform:innohdmi-rockchip");
-> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
-> index b360e62..c0dae3b 100644
-> --- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
-> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
-> @@ -356,34 +356,49 @@ static const struct dev_pm_ops rockchip_drm_pm_ops = {
->  				rockchip_drm_sys_resume)
->  };
->  
-> -static int compare_of(struct device *dev, void *data)
-> -{
-> -	struct device_node *np = data;
-> +static struct platform_driver *rockchip_drm_comp_drvs[] = {
-> +	&vop_platform_driver,
-> +#ifdef CONFIG_ROCKCHIP_ANALOGIX_DP
-> +	&rockchip_dp_driver,
-> +#endif
-> +#ifdef CONFIG_ROCKCHIP_CDN_DP
-> +	&cdn_dp_driver,
-> +#endif
-> +#ifdef CONFIG_ROCKCHIP_DW_HDMI
-> +	&dw_hdmi_rockchip_pltfm_driver,
-> +#endif
-> +#ifdef CONFIG_ROCKCHIP_DW_MIPI_DSI
-> +	&dw_mipi_dsi_driver,
-> +#endif
-> +#ifdef CONFIG_ROCKCHIP_INNO_HDMI
-> +	&inno_hdmi_driver,
-> +#endif
+> +static const struct gpadc_data sun8i_a33_gpadc_data = {
+> +	.temp_offset = -1662,
+> +	.temp_scale = 162,
+> +	.tp_mode_en = SUN8I_GPADC_CTRL1_CHOP_TEMP_EN,
 > +};
->  
-> -	return dev->of_node == np;
-> +static int compare_dev(struct device *dev, void *data)
-> +{
-> +	return dev == (struct device *)data;
->  }
->  
-> -static void rockchip_add_endpoints(struct device *dev,
-> -				   struct component_match **match,
-> -				   struct device_node *port)
-> +static struct component_match *rockchip_drm_match_add(struct device *dev)
->  {
-> -	struct device_node *ep, *remote;
-> +	struct component_match *match = NULL;
-> +	int i;
->  
-> -	for_each_child_of_node(port, ep) {
-> -		remote = of_graph_get_remote_port_parent(ep);
-> -		if (!remote || !of_device_is_available(remote)) {
-> -			of_node_put(remote);
-> -			continue;
-> -		} else if (!of_device_is_available(remote->parent)) {
-> -			dev_warn(dev, "parent device of %s is not available\n",
-> -				 remote->full_name);
-> -			of_node_put(remote);
-> -			continue;
-> -		}
-> +	for (i = 0; i < ARRAY_SIZE(rockchip_drm_comp_drvs); i++) {
-> +		struct platform_driver *drv = rockchip_drm_comp_drvs[i];
-> +		struct device *p = NULL, *d;
->  
-> -		drm_of_component_match_add(dev, match, compare_of, remote);
-> -		of_node_put(remote);
-> +		while ((d = bus_find_device(&platform_bus_type, p, &drv->driver,
-> +					    (void *)platform_bus_type.match))) {
-> +			put_device(p);
-> +			component_match_add(dev, &match, compare_dev, d);
-> +			p = d;
-> +		}
-> +		put_device(p);
-
-I think you could move the bus_find_device() inside the loop and just have
-put_device in one place. I spent more time than I would have liked trying to
-rationalize why there was an extra put.
-
->  	}
 > +
-> +	return match ?: ERR_PTR(-ENODEV);
->  }
->  
->  static const struct component_master_ops rockchip_drm_ops = {
-> @@ -391,21 +406,16 @@ static const struct component_master_ops rockchip_drm_ops = {
->  	.unbind = rockchip_drm_unbind,
+>  struct sun4i_gpadc_iio {
+>  	struct iio_dev			*indio_dev;
+>  	struct completion		completion;
+> @@ -96,6 +102,7 @@ struct sun4i_gpadc_iio {
+>  	unsigned int			temp_data_irq;
+>  	atomic_t			ignore_temp_data_irq;
+>  	const struct gpadc_data		*data;
+> +	bool				no_irq;
+>  	/* prevents concurrent reads of temperature and ADC */
+>  	struct mutex			mutex;
+>  };
+> @@ -138,6 +145,23 @@ static const struct iio_chan_spec sun4i_gpadc_channels_no_temp[] = {
+>  	SUN4I_GPADC_ADC_CHANNEL(3, "adc_chan3"),
 >  };
 >  
-> -static int rockchip_drm_platform_probe(struct platform_device *pdev)
-> +static int rockchip_drm_platform_of_probe(struct device *dev)
+> +static const struct iio_chan_spec sun8i_a33_gpadc_channels[] = {
+> +	{
+> +		.type = IIO_TEMP,
+> +		.info_mask_separate = BIT(IIO_CHAN_INFO_RAW) |
+> +				      BIT(IIO_CHAN_INFO_SCALE) |
+> +				      BIT(IIO_CHAN_INFO_OFFSET),
+> +		.datasheet_name = "temp_adc",
+> +	},
+> +};
+> +
+> +static const struct regmap_config sun4i_gpadc_regmap_config = {
+> +	.reg_bits = 32,
+> +	.val_bits = 32,
+> +	.reg_stride = 4,
+> +	.fast_io = true,
+> +};
+> +
+>  static int sun4i_prepare_for_irq(struct iio_dev *indio_dev, int channel,
+>  				 unsigned int irq)
 >  {
-> -	struct device *dev = &pdev->dev;
-> -	struct component_match *match = NULL;
->  	struct device_node *np = dev->of_node;
->  	struct device_node *port;
-> +	bool found = false;
->  	int i;
+> @@ -247,6 +271,17 @@ static int sun4i_gpadc_temp_read(struct iio_dev *indio_dev, int *val)
+>  {
+>  	struct sun4i_gpadc_iio *info = iio_priv(indio_dev);
 >  
->  	if (!np)
->  		return -ENODEV;
-> -	/*
-> -	 * Bind the crtc ports first, so that
-> -	 * drm_of_find_possible_crtcs called from encoder .bind callbacks
-> -	 * works as expected.
-> -	 */
+> +	if (info->no_irq) {
+> +		pm_runtime_get_sync(indio_dev->dev.parent);
 > +
->  	for (i = 0;; i++) {
->  		struct device_node *iommu;
->  
-> @@ -429,9 +439,9 @@ static int rockchip_drm_platform_probe(struct platform_device *pdev)
->  			is_support_iommu = false;
->  		}
->  
-> +		found = true;
+> +		regmap_read(info->regmap, SUN4I_GPADC_TEMP_DATA, val);
 > +
->  		of_node_put(iommu);
-> -		drm_of_component_match_add(dev, &match, compare_of,
-> -					   port->parent);
->  		of_node_put(port);
->  	}
->  
-> @@ -440,27 +450,27 @@ static int rockchip_drm_platform_probe(struct platform_device *pdev)
->  		return -ENODEV;
->  	}
->  
-> -	if (!match) {
-> +	if (!found) {
->  		dev_err(dev, "No available vop found for display-subsystem.\n");
->  		return -ENODEV;
->  	}
-> -	/*
-> -	 * For each bound crtc, bind the encoders attached to its
-> -	 * remote endpoint.
-> -	 */
-> -	for (i = 0;; i++) {
-> -		port = of_parse_phandle(np, "ports", i);
-> -		if (!port)
-> -			break;
->  
-> -		if (!of_device_is_available(port->parent)) {
-> -			of_node_put(port);
-> -			continue;
-> -		}
-> +	return 0;
-> +}
->  
-> -		rockchip_add_endpoints(dev, &match, port);
-> -		of_node_put(port);
-> -	}
-> +static int rockchip_drm_platform_probe(struct platform_device *pdev)
-> +{
-> +	struct device *dev = &pdev->dev;
-> +	struct component_match *match = NULL;
-> +	int ret;
+> +		pm_runtime_mark_last_busy(indio_dev->dev.parent);
+> +		pm_runtime_put_autosuspend(indio_dev->dev.parent);
 > +
-> +	ret = rockchip_drm_platform_of_probe(dev);
-> +	if (ret)
-> +		return ret;
-> +
-> +	match = rockchip_drm_match_add(dev);
-> +	if (IS_ERR(match))
-> +		return PTR_ERR(match);
->  
->  	return component_master_add_with_match(dev, &rockchip_drm_ops, match);
->  }
-> @@ -488,7 +498,57 @@ static struct platform_driver rockchip_drm_platform_driver = {
->  	},
->  };
->  
-> -module_platform_driver(rockchip_drm_platform_driver);
-> +static void rockchip_drm_unregister_drivers(void)
-> +{
-> +	int i;
-> +
-> +	for (i = ARRAY_SIZE(rockchip_drm_comp_drvs) - 1; i >= 0; i--)
-> +		platform_driver_unregister(rockchip_drm_comp_drvs[i]);
-> +}
-> +
-> +static int rockchip_drm_register_drivers(void)
-> +{
-> +	int i, ret;
-> +
-> +	for (i = 0; i < ARRAY_SIZE(rockchip_drm_comp_drvs); i++) {
-> +		ret = platform_driver_register(rockchip_drm_comp_drvs[i]);
-> +		if (ret)
-> +			goto fail;
+> +		return 0;
 > +	}
-> +	return 0;
-> +fail:
-> +	rockchip_drm_unregister_drivers();
-
-Are you sure you can call this for the drivers that have not yet been
-registered? I took a quick look in the platform_driver code and it seems like
-this might cause a device reference imbalance, at the least.
-
-> +	return ret;
-> +}
 > +
-> +static int __init rockchip_drm_init(void)
-> +{
-> +	int ret;
-> +
-> +	ret = rockchip_drm_register_drivers();
-> +	if (ret)
-> +		return ret;
-> +
-> +	ret = platform_driver_register(&rockchip_drm_platform_driver);
-> +	if (ret)
-> +		goto err_unreg_drivers;
-> +
-> +	return 0;
-> +
-> +err_unreg_drivers:
-> +	rockchip_drm_unregister_drivers();
-> +	return ret;
-> +}
-> +
-> +static void __exit rockchip_drm_fini(void)
-> +{
-> +	platform_driver_unregister(&rockchip_drm_platform_driver);
-> +
-> +	rockchip_drm_unregister_drivers();
-> +}
-> +
-> +module_init(rockchip_drm_init);
-> +module_exit(rockchip_drm_fini);
+>  	return sun4i_gpadc_read(indio_dev, 0, val, info->temp_data_irq);
+>  }
 >  
->  MODULE_AUTHOR("Mark Yao <mark.yao@rock-chips.com>");
->  MODULE_DESCRIPTION("ROCKCHIP DRM Driver");
-> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.h b/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
-> index adc3930..f46e1d0 100644
-> --- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
-> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
-> @@ -79,4 +79,10 @@ void rockchip_drm_dma_detach_device(struct drm_device *drm_dev,
->  int rockchip_drm_wait_line_flag(struct drm_crtc *crtc, unsigned int line_num,
->  				unsigned int mstimeout);
->  
-> +extern struct platform_driver cdn_dp_driver;
-> +extern struct platform_driver dw_hdmi_rockchip_pltfm_driver;
-> +extern struct platform_driver dw_mipi_dsi_driver;
-> +extern struct platform_driver inno_hdmi_driver;
-> +extern struct platform_driver rockchip_dp_driver;
-> +extern struct platform_driver vop_platform_driver;
-
-Should these be protected by #ifdef CONFIG_*?
-
->  #endif /* _ROCKCHIP_DRM_DRV_H_ */
-> diff --git a/drivers/gpu/drm/rockchip/rockchip_vop_reg.c b/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
-> index 91fbc7b..0da4444 100644
-> --- a/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
-> +++ b/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
-> @@ -404,7 +404,7 @@ static int vop_remove(struct platform_device *pdev)
+> @@ -454,6 +489,58 @@ static int sun4i_irq_init(struct platform_device *pdev, const char *name,
 >  	return 0;
 >  }
 >  
-> -static struct platform_driver vop_platform_driver = {
-> +struct platform_driver vop_platform_driver = {
->  	.probe = vop_probe,
->  	.remove = vop_remove,
+> +static const struct of_device_id sun4i_gpadc_of_id[] = {
+> +	{
+> +		.compatible = "allwinner,sun8i-a33-gpadc-iio",
+> +		.data = &sun8i_a33_gpadc_data,
+> +	},
+> +	{ /* sentinel */ }
+> +};
+> +
+> +static int sun4i_gpadc_probe_dt(struct platform_device *pdev,
+> +				struct iio_dev *indio_dev)
+> +{
+> +	struct sun4i_gpadc_iio *info = iio_priv(indio_dev);
+> +	const struct of_device_id *of_dev;
+> +	struct thermal_zone_device *tzd;
+> +	struct resource *mem;
+> +	void __iomem *base;
+> +	int ret;
+> +
+> +	of_dev = of_match_device(sun4i_gpadc_of_id, &pdev->dev);
+> +	if (!of_dev)
+> +		return -ENODEV;
+> +
+> +	info->no_irq = true;
+> +	info->data = (struct gpadc_data *)of_dev->data;
+> +	indio_dev->num_channels = ARRAY_SIZE(sun8i_a33_gpadc_channels);
+> +	indio_dev->channels = sun8i_a33_gpadc_channels;
+> +
+> +	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	base = devm_ioremap_resource(&pdev->dev, mem);
+> +	if (IS_ERR(base))
+> +		return PTR_ERR(base);
+> +
+> +	info->regmap = devm_regmap_init_mmio(&pdev->dev, base,
+> +					     &sun4i_gpadc_regmap_config);
+> +	if (IS_ERR(info->regmap)) {
+> +		ret = PTR_ERR(info->regmap);
+> +		dev_err(&pdev->dev, "failed to init regmap: %d\n", ret);
+> +		return ret;
+> +	}
+> +
+> +	if (!IS_ENABLED(THERMAL_OF))
+> +		return 0;
+> +
+> +	tzd = devm_thermal_zone_of_sensor_register(&pdev->dev, 0, info,
+> +						   &sun4i_ts_tz_ops);
+> +	if (IS_ERR(tzd))
+> +		dev_err(&pdev->dev, "could not register thermal sensor: %ld\n",
+> +			PTR_ERR(tzd));
+> +
+> +	return PTR_ERR_OR_ZERO(tzd);
+> +}
+> +
+>  static int sun4i_gpadc_probe_mfd(struct platform_device *pdev,
+>  				 struct iio_dev *indio_dev)
+>  {
+> @@ -462,6 +549,7 @@ static int sun4i_gpadc_probe_mfd(struct platform_device *pdev,
+>  		dev_get_drvdata(pdev->dev.parent);
+>  	int ret;
+>  
+> +	info->no_irq = false;
+>  	info->regmap = sun4i_gpadc_dev->regmap;
+>  
+>  	indio_dev->num_channels = ARRAY_SIZE(sun4i_gpadc_channels);
+> @@ -561,7 +649,11 @@ static int sun4i_gpadc_probe(struct platform_device *pdev)
+>  	indio_dev->info = &sun4i_gpadc_iio_info;
+>  	indio_dev->modes = INDIO_DIRECT_MODE;
+>  
+> -	ret = sun4i_gpadc_probe_mfd(pdev, indio_dev);
+> +	if (pdev->dev.of_node)
+> +		ret = sun4i_gpadc_probe_dt(pdev, indio_dev);
+> +	else
+> +		ret = sun4i_gpadc_probe_mfd(pdev, indio_dev);
+> +
+>  	if (ret)
+>  		return ret;
+>  
+> @@ -580,7 +672,7 @@ static int sun4i_gpadc_probe(struct platform_device *pdev)
+>  	return 0;
+>  
+>  err_map:
+> -	if (IS_ENABLED(CONFIG_THERMAL_OF))
+> +	if (!info->no_irq && IS_ENABLED(CONFIG_THERMAL_OF))
+>  		iio_map_array_unregister(indio_dev);
+>  
+>  	pm_runtime_put(&pdev->dev);
+> @@ -592,10 +684,11 @@ static int sun4i_gpadc_probe(struct platform_device *pdev)
+>  static int sun4i_gpadc_remove(struct platform_device *pdev)
+>  {
+>  	struct iio_dev *indio_dev = platform_get_drvdata(pdev);
+> +	struct sun4i_gpadc_iio *info = iio_priv(indio_dev);
+>  
+>  	pm_runtime_put(&pdev->dev);
+>  	pm_runtime_disable(&pdev->dev);
+> -	if (IS_ENABLED(CONFIG_THERMAL_OF))
+> +	if (!info->no_irq && IS_ENABLED(CONFIG_THERMAL_OF))
+>  		iio_map_array_unregister(indio_dev);
+>  
+>  	return 0;
+> @@ -611,6 +704,7 @@ static const struct platform_device_id sun4i_gpadc_id[] = {
+>  static struct platform_driver sun4i_gpadc_driver = {
 >  	.driver = {
-> @@ -412,9 +412,3 @@ static struct platform_driver vop_platform_driver = {
->  		.of_match_table = of_match_ptr(vop_driver_dt_match),
+>  		.name = "sun4i-gpadc-iio",
+> +		.of_match_table = sun4i_gpadc_of_id,
+>  		.pm = &sun4i_gpadc_pm_ops,
 >  	},
->  };
-> -
-> -module_platform_driver(vop_platform_driver);
-> -
-> -MODULE_AUTHOR("Mark Yao <mark.yao@rock-chips.com>");
-> -MODULE_DESCRIPTION("ROCKCHIP VOP Driver");
-> -MODULE_LICENSE("GPL v2");
-> -- 
-> 2.1.4
+>  	.id_table = sun4i_gpadc_id,
+> diff --git a/include/linux/mfd/sun4i-gpadc.h b/include/linux/mfd/sun4i-gpadc.h
+> index 509e736..139872c 100644
+> --- a/include/linux/mfd/sun4i-gpadc.h
+> +++ b/include/linux/mfd/sun4i-gpadc.h
+> @@ -38,6 +38,10 @@
+>  #define SUN6I_GPADC_CTRL1_ADC_CHAN_SELECT(x)		(GENMASK(3, 0) & BIT(x))
+>  #define SUN6I_GPADC_CTRL1_ADC_CHAN_MASK			GENMASK(3, 0)
+>  
+> +/* TP_CTRL1 bits for sun8i SoCs */
+> +#define SUN8I_GPADC_CTRL1_CHOP_TEMP_EN			BIT(8)
+> +#define SUN8I_GPADC_CTRL1_GPADC_CALI_EN			BIT(7)
+> +
+>  #define SUN4I_GPADC_CTRL2				0x08
+>  
+>  #define SUN4I_GPADC_CTRL2_TP_SENSITIVE_ADJUST(x)	((GENMASK(3, 0) & (x)) << 28)
 > 
