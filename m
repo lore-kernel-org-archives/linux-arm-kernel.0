@@ -1,130 +1,39 @@
-From: james.morse@arm.com (James Morse)
-Date: Tue, 14 Mar 2017 09:45:06 +0000
-Subject: [PATCH v2 3/3] arm64: KVM: add guest SEI support
-In-Reply-To: <1488946181-130774-4-git-send-email-xiexiuqi@huawei.com>
-References: <1488946181-130774-1-git-send-email-xiexiuqi@huawei.com>
- <1488946181-130774-4-git-send-email-xiexiuqi@huawei.com>
-Message-ID: <58C7BBA2.4080208@arm.com>
+From: jagan@openedev.com (Jagan Teki)
+Date: Tue, 14 Mar 2017 15:18:09 +0530
+Subject: [PATCH v5 0/8] arm: dts: imx6q-icore: Add LVDS display nodes
+Message-ID: <1489484897-14933-1-git-send-email-jagan@openedev.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Xie XiuQi,
+From: Jagan Teki <jagan@amarulasolutions.com>
 
-On 08/03/17 04:09, Xie XiuQi wrote:
-> Add ghes handling for SEI so that the host kernel could parse and
-> report detailed error information for SEI which occur in the guest
-> kernel.
+This series adds support for lvds display, touchscreen nodes on dts for
+Engicam i.CoreM6 Quad boards along with selecting few touchscreen driver
+configs to imx_v6_v7_defconfig so-that select by default.
 
-How does this interact with Synchronous External Abort as a notify method?
-Both of these take the in_nmi() path through APEI.
+Jagan Teki (8):
+  ARM: dts: imx6qdl-icore: Add backlight support for lvds
+  ARM: dts: imx6q: Add Engicam i.CoreM6 Quad/Dual OpenFrame Cap 10.1
+    initial support
+  ARM: dts: imx6q: Add Engicam i.CoreM6 Quad/Dual OpenFrame Cap 12.3
+    initial support
+  ARM: dts: imx6q-icore: Add LVDS support
+  dt-bindings: input: touchscreen: Add max11801-ts binding
+  ARM: dts: imx6q-icore: Add touchscreen node
+  ARM: imx_v6_v7_defconfig: Select max11801_ts touchscreen driver
+  ARM: imx_v6_v7_defconfig: Select hid-multitouchdriver
 
-SError Interrupts are masked during exception processing, so we don't have to
-worry about them becoming recursive.
-For SEA the firmware has to promise not to invoke another SEA while we are still
-processing the first, and SEI will be masked if we took it as an exception.
+ .../bindings/input/touchscreen/max11801-ts.txt     | 18 +++++
+ arch/arm/boot/dts/Makefile                         |  2 +
+ arch/arm/boot/dts/imx6q-icore-ofcap10.dts          | 76 ++++++++++++++++++++++
+ arch/arm/boot/dts/imx6q-icore-ofcap12.dts          | 76 ++++++++++++++++++++++
+ arch/arm/boot/dts/imx6q-icore.dts                  | 34 ++++++++++
+ arch/arm/boot/dts/imx6qdl-icore.dtsi               | 19 ++++++
+ arch/arm/configs/imx_v6_v7_defconfig               |  2 +
+ 7 files changed, 227 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/input/touchscreen/max11801-ts.txt
+ create mode 100644 arch/arm/boot/dts/imx6q-icore-ofcap10.dts
+ create mode 100644 arch/arm/boot/dts/imx6q-icore-ofcap12.dts
 
-What happens if we take an SEA while processing another event notified via SEI?
-Can this happen on your platform? Can someone else build a platform where this
-happens? Does the GHES APEI code need to be able to handle this?
-
-If we need to support both at the same time we will need to change Linux's APEI
-code to reserve a page of virtual address space per GHES entry, instead of one
-for NMI and one for IRQ.
-
-
-> diff --git a/arch/arm64/include/asm/system_misc.h b/arch/arm64/include/asm/system_misc.h
-> index 5b2cecd..d68d61f 100644
-> --- a/arch/arm64/include/asm/system_misc.h
-> +++ b/arch/arm64/include/asm/system_misc.h
-> @@ -59,5 +59,6 @@ void hook_debug_fault_code(int nr, int (*fn)(unsigned long, unsigned int,
->  #endif	/* __ASSEMBLY__ */
->  
->  int handle_guest_sea(unsigned long addr, unsigned int esr);
-> +int handle_guest_sei(unsigned long addr, unsigned int esr);
->  
->  #endif	/* __ASM_SYSTEM_MISC_H */
-> diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-> index 65dbfa9..cf9f569 100644
-> --- a/arch/arm64/kernel/traps.c
-> +++ b/arch/arm64/kernel/traps.c
-> @@ -616,6 +616,24 @@ const char *esr_get_class_string(u32 esr)
->  }
->  
->  /*
-> + * Handle asynchronous SError interrupt that occur in a guest kernel.
-> + */
-> +int handle_guest_sei(unsigned long addr, unsigned int esr)
-> +{
-> +	/*
-> +	 * synchronize_rcu() will wait for nmi_exit(), so no need to
-> +	 * rcu_read_lock().
-> +	 */
-
-This comment was true for patch 4 of Tyler's series, but not-true when we got to
-patch 10. Please remove it,
-
-
-> +	if(IS_ENABLED(CONFIG_ACPI_APEI_SEI)) {
-> +		rcu_read_lock();
-
-Please put the rcu calls against the thing using them.
-
-
-> +		ghes_notify_sei();
-> +		rcu_read_unlock();
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +/*
->   * bad_mode handles the impossible case in the exception vector. This is always
->   * fatal.
->   */
-
-> diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
-> index 1bfe30d..8c7dba0 100644
-> --- a/arch/arm64/kvm/handle_exit.c
-> +++ b/arch/arm64/kvm/handle_exit.c
-> @@ -172,6 +173,23 @@ static exit_handle_fn kvm_get_exit_handler(struct kvm_vcpu *vcpu)
->  	return arm_exit_handlers[hsr_ec];
->  }
->  
-> +static int kvm_handle_guest_sei(struct kvm_vcpu *vcpu, struct kvm_run *run)
-> +{
-> +	unsigned long fault_ipa = kvm_vcpu_get_fault_ipa(vcpu);
-> +
-> +	if (handle_guest_sei((unsigned long)fault_ipa,
-> +				kvm_vcpu_get_hsr(vcpu))) {
-> +		kvm_err("Failed to handle guest SEI, FSC: EC=%#x xFSC=%#lx ESR_EL2=%#lx\n",
-> +				kvm_vcpu_trap_get_class(vcpu),
-> +				(unsigned long)kvm_vcpu_trap_get_fault(vcpu),
-> +				(unsigned long)kvm_vcpu_get_hsr(vcpu));
-> +	}
-> +
-
-> +	kvm_inject_vabt(vcpu);
-
-Always inject an SError Interrupt? How should this work when Qemu supports
-guest-RAS too?
-
-If we do want to kill the guest for RAS-related reasons we should go via
-user-space to allow Qemu to handle the error and potentially notify the guest.
-This would let Qemu generate CPER records for the guest, mirroring what just
-happened with the firmware-generated records.
-
-As on the other thread: if there were CPER records processed by
-handle_guest_sei() we should continue as normal as the fault was handled in some
-way.
-If there were no CPER records, (or the system doesn't support SEI as a GHES
-notification mechanism), then yes we should still call kvm_inject_vabt().
-
-A suggestion of how do this: [0], if you have a better suggestion please chime in!
-
-
-Thanks,
-
-James
-
-
-[0] https://www.spinics.net/lists/kvm/msg146131.html
+-- 
+1.9.1
