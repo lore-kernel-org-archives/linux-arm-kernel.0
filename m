@@ -1,61 +1,90 @@
-From: sean.wang@mediatek.com (Sean Wang)
-Date: Tue, 14 Mar 2017 13:40:09 +0800
-Subject: [PATCH v5 2/4] dt-bindings: mfd: Add LED subnode binding for
- MT6323 PMIC
-In-Reply-To: <c86eacdb-d5c8-2f0a-11f1-1a3bc623b4b0@gmail.com>
-References: <1488549385-19899-1-git-send-email-sean.wang@mediatek.com>
- <1488549385-19899-3-git-send-email-sean.wang@mediatek.com>
- <c86eacdb-d5c8-2f0a-11f1-1a3bc623b4b0@gmail.com>
-Message-ID: <1489470009.1870.6.camel@mtkswgap22>
+From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
+Date: Tue, 14 Mar 2017 11:30:17 +0530
+Subject: [PATCH 14/14] arm64: pmuv3: use arm_pmu ACPI framework
+In-Reply-To: <1489143891-11596-15-git-send-email-mark.rutland@arm.com>
+References: <1489143891-11596-1-git-send-email-mark.rutland@arm.com>
+ <1489143891-11596-15-git-send-email-mark.rutland@arm.com>
+Message-ID: <CAFpQJXUQm84-DTCAng1RQq-wv-nqw=+MTe=vGTL7Sw=yL2sd+A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2017-03-13 at 13:00 +0100, Matthias Brugger wrote:
-> 
-> On 03/03/17 14:56, sean.wang at mediatek.com wrote:
-> > From: Sean Wang <sean.wang@mediatek.com>
-> >
-> > This patch adds documentation for devicetree bindings
-> > for LED support as the subnode of MT6323 PMIC
-> >
-> > Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-> > ---
-> >  Documentation/devicetree/bindings/mfd/mt6397.txt | 5 +++++
-> >  1 file changed, 5 insertions(+)
-> >
-> > diff --git a/Documentation/devicetree/bindings/mfd/mt6397.txt b/Documentation/devicetree/bindings/mfd/mt6397.txt
-> > index 949c85f..522a3bb 100644
-> > --- a/Documentation/devicetree/bindings/mfd/mt6397.txt
-> > +++ b/Documentation/devicetree/bindings/mfd/mt6397.txt
-> > @@ -6,6 +6,7 @@ MT6397/MT6323 is a multifunction device with the following sub modules:
-> >  - Audio codec
-> >  - GPIO
-> >  - Clock
-> > +- LED
-> >
-> >  It is interfaced to host controller using SPI interface by a proprietary hardware
-> >  called PMIC wrapper or pwrap. MT6397/MT6323 MFD is a child device of pwrap.
-> > @@ -34,6 +35,10 @@ Optional subnodes:
-> >  - clk
-> >  	Required properties:
-> >  		- compatible: "mediatek,mt6397-clk"
-> > +- led
-> > +	Required properties:
-> > +		- compatible: "mediatek,mt6323-led"
-> > +	see Documentation/devicetree/bindings/leds/leds-mt6323.txt
-> 
-> Part of this patch is already part of linux-next:
-> 05daab3 ("Documentation: devicetree: Add LED subnode binding for MT6323 
-> PMIC")
-> 
-Hi Matthias,
+Hi Mark,
 
-There is still small differences from the merged patch. 
+On Fri, Mar 10, 2017 at 4:34 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> Now that we have a framework to handle the ACPI bits, make the PMUv3
+> code use this. The framework is a little different to what was
+> originally envisaged, and we can drop some unused support code in the
+> process of moving over to it.
+>
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Jeremy Linton <jeremy.linton@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm64/kernel/perf_event.c | 26 +++++++++-----------------
+>  1 file changed, 9 insertions(+), 17 deletions(-)
+>
+> One thing I'm not sure about here is how to verify that PMUv3 is supported. I
+> can put a test in armv8_pmuv3_init(), but it feels like that should be verified
+> earlier.
+>
+> Mark.
+>
+> diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
+> index 57ae9d9..daf95919 100644
+> --- a/arch/arm64/kernel/perf_event.c
+> +++ b/arch/arm64/kernel/perf_event.c
+> @@ -1081,24 +1081,9 @@ static int armv8_vulcan_pmu_init(struct arm_pmu *cpu_pmu)
+>         {},
+>  };
+>
+> -/*
+> - * Non DT systems have their micro/arch events probed at run-time.
+> - * A fairly complete list of generic events are provided and ones that
+> - * aren't supported by the current PMU are disabled.
+> - */
+> -static const struct pmu_probe_info armv8_pmu_probe_table[] = {
+> -       PMU_PROBE(0, 0, armv8_pmuv3_init), /* enable all defined counters */
+> -       { /* sentinel value */ }
+> -};
+> -
+>  static int armv8_pmu_device_probe(struct platform_device *pdev)
+>  {
+> -       if (acpi_disabled)
+> -               return arm_pmu_device_probe(pdev, armv8_pmu_of_device_ids,
+> -                                           NULL);
+> -
+> -       return arm_pmu_device_probe(pdev, armv8_pmu_of_device_ids,
+> -                                   armv8_pmu_probe_table);
+> +       return arm_pmu_device_probe(pdev, armv8_pmu_of_device_ids, NULL);
+>  }
+>
+>  static struct platform_driver armv8_pmu_driver = {
+> @@ -1109,4 +1094,11 @@ static int armv8_pmu_device_probe(struct platform_device *pdev)
+>         .probe          = armv8_pmu_device_probe,
+>  };
+>
+> -builtin_platform_driver(armv8_pmu_driver);
+> +int __init armv8_pmu_driver_init(void)
+> +{
+> +       if (acpi_disabled)
+> +               return platform_driver_register(&armv8_pmu_driver);
+> +       else
+> +               return arm_pmu_acpi_probe(armv8_pmuv3_init);
 
-I will submit the series for the next version based on newer kernel and
+i think this function needs to be updated to
+probe SoC specific init (armv8_a53_pmu_init, armv8_vulcan_pmu_init
+etc)  as well.
 
-split the already merged ones out. Thanks for your kindly remainder.
+> +}
+> +device_initcall(armv8_pmu_driver_init)
+> --
+> 1.9.1
 
-	Sean
-> Regards,
-> Matthias
+thanks
+Ganapat
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
