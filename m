@@ -1,39 +1,51 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue, 14 Mar 2017 16:27:26 +0200
-Subject: [PATCH v2 1/4] pinctrl: samsung: Fix the width of PINCFG_TYPE_DRV
- bitfields for Exynos5433
-In-Reply-To: <CACRpkda0-k7Vo9Y6yNtLNXu-gGnJW9y83t6W9p032KWjHYdMiw@mail.gmail.com>
-References: <CGME20161230041426epcas1p1f827d3cee8b607d81e9921b412ddf301@epcas1p1.samsung.com>
- <20161230041421.24448-1-andi.shyti@samsung.com>
- <20161230041421.24448-2-andi.shyti@samsung.com>
- <CACRpkdbR3x14h38Gg7qpeWnswwD9qsS0zDUrrXCEJH-AdEB+cQ@mail.gmail.com>
- <58AF7CCB.5070303@samsung.com>
- <CACRpkda0-k7Vo9Y6yNtLNXu-gGnJW9y83t6W9p032KWjHYdMiw@mail.gmail.com>
-Message-ID: <CAJKOXPd1pRN47Ss5qTHUVAdPwxKqE5vGGevG1OhVH0uSZnotKA@mail.gmail.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Tue, 14 Mar 2017 15:46:10 +0100
+Subject: [PATCH v2 4/4] phy: exynos: Use one define for enable bit
+In-Reply-To: <20170311182534.13345-5-krzk@kernel.org>
+References: <20170311182534.13345-1-krzk@kernel.org>
+ <20170311182534.13345-5-krzk@kernel.org>
+ <CGME20170314144612epcas5p43922a86ea62ef32bc8e32dc27f5164ab@epcas5p4.samsung.com>
+Message-ID: <2746282.jBJ7tRjldv@amdc3058>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 14, 2017 at 3:47 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Fri, Feb 24, 2017 at 1:22 AM, Chanwoo Choi <cw00.choi@samsung.com> wrote:
->> On 2016? 12? 30? 22:28, Linus Walleij wrote:
->>> On Fri, Dec 30, 2016 at 5:14 AM, Andi Shyti <andi.shyti@samsung.com> wrote:
-> Probably. Send a patch fixing it up so I can apply it.
->
-> There are now something like 5 different people submitting Samsung pinctrl
-> patches without coordination so this will start to happen a lot if you keep
-> up this development pace.
->
-> As I just wrote in another mail: I want someone to step up and collect
-> Samsung patches and send them to me using a pull request.
 
-I think we can handle it as there are three of us.
+Hi,
 
-> Samsung people also need to start reviewing each other's patches
-> more I guess, but mainly I need help with integration.
+On Saturday, March 11, 2017 08:25:34 PM Krzysztof Kozlowski wrote:
+> There is no need for separate defines for Exynos4 and Exynos5 phy enable
+> bit and MIPI phy reset bits.  In both cases there are the same so
+> simplify it.
+> 
+> This reduces number of defines and allows removal of one header file.
+> 
+> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+> Acked-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  drivers/phy/phy-exynos-dp-video.c           |  5 ++--
+>  drivers/phy/phy-exynos-mipi-video.c         | 39 ++++++++++++++---------------
+>  drivers/phy/phy-exynos5-usbdrd.c            |  5 ++--
+>  include/linux/mfd/syscon/exynos5-pmu.h      | 22 ----------------
+>  include/linux/soc/samsung/exynos-regs-pmu.h |  3 ++-
+>  5 files changed, 25 insertions(+), 49 deletions(-)
+>  delete mode 100644 include/linux/mfd/syscon/exynos5-pmu.h
 
-More or less recently we do the reviews. Sure we can focus more... and
-actually having an entry gate for patches would ensure at least one
-more review from the applying person.
+[...]
+
+> --- a/include/linux/mfd/syscon/exynos5-pmu.h
+> +++ /dev/null
+
+> -#define EXYNOS5433_PAD_RETENTION_AUD_OPTION		(0x3028)
+> -#define EXYNOS5433_PAD_INITIATE_WAKEUP_FROM_LOWPWR	BIT(28)
+
+EXYNOS5433_PAD_INITIATE_WAKEUP_FROM_LOWPWR is not defined in
+<soc/samsung/exynos-regs-pmu.h> and is still used by
+drivers/mfd/exynos-lpass.c (at least in next-20170310)
+
+Do I miss something or it needs to be fixed?
 
 Best regards,
-Krzysztof
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
