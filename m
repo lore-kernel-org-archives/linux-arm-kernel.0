@@ -1,84 +1,31 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Tue, 14 Mar 2017 16:46:31 -0500
-Subject: Neophyte questions about PCIe
-In-Reply-To: <912c26d5-835f-9f39-73ba-db561b5bcffa@free.fr>
-References: <ced6a4bf-c94a-c116-1e94-52a8d675d132@free.fr>
- <20170308151724.GA20780@bhelgaas-glaptop.roam.corp.google.com>
- <f964ee05-db7f-c381-c91c-82897175da6d@free.fr>
- <9ba05c2c-57ef-b2c0-6a7c-457c392d98b5@free.fr>
- <df517167-d692-38a8-9c8f-a1112c7f578d@free.fr>
- <94b3c89c-b116-288f-7530-15cc2611f425@free.fr>
- <912c26d5-835f-9f39-73ba-db561b5bcffa@free.fr>
-Message-ID: <20170314214631.GA2021@bhelgaas-glaptop.roam.corp.google.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 14 Mar 2017 22:51:06 +0100
+Subject: [PATCH 1/2] ARM: dts: BCM5301X: Specify serial console parameters
+In-Reply-To: <5776ba44-e280-9711-1b05-1c79556884e2@broadcom.com>
+References: <20170314075830.2247-1-zajec5@gmail.com>
+ <20170314122650.GV15842@lunn.ch>
+ <3345fb38-fbea-141e-6ad2-a3341e2c31fe@gmail.com>
+ <CAC3K-4qQzX37BLD2N-N-vDwSk=H_rF5PzoMM+GM=Z935QFVnXw@mail.gmail.com>
+ <9f5a0381-aae6-9ac2-56f3-9eb78ecfd819@broadcom.com>
+ <CAC3K-4pAzs5fXNB=ZpyzYZnTENa=c0v81GVn7WpW53K7GV9UOg@mail.gmail.com>
+ <5776ba44-e280-9711-1b05-1c79556884e2@broadcom.com>
+Message-ID: <20170314215106.GB22176@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 14, 2017 at 04:54:00PM +0100, Mason wrote:
-> On 14/03/2017 15:00, Mason wrote:
-> 
-> > On 10/03/2017 18:49, Mason wrote:
-> > 
-> >> /* Root complex reports incorrect device class */
-> >> static void tango_pcie_fixup_class(struct pci_dev *dev)
-> >> {
-> >> 	dev->class = PCI_CLASS_BRIDGE_PCI << 8;
-> >> }
-> > 
-> > Gen1 controller reports class/rev = 0x04800001
-> > Gen2 controller reports class/rev = 0x06000001
-> > 
-> > #define PCI_CLASS_BRIDGE_HOST		0x0600
-> > #define PCI_CLASS_BRIDGE_ISA		0x0601
-> > #define PCI_CLASS_BRIDGE_EISA		0x0602
-> > #define PCI_CLASS_BRIDGE_MC		0x0603
-> > #define PCI_CLASS_BRIDGE_PCI		0x0604
-> > #define PCI_CLASS_BRIDGE_PCMCIA		0x0605
-> > #define PCI_CLASS_BRIDGE_NUBUS		0x0606
-> > #define PCI_CLASS_BRIDGE_CARDBUS	0x0607
-> > #define PCI_CLASS_BRIDGE_RACEWAY	0x0608
-> > #define PCI_CLASS_BRIDGE_OTHER		0x0680
-> > 
-> > My fixup replaces 0x048000 with 0x060400.
-> > 
-> > 	0x060400 != 0x060000
-> > 
-> > Which is correct:
-> > PCI_CLASS_BRIDGE_HOST or PCI_CLASS_BRIDGE_PCI?
-> > 
-> > Naively, I would expect Host/PCI bridge to be more correct
-> > for a root complex.
-> 
-> But that's very likely wrong, since the code in Linux does:
-> 
-> 	switch (dev->hdr_type) {		    /* header type */
-> 	case PCI_HEADER_TYPE_BRIDGE:		    /* bridge header */
-> 		if (class != PCI_CLASS_BRIDGE_PCI)
-> 			goto bad;
-> 		/* The PCI-to-PCI bridge spec requires that subtractive
-> 		   decoding (i.e. transparent) bridge must have programming
-> 		   interface code of 0x01. */
-> 
-> So a class of PCI_CLASS_BRIDGE_HOST would error out, I think.
-> Does this mean I need to fixup Gen2 as well?
-> (Since it reports 0x060000)
+> >Unfortunately, there is not a common bootloader.  CFE is used for the
+> >4708/9 boards, and u-boot is used for the 5301x boards.
+> OK, little different situation not having a boot rom with console
+> output enforcing all designs to use the same UART.
+> Do both of the bootloaders happen to use the same UART and all the
+> boards are designed to use the same UART?
 
-Header Type 1 (PCI_HEADER_TYPE_BRIDGE) identifies PCI-to-PCI bridges
-(see PCI spec r3.0, sec 6.1).  These devices use the type 1
-configuration header (PCI-to-PCI Bridge spec r1.2, sec 3.2) and they
-exist on a primary PCI bus and forward transactions between that bus
-and a secondary PCI bus.  The PCI core controls the memory, I/O, and
-prefetchable memory windows between the primary and secondary buses
-using the window registers in the type 1 header.
+You need to be a little bit careful here. Some vendor could use a
+different UART in there design, use some other bootloader,
+etc. Somebody in the community might want to throw out uboot and use
+barebox etc....
 
-So I guess if this device has a type 1 header, it should use
-PCI_CLASS_BRIDGE_PCI; otherwise use PCI_CLASS_BRIDGE_HOST.
+Device tree does allow .dtsi properties to be over written, so it is
+not an issue in practice.
 
-I don't know the topology of your hardware, but normally a Root
-Complex itself is not a PCI-to-PCI bridge.  It usually *contains*
-several Root Ports, which appear to be on the root PCI bus and act as
-bridges to a secondary bus.  The RC might appear as a type 0 device
-but the programming model is not specified.  The Root Ports would be
-type 1 devices like standard PCI-to-PCI bridges (PCIe spec r3.0, sec
-1.3.1 and 1.4).
-
-Bjorn
+    Andrew
