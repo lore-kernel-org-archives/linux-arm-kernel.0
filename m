@@ -1,140 +1,134 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 14 Mar 2017 16:08:23 +0800
-Subject: [PATCH v2] arm64: dts: added thermal monitor node
-In-Reply-To: <1489457869-21815-1-git-send-email-andy.tang@nxp.com>
-References: <1489457869-21815-1-git-send-email-andy.tang@nxp.com>
-Message-ID: <20170314080821.GN3618@dragon>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Tue, 14 Mar 2017 09:13:25 +0100
+Subject: [PATCH] drm: dw_hdmi: Gate audio sampler clock from the
+ enablement functions
+In-Reply-To: <56e51c49-176e-3316-bd8c-f947061732bf@collabora.com>
+References: <20170310093509.19044-1-romain.perier@collabora.com>
+ <25ad96a7-d907-2bcb-3a96-15a2956e7652@baylibre.com>
+ <20170313093630.GE21222@n2100.armlinux.org.uk>
+ <724d599e-7285-3feb-9a18-d3fbc4000eb5@synopsys.com>
+ <20170313131053.GI21222@n2100.armlinux.org.uk>
+ <296108ae-1720-63f1-1eed-ed5dbe1b8bad@synopsys.com>
+ <56e51c49-176e-3316-bd8c-f947061732bf@collabora.com>
+Message-ID: <2cdf37b1-810c-b595-4e7f-09353bc3a006@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 14, 2017 at 10:17:49AM +0800, Yuantian Tang wrote:
-> There is a thermal monitoring unit on ls1012a soc which can
-> monitor and record the temperature of cores so that appropriate actions
-> can be taken or alarm the user when the temperature exceeds a programmed
-> temperature threshold.
-> 
-> Signed-off-by: Tang Yuantian <andy.tang@nxp.com>
-
-'arm64: dts: ls1012a: ...' for subject prefix to make it more specific.
-
-> ---
-> v2:
-> 	-- rebased to latest kernel.
-> 
->  arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi | 76 ++++++++++++++++++++++++++
->  1 file changed, 76 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
-> index cffebb4..d9d9b0f 100644
-> --- a/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
-> +++ b/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
-> @@ -43,6 +43,7 @@
->   */
->  
->  #include <dt-bindings/interrupt-controller/irq.h>
-> +#include <dt-bindings/thermal/thermal.h>
->  
->  / {
->  	compatible = "fsl,ls1012a";
-> @@ -126,6 +127,81 @@
->  			#clock-cells = <2>;
->  			clocks = <&sysclk>;
->  		};
-
-Have a newline between nodes.
-
-> +		tmu: tmu at 1f00000 {
-> +			compatible = "fsl,qoriq-tmu";
-> +			reg = <0x0 0x1f00000 0x0 0x10000>;
-> +			interrupts = <0 33 0x4>;
-> +			fsl,tmu-range = <0xb0000 0x9002a 0x6004c 0x30062>;
-> +			fsl,tmu-calibration = <0x00000000 0x00000026
-> +					       0x00000001 0x0000002d
-> +					       0x00000002 0x00000032
-> +					       0x00000003 0x00000039
-> +					       0x00000004 0x0000003f
-> +					       0x00000005 0x00000046
-> +					       0x00000006 0x0000004d
-> +					       0x00000007 0x00000054
-> +					       0x00000008 0x0000005a
-> +					       0x00000009 0x00000061
-> +					       0x0000000a 0x0000006a
-> +					       0x0000000b 0x00000071
-> +
-> +					       0x00010000 0x00000025
-> +					       0x00010001 0x0000002c
-> +					       0x00010002 0x00000035
-> +					       0x00010003 0x0000003d
-> +					       0x00010004 0x00000045
-> +					       0x00010005 0x0000004e
-> +					       0x00010006 0x00000057
-> +					       0x00010007 0x00000061
-> +					       0x00010008 0x0000006b
-> +					       0x00010009 0x00000076
-> +
-> +					       0x00020000 0x00000029
-> +					       0x00020001 0x00000033
-> +					       0x00020002 0x0000003d
-> +					       0x00020003 0x00000049
-> +					       0x00020004 0x00000056
-> +					       0x00020005 0x00000061
-> +					       0x00020006 0x0000006d
-> +
-> +					       0x00030000 0x00000021
-> +					       0x00030001 0x0000002a
-> +					       0x00030002 0x0000003c
-> +					       0x00030003 0x0000004e>;
-> +			big-endian;
-> +			#thermal-sensor-cells = <1>;
-> +		};
-> +
-> +		thermal-zones {
-> +			cpu_thermal: cpu-thermal {
-> +				polling-delay-passive = <1000>;
-> +				polling-delay = <5000>;
-> +
-
-We usually do not have any newline in middle of property list, so please
-drop it.
-
-> +				thermal-sensors = <&tmu 0>;
-> +
-> +				trips {
-> +					cpu_alert: cpu-alert {
-> +						temperature = <85000>;
-> +						hysteresis = <2000>;
-> +						type = "passive";
-> +					};
-
-Have a newline between node.
-
-Shawn
-
-> +					cpu_crit: cpu-crit {
-> +						temperature = <95000>;
-> +						hysteresis = <2000>;
-> +						type = "critical";
-> +					};
-> +				};
-> +
-> +				cooling-maps {
-> +					map0 {
-> +						trip = <&cpu_alert>;
-> +						cooling-device =
-> +							<&cpu0 THERMAL_NO_LIMIT
-> +							THERMAL_NO_LIMIT>;
-> +					};
-> +				};
-> +			};
-> +		};
->  
->  		i2c0: i2c at 2180000 {
->  			compatible = "fsl,vf610-i2c";
-> -- 
-> 2.1.0.27.g96db324
+On 03/14/2017 08:53 AM, Romain Perier wrote:
+> Hi,
 > 
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Le 13/03/2017 ? 19:49, Jose Abreu a ?crit :
+>> Hi Russell,
+>>
+>>
+>> On 13-03-2017 13:10, Russell King - ARM Linux wrote:
+>>> On Mon, Mar 13, 2017 at 12:55:58PM +0000, Jose Abreu wrote:
+>>>> Hi,
+>>>>
+>>>>
+>>>> On 13-03-2017 09:36, Russell King - ARM Linux wrote:
+>>>>> On Mon, Mar 13, 2017 at 10:27:08AM +0100, Neil Armstrong wrote:
+>>>>>> On 03/10/2017 10:35 AM, Romain Perier wrote:
+>>>>>>> Currently, the audio sampler clock is enabled from dw_hdmi_setup() at
+>>>>>>> step E. and is kept enabled for later use. This clock should be enabled
+>>>>>>> and disabled along with the actual audio stream and not always on (that
+>>>>>>> is bad for PM). Futhermore, this might cause sound glitches with some
+>>>>>>> HDMI devices, as the CTS+N is forced to zero when the stream is disabled
+>>>>>>> while the audio clock is still running.
+>>>>>>>
+>>>>>>> This commit adds a parameter to hdmi_audio_enable_clk() that controls
+>>>>>>> when the audio sample clock must be enabled or disabled. Then, it moves
+>>>>>>> the call to this function into dw_hdmi_audio_enable() and
+>>>>>>> dw_hdmi_audio_disable().
+>>>>>>>
+>>>>>>> Signed-off-by: Romain Perier <romain.perier@collabora.com>
+>>>>>>> ---
+>>>>>>>  drivers/gpu/drm/bridge/dw-hdmi.c | 15 +++++++++------
+>>>>>>>  1 file changed, 9 insertions(+), 6 deletions(-)
+>>>>>>>
+>>>>>> Hi Romain, Russell, Jose,
+>>>>>>
+>>>>>> This is a little out of scope, but I was wondering why the CTS calculation
+>>>>>> was not left in AUTO mode in the dw-hdmi driver ?
+>>>>> There is no indication in the iMX6 manuals that the iMX6 supports
+>>>>> automatic CTS calculation.  Bits 7:4 of the AUD_CTS3 register are
+>>>>> marked as "reserved".
+>>>>>
+>>>>> We're reliant on the information in the iMX6 manuals as we don't have
+>>>>> access to Synopsis' databooks for these parts (I understand you have
+>>>>> to be a customer to have access to that.)
+>>>>>
+>>>> (Synopsis -> Synopsys :))
+>>>>
+>>>> Trying to catch up with the conversation:
+>>>>
+>>>> 1) In AHB audio mode the bits are always reserved.
+>>>> 2) I think we should enable/disable clock instead of just forcing
+>>>> N/CTS, though, I don't know what could be the implications for
+>>>> iMX platform. I remember at the time I tested this using I2S
+>>>> (I've never used AHB), and HDMI protocol analyzers were
+>>>> complaining about the N/CTS being forced to zero.
+>>> What you're recommending is to basically ignore the published workaround,
+>>> which, presumably, was arrived at by proper analysis of the issue both
+>>> by Freescale engineers and Synopsys engineers, and instead try some other
+>>> solution.
+>>>
+>>> I'm not sure that's a good idea.  Only those with knowledge of the IP can
+>>> say what effect disabling the audio clock will have: will it still allow
+>>> the FIFO to be loaded, as required by the errata?  If not, it's not a
+>>> solution that AHB can use.  I would imagine that _if_ it was as simple as
+>>> disabling the audio clock, that simple approach would have been documented
+>>> in Freescale's errata documents, rather than the rather more complex
+>>> method of zeroing the CTS/N values.
+>> I'm just following what the user guide says: the final step of
+>> configuration is enabling the audio clock. There is no reference
+>> neither in datasheet neither in user guide about this behavior
+>> but, as I said, I've never used AHB so I can't prove what is the
+>> best solution. Could it be platform specific?
+> 
+> And that's precisely why I am enabling it
+> 
+>>
+>>> I think there are two choices here:
+>>>
+>>> 1) get some definitive information about the IP and the errata for AHB,
+>>>    and determine whether the solution you propose would work.  (That's
+>>>    out of scope for me, I've no contacts with FSL/NXP and I'm not a
+>>>    Synopsys customer.)
+>> This is the right thing to do but if you can't test in the
+>> Freescale platform then we have not much else to do.
+>>
+>> Best regards,
+>> Jose Miguel Abreu
+>>
+>>> 2) the I2S audio support stops re-using the AHB audio support functions,
+>>>    switching to their own implementation that behaves correctly for them.
+>>>    (Remember, it was I2S's choice to re-use the AHB audio support functions
+>>>    I added which we're now discussing - they didn't have to do that, and
+>>>    regressing AHB audio just for I2S is not something we should ever
+>>>    consider doing.)
+>>>
+> 
+> The workaround looks AHB specific in any cases and does not seem to work
+> with I2S. The I2S variant should not used the same functions, at least
+> for enabling/disabling audio stream.
+> 
+> Regards,
+> Romain
+> 
+Hi All,
+
+Jose, thanks for your clarification.
+
+It seems reasonable to indeed add I2S/SPDIF specific functions, or at least add
+parameters to change the behavior when the audio clock is generated by the
+Synopsys IP or by an external audio block as in I2S and SPDIF.
+
+Nevertheless, on the Amlogic platforms, we will need to add this AUTO cts calculation
+feature and will certainly need this behavior fix.
+
+Romain, feel free to add the correct I2S behavior, I'll be happy to test your patches.
+
+Thanks,
+Neil
