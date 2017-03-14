@@ -1,70 +1,48 @@
-From: vigneshr@ti.com (Vignesh R)
-Date: Tue, 14 Mar 2017 19:14:19 +0530
-Subject: [PATCH] serial: 8250: 8250_core: Use dev_name() during
- request_irq()
-In-Reply-To: <CAHp75VeFKSbk9hvoJXdK6uOz+JYATD8D057iNv0JDuEnBFS=yw@mail.gmail.com>
-References: <20170308121943.29340-1-vigneshr@ti.com>
- <CAHp75VeFKSbk9hvoJXdK6uOz+JYATD8D057iNv0JDuEnBFS=yw@mail.gmail.com>
-Message-ID: <2a0cf043-6e3f-6807-0794-d9d6f46b77f5@ti.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Tue, 14 Mar 2017 14:45 +0100
+Subject: [PATCH v2 3/8] ARM: dts: exynos: Fix watchdog reset on Exynos4412
+In-Reply-To: <CAJKOXPcoP7c=TTFtWqBLMXT0BS_yi3fpu8X3q4sxCTM9m=mPmw@mail.gmail.com>
+References: <20170311172527.16368-1-krzk@kernel.org>
+ <6788694.7QfyuOlrPv@amdc3058>
+ <CAJKOXPcoP7c=TTFtWqBLMXT0BS_yi3fpu8X3q4sxCTM9m=mPmw@mail.gmail.com>
+ <CGME20170314134503epcas1p178241245d202edf9f3ea5885c605ffb6@epcas1p1.samsung.com>
+Message-ID: <1510739.WtREN49XT5@amdc3058>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On Monday 13 March 2017 01:35 AM, Andy Shevchenko wrote:
-> On Wed, Mar 8, 2017 at 2:19 PM, Vignesh R <vigneshr@ti.com> wrote:
->> Passing "serial" as name during request_irq() results in all serial port
->> irqs have same name. This does not help much to easily identify which
->> irq belongs to which serial port instance. Therefore pass dev_name()
->> during request_irq() so that better identifiable name is listed for
->> serial ports in cat /proc/interrupts output.
->>
->> Output of cat /proc/interrupts
->> Before this patch:
->>  26:        689          0     GICv2 309 Edge      serial
->> After this patch:
->>  26:        696          0     GICv2 309 Edge      2530c00.serial
+On Tuesday, March 14, 2017 03:09:25 PM Krzysztof Kozlowski wrote:
+> On Tue, Mar 14, 2017 at 3:03 PM, Bartlomiej Zolnierkiewicz
+> <b.zolnierkie@samsung.com> wrote:
+> >
+> > Hi,
+> >
+> > On Saturday, March 11, 2017 07:25:22 PM Krzysztof Kozlowski wrote:
+> >> The Exynos4412 has the same watchdog as newer SoCs (e.g. Exynos5250).
+> >> Just like the others, for working it requires additional steps in Power
+> >> Management Unit: unmasking the reset request and enabling the system
+> >> reset.  Without these additional steps in PMU, the watchdog will not be
+> >> able to reset the system on expiration event.
+> >>
+> >> Change the compatible of Exynos4412 watchdog device node to
+> >> samsung,exynos5250-wdt which includes the additional PMU steps.
+> >
+> > This is going to confuse people.  How's about doing it cleanly
+> > (by adding samsung,exynos4412-wdt compatible and convert existing
+> > users to use instead)?
 > 
-> I don't know if it worth to mention that some (testing) tools may
-> depend on this name.
+> I don't find usage of 5250 in Exynos4412 DTS as confusing because
+> since long time I do not threat these numbers as having any meaning
+> (e.g. 3250 is newer...). Yes, we can duplicate the compatible for that
+> purpose. Care to send a patch for this?
 
-I wonder how such tools will distinguish b/w different serial device
-instances. But, this change is making interrupt name more descriptive
-and maybe help test tools to distinguish irqs more easily
+I don't buy this argument. The point is not in the number itself
+but in the fact that you as developer know than 3250 is newer than
+4412 (the same way as you know that 5250 is also newer than 4412).
+This convention is used for all Exynos bindings so please don't
+break it.
 
-> Besides that imagine what would be the name of PCI device here. 
-> I would suggest adding ID if you need one in a form like
-> "serial%d", where ID may or may not be supplied by the actual 8250 drivers.
-> 
-
-Are you suggesting to use serial_index() as ID?
-
->>
->> Signed-off-by: Vignesh R <vigneshr@ti.com>
->> ---
->>  drivers/tty/serial/8250/8250_core.c | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/drivers/tty/serial/8250/8250_core.c b/drivers/tty/serial/8250/8250_core.c
->> index 76e03a7de9cc..f83b69f30987 100644
->> --- a/drivers/tty/serial/8250/8250_core.c
->> +++ b/drivers/tty/serial/8250/8250_core.c
->> @@ -218,7 +218,7 @@ static int serial_link_irq_chain(struct uart_8250_port *up)
->>                 spin_unlock_irq(&i->lock);
->>                 irq_flags |= up->port.irqflags;
->>                 ret = request_irq(up->port.irq, serial8250_interrupt,
->> -                                 irq_flags, "serial", i);
->> +                                 irq_flags, dev_name(up->port.dev), i);
->>                 if (ret < 0)
->>                         serial_do_unlink(i, up);
->>         }
->> --
->> 2.11.0
->>
-> 
-> 
-> 
-
--- 
-Regards
-Vignesh
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
