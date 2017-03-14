@@ -1,55 +1,49 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue, 14 Mar 2017 16:55:46 +0200
-Subject: [PATCH v2 4/4] phy: exynos: Use one define for enable bit
-In-Reply-To: <2746282.jBJ7tRjldv@amdc3058>
-References: <20170311182534.13345-1-krzk@kernel.org>
- <CGME20170314144612epcas5p43922a86ea62ef32bc8e32dc27f5164ab@epcas5p4.samsung.com>
- <20170311182534.13345-5-krzk@kernel.org> <2746282.jBJ7tRjldv@amdc3058>
-Message-ID: <CAJKOXPeUYeAuXgZLVYTBNTZhcmiEMr6sfWWpXMytzzeC0+wY4Q@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 14 Mar 2017 08:17:26 -0700
+Subject: [PATCH] ARM: omap2+: Revert omap-smp.c changes resetting CPU1
+ during boot
+In-Reply-To: <0bade322-5bee-412f-ef21-972c99846e84@ti.com>
+References: <20170313205231.1593-1-tony@atomide.com>
+ <0bade322-5bee-412f-ef21-972c99846e84@ti.com>
+Message-ID: <20170314151725.GC20572@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 14, 2017 at 4:46 PM, Bartlomiej Zolnierkiewicz
-<b.zolnierkie@samsung.com> wrote:
->
-> Hi,
->
-> On Saturday, March 11, 2017 08:25:34 PM Krzysztof Kozlowski wrote:
->> There is no need for separate defines for Exynos4 and Exynos5 phy enable
->> bit and MIPI phy reset bits.  In both cases there are the same so
->> simplify it.
->>
->> This reduces number of defines and allows removal of one header file.
->>
->> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
->> Acked-by: Lee Jones <lee.jones@linaro.org>
->> ---
->>  drivers/phy/phy-exynos-dp-video.c           |  5 ++--
->>  drivers/phy/phy-exynos-mipi-video.c         | 39 ++++++++++++++---------------
->>  drivers/phy/phy-exynos5-usbdrd.c            |  5 ++--
->>  include/linux/mfd/syscon/exynos5-pmu.h      | 22 ----------------
->>  include/linux/soc/samsung/exynos-regs-pmu.h |  3 ++-
->>  5 files changed, 25 insertions(+), 49 deletions(-)
->>  delete mode 100644 include/linux/mfd/syscon/exynos5-pmu.h
->
-> [...]
->
->> --- a/include/linux/mfd/syscon/exynos5-pmu.h
->> +++ /dev/null
->
->> -#define EXYNOS5433_PAD_RETENTION_AUD_OPTION          (0x3028)
->> -#define EXYNOS5433_PAD_INITIATE_WAKEUP_FROM_LOWPWR   BIT(28)
->
-> EXYNOS5433_PAD_INITIATE_WAKEUP_FROM_LOWPWR is not defined in
-> <soc/samsung/exynos-regs-pmu.h> and is still used by
-> drivers/mfd/exynos-lpass.c (at least in next-20170310)
->
-> Do I miss something or it needs to be fixed?
+* Tero Kristo <t-kristo@ti.com> [170314 00:32]:
+> On 13/03/17 22:52, Tony Lindgren wrote:
+> > Additionally we also need to fix the hot-unplug code to properly park CPU1
+> > to the bootrom loop so it's not affected by SDRAM changes done by kexec
+> > booting kernel.
+> 
+> Imo, we are doing too much bandaid hackery for this issue now. How much do
+> we care if the older kernels don't work properly with kexec? I know I don't
+> care a bit myself. It means you just need to do 1 cold-boot for the system
+> to fix it.
 
-Yeah, kbuild also told me that. :)
+Well kexec is a standard Linux feature and it is currently working and
+at least I care.
 
-I fixed it in v3, can you take a look?
-http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1351482.html
+And if the CPU1 start-up address is programmed to be in the currently
+booting kernel's area by something else, it's almost certainly totally
+broken.
 
-Best regards,
-Krzysztof
+Note that this still does not remove the need to park CPU1 properly to
+bootrom loop.
+
+> If we just drop all the cpu1 reset code and park cpu1 properly at end when
+> executing kexec we should be just fine, and the implementation will be much
+> cleaner.
+> 
+> Does the wakeup issue for cpu1 ever happen with suspend, so that you
+> actually must reset the cpu so that it comes up? If that is the case, it is
+> going to be a tricky situation overall and we should understand the root
+> cause for it before trying to fix it.
+
+Yes omap4 CPU1 can fail occasional suspend/resume cycle. But let's assume
+that's a separate issue or a side effect of not properly initializing
+CPU1 during kexec before the suspend/resume cycle. I can do some more
+tests on that.
+
+Regards,
+
+Tony
