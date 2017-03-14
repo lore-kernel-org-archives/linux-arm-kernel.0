@@ -1,77 +1,49 @@
-From: jb@abbadie.fr (Jean-Baptiste Abbadie)
-Date: Tue, 14 Mar 2017 20:14:20 +0100
-Subject: [PATCH] staging: vc04_services: Remove unused functions
-Message-ID: <20170314191420.5540-1-jb@abbadie.fr>
+From: tjakobi@math.uni-bielefeld.de (Tobias Jakobi)
+Date: Tue, 14 Mar 2017 20:17:35 +0100
+Subject: [PATCH] drm/exynos: Print kernel pointers in a restricted form
+In-Reply-To: <20170314190859.y55wlc4z7xdsbbxg@kozik-lap>
+References: <20170314183804.13788-1-krzk@kernel.org>
+ <e1800491-0b60-74d1-1377-756d5b0bb371@math.uni-bielefeld.de>
+ <20170314190859.y55wlc4z7xdsbbxg@kozik-lap>
+Message-ID: <de5e8583-748b-9df2-f7cc-c1b4fb499d17@math.uni-bielefeld.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These four functions are not used and report errors with sparse.
+Krzysztof Kozlowski wrote:
+> On Tue, Mar 14, 2017 at 08:01:41PM +0100, Tobias Jakobi wrote:
+>> Hello Krzysztof,
+>>
+>> I was wondering about the benefit of this. From a quick look these are
+>> all messages that end up in the kernel log / dmesg.
+>>
+>> IIRC %pK does nothing there, since dmest_restrict is supposed to be used
+>> to deny an unpriviliged user the access to the kernel log.
+>>
+>> Or am I missing something here?
+> 
+> These are regular printks so depending on kernel options (e.g. dynamic
+> debug, drm.debug) these might be printed also in the console. Of course
+> we could argue then if access to one of the consoles is worth
+> securing.
+This here suggests otherwise.
+https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/Documentation/sysctl/kernel.txt#n388
 
-Signed-off-by: Jean-Baptiste Abbadie <jb@abbadie.fr>
----
- .../vc04_services/interface/vchiq_arm/vchiq_shim.c | 50 ----------------------
- 1 file changed, 50 deletions(-)
+I have not tested this, but IIRC %pK is not honored by the kernel
+logging infrastucture. That's why dmesg_restrict is there.
 
-diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_shim.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_shim.c
-index 46bb8bd7583b..8af95fc361ed 100644
---- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_shim.c
-+++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_shim.c
-@@ -814,56 +814,6 @@ int32_t vchi_get_peer_version(const VCHI_SERVICE_HANDLE_T handle, short *peer_ve
- }
- EXPORT_SYMBOL(vchi_get_peer_version);
- 
--/* ----------------------------------------------------------------------
-- * read a uint32_t from buffer.
-- * network format is defined to be little endian
-- * -------------------------------------------------------------------- */
--uint32_t
--vchi_readbuf_uint32(const void *_ptr)
--{
--	const unsigned char *ptr = _ptr;
--	return ptr[0] | (ptr[1] << 8) | (ptr[2] << 16) | (ptr[3] << 24);
--}
--
--/* ----------------------------------------------------------------------
-- * write a uint32_t to buffer.
-- * network format is defined to be little endian
-- * -------------------------------------------------------------------- */
--void
--vchi_writebuf_uint32(void *_ptr, uint32_t value)
--{
--	unsigned char *ptr = _ptr;
--
--	ptr[0] = (unsigned char)((value >> 0)  & 0xFF);
--	ptr[1] = (unsigned char)((value >> 8)  & 0xFF);
--	ptr[2] = (unsigned char)((value >> 16) & 0xFF);
--	ptr[3] = (unsigned char)((value >> 24) & 0xFF);
--}
--
--/* ----------------------------------------------------------------------
-- * read a uint16_t from buffer.
-- * network format is defined to be little endian
-- * -------------------------------------------------------------------- */
--uint16_t
--vchi_readbuf_uint16(const void *_ptr)
--{
--	const unsigned char *ptr = _ptr;
--
--	return ptr[0] | (ptr[1] << 8);
--}
--
--/* ----------------------------------------------------------------------
-- * write a uint16_t into the buffer.
-- * network format is defined to be little endian
-- * -------------------------------------------------------------------- */
--void
--vchi_writebuf_uint16(void *_ptr, uint16_t value)
--{
--	unsigned char *ptr = _ptr;
--	ptr[0] = (value >> 0)  & 0xFF;
--	ptr[1] = (value >> 8)  & 0xFF;
--}
--
- /***********************************************************
-  * Name: vchi_service_use
-  *
--- 
-2.12.0
+Correct me if I'm wrong.
+
+- Tobias
+
+
+> Actually, I think that we should get rid of printing of these kernel
+> pointers entirely...
+> 
+> 
+> Best regards,
+> Krzysztof
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
