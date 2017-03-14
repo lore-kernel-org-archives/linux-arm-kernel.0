@@ -1,43 +1,76 @@
 From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Tue, 14 Mar 2017 15:18:40 +0100
-Subject: [PATCH v2 04/20] ARM: sun8i: dt: Add DT bindings documentation for
- Allwinner syscon
+Date: Tue, 14 Mar 2017 15:18:44 +0100
+Subject: [PATCH v2 08/20] ARM: dts: sun8i: Enable dwmac-sun8i on the Banana Pi
+ M2+
 In-Reply-To: <20170314141856.24560-1-clabbe.montjoie@gmail.com>
 References: <20170314141856.24560-1-clabbe.montjoie@gmail.com>
-Message-ID: <20170314141856.24560-5-clabbe.montjoie@gmail.com>
+Message-ID: <20170314141856.24560-9-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: LABBE Corentin <clabbe.montjoie@gmail.com>
+
+The dwmac-sun8i hardware is present on the Banana Pi M2+
+It uses an external PHY rtl8211e via RGMII.
+
+This patch create the needed regulator, emac and phy nodes.
+
 Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
 ---
- .../devicetree/bindings/misc/allwinner,syscon.txt     | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/misc/allwinner,syscon.txt
+ arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts | 37 +++++++++++++++++++++++++
+ 1 file changed, 37 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/misc/allwinner,syscon.txt b/Documentation/devicetree/bindings/misc/allwinner,syscon.txt
-new file mode 100644
-index 0000000..9f5f1f5
---- /dev/null
-+++ b/Documentation/devicetree/bindings/misc/allwinner,syscon.txt
-@@ -0,0 +1,19 @@
-+* Allwinner sun8i system controller
+diff --git a/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts b/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts
+index 52acbe1..30b0a41 100644
+--- a/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts
++++ b/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts
+@@ -90,6 +90,18 @@
+ 		pinctrl-0 = <&wifi_en_bpi_m2p>;
+ 		reset-gpios = <&r_pio 0 7 GPIO_ACTIVE_LOW>; /* PL7 */
+ 	};
 +
-+This file describes the bindings for the system controller present in
-+Allwinner SoC H3, A83T and A64.
-+The principal function of this syscon is to control EMAC PHY choice and
-+config.
++	reg_gmac_3v3: gmac-3v3 {
++		      compatible = "regulator-fixed";
++		      pinctrl-names = "default";
++		      pinctrl-0 = <&gmac_power_pin_orangepi>;
++		      regulator-name = "gmac-3v3";
++		      regulator-min-microvolt = <3300000>;
++		      regulator-max-microvolt = <3300000>;
++		      startup-delay-us = <100000>;
++		      enable-active-high;
++		      gpio = <&pio 3 6 GPIO_ACTIVE_HIGH>;
++	      };
+ };
+ 
+ &ehci1 {
+@@ -186,3 +198,28 @@
+ 	/* USB VBUS is on as long as VCC-IO is on */
+ 	status = "okay";
+ };
 +
-+Required properties for the system controller:
-+- reg: address and length of the register for the device.
-+- compatible: should be "syscon" and one of the following string:
-+		"allwinner,sun8i-h3-system-controller"
-+		"allwinner,sun8i-a64-system-controller"
-+		"allwinner,sun8i-a83t-system-controller"
++&pio {
++	gmac_power_pin_orangepi: gmac_power_pin at 0 {
++		 pins = "PD6";
++		 function = "gpio_out";
++		 drive-strength = <10>;
++	 };
++};
 +
-+Example:
-+syscon: syscon at 01c00000 {
-+	compatible = "syscon", "allwinner,sun8i-h3-system-controller";
-+	reg = <0x01c00000 0x1000>;
++&mdio {
++	ext_rgmii_phy: ethernet-phy at 1 {
++		reg = <0>;
++	};
++};
++
++&emac {
++	pinctrl-names = "default";
++	pinctrl-0 = <&emac_rgmii_pins>;
++	phy-supply = <&reg_gmac_3v3>;
++	phy-handle = <&ext_rgmii_phy>;
++	phy-mode = "rgmii";
++
++	allwinner,leds-active-low;
++	status = "okay";
 +};
 -- 
 2.10.2
