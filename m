@@ -1,236 +1,130 @@
-From: xiexiuqi@huawei.com (Xie XiuQi)
-Date: Tue, 14 Mar 2017 17:35:17 +0800
-Subject: [PATCH V12 09/10] trace, ras: add ARM processor error trace event
-In-Reply-To: <20170313095852.0c424d53@gandalf.local.home>
-References: <1488833103-21082-1-git-send-email-tbaicar@codeaurora.org>
- <1488833103-21082-10-git-send-email-tbaicar@codeaurora.org>
- <58C12342.2090701@huawei.com>
- <14545228-7ff1-b31c-1fa5-daacf89a44b9@codeaurora.org>
- <58C60485.2070509@huawei.com> <58C65FCB.3040508@huawei.com>
- <20170313095852.0c424d53@gandalf.local.home>
-Message-ID: <58C7B955.50909@huawei.com>
+From: james.morse@arm.com (James Morse)
+Date: Tue, 14 Mar 2017 09:45:06 +0000
+Subject: [PATCH v2 3/3] arm64: KVM: add guest SEI support
+In-Reply-To: <1488946181-130774-4-git-send-email-xiexiuqi@huawei.com>
+References: <1488946181-130774-1-git-send-email-xiexiuqi@huawei.com>
+ <1488946181-130774-4-git-send-email-xiexiuqi@huawei.com>
+Message-ID: <58C7BBA2.4080208@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Steven,
+Hi Xie XiuQi,
 
-Thanks for you comments. As your suggestion, I've changed it in v2.
+On 08/03/17 04:09, Xie XiuQi wrote:
+> Add ghes handling for SEI so that the host kernel could parse and
+> report detailed error information for SEI which occur in the guest
+> kernel.
 
->From c29c14c3b960f55beb4c4b22b7aced64fa7daf9a Mon Sep 17 00:00:00 2001
-From: Xie XiuQi <xiexiuqi@huawei.com>
-Date: Mon, 13 Mar 2017 15:46:06 +0800
-Subject: [PATCH v2] trace: ras: add ARM processor error information trace event
+How does this interact with Synchronous External Abort as a notify method?
+Both of these take the in_nmi() path through APEI.
 
-Add a new trace event for ARM processor error information, so that
-the user will know what error occurred. With this information the
-user may take appropriate action.
+SError Interrupts are masked during exception processing, so we don't have to
+worry about them becoming recursive.
+For SEA the firmware has to promise not to invoke another SEA while we are still
+processing the first, and SEI will be masked if we took it as an exception.
 
-These trace events are consistent with the ARM processor error
-information table which defined in UEFI 2.6 spec section N.2.4.4.1.
+What happens if we take an SEA while processing another event notified via SEI?
+Can this happen on your platform? Can someone else build a platform where this
+happens? Does the GHES APEI code need to be able to handle this?
 
----
-v2: add trace enabled condition as Steven's suggestion.
-    fix a typo.
-
-Signed-off-by: Xie XiuQi <xiexiuqi@huawei.com>
----
- drivers/acpi/apei/ghes.c | 10 ++++++
- include/linux/cper.h     |  5 +++
- include/ras/ras_event.h  | 87 ++++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 102 insertions(+)
-
-diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
-index 251d7e0..bcb8160 100644
---- a/drivers/acpi/apei/ghes.c
-+++ b/drivers/acpi/apei/ghes.c
-@@ -518,9 +518,19 @@ static void ghes_do_proc(struct ghes *ghes,
- 		else if (!uuid_le_cmp(sec_type, CPER_SEC_PROC_ARM) &&
- 			 trace_arm_event_enabled()) {
- 			struct cper_sec_proc_arm *arm_err;
-+			struct cper_arm_err_info *err_info;
-+			int i;
-
- 			arm_err = acpi_hest_generic_data_payload(gdata);
- 			trace_arm_event(arm_err);
-+
-+			if (trace_arm_proc_err_enabled()) {
-+				err_info = (struct cper_arm_err_info *)(arm_err + 1);
-+				for (i = 0; i < arm_err->err_info_num; i++) {
-+					trace_arm_proc_err(err_info);
-+					err_info += 1;
-+				}
-+			}
- 		} else if (trace_unknown_sec_event_enabled()) {
- 			void *unknown_err = acpi_hest_generic_data_payload(gdata);
- 			trace_unknown_sec_event(&sec_type,
-diff --git a/include/linux/cper.h b/include/linux/cper.h
-index 85450f3..0cae900 100644
---- a/include/linux/cper.h
-+++ b/include/linux/cper.h
-@@ -270,6 +270,11 @@ enum {
- #define CPER_ARM_INFO_VALID_VIRT_ADDR		0x0008
- #define CPER_ARM_INFO_VALID_PHYSICAL_ADDR	0x0010
-
-+#define CPER_ARM_INFO_TYPE_CACHE		0
-+#define CPER_ARM_INFO_TYPE_TLB			1
-+#define CPER_ARM_INFO_TYPE_BUS			2
-+#define CPER_ARM_INFO_TYPE_UARCH		3
-+
- #define CPER_ARM_INFO_FLAGS_FIRST		0x0001
- #define CPER_ARM_INFO_FLAGS_LAST		0x0002
- #define CPER_ARM_INFO_FLAGS_PROPAGATED		0x0004
-diff --git a/include/ras/ras_event.h b/include/ras/ras_event.h
-index b36db48..0f9f46e 100644
---- a/include/ras/ras_event.h
-+++ b/include/ras/ras_event.h
-@@ -195,6 +195,93 @@
- 		  __entry->running_state, __entry->psci_state)
- );
-
-+#define ARM_PROC_ERR_TYPE	\
-+	EM ( CPER_ARM_INFO_TYPE_CACHE, "cache error" )	\
-+	EM ( CPER_ARM_INFO_TYPE_TLB,  "TLB error" )	\
-+	EM ( CPER_ARM_INFO_TYPE_BUS, "bus error" )	\
-+	EMe ( CPER_ARM_INFO_TYPE_UARCH, "micro-architectural error" )
-+
-+#define ARM_PROC_ERR_FLAGS	\
-+	EM ( CPER_ARM_INFO_FLAGS_FIRST, "First error captured" )	\
-+	EM ( CPER_ARM_INFO_FLAGS_LAST,  "Last error captured" )	\
-+	EM ( CPER_ARM_INFO_FLAGS_PROPAGATED, "Propagated" )	\
-+	EMe ( CPER_ARM_INFO_FLAGS_OVERFLOW, "Overflow" )
-+
-+/*
-+ * First define the enums in MM_ACTION_RESULT to be exported to userspace
-+ * via TRACE_DEFINE_ENUM().
-+ */
-+#undef EM
-+#undef EMe
-+#define EM(a, b) TRACE_DEFINE_ENUM(a);
-+#define EMe(a, b)	TRACE_DEFINE_ENUM(a);
-+
-+ARM_PROC_ERR_TYPE
-+ARM_PROC_ERR_FLAGS
-+
-+/*
-+ * Now redefine the EM() and EMe() macros to map the enums to the strings
-+ * that will be printed in the output.
-+ */
-+#undef EM
-+#undef EMe
-+#define EM(a, b)		{ a, b },
-+#define EMe(a, b)	{ a, b }
-+
-+TRACE_EVENT(arm_proc_err,
-+
-+	TP_PROTO(const struct cper_arm_err_info *err),
-+
-+	TP_ARGS(err),
-+
-+	TP_STRUCT__entry(
-+		__field(u8, type)
-+		__field(u16, multiple_error)
-+		__field(u8, flags)
-+		__field(u64, error_info)
-+		__field(u64, virt_fault_addr)
-+		__field(u64, physical_fault_addr)
-+	),
-+
-+	TP_fast_assign(
-+		__entry->type = err->type;
-+
-+		if (err->validation_bits & CPER_ARM_INFO_VALID_MULTI_ERR)
-+			__entry->multiple_error = err->multiple_error;
-+		else
-+			__entry->multiple_error = ~0;
-+			
-+		if (err->validation_bits & CPER_ARM_INFO_VALID_FLAGS)
-+			__entry->flags = err->flags;
-+		else
-+			__entry->flags = ~0;
-+
-+		if (err->validation_bits & CPER_ARM_INFO_VALID_ERR_INFO)
-+			__entry->error_info = err->error_info;
-+		else
-+			__entry->error_info = 0ULL;
-+
-+		if (err->validation_bits & CPER_ARM_INFO_VALID_VIRT_ADDR)
-+			__entry->virt_fault_addr = err->virt_fault_addr;
-+		else
-+			__entry->virt_fault_addr = 0ULL;
-+
-+		if (err->validation_bits & CPER_ARM_INFO_VALID_PHYSICAL_ADDR)
-+			__entry->physical_fault_addr = err->physical_fault_addr;
-+		else
-+			__entry->physical_fault_addr = 0ULL;
-+	),
-+
-+	TP_printk("ARM Processor Error: type %s; count: %u; flags: %s;"
-+		  " error info: %016llx; virtual address: %016llx;"
-+		  " physical address: %016llx",
-+		  __print_symbolic(__entry->type, ARCH_PROC_ERR_TYPE),
-+		  __entry->multiple_error,
-+		  __print_symbolic(__entry->flags, ARCH_PROC_ERR_FLAGS),
-+		  __entry->error_info, __entry->virt_fault_addr,
-+		  __entry->physical_fault_addr)
-+);
-+
- /*
-  * Unknown Section Report
-  *
--- 
-1.8.3.1
+If we need to support both at the same time we will need to change Linux's APEI
+code to reserve a page of virtual address space per GHES entry, instead of one
+for NMI and one for IRQ.
 
 
+> diff --git a/arch/arm64/include/asm/system_misc.h b/arch/arm64/include/asm/system_misc.h
+> index 5b2cecd..d68d61f 100644
+> --- a/arch/arm64/include/asm/system_misc.h
+> +++ b/arch/arm64/include/asm/system_misc.h
+> @@ -59,5 +59,6 @@ void hook_debug_fault_code(int nr, int (*fn)(unsigned long, unsigned int,
+>  #endif	/* __ASSEMBLY__ */
+>  
+>  int handle_guest_sea(unsigned long addr, unsigned int esr);
+> +int handle_guest_sei(unsigned long addr, unsigned int esr);
+>  
+>  #endif	/* __ASM_SYSTEM_MISC_H */
+> diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+> index 65dbfa9..cf9f569 100644
+> --- a/arch/arm64/kernel/traps.c
+> +++ b/arch/arm64/kernel/traps.c
+> @@ -616,6 +616,24 @@ const char *esr_get_class_string(u32 esr)
+>  }
+>  
+>  /*
+> + * Handle asynchronous SError interrupt that occur in a guest kernel.
+> + */
+> +int handle_guest_sei(unsigned long addr, unsigned int esr)
+> +{
+> +	/*
+> +	 * synchronize_rcu() will wait for nmi_exit(), so no need to
+> +	 * rcu_read_lock().
+> +	 */
 
-On 2017/3/13 21:58, Steven Rostedt wrote:
-> On Mon, 13 Mar 2017 17:00:59 +0800
-> Xie XiuQi <xiexiuqi@huawei.com> wrote:
-> 
->> ---
->>  drivers/acpi/apei/ghes.c |  8 +++++
->>  include/linux/cper.h     |  5 +++
->>  include/ras/ras_event.h  | 87 ++++++++++++++++++++++++++++++++++++++++++++++++
->>  3 files changed, 100 insertions(+)
->>
->> diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
->> index 251d7e0..6d34c26 100644
->> --- a/drivers/acpi/apei/ghes.c
->> +++ b/drivers/acpi/apei/ghes.c
->> @@ -518,9 +518,17 @@ static void ghes_do_proc(struct ghes *ghes,
->>  		else if (!uuid_le_cmp(sec_type, CPER_SEC_PROC_ARM) &&
->>  			 trace_arm_event_enabled()) {
->>  			struct cper_sec_proc_arm *arm_err;
->> +			struct cper_arm_err_info *err_info;
->> +			int i;
->>
->>  			arm_err = acpi_hest_generic_data_payload(gdata);
->>  			trace_arm_event(arm_err);
->> +
-> 
-> 		if (trace_arm_proc_err_enabled()) {
-> 
->> +			err_info = (struct cper_arm_err_info *)(arm_err + 1);
->> +			for (i = 0; i < arm_err->err_info_num; i++) {
->> +				trace_arm_proc_err(err_info);
->> +				err_info += 1;
->> +			}
-> 
-> 		}
-> 
-> -- Steve
-> 
->>  		} else if (trace_unknown_sec_event_enabled()) {
->>  			void *unknown_err = acpi_hest_generic_data_payload(gdata);
->>  			trace_unknown_sec_event(&sec_type,
->> diff --git a/include/linux/cper.h b/include/linux/cper.h
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
-> .
-> 
+This comment was true for patch 4 of Tyler's series, but not-true when we got to
+patch 10. Please remove it,
 
--- 
+
+> +	if(IS_ENABLED(CONFIG_ACPI_APEI_SEI)) {
+> +		rcu_read_lock();
+
+Please put the rcu calls against the thing using them.
+
+
+> +		ghes_notify_sei();
+> +		rcu_read_unlock();
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +/*
+>   * bad_mode handles the impossible case in the exception vector. This is always
+>   * fatal.
+>   */
+
+> diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
+> index 1bfe30d..8c7dba0 100644
+> --- a/arch/arm64/kvm/handle_exit.c
+> +++ b/arch/arm64/kvm/handle_exit.c
+> @@ -172,6 +173,23 @@ static exit_handle_fn kvm_get_exit_handler(struct kvm_vcpu *vcpu)
+>  	return arm_exit_handlers[hsr_ec];
+>  }
+>  
+> +static int kvm_handle_guest_sei(struct kvm_vcpu *vcpu, struct kvm_run *run)
+> +{
+> +	unsigned long fault_ipa = kvm_vcpu_get_fault_ipa(vcpu);
+> +
+> +	if (handle_guest_sei((unsigned long)fault_ipa,
+> +				kvm_vcpu_get_hsr(vcpu))) {
+> +		kvm_err("Failed to handle guest SEI, FSC: EC=%#x xFSC=%#lx ESR_EL2=%#lx\n",
+> +				kvm_vcpu_trap_get_class(vcpu),
+> +				(unsigned long)kvm_vcpu_trap_get_fault(vcpu),
+> +				(unsigned long)kvm_vcpu_get_hsr(vcpu));
+> +	}
+> +
+
+> +	kvm_inject_vabt(vcpu);
+
+Always inject an SError Interrupt? How should this work when Qemu supports
+guest-RAS too?
+
+If we do want to kill the guest for RAS-related reasons we should go via
+user-space to allow Qemu to handle the error and potentially notify the guest.
+This would let Qemu generate CPER records for the guest, mirroring what just
+happened with the firmware-generated records.
+
+As on the other thread: if there were CPER records processed by
+handle_guest_sei() we should continue as normal as the fault was handled in some
+way.
+If there were no CPER records, (or the system doesn't support SEI as a GHES
+notification mechanism), then yes we should still call kvm_inject_vabt().
+
+A suggestion of how do this: [0], if you have a better suggestion please chime in!
+
+
 Thanks,
-Xie XiuQi
+
+James
+
+
+[0] https://www.spinics.net/lists/kvm/msg146131.html
