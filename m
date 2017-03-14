@@ -1,106 +1,79 @@
-From: dingtianhong@huawei.com (Ding Tianhong)
-Date: Tue, 14 Mar 2017 22:06:48 +0800
-Subject: [PATCH] arm64: enable ARCH_WANT_RELAX_ORDER for aarch64
-In-Reply-To: <d97d0876-3e00-1979-72de-35fd81bfedf5@arm.com>
-References: <35233df0-3406-e66f-d9d2-bf7ed7814386@huawei.com>
- <d97d0876-3e00-1979-72de-35fd81bfedf5@arm.com>
-Message-ID: <5bcff420-2ba7-7f64-9c52-41a5c60e9c31@huawei.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Tue, 14 Mar 2017 15:16:11 +0100
+Subject: [PATCH 1/3] arm64: defconfig: Enable DRM and LPASS drivers for
+ Exynos5433 and Exynos7
+In-Reply-To: <20170311213856.21701-2-krzk@kernel.org>
+References: <20170311213856.21701-1-krzk@kernel.org>
+ <20170311213856.21701-2-krzk@kernel.org>
+ <CGME20170314141613epcas5p30fa91bf723a5e3a8f11ce9a8cfdb7dd7@epcas5p3.samsung.com>
+Message-ID: <2818068.EPOAvXIH6Z@amdc3058>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin?
 
-On 2017/3/13 21:31, Robin Murphy wrote:
-> On 13/03/17 12:03, Ding Tianhong wrote:
->> The ARCH_WANT_RELAX_ORDER will enable Relaxed Ordering (RO) which allows
->> transactions that do not have any order of completion requirements to
->> complete more efficiently compare to the Stricted Ordering (SO) for ixbge
->> nic card.
+Hi,
+
+On Saturday, March 11, 2017 11:38:54 PM Krzysztof Kozlowski wrote:
+> Enable drivers specific to Exynos5433 and Exynos7:
+> 1. MFD Low Power Audio SubSystem (LPASS),
+> 2. Entire DRM stack (display, outputs, additional sub-blocks),
+> 3. Drivers for video-related sub-blocks (JPEG, Multi Format Codec,
+>    GScaler).
 > 
-> Which ixgbe NIC? As far as I can see we have an arch-level config option
-> here which applies to one single driver, and doesn't even cover all the
-> hardware supported by that driver (82598, for example, still has the
-> #ifndef CONFIG_SPARC in the equivalent place). Looking at the history,
-> I'd prefer to at least know what the "various issues with certain
-> chipsets" were, and why they wouldn't affect ARM systems,  before making
-> any judgement about whether this could be considered universally safe
-> for arm64.
+> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+> ---
+>  arch/arm64/configs/defconfig | 18 ++++++++++++++++++
+>  1 file changed, 18 insertions(+)
 > 
+> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+> index 5e7fa211eb0a..81515cbd2fe8 100644
+> --- a/arch/arm64/configs/defconfig
+> +++ b/arch/arm64/configs/defconfig
+> @@ -302,6 +302,7 @@ CONFIG_RENESAS_WDT=y
+>  CONFIG_S3C2410_WATCHDOG=y
+>  CONFIG_MESON_GXBB_WATCHDOG=m
+>  CONFIG_MESON_WATCHDOG=m
+> +CONFIG_MFD_EXYNOS_LPASS=m
+>  CONFIG_MFD_MAX77620=y
+>  CONFIG_MFD_RK808=y
+>  CONFIG_MFD_SPMI_PMIC=y
+> @@ -327,10 +328,27 @@ CONFIG_MEDIA_CONTROLLER=y
+>  CONFIG_VIDEO_V4L2_SUBDEV_API=y
+>  # CONFIG_DVB_NET is not set
+>  CONFIG_V4L_MEM2MEM_DRIVERS=y
+> +CONFIG_VIDEO_SAMSUNG_S5P_JPEG=m
+> +CONFIG_VIDEO_SAMSUNG_S5P_MFC=m
+> +CONFIG_VIDEO_SAMSUNG_EXYNOS_GSC=m
+>  CONFIG_VIDEO_RENESAS_FCP=m
+>  CONFIG_VIDEO_RENESAS_VSP1=m
+>  CONFIG_DRM=m
+>  CONFIG_DRM_NOUVEAU=m
+> +CONFIG_DRM_EXYNOS=m
+> +CONFIG_DRM_EXYNOS_FIMD=y
+> +CONFIG_DRM_EXYNOS5433_DECON=y
+> +CONFIG_DRM_EXYNOS7_DECON=y
+> +CONFIG_DRM_EXYNOS_MIXER=y
+> +CONFIG_DRM_EXYNOS_VIDI=y
+> +CONFIG_DRM_EXYNOS_DPI=y
+> +CONFIG_DRM_EXYNOS_DSI=y
+> +CONFIG_DRM_EXYNOS_HDMI=y
+> +CONFIG_DRM_EXYNOS_MIC=y
+> +CONFIG_DRM_EXYNOS_G2D=y
+> +CONFIG_DRM_EXYNOS_IPP=y
+> +CONFIG_DRM_EXYNOS_FIMC=y
+> +CONFIG_DRM_EXYNOS_ROTATOR=y
 
-Indeed, in fact if the chipsets didn't support RO mode or has some errata for RO mode, it may
-occur some issues, but it looks no such aarch64 chips, maybe I miss something.
+I would prefer to enable only sub-drivers that are actually
+used on Exynos5433/Exynos7 hardware, i.e. currently only
+exynos4.dtsi uses compatibles for FIMC and rotator drivers
+(I have not checked all sub-drivers).
 
-There are several intel nic card could support enable relax order, so need another patch to rename the SPARC
-to ARCH_WANT_RELAX_ORDER, the universal name looks more better.
+>  CONFIG_DRM_RCAR_DU=m
+>  CONFIG_DRM_RCAR_HDMI=y
+>  CONFIG_DRM_RCAR_LVDS=y
 
->> The system will see high write-to-memory performance when RO is
->> enabled on the data transactions just like the SPARC did.
->>
->> The aarch64 pcie controller could both support Relaxed Ordering (RO)
-> 
-> What is "the AArch64 PCIe controller", exactly? Disregarding that
-> talking of PCIe in terms of the CPU ISA makes little sense, I can barely
-> name two ARMv8-based systems which nominally use the same PCIe IP, and
-> the amount of various quirks and incompatibilities I'm aware of leaves
-> me with the default assumption that any such unqualified blanket
-> statement is probably wrong. I think we need some much more considered
-> reasoning here.
-> 
-
-Agree, till now I could only test on hip06/hip07 board and get the better performance,
-maybe I could test on other aarch64 platform.
-
->> and Stricted Ordering (SO), so enable ARCH_WANT_RELAX_ORDER for ixgbe
->> nic card to get much more better performance, and didn't see any
->> adverse effects.
->>
->> Nic Card(Ixgbe)			Disable RO	|	Enable RO
->> Performance(Per thread)		8.4Gb/s		|	9.4Gb/s
->>
->> Tested by Iperf on Hip06/Hip07 Soc Board.
->>
->> Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
->> ---
->>  arch/arm64/Kconfig | 1 +
->>  1 file changed, 1 insertion(+)
->>
->> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
->> index 8c7c244..36249a3 100644
->> --- a/arch/arm64/Kconfig
->> +++ b/arch/arm64/Kconfig
->> @@ -115,6 +115,7 @@ config ARM64
->>  	select SPARSE_IRQ
->>  	select SYSCTL_EXCEPTION_TRACE
->>  	select THREAD_INFO_IN_TASK
->> +	select ARCH_WANT_RELAX_ORDER
-> 
-> I'd say the first order of business is to rename this config option to
-> IXBGE_82599_WANT_RELAXED_ORDER so that it's not entirely misleading and
-
-not only for 82599, including 82598, 82576....
-
-> ambiguous. At first glance it looks far more like something scary to do
-> with memory barriers than a network driver option. Howcome this isn't
-> just in drivers/net/intel/Kconfig as a "default y if SPARC" bool anyway?
-
-didn't see any essential differences, and I still need to get some Acked by arm maintainer.
-
-> 
-
-Yes, more memory barriers always affect the performance especially for
-some architecture not just like sparc, any optimization should be taken seriously
-especially for aarch64.
-
-
-Thanks.
-Ding
-
-> Robin.
-> 
->>  	help
->>  	  ARM 64-bit (AArch64) Linux support.
->>
-> 
-> 
-> .
-> 
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
