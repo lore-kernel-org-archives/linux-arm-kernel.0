@@ -1,96 +1,148 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Tue, 14 Mar 2017 12:27:31 +0800
-Subject: [PATCH V7 6/7] LIBIO: Support the dynamically logical PIO
- registration of ACPI host I/O
-In-Reply-To: <1489372963-9000-7-git-send-email-yuanzhichang@hisilicon.com>
-Message-ID: <201703141216.LokXDKIS%fengguang.wu@intel.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 14 Mar 2017 12:31:22 +0800
+Subject: Applied "ASoC: sun8i-codec: Update mixer to use SOC_DAPM_DOUBLE"
+ to the asoc tree
+In-Reply-To: <E1clbY9-0000DH-LY@finisterre>
+References: <20170210094133.11382-3-mylene.josserand@free-electrons.com>
+ <E1clbY9-0000DH-LY@finisterre>
+Message-ID: <CAGb2v6428PpYPzpHngLgaeziwKN8u-TYiNO1bs7TFw-7VrQOAg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi zhichang.yuan,
+Hi Mark,
 
-[auto build test ERROR on linus/master]
-[also build test ERROR on v4.11-rc2 next-20170310]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+On Wed, Mar 8, 2017 at 9:22 PM, Mark Brown <broonie@kernel.org> wrote:
+> The patch
+>
+>    ASoC: sun8i-codec: Update mixer to use SOC_DAPM_DOUBLE
+>
+> has been applied to the asoc tree at
+>
+>    git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git
+>
+> All being well this means that it will be integrated into the linux-next
+> tree (usually sometime in the next 24 hours) and sent to Linus during
+> the next merge window (or sooner if it is a bug fix), however if
+> problems are discovered then the patch may be dropped or reverted.
+>
+> You may get further e-mails resulting from automated or manual testing
+> and review of the tree, please engage with people reporting problems and
+> send followup patches addressing any issues that are reported if needed.
+>
+> If any updates are required or you are submitting further changes they
+> should be sent as incremental updates against current git, existing
+> patches will not be replaced.
+>
+> Please add any relevant lists and maintainers to the CCs when replying
+> to this mail.
+>
+> Thanks,
+> Mark
+>
+> From ca14da6e611674cad275f29ac2aaf1e2eb427c6b Mon Sep 17 00:00:00 2001
+> From: =?UTF-8?q?Myl=C3=A8ne=20Josserand?=
+>  <mylene.josserand@free-electrons.com>
+> Date: Fri, 10 Feb 2017 10:41:31 +0100
+> Subject: [PATCH] ASoC: sun8i-codec: Update mixer to use SOC_DAPM_DOUBLE
+> MIME-Version: 1.0
+> Content-Type: text/plain; charset=UTF-8
+> Content-Transfer-Encoding: 8bit
+>
+> Update the driver to use the new SOC_DAPM_DOUBLE definition
+> on the digital DAC mixer.
+> Update the names accordingly as, when they are shared, the
+> controls are not prefixed with the widget's name anymore.
+>
+> Signed-off-by: Myl?ne Josserand <mylene.josserand@free-electrons.com>
+> Acked-by: Chen-Yu Tsai <wens@csie.org>
+> Signed-off-by: Mark Brown <broonie@kernel.org>
+> ---
+>  sound/soc/sunxi/sun8i-codec.c | 45 ++++++++++++++++++++-----------------------
+>  1 file changed, 21 insertions(+), 24 deletions(-)
+>
+> diff --git a/sound/soc/sunxi/sun8i-codec.c b/sound/soc/sunxi/sun8i-codec.c
+> index d60f6fbd36a2..107fa8213600 100644
+> --- a/sound/soc/sunxi/sun8i-codec.c
+> +++ b/sound/soc/sunxi/sun8i-codec.c
+> @@ -259,25 +259,20 @@ static int sun8i_codec_hw_params(struct snd_pcm_substream *substream,
+>         return 0;
+>  }
+>
+> -static const struct snd_kcontrol_new sun8i_output_left_mixer_controls[] = {
+> -       SOC_DAPM_SINGLE("LSlot 0", SUN8I_DAC_MXR_SRC,
+> -                       SUN8I_DAC_MXR_SRC_DACL_MXR_SRC_AIF1DA0L, 1, 0),
+> -       SOC_DAPM_SINGLE("LSlot 1", SUN8I_DAC_MXR_SRC,
+> -                       SUN8I_DAC_MXR_SRC_DACL_MXR_SRC_AIF1DA1L, 1, 0),
+> -       SOC_DAPM_SINGLE("DACL", SUN8I_DAC_MXR_SRC,
+> -                       SUN8I_DAC_MXR_SRC_DACL_MXR_SRC_AIF2DACL, 1, 0),
+> -       SOC_DAPM_SINGLE("ADCL", SUN8I_DAC_MXR_SRC,
+> -                       SUN8I_DAC_MXR_SRC_DACL_MXR_SRC_ADCL, 1, 0),
+> -};
+> -
+> -static const struct snd_kcontrol_new sun8i_output_right_mixer_controls[] = {
+> -       SOC_DAPM_SINGLE("RSlot 0", SUN8I_DAC_MXR_SRC,
+> +static const struct snd_kcontrol_new sun8i_dac_mixer_controls[] = {
+> +       SOC_DAPM_DOUBLE("AIF1 Slot 0 Digital DAC Playback Switch",
+> +                       SUN8I_DAC_MXR_SRC,
+> +                       SUN8I_DAC_MXR_SRC_DACL_MXR_SRC_AIF1DA0L,
+>                         SUN8I_DAC_MXR_SRC_DACR_MXR_SRC_AIF1DA0R, 1, 0),
+> -       SOC_DAPM_SINGLE("RSlot 1", SUN8I_DAC_MXR_SRC,
+> +       SOC_DAPM_DOUBLE("AIF1 Slot 1 Digital DAC Playback Switch",
+> +                       SUN8I_DAC_MXR_SRC,
+> +                       SUN8I_DAC_MXR_SRC_DACL_MXR_SRC_AIF1DA1L,
+>                         SUN8I_DAC_MXR_SRC_DACR_MXR_SRC_AIF1DA1R, 1, 0),
+> -       SOC_DAPM_SINGLE("DACR", SUN8I_DAC_MXR_SRC,
+> +       SOC_DAPM_DOUBLE("AIF2 Digital DAC Playback Switch", SUN8I_DAC_MXR_SRC,
+> +                       SUN8I_DAC_MXR_SRC_DACL_MXR_SRC_AIF2DACL,
+>                         SUN8I_DAC_MXR_SRC_DACR_MXR_SRC_AIF2DACR, 1, 0),
+> -       SOC_DAPM_SINGLE("ADCR", SUN8I_DAC_MXR_SRC,
+> +       SOC_DAPM_DOUBLE("ADC Digital DAC Playback Switch", SUN8I_DAC_MXR_SRC,
+> +                       SUN8I_DAC_MXR_SRC_DACL_MXR_SRC_ADCL,
+>                         SUN8I_DAC_MXR_SRC_DACR_MXR_SRC_ADCR, 1, 0),
+>  };
+>
+> @@ -293,12 +288,12 @@ static const struct snd_soc_dapm_widget sun8i_codec_dapm_widgets[] = {
+>                          SUN8I_AIF1_DACDAT_CTRL_AIF1_DA0R_ENA, 0),
+>
+>         /* DAC Mixers */
+> -       SND_SOC_DAPM_MIXER("Left DAC Mixer", SND_SOC_NOPM, 0, 0,
+> -                          sun8i_output_left_mixer_controls,
+> -                          ARRAY_SIZE(sun8i_output_left_mixer_controls)),
+> -       SND_SOC_DAPM_MIXER("Right DAC Mixer", SND_SOC_NOPM, 0, 0,
+> -                          sun8i_output_right_mixer_controls,
+> -                          ARRAY_SIZE(sun8i_output_right_mixer_controls)),
+> +       SND_SOC_DAPM_MIXER("Left Digital DAC Mixer", SND_SOC_NOPM, 0, 0,
+> +                          sun8i_dac_mixer_controls,
+> +                          ARRAY_SIZE(sun8i_dac_mixer_controls)),
+> +       SND_SOC_DAPM_MIXER("Right Digital DAC Mixer", SND_SOC_NOPM, 0, 0,
+> +                          sun8i_dac_mixer_controls,
+> +                          ARRAY_SIZE(sun8i_dac_mixer_controls)),
 
-url:    https://github.com/0day-ci/linux/commits/zhichang-yuan/LPC-legacy-ISA-I-O-support/20170314-114635
-config: i386-tinyconfig (attached as .config)
-compiler: gcc-6 (Debian 6.2.0-3) 6.2.0 20160901
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=i386 
+This patch changes the mixer controls exposed to user space.
 
-All errors (new ones prefixed by >>):
+This driver was just introduced in 4.11-rc1. Would it make sense to
+merge these cleanup patches as fixes for 4.11, so we don't affect
+userspace across kernel releases?
 
-   In file included from arch/x86/boot/compressed/misc.h:24:0,
-                    from arch/x86/boot/compressed/cmdline.c:1:
->> arch/x86/boot/compressed/../ctype.h:4:19: error: redefinition of 'isdigit'
-    static inline int isdigit(int ch)
-                      ^~~~~~~
-   In file included from include/acpi/platform/aclinux.h:82:0,
-                    from include/acpi/platform/acenv.h:186,
-                    from include/acpi/acpi.h:56,
-                    from include/linux/acpi.h:33,
-                    from include/linux/libio.h:23,
-                    from include/linux/io.h:27,
-                    from arch/x86/boot/compressed/misc.h:17,
-                    from arch/x86/boot/compressed/cmdline.c:1:
-   include/linux/ctype.h:25:19: note: previous definition of 'isdigit' was here
-    static inline int isdigit(int c)
-                      ^~~~~~~
->> arch/x86/boot/compressed/../ctype.h:9:32: error: expected ')' before 'ch'
-    static inline int isxdigit(int ch)
-                                   ^
-   include/linux/ctype.h:20:50: note: in definition of macro '__ismask'
-    #define __ismask(x) (_ctype[(int)(unsigned char)(x)])
-                                                     ^
-   arch/x86/boot/compressed/../ctype.h:9:19: note: in expansion of macro 'isxdigit'
-    static inline int isxdigit(int ch)
-                      ^~~~~~~~
-   include/linux/ctype.h:20:52: error: expected expression before ']' token
-    #define __ismask(x) (_ctype[(int)(unsigned char)(x)])
-                                                       ^
-   include/linux/ctype.h:36:23: note: in expansion of macro '__ismask'
-    #define isxdigit(c) ((__ismask(c)&(_D|_X)) != 0)
-                          ^~~~~~~~
-   arch/x86/boot/compressed/../ctype.h:9:19: note: in expansion of macro 'isxdigit'
-    static inline int isxdigit(int ch)
-                      ^~~~~~~~
-   include/linux/ctype.h:36:44: error: expected ')' before '!=' token
-    #define isxdigit(c) ((__ismask(c)&(_D|_X)) != 0)
-                                               ^
-   arch/x86/boot/compressed/../ctype.h:9:19: note: in expansion of macro 'isxdigit'
-    static inline int isxdigit(int ch)
-                      ^~~~~~~~
+Thanks
+ChenYu
 
-vim +/isdigit +4 arch/x86/boot/compressed/../ctype.h
-
-60b217a0 arch/x86/boot/ctype.h   Alexander Kuleshov 2015-01-03   1  #ifndef BOOT_CTYPE_H
-60b217a0 arch/x86/boot/ctype.h   Alexander Kuleshov 2015-01-03   2  #define BOOT_CTYPE_H
-f4ed2877 arch/x86/boot/isdigit.h Yinghai Lu         2010-08-02   3  
-f4ed2877 arch/x86/boot/isdigit.h Yinghai Lu         2010-08-02  @4  static inline int isdigit(int ch)
-f4ed2877 arch/x86/boot/isdigit.h Yinghai Lu         2010-08-02   5  {
-f4ed2877 arch/x86/boot/isdigit.h Yinghai Lu         2010-08-02   6  	return (ch >= '0') && (ch <= '9');
-f4ed2877 arch/x86/boot/isdigit.h Yinghai Lu         2010-08-02   7  }
-f4ed2877 arch/x86/boot/isdigit.h Yinghai Lu         2010-08-02   8  
-f4ed2877 arch/x86/boot/isdigit.h Yinghai Lu         2010-08-02  @9  static inline int isxdigit(int ch)
-f4ed2877 arch/x86/boot/isdigit.h Yinghai Lu         2010-08-02  10  {
-f4ed2877 arch/x86/boot/isdigit.h Yinghai Lu         2010-08-02  11  	if (isdigit(ch))
-f4ed2877 arch/x86/boot/isdigit.h Yinghai Lu         2010-08-02  12  		return true;
-
-:::::: The code at line 4 was first introduced by commit
-:::::: f4ed2877b16e8146427306aea8819adac5c88374 x86, setup: reorganize the early console setup
-
-:::::: TO: Yinghai Lu <yinghai@kernel.org>
-:::::: CC: H. Peter Anvin <hpa@linux.intel.com>
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 6522 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170314/367f20e7/attachment-0001.gz>
+>
+>         /* Clocks */
+>         SND_SOC_DAPM_SUPPLY("MODCLK AFI1", SUN8I_MOD_CLK_ENA,
+> @@ -340,8 +335,10 @@ static const struct snd_soc_dapm_route sun8i_codec_dapm_routes[] = {
+>         { "Digital Right DAC", NULL, "DAC" },
+>
+>         /* DAC Mixer Routes */
+> -       { "Left DAC Mixer", "LSlot 0", "Digital Left DAC"},
+> -       { "Right DAC Mixer", "RSlot 0", "Digital Right DAC"},
+> +       { "Left Digital DAC Mixer", "AIF1 Slot 0 Digital DAC Playback Switch",
+> +         "Digital Left DAC"},
+> +       { "Right Digital DAC Mixer", "AIF1 Slot 0 Digital DAC Playback Switch ",
+> +         "Digital Right DAC"},
+>  };
+>
+>  static struct snd_soc_dai_ops sun8i_codec_dai_ops = {
+> --
+> 2.11.0
+>
