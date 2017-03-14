@@ -1,150 +1,126 @@
-From: alim.akhtar@samsung.com (Alim Akhtar)
-Date: Tue, 14 Mar 2017 13:21:10 +0530
-Subject: [2/3] soc: samsung: Do not build ARMv7 PMU drivers on ARMv8
-In-Reply-To: <20170311213856.21701-3-krzk@kernel.org>
-References: <20170311213856.21701-3-krzk@kernel.org>
- <CGME20170314075427epcas5p19d137fbcc390e937172a17ae99f11a0c@epcas5p1.samsung.com>
-Message-ID: <2da8c346-dae9-6754-8349-df0946c89ae2@samsung.com>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Tue, 14 Mar 2017 08:55:36 +0100
+Subject: [PATCH v4 14/36] [media] v4l2-mc: add a function to inherit
+ controls from a pipeline
+In-Reply-To: <20170314004533.3b3cd44b@vento.lan>
+References: <20170303230645.GR21222@n2100.armlinux.org.uk>
+ <20170304131329.GV3220@valkosipuli.retiisi.org.uk>
+ <a7b8e095-a95c-24bd-b1e9-e983f18061c4@xs4all.nl>
+ <20170310130733.GU21222@n2100.armlinux.org.uk>
+ <c679f755-52a6-3c6f-3d65-277db46676cc@xs4all.nl>
+ <20170310140124.GV21222@n2100.armlinux.org.uk>
+ <cc8900b0-c091-b14b-96f4-01f8fa72431c@xs4all.nl>
+ <20170310125342.7f047acf@vento.lan>
+ <20170310223714.GI3220@valkosipuli.retiisi.org.uk>
+ <20170311082549.576531d0@vento.lan>
+ <20170313124621.GA10701@valkosipuli.retiisi.org.uk>
+ <20170314004533.3b3cd44b@vento.lan>
+Message-ID: <e0a6c60b-1735-de0b-21f4-d8c3f4b3f10f@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
+On 03/14/2017 04:45 AM, Mauro Carvalho Chehab wrote:
+> Hi Sakari,
+> 
+> I started preparing a long argument about it, but gave up in favor of a
+> simpler one.
+> 
+> Em Mon, 13 Mar 2017 14:46:22 +0200
+> Sakari Ailus <sakari.ailus@iki.fi> escreveu:
+> 
+>> Drivers are written to support hardware, not particular use case.  
+> 
+> No, it is just the reverse: drivers and hardware are developed to
+> support use cases.
+> 
+> Btw, you should remember that the hardware is the full board, not just the
+> SoC. In practice, the board do limit the use cases: several provide a
+> single physical CSI connector, allowing just one sensor.
+> 
+>>> This situation is there since 2009. If I remember well, you tried to write
+>>> such generic plugin in the past, but never finished it, apparently because
+>>> it is too complex. Others tried too over the years.   
+>>
+>> I'd argue I know better what happened with that attempt than you do. I had a
+>> prototype of a generic pipeline configuration library but due to various
+>> reasons I haven't been able to continue working on that since around 2012.
+> 
+> ...
+> 
+>>> The last trial was done by Jacek, trying to cover just the exynos4 driver. 
+>>> Yet, even such limited scope plugin was not good enough, as it was never
+>>> merged upstream. Currently, there's no such plugins upstream.
+>>>
+>>> If we can't even merge a plugin that solves it for just *one* driver,
+>>> I have no hope that we'll be able to do it for the generic case.  
+>>
+>> I believe Jacek ceased to work on that plugin in his day job; other than
+>> that, there are some matters left to be addressed in his latest patchset.
+> 
+> The two above basically summaries the issue: the task of doing a generic
+> plugin on userspace, even for a single driver is complex enough to
+> not cover within a reasonable timeline.
+> 
+> From 2009 to 2012, you were working on it, but didn't finish it.
+> 
+> Apparently, nobody worked on it between 2013-2014 (but I may be wrong, as
+> I didn't check when the generic plugin interface was added to libv4l).
+> 
+> In the case of Jacek's work, the first patch I was able to find was
+> written in Oct, 2014:
+> 	https://patchwork.kernel.org/patch/5098111/
+> 	(not sure what happened with the version 1).
+> 
+> The last e-mail about this subject was issued in Dec, 2016.
+> 
+> In summary, you had this on your task for 3 years for an OMAP3
+> plugin (where you have a good expertise), and Jacek for 2 years, 
+> for Exynos 4, where he should also have a good knowledge.
+> 
+> Yet, with all that efforts, no concrete results were achieved, as none
+> of the plugins got merged.
+> 
+> Even if they were merged, if we keep the same mean time to develop a
+> libv4l plugin, that would mean that a plugin for i.MX6 could take 2-3
+> years to be developed.
+> 
+> There's a clear message on it:
+> 	- we shouldn't keep pushing for a solution via libv4l.
 
-On 03/12/2017 03:08 AM, Krzysztof Kozlowski wrote:
-> The Exynos Power Management Unit (PMU) drivers contain quite large
-> static arrays of register values necessary for given Exynos SoC to enter
-> low power mode.  All this data is useless for ARMv8 SoC like
-> Exynos5433, because the image will not be shared between ARMv7 and
-> ARMv8.
->
-> Add additional Kconfig symbol for selecting the SoC-specific driver
-> addons thus skipping the useless data in the final image (this is
-> similar approach to chosen for Exynos clock controller drivers):
->  - exynos-pmu driver will be compiled on both architectures ARMv7
->    and ARMv8,
->  - additional driver_data for ARMv7 SoCs will not be built on ARMv8
->    and a macro will return NULL for them in of_device_id - this should
->    be safe as these compatibles cannot match on ARMv7 and driver
->    anyway handles NULL driver_data,
->  - on ARMv8 compile only exynos-pmu driver which exposes the
->    syscon-regmap for PMU address space.
->
-> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
-> ---
->  drivers/soc/samsung/Kconfig      |  8 +++++++-
->  drivers/soc/samsung/Makefile     |  4 +++-
->  drivers/soc/samsung/exynos-pmu.c | 22 ++++++++++++++++------
->  drivers/soc/samsung/exynos-pmu.h |  3 +++
->  4 files changed, 29 insertions(+), 8 deletions(-)
->
-> diff --git a/drivers/soc/samsung/Kconfig b/drivers/soc/samsung/Kconfig
-> index 245533907d1b..8b25bd55e648 100644
-> --- a/drivers/soc/samsung/Kconfig
-> +++ b/drivers/soc/samsung/Kconfig
-> @@ -8,7 +8,13 @@ if SOC_SAMSUNG
->
->  config EXYNOS_PMU
->  	bool "Exynos PMU controller driver" if COMPILE_TEST
-> -	depends on (ARM && ARCH_EXYNOS) || ((ARM || ARM64) && COMPILE_TEST)
-> +	depends on ARCH_EXYNOS || ((ARM || ARM64) && COMPILE_TEST)
-> +	select EXYNOS_PMU_ARM_DRIVERS if ARM && ARCH_EXYNOS
-> +
+Or:
 
-In general this patch look ok, but I was think we should make these 
-configs configurable via _menuconfig_. Currently these are visible only 
-if COMPILE_TEST is enabled.
-Recently I was working on adding PMU support for Exynos7 and I face 
-issues when I want to disable this option and re-enable it for testing 
-purpose.
+	- userspace plugin development had a very a low priority and
+	  never got the attention it needed.
 
-> +# There is no need to enable these drivers for ARMv8
-> +config EXYNOS_PMU_ARM_DRIVERS
-> +	bool "Exynos PMU ARMv7-specific driver extensions" if COMPILE_TEST
-> +	depends on EXYNOS_PMU
->
->  config EXYNOS_PM_DOMAINS
->  	bool "Exynos PM domains" if COMPILE_TEST
-> diff --git a/drivers/soc/samsung/Makefile b/drivers/soc/samsung/Makefile
-> index 3619f2ecddaa..4d7694a4e7a4 100644
-> --- a/drivers/soc/samsung/Makefile
-> +++ b/drivers/soc/samsung/Makefile
-> @@ -1,3 +1,5 @@
-> -obj-$(CONFIG_EXYNOS_PMU)	+= exynos-pmu.o exynos3250-pmu.o exynos4-pmu.o \
-> +obj-$(CONFIG_EXYNOS_PMU)	+= exynos-pmu.o
-> +
-> +obj-$(CONFIG_EXYNOS_PMU_ARM_DRIVERS)	+= exynos3250-pmu.o exynos4-pmu.o \
->  					exynos5250-pmu.o exynos5420-pmu.o
->  obj-$(CONFIG_EXYNOS_PM_DOMAINS) += pm_domains.o
-> diff --git a/drivers/soc/samsung/exynos-pmu.c b/drivers/soc/samsung/exynos-pmu.c
-> index 56d9244ff981..bd4a76f27bc2 100644
-> --- a/drivers/soc/samsung/exynos-pmu.c
-> +++ b/drivers/soc/samsung/exynos-pmu.c
-> @@ -69,27 +69,37 @@ void exynos_sys_powerdown_conf(enum sys_powerdown mode)
->  }
->
->  /*
-> + * Split the data between ARM architectures because it is relatively big
-> + * and useless on other arch.
-> + */
-> +#ifdef CONFIG_EXYNOS_PMU_ARM_DRIVERS
-> +#define exynos_pmu_data_arm_ptr(data)	(&data)
-> +#else
-> +#define exynos_pmu_data_arm_ptr(data)	NULL
-> +#endif
-> +
-> +/*
->   * PMU platform driver and devicetree bindings.
->   */
->  static const struct of_device_id exynos_pmu_of_device_ids[] = {
->  	{
->  		.compatible = "samsung,exynos3250-pmu",
-> -		.data = &exynos3250_pmu_data,
-> +		.data = exynos_pmu_data_arm_ptr(exynos3250_pmu_data),
->  	}, {
->  		.compatible = "samsung,exynos4210-pmu",
-> -		.data = &exynos4210_pmu_data,
-> +		.data = exynos_pmu_data_arm_ptr(exynos4210_pmu_data),
->  	}, {
->  		.compatible = "samsung,exynos4212-pmu",
-> -		.data = &exynos4212_pmu_data,
-> +		.data = exynos_pmu_data_arm_ptr(exynos4212_pmu_data),
->  	}, {
->  		.compatible = "samsung,exynos4412-pmu",
-> -		.data = &exynos4412_pmu_data,
-> +		.data = exynos_pmu_data_arm_ptr(exynos4412_pmu_data),
->  	}, {
->  		.compatible = "samsung,exynos5250-pmu",
-> -		.data = &exynos5250_pmu_data,
-> +		.data = exynos_pmu_data_arm_ptr(exynos5250_pmu_data),
->  	}, {
->  		.compatible = "samsung,exynos5420-pmu",
-> -		.data = &exynos5420_pmu_data,
-> +		.data = exynos_pmu_data_arm_ptr(exynos5420_pmu_data),
->  	}, {
->  		.compatible = "samsung,exynos5433-pmu",
-So, as I understand, the idea here to use something like
-	.data = &exynos5433_pmu_data or so in case ARMv8?
+I know that's *my* reason. I rarely if ever looked at it. I always assumed
+Sakari and/or Laurent would look at it. If this reason is also valid for
+Sakari and Laurent, then it is no wonder nothing has happened in all that
+time.
 
->  	},
-> diff --git a/drivers/soc/samsung/exynos-pmu.h b/drivers/soc/samsung/exynos-pmu.h
-> index a469e366fead..40d4229abfb5 100644
-> --- a/drivers/soc/samsung/exynos-pmu.h
-> +++ b/drivers/soc/samsung/exynos-pmu.h
-> @@ -31,6 +31,8 @@ struct exynos_pmu_data {
->  };
->
->  extern void __iomem *pmu_base_addr;
-> +
-> +#ifdef CONFIG_EXYNOS_PMU_ARM_DRIVERS
->  /* list of all exported SoC specific data */
->  extern const struct exynos_pmu_data exynos3250_pmu_data;
->  extern const struct exynos_pmu_data exynos4210_pmu_data;
-> @@ -38,6 +40,7 @@ extern const struct exynos_pmu_data exynos4212_pmu_data;
->  extern const struct exynos_pmu_data exynos4412_pmu_data;
->  extern const struct exynos_pmu_data exynos5250_pmu_data;
->  extern const struct exynos_pmu_data exynos5420_pmu_data;
-> +#endif
->
->  extern void pmu_raw_writel(u32 val, u32 offset);
->  extern u32 pmu_raw_readl(u32 offset);
->
+We're all very driver-development-driven, and userspace gets very little
+attention in general. So before just throwing in the towel we should take
+a good look at the reasons why there has been little or no development: is
+it because of fundamental design defects, or because nobody paid attention
+to it?
+
+I strongly suspect it is the latter.
+
+In addition, I suspect end-users of these complex devices don't really care
+about a plugin: they want full control and won't typically use generic
+applications. If they would need support for that, we'd have seen much more
+interest. The main reason for having a plugin is to simplify testing and
+if this is going to be used on cheap hobbyist devkits.
+
+An additional complication is simply that it is hard to find fully supported
+MC hardware. omap3 boards are hard to find these days, renesas boards are not
+easy to get, freescale isn't the most popular either. Allwinner, mediatek,
+amlogic, broadcom and qualcomm all have closed source implementations or no
+implementation at all.
+
+I know it took me a very long time before I had a working omap3.
+
+So I am not at all surprised that little progress has been made.
+
+Regards,
+
+	Hans
