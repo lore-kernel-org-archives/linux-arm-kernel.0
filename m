@@ -1,195 +1,65 @@
-From: georgi.djakov@linaro.org (Georgi Djakov)
-Date: Tue, 14 Mar 2017 17:45:40 +0200
-Subject: [RFC v0 1/2] interconnect: Add generic interconnect controller API
-In-Reply-To: <1489053400.32329.43.camel@pengutronix.de>
-References: <20170301182235.19154-1-georgi.djakov@linaro.org>
- <20170301182235.19154-2-georgi.djakov@linaro.org>
- <1489053400.32329.43.camel@pengutronix.de>
-Message-ID: <12f0e851-6511-3f4f-ca0f-ba614a0bbe65@linaro.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 14 Mar 2017 16:42:37 +0100
+Subject: [PATCH 1/2] pinctrl: meson: gxl: add the missing PWM pin
+ definitions
+In-Reply-To: <CAFBinCDty8v80tLxHJPR+SHv32LX834dPJUruRNqr6angx3OOQ@mail.gmail.com>
+References: <20170304212318.27076-1-martin.blumenstingl@googlemail.com>
+ <20170304212318.27076-2-martin.blumenstingl@googlemail.com>
+ <1488811357.2420.18.camel@baylibre.com>
+ <CAFBinCDty8v80tLxHJPR+SHv32LX834dPJUruRNqr6angx3OOQ@mail.gmail.com>
+Message-ID: <CACRpkdbGfGUhnAQz=9xeFnD2hF6m_xXacu8mZiwte-OCSDMo9w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lucas,
-Thanks for the comments!
+On Thu, Mar 9, 2017 at 8:47 PM, Martin Blumenstingl
+<martin.blumenstingl@googlemail.com> wrote:
+> On Mon, Mar 6, 2017 at 3:42 PM, Jerome Brunet <jbrunet@baylibre.com> wrote:
+>> On Sat, 2017-03-04 at 22:23 +0100, Martin Blumenstingl wrote:
 
-On 03/09/2017 11:56 AM, Lucas Stach wrote:
-> Am Mittwoch, den 01.03.2017, 20:22 +0200 schrieb Georgi Djakov:
->> This patch introduce a new API to get the requirement and configure the
->> interconnect buses across the entire chipset to fit with the current demand.
+>>> +     FUNCTION(pwm_f_clk),
+>>> +     FUNCTION(pwm_f_x),
 >>
->> The API is using a consumer/provider-based model, where the providers are
->> the interconnect controllers and the consumers could be various drivers.
->> The consumers request interconnect resources (path) to an endpoint and set
->> the desired constraints on this data flow path. The provider(s) receive
->> requests from consumers and aggregate these requests for all master-slave
->> pairs on that path. Then the providers configure each participating in the
->> topology node according to the requested data flow path, physical links and
->> constraints. The topology could be complicated and multi-tiered and is SoC
->> specific.
+>> I wonder if having function named "pwm_f_clk" really makes sense ?
+>> Shouldn't it be just "pwm_f" ? This is real function, isn't it ?
+>> The actual pin used will be provided in the dt. Here, I suppose we
+>> could have this:
 >>
->> Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
->> ---
->>  .../bindings/interconnect/interconnect.txt         |  91 +++++++
->>  Documentation/interconnect/interconnect.txt        |  68 +++++
->>  drivers/Kconfig                                    |   2 +
->>  drivers/Makefile                                   |   1 +
->>  drivers/interconnect/Kconfig                       |  10 +
->>  drivers/interconnect/Makefile                      |   1 +
->>  drivers/interconnect/interconnect.c                | 285 +++++++++++++++++++++
->>  include/linux/interconnect-consumer.h              |  70 +++++
->>  include/linux/interconnect-provider.h              |  92 +++++++
->>  9 files changed, 620 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/interconnect/interconnect.txt
->>  create mode 100644 Documentation/interconnect/interconnect.txt
->>  create mode 100644 drivers/interconnect/Kconfig
->>  create mode 100644 drivers/interconnect/Makefile
->>  create mode 100644 drivers/interconnect/interconnect.c
->>  create mode 100644 include/linux/interconnect-consumer.h
->>  create mode 100644 include/linux/interconnect-provider.h
+>> +static const char * const pwm_f_groups[] = {
+>> +       "pwm_f_x", "pwm_f_clk",
+>> +};
 >>
->> diff --git a/Documentation/devicetree/bindings/interconnect/interconnect.txt b/Documentation/devicetree/bindings/interconnect/interconnect.txt
->> new file mode 100644
->> index 000000000000..c62d86e4c52d
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/interconnect/interconnect.txt
->> @@ -0,0 +1,91 @@
->> +Interconnect Provider Device Tree Bindings
->> +=========================================
->> +
->> +The purpose of this document is to define a common set of generic interconnect
->> +providers/consumers properties.
->> +
->> +
->> += interconnect providers =
->> +
->> +The interconnect provider binding is intended to represent the interconnect
->> +controllers in the system. Each provider registers a set of interconnect
->> +nodes, which expose the interconnect related capabilities of the interconnect
->> +to consumer drivers. These capabilities can be throughput, latency, priority
->> +etc. The consumer drivers set constraints on interconnect path (or endpoints)
->> +depending on the usecase.
->> +
->> +Required properties:
->> +- compatible : contains the interconnect provider vendor specific compatible
->> +	       string
->> +- reg : register space of the interconnect controller hardware
->> +- #interconnect-cells : number of cells in a interconnect specifier needed to
->> +		       encode the interconnect node id.
->> +
->> +
->> +Optional properties:
->> +interconnect-port : A phandle and interconnect provider specifier as defined by
->> +		bindings of the interconnect provider specified by phandle.
->> +		This denotes the port to which the interconnect consumer is
->> +		wired. It is used when there are multiple interconnect providers
->> +		that have one or multiple links between them.
+>> Has far as I can see, on meson arch, the function does not carry much
+>> information anyway, except for prints.
+>>
+>> To be clear, I'm not questioning this change in particular. It looks
+>> good, and follows what has been done in the past on meson. I know we
+>> have been this a lot already, but I'm questioning whether we should
+>> continue to do so ?
+>>
+>> I asking because I also have a lot case like this coming up on audio
+>> for gxl and gxbb, where the same function can use different pins.
 >
-> I think this isn't required. We should try to get a clear definition for
-> both the provider, as well as the consumer without mixing them in the
-> binding.
->
-> Hierarchical interconnect nodes can always be both a provider and a
-> consumer of interconnect ports at the same time.
->
+> could you please look into Jerome's question?
+> personally I'm fine with either way, and changing my patch would be
+> quite trivial. but I'd like to know what's "the way to go" before
+> changing anything (and reverting that afterwards again).
 
-Yes, this is true - a hierarchical interconnect can be both provider
-and a consumer. Each interconnect provider may have master and slave
-unidirectional ports connected to another interconnect.
+I don't understand the question really.
 
->> +
->> +Example:
->> +
->> +		snoc: snoc at 0580000 {
->> +			compatible = "qcom,msm-bus-snoc";
->> +			reg = <0x580000 0x14000>;
->> +			#interconnect-cells = <1>;
->> +			clock-names = "bus_clk", "bus_a_clk";
->> +			clocks = <&rpmcc RPM_SMD_SNOC_CLK>, <&rpmcc RPM_SMD_SNOC_A_CLK>;
->> +			status = "okay";
->> +			interconnect-port = <&bimc MAS_SNOC_CFG>,
->> +					<&bimc SNOC_BIMC_0_MAS>,
->> +					<&bimc SNOC_BIMC_1_MAS>,
->> +					<&pnoc SNOC_PNOC_SLV>;
->> +		};
->> +		bimc: bimc at 0400000 {
->> +			compatible = "qcom,msm-bus-bimc";
->> +			reg = <0x400000 0x62000>;
->> +			#interconnect-cells = <1>;
->> +			clock-names = "bus_clk", "bus_a_clk";
->> +			clocks = <&rpmcc RPM_SMD_BIMC_CLK>, <&rpmcc RPM_SMD_BIMC_A_CLK>;
->> +			status = "okay";
->> +			interconnect-port = <&snoc BIMC_SNOC_MAS>;
->> +		};
->> +		pnoc: pnoc at 500000 {
->> +			compatible = "qcom,msm-bus-pnoc";
->> +			reg = <0x500000 0x11000>;
->> +			#interconnect-cells = <1>;
->> +			clock-names = "bus_clk", "bus_a_clk";
->> +			clocks = <&rpmcc RPM_SMD_PCNOC_CLK>, <&rpmcc RPM_SMD_PCNOC_A_CLK>;
->> +			status = "okay";
->> +			interconnect-port = <&snoc PNOC_SNOC_SLV>;
->> +		};
->> +
->> += interconnect consumers =
->> +
->> +The interconnect consumers are device nodes which consume the interconnect
->> +path(s) provided by the interconnect provider. There can be multiple
->> +interconnect providers on a SoC and the consumer may consume multiple paths
->> +from different providers depending on usecase and the components it has to
->> +interact with.
->> +
->> +Required-properties:
->> +interconnect-port : A phandle and interconnect provider specifier as defined by
->> +		bindings of the interconnect provider specified by phandle.
->> +		This denotes the port to which the interconnect consumer is
->> +		wired.
->> +interconnect-path : List of phandles to the data path endpoints.
->> +interconnect-path-names : List of interconnect path name strings sorted in the
->> +		same order as the interconnect-path property.  Consumers drivers
->> +		will use interconnect-path-names to match the link names with
->> +		interconnect specifiers.
->> +
->> +Example:
->> +
->> +	sdhci at 07864000 {
->> +		...
->> +		interconnect-port = <&pnoc MAS_PNOC_SDCC_2>;
->> +		interconnect-path = <&blsp1_uart2>;
->> +		interconnect-path-names = "spi";
->> +	};
->
-> Sorry, but this binding is not entirely clear to me. What do the paths
-> do?
+I am not an expert on this system, if the people working with it
+cannot tell a function from a group I don't know who can... certainly
+not me.
 
-The path specifies the other endpoint, so in the above theoretical
-example the sdhci could tell the system that it will use an average
-bandwidth of X kbps for performing a data transfer to spi.
+What I can say is that pincontrol combines functions and groups to
+states using a mapping. The functions should be something you poke
+into a register, the groups are looser defined but may also be a
+character of the hardware, but more usual a character of the
+intended electronic usecase. Groups contain 1..n pins and can
+be combined with some applicable functions.
 
->
-> From a device perspective you have 1..n master ports, that are wired to
-> 1..n slave ports on the interconnect side. Wouldn't it be sufficient to
-> specify the phandles to the interconnect slave ports?
+Please re-read Documentation/pinctrl.txt very closely if anything is
+unclear, I really put a lot of hours into getting that right. Especially
+reexamine "Pinmux conventions".
 
-Specifying the source and the destination would also work. For
-example we could also use:
-interconnect-src = <&xnoc PORT_A>, <&xnoc PORT_B>;
-interconnect-src-names = "low_power", "high_throughput";
-interconnect-dst = <&ynoc PORT_B>, <&znoc PORT_C>;
-interconnect-dst-names = "spi", "mem"
-
-Or we may even replace it with a property containing a list of src and 
-dst pairs?
-
-> Also this should probably be a plural "ports", as a device might have
-> multiple master ports. This would need a "port-names" property, so the
-> device can reference the correct slave port when making QoS requests.
-> For devices with one read and one write port the QoS requirements of
-> both ports may be vastly different.
-
-Yes, this scenario is valid too.
-
-Anyway, i will start converting this to platform data as suggested by
-Rob and meanwhile we can continue the discussion about DT bindings.
-
-Thanks,
-Georgi
+Yours,
+Linus Walleij
