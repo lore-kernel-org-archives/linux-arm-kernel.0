@@ -1,61 +1,54 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Tue, 14 Mar 2017 17:14:22 +0100
-Subject: [PATCHv2,6/7] mm: convert generic code to 5-level paging
-In-Reply-To: <20170309142408.2868-7-kirill.shutemov@linux.intel.com>
-References: <20170309142408.2868-7-kirill.shutemov@linux.intel.com>
-Message-ID: <2565467.lozgIVsiVn@diego>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 14 Mar 2017 16:19:04 +0000
+Subject: [PATCH v2 1/2] dts: mfd: axp20x: Add "xpowers,master-mode"
+ property for AXP806 PMICs
+In-Reply-To: <396866a490b6056c60e93d862656bb90daedab98.1487791328.git.rask@formelder.dk>
+References: <cover.1487791328.git.rask@formelder.dk>
+ <396866a490b6056c60e93d862656bb90daedab98.1487791328.git.rask@formelder.dk>
+Message-ID: <20170314161904.ti5anq5aqoedt4lq@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[added arm64 maintainers and arm list to recipients]
+On Wed, 22 Feb 2017, Rask Ingemann Lambertsen wrote:
 
-Hi,
-
-Am Donnerstag, 9. M?rz 2017, 17:24:07 CET schrieb Kirill A. Shutemov:
-> Convert all non-architecture-specific code to 5-level paging.
+> commit b101829a029a ("mfd: axp20x: Fix AXP806 access errors on cold boot")
+> was intended to fix the case where a board uses an AXP806 in slave mode,
+> but the boot loader leaves it in master mode for lack of AXP806 support.
+> But now the driver breaks on boards where the PMIC is operating in master
+> mode. To let the device tree describe which mode of operation is needed,
+> this patch introduces a new property "xpowers,master-mode".
 > 
-> It's mostly mechanical adding handling one more page table level in
-> places where we deal with pud_t.
+> Fixes: 204ae2963e10 ("mfd: axp20x: Add bindings for AXP806 PMIC")
+> Signed-off-by: Rask Ingemann Lambertsen <rask@formelder.dk>
+> Acked-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+> Changes from v1 to v2:
+> Changed the commit message such that Fixes: points to the commit which
+> introduced the bindings for the AXP806 because the property should have been
+> included from the beginning of the AXP806 support.
 > 
-> Signed-off-by: Kirill A. Shutemov <kirill.shutemov@linux.intel.com>
-> Acked-by: Michal Hocko <mhocko@suse.com>
+>  Documentation/devicetree/bindings/mfd/axp20x.txt | 3 +++
+>  1 file changed, 3 insertions(+)
 
-This breaks (at least) arm64 Rockchip platforms it seems.
+Applied, thanks.
 
-4.11-rc1 worked just fine, while 4.11-rc2 kills the systems and I've bisected 
-it down to this one commit.
+> diff --git a/Documentation/devicetree/bindings/mfd/axp20x.txt b/Documentation/devicetree/bindings/mfd/axp20x.txt
+> index 8f3ad9a..b41d260 100644
+> --- a/Documentation/devicetree/bindings/mfd/axp20x.txt
+> +++ b/Documentation/devicetree/bindings/mfd/axp20x.txt
+> @@ -28,6 +28,9 @@ Optional properties:
+>  		  regulator to drive the OTG VBus, rather then as an input pin
+>  		  which signals whether the board is driving OTG VBus or not.
+>  
+> +- x-powers,master-mode: Boolean (axp806 only). Set this when the PMIC is
+> +			wired for master mode. The default is slave mode.
+> +
+>  - <input>-supply: a phandle to the regulator supply node. May be omitted if
+>  		  inputs are unregulated, such as using the IPSOUT output
+>  		  from the PMIC.
 
-As can be seen in the log [0] of the boot, the errors happen really late and 
-systemd has nearly reached the login prompt when the systems die with some 
-random paging fault (unhandled paging request, unhandled page fault, sometimes 
-they just die without any error).
-
-The error itself is pretty random and changes the all the time, but the 
-position during boot is always in that area on every machine.
-
-If I revert this one commit, everything works nicely again.
-
-
-Affected platforms I have:
-- rk3368 (8 * Cortex-A53, with a vendor uboot fork from 2014)
-- rk3399 (2 * A72 + 4 * A53, recent coreboot from ChromeOS)
-ARM64 kernel with ARM64 Debian userland
-Config comes from the arm64 "defconfig"
-
-Not affected platforms I have:
-- all arm32 Rockchip platforms I have seem to work fine with this patch
-  (rk3036, rk3288)
-Config comes from "multi_v7_defconfig"
-
-
-Heiko
-
-[0] https://bpaste.net/show/13f9faf90e13
-and attached to this mail
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: r88-fail.log
-Type: text/x-log
-Size: 31152 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170314/ec43681c/attachment-0001.bin>
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
