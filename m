@@ -1,126 +1,164 @@
-From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Tue, 14 Mar 2017 09:43:09 -0700
-Subject: [PATCH v5 15/39] [media] v4l2: add a frame interval error event
-In-Reply-To: <1489508491.28116.8.camel@ndufresne.ca>
-References: <1489121599-23206-1-git-send-email-steve_longerbeam@mentor.com>
- <1489121599-23206-16-git-send-email-steve_longerbeam@mentor.com>
- <5b0a0e76-2524-4140-5ccc-380a8f949cfa@xs4all.nl>
- <ec05e6e0-79f2-2db2-bde9-4aed00d76faa@gmail.com>
- <6b574476-77df-0e25-a4d1-32d4fe0aec12@xs4all.nl>
- <5d5cf4a4-a4d3-586e-cd16-54f543dfcce9@gmail.com>
- <aa6a5a1d-18fd-8bed-a349-2654d2d1abe0@xs4all.nl>
- <20170313104538.GF21222@n2100.armlinux.org.uk>
- <1489508491.28116.8.camel@ndufresne.ca>
-Message-ID: <429b04e6-3922-6568-fc3f-036dc632a55b@gmail.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Tue, 14 Mar 2017 18:46:49 +0200
+Subject: [PATCH v4 1/5] phy: exynos4: Remove duplicated defines of PHY
+ register defines
+In-Reply-To: <20170314164653.15771-1-krzk@kernel.org>
+References: <20170314164653.15771-1-krzk@kernel.org>
+Message-ID: <20170314164653.15771-2-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Phy drivers access PMU region through regmap provided by exynos-pmu
+driver.   However there is no need to duplicate defines for PMU
+registers.  Instead just use whatever is defined in exynos-regs-pmu.h.
 
+Additionally MIPI PHY registers for Exynos5433 start from the same
+address as Exynos4 and Exynos5250 so re-use existing defines.
 
-On 03/14/2017 09:21 AM, Nicolas Dufresne wrote:
-> Le lundi 13 mars 2017 ? 10:45 +0000, Russell King - ARM Linux a ?crit :
->> On Mon, Mar 13, 2017 at 11:02:34AM +0100, Hans Verkuil wrote:
->>> On 03/11/2017 07:14 PM, Steve Longerbeam wrote:
->>>> The event must be user visible, otherwise the user has no indication
->>>> the error, and can't correct it by stream restart.
->>> In that case the driver can detect this and call vb2_queue_error. It's
->>> what it is there for.
->>>
->>> The event doesn't help you since only this driver has this issue. So nobody
->>> will watch this event, unless it is sw specifically written for this SoC.
->>>
->>> Much better to call vb2_queue_error to signal a fatal error (which this
->>> apparently is) since there are more drivers that do this, and vivid supports
->>> triggering this condition as well.
->> So today, I can fiddle around with the IMX219 registers to help gain
->> an understanding of how this sensor works.  Several of the registers
->> (such as the PLL setup [*]) require me to disable streaming on the
->> sensor while changing them.
->>
->> This is something I've done many times while testing various ideas,
->> and is my primary way of figuring out and testing such things.
->>
->> Whenever I resume streaming (provided I've let the sensor stop
->> streaming at a frame boundary) it resumes as if nothing happened.  If I
->> stop the sensor mid-frame, then I get the rolling issue that Steve
->> reports, but once the top of the frame becomes aligned with the top of
->> the capture, everything then becomes stable again as if nothing happened.
->>
->> The side effect of what you're proposing is that when I disable streaming
->> at the sensor by poking at its registers, rather than the capture just
->> stopping, an error is going to be delivered to gstreamer, and gstreamer
->> is going to exit, taking the entire capture process down.
-> Indeed, there is no recovery attempt in GStreamer code, and it's hard
-> for an higher level programs to handle this. Nothing prevents from
-> adding something of course, but the errors are really un-specific, so
-> it would be something pretty blind. For what it has been tested, this
-> case was never met, usually the error is triggered by a USB camera
-> being un-plugged, a driver failure or even a firmware crash. Most of
-> the time, this is not recoverable.
->
-> My main concern here based on what I'm reading, is that this driver is
-> not even able to notice immediately that a produced frame was corrupted
-> (because it's out of sync). From usability perspective, this is really
-> bad.
+This reduces number of defines and allows removal of one header file.
 
-First, this is an isolated problem, specific to bt.656 and it only
-occurs when disrupting the analog video source signal in some
-way (by unplugging the RCA cable from the ADV718x connector
-for example).
+Suggested-by: Marek Szyprowski <m.szyprowski@samsung.com>
+Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+Acked-by: Lee Jones <lee.jones@linaro.org>
+Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+---
+ drivers/phy/phy-exynos-mipi-video.c         | 12 ++++++------
+ include/linux/mfd/syscon/exynos4-pmu.h      | 21 ---------------------
+ include/linux/mfd/syscon/exynos5-pmu.h      |  3 ---
+ include/linux/soc/samsung/exynos-regs-pmu.h |  9 ++++++++-
+ 4 files changed, 14 insertions(+), 31 deletions(-)
+ delete mode 100644 include/linux/mfd/syscon/exynos4-pmu.h
 
-Second, there is no DMA status support in i.MX6 to catch these
-shifted bt.656 codes, and the ADV718x does not provide any
-status indicators of this event either. So monitoring frame intervals
-is the only solution available, until FSL/NXP issues a new silicon rev.
-
-
->   Can't the driver derive a clock from some irq and calculate for
-> each frame if the timing was correct ?
-
-That's what is being done, essentially.
-
->   And if not mark the buffer with
-> V4L2_BUF_FLAG_ERROR ?
-
-I prefer to keep the private event, V4L2_BUF_FLAG_ERROR is too
-unspecific.
-
-Steve
-
-
->
->> This severely restricts the ability to be able to develop and test
->> sensor drivers.
->>
->> So, I strongly disagree with you.
->>
->> Loss of capture frames is not necessarily a fatal error - as I have been
->> saying repeatedly.  In Steve's case, there's some unknown interaction
->> between the source and iMX6 hardware that is causing the instability,
->> but that is simply not true of other sources, and I oppose any idea that
->> we should cripple the iMX6 side of the capture based upon just one
->> hardware combination where this is a problem.
-> Indeed, it happens all the time with slow USB port and UVC devices.
-> Though, the driver is well aware, and mark the buffers with
-> V4L2_BUF_FLAG_ERROR.
->
->> Steve suggested that the problem could be in the iMX6 CSI block - and I
->> note comparing Steve's code with the code in FSL's repository that there
->> are some changes that are missing in Steve's code to do with the CCIR656
->> sync code setup, particularly for >8 bit.  The progressive CCIR656 8-bit
->> setup looks pretty similar though - but I think what needs to be asked
->> is whether the same problem is visible using the FSL/NXP vendor kernel.
->>
->>
->> * - the PLL setup is something that requires research at the moment.
->> Sony's official position (even to their customers) is that they do not
->> supply the necessary information, instead they expect customers to tell
->> them the capture settings they want, and Sony will throw the values into
->> a spreadsheet, and they'll supply the register settings back to the
->> customer.  Hence, the only way to proceed with a generic driver for
->> this sensor is to experiment, and experimenting requires the ability to
->> pause the stream at the sensor while making changes.  Take this away,
->> and we're stuck with the tables-of-register-settings-for-set-of-fixed-
->> capture-settings approach.  I've made a lot of progress away from this
->> which is all down to the flexibility afforded by _not_ killing the
->> capture process.
+diff --git a/drivers/phy/phy-exynos-mipi-video.c b/drivers/phy/phy-exynos-mipi-video.c
+index 6bee04cc4d53..d7fe1f8c3ac8 100644
+--- a/drivers/phy/phy-exynos-mipi-video.c
++++ b/drivers/phy/phy-exynos-mipi-video.c
+@@ -12,7 +12,6 @@
+ #include <linux/err.h>
+ #include <linux/io.h>
+ #include <linux/kernel.h>
+-#include <linux/mfd/syscon/exynos4-pmu.h>
+ #include <linux/mfd/syscon/exynos5-pmu.h>
+ #include <linux/module.h>
+ #include <linux/of.h>
+@@ -21,6 +20,7 @@
+ #include <linux/phy/phy.h>
+ #include <linux/regmap.h>
+ #include <linux/spinlock.h>
++#include <linux/soc/samsung/exynos-regs-pmu.h>
+ #include <linux/mfd/syscon.h>
+ 
+ enum exynos_mipi_phy_id {
+@@ -173,7 +173,7 @@ static const struct mipi_phy_device_desc exynos5433_mipi_phy = {
+ 			/* EXYNOS_MIPI_PHY_ID_CSIS0 */
+ 			.coupled_phy_id = EXYNOS_MIPI_PHY_ID_DSIM0,
+ 			.enable_val = EXYNOS5_PHY_ENABLE,
+-			.enable_reg = EXYNOS5433_MIPI_PHY0_CONTROL,
++			.enable_reg = EXYNOS4_MIPI_PHY_CONTROL(0),
+ 			.enable_map = EXYNOS_MIPI_REGMAP_PMU,
+ 			.resetn_val = BIT(0),
+ 			.resetn_reg = EXYNOS5433_SYSREG_CAM0_MIPI_DPHY_CON,
+@@ -182,7 +182,7 @@ static const struct mipi_phy_device_desc exynos5433_mipi_phy = {
+ 			/* EXYNOS_MIPI_PHY_ID_DSIM0 */
+ 			.coupled_phy_id = EXYNOS_MIPI_PHY_ID_CSIS0,
+ 			.enable_val = EXYNOS5_PHY_ENABLE,
+-			.enable_reg = EXYNOS5433_MIPI_PHY0_CONTROL,
++			.enable_reg = EXYNOS4_MIPI_PHY_CONTROL(0),
+ 			.enable_map = EXYNOS_MIPI_REGMAP_PMU,
+ 			.resetn_val = BIT(0),
+ 			.resetn_reg = EXYNOS5433_SYSREG_DISP_MIPI_PHY,
+@@ -191,7 +191,7 @@ static const struct mipi_phy_device_desc exynos5433_mipi_phy = {
+ 			/* EXYNOS_MIPI_PHY_ID_CSIS1 */
+ 			.coupled_phy_id = EXYNOS_MIPI_PHY_ID_NONE,
+ 			.enable_val = EXYNOS5_PHY_ENABLE,
+-			.enable_reg = EXYNOS5433_MIPI_PHY1_CONTROL,
++			.enable_reg = EXYNOS4_MIPI_PHY_CONTROL(1),
+ 			.enable_map = EXYNOS_MIPI_REGMAP_PMU,
+ 			.resetn_val = BIT(1),
+ 			.resetn_reg = EXYNOS5433_SYSREG_CAM0_MIPI_DPHY_CON,
+@@ -200,7 +200,7 @@ static const struct mipi_phy_device_desc exynos5433_mipi_phy = {
+ 			/* EXYNOS_MIPI_PHY_ID_DSIM1 */
+ 			.coupled_phy_id = EXYNOS_MIPI_PHY_ID_NONE,
+ 			.enable_val = EXYNOS5_PHY_ENABLE,
+-			.enable_reg = EXYNOS5433_MIPI_PHY1_CONTROL,
++			.enable_reg = EXYNOS4_MIPI_PHY_CONTROL(1),
+ 			.enable_map = EXYNOS_MIPI_REGMAP_PMU,
+ 			.resetn_val = BIT(1),
+ 			.resetn_reg = EXYNOS5433_SYSREG_DISP_MIPI_PHY,
+@@ -209,7 +209,7 @@ static const struct mipi_phy_device_desc exynos5433_mipi_phy = {
+ 			/* EXYNOS_MIPI_PHY_ID_CSIS2 */
+ 			.coupled_phy_id = EXYNOS_MIPI_PHY_ID_NONE,
+ 			.enable_val = EXYNOS5_PHY_ENABLE,
+-			.enable_reg = EXYNOS5433_MIPI_PHY2_CONTROL,
++			.enable_reg = EXYNOS4_MIPI_PHY_CONTROL(2),
+ 			.enable_map = EXYNOS_MIPI_REGMAP_PMU,
+ 			.resetn_val = BIT(0),
+ 			.resetn_reg = EXYNOS5433_SYSREG_CAM1_MIPI_DPHY_CON,
+diff --git a/include/linux/mfd/syscon/exynos4-pmu.h b/include/linux/mfd/syscon/exynos4-pmu.h
+deleted file mode 100644
+index 278b1b1549e9..000000000000
+--- a/include/linux/mfd/syscon/exynos4-pmu.h
++++ /dev/null
+@@ -1,21 +0,0 @@
+-/*
+- * Copyright (C) 2015 Samsung Electronics Co., Ltd.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- */
+-
+-#ifndef _LINUX_MFD_SYSCON_PMU_EXYNOS4_H_
+-#define _LINUX_MFD_SYSCON_PMU_EXYNOS4_H_
+-
+-/* Exynos4 PMU register definitions */
+-
+-/* MIPI_PHYn_CONTROL register offset: n = 0..1 */
+-#define EXYNOS4_MIPI_PHY_CONTROL(n)	(0x710 + (n) * 4)
+-#define EXYNOS4_MIPI_PHY_ENABLE		(1 << 0)
+-#define EXYNOS4_MIPI_PHY_SRESETN	(1 << 1)
+-#define EXYNOS4_MIPI_PHY_MRESETN	(1 << 2)
+-#define EXYNOS4_MIPI_PHY_RESET_MASK	(3 << 1)
+-
+-#endif /* _LINUX_MFD_SYSCON_PMU_EXYNOS4_H_ */
+diff --git a/include/linux/mfd/syscon/exynos5-pmu.h b/include/linux/mfd/syscon/exynos5-pmu.h
+index c28ff21ca4d2..77c93551ee58 100644
+--- a/include/linux/mfd/syscon/exynos5-pmu.h
++++ b/include/linux/mfd/syscon/exynos5-pmu.h
+@@ -38,9 +38,6 @@
+ 
+ /* Exynos5433 specific register definitions */
+ #define EXYNOS5433_USBHOST30_PHY_CONTROL	(0x728)
+-#define EXYNOS5433_MIPI_PHY0_CONTROL		(0x710)
+-#define EXYNOS5433_MIPI_PHY1_CONTROL		(0x714)
+-#define EXYNOS5433_MIPI_PHY2_CONTROL		(0x718)
+ 
+ #define EXYNOS5_PHY_ENABLE			BIT(0)
+ #define EXYNOS5_MIPI_PHY_S_RESETN		BIT(1)
+diff --git a/include/linux/soc/samsung/exynos-regs-pmu.h b/include/linux/soc/samsung/exynos-regs-pmu.h
+index 49df0a01a2cc..e57d75889a09 100644
+--- a/include/linux/soc/samsung/exynos-regs-pmu.h
++++ b/include/linux/soc/samsung/exynos-regs-pmu.h
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright (c) 2010-2012 Samsung Electronics Co., Ltd.
++ * Copyright (c) 2010-2015 Samsung Electronics Co., Ltd.
+  *		http://www.samsung.com
+  *
+  * EXYNOS - Power management unit definition
+@@ -50,6 +50,13 @@
+ #define S5P_WAKEUP_MASK				0x0608
+ #define S5P_WAKEUP_MASK2				0x0614
+ 
++/* MIPI_PHYn_CONTROL, valid for Exynos3250, Exynos4, Exynos5250 and Exynos5433 */
++#define EXYNOS4_MIPI_PHY_CONTROL(n)		(0x0710 + (n) * 4)
++#define EXYNOS4_MIPI_PHY_ENABLE			(1 << 0)
++#define EXYNOS4_MIPI_PHY_SRESETN		(1 << 1)
++#define EXYNOS4_MIPI_PHY_MRESETN		(1 << 2)
++#define EXYNOS4_MIPI_PHY_RESET_MASK		(3 << 1)
++
+ #define S5P_INFORM0				0x0800
+ #define S5P_INFORM1				0x0804
+ #define S5P_INFORM5				0x0814
+-- 
+2.9.3
