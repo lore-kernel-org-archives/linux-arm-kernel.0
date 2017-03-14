@@ -1,92 +1,77 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Tue, 14 Mar 2017 18:13:26 +0000
-Subject: [PATCH 2/3] arm64: v8.3: Support for complex number instructions
-In-Reply-To: <1489515207-9233-1-git-send-email-suzuki.poulose@arm.com>
-References: <1489515207-9233-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1489515207-9233-3-git-send-email-suzuki.poulose@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 14 Mar 2017 11:14:26 -0700
+Subject: [PATCH] ARM: omap2+: Revert omap-smp.c changes resetting CPU1
+ during boot
+In-Reply-To: <ea09d676-29f6-7100-4c68-88920deaeb7c@ti.com>
+References: <20170313205231.1593-1-tony@atomide.com>
+ <0bade322-5bee-412f-ef21-972c99846e84@ti.com>
+ <20170314151725.GC20572@atomide.com>
+ <d0fe191f-66f8-b72d-0a2a-00815e663a8d@ti.com>
+ <20170314164106.GE20572@atomide.com>
+ <ea09d676-29f6-7100-4c68-88920deaeb7c@ti.com>
+Message-ID: <20170314181425.GF20572@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM v8.3 adds support for new instructions to aid floating-point
-multiplication and addition of complex numbers. Expose the support
-via HWCAP and MRS emulation
+* Andrew F. Davis <afd@ti.com> [170314 10:59]:
+> On 03/14/2017 11:41 AM, Tony Lindgren wrote:
+> > * Andrew F. Davis <afd@ti.com> [170314 09:04]:
+> >> On 03/14/2017 10:17 AM, Tony Lindgren wrote:
+> >>> And if the CPU1 start-up address is programmed to be in the currently
+> >>> booting kernel's area by something else, it's almost certainly totally
+> >>> broken.
+> >>>
+> >>
+> >> I disagree, the core can be parked correctly and still have the boot-to
+> >> address point to anywhere. There are two registers in play here, one
+> >> sets the target jump-to address, the other lets it out of the parking
+> >> loop. To know we are not parked we need to check the parking release
+> >> register, the jump-to address is completely irrelevant as a check for
+> >> proper parking.
+> > 
+> > Well at this point we have CPU1 parked and configured for a wrong
+> > start-up address. So the boot-to address is a valid check. I can
+> > certainly add a check for CPU1 being parked too.
 
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
----
- Documentation/arm64/cpu-feature-registers.txt | 2 ++
- arch/arm64/include/asm/sysreg.h               | 1 +
- arch/arm64/include/uapi/asm/hwcap.h           | 1 +
- arch/arm64/kernel/cpufeature.c                | 2 ++
- arch/arm64/kernel/cpuinfo.c                   | 1 +
- 5 files changed, 7 insertions(+)
+OK I sent out v3 version of the patch doing that. Can you please
+review and test that one?
 
-diff --git a/Documentation/arm64/cpu-feature-registers.txt b/Documentation/arm64/cpu-feature-registers.txt
-index 5b279dc..0ce0a40 100644
---- a/Documentation/arm64/cpu-feature-registers.txt
-+++ b/Documentation/arm64/cpu-feature-registers.txt
-@@ -174,6 +174,8 @@ infrastructure:
-      x--------------------------------------------------x
-      | Name                         |  bits   | visible |
-      |--------------------------------------------------|
-+     | FCMA                         | [19-16] |    y    |
-+     |--------------------------------------------------|
-      | JSCVT                        | [15-12] |    y    |
-      x--------------------------------------------------x
- 
-diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-index cbb3143..69af995 100644
---- a/arch/arm64/include/asm/sysreg.h
-+++ b/arch/arm64/include/asm/sysreg.h
-@@ -157,6 +157,7 @@
- #define ID_AA64ISAR0_AES_SHIFT		4
- 
- /* id_aa64isar1 */
-+#define ID_AA64ISAR1_FCMA_SHIFT		16
- #define ID_AA64ISAR1_JSCVT_SHIFT	12
- 
- /* id_aa64pfr0 */
-diff --git a/arch/arm64/include/uapi/asm/hwcap.h b/arch/arm64/include/uapi/asm/hwcap.h
-index 391a876..85841a4 100644
---- a/arch/arm64/include/uapi/asm/hwcap.h
-+++ b/arch/arm64/include/uapi/asm/hwcap.h
-@@ -33,5 +33,6 @@
- #define HWCAP_CPUID		(1 << 11)
- #define HWCAP_ASIMDRDM		(1 << 12)
- #define HWCAP_JSCVT		(1 << 13)
-+#define HWCAP_FCMA		(1 << 14)
- 
- #endif /* _UAPI__ASM_HWCAP_H */
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index af88910..a5ff8ae 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -98,6 +98,7 @@ static const struct arm64_ftr_bits ftr_id_aa64isar0[] = {
- };
- 
- static const struct arm64_ftr_bits ftr_id_aa64isar1[] = {
-+	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_EXACT, ID_AA64ISAR1_FCMA_SHIFT, 4, 0),
- 	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_EXACT, ID_AA64ISAR1_JSCVT_SHIFT, 4, 0),
- 	ARM64_FTR_END,
- };
-@@ -894,6 +895,7 @@ static const struct arm64_cpu_capabilities arm64_elf_hwcaps[] = {
- 	HWCAP_CAP(SYS_ID_AA64PFR0_EL1, ID_AA64PFR0_ASIMD_SHIFT, FTR_SIGNED, 0, CAP_HWCAP, HWCAP_ASIMD),
- 	HWCAP_CAP(SYS_ID_AA64PFR0_EL1, ID_AA64PFR0_ASIMD_SHIFT, FTR_SIGNED, 1, CAP_HWCAP, HWCAP_ASIMDHP),
- 	HWCAP_CAP(SYS_ID_AA64ISAR1_EL1, ID_AA64ISAR1_JSCVT_SHIFT, FTR_UNSIGNED, 1, CAP_HWCAP, HWCAP_JSCVT),
-+	HWCAP_CAP(SYS_ID_AA64ISAR1_EL1, ID_AA64ISAR1_FCMA_SHIFT, FTR_UNSIGNED, 1, CAP_HWCAP, HWCAP_FCMA),
- 	{},
- };
- 
-diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
-index 95cfd33..e6afed8 100644
---- a/arch/arm64/kernel/cpuinfo.c
-+++ b/arch/arm64/kernel/cpuinfo.c
-@@ -66,6 +66,7 @@ static const char *const hwcap_str[] = {
- 	"cpuid",
- 	"asimdrdm",
- 	"jscvt",
-+	"fcma",
- 	NULL
- };
- 
--- 
-2.7.4
+<snip>
+
+Then onto the other related patches..
+
+> We re-park cpu1 in bootROM in U-Boot already, in the U-Boot tree:
+> arch/arm/mach-omap2/omap5/sec_entry_cpu1.S
+
+OK good to hear.
+
+> omap_smc_sec_cpu1() wakes up cpu1 into the function cpu1_entry(), this
+> makes an SMC call to setup the core, then re-parks itself back in bootROM.
+> Relevant code to run on cpu1:
+> 
+> > #define AUX_CORE_BOOT_0		0x48281800
+> > #define AUX_CORE_BOOT_1		0x48281804
+> > /* DRA7xx ROM code function "startup_BootSlave". This function is where CPU1
+> >  * waits on WFE, polling on AUX_CORE_BOOT_x registers.
+> >  * This address is same for J6 and J6 Eco.
+> >  */
+> > #define ROM_FXN_STARTUP_BOOTSLAVE     0x00038a64
+> >
+> > ldr	r4, =AUX_CORE_BOOT_0
+> > mov	r5, #0x0
+> > str	r5, [r4]
+> > ldr	r4, =ROM_FXN_STARTUP_BOOTSLAVE
+> > bx	r4	@ Jump back to ROM
+> 
+> We would have to do this in kernel. The issue I'm thinking we are going
+> to hit is that the parking function in bootROM expects the MMU to be
+> off. Although we don't really need to turn it off as long as we can
+> identity map the bootROM area, the AUX_CORE_BOOT_0/1 space, and wherever
+> we plan to exit the parking loop.
+
+Would be good to hear what Russell thinks we should do here to park
+CPU1.
+
+Regards,
+
+Tony
