@@ -1,77 +1,40 @@
 From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Tue, 14 Mar 2017 15:18:48 +0100
-Subject: [PATCH v2 12/20] ARM: dts: sun8i: Enable dwmac-sun8i on the Orange Pi
- plus
+Date: Tue, 14 Mar 2017 15:18:50 +0100
+Subject: [PATCH v2 14/20] ARM64: dts: sun50i-a64: Add dt node for the syscon
+ control module
 In-Reply-To: <20170314141856.24560-1-clabbe.montjoie@gmail.com>
 References: <20170314141856.24560-1-clabbe.montjoie@gmail.com>
-Message-ID: <20170314141856.24560-13-clabbe.montjoie@gmail.com>
+Message-ID: <20170314141856.24560-15-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The dwmac-sun8i hardware is present on the Orange PI plus.
-It uses an external PHY rtl8211e via RGMII.
+This patch add the dt node for the syscon register present on the
+Allwinner A64.
 
-This patch create the needed regulator, emac and phy nodes.
+Only two register are present in this syscon and the only one useful is
+the one dedicated to EMAC clock.
 
 Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
 ---
- arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts | 35 ++++++++++++++++++++++++++++
- 1 file changed, 35 insertions(+)
+ arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
-index 8c40ab7..4e075a2 100644
---- a/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
-+++ b/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
-@@ -58,6 +58,18 @@
- 		enable-active-high;
- 		gpio = <&pio 6 11 GPIO_ACTIVE_HIGH>;
- 	};
-+
-+	reg_gmac_3v3: gmac-3v3 {
-+		compatible = "regulator-fixed";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&gmac_power_pin_orangepi>;
-+		regulator-name = "gmac-3v3";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		startup-delay-us = <100000>;
-+		enable-active-high;
-+		gpio = <&pio 3 6 GPIO_ACTIVE_HIGH>;
-+	};
- };
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+index 1c64ea2..3b09af2 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+@@ -121,6 +121,12 @@
+ 		#size-cells = <1>;
+ 		ranges;
  
- &ehci3 {
-@@ -86,8 +98,31 @@
- 		pins = "PG11";
- 		function = "gpio_out";
- 	};
++		syscon: syscon at 01c00000 {
++			compatible = "syscon",
++				"allwinner,sun8i-h3-system-controller";
++			reg = <0x01c00000 0x1000>;
++		};
 +
-+	gmac_power_pin_orangepi: gmac_power_pin at 0 {
-+		pins = "PD6";
-+		function = "gpio_out";
-+		drive-strength = <10>;
-+	};
- };
- 
- &usbphy {
- 	usb3_vbus-supply = <&reg_usb3_vbus>;
- };
-+
-+&mdio {
-+	ext_rgmii_phy: ethernet-phy at 1 {
-+		reg = <0>;
-+	};
-+};
-+
-+&emac {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&emac_rgmii_pins>;
-+	phy-supply = <&reg_gmac_3v3>;
-+	phy-handle = <&ext_rgmii_phy>;
-+	phy-mode = "rgmii";
-+
-+	allwinner,leds-active-low;
-+	status = "okay";
-+};
+ 		mmc0: mmc at 1c0f000 {
+ 			compatible = "allwinner,sun50i-a64-mmc";
+ 			reg = <0x01c0f000 0x1000>;
 -- 
 2.10.2
