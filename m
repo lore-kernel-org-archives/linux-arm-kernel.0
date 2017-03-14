@@ -1,25 +1,24 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 14 Mar 2017 14:11:50 +0100
-Subject: [PATCH v2 4/5] dt: bindings: add binding for Allwinner A64 R_PIO
- pinctrl
-In-Reply-To: <20170301180111.12365-5-icenowy@aosc.xyz>
-References: <20170301180111.12365-1-icenowy@aosc.xyz>
- <20170301180111.12365-5-icenowy@aosc.xyz>
-Message-ID: <CACRpkdYtoXWwdiE0K+idk+Yem6HD2eqSA_tWOrnJ+btw5tnVaQ@mail.gmail.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Tue, 14 Mar 2017 14:11:55 +0100
+Subject: [PATCH v3 1/3] watchdog: s3c2410: Constify local structures
+In-Reply-To: <20170313190726.2988-2-krzk@kernel.org>
+References: <20170313190726.2988-1-krzk@kernel.org>
+ <20170313190726.2988-2-krzk@kernel.org>
+ <CGME20170314131158epcas5p3ca1212cc3ce89b0666cafc3aaa87fb78@epcas5p3.samsung.com>
+Message-ID: <1630264.smGZ3BB1uD@amdc3058>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 1, 2017 at 7:01 PM, Icenowy Zheng <icenowy@aosc.xyz> wrote:
+On Monday, March 13, 2017 09:07:24 PM Krzysztof Kozlowski wrote:
+> Structures watchdog_device, watchdog_ops and s3c2410_wdt_variant are not
+> modified so they can be made const to increase code safeness.
+> 
+> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 
-> Allwinner A64 SoC has also a dedicated pin controller for Port L GPIOs,
-> which is called "Port Controller (CPUs-PORT)" in SoC User Manual.
->
-> Add a binding for this pin controller, like the ones in A23/33 and H3.
->
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
-> Acked-by: Chen-Yu Tsai <wens@csie.org>
+Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 
-Patch applied.
-
-Yours,
-Linus Walleij
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
