@@ -1,99 +1,57 @@
 From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Tue, 14 Mar 2017 15:18:36 +0100
-Subject: [PATCH v2 00/20] net-next: stmmac: add dwmac-sun8i ethernet driver
-Message-ID: <20170314141856.24560-1-clabbe.montjoie@gmail.com>
+Date: Tue, 14 Mar 2017 15:18:38 +0100
+Subject: [PATCH v2 02/20] net-next: stmmac: add optional setup function
+In-Reply-To: <20170314141856.24560-1-clabbe.montjoie@gmail.com>
+References: <20170314141856.24560-1-clabbe.montjoie@gmail.com>
+Message-ID: <20170314141856.24560-3-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello
+Instead of ading more ifthen logic for adding a new mac_device_info
+setup function, it is easier to add a function pointer to the function
+needed.
 
-This patch series add the driver for dwmac-sun8i which handle the Ethernet MAC
-present on Allwinner H3/H5/A83T/A64 SoCs.
+Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+---
+ drivers/net/ethernet/stmicro/stmmac/stmmac_main.c | 4 +++-
+ include/linux/stmmac.h                            | 3 +++
+ 2 files changed, 6 insertions(+), 1 deletion(-)
 
-This driver is the continuation of the sun8i-emac driver.
-During the development, it appeared that in fact the hardware was a modified
-version of some dwmac.
-So the driver is now written as a glue driver for stmmac.
-
-It supports 10/100/1000 Mbit/s speed with half/full duplex.
-It can use an internal PHY (MII 10/100) or an external PHY
-via RGMII/RMII.
-
-This patch series enable the driver only for the H3/A64/H5 SoC since A83T
-doesn't have the necessary clocks present in mainline.
-
-The driver have been tested on the following boards:
-- H3 Orange PI PC, BananaPI-M2+
-- A64 Pine64, BananaPi-M64
-- A83T BananaPI-M3
-
-The first two patchs are some mandatory changes for letting dwmac-sun8i be used.
-The following three patchs add the driver and its documentation.
-The remaining are DT patch enabling it.
-
-Regards
-Corentin Labbe
-
-Changes since v1:
-- added TX/RX delay units
-- splitted syscon documentation in its own patch
-- regulator is now disabled after clk_prepare_enable(gmac->tx_clk) error
-- Fixed a memory leak on mac_device_info
-- Use now generic pin config for all DT stuff
-- CONFIG_DWMAC_SUN8I is now set to y in defconfigs
-
-Corentin Labbe (17):
-  net-next: stmmac: export stmmac_set_mac_addr/stmmac_get_mac_addr
-  net-next: stmmac: add optional setup function
-  ARM: sun8i: dt: Add DT bindings documentation for Allwinner
-    dwmac-sun8i
-  ARM: sun8i: dt: Add DT bindings documentation for Allwinner syscon
-  net-next: stmmac: Add dwmac-sun8i
-  ARM: dts: sunxi-h3-h5: Add dt node for the syscon control module
-  ARM: dts: sunxi-h3-h5: add dwmac-sun8i ethernet driver
-  ARM: dts: sun8i: Enable dwmac-sun8i on the Orange Pi 2
-  ARM: dts: sun8i: Enable dwmac-sun8i on the Orange PI One
-  ARM: dts: sun8i: Enable dwmac-sun8i on the Orange Pi plus
-  ARM: dts: sun8i: orangepi-pc-plus: Set EMAC activity LEDs to active
-    high
-  ARM64: dts: sun50i-a64: Add dt node for the syscon control module
-  ARM64: dts: sun50i-a64: add dwmac-sun8i Ethernet driver
-  ARM: dts: sun50i-a64: enable dwmac-sun8i on pine64
-  ARM: dts: sun50i-a64: enable dwmac-sun8i on pine64 plus
-  ARM: dts: sun50i-a64: enable dwmac-sun8i on the BananaPi M64
-  ARM: sunxi: Enable dwmac-sun8i driver on multi_v7_defconfig
-
-LABBE Corentin (3):
-  ARM: dts: sun8i: Enable dwmac-sun8i on the Banana Pi M2+
-  ARM: dts: sun8i: Enable dwmac-sun8i on the Orange PI PC
-  ARM: sunxi: Enable dwmac-sun8i driver on sunxi_defconfig
-
- .../devicetree/bindings/misc/allwinner,syscon.txt  |  19 +
- .../devicetree/bindings/net/dwmac-sun8i.txt        |  77 ++
- arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts    |  37 +
- arch/arm/boot/dts/sun8i-h3-orangepi-2.dts          |   8 +
- arch/arm/boot/dts/sun8i-h3-orangepi-one.dts        |   8 +
- arch/arm/boot/dts/sun8i-h3-orangepi-pc-plus.dts    |   5 +
- arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts         |   8 +
- arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts       |  35 +
- arch/arm/boot/dts/sunxi-h3-h5.dtsi                 |  39 +
- arch/arm/configs/multi_v7_defconfig                |   1 +
- arch/arm/configs/sunxi_defconfig                   |   1 +
- .../boot/dts/allwinner/sun50i-a64-bananapi-m64.dts |  14 +
- .../boot/dts/allwinner/sun50i-a64-pine64-plus.dts  |  16 +-
- .../arm64/boot/dts/allwinner/sun50i-a64-pine64.dts |  15 +
- arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi      |  43 +
- drivers/net/ethernet/stmicro/stmmac/Kconfig        |  11 +
- drivers/net/ethernet/stmicro/stmmac/Makefile       |   1 +
- drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c  | 938 +++++++++++++++++++++
- drivers/net/ethernet/stmicro/stmmac/dwmac_lib.c    |   3 +-
- drivers/net/ethernet/stmicro/stmmac/stmmac_main.c  |  31 +-
- .../net/ethernet/stmicro/stmmac/stmmac_platform.c  |   9 +-
- include/linux/stmmac.h                             |   4 +
- 22 files changed, 1317 insertions(+), 6 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/misc/allwinner,syscon.txt
- create mode 100644 Documentation/devicetree/bindings/net/dwmac-sun8i.txt
- create mode 100644 drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
-
+diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c b/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
+index 4498a38..856ac57 100644
+--- a/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
++++ b/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
+@@ -3101,7 +3101,9 @@ static int stmmac_hw_init(struct stmmac_priv *priv)
+ 	struct mac_device_info *mac;
+ 
+ 	/* Identify the MAC HW device */
+-	if (priv->plat->has_gmac) {
++	if (priv->plat->setup) {
++		mac = priv->plat->setup(priv);
++	} else if (priv->plat->has_gmac) {
+ 		priv->dev->priv_flags |= IFF_UNICAST_FLT;
+ 		mac = dwmac1000_setup(priv->ioaddr,
+ 				      priv->plat->multicast_filter_bins,
+diff --git a/include/linux/stmmac.h b/include/linux/stmmac.h
+index fc273e9..8f09f18 100644
+--- a/include/linux/stmmac.h
++++ b/include/linux/stmmac.h
+@@ -109,6 +109,8 @@ struct stmmac_axi {
+ 	bool axi_rb;
+ };
+ 
++struct stmmac_priv;
++
+ struct plat_stmmacenet_data {
+ 	int bus_id;
+ 	int phy_addr;
+@@ -136,6 +138,7 @@ struct plat_stmmacenet_data {
+ 	void (*fix_mac_speed)(void *priv, unsigned int speed);
+ 	int (*init)(struct platform_device *pdev, void *priv);
+ 	void (*exit)(struct platform_device *pdev, void *priv);
++	struct mac_device_info *(*setup)(struct stmmac_priv *priv);
+ 	void *bsp_priv;
+ 	struct clk *stmmac_clk;
+ 	struct clk *pclk;
 -- 
 2.10.2
