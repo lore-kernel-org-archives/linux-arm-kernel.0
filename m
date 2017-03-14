@@ -1,46 +1,39 @@
-From: slash.tmp@free.fr (Mason)
-Date: Tue, 14 Mar 2017 15:00:11 +0100
-Subject: Neophyte questions about PCIe
-In-Reply-To: <df517167-d692-38a8-9c8f-a1112c7f578d@free.fr>
-References: <ced6a4bf-c94a-c116-1e94-52a8d675d132@free.fr>
- <20170308151724.GA20780@bhelgaas-glaptop.roam.corp.google.com>
- <f964ee05-db7f-c381-c91c-82897175da6d@free.fr>
- <9ba05c2c-57ef-b2c0-6a7c-457c392d98b5@free.fr>
- <df517167-d692-38a8-9c8f-a1112c7f578d@free.fr>
-Message-ID: <94b3c89c-b116-288f-7530-15cc2611f425@free.fr>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 14 Mar 2017 14:00:59 +0000
+Subject: [PATCH] mfd: stm32-timers: fix max register
+In-Reply-To: <1487145872-1212-1-git-send-email-fabrice.gasnier@st.com>
+References: <1487145872-1212-1-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <20170314140059.6bmxavtlsjuvoxnw@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/03/2017 18:49, Mason wrote:
+On Wed, 15 Feb 2017, Fabrice Gasnier wrote:
 
-> /* Root complex reports incorrect device class */
-> static void tango_pcie_fixup_class(struct pci_dev *dev)
-> {
-> 	dev->class = PCI_CLASS_BRIDGE_PCI << 8;
-> }
+> STM32 timers register bank size is 0x400. Fix regmap max_register.
+> 
+> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+> ---
+>  drivers/mfd/stm32-timers.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 
-Gen1 controller reports class/rev = 0x04800001
-Gen2 controller reports class/rev = 0x06000001
+Applied, thanks.
 
-#define PCI_CLASS_BRIDGE_HOST		0x0600
-#define PCI_CLASS_BRIDGE_ISA		0x0601
-#define PCI_CLASS_BRIDGE_EISA		0x0602
-#define PCI_CLASS_BRIDGE_MC		0x0603
-#define PCI_CLASS_BRIDGE_PCI		0x0604
-#define PCI_CLASS_BRIDGE_PCMCIA		0x0605
-#define PCI_CLASS_BRIDGE_NUBUS		0x0606
-#define PCI_CLASS_BRIDGE_CARDBUS	0x0607
-#define PCI_CLASS_BRIDGE_RACEWAY	0x0608
-#define PCI_CLASS_BRIDGE_OTHER		0x0680
+> diff --git a/drivers/mfd/stm32-timers.c b/drivers/mfd/stm32-timers.c
+> index 192cbb6..2182f00 100644
+> --- a/drivers/mfd/stm32-timers.c
+> +++ b/drivers/mfd/stm32-timers.c
+> @@ -15,7 +15,7 @@
+>  	.reg_bits = 32,
+>  	.val_bits = 32,
+>  	.reg_stride = sizeof(u32),
+> -	.max_register = 0x400,
+> +	.max_register = 0x3fc,
+>  };
+>  
+>  static void stm32_timers_get_arr_size(struct stm32_timers *ddata)
 
-My fixup replaces 0x048000 with 0x060400.
-
-	0x060400 != 0x060000
-
-Which is correct:
-PCI_CLASS_BRIDGE_HOST or PCI_CLASS_BRIDGE_PCI?
-
-Naively, I would expect Host/PCI bridge to be more correct
-for a root complex.
-
-Regards.
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
