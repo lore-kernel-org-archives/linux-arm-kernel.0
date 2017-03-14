@@ -1,126 +1,131 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Tue, 14 Mar 2017 08:55:36 +0100
-Subject: [PATCH v4 14/36] [media] v4l2-mc: add a function to inherit
- controls from a pipeline
-In-Reply-To: <20170314004533.3b3cd44b@vento.lan>
-References: <20170303230645.GR21222@n2100.armlinux.org.uk>
- <20170304131329.GV3220@valkosipuli.retiisi.org.uk>
- <a7b8e095-a95c-24bd-b1e9-e983f18061c4@xs4all.nl>
- <20170310130733.GU21222@n2100.armlinux.org.uk>
- <c679f755-52a6-3c6f-3d65-277db46676cc@xs4all.nl>
- <20170310140124.GV21222@n2100.armlinux.org.uk>
- <cc8900b0-c091-b14b-96f4-01f8fa72431c@xs4all.nl>
- <20170310125342.7f047acf@vento.lan>
- <20170310223714.GI3220@valkosipuli.retiisi.org.uk>
- <20170311082549.576531d0@vento.lan>
- <20170313124621.GA10701@valkosipuli.retiisi.org.uk>
- <20170314004533.3b3cd44b@vento.lan>
-Message-ID: <e0a6c60b-1735-de0b-21f4-d8c3f4b3f10f@xs4all.nl>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 14 Mar 2017 15:56:34 +0800
+Subject: [PATCH] ARM: dts: imx7d-sdb: Add sht11 Click Board support
+In-Reply-To: <1488997949-17160-1-git-send-email-marco.franchi@nxp.com>
+References: <1488997949-17160-1-git-send-email-marco.franchi@nxp.com>
+Message-ID: <20170314075633.GM3618@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/14/2017 04:45 AM, Mauro Carvalho Chehab wrote:
-> Hi Sakari,
+On Wed, Mar 08, 2017 at 03:32:29PM -0300, Marco Franchi wrote:
+> The imx7d-sdb has a mickro bus connector that can be connected to a 
+> Sensirion SHT11 click board (temperature and humidity sensor):
 > 
-> I started preparing a long argument about it, but gave up in favor of a
-> simpler one.
+> https://shop.mikroe.com/click/sensors/sht1x
 > 
-> Em Mon, 13 Mar 2017 14:46:22 +0200
-> Sakari Ailus <sakari.ailus@iki.fi> escreveu:
+> Add a new device tree file to describe such hardware.
 > 
->> Drivers are written to support hardware, not particular use case.  
+> Signed-off-by: Marco Franchi <marco.franchi@nxp.com>
+> ---
+>  arch/arm/boot/dts/Makefile            |  1 +
+>  arch/arm/boot/dts/imx7d-sdb-sht11.dts | 74 +++++++++++++++++++++++++++++++++++
+>  2 files changed, 75 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/imx7d-sdb-sht11.dts
 > 
-> No, it is just the reverse: drivers and hardware are developed to
-> support use cases.
-> 
-> Btw, you should remember that the hardware is the full board, not just the
-> SoC. In practice, the board do limit the use cases: several provide a
-> single physical CSI connector, allowing just one sensor.
-> 
->>> This situation is there since 2009. If I remember well, you tried to write
->>> such generic plugin in the past, but never finished it, apparently because
->>> it is too complex. Others tried too over the years.   
->>
->> I'd argue I know better what happened with that attempt than you do. I had a
->> prototype of a generic pipeline configuration library but due to various
->> reasons I haven't been able to continue working on that since around 2012.
-> 
-> ...
-> 
->>> The last trial was done by Jacek, trying to cover just the exynos4 driver. 
->>> Yet, even such limited scope plugin was not good enough, as it was never
->>> merged upstream. Currently, there's no such plugins upstream.
->>>
->>> If we can't even merge a plugin that solves it for just *one* driver,
->>> I have no hope that we'll be able to do it for the generic case.  
->>
->> I believe Jacek ceased to work on that plugin in his day job; other than
->> that, there are some matters left to be addressed in his latest patchset.
-> 
-> The two above basically summaries the issue: the task of doing a generic
-> plugin on userspace, even for a single driver is complex enough to
-> not cover within a reasonable timeline.
-> 
-> From 2009 to 2012, you were working on it, but didn't finish it.
-> 
-> Apparently, nobody worked on it between 2013-2014 (but I may be wrong, as
-> I didn't check when the generic plugin interface was added to libv4l).
-> 
-> In the case of Jacek's work, the first patch I was able to find was
-> written in Oct, 2014:
-> 	https://patchwork.kernel.org/patch/5098111/
-> 	(not sure what happened with the version 1).
-> 
-> The last e-mail about this subject was issued in Dec, 2016.
-> 
-> In summary, you had this on your task for 3 years for an OMAP3
-> plugin (where you have a good expertise), and Jacek for 2 years, 
-> for Exynos 4, where he should also have a good knowledge.
-> 
-> Yet, with all that efforts, no concrete results were achieved, as none
-> of the plugins got merged.
-> 
-> Even if they were merged, if we keep the same mean time to develop a
-> libv4l plugin, that would mean that a plugin for i.MX6 could take 2-3
-> years to be developed.
-> 
-> There's a clear message on it:
-> 	- we shouldn't keep pushing for a solution via libv4l.
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 0118084..7009856 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -458,6 +458,7 @@ dtb-$(CONFIG_SOC_IMX7D) += \
+>  	imx7d-nitrogen7.dtb \
+>  	imx7d-sbc-imx7.dtb \
+>  	imx7d-sdb.dtb \
+> +	imx7d-sdb-sht11.dtb \
+>  	imx7s-colibri-eval-v3.dtb \
+>  	imx7s-warp.dtb
+>  dtb-$(CONFIG_SOC_LS1021A) += \
+> diff --git a/arch/arm/boot/dts/imx7d-sdb-sht11.dts b/arch/arm/boot/dts/imx7d-sdb-sht11.dts
+> new file mode 100644
+> index 0000000..2f6f801
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/imx7d-sdb-sht11.dts
+> @@ -0,0 +1,74 @@
+> +/*
+> + * Copyright (C) 2015 Freescale Semiconductor, Inc.
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This file is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This file is distributed in the hope that it will be useful,
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively,
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use,
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+> + */
+> +
+> +#include "imx7d-sdb.dts"
+> +
+> +/ {
+> +	sensor {
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&pinctrl_sensor>;
+> +		compatible = "sensirion,sht15";
+> +		clk-gpios = <&gpio4 12 0>;
+> +		data-gpios = <&gpio4 13 0>;
+> +		vcc-supply = <&reg_sht15>;
+> +	};
+> +
+> +	reg_sht15: reg-sht15 {
 
-Or:
+'regulator-sht15' should be the recommended name.
 
-	- userspace plugin development had a very a low priority and
-	  never got the attention it needed.
+I fixed it up and applied the patch.
 
-I know that's *my* reason. I rarely if ever looked at it. I always assumed
-Sakari and/or Laurent would look at it. If this reason is also valid for
-Sakari and Laurent, then it is no wonder nothing has happened in all that
-time.
+Shawn
 
-We're all very driver-development-driven, and userspace gets very little
-attention in general. So before just throwing in the towel we should take
-a good look at the reasons why there has been little or no development: is
-it because of fundamental design defects, or because nobody paid attention
-to it?
-
-I strongly suspect it is the latter.
-
-In addition, I suspect end-users of these complex devices don't really care
-about a plugin: they want full control and won't typically use generic
-applications. If they would need support for that, we'd have seen much more
-interest. The main reason for having a plugin is to simplify testing and
-if this is going to be used on cheap hobbyist devkits.
-
-An additional complication is simply that it is hard to find fully supported
-MC hardware. omap3 boards are hard to find these days, renesas boards are not
-easy to get, freescale isn't the most popular either. Allwinner, mediatek,
-amlogic, broadcom and qualcomm all have closed source implementations or no
-implementation at all.
-
-I know it took me a very long time before I had a working omap3.
-
-So I am not at all surprised that little progress has been made.
-
-Regards,
-
-	Hans
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "reg_sht15";
+> +		regulator-min-microvolt = <3300000>;
+> +		regulator-max-microvolt = <3300000>;
+> +	};
+> +};
+> +
+> +&i2c3 {
+> +	status = "disabled";
+> +};
+> +
+> +&iomuxc {
+> +	pinctrl_sensor: sensorgrp {
+> +		fsl,pins = <
+> +			MX7D_PAD_I2C3_SDA__GPIO4_IO13	0x4000007f
+> +			MX7D_PAD_I2C3_SCL__GPIO4_IO12	0x4000007f
+> +		>;
+> +	};
+> +};
+> -- 
+> 2.7.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
