@@ -1,81 +1,45 @@
-From: yuanzhichang@hisilicon.com (zhichang.yuan)
-Date: Tue, 14 Mar 2017 15:07:35 +0800
-Subject: [PATCH V7 4/7] LPC: Support the device-tree LPC host on
- Hip06/Hip07 (fwd)
-In-Reply-To: <alpine.DEB.2.20.1703140635090.3516@hadrien>
-References: <alpine.DEB.2.20.1703140635090.3516@hadrien>
-Message-ID: <58C796B7.9060505@hisilicon.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 14 Mar 2017 15:28:48 +0800
+Subject: [PATCH] ARM: dts: imx6q-bx50v3/imx6q-b450v3/imx6q-b650v3: fix
+ at25 spi-clk frequency issue
+In-Reply-To: <20170303212032.31725-1-yungching0725@gmail.com>
+References: <20170303212032.31725-1-yungching0725@gmail.com>
+Message-ID: <20170314072846.GJ3618@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Julia,
+On Sat, Mar 04, 2017 at 05:20:32AM +0800, Ken Lin wrote:
+> Change the maxium spi clock frequency from 20MHz to 10MHz to meet the operation voltage range requirement recommended in AT25 datasheet
 
+The commit log should be wrapped around column 72 to make it easier for
+read.
 
-On 2017/3/14 13:37, Julia Lawall wrote:
-> Line 460 looks suspicious.  Can tmprange be different than range but not
-> be an ERR_PTR?  If so, lpcdev->io_host will have an invalid value.
-> 
+The subject prefix is unnecessarily too long, as it only changes
+imx6q-bx50v3.dtsi.
 
-Thanks for your pointing out!
-You are right!
+I fixed them this time, and apply the patch.
 
-miss a line of 'return 0;' 
+Shawn
 
-if (tmprange != range) {
-    kfree(range);
-    if (IS_ERR(tmprange))
-        return -EFAULT;
-    return 0;
-}
-
-Thanks again!
-Zhichang 
-
-> julia
 > 
-> ---------- Forwarded message ----------
-> Date: Tue, 14 Mar 2017 13:12:05 +0800
-> From: kbuild test robot <fengguang.wu@intel.com>
-> To: kbuild at 01.org
-> Cc: Julia Lawall <julia.lawall@lip6.fr>
-> Subject: Re: [PATCH V7 4/7] LPC: Support the device-tree LPC host on Hip06/Hip07
-> 
-> Hi zhichang.yuan,
-> 
-> [auto build test WARNING on linus/master]
-> [also build test WARNING on v4.11-rc2 next-20170310]
-> [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
-> 
-> url:    https://github.com/0day-ci/linux/commits/zhichang-yuan/LPC-legacy-ISA-I-O-support/20170314-114635
-> :::::: branch date: 85 minutes ago
-> :::::: commit date: 85 minutes ago
-> 
->>> drivers/bus/hisi_lpc.c:465:19-24: ERROR: reference preceded by free on line 460
-> 
-> git remote add linux-review https://github.com/0day-ci/linux
-> git remote update linux-review
-> git checkout 4e05ad6c3274fa75c903c7809ef0b51329a31ab2
-> vim +465 drivers/bus/hisi_lpc.c
-> 
-> 4e05ad6c zhichang.yuan 2017-03-13  454  	range->flags = IO_HOST_INDIRECT;
-> 4e05ad6c zhichang.yuan 2017-03-13  455  	range->size = LPC_BUS_IO_SIZE;
-> 4e05ad6c zhichang.yuan 2017-03-13  456  	range->hw_start = LPC_MIN_BUS_RANGE;
-> 4e05ad6c zhichang.yuan 2017-03-13  457
-> 4e05ad6c zhichang.yuan 2017-03-13  458  	tmprange = register_libio_range(range);
-> 4e05ad6c zhichang.yuan 2017-03-13  459  	if (tmprange != range) {
-> 4e05ad6c zhichang.yuan 2017-03-13 @460  		kfree(range);
-> 4e05ad6c zhichang.yuan 2017-03-13  461  		if (IS_ERR(tmprange))
-> 4e05ad6c zhichang.yuan 2017-03-13  462  			return -EFAULT;
-> 4e05ad6c zhichang.yuan 2017-03-13  463  	}
-> 4e05ad6c zhichang.yuan 2017-03-13  464
-> 4e05ad6c zhichang.yuan 2017-03-13 @465  	lpcdev->io_host = range;
-> 4e05ad6c zhichang.yuan 2017-03-13  466
-> 4e05ad6c zhichang.yuan 2017-03-13  467  	return 0;
-> 4e05ad6c zhichang.yuan 2017-03-13  468  }
-> 
+> Signed-off-by: Ken Lin <yungching0725@gmail.com>
 > ---
-> 0-DAY kernel test infrastructure                Open Source Technology Center
-> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+>  arch/arm/boot/dts/imx6q-bx50v3.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> .
+> diff --git a/arch/arm/boot/dts/imx6q-bx50v3.dtsi b/arch/arm/boot/dts/imx6q-bx50v3.dtsi
+> index f99e6efda3e2..614c40e5f772 100644
+> --- a/arch/arm/boot/dts/imx6q-bx50v3.dtsi
+> +++ b/arch/arm/boot/dts/imx6q-bx50v3.dtsi
+> @@ -103,7 +103,7 @@
+>  
+>  	m25_eeprom: m25p80 at 0 {
+>  		compatible = "atmel,at25";
+> -		spi-max-frequency = <20000000>;
+> +		spi-max-frequency = <10000000>;
+>  		size = <0x8000>;
+>  		pagesize = <64>;
+>  		reg = <0>;
+> -- 
+> 2.11.0
 > 
