@@ -1,27 +1,41 @@
-From: santosh.shilimkar@oracle.com (santosh.shilimkar at oracle.com)
-Date: Tue, 14 Mar 2017 14:19:18 -0700
-Subject: [PATCH] firmware: ti_sci: fix strncat length check
-In-Reply-To: <20170314211157.3424031-1-arnd@arndb.de>
-References: <20170314211157.3424031-1-arnd@arndb.de>
-Message-ID: <4e3a448e-da7e-4da5-96bf-327da2a8c7d0@oracle.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 14 Mar 2017 22:24:48 +0100
+Subject: [RESEND PATCH] ARM: omap2: mark omap_init_rng as __init
+Message-ID: <20170314212500.3612283-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/14/17 2:11 PM, Arnd Bergmann wrote:
-> gcc-7 notices that the length we pass to strncat is wrong:
->
-> drivers/firmware/ti_sci.c: In function 'ti_sci_probe':
-> drivers/firmware/ti_sci.c:204:32: error: specified bound 50 equals the size of the destination [-Werror=stringop-overflow=]
->
-> Instead of the total length, we must pass the length of the
-> remaining space here.
->
-> Fixes: aa276781a64a ("firmware: Add basic support for TI System Control Interface (TI-SCI) protocol")
-> Acked-by: Nishanth Menon <nm@ti.com>
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
-> Originally submitted on Jan 11, patch is still needed on Linux-4.11-rc2.
+I found this section mismatch when building with an older
+compiler release:
 
-Looks fine to me Arnd. Will you be applying it to SOC driver branch ?
+WARNING: vmlinux.o(.text+0x3051c): Section mismatch in reference from the function omap_init_rng() to the function .init.text:omap_device_build()
 
-Acked-by: Santosh Shilimkar <ssantosh@kernel.org>
+Obviously this one function should be __init as well. Normally
+we don't get a warning as the function gets inlined into its
+caller.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Acked-by: Tony Lindgren <tony@atomide.com>
+---
+Originally submitted on Dec 16. Tony, could you pick it up for v4.12?
+We haven't started merging stuff yet, and I forgot to apply it earlier
+but want to get it out of my backlog.
+---
+ arch/arm/mach-omap2/devices.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
+index 3fdb94599184..473951203104 100644
+--- a/arch/arm/mach-omap2/devices.c
++++ b/arch/arm/mach-omap2/devices.c
+@@ -121,7 +121,7 @@ static inline void omap_init_mcspi(void) {}
+  *
+  * Bind the RNG hwmod to the RNG omap_device.  No return value.
+  */
+-static void omap_init_rng(void)
++static void __init omap_init_rng(void)
+ {
+ 	struct omap_hwmod *oh;
+ 	struct platform_device *pdev;
+-- 
+2.9.0
