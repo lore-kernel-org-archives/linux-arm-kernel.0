@@ -1,34 +1,79 @@
 From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Tue, 14 Mar 2017 15:18:49 +0100
-Subject: [PATCH v2 13/20] ARM: dts: sun8i: orangepi-pc-plus: Set EMAC activity
- LEDs to active high
+Date: Tue, 14 Mar 2017 15:18:51 +0100
+Subject: [PATCH v2 15/20] ARM64: dts: sun50i-a64: add dwmac-sun8i Ethernet
+ driver
 In-Reply-To: <20170314141856.24560-1-clabbe.montjoie@gmail.com>
 References: <20170314141856.24560-1-clabbe.montjoie@gmail.com>
-Message-ID: <20170314141856.24560-14-clabbe.montjoie@gmail.com>
+Message-ID: <20170314141856.24560-16-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On the Orange Pi PC Plus, the polarity of the LEDs on the RJ45 Ethernet
-port were changed from active low to active high.
+The dwmac-sun8i is an Ethernet MAC that supports 10/100/1000 Mbit
+connections. It is very similar to the device found in the Allwinner
+H3, but lacks the internal 100 Mbit PHY and its associated control
+bits.
+This adds the necessary bits to the Allwinner A64 SoC .dtsi, but keeps
+it disabled at this level.
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
 ---
- arch/arm/boot/dts/sun8i-h3-orangepi-pc-plus.dts | 5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 37 +++++++++++++++++++++++++++
+ 1 file changed, 37 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-pc-plus.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-pc-plus.dts
-index 8b93f5c..0380769 100644
---- a/arch/arm/boot/dts/sun8i-h3-orangepi-pc-plus.dts
-+++ b/arch/arm/boot/dts/sun8i-h3-orangepi-pc-plus.dts
-@@ -86,3 +86,8 @@
- 	/* eMMC is missing pull-ups */
- 	bias-pull-up;
- };
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+index 3b09af2..57d69e5 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+@@ -277,6 +277,23 @@
+ 				bias-pull-up;
+ 			};
+ 
++			rmii_pins: rmii_pins {
++				pins = "PD10", "PD11", "PD13", "PD14",
++						"PD17", "PD18", "PD19", "PD20",
++						"PD22", "PD23";
++				function = "emac";
++				drive-strength = <40>;
++			};
 +
-+&emac {
-+	/* LEDs changed to active high on the plus */
-+	/delete-property/ allwinner,leds-active-low;
-+};
++			rgmii_pins: rgmii_pins {
++				pins = "PD8", "PD9", "PD10", "PD11",
++						"PD12", "PD13", "PD15",
++						"PD16", "PD17", "PD18", "PD19",
++						"PD20", "PD21", "PD22", "PD23";
++				function = "emac";
++				drive-strength = <40>;
++			};
++
+ 			uart0_pins_a: uart0 at 0 {
+ 				pins = "PB8", "PB9";
+ 				function = "uart0";
+@@ -381,6 +398,26 @@
+ 			#size-cells = <0>;
+ 		};
+ 
++		emac: ethernet at 1c30000 {
++			compatible = "allwinner,sun50i-a64-emac";
++			syscon = <&syscon>;
++			reg = <0x01c30000 0x100>;
++			interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>;
++			interrupt-names = "macirq";
++			resets = <&ccu RST_BUS_EMAC>;
++			reset-names = "stmmaceth";
++			clocks = <&ccu CLK_BUS_EMAC>;
++			clock-names = "stmmaceth";
++			status = "disabled";
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			mdio: mdio {
++				#address-cells = <1>;
++				#size-cells = <0>;
++			};
++		};
++
+ 		gic: interrupt-controller at 1c81000 {
+ 			compatible = "arm,gic-400";
+ 			reg = <0x01c81000 0x1000>,
 -- 
 2.10.2
