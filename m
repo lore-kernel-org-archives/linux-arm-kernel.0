@@ -1,18 +1,18 @@
 From: jagan@openedev.com (Jagan Teki)
-Date: Tue, 14 Mar 2017 15:18:17 +0530
-Subject: [PATCH v5 8/8] ARM: imx_v6_v7_defconfig: Select hid-multitouchdriver
+Date: Tue, 14 Mar 2017 15:18:15 +0530
+Subject: [PATCH v5 6/8] ARM: dts: imx6q-icore: Add touchscreen node
 In-Reply-To: <1489484897-14933-1-git-send-email-jagan@openedev.com>
 References: <1489484897-14933-1-git-send-email-jagan@openedev.com>
-Message-ID: <1489484897-14933-9-git-send-email-jagan@openedev.com>
+Message-ID: <1489484897-14933-7-git-send-email-jagan@openedev.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jagan Teki <jagan@amarulasolutions.com>
 
-Select CONFIG_HID_MULTITOUCH so that we can have multi touchscreen
-funtionality via USB by default on Engicam i.CoreM6 Quad with
-OpenFrame Cap 10.1 display boards.
+max11801 touchscreen on Engicam iCoreM6 Quad module is
+connected via i2c1, so add tc: max11801 at 48 on i2c1.
 
+Cc: Domenico Acri <domenico.acri@engicam.com>
 Cc: Matteo Lisi <matteo.lisi@engicam.com>
 Cc: Michael Trimarchi <michael@amarulasolutions.com>
 Cc: Shawn Guo <shawnguo@kernel.org>
@@ -23,20 +23,28 @@ Changes for v5:
 Changes for v4:
 - Newly added patch
 
- arch/arm/configs/imx_v6_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/imx6q-icore.dts | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index 842168f..914e8cb 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -174,6 +174,7 @@ CONFIG_TOUCHSCREEN_SX8654=y
- CONFIG_TOUCHSCREEN_COLIBRI_VF50=y
- CONFIG_INPUT_MISC=y
- CONFIG_INPUT_MMA8450=y
-+CONFIG_HID_MULTITOUCH=y
- CONFIG_SERIO_SERPORT=m
- # CONFIG_LEGACY_PTYS is not set
- CONFIG_SERIAL_IMX=y
+diff --git a/arch/arm/boot/dts/imx6q-icore.dts b/arch/arm/boot/dts/imx6q-icore.dts
+index 73f34d1..8c1a572 100644
+--- a/arch/arm/boot/dts/imx6q-icore.dts
++++ b/arch/arm/boot/dts/imx6q-icore.dts
+@@ -58,6 +58,15 @@
+ 	status = "okay";
+ };
+ 
++&i2c1 {
++	ts: max11801 at 48 {
++		compatible = "max11801";
++		reg = <0x48>;
++		interrupt-parent = <&gpio3>;
++		interrupts = <31 2>;
++	};
++};
++
+ &ldb {
+ 	status = "okay";
+ 
 -- 
 1.9.1
