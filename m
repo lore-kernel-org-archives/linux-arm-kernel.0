@@ -1,77 +1,38 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue, 14 Mar 2017 16:18:23 +0200
-Subject: [PATCH 1/3] arm64: defconfig: Enable DRM and LPASS drivers for
- Exynos5433 and Exynos7
-In-Reply-To: <2818068.EPOAvXIH6Z@amdc3058>
-References: <20170311213856.21701-1-krzk@kernel.org>
- <CGME20170314141613epcas5p30fa91bf723a5e3a8f11ce9a8cfdb7dd7@epcas5p3.samsung.com>
- <20170311213856.21701-2-krzk@kernel.org> <2818068.EPOAvXIH6Z@amdc3058>
-Message-ID: <CAJKOXPf5D+=Qdmbr03yCXcRiSbmfBJbd1T2HnKfsg5huQSQShA@mail.gmail.com>
+From: clabbe.montjoie@gmail.com (Corentin Labbe)
+Date: Tue, 14 Mar 2017 15:18:37 +0100
+Subject: [PATCH v2 01/20] net-next: stmmac: export
+ stmmac_set_mac_addr/stmmac_get_mac_addr
+In-Reply-To: <20170314141856.24560-1-clabbe.montjoie@gmail.com>
+References: <20170314141856.24560-1-clabbe.montjoie@gmail.com>
+Message-ID: <20170314141856.24560-2-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 14, 2017 at 4:16 PM, Bartlomiej Zolnierkiewicz
-<b.zolnierkie@samsung.com> wrote:
->
-> Hi,
->
-> On Saturday, March 11, 2017 11:38:54 PM Krzysztof Kozlowski wrote:
->> Enable drivers specific to Exynos5433 and Exynos7:
->> 1. MFD Low Power Audio SubSystem (LPASS),
->> 2. Entire DRM stack (display, outputs, additional sub-blocks),
->> 3. Drivers for video-related sub-blocks (JPEG, Multi Format Codec,
->>    GScaler).
->>
->> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
->> ---
->>  arch/arm64/configs/defconfig | 18 ++++++++++++++++++
->>  1 file changed, 18 insertions(+)
->>
->> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
->> index 5e7fa211eb0a..81515cbd2fe8 100644
->> --- a/arch/arm64/configs/defconfig
->> +++ b/arch/arm64/configs/defconfig
->> @@ -302,6 +302,7 @@ CONFIG_RENESAS_WDT=y
->>  CONFIG_S3C2410_WATCHDOG=y
->>  CONFIG_MESON_GXBB_WATCHDOG=m
->>  CONFIG_MESON_WATCHDOG=m
->> +CONFIG_MFD_EXYNOS_LPASS=m
->>  CONFIG_MFD_MAX77620=y
->>  CONFIG_MFD_RK808=y
->>  CONFIG_MFD_SPMI_PMIC=y
->> @@ -327,10 +328,27 @@ CONFIG_MEDIA_CONTROLLER=y
->>  CONFIG_VIDEO_V4L2_SUBDEV_API=y
->>  # CONFIG_DVB_NET is not set
->>  CONFIG_V4L_MEM2MEM_DRIVERS=y
->> +CONFIG_VIDEO_SAMSUNG_S5P_JPEG=m
->> +CONFIG_VIDEO_SAMSUNG_S5P_MFC=m
->> +CONFIG_VIDEO_SAMSUNG_EXYNOS_GSC=m
->>  CONFIG_VIDEO_RENESAS_FCP=m
->>  CONFIG_VIDEO_RENESAS_VSP1=m
->>  CONFIG_DRM=m
->>  CONFIG_DRM_NOUVEAU=m
->> +CONFIG_DRM_EXYNOS=m
->> +CONFIG_DRM_EXYNOS_FIMD=y
->> +CONFIG_DRM_EXYNOS5433_DECON=y
->> +CONFIG_DRM_EXYNOS7_DECON=y
->> +CONFIG_DRM_EXYNOS_MIXER=y
->> +CONFIG_DRM_EXYNOS_VIDI=y
->> +CONFIG_DRM_EXYNOS_DPI=y
->> +CONFIG_DRM_EXYNOS_DSI=y
->> +CONFIG_DRM_EXYNOS_HDMI=y
->> +CONFIG_DRM_EXYNOS_MIC=y
->> +CONFIG_DRM_EXYNOS_G2D=y
->> +CONFIG_DRM_EXYNOS_IPP=y
->> +CONFIG_DRM_EXYNOS_FIMC=y
->> +CONFIG_DRM_EXYNOS_ROTATOR=y
->
-> I would prefer to enable only sub-drivers that are actually
-> used on Exynos5433/Exynos7 hardware, i.e. currently only
-> exynos4.dtsi uses compatibles for FIMC and rotator drivers
-> (I have not checked all sub-drivers).
+Thoses symbol will be needed for the dwmac-sun8i ethernet driver.
+For letting it to be build as module, they need to be exported.
 
-I thought I enabled only these which are present but apparently I went
-too far. I'll fix it up. Thanks for review!
+Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+---
+ drivers/net/ethernet/stmicro/stmmac/dwmac_lib.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-Best regards,
-Krzysztof
+diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac_lib.c b/drivers/net/ethernet/stmicro/stmmac/dwmac_lib.c
+index e60bfca..0ab985c8 100644
+--- a/drivers/net/ethernet/stmicro/stmmac/dwmac_lib.c
++++ b/drivers/net/ethernet/stmicro/stmmac/dwmac_lib.c
+@@ -248,6 +248,7 @@ void stmmac_set_mac_addr(void __iomem *ioaddr, u8 addr[6],
+ 	data = (addr[3] << 24) | (addr[2] << 16) | (addr[1] << 8) | addr[0];
+ 	writel(data, ioaddr + low);
+ }
++EXPORT_SYMBOL_GPL(stmmac_set_mac_addr);
+ 
+ /* Enable disable MAC RX/TX */
+ void stmmac_set_mac(void __iomem *ioaddr, bool enable)
+@@ -279,4 +280,4 @@ void stmmac_get_mac_addr(void __iomem *ioaddr, unsigned char *addr,
+ 	addr[4] = hi_addr & 0xff;
+ 	addr[5] = (hi_addr >> 8) & 0xff;
+ }
+-
++EXPORT_SYMBOL_GPL(stmmac_get_mac_addr);
+-- 
+2.10.2
