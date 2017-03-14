@@ -1,27 +1,40 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Tue, 14 Mar 2017 22:11:46 +0100
-Subject: [BUG] dmaengine: pxa_dma: + mmc: pxamci: race condition with DMA
- error on tx channel
-In-Reply-To: <feb39d00-d40d-f935-751c-8119f40b4df4@tul.cz> (Petr Cvek's
- message of "Fri, 10 Mar 2017 01:49:12 +0100")
-References: <e749aff1-0ffc-c9ed-42b2-82397b4e8ba2@tul.cz>
- <877f3zwwgo.fsf@belgarion.home>
- <feb39d00-d40d-f935-751c-8119f40b4df4@tul.cz>
-Message-ID: <871stzh8bx.fsf@belgarion.home>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 14 Mar 2017 22:11:40 +0100
+Subject: [PATCH] firmware: ti_sci: fix strncat length check
+Message-ID: <20170314211157.3424031-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Petr Cvek <petr.cvek@tul.cz> writes:
+gcc-7 notices that the length we pass to strncat is wrong:
 
-Ok Petr, I've been trying for days to reproduce without any luck.
+drivers/firmware/ti_sci.c: In function 'ti_sci_probe':
+drivers/firmware/ti_sci.c:204:32: error: specified bound 50 equals the size of the destination [-Werror=stringop-overflow=]
 
-I had a look at your traces, and I'd like something else when it happens :
- 1) The patch I provided earlier applied
- 2) This done (the 'cat' after the bug) :
-	mount -t debugfs none /sys/kernel/debug/
-	cat /sys/kernel/debug/pxa-dma.0/channels/4/[sd]*
+Instead of the total length, we must pass the length of the
+remaining space here.
 
-Cheers.
+Fixes: aa276781a64a ("firmware: Add basic support for TI System Control Interface (TI-SCI) protocol")
+Acked-by: Nishanth Menon <nm@ti.com>
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+Originally submitted on Jan 11, patch is still needed on Linux-4.11-rc2.
+---
+ drivers/firmware/ti_sci.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
---
-Robert
+diff --git a/drivers/firmware/ti_sci.c b/drivers/firmware/ti_sci.c
+index 874ff32db366..00cfed3c3e1a 100644
+--- a/drivers/firmware/ti_sci.c
++++ b/drivers/firmware/ti_sci.c
+@@ -202,7 +202,8 @@ static int ti_sci_debugfs_create(struct platform_device *pdev,
+ 	info->debug_buffer[info->debug_region_size] = 0;
+ 
+ 	info->d = debugfs_create_file(strncat(debug_name, dev_name(dev),
+-					      sizeof(debug_name)),
++					      sizeof(debug_name) -
++					      sizeof("ti_sci_debug@")),
+ 				      0444, NULL, info, &ti_sci_debug_fops);
+ 	if (IS_ERR(info->d))
+ 		return PTR_ERR(info->d);
+-- 
+2.9.0
