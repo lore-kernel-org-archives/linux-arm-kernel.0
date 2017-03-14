@@ -1,54 +1,80 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Tue, 14 Mar 2017 06:47:51 -0700
-Subject: [PATCH v3 1/3] watchdog: s3c2410: Constify local structures
-In-Reply-To: <20170313190726.2988-2-krzk@kernel.org>
-References: <20170313190726.2988-1-krzk@kernel.org>
- <20170313190726.2988-2-krzk@kernel.org>
-Message-ID: <7b5ab910-2d3b-e36f-8418-25e2ffc0d647@roeck-us.net>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 14 Mar 2017 14:54:24 +0100
+Subject: [PATCH v2 05/12] Document: dt: binding: imx: update pinctrl doc
+ for imx6sll
+In-Reply-To: <CAA+hA=TL=Ys6j7YGOofAqrEGBcR15szvx3mMf-Dm03rnEa_VRA@mail.gmail.com>
+References: <1482832070-22668-1-git-send-email-ping.bai@nxp.com>
+ <1482832070-22668-6-git-send-email-ping.bai@nxp.com>
+ <CACRpkdYUME8K+JusA0ORRKqxyBuhDdyei8eg7UZbHidKw9=bQw@mail.gmail.com>
+ <CAA+hA=TL=Ys6j7YGOofAqrEGBcR15szvx3mMf-Dm03rnEa_VRA@mail.gmail.com>
+Message-ID: <CACRpkdaLq125bKQcpHeFn312omxw9jp0VHr9DVanj42Y_29+mg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/13/2017 12:07 PM, Krzysztof Kozlowski wrote:
-> Structures watchdog_device, watchdog_ops and s3c2410_wdt_variant are not
-> modified so they can be made const to increase code safeness.
->
-> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+On Thu, Feb 16, 2017 at 8:51 AM, Dong Aisheng <dongas86@gmail.com> wrote:
+> On Tue, Dec 27, 2016 at 8:59 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
 
-Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+>> I would consider augmenting the code in the driver to handle the generic
+>> bindings *in addition* to the old legacy bindings, and use those over these
+>> random custom bits.
+(...)
+> Generic binding only supports parsing strings for pins and function
+> from dts right now, that means we need back to the old way of hardcoding
+> all register bits in driver which we actually chose to move out since
+> the commit "e164153 pinctrl: imx: move hard-coding data into device tree".
 
-> ---
->  drivers/watchdog/s3c2410_wdt.c | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
+Aha I see.
+
+> One option is using macro definitions instead of raw data as pinctrl-single
+> users as OMAP.
+> e.g.
+> art2_pins: pinmux_uart2_pins {
+>         pinctrl-single,pins = <
+>                 OMAP4_IOPAD(0x118, PIN_INPUT_PULLUP | MUX_MODE0)
+>  /* uart2_cts.uart2_cts */
+>         ........
 >
-> diff --git a/drivers/watchdog/s3c2410_wdt.c b/drivers/watchdog/s3c2410_wdt.c
-> index 6ed97596ca80..52b66bcdd1ef 100644
-> --- a/drivers/watchdog/s3c2410_wdt.c
-> +++ b/drivers/watchdog/s3c2410_wdt.c
-> @@ -131,7 +131,7 @@ struct s3c2410_wdt {
->  	unsigned long		wtdat_save;
->  	struct watchdog_device	wdt_device;
->  	struct notifier_block	freq_transition;
-> -	struct s3c2410_wdt_variant *drv_data;
-> +	const struct s3c2410_wdt_variant *drv_data;
->  	struct regmap *pmureg;
->  };
+> For this way, no driver changes required, just replace the raw data by macro
+> in device tree. But i wonder this may not be your original intention although
+> it's the easiest way for us.
+> Anyway, if you agree, we probably would prefer this way.
+
+That make it look better than it looks today, but...
+
+> Another option is partially convert to generic binding for only pad
+> configuration
+> part. e.g.
+> pinctrl_usdhc1: usdhc1grp {
+>         fsl,pins = <
+>                 MX7D_PAD_SD1_CMD__SD1_CMD
+>                 MX7D_PAD_SD1_CLK__SD1_CLK
+>                 MX7D_PAD_SD1_DATA0__SD1_DATA0
+>                 ...
+>         >;
+>         bias-pull-up = <47KOHM>;
+>         drive-strength = <130OHM>;
+>         slew-rate = <FAST>;
+>         speed = <50MHZ>;
+>         ....
+> };
+> (Some of the property still not supported or not the same as generic
+> binding right now)
+
+This looks totally awesome, so if you could do this, it would be even
+better.
+
+> This way requires no big drivers changes and only extend the driver
+> to support the generic pinctrl dt configuration properties.
+
+Yep, you should be able to support both the old and the new
+way of configuring the pins this way I guess.
+
+> And it also fix the raw data issues and looks like more applicable than the full
+> migration.
 >
-> @@ -401,7 +401,7 @@ static const struct watchdog_ops s3c2410wdt_ops = {
->  	.restart = s3c2410wdt_restart,
->  };
->
-> -static struct watchdog_device s3c2410_wdd = {
-> +static const struct watchdog_device s3c2410_wdd = {
->  	.info = &s3c2410_wdt_ident,
->  	.ops = &s3c2410wdt_ops,
->  	.timeout = S3C2410_WATCHDOG_DEFAULT_TIME,
-> @@ -507,7 +507,7 @@ static inline unsigned int s3c2410wdt_get_bootstatus(struct s3c2410_wdt *wdt)
->  	return 0;
->  }
->
-> -static inline struct s3c2410_wdt_variant *
-> +static inline const struct s3c2410_wdt_variant *
->  s3c2410_get_wdt_drv_data(struct platform_device *pdev)
->  {
->  	if (pdev->dev.of_node) {
->
+> So would you be willing to accept it?
+
+Anything that move us closer to the generic bindings will be accepted.
+
+Yours,
+Linus Walleij
