@@ -1,35 +1,37 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue, 14 Mar 2017 19:10:28 +0200
-Subject: [PATCH v2 3/3] arm64: exynos: Enable Exynos PMU and PM domains drivers
-In-Reply-To: <20170314171028.20337-1-krzk@kernel.org>
-References: <20170314171028.20337-1-krzk@kernel.org>
-Message-ID: <20170314171028.20337-4-krzk@kernel.org>
+From: joe@perches.com (Joe Perches)
+Date: Tue, 14 Mar 2017 10:17:48 -0700
+Subject: [PATCH 23/35] drivers/mfd: Convert remaining uses of pr_warning
+ to pr_warn
+In-Reply-To: <20170314140455.umlhdbuj3grqtu6i@dell>
+References: <cover.1487314666.git.joe@perches.com>
+ <a6c827c14d0b9f4be42e549ec4c629245516e979.1487314667.git.joe@perches.com>
+ <20170314140455.umlhdbuj3grqtu6i@dell>
+Message-ID: <1489511868.2582.2.camel@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable EXYNOS_PM_DOMAINS because recently Exynos5433 got support for
-Power Management domains.  The Exynos5433 pinctrl driver requires
-EXYNOS_PMU to get the syscon-regmap for PMU address space.
+On Tue, 2017-03-14 at 14:04 +0000, Lee Jones wrote:
+> On Thu, 16 Feb 2017, Joe Perches wrote:
+> > To enable eventual removal of pr_warning
+[]
+> > diff --git a/drivers/mfd/twl4030-power.c b/drivers/mfd/twl4030-power.c
+[]
+> > @@ -502,9 +502,7 @@ static int load_twl4030_script(const struct twl4030_power_data *pdata,
+> >  	}
+> >  	if (tscript->flags & TWL4030_SLEEP_SCRIPT) {
+> >  		if (!order)
+> > -			pr_warning("TWL4030: Bad order of scripts (sleep "\
+> > -					"script before wakeup) Leads to boot"\
+> > -					"failure on some boards\n");
+> > +			pr_warn("TWL4030: Bad order of scripts (sleep script before wakeup) Leads to boot failure on some boards\n");
+> 
+> Is 80 chars considered the lessor sin?
 
-Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
-Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-Reviewed-by: Alim Akhtar <alim.akhtar@samsung.com>
----
- arch/arm64/Kconfig.platforms | 2 ++
- 1 file changed, 2 insertions(+)
+Splitting logging messages into multiple lines is non preferred.
 
-diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
-index 129cc5ae4091..9cdaecd3e583 100644
---- a/arch/arm64/Kconfig.platforms
-+++ b/arch/arm64/Kconfig.platforms
-@@ -54,6 +54,8 @@ config ARCH_BRCMSTB
- config ARCH_EXYNOS
- 	bool "ARMv8 based Samsung Exynos SoC family"
- 	select COMMON_CLK_SAMSUNG
-+	select EXYNOS_PM_DOMAINS if PM_GENERIC_DOMAINS
-+	select EXYNOS_PMU
- 	select HAVE_S3C2410_WATCHDOG if WATCHDOG
- 	select HAVE_S3C_RTC if RTC_CLASS
- 	select PINCTRL
--- 
-2.9.3
+Documentation/process/coding-style.rst:
+
+Breaking long lines and strings:
+
+never break user-visible strings such as
+printk messages, because that breaks the ability to grep for them.
