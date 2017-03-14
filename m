@@ -1,278 +1,917 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue, 14 Mar 2017 08:44:31 +0200
-Subject: [RESEND PATCH v3 2/2] phy: Group vendor specific phy drivers
-In-Reply-To: <1489472570-26434-1-git-send-email-vivek.gautam@codeaurora.org>
-References: <1489472080-23711-2-git-send-email-vivek.gautam@codeaurora.org>
- <1489472570-26434-1-git-send-email-vivek.gautam@codeaurora.org>
-Message-ID: <CAJKOXPcWKjis_dWtzJPWSZxVnRPYdsf+_uDzjCaCFOwyOLG2Gw@mail.gmail.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 14 Mar 2017 15:07:34 +0800
+Subject: [PATCH v2 1/2] dts: arm64: add LS1043A DPAA support
+In-Reply-To: <1488382505-17554-2-git-send-email-madalin.bucur@nxp.com>
+References: <1488382505-17554-1-git-send-email-madalin.bucur@nxp.com>
+ <1488382505-17554-2-git-send-email-madalin.bucur@nxp.com>
+Message-ID: <20170314070732.GH3618@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 14, 2017 at 8:22 AM, Vivek Gautam
-<vivek.gautam@codeaurora.org> wrote:
-> Adding vendor specific directories in phy to group
-> phy drivers under their respective vendor umbrella.
->
-> Also updated the MAINTAINERS file to reflect the correct
-> directory structure for phy drivers.
->
-> Signed-off-by: Vivek Gautam <vivek.gautam@codeaurora.org>
-> Acked-by: Heiko Stuebner <heiko@sntech.de>
-> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-> Cc: Kishon Vijay Abraham I <kishon@ti.com>
-> Cc: David S. Miller <davem@davemloft.net>
-> Cc: Geert Uytterhoeven <geert+renesas@glider.be>
-> Cc: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
-> Cc: Guenter Roeck <linux@roeck-us.net>
-> Cc: Heiko Stuebner <heiko@sntech.de>
-> Cc: Viresh Kumar <viresh.kumar@linaro.org>
-> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Cc: Chen-Yu Tsai <wens@csie.org>
-> Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> Cc: Krzysztof Kozlowski <krzk@kernel.org>
-> Cc: Jaehoon Chung <jh80.chung@samsung.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-arm-msm at vger.kernel.org
-> Cc: linux-kernel at vger.kernel.org
-> Cc: linux-omap at vger.kernel.org
-> Cc: linux-renesas-soc at vger.kernel.org
-> Cc: linux-rockchip at lists.infradead.org
-> Cc: linux-samsung-soc at vger.kernel.org
-> Cc: linux-usb at vger.kernel.org
+On Wed, Mar 01, 2017 at 05:35:04PM +0200, Madalin Bucur wrote:
+> Signed-off-by: Madalin Bucur <madalin.bucur@nxp.com>
+
+Empty commit log is generally not welcome, especially when the commit
+adds so many files.
+
 > ---
->
-> Corrected Krzysztof's email-id. Added linux-arm-msm.
->
-> Hi Heiko, Viresh,
-> It's been a year since the last version of this patch was posted.
-> Kishon has agreed to pull this change now. I am carrying forward
-> your Acks since there are no functional changes.
-> I have taken care of the drivers that were added/removed since
-> the last version.
-> Please feel free to jump in if you have any concerns.
->
-> Changes since v2
->  - Rebased on linux-phy/next.
->  - Took care of drivers added/removed for each vendors since v2.
->  - Updated the 'Signed-off-by' tag with my current email id.
->
-> Changes from v1:
->  - Updated the MAINTAINERS file to reflect the same change
->    in directory structure.
->  - Removed PHY_PLAT config as pointed out by Kishon.
->    So we don't require the second patch in the v1 of this series:
->    [PATCH 2/2] arm: mach-spear: Enable PHY_PLAT to meet dependency
->  - Renamed sunxi --> allwinner; rcar --> renesas.
->  - Fixed error coming with qcom Makefile.
->
-> * Build tested multi_v7_defconfig.
-> * Build tested arm64 defconfig with all the involved configs enabled.
->
->  MAINTAINERS                                        |  18 +-
->  drivers/phy/Kconfig                                | 471 +--------------------
->  drivers/phy/Makefile                               |  67 +--
->  drivers/phy/allwinner/Kconfig                      |  31 ++
->  drivers/phy/allwinner/Makefile                     |   2 +
->  drivers/phy/{ => allwinner}/phy-sun4i-usb.c        |   0
->  drivers/phy/{ => allwinner}/phy-sun9i-usb.c        |   0
->  drivers/phy/broadcom/Kconfig                       |  64 +++
->  drivers/phy/broadcom/Makefile                      |   7 +
->  drivers/phy/{ => broadcom}/phy-bcm-cygnus-pcie.c   |   0
->  drivers/phy/{ => broadcom}/phy-bcm-kona-usb2.c     |   0
->  drivers/phy/{ => broadcom}/phy-bcm-ns-usb2.c       |   0
->  drivers/phy/{ => broadcom}/phy-bcm-ns-usb3.c       |   0
->  drivers/phy/{ => broadcom}/phy-bcm-ns2-pcie.c      |   0
->  drivers/phy/{ => broadcom}/phy-bcm-nsp-usb3.c      |   0
->  drivers/phy/{ => broadcom}/phy-brcm-sata.c         |   0
->  drivers/phy/hisilicon/Kconfig                      |  20 +
->  drivers/phy/hisilicon/Makefile                     |   2 +
->  drivers/phy/{ => hisilicon}/phy-hi6220-usb.c       |   0
->  drivers/phy/{ => hisilicon}/phy-hix5hd2-sata.c     |   0
->  drivers/phy/marvell/Kconfig                        |  50 +++
->  drivers/phy/marvell/Makefile                       |   6 +
->  drivers/phy/{ => marvell}/phy-armada375-usb2.c     |   0
->  drivers/phy/{ => marvell}/phy-berlin-sata.c        |   0
->  drivers/phy/{ => marvell}/phy-berlin-usb.c         |   0
->  drivers/phy/{ => marvell}/phy-mvebu-sata.c         |   0
->  drivers/phy/{ => marvell}/phy-pxa-28nm-hsic.c      |   0
->  drivers/phy/{ => marvell}/phy-pxa-28nm-usb2.c      |   0
->  drivers/phy/qualcomm/Kconfig                       |  38 ++
->  drivers/phy/qualcomm/Makefile                      |   7 +
->  drivers/phy/{ => qualcomm}/phy-qcom-apq8064-sata.c |   0
->  drivers/phy/{ => qualcomm}/phy-qcom-ipq806x-sata.c |   0
->  drivers/phy/{ => qualcomm}/phy-qcom-ufs-i.h        |   0
->  drivers/phy/{ => qualcomm}/phy-qcom-ufs-qmp-14nm.c |   0
->  drivers/phy/{ => qualcomm}/phy-qcom-ufs-qmp-14nm.h |   0
->  drivers/phy/{ => qualcomm}/phy-qcom-ufs-qmp-20nm.c |   0
->  drivers/phy/{ => qualcomm}/phy-qcom-ufs-qmp-20nm.h |   0
->  drivers/phy/{ => qualcomm}/phy-qcom-ufs.c          |   0
->  drivers/phy/{ => qualcomm}/phy-qcom-usb-hs.c       |   0
->  drivers/phy/{ => qualcomm}/phy-qcom-usb-hsic.c     |   0
->  drivers/phy/renesas/Kconfig                        |  17 +
->  drivers/phy/renesas/Makefile                       |   2 +
->  drivers/phy/{ => renesas}/phy-rcar-gen2.c          |   0
->  drivers/phy/{ => renesas}/phy-rcar-gen3-usb2.c     |   0
->  drivers/phy/rockchip/Kconfig                       |  51 +++
->  drivers/phy/rockchip/Makefile                      |   6 +
->  drivers/phy/{ => rockchip}/phy-rockchip-dp.c       |   0
->  drivers/phy/{ => rockchip}/phy-rockchip-emmc.c     |   0
->  .../phy/{ => rockchip}/phy-rockchip-inno-usb2.c    |   0
->  drivers/phy/{ => rockchip}/phy-rockchip-pcie.c     |   0
->  drivers/phy/{ => rockchip}/phy-rockchip-typec.c    |   0
->  drivers/phy/{ => rockchip}/phy-rockchip-usb.c      |   0
->  drivers/phy/samsung/Kconfig                        |  96 +++++
->  drivers/phy/samsung/Makefile                       |  11 +
->  drivers/phy/{ => samsung}/phy-exynos-dp-video.c    |   0
->  drivers/phy/{ => samsung}/phy-exynos-mipi-video.c  |   0
->  drivers/phy/{ => samsung}/phy-exynos-pcie.c        |   0
->  drivers/phy/{ => samsung}/phy-exynos4210-usb2.c    |   0
->  drivers/phy/{ => samsung}/phy-exynos4x12-usb2.c    |   0
->  drivers/phy/{ => samsung}/phy-exynos5-usbdrd.c     |   0
->  drivers/phy/{ => samsung}/phy-exynos5250-sata.c    |   0
->  drivers/phy/{ => samsung}/phy-exynos5250-usb2.c    |   0
->  drivers/phy/{ => samsung}/phy-s5pv210-usb2.c       |   0
->  drivers/phy/{ => samsung}/phy-samsung-usb2.c       |   0
->  drivers/phy/{ => samsung}/phy-samsung-usb2.h       |   0
->  drivers/phy/st/Kconfig                             |  33 ++
->  drivers/phy/st/Makefile                            |   4 +
->  drivers/phy/{ => st}/phy-miphy28lp.c               |   0
->  drivers/phy/{ => st}/phy-spear1310-miphy.c         |   0
->  drivers/phy/{ => st}/phy-spear1340-miphy.c         |   0
->  drivers/phy/{ => st}/phy-stih407-usb.c             |   0
->  drivers/phy/ti/Kconfig                             |  78 ++++
->  drivers/phy/ti/Makefile                            |   7 +
->  drivers/phy/{ => ti}/phy-da8xx-usb.c               |   0
->  drivers/phy/{ => ti}/phy-dm816x-usb.c              |   0
->  drivers/phy/{ => ti}/phy-omap-control.c            |   0
->  drivers/phy/{ => ti}/phy-omap-usb2.c               |   0
->  drivers/phy/{ => ti}/phy-ti-pipe3.c                |   0
->  drivers/phy/{ => ti}/phy-tusb1210.c                |   0
->  drivers/phy/{ => ti}/phy-twl4030-usb.c             |   0
->  80 files changed, 567 insertions(+), 521 deletions(-)
->  create mode 100644 drivers/phy/allwinner/Kconfig
->  create mode 100644 drivers/phy/allwinner/Makefile
->  rename drivers/phy/{ => allwinner}/phy-sun4i-usb.c (100%)
->  rename drivers/phy/{ => allwinner}/phy-sun9i-usb.c (100%)
->  create mode 100644 drivers/phy/broadcom/Kconfig
->  create mode 100644 drivers/phy/broadcom/Makefile
->  rename drivers/phy/{ => broadcom}/phy-bcm-cygnus-pcie.c (100%)
->  rename drivers/phy/{ => broadcom}/phy-bcm-kona-usb2.c (100%)
->  rename drivers/phy/{ => broadcom}/phy-bcm-ns-usb2.c (100%)
->  rename drivers/phy/{ => broadcom}/phy-bcm-ns-usb3.c (100%)
->  rename drivers/phy/{ => broadcom}/phy-bcm-ns2-pcie.c (100%)
->  rename drivers/phy/{ => broadcom}/phy-bcm-nsp-usb3.c (100%)
->  rename drivers/phy/{ => broadcom}/phy-brcm-sata.c (100%)
->  create mode 100644 drivers/phy/hisilicon/Kconfig
->  create mode 100644 drivers/phy/hisilicon/Makefile
->  rename drivers/phy/{ => hisilicon}/phy-hi6220-usb.c (100%)
->  rename drivers/phy/{ => hisilicon}/phy-hix5hd2-sata.c (100%)
->  create mode 100644 drivers/phy/marvell/Kconfig
->  create mode 100644 drivers/phy/marvell/Makefile
->  rename drivers/phy/{ => marvell}/phy-armada375-usb2.c (100%)
->  rename drivers/phy/{ => marvell}/phy-berlin-sata.c (100%)
->  rename drivers/phy/{ => marvell}/phy-berlin-usb.c (100%)
->  rename drivers/phy/{ => marvell}/phy-mvebu-sata.c (100%)
->  rename drivers/phy/{ => marvell}/phy-pxa-28nm-hsic.c (100%)
->  rename drivers/phy/{ => marvell}/phy-pxa-28nm-usb2.c (100%)
->  create mode 100644 drivers/phy/qualcomm/Kconfig
->  create mode 100644 drivers/phy/qualcomm/Makefile
->  rename drivers/phy/{ => qualcomm}/phy-qcom-apq8064-sata.c (100%)
->  rename drivers/phy/{ => qualcomm}/phy-qcom-ipq806x-sata.c (100%)
->  rename drivers/phy/{ => qualcomm}/phy-qcom-ufs-i.h (100%)
->  rename drivers/phy/{ => qualcomm}/phy-qcom-ufs-qmp-14nm.c (100%)
->  rename drivers/phy/{ => qualcomm}/phy-qcom-ufs-qmp-14nm.h (100%)
->  rename drivers/phy/{ => qualcomm}/phy-qcom-ufs-qmp-20nm.c (100%)
->  rename drivers/phy/{ => qualcomm}/phy-qcom-ufs-qmp-20nm.h (100%)
->  rename drivers/phy/{ => qualcomm}/phy-qcom-ufs.c (100%)
->  rename drivers/phy/{ => qualcomm}/phy-qcom-usb-hs.c (100%)
->  rename drivers/phy/{ => qualcomm}/phy-qcom-usb-hsic.c (100%)
->  create mode 100644 drivers/phy/renesas/Kconfig
->  create mode 100644 drivers/phy/renesas/Makefile
->  rename drivers/phy/{ => renesas}/phy-rcar-gen2.c (100%)
->  rename drivers/phy/{ => renesas}/phy-rcar-gen3-usb2.c (100%)
->  create mode 100644 drivers/phy/rockchip/Kconfig
->  create mode 100644 drivers/phy/rockchip/Makefile
->  rename drivers/phy/{ => rockchip}/phy-rockchip-dp.c (100%)
->  rename drivers/phy/{ => rockchip}/phy-rockchip-emmc.c (100%)
->  rename drivers/phy/{ => rockchip}/phy-rockchip-inno-usb2.c (100%)
->  rename drivers/phy/{ => rockchip}/phy-rockchip-pcie.c (100%)
->  rename drivers/phy/{ => rockchip}/phy-rockchip-typec.c (100%)
->  rename drivers/phy/{ => rockchip}/phy-rockchip-usb.c (100%)
->  create mode 100644 drivers/phy/samsung/Kconfig
->  create mode 100644 drivers/phy/samsung/Makefile
->  rename drivers/phy/{ => samsung}/phy-exynos-dp-video.c (100%)
->  rename drivers/phy/{ => samsung}/phy-exynos-mipi-video.c (100%)
->  rename drivers/phy/{ => samsung}/phy-exynos-pcie.c (100%)
->  rename drivers/phy/{ => samsung}/phy-exynos4210-usb2.c (100%)
->  rename drivers/phy/{ => samsung}/phy-exynos4x12-usb2.c (100%)
->  rename drivers/phy/{ => samsung}/phy-exynos5-usbdrd.c (100%)
->  rename drivers/phy/{ => samsung}/phy-exynos5250-sata.c (100%)
->  rename drivers/phy/{ => samsung}/phy-exynos5250-usb2.c (100%)
->  rename drivers/phy/{ => samsung}/phy-s5pv210-usb2.c (100%)
->  rename drivers/phy/{ => samsung}/phy-samsung-usb2.c (100%)
->  rename drivers/phy/{ => samsung}/phy-samsung-usb2.h (100%)
->  create mode 100644 drivers/phy/st/Kconfig
->  create mode 100644 drivers/phy/st/Makefile
->  rename drivers/phy/{ => st}/phy-miphy28lp.c (100%)
->  rename drivers/phy/{ => st}/phy-spear1310-miphy.c (100%)
->  rename drivers/phy/{ => st}/phy-spear1340-miphy.c (100%)
->  rename drivers/phy/{ => st}/phy-stih407-usb.c (100%)
->  create mode 100644 drivers/phy/ti/Kconfig
->  create mode 100644 drivers/phy/ti/Makefile
->  rename drivers/phy/{ => ti}/phy-da8xx-usb.c (100%)
->  rename drivers/phy/{ => ti}/phy-dm816x-usb.c (100%)
->  rename drivers/phy/{ => ti}/phy-omap-control.c (100%)
->  rename drivers/phy/{ => ti}/phy-omap-usb2.c (100%)
->  rename drivers/phy/{ => ti}/phy-ti-pipe3.c (100%)
->  rename drivers/phy/{ => ti}/phy-tusb1210.c (100%)
->  rename drivers/phy/{ => ti}/phy-twl4030-usb.c (100%)
->
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index c776906f67a9..22583a160fa5 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -1814,8 +1814,8 @@ F:        drivers/i2c/busses/i2c-st.c
->  F:     drivers/media/rc/st_rc.c
->  F:     drivers/media/platform/sti/c8sectpfe/
->  F:     drivers/mmc/host/sdhci-st.c
-> -F:     drivers/phy/phy-miphy28lp.c
-> -F:     drivers/phy/phy-stih407-usb.c
-> +F:     drivers/phy/st/phy-miphy28lp.c
-> +F:     drivers/phy/st/phy-stih407-usb.c
->  F:     drivers/pinctrl/pinctrl-st.c
->  F:     drivers/remoteproc/st_remoteproc.c
->  F:     drivers/remoteproc/st_slim_rproc.c
-> @@ -10637,7 +10637,7 @@ RENESAS USB2 PHY DRIVER
->  M:     Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
->  L:     linux-renesas-soc at vger.kernel.org
->  S:     Maintained
-> -F:     drivers/phy/phy-rcar-gen3-usb2.c
-> +F:     drivers/phy/renesas/phy-rcar-gen3-usb2.c
->
->  RESET CONTROLLER FRAMEWORK
->  M:     Philipp Zabel <p.zabel@pengutronix.de>
-> @@ -11011,12 +11011,12 @@ L:    linux-kernel at vger.kernel.org
->  S:     Supported
->  F:     Documentation/devicetree/bindings/phy/samsung-phy.txt
->  F:     Documentation/phy/samsung-usb2.txt
-> -F:     drivers/phy/phy-exynos4210-usb2.c
-> -F:     drivers/phy/phy-exynos4x12-usb2.c
-> -F:     drivers/phy/phy-exynos5250-usb2.c
-> -F:     drivers/phy/phy-s5pv210-usb2.c
-> -F:     drivers/phy/phy-samsung-usb2.c
-> -F:     drivers/phy/phy-samsung-usb2.h
-> +F:     drivers/phy/samsung/phy-exynos4210-usb2.c
-> +F:     drivers/phy/samsung/phy-exynos4x12-usb2.c
-> +F:     drivers/phy/samsung/phy-exynos5250-usb2.c
-> +F:     drivers/phy/samsung/phy-s5pv210-usb2.c
-> +F:     drivers/phy/samsung/phy-samsung-usb2.c
-> +F:     drivers/phy/samsung/phy-samsung-usb2.h
+>  arch/arm64/boot/dts/freescale/fsl-ls1043-post.dtsi | 41 +++++++++++
+>  arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts  |  2 +
+>  arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts  | 75 ++++++++++++++++++++
+>  arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi     | 73 +++++++++++++++++++-
+>  .../boot/dts/freescale/qoriq-bman1-portals.dtsi    | 67 ++++++++++++++++++
+>  .../boot/dts/freescale/qoriq-fman3-0-10g-0.dtsi    | 42 ++++++++++++
+>  .../boot/dts/freescale/qoriq-fman3-0-1g-0.dtsi     | 41 +++++++++++
+>  .../boot/dts/freescale/qoriq-fman3-0-1g-1.dtsi     | 41 +++++++++++
+>  .../boot/dts/freescale/qoriq-fman3-0-1g-2.dtsi     | 41 +++++++++++
+>  .../boot/dts/freescale/qoriq-fman3-0-1g-3.dtsi     | 41 +++++++++++
+>  .../boot/dts/freescale/qoriq-fman3-0-1g-4.dtsi     | 41 +++++++++++
+>  .../boot/dts/freescale/qoriq-fman3-0-1g-5.dtsi     | 41 +++++++++++
+>  arch/arm64/boot/dts/freescale/qoriq-fman3-0.dtsi   | 80 ++++++++++++++++++++++
+>  .../boot/dts/freescale/qoriq-qman1-portals.dtsi    | 76 ++++++++++++++++++++
+>  14 files changed, 701 insertions(+), 1 deletion(-)
+>  create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls1043-post.dtsi
+>  create mode 100644 arch/arm64/boot/dts/freescale/qoriq-bman1-portals.dtsi
+>  create mode 100644 arch/arm64/boot/dts/freescale/qoriq-fman3-0-10g-0.dtsi
+>  create mode 100644 arch/arm64/boot/dts/freescale/qoriq-fman3-0-1g-0.dtsi
+>  create mode 100644 arch/arm64/boot/dts/freescale/qoriq-fman3-0-1g-1.dtsi
+>  create mode 100644 arch/arm64/boot/dts/freescale/qoriq-fman3-0-1g-2.dtsi
+>  create mode 100644 arch/arm64/boot/dts/freescale/qoriq-fman3-0-1g-3.dtsi
+>  create mode 100644 arch/arm64/boot/dts/freescale/qoriq-fman3-0-1g-4.dtsi
+>  create mode 100644 arch/arm64/boot/dts/freescale/qoriq-fman3-0-1g-5.dtsi
+>  create mode 100644 arch/arm64/boot/dts/freescale/qoriq-fman3-0.dtsi
+>  create mode 100644 arch/arm64/boot/dts/freescale/qoriq-qman1-portals.dtsi
 
-Or this could be "drivers/phy/samsung/" so it would include all
-drivers (if that is desired)?
+I'm not comfortable with so many and complex include level.  Can you
+please elaborate it a bit and help us understand the necessity of doing
+that?
 
-I am fine with both, so:
-Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
+> 
+> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043-post.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1043-post.dtsi
+> new file mode 100644
+> index 0000000..bf443d2
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/freescale/fsl-ls1043-post.dtsi
+> @@ -0,0 +1,41 @@
+> +/*
+> + * QorIQ FMan v3 device tree nodes for ls1043
+> + *
+> + * Copyright 2015-2016 Freescale Semiconductor Inc.
+> + *
+> + * SPDX-License-Identifier: (GPL-2.0+ OR BSD-3-Clause)
+> + */
 
-Best regards,
-Krzysztof
+It's still controversial whether we should use SPDX tag.
+
+https://lkml.org/lkml/2017/2/28/750
+
+> +
+> +&soc {
+> +
+> +/include/ "qoriq-fman3-0.dtsi"
+> +/include/ "qoriq-fman3-0-1g-0.dtsi"
+> +/include/ "qoriq-fman3-0-1g-1.dtsi"
+> +/include/ "qoriq-fman3-0-1g-2.dtsi"
+> +/include/ "qoriq-fman3-0-1g-3.dtsi"
+> +/include/ "qoriq-fman3-0-1g-4.dtsi"
+> +/include/ "qoriq-fman3-0-1g-5.dtsi"
+> +/include/ "qoriq-fman3-0-10g-0.dtsi"
+
+We usually put the includes at the beginning of the file, and #include
+is more recommended than /include/.
+
+> +	fman at 1a00000 {
+> +		enet0: ethernet at e0000 {
+> +		};
+> +
+> +		enet1: ethernet at e2000 {
+> +		};
+> +
+> +		enet2: ethernet at e4000 {
+> +		};
+> +
+> +		enet3: ethernet at e6000 {
+> +		};
+> +
+> +		enet4: ethernet at e8000 {
+> +		};
+> +
+> +		enet5: ethernet at ea000 {
+> +		};
+> +
+> +		enet6: ethernet at f0000 {
+> +		};
+> +	};
+
+I do not quite understand why these nodes are empty.
+
+> +};
+> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts b/arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts
+> index 0989d63..ee66bb2 100644
+> --- a/arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts
+> +++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts
+> @@ -181,3 +181,5 @@
+>  		reg = <0>;
+>  	};
+>  };
+> +
+> +/include/ "fsl-ls1043-post.dtsi"
+
+Move it to header of the file.
+
+> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts
+> index c37110b..d94f003 100644
+> --- a/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts
+> +++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts
+> @@ -139,3 +139,78 @@
+>  &duart1 {
+>  	status = "okay";
+>  };
+> +
+> +/include/ "fsl-ls1043-post.dtsi"
+> +
+
+Ditto
+
+> +&soc {
+> +	fman at 1a00000 {
+> +		ethernet at e0000 {
+
+You defined enet0 label.  Why don't you use it?
+
+> +			phy-handle = <&qsgmii_phy1>;
+> +			phy-connection-type = "qsgmii";
+> +		};
+> +
+> +		ethernet at e2000 {
+> +			phy-handle = <&qsgmii_phy2>;
+> +			phy-connection-type = "qsgmii";
+> +		};
+> +
+> +		ethernet at e4000 {
+> +			phy-handle = <&rgmii_phy1>;
+> +			phy-connection-type = "rgmii";
+> +		};
+> +
+> +		ethernet at e6000 {
+> +			phy-handle = <&rgmii_phy2>;
+> +			phy-connection-type = "rgmii";
+> +		};
+> +
+> +		ethernet at e8000 {
+> +			phy-handle = <&qsgmii_phy3>;
+> +			phy-connection-type = "qsgmii";
+> +		};
+> +
+> +		ethernet at ea000 {
+> +			phy-handle = <&qsgmii_phy4>;
+> +			phy-connection-type = "qsgmii";
+> +		};
+> +
+> +		ethernet at f0000 { /* 10GEC1 */
+> +			phy-handle = <&aqr105_phy>;
+> +			phy-connection-type = "xgmii";
+> +		};
+> +
+> +		mdio at fc000 {
+
+Use label reference the node you already define, so that you do not have
+to maintain the device tree hierarchy for referencing the node.
+
+> +			rgmii_phy1: ethernet-phy at 1 {
+> +				reg = <0x1>;
+> +			};
+> +
+> +			rgmii_phy2: ethernet-phy at 2 {
+> +				reg = <0x2>;
+> +			};
+> +
+> +			qsgmii_phy1: ethernet-phy at 3 {
+> +				reg = <0x4>;
+
+The unit address in the node name should match 'reg' value.
+
+> +			};
+> +
+> +			qsgmii_phy2: ethernet-phy at 4 {
+> +				reg = <0x5>;
+> +			};
+> +
+> +			qsgmii_phy3: ethernet-phy at 5 {
+> +				reg = <0x6>;
+> +			};
+> +
+> +			qsgmii_phy4: ethernet-phy at 6 {
+> +				reg = <0x7>;
+> +			};
+> +		};
+> +
+> +		mdio at fd000 {
+> +			aqr105_phy: ethernet-phy at c {
+> +				compatible = "ethernet-phy-ieee802.3-c45";
+> +				interrupts = <0 132 4>;
+> +				reg = <0x1>;
+> +			};
+> +		};
+> +	};
+> +};
+> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
+> index ec13a6e..ac1e0af 100644
+> --- a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
+> +++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
+> @@ -52,6 +52,17 @@
+>  	#address-cells = <2>;
+>  	#size-cells = <2>;
+>  
+> +	aliases {
+> +		fman0 = &fman0;
+> +		ethernet0 = &enet0;
+> +		ethernet1 = &enet1;
+> +		ethernet2 = &enet2;
+> +		ethernet3 = &enet3;
+> +		ethernet4 = &enet4;
+> +		ethernet5 = &enet5;
+> +		ethernet6 = &enet6;
+> +	};
+> +
+>  	cpus {
+>  		#address-cells = <1>;
+>  		#size-cells = <0>;
+> @@ -106,6 +117,36 @@
+>  		      /* DRAM space 1, size: 2GiB DRAM */
+>  	};
+>  
+> +	reserved-memory {
+> +		#address-cells = <2>;
+> +		#size-cells = <2>;
+> +		ranges;
+> +
+> +		bman_fbpr: bman-fbpr {
+> +			size = <0 0x1000000>;
+> +			alignment = <0 0x1000000>;
+> +		};
+> +
+> +		qman_fqd: qman-fqd {
+> +			size = <0 0x400000>;
+> +			alignment = <0 0x400000>;
+> +		};
+> +
+> +		qman_pfdr: qman-pfdr {
+> +			size = <0 0x2000000>;
+> +			alignment = <0 0x2000000>;
+> +		};
+> +	};
+> +
+> +	bportals: bman-portals at 508000000 {
+> +		ranges = <0x0 0x5 0x08000000 0x8000000>;
+> +	};
+> +
+> +	qportals: qman-portals at 500000000 {
+> +		ranges = <0x0 0x5 0x00000000 0x8000000>;
+> +	};
+
+Why are these two devices directly under root, not soc node?
+
+> +
+> +
+>  	sysclk: sysclk {
+>  		compatible = "fixed-clock";
+>  		#clock-cells = <0>;
+> @@ -152,7 +193,7 @@
+>  		interrupts = <1 9 0xf08>;
+>  	};
+>  
+> -	soc {
+> +	soc: soc {
+>  		compatible = "simple-bus";
+>  		#address-cells = <2>;
+>  		#size-cells = <2>;
+> @@ -333,6 +374,18 @@
+>  			};
+>  		};
+>  
+> +		qman: qman at 1880000 {
+> +			compatible = "fsl,qman";
+> +			reg = <0x00 0x1880000 0x0 0x10000>;
+> +			interrupts = <0 45 0x4>;
+> +		};
+> +
+> +		bman: bman at 1890000 {
+> +			compatible = "fsl,bman";
+> +			reg = <0x00 0x1890000 0x0 0x10000>;
+> +			interrupts = <0 45 0x4>;
+> +		};
+> +
+>  		dspi0: dspi at 2100000 {
+>  			compatible = "fsl,ls1043a-dspi", "fsl,ls1021a-v1.0-dspi";
+>  			#address-cells = <1>;
+> @@ -686,3 +739,21 @@
+>  	};
+>  
+>  };
+> +
+> +&bman_fbpr {
+> +	compatible = "fsl,bman-fbpr";
+> +	alloc-ranges = <0 0 0x10000 0>;
+> +};
+> +
+> +&qman_fqd {
+> +	compatible = "fsl,qman-fqd";
+> +	alloc-ranges = <0 0 0x10000 0>;
+> +};
+> +
+> +&qman_pfdr {
+> +	compatible = "fsl,qman-pfdr";
+> +	alloc-ranges = <0 0 0x10000 0>;
+> +};
+
+Why do you need to separate these from the nodes in reserved-memory?
+
+I stop right here.  Honestly, I do not like the patch as its current
+form.  I guess you should do something to make the reviewing of the
+changes a bit easier.
+
+Shawn
+
+> +
+> +/include/ "qoriq-qman1-portals.dtsi"
+> +/include/ "qoriq-bman1-portals.dtsi"
+> diff --git a/arch/arm64/boot/dts/freescale/qoriq-bman1-portals.dtsi b/arch/arm64/boot/dts/freescale/qoriq-bman1-portals.dtsi
+> new file mode 100644
+> index 0000000..b007344
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/freescale/qoriq-bman1-portals.dtsi
+> @@ -0,0 +1,67 @@
+> +/*
+> + * QorIQ BMan Portals device tree
+> + *
+> + * Copyright 2011-2016 Freescale Semiconductor Inc.
+> + *
+> + * SPDX-License-Identifier: (GPL-2.0+ OR BSD-3-Clause)
+> + */
+> +
+> +&bportals {
+> +	#address-cells = <1>;
+> +	#size-cells = <1>;
+> +	compatible = "simple-bus";
+> +
+> +	bman-portal at 0 {
+> +		compatible = "fsl,bman-portal";
+> +		reg = <0x0 0x4000 0x4000000 0x4000>;
+> +		interrupts = <0 173 0x4>;
+> +	};
+> +
+> +	bman-portal at 10000 {
+> +		compatible = "fsl,bman-portal";
+> +		reg = <0x10000 0x4000 0x4010000 0x4000>;
+> +		interrupts = <0 175 0x4>;
+> +	};
+> +
+> +	bman-portal at 20000 {
+> +		compatible = "fsl,bman-portal";
+> +		reg = <0x20000 0x4000 0x4020000 0x4000>;
+> +		interrupts = <0 177 0x4>;
+> +	};
+> +
+> +	bman-portal at 30000 {
+> +		compatible = "fsl,bman-portal";
+> +		reg = <0x30000 0x4000 0x4030000 0x4000>;
+> +		interrupts = <0 179 0x4>;
+> +	};
+> +
+> +	bman-portal at 40000 {
+> +		compatible = "fsl,bman-portal";
+> +		reg = <0x40000 0x4000 0x4040000 0x4000>;
+> +		interrupts = <0 181 0x4>;
+> +	};
+> +
+> +	bman-portal at 50000 {
+> +		compatible = "fsl,bman-portal";
+> +		reg = <0x50000 0x4000 0x4050000 0x4000>;
+> +		interrupts = <0 183 0x4>;
+> +	};
+> +
+> +	bman-portal at 60000 {
+> +		compatible = "fsl,bman-portal";
+> +		reg = <0x60000 0x4000 0x4060000 0x4000>;
+> +		interrupts = <0 185 0x4>;
+> +	};
+> +
+> +	bman-portal at 70000 {
+> +		compatible = "fsl,bman-portal";
+> +		reg = <0x70000 0x4000 0x4070000 0x4000>;
+> +		interrupts = <0 187 0x4>;
+> +	};
+> +
+> +	bman-portal at 80000 {
+> +		compatible = "fsl,bman-portal";
+> +		reg = <0x80000 0x4000 0x4080000 0x4000>;
+> +		interrupts = <0 189 0x4>;
+> +	};
+> +};
+> diff --git a/arch/arm64/boot/dts/freescale/qoriq-fman3-0-10g-0.dtsi b/arch/arm64/boot/dts/freescale/qoriq-fman3-0-10g-0.dtsi
+> new file mode 100644
+> index 0000000..ecdffe7
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/freescale/qoriq-fman3-0-10g-0.dtsi
+> @@ -0,0 +1,42 @@
+> +/*
+> + * QorIQ FMan v3 10g port #0 device tree
+> + *
+> + * Copyright 2012-2015 Freescale Semiconductor Inc.
+> + *
+> + * SPDX-License-Identifier: (GPL-2.0+ OR BSD-3-Clause)
+> + */
+> +
+> +fman at 1a00000 {
+> +	fman0_rx_0x10: port at 90000 {
+> +		cell-index = <0x10>;
+> +		compatible = "fsl,fman-v3-port-rx";
+> +		reg = <0x90000 0x1000>;
+> +		fsl,fman-10g-port;
+> +	};
+> +
+> +	fman0_tx_0x30: port at b0000 {
+> +		cell-index = <0x30>;
+> +		compatible = "fsl,fman-v3-port-tx";
+> +		reg = <0xb0000 0x1000>;
+> +		fsl,fman-10g-port;
+> +	};
+> +
+> +	ethernet at f0000 {
+> +		cell-index = <0x8>;
+> +		compatible = "fsl,fman-memac";
+> +		reg = <0xf0000 0x1000>;
+> +		fsl,fman-ports = <&fman0_rx_0x10 &fman0_tx_0x30>;
+> +		pcsphy-handle = <&pcsphy6>;
+> +	};
+> +
+> +	mdio at f1000 {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		compatible = "fsl,fman-memac-mdio", "fsl,fman-xmdio";
+> +		reg = <0xf1000 0x1000>;
+> +
+> +		pcsphy6: ethernet-phy at 0 {
+> +			reg = <0x0>;
+> +		};
+> +	};
+> +};
+> diff --git a/arch/arm64/boot/dts/freescale/qoriq-fman3-0-1g-0.dtsi b/arch/arm64/boot/dts/freescale/qoriq-fman3-0-1g-0.dtsi
+> new file mode 100644
+> index 0000000..d600786
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/freescale/qoriq-fman3-0-1g-0.dtsi
+> @@ -0,0 +1,41 @@
+> +/*
+> + * QorIQ FMan v3 1g port #0 device tree
+> + *
+> + * Copyright 2012-2015 Freescale Semiconductor Inc.
+> + *
+> + * SPDX-License-Identifier: (GPL-2.0+ OR BSD-3-Clause)
+> + */
+> +
+> +fman at 1a00000 {
+> +	fman0_rx_0x08: port at 88000 {
+> +		cell-index = <0x8>;
+> +		compatible = "fsl,fman-v3-port-rx";
+> +		reg = <0x88000 0x1000>;
+> +	};
+> +
+> +	fman0_tx_0x28: port at a8000 {
+> +		cell-index = <0x28>;
+> +		compatible = "fsl,fman-v3-port-tx";
+> +		reg = <0xa8000 0x1000>;
+> +	};
+> +
+> +	ethernet at e0000 {
+> +		cell-index = <0>;
+> +		compatible = "fsl,fman-memac";
+> +		reg = <0xe0000 0x1000>;
+> +		fsl,fman-ports = <&fman0_rx_0x08 &fman0_tx_0x28>;
+> +		ptp-timer = <&ptp_timer0>;
+> +		pcsphy-handle = <&pcsphy0>;
+> +	};
+> +
+> +	mdio at e1000 {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		compatible = "fsl,fman-memac-mdio", "fsl,fman-xmdio";
+> +		reg = <0xe1000 0x1000>;
+> +
+> +		pcsphy0: ethernet-phy at 0 {
+> +			reg = <0x0>;
+> +		};
+> +	};
+> +};
+> diff --git a/arch/arm64/boot/dts/freescale/qoriq-fman3-0-1g-1.dtsi b/arch/arm64/boot/dts/freescale/qoriq-fman3-0-1g-1.dtsi
+> new file mode 100644
+> index 0000000..3c0b76d
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/freescale/qoriq-fman3-0-1g-1.dtsi
+> @@ -0,0 +1,41 @@
+> +/*
+> + * QorIQ FMan v3 1g port #1 device tree
+> + *
+> + * Copyright 2012-2015 Freescale Semiconductor Inc.
+> + *
+> + * SPDX-License-Identifier: (GPL-2.0+ OR BSD-3-Clause)
+> + */
+> +
+> +fman at 1a00000 {
+> +	fman0_rx_0x09: port at 89000 {
+> +		cell-index = <0x9>;
+> +		compatible = "fsl,fman-v3-port-rx";
+> +		reg = <0x89000 0x1000>;
+> +	};
+> +
+> +	fman0_tx_0x29: port at a9000 {
+> +		cell-index = <0x29>;
+> +		compatible = "fsl,fman-v3-port-tx";
+> +		reg = <0xa9000 0x1000>;
+> +	};
+> +
+> +	ethernet at e2000 {
+> +		cell-index = <1>;
+> +		compatible = "fsl,fman-memac";
+> +		reg = <0xe2000 0x1000>;
+> +		fsl,fman-ports = <&fman0_rx_0x09 &fman0_tx_0x29>;
+> +		ptp-timer = <&ptp_timer0>;
+> +		pcsphy-handle = <&pcsphy1>;
+> +	};
+> +
+> +	mdio at e3000 {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		compatible = "fsl,fman-memac-mdio", "fsl,fman-xmdio";
+> +		reg = <0xe3000 0x1000>;
+> +
+> +		pcsphy1: ethernet-phy at 0 {
+> +			reg = <0x0>;
+> +		};
+> +	};
+> +};
+> diff --git a/arch/arm64/boot/dts/freescale/qoriq-fman3-0-1g-2.dtsi b/arch/arm64/boot/dts/freescale/qoriq-fman3-0-1g-2.dtsi
+> new file mode 100644
+> index 0000000..89633af
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/freescale/qoriq-fman3-0-1g-2.dtsi
+> @@ -0,0 +1,41 @@
+> +/*
+> + * QorIQ FMan v3 1g port #2 device tree
+> + *
+> + * Copyright 2012-2015 Freescale Semiconductor Inc.
+> + *
+> + * SPDX-License-Identifier: (GPL-2.0+ OR BSD-3-Clause)
+> + */
+> +
+> +fman at 1a00000 {
+> +	fman0_rx_0x0a: port at 8a000 {
+> +		cell-index = <0xa>;
+> +		compatible = "fsl,fman-v3-port-rx";
+> +		reg = <0x8a000 0x1000>;
+> +	};
+> +
+> +	fman0_tx_0x2a: port at aa000 {
+> +		cell-index = <0x2a>;
+> +		compatible = "fsl,fman-v3-port-tx";
+> +		reg = <0xaa000 0x1000>;
+> +	};
+> +
+> +	ethernet at e4000 {
+> +		cell-index = <2>;
+> +		compatible = "fsl,fman-memac";
+> +		reg = <0xe4000 0x1000>;
+> +		fsl,fman-ports = <&fman0_rx_0x0a &fman0_tx_0x2a>;
+> +		ptp-timer = <&ptp_timer0>;
+> +		pcsphy-handle = <&pcsphy2>;
+> +	};
+> +
+> +	mdio at e5000 {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		compatible = "fsl,fman-memac-mdio", "fsl,fman-xmdio";
+> +		reg = <0xe5000 0x1000>;
+> +
+> +		pcsphy2: ethernet-phy at 0 {
+> +			reg = <0x0>;
+> +		};
+> +	};
+> +};
+> diff --git a/arch/arm64/boot/dts/freescale/qoriq-fman3-0-1g-3.dtsi b/arch/arm64/boot/dts/freescale/qoriq-fman3-0-1g-3.dtsi
+> new file mode 100644
+> index 0000000..87c2b70
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/freescale/qoriq-fman3-0-1g-3.dtsi
+> @@ -0,0 +1,41 @@
+> +/*
+> + * QorIQ FMan v3 1g port #3 device tree
+> + *
+> + * Copyright 2012-2015 Freescale Semiconductor Inc.
+> + *
+> + * SPDX-License-Identifier: (GPL-2.0+ OR BSD-3-Clause)
+> + */
+> +
+> +fman at 1a00000 {
+> +	fman0_rx_0x0b: port at 8b000 {
+> +		cell-index = <0xb>;
+> +		compatible = "fsl,fman-v3-port-rx";
+> +		reg = <0x8b000 0x1000>;
+> +	};
+> +
+> +	fman0_tx_0x2b: port at ab000 {
+> +		cell-index = <0x2b>;
+> +		compatible = "fsl,fman-v3-port-tx";
+> +		reg = <0xab000 0x1000>;
+> +	};
+> +
+> +	ethernet at e6000 {
+> +		cell-index = <3>;
+> +		compatible = "fsl,fman-memac";
+> +		reg = <0xe6000 0x1000>;
+> +		fsl,fman-ports = <&fman0_rx_0x0b &fman0_tx_0x2b>;
+> +		ptp-timer = <&ptp_timer0>;
+> +		pcsphy-handle = <&pcsphy3>;
+> +	};
+> +
+> +	mdio at e7000 {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		compatible = "fsl,fman-memac-mdio", "fsl,fman-xmdio";
+> +		reg = <0xe7000 0x1000>;
+> +
+> +		pcsphy3: ethernet-phy at 0 {
+> +			reg = <0x0>;
+> +		};
+> +	};
+> +};
+> diff --git a/arch/arm64/boot/dts/freescale/qoriq-fman3-0-1g-4.dtsi b/arch/arm64/boot/dts/freescale/qoriq-fman3-0-1g-4.dtsi
+> new file mode 100644
+> index 0000000..8f4d74b
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/freescale/qoriq-fman3-0-1g-4.dtsi
+> @@ -0,0 +1,41 @@
+> +/*
+> + * QorIQ FMan v3 1g port #4 device tree
+> + *
+> + * Copyright 2012-2015 Freescale Semiconductor Inc.
+> + *
+> + * SPDX-License-Identifier: (GPL-2.0+ OR BSD-3-Clause)
+> + */
+> +
+> +fman at 1a00000 {
+> +	fman0_rx_0x0c: port at 8c000 {
+> +		cell-index = <0xc>;
+> +		compatible = "fsl,fman-v3-port-rx";
+> +		reg = <0x8c000 0x1000>;
+> +	};
+> +
+> +	fman0_tx_0x2c: port at ac000 {
+> +		cell-index = <0x2c>;
+> +		compatible = "fsl,fman-v3-port-tx";
+> +		reg = <0xac000 0x1000>;
+> +	};
+> +
+> +	ethernet at e8000 {
+> +		cell-index = <4>;
+> +		compatible = "fsl,fman-memac";
+> +		reg = <0xe8000 0x1000>;
+> +		fsl,fman-ports = <&fman0_rx_0x0c &fman0_tx_0x2c>;
+> +		ptp-timer = <&ptp_timer0>;
+> +		pcsphy-handle = <&pcsphy4>;
+> +	};
+> +
+> +	mdio at e9000 {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		compatible = "fsl,fman-memac-mdio", "fsl,fman-xmdio";
+> +		reg = <0xe9000 0x1000>;
+> +
+> +		pcsphy4: ethernet-phy at 0 {
+> +			reg = <0x0>;
+> +		};
+> +	};
+> +};
+> diff --git a/arch/arm64/boot/dts/freescale/qoriq-fman3-0-1g-5.dtsi b/arch/arm64/boot/dts/freescale/qoriq-fman3-0-1g-5.dtsi
+> new file mode 100644
+> index 0000000..d534f77
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/freescale/qoriq-fman3-0-1g-5.dtsi
+> @@ -0,0 +1,41 @@
+> +/*
+> + * QorIQ FMan v3 1g port #5 device tree
+> + *
+> + * Copyright 2012-2015 Freescale Semiconductor Inc.
+> + *
+> + * SPDX-License-Identifier: (GPL-2.0+ OR BSD-3-Clause)
+> + */
+> +
+> +fman at 1a00000 {
+> +	fman0_rx_0x0d: port at 8d000 {
+> +		cell-index = <0xd>;
+> +		compatible = "fsl,fman-v3-port-rx";
+> +		reg = <0x8d000 0x1000>;
+> +	};
+> +
+> +	fman0_tx_0x2d: port at ad000 {
+> +		cell-index = <0x2d>;
+> +		compatible = "fsl,fman-v3-port-tx";
+> +		reg = <0xad000 0x1000>;
+> +	};
+> +
+> +	ethernet at ea000 {
+> +		cell-index = <5>;
+> +		compatible = "fsl,fman-memac";
+> +		reg = <0xea000 0x1000>;
+> +		fsl,fman-ports = <&fman0_rx_0x0d &fman0_tx_0x2d>;
+> +		ptp-timer = <&ptp_timer0>;
+> +		pcsphy-handle = <&pcsphy5>;
+> +	};
+> +
+> +	mdio at eb000 {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		compatible = "fsl,fman-memac-mdio", "fsl,fman-xmdio";
+> +		reg = <0xeb000 0x1000>;
+> +
+> +		pcsphy5: ethernet-phy at 0 {
+> +			reg = <0x0>;
+> +		};
+> +	};
+> +};
+> diff --git a/arch/arm64/boot/dts/freescale/qoriq-fman3-0.dtsi b/arch/arm64/boot/dts/freescale/qoriq-fman3-0.dtsi
+> new file mode 100644
+> index 0000000..a559441
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/freescale/qoriq-fman3-0.dtsi
+> @@ -0,0 +1,80 @@
+> +/*
+> + * QorIQ FMan v3 device tree
+> + *
+> + * Copyright 2012-2015 Freescale Semiconductor Inc.
+> + *
+> + * SPDX-License-Identifier: (GPL-2.0+ OR BSD-3-Clause)
+> + */
+> +
+> +fman0: fman at 1a00000 {
+> +	#address-cells = <1>;
+> +	#size-cells = <1>;
+> +	cell-index = <0>;
+> +	compatible = "fsl,fman";
+> +	ranges = <0x0 0x00 0x1a00000 0x100000>;
+> +	reg = <0x0 0x1a00000 0x0 0x100000>;
+> +	interrupts = <0 44 0x4>, <0 45 0x4>;
+> +	clocks = <&clockgen 3 0>;
+> +	clock-names = "fmanclk";
+> +	fsl,qman-channel-range = <0x800 0x10>;
+> +
+> +	muram at 0 {
+> +		compatible = "fsl,fman-muram";
+> +		reg = <0x0 0x60000>;
+> +	};
+> +
+> +	fman0_oh_0x2: port at 82000 {
+> +		cell-index = <0x2>;
+> +		compatible = "fsl,fman-v3-port-oh";
+> +		reg = <0x82000 0x1000>;
+> +	};
+> +
+> +	fman0_oh_0x3: port at 83000 {
+> +		cell-index = <0x3>;
+> +		compatible = "fsl,fman-v3-port-oh";
+> +		reg = <0x83000 0x1000>;
+> +	};
+> +
+> +	fman0_oh_0x4: port at 84000 {
+> +		cell-index = <0x4>;
+> +		compatible = "fsl,fman-v3-port-oh";
+> +		reg = <0x84000 0x1000>;
+> +	};
+> +
+> +	fman0_oh_0x5: port at 85000 {
+> +		cell-index = <0x5>;
+> +		compatible = "fsl,fman-v3-port-oh";
+> +		reg = <0x85000 0x1000>;
+> +	};
+> +
+> +	fman0_oh_0x6: port at 86000 {
+> +		cell-index = <0x6>;
+> +		compatible = "fsl,fman-v3-port-oh";
+> +		reg = <0x86000 0x1000>;
+> +	};
+> +
+> +	fman0_oh_0x7: port at 87000 {
+> +		cell-index = <0x7>;
+> +		compatible = "fsl,fman-v3-port-oh";
+> +		reg = <0x87000 0x1000>;
+> +	};
+> +
+> +	mdio0: mdio at fc000 {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		compatible = "fsl,fman-memac-mdio", "fsl,fman-xmdio";
+> +		reg = <0xfc000 0x1000>;
+> +	};
+> +
+> +	xmdio0: mdio at fd000 {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		compatible = "fsl,fman-memac-mdio", "fsl,fman-xmdio";
+> +		reg = <0xfd000 0x1000>;
+> +	};
+> +
+> +	ptp_timer0: ptp-timer at fe000 {
+> +		compatible = "fsl,fman-ptp-timer";
+> +		reg = <0xfe000 0x1000>;
+> +	};
+> +};
+> diff --git a/arch/arm64/boot/dts/freescale/qoriq-qman1-portals.dtsi b/arch/arm64/boot/dts/freescale/qoriq-qman1-portals.dtsi
+> new file mode 100644
+> index 0000000..4baec2c
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/freescale/qoriq-qman1-portals.dtsi
+> @@ -0,0 +1,76 @@
+> +/*
+> + * QorIQ QMan Portals device tree
+> + *
+> + * Copyright 2011-2016 Freescale Semiconductor Inc.
+> + *
+> + * SPDX-License-Identifier: (GPL-2.0+ OR BSD-3-Clause)
+> + */
+> +
+> +&qportals {
+> +	#address-cells = <1>;
+> +	#size-cells = <1>;
+> +	compatible = "simple-bus";
+> +
+> +	qportal0: qman-portal at 0 {
+> +		compatible = "fsl,qman-portal";
+> +		reg = <0x0 0x4000 0x4000000 0x4000>;
+> +		interrupts = <0 172 0x4>;
+> +		cell-index = <0>;
+> +	};
+> +
+> +	qportal1: qman-portal at 10000 {
+> +		compatible = "fsl,qman-portal";
+> +		reg = <0x10000 0x4000 0x4010000 0x4000>;
+> +		interrupts = <0 174 0x4>;
+> +		cell-index = <1>;
+> +	};
+> +
+> +	qportal2: qman-portal at 20000 {
+> +		compatible = "fsl,qman-portal";
+> +		reg = <0x20000 0x4000 0x4020000 0x4000>;
+> +		interrupts = <0 176 0x4>;
+> +		cell-index = <2>;
+> +	};
+> +
+> +	qportal3: qman-portal at 30000 {
+> +		compatible = "fsl,qman-portal";
+> +		reg = <0x30000 0x4000 0x4030000 0x4000>;
+> +		interrupts = <0 178 0x4>;
+> +		cell-index = <3>;
+> +	};
+> +
+> +	qportal4: qman-portal at 40000 {
+> +		compatible = "fsl,qman-portal";
+> +		reg = <0x40000 0x4000 0x4040000 0x4000>;
+> +		interrupts = <0 180 0x4>;
+> +		cell-index = <4>;
+> +	};
+> +
+> +	qportal5: qman-portal at 50000 {
+> +		compatible = "fsl,qman-portal";
+> +		reg = <0x50000 0x4000 0x4050000 0x4000>;
+> +		interrupts = <0 182 0x4>;
+> +		cell-index = <5>;
+> +	};
+> +
+> +	qportal6: qman-portal at 60000 {
+> +		compatible = "fsl,qman-portal";
+> +		reg = <0x60000 0x4000 0x4060000 0x4000>;
+> +		interrupts = <0 184 0x4>;
+> +		cell-index = <6>;
+> +	};
+> +
+> +	qportal7: qman-portal at 70000 {
+> +		compatible = "fsl,qman-portal";
+> +		reg = <0x70000 0x4000 0x4070000 0x4000>;
+> +		interrupts = <0 186 0x4>;
+> +		cell-index = <7>;
+> +	};
+> +
+> +	qportal8: qman-portal at 80000 {
+> +		compatible = "fsl,qman-portal";
+> +		reg = <0x80000 0x4000 0x4080000 0x4000>;
+> +		interrupts = <0 188 0x4>;
+> +		cell-index = <8>;
+> +	};
+> +};
+> -- 
+> 2.1.0
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
