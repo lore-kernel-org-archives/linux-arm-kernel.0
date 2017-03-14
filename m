@@ -1,33 +1,33 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 14 Mar 2017 14:06:39 -0700
-Subject: [PATCH 4/4] ARM: OMAP2+: Make hwmod clkdm_name const
-In-Reply-To: <20170314210639.2065-1-tony@atomide.com>
-References: <20170314210639.2065-1-tony@atomide.com>
-Message-ID: <20170314210639.2065-5-tony@atomide.com>
+Date: Tue, 14 Mar 2017 14:06:35 -0700
+Subject: [PATCH 0/4] Clean up omap hwmod code for dynamic allocation
+Message-ID: <20170314210639.2065-1-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This can be const, and needs to be const when we start initializing
-it from clkdm data.
+Hi all,
 
-Cc: Paul Walmsley <paul@pwsan.com>
-Cc: Tero Kristo <t-kristo@ti.com>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
----
- arch/arm/mach-omap2/omap_hwmod.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+In preparation for eventually configuring omap hwmod data from device tree
+we need to make few changes in preparation for allocating data dynamically.
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod.h b/arch/arm/mach-omap2/omap_hwmod.h
---- a/arch/arm/mach-omap2/omap_hwmod.h
-+++ b/arch/arm/mach-omap2/omap_hwmod.h
-@@ -676,7 +676,7 @@ struct omap_hwmod {
- 	const char			*main_clk;
- 	struct clk			*_clk;
- 	struct omap_hwmod_opt_clk	*opt_clks;
--	char				*clkdm_name;
-+	const char			*clkdm_name;
- 	struct clockdomain		*clkdm;
- 	struct list_head		slave_ports; /* connect to *_TA */
- 	void				*dev_attr;
+Regards,
+
+Tony
+
+Tony Lindgren (4):
+  ARM: OMAP2+: Remove mostly unused hwmod linkspace
+  ARM: OMAP2+: Use list_for_each_entry for hwmod slave_ports
+  ARM: OMAP2+: Remove unnecessary hwmod clockact
+  ARM: OMAP2+: Make hwmod clkdm_name const
+
+ arch/arm/mach-omap2/omap_hwmod.c                   | 199 ++-------------------
+ arch/arm/mach-omap2/omap_hwmod.h                   |  16 +-
+ arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c |   1 -
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |   4 -
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c         |   2 -
+ arch/arm/mach-omap2/omap_hwmod_54xx_data.c         |   2 -
+ arch/arm/mach-omap2/omap_hwmod_7xx_data.c          |   1 -
+ 7 files changed, 15 insertions(+), 210 deletions(-)
+
 -- 
 2.11.1
