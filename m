@@ -1,72 +1,41 @@
 From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Tue, 14 Mar 2017 08:18:23 -0700
-Subject: [PATCH v6 0/4] i.MX7 PCI support
-Message-ID: <20170314151827.31248-1-andrew.smirnov@gmail.com>
+Date: Tue, 14 Mar 2017 08:33:57 -0700
+Subject: [PATCH] ARM: dts: imx7s: Do not claim i.MX51 compatibility for SRC
+Message-ID: <20170314153357.32463-1-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello, everyone:
+System Reset Controller in i.MX7 doesn't have any commonality with IP
+block found in i.MX5 and i.MX6 SoC families. Given that and the new
+upstream driver for i.MX7 variant (see
+https://lkml.org/lkml/2017/2/21/466) remove "fsl,imx51-src" from
+compatibility string.
 
-This is a sixth iteration of the code that adds PCI-subsystem bits
-necessary for enabling PCI support on i.MX7.
+Cc: yurovsky at gmail.com
+Cc: Fabio Estevam <fabio.estevam@nxp.com>
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Russell King <linux@armlinux.org.uk>
+Cc: devicetree at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
+---
+ arch/arm/boot/dts/imx7s.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Chagnes since v5:
-
-	- Collected ACKs from Lee and Rob
-
-Changes since v4 (can be found at [version4]):
-
-	- Dropped typo-fix patch (originally patch #1 of the
-          series). Bjorn, I am assuming that patch from v4 survived
-          and stayed in your tree, let me know if that is not true.
-
-	- Added patch with workaround to address speed change false
-          failures (I kept it as a separate patch to better document
-          exchange with NXP/Freescale that lead to that patch)
-
-	- Added patch to avoid speed change on links configured Gen1
-          only (Let me know if that is a terrible idea)
-
-	- Addressed section mismatch problem by moving call to
-          hook_fault_code to happend before driver registration.
-
-Changes since v3 (can be found at [version3]):
-	- Move all of the reset_control_assert's into imx6_pcie_assert_core_reset
-	- Documented required reset and power domain DT bindings
-
-Changes since v2 (can be found at [version2]):
-
-	- Collected Reviewed-by for patch #2 from Lucas
-	- Reset logic implementation moved out into a reset controller
-          driver (see [reset1])
-	- Removed unused leftover code
-
-Changes since v1 (can be found at [version1]):
-
-	- All GPC related code moved into a separate driver (see [gpc1])
-	- Removed GPIO probe deferral logging
-	- Fixed section mismatch warning
-	- Minor reformatting of fsl,imx6q-pcie.txt(as per Rob
-          Herring's request)
-
-[version5] https://lkml.org/lkml/2017/2/20/376
-[version4] https://lkml.org/lkml/2017/2/7/478
-[version3] https://lkml.org/lkml/2017/2/6/565
-[version2] https://lkml.org/lkml/2017/2/1/510
-[version1] https://lkml.org/lkml/2017/1/19/488
-[gpc1] https://lkml.org/lkml/2017/2/6/551
-[reset1] https://lkml.org/lkml/2017/2/6/554
-
-Andrey Smirnov (4):
-  PCI: imx6: Add code to support i.MX7D
-  PCI: imx6: Do not wait for speed change on i.MX7
-  PCI: imx6: Do not switch speed if Gen2 is disabled
-  PCI: imx6: Allow probe deferal by reset GPIO
-
- .../devicetree/bindings/pci/fsl,imx6q-pcie.txt     |  13 +-
- drivers/pci/host/pci-imx6.c                        | 199 +++++++++++++++------
- include/linux/mfd/syscon/imx7-iomuxc-gpr.h         |   4 +
- 3 files changed, 161 insertions(+), 55 deletions(-)
-
+diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
+index ec7a61a..12984b6 100644
+--- a/arch/arm/boot/dts/imx7s.dtsi
++++ b/arch/arm/boot/dts/imx7s.dtsi
+@@ -556,7 +556,7 @@
+ 			};
+ 
+ 			src: src at 30390000 {
+-				compatible = "fsl,imx7d-src", "fsl,imx51-src", "syscon";
++				compatible = "fsl,imx7d-src", "syscon";
+ 				reg = <0x30390000 0x10000>;
+ 				interrupts = <GIC_SPI 89 IRQ_TYPE_LEVEL_HIGH>;
+ 				#reset-cells = <1>;
 -- 
 2.9.3
