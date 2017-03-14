@@ -1,32 +1,43 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue, 14 Mar 2017 21:08:59 +0200
-Subject: [PATCH] drm/exynos: Print kernel pointers in a restricted form
-In-Reply-To: <e1800491-0b60-74d1-1377-756d5b0bb371@math.uni-bielefeld.de>
-References: <20170314183804.13788-1-krzk@kernel.org>
- <e1800491-0b60-74d1-1377-756d5b0bb371@math.uni-bielefeld.de>
-Message-ID: <20170314190859.y55wlc4z7xdsbbxg@kozik-lap>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 14 Mar 2017 19:12:10 +0000
+Subject: [PATCH] ARM: wire up new statx syscall
+In-Reply-To: <20170314185523.38598-1-code@mmayer.net>
+References: <20170314185523.38598-1-code@mmayer.net>
+Message-ID: <20170314191210.GR21222@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 14, 2017 at 08:01:41PM +0100, Tobias Jakobi wrote:
-> Hello Krzysztof,
+I already have a patch merged.
+
+Thanks anyway.
+
+On Tue, Mar 14, 2017 at 11:55:23AM -0700, Markus Mayer wrote:
+> From: Markus Mayer <mmayer@broadcom.com>
 > 
-> I was wondering about the benefit of this. From a quick look these are
-> all messages that end up in the kernel log / dmesg.
+> Add new statx syscall to ARM syscall table.
 > 
-> IIRC %pK does nothing there, since dmest_restrict is supposed to be used
-> to deny an unpriviliged user the access to the kernel log.
+> Signed-off-by: Markus Mayer <mmayer@broadcom.com>
+> ---
 > 
-> Or am I missing something here?
+> It looks like this hasn't been submitted before, so here goes.
+> 
+>  arch/arm/tools/syscall.tbl | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/tools/syscall.tbl b/arch/arm/tools/syscall.tbl
+> index 3c2cb5d..0bb0e9c 100644
+> --- a/arch/arm/tools/syscall.tbl
+> +++ b/arch/arm/tools/syscall.tbl
+> @@ -411,3 +411,4 @@
+>  394	common	pkey_mprotect		sys_pkey_mprotect
+>  395	common	pkey_alloc		sys_pkey_alloc
+>  396	common	pkey_free		sys_pkey_free
+> +397	common	statx			sys_statx
+> -- 
+> 2.7.4
+> 
 
-These are regular printks so depending on kernel options (e.g. dynamic
-debug, drm.debug) these might be printed also in the console. Of course
-we could argue then if access to one of the consoles is worth
-securing.
-
-Actually, I think that we should get rid of printing of these kernel
-pointers entirely...
-
-
-Best regards,
-Krzysztof
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
