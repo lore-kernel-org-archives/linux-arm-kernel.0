@@ -1,148 +1,86 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 14 Mar 2017 12:31:22 +0800
-Subject: Applied "ASoC: sun8i-codec: Update mixer to use SOC_DAPM_DOUBLE"
- to the asoc tree
-In-Reply-To: <E1clbY9-0000DH-LY@finisterre>
-References: <20170210094133.11382-3-mylene.josserand@free-electrons.com>
- <E1clbY9-0000DH-LY@finisterre>
-Message-ID: <CAGb2v6428PpYPzpHngLgaeziwKN8u-TYiNO1bs7TFw-7VrQOAg@mail.gmail.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Tue, 14 Mar 2017 13:10:22 +0800
+Subject: [PATCH V7 6/7] LIBIO: Support the dynamically logical PIO
+ registration of ACPI host I/O
+In-Reply-To: <1489372963-9000-7-git-send-email-yuanzhichang@hisilicon.com>
+Message-ID: <201703141330.2iWD3b4I%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Hi zhichang.yuan,
 
-On Wed, Mar 8, 2017 at 9:22 PM, Mark Brown <broonie@kernel.org> wrote:
-> The patch
->
->    ASoC: sun8i-codec: Update mixer to use SOC_DAPM_DOUBLE
->
-> has been applied to the asoc tree at
->
->    git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git
->
-> All being well this means that it will be integrated into the linux-next
-> tree (usually sometime in the next 24 hours) and sent to Linus during
-> the next merge window (or sooner if it is a bug fix), however if
-> problems are discovered then the patch may be dropped or reverted.
->
-> You may get further e-mails resulting from automated or manual testing
-> and review of the tree, please engage with people reporting problems and
-> send followup patches addressing any issues that are reported if needed.
->
-> If any updates are required or you are submitting further changes they
-> should be sent as incremental updates against current git, existing
-> patches will not be replaced.
->
-> Please add any relevant lists and maintainers to the CCs when replying
-> to this mail.
->
-> Thanks,
-> Mark
->
-> From ca14da6e611674cad275f29ac2aaf1e2eb427c6b Mon Sep 17 00:00:00 2001
-> From: =?UTF-8?q?Myl=C3=A8ne=20Josserand?=
->  <mylene.josserand@free-electrons.com>
-> Date: Fri, 10 Feb 2017 10:41:31 +0100
-> Subject: [PATCH] ASoC: sun8i-codec: Update mixer to use SOC_DAPM_DOUBLE
-> MIME-Version: 1.0
-> Content-Type: text/plain; charset=UTF-8
-> Content-Transfer-Encoding: 8bit
->
-> Update the driver to use the new SOC_DAPM_DOUBLE definition
-> on the digital DAC mixer.
-> Update the names accordingly as, when they are shared, the
-> controls are not prefixed with the widget's name anymore.
->
-> Signed-off-by: Myl?ne Josserand <mylene.josserand@free-electrons.com>
-> Acked-by: Chen-Yu Tsai <wens@csie.org>
-> Signed-off-by: Mark Brown <broonie@kernel.org>
-> ---
->  sound/soc/sunxi/sun8i-codec.c | 45 ++++++++++++++++++++-----------------------
->  1 file changed, 21 insertions(+), 24 deletions(-)
->
-> diff --git a/sound/soc/sunxi/sun8i-codec.c b/sound/soc/sunxi/sun8i-codec.c
-> index d60f6fbd36a2..107fa8213600 100644
-> --- a/sound/soc/sunxi/sun8i-codec.c
-> +++ b/sound/soc/sunxi/sun8i-codec.c
-> @@ -259,25 +259,20 @@ static int sun8i_codec_hw_params(struct snd_pcm_substream *substream,
->         return 0;
->  }
->
-> -static const struct snd_kcontrol_new sun8i_output_left_mixer_controls[] = {
-> -       SOC_DAPM_SINGLE("LSlot 0", SUN8I_DAC_MXR_SRC,
-> -                       SUN8I_DAC_MXR_SRC_DACL_MXR_SRC_AIF1DA0L, 1, 0),
-> -       SOC_DAPM_SINGLE("LSlot 1", SUN8I_DAC_MXR_SRC,
-> -                       SUN8I_DAC_MXR_SRC_DACL_MXR_SRC_AIF1DA1L, 1, 0),
-> -       SOC_DAPM_SINGLE("DACL", SUN8I_DAC_MXR_SRC,
-> -                       SUN8I_DAC_MXR_SRC_DACL_MXR_SRC_AIF2DACL, 1, 0),
-> -       SOC_DAPM_SINGLE("ADCL", SUN8I_DAC_MXR_SRC,
-> -                       SUN8I_DAC_MXR_SRC_DACL_MXR_SRC_ADCL, 1, 0),
-> -};
-> -
-> -static const struct snd_kcontrol_new sun8i_output_right_mixer_controls[] = {
-> -       SOC_DAPM_SINGLE("RSlot 0", SUN8I_DAC_MXR_SRC,
-> +static const struct snd_kcontrol_new sun8i_dac_mixer_controls[] = {
-> +       SOC_DAPM_DOUBLE("AIF1 Slot 0 Digital DAC Playback Switch",
-> +                       SUN8I_DAC_MXR_SRC,
-> +                       SUN8I_DAC_MXR_SRC_DACL_MXR_SRC_AIF1DA0L,
->                         SUN8I_DAC_MXR_SRC_DACR_MXR_SRC_AIF1DA0R, 1, 0),
-> -       SOC_DAPM_SINGLE("RSlot 1", SUN8I_DAC_MXR_SRC,
-> +       SOC_DAPM_DOUBLE("AIF1 Slot 1 Digital DAC Playback Switch",
-> +                       SUN8I_DAC_MXR_SRC,
-> +                       SUN8I_DAC_MXR_SRC_DACL_MXR_SRC_AIF1DA1L,
->                         SUN8I_DAC_MXR_SRC_DACR_MXR_SRC_AIF1DA1R, 1, 0),
-> -       SOC_DAPM_SINGLE("DACR", SUN8I_DAC_MXR_SRC,
-> +       SOC_DAPM_DOUBLE("AIF2 Digital DAC Playback Switch", SUN8I_DAC_MXR_SRC,
-> +                       SUN8I_DAC_MXR_SRC_DACL_MXR_SRC_AIF2DACL,
->                         SUN8I_DAC_MXR_SRC_DACR_MXR_SRC_AIF2DACR, 1, 0),
-> -       SOC_DAPM_SINGLE("ADCR", SUN8I_DAC_MXR_SRC,
-> +       SOC_DAPM_DOUBLE("ADC Digital DAC Playback Switch", SUN8I_DAC_MXR_SRC,
-> +                       SUN8I_DAC_MXR_SRC_DACL_MXR_SRC_ADCL,
->                         SUN8I_DAC_MXR_SRC_DACR_MXR_SRC_ADCR, 1, 0),
->  };
->
-> @@ -293,12 +288,12 @@ static const struct snd_soc_dapm_widget sun8i_codec_dapm_widgets[] = {
->                          SUN8I_AIF1_DACDAT_CTRL_AIF1_DA0R_ENA, 0),
->
->         /* DAC Mixers */
-> -       SND_SOC_DAPM_MIXER("Left DAC Mixer", SND_SOC_NOPM, 0, 0,
-> -                          sun8i_output_left_mixer_controls,
-> -                          ARRAY_SIZE(sun8i_output_left_mixer_controls)),
-> -       SND_SOC_DAPM_MIXER("Right DAC Mixer", SND_SOC_NOPM, 0, 0,
-> -                          sun8i_output_right_mixer_controls,
-> -                          ARRAY_SIZE(sun8i_output_right_mixer_controls)),
-> +       SND_SOC_DAPM_MIXER("Left Digital DAC Mixer", SND_SOC_NOPM, 0, 0,
-> +                          sun8i_dac_mixer_controls,
-> +                          ARRAY_SIZE(sun8i_dac_mixer_controls)),
-> +       SND_SOC_DAPM_MIXER("Right Digital DAC Mixer", SND_SOC_NOPM, 0, 0,
-> +                          sun8i_dac_mixer_controls,
-> +                          ARRAY_SIZE(sun8i_dac_mixer_controls)),
+[auto build test ERROR on linus/master]
+[also build test ERROR on v4.11-rc2 next-20170310]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-This patch changes the mixer controls exposed to user space.
+url:    https://github.com/0day-ci/linux/commits/zhichang-yuan/LPC-legacy-ISA-I-O-support/20170314-114635
+config: blackfin-allmodconfig (attached as .config)
+compiler: bfin-uclinux-gcc (GCC) 6.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=blackfin 
 
-This driver was just introduced in 4.11-rc1. Would it make sense to
-merge these cleanup patches as fixes for 4.11, so we don't affect
-userspace across kernel releases?
+All error/warnings (new ones prefixed by >>):
 
-Thanks
-ChenYu
+   include/linux/ratelimit.h: In function 'ratelimit_state_exit':
+>> arch/blackfin/kernel/module.c:7:40: error: 'mod' undeclared (first use in this function)
+    #define pr_fmt(fmt) "module %s: " fmt, mod->name
+                                           ^
+   include/linux/printk.h:303:22: note: in expansion of macro 'pr_fmt'
+     printk(KERN_WARNING pr_fmt(fmt), ##__VA_ARGS__)
+                         ^~~~~~
+   include/linux/printk.h:304:17: note: in expansion of macro 'pr_warning'
+    #define pr_warn pr_warning
+                    ^~~~~~~~~~
+>> include/linux/ratelimit.h:61:3: note: in expansion of macro 'pr_warn'
+      pr_warn("%s: %d output lines suppressed due to ratelimiting\n",
+      ^~~~~~~
+   arch/blackfin/kernel/module.c:7:40: note: each undeclared identifier is reported only once for each function it appears in
+    #define pr_fmt(fmt) "module %s: " fmt, mod->name
+                                           ^
+   include/linux/printk.h:303:22: note: in expansion of macro 'pr_fmt'
+     printk(KERN_WARNING pr_fmt(fmt), ##__VA_ARGS__)
+                         ^~~~~~
+   include/linux/printk.h:304:17: note: in expansion of macro 'pr_warning'
+    #define pr_warn pr_warning
+                    ^~~~~~~~~~
+>> include/linux/ratelimit.h:61:3: note: in expansion of macro 'pr_warn'
+      pr_warn("%s: %d output lines suppressed due to ratelimiting\n",
+      ^~~~~~~
 
->
->         /* Clocks */
->         SND_SOC_DAPM_SUPPLY("MODCLK AFI1", SUN8I_MOD_CLK_ENA,
-> @@ -340,8 +335,10 @@ static const struct snd_soc_dapm_route sun8i_codec_dapm_routes[] = {
->         { "Digital Right DAC", NULL, "DAC" },
->
->         /* DAC Mixer Routes */
-> -       { "Left DAC Mixer", "LSlot 0", "Digital Left DAC"},
-> -       { "Right DAC Mixer", "RSlot 0", "Digital Right DAC"},
-> +       { "Left Digital DAC Mixer", "AIF1 Slot 0 Digital DAC Playback Switch",
-> +         "Digital Left DAC"},
-> +       { "Right Digital DAC Mixer", "AIF1 Slot 0 Digital DAC Playback Switch ",
-> +         "Digital Right DAC"},
->  };
->
->  static struct snd_soc_dai_ops sun8i_codec_dai_ops = {
-> --
-> 2.11.0
->
+vim +/mod +7 arch/blackfin/kernel/module.c
+
+1394f032 Bryan Wu    2007-05-06   1  /*
+96f1050d Robin Getz  2009-09-24   2   * Copyright 2004-2009 Analog Devices Inc.
+1394f032 Bryan Wu    2007-05-06   3   *
+96f1050d Robin Getz  2009-09-24   4   * Licensed under the GPL-2 or later
+1394f032 Bryan Wu    2007-05-06   5   */
+1394f032 Bryan Wu    2007-05-06   6  
+b75a9e6b Joe Perches 2010-10-20  @7  #define pr_fmt(fmt) "module %s: " fmt, mod->name
+1394f032 Bryan Wu    2007-05-06   8  
+1394f032 Bryan Wu    2007-05-06   9  #include <linux/moduleloader.h>
+1394f032 Bryan Wu    2007-05-06  10  #include <linux/elf.h>
+1394f032 Bryan Wu    2007-05-06  11  #include <linux/vmalloc.h>
+1394f032 Bryan Wu    2007-05-06  12  #include <linux/fs.h>
+1394f032 Bryan Wu    2007-05-06  13  #include <linux/string.h>
+1394f032 Bryan Wu    2007-05-06  14  #include <linux/kernel.h>
+1394f032 Bryan Wu    2007-05-06  15  #include <asm/dma.h>
+
+:::::: The code at line 7 was first introduced by commit
+:::::: b75a9e6bfba5c7343391ac1bacd44d6652dde8da Blackfin: use more standard pr_fmt in the module loader
+
+:::::: TO: Joe Perches <joe@perches.com>
+:::::: CC: Mike Frysinger <vapier@gentoo.org>
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 43892 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170314/96f1018c/attachment-0001.gz>
