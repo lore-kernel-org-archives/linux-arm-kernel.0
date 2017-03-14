@@ -1,32 +1,116 @@
-From: mathias.nyman@linux.intel.com (Mathias Nyman)
-Date: Tue, 14 Mar 2017 11:20:49 +0200
-Subject: [PATCH] [for 4.11]xhci: plat: Register shutdown for xhci_plat
-In-Reply-To: <1489442340-27084-1-git-send-email-awallis@codeaurora.org>
-References: <1489442340-27084-1-git-send-email-awallis@codeaurora.org>
-Message-ID: <58C7B5F1.7070003@linux.intel.com>
+From: peter.senna@collabora.com (Peter Senna Tschudin)
+Date: Tue, 14 Mar 2017 10:23:02 +0100
+Subject: [PATCH V4] dts/imx6q-b850v3: Use megachips-stdpxxxx-ge-b850v3-fw
+ bridges (LVDS-DP++)
+Message-ID: <20170314092302.7317-1-peter.senna@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13.03.2017 23:59, Adam Wallis wrote:
-> Shutdown should be called for xhci_plat devices especially for
-> situations where kexec might be used by stopping DMA
-> transactions.
->
-> Signed-off-by: Adam Wallis <awallis@codeaurora.org>
-> ---
->   drivers/usb/host/xhci-plat.c | 1 +
->   1 file changed, 1 insertion(+)
->
-> diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
-> index bd02a6c..6ed468f 100644
-> --- a/drivers/usb/host/xhci-plat.c
-> +++ b/drivers/usb/host/xhci-plat.c
-> @@ -344,6 +344,7 @@ static int xhci_plat_resume(struct device *dev)
->   static struct platform_driver usb_xhci_driver = {
->   	.probe	= xhci_plat_probe,
->   	.remove	= xhci_plat_remove,
-> +	.shutdown	= usb_hcd_platform_shutdown,
+Configures the megachips-stdpxxxx-ge-b850v3-fw bridges on the GE
+B850v3 dts file.
 
-Thanks, adding to queue.
+Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Cc: Martyn Welch <martyn.welch@collabora.co.uk>
+Cc: Martin Donnelly <martin.donnelly@ge.com>
+Cc: Javier Martinez Canillas <javier@dowhile0.org>
+Cc: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+Cc: Philipp Zabel <p.zabel@pengutronix.de>
+Cc: Rob Herring <robh@kernel.org>
+Cc: Fabio Estevam <fabio.estevam@nxp.com>
+Signed-off-by: Peter Senna Tschudin <peter.senna@collabora.com>
+---
+Subject was [PATCH V4 4/4] ...
+But patches 1, 2, and 3 are already upstream and were not resent.
 
--Mathias
+Changes from V3:
+ - Newline fixes
+ - Removed 'status = "okay";' from '&mux2_i2c2'
+ - Sorted device nodes in order of unit address
+
+Unchanged since V1.
+ arch/arm/boot/dts/imx6q-b850v3.dts | 66 ++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 66 insertions(+)
+
+diff --git a/arch/arm/boot/dts/imx6q-b850v3.dts b/arch/arm/boot/dts/imx6q-b850v3.dts
+index d78514c..ef67b47 100644
+--- a/arch/arm/boot/dts/imx6q-b850v3.dts
++++ b/arch/arm/boot/dts/imx6q-b850v3.dts
+@@ -72,6 +72,14 @@
+ 		fsl,data-mapping = "spwg";
+ 		fsl,data-width = <24>;
+ 		status = "okay";
++
++		port at 4 {
++			reg = <4>;
++
++			lvds0_out: endpoint {
++				remote-endpoint = <&stdp4028_in>;
++			};
++		};
+ 	};
+ };
+ 
+@@ -142,3 +150,61 @@
+ 		reg = <0x4a>;
+ 	};
+ };
++
++&mux2_i2c2 {
++	clock-frequency = <100000>;
++
++	stdp2690 at 72 {
++		compatible = "megachips,stdp2690-ge-b850v3-fw";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		reg = <0x72>;
++
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			port at 0 {
++				reg = <0>;
++				stdp2690_in: endpoint {
++					remote-endpoint = <&stdp4028_out>;
++				};
++			};
++
++			port at 1 {
++				reg = <1>;
++				stdp2690_out: endpoint {
++					/* Connector for external display */
++				};
++			};
++		};
++	};
++
++	stdp4028 at 73 {
++		compatible = "megachips,stdp4028-ge-b850v3-fw";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		reg = <0x73>;
++		interrupt-parent = <&gpio2>;
++		interrupts = <0 IRQ_TYPE_LEVEL_HIGH>;
++
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			port at 0 {
++				reg = <0>;
++				stdp4028_in: endpoint {
++					remote-endpoint = <&lvds0_out>;
++				};
++			};
++
++			port at 1 {
++				reg = <1>;
++				stdp4028_out: endpoint {
++					remote-endpoint = <&stdp2690_in>;
++				};
++			};
++		};
++	};
++};
+-- 
+2.9.3
