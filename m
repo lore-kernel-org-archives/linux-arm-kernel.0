@@ -1,111 +1,64 @@
-From: georgi.djakov@linaro.org (Georgi Djakov)
-Date: Tue, 14 Mar 2017 17:39:13 +0200
-Subject: [RFC v0 1/2] interconnect: Add generic interconnect controller API
-In-Reply-To: <58B8CFDA.3080303@codeaurora.org>
-References: <20170301182235.19154-1-georgi.djakov@linaro.org>
- <20170301182235.19154-2-georgi.djakov@linaro.org>
- <58B8CFDA.3080303@codeaurora.org>
-Message-ID: <df0f892b-3318-8316-eafb-07e55ddc5406@linaro.org>
+From: sebastien.bourdelin@savoirfairelinux.com (Sebastien Bourdelin)
+Date: Tue, 14 Mar 2017 11:40:08 -0400
+Subject: [PATCH v2 4/6] bus: add driver for the Technologic Systems NBUS
+In-Reply-To: <CACRpkdbjANV+kiO_W9+=OL=fzPtTVwH2CpWDmNa50t3JaHTFkQ@mail.gmail.com>
+References: <20170203194729.20995-1-sebastien.bourdelin@savoirfairelinux.com>
+ <20170203194729.20995-5-sebastien.bourdelin@savoirfairelinux.com>
+ <CACRpkdYfGmVBYgAc4KZGN6634WM_EyzNj_SBbALEs4WYipXRQA@mail.gmail.com>
+ <82dfdbb8-58fc-45b4-685c-98be11341e45@savoirfairelinux.com>
+ <CACRpkdbjANV+kiO_W9+=OL=fzPtTVwH2CpWDmNa50t3JaHTFkQ@mail.gmail.com>
+Message-ID: <07e0e4b2-36a5-a37e-ea04-d05158d11fba@savoirfairelinux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/03/2017 04:07 AM, Saravana Kannan wrote:
-> On 03/01/2017 10:22 AM, Georgi Djakov wrote:
->> This patch introduce a new API to get the requirement and configure the
->> interconnect buses across the entire chipset to fit with the current
->> demand.
->>
+Hi Linus,
 
-[..]
+On 03/14/2017 09:23 AM, Linus Walleij wrote:
+> On Wed, Feb 22, 2017 at 5:56 PM, Sebastien Bourdelin
+> <sebastien.bourdelin@savoirfairelinux.com> wrote:
+>> On 02/04/2017 05:14 AM, Linus Walleij wrote:
+> 
+>>>> +       gpiod_set_array_value_cansleep(gpios->ndescs, gpios->desc, values);
+>>>
+>>> This can also fail and you should check the return code and print an error
+>>> message if it does.
+>>>
+>> As far as i understood, the "gpiod_set_array_value_cansleep(...)"
+>> function doesn't return
+>> anything, it will return immediately if gpios->desc is null but nothing
+>> else.
+>> Did i miss something?
+> 
+> No I did, sorry about that.
+> 
+> We *should* make these functions return errors but currently they do not.
+> 
+Ok got it.
+Thanks!
 
->> +int interconnect_set(struct interconnect_path *path, u32 bandwidth)
->> +{
->> +    struct interconnect_node *node;
->> +
->> +    list_for_each_entry(node, &path->node_list, search_list) {
->> +        if (node->icp->ops->set)
->> +            node->icp->ops->set(node, bandwidth);
+>>> Error codes?
+>>>
+>> Same question here, these functions only make call to
+>> "gpiod_set_value_cansleep(...)",
+>> which as far as i understood doesn't return any error code.
+> 
+> Yeah, forget that.
+> 
+Ok.
+
+>>>> +               gpiod_set_value_cansleep(ts_nbus->csn, 1);
+>>>
+>>> Here too.
+>>>
+>> Same question, doesn't seem to have an error code.
+> 
+> That too.
 >
-> This ops needs to take a "source" and "dest" input and you'll need to
-> pass in the prev/next nodes of each "node" in this list. This is needed
-> so that each interconnect know the local source/destination and can make
-> the aggregation decisions correctly based on the internal implementation
-> of the interconnect. For the first and last nodes in the list, the
-> source and destination nodes can be NULL, respectively.
+Ok.
 
-I agree. Updated.
+> Yours,
+> Linus Walleij
+> 
 
->
->> +    }
->> +
->> +    return 0;
->> +}
->> +
-
-[..]
-
->> +void interconnect_put(struct interconnect_path *path)
->> +{
->> +    struct interconnect_node *node;
->> +    struct icn_qos *req;
->> +    struct hlist_node *tmp;
->> +
->> +    if (IS_ERR(path))
->> +        return;
->> +
->> +    list_for_each_entry(node, &path->node_list, search_list) {
->> +        hlist_for_each_entry_safe(req, tmp, &node->qos_list, node) {
->> +            if (req->path == path) {
->> +                hlist_del(&req->node);
->> +                kfree(req);
->> +            }
->
-> Should we go through and remove any bandwidth votes that were made on
-> this path before we free it?
->
-
-Yes, thanks! We should remove the constraints from the path, then
-update the nodes and after that free the memory.
-
->> +        }
->> +    }
->> +
->> +    kfree(path);
->> +}
->> +EXPORT_SYMBOL_GPL(interconnect_put);
->> +
->> +int interconnect_add_provider(struct icp *icp)
->> +{
->> +    struct interconnect_node *node;
->> +
->> +    WARN(!icp->ops->xlate, "%s: .xlate is not implemented\n", __func__);
->> +    WARN(!icp->ops->set, "%s: .set is not implemented\n", __func__);
->> +
->> +    mutex_lock(&interconnect_provider_list_mutex);
->> +    list_add(&icp->icp_list, &interconnect_provider_list);
->> +    mutex_unlock(&interconnect_provider_list_mutex);
->> +
->> +    list_for_each_entry(node, &icp->nodes, icn_list) {
->> +        INIT_HLIST_HEAD(&node->qos_list);
->> +    }
->> +
->> +    dev_info(icp->dev, "added interconnect provider %s\n", icp->name);
->> +
->> +    return 0;
->> +}
->> +EXPORT_SYMBOL_GPL(interconnect_add_provider);
->> +
->> +int interconnect_del_provider(struct icp *icp)
->> +{
->> +    mutex_lock(&interconnect_provider_list_mutex);
->> +    of_node_put(icp->of_node);
->> +    list_del(&icp->icp_list);
->
-> If there's a path with an active vote, we should probably return a
-> -EBUSY to prevent deleting a provider that's actively used?
->
-
-Thanks, sounds good. Will do.
-
-BR,
-Georgi
+Best regards,
+Sebastien Bourdelin.
