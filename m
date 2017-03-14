@@ -1,57 +1,104 @@
 From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Tue, 14 Mar 2017 15:18:38 +0100
-Subject: [PATCH v2 02/20] net-next: stmmac: add optional setup function
+Date: Tue, 14 Mar 2017 15:18:39 +0100
+Subject: [PATCH v2 03/20] ARM: sun8i: dt: Add DT bindings documentation for
+ Allwinner dwmac-sun8i
 In-Reply-To: <20170314141856.24560-1-clabbe.montjoie@gmail.com>
 References: <20170314141856.24560-1-clabbe.montjoie@gmail.com>
-Message-ID: <20170314141856.24560-3-clabbe.montjoie@gmail.com>
+Message-ID: <20170314141856.24560-4-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of ading more ifthen logic for adding a new mac_device_info
-setup function, it is easier to add a function pointer to the function
-needed.
+This patch adds documentation for Device-Tree bindings for the
+Allwinner dwmac-sun8i driver.
 
 Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
 ---
- drivers/net/ethernet/stmicro/stmmac/stmmac_main.c | 4 +++-
- include/linux/stmmac.h                            | 3 +++
- 2 files changed, 6 insertions(+), 1 deletion(-)
+ .../devicetree/bindings/net/dwmac-sun8i.txt        | 77 ++++++++++++++++++++++
+ 1 file changed, 77 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/net/dwmac-sun8i.txt
 
-diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c b/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
-index 4498a38..856ac57 100644
---- a/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
-+++ b/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
-@@ -3101,7 +3101,9 @@ static int stmmac_hw_init(struct stmmac_priv *priv)
- 	struct mac_device_info *mac;
- 
- 	/* Identify the MAC HW device */
--	if (priv->plat->has_gmac) {
-+	if (priv->plat->setup) {
-+		mac = priv->plat->setup(priv);
-+	} else if (priv->plat->has_gmac) {
- 		priv->dev->priv_flags |= IFF_UNICAST_FLT;
- 		mac = dwmac1000_setup(priv->ioaddr,
- 				      priv->plat->multicast_filter_bins,
-diff --git a/include/linux/stmmac.h b/include/linux/stmmac.h
-index fc273e9..8f09f18 100644
---- a/include/linux/stmmac.h
-+++ b/include/linux/stmmac.h
-@@ -109,6 +109,8 @@ struct stmmac_axi {
- 	bool axi_rb;
- };
- 
-+struct stmmac_priv;
+diff --git a/Documentation/devicetree/bindings/net/dwmac-sun8i.txt b/Documentation/devicetree/bindings/net/dwmac-sun8i.txt
+new file mode 100644
+index 0000000..f01ef17
+--- /dev/null
++++ b/Documentation/devicetree/bindings/net/dwmac-sun8i.txt
+@@ -0,0 +1,77 @@
++* Allwinner sun8i GMAC ethernet controller
 +
- struct plat_stmmacenet_data {
- 	int bus_id;
- 	int phy_addr;
-@@ -136,6 +138,7 @@ struct plat_stmmacenet_data {
- 	void (*fix_mac_speed)(void *priv, unsigned int speed);
- 	int (*init)(struct platform_device *pdev, void *priv);
- 	void (*exit)(struct platform_device *pdev, void *priv);
-+	struct mac_device_info *(*setup)(struct stmmac_priv *priv);
- 	void *bsp_priv;
- 	struct clk *stmmac_clk;
- 	struct clk *pclk;
++This device is a platform glue layer for stmmac.
++Please see stmmac.txt for the other unchanged properties.
++
++Required properties:
++- compatible: should be one of the following string:
++		"allwinner,sun8i-a83t-emac"
++		"allwinner,sun8i-h3-emac"
++		"allwinner,sun50i-a64-emac"
++- reg: address and length of the register for the device.
++- interrupts: interrupt for the device
++- interrupt-names: should be "macirq"
++- clocks: A phandle to the reference clock for this device
++- clock-names: should be "stmmaceth"
++- resets: A phandle to the reset control for this device
++- reset-names: should be "stmmaceth"
++- phy-mode: See ethernet.txt
++- phy-handle: See ethernet.txt
++- #address-cells: shall be 1
++- #size-cells: shall be 0
++- syscon: A phandle to the syscon of the SoC with one of the following
++ compatible string:
++  - allwinner,sun8i-h3-system-controller
++  - allwinner,sun8i-a64-system-controller
++  - allwinner,sun8i-a83t-system-controller
++
++Optional properties:
++- allwinner,tx-delay: TX clock delay chain value. Range value is 0-0x07. Default is 0)
++- allwinner,rx-delay: RX clock delay chain value. Range value is 0-0x1F. Default is 0)
++Both delay properties are in 0.1ns step.
++
++Optional properties for "allwinner,sun8i-h3-emac":
++- allwinner,leds-active-low: EPHY LEDs are active low
++
++Required child node of emac:
++- mdio bus node: should be named mdio
++
++Required properties of the mdio node:
++- #address-cells: shall be 1
++- #size-cells: shall be 0
++
++The device node referenced by "phy" or "phy-handle" should be a child node
++of the mdio node. See phy.txt for the generic PHY bindings.
++
++Required properties of the phy node with "allwinner,sun8i-h3-emac":
++- clocks: a phandle to the reference clock for the EPHY
++- resets: a phandle to the reset control for the EPHY
++
++Example:
++
++emac: ethernet at 1c0b000 {
++	compatible = "allwinner,sun8i-h3-emac";
++	syscon = <&syscon>;
++	reg = <0x01c0b000 0x104>;
++	interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>;
++	interrupt-names = "macirq";
++	resets = <&ccu RST_BUS_EMAC>;
++	reset-names = "stmmaceth";
++	clocks = <&ccu CLK_BUS_EMAC>;
++	clock-names = "stmmaceth";
++	#address-cells = <1>;
++	#size-cells = <0>;
++
++	phy = <&int_mii_phy>;
++	phy-mode = "mii";
++	allwinner,leds-active-low;
++	mdio: mdio {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		int_mii_phy: ethernet-phy at 1 {
++			reg = <1>;
++			clocks = <&ccu CLK_BUS_EPHY>;
++			resets = <&ccu RST_BUS_EPHY>;
++		};
++	};
++};
 -- 
 2.10.2
