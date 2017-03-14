@@ -1,81 +1,65 @@
-From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
-Date: Tue, 14 Mar 2017 08:14:51 +0000
-Subject: [PATCH V7 5/7] ACPI: Delay the enumeration on the devices whose
- dependency has not met
-In-Reply-To: <4600523.rWNiWKrYZC@aspire.rjw.lan>
-References: <1489372963-9000-1-git-send-email-yuanzhichang@hisilicon.com>
- <1489372963-9000-6-git-send-email-yuanzhichang@hisilicon.com>
- <4600523.rWNiWKrYZC@aspire.rjw.lan>
-Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E204822B1@FRAEML521-MBX.china.huawei.com>
+From: nicolas.ferre@microchip.com (Nicolas Ferre)
+Date: Tue, 14 Mar 2017 09:21:35 +0100
+Subject: [PATCH] ARM: at91: pm: cpu_idle: switch DDR to power-down mode
+In-Reply-To: <20170313210742.r7jdbuyp72ma76vl@piout.net>
+References: <20170313171450.18681-1-nicolas.ferre@microchip.com>
+ <20170313210742.r7jdbuyp72ma76vl@piout.net>
+Message-ID: <c4762297-e2ef-e6cd-536d-536dc27ab4e6@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rafael
-
-Many thanks for your review
-
-> -----Original Message-----
-> From: Rafael J. Wysocki [mailto:rjw at rjwysocki.net]
-> Sent: 13 March 2017 21:25
-> To: Yuanzhichang
-> Cc: catalin.marinas at arm.com; will.deacon at arm.com; robh+dt at kernel.org;
-> frowand.list at gmail.com; bhelgaas at google.com; rafael at kernel.org;
-> mark.rutland at arm.com; arnd at arndb.de; linux-arm-
-> kernel at lists.infradead.org; linux-acpi at vger.kernel.org;
-> lorenzo.pieralisi at arm.com; benh at kernel.crashing.org; linux-
-> kernel at vger.kernel.org; Linuxarm; devicetree at vger.kernel.org; linux-
-> pci at vger.kernel.org; linux-serial at vger.kernel.org; minyard at acm.org;
-> liviu.dudau at arm.com; zourongrong at gmail.com; John Garry; Gabriele
-> Paoloni; zhichang.yuan02 at gmail.com; kantyzc at 163.com; xuwei (O)
-> Subject: Re: [PATCH V7 5/7] ACPI: Delay the enumeration on the devices
-> whose dependency has not met
+Le 13/03/2017 ? 22:07, Alexandre Belloni a ?crit :
+> On 13/03/2017 at 18:14:50 +0100, Nicolas Ferre wrote:
+>> On some DDR controllers, compatible with the sama5d3 one,
+>> the sequence to enter/exit/re-enter the self-refresh mode adds
+>> more constrains than what is currently written in the at91_idle
+>> driver. An actual access to the DDR chip is needed between exit
+>> and re-enter of this mode which is somehow difficult to implement.
+>> This sequence can completely hang the SoC. It is particularly
+>> experienced on parts which embed a L2 cache if the code run
+>> between IDLE calls fits in it...
+>>
+>> Moreover, as the intention is to enter and exit pretty rapidly
+>> from IDLE, the power-down mode is a good candidate.
+>>
+>> So now we use power-down instead of self-refresh. As we can
+>> simplify the funciton for sama5d3 compatible DDR controllers,
+>               typo ^
 > 
-> On Monday, March 13, 2017 10:42:41 AM zhichang.yuan wrote:
-> > In commit 40e7fcb1929(ACPI: Add _DEP support to fix battery issue on
-> Asus
-> > T100TA), the '_DEP' was supported to solve the dependency of Asus
-> battery. But
-> > this patch is specific to Asus battery device.
-> > In the real world, there are other devices which need the dependency
-> to play the
-> > role on the enumeration order. For example, all the Hip06 LPC
-> > periperals(IPMI-BT, uart, etc) must be scanned after the LPC host
-> driver
-> > finished the probing. So, it makes sense to add a checking whether
-> the ACPI
-> > device meet all the dependencies during its enumeration slot, if not,
-> the
-> > enumeration will be delayed till all dependency master finish their
-> work.
-> >
-> > This patch adds the dependency checking in ACPI enumeration, also the
-> > corresponding handling to retrigger the Hip06 LPC peripherals'
-> scanning.
+>> we instanciate a new sama5d3_ddr_standby() function.
+
+And here ^ also: I rewrite a v2 now.
+
+
+>> Signed-off-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+>> ---
+>>  arch/arm/mach-at91/pm.c | 19 ++++++++++++++++++-
+>>  1 file changed, 18 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
+>> index 3d89b7905bd9..63e7df8ec815 100644
+>> --- a/arch/arm/mach-at91/pm.c
+>> +++ b/arch/arm/mach-at91/pm.c
+>> @@ -289,6 +289,23 @@ static void at91_ddr_standby(void)
+>>  		at91_ramc_write(1, AT91_DDRSDRC_LPR, saved_lpr1);
+>>  }
+>>  
+>> +static void sama5d3_ddr_standby(void)
+>> +{
+>> +	u32 lpr0;
+>> +	u32 saved_lpr0;
+>> +
+>> +	saved_lpr0 = at91_ramc_read(0, AT91_DDRSDRC_LPR);
+>> +	lpr0 = saved_lpr0 & ~AT91_DDRSDRC_LPCB;
+>> +	lpr0 |= AT91_DDRSDRC_LPCB_POWER_DOWN;
+>> +
+>> +	/* self-refresh mode now */
 > 
-> AFAICS, _DEP is generally abused in the wild and cannot be made
-> generic.  Sorry.
+> So this is not self refresh anymore
 
-Another option here would be to revert this patch and add a dependency
-check in the probe functions of the LPC possible children nodes (e.g. 
-in the IPMI driver:
-http://elixir.free-electrons.com/source/drivers/char/ipmi/ipmi_si_intf.c?v=4.10#L2683
-)  
+True, and useless comment in this case: so I simply remove it!
+Sorry for the noise.
 
-we could add 
-
-	if (device->dep_unmet)
-		return -EPROBE_DEFER;
-
-as we now have in acpi/battery.c...
-
-I think this should not make any difference for current shipped FW that has
-got no DEP method...
-
-What do you think?
-
-Many Thanks
-Gab
-
-> 
-> Thanks,
-> Rafael
+Regards,
+-- 
+Nicolas Ferre
