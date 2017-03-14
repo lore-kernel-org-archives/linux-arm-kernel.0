@@ -1,63 +1,45 @@
-From: slash.tmp@free.fr (Mason)
-Date: Tue, 14 Mar 2017 16:54:00 +0100
-Subject: Neophyte questions about PCIe
-In-Reply-To: <94b3c89c-b116-288f-7530-15cc2611f425@free.fr>
-References: <ced6a4bf-c94a-c116-1e94-52a8d675d132@free.fr>
- <20170308151724.GA20780@bhelgaas-glaptop.roam.corp.google.com>
- <f964ee05-db7f-c381-c91c-82897175da6d@free.fr>
- <9ba05c2c-57ef-b2c0-6a7c-457c392d98b5@free.fr>
- <df517167-d692-38a8-9c8f-a1112c7f578d@free.fr>
- <94b3c89c-b116-288f-7530-15cc2611f425@free.fr>
-Message-ID: <912c26d5-835f-9f39-73ba-db561b5bcffa@free.fr>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Tue, 14 Mar 2017 17:59:01 +0200
+Subject: [PATCH] serial: 8250: 8250_core: Use dev_name() during
+ request_irq()
+In-Reply-To: <2a0cf043-6e3f-6807-0794-d9d6f46b77f5@ti.com>
+References: <20170308121943.29340-1-vigneshr@ti.com>
+ <CAHp75VeFKSbk9hvoJXdK6uOz+JYATD8D057iNv0JDuEnBFS=yw@mail.gmail.com>
+ <2a0cf043-6e3f-6807-0794-d9d6f46b77f5@ti.com>
+Message-ID: <CAHp75Vc0Ap53s=6SU2o5QjgdaBDWKC24bym7HUt6jQ69HrpdCg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/03/2017 15:00, Mason wrote:
+On Tue, Mar 14, 2017 at 3:44 PM, Vignesh R <vigneshr@ti.com> wrote:
+> On Monday 13 March 2017 01:35 AM, Andy Shevchenko wrote:
+>> On Wed, Mar 8, 2017 at 2:19 PM, Vignesh R <vigneshr@ti.com> wrote:
+>>> Passing "serial" as name during request_irq() results in all serial port
+>>> irqs have same name. This does not help much to easily identify which
+>>> irq belongs to which serial port instance. Therefore pass dev_name()
+>>> during request_irq() so that better identifiable name is listed for
+>>> serial ports in cat /proc/interrupts output.
+>>>
+>>> Output of cat /proc/interrupts
+>>> Before this patch:
+>>>  26:        689          0     GICv2 309 Edge      serial
+>>> After this patch:
+>>>  26:        696          0     GICv2 309 Edge      2530c00.serial
 
-> On 10/03/2017 18:49, Mason wrote:
-> 
->> /* Root complex reports incorrect device class */
->> static void tango_pcie_fixup_class(struct pci_dev *dev)
->> {
->> 	dev->class = PCI_CLASS_BRIDGE_PCI << 8;
->> }
-> 
-> Gen1 controller reports class/rev = 0x04800001
-> Gen2 controller reports class/rev = 0x06000001
-> 
-> #define PCI_CLASS_BRIDGE_HOST		0x0600
-> #define PCI_CLASS_BRIDGE_ISA		0x0601
-> #define PCI_CLASS_BRIDGE_EISA		0x0602
-> #define PCI_CLASS_BRIDGE_MC		0x0603
-> #define PCI_CLASS_BRIDGE_PCI		0x0604
-> #define PCI_CLASS_BRIDGE_PCMCIA		0x0605
-> #define PCI_CLASS_BRIDGE_NUBUS		0x0606
-> #define PCI_CLASS_BRIDGE_CARDBUS	0x0607
-> #define PCI_CLASS_BRIDGE_RACEWAY	0x0608
-> #define PCI_CLASS_BRIDGE_OTHER		0x0680
-> 
-> My fixup replaces 0x048000 with 0x060400.
-> 
-> 	0x060400 != 0x060000
-> 
-> Which is correct:
-> PCI_CLASS_BRIDGE_HOST or PCI_CLASS_BRIDGE_PCI?
-> 
-> Naively, I would expect Host/PCI bridge to be more correct
-> for a root complex.
+>  But, this change is making interrupt name more descriptive
 
-But that's very likely wrong, since the code in Linux does:
+It doesn't in PCI case, it makes it worse.
 
-	switch (dev->hdr_type) {		    /* header type */
-	case PCI_HEADER_TYPE_BRIDGE:		    /* bridge header */
-		if (class != PCI_CLASS_BRIDGE_PCI)
-			goto bad;
-		/* The PCI-to-PCI bridge spec requires that subtractive
-		   decoding (i.e. transparent) bridge must have programming
-		   interface code of 0x01. */
+(The world is not DT-centric)
 
-So a class of PCI_CLASS_BRIDGE_HOST would error out, I think.
-Does this mean I need to fixup Gen2 as well?
-(Since it reports 0x060000)
+>> Besides that imagine what would be the name of PCI device here.
+>> I would suggest adding ID if you need one in a form like
+>> "serial%d", where ID may or may not be supplied by the actual 8250 drivers.
+>>
+>
+> Are you suggesting to use serial_index() as ID?
 
-Regards.
+Yes.
+
+-- 
+With Best Regards,
+Andy Shevchenko
