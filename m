@@ -1,64 +1,65 @@
 From: pavel@ucw.cz (Pavel Machek)
-Date: Tue, 14 Mar 2017 19:26:35 +0100
-Subject: [PATCH v4 14/36] [media] v4l2-mc: add a function to inherit
- controls from a pipeline
-In-Reply-To: <20170312193745.636df0bf@vento.lan>
-References: <20170310130733.GU21222@n2100.armlinux.org.uk>
- <c679f755-52a6-3c6f-3d65-277db46676cc@xs4all.nl>
- <20170310140124.GV21222@n2100.armlinux.org.uk>
- <cc8900b0-c091-b14b-96f4-01f8fa72431c@xs4all.nl>
- <20170310125342.7f047acf@vento.lan>
- <20170310223714.GI3220@valkosipuli.retiisi.org.uk>
- <20170311082549.576531d0@vento.lan>
- <20170311231456.GH21222@n2100.armlinux.org.uk>
- <20170312212904.GA7995@amd> <20170312193745.636df0bf@vento.lan>
-Message-ID: <20170314182635.GA3744@amd>
+Date: Tue, 14 Mar 2017 19:26:46 +0100
+Subject: [PATCH v5 15/39] [media] v4l2: add a frame interval error event
+In-Reply-To: <20170313104538.GF21222@n2100.armlinux.org.uk>
+References: <1489121599-23206-1-git-send-email-steve_longerbeam@mentor.com>
+ <1489121599-23206-16-git-send-email-steve_longerbeam@mentor.com>
+ <5b0a0e76-2524-4140-5ccc-380a8f949cfa@xs4all.nl>
+ <ec05e6e0-79f2-2db2-bde9-4aed00d76faa@gmail.com>
+ <6b574476-77df-0e25-a4d1-32d4fe0aec12@xs4all.nl>
+ <5d5cf4a4-a4d3-586e-cd16-54f543dfcce9@gmail.com>
+ <aa6a5a1d-18fd-8bed-a349-2654d2d1abe0@xs4all.nl>
+ <20170313104538.GF21222@n2100.armlinux.org.uk>
+Message-ID: <20170314182646.GB3744@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-
-> > Mid-layer is difficult... there are _hundreds_ of possible
-> > pipeline setups. If it should live in kernel or in userspace is a
-> > question... but I don't think having it in kernel helps in any way.
+On Mon 2017-03-13 10:45:38, Russell King - ARM Linux wrote:
+> On Mon, Mar 13, 2017 at 11:02:34AM +0100, Hans Verkuil wrote:
+> > On 03/11/2017 07:14 PM, Steve Longerbeam wrote:
+> > > The event must be user visible, otherwise the user has no indication
+> > > the error, and can't correct it by stream restart.
+> > 
+> > In that case the driver can detect this and call vb2_queue_error. It's
+> > what it is there for.
+> > 
+> > The event doesn't help you since only this driver has this issue. So nobody
+> > will watch this event, unless it is sw specifically written for this SoC.
+> > 
+> > Much better to call vb2_queue_error to signal a fatal error (which this
+> > apparently is) since there are more drivers that do this, and vivid supports
+> > triggering this condition as well.
 > 
-> Mid-layer is difficult, because we either need to feed some
-> library with knowledge for all kernel drivers or we need to improve
-> the MC API to provide more details.
+> So today, I can fiddle around with the IMX219 registers to help gain
+> an understanding of how this sensor works.  Several of the registers
+> (such as the PLL setup [*]) require me to disable streaming on the
+> sensor while changing them.
 > 
-> For example, several drivers used to expose entities via the
-> generic MEDIA_ENT_T_DEVNODE to represent entities of different
-> types. See, for example, entities 1, 5 and 7 (and others) at:
->
-> > https://mchehab.fedorapeople.org/mc-next-gen/igepv2_omap3isp.png
+> This is something I've done many times while testing various ideas,
+> and is my primary way of figuring out and testing such things.
+> 
+> Whenever I resume streaming (provided I've let the sensor stop
+> streaming at a frame boundary) it resumes as if nothing happened.  If I
+> stop the sensor mid-frame, then I get the rolling issue that Steve
+> reports, but once the top of the frame becomes aligned with the top of
+> the capture, everything then becomes stable again as if nothing happened.
+> 
+> The side effect of what you're proposing is that when I disable streaming
+> at the sensor by poking at its registers, rather than the capture just
+> stopping, an error is going to be delivered to gstreamer, and gstreamer
+> is going to exit, taking the entire capture process down.
+> 
+> This severely restricts the ability to be able to develop and test
+> sensor drivers.
 
-Well... we provide enough information, so that device-specific code
-does not have to be in kernel.
+Well, but kernel should do what is best for production, not what is
+best for driver debugging.
 
-There are few types of ENT_T_DEVNODE there. "ISP CCP2" does not really
-provide any functionality to the user. It just has to be there,
-because the pipeline needs to be connected. "ISP Preview" provides
-format conversion. "ISP Resizer" provides rescaling.
+And yes, I guess you can have #ifdef or module parameter or something
+switching for behaviour you prefer when you are debugging. But for
+production, vb2_queue_error() seems to be the right solution.
 
-I'm not sure if it ever makes sense to use "ISP Preview
-output". Normally you take data for display from "ISP Resizer
-output". (Would there be some power advantage from that?)
-
-> A device-specific code could either be hardcoding the entity number
-> or checking for the entity strings to add some logic to setup
-> controls on those "unknown" entities, a generic app won't be able 
-> to do anything with them, as it doesn't know what function(s) such
-> entity provide.
-
-Generic app should know if it wants RGGB10 data, then it can use "ISP
-CCDC output", or if it wants "cooked" data suitable for display, then
-it wants to use "ISP Resizer output". Once application knows what
-output it wants, there's just one path through the system. So being
-able to tell the ENT_T_DEVNODEs apart does not seem to be critical.
-
-OTOH, for useful camera application, different paths are needed at
-different phases.
-									Pavel
+								Pavel
 -- 
 (english) http://www.livejournal.com/~pavelmachek
 (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
@@ -68,4 +69,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 181 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170314/bf43497f/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170314/b79f73d5/attachment-0001.sig>
