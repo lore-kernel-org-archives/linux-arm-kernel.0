@@ -1,79 +1,164 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 14 Mar 2017 16:19:16 +0000
-Subject: [PATCH v2 2/2] mfd: axp20x: Add support for dts property
- "xpowers,master-mode"
-In-Reply-To: <ef82cd5bbea5a5eedcafd3f57e7b7409dd9b4b5e.1487791329.git.rask@formelder.dk>
-References: <cover.1487791328.git.rask@formelder.dk>
- <ef82cd5bbea5a5eedcafd3f57e7b7409dd9b4b5e.1487791329.git.rask@formelder.dk>
-Message-ID: <20170314161916.77ityr7jdfxtsaij@dell>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Tue, 14 Mar 2017 16:20:26 +0000
+Subject: [PATCH V2] arm64: hwpoison: add VM_FAULT_HWPOISON[_LARGE] handling
+In-Reply-To: <b2df589b-3d8d-8a25-d3ba-2b55f3791475@codeaurora.org> (Tyler
+ Baicar's message of "Fri, 10 Mar 2017 11:06:04 -0700")
+References: <1487720205-14594-1-git-send-email-tbaicar@codeaurora.org>
+ <87wpc7o7mo.fsf@e105922-lin.cambridge.arm.com>
+ <874lz4oo80.fsf@e105922-lin.cambridge.arm.com>
+ <fae5fa32-687b-4ebd-2d0c-b9df5837ba89@codeaurora.org>
+ <87efy6mjgj.fsf@e105922-lin.cambridge.arm.com>
+ <b2df589b-3d8d-8a25-d3ba-2b55f3791475@codeaurora.org>
+Message-ID: <87shmfkeyd.fsf@e105922-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 22 Feb 2017, Rask Ingemann Lambertsen wrote:
+Hi Tyler,
 
-> commit b101829a029a ("mfd: axp20x: Fix AXP806 access errors on cold boot")
-> was intended to fix the case where a board uses an AXP806 in slave mode,
-> but the boot loader leaves it in master mode for lack of AXP806 support.
-> But now the driver breaks on boards where the PMIC is operating in master
-> mode. This patch lets the driver use the new device tree property
-> "xpowers,master-mode" to set the correct operating mode for the board.
-> 
-> Fixes: 8824ee857348 ("mfd: axp20x: Add support for AXP806 PMIC")
-> Signed-off-by: Rask Ingemann Lambertsen <rask@formelder.dk>
-> ---
-> Changes from v1 to v2:
-> Changed the commit message such that Fixes: points to the commit which added
-> the AXP806 driver because the property should have been included from the
-> beginning of the AXP806 support.
-> 
->  drivers/mfd/axp20x.c | 21 +++++++++++++--------
->  1 file changed, 13 insertions(+), 8 deletions(-)
+"Baicar, Tyler" <tbaicar@codeaurora.org> writes:
 
-Applied, thanks.
+> Hello Punit,
+>
+> I ran the test with and without the kernel patch you're suggesting
+> below. I do not see the "bad pmd ..." print that you are seeing in
+> either case.
 
-> diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
-> index 25115fe..0512900 100644
-> --- a/drivers/mfd/axp20x.c
-> +++ b/drivers/mfd/axp20x.c
-> @@ -31,6 +31,7 @@
->  
->  #define AXP20X_OFF	0x80
->  
-> +#define AXP806_REG_ADDR_EXT_ADDR_MASTER_MODE	0
->  #define AXP806_REG_ADDR_EXT_ADDR_SLAVE_MODE	BIT(4)
->  
->  static const char * const axp20x_model_names[] = {
-> @@ -877,15 +878,19 @@ int axp20x_device_probe(struct axp20x_dev *axp20x)
->  	 * the these device addressing bits (in the upper 4 bits of the
->  	 * registers) match.
->  	 *
-> -	 * Since we only support an AXP806 chained to an AXP809 in slave
-> -	 * mode, and there isn't any existing hardware which uses AXP806
-> -	 * in master mode, or has 2 AXP806s in the same system, we can
-> -	 * just program the register address extension to the slave mode
-> -	 * address.
-> +	 * By default we support an AXP806 chained to an AXP809 in slave
-> +	 * mode. Boards which use an AXP806 in master mode can set the
-> +	 * property "x-powers,master-mode" to override the default.
->  	 */
-> -	if (axp20x->variant == AXP806_ID)
-> -		regmap_write(axp20x->regmap, AXP806_REG_ADDR_EXT,
-> -			     AXP806_REG_ADDR_EXT_ADDR_SLAVE_MODE);
-> +	if (axp20x->variant == AXP806_ID) {
-> +		if (of_property_read_bool(axp20x->dev->of_node,
-> +					  "x-powers,master-mode"))
-> +			regmap_write(axp20x->regmap, AXP806_REG_ADDR_EXT,
-> +				     AXP806_REG_ADDR_EXT_ADDR_MASTER_MODE);
-> +		else
-> +			regmap_write(axp20x->regmap, AXP806_REG_ADDR_EXT,
-> +				     AXP806_REG_ADDR_EXT_ADDR_SLAVE_MODE);
-> +	}
->  
->  	ret = regmap_add_irq_chip(axp20x->regmap, axp20x->irq,
->  			  IRQF_ONESHOT | IRQF_SHARED | axp20x->irq_flags,
+Thanks for trying out the patch. It's important to understand why we are
+seeing the difference in behaviour.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Looking at the code path, you should be hitting the "bad pmd" pr_err in
+dmesg. Any chance either hugepages or the memory failure configs weren't
+enabled in the test kernel?
+
+The test script (run_hugepage.sh) isn't particularly robust. It carries
+on executing even though some of the pre-conditions are not satisfied. I
+had seen the script continue even though some of the dependencies were
+missing from "bin" directory in the mce-test repo (Fixed by running
+"make install" in tools/page-types".
+
+Also, I reduced the console output and dmesg noise by executing only the
+failing test in run_hugepage.sh -
+
+"exec_testcase head late_touch file fork_shared killed".
+
+Can you try re-running with the other tests commented out?
+
+> All the tests are not passing for me though, it runs 42
+> test cases and 14 show up as failed for some reason.
+
+I see similar behaviour. I think the failures are due to timing
+sensitivity when synchronising multi-process test cases - I saw a
+comment implying this somewhere but can't seem to find it now.
+
+Thanks,
+Punit
+
+>
+> Thanks,
+>
+> Tyler
+>
+>
+> On 3/9/2017 10:46 AM, Punit Agrawal wrote:
+>> [ +steve for arm64 mm and hugepages chops ]
+>>
+>> "Baicar, Tyler" <tbaicar@codeaurora.org> writes:
+>>
+>>> On 3/7/2017 12:56 PM, Punit Agrawal wrote:
+>>>> Punit Agrawal <punit.agrawal@arm.com> writes:
+>>>>
+>>>> [...]
+>>>>
+>>>>> The code looks good but I ran into some failures while running the
+>>>>> hugepages hwpoison tests from mce-tests suite[0]. I get a bad pmd error
+>>>>> in dmesg -
+>>>>>
+>>>>> [  344.165544] mm/pgtable-generic.c:33: bad pmd 000000083af00074.
+>>>>>
+>>>>> I suspect that this is due to the huge pte accessors not correctly
+>>>>> dealing with poisoned entries (which are represented as swap entries).
+>>>> I think I've got to the bottom of the issue - the problem is due to
+>>>> huge_pte_at() returning NULL for poisoned pmd entries (which in turn is
+>>>> due to pmd_present() not handling poisoned pmd entries correctly)
+>>>>
+>>>> The following is the call chain for the failure case.
+>>>>
+>>>> do_munmap
+>>>>     unmap_region
+>>>>       unmap_vmas
+>>>>         unmap_single_vma
+>>>>           __unmap_hugepage_range_final    # The test case uses hugepages
+>>>>             __unmap_hugepage_range
+>>>>               huge_pte_offset             # Returns NULL for a poisoned pmd
+>>>>
+>>>> Reverting 5bb1cc0ff9a6 ("arm64: Ensure pmd_present() returns false after
+>>>> pmd_mknotpresent()") fixes the problem for me but I don't think that is
+>>>> the right fix.
+>>>>
+>>>> While I work on a proper fix, it would be great if you can confirm that
+>>>> reverting 5bb1cc0ff9a6 makes the problem go away at your end.
+>>> Thanks Punit! I haven't got a chance to do this yet, but I will let
+>>> you know once I get it tested :)
+>> This time with a patch. Please test this instead.
+>>
+>> After a lot of head scratching, I've bit the bullet and added a check to
+>> return the poisoned entry from huge_pte_offset(). What with having to
+>> deal with contiguous hugepages et al., there just doesn't seem to be any
+>> leeway in how we handle the situation here.
+>>
+>> Let's see if there are any other ideas. Patch follows.
+>>
+>> Thanks,
+>> Punit
+>>
+>> ----------->8-------------
+>>  From d5ad3f428e629c80b0f93f2bbdf99b4cae28c9bc Mon Sep 17 00:00:00 2001
+>> From: Punit Agrawal <punit.agrawal@arm.com>
+>> Date: Thu, 9 Mar 2017 16:16:29 +0000
+>> Subject: [PATCH] arm64: hugetlb: Fix huge_pte_offset to return poisoned pmd
+>>
+>> When memory failure is enabled, a poisoned hugepage PMD is marked as a
+>> swap entry. As pmd_present() only checks for VALID and PROT_NONE
+>> bits (turned off for swap entries), it causues huge_pte_offset() to
+>> return NULL for poisoned PMDs.
+>>
+>> This behaviour of huge_pte_offset() leads to the error such as below
+>> when munmap is called on poisoned hugepages.
+>>
+>> [  344.165544] mm/pgtable-generic.c:33: bad pmd 000000083af00074.
+>>
+>> Fix huge_pte_offset() to return the poisoned PMD which is then
+>> appropriately handled by the generic layer code.
+>>
+>> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>> Cc: Steve Capper <steve.capper@arm.com>
+>> ---
+>>   arch/arm64/mm/hugetlbpage.c | 11 ++++++++++-
+>>   1 file changed, 10 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
+>> index e25584d72396..9263f206353c 100644
+>> --- a/arch/arm64/mm/hugetlbpage.c
+>> +++ b/arch/arm64/mm/hugetlbpage.c
+>> @@ -150,8 +150,17 @@ pte_t *huge_pte_offset(struct mm_struct *mm, unsigned long addr)
+>>          if (pud_huge(*pud))
+>>                  return (pte_t *)pud;
+>>          pmd = pmd_offset(pud, addr);
+>> +
+>> +       /*
+>> +        * In case of HW Poisoning, a hugepage pmd can contain
+>> +        * poisoned entries. Poisoned entries are marked as swap
+>> +        * entries.
+>> +        *
+>> +        * For pmds that are not present, check to see if it could be
+>> +        * a swap entry (!present and !none) before giving up.
+>> +        */
+>>          if (!pmd_present(*pmd))
+>> -               return NULL;
+>> +               return !pmd_none(*pmd) ? (pte_t *)pmd : NULL;
+>>
+>>          if (pte_cont(pmd_pte(*pmd))) {
+>>                  pmd = pmd_offset(
+>> --
+>> 2.11.0
