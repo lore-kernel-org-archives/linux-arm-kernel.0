@@ -1,30 +1,116 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 14 Mar 2017 14:36:24 +0100
-Subject: [PATCH 0/7] Rename RK1108 to RV1108
-In-Reply-To: <4369285.zq7cJYMXhu@phil>
-References: <1486983566-32265-1-git-send-email-andy.yan@rock-chips.com>
- <0bbc4151-d954-1a27-48c3-1e8c9cb9e16f@rock-chips.com>
- <CACRpkdbNbGvwUq3uLgekimOwzBZCXf37JW9LCCqLm1so=CMNrw@mail.gmail.com>
- <4369285.zq7cJYMXhu@phil>
-Message-ID: <CACRpkdbuX7f58S_sTBMVEusX2g1iJ4T-cw9efJLFSYb8fV=EDA@mail.gmail.com>
+From: j-keerthy@ti.com (Keerthy)
+Date: Tue, 14 Mar 2017 19:08:03 +0530
+Subject: [PATCH v3 00/25] arm/arm64: KVM: Rework the hyp-stub API
+In-Reply-To: <20170306142458.8875-1-marc.zyngier@arm.com>
+References: <20170306142458.8875-1-marc.zyngier@arm.com>
+Message-ID: <8493dac7-c9be-fd3b-c5c0-83fbbfa4af10@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 23, 2017 at 4:00 PM, Heiko Stuebner <heiko@sntech.de> wrote:
-> Am Donnerstag, 23. Februar 2017, 11:15:56 CET schrieb Linus Walleij:
 
->> Nobody gets hurt. Just rename everything to avoid confusion.
->> Just my ?0.01.
->>
->> Acked-by: Linus Walleij <linus.walleij@linaro.org>
->>
->> Tell me if I can merge a subset of the patches to the pinctrl tree.
->
-> I did provide Reviewed-bys for them, so you should be able to merge the
-> pinctrl patches (4+5) at your convenience :-)
 
-They are conflicting right now, but I will merge it when I get a v4.11-rc1
-based series.
+On Monday 06 March 2017 07:54 PM, Marc Zyngier wrote:
+> As noticed by RMK in this thread[1], the hyp-stub API on 32bit ARM
+> could do with some TLC (it cannot perform a soft-restart at HYP, and
+> has holes in the hyp-stub support in a number of places). In general,
+> it would be desirable for the 32bit behaviour to align on 64bit, if
+> only to ease maintenance.
+> 
+> This series implements the following:
+> - Add HVC_[GS]ET_VECTORS and HVC_SOFT_RESTART to the 32bit code
+> - Add HVC_RESET_VECTORS to both arm and arm64, removing the need for
+>   __hyp_reset_vectors
+> - Implement add the stub entry points in the KVM init code, which
+>   didn't implement any so far
+> - Convert the HYP code to use the init code stubs directly
+> - Some general cleanup as a result of these changes (which includes
+>   killing HVC_GET_VECTORS)
+> - Add some API documentation that covers the above
+> 
+> Patches 9 to 11 would be better squashed into 7 and 8, but I've kept
+> separate so that I can take the blame for everything I've broken.
 
-Yours,
-Linus Walleij
+Tested for kexec booting with the patch series applied on linux-next.
+
+kexec is working nicely with HYP and SVC modes. Tested for both modes by
+using different u-boot for booting in HYP and SVC modes. Kexec works well.
+
+Tested on DRA7-EVM, AM57XX-EVM and KEYSTONE-K2E-EVM.
+
+Tested-by: Keerthy <j-keerthy@ti.com>
+
+> 
+> This has been tested on arm (Cubietruck, Jetson TK1) and arm64
+> (Seattle), both as host and guest.
+> 
+> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-December/473472.html
+> 
+> * From v2:
+>   - Kill HVC_GET_VECTORS and the corresponding __hyp_get_vectors
+> 
+> * From v1:
+>   - Fixed some glaring bugs (reported by Ard and James)
+>   - Tidy up stub vector export on 32bit (Ard)
+>   - Nicer VA/PA conversion on 32bit (Ard)
+>   - Updated cpu_v7_reset documentation
+>   - Cleaned up HYP reset on PM events
+>   - Minor stub documentation update
+> 
+> Marc Zyngier (23):
+>   arm64: hyp-stub: Implement HVC_RESET_VECTORS stub hypercall
+>   arm64: KVM: Implement HVC_RESET_VECTORS stub hypercall
+>   arm64: KVM: Implement HVC_GET_VECTORS in the init code
+>   arm64: KVM: Allow the main HYP code to use the init hyp stub
+>     implementation
+>   arm64: KVM: Convert __cpu_reset_hyp_mode to using __hyp_reset_vectors
+>   arm64: KVM: Implement HVC_SOFT_RESTART in the init code
+>   ARM: KVM: Convert KVM to use HVC_GET_VECTORS
+>   ARM: Update cpu_v7_reset documentation
+>   ARM: hyp-stub: Use r1 for the soft-restart address
+>   ARM: Expose the VA/IDMAP offset
+>   ARM: hyp-stub: Implement HVC_RESET_VECTORS stub hypercall
+>   ARM: KVM: Implement HVC_RESET_VECTORS stub hypercall
+>   ARM: KVM: Implement HVC_GET_VECTORS in the init code
+>   ARM: KVM: Allow the main HYP code to use the init hyp stub
+>     implementation
+>   ARM: KVM: Convert __cpu_reset_hyp_mode to using __hyp_reset_vectors
+>   ARM: KVM: Implement HVC_SOFT_RESTART in the init code
+>   arm/arm64: KVM: Use __hyp_reset_vectors() directly
+>   arm/arm64: KVM: Remove kvm_get_idmap_start
+>   arm/arm64: KVM: Use HVC_RESET_VECTORS to reinit HYP mode
+>   ARM: decompressor: Remove __hyp_get_vectors usage
+>   ARM: hyp-stub/KVM: Kill __hyp_get_vectors
+>   arm64: hyp-stub/KVM: Kill __hyp_get_vectors
+>   arm/arm64: Add hyp-stub API documentation
+> 
+> Russell King (2):
+>   ARM: hyp-stub: improve ABI
+>   ARM: soft-reboot into same mode that we entered the kernel
+> 
+>  Documentation/virtual/kvm/arm/hyp-abi.txt | 45 ++++++++++++++++++++++++++++
+>  arch/arm/boot/compressed/head.S           |  5 +++-
+>  arch/arm/include/asm/kvm_asm.h            |  2 --
+>  arch/arm/include/asm/kvm_host.h           |  6 ----
+>  arch/arm/include/asm/kvm_mmu.h            |  1 -
+>  arch/arm/include/asm/proc-fns.h           |  4 +--
+>  arch/arm/include/asm/virt.h               | 12 +++++++-
+>  arch/arm/kernel/hyp-stub.S                | 39 +++++++++++++++++++-----
+>  arch/arm/kernel/reboot.c                  |  7 +++--
+>  arch/arm/kvm/arm.c                        | 25 ++++++----------
+>  arch/arm/kvm/hyp/hyp-entry.S              | 29 ++++++++++++++----
+>  arch/arm/kvm/init.S                       | 49 ++++++++++++++++++++++++++-----
+>  arch/arm/kvm/interrupts.S                 |  4 ---
+>  arch/arm/kvm/mmu.c                        |  5 ----
+>  arch/arm/mm/mmu.c                         |  5 ++++
+>  arch/arm/mm/proc-v7.S                     | 15 ++++++----
+>  arch/arm64/include/asm/kvm_asm.h          |  1 -
+>  arch/arm64/include/asm/kvm_host.h         |  7 -----
+>  arch/arm64/include/asm/kvm_mmu.h          |  1 -
+>  arch/arm64/include/asm/virt.h             | 17 +++++++----
+>  arch/arm64/kernel/hyp-stub.S              | 26 ++++++++--------
+>  arch/arm64/kvm/hyp-init.S                 | 45 +++++++++++++++++++++-------
+>  arch/arm64/kvm/hyp.S                      |  2 +-
+>  arch/arm64/kvm/hyp/hyp-entry.S            | 39 ++++++++++++------------
+>  24 files changed, 265 insertions(+), 126 deletions(-)
+>  create mode 100644 Documentation/virtual/kvm/arm/hyp-abi.txt
+> 
