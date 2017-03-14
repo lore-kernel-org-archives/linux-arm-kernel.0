@@ -1,11 +1,11 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 14 Mar 2017 16:19:04 +0000
-Subject: [PATCH v2 1/2] dts: mfd: axp20x: Add "xpowers,master-mode"
- property for AXP806 PMICs
-In-Reply-To: <396866a490b6056c60e93d862656bb90daedab98.1487791328.git.rask@formelder.dk>
+Date: Tue, 14 Mar 2017 16:19:16 +0000
+Subject: [PATCH v2 2/2] mfd: axp20x: Add support for dts property
+ "xpowers,master-mode"
+In-Reply-To: <ef82cd5bbea5a5eedcafd3f57e7b7409dd9b4b5e.1487791329.git.rask@formelder.dk>
 References: <cover.1487791328.git.rask@formelder.dk>
- <396866a490b6056c60e93d862656bb90daedab98.1487791328.git.rask@formelder.dk>
-Message-ID: <20170314161904.ti5anq5aqoedt4lq@dell>
+ <ef82cd5bbea5a5eedcafd3f57e7b7409dd9b4b5e.1487791329.git.rask@formelder.dk>
+Message-ID: <20170314161916.77ityr7jdfxtsaij@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,37 +15,62 @@ On Wed, 22 Feb 2017, Rask Ingemann Lambertsen wrote:
 > was intended to fix the case where a board uses an AXP806 in slave mode,
 > but the boot loader leaves it in master mode for lack of AXP806 support.
 > But now the driver breaks on boards where the PMIC is operating in master
-> mode. To let the device tree describe which mode of operation is needed,
-> this patch introduces a new property "xpowers,master-mode".
+> mode. This patch lets the driver use the new device tree property
+> "xpowers,master-mode" to set the correct operating mode for the board.
 > 
-> Fixes: 204ae2963e10 ("mfd: axp20x: Add bindings for AXP806 PMIC")
+> Fixes: 8824ee857348 ("mfd: axp20x: Add support for AXP806 PMIC")
 > Signed-off-by: Rask Ingemann Lambertsen <rask@formelder.dk>
-> Acked-by: Chen-Yu Tsai <wens@csie.org>
 > ---
 > Changes from v1 to v2:
-> Changed the commit message such that Fixes: points to the commit which
-> introduced the bindings for the AXP806 because the property should have been
-> included from the beginning of the AXP806 support.
+> Changed the commit message such that Fixes: points to the commit which added
+> the AXP806 driver because the property should have been included from the
+> beginning of the AXP806 support.
 > 
->  Documentation/devicetree/bindings/mfd/axp20x.txt | 3 +++
->  1 file changed, 3 insertions(+)
+>  drivers/mfd/axp20x.c | 21 +++++++++++++--------
+>  1 file changed, 13 insertions(+), 8 deletions(-)
 
 Applied, thanks.
 
-> diff --git a/Documentation/devicetree/bindings/mfd/axp20x.txt b/Documentation/devicetree/bindings/mfd/axp20x.txt
-> index 8f3ad9a..b41d260 100644
-> --- a/Documentation/devicetree/bindings/mfd/axp20x.txt
-> +++ b/Documentation/devicetree/bindings/mfd/axp20x.txt
-> @@ -28,6 +28,9 @@ Optional properties:
->  		  regulator to drive the OTG VBus, rather then as an input pin
->  		  which signals whether the board is driving OTG VBus or not.
+> diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
+> index 25115fe..0512900 100644
+> --- a/drivers/mfd/axp20x.c
+> +++ b/drivers/mfd/axp20x.c
+> @@ -31,6 +31,7 @@
 >  
-> +- x-powers,master-mode: Boolean (axp806 only). Set this when the PMIC is
-> +			wired for master mode. The default is slave mode.
-> +
->  - <input>-supply: a phandle to the regulator supply node. May be omitted if
->  		  inputs are unregulated, such as using the IPSOUT output
->  		  from the PMIC.
+>  #define AXP20X_OFF	0x80
+>  
+> +#define AXP806_REG_ADDR_EXT_ADDR_MASTER_MODE	0
+>  #define AXP806_REG_ADDR_EXT_ADDR_SLAVE_MODE	BIT(4)
+>  
+>  static const char * const axp20x_model_names[] = {
+> @@ -877,15 +878,19 @@ int axp20x_device_probe(struct axp20x_dev *axp20x)
+>  	 * the these device addressing bits (in the upper 4 bits of the
+>  	 * registers) match.
+>  	 *
+> -	 * Since we only support an AXP806 chained to an AXP809 in slave
+> -	 * mode, and there isn't any existing hardware which uses AXP806
+> -	 * in master mode, or has 2 AXP806s in the same system, we can
+> -	 * just program the register address extension to the slave mode
+> -	 * address.
+> +	 * By default we support an AXP806 chained to an AXP809 in slave
+> +	 * mode. Boards which use an AXP806 in master mode can set the
+> +	 * property "x-powers,master-mode" to override the default.
+>  	 */
+> -	if (axp20x->variant == AXP806_ID)
+> -		regmap_write(axp20x->regmap, AXP806_REG_ADDR_EXT,
+> -			     AXP806_REG_ADDR_EXT_ADDR_SLAVE_MODE);
+> +	if (axp20x->variant == AXP806_ID) {
+> +		if (of_property_read_bool(axp20x->dev->of_node,
+> +					  "x-powers,master-mode"))
+> +			regmap_write(axp20x->regmap, AXP806_REG_ADDR_EXT,
+> +				     AXP806_REG_ADDR_EXT_ADDR_MASTER_MODE);
+> +		else
+> +			regmap_write(axp20x->regmap, AXP806_REG_ADDR_EXT,
+> +				     AXP806_REG_ADDR_EXT_ADDR_SLAVE_MODE);
+> +	}
+>  
+>  	ret = regmap_add_irq_chip(axp20x->regmap, axp20x->irq,
+>  			  IRQF_ONESHOT | IRQF_SHARED | axp20x->irq_flags,
 
 -- 
 Lee Jones
