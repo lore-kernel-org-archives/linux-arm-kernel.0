@@ -1,74 +1,77 @@
 From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Tue, 14 Mar 2017 15:18:43 +0100
-Subject: [PATCH v2 07/20] ARM: dts: sunxi-h3-h5: add dwmac-sun8i ethernet
- driver
+Date: Tue, 14 Mar 2017 15:18:48 +0100
+Subject: [PATCH v2 12/20] ARM: dts: sun8i: Enable dwmac-sun8i on the Orange Pi
+ plus
 In-Reply-To: <20170314141856.24560-1-clabbe.montjoie@gmail.com>
 References: <20170314141856.24560-1-clabbe.montjoie@gmail.com>
-Message-ID: <20170314141856.24560-8-clabbe.montjoie@gmail.com>
+Message-ID: <20170314141856.24560-13-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The dwmac-sun8i is an ethernet MAC hardware that support 10/100/1000
-speed.
+The dwmac-sun8i hardware is present on the Orange PI plus.
+It uses an external PHY rtl8211e via RGMII.
 
-This patch enable the dwmac-sun8i on Allwinner H3/H5 SoC Device-tree.
-SoC H3/H5 have an internal PHY, so optionals syscon and ephy are set.
+This patch create the needed regulator, emac and phy nodes.
 
 Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
 ---
- arch/arm/boot/dts/sunxi-h3-h5.dtsi | 33 +++++++++++++++++++++++++++++++++
- 1 file changed, 33 insertions(+)
+ arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts | 35 ++++++++++++++++++++++++++++
+ 1 file changed, 35 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sunxi-h3-h5.dtsi b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
-index 07e4f36..c35af5e 100644
---- a/arch/arm/boot/dts/sunxi-h3-h5.dtsi
-+++ b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
-@@ -272,6 +272,14 @@
- 			interrupt-controller;
- 			#interrupt-cells = <3>;
+diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
+index 8c40ab7..4e075a2 100644
+--- a/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
++++ b/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
+@@ -58,6 +58,18 @@
+ 		enable-active-high;
+ 		gpio = <&pio 6 11 GPIO_ACTIVE_HIGH>;
+ 	};
++
++	reg_gmac_3v3: gmac-3v3 {
++		compatible = "regulator-fixed";
++		pinctrl-names = "default";
++		pinctrl-0 = <&gmac_power_pin_orangepi>;
++		regulator-name = "gmac-3v3";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		startup-delay-us = <100000>;
++		enable-active-high;
++		gpio = <&pio 3 6 GPIO_ACTIVE_HIGH>;
++	};
+ };
  
-+			emac_rgmii_pins: emac0 at 0 {
-+				pins = "PD0", "PD1", "PD2", "PD3", "PD4",
-+					"PD5", "PD7", "PD8", "PD9", "PD10",
-+					"PD12", "PD13", "PD15", "PD16", "PD17";
-+				function = "emac";
-+				drive-strength = <40>;
-+			};
+ &ehci3 {
+@@ -86,8 +98,31 @@
+ 		pins = "PG11";
+ 		function = "gpio_out";
+ 	};
 +
- 			i2c0_pins: i2c0 {
- 				pins = "PA11", "PA12";
- 				function = "i2c0";
-@@ -368,6 +376,31 @@
- 			clocks = <&osc24M>;
- 		};
++	gmac_power_pin_orangepi: gmac_power_pin at 0 {
++		pins = "PD6";
++		function = "gpio_out";
++		drive-strength = <10>;
++	};
+ };
  
-+		emac: ethernet at 1c30000 {
-+			compatible = "allwinner,sun8i-h3-emac";
-+			syscon = <&syscon>;
-+			reg = <0x01c30000 0x104>;
-+			interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-names = "macirq";
-+			resets = <&ccu RST_BUS_EMAC>;
-+			reset-names = "stmmaceth";
-+			clocks = <&ccu CLK_BUS_EMAC>;
-+			clock-names = "stmmaceth";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
+ &usbphy {
+ 	usb3_vbus-supply = <&reg_usb3_vbus>;
+ };
 +
-+			mdio: mdio {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				int_mii_phy: ethernet-phy at 1 {
-+				reg = <1>;
-+				clocks = <&ccu CLK_BUS_EPHY>;
-+				resets = <&ccu RST_BUS_EPHY>;
-+				};
-+			};
-+		};
++&mdio {
++	ext_rgmii_phy: ethernet-phy at 1 {
++		reg = <0>;
++	};
++};
 +
- 		spi0: spi at 01c68000 {
- 			compatible = "allwinner,sun8i-h3-spi";
- 			reg = <0x01c68000 0x1000>;
++&emac {
++	pinctrl-names = "default";
++	pinctrl-0 = <&emac_rgmii_pins>;
++	phy-supply = <&reg_gmac_3v3>;
++	phy-handle = <&ext_rgmii_phy>;
++	phy-mode = "rgmii";
++
++	allwinner,leds-active-low;
++	status = "okay";
++};
 -- 
 2.10.2
