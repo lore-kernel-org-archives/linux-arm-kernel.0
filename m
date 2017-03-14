@@ -1,33 +1,31 @@
 From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Tue, 14 Mar 2017 15:18:55 +0100
-Subject: [PATCH v2 19/20] ARM: sunxi: Enable dwmac-sun8i driver on
- sunxi_defconfig
+Date: Tue, 14 Mar 2017 15:18:56 +0100
+Subject: [PATCH v2 20/20] ARM: sunxi: Enable dwmac-sun8i driver on
+ multi_v7_defconfig
 In-Reply-To: <20170314141856.24560-1-clabbe.montjoie@gmail.com>
 References: <20170314141856.24560-1-clabbe.montjoie@gmail.com>
-Message-ID: <20170314141856.24560-20-clabbe.montjoie@gmail.com>
+Message-ID: <20170314141856.24560-21-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: LABBE Corentin <clabbe.montjoie@gmail.com>
-
-Enable the dwmac-sun8i driver in the sunxi default configuration
+Enable the dwmac-sun8i driver in the multi_v7 default configuration
 
 Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
 ---
- arch/arm/configs/sunxi_defconfig | 1 +
+ arch/arm/configs/multi_v7_defconfig | 1 +
  1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/configs/sunxi_defconfig b/arch/arm/configs/sunxi_defconfig
-index 5cd5dd70..504e022 100644
---- a/arch/arm/configs/sunxi_defconfig
-+++ b/arch/arm/configs/sunxi_defconfig
-@@ -40,6 +40,7 @@ CONFIG_ATA=y
- CONFIG_AHCI_SUNXI=y
- CONFIG_NETDEVICES=y
- CONFIG_SUN4I_EMAC=y
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 36c1b39..380919f 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -257,6 +257,7 @@ CONFIG_SMSC911X=y
+ CONFIG_STMMAC_ETH=y
+ CONFIG_STMMAC_PLATFORM=y
+ CONFIG_DWMAC_DWC_QOS_ETH=y
 +CONFIG_DWMAC_SUN8I=y
- # CONFIG_NET_VENDOR_ARC is not set
- # CONFIG_NET_CADENCE is not set
- # CONFIG_NET_VENDOR_BROADCOM is not set
+ CONFIG_TI_CPSW=y
+ CONFIG_XILINX_EMACLITE=y
+ CONFIG_AT803X_PHY=y
 -- 
 2.10.2
