@@ -1,55 +1,70 @@
 From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Tue, 14 Mar 2017 15:15:24 -0500
-Subject: [PATCH v3 0/3] pci: remove msi_controller registration API
-In-Reply-To: <1488292276-11106-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1488292276-11106-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20170314201524.GF26264@bhelgaas-glaptop.roam.corp.google.com>
+Date: Tue, 14 Mar 2017 15:17:55 -0500
+Subject: [PATCH] PCI: aardvark: Remove msi-controller dt node probing
+In-Reply-To: <20170314193005.GC26264@bhelgaas-glaptop.roam.corp.google.com>
+References: <20170314190851.28203-1-stephen.boyd@linaro.org>
+ <20170314193005.GC26264@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <20170314201755.GG26264@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 28, 2017 at 03:31:13PM +0100, Thomas Petazzoni wrote:
-> Hello,
+On Tue, Mar 14, 2017 at 02:30:05PM -0500, Bjorn Helgaas wrote:
+> On Tue, Mar 14, 2017 at 12:08:51PM -0700, Stephen Boyd wrote:
+> > This code assigns variables that are never used. Remove them.
+> > 
+> > Reported-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+> > Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> > Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
 > 
-> This small patch series aims at removing the small msi_controller
-> registration API implemented in drivers/of/of_pci.c.
-> 
-> In order to do so, it moves the last two users of this API to the
-> generic MSI support:
-> 
->  - The pci-aardvark driver is moved to use the generic MSI
->    support. This driver is both the provider of the MSI capability and
->    the consumer of this capability.
-> 
->  - The pci-mvebu driver is cleaned up from using the msi_controller
->    registration API. This driver is only consuming MSI capabilies from
->    another driver (irq-armada-370-xp) which was migrated to the
->    generic MSI support some time ago. Therefore, this patch is simply
->    removing dead code.
-> 
-> Finally, the last commit removed the now unused API.
-> 
-> Changes between v2 and v3 are described in each individual patch.
-> 
-> Thanks,
-> 
-> Thomas
-> 
-> Thomas Petazzoni (3):
->   pci: pci-aardvark: move to MSI handling using generic MSI support
->   pci: pci-mvebu: remove useless MSI enabling code
->   of: pci: remove unused MSI controller helpers
-> 
->  drivers/of/of_pci.c             |  45 -----------
->  drivers/pci/host/pci-aardvark.c | 173 ++++++++++++++++------------------------
->  drivers/pci/host/pci-mvebu.c    |  17 ----
->  include/linux/of_pci.h          |  11 ---
->  4 files changed, 67 insertions(+), 179 deletions(-)
+> I love removing unused code!  Applied to pci/host-aardvark for v4.12,
+> thanks!
 
-Applied to pci/msi for v4.12, thanks!
+Actually, I applied Thomas' series [1], which does some additional
+cleanup and also removes this same code.  So I'll just drop this one
+since it's redundant.  Thanks again and sorry for my confusion.
 
-I think Marc's ack on 1/30 applies to the first two, so I added it to them.
+[1] https://patchwork.ozlabs.org/patch/733572/
 
-Oh, and I'll drop the other aardvark change that removes the same bits of
-unused "msi-parent" code from advk_pcie_probe().
-
-Bjorn
+> > ---
+> >  drivers/pci/host/pci-aardvark.c | 8 --------
+> >  1 file changed, 8 deletions(-)
+> > 
+> > diff --git a/drivers/pci/host/pci-aardvark.c b/drivers/pci/host/pci-aardvark.c
+> > index 4fce494271cc..56e1aead65fc 100644
+> > --- a/drivers/pci/host/pci-aardvark.c
+> > +++ b/drivers/pci/host/pci-aardvark.c
+> > @@ -917,8 +917,6 @@ static int advk_pcie_probe(struct platform_device *pdev)
+> >  	struct advk_pcie *pcie;
+> >  	struct resource *res;
+> >  	struct pci_bus *bus, *child;
+> > -	struct msi_controller *msi;
+> > -	struct device_node *msi_node;
+> >  	int ret, irq;
+> >  
+> >  	pcie = devm_kzalloc(dev, sizeof(struct advk_pcie), GFP_KERNEL);
+> > @@ -962,12 +960,6 @@ static int advk_pcie_probe(struct platform_device *pdev)
+> >  		return ret;
+> >  	}
+> >  
+> > -	msi_node = of_parse_phandle(dev->of_node, "msi-parent", 0);
+> > -	if (msi_node)
+> > -		msi = of_pci_find_msi_chip_by_node(msi_node);
+> > -	else
+> > -		msi = NULL;
+> > -
+> >  	bus = pci_scan_root_bus_msi(dev, 0, &advk_pcie_ops,
+> >  				    pcie, &pcie->resources, &pcie->msi);
+> >  	if (!bus) {
+> > -- 
+> > 2.10.0.297.gf6727b0
+> > 
+> > 
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
