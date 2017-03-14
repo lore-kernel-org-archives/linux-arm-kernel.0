@@ -1,36 +1,33 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 14 Mar 2017 11:27:17 +0100
-Subject: [PATCH v2] ARM: at91: pm: cpu_idle: switch DDR to power-down mode
-In-Reply-To: <20170314083804.1756-1-nicolas.ferre@microchip.com>
-References: <20170314083804.1756-1-nicolas.ferre@microchip.com>
-Message-ID: <20170314102717.itygahokl7xlr62u@piout.net>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 14 Mar 2017 11:29:28 +0100
+Subject: [PATCH -next v2] pinctrl: samsung: Fix return value check in
+ samsung_pinctrl_get_soc_data()
+In-Reply-To: <c4dd122b-0312-fcca-08e2-4d4586949a88@samsung.com>
+References: <20170125140321.23911-1-weiyj.lk@gmail.com>
+ <20170205155849.4362-1-weiyj.lk@gmail.com>
+ <CGME20170213145008epcas3p119bdd6f76468a00fb8d796308ad37698@epcas3p1.samsung.com>
+ <CACRpkda0BYLNpPFwpNaEMdeyx61KDUQz_6Y=FQj340pViFjVVQ@mail.gmail.com>
+ <c4dd122b-0312-fcca-08e2-4d4586949a88@samsung.com>
+Message-ID: <CACRpkda1tALy3rmk7FebnR3Xg4WOuUc0Gv1xAmxkd+RLhJ_1VQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/03/2017 at 09:38:04 +0100, Nicolas Ferre wrote:
-> On some DDR controllers, compatible with the sama5d3 one,
-> the sequence to enter/exit/re-enter the self-refresh mode adds
-> more constrains than what is currently written in the at91_idle
-> driver. An actual access to the DDR chip is needed between exit
-> and re-enter of this mode which is somehow difficult to implement.
-> This sequence can completely hang the SoC. It is particularly
-> experienced on parts which embed a L2 cache if the code run
-> between IDLE calls fits in it...
-> 
-> Moreover, as the intention is to enter and exit pretty rapidly
-> from IDLE, the power-down mode is a good candidate.
-> 
-> So now we use power-down instead of self-refresh. As we can
-> simplify the code for sama5d3 compatible DDR controllers,
-> we instantiate a new sama5d3_ddr_standby() function.
-> 
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@microchip.com>
-> Cc: <stable@vger.kernel.org> # v4.1+
-> Fixes: 017b5522d5e3 ("ARM: at91: Add new binding for sama5d3-ddramc")
+On Tue, Feb 21, 2017 at 2:49 PM, Marek Szyprowski
+<m.szyprowski@samsung.com> wrote:
 
-Applied, thanks.
+> Sadly this patch breaks support for IMEM pinctrl block on Exynos5433/TM2
+> and it took us some time to find the source of the problem.
+>
+> devm_ioremap_resource() is not functionally a full equivalent of
+> devm_ioremap(). The problem here is that registers for IMEM and ALIVE
+> pin controllers are shared and both devices have <0x11090000 0x1000>
+> range in their reg property. devm_ioremap_resource() maps given
+> resource exclusively for the device, while devm_ioremap() allows
+> non-exclusive mappings.
+>
+> This patch has to be reverted asap.
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Patch reverted for fixes, copying the above text as commit message.
+
+Yours,
+Linus Walleij
