@@ -1,93 +1,49 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 14 Mar 2017 22:39:21 +0100
-Subject: [PATCH] [v2] arm64: define BUG() instruction without CONFIG_BUG
-Message-ID: <20170314213939.3874497-1-arnd@arndb.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 14 Mar 2017 22:41:10 +0100
+Subject: [PATCH] pinctrl: qcom: add get_direction function
+In-Reply-To: <13b19c7f-9440-ab8e-8a2f-d1796a9b3dde@codeaurora.org>
+References: <1486768860-18237-1-git-send-email-timur@codeaurora.org>
+ <8652c018-4051-5c77-3126-2d41d150518a@codeaurora.org>
+ <CACRpkdaoHTZa+XjEBAMtO2dS1jevi5h-QYe90SrZDuJghQSyYw@mail.gmail.com>
+ <13b19c7f-9440-ab8e-8a2f-d1796a9b3dde@codeaurora.org>
+Message-ID: <CACRpkdZFzYStyPfK1DwkZfvtd7wX9HtD1bnCy+i9h-7xowOz4g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This mirrors commit e9c38ceba8d9 ("ARM: 8455/1: define __BUG as
-asm(BUG_INSTR) without CONFIG_BUG") to make the behavior of
-arm64 consistent with arm and x86, and avoids lots of warnings in
-randconfig builds, such as:
+On Mon, Mar 6, 2017 at 10:52 PM, Timur Tabi <timur@codeaurora.org> wrote:
 
-kernel/seccomp.c: In function '__seccomp_filter':
-kernel/seccomp.c:666:1: error: no return statement in function returning non-void [-Werror=return-type]
+> On ACPI platforms, the kernel has no control over the muxing (aka function)
+> of the various pins.  Firmware configures the TLMM controller for all pins,
+> and configures them for whatever functions they're supposed to be.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
-Originally submitted v1 on Feb 14 as a simple addition of a few lines.
-v2 is a new version doing the same thing with a cleaner rewrite of
-the file, using three lines less, after a suggested from Will Deacon.
+I think it would be better if pin control and ACPI play along, and I bet that
+will happen in the future. This is I guess a question for ACPI standardization
+work.
 
-No need to get this into v4.11 though, especially as the rewrite
-makes it a bit risky. Please queue this for v4.12 if you like the
-new version.
----
- arch/arm64/include/asm/bug.h | 34 ++++++++++++++++++++--------------
- 1 file changed, 20 insertions(+), 14 deletions(-)
+> Therefore, on ACPI, the driver should never change the function of any pin.
+> If it's set to something other than 0, then it should never touch that pin.
+> Don't write to it, don't change the direction, and definitely don't change
+> the function.
 
-diff --git a/arch/arm64/include/asm/bug.h b/arch/arm64/include/asm/bug.h
-index 561190d15881..bfc6021760e5 100644
---- a/arch/arm64/include/asm/bug.h
-+++ b/arch/arm64/include/asm/bug.h
-@@ -20,9 +20,6 @@
- 
- #include <asm/brk-imm.h>
- 
--#ifdef CONFIG_GENERIC_BUG
--#define HAVE_ARCH_BUG
--
- #ifdef CONFIG_DEBUG_BUGVERBOSE
- #define _BUGVERBOSE_LOCATION(file, line) __BUGVERBOSE_LOCATION(file, line)
- #define __BUGVERBOSE_LOCATION(file, line)				\
-@@ -36,28 +33,37 @@
- #define _BUGVERBOSE_LOCATION(file, line)
- #endif
- 
--#define _BUG_FLAGS(flags) __BUG_FLAGS(flags)
-+#ifdef CONFIG_GENERIC_BUG
- 
--#define __BUG_FLAGS(flags) asm volatile (		\
-+#define __BUG_ENTRY(flags) 				\
- 		".pushsection __bug_table,\"a\"\n\t"	\
- 		".align 2\n\t"				\
- 	"0:	.long 1f - 0b\n\t"			\
- _BUGVERBOSE_LOCATION(__FILE__, __LINE__)		\
- 		".short " #flags "\n\t"			\
- 		".popsection\n"				\
--							\
--	"1:	brk %[imm]"				\
--		:: [imm] "i" (BUG_BRK_IMM)		\
--)
-+	"1:	"
-+#else
-+#define __BUG_ENTRY(flags) ""
-+#endif
-+
-+#define __BUG_FLAGS(flags)				\
-+	asm volatile (					\
-+		__BUG_ENTRY(0)				\
-+		"brk %[imm]" :: [imm] "i" (BUG_BRK_IMM)	\
-+	);
- 
--#define BUG() do {				\
--	_BUG_FLAGS(0);				\
--	unreachable();				\
-+#define _BUG_FLAGS(flags) __BUG_FLAGS(flags)
-+
-+#define BUG() do {					\
-+	__BUG_FLAGS(0);					\
-+	unreachable();					\
- } while (0)
- 
--#define __WARN_TAINT(taint) _BUG_FLAGS(BUGFLAG_TAINT(taint))
-+#define __WARN_TAINT(taint) 				\
-+	__BUG_FLAGS(BUGFLAG_TAINT(taint))
- 
--#endif /* ! CONFIG_GENERIC_BUG */
-+#define HAVE_ARCH_BUG
- 
- #include <asm-generic/bug.h>
- 
--- 
-2.9.0
+Does that mean that pins with 0 are free to play around with?
+
+> So would it be acceptable, for example, to change msm_gpio_set() such that
+> if the function of that pin is non-zero, just return an error?
+
+I would ask the driver maintainer about his opinion, and also whoever
+is an authority on ACPI for the TLMM-chips, I am no expert
+in ACPI. Hell I'm not even good at device tree. Not to mention SFI.
+Oh well...
+
+> After all, if pin #17 is set to UART and not GPIO, then there's no point in
+> setting that value to 1 or 0, because it's not muxed for GPIO and therefore,
+> that 1/0 is not actually going anywhere.  It won't be written to the pin.
+>
+> I hope I'm making sense.
+
+In a way I guess, I'm just ignorant about how current ACPI implementations
+work with hardware in this case so it is likely that you know this
+better than me.
+
+Yours,
+Linus Walleij
