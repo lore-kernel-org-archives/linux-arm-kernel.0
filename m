@@ -1,140 +1,274 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Tue, 14 Mar 2017 23:32:54 +0100
-Subject: media / v4l2-mc: wishlist for complex cameras (was Re: [PATCH v4
- 14/36] [media] v4l2-mc: add a function to inherit controls from a pipeline)
-In-Reply-To: <20170314072143.498cde9b@vento.lan>
-References: <c679f755-52a6-3c6f-3d65-277db46676cc@xs4all.nl>
- <20170310140124.GV21222@n2100.armlinux.org.uk>
- <cc8900b0-c091-b14b-96f4-01f8fa72431c@xs4all.nl>
- <20170310125342.7f047acf@vento.lan>
- <20170310223714.GI3220@valkosipuli.retiisi.org.uk>
- <20170311082549.576531d0@vento.lan>
- <20170313124621.GA10701@valkosipuli.retiisi.org.uk>
- <20170314004533.3b3cd44b@vento.lan>
- <e0a6c60b-1735-de0b-21f4-d8c3f4b3f10f@xs4all.nl>
- <20170314072143.498cde9b@vento.lan>
-Message-ID: <20170314223254.GA7141@amd>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Tue, 14 Mar 2017 15:34:26 -0700
+Subject: [PATCH v2 1/1] ARM64: dts: meson-gxl: improve support for the
+ P212 reference design
+In-Reply-To: <20170304095213.8221-2-martin.blumenstingl@googlemail.com>
+ (Martin Blumenstingl's message of "Sat, 4 Mar 2017 10:52:13 +0100")
+References: <20170219224114.17201-1-martin.blumenstingl@googlemail.com>
+ <20170304095213.8221-1-martin.blumenstingl@googlemail.com>
+ <20170304095213.8221-2-martin.blumenstingl@googlemail.com>
+Message-ID: <m21stza3nx.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Martin Blumenstingl <martin.blumenstingl@googlemail.com> writes:
 
-> > > Even if they were merged, if we keep the same mean time to develop a
-> > > libv4l plugin, that would mean that a plugin for i.MX6 could take 2-3
-> > > years to be developed.
-> > > 
-> > > There's a clear message on it:
-> > > 	- we shouldn't keep pushing for a solution via libv4l.  
-> > 
-> > Or:
-> > 
-> > 	- userspace plugin development had a very a low priority and
-> > 	  never got the attention it needed.
-> 
-> The end result is the same: we can't count on it.
-> 
-> > 
-> > I know that's *my* reason. I rarely if ever looked at it. I always assumed
-> > Sakari and/or Laurent would look at it. If this reason is also valid for
-> > Sakari and Laurent, then it is no wonder nothing has happened in all that
-> > time.
-> > 
-> > We're all very driver-development-driven, and userspace gets very little
-> > attention in general. So before just throwing in the towel we should take
-> > a good look at the reasons why there has been little or no development: is
-> > it because of fundamental design defects, or because nobody paid attention
-> > to it?
-> 
-> No. We should look it the other way: basically, there are patches
-> for i.MX6 driver that sends control from videonode to subdevs. 
-> 
-> If we nack apply it, who will write the userspace plugin? When
-> such change will be merged upstream?
+> The Amlogic P212 reference design is used by other devices as well, such
+> as (for example) the Khadas VIM boards. Thus this patch adds and moves
+> all common entries from meson-gxl-s905x-p212.dts to a new, separate
+> meson-gxl-s905x-p212.dtsi (which can be re-used on boards such as the
+> Khadas VIM).
+> Support for all boards based on the P212 reference design includes:
+> - enabling IR support
+> - enabling the SAR ADC (SARADC_CH1 is connected to a resistor which
+>   indicates the hardware revision, a similar design is found on the
+>   Khadas VIM boards)
+> - all MMC controllers (which means that SDIO wifi, the SD card and the
+>   eMMC are now supported)
+> - pwm_ef as dependency for the SDIO wifi modules
+> - uart_A which is connected to the bluetooth module (the bluetooth
+>   module itself is not enabled yet due to missing devicetree bindings
+>   for the Broadcom serial bluetooth devices)
+> - uart_AO is moved to the .dtsi (as all known devices use it as their
+>   boot-console)
+>
+> Specific to the P212 board:
+> - this also enables the CVBS connector (which is not available on the
+>   Khadas VIM boards for example)
+> - Realtek based SDIO wifi (instead of Broadcom which most other devices
+>   use)
+>
+> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+> Tested-by: Neil Armstrong <narmstrong@baylibre.com>
 
-Well, I believe first question is: what applications would we want to
-run on complex devices? Will sending control from video to subdevs
-actually help?
+I also gave this a spin on P212 board and it's working well.
 
-mplayer is useful for testing... but that one already works (after you
-setup the pipeline, and configure exposure/gain).
+Applied to v4.12/dt64
 
-But thats useful for testing, not really for production. Image will be
-out of focus and with wrong white balance.
+Kevin
 
-What I would really like is an application to get still photos. For
-taking pictures with manual settings we need
-
-a) units for controls: user wants to focus on 1m, and take picture
-with ISO200, 1/125 sec. We should also tell him that lens is f/5.6 and
-focal length is 20mm with 5mm chip.
-
-But... autofocus/autogain would really be good to have. Thus we need:
-
-b) for each frame, we need exposure settings and focus position at
-time frame was taken. Otherwise autofocus/autogain will be too
-slow. At least focus position is going to be tricky -- either kernel
-would have to compute focus position for us (not trivial) or we'd need
-enough information to compute it in userspace.
-
-There are more problems: hardware-accelerated preview is not trivial
-to set up (and I'm unsure if it can be done in generic way). Still
-photos application needs to switch resolutions between preview and
-photo capture. Probably hardware-accelerated histograms are needed for
-white balance, auto gain and auto focus, ....
-
-It seems like there's a _lot_ of stuff to be done before we have
-useful support for complex cameras...
-
-(And I'm not sure... when application such as skype is running, is
-there some way to run autogain/autofocus/autowhitebalance? Is that
-something we want to support?)
-
-> If we don't have answers to any of the above questions, we should not
-> nack it.
-> 
-> That's said, that doesn't prevent merging a libv4l plugin if/when
-> someone can find time/interest to develop it.
-
-I believe other question is: will not having same control on main
-video device and subdevs be confusing? Does it actually help userspace
-in any way? Yes, we can make controls accessible to old application,
-but does it make them more useful? 
-
-> > In addition, I suspect end-users of these complex devices don't really care
-> > about a plugin: they want full control and won't typically use generic
-> > applications. If they would need support for that, we'd have seen much more
-> > interest. The main reason for having a plugin is to simplify testing and
-> > if this is going to be used on cheap hobbyist devkits.
-> 
-> What are the needs for a cheap hobbyist devkit owner? Do we currently
-> satisfy those needs? I'd say that having a functional driver when
-> compiled without the subdev API, that implements the ioctl's/controls
-
-Having different interface based on config options... is just
-weird. What about poor people (like me) trying to develop complex
-applications?
-
-> [1] Yet, I might eventually do that for fun, an OMAP3 board with tvp5150
-> just arrived here last week. It would be nice to have xawtv3 running on it :-)
-> So, if I have a lot of spare time (with is very unlikely), I might eventually 
-> do something for it to work.
-> 
-> > I know it took me a very long time before I had a working omap3.
-> 
-> My first OMAP3 board with working V4L2 source just arrived last week
-> :-)
-
-You can get Nokia N900 on aliexpress. If not, they are still available
-between people :-).
-
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170314/52d3f8de/attachment.sig>
+> ---
+>  .../boot/dts/amlogic/meson-gxl-s905x-p212.dts      |  21 +--
+>  .../boot/dts/amlogic/meson-gxl-s905x-p212.dtsi     | 173 +++++++++++++++++++++
+>  2 files changed, 185 insertions(+), 9 deletions(-)
+>  create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dtsi
+>
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dts b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dts
+> index 9639f012b02b..db31e093f40e 100644
+> --- a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dts
+> +++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dts
+> @@ -43,23 +43,26 @@
+>  
+>  /dts-v1/;
+>  
+> -#include "meson-gxl-s905x.dtsi"
+> +#include "meson-gxl-s905x-p212.dtsi"
+>  
+>  / {
+>  	compatible = "amlogic,p212", "amlogic,s905x", "amlogic,meson-gxl";
+>  	model = "Amlogic Meson GXL (S905X) P212 Development Board";
+>  
+> -	aliases {
+> -		serial0 = &uart_AO;
+> -	};
+> +	cvbs-connector {
+> +		compatible = "composite-video-connector";
+>  
+> -	chosen {
+> -		stdout-path = "serial0:115200n8";
+> +		port {
+> +			cvbs_connector_in: endpoint {
+> +				remote-endpoint = <&cvbs_vdac_out>;
+> +			};
+> +		};
+>  	};
+> +};
+>  
+> -	memory at 0 {
+> -		device_type = "memory";
+> -		reg = <0x0 0x0 0x0 0x80000000>;
+> +&cvbs_vdac_port {
+> +	cvbs_vdac_out: endpoint {
+> +		remote-endpoint = <&cvbs_connector_in>;
+>  	};
+>  };
+>  
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dtsi
+> new file mode 100644
+> index 000000000000..f3eea8e89d12
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dtsi
+> @@ -0,0 +1,173 @@
+> +/*
+> + * Copyright (c) 2016 Martin Blumenstingl <martin.blumenstingl@googlemail.com>.
+> + * Based on meson-gx-p23x-q20x.dtsi:
+> + * - Copyright (c) 2016 Endless Computers, Inc.
+> + *   Author: Carlo Caione <carlo@endlessm.com>
+> + * - Copyright (c) 2016 BayLibre, SAS.
+> + *   Author: Neil Armstrong <narmstrong@baylibre.com>
+> + *
+> + * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+> + */
+> +
+> +/* Common DTSI for devices which are based on the P212 reference board. */
+> +
+> +#include "meson-gxl-s905x.dtsi"
+> +
+> +/ {
+> +	aliases {
+> +		serial0 = &uart_AO;
+> +		serial1 = &uart_A;
+> +	};
+> +
+> +	chosen {
+> +		stdout-path = "serial0:115200n8";
+> +	};
+> +
+> +	memory at 0 {
+> +		device_type = "memory";
+> +		reg = <0x0 0x0 0x0 0x80000000>;
+> +	};
+> +
+> +	vddio_boot: regulator-vddio_boot {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "VDDIO_BOOT";
+> +		regulator-min-microvolt = <1800000>;
+> +		regulator-max-microvolt = <1800000>;
+> +	};
+> +
+> +	vddao_3v3: regulator-vddao_3v3 {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "VDDAO_3V3";
+> +		regulator-min-microvolt = <3300000>;
+> +		regulator-max-microvolt = <3300000>;
+> +	};
+> +
+> +	vddio_ao18: regulator-vddio_ao18 {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "VDDIO_AO18";
+> +		regulator-min-microvolt = <1800000>;
+> +		regulator-max-microvolt = <1800000>;
+> +	};
+> +
+> +	vcc_3v3: regulator-vcc_3v3 {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "VCC_3V3";
+> +		regulator-min-microvolt = <3300000>;
+> +		regulator-max-microvolt = <3300000>;
+> +	};
+> +
+> +	emmc_pwrseq: emmc-pwrseq {
+> +		compatible = "mmc-pwrseq-emmc";
+> +		reset-gpios = <&gpio BOOT_9 GPIO_ACTIVE_LOW>;
+> +	};
+> +
+> +	wifi32k: wifi32k {
+> +		compatible = "pwm-clock";
+> +		#clock-cells = <0>;
+> +		clock-frequency = <32768>;
+> +		pwms = <&pwm_ef 0 30518 0>; /* PWM_E at 32.768KHz */
+> +	};
+> +
+> +	sdio_pwrseq: sdio-pwrseq {
+> +		compatible = "mmc-pwrseq-simple";
+> +		reset-gpios = <&gpio GPIOX_6 GPIO_ACTIVE_LOW>;
+> +		clocks = <&wifi32k>;
+> +		clock-names = "ext_clock";
+> +	};
+> +};
+> +
+> +&ethmac {
+> +	status = "okay";
+> +};
+> +
+> +&ir {
+> +	status = "okay";
+> +	pinctrl-0 = <&remote_input_ao_pins>;
+> +	pinctrl-names = "default";
+> +};
+> +
+> +&saradc {
+> +	status = "okay";
+> +	vref-supply = <&vddio_ao18>;
+> +};
+> +
+> +/* Wireless SDIO Module */
+> +&sd_emmc_a {
+> +	status = "okay";
+> +	pinctrl-0 = <&sdio_pins>;
+> +	pinctrl-names = "default";
+> +	#address-cells = <1>;
+> +	#size-cells = <0>;
+> +
+> +	bus-width = <4>;
+> +	cap-sd-highspeed;
+> +	max-frequency = <100000000>;
+> +
+> +	non-removable;
+> +	disable-wp;
+> +
+> +	mmc-pwrseq = <&sdio_pwrseq>;
+> +
+> +	vmmc-supply = <&vddao_3v3>;
+> +	vqmmc-supply = <&vddio_boot>;
+> +};
+> +
+> +/* SD card */
+> +&sd_emmc_b {
+> +	status = "okay";
+> +	pinctrl-0 = <&sdcard_pins>;
+> +	pinctrl-names = "default";
+> +
+> +	bus-width = <4>;
+> +	cap-sd-highspeed;
+> +	max-frequency = <100000000>;
+> +	disable-wp;
+> +
+> +	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_HIGH>;
+> +	cd-inverted;
+> +
+> +	vmmc-supply = <&vddao_3v3>;
+> +	vqmmc-supply = <&vddio_boot>;
+> +};
+> +
+> +/* eMMC */
+> +&sd_emmc_c {
+> +	status = "okay";
+> +	pinctrl-0 = <&emmc_pins>;
+> +	pinctrl-names = "default";
+> +
+> +	bus-width = <8>;
+> +	cap-sd-highspeed;
+> +	cap-mmc-highspeed;
+> +	max-frequency = <200000000>;
+> +	non-removable;
+> +	disable-wp;
+> +	mmc-ddr-1_8v;
+> +	mmc-hs200-1_8v;
+> +
+> +	mmc-pwrseq = <&emmc_pwrseq>;
+> +	vmmc-supply = <&vcc_3v3>;
+> +	vqmmc-supply = <&vddio_boot>;
+> +};
+> +
+> +&pwm_ef {
+> +	status = "okay";
+> +	pinctrl-0 = <&pwm_e_pins>;
+> +	pinctrl-names = "default";
+> +	clocks = <&clkc CLKID_FCLK_DIV4>;
+> +	clock-names = "clkin0";
+> +};
+> +
+> +/* This is connected to the Bluetooth module: */
+> +&uart_A {
+> +	status = "okay";
+> +	pinctrl-0 = <&uart_a_pins>, <&uart_a_cts_rts_pins>;
+> +	pinctrl-names = "default";
+> +	uart-has-rtscts;
+> +};
+> +
+> +&uart_AO {
+> +	status = "okay";
+> +	pinctrl-0 = <&uart_ao_a_pins>;
+> +	pinctrl-names = "default";
+> +};
