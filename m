@@ -1,40 +1,50 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 14 Mar 2017 21:27:13 +0100
-Subject: [PATCH] PCI: aardvark: Remove msi-controller dt node probing
-In-Reply-To: <20170314193005.GC26264@bhelgaas-glaptop.roam.corp.google.com>
-References: <20170314190851.28203-1-stephen.boyd@linaro.org>
- <20170314193005.GC26264@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <20170314212713.1afb7a9f@free-electrons.com>
+From: nicolas@ndufresne.ca (Nicolas Dufresne)
+Date: Tue, 14 Mar 2017 16:28:02 -0400
+Subject: [RFC PATCH 00/12] Ion cleanup in preparation for moving out of
+ staging
+In-Reply-To: <CA+M3ks5AyVN1hn=FCRx7sy-3B=VujEBL4G4tWy6opifkKTD8=w@mail.gmail.com>
+References: <1488491084-17252-1-git-send-email-labbott@redhat.com>
+ <20170303132949.GC31582@dhcp22.suse.cz>
+ <cf383b9b-3cbc-0092-a071-f120874c053c@redhat.com>
+ <20170306074258.GA27953@dhcp22.suse.cz>
+ <20170306104041.zghsicrnadoap7lp@phenom.ffwll.local>
+ <20170306105805.jsq44kfxhsvazkm6@sirena.org.uk>
+ <20170306160437.sf7bksorlnw7u372@phenom.ffwll.local>
+ <CA+M3ks77Am3Fx-ZNmgeM5tCqdM7SzV7rby4Es-p2F2aOhUco9g@mail.gmail.com>
+ <26bc57ae-d88f-4ea0-d666-2c1a02bf866f@redhat.com>
+ <CA+M3ks6R=n4n54wofK7pYcWoQKUhzyWQytBO90+pRDRrAhi3ww@mail.gmail.com>
+ <CAKMK7uH9NemeM2z-tQvge_B=kABop6O7UQFK3PirpJminMCPqw@mail.gmail.com>
+ <6d3d52ba-29a9-701f-2948-00ce28282975@redhat.com>
+ <CA+M3ks5AyVN1hn=FCRx7sy-3B=VujEBL4G4tWy6opifkKTD8=w@mail.gmail.com>
+Message-ID: <1489523282.28116.10.camel@ndufresne.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Tue, 14 Mar 2017 14:30:05 -0500, Bjorn Helgaas wrote:
-> On Tue, Mar 14, 2017 at 12:08:51PM -0700, Stephen Boyd wrote:
-> > This code assigns variables that are never used. Remove them.
-> > 
-> > Reported-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-> > Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> > Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>  
+Le mardi 14 mars 2017 ? 15:47 +0100, Benjamin Gaignard a ?crit?:
+> Should we use /devi/ion/$heap instead of /dev/ion_$heap ?
+> I think it would be easier for user to look into one directory rather
+> then in whole /dev to find the heaps
 > 
-> I love removing unused code!  Applied to pci/host-aardvark for v4.12,
-> thanks!
+> > is that we don't have to worry about a limit of 32 possible
+> > heaps per system (32-bit heap id allocation field). But dealing
+> > with an ioctl seems easier than names. Userspace might be less
+> > likely to hardcode random id numbers vs. names as well.
+> 
+> In the futur I think that heap type will be replaced by a "get caps"
+> ioctl which will
+> describe heap capabilities. At least that is my understanding of
+> kernel part
+> of "unix memory allocator" project
 
-Why? I have already sent a patch that also does this (and much more!) a
-number of times already, and it has never been applied. See:
+I think what we really need from userspace point of view, is the
+ability to find a compatible heap for a set of drivers. And this
+without specific knowledge of the drivers.
 
-  [PATCH v3 1/3] pci: pci-aardvark: move to MSI handling using generic MSI support
-
-v1 on September 1st, 2016
-v2 on December 23th, 2016
-v3 on February 28th, 2017
-
-Best regards,
-
-Thomas
-
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Nicolas
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170314/b02c34f7/attachment.sig>
