@@ -1,62 +1,216 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 14 Mar 2017 19:05:02 +0000
-Subject: [PATCH 1/2] Documentation: perf: xgene: Add support for SoC PMU
- of next generation of X-Gene
-In-Reply-To: <1489514812-19671-2-git-send-email-hotran@apm.com>
-References: <1489514812-19671-1-git-send-email-hotran@apm.com>
- <1489514812-19671-2-git-send-email-hotran@apm.com>
-Message-ID: <20170314190501.GA26335@leverpostej>
+From: tjakobi@math.uni-bielefeld.de (Tobias Jakobi)
+Date: Tue, 14 Mar 2017 20:01:41 +0100
+Subject: [PATCH] drm/exynos: Print kernel pointers in a restricted form
+In-Reply-To: <20170314183804.13788-1-krzk@kernel.org>
+References: <20170314183804.13788-1-krzk@kernel.org>
+Message-ID: <e1800491-0b60-74d1-1377-756d5b0bb371@math.uni-bielefeld.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 14, 2017 at 11:06:51AM -0700, Hoan Tran wrote:
-> This patch adds support for SoC-wide (AKA uncore) Performance Monitoring
-> Unit in the next generation of X-Gene SoC.
+Hello Krzysztof,
 
-It adds a description, certainly.
+I was wondering about the benefit of this. From a quick look these are
+all messages that end up in the kernel log / dmesg.
 
+IIRC %pK does nothing there, since dmest_restrict is supposed to be used
+to deny an unpriviliged user the access to the kernel log.
+
+Or am I missing something here?
+
+- Tobias
+
+
+Krzysztof Kozlowski wrote:
+> Printing raw kernel pointers might reveal information which sometimes we
+> try to hide (e.g. with Kernel Address Space Layout Randomization).  Use
+> the "%pK" format so these pointers will be hidden for unprivileged
+> users.
 > 
-> Signed-off-by: Hoan Tran <hotran@apm.com>
+> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 > ---
->  Documentation/perf/xgene-pmu.txt | 17 +++++++++++------
->  1 file changed, 11 insertions(+), 6 deletions(-)
+>  drivers/gpu/drm/exynos/exynos_drm_dsi.c     |  4 ++--
+>  drivers/gpu/drm/exynos/exynos_drm_fimc.c    |  2 +-
+>  drivers/gpu/drm/exynos/exynos_drm_gem.c     |  2 +-
+>  drivers/gpu/drm/exynos/exynos_drm_gsc.c     |  2 +-
+>  drivers/gpu/drm/exynos/exynos_drm_ipp.c     | 22 +++++++++++-----------
+>  drivers/gpu/drm/exynos/exynos_drm_rotator.c |  2 +-
+>  6 files changed, 17 insertions(+), 17 deletions(-)
 > 
-> diff --git a/Documentation/perf/xgene-pmu.txt b/Documentation/perf/xgene-pmu.txt
-> index d7cff44..51f8179 100644
-> --- a/Documentation/perf/xgene-pmu.txt
-> +++ b/Documentation/perf/xgene-pmu.txt
-> @@ -23,12 +23,17 @@ equivalent of "l3c0/config=0x0b/".
->  Most of the SoC PMU has a specific list of agent ID used for monitoring
->  performance of a specific datapath. For example, agents of a L3 cache can be
->  a specific CPU or an I/O bridge. Each PMU has a set of 2 registers capable of
-> -masking the agents from which the request come from. If the bit with
-> -the bit number corresponding to the agent is set, the event is counted only if
-> -it is caused by a request from that agent. Each agent ID bit is inversely mapped
-> -to a corresponding bit in "config1" field. By default, the event will be
-> -counted for all agent requests (config1 = 0x0). For all the supported agents of
-> -each PMU, please refer to APM X-Gene User Manual.
-> +masking the agents from which the request come from. If an agent is enabled,
-> +the event is counted only if it is caused by a request from that agent.
-> + - With SoC PMU version 1 and 2, each agent ID has an enable bit which is
-> +inversely mapped to a corresponding bit in "config1" field. The value by
-> +default of config1 is 0.
-> + - With Soc PMU version 3, agent ID enable mask is encoded and mapped into
-> +"config1" field without inversion. The value by default of "config1" is
-> +defined corresponding to each SoC PMU type.
-
-Why is this the opposite way around from version 1 and 2, given it's
-described in the same field?
-
-It seems that this only adds complication...
-
-Mark.
-
-> +By default, the event will be counted for all agent requests. For all the
-> +supported agents of each PMU and agent configuration, please refer to
-> +APM X-Gene User Manual.
+> diff --git a/drivers/gpu/drm/exynos/exynos_drm_dsi.c b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
+> index 812e2ec0761d..202526b20b64 100644
+> --- a/drivers/gpu/drm/exynos/exynos_drm_dsi.c
+> +++ b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
+> @@ -979,7 +979,7 @@ static void exynos_dsi_send_to_fifo(struct exynos_dsi *dsi,
+>  	bool first = !xfer->tx_done;
+>  	u32 reg;
 >  
->  Each perf driver also provides a "cpumask" sysfs attribute, which contains a
->  single CPU ID of the processor which will be used to handle all the PMU events.
-> -- 
-> 1.9.1
+> -	dev_dbg(dev, "< xfer %p: tx len %u, done %u, rx len %u, done %u\n",
+> +	dev_dbg(dev, "< xfer %pK: tx len %u, done %u, rx len %u, done %u\n",
+>  		xfer, length, xfer->tx_done, xfer->rx_len, xfer->rx_done);
+>  
+>  	if (length > DSI_TX_FIFO_SIZE)
+> @@ -1177,7 +1177,7 @@ static bool exynos_dsi_transfer_finish(struct exynos_dsi *dsi)
+>  	spin_unlock_irqrestore(&dsi->transfer_lock, flags);
+>  
+>  	dev_dbg(dsi->dev,
+> -		"> xfer %p, tx_len %zu, tx_done %u, rx_len %u, rx_done %u\n",
+> +		"> xfer %pK, tx_len %zu, tx_done %u, rx_len %u, rx_done %u\n",
+>  		xfer, xfer->packet.payload_length, xfer->tx_done, xfer->rx_len,
+>  		xfer->rx_done);
+>  
+> diff --git a/drivers/gpu/drm/exynos/exynos_drm_fimc.c b/drivers/gpu/drm/exynos/exynos_drm_fimc.c
+> index 95871577015d..5b18b5c5fdf2 100644
+> --- a/drivers/gpu/drm/exynos/exynos_drm_fimc.c
+> +++ b/drivers/gpu/drm/exynos/exynos_drm_fimc.c
+> @@ -1695,7 +1695,7 @@ static int fimc_probe(struct platform_device *pdev)
+>  		goto err_put_clk;
+>  	}
+>  
+> -	DRM_DEBUG_KMS("id[%d]ippdrv[%p]\n", ctx->id, ippdrv);
+> +	DRM_DEBUG_KMS("id[%d]ippdrv[%pK]\n", ctx->id, ippdrv);
+>  
+>  	spin_lock_init(&ctx->lock);
+>  	platform_set_drvdata(pdev, ctx);
+> diff --git a/drivers/gpu/drm/exynos/exynos_drm_gem.c b/drivers/gpu/drm/exynos/exynos_drm_gem.c
+> index 4c28f7ffcc4d..55a1579d11b3 100644
+> --- a/drivers/gpu/drm/exynos/exynos_drm_gem.c
+> +++ b/drivers/gpu/drm/exynos/exynos_drm_gem.c
+> @@ -218,7 +218,7 @@ static struct exynos_drm_gem *exynos_drm_gem_init(struct drm_device *dev,
+>  		return ERR_PTR(ret);
+>  	}
+>  
+> -	DRM_DEBUG_KMS("created file object = %p\n", obj->filp);
+> +	DRM_DEBUG_KMS("created file object = %pK\n", obj->filp);
+>  
+>  	return exynos_gem;
+>  }
+> diff --git a/drivers/gpu/drm/exynos/exynos_drm_gsc.c b/drivers/gpu/drm/exynos/exynos_drm_gsc.c
+> index bef57987759d..0506b2b17ac1 100644
+> --- a/drivers/gpu/drm/exynos/exynos_drm_gsc.c
+> +++ b/drivers/gpu/drm/exynos/exynos_drm_gsc.c
+> @@ -1723,7 +1723,7 @@ static int gsc_probe(struct platform_device *pdev)
+>  		return ret;
+>  	}
+>  
+> -	DRM_DEBUG_KMS("id[%d]ippdrv[%p]\n", ctx->id, ippdrv);
+> +	DRM_DEBUG_KMS("id[%d]ippdrv[%pK]\n", ctx->id, ippdrv);
+>  
+>  	mutex_init(&ctx->lock);
+>  	platform_set_drvdata(pdev, ctx);
+> diff --git a/drivers/gpu/drm/exynos/exynos_drm_ipp.c b/drivers/gpu/drm/exynos/exynos_drm_ipp.c
+> index 9c84ee76f18a..3edda18cc2d2 100644
+> --- a/drivers/gpu/drm/exynos/exynos_drm_ipp.c
+> +++ b/drivers/gpu/drm/exynos/exynos_drm_ipp.c
+> @@ -208,7 +208,7 @@ static struct exynos_drm_ippdrv *ipp_find_drv_by_handle(u32 prop_id)
+>  	 * e.g PAUSE state, queue buf, command control.
+>  	 */
+>  	list_for_each_entry(ippdrv, &exynos_drm_ippdrv_list, drv_list) {
+> -		DRM_DEBUG_KMS("count[%d]ippdrv[%p]\n", count++, ippdrv);
+> +		DRM_DEBUG_KMS("count[%d]ippdrv[%pK]\n", count++, ippdrv);
+>  
+>  		mutex_lock(&ippdrv->cmd_lock);
+>  		list_for_each_entry(c_node, &ippdrv->cmd_list, list) {
+> @@ -388,7 +388,7 @@ int exynos_drm_ipp_set_property(struct drm_device *drm_dev, void *data,
+>  	}
+>  	property->prop_id = ret;
+>  
+> -	DRM_DEBUG_KMS("created prop_id[%d]cmd[%d]ippdrv[%p]\n",
+> +	DRM_DEBUG_KMS("created prop_id[%d]cmd[%d]ippdrv[%pK]\n",
+>  		property->prop_id, property->cmd, ippdrv);
+>  
+>  	/* stored property information and ippdrv in private data */
+> @@ -518,7 +518,7 @@ static int ipp_put_mem_node(struct drm_device *drm_dev,
+>  {
+>  	int i;
+>  
+> -	DRM_DEBUG_KMS("node[%p]\n", m_node);
+> +	DRM_DEBUG_KMS("node[%pK]\n", m_node);
+>  
+>  	if (!m_node) {
+>  		DRM_ERROR("invalid dequeue node.\n");
+> @@ -562,7 +562,7 @@ static struct drm_exynos_ipp_mem_node
+>  	m_node->buf_id = qbuf->buf_id;
+>  	INIT_LIST_HEAD(&m_node->list);
+>  
+> -	DRM_DEBUG_KMS("m_node[%p]ops_id[%d]\n", m_node, qbuf->ops_id);
+> +	DRM_DEBUG_KMS("m_node[%pK]ops_id[%d]\n", m_node, qbuf->ops_id);
+>  	DRM_DEBUG_KMS("prop_id[%d]buf_id[%d]\n", qbuf->prop_id, m_node->buf_id);
+>  
+>  	for_each_ipp_planar(i) {
+> @@ -659,7 +659,7 @@ static void ipp_put_event(struct drm_exynos_ipp_cmd_node *c_node,
+>  
+>  	mutex_lock(&c_node->event_lock);
+>  	list_for_each_entry_safe(e, te, &c_node->event_list, base.link) {
+> -		DRM_DEBUG_KMS("count[%d]e[%p]\n", count++, e);
+> +		DRM_DEBUG_KMS("count[%d]e[%pK]\n", count++, e);
+>  
+>  		/*
+>  		 * qbuf == NULL condition means all event deletion.
+> @@ -750,7 +750,7 @@ static struct drm_exynos_ipp_mem_node
+>  
+>  	/* find memory node from memory list */
+>  	list_for_each_entry(m_node, head, list) {
+> -		DRM_DEBUG_KMS("count[%d]m_node[%p]\n", count++, m_node);
+> +		DRM_DEBUG_KMS("count[%d]m_node[%pK]\n", count++, m_node);
+>  
+>  		/* compare buffer id */
+>  		if (m_node->buf_id == qbuf->buf_id)
+> @@ -767,7 +767,7 @@ static int ipp_set_mem_node(struct exynos_drm_ippdrv *ippdrv,
+>  	struct exynos_drm_ipp_ops *ops = NULL;
+>  	int ret = 0;
+>  
+> -	DRM_DEBUG_KMS("node[%p]\n", m_node);
+> +	DRM_DEBUG_KMS("node[%pK]\n", m_node);
+>  
+>  	if (!m_node) {
+>  		DRM_ERROR("invalid queue node.\n");
+> @@ -1232,7 +1232,7 @@ static int ipp_start_property(struct exynos_drm_ippdrv *ippdrv,
+>  			m_node = list_first_entry(head,
+>  				struct drm_exynos_ipp_mem_node, list);
+>  
+> -			DRM_DEBUG_KMS("m_node[%p]\n", m_node);
+> +			DRM_DEBUG_KMS("m_node[%pK]\n", m_node);
+>  
+>  			ret = ipp_set_mem_node(ippdrv, c_node, m_node);
+>  			if (ret) {
+> @@ -1601,7 +1601,7 @@ static int ipp_subdrv_probe(struct drm_device *drm_dev, struct device *dev)
+>  		}
+>  		ippdrv->prop_list.ipp_id = ret;
+>  
+> -		DRM_DEBUG_KMS("count[%d]ippdrv[%p]ipp_id[%d]\n",
+> +		DRM_DEBUG_KMS("count[%d]ippdrv[%pK]ipp_id[%d]\n",
+>  			count++, ippdrv, ret);
+>  
+>  		/* store parent device for node */
+> @@ -1659,7 +1659,7 @@ static int ipp_subdrv_open(struct drm_device *drm_dev, struct device *dev,
+>  
+>  	file_priv->ipp_dev = dev;
+>  
+> -	DRM_DEBUG_KMS("done priv[%p]\n", dev);
+> +	DRM_DEBUG_KMS("done priv[%pK]\n", dev);
+>  
+>  	return 0;
+>  }
+> @@ -1676,7 +1676,7 @@ static void ipp_subdrv_close(struct drm_device *drm_dev, struct device *dev,
+>  		mutex_lock(&ippdrv->cmd_lock);
+>  		list_for_each_entry_safe(c_node, tc_node,
+>  			&ippdrv->cmd_list, list) {
+> -			DRM_DEBUG_KMS("count[%d]ippdrv[%p]\n",
+> +			DRM_DEBUG_KMS("count[%d]ippdrv[%pK]\n",
+>  				count++, ippdrv);
+>  
+>  			if (c_node->filp == file) {
+> diff --git a/drivers/gpu/drm/exynos/exynos_drm_rotator.c b/drivers/gpu/drm/exynos/exynos_drm_rotator.c
+> index 6591e406084c..79282a820ecc 100644
+> --- a/drivers/gpu/drm/exynos/exynos_drm_rotator.c
+> +++ b/drivers/gpu/drm/exynos/exynos_drm_rotator.c
+> @@ -748,7 +748,7 @@ static int rotator_probe(struct platform_device *pdev)
+>  		goto err_ippdrv_register;
+>  	}
+>  
+> -	DRM_DEBUG_KMS("ippdrv[%p]\n", ippdrv);
+> +	DRM_DEBUG_KMS("ippdrv[%pK]\n", ippdrv);
+>  
+>  	platform_set_drvdata(pdev, rot);
+>  
 > 
