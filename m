@@ -1,79 +1,155 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 14 Mar 2017 09:39:15 +0100
-Subject: [PATCH V7 0/7] LPC: legacy ISA I/O support
-In-Reply-To: <1489372963-9000-1-git-send-email-yuanzhichang@hisilicon.com>
-References: <1489372963-9000-1-git-send-email-yuanzhichang@hisilicon.com>
-Message-ID: <CAK8P3a1f33ipk3Q8+wj9L6zP=ccn_AuhTfV0CC0+wAqrO-2beg@mail.gmail.com>
+From: alim.akhtar@samsung.com (Alim Akhtar)
+Date: Tue, 14 Mar 2017 14:10:02 +0530
+Subject: [2/3] soc: samsung: Do not build ARMv7 PMU drivers on ARMv8
+In-Reply-To: <CAJKOXPd=K8rbBxV21ibubjgU8BV3g4AqDrXX0f6-N_VPkR=puQ@mail.gmail.com>
+References: <CGME20170314075427epcas5p19d137fbcc390e937172a17ae99f11a0c@epcas5p1.samsung.com>
+ <20170311213856.21701-3-krzk@kernel.org>
+ <2da8c346-dae9-6754-8349-df0946c89ae2@samsung.com>
+ <CAJKOXPd=K8rbBxV21ibubjgU8BV3g4AqDrXX0f6-N_VPkR=puQ@mail.gmail.com>
+Message-ID: <0ae4c538-a3af-a1b7-418d-4bccbf09faf4@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 13, 2017 at 3:42 AM, zhichang.yuan
-<yuanzhichang@hisilicon.com> wrote:
-> This patchset supports the IPMI-bt device attached to the Low-Pin-Count
-> interface implemented on Hisilicon Hip06/Hip07 SoC.
->                         -----------
->                         | LPC host|
->                         |         |
->                         -----------
->                              |
->                 _____________V_______________LPC
->                   |                       |
->                   V                       V
->                                      ------------
->                                      |  BT(ipmi)|
->                                      ------------
+
+
+On 03/14/2017 01:32 PM, Krzysztof Kozlowski wrote:
+> On Tue, Mar 14, 2017 at 9:51 AM, Alim Akhtar <alim.akhtar@samsung.com> wrote:
+>> Hi Krzysztof,
+>>
+>> On 03/12/2017 03:08 AM, Krzysztof Kozlowski wrote:
+>>> The Exynos Power Management Unit (PMU) drivers contain quite large
+>>> static arrays of register values necessary for given Exynos SoC to enter
+>>> low power mode.  All this data is useless for ARMv8 SoC like
+>>> Exynos5433, because the image will not be shared between ARMv7 and
+>>> ARMv8.
+>>>
+>>> Add additional Kconfig symbol for selecting the SoC-specific driver
+>>> addons thus skipping the useless data in the final image (this is
+>>> similar approach to chosen for Exynos clock controller drivers):
+>>>  - exynos-pmu driver will be compiled on both architectures ARMv7
+>>>    and ARMv8,
+>>>  - additional driver_data for ARMv7 SoCs will not be built on ARMv8
+>>>    and a macro will return NULL for them in of_device_id - this should
+>>>    be safe as these compatibles cannot match on ARMv7 and driver
+>>>    anyway handles NULL driver_data,
+>>>  - on ARMv8 compile only exynos-pmu driver which exposes the
+>>>    syscon-regmap for PMU address space.
+>>>
+>>> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+>>> ---
+>>>  drivers/soc/samsung/Kconfig      |  8 +++++++-
+>>>  drivers/soc/samsung/Makefile     |  4 +++-
+>>>  drivers/soc/samsung/exynos-pmu.c | 22 ++++++++++++++++------
+>>>  drivers/soc/samsung/exynos-pmu.h |  3 +++
+>>>  4 files changed, 29 insertions(+), 8 deletions(-)
+>>>
+>>> diff --git a/drivers/soc/samsung/Kconfig b/drivers/soc/samsung/Kconfig
+>>> index 245533907d1b..8b25bd55e648 100644
+>>> --- a/drivers/soc/samsung/Kconfig
+>>> +++ b/drivers/soc/samsung/Kconfig
+>>> @@ -8,7 +8,13 @@ if SOC_SAMSUNG
+>>>
+>>>  config EXYNOS_PMU
+>>>       bool "Exynos PMU controller driver" if COMPILE_TEST
+>>> -     depends on (ARM && ARCH_EXYNOS) || ((ARM || ARM64) && COMPILE_TEST)
+>>> +     depends on ARCH_EXYNOS || ((ARM || ARM64) && COMPILE_TEST)
+>>> +     select EXYNOS_PMU_ARM_DRIVERS if ARM && ARCH_EXYNOS
+>>> +
+>>
+>> In general this patch look ok, but I was think we should make these
+>> configs configurable via _menuconfig_. Currently these are visible only
+>> if COMPILE_TEST is enabled.
+>> Recently I was working on adding PMU support for Exynos7 and I face
+>> issues when I want to disable this option and re-enable it for testing
+>> purpose.
 >
-> When master accesses those peripherals beneath the Hip06/Hip07 LPC, a specific
-> LPC driver is needed to make LPC host generate the standard LPC I/O cycles with
-> the target peripherals'I/O port addresses. But on curent arm64 world, there is
-> no real I/O accesses. All the I/O operations through in/out pair are based on
-> MMIO which is not satisfied the I/O mechanism on Hip06/Hip07 LPC.
-> To solve this issue and keep the relevant existing peripherals' driver
-> untouched, this patchset implements:
->   - introduces a generic I/O space management framwork, LIBIO, to support I/O
->     operations of both MMIO buses and the host controllers which access their
->     peripherals with host local I/O addresses;
->   - redefines the in/out accessors to provide unified interfaces for MMIO and
->     legacy I/O. Based on the LIBIO, the calling of in/out() from upper-layer
->     drivers, such as ipmi-si, will be redirected to the corresponding
->     device-specific I/O hooks to perfrom the I/O accesses.
-> Based on this patch-set, all the I/O accesses to Hip06/Hip07 LPC peripherals
-> can be supported without any changes on the existing ipmi-si driver.
+> These drivers are not available in menuconfig on purpose - these are
+> essential parts of SoC. Without them usually something will not work
+> so user should not be able to disable them. For all of such drivers,
+> we use the SELECT from mach approach.
+>
+Well, what you are saying is very subjective. In past I have face issues 
+where to isolate or narrow down some issue, we do need to play with PMU 
+and power domains. So, having a configurable option won't hurt here.
+Anyway if you (or anyone else) strongly feel we should be following 
+"SELECT from MACH approach" then lets follow it.
 
-Thanks for reposting this. I have a few high-level comments first, based on
-the walk through the code I did with Gabriele and John last week:
 
-- I think the libio framework is more generic than it needs to be, but as
-  Alex really liked it this way and it was done like this based on his earlier
-  comments, I think that's ok.
+>>> +# There is no need to enable these drivers for ARMv8
+>>> +config EXYNOS_PMU_ARM_DRIVERS
+>>> +     bool "Exynos PMU ARMv7-specific driver extensions" if COMPILE_TEST
+>>> +     depends on EXYNOS_PMU
+>>>
+>>>  config EXYNOS_PM_DOMAINS
+>>>       bool "Exynos PM domains" if COMPILE_TEST
+>>> diff --git a/drivers/soc/samsung/Makefile b/drivers/soc/samsung/Makefile
+>>> index 3619f2ecddaa..4d7694a4e7a4 100644
+>>> --- a/drivers/soc/samsung/Makefile
+>>> +++ b/drivers/soc/samsung/Makefile
+>>> @@ -1,3 +1,5 @@
+>>> -obj-$(CONFIG_EXYNOS_PMU)     += exynos-pmu.o exynos3250-pmu.o exynos4-pmu.o \
+>>> +obj-$(CONFIG_EXYNOS_PMU)     += exynos-pmu.o
+>>> +
+>>> +obj-$(CONFIG_EXYNOS_PMU_ARM_DRIVERS) += exynos3250-pmu.o exynos4-pmu.o \
+>>>                                       exynos5250-pmu.o exynos5420-pmu.o
+>>>  obj-$(CONFIG_EXYNOS_PM_DOMAINS) += pm_domains.o
+>>> diff --git a/drivers/soc/samsung/exynos-pmu.c b/drivers/soc/samsung/exynos-pmu.c
+>>> index 56d9244ff981..bd4a76f27bc2 100644
+>>> --- a/drivers/soc/samsung/exynos-pmu.c
+>>> +++ b/drivers/soc/samsung/exynos-pmu.c
+>>> @@ -69,27 +69,37 @@ void exynos_sys_powerdown_conf(enum sys_powerdown mode)
+>>>  }
+>>>
+>>>  /*
+>>> + * Split the data between ARM architectures because it is relatively big
+>>> + * and useless on other arch.
+>>> + */
+>>> +#ifdef CONFIG_EXYNOS_PMU_ARM_DRIVERS
+>>> +#define exynos_pmu_data_arm_ptr(data)        (&data)
+>>> +#else
+>>> +#define exynos_pmu_data_arm_ptr(data)        NULL
+>>> +#endif
+>>> +
+>>> +/*
+>>>   * PMU platform driver and devicetree bindings.
+>>>   */
+>>>  static const struct of_device_id exynos_pmu_of_device_ids[] = {
+>>>       {
+>>>               .compatible = "samsung,exynos3250-pmu",
+>>> -             .data = &exynos3250_pmu_data,
+>>> +             .data = exynos_pmu_data_arm_ptr(exynos3250_pmu_data),
+>>>       }, {
+>>>               .compatible = "samsung,exynos4210-pmu",
+>>> -             .data = &exynos4210_pmu_data,
+>>> +             .data = exynos_pmu_data_arm_ptr(exynos4210_pmu_data),
+>>>       }, {
+>>>               .compatible = "samsung,exynos4212-pmu",
+>>> -             .data = &exynos4212_pmu_data,
+>>> +             .data = exynos_pmu_data_arm_ptr(exynos4212_pmu_data),
+>>>       }, {
+>>>               .compatible = "samsung,exynos4412-pmu",
+>>> -             .data = &exynos4412_pmu_data,
+>>> +             .data = exynos_pmu_data_arm_ptr(exynos4412_pmu_data),
+>>>       }, {
+>>>               .compatible = "samsung,exynos5250-pmu",
+>>> -             .data = &exynos5250_pmu_data,
+>>> +             .data = exynos_pmu_data_arm_ptr(exynos5250_pmu_data),
+>>>       }, {
+>>>               .compatible = "samsung,exynos5420-pmu",
+>>> -             .data = &exynos5420_pmu_data,
+>>> +             .data = exynos_pmu_data_arm_ptr(exynos5420_pmu_data),
+>>>       }, {
+>>>               .compatible = "samsung,exynos5433-pmu",
+>> So, as I understand, the idea here to use something like
+>>         .data = &exynos5433_pmu_data or so in case ARMv8?
+>
+> In the future, yes. Now there is no low power mode support for
+> Exynos5433 so the data is left empty.
+>
+Ok, this is fine.
 
-- after we went back and forth on the ACPI implementation, we concluded
-  that it is correct to do the same as on DT and completely abstract the
-  number space for I/O ports. No code should rely on a Linux port number
-  to have any particular relation to the physical address or the the address
-  on a PCI or LPC bus.
-
-- The name "libio" still needs to be changed, this is way too generic, as
-  "I/O" can refer to many things in the kernel, and almost none of them
-  are related to x86 programmed I/O ports in any way. My suggestion
-  would be "generic_ioport", or possibly "libioport", "libpio" or "pci_io". Any
-  of them would work for me, or someone else could come up with a better
-  name that describes what it is.
-
-- I'm pretty sure the current implementation is broken for the ioport_map
-  function that tries to turn an IORESOURCE_IO number into a pointer.
-  Forcing CONFIG_GENERIC_IOMAP on would solve this, but also
-  make all MMIO operations slower, which we probably don't want.
-  It's probably enough to add a check in ioport_map() to see if the range
-  is mapped into a virtual address or not.
-
-- We could simplify the lookup a bit by using the trick from arch/ia64
-  of using an array instead of linked list for walking the port numbers.
-  There, the upper bits of the port number refer to an address space
-  number while the lower bits refer to the bus address within that
-  address space. This should work just as well as the current
-  implementation but would be a little easier to understand. Maybe
-  Bjorn can comment on this too, as I think he was involved with the
-  ia64 implementation.
-
-      Arnd
+> Best regards,
+> Krzysztof
+>
+>
+>
