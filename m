@@ -1,72 +1,201 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Tue, 14 Mar 2017 19:26:46 +0100
-Subject: [PATCH v5 15/39] [media] v4l2: add a frame interval error event
-In-Reply-To: <20170313104538.GF21222@n2100.armlinux.org.uk>
-References: <1489121599-23206-1-git-send-email-steve_longerbeam@mentor.com>
- <1489121599-23206-16-git-send-email-steve_longerbeam@mentor.com>
- <5b0a0e76-2524-4140-5ccc-380a8f949cfa@xs4all.nl>
- <ec05e6e0-79f2-2db2-bde9-4aed00d76faa@gmail.com>
- <6b574476-77df-0e25-a4d1-32d4fe0aec12@xs4all.nl>
- <5d5cf4a4-a4d3-586e-cd16-54f543dfcce9@gmail.com>
- <aa6a5a1d-18fd-8bed-a349-2654d2d1abe0@xs4all.nl>
- <20170313104538.GF21222@n2100.armlinux.org.uk>
-Message-ID: <20170314182646.GB3744@amd>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Tue, 14 Mar 2017 20:38:04 +0200
+Subject: [PATCH] drm/exynos: Print kernel pointers in a restricted form
+Message-ID: <20170314183804.13788-1-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon 2017-03-13 10:45:38, Russell King - ARM Linux wrote:
-> On Mon, Mar 13, 2017 at 11:02:34AM +0100, Hans Verkuil wrote:
-> > On 03/11/2017 07:14 PM, Steve Longerbeam wrote:
-> > > The event must be user visible, otherwise the user has no indication
-> > > the error, and can't correct it by stream restart.
-> > 
-> > In that case the driver can detect this and call vb2_queue_error. It's
-> > what it is there for.
-> > 
-> > The event doesn't help you since only this driver has this issue. So nobody
-> > will watch this event, unless it is sw specifically written for this SoC.
-> > 
-> > Much better to call vb2_queue_error to signal a fatal error (which this
-> > apparently is) since there are more drivers that do this, and vivid supports
-> > triggering this condition as well.
-> 
-> So today, I can fiddle around with the IMX219 registers to help gain
-> an understanding of how this sensor works.  Several of the registers
-> (such as the PLL setup [*]) require me to disable streaming on the
-> sensor while changing them.
-> 
-> This is something I've done many times while testing various ideas,
-> and is my primary way of figuring out and testing such things.
-> 
-> Whenever I resume streaming (provided I've let the sensor stop
-> streaming at a frame boundary) it resumes as if nothing happened.  If I
-> stop the sensor mid-frame, then I get the rolling issue that Steve
-> reports, but once the top of the frame becomes aligned with the top of
-> the capture, everything then becomes stable again as if nothing happened.
-> 
-> The side effect of what you're proposing is that when I disable streaming
-> at the sensor by poking at its registers, rather than the capture just
-> stopping, an error is going to be delivered to gstreamer, and gstreamer
-> is going to exit, taking the entire capture process down.
-> 
-> This severely restricts the ability to be able to develop and test
-> sensor drivers.
+Printing raw kernel pointers might reveal information which sometimes we
+try to hide (e.g. with Kernel Address Space Layout Randomization).  Use
+the "%pK" format so these pointers will be hidden for unprivileged
+users.
 
-Well, but kernel should do what is best for production, not what is
-best for driver debugging.
+Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+---
+ drivers/gpu/drm/exynos/exynos_drm_dsi.c     |  4 ++--
+ drivers/gpu/drm/exynos/exynos_drm_fimc.c    |  2 +-
+ drivers/gpu/drm/exynos/exynos_drm_gem.c     |  2 +-
+ drivers/gpu/drm/exynos/exynos_drm_gsc.c     |  2 +-
+ drivers/gpu/drm/exynos/exynos_drm_ipp.c     | 22 +++++++++++-----------
+ drivers/gpu/drm/exynos/exynos_drm_rotator.c |  2 +-
+ 6 files changed, 17 insertions(+), 17 deletions(-)
 
-And yes, I guess you can have #ifdef or module parameter or something
-switching for behaviour you prefer when you are debugging. But for
-production, vb2_queue_error() seems to be the right solution.
-
-								Pavel
+diff --git a/drivers/gpu/drm/exynos/exynos_drm_dsi.c b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
+index 812e2ec0761d..202526b20b64 100644
+--- a/drivers/gpu/drm/exynos/exynos_drm_dsi.c
++++ b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
+@@ -979,7 +979,7 @@ static void exynos_dsi_send_to_fifo(struct exynos_dsi *dsi,
+ 	bool first = !xfer->tx_done;
+ 	u32 reg;
+ 
+-	dev_dbg(dev, "< xfer %p: tx len %u, done %u, rx len %u, done %u\n",
++	dev_dbg(dev, "< xfer %pK: tx len %u, done %u, rx len %u, done %u\n",
+ 		xfer, length, xfer->tx_done, xfer->rx_len, xfer->rx_done);
+ 
+ 	if (length > DSI_TX_FIFO_SIZE)
+@@ -1177,7 +1177,7 @@ static bool exynos_dsi_transfer_finish(struct exynos_dsi *dsi)
+ 	spin_unlock_irqrestore(&dsi->transfer_lock, flags);
+ 
+ 	dev_dbg(dsi->dev,
+-		"> xfer %p, tx_len %zu, tx_done %u, rx_len %u, rx_done %u\n",
++		"> xfer %pK, tx_len %zu, tx_done %u, rx_len %u, rx_done %u\n",
+ 		xfer, xfer->packet.payload_length, xfer->tx_done, xfer->rx_len,
+ 		xfer->rx_done);
+ 
+diff --git a/drivers/gpu/drm/exynos/exynos_drm_fimc.c b/drivers/gpu/drm/exynos/exynos_drm_fimc.c
+index 95871577015d..5b18b5c5fdf2 100644
+--- a/drivers/gpu/drm/exynos/exynos_drm_fimc.c
++++ b/drivers/gpu/drm/exynos/exynos_drm_fimc.c
+@@ -1695,7 +1695,7 @@ static int fimc_probe(struct platform_device *pdev)
+ 		goto err_put_clk;
+ 	}
+ 
+-	DRM_DEBUG_KMS("id[%d]ippdrv[%p]\n", ctx->id, ippdrv);
++	DRM_DEBUG_KMS("id[%d]ippdrv[%pK]\n", ctx->id, ippdrv);
+ 
+ 	spin_lock_init(&ctx->lock);
+ 	platform_set_drvdata(pdev, ctx);
+diff --git a/drivers/gpu/drm/exynos/exynos_drm_gem.c b/drivers/gpu/drm/exynos/exynos_drm_gem.c
+index 4c28f7ffcc4d..55a1579d11b3 100644
+--- a/drivers/gpu/drm/exynos/exynos_drm_gem.c
++++ b/drivers/gpu/drm/exynos/exynos_drm_gem.c
+@@ -218,7 +218,7 @@ static struct exynos_drm_gem *exynos_drm_gem_init(struct drm_device *dev,
+ 		return ERR_PTR(ret);
+ 	}
+ 
+-	DRM_DEBUG_KMS("created file object = %p\n", obj->filp);
++	DRM_DEBUG_KMS("created file object = %pK\n", obj->filp);
+ 
+ 	return exynos_gem;
+ }
+diff --git a/drivers/gpu/drm/exynos/exynos_drm_gsc.c b/drivers/gpu/drm/exynos/exynos_drm_gsc.c
+index bef57987759d..0506b2b17ac1 100644
+--- a/drivers/gpu/drm/exynos/exynos_drm_gsc.c
++++ b/drivers/gpu/drm/exynos/exynos_drm_gsc.c
+@@ -1723,7 +1723,7 @@ static int gsc_probe(struct platform_device *pdev)
+ 		return ret;
+ 	}
+ 
+-	DRM_DEBUG_KMS("id[%d]ippdrv[%p]\n", ctx->id, ippdrv);
++	DRM_DEBUG_KMS("id[%d]ippdrv[%pK]\n", ctx->id, ippdrv);
+ 
+ 	mutex_init(&ctx->lock);
+ 	platform_set_drvdata(pdev, ctx);
+diff --git a/drivers/gpu/drm/exynos/exynos_drm_ipp.c b/drivers/gpu/drm/exynos/exynos_drm_ipp.c
+index 9c84ee76f18a..3edda18cc2d2 100644
+--- a/drivers/gpu/drm/exynos/exynos_drm_ipp.c
++++ b/drivers/gpu/drm/exynos/exynos_drm_ipp.c
+@@ -208,7 +208,7 @@ static struct exynos_drm_ippdrv *ipp_find_drv_by_handle(u32 prop_id)
+ 	 * e.g PAUSE state, queue buf, command control.
+ 	 */
+ 	list_for_each_entry(ippdrv, &exynos_drm_ippdrv_list, drv_list) {
+-		DRM_DEBUG_KMS("count[%d]ippdrv[%p]\n", count++, ippdrv);
++		DRM_DEBUG_KMS("count[%d]ippdrv[%pK]\n", count++, ippdrv);
+ 
+ 		mutex_lock(&ippdrv->cmd_lock);
+ 		list_for_each_entry(c_node, &ippdrv->cmd_list, list) {
+@@ -388,7 +388,7 @@ int exynos_drm_ipp_set_property(struct drm_device *drm_dev, void *data,
+ 	}
+ 	property->prop_id = ret;
+ 
+-	DRM_DEBUG_KMS("created prop_id[%d]cmd[%d]ippdrv[%p]\n",
++	DRM_DEBUG_KMS("created prop_id[%d]cmd[%d]ippdrv[%pK]\n",
+ 		property->prop_id, property->cmd, ippdrv);
+ 
+ 	/* stored property information and ippdrv in private data */
+@@ -518,7 +518,7 @@ static int ipp_put_mem_node(struct drm_device *drm_dev,
+ {
+ 	int i;
+ 
+-	DRM_DEBUG_KMS("node[%p]\n", m_node);
++	DRM_DEBUG_KMS("node[%pK]\n", m_node);
+ 
+ 	if (!m_node) {
+ 		DRM_ERROR("invalid dequeue node.\n");
+@@ -562,7 +562,7 @@ static struct drm_exynos_ipp_mem_node
+ 	m_node->buf_id = qbuf->buf_id;
+ 	INIT_LIST_HEAD(&m_node->list);
+ 
+-	DRM_DEBUG_KMS("m_node[%p]ops_id[%d]\n", m_node, qbuf->ops_id);
++	DRM_DEBUG_KMS("m_node[%pK]ops_id[%d]\n", m_node, qbuf->ops_id);
+ 	DRM_DEBUG_KMS("prop_id[%d]buf_id[%d]\n", qbuf->prop_id, m_node->buf_id);
+ 
+ 	for_each_ipp_planar(i) {
+@@ -659,7 +659,7 @@ static void ipp_put_event(struct drm_exynos_ipp_cmd_node *c_node,
+ 
+ 	mutex_lock(&c_node->event_lock);
+ 	list_for_each_entry_safe(e, te, &c_node->event_list, base.link) {
+-		DRM_DEBUG_KMS("count[%d]e[%p]\n", count++, e);
++		DRM_DEBUG_KMS("count[%d]e[%pK]\n", count++, e);
+ 
+ 		/*
+ 		 * qbuf == NULL condition means all event deletion.
+@@ -750,7 +750,7 @@ static struct drm_exynos_ipp_mem_node
+ 
+ 	/* find memory node from memory list */
+ 	list_for_each_entry(m_node, head, list) {
+-		DRM_DEBUG_KMS("count[%d]m_node[%p]\n", count++, m_node);
++		DRM_DEBUG_KMS("count[%d]m_node[%pK]\n", count++, m_node);
+ 
+ 		/* compare buffer id */
+ 		if (m_node->buf_id == qbuf->buf_id)
+@@ -767,7 +767,7 @@ static int ipp_set_mem_node(struct exynos_drm_ippdrv *ippdrv,
+ 	struct exynos_drm_ipp_ops *ops = NULL;
+ 	int ret = 0;
+ 
+-	DRM_DEBUG_KMS("node[%p]\n", m_node);
++	DRM_DEBUG_KMS("node[%pK]\n", m_node);
+ 
+ 	if (!m_node) {
+ 		DRM_ERROR("invalid queue node.\n");
+@@ -1232,7 +1232,7 @@ static int ipp_start_property(struct exynos_drm_ippdrv *ippdrv,
+ 			m_node = list_first_entry(head,
+ 				struct drm_exynos_ipp_mem_node, list);
+ 
+-			DRM_DEBUG_KMS("m_node[%p]\n", m_node);
++			DRM_DEBUG_KMS("m_node[%pK]\n", m_node);
+ 
+ 			ret = ipp_set_mem_node(ippdrv, c_node, m_node);
+ 			if (ret) {
+@@ -1601,7 +1601,7 @@ static int ipp_subdrv_probe(struct drm_device *drm_dev, struct device *dev)
+ 		}
+ 		ippdrv->prop_list.ipp_id = ret;
+ 
+-		DRM_DEBUG_KMS("count[%d]ippdrv[%p]ipp_id[%d]\n",
++		DRM_DEBUG_KMS("count[%d]ippdrv[%pK]ipp_id[%d]\n",
+ 			count++, ippdrv, ret);
+ 
+ 		/* store parent device for node */
+@@ -1659,7 +1659,7 @@ static int ipp_subdrv_open(struct drm_device *drm_dev, struct device *dev,
+ 
+ 	file_priv->ipp_dev = dev;
+ 
+-	DRM_DEBUG_KMS("done priv[%p]\n", dev);
++	DRM_DEBUG_KMS("done priv[%pK]\n", dev);
+ 
+ 	return 0;
+ }
+@@ -1676,7 +1676,7 @@ static void ipp_subdrv_close(struct drm_device *drm_dev, struct device *dev,
+ 		mutex_lock(&ippdrv->cmd_lock);
+ 		list_for_each_entry_safe(c_node, tc_node,
+ 			&ippdrv->cmd_list, list) {
+-			DRM_DEBUG_KMS("count[%d]ippdrv[%p]\n",
++			DRM_DEBUG_KMS("count[%d]ippdrv[%pK]\n",
+ 				count++, ippdrv);
+ 
+ 			if (c_node->filp == file) {
+diff --git a/drivers/gpu/drm/exynos/exynos_drm_rotator.c b/drivers/gpu/drm/exynos/exynos_drm_rotator.c
+index 6591e406084c..79282a820ecc 100644
+--- a/drivers/gpu/drm/exynos/exynos_drm_rotator.c
++++ b/drivers/gpu/drm/exynos/exynos_drm_rotator.c
+@@ -748,7 +748,7 @@ static int rotator_probe(struct platform_device *pdev)
+ 		goto err_ippdrv_register;
+ 	}
+ 
+-	DRM_DEBUG_KMS("ippdrv[%p]\n", ippdrv);
++	DRM_DEBUG_KMS("ippdrv[%pK]\n", ippdrv);
+ 
+ 	platform_set_drvdata(pdev, rot);
+ 
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170314/b79f73d5/attachment-0001.sig>
+2.9.3
