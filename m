@@ -1,58 +1,37 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 14 Mar 2017 14:47:23 +0100
-Subject: [PATCH v2 1/4] pinctrl: samsung: Fix the width of PINCFG_TYPE_DRV
- bitfields for Exynos5433
-In-Reply-To: <58AF7CCB.5070303@samsung.com>
-References: <CGME20161230041426epcas1p1f827d3cee8b607d81e9921b412ddf301@epcas1p1.samsung.com>
- <20161230041421.24448-1-andi.shyti@samsung.com>
- <20161230041421.24448-2-andi.shyti@samsung.com>
- <CACRpkdbR3x14h38Gg7qpeWnswwD9qsS0zDUrrXCEJH-AdEB+cQ@mail.gmail.com>
- <58AF7CCB.5070303@samsung.com>
-Message-ID: <CACRpkda0-k7Vo9Y6yNtLNXu-gGnJW9y83t6W9p032KWjHYdMiw@mail.gmail.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Tue, 14 Mar 2017 06:47:26 -0700
+Subject: [PATCH v3 2/3] watchdog: s3c2410: Simplify getting driver data
+In-Reply-To: <CAJKOXPeoHVECsyT+Jy4D3bCwed2gsiKq3akMcDGNKTvrVbcEUg@mail.gmail.com>
+References: <20170313190726.2988-1-krzk@kernel.org>
+ <CGME20170314131709epcas5p4e150e0df2a04a3369edf61b2075e2e8f@epcas5p4.samsung.com>
+ <20170313190726.2988-3-krzk@kernel.org> <2568764.DQnxL2m83S@amdc3058>
+ <CAJKOXPeoHVECsyT+Jy4D3bCwed2gsiKq3akMcDGNKTvrVbcEUg@mail.gmail.com>
+Message-ID: <08e02fbe-a059-fae9-ad08-ccd32a9602a7@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 24, 2017 at 1:22 AM, Chanwoo Choi <cw00.choi@samsung.com> wrote:
-> On 2016? 12? 30? 22:28, Linus Walleij wrote:
->> On Fri, Dec 30, 2016 at 5:14 AM, Andi Shyti <andi.shyti@samsung.com> wrote:
+On 03/14/2017 06:20 AM, Krzysztof Kozlowski wrote:
+> On Tue, Mar 14, 2017 at 3:17 PM, Bartlomiej Zolnierkiewicz
+> <b.zolnierkie@samsung.com> wrote:
 >>
->>> From: Chanwoo Choi <cw00.choi@samsung.com>
+>> Hi,
+>>
+>> On Monday, March 13, 2017 09:07:25 PM Krzysztof Kozlowski wrote:
+>>> Simplify the flow in helper function for getting the driver data by
+>>> using of_device_get_match_data() and only one if() branch.
 >>>
->>> This patch fixes the wrong width of PINCFG_TYPE_DRV bitfields for Exynos5433
->>> because PINCFG_TYPE_DRV of Exynos5433 has 4bit fields in the *_DRV
->>> registers. Usually, other Exynos have 2bit field for PINCFG_TYPE_DRV.
->>>
->>> Fixes: 3c5ecc9ed353 ("pinctrl: exynos: Add support for Exynos5433")
->>> Cc: stable at vger.kernel.org
->>> Cc: Tomasz Figa <tomasz.figa@gmail.com>
->>> Cc: Krzysztof Kozlowski <krzk@kernel.org>
->>> Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
->>> Cc: Linus Walleij <linus.walleij@linaro.org>
->>> Cc: Kukjin Kim <kgene@kernel.org>
->>> Cc: Javier Martinez Canillas <javier@osg.samsung.com>
->>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+>>> The code should be equivalent.
 >>
->> Nominally I think you should sign this off too Andi, as you are in the delivery
->> path.
->>
->> Patch applied for fixes.
+>> While you are at it could you remove s3c2410_get_wdt_drv_data()
+>> helper?  It is used only once during probe and is marked inline
+>> anyway..
 >
-> This patch was already merged on your git and then merge it on tovalds's git[1].
-> But, when I checked the latest drivers/pinctrl/samsung/pinctrl-exynos.c,
-> it doesn't contain the all codes of patch[1].
-> Maybe, I think that there was some merge conflict[2].
+> Thanks for feedback!
+> The existence of this helper is purely from code readability (thus
+> inline does not matter). The probe is big so splitting some small
+> self-contained part helps. Not much but a little...
+>
 
-Probably. Send a patch fixing it up so I can apply it.
+Agreed. I don't see value in removing this helper.
 
-There are now something like 5 different people submitting Samsung pinctrl
-patches without coordination so this will start to happen a lot if you keep
-up this development pace.
-
-As I just wrote in another mail: I want someone to step up and collect
-Samsung patches and send them to me using a pull request.
-
-Samsung people also need to start reviewing each other's patches
-more I guess, but mainly I need help with integration.
-
-Yours,
-Linus Walleij
+Guenter
