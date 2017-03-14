@@ -1,295 +1,140 @@
-From: vivek.gautam@codeaurora.org (Vivek Gautam)
-Date: Tue, 14 Mar 2017 13:35:57 +0530
-Subject: [RESEND PATCH v3 2/2] phy: Group vendor specific phy drivers
-In-Reply-To: <CAJKOXPcWKjis_dWtzJPWSZxVnRPYdsf+_uDzjCaCFOwyOLG2Gw@mail.gmail.com>
-References: <1489472080-23711-2-git-send-email-vivek.gautam@codeaurora.org>
- <1489472570-26434-1-git-send-email-vivek.gautam@codeaurora.org>
- <CAJKOXPcWKjis_dWtzJPWSZxVnRPYdsf+_uDzjCaCFOwyOLG2Gw@mail.gmail.com>
-Message-ID: <42126738-453a-555f-c3c1-48d30702af9b@codeaurora.org>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 14 Mar 2017 16:08:23 +0800
+Subject: [PATCH v2] arm64: dts: added thermal monitor node
+In-Reply-To: <1489457869-21815-1-git-send-email-andy.tang@nxp.com>
+References: <1489457869-21815-1-git-send-email-andy.tang@nxp.com>
+Message-ID: <20170314080821.GN3618@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
+On Tue, Mar 14, 2017 at 10:17:49AM +0800, Yuantian Tang wrote:
+> There is a thermal monitoring unit on ls1012a soc which can
+> monitor and record the temperature of cores so that appropriate actions
+> can be taken or alarm the user when the temperature exceeds a programmed
+> temperature threshold.
+> 
+> Signed-off-by: Tang Yuantian <andy.tang@nxp.com>
 
+'arm64: dts: ls1012a: ...' for subject prefix to make it more specific.
 
-On 03/14/2017 12:14 PM, Krzysztof Kozlowski wrote:
-> On Tue, Mar 14, 2017 at 8:22 AM, Vivek Gautam
-> <vivek.gautam@codeaurora.org> wrote:
->> Adding vendor specific directories in phy to group
->> phy drivers under their respective vendor umbrella.
->>
->> Also updated the MAINTAINERS file to reflect the correct
->> directory structure for phy drivers.
->>
->> Signed-off-by: Vivek Gautam <vivek.gautam@codeaurora.org>
->> Acked-by: Heiko Stuebner <heiko@sntech.de>
->> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
->> Cc: Kishon Vijay Abraham I <kishon@ti.com>
->> Cc: David S. Miller <davem@davemloft.net>
->> Cc: Geert Uytterhoeven <geert+renesas@glider.be>
->> Cc: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
->> Cc: Guenter Roeck <linux@roeck-us.net>
->> Cc: Heiko Stuebner <heiko@sntech.de>
->> Cc: Viresh Kumar <viresh.kumar@linaro.org>
->> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
->> Cc: Chen-Yu Tsai <wens@csie.org>
->> Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
->> Cc: Krzysztof Kozlowski <krzk@kernel.org>
->> Cc: Jaehoon Chung <jh80.chung@samsung.com>
->> Cc: linux-arm-kernel at lists.infradead.org
->> Cc: linux-arm-msm at vger.kernel.org
->> Cc: linux-kernel at vger.kernel.org
->> Cc: linux-omap at vger.kernel.org
->> Cc: linux-renesas-soc at vger.kernel.org
->> Cc: linux-rockchip at lists.infradead.org
->> Cc: linux-samsung-soc at vger.kernel.org
->> Cc: linux-usb at vger.kernel.org
->> ---
->>
->> Corrected Krzysztof's email-id. Added linux-arm-msm.
->>
->> Hi Heiko, Viresh,
->> It's been a year since the last version of this patch was posted.
->> Kishon has agreed to pull this change now. I am carrying forward
->> your Acks since there are no functional changes.
->> I have taken care of the drivers that were added/removed since
->> the last version.
->> Please feel free to jump in if you have any concerns.
->>
->> Changes since v2
->>   - Rebased on linux-phy/next.
->>   - Took care of drivers added/removed for each vendors since v2.
->>   - Updated the 'Signed-off-by' tag with my current email id.
->>
->> Changes from v1:
->>   - Updated the MAINTAINERS file to reflect the same change
->>     in directory structure.
->>   - Removed PHY_PLAT config as pointed out by Kishon.
->>     So we don't require the second patch in the v1 of this series:
->>     [PATCH 2/2] arm: mach-spear: Enable PHY_PLAT to meet dependency
->>   - Renamed sunxi --> allwinner; rcar --> renesas.
->>   - Fixed error coming with qcom Makefile.
->>
->> * Build tested multi_v7_defconfig.
->> * Build tested arm64 defconfig with all the involved configs enabled.
->>
->>   MAINTAINERS                                        |  18 +-
->>   drivers/phy/Kconfig                                | 471 +--------------------
->>   drivers/phy/Makefile                               |  67 +--
->>   drivers/phy/allwinner/Kconfig                      |  31 ++
->>   drivers/phy/allwinner/Makefile                     |   2 +
->>   drivers/phy/{ => allwinner}/phy-sun4i-usb.c        |   0
->>   drivers/phy/{ => allwinner}/phy-sun9i-usb.c        |   0
->>   drivers/phy/broadcom/Kconfig                       |  64 +++
->>   drivers/phy/broadcom/Makefile                      |   7 +
->>   drivers/phy/{ => broadcom}/phy-bcm-cygnus-pcie.c   |   0
->>   drivers/phy/{ => broadcom}/phy-bcm-kona-usb2.c     |   0
->>   drivers/phy/{ => broadcom}/phy-bcm-ns-usb2.c       |   0
->>   drivers/phy/{ => broadcom}/phy-bcm-ns-usb3.c       |   0
->>   drivers/phy/{ => broadcom}/phy-bcm-ns2-pcie.c      |   0
->>   drivers/phy/{ => broadcom}/phy-bcm-nsp-usb3.c      |   0
->>   drivers/phy/{ => broadcom}/phy-brcm-sata.c         |   0
->>   drivers/phy/hisilicon/Kconfig                      |  20 +
->>   drivers/phy/hisilicon/Makefile                     |   2 +
->>   drivers/phy/{ => hisilicon}/phy-hi6220-usb.c       |   0
->>   drivers/phy/{ => hisilicon}/phy-hix5hd2-sata.c     |   0
->>   drivers/phy/marvell/Kconfig                        |  50 +++
->>   drivers/phy/marvell/Makefile                       |   6 +
->>   drivers/phy/{ => marvell}/phy-armada375-usb2.c     |   0
->>   drivers/phy/{ => marvell}/phy-berlin-sata.c        |   0
->>   drivers/phy/{ => marvell}/phy-berlin-usb.c         |   0
->>   drivers/phy/{ => marvell}/phy-mvebu-sata.c         |   0
->>   drivers/phy/{ => marvell}/phy-pxa-28nm-hsic.c      |   0
->>   drivers/phy/{ => marvell}/phy-pxa-28nm-usb2.c      |   0
->>   drivers/phy/qualcomm/Kconfig                       |  38 ++
->>   drivers/phy/qualcomm/Makefile                      |   7 +
->>   drivers/phy/{ => qualcomm}/phy-qcom-apq8064-sata.c |   0
->>   drivers/phy/{ => qualcomm}/phy-qcom-ipq806x-sata.c |   0
->>   drivers/phy/{ => qualcomm}/phy-qcom-ufs-i.h        |   0
->>   drivers/phy/{ => qualcomm}/phy-qcom-ufs-qmp-14nm.c |   0
->>   drivers/phy/{ => qualcomm}/phy-qcom-ufs-qmp-14nm.h |   0
->>   drivers/phy/{ => qualcomm}/phy-qcom-ufs-qmp-20nm.c |   0
->>   drivers/phy/{ => qualcomm}/phy-qcom-ufs-qmp-20nm.h |   0
->>   drivers/phy/{ => qualcomm}/phy-qcom-ufs.c          |   0
->>   drivers/phy/{ => qualcomm}/phy-qcom-usb-hs.c       |   0
->>   drivers/phy/{ => qualcomm}/phy-qcom-usb-hsic.c     |   0
->>   drivers/phy/renesas/Kconfig                        |  17 +
->>   drivers/phy/renesas/Makefile                       |   2 +
->>   drivers/phy/{ => renesas}/phy-rcar-gen2.c          |   0
->>   drivers/phy/{ => renesas}/phy-rcar-gen3-usb2.c     |   0
->>   drivers/phy/rockchip/Kconfig                       |  51 +++
->>   drivers/phy/rockchip/Makefile                      |   6 +
->>   drivers/phy/{ => rockchip}/phy-rockchip-dp.c       |   0
->>   drivers/phy/{ => rockchip}/phy-rockchip-emmc.c     |   0
->>   .../phy/{ => rockchip}/phy-rockchip-inno-usb2.c    |   0
->>   drivers/phy/{ => rockchip}/phy-rockchip-pcie.c     |   0
->>   drivers/phy/{ => rockchip}/phy-rockchip-typec.c    |   0
->>   drivers/phy/{ => rockchip}/phy-rockchip-usb.c      |   0
->>   drivers/phy/samsung/Kconfig                        |  96 +++++
->>   drivers/phy/samsung/Makefile                       |  11 +
->>   drivers/phy/{ => samsung}/phy-exynos-dp-video.c    |   0
->>   drivers/phy/{ => samsung}/phy-exynos-mipi-video.c  |   0
->>   drivers/phy/{ => samsung}/phy-exynos-pcie.c        |   0
->>   drivers/phy/{ => samsung}/phy-exynos4210-usb2.c    |   0
->>   drivers/phy/{ => samsung}/phy-exynos4x12-usb2.c    |   0
->>   drivers/phy/{ => samsung}/phy-exynos5-usbdrd.c     |   0
->>   drivers/phy/{ => samsung}/phy-exynos5250-sata.c    |   0
->>   drivers/phy/{ => samsung}/phy-exynos5250-usb2.c    |   0
->>   drivers/phy/{ => samsung}/phy-s5pv210-usb2.c       |   0
->>   drivers/phy/{ => samsung}/phy-samsung-usb2.c       |   0
->>   drivers/phy/{ => samsung}/phy-samsung-usb2.h       |   0
->>   drivers/phy/st/Kconfig                             |  33 ++
->>   drivers/phy/st/Makefile                            |   4 +
->>   drivers/phy/{ => st}/phy-miphy28lp.c               |   0
->>   drivers/phy/{ => st}/phy-spear1310-miphy.c         |   0
->>   drivers/phy/{ => st}/phy-spear1340-miphy.c         |   0
->>   drivers/phy/{ => st}/phy-stih407-usb.c             |   0
->>   drivers/phy/ti/Kconfig                             |  78 ++++
->>   drivers/phy/ti/Makefile                            |   7 +
->>   drivers/phy/{ => ti}/phy-da8xx-usb.c               |   0
->>   drivers/phy/{ => ti}/phy-dm816x-usb.c              |   0
->>   drivers/phy/{ => ti}/phy-omap-control.c            |   0
->>   drivers/phy/{ => ti}/phy-omap-usb2.c               |   0
->>   drivers/phy/{ => ti}/phy-ti-pipe3.c                |   0
->>   drivers/phy/{ => ti}/phy-tusb1210.c                |   0
->>   drivers/phy/{ => ti}/phy-twl4030-usb.c             |   0
->>   80 files changed, 567 insertions(+), 521 deletions(-)
->>   create mode 100644 drivers/phy/allwinner/Kconfig
->>   create mode 100644 drivers/phy/allwinner/Makefile
->>   rename drivers/phy/{ => allwinner}/phy-sun4i-usb.c (100%)
->>   rename drivers/phy/{ => allwinner}/phy-sun9i-usb.c (100%)
->>   create mode 100644 drivers/phy/broadcom/Kconfig
->>   create mode 100644 drivers/phy/broadcom/Makefile
->>   rename drivers/phy/{ => broadcom}/phy-bcm-cygnus-pcie.c (100%)
->>   rename drivers/phy/{ => broadcom}/phy-bcm-kona-usb2.c (100%)
->>   rename drivers/phy/{ => broadcom}/phy-bcm-ns-usb2.c (100%)
->>   rename drivers/phy/{ => broadcom}/phy-bcm-ns-usb3.c (100%)
->>   rename drivers/phy/{ => broadcom}/phy-bcm-ns2-pcie.c (100%)
->>   rename drivers/phy/{ => broadcom}/phy-bcm-nsp-usb3.c (100%)
->>   rename drivers/phy/{ => broadcom}/phy-brcm-sata.c (100%)
->>   create mode 100644 drivers/phy/hisilicon/Kconfig
->>   create mode 100644 drivers/phy/hisilicon/Makefile
->>   rename drivers/phy/{ => hisilicon}/phy-hi6220-usb.c (100%)
->>   rename drivers/phy/{ => hisilicon}/phy-hix5hd2-sata.c (100%)
->>   create mode 100644 drivers/phy/marvell/Kconfig
->>   create mode 100644 drivers/phy/marvell/Makefile
->>   rename drivers/phy/{ => marvell}/phy-armada375-usb2.c (100%)
->>   rename drivers/phy/{ => marvell}/phy-berlin-sata.c (100%)
->>   rename drivers/phy/{ => marvell}/phy-berlin-usb.c (100%)
->>   rename drivers/phy/{ => marvell}/phy-mvebu-sata.c (100%)
->>   rename drivers/phy/{ => marvell}/phy-pxa-28nm-hsic.c (100%)
->>   rename drivers/phy/{ => marvell}/phy-pxa-28nm-usb2.c (100%)
->>   create mode 100644 drivers/phy/qualcomm/Kconfig
->>   create mode 100644 drivers/phy/qualcomm/Makefile
->>   rename drivers/phy/{ => qualcomm}/phy-qcom-apq8064-sata.c (100%)
->>   rename drivers/phy/{ => qualcomm}/phy-qcom-ipq806x-sata.c (100%)
->>   rename drivers/phy/{ => qualcomm}/phy-qcom-ufs-i.h (100%)
->>   rename drivers/phy/{ => qualcomm}/phy-qcom-ufs-qmp-14nm.c (100%)
->>   rename drivers/phy/{ => qualcomm}/phy-qcom-ufs-qmp-14nm.h (100%)
->>   rename drivers/phy/{ => qualcomm}/phy-qcom-ufs-qmp-20nm.c (100%)
->>   rename drivers/phy/{ => qualcomm}/phy-qcom-ufs-qmp-20nm.h (100%)
->>   rename drivers/phy/{ => qualcomm}/phy-qcom-ufs.c (100%)
->>   rename drivers/phy/{ => qualcomm}/phy-qcom-usb-hs.c (100%)
->>   rename drivers/phy/{ => qualcomm}/phy-qcom-usb-hsic.c (100%)
->>   create mode 100644 drivers/phy/renesas/Kconfig
->>   create mode 100644 drivers/phy/renesas/Makefile
->>   rename drivers/phy/{ => renesas}/phy-rcar-gen2.c (100%)
->>   rename drivers/phy/{ => renesas}/phy-rcar-gen3-usb2.c (100%)
->>   create mode 100644 drivers/phy/rockchip/Kconfig
->>   create mode 100644 drivers/phy/rockchip/Makefile
->>   rename drivers/phy/{ => rockchip}/phy-rockchip-dp.c (100%)
->>   rename drivers/phy/{ => rockchip}/phy-rockchip-emmc.c (100%)
->>   rename drivers/phy/{ => rockchip}/phy-rockchip-inno-usb2.c (100%)
->>   rename drivers/phy/{ => rockchip}/phy-rockchip-pcie.c (100%)
->>   rename drivers/phy/{ => rockchip}/phy-rockchip-typec.c (100%)
->>   rename drivers/phy/{ => rockchip}/phy-rockchip-usb.c (100%)
->>   create mode 100644 drivers/phy/samsung/Kconfig
->>   create mode 100644 drivers/phy/samsung/Makefile
->>   rename drivers/phy/{ => samsung}/phy-exynos-dp-video.c (100%)
->>   rename drivers/phy/{ => samsung}/phy-exynos-mipi-video.c (100%)
->>   rename drivers/phy/{ => samsung}/phy-exynos-pcie.c (100%)
->>   rename drivers/phy/{ => samsung}/phy-exynos4210-usb2.c (100%)
->>   rename drivers/phy/{ => samsung}/phy-exynos4x12-usb2.c (100%)
->>   rename drivers/phy/{ => samsung}/phy-exynos5-usbdrd.c (100%)
->>   rename drivers/phy/{ => samsung}/phy-exynos5250-sata.c (100%)
->>   rename drivers/phy/{ => samsung}/phy-exynos5250-usb2.c (100%)
->>   rename drivers/phy/{ => samsung}/phy-s5pv210-usb2.c (100%)
->>   rename drivers/phy/{ => samsung}/phy-samsung-usb2.c (100%)
->>   rename drivers/phy/{ => samsung}/phy-samsung-usb2.h (100%)
->>   create mode 100644 drivers/phy/st/Kconfig
->>   create mode 100644 drivers/phy/st/Makefile
->>   rename drivers/phy/{ => st}/phy-miphy28lp.c (100%)
->>   rename drivers/phy/{ => st}/phy-spear1310-miphy.c (100%)
->>   rename drivers/phy/{ => st}/phy-spear1340-miphy.c (100%)
->>   rename drivers/phy/{ => st}/phy-stih407-usb.c (100%)
->>   create mode 100644 drivers/phy/ti/Kconfig
->>   create mode 100644 drivers/phy/ti/Makefile
->>   rename drivers/phy/{ => ti}/phy-da8xx-usb.c (100%)
->>   rename drivers/phy/{ => ti}/phy-dm816x-usb.c (100%)
->>   rename drivers/phy/{ => ti}/phy-omap-control.c (100%)
->>   rename drivers/phy/{ => ti}/phy-omap-usb2.c (100%)
->>   rename drivers/phy/{ => ti}/phy-ti-pipe3.c (100%)
->>   rename drivers/phy/{ => ti}/phy-tusb1210.c (100%)
->>   rename drivers/phy/{ => ti}/phy-twl4030-usb.c (100%)
->>
->> diff --git a/MAINTAINERS b/MAINTAINERS
->> index c776906f67a9..22583a160fa5 100644
->> --- a/MAINTAINERS
->> +++ b/MAINTAINERS
->> @@ -1814,8 +1814,8 @@ F:        drivers/i2c/busses/i2c-st.c
->>   F:     drivers/media/rc/st_rc.c
->>   F:     drivers/media/platform/sti/c8sectpfe/
->>   F:     drivers/mmc/host/sdhci-st.c
->> -F:     drivers/phy/phy-miphy28lp.c
->> -F:     drivers/phy/phy-stih407-usb.c
->> +F:     drivers/phy/st/phy-miphy28lp.c
->> +F:     drivers/phy/st/phy-stih407-usb.c
->>   F:     drivers/pinctrl/pinctrl-st.c
->>   F:     drivers/remoteproc/st_remoteproc.c
->>   F:     drivers/remoteproc/st_slim_rproc.c
->> @@ -10637,7 +10637,7 @@ RENESAS USB2 PHY DRIVER
->>   M:     Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
->>   L:     linux-renesas-soc at vger.kernel.org
->>   S:     Maintained
->> -F:     drivers/phy/phy-rcar-gen3-usb2.c
->> +F:     drivers/phy/renesas/phy-rcar-gen3-usb2.c
->>
->>   RESET CONTROLLER FRAMEWORK
->>   M:     Philipp Zabel <p.zabel@pengutronix.de>
->> @@ -11011,12 +11011,12 @@ L:    linux-kernel at vger.kernel.org
->>   S:     Supported
->>   F:     Documentation/devicetree/bindings/phy/samsung-phy.txt
->>   F:     Documentation/phy/samsung-usb2.txt
->> -F:     drivers/phy/phy-exynos4210-usb2.c
->> -F:     drivers/phy/phy-exynos4x12-usb2.c
->> -F:     drivers/phy/phy-exynos5250-usb2.c
->> -F:     drivers/phy/phy-s5pv210-usb2.c
->> -F:     drivers/phy/phy-samsung-usb2.c
->> -F:     drivers/phy/phy-samsung-usb2.h
->> +F:     drivers/phy/samsung/phy-exynos4210-usb2.c
->> +F:     drivers/phy/samsung/phy-exynos4x12-usb2.c
->> +F:     drivers/phy/samsung/phy-exynos5250-usb2.c
->> +F:     drivers/phy/samsung/phy-s5pv210-usb2.c
->> +F:     drivers/phy/samsung/phy-samsung-usb2.c
->> +F:     drivers/phy/samsung/phy-samsung-usb2.h
-> Or this could be "drivers/phy/samsung/" so it would include all
-> drivers (if that is desired)?
->
-> I am fine with both, so:
-> Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
+> ---
+> v2:
+> 	-- rebased to latest kernel.
+> 
+>  arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi | 76 ++++++++++++++++++++++++++
+>  1 file changed, 76 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
+> index cffebb4..d9d9b0f 100644
+> --- a/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
+> +++ b/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
+> @@ -43,6 +43,7 @@
+>   */
+>  
+>  #include <dt-bindings/interrupt-controller/irq.h>
+> +#include <dt-bindings/thermal/thermal.h>
+>  
+>  / {
+>  	compatible = "fsl,ls1012a";
+> @@ -126,6 +127,81 @@
+>  			#clock-cells = <2>;
+>  			clocks = <&sysclk>;
+>  		};
 
-Thanks for the Ack.
-I am also fine with both. Sylwester can comment on this since there are
-couple of drivers apart from this list.
-I am cool with phy-exynos5-usbdrd.c driver that I wrote. :-)
+Have a newline between nodes.
 
-Best Regards
-Vivek
+> +		tmu: tmu at 1f00000 {
+> +			compatible = "fsl,qoriq-tmu";
+> +			reg = <0x0 0x1f00000 0x0 0x10000>;
+> +			interrupts = <0 33 0x4>;
+> +			fsl,tmu-range = <0xb0000 0x9002a 0x6004c 0x30062>;
+> +			fsl,tmu-calibration = <0x00000000 0x00000026
+> +					       0x00000001 0x0000002d
+> +					       0x00000002 0x00000032
+> +					       0x00000003 0x00000039
+> +					       0x00000004 0x0000003f
+> +					       0x00000005 0x00000046
+> +					       0x00000006 0x0000004d
+> +					       0x00000007 0x00000054
+> +					       0x00000008 0x0000005a
+> +					       0x00000009 0x00000061
+> +					       0x0000000a 0x0000006a
+> +					       0x0000000b 0x00000071
+> +
+> +					       0x00010000 0x00000025
+> +					       0x00010001 0x0000002c
+> +					       0x00010002 0x00000035
+> +					       0x00010003 0x0000003d
+> +					       0x00010004 0x00000045
+> +					       0x00010005 0x0000004e
+> +					       0x00010006 0x00000057
+> +					       0x00010007 0x00000061
+> +					       0x00010008 0x0000006b
+> +					       0x00010009 0x00000076
+> +
+> +					       0x00020000 0x00000029
+> +					       0x00020001 0x00000033
+> +					       0x00020002 0x0000003d
+> +					       0x00020003 0x00000049
+> +					       0x00020004 0x00000056
+> +					       0x00020005 0x00000061
+> +					       0x00020006 0x0000006d
+> +
+> +					       0x00030000 0x00000021
+> +					       0x00030001 0x0000002a
+> +					       0x00030002 0x0000003c
+> +					       0x00030003 0x0000004e>;
+> +			big-endian;
+> +			#thermal-sensor-cells = <1>;
+> +		};
+> +
+> +		thermal-zones {
+> +			cpu_thermal: cpu-thermal {
+> +				polling-delay-passive = <1000>;
+> +				polling-delay = <5000>;
+> +
 
->
-> Best regards,
-> Krzysztof
+We usually do not have any newline in middle of property list, so please
+drop it.
 
--- 
-The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+> +				thermal-sensors = <&tmu 0>;
+> +
+> +				trips {
+> +					cpu_alert: cpu-alert {
+> +						temperature = <85000>;
+> +						hysteresis = <2000>;
+> +						type = "passive";
+> +					};
+
+Have a newline between node.
+
+Shawn
+
+> +					cpu_crit: cpu-crit {
+> +						temperature = <95000>;
+> +						hysteresis = <2000>;
+> +						type = "critical";
+> +					};
+> +				};
+> +
+> +				cooling-maps {
+> +					map0 {
+> +						trip = <&cpu_alert>;
+> +						cooling-device =
+> +							<&cpu0 THERMAL_NO_LIMIT
+> +							THERMAL_NO_LIMIT>;
+> +					};
+> +				};
+> +			};
+> +		};
+>  
+>  		i2c0: i2c at 2180000 {
+>  			compatible = "fsl,vf610-i2c";
+> -- 
+> 2.1.0.27.g96db324
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
