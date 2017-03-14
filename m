@@ -1,29 +1,73 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Tue, 14 Mar 2017 14:05:03 +0100
-Subject: [PATCH v2 6/8] ARM: dts: exynos: Fix infinite interrupt in soft
- mode on Exynos4210 and Exynos5440
-In-Reply-To: <20170311172527.16368-7-krzk@kernel.org>
-References: <20170311172527.16368-1-krzk@kernel.org>
- <20170311172527.16368-7-krzk@kernel.org>
- <CGME20170314130505epcas5p3ae5e356cfdf8b7b1d66256e47ea168ee@epcas5p3.samsung.com>
-Message-ID: <10290646.0XEPi6EO6e@amdc3058>
+From: ludovic.desroches@microchip.com (Ludovic Desroches)
+Date: Tue, 14 Mar 2017 14:06:40 +0100
+Subject: [PATCH] mmc: sdhci-of-at91: Support external regulators
+In-Reply-To: <20170309151820.7510-1-romain.izard.pro@gmail.com>
+References: <20170309151820.7510-1-romain.izard.pro@gmail.com>
+Message-ID: <20170314130640.wz2wnebphaluvsjw@rfolt0960.corp.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday, March 11, 2017 07:25:25 PM Krzysztof Kozlowski wrote:
-> In soft (no-reboot) mode, the driver self-pings watchdog upon expiration
-> of an interrupt.  The interrupt has to be cleared, because otherwise
-> system enters infinite interrupt handling loop.
+On Thu, Mar 09, 2017 at 04:18:20PM +0100, Romain Izard wrote:
+> The SDHCI controller in the SAMA5D2 chip requires a valid voltage set
+> in the power control register, otherwise commands will fail with a
+> timeout error.
 > 
-> Use a samsung,s3c6410-wdt compatible to select appropriate quirk for
-> clearing the watchdog interrupt.
+> When using the regulator framework to specify the regulator used by the
+> mmc device, the voltage is not configured, and it is not possible to use
+> the connected device.
 > 
-> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+> Implement a custom 'set_power' function for this specific hardware, that
+> configures the voltage in the register in all cases.
+> 
+> Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
 
-Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+Cc: stable at vger.kernel.org #4.9+
 
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+Can be added since sdhci_set_power_noreg was introduced in 4.9.
+
+> ---
+>  drivers/mmc/host/sdhci-of-at91.c | 19 +++++++++++++++++++
+>  1 file changed, 19 insertions(+)
+> 
+> diff --git a/drivers/mmc/host/sdhci-of-at91.c b/drivers/mmc/host/sdhci-of-at91.c
+> index 2f9ad213377a..291a74955a4c 100644
+> --- a/drivers/mmc/host/sdhci-of-at91.c
+> +++ b/drivers/mmc/host/sdhci-of-at91.c
+> @@ -85,11 +85,30 @@ static void sdhci_at91_set_clock(struct sdhci_host *host, unsigned int clock)
+>  	sdhci_writew(host, clk, SDHCI_CLOCK_CONTROL);
+>  }
+>  
+> +/*
+> + * In this specific implementation of the SDHCI contoller, the power register
+> + * needs to have a valid voltage set even when the power supply is managed by
+> + * an external regulator.
+> + */
+> +static void sdhci_at91_set_power(struct sdhci_host *host, unsigned char mode,
+> +		     unsigned short vdd)
+> +{
+> +	if (!IS_ERR(host->mmc->supply.vmmc)) {
+> +		struct mmc_host *mmc = host->mmc;
+> +
+> +		spin_unlock_irq(&host->lock);
+> +		mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, vdd);
+> +		spin_lock_irq(&host->lock);
+> +	}
+> +	sdhci_set_power_noreg(host, mode, vdd);
+> +}
+> +
+>  static const struct sdhci_ops sdhci_at91_sama5d2_ops = {
+>  	.set_clock		= sdhci_at91_set_clock,
+>  	.set_bus_width		= sdhci_set_bus_width,
+>  	.reset			= sdhci_reset,
+>  	.set_uhs_signaling	= sdhci_set_uhs_signaling,
+> +	.set_power		= sdhci_at91_set_power,
+>  };
+>  
+>  static const struct sdhci_pltfm_data soc_data_sama5d2 = {
+> -- 
+> 2.9.3
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
