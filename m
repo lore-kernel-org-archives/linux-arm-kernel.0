@@ -1,44 +1,32 @@
-From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Tue, 14 Mar 2017 12:08:51 -0700
-Subject: [PATCH] PCI: aardvark: Remove msi-controller dt node probing
-Message-ID: <20170314190851.28203-1-stephen.boyd@linaro.org>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Tue, 14 Mar 2017 21:08:59 +0200
+Subject: [PATCH] drm/exynos: Print kernel pointers in a restricted form
+In-Reply-To: <e1800491-0b60-74d1-1377-756d5b0bb371@math.uni-bielefeld.de>
+References: <20170314183804.13788-1-krzk@kernel.org>
+ <e1800491-0b60-74d1-1377-756d5b0bb371@math.uni-bielefeld.de>
+Message-ID: <20170314190859.y55wlc4z7xdsbbxg@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This code assigns variables that are never used. Remove them.
+On Tue, Mar 14, 2017 at 08:01:41PM +0100, Tobias Jakobi wrote:
+> Hello Krzysztof,
+> 
+> I was wondering about the benefit of this. From a quick look these are
+> all messages that end up in the kernel log / dmesg.
+> 
+> IIRC %pK does nothing there, since dmest_restrict is supposed to be used
+> to deny an unpriviliged user the access to the kernel log.
+> 
+> Or am I missing something here?
 
-Reported-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
----
- drivers/pci/host/pci-aardvark.c | 8 --------
- 1 file changed, 8 deletions(-)
+These are regular printks so depending on kernel options (e.g. dynamic
+debug, drm.debug) these might be printed also in the console. Of course
+we could argue then if access to one of the consoles is worth
+securing.
 
-diff --git a/drivers/pci/host/pci-aardvark.c b/drivers/pci/host/pci-aardvark.c
-index 4fce494271cc..56e1aead65fc 100644
---- a/drivers/pci/host/pci-aardvark.c
-+++ b/drivers/pci/host/pci-aardvark.c
-@@ -917,8 +917,6 @@ static int advk_pcie_probe(struct platform_device *pdev)
- 	struct advk_pcie *pcie;
- 	struct resource *res;
- 	struct pci_bus *bus, *child;
--	struct msi_controller *msi;
--	struct device_node *msi_node;
- 	int ret, irq;
- 
- 	pcie = devm_kzalloc(dev, sizeof(struct advk_pcie), GFP_KERNEL);
-@@ -962,12 +960,6 @@ static int advk_pcie_probe(struct platform_device *pdev)
- 		return ret;
- 	}
- 
--	msi_node = of_parse_phandle(dev->of_node, "msi-parent", 0);
--	if (msi_node)
--		msi = of_pci_find_msi_chip_by_node(msi_node);
--	else
--		msi = NULL;
--
- 	bus = pci_scan_root_bus_msi(dev, 0, &advk_pcie_ops,
- 				    pcie, &pcie->resources, &pcie->msi);
- 	if (!bus) {
--- 
-2.10.0.297.gf6727b0
+Actually, I think that we should get rid of printing of these kernel
+pointers entirely...
+
+
+Best regards,
+Krzysztof
