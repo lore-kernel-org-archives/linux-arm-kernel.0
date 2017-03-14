@@ -1,147 +1,189 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 14 Mar 2017 10:56:44 +0000
-Subject: [RFC PATCH] iommu/dma: check pci host bridge dma_mask for IOVA
- allocation
-In-Reply-To: <1489481327-2862-1-git-send-email-oza.oza@broadcom.com>
-References: <1489481327-2862-1-git-send-email-oza.oza@broadcom.com>
-Message-ID: <e24a46f0-bd25-8fff-d19e-cafd615d7c37@arm.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Tue, 14 Mar 2017 11:03:22 +0000
+Subject: kvm/arm64: use-after-free in kvm_vm_ioctl/vmacache_update
+In-Reply-To: <0fc0380f-f108-7d20-ee8a-1b044fa1f115@arm.com>
+References: <CAAeHK+wha3wr=HraKtGMqeEnZUU6-jboowG5PWRMHtqwTQC7FQ@mail.gmail.com>
+ <CAAeHK+wLjS5ZGdNb4W3UkWO8HsFB=s1+a-1boN_F0boM1-bxUg@mail.gmail.com>
+ <3a57c408-8aa5-d339-4176-add4924e817d@arm.com>
+ <0fc0380f-f108-7d20-ee8a-1b044fa1f115@arm.com>
+Message-ID: <2200dd06-2374-b95d-131b-5a2437d14007@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/03/17 08:48, Oza Pawandeep wrote:
-> It is possible that PCI device supports 64-bit DMA addressing,
-> and thus it's driver sets device's dma_mask to DMA_BIT_MASK(64),
-> however PCI host bridge may have limitations on the inbound
-> transaction addressing. As an example, consider NVME SSD device
-> connected to iproc-PCIe controller.
-
-Aw heck, not another one :(
-
-> Currently, the IOMMU DMA ops only considers PCI device dma_mask
-> when allocating an IOVA. This is particularly problematic on
-> ARM/ARM64 SOCs where the IOMMU (i.e. SMMU) translates IOVA to
-> PA for in-bound transactions only after PCI Host has forwarded
-> these transactions on SOC IO bus. This means on such ARM/ARM64
-> SOCs the IOVA of in-bound transactions has to honor the addressing
-> restrictions of the PCI Host.
-
-Depending on whether this most closely matches the R-Car situation[1] or
-the X-Gene situation[2], this may not address the real problem at all
-(if the non-IOMMU case is also affected). Either way it also fails to
-help non-PCI devices which can face the exact same problem.
-
-> This patch tries to solve above described IOVA allocation
-> problem by:
-> 1. Adding iommu_get_dma_mask() to get dma_mask of any device
-> 2. For PCI device, iommu_get_dma_mask() compare dma_mask of
-> PCI device and corresponding PCI Host dma_mask (if set).
-> 3. Use iommu_get_dma_mask() in IOMMU DMA ops implementation
-> instead of dma_get_mask()
-
-Sorry, but NAK to this approach - not only is the implementation rather
-ugly, and incomplete as above, but the fact that it starts with a clear
-description of the underlying problem and then goes on to bodge around
-it down the line instead of actually fixing it is the kicker.
-
-I've got a simple arm64 patch for proper DMA mask inheritance based on
-the various discussions at [1] which I will try to clean up and send out
-for 4.12 if nobody else sends anything soon, but it does depend on
-getting [3] merged first to avoid regressing certain platforms.
-
-Robin.
-
-[1]:http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1306545.html
-[2]:http://www.spinics.net/lists/arm-kernel/msg552422.html
-[3]:http://www.spinics.net/lists/arm-kernel/msg566947.html
-
-> Signed-off-by: Oza Pawandeep <oza.oza@broadcom.com>
-> Reviewed-by: Anup Patel <anup.patel@broadcom.com>
-> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
-> ---
->  drivers/iommu/dma-iommu.c | 44 ++++++++++++++++++++++++++++++++++++++++----
->  1 file changed, 40 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
-> index 48d36ce..e93e536 100644
-> --- a/drivers/iommu/dma-iommu.c
-> +++ b/drivers/iommu/dma-iommu.c
-> @@ -108,6 +108,42 @@ int iommu_get_dma_cookie(struct iommu_domain *domain)
+On 13/03/17 09:58, Marc Zyngier wrote:
+> On 10/03/17 18:37, Suzuki K Poulose wrote:
+>> On 10/03/17 15:50, Andrey Konovalov wrote:
+>>> On Fri, Mar 10, 2017 at 2:38 PM, Andrey Konovalov <andreyknvl@google.com> wrote:
+>>>> Hi,
+>>>>
+>>>> I've got the following error report while fuzzing the kernel with syzkaller.
+>>>>
+>>>> On linux-next commit 56b8bad5e066c23e8fa273ef5fba50bd3da2ace8 (Mar 8).
+>>>>
+>>>> Unfortunately I can't reproduce it.
+>>>>
+>>>> ==================================================================
+>>>> BUG: KASAN: use-after-free in vmacache_update+0x114/0x118 mm/vmacache.c:63
+>>>> Read of size 8 at addr ffff80003b9a2040 by task syz-executor/26615
+>>>>
+>>>> CPU: 1 PID: 26615 Comm: syz-executor Not tainted
+>>>> 4.11.0-rc1-next-20170308-xc2-dirty #3
+>>>> Hardware name: Hardkernel ODROID-C2 (DT)
+>>>> Call trace:
+>>>> [<ffff20000808fbb0>] dump_backtrace+0x0/0x440 arch/arm64/kernel/traps.c:505
+>>>> [<ffff200008090010>] show_stack+0x20/0x30 arch/arm64/kernel/traps.c:228
+>>>> [<ffff2000088e9578>] __dump_stack lib/dump_stack.c:16 [inline]
+>>>> [<ffff2000088e9578>] dump_stack+0x110/0x168 lib/dump_stack.c:52
+>>>> [<ffff200008414018>] print_address_description+0x60/0x248 mm/kasan/report.c:250
+>>>> [<ffff2000084142e8>] kasan_report_error+0xe8/0x250 mm/kasan/report.c:349
+>>>> [<ffff200008414564>] kasan_report mm/kasan/report.c:372 [inline]
+>>>> [<ffff200008414564>] __asan_report_load8_noabort+0x3c/0x48 mm/kasan/report.c:393
+>>>> [<ffff200008383f64>] vmacache_update+0x114/0x118 mm/vmacache.c:63
+>>>> [<ffff2000083a9000>] find_vma+0xf8/0x150 mm/mmap.c:2124
+>>>> [<ffff2000080dc19c>] kvm_arch_prepare_memory_region+0x2ac/0x488
+>>>> arch/arm64/kvm/../../../arch/arm/kvm/mmu.c:1817
+>>>> [<ffff2000080c2920>] __kvm_set_memory_region+0x3d8/0x12b8
+>>>> arch/arm64/kvm/../../../virt/kvm/kvm_main.c:1026
+>>>> [<ffff2000080c3838>] kvm_set_memory_region+0x38/0x58
+>>>> arch/arm64/kvm/../../../virt/kvm/kvm_main.c:1075
+>>>> [<ffff2000080c747c>] kvm_vm_ioctl_set_memory_region
+>>>> arch/arm64/kvm/../../../virt/kvm/kvm_main.c:1087 [inline]
+>>>> [<ffff2000080c747c>] kvm_vm_ioctl+0xb94/0x1308
+>>>> arch/arm64/kvm/../../../virt/kvm/kvm_main.c:2960
+>>>> [<ffff20000848f928>] vfs_ioctl fs/ioctl.c:45 [inline]
+>>>> [<ffff20000848f928>] do_vfs_ioctl+0x128/0xfc0 fs/ioctl.c:685
+>>>> [<ffff200008490868>] SYSC_ioctl fs/ioctl.c:700 [inline]
+>>>> [<ffff200008490868>] SyS_ioctl+0xa8/0xb8 fs/ioctl.c:691
+>>>> [<ffff200008083f70>] el0_svc_naked+0x24/0x28
+>>>>
+>>>> Allocated by task 26657:
+>>>>  save_stack_trace_tsk+0x0/0x330 arch/arm64/kernel/stacktrace.c:133
+>>>>  save_stack_trace+0x20/0x30 arch/arm64/kernel/stacktrace.c:216
+>>>>  save_stack mm/kasan/kasan.c:515 [inline]
+>>>>  set_track mm/kasan/kasan.c:527 [inline]
+>>>>  kasan_kmalloc+0xd4/0x180 mm/kasan/kasan.c:619
+>>>>  kasan_slab_alloc+0x14/0x20 mm/kasan/kasan.c:557
+>>>>  slab_post_alloc_hook mm/slab.h:456 [inline]
+>>>>  slab_alloc_node mm/slub.c:2718 [inline]
+>>>>  slab_alloc mm/slub.c:2726 [inline]
+>>>>  kmem_cache_alloc+0x144/0x230 mm/slub.c:2731
+>>>>  __split_vma+0x118/0x608 mm/mmap.c:2515
+>>>>  do_munmap+0x194/0x9b0 mm/mmap.c:2636
+>>>> Freed by task 26657:
+>>>>  save_stack_trace_tsk+0x0/0x330 arch/arm64/kernel/stacktrace.c:133
+>>>>  save_stack_trace+0x20/0x30 arch/arm64/kernel/stacktrace.c:216
+>>>>  save_stack mm/kasan/kasan.c:515 [inline]
+>>>>  set_track mm/kasan/kasan.c:527 [inline]
+>>>>  kasan_slab_free+0x84/0x198 mm/kasan/kasan.c:592
+>>>>  slab_free_hook mm/slub.c:1357 [inline]
+>>>>  slab_free_freelist_hook mm/slub.c:1379 [inline]
+>>>>  slab_free mm/slub.c:2961 [inline]
+>>>>  kmem_cache_free+0x80/0x258 mm/slub.c:2983
+>>>>  __vma_adjust+0x6b0/0xf mm/mmap.c:890]  el0_svc_naked+0x24/0x28
+>>>>
+>>>> The buggy address belongs to the object at ffff80003b9a2000
+>>>>  which belongs to the cache vm_area_struct(647:session-6.scope) of size 184
+>>>> The buggy address is located 64 bytes inside of
+>>>>  184-byte region [ffff80003b9a2000, ffff80003b9a20b8)
+>>>> The buggy address belongs to the page:
+>>>> page:ffff7e0000ee6880 count:1 mapcount:0 mapping:          (null) index:0x0
+>>>> flags: 0xfffc00000000100(slab)
+>>>> raw: 0fffc00000000100 0000000000000000 0000000000000000 0000000180100010
+>>>> raw: 0000000000000000 0000000c00000001 ffff80005a5cc600 ffff80005ac99980
+>>>> page dumped because: kasan: bad access detected
+>>>> page->mem_cgroup:ffff80005ac99980
+>>>>
+>>>> Memory state around the buggy address:
+>>>>  ffff80003b9a1f00: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff
+>>>>  ffff80003b9a1f80: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff
+>>>>> ffff80003b9a2000: fb fb fb fb fb fb fb fb fb fb fb fb fb fb fb fb
+>>>>                                            ^
+>>>>  ffff80003b9a2080: fb fb fb fb fb fb fb fc fc fc fc fc fc fc fc fb
+>>>>  ffff80003b9a2100: fb fb fb fb fb fb fb fb fb fb fb fb fb fb fb fb
+>>>> ==================================================================
+>>>
+>>> Another one that looks related and doesn't have parts of stack traces missing:
+>>>
+>>> ==================================================================
+>>> BUG: KASAN: use-after-free in find_vma+0x140/0x150 mm/mmap.c:2114
+>>> Read of size 8 at addr ffff800031a03e90 by task syz-executor/4360
+>>>
+>>> CPU: 2 PID: 4360 Comm: syz-executor Not tainted
+>>> 4.11.0-rc1-next-20170308-xc2-dirty #3
+>>> Hardware name: Hardkernel ODROID-C2 (DT)
+>>> Call trace:
+>>> [<ffff20000808fbb0>] dump_backtrace+0x0/0x440 arch/arm64/kernel/traps.c:505
+>>> [<ffff200008090010>] show_stack+0x20/0x30 arch/arm64/kernel/traps.c:228
+>>> [<ffff2000088e9578>] __dump_stack lib/dump_stack.c:16 [inline]
+>>> [<ffff2000088e9578>] dump_stack+0x110/0x168 lib/dump_stack.c:52
+>>> [<ffff200008414018>] print_address_description+0x60/0x248 mm/kasan/report.c:250
+>>> [<ffff2000084142e8>] kasan_report_error+0xe8/0x250 mm/kasan/report.c:349
+>>> [<ffff200008414564>] kasan_report mm/kasan/report.c:372 [inline]
+>>> [<ffff200008414564>] __asan_report_load8_noabort+0x3c/0x48 mm/kasan/report.c:393
+>>> [<ffff2000083a9048>] find_vma+0x140/0x150 mm/mmap.c:2114
+>>> [<ffff2000080dc19c>] kvm_arch_prepare_memory_region+0x2ac/0x488
+>>> arch/arm64/kvm/../../../arch/arm/kvm/mmu.c:1817
+>>
+>> It looks like we don't take the mmap_sem before calling find_vma() in
+>> stage2_unmap_memslot() and in kvm_arch_prepare_memory_region(), which is causing
+>> the race, with probably the test trying to unmap ranges in between.
+>
+> That indeed seems like a possible failure mode. The annoying thing is
+> that we're not exactly in a position to take mmap_sem in
+> stage2_unmap_memslot, since we hold the kvm->mmu_lock spinlock. We may
+> have to hold mmap_sem while iterating over all the memslots.
+>
+> How about the following (very lightly tested):
+>
+> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+> index 962616fd4ddd..2006a79d5912 100644
+> --- a/arch/arm/kvm/mmu.c
+> +++ b/arch/arm/kvm/mmu.c
+> @@ -803,6 +803,7 @@ void stage2_unmap_vm(struct kvm *kvm)
+>  	int idx;
+>
+>  	idx = srcu_read_lock(&kvm->srcu);
+> +	down_read(&current->mm->mmap_sem);
+>  	spin_lock(&kvm->mmu_lock);
+>
+>  	slots = kvm_memslots(kvm);
+> @@ -810,6 +811,7 @@ void stage2_unmap_vm(struct kvm *kvm)
+>  		stage2_unmap_memslot(kvm, memslot);
+>
+>  	spin_unlock(&kvm->mmu_lock);
+> +	up_read(&current->mm->mmap_sem);
+>  	srcu_read_unlock(&kvm->srcu, idx);
 >  }
->  EXPORT_SYMBOL(iommu_get_dma_cookie);
->  
-> +static u64 __iommu_dma_mask(struct device *dev, bool is_coherent)
-> +{
-> +#ifdef CONFIG_PCI
-> +	u64 pci_hb_dma_mask;
-> +
-> +	if (dev_is_pci(dev)) {
-> +		struct pci_dev *pdev = to_pci_dev(dev);
-> +		struct pci_host_bridge *br = pci_find_host_bridge(pdev->bus);
-> +
-> +		if ((!is_coherent) && !(br->dev.dma_mask))
-> +			goto default_dev_dma_mask;
-> +
-> +		/* pci host bridge dma-mask. */
-> +		pci_hb_dma_mask = (!is_coherent) ? *br->dev.dma_mask :
-> +				   br->dev.coherent_dma_mask;
-> +
-> +		if (pci_hb_dma_mask && ((pci_hb_dma_mask) < (*dev->dma_mask)))
-> +			return pci_hb_dma_mask;
-> +	}
-> +default_dev_dma_mask:
-> +#endif
-> +	return (!is_coherent) ? dma_get_mask(dev) :
-> +		dev->coherent_dma_mask;
-> +}
-> +
-> +static u64 __iommu_dma_get_coherent_mask(struct device *dev)
-> +{
-> +	return __iommu_dma_mask(dev, true);
-> +}
-> +
-> +static u64 __iommu_dma_get_mask(struct device *dev)
-> +{
-> +	return __iommu_dma_mask(dev, false);
-> +}
-> +
-> +
->  /**
->   * iommu_get_msi_cookie - Acquire just MSI remapping resources
->   * @domain: IOMMU domain to prepare
-> @@ -461,7 +497,7 @@ struct page **iommu_dma_alloc(struct device *dev, size_t size, gfp_t gfp,
->  	if (!pages)
->  		return NULL;
->  
-> -	iova = __alloc_iova(domain, size, dev->coherent_dma_mask, dev);
-> +	iova = __alloc_iova(domain, size, __iommu_dma_get_coherent_mask(dev), dev);
->  	if (!iova)
->  		goto out_free_pages;
->  
-> @@ -532,7 +568,7 @@ static dma_addr_t __iommu_dma_map(struct device *dev, phys_addr_t phys,
->  	struct iova_domain *iovad = cookie_iovad(domain);
->  	size_t iova_off = iova_offset(iovad, phys);
->  	size_t len = iova_align(iovad, size + iova_off);
-> -	struct iova *iova = __alloc_iova(domain, len, dma_get_mask(dev), dev);
-> +	struct iova *iova = __alloc_iova(domain, len, __iommu_dma_get_mask(dev), dev);
->  
->  	if (!iova)
->  		return DMA_ERROR_CODE;
-> @@ -690,7 +726,7 @@ int iommu_dma_map_sg(struct device *dev, struct scatterlist *sg,
->  		prev = s;
->  	}
->  
-> -	iova = __alloc_iova(domain, iova_len, dma_get_mask(dev), dev);
-> +	iova = __alloc_iova(domain, iova_len, __iommu_dma_get_mask(dev), dev);
->  	if (!iova)
->  		goto out_restore_sg;
->  
-> @@ -760,7 +796,7 @@ static struct iommu_dma_msi_page *iommu_dma_get_msi_page(struct device *dev,
->  
->  	msi_page->phys = msi_addr;
->  	if (iovad) {
-> -		iova = __alloc_iova(domain, size, dma_get_mask(dev), dev);
-> +		iova = __alloc_iova(domain, size, __iommu_dma_get_mask(dev), dev);
->  		if (!iova)
->  			goto out_free_page;
->  		msi_page->iova = iova_dma_addr(iovad, iova);
-> 
+>
+> @@ -1813,6 +1815,7 @@ int kvm_arch_prepare_memory_region(struct kvm *kvm,
+>  	 *     |               memory region                |
+>  	 *     +--------------------------------------------+
+>  	 */
+> +	down_read(&current->mm->mmap_sem);
+>  	do {
+>  		struct vm_area_struct *vma = find_vma(current->mm, hva);
+>  		hva_t vm_start, vm_end;
+
+I have added the following hunk :
+
+@@ -1844,8 +1847,10 @@ int kvm_arch_prepare_memory_region(struct kvm *kvm,
+                         pa += vm_start - vma->vm_start;
+  
+                         /* IO region dirty page logging not allowed */
+-                       if (memslot->flags & KVM_MEM_LOG_DIRTY_PAGES)
+-                               return -EINVAL;
++                       if (memslot->flags & KVM_MEM_LOG_DIRTY_PAGES) {
++                               ret = -EINVAL;
++                               goto out;
++                       }
+  
+                         ret = kvm_phys_addr_ioremap(kvm, gpa, pa,
+                                                     vm_end - vm_start,
+
+>
+> I'm much more worried about the other report, as I don't really see yet
+> how it happens. Coffee required.
+
+I have something about that one. Will soon post a patch for it.
+
+Suzuki
