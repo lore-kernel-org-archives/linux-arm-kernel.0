@@ -1,68 +1,79 @@
-From: nicolas.ferre@microchip.com (Nicolas Ferre)
-Date: Tue, 14 Mar 2017 09:38:04 +0100
-Subject: [PATCH v2] ARM: at91: pm: cpu_idle: switch DDR to power-down mode
-Message-ID: <20170314083804.1756-1-nicolas.ferre@microchip.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 14 Mar 2017 09:39:15 +0100
+Subject: [PATCH V7 0/7] LPC: legacy ISA I/O support
+In-Reply-To: <1489372963-9000-1-git-send-email-yuanzhichang@hisilicon.com>
+References: <1489372963-9000-1-git-send-email-yuanzhichang@hisilicon.com>
+Message-ID: <CAK8P3a1f33ipk3Q8+wj9L6zP=ccn_AuhTfV0CC0+wAqrO-2beg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On some DDR controllers, compatible with the sama5d3 one,
-the sequence to enter/exit/re-enter the self-refresh mode adds
-more constrains than what is currently written in the at91_idle
-driver. An actual access to the DDR chip is needed between exit
-and re-enter of this mode which is somehow difficult to implement.
-This sequence can completely hang the SoC. It is particularly
-experienced on parts which embed a L2 cache if the code run
-between IDLE calls fits in it...
+On Mon, Mar 13, 2017 at 3:42 AM, zhichang.yuan
+<yuanzhichang@hisilicon.com> wrote:
+> This patchset supports the IPMI-bt device attached to the Low-Pin-Count
+> interface implemented on Hisilicon Hip06/Hip07 SoC.
+>                         -----------
+>                         | LPC host|
+>                         |         |
+>                         -----------
+>                              |
+>                 _____________V_______________LPC
+>                   |                       |
+>                   V                       V
+>                                      ------------
+>                                      |  BT(ipmi)|
+>                                      ------------
+>
+> When master accesses those peripherals beneath the Hip06/Hip07 LPC, a specific
+> LPC driver is needed to make LPC host generate the standard LPC I/O cycles with
+> the target peripherals'I/O port addresses. But on curent arm64 world, there is
+> no real I/O accesses. All the I/O operations through in/out pair are based on
+> MMIO which is not satisfied the I/O mechanism on Hip06/Hip07 LPC.
+> To solve this issue and keep the relevant existing peripherals' driver
+> untouched, this patchset implements:
+>   - introduces a generic I/O space management framwork, LIBIO, to support I/O
+>     operations of both MMIO buses and the host controllers which access their
+>     peripherals with host local I/O addresses;
+>   - redefines the in/out accessors to provide unified interfaces for MMIO and
+>     legacy I/O. Based on the LIBIO, the calling of in/out() from upper-layer
+>     drivers, such as ipmi-si, will be redirected to the corresponding
+>     device-specific I/O hooks to perfrom the I/O accesses.
+> Based on this patch-set, all the I/O accesses to Hip06/Hip07 LPC peripherals
+> can be supported without any changes on the existing ipmi-si driver.
 
-Moreover, as the intention is to enter and exit pretty rapidly
-from IDLE, the power-down mode is a good candidate.
+Thanks for reposting this. I have a few high-level comments first, based on
+the walk through the code I did with Gabriele and John last week:
 
-So now we use power-down instead of self-refresh. As we can
-simplify the code for sama5d3 compatible DDR controllers,
-we instantiate a new sama5d3_ddr_standby() function.
+- I think the libio framework is more generic than it needs to be, but as
+  Alex really liked it this way and it was done like this based on his earlier
+  comments, I think that's ok.
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@microchip.com>
-Cc: <stable@vger.kernel.org> # v4.1+
-Fixes: 017b5522d5e3 ("ARM: at91: Add new binding for sama5d3-ddramc")
----
- arch/arm/mach-at91/pm.c | 18 +++++++++++++++++-
- 1 file changed, 17 insertions(+), 1 deletion(-)
+- after we went back and forth on the ACPI implementation, we concluded
+  that it is correct to do the same as on DT and completely abstract the
+  number space for I/O ports. No code should rely on a Linux port number
+  to have any particular relation to the physical address or the the address
+  on a PCI or LPC bus.
 
-diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
-index 3d89b7905bd9..a277981f414d 100644
---- a/arch/arm/mach-at91/pm.c
-+++ b/arch/arm/mach-at91/pm.c
-@@ -289,6 +289,22 @@ static void at91_ddr_standby(void)
- 		at91_ramc_write(1, AT91_DDRSDRC_LPR, saved_lpr1);
- }
- 
-+static void sama5d3_ddr_standby(void)
-+{
-+	u32 lpr0;
-+	u32 saved_lpr0;
-+
-+	saved_lpr0 = at91_ramc_read(0, AT91_DDRSDRC_LPR);
-+	lpr0 = saved_lpr0 & ~AT91_DDRSDRC_LPCB;
-+	lpr0 |= AT91_DDRSDRC_LPCB_POWER_DOWN;
-+
-+	at91_ramc_write(0, AT91_DDRSDRC_LPR, lpr0);
-+
-+	cpu_do_idle();
-+
-+	at91_ramc_write(0, AT91_DDRSDRC_LPR, saved_lpr0);
-+}
-+
- /* We manage both DDRAM/SDRAM controllers, we need more than one value to
-  * remember.
-  */
-@@ -323,7 +339,7 @@ static const struct of_device_id const ramc_ids[] __initconst = {
- 	{ .compatible = "atmel,at91rm9200-sdramc", .data = at91rm9200_standby },
- 	{ .compatible = "atmel,at91sam9260-sdramc", .data = at91sam9_sdram_standby },
- 	{ .compatible = "atmel,at91sam9g45-ddramc", .data = at91_ddr_standby },
--	{ .compatible = "atmel,sama5d3-ddramc", .data = at91_ddr_standby },
-+	{ .compatible = "atmel,sama5d3-ddramc", .data = sama5d3_ddr_standby },
- 	{ /*sentinel*/ }
- };
- 
--- 
-2.9.0
+- The name "libio" still needs to be changed, this is way too generic, as
+  "I/O" can refer to many things in the kernel, and almost none of them
+  are related to x86 programmed I/O ports in any way. My suggestion
+  would be "generic_ioport", or possibly "libioport", "libpio" or "pci_io". Any
+  of them would work for me, or someone else could come up with a better
+  name that describes what it is.
+
+- I'm pretty sure the current implementation is broken for the ioport_map
+  function that tries to turn an IORESOURCE_IO number into a pointer.
+  Forcing CONFIG_GENERIC_IOMAP on would solve this, but also
+  make all MMIO operations slower, which we probably don't want.
+  It's probably enough to add a check in ioport_map() to see if the range
+  is mapped into a virtual address or not.
+
+- We could simplify the lookup a bit by using the trick from arch/ia64
+  of using an array instead of linked list for walking the port numbers.
+  There, the upper bits of the port number refer to an address space
+  number while the lower bits refer to the bus address within that
+  address space. This should work just as well as the current
+  implementation but would be a little easier to understand. Maybe
+  Bjorn can comment on this too, as I think he was involved with the
+  ia64 implementation.
+
+      Arnd
