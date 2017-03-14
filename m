@@ -1,66 +1,63 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Tue, 14 Mar 2017 16:53:33 +0100
-Subject: [PATCH v2 4/4] phy: exynos: Use one define for enable bit
-In-Reply-To: <CAJKOXPeUYeAuXgZLVYTBNTZhcmiEMr6sfWWpXMytzzeC0+wY4Q@mail.gmail.com>
-References: <20170311182534.13345-1-krzk@kernel.org>
- <2746282.jBJ7tRjldv@amdc3058>
- <CAJKOXPeUYeAuXgZLVYTBNTZhcmiEMr6sfWWpXMytzzeC0+wY4Q@mail.gmail.com>
- <CGME20170314155351epcas5p210791391569477d6b115bb922ab068ed@epcas5p2.samsung.com>
-Message-ID: <2409116.U9sOiGfLuq@amdc3058>
+From: slash.tmp@free.fr (Mason)
+Date: Tue, 14 Mar 2017 16:54:00 +0100
+Subject: Neophyte questions about PCIe
+In-Reply-To: <94b3c89c-b116-288f-7530-15cc2611f425@free.fr>
+References: <ced6a4bf-c94a-c116-1e94-52a8d675d132@free.fr>
+ <20170308151724.GA20780@bhelgaas-glaptop.roam.corp.google.com>
+ <f964ee05-db7f-c381-c91c-82897175da6d@free.fr>
+ <9ba05c2c-57ef-b2c0-6a7c-457c392d98b5@free.fr>
+ <df517167-d692-38a8-9c8f-a1112c7f578d@free.fr>
+ <94b3c89c-b116-288f-7530-15cc2611f425@free.fr>
+Message-ID: <912c26d5-835f-9f39-73ba-db561b5bcffa@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, March 14, 2017 04:55:46 PM Krzysztof Kozlowski wrote:
-> On Tue, Mar 14, 2017 at 4:46 PM, Bartlomiej Zolnierkiewicz
-> <b.zolnierkie@samsung.com> wrote:
-> >
-> > Hi,
-> >
-> > On Saturday, March 11, 2017 08:25:34 PM Krzysztof Kozlowski wrote:
-> >> There is no need for separate defines for Exynos4 and Exynos5 phy enable
-> >> bit and MIPI phy reset bits.  In both cases there are the same so
-> >> simplify it.
-> >>
-> >> This reduces number of defines and allows removal of one header file.
-> >>
-> >> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
-> >> Acked-by: Lee Jones <lee.jones@linaro.org>
-> >> ---
-> >>  drivers/phy/phy-exynos-dp-video.c           |  5 ++--
-> >>  drivers/phy/phy-exynos-mipi-video.c         | 39 ++++++++++++++---------------
-> >>  drivers/phy/phy-exynos5-usbdrd.c            |  5 ++--
-> >>  include/linux/mfd/syscon/exynos5-pmu.h      | 22 ----------------
-> >>  include/linux/soc/samsung/exynos-regs-pmu.h |  3 ++-
-> >>  5 files changed, 25 insertions(+), 49 deletions(-)
-> >>  delete mode 100644 include/linux/mfd/syscon/exynos5-pmu.h
-> >
-> > [...]
-> >
-> >> --- a/include/linux/mfd/syscon/exynos5-pmu.h
-> >> +++ /dev/null
-> >
-> >> -#define EXYNOS5433_PAD_RETENTION_AUD_OPTION          (0x3028)
-> >> -#define EXYNOS5433_PAD_INITIATE_WAKEUP_FROM_LOWPWR   BIT(28)
-> >
-> > EXYNOS5433_PAD_INITIATE_WAKEUP_FROM_LOWPWR is not defined in
-> > <soc/samsung/exynos-regs-pmu.h> and is still used by
-> > drivers/mfd/exynos-lpass.c (at least in next-20170310)
-> >
-> > Do I miss something or it needs to be fixed?
+On 14/03/2017 15:00, Mason wrote:
+
+> On 10/03/2017 18:49, Mason wrote:
 > 
-> Yeah, kbuild also told me that. :)
+>> /* Root complex reports incorrect device class */
+>> static void tango_pcie_fixup_class(struct pci_dev *dev)
+>> {
+>> 	dev->class = PCI_CLASS_BRIDGE_PCI << 8;
+>> }
 > 
-> I fixed it in v3, can you take a look?
-> http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1351482.html
+> Gen1 controller reports class/rev = 0x04800001
+> Gen2 controller reports class/rev = 0x06000001
+> 
+> #define PCI_CLASS_BRIDGE_HOST		0x0600
+> #define PCI_CLASS_BRIDGE_ISA		0x0601
+> #define PCI_CLASS_BRIDGE_EISA		0x0602
+> #define PCI_CLASS_BRIDGE_MC		0x0603
+> #define PCI_CLASS_BRIDGE_PCI		0x0604
+> #define PCI_CLASS_BRIDGE_PCMCIA		0x0605
+> #define PCI_CLASS_BRIDGE_NUBUS		0x0606
+> #define PCI_CLASS_BRIDGE_CARDBUS	0x0607
+> #define PCI_CLASS_BRIDGE_RACEWAY	0x0608
+> #define PCI_CLASS_BRIDGE_OTHER		0x0680
+> 
+> My fixup replaces 0x048000 with 0x060400.
+> 
+> 	0x060400 != 0x060000
+> 
+> Which is correct:
+> PCI_CLASS_BRIDGE_HOST or PCI_CLASS_BRIDGE_PCI?
+> 
+> Naively, I would expect Host/PCI bridge to be more correct
+> for a root complex.
 
-Ah, thanks, my mailing lists retrieval setup has some lag..
+But that's very likely wrong, since the code in Linux does:
 
-For the whole v3:
+	switch (dev->hdr_type) {		    /* header type */
+	case PCI_HEADER_TYPE_BRIDGE:		    /* bridge header */
+		if (class != PCI_CLASS_BRIDGE_PCI)
+			goto bad;
+		/* The PCI-to-PCI bridge spec requires that subtractive
+		   decoding (i.e. transparent) bridge must have programming
+		   interface code of 0x01. */
 
-Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+So a class of PCI_CLASS_BRIDGE_HOST would error out, I think.
+Does this mean I need to fixup Gen2 as well?
+(Since it reports 0x060000)
 
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+Regards.
