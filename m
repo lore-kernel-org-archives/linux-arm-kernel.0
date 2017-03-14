@@ -1,55 +1,140 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Tue, 14 Mar 2017 16:55:13 -0500
-Subject: [PATCH] pinctrl: qcom: add get_direction function
-In-Reply-To: <CACRpkdZFzYStyPfK1DwkZfvtd7wX9HtD1bnCy+i9h-7xowOz4g@mail.gmail.com>
-References: <1486768860-18237-1-git-send-email-timur@codeaurora.org>
- <8652c018-4051-5c77-3126-2d41d150518a@codeaurora.org>
- <CACRpkdaoHTZa+XjEBAMtO2dS1jevi5h-QYe90SrZDuJghQSyYw@mail.gmail.com>
- <13b19c7f-9440-ab8e-8a2f-d1796a9b3dde@codeaurora.org>
- <CACRpkdZFzYStyPfK1DwkZfvtd7wX9HtD1bnCy+i9h-7xowOz4g@mail.gmail.com>
-Message-ID: <e209d18d-dc53-c0e9-448c-8a88264cac74@codeaurora.org>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Tue, 14 Mar 2017 23:32:54 +0100
+Subject: media / v4l2-mc: wishlist for complex cameras (was Re: [PATCH v4
+ 14/36] [media] v4l2-mc: add a function to inherit controls from a pipeline)
+In-Reply-To: <20170314072143.498cde9b@vento.lan>
+References: <c679f755-52a6-3c6f-3d65-277db46676cc@xs4all.nl>
+ <20170310140124.GV21222@n2100.armlinux.org.uk>
+ <cc8900b0-c091-b14b-96f4-01f8fa72431c@xs4all.nl>
+ <20170310125342.7f047acf@vento.lan>
+ <20170310223714.GI3220@valkosipuli.retiisi.org.uk>
+ <20170311082549.576531d0@vento.lan>
+ <20170313124621.GA10701@valkosipuli.retiisi.org.uk>
+ <20170314004533.3b3cd44b@vento.lan>
+ <e0a6c60b-1735-de0b-21f4-d8c3f4b3f10f@xs4all.nl>
+ <20170314072143.498cde9b@vento.lan>
+Message-ID: <20170314223254.GA7141@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/14/2017 04:41 PM, Linus Walleij wrote:
-> On Mon, Mar 6, 2017 at 10:52 PM, Timur Tabi <timur@codeaurora.org> wrote:
+Hi!
+
+> > > Even if they were merged, if we keep the same mean time to develop a
+> > > libv4l plugin, that would mean that a plugin for i.MX6 could take 2-3
+> > > years to be developed.
+> > > 
+> > > There's a clear message on it:
+> > > 	- we shouldn't keep pushing for a solution via libv4l.  
+> > 
+> > Or:
+> > 
+> > 	- userspace plugin development had a very a low priority and
+> > 	  never got the attention it needed.
 > 
->> On ACPI platforms, the kernel has no control over the muxing (aka function)
->> of the various pins.  Firmware configures the TLMM controller for all pins,
->> and configures them for whatever functions they're supposed to be.
+> The end result is the same: we can't count on it.
 > 
-> I think it would be better if pin control and ACPI play along, and I bet that
-> will happen in the future. This is I guess a question for ACPI standardization
-> work.
-
-Maybe.  During the development of the ACPI standard, everyone made a big stink
-about how muxing should be handled by the firmware and never touched by the OS.
-It would be a significant reversal if they decide to add mux configuration to ACPI.
-
->> Therefore, on ACPI, the driver should never change the function of any pin.
->> If it's set to something other than 0, then it should never touch that pin.
->> Don't write to it, don't change the direction, and definitely don't change
->> the function.
+> > 
+> > I know that's *my* reason. I rarely if ever looked at it. I always assumed
+> > Sakari and/or Laurent would look at it. If this reason is also valid for
+> > Sakari and Laurent, then it is no wonder nothing has happened in all that
+> > time.
+> > 
+> > We're all very driver-development-driven, and userspace gets very little
+> > attention in general. So before just throwing in the towel we should take
+> > a good look at the reasons why there has been little or no development: is
+> > it because of fundamental design defects, or because nobody paid attention
+> > to it?
 > 
-> Does that mean that pins with 0 are free to play around with?
-
-Yes.
-
->> So would it be acceptable, for example, to change msm_gpio_set() such that
->> if the function of that pin is non-zero, just return an error?
+> No. We should look it the other way: basically, there are patches
+> for i.MX6 driver that sends control from videonode to subdevs. 
 > 
-> I would ask the driver maintainer about his opinion, and also whoever
-> is an authority on ACPI for the TLMM-chips, I am no expert
-> in ACPI. Hell I'm not even good at device tree. Not to mention SFI.
-> Oh well...
+> If we nack apply it, who will write the userspace plugin? When
+> such change will be merged upstream?
 
-Well, I was hoping that Stephen would respond to this question. :-)
+Well, I believe first question is: what applications would we want to
+run on complex devices? Will sending control from video to subdevs
+actually help?
 
-My point is, if the driver knows that the GPIO cannot be written to (because
-it's muxed to something else), shouldn't the driver return with an error if the
-caller attempts to write?
+mplayer is useful for testing... but that one already works (after you
+setup the pipeline, and configure exposure/gain).
 
+But thats useful for testing, not really for production. Image will be
+out of focus and with wrong white balance.
+
+What I would really like is an application to get still photos. For
+taking pictures with manual settings we need
+
+a) units for controls: user wants to focus on 1m, and take picture
+with ISO200, 1/125 sec. We should also tell him that lens is f/5.6 and
+focal length is 20mm with 5mm chip.
+
+But... autofocus/autogain would really be good to have. Thus we need:
+
+b) for each frame, we need exposure settings and focus position at
+time frame was taken. Otherwise autofocus/autogain will be too
+slow. At least focus position is going to be tricky -- either kernel
+would have to compute focus position for us (not trivial) or we'd need
+enough information to compute it in userspace.
+
+There are more problems: hardware-accelerated preview is not trivial
+to set up (and I'm unsure if it can be done in generic way). Still
+photos application needs to switch resolutions between preview and
+photo capture. Probably hardware-accelerated histograms are needed for
+white balance, auto gain and auto focus, ....
+
+It seems like there's a _lot_ of stuff to be done before we have
+useful support for complex cameras...
+
+(And I'm not sure... when application such as skype is running, is
+there some way to run autogain/autofocus/autowhitebalance? Is that
+something we want to support?)
+
+> If we don't have answers to any of the above questions, we should not
+> nack it.
+> 
+> That's said, that doesn't prevent merging a libv4l plugin if/when
+> someone can find time/interest to develop it.
+
+I believe other question is: will not having same control on main
+video device and subdevs be confusing? Does it actually help userspace
+in any way? Yes, we can make controls accessible to old application,
+but does it make them more useful? 
+
+> > In addition, I suspect end-users of these complex devices don't really care
+> > about a plugin: they want full control and won't typically use generic
+> > applications. If they would need support for that, we'd have seen much more
+> > interest. The main reason for having a plugin is to simplify testing and
+> > if this is going to be used on cheap hobbyist devkits.
+> 
+> What are the needs for a cheap hobbyist devkit owner? Do we currently
+> satisfy those needs? I'd say that having a functional driver when
+> compiled without the subdev API, that implements the ioctl's/controls
+
+Having different interface based on config options... is just
+weird. What about poor people (like me) trying to develop complex
+applications?
+
+> [1] Yet, I might eventually do that for fun, an OMAP3 board with tvp5150
+> just arrived here last week. It would be nice to have xawtv3 running on it :-)
+> So, if I have a lot of spare time (with is very unlikely), I might eventually 
+> do something for it to work.
+> 
+> > I know it took me a very long time before I had a working omap3.
+> 
+> My first OMAP3 board with working V4L2 source just arrived last week
+> :-)
+
+You can get Nokia N900 on aliexpress. If not, they are still available
+between people :-).
+
+									Pavel
 -- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
-Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170314/52d3f8de/attachment.sig>
