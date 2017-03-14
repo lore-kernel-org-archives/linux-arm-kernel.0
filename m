@@ -1,48 +1,40 @@
 From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Tue, 14 Mar 2017 15:18:47 +0100
-Subject: [PATCH v2 11/20] ARM: dts: sun8i: Enable dwmac-sun8i on the Orange PI
- One
+Date: Tue, 14 Mar 2017 15:18:42 +0100
+Subject: [PATCH v2 06/20] ARM: dts: sunxi-h3-h5: Add dt node for the syscon
+ control module
 In-Reply-To: <20170314141856.24560-1-clabbe.montjoie@gmail.com>
 References: <20170314141856.24560-1-clabbe.montjoie@gmail.com>
-Message-ID: <20170314141856.24560-12-clabbe.montjoie@gmail.com>
+Message-ID: <20170314141856.24560-7-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The dwmac-sun8i hardware is present on the Orange PI One.
-It uses the internal PHY.
+This patch add the dt node for the syscon register present on the
+Allwinner H3/H5
 
-This patch create the needed emac node.
+Only two register are present in this syscon and the only one useful is
+the one dedicated to EMAC clock..
 
 Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
 ---
- arch/arm/boot/dts/sun8i-h3-orangepi-one.dts | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm/boot/dts/sunxi-h3-h5.dtsi | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts
-index ea8fd13..1f98ddc 100644
---- a/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts
-+++ b/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts
-@@ -53,6 +53,7 @@
+diff --git a/arch/arm/boot/dts/sunxi-h3-h5.dtsi b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
+index 2494ea0..07e4f36 100644
+--- a/arch/arm/boot/dts/sunxi-h3-h5.dtsi
++++ b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
+@@ -102,6 +102,12 @@
+ 		#size-cells = <1>;
+ 		ranges;
  
- 	aliases {
- 		serial0 = &uart0;
-+		ethernet0 = &emac;
- 	};
- 
- 	chosen {
-@@ -93,6 +94,13 @@
- 	status = "okay";
- };
- 
-+&emac {
-+	phy-handle = <&int_mii_phy>;
-+	phy-mode = "mii";
-+	allwinner,leds-active-low;
-+	status = "okay";
-+};
++		syscon: syscon at 01c00000 {
++			compatible = "syscon",
++				"allwinner,sun8i-h3-system-controller";
++			reg = <0x01c00000 0x1000>;
++		};
 +
- &mmc0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin>;
+ 		dma: dma-controller at 01c02000 {
+ 			compatible = "allwinner,sun8i-h3-dma";
+ 			reg = <0x01c02000 0x1000>;
 -- 
 2.10.2
