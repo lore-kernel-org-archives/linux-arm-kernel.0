@@ -1,29 +1,24 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Tue, 14 Mar 2017 14:07:35 +0100
-Subject: [PATCH v2 8/8] ARM: dts: s5pv210: Fix infinite interrupt in soft
- mode
-In-Reply-To: <20170311172527.16368-9-krzk@kernel.org>
-References: <20170311172527.16368-1-krzk@kernel.org>
- <20170311172527.16368-9-krzk@kernel.org>
- <CGME20170314130737epcas5p2acd94980f020d95f52ac53e3ca1eb258@epcas5p2.samsung.com>
-Message-ID: <18872645.gYpaTZ7CIU@amdc3058>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 14 Mar 2017 14:09:16 +0100
+Subject: [PATCH v2 1/5] pinctrl: sunxi: refactor pinctrl choice selecting
+ for ARM64
+In-Reply-To: <20170301180111.12365-2-icenowy@aosc.xyz>
+References: <20170301180111.12365-1-icenowy@aosc.xyz>
+ <20170301180111.12365-2-icenowy@aosc.xyz>
+Message-ID: <CACRpkdZzTFAn-Mkm+SUwoatbV3RzyqoSVMB0dqkNhuDsYY56AA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday, March 11, 2017 07:25:27 PM Krzysztof Kozlowski wrote:
-> In soft (no-reboot) mode, the driver self-pings watchdog upon expiration
-> of an interrupt.  The interrupt has to be cleared, because otherwise
-> system enters infinite interrupt handling loop.
-> 
-> Use a samsung,s3c6410-wdt compatible to select appropriate quirk for
-> clearing the watchdog interrupt.
-> 
-> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+On Wed, Mar 1, 2017 at 7:01 PM, Icenowy Zheng <icenowy@aosc.xyz> wrote:
 
-Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> ARM64 Allwinner SoCs used to have every pinctrl driver selected in
+> ARCH_SUNXI. Change this to make their default value to (ARM64 &&
+> ARCH_SUNXI).
+>
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+> Reviewed-by: Andre Przywara <andre.przywara@arm.com>
 
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+Patch applied with Maxime's ACK.
+
+Yours,
+Linus Walleij
