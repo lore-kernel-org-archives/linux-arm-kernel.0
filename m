@@ -1,23 +1,40 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 14 Mar 2017 14:13:32 +0100
-Subject: [PATCH v2 5/5] pinctrl: sunxi: Add A64 R_PIO controller support
-In-Reply-To: <20170301180930.13155-1-icenowy@aosc.xyz>
-References: <20170301180930.13155-1-icenowy@aosc.xyz>
-Message-ID: <CACRpkdaebcgFRnCTq-FdOTS5D3tNYhwP139LO-EjBrh_odVAKw@mail.gmail.com>
+Date: Tue, 14 Mar 2017 14:15:58 +0100
+Subject: [PATCH] pinctrl: sunxi: select GPIOLIB
+In-Reply-To: <20170228190815.10699-1-icenowy@aosc.xyz>
+References: <20170228190815.10699-1-icenowy@aosc.xyz>
+Message-ID: <CACRpkdawMd98EwnWjKbvsbMc0j_RjMG1qiJ5TGQC2KLLQuYOUw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 1, 2017 at 7:09 PM, Icenowy Zheng <icenowy@aosc.xyz> wrote:
+On Tue, Feb 28, 2017 at 8:08 PM, Icenowy Zheng <icenowy@aosc.xyz> wrote:
 
-> The A64 has a R_PIO pin controller, similar to the one found on the H3 SoC.
-> Add support for the pins controlled by the R_PIO controller.
+> Allwinner pin controllers are also GPIO controllers.
+>
+> Currently, if GPIOLIB is forgot to be chosen, the build of
+> pinctrl-sunxi.c will fail for lacking a lot of gpiochip_* functions.
+>
+> Select GPIOLIB to ensure this driver can be built.
 >
 > Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
-> Acked-by: Chen-Yu Tsai <wens@csie.org>
 > ---
-> Changes in v2:
+> This bug is found when I try to add sunxi drivers on an ARM64
+> allnoconfig, in order to prove that sunxi-ng ccu driver depends on
+> reset_controller framework.
+>
+> I proved the latter dependency, but how to satisfy it still needs
+> some discussion.
 
 Patch applied.
+
+This is the right thing to do.
+
+We used to have a restriction such that a pin control driver
+could not simply select GPIOLIB, because the selection had
+to be done from the platform instead.
+
+But we have fixed that! We can now select GPIOLIB
+directly from any driver that needs it.
 
 Yours,
 Linus Walleij
