@@ -1,49 +1,84 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 14 Mar 2017 22:41:10 +0100
-Subject: [PATCH] pinctrl: qcom: add get_direction function
-In-Reply-To: <13b19c7f-9440-ab8e-8a2f-d1796a9b3dde@codeaurora.org>
-References: <1486768860-18237-1-git-send-email-timur@codeaurora.org>
- <8652c018-4051-5c77-3126-2d41d150518a@codeaurora.org>
- <CACRpkdaoHTZa+XjEBAMtO2dS1jevi5h-QYe90SrZDuJghQSyYw@mail.gmail.com>
- <13b19c7f-9440-ab8e-8a2f-d1796a9b3dde@codeaurora.org>
-Message-ID: <CACRpkdZFzYStyPfK1DwkZfvtd7wX9HtD1bnCy+i9h-7xowOz4g@mail.gmail.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Tue, 14 Mar 2017 16:46:31 -0500
+Subject: Neophyte questions about PCIe
+In-Reply-To: <912c26d5-835f-9f39-73ba-db561b5bcffa@free.fr>
+References: <ced6a4bf-c94a-c116-1e94-52a8d675d132@free.fr>
+ <20170308151724.GA20780@bhelgaas-glaptop.roam.corp.google.com>
+ <f964ee05-db7f-c381-c91c-82897175da6d@free.fr>
+ <9ba05c2c-57ef-b2c0-6a7c-457c392d98b5@free.fr>
+ <df517167-d692-38a8-9c8f-a1112c7f578d@free.fr>
+ <94b3c89c-b116-288f-7530-15cc2611f425@free.fr>
+ <912c26d5-835f-9f39-73ba-db561b5bcffa@free.fr>
+Message-ID: <20170314214631.GA2021@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 6, 2017 at 10:52 PM, Timur Tabi <timur@codeaurora.org> wrote:
+On Tue, Mar 14, 2017 at 04:54:00PM +0100, Mason wrote:
+> On 14/03/2017 15:00, Mason wrote:
+> 
+> > On 10/03/2017 18:49, Mason wrote:
+> > 
+> >> /* Root complex reports incorrect device class */
+> >> static void tango_pcie_fixup_class(struct pci_dev *dev)
+> >> {
+> >> 	dev->class = PCI_CLASS_BRIDGE_PCI << 8;
+> >> }
+> > 
+> > Gen1 controller reports class/rev = 0x04800001
+> > Gen2 controller reports class/rev = 0x06000001
+> > 
+> > #define PCI_CLASS_BRIDGE_HOST		0x0600
+> > #define PCI_CLASS_BRIDGE_ISA		0x0601
+> > #define PCI_CLASS_BRIDGE_EISA		0x0602
+> > #define PCI_CLASS_BRIDGE_MC		0x0603
+> > #define PCI_CLASS_BRIDGE_PCI		0x0604
+> > #define PCI_CLASS_BRIDGE_PCMCIA		0x0605
+> > #define PCI_CLASS_BRIDGE_NUBUS		0x0606
+> > #define PCI_CLASS_BRIDGE_CARDBUS	0x0607
+> > #define PCI_CLASS_BRIDGE_RACEWAY	0x0608
+> > #define PCI_CLASS_BRIDGE_OTHER		0x0680
+> > 
+> > My fixup replaces 0x048000 with 0x060400.
+> > 
+> > 	0x060400 != 0x060000
+> > 
+> > Which is correct:
+> > PCI_CLASS_BRIDGE_HOST or PCI_CLASS_BRIDGE_PCI?
+> > 
+> > Naively, I would expect Host/PCI bridge to be more correct
+> > for a root complex.
+> 
+> But that's very likely wrong, since the code in Linux does:
+> 
+> 	switch (dev->hdr_type) {		    /* header type */
+> 	case PCI_HEADER_TYPE_BRIDGE:		    /* bridge header */
+> 		if (class != PCI_CLASS_BRIDGE_PCI)
+> 			goto bad;
+> 		/* The PCI-to-PCI bridge spec requires that subtractive
+> 		   decoding (i.e. transparent) bridge must have programming
+> 		   interface code of 0x01. */
+> 
+> So a class of PCI_CLASS_BRIDGE_HOST would error out, I think.
+> Does this mean I need to fixup Gen2 as well?
+> (Since it reports 0x060000)
 
-> On ACPI platforms, the kernel has no control over the muxing (aka function)
-> of the various pins.  Firmware configures the TLMM controller for all pins,
-> and configures them for whatever functions they're supposed to be.
+Header Type 1 (PCI_HEADER_TYPE_BRIDGE) identifies PCI-to-PCI bridges
+(see PCI spec r3.0, sec 6.1).  These devices use the type 1
+configuration header (PCI-to-PCI Bridge spec r1.2, sec 3.2) and they
+exist on a primary PCI bus and forward transactions between that bus
+and a secondary PCI bus.  The PCI core controls the memory, I/O, and
+prefetchable memory windows between the primary and secondary buses
+using the window registers in the type 1 header.
 
-I think it would be better if pin control and ACPI play along, and I bet that
-will happen in the future. This is I guess a question for ACPI standardization
-work.
+So I guess if this device has a type 1 header, it should use
+PCI_CLASS_BRIDGE_PCI; otherwise use PCI_CLASS_BRIDGE_HOST.
 
-> Therefore, on ACPI, the driver should never change the function of any pin.
-> If it's set to something other than 0, then it should never touch that pin.
-> Don't write to it, don't change the direction, and definitely don't change
-> the function.
+I don't know the topology of your hardware, but normally a Root
+Complex itself is not a PCI-to-PCI bridge.  It usually *contains*
+several Root Ports, which appear to be on the root PCI bus and act as
+bridges to a secondary bus.  The RC might appear as a type 0 device
+but the programming model is not specified.  The Root Ports would be
+type 1 devices like standard PCI-to-PCI bridges (PCIe spec r3.0, sec
+1.3.1 and 1.4).
 
-Does that mean that pins with 0 are free to play around with?
-
-> So would it be acceptable, for example, to change msm_gpio_set() such that
-> if the function of that pin is non-zero, just return an error?
-
-I would ask the driver maintainer about his opinion, and also whoever
-is an authority on ACPI for the TLMM-chips, I am no expert
-in ACPI. Hell I'm not even good at device tree. Not to mention SFI.
-Oh well...
-
-> After all, if pin #17 is set to UART and not GPIO, then there's no point in
-> setting that value to 1 or 0, because it's not muxed for GPIO and therefore,
-> that 1/0 is not actually going anywhere.  It won't be written to the pin.
->
-> I hope I'm making sense.
-
-In a way I guess, I'm just ignorant about how current ACPI implementations
-work with hardware in this case so it is likely that you know this
-better than me.
-
-Yours,
-Linus Walleij
+Bjorn
