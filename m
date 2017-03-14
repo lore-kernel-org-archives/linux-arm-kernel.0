@@ -1,28 +1,36 @@
-From: David.Laight@ACULAB.COM (David Laight)
-Date: Tue, 14 Mar 2017 10:23:53 +0000
-Subject: Neophyte questions about PCIe
-In-Reply-To: <826d0a3f-753f-0330-5792-e11beb78d6bf@free.fr>
-References: <ced6a4bf-c94a-c116-1e94-52a8d675d132@free.fr>
- <20170308151724.GA20780@bhelgaas-glaptop.roam.corp.google.com>
- <f964ee05-db7f-c381-c91c-82897175da6d@free.fr>
- <9ba05c2c-57ef-b2c0-6a7c-457c392d98b5@free.fr>
- <df517167-d692-38a8-9c8f-a1112c7f578d@free.fr>
- <c0a353cb-aa1f-25db-eccd-7a1618e655b3@free.fr>
- <20170313214024.GD8232@bhelgaas-glaptop.roam.corp.google.com>
- <826d0a3f-753f-0330-5792-e11beb78d6bf@free.fr>
-Message-ID: <063D6719AE5E284EB5DD2968C1650D6DCFFB0422@AcuExch.aculab.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 14 Mar 2017 11:27:17 +0100
+Subject: [PATCH v2] ARM: at91: pm: cpu_idle: switch DDR to power-down mode
+In-Reply-To: <20170314083804.1756-1-nicolas.ferre@microchip.com>
+References: <20170314083804.1756-1-nicolas.ferre@microchip.com>
+Message-ID: <20170314102717.itygahokl7xlr62u@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mason
-> Sent: 13 March 2017 21:58
-...
-> I'd like to push support for this PCIe controller upstream.
+On 14/03/2017 at 09:38:04 +0100, Nicolas Ferre wrote:
+> On some DDR controllers, compatible with the sama5d3 one,
+> the sequence to enter/exit/re-enter the self-refresh mode adds
+> more constrains than what is currently written in the at91_idle
+> driver. An actual access to the DDR chip is needed between exit
+> and re-enter of this mode which is somehow difficult to implement.
+> This sequence can completely hang the SoC. It is particularly
+> experienced on parts which embed a L2 cache if the code run
+> between IDLE calls fits in it...
 > 
-> Is the code I posted on the right track?
-> Maybe I can post a RFC patch tomorrow?
+> Moreover, as the intention is to enter and exit pretty rapidly
+> from IDLE, the power-down mode is a good candidate.
+> 
+> So now we use power-down instead of self-refresh. As we can
+> simplify the code for sama5d3 compatible DDR controllers,
+> we instantiate a new sama5d3_ddr_standby() function.
+> 
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+> Cc: <stable@vger.kernel.org> # v4.1+
+> Fixes: 017b5522d5e3 ("ARM: at91: Add new binding for sama5d3-ddramc")
 
-I think you need to resolve the problem of config space (and IO) cycles
-before the driver can be deemed usable.
+Applied, thanks.
 
-	David
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
