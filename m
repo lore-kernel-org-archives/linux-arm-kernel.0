@@ -1,105 +1,126 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 14 Mar 2017 09:41:06 -0700
-Subject: [PATCH] ARM: omap2+: Revert omap-smp.c changes resetting CPU1
- during boot
-In-Reply-To: <d0fe191f-66f8-b72d-0a2a-00815e663a8d@ti.com>
-References: <20170313205231.1593-1-tony@atomide.com>
- <0bade322-5bee-412f-ef21-972c99846e84@ti.com>
- <20170314151725.GC20572@atomide.com>
- <d0fe191f-66f8-b72d-0a2a-00815e663a8d@ti.com>
-Message-ID: <20170314164106.GE20572@atomide.com>
+From: slongerbeam@gmail.com (Steve Longerbeam)
+Date: Tue, 14 Mar 2017 09:43:09 -0700
+Subject: [PATCH v5 15/39] [media] v4l2: add a frame interval error event
+In-Reply-To: <1489508491.28116.8.camel@ndufresne.ca>
+References: <1489121599-23206-1-git-send-email-steve_longerbeam@mentor.com>
+ <1489121599-23206-16-git-send-email-steve_longerbeam@mentor.com>
+ <5b0a0e76-2524-4140-5ccc-380a8f949cfa@xs4all.nl>
+ <ec05e6e0-79f2-2db2-bde9-4aed00d76faa@gmail.com>
+ <6b574476-77df-0e25-a4d1-32d4fe0aec12@xs4all.nl>
+ <5d5cf4a4-a4d3-586e-cd16-54f543dfcce9@gmail.com>
+ <aa6a5a1d-18fd-8bed-a349-2654d2d1abe0@xs4all.nl>
+ <20170313104538.GF21222@n2100.armlinux.org.uk>
+ <1489508491.28116.8.camel@ndufresne.ca>
+Message-ID: <429b04e6-3922-6568-fc3f-036dc632a55b@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Andrew F. Davis <afd@ti.com> [170314 09:04]:
-> On 03/14/2017 10:17 AM, Tony Lindgren wrote:
-> > * Tero Kristo <t-kristo@ti.com> [170314 00:32]:
-> >> On 13/03/17 22:52, Tony Lindgren wrote:
-> >>> Additionally we also need to fix the hot-unplug code to properly park CPU1
-> >>> to the bootrom loop so it's not affected by SDRAM changes done by kexec
-> >>> booting kernel.
-> >>
-> >> Imo, we are doing too much bandaid hackery for this issue now. How much do
-> >> we care if the older kernels don't work properly with kexec? I know I don't
-> >> care a bit myself. It means you just need to do 1 cold-boot for the system
-> >> to fix it.
-> > 
-> > Well kexec is a standard Linux feature and it is currently working and
-> > at least I care.
-> > 
-> > And if the CPU1 start-up address is programmed to be in the currently
-> > booting kernel's area by something else, it's almost certainly totally
-> > broken.
-> > 
-> 
-> I disagree, the core can be parked correctly and still have the boot-to
-> address point to anywhere. There are two registers in play here, one
-> sets the target jump-to address, the other lets it out of the parking
-> loop. To know we are not parked we need to check the parking release
-> register, the jump-to address is completely irrelevant as a check for
-> proper parking.
 
-Well at this point we have CPU1 parked and configured for a wrong
-start-up address. So the boot-to address is a valid check. I can
-certainly add a check for CPU1 being parked too.
 
-> > Note that this still does not remove the need to park CPU1 properly to
-> > bootrom loop.
-> > 
-> 
-> I agree, and if we always park the the core correctly every time then
-> there is no reason to do all these checks and resets, we just boot as
-> normal.
+On 03/14/2017 09:21 AM, Nicolas Dufresne wrote:
+> Le lundi 13 mars 2017 ? 10:45 +0000, Russell King - ARM Linux a ?crit :
+>> On Mon, Mar 13, 2017 at 11:02:34AM +0100, Hans Verkuil wrote:
+>>> On 03/11/2017 07:14 PM, Steve Longerbeam wrote:
+>>>> The event must be user visible, otherwise the user has no indication
+>>>> the error, and can't correct it by stream restart.
+>>> In that case the driver can detect this and call vb2_queue_error. It's
+>>> what it is there for.
+>>>
+>>> The event doesn't help you since only this driver has this issue. So nobody
+>>> will watch this event, unless it is sw specifically written for this SoC.
+>>>
+>>> Much better to call vb2_queue_error to signal a fatal error (which this
+>>> apparently is) since there are more drivers that do this, and vivid supports
+>>> triggering this condition as well.
+>> So today, I can fiddle around with the IMX219 registers to help gain
+>> an understanding of how this sensor works.  Several of the registers
+>> (such as the PLL setup [*]) require me to disable streaming on the
+>> sensor while changing them.
+>>
+>> This is something I've done many times while testing various ideas,
+>> and is my primary way of figuring out and testing such things.
+>>
+>> Whenever I resume streaming (provided I've let the sensor stop
+>> streaming at a frame boundary) it resumes as if nothing happened.  If I
+>> stop the sensor mid-frame, then I get the rolling issue that Steve
+>> reports, but once the top of the frame becomes aligned with the top of
+>> the capture, everything then becomes stable again as if nothing happened.
+>>
+>> The side effect of what you're proposing is that when I disable streaming
+>> at the sensor by poking at its registers, rather than the capture just
+>> stopping, an error is going to be delivered to gstreamer, and gstreamer
+>> is going to exit, taking the entire capture process down.
+> Indeed, there is no recovery attempt in GStreamer code, and it's hard
+> for an higher level programs to handle this. Nothing prevents from
+> adding something of course, but the errors are really un-specific, so
+> it would be something pretty blind. For what it has been tested, this
+> case was never met, usually the error is triggered by a USB camera
+> being un-plugged, a driver failure or even a firmware crash. Most of
+> the time, this is not recoverable.
+>
+> My main concern here based on what I'm reading, is that this driver is
+> not even able to notice immediately that a produced frame was corrupted
+> (because it's out of sync). From usability perspective, this is really
+> bad.
 
-Correct. And these sanity checks are still needed to keep things
-working and fix the regression you reported.
+First, this is an isolated problem, specific to bt.656 and it only
+occurs when disrupting the analog video source signal in some
+way (by unplugging the RCA cable from the ADV718x connector
+for example).
 
-> If the core is not parked correctly then the system is messed up and
-> should be cold-booted, we have no way to know whether that core is off
-> running in space wreaking stuff.
-> 
-> I cannot think of any reliable test, for now the focus should be
-> figuring out why we have escaped cores in the first place.
+Second, there is no DMA status support in i.MX6 to catch these
+shifted bt.656 codes, and the ADV718x does not provide any
+status indicators of this event either. So monitoring frame intervals
+is the only solution available, until FSL/NXP issues a new silicon rev.
 
-Well I think we got there as omap4 powers CPU1 off in idle. And now
-we have dra7 using the same code and not doing that.
 
-> In my testing, core1 always ends up looping in omap4_cpu_die(), the loop
-> in this function doesn't check for the boot-to address register, just
-> the core release register. I'm not sure how this works at all, if even
-> in the same kernel, when trying to bring this core back up it will
-> ignore our set boot-to address and return to the caller of this
-> function. Maybe the kernel is able to cope with that, but it does not
-> seem to be the intended wakeup path.
+>   Can't the driver derive a clock from some irq and calculate for
+> each frame if the timing was correct ?
 
-The kernel wakeup_secondary() loops won't work without reset naturally
-as that area of memory will be overwritten with different code by the
-new kernel booting depending on the kernel version. It only works
-kexec booting the same exact kernel version by luck because the code
-at that address stays the same. So not very usable :)
+That's what is being done, essentially.
 
-> I'll do some testing and see if this will help in omap4_cpu_die():
-> 
-> if (boot_cpu == smp_processor_id()) {
-> 	/*
-> 	 * OK, proper wakeup, we're done
-> 	 */
-> +
-> +	boot_address = readl_relaxed(base + OMAP_AUX_CORE_BOOT_1);
-> +	boot_address();
-> +
-> 	break;
-> }
+>   And if not mark the buffer with
+> V4L2_BUF_FLAG_ERROR ?
 
-That's not going to help unless the boot_address is in the bootrom
-so it won't get trashed by the next booting kernel in kexec case.
-Or else we need to relocate the loop out of the way and that too
-gets messy as it can still be overwritten by appended dtb or
-initramfs. So it would really be best to have bootloader configure
-CPU1, then park it back to bootrom loop both in u-boot and kernel.
-Presumably the bootrom loop won't affect CPU1 state so this should
-be doable.
+I prefer to keep the private event, V4L2_BUF_FLAG_ERROR is too
+unspecific.
 
-Regards,
+Steve
 
-Tony
+
+>
+>> This severely restricts the ability to be able to develop and test
+>> sensor drivers.
+>>
+>> So, I strongly disagree with you.
+>>
+>> Loss of capture frames is not necessarily a fatal error - as I have been
+>> saying repeatedly.  In Steve's case, there's some unknown interaction
+>> between the source and iMX6 hardware that is causing the instability,
+>> but that is simply not true of other sources, and I oppose any idea that
+>> we should cripple the iMX6 side of the capture based upon just one
+>> hardware combination where this is a problem.
+> Indeed, it happens all the time with slow USB port and UVC devices.
+> Though, the driver is well aware, and mark the buffers with
+> V4L2_BUF_FLAG_ERROR.
+>
+>> Steve suggested that the problem could be in the iMX6 CSI block - and I
+>> note comparing Steve's code with the code in FSL's repository that there
+>> are some changes that are missing in Steve's code to do with the CCIR656
+>> sync code setup, particularly for >8 bit.  The progressive CCIR656 8-bit
+>> setup looks pretty similar though - but I think what needs to be asked
+>> is whether the same problem is visible using the FSL/NXP vendor kernel.
+>>
+>>
+>> * - the PLL setup is something that requires research at the moment.
+>> Sony's official position (even to their customers) is that they do not
+>> supply the necessary information, instead they expect customers to tell
+>> them the capture settings they want, and Sony will throw the values into
+>> a spreadsheet, and they'll supply the register settings back to the
+>> customer.  Hence, the only way to proceed with a generic driver for
+>> this sensor is to experiment, and experimenting requires the ability to
+>> pause the stream at the sensor while making changes.  Take this away,
+>> and we're stuck with the tables-of-register-settings-for-set-of-fixed-
+>> capture-settings approach.  I've made a lot of progress away from this
+>> which is all down to the flexibility afforded by _not_ killing the
+>> capture process.
