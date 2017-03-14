@@ -1,40 +1,34 @@
 From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Tue, 14 Mar 2017 15:18:50 +0100
-Subject: [PATCH v2 14/20] ARM64: dts: sun50i-a64: Add dt node for the syscon
- control module
+Date: Tue, 14 Mar 2017 15:18:49 +0100
+Subject: [PATCH v2 13/20] ARM: dts: sun8i: orangepi-pc-plus: Set EMAC activity
+ LEDs to active high
 In-Reply-To: <20170314141856.24560-1-clabbe.montjoie@gmail.com>
 References: <20170314141856.24560-1-clabbe.montjoie@gmail.com>
-Message-ID: <20170314141856.24560-15-clabbe.montjoie@gmail.com>
+Message-ID: <20170314141856.24560-14-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add the dt node for the syscon register present on the
-Allwinner A64.
+On the Orange Pi PC Plus, the polarity of the LEDs on the RJ45 Ethernet
+port were changed from active low to active high.
 
-Only two register are present in this syscon and the only one useful is
-the one dedicated to EMAC clock.
-
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
 ---
- arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm/boot/dts/sun8i-h3-orangepi-pc-plus.dts | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-index 1c64ea2..3b09af2 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-@@ -121,6 +121,12 @@
- 		#size-cells = <1>;
- 		ranges;
- 
-+		syscon: syscon at 01c00000 {
-+			compatible = "syscon",
-+				"allwinner,sun8i-h3-system-controller";
-+			reg = <0x01c00000 0x1000>;
-+		};
+diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-pc-plus.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-pc-plus.dts
+index 8b93f5c..0380769 100644
+--- a/arch/arm/boot/dts/sun8i-h3-orangepi-pc-plus.dts
++++ b/arch/arm/boot/dts/sun8i-h3-orangepi-pc-plus.dts
+@@ -86,3 +86,8 @@
+ 	/* eMMC is missing pull-ups */
+ 	bias-pull-up;
+ };
 +
- 		mmc0: mmc at 1c0f000 {
- 			compatible = "allwinner,sun50i-a64-mmc";
- 			reg = <0x01c0f000 0x1000>;
++&emac {
++	/* LEDs changed to active high on the plus */
++	/delete-property/ allwinner,leds-active-low;
++};
 -- 
 2.10.2
