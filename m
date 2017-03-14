@@ -1,112 +1,86 @@
-From: nicolas@ndufresne.ca (Nicolas Dufresne)
-Date: Tue, 14 Mar 2017 12:21:31 -0400
-Subject: [PATCH v5 15/39] [media] v4l2: add a frame interval error event
-In-Reply-To: <20170313104538.GF21222@n2100.armlinux.org.uk>
-References: <1489121599-23206-1-git-send-email-steve_longerbeam@mentor.com>
- <1489121599-23206-16-git-send-email-steve_longerbeam@mentor.com>
- <5b0a0e76-2524-4140-5ccc-380a8f949cfa@xs4all.nl>
- <ec05e6e0-79f2-2db2-bde9-4aed00d76faa@gmail.com>
- <6b574476-77df-0e25-a4d1-32d4fe0aec12@xs4all.nl>
- <5d5cf4a4-a4d3-586e-cd16-54f543dfcce9@gmail.com>
- <aa6a5a1d-18fd-8bed-a349-2654d2d1abe0@xs4all.nl>
- <20170313104538.GF21222@n2100.armlinux.org.uk>
-Message-ID: <1489508491.28116.8.camel@ndufresne.ca>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 14 Mar 2017 17:30:34 +0100
+Subject: [PATCH 1/4] ARM64: Prepare Marvell IAP140 aka PXA1908
+In-Reply-To: <20170219032000.4674-2-afaerber@suse.de>
+References: <20170219032000.4674-1-afaerber@suse.de>
+ <20170219032000.4674-2-afaerber@suse.de>
+Message-ID: <CAPDyKFoy-dKTk=t6cmwzbjyntZHrkSyZbtpJ0wAMUDJ5xz4viA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le lundi 13 mars 2017 ? 10:45 +0000, Russell King - ARM Linux a ?crit?:
-> On Mon, Mar 13, 2017 at 11:02:34AM +0100, Hans Verkuil wrote:
-> > On 03/11/2017 07:14 PM, Steve Longerbeam wrote:
-> > > The event must be user visible, otherwise the user has no indication
-> > > the error, and can't correct it by stream restart.
-> > 
-> > In that case the driver can detect this and call vb2_queue_error. It's
-> > what it is there for.
-> > 
-> > The event doesn't help you since only this driver has this issue. So nobody
-> > will watch this event, unless it is sw specifically written for this SoC.
-> > 
-> > Much better to call vb2_queue_error to signal a fatal error (which this
-> > apparently is) since there are more drivers that do this, and vivid supports
-> > triggering this condition as well.
-> 
-> So today, I can fiddle around with the IMX219 registers to help gain
-> an understanding of how this sensor works.??Several of the registers
-> (such as the PLL setup [*]) require me to disable streaming on the
-> sensor while changing them.
-> 
-> This is something I've done many times while testing various ideas,
-> and is my primary way of figuring out and testing such things.
-> 
-> Whenever I resume streaming (provided I've let the sensor stop
-> streaming at a frame boundary) it resumes as if nothing happened.??If I
-> stop the sensor mid-frame, then I get the rolling issue that Steve
-> reports, but once the top of the frame becomes aligned with the top of
-> the capture, everything then becomes stable again as if nothing happened.
-> 
-> The side effect of what you're proposing is that when I disable streaming
-> at the sensor by poking at its registers, rather than the capture just
-> stopping, an error is going to be delivered to gstreamer, and gstreamer
-> is going to exit, taking the entire capture process down.
+On 19 February 2017 at 04:19, Andreas F?rber <afaerber@suse.de> wrote:
+> Suppress COMMON_CLK_PXA and MMC_PXA for now as they don't build on arm64.
+> Also suppress the deprecated SERIAL_PXA in favor of SERIAL_8250_PXA.
+>
+> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+> ---
+>  arch/arm64/Kconfig.platforms | 5 +++++
+>  drivers/clk/Kconfig          | 2 +-
+>  drivers/mmc/host/Kconfig     | 2 +-
+>  drivers/tty/serial/Kconfig   | 2 +-
+>  4 files changed, 8 insertions(+), 3 deletions(-)
 
-Indeed, there is no recovery attempt in GStreamer code, and it's hard
-for an higher level programs to handle this. Nothing prevents from
-adding something of course, but the errors are really un-specific, so
-it would be something pretty blind. For what it has been tested, this
-case was never met, usually the error is triggered by a USB camera
-being un-plugged, a driver failure or even a firmware crash. Most of
-the time, this is not recoverable.
+Please try split this up so it can be applied on each subsystem independently.
 
-My main concern here based on what I'm reading, is that this driver is
-not even able to notice immediately that a produced frame was corrupted
-(because it's out of sync). From usability perspective, this is really
-bad. Can't the driver derive a clock from some irq and calculate for
-each frame if the timing was correct ? And if not mark the buffer with
-V4L2_BUF_FLAG_ERROR ?
+Kind regards
+Uffe
 
-> 
-> This severely restricts the ability to be able to develop and test
-> sensor drivers.
-> 
-> So, I strongly disagree with you.
-> 
-> Loss of capture frames is not necessarily a fatal error - as I have been
-> saying repeatedly.??In Steve's case, there's some unknown interaction
-> between the source and iMX6 hardware that is causing the instability,
-> but that is simply not true of other sources, and I oppose any idea that
-> we should cripple the iMX6 side of the capture based upon just one
-> hardware combination where this is a problem.
-
-Indeed, it happens all the time with slow USB port and UVC devices.
-Though, the driver is well aware, and mark the buffers with
-V4L2_BUF_FLAG_ERROR.
-
-> 
-> Steve suggested that the problem could be in the iMX6 CSI block - and I
-> note comparing Steve's code with the code in FSL's repository that there
-> are some changes that are missing in Steve's code to do with the CCIR656
-> sync code setup, particularly for >8 bit.??The progressive CCIR656 8-bit
-> setup looks pretty similar though - but I think what needs to be asked
-> is whether the same problem is visible using the FSL/NXP vendor kernel.
-> 
-> 
-> * - the PLL setup is something that requires research at the moment.
-> Sony's official position (even to their customers) is that they do not
-> supply the necessary information, instead they expect customers to tell
-> them the capture settings they want, and Sony will throw the values into
-> a spreadsheet, and they'll supply the register settings back to the
-> customer.??Hence, the only way to proceed with a generic driver for
-> this sensor is to experiment, and experimenting requires the ability to
-> pause the stream at the sensor while making changes.??Take this away,
-> and we're stuck with the tables-of-register-settings-for-set-of-fixed-
-> capture-settings approach.??I've made a lot of progress away from this
-> which is all down to the flexibility afforded by _not_ killing the
-> capture process.
-> 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170314/4ab6983e/attachment-0001.sig>
+>
+> diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
+> index 129cc5a..841b6c8 100644
+> --- a/arch/arm64/Kconfig.platforms
+> +++ b/arch/arm64/Kconfig.platforms
+> @@ -111,6 +111,11 @@ config ARCH_MVEBU
+>            - Armada 7K SoC Family
+>            - Armada 8K SoC Family
+>
+> +config ARCH_PXA
+> +       bool "Marvell PXA SoC Family"
+> +       help
+> +         This enables support for the Marvell PXA family.
+> +
+>  config ARCH_QCOM
+>         bool "Qualcomm Platforms"
+>         select GPIOLIB
+> diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
+> index 9356ab4..3d25f20 100644
+> --- a/drivers/clk/Kconfig
+> +++ b/drivers/clk/Kconfig
+> @@ -185,7 +185,7 @@ config COMMON_CLK_PWM
+>           at 50% duty cycle.
+>
+>  config COMMON_CLK_PXA
+> -       def_bool COMMON_CLK && ARCH_PXA
+> +       def_bool COMMON_CLK && ARCH_PXA && ARM
+>         ---help---
+>           Support for the Marvell PXA SoC.
+>
+> diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
+> index f08691a..a650eca 100644
+> --- a/drivers/mmc/host/Kconfig
+> +++ b/drivers/mmc/host/Kconfig
+> @@ -27,7 +27,7 @@ config MMC_QCOM_DML
+>
+>  config MMC_PXA
+>         tristate "Intel PXA25x/26x/27x Multimedia Card Interface support"
+> -       depends on ARCH_PXA
+> +       depends on ARCH_PXA && ARM
+>         help
+>           This selects the Intel(R) PXA(R) Multimedia card Interface.
+>           If you have a PXA(R) platform with a Multimedia Card slot,
+> diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
+> index 6117ac8..0713a05 100644
+> --- a/drivers/tty/serial/Kconfig
+> +++ b/drivers/tty/serial/Kconfig
+> @@ -439,7 +439,7 @@ config SERIAL_MPSC_CONSOLE
+>
+>  config SERIAL_PXA
+>         bool "PXA serial port support (DEPRECATED)"
+> -       depends on ARCH_PXA || ARCH_MMP
+> +       depends on (ARCH_PXA && ARM) || ARCH_MMP
+>         select SERIAL_CORE
+>         select SERIAL_8250_PXA if SERIAL_8250=y
+>         select SERIAL_PXA_NON8250 if !SERIAL_8250=y
+> --
+> 2.10.2
+>
