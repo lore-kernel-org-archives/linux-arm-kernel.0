@@ -1,155 +1,122 @@
-From: alim.akhtar@samsung.com (Alim Akhtar)
-Date: Tue, 14 Mar 2017 14:10:02 +0530
-Subject: [2/3] soc: samsung: Do not build ARMv7 PMU drivers on ARMv8
-In-Reply-To: <CAJKOXPd=K8rbBxV21ibubjgU8BV3g4AqDrXX0f6-N_VPkR=puQ@mail.gmail.com>
-References: <CGME20170314075427epcas5p19d137fbcc390e937172a17ae99f11a0c@epcas5p1.samsung.com>
- <20170311213856.21701-3-krzk@kernel.org>
- <2da8c346-dae9-6754-8349-df0946c89ae2@samsung.com>
- <CAJKOXPd=K8rbBxV21ibubjgU8BV3g4AqDrXX0f6-N_VPkR=puQ@mail.gmail.com>
-Message-ID: <0ae4c538-a3af-a1b7-418d-4bccbf09faf4@samsung.com>
+From: oza.oza@broadcom.com (Oza Pawandeep)
+Date: Tue, 14 Mar 2017 14:18:47 +0530
+Subject: [RFC PATCH] iommu/dma: check pci host bridge dma_mask for IOVA
+ allocation
+Message-ID: <1489481327-2862-1-git-send-email-oza.oza@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+It is possible that PCI device supports 64-bit DMA addressing,
+and thus it's driver sets device's dma_mask to DMA_BIT_MASK(64),
+however PCI host bridge may have limitations on the inbound
+transaction addressing. As an example, consider NVME SSD device
+connected to iproc-PCIe controller.
 
+Currently, the IOMMU DMA ops only considers PCI device dma_mask
+when allocating an IOVA. This is particularly problematic on
+ARM/ARM64 SOCs where the IOMMU (i.e. SMMU) translates IOVA to
+PA for in-bound transactions only after PCI Host has forwarded
+these transactions on SOC IO bus. This means on such ARM/ARM64
+SOCs the IOVA of in-bound transactions has to honor the addressing
+restrictions of the PCI Host.
 
-On 03/14/2017 01:32 PM, Krzysztof Kozlowski wrote:
-> On Tue, Mar 14, 2017 at 9:51 AM, Alim Akhtar <alim.akhtar@samsung.com> wrote:
->> Hi Krzysztof,
->>
->> On 03/12/2017 03:08 AM, Krzysztof Kozlowski wrote:
->>> The Exynos Power Management Unit (PMU) drivers contain quite large
->>> static arrays of register values necessary for given Exynos SoC to enter
->>> low power mode.  All this data is useless for ARMv8 SoC like
->>> Exynos5433, because the image will not be shared between ARMv7 and
->>> ARMv8.
->>>
->>> Add additional Kconfig symbol for selecting the SoC-specific driver
->>> addons thus skipping the useless data in the final image (this is
->>> similar approach to chosen for Exynos clock controller drivers):
->>>  - exynos-pmu driver will be compiled on both architectures ARMv7
->>>    and ARMv8,
->>>  - additional driver_data for ARMv7 SoCs will not be built on ARMv8
->>>    and a macro will return NULL for them in of_device_id - this should
->>>    be safe as these compatibles cannot match on ARMv7 and driver
->>>    anyway handles NULL driver_data,
->>>  - on ARMv8 compile only exynos-pmu driver which exposes the
->>>    syscon-regmap for PMU address space.
->>>
->>> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
->>> ---
->>>  drivers/soc/samsung/Kconfig      |  8 +++++++-
->>>  drivers/soc/samsung/Makefile     |  4 +++-
->>>  drivers/soc/samsung/exynos-pmu.c | 22 ++++++++++++++++------
->>>  drivers/soc/samsung/exynos-pmu.h |  3 +++
->>>  4 files changed, 29 insertions(+), 8 deletions(-)
->>>
->>> diff --git a/drivers/soc/samsung/Kconfig b/drivers/soc/samsung/Kconfig
->>> index 245533907d1b..8b25bd55e648 100644
->>> --- a/drivers/soc/samsung/Kconfig
->>> +++ b/drivers/soc/samsung/Kconfig
->>> @@ -8,7 +8,13 @@ if SOC_SAMSUNG
->>>
->>>  config EXYNOS_PMU
->>>       bool "Exynos PMU controller driver" if COMPILE_TEST
->>> -     depends on (ARM && ARCH_EXYNOS) || ((ARM || ARM64) && COMPILE_TEST)
->>> +     depends on ARCH_EXYNOS || ((ARM || ARM64) && COMPILE_TEST)
->>> +     select EXYNOS_PMU_ARM_DRIVERS if ARM && ARCH_EXYNOS
->>> +
->>
->> In general this patch look ok, but I was think we should make these
->> configs configurable via _menuconfig_. Currently these are visible only
->> if COMPILE_TEST is enabled.
->> Recently I was working on adding PMU support for Exynos7 and I face
->> issues when I want to disable this option and re-enable it for testing
->> purpose.
->
-> These drivers are not available in menuconfig on purpose - these are
-> essential parts of SoC. Without them usually something will not work
-> so user should not be able to disable them. For all of such drivers,
-> we use the SELECT from mach approach.
->
-Well, what you are saying is very subjective. In past I have face issues 
-where to isolate or narrow down some issue, we do need to play with PMU 
-and power domains. So, having a configurable option won't hurt here.
-Anyway if you (or anyone else) strongly feel we should be following 
-"SELECT from MACH approach" then lets follow it.
+This patch tries to solve above described IOVA allocation
+problem by:
+1. Adding iommu_get_dma_mask() to get dma_mask of any device
+2. For PCI device, iommu_get_dma_mask() compare dma_mask of
+PCI device and corresponding PCI Host dma_mask (if set).
+3. Use iommu_get_dma_mask() in IOMMU DMA ops implementation
+instead of dma_get_mask()
 
+Signed-off-by: Oza Pawandeep <oza.oza@broadcom.com>
+Reviewed-by: Anup Patel <anup.patel@broadcom.com>
+Reviewed-by: Scott Branden <scott.branden@broadcom.com>
+---
+ drivers/iommu/dma-iommu.c | 44 ++++++++++++++++++++++++++++++++++++++++----
+ 1 file changed, 40 insertions(+), 4 deletions(-)
 
->>> +# There is no need to enable these drivers for ARMv8
->>> +config EXYNOS_PMU_ARM_DRIVERS
->>> +     bool "Exynos PMU ARMv7-specific driver extensions" if COMPILE_TEST
->>> +     depends on EXYNOS_PMU
->>>
->>>  config EXYNOS_PM_DOMAINS
->>>       bool "Exynos PM domains" if COMPILE_TEST
->>> diff --git a/drivers/soc/samsung/Makefile b/drivers/soc/samsung/Makefile
->>> index 3619f2ecddaa..4d7694a4e7a4 100644
->>> --- a/drivers/soc/samsung/Makefile
->>> +++ b/drivers/soc/samsung/Makefile
->>> @@ -1,3 +1,5 @@
->>> -obj-$(CONFIG_EXYNOS_PMU)     += exynos-pmu.o exynos3250-pmu.o exynos4-pmu.o \
->>> +obj-$(CONFIG_EXYNOS_PMU)     += exynos-pmu.o
->>> +
->>> +obj-$(CONFIG_EXYNOS_PMU_ARM_DRIVERS) += exynos3250-pmu.o exynos4-pmu.o \
->>>                                       exynos5250-pmu.o exynos5420-pmu.o
->>>  obj-$(CONFIG_EXYNOS_PM_DOMAINS) += pm_domains.o
->>> diff --git a/drivers/soc/samsung/exynos-pmu.c b/drivers/soc/samsung/exynos-pmu.c
->>> index 56d9244ff981..bd4a76f27bc2 100644
->>> --- a/drivers/soc/samsung/exynos-pmu.c
->>> +++ b/drivers/soc/samsung/exynos-pmu.c
->>> @@ -69,27 +69,37 @@ void exynos_sys_powerdown_conf(enum sys_powerdown mode)
->>>  }
->>>
->>>  /*
->>> + * Split the data between ARM architectures because it is relatively big
->>> + * and useless on other arch.
->>> + */
->>> +#ifdef CONFIG_EXYNOS_PMU_ARM_DRIVERS
->>> +#define exynos_pmu_data_arm_ptr(data)        (&data)
->>> +#else
->>> +#define exynos_pmu_data_arm_ptr(data)        NULL
->>> +#endif
->>> +
->>> +/*
->>>   * PMU platform driver and devicetree bindings.
->>>   */
->>>  static const struct of_device_id exynos_pmu_of_device_ids[] = {
->>>       {
->>>               .compatible = "samsung,exynos3250-pmu",
->>> -             .data = &exynos3250_pmu_data,
->>> +             .data = exynos_pmu_data_arm_ptr(exynos3250_pmu_data),
->>>       }, {
->>>               .compatible = "samsung,exynos4210-pmu",
->>> -             .data = &exynos4210_pmu_data,
->>> +             .data = exynos_pmu_data_arm_ptr(exynos4210_pmu_data),
->>>       }, {
->>>               .compatible = "samsung,exynos4212-pmu",
->>> -             .data = &exynos4212_pmu_data,
->>> +             .data = exynos_pmu_data_arm_ptr(exynos4212_pmu_data),
->>>       }, {
->>>               .compatible = "samsung,exynos4412-pmu",
->>> -             .data = &exynos4412_pmu_data,
->>> +             .data = exynos_pmu_data_arm_ptr(exynos4412_pmu_data),
->>>       }, {
->>>               .compatible = "samsung,exynos5250-pmu",
->>> -             .data = &exynos5250_pmu_data,
->>> +             .data = exynos_pmu_data_arm_ptr(exynos5250_pmu_data),
->>>       }, {
->>>               .compatible = "samsung,exynos5420-pmu",
->>> -             .data = &exynos5420_pmu_data,
->>> +             .data = exynos_pmu_data_arm_ptr(exynos5420_pmu_data),
->>>       }, {
->>>               .compatible = "samsung,exynos5433-pmu",
->> So, as I understand, the idea here to use something like
->>         .data = &exynos5433_pmu_data or so in case ARMv8?
->
-> In the future, yes. Now there is no low power mode support for
-> Exynos5433 so the data is left empty.
->
-Ok, this is fine.
-
-> Best regards,
-> Krzysztof
->
->
->
+diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
+index 48d36ce..e93e536 100644
+--- a/drivers/iommu/dma-iommu.c
++++ b/drivers/iommu/dma-iommu.c
+@@ -108,6 +108,42 @@ int iommu_get_dma_cookie(struct iommu_domain *domain)
+ }
+ EXPORT_SYMBOL(iommu_get_dma_cookie);
+ 
++static u64 __iommu_dma_mask(struct device *dev, bool is_coherent)
++{
++#ifdef CONFIG_PCI
++	u64 pci_hb_dma_mask;
++
++	if (dev_is_pci(dev)) {
++		struct pci_dev *pdev = to_pci_dev(dev);
++		struct pci_host_bridge *br = pci_find_host_bridge(pdev->bus);
++
++		if ((!is_coherent) && !(br->dev.dma_mask))
++			goto default_dev_dma_mask;
++
++		/* pci host bridge dma-mask. */
++		pci_hb_dma_mask = (!is_coherent) ? *br->dev.dma_mask :
++				   br->dev.coherent_dma_mask;
++
++		if (pci_hb_dma_mask && ((pci_hb_dma_mask) < (*dev->dma_mask)))
++			return pci_hb_dma_mask;
++	}
++default_dev_dma_mask:
++#endif
++	return (!is_coherent) ? dma_get_mask(dev) :
++		dev->coherent_dma_mask;
++}
++
++static u64 __iommu_dma_get_coherent_mask(struct device *dev)
++{
++	return __iommu_dma_mask(dev, true);
++}
++
++static u64 __iommu_dma_get_mask(struct device *dev)
++{
++	return __iommu_dma_mask(dev, false);
++}
++
++
+ /**
+  * iommu_get_msi_cookie - Acquire just MSI remapping resources
+  * @domain: IOMMU domain to prepare
+@@ -461,7 +497,7 @@ struct page **iommu_dma_alloc(struct device *dev, size_t size, gfp_t gfp,
+ 	if (!pages)
+ 		return NULL;
+ 
+-	iova = __alloc_iova(domain, size, dev->coherent_dma_mask, dev);
++	iova = __alloc_iova(domain, size, __iommu_dma_get_coherent_mask(dev), dev);
+ 	if (!iova)
+ 		goto out_free_pages;
+ 
+@@ -532,7 +568,7 @@ static dma_addr_t __iommu_dma_map(struct device *dev, phys_addr_t phys,
+ 	struct iova_domain *iovad = cookie_iovad(domain);
+ 	size_t iova_off = iova_offset(iovad, phys);
+ 	size_t len = iova_align(iovad, size + iova_off);
+-	struct iova *iova = __alloc_iova(domain, len, dma_get_mask(dev), dev);
++	struct iova *iova = __alloc_iova(domain, len, __iommu_dma_get_mask(dev), dev);
+ 
+ 	if (!iova)
+ 		return DMA_ERROR_CODE;
+@@ -690,7 +726,7 @@ int iommu_dma_map_sg(struct device *dev, struct scatterlist *sg,
+ 		prev = s;
+ 	}
+ 
+-	iova = __alloc_iova(domain, iova_len, dma_get_mask(dev), dev);
++	iova = __alloc_iova(domain, iova_len, __iommu_dma_get_mask(dev), dev);
+ 	if (!iova)
+ 		goto out_restore_sg;
+ 
+@@ -760,7 +796,7 @@ static struct iommu_dma_msi_page *iommu_dma_get_msi_page(struct device *dev,
+ 
+ 	msi_page->phys = msi_addr;
+ 	if (iovad) {
+-		iova = __alloc_iova(domain, size, dma_get_mask(dev), dev);
++		iova = __alloc_iova(domain, size, __iommu_dma_get_mask(dev), dev);
+ 		if (!iova)
+ 			goto out_free_page;
+ 		msi_page->iova = iova_dma_addr(iovad, iova);
+-- 
+1.9.1
