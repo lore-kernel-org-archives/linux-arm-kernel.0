@@ -1,116 +1,110 @@
-From: j-keerthy@ti.com (Keerthy)
-Date: Tue, 14 Mar 2017 19:08:03 +0530
-Subject: [PATCH v3 00/25] arm/arm64: KVM: Rework the hyp-stub API
-In-Reply-To: <20170306142458.8875-1-marc.zyngier@arm.com>
-References: <20170306142458.8875-1-marc.zyngier@arm.com>
-Message-ID: <8493dac7-c9be-fd3b-c5c0-83fbbfa4af10@ti.com>
+From: quentin.schulz@free-electrons.com (Quentin Schulz)
+Date: Tue, 14 Mar 2017 14:44:21 +0100
+Subject: [PATCH v3 01/18] dt-bindings: power: battery: add
+ constant-charge-current property
+In-Reply-To: <CAGb2v67913XnRNv9bYty5WcGLAWHYMM6=M9BVmTZ3wjReh_UBg@mail.gmail.com>
+References: <20170215004646.23607-1-liam@networkimprov.net>
+ <6a678b03-124a-76b3-066e-858731fc6c80@free-electrons.com>
+ <CAGb2v67913XnRNv9bYty5WcGLAWHYMM6=M9BVmTZ3wjReh_UBg@mail.gmail.com>
+Message-ID: <5f4f8212-e071-9e20-542d-f6557eead260@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Chen-Yu,
 
+Sorry for the late reply.
 
-On Monday 06 March 2017 07:54 PM, Marc Zyngier wrote:
-> As noticed by RMK in this thread[1], the hyp-stub API on 32bit ARM
-> could do with some TLC (it cannot perform a soft-restart at HYP, and
-> has holes in the hyp-stub support in a number of places). In general,
-> it would be desirable for the 32bit behaviour to align on 64bit, if
-> only to ease maintenance.
+On 21/02/2017 05:55, Chen-Yu Tsai wrote:
+> On Wed, Feb 15, 2017 at 4:53 PM, Quentin Schulz
+> <quentin.schulz@free-electrons.com> wrote:
+>> Hi,
+>>
+>> On 15/02/2017 01:46, Liam Breck wrote:
+>>>
+>>> On Tue, 14 Feb 2017 10:40:55 +0100 Quentin Schulz wrote:
+>>>> This adds the constant-charge-current property to the list of optional
+>>>> properties of the battery.
+>>>>
+>>>> The constant charge current is critical for batteries as they can't
+>>>> handle all charge currents.
+>>>>
+>>>> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+>>>> ---
+>>>>
+>>>> added in v3
+>>>>
+>>>>  Documentation/devicetree/bindings/power/supply/battery.txt | 2 ++
+>>>
+>>> Is constant-charge-current dependent on the battery (e.g. capacity, nominal voltage, etc) or the
+>>> system (charger chip, input current/voltage, etc)?
+>>>
+>>> It belongs in Doc.../power/supply/battery.txt if it's a characteristic of the battery.
+>>>
+>>> Note, this page asserts that constant-current charging applies to NiMH batteries:
+>>> http://power-topics.blogspot.com/2016/05/constant-voltage-constant-current.html
+>>>
+>>> Related properties to be added to battery.txt near-future in a patchset for the BQ24190
+>>> charger are as follows. These are not currently in enum power_supply_property, so the actual names
+>>> are still to be decided.
+>>>
+>>> precharge-current-microamp:
+>>>    maximum charge current during precharge phase (typically 20% of battery capacity)
+>>>
+>>> termination-current-microamp (or endcharge-current):
+>>>    a charge cycle terminates when the battery voltage is above recharge threshold,
+>>>    and the current is below this setting (typically 10% of battery capacity)
+>>>
+>>
+>> We have a client with a board whose battery accepts a maximum of 300mA
+>> for charging. So depending on the battery, we cannot have any charging
+>> current we want. The AXP PmMICs set constant charge current in a range
+>> of 300mA-1800mA, so it is enforced by the charger but needs to be
+>> adapted depending on the battery present in the system.
 > 
-> This series implements the following:
-> - Add HVC_[GS]ET_VECTORS and HVC_SOFT_RESTART to the 32bit code
-> - Add HVC_RESET_VECTORS to both arm and arm64, removing the need for
->   __hyp_reset_vectors
-> - Implement add the stub entry points in the KVM init code, which
->   didn't implement any so far
-> - Convert the HYP code to use the init code stubs directly
-> - Some general cleanup as a result of these changes (which includes
->   killing HVC_GET_VECTORS)
-> - Add some API documentation that covers the above
+> May I ask the capacity of the battery in question?
 > 
-> Patches 9 to 11 would be better squashed into 7 and 8, but I've kept
-> separate so that I can take the blame for everything I've broken.
 
-Tested for kexec booting with the patch series applied on linux-next.
+It is a 400mAh battery.
 
-kexec is working nicely with HYP and SVC modes. Tested for both modes by
-using different u-boot for booting in HYP and SVC modes. Kexec works well.
+Quentin
 
-Tested on DRA7-EVM, AM57XX-EVM and KEYSTONE-K2E-EVM.
+> Typically one charges LiPo batteries at no more than 1C. So if it's
+> a 1800 mAh battery, the charge current should be no more than 1800 mA.
+> 
+> ChenYu
+> 
+>> The AXP PMICs charge battery with constant current (Ichrg) between the
+>> trickle voltage (Vtrkl which is ~3.0V) and the targeted voltage (Vtrgt;
+>> which seems to be the voltage telling the battery is fully charged).
+>>
+>> So if I understand correctly, "my" constant-charge-current would be
+>> located in the charging cycle between your precharge-current-microamp
+>> and the termination-current-microamp as it is the current for the
+>> charging process as a whole.
+>>
+>> See here[1] for the explanation in the datasheet (page 20).
+>>
+>> That would definitely match what is explained in your link for constant
+>> current.
+>>
+>> [1] http://dl.linux-sunxi.org/AXP/AXP209_Datasheet_v1.0en.pdf
+>>
+>> Let me know if something seems odd,
+>> Thanks,
+>> Quentin
+>>
+>> --
+>> Quentin Schulz, Free Electrons
+>> Embedded Linux and Kernel engineering
+>> http://free-electrons.com
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
 
-Tested-by: Keerthy <j-keerthy@ti.com>
-
-> 
-> This has been tested on arm (Cubietruck, Jetson TK1) and arm64
-> (Seattle), both as host and guest.
-> 
-> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-December/473472.html
-> 
-> * From v2:
->   - Kill HVC_GET_VECTORS and the corresponding __hyp_get_vectors
-> 
-> * From v1:
->   - Fixed some glaring bugs (reported by Ard and James)
->   - Tidy up stub vector export on 32bit (Ard)
->   - Nicer VA/PA conversion on 32bit (Ard)
->   - Updated cpu_v7_reset documentation
->   - Cleaned up HYP reset on PM events
->   - Minor stub documentation update
-> 
-> Marc Zyngier (23):
->   arm64: hyp-stub: Implement HVC_RESET_VECTORS stub hypercall
->   arm64: KVM: Implement HVC_RESET_VECTORS stub hypercall
->   arm64: KVM: Implement HVC_GET_VECTORS in the init code
->   arm64: KVM: Allow the main HYP code to use the init hyp stub
->     implementation
->   arm64: KVM: Convert __cpu_reset_hyp_mode to using __hyp_reset_vectors
->   arm64: KVM: Implement HVC_SOFT_RESTART in the init code
->   ARM: KVM: Convert KVM to use HVC_GET_VECTORS
->   ARM: Update cpu_v7_reset documentation
->   ARM: hyp-stub: Use r1 for the soft-restart address
->   ARM: Expose the VA/IDMAP offset
->   ARM: hyp-stub: Implement HVC_RESET_VECTORS stub hypercall
->   ARM: KVM: Implement HVC_RESET_VECTORS stub hypercall
->   ARM: KVM: Implement HVC_GET_VECTORS in the init code
->   ARM: KVM: Allow the main HYP code to use the init hyp stub
->     implementation
->   ARM: KVM: Convert __cpu_reset_hyp_mode to using __hyp_reset_vectors
->   ARM: KVM: Implement HVC_SOFT_RESTART in the init code
->   arm/arm64: KVM: Use __hyp_reset_vectors() directly
->   arm/arm64: KVM: Remove kvm_get_idmap_start
->   arm/arm64: KVM: Use HVC_RESET_VECTORS to reinit HYP mode
->   ARM: decompressor: Remove __hyp_get_vectors usage
->   ARM: hyp-stub/KVM: Kill __hyp_get_vectors
->   arm64: hyp-stub/KVM: Kill __hyp_get_vectors
->   arm/arm64: Add hyp-stub API documentation
-> 
-> Russell King (2):
->   ARM: hyp-stub: improve ABI
->   ARM: soft-reboot into same mode that we entered the kernel
-> 
->  Documentation/virtual/kvm/arm/hyp-abi.txt | 45 ++++++++++++++++++++++++++++
->  arch/arm/boot/compressed/head.S           |  5 +++-
->  arch/arm/include/asm/kvm_asm.h            |  2 --
->  arch/arm/include/asm/kvm_host.h           |  6 ----
->  arch/arm/include/asm/kvm_mmu.h            |  1 -
->  arch/arm/include/asm/proc-fns.h           |  4 +--
->  arch/arm/include/asm/virt.h               | 12 +++++++-
->  arch/arm/kernel/hyp-stub.S                | 39 +++++++++++++++++++-----
->  arch/arm/kernel/reboot.c                  |  7 +++--
->  arch/arm/kvm/arm.c                        | 25 ++++++----------
->  arch/arm/kvm/hyp/hyp-entry.S              | 29 ++++++++++++++----
->  arch/arm/kvm/init.S                       | 49 ++++++++++++++++++++++++++-----
->  arch/arm/kvm/interrupts.S                 |  4 ---
->  arch/arm/kvm/mmu.c                        |  5 ----
->  arch/arm/mm/mmu.c                         |  5 ++++
->  arch/arm/mm/proc-v7.S                     | 15 ++++++----
->  arch/arm64/include/asm/kvm_asm.h          |  1 -
->  arch/arm64/include/asm/kvm_host.h         |  7 -----
->  arch/arm64/include/asm/kvm_mmu.h          |  1 -
->  arch/arm64/include/asm/virt.h             | 17 +++++++----
->  arch/arm64/kernel/hyp-stub.S              | 26 ++++++++--------
->  arch/arm64/kvm/hyp-init.S                 | 45 +++++++++++++++++++++-------
->  arch/arm64/kvm/hyp.S                      |  2 +-
->  arch/arm64/kvm/hyp/hyp-entry.S            | 39 ++++++++++++------------
->  24 files changed, 265 insertions(+), 126 deletions(-)
->  create mode 100644 Documentation/virtual/kvm/arm/hyp-abi.txt
-> 
+-- 
+Quentin Schulz, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
