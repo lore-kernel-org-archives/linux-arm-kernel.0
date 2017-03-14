@@ -1,89 +1,53 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 14 Mar 2017 14:04:55 +0000
-Subject: [PATCH 23/35] drivers/mfd: Convert remaining uses of pr_warning
- to pr_warn
-In-Reply-To: <a6c827c14d0b9f4be42e549ec4c629245516e979.1487314667.git.joe@perches.com>
-References: <cover.1487314666.git.joe@perches.com>
- <a6c827c14d0b9f4be42e549ec4c629245516e979.1487314667.git.joe@perches.com>
-Message-ID: <20170314140455.umlhdbuj3grqtu6i@dell>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 14 Mar 2017 15:05:27 +0100
+Subject: [PATCH 1/1] pinctrl: st: add irq_request_resources callback
+In-Reply-To: <1488203368-13574-1-git-send-email-patrice.chotard@st.com>
+References: <1488203368-13574-1-git-send-email-patrice.chotard@st.com>
+Message-ID: <CACRpkdb1WYRYifUp=C9QpEXN4ntxNfFx_H1+mA1-0UJw=dUFPQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 16 Feb 2017, Joe Perches wrote:
+On Mon, Feb 27, 2017 at 2:49 PM,  <patrice.chotard@st.com> wrote:
 
-> To enable eventual removal of pr_warning
-> 
-> This makes pr_warn use consistent for drivers/mfd
-> 
-> Prior to this patch, there were 4 uses of pr_warning and
-> 9 uses of pr_warn in drivers/mfd
-> 
-> Signed-off-by: Joe Perches <joe@perches.com>
-> ---
->  drivers/mfd/db8500-prcmu.c  | 2 +-
->  drivers/mfd/sta2x11-mfd.c   | 4 ++--
->  drivers/mfd/twl4030-power.c | 7 ++-----
->  3 files changed, 5 insertions(+), 8 deletions(-)
-> 
-> diff --git a/drivers/mfd/db8500-prcmu.c b/drivers/mfd/db8500-prcmu.c
-> index ca38a6a14110..5c739ac752e8 100644
-> --- a/drivers/mfd/db8500-prcmu.c
-> +++ b/drivers/mfd/db8500-prcmu.c
-> @@ -2377,7 +2377,7 @@ static void ack_dbb_wakeup(void)
->  
->  static inline void print_unknown_header_warning(u8 n, u8 header)
->  {
-> -	pr_warning("prcmu: Unknown message header (%d) in mailbox %d.\n",
-> +	pr_warn("prcmu: Unknown message header (%d) in mailbox %d\n",
->  		header, n);
->  }
->  
-> diff --git a/drivers/mfd/sta2x11-mfd.c b/drivers/mfd/sta2x11-mfd.c
-> index 9292202039ee..3aeafa228baf 100644
-> --- a/drivers/mfd/sta2x11-mfd.c
-> +++ b/drivers/mfd/sta2x11-mfd.c
-> @@ -60,8 +60,8 @@ static struct sta2x11_mfd *sta2x11_mfd_find(struct pci_dev *pdev)
->  	struct sta2x11_mfd *mfd;
->  
->  	if (!pdev && !list_empty(&sta2x11_mfd_list)) {
-> -		pr_warning("%s: Unspecified device, "
-> -			    "using first instance\n", __func__);
-> +		pr_warn("%s: Unspecified device, using first instance\n",
-> +			__func__);
->  		return list_entry(sta2x11_mfd_list.next,
->  				  struct sta2x11_mfd, list);
->  	}
-> diff --git a/drivers/mfd/twl4030-power.c b/drivers/mfd/twl4030-power.c
-> index 1beb722f6080..8be023ba8e3e 100644
-> --- a/drivers/mfd/twl4030-power.c
-> +++ b/drivers/mfd/twl4030-power.c
-> @@ -502,9 +502,7 @@ static int load_twl4030_script(const struct twl4030_power_data *pdata,
->  	}
->  	if (tscript->flags & TWL4030_SLEEP_SCRIPT) {
->  		if (!order)
-> -			pr_warning("TWL4030: Bad order of scripts (sleep "\
-> -					"script before wakeup) Leads to boot"\
-> -					"failure on some boards\n");
-> +			pr_warn("TWL4030: Bad order of scripts (sleep script before wakeup) Leads to boot failure on some boards\n");
+> From: Patrice Chotard <patrice.chotard@st.com>
+>
+> When using GPIO as IRQ source, the GPIO must be configured
+> in INPUT. The callback dedicated for this was missing in
+> pinctrl-st driver.
+>
+> This fix the following kernel error when trying to lock a gpio
+> as IRQ:
+>
+> [    7.521095] gpio gpiochip7: (PIO11): gpiochip_lock_as_irq: tried to flag a GPIO set as output for IRQ
+> [    7.526018] gpio gpiochip7: (PIO11): unable to lock HW IRQ 6 for IRQ
+> [    7.529405] genirq: Failed to request resources for 0-0053 (irq 81) on irqchip GPIO
+>
+> Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
 
-Is 80 chars considered the lessor sin?
+I see what problem you are trying to solve.
 
->  		err = twl4030_config_sleep_sequence(address);
->  	}
->  out:
-> @@ -929,8 +927,7 @@ static int twl4030_power_probe(struct platform_device *pdev)
->  		err = twl_i2c_read_u8(TWL_MODULE_PM_MASTER, &val,
->  				      TWL4030_PM_MASTER_CFG_P123_TRANSITION);
->  		if (err) {
-> -			pr_warning("TWL4030 Unable to read registers\n");
-> -
-> +			pr_warn("TWL4030 Unable to read registers\n");
->  		} else if (!(val & SEQ_OFFSYNC)) {
->  			val |= SEQ_OFFSYNC;
->  			err = twl_i2c_write_u8(TWL_MODULE_PM_MASTER, val,
+> +static int st_gpio_irq_request_resources(struct irq_data *d)
+> +{
+> +       struct gpio_chip *gc = irq_data_get_irq_chip_data(d);
+> +       int pin = d->hwirq;
+> +
+> +       return st_gpio_direction_input(gc, pin);
+> +}
+(...)
+> +       .irq_request_resources  = st_gpio_irq_request_resources,
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+But this is just hiding the problem I'm afraid.
+
+Now thay you override .irq_request_resources()
+gpiochip_irq_reqres() will not be called, so then you have
+to lock the irq in the driver, with something like:
+
+ret = gpiochip_lock_as_irq(&chip->gc, d->hwirq);
+        if (ret)
+                goto out;
+
+You also have to implement the .irq_release_resources()
+callback and unlock the IRQ there.
+
+Yours,
+Linus Walleij
