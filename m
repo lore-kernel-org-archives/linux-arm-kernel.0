@@ -1,33 +1,143 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 14 Mar 2017 11:29:28 +0100
-Subject: [PATCH -next v2] pinctrl: samsung: Fix return value check in
- samsung_pinctrl_get_soc_data()
-In-Reply-To: <c4dd122b-0312-fcca-08e2-4d4586949a88@samsung.com>
-References: <20170125140321.23911-1-weiyj.lk@gmail.com>
- <20170205155849.4362-1-weiyj.lk@gmail.com>
- <CGME20170213145008epcas3p119bdd6f76468a00fb8d796308ad37698@epcas3p1.samsung.com>
- <CACRpkda0BYLNpPFwpNaEMdeyx61KDUQz_6Y=FQj340pViFjVVQ@mail.gmail.com>
- <c4dd122b-0312-fcca-08e2-4d4586949a88@samsung.com>
-Message-ID: <CACRpkda1tALy3rmk7FebnR3Xg4WOuUc0Gv1xAmxkd+RLhJ_1VQ@mail.gmail.com>
+From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
+Date: Tue, 14 Mar 2017 11:39:41 +0100
+Subject: [PATCH V2] ARM: dts: BCM5301X: Add support for TP-LINK Archer C5 V2
+In-Reply-To: <20170311121453.18534-1-zajec5@gmail.com>
+References: <20170311121453.18534-1-zajec5@gmail.com>
+Message-ID: <20170314103941.1478-1-zajec5@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 21, 2017 at 2:49 PM, Marek Szyprowski
-<m.szyprowski@samsung.com> wrote:
+From: Rafa? Mi?ecki <rafal@milecki.pl>
 
-> Sadly this patch breaks support for IMEM pinctrl block on Exynos5433/TM2
-> and it took us some time to find the source of the problem.
->
-> devm_ioremap_resource() is not functionally a full equivalent of
-> devm_ioremap(). The problem here is that registers for IMEM and ALIVE
-> pin controllers are shared and both devices have <0x11090000 0x1000>
-> range in their reg property. devm_ioremap_resource() maps given
-> resource exclusively for the device, while devm_ioremap() allows
-> non-exclusive mappings.
->
-> This patch has to be reverted asap.
+This is BCM47081A0 based home router with BCM43217 and BCM4352 wireless
+chipsets.
 
-Patch reverted for fixes, copying the above text as commit message.
+Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
+---
+V2: Don't specify console parameters in bootargs. A separated patch has been
+    sent to handle this properly:
+    [PATCH 1/2] ARM: dts: BCM5301X: Specify serial console parameters
+---
+ arch/arm/boot/dts/Makefile                         |  1 +
+ arch/arm/boot/dts/bcm47081-tplink-archer-c5-v2.dts | 98 ++++++++++++++++++++++
+ 2 files changed, 99 insertions(+)
+ create mode 100644 arch/arm/boot/dts/bcm47081-tplink-archer-c5-v2.dts
 
-Yours,
-Linus Walleij
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 595c74a35a7b..1e24f5db4835 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -88,6 +88,7 @@ dtb-$(CONFIG_ARCH_BCM_5301X) += \
+ 	bcm47081-buffalo-wzr-900dhp.dtb \
+ 	bcm47081-luxul-xap-1410.dtb \
+ 	bcm47081-luxul-xwr-1200.dtb \
++	bcm47081-tplink-archer-c5-v2.dtb \
+ 	bcm4709-asus-rt-ac87u.dtb \
+ 	bcm4709-buffalo-wxr-1900dhp.dtb \
+ 	bcm4709-linksys-ea9200.dtb \
+diff --git a/arch/arm/boot/dts/bcm47081-tplink-archer-c5-v2.dts b/arch/arm/boot/dts/bcm47081-tplink-archer-c5-v2.dts
+new file mode 100644
+index 000000000000..a854a5174b7f
+--- /dev/null
++++ b/arch/arm/boot/dts/bcm47081-tplink-archer-c5-v2.dts
+@@ -0,0 +1,98 @@
++/*
++ * Copyright (C) 2017 Rafa? Mi?ecki <rafal@milecki.pl>
++ *
++ * Licensed under the ISC license.
++ */
++
++/dts-v1/;
++
++#include "bcm47081.dtsi"
++
++/ {
++	compatible = "tplink,archer-c5-v2", "brcm,bcm47081", "brcm,bcm4708";
++	model = "TP-LINK Archer C5 V2";
++
++	chosen {
++		bootargs = "earlycon";
++	};
++
++	memory {
++		reg = <0x00000000 0x08000000>;
++	};
++
++	leds {
++		compatible = "gpio-leds";
++
++		2ghz {
++			label = "bcm53xx:green:2ghz";
++			gpios = <&chipcommon 0 GPIO_ACTIVE_HIGH>;
++		};
++
++		lan {
++			label = "bcm53xx:green:lan";
++			gpios = <&chipcommon 1 GPIO_ACTIVE_HIGH>;
++		};
++
++		usb2-port1 {
++			label = "bcm53xx:green:usb2-port1";
++			gpios = <&chipcommon 2 GPIO_ACTIVE_HIGH>;
++		};
++
++		power {
++			label = "bcm53xx:green:power";
++			gpios = <&chipcommon 4 GPIO_ACTIVE_HIGH>;
++			linux,default-trigger = "default-on";
++		};
++
++		wan-green {
++			label = "bcm53xx:green:wan";
++			gpios = <&chipcommon 5 GPIO_ACTIVE_HIGH>;
++		};
++
++		wps {
++			label = "bcm53xx:green:wps";
++			gpios = <&chipcommon 6 GPIO_ACTIVE_HIGH>;
++		};
++
++		wan-amber {
++			label = "bcm53xx:amber:wan";
++			gpios = <&chipcommon 8 GPIO_ACTIVE_HIGH>;
++		};
++
++		5ghz {
++			label = "bcm53xx:green:5ghz";
++			gpios = <&chipcommon 12 GPIO_ACTIVE_HIGH>;
++		};
++
++		usb2-port2 {
++			label = "bcm53xx:green:usb2-port2";
++			gpios = <&chipcommon 13 GPIO_ACTIVE_HIGH>;
++		};
++	};
++
++	gpio-keys {
++		compatible = "gpio-keys";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		rfkill {
++			label = "WiFi";
++			linux,code = <KEY_RFKILL>;
++			gpios = <&chipcommon 3 GPIO_ACTIVE_LOW>;
++		};
++
++		restart {
++			label = "Reset";
++			linux,code = <KEY_RESTART>;
++			gpios = <&chipcommon 7 GPIO_ACTIVE_LOW>;
++		};
++	};
++};
++
++&spi_nor {
++	status = "okay";
++};
++
++&usb2 {
++	vcc-gpio = <&chipcommon 9 GPIO_ACTIVE_HIGH>;
++};
+-- 
+2.11.0
