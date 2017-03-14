@@ -1,37 +1,34 @@
-From: joe@perches.com (Joe Perches)
-Date: Tue, 14 Mar 2017 10:17:48 -0700
-Subject: [PATCH 23/35] drivers/mfd: Convert remaining uses of pr_warning
- to pr_warn
-In-Reply-To: <20170314140455.umlhdbuj3grqtu6i@dell>
-References: <cover.1487314666.git.joe@perches.com>
- <a6c827c14d0b9f4be42e549ec4c629245516e979.1487314667.git.joe@perches.com>
- <20170314140455.umlhdbuj3grqtu6i@dell>
-Message-ID: <1489511868.2582.2.camel@perches.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Tue, 14 Mar 2017 18:21:17 +0100
+Subject: [PATCH 1/7] mfd: syscon: atmel-smc: Add new helpers to ease SMC
+ regs manipulation
+In-Reply-To: <20170314170003.nfpc7adtyczvhb26@dell>
+References: <1487609701-10300-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1487609701-10300-2-git-send-email-boris.brezillon@free-electrons.com>
+ <20170314170003.nfpc7adtyczvhb26@dell>
+Message-ID: <20170314182117.4c6c2162@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2017-03-14 at 14:04 +0000, Lee Jones wrote:
-> On Thu, 16 Feb 2017, Joe Perches wrote:
-> > To enable eventual removal of pr_warning
-[]
-> > diff --git a/drivers/mfd/twl4030-power.c b/drivers/mfd/twl4030-power.c
-[]
-> > @@ -502,9 +502,7 @@ static int load_twl4030_script(const struct twl4030_power_data *pdata,
-> >  	}
-> >  	if (tscript->flags & TWL4030_SLEEP_SCRIPT) {
-> >  		if (!order)
-> > -			pr_warning("TWL4030: Bad order of scripts (sleep "\
-> > -					"script before wakeup) Leads to boot"\
-> > -					"failure on some boards\n");
-> > +			pr_warn("TWL4030: Bad order of scripts (sleep script before wakeup) Leads to boot failure on some boards\n");
+On Tue, 14 Mar 2017 17:00:03 +0000
+Lee Jones <lee.jones@linaro.org> wrote:
+
+> On Mon, 20 Feb 2017, Boris Brezillon wrote:
 > 
-> Is 80 chars considered the lessor sin?
+> > These new helpers + macro definitions are meant to replace the old ones
+> > which are unpractical to use.
+> > 
+> > Note that the macros and function prefixes have been intentionally
+> > changed to ATMEL_[H]SMC_XX and atmel_[h]smc_ to reflect the fact that
+> > this IP is also embedded in avr32 SoCs (and not only in at91 ones).  
+> 
+> I'm going to NACK this patch.
+> 
+> I don't see any reason why all those functions have to be inline and
+> shoved into a header file.
 
-Splitting logging messages into multiple lines is non preferred.
+Because those are simple conversion helpers, and I thought a
+dedicated C file was not required, but I can move them into a C file
+and export these functions using EXPORT_SYMBOL_GPL() if you prefer.
 
-Documentation/process/coding-style.rst:
-
-Breaking long lines and strings:
-
-never break user-visible strings such as
-printk messages, because that breaks the ability to grep for them.
+Would that work for you?
