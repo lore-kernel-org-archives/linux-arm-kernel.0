@@ -1,30 +1,48 @@
-From: code@mmayer.net (Markus Mayer)
-Date: Tue, 14 Mar 2017 11:55:23 -0700
-Subject: [PATCH] ARM: wire up new statx syscall
-Message-ID: <20170314185523.38598-1-code@mmayer.net>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Tue, 14 Mar 2017 19:55:07 +0100
+Subject: [PATCHv2,6/7] mm: convert generic code to 5-level paging
+In-Reply-To: <20170314170625.gwlfjlxooij3elsd@node.shutemov.name>
+References: <20170309142408.2868-7-kirill.shutemov@linux.intel.com>
+ <2565467.lozgIVsiVn@diego>
+ <20170314170625.gwlfjlxooij3elsd@node.shutemov.name>
+Message-ID: <15847703.KEZMYLnFVy@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Markus Mayer <mmayer@broadcom.com>
+Am Dienstag, 14. M?rz 2017, 20:06:25 CET schrieb Kirill A. Shutemov:
+> On Tue, Mar 14, 2017 at 05:14:22PM +0100, Heiko St?bner wrote:
+> > [added arm64 maintainers and arm list to recipients]
+> > 
+> > Hi,
+> > 
+> > Am Donnerstag, 9. M?rz 2017, 17:24:07 CET schrieb Kirill A. Shutemov:
+> > > Convert all non-architecture-specific code to 5-level paging.
+> > > 
+> > > It's mostly mechanical adding handling one more page table level in
+> > > places where we deal with pud_t.
+> > > 
+> > > Signed-off-by: Kirill A. Shutemov <kirill.shutemov@linux.intel.com>
+> > > Acked-by: Michal Hocko <mhocko@suse.com>
+> > 
+> > This breaks (at least) arm64 Rockchip platforms it seems.
+> > 
+> > 4.11-rc1 worked just fine, while 4.11-rc2 kills the systems and I've
+> > bisected it down to this one commit.
+> 
+> Have you tried current Linus' tree? There is important fix:
+> 
+> https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?i
+> d=ce70df089143c49385b4f32f39d41fb50fbf6a7c
 
-Add new statx syscall to ARM syscall table.
+thanks for the pointer ... my arm64 board seem to boot now again.
 
-Signed-off-by: Markus Mayer <mmayer@broadcom.com>
----
+While I did look for responses to the original series [0] + [1], where there 
+weren't any, I didn't think to just look into Linus' tree if there was some 
+fixup already. 
 
-It looks like this hasn't been submitted before, so here goes.
+So sorry for the noise and all seems well now
+Heiko
 
- arch/arm/tools/syscall.tbl | 1 +
- 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/tools/syscall.tbl b/arch/arm/tools/syscall.tbl
-index 3c2cb5d..0bb0e9c 100644
---- a/arch/arm/tools/syscall.tbl
-+++ b/arch/arm/tools/syscall.tbl
-@@ -411,3 +411,4 @@
- 394	common	pkey_mprotect		sys_pkey_mprotect
- 395	common	pkey_alloc		sys_pkey_alloc
- 396	common	pkey_free		sys_pkey_free
-+397	common	statx			sys_statx
--- 
-2.7.4
+[0] https://lkml.org/lkml/2017/3/9/442
+[1] https://patchwork.kernel.org/patch/9613445/
