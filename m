@@ -1,49 +1,96 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 14 Mar 2017 08:17:26 -0700
-Subject: [PATCH] ARM: omap2+: Revert omap-smp.c changes resetting CPU1
- during boot
-In-Reply-To: <0bade322-5bee-412f-ef21-972c99846e84@ti.com>
-References: <20170313205231.1593-1-tony@atomide.com>
- <0bade322-5bee-412f-ef21-972c99846e84@ti.com>
-Message-ID: <20170314151725.GC20572@atomide.com>
+From: andrew.smirnov@gmail.com (Andrey Smirnov)
+Date: Tue, 14 Mar 2017 08:18:26 -0700
+Subject: [PATCH v6 3/4] PCI: imx6: Do not switch speed if Gen2 is disabled
+In-Reply-To: <20170314151827.31248-1-andrew.smirnov@gmail.com>
+References: <20170314151827.31248-1-andrew.smirnov@gmail.com>
+Message-ID: <20170314151827.31248-4-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tero Kristo <t-kristo@ti.com> [170314 00:32]:
-> On 13/03/17 22:52, Tony Lindgren wrote:
-> > Additionally we also need to fix the hot-unplug code to properly park CPU1
-> > to the bootrom loop so it's not affected by SDRAM changes done by kexec
-> > booting kernel.
-> 
-> Imo, we are doing too much bandaid hackery for this issue now. How much do
-> we care if the older kernels don't work properly with kexec? I know I don't
-> care a bit myself. It means you just need to do 1 cold-boot for the system
-> to fix it.
+Save a bit of time and avoid going through link speed change procedure
+in configuration where link max speed is limited to Gen1 in DT.
 
-Well kexec is a standard Linux feature and it is currently working and
-at least I care.
+Cc: yurovsky at gmail.com
+Cc: Lucas Stach <l.stach@pengutronix.de>
+Cc: Bjorn Helgaas <bhelgaas@google.com>
+Cc: Fabio Estevam <fabio.estevam@nxp.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
+---
+ drivers/pci/host/pci-imx6.c | 52 ++++++++++++++++++++++-----------------------
+ 1 file changed, 26 insertions(+), 26 deletions(-)
 
-And if the CPU1 start-up address is programmed to be in the currently
-booting kernel's area by something else, it's almost certainly totally
-broken.
-
-Note that this still does not remove the need to park CPU1 properly to
-bootrom loop.
-
-> If we just drop all the cpu1 reset code and park cpu1 properly at end when
-> executing kexec we should be just fine, and the implementation will be much
-> cleaner.
-> 
-> Does the wakeup issue for cpu1 ever happen with suspend, so that you
-> actually must reset the cpu so that it comes up? If that is the case, it is
-> going to be a tricky situation overall and we should understand the root
-> cause for it before trying to fix it.
-
-Yes omap4 CPU1 can fail occasional suspend/resume cycle. But let's assume
-that's a separate issue or a side effect of not properly initializing
-CPU1 during kexec before the suspend/resume cycle. I can do some more
-tests on that.
-
-Regards,
-
-Tony
+diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
+index 473bbdc..071251f3 100644
+--- a/drivers/pci/host/pci-imx6.c
++++ b/drivers/pci/host/pci-imx6.c
+@@ -565,40 +565,40 @@ static int imx6_pcie_establish_link(struct imx6_pcie *imx6_pcie)
+ 		tmp &= ~PCIE_RC_LCR_MAX_LINK_SPEEDS_MASK;
+ 		tmp |= PCIE_RC_LCR_MAX_LINK_SPEEDS_GEN2;
+ 		dw_pcie_writel_rc(pp, PCIE_RC_LCR, tmp);
+-	} else {
+-		dev_info(dev, "Link: Gen2 disabled\n");
+-	}
+-
+-	/*
+-	 * Start Directed Speed Change so the best possible speed both link
+-	 * partners support can be negotiated.
+-	 */
+-	tmp = dw_pcie_readl_rc(pp, PCIE_LINK_WIDTH_SPEED_CONTROL);
+-	tmp |= PORT_LOGIC_SPEED_CHANGE;
+-	dw_pcie_writel_rc(pp, PCIE_LINK_WIDTH_SPEED_CONTROL, tmp);
+ 
+-	if (imx6_pcie->variant != IMX7D) {
+ 		/*
+-		 * On i.MX7, DIRECT_SPEED_CHANGE behaves differently
+-		 * from i.MX6 family when no link speed transition
+-		 * occurs and we go Gen1 -> yep, Gen1. The difference
+-		 * is that, in such case, it will not be cleared by HW
+-		 * which will cause the following code to report false
+-		 * failure.
++		 * Start Directed Speed Change so the best possible
++		 * speed both link partners support can be negotiated.
+ 		 */
++		tmp = dw_pcie_readl_rc(pp, PCIE_LINK_WIDTH_SPEED_CONTROL);
++		tmp |= PORT_LOGIC_SPEED_CHANGE;
++		dw_pcie_writel_rc(pp, PCIE_LINK_WIDTH_SPEED_CONTROL, tmp);
++
++		if (imx6_pcie->variant != IMX7D) {
++			/*
++			 * On i.MX7, DIRECT_SPEED_CHANGE behaves differently
++			 * from i.MX6 family when no link speed transition
++			 * occurs and we go Gen1 -> yep, Gen1. The difference
++			 * is that, in such case, it will not be cleared by HW
++			 * which will cause the following code to report false
++			 * failure.
++			 */
++
++			ret = imx6_pcie_wait_for_speed_change(imx6_pcie);
++			if (ret) {
++				dev_err(dev, "Failed to bring link up!\n");
++				goto err_reset_phy;
++			}
++		}
+ 
+-		ret = imx6_pcie_wait_for_speed_change(imx6_pcie);
++		/* Make sure link training is finished as well! */
++		ret = imx6_pcie_wait_for_link(imx6_pcie);
+ 		if (ret) {
+ 			dev_err(dev, "Failed to bring link up!\n");
+ 			goto err_reset_phy;
+ 		}
+-	}
+-
+-	/* Make sure link training is finished as well! */
+-	ret = imx6_pcie_wait_for_link(imx6_pcie);
+-	if (ret) {
+-		dev_err(dev, "Failed to bring link up!\n");
+-		goto err_reset_phy;
++	} else {
++		dev_info(dev, "Link: Gen2 disabled\n");
+ 	}
+ 
+ 	tmp = dw_pcie_readl_rc(pp, PCIE_RC_LCSR);
+-- 
+2.9.3
