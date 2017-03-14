@@ -1,63 +1,50 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 14 Mar 2017 18:47:34 +0000
-Subject: [PATCH 00/14] arm_pmu: ACPI support
-In-Reply-To: <20170314114508.GA15740@leverpostej>
-References: <1489143891-11596-1-git-send-email-mark.rutland@arm.com>
- <5b5dca5f-0ea3-d7e7-63c9-dba57969d4be@arm.com>
- <20170314114508.GA15740@leverpostej>
-Message-ID: <20170314184733.GC15740@leverpostej>
+From: shli@kernel.org (Shaohua Li)
+Date: Tue, 14 Mar 2017 11:48:06 -0700
+Subject: [PATCH v6 0/4] Broadcom SBA RAID support
+In-Reply-To: <CAPcyv4hGGbhF-g8B__9=rsP+QwR6RBi=WqALLgABNb1M4D3rBw@mail.gmail.com>
+References: <1488793408-25592-1-git-send-email-anup.patel@broadcom.com>
+ <CAPcyv4hGGbhF-g8B__9=rsP+QwR6RBi=WqALLgABNb1M4D3rBw@mail.gmail.com>
+Message-ID: <20170314184806.o2oykhztje3obwot@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 14, 2017 at 11:49:19AM +0000, Mark Rutland wrote:
-> On Fri, Mar 10, 2017 at 04:14:57PM -0600, Jeremy Linton wrote:
-> > I tried these patches on a m400 (which uses PPIs), and the kernel
-> > fails to come up enough to login via the network (which works with
-> > 4.11rc1 without these patches). So, I suspect there is something
-> > wrong with them. 
+On Tue, Mar 14, 2017 at 09:56:35AM -0700, Dan Williams wrote:
+> On Mon, Mar 6, 2017 at 1:43 AM, Anup Patel <anup.patel@broadcom.com> wrote:
+> > The Broadcom SBA RAID is a stream-based device which provides
+> > RAID5/6 offload.
+> >
+> > It requires a SoC specific ring manager (such as Broadcom FlexRM
+> > ring manager) to provide ring-based programming interface. Due to
+> > this, the Broadcom SBA RAID driver (mailbox client) implements
+> > DMA device having one DMA channel using a set of mailbox channels
+> > provided by Broadcom SoC specific ring manager driver (mailbox
+> > controller).
+> >
+> > The Broadcom SBA RAID hardware requires PQ disk position instead
+> > of PQ disk coefficient. To address this, we have added raid_gflog
+> > table which will help driver to convert PQ disk coefficient to PQ
+> > disk position.
+> >
+> > This patchset is based on Linux-4.11-rc1 and depends on patchset
+> > "[PATCH v5 0/2] Broadcom FlexRM ring manager support"
+> >
+> > It is also available at sba-raid-v6 branch of
+> > https://github.com/Broadcom/arm64-linux.git
+> >
+> [..]
+> >
+> > Anup Patel (4):
+> >   lib/raid6: Add log-of-2 table for RAID6 HW requiring disk position
+> >   async_tx: Fix DMA_PREP_FENCE usage in do_async_gen_syndrome()
+> >   dmaengine: Add Broadcom SBA RAID driver
+> >   dt-bindings: Add DT bindings document for Broadcom SBA RAID driver
 > 
-> Indeed; sorry about this. I'll see if I can get access to a board to try
-> local debugging.
+> For the dmaengine and async_tx changes:
+> 
+> Acked-by: Dan Williams <dan.j.williams@intel.com>
+> 
+> The raid change should get an ack from Shaohua.
 
-> > About the only thing it says with any meaning when earlycon is passed is:
-> > [   10.965147] Serial: 8250/16550 driver, 32 ports, IRQ sharing enabled
-> > [   11.064193] dw-apb-uart APMC0D08:00: cannot get irq
-> > 
-> > and promptly hangs up.
+For the raid6 part:
 
-I believe that this is a latent FW bug, in a beta FW, exposed by recent
-changes.
-
-I managed to get access to two APM Mustang boards. I can reproduce the
-issue with a vanilla v4.11-rc1 defconfig on one, which has a beta FW.
-The same kernel boots fine on the other, which has a later released FW.
-
-I bisected the issue down to commit:
-
-  d44fa3d46079dc09 ("ACPI: Add support for ResourceSource/IRQ domain mapping")
-
-It seems the beta FW describes the UART interrupt with an Extended
-Interrupt Descriptor with the Consumer/Producer bit clear. Per the spec,
-this means "This device produces and consumes this resource", which
-doesn't make sense here given the UART is not an interrupt controller.
-
-The (working) released FW doesn't use an Extended Interrupt Descriptor
-for this interrupt, sidestepping the issue.
-
-Given that (AFAICT) this only affects a known-broken, beta FW, I don't
-think that we care that much.
-
-However, I think there is a larger potential issue here.
-
-In acpi_irq_parse_one_cb(), we skip interrupts with an Extended
-Interrupt Descriptor with the Consumer/Producer bit clear. It sounds
-like devices which behave as interrupt controllers could legitimately
-have this bit set for interrupts they generate and deliver to
-themselves, and we'd erroneously skip these when parsing interrupts.
-
-It's not entirely clear to me why this bit exists at all, given that
-it's not used as part of mapping the interrupt, and if you really want
-to know you can map the interrupt and look at the result.
-
-Thanks,
-Mark.
+Acked-by: Shaohua Li <shli@fb.com>
