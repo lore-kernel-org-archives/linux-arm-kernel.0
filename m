@@ -1,136 +1,409 @@
-From: pbonzini@redhat.com (Paolo Bonzini)
-Date: Tue, 14 Mar 2017 17:57:26 +0100
-Subject: kvm/arm64: use-after-free in
- kvm_unmap_hva_handler/unmap_stage2_pmds
-In-Reply-To: <20f6c994-d83e-7a6f-9f13-f10287211a6c@arm.com>
-References: <CAAeHK+yjKm3mO2h9M30t-V_PnMhXEM887_zESCSg6gkbzivPsQ@mail.gmail.com>
- <20f6c994-d83e-7a6f-9f13-f10287211a6c@arm.com>
-Message-ID: <9f473bb9-d0eb-6803-1263-75ffef0301fe@redhat.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 14 Mar 2017 17:00:03 +0000
+Subject: [PATCH 1/7] mfd: syscon: atmel-smc: Add new helpers to ease SMC
+ regs manipulation
+In-Reply-To: <1487609701-10300-2-git-send-email-boris.brezillon@free-electrons.com>
+References: <1487609701-10300-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1487609701-10300-2-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20170314170003.nfpc7adtyczvhb26@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, 20 Feb 2017, Boris Brezillon wrote:
 
+> These new helpers + macro definitions are meant to replace the old ones
+> which are unpractical to use.
+> 
+> Note that the macros and function prefixes have been intentionally
+> changed to ATMEL_[H]SMC_XX and atmel_[h]smc_ to reflect the fact that
+> this IP is also embedded in avr32 SoCs (and not only in at91 ones).
 
-On 14/03/2017 12:07, Suzuki K Poulose wrote:
-> On 10/03/17 13:34, Andrey Konovalov wrote:
->> Hi,
->>
->> I've got the following error report while fuzzing the kernel with
->> syzkaller.
->>
->> On linux-next commit 56b8bad5e066c23e8fa273ef5fba50bd3da2ace8 (Mar 8).
->>
->> Unfortunately I can't reproduce it.
->>
->> ==================================================================
->> BUG: KASAN: use-after-free in put_page include/linux/compiler.h:243
->> [inline]
->> BUG: KASAN: use-after-free in unmap_stage2_pmds
->> arch/arm64/kvm/../../../arch/arm/kvm/mmu.c:240 [inline]
->> BUG: KASAN: use-after-free in unmap_stage2_puds
->> arch/arm64/kvm/../../../arch/arm/kvm/mmu.c:269 [inline]
->> BUG: KASAN: use-after-free in unmap_stage2_range+0x884/0x938
->> arch/arm64/kvm/../../../arch/arm/kvm/mmu.c:299
->> Read of size 8 at addr ffff80004585c000 by task syz-executor/5176
+I'm going to NACK this patch.
+
+I don't see any reason why all those functions have to be inline and
+shoved into a header file.
+
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> ---
+>  include/linux/mfd/syscon/atmel-smc.h | 362 +++++++++++++++++++++++++++++++++++
+>  1 file changed, 362 insertions(+)
 > 
-> 
->> [<ffff2000080d9664>] put_page include/linux/compiler.h:243 [inline]
->> [<ffff2000080d9664>] unmap_stage2_pmds
->> arch/arm64/kvm/../../../arch/arm/kvm/mmu.c:240 [inline]
->> [<ffff2000080d9664>] unmap_stage2_puds
->> arch/arm64/kvm/../../../arch/arm/kvm/mmu.c:269 [inline]
->> [<ffff2000080d9664>] unmap_stage2_range+0x884/0x938
->> arch/arm64/kvm/../../../arch/arm/kvm/mmu.c:299
->> [<ffff2000080d9740>] kvm_unmap_hva_handler+0x28/0x38
->> arch/arm64/kvm/../../../arch/arm/kvm/mmu.c:1556
->> [<ffff2000080d7578>] handle_hva_to_gpa+0x140/0x250
->> arch/arm64/kvm/../../../arch/arm/kvm/mmu.c:1547
->> [<ffff2000080db858>] kvm_unmap_hva_range+0x60/0x80
->> arch/arm64/kvm/../../../arch/arm/kvm/mmu.c:1579
->> [<ffff2000080c12dc>]
->> kvm_mmu_notifier_invalidate_range_start+0x194/0x278
->> arch/arm64/kvm/../../../virt/kvm/kvm_main.c:357
->> [<ffff2000083fea58>] __mmu_notifier_invalidate_range_start+0x1d0/0x2a0
->> mm/mmu_notifier.c:199
->> [<ffff200008395f44>] mmu_notifier_invalidate_range_start
->> include/linux/mmu_notifier.h:282 [inline]
->> [<ffff200008395f44>] unmap_vmas+0x12c/0x198 mm/memory.c:1372
->> [<ffff2000083a8e00>] unmap_region+0x128/0x230 mm/mmap.c:2460
->> [<ffff2000083ae6e0>] update_hiwater_vm include/linux/mm.h:1483 [inline]
->> [<ffff2000083ae6e0>] remove_vma_list mm/mmap.c:2432 [inline]
->> [<ffff2000083ae6e0>] do_munmap+0x598/0x9b0 mm/mmap.c:2662
->> [<ffff2000083b14a0>] find_vma_links mm/mmap.c:495 [inline]
->> [<ffff2000083b14a0>] mmap_region+0x138/0xc78 mm/mmap.c:1610
->> [<ffff2000083b23ac>] is_file_hugepages include/linux/hugetlb.h:269
->> [inline]
->> [<ffff2000083b23ac>] do_mmap+0x3cc/0x848 mm/mmap.c:1446
->> [<ffff200008369b0c>] do_mmap_pgoff include/linux/mm.h:2039 [inline]
->> [<ffff200008369b0c>] vm_mmap_pgoff+0xec/0x120 mm/util.c:305
->> [<ffff2000083ac558>] SYSC_mmap_pgoff mm/mmap.c:1475 [inline]
->> [<ffff2000083ac558>] SyS_mmap_pgoff+0x220/0x420 mm/mmap.c:1458
->> [<ffff20000808ecf0>] sys_mmap+0x58/0x80 arch/arm64/kernel/sys.c:37
->> [<ffff200008083f70>] el0_svc_naked+0x24/0x28
->>
-> 
-> We hold kvm->mmu_lock, while manipulating the stage2 ranges. However, I
-> find that
-> we don't take the lock, when we do it f rom kvm_free_stage2_pgd(), which
-> could
-> potentially have caused a problem with an munmap of a memslot ?
-> 
-> Lightly tested...
-> 
-> 
-> commit fa75684dbf0fe845cf8403517d6e0c2c3344a544
-> Author: Suzuki K Poulose <suzuki.poulose@arm.com>
-> Date:   Tue Mar 14 10:26:54 2017 +0000
-> 
->     kvm: arm: Fix locking for kvm_free_stage2_pgd
->         In kvm_free_stage2_pgd() we don't hold the kvm->mmu_lock while
-> calling
->     unmap_stage2_range() on the entire memory range for the guest. This
-> could
->     cause problems with other callers (e.g, munmap on a memslot) trying to
->     unmap a range.
->         Cc: Marc Zyngier <marc.zyngier@arm.com>
->     Cc: Christoffer Dall <christoffer.dall@linaro.org>
->     Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> 
-> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-> index a07ce3e..7f97063 100644
-> --- a/arch/arm/kvm/mmu.c
-> +++ b/arch/arm/kvm/mmu.c
-> @@ -831,7 +831,10 @@ void kvm_free_stage2_pgd(struct kvm *kvm)
->         if (kvm->arch.pgd == NULL)
->                 return;
+> diff --git a/include/linux/mfd/syscon/atmel-smc.h b/include/linux/mfd/syscon/atmel-smc.h
+> index be6ebe64eebe..6124f3d2b965 100644
+> --- a/include/linux/mfd/syscon/atmel-smc.h
+> +++ b/include/linux/mfd/syscon/atmel-smc.h
+> @@ -69,6 +69,368 @@
+>  #define AT91_SMC_PS_16			(2 << 28)
+>  #define AT91_SMC_PS_32			(3 << 28)
 >  
-> +       spin_lock(&kvm->mmu_lock);
->         unmap_stage2_range(kvm, 0, KVM_PHYS_SIZE);
-> +       spin_unlock(&kvm->mmu_lock);
+> +#define ATMEL_SMC_SETUP(cs)			(((cs) * 0x10))
+> +#define ATMEL_HSMC_SETUP(cs)			(0x600 + ((cs) * 0x14))
+> +#define ATMEL_SMC_PULSE(cs)			(((cs) * 0x10) + 0x4)
+> +#define ATMEL_HSMC_PULSE(cs)			(0x600 + ((cs) * 0x14) + 0x4)
+> +#define ATMEL_SMC_CYCLE(cs)			(((cs) * 0x10) + 0x8)
+> +#define ATMEL_HSMC_CYCLE(cs)			(0x600 + ((cs) * 0x14) + 0x8)
+> +#define ATMEL_SMC_NWE_SHIFT			0
+> +#define ATMEL_SMC_NCS_WR_SHIFT			8
+> +#define ATMEL_SMC_NRD_SHIFT			16
+> +#define ATMEL_SMC_NCS_RD_SHIFT			24
 > +
->         /* Free the HW pgd, one page at a time */
->         free_pages_exact(kvm->arch.pgd, S2_PGD_SIZE);
->         kvm->arch.pgd = NULL;
+> +#define ATMEL_SMC_MODE(cs)			(((cs) * 0x10) + 0xc)
+> +#define ATMEL_HSMC_MODE(cs)			(0x600 + ((cs) * 0x14) + 0x10)
+> +#define ATMEL_SMC_MODE_READMODE_MASK		BIT(0)
+> +#define ATMEL_SMC_MODE_READMODE_NCS		(0 << 0)
+> +#define ATMEL_SMC_MODE_READMODE_NRD		(1 << 0)
+> +#define ATMEL_SMC_MODE_WRITEMODE_MASK		BIT(1)
+> +#define ATMEL_SMC_MODE_WRITEMODE_NCS		(0 << 1)
+> +#define ATMEL_SMC_MODE_WRITEMODE_NWE		(1 << 1)
+> +#define ATMEL_SMC_MODE_EXNWMODE_MASK		GENMASK(5, 4)
+> +#define ATMEL_SMC_MODE_EXNWMODE_DISABLE		(0 << 4)
+> +#define ATMEL_SMC_MODE_EXNWMODE_FROZEN		(2 << 4)
+> +#define ATMEL_SMC_MODE_EXNWMODE_READY		(3 << 4)
+> +#define ATMEL_SMC_MODE_BAT_MASK			BIT(8)
+> +#define ATMEL_SMC_MODE_BAT_SELECT		(0 << 8)
+> +#define ATMEL_SMC_MODE_BAT_WRITE		(1 << 8)
+> +#define ATMEL_SMC_MODE_DBW_MASK			GENMASK(13, 12)
+> +#define ATMEL_SMC_MODE_DBW_8			(0 << 12)
+> +#define ATMEL_SMC_MODE_DBW_16			(1 << 12)
+> +#define ATMEL_SMC_MODE_DBW_32			(2 << 12)
+> +#define ATMEL_SMC_MODE_TDF_MASK			GENMASK(19, 16)
+> +#define ATMEL_SMC_MODE_TDF(x)			(((x) - 1) << 16)
+> +#define ATMEL_SMC_MODE_TDF_MAX			16
+> +#define ATMEL_SMC_MODE_TDFMODE_OPTIMIZED	BIT(20)
+> +#define ATMEL_SMC_MODE_PMEN			BIT(24)
+> +#define ATMEL_SMC_MODE_PS_MASK			GENMASK(29, 28)
+> +#define ATMEL_SMC_MODE_PS_4			(0 << 28)
+> +#define ATMEL_SMC_MODE_PS_8			(1 << 28)
+> +#define ATMEL_SMC_MODE_PS_16			(2 << 28)
+> +#define ATMEL_SMC_MODE_PS_32			(3 << 28)
+> +
+> +#define ATMEL_HSMC_TIMINGS(cs)			(0x600 + ((cs) * 0x14) + 0xc)
+> +#define ATMEL_HSMC_TIMINGS_OCMS			BIT(12)
+> +#define ATMEL_HSMC_TIMINGS_RBNSEL(x)		((x) << 28)
+> +#define ATMEL_HSMC_TIMINGS_NFSEL		BIT(31)
+> +#define ATMEL_HSMC_TIMINGS_TCLR_SHIFT		0
+> +#define ATMEL_HSMC_TIMINGS_TADL_SHIFT		4
+> +#define ATMEL_HSMC_TIMINGS_TAR_SHIFT		8
+> +#define ATMEL_HSMC_TIMINGS_TRR_SHIFT		16
+> +#define ATMEL_HSMC_TIMINGS_TWB_SHIFT		24
+> +
+> +/**
+> + * struct atmel_smc_cs_conf - SMC CS config as described in the datasheet.
+> + * @setup: NCS/NWE/NRD setup timings (not applicable to at91rm9200)
+> + * @pulse: NCS/NWE/NRD pulse timings (not applicable to at91rm9200)
+> + * @cycle: NWE/NRD cycle timings (not applicable to at91rm9200)
+> + * @timings: advanced NAND related timings (only applicable to HSMC)
+> + * @mode: all kind of config parameters (see the fields definition above).
+> + *	  The mode fields are different on at91rm9200
+> + */
+> +struct atmel_smc_cs_conf {
+> +	u32 setup;
+> +	u32 pulse;
+> +	u32 cycle;
+> +	u32 timings;
+> +	u32 mode;
+> +};
+> +
+> +/**
+> + * atmel_smc_cs_conf_init - initialize a SMC CS conf
+> + * @conf: the SMC CS conf to initialize
+> + *
+> + * Set all fields to 0 so that one can start defining a new config.
+> + */
+> +static inline void atmel_smc_cs_conf_init(struct atmel_smc_cs_conf *conf)
+> +{
+> +	memset(conf, 0, sizeof(*conf));
+> +}
+> +
+> +/**
+> + * atmel_smc_cs_encode_ncycles - encode a number of MCK clk cycles in the
+> + *				 format expected by the SMC engine
+> + * @ncycles: number of MCK clk cycles
+> + * @msbpos: position of the MSB part of the timing field
+> + * @msbwidth: width of the MSB part of the timing field
+> + * @msbfactor: factor applied to the MSB
+> + * @encodedval: param used to store the encoding result
+> + *
+> + * This function encodes the @ncycles value as described in the datasheet
+> + * (section "SMC Setup/Pulse/Cycle/Timings Register"). This is a generic
+> + * helper which called with different parameter depending on the encoding
+> + * scheme.
+> + *
+> + * If the @ncycles value is too big to be encoded, -ERANGE is returned and
+> + * the encodedval is contains the maximum val. Otherwise, 0 is returned.
+> + */
+> +static inline int atmel_smc_cs_encode_ncycles(unsigned int ncycles,
+> +					      unsigned int msbpos,
+> +					      unsigned int msbwidth,
+> +					      unsigned int msbfactor,
+> +					      unsigned int *encodedval)
+> +{
+> +	unsigned int lsbmask = GENMASK(msbpos - 1, 0);
+> +	unsigned int msbmask = GENMASK(msbwidth - 1, 0);
+> +	unsigned int msb, lsb;
+> +	int ret = 0;
+> +
+> +	msb = ncycles / msbfactor;
+> +	lsb = ncycles % msbfactor;
+> +
+> +	if (lsb > lsbmask) {
+> +		lsb = 0;
+> +		msb++;
+> +	}
+> +
+> +	/*
+> +	 * Let's just put the maximum we can if the requested setting does
+> +	 * not fit in the register field.
+> +	 * We still return -ERANGE in case the caller cares.
+> +	 */
+> +	if (msb > msbmask) {
+> +		msb = msbmask;
+> +		lsb = lsbmask;
+> +		ret = -ERANGE;
+> +	}
+> +
+> +	*encodedval = (msb << msbpos) | lsb;
+> +
+> +	return ret;
+> +}
+> +
+> +/**
+> + * atmel_smc_cs_conf_set_timing - set the SMC CS conf Txx parameter to a
+> + *				  specific value
+> + * @conf: SMC CS conf descriptor
+> + * @shift: the position of the Txx field in the TIMINGS register
+> + * @ncycles: value (expressed in MCK clk cycles) to assign to this Txx
+> + *	     parameter
+> + *
+> + * This function encodes the @ncycles value as described in the datasheet
+> + * (section "SMC Timings Register"), and then stores the result in the
+> + * @conf->timings field at @shift position.
+> + *
+> + * Returns -EINVAL if shift is invalid, -ERANGE if ncycles does not fit in
+> + * the field, and 0 otherwise.
+> + */
+> +static inline int atmel_smc_cs_conf_set_timing(struct atmel_smc_cs_conf *conf,
+> +					       unsigned int shift,
+> +					       unsigned int ncycles)
+> +{
+> +	unsigned int val;
+> +	int ret;
+> +
+> +	if (shift != ATMEL_HSMC_TIMINGS_TCLR_SHIFT &&
+> +	    shift != ATMEL_HSMC_TIMINGS_TADL_SHIFT &&
+> +	    shift != ATMEL_HSMC_TIMINGS_TAR_SHIFT &&
+> +	    shift != ATMEL_HSMC_TIMINGS_TRR_SHIFT &&
+> +	    shift != ATMEL_HSMC_TIMINGS_TWB_SHIFT)
+> +		return -EINVAL;
+> +
+> +	/*
+> +	 * The formula described in atmel datasheets (section "HSMC Timings
+> +	 * Register"):
+> +	 *
+> +	 * ncycles = (Txx[3] * 64) + Txx[2:0]
+> +	 */
+> +	ret = atmel_smc_cs_encode_ncycles(ncycles, 3, 1, 64, &val);
+> +	conf->timings &= ~GENMASK(shift + 3, shift);
+> +	conf->timings |= val << shift;
+> +
+> +	return ret;
+> +}
+> +
+> +/**
+> + * atmel_smc_cs_conf_set_setup - set the SMC CS conf xx_SETUP parameter to a
+> + *				 specific value
+> + * @conf: SMC CS conf descriptor
+> + * @shift: the position of the xx_SETUP field in the SETUP register
+> + * @ncycles: value (expressed in MCK clk cycles) to assign to this xx_SETUP
+> + *	     parameter
+> + *
+> + * This function encodes the @ncycles value as described in the datasheet
+> + * (section "SMC Setup Register"), and then stores the result in the
+> + * @conf->setup field at @shift position.
+> + *
+> + * Returns -EINVAL if @shift is invalid, -ERANGE if @ncycles does not fit in
+> + * the field, and 0 otherwise.
+> + */
+> +static inline int atmel_smc_cs_conf_set_setup(struct atmel_smc_cs_conf *conf,
+> +					      unsigned int shift,
+> +					      unsigned int ncycles)
+> +{
+> +	unsigned int val;
+> +	int ret;
+> +
+> +	if (shift != ATMEL_SMC_NWE_SHIFT && shift != ATMEL_SMC_NCS_WR_SHIFT &&
+> +	    shift != ATMEL_SMC_NRD_SHIFT && shift != ATMEL_SMC_NCS_RD_SHIFT)
+> +		return -EINVAL;
+> +
+> +	/*
+> +	 * The formula described in atmel datasheets (section "SMC Setup
+> +	 * Register"):
+> +	 *
+> +	 * ncycles = (128 * xx_SETUP[5]) + xx_SETUP[4:0]
+> +	 */
+> +	ret = atmel_smc_cs_encode_ncycles(ncycles, 5, 1, 128, &val);
+> +	conf->setup &= ~GENMASK(shift + 7, shift);
+> +	conf->setup |= val << shift;
+> +
+> +	return ret;
+> +}
+> +
+> +/**
+> + * atmel_smc_cs_conf_set_pulse - set the SMC CS conf xx_PULSE parameter to a
+> + *				 specific value
+> + * @conf: SMC CS conf descriptor
+> + * @shift: the position of the xx_PULSE field in the PULSE register
+> + * @ncycles: value (expressed in MCK clk cycles) to assign to this xx_PULSE
+> + *	     parameter
+> + *
+> + * This function encodes the @ncycles value as described in the datasheet
+> + * (section "SMC Pulse Register"), and then stores the result in the
+> + * @conf->setup field at @shift position.
+> + *
+> + * Returns -EINVAL if @shift is invalid, -ERANGE if @ncycles does not fit in
+> + * the field, and 0 otherwise.
+> + */
+> +static inline int atmel_smc_cs_conf_set_pulse(struct atmel_smc_cs_conf *conf,
+> +					      unsigned int shift,
+> +					      unsigned int ncycles)
+> +{
+> +	unsigned int val;
+> +	int ret;
+> +
+> +	if (shift != ATMEL_SMC_NWE_SHIFT && shift != ATMEL_SMC_NCS_WR_SHIFT &&
+> +	    shift != ATMEL_SMC_NRD_SHIFT && shift != ATMEL_SMC_NCS_RD_SHIFT)
+> +		return -EINVAL;
+> +
+> +	/*
+> +	 * The formula described in atmel datasheets (section "SMC Pulse
+> +	 * Register"):
+> +	 *
+> +	 * ncycles = (256 * xx_PULSE[6]) + xx_PULSE[5:0]
+> +	 */
+> +	ret = atmel_smc_cs_encode_ncycles(ncycles, 6, 1, 256, &val);
+> +	conf->pulse &= ~GENMASK(shift + 7, shift);
+> +	conf->pulse |= val << shift;
+> +
+> +	return ret;
+> +}
+> +
+> +/**
+> + * atmel_smc_cs_conf_set_cycle - set the SMC CS conf xx_CYCLE parameter to a
+> + *				 specific value
+> + * @conf: SMC CS conf descriptor
+> + * @shift: the position of the xx_CYCLE field in the CYCLE register
+> + * @ncycles: value (expressed in MCK clk cycles) to assign to this xx_CYCLE
+> + *	     parameter
+> + *
+> + * This function encodes the @ncycles value as described in the datasheet
+> + * (section "SMC Pulse Register"), and then stores the result in the
+> + * @conf->setup field at @shift position.
+> + *
+> + * Returns -EINVAL if @shift is invalid, -ERANGE if @ncycles does not fit in
+> + * the field, and 0 otherwise.
+> + */
+> +static inline int atmel_smc_cs_conf_set_cycle(struct atmel_smc_cs_conf *conf,
+> +					      unsigned int shift,
+> +					      unsigned int ncycles)
+> +{
+> +	unsigned int val;
+> +	int ret;
+> +
+> +	if (shift != ATMEL_SMC_NWE_SHIFT && shift != ATMEL_SMC_NRD_SHIFT)
+> +		return -EINVAL;
+> +
+> +	/*
+> +	 * The formula described in atmel datasheets (section "SMC Cycle
+> +	 * Register"):
+> +	 *
+> +	 * ncycles = (xx_CYCLE[8:7] * 256) + xx_CYCLE[6:0]
+> +	 */
+> +	ret = atmel_smc_cs_encode_ncycles(ncycles, 7, 2, 256, &val);
+> +	conf->cycle &= ~GENMASK(shift + 15, shift);
+> +	conf->cycle |= val << shift;
+> +
+> +	return ret;
+> +}
+> +
+> +/**
+> + * atmel_smc_cs_conf_apply - apply an SMC CS conf
+> + * @regmap: the SMC regmap
+> + * @cs: the CS id
+> + * @conf the SMC CS conf to apply
+> + *
+> + * Applies an SMC CS configuration.
+> + * Only valid on at91sam9/avr32 SoCs.
+> + */
+> +static inline void atmel_smc_cs_conf_apply(struct regmap *regmap, int cs,
+> +					   const struct atmel_smc_cs_conf *conf)
+> +{
+> +	regmap_write(regmap, ATMEL_SMC_SETUP(cs), conf->setup);
+> +	regmap_write(regmap, ATMEL_SMC_PULSE(cs), conf->pulse);
+> +	regmap_write(regmap, ATMEL_SMC_CYCLE(cs), conf->cycle);
+> +	regmap_write(regmap, ATMEL_SMC_MODE(cs), conf->mode);
+> +}
+> +
+> +/**
+> + * atmel_hsmc_cs_conf_apply - apply an SMC CS conf
+> + * @regmap: the HSMC regmap
+> + * @cs: the CS id
+> + * @conf the SMC CS conf to apply
+> + *
+> + * Applies an SMC CS configuration.
+> + * Only valid on post-sama5 SoCs.
+> + */
+> +static inline void atmel_hsmc_cs_conf_apply(struct regmap *regmap, int cs,
+> +					const struct atmel_smc_cs_conf *conf)
+> +{
+> +	regmap_write(regmap, ATMEL_HSMC_SETUP(cs), conf->setup);
+> +	regmap_write(regmap, ATMEL_HSMC_PULSE(cs), conf->pulse);
+> +	regmap_write(regmap, ATMEL_HSMC_CYCLE(cs), conf->cycle);
+> +	regmap_write(regmap, ATMEL_HSMC_TIMINGS(cs), conf->timings);
+> +	regmap_write(regmap, ATMEL_HSMC_MODE(cs), conf->mode);
+> +}
+> +
+> +/**
+> + * atmel_smc_cs_conf_get - retrieve the current SMC CS conf
+> + * @regmap: the SMC regmap
+> + * @cs: the CS id
+> + * @conf: the SMC CS conf object to store the current conf
+> + *
+> + * Retrieve the SMC CS configuration.
+> + * Only valid on at91sam9/avr32 SoCs.
+> + */
+> +static inline void atmel_smc_cs_conf_get(struct regmap *regmap, int cs,
+> +					 struct atmel_smc_cs_conf *conf)
+> +{
+> +	regmap_read(regmap, ATMEL_SMC_SETUP(cs), &conf->setup);
+> +	regmap_read(regmap, ATMEL_SMC_PULSE(cs), &conf->pulse);
+> +	regmap_read(regmap, ATMEL_SMC_CYCLE(cs), &conf->cycle);
+> +	regmap_read(regmap, ATMEL_SMC_MODE(cs), &conf->mode);
+> +}
+> +
+> +/**
+> + * atmel_hsmc_cs_conf_get - retrieve the current SMC CS conf
+> + * @regmap: the HSMC regmap
+> + * @cs: the CS id
+> + * @conf: the SMC CS conf object to store the current conf
+> + *
+> + * Retrieve the SMC CS configuration.
+> + * Only valid on post-sama5 SoCs.
+> + */
+> +static inline void atmel_hsmc_cs_conf_get(struct regmap *regmap, int cs,
+> +					  struct atmel_smc_cs_conf *conf)
+> +{
+> +	regmap_read(regmap, ATMEL_HSMC_SETUP(cs), &conf->setup);
+> +	regmap_read(regmap, ATMEL_HSMC_PULSE(cs), &conf->pulse);
+> +	regmap_read(regmap, ATMEL_HSMC_CYCLE(cs), &conf->cycle);
+> +	regmap_read(regmap, ATMEL_HSMC_TIMINGS(cs), &conf->timings);
+> +	regmap_read(regmap, ATMEL_HSMC_MODE(cs), &conf->mode);
+> +}
+>  
+>  /*
+>   * This function converts a setup timing expressed in nanoseconds into an
 
-Reviewed-by: Paolo Bonzini <pbonzini@redhat.com>
-> 
-> 
-> 
->> The buggy address belongs to the page:
->> page:ffff7e0001161700 count:0 mapcount:0 mapping:          (null)
->> index:0x0
->> flags: 0xfffc00000000000()
->> raw: 0fffc00000000000 0000000000000000 0000000000000000 00000000ffffffff
->> raw: ffff7e00018c9120 ffff7e0000ea8b60 0000000000000000 0000000000000000
->> page dumped because: kasan: bad access detected
->>
->> Memory state around the buggy address:
->>  ffff80004585bf00: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff
->>  ffff80004585bf80: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff
->>> ffff80004585c000: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff
->>                    ^
->>  ffff80004585c080: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff
->>  ffff80004585c100: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff
->> ==================================================================
->>
-> 
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
