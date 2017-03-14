@@ -1,57 +1,70 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Tue, 14 Mar 2017 14:30:05 -0500
-Subject: [PATCH] PCI: aardvark: Remove msi-controller dt node probing
-In-Reply-To: <20170314190851.28203-1-stephen.boyd@linaro.org>
-References: <20170314190851.28203-1-stephen.boyd@linaro.org>
-Message-ID: <20170314193005.GC26264@bhelgaas-glaptop.roam.corp.google.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Tue, 14 Mar 2017 13:32:40 -0600
+Subject: [2/2] coresight: Fix reference count for software sources
+In-Reply-To: <c6534dee-172b-24b0-0aee-84c9c8ccafaa@arm.com>
+References: <1489073232-5093-3-git-send-email-suzuki.poulose@arm.com>
+ <CANLsYkwg_PRcL5Sqd15phOFS-L8-v3SdvF1kBFa9De-==tx9gw@mail.gmail.com>
+ <c6534dee-172b-24b0-0aee-84c9c8ccafaa@arm.com>
+Message-ID: <CANLsYkxDhNLF1C6To72nt8ouZamrEHorDmuR_j_VfVTe6HToJw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 14, 2017 at 12:08:51PM -0700, Stephen Boyd wrote:
-> This code assigns variables that are never used. Remove them.
-> 
-> Reported-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
+On 14 March 2017 at 11:55, Suzuki K Poulose <Suzuki.Poulose@arm.com> wrote:
+> On 14/03/17 17:40, Mathieu Poirier wrote:
+>>
+>> On 14 March 2017 at 11:32, Mathieu Poirier <mathieu.poirier@linaro.org>
+>> wrote:
+>>>
+>>> From: "Suzuki K. Poulose" <Suzuki.Poulose@arm.com>
+>>>
+>>> For software sources (i.e STM), there could be multiple agents
+>>> generating the trace data, unlike the ETMs. So we need to
+>>> properly do the accounting for the active number of users
+>>> to disable the device when the last user goes away. Right
+>>> now, the reference counting is broken for sources as we skip
+>>> the actions when we detect that the source is enabled.
+>>>
+>>> This patch fixes the problem by adding the refcounting for
+>>> software sources, even when they are enabled.
+>>>
+>>> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+>>> Reported-by: Robert Walker <robert.walker@arm.com>
+>>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+>>> ---
+>>>  drivers/hwtracing/coresight/coresight.c | 13 +++++++++++--
+>>>  1 file changed, 11 insertions(+), 2 deletions(-)
+>>>
+>>> diff --git a/drivers/hwtracing/coresight/coresight.c
+>>> b/drivers/hwtracing/coresight/coresight.c
+>>> index 34cd1ed..2da9e39 100644
+>>> --- a/drivers/hwtracing/coresight/coresight.c
+>>> +++ b/drivers/hwtracing/coresight/coresight.c
+>>> @@ -552,6 +552,7 @@ int coresight_enable(struct coresight_device *csdev)
+>>>         int cpu, ret = 0;
+>>>         struct coresight_device *sink;
+>>>         struct list_head *path;
+>>> +       enum coresight_dev_subtype_source subtype =
+>>> csdev->subtype.source_subtype;
+>>
+>>
+>> Checkpatch.pl complains about a line over 80 characters.
+>
+>
+>
+> Hmm, I think the name of the enum is unusually long. I could clean it up a
+> little bit.
+> Also, it does look silly to split a simple variable assignment though.
+>
+> What do you prefer ?
 
-I love removing unused code!  Applied to pci/host-aardvark for v4.12,
-thanks!
+enum coresight_dev_subtype_source subtype;
+...
+...
 
-> ---
->  drivers/pci/host/pci-aardvark.c | 8 --------
->  1 file changed, 8 deletions(-)
-> 
-> diff --git a/drivers/pci/host/pci-aardvark.c b/drivers/pci/host/pci-aardvark.c
-> index 4fce494271cc..56e1aead65fc 100644
-> --- a/drivers/pci/host/pci-aardvark.c
-> +++ b/drivers/pci/host/pci-aardvark.c
-> @@ -917,8 +917,6 @@ static int advk_pcie_probe(struct platform_device *pdev)
->  	struct advk_pcie *pcie;
->  	struct resource *res;
->  	struct pci_bus *bus, *child;
-> -	struct msi_controller *msi;
-> -	struct device_node *msi_node;
->  	int ret, irq;
->  
->  	pcie = devm_kzalloc(dev, sizeof(struct advk_pcie), GFP_KERNEL);
-> @@ -962,12 +960,6 @@ static int advk_pcie_probe(struct platform_device *pdev)
->  		return ret;
->  	}
->  
-> -	msi_node = of_parse_phandle(dev->of_node, "msi-parent", 0);
-> -	if (msi_node)
-> -		msi = of_pci_find_msi_chip_by_node(msi_node);
-> -	else
-> -		msi = NULL;
-> -
->  	bus = pci_scan_root_bus_msi(dev, 0, &advk_pcie_ops,
->  				    pcie, &pcie->resources, &pcie->msi);
->  	if (!bus) {
-> -- 
-> 2.10.0.297.gf6727b0
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+subtype = csdev->subtype.source_subtype;
+
+That is probably the easiest.
+
+
+>
+> Suzuki
