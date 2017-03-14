@@ -1,43 +1,41 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 14 Mar 2017 19:12:10 +0000
-Subject: [PATCH] ARM: wire up new statx syscall
-In-Reply-To: <20170314185523.38598-1-code@mmayer.net>
-References: <20170314185523.38598-1-code@mmayer.net>
-Message-ID: <20170314191210.GR21222@n2100.armlinux.org.uk>
+From: stephen.boyd@linaro.org (Stephen Boyd)
+Date: Tue, 14 Mar 2017 12:14:14 -0700
+Subject: [PATCH] dt-bindings: arm-gic: Remove 0x from unit addresses
+Message-ID: <20170314191414.29881-1-stephen.boyd@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I already have a patch merged.
+DT spec says we shouldn't have '0x' on unit addresses. Remove
+them from these examples so people don't copy/pasta them into dts
+files.
 
-Thanks anyway.
+Cc: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
+---
+ Documentation/devicetree/bindings/interrupt-controller/arm,gic.txt | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-On Tue, Mar 14, 2017 at 11:55:23AM -0700, Markus Mayer wrote:
-> From: Markus Mayer <mmayer@broadcom.com>
-> 
-> Add new statx syscall to ARM syscall table.
-> 
-> Signed-off-by: Markus Mayer <mmayer@broadcom.com>
-> ---
-> 
-> It looks like this hasn't been submitted before, so here goes.
-> 
->  arch/arm/tools/syscall.tbl | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/tools/syscall.tbl b/arch/arm/tools/syscall.tbl
-> index 3c2cb5d..0bb0e9c 100644
-> --- a/arch/arm/tools/syscall.tbl
-> +++ b/arch/arm/tools/syscall.tbl
-> @@ -411,3 +411,4 @@
->  394	common	pkey_mprotect		sys_pkey_mprotect
->  395	common	pkey_alloc		sys_pkey_alloc
->  396	common	pkey_free		sys_pkey_free
-> +397	common	statx			sys_statx
-> -- 
-> 2.7.4
-> 
-
+diff --git a/Documentation/devicetree/bindings/interrupt-controller/arm,gic.txt b/Documentation/devicetree/bindings/interrupt-controller/arm,gic.txt
+index 5393e2a45a42..2921655c8909 100644
+--- a/Documentation/devicetree/bindings/interrupt-controller/arm,gic.txt
++++ b/Documentation/devicetree/bindings/interrupt-controller/arm,gic.txt
+@@ -155,7 +155,7 @@ Example:
+ 		      <0x0 0xe112f000 0 0x02000>,
+ 		      <0x0 0xe1140000 0 0x10000>,
+ 		      <0x0 0xe1160000 0 0x10000>;
+-		v2m0: v2m at 0x8000 {
++		v2m0: v2m at 8000 {
+ 			compatible = "arm,gic-v2m-frame";
+ 			msi-controller;
+ 			reg = <0x0 0x80000 0 0x1000>;
+@@ -163,7 +163,7 @@ Example:
+ 
+ 		....
+ 
+-		v2mN: v2m at 0x9000 {
++		v2mN: v2m at 9000 {
+ 			compatible = "arm,gic-v2m-frame";
+ 			msi-controller;
+ 			reg = <0x0 0x90000 0 0x1000>;
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+2.10.0.297.gf6727b0
