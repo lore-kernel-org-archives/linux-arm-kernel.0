@@ -1,50 +1,49 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 14 Mar 2017 16:47:28 +0000
-Subject: [PATCH v5 15/39] [media] v4l2: add a frame interval error event
-In-Reply-To: <1489508491.28116.8.camel@ndufresne.ca>
-References: <1489121599-23206-1-git-send-email-steve_longerbeam@mentor.com>
- <1489121599-23206-16-git-send-email-steve_longerbeam@mentor.com>
- <5b0a0e76-2524-4140-5ccc-380a8f949cfa@xs4all.nl>
- <ec05e6e0-79f2-2db2-bde9-4aed00d76faa@gmail.com>
- <6b574476-77df-0e25-a4d1-32d4fe0aec12@xs4all.nl>
- <5d5cf4a4-a4d3-586e-cd16-54f543dfcce9@gmail.com>
- <aa6a5a1d-18fd-8bed-a349-2654d2d1abe0@xs4all.nl>
- <20170313104538.GF21222@n2100.armlinux.org.uk>
- <1489508491.28116.8.camel@ndufresne.ca>
-Message-ID: <20170314164728.GQ21222@n2100.armlinux.org.uk>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Tue, 14 Mar 2017 17:54:59 +0100
+Subject: [PATCH v5 1/2] mailbox: Add driver for Broadcom FlexRM ring
+ manager
+In-Reply-To: <1488793240-25484-2-git-send-email-anup.patel@broadcom.com>
+References: <1488793240-25484-1-git-send-email-anup.patel@broadcom.com>
+ <1488793240-25484-2-git-send-email-anup.patel@broadcom.com>
+Message-ID: <CABb+yY0uDhgq-8hiAAXdq35igHH1GJVuuGTmerK=9UN6_VTHnA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 14, 2017 at 12:21:31PM -0400, Nicolas Dufresne wrote:
-> My main concern here based on what I'm reading, is that this driver is
-> not even able to notice immediately that a produced frame was corrupted
-> (because it's out of sync). From usability perspective, this is really
-> bad. Can't the driver derive a clock from some irq and calculate for
-> each frame if the timing was correct ? And if not mark the buffer with
-> V4L2_BUF_FLAG_ERROR ?
+On Mon, Mar 6, 2017 at 10:40 AM, Anup Patel <anup.patel@broadcom.com> wrote:
+> Some of the Broadcom iProc SoCs have FlexRM ring manager
+> which provides a ring-based programming interface to various
+> offload engines (e.g. RAID, Crypto, etc).
+>
+> This patch adds a common mailbox driver for Broadcom FlexRM
+> ring manager which can be shared by various offload engine
+> drivers (implemented as mailbox clients).
+>
+> Reviewed-by: Ray Jui <ray.jui@broadcom.com>
+> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
+> Reviewed-by: Pramod KUMAR <pramod.kumar@broadcom.com>
+> Signed-off-by: Anup Patel <anup.patel@broadcom.com>
+> ---
+>  drivers/mailbox/Kconfig                      |  11 +
+>  drivers/mailbox/Makefile                     |   2 +
+>  drivers/mailbox/mailbox-flexrm/Makefile      |   6 +
+>  drivers/mailbox/mailbox-flexrm/flexrm-desc.c | 764 ++++++++++++++++++++++++
+>  drivers/mailbox/mailbox-flexrm/flexrm-desc.h |  47 ++
+>  drivers/mailbox/mailbox-flexrm/flexrm-main.c | 829 +++++++++++++++++++++++++++
+>  include/linux/mailbox/brcm-message.h         |  14 +-
+>  7 files changed, 1669 insertions(+), 4 deletions(-)
+>  create mode 100644 drivers/mailbox/mailbox-flexrm/Makefile
+>  create mode 100644 drivers/mailbox/mailbox-flexrm/flexrm-desc.c
+>  create mode 100644 drivers/mailbox/mailbox-flexrm/flexrm-desc.h
+>  create mode 100644 drivers/mailbox/mailbox-flexrm/flexrm-main.c
+>
+I would avoid platform specific sub-directory if possible, because
+people tend to take it as  their fenced island where they can do
+whatever they like.
 
-One of the issues of measuring timing with IRQs is the fact that the
-IRQ subsystem only allows one IRQ to run at a time.  If an IRQ takes
-a relatively long time to process, then it throws the timing of other
-IRQs out.
+Can you break this into an upper BRCM specific code (desc management)
+and a lower purely mailbox driver (only sets up pointers/addresses to
+create rings and track the flexrm's PC)?   Is there a reason why you
+must dma_map, the buffers to send, in the spinlock protected
+.send_data()?
 
-If you're going to decide that a buffer should be marked in error on
-the basis of an interrupt arriving late, this can trigger spuriously.
-
-It wasn't that long ago that USB HID was regularly eating something
-like 20ms of interrupt time... that's been solved, but that doesn't
-mean all cases are solved - there are still interrupt handlers in the
-kernel that are on the order of milliseconds to complete.
-
-Given the quality I observe of some USB serial devices (eg, running at
-115200 baud, but feeling like they deliver characters to userspace at
-9600 baud) I wouldn't be surprised if some USB serial drivers eat a lot
-of IRQ time... and if so, all it'll take is to plug such a device in
-to disrupt capture.
-
-That sounds way too fragile to me.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+thanks
