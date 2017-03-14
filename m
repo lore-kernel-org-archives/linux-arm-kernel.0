@@ -1,17 +1,33 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Tue, 14 Mar 2017 22:03:21 +0100 (CET)
-Subject: [PATCH] staging: vc04_services: Remove unused functions
-In-Reply-To: <20170314191420.5540-1-jb@abbadie.fr>
-References: <20170314191420.5540-1-jb@abbadie.fr>
-Message-ID: <169963228.159329.1489525401728@email.1und1.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 14 Mar 2017 14:06:39 -0700
+Subject: [PATCH 4/4] ARM: OMAP2+: Make hwmod clkdm_name const
+In-Reply-To: <20170314210639.2065-1-tony@atomide.com>
+References: <20170314210639.2065-1-tony@atomide.com>
+Message-ID: <20170314210639.2065-5-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Jean-Baptiste Abbadie <jb@abbadie.fr> hat am 14. M?rz 2017 um 20:14 geschrieben:
-> 
-> 
-> These four functions are not used and report errors with sparse.
-> 
-> Signed-off-by: Jean-Baptiste Abbadie <jb@abbadie.fr>
+This can be const, and needs to be const when we start initializing
+it from clkdm data.
 
-Acked-by: Stefan Wahren <stefan.wahren@i2se.com>
+Cc: Paul Walmsley <paul@pwsan.com>
+Cc: Tero Kristo <t-kristo@ti.com>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+---
+ arch/arm/mach-omap2/omap_hwmod.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-omap2/omap_hwmod.h b/arch/arm/mach-omap2/omap_hwmod.h
+--- a/arch/arm/mach-omap2/omap_hwmod.h
++++ b/arch/arm/mach-omap2/omap_hwmod.h
+@@ -676,7 +676,7 @@ struct omap_hwmod {
+ 	const char			*main_clk;
+ 	struct clk			*_clk;
+ 	struct omap_hwmod_opt_clk	*opt_clks;
+-	char				*clkdm_name;
++	const char			*clkdm_name;
+ 	struct clockdomain		*clkdm;
+ 	struct list_head		slave_ports; /* connect to *_TA */
+ 	void				*dev_attr;
+-- 
+2.11.1
