@@ -1,40 +1,27 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Tue, 14 Mar 2017 14:52:34 +0000
-Subject: [PATCH 3/3] kvm: arm/arm64: Fix locking for kvm_free_stage2_pgd
-In-Reply-To: <1489503154-20705-1-git-send-email-suzuki.poulose@arm.com>
-References: <1489503154-20705-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1489503154-20705-4-git-send-email-suzuki.poulose@arm.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Tue, 14 Mar 2017 16:56:44 +0200
+Subject: [PATCH v2 2/4] phy: exynos5: Remove duplicated defines of PHY
+ register defines
+In-Reply-To: <10362020.XmlhBa7gD6@amdc3058>
+References: <20170311182534.13345-1-krzk@kernel.org>
+ <CGME20170314143705epcas5p42e226d072b9ec705bb0dca981923f313@epcas5p4.samsung.com>
+ <20170311182534.13345-3-krzk@kernel.org> <10362020.XmlhBa7gD6@amdc3058>
+Message-ID: <CAJKOXPcZ4nks2k9M91fr7QX25Zuk-OTUGuvG7xRepE8ZPWSGyg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In kvm_free_stage2_pgd() we don't hold the kvm->mmu_lock while calling
-unmap_stage2_range() on the entire memory range for the guest. This could
-cause problems with other callers (e.g, munmap on a memslot) trying to
-unmap a range.
+On Tue, Mar 14, 2017 at 4:37 PM, Bartlomiej Zolnierkiewicz
+<b.zolnierkie@samsung.com> wrote:
+> On Saturday, March 11, 2017 08:25:32 PM Krzysztof Kozlowski wrote:
+>> Phy drivers access PMU region through regmap provided by exynos-pmu
+>> driver.   However there is no need to duplicate defines for PMU
+>> registers.  Instead just use whatever is defined in exynos-regs-pmu.h.
+>>
+>> This reduces number of defines and allows removal of one header.
+>
+> exynos5-pmu.h goes away in patch #4
 
-Fixes: commit d5d8184d35c9 ("KVM: ARM: Memory virtualization setup")
-Cc: stable at vger.kernel.org # v3.10+
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Christoffer Dall <christoffer.dall@linaro.org>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
----
- arch/arm/kvm/mmu.c | 3 +++
- 1 file changed, 3 insertions(+)
+Right, I will leave only the first part about number of defines.
 
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index 13b9c1f..b361f71 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -831,7 +831,10 @@ void kvm_free_stage2_pgd(struct kvm *kvm)
- 	if (kvm->arch.pgd == NULL)
- 		return;
- 
-+	spin_lock(&kvm->mmu_lock);
- 	unmap_stage2_range(kvm, 0, KVM_PHYS_SIZE);
-+	spin_unlock(&kvm->mmu_lock);
-+
- 	/* Free the HW pgd, one page at a time */
- 	free_pages_exact(kvm->arch.pgd, S2_PGD_SIZE);
- 	kvm->arch.pgd = NULL;
--- 
-2.7.4
+Thanks,
+Krzysztof
