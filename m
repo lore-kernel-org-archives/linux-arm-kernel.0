@@ -1,35 +1,56 @@
-From: kirill@shutemov.name (Kirill A. Shutemov)
-Date: Tue, 14 Mar 2017 20:06:25 +0300
-Subject: [PATCHv2,6/7] mm: convert generic code to 5-level paging
-In-Reply-To: <2565467.lozgIVsiVn@diego>
-References: <20170309142408.2868-7-kirill.shutemov@linux.intel.com>
- <2565467.lozgIVsiVn@diego>
-Message-ID: <20170314170625.gwlfjlxooij3elsd@node.shutemov.name>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Tue, 14 Mar 2017 19:10:26 +0200
+Subject: [PATCH v2 1/3] arm64: defconfig: Enable video,
+ DRM and LPASS drivers for Exynos5433 and Exynos7
+In-Reply-To: <20170314171028.20337-1-krzk@kernel.org>
+References: <20170314171028.20337-1-krzk@kernel.org>
+Message-ID: <20170314171028.20337-2-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 14, 2017 at 05:14:22PM +0100, Heiko St?bner wrote:
-> [added arm64 maintainers and arm list to recipients]
-> 
-> Hi,
-> 
-> Am Donnerstag, 9. M?rz 2017, 17:24:07 CET schrieb Kirill A. Shutemov:
-> > Convert all non-architecture-specific code to 5-level paging.
-> > 
-> > It's mostly mechanical adding handling one more page table level in
-> > places where we deal with pud_t.
-> > 
-> > Signed-off-by: Kirill A. Shutemov <kirill.shutemov@linux.intel.com>
-> > Acked-by: Michal Hocko <mhocko@suse.com>
-> 
-> This breaks (at least) arm64 Rockchip platforms it seems.
-> 
-> 4.11-rc1 worked just fine, while 4.11-rc2 kills the systems and I've bisected 
-> it down to this one commit.
+Enable drivers specific to Exynos5433 and Exynos7:
+1. MFD Low Power Audio SubSystem (LPASS),
+2. DRM drivers (DECON display, outputs),
+3. Drivers for video-related sub-blocks (JPEG, Multi Format Codec,
+   GScaler).
 
-Have you tried current Linus' tree? There is important fix:
+Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+---
+ arch/arm64/configs/defconfig | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=ce70df089143c49385b4f32f39d41fb50fbf6a7c
-
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index 5e7fa211eb0a..3b54794d3166 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -302,6 +302,7 @@ CONFIG_RENESAS_WDT=y
+ CONFIG_S3C2410_WATCHDOG=y
+ CONFIG_MESON_GXBB_WATCHDOG=m
+ CONFIG_MESON_WATCHDOG=m
++CONFIG_MFD_EXYNOS_LPASS=m
+ CONFIG_MFD_MAX77620=y
+ CONFIG_MFD_RK808=y
+ CONFIG_MFD_SPMI_PMIC=y
+@@ -327,10 +328,20 @@ CONFIG_MEDIA_CONTROLLER=y
+ CONFIG_VIDEO_V4L2_SUBDEV_API=y
+ # CONFIG_DVB_NET is not set
+ CONFIG_V4L_MEM2MEM_DRIVERS=y
++CONFIG_VIDEO_SAMSUNG_S5P_JPEG=m
++CONFIG_VIDEO_SAMSUNG_S5P_MFC=m
++CONFIG_VIDEO_SAMSUNG_EXYNOS_GSC=m
+ CONFIG_VIDEO_RENESAS_FCP=m
+ CONFIG_VIDEO_RENESAS_VSP1=m
+ CONFIG_DRM=m
+ CONFIG_DRM_NOUVEAU=m
++CONFIG_DRM_EXYNOS=m
++CONFIG_DRM_EXYNOS5433_DECON=y
++CONFIG_DRM_EXYNOS7_DECON=y
++CONFIG_DRM_EXYNOS_DSI=y
++# CONFIG_DRM_EXYNOS_DP is not set
++CONFIG_DRM_EXYNOS_HDMI=y
++CONFIG_DRM_EXYNOS_MIC=y
+ CONFIG_DRM_RCAR_DU=m
+ CONFIG_DRM_RCAR_HDMI=y
+ CONFIG_DRM_RCAR_LVDS=y
 -- 
- Kirill A. Shutemov
+2.9.3
