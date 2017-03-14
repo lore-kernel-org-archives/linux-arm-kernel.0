@@ -1,9 +1,9 @@
 From: vivek.gautam@codeaurora.org (Vivek Gautam)
-Date: Tue, 14 Mar 2017 11:44:40 +0530
-Subject: [PATCH v3 2/2] phy: Group vendor specific phy drivers
-In-Reply-To: <1489472080-23711-1-git-send-email-vivek.gautam@codeaurora.org>
-References: <1489472080-23711-1-git-send-email-vivek.gautam@codeaurora.org>
-Message-ID: <1489472080-23711-2-git-send-email-vivek.gautam@codeaurora.org>
+Date: Tue, 14 Mar 2017 11:52:50 +0530
+Subject: [RESEND PATCH v3 2/2] phy: Group vendor specific phy drivers
+In-Reply-To: <1489472080-23711-2-git-send-email-vivek.gautam@codeaurora.org>
+References: <1489472080-23711-2-git-send-email-vivek.gautam@codeaurora.org>
+Message-ID: <1489472570-26434-1-git-send-email-vivek.gautam@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -26,16 +26,19 @@ Cc: Viresh Kumar <viresh.kumar@linaro.org>
 Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
 Cc: Chen-Yu Tsai <wens@csie.org>
 Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
-Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Cc: Krzysztof Kozlowski <krzk@kernel.org>
 Cc: Jaehoon Chung <jh80.chung@samsung.com>
 Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-arm-msm at vger.kernel.org
 Cc: linux-kernel at vger.kernel.org
 Cc: linux-omap at vger.kernel.org
-Cc: linux-samsung-soc at vger.kernel.org
 Cc: linux-renesas-soc at vger.kernel.org
 Cc: linux-rockchip at lists.infradead.org
+Cc: linux-samsung-soc at vger.kernel.org
 Cc: linux-usb at vger.kernel.org
 ---
+
+Corrected Krzysztof's email-id. Added linux-arm-msm.
 
 Hi Heiko, Viresh,
 It's been a year since the last version of this patch was posted.
