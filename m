@@ -1,201 +1,63 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue, 14 Mar 2017 20:38:04 +0200
-Subject: [PATCH] drm/exynos: Print kernel pointers in a restricted form
-Message-ID: <20170314183804.13788-1-krzk@kernel.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 14 Mar 2017 18:47:34 +0000
+Subject: [PATCH 00/14] arm_pmu: ACPI support
+In-Reply-To: <20170314114508.GA15740@leverpostej>
+References: <1489143891-11596-1-git-send-email-mark.rutland@arm.com>
+ <5b5dca5f-0ea3-d7e7-63c9-dba57969d4be@arm.com>
+ <20170314114508.GA15740@leverpostej>
+Message-ID: <20170314184733.GC15740@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Printing raw kernel pointers might reveal information which sometimes we
-try to hide (e.g. with Kernel Address Space Layout Randomization).  Use
-the "%pK" format so these pointers will be hidden for unprivileged
-users.
+On Tue, Mar 14, 2017 at 11:49:19AM +0000, Mark Rutland wrote:
+> On Fri, Mar 10, 2017 at 04:14:57PM -0600, Jeremy Linton wrote:
+> > I tried these patches on a m400 (which uses PPIs), and the kernel
+> > fails to come up enough to login via the network (which works with
+> > 4.11rc1 without these patches). So, I suspect there is something
+> > wrong with them. 
+> 
+> Indeed; sorry about this. I'll see if I can get access to a board to try
+> local debugging.
 
-Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
----
- drivers/gpu/drm/exynos/exynos_drm_dsi.c     |  4 ++--
- drivers/gpu/drm/exynos/exynos_drm_fimc.c    |  2 +-
- drivers/gpu/drm/exynos/exynos_drm_gem.c     |  2 +-
- drivers/gpu/drm/exynos/exynos_drm_gsc.c     |  2 +-
- drivers/gpu/drm/exynos/exynos_drm_ipp.c     | 22 +++++++++++-----------
- drivers/gpu/drm/exynos/exynos_drm_rotator.c |  2 +-
- 6 files changed, 17 insertions(+), 17 deletions(-)
+> > About the only thing it says with any meaning when earlycon is passed is:
+> > [   10.965147] Serial: 8250/16550 driver, 32 ports, IRQ sharing enabled
+> > [   11.064193] dw-apb-uart APMC0D08:00: cannot get irq
+> > 
+> > and promptly hangs up.
 
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_dsi.c b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
-index 812e2ec0761d..202526b20b64 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_dsi.c
-+++ b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
-@@ -979,7 +979,7 @@ static void exynos_dsi_send_to_fifo(struct exynos_dsi *dsi,
- 	bool first = !xfer->tx_done;
- 	u32 reg;
- 
--	dev_dbg(dev, "< xfer %p: tx len %u, done %u, rx len %u, done %u\n",
-+	dev_dbg(dev, "< xfer %pK: tx len %u, done %u, rx len %u, done %u\n",
- 		xfer, length, xfer->tx_done, xfer->rx_len, xfer->rx_done);
- 
- 	if (length > DSI_TX_FIFO_SIZE)
-@@ -1177,7 +1177,7 @@ static bool exynos_dsi_transfer_finish(struct exynos_dsi *dsi)
- 	spin_unlock_irqrestore(&dsi->transfer_lock, flags);
- 
- 	dev_dbg(dsi->dev,
--		"> xfer %p, tx_len %zu, tx_done %u, rx_len %u, rx_done %u\n",
-+		"> xfer %pK, tx_len %zu, tx_done %u, rx_len %u, rx_done %u\n",
- 		xfer, xfer->packet.payload_length, xfer->tx_done, xfer->rx_len,
- 		xfer->rx_done);
- 
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_fimc.c b/drivers/gpu/drm/exynos/exynos_drm_fimc.c
-index 95871577015d..5b18b5c5fdf2 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_fimc.c
-+++ b/drivers/gpu/drm/exynos/exynos_drm_fimc.c
-@@ -1695,7 +1695,7 @@ static int fimc_probe(struct platform_device *pdev)
- 		goto err_put_clk;
- 	}
- 
--	DRM_DEBUG_KMS("id[%d]ippdrv[%p]\n", ctx->id, ippdrv);
-+	DRM_DEBUG_KMS("id[%d]ippdrv[%pK]\n", ctx->id, ippdrv);
- 
- 	spin_lock_init(&ctx->lock);
- 	platform_set_drvdata(pdev, ctx);
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_gem.c b/drivers/gpu/drm/exynos/exynos_drm_gem.c
-index 4c28f7ffcc4d..55a1579d11b3 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_gem.c
-+++ b/drivers/gpu/drm/exynos/exynos_drm_gem.c
-@@ -218,7 +218,7 @@ static struct exynos_drm_gem *exynos_drm_gem_init(struct drm_device *dev,
- 		return ERR_PTR(ret);
- 	}
- 
--	DRM_DEBUG_KMS("created file object = %p\n", obj->filp);
-+	DRM_DEBUG_KMS("created file object = %pK\n", obj->filp);
- 
- 	return exynos_gem;
- }
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_gsc.c b/drivers/gpu/drm/exynos/exynos_drm_gsc.c
-index bef57987759d..0506b2b17ac1 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_gsc.c
-+++ b/drivers/gpu/drm/exynos/exynos_drm_gsc.c
-@@ -1723,7 +1723,7 @@ static int gsc_probe(struct platform_device *pdev)
- 		return ret;
- 	}
- 
--	DRM_DEBUG_KMS("id[%d]ippdrv[%p]\n", ctx->id, ippdrv);
-+	DRM_DEBUG_KMS("id[%d]ippdrv[%pK]\n", ctx->id, ippdrv);
- 
- 	mutex_init(&ctx->lock);
- 	platform_set_drvdata(pdev, ctx);
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_ipp.c b/drivers/gpu/drm/exynos/exynos_drm_ipp.c
-index 9c84ee76f18a..3edda18cc2d2 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_ipp.c
-+++ b/drivers/gpu/drm/exynos/exynos_drm_ipp.c
-@@ -208,7 +208,7 @@ static struct exynos_drm_ippdrv *ipp_find_drv_by_handle(u32 prop_id)
- 	 * e.g PAUSE state, queue buf, command control.
- 	 */
- 	list_for_each_entry(ippdrv, &exynos_drm_ippdrv_list, drv_list) {
--		DRM_DEBUG_KMS("count[%d]ippdrv[%p]\n", count++, ippdrv);
-+		DRM_DEBUG_KMS("count[%d]ippdrv[%pK]\n", count++, ippdrv);
- 
- 		mutex_lock(&ippdrv->cmd_lock);
- 		list_for_each_entry(c_node, &ippdrv->cmd_list, list) {
-@@ -388,7 +388,7 @@ int exynos_drm_ipp_set_property(struct drm_device *drm_dev, void *data,
- 	}
- 	property->prop_id = ret;
- 
--	DRM_DEBUG_KMS("created prop_id[%d]cmd[%d]ippdrv[%p]\n",
-+	DRM_DEBUG_KMS("created prop_id[%d]cmd[%d]ippdrv[%pK]\n",
- 		property->prop_id, property->cmd, ippdrv);
- 
- 	/* stored property information and ippdrv in private data */
-@@ -518,7 +518,7 @@ static int ipp_put_mem_node(struct drm_device *drm_dev,
- {
- 	int i;
- 
--	DRM_DEBUG_KMS("node[%p]\n", m_node);
-+	DRM_DEBUG_KMS("node[%pK]\n", m_node);
- 
- 	if (!m_node) {
- 		DRM_ERROR("invalid dequeue node.\n");
-@@ -562,7 +562,7 @@ static struct drm_exynos_ipp_mem_node
- 	m_node->buf_id = qbuf->buf_id;
- 	INIT_LIST_HEAD(&m_node->list);
- 
--	DRM_DEBUG_KMS("m_node[%p]ops_id[%d]\n", m_node, qbuf->ops_id);
-+	DRM_DEBUG_KMS("m_node[%pK]ops_id[%d]\n", m_node, qbuf->ops_id);
- 	DRM_DEBUG_KMS("prop_id[%d]buf_id[%d]\n", qbuf->prop_id, m_node->buf_id);
- 
- 	for_each_ipp_planar(i) {
-@@ -659,7 +659,7 @@ static void ipp_put_event(struct drm_exynos_ipp_cmd_node *c_node,
- 
- 	mutex_lock(&c_node->event_lock);
- 	list_for_each_entry_safe(e, te, &c_node->event_list, base.link) {
--		DRM_DEBUG_KMS("count[%d]e[%p]\n", count++, e);
-+		DRM_DEBUG_KMS("count[%d]e[%pK]\n", count++, e);
- 
- 		/*
- 		 * qbuf == NULL condition means all event deletion.
-@@ -750,7 +750,7 @@ static struct drm_exynos_ipp_mem_node
- 
- 	/* find memory node from memory list */
- 	list_for_each_entry(m_node, head, list) {
--		DRM_DEBUG_KMS("count[%d]m_node[%p]\n", count++, m_node);
-+		DRM_DEBUG_KMS("count[%d]m_node[%pK]\n", count++, m_node);
- 
- 		/* compare buffer id */
- 		if (m_node->buf_id == qbuf->buf_id)
-@@ -767,7 +767,7 @@ static int ipp_set_mem_node(struct exynos_drm_ippdrv *ippdrv,
- 	struct exynos_drm_ipp_ops *ops = NULL;
- 	int ret = 0;
- 
--	DRM_DEBUG_KMS("node[%p]\n", m_node);
-+	DRM_DEBUG_KMS("node[%pK]\n", m_node);
- 
- 	if (!m_node) {
- 		DRM_ERROR("invalid queue node.\n");
-@@ -1232,7 +1232,7 @@ static int ipp_start_property(struct exynos_drm_ippdrv *ippdrv,
- 			m_node = list_first_entry(head,
- 				struct drm_exynos_ipp_mem_node, list);
- 
--			DRM_DEBUG_KMS("m_node[%p]\n", m_node);
-+			DRM_DEBUG_KMS("m_node[%pK]\n", m_node);
- 
- 			ret = ipp_set_mem_node(ippdrv, c_node, m_node);
- 			if (ret) {
-@@ -1601,7 +1601,7 @@ static int ipp_subdrv_probe(struct drm_device *drm_dev, struct device *dev)
- 		}
- 		ippdrv->prop_list.ipp_id = ret;
- 
--		DRM_DEBUG_KMS("count[%d]ippdrv[%p]ipp_id[%d]\n",
-+		DRM_DEBUG_KMS("count[%d]ippdrv[%pK]ipp_id[%d]\n",
- 			count++, ippdrv, ret);
- 
- 		/* store parent device for node */
-@@ -1659,7 +1659,7 @@ static int ipp_subdrv_open(struct drm_device *drm_dev, struct device *dev,
- 
- 	file_priv->ipp_dev = dev;
- 
--	DRM_DEBUG_KMS("done priv[%p]\n", dev);
-+	DRM_DEBUG_KMS("done priv[%pK]\n", dev);
- 
- 	return 0;
- }
-@@ -1676,7 +1676,7 @@ static void ipp_subdrv_close(struct drm_device *drm_dev, struct device *dev,
- 		mutex_lock(&ippdrv->cmd_lock);
- 		list_for_each_entry_safe(c_node, tc_node,
- 			&ippdrv->cmd_list, list) {
--			DRM_DEBUG_KMS("count[%d]ippdrv[%p]\n",
-+			DRM_DEBUG_KMS("count[%d]ippdrv[%pK]\n",
- 				count++, ippdrv);
- 
- 			if (c_node->filp == file) {
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_rotator.c b/drivers/gpu/drm/exynos/exynos_drm_rotator.c
-index 6591e406084c..79282a820ecc 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_rotator.c
-+++ b/drivers/gpu/drm/exynos/exynos_drm_rotator.c
-@@ -748,7 +748,7 @@ static int rotator_probe(struct platform_device *pdev)
- 		goto err_ippdrv_register;
- 	}
- 
--	DRM_DEBUG_KMS("ippdrv[%p]\n", ippdrv);
-+	DRM_DEBUG_KMS("ippdrv[%pK]\n", ippdrv);
- 
- 	platform_set_drvdata(pdev, rot);
- 
--- 
-2.9.3
+I believe that this is a latent FW bug, in a beta FW, exposed by recent
+changes.
+
+I managed to get access to two APM Mustang boards. I can reproduce the
+issue with a vanilla v4.11-rc1 defconfig on one, which has a beta FW.
+The same kernel boots fine on the other, which has a later released FW.
+
+I bisected the issue down to commit:
+
+  d44fa3d46079dc09 ("ACPI: Add support for ResourceSource/IRQ domain mapping")
+
+It seems the beta FW describes the UART interrupt with an Extended
+Interrupt Descriptor with the Consumer/Producer bit clear. Per the spec,
+this means "This device produces and consumes this resource", which
+doesn't make sense here given the UART is not an interrupt controller.
+
+The (working) released FW doesn't use an Extended Interrupt Descriptor
+for this interrupt, sidestepping the issue.
+
+Given that (AFAICT) this only affects a known-broken, beta FW, I don't
+think that we care that much.
+
+However, I think there is a larger potential issue here.
+
+In acpi_irq_parse_one_cb(), we skip interrupts with an Extended
+Interrupt Descriptor with the Consumer/Producer bit clear. It sounds
+like devices which behave as interrupt controllers could legitimately
+have this bit set for interrupts they generate and deliver to
+themselves, and we'd erroneously skip these when parsing interrupts.
+
+It's not entirely clear to me why this bit exists at all, given that
+it's not used as part of mapping the interrupt, and if you really want
+to know you can map the interrupt and look at the result.
+
+Thanks,
+Mark.
