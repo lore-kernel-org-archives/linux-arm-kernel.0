@@ -1,48 +1,58 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Tue, 14 Mar 2017 14:45 +0100
-Subject: [PATCH v2 3/8] ARM: dts: exynos: Fix watchdog reset on Exynos4412
-In-Reply-To: <CAJKOXPcoP7c=TTFtWqBLMXT0BS_yi3fpu8X3q4sxCTM9m=mPmw@mail.gmail.com>
-References: <20170311172527.16368-1-krzk@kernel.org>
- <6788694.7QfyuOlrPv@amdc3058>
- <CAJKOXPcoP7c=TTFtWqBLMXT0BS_yi3fpu8X3q4sxCTM9m=mPmw@mail.gmail.com>
- <CGME20170314134503epcas1p178241245d202edf9f3ea5885c605ffb6@epcas1p1.samsung.com>
-Message-ID: <1510739.WtREN49XT5@amdc3058>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 14 Mar 2017 14:47:23 +0100
+Subject: [PATCH v2 1/4] pinctrl: samsung: Fix the width of PINCFG_TYPE_DRV
+ bitfields for Exynos5433
+In-Reply-To: <58AF7CCB.5070303@samsung.com>
+References: <CGME20161230041426epcas1p1f827d3cee8b607d81e9921b412ddf301@epcas1p1.samsung.com>
+ <20161230041421.24448-1-andi.shyti@samsung.com>
+ <20161230041421.24448-2-andi.shyti@samsung.com>
+ <CACRpkdbR3x14h38Gg7qpeWnswwD9qsS0zDUrrXCEJH-AdEB+cQ@mail.gmail.com>
+ <58AF7CCB.5070303@samsung.com>
+Message-ID: <CACRpkda0-k7Vo9Y6yNtLNXu-gGnJW9y83t6W9p032KWjHYdMiw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, March 14, 2017 03:09:25 PM Krzysztof Kozlowski wrote:
-> On Tue, Mar 14, 2017 at 3:03 PM, Bartlomiej Zolnierkiewicz
-> <b.zolnierkie@samsung.com> wrote:
-> >
-> > Hi,
-> >
-> > On Saturday, March 11, 2017 07:25:22 PM Krzysztof Kozlowski wrote:
-> >> The Exynos4412 has the same watchdog as newer SoCs (e.g. Exynos5250).
-> >> Just like the others, for working it requires additional steps in Power
-> >> Management Unit: unmasking the reset request and enabling the system
-> >> reset.  Without these additional steps in PMU, the watchdog will not be
-> >> able to reset the system on expiration event.
-> >>
-> >> Change the compatible of Exynos4412 watchdog device node to
-> >> samsung,exynos5250-wdt which includes the additional PMU steps.
-> >
-> > This is going to confuse people.  How's about doing it cleanly
-> > (by adding samsung,exynos4412-wdt compatible and convert existing
-> > users to use instead)?
-> 
-> I don't find usage of 5250 in Exynos4412 DTS as confusing because
-> since long time I do not threat these numbers as having any meaning
-> (e.g. 3250 is newer...). Yes, we can duplicate the compatible for that
-> purpose. Care to send a patch for this?
+On Fri, Feb 24, 2017 at 1:22 AM, Chanwoo Choi <cw00.choi@samsung.com> wrote:
+> On 2016? 12? 30? 22:28, Linus Walleij wrote:
+>> On Fri, Dec 30, 2016 at 5:14 AM, Andi Shyti <andi.shyti@samsung.com> wrote:
+>>
+>>> From: Chanwoo Choi <cw00.choi@samsung.com>
+>>>
+>>> This patch fixes the wrong width of PINCFG_TYPE_DRV bitfields for Exynos5433
+>>> because PINCFG_TYPE_DRV of Exynos5433 has 4bit fields in the *_DRV
+>>> registers. Usually, other Exynos have 2bit field for PINCFG_TYPE_DRV.
+>>>
+>>> Fixes: 3c5ecc9ed353 ("pinctrl: exynos: Add support for Exynos5433")
+>>> Cc: stable at vger.kernel.org
+>>> Cc: Tomasz Figa <tomasz.figa@gmail.com>
+>>> Cc: Krzysztof Kozlowski <krzk@kernel.org>
+>>> Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
+>>> Cc: Linus Walleij <linus.walleij@linaro.org>
+>>> Cc: Kukjin Kim <kgene@kernel.org>
+>>> Cc: Javier Martinez Canillas <javier@osg.samsung.com>
+>>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+>>
+>> Nominally I think you should sign this off too Andi, as you are in the delivery
+>> path.
+>>
+>> Patch applied for fixes.
+>
+> This patch was already merged on your git and then merge it on tovalds's git[1].
+> But, when I checked the latest drivers/pinctrl/samsung/pinctrl-exynos.c,
+> it doesn't contain the all codes of patch[1].
+> Maybe, I think that there was some merge conflict[2].
 
-I don't buy this argument. The point is not in the number itself
-but in the fact that you as developer know than 3250 is newer than
-4412 (the same way as you know that 5250 is also newer than 4412).
-This convention is used for all Exynos bindings so please don't
-break it.
+Probably. Send a patch fixing it up so I can apply it.
 
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+There are now something like 5 different people submitting Samsung pinctrl
+patches without coordination so this will start to happen a lot if you keep
+up this development pace.
+
+As I just wrote in another mail: I want someone to step up and collect
+Samsung patches and send them to me using a pull request.
+
+Samsung people also need to start reviewing each other's patches
+more I guess, but mainly I need help with integration.
+
+Yours,
+Linus Walleij
