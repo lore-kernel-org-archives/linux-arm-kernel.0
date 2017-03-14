@@ -1,71 +1,42 @@
-From: minghsiu.tsai@mediatek.com (Minghsiu Tsai)
-Date: Tue, 14 Mar 2017 22:21:22 +0800
-Subject: [PATCH] media: mtk-jpeg: fix continuous log "Context is NULL"
-Message-ID: <1489501282-52137-1-git-send-email-minghsiu.tsai@mediatek.com>
+From: clabbe.montjoie@gmail.com (Corentin Labbe)
+Date: Tue, 14 Mar 2017 15:18:52 +0100
+Subject: [PATCH v2 16/20] ARM: dts: sun50i-a64: enable dwmac-sun8i on pine64
+In-Reply-To: <20170314141856.24560-1-clabbe.montjoie@gmail.com>
+References: <20170314141856.24560-1-clabbe.montjoie@gmail.com>
+Message-ID: <20170314141856.24560-17-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The symptom is continuous log "mtk-jpeg 18004000.jpegdec: Context is NULL"
-in kernel log. It is becauese the error handling in irq doesn't clear
-interrupt.
+The dwmac-sun8i hardware is present on the pine64
+It uses an external PHY via RMII.
 
-The calling flow like as below when issue happen
-mtk_jpeg_device_run()
-mtk_jpeg_job_abort()
-  v4l2_m2m_job_finish() -> m2m_dev->curr_ctx = NULL;
-mtk_jpeg_dec_irq()
-  v4l2_m2m_get_curr_priv()
-     -> m2m_dev->curr_ctx == NULL
-     -> return NULL
-log "Context is NULL"
-
-There is race condition between job_abort() and irq. In order to simplify
-code, don't want to add extra flag to maintain state, empty job_abort() and
-clear interrupt before v4l2_m2m_get_curr_priv() in irq.
-
-Signed-off-by: Minghsiu Tsai <minghsiu.tsai@mediatek.com>
+Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
 ---
- drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c | 14 ++------------
- 1 file changed, 2 insertions(+), 12 deletions(-)
+ arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
-diff --git a/drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c b/drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c
-index b10183f..c02bc7f 100644
---- a/drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c
-+++ b/drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c
-@@ -862,15 +862,6 @@ static int mtk_jpeg_job_ready(void *priv)
- 
- static void mtk_jpeg_job_abort(void *priv)
- {
--	struct mtk_jpeg_ctx *ctx = priv;
--	struct mtk_jpeg_dev *jpeg = ctx->jpeg;
--	struct vb2_buffer *src_buf, *dst_buf;
--
--	src_buf = v4l2_m2m_src_buf_remove(ctx->fh.m2m_ctx);
--	dst_buf = v4l2_m2m_dst_buf_remove(ctx->fh.m2m_ctx);
--	v4l2_m2m_buf_done(to_vb2_v4l2_buffer(src_buf), VB2_BUF_STATE_ERROR);
--	v4l2_m2m_buf_done(to_vb2_v4l2_buffer(dst_buf), VB2_BUF_STATE_ERROR);
--	v4l2_m2m_job_finish(jpeg->m2m_dev, ctx->fh.m2m_ctx);
- }
- 
- static struct v4l2_m2m_ops mtk_jpeg_m2m_ops = {
-@@ -941,6 +932,8 @@ static irqreturn_t mtk_jpeg_dec_irq(int irq, void *priv)
- 	u32 dec_ret;
- 	int i;
- 
-+	dec_ret = mtk_jpeg_dec_get_int_status(jpeg->dec_reg_base);
-+	dec_irq_ret = mtk_jpeg_dec_enum_result(dec_ret);
- 	ctx = v4l2_m2m_get_curr_priv(jpeg->m2m_dev);
- 	if (!ctx) {
- 		v4l2_err(&jpeg->v4l2_dev, "Context is NULL\n");
-@@ -951,9 +944,6 @@ static irqreturn_t mtk_jpeg_dec_irq(int irq, void *priv)
- 	dst_buf = v4l2_m2m_dst_buf_remove(ctx->fh.m2m_ctx);
- 	jpeg_src_buf = mtk_jpeg_vb2_to_srcbuf(src_buf);
- 
--	dec_ret = mtk_jpeg_dec_get_int_status(jpeg->dec_reg_base);
--	dec_irq_ret = mtk_jpeg_dec_enum_result(dec_ret);
--
- 	if (dec_irq_ret >= MTK_JPEG_DEC_RESULT_UNDERFLOW)
- 		mtk_jpeg_dec_reset(jpeg->dec_reg_base);
- 
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
+index c680ed3..b53994d 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
+@@ -109,3 +109,18 @@
+ &usbphy {
+ 	status = "okay";
+ };
++
++&mdio {
++	ext_rmii_phy1: ethernet-phy at 1 {
++	      reg = <1>;
++	};
++};
++
++&emac {
++	pinctrl-names = "default";
++	pinctrl-0 = <&rmii_pins>;
++	phy-mode = "rmii";
++	phy-handle = <&ext_rmii_phy1>;
++	status = "okay";
++
++};
 -- 
-1.9.1
+2.10.2
