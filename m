@@ -1,93 +1,165 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Wed, 15 Mar 2017 10:49:53 +0800
-Subject: [PATCH 00/14] arm_pmu: ACPI support
-In-Reply-To: <73d82fe7959106d78a49f50d2170ffca@codeaurora.org>
-References: <1489143891-11596-1-git-send-email-mark.rutland@arm.com>
- <5b5dca5f-0ea3-d7e7-63c9-dba57969d4be@arm.com>
- <20170314114508.GA15740@leverpostej> <20170314184733.GC15740@leverpostej>
- <73d82fe7959106d78a49f50d2170ffca@codeaurora.org>
-Message-ID: <db839fdc-7615-30be-1756-3c44c5a3e55a@linaro.org>
+From: pushkar.iit@gmail.com (Pushkar Jambhlekar)
+Date: Tue, 14 Mar 2017 18:39:04 +0530
+Subject: [PATCH] vc04_services: Fixing coding and logical guidelines
+Message-ID: <1489496944-44038-1-git-send-email-pushkar.iit@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017/3/15 6:06, Agustin Vega-Frias wrote:
-> Hi Mark,
->
-> On 2017-03-14 14:47, Mark Rutland wrote:
->> On Tue, Mar 14, 2017 at 11:49:19AM +0000, Mark Rutland wrote:
->>> On Fri, Mar 10, 2017 at 04:14:57PM -0600, Jeremy Linton wrote:
->>> > I tried these patches on a m400 (which uses PPIs), and the kernel
->>> > fails to come up enough to login via the network (which works with
->>> > 4.11rc1 without these patches). So, I suspect there is something
->>> > wrong with them.
->>>
->>> Indeed; sorry about this. I'll see if I can get access to a board to try
->>> local debugging.
->>
->>> > About the only thing it says with any meaning when earlycon is
->>> passed is:
->>> > [   10.965147] Serial: 8250/16550 driver, 32 ports, IRQ sharing
->>> enabled
->>> > [   11.064193] dw-apb-uart APMC0D08:00: cannot get irq
->>> >
->>> > and promptly hangs up.
->>
->> I believe that this is a latent FW bug, in a beta FW, exposed by recent
->> changes.
->>
->> I managed to get access to two APM Mustang boards. I can reproduce the
->> issue with a vanilla v4.11-rc1 defconfig on one, which has a beta FW.
->> The same kernel boots fine on the other, which has a later released FW.
->>
->> I bisected the issue down to commit:
->>
->>   d44fa3d46079dc09 ("ACPI: Add support for ResourceSource/IRQ domain
->> mapping")
->>
->> It seems the beta FW describes the UART interrupt with an Extended
->> Interrupt Descriptor with the Consumer/Producer bit clear. Per the spec,
->> this means "This device produces and consumes this resource", which
->> doesn't make sense here given the UART is not an interrupt controller.
->>
->> The (working) released FW doesn't use an Extended Interrupt Descriptor
->> for this interrupt, sidestepping the issue.
->>
->> Given that (AFAICT) this only affects a known-broken, beta FW, I don't
->> think that we care that much.
->>
->> However, I think there is a larger potential issue here.
->>
->> In acpi_irq_parse_one_cb(), we skip interrupts with an Extended
->> Interrupt Descriptor with the Consumer/Producer bit clear. It sounds
->> like devices which behave as interrupt controllers could legitimately
->> have this bit set for interrupts they generate and deliver to
->> themselves, and we'd erroneously skip these when parsing interrupts.
->>
->> It's not entirely clear to me why this bit exists at all, given that
->> it's not used as part of mapping the interrupt, and if you really want
->> to know you can map the interrupt and look at the result.
->>
->
-> I think the best approach would be to try to amend the spec and make
-> zero mean producer only which is the way it is being treated in Linux.
-> That would mean that a device consuming its own interrupts would have to
-> have two resources, one for describing the resource as producer and one
-> as consumer.
+Description:
+    in file 'vc04_services/interface/vchiq_arm/vchiq_shim.c', making changes to make code according to 'checkpath.pl'.
+Also, fixing logical issue, i.e. removing break after goto statement.
 
-Agreed. I think it's a typo in the spec, should be only produce resource
-if it's 0, and that's the behavior in ACPICA core now (both used by
-linux kernel and windows).
+Signed-off-by: Pushkar Jambhlekar <pushkar.iit@gmail.com>
+---
+ .../vc04_services/interface/vchiq_arm/vchiq_shim.c | 33 ++++++++++++++++------
+ 1 file changed, 24 insertions(+), 9 deletions(-)
 
->
-> Unfortunately the spec is vague in some areas like the feature we used
-> to implement secondary IRQ controllers which require this patch.
->
-> Hanjun, can you bring this up at the next ASWG meeting? I don't normally
-> attend but I will ask our ASWG lead to invite me so we can discuss this
-> in that forum.
-
-I will do that, and I will send an email to report this issue first with
-you and Mark CCed.
-
-Thanks
-Hanjun
+diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_shim.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_shim.c
+index 48984ab..6d8a1d8 100644
+--- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_shim.c
++++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_shim.c
+@@ -52,7 +52,8 @@ typedef struct {
+ 
+ /* ----------------------------------------------------------------------
+  * return pointer to the mphi message driver function table
+- * -------------------------------------------------------------------- */
++ * ----------------------------------------------------------------------
++ */
+ const VCHI_MESSAGE_DRIVER_T *
+ vchi_mphi_message_driver_func_table(void)
+ {
+@@ -61,7 +62,8 @@ vchi_mphi_message_driver_func_table(void)
+ 
+ /* ----------------------------------------------------------------------
+  * return a pointer to the 'single' connection driver fops
+- * -------------------------------------------------------------------- */
++ * ----------------------------------------------------------------------
++ */
+ const VCHI_CONNECTION_API_T *
+ single_get_func_table(void)
+ {
+@@ -556,6 +558,7 @@ EXPORT_SYMBOL(vchi_connect);
+ int32_t vchi_disconnect(VCHI_INSTANCE_T instance_handle)
+ {
+ 	VCHIQ_INSTANCE_T instance = (VCHIQ_INSTANCE_T)instance_handle;
++
+ 	return vchiq_status_to_vchi(vchiq_shutdown(instance));
+ }
+ EXPORT_SYMBOL(vchi_disconnect);
+@@ -592,7 +595,6 @@ static VCHIQ_STATUS_T shim_callback(VCHIQ_REASON_T reason,
+ 				  VCHI_CALLBACK_MSG_AVAILABLE, NULL);
+ 
+ 		goto done;
+-		break;
+ 
+ 	case VCHIQ_BULK_TRANSMIT_DONE:
+ 		service->callback(service->callback_param,
+@@ -733,8 +735,10 @@ int32_t vchi_service_close(const VCHI_SERVICE_HANDLE_T handle)
+ {
+ 	int32_t ret = -1;
+ 	SHIM_SERVICE_T *service = (SHIM_SERVICE_T *)handle;
++
+ 	if (service) {
+ 		VCHIQ_STATUS_T status = vchiq_close_service(service->handle);
++
+ 		if (status == VCHIQ_SUCCESS) {
+ 			service_free(service);
+ 			service = NULL;
+@@ -750,8 +754,10 @@ int32_t vchi_service_destroy(const VCHI_SERVICE_HANDLE_T handle)
+ {
+ 	int32_t ret = -1;
+ 	SHIM_SERVICE_T *service = (SHIM_SERVICE_T *)handle;
++
+ 	if (service) {
+ 		VCHIQ_STATUS_T status = vchiq_remove_service(service->handle);
++
+ 		if (status == VCHIQ_SUCCESS) {
+ 			service_free(service);
+ 			service = NULL;
+@@ -770,6 +776,7 @@ int32_t vchi_service_set_option(const VCHI_SERVICE_HANDLE_T handle,
+ 	int32_t ret = -1;
+ 	SHIM_SERVICE_T *service = (SHIM_SERVICE_T *)handle;
+ 	VCHIQ_SERVICE_OPTION_T vchiq_option;
++
+ 	switch (option) {
+ 	case VCHI_SERVICE_OPTION_TRACE:
+ 		vchiq_option = VCHIQ_SERVICE_OPTION_TRACE;
+@@ -797,8 +804,8 @@ int32_t vchi_get_peer_version(const VCHI_SERVICE_HANDLE_T handle, short *peer_ve
+ {
+ 	int32_t ret = -1;
+ 	SHIM_SERVICE_T *service = (SHIM_SERVICE_T *)handle;
+-	if (service)
+-	{
++
++	if (service) {
+ 		VCHIQ_STATUS_T status;
+ 
+ 		status = vchiq_get_peer_version(service->handle, peer_version);
+@@ -811,7 +818,8 @@ EXPORT_SYMBOL(vchi_get_peer_version);
+ /* ----------------------------------------------------------------------
+  * read a uint32_t from buffer.
+  * network format is defined to be little endian
+- * -------------------------------------------------------------------- */
++ * ----------------------------------------------------------------------
++ */
+ uint32_t
+ vchi_readbuf_uint32(const void *_ptr)
+ {
+@@ -822,11 +830,13 @@ vchi_readbuf_uint32(const void *_ptr)
+ /* ----------------------------------------------------------------------
+  * write a uint32_t to buffer.
+  * network format is defined to be little endian
+- * -------------------------------------------------------------------- */
++ * ----------------------------------------------------------------------
++ */
+ void
+ vchi_writebuf_uint32(void *_ptr, uint32_t value)
+ {
+ 	unsigned char *ptr = _ptr;
++
+ 	ptr[0] = (unsigned char)((value >> 0)  & 0xFF);
+ 	ptr[1] = (unsigned char)((value >> 8)  & 0xFF);
+ 	ptr[2] = (unsigned char)((value >> 16) & 0xFF);
+@@ -836,7 +846,8 @@ vchi_writebuf_uint32(void *_ptr, uint32_t value)
+ /* ----------------------------------------------------------------------
+  * read a uint16_t from buffer.
+  * network format is defined to be little endian
+- * -------------------------------------------------------------------- */
++ * ----------------------------------------------------------------------
++ */
+ uint16_t
+ vchi_readbuf_uint16(const void *_ptr)
+ {
+@@ -847,11 +858,13 @@ vchi_readbuf_uint16(const void *_ptr)
+ /* ----------------------------------------------------------------------
+  * write a uint16_t into the buffer.
+  * network format is defined to be little endian
+- * -------------------------------------------------------------------- */
++ * ----------------------------------------------------------------------
++ */
+ void
+ vchi_writebuf_uint16(void *_ptr, uint16_t value)
+ {
+ 	unsigned char *ptr = _ptr;
++
+ 	ptr[0] = (value >> 0)  & 0xFF;
+ 	ptr[1] = (value >> 8)  & 0xFF;
+ }
+@@ -870,6 +883,7 @@ int32_t vchi_service_use(const VCHI_SERVICE_HANDLE_T handle)
+ {
+ 	int32_t ret = -1;
+ 	SHIM_SERVICE_T *service = (SHIM_SERVICE_T *)handle;
++
+ 	if (service)
+ 		ret = vchiq_status_to_vchi(vchiq_use_service(service->handle));
+ 	return ret;
+@@ -890,6 +904,7 @@ int32_t vchi_service_release(const VCHI_SERVICE_HANDLE_T handle)
+ {
+ 	int32_t ret = -1;
+ 	SHIM_SERVICE_T *service = (SHIM_SERVICE_T *)handle;
++
+ 	if (service)
+ 		ret = vchiq_status_to_vchi(
+ 			vchiq_release_service(service->handle));
+-- 
+2.7.4
