@@ -1,151 +1,142 @@
-From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Mon, 13 Mar 2017 16:39:01 -0700
-Subject: [PATCH v5 00/39] i.MX Media Driver
-In-Reply-To: <20170313093007.GD21222@n2100.armlinux.org.uk>
-References: <1489121599-23206-1-git-send-email-steve_longerbeam@mentor.com>
- <20170310201356.GA21222@n2100.armlinux.org.uk>
- <47542ef8-3e91-b4cd-cc65-95000105f172@gmail.com>
- <20170312195741.GS21222@n2100.armlinux.org.uk>
- <ea3ccdb8-903f-93ab-6875-90da440fc52a@gmail.com>
- <20170312202240.GT21222@n2100.armlinux.org.uk>
- <f1807742-012f-249e-1ad8-22d8434695cb@gmail.com>
- <20170313081625.GX21222@n2100.armlinux.org.uk>
- <20170313093007.GD21222@n2100.armlinux.org.uk>
-Message-ID: <57ebeab6-0e98-cd12-9fe3-6a33c5ec0cad@gmail.com>
+From: inki.dae@samsung.com (Inki Dae)
+Date: Tue, 14 Mar 2017 10:21:03 +0900
+Subject: [RESEND] drm/exynos: Remove support for Exynos4415 (SoC not
+ supported anymore)
+In-Reply-To: <20170311180416.7071-1-krzk@kernel.org>
+References: <CGME20170311180431epcas2p10b35859d1f3eedd1e4dc4d4bb9833cce@epcas2p1.samsung.com>
+ <20170311180416.7071-1-krzk@kernel.org>
+Message-ID: <58C7457F.4050405@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-er, I meant I will integrate this patch. And verify/fix
-possible breakage for non-bayer passthrough.
+Merged.
 
-Steve
+Thanks.
 
-
-On 03/13/2017 02:30 AM, Russell King - ARM Linux wrote:
-> On Mon, Mar 13, 2017 at 08:16:25AM +0000, Russell King - ARM Linux wrote:
->> On Sun, Mar 12, 2017 at 09:26:41PM -0700, Steve Longerbeam wrote:
->>> On 03/12/2017 01:22 PM, Russell King - ARM Linux wrote:
->>>> What I had was this patch for your v3.  I never got to testing your
->>>> v4 because of the LP-11 problem.
->>>>
->>>> In v5, you've changed to propagate the ipu_cpmem_set_image() error
->>>> code to avoid the resulting corruption, but that leaves the other bits
->>>> of this patch unaddressed, along my "media: imx: smfc: add support
->>>> for bayer formats" patch.
->>>>
->>>> Your driver basically has no support for bayer formats.
->>> You added the patches to this driver that adds the bayer support,
->>> I don't think there is anything more required of the driver at this
->>> point to support bayer, the remaining work needs to happen in the IPUv3
->>> driver.
->> There is more work, because the way you've merged my changes to
->> imx_smfc_setup_channel() into csi_idmac_setup_channel() is wrong with
->> respect to the burst size.
->>
->> You always set it to 8 or 16 depending on the width:
->>
->> 	burst_size = (image.pix.width & 0xf) ? 8 : 16;
->>
->> 	ipu_cpmem_set_burstsize(priv->idmac_ch, burst_size);
->>
->> and then you have my switch() statement which assigns burst_size.
->> My _tested_ code removed the above, added the switch, which had
->> a default case which reflected the above setting:
->>
->> 	default:
->> 		burst_size = (outfmt->width & 0xf) ? 8 : 16;
->>
->> and then went on to set the burst size _after_ the switch statement:
->>
->> 	ipu_cpmem_set_burstsize(priv->smfc_ch, burst_size);
->>
->> The effect is unchanged for non-bayer formats.  For bayer formats, the
->> burst size is determined by the bayer data size.
->>
->> So, even if it's appropriate to fix ipu_cpmem_set_image(), fixing the
->> above is still required.
->>
->> I'm not convinced that fixing ipu_cpmem_set_image() is even the best
->> solution - it's not as trivial as it looks on the surface:
->>
->>          ipu_cpmem_set_resolution(ch, image->rect.width, image->rect.height);
->>          ipu_cpmem_set_stride(ch, pix->bytesperline);
->>
->> this is fine, it doesn't depend on the format.  However, the next line:
->>
->>          ipu_cpmem_set_fmt(ch, v4l2_pix_fmt_to_drm_fourcc(pix->pixelformat));
->>
->> does - v4l2_pix_fmt_to_drm_fourcc() is a locally defined function (it
->> isn't v4l2 code) that converts a v4l2 pixel format to a DRM fourcc.
->> DRM knows nothing about bayer formats, there aren't fourcc codes in
->> DRM for it.  The result is that v4l2_pix_fmt_to_drm_fourcc() returns
->> -EINVAL cast to a u32, which gets passed unchecked into ipu_cpmem_set_fmt().
->>
->> ipu_cpmem_set_fmt() won't recognise that, and also returns -EINVAL - and
->> it's a bug that this is not checked and propagated.  If it is checked and
->> propagated, then we need this to support bayer formats, and I don't see
->> DRM people wanting bayer format fourcc codes added without there being
->> a real DRM driver wanting to use them.
->>
->> Then there's the business of calculating the top-left offset of the image,
->> which for bayer always needs to be an even number of pixels - as this
->> function takes the top-left offset, it ought to respect it, but if it
->> doesn't meet this criteria, what should it do?  csi_idmac_setup_channel()
->> always sets them to zero, but that's not really something that
->> ipu_cpmem_set_image() should assume.
-> For the time being, I've restored the functionality along the same lines
-> as I originally had.  This seems to get me working capture, but might
-> break non-bayer passthrough mode:
->
-> diff --git a/drivers/staging/media/imx/imx-media-csi.c b/drivers/staging/media/imx/imx-media-csi.c
-> index fc0036aa84d0..df336971a009 100644
-> --- a/drivers/staging/media/imx/imx-media-csi.c
-> +++ b/drivers/staging/media/imx/imx-media-csi.c
-> @@ -314,14 +314,6 @@ static int csi_idmac_setup_channel(struct csi_priv *priv)
->   	image.phys0 = phys[0];
->   	image.phys1 = phys[1];
->   
-> -	ret = ipu_cpmem_set_image(priv->idmac_ch, &image);
-> -	if (ret)
-> -		return ret;
+2017? 03? 12? 03:04? Krzysztof Kozlowski ?(?) ? ?:
+> Support for Exynos4415 is going away because there are no internal nor
+> external users.
+> 
+> Since commit 46dcf0ff0de3 ("ARM: dts: exynos: Remove exynos4415.dtsi"),
+> the platform cannot be instantiated so remove also the drivers.
+> 
+> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+> Acked-by: Kukjin Kim <kgene@kernel.org>
+> Acked-by: Rob Herring <robh@kernel.org>
+> ---
+>  .../devicetree/bindings/display/exynos/exynos_dsim.txt |  1 -
+>  .../bindings/display/exynos/samsung-fimd.txt           |  1 -
+>  drivers/gpu/drm/exynos/exynos_drm_dsi.c                | 15 +--------------
+>  drivers/gpu/drm/exynos/exynos_drm_fimd.c               | 18 ++----------------
+>  4 files changed, 3 insertions(+), 32 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/display/exynos/exynos_dsim.txt b/Documentation/devicetree/bindings/display/exynos/exynos_dsim.txt
+> index a78265993665..ca5204b3bc21 100644
+> --- a/Documentation/devicetree/bindings/display/exynos/exynos_dsim.txt
+> +++ b/Documentation/devicetree/bindings/display/exynos/exynos_dsim.txt
+> @@ -4,7 +4,6 @@ Required properties:
+>    - compatible: value should be one of the following
+>  		"samsung,exynos3250-mipi-dsi" /* for Exynos3250/3472 SoCs */
+>  		"samsung,exynos4210-mipi-dsi" /* for Exynos4 SoCs */
+> -		"samsung,exynos4415-mipi-dsi" /* for Exynos4415 SoC */
+>  		"samsung,exynos5410-mipi-dsi" /* for Exynos5410/5420/5440 SoCs */
+>  		"samsung,exynos5422-mipi-dsi" /* for Exynos5422/5800 SoCs */
+>  		"samsung,exynos5433-mipi-dsi" /* for Exynos5433 SoCs */
+> diff --git a/Documentation/devicetree/bindings/display/exynos/samsung-fimd.txt b/Documentation/devicetree/bindings/display/exynos/samsung-fimd.txt
+> index 18645e0228b0..5837402c3ade 100644
+> --- a/Documentation/devicetree/bindings/display/exynos/samsung-fimd.txt
+> +++ b/Documentation/devicetree/bindings/display/exynos/samsung-fimd.txt
+> @@ -11,7 +11,6 @@ Required properties:
+>  		"samsung,s5pv210-fimd"; /* for S5PV210 SoC */
+>  		"samsung,exynos3250-fimd"; /* for Exynos3250/3472 SoCs */
+>  		"samsung,exynos4210-fimd"; /* for Exynos4 SoCs */
+> -		"samsung,exynos4415-fimd"; /* for Exynos4415 SoC */
+>  		"samsung,exynos5250-fimd"; /* for Exynos5250 SoCs */
+>  		"samsung,exynos5420-fimd"; /* for Exynos5420/5422/5800 SoCs */
+>  
+> diff --git a/drivers/gpu/drm/exynos/exynos_drm_dsi.c b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
+> index 812e2ec0761d..ef6f9c6de098 100644
+> --- a/drivers/gpu/drm/exynos/exynos_drm_dsi.c
+> +++ b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
+> @@ -86,7 +86,7 @@
+>  #define DSIM_SYNC_INFORM		(1 << 27)
+>  #define DSIM_EOT_DISABLE		(1 << 28)
+>  #define DSIM_MFLUSH_VS			(1 << 29)
+> -/* This flag is valid only for exynos3250/3472/4415/5260/5430 */
+> +/* This flag is valid only for exynos3250/3472/5260/5430 */
+>  #define DSIM_CLKLANE_STOP		(1 << 30)
+>  
+>  /* DSIM_ESCMODE */
+> @@ -473,17 +473,6 @@ static const struct exynos_dsi_driver_data exynos4_dsi_driver_data = {
+>  	.reg_values = reg_values,
+>  };
+>  
+> -static const struct exynos_dsi_driver_data exynos4415_dsi_driver_data = {
+> -	.reg_ofs = exynos_reg_ofs,
+> -	.plltmr_reg = 0x58,
+> -	.has_clklane_stop = 1,
+> -	.num_clks = 2,
+> -	.max_freq = 1000,
+> -	.wait_for_reset = 1,
+> -	.num_bits_resol = 11,
+> -	.reg_values = reg_values,
+> -};
 > -
-> -	burst_size = (image.pix.width & 0xf) ? 8 : 16;
+>  static const struct exynos_dsi_driver_data exynos5_dsi_driver_data = {
+>  	.reg_ofs = exynos_reg_ofs,
+>  	.plltmr_reg = 0x58,
+> @@ -521,8 +510,6 @@ static const struct of_device_id exynos_dsi_of_match[] = {
+>  	  .data = &exynos3_dsi_driver_data },
+>  	{ .compatible = "samsung,exynos4210-mipi-dsi",
+>  	  .data = &exynos4_dsi_driver_data },
+> -	{ .compatible = "samsung,exynos4415-mipi-dsi",
+> -	  .data = &exynos4415_dsi_driver_data },
+>  	{ .compatible = "samsung,exynos5410-mipi-dsi",
+>  	  .data = &exynos5_dsi_driver_data },
+>  	{ .compatible = "samsung,exynos5422-mipi-dsi",
+> diff --git a/drivers/gpu/drm/exynos/exynos_drm_fimd.c b/drivers/gpu/drm/exynos/exynos_drm_fimd.c
+> index a9fa444c6053..661b9fe049e2 100644
+> --- a/drivers/gpu/drm/exynos/exynos_drm_fimd.c
+> +++ b/drivers/gpu/drm/exynos/exynos_drm_fimd.c
+> @@ -71,10 +71,10 @@
+>  #define TRIGCON				0x1A4
+>  #define TRGMODE_ENABLE			(1 << 0)
+>  #define SWTRGCMD_ENABLE			(1 << 1)
+> -/* Exynos3250, 3472, 4415, 5260 5410, 5420 and 5422 only supported. */
+> +/* Exynos3250, 3472, 5260 5410, 5420 and 5422 only supported. */
+>  #define HWTRGEN_ENABLE			(1 << 3)
+>  #define HWTRGMASK_ENABLE		(1 << 4)
+> -/* Exynos3250, 3472, 4415, 5260, 5420 and 5422 only supported. */
+> +/* Exynos3250, 3472, 5260, 5420 and 5422 only supported. */
+>  #define HWTRIGEN_PER_ENABLE		(1 << 31)
+>  
+>  /* display mode change control register except exynos4 */
+> @@ -138,18 +138,6 @@ static struct fimd_driver_data exynos4_fimd_driver_data = {
+>  	.has_vtsel = 1,
+>  };
+>  
+> -static struct fimd_driver_data exynos4415_fimd_driver_data = {
+> -	.timing_base = 0x20000,
+> -	.lcdblk_offset = 0x210,
+> -	.lcdblk_vt_shift = 10,
+> -	.lcdblk_bypass_shift = 1,
+> -	.trg_type = I80_HW_TRG,
+> -	.has_shadowcon = 1,
+> -	.has_vidoutcon = 1,
+> -	.has_vtsel = 1,
+> -	.has_trigger_per_te = 1,
+> -};
 > -
-> -	ipu_cpmem_set_burstsize(priv->idmac_ch, burst_size);
-> -
->   	/*
->   	 * Check for conditions that require the IPU to handle the
->   	 * data internally as generic data, aka passthrough mode:
-> @@ -346,15 +338,29 @@ static int csi_idmac_setup_channel(struct csi_priv *priv)
->   		passthrough_bits = 16;
->   		break;
->   	default:
-> +		burst_size = (image.pix.width & 0xf) ? 8 : 16;
->   		passthrough = (sensor_ep->bus_type != V4L2_MBUS_CSI2 &&
->   			       sensor_ep->bus.parallel.bus_width >= 16);
->   		passthrough_bits = 16;
->   		break;
->   	}
->   
-> -	if (passthrough)
-> +	if (passthrough) {
-> +		ipu_cpmem_set_resolution(priv->idmac_ch, image.rect.width,
-> +					 image.rect.height);
-> +		ipu_cpmem_set_stride(priv->idmac_ch, image.pix.bytesperline);
-> +		ipu_cpmem_set_buffer(priv->idmac_ch, 0, image.phys0);
-> +		ipu_cpmem_set_buffer(priv->idmac_ch, 1, image.phys1);
-> +		ipu_cpmem_set_burstsize(priv->idmac_ch, burst_size);
->   		ipu_cpmem_set_format_passthrough(priv->idmac_ch,
->   						 passthrough_bits);
-> +	} else {
-> +		ret = ipu_cpmem_set_image(priv->idmac_ch, &image);
-> +		if (ret)
-> +			return ret;
-> +
-> +		ipu_cpmem_set_burstsize(priv->idmac_ch, burst_size);
-> +	}
->   
->   	/*
->   	 * Set the channel for the direct CSI-->memory via SMFC
->
->
+>  static struct fimd_driver_data exynos5_fimd_driver_data = {
+>  	.timing_base = 0x20000,
+>  	.lcdblk_offset = 0x214,
+> @@ -210,8 +198,6 @@ static const struct of_device_id fimd_driver_dt_match[] = {
+>  	  .data = &exynos3_fimd_driver_data },
+>  	{ .compatible = "samsung,exynos4210-fimd",
+>  	  .data = &exynos4_fimd_driver_data },
+> -	{ .compatible = "samsung,exynos4415-fimd",
+> -	  .data = &exynos4415_fimd_driver_data },
+>  	{ .compatible = "samsung,exynos5250-fimd",
+>  	  .data = &exynos5_fimd_driver_data },
+>  	{ .compatible = "samsung,exynos5420-fimd",
+> 
