@@ -1,45 +1,76 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Tue, 14 Mar 2017 17:59:01 +0200
-Subject: [PATCH] serial: 8250: 8250_core: Use dev_name() during
- request_irq()
-In-Reply-To: <2a0cf043-6e3f-6807-0794-d9d6f46b77f5@ti.com>
-References: <20170308121943.29340-1-vigneshr@ti.com>
- <CAHp75VeFKSbk9hvoJXdK6uOz+JYATD8D057iNv0JDuEnBFS=yw@mail.gmail.com>
- <2a0cf043-6e3f-6807-0794-d9d6f46b77f5@ti.com>
-Message-ID: <CAHp75Vc0Ap53s=6SU2o5QjgdaBDWKC24bym7HUt6jQ69HrpdCg@mail.gmail.com>
+From: afd@ti.com (Andrew F. Davis)
+Date: Tue, 14 Mar 2017 11:02:02 -0500
+Subject: [PATCH] ARM: omap2+: Revert omap-smp.c changes resetting CPU1
+ during boot
+In-Reply-To: <20170314151725.GC20572@atomide.com>
+References: <20170313205231.1593-1-tony@atomide.com>
+ <0bade322-5bee-412f-ef21-972c99846e84@ti.com>
+ <20170314151725.GC20572@atomide.com>
+Message-ID: <d0fe191f-66f8-b72d-0a2a-00815e663a8d@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 14, 2017 at 3:44 PM, Vignesh R <vigneshr@ti.com> wrote:
-> On Monday 13 March 2017 01:35 AM, Andy Shevchenko wrote:
->> On Wed, Mar 8, 2017 at 2:19 PM, Vignesh R <vigneshr@ti.com> wrote:
->>> Passing "serial" as name during request_irq() results in all serial port
->>> irqs have same name. This does not help much to easily identify which
->>> irq belongs to which serial port instance. Therefore pass dev_name()
->>> during request_irq() so that better identifiable name is listed for
->>> serial ports in cat /proc/interrupts output.
->>>
->>> Output of cat /proc/interrupts
->>> Before this patch:
->>>  26:        689          0     GICv2 309 Edge      serial
->>> After this patch:
->>>  26:        696          0     GICv2 309 Edge      2530c00.serial
-
->  But, this change is making interrupt name more descriptive
-
-It doesn't in PCI case, it makes it worse.
-
-(The world is not DT-centric)
-
->> Besides that imagine what would be the name of PCI device here.
->> I would suggest adding ID if you need one in a form like
->> "serial%d", where ID may or may not be supplied by the actual 8250 drivers.
+On 03/14/2017 10:17 AM, Tony Lindgren wrote:
+> * Tero Kristo <t-kristo@ti.com> [170314 00:32]:
+>> On 13/03/17 22:52, Tony Lindgren wrote:
+>>> Additionally we also need to fix the hot-unplug code to properly park CPU1
+>>> to the bootrom loop so it's not affected by SDRAM changes done by kexec
+>>> booting kernel.
 >>
->
-> Are you suggesting to use serial_index() as ID?
+>> Imo, we are doing too much bandaid hackery for this issue now. How much do
+>> we care if the older kernels don't work properly with kexec? I know I don't
+>> care a bit myself. It means you just need to do 1 cold-boot for the system
+>> to fix it.
+> 
+> Well kexec is a standard Linux feature and it is currently working and
+> at least I care.
+> 
+> And if the CPU1 start-up address is programmed to be in the currently
+> booting kernel's area by something else, it's almost certainly totally
+> broken.
+> 
 
-Yes.
+I disagree, the core can be parked correctly and still have the boot-to
+address point to anywhere. There are two registers in play here, one
+sets the target jump-to address, the other lets it out of the parking
+loop. To know we are not parked we need to check the parking release
+register, the jump-to address is completely irrelevant as a check for
+proper parking.
 
--- 
-With Best Regards,
-Andy Shevchenko
+> Note that this still does not remove the need to park CPU1 properly to
+> bootrom loop.
+> 
+
+I agree, and if we always park the the core correctly every time then
+there is no reason to do all these checks and resets, we just boot as
+normal.
+
+If the core is not parked correctly then the system is messed up and
+should be cold-booted, we have no way to know whether that core is off
+running in space wreaking stuff.
+
+I cannot think of any reliable test, for now the focus should be
+figuring out why we have escaped cores in the first place.
+
+In my testing, core1 always ends up looping in omap4_cpu_die(), the loop
+in this function doesn't check for the boot-to address register, just
+the core release register. I'm not sure how this works at all, if even
+in the same kernel, when trying to bring this core back up it will
+ignore our set boot-to address and return to the caller of this
+function. Maybe the kernel is able to cope with that, but it does not
+seem to be the intended wakeup path.
+
+I'll do some testing and see if this will help in omap4_cpu_die():
+
+if (boot_cpu == smp_processor_id()) {
+	/*
+	 * OK, proper wakeup, we're done
+	 */
++
++	boot_address = readl_relaxed(base + OMAP_AUX_CORE_BOOT_1);
++	boot_address();
++
+	break;
+}
+
+Andrew
