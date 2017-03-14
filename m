@@ -1,52 +1,46 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 14 Mar 2017 13:55:22 +0000
-Subject: [PATCH v3 00/25] arm/arm64: KVM: Rework the hyp-stub API
-In-Reply-To: <8493dac7-c9be-fd3b-c5c0-83fbbfa4af10@ti.com>
-References: <20170306142458.8875-1-marc.zyngier@arm.com>
- <8493dac7-c9be-fd3b-c5c0-83fbbfa4af10@ti.com>
-Message-ID: <8d2cf6fa-cac7-268b-bc26-2649f5696196@arm.com>
+From: slash.tmp@free.fr (Mason)
+Date: Tue, 14 Mar 2017 15:00:11 +0100
+Subject: Neophyte questions about PCIe
+In-Reply-To: <df517167-d692-38a8-9c8f-a1112c7f578d@free.fr>
+References: <ced6a4bf-c94a-c116-1e94-52a8d675d132@free.fr>
+ <20170308151724.GA20780@bhelgaas-glaptop.roam.corp.google.com>
+ <f964ee05-db7f-c381-c91c-82897175da6d@free.fr>
+ <9ba05c2c-57ef-b2c0-6a7c-457c392d98b5@free.fr>
+ <df517167-d692-38a8-9c8f-a1112c7f578d@free.fr>
+Message-ID: <94b3c89c-b116-288f-7530-15cc2611f425@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 10/03/2017 18:49, Mason wrote:
 
-On 14/03/17 13:38, Keerthy wrote:
-> 
-> 
-> On Monday 06 March 2017 07:54 PM, Marc Zyngier wrote:
->> As noticed by RMK in this thread[1], the hyp-stub API on 32bit ARM
->> could do with some TLC (it cannot perform a soft-restart at HYP, and
->> has holes in the hyp-stub support in a number of places). In general,
->> it would be desirable for the 32bit behaviour to align on 64bit, if
->> only to ease maintenance.
->>
->> This series implements the following:
->> - Add HVC_[GS]ET_VECTORS and HVC_SOFT_RESTART to the 32bit code
->> - Add HVC_RESET_VECTORS to both arm and arm64, removing the need for
->>   __hyp_reset_vectors
->> - Implement add the stub entry points in the KVM init code, which
->>   didn't implement any so far
->> - Convert the HYP code to use the init code stubs directly
->> - Some general cleanup as a result of these changes (which includes
->>   killing HVC_GET_VECTORS)
->> - Add some API documentation that covers the above
->>
->> Patches 9 to 11 would be better squashed into 7 and 8, but I've kept
->> separate so that I can take the blame for everything I've broken.
-> 
-> Tested for kexec booting with the patch series applied on linux-next.
-> 
-> kexec is working nicely with HYP and SVC modes. Tested for both modes by
-> using different u-boot for booting in HYP and SVC modes. Kexec works well.
-> 
-> Tested on DRA7-EVM, AM57XX-EVM and KEYSTONE-K2E-EVM.
-> 
-> Tested-by: Keerthy <j-keerthy@ti.com>
+> /* Root complex reports incorrect device class */
+> static void tango_pcie_fixup_class(struct pci_dev *dev)
+> {
+> 	dev->class = PCI_CLASS_BRIDGE_PCI << 8;
+> }
 
-Thanks a lot. I assume this Tested-by applies to the 32bit patches in
-this series?
+Gen1 controller reports class/rev = 0x04800001
+Gen2 controller reports class/rev = 0x06000001
 
-Cheers,
+#define PCI_CLASS_BRIDGE_HOST		0x0600
+#define PCI_CLASS_BRIDGE_ISA		0x0601
+#define PCI_CLASS_BRIDGE_EISA		0x0602
+#define PCI_CLASS_BRIDGE_MC		0x0603
+#define PCI_CLASS_BRIDGE_PCI		0x0604
+#define PCI_CLASS_BRIDGE_PCMCIA		0x0605
+#define PCI_CLASS_BRIDGE_NUBUS		0x0606
+#define PCI_CLASS_BRIDGE_CARDBUS	0x0607
+#define PCI_CLASS_BRIDGE_RACEWAY	0x0608
+#define PCI_CLASS_BRIDGE_OTHER		0x0680
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+My fixup replaces 0x048000 with 0x060400.
+
+	0x060400 != 0x060000
+
+Which is correct:
+PCI_CLASS_BRIDGE_HOST or PCI_CLASS_BRIDGE_PCI?
+
+Naively, I would expect Host/PCI bridge to be more correct
+for a root complex.
+
+Regards.
