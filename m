@@ -1,78 +1,36 @@
-From: wuchengli@google.com (=?UTF-8?B?V3UtQ2hlbmcgTGkgKOadjuWLmeiqoCk=?=)
-Date: Tue, 14 Mar 2017 23:24:05 +0800
-Subject: [PATCH] media: mtk-jpeg: fix continuous log "Context is NULL"
-In-Reply-To: <1489501282-52137-1-git-send-email-minghsiu.tsai@mediatek.com>
-References: <1489501282-52137-1-git-send-email-minghsiu.tsai@mediatek.com>
-Message-ID: <CAOMLVLiQRiVgNr+UB=DiSuhjFtgphBgLSp4Q72Y_L9Gs8BqDww@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 14 Mar 2017 16:32:00 +0100
+Subject: [PATCH 4/4] tty/serial: sh-sci: remove uneeded IS_ERR_OR_NULL
+ calls
+In-Reply-To: <20170306100220.droey65uq2ew3mzu@pengutronix.de>
+References: <20170303191248.wlwjri55ip2x5pgg@pengutronix.de>
+ <CAMuHMdXFrwa2jCVDb+8ecqgARLG0oGrPp9pLs0b6vEiWeKJ+uA@mail.gmail.com>
+ <20170303194414.n76tr3oa2mlrzjre@pengutronix.de>
+ <CAMuHMdXiz5hqW=fm-2H1aNKq_gXD2o0508jD2XjxYUvKoEvHdw@mail.gmail.com>
+ <20170304174819.esxhwwbsxzuq3vyc@pengutronix.de>
+ <CAMuHMdX8BEnaTtNFAbcvfHwJH=oPUmQ2NB+jfouGyhQpJ_m_4A@mail.gmail.com>
+ <20170306085842.yijkfpqi3adcedmm@pengutronix.de>
+ <CAMuHMdV2_vbocY4wCzvYtPAaF+QEX_Y4g6qVu5EqEBf5AnFdaw@mail.gmail.com>
+ <20170306093043.ay4dz3ehp3aakwxh@pengutronix.de>
+ <CAMuHMdWQuvANNU14A7NQuzv6AFp04bq4DG_oc7w9h4wUrG+4aQ@mail.gmail.com>
+ <20170306100220.droey65uq2ew3mzu@pengutronix.de>
+Message-ID: <CACRpkdZyey3jyApevpe1tDyFdPut0J+7ZeiyJQgdaWJLr09mrQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 14, 2017 at 10:21 PM, Minghsiu Tsai
-<minghsiu.tsai@mediatek.com> wrote:
-> The symptom is continuous log "mtk-jpeg 18004000.jpegdec: Context is NULL"
-> in kernel log. It is becauese the error handling in irq doesn't clear
-> interrupt.
+On Mon, Mar 6, 2017 at 11:02 AM, Uwe Kleine-K?nig
+<u.kleine-koenig@pengutronix.de> wrote:
+
+>> Anyway, for sh-sci.c, platforms either have DT and GPIOLIB, or they do not
+>> need mctrl-gpio.
 >
-> The calling flow like as below when issue happen
-> mtk_jpeg_device_run()
-> mtk_jpeg_job_abort()
->   v4l2_m2m_job_finish() -> m2m_dev->curr_ctx = NULL;
-> mtk_jpeg_dec_irq()
->   v4l2_m2m_get_curr_priv()
->      -> m2m_dev->curr_ctx == NULL
->      -> return NULL
-> log "Context is NULL"
->
-> There is race condition between job_abort() and irq. In order to simplify
-> code, don't want to add extra flag to maintain state, empty job_abort() and
-> clear interrupt before v4l2_m2m_get_curr_priv() in irq.
->
-> Signed-off-by: Minghsiu Tsai <minghsiu.tsai@mediatek.com>
-Reviewed-by: Wu-Cheng Li <wuchengli@chromium.org>
-Tested-by: Wu-Cheng Li <wuchengli@chromium.org>
-> ---
->  drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c | 14 ++------------
->  1 file changed, 2 insertions(+), 12 deletions(-)
->
-> diff --git a/drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c b/drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c
-> index b10183f..c02bc7f 100644
-> --- a/drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c
-> +++ b/drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c
-> @@ -862,15 +862,6 @@ static int mtk_jpeg_job_ready(void *priv)
->
->  static void mtk_jpeg_job_abort(void *priv)
->  {
-> -       struct mtk_jpeg_ctx *ctx = priv;
-> -       struct mtk_jpeg_dev *jpeg = ctx->jpeg;
-> -       struct vb2_buffer *src_buf, *dst_buf;
-> -
-> -       src_buf = v4l2_m2m_src_buf_remove(ctx->fh.m2m_ctx);
-> -       dst_buf = v4l2_m2m_dst_buf_remove(ctx->fh.m2m_ctx);
-> -       v4l2_m2m_buf_done(to_vb2_v4l2_buffer(src_buf), VB2_BUF_STATE_ERROR);
-> -       v4l2_m2m_buf_done(to_vb2_v4l2_buffer(dst_buf), VB2_BUF_STATE_ERROR);
-> -       v4l2_m2m_job_finish(jpeg->m2m_dev, ctx->fh.m2m_ctx);
->  }
->
->  static struct v4l2_m2m_ops mtk_jpeg_m2m_ops = {
-> @@ -941,6 +932,8 @@ static irqreturn_t mtk_jpeg_dec_irq(int irq, void *priv)
->         u32 dec_ret;
->         int i;
->
-> +       dec_ret = mtk_jpeg_dec_get_int_status(jpeg->dec_reg_base);
-> +       dec_irq_ret = mtk_jpeg_dec_enum_result(dec_ret);
->         ctx = v4l2_m2m_get_curr_priv(jpeg->m2m_dev);
->         if (!ctx) {
->                 v4l2_err(&jpeg->v4l2_dev, "Context is NULL\n");
-> @@ -951,9 +944,6 @@ static irqreturn_t mtk_jpeg_dec_irq(int irq, void *priv)
->         dst_buf = v4l2_m2m_dst_buf_remove(ctx->fh.m2m_ctx);
->         jpeg_src_buf = mtk_jpeg_vb2_to_srcbuf(src_buf);
->
-> -       dec_ret = mtk_jpeg_dec_get_int_status(jpeg->dec_reg_base);
-> -       dec_irq_ret = mtk_jpeg_dec_enum_result(dec_ret);
-> -
->         if (dec_irq_ret >= MTK_JPEG_DEC_RESULT_UNDERFLOW)
->                 mtk_jpeg_dec_reset(jpeg->dec_reg_base);
->
-> --
-> 1.9.1
->
+> So we're in agreement now that HALFGPIOLIB is the way to go?
+> Linus, what do you think?
+
+I'm too swamped in mail and work to figure this out right now. I guess
+I will get back to it...
+
+I need more active comaintainers I guess, interested in the job? ;)
+
+Yours,
+Linus Walleij
