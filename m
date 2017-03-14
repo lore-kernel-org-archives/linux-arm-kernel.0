@@ -1,65 +1,66 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 14 Mar 2017 16:42:37 +0100
-Subject: [PATCH 1/2] pinctrl: meson: gxl: add the missing PWM pin
- definitions
-In-Reply-To: <CAFBinCDty8v80tLxHJPR+SHv32LX834dPJUruRNqr6angx3OOQ@mail.gmail.com>
-References: <20170304212318.27076-1-martin.blumenstingl@googlemail.com>
- <20170304212318.27076-2-martin.blumenstingl@googlemail.com>
- <1488811357.2420.18.camel@baylibre.com>
- <CAFBinCDty8v80tLxHJPR+SHv32LX834dPJUruRNqr6angx3OOQ@mail.gmail.com>
-Message-ID: <CACRpkdbGfGUhnAQz=9xeFnD2hF6m_xXacu8mZiwte-OCSDMo9w@mail.gmail.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Tue, 14 Mar 2017 16:53:33 +0100
+Subject: [PATCH v2 4/4] phy: exynos: Use one define for enable bit
+In-Reply-To: <CAJKOXPeUYeAuXgZLVYTBNTZhcmiEMr6sfWWpXMytzzeC0+wY4Q@mail.gmail.com>
+References: <20170311182534.13345-1-krzk@kernel.org>
+ <2746282.jBJ7tRjldv@amdc3058>
+ <CAJKOXPeUYeAuXgZLVYTBNTZhcmiEMr6sfWWpXMytzzeC0+wY4Q@mail.gmail.com>
+ <CGME20170314155351epcas5p210791391569477d6b115bb922ab068ed@epcas5p2.samsung.com>
+Message-ID: <2409116.U9sOiGfLuq@amdc3058>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 9, 2017 at 8:47 PM, Martin Blumenstingl
-<martin.blumenstingl@googlemail.com> wrote:
-> On Mon, Mar 6, 2017 at 3:42 PM, Jerome Brunet <jbrunet@baylibre.com> wrote:
->> On Sat, 2017-03-04 at 22:23 +0100, Martin Blumenstingl wrote:
+On Tuesday, March 14, 2017 04:55:46 PM Krzysztof Kozlowski wrote:
+> On Tue, Mar 14, 2017 at 4:46 PM, Bartlomiej Zolnierkiewicz
+> <b.zolnierkie@samsung.com> wrote:
+> >
+> > Hi,
+> >
+> > On Saturday, March 11, 2017 08:25:34 PM Krzysztof Kozlowski wrote:
+> >> There is no need for separate defines for Exynos4 and Exynos5 phy enable
+> >> bit and MIPI phy reset bits.  In both cases there are the same so
+> >> simplify it.
+> >>
+> >> This reduces number of defines and allows removal of one header file.
+> >>
+> >> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+> >> Acked-by: Lee Jones <lee.jones@linaro.org>
+> >> ---
+> >>  drivers/phy/phy-exynos-dp-video.c           |  5 ++--
+> >>  drivers/phy/phy-exynos-mipi-video.c         | 39 ++++++++++++++---------------
+> >>  drivers/phy/phy-exynos5-usbdrd.c            |  5 ++--
+> >>  include/linux/mfd/syscon/exynos5-pmu.h      | 22 ----------------
+> >>  include/linux/soc/samsung/exynos-regs-pmu.h |  3 ++-
+> >>  5 files changed, 25 insertions(+), 49 deletions(-)
+> >>  delete mode 100644 include/linux/mfd/syscon/exynos5-pmu.h
+> >
+> > [...]
+> >
+> >> --- a/include/linux/mfd/syscon/exynos5-pmu.h
+> >> +++ /dev/null
+> >
+> >> -#define EXYNOS5433_PAD_RETENTION_AUD_OPTION          (0x3028)
+> >> -#define EXYNOS5433_PAD_INITIATE_WAKEUP_FROM_LOWPWR   BIT(28)
+> >
+> > EXYNOS5433_PAD_INITIATE_WAKEUP_FROM_LOWPWR is not defined in
+> > <soc/samsung/exynos-regs-pmu.h> and is still used by
+> > drivers/mfd/exynos-lpass.c (at least in next-20170310)
+> >
+> > Do I miss something or it needs to be fixed?
+> 
+> Yeah, kbuild also told me that. :)
+> 
+> I fixed it in v3, can you take a look?
+> http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1351482.html
 
->>> +     FUNCTION(pwm_f_clk),
->>> +     FUNCTION(pwm_f_x),
->>
->> I wonder if having function named "pwm_f_clk" really makes sense ?
->> Shouldn't it be just "pwm_f" ? This is real function, isn't it ?
->> The actual pin used will be provided in the dt. Here, I suppose we
->> could have this:
->>
->> +static const char * const pwm_f_groups[] = {
->> +       "pwm_f_x", "pwm_f_clk",
->> +};
->>
->> Has far as I can see, on meson arch, the function does not carry much
->> information anyway, except for prints.
->>
->> To be clear, I'm not questioning this change in particular. It looks
->> good, and follows what has been done in the past on meson. I know we
->> have been this a lot already, but I'm questioning whether we should
->> continue to do so ?
->>
->> I asking because I also have a lot case like this coming up on audio
->> for gxl and gxbb, where the same function can use different pins.
->
-> could you please look into Jerome's question?
-> personally I'm fine with either way, and changing my patch would be
-> quite trivial. but I'd like to know what's "the way to go" before
-> changing anything (and reverting that afterwards again).
+Ah, thanks, my mailing lists retrieval setup has some lag..
 
-I don't understand the question really.
+For the whole v3:
 
-I am not an expert on this system, if the people working with it
-cannot tell a function from a group I don't know who can... certainly
-not me.
+Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 
-What I can say is that pincontrol combines functions and groups to
-states using a mapping. The functions should be something you poke
-into a register, the groups are looser defined but may also be a
-character of the hardware, but more usual a character of the
-intended electronic usecase. Groups contain 1..n pins and can
-be combined with some applicable functions.
-
-Please re-read Documentation/pinctrl.txt very closely if anything is
-unclear, I really put a lot of hours into getting that right. Especially
-reexamine "Pinmux conventions".
-
-Yours,
-Linus Walleij
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
