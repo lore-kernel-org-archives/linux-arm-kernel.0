@@ -1,35 +1,27 @@
-From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Tue, 14 Mar 2017 16:01:47 +0100
-Subject: [PATCH 2/4] ARM: dts: dm8168-evm: add the external reference
- clock for SATA
-In-Reply-To: <20170313213405.GX20572@atomide.com>
-References: <1489423399-3824-1-git-send-email-bgolaszewski@baylibre.com>
- <1489423399-3824-3-git-send-email-bgolaszewski@baylibre.com>
- <20170313213405.GX20572@atomide.com>
-Message-ID: <CAMpxmJW5f5foYbFv_FsQPibDamT4hCJSywnELdLmXpQg_oKohQ@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 14 Mar 2017 16:03:48 +0100
+Subject: [PATCH] pinctrl: rockchip: add irq_enable & irq_disable ops
+In-Reply-To: <1488434212-6567-1-git-send-email-jeffy.chen@rock-chips.com>
+References: <1488434212-6567-1-git-send-email-jeffy.chen@rock-chips.com>
+Message-ID: <CACRpkdYQawufFw+TX8MX0qbAXOy9rJ=uT5qCG8kmfOON2k7yMw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-03-13 22:34 GMT+01:00 Tony Lindgren <tony@atomide.com>:
-> * Bartosz Golaszewski <bgolaszewski@baylibre.com> [170313 09:45]:
->> This board has an external oscillator supplying the reference clock
->> signal for SATA. Its rate is fixed at 100Mhz. Add a corresponding
->> device tree node.
->
-> Is this the 100MHz clock from PCIe? Just like on dm814x-evm as noted
-> in the workaround thread below:
->
-> http://e2e.ti.com/support/dsp/davinci_digital_media_processors/f/716/p/181083/671141
->
-> Regards,
->
-> Tony
->
+On Thu, Mar 2, 2017 at 6:56 AM, Jeffy Chen <jeffy.chen@rock-chips.com> wrote:
 
-Hi Tony,
+> Currently we are trying to enable/disable the clk of irq's gpio bank when
+> unmask/mask irq. But the kernel's "lazy disable approach" will skip masking
+> irq when the irq chip doesn't support irq_disable ops.
+>
+> So we may hit this case:
+>         irq_enable-> enable clk
+>         irq_disable-> noop
+>         irq_enable-> enable clk again
+>         irq_disable-> noop
+>
+> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
 
-these signals come from a TI CDCM61002 (U30 on the board's
-schematics). It's hardwired to 100mHZ output.
+Heiko, can you look at this patch?
 
-Thanks,
-Bartosz Golaszewski
+Yours,
+Linus Walleij
