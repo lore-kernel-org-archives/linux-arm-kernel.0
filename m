@@ -1,80 +1,52 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 14 Mar 2017 14:54:24 +0100
-Subject: [PATCH v2 05/12] Document: dt: binding: imx: update pinctrl doc
- for imx6sll
-In-Reply-To: <CAA+hA=TL=Ys6j7YGOofAqrEGBcR15szvx3mMf-Dm03rnEa_VRA@mail.gmail.com>
-References: <1482832070-22668-1-git-send-email-ping.bai@nxp.com>
- <1482832070-22668-6-git-send-email-ping.bai@nxp.com>
- <CACRpkdYUME8K+JusA0ORRKqxyBuhDdyei8eg7UZbHidKw9=bQw@mail.gmail.com>
- <CAA+hA=TL=Ys6j7YGOofAqrEGBcR15szvx3mMf-Dm03rnEa_VRA@mail.gmail.com>
-Message-ID: <CACRpkdaLq125bKQcpHeFn312omxw9jp0VHr9DVanj42Y_29+mg@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 14 Mar 2017 13:55:22 +0000
+Subject: [PATCH v3 00/25] arm/arm64: KVM: Rework the hyp-stub API
+In-Reply-To: <8493dac7-c9be-fd3b-c5c0-83fbbfa4af10@ti.com>
+References: <20170306142458.8875-1-marc.zyngier@arm.com>
+ <8493dac7-c9be-fd3b-c5c0-83fbbfa4af10@ti.com>
+Message-ID: <8d2cf6fa-cac7-268b-bc26-2649f5696196@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 16, 2017 at 8:51 AM, Dong Aisheng <dongas86@gmail.com> wrote:
-> On Tue, Dec 27, 2016 at 8:59 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
 
->> I would consider augmenting the code in the driver to handle the generic
->> bindings *in addition* to the old legacy bindings, and use those over these
->> random custom bits.
-(...)
-> Generic binding only supports parsing strings for pins and function
-> from dts right now, that means we need back to the old way of hardcoding
-> all register bits in driver which we actually chose to move out since
-> the commit "e164153 pinctrl: imx: move hard-coding data into device tree".
+On 14/03/17 13:38, Keerthy wrote:
+> 
+> 
+> On Monday 06 March 2017 07:54 PM, Marc Zyngier wrote:
+>> As noticed by RMK in this thread[1], the hyp-stub API on 32bit ARM
+>> could do with some TLC (it cannot perform a soft-restart at HYP, and
+>> has holes in the hyp-stub support in a number of places). In general,
+>> it would be desirable for the 32bit behaviour to align on 64bit, if
+>> only to ease maintenance.
+>>
+>> This series implements the following:
+>> - Add HVC_[GS]ET_VECTORS and HVC_SOFT_RESTART to the 32bit code
+>> - Add HVC_RESET_VECTORS to both arm and arm64, removing the need for
+>>   __hyp_reset_vectors
+>> - Implement add the stub entry points in the KVM init code, which
+>>   didn't implement any so far
+>> - Convert the HYP code to use the init code stubs directly
+>> - Some general cleanup as a result of these changes (which includes
+>>   killing HVC_GET_VECTORS)
+>> - Add some API documentation that covers the above
+>>
+>> Patches 9 to 11 would be better squashed into 7 and 8, but I've kept
+>> separate so that I can take the blame for everything I've broken.
+> 
+> Tested for kexec booting with the patch series applied on linux-next.
+> 
+> kexec is working nicely with HYP and SVC modes. Tested for both modes by
+> using different u-boot for booting in HYP and SVC modes. Kexec works well.
+> 
+> Tested on DRA7-EVM, AM57XX-EVM and KEYSTONE-K2E-EVM.
+> 
+> Tested-by: Keerthy <j-keerthy@ti.com>
 
-Aha I see.
+Thanks a lot. I assume this Tested-by applies to the 32bit patches in
+this series?
 
-> One option is using macro definitions instead of raw data as pinctrl-single
-> users as OMAP.
-> e.g.
-> art2_pins: pinmux_uart2_pins {
->         pinctrl-single,pins = <
->                 OMAP4_IOPAD(0x118, PIN_INPUT_PULLUP | MUX_MODE0)
->  /* uart2_cts.uart2_cts */
->         ........
->
-> For this way, no driver changes required, just replace the raw data by macro
-> in device tree. But i wonder this may not be your original intention although
-> it's the easiest way for us.
-> Anyway, if you agree, we probably would prefer this way.
+Cheers,
 
-That make it look better than it looks today, but...
-
-> Another option is partially convert to generic binding for only pad
-> configuration
-> part. e.g.
-> pinctrl_usdhc1: usdhc1grp {
->         fsl,pins = <
->                 MX7D_PAD_SD1_CMD__SD1_CMD
->                 MX7D_PAD_SD1_CLK__SD1_CLK
->                 MX7D_PAD_SD1_DATA0__SD1_DATA0
->                 ...
->         >;
->         bias-pull-up = <47KOHM>;
->         drive-strength = <130OHM>;
->         slew-rate = <FAST>;
->         speed = <50MHZ>;
->         ....
-> };
-> (Some of the property still not supported or not the same as generic
-> binding right now)
-
-This looks totally awesome, so if you could do this, it would be even
-better.
-
-> This way requires no big drivers changes and only extend the driver
-> to support the generic pinctrl dt configuration properties.
-
-Yep, you should be able to support both the old and the new
-way of configuring the pins this way I guess.
-
-> And it also fix the raw data issues and looks like more applicable than the full
-> migration.
->
-> So would you be willing to accept it?
-
-Anything that move us closer to the generic bindings will be accepted.
-
-Yours,
-Linus Walleij
+	M.
+-- 
+Jazz is not dead. It just smells funny...
