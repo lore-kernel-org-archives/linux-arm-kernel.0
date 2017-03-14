@@ -1,110 +1,70 @@
-From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Tue, 14 Mar 2017 14:44:21 +0100
-Subject: [PATCH v3 01/18] dt-bindings: power: battery: add
- constant-charge-current property
-In-Reply-To: <CAGb2v67913XnRNv9bYty5WcGLAWHYMM6=M9BVmTZ3wjReh_UBg@mail.gmail.com>
-References: <20170215004646.23607-1-liam@networkimprov.net>
- <6a678b03-124a-76b3-066e-858731fc6c80@free-electrons.com>
- <CAGb2v67913XnRNv9bYty5WcGLAWHYMM6=M9BVmTZ3wjReh_UBg@mail.gmail.com>
-Message-ID: <5f4f8212-e071-9e20-542d-f6557eead260@free-electrons.com>
+From: vigneshr@ti.com (Vignesh R)
+Date: Tue, 14 Mar 2017 19:14:19 +0530
+Subject: [PATCH] serial: 8250: 8250_core: Use dev_name() during
+ request_irq()
+In-Reply-To: <CAHp75VeFKSbk9hvoJXdK6uOz+JYATD8D057iNv0JDuEnBFS=yw@mail.gmail.com>
+References: <20170308121943.29340-1-vigneshr@ti.com>
+ <CAHp75VeFKSbk9hvoJXdK6uOz+JYATD8D057iNv0JDuEnBFS=yw@mail.gmail.com>
+Message-ID: <2a0cf043-6e3f-6807-0794-d9d6f46b77f5@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chen-Yu,
 
-Sorry for the late reply.
 
-On 21/02/2017 05:55, Chen-Yu Tsai wrote:
-> On Wed, Feb 15, 2017 at 4:53 PM, Quentin Schulz
-> <quentin.schulz@free-electrons.com> wrote:
->> Hi,
+On Monday 13 March 2017 01:35 AM, Andy Shevchenko wrote:
+> On Wed, Mar 8, 2017 at 2:19 PM, Vignesh R <vigneshr@ti.com> wrote:
+>> Passing "serial" as name during request_irq() results in all serial port
+>> irqs have same name. This does not help much to easily identify which
+>> irq belongs to which serial port instance. Therefore pass dev_name()
+>> during request_irq() so that better identifiable name is listed for
+>> serial ports in cat /proc/interrupts output.
 >>
->> On 15/02/2017 01:46, Liam Breck wrote:
->>>
->>> On Tue, 14 Feb 2017 10:40:55 +0100 Quentin Schulz wrote:
->>>> This adds the constant-charge-current property to the list of optional
->>>> properties of the battery.
->>>>
->>>> The constant charge current is critical for batteries as they can't
->>>> handle all charge currents.
->>>>
->>>> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
->>>> ---
->>>>
->>>> added in v3
->>>>
->>>>  Documentation/devicetree/bindings/power/supply/battery.txt | 2 ++
->>>
->>> Is constant-charge-current dependent on the battery (e.g. capacity, nominal voltage, etc) or the
->>> system (charger chip, input current/voltage, etc)?
->>>
->>> It belongs in Doc.../power/supply/battery.txt if it's a characteristic of the battery.
->>>
->>> Note, this page asserts that constant-current charging applies to NiMH batteries:
->>> http://power-topics.blogspot.com/2016/05/constant-voltage-constant-current.html
->>>
->>> Related properties to be added to battery.txt near-future in a patchset for the BQ24190
->>> charger are as follows. These are not currently in enum power_supply_property, so the actual names
->>> are still to be decided.
->>>
->>> precharge-current-microamp:
->>>    maximum charge current during precharge phase (typically 20% of battery capacity)
->>>
->>> termination-current-microamp (or endcharge-current):
->>>    a charge cycle terminates when the battery voltage is above recharge threshold,
->>>    and the current is below this setting (typically 10% of battery capacity)
->>>
->>
->> We have a client with a board whose battery accepts a maximum of 300mA
->> for charging. So depending on the battery, we cannot have any charging
->> current we want. The AXP PmMICs set constant charge current in a range
->> of 300mA-1800mA, so it is enforced by the charger but needs to be
->> adapted depending on the battery present in the system.
+>> Output of cat /proc/interrupts
+>> Before this patch:
+>>  26:        689          0     GICv2 309 Edge      serial
+>> After this patch:
+>>  26:        696          0     GICv2 309 Edge      2530c00.serial
 > 
-> May I ask the capacity of the battery in question?
+> I don't know if it worth to mention that some (testing) tools may
+> depend on this name.
+
+I wonder how such tools will distinguish b/w different serial device
+instances. But, this change is making interrupt name more descriptive
+and maybe help test tools to distinguish irqs more easily
+
+> Besides that imagine what would be the name of PCI device here. 
+> I would suggest adding ID if you need one in a form like
+> "serial%d", where ID may or may not be supplied by the actual 8250 drivers.
 > 
 
-It is a 400mAh battery.
+Are you suggesting to use serial_index() as ID?
 
-Quentin
-
-> Typically one charges LiPo batteries at no more than 1C. So if it's
-> a 1800 mAh battery, the charge current should be no more than 1800 mA.
-> 
-> ChenYu
-> 
->> The AXP PMICs charge battery with constant current (Ichrg) between the
->> trickle voltage (Vtrkl which is ~3.0V) and the targeted voltage (Vtrgt;
->> which seems to be the voltage telling the battery is fully charged).
 >>
->> So if I understand correctly, "my" constant-charge-current would be
->> located in the charging cycle between your precharge-current-microamp
->> and the termination-current-microamp as it is the current for the
->> charging process as a whole.
+>> Signed-off-by: Vignesh R <vigneshr@ti.com>
+>> ---
+>>  drivers/tty/serial/8250/8250_core.c | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
 >>
->> See here[1] for the explanation in the datasheet (page 20).
->>
->> That would definitely match what is explained in your link for constant
->> current.
->>
->> [1] http://dl.linux-sunxi.org/AXP/AXP209_Datasheet_v1.0en.pdf
->>
->> Let me know if something seems odd,
->> Thanks,
->> Quentin
->>
+>> diff --git a/drivers/tty/serial/8250/8250_core.c b/drivers/tty/serial/8250/8250_core.c
+>> index 76e03a7de9cc..f83b69f30987 100644
+>> --- a/drivers/tty/serial/8250/8250_core.c
+>> +++ b/drivers/tty/serial/8250/8250_core.c
+>> @@ -218,7 +218,7 @@ static int serial_link_irq_chain(struct uart_8250_port *up)
+>>                 spin_unlock_irq(&i->lock);
+>>                 irq_flags |= up->port.irqflags;
+>>                 ret = request_irq(up->port.irq, serial8250_interrupt,
+>> -                                 irq_flags, "serial", i);
+>> +                                 irq_flags, dev_name(up->port.dev), i);
+>>                 if (ret < 0)
+>>                         serial_do_unlink(i, up);
+>>         }
 >> --
->> Quentin Schulz, Free Electrons
->> Embedded Linux and Kernel engineering
->> http://free-electrons.com
+>> 2.11.0
+>>
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
 > 
 
 -- 
-Quentin Schulz, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Regards
+Vignesh
