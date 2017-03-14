@@ -1,50 +1,62 @@
-From: nicolas@ndufresne.ca (Nicolas Dufresne)
-Date: Tue, 14 Mar 2017 16:28:02 -0400
-Subject: [RFC PATCH 00/12] Ion cleanup in preparation for moving out of
- staging
-In-Reply-To: <CA+M3ks5AyVN1hn=FCRx7sy-3B=VujEBL4G4tWy6opifkKTD8=w@mail.gmail.com>
-References: <1488491084-17252-1-git-send-email-labbott@redhat.com>
- <20170303132949.GC31582@dhcp22.suse.cz>
- <cf383b9b-3cbc-0092-a071-f120874c053c@redhat.com>
- <20170306074258.GA27953@dhcp22.suse.cz>
- <20170306104041.zghsicrnadoap7lp@phenom.ffwll.local>
- <20170306105805.jsq44kfxhsvazkm6@sirena.org.uk>
- <20170306160437.sf7bksorlnw7u372@phenom.ffwll.local>
- <CA+M3ks77Am3Fx-ZNmgeM5tCqdM7SzV7rby4Es-p2F2aOhUco9g@mail.gmail.com>
- <26bc57ae-d88f-4ea0-d666-2c1a02bf866f@redhat.com>
- <CA+M3ks6R=n4n54wofK7pYcWoQKUhzyWQytBO90+pRDRrAhi3ww@mail.gmail.com>
- <CAKMK7uH9NemeM2z-tQvge_B=kABop6O7UQFK3PirpJminMCPqw@mail.gmail.com>
- <6d3d52ba-29a9-701f-2948-00ce28282975@redhat.com>
- <CA+M3ks5AyVN1hn=FCRx7sy-3B=VujEBL4G4tWy6opifkKTD8=w@mail.gmail.com>
-Message-ID: <1489523282.28116.10.camel@ndufresne.ca>
+From: tjakobi@math.uni-bielefeld.de (Tobias Jakobi)
+Date: Tue, 14 Mar 2017 21:41:50 +0100
+Subject: [PATCH] drm/exynos: Print kernel pointers in a restricted form
+In-Reply-To: <20170314195240.gj7jbgql7hfziw42@kozik-lap>
+References: <20170314183804.13788-1-krzk@kernel.org>
+ <e1800491-0b60-74d1-1377-756d5b0bb371@math.uni-bielefeld.de>
+ <20170314190859.y55wlc4z7xdsbbxg@kozik-lap>
+ <de5e8583-748b-9df2-f7cc-c1b4fb499d17@math.uni-bielefeld.de>
+ <20170314195240.gj7jbgql7hfziw42@kozik-lap>
+Message-ID: <e147ef15-0f7c-19f0-8e1b-db6a75930932@math.uni-bielefeld.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le mardi 14 mars 2017 ? 15:47 +0100, Benjamin Gaignard a ?crit?:
-> Should we use /devi/ion/$heap instead of /dev/ion_$heap ?
-> I think it would be easier for user to look into one directory rather
-> then in whole /dev to find the heaps
+Krzysztof Kozlowski wrote:
+> On Tue, Mar 14, 2017 at 08:17:35PM +0100, Tobias Jakobi wrote:
+>> Krzysztof Kozlowski wrote:
+>>> On Tue, Mar 14, 2017 at 08:01:41PM +0100, Tobias Jakobi wrote:
+>>>> Hello Krzysztof,
+>>>>
+>>>> I was wondering about the benefit of this. From a quick look these are
+>>>> all messages that end up in the kernel log / dmesg.
+>>>>
+>>>> IIRC %pK does nothing there, since dmest_restrict is supposed to be used
+>>>> to deny an unpriviliged user the access to the kernel log.
+>>>>
+>>>> Or am I missing something here?
+>>>
+>>> These are regular printks so depending on kernel options (e.g. dynamic
+>>> debug, drm.debug) these might be printed also in the console. Of course
+>>> we could argue then if access to one of the consoles is worth
+>>> securing.
+>> This here suggests otherwise.
+>> https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/Documentation/sysctl/kernel.txt#n388
+>>
+>> I have not tested this, but IIRC %pK is not honored by the kernel
+>> logging infrastucture. That's why dmesg_restrict is there.
+>>
+>> Correct me if I'm wrong.
 > 
-> > is that we don't have to worry about a limit of 32 possible
-> > heaps per system (32-bit heap id allocation field). But dealing
-> > with an ioctl seems easier than names. Userspace might be less
-> > likely to hardcode random id numbers vs. names as well.
+> The %pK will not help for dmesg or /proc/kmsg but it will help for
+> console (/dev/ttySACN, ttySN etc) because effectively it uses the same
+> vsprintf()/pointer() functions.
+Thanks for the explanation, I didn't know that there was a difference
+there. In that case, looks good to me.
+
+
+> As I said, we could argue whether securing console is worth... usually
+> attacker having access to it has also physical access to the machine so
+> everything gets easier...
+Still, putting %pK there certainly doesn't hurt.
+
+- Tobias
+
 > 
-> In the futur I think that heap type will be replaced by a "get caps"
-> ioctl which will
-> describe heap capabilities. At least that is my understanding of
-> kernel part
-> of "unix memory allocator" project
-
-I think what we really need from userspace point of view, is the
-ability to find a compatible heap for a set of drivers. And this
-without specific knowledge of the drivers.
-
-Nicolas
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170314/b02c34f7/attachment.sig>
+> Best regards,
+> Krzysztof
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
