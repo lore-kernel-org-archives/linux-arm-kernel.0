@@ -1,68 +1,52 @@
 From: jagan@openedev.com (Jagan Teki)
-Date: Tue, 14 Mar 2017 15:18:13 +0530
-Subject: [PATCH v5 4/8] ARM: dts: imx6q-icore: Add LVDS support
+Date: Tue, 14 Mar 2017 15:18:14 +0530
+Subject: [PATCH v5 5/8] dt-bindings: input: touchscreen: Add max11801-ts
+ binding
 In-Reply-To: <1489484897-14933-1-git-send-email-jagan@openedev.com>
 References: <1489484897-14933-1-git-send-email-jagan@openedev.com>
-Message-ID: <1489484897-14933-5-git-send-email-jagan@openedev.com>
+Message-ID: <1489484897-14933-6-git-send-email-jagan@openedev.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jagan Teki <jagan@amarulasolutions.com>
 
-Add LVDS display support for OpenFrame Capacitive touch 7 inc
-display which is supported by Engicam i.CoreM6 QDL Starter Kit.
+Add missing documentation of max11801-ts dt-binding details.
 
-Cc: Domenico Acri <domenico.acri@engicam.com>
-Cc: Matteo Lisi <matteo.lisi@engicam.com>
-Cc: Michael Trimarchi <michael@amarulasolutions.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Rob Herring <robh+dt@kernel.org>
 Cc: Shawn Guo <shawnguo@kernel.org>
+Cc: Michael Trimarchi <michael@amarulasolutions.com>
 Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 ---
 Changes for v5:
-- %s/arm/ARM/g with subject prefix
-Changes for v4:
-- Fix checkpatch.pl Errors/Warnings
-Changes for v3:
-- Use native-mode as timing0 since this is the initial lvds-channel
-- Rename hsd100pxn1 reference as timing0
-- Update the correct patch author
-Changes for v2:
-- none
+- Newly added patch
 
- arch/arm/boot/dts/imx6q-icore.dts | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
+ .../bindings/input/touchscreen/max11801-ts.txt         | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/input/touchscreen/max11801-ts.txt
 
-diff --git a/arch/arm/boot/dts/imx6q-icore.dts b/arch/arm/boot/dts/imx6q-icore.dts
-index 59eb7ad..73f34d1 100644
---- a/arch/arm/boot/dts/imx6q-icore.dts
-+++ b/arch/arm/boot/dts/imx6q-icore.dts
-@@ -57,3 +57,28 @@
- &can2 {
- 	status = "okay";
- };
+diff --git a/Documentation/devicetree/bindings/input/touchscreen/max11801-ts.txt b/Documentation/devicetree/bindings/input/touchscreen/max11801-ts.txt
+new file mode 100644
+index 0000000..b6ac452
+--- /dev/null
++++ b/Documentation/devicetree/bindings/input/touchscreen/max11801-ts.txt
+@@ -0,0 +1,18 @@
++* MAXI MAX11801 Resistive touch screen controller with i2c interface
 +
-+&ldb {
-+	status = "okay";
++Required properties:
++- compatible: must be "max11801"
++- reg: i2c slave address
++- interrupt-parent: the phandle for the interrupt controller
++- interrupts: touch controller interrupt
 +
-+	lvds-channel at 0 {
-+		fsl,data-mapping = "spwg";
-+		fsl,data-width = <18>;
-+		status = "okay";
++Example:
 +
-+		display-timings {
-+			native-mode = <&timing0>;
-+			timing0: timing0 {
-+				clock-frequency = <60000000>;
-+				hactive = <800>;
-+				vactive = <480>;
-+				hback-porch = <30>;
-+				hfront-porch = <30>;
-+				vback-porch = <5>;
-+				vfront-porch = <5>;
-+				hsync-len = <64>;
-+				vsync-len = <20>;
-+			};
-+		};
++&i2c1 {
++	ts: max11801 at 48 {
++		compatible = "max11801";
++		reg = <0x48>;
++		interrupt-parent = <&gpio3>;
++		interrupts = <31 2>;
 +	};
 +};
 -- 
