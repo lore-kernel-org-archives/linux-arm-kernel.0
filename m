@@ -1,44 +1,56 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 14 Mar 2017 10:51:08 +0000
-Subject: [PATCH 14/14] arm64: pmuv3: use arm_pmu ACPI framework
-In-Reply-To: <CAFpQJXUQm84-DTCAng1RQq-wv-nqw=+MTe=vGTL7Sw=yL2sd+A@mail.gmail.com>
-References: <1489143891-11596-1-git-send-email-mark.rutland@arm.com>
- <1489143891-11596-15-git-send-email-mark.rutland@arm.com>
- <CAFpQJXUQm84-DTCAng1RQq-wv-nqw=+MTe=vGTL7Sw=yL2sd+A@mail.gmail.com>
-Message-ID: <20170314105108.GA15248@leverpostej>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 14 Mar 2017 11:52:08 +0100
+Subject: [GIT PULL] ARM: at91: fixes for 4.11
+Message-ID: <20170314105208.gamqtnumihav7tbf@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ganapatrao,
+Arnd, Olof,
 
-On Tue, Mar 14, 2017 at 11:30:17AM +0530, Ganapatrao Kulkarni wrote:
-> > +int __init armv8_pmu_driver_init(void)
-> > +{
-> > +       if (acpi_disabled)
-> > +               return platform_driver_register(&armv8_pmu_driver);
-> > +       else
-> > +               return arm_pmu_acpi_probe(armv8_pmuv3_init);
-> 
-> i think this function needs to be updated to
-> probe SoC specific init (armv8_a53_pmu_init, armv8_vulcan_pmu_init
-> etc)  as well.
+Here are two fixes for 4.11. The revert is reverting a DT patch that
+went through the USB tree but should have never been applied.
 
-Only exposing generic PMUv3 here was a deliberate decision, based on
-prior discussions, so as to keep things consistent on ACPI platforms
-regardless of which CPU types the PMU code is immediately aware of.
+The second patch fixes an issue were the SoC hangs when using
+at91_cpuidle.
 
-I should have documented this better; sorry about that.
 
-All events which can be enumerated via the PMU ID registers will be
-exposed via sysfs.
+The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
 
-Other events (e.g. those which are implementation defined) will not be
-exposed via sysfs, but can still be used as raw events.
+  Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
 
-There's been some perf tool work to allow these to be enumerated in
-userspace based on JSON files. This allows new events to be supported
-with a userspace update, event when the kernel itself is older than the
-CPU in question, and does not know anything about its events.
+are available in the git repository at:
 
-Thanks,
-Mark.
+  git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git tags/at91-ab-4.11-fixes
+
+for you to fetch changes up to 60b89f1928af80b546b5c3fd8714a62f6f4b8844:
+
+  ARM: at91: pm: cpu_idle: switch DDR to power-down mode (2017-03-14 11:09:50 +0100)
+
+----------------------------------------------------------------
+Fixes for 4.11:
+
+ - Fix USB host for sama5d2
+ - Fix cpuidle on sama5
+
+----------------------------------------------------------------
+Nicolas Ferre (1):
+      ARM: at91: pm: cpu_idle: switch DDR to power-down mode
+
+Romain Izard (1):
+      Revert "ARM: at91/dt: sama5d2: Use new compatible for ohci node"
+
+ arch/arm/boot/dts/sama5d2.dtsi |  2 +-
+ arch/arm/mach-at91/pm.c        | 18 +++++++++++++++++-
+ 2 files changed, 18 insertions(+), 2 deletions(-)
+
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170314/afc6d989/attachment.sig>
