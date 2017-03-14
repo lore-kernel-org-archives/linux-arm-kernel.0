@@ -1,116 +1,150 @@
-From: romain.perier@collabora.com (Romain Perier)
-Date: Tue, 14 Mar 2017 08:53:16 +0100
-Subject: [PATCH] drm: dw_hdmi: Gate audio sampler clock from the
- enablement functions
-In-Reply-To: <296108ae-1720-63f1-1eed-ed5dbe1b8bad@synopsys.com>
-References: <20170310093509.19044-1-romain.perier@collabora.com>
- <25ad96a7-d907-2bcb-3a96-15a2956e7652@baylibre.com>
- <20170313093630.GE21222@n2100.armlinux.org.uk>
- <724d599e-7285-3feb-9a18-d3fbc4000eb5@synopsys.com>
- <20170313131053.GI21222@n2100.armlinux.org.uk>
- <296108ae-1720-63f1-1eed-ed5dbe1b8bad@synopsys.com>
-Message-ID: <56e51c49-176e-3316-bd8c-f947061732bf@collabora.com>
+From: alim.akhtar@samsung.com (Alim Akhtar)
+Date: Tue, 14 Mar 2017 13:21:10 +0530
+Subject: [2/3] soc: samsung: Do not build ARMv7 PMU drivers on ARMv8
+In-Reply-To: <20170311213856.21701-3-krzk@kernel.org>
+References: <20170311213856.21701-3-krzk@kernel.org>
+ <CGME20170314075427epcas5p19d137fbcc390e937172a17ae99f11a0c@epcas5p1.samsung.com>
+Message-ID: <2da8c346-dae9-6754-8349-df0946c89ae2@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Krzysztof,
 
-
-Le 13/03/2017 ? 19:49, Jose Abreu a ?crit :
-> Hi Russell,
+On 03/12/2017 03:08 AM, Krzysztof Kozlowski wrote:
+> The Exynos Power Management Unit (PMU) drivers contain quite large
+> static arrays of register values necessary for given Exynos SoC to enter
+> low power mode.  All this data is useless for ARMv8 SoC like
+> Exynos5433, because the image will not be shared between ARMv7 and
+> ARMv8.
 >
+> Add additional Kconfig symbol for selecting the SoC-specific driver
+> addons thus skipping the useless data in the final image (this is
+> similar approach to chosen for Exynos clock controller drivers):
+>  - exynos-pmu driver will be compiled on both architectures ARMv7
+>    and ARMv8,
+>  - additional driver_data for ARMv7 SoCs will not be built on ARMv8
+>    and a macro will return NULL for them in of_device_id - this should
+>    be safe as these compatibles cannot match on ARMv7 and driver
+>    anyway handles NULL driver_data,
+>  - on ARMv8 compile only exynos-pmu driver which exposes the
+>    syscon-regmap for PMU address space.
 >
-> On 13-03-2017 13:10, Russell King - ARM Linux wrote:
->> On Mon, Mar 13, 2017 at 12:55:58PM +0000, Jose Abreu wrote:
->>> Hi,
->>>
->>>
->>> On 13-03-2017 09:36, Russell King - ARM Linux wrote:
->>>> On Mon, Mar 13, 2017 at 10:27:08AM +0100, Neil Armstrong wrote:
->>>>> On 03/10/2017 10:35 AM, Romain Perier wrote:
->>>>>> Currently, the audio sampler clock is enabled from dw_hdmi_setup() at
->>>>>> step E. and is kept enabled for later use. This clock should be enabled
->>>>>> and disabled along with the actual audio stream and not always on (that
->>>>>> is bad for PM). Futhermore, this might cause sound glitches with some
->>>>>> HDMI devices, as the CTS+N is forced to zero when the stream is disabled
->>>>>> while the audio clock is still running.
->>>>>>
->>>>>> This commit adds a parameter to hdmi_audio_enable_clk() that controls
->>>>>> when the audio sample clock must be enabled or disabled. Then, it moves
->>>>>> the call to this function into dw_hdmi_audio_enable() and
->>>>>> dw_hdmi_audio_disable().
->>>>>>
->>>>>> Signed-off-by: Romain Perier <romain.perier@collabora.com>
->>>>>> ---
->>>>>>  drivers/gpu/drm/bridge/dw-hdmi.c | 15 +++++++++------
->>>>>>  1 file changed, 9 insertions(+), 6 deletions(-)
->>>>>>
->>>>> Hi Romain, Russell, Jose,
->>>>>
->>>>> This is a little out of scope, but I was wondering why the CTS calculation
->>>>> was not left in AUTO mode in the dw-hdmi driver ?
->>>> There is no indication in the iMX6 manuals that the iMX6 supports
->>>> automatic CTS calculation.  Bits 7:4 of the AUD_CTS3 register are
->>>> marked as "reserved".
->>>>
->>>> We're reliant on the information in the iMX6 manuals as we don't have
->>>> access to Synopsis' databooks for these parts (I understand you have
->>>> to be a customer to have access to that.)
->>>>
->>> (Synopsis -> Synopsys :))
->>>
->>> Trying to catch up with the conversation:
->>>
->>> 1) In AHB audio mode the bits are always reserved.
->>> 2) I think we should enable/disable clock instead of just forcing
->>> N/CTS, though, I don't know what could be the implications for
->>> iMX platform. I remember at the time I tested this using I2S
->>> (I've never used AHB), and HDMI protocol analyzers were
->>> complaining about the N/CTS being forced to zero.
->> What you're recommending is to basically ignore the published workaround,
->> which, presumably, was arrived at by proper analysis of the issue both
->> by Freescale engineers and Synopsys engineers, and instead try some other
->> solution.
->>
->> I'm not sure that's a good idea.  Only those with knowledge of the IP can
->> say what effect disabling the audio clock will have: will it still allow
->> the FIFO to be loaded, as required by the errata?  If not, it's not a
->> solution that AHB can use.  I would imagine that _if_ it was as simple as
->> disabling the audio clock, that simple approach would have been documented
->> in Freescale's errata documents, rather than the rather more complex
->> method of zeroing the CTS/N values.
-> I'm just following what the user guide says: the final step of
-> configuration is enabling the audio clock. There is no reference
-> neither in datasheet neither in user guide about this behavior
-> but, as I said, I've never used AHB so I can't prove what is the
-> best solution. Could it be platform specific?
-
-And that's precisely why I am enabling it
-
+> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+> ---
+>  drivers/soc/samsung/Kconfig      |  8 +++++++-
+>  drivers/soc/samsung/Makefile     |  4 +++-
+>  drivers/soc/samsung/exynos-pmu.c | 22 ++++++++++++++++------
+>  drivers/soc/samsung/exynos-pmu.h |  3 +++
+>  4 files changed, 29 insertions(+), 8 deletions(-)
 >
->> I think there are two choices here:
->>
->> 1) get some definitive information about the IP and the errata for AHB,
->>    and determine whether the solution you propose would work.  (That's
->>    out of scope for me, I've no contacts with FSL/NXP and I'm not a
->>    Synopsys customer.)
-> This is the right thing to do but if you can't test in the
-> Freescale platform then we have not much else to do.
+> diff --git a/drivers/soc/samsung/Kconfig b/drivers/soc/samsung/Kconfig
+> index 245533907d1b..8b25bd55e648 100644
+> --- a/drivers/soc/samsung/Kconfig
+> +++ b/drivers/soc/samsung/Kconfig
+> @@ -8,7 +8,13 @@ if SOC_SAMSUNG
 >
-> Best regards,
-> Jose Miguel Abreu
+>  config EXYNOS_PMU
+>  	bool "Exynos PMU controller driver" if COMPILE_TEST
+> -	depends on (ARM && ARCH_EXYNOS) || ((ARM || ARM64) && COMPILE_TEST)
+> +	depends on ARCH_EXYNOS || ((ARM || ARM64) && COMPILE_TEST)
+> +	select EXYNOS_PMU_ARM_DRIVERS if ARM && ARCH_EXYNOS
+> +
+
+In general this patch look ok, but I was think we should make these 
+configs configurable via _menuconfig_. Currently these are visible only 
+if COMPILE_TEST is enabled.
+Recently I was working on adding PMU support for Exynos7 and I face 
+issues when I want to disable this option and re-enable it for testing 
+purpose.
+
+> +# There is no need to enable these drivers for ARMv8
+> +config EXYNOS_PMU_ARM_DRIVERS
+> +	bool "Exynos PMU ARMv7-specific driver extensions" if COMPILE_TEST
+> +	depends on EXYNOS_PMU
 >
->> 2) the I2S audio support stops re-using the AHB audio support functions,
->>    switching to their own implementation that behaves correctly for them.
->>    (Remember, it was I2S's choice to re-use the AHB audio support functions
->>    I added which we're now discussing - they didn't have to do that, and
->>    regressing AHB audio just for I2S is not something we should ever
->>    consider doing.)
->>
+>  config EXYNOS_PM_DOMAINS
+>  	bool "Exynos PM domains" if COMPILE_TEST
+> diff --git a/drivers/soc/samsung/Makefile b/drivers/soc/samsung/Makefile
+> index 3619f2ecddaa..4d7694a4e7a4 100644
+> --- a/drivers/soc/samsung/Makefile
+> +++ b/drivers/soc/samsung/Makefile
+> @@ -1,3 +1,5 @@
+> -obj-$(CONFIG_EXYNOS_PMU)	+= exynos-pmu.o exynos3250-pmu.o exynos4-pmu.o \
+> +obj-$(CONFIG_EXYNOS_PMU)	+= exynos-pmu.o
+> +
+> +obj-$(CONFIG_EXYNOS_PMU_ARM_DRIVERS)	+= exynos3250-pmu.o exynos4-pmu.o \
+>  					exynos5250-pmu.o exynos5420-pmu.o
+>  obj-$(CONFIG_EXYNOS_PM_DOMAINS) += pm_domains.o
+> diff --git a/drivers/soc/samsung/exynos-pmu.c b/drivers/soc/samsung/exynos-pmu.c
+> index 56d9244ff981..bd4a76f27bc2 100644
+> --- a/drivers/soc/samsung/exynos-pmu.c
+> +++ b/drivers/soc/samsung/exynos-pmu.c
+> @@ -69,27 +69,37 @@ void exynos_sys_powerdown_conf(enum sys_powerdown mode)
+>  }
+>
+>  /*
+> + * Split the data between ARM architectures because it is relatively big
+> + * and useless on other arch.
+> + */
+> +#ifdef CONFIG_EXYNOS_PMU_ARM_DRIVERS
+> +#define exynos_pmu_data_arm_ptr(data)	(&data)
+> +#else
+> +#define exynos_pmu_data_arm_ptr(data)	NULL
+> +#endif
+> +
+> +/*
+>   * PMU platform driver and devicetree bindings.
+>   */
+>  static const struct of_device_id exynos_pmu_of_device_ids[] = {
+>  	{
+>  		.compatible = "samsung,exynos3250-pmu",
+> -		.data = &exynos3250_pmu_data,
+> +		.data = exynos_pmu_data_arm_ptr(exynos3250_pmu_data),
+>  	}, {
+>  		.compatible = "samsung,exynos4210-pmu",
+> -		.data = &exynos4210_pmu_data,
+> +		.data = exynos_pmu_data_arm_ptr(exynos4210_pmu_data),
+>  	}, {
+>  		.compatible = "samsung,exynos4212-pmu",
+> -		.data = &exynos4212_pmu_data,
+> +		.data = exynos_pmu_data_arm_ptr(exynos4212_pmu_data),
+>  	}, {
+>  		.compatible = "samsung,exynos4412-pmu",
+> -		.data = &exynos4412_pmu_data,
+> +		.data = exynos_pmu_data_arm_ptr(exynos4412_pmu_data),
+>  	}, {
+>  		.compatible = "samsung,exynos5250-pmu",
+> -		.data = &exynos5250_pmu_data,
+> +		.data = exynos_pmu_data_arm_ptr(exynos5250_pmu_data),
+>  	}, {
+>  		.compatible = "samsung,exynos5420-pmu",
+> -		.data = &exynos5420_pmu_data,
+> +		.data = exynos_pmu_data_arm_ptr(exynos5420_pmu_data),
+>  	}, {
+>  		.compatible = "samsung,exynos5433-pmu",
+So, as I understand, the idea here to use something like
+	.data = &exynos5433_pmu_data or so in case ARMv8?
 
-The workaround looks AHB specific in any cases and does not seem to work
-with I2S. The I2S variant should not used the same functions, at least
-for enabling/disabling audio stream.
-
-Regards,
-Romain
+>  	},
+> diff --git a/drivers/soc/samsung/exynos-pmu.h b/drivers/soc/samsung/exynos-pmu.h
+> index a469e366fead..40d4229abfb5 100644
+> --- a/drivers/soc/samsung/exynos-pmu.h
+> +++ b/drivers/soc/samsung/exynos-pmu.h
+> @@ -31,6 +31,8 @@ struct exynos_pmu_data {
+>  };
+>
+>  extern void __iomem *pmu_base_addr;
+> +
+> +#ifdef CONFIG_EXYNOS_PMU_ARM_DRIVERS
+>  /* list of all exported SoC specific data */
+>  extern const struct exynos_pmu_data exynos3250_pmu_data;
+>  extern const struct exynos_pmu_data exynos4210_pmu_data;
+> @@ -38,6 +40,7 @@ extern const struct exynos_pmu_data exynos4212_pmu_data;
+>  extern const struct exynos_pmu_data exynos4412_pmu_data;
+>  extern const struct exynos_pmu_data exynos5250_pmu_data;
+>  extern const struct exynos_pmu_data exynos5420_pmu_data;
+> +#endif
+>
+>  extern void pmu_raw_writel(u32 val, u32 offset);
+>  extern u32 pmu_raw_readl(u32 offset);
+>
