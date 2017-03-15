@@ -1,56 +1,57 @@
-From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Wed, 15 Mar 2017 11:55:31 +0100
-Subject: [PATCH v4 12/18] mfd: axp20x: add CHRG_CTRL1/2/3 to writeable regs
- for AXP20X/AXP22X
-In-Reply-To: <20170315105537.22349-1-quentin.schulz@free-electrons.com>
-References: <20170315105537.22349-1-quentin.schulz@free-electrons.com>
-Message-ID: <20170315105537.22349-13-quentin.schulz@free-electrons.com>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Wed, 15 Mar 2017 11:56:39 +0100
+Subject: [PATCH 3/3] kvm: arm/arm64: Fix locking for kvm_free_stage2_pgd
+In-Reply-To: <314fbde3-17e6-414b-85e6-326de22bdc1c@arm.com>
+References: <1489503154-20705-1-git-send-email-suzuki.poulose@arm.com>
+ <1489503154-20705-4-git-send-email-suzuki.poulose@arm.com>
+ <20170315092147.GM1277@cbox>
+ <314fbde3-17e6-414b-85e6-326de22bdc1c@arm.com>
+Message-ID: <20170315105639.GA31974@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The CHRG_CTRL1 and CHRG_CTRL2 registers are made for controlling
-different battery charging settings such as the constant current charge
-value.
+On Wed, Mar 15, 2017 at 09:39:26AM +0000, Marc Zyngier wrote:
+> On 15/03/17 09:21, Christoffer Dall wrote:
+> > On Tue, Mar 14, 2017 at 02:52:34PM +0000, Suzuki K Poulose wrote:
+> >> In kvm_free_stage2_pgd() we don't hold the kvm->mmu_lock while calling
+> >> unmap_stage2_range() on the entire memory range for the guest. This could
+> >> cause problems with other callers (e.g, munmap on a memslot) trying to
+> >> unmap a range.
+> >>
+> >> Fixes: commit d5d8184d35c9 ("KVM: ARM: Memory virtualization setup")
+> >> Cc: stable at vger.kernel.org # v3.10+
+> >> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> >> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+> >> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> >> ---
+> >>  arch/arm/kvm/mmu.c | 3 +++
+> >>  1 file changed, 3 insertions(+)
+> >>
+> >> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+> >> index 13b9c1f..b361f71 100644
+> >> --- a/arch/arm/kvm/mmu.c
+> >> +++ b/arch/arm/kvm/mmu.c
+> >> @@ -831,7 +831,10 @@ void kvm_free_stage2_pgd(struct kvm *kvm)
+> >>  	if (kvm->arch.pgd == NULL)
+> >>  		return;
+> >>  
+> >> +	spin_lock(&kvm->mmu_lock);
+> >>  	unmap_stage2_range(kvm, 0, KVM_PHYS_SIZE);
+> >> +	spin_unlock(&kvm->mmu_lock);
+> >> +
+> > 
+> > This ends up holding the spin lock for potentially quite a while, where
+> > we can do things like __flush_dcache_area(), which I think can fault.
+> 
+> I believe we're always using the linear mapping (or kmap on 32bit) in
+> order not to fault.
+> 
 
-The AXP22X also have a third register CHRG_CTRL3 which has settings for
-battery charging too.
+ok, then there's just the concern that we may be holding a spinlock for
+a very long time.  I seem to recall Mario once added something where he
+unlocked and gave a chance to schedule something else for each PUD or
+something like that, because he ran into the issue during migration.  Am
+I confusing this with something else?
 
-This adds the CHRG_CTRL1, CHRG_CTRL2 and CHRG_CTRL3 registers to the
-list of writeable registers for AXP20X and AXP22X PMICs.
-
-Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Acked-by: Chen-Yu Tsai <wens@csie.org>
-Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
----
-
-v2:
- - added AXP20X_CHRG_CTRL2 and AXP20X_CHRG_CTRL3 to the writeable
- registers table,
- - removed added reg range for ADC data in volatile regs range,
-
- drivers/mfd/axp20x.c | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
-index a58326e..b2b6b16 100644
---- a/drivers/mfd/axp20x.c
-+++ b/drivers/mfd/axp20x.c
-@@ -67,6 +67,7 @@ static const struct regmap_access_table axp152_volatile_table = {
- 
- static const struct regmap_range axp20x_writeable_ranges[] = {
- 	regmap_reg_range(AXP20X_DATACACHE(0), AXP20X_IRQ5_STATE),
-+	regmap_reg_range(AXP20X_CHRG_CTRL1, AXP20X_CHRG_CTRL2),
- 	regmap_reg_range(AXP20X_DCDC_MODE, AXP20X_FG_RES),
- 	regmap_reg_range(AXP20X_RDC_H, AXP20X_OCV(AXP20X_OCV_MAX)),
- };
-@@ -93,6 +94,7 @@ static const struct regmap_access_table axp20x_volatile_table = {
- /* AXP22x ranges are shared with the AXP809, as they cover the same range */
- static const struct regmap_range axp22x_writeable_ranges[] = {
- 	regmap_reg_range(AXP20X_DATACACHE(0), AXP20X_IRQ5_STATE),
-+	regmap_reg_range(AXP20X_CHRG_CTRL1, AXP22X_CHRG_CTRL3),
- 	regmap_reg_range(AXP20X_DCDC_MODE, AXP22X_BATLOW_THRES1),
- };
- 
--- 
-2.9.3
+Thanks,
+-Christoffer
