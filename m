@@ -1,38 +1,96 @@
-From: mchehab@s-opensource.com (Mauro Carvalho Chehab)
-Date: Wed, 15 Mar 2017 13:14:38 -0300
-Subject: [PATCH v3] arm: install.sh: don't use /sbin/install if cross-compiling
-Message-ID: <d3a0049dc4c9064213bc40594ab2cc5d9f8a9e23.1489594469.git.mchehab@s-opensource.com>
+From: james.morse@arm.com (James Morse)
+Date: Wed, 15 Mar 2017 16:07:27 +0000
+Subject: [PATCH] KVM: arm/arm64: Signal SIGBUS when stage2 discovers hwpoison
+ memory
+Message-ID: <20170315160727.16465-1-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It doesn't make sense to run the local machine's install
-script if the Kernel was built using a cross-compiler, as it
-will try to create symlinks at the rootfs of the local machine:
+Once we enable ARCH_SUPPORTS_MEMORY_FAILURE on arm64[0], notifications for
+broken memory can call memory_failure() in mm/memory-failure.c to deliver
+SIGBUS to any user space process using the page, and notify all the
+in-kernel users.
 
-ln: failed to create symbolic link '/boot/System.map': Permission denied
-ln: failed to create symbolic link '/boot/vmlinuz': Permission denied
-ln: failed to create symbolic link '/boot/System.map': Permission denied
+If the page corresponded with guest memory, KVM will unmap this page
+from its stage2 page tables. The user space process that allocated
+this memory may have never touched this page in which case it may not
+be mapped meaning SIGBUS won't be delivered.
 
-Signed-off-by: Mauro Carvalho Chehab <mchehab@s-opensource.com>
+When this happens KVM discovers pfn == KVM_PFN_ERR_HWPOISON when it
+comes to process the stage2 fault.
+
+Do as x86 does, and deliver the SIGBUS when we discover
+KVM_PFN_ERR_HWPOISON. Use the stage2 mapping size as the si_addr_lsb
+as this matches the user space mapping size.
+
+Signed-off-by: James Morse <james.morse@arm.com>
+CC: gengdongjiu <gengdj.1984@gmail.com>
 ---
- arch/arm/boot/install.sh | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+ Without this patch both kvmtool and Qemu exit as the KVM_RUN ioctl() returns
+ EFAULT.
+ QEMU: error: kvm run failed Bad address
+ LVKM: KVM_RUN failed: Bad address
 
-diff --git a/arch/arm/boot/install.sh b/arch/arm/boot/install.sh
-index 2a45092a40e3..5384f0ff91ea 100644
---- a/arch/arm/boot/install.sh
-+++ b/arch/arm/boot/install.sh
-@@ -36,7 +36,10 @@ verify "$3"
+ With this patch both kvmtool and Qemu receive SIGBUS ... and then exit.
+ In the future Qemu can use this signal to notify the guest, for more details
+ see hwpoison[1].
+
+ [0] https://www.spinics.net/lists/arm-kernel/msg560009.html
+ [1] https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/Documentation/vm/hwpoison.txt
+
+
+ arch/arm/kvm/mmu.c | 23 +++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
+
+diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+index 962616fd4ddd..9d1aa294e88f 100644
+--- a/arch/arm/kvm/mmu.c
++++ b/arch/arm/kvm/mmu.c
+@@ -20,8 +20,10 @@
+ #include <linux/kvm_host.h>
+ #include <linux/io.h>
+ #include <linux/hugetlb.h>
++#include <linux/sched/signal.h>
+ #include <trace/events/kvm.h>
+ #include <asm/pgalloc.h>
++#include <asm/siginfo.h>
+ #include <asm/cacheflush.h>
+ #include <asm/kvm_arm.h>
+ #include <asm/kvm_mmu.h>
+@@ -1237,6 +1239,23 @@ static void coherent_cache_guest_page(struct kvm_vcpu *vcpu, kvm_pfn_t pfn,
+ 	__coherent_cache_guest_page(vcpu, pfn, size);
+ }
  
- # User may have a custom install script
- if [ -x ~/bin/${INSTALLKERNEL} ]; then exec ~/bin/${INSTALLKERNEL} "$@"; fi
--if [ -x /sbin/${INSTALLKERNEL} ]; then exec /sbin/${INSTALLKERNEL} "$@"; fi
++static void kvm_send_hwpoison_signal(unsigned long address, bool hugetlb)
++{
++	siginfo_t info;
 +
-+if [ "x$CROSS_COMPILE" == "x" ]; then
-+  if [ -x /sbin/${INSTALLKERNEL} ]; then exec /sbin/${INSTALLKERNEL} "$@"; fi
-+fi
++	info.si_signo   = SIGBUS;
++	info.si_errno   = 0;
++	info.si_code    = BUS_MCEERR_AR;
++	info.si_addr    = (void __user *)address;
++
++	if (hugetlb)
++		info.si_addr_lsb = PMD_SHIFT;
++	else
++		info.si_addr_lsb = PAGE_SHIFT;
++
++	send_sig_info(SIGBUS, &info, current);
++}
++
+ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 			  struct kvm_memory_slot *memslot, unsigned long hva,
+ 			  unsigned long fault_status)
+@@ -1306,6 +1325,10 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 	smp_rmb();
  
- if [ "$(basename $2)" = "zImage" ]; then
- # Compressed install
+ 	pfn = gfn_to_pfn_prot(kvm, gfn, write_fault, &writable);
++	if (pfn == KVM_PFN_ERR_HWPOISON) {
++		kvm_send_hwpoison_signal(hva, hugetlb);
++		return 0;
++	}
+ 	if (is_error_noslot_pfn(pfn))
+ 		return -EFAULT;
+ 
 -- 
-2.9.3
+2.10.1
