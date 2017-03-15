@@ -1,24 +1,156 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 15 Mar 2017 14:13:49 -0500
-Subject: [PATCH 1/2] doc: dt: mtd: add w25q64 to list of supported SPI
- flashes
-In-Reply-To: <20170307215751.29266-2-fcooper@ti.com>
-References: <20170307215751.29266-1-fcooper@ti.com>
- <20170307215751.29266-2-fcooper@ti.com>
-Message-ID: <20170315191349.mxh2ahnhn2uhyvm4@rob-hp-laptop>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 15 Mar 2017 20:17:35 +0100
+Subject: [PATCH] ARM: dts: mvebu: linksys: enable buffer manager support
+In-Reply-To: <20170308053312.29243-1-ralph.sennhauser@gmail.com> (Ralph
+ Sennhauser's message of "Wed, 8 Mar 2017 06:33:12 +0100")
+References: <20170308053312.29243-1-ralph.sennhauser@gmail.com>
+Message-ID: <8760jafiy8.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 07, 2017 at 03:57:50PM -0600, Franklin S Cooper Jr wrote:
-> From: Sekhar Nori <nsekhar@ti.com>
-> 
-> W25Q64 is found on TI's AM335x ICEv2 board. Add it to list
-> for supported SPI flash devices. This flash can be identified
-> using JEDEC READ ID opcode.
-> 
-> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
-> ---
->  Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt | 1 +
->  1 file changed, 1 insertion(+)
+Hi Ralph,
+ 
+ On mer., mars 08 2017, Ralph Sennhauser <ralph.sennhauser@gmail.com> wrote:
 
-Acked-by: Rob Herring <robh@kernel.org>
+> Add appropriate properties to devices in the Linksys WRT AC Series for the
+> mvneta driver to use hardware buffer management.
+>
+> Also update "soc" ranges property and set the status of bm and bm-bppi
+> to "okay" (SRAM).
+>
+> Signed-off-by: Ralph Sennhauser <ralph.sennhauser@gmail.com>
+> ---
+>  arch/arm/boot/dts/armada-385-linksys.dtsi     | 17 ++++++++++++++++-
+>  arch/arm/boot/dts/armada-xp-linksys-mamba.dts | 17 ++++++++++++++++-
+>  2 files changed, 32 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/armada-385-linksys.dtsi b/arch/arm/boot/dts/armada-385-linksys.dtsi
+> index df47bf1..4aac375 100644
+> --- a/arch/arm/boot/dts/armada-385-linksys.dtsi
+> +++ b/arch/arm/boot/dts/armada-385-linksys.dtsi
+> @@ -59,7 +59,8 @@
+>  		ranges = <MBUS_ID(0xf0, 0x01) 0 0xf1000000 0x100000
+>  			  MBUS_ID(0x01, 0x1d) 0 0xfff00000 0x100000
+>  			  MBUS_ID(0x09, 0x19) 0 0xf1100000 0x10000
+> -			  MBUS_ID(0x09, 0x15) 0 0xf1110000 0x10000>;
+> +			  MBUS_ID(0x09, 0x15) 0 0xf1110000 0x10000
+> +			  MBUS_ID(0x0c, 0x04) 0 0xf1200000 0x100000>;
+>  
+>  		internal-regs {
+>  			i2c at 11000 {
+> @@ -88,6 +89,9 @@
+>  			ethernet at 70000 {
+>  				status = "okay";
+>  				phy-mode = "rgmii-id";
+> +				buffer-manager = <&bm>;
+> +				bm,pool-long = <1>;
+> +				bm,pool-short = <3>;
+>  				fixed-link {
+>  					speed = <1000>;
+>  					full-duplex;
+> @@ -97,6 +101,9 @@
+>  			ethernet at 34000 {
+>  				status = "okay";
+>  				phy-mode = "sgmii";
+> +				buffer-manager = <&bm>;
+> +				bm,pool-long = <0>;
+> +				bm,pool-short = <3>;
+Any reason to reuse the same pool than the other port?
+
+As only two ports are used here, then each of them can have use 2 of the
+4 availables pools. 
+
+>  				fixed-link {
+>  					speed = <1000>;
+>  					full-duplex;
+> @@ -159,6 +166,10 @@
+>  				status = "okay";
+>  			};
+>  
+> +			bm at c8000 {
+> +				status = "okay";
+> +			};
+> +
+>  			/* USB part of the eSATA/USB 2.0 port */
+>  			usb at 58000 {
+>  				status = "okay";
+> @@ -241,6 +252,10 @@
+>  			};
+>  		};
+>  
+> +		bm-bppi {
+> +			status = "okay";
+> +		};
+> +
+>  		pcie-controller {
+>  			status = "okay";
+>  
+> diff --git a/arch/arm/boot/dts/armada-xp-linksys-mamba.dts b/arch/arm/boot/dts/armada-xp-linksys-mamba.dts
+> index 3744ba3..b188a4dc 100644
+> --- a/arch/arm/boot/dts/armada-xp-linksys-mamba.dts
+> +++ b/arch/arm/boot/dts/armada-xp-linksys-mamba.dts
+> @@ -71,7 +71,8 @@
+>  		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xf1000000 0x100000
+>  			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000
+>  			  MBUS_ID(0x09, 0x09) 0 0 0xf1100000 0x10000
+> -			  MBUS_ID(0x09, 0x05) 0 0 0xf1110000 0x10000>;
+> +			  MBUS_ID(0x09, 0x05) 0 0 0xf1110000 0x10000
+> +			  MBUS_ID(0x0c, 0x04) 0 0 0xf1200000 0x100000>;
+>  
+>  		internal-regs {
+>  
+> @@ -95,6 +96,9 @@
+>  				pinctrl-names = "default";
+>  				status = "okay";
+>  				phy-mode = "rgmii-id";
+> +				buffer-manager = <&bm>;
+> +				bm,pool-long = <0>;
+> +				bm,pool-short = <3>;
+>  				fixed-link {
+>  					speed = <1000>;
+>  					full-duplex;
+> @@ -106,6 +110,9 @@
+>  				pinctrl-names = "default";
+>  				status = "okay";
+>  				phy-mode = "rgmii-id";
+> +				buffer-manager = <&bm>;
+> +				bm,pool-long = <1>;
+> +				bm,pool-short = <3>;
+Same question that above.
+
+Gregory
+
+>  				fixed-link {
+>  					speed = <1000>;
+>  					full-duplex;
+> @@ -186,6 +193,10 @@
+>  				};
+>  			};
+>  
+> +			bm at c8000 {
+> +				status = "okay";
+> +			};
+> +
+>  			nand at d0000 {
+>  				status = "okay";
+>  				num-cs = <1>;
+> @@ -259,6 +270,10 @@
+>  				};
+>  			};
+>  		};
+> +
+> +		bm-bppi {
+> +			status = "okay";
+> +		};
+>  	};
+>  
+>  	gpio_keys {
+> -- 
+> 2.10.2
+>
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
