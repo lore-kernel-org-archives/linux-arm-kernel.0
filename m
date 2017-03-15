@@ -1,42 +1,165 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Tue, 14 Mar 2017 19:12:06 -0500
-Subject: [PATCH] pinctrl: qcom: add get_direction function
-In-Reply-To: <20170314234140.GI10239@codeaurora.org>
-References: <1486768860-18237-1-git-send-email-timur@codeaurora.org>
- <8652c018-4051-5c77-3126-2d41d150518a@codeaurora.org>
- <CACRpkdaoHTZa+XjEBAMtO2dS1jevi5h-QYe90SrZDuJghQSyYw@mail.gmail.com>
- <13b19c7f-9440-ab8e-8a2f-d1796a9b3dde@codeaurora.org>
- <CACRpkdZFzYStyPfK1DwkZfvtd7wX9HtD1bnCy+i9h-7xowOz4g@mail.gmail.com>
- <e209d18d-dc53-c0e9-448c-8a88264cac74@codeaurora.org>
- <20170314233040.GH10239@codeaurora.org>
- <c40b0ee7-6d8c-8c5d-d4c5-9ecf8076e44f@codeaurora.org>
- <20170314234140.GI10239@codeaurora.org>
-Message-ID: <f1152d48-004e-71bc-16a1-3a25990ba9e4@codeaurora.org>
+From: mchehab@s-opensource.com (Mauro Carvalho Chehab)
+Date: Tue, 14 Mar 2017 21:54:31 -0300
+Subject: media / v4l2-mc: wishlist for complex cameras (was Re: [PATCH
+ v4 14/36] [media] v4l2-mc: add a function to inherit controls from a
+ pipeline)
+In-Reply-To: <20170314223254.GA7141@amd>
+References: <c679f755-52a6-3c6f-3d65-277db46676cc@xs4all.nl>
+ <20170310140124.GV21222@n2100.armlinux.org.uk>
+ <cc8900b0-c091-b14b-96f4-01f8fa72431c@xs4all.nl>
+ <20170310125342.7f047acf@vento.lan>
+ <20170310223714.GI3220@valkosipuli.retiisi.org.uk>
+ <20170311082549.576531d0@vento.lan>
+ <20170313124621.GA10701@valkosipuli.retiisi.org.uk>
+ <20170314004533.3b3cd44b@vento.lan>
+ <e0a6c60b-1735-de0b-21f4-d8c3f4b3f10f@xs4all.nl>
+ <20170314072143.498cde9b@vento.lan> <20170314223254.GA7141@amd>
+Message-ID: <20170314215420.6fc63c67@vento.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stephen Boyd wrote:
+Em Tue, 14 Mar 2017 23:32:54 +0100
+Pavel Machek <pavel@ucw.cz> escreveu:
 
->> > The idea is to notify drivers with an error code when they make a
->> > mistake. Perhaps the device tree or the ACPI table has an error?
+> Hi!
+> 
+> > > > Even if they were merged, if we keep the same mean time to develop a
+> > > > libv4l plugin, that would mean that a plugin for i.MX6 could take 2-3
+> > > > years to be developed.
+> > > > 
+> > > > There's a clear message on it:
+> > > > 	- we shouldn't keep pushing for a solution via libv4l.    
+> > > 
+> > > Or:
+> > > 
+> > > 	- userspace plugin development had a very a low priority and
+> > > 	  never got the attention it needed.  
+> > 
+> > The end result is the same: we can't count on it.
+> >   
+> > > 
+> > > I know that's *my* reason. I rarely if ever looked at it. I always assumed
+> > > Sakari and/or Laurent would look at it. If this reason is also valid for
+> > > Sakari and Laurent, then it is no wonder nothing has happened in all that
+> > > time.
+> > > 
+> > > We're all very driver-development-driven, and userspace gets very little
+> > > attention in general. So before just throwing in the towel we should take
+> > > a good look at the reasons why there has been little or no development: is
+> > > it because of fundamental design defects, or because nobody paid attention
+> > > to it?  
+> > 
+> > No. We should look it the other way: basically, there are patches
+> > for i.MX6 driver that sends control from videonode to subdevs. 
+> > 
+> > If we nack apply it, who will write the userspace plugin? When
+> > such change will be merged upstream?  
+> 
+> Well, I believe first question is: what applications would we want to
+> run on complex devices? Will sending control from video to subdevs
+> actually help?
 
-> In general the kernel isn't a firmware validator. At least that's
-> the way I view it. Others may have different opinions here.
+I would say: camorama, xawtv3, zbar, google talk, skype. If it runs
+with those, it will likely run with any other application.
 
-I would be okay with wrapping that check around #ifdef CONFIG_DEBUG_GPIO.
+> mplayer is useful for testing... but that one already works (after you
+> setup the pipeline, and configure exposure/gain).
+> 
+> But thats useful for testing, not really for production. Image will be
+> out of focus and with wrong white balance.
+> 
+> What I would really like is an application to get still photos. For
+> taking pictures with manual settings we need
+> 
+> a) units for controls: user wants to focus on 1m, and take picture
+> with ISO200, 1/125 sec. We should also tell him that lens is f/5.6 and
+> focal length is 20mm with 5mm chip.
+> 
+> But... autofocus/autogain would really be good to have. Thus we need:
+> 
+> b) for each frame, we need exposure settings and focus position at
+> time frame was taken. Otherwise autofocus/autogain will be too
+> slow. At least focus position is going to be tricky -- either kernel
+> would have to compute focus position for us (not trivial) or we'd need
+> enough information to compute it in userspace.
+> 
+> There are more problems: hardware-accelerated preview is not trivial
+> to set up (and I'm unsure if it can be done in generic way). Still
+> photos application needs to switch resolutions between preview and
+> photo capture. Probably hardware-accelerated histograms are needed for
+> white balance, auto gain and auto focus, ....
+> 
+> It seems like there's a _lot_ of stuff to be done before we have
+> useful support for complex cameras...
 
->> > I could add that, but I still think returning an error code is
->> > appropriate.  On the TLMM, we know for sure that the pin must be set
->> > to function 0 in order for the read/write routines to operate
->> > correctly.
+Taking still pictures using a hardware-accelerated preview is
+a sophisticated use case. I don't know any userspace application
+that does that. Ok, several allow taking snapshots, by simply
+storing the image of the current frame.
 
-> On ACPI we could make the gpio_get() path fail if the pin isn't
-> in GPIO mode?
+> (And I'm not sure... when application such as skype is running, is
+> there some way to run autogain/autofocus/autowhitebalance? Is that
+> something we want to support?)
 
-Did you mean the gpio_chip.request callback?  Currently that points to 
-gpiochip_generic_request in pinctrl-msm.c.
+Autofocus no. Autogain/Autowhite can be done via libv4l, provided that
+it can access the device's controls via /dev/video devnode. Other
+applications may be using some other similar algorithms.
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the
-Code Aurora Forum, hosted by The Linux Foundation.
+Ok, they don't use histograms provided by the SoC. So, they do it in
+software, with is slower. Still, it works fine when the light
+conditions don't change too fast.
+
+> > If we don't have answers to any of the above questions, we should not
+> > nack it.
+> > 
+> > That's said, that doesn't prevent merging a libv4l plugin if/when
+> > someone can find time/interest to develop it.  
+> 
+> I believe other question is: will not having same control on main
+> video device and subdevs be confusing? Does it actually help userspace
+> in any way? Yes, we can make controls accessible to old application,
+> but does it make them more useful? 
+
+Yes. As I said, libv4l (and some apps) have logic inside to adjust
+the image via bright, contrast and white balance controls, using the
+video devnode. They don't talk subdev API. So, if those controls
+aren't exported, they won't be able to provide a good quality image.
+
+> > > In addition, I suspect end-users of these complex devices don't really care
+> > > about a plugin: they want full control and won't typically use generic
+> > > applications. If they would need support for that, we'd have seen much more
+> > > interest. The main reason for having a plugin is to simplify testing and
+> > > if this is going to be used on cheap hobbyist devkits.  
+> > 
+> > What are the needs for a cheap hobbyist devkit owner? Do we currently
+> > satisfy those needs? I'd say that having a functional driver when
+> > compiled without the subdev API, that implements the ioctl's/controls  
+> 
+> Having different interface based on config options... is just
+> weird. What about poor people (like me) trying to develop complex
+> applications?
+
+Well, that could be done using other mechanisms, like a modprobe
+parameter or by switching the behaviour if a subdev interface is
+opened. I don't see much trouble on allowing accessing a control via
+both interfaces.
+
+> 
+> > [1] Yet, I might eventually do that for fun, an OMAP3 board with tvp5150
+> > just arrived here last week. It would be nice to have xawtv3 running on it :-)
+> > So, if I have a lot of spare time (with is very unlikely), I might eventually 
+> > do something for it to work.
+> >   
+> > > I know it took me a very long time before I had a working omap3.  
+> > 
+> > My first OMAP3 board with working V4L2 source just arrived last week
+> > :-)  
+> 
+> You can get Nokia N900 on aliexpress. If not, they are still available
+> between people :-)
+
+I have one. Unfortunately, I never had a chance to use it, as the display
+stopped working one week after I get it.
+
+Thanks,
+Mauro
