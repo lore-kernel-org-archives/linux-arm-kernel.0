@@ -1,82 +1,46 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 15 Mar 2017 12:37:46 +0100
-Subject: [PATCH] tty/serial: atmel_serial: BUG: stop DMA from transmitting
- in stop_tx
-In-Reply-To: <20161213162756.16139-1-richard.genoud@gmail.com>
-References: <20161213162756.16139-1-richard.genoud@gmail.com>
-Message-ID: <c5c0cdcf-d4da-a8c0-4161-85535ecf88ec@atmel.com>
+From: dwmw2@infradead.org (David Woodhouse)
+Date: Wed, 15 Mar 2017 11:41:18 +0000
+Subject: [PATCH v33 00/14] add kdump support
+In-Reply-To: <20170315095656.24992-1-takahiro.akashi@linaro.org>
+References: <20170315095656.24992-1-takahiro.akashi@linaro.org>
+Message-ID: <1489578078.4195.113.camel@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 13/12/2016 ? 17:27, Richard Genoud a ?crit :
-> If we don't disable the transmitter in atmel_stop_tx, the DMA buffer
-> continues to send data until it is emptied.
-> This cause problems with the flow control (CTS is asserted and data are
-> still sent).
+On Wed, 2017-03-15 at 18:56 +0900, AKASHI Takahiro wrote:
+> This patch series adds kdump support on arm64.
 > 
-> So, disabling the transmitter in atmel_stop_tx is a sane thing to do.
+> To load a crash-dump kernel to the systems, a series of patches to
+> kexec-tools[1] are also needed. Please use the latest one, v6 [2].
+> For your convinience, you can pick them up from:
+> ?? https://git.linaro.org/people/takahiro.akashi/linux-aarch64.git?arm64/kdump
+> ?? https://git.linaro.org/people/takahiro.akashi/kexec-tools.git?arm64/kdump
 > 
-> Tested on at91sam9g35-cm(DMA)
-> Tested for regressions on sama5d2-xplained(Fifo) and at91sam9g20ek(PDC)
+> To examine vmcore (/proc/vmcore) on a crash-dump kernel, you can use
+> ? - crash utility (v7.1.8 or later) [3]
 > 
-> Cc: <stable@vger.kernel.org> (beware, this won't apply before 4.3)
-> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
-> ---
->  drivers/tty/serial/atmel_serial.c | 11 +++++++++++
->  1 file changed, 11 insertions(+)
-> 
-> NB: this is not for the 4.10 merge window, I'm just sending it now to
-> have some comments if someone is againts it.
-> 
-> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-> index 168b10cad47b..f9d42de5ab2d 100644
-> --- a/drivers/tty/serial/atmel_serial.c
-> +++ b/drivers/tty/serial/atmel_serial.c
-> @@ -481,6 +481,14 @@ static void atmel_stop_tx(struct uart_port *port)
->  		/* disable PDC transmit */
->  		atmel_uart_writel(port, ATMEL_PDC_PTCR, ATMEL_PDC_TXTDIS);
->  	}
-> +
-> +	/*
-> +	 * Disable the transmitter.
-> +	 * This is mandatory when DMA is used, otherwise the DMA buffer
-> +	 * is fully transmitted.
-> +	 */
-> +	atmel_uart_writel(port, ATMEL_US_CR, ATMEL_US_TXDIS);
-> +
->  	/* Disable interrupts */
->  	atmel_uart_writel(port, ATMEL_US_IDR, atmel_port->tx_done_mask);
->  
-> @@ -513,6 +521,9 @@ static void atmel_start_tx(struct uart_port *port)
->  
->  	/* Enable interrupts */
->  	atmel_uart_writel(port, ATMEL_US_IER, atmel_port->tx_done_mask);
-> +
-> +	/* re-enable the transmitter */
-> +	atmel_uart_writel(port, ATMEL_US_CR, ATMEL_US_TXEN);
->  }
->  
->  /*
+> I tested this patchset on fast model and hikey.
 
-Hi Richard,
+Please build with CONFIG_DEBUG_SECTION_MISMATCH=y.
 
-I've just discovered that I have some weird behavior with this patch. On
-current Linus' tree, with sama5d2 + DMA, I see some garbage characters
-coming out of the console when I try to stop my system (reboot/halt) [1].
+It might be because I'm using your v32 patchset, hacked late at night
+to apply to a 4.9 kernel, but I see this:
 
-Moreover, and I do understand that it's not the problem right here, when
-applied on our linux-4.4-at91 branch (our vendor tree actually), it
-hangs the boot process as it seems that a burst of open/close of the
-serial port happens while starting the rootfs. It's definitively my own
-problem, but it can bring light to what we are seeing on Mainline...
+WARNING: vmlinux.o(.text+0x10240): Section mismatch in reference from the function arch_kexec_protect_crashkres() to the function .init.text:create_pgd_mapping()
+The function arch_kexec_protect_crashkres() references
+the function __init create_pgd_mapping().
+This is often because arch_kexec_protect_crashkres lacks a __init?
+annotation or the annotation of create_pgd_mapping is wrong.
 
-I think that we may need to flush the DMA channel in this
-atmel_stop_tx() function.
-
-Best regards,
-
-[1] If you want to test, you need to apply this patch for eMMC BTW:
-https://patchwork.kernel.org/patch/9617489/
-
--- 
-Nicolas Ferre
+WARNING: vmlinux.o(.text+0x102b0): Section mismatch in reference from the function arch_kexec_unprotect_crashkres() to the function .init.text:create_pgd_mapping()
+The function arch_kexec_unprotect_crashkres() references
+the function __init create_pgd_mapping().
+This is often because arch_kexec_unprotect_crashkres lacks a __init?
+annotation or the annotation of create_pgd_mapping is wrong.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: smime.p7s
+Type: application/x-pkcs7-signature
+Size: 4938 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170315/943556e5/attachment-0001.bin>
