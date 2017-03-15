@@ -1,32 +1,51 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Wed, 15 Mar 2017 23:24:49 +0100
-Subject: [PATCH v4 02/18] power: supply: power_supply_core: add
- constant-charge-current optional property
-In-Reply-To: <20170315105537.22349-3-quentin.schulz@free-electrons.com>
-References: <20170315105537.22349-1-quentin.schulz@free-electrons.com>
- <20170315105537.22349-3-quentin.schulz@free-electrons.com>
-Message-ID: <20170315222449.bvca6r3zoaxoedlb@earth>
+From: james.hogan@imgtec.com (James Hogan)
+Date: Wed, 15 Mar 2017 22:26:32 +0000
+Subject: [PATCH v2] generic syscalls: Wire up statx syscall
+In-Reply-To: <20170313144521.28127-1-shorne@gmail.com>
+References: <20170313144521.28127-1-shorne@gmail.com>
+Message-ID: <CAAG0J99QAwefvpnNxrGRU6XH+0+k1LO6qRW3kLBQCc3nc6QdmA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 13 March 2017 at 14:45, Stafford Horne <shorne@gmail.com> wrote:
+> The new syscall statx is implemented as generic code, so enable it
+> for architectures like openrisc which use the generic syscall table.
+>
+> Fixes: a528d35e8bfcc ("statx: Add a system call to make enhanced file info available")
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Al Viro <viro@zeniv.linux.org.uk>
+> Cc: David Howells <dhowells@redhat.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Signed-off-by: Stafford Horne <shorne@gmail.com>
+> ---
+> Change in v2:
+>  - Add a few more Cc's to get attention of the right people
+>  - Add a fixes tag for better audit
+>
+>  include/uapi/asm-generic/unistd.h | 4 +++-
+>  1 file changed, 3 insertions(+), 1 deletion(-)
+>
+> diff --git a/include/uapi/asm-generic/unistd.h b/include/uapi/asm-generic/unistd.h
+> index 9b1462e..a076cf1 100644
+> --- a/include/uapi/asm-generic/unistd.h
+> +++ b/include/uapi/asm-generic/unistd.h
+> @@ -730,9 +730,11 @@ __SYSCALL(__NR_pkey_mprotect, sys_pkey_mprotect)
+>  __SYSCALL(__NR_pkey_alloc,    sys_pkey_alloc)
+>  #define __NR_pkey_free 290
+>  __SYSCALL(__NR_pkey_free,     sys_pkey_free)
+> +#define __NR_statx 291
+> +__SYSCALL(__NR_statx,     sys_statx)
+>
+>  #undef __NR_syscalls
+> -#define __NR_syscalls 291
+> +#define __NR_syscalls 292
 
-On Wed, Mar 15, 2017 at 11:55:21AM +0100, Quentin Schulz wrote:
-> This adds the constant-charge-current property to the list of optional
-> properties for the battery.
-> 
-> The constant charge current is critical for batteries as they can't
-> handle all charge currents.
-> 
-> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+Out of interest, anybody know OTOH which other stat syscalls statx
+supersedes (such that they could at some point be disabled by default
+in asm-generic for new arches, and implemented in userspace)?
 
-Acked-By: Sebastian Reichel <sre@kernel.org>
-
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170315/fb9be2c2/attachment.sig>
+Cheers
+-- 
+James Hogan
