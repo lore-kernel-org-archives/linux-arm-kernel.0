@@ -1,137 +1,38 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 15 Mar 2017 14:11:31 +0100
-Subject: [PATCH v6 08/14] mmc: sdhci-xenon: Add Marvell Xenon SDHC core
- functionality
-In-Reply-To: <cb885ae19e7c467908cdaa1f1cc8d95a7217d663.1487091464.git-series.gregory.clement@free-electrons.com>
-References: <cover.ff78bebe0384f650a51e5e6f0f1dca6e7894b53b.1487091464.git-series.gregory.clement@free-electrons.com>
- <cb885ae19e7c467908cdaa1f1cc8d95a7217d663.1487091464.git-series.gregory.clement@free-electrons.com>
-Message-ID: <CAPDyKFpH+RGAZGoVCuCOKJ2iEa+Y=cNNcM-uKhkYaTpmogXCKA@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 15 Mar 2017 14:12:39 +0100
+Subject: [RFC PATCH 0/4] pinctrl: rockchip: PREEMPT_RT_FULL fixes
+In-Reply-To: <20170313183813.3582-1-john@metanate.com>
+References: <20170313183813.3582-1-john@metanate.com>
+Message-ID: <CACRpkdZXBZr_Syur3r=3GTjjrCPx4bgj0g5iNSN6rdikqkww4w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14 February 2017 at 18:01, Gregory CLEMENT
-<gregory.clement@free-electrons.com> wrote:
-> From: Hu Ziji <huziji@marvell.com>
+On Mon, Mar 13, 2017 at 7:38 PM, John Keeping <john@metanate.com> wrote:
+
+> As described in Documentation/gpio/driver.txt, we should not be using
+> sleepable APIs in the irqchip implementation.  Since this includes the
+> regmap API, this patch series ends up moving the mux setup for IRQs into
+> an irq_bus_sync_unlock() handler which may result in the IRQ being
+> configured before the port has been muxed as a GPIO.
 >
-> Add Xenon eMMC/SD/SDIO host controller core functionality.
-> Add Xenon specific initialization process.
-> Add Xenon specific mmc_host_ops APIs.
-> Add Xenon specific register definitions.
->
-> Add CONFIG_MMC_SDHCI_XENON support in drivers/mmc/host/Kconfig.
->
-> Marvell Xenon SDHC conforms to SD Physical Layer Specification
-> Version 3.01 and is designed according to the guidelines provided
-> in the SD Host Controller Standard Specification Version 3.00.
->
-> Signed-off-by: Hu Ziji <huziji@marvell.com>
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> ---
->  drivers/mmc/host/Kconfig       |   9 +-
->  drivers/mmc/host/Makefile      |   3 +-
->  drivers/mmc/host/sdhci-xenon.c | 602 ++++++++++++++++++++++++++++++++++-
->  drivers/mmc/host/sdhci-xenon.h |  70 ++++-
->  4 files changed, 684 insertions(+)
->  create mode 100644 drivers/mmc/host/sdhci-xenon.c
->  create mode 100644 drivers/mmc/host/sdhci-xenon.h
->
-> diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
-> index 2eb97014dc3f..1c1a88bfbdad 100644
-> --- a/drivers/mmc/host/Kconfig
-> +++ b/drivers/mmc/host/Kconfig
-> @@ -819,3 +819,12 @@ config MMC_SDHCI_BRCMSTB
->           Broadcom STB SoCs.
->
->           If unsure, say Y.
-> +
-> +config MMC_SDHCI_XENON
-> +       tristate "Marvell Xenon eMMC/SD/SDIO SDHCI driver"
-> +       depends on MMC_SDHCI_PLTFM
-> +       help
-> +         This selects Marvell Xenon eMMC/SD/SDIO SDHCI.
-> +         If you have a machine with integrated Marvell Xenon SDHC IP,
+> I've marked the series as RFC because I'm not sure if this is the best
+> way to accomplish this or if there is another approach that is cleaner.
+> Also, the first patch may not be correct on RK3399 because I originally
+> wrote the patch for RK3288 on top of v4.4 where all drive updates only
+> affect a single register.  We don't need locking in this case because
+> regmap_update_bits() takes a lock on the regmap internally, but if these
+> two registers need to be updated atomically then another lock will
+> be required here - slock cannot be used if it is converted to a raw
+> spinlock since with full RT preemption the regmap's spinlock may sleep.
 
-/s/SDHC/SDHCI
+Nice work! It all looks good to me, let's see what Heiko says.
 
-> +         say Y or M here.
-> +         If unsure, say N.
-> diff --git a/drivers/mmc/host/Makefile b/drivers/mmc/host/Makefile
-> index ccc9c4cba154..b0a2ab4b256e 100644
-> --- a/drivers/mmc/host/Makefile
-> +++ b/drivers/mmc/host/Makefile
-> @@ -82,3 +82,6 @@ obj-$(CONFIG_MMC_SDHCI_BRCMSTB)               += sdhci-brcmstb.o
->  ifeq ($(CONFIG_CB710_DEBUG),y)
->         CFLAGS-cb710-mmc        += -DDEBUG
->  endif
-> +
-> +obj-$(CONFIG_MMC_SDHCI_XENON)  += sdhci-xenon-driver.o
-> +sdhci-xenon-driver-y           += sdhci-xenon.o
+Please keep Julia Cartwright on the CC for this patch series, she is
+doing some coccinelle-based rewrites to use raw spinlocks as we
+speak, and she knows this stuff.
 
-Why not only this:
-obj-$(CONFIG_MMC_SDHCI_XENON) += sdhci-xenon.o
+She has not targeted the Rockchip driver yet, I guess because of
+its complexity.
 
-> diff --git a/drivers/mmc/host/sdhci-xenon.c b/drivers/mmc/host/sdhci-xenon.c
-> new file mode 100644
-> index 000000000000..e633f803907a
-> --- /dev/null
-> +++ b/drivers/mmc/host/sdhci-xenon.c
-> @@ -0,0 +1,602 @@
-> +/*
-> + * Driver for Marvell Xenon SDHC as a platform device
-> + *
-> + * Copyright (C) 2016 Marvell, All Rights Reserved.
-> + *
-> + * Author:     Hu Ziji <huziji@marvell.com>
-> + * Date:       2016-8-24
-> + *
-> + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public License as
-> + * published by the Free Software Foundation version 2.
-> + *
-> + * Inspired by Jisheng Zhang <jszhang@marvell.com>
-> + * Special thanks to Video BG4 project team.
-> + */
-> +
-> +#include <linux/delay.h>
-> +#include <linux/module.h>
-> +#include <linux/of.h>
-> +
-> +#include "sdhci-pltfm.h"
-> +#include "sdhci-xenon.h"
-> +
-> +static int enable_xenon_internal_clk(struct sdhci_host *host)
-
-[...]
-
-> +/* Set SDCLK-off-while-idle */
-> +static void xenon_set_sdclk_off_idle(struct sdhci_host *host,
-> +                                    unsigned char sdhc_id, bool enable)
-
-[...]
-
-> +/* Recover the Register Setting cleared during SOFTWARE_RESET_ALL */
-> +static void sdhci_xenon_reset_exit(struct sdhci_host *host,
-> +                                  unsigned char sdhc_id, u8 mask)
-
-[...]
-
-ff --git a/drivers/mmc/host/sdhci-xenon.h b/drivers/mmc/host/sdhci-xenon.h
-> new file mode 100644
-> index 000000000000..69de711db9eb
-> --- /dev/null
-> +++ b/drivers/mmc/host/sdhci-xenon.h
-
-You should probably put all this in the c-file instead. That is how
-most other sdhci variants does it.
-
-[...]
-
-Overall this looks good to me, however I think Adrian needs to have a
-quick look as well.
-
-One additional very minor nitpick. Perhaps you can align on the
-function names prefix, as those currently varies between "whatever",
-"xenon_" and "sdhci_xenon_".
-
-Kind regards
-Uffe
+Yours,
+Linus Walleij
