@@ -1,79 +1,66 @@
-From: john@metanate.com (John Keeping)
-Date: Wed, 15 Mar 2017 18:46:27 +0000
-Subject: [PATCH v2 2/4] pinctrl: rockchip: convert to raw spinlock
-In-Reply-To: <20170315182309.GD682@jcartwri.amer.corp.natinst.com>
-References: <20170315174654.15128-1-john@metanate.com>
- <20170315180137.GB682@jcartwri.amer.corp.natinst.com>
- <20170315180806.3714af56.john@metanate.com>
- <8564532.G8NNa9Oa4k@phil>
- <20170315182309.GD682@jcartwri.amer.corp.natinst.com>
-Message-ID: <20170315184627.60baad35.john@metanate.com>
+From: slongerbeam@gmail.com (Steve Longerbeam)
+Date: Wed, 15 Mar 2017 11:49:00 -0700
+Subject: [PATCH v5 07/39] ARM: dts: imx6qdl-sabrelite: remove erratum
+ ERR006687 workaround
+In-Reply-To: <CAOMZO5BNrSEyrbWbCBCbsy4yTrh4AHfk2Too0qHuffxqUCgADg@mail.gmail.com>
+References: <1489121599-23206-1-git-send-email-steve_longerbeam@mentor.com>
+ <1489121599-23206-8-git-send-email-steve_longerbeam@mentor.com>
+ <9f5d0ac4-0602-c729-5c00-1d9ef49247c1@boundarydevices.com>
+ <CAOMZO5BNrSEyrbWbCBCbsy4yTrh4AHfk2Too0qHuffxqUCgADg@mail.gmail.com>
+Message-ID: <16767ed6-bc06-790c-1830-18439c977a37@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 15 Mar 2017 13:23:09 -0500, Julia Cartwright wrote:
-> On Wed, Mar 15, 2017 at 07:16:53PM +0100, Heiko Stuebner wrote:
-> > Am Mittwoch, 15. M?rz 2017, 18:08:06 CET schrieb John Keeping:  
-> > > On Wed, 15 Mar 2017 13:01:37 -0500, Julia Cartwright wrote:  
-> > > > On Wed, Mar 15, 2017 at 05:46:52PM +0000, John Keeping wrote:  
-> > > > > This lock is used from rockchip_irq_set_type() which is part of the
-> > > > > irq_chip implementation and thus must use raw_spinlock_t as documented
-> > > > > in Documentation/gpio/driver.txt.
-> > > > > 
-> > > > > Signed-off-by: John Keeping <john@metanate.com>
-> > > > > Reviewed-by: Heiko Stuebner <heiko@sntech.de>
-> > > > > Tested-by: Heiko Stuebner <heiko@sntech.de>
-> > > > > ---
-> > > > > v2: unchanged
-> > > > > ---
-> > > > > 
-> > > > >  drivers/pinctrl/pinctrl-rockchip.c | 30 +++++++++++++++---------------
-> > > > >  1 file changed, 15 insertions(+), 15 deletions(-)
-> > > > > 
-> > > > > diff --git a/drivers/pinctrl/pinctrl-rockchip.c
-> > > > > b/drivers/pinctrl/pinctrl-rockchip.c index 128c383ea7ba..8c1cae6d78d7
-> > > > > 100644  
-> [..]
-> > > > > @@ -1295,14 +1295,14 @@ static int rockchip_set_pull(struct
-> > > > > rockchip_pin_bank *bank,> > 
-> > > > >  	switch (ctrl->type) {
-> > > > > 
-> > > > >  	case RK2928:
-> > > > > -		spin_lock_irqsave(&bank->slock, flags);
-> > > > > +		raw_spin_lock_irqsave(&bank->slock, flags);
-> > > > > 
-> > > > >  		data = BIT(bit + 16);
-> > > > >  		if (pull == PIN_CONFIG_BIAS_DISABLE)
-> > > > >  		
-> > > > >  			data |= BIT(bit);  
-> > > > 
-> > > > This should be lifted out from under the lock.
-> > > >   
-> > > > >  		ret = regmap_write(regmap, reg, data);  
-> > > > 
-> > > > How is this legal?  The regmap_write() here is going to end up acquiring
-> > > > the regmap mutex.  
-> > > 
-> > > It's not, the spinlock can be deleted here.  I only have RK3288 hardware
-> > > to test and I missed this when checking the uses of slock.  
-> > 
-> > That part could very well also use regmap_update_bits like the other parts.
-> > Not really sure, why we use regmap_write here, but I'm also not sure, if it 
-> > matters at all.  
-> 
-> regmap_update_bits also acquires the regmap lock, which would similarly
-> be a problem here.[1]
-> 
-> But, if we could pull this entire operation out of the lock (and
-> convince ourselves that it's okay to do so), then even better!
-
-Yes, we can delete the lock here for the same reason as all of the
-others that are removed in patch 1.
-
-I don't think it makes much difference whether we use regmap_write or
-regmap_update_bits here (although consistently using regmap_update_bits
-might be nice) so I won't change it as part of this series, especially
-since I don't have an RK2928 to test.
 
 
-John
+On 03/10/2017 11:17 AM, Fabio Estevam wrote:
+> On Fri, Mar 10, 2017 at 3:59 PM, Troy Kisky
+> <troy.kisky@boundarydevices.com> wrote:
+>> On 3/9/2017 8:52 PM, Steve Longerbeam wrote:
+>>> There is a pin conflict with GPIO_6. This pin functions as a power
+>>> input pin to the OV5642 camera sensor, but ENET uses it as the h/w
+>>> workaround for erratum ERR006687, to wake-up the ARM cores on normal
+>>> RX and TX packet done events. So we need to remove the h/w workaround
+>>> to support the OV5642. The result is that the CPUidle driver will no
+>>> longer allow entering the deep idle states on the sabrelite.
+>>>
+>>> This is a partial revert of
+>>>
+>>> commit 6261c4c8f13e ("ARM: dts: imx6qdl-sabrelite: use GPIO_6 for FEC
+>>>                       interrupt.")
+>>> commit a28eeb43ee57 ("ARM: dts: imx6: tag boards that have the HW workaround
+>>>                       for ERR006687")
+>>>
+>>> Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
+>>> ---
+>>>  arch/arm/boot/dts/imx6qdl-sabrelite.dtsi | 4 ----
+>>>  1 file changed, 4 deletions(-)
+>>>
+>>> diff --git a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
+>>> index 8413179..89dce27 100644
+>>> --- a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
+>>> +++ b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
+>>> @@ -270,9 +270,6 @@
+>>>       txd1-skew-ps = <0>;
+>>>       txd2-skew-ps = <0>;
+>>>       txd3-skew-ps = <0>;
+>>
+>> How about
+>>
+>> +#if !IS_ENABLED(CONFIG_VIDEO_OV5642)
+>
+> Or maybe just create a new device tree for using the camera, like
+> imx6q-sabrelite-camera.dts.
+>
+> This way we can keep the FEC erratum for the existing sabrelite dtb's.
+
+Is it really necessary to keep the erratum in sabrelite dts? Because the
+sabrelite is a _reference_ platform, vendors use this dts as a working
+example of how to configure their imx6-based hardware. So as a working
+example, it should contain as much example hardware config as possible
+as a guide. If a vendor does not require OV5642 support and requires
+the lower power consumption that the erratum workaround provides, they
+can refer to other example imx6 dts files which still implement the
+erratum, or look at the git log of this file.
+
+Steve
