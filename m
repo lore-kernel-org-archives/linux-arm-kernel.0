@@ -1,163 +1,131 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Wed, 15 Mar 2017 17:28:56 +0100
-Subject: [RFC PATCH 2/4] pinctrl: rockchip: convert to raw spinlock
-In-Reply-To: <20170313183813.3582-3-john@metanate.com>
-References: <20170313183813.3582-1-john@metanate.com>
- <20170313183813.3582-3-john@metanate.com>
-Message-ID: <39203480.lbsBriduiK@phil>
+From: pku.leo@gmail.com (Yang Li)
+Date: Wed, 15 Mar 2017 11:31:49 -0500
+Subject: [PATCH] mm: move pcp and lru-pcp drainging into single wq
+In-Reply-To: <20170315073928.GA32620@dhcp22.suse.cz>
+References: <20170307131751.24936-1-mhocko@kernel.org>
+ <CADRPPNT9zyc_0sg0eoZEMbTQ+mCHAkmzmHW93zHaOuzpALtzrg@mail.gmail.com>
+ <20170313095836.GI31518@dhcp22.suse.cz>
+ <CADRPPNRE_fEKjdNmSAqEJBAFJ_xDmiJQJk=Hnc16ymC2z_z8jQ@mail.gmail.com>
+ <20170315073928.GA32620@dhcp22.suse.cz>
+Message-ID: <CADRPPNSN4eULYX1nG0_nir75bfB_c1EbmRTBiQGeOZ3ccORT_w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, 13. M?rz 2017, 18:38:11 CET schrieb John Keeping:
-> This lock is used from rockchip_irq_set_type() which is part of the
-> irq_chip implementation and thus must use raw_spinlock_t as documented
-> in Documentation/gpio/driver.txt.
-> 
-> Signed-off-by: John Keeping <john@metanate.com>
+On Wed, Mar 15, 2017 at 2:39 AM, Michal Hocko <mhocko@kernel.org> wrote:
+> On Tue 14-03-17 18:07:38, Yang Li wrote:
+>> On Mon, Mar 13, 2017 at 4:58 AM, Michal Hocko <mhocko@kernel.org> wrote:
+>> > On Fri 10-03-17 17:31:56, Yang Li wrote:
+>> >> On Tue, Mar 7, 2017 at 7:17 AM, Michal Hocko <mhocko@kernel.org> wrote:
+>> >> > From: Michal Hocko <mhocko@suse.com>
+>> >> >
+>> >> > We currently have 2 specific WQ_RECLAIM workqueues in the mm code.
+>> >> > vmstat_wq for updating pcp stats and lru_add_drain_wq dedicated to drain
+>> >> > per cpu lru caches. This seems more than necessary because both can run
+>> >> > on a single WQ. Both do not block on locks requiring a memory allocation
+>> >> > nor perform any allocations themselves. We will save one rescuer thread
+>> >> > this way.
+>> >> >
+>> >> > On the other hand drain_all_pages() queues work on the system wq which
+>> >> > doesn't have rescuer and so this depend on memory allocation (when all
+>> >> > workers are stuck allocating and new ones cannot be created). This is
+>> >> > not critical as there should be somebody invoking the OOM killer (e.g.
+>> >> > the forking worker) and get the situation unstuck and eventually
+>> >> > performs the draining. Quite annoying though. This worker should be
+>> >> > using WQ_RECLAIM as well. We can reuse the same one as for lru draining
+>> >> > and vmstat.
+>> >> >
+>> >> > Changes since v1
+>> >> > - rename vmstat_wq to mm_percpu_wq - per Mel
+>> >> > - make sure we are not trying to enqueue anything while the WQ hasn't
+>> >> >   been intialized yet. This shouldn't happen because the initialization
+>> >> >   is done from an init code but some init section might be triggering
+>> >> >   those paths indirectly so just warn and skip the draining in that case
+>> >> >   per Vlastimil
+>> >>
+>> >> So what's the plan if this really happens?  Shall we put the
+>> >> initialization of the mm_percpu_wq earlier?
+>> >
+>> > yes
+>> >
+>> >> Or if it is really harmless we can probably remove the warnings.
+>> >
+>> > Yeah, it is harmless but if we can move it earlier then it would be
+>> > prefferable to fix this.
+>> >
+>> >>
+>> >> I'm seeing this on arm64 with a linux-next tree:
+>> > [...]
+>> >> [    0.279000] [<ffffff80081636bc>] drain_all_pages+0x244/0x25c
+>> >> [    0.279065] [<ffffff80081c675c>] start_isolate_page_range+0x14c/0x1f0
+>> >> [    0.279137] [<ffffff8008166a48>] alloc_contig_range+0xec/0x354
+>> >> [    0.279203] [<ffffff80081c6c5c>] cma_alloc+0x100/0x1fc
+>> >> [    0.279263] [<ffffff8008481714>] dma_alloc_from_contiguous+0x3c/0x44
+>> >> [    0.279336] [<ffffff8008b25720>] atomic_pool_init+0x7c/0x208
+>> >> [    0.279399] [<ffffff8008b258f0>] arm64_dma_init+0x44/0x4c
+>> >> [    0.279461] [<ffffff8008083144>] do_one_initcall+0x38/0x128
+>> >> [    0.279525] [<ffffff8008b20d30>] kernel_init_freeable+0x1a0/0x240
+>> >> [    0.279596] [<ffffff8008807778>] kernel_init+0x10/0xfc
+>> >> [    0.279654] [<ffffff8008082b70>] ret_from_fork+0x10/0x20
+>> >
+>> > The following should address this. I didn't get to test it yet though.
+>> > ---
+>> > diff --git a/include/linux/mm.h b/include/linux/mm.h
+>> > index 21ee5503c702..8362dca071cb 100644
+>> > --- a/include/linux/mm.h
+>> > +++ b/include/linux/mm.h
+>> > @@ -32,6 +32,8 @@ struct user_struct;
+>> >  struct writeback_control;
+>> >  struct bdi_writeback;
+>> >
+>> > +void init_mm_internals(void);
+>> > +
+>> >  #ifndef CONFIG_NEED_MULTIPLE_NODES     /* Don't use mapnrs, do it properly */
+>> >  extern unsigned long max_mapnr;
+>> >
+>> > diff --git a/init/main.c b/init/main.c
+>> > index 51aa8f336819..c72d35250e84 100644
+>> > --- a/init/main.c
+>> > +++ b/init/main.c
+>> > @@ -1023,6 +1023,8 @@ static noinline void __init kernel_init_freeable(void)
+>> >
+>> >         workqueue_init();
+>> >
+>> > +       init_mm_internals();
+>> > +
+>> >         do_pre_smp_initcalls();
+>> >         lockup_detector_init();
+>> >
+>> > diff --git a/mm/vmstat.c b/mm/vmstat.c
+>> > index 4bbc775f9d08..d0871fc1aeca 100644
+>> > --- a/mm/vmstat.c
+>> > +++ b/mm/vmstat.c
+>> > @@ -1762,7 +1762,7 @@ static int vmstat_cpu_dead(unsigned int cpu)
+>> >
+>> >  struct workqueue_struct *mm_percpu_wq;
+>> >
+>> > -static int __init setup_vmstat(void)
+>> > +void __init init_mm_internals(void)
+>> >  {
+>> >         int ret __maybe_unused;
+>> >
+>> > @@ -1792,9 +1792,7 @@ static int __init setup_vmstat(void)
+>> >         proc_create("vmstat", S_IRUGO, NULL, &proc_vmstat_file_operations);
+>> >         proc_create("zoneinfo", S_IRUGO, NULL, &proc_zoneinfo_file_operations);
+>> >  #endif
+>> > -       return 0;
+>> >  }
+>> > -module_init(setup_vmstat)
+>> >
+>> >  #if defined(CONFIG_DEBUG_FS) && defined(CONFIG_COMPACTION)
+>>
+>> I did a test on arm64.  This do fix the warnings.
+>
+> Thanks! Can I assume your
+> Tested-by: Yang Li <pku.leo@gmail.com>
 
-Looks good
-Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+Sure.
 
-> ---
->  drivers/pinctrl/pinctrl-rockchip.c | 30 +++++++++++++++---------------
->  1 file changed, 15 insertions(+), 15 deletions(-)
-> 
-> diff --git a/drivers/pinctrl/pinctrl-rockchip.c
-> b/drivers/pinctrl/pinctrl-rockchip.c index 1defe83a5c4d..2f963aea64b2
-> 100644
-> --- a/drivers/pinctrl/pinctrl-rockchip.c
-> +++ b/drivers/pinctrl/pinctrl-rockchip.c
-> @@ -163,7 +163,7 @@ struct rockchip_pin_bank {
->  	struct irq_domain		*domain;
->  	struct gpio_chip		gpio_chip;
->  	struct pinctrl_gpio_range	grange;
-> -	spinlock_t			slock;
-> +	raw_spinlock_t			slock;
->  	u32				toggle_edge_mode;
->  };
-> 
-> @@ -1292,14 +1292,14 @@ static int rockchip_set_pull(struct
-> rockchip_pin_bank *bank,
-> 
->  	switch (ctrl->type) {
->  	case RK2928:
-> -		spin_lock_irqsave(&bank->slock, flags);
-> +		raw_spin_lock_irqsave(&bank->slock, flags);
-> 
->  		data = BIT(bit + 16);
->  		if (pull == PIN_CONFIG_BIAS_DISABLE)
->  			data |= BIT(bit);
->  		ret = regmap_write(regmap, reg, data);
-> 
-> -		spin_unlock_irqrestore(&bank->slock, flags);
-> +		raw_spin_unlock_irqrestore(&bank->slock, flags);
->  		break;
->  	case RK1108:
->  	case RK3188:
-> @@ -1433,7 +1433,7 @@ static int _rockchip_pmx_gpio_set_direction(struct
-> gpio_chip *chip, return ret;
-> 
->  	clk_enable(bank->clk);
-> -	spin_lock_irqsave(&bank->slock, flags);
-> +	raw_spin_lock_irqsave(&bank->slock, flags);
-> 
->  	data = readl_relaxed(bank->reg_base + GPIO_SWPORT_DDR);
->  	/* set bit to 1 for output, 0 for input */
-> @@ -1443,7 +1443,7 @@ static int _rockchip_pmx_gpio_set_direction(struct
-> gpio_chip *chip, data &= ~BIT(pin);
->  	writel_relaxed(data, bank->reg_base + GPIO_SWPORT_DDR);
-> 
-> -	spin_unlock_irqrestore(&bank->slock, flags);
-> +	raw_spin_unlock_irqrestore(&bank->slock, flags);
->  	clk_disable(bank->clk);
-> 
->  	return 0;
-> @@ -1874,7 +1874,7 @@ static void rockchip_gpio_set(struct gpio_chip *gc,
-> unsigned offset, int value) u32 data;
-> 
->  	clk_enable(bank->clk);
-> -	spin_lock_irqsave(&bank->slock, flags);
-> +	raw_spin_lock_irqsave(&bank->slock, flags);
-> 
->  	data = readl(reg);
->  	data &= ~BIT(offset);
-> @@ -1882,7 +1882,7 @@ static void rockchip_gpio_set(struct gpio_chip *gc,
-> unsigned offset, int value) data |= BIT(offset);
->  	writel(data, reg);
-> 
-> -	spin_unlock_irqrestore(&bank->slock, flags);
-> +	raw_spin_unlock_irqrestore(&bank->slock, flags);
->  	clk_disable(bank->clk);
->  }
-> 
-> @@ -1994,7 +1994,7 @@ static void rockchip_irq_demux(struct irq_desc *desc)
-> 
->  			data = readl_relaxed(bank->reg_base + GPIO_EXT_PORT);
->  			do {
-> -				spin_lock_irqsave(&bank->slock, flags);
-> +				raw_spin_lock_irqsave(&bank->slock, flags);
-> 
->  				polarity = readl_relaxed(bank->reg_base +
->  							 GPIO_INT_POLARITY);
-> @@ -2005,7 +2005,7 @@ static void rockchip_irq_demux(struct irq_desc *desc)
->  				writel(polarity,
->  				       bank->reg_base + GPIO_INT_POLARITY);
-> 
-> -				spin_unlock_irqrestore(&bank->slock, flags);
-> +				raw_spin_unlock_irqrestore(&bank->slock, flags);
-> 
->  				data_old = data;
->  				data = readl_relaxed(bank->reg_base +
-> @@ -2036,20 +2036,20 @@ static int rockchip_irq_set_type(struct irq_data *d,
-> unsigned int type) return ret;
-> 
->  	clk_enable(bank->clk);
-> -	spin_lock_irqsave(&bank->slock, flags);
-> +	raw_spin_lock_irqsave(&bank->slock, flags);
-> 
->  	data = readl_relaxed(bank->reg_base + GPIO_SWPORT_DDR);
->  	data &= ~mask;
->  	writel_relaxed(data, bank->reg_base + GPIO_SWPORT_DDR);
-> 
-> -	spin_unlock_irqrestore(&bank->slock, flags);
-> +	raw_spin_unlock_irqrestore(&bank->slock, flags);
-> 
->  	if (type & IRQ_TYPE_EDGE_BOTH)
->  		irq_set_handler_locked(d, handle_edge_irq);
->  	else
->  		irq_set_handler_locked(d, handle_level_irq);
-> 
-> -	spin_lock_irqsave(&bank->slock, flags);
-> +	raw_spin_lock_irqsave(&bank->slock, flags);
->  	irq_gc_lock(gc);
-> 
->  	level = readl_relaxed(gc->reg_base + GPIO_INTTYPE_LEVEL);
-> @@ -2092,7 +2092,7 @@ static int rockchip_irq_set_type(struct irq_data *d,
-> unsigned int type) break;
->  	default:
->  		irq_gc_unlock(gc);
-> -		spin_unlock_irqrestore(&bank->slock, flags);
-> +		raw_spin_unlock_irqrestore(&bank->slock, flags);
->  		clk_disable(bank->clk);
->  		return -EINVAL;
->  	}
-> @@ -2101,7 +2101,7 @@ static int rockchip_irq_set_type(struct irq_data *d,
-> unsigned int type) writel_relaxed(polarity, gc->reg_base +
-> GPIO_INT_POLARITY);
-> 
->  	irq_gc_unlock(gc);
-> -	spin_unlock_irqrestore(&bank->slock, flags);
-> +	raw_spin_unlock_irqrestore(&bank->slock, flags);
->  	clk_disable(bank->clk);
-> 
->  	return 0;
-> @@ -2383,7 +2383,7 @@ static struct rockchip_pin_ctrl
-> *rockchip_pinctrl_get_soc_data( for (i = 0; i < ctrl->nr_banks; ++i,
-> ++bank) {
->  		int bank_pins = 0;
-> 
-> -		spin_lock_init(&bank->slock);
-> +		raw_spin_lock_init(&bank->slock);
->  		bank->drvdata = d;
->  		bank->pin_base = ctrl->nr_pins;
->  		ctrl->nr_pins += bank->nr_pins;
+Tested-by: Li Yang <pku.leo@gmail.com>
+
+Regards,
+Leo
