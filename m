@@ -1,90 +1,51 @@
-From: dongas86@gmail.com (Dong Aisheng)
-Date: Wed, 15 Mar 2017 22:05:21 +0800
-Subject: [PATCH v2 05/12] Document: dt: binding: imx: update pinctrl doc
- for imx6sll
-In-Reply-To: <CACRpkdaLq125bKQcpHeFn312omxw9jp0VHr9DVanj42Y_29+mg@mail.gmail.com>
-References: <1482832070-22668-1-git-send-email-ping.bai@nxp.com>
- <1482832070-22668-6-git-send-email-ping.bai@nxp.com>
- <CACRpkdYUME8K+JusA0ORRKqxyBuhDdyei8eg7UZbHidKw9=bQw@mail.gmail.com>
- <CAA+hA=TL=Ys6j7YGOofAqrEGBcR15szvx3mMf-Dm03rnEa_VRA@mail.gmail.com>
- <CACRpkdaLq125bKQcpHeFn312omxw9jp0VHr9DVanj42Y_29+mg@mail.gmail.com>
-Message-ID: <CAA+hA=Rtw-4-SCf8svFq3E9TKv3zBD9T=nPhF7=3qEoH9k4wsA@mail.gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 15 Mar 2017 14:05:41 +0000
+Subject: [PATCH] drm/etnaviv: add etnaviv cooling device
+In-Reply-To: <1489582989.16018.4.camel@pengutronix.de>
+References: <E1cn8jj-0002mp-SO@rmk-PC.armlinux.org.uk>
+ <1489582989.16018.4.camel@pengutronix.de>
+Message-ID: <20170315140541.GT21222@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Wed, Mar 15, 2017 at 02:03:09PM +0100, Lucas Stach wrote:
+> Am Sonntag, den 12.03.2017, 19:00 +0000 schrieb Russell King:
+> > Each Vivante GPU contains a clock divider which can divide the GPU clock
+> > by 2^n, which can lower the power dissipation from the GPU.  It has been
+> > suggested that the GC600 on Dove is responsible for 20-30% of the power
+> > dissipation from the SoC, so lowering the GPU clock rate provides a way
+> > to throttle the power dissiptation, and reduce the temperature when the
+> > SoC gets hot.
+> > 
+> > This patch hooks the Etnaviv driver into the kernel's thermal management
+> > to allow the GPUs to be throttled when necessary, allowing a reduction in
+> > GPU clock rate from /1 to /64 in power of 2 steps.
+> 
+> Are those power of 2 steps a hardware limitation, or is it something you
+> implemented this way to get a smaller number of steps, with a more
+> meaningful difference in clock speed?
+> My understanding was that the FSCALE value is just a regular divider
+> with all steps values in the range of 1-64 being usable.
 
-On Tue, Mar 14, 2017 at 9:54 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Thu, Feb 16, 2017 at 8:51 AM, Dong Aisheng <dongas86@gmail.com> wrote:
->> On Tue, Dec 27, 2016 at 8:59 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
->
->>> I would consider augmenting the code in the driver to handle the generic
->>> bindings *in addition* to the old legacy bindings, and use those over these
->>> random custom bits.
-> (...)
->> Generic binding only supports parsing strings for pins and function
->> from dts right now, that means we need back to the old way of hardcoding
->> all register bits in driver which we actually chose to move out since
->> the commit "e164153 pinctrl: imx: move hard-coding data into device tree".
->
-> Aha I see.
->
->> One option is using macro definitions instead of raw data as pinctrl-single
->> users as OMAP.
->> e.g.
->> art2_pins: pinmux_uart2_pins {
->>         pinctrl-single,pins = <
->>                 OMAP4_IOPAD(0x118, PIN_INPUT_PULLUP | MUX_MODE0)
->>  /* uart2_cts.uart2_cts */
->>         ........
->>
->> For this way, no driver changes required, just replace the raw data by macro
->> in device tree. But i wonder this may not be your original intention although
->> it's the easiest way for us.
->> Anyway, if you agree, we probably would prefer this way.
->
-> That make it look better than it looks today, but...
->
->> Another option is partially convert to generic binding for only pad
->> configuration
->> part. e.g.
->> pinctrl_usdhc1: usdhc1grp {
->>         fsl,pins = <
->>                 MX7D_PAD_SD1_CMD__SD1_CMD
->>                 MX7D_PAD_SD1_CLK__SD1_CLK
->>                 MX7D_PAD_SD1_DATA0__SD1_DATA0
->>                 ...
->>         >;
->>         bias-pull-up = <47KOHM>;
->>         drive-strength = <130OHM>;
->>         slew-rate = <FAST>;
->>         speed = <50MHZ>;
->>         ....
->> };
->> (Some of the property still not supported or not the same as generic
->> binding right now)
->
-> This looks totally awesome, so if you could do this, it would be even
-> better.
->
->> This way requires no big drivers changes and only extend the driver
->> to support the generic pinctrl dt configuration properties.
->
-> Yep, you should be able to support both the old and the new
-> way of configuring the pins this way I guess.
->
->> And it also fix the raw data issues and looks like more applicable than the full
->> migration.
->>
->> So would you be willing to accept it?
->
-> Anything that move us closer to the generic bindings will be accepted.
->
+I don't share your understanding.  The Vivante GAL kernel driver only
+ever sets power-of-two values.  I have no evidence to support your
+suggestion.
 
-It's good to get an alignment with you.
-We will start to do that.
+There's evidence that says your understanding is incorrect however.
+It isn't a divider.  A value of 0x40 gives the fastest clock rate,
+a value of 0x01 gives the slowest.  If it were a binary divider,
+a value of 0x7f would give the slowest rate - so why doesn't Vivante
+use that in galcore when putting the GPU into idle/lower power - why
+do they just 0x01.
 
-Thanks
+This all leads me to believe that it's not a binary divider, but a
+set of bits that select the clock from a set of divide-by-two stages,
+and having more than one bit set is invalid.
 
-Regards
-Dong Aisheng
+However, without definitive information from Vivante, we'll never
+really know.  We're unlikely to get that.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
