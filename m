@@ -1,213 +1,109 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Wed, 15 Mar 2017 14:03:09 +0100
-Subject: [PATCH] drm/etnaviv: add etnaviv cooling device
-In-Reply-To: <E1cn8jj-0002mp-SO@rmk-PC.armlinux.org.uk>
-References: <E1cn8jj-0002mp-SO@rmk-PC.armlinux.org.uk>
-Message-ID: <1489582989.16018.4.camel@pengutronix.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 15 Mar 2017 14:08:57 +0100
+Subject: [PATCH] pinctrl: qcom: add get_direction function
+In-Reply-To: <20170315050850.GC1694@minitux>
+References: <1486768860-18237-1-git-send-email-timur@codeaurora.org>
+ <8652c018-4051-5c77-3126-2d41d150518a@codeaurora.org>
+ <CACRpkdaoHTZa+XjEBAMtO2dS1jevi5h-QYe90SrZDuJghQSyYw@mail.gmail.com>
+ <13b19c7f-9440-ab8e-8a2f-d1796a9b3dde@codeaurora.org>
+ <CACRpkdZFzYStyPfK1DwkZfvtd7wX9HtD1bnCy+i9h-7xowOz4g@mail.gmail.com>
+ <e209d18d-dc53-c0e9-448c-8a88264cac74@codeaurora.org>
+ <20170314233040.GH10239@codeaurora.org>
+ <c40b0ee7-6d8c-8c5d-d4c5-9ecf8076e44f@codeaurora.org>
+ <20170314234140.GI10239@codeaurora.org>
+ <f1152d48-004e-71bc-16a1-3a25990ba9e4@codeaurora.org>
+ <20170315050850.GC1694@minitux>
+Message-ID: <CACRpkdYE4svSgFywpgfM1zE72BaA_FsUCR1VeAGMLYykJCQoWw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Sonntag, den 12.03.2017, 19:00 +0000 schrieb Russell King:
-> Each Vivante GPU contains a clock divider which can divide the GPU clock
-> by 2^n, which can lower the power dissipation from the GPU.  It has been
-> suggested that the GC600 on Dove is responsible for 20-30% of the power
-> dissipation from the SoC, so lowering the GPU clock rate provides a way
-> to throttle the power dissiptation, and reduce the temperature when the
-> SoC gets hot.
-> 
-> This patch hooks the Etnaviv driver into the kernel's thermal management
-> to allow the GPUs to be throttled when necessary, allowing a reduction in
-> GPU clock rate from /1 to /64 in power of 2 steps.
+On Wed, Mar 15, 2017 at 6:08 AM, Bjorn Andersson
+<bjorn.andersson@linaro.org> wrote:
+> On Tue 14 Mar 17:12 PDT 2017, Timur Tabi wrote:
 
-Are those power of 2 steps a hardware limitation, or is it something you
-implemented this way to get a smaller number of steps, with a more
-meaningful difference in clock speed?
-My understanding was that the FSCALE value is just a regular divider
-with all steps values in the range of 1-64 being usable.
+>> Did you mean the gpio_chip.request callback?  Currently that points to
+>> gpiochip_generic_request in pinctrl-msm.c.
+>
+> It might be useful to fail gpio_get, as that gives a much nicer error
+> path in the client. But I'm slightly concerned about the few cases where
+> one of the pinmux states is gpio and that this would force the
+> gpio_get() only to be called after switching to that particular mode.
+>
+> @Linus, have there been any discussion around this in other drivers?
 
-Regards,
-Lucas
-> 
-> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
-> ---
->  drivers/gpu/drm/etnaviv/etnaviv_gpu.c | 84 ++++++++++++++++++++++++++++-------
->  drivers/gpu/drm/etnaviv/etnaviv_gpu.h |  2 +
->  2 files changed, 71 insertions(+), 15 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/etnaviv/etnaviv_gpu.c b/drivers/gpu/drm/etnaviv/etnaviv_gpu.c
-> index 130d7d517a19..bd95182d0852 100644
-> --- a/drivers/gpu/drm/etnaviv/etnaviv_gpu.c
-> +++ b/drivers/gpu/drm/etnaviv/etnaviv_gpu.c
-> @@ -18,6 +18,7 @@
->  #include <linux/dma-fence.h>
->  #include <linux/moduleparam.h>
->  #include <linux/of_device.h>
-> +#include <linux/thermal.h>
->  
->  #include "etnaviv_cmdbuf.h"
->  #include "etnaviv_dump.h"
-> @@ -409,6 +410,17 @@ static void etnaviv_gpu_load_clock(struct etnaviv_gpu *gpu, u32 clock)
->  	gpu_write(gpu, VIVS_HI_CLOCK_CONTROL, clock);
->  }
->  
-> +static void etnaviv_gpu_update_clock(struct etnaviv_gpu *gpu)
-> +{
-> +	unsigned int fscale = 1 << (6 - gpu->freq_scale);
-> +	u32 clock;
-> +
-> +	clock = VIVS_HI_CLOCK_CONTROL_DISABLE_DEBUG_REGISTERS |
-> +		VIVS_HI_CLOCK_CONTROL_FSCALE_VAL(fscale);
-> +
-> +	etnaviv_gpu_load_clock(gpu, clock);
-> +}
-> +
->  static int etnaviv_hw_reset(struct etnaviv_gpu *gpu)
->  {
->  	u32 control, idle;
-> @@ -426,11 +438,10 @@ static int etnaviv_hw_reset(struct etnaviv_gpu *gpu)
->  	timeout = jiffies + msecs_to_jiffies(1000);
->  
->  	while (time_is_after_jiffies(timeout)) {
-> -		control = VIVS_HI_CLOCK_CONTROL_DISABLE_DEBUG_REGISTERS |
-> -			  VIVS_HI_CLOCK_CONTROL_FSCALE_VAL(0x40);
-> -
->  		/* enable clock */
-> -		etnaviv_gpu_load_clock(gpu, control);
-> +		etnaviv_gpu_update_clock(gpu);
-> +
-> +		control = gpu_read(gpu, VIVS_HI_CLOCK_CONTROL);
->  
->  		/* Wait for stable clock.  Vivante's code waited for 1ms */
->  		usleep_range(1000, 10000);
-> @@ -490,11 +501,7 @@ static int etnaviv_hw_reset(struct etnaviv_gpu *gpu)
->  	}
->  
->  	/* We rely on the GPU running, so program the clock */
-> -	control = VIVS_HI_CLOCK_CONTROL_DISABLE_DEBUG_REGISTERS |
-> -		  VIVS_HI_CLOCK_CONTROL_FSCALE_VAL(0x40);
-> -
-> -	/* enable clock */
-> -	etnaviv_gpu_load_clock(gpu, control);
-> +	etnaviv_gpu_update_clock(gpu);
->  
->  	return 0;
->  }
-> @@ -1526,17 +1533,13 @@ static int etnaviv_gpu_hw_suspend(struct etnaviv_gpu *gpu)
->  #ifdef CONFIG_PM
->  static int etnaviv_gpu_hw_resume(struct etnaviv_gpu *gpu)
->  {
-> -	u32 clock;
->  	int ret;
->  
->  	ret = mutex_lock_killable(&gpu->lock);
->  	if (ret)
->  		return ret;
->  
-> -	clock = VIVS_HI_CLOCK_CONTROL_DISABLE_DEBUG_REGISTERS |
-> -		VIVS_HI_CLOCK_CONTROL_FSCALE_VAL(0x40);
-> -
-> -	etnaviv_gpu_load_clock(gpu, clock);
-> +	etnaviv_gpu_update_clock(gpu);
->  	etnaviv_gpu_hw_init(gpu);
->  
->  	gpu->switch_context = true;
-> @@ -1548,6 +1551,47 @@ static int etnaviv_gpu_hw_resume(struct etnaviv_gpu *gpu)
->  }
->  #endif
->  
-> +static int
-> +etnaviv_gpu_cooling_get_max_state(struct thermal_cooling_device *cdev,
-> +				  unsigned long *state)
-> +{
-> +	*state = 6;
-> +
-> +	return 0;
-> +}
-> +
-> +static int
-> +etnaviv_gpu_cooling_get_cur_state(struct thermal_cooling_device *cdev,
-> +				  unsigned long *state)
-> +{
-> +	struct etnaviv_gpu *gpu = cdev->devdata;
-> +
-> +	*state = gpu->freq_scale;
-> +
-> +	return 0;
-> +}
-> +
-> +static int
-> +etnaviv_gpu_cooling_set_cur_state(struct thermal_cooling_device *cdev,
-> +				  unsigned long state)
-> +{
-> +	struct etnaviv_gpu *gpu = cdev->devdata;
-> +
-> +	mutex_lock(&gpu->lock);
-> +	gpu->freq_scale = state;
-> +	if (!pm_runtime_suspended(gpu->dev))
-> +		etnaviv_gpu_update_clock(gpu);
-> +	mutex_unlock(&gpu->lock);
-> +
-> +	return 0;
-> +}
-> +
-> +static struct thermal_cooling_device_ops cooling_ops = {
-> +	.get_max_state = etnaviv_gpu_cooling_get_max_state,
-> +	.get_cur_state = etnaviv_gpu_cooling_get_cur_state,
-> +	.set_cur_state = etnaviv_gpu_cooling_set_cur_state,
-> +};
-> +
->  static int etnaviv_gpu_bind(struct device *dev, struct device *master,
->  	void *data)
->  {
-> @@ -1556,13 +1600,20 @@ static int etnaviv_gpu_bind(struct device *dev, struct device *master,
->  	struct etnaviv_gpu *gpu = dev_get_drvdata(dev);
->  	int ret;
->  
-> +	gpu->cooling = thermal_of_cooling_device_register(dev->of_node,
-> +				(char *)dev_name(dev), gpu, &cooling_ops);
-> +	if (IS_ERR(gpu->cooling))
-> +		return PTR_ERR(gpu->cooling);
-> +
->  #ifdef CONFIG_PM
->  	ret = pm_runtime_get_sync(gpu->dev);
->  #else
->  	ret = etnaviv_gpu_clk_enable(gpu);
->  #endif
-> -	if (ret < 0)
-> +	if (ret < 0) {
-> +		thermal_cooling_device_unregister(gpu->cooling);
->  		return ret;
-> +	}
->  
->  	gpu->drm = drm;
->  	gpu->fence_context = dma_fence_context_alloc(1);
-> @@ -1616,6 +1667,9 @@ static void etnaviv_gpu_unbind(struct device *dev, struct device *master,
->  	}
->  
->  	gpu->drm = NULL;
-> +
-> +	thermal_cooling_device_unregister(gpu->cooling);
-> +	gpu->cooling = NULL;
->  }
->  
->  static const struct component_ops gpu_ops = {
-> diff --git a/drivers/gpu/drm/etnaviv/etnaviv_gpu.h b/drivers/gpu/drm/etnaviv/etnaviv_gpu.h
-> index 1c0606ea7d5e..6a1e68eec24c 100644
-> --- a/drivers/gpu/drm/etnaviv/etnaviv_gpu.h
-> +++ b/drivers/gpu/drm/etnaviv/etnaviv_gpu.h
-> @@ -97,6 +97,7 @@ struct etnaviv_cmdbuf;
->  
->  struct etnaviv_gpu {
->  	struct drm_device *drm;
-> +	struct thermal_cooling_device *cooling;
->  	struct device *dev;
->  	struct mutex lock;
->  	struct etnaviv_chip_identity identity;
-> @@ -150,6 +151,7 @@ struct etnaviv_gpu {
->  	u32 hangcheck_fence;
->  	u32 hangcheck_dma_addr;
->  	struct work_struct recover_work;
-> +	unsigned int freq_scale;
->  };
->  
->  static inline void gpu_write(struct etnaviv_gpu *gpu, u32 reg, u32 data)
+Not more than the obvious, this driver has:
+
+        .request          = gpiochip_generic_request,
+        .free             = gpiochip_generic_free,
+
+Which will call:
+
+pinctrl_request_gpio()
+pinctrl_free_gpio()
+
+(Note: we now also have gpiochip_generic_config() and
+pinctrl_gpio_set_config(), you should maybe want to look into
+this because it makes it possible for the pin control back-end
+to support debouncing and open drain/source from the gpiolib
+side.)
+
+Anyways in some drivers (not pinctrl-msm.c) this ends up calling
+this helper callback in pinmux_ops:
+
+ * @gpio_request_enable: requests and enables GPIO on a certain pin.
+ *      Implement this only if you can mux every pin individually as GPIO. The
+ *      affected GPIO range is passed along with an offset(pin number) into that
+ *      specific GPIO range - function selectors and pin groups are orthogonal
+ *      to this, the core will however make sure the pins do not collide.
+
+If you do not have this kind of BIOS/ACPI playing around with the
+pins behind your back, then this is really helpful to avoid having
+to (in the DTS) mux all these pins to the GPIO function explicitly
+like this for example:
+
+/* Interrupt line for the KXSD9 accelerometer */
+dragon_kxsd9_gpios: kxsd9 {
+    irq {
+        pins = "gpio57"; /* IRQ line */
+        bias-pull-up;
+    };
+};
+
+Well, in this case, since we also need to set up a pull-up the DT node
+is needed anyways, but you get the idea.
+
+So we have a bunch of fit-all callbacks but the subsystem was
+constructed for a scenario where the kernel has full control over the
+pins.
+
+In the beg?nning ACPI people were saying they simply should not
+devise any pin control driver at all, because ACPI would handle all
+muxing behind the scenes. It turns out they were mostly too
+ambitious about that, one usecase is power optimizations that are
+not readily understood when writing the BIOS, other reasons are
+when you are building embedded systems and randomly adding some
+extra peripherals, in theory every vendor should ideally write a new
+ACPI table and reflash the BIOS but it appears that in practice they
+do not, so I think most of that hardware has some hybrid model.
+
+I would ask the Intel people about their position of ACPI and pin
+control interwork, they have most experience in this. If you
+git-blame drivers/gpio/gpiolib-acpi.c you can see that it is mostly
+written by Mika and Rafael.
+
+If you look in intel_pinmux_set_mux() you find that they do avoid
+muxing some pins:
+
+        /*
+         * All pins in the groups needs to be accessible and writable
+         * before we can enable the mux for this group.
+         */
+        for (i = 0; i < grp->npins; i++) {
+                if (!intel_pad_usable(pctrl, grp->pins[i])) {
+                        raw_spin_unlock_irqrestore(&pctrl->lock, flags);
+                        return -EBUSY;
+                }
+        }
+
+Yours,
+Linus Walleij
