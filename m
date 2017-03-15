@@ -1,54 +1,57 @@
-From: zyw@rock-chips.com (Chris Zhong)
-Date: Wed, 15 Mar 2017 17:55:23 +0800
-Subject: [PATCH 1/3] dt-bindings: add the grf clock for dw-mipi-dsi
-In-Reply-To: <3304582.Whtjx7Nypf@diego>
-References: <1489567352-3333-1-git-send-email-zyw@rock-chips.com>
- <3304582.Whtjx7Nypf@diego>
-Message-ID: <58C90F8B.7070102@rock-chips.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Wed, 15 Mar 2017 18:59:00 +0900
+Subject: [PATCH v33 01/14] memblock: add memblock_clear_nomap()
+In-Reply-To: <20170315095656.24992-1-takahiro.akashi@linaro.org>
+References: <20170315095656.24992-1-takahiro.akashi@linaro.org>
+Message-ID: <20170315095901.25063-1-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko
+This function, with a combination of memblock_mark_nomap(), will be used
+in a later kdump patch for arm64 when it temporarily isolates some range
+of memory from the other memory blocks in order to create a specific
+kernel mapping at boot time.
 
-On 03/15/2017 05:03 PM, Heiko St?bner wrote:
-> Am Mittwoch, 15. M?rz 2017, 16:42:30 CET schrieb Chris Zhong:
->> For RK3399, the grf clock should be controlled by dw-mipi-dsi driver,
->> add the description for this clock.
->>
->> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
->> ---
->>
->>   .../devicetree/bindings/display/rockchip/dw_mipi_dsi_rockchip.txt       | 2
->> +- 1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git
->> a/Documentation/devicetree/bindings/display/rockchip/dw_mipi_dsi_rockchip.t
->> xt
->> b/Documentation/devicetree/bindings/display/rockchip/dw_mipi_dsi_rockchip.t
->> xt index 188f6f7..7e17a60 100644
->> ---
->> a/Documentation/devicetree/bindings/display/rockchip/dw_mipi_dsi_rockchip.t
->> xt +++
->> b/Documentation/devicetree/bindings/display/rockchip/dw_mipi_dsi_rockchip.t
->> xt @@ -10,7 +10,7 @@ Required properties:
->>   - interrupts: Represent the controller's interrupt to the CPU(s).
->>   - clocks, clock-names: Phandles to the controller's pll reference
->>     clock(ref) and APB clock(pclk). For RK3399, a phy config clock
->> -  (phy_cfg) is additional required. As described in [1].
->> +  (phy_cfg) and a grf clock(grf) are additional required. As described in
->> [1].
-> your "grf" clock is optional, as it is not present on all socs (like the
-> rk3288) so should probably move to a separate section and not be in the
-> required properties
-For RK3399, the grf clock is required, according to the advice provided 
-by rob[0],
-put it into "required properties " is better.
-[0] https://patchwork.kernel.org/patch/9220187/
->
-> Heiko
->
->
->
+Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+---
+ include/linux/memblock.h |  1 +
+ mm/memblock.c            | 12 ++++++++++++
+ 2 files changed, 13 insertions(+)
 
+diff --git a/include/linux/memblock.h b/include/linux/memblock.h
+index bdfc65af4152..e82daffcfc44 100644
+--- a/include/linux/memblock.h
++++ b/include/linux/memblock.h
+@@ -93,6 +93,7 @@ int memblock_mark_hotplug(phys_addr_t base, phys_addr_t size);
+ int memblock_clear_hotplug(phys_addr_t base, phys_addr_t size);
+ int memblock_mark_mirror(phys_addr_t base, phys_addr_t size);
+ int memblock_mark_nomap(phys_addr_t base, phys_addr_t size);
++int memblock_clear_nomap(phys_addr_t base, phys_addr_t size);
+ ulong choose_memblock_flags(void);
+ 
+ /* Low level functions */
+diff --git a/mm/memblock.c b/mm/memblock.c
+index 696f06d17c4e..2f4ca8104ea4 100644
+--- a/mm/memblock.c
++++ b/mm/memblock.c
+@@ -805,6 +805,18 @@ int __init_memblock memblock_mark_nomap(phys_addr_t base, phys_addr_t size)
+ }
+ 
+ /**
++ * memblock_clear_nomap - Clear flag MEMBLOCK_NOMAP for a specified region.
++ * @base: the base phys addr of the region
++ * @size: the size of the region
++ *
++ * Return 0 on success, -errno on failure.
++ */
++int __init_memblock memblock_clear_nomap(phys_addr_t base, phys_addr_t size)
++{
++	return memblock_setclr_flag(base, size, 0, MEMBLOCK_NOMAP);
++}
++
++/**
+  * __next_reserved_mem_region - next function for for_each_reserved_region()
+  * @idx: pointer to u64 loop variable
+  * @out_start: ptr to phys_addr_t for start address of the region, can be %NULL
 -- 
-Chris Zhong
+2.11.1
