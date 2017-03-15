@@ -1,51 +1,31 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 15 Mar 2017 14:05:41 +0000
-Subject: [PATCH] drm/etnaviv: add etnaviv cooling device
-In-Reply-To: <1489582989.16018.4.camel@pengutronix.de>
-References: <E1cn8jj-0002mp-SO@rmk-PC.armlinux.org.uk>
- <1489582989.16018.4.camel@pengutronix.de>
-Message-ID: <20170315140541.GT21222@n2100.armlinux.org.uk>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 15 Mar 2017 22:15:22 +0800
+Subject: Applied "ASoC: sun8i-codec: Update mixer to use SOC_DAPM_DOUBLE"
+ to the asoc tree
+In-Reply-To: <20170315134323.i3pvla3pzejmkxwh@sirena.org.uk>
+References: <20170210094133.11382-3-mylene.josserand@free-electrons.com>
+ <E1clbY9-0000DH-LY@finisterre>
+ <CAGb2v6428PpYPzpHngLgaeziwKN8u-TYiNO1bs7TFw-7VrQOAg@mail.gmail.com>
+ <20170315134323.i3pvla3pzejmkxwh@sirena.org.uk>
+Message-ID: <CAGb2v67-b+8CM0MqhT_YQeuNxEnVoxG-COZPy8LW32Eb-QE67Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 15, 2017 at 02:03:09PM +0100, Lucas Stach wrote:
-> Am Sonntag, den 12.03.2017, 19:00 +0000 schrieb Russell King:
-> > Each Vivante GPU contains a clock divider which can divide the GPU clock
-> > by 2^n, which can lower the power dissipation from the GPU.  It has been
-> > suggested that the GC600 on Dove is responsible for 20-30% of the power
-> > dissipation from the SoC, so lowering the GPU clock rate provides a way
-> > to throttle the power dissiptation, and reduce the temperature when the
-> > SoC gets hot.
-> > 
-> > This patch hooks the Etnaviv driver into the kernel's thermal management
-> > to allow the GPUs to be throttled when necessary, allowing a reduction in
-> > GPU clock rate from /1 to /64 in power of 2 steps.
-> 
-> Are those power of 2 steps a hardware limitation, or is it something you
-> implemented this way to get a smaller number of steps, with a more
-> meaningful difference in clock speed?
-> My understanding was that the FSCALE value is just a regular divider
-> with all steps values in the range of 1-64 being usable.
+On Wed, Mar 15, 2017 at 9:43 PM, Mark Brown <broonie@kernel.org> wrote:
+> On Tue, Mar 14, 2017 at 12:31:22PM +0800, Chen-Yu Tsai wrote:
+>> On Wed, Mar 8, 2017 at 9:22 PM, Mark Brown <broonie@kernel.org> wrote:
+>> This patch changes the mixer controls exposed to user space.
+>
+>> This driver was just introduced in 4.11-rc1. Would it make sense to
+>> merge these cleanup patches as fixes for 4.11, so we don't affect
+>> userspace across kernel releases?
+>
+> It would but it doesn't pick over cleanly, it looks like it depends on
+> some of the other changes.
 
-I don't share your understanding.  The Vivante GAL kernel driver only
-ever sets power-of-two values.  I have no evidence to support your
-suggestion.
+It depends on the second half of commit 4aa8146c89f3 ("ASoC: sun8i-codec:
+Remove analog "HP" widget"), which is also a cleanup. Would it be OK
+to pick these two over to fixes then? Or should we send a clean version
+instead?
 
-There's evidence that says your understanding is incorrect however.
-It isn't a divider.  A value of 0x40 gives the fastest clock rate,
-a value of 0x01 gives the slowest.  If it were a binary divider,
-a value of 0x7f would give the slowest rate - so why doesn't Vivante
-use that in galcore when putting the GPU into idle/lower power - why
-do they just 0x01.
-
-This all leads me to believe that it's not a binary divider, but a
-set of bits that select the clock from a set of divide-by-two stages,
-and having more than one bit set is invalid.
-
-However, without definitive information from Vivante, we'll never
-really know.  We're unlikely to get that.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+ChenYu
