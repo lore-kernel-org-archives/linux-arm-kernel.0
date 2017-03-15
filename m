@@ -1,40 +1,76 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Wed, 15 Mar 2017 18:12:53 +0100
-Subject: [RFC PATCH 2/4] pinctrl: rockchip: convert to raw spinlock
-In-Reply-To: <20170315165900.63f32371.john@metanate.com>
-References: <20170313183813.3582-1-john@metanate.com>
- <2549921.4Nq1JGygY8@phil> <20170315165900.63f32371.john@metanate.com>
-Message-ID: <5561804.yNijhH7yqI@phil>
+From: dwmw2@infradead.org (David Woodhouse)
+Date: Wed, 15 Mar 2017 17:17:46 +0000
+Subject: [PATCH 1/3] arm64: enable pci resource mapping using sysfs
+Message-ID: <1489598266.86622.12.camel@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 15. M?rz 2017, 16:59:00 CET schrieb John Keeping:
-> On Wed, 15 Mar 2017 17:41:21 +0100, Heiko Stuebner wrote:
-> > Am Mittwoch, 15. M?rz 2017, 17:28:56 CET schrieb Heiko Stuebner:
-> > > Am Montag, 13. M?rz 2017, 18:38:11 CET schrieb John Keeping:
-> > > > This lock is used from rockchip_irq_set_type() which is part of the
-> > > > irq_chip implementation and thus must use raw_spinlock_t as documented
-> > > > in Documentation/gpio/driver.txt.
-> > > > 
-> > > > Signed-off-by: John Keeping <john@metanate.com>
-> > > 
-> > > Looks good
-> > > Reviewed-by: Heiko Stuebner <heiko@sntech.de>
-> > 
-> > I have to take that back.
-> > This leaves the spin_lock in the schmitt trigger unconverted and produces
-> > compile issues.
-> > 
-> > So it either needs to be converted or removed - I guess it should be
-> > removed.
-> Yes, it looks like it should be removed - the patches adding that hadn't
-> been applied when I sent this out!
-> 
-> I'll rebase and add the schmitt trigger change to patch 1 in a day or
-> two, after giving a bit more time for reviews.
+From: Brijesh Singh <brijess@amazon.com>
 
-I don't think you need to wait overly long. Linus seems happy, I'm happy and 
-the schmitt issue in the open might prevent people from taking a closer look.
+To support pci resource mapping from userspace, pci_mmap_page_range
+implementation must be done for that platform. This support was
+broken for arm64.
 
+This patch copies existing implementation from arm to
+enable sysfs mmap.
 
-Heiko
+[dwmw2: Add WC support]
+Reviewed-by: Erik Quanstrom <quanstro@amazon.com>
+Reviewed-by: Anthony Liguori <aliguori@amazon.com>
+Signed-off-by: Brijesh Singh <brijess@amazon.com>
+Signed-off-by: David Woodhouse <dwmw@amazon.co.uk>
+---
+ arch/arm64/include/asm/pci.h |  4 ++++
+ arch/arm64/kernel/pci.c      | 19 +++++++++++++++++++
+ 2 files changed, 23 insertions(+)
+
+diff --git a/arch/arm64/include/asm/pci.h b/arch/arm64/include/asm/pci.h
+index b9a7ba9..f73734f 100644
+--- a/arch/arm64/include/asm/pci.h
++++ b/arch/arm64/include/asm/pci.h
+@@ -37,5 +37,9 @@ static inline int pci_proc_domain(struct pci_bus *bus)
+ }
+ #endif  /* CONFIG_PCI */
+ 
++#define HAVE_PCI_MMAP
++extern int pci_mmap_page_range(struct pci_dev *dev, struct vm_area_struct *vma,
++			       enum pci_mmap_state mmap_state, int write_combine);
++
+ #endif  /* __KERNEL__ */
+ #endif  /* __ASM_PCI_H */
+diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
+index 4f0e3eb..a9b6542 100644
+--- a/arch/arm64/kernel/pci.c
++++ b/arch/arm64/kernel/pci.c
+@@ -228,3 +228,22 @@ void pcibios_remove_bus(struct pci_bus *bus)
+ }
+ 
+ #endif
++
++int pci_mmap_page_range(struct pci_dev *dev, struct vm_area_struct *vma,
++			enum pci_mmap_state mmap_state, int write_combine)
++{
++	if (mmap_state == pci_mmap_io)
++		return -EINVAL;
++
++	if (write_combine)
++		vma->vm_page_prot = pgprot_writecombine(vma->vm_page_prot);
++	else
++		vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
++
++	if (remap_pfn_range(vma, vma->vm_start, vma->vm_pgoff,
++			     vma->vm_end - vma->vm_start,
++			     vma->vm_page_prot))
++		return -EAGAIN;
++
++	return 0;
++}
+-- 
+dwmw2
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: smime.p7s
+Type: application/x-pkcs7-signature
+Size: 4938 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170315/dfa57403/attachment-0001.bin>
