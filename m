@@ -1,39 +1,75 @@
 From: isubramanian@apm.com (Iyappan Subramanian)
-Date: Wed, 15 Mar 2017 13:27:17 -0700
-Subject: [PATCH net-next 3/7] drivers: net: xgene: Fix wrong logical operation
+Date: Wed, 15 Mar 2017 13:27:18 -0700
+Subject: [PATCH net-next 4/7] drivers: net: xgene: Fix Rx checksum validation
+ logic
 In-Reply-To: <1489609641-31557-1-git-send-email-isubramanian@apm.com>
 References: <1489609641-31557-1-git-send-email-isubramanian@apm.com>
-Message-ID: <1489609641-31557-4-git-send-email-isubramanian@apm.com>
+Message-ID: <1489609641-31557-5-git-send-email-isubramanian@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Quan Nguyen <qnguyen@apm.com>
+This patch fixes Rx checksum validation logic and
+adds NETIF_F_RXCSUM flag.
 
-This patch fixes the wrong logical OR operation by changing it to
-bit-wise OR operation.
-
-Fixes: 3bb502f83080 ("drivers: net: xgene: fix statistics counters race condition")
 Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
-Signed-off-by: Quan Nguyen <qnguyen@apm.com>
 ---
- drivers/net/ethernet/apm/xgene/xgene_enet_main.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/net/ethernet/apm/xgene/xgene_enet_main.c | 27 +++++++++++++++---------
+ 1 file changed, 17 insertions(+), 10 deletions(-)
 
 diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_main.c b/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
-index b3568c4..ec43278 100644
+index ec43278..e881365 100644
 --- a/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
 +++ b/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
-@@ -677,9 +677,9 @@ static int xgene_enet_rx_frame(struct xgene_enet_desc_ring *rx_ring,
- 	buf_pool->rx_skb[skb_index] = NULL;
+@@ -601,14 +601,24 @@ static netdev_tx_t xgene_enet_start_xmit(struct sk_buff *skb,
+ 	return NETDEV_TX_OK;
+ }
  
- 	/* checking for error */
--	status = (GET_VAL(ELERR, le64_to_cpu(raw_desc->m0)) << LERR_LEN) ||
-+	status = (GET_VAL(ELERR, le64_to_cpu(raw_desc->m0)) << LERR_LEN) |
- 		  GET_VAL(LERR, le64_to_cpu(raw_desc->m0));
--	if (unlikely(status > 2)) {
-+	if (unlikely(status)) {
- 		dev_kfree_skb_any(skb);
- 		xgene_enet_free_pagepool(page_pool, raw_desc, exp_desc);
- 		xgene_enet_parse_error(rx_ring, netdev_priv(rx_ring->ndev),
+-static void xgene_enet_skip_csum(struct sk_buff *skb)
++static void xgene_enet_rx_csum(struct sk_buff *skb)
+ {
++	struct net_device *ndev = skb->dev;
+ 	struct iphdr *iph = ip_hdr(skb);
+ 
+-	if (!ip_is_fragment(iph) ||
+-	    (iph->protocol != IPPROTO_TCP && iph->protocol != IPPROTO_UDP)) {
+-		skb->ip_summed = CHECKSUM_UNNECESSARY;
+-	}
++	if (!(ndev->features & NETIF_F_RXCSUM))
++		return;
++
++	if (skb->protocol != htons(ETH_P_IP))
++		return;
++
++	if (ip_is_fragment(iph))
++		return;
++
++	if (iph->protocol != IPPROTO_TCP && iph->protocol != IPPROTO_UDP)
++		return;
++
++	skb->ip_summed = CHECKSUM_UNNECESSARY;
+ }
+ 
+ static void xgene_enet_free_pagepool(struct xgene_enet_desc_ring *buf_pool,
+@@ -729,10 +739,7 @@ static int xgene_enet_rx_frame(struct xgene_enet_desc_ring *rx_ring,
+ skip_jumbo:
+ 	skb_checksum_none_assert(skb);
+ 	skb->protocol = eth_type_trans(skb, ndev);
+-	if (likely((ndev->features & NETIF_F_IP_CSUM) &&
+-		   skb->protocol == htons(ETH_P_IP))) {
+-		xgene_enet_skip_csum(skb);
+-	}
++	xgene_enet_rx_csum(skb);
+ 
+ 	rx_ring->rx_packets++;
+ 	rx_ring->rx_bytes += datalen;
+@@ -2039,7 +2046,7 @@ static int xgene_enet_probe(struct platform_device *pdev)
+ 	xgene_enet_setup_ops(pdata);
+ 
+ 	if (pdata->phy_mode == PHY_INTERFACE_MODE_XGMII) {
+-		ndev->features |= NETIF_F_TSO;
++		ndev->features |= NETIF_F_TSO | NETIF_F_RXCSUM;
+ 		spin_lock_init(&pdata->mss_lock);
+ 	}
+ 	ndev->hw_features = ndev->features;
 -- 
 1.9.1
