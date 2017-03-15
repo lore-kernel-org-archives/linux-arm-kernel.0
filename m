@@ -1,70 +1,141 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Wed, 15 Mar 2017 14:33:31 +0000
-Subject: [PATCH 3/3] kvm: arm/arm64: Fix locking for kvm_free_stage2_pgd
-In-Reply-To: <0e5ff7f7-855c-ea28-fdee-73c062c3d289@arm.com>
-References: <1489503154-20705-1-git-send-email-suzuki.poulose@arm.com>
- <1489503154-20705-4-git-send-email-suzuki.poulose@arm.com>
- <20170315092147.GM1277@cbox> <314fbde3-17e6-414b-85e6-326de22bdc1c@arm.com>
- <20170315105639.GA31974@cbox> <0e5ff7f7-855c-ea28-fdee-73c062c3d289@arm.com>
-Message-ID: <0afc4248-9a1b-ee0f-8f9b-5357707b9d72@arm.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Wed, 15 Mar 2017 10:33:53 -0400
+Subject: [PATCH V4 0/3] PCI/ASPM: reconfigure ASPM following hotplug for
+ POLICY_DEFAULT
+In-Reply-To: <20170314192138.GA26264@bhelgaas-glaptop.roam.corp.google.com>
+References: <1489438085-2055-1-git-send-email-okaya@codeaurora.org>
+ <20170313214616.GE8232@bhelgaas-glaptop.roam.corp.google.com>
+ <c6b78903-ea09-9719-7073-c679b0b64a05@codeaurora.org>
+ <20170313230855.GG8232@bhelgaas-glaptop.roam.corp.google.com>
+ <b44fa6b3-7db5-bea4-7f2e-7f880362d171@codeaurora.org>
+ <20170314192138.GA26264@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <8fa282de-9896-0e2a-01cb-7146817268e6@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/03/17 13:28, Marc Zyngier wrote:
-> On 15/03/17 10:56, Christoffer Dall wrote:
->> On Wed, Mar 15, 2017 at 09:39:26AM +0000, Marc Zyngier wrote:
->>> On 15/03/17 09:21, Christoffer Dall wrote:
->>>> On Tue, Mar 14, 2017 at 02:52:34PM +0000, Suzuki K Poulose wrote:
->>>>> In kvm_free_stage2_pgd() we don't hold the kvm->mmu_lock while calling
->>>>> unmap_stage2_range() on the entire memory range for the guest. This could
->>>>> cause problems with other callers (e.g, munmap on a memslot) trying to
->>>>> unmap a range.
->>>>>
->>>>> Fixes: commit d5d8184d35c9 ("KVM: ARM: Memory virtualization setup")
->>>>> Cc: stable at vger.kernel.org # v3.10+
->>>>> Cc: Marc Zyngier <marc.zyngier@arm.com>
->>>>> Cc: Christoffer Dall <christoffer.dall@linaro.org>
->>>>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+On 3/14/2017 3:21 PM, Bjorn Helgaas wrote:
+> On Mon, Mar 13, 2017 at 07:21:42PM -0400, Sinan Kaya wrote:
+>> On 3/13/2017 7:08 PM, Bjorn Helgaas wrote:
+>>> On Mon, Mar 13, 2017 at 06:05:55PM -0400, Sinan Kaya wrote:
+>>>> On 3/13/2017 5:46 PM, Bjorn Helgaas wrote:
+>>>>> What is this series based on?  Unless they depend on other in-flight
+>>>>> patches, I apply patches to branches based on my "master" branch,
+>>>>> which is typically -rc1 or -rc2 (it's currently v4.11-rc1).  These
+>>>>> don't apply to either.
+>>>>
+>>>> It looks like I am on 4.10. I can rebase and post again. 
+>>>
+>>> Rebasing would be good, but I can give you some comments on your v4,
+>>> now that I can apply it and see what it looks like.
+>>>
+>>
+>> Thanks, 
+>>
+>> I'm mostly done with the rebase. I'll have to retest tomorrow morning and
+>> then post.
+>>
+>> I had to drop this
+>>
+>>    - for endpoints, have pcie_aspm_init_link_state() do the actual ASPM
+>>       setup of the link as it currently does.
+>>
+>> during rebase.
+>>
+>> The reason is that the clock configuration needs to switch to common clock
+>> mode across all the devices before any ASPM latency is read/configured.
+>>
+>> Common clock configuration seem to be trying to walk the device list.
+>>
+>> Here is the untested version. It might not even compile.
+>> I'll wait until I receive your comments.
+> 
+> I had already started looking at v4, so these comments are based on
+> that.  Your v4 is a great start and these are all general comments so
+> I didn't try to match each one up with the code.
+> 
+>   - Goal: retain BIOS ASPM config of bridge even if children are
+>     removed and re-added.  Is there a bugzilla for this problem?
 
-...
+No, I do not have a bugzilla.
 
->> ok, then there's just the concern that we may be holding a spinlock for
->> a very long time.  I seem to recall Mario once added something where he
->> unlocked and gave a chance to schedule something else for each PUD or
->> something like that, because he ran into the issue during migration.  Am
->> I confusing this with something else?
->
-> That definitely rings a bell: stage2_wp_range() uses that kind of trick
-> to give the system a chance to breathe. Maybe we could use a similar
-> trick in our S2 unmapping code? How about this (completely untested) patch:
->
-> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-> index 962616fd4ddd..1786c24212d4 100644
-> --- a/arch/arm/kvm/mmu.c
-> +++ b/arch/arm/kvm/mmu.c
-> @@ -292,8 +292,13 @@ static void unmap_stage2_range(struct kvm *kvm, phys_addr_t start, u64 size)
->  	phys_addr_t addr = start, end = start + size;
->  	phys_addr_t next;
->
-> +	BUG_ON(!spin_is_locked(&kvm->mmu_lock));
-> +
->  	pgd = kvm->arch.pgd + stage2_pgd_index(addr);
->  	do {
-> +		if (need_resched() || spin_needbreak(&kvm->mmu_lock))
-> +			cond_resched_lock(&kvm->mmu_lock);
+> 
+>   - pci_aspm_init(): Fix function comment.  Called for every device we
+>     enumerate.  
 
-nit: I think we could make the cond_resched_lock() unconditionally here:
-Given, __cond_resched_lock() already does all the above checks :
+Sure.
 
-kernel/sched/core.c:
+>     Maybe split body into pci_aspm_init_upstream() (the
+>     has_secondary_link part) and pci_aspm_init_downstream() (or maybe
+>     these end up being similar enough that splitting doesn't make
+>     sense).  I don't think we should need locking in either case
+>     because this is a new device we're in the process of enumerating.
 
-int __cond_resched_lock(spinlock_t *lock)
-{
-         int resched = should_resched(PREEMPT_LOCK_OFFSET);
+I'll get rid of the locking. 
+> 
+>     - Upstream link partner:  Shouldn't need to check pdev->link_state
+>       (should always be NULL for a brand-new device).  Should allocate
+>       link_state and capture everything that doesn't depend on the
+>       downstream link partner, i.e., all DEVCAP & LNKCAP info (this
+>       includes the initial BIOS config you're after).
 
-...
+Yup, this is done on my last patch. I moved it to a separate patch to make
+it obvious. Once I finish incorporating your comments and tests, I'll post
+the updated version.
 
-         if (spin_needbreak(lock) || resched) {
+> 
+>     - Downstream link partner: (devices where dev->has_secondary_link
+>       is not set).  Capture device-specific state, i.e., DEVCAP &
+>       LNKCAP info, exit latencies and latency requirements.  The
+>       sanity check/blacklist stuff only depends on the downstream link
+>       partner and maybe could be computed and saved here, e.g., in a
+>       new pdev->aspm_blacklist or pdev->link->blacklist.  
 
+I removed reading upstream device specific pieces out of this function on
+the last patch. The reason is that common clock may not have been set up
+by the time we reach to this function. Any register reads from capabilities
+will be incorrect until we switch to common clock and switching to common
+clock requires walking the children objects.
 
-Suzuki
+> 
+>       Probably should not *write* to any hardware configuration, e.g.,
+>       common clock configuration, because some of that depends on all
+>       siblings, and we haven't enumerated them all yet.  The hardware
+>       configuration should probably be done in
+>       pcie_aspm_init_link_state().
+
+Even reading the capabilities are incorrect. Devices maintain two sets of
+capabilities. One for common clock and one without common clock. We would
+be reading the incorrect one based on whether common clock is setup or not
+during boot.
+
+> 
+>   - pcie_aspm_init_link_state(): Called for bridges (upstream end of
+>     link) after all children have been enumerated.  No longer needs to
+>     check aspm_support_enabled or pdev->has_secondary_link or the VIA
+>     quirk: pci_aspm_init() already checked that stuff, so we only need
+>     to check pdev->link_state here.  Probably should do the common
+>     clock config here instead of in pci_aspm_init().
+
+I agree. This is the correct place. I'll remove the extra checks. The only
+thing that I do not understand well is the VIA configuration and I'm afraid
+I'm going to break it. 
+
+> 
+>   - pcie_aspm_configure_common_clock(): I don't think you touched
+>     this, but this might be a good opportunity to move the re-read
+>     (pcie_get_aspm_reg() stuff) into this function so it doesn't
+>     clutter the caller?  Could be a preliminary cleanup patch.
+> 
+>     PCI_EXP_LNKSTA_SLC is HwInit, which means it's read-only and could
+>     be captured at pci_aspm_init()-time.  Currently we only look at
+>     SLC for the first child, but pci_aspm_init_upstream() could set a
+>     link->downstream_slc bit, and pci_aspm_init_downstream() could
+>     clear it if it found a device with SLC not set.
+> 
+
+Let me look at these more.
+
+-- 
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
