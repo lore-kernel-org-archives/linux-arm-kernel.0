@@ -1,573 +1,421 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 15 Mar 2017 14:39:11 +0100
-Subject: [PATCH v2] pata: remove the at91 driver
-Message-ID: <1489585151-16415-1-git-send-email-boris.brezillon@free-electrons.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 15 Mar 2017 14:39:26 +0100
+Subject: [PATCH v6 09/14] mmc: sdhci-xenon: Add support to PHYs of Marvell
+ Xenon SDHC
+In-Reply-To: <b646d28daf3d8cb8e57774ce040f39350364041e.1487091464.git-series.gregory.clement@free-electrons.com>
+References: <cover.ff78bebe0384f650a51e5e6f0f1dca6e7894b53b.1487091464.git-series.gregory.clement@free-electrons.com>
+ <b646d28daf3d8cb8e57774ce040f39350364041e.1487091464.git-series.gregory.clement@free-electrons.com>
+Message-ID: <CAPDyKFrQb3NA53o6z9go0+RxxvstwWdeLHpiXtKaXOksxrov3g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This driver is orphan since commit b2026f708e09 ("ARM: at91: remove
-at91sam9260/at91sam9g20 legacy board support"). Given that nobody cared
-adding DT support to it, it probably means it's no longer used and is
-thus a good candidate for removal.
+On 14 February 2017 at 18:01, Gregory CLEMENT
+<gregory.clement@free-electrons.com> wrote:
+> From: Hu Ziji <huziji@marvell.com>
+>
+> Marvell Xenon eMMC/SD/SDIO Host Controller contains PHY.
+> Multiple types of PHYs are supported.
+>
+> Add support to multiple types of PHYs init and configuration.
+> Add register definitions of PHYs.
+>
+> Xenon PHY cannot fit in kernel common PHY framework.
+> Xenon SDHC PHY register is a part of Xenon SDHC register set.
+> Besides, MMC initialization has to call several PHY functions to
+> complete timing setting.
+> Those PHY setting functions have to access SDHC registers and know
+> current MMC setting, such as bus width, clock frequency and
+> speed mode.
+> As a result, implement Xenon PHY in MMC host directory.
+>
+> Signed-off-by: Hu Ziji <huziji@marvell.com>
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> ---
+>  drivers/mmc/host/Makefile          |   2 +-
+>  drivers/mmc/host/sdhci-xenon-phy.c | 751 ++++++++++++++++++++++++++++++-
+>  drivers/mmc/host/sdhci-xenon.c     |   3 +-
+>  drivers/mmc/host/sdhci-xenon.h     |  37 +-
+>  4 files changed, 791 insertions(+), 2 deletions(-)
+>  create mode 100644 drivers/mmc/host/sdhci-xenon-phy.c
 
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-Acked-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
----
-Note that I'm removing this driver because I plan to rework the macro
-definitions in atmel-smc.h, and some of them are used in this driver.
-Since I can't test it, and this drivers is not used anymore, it's probably
-better to remove it.
+I see, you put the phy implementation in a separate file. I guess that
+makes sense. However, I leave the decision for Adrian.
 
-Changes since v1:
-- add Bartlomiej's and Nicolas' ack
-- fix the commit id/message that made the pata_at91 driver orphan
----
- drivers/ata/Kconfig     |   8 -
- drivers/ata/Makefile    |   1 -
- drivers/ata/pata_at91.c | 503 ------------------------------------------------
- 3 files changed, 512 deletions(-)
- delete mode 100644 drivers/ata/pata_at91.c
+Anyway, in such case I guess the extended Makefile options and the
+separate header files makes sense.
 
-diff --git a/drivers/ata/Kconfig b/drivers/ata/Kconfig
-index 70b57d2229d6..3c878d64449c 100644
---- a/drivers/ata/Kconfig
-+++ b/drivers/ata/Kconfig
-@@ -885,14 +885,6 @@ config PATA_AT32
- 
- 	  If unsure, say N.
- 
--config PATA_AT91
--	tristate "PATA support for AT91SAM9260"
--	depends on ARM && SOC_AT91SAM9
--	help
--	  This option enables support for IDE devices on the Atmel AT91SAM9260 SoC.
--
--	  If unsure, say N.
--
- config PATA_CMD640_PCI
- 	tristate "CMD640 PCI PATA support (Experimental)"
- 	depends on PCI
-diff --git a/drivers/ata/Makefile b/drivers/ata/Makefile
-index 89a0a1915d36..e29feb16bda1 100644
---- a/drivers/ata/Makefile
-+++ b/drivers/ata/Makefile
-@@ -91,7 +91,6 @@ obj-$(CONFIG_PATA_WINBOND)	+= pata_sl82c105.o
- 
- # SFF PIO only
- obj-$(CONFIG_PATA_AT32)		+= pata_at32.o
--obj-$(CONFIG_PATA_AT91)		+= pata_at91.o
- obj-$(CONFIG_PATA_CMD640_PCI)	+= pata_cmd640.o
- obj-$(CONFIG_PATA_FALCON)	+= pata_falcon.o
- obj-$(CONFIG_PATA_ISAPNP)	+= pata_isapnp.o
-diff --git a/drivers/ata/pata_at91.c b/drivers/ata/pata_at91.c
-deleted file mode 100644
-index fd5b34f0d007..000000000000
---- a/drivers/ata/pata_at91.c
-+++ /dev/null
-@@ -1,503 +0,0 @@
--/*
-- * PATA driver for AT91SAM9260 Static Memory Controller
-- * with CompactFlash interface in True IDE mode
-- *
-- * Copyright (C) 2009 Matyukevich Sergey
-- *               2011 Igor Plyatov
-- *
-- * Based on:
-- *      * generic platform driver by Paul Mundt: drivers/ata/pata_platform.c
-- *      * pata_at32 driver by Kristoffer Nyborg Gregertsen
-- *      * at91_ide driver by Stanislaw Gruszka
-- *
-- * This program is free software; you can redistribute it and/or modify it
-- * under the terms of the GNU General Public License version 2
-- * as published by the Free Software Foundation.
-- *
-- */
--
--#include <linux/kernel.h>
--#include <linux/module.h>
--#include <linux/blkdev.h>
--#include <linux/gfp.h>
--#include <scsi/scsi_host.h>
--#include <linux/ata.h>
--#include <linux/clk.h>
--#include <linux/libata.h>
--#include <linux/mfd/syscon.h>
--#include <linux/mfd/syscon/atmel-smc.h>
--#include <linux/platform_device.h>
--#include <linux/ata_platform.h>
--#include <linux/platform_data/atmel.h>
--#include <linux/regmap.h>
--#include <linux/gpio.h>
--
--#define DRV_NAME		"pata_at91"
--#define DRV_VERSION		"0.3"
--
--#define CF_IDE_OFFSET		0x00c00000
--#define CF_ALT_IDE_OFFSET	0x00e00000
--#define CF_IDE_RES_SIZE		0x08
--#define CS_PULSE_MAXIMUM	319
--#define ER_SMC_CALC		1
--#define ER_SMC_RECALC		2
--
--struct at91_ide_info {
--	unsigned long mode;
--	unsigned int cs;
--	struct clk *mck;
--	void __iomem *ide_addr;
--	void __iomem *alt_addr;
--};
--
--/**
-- * struct smc_range - range of valid values for SMC register.
-- */
--struct smc_range {
--	int min;
--	int max;
--};
--
--struct regmap *smc;
--
--struct at91sam9_smc_generic_fields {
--	struct regmap_field *setup;
--	struct regmap_field *pulse;
--	struct regmap_field *cycle;
--	struct regmap_field *mode;
--} fields;
--
--/**
-- * adjust_smc_value - adjust value for one of SMC registers.
-- * @value: adjusted value
-- * @range: array of SMC ranges with valid values
-- * @size: SMC ranges array size
-- *
-- * This returns the difference between input and output value or negative
-- * in case of invalid input value.
-- * If negative returned, then output value = maximal possible from ranges.
-- */
--static int adjust_smc_value(int *value, struct smc_range *range, int size)
--{
--	int maximum = (range + size - 1)->max;
--	int remainder;
--
--	do {
--		if (*value < range->min) {
--			remainder = range->min - *value;
--			*value = range->min; /* nearest valid value */
--			return remainder;
--		} else if ((range->min <= *value) && (*value <= range->max))
--			return 0;
--
--		range++;
--	} while (--size);
--	*value = maximum;
--
--	return -1; /* invalid value */
--}
--
--/**
-- * calc_smc_vals - calculate SMC register values
-- * @dev: ATA device
-- * @setup: SMC_SETUP register value
-- * @pulse: SMC_PULSE register value
-- * @cycle: SMC_CYCLE register value
-- *
-- * This returns negative in case of invalid values for SMC registers:
-- * -ER_SMC_RECALC - recalculation required for SMC values,
-- * -ER_SMC_CALC - calculation failed (invalid input values).
-- *
-- * SMC use special coding scheme, see "Coding and Range of Timing
-- * Parameters" table from AT91SAM9 datasheets.
-- *
-- *	SMC_SETUP = 128*setup[5] + setup[4:0]
-- *	SMC_PULSE = 256*pulse[6] + pulse[5:0]
-- *	SMC_CYCLE = 256*cycle[8:7] + cycle[6:0]
-- */
--static int calc_smc_vals(struct device *dev,
--		int *setup, int *pulse, int *cycle, int *cs_pulse)
--{
--	int ret_val;
--	int err = 0;
--	struct smc_range range_setup[] = {	/* SMC_SETUP valid values */
--		{.min = 0,	.max = 31},	/* first  range */
--		{.min = 128,	.max = 159}	/* second range */
--	};
--	struct smc_range range_pulse[] = {	/* SMC_PULSE valid values */
--		{.min = 0,	.max = 63},	/* first  range */
--		{.min = 256,	.max = 319}	/* second range */
--	};
--	struct smc_range range_cycle[] = {	/* SMC_CYCLE valid values */
--		{.min = 0,	.max = 127},	/* first  range */
--		{.min = 256,	.max = 383},	/* second range */
--		{.min = 512,	.max = 639},	/* third  range */
--		{.min = 768,	.max = 895}	/* fourth range */
--	};
--
--	ret_val = adjust_smc_value(setup, range_setup, ARRAY_SIZE(range_setup));
--	if (ret_val < 0)
--		dev_warn(dev, "maximal SMC Setup value\n");
--	else
--		*cycle += ret_val;
--
--	ret_val = adjust_smc_value(pulse, range_pulse, ARRAY_SIZE(range_pulse));
--	if (ret_val < 0)
--		dev_warn(dev, "maximal SMC Pulse value\n");
--	else
--		*cycle += ret_val;
--
--	ret_val = adjust_smc_value(cycle, range_cycle, ARRAY_SIZE(range_cycle));
--	if (ret_val < 0)
--		dev_warn(dev, "maximal SMC Cycle value\n");
--
--	*cs_pulse = *cycle;
--	if (*cs_pulse > CS_PULSE_MAXIMUM) {
--		dev_err(dev, "unable to calculate valid SMC settings\n");
--		return -ER_SMC_CALC;
--	}
--
--	ret_val = adjust_smc_value(cs_pulse, range_pulse,
--					ARRAY_SIZE(range_pulse));
--	if (ret_val < 0) {
--		dev_warn(dev, "maximal SMC CS Pulse value\n");
--	} else if (ret_val != 0) {
--		*cycle = *cs_pulse;
--		dev_warn(dev, "SMC Cycle extended\n");
--		err = -ER_SMC_RECALC;
--	}
--
--	return err;
--}
--
--/**
-- * to_smc_format - convert values into SMC format
-- * @setup: SETUP value of SMC Setup Register
-- * @pulse: PULSE value of SMC Pulse Register
-- * @cycle: CYCLE value of SMC Cycle Register
-- * @cs_pulse: NCS_PULSE value of SMC Pulse Register
-- */
--static void to_smc_format(int *setup, int *pulse, int *cycle, int *cs_pulse)
--{
--	*setup = (*setup & 0x1f) | ((*setup & 0x80) >> 2);
--	*pulse = (*pulse & 0x3f) | ((*pulse & 0x100) >> 2);
--	*cycle = (*cycle & 0x7f) | ((*cycle & 0x300) >> 1);
--	*cs_pulse = (*cs_pulse & 0x3f) | ((*cs_pulse & 0x100) >> 2);
--}
--
--static unsigned long calc_mck_cycles(unsigned long ns, unsigned long mck_hz)
--{
--	unsigned long mul;
--
--	/*
--	* cycles = x [nsec] * f [Hz] / 10^9 [ns in sec] =
--	*     x * (f / 1_000_000_000) =
--	*     x * ((f * 65536) / 1_000_000_000) / 65536 =
--	*     x * (((f / 10_000) * 65536) / 100_000) / 65536 =
--	*/
--
--	mul = (mck_hz / 10000) << 16;
--	mul /= 100000;
--
--	return (ns * mul + 65536) >> 16;    /* rounding */
--}
--
--/**
-- * set_smc_timing - SMC timings setup.
-- * @dev: device
-- * @info: AT91 IDE info
-- * @ata: ATA timings
-- *
-- * Its assumed that write timings are same as read timings,
-- * cs_setup = 0 and cs_pulse = cycle.
-- */
--static void set_smc_timing(struct device *dev, struct ata_device *adev,
--		struct at91_ide_info *info, const struct ata_timing *ata)
--{
--	int ret = 0;
--	int use_iordy;
--	unsigned int t6z;         /* data tristate time in ns */
--	unsigned int cycle;       /* SMC Cycle width in MCK ticks */
--	unsigned int setup;       /* SMC Setup width in MCK ticks */
--	unsigned int pulse;       /* CFIOR and CFIOW pulse width in MCK ticks */
--	unsigned int cs_pulse;    /* CS4 or CS5 pulse width in MCK ticks*/
--	unsigned int tdf_cycles;  /* SMC TDF MCK ticks */
--	unsigned long mck_hz;     /* MCK frequency in Hz */
--
--	t6z = (ata->mode < XFER_PIO_5) ? 30 : 20;
--	mck_hz = clk_get_rate(info->mck);
--	cycle = calc_mck_cycles(ata->cyc8b, mck_hz);
--	setup = calc_mck_cycles(ata->setup, mck_hz);
--	pulse = calc_mck_cycles(ata->act8b, mck_hz);
--	tdf_cycles = calc_mck_cycles(t6z, mck_hz);
--
--	do {
--		ret = calc_smc_vals(dev, &setup, &pulse, &cycle, &cs_pulse);
--	} while (ret == -ER_SMC_RECALC);
--
--	if (ret == -ER_SMC_CALC)
--		dev_err(dev, "Interface may not operate correctly\n");
--
--	dev_dbg(dev, "SMC Setup=%u, Pulse=%u, Cycle=%u, CS Pulse=%u\n",
--		setup, pulse, cycle, cs_pulse);
--	to_smc_format(&setup, &pulse, &cycle, &cs_pulse);
--	/* disable or enable waiting for IORDY signal */
--	use_iordy = ata_pio_need_iordy(adev);
--	if (use_iordy)
--		info->mode |= AT91_SMC_EXNWMODE_READY;
--
--	if (tdf_cycles > 15) {
--		tdf_cycles = 15;
--		dev_warn(dev, "maximal SMC TDF Cycles value\n");
--	}
--
--	dev_dbg(dev, "Use IORDY=%u, TDF Cycles=%u\n", use_iordy, tdf_cycles);
--
--	regmap_fields_write(fields.setup, info->cs,
--			    AT91SAM9_SMC_NRDSETUP(setup) |
--			    AT91SAM9_SMC_NWESETUP(setup) |
--			    AT91SAM9_SMC_NCS_NRDSETUP(0) |
--			    AT91SAM9_SMC_NCS_WRSETUP(0));
--	regmap_fields_write(fields.pulse, info->cs,
--			    AT91SAM9_SMC_NRDPULSE(pulse) |
--			    AT91SAM9_SMC_NWEPULSE(pulse) |
--			    AT91SAM9_SMC_NCS_NRDPULSE(cs_pulse) |
--			    AT91SAM9_SMC_NCS_WRPULSE(cs_pulse));
--	regmap_fields_write(fields.cycle, info->cs,
--			    AT91SAM9_SMC_NRDCYCLE(cycle) |
--			    AT91SAM9_SMC_NWECYCLE(cycle));
--	regmap_fields_write(fields.mode, info->cs, info->mode |
--			    AT91_SMC_TDF_(tdf_cycles));
--}
--
--static void pata_at91_set_piomode(struct ata_port *ap, struct ata_device *adev)
--{
--	struct at91_ide_info *info = ap->host->private_data;
--	struct ata_timing timing;
--	int ret;
--
--	/* Compute ATA timing and set it to SMC */
--	ret = ata_timing_compute(adev, adev->pio_mode, &timing, 1000, 0);
--	if (ret) {
--		dev_warn(ap->dev, "Failed to compute ATA timing %d, "
--			 "set PIO_0 timing\n", ret);
--		timing = *ata_timing_find_mode(XFER_PIO_0);
--	}
--	set_smc_timing(ap->dev, adev, info, &timing);
--}
--
--static unsigned int pata_at91_data_xfer_noirq(struct ata_queued_cmd *qc,
--		unsigned char *buf, unsigned int buflen, int rw)
--{
--	struct at91_ide_info *info = qc->dev->link->ap->host->private_data;
--	unsigned int consumed;
--	unsigned int mode;
--	unsigned long flags;
--
--	local_irq_save(flags);
--	regmap_fields_read(fields.mode, info->cs, &mode);
--
--	/* set 16bit mode before writing data */
--	regmap_fields_write(fields.mode, info->cs, (mode & ~AT91_SMC_DBW) |
--			    AT91_SMC_DBW_16);
--
--	consumed = ata_sff_data_xfer(qc, buf, buflen, rw);
--
--	/* restore 8bit mode after data is written */
--	regmap_fields_write(fields.mode, info->cs, (mode & ~AT91_SMC_DBW) |
--			    AT91_SMC_DBW_8);
--
--	local_irq_restore(flags);
--	return consumed;
--}
--
--static struct scsi_host_template pata_at91_sht = {
--	ATA_PIO_SHT(DRV_NAME),
--};
--
--static struct ata_port_operations pata_at91_port_ops = {
--	.inherits	= &ata_sff_port_ops,
--
--	.sff_data_xfer	= pata_at91_data_xfer_noirq,
--	.set_piomode	= pata_at91_set_piomode,
--	.cable_detect	= ata_cable_40wire,
--};
--
--static int at91sam9_smc_fields_init(struct device *dev)
--{
--	struct reg_field field = REG_FIELD(0, 0, 31);
--
--	field.id_size = 8;
--	field.id_offset = AT91SAM9_SMC_GENERIC_BLK_SZ;
--
--	field.reg = AT91SAM9_SMC_SETUP(AT91SAM9_SMC_GENERIC);
--	fields.setup = devm_regmap_field_alloc(dev, smc, field);
--	if (IS_ERR(fields.setup))
--		return PTR_ERR(fields.setup);
--
--	field.reg = AT91SAM9_SMC_PULSE(AT91SAM9_SMC_GENERIC);
--	fields.pulse = devm_regmap_field_alloc(dev, smc, field);
--	if (IS_ERR(fields.pulse))
--		return PTR_ERR(fields.pulse);
--
--	field.reg = AT91SAM9_SMC_CYCLE(AT91SAM9_SMC_GENERIC);
--	fields.cycle = devm_regmap_field_alloc(dev, smc, field);
--	if (IS_ERR(fields.cycle))
--		return PTR_ERR(fields.cycle);
--
--	field.reg = AT91SAM9_SMC_MODE(AT91SAM9_SMC_GENERIC);
--	fields.mode = devm_regmap_field_alloc(dev, smc, field);
--
--	return PTR_ERR_OR_ZERO(fields.mode);
--}
--
--static int pata_at91_probe(struct platform_device *pdev)
--{
--	struct at91_cf_data *board = dev_get_platdata(&pdev->dev);
--	struct device *dev = &pdev->dev;
--	struct at91_ide_info *info;
--	struct resource *mem_res;
--	struct ata_host *host;
--	struct ata_port *ap;
--
--	int irq_flags = 0;
--	int irq = 0;
--	int ret;
--
--	/*  get platform resources: IO/CTL memories and irq/rst pins */
--
--	if (pdev->num_resources != 1) {
--		dev_err(&pdev->dev, "invalid number of resources\n");
--		return -EINVAL;
--	}
--
--	mem_res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--
--	if (!mem_res) {
--		dev_err(dev, "failed to get mem resource\n");
--		return -EINVAL;
--	}
--
--	irq = board->irq_pin;
--
--	smc = syscon_regmap_lookup_by_phandle(pdev->dev.of_node, "atmel,smc");
--	if (IS_ERR(smc))
--		return PTR_ERR(smc);
--
--	ret = at91sam9_smc_fields_init(dev);
--	if (ret < 0)
--		return ret;
--
--	/* init ata host */
--
--	host = ata_host_alloc(dev, 1);
--
--	if (!host)
--		return -ENOMEM;
--
--	ap = host->ports[0];
--	ap->ops = &pata_at91_port_ops;
--	ap->flags |= ATA_FLAG_SLAVE_POSS;
--	ap->pio_mask = ATA_PIO4;
--
--	if (!gpio_is_valid(irq)) {
--		ap->flags |= ATA_FLAG_PIO_POLLING;
--		ata_port_desc(ap, "no IRQ, using PIO polling");
--	}
--
--	info = devm_kzalloc(dev, sizeof(*info), GFP_KERNEL);
--
--	if (!info) {
--		dev_err(dev, "failed to allocate memory for private data\n");
--		return -ENOMEM;
--	}
--
--	info->mck = clk_get(NULL, "mck");
--
--	if (IS_ERR(info->mck)) {
--		dev_err(dev, "failed to get access to mck clock\n");
--		return -ENODEV;
--	}
--
--	info->cs    = board->chipselect;
--	info->mode  = AT91_SMC_READMODE | AT91_SMC_WRITEMODE |
--		AT91_SMC_EXNWMODE_READY | AT91_SMC_BAT_SELECT |
--		AT91_SMC_DBW_8 | AT91_SMC_TDF_(0);
--
--	info->ide_addr = devm_ioremap(dev,
--			mem_res->start + CF_IDE_OFFSET, CF_IDE_RES_SIZE);
--
--	if (!info->ide_addr) {
--		dev_err(dev, "failed to map IO base\n");
--		ret = -ENOMEM;
--		goto err_put;
--	}
--
--	info->alt_addr = devm_ioremap(dev,
--			mem_res->start + CF_ALT_IDE_OFFSET, CF_IDE_RES_SIZE);
--
--	if (!info->alt_addr) {
--		dev_err(dev, "failed to map CTL base\n");
--		ret = -ENOMEM;
--		goto err_put;
--	}
--
--	ap->ioaddr.cmd_addr = info->ide_addr;
--	ap->ioaddr.ctl_addr = info->alt_addr + 0x06;
--	ap->ioaddr.altstatus_addr = ap->ioaddr.ctl_addr;
--
--	ata_sff_std_ports(&ap->ioaddr);
--
--	ata_port_desc(ap, "mmio cmd 0x%llx ctl 0x%llx",
--			(unsigned long long)mem_res->start + CF_IDE_OFFSET,
--			(unsigned long long)mem_res->start + CF_ALT_IDE_OFFSET);
--
--	host->private_data = info;
--
--	ret = ata_host_activate(host, gpio_is_valid(irq) ? gpio_to_irq(irq) : 0,
--				gpio_is_valid(irq) ? ata_sff_interrupt : NULL,
--				irq_flags, &pata_at91_sht);
--	if (ret)
--		goto err_put;
--
--	return 0;
--
--err_put:
--	clk_put(info->mck);
--	return ret;
--}
--
--static int pata_at91_remove(struct platform_device *pdev)
--{
--	struct ata_host *host = platform_get_drvdata(pdev);
--	struct at91_ide_info *info;
--
--	if (!host)
--		return 0;
--	info = host->private_data;
--
--	ata_host_detach(host);
--
--	if (!info)
--		return 0;
--
--	clk_put(info->mck);
--
--	return 0;
--}
--
--static struct platform_driver pata_at91_driver = {
--	.probe		= pata_at91_probe,
--	.remove		= pata_at91_remove,
--	.driver		= {
--		.name		= DRV_NAME,
--	},
--};
--
--module_platform_driver(pata_at91_driver);
--
--MODULE_LICENSE("GPL");
--MODULE_DESCRIPTION("Driver for CF in True IDE mode on AT91SAM9260 SoC");
--MODULE_AUTHOR("Matyukevich Sergey");
--MODULE_VERSION(DRV_VERSION);
--
--- 
-2.7.4
+>
+> diff --git a/drivers/mmc/host/Makefile b/drivers/mmc/host/Makefile
+> index b0a2ab4b256e..893b48db5513 100644
+> --- a/drivers/mmc/host/Makefile
+> +++ b/drivers/mmc/host/Makefile
+> @@ -84,4 +84,4 @@ ifeq ($(CONFIG_CB710_DEBUG),y)
+>  endif
+>
+>  obj-$(CONFIG_MMC_SDHCI_XENON)  += sdhci-xenon-driver.o
+> -sdhci-xenon-driver-y           += sdhci-xenon.o
+> +sdhci-xenon-driver-y           += sdhci-xenon.o sdhci-xenon-phy.o
+> diff --git a/drivers/mmc/host/sdhci-xenon-phy.c b/drivers/mmc/host/sdhci-xenon-phy.c
+> new file mode 100644
+> index 000000000000..c26ba3a180a0
+> --- /dev/null
+> +++ b/drivers/mmc/host/sdhci-xenon-phy.c
+
+[...]
+
+> +/*
+> + * eMMC PHY configuration and operations
+> + */
+> +struct emmc_phy_params {
+
+Perhaps prefix the struct name with "xenon_".
+
+> +       bool    slow_mode;
+> +
+> +       u8      znr;
+> +       u8      zpr;
+> +
+> +       /* Nr of consecutive Sampling Points of a Valid Sampling Window */
+> +       u8      nr_tun_times;
+> +       /* Divider for calculating Tuning Step */
+> +       u8      tun_step_divider;
+> +};
+> +
+> +static int alloc_emmc_phy(struct sdhci_xenon_priv *priv)
+> +{
+> +       struct emmc_phy_params *params;
+> +
+> +       params = kzalloc(sizeof(*params), GFP_KERNEL);
+
+Why not using devm_kzalloc()?
+
+[...]
+
+> +
+> +/*
+> + * If eMMC PHY Slow Mode is required in lower speed mode (SDCLK < 55MHz)
+> + * in SDR mode, enable Slow Mode to bypass eMMC PHY.
+> + * SDIO slower SDR mode also requires Slow Mode.
+> + *
+> + * If Slow Mode is enabled, return true.
+> + * Otherwise, return false.
+> + */
+> +static bool emmc_phy_slow_mode(struct sdhci_host *host,
+> +                              unsigned char timing)
+> +{
+> +       struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> +       struct sdhci_xenon_priv *priv = sdhci_pltfm_priv(pltfm_host);
+> +       struct emmc_phy_params *params = priv->phy_params;
+> +       struct xenon_emmc_phy_regs *phy_regs = priv->emmc_phy_regs;
+> +       u32 reg;
+> +
+> +       if (host->clock > MMC_HIGH_52_MAX_DTR)
+> +               return false;
+> +
+> +       reg = sdhci_readl(host, phy_regs->timing_adj);
+> +       /* Enable Slow Mode for SDIO in slower SDR mode */
+> +       if ((priv->init_card_type == MMC_TYPE_SDIO) &&
+> +           ((timing == MMC_TIMING_UHS_SDR25) ||
+> +            (timing == MMC_TIMING_UHS_SDR12) ||
+> +            (timing == MMC_TIMING_SD_HS))) {
+> +               reg |= XENON_TIMING_ADJUST_SLOW_MODE;
+> +               sdhci_writel(host, reg, phy_regs->timing_adj);
+> +               return true;
+> +       }
+> +
+> +       /* Check if Slow Mode is required in lower speed mode in SDR mode */
+> +       if (((timing == MMC_TIMING_UHS_SDR25) ||
+> +            (timing == MMC_TIMING_UHS_SDR12) ||
+> +            (timing == MMC_TIMING_SD_HS) ||
+> +            (timing == MMC_TIMING_MMC_HS)) && params->slow_mode) {
+> +               reg |= XENON_TIMING_ADJUST_SLOW_MODE;
+> +               sdhci_writel(host, reg, phy_regs->timing_adj);
+> +               return true;
+> +       }
+> +
+
+Two quite similar if statement. Can you perhaps combine them to avoid
+code duplication.
+
+> +       reg &= ~XENON_TIMING_ADJUST_SLOW_MODE;
+> +       sdhci_writel(host, reg, phy_regs->timing_adj);
+> +       return false;
+> +}
+> +
+> +/*
+> + * Set-up eMMC 5.0/5.1 PHY.
+> + * Specific configuration depends on the current speed mode in use.
+> + */
+> +static void emmc_phy_set(struct sdhci_host *host,
+> +                        unsigned char timing)
+> +{
+> +       u32 reg;
+> +       struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> +       struct sdhci_xenon_priv *priv = sdhci_pltfm_priv(pltfm_host);
+> +       struct emmc_phy_params *params = priv->phy_params;
+> +       struct xenon_emmc_phy_regs *phy_regs = priv->emmc_phy_regs;
+> +       unsigned long flags;
+> +
+> +       dev_dbg(mmc_dev(host->mmc), "eMMC PHY setting starts\n");
+> +
+> +       spin_lock_irqsave(&host->lock, flags);
+> +
+> +       /* Setup pad, set bit[28] and bits[26:24] */
+> +       reg = sdhci_readl(host, phy_regs->pad_ctrl);
+> +       reg |= (XENON_FC_DQ_RECEN | XENON_FC_CMD_RECEN |
+> +               XENON_FC_QSP_RECEN | XENON_OEN_QSN);
+> +       /* All FC_XX_RECEIVCE should be set as CMOS Type */
+> +       reg |= XENON_FC_ALL_CMOS_RECEIVER;
+> +       sdhci_writel(host, reg, phy_regs->pad_ctrl);
+> +
+> +       /* Set CMD and DQ Pull Up */
+> +       if (priv->phy_type == EMMC_5_0_PHY) {
+> +               reg = sdhci_readl(host, XENON_EMMC_5_0_PHY_PAD_CONTROL);
+> +               reg |= (XENON_EMMC5_FC_CMD_PU | XENON_EMMC5_FC_DQ_PU);
+> +               reg &= ~(XENON_EMMC5_FC_CMD_PD | XENON_EMMC5_FC_DQ_PD);
+> +               sdhci_writel(host, reg, XENON_EMMC_5_0_PHY_PAD_CONTROL);
+> +       } else {
+> +               reg = sdhci_readl(host, XENON_EMMC_PHY_PAD_CONTROL1);
+> +               reg |= (XENON_EMMC5_1_FC_CMD_PU | XENON_EMMC5_1_FC_DQ_PU);
+> +               reg &= ~(XENON_EMMC5_1_FC_CMD_PD | XENON_EMMC5_1_FC_DQ_PD);
+> +               sdhci_writel(host, reg, XENON_EMMC_PHY_PAD_CONTROL1);
+> +       }
+> +
+> +       if (timing == MMC_TIMING_LEGACY) {
+> +               /*
+> +                * If Slow Mode is required, enable Slow Mode by default
+> +                * in early init phase to avoid any potential issue.
+> +                */
+> +               if (params->slow_mode) {
+> +                       reg = sdhci_readl(host, phy_regs->timing_adj);
+> +                       reg |= XENON_TIMING_ADJUST_SLOW_MODE;
+> +                       sdhci_writel(host, reg, phy_regs->timing_adj);
+> +               }
+> +               goto phy_init;
+> +       }
+> +
+> +       /*
+> +        * FIXME: should depends on the specific board timing.
+> +        */
+> +       if ((timing == MMC_TIMING_MMC_HS400) ||
+> +           (timing == MMC_TIMING_MMC_HS200) ||
+> +           (timing == MMC_TIMING_UHS_SDR50) ||
+> +           (timing == MMC_TIMING_UHS_SDR104) ||
+> +           (timing == MMC_TIMING_UHS_DDR50) ||
+> +           (timing == MMC_TIMING_UHS_SDR25) ||
+> +           (timing == MMC_TIMING_MMC_DDR52)) {
+> +               reg = sdhci_readl(host, phy_regs->timing_adj);
+> +               reg &= ~XENON_OUTPUT_QSN_PHASE_SELECT;
+> +               sdhci_writel(host, reg, phy_regs->timing_adj);
+> +       }
+> +
+> +       /*
+> +        * If SDIO card, set SDIO Mode
+> +        * Otherwise, clear SDIO Mode
+> +        */
+> +       reg = sdhci_readl(host, phy_regs->timing_adj);
+> +       if (priv->init_card_type == MMC_TYPE_SDIO)
+> +               reg |= XENON_TIMING_ADJUST_SDIO_MODE;
+> +       else
+> +               reg &= ~XENON_TIMING_ADJUST_SDIO_MODE;
+> +       sdhci_writel(host, reg, phy_regs->timing_adj);
+> +
+> +       if (emmc_phy_slow_mode(host, timing))
+> +               goto phy_init;
+> +
+> +       /*
+> +        * Set preferred ZNR and ZPR value
+> +        * The ZNR and ZPR value vary between different boards.
+> +        * Define them both in sdhci-xenon-emmc-phy.h.
+> +        */
+> +       reg = sdhci_readl(host, phy_regs->pad_ctrl2);
+> +       reg &= ~((XENON_ZNR_MASK << XENON_ZNR_SHIFT) | XENON_ZPR_MASK);
+> +       reg |= ((params->znr << XENON_ZNR_SHIFT) | params->zpr);
+> +       sdhci_writel(host, reg, phy_regs->pad_ctrl2);
+> +
+> +       /*
+> +        * When setting EMMC_PHY_FUNC_CONTROL register,
+> +        * SD clock should be disabled
+> +        */
+> +       reg = sdhci_readl(host, SDHCI_CLOCK_CONTROL);
+> +       reg &= ~SDHCI_CLOCK_CARD_EN;
+> +       sdhci_writew(host, reg, SDHCI_CLOCK_CONTROL);
+> +
+> +       reg = sdhci_readl(host, phy_regs->func_ctrl);
+> +       if ((timing == MMC_TIMING_UHS_DDR50) ||
+> +           (timing == MMC_TIMING_MMC_HS400) ||
+> +           (timing == MMC_TIMING_MMC_DDR52))
+> +               reg |= (XENON_DQ_DDR_MODE_MASK << XENON_DQ_DDR_MODE_SHIFT) |
+> +                      XENON_CMD_DDR_MODE;
+> +       else
+> +               reg &= ~((XENON_DQ_DDR_MODE_MASK << XENON_DQ_DDR_MODE_SHIFT) |
+> +                        XENON_CMD_DDR_MODE);
+> +
+> +       if (timing == MMC_TIMING_MMC_HS400)
+> +               reg &= ~XENON_DQ_ASYNC_MODE;
+> +       else
+> +               reg |= XENON_DQ_ASYNC_MODE;
+> +       sdhci_writel(host, reg, phy_regs->func_ctrl);
+> +
+> +       /* Enable bus clock */
+> +       reg = sdhci_readl(host, SDHCI_CLOCK_CONTROL);
+> +       reg |= SDHCI_CLOCK_CARD_EN;
+> +       sdhci_writew(host, reg, SDHCI_CLOCK_CONTROL);
+> +
+> +       if (timing == MMC_TIMING_MMC_HS400)
+> +               /* Hardware team recommend a value for HS400 */
+> +               sdhci_writel(host, XENON_LOGIC_TIMING_VALUE,
+> +                            phy_regs->logic_timing_adj);
+> +       else
+> +               __emmc_phy_disable_data_strobe(host);
+> +
+> +phy_init:
+> +       emmc_phy_init(host);
+> +
+> +       spin_unlock_irqrestore(&host->lock, flags);
+> +
+> +       dev_dbg(mmc_dev(host->mmc), "eMMC PHY setting completes\n");
+
+Again you are checking the MMC_TIMING_* in several if statements.
+Perhaps you can use switch statement instead and build a couple of
+different register variables, that you use when reading/writing
+afterwards.
+
+> +}
+> +
+> +static int emmc_phy_parse_param_dt(struct sdhci_host *host,
+> +                                  struct device_node *np,
+> +                                  struct emmc_phy_params *params)
+> +{
+> +       u32 value;
+> +
+> +       if (of_property_read_bool(np, "marvell,xenon-phy-slow-mode"))
+> +               params->slow_mode = true;
+> +       else
+> +               params->slow_mode = false;
+> +
+> +       if (!of_property_read_u32(np, "marvell,xenon-phy-znr", &value))
+> +               params->znr = value & XENON_ZNR_MASK;
+> +       else
+> +               params->znr = XENON_ZNR_DEF_VALUE;
+> +
+> +       if (!of_property_read_u32(np, "marvell,xenon-phy-zpr", &value))
+> +               params->zpr = value & XENON_ZPR_MASK;
+> +       else
+> +               params->zpr = XENON_ZPR_DEF_VALUE;
+> +
+> +       if (!of_property_read_u32(np, "marvell,xenon-phy-nr-success-tun",
+> +                                 &value))
+> +               params->nr_tun_times = value & XENON_TUN_CONSECUTIVE_TIMES_MASK;
+> +       else
+> +               params->nr_tun_times = XENON_TUN_CONSECUTIVE_TIMES;
+> +
+> +       if (!of_property_read_u32(np, "marvell,xenon-phy-tun-step-divider",
+> +                                 &value))
+> +               params->tun_step_divider = value & 0xFF;
+> +       else
+> +               params->tun_step_divider = XENON_TUNING_STEP_DIVIDER;
+> +
+> +       return 0;
+
+Instead of all these if-else, let's start by assigning default values
+instead. This makes the code more readable.
+
+> +}
+> +
+> +/*
+> + * Setting PHY when card is working in High Speed Mode.
+> + * HS400 set data strobe line.
+> + * HS200/SDR104 set tuning config to prepare for tuning.
+> + */
+> +static int xenon_hs_delay_adj(struct sdhci_host *host)
+> +{
+> +       int ret = 0;
+> +
+> +       if (WARN_ON(host->clock <= XENON_DEFAULT_SDCLK_FREQ))
+> +               return -EINVAL;
+> +
+> +       if (host->timing == MMC_TIMING_MMC_HS400) {
+> +               emmc_phy_strobe_delay_adj(host);
+> +               return 0;
+> +       }
+> +
+> +       if ((host->timing == MMC_TIMING_MMC_HS200) ||
+> +           (host->timing == MMC_TIMING_UHS_SDR104))
+> +               return emmc_phy_config_tuning(host);
+> +
+> +       /*
+> +        * DDR Mode requires driver to scan Sampling Fixed Delay Line,
+> +        * to find out a perfect operation sampling point.
+> +        * It is hard to implement such a scan in host driver since initiating
+> +        * commands by host driver is not safe.
+> +        * Thus so far just keep PHY Sampling Fixed Delay in default value
+> +        * in DDR mode.
+> +        *
+> +        * If any timing issue occurs in DDR mode on Marvell products,
+> +        * please contact maintainer to ask for internal support in Marvell.
+> +        */
+> +       if ((host->timing == MMC_TIMING_MMC_DDR52) ||
+> +           (host->timing == MMC_TIMING_UHS_DDR50))
+> +               dev_warn_once(mmc_dev(host->mmc), "Timing issue might occur in DDR mode\n");
+
+Please consider a to convert to use a switch statment instead of the
+several if statements.
+
+> +       return ret;
+> +}
+> +
+
+[...]
+
+> +
+> +static int add_xenon_phy(struct device_node *np, struct sdhci_host *host,
+> +                        const char *phy_name)
+> +{
+> +       struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> +       struct sdhci_xenon_priv *priv = sdhci_pltfm_priv(pltfm_host);
+> +       int i, ret;
+> +
+> +       for (i = 0; i < NR_PHY_TYPES; i++) {
+> +               if (!strcmp(phy_name, phy_types[i])) {
+> +                       priv->phy_type = i;
+> +                       break;
+> +               }
+> +       }
+> +       if (i == NR_PHY_TYPES) {
+> +               dev_err(mmc_dev(host->mmc),
+> +                       "Unable to determine PHY name %s. Use default eMMC 5.1 PHY\n",
+> +                       phy_name);
+> +               priv->phy_type = EMMC_5_1_PHY;
+> +       }
+> +
+> +       ret = alloc_emmc_phy(priv);
+> +       if (ret)
+> +               return ret;
+> +
+> +       ret = emmc_phy_parse_param_dt(host, np, priv->phy_params);
+> +       if (ret)
+> +               clean_emmc_phy(priv);
+> +
+> +       return ret;
+> +}
+> +
+> +int xenon_phy_parse_dt(struct device_node *np, struct sdhci_host *host)
+> +{
+> +       const char *phy_type = NULL;
+> +
+> +       if (!of_property_read_string(np, "marvell,xenon-phy-type", &phy_type))
+> +               return add_xenon_phy(np, host, phy_type);
+> +
+> +       dev_info(mmc_dev(host->mmc), "Fail to get Xenon PHY type. Use default eMMC 5.1 PHY\n");
+
+Isn't there already a dev_err() being printed for this case. You
+probably only need one.
+
+> +       return add_xenon_phy(np, host, "emmc 5.1 phy");
+> +}
+
+[...]
+
+Kind regards
+Uffe
