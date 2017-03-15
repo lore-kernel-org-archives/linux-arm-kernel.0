@@ -1,59 +1,48 @@
-From: pbonzini@redhat.com (Paolo Bonzini)
-Date: Wed, 15 Mar 2017 14:29:07 +0100
-Subject: [PATCH 1/3] kvm: arm/arm64: Take mmap_sem in stage2_unmap_vm
-In-Reply-To: <20170315091755.GL1277@cbox>
-References: <1489503154-20705-1-git-send-email-suzuki.poulose@arm.com>
- <1489503154-20705-2-git-send-email-suzuki.poulose@arm.com>
- <20170315091755.GL1277@cbox>
-Message-ID: <07ccec83-8dbb-9d3a-e7f0-fef445d581a8@redhat.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Wed, 15 Mar 2017 13:31:50 +0000
+Subject: [PATCH 0/5] soc/tegra: Enable flowctrl support for Tegra132/210
+Message-ID: <1489584715-23138-1-git-send-email-jonathanh@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The flowctrl modules is supported by both Tegra132 and Tegra210 devices.
+These devices already have the flowctrl node defined in their respective
+*.dtsi device-tree files. The flowctrl driver is currently located in
+the arch/arm/mach-tegra directory and so can only be used for 32-bit
+Tegra devices. Move this driver into drivers/soc/tegra so that it can
+be used for all Tegra devices that support flowctrl.
 
+I have also added a couple clean-up patches.
 
-On 15/03/2017 10:17, Christoffer Dall wrote:
-> On Tue, Mar 14, 2017 at 02:52:32PM +0000, Suzuki K Poulose wrote:
->> From: Marc Zyngier <marc.zyngier@arm.com>
->>
->> We don't hold the mmap_sem while searching for the VMAs when
->> we try to unmap each memslot for a VM. Fix this properly to
->> avoid unexpected results.
->>
->> Fixes: commit 957db105c997 ("arm/arm64: KVM: Introduce stage2_unmap_vm")
->> Cc: stable at vger.kernel.org # v3.19+
->> Cc: Christoffer Dall <christoffer.dall@linaro.org>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
->> ---
->>  arch/arm/kvm/mmu.c | 2 ++
->>  1 file changed, 2 insertions(+)
->>
->> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
->> index 962616f..f2e2e0c 100644
->> --- a/arch/arm/kvm/mmu.c
->> +++ b/arch/arm/kvm/mmu.c
->> @@ -803,6 +803,7 @@ void stage2_unmap_vm(struct kvm *kvm)
->>  	int idx;
->>  
->>  	idx = srcu_read_lock(&kvm->srcu);
->> +	down_read(&current->mm->mmap_sem);
->>  	spin_lock(&kvm->mmu_lock);
->>  
->>  	slots = kvm_memslots(kvm);
->> @@ -810,6 +811,7 @@ void stage2_unmap_vm(struct kvm *kvm)
->>  		stage2_unmap_memslot(kvm, memslot);
->>  
->>  	spin_unlock(&kvm->mmu_lock);
->> +	up_read(&current->mm->mmap_sem);
->>  	srcu_read_unlock(&kvm->srcu, idx);
->>  }
->>  
->> -- 
->> 2.7.4
->>
-> 
-> Are we sure that holding mmu_lock is valid while holding the mmap_sem?
+Jon Hunter (5):
+  ARM: tegra: WARN if flowctrl is not supported
+  ARM: tegra: Remove unnecessary inclusion of flowctrl header
+  soc/tegra: Move Tegra flowctrl driver
+  dt-bindings: tegra: Update compatible strings for Tegra flowctrl
+  soc/tegra: Add initial flowctrl support for Tegra210
 
-Sure, spinlock-inside-semaphore and spinlock-inside-mutex is always okay.
+ .../bindings/arm/tegra/nvidia,tegra20-flowctrl.txt |   8 +-
+ arch/arm/mach-tegra/Kconfig                        |   1 +
+ arch/arm/mach-tegra/Makefile                       |   1 -
+ arch/arm/mach-tegra/cpuidle-tegra20.c              |   3 +-
+ arch/arm/mach-tegra/flowctrl.c                     | 171 -------------------
+ arch/arm/mach-tegra/flowctrl.h                     |  66 --------
+ arch/arm/mach-tegra/platsmp.c                      |   2 +-
+ arch/arm/mach-tegra/pm.c                           |   2 +-
+ arch/arm/mach-tegra/reset-handler.S                |   2 +-
+ arch/arm/mach-tegra/sleep-tegra20.S                |   3 +-
+ arch/arm/mach-tegra/sleep-tegra30.S                |   2 +-
+ arch/arm/mach-tegra/sleep.S                        |   2 -
+ arch/arm/mach-tegra/tegra.c                        |   2 -
+ drivers/soc/tegra/Kconfig                          |   5 +
+ drivers/soc/tegra/Makefile                         |   1 +
+ drivers/soc/tegra/flowctrl.c                       | 187 +++++++++++++++++++++
+ include/soc/tegra/flowctrl.h                       |  62 +++++++
+ 17 files changed, 271 insertions(+), 249 deletions(-)
+ delete mode 100644 arch/arm/mach-tegra/flowctrl.c
+ delete mode 100644 arch/arm/mach-tegra/flowctrl.h
+ create mode 100644 drivers/soc/tegra/flowctrl.c
+ create mode 100644 include/soc/tegra/flowctrl.h
 
-Paolo
+-- 
+2.7.4
