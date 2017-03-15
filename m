@@ -1,33 +1,124 @@
 From: robh@kernel.org (Rob Herring)
-Date: Wed, 15 Mar 2017 12:37:53 -0500
-Subject: [PATCH 7/15] dt-bindings: display: sun4i: Add
- allwinner,tcon-channel property
-In-Reply-To: <46fdec2d680d539652f87d79c627973b3a568438.1488876832.git-series.maxime.ripard@free-electrons.com>
-References: <cover.bc06ffa88f847ddd9ddd7c259415d5f61b55307b.1488876832.git-series.maxime.ripard@free-electrons.com>
- <46fdec2d680d539652f87d79c627973b3a568438.1488876832.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <20170315173753.6zywfxapdczu2i34@rob-hp-laptop>
+Date: Wed, 15 Mar 2017 12:46:06 -0500
+Subject: [RESEND PATCH v2 1/2] ASoC: stm32: add bindings for SAI
+In-Reply-To: <1488879872-7839-2-git-send-email-olivier.moysan@st.com>
+References: <1488879872-7839-1-git-send-email-olivier.moysan@st.com>
+ <1488879872-7839-2-git-send-email-olivier.moysan@st.com>
+Message-ID: <20170315174606.rrvhuuzplzwwucph@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 07, 2017 at 09:56:26AM +0100, Maxime Ripard wrote:
-> The Allwinner Timings Controller has two, mutually exclusive, channels.
-> When the binding has been introduced, it was assumed that there would be
-> only a single user per channel in the system.
+On Tue, Mar 07, 2017 at 10:44:31AM +0100, olivier moysan wrote:
+> This patch adds documentation of device tree bindings for the
+> STM32 SAI ASoC driver.
 > 
-> While this is likely for the channel 0 which only connects to LCD displays,
-> it turns out that the channel 1 can be connected to multiple controllers in
-> the SoC (HDMI and TV encoders for example). And while the simultaneous use
-> of HDMI and TV outputs cannot be achieved, switching from one to the other
-> at runtime definitely sounds plausible.
+> Signed-off-by: olivier moysan <olivier.moysan@st.com>
+> ---
+>  .../devicetree/bindings/sound/st,stm32-sai.txt     | 79 ++++++++++++++++++++++
+>  1 file changed, 79 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/sound/st,stm32-sai.txt
 > 
-> Add an extra property, allwinner,tcon-channel, to specify for a given
-> endpoint which TCON channel it is connected to, while falling back to the
-> previous mechanism if that property is missing.
+> diff --git a/Documentation/devicetree/bindings/sound/st,stm32-sai.txt b/Documentation/devicetree/bindings/sound/st,stm32-sai.txt
+> new file mode 100644
+> index 0000000..b3be26d
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/sound/st,stm32-sai.txt
+> @@ -0,0 +1,79 @@
+> +STMicroelectronics STM32 Serial Audio Interface (SAI).
+> +
+> +The SAI interface (Serial Audio Interface) offers a wide set of audio protocols
+> +as I2S standards, LSB or MSB-justified, PCM/DSP, TDM, and AC'97.
+> +The SAI contains two independent audio sub-blocks. Each sub-block has
+> +its own clock generator and I/O lines controller.
+> +
+> +Required properties:
+> +  - compatible: Should be "st,stm32f4-sai"
+> +  - reg: Base address and size of SAI common register set.
+> +  - clocks: Must contain phandle and clock specifier pairs for each entry
+> +	in clock-names.
+> +  - clock-names: Must contain "clk_x8k" and "clk_x11k"
+> +	"clk_x8k": SAI parent clock for sampling rates multiple of 8kHz.
+> +	"clk_x11k": SAI parent clock for sampling rates multiple of 11.025kHz.
 
-I think perhaps TCON channels should have been ports rather than 
-endpoints. The fact that the channels are mutually exclusive can be 
-handled in the driver and doesn't really matter in the binding. How 
-painful would it be to rework things to move TCON channel 1 from port 0, 
-endpoint 1 to port 1? 
+clk_ is redundant.
 
-Rob
+> +  - interrupts: cpu DAI interrupt line shared by SAI sub-blocks
+> +
+> +Note: Each SAI controller should have an alias correctly numbered
+> +in "aliases" node, to provide explicit name to CPU DAI.
+
+No, it shouldn't. Why do you need that?
+
+
+> +
+> +Optional properties:
+> +  - resets: Reference to a reset controller asserting the SAI
+> +
+> +SAI subnodes:
+> +Two subnodes corresponding to SAI sub-block instances A et B can be defined.
+> +Subnode can be omitted for unsused sub-block.
+> +
+> +SAI subnodes required properties:
+> +  - compatible: Should be "st,stm32-sai-sub-a" or "st,stm32-sai-sub-b"
+> +	for SAI sub-block A or B respectively.
+> +  - reg: Base address and size of SAI sub-block register set.
+> +  - clocks: Must contain one phandle and clock specifier pair
+> +	for sai_ck which feeds the internal clock generator.
+> +  - clock-names: Must contain "sai_ck".
+> +  - dmas: see Documentation/devicetree/bindings/dma/stm32-dma.txt
+> +  - dma-names: identifier string for each DMA request line
+> +	"tx": if sai sub-block is configured as playback DAI
+> +	"rx": if sai sub-block is configured as capture DAI
+> +  - pinctrl-names: should contain only value "default"
+> +  - pinctrl-0: see Documentation/devicetree/bindings/pinctrl/pinctrl-stm32.txt
+> +
+> +Example:
+> +sai1: sai1 at 40015800 {
+> +	compatible = "st,stm32f4-sai";
+> +	reg = <0x40015800 0x400>;
+> +	clocks = <&rcc 1 CLK_SAIQ_PDIV>, <&rcc 1 CLK_I2SQ_PDIV>;
+> +	clock-names = "clk_x8k", "clk_x11k";
+> +	interrupts = <87>;
+> +	resets = <&rcc 310>;
+> +
+> +	sai1b: sai at 1 {
+
+unit address needs a reg property.
+
+audio-controller at 1
+
+> +		#sound-dai-cells = <0>;
+> +		compatible = "st,stm32-sai-sub-b";
+> +		clocks = <&rcc 1 CLK_SAI2>;
+> +		clock-names = "sai_ck";
+> +		dmas = <&dma2 5 0 0x400 0x1>;
+> +		dma-names = "tx";
+> +	};
+> +};
+> +
+> +sound {
+> +	compatible = "simple-audio-card";
+
+Perhaps you want to use the graph-card here. It's getting close to 
+merging.
+
+> +	simple-audio-card,name = "STM32-Sound-Card";
+> +	status = "okay";
+> +
+> +	simple-audio-card,dai-link at 0 {
+> +		format = "i2s";
+> +		cpu {
+> +			sound-dai = <&sai1b>;
+> +		};
+> +		codec {
+> +			sound-dai = <&codec>;
+> +		};
+> +	};
+> +};
+> +
+> +aliases {
+> +	sai1 = &sai1;
+> +};
+> -- 
+> 1.9.1
+> 
