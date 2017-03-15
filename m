@@ -1,59 +1,59 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Wed, 15 Mar 2017 18:23:27 +0100
-Subject: [PATCH v3] drm/rockchip: Refactor the component match logic.
-In-Reply-To: <19101003.9xjQ92OS5C@phil>
-References: <1489573247-9628-1-git-send-email-jeffy.chen@rock-chips.com>
- <19101003.9xjQ92OS5C@phil>
-Message-ID: <2110531.OeyX13mlk5@phil>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 15 Mar 2017 12:26:22 -0500
+Subject: [PATCH 6/15] dt-bindings: display: sun4i: Add HDMI display
+ bindings
+In-Reply-To: <f1d46b79f933df724a6750d557ebe9517b6339b5.1488876832.git-series.maxime.ripard@free-electrons.com>
+References: <cover.bc06ffa88f847ddd9ddd7c259415d5f61b55307b.1488876832.git-series.maxime.ripard@free-electrons.com>
+ <f1d46b79f933df724a6750d557ebe9517b6339b5.1488876832.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <20170315172622.lb6vy7cmbwaf7crn@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 15. M?rz 2017, 18:00:04 CET schrieb Heiko Stuebner:
-> Am Mittwoch, 15. M?rz 2017, 18:20:47 CET schrieb Jeffy Chen:
-> > Currently we are adding all components from the dts, if one of their
-> > drivers been disabled, we would not be able to bring up others.
-> > 
-> > Refactor component match logic, follow exynos drm.
-> > 
-> > Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
-> > Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
+On Tue, Mar 07, 2017 at 09:56:25AM +0100, Maxime Ripard wrote:
+> One of the possible output of the display pipeline, on the SoCs that have
+> it, is the HDMI controller.
 > 
-> This reliably produces null pointer dereference errors in
-> 	__platform_driver_register called from rockchip_drm_init
-> on at least rk3036 and rk3288 (probably more) when applied on top of
-> Linus' tree from today. Log attached and Rockchip drm compiled as module.
+> Add a binding for it.
 > 
-> I'm currently dug into other areas, so hadn't have time to investigate
-> further yet.
-
-> +#define DRV_PTR(drv, cond) (IS_ENABLED(cond) ? &drv : NULL)
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt | 21 +++++++-
+>  1 file changed, 21 insertions(+), 0 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+> index b82c00449468..4b280672658e 100644
+> --- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+> +++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+> @@ -4,6 +4,27 @@ Allwinner A10 Display Pipeline
+>  The Allwinner A10 Display pipeline is composed of several components
+>  that are going to be documented below:
+>  
+> +HDMI Encoder
+> +------------
 > +
-> +static struct platform_driver *rockchip_drm_comp_drvs[] = {
-> +	&vop_platform_driver,
-> +	DRV_PTR(rockchip_dp_driver, CONFIG_ROCKCHIP_ANALOGIX_DP),
-> +	DRV_PTR(cdn_dp_driver, CONFIG_ROCKCHIP_CDN_DP),
-> +	DRV_PTR(dw_hdmi_rockchip_pltfm_driver, CONFIG_ROCKCHIP_DW_HDMI),
-> +	DRV_PTR(dw_mipi_dsi_driver, CONFIG_ROCKCHIP_DW_MIPI_DSI),
-> +	DRV_PTR(inno_hdmi_driver, CONFIG_ROCKCHIP_INNO_HDMI),
-> +};
-
-[...]
-
-> +static int rockchip_drm_register_drivers(void)
-> +{
-> +	int i, ret;
+> +The HDMI Encoder supports the HDMI video and audio outputs, and does
+> +CEC. It is one end of the pipeline.
 > +
-> +	for (i = 0; i < ARRAY_SIZE(rockchip_drm_comp_drvs); i++) {
-> +		ret = platform_driver_register(rockchip_drm_comp_drvs[i]);
-> +		if (ret)
-> +			goto err_unreg;
-> +	}
+> +Required properties:
+> +  - compatible: value must be one of:
+> +    * allwinner,sun5i-a10s-hdmi
+> +  - reg: base address and size of memory-mapped region
+> +  - clocks: phandles to the clocks feeding the HDMI encoder
+> +    * ahb: the HDMI interface clock
+> +    * mod: the HDMI module clock
+> +    * pll-0: the first video PLL
+> +    * pll-1: the second video PLL
+> +  - clock-names: the clock names mentioned above
+> +
+> +  - ports: A ports node with endpoint definitions as defined in
+> +    Documentation/devicetree/bindings/media/video-interfaces.txt. The
+> +    first port should be the input endpoint.
 
-This of course won't work in the NULL case, as platform_driver_register always 
-dereferences its parameter [0], so you should only call it for the actual non-
-null array elements - of course same for unregister.
+You need an output port to an HDMI connector node and an audio port.
 
-
-Heiko
-
-[0] http://lxr.free-electrons.com/source/drivers/base/platform.c#L617
+> +
+>  TV Encoder
+>  ----------
+>  
+> -- 
+> git-series 0.8.11
