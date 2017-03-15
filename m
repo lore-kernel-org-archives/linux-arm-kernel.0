@@ -1,73 +1,86 @@
-From: vivek.gautam@codeaurora.org (Vivek Gautam)
-Date: Wed, 15 Mar 2017 20:21:55 +0530
-Subject: [RESEND PATCH v3 2/2] phy: Group vendor specific phy drivers
-In-Reply-To: <2492681.1VCl1nfEs0@diego>
-References: <1489472080-23711-2-git-send-email-vivek.gautam@codeaurora.org>
- <1489472570-26434-1-git-send-email-vivek.gautam@codeaurora.org>
- <2492681.1VCl1nfEs0@diego>
-Message-ID: <CAFp+6iGO=zPFq7dLupPa6XitBmFOj+tk75CtQGfm8h1yKJjeEA@mail.gmail.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Wed, 15 Mar 2017 15:52:15 +0100
+Subject: [GIT PULL v2] Reset controller changes for v4.12
+Message-ID: <1489589535.2528.23.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 15, 2017 at 1:38 PM, Heiko St?bner <heiko@sntech.de> wrote:
-> Am Dienstag, 14. M?rz 2017, 11:52:50 CET schrieb Vivek Gautam:
->> Adding vendor specific directories in phy to group
->> phy drivers under their respective vendor umbrella.
->>
->> Also updated the MAINTAINERS file to reflect the correct
->> directory structure for phy drivers.
->>
->> Signed-off-by: Vivek Gautam <vivek.gautam@codeaurora.org>
->> Acked-by: Heiko Stuebner <heiko@sntech.de>
->> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
->> Cc: Kishon Vijay Abraham I <kishon@ti.com>
->> Cc: David S. Miller <davem@davemloft.net>
->> Cc: Geert Uytterhoeven <geert+renesas@glider.be>
->> Cc: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
->> Cc: Guenter Roeck <linux@roeck-us.net>
->> Cc: Heiko Stuebner <heiko@sntech.de>
->> Cc: Viresh Kumar <viresh.kumar@linaro.org>
->> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
->> Cc: Chen-Yu Tsai <wens@csie.org>
->> Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
->> Cc: Krzysztof Kozlowski <krzk@kernel.org>
->> Cc: Jaehoon Chung <jh80.chung@samsung.com>
->> Cc: linux-arm-kernel at lists.infradead.org
->> Cc: linux-arm-msm at vger.kernel.org
->> Cc: linux-kernel at vger.kernel.org
->> Cc: linux-omap at vger.kernel.org
->> Cc: linux-renesas-soc at vger.kernel.org
->> Cc: linux-rockchip at lists.infradead.org
->> Cc: linux-samsung-soc at vger.kernel.org
->> Cc: linux-usb at vger.kernel.org
->> ---
->>
->> Corrected Krzysztof's email-id. Added linux-arm-msm.
->>
->> Hi Heiko, Viresh,
->> It's been a year since the last version of this patch was posted.
->> Kishon has agreed to pull this change now. I am carrying forward
->> your Acks since there are no functional changes.
->> I have taken care of the drivers that were added/removed since
->> the last version.
->> Please feel free to jump in if you have any concerns.
->
-> still looks all good and I gave that a try on 4.11-rc2 yesterday as well.
+Hi,
 
-Thanks Heiko for testing this patch.
+Please consider merging this tag, which adds new drivers for i.MX7 and
+Arria10, removes module code from non-modular drivers, and fixes a build
+warning in the uniphier driver and the nr_resets property usage of the
+socfpga driver as well as 64-bit compilation of the sunxi driver.
 
-Best Regards
-Vivek
->
->
-> Heiko
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+I have dropped the mfd dt-bindings patch "dt-bindings: mfd: Add Altera
+Arria10 SR Reset Controller bindings" since v1, and added "reset: sunxi:
+fix for 64-bit compilation".
 
+regards
+Philipp
 
+The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+  Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
+
+are available in the git repository at:
+
+  git://git.pengutronix.de/git/pza/linux.git tags/reset-for-4.12-1
+
+for you to fetch changes up to 11282a49b735ad7f4cea187de2b8dc5489343e4b:
+
+  reset: sunxi: fix for 64-bit compilation (2017-03-15 12:19:12 +0100)
+
+----------------------------------------------------------------
+Reset controller changes for v4.12
+
+- make reset drivers with bool Kconfig options explicitly non-modular
+- fix uniphier non-static symbol warnings
+- fix socfpga nr_resets property
+- new drivers for the Arria10 and i.MX7 system reset controllers
+- fix sunxi 64-bit compilation
+
+----------------------------------------------------------------
+Andre Przywara (1):
+      reset: sunxi: fix for 64-bit compilation
+
+Andrey Smirnov (1):
+      reset: Add i.MX7 SRC reset driver
+
+Paul Gortmaker (4):
+      reset: meson: make it explicitly non-modular
+      reset: oxnas: make it explicitly non-modular
+      reset: ath79: make it explicitly non-modular
+      reset: pistachio: make it explicitly non-modular
+
+Rojhalat Ibrahim (1):
+      reset-socfpga: Fix nr_resets property
+
+Thor Thayer (2):
+      dt-bindings: reset: a10sr: Add Arria10 SR Reset Controller offsets
+      reset: Add Altera Arria10 SR Reset Controller
+
+Wei Yongjun (1):
+      reset: uniphier: fix non static symbol warnings
+
+ .../devicetree/bindings/reset/fsl,imx7-src.txt     |  47 ++++++
+ MAINTAINERS                                        |   2 +
+ drivers/reset/Kconfig                              |  14 ++
+ drivers/reset/Makefile                             |   3 +
+ drivers/reset/reset-a10sr.c                        | 138 ++++++++++++++++++
+ drivers/reset/reset-ath79.c                        |  27 ++--
+ drivers/reset/reset-imx7.c                         | 158 +++++++++++++++++++++
+ drivers/reset/reset-meson.c                        |  12 +-
+ drivers/reset/reset-oxnas.c                        |   6 +-
+ drivers/reset/reset-pistachio.c                    |   9 +-
+ drivers/reset/reset-socfpga.c                      |  13 +-
+ drivers/reset/reset-sunxi.c                        |  18 +--
+ drivers/reset/reset-uniphier.c                     |  20 +--
+ include/dt-bindings/reset/altr,rst-mgr-a10sr.h     |  33 +++++
+ include/dt-bindings/reset/imx7-reset.h             |  62 ++++++++
+ 15 files changed, 500 insertions(+), 62 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/reset/fsl,imx7-src.txt
+ create mode 100644 drivers/reset/reset-a10sr.c
+ create mode 100644 drivers/reset/reset-imx7.c
+ create mode 100644 include/dt-bindings/reset/altr,rst-mgr-a10sr.h
+ create mode 100644 include/dt-bindings/reset/imx7-reset.h
