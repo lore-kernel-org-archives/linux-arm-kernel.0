@@ -1,31 +1,40 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Wed, 15 Mar 2017 18:59:40 +0900
-Subject: [PATCH v33 11/14] arm64: kdump: enable kdump in defconfig
-In-Reply-To: <20170315095656.24992-1-takahiro.akashi@linaro.org>
-References: <20170315095656.24992-1-takahiro.akashi@linaro.org>
-Message-ID: <20170315095941.25119-9-takahiro.akashi@linaro.org>
+From: phdm@macq.eu (Philippe De Muyter)
+Date: Wed, 15 Mar 2017 11:50:49 +0100
+Subject: media / v4l2-mc: wishlist for complex cameras (was Re: [PATCH
+ v4 14/36] [media] v4l2-mc: add a function to inherit controls from
+ a pipeline)
+In-Reply-To: <20170314215420.6fc63c67@vento.lan>
+References: <cc8900b0-c091-b14b-96f4-01f8fa72431c@xs4all.nl>
+ <20170310125342.7f047acf@vento.lan>
+ <20170310223714.GI3220@valkosipuli.retiisi.org.uk>
+ <20170311082549.576531d0@vento.lan>
+ <20170313124621.GA10701@valkosipuli.retiisi.org.uk>
+ <20170314004533.3b3cd44b@vento.lan>
+ <e0a6c60b-1735-de0b-21f4-d8c3f4b3f10f@xs4all.nl>
+ <20170314072143.498cde9b@vento.lan> <20170314223254.GA7141@amd>
+ <20170314215420.6fc63c67@vento.lan>
+Message-ID: <20170315105049.GA12099@frolo.macqel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kdump is enabled by default as kexec is.
+On Tue, Mar 14, 2017 at 09:54:31PM -0300, Mauro Carvalho Chehab wrote:
+> Em Tue, 14 Mar 2017 23:32:54 +0100
+> Pavel Machek <pavel@ucw.cz> escreveu:
+> 
+> > 
+> > Well, I believe first question is: what applications would we want to
+> > run on complex devices? Will sending control from video to subdevs
+> > actually help?
+> 
+> I would say: camorama, xawtv3, zbar, google talk, skype. If it runs
+> with those, it will likely run with any other application.
+> 
 
-Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
----
- arch/arm64/configs/defconfig | 1 +
- 1 file changed, 1 insertion(+)
+I would like to add the 'v4l2src' plugin of gstreamer, and on the imx6 its
+imx-specific counterpart 'imxv4l2videosrc' from the gstreamer-imx package
+at https://github.com/Freescale/gstreamer-imx, and 'v4l2-ctl'.
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 7c48028ec64a..927ee18bbdf2 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -82,6 +82,7 @@ CONFIG_CMA=y
- CONFIG_SECCOMP=y
- CONFIG_XEN=y
- CONFIG_KEXEC=y
-+CONFIG_CRASH_DUMP=y
- # CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
- CONFIG_COMPAT=y
- CONFIG_CPU_IDLE=y
+Philippe
+
 -- 
-2.11.1
+Philippe De Muyter +32 2 6101532 Macq SA rue de l'Aeronef 2 B-1140 Bruxelles
