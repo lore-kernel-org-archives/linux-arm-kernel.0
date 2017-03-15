@@ -1,85 +1,117 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 15 Mar 2017 15:16:01 +0800
-Subject: [linux-sunxi] [PATCH v3 5/5] ARM: dts: sun8i: h2+: enable USB OTG
- for Orange Pi Zero board
-In-Reply-To: <20170306223449.21404-6-icenowy@aosc.xyz>
-References: <20170306223449.21404-1-icenowy@aosc.xyz>
- <20170306223449.21404-6-icenowy@aosc.xyz>
-Message-ID: <CAGb2v67+FpOvPHVWbOX+R9wy0LnDya-ak41zO5W-wyAWTn2pWw@mail.gmail.com>
+From: andy.tang@nxp.com (Yuantian Tang)
+Date: Wed, 15 Mar 2017 15:10:25 +0800
+Subject: [PATCH v3] arm64: dts: ls1012a: add thermal monitor node
+Message-ID: <1489561825-42670-1-git-send-email-andy.tang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+There is a thermal monitoring unit on ls1012a soc which can
+monitor and record the temperature of cores so that appropriate actions
+can be taken or alarm the user when the temperature exceeds a programmed
+temperature threshold.
 
-On Tue, Mar 7, 2017 at 6:34 AM, Icenowy Zheng <icenowy@aosc.xyz> wrote:
-> Orange Pi Zero board features a USB OTG port, which has a ID pin, and
-> can be used to power up the board. However, even if the board is powered
-> via +5V pin in GPIO/expansion headers, the VBUS in the OTG port cannot
-> be powered up, thus it's impossible to use it in host mode with simple
-> OTG cables.
->
-> Add support for it in peripheral mode.
->
-> If someone really want to use it in host mode, the mode of PHY can be
-> switch via sysfs, then use a powered USB OTG cable or powered USB HUB to
-> power up external USB devices.
->
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
-> ---
-> New patch in v3.
->
->  arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts | 14 ++++++++++++++
->  1 file changed, 14 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts b/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts
-> index b7ca916d871d..63f819394b98 100644
-> --- a/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts
-> +++ b/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts
-> @@ -96,6 +96,10 @@
->         };
->  };
->
-> +&ehci0 {
-> +       status = "okay";
-> +};
-> +
->  &ehci1 {
->         status = "okay";
->  };
-> @@ -132,6 +136,10 @@
->         bias-pull-up;
->  };
->
-> +&ohci0 {
-> +       status = "okay";
-> +};
-> +
->  &ohci1 {
->         status = "okay";
->  };
-> @@ -154,7 +162,13 @@
->         status = "disabled";
->  };
->
-> +&usb_otg {
-> +       dr_mode = "peripheral";
-> +       status = "okay";
-> +};
-> +
->  &usbphy {
->         /* USB VBUS is always on */
+Signed-off-by: Tang Yuantian <andy.tang@nxp.com>
+---
+v3:
+	-- fix alignment and format issue
+v2:
+	-- rebase to latest kernel
+ arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi | 76 ++++++++++++++++++++++++++
+ 1 file changed, 76 insertions(+)
 
-This comment does not match your commit message, which says it's always off.
-
-ChenYu
-
->         status = "okay";
-> +       usb0_id_det-gpios = <&pio 6 12 GPIO_ACTIVE_HIGH>; /* PG12 */
->  };
-> --
-> 2.11.1
->
-> --
-> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
-> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
-> For more options, visit https://groups.google.com/d/optout.
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
+index cffebb4..2cceefd 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
+@@ -43,6 +43,7 @@
+  */
+ 
+ #include <dt-bindings/interrupt-controller/irq.h>
++#include <dt-bindings/thermal/thermal.h>
+ 
+ / {
+ 	compatible = "fsl,ls1012a";
+@@ -127,6 +128,81 @@
+ 			clocks = <&sysclk>;
+ 		};
+ 
++		tmu: tmu at 1f00000 {
++			compatible = "fsl,qoriq-tmu";
++			reg = <0x0 0x1f00000 0x0 0x10000>;
++			interrupts = <0 33 0x4>;
++			fsl,tmu-range = <0xb0000 0x9002a 0x6004c 0x30062>;
++			fsl,tmu-calibration = <0x00000000 0x00000026
++					       0x00000001 0x0000002d
++					       0x00000002 0x00000032
++					       0x00000003 0x00000039
++					       0x00000004 0x0000003f
++					       0x00000005 0x00000046
++					       0x00000006 0x0000004d
++					       0x00000007 0x00000054
++					       0x00000008 0x0000005a
++					       0x00000009 0x00000061
++					       0x0000000a 0x0000006a
++					       0x0000000b 0x00000071
++
++					       0x00010000 0x00000025
++					       0x00010001 0x0000002c
++					       0x00010002 0x00000035
++					       0x00010003 0x0000003d
++					       0x00010004 0x00000045
++					       0x00010005 0x0000004e
++					       0x00010006 0x00000057
++					       0x00010007 0x00000061
++					       0x00010008 0x0000006b
++					       0x00010009 0x00000076
++
++					       0x00020000 0x00000029
++					       0x00020001 0x00000033
++					       0x00020002 0x0000003d
++					       0x00020003 0x00000049
++					       0x00020004 0x00000056
++					       0x00020005 0x00000061
++					       0x00020006 0x0000006d
++
++					       0x00030000 0x00000021
++					       0x00030001 0x0000002a
++					       0x00030002 0x0000003c
++					       0x00030003 0x0000004e>;
++			big-endian;
++			#thermal-sensor-cells = <1>;
++		};
++
++		thermal-zones {
++			cpu_thermal: cpu-thermal {
++				polling-delay-passive = <1000>;
++				polling-delay = <5000>;
++				thermal-sensors = <&tmu 0>;
++				trips {
++					cpu_alert: cpu-alert {
++						temperature = <85000>;
++						hysteresis = <2000>;
++						type = "passive";
++					};
++
++					cpu_crit: cpu-crit {
++						temperature = <95000>;
++						hysteresis = <2000>;
++						type = "critical";
++					};
++				};
++
++				cooling-maps {
++					map0 {
++						trip = <&cpu_alert>;
++						cooling-device =
++							<&cpu0 THERMAL_NO_LIMIT
++							THERMAL_NO_LIMIT>;
++					};
++				};
++			};
++		};
++
+ 		i2c0: i2c at 2180000 {
+ 			compatible = "fsl,vf610-i2c";
+ 			#address-cells = <1>;
+-- 
+2.1.0.27.g96db324
