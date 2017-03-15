@@ -1,421 +1,98 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 15 Mar 2017 14:39:26 +0100
-Subject: [PATCH v6 09/14] mmc: sdhci-xenon: Add support to PHYs of Marvell
- Xenon SDHC
-In-Reply-To: <b646d28daf3d8cb8e57774ce040f39350364041e.1487091464.git-series.gregory.clement@free-electrons.com>
-References: <cover.ff78bebe0384f650a51e5e6f0f1dca6e7894b53b.1487091464.git-series.gregory.clement@free-electrons.com>
- <b646d28daf3d8cb8e57774ce040f39350364041e.1487091464.git-series.gregory.clement@free-electrons.com>
-Message-ID: <CAPDyKFrQb3NA53o6z9go0+RxxvstwWdeLHpiXtKaXOksxrov3g@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 15 Mar 2017 13:43:55 +0000
+Subject: [PATCH 3/3] kvm: arm/arm64: Fix locking for kvm_free_stage2_pgd
+In-Reply-To: <20170315133542.GP1277@cbox>
+References: <1489503154-20705-1-git-send-email-suzuki.poulose@arm.com>
+ <1489503154-20705-4-git-send-email-suzuki.poulose@arm.com>
+ <20170315092147.GM1277@cbox> <314fbde3-17e6-414b-85e6-326de22bdc1c@arm.com>
+ <20170315105639.GA31974@cbox> <0e5ff7f7-855c-ea28-fdee-73c062c3d289@arm.com>
+ <20170315133542.GP1277@cbox>
+Message-ID: <635795ed-7b12-bfb3-3b11-4edcfbc7b1bc@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14 February 2017 at 18:01, Gregory CLEMENT
-<gregory.clement@free-electrons.com> wrote:
-> From: Hu Ziji <huziji@marvell.com>
->
-> Marvell Xenon eMMC/SD/SDIO Host Controller contains PHY.
-> Multiple types of PHYs are supported.
->
-> Add support to multiple types of PHYs init and configuration.
-> Add register definitions of PHYs.
->
-> Xenon PHY cannot fit in kernel common PHY framework.
-> Xenon SDHC PHY register is a part of Xenon SDHC register set.
-> Besides, MMC initialization has to call several PHY functions to
-> complete timing setting.
-> Those PHY setting functions have to access SDHC registers and know
-> current MMC setting, such as bus width, clock frequency and
-> speed mode.
-> As a result, implement Xenon PHY in MMC host directory.
->
-> Signed-off-by: Hu Ziji <huziji@marvell.com>
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> ---
->  drivers/mmc/host/Makefile          |   2 +-
->  drivers/mmc/host/sdhci-xenon-phy.c | 751 ++++++++++++++++++++++++++++++-
->  drivers/mmc/host/sdhci-xenon.c     |   3 +-
->  drivers/mmc/host/sdhci-xenon.h     |  37 +-
->  4 files changed, 791 insertions(+), 2 deletions(-)
->  create mode 100644 drivers/mmc/host/sdhci-xenon-phy.c
+On 15/03/17 13:35, Christoffer Dall wrote:
+> On Wed, Mar 15, 2017 at 01:28:07PM +0000, Marc Zyngier wrote:
+>> On 15/03/17 10:56, Christoffer Dall wrote:
+>>> On Wed, Mar 15, 2017 at 09:39:26AM +0000, Marc Zyngier wrote:
+>>>> On 15/03/17 09:21, Christoffer Dall wrote:
+>>>>> On Tue, Mar 14, 2017 at 02:52:34PM +0000, Suzuki K Poulose wrote:
+>>>>>> In kvm_free_stage2_pgd() we don't hold the kvm->mmu_lock while calling
+>>>>>> unmap_stage2_range() on the entire memory range for the guest. This could
+>>>>>> cause problems with other callers (e.g, munmap on a memslot) trying to
+>>>>>> unmap a range.
+>>>>>>
+>>>>>> Fixes: commit d5d8184d35c9 ("KVM: ARM: Memory virtualization setup")
+>>>>>> Cc: stable at vger.kernel.org # v3.10+
+>>>>>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+>>>>>> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+>>>>>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+>>>>>> ---
+>>>>>>  arch/arm/kvm/mmu.c | 3 +++
+>>>>>>  1 file changed, 3 insertions(+)
+>>>>>>
+>>>>>> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+>>>>>> index 13b9c1f..b361f71 100644
+>>>>>> --- a/arch/arm/kvm/mmu.c
+>>>>>> +++ b/arch/arm/kvm/mmu.c
+>>>>>> @@ -831,7 +831,10 @@ void kvm_free_stage2_pgd(struct kvm *kvm)
+>>>>>>  	if (kvm->arch.pgd == NULL)
+>>>>>>  		return;
+>>>>>>  
+>>>>>> +	spin_lock(&kvm->mmu_lock);
+>>>>>>  	unmap_stage2_range(kvm, 0, KVM_PHYS_SIZE);
+>>>>>> +	spin_unlock(&kvm->mmu_lock);
+>>>>>> +
+>>>>>
+>>>>> This ends up holding the spin lock for potentially quite a while, where
+>>>>> we can do things like __flush_dcache_area(), which I think can fault.
+>>>>
+>>>> I believe we're always using the linear mapping (or kmap on 32bit) in
+>>>> order not to fault.
+>>>>
+>>>
+>>> ok, then there's just the concern that we may be holding a spinlock for
+>>> a very long time.  I seem to recall Mario once added something where he
+>>> unlocked and gave a chance to schedule something else for each PUD or
+>>> something like that, because he ran into the issue during migration.  Am
+>>> I confusing this with something else?
+>>
+>> That definitely rings a bell: stage2_wp_range() uses that kind of trick
+>> to give the system a chance to breathe. Maybe we could use a similar
+>> trick in our S2 unmapping code? How about this (completely untested) patch:
+>>
+>> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+>> index 962616fd4ddd..1786c24212d4 100644
+>> --- a/arch/arm/kvm/mmu.c
+>> +++ b/arch/arm/kvm/mmu.c
+>> @@ -292,8 +292,13 @@ static void unmap_stage2_range(struct kvm *kvm, phys_addr_t start, u64 size)
+>>  	phys_addr_t addr = start, end = start + size;
+>>  	phys_addr_t next;
+>>  
+>> +	BUG_ON(!spin_is_locked(&kvm->mmu_lock));
+>> +
+>>  	pgd = kvm->arch.pgd + stage2_pgd_index(addr);
+>>  	do {
+>> +		if (need_resched() || spin_needbreak(&kvm->mmu_lock))
+>> +			cond_resched_lock(&kvm->mmu_lock);
+>> +
+>>  		next = stage2_pgd_addr_end(addr, end);
+>>  		if (!stage2_pgd_none(*pgd))
+>>  			unmap_stage2_puds(kvm, pgd, addr, next);
+>>
+>> The additional BUG_ON() is just for my own peace of mind - we seem to
+>> have missed a couple of these lately, and the "breathing" code makes
+>> it imperative that this lock is being taken prior to entering the
+>> function.
+>>
+> 
+> Looks good to me!
 
-I see, you put the phy implementation in a separate file. I guess that
-makes sense. However, I leave the decision for Adrian.
+OK. I'll stash that on top of Suzuki's series, and start running some
+actual tests... ;-)
 
-Anyway, in such case I guess the extended Makefile options and the
-separate header files makes sense.
+Thanks,
 
->
-> diff --git a/drivers/mmc/host/Makefile b/drivers/mmc/host/Makefile
-> index b0a2ab4b256e..893b48db5513 100644
-> --- a/drivers/mmc/host/Makefile
-> +++ b/drivers/mmc/host/Makefile
-> @@ -84,4 +84,4 @@ ifeq ($(CONFIG_CB710_DEBUG),y)
->  endif
->
->  obj-$(CONFIG_MMC_SDHCI_XENON)  += sdhci-xenon-driver.o
-> -sdhci-xenon-driver-y           += sdhci-xenon.o
-> +sdhci-xenon-driver-y           += sdhci-xenon.o sdhci-xenon-phy.o
-> diff --git a/drivers/mmc/host/sdhci-xenon-phy.c b/drivers/mmc/host/sdhci-xenon-phy.c
-> new file mode 100644
-> index 000000000000..c26ba3a180a0
-> --- /dev/null
-> +++ b/drivers/mmc/host/sdhci-xenon-phy.c
-
-[...]
-
-> +/*
-> + * eMMC PHY configuration and operations
-> + */
-> +struct emmc_phy_params {
-
-Perhaps prefix the struct name with "xenon_".
-
-> +       bool    slow_mode;
-> +
-> +       u8      znr;
-> +       u8      zpr;
-> +
-> +       /* Nr of consecutive Sampling Points of a Valid Sampling Window */
-> +       u8      nr_tun_times;
-> +       /* Divider for calculating Tuning Step */
-> +       u8      tun_step_divider;
-> +};
-> +
-> +static int alloc_emmc_phy(struct sdhci_xenon_priv *priv)
-> +{
-> +       struct emmc_phy_params *params;
-> +
-> +       params = kzalloc(sizeof(*params), GFP_KERNEL);
-
-Why not using devm_kzalloc()?
-
-[...]
-
-> +
-> +/*
-> + * If eMMC PHY Slow Mode is required in lower speed mode (SDCLK < 55MHz)
-> + * in SDR mode, enable Slow Mode to bypass eMMC PHY.
-> + * SDIO slower SDR mode also requires Slow Mode.
-> + *
-> + * If Slow Mode is enabled, return true.
-> + * Otherwise, return false.
-> + */
-> +static bool emmc_phy_slow_mode(struct sdhci_host *host,
-> +                              unsigned char timing)
-> +{
-> +       struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-> +       struct sdhci_xenon_priv *priv = sdhci_pltfm_priv(pltfm_host);
-> +       struct emmc_phy_params *params = priv->phy_params;
-> +       struct xenon_emmc_phy_regs *phy_regs = priv->emmc_phy_regs;
-> +       u32 reg;
-> +
-> +       if (host->clock > MMC_HIGH_52_MAX_DTR)
-> +               return false;
-> +
-> +       reg = sdhci_readl(host, phy_regs->timing_adj);
-> +       /* Enable Slow Mode for SDIO in slower SDR mode */
-> +       if ((priv->init_card_type == MMC_TYPE_SDIO) &&
-> +           ((timing == MMC_TIMING_UHS_SDR25) ||
-> +            (timing == MMC_TIMING_UHS_SDR12) ||
-> +            (timing == MMC_TIMING_SD_HS))) {
-> +               reg |= XENON_TIMING_ADJUST_SLOW_MODE;
-> +               sdhci_writel(host, reg, phy_regs->timing_adj);
-> +               return true;
-> +       }
-> +
-> +       /* Check if Slow Mode is required in lower speed mode in SDR mode */
-> +       if (((timing == MMC_TIMING_UHS_SDR25) ||
-> +            (timing == MMC_TIMING_UHS_SDR12) ||
-> +            (timing == MMC_TIMING_SD_HS) ||
-> +            (timing == MMC_TIMING_MMC_HS)) && params->slow_mode) {
-> +               reg |= XENON_TIMING_ADJUST_SLOW_MODE;
-> +               sdhci_writel(host, reg, phy_regs->timing_adj);
-> +               return true;
-> +       }
-> +
-
-Two quite similar if statement. Can you perhaps combine them to avoid
-code duplication.
-
-> +       reg &= ~XENON_TIMING_ADJUST_SLOW_MODE;
-> +       sdhci_writel(host, reg, phy_regs->timing_adj);
-> +       return false;
-> +}
-> +
-> +/*
-> + * Set-up eMMC 5.0/5.1 PHY.
-> + * Specific configuration depends on the current speed mode in use.
-> + */
-> +static void emmc_phy_set(struct sdhci_host *host,
-> +                        unsigned char timing)
-> +{
-> +       u32 reg;
-> +       struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-> +       struct sdhci_xenon_priv *priv = sdhci_pltfm_priv(pltfm_host);
-> +       struct emmc_phy_params *params = priv->phy_params;
-> +       struct xenon_emmc_phy_regs *phy_regs = priv->emmc_phy_regs;
-> +       unsigned long flags;
-> +
-> +       dev_dbg(mmc_dev(host->mmc), "eMMC PHY setting starts\n");
-> +
-> +       spin_lock_irqsave(&host->lock, flags);
-> +
-> +       /* Setup pad, set bit[28] and bits[26:24] */
-> +       reg = sdhci_readl(host, phy_regs->pad_ctrl);
-> +       reg |= (XENON_FC_DQ_RECEN | XENON_FC_CMD_RECEN |
-> +               XENON_FC_QSP_RECEN | XENON_OEN_QSN);
-> +       /* All FC_XX_RECEIVCE should be set as CMOS Type */
-> +       reg |= XENON_FC_ALL_CMOS_RECEIVER;
-> +       sdhci_writel(host, reg, phy_regs->pad_ctrl);
-> +
-> +       /* Set CMD and DQ Pull Up */
-> +       if (priv->phy_type == EMMC_5_0_PHY) {
-> +               reg = sdhci_readl(host, XENON_EMMC_5_0_PHY_PAD_CONTROL);
-> +               reg |= (XENON_EMMC5_FC_CMD_PU | XENON_EMMC5_FC_DQ_PU);
-> +               reg &= ~(XENON_EMMC5_FC_CMD_PD | XENON_EMMC5_FC_DQ_PD);
-> +               sdhci_writel(host, reg, XENON_EMMC_5_0_PHY_PAD_CONTROL);
-> +       } else {
-> +               reg = sdhci_readl(host, XENON_EMMC_PHY_PAD_CONTROL1);
-> +               reg |= (XENON_EMMC5_1_FC_CMD_PU | XENON_EMMC5_1_FC_DQ_PU);
-> +               reg &= ~(XENON_EMMC5_1_FC_CMD_PD | XENON_EMMC5_1_FC_DQ_PD);
-> +               sdhci_writel(host, reg, XENON_EMMC_PHY_PAD_CONTROL1);
-> +       }
-> +
-> +       if (timing == MMC_TIMING_LEGACY) {
-> +               /*
-> +                * If Slow Mode is required, enable Slow Mode by default
-> +                * in early init phase to avoid any potential issue.
-> +                */
-> +               if (params->slow_mode) {
-> +                       reg = sdhci_readl(host, phy_regs->timing_adj);
-> +                       reg |= XENON_TIMING_ADJUST_SLOW_MODE;
-> +                       sdhci_writel(host, reg, phy_regs->timing_adj);
-> +               }
-> +               goto phy_init;
-> +       }
-> +
-> +       /*
-> +        * FIXME: should depends on the specific board timing.
-> +        */
-> +       if ((timing == MMC_TIMING_MMC_HS400) ||
-> +           (timing == MMC_TIMING_MMC_HS200) ||
-> +           (timing == MMC_TIMING_UHS_SDR50) ||
-> +           (timing == MMC_TIMING_UHS_SDR104) ||
-> +           (timing == MMC_TIMING_UHS_DDR50) ||
-> +           (timing == MMC_TIMING_UHS_SDR25) ||
-> +           (timing == MMC_TIMING_MMC_DDR52)) {
-> +               reg = sdhci_readl(host, phy_regs->timing_adj);
-> +               reg &= ~XENON_OUTPUT_QSN_PHASE_SELECT;
-> +               sdhci_writel(host, reg, phy_regs->timing_adj);
-> +       }
-> +
-> +       /*
-> +        * If SDIO card, set SDIO Mode
-> +        * Otherwise, clear SDIO Mode
-> +        */
-> +       reg = sdhci_readl(host, phy_regs->timing_adj);
-> +       if (priv->init_card_type == MMC_TYPE_SDIO)
-> +               reg |= XENON_TIMING_ADJUST_SDIO_MODE;
-> +       else
-> +               reg &= ~XENON_TIMING_ADJUST_SDIO_MODE;
-> +       sdhci_writel(host, reg, phy_regs->timing_adj);
-> +
-> +       if (emmc_phy_slow_mode(host, timing))
-> +               goto phy_init;
-> +
-> +       /*
-> +        * Set preferred ZNR and ZPR value
-> +        * The ZNR and ZPR value vary between different boards.
-> +        * Define them both in sdhci-xenon-emmc-phy.h.
-> +        */
-> +       reg = sdhci_readl(host, phy_regs->pad_ctrl2);
-> +       reg &= ~((XENON_ZNR_MASK << XENON_ZNR_SHIFT) | XENON_ZPR_MASK);
-> +       reg |= ((params->znr << XENON_ZNR_SHIFT) | params->zpr);
-> +       sdhci_writel(host, reg, phy_regs->pad_ctrl2);
-> +
-> +       /*
-> +        * When setting EMMC_PHY_FUNC_CONTROL register,
-> +        * SD clock should be disabled
-> +        */
-> +       reg = sdhci_readl(host, SDHCI_CLOCK_CONTROL);
-> +       reg &= ~SDHCI_CLOCK_CARD_EN;
-> +       sdhci_writew(host, reg, SDHCI_CLOCK_CONTROL);
-> +
-> +       reg = sdhci_readl(host, phy_regs->func_ctrl);
-> +       if ((timing == MMC_TIMING_UHS_DDR50) ||
-> +           (timing == MMC_TIMING_MMC_HS400) ||
-> +           (timing == MMC_TIMING_MMC_DDR52))
-> +               reg |= (XENON_DQ_DDR_MODE_MASK << XENON_DQ_DDR_MODE_SHIFT) |
-> +                      XENON_CMD_DDR_MODE;
-> +       else
-> +               reg &= ~((XENON_DQ_DDR_MODE_MASK << XENON_DQ_DDR_MODE_SHIFT) |
-> +                        XENON_CMD_DDR_MODE);
-> +
-> +       if (timing == MMC_TIMING_MMC_HS400)
-> +               reg &= ~XENON_DQ_ASYNC_MODE;
-> +       else
-> +               reg |= XENON_DQ_ASYNC_MODE;
-> +       sdhci_writel(host, reg, phy_regs->func_ctrl);
-> +
-> +       /* Enable bus clock */
-> +       reg = sdhci_readl(host, SDHCI_CLOCK_CONTROL);
-> +       reg |= SDHCI_CLOCK_CARD_EN;
-> +       sdhci_writew(host, reg, SDHCI_CLOCK_CONTROL);
-> +
-> +       if (timing == MMC_TIMING_MMC_HS400)
-> +               /* Hardware team recommend a value for HS400 */
-> +               sdhci_writel(host, XENON_LOGIC_TIMING_VALUE,
-> +                            phy_regs->logic_timing_adj);
-> +       else
-> +               __emmc_phy_disable_data_strobe(host);
-> +
-> +phy_init:
-> +       emmc_phy_init(host);
-> +
-> +       spin_unlock_irqrestore(&host->lock, flags);
-> +
-> +       dev_dbg(mmc_dev(host->mmc), "eMMC PHY setting completes\n");
-
-Again you are checking the MMC_TIMING_* in several if statements.
-Perhaps you can use switch statement instead and build a couple of
-different register variables, that you use when reading/writing
-afterwards.
-
-> +}
-> +
-> +static int emmc_phy_parse_param_dt(struct sdhci_host *host,
-> +                                  struct device_node *np,
-> +                                  struct emmc_phy_params *params)
-> +{
-> +       u32 value;
-> +
-> +       if (of_property_read_bool(np, "marvell,xenon-phy-slow-mode"))
-> +               params->slow_mode = true;
-> +       else
-> +               params->slow_mode = false;
-> +
-> +       if (!of_property_read_u32(np, "marvell,xenon-phy-znr", &value))
-> +               params->znr = value & XENON_ZNR_MASK;
-> +       else
-> +               params->znr = XENON_ZNR_DEF_VALUE;
-> +
-> +       if (!of_property_read_u32(np, "marvell,xenon-phy-zpr", &value))
-> +               params->zpr = value & XENON_ZPR_MASK;
-> +       else
-> +               params->zpr = XENON_ZPR_DEF_VALUE;
-> +
-> +       if (!of_property_read_u32(np, "marvell,xenon-phy-nr-success-tun",
-> +                                 &value))
-> +               params->nr_tun_times = value & XENON_TUN_CONSECUTIVE_TIMES_MASK;
-> +       else
-> +               params->nr_tun_times = XENON_TUN_CONSECUTIVE_TIMES;
-> +
-> +       if (!of_property_read_u32(np, "marvell,xenon-phy-tun-step-divider",
-> +                                 &value))
-> +               params->tun_step_divider = value & 0xFF;
-> +       else
-> +               params->tun_step_divider = XENON_TUNING_STEP_DIVIDER;
-> +
-> +       return 0;
-
-Instead of all these if-else, let's start by assigning default values
-instead. This makes the code more readable.
-
-> +}
-> +
-> +/*
-> + * Setting PHY when card is working in High Speed Mode.
-> + * HS400 set data strobe line.
-> + * HS200/SDR104 set tuning config to prepare for tuning.
-> + */
-> +static int xenon_hs_delay_adj(struct sdhci_host *host)
-> +{
-> +       int ret = 0;
-> +
-> +       if (WARN_ON(host->clock <= XENON_DEFAULT_SDCLK_FREQ))
-> +               return -EINVAL;
-> +
-> +       if (host->timing == MMC_TIMING_MMC_HS400) {
-> +               emmc_phy_strobe_delay_adj(host);
-> +               return 0;
-> +       }
-> +
-> +       if ((host->timing == MMC_TIMING_MMC_HS200) ||
-> +           (host->timing == MMC_TIMING_UHS_SDR104))
-> +               return emmc_phy_config_tuning(host);
-> +
-> +       /*
-> +        * DDR Mode requires driver to scan Sampling Fixed Delay Line,
-> +        * to find out a perfect operation sampling point.
-> +        * It is hard to implement such a scan in host driver since initiating
-> +        * commands by host driver is not safe.
-> +        * Thus so far just keep PHY Sampling Fixed Delay in default value
-> +        * in DDR mode.
-> +        *
-> +        * If any timing issue occurs in DDR mode on Marvell products,
-> +        * please contact maintainer to ask for internal support in Marvell.
-> +        */
-> +       if ((host->timing == MMC_TIMING_MMC_DDR52) ||
-> +           (host->timing == MMC_TIMING_UHS_DDR50))
-> +               dev_warn_once(mmc_dev(host->mmc), "Timing issue might occur in DDR mode\n");
-
-Please consider a to convert to use a switch statment instead of the
-several if statements.
-
-> +       return ret;
-> +}
-> +
-
-[...]
-
-> +
-> +static int add_xenon_phy(struct device_node *np, struct sdhci_host *host,
-> +                        const char *phy_name)
-> +{
-> +       struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-> +       struct sdhci_xenon_priv *priv = sdhci_pltfm_priv(pltfm_host);
-> +       int i, ret;
-> +
-> +       for (i = 0; i < NR_PHY_TYPES; i++) {
-> +               if (!strcmp(phy_name, phy_types[i])) {
-> +                       priv->phy_type = i;
-> +                       break;
-> +               }
-> +       }
-> +       if (i == NR_PHY_TYPES) {
-> +               dev_err(mmc_dev(host->mmc),
-> +                       "Unable to determine PHY name %s. Use default eMMC 5.1 PHY\n",
-> +                       phy_name);
-> +               priv->phy_type = EMMC_5_1_PHY;
-> +       }
-> +
-> +       ret = alloc_emmc_phy(priv);
-> +       if (ret)
-> +               return ret;
-> +
-> +       ret = emmc_phy_parse_param_dt(host, np, priv->phy_params);
-> +       if (ret)
-> +               clean_emmc_phy(priv);
-> +
-> +       return ret;
-> +}
-> +
-> +int xenon_phy_parse_dt(struct device_node *np, struct sdhci_host *host)
-> +{
-> +       const char *phy_type = NULL;
-> +
-> +       if (!of_property_read_string(np, "marvell,xenon-phy-type", &phy_type))
-> +               return add_xenon_phy(np, host, phy_type);
-> +
-> +       dev_info(mmc_dev(host->mmc), "Fail to get Xenon PHY type. Use default eMMC 5.1 PHY\n");
-
-Isn't there already a dev_err() being printed for this case. You
-probably only need one.
-
-> +       return add_xenon_phy(np, host, "emmc 5.1 phy");
-> +}
-
-[...]
-
-Kind regards
-Uffe
+	M.
+-- 
+Jazz is not dead. It just smells funny...
