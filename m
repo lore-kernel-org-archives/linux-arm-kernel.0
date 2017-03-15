@@ -1,35 +1,93 @@
-From: philipp.tomsich@theobroma-systems.com (Philipp Tomsich)
-Date: Wed, 15 Mar 2017 12:23:58 +0100
-Subject: [PATCH] clk: sunxi-ng: Fix div/mult settings for osc12M on A64
-Message-ID: <1489577038-34773-1-git-send-email-philipp.tomsich@theobroma-systems.com>
+From: Vadim.Lomovtsev@caviumnetworks.com (Vadim Lomovtsev)
+Date: Wed, 15 Mar 2017 04:33:23 -0700
+Subject: [PATCH] PCI: ACPI: Fix ThunderX PEM initialization
+In-Reply-To: <376ae1df-da85-e576-75d6-3ae2ab0f1b41@jonmasters.org>
+References: <1485793552-12614-1-git-send-email-Vadim.Lomovtsev@caviumnetworks.com>
+ <20170130211236.GW20550@bhelgaas-glaptop.roam.corp.google.com>
+ <20170131102830.GA13854@localhost.localdomain>
+ <20170131142525.GA9942@bhelgaas-glaptop.roam.corp.google.com>
+ <20170131145720.GA14231@localhost.localdomain>
+ <20170131203109.GA14127@bhelgaas-glaptop.roam.corp.google.com>
+ <20170201125325.GA15805@localhost.localdomain>
+ <20170201151807.GA15793@bhelgaas-glaptop.roam.corp.google.com>
+ <376ae1df-da85-e576-75d6-3ae2ab0f1b41@jonmasters.org>
+Message-ID: <20170315113323.GA28027@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mult/div for osc12M was previously backwards (giving a 48M rate
-for osc12M). Fix it.
+Hi Jon,
 
-X-AffectedPlatforms: A64-uQ7
-Signed-off-by: Philipp Tomsich <philipp.tomsich@theobroma-systems.com>
-Tested-by: Christoph Muellner <christoph.muellner@theobroma-systems.com>
+On Wed, Mar 15, 2017 at 07:14:38AM -0400, Jon Masters wrote:
+> Hi Bjorn, Vadim,
+> 
+> Following up to this old thread...
+> 
+> On 02/01/2017 10:18 AM, Bjorn Helgaas wrote:
+> > On Wed, Feb 01, 2017 at 04:53:25AM -0800, Vadim Lomovtsev wrote:
+> 
+> >>>> Because there is no such ACPI ID as "THRX0002" registered
+> >>>> (http://www.uefi.org/acpi_id_list).
+> 
+> There is still no "THRX" prefix registered with UEFI as of this morning.
+> 
+> >>> To be pedantically correct, I think you want "THRX" registered.  Then
+> >>> you can manage the "0002" part internally without registering each
+> >>> individual device.
+> 
+> The upstream Linux kernel contains a quirk matching entry that looks for
+> "THRX". Therefore, you have already agreed (as of at least January) that
+> this is the prefix that you will use in any firmware updates to support
+> the latest upstream Linux kernel. Please register this prefix promptly.
 
-Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
----
+And from what I know for now - we wont going to register this
+since we have already regsitered "CAV" prefix for that. And this was the part
+of our discussion also.
 
- drivers/clk/sunxi-ng/ccu-sun50i-a64.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+We had a bit long review of proper implementation of legacy firmware support,
+so my apologise on that.
 
-diff --git a/drivers/clk/sunxi-ng/ccu-sun50i-a64.c b/drivers/clk/sunxi-ng/ccu-sun50i-a64.c
-index e3c084c..f54114c 100644
---- a/drivers/clk/sunxi-ng/ccu-sun50i-a64.c
-+++ b/drivers/clk/sunxi-ng/ccu-sun50i-a64.c
-@@ -566,7 +566,7 @@ static SUNXI_CCU_M_WITH_GATE(gpu_clk, "gpu", "pll-gpu",
- 			     0x1a0, 0, 3, BIT(31), CLK_SET_RATE_PARENT);
- 
- /* Fixed Factor clocks */
--static CLK_FIXED_FACTOR(osc12M_clk, "osc12M", "osc24M", 1, 2, 0);
-+static CLK_FIXED_FACTOR(osc12M_clk, "osc12M", "osc24M", 2, 1, 0);
- 
- /* We hardcode the divider to 4 for now */
- static CLK_FIXED_FACTOR(pll_audio_clk, "pll-audio",
--- 
-1.9.1
+Please take a look at link to the patchset posted by Tomasz.
+https://www.spinics.net/lists/arm-kernel/msg568741.html
+
+> 
+> >> Not sure if it would be registered that way, because (AFAIK)
+> >> it expected to be string constructed from Vendor ID (not the Product ID) plus
+> >> four hex digit manged internaly. So we suggest to change it to 177DXXXX
+> >> which corresponds to Cavium PCI ID https://pci-ids.ucw.cz/pci.ids.
+> >> It's also possible to use the 3-digit PNP ID, "CAV", to construct these
+> >> _HID/_CID/_SUB values (http://www.uefi.org/pnp_id_list).
+> > 
+> > My point was that you only need to register the prefix ("CAV" or
+> > "THRX") of the PNP or ACPI ID.  Then you manage the suffixes
+> > internally.  You as long as you register "CAV" or "THRX", you can
+> > assign and use "THRX0002" yourself without registering that
+> > specifically.
+> >
+
+And my reply here was :
+"Yes, exactly. And the "CAV" perfix is already registered.
+And I think will'll use it to keep things aligned to specs & rules."
+
+> >> So the FW will be updated accordingly.
+> 
+> Indeed.
+
+Yes, it is now contains "CAVxxx" as _HID for device config object.
+
+> 
+> The version Bjorn merged looks for "THRX". This is the version that you will
+> use, and you will promptly register that prefix with UEFI and provide fixes
+> for existing firmware to correctly use the solution that is upstream.
+
+Cavium FW is updated accordingly to use already registered prefix.
+For existent FW legacy support is posted by Tomasz.
+
+> 
+> Thanks,
+> 
+> Jon.
+> 
+
+
+WBR,
+Vadim
