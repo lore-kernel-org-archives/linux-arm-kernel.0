@@ -1,115 +1,181 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Wed, 15 Mar 2017 18:49:43 +0000
-Subject: [PATCH V2] arm64: hwpoison: add VM_FAULT_HWPOISON[_LARGE] handling
-In-Reply-To: <20170315111955.GA29014@e104818-lin.cambridge.arm.com> (Catalin
- Marinas's message of "Wed, 15 Mar 2017 11:19:56 +0000")
-References: <1487720205-14594-1-git-send-email-tbaicar@codeaurora.org>
- <87wpc7o7mo.fsf@e105922-lin.cambridge.arm.com>
- <874lz4oo80.fsf@e105922-lin.cambridge.arm.com>
- <fae5fa32-687b-4ebd-2d0c-b9df5837ba89@codeaurora.org>
- <87efy6mjgj.fsf@e105922-lin.cambridge.arm.com>
- <20170315111955.GA29014@e104818-lin.cambridge.arm.com>
-Message-ID: <87d1dijry0.fsf@e105922-lin.cambridge.arm.com>
+From: john@metanate.com (John Keeping)
+Date: Wed, 15 Mar 2017 18:51:33 +0000
+Subject: [PATCH v2.1 1/4] pinctrl: rockchip: remove unnecessary locking
+In-Reply-To: <20170315174654.15128-2-john@metanate.com>
+References: <20170315174654.15128-1-john@metanate.com>
+ <20170315174654.15128-2-john@metanate.com>
+Message-ID: <20170315185133.38ee57a4.john@metanate.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Catalin Marinas <catalin.marinas@arm.com> writes:
+regmap_update_bits does its own locking and everything else accessed
+here is a local variable so there is no need to lock around it.
 
-> Hi Punit,
->
-> Adding David Woods since he seems to have added the arm64-specific
-> huge_pte_offset() code.
->
-> On Thu, Mar 09, 2017 at 05:46:36PM +0000, Punit Agrawal wrote:
->> From d5ad3f428e629c80b0f93f2bbdf99b4cae28c9bc Mon Sep 17 00:00:00 2001
->> From: Punit Agrawal <punit.agrawal@arm.com>
->> Date: Thu, 9 Mar 2017 16:16:29 +0000
->> Subject: [PATCH] arm64: hugetlb: Fix huge_pte_offset to return poisoned pmd
->> 
->> When memory failure is enabled, a poisoned hugepage PMD is marked as a
->> swap entry. As pmd_present() only checks for VALID and PROT_NONE
->> bits (turned off for swap entries), it causues huge_pte_offset() to
->> return NULL for poisoned PMDs.
->> 
->> This behaviour of huge_pte_offset() leads to the error such as below
->> when munmap is called on poisoned hugepages.
->> 
->> [  344.165544] mm/pgtable-generic.c:33: bad pmd 000000083af00074.
->> 
->> Fix huge_pte_offset() to return the poisoned PMD which is then
->> appropriately handled by the generic layer code.
->> 
->> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
->> Cc: Catalin Marinas <catalin.marinas@arm.com>
->> Cc: Steve Capper <steve.capper@arm.com>
->> ---
->>  arch/arm64/mm/hugetlbpage.c | 11 ++++++++++-
->>  1 file changed, 10 insertions(+), 1 deletion(-)
->> 
->> diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
->> index e25584d72396..9263f206353c 100644
->> --- a/arch/arm64/mm/hugetlbpage.c
->> +++ b/arch/arm64/mm/hugetlbpage.c
->> @@ -150,8 +150,17 @@ pte_t *huge_pte_offset(struct mm_struct *mm, unsigned long addr)
->>         if (pud_huge(*pud))
->>                 return (pte_t *)pud;
->>         pmd = pmd_offset(pud, addr);
->> +
->> +       /*
->> +        * In case of HW Poisoning, a hugepage pmd can contain
->> +        * poisoned entries. Poisoned entries are marked as swap
->> +        * entries.
->> +        *
->> +        * For pmds that are not present, check to see if it could be
->> +        * a swap entry (!present and !none) before giving up.
->> +        */
->>         if (!pmd_present(*pmd))
->> -               return NULL;
->> +               return !pmd_none(*pmd) ? (pte_t *)pmd : NULL;
->
-> I'm not sure we need to return NULL here when pmd_none(). If we use
-> hugetlb at the pmd level we don't need to allocate a pmd page but just
-> fall back to hugetlb_no_page() in hugetlb_fault(). The problem is we
-> can't tell what kind of huge page we have when calling
-> huge_pte_offset(), so we always rely on huge_pte_alloc(). But there are
-> places where huge_pte_none() is checked explicitly and we would never
-> return it from huge_pte_get().
+Signed-off-by: John Keeping <john@metanate.com>
+Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+Tested-by: Heiko Stuebner <heiko@sntech.de>
+---
+v2.1:
+- Remove RK2928 locking in rockchip_set_pull()
+v2:
+- Also remove locking in rockchip_set_schmitt()
+---
+ drivers/pinctrl/pinctrl-rockchip.c | 33 ++-------------------------------
+ 1 file changed, 2 insertions(+), 31 deletions(-)
 
-Makes sense.
-
->
-> Can we improve the generic code to pass the huge page size to
-> huge_pte_offset()? Otherwise we make all kind of assumptions/guesses in
-> the arch code.
-
-Agreed. The present fix only works for poisoned PMD entries. I'll
-prototype adding size parameter and using that to disambiguate huge page
-sizes. The change will touch a lot of architectures, most seem to have a
-local definition of huge_pte_offset().
-
->
->> 
->>         if (pte_cont(pmd_pte(*pmd))) {
->>                 pmd = pmd_offset(
->
-> Given that we can have huge pages at the pud level, we should address
-> that as well. The generic huge_pte_offset() doesn't need to since it
-> assumes huge pages at the pmd level only. If a pud is not present, you
-> can't dereference it to find the pmd, hence returning NULL.
->
-> Apart from hw poisoning, I think another use-case for non-present
-> pmd/pud entries is is_hugetlb_entry_migration() (see hugetlb_fault()),
-> so we need to fix this either way.
->
-> We have a discrepancy between the pud_present and pmd_present. The
-> latter was modified to fall back on pte_present because of THP which
-> does not support puds (last time I checked). So if a pud is poisoned,
-> huge_pte_offset thinks it is present and will try to get the pmd it
-> points to.
->
-> I think we can leave the pud_present() unchanged but fix the
-> huge_pte_offset() to check for pud_table() before dereferencing,
-> otherwise returning the actual value. And we need to figure out which
-> huge page size we have when the pud/pmd is 0.
-
-Ack. I'll add the check in the next update.
+diff --git a/drivers/pinctrl/pinctrl-rockchip.c b/drivers/pinctrl/pinctrl-rockchip.c
+index 1e276dfe1763..1d835370c2c7 100644
+--- a/drivers/pinctrl/pinctrl-rockchip.c
++++ b/drivers/pinctrl/pinctrl-rockchip.c
+@@ -652,7 +652,6 @@ static int rockchip_set_mux(struct rockchip_pin_bank *bank, int pin, int mux)
+ 	int iomux_num = (pin / 8);
+ 	struct regmap *regmap;
+ 	int reg, ret, mask, mux_type;
+-	unsigned long flags;
+ 	u8 bit;
+ 	u32 data, rmask;
+ 
+@@ -701,15 +700,11 @@ static int rockchip_set_mux(struct rockchip_pin_bank *bank, int pin, int mux)
+ 	if (ctrl->iomux_recalc && (mux_type & IOMUX_RECALCED))
+ 		ctrl->iomux_recalc(bank->bank_num, pin, &reg, &bit, &mask);
+ 
+-	spin_lock_irqsave(&bank->slock, flags);
+-
+ 	data = (mask << (bit + 16));
+ 	rmask = data | (data >> 16);
+ 	data |= (mux & mask) << bit;
+ 	ret = regmap_update_bits(regmap, reg, rmask, data);
+ 
+-	spin_unlock_irqrestore(&bank->slock, flags);
+-
+ 	return ret;
+ }
+ 
+@@ -1135,7 +1130,6 @@ static int rockchip_set_drive_perpin(struct rockchip_pin_bank *bank,
+ 	struct rockchip_pinctrl *info = bank->drvdata;
+ 	struct rockchip_pin_ctrl *ctrl = info->ctrl;
+ 	struct regmap *regmap;
+-	unsigned long flags;
+ 	int reg, ret, i;
+ 	u32 data, rmask, rmask_bits, temp;
+ 	u8 bit;
+@@ -1163,8 +1157,6 @@ static int rockchip_set_drive_perpin(struct rockchip_pin_bank *bank,
+ 		return ret;
+ 	}
+ 
+-	spin_lock_irqsave(&bank->slock, flags);
+-
+ 	switch (drv_type) {
+ 	case DRV_TYPE_IO_1V8_3V0_AUTO:
+ 	case DRV_TYPE_IO_3V3_ONLY:
+@@ -1185,17 +1177,14 @@ static int rockchip_set_drive_perpin(struct rockchip_pin_bank *bank,
+ 			rmask = BIT(15) | BIT(31);
+ 			data |= BIT(31);
+ 			ret = regmap_update_bits(regmap, reg, rmask, data);
+-			if (ret) {
+-				spin_unlock_irqrestore(&bank->slock, flags);
++			if (ret)
+ 				return ret;
+-			}
+ 
+ 			rmask = 0x3 | (0x3 << 16);
+ 			temp |= (0x3 << 16);
+ 			reg += 0x4;
+ 			ret = regmap_update_bits(regmap, reg, rmask, temp);
+ 
+-			spin_unlock_irqrestore(&bank->slock, flags);
+ 			return ret;
+ 		case 18 ... 21:
+ 			/* setting fully enclosed in the second register */
+@@ -1203,7 +1192,6 @@ static int rockchip_set_drive_perpin(struct rockchip_pin_bank *bank,
+ 			bit -= 16;
+ 			break;
+ 		default:
+-			spin_unlock_irqrestore(&bank->slock, flags);
+ 			dev_err(info->dev, "unsupported bit: %d for pinctrl drive type: %d\n",
+ 				bit, drv_type);
+ 			return -EINVAL;
+@@ -1215,7 +1203,6 @@ static int rockchip_set_drive_perpin(struct rockchip_pin_bank *bank,
+ 		rmask_bits = RK3288_DRV_BITS_PER_PIN;
+ 		break;
+ 	default:
+-		spin_unlock_irqrestore(&bank->slock, flags);
+ 		dev_err(info->dev, "unsupported pinctrl drive type: %d\n",
+ 			drv_type);
+ 		return -EINVAL;
+@@ -1227,7 +1214,6 @@ static int rockchip_set_drive_perpin(struct rockchip_pin_bank *bank,
+ 	data |= (ret << bit);
+ 
+ 	ret = regmap_update_bits(regmap, reg, rmask, data);
+-	spin_unlock_irqrestore(&bank->slock, flags);
+ 
+ 	return ret;
+ }
+@@ -1294,7 +1280,6 @@ static int rockchip_set_pull(struct rockchip_pin_bank *bank,
+ 	struct rockchip_pin_ctrl *ctrl = info->ctrl;
+ 	struct regmap *regmap;
+ 	int reg, ret, i, pull_type;
+-	unsigned long flags;
+ 	u8 bit;
+ 	u32 data, rmask;
+ 
+@@ -1309,14 +1294,10 @@ static int rockchip_set_pull(struct rockchip_pin_bank *bank,
+ 
+ 	switch (ctrl->type) {
+ 	case RK2928:
+-		spin_lock_irqsave(&bank->slock, flags);
+-
+ 		data = BIT(bit + 16);
+ 		if (pull == PIN_CONFIG_BIAS_DISABLE)
+ 			data |= BIT(bit);
+ 		ret = regmap_write(regmap, reg, data);
+-
+-		spin_unlock_irqrestore(&bank->slock, flags);
+ 		break;
+ 	case RK1108:
+ 	case RK3188:
+@@ -1339,16 +1320,12 @@ static int rockchip_set_pull(struct rockchip_pin_bank *bank,
+ 			return ret;
+ 		}
+ 
+-		spin_lock_irqsave(&bank->slock, flags);
+-
+ 		/* enable the write to the equivalent lower bits */
+ 		data = ((1 << RK3188_PULL_BITS_PER_PIN) - 1) << (bit + 16);
+ 		rmask = data | (data >> 16);
+ 		data |= (ret << bit);
+ 
+ 		ret = regmap_update_bits(regmap, reg, rmask, data);
+-
+-		spin_unlock_irqrestore(&bank->slock, flags);
+ 		break;
+ 	default:
+ 		dev_err(info->dev, "unsupported pinctrl type\n");
+@@ -1408,7 +1385,6 @@ static int rockchip_set_schmitt(struct rockchip_pin_bank *bank,
+ 	struct rockchip_pin_ctrl *ctrl = info->ctrl;
+ 	struct regmap *regmap;
+ 	int reg, ret;
+-	unsigned long flags;
+ 	u8 bit;
+ 	u32 data, rmask;
+ 
+@@ -1419,16 +1395,11 @@ static int rockchip_set_schmitt(struct rockchip_pin_bank *bank,
+ 	if (ret)
+ 		return ret;
+ 
+-	spin_lock_irqsave(&bank->slock, flags);
+-
+ 	/* enable the write to the equivalent lower bits */
+ 	data = BIT(bit + 16) | (enable << bit);
+ 	rmask = BIT(bit + 16) | BIT(bit);
+ 
+-	ret = regmap_update_bits(regmap, reg, rmask, data);
+-	spin_unlock_irqrestore(&bank->slock, flags);
+-
+-	return ret;
++	return regmap_update_bits(regmap, reg, rmask, data);
+ }
+ 
+ /*
+-- 
+2.12.0.377.gf910686b23.dirty
