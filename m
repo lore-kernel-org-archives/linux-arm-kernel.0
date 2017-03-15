@@ -1,42 +1,47 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Thu, 16 Mar 2017 00:21:51 +0800
-Subject: [PATCH 4/4] ARM: sun8i: v3s: add ns2009 node for Lichee Pi Zero board
-Message-ID: <20170315162151.54956-1-icenowy@aosc.xyz>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Wed, 15 Mar 2017 17:23:17 +0100
+Subject: [PATCH v2] arm: install.sh: don't use /sbin/install if
+ cross-compiling
+In-Reply-To: <6675ef47aaa7a186f066c506a564e71c54559776.1489592885.git.mchehab@s-opensource.com>
+References: <6675ef47aaa7a186f066c506a564e71c54559776.1489592885.git.mchehab@s-opensource.com>
+Message-ID: <20170315172317.03b14bf8@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The production batch of Lichee Pi Zero board features a NS2009 resistive
-touchscreen controller, which is wired to touch panel pins at 40-pin LCD
-connector, in order to make the board fully compatible to 40-pin LCDs
-with resistive touch panel which are used with Lichee Pi One (with A13's
-integrated resistive touch controller).
+Hi,
 
-Add the device node for the touchscreen controller.
+On Wed, 15 Mar 2017 12:48:59 -0300 Mauro Carvalho Chehab wrote:
+> It doesn't make sense to run the local machine's install
+> script if the Kernel was built using a cross-compiler, as it
+> will try to create symlinks at the rootfs of the local machine:
+> 
+> ln: failed to create symbolic link '/boot/System.map': Permission denied
+> ln: failed to create symbolic link '/boot/vmlinuz': Permission denied
+> ln: failed to create symbolic link '/boot/System.map': Permission denied
+> 
+> Signed-off-by: Mauro Carvalho Chehab <mchehab@s-opensource.com>
+> ---
+> 
+> v2: keep calling a ~/bin/${INSTALLKERNEL} script, as it can be used to cope with
+> cross builds.
+> 
+>  arch/arm/boot/install.sh | 7 +++++--
+>  1 file changed, 5 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/boot/install.sh b/arch/arm/boot/install.sh
+> index 2a45092a40e3..831e63ac8b0f 100644
+> --- a/arch/arm/boot/install.sh
+> +++ b/arch/arm/boot/install.sh
+> @@ -35,8 +35,11 @@ verify "$2"
+>  verify "$3"
+>  
+>  # User may have a custom install script
+> -if [ -x ~/bin/${INSTALLKERNEL} ]; then exec ~/bin/${INSTALLKERNEL} "$@"; fi
+> -if [ -x /sbin/${INSTALLKERNEL} ]; then exec /sbin/${INSTALLKERNEL} "$@"; fi
+> +
+> +  if [ -x ~/bin/${INSTALLKERNEL} ]; then exec ~/bin/ "$@"; fi
+                                            ^^^^^^^^^^^
+exec the ~/bin directory?
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
----
- arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts | 9 +++++++++
- 1 file changed, 9 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts b/arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts
-index 387fc2aa546d..a8a2081175d3 100644
---- a/arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts
-+++ b/arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts
-@@ -86,6 +86,15 @@
- 	status = "okay";
- };
- 
-+&i2c0 {
-+	status = "okay";
-+
-+	ns2009: ns2009 at 48 {
-+		compatible = "nsiway,ns2009";
-+		reg = <0x48>;
-+	};
-+};
-+
- &uart0 {
- 	pinctrl-0 = <&uart0_pins_a>;
- 	pinctrl-names = "default";
--- 
-2.12.0
+Lothar Wa?mann
