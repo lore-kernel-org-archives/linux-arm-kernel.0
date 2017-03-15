@@ -1,93 +1,82 @@
-From: Vadim.Lomovtsev@caviumnetworks.com (Vadim Lomovtsev)
-Date: Wed, 15 Mar 2017 04:33:23 -0700
-Subject: [PATCH] PCI: ACPI: Fix ThunderX PEM initialization
-In-Reply-To: <376ae1df-da85-e576-75d6-3ae2ab0f1b41@jonmasters.org>
-References: <1485793552-12614-1-git-send-email-Vadim.Lomovtsev@caviumnetworks.com>
- <20170130211236.GW20550@bhelgaas-glaptop.roam.corp.google.com>
- <20170131102830.GA13854@localhost.localdomain>
- <20170131142525.GA9942@bhelgaas-glaptop.roam.corp.google.com>
- <20170131145720.GA14231@localhost.localdomain>
- <20170131203109.GA14127@bhelgaas-glaptop.roam.corp.google.com>
- <20170201125325.GA15805@localhost.localdomain>
- <20170201151807.GA15793@bhelgaas-glaptop.roam.corp.google.com>
- <376ae1df-da85-e576-75d6-3ae2ab0f1b41@jonmasters.org>
-Message-ID: <20170315113323.GA28027@localhost.localdomain>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 15 Mar 2017 12:37:46 +0100
+Subject: [PATCH] tty/serial: atmel_serial: BUG: stop DMA from transmitting
+ in stop_tx
+In-Reply-To: <20161213162756.16139-1-richard.genoud@gmail.com>
+References: <20161213162756.16139-1-richard.genoud@gmail.com>
+Message-ID: <c5c0cdcf-d4da-a8c0-4161-85535ecf88ec@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jon,
-
-On Wed, Mar 15, 2017 at 07:14:38AM -0400, Jon Masters wrote:
-> Hi Bjorn, Vadim,
+Le 13/12/2016 ? 17:27, Richard Genoud a ?crit :
+> If we don't disable the transmitter in atmel_stop_tx, the DMA buffer
+> continues to send data until it is emptied.
+> This cause problems with the flow control (CTS is asserted and data are
+> still sent).
 > 
-> Following up to this old thread...
+> So, disabling the transmitter in atmel_stop_tx is a sane thing to do.
 > 
-> On 02/01/2017 10:18 AM, Bjorn Helgaas wrote:
-> > On Wed, Feb 01, 2017 at 04:53:25AM -0800, Vadim Lomovtsev wrote:
+> Tested on at91sam9g35-cm(DMA)
+> Tested for regressions on sama5d2-xplained(Fifo) and at91sam9g20ek(PDC)
 > 
-> >>>> Because there is no such ACPI ID as "THRX0002" registered
-> >>>> (http://www.uefi.org/acpi_id_list).
+> Cc: <stable@vger.kernel.org> (beware, this won't apply before 4.3)
+> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
+> ---
+>  drivers/tty/serial/atmel_serial.c | 11 +++++++++++
+>  1 file changed, 11 insertions(+)
 > 
-> There is still no "THRX" prefix registered with UEFI as of this morning.
+> NB: this is not for the 4.10 merge window, I'm just sending it now to
+> have some comments if someone is againts it.
 > 
-> >>> To be pedantically correct, I think you want "THRX" registered.  Then
-> >>> you can manage the "0002" part internally without registering each
-> >>> individual device.
-> 
-> The upstream Linux kernel contains a quirk matching entry that looks for
-> "THRX". Therefore, you have already agreed (as of at least January) that
-> this is the prefix that you will use in any firmware updates to support
-> the latest upstream Linux kernel. Please register this prefix promptly.
+> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+> index 168b10cad47b..f9d42de5ab2d 100644
+> --- a/drivers/tty/serial/atmel_serial.c
+> +++ b/drivers/tty/serial/atmel_serial.c
+> @@ -481,6 +481,14 @@ static void atmel_stop_tx(struct uart_port *port)
+>  		/* disable PDC transmit */
+>  		atmel_uart_writel(port, ATMEL_PDC_PTCR, ATMEL_PDC_TXTDIS);
+>  	}
+> +
+> +	/*
+> +	 * Disable the transmitter.
+> +	 * This is mandatory when DMA is used, otherwise the DMA buffer
+> +	 * is fully transmitted.
+> +	 */
+> +	atmel_uart_writel(port, ATMEL_US_CR, ATMEL_US_TXDIS);
+> +
+>  	/* Disable interrupts */
+>  	atmel_uart_writel(port, ATMEL_US_IDR, atmel_port->tx_done_mask);
+>  
+> @@ -513,6 +521,9 @@ static void atmel_start_tx(struct uart_port *port)
+>  
+>  	/* Enable interrupts */
+>  	atmel_uart_writel(port, ATMEL_US_IER, atmel_port->tx_done_mask);
+> +
+> +	/* re-enable the transmitter */
+> +	atmel_uart_writel(port, ATMEL_US_CR, ATMEL_US_TXEN);
+>  }
+>  
+>  /*
 
-And from what I know for now - we wont going to register this
-since we have already regsitered "CAV" prefix for that. And this was the part
-of our discussion also.
+Hi Richard,
 
-We had a bit long review of proper implementation of legacy firmware support,
-so my apologise on that.
+I've just discovered that I have some weird behavior with this patch. On
+current Linus' tree, with sama5d2 + DMA, I see some garbage characters
+coming out of the console when I try to stop my system (reboot/halt) [1].
 
-Please take a look at link to the patchset posted by Tomasz.
-https://www.spinics.net/lists/arm-kernel/msg568741.html
+Moreover, and I do understand that it's not the problem right here, when
+applied on our linux-4.4-at91 branch (our vendor tree actually), it
+hangs the boot process as it seems that a burst of open/close of the
+serial port happens while starting the rootfs. It's definitively my own
+problem, but it can bring light to what we are seeing on Mainline...
 
-> 
-> >> Not sure if it would be registered that way, because (AFAIK)
-> >> it expected to be string constructed from Vendor ID (not the Product ID) plus
-> >> four hex digit manged internaly. So we suggest to change it to 177DXXXX
-> >> which corresponds to Cavium PCI ID https://pci-ids.ucw.cz/pci.ids.
-> >> It's also possible to use the 3-digit PNP ID, "CAV", to construct these
-> >> _HID/_CID/_SUB values (http://www.uefi.org/pnp_id_list).
-> > 
-> > My point was that you only need to register the prefix ("CAV" or
-> > "THRX") of the PNP or ACPI ID.  Then you manage the suffixes
-> > internally.  You as long as you register "CAV" or "THRX", you can
-> > assign and use "THRX0002" yourself without registering that
-> > specifically.
-> >
+I think that we may need to flush the DMA channel in this
+atmel_stop_tx() function.
 
-And my reply here was :
-"Yes, exactly. And the "CAV" perfix is already registered.
-And I think will'll use it to keep things aligned to specs & rules."
+Best regards,
 
-> >> So the FW will be updated accordingly.
-> 
-> Indeed.
+[1] If you want to test, you need to apply this patch for eMMC BTW:
+https://patchwork.kernel.org/patch/9617489/
 
-Yes, it is now contains "CAVxxx" as _HID for device config object.
-
-> 
-> The version Bjorn merged looks for "THRX". This is the version that you will
-> use, and you will promptly register that prefix with UEFI and provide fixes
-> for existing firmware to correctly use the solution that is upstream.
-
-Cavium FW is updated accordingly to use already registered prefix.
-For existent FW legacy support is posted by Tomasz.
-
-> 
-> Thanks,
-> 
-> Jon.
-> 
-
-
-WBR,
-Vadim
+-- 
+Nicolas Ferre
