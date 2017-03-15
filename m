@@ -1,23 +1,41 @@
 From: robh@kernel.org (Rob Herring)
-Date: Wed, 15 Mar 2017 15:26:27 -0500
-Subject: [RESEND PATCH v3 1/2] dt-bindings: i2c: Add Mediatek MT2701 i2c
- binding
-In-Reply-To: <1489029185-21447-2-git-send-email-jun.gao@mediatek.com>
-References: <1489029185-21447-1-git-send-email-jun.gao@mediatek.com>
- <1489029185-21447-2-git-send-email-jun.gao@mediatek.com>
-Message-ID: <20170315202627.nx7dkgjf3lsf2dp7@rob-hp-laptop>
+Date: Wed, 15 Mar 2017 15:36:24 -0500
+Subject: [PATCH v3 1/2] Documentation: bindings: Introduce
+ scpi,sensors-scale
+In-Reply-To: <57ff035a-b462-6f5d-0100-051e99e9a2b6@arm.com>
+References: <20170309101759.18081-1-carlo@caione.org>
+ <20170309101759.18081-2-carlo@caione.org>
+ <57ff035a-b462-6f5d-0100-051e99e9a2b6@arm.com>
+Message-ID: <20170315203624.iylw2c2nuqb4mrqu@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 09, 2017 at 11:13:04AM +0800, Jun Gao wrote:
-> From: Jun Gao <jun.gao@mediatek.com>
+On Wed, Mar 15, 2017 at 06:20:33PM +0000, Sudeep Holla wrote:
 > 
-> Add MT2701 i2c binding to i2c-mt6577.txt and there is no need to
-> modify i2c driver.
 > 
-> Signed-off-by: Jun Gao <jun.gao@mediatek.com>
-> ---
->  .../devicetree/bindings/i2c/i2c-mt6577.txt         |   11 ++++++-----
->  1 file changed, 6 insertions(+), 5 deletions(-)
+> On 09/03/17 10:17, Carlo Caione wrote:
+> > From: Carlo Caione <carlo@endlessm.com>
+> > 
+> > Document the new property `scpi,sensors-scale` used by the hwmon-scpi
+> > driver to convert the sensor readings to the correct / expected scale.
+> > 
+> 
+> I am fine with DT bindings if DT maintainers agree with having one but I
+> would like to add couple of points to get their feedback:
+> 
+> 1. ARM recognized the drawbacks of SCPI which started informally with
+>    ARM Ltd platforms and got adopted by few vendors. It's now being
+>    worked on and a much better and scalable replacement protocol is
+>    being discussed with vendors now. So future enhancement to this SCPI
+>    protocol is unlikely.
+> 
+> 2. AmLogic has diverted from base protocol in many ways and most of them
+>    are handled with just compatible so far without any need for
+>    additional bindings. Can we avoid it ?
+> 
+> So based on these, I prefer not to add more bindings to handle such
+> deviations but make it just AmLogic specific.
 
-Acked-by: Rob Herring <robh@kernel.org>
+Agreed.
+
+Rob
