@@ -1,107 +1,23 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 15 Mar 2017 13:48:29 +0100
-Subject: [PATCH v6 07/14] dt: bindings: Add bindings for Marvell Xenon SD
- Host Controller
-In-Reply-To: <3a4ce2fd25ed812482b0fc96f50dd305c8f40fe9.1487091464.git-series.gregory.clement@free-electrons.com>
-References: <cover.ff78bebe0384f650a51e5e6f0f1dca6e7894b53b.1487091464.git-series.gregory.clement@free-electrons.com>
- <3a4ce2fd25ed812482b0fc96f50dd305c8f40fe9.1487091464.git-series.gregory.clement@free-electrons.com>
-Message-ID: <CAPDyKFrmb51cTR7B5S0JkmACH0=bw9+28RmWnjwWkuiT7N4wVw@mail.gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 15 Mar 2017 12:55:28 +0000
+Subject: [PATCH] arm: install.sh: don't use /sbin/install if
+ cross-compiling
+In-Reply-To: <ca1a7552e8c3705dbcb64ff3b2e6ad5616a1073a.1489581503.git.mchehab@s-opensource.com>
+References: <ca1a7552e8c3705dbcb64ff3b2e6ad5616a1073a.1489581503.git.mchehab@s-opensource.com>
+Message-ID: <20170315125528.GS21222@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[...]
+On Wed, Mar 15, 2017 at 09:43:21AM -0300, Mauro Carvalho Chehab wrote:
+> It doesn't make sense to run the local machine's install
+> script if the Kernel was built using a cross-compiler, as it
+> will try to create symlinks at the rootfs on the local machine:
 
-> +
-> +Example:
-> +- For eMMC:
-> +
-> +       sdhci at aa0000 {
-> +               compatible = "marvell,armada-ap806-sdhci";
-> +               reg = <0xaa0000 0x1000>;
-> +               interrupts = <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>
-> +               clocks = <&emmc_clk>;
-> +               clock-names = "core";
-> +               bus-width = <4>;
-> +               marvell,xenon-phy-slow-mode;
-> +               marvell,xenon-tun-count = <11>;
+Please only do this for /sbin/installkernel.  The user's ~/bin/installkernel
+may be designed to cope with this (I use this feature for my cross-built
+kernels.)
 
-There's no vmmc-supply here.
-
-How do you control power to the eMMC card?
-
-> +
-> +               #address-cells = <1>;
-> +               #size-cells = <0>;
-> +               apm_mmccard: mmccard at 0 {
-> +                       compatible = "mmc-card";
-> +                       reg = <0>;
-> +               };
-> +       };
-> +
-> +- For SD/SDIO:
-> +
-> +       sdhci at ab0000 {
-> +               compatible = "marvell,armada-cp110-sdhci";
-> +               reg = <0xab0000 0x1000>;
-> +               interrupts = <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>
-> +               vqmmc-supply = <&sd_regulator>;
-
-I guess you know vqmmc is for the I/O voltage.
-
-Again, how do you power the SD/SDIO card? No vmmc?
-
-> +               clocks = <&sdclk>;
-> +               clock-names = "core";
-> +               bus-width = <4>;
-> +               marvell,xenon-tun-count = <9>;
-> +       };
-> +
-> +- For eMMC with compatible "marvell,armada-3700-sdhci":
-> +
-> +       sdhci at aa0000 {
-> +               compatible = "marvell,armada-3700-sdhci";
-> +               reg = <0xaa0000 0x1000>,
-> +                     <phy_addr 0x4>;
-> +               interrupts = <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>
-> +               clocks = <&emmcclk>;
-> +               clock-names = "core";
-> +               bus-width = <8>;
-> +               mmc-ddr-1_8v;
-> +               mmc-hs400-1_8v;
-
-Again, no vmmc?
-
-> +
-> +               marvell,pad-type = "fixed-1-8v";
-> +
-> +               #address-cells = <1>;
-> +               #size-cells = <0>;
-> +               mmccard: mmccard at 0 {
-> +                       compatible = "mmc-card";
-> +                       reg = <0>;
-> +               };
-> +       };
-> +
-> +- For SD/SDIO with compatible "marvell,armada-3700-sdhci":
-> +
-> +       sdhci at ab0000 {
-> +               compatible = "marvell,armada-3700-sdhci";
-> +               reg = <0xab0000 0x1000>,
-> +                     <phy_addr 0x4>;
-> +               interrupts = <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>
-> +               vqmmc-supply = <&sd_regulator>;
-
-Again, no vmmc?
-
-> +               clocks = <&sdclk>;
-> +               clock-names = "core";
-> +               bus-width = <4>;
-> +
-> +               marvell,pad-type = "sd";
-> +       };
-> --
-> git-series 0.9.1
-
-
-Kind regards
-Uffe
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
