@@ -1,66 +1,111 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 15 Mar 2017 19:17:41 +0000
-Subject: [RFC arm64] samples/bpf: explicitly exclude sysreg sections with
- asm macros
-In-Reply-To: <20170315183130.GB32819@C02RW35GFVH8.dhcp.broadcom.net>
-References: <1489101492-15653-1-git-send-email-andy@greyhouse.net>
- <20170310175229.GC18894@arm.com>
- <20170310192656.GA13928@C02RW35GFVH8>
- <20170310204112.GA21382@leverpostej>
- <20170315183130.GB32819@C02RW35GFVH8.dhcp.broadcom.net>
-Message-ID: <20170315191741.GB29452@leverpostej>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 15 Mar 2017 14:25:21 -0500
+Subject: [PATCH v3 1/6] dt-bindings: iio: introduce trigger providers,
+ consumers
+In-Reply-To: <12a6a2f8-9ff6-a4f0-c9a2-c7de037019ef@kernel.org>
+References: <1488300679-3259-1-git-send-email-fabrice.gasnier@st.com>
+ <1488300679-3259-2-git-send-email-fabrice.gasnier@st.com>
+ <20170303062126.5bewa5u6o7wu7sy4@rob-hp-laptop>
+ <948e5b96-7a8f-406d-6d03-d129d1b2ce54@kernel.org>
+ <12a6a2f8-9ff6-a4f0-c9a2-c7de037019ef@kernel.org>
+Message-ID: <20170315192521.l7mb3egh4hbxdpx6@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Wed, Mar 15, 2017 at 02:31:30PM -0400, Andy Gospodarek wrote:
-> On Fri, Mar 10, 2017 at 08:41:13PM +0000, Mark Rutland wrote:
-> > On Fri, Mar 10, 2017 at 02:26:56PM -0500, Andy Gospodarek wrote:
-> > > On Fri, Mar 10, 2017 at 05:52:30PM +0000, Will Deacon wrote:
-> > > > On Thu, Mar 09, 2017 at 06:18:12PM -0500, Andy Gospodarek wrote:
-
-> > > > Why does asm cause compilation to fail?
-> > > 
-> > > It isn't the ASM itself that causes the compilation to fail, it's the
-> > > ASM macros included inside the new ifdef that are problematic.  Here is
-> > > what is seen per object file:
+On Sun, Mar 05, 2017 at 12:13:36PM +0000, Jonathan Cameron wrote:
+> On 05/03/17 11:43, Jonathan Cameron wrote:
+> > On 03/03/17 06:21, Rob Herring wrote:
+> >> On Tue, Feb 28, 2017 at 05:51:14PM +0100, Fabrice Gasnier wrote:
+> >>> Document iio provider and consumer bindings.
+> >>>
+> >>> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+> >>> ---
+> >>>  .../devicetree/bindings/iio/iio-bindings.txt       | 38 ++++++++++++++++++++++
+> >>>  1 file changed, 38 insertions(+)
+> >>>
+> >>> diff --git a/Documentation/devicetree/bindings/iio/iio-bindings.txt b/Documentation/devicetree/bindings/iio/iio-bindings.txt
+> >>> index 68d6f8c..01765e9 100644
+> >>> --- a/Documentation/devicetree/bindings/iio/iio-bindings.txt
+> >>> +++ b/Documentation/devicetree/bindings/iio/iio-bindings.txt
+> >>> @@ -95,3 +95,41 @@ vdd channel is connected to output 0 of the &ref device.
+> >>>  		io-channels = <&adc 10>, <&adc 11>;
+> >>>  		io-channel-names = "adc1", "adc2";
+> >>>  	};
+> >>> +
+> >>> +==IIO trigger providers==
+> >>> +Sources of IIO triggers can be represented by any node in the device
+> >>> +tree. Those nodes are designated as IIO trigger providers. IIO trigger
+> >>> +consumer uses a phandle and an IIO trigger specifier to connect to an
+> >>> +IIO trigger provider.
+> >>> +An IIO trigger specifier is an array of one or more cells identifying
+> >>> +the IIO trigger output on a device. The length of an IIO trigger
+> >>> +specifier is defined by the value of a #io-trigger-cells property in
+> >>> +the IIO trigger provider node.
+> >>> +
+> >>> +Required properties:
+> >>> +#io-trigger-cells:
+> >>> +		Number of cells in an IIO trigger specifier; Typically
+> >>> +		0 for nodes with a simple IIO trigger output.
+> >>> +
+> >>> +Example:
+> >>> +	trig0: interrupt-trigger0 {
+> >>> +		#io-trigger-cells = <0>;
+> >>> +		compatible = "interrupt-trigger";
+> >>> +		interrupts = <11 0>;
+> >>> +		interrupt-parent = <&gpioa>;
+> >>> +	}
+> >>> +
+> >>> +==IIO trigger consumers==
+> >>> +Required properties:
+> >>> +- io-triggers:	List of phandle representing the IIO trigger specifier.
+> >>> +
+> >>> +Optional properties:
+> >>> +- io-trigger-names :
+> >>> +		List of IIO trigger name strings that matches elements
+> >>> +		in 'io-triggers' list property.
+> >>> +
+> >>> +Example:
+> >>> +	some_trigger_consumer {
+> >>> +		io-triggers = <&trig0>;
+> >>> +		io-trigger-names = "mytrig";
+> >>> +	}
+> >>
+> >> I have some reservations about this. We could just as easily add the 
+> >> interrupt directly to the consumer node and use "trigger" for a standard 
+> >> interrupt name. So the question is whether this extra level of 
+> >> indirection is needed? 
 > > 
-> > > ./arch/arm64/include/asm/barrier.h:62:23: note: expanded from macro
-> > > '__smp_store_release'
-> > >                 asm volatile ("stlr %1, %0"
-> > > \
-> > >                                     ^
-> > > 1 warning generated.
-> > > LLVM ERROR: Inline asm not supported by this streamer because we don't  <----  THIS LINE
-> > > have an asm parser for this target
+> > First thing to note here, is that Fabrice's use of the generic interrupt
+> > trigger is an extremely 'unusual' one! Normal use case is that we have
+> > a random gpio pin providing interrupts to driver triggering on random
+> > devices - there need be no association between the two whatsoever.
+> > So what we are doing here is 'allowing' an interrupt to provide a trigger.
+> > It's not necessarily the one going to be used by any particular device
+> > driver.  The decision of which trigger to use is definitely one for
+> > userspace, not something that should be configured in to the device tree.
 > > 
-> > ... so as far as I can see it's the presence of any inline assembly that
-> > the tool cannot handle, as LLVM tells us.
+> > For this particular case you could in theory just do it by using an interrupt
+> > as you describe.  Ultimately though we should be able to play more complex
+> > games with this device and having it able to handle any trigger - which 
+> > includes those not using the direct hardware route.  It'll be up to the
+> > driver to figure out when it can use the fast method and when it can't.
+> > 
+> > Conversely, even when we are using this hardware route to drive the
+> > triggering it should be possible to hang off a device to be triggered
+> > by the interrupt via the kernel rather than directly. 
+> > 
+> > So from a device tree point of view we are just describing the fact that
+> > there is a pin, which may be used to trigger something.  What that something
+> > is, is a question for userspace not the device tree.
+> > 
+> Ah, I'm half asleep this morning.  Clearly there is a more general follow
+> up question.  If we are arguing these are generic, why are we setting
+> up the mapping in device tree?
+> 
+> My gut feeling is we shouldn't be.  So I think we need the first chunk
+> above but the latter part should be a job for userspace not the devicetree.
 
-> > So why isn't this a problem on other architectures? They're going to
-> > have equivalent inline asm getting pulled in, and these samples
-> > presumably compiled on at least on architecture in the past.
+So you mean keep the provider side, but get rid of the consumer? That 
+makes sense to me.
 
-> As far as I can tell (hoping my regex is proper), x86 doesn't have any
-> inline assembly that introduces macros like this in any h-files.
-
-Just to be clear, is the error quoted above at all relevant here?
-
-The error is for an asm statement which does not use assembly macros, in
-a different file.
-
-In the error message, LLVM explicitly states that it does not have a
-parser for this target's assembly -- which would be a problem for *any*
-inline assembly.
-
-How does that specific error relate to the use of assembly macros within
-sysreg.h?
-
-... has the wrong error been quoted above?
-
-... does LLVM dump a misleading error message after seeing an assembly
-macro (which it presumably can't handle)?
-
-Thanks,
-Mark.
+Rob
