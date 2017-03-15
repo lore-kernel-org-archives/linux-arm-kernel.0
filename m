@@ -1,125 +1,65 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Wed, 15 Mar 2017 16:00:32 +0000
-Subject: [2/2] coresight: Fix reference count for software sources
-In-Reply-To: <CAG2=9p_+2jv8xxUex=mvNXJswk+cx-kXGRcTbCd9i5-vOf6X4A@mail.gmail.com>
-References: <1489073232-5093-3-git-send-email-suzuki.poulose@arm.com>
- <CANLsYkwg_PRcL5Sqd15phOFS-L8-v3SdvF1kBFa9De-==tx9gw@mail.gmail.com>
- <ddf386ee-0be5-b1ca-174c-89d9e48ba282@arm.com>
- <CAG2=9p_+2jv8xxUex=mvNXJswk+cx-kXGRcTbCd9i5-vOf6X4A@mail.gmail.com>
-Message-ID: <33ea0fe9-e93b-0cd0-9950-8443aceafc5b@arm.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Wed, 15 Mar 2017 11:02:38 -0500
+Subject: Enumerating an empty bus hangs the entire system
+In-Reply-To: <1eeea8ff-0840-a005-38b4-61f3c253cee1@free.fr>
+References: <1eeea8ff-0840-a005-38b4-61f3c253cee1@free.fr>
+Message-ID: <20170315160238.GB5073@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/03/17 03:51, Chunyan Zhang wrote:
-> Hi Suzuki,
->
-> On 15 March 2017 at 02:06, Suzuki K Poulose <Suzuki.Poulose@arm.com> wrote:
->> On 14/03/17 17:40, Mathieu Poirier wrote:
->>>
->>> On 14 March 2017 at 11:32, Mathieu Poirier <mathieu.poirier@linaro.org>
->>> wrote:
->>>>
->>>> From: "Suzuki K. Poulose" <Suzuki.Poulose@arm.com>
->>>>
->>>> For software sources (i.e STM), there could be multiple agents
->>>> generating the trace data, unlike the ETMs. So we need to
->>>> properly do the accounting for the active number of users
->>>> to disable the device when the last user goes away. Right
->>>> now, the reference counting is broken for sources as we skip
->>>> the actions when we detect that the source is enabled.
->>>>
->>>> This patch fixes the problem by adding the refcounting for
->>>> software sources, even when they are enabled.
->>>>
->>>> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
->>>> Reported-by: Robert Walker <robert.walker@arm.com>
->>>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
->>>> ---
->>>>  drivers/hwtracing/coresight/coresight.c | 13 +++++++++++--
->>>>  1 file changed, 11 insertions(+), 2 deletions(-)
->>>>
->>>> diff --git a/drivers/hwtracing/coresight/coresight.c
->>>> b/drivers/hwtracing/coresight/coresight.c
->>>> index 34cd1ed..2da9e39 100644
->>>> --- a/drivers/hwtracing/coresight/coresight.c
->>>> +++ b/drivers/hwtracing/coresight/coresight.c
->>>> @@ -552,6 +552,7 @@ int coresight_enable(struct coresight_device *csdev)
->>>>         int cpu, ret = 0;
->>>>         struct coresight_device *sink;
->>>>         struct list_head *path;
->>>> +       enum coresight_dev_subtype_source subtype =
->>>> csdev->subtype.source_subtype;
->>>
->>>
->>> Checkpatch.pl complains about a line over 80 characters.
->>>
->>>>
->>>>         mutex_lock(&coresight_mutex);
->>>>
->>>> @@ -559,8 +560,16 @@ int coresight_enable(struct coresight_device *csdev)
->>>>         if (ret)
->>>>                 goto out;
->>>>
->>>> -       if (csdev->enable)
->>>> +       if (csdev->enable) {
->>>> +               /*
->>>> +                * There could be multiple applications driving the
->>>> software
->>>> +                * source. So keep the refcount for each such user when
->>>> the
->>>> +                * source is already enabled.
->>>> +                */
->>>> +               if (subtype == CORESIGHT_DEV_SUBTYPE_SOURCE_SOFTWARE)
->>>> +                       atomic_inc(csdev->refcnt);
->>>>                 goto out;
->>>> +       }
->>>>
->>
->> Btw, should we allow the user to turn on the STM from sysfs (echo 1 >
->> $STM/enable_source) ?
->
-> If enabling STM can not be allowed via sysfs, how should we allow
-> users to turn on STM when they want to mmap STM to user space, and
-> write STM device from user space directly? For example this kind of
-> use case [1].
+On Wed, Mar 15, 2017 at 04:25:44PM +0100, Mason wrote:
+> Hello,
+> 
+> My driver works reasonably well on revision 1 of the PCIe controller.
+> (For lax enough values of "reasonably well"...)
+> 
+> So I wanted to try it out on revision 2 of the controller.
+> 
+> Turns out the system hangs if I boot with no card inserted in the PCIe
+> slot. (This does not happen on revision 1.) If I log all config space
+> accesses, this is what I see:
+> 
+> ...
+> [    2.966402] tango_config_read: bus=0 devfn=0 where=128 size=2
+> [    2.972284] tango_config_read: bus=0 devfn=0 where=140 size=4
+> [    2.978167] tango_config_read: bus=0 devfn=0 where=146 size=2
+> [    2.984144] pci_bus 0000:01: busn_res: can not insert [bus 01-ff] under [bus 00-3f] (conflicts with (null) [bus 00-3f])
+> [    2.995105] tango_config_write: bus=0 devfn=0 where=24 size=4 val=0xff0100
+> [    3.002134] pci_bus 0000:01: scanning bus
+> [    3.006274] tango_config_read: bus=1 devfn=0 where=0 size=4
+> 
+> Basically, the PCI framework tries to read vendor and device IDs
+> of the non-existent device on bus 1, which hangs the system,
+> because the read never completes :-(
+> 
+> I had the same problem with the legacy driver for 3.4 but I was
+> hoping I would magically avoid it in a recent kernel.
+> 
+> The only work-around I see is: assuming the first access to a
+> bus will be to register 0, check the PHY for an active link
+> before sending an actual read request to register 0.
+> 
+> Is that reasonable?
+> 
+> Is it compliant for the PCIe controller to hang like that,
+> or should it handle some kind of time out?
+> 
+> Liviu suggested: "The PCIe controller probably generates (or propagates)
+> a bus abort that it should actually trap in HW.	Check if there is a SW
+> configurable way to recover that."
 
-The ioct(, STP_POLICY_ID_SET) indirectly turns on the STM hardware via :
-stm_char_policy_set_ioctl()->stm.link (stm_generic_link)-> coresight_enable().
+I agree; generally the PCIe controller will timeout and report an
+error somehow.  On most systems the PCIe controller fabricates all
+ones read data (0xffffffff) to satisfy the CPU's read request.
 
+I'm not enough of a hardware person to point you to a spec section
+that addresses this, but the Linux PCI core is definitely not prepared
+to deal with config requests that hang.
 
->
->> All STM users should set their policy via ioctls and that in turn turns the
->> device on.
->
-> Yes users can set policy via ioctls to request resource of STM (i.e.
-> which STM channel(s) will be written), but they still need to use
-> sysfs to enable STM.
+If checking for link in your accessor is the best you can do, maybe
+that's all you can do.  I thought there was another driver that did
+that, but I can't find it now.  It doesn't seem perfectly safe to me,
+since the link could go down after you check for "link up" and before
+you actually issue the read.
 
-As mentioned above, it is not necessary.
-
->
->> So it doesn't make sense for enable_source to really enable
->> the hardware unless someone really opens it.
->
-> Right, there're two ways to enable STM currently, e.g.
-> 1) echo <addr>.stm  > /sys/class/stm_source/stm_ftrace/stm_source_link
-
-I am not familiar with the stm_source class. From a quick glance, it looks like,
-writing to stm_source_link triggers :
-  stm_source_link_store()->stm_source_link_add()->(stm->data->link()).
-
-which is fine for connecting a source (ftrace,console or heartbeat) to STM.
-
-> 2) echo 1 > $STM/enable_source
-
-This is a bit awkward for an application who wants to mmap and stream data,
-and is quite unnecessary from my explanation above.
-
->
-> That would probably make people confused, I would appreciate any
-> better solution.
-
-Please let me know if you have any outstanding concerns.
-
-Cheers
-Suzuki
+Bjorn
