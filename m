@@ -1,48 +1,40 @@
-From: nicolas.ferre@microchip.com (Nicolas Ferre)
-Date: Wed, 15 Mar 2017 16:29:48 +0100
-Subject: [RFC PATCH] tty/serial: atmel: fix TX path in atmel_console_write()
-In-Reply-To: <CACQ1gAgW4aGJSxSAXDWL7td9eV12UV=Xv=PZR58BqqHxEeRH0g@mail.gmail.com>
-References: <CACQ1gAgW4aGJSxSAXDWL7td9eV12UV=Xv=PZR58BqqHxEeRH0g@mail.gmail.com>
-Message-ID: <20170315152948.10978-1-nicolas.ferre@microchip.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 15 Mar 2017 15:34:21 +0000
+Subject: [PATCH 00/14] arm_pmu: ACPI support
+In-Reply-To: <5b5dca5f-0ea3-d7e7-63c9-dba57969d4be@arm.com>
+References: <1489143891-11596-1-git-send-email-mark.rutland@arm.com>
+ <5b5dca5f-0ea3-d7e7-63c9-dba57969d4be@arm.com>
+Message-ID: <20170315153420.GC9404@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A side effect of 89d8232411a8 ("tty/serial: atmel_serial: BUG: stop DMA
-from transmitting in stop_tx") is that the console can be called with
-TX path disabled. Then the system would hang trying to push charecters
-out in atmel_console_putchar().
+On Fri, Mar 10, 2017 at 04:14:57PM -0600, Jeremy Linton wrote:
+> On 03/10/2017 05:04 AM, Mark Rutland wrote:
+> >I've given this some testing on a Juno platform (using SPIs). To see that IRQs
+> >are correctly associated, I've tested with the following:
+> >
+> >  $ taskset -c ${SOME_CPU_HERE} perf record \
+> >    -e armv8_pmuv3_0/cpu_cycles/ \
+> >    -e armv8_pmuv3_1/cpu_cycles/ \
+> >    cat /proc/interrupts
+> >
+> >I've also booted with nr_cpus temporarily capped (passing maxcpus=) to test the
+> >association logic. This has also been tested in a VM using PPIs; I do not have
+> >access to a host machine which itself uses PPIs.
+> 
+> I tried these patches on a m400 (which uses PPIs), and the kernel
+> fails to come up enough to login via the network (which works with
+> 4.11rc1 without these patches). So, I suspect there is something
+> wrong with them. Although its quite possibly PEBCAK.
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@microchip.com>
-Fixes: 89d8232411a8 ("tty/serial: atmel_serial: BUG: stop DMA from transmitting
-in stop_tx")
-Cc: stable <stable@vger.kernel.org> # 4.4+
----
-Hi Richard,
+It looks like we've gotten to the bottom of the hang in the other
+thread; I had a go with a hack to bodge around that (as I have not yet
+upgraded the FW).
 
-I found this to fix the problem with system hang in my linux-4.4-at91 branch
-(in the atmel_console_putchar() waiting loop actually). I'm open to more
-insignt.
-As we cannot figure out if this bit is set or not, I didn't preserve the
-current status...
+I had a go with the above taskset pattern (limited to a single PMU) on
+an APM Mustang board. Everything seems happy, even when I booted with
+maxcpus temporarily capped, where CPUs successfully associated
+themselves with the PMU later on.
 
-Regards,
-
- drivers/tty/serial/atmel_serial.c | 3 +++
- 1 file changed, 3 insertions(+)
-
-diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-index dcebb28ffbc4..7372dbdb7a4c 100644
---- a/drivers/tty/serial/atmel_serial.c
-+++ b/drivers/tty/serial/atmel_serial.c
-@@ -2483,6 +2483,9 @@ static void atmel_console_write(struct console *co, const char *s, u_int count)
- 	pdc_tx = atmel_uart_readl(port, ATMEL_PDC_PTSR) & ATMEL_PDC_TXTEN;
- 	atmel_uart_writel(port, ATMEL_PDC_PTCR, ATMEL_PDC_TXTDIS);
- 
-+	/* Make sure that tx path is actually able to send characters */
-+	atmel_uart_writel(port, ATMEL_US_CR, ATMEL_US_TXEN);
-+
- 	uart_console_write(port, s, count, atmel_console_putchar);
- 
- 	/*
--- 
-2.9.0
+Thanks,
+Mark.
