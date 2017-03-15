@@ -1,44 +1,41 @@
-From: mchehab@s-opensource.com (Mauro Carvalho Chehab)
-Date: Wed, 15 Mar 2017 12:48:59 -0300
-Subject: [PATCH v2] arm: install.sh: don't use /sbin/install if cross-compiling
-Message-ID: <6675ef47aaa7a186f066c506a564e71c54559776.1489592885.git.mchehab@s-opensource.com>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Wed, 15 Mar 2017 23:51:36 +0800
+Subject: [PATCH 0/4] Add support for Nsiway NS2009 touchscreen controller
+Message-ID: <20170315155140.54518-1-icenowy@aosc.xyz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It doesn't make sense to run the local machine's install
-script if the Kernel was built using a cross-compiler, as it
-will try to create symlinks at the rootfs of the local machine:
+The production batch of Lichee Pi Zero board have a Nsiway NS2009 touchscreen
+controller on board, which is used for connecting resistive touch panels on
+40-pin LCD connector.
 
-ln: failed to create symbolic link '/boot/System.map': Permission denied
-ln: failed to create symbolic link '/boot/vmlinuz': Permission denied
-ln: failed to create symbolic link '/boot/System.map': Permission denied
+This patchset adds support for it.
 
-Signed-off-by: Mauro Carvalho Chehab <mchehab@s-opensource.com>
----
+Patch 1 adds vendor prefix for Nsiway, and patch 2 adds device tree binding
+for NS2009.
 
-v2: keep calling a ~/bin/${INSTALLKERNEL} script, as it can be used to cope with
-cross builds.
+Patch 3 is the real driver of NS2009, which currently supports only polling
+(as the IRQ pin is not connected on Lichee Pi Zero).
 
- arch/arm/boot/install.sh | 7 +++++--
- 1 file changed, 5 insertions(+), 2 deletions(-)
+Patch 4 adds NS2009 node to Lichee Pi Zero device tree.
 
-diff --git a/arch/arm/boot/install.sh b/arch/arm/boot/install.sh
-index 2a45092a40e3..831e63ac8b0f 100644
---- a/arch/arm/boot/install.sh
-+++ b/arch/arm/boot/install.sh
-@@ -35,8 +35,11 @@ verify "$2"
- verify "$3"
- 
- # User may have a custom install script
--if [ -x ~/bin/${INSTALLKERNEL} ]; then exec ~/bin/${INSTALLKERNEL} "$@"; fi
--if [ -x /sbin/${INSTALLKERNEL} ]; then exec /sbin/${INSTALLKERNEL} "$@"; fi
-+
-+  if [ -x ~/bin/${INSTALLKERNEL} ]; then exec ~/bin/ "$@"; fi
-+if [ "x$CROSS_COMPILE" == "x" ]; then
-+  if [ -x /sbin/${INSTALLKERNEL} ]; then exec /sbin/${INSTALLKERNEL} "$@"; fi
-+fi
- 
- if [ "$(basename $2)" = "zImage" ]; then
- # Compressed install
+Icenowy Zheng (4):
+  dt-bindings: add vendor prefix for Shenzhen Nsiway Techonology Co.,
+    Ltd.
+  dt-bindings: add binding for Nsiway NS2009 touchscreen controller
+  Input: add driver for Nsiway NS2009 resistive touchscreen controller
+  ARM: sun8i: v3s: add ns2009 node for Lichee Pi Zero board
+
+ .../bindings/input/touchscreen/ns2009.txt          |  23 +++
+ .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+ MAINTAINERS                                        |   6 +
+ arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts      |   9 +
+ drivers/input/touchscreen/Kconfig                  |  13 ++
+ drivers/input/touchscreen/Makefile                 |   1 +
+ drivers/input/touchscreen/ns2009.c                 | 212 +++++++++++++++++++++
+ 7 files changed, 265 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/input/touchscreen/ns2009.txt
+ create mode 100644 drivers/input/touchscreen/ns2009.c
+
 -- 
-2.9.3
+2.12.0
