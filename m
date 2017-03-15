@@ -1,86 +1,174 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Wed, 15 Mar 2017 15:52:15 +0100
-Subject: [GIT PULL v2] Reset controller changes for v4.12
-Message-ID: <1489589535.2528.23.camel@pengutronix.de>
+From: npcomplete13@gmail.com (Vivek Unune)
+Date: Wed, 15 Mar 2017 11:00:33 -0400
+Subject: [PATCH] ARM: dts: BCM5301X: Add support for Linksys EA9500
+Message-ID: <1489590033-4946-1-git-send-email-npcomplete13@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hardware Info
+-------------
 
-Please consider merging this tag, which adds new drivers for i.MX7 and
-Arria10, removes module code from non-modular drivers, and fixes a build
-warning in the uniphier driver and the nr_resets property usage of the
-socfpga driver as well as 64-bit compilation of the sunxi driver.
+Processor	- Broadcom BCM4709C0KFEBG dual-core @ 1.4 GHz
+Switch		- BCM53012 in BCM4709C0KFEBG & external BCM53125
+DDR3 RAM	- 256 MB
+Flash		- 128 MB (Toshiba TC58BVG0S3HTA00)
+2.4GHz		- BCM4366 4?4 2.4/5G single chip 802.11ac SoC
+Power Amp	- Skyworks SE2623L 2.4 GHz power amp (x4)
+5GHz x 2	- BCM4366 4?4 2.4/5G single chip 802.11ac SoC
+Power Amp	- PLX Technology PEX8603 3-lane, 3-port PCIe switch
+Ports		- 8 Ports, 1 WAN Ports
+Antennas	- 8 Antennas
+Serial Port	- @J6 [GND,TX,RX] (VCC NC)    115200 8n1
 
-I have dropped the mfd dt-bindings patch "dt-bindings: mfd: Add Altera
-Arria10 SR Reset Controller bindings" since v1, and added "reset: sunxi:
-fix for 64-bit compilation".
+I was able to test this with Lede with following quirks.
 
-regards
-Philipp
+- Broadcom 4366c0 wireless chip is used and it's firmware package doesn't
+  exist yet. I was able to test it with firmware that came buried in the
+  router's dhd.ko
+- CPU is connected to port 5
+- It has two switches in order to support 8 lan ports. Internal switch is
+  BCM53012. The external switch BCM53125 currently works as "dumb switch"
+- Using 8 bit ECC gives errors, switching to 1 bit ECC solved the issue
+- It uses dual firmware (trx) copies for failsafe purposes.
 
-The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
+Installation
+------------
 
-  Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
+Linksys gpg-signs their firmware for this router, hence it is not
+possible to install using Factory UI.
 
-are available in the git repository at:
+This router needs serial cable hooked up to J6. Then interrupt the boot
+   process by Ctrl+C to enter CFE prompt
+   From there execute:
+        `flash -noheader 192.168.1.10:/lede.trx nflash0.trx`
+   where 192.168.1.10 is where your tftp server should is running.
+You may want to reset partial boots using
+  `nvram set partialboot=0 && nvram commit' while at CFE prompt.
 
-  git://git.pengutronix.de/git/pza/linux.git tags/reset-for-4.12-1
+TODO
+----
 
-for you to fetch changes up to 11282a49b735ad7f4cea187de2b8dc5489343e4b:
+- Add BCM53125 (secondary switch) to dts
+- Add robo_reset gpio (pin# 10 active low) to dts
 
-  reset: sunxi: fix for 64-bit compilation (2017-03-15 12:19:12 +0100)
+Signed-off-by: Vivek Unune <npcomplete13@gmail.com>
+---
+ arch/arm/boot/dts/bcm47094-linksys-panamera.dts | 97 ++++++++++++++++++++++++-
+ 1 file changed, 96 insertions(+), 1 deletion(-)
 
-----------------------------------------------------------------
-Reset controller changes for v4.12
-
-- make reset drivers with bool Kconfig options explicitly non-modular
-- fix uniphier non-static symbol warnings
-- fix socfpga nr_resets property
-- new drivers for the Arria10 and i.MX7 system reset controllers
-- fix sunxi 64-bit compilation
-
-----------------------------------------------------------------
-Andre Przywara (1):
-      reset: sunxi: fix for 64-bit compilation
-
-Andrey Smirnov (1):
-      reset: Add i.MX7 SRC reset driver
-
-Paul Gortmaker (4):
-      reset: meson: make it explicitly non-modular
-      reset: oxnas: make it explicitly non-modular
-      reset: ath79: make it explicitly non-modular
-      reset: pistachio: make it explicitly non-modular
-
-Rojhalat Ibrahim (1):
-      reset-socfpga: Fix nr_resets property
-
-Thor Thayer (2):
-      dt-bindings: reset: a10sr: Add Arria10 SR Reset Controller offsets
-      reset: Add Altera Arria10 SR Reset Controller
-
-Wei Yongjun (1):
-      reset: uniphier: fix non static symbol warnings
-
- .../devicetree/bindings/reset/fsl,imx7-src.txt     |  47 ++++++
- MAINTAINERS                                        |   2 +
- drivers/reset/Kconfig                              |  14 ++
- drivers/reset/Makefile                             |   3 +
- drivers/reset/reset-a10sr.c                        | 138 ++++++++++++++++++
- drivers/reset/reset-ath79.c                        |  27 ++--
- drivers/reset/reset-imx7.c                         | 158 +++++++++++++++++++++
- drivers/reset/reset-meson.c                        |  12 +-
- drivers/reset/reset-oxnas.c                        |   6 +-
- drivers/reset/reset-pistachio.c                    |   9 +-
- drivers/reset/reset-socfpga.c                      |  13 +-
- drivers/reset/reset-sunxi.c                        |  18 +--
- drivers/reset/reset-uniphier.c                     |  20 +--
- include/dt-bindings/reset/altr,rst-mgr-a10sr.h     |  33 +++++
- include/dt-bindings/reset/imx7-reset.h             |  62 ++++++++
- 15 files changed, 500 insertions(+), 62 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/reset/fsl,imx7-src.txt
- create mode 100644 drivers/reset/reset-a10sr.c
- create mode 100644 drivers/reset/reset-imx7.c
- create mode 100644 include/dt-bindings/reset/altr,rst-mgr-a10sr.h
- create mode 100644 include/dt-bindings/reset/imx7-reset.h
+diff --git a/arch/arm/boot/dts/bcm47094-linksys-panamera.dts b/arch/arm/boot/dts/bcm47094-linksys-panamera.dts
+index b6750f7..75537ed 100644
+--- a/arch/arm/boot/dts/bcm47094-linksys-panamera.dts
++++ b/arch/arm/boot/dts/bcm47094-linksys-panamera.dts
+@@ -7,7 +7,7 @@
+ /dts-v1/;
+ 
+ #include "bcm47094.dtsi"
+-#include "bcm5301x-nand-cs0-bch8.dtsi"
++#include "bcm5301x-nand-cs0-bch1.dtsi"
+ 
+ / {
+ 	compatible = "linksys,panamera", "brcm,bcm47094", "brcm,bcm4708";
+@@ -32,5 +32,100 @@
+ 			linux,code = <KEY_WPS_BUTTON>;
+ 			gpios = <&chipcommon 3 GPIO_ACTIVE_LOW>;
+ 		};
++
++		rfkill {
++		label = "WiFi";
++		linux,code = <KEY_RFKILL>;
++		gpios = <&chipcommon 16 GPIO_ACTIVE_LOW>;
++		};
++
++		reset {
++		label = "Reset";
++		linux,code = <KEY_RESTART>;
++		gpios = <&chipcommon 17 GPIO_ACTIVE_LOW>;
++		};
++	};
++
++	leds {
++		compatible = "gpio-leds";
++
++		wps {
++		label = "bcm53xx:white:wps";
++		gpios = <&chipcommon 22 GPIO_ACTIVE_LOW>;
++		};
++
++		usb2 {
++		label = "bcm53xx:green:usb2";
++		gpios = <&chipcommon 1 GPIO_ACTIVE_LOW>;
++		};
++
++		usb3 {
++		label = "bcm53xx:green:usb3";
++		gpios = <&chipcommon 2 GPIO_ACTIVE_LOW>;
++		};
++
++		power {
++		label = "bcm53xx:white:power";
++		gpios = <&chipcommon 4 GPIO_ACTIVE_HIGH>;
++		};
++
++		wifi-disabled {
++		label = "bcm53xx:amber:wifi-disabled";
++		gpios = <&chipcommon 0 GPIO_ACTIVE_LOW>;
++		};
++
++		wifi-enabled {
++		label = "bcm53xx:white:wifi-enabled";
++		gpios = <&chipcommon 5 GPIO_ACTIVE_HIGH>;
++		};
++
++		bluebar1 {
++		label = "bcm53xx:white:bluebar1";
++		gpios = <&chipcommon 11 GPIO_ACTIVE_HIGH>;
++		};
++
++		bluebar2 {
++		label = "bcm53xx:white:bluebar2";
++		gpios = <&chipcommon 12 GPIO_ACTIVE_HIGH>;
++		};
++
++		bluebar3 {
++		label = "bcm53xx:white:bluebar3";
++		gpios = <&chipcommon 15 GPIO_ACTIVE_LOW>;
++		};
++
++		bluebar4 {
++		label = "bcm53xx:white:bluebar4";
++		gpios = <&chipcommon 18 GPIO_ACTIVE_HIGH>;
++		};
++
++		bluebar5 {
++		label = "bcm53xx:white:bluebar5";
++		gpios = <&chipcommon 19 GPIO_ACTIVE_HIGH>;
++		};
++
++		bluebar6 {
++		label = "bcm53xx:white:bluebar6";
++		gpios = <&chipcommon 20 GPIO_ACTIVE_HIGH>;
++		};
++
++		bluebar7 {
++		label = "bcm53xx:white:bluebar7";
++		gpios = <&chipcommon 21 GPIO_ACTIVE_HIGH>;
++		};
++
++		bluebar8 {
++		label = "bcm53xx:white:bluebar8";
++		gpios = <&chipcommon 8 GPIO_ACTIVE_HIGH>;
++		};
++
+ 	};
+ };
++
++&usb2 {
++	vcc-gpio = <&chipcommon 13 GPIO_ACTIVE_HIGH>;
++};
++
++&usb3 {
++	vcc-gpio = <&chipcommon 14 GPIO_ACTIVE_HIGH>;
++};
+-- 
+2.7.4
