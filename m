@@ -1,99 +1,65 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 15 Mar 2017 12:53:41 -0500
-Subject: [PATCH v4 3/5] dt-bindings: Add TI SCI PM Domains
-In-Reply-To: <1488882154-21485-4-git-send-email-d-gerlach@ti.com>
-References: <1488882154-21485-1-git-send-email-d-gerlach@ti.com>
- <1488882154-21485-4-git-send-email-d-gerlach@ti.com>
-Message-ID: <20170315175341.alba5snfgz5xyrzf@rob-hp-laptop>
+From: julia@ni.com (Julia Cartwright)
+Date: Wed, 15 Mar 2017 13:01:37 -0500
+Subject: [PATCH v2 2/4] pinctrl: rockchip: convert to raw spinlock
+In-Reply-To: <20170315174654.15128-3-john@metanate.com>
+References: <20170315174654.15128-1-john@metanate.com>
+ <20170315174654.15128-3-john@metanate.com>
+Message-ID: <20170315180137.GB682@jcartwri.amer.corp.natinst.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 07, 2017 at 04:22:32AM -0600, Dave Gerlach wrote:
-> Add a generic power domain implementation, TI SCI PM Domains, that
-> will hook into the genpd framework and allow the TI SCI protocol to
-> control device power states.
+Hello John-
+
+On Wed, Mar 15, 2017 at 05:46:52PM +0000, John Keeping wrote:
+> This lock is used from rockchip_irq_set_type() which is part of the
+> irq_chip implementation and thus must use raw_spinlock_t as documented
+> in Documentation/gpio/driver.txt.
 > 
-> Also, provide macros representing each device index as understood
-> by TI SCI to be used in the device node power-domain references.
-> These are identifiers for the K2G devices managed by the PMMC.
-> 
-> Signed-off-by: Nishanth Menon <nm@ti.com>
-> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+> Signed-off-by: John Keeping <john@metanate.com>
+> Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+> Tested-by: Heiko Stuebner <heiko@sntech.de>
 > ---
->  .../devicetree/bindings/soc/ti/sci-pm-domain.txt   | 59 ++++++++++++++
->  MAINTAINERS                                        |  2 +
->  include/dt-bindings/genpd/k2g.h                    | 90 ++++++++++++++++++++++
->  3 files changed, 151 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/soc/ti/sci-pm-domain.txt
->  create mode 100644 include/dt-bindings/genpd/k2g.h
+> v2: unchanged
+> ---
+>  drivers/pinctrl/pinctrl-rockchip.c | 30 +++++++++++++++---------------
+>  1 file changed, 15 insertions(+), 15 deletions(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/soc/ti/sci-pm-domain.txt b/Documentation/devicetree/bindings/soc/ti/sci-pm-domain.txt
-> new file mode 100644
-> index 000000000000..86a6a3d52ed6
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/soc/ti/sci-pm-domain.txt
-> @@ -0,0 +1,59 @@
-> +Texas Instruments TI-SCI Generic Power Domain
-> +---------------------------------------------
-> +
-> +Some TI SoCs contain a system controller (like the PMMC, etc...) that is
-> +responsible for controlling the state of the IPs that are present.
-> +Communication between the host processor running an OS and the system
-> +controller happens through a protocol known as TI-SCI [1]. This pm domain
-> +implementation plugs into the generic pm domain framework and makes use of
-> +the TI SCI protocol power on and off each device when needed.
+> diff --git a/drivers/pinctrl/pinctrl-rockchip.c b/drivers/pinctrl/pinctrl-rockchip.c
+> index 128c383ea7ba..8c1cae6d78d7 100644
+> --- a/drivers/pinctrl/pinctrl-rockchip.c
+> +++ b/drivers/pinctrl/pinctrl-rockchip.c
+> @@ -163,7 +163,7 @@ struct rockchip_pin_bank {
+>  	struct irq_domain		*domain;
+>  	struct gpio_chip		gpio_chip;
+>  	struct pinctrl_gpio_range	grange;
+> -	spinlock_t			slock;
+> +	raw_spinlock_t			slock;
+>  	u32				toggle_edge_mode;
+>  };
+>  
+> @@ -1295,14 +1295,14 @@ static int rockchip_set_pull(struct rockchip_pin_bank *bank,
+>  
+>  	switch (ctrl->type) {
+>  	case RK2928:
+> -		spin_lock_irqsave(&bank->slock, flags);
+> +		raw_spin_lock_irqsave(&bank->slock, flags);
+>  
+>  		data = BIT(bit + 16);
+>  		if (pull == PIN_CONFIG_BIAS_DISABLE)
+>  			data |= BIT(bit);
 
-The last sentence is mostly Linux implementation details. The binding is 
-power domains. The Linux framework is PM domains. Let's keep those 
-distinct and the latter doesn't belong in bindings.
+This should be lifted out from under the lock.
 
-> +
-> +[1] Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
-> +
-> +PM Domain Node
-> +==============
-> +The PM domain node represents the global PM domain managed by the PMMC, which
-> +in this case is the implementation as documented by the generic PM domain
-> +bindings in Documentation/devicetree/bindings/power/power_domain.txt.  Because
-> +this relies on the TI SCI protocol to communicate with the PMMC it must be a
-> +child of the pmmc node.
-> +
-> +Required Properties:
-> +--------------------
-> +- compatible: should be "ti,sci-pm-domain"
-> +- #power-domain-cells: Must be 1 so that an id can be provided in each
-> +		       device node.
-> +
-> +Example (K2G):
-> +-------------
-> +	pmmc: pmmc {
-> +		compatible = "ti,k2g-sci";
-> +		...
-> +
-> +		k2g_pds: power-controller {
-> +			compatible = "ti,sci-pm-domain";
-> +			#power-domain-cells = <1>;
-> +		};
-> +	};
-> +
-> +PM Domain Consumers
-> +===================
-> +Hardware blocks belonging to a PM domain should contain a "power-domains"
-> +property that is a phandle pointing to the corresponding PM domain node
-> +along with an index representing the device id to be passed to the PMMC
-> +for device control.
-> +
-> +Required Properties:
-> +--------------------
-> +- power-domains: phandle pointing to the corresponding PM domain node
-> +		 and an ID representing the device.
-> +
-> +See dt-bindings/genpd/k2g.h for the list of valid identifiers for k2g.
-> +
-> +Example (K2G):
-> +--------------------
-> +	uart0: serial at 02530c00 {
-> +		compatible = "ns16550a";
-> +		...
-> +		power-domains = <&k2g_pds K2G_DEV_UART0>;
-> +	};
+>  		ret = regmap_write(regmap, reg, data);
+
+How is this legal?  The regmap_write() here is going to end up acquiring
+the regmap mutex.
+
+   Julia
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170315/e870348b/attachment.sig>
