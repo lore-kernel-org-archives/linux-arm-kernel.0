@@ -1,38 +1,48 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 15 Mar 2017 12:11:54 +0100
-Subject: [PATCH v1 0/7] initialize dtsi file and dts file for RK3328 SoCs
-In-Reply-To: <1489572237-6649-1-git-send-email-cl@rock-chips.com>
-References: <1489572237-6649-1-git-send-email-cl@rock-chips.com>
-Message-ID: <2592337.TJConaiLTi@diego>
+From: quentin.schulz@free-electrons.com (Quentin Schulz)
+Date: Wed, 15 Mar 2017 11:55:35 +0100
+Subject: [PATCH v4 16/18] ARM: dtsi: axp22x: add battery power supply subnode
+In-Reply-To: <20170315105537.22349-1-quentin.schulz@free-electrons.com>
+References: <20170315105537.22349-1-quentin.schulz@free-electrons.com>
+Message-ID: <20170315105537.22349-17-quentin.schulz@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Liang,
+The X-Powers AXP22X PMIC exposes battery supply various data such as
+the battery status (charging, discharging, full, dead), current max
+limit, current current, battery capacity (in percentage), voltage max
+limit, current voltage, and battery capacity (in Ah).
 
-Am Mittwoch, 15. M?rz 2017, 18:03:50 CET schrieb cl at rock-chips.com:
-> From: Liang Chen <cl@rock-chips.com>
-> 
-> These patchs depend on pinctrl patchs as below:
-> 
-> https://patchwork.kernel.org/patch/9566427/
-> https://patchwork.kernel.org/patch/9566425/
-> https://patchwork.kernel.org/patch/9566431/
-> 
-> Chen Liang (7):
->   include: dt-bindings: Add pin function index definition for rockchip
->     pinctrl
->   dt-bindings: iio: rockchip-saradc: add support for rk3328
->   dt-bindings: i2c: rk3x: add support for rk3328
->   dt-bindings: soc: rockchip: grf: add support for rk3328
+This adds the battery power supply subnode for AXP22X PMIC.
 
-both my inbox as well as the linux-rockchip list did only get patches 1-4 it 
-seems?
+Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Acked-by: Chen-Yu Tsai <wens@csie.org>
+---
 
->   arm64: dts: rockchip: add core dtsi file for RK3328 SoCs
->   arm64: dts: rockchip: add dts file for RK3328 evaluation board
->   dt-bindings: document rockchip rk3328-evb board
+v2:
+ - changed DT node name from battery_power_supply to
+ battery-power-supply,
+ - removed io-channels and io-channel-names from DT (the IIO mapping is
+ done in the IIO ADC driver now),
 
-So right now I'm missing these next 3. Did something go wrong when sending?
+ arch/arm/boot/dts/axp22x.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-
-Heiko
+diff --git a/arch/arm/boot/dts/axp22x.dtsi b/arch/arm/boot/dts/axp22x.dtsi
+index 67331c5..87fb08e 100644
+--- a/arch/arm/boot/dts/axp22x.dtsi
++++ b/arch/arm/boot/dts/axp22x.dtsi
+@@ -57,6 +57,11 @@
+ 		status = "disabled";
+ 	};
+ 
++	battery_power_supply: battery-power-supply {
++		compatible = "x-powers,axp221-battery-power-supply";
++		status = "disabled";
++	};
++
+ 	regulators {
+ 		/* Default work frequency for buck regulators */
+ 		x-powers,dcdc-freq = <3000>;
+-- 
+2.9.3
