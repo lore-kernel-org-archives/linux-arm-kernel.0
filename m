@@ -1,39 +1,33 @@
 From: cl@rock-chips.com (cl at rock-chips.com)
-Date: Wed, 15 Mar 2017 18:03:50 +0800
-Subject: [PATCH v1 0/7] initialize dtsi file and dts file for RK3328 SoCs
-Message-ID: <1489572237-6649-1-git-send-email-cl@rock-chips.com>
+Date: Wed, 15 Mar 2017 18:03:52 +0800
+Subject: [PATCH v1 2/7] dt-bindings: iio: rockchip-saradc: add support for
+ rk3328
+In-Reply-To: <1489572237-6649-1-git-send-email-cl@rock-chips.com>
+References: <1489572237-6649-1-git-send-email-cl@rock-chips.com>
+Message-ID: <1489572237-6649-3-git-send-email-cl@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Liang Chen <cl@rock-chips.com>
+From: Chen Liang <cl@rock-chips.com>
 
-These patchs depend on pinctrl patchs as below:
+The rk3328 saradc is the same as rk3399.
 
-https://patchwork.kernel.org/patch/9566427/
-https://patchwork.kernel.org/patch/9566425/
-https://patchwork.kernel.org/patch/9566431/
+Signed-off-by: Chen Liang <cl@rock-chips.com>
+---
+ Documentation/devicetree/bindings/iio/adc/rockchip-saradc.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-Chen Liang (7):
-  include: dt-bindings: Add pin function index definition for rockchip
-    pinctrl
-  dt-bindings: iio: rockchip-saradc: add support for rk3328
-  dt-bindings: i2c: rk3x: add support for rk3328
-  dt-bindings: soc: rockchip: grf: add support for rk3328
-  arm64: dts: rockchip: add core dtsi file for RK3328 SoCs
-  arm64: dts: rockchip: add dts file for RK3328 evaluation board
-  dt-bindings: document rockchip rk3328-evb board
-
- Documentation/devicetree/bindings/arm/rockchip.txt |    4 +
- Documentation/devicetree/bindings/i2c/i2c-rk3x.txt |    1 +
- .../bindings/iio/adc/rockchip-saradc.txt           |    1 +
- .../devicetree/bindings/soc/rockchip/grf.txt       |    1 +
- arch/arm64/boot/dts/rockchip/Makefile              |    1 +
- arch/arm64/boot/dts/rockchip/rk3328-evb.dts        |   57 +
- arch/arm64/boot/dts/rockchip/rk3328.dtsi           | 1362 ++++++++++++++++++++
- include/dt-bindings/pinctrl/rockchip.h             |    3 +
- 8 files changed, 1430 insertions(+)
- create mode 100644 arch/arm64/boot/dts/rockchip/rk3328-evb.dts
- create mode 100644 arch/arm64/boot/dts/rockchip/rk3328.dtsi
-
+diff --git a/Documentation/devicetree/bindings/iio/adc/rockchip-saradc.txt b/Documentation/devicetree/bindings/iio/adc/rockchip-saradc.txt
+index 205593f..f81bc20 100644
+--- a/Documentation/devicetree/bindings/iio/adc/rockchip-saradc.txt
++++ b/Documentation/devicetree/bindings/iio/adc/rockchip-saradc.txt
+@@ -5,6 +5,7 @@ Required properties:
+    - "rockchip,saradc": for rk3188, rk3288
+    - "rockchip,rk3066-tsadc": for rk3036
+    - "rockchip,rk3399-saradc": for rk3399
++   - "rockchip,rk3328-saradc", "rockchip,rk3399-saradc": for rk3328
+ 
+ - reg: physical base address of the controller and length of memory mapped
+        region.
 -- 
 1.9.1
