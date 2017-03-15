@@ -1,31 +1,36 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 15 Mar 2017 22:15:22 +0800
-Subject: Applied "ASoC: sun8i-codec: Update mixer to use SOC_DAPM_DOUBLE"
- to the asoc tree
-In-Reply-To: <20170315134323.i3pvla3pzejmkxwh@sirena.org.uk>
-References: <20170210094133.11382-3-mylene.josserand@free-electrons.com>
- <E1clbY9-0000DH-LY@finisterre>
- <CAGb2v6428PpYPzpHngLgaeziwKN8u-TYiNO1bs7TFw-7VrQOAg@mail.gmail.com>
- <20170315134323.i3pvla3pzejmkxwh@sirena.org.uk>
-Message-ID: <CAGb2v67-b+8CM0MqhT_YQeuNxEnVoxG-COZPy8LW32Eb-QE67Q@mail.gmail.com>
+From: joe@perches.com (Joe Perches)
+Date: Wed, 15 Mar 2017 07:17:24 -0700
+Subject: [PATCH 23/35] drivers/mfd: Convert remaining uses of pr_warning
+ to pr_warn
+In-Reply-To: <20170315122300.jwuogngm6obgvz5z@dell>
+References: <cover.1487314666.git.joe@perches.com>
+ <a6c827c14d0b9f4be42e549ec4c629245516e979.1487314667.git.joe@perches.com>
+ <20170314140455.umlhdbuj3grqtu6i@dell>
+ <1489511868.2582.2.camel@perches.com>
+ <20170315122300.jwuogngm6obgvz5z@dell>
+Message-ID: <1489587444.2582.6.camel@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 15, 2017 at 9:43 PM, Mark Brown <broonie@kernel.org> wrote:
-> On Tue, Mar 14, 2017 at 12:31:22PM +0800, Chen-Yu Tsai wrote:
->> On Wed, Mar 8, 2017 at 9:22 PM, Mark Brown <broonie@kernel.org> wrote:
->> This patch changes the mixer controls exposed to user space.
->
->> This driver was just introduced in 4.11-rc1. Would it make sense to
->> merge these cleanup patches as fixes for 4.11, so we don't affect
->> userspace across kernel releases?
->
-> It would but it doesn't pick over cleanly, it looks like it depends on
-> some of the other changes.
+On Wed, 2017-03-15 at 12:23 +0000, Lee Jones wrote:
+> On Tue, 14 Mar 2017, Joe Perches wrote:
+[]
+> > never break user-visible strings such as
+> > printk messages, because that breaks the ability to grep for them.
+> 
+> Right, I'm aware of this.  I'm also aware of the other rule we have
+> where lines are not to exceed 80 chars.  Hence my question; "is the 80
+> chars rule the lessor sin of the two".
+> 
+> Rock <=> hard place
+> 
+> Actually I would say that the error message sub-optimal and could, in
+> fact be edited to be more succinct, thus not breaking any rules. 
 
-It depends on the second half of commit 4aa8146c89f3 ("ASoC: sun8i-codec:
-Remove analog "HP" widget"), which is also a cleanup. Would it be OK
-to pick these two over to fixes then? Or should we send a clean version
-instead?
+It's not a 'sin' at all.
 
-ChenYu
+The rule is to exceed 80 columns when the logging
+message format is long.
+
+I didn't even look at the format content.
+Change it if you wish.
