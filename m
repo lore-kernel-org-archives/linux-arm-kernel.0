@@ -1,174 +1,79 @@
-From: npcomplete13@gmail.com (Vivek Unune)
-Date: Wed, 15 Mar 2017 11:00:33 -0400
-Subject: [PATCH] ARM: dts: BCM5301X: Add support for Linksys EA9500
-Message-ID: <1489590033-4946-1-git-send-email-npcomplete13@gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 15 Mar 2017 15:07:19 +0000
+Subject: [PATCH 3/3] kvm: arm/arm64: Fix locking for kvm_free_stage2_pgd
+In-Reply-To: <0afc4248-9a1b-ee0f-8f9b-5357707b9d72@arm.com>
+References: <1489503154-20705-1-git-send-email-suzuki.poulose@arm.com>
+ <1489503154-20705-4-git-send-email-suzuki.poulose@arm.com>
+ <20170315092147.GM1277@cbox> <314fbde3-17e6-414b-85e6-326de22bdc1c@arm.com>
+ <20170315105639.GA31974@cbox> <0e5ff7f7-855c-ea28-fdee-73c062c3d289@arm.com>
+ <0afc4248-9a1b-ee0f-8f9b-5357707b9d72@arm.com>
+Message-ID: <099ce185-8d78-9870-c535-b694d60a8813@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hardware Info
--------------
+On 15/03/17 14:33, Suzuki K Poulose wrote:
+> On 15/03/17 13:28, Marc Zyngier wrote:
+>> On 15/03/17 10:56, Christoffer Dall wrote:
+>>> On Wed, Mar 15, 2017 at 09:39:26AM +0000, Marc Zyngier wrote:
+>>>> On 15/03/17 09:21, Christoffer Dall wrote:
+>>>>> On Tue, Mar 14, 2017 at 02:52:34PM +0000, Suzuki K Poulose wrote:
+>>>>>> In kvm_free_stage2_pgd() we don't hold the kvm->mmu_lock while calling
+>>>>>> unmap_stage2_range() on the entire memory range for the guest. This could
+>>>>>> cause problems with other callers (e.g, munmap on a memslot) trying to
+>>>>>> unmap a range.
+>>>>>>
+>>>>>> Fixes: commit d5d8184d35c9 ("KVM: ARM: Memory virtualization setup")
+>>>>>> Cc: stable at vger.kernel.org # v3.10+
+>>>>>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+>>>>>> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+>>>>>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> 
+> ...
+> 
+>>> ok, then there's just the concern that we may be holding a spinlock for
+>>> a very long time.  I seem to recall Mario once added something where he
+>>> unlocked and gave a chance to schedule something else for each PUD or
+>>> something like that, because he ran into the issue during migration.  Am
+>>> I confusing this with something else?
+>>
+>> That definitely rings a bell: stage2_wp_range() uses that kind of trick
+>> to give the system a chance to breathe. Maybe we could use a similar
+>> trick in our S2 unmapping code? How about this (completely untested) patch:
+>>
+>> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+>> index 962616fd4ddd..1786c24212d4 100644
+>> --- a/arch/arm/kvm/mmu.c
+>> +++ b/arch/arm/kvm/mmu.c
+>> @@ -292,8 +292,13 @@ static void unmap_stage2_range(struct kvm *kvm, phys_addr_t start, u64 size)
+>>  	phys_addr_t addr = start, end = start + size;
+>>  	phys_addr_t next;
+>>
+>> +	BUG_ON(!spin_is_locked(&kvm->mmu_lock));
+>> +
+>>  	pgd = kvm->arch.pgd + stage2_pgd_index(addr);
+>>  	do {
+>> +		if (need_resched() || spin_needbreak(&kvm->mmu_lock))
+>> +			cond_resched_lock(&kvm->mmu_lock);
+> 
+> nit: I think we could make the cond_resched_lock() unconditionally here:
+> Given, __cond_resched_lock() already does all the above checks :
+> 
+> kernel/sched/core.c:
+> 
+> int __cond_resched_lock(spinlock_t *lock)
+> {
+>          int resched = should_resched(PREEMPT_LOCK_OFFSET);
+> 
+> ...
+> 
+>          if (spin_needbreak(lock) || resched) {
 
-Processor	- Broadcom BCM4709C0KFEBG dual-core @ 1.4 GHz
-Switch		- BCM53012 in BCM4709C0KFEBG & external BCM53125
-DDR3 RAM	- 256 MB
-Flash		- 128 MB (Toshiba TC58BVG0S3HTA00)
-2.4GHz		- BCM4366 4?4 2.4/5G single chip 802.11ac SoC
-Power Amp	- Skyworks SE2623L 2.4 GHz power amp (x4)
-5GHz x 2	- BCM4366 4?4 2.4/5G single chip 802.11ac SoC
-Power Amp	- PLX Technology PEX8603 3-lane, 3-port PCIe switch
-Ports		- 8 Ports, 1 WAN Ports
-Antennas	- 8 Antennas
-Serial Port	- @J6 [GND,TX,RX] (VCC NC)    115200 8n1
+Right. And should_resched() also contains a test for need_resched().
 
-I was able to test this with Lede with following quirks.
+This means we can also simplify stage2_wp_range(). Awesome!
 
-- Broadcom 4366c0 wireless chip is used and it's firmware package doesn't
-  exist yet. I was able to test it with firmware that came buried in the
-  router's dhd.ko
-- CPU is connected to port 5
-- It has two switches in order to support 8 lan ports. Internal switch is
-  BCM53012. The external switch BCM53125 currently works as "dumb switch"
-- Using 8 bit ECC gives errors, switching to 1 bit ECC solved the issue
-- It uses dual firmware (trx) copies for failsafe purposes.
+Thanks,
 
-Installation
-------------
-
-Linksys gpg-signs their firmware for this router, hence it is not
-possible to install using Factory UI.
-
-This router needs serial cable hooked up to J6. Then interrupt the boot
-   process by Ctrl+C to enter CFE prompt
-   From there execute:
-        `flash -noheader 192.168.1.10:/lede.trx nflash0.trx`
-   where 192.168.1.10 is where your tftp server should is running.
-You may want to reset partial boots using
-  `nvram set partialboot=0 && nvram commit' while at CFE prompt.
-
-TODO
-----
-
-- Add BCM53125 (secondary switch) to dts
-- Add robo_reset gpio (pin# 10 active low) to dts
-
-Signed-off-by: Vivek Unune <npcomplete13@gmail.com>
----
- arch/arm/boot/dts/bcm47094-linksys-panamera.dts | 97 ++++++++++++++++++++++++-
- 1 file changed, 96 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/bcm47094-linksys-panamera.dts b/arch/arm/boot/dts/bcm47094-linksys-panamera.dts
-index b6750f7..75537ed 100644
---- a/arch/arm/boot/dts/bcm47094-linksys-panamera.dts
-+++ b/arch/arm/boot/dts/bcm47094-linksys-panamera.dts
-@@ -7,7 +7,7 @@
- /dts-v1/;
- 
- #include "bcm47094.dtsi"
--#include "bcm5301x-nand-cs0-bch8.dtsi"
-+#include "bcm5301x-nand-cs0-bch1.dtsi"
- 
- / {
- 	compatible = "linksys,panamera", "brcm,bcm47094", "brcm,bcm4708";
-@@ -32,5 +32,100 @@
- 			linux,code = <KEY_WPS_BUTTON>;
- 			gpios = <&chipcommon 3 GPIO_ACTIVE_LOW>;
- 		};
-+
-+		rfkill {
-+		label = "WiFi";
-+		linux,code = <KEY_RFKILL>;
-+		gpios = <&chipcommon 16 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		reset {
-+		label = "Reset";
-+		linux,code = <KEY_RESTART>;
-+		gpios = <&chipcommon 17 GPIO_ACTIVE_LOW>;
-+		};
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+
-+		wps {
-+		label = "bcm53xx:white:wps";
-+		gpios = <&chipcommon 22 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		usb2 {
-+		label = "bcm53xx:green:usb2";
-+		gpios = <&chipcommon 1 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		usb3 {
-+		label = "bcm53xx:green:usb3";
-+		gpios = <&chipcommon 2 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		power {
-+		label = "bcm53xx:white:power";
-+		gpios = <&chipcommon 4 GPIO_ACTIVE_HIGH>;
-+		};
-+
-+		wifi-disabled {
-+		label = "bcm53xx:amber:wifi-disabled";
-+		gpios = <&chipcommon 0 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		wifi-enabled {
-+		label = "bcm53xx:white:wifi-enabled";
-+		gpios = <&chipcommon 5 GPIO_ACTIVE_HIGH>;
-+		};
-+
-+		bluebar1 {
-+		label = "bcm53xx:white:bluebar1";
-+		gpios = <&chipcommon 11 GPIO_ACTIVE_HIGH>;
-+		};
-+
-+		bluebar2 {
-+		label = "bcm53xx:white:bluebar2";
-+		gpios = <&chipcommon 12 GPIO_ACTIVE_HIGH>;
-+		};
-+
-+		bluebar3 {
-+		label = "bcm53xx:white:bluebar3";
-+		gpios = <&chipcommon 15 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		bluebar4 {
-+		label = "bcm53xx:white:bluebar4";
-+		gpios = <&chipcommon 18 GPIO_ACTIVE_HIGH>;
-+		};
-+
-+		bluebar5 {
-+		label = "bcm53xx:white:bluebar5";
-+		gpios = <&chipcommon 19 GPIO_ACTIVE_HIGH>;
-+		};
-+
-+		bluebar6 {
-+		label = "bcm53xx:white:bluebar6";
-+		gpios = <&chipcommon 20 GPIO_ACTIVE_HIGH>;
-+		};
-+
-+		bluebar7 {
-+		label = "bcm53xx:white:bluebar7";
-+		gpios = <&chipcommon 21 GPIO_ACTIVE_HIGH>;
-+		};
-+
-+		bluebar8 {
-+		label = "bcm53xx:white:bluebar8";
-+		gpios = <&chipcommon 8 GPIO_ACTIVE_HIGH>;
-+		};
-+
- 	};
- };
-+
-+&usb2 {
-+	vcc-gpio = <&chipcommon 13 GPIO_ACTIVE_HIGH>;
-+};
-+
-+&usb3 {
-+	vcc-gpio = <&chipcommon 14 GPIO_ACTIVE_HIGH>;
-+};
+	M.
 -- 
-2.7.4
+Jazz is not dead. It just smells funny...
