@@ -1,48 +1,33 @@
 From: jonathanh@nvidia.com (Jon Hunter)
-Date: Wed, 15 Mar 2017 13:31:50 +0000
-Subject: [PATCH 0/5] soc/tegra: Enable flowctrl support for Tegra132/210
-Message-ID: <1489584715-23138-1-git-send-email-jonathanh@nvidia.com>
+Date: Wed, 15 Mar 2017 13:31:52 +0000
+Subject: [PATCH 2/5] ARM: tegra: Remove unnecessary inclusion of flowctrl
+ header
+In-Reply-To: <1489584715-23138-1-git-send-email-jonathanh@nvidia.com>
+References: <1489584715-23138-1-git-send-email-jonathanh@nvidia.com>
+Message-ID: <1489584715-23138-3-git-send-email-jonathanh@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The flowctrl modules is supported by both Tegra132 and Tegra210 devices.
-These devices already have the flowctrl node defined in their respective
-*.dtsi device-tree files. The flowctrl driver is currently located in
-the arch/arm/mach-tegra directory and so can only be used for 32-bit
-Tegra devices. Move this driver into drivers/soc/tegra so that it can
-be used for all Tegra devices that support flowctrl.
+The Tegra flowctrl.h header is included unnecessarily by the Tegra
+sleep.S source file. Remove this unnecessary inclusion.
 
-I have also added a couple clean-up patches.
+Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
+---
+ arch/arm/mach-tegra/sleep.S | 2 --
+ 1 file changed, 2 deletions(-)
 
-Jon Hunter (5):
-  ARM: tegra: WARN if flowctrl is not supported
-  ARM: tegra: Remove unnecessary inclusion of flowctrl header
-  soc/tegra: Move Tegra flowctrl driver
-  dt-bindings: tegra: Update compatible strings for Tegra flowctrl
-  soc/tegra: Add initial flowctrl support for Tegra210
-
- .../bindings/arm/tegra/nvidia,tegra20-flowctrl.txt |   8 +-
- arch/arm/mach-tegra/Kconfig                        |   1 +
- arch/arm/mach-tegra/Makefile                       |   1 -
- arch/arm/mach-tegra/cpuidle-tegra20.c              |   3 +-
- arch/arm/mach-tegra/flowctrl.c                     | 171 -------------------
- arch/arm/mach-tegra/flowctrl.h                     |  66 --------
- arch/arm/mach-tegra/platsmp.c                      |   2 +-
- arch/arm/mach-tegra/pm.c                           |   2 +-
- arch/arm/mach-tegra/reset-handler.S                |   2 +-
- arch/arm/mach-tegra/sleep-tegra20.S                |   3 +-
- arch/arm/mach-tegra/sleep-tegra30.S                |   2 +-
- arch/arm/mach-tegra/sleep.S                        |   2 -
- arch/arm/mach-tegra/tegra.c                        |   2 -
- drivers/soc/tegra/Kconfig                          |   5 +
- drivers/soc/tegra/Makefile                         |   1 +
- drivers/soc/tegra/flowctrl.c                       | 187 +++++++++++++++++++++
- include/soc/tegra/flowctrl.h                       |  62 +++++++
- 17 files changed, 271 insertions(+), 249 deletions(-)
- delete mode 100644 arch/arm/mach-tegra/flowctrl.c
- delete mode 100644 arch/arm/mach-tegra/flowctrl.h
- create mode 100644 drivers/soc/tegra/flowctrl.c
- create mode 100644 include/soc/tegra/flowctrl.h
-
+diff --git a/arch/arm/mach-tegra/sleep.S b/arch/arm/mach-tegra/sleep.S
+index f024a5109e8e..5e3496753df1 100644
+--- a/arch/arm/mach-tegra/sleep.S
++++ b/arch/arm/mach-tegra/sleep.S
+@@ -30,8 +30,6 @@
+ #include <asm/hardware/cache-l2x0.h>
+ 
+ #include "iomap.h"
+-
+-#include "flowctrl.h"
+ #include "sleep.h"
+ 
+ #define CLK_RESET_CCLK_BURST	0x20
 -- 
 2.7.4
