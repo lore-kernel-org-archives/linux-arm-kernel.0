@@ -1,156 +1,66 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 15 Mar 2017 20:17:35 +0100
-Subject: [PATCH] ARM: dts: mvebu: linksys: enable buffer manager support
-In-Reply-To: <20170308053312.29243-1-ralph.sennhauser@gmail.com> (Ralph
- Sennhauser's message of "Wed, 8 Mar 2017 06:33:12 +0100")
-References: <20170308053312.29243-1-ralph.sennhauser@gmail.com>
-Message-ID: <8760jafiy8.fsf@free-electrons.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 15 Mar 2017 19:17:41 +0000
+Subject: [RFC arm64] samples/bpf: explicitly exclude sysreg sections with
+ asm macros
+In-Reply-To: <20170315183130.GB32819@C02RW35GFVH8.dhcp.broadcom.net>
+References: <1489101492-15653-1-git-send-email-andy@greyhouse.net>
+ <20170310175229.GC18894@arm.com>
+ <20170310192656.GA13928@C02RW35GFVH8>
+ <20170310204112.GA21382@leverpostej>
+ <20170315183130.GB32819@C02RW35GFVH8.dhcp.broadcom.net>
+Message-ID: <20170315191741.GB29452@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ralph,
- 
- On mer., mars 08 2017, Ralph Sennhauser <ralph.sennhauser@gmail.com> wrote:
+Hi,
 
-> Add appropriate properties to devices in the Linksys WRT AC Series for the
-> mvneta driver to use hardware buffer management.
->
-> Also update "soc" ranges property and set the status of bm and bm-bppi
-> to "okay" (SRAM).
->
-> Signed-off-by: Ralph Sennhauser <ralph.sennhauser@gmail.com>
-> ---
->  arch/arm/boot/dts/armada-385-linksys.dtsi     | 17 ++++++++++++++++-
->  arch/arm/boot/dts/armada-xp-linksys-mamba.dts | 17 ++++++++++++++++-
->  2 files changed, 32 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/armada-385-linksys.dtsi b/arch/arm/boot/dts/armada-385-linksys.dtsi
-> index df47bf1..4aac375 100644
-> --- a/arch/arm/boot/dts/armada-385-linksys.dtsi
-> +++ b/arch/arm/boot/dts/armada-385-linksys.dtsi
-> @@ -59,7 +59,8 @@
->  		ranges = <MBUS_ID(0xf0, 0x01) 0 0xf1000000 0x100000
->  			  MBUS_ID(0x01, 0x1d) 0 0xfff00000 0x100000
->  			  MBUS_ID(0x09, 0x19) 0 0xf1100000 0x10000
-> -			  MBUS_ID(0x09, 0x15) 0 0xf1110000 0x10000>;
-> +			  MBUS_ID(0x09, 0x15) 0 0xf1110000 0x10000
-> +			  MBUS_ID(0x0c, 0x04) 0 0xf1200000 0x100000>;
->  
->  		internal-regs {
->  			i2c at 11000 {
-> @@ -88,6 +89,9 @@
->  			ethernet at 70000 {
->  				status = "okay";
->  				phy-mode = "rgmii-id";
-> +				buffer-manager = <&bm>;
-> +				bm,pool-long = <1>;
-> +				bm,pool-short = <3>;
->  				fixed-link {
->  					speed = <1000>;
->  					full-duplex;
-> @@ -97,6 +101,9 @@
->  			ethernet at 34000 {
->  				status = "okay";
->  				phy-mode = "sgmii";
-> +				buffer-manager = <&bm>;
-> +				bm,pool-long = <0>;
-> +				bm,pool-short = <3>;
-Any reason to reuse the same pool than the other port?
+On Wed, Mar 15, 2017 at 02:31:30PM -0400, Andy Gospodarek wrote:
+> On Fri, Mar 10, 2017 at 08:41:13PM +0000, Mark Rutland wrote:
+> > On Fri, Mar 10, 2017 at 02:26:56PM -0500, Andy Gospodarek wrote:
+> > > On Fri, Mar 10, 2017 at 05:52:30PM +0000, Will Deacon wrote:
+> > > > On Thu, Mar 09, 2017 at 06:18:12PM -0500, Andy Gospodarek wrote:
 
-As only two ports are used here, then each of them can have use 2 of the
-4 availables pools. 
+> > > > Why does asm cause compilation to fail?
+> > > 
+> > > It isn't the ASM itself that causes the compilation to fail, it's the
+> > > ASM macros included inside the new ifdef that are problematic.  Here is
+> > > what is seen per object file:
+> > 
+> > > ./arch/arm64/include/asm/barrier.h:62:23: note: expanded from macro
+> > > '__smp_store_release'
+> > >                 asm volatile ("stlr %1, %0"
+> > > \
+> > >                                     ^
+> > > 1 warning generated.
+> > > LLVM ERROR: Inline asm not supported by this streamer because we don't  <----  THIS LINE
+> > > have an asm parser for this target
+> > 
+> > ... so as far as I can see it's the presence of any inline assembly that
+> > the tool cannot handle, as LLVM tells us.
 
->  				fixed-link {
->  					speed = <1000>;
->  					full-duplex;
-> @@ -159,6 +166,10 @@
->  				status = "okay";
->  			};
->  
-> +			bm at c8000 {
-> +				status = "okay";
-> +			};
-> +
->  			/* USB part of the eSATA/USB 2.0 port */
->  			usb at 58000 {
->  				status = "okay";
-> @@ -241,6 +252,10 @@
->  			};
->  		};
->  
-> +		bm-bppi {
-> +			status = "okay";
-> +		};
-> +
->  		pcie-controller {
->  			status = "okay";
->  
-> diff --git a/arch/arm/boot/dts/armada-xp-linksys-mamba.dts b/arch/arm/boot/dts/armada-xp-linksys-mamba.dts
-> index 3744ba3..b188a4dc 100644
-> --- a/arch/arm/boot/dts/armada-xp-linksys-mamba.dts
-> +++ b/arch/arm/boot/dts/armada-xp-linksys-mamba.dts
-> @@ -71,7 +71,8 @@
->  		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xf1000000 0x100000
->  			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000
->  			  MBUS_ID(0x09, 0x09) 0 0 0xf1100000 0x10000
-> -			  MBUS_ID(0x09, 0x05) 0 0 0xf1110000 0x10000>;
-> +			  MBUS_ID(0x09, 0x05) 0 0 0xf1110000 0x10000
-> +			  MBUS_ID(0x0c, 0x04) 0 0 0xf1200000 0x100000>;
->  
->  		internal-regs {
->  
-> @@ -95,6 +96,9 @@
->  				pinctrl-names = "default";
->  				status = "okay";
->  				phy-mode = "rgmii-id";
-> +				buffer-manager = <&bm>;
-> +				bm,pool-long = <0>;
-> +				bm,pool-short = <3>;
->  				fixed-link {
->  					speed = <1000>;
->  					full-duplex;
-> @@ -106,6 +110,9 @@
->  				pinctrl-names = "default";
->  				status = "okay";
->  				phy-mode = "rgmii-id";
-> +				buffer-manager = <&bm>;
-> +				bm,pool-long = <1>;
-> +				bm,pool-short = <3>;
-Same question that above.
+> > So why isn't this a problem on other architectures? They're going to
+> > have equivalent inline asm getting pulled in, and these samples
+> > presumably compiled on at least on architecture in the past.
 
-Gregory
+> As far as I can tell (hoping my regex is proper), x86 doesn't have any
+> inline assembly that introduces macros like this in any h-files.
 
->  				fixed-link {
->  					speed = <1000>;
->  					full-duplex;
-> @@ -186,6 +193,10 @@
->  				};
->  			};
->  
-> +			bm at c8000 {
-> +				status = "okay";
-> +			};
-> +
->  			nand at d0000 {
->  				status = "okay";
->  				num-cs = <1>;
-> @@ -259,6 +270,10 @@
->  				};
->  			};
->  		};
-> +
-> +		bm-bppi {
-> +			status = "okay";
-> +		};
->  	};
->  
->  	gpio_keys {
-> -- 
-> 2.10.2
->
+Just to be clear, is the error quoted above at all relevant here?
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+The error is for an asm statement which does not use assembly macros, in
+a different file.
+
+In the error message, LLVM explicitly states that it does not have a
+parser for this target's assembly -- which would be a problem for *any*
+inline assembly.
+
+How does that specific error relate to the use of assembly macros within
+sysreg.h?
+
+... has the wrong error been quoted above?
+
+... does LLVM dump a misleading error message after seeing an assembly
+macro (which it presumably can't handle)?
+
+Thanks,
+Mark.
