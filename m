@@ -1,91 +1,96 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Wed, 15 Mar 2017 14:35:42 +0100
-Subject: [PATCH 3/3] kvm: arm/arm64: Fix locking for kvm_free_stage2_pgd
-In-Reply-To: <0e5ff7f7-855c-ea28-fdee-73c062c3d289@arm.com>
-References: <1489503154-20705-1-git-send-email-suzuki.poulose@arm.com>
- <1489503154-20705-4-git-send-email-suzuki.poulose@arm.com>
- <20170315092147.GM1277@cbox>
- <314fbde3-17e6-414b-85e6-326de22bdc1c@arm.com>
- <20170315105639.GA31974@cbox>
- <0e5ff7f7-855c-ea28-fdee-73c062c3d289@arm.com>
-Message-ID: <20170315133542.GP1277@cbox>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Wed, 15 Mar 2017 14:36:27 +0100
+Subject: [PATCH] tty/serial: atmel_serial: BUG: stop DMA from transmitting
+ in stop_tx
+In-Reply-To: <c5c0cdcf-d4da-a8c0-4161-85535ecf88ec@atmel.com>
+References: <20161213162756.16139-1-richard.genoud@gmail.com>
+ <c5c0cdcf-d4da-a8c0-4161-85535ecf88ec@atmel.com>
+Message-ID: <CACQ1gAgW4aGJSxSAXDWL7td9eV12UV=Xv=PZR58BqqHxEeRH0g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 15, 2017 at 01:28:07PM +0000, Marc Zyngier wrote:
-> On 15/03/17 10:56, Christoffer Dall wrote:
-> > On Wed, Mar 15, 2017 at 09:39:26AM +0000, Marc Zyngier wrote:
-> >> On 15/03/17 09:21, Christoffer Dall wrote:
-> >>> On Tue, Mar 14, 2017 at 02:52:34PM +0000, Suzuki K Poulose wrote:
-> >>>> In kvm_free_stage2_pgd() we don't hold the kvm->mmu_lock while calling
-> >>>> unmap_stage2_range() on the entire memory range for the guest. This could
-> >>>> cause problems with other callers (e.g, munmap on a memslot) trying to
-> >>>> unmap a range.
-> >>>>
-> >>>> Fixes: commit d5d8184d35c9 ("KVM: ARM: Memory virtualization setup")
-> >>>> Cc: stable at vger.kernel.org # v3.10+
-> >>>> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> >>>> Cc: Christoffer Dall <christoffer.dall@linaro.org>
-> >>>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> >>>> ---
-> >>>>  arch/arm/kvm/mmu.c | 3 +++
-> >>>>  1 file changed, 3 insertions(+)
-> >>>>
-> >>>> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-> >>>> index 13b9c1f..b361f71 100644
-> >>>> --- a/arch/arm/kvm/mmu.c
-> >>>> +++ b/arch/arm/kvm/mmu.c
-> >>>> @@ -831,7 +831,10 @@ void kvm_free_stage2_pgd(struct kvm *kvm)
-> >>>>  	if (kvm->arch.pgd == NULL)
-> >>>>  		return;
-> >>>>  
-> >>>> +	spin_lock(&kvm->mmu_lock);
-> >>>>  	unmap_stage2_range(kvm, 0, KVM_PHYS_SIZE);
-> >>>> +	spin_unlock(&kvm->mmu_lock);
-> >>>> +
-> >>>
-> >>> This ends up holding the spin lock for potentially quite a while, where
-> >>> we can do things like __flush_dcache_area(), which I think can fault.
-> >>
-> >> I believe we're always using the linear mapping (or kmap on 32bit) in
-> >> order not to fault.
-> >>
-> > 
-> > ok, then there's just the concern that we may be holding a spinlock for
-> > a very long time.  I seem to recall Mario once added something where he
-> > unlocked and gave a chance to schedule something else for each PUD or
-> > something like that, because he ran into the issue during migration.  Am
-> > I confusing this with something else?
-> 
-> That definitely rings a bell: stage2_wp_range() uses that kind of trick
-> to give the system a chance to breathe. Maybe we could use a similar
-> trick in our S2 unmapping code? How about this (completely untested) patch:
-> 
-> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-> index 962616fd4ddd..1786c24212d4 100644
-> --- a/arch/arm/kvm/mmu.c
-> +++ b/arch/arm/kvm/mmu.c
-> @@ -292,8 +292,13 @@ static void unmap_stage2_range(struct kvm *kvm, phys_addr_t start, u64 size)
->  	phys_addr_t addr = start, end = start + size;
->  	phys_addr_t next;
->  
-> +	BUG_ON(!spin_is_locked(&kvm->mmu_lock));
-> +
->  	pgd = kvm->arch.pgd + stage2_pgd_index(addr);
->  	do {
-> +		if (need_resched() || spin_needbreak(&kvm->mmu_lock))
-> +			cond_resched_lock(&kvm->mmu_lock);
-> +
->  		next = stage2_pgd_addr_end(addr, end);
->  		if (!stage2_pgd_none(*pgd))
->  			unmap_stage2_puds(kvm, pgd, addr, next);
-> 
-> The additional BUG_ON() is just for my own peace of mind - we seem to
-> have missed a couple of these lately, and the "breathing" code makes
-> it imperative that this lock is being taken prior to entering the
-> function.
-> 
+2017-03-15 12:37 GMT+01:00 Nicolas Ferre <nicolas.ferre@atmel.com>:
+> Le 13/12/2016 ? 17:27, Richard Genoud a ?crit :
+>> If we don't disable the transmitter in atmel_stop_tx, the DMA buffer
+>> continues to send data until it is emptied.
+>> This cause problems with the flow control (CTS is asserted and data are
+>> still sent).
+>>
+>> So, disabling the transmitter in atmel_stop_tx is a sane thing to do.
+>>
+>> Tested on at91sam9g35-cm(DMA)
+>> Tested for regressions on sama5d2-xplained(Fifo) and at91sam9g20ek(PDC)
+>>
+>> Cc: <stable@vger.kernel.org> (beware, this won't apply before 4.3)
+>> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
+>> ---
+>>  drivers/tty/serial/atmel_serial.c | 11 +++++++++++
+>>  1 file changed, 11 insertions(+)
+>>
+>> NB: this is not for the 4.10 merge window, I'm just sending it now to
+>> have some comments if someone is againts it.
+>>
+>> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+>> index 168b10cad47b..f9d42de5ab2d 100644
+>> --- a/drivers/tty/serial/atmel_serial.c
+>> +++ b/drivers/tty/serial/atmel_serial.c
+>> @@ -481,6 +481,14 @@ static void atmel_stop_tx(struct uart_port *port)
+>>               /* disable PDC transmit */
+>>               atmel_uart_writel(port, ATMEL_PDC_PTCR, ATMEL_PDC_TXTDIS);
+>>       }
+>> +
+>> +     /*
+>> +      * Disable the transmitter.
+>> +      * This is mandatory when DMA is used, otherwise the DMA buffer
+>> +      * is fully transmitted.
+>> +      */
+>> +     atmel_uart_writel(port, ATMEL_US_CR, ATMEL_US_TXDIS);
+>> +
+>>       /* Disable interrupts */
+>>       atmel_uart_writel(port, ATMEL_US_IDR, atmel_port->tx_done_mask);
+>>
+>> @@ -513,6 +521,9 @@ static void atmel_start_tx(struct uart_port *port)
+>>
+>>       /* Enable interrupts */
+>>       atmel_uart_writel(port, ATMEL_US_IER, atmel_port->tx_done_mask);
+>> +
+>> +     /* re-enable the transmitter */
+>> +     atmel_uart_writel(port, ATMEL_US_CR, ATMEL_US_TXEN);
+>>  }
+>>
+>>  /*
+>
+> Hi Richard,
+Hi !
+>
+> I've just discovered that I have some weird behavior with this patch. On
+> current Linus' tree, with sama5d2 + DMA, I see some garbage characters
+> coming out of the console when I try to stop my system (reboot/halt) [1].
+Yes, I've also seen that on my board, it was on my todo list.
+(Although I didn't know this patch was the culprit !)
 
-Looks good to me!
+>
+> Moreover, and I do understand that it's not the problem right here, when
+> applied on our linux-4.4-at91 branch (our vendor tree actually), it
+> hangs the boot process as it seems that a burst of open/close of the
+> serial port happens while starting the rootfs. It's definitively my own
+> problem, but it can bring light to what we are seeing on Mainline...
+a?e !
+This is clearly something we'll have to understand !
 
--Christoffer
+> I think that we may need to flush the DMA channel in this
+> atmel_stop_tx() function.
+>
+yes, I'll look into that.
+
+> Best regards,
+>
+> [1] If you want to test, you need to apply this patch for eMMC BTW:
+> https://patchwork.kernel.org/patch/9617489/
+>
+> --
+> Nicolas Ferre
+
+Thanks !
+
+Richard.
