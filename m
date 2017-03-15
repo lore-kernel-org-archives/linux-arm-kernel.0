@@ -1,88 +1,90 @@
-From: huziji@marvell.com (Ziji Hu)
-Date: Wed, 15 Mar 2017 21:58:43 +0800
-Subject: [PATCH v6 08/14] mmc: sdhci-xenon: Add Marvell Xenon SDHC core
- functionality
-In-Reply-To: <CAPDyKFpH+RGAZGoVCuCOKJ2iEa+Y=cNNcM-uKhkYaTpmogXCKA@mail.gmail.com>
-References: <cover.ff78bebe0384f650a51e5e6f0f1dca6e7894b53b.1487091464.git-series.gregory.clement@free-electrons.com>
- <cb885ae19e7c467908cdaa1f1cc8d95a7217d663.1487091464.git-series.gregory.clement@free-electrons.com>
- <CAPDyKFpH+RGAZGoVCuCOKJ2iEa+Y=cNNcM-uKhkYaTpmogXCKA@mail.gmail.com>
-Message-ID: <10855817-e693-e007-9499-c4e97936fadb@marvell.com>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Wed, 15 Mar 2017 22:05:21 +0800
+Subject: [PATCH v2 05/12] Document: dt: binding: imx: update pinctrl doc
+ for imx6sll
+In-Reply-To: <CACRpkdaLq125bKQcpHeFn312omxw9jp0VHr9DVanj42Y_29+mg@mail.gmail.com>
+References: <1482832070-22668-1-git-send-email-ping.bai@nxp.com>
+ <1482832070-22668-6-git-send-email-ping.bai@nxp.com>
+ <CACRpkdYUME8K+JusA0ORRKqxyBuhDdyei8eg7UZbHidKw9=bQw@mail.gmail.com>
+ <CAA+hA=TL=Ys6j7YGOofAqrEGBcR15szvx3mMf-Dm03rnEa_VRA@mail.gmail.com>
+ <CACRpkdaLq125bKQcpHeFn312omxw9jp0VHr9DVanj42Y_29+mg@mail.gmail.com>
+Message-ID: <CAA+hA=Rtw-4-SCf8svFq3E9TKv3zBD9T=nPhF7=3qEoH9k4wsA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ulf,
+Hi Linus,
 
-On 2017/3/15 21:11, Ulf Hansson wrote:
-> On 14 February 2017 at 18:01, Gregory CLEMENT
-> <gregory.clement@free-electrons.com> wrote:
->> From: Hu Ziji <huziji@marvell.com>
-<snip>
->> +config MMC_SDHCI_XENON
->> +       tristate "Marvell Xenon eMMC/SD/SDIO SDHCI driver"
->> +       depends on MMC_SDHCI_PLTFM
->> +       help
->> +         This selects Marvell Xenon eMMC/SD/SDIO SDHCI.
->> +         If you have a machine with integrated Marvell Xenon SDHC IP,
-> 
-> /s/SDHC/SDHCI
-> 
+On Tue, Mar 14, 2017 at 9:54 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Thu, Feb 16, 2017 at 8:51 AM, Dong Aisheng <dongas86@gmail.com> wrote:
+>> On Tue, Dec 27, 2016 at 8:59 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+>
+>>> I would consider augmenting the code in the driver to handle the generic
+>>> bindings *in addition* to the old legacy bindings, and use those over these
+>>> random custom bits.
+> (...)
+>> Generic binding only supports parsing strings for pins and function
+>> from dts right now, that means we need back to the old way of hardcoding
+>> all register bits in driver which we actually chose to move out since
+>> the commit "e164153 pinctrl: imx: move hard-coding data into device tree".
+>
+> Aha I see.
+>
+>> One option is using macro definitions instead of raw data as pinctrl-single
+>> users as OMAP.
+>> e.g.
+>> art2_pins: pinmux_uart2_pins {
+>>         pinctrl-single,pins = <
+>>                 OMAP4_IOPAD(0x118, PIN_INPUT_PULLUP | MUX_MODE0)
+>>  /* uart2_cts.uart2_cts */
+>>         ........
+>>
+>> For this way, no driver changes required, just replace the raw data by macro
+>> in device tree. But i wonder this may not be your original intention although
+>> it's the easiest way for us.
+>> Anyway, if you agree, we probably would prefer this way.
+>
+> That make it look better than it looks today, but...
+>
+>> Another option is partially convert to generic binding for only pad
+>> configuration
+>> part. e.g.
+>> pinctrl_usdhc1: usdhc1grp {
+>>         fsl,pins = <
+>>                 MX7D_PAD_SD1_CMD__SD1_CMD
+>>                 MX7D_PAD_SD1_CLK__SD1_CLK
+>>                 MX7D_PAD_SD1_DATA0__SD1_DATA0
+>>                 ...
+>>         >;
+>>         bias-pull-up = <47KOHM>;
+>>         drive-strength = <130OHM>;
+>>         slew-rate = <FAST>;
+>>         speed = <50MHZ>;
+>>         ....
+>> };
+>> (Some of the property still not supported or not the same as generic
+>> binding right now)
+>
+> This looks totally awesome, so if you could do this, it would be even
+> better.
+>
+>> This way requires no big drivers changes and only extend the driver
+>> to support the generic pinctrl dt configuration properties.
+>
+> Yep, you should be able to support both the old and the new
+> way of configuring the pins this way I guess.
+>
+>> And it also fix the raw data issues and looks like more applicable than the full
+>> migration.
+>>
+>> So would you be willing to accept it?
+>
+> Anything that move us closer to the generic bindings will be accepted.
+>
 
-	Sorry. I don't get your point.
-	Could you please give more detailed comments?
+It's good to get an alignment with you.
+We will start to do that.
 
->> +         say Y or M here.
->> +         If unsure, say N.
->> diff --git a/drivers/mmc/host/Makefile b/drivers/mmc/host/Makefile
->> index ccc9c4cba154..b0a2ab4b256e 100644
->> --- a/drivers/mmc/host/Makefile
->> +++ b/drivers/mmc/host/Makefile
->> @@ -82,3 +82,6 @@ obj-$(CONFIG_MMC_SDHCI_BRCMSTB)               += sdhci-brcmstb.o
->>  ifeq ($(CONFIG_CB710_DEBUG),y)
->>         CFLAGS-cb710-mmc        += -DDEBUG
->>  endif
->> +
->> +obj-$(CONFIG_MMC_SDHCI_XENON)  += sdhci-xenon-driver.o
->> +sdhci-xenon-driver-y           += sdhci-xenon.o
-> 
-> Why not only this:
-> obj-$(CONFIG_MMC_SDHCI_XENON) += sdhci-xenon.o
-> 
+Thanks
 
-	Yes. Will try.
-
->> diff --git a/drivers/mmc/host/sdhci-xenon.c b/drivers/mmc/host/sdhci-xenon.c
->> new file mode 100644
-<snip>
-> 
-> ff --git a/drivers/mmc/host/sdhci-xenon.h b/drivers/mmc/host/sdhci-xenon.h
->> new file mode 100644
->> index 000000000000..69de711db9eb
->> --- /dev/null
->> +++ b/drivers/mmc/host/sdhci-xenon.h
-> 
-> You should probably put all this in the c-file instead. That is how
-> most other sdhci variants does it.
-> 
-
-	Unfortunately, we have some registers like XENON_SLOT_EMMC_CTRL
-	which are accessed by both sdhci-xenon.c and sdhci-xenon-phy.c
-
-> [...]
-> 
-> Overall this looks good to me, however I think Adrian needs to have a
-> quick look as well.
-> 
-> One additional very minor nitpick. Perhaps you can align on the
-> function names prefix, as those currently varies between "whatever",
-> "xenon_" and "sdhci_xenon_".
-> 
-	Sure. Will fix them as you request.
-
-	Thank you.
-
-Best regards,
-Hu Ziji
-
-> Kind regards
-> Uffe
-> 
+Regards
+Dong Aisheng
