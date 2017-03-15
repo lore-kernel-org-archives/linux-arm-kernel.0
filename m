@@ -1,75 +1,124 @@
-From: dwmw2@infradead.org (David Woodhouse)
-Date: Wed, 15 Mar 2017 20:42:20 +0000
-Subject: [PATCH v2 1/4] arm64: enable pci resource mapping using sysfs
-Message-ID: <1489610540.86622.19.camel@infradead.org>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Wed, 15 Mar 2017 14:41:59 -0600
+Subject: [v3 3/5] coresight: add support for debug module
+In-Reply-To: <516f8989-4dde-2686-d549-0761feb14d1b@arm.com>
+References: <1488520809-31670-4-git-send-email-leo.yan@linaro.org>
+ <011fdac0-59bf-b539-2de3-0b59a41bc922@arm.com>
+ <20170309175915.GA964@leoy-linaro>
+ <3f27efee-3b63-81fd-eb96-73fd7e6f5e92@arm.com>
+ <20170313165600.GB32431@linaro.org>
+ <516f8989-4dde-2686-d549-0761feb14d1b@arm.com>
+Message-ID: <CANLsYkzJsGvr4ZzNbTwcPu1Qki6=Szvu+bMjHZ_rza==DqFChw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Brijesh Singh <brijess@amazon.com>
+On 15 March 2017 at 10:44, Suzuki K Poulose <Suzuki.Poulose@arm.com> wrote:
+> On 13/03/17 16:56, Mathieu Poirier wrote:
+>>
+>> On Fri, Mar 10, 2017 at 02:29:53PM +0000, Suzuki K Poulose wrote:
+>>>>>>
+>>>>>> +
+>>>>>> +       put_online_cpus();
+>>>>>> +
+>>>>>> +       if (!debug_count++)
+>>>>>> +               atomic_notifier_chain_register(&panic_notifier_list,
+>>>>>> +                                              &debug_notifier);
+>>>>>> +
+>>>>>
+>>>>>
+>>>>>> +       sprintf(buf, (char *)id->data, drvdata->cpu);
+>>>>>> +       dev_info(dev, "%s initialized\n", buf);
+>>>>>
+>>>>>
+>>>>> This could simply be :
+>>>>>         dev_info(dev, "Coresight debug-CPU%d initialized\n",
+>>>>> drvdata->cpu);
+>>>>>
+>>>>> and get rid of the static string and the buffer, see below.
+>>>
+>>>
+>>> Also we need pm_runtime_put() here to balance the pm_runtime_get_ from
+>>> AMBA
+>>> device probe.
+>>
+>>
+>> Good point.
+>>
+>>> More on that below.
+>>>
+>>>>>
+>>>>>> +       return 0;
+>>>>>> +}
+>>>>>> +
+>>>>>> +static struct amba_id debug_ids[] = {
+>>>>>> +       {       /* Debug for Cortex-A53 */
+>>>>>> +               .id     = 0x000bbd03,
+>>>>>> +               .mask   = 0x000fffff,
+>>>>>
+>>>>>
+>>>>> ...
+>>>>>
+>>>>>> +               .data   = "Coresight debug-CPU%d",
+>>>>>
+>>>>>
+>>>>> I think this is pointless, as the debug area we are interested in is
+>>>>> always associated
+>>>>> with a CPU, we could as well figure out what to print from the
+>>>>> drvdata->cpu above.
+>>>>
+>>>>
+>>>> I prefer to follow your suggestion for upper two comments; but I'd like
+>>>> check with Mathieu, due I followed up Mathieu's suggestion to write
+>>>> current code.
+>>>
+>>>
+>>> Btw, I don't see any PM calls to make sure the power domain (at least the
+>>> debug domain)
+>>> is up, which could cause problems with accesses to some of these
+>>> registers (leave alone the
+>>> ones in CPU power domain), especially the EDPRSR. We could also do
+>>> pm_runtime_get on the
+>>> CPU's power domain, if the CPU is online, before we access the pcsr.
+>>
+>>
+>> I thought about PM runtime operations a little while back but wondered if
+>> it is
+>> really a good thing to have them around.  When this code is called the
+>> system
+>> has crashed and as such making PM runtimes call isn't a good idea.
+>
+>
+> You are right. It is not safe to make such calls when we have crashed.
+> The other side effect is, if we don't have the debug power domain up,
+> we could possibly hang the system and prevent other registered notifiers
+> from running, which doesn't sound good either.
+>
+>>
+>> One thing we could do is _not_ call pm_runtime_put() at the end of the
+>> probe()
+>> operation.  That way we wouldn't have to mess around with PM runtime
+>> operations
+>> on an unstable system.  This, of course, is costly in terms of power
+>> consumption
+>> but the system is under test/debug anyway.
+>
+>
+> May be control the behavior via kernel command line ? Something like
+> coresight_debug={on or 1} or
+> even use the "nohlt" ?
 
-To support PCI resource mapping from userspace, pci_mmap_page_range()
-must be implemented and HAVE_PCI_MMAP defined. This support was absent
-for arm64.
+We need to deal with the debug and CPU power domains.
 
-[dwmw2: Add WC support]
-Reviewed-by: Erik Quanstrom <quanstro@amazon.com>
-Reviewed-by: Anthony Liguori <aliguori@amazon.com>
-Signed-off-by: Brijesh Singh <brijess@amazon.com>
-Signed-off-by: David Woodhouse <dwmw@amazon.co.uk>
----
-v2: s/pgprot_uncached/pgprot_device/
+For the former I suggest we do what coresight does and use the
+"power-domains" binding[1].  For the CPU power domain we can re-use
+the "nohlt" flag.  In the probe function if the "nohlt" cmd line flag
+is not set the code bails out.  If it is set pm_runtime_put() is _not_
+called and the driver can be used without worries of hanging the
+system when the panic handler is invoked.
 
- arch/arm64/include/asm/pci.h |  4 ++++
- arch/arm64/kernel/pci.c      | 19 +++++++++++++++++++
- 2 files changed, 23 insertions(+)
+Am I forgetting something?
 
-diff --git a/arch/arm64/include/asm/pci.h b/arch/arm64/include/asm/pci.h
-index b9a7ba9..f73734f 100644
---- a/arch/arm64/include/asm/pci.h
-+++ b/arch/arm64/include/asm/pci.h
-@@ -37,5 +37,9 @@ static inline int pci_proc_domain(struct pci_bus *bus)
- }
- #endif  /* CONFIG_PCI */
- 
-+#define HAVE_PCI_MMAP
-+extern int pci_mmap_page_range(struct pci_dev *dev, struct vm_area_struct *vma,
-+			       enum pci_mmap_state mmap_state, int write_combine);
-+
- #endif  /* __KERNEL__ */
- #endif  /* __ASM_PCI_H */
-diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
-index 4f0e3eb..9a87b2a 100644
---- a/arch/arm64/kernel/pci.c
-+++ b/arch/arm64/kernel/pci.c
-@@ -228,3 +228,22 @@ void pcibios_remove_bus(struct pci_bus *bus)
- }
- 
- #endif
-+
-+int pci_mmap_page_range(struct pci_dev *dev, struct vm_area_struct *vma,
-+			enum pci_mmap_state mmap_state, int write_combine)
-+{
-+	if (mmap_state == pci_mmap_io)
-+		return -EINVAL;
-+
-+	if (write_combine)
-+		vma->vm_page_prot = pgprot_writecombine(vma->vm_page_prot);
-+	else
-+		vma->vm_page_prot = pgprot_device(vma->vm_page_prot);
-+
-+	if (remap_pfn_range(vma, vma->vm_start, vma->vm_pgoff,
-+			     vma->vm_end - vma->vm_start,
-+			     vma->vm_page_prot))
-+		return -EAGAIN;
-+
-+	return 0;
-+}
--- 
-dwmw2
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: smime.p7s
-Type: application/x-pkcs7-signature
-Size: 4938 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170315/21eba039/attachment-0001.bin>
+[1]. http://lxr.free-electrons.com/source/arch/arm64/boot/dts/arm/juno-base.dtsi#L137
+
+>
+> Suzuki
