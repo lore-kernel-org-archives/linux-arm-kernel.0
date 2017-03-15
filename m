@@ -1,60 +1,59 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 15 Mar 2017 10:22:01 -0700
-Subject: [PATCH] ARM: omap2+: Revert omap-smp.c changes resetting CPU1
- during boot
-In-Reply-To: <20170314181425.GF20572@atomide.com>
-References: <20170313205231.1593-1-tony@atomide.com>
- <0bade322-5bee-412f-ef21-972c99846e84@ti.com>
- <20170314151725.GC20572@atomide.com>
- <d0fe191f-66f8-b72d-0a2a-00815e663a8d@ti.com>
- <20170314164106.GE20572@atomide.com>
- <ea09d676-29f6-7100-4c68-88920deaeb7c@ti.com>
- <20170314181425.GF20572@atomide.com>
-Message-ID: <20170315172200.GM20572@atomide.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Wed, 15 Mar 2017 18:23:27 +0100
+Subject: [PATCH v3] drm/rockchip: Refactor the component match logic.
+In-Reply-To: <19101003.9xjQ92OS5C@phil>
+References: <1489573247-9628-1-git-send-email-jeffy.chen@rock-chips.com>
+ <19101003.9xjQ92OS5C@phil>
+Message-ID: <2110531.OeyX13mlk5@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [170314 11:16]:
-> * Andrew F. Davis <afd@ti.com> [170314 10:59]:
-> Then onto the other related patches..
-> 
-> > We re-park cpu1 in bootROM in U-Boot already, in the U-Boot tree:
-> > arch/arm/mach-omap2/omap5/sec_entry_cpu1.S
-> 
-> OK good to hear.
-> 
-> > omap_smc_sec_cpu1() wakes up cpu1 into the function cpu1_entry(), this
-> > makes an SMC call to setup the core, then re-parks itself back in bootROM.
-> > Relevant code to run on cpu1:
+Am Mittwoch, 15. M?rz 2017, 18:00:04 CET schrieb Heiko Stuebner:
+> Am Mittwoch, 15. M?rz 2017, 18:20:47 CET schrieb Jeffy Chen:
+> > Currently we are adding all components from the dts, if one of their
+> > drivers been disabled, we would not be able to bring up others.
 > > 
-> > > #define AUX_CORE_BOOT_0		0x48281800
-> > > #define AUX_CORE_BOOT_1		0x48281804
-> > > /* DRA7xx ROM code function "startup_BootSlave". This function is where CPU1
-> > >  * waits on WFE, polling on AUX_CORE_BOOT_x registers.
-> > >  * This address is same for J6 and J6 Eco.
-> > >  */
-> > > #define ROM_FXN_STARTUP_BOOTSLAVE     0x00038a64
-> > >
-> > > ldr	r4, =AUX_CORE_BOOT_0
-> > > mov	r5, #0x0
-> > > str	r5, [r4]
-> > > ldr	r4, =ROM_FXN_STARTUP_BOOTSLAVE
-> > > bx	r4	@ Jump back to ROM
+> > Refactor component match logic, follow exynos drm.
 > > 
-> > We would have to do this in kernel. The issue I'm thinking we are going
-> > to hit is that the parking function in bootROM expects the MMU to be
-> > off. Although we don't really need to turn it off as long as we can
-> > identity map the bootROM area, the AUX_CORE_BOOT_0/1 space, and wherever
-> > we plan to exit the parking loop.
+> > Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+> > Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
 > 
-> Would be good to hear what Russell thinks we should do here to park
-> CPU1.
+> This reliably produces null pointer dereference errors in
+> 	__platform_driver_register called from rockchip_drm_init
+> on at least rk3036 and rk3288 (probably more) when applied on top of
+> Linus' tree from today. Log attached and Rockchip drm compiled as module.
+> 
+> I'm currently dug into other areas, so hadn't have time to investigate
+> further yet.
 
-How about we introduce smp_park_secondary()?
+> +#define DRV_PTR(drv, cond) (IS_ENABLED(cond) ? &drv : NULL)
+> +
+> +static struct platform_driver *rockchip_drm_comp_drvs[] = {
+> +	&vop_platform_driver,
+> +	DRV_PTR(rockchip_dp_driver, CONFIG_ROCKCHIP_ANALOGIX_DP),
+> +	DRV_PTR(cdn_dp_driver, CONFIG_ROCKCHIP_CDN_DP),
+> +	DRV_PTR(dw_hdmi_rockchip_pltfm_driver, CONFIG_ROCKCHIP_DW_HDMI),
+> +	DRV_PTR(dw_mipi_dsi_driver, CONFIG_ROCKCHIP_DW_MIPI_DSI),
+> +	DRV_PTR(inno_hdmi_driver, CONFIG_ROCKCHIP_INNO_HDMI),
+> +};
 
-Then soft_restart() can call it between setup_mm_for_reboot()
-and cpu_proc_fin()?
+[...]
 
-Regards,
+> +static int rockchip_drm_register_drivers(void)
+> +{
+> +	int i, ret;
+> +
+> +	for (i = 0; i < ARRAY_SIZE(rockchip_drm_comp_drvs); i++) {
+> +		ret = platform_driver_register(rockchip_drm_comp_drvs[i]);
+> +		if (ret)
+> +			goto err_unreg;
+> +	}
 
-Tony
+This of course won't work in the NULL case, as platform_driver_register always 
+dereferences its parameter [0], so you should only call it for the actual non-
+null array elements - of course same for unregister.
+
+
+Heiko
+
+[0] http://lxr.free-electrons.com/source/drivers/base/platform.c#L617
