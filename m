@@ -1,38 +1,48 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 15 Mar 2017 14:12:39 +0100
-Subject: [RFC PATCH 0/4] pinctrl: rockchip: PREEMPT_RT_FULL fixes
-In-Reply-To: <20170313183813.3582-1-john@metanate.com>
-References: <20170313183813.3582-1-john@metanate.com>
-Message-ID: <CACRpkdZXBZr_Syur3r=3GTjjrCPx4bgj0g5iNSN6rdikqkww4w@mail.gmail.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Wed, 15 Mar 2017 15:15:28 +0200
+Subject: [PATCH v4 4/5] mfd: exynos-lpass: Use common soc/exynos-regs-pmu.h
+ header
+In-Reply-To: <20170315121212.p2xu64dzhrzmjbxv@dell>
+References: <20170314164653.15771-1-krzk@kernel.org>
+ <20170314164653.15771-5-krzk@kernel.org>
+ <20170315101007.xtnwz7mmkt446sgd@dell>
+ <CAJKOXPeFw-qRcznSvw-+ZYxObXTPjE4bRM37=sGf8aWbR31WEg@mail.gmail.com>
+ <20170315121212.p2xu64dzhrzmjbxv@dell>
+Message-ID: <CAJKOXPfZv5yVMHV2wQfgPp8Vy8aQvq_DartX_hPG5jG4U_Mn7g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 13, 2017 at 7:38 PM, John Keeping <john@metanate.com> wrote:
-
-> As described in Documentation/gpio/driver.txt, we should not be using
-> sleepable APIs in the irqchip implementation.  Since this includes the
-> regmap API, this patch series ends up moving the mux setup for IRQs into
-> an irq_bus_sync_unlock() handler which may result in the IRQ being
-> configured before the port has been muxed as a GPIO.
+On Wed, Mar 15, 2017 at 2:12 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> On Wed, 15 Mar 2017, Krzysztof Kozlowski wrote:
 >
-> I've marked the series as RFC because I'm not sure if this is the best
-> way to accomplish this or if there is another approach that is cleaner.
-> Also, the first patch may not be correct on RK3399 because I originally
-> wrote the patch for RK3288 on top of v4.4 where all drive updates only
-> affect a single register.  We don't need locking in this case because
-> regmap_update_bits() takes a lock on the regmap internally, but if these
-> two registers need to be updated atomically then another lock will
-> be required here - slock cannot be used if it is converted to a raw
-> spinlock since with full RT preemption the regmap's spinlock may sleep.
+>> On Wed, Mar 15, 2017 at 12:10 PM, Lee Jones <lee.jones@linaro.org> wrote:
+>> > On Tue, 14 Mar 2017, Krzysztof Kozlowski wrote:
+>> >
+>> >> The MFD-specific header will go away because it duplicates defines from
+>> >> exynos-regs-pmu.h.
+>> >>
+>> >> Reported-by: kbuild test robot <fengguang.wu@intel.com>
+>> >> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+>> >> Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+>> >> ---
+>> >>  drivers/mfd/exynos-lpass.c | 4 ++--
+>> >>  1 file changed, 2 insertions(+), 2 deletions(-)
+>> >
+>> > Applied, thanks.
+>>
+>> Hi,
+>>
+>> This is also needed for patch 5/5 in the set so I was wondering if
+>> this can be put on separate branch and then shared if phy maintainers
+>> would need it?
+>
+> What is the dependency?
 
-Nice work! It all looks good to me, let's see what Heiko says.
+This patch removes the last usage of define from header we want to
+remove (linux/mfd/syscon/exynos5-pmu.h). The next patch (5/5) removes
+the header as there are no more users.
 
-Please keep Julia Cartwright on the CC for this patch series, she is
-doing some coccinelle-based rewrites to use raw spinlocks as we
-speak, and she knows this stuff.
+BTW, I hope you got all the mails from this patchset including cover letter.
 
-She has not targeted the Rockchip driver yet, I guess because of
-its complexity.
-
-Yours,
-Linus Walleij
+Best regards,
+Krzysztof
