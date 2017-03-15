@@ -1,44 +1,107 @@
-From: mchehab@s-opensource.com (Mauro Carvalho Chehab)
-Date: Wed, 15 Mar 2017 09:43:21 -0300
-Subject: [PATCH] arm: install.sh: don't use /sbin/install if cross-compiling
-Message-ID: <ca1a7552e8c3705dbcb64ff3b2e6ad5616a1073a.1489581503.git.mchehab@s-opensource.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 15 Mar 2017 13:43:44 +0100
+Subject: [PATCH v6 03/14] mmc: core: Add mmc-card dt sub-node parse in
+ core layer
+In-Reply-To: <34e51d32c82b57571e061e80df3bbaed731db554.1487091464.git-series.gregory.clement@free-electrons.com>
+References: <cover.ff78bebe0384f650a51e5e6f0f1dca6e7894b53b.1487091464.git-series.gregory.clement@free-electrons.com>
+ <34e51d32c82b57571e061e80df3bbaed731db554.1487091464.git-series.gregory.clement@free-electrons.com>
+Message-ID: <CAPDyKFoqxMCSe-2bt2dz1AM_2X7dtVe4w6e7+oAQ==HO_=XKQw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It doesn't make sense to run the local machine's install
-script if the Kernel was built using a cross-compiler, as it
-will try to create symlinks at the rootfs on the local machine:
+On 14 February 2017 at 18:01, Gregory CLEMENT
+<gregory.clement@free-electrons.com> wrote:
+> From: Hu Ziji <huziji@marvell.com>
+>
+> Some vendor host, like Xenon, can support multiple types.
+> In dts, use mmc-card dt sub-node to indicate eMMC is in use.
+>
+> Add a generic mmc-card parse function in mmc core layer.
+> If mmc-card sub-node is detected, set eMMC common caps, such as
+> MMC_CAP_NONREMOVABLE, MMC_CAP2_NO_SD and MMC_CAP2_NO_SDIO.
+>
+> Since it is likely that struct mmc_card is not allocated yet when
+> this mmc-card parse function is called, it will return true if
+> mmc-card sub-node is detected. Otherwise, return false.
+> It can help vendor host determine if the card type is eMMC.
+>
+> Signed-off-by: Hu Ziji <huziji@marvell.com>
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> ---
+>  drivers/mmc/core/mmc.c   | 24 ++++++++++++++++++++++++
+>  include/linux/mmc/core.h |  2 ++
+>  2 files changed, 26 insertions(+)
+>
+> diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
+> index b61b52f9da3d..dc480006a303 100644
+> --- a/drivers/mmc/core/mmc.c
+> +++ b/drivers/mmc/core/mmc.c
+> @@ -2111,6 +2111,30 @@ static const struct mmc_bus_ops mmc_ops = {
+>  };
+>
+>  /*
+> + * Parse mmc-card dt sub-node and set eMMC common caps
+> + * if mmc-card exists.
+> + * If mmc-card is detected, return true.
+> + * Otherwise, return false.
+> + */
+> +bool mmc_of_parse_mmc_card(struct mmc_host *host)
+> +{
+> +       struct device_node *np;
+> +       bool ret = false;
+> +
+> +       np = mmc_of_find_child_device(host, 0);
 
-$ export ROOTDIR=/devel/arm_rootdir/
-$ make CROSS_COMPILE=arm-linux- ARCH=arm INSTALL_PATH=$ROOTDIR INSTALL_MOD_PATH=$ROOTDIR INSTALL_FW_PATH=$ROOTDIR INSTALL_HDR_PATH=$ROOTDIR zinstall
-/bin/sh ./arch/arm/boot/install.sh "4.11.0-rc1-00545-g940f6daec092-dirty" \
-arch/arm/boot/zImage System.map "/devel/arm_rootdir/"
-ln: failed to create symbolic link '/boot/System.map': Permission denied
-ln: failed to create symbolic link '/boot/vmlinuz': Permission denied
-ln: failed to create symbolic link '/boot/System.map': Permission denied
+There are already some places in the mmc core where child nodes are
+being parsed. You may have a look for mmc_of_find_child_device() and
+find the callers of it.
 
-Signed-off-by: Mauro Carvalho Chehab <mchehab@s-opensource.com>
----
- arch/arm/boot/install.sh | 7 +++++--
- 1 file changed, 5 insertions(+), 2 deletions(-)
+Additionally, we need a generic method of how to describe in DT, when
+an mmc host controller has more than one mmc slot. This will also be
+done using child nodes.
 
-diff --git a/arch/arm/boot/install.sh b/arch/arm/boot/install.sh
-index 2a45092a40e3..32f821df524d 100644
---- a/arch/arm/boot/install.sh
-+++ b/arch/arm/boot/install.sh
-@@ -35,8 +35,11 @@ verify "$2"
- verify "$3"
- 
- # User may have a custom install script
--if [ -x ~/bin/${INSTALLKERNEL} ]; then exec ~/bin/${INSTALLKERNEL} "$@"; fi
--if [ -x /sbin/${INSTALLKERNEL} ]; then exec /sbin/${INSTALLKERNEL} "$@"; fi
-+
-+if [ "x$CROSS_COMPILE" == "x" ]; then
-+  if [ -x ~/bin/${INSTALLKERNEL} ]; then exec ~/bin/${INSTALLKERNEL} "$@"; fi
-+  if [ -x /sbin/${INSTALLKERNEL} ]; then exec /sbin/${INSTALLKERNEL} "$@"; fi
-+fi
- 
- if [ "$(basename $2)" = "zImage" ]; then
- # Compressed install
--- 
-2.9.3
+So, before starting hacking on this, it seems like we need some
+consolidation of the code. In principle, I would like to move the APIs
+for parsing of the child nodes into host.c, along with existing
+mmc_of_parse() function.
+
+> +       if (np && of_device_is_compatible(np, "mmc-card")) {
+> +               /* mmc-card sub-node indicates eMMC card is in use. */
+> +               host->caps |= MMC_CAP_NONREMOVABLE;
+> +               host->caps2 |= MMC_CAP2_NO_SDIO | MMC_CAP2_NO_SD;
+> +               ret = true;
+> +       }
+> +
+
+So instead of providing a new mmc OF parse API, let's make
+mmc_of_parse() call another internal function which deals with child
+node parsing.
+
+> +       of_node_put(np);
+> +       return ret;
+> +}
+> +EXPORT_SYMBOL_GPL(mmc_of_parse_mmc_card);
+> +
+> +/*
+>   * Starting point for MMC card init.
+>   */
+>  int mmc_attach_mmc(struct mmc_host *host)
+> diff --git a/include/linux/mmc/core.h b/include/linux/mmc/core.h
+> index e33cc748dcfe..1b27323f3b6e 100644
+> --- a/include/linux/mmc/core.h
+> +++ b/include/linux/mmc/core.h
+> @@ -234,4 +234,6 @@ struct device_node;
+>  extern u32 mmc_vddrange_to_ocrmask(int vdd_min, int vdd_max);
+>  extern int mmc_of_parse_voltage(struct device_node *np, u32 *mask);
+>
+> +extern bool mmc_of_parse_mmc_card(struct mmc_host *host);
+> +
+>  #endif /* LINUX_MMC_CORE_H */
+> --
+> git-series 0.9.1
+
+If you didn't quite understand my comments, then please tell me. Then
+I can help out cooking some patches for you.
+
+Kind regards
+Uffe
