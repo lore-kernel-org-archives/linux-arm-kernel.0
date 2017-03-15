@@ -1,51 +1,48 @@
-From: slash.tmp@free.fr (Mason)
-Date: Wed, 15 Mar 2017 16:25:44 +0100
-Subject: Enumerating an empty bus hangs the entire system
-Message-ID: <1eeea8ff-0840-a005-38b4-61f3c253cee1@free.fr>
+From: nicolas.ferre@microchip.com (Nicolas Ferre)
+Date: Wed, 15 Mar 2017 16:29:48 +0100
+Subject: [RFC PATCH] tty/serial: atmel: fix TX path in atmel_console_write()
+In-Reply-To: <CACQ1gAgW4aGJSxSAXDWL7td9eV12UV=Xv=PZR58BqqHxEeRH0g@mail.gmail.com>
+References: <CACQ1gAgW4aGJSxSAXDWL7td9eV12UV=Xv=PZR58BqqHxEeRH0g@mail.gmail.com>
+Message-ID: <20170315152948.10978-1-nicolas.ferre@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+A side effect of 89d8232411a8 ("tty/serial: atmel_serial: BUG: stop DMA
+from transmitting in stop_tx") is that the console can be called with
+TX path disabled. Then the system would hang trying to push charecters
+out in atmel_console_putchar().
 
-My driver works reasonably well on revision 1 of the PCIe controller.
-(For lax enough values of "reasonably well"...)
+Signed-off-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+Fixes: 89d8232411a8 ("tty/serial: atmel_serial: BUG: stop DMA from transmitting
+in stop_tx")
+Cc: stable <stable@vger.kernel.org> # 4.4+
+---
+Hi Richard,
 
-So I wanted to try it out on revision 2 of the controller.
+I found this to fix the problem with system hang in my linux-4.4-at91 branch
+(in the atmel_console_putchar() waiting loop actually). I'm open to more
+insignt.
+As we cannot figure out if this bit is set or not, I didn't preserve the
+current status...
 
-Turns out the system hangs if I boot with no card inserted in the PCIe
-slot. (This does not happen on revision 1.) If I log all config space
-accesses, this is what I see:
+Regards,
 
-...
-[    2.966402] tango_config_read: bus=0 devfn=0 where=128 size=2
-[    2.972284] tango_config_read: bus=0 devfn=0 where=140 size=4
-[    2.978167] tango_config_read: bus=0 devfn=0 where=146 size=2
-[    2.984144] pci_bus 0000:01: busn_res: can not insert [bus 01-ff] under [bus 00-3f] (conflicts with (null) [bus 00-3f])
-[    2.995105] tango_config_write: bus=0 devfn=0 where=24 size=4 val=0xff0100
-[    3.002134] pci_bus 0000:01: scanning bus
-[    3.006274] tango_config_read: bus=1 devfn=0 where=0 size=4
+ drivers/tty/serial/atmel_serial.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-Basically, the PCI framework tries to read vendor and device IDs
-of the non-existent device on bus 1, which hangs the system,
-because the read never completes :-(
-
-I had the same problem with the legacy driver for 3.4 but I was
-hoping I would magically avoid it in a recent kernel.
-
-The only work-around I see is: assuming the first access to a
-bus will be to register 0, check the PHY for an active link
-before sending an actual read request to register 0.
-
-Is that reasonable?
-
-Is it compliant for the PCIe controller to hang like that,
-or should it handle some kind of time out?
-
-Liviu suggested: "The PCIe controller probably generates (or propagates)
-a bus abort that it should actually trap in HW.	Check if there is a SW
-configurable way to recover that."
-
-But I unmasked all system/misc errors, and I don't see any
-interrupts firing.
-
-Regards.
+diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+index dcebb28ffbc4..7372dbdb7a4c 100644
+--- a/drivers/tty/serial/atmel_serial.c
++++ b/drivers/tty/serial/atmel_serial.c
+@@ -2483,6 +2483,9 @@ static void atmel_console_write(struct console *co, const char *s, u_int count)
+ 	pdc_tx = atmel_uart_readl(port, ATMEL_PDC_PTSR) & ATMEL_PDC_TXTEN;
+ 	atmel_uart_writel(port, ATMEL_PDC_PTCR, ATMEL_PDC_TXTDIS);
+ 
++	/* Make sure that tx path is actually able to send characters */
++	atmel_uart_writel(port, ATMEL_US_CR, ATMEL_US_TXEN);
++
+ 	uart_console_write(port, s, count, atmel_console_putchar);
+ 
+ 	/*
+-- 
+2.9.0
