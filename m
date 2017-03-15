@@ -1,101 +1,82 @@
-From: marco.franchi@nxp.com (Marco Franchi)
-Date: Wed, 15 Mar 2017 13:43:58 -0300
-Subject: [PATCH] ARM: dts: imx7d-sdb: Add thermo 2 Click Board support
-Message-ID: <1489596238-31669-1-git-send-email-marco.franchi@nxp.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Wed, 15 Mar 2017 16:44:37 +0000
+Subject: [v3 3/5] coresight: add support for debug module
+In-Reply-To: <20170313165600.GB32431@linaro.org>
+References: <1488520809-31670-4-git-send-email-leo.yan@linaro.org>
+ <011fdac0-59bf-b539-2de3-0b59a41bc922@arm.com>
+ <20170309175915.GA964@leoy-linaro>
+ <3f27efee-3b63-81fd-eb96-73fd7e6f5e92@arm.com>
+ <20170313165600.GB32431@linaro.org>
+Message-ID: <516f8989-4dde-2686-d549-0761feb14d1b@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The imx7d-sdb has a mickro bus connector that can be connected to a
-Dallas Semiconductor Thermo 2 click board (DS1825 one wire temperature sensor):
+On 13/03/17 16:56, Mathieu Poirier wrote:
+> On Fri, Mar 10, 2017 at 02:29:53PM +0000, Suzuki K Poulose wrote:
+>>>>> +
+>>>>> +	put_online_cpus();
+>>>>> +
+>>>>> +	if (!debug_count++)
+>>>>> +		atomic_notifier_chain_register(&panic_notifier_list,
+>>>>> +					       &debug_notifier);
+>>>>> +
+>>>>
+>>>>> +	sprintf(buf, (char *)id->data, drvdata->cpu);
+>>>>> +	dev_info(dev, "%s initialized\n", buf);
+>>>>
+>>>> This could simply be :
+>>>> 	dev_info(dev, "Coresight debug-CPU%d initialized\n", drvdata->cpu);
+>>>>
+>>>> and get rid of the static string and the buffer, see below.
+>>
+>> Also we need pm_runtime_put() here to balance the pm_runtime_get_ from AMBA
+>> device probe.
+>
+> Good point.
+>
+>> More on that below.
+>>
+>>>>
+>>>>> +	return 0;
+>>>>> +}
+>>>>> +
+>>>>> +static struct amba_id debug_ids[] = {
+>>>>> +	{       /* Debug for Cortex-A53 */
+>>>>> +		.id	= 0x000bbd03,
+>>>>> +		.mask	= 0x000fffff,
+>>>>
+>>>> ...
+>>>>
+>>>>> +		.data   = "Coresight debug-CPU%d",
+>>>>
+>>>> I think this is pointless, as the debug area we are interested in is always associated
+>>>> with a CPU, we could as well figure out what to print from the drvdata->cpu above.
+>>>
+>>> I prefer to follow your suggestion for upper two comments; but I'd like
+>>> check with Mathieu, due I followed up Mathieu's suggestion to write
+>>> current code.
+>>
+>> Btw, I don't see any PM calls to make sure the power domain (at least the debug domain)
+>> is up, which could cause problems with accesses to some of these registers (leave alone the
+>> ones in CPU power domain), especially the EDPRSR. We could also do pm_runtime_get on the
+>> CPU's power domain, if the CPU is online, before we access the pcsr.
+>
+> I thought about PM runtime operations a little while back but wondered if it is
+> really a good thing to have them around.  When this code is called the system
+> has crashed and as such making PM runtimes call isn't a good idea.
 
-https://shop.mikroe.com/click/sensors/thermo-2
+You are right. It is not safe to make such calls when we have crashed.
+The other side effect is, if we don't have the debug power domain up,
+we could possibly hang the system and prevent other registered notifiers
+from running, which doesn't sound good either.
 
-Add a new device tree file to describe such hardware.
+>
+> One thing we could do is _not_ call pm_runtime_put() at the end of the probe()
+> operation.  That way we wouldn't have to mess around with PM runtime operations
+> on an unstable system.  This, of course, is costly in terms of power consumption
+> but the system is under test/debug anyway.
 
-Signed-off-by: Marco Franchi <marco.franchi@nxp.com>
----
- arch/arm/boot/dts/Makefile             |  1 +
- arch/arm/boot/dts/imx7d-sdb-ds1825.dts | 60 ++++++++++++++++++++++++++++++++++
- 2 files changed, 61 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx7d-sdb-ds1825.dts
+May be control the behavior via kernel command line ? Something like coresight_debug={on or 1} or
+even use the "nohlt" ?
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 7009856..d90c6c2 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -458,6 +458,7 @@ dtb-$(CONFIG_SOC_IMX7D) += \
- 	imx7d-nitrogen7.dtb \
- 	imx7d-sbc-imx7.dtb \
- 	imx7d-sdb.dtb \
-+	imx7d-sdb-ds1825.dtb \
- 	imx7d-sdb-sht11.dtb \
- 	imx7s-colibri-eval-v3.dtb \
- 	imx7s-warp.dtb
-diff --git a/arch/arm/boot/dts/imx7d-sdb-ds1825.dts b/arch/arm/boot/dts/imx7d-sdb-ds1825.dts
-new file mode 100644
-index 0000000..bd1cd20
---- /dev/null
-+++ b/arch/arm/boot/dts/imx7d-sdb-ds1825.dts
-@@ -0,0 +1,60 @@
-+/*
-+ * Copyright (C) 2015 Freescale Semiconductor, Inc.
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+#include "imx7d-sdb.dts"
-+
-+/ {
-+	onewire_device {
-+		compatible = "w1-gpio";
-+		gpios = <&gpio1 2 GPIO_ACTIVE_HIGH>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_w1>;
-+	};
-+};
-+
-+&iomuxc_lpsr {
-+	pinctrl_w1: w1grp {
-+    	fsl,pins = <
-+			MX7D_PAD_LPSR_GPIO1_IO02__GPIO1_IO2		0x14
-+		>;
-+    };
-+};
--- 
-2.7.4
+Suzuki
