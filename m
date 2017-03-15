@@ -1,47 +1,30 @@
-From: dwmw2@infradead.org (David Woodhouse)
-Date: Wed, 15 Mar 2017 19:18:16 +0000
-Subject: [PATCH 1/3] arm64: enable pci resource mapping using sysfs
-In-Reply-To: <20170315175353.GA29452@leverpostej>
-References: <1489598266.86622.12.camel@infradead.org>
- <20170315175353.GA29452@leverpostej>
-Message-ID: <1489605496.4195.182.camel@infradead.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 15 Mar 2017 19:35:30 +0000
+Subject: [PATCH v3 3/6] spi: davinci: use rx buffer as dummy tx buffer
+In-Reply-To: <1487872921-26628-4-git-send-email-fisaksen@baylibre.com>
+References: <1487872921-26628-1-git-send-email-fisaksen@baylibre.com>
+ <1487872921-26628-4-git-send-email-fisaksen@baylibre.com>
+Message-ID: <20170315193530.fjguqfb6vjd7kfey@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2017-03-15 at 17:54 +0000, Mark Rutland wrote:
-> It's not so much "broken" as "not currently supported".
+On Thu, Feb 23, 2017 at 07:01:58PM +0100, Frode Isaksen wrote:
+> When doing rx-only transfer, the transfer will fail
+> if the number of SG entries exceeds 20.
+> This happens because the eDMA DMA engine is limited
+> to 20 SG entries in one transaction, and when the
+> DMA transcation is resumed (which takes > 150us),
+> rx errors occurs because the slave is still transmitting.
+> Fix this by using the rx buffer as the dummy tx buffer,
+> so that resuming the rx transcation happens at the same
+> time as resuming the tx transcation.
 
-Yeah, I thought that when I inherited the commit, but didn't get as far
-as rephrasing it. Will do so.
-
-> [...]
-> 
-> > 
-> > +#define HAVE_PCI_MMAP
-> > +extern int pci_mmap_page_range(struct pci_dev *dev, struct vm_area_struct *vma,
-> > +			???????enum pci_mmap_state mmap_state, int write_combine);
-> > +
-> Per the prior attempt at this [1], we only want to expose the sysfs
-> interface, and not the legacy procfs interface, and need the two
-> decoupled [2].
-
-I do not like that idea. The procfs horridness is legacy, sure, but
-it's not actually an arch-specific interface. You get to mess with
-'legacy' syscalls all you like on a new architecture, but there could
-exist arch-agnostic code which uses the procfs interface, surely?
-
-> > +	if (write_combine)
-> > +		vma->vm_page_prot = pgprot_writecombine(vma->vm_page_prot);
-> > +	else
-> > +		vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
-> ... as per Will's comment in [3], the latter of these should use
-> pgprot_device.
-
-Will fix that; thanks.
+Please submit a followup patch adding a comment explaing what's going
+in the actual code as someone's going to clean this up at some point.
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: smime.p7s
-Type: application/x-pkcs7-signature
-Size: 4938 bytes
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170315/29227397/attachment-0001.bin>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170315/2cfc400d/attachment.sig>
