@@ -1,82 +1,95 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Wed, 15 Mar 2017 16:44:37 +0000
-Subject: [v3 3/5] coresight: add support for debug module
-In-Reply-To: <20170313165600.GB32431@linaro.org>
-References: <1488520809-31670-4-git-send-email-leo.yan@linaro.org>
- <011fdac0-59bf-b539-2de3-0b59a41bc922@arm.com>
- <20170309175915.GA964@leoy-linaro>
- <3f27efee-3b63-81fd-eb96-73fd7e6f5e92@arm.com>
- <20170313165600.GB32431@linaro.org>
-Message-ID: <516f8989-4dde-2686-d549-0761feb14d1b@arm.com>
+From: briannorris@chromium.org (Brian Norris)
+Date: Wed, 15 Mar 2017 09:47:29 -0700
+Subject: [PATCH 2/3] drm/rockchip/dsi: enable the grf clk before writing
+ grf registers
+In-Reply-To: <1489567352-3333-2-git-send-email-zyw@rock-chips.com>
+References: <1489567352-3333-1-git-send-email-zyw@rock-chips.com>
+ <1489567352-3333-2-git-send-email-zyw@rock-chips.com>
+Message-ID: <20170315164726.GA54312@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/03/17 16:56, Mathieu Poirier wrote:
-> On Fri, Mar 10, 2017 at 02:29:53PM +0000, Suzuki K Poulose wrote:
->>>>> +
->>>>> +	put_online_cpus();
->>>>> +
->>>>> +	if (!debug_count++)
->>>>> +		atomic_notifier_chain_register(&panic_notifier_list,
->>>>> +					       &debug_notifier);
->>>>> +
->>>>
->>>>> +	sprintf(buf, (char *)id->data, drvdata->cpu);
->>>>> +	dev_info(dev, "%s initialized\n", buf);
->>>>
->>>> This could simply be :
->>>> 	dev_info(dev, "Coresight debug-CPU%d initialized\n", drvdata->cpu);
->>>>
->>>> and get rid of the static string and the buffer, see below.
->>
->> Also we need pm_runtime_put() here to balance the pm_runtime_get_ from AMBA
->> device probe.
->
-> Good point.
->
->> More on that below.
->>
->>>>
->>>>> +	return 0;
->>>>> +}
->>>>> +
->>>>> +static struct amba_id debug_ids[] = {
->>>>> +	{       /* Debug for Cortex-A53 */
->>>>> +		.id	= 0x000bbd03,
->>>>> +		.mask	= 0x000fffff,
->>>>
->>>> ...
->>>>
->>>>> +		.data   = "Coresight debug-CPU%d",
->>>>
->>>> I think this is pointless, as the debug area we are interested in is always associated
->>>> with a CPU, we could as well figure out what to print from the drvdata->cpu above.
->>>
->>> I prefer to follow your suggestion for upper two comments; but I'd like
->>> check with Mathieu, due I followed up Mathieu's suggestion to write
->>> current code.
->>
->> Btw, I don't see any PM calls to make sure the power domain (at least the debug domain)
->> is up, which could cause problems with accesses to some of these registers (leave alone the
->> ones in CPU power domain), especially the EDPRSR. We could also do pm_runtime_get on the
->> CPU's power domain, if the CPU is online, before we access the pcsr.
->
-> I thought about PM runtime operations a little while back but wondered if it is
-> really a good thing to have them around.  When this code is called the system
-> has crashed and as such making PM runtimes call isn't a good idea.
+Hi Chris,
 
-You are right. It is not safe to make such calls when we have crashed.
-The other side effect is, if we don't have the debug power domain up,
-we could possibly hang the system and prevent other registered notifiers
-from running, which doesn't sound good either.
+On Wed, Mar 15, 2017 at 04:42:31PM +0800, Chris Zhong wrote:
+> For RK3399, the grf clk should be enabled before writing grf registers,
+> otherwise the register value can not be changed.
+> 
+> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+> ---
+> 
+>  drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 24 ++++++++++++++++++++++++
+>  1 file changed, 24 insertions(+)
+> 
+> diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> index f84f9ae..d8f24f2 100644
+> --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> @@ -291,6 +291,7 @@ struct dw_mipi_dsi {
+>  	struct regmap *grf_regmap;
+>  	void __iomem *base;
+>  
+> +	struct clk *grf_clk;
+>  	struct clk *pllref_clk;
+>  	struct clk *pclk;
+>  	struct clk *phy_cfg_clk;
+> @@ -979,6 +980,16 @@ static void dw_mipi_dsi_encoder_enable(struct drm_encoder *encoder)
+>  	dw_mipi_dsi_dphy_interface_config(dsi);
+>  	dw_mipi_dsi_clear_err(dsi);
+>  
+> +	/*
+> +	 * For the RK3399, the clk of grf must be enabled before writing grf
+> +	 * register.
+> +	 */
+> +	ret = clk_prepare_enable(dsi->grf_clk);
+> +	if (ret) {
+> +		dev_err(dsi->dev, "Failed to enable grf_clk\n");
+> +		return;
+> +	}
+> +
+>  	if (pdata->grf_dsi0_mode_reg)
+>  		regmap_write(dsi->grf_regmap, pdata->grf_dsi0_mode_reg,
+>  			     pdata->grf_dsi0_mode);
+> @@ -1003,6 +1014,8 @@ static void dw_mipi_dsi_encoder_enable(struct drm_encoder *encoder)
+>  	regmap_write(dsi->grf_regmap, pdata->grf_switch_reg, val);
+>  	dev_dbg(dsi->dev, "vop %s output to dsi0\n", (mux) ? "LIT" : "BIG");
+>  	dsi->dpms_mode = DRM_MODE_DPMS_ON;
+> +
+> +	clk_disable_unprepare(dsi->grf_clk);
+>  }
+>  
+>  static int
+> @@ -1238,6 +1251,17 @@ static int dw_mipi_dsi_bind(struct device *dev, struct device *master,
+>  		dev_dbg(dev, "have not phy_cfg_clk\n");
+>  	}
+>  
+> +	dsi->grf_clk = devm_clk_get(dev, "grf");
+> +	if (IS_ERR(dsi->grf_clk)) {
+> +		ret = PTR_ERR(dsi->grf_clk);
+> +		if (ret != -ENOENT) {
+> +			dev_err(dev, "Unable to get grf_clk: %d\n", ret);
 
->
-> One thing we could do is _not_ call pm_runtime_put() at the end of the probe()
-> operation.  That way we wouldn't have to mess around with PM runtime operations
-> on an unstable system.  This, of course, is costly in terms of power consumption
-> but the system is under test/debug anyway.
+If you're going to print an error, you should probably check for
+-EPROBE_DEFER. This driver isn't quite consistent about this.
 
-May be control the behavior via kernel command line ? Something like coresight_debug={on or 1} or
-even use the "nohlt" ?
+> +			return ret;
+> +		}
+> +		dsi->grf_clk = NULL;
+> +		dev_dbg(dev, "have not grf_clk\n");
 
-Suzuki
+The wording is a little awkward; maybe "no grf_clk provided\n"?
+
+Also, to be clear, this clock is required for RK3399, but not for others
+(e.g., RK3288) right? I guess this makes sense then, to just treat it as
+optional for all cases, even if you document it as "required" for
+RK3399.
+
+Brian
+
+> +	}
+> +
+>  	ret = clk_prepare_enable(dsi->pllref_clk);
+>  	if (ret) {
+>  		dev_err(dev, "%s: Failed to enable pllref_clk\n", __func__);
+
+Brian
