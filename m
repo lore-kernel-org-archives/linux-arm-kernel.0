@@ -1,23 +1,85 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 15 Mar 2017 15:05:43 +0800
-Subject: [linux-sunxi] [PATCH v3 4/5] ARM: dts: sun8i: h3: enable USB OTG
- on Orange Pi One
-In-Reply-To: <20170306223449.21404-5-icenowy@aosc.xyz>
+Date: Wed, 15 Mar 2017 15:16:01 +0800
+Subject: [linux-sunxi] [PATCH v3 5/5] ARM: dts: sun8i: h2+: enable USB OTG
+ for Orange Pi Zero board
+In-Reply-To: <20170306223449.21404-6-icenowy@aosc.xyz>
 References: <20170306223449.21404-1-icenowy@aosc.xyz>
- <20170306223449.21404-5-icenowy@aosc.xyz>
-Message-ID: <CAGb2v64-L5dnoOch5ErCvJT-R_1n7JSf1oBoK0Ff=X7SSPei5w@mail.gmail.com>
+ <20170306223449.21404-6-icenowy@aosc.xyz>
+Message-ID: <CAGb2v67+FpOvPHVWbOX+R9wy0LnDya-ak41zO5W-wyAWTn2pWw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
+
 On Tue, Mar 7, 2017 at 6:34 AM, Icenowy Zheng <icenowy@aosc.xyz> wrote:
-> Orange Pi One features a MicroUSB port that can work in both host mode
-> and peripheral mode.
+> Orange Pi Zero board features a USB OTG port, which has a ID pin, and
+> can be used to power up the board. However, even if the board is powered
+> via +5V pin in GPIO/expansion headers, the VBUS in the OTG port cannot
+> be powered up, thus it's impossible to use it in host mode with simple
+> OTG cables.
 >
-> When in host mode, its VBUS is controlled via a GPIO; when in peripheral
-> mode, its VBUS cannot be used to power up the board.
+> Add support for it in peripheral mode.
 >
-> Add support for this port.
+> If someone really want to use it in host mode, the mode of PHY can be
+> switch via sysfs, then use a powered USB OTG cable or powered USB HUB to
+> power up external USB devices.
 >
 > Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+> ---
+> New patch in v3.
+>
+>  arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts | 14 ++++++++++++++
+>  1 file changed, 14 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts b/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts
+> index b7ca916d871d..63f819394b98 100644
+> --- a/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts
+> +++ b/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts
+> @@ -96,6 +96,10 @@
+>         };
+>  };
+>
+> +&ehci0 {
+> +       status = "okay";
+> +};
+> +
+>  &ehci1 {
+>         status = "okay";
+>  };
+> @@ -132,6 +136,10 @@
+>         bias-pull-up;
+>  };
+>
+> +&ohci0 {
+> +       status = "okay";
+> +};
+> +
+>  &ohci1 {
+>         status = "okay";
+>  };
+> @@ -154,7 +162,13 @@
+>         status = "disabled";
+>  };
+>
+> +&usb_otg {
+> +       dr_mode = "peripheral";
+> +       status = "okay";
+> +};
+> +
+>  &usbphy {
+>         /* USB VBUS is always on */
 
-Acked-by: Chen-Yu Tsai <wens@csie.org>
+This comment does not match your commit message, which says it's always off.
+
+ChenYu
+
+>         status = "okay";
+> +       usb0_id_det-gpios = <&pio 6 12 GPIO_ACTIVE_HIGH>; /* PG12 */
+>  };
+> --
+> 2.11.1
+>
+> --
+> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
+> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
+> For more options, visit https://groups.google.com/d/optout.
