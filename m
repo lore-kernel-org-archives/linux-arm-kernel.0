@@ -1,224 +1,60 @@
-From: john@metanate.com (John Keeping)
-Date: Wed, 15 Mar 2017 16:59:00 +0000
-Subject: [RFC PATCH 2/4] pinctrl: rockchip: convert to raw spinlock
-In-Reply-To: <2549921.4Nq1JGygY8@phil>
-References: <20170313183813.3582-1-john@metanate.com>
- <20170313183813.3582-3-john@metanate.com>
- <39203480.lbsBriduiK@phil> <2549921.4Nq1JGygY8@phil>
-Message-ID: <20170315165900.63f32371.john@metanate.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 15 Mar 2017 10:22:01 -0700
+Subject: [PATCH] ARM: omap2+: Revert omap-smp.c changes resetting CPU1
+ during boot
+In-Reply-To: <20170314181425.GF20572@atomide.com>
+References: <20170313205231.1593-1-tony@atomide.com>
+ <0bade322-5bee-412f-ef21-972c99846e84@ti.com>
+ <20170314151725.GC20572@atomide.com>
+ <d0fe191f-66f8-b72d-0a2a-00815e663a8d@ti.com>
+ <20170314164106.GE20572@atomide.com>
+ <ea09d676-29f6-7100-4c68-88920deaeb7c@ti.com>
+ <20170314181425.GF20572@atomide.com>
+Message-ID: <20170315172200.GM20572@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 15 Mar 2017 17:41:21 +0100, Heiko Stuebner wrote:
-
-> Am Mittwoch, 15. M?rz 2017, 17:28:56 CET schrieb Heiko Stuebner:
-> > Am Montag, 13. M?rz 2017, 18:38:11 CET schrieb John Keeping:  
-> > > This lock is used from rockchip_irq_set_type() which is part of the
-> > > irq_chip implementation and thus must use raw_spinlock_t as documented
-> > > in Documentation/gpio/driver.txt.
-> > > 
-> > > Signed-off-by: John Keeping <john@metanate.com>  
+* Tony Lindgren <tony@atomide.com> [170314 11:16]:
+> * Andrew F. Davis <afd@ti.com> [170314 10:59]:
+> Then onto the other related patches..
+> 
+> > We re-park cpu1 in bootROM in U-Boot already, in the U-Boot tree:
+> > arch/arm/mach-omap2/omap5/sec_entry_cpu1.S
+> 
+> OK good to hear.
+> 
+> > omap_smc_sec_cpu1() wakes up cpu1 into the function cpu1_entry(), this
+> > makes an SMC call to setup the core, then re-parks itself back in bootROM.
+> > Relevant code to run on cpu1:
 > > 
-> > Looks good
-> > Reviewed-by: Heiko Stuebner <heiko@sntech.de>  
+> > > #define AUX_CORE_BOOT_0		0x48281800
+> > > #define AUX_CORE_BOOT_1		0x48281804
+> > > /* DRA7xx ROM code function "startup_BootSlave". This function is where CPU1
+> > >  * waits on WFE, polling on AUX_CORE_BOOT_x registers.
+> > >  * This address is same for J6 and J6 Eco.
+> > >  */
+> > > #define ROM_FXN_STARTUP_BOOTSLAVE     0x00038a64
+> > >
+> > > ldr	r4, =AUX_CORE_BOOT_0
+> > > mov	r5, #0x0
+> > > str	r5, [r4]
+> > > ldr	r4, =ROM_FXN_STARTUP_BOOTSLAVE
+> > > bx	r4	@ Jump back to ROM
+> > 
+> > We would have to do this in kernel. The issue I'm thinking we are going
+> > to hit is that the parking function in bootROM expects the MMU to be
+> > off. Although we don't really need to turn it off as long as we can
+> > identity map the bootROM area, the AUX_CORE_BOOT_0/1 space, and wherever
+> > we plan to exit the parking loop.
 > 
-> I have to take that back.
-> This leaves the spin_lock in the schmitt trigger unconverted and produces 
-> compile issues.
-> 
-> So it either needs to be converted or removed - I guess it should be removed.
+> Would be good to hear what Russell thinks we should do here to park
+> CPU1.
 
-Yes, it looks like it should be removed - the patches adding that hadn't
-been applied when I sent this out!
+How about we introduce smp_park_secondary()?
 
-I'll rebase and add the schmitt trigger change to patch 1 in a day or
-two, after giving a bit more time for reviews.
+Then soft_restart() can call it between setup_mm_for_reboot()
+and cpu_proc_fin()?
 
-> > > ---
-> > > 
-> > >  drivers/pinctrl/pinctrl-rockchip.c | 30 +++++++++++++++---------------
-> > >  1 file changed, 15 insertions(+), 15 deletions(-)
-> > > 
-> > > diff --git a/drivers/pinctrl/pinctrl-rockchip.c
-> > > b/drivers/pinctrl/pinctrl-rockchip.c index 1defe83a5c4d..2f963aea64b2
-> > > 100644
-> > > --- a/drivers/pinctrl/pinctrl-rockchip.c
-> > > +++ b/drivers/pinctrl/pinctrl-rockchip.c
-> > > @@ -163,7 +163,7 @@ struct rockchip_pin_bank {
-> > > 
-> > >  	struct irq_domain		*domain;
-> > >  	struct gpio_chip		gpio_chip;
-> > >  	struct pinctrl_gpio_range	grange;
-> > > 
-> > > -	spinlock_t			slock;
-> > > +	raw_spinlock_t			slock;
-> > > 
-> > >  	u32				toggle_edge_mode;
-> > >  
-> > >  };
-> > > 
-> > > @@ -1292,14 +1292,14 @@ static int rockchip_set_pull(struct
-> > > rockchip_pin_bank *bank,
-> > > 
-> > >  	switch (ctrl->type) {
-> > > 
-> > >  	case RK2928:
-> > > -		spin_lock_irqsave(&bank->slock, flags);
-> > > +		raw_spin_lock_irqsave(&bank->slock, flags);
-> > > 
-> > >  		data = BIT(bit + 16);
-> > >  		if (pull == PIN_CONFIG_BIAS_DISABLE)
-> > >  		
-> > >  			data |= BIT(bit);
-> > >  		
-> > >  		ret = regmap_write(regmap, reg, data);
-> > > 
-> > > -		spin_unlock_irqrestore(&bank->slock, flags);
-> > > +		raw_spin_unlock_irqrestore(&bank->slock, flags);
-> > > 
-> > >  		break;
-> > >  	
-> > >  	case RK1108:
-> > > 
-> > >  	case RK3188:
-> > > @@ -1433,7 +1433,7 @@ static int _rockchip_pmx_gpio_set_direction(struct
-> > > gpio_chip *chip, return ret;
-> > > 
-> > >  	clk_enable(bank->clk);
-> > > 
-> > > -	spin_lock_irqsave(&bank->slock, flags);
-> > > +	raw_spin_lock_irqsave(&bank->slock, flags);
-> > > 
-> > >  	data = readl_relaxed(bank->reg_base + GPIO_SWPORT_DDR);
-> > >  	/* set bit to 1 for output, 0 for input */
-> > > 
-> > > @@ -1443,7 +1443,7 @@ static int _rockchip_pmx_gpio_set_direction(struct
-> > > gpio_chip *chip, data &= ~BIT(pin);
-> > > 
-> > >  	writel_relaxed(data, bank->reg_base + GPIO_SWPORT_DDR);
-> > > 
-> > > -	spin_unlock_irqrestore(&bank->slock, flags);
-> > > +	raw_spin_unlock_irqrestore(&bank->slock, flags);
-> > > 
-> > >  	clk_disable(bank->clk);
-> > >  	
-> > >  	return 0;
-> > > 
-> > > @@ -1874,7 +1874,7 @@ static void rockchip_gpio_set(struct gpio_chip *gc,
-> > > unsigned offset, int value) u32 data;
-> > > 
-> > >  	clk_enable(bank->clk);
-> > > 
-> > > -	spin_lock_irqsave(&bank->slock, flags);
-> > > +	raw_spin_lock_irqsave(&bank->slock, flags);
-> > > 
-> > >  	data = readl(reg);
-> > >  	data &= ~BIT(offset);
-> > > 
-> > > @@ -1882,7 +1882,7 @@ static void rockchip_gpio_set(struct gpio_chip *gc,
-> > > unsigned offset, int value) data |= BIT(offset);
-> > > 
-> > >  	writel(data, reg);
-> > > 
-> > > -	spin_unlock_irqrestore(&bank->slock, flags);
-> > > +	raw_spin_unlock_irqrestore(&bank->slock, flags);
-> > > 
-> > >  	clk_disable(bank->clk);
-> > >  
-> > >  }
-> > > 
-> > > @@ -1994,7 +1994,7 @@ static void rockchip_irq_demux(struct irq_desc
-> > > *desc)
-> > > 
-> > >  			data = readl_relaxed(bank->reg_base + GPIO_EXT_PORT);
-> > >  			do {
-> > > 
-> > > -				spin_lock_irqsave(&bank->slock, flags);
-> > > +				raw_spin_lock_irqsave(&bank->slock, flags);
-> > > 
-> > >  				polarity = readl_relaxed(bank->reg_base +
-> > >  				
-> > >  							 GPIO_INT_POLARITY);
-> > > 
-> > > @@ -2005,7 +2005,7 @@ static void rockchip_irq_demux(struct irq_desc
-> > > *desc)
-> > > 
-> > >  				writel(polarity,
-> > >  				
-> > >  				       bank->reg_base + GPIO_INT_POLARITY);
-> > > 
-> > > -				spin_unlock_irqrestore(&bank->slock, flags);
-> > > +				raw_spin_unlock_irqrestore(&bank->slock, flags);
-> > > 
-> > >  				data_old = data;
-> > >  				data = readl_relaxed(bank->reg_base +
-> > > 
-> > > @@ -2036,20 +2036,20 @@ static int rockchip_irq_set_type(struct irq_data
-> > > *d, unsigned int type) return ret;
-> > > 
-> > >  	clk_enable(bank->clk);
-> > > 
-> > > -	spin_lock_irqsave(&bank->slock, flags);
-> > > +	raw_spin_lock_irqsave(&bank->slock, flags);
-> > > 
-> > >  	data = readl_relaxed(bank->reg_base + GPIO_SWPORT_DDR);
-> > >  	data &= ~mask;
-> > >  	writel_relaxed(data, bank->reg_base + GPIO_SWPORT_DDR);
-> > > 
-> > > -	spin_unlock_irqrestore(&bank->slock, flags);
-> > > +	raw_spin_unlock_irqrestore(&bank->slock, flags);
-> > > 
-> > >  	if (type & IRQ_TYPE_EDGE_BOTH)
-> > >  	
-> > >  		irq_set_handler_locked(d, handle_edge_irq);
-> > >  	
-> > >  	else
-> > >  	
-> > >  		irq_set_handler_locked(d, handle_level_irq);
-> > > 
-> > > -	spin_lock_irqsave(&bank->slock, flags);
-> > > +	raw_spin_lock_irqsave(&bank->slock, flags);
-> > > 
-> > >  	irq_gc_lock(gc);
-> > >  	
-> > >  	level = readl_relaxed(gc->reg_base + GPIO_INTTYPE_LEVEL);
-> > > 
-> > > @@ -2092,7 +2092,7 @@ static int rockchip_irq_set_type(struct irq_data *d,
-> > > unsigned int type) break;
-> > > 
-> > >  	default:
-> > >  		irq_gc_unlock(gc);
-> > > 
-> > > -		spin_unlock_irqrestore(&bank->slock, flags);
-> > > +		raw_spin_unlock_irqrestore(&bank->slock, flags);
-> > > 
-> > >  		clk_disable(bank->clk);
-> > >  		return -EINVAL;
-> > >  	
-> > >  	}
-> > > 
-> > > @@ -2101,7 +2101,7 @@ static int rockchip_irq_set_type(struct irq_data *d,
-> > > unsigned int type) writel_relaxed(polarity, gc->reg_base +
-> > > GPIO_INT_POLARITY);
-> > > 
-> > >  	irq_gc_unlock(gc);
-> > > 
-> > > -	spin_unlock_irqrestore(&bank->slock, flags);
-> > > +	raw_spin_unlock_irqrestore(&bank->slock, flags);
-> > > 
-> > >  	clk_disable(bank->clk);
-> > >  	
-> > >  	return 0;
-> > > 
-> > > @@ -2383,7 +2383,7 @@ static struct rockchip_pin_ctrl
-> > > *rockchip_pinctrl_get_soc_data( for (i = 0; i < ctrl->nr_banks; ++i,
-> > > ++bank) {
-> > > 
-> > >  		int bank_pins = 0;
-> > > 
-> > > -		spin_lock_init(&bank->slock);
-> > > +		raw_spin_lock_init(&bank->slock);
-> > > 
-> > >  		bank->drvdata = d;
-> > >  		bank->pin_base = ctrl->nr_pins;
-> > >  		ctrl->nr_pins += bank->nr_pins;  
+Regards,
+
+Tony
