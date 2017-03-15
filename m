@@ -1,40 +1,58 @@
-From: phdm@macq.eu (Philippe De Muyter)
-Date: Wed, 15 Mar 2017 11:50:49 +0100
-Subject: media / v4l2-mc: wishlist for complex cameras (was Re: [PATCH
- v4 14/36] [media] v4l2-mc: add a function to inherit controls from
- a pipeline)
-In-Reply-To: <20170314215420.6fc63c67@vento.lan>
-References: <cc8900b0-c091-b14b-96f4-01f8fa72431c@xs4all.nl>
- <20170310125342.7f047acf@vento.lan>
- <20170310223714.GI3220@valkosipuli.retiisi.org.uk>
- <20170311082549.576531d0@vento.lan>
- <20170313124621.GA10701@valkosipuli.retiisi.org.uk>
- <20170314004533.3b3cd44b@vento.lan>
- <e0a6c60b-1735-de0b-21f4-d8c3f4b3f10f@xs4all.nl>
- <20170314072143.498cde9b@vento.lan> <20170314223254.GA7141@amd>
- <20170314215420.6fc63c67@vento.lan>
-Message-ID: <20170315105049.GA12099@frolo.macqel>
+From: quentin.schulz@free-electrons.com (Quentin Schulz)
+Date: Wed, 15 Mar 2017 11:55:22 +0100
+Subject: [PATCH v4 03/18] mfd: axp20x: correct name of temperature data ADC
+ registers
+In-Reply-To: <20170315105537.22349-1-quentin.schulz@free-electrons.com>
+References: <20170315105537.22349-1-quentin.schulz@free-electrons.com>
+Message-ID: <20170315105537.22349-4-quentin.schulz@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 14, 2017 at 09:54:31PM -0300, Mauro Carvalho Chehab wrote:
-> Em Tue, 14 Mar 2017 23:32:54 +0100
-> Pavel Machek <pavel@ucw.cz> escreveu:
-> 
-> > 
-> > Well, I believe first question is: what applications would we want to
-> > run on complex devices? Will sending control from video to subdevs
-> > actually help?
-> 
-> I would say: camorama, xawtv3, zbar, google talk, skype. If it runs
-> with those, it will likely run with any other application.
-> 
+The registers 0x56 and 0x57 of AXP22X PMIC store the value of the
+internal temperature of the PMIC.
 
-I would like to add the 'v4l2src' plugin of gstreamer, and on the imx6 its
-imx-specific counterpart 'imxv4l2videosrc' from the gstreamer-imx package
-at https://github.com/Freescale/gstreamer-imx, and 'v4l2-ctl'.
+This patch modifies the name of these registers from AXP22X_PMIC_ADC_H/L
+to AXP22X_PMIC_TEMP_H/L so their purpose is clearer.
 
-Philippe
+Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+Acked-by: Chen-Yu Tsai <wens@csie.org>
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
+---
 
+added in v2
+
+ drivers/mfd/axp20x.c       | 2 +-
+ include/linux/mfd/axp20x.h | 4 ++--
+ 2 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
+index 25115fe..56472c2 100644
+--- a/drivers/mfd/axp20x.c
++++ b/drivers/mfd/axp20x.c
+@@ -100,7 +100,7 @@ static const struct regmap_range axp22x_volatile_ranges[] = {
+ 	regmap_reg_range(AXP20X_PWR_INPUT_STATUS, AXP20X_PWR_OP_MODE),
+ 	regmap_reg_range(AXP20X_IRQ1_EN, AXP20X_IRQ5_STATE),
+ 	regmap_reg_range(AXP22X_GPIO_STATE, AXP22X_GPIO_STATE),
+-	regmap_reg_range(AXP22X_PMIC_ADC_H, AXP20X_IPSOUT_V_HIGH_L),
++	regmap_reg_range(AXP22X_PMIC_TEMP_H, AXP20X_IPSOUT_V_HIGH_L),
+ 	regmap_reg_range(AXP20X_FG_RES, AXP20X_FG_RES),
+ };
+ 
+diff --git a/include/linux/mfd/axp20x.h b/include/linux/mfd/axp20x.h
+index 0d9a1ff..dc8798c 100644
+--- a/include/linux/mfd/axp20x.h
++++ b/include/linux/mfd/axp20x.h
+@@ -228,8 +228,8 @@ enum axp20x_variants {
+ #define AXP20X_OCV_MAX			0xf
+ 
+ /* AXP22X specific registers */
+-#define AXP22X_PMIC_ADC_H		0x56
+-#define AXP22X_PMIC_ADC_L		0x57
++#define AXP22X_PMIC_TEMP_H		0x56
++#define AXP22X_PMIC_TEMP_L		0x57
+ #define AXP22X_TS_ADC_H			0x58
+ #define AXP22X_TS_ADC_L			0x59
+ #define AXP22X_BATLOW_THRES1		0xe6
 -- 
-Philippe De Muyter +32 2 6101532 Macq SA rue de l'Aeronef 2 B-1140 Bruxelles
+2.9.3
