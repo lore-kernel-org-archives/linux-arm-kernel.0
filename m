@@ -1,50 +1,53 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 15 Mar 2017 21:02:06 +0100
-Subject: mainline build: 208 builds: 0 failed, 208 passed,
- 422 warnings (v4.11-rc2-164-gdefc7d752265)
-In-Reply-To: <58c97f8f.c4b5190a.8c4e4.300d@mx.google.com>
-References: <58c97f8f.c4b5190a.8c4e4.300d@mx.google.com>
-Message-ID: <CAK8P3a1jHhM=80Zo59JoDNd2RKwTfdR_i61_=ASqqUeJ1oecxg@mail.gmail.com>
+From: jnair@caviumnetworks.com (Jayachandran C)
+Date: Wed, 15 Mar 2017 20:11:00 +0000
+Subject: [PATCH v6 1/3] dt-bindings: Add arm64 ARCH_THUNDER2 platform
+ documentation
+In-Reply-To: <1489608662-4434-1-git-send-email-jnair@caviumnetworks.com>
+References: <1489495634-2920-1-git-send-email-jnair@caviumnetworks.com>
+ <1489608662-4434-1-git-send-email-jnair@caviumnetworks.com>
+Message-ID: <1489608662-4434-2-git-send-email-jnair@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 15, 2017 at 6:53 PM, kernelci.org bot <bot@kernelci.org> wrote:
->
-> mainline build: 208 builds: 0 failed, 208 passed, 422 warnings (v4.11-rc2-164-gdefc7d752265)
+Add documentation for Cavium's ThunderX2 CN99XX ARM64 processor. This
+SoC will use "cavium,thunderx2-cn9900" as the compatible property.
 
-The last build failure in mainline is gone now, though I don't know
-what fixed it.
-Let's hope this doesn't come back as the cause was apparently a race condition
-in Kbuild that might have stopped triggering.
+Also add a documentation entry for the "cavium,thunder2" cpu core
+present in these SoCs.
 
-> Warnings summary:
-> 409 :1325:2: warning: #warning syscall statx not implemented [-Wcpp]
+Signed-off-by: Jayachandran C <jnair@caviumnetworks.com>
+Acked-by: Rob Herring <robh@kernel.org>
+---
+ Documentation/devicetree/bindings/arm/cavium-thunder2.txt | 8 ++++++++
+ Documentation/devicetree/bindings/arm/cpus.txt            | 1 +
+ 2 files changed, 9 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/cavium-thunder2.txt
 
-The warning triggers for arm, arm64 and mips on every build. I saw a patch
-was posted for asm-generic, which takes care of arm64.
-
-Catalin and Will: can you take this through the arm64 tree? I don't have
-anything else for asm-generic at the moment.
-
-Russell and Ralf, do you already have patches for ARM and MIPS to
-add the syscalls, or would you like me to send you patches for it?
-I assume all arch maintainers will get to it eventually, but I'd like to
-see this gone from the kernelci reporting.
-
-Once the syscall number has been assigned for arch/arm, we will
-also need to update the compat syscall table for arm64 of course.
-
-> 2 include/linux/device.h:1479:15: warning: passing argument 1 of 'platform_driver_unregister' discards 'const' qualifier from pointer target type [-Wdiscarded-qualifiers]
-> 2 include/linux/device.h:1474:20: warning: passing argument 1 of '__platform_driver_register' discards 'const' qualifier from pointer target type [-Wdiscarded-qualifiers]
-
-Mauro has applied the fix in linux-next, I assume this is going to hit mainline
-before v4.11-rc3.
-
-> 1 net/wireless/nl80211.c:5743:1: warning: the frame size of 2064 bytes is larger than 2048 bytes [-Wframe-larger-than=]
-> 1 net/bridge/br_netlink.c:1339:1: warning: the frame size of 2544 bytes is larger than 2048 bytes [-Wframe-larger-than=]
-> 1 drivers/tty/vt/keyboard.c:1472:1: warning: the frame size of 2344 bytes is larger than 2048 bytes [-Wframe-larger-than=]
-
-I still have this one on my list, should be able to post an updated version
-in a few days after I'm through with my backlog of older patches.
-
-      Arnd
+diff --git a/Documentation/devicetree/bindings/arm/cavium-thunder2.txt b/Documentation/devicetree/bindings/arm/cavium-thunder2.txt
+new file mode 100644
+index 0000000..dc5dd65
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/cavium-thunder2.txt
+@@ -0,0 +1,8 @@
++Cavium ThunderX2 CN99XX platform tree bindings
++----------------------------------------------
++
++Boards with Cavium ThunderX2 CN99XX SoC shall have the root property:
++  compatible = "cavium,thunderx2-cn9900", "brcm,vulcan-soc";
++
++These SoC uses the "cavium,thunder2" core which will be compatible
++with "brcm,vulcan".
+diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
+index 698ad1f0..1030f5f 100644
+--- a/Documentation/devicetree/bindings/arm/cpus.txt
++++ b/Documentation/devicetree/bindings/arm/cpus.txt
+@@ -170,6 +170,7 @@ nodes to be present and contain the properties described below.
+ 			    "brcm,brahma-b15"
+ 			    "brcm,vulcan"
+ 			    "cavium,thunder"
++			    "cavium,thunder2"
+ 			    "faraday,fa526"
+ 			    "intel,sa110"
+ 			    "intel,sa1100"
+-- 
+2.7.4
