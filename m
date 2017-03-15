@@ -1,72 +1,52 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Wed, 15 Mar 2017 19:16:53 +0100
-Subject: [PATCH v2 2/4] pinctrl: rockchip: convert to raw spinlock
-In-Reply-To: <20170315180806.3714af56.john@metanate.com>
-References: <20170315174654.15128-1-john@metanate.com>
- <20170315180137.GB682@jcartwri.amer.corp.natinst.com>
- <20170315180806.3714af56.john@metanate.com>
-Message-ID: <8564532.G8NNa9Oa4k@phil>
+From: julia@ni.com (Julia Cartwright)
+Date: Wed, 15 Mar 2017 13:17:30 -0500
+Subject: [RFC PATCH 0/4] pinctrl: rockchip: PREEMPT_RT_FULL fixes
+In-Reply-To: <CACRpkdZXBZr_Syur3r=3GTjjrCPx4bgj0g5iNSN6rdikqkww4w@mail.gmail.com>
+References: <20170313183813.3582-1-john@metanate.com>
+ <CACRpkdZXBZr_Syur3r=3GTjjrCPx4bgj0g5iNSN6rdikqkww4w@mail.gmail.com>
+Message-ID: <20170315181730.GC682@jcartwri.amer.corp.natinst.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 15. M?rz 2017, 18:08:06 CET schrieb John Keeping:
-> On Wed, 15 Mar 2017 13:01:37 -0500, Julia Cartwright wrote:
-> > On Wed, Mar 15, 2017 at 05:46:52PM +0000, John Keeping wrote:
-> > > This lock is used from rockchip_irq_set_type() which is part of the
-> > > irq_chip implementation and thus must use raw_spinlock_t as documented
-> > > in Documentation/gpio/driver.txt.
-> > > 
-> > > Signed-off-by: John Keeping <john@metanate.com>
-> > > Reviewed-by: Heiko Stuebner <heiko@sntech.de>
-> > > Tested-by: Heiko Stuebner <heiko@sntech.de>
-> > > ---
-> > > v2: unchanged
-> > > ---
-> > > 
-> > >  drivers/pinctrl/pinctrl-rockchip.c | 30 +++++++++++++++---------------
-> > >  1 file changed, 15 insertions(+), 15 deletions(-)
-> > > 
-> > > diff --git a/drivers/pinctrl/pinctrl-rockchip.c
-> > > b/drivers/pinctrl/pinctrl-rockchip.c index 128c383ea7ba..8c1cae6d78d7
-> > > 100644
-> > > --- a/drivers/pinctrl/pinctrl-rockchip.c
-> > > +++ b/drivers/pinctrl/pinctrl-rockchip.c
-> > > @@ -163,7 +163,7 @@ struct rockchip_pin_bank {
-> > > 
-> > >  	struct irq_domain		*domain;
-> > >  	struct gpio_chip		gpio_chip;
-> > >  	struct pinctrl_gpio_range	grange;
-> > > 
-> > > -	spinlock_t			slock;
-> > > +	raw_spinlock_t			slock;
-> > > 
-> > >  	u32				toggle_edge_mode;
-> > >  
-> > >  };
-> > > 
-> > > @@ -1295,14 +1295,14 @@ static int rockchip_set_pull(struct
-> > > rockchip_pin_bank *bank,> > 
-> > >  	switch (ctrl->type) {
-> > > 
-> > >  	case RK2928:
-> > > -		spin_lock_irqsave(&bank->slock, flags);
-> > > +		raw_spin_lock_irqsave(&bank->slock, flags);
-> > > 
-> > >  		data = BIT(bit + 16);
-> > >  		if (pull == PIN_CONFIG_BIAS_DISABLE)
-> > >  		
-> > >  			data |= BIT(bit);
-> > 
-> > This should be lifted out from under the lock.
-> > 
-> > >  		ret = regmap_write(regmap, reg, data);
-> > 
-> > How is this legal?  The regmap_write() here is going to end up acquiring
-> > the regmap mutex.
+On Wed, Mar 15, 2017 at 02:12:39PM +0100, Linus Walleij wrote:
+> On Mon, Mar 13, 2017 at 7:38 PM, John Keeping <john@metanate.com> wrote:
 > 
-> It's not, the spinlock can be deleted here.  I only have RK3288 hardware
-> to test and I missed this when checking the uses of slock.
+> > As described in Documentation/gpio/driver.txt, we should not be using
+> > sleepable APIs in the irqchip implementation.  Since this includes the
+> > regmap API, this patch series ends up moving the mux setup for IRQs into
+> > an irq_bus_sync_unlock() handler which may result in the IRQ being
+> > configured before the port has been muxed as a GPIO.
+> >
+> > I've marked the series as RFC because I'm not sure if this is the best
+> > way to accomplish this or if there is another approach that is cleaner.
+> > Also, the first patch may not be correct on RK3399 because I originally
+> > wrote the patch for RK3288 on top of v4.4 where all drive updates only
+> > affect a single register.  We don't need locking in this case because
+> > regmap_update_bits() takes a lock on the regmap internally, but if these
+> > two registers need to be updated atomically then another lock will
+> > be required here - slock cannot be used if it is converted to a raw
+> > spinlock since with full RT preemption the regmap's spinlock may sleep.
+> 
+> Nice work! It all looks good to me, let's see what Heiko says.
+> 
+> Please keep Julia Cartwright on the CC for this patch series, she is
+> doing some coccinelle-based rewrites to use raw spinlocks as we
+> speak, and she knows this stuff.
+> 
+> She has not targeted the Rockchip driver yet, I guess because of
+> its complexity.
 
-That part could very well also use regmap_update_bits like the other parts.
-Not really sure, why we use regmap_write here, but I'm also not sure, if it 
-matters at all.
+I haven't really given much thought to how we might generically solve
+raw_spinlock problems for those drivers which make of irq_chip_generic
+just yet.  I don't imagine it would be too difficult, just more work.
+
+Thanks for the CC.
+
+   Julia
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170315/c3ed4b8f/attachment.sig>
