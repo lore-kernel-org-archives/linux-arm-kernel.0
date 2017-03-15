@@ -1,37 +1,42 @@
-From: David.Laight@ACULAB.COM (David Laight)
-Date: Wed, 15 Mar 2017 16:19:41 +0000
-Subject: Enumerating an empty bus hangs the entire system
-In-Reply-To: <135a0b18-caa3-d3c2-8ea5-6959e70e75ac@free.fr>
-References: <1eeea8ff-0840-a005-38b4-61f3c253cee1@free.fr>
- <20170315160238.GB5073@bhelgaas-glaptop.roam.corp.google.com>
- <135a0b18-caa3-d3c2-8ea5-6959e70e75ac@free.fr>
-Message-ID: <063D6719AE5E284EB5DD2968C1650D6DCFFB1ABE@AcuExch.aculab.com>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Thu, 16 Mar 2017 00:21:51 +0800
+Subject: [PATCH 4/4] ARM: sun8i: v3s: add ns2009 node for Lichee Pi Zero board
+Message-ID: <20170315162151.54956-1-icenowy@aosc.xyz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mason
-> Sent: 15 March 2017 16:14
-> On 15/03/2017 17:02, Bjorn Helgaas wrote:
-> 
-> > If checking for link in your accessor is the best you can do, maybe
-> > that's all you can do.  I thought there was another driver that did
-> > that, but I can't find it now.  It doesn't seem perfectly safe to me,
-> > since the link could go down after you check for "link up" and before
-> > you actually issue the read.
-> 
-> Are you thinking of some hotplug scenario?
-> 
-> My system doesn't support hotplug, and I naively thought that the
-> link would be down if there is no card, and up shortly after reset
-> if there is a card.
+The production batch of Lichee Pi Zero board features a NS2009 resistive
+touchscreen controller, which is wired to touch panel pins at 40-pin LCD
+connector, in order to make the board fully compatible to 40-pin LCDs
+with resistive touch panel which are used with Lichee Pi One (with A13's
+integrated resistive touch controller).
 
-Noise on the lines can be enough to take the link down.
+Add the device node for the touchscreen controller.
 
-We have some very annoying Dell x86 server chassis that generate an
-NMI when the PCIe link has any sort of error.
-The software can be 'hardened' to reads returning ~0u, doing anything
-useful in an NMI handler is almost impossible.
-They also won't boot is there is an error early on.
-Stops us doing a remove, reprogram fpga, rescan.
+Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+---
+ arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-	David
+diff --git a/arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts b/arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts
+index 387fc2aa546d..a8a2081175d3 100644
+--- a/arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts
++++ b/arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts
+@@ -86,6 +86,15 @@
+ 	status = "okay";
+ };
+ 
++&i2c0 {
++	status = "okay";
++
++	ns2009: ns2009 at 48 {
++		compatible = "nsiway,ns2009";
++		reg = <0x48>;
++	};
++};
++
+ &uart0 {
+ 	pinctrl-0 = <&uart0_pins_a>;
+ 	pinctrl-names = "default";
+-- 
+2.12.0
