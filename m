@@ -1,37 +1,34 @@
 From: isubramanian@apm.com (Iyappan Subramanian)
-Date: Wed, 15 Mar 2017 13:27:14 -0700
-Subject: [PATCH net-next 0/7] drivers: net: xgene: Bug fixes and errata
- workarounds
-Message-ID: <1489609641-31557-1-git-send-email-isubramanian@apm.com>
+Date: Wed, 15 Mar 2017 13:27:15 -0700
+Subject: [PATCH net-next 1/7] drivers: net: phy: xgene: Fix mdio write
+In-Reply-To: <1489609641-31557-1-git-send-email-isubramanian@apm.com>
+References: <1489609641-31557-1-git-send-email-isubramanian@apm.com>
+Message-ID: <1489609641-31557-2-git-send-email-isubramanian@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch set addresses bug fixes and errata workarounds.
+From: Quan Nguyen <qnguyen@apm.com>
 
-Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
+This patches fixes a typo in the argument to xgene_enet_wr_mdio_csr().
+
 Signed-off-by: Quan Nguyen <qnguyen@apm.com>
+Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
 ---
+ drivers/net/phy/mdio-xgene.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Iyappan Subramanian (3):
-  drivers: net: xgene: Fix Rx checksum validation logic
-  drivers: net: xgene: Add workaround for errata 10GE_8/ENET_11
-  MAINTAINERS: Update X-Gene SoC ethernet maintainer
-
-Quan Nguyen (4):
-  drivers: net: phy: xgene: Fix mdio write
-  drivers: net: xgene: Fix hardware checksum setting
-  drivers: net: xgene: Fix wrong logical operation
-  drivers: net: xgene: Add workaround for errata 10GE_1
-
- MAINTAINERS                                       |  1 +
- drivers/net/ethernet/apm/xgene/xgene_enet_hw.c    |  3 +-
- drivers/net/ethernet/apm/xgene/xgene_enet_hw.h    |  2 +
- drivers/net/ethernet/apm/xgene/xgene_enet_main.c  | 74 ++++++++++++++---------
- drivers/net/ethernet/apm/xgene/xgene_enet_main.h  |  1 +
- drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.c |  7 +++
- drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.h |  5 ++
- drivers/net/phy/mdio-xgene.c                      |  2 +-
- 8 files changed, 65 insertions(+), 30 deletions(-)
-
+diff --git a/drivers/net/phy/mdio-xgene.c b/drivers/net/phy/mdio-xgene.c
+index f095051..3e2ac07 100644
+--- a/drivers/net/phy/mdio-xgene.c
++++ b/drivers/net/phy/mdio-xgene.c
+@@ -229,7 +229,7 @@ static int xgene_xfi_mdio_write(struct mii_bus *bus, int phy_id,
+ 
+ 	val = SET_VAL(HSTPHYADX, phy_id) | SET_VAL(HSTREGADX, reg) |
+ 	      SET_VAL(HSTMIIMWRDAT, data);
+-	xgene_enet_wr_mdio_csr(addr, MIIM_FIELD_ADDR, data);
++	xgene_enet_wr_mdio_csr(addr, MIIM_FIELD_ADDR, val);
+ 
+ 	val = HSTLDCMD | SET_VAL(HSTMIIMCMD, MIIM_CMD_LEGACY_WRITE);
+ 	xgene_enet_wr_mdio_csr(addr, MIIM_COMMAND_ADDR, val);
 -- 
 1.9.1
