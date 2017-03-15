@@ -1,109 +1,50 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Wed, 15 Mar 2017 08:49:15 +0100
-Subject: [PATCH 2/2] PCI: Add legacy firmware support for Cavium ThunderX host
- controller
-In-Reply-To: <1489564155-3881-1-git-send-email-tn@semihalf.com>
-References: <1489564155-3881-1-git-send-email-tn@semihalf.com>
-Message-ID: <1489564155-3881-3-git-send-email-tn@semihalf.com>
+From: anup.patel@broadcom.com (Anup Patel)
+Date: Wed, 15 Mar 2017 13:32:05 +0530
+Subject: [PATCH v6 0/4] Broadcom SBA RAID support
+In-Reply-To: <CAPcyv4hGGbhF-g8B__9=rsP+QwR6RBi=WqALLgABNb1M4D3rBw@mail.gmail.com>
+References: <1488793408-25592-1-git-send-email-anup.patel@broadcom.com>
+ <CAPcyv4hGGbhF-g8B__9=rsP+QwR6RBi=WqALLgABNb1M4D3rBw@mail.gmail.com>
+Message-ID: <CAALAos9CsqNGX6-fB6vOWhG_7M2CfGTD1gfp-iLcu39aR4oZzw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-During early days of PCI quirks support ThunderX firmware did not provide
-PNP0c02 node with PCI configuration space and PEM-specific register ranges.
-This means that for legacy FW we are not reserving these resources and
-cannot gather PEM-specific resources for further PEM initialization.
+On Tue, Mar 14, 2017 at 10:26 PM, Dan Williams <dan.j.williams@intel.com> wrote:
+> On Mon, Mar 6, 2017 at 1:43 AM, Anup Patel <anup.patel@broadcom.com> wrote:
+>> The Broadcom SBA RAID is a stream-based device which provides
+>> RAID5/6 offload.
+>>
+>> It requires a SoC specific ring manager (such as Broadcom FlexRM
+>> ring manager) to provide ring-based programming interface. Due to
+>> this, the Broadcom SBA RAID driver (mailbox client) implements
+>> DMA device having one DMA channel using a set of mailbox channels
+>> provided by Broadcom SoC specific ring manager driver (mailbox
+>> controller).
+>>
+>> The Broadcom SBA RAID hardware requires PQ disk position instead
+>> of PQ disk coefficient. To address this, we have added raid_gflog
+>> table which will help driver to convert PQ disk coefficient to PQ
+>> disk position.
+>>
+>> This patchset is based on Linux-4.11-rc1 and depends on patchset
+>> "[PATCH v5 0/2] Broadcom FlexRM ring manager support"
+>>
+>> It is also available at sba-raid-v6 branch of
+>> https://github.com/Broadcom/arm64-linux.git
+>>
+> [..]
+>>
+>> Anup Patel (4):
+>>   lib/raid6: Add log-of-2 table for RAID6 HW requiring disk position
+>>   async_tx: Fix DMA_PREP_FENCE usage in do_async_gen_syndrome()
+>>   dmaengine: Add Broadcom SBA RAID driver
+>>   dt-bindings: Add DT bindings document for Broadcom SBA RAID driver
+>
+> For the dmaengine and async_tx changes:
+>
+> Acked-by: Dan Williams <dan.j.williams@intel.com>
+>
 
-In order to support already deployed legacy FW calculate PEM-specific ranges
-and provide resources reservation as fallback scenario into PEM driver when
-we could not gather PEM reg base from ACPI tables.
+Thanks Dan ...
 
-Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-Signed-off-by: Vadim Lomovtsev <Vadim.Lomovtsev@caviumnetworks.com>
----
- drivers/pci/host/pci-thunder-pem.c | 56 ++++++++++++++++++++++++++++++++++++--
- 1 file changed, 54 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/pci/host/pci-thunder-pem.c b/drivers/pci/host/pci-thunder-pem.c
-index e354010..e0aa194 100644
---- a/drivers/pci/host/pci-thunder-pem.c
-+++ b/drivers/pci/host/pci-thunder-pem.c
-@@ -14,6 +14,7 @@
-  * Copyright (C) 2015 - 2016 Cavium, Inc.
-  */
- 
-+#include <linux/bitfield.h>
- #include <linux/kernel.h>
- #include <linux/init.h>
- #include <linux/of_address.h>
-@@ -319,6 +320,50 @@ static int thunder_pem_init(struct device *dev, struct pci_config_window *cfg,
- 
- #if defined(CONFIG_ACPI) && defined(CONFIG_PCI_QUIRKS)
- 
-+#define PEM_RES_BASE		0x87e0c0000000UL
-+#define PEM_NODE_MASK		GENMASK(45, 44)
-+#define PEM_INDX_MASK		GENMASK(26, 24)
-+#define PEM_MIN_DOM_IN_NODE	4
-+#define PEM_MAX_DOM_IN_NODE	10
-+
-+static void thunder_pem_reserve_range(struct device *dev, int seg,
-+				      struct resource *r)
-+{
-+	resource_size_t start = r->start, end = r->end;
-+	struct resource *res;
-+	const char *regionid;
-+
-+	regionid = kasprintf(GFP_KERNEL, "PEM RC:%d", seg);
-+	if (!regionid)
-+		return;
-+
-+	res = request_mem_region(start, end - start + 1, regionid);
-+	if (res)
-+		res->flags &= ~IORESOURCE_BUSY;
-+	else
-+		kfree(regionid);
-+
-+	dev_info(dev, "%pR %s reserved\n", r,
-+		 res ? "has been" : "could not be");
-+}
-+
-+static void thunder_pem_legacy_fw(struct acpi_pci_root *root,
-+				 struct resource *res_pem)
-+{
-+	int node = acpi_get_node(root->device->handle);
-+	int index;
-+
-+	if (node == NUMA_NO_NODE)
-+		node = 0;
-+
-+	index = root->segment - PEM_MIN_DOM_IN_NODE;
-+	index -= node * PEM_MAX_DOM_IN_NODE;
-+	res_pem->start = PEM_RES_BASE | FIELD_PREP(PEM_NODE_MASK, node) |
-+					FIELD_PREP(PEM_INDX_MASK, index);
-+	res_pem->end = res_pem->start + SZ_16M - 1;
-+	res_pem->flags = IORESOURCE_MEM;
-+}
-+
- static int thunder_pem_acpi_init(struct pci_config_window *cfg)
- {
- 	struct device *dev = cfg->parent;
-@@ -332,9 +377,16 @@ static int thunder_pem_acpi_init(struct pci_config_window *cfg)
- 		return -ENOMEM;
- 
- 	ret = acpi_get_rc_resources(dev, "CAVA02B", root->segment, res_pem);
-+
-+	/*
-+	 * If we fail to gather resources it means that we run with old
-+	 * FW where we need to calculate PEM-specific resources manually.
-+	 */
- 	if (ret) {
--		dev_err(dev, "can't get rc base address\n");
--		return ret;
-+		thunder_pem_legacy_fw(root, res_pem);
-+		/* Reserve PEM specific resources and PCI configuration space */
-+		thunder_pem_reserve_range(dev, root->segment, res_pem);
-+		thunder_pem_reserve_range(dev, root->segment, &cfg->res);
- 	}
- 
- 	return thunder_pem_init(dev, cfg, res_pem);
--- 
-2.7.4
+Regards,
+Anup
