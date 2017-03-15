@@ -1,62 +1,62 @@
-From: abelvesa@linux.com (Abel Vesa)
-Date: Wed, 15 Mar 2017 18:07:39 +0000
-Subject: [PATCH] arm: ftrace: fix dynamic ftrace with DEBUG_RODATA and
- !FRAME_POINTER
-Message-ID: <1489601259-9432-1-git-send-email-abelvesa@linux.com>
+From: john@metanate.com (John Keeping)
+Date: Wed, 15 Mar 2017 18:08:06 +0000
+Subject: [PATCH v2 2/4] pinctrl: rockchip: convert to raw spinlock
+In-Reply-To: <20170315180137.GB682@jcartwri.amer.corp.natinst.com>
+References: <20170315174654.15128-1-john@metanate.com>
+ <20170315174654.15128-3-john@metanate.com>
+ <20170315180137.GB682@jcartwri.amer.corp.natinst.com>
+Message-ID: <20170315180806.3714af56.john@metanate.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The support for dynamic ftrace with CONFIG_DEBUG_RODATA involves
-overriding the weak arch_ftrace_update_code() with a variant which makes
-the kernel text writable around the patching.
+On Wed, 15 Mar 2017 13:01:37 -0500, Julia Cartwright wrote:
+> On Wed, Mar 15, 2017 at 05:46:52PM +0000, John Keeping wrote:
+> > This lock is used from rockchip_irq_set_type() which is part of the
+> > irq_chip implementation and thus must use raw_spinlock_t as documented
+> > in Documentation/gpio/driver.txt.
+> > 
+> > Signed-off-by: John Keeping <john@metanate.com>
+> > Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+> > Tested-by: Heiko Stuebner <heiko@sntech.de>
+> > ---
+> > v2: unchanged
+> > ---
+> >  drivers/pinctrl/pinctrl-rockchip.c | 30 +++++++++++++++---------------
+> >  1 file changed, 15 insertions(+), 15 deletions(-)
+> > 
+> > diff --git a/drivers/pinctrl/pinctrl-rockchip.c b/drivers/pinctrl/pinctrl-rockchip.c
+> > index 128c383ea7ba..8c1cae6d78d7 100644
+> > --- a/drivers/pinctrl/pinctrl-rockchip.c
+> > +++ b/drivers/pinctrl/pinctrl-rockchip.c
+> > @@ -163,7 +163,7 @@ struct rockchip_pin_bank {
+> >  	struct irq_domain		*domain;
+> >  	struct gpio_chip		gpio_chip;
+> >  	struct pinctrl_gpio_range	grange;
+> > -	spinlock_t			slock;
+> > +	raw_spinlock_t			slock;
+> >  	u32				toggle_edge_mode;
+> >  };
+> >  
+> > @@ -1295,14 +1295,14 @@ static int rockchip_set_pull(struct rockchip_pin_bank *bank,
+> >  
+> >  	switch (ctrl->type) {
+> >  	case RK2928:
+> > -		spin_lock_irqsave(&bank->slock, flags);
+> > +		raw_spin_lock_irqsave(&bank->slock, flags);
+> >  
+> >  		data = BIT(bit + 16);
+> >  		if (pull == PIN_CONFIG_BIAS_DISABLE)
+> >  			data |= BIT(bit);  
+> 
+> This should be lifted out from under the lock.
+> 
+> >  		ret = regmap_write(regmap, reg, data);  
+> 
+> How is this legal?  The regmap_write() here is going to end up acquiring
+> the regmap mutex.
 
-This override was however added under the CONFIG_OLD_MCOUNT ifdef, and
-CONFIG_OLD_MCOUNT is only enabled if frame pointers are enabled.
+It's not, the spinlock can be deleted here.  I only have RK3288 hardware
+to test and I missed this when checking the uses of slock.
 
-This leads to non-functional dynamic ftrace (ftrace triggers a
-WARN_ON()) when CONFIG_DEBUG_RODATA is enabled and CONFIG_FRAME_POINTER
-is not.
 
-Move the override out of that ifdef and into the CONFIG_DYNAMIC_FTRACE
-ifdef where it belongs.
-
-Fixes: 80d6b0c2eed2a ("ARM: mm: allow text and rodata sections to be read-only")
-
-Suggested-by: Nicolai Stange <nicstange@gmail.com>
-Suggested-by: Rabin Vincent <rabin@rab.in>
-Signed-off-by: Abel Vesa <abelvesa@linux.com>
----
- arch/arm/kernel/ftrace.c | 11 ++++++-----
- 1 file changed, 6 insertions(+), 5 deletions(-)
-
-diff --git a/arch/arm/kernel/ftrace.c b/arch/arm/kernel/ftrace.c
-index 3f17594..414e60e 100644
---- a/arch/arm/kernel/ftrace.c
-+++ b/arch/arm/kernel/ftrace.c
-@@ -29,11 +29,6 @@
- #endif
- 
- #ifdef CONFIG_DYNAMIC_FTRACE
--#ifdef CONFIG_OLD_MCOUNT
--#define OLD_MCOUNT_ADDR	((unsigned long) mcount)
--#define OLD_FTRACE_ADDR ((unsigned long) ftrace_caller_old)
--
--#define	OLD_NOP		0xe1a00000	/* mov r0, r0 */
- 
- static int __ftrace_modify_code(void *data)
- {
-@@ -51,6 +46,12 @@ void arch_ftrace_update_code(int command)
- 	stop_machine(__ftrace_modify_code, &command, NULL);
- }
- 
-+#ifdef CONFIG_OLD_MCOUNT
-+#define OLD_MCOUNT_ADDR	((unsigned long) mcount)
-+#define OLD_FTRACE_ADDR ((unsigned long) ftrace_caller_old)
-+
-+#define	OLD_NOP		0xe1a00000	/* mov r0, r0 */
-+
- static unsigned long ftrace_nop_replace(struct dyn_ftrace *rec)
- {
- 	return rec->arch.old_mcount ? OLD_NOP : NOP;
--- 
-2.7.4
+John
