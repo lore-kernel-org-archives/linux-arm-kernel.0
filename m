@@ -1,35 +1,25 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Wed, 15 Mar 2017 15:12:11 +0530
-Subject: [PATCH V2 1/2] kexec: arm64: create identity page table to be
- used in purgatory
-In-Reply-To: <281f2f04-842d-73d3-cd52-8774ab549c23@redhat.com>
-References: <cover.1482129830.git.panand@redhat.com>
- <ea98a0045c8d466456f53150f341546810dd47e1.1482129830.git.panand@redhat.com>
- <587E53A6.6020709@arm.com> <281f2f04-842d-73d3-cd52-8774ab549c23@redhat.com>
-Message-ID: <8aba46a4-411e-0a4c-0e85-ea955348f631@redhat.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 15 Mar 2017 10:43:57 +0100
+Subject: [PATCH 2/3] pinctrl: meson-gxl: Fix inverted registers and add
+ missing pins
+In-Reply-To: <1488893462-7016-3-git-send-email-narmstrong@baylibre.com>
+References: <1488893462-7016-1-git-send-email-narmstrong@baylibre.com>
+ <1488893462-7016-3-git-send-email-narmstrong@baylibre.com>
+Message-ID: <CACRpkdZ+x6vZQKfCoKD3dn-XzAxBBwMy=HF1Zi7SqXFWv28rZA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi James,
+On Tue, Mar 7, 2017 at 2:31 PM, Neil Armstrong <narmstrong@baylibre.com> wrote:
 
-On Wednesday 18 January 2017 01:13 PM, Pratyush Anand wrote:
+> Fix some inverted bit numbers in some pinctrl groups and add missing pins
+> and groups to be in pair with the GXBB pinctrl pins definition.
 >
->>
->>> +     * in kexec
->>> +     */
->>> +    if (next_tbl_cnt > 5)
->>> +        die("%s: No more memory for page table\n", __func__);
->>
->> die()? With a bit of juggling can't we return an error so we never try
->> to enable
->> the MMU+dcache instead?
->>
->
-> OK. can do that.
+> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 
-It does not seem easy to do that. We will have to revert job of 
-add_buffer_phys_virt() in case of failure, and it will need lot of new 
-code. So, IMHO it would be better to keep die() as of now.
-What do you say?
+This does not apply on my fixes branch and possibly no other
+v4.11-rc1-based branch. Can you please rebase it and resend?
 
-~Pratyush
+I guess this also needs queueing for fixes?
+
+Yours,
+Linus Walleij
