@@ -1,52 +1,59 @@
-From: julia@ni.com (Julia Cartwright)
-Date: Wed, 15 Mar 2017 13:17:30 -0500
-Subject: [RFC PATCH 0/4] pinctrl: rockchip: PREEMPT_RT_FULL fixes
-In-Reply-To: <CACRpkdZXBZr_Syur3r=3GTjjrCPx4bgj0g5iNSN6rdikqkww4w@mail.gmail.com>
-References: <20170313183813.3582-1-john@metanate.com>
- <CACRpkdZXBZr_Syur3r=3GTjjrCPx4bgj0g5iNSN6rdikqkww4w@mail.gmail.com>
-Message-ID: <20170315181730.GC682@jcartwri.amer.corp.natinst.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 15 Mar 2017 17:54:08 +0000
+Subject: [PATCH 1/3] arm64: enable pci resource mapping using sysfs
+In-Reply-To: <1489598266.86622.12.camel@infradead.org>
+References: <1489598266.86622.12.camel@infradead.org>
+Message-ID: <20170315175353.GA29452@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 15, 2017 at 02:12:39PM +0100, Linus Walleij wrote:
-> On Mon, Mar 13, 2017 at 7:38 PM, John Keeping <john@metanate.com> wrote:
-> 
-> > As described in Documentation/gpio/driver.txt, we should not be using
-> > sleepable APIs in the irqchip implementation.  Since this includes the
-> > regmap API, this patch series ends up moving the mux setup for IRQs into
-> > an irq_bus_sync_unlock() handler which may result in the IRQ being
-> > configured before the port has been muxed as a GPIO.
-> >
-> > I've marked the series as RFC because I'm not sure if this is the best
-> > way to accomplish this or if there is another approach that is cleaner.
-> > Also, the first patch may not be correct on RK3399 because I originally
-> > wrote the patch for RK3288 on top of v4.4 where all drive updates only
-> > affect a single register.  We don't need locking in this case because
-> > regmap_update_bits() takes a lock on the regmap internally, but if these
-> > two registers need to be updated atomically then another lock will
-> > be required here - slock cannot be used if it is converted to a raw
-> > spinlock since with full RT preemption the regmap's spinlock may sleep.
-> 
-> Nice work! It all looks good to me, let's see what Heiko says.
-> 
-> Please keep Julia Cartwright on the CC for this patch series, she is
-> doing some coccinelle-based rewrites to use raw spinlocks as we
-> speak, and she knows this stuff.
-> 
-> She has not targeted the Rockchip driver yet, I guess because of
-> its complexity.
+Hi,
 
-I haven't really given much thought to how we might generically solve
-raw_spinlock problems for those drivers which make of irq_chip_generic
-just yet.  I don't imagine it would be too difficult, just more work.
+On Wed, Mar 15, 2017 at 05:17:46PM +0000, David Woodhouse wrote:
+> From: Brijesh Singh <brijess@amazon.com>
+> 
+> To support pci resource mapping from userspace, pci_mmap_page_range
+> implementation must be done for that platform. This support was
+> broken for arm64.
+> 
+> This patch copies existing implementation from arm to
+> enable sysfs mmap.
 
-Thanks for the CC.
+It's not so much "broken" as "not currently supported".
 
-   Julia
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170315/c3ed4b8f/attachment.sig>
+[...]
+
+> +#define HAVE_PCI_MMAP
+> +extern int pci_mmap_page_range(struct pci_dev *dev, struct vm_area_struct *vma,
+> +			       enum pci_mmap_state mmap_state, int write_combine);
+> +
+
+Per the prior attempt at this [1], we only want to expose the sysfs
+interface, and not the legacy procfs interface, and need the two
+decoupled [2].
+
+... or has something changed in the mean time, so that this only exposes
+the sysfs interface?
+
+[...]
+
+> +int pci_mmap_page_range(struct pci_dev *dev, struct vm_area_struct *vma,
+> +			enum pci_mmap_state mmap_state, int write_combine)
+> +{
+> +	if (mmap_state == pci_mmap_io)
+> +		return -EINVAL;
+> +
+> +	if (write_combine)
+> +		vma->vm_page_prot = pgprot_writecombine(vma->vm_page_prot);
+> +	else
+> +		vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
+
+... as per Will's comment in [3], the latter of these should use
+pgprot_device.
+
+Thanks,
+Mark.
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-April/421948.html
+[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-April/423083.html
+[3] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-April/422571.html
