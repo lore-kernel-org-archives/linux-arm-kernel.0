@@ -1,39 +1,31 @@
 From: jonathanh@nvidia.com (Jon Hunter)
-Date: Wed, 15 Mar 2017 13:31:54 +0000
-Subject: [PATCH 4/5] dt-bindings: tegra: Update compatible strings for Tegra
- flowctrl
+Date: Wed, 15 Mar 2017 13:31:55 +0000
+Subject: [PATCH 5/5] soc/tegra: Add initial flowctrl support for Tegra210
 In-Reply-To: <1489584715-23138-1-git-send-email-jonathanh@nvidia.com>
 References: <1489584715-23138-1-git-send-email-jonathanh@nvidia.com>
-Message-ID: <1489584715-23138-5-git-send-email-jonathanh@nvidia.com>
+Message-ID: <1489584715-23138-6-git-send-email-jonathanh@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update the compatible strings for Tegra Flow Control driver to match
-the device-tree source files for Tegra.
+Tegra210 supports the flowctrl module and so add initial support for
+this device.
 
 Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
 ---
- .../devicetree/bindings/arm/tegra/nvidia,tegra20-flowctrl.txt     | 8 +++++++-
- 1 file changed, 7 insertions(+), 1 deletion(-)
+ drivers/soc/tegra/flowctrl.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-flowctrl.txt b/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-flowctrl.txt
-index ccf0adddc820..d92bf782985f 100644
---- a/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-flowctrl.txt
-+++ b/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-flowctrl.txt
-@@ -1,7 +1,13 @@
- NVIDIA Tegra Flow Controller
+diff --git a/drivers/soc/tegra/flowctrl.c b/drivers/soc/tegra/flowctrl.c
+index b94d9161e448..1a993104e7ff 100644
+--- a/drivers/soc/tegra/flowctrl.c
++++ b/drivers/soc/tegra/flowctrl.c
+@@ -147,6 +147,7 @@ void flowctrl_cpu_suspend_exit(unsigned int cpuid)
+ }
  
- Required properties:
--- compatible: Should be "nvidia,tegra<chip>-flowctrl"
-+- compatible: Should contain one of the following:
-+	For Tegra20 must contain "nvidia,tegra20-flowctrl".
-+	For Tegra30 must contain "nvidia,tegra30-flowctrl".
-+	For Tegra114 must contain "nvidia,tegra114-flowctrl"
-+	For Tegra124 must contain "nvidia,tegra124-flowctrl"
-+	For Tegra132 must contain "nvidia,tegra124-flowctrl"
-+	For Tegra210 must contain "nvidia,tegra210-flowctrl"
- - reg: Should contain one register range (address and length)
- 
- Example:
+ static const struct of_device_id matches[] __initconst = {
++	{ .compatible = "nvidia,tegra210-flowctrl" },
+ 	{ .compatible = "nvidia,tegra124-flowctrl" },
+ 	{ .compatible = "nvidia,tegra114-flowctrl" },
+ 	{ .compatible = "nvidia,tegra30-flowctrl" },
 -- 
 2.7.4
