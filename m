@@ -1,44 +1,33 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Thu, 16 Mar 2017 01:28:08 +0800
-Subject: [PATCH v2 5/5] arm64: allwinner: a64: add R_PIO pinctrl node
-In-Reply-To: <20170315172808.64011-1-icenowy@aosc.xyz>
-References: <20170315172808.64011-1-icenowy@aosc.xyz>
-Message-ID: <20170315172808.64011-6-icenowy@aosc.xyz>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 15 Mar 2017 12:37:53 -0500
+Subject: [PATCH 7/15] dt-bindings: display: sun4i: Add
+ allwinner,tcon-channel property
+In-Reply-To: <46fdec2d680d539652f87d79c627973b3a568438.1488876832.git-series.maxime.ripard@free-electrons.com>
+References: <cover.bc06ffa88f847ddd9ddd7c259415d5f61b55307b.1488876832.git-series.maxime.ripard@free-electrons.com>
+ <46fdec2d680d539652f87d79c627973b3a568438.1488876832.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <20170315173753.6zywfxapdczu2i34@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allwinner A64 have a dedicated pin controller to manage the PL pin bank.
-As the driver and the required clock support are added, add the device
-node for it.
+On Tue, Mar 07, 2017 at 09:56:26AM +0100, Maxime Ripard wrote:
+> The Allwinner Timings Controller has two, mutually exclusive, channels.
+> When the binding has been introduced, it was assumed that there would be
+> only a single user per channel in the system.
+> 
+> While this is likely for the channel 0 which only connects to LCD displays,
+> it turns out that the channel 1 can be connected to multiple controllers in
+> the SoC (HDMI and TV encoders for example). And while the simultaneous use
+> of HDMI and TV outputs cannot be achieved, switching from one to the other
+> at runtime definitely sounds plausible.
+> 
+> Add an extra property, allwinner,tcon-channel, to specify for a given
+> endpoint which TCON channel it is connected to, while falling back to the
+> previous mechanism if that property is missing.
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
----
-New patch in v2.
+I think perhaps TCON channels should have been ports rather than 
+endpoints. The fact that the channels are mutually exclusive can be 
+handled in the driver and doesn't really matter in the binding. How 
+painful would it be to rework things to move TCON channel 1 from port 0, 
+endpoint 1 to port 1? 
 
- arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-index dbeba43386f6..a59fec6f2a22 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-@@ -410,5 +410,17 @@
- 			#clock-cells = <1>;
- 			#reset-cells = <1>;
- 		};
-+
-+		r_pio: pinctrl at 01f02c00 {
-+			compatible = "allwinner,sun50i-a64-r-pinctrl";
-+			reg = <0x01f02c00 0x400>;
-+			interrupts = <GIC_SPI 45 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&r_ccu CLK_APB0_PIO>, <&osc24M>, <&osc32k>;
-+			clock-names = "apb", "hosc", "losc";
-+			gpio-controller;
-+			#gpio-cells = <3>;
-+			interrupt-controller;
-+			#interrupt-cells = <3>;
-+		};
- 	};
- };
--- 
-2.12.0
+Rob
