@@ -1,109 +1,137 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 15 Mar 2017 14:08:57 +0100
-Subject: [PATCH] pinctrl: qcom: add get_direction function
-In-Reply-To: <20170315050850.GC1694@minitux>
-References: <1486768860-18237-1-git-send-email-timur@codeaurora.org>
- <8652c018-4051-5c77-3126-2d41d150518a@codeaurora.org>
- <CACRpkdaoHTZa+XjEBAMtO2dS1jevi5h-QYe90SrZDuJghQSyYw@mail.gmail.com>
- <13b19c7f-9440-ab8e-8a2f-d1796a9b3dde@codeaurora.org>
- <CACRpkdZFzYStyPfK1DwkZfvtd7wX9HtD1bnCy+i9h-7xowOz4g@mail.gmail.com>
- <e209d18d-dc53-c0e9-448c-8a88264cac74@codeaurora.org>
- <20170314233040.GH10239@codeaurora.org>
- <c40b0ee7-6d8c-8c5d-d4c5-9ecf8076e44f@codeaurora.org>
- <20170314234140.GI10239@codeaurora.org>
- <f1152d48-004e-71bc-16a1-3a25990ba9e4@codeaurora.org>
- <20170315050850.GC1694@minitux>
-Message-ID: <CACRpkdYE4svSgFywpgfM1zE72BaA_FsUCR1VeAGMLYykJCQoWw@mail.gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 15 Mar 2017 14:11:31 +0100
+Subject: [PATCH v6 08/14] mmc: sdhci-xenon: Add Marvell Xenon SDHC core
+ functionality
+In-Reply-To: <cb885ae19e7c467908cdaa1f1cc8d95a7217d663.1487091464.git-series.gregory.clement@free-electrons.com>
+References: <cover.ff78bebe0384f650a51e5e6f0f1dca6e7894b53b.1487091464.git-series.gregory.clement@free-electrons.com>
+ <cb885ae19e7c467908cdaa1f1cc8d95a7217d663.1487091464.git-series.gregory.clement@free-electrons.com>
+Message-ID: <CAPDyKFpH+RGAZGoVCuCOKJ2iEa+Y=cNNcM-uKhkYaTpmogXCKA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 15, 2017 at 6:08 AM, Bjorn Andersson
-<bjorn.andersson@linaro.org> wrote:
-> On Tue 14 Mar 17:12 PDT 2017, Timur Tabi wrote:
-
->> Did you mean the gpio_chip.request callback?  Currently that points to
->> gpiochip_generic_request in pinctrl-msm.c.
+On 14 February 2017 at 18:01, Gregory CLEMENT
+<gregory.clement@free-electrons.com> wrote:
+> From: Hu Ziji <huziji@marvell.com>
 >
-> It might be useful to fail gpio_get, as that gives a much nicer error
-> path in the client. But I'm slightly concerned about the few cases where
-> one of the pinmux states is gpio and that this would force the
-> gpio_get() only to be called after switching to that particular mode.
+> Add Xenon eMMC/SD/SDIO host controller core functionality.
+> Add Xenon specific initialization process.
+> Add Xenon specific mmc_host_ops APIs.
+> Add Xenon specific register definitions.
 >
-> @Linus, have there been any discussion around this in other drivers?
+> Add CONFIG_MMC_SDHCI_XENON support in drivers/mmc/host/Kconfig.
+>
+> Marvell Xenon SDHC conforms to SD Physical Layer Specification
+> Version 3.01 and is designed according to the guidelines provided
+> in the SD Host Controller Standard Specification Version 3.00.
+>
+> Signed-off-by: Hu Ziji <huziji@marvell.com>
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> ---
+>  drivers/mmc/host/Kconfig       |   9 +-
+>  drivers/mmc/host/Makefile      |   3 +-
+>  drivers/mmc/host/sdhci-xenon.c | 602 ++++++++++++++++++++++++++++++++++-
+>  drivers/mmc/host/sdhci-xenon.h |  70 ++++-
+>  4 files changed, 684 insertions(+)
+>  create mode 100644 drivers/mmc/host/sdhci-xenon.c
+>  create mode 100644 drivers/mmc/host/sdhci-xenon.h
+>
+> diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
+> index 2eb97014dc3f..1c1a88bfbdad 100644
+> --- a/drivers/mmc/host/Kconfig
+> +++ b/drivers/mmc/host/Kconfig
+> @@ -819,3 +819,12 @@ config MMC_SDHCI_BRCMSTB
+>           Broadcom STB SoCs.
+>
+>           If unsure, say Y.
+> +
+> +config MMC_SDHCI_XENON
+> +       tristate "Marvell Xenon eMMC/SD/SDIO SDHCI driver"
+> +       depends on MMC_SDHCI_PLTFM
+> +       help
+> +         This selects Marvell Xenon eMMC/SD/SDIO SDHCI.
+> +         If you have a machine with integrated Marvell Xenon SDHC IP,
 
-Not more than the obvious, this driver has:
+/s/SDHC/SDHCI
 
-        .request          = gpiochip_generic_request,
-        .free             = gpiochip_generic_free,
+> +         say Y or M here.
+> +         If unsure, say N.
+> diff --git a/drivers/mmc/host/Makefile b/drivers/mmc/host/Makefile
+> index ccc9c4cba154..b0a2ab4b256e 100644
+> --- a/drivers/mmc/host/Makefile
+> +++ b/drivers/mmc/host/Makefile
+> @@ -82,3 +82,6 @@ obj-$(CONFIG_MMC_SDHCI_BRCMSTB)               += sdhci-brcmstb.o
+>  ifeq ($(CONFIG_CB710_DEBUG),y)
+>         CFLAGS-cb710-mmc        += -DDEBUG
+>  endif
+> +
+> +obj-$(CONFIG_MMC_SDHCI_XENON)  += sdhci-xenon-driver.o
+> +sdhci-xenon-driver-y           += sdhci-xenon.o
 
-Which will call:
+Why not only this:
+obj-$(CONFIG_MMC_SDHCI_XENON) += sdhci-xenon.o
 
-pinctrl_request_gpio()
-pinctrl_free_gpio()
+> diff --git a/drivers/mmc/host/sdhci-xenon.c b/drivers/mmc/host/sdhci-xenon.c
+> new file mode 100644
+> index 000000000000..e633f803907a
+> --- /dev/null
+> +++ b/drivers/mmc/host/sdhci-xenon.c
+> @@ -0,0 +1,602 @@
+> +/*
+> + * Driver for Marvell Xenon SDHC as a platform device
+> + *
+> + * Copyright (C) 2016 Marvell, All Rights Reserved.
+> + *
+> + * Author:     Hu Ziji <huziji@marvell.com>
+> + * Date:       2016-8-24
+> + *
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License as
+> + * published by the Free Software Foundation version 2.
+> + *
+> + * Inspired by Jisheng Zhang <jszhang@marvell.com>
+> + * Special thanks to Video BG4 project team.
+> + */
+> +
+> +#include <linux/delay.h>
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +
+> +#include "sdhci-pltfm.h"
+> +#include "sdhci-xenon.h"
+> +
+> +static int enable_xenon_internal_clk(struct sdhci_host *host)
 
-(Note: we now also have gpiochip_generic_config() and
-pinctrl_gpio_set_config(), you should maybe want to look into
-this because it makes it possible for the pin control back-end
-to support debouncing and open drain/source from the gpiolib
-side.)
+[...]
 
-Anyways in some drivers (not pinctrl-msm.c) this ends up calling
-this helper callback in pinmux_ops:
+> +/* Set SDCLK-off-while-idle */
+> +static void xenon_set_sdclk_off_idle(struct sdhci_host *host,
+> +                                    unsigned char sdhc_id, bool enable)
 
- * @gpio_request_enable: requests and enables GPIO on a certain pin.
- *      Implement this only if you can mux every pin individually as GPIO. The
- *      affected GPIO range is passed along with an offset(pin number) into that
- *      specific GPIO range - function selectors and pin groups are orthogonal
- *      to this, the core will however make sure the pins do not collide.
+[...]
 
-If you do not have this kind of BIOS/ACPI playing around with the
-pins behind your back, then this is really helpful to avoid having
-to (in the DTS) mux all these pins to the GPIO function explicitly
-like this for example:
+> +/* Recover the Register Setting cleared during SOFTWARE_RESET_ALL */
+> +static void sdhci_xenon_reset_exit(struct sdhci_host *host,
+> +                                  unsigned char sdhc_id, u8 mask)
 
-/* Interrupt line for the KXSD9 accelerometer */
-dragon_kxsd9_gpios: kxsd9 {
-    irq {
-        pins = "gpio57"; /* IRQ line */
-        bias-pull-up;
-    };
-};
+[...]
 
-Well, in this case, since we also need to set up a pull-up the DT node
-is needed anyways, but you get the idea.
+ff --git a/drivers/mmc/host/sdhci-xenon.h b/drivers/mmc/host/sdhci-xenon.h
+> new file mode 100644
+> index 000000000000..69de711db9eb
+> --- /dev/null
+> +++ b/drivers/mmc/host/sdhci-xenon.h
 
-So we have a bunch of fit-all callbacks but the subsystem was
-constructed for a scenario where the kernel has full control over the
-pins.
+You should probably put all this in the c-file instead. That is how
+most other sdhci variants does it.
 
-In the beg?nning ACPI people were saying they simply should not
-devise any pin control driver at all, because ACPI would handle all
-muxing behind the scenes. It turns out they were mostly too
-ambitious about that, one usecase is power optimizations that are
-not readily understood when writing the BIOS, other reasons are
-when you are building embedded systems and randomly adding some
-extra peripherals, in theory every vendor should ideally write a new
-ACPI table and reflash the BIOS but it appears that in practice they
-do not, so I think most of that hardware has some hybrid model.
+[...]
 
-I would ask the Intel people about their position of ACPI and pin
-control interwork, they have most experience in this. If you
-git-blame drivers/gpio/gpiolib-acpi.c you can see that it is mostly
-written by Mika and Rafael.
+Overall this looks good to me, however I think Adrian needs to have a
+quick look as well.
 
-If you look in intel_pinmux_set_mux() you find that they do avoid
-muxing some pins:
+One additional very minor nitpick. Perhaps you can align on the
+function names prefix, as those currently varies between "whatever",
+"xenon_" and "sdhci_xenon_".
 
-        /*
-         * All pins in the groups needs to be accessible and writable
-         * before we can enable the mux for this group.
-         */
-        for (i = 0; i < grp->npins; i++) {
-                if (!intel_pad_usable(pctrl, grp->pins[i])) {
-                        raw_spin_unlock_irqrestore(&pctrl->lock, flags);
-                        return -EBUSY;
-                }
-        }
-
-Yours,
-Linus Walleij
+Kind regards
+Uffe
