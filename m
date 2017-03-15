@@ -1,165 +1,113 @@
-From: pushkar.iit@gmail.com (Pushkar Jambhlekar)
-Date: Tue, 14 Mar 2017 18:39:04 +0530
-Subject: [PATCH] vc04_services: Fixing coding and logical guidelines
-Message-ID: <1489496944-44038-1-git-send-email-pushkar.iit@gmail.com>
+From: zhang.chunyan@linaro.org (Chunyan Zhang)
+Date: Wed, 15 Mar 2017 11:51:39 +0800
+Subject: [2/2] coresight: Fix reference count for software sources
+In-Reply-To: <ddf386ee-0be5-b1ca-174c-89d9e48ba282@arm.com>
+References: <1489073232-5093-3-git-send-email-suzuki.poulose@arm.com>
+ <CANLsYkwg_PRcL5Sqd15phOFS-L8-v3SdvF1kBFa9De-==tx9gw@mail.gmail.com>
+ <ddf386ee-0be5-b1ca-174c-89d9e48ba282@arm.com>
+Message-ID: <CAG2=9p_+2jv8xxUex=mvNXJswk+cx-kXGRcTbCd9i5-vOf6X4A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Description:
-    in file 'vc04_services/interface/vchiq_arm/vchiq_shim.c', making changes to make code according to 'checkpath.pl'.
-Also, fixing logical issue, i.e. removing break after goto statement.
+Hi Suzuki,
 
-Signed-off-by: Pushkar Jambhlekar <pushkar.iit@gmail.com>
----
- .../vc04_services/interface/vchiq_arm/vchiq_shim.c | 33 ++++++++++++++++------
- 1 file changed, 24 insertions(+), 9 deletions(-)
+On 15 March 2017 at 02:06, Suzuki K Poulose <Suzuki.Poulose@arm.com> wrote:
+> On 14/03/17 17:40, Mathieu Poirier wrote:
+>>
+>> On 14 March 2017 at 11:32, Mathieu Poirier <mathieu.poirier@linaro.org>
+>> wrote:
+>>>
+>>> From: "Suzuki K. Poulose" <Suzuki.Poulose@arm.com>
+>>>
+>>> For software sources (i.e STM), there could be multiple agents
+>>> generating the trace data, unlike the ETMs. So we need to
+>>> properly do the accounting for the active number of users
+>>> to disable the device when the last user goes away. Right
+>>> now, the reference counting is broken for sources as we skip
+>>> the actions when we detect that the source is enabled.
+>>>
+>>> This patch fixes the problem by adding the refcounting for
+>>> software sources, even when they are enabled.
+>>>
+>>> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+>>> Reported-by: Robert Walker <robert.walker@arm.com>
+>>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+>>> ---
+>>>  drivers/hwtracing/coresight/coresight.c | 13 +++++++++++--
+>>>  1 file changed, 11 insertions(+), 2 deletions(-)
+>>>
+>>> diff --git a/drivers/hwtracing/coresight/coresight.c
+>>> b/drivers/hwtracing/coresight/coresight.c
+>>> index 34cd1ed..2da9e39 100644
+>>> --- a/drivers/hwtracing/coresight/coresight.c
+>>> +++ b/drivers/hwtracing/coresight/coresight.c
+>>> @@ -552,6 +552,7 @@ int coresight_enable(struct coresight_device *csdev)
+>>>         int cpu, ret = 0;
+>>>         struct coresight_device *sink;
+>>>         struct list_head *path;
+>>> +       enum coresight_dev_subtype_source subtype =
+>>> csdev->subtype.source_subtype;
+>>
+>>
+>> Checkpatch.pl complains about a line over 80 characters.
+>>
+>>>
+>>>         mutex_lock(&coresight_mutex);
+>>>
+>>> @@ -559,8 +560,16 @@ int coresight_enable(struct coresight_device *csdev)
+>>>         if (ret)
+>>>                 goto out;
+>>>
+>>> -       if (csdev->enable)
+>>> +       if (csdev->enable) {
+>>> +               /*
+>>> +                * There could be multiple applications driving the
+>>> software
+>>> +                * source. So keep the refcount for each such user when
+>>> the
+>>> +                * source is already enabled.
+>>> +                */
+>>> +               if (subtype == CORESIGHT_DEV_SUBTYPE_SOURCE_SOFTWARE)
+>>> +                       atomic_inc(csdev->refcnt);
+>>>                 goto out;
+>>> +       }
+>>>
+>
+> Btw, should we allow the user to turn on the STM from sysfs (echo 1 >
+> $STM/enable_source) ?
 
-diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_shim.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_shim.c
-index 48984ab..6d8a1d8 100644
---- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_shim.c
-+++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_shim.c
-@@ -52,7 +52,8 @@ typedef struct {
- 
- /* ----------------------------------------------------------------------
-  * return pointer to the mphi message driver function table
-- * -------------------------------------------------------------------- */
-+ * ----------------------------------------------------------------------
-+ */
- const VCHI_MESSAGE_DRIVER_T *
- vchi_mphi_message_driver_func_table(void)
- {
-@@ -61,7 +62,8 @@ vchi_mphi_message_driver_func_table(void)
- 
- /* ----------------------------------------------------------------------
-  * return a pointer to the 'single' connection driver fops
-- * -------------------------------------------------------------------- */
-+ * ----------------------------------------------------------------------
-+ */
- const VCHI_CONNECTION_API_T *
- single_get_func_table(void)
- {
-@@ -556,6 +558,7 @@ EXPORT_SYMBOL(vchi_connect);
- int32_t vchi_disconnect(VCHI_INSTANCE_T instance_handle)
- {
- 	VCHIQ_INSTANCE_T instance = (VCHIQ_INSTANCE_T)instance_handle;
-+
- 	return vchiq_status_to_vchi(vchiq_shutdown(instance));
- }
- EXPORT_SYMBOL(vchi_disconnect);
-@@ -592,7 +595,6 @@ static VCHIQ_STATUS_T shim_callback(VCHIQ_REASON_T reason,
- 				  VCHI_CALLBACK_MSG_AVAILABLE, NULL);
- 
- 		goto done;
--		break;
- 
- 	case VCHIQ_BULK_TRANSMIT_DONE:
- 		service->callback(service->callback_param,
-@@ -733,8 +735,10 @@ int32_t vchi_service_close(const VCHI_SERVICE_HANDLE_T handle)
- {
- 	int32_t ret = -1;
- 	SHIM_SERVICE_T *service = (SHIM_SERVICE_T *)handle;
-+
- 	if (service) {
- 		VCHIQ_STATUS_T status = vchiq_close_service(service->handle);
-+
- 		if (status == VCHIQ_SUCCESS) {
- 			service_free(service);
- 			service = NULL;
-@@ -750,8 +754,10 @@ int32_t vchi_service_destroy(const VCHI_SERVICE_HANDLE_T handle)
- {
- 	int32_t ret = -1;
- 	SHIM_SERVICE_T *service = (SHIM_SERVICE_T *)handle;
-+
- 	if (service) {
- 		VCHIQ_STATUS_T status = vchiq_remove_service(service->handle);
-+
- 		if (status == VCHIQ_SUCCESS) {
- 			service_free(service);
- 			service = NULL;
-@@ -770,6 +776,7 @@ int32_t vchi_service_set_option(const VCHI_SERVICE_HANDLE_T handle,
- 	int32_t ret = -1;
- 	SHIM_SERVICE_T *service = (SHIM_SERVICE_T *)handle;
- 	VCHIQ_SERVICE_OPTION_T vchiq_option;
-+
- 	switch (option) {
- 	case VCHI_SERVICE_OPTION_TRACE:
- 		vchiq_option = VCHIQ_SERVICE_OPTION_TRACE;
-@@ -797,8 +804,8 @@ int32_t vchi_get_peer_version(const VCHI_SERVICE_HANDLE_T handle, short *peer_ve
- {
- 	int32_t ret = -1;
- 	SHIM_SERVICE_T *service = (SHIM_SERVICE_T *)handle;
--	if (service)
--	{
-+
-+	if (service) {
- 		VCHIQ_STATUS_T status;
- 
- 		status = vchiq_get_peer_version(service->handle, peer_version);
-@@ -811,7 +818,8 @@ EXPORT_SYMBOL(vchi_get_peer_version);
- /* ----------------------------------------------------------------------
-  * read a uint32_t from buffer.
-  * network format is defined to be little endian
-- * -------------------------------------------------------------------- */
-+ * ----------------------------------------------------------------------
-+ */
- uint32_t
- vchi_readbuf_uint32(const void *_ptr)
- {
-@@ -822,11 +830,13 @@ vchi_readbuf_uint32(const void *_ptr)
- /* ----------------------------------------------------------------------
-  * write a uint32_t to buffer.
-  * network format is defined to be little endian
-- * -------------------------------------------------------------------- */
-+ * ----------------------------------------------------------------------
-+ */
- void
- vchi_writebuf_uint32(void *_ptr, uint32_t value)
- {
- 	unsigned char *ptr = _ptr;
-+
- 	ptr[0] = (unsigned char)((value >> 0)  & 0xFF);
- 	ptr[1] = (unsigned char)((value >> 8)  & 0xFF);
- 	ptr[2] = (unsigned char)((value >> 16) & 0xFF);
-@@ -836,7 +846,8 @@ vchi_writebuf_uint32(void *_ptr, uint32_t value)
- /* ----------------------------------------------------------------------
-  * read a uint16_t from buffer.
-  * network format is defined to be little endian
-- * -------------------------------------------------------------------- */
-+ * ----------------------------------------------------------------------
-+ */
- uint16_t
- vchi_readbuf_uint16(const void *_ptr)
- {
-@@ -847,11 +858,13 @@ vchi_readbuf_uint16(const void *_ptr)
- /* ----------------------------------------------------------------------
-  * write a uint16_t into the buffer.
-  * network format is defined to be little endian
-- * -------------------------------------------------------------------- */
-+ * ----------------------------------------------------------------------
-+ */
- void
- vchi_writebuf_uint16(void *_ptr, uint16_t value)
- {
- 	unsigned char *ptr = _ptr;
-+
- 	ptr[0] = (value >> 0)  & 0xFF;
- 	ptr[1] = (value >> 8)  & 0xFF;
- }
-@@ -870,6 +883,7 @@ int32_t vchi_service_use(const VCHI_SERVICE_HANDLE_T handle)
- {
- 	int32_t ret = -1;
- 	SHIM_SERVICE_T *service = (SHIM_SERVICE_T *)handle;
-+
- 	if (service)
- 		ret = vchiq_status_to_vchi(vchiq_use_service(service->handle));
- 	return ret;
-@@ -890,6 +904,7 @@ int32_t vchi_service_release(const VCHI_SERVICE_HANDLE_T handle)
- {
- 	int32_t ret = -1;
- 	SHIM_SERVICE_T *service = (SHIM_SERVICE_T *)handle;
-+
- 	if (service)
- 		ret = vchiq_status_to_vchi(
- 			vchiq_release_service(service->handle));
--- 
-2.7.4
+If enabling STM can not be allowed via sysfs, how should we allow
+users to turn on STM when they want to mmap STM to user space, and
+write STM device from user space directly? For example this kind of
+use case [1].
+
+> All STM users should set their policy via ioctls and that in turn turns the
+> device on.
+
+Yes users can set policy via ioctls to request resource of STM (i.e.
+which STM channel(s) will be written), but they still need to use
+sysfs to enable STM.
+
+> So it doesn't make sense for enable_source to really enable
+> the hardware unless someone really opens it.
+
+Right, there're two ways to enable STM currently, e.g.
+1) echo <addr>.stm  > /sys/class/stm_source/stm_ftrace/stm_source_link
+2) echo 1 > $STM/enable_source
+
+That would probably make people confused, I would appreciate any
+better solution.
+
+
+Thanks,
+Chunyan
+
+[1] https://github.com/lyrazhang/user-space-tests/tree/mmap-wrapper/mmap-wrapper
+
+>
+> Chunyan, Mathieu,
+>
+> thoughts ?
+>
+> Suzuki
+>
