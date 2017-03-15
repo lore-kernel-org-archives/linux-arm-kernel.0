@@ -1,79 +1,87 @@
-From: julia@ni.com (Julia Cartwright)
-Date: Wed, 15 Mar 2017 13:23:09 -0500
-Subject: [PATCH v2 2/4] pinctrl: rockchip: convert to raw spinlock
-In-Reply-To: <8564532.G8NNa9Oa4k@phil>
-References: <20170315174654.15128-1-john@metanate.com>
- <20170315180137.GB682@jcartwri.amer.corp.natinst.com>
- <20170315180806.3714af56.john@metanate.com> <8564532.G8NNa9Oa4k@phil>
-Message-ID: <20170315182309.GD682@jcartwri.amer.corp.natinst.com>
+From: andy@greyhouse.net (Andy Gospodarek)
+Date: Wed, 15 Mar 2017 14:31:30 -0400
+Subject: [RFC arm64] samples/bpf: explicitly exclude sysreg sections with
+ asm macros
+In-Reply-To: <20170310204112.GA21382@leverpostej>
+References: <1489101492-15653-1-git-send-email-andy@greyhouse.net>
+ <20170310175229.GC18894@arm.com>
+ <20170310192656.GA13928@C02RW35GFVH8>
+ <20170310204112.GA21382@leverpostej>
+Message-ID: <20170315183130.GB32819@C02RW35GFVH8.dhcp.broadcom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 15, 2017 at 07:16:53PM +0100, Heiko Stuebner wrote:
-> Am Mittwoch, 15. M?rz 2017, 18:08:06 CET schrieb John Keeping:
-> > On Wed, 15 Mar 2017 13:01:37 -0500, Julia Cartwright wrote:
-> > > On Wed, Mar 15, 2017 at 05:46:52PM +0000, John Keeping wrote:
-> > > > This lock is used from rockchip_irq_set_type() which is part of the
-> > > > irq_chip implementation and thus must use raw_spinlock_t as documented
-> > > > in Documentation/gpio/driver.txt.
-> > > > 
-> > > > Signed-off-by: John Keeping <john@metanate.com>
-> > > > Reviewed-by: Heiko Stuebner <heiko@sntech.de>
-> > > > Tested-by: Heiko Stuebner <heiko@sntech.de>
-> > > > ---
-> > > > v2: unchanged
-> > > > ---
-> > > > 
-> > > >  drivers/pinctrl/pinctrl-rockchip.c | 30 +++++++++++++++---------------
-> > > >  1 file changed, 15 insertions(+), 15 deletions(-)
-> > > > 
-> > > > diff --git a/drivers/pinctrl/pinctrl-rockchip.c
-> > > > b/drivers/pinctrl/pinctrl-rockchip.c index 128c383ea7ba..8c1cae6d78d7
-> > > > 100644
-[..]
-> > > > @@ -1295,14 +1295,14 @@ static int rockchip_set_pull(struct
-> > > > rockchip_pin_bank *bank,> > 
-> > > >  	switch (ctrl->type) {
-> > > > 
-> > > >  	case RK2928:
-> > > > -		spin_lock_irqsave(&bank->slock, flags);
-> > > > +		raw_spin_lock_irqsave(&bank->slock, flags);
-> > > > 
-> > > >  		data = BIT(bit + 16);
-> > > >  		if (pull == PIN_CONFIG_BIAS_DISABLE)
-> > > >  		
-> > > >  			data |= BIT(bit);
-> > > 
-> > > This should be lifted out from under the lock.
-> > > 
-> > > >  		ret = regmap_write(regmap, reg, data);
-> > > 
-> > > How is this legal?  The regmap_write() here is going to end up acquiring
-> > > the regmap mutex.
-> > 
-> > It's not, the spinlock can be deleted here.  I only have RK3288 hardware
-> > to test and I missed this when checking the uses of slock.
+On Fri, Mar 10, 2017 at 08:41:13PM +0000, Mark Rutland wrote:
+> Hi,
 > 
-> That part could very well also use regmap_update_bits like the other parts.
-> Not really sure, why we use regmap_write here, but I'm also not sure, if it 
-> matters at all.
+> On Fri, Mar 10, 2017 at 02:26:56PM -0500, Andy Gospodarek wrote:
+> > On Fri, Mar 10, 2017 at 05:52:30PM +0000, Will Deacon wrote:
+> > > On Thu, Mar 09, 2017 at 06:18:12PM -0500, Andy Gospodarek wrote:
+> > > > The previous fix to workaround compilation issues for samples/bpf on arm64 was
+> > > > to prevent inclusion of code in sysregs.h.  This is not sustainable at this
+> > > > point since other header files need access to sysregs.h for multiple
+> > > > defintions.  The fact that the bpf samples cannot be compiled on arm64 is
+> > > > fairly well documented on the iovisor-dev mailing and other places without a
+> > > > clear-cut solution other than waiting for the llvm fix.  This attempts to
+> > > > resolve that by dropping the fix to define _ASM_SYSREG_H on the clang command
+> > > > line, and replace it with one that is wrapped around the offending code.  I
+> > > > recognize this feels a bit fragile, but the current situation is not great
+> > > > either and it seems that we are more likely to see users if the current code
+> > > > actually compiles and runs.
+> > > 
+> > > Why does asm cause compilation to fail?
+> > 
+> > It isn't the ASM itself that causes the compilation to fail, it's the
+> > ASM macros included inside the new ifdef that are problematic.  Here is
+> > what is seen per object file:
+> 
+> > ./arch/arm64/include/asm/barrier.h:62:23: note: expanded from macro
+> > '__smp_store_release'
+> >                 asm volatile ("stlr %1, %0"
+> > \
+> >                                     ^
+> > 1 warning generated.
+> > LLVM ERROR: Inline asm not supported by this streamer because we don't  <----  THIS LINE
+> > have an asm parser for this target
+> 
+> ... so as far as I can see it's the presence of any inline assembly that
+> the tool cannot handle, as LLVM tells us.
+> 
+> So why isn't this a problem on other architectures? They're going to
+> have equivalent inline asm getting pulled in, and these samples
+> presumably compiled on at least on architecture in the past.
+> 
+> Does the Tool parse x86 asm without issue, say?
 
-regmap_update_bits also acquires the regmap lock, which would similarly
-be a problem here.[1]
+As far as I can tell (hoping my regex is proper), x86 doesn't have any
+inline assembly that introduces macros like this in any h-files.
 
-But, if we could pull this entire operation out of the lock (and
-convince ourselves that it's okay to do so), then even better!
+> 
+> > One other solution would be to move these macros out to another file
+> > (like sysreg-macros.h or similar) and then continue to use a trick
+> > similar to what we are using not to exclude those macros.  It would need
+> > to be clear to ARCH maintainers that these macros would need to be there
+> > for the forseeable future.  
+> 
+> That's not going to fly. We can't factor out each individual piece of
+> asm without making the architecure ports significantly harder to
+> maintain.
 
-   Julia
+I'm not explicitly asking for that as I agree filtering out all asm
+would be unreasonable.  It seems to me that the specific
+not-in-a-function inline asm (that in this case creates these two new
+macros) is what is in question.
 
-1: Why is this a problem?  Because we're in the middle of a
-   raw_spinlock_t protected critical region: if there were contention on
-   the nested mutex (the "regmap mutex"), then we'd attempt to sleep in
-   atomic context.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170315/8296ca0e/attachment.sig>
+What's most interesting is that that originally sysreg.h contained on
+the mrs_s and msr_s macros with commit 72c58395.  Is the right answer
+actually to move more of the code that has crept into sysreg.h out to
+some other file since it clearly isn't just macros anymore?
+
+> As above, it's not clear to me why this issue doesn't affect other
+> architectures. It sounds like it may simply be a deficiency in the
+> version of LLVM being used, that could be solved by updating that.
+
+I build llvm and friends from source and tested it before submitting
+this patch (I needed to do it based on the older versions included in
+the userspace on my distro), so I knew that a simple upgrade to the
+latest wasn't going to do it.
