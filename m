@@ -1,86 +1,154 @@
-From: illusionist.neo@gmail.com (Shubham Bansal)
-Date: Wed, 15 Mar 2017 17:43:44 +0530
-Subject: arch: arm: bpf: Converting cBPF to eBPF for arm 32 bit
-In-Reply-To: <CAGXu5jLo8UvpNSQZBHjWZoO959ha6KFQxFzmg7SK44wz=R_QSg@mail.gmail.com>
-References: <20170130103853.GA34633@in3o.xyz>
- <CAGXu5j+7+D=N8U9Zpq1Uq526B4C4g=gQZtQ1iCMt3juDFgfgJA@mail.gmail.com>
- <CAHgaXd+nj69n-Xf46N=4M-j-0hKHVrrLfsvRZCG=2CCAtVF6ZA@mail.gmail.com>
- <CAGXu5j+NSLomuSgD40kys+pWc+J9aB6Bbk_gSP9Lp_ScimQn_w@mail.gmail.com>
- <CAHgaXd+EKJ0FWaaPojsNJtgY_YpdQXu6eMEp97uOpTFAWs4qTQ@mail.gmail.com>
- <CAGXu5jLo8UvpNSQZBHjWZoO959ha6KFQxFzmg7SK44wz=R_QSg@mail.gmail.com>
-Message-ID: <CAHgaXdJL92XRjHae2Nb9j9SerSe65=N=ErDHTQf23sdBxwthzw@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 15 Mar 2017 12:14:50 +0000
+Subject: [PATCH v4 00/18] add support for AXP20X and AXP22X power supply
+ drivers
+In-Reply-To: <20170315105537.22349-1-quentin.schulz@free-electrons.com>
+References: <20170315105537.22349-1-quentin.schulz@free-electrons.com>
+Message-ID: <20170315121450.bl5dxdjzazwsrvni@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi kees,
+On Wed, 15 Mar 2017, Quentin Schulz wrote:
 
-> It seems like you're suggesting truncating the 64-bit register values?
-> I think your best solution is going to be to use a memory scratch
-> space and build 64-bit operations using 32-bit registers and memory
-> operations.
+> The X-Powers AXP20X and AXP22X PMICs have multiple ADCs. They expose
+> information and data of the various power supplies they support such as
+> ACIN, battery and VBUS. For example, they expose the current battery
+> voltage, charge or discharge, as well as ACIN and VBUS current voltages
+> and currents, internal PMIC temperature and ADC on 2 different GPIOs
+> when in the right mode (for the AXP209 only).
 
-Yes. I was suggesting the truncating of 64-bit register values, but
-for 32 bit operands only. So when I am truncating the BPF register, I
-am getting rid of non-useful bytes only.
+What are you missing from this set now?  What Acks etc?  And what's
+the plan with regards to route to Mainline?  Where are the dependencies
+etc?
 
- Can you explain how to use memory scratch space and build 64-bit
-operations using 32-bit registers and memory operations ? A small
-example would help a lot.
+> The ACIN power supply driver is added by this patch. The AXP20X and
+> AXP22X can both read the status and the "usability" of the power supply
+> but only the AXP209 will be able to tell the current current and voltage
+> of the power supply by reading ADC channels. It is simply not supported
+> by the AXP22X PMICs.
+> 
+> The battery power supply driver is also added by this patch. The AXP20X
+> and AXP22X share most of their behaviour but have slight variations. The
+> allowed target voltages for battery charging are not the same, the
+> AXP22X PMIC are able to tell if the battery percentage computed by the
+> PMIC is trustworthy and they have different formulas for computing max
+> current for battery power supply. The driver is able to give the current
+> voltage and current of the battery (be it charging or discharging), the
+> maximal and minimal voltage and maximal current allowed for the battery,
+> whether the battery is present and usable and its capacity. It will get
+> the battery current current and voltage by reading the ADC channels. The
+> PMIC allows maximal voltages (4.36V for AXP20X and 4.22V and 4.24V for
+> AXP22X) that should not be used with Lithium-based batteries and since
+> this PMIC is supposed to be used with Lithium-based batteries, they have
+> been disabled. The values returned by the ADC driver are multipled by
+> 1000 to scale from the mV returned by the ADC to the uV expected by the
+> power supply framework.
+> 
+> This series of patch adds DT bindings for ACIN power supply, ADC and
+> battery power supply drivers for AXP20X and AXP22X PMICs and their
+> documentation. It also enables the supported power supplies for the
+> Nextthing Co. CHIP and Sinlinx SinA33 boards.
+> 
+> The different drivers are also added to the MFD cells of the AXP20X and
+> AXP22X cells and the writeable and volatile regs updated to work with
+> the newly added drivers.
+> 
+> This series of patch is based on a previous upstreaming attempt done by
+> Bruno Pr?mont few months ago. It differs in three points: the ADC
+> driver does not tell the battery temperature (TS_IN) as I do not have a
+> board to test it with, it does not tell the instantaneous battery power
+> as it returns crazy values for me and finally no support for OCV curves
+> for the battery.
+> 
+> You can test these patches from this repo and branch:
+> https://github.com/QSchulz/linux/tree/axp2xx_adc_batt_ac_v4
+> 
+> v4:
+>  - added the ability to set maximum constant charge current from sysfs,
+>  - added a warning when setting a higher than current maximum constant charge
+>  current,
+>  - set default to minimum possible value for current and maximum constant charge
+>  current when no battery DT is present or invalid battery DT,
+>  - fixed a forgotten custom formula to compute maximum constant charge current
+>  for AXP22X,
+>  - automatically lower the current constant charge current when it is higher
+>  than the maximum constant charge current about to be set,
+> 
+> v3:
+>  - Removed DT property for constant charge current in favor of the WIP
+>  battery framework as requested by Sebastian Reichel,
+>  - Using a simple if condition instead of a switch in the ADC driver,
+>  - Fixed error handling in ADC driver's probe,
+>  - Fixed missing call to iio_map_array_unregister in the ADC driver's
+>  remove,
+>  - Removed ADC driver's DT node and documentation,
+>  - Merged IIO channel mapping patches into the original ADC driver
+>  patch,
+>  - Removed `adding V-OFF to writeable reg' patch as it's already in
+>  writeable reg range,
+> 
+> v2:
+>  - Some registers' name have been changed to better reflect their
+>  purpose,
+>  - Make VBUS power supply driver use IIO channels when AXP ADC driver is
+>  enabled, but fall back on previous behavior when disabled. This is made
+>  to avoid the ADC driver overwritting registers for VBUS power supply
+>  ADC when removed,
+>  - Removed useless adding of data registers to volatile registers,
+>  - Reordered IIO channels, now grouped by same part of the PMIC (e.g.
+>  voltage and current of the battery have the same index in different
+>  IIO types),
+>  - Added structures for specific data instead of matching on IDs,
+>  - Switched from DT IIO channels mapping to iio_map structures IIO
+>  channels mapping,
+> 
+> Quentin
+> 
+> Quentin Schulz (18):
+>   dt-bindings: power: battery: add constant-charge-current property
+>   power: supply: power_supply_core: add constant-charge-current optional
+>     property
+>   mfd: axp20x: correct name of temperature data ADC registers
+>   iio: adc: add support for X-Powers AXP20X and AXP22X PMICs ADCs
+>   mfd: axp20x: add ADC cells for AXP20X and AXP22X PMICs
+>   mfd: axp20x: add AC power supply cells for AXP22X PMICs
+>   ARM: dtsi: axp209: add AC power supply subnode
+>   ARM: dtsi: axp22x: add AC power supply subnode
+>   ARM: dts: sun8i: sina33: enable ACIN power supply subnode
+>   ARM: sun5i: chip: enable ACIN power supply subnode
+>   dt-bindings: power: supply: add AXP20X/AXP22X battery DT binding
+>   mfd: axp20x: add CHRG_CTRL1/2/3 to writeable regs for AXP20X/AXP22X
+>   power: supply: add battery driver for AXP20X and AXP22X PMICs
+>   mfd: axp20x: add MFD cells for AXP20X and AXP22X battery driver
+>   ARM: dtsi: axp209: add battery power supply subnode
+>   ARM: dtsi: axp22x: add battery power supply subnode
+>   ARM: dts: sun8i: sina33: enable battery power supply subnode
+>   ARM: sun5i: chip: enable battery power supply subnode
+> 
+>  .../bindings/power/supply/axp20x_battery.txt       |  30 +
+>  .../devicetree/bindings/power/supply/battery.txt   |   2 +
+>  arch/arm/boot/dts/axp209.dtsi                      |  10 +
+>  arch/arm/boot/dts/axp22x.dtsi                      |  10 +
+>  arch/arm/boot/dts/sun5i-r8-chip.dts                |   8 +
+>  arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts     |   8 +
+>  drivers/iio/adc/Kconfig                            |  10 +
+>  drivers/iio/adc/Makefile                           |   1 +
+>  drivers/iio/adc/axp20x_adc.c                       | 617 +++++++++++++++++++++
+>  drivers/mfd/axp20x.c                               |  29 +-
+>  drivers/power/supply/Kconfig                       |  12 +
+>  drivers/power/supply/Makefile                      |   1 +
+>  drivers/power/supply/axp20x_battery.c              | 565 +++++++++++++++++++
+>  drivers/power/supply/power_supply_core.c           |   3 +
+>  include/linux/mfd/axp20x.h                         |   4 +-
+>  include/linux/power_supply.h                       |   1 +
+>  16 files changed, 1308 insertions(+), 3 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/power/supply/axp20x_battery.txt
+>  create mode 100644 drivers/iio/adc/axp20x_adc.c
+>  create mode 100644 drivers/power/supply/axp20x_battery.c
+> 
 
->> - Similarly, For all BPF_ALU class instructions.
->> - For BPF_ADD, I will mask the addition result to 32 bit only.
->>  I am not sure, Overflow might be a problem.
->> - For BPF_SUB, I will mask the subtraction result to 32 bit only.
->>  I am not sure, Underflow might be problem.
->> - For BPF_MUL, similar to BPF_ADD. Overflow Problem ?
->> - For BPF_DIV, 32 bit masking should be fine, I guess.
->> - For BPF_OR, BPF_AND, BPF_XOR, BPF_LSH, BPF_RSH, BPF_MOD 32 bit
->>  masking should be fine.
->> - For BPF_NEG and BPF_ARSH, might be a problem because of the sign bit.
->> - For BPF_END, 32 bit masking should work fine.
->>  Let me know if any of the above point is wrong or need your suggestion.
->>
->> - Although, for ALU instructions, there is a big problem of register
->>   flag manipulations. Generally, architecture's ABI takes care of this
->>   part but as we are doing 64 bit Instructions emulation(kind of) on 32
->>   bit machine, it needs to be done manually. Does that sound correct ?
->
-> You can't truncate, but you'll have to build 64-bit ops using 32-bit registers.
-
-A small example would help a lot.
->
->>
->> - I am not JITing BPF_ALU64 class instructions as of now. As we have to
->>   take care of atomic instructions and race conditions with these
->>   instruction which looks complicated to me as of now. Will try to figure out
->>   this part and implement it later. Currently, I will just let it be
->>   interpreted by the ebpf interpreter.
->>
->> - For BPF_JMP class, I am assuming that, although eBPF is 64 bit ABI,
->>   the address pointers on 32 bit arch like arm will be of 32 bit only.
->>   So, for BPF_JMP, masking the 64 bit destination address to 32 bit
->>   should do the trick and no address will be corrupted in this way. Am I
->>   correct to assume this ?
->>   Also, I need to check for address getting out of the allowed memory
->>   range.
->
-> That's probably true, but the JIT should likely detect a truncation
-> here, if you're going to depend on it, and reject the BPF.
-
-Okay. So I guess I have to use memory for this as well ?
-An example would be great.
-
->
->> - For BPF_LD, BPF_LDX, BPF_ST and BPF_STX class instructions, I am
->>   assuming the same thing as above - All addresses and pointers are 32
->>   bit - which can be taken care just by maksing the eBPF register
->>   values. Does that sound correct ?
->>   Also, I need to check for the address overflow, address getting out
->>   of the allowed memory range and things like that.
->
-> I'd say, get something working and send a patch -- that's likely the
-> best way to get more detailed feedback. :)
-I would love to but I have to understand what to implement first.
-
-
--Shubham
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
