@@ -1,59 +1,45 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 15 Mar 2017 12:26:22 -0500
-Subject: [PATCH 6/15] dt-bindings: display: sun4i: Add HDMI display
- bindings
-In-Reply-To: <f1d46b79f933df724a6750d557ebe9517b6339b5.1488876832.git-series.maxime.ripard@free-electrons.com>
-References: <cover.bc06ffa88f847ddd9ddd7c259415d5f61b55307b.1488876832.git-series.maxime.ripard@free-electrons.com>
- <f1d46b79f933df724a6750d557ebe9517b6339b5.1488876832.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <20170315172622.lb6vy7cmbwaf7crn@rob-hp-laptop>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Thu, 16 Mar 2017 01:28:03 +0800
+Subject: [PATCH v2 0/5] Add support for the R_CCU on Allwinner H3/A64 SoCs
+Message-ID: <20170315172808.64011-1-icenowy@aosc.xyz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 07, 2017 at 09:56:25AM +0100, Maxime Ripard wrote:
-> One of the possible output of the display pipeline, on the SoCs that have
-> it, is the HDMI controller.
-> 
-> Add a binding for it.
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt | 21 +++++++-
->  1 file changed, 21 insertions(+), 0 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-> index b82c00449468..4b280672658e 100644
-> --- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-> +++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-> @@ -4,6 +4,27 @@ Allwinner A10 Display Pipeline
->  The Allwinner A10 Display pipeline is composed of several components
->  that are going to be documented below:
->  
-> +HDMI Encoder
-> +------------
-> +
-> +The HDMI Encoder supports the HDMI video and audio outputs, and does
-> +CEC. It is one end of the pipeline.
-> +
-> +Required properties:
-> +  - compatible: value must be one of:
-> +    * allwinner,sun5i-a10s-hdmi
-> +  - reg: base address and size of memory-mapped region
-> +  - clocks: phandles to the clocks feeding the HDMI encoder
-> +    * ahb: the HDMI interface clock
-> +    * mod: the HDMI module clock
-> +    * pll-0: the first video PLL
-> +    * pll-1: the second video PLL
-> +  - clock-names: the clock names mentioned above
-> +
-> +  - ports: A ports node with endpoint definitions as defined in
-> +    Documentation/devicetree/bindings/media/video-interfaces.txt. The
-> +    first port should be the input endpoint.
+Allwinner SoCs after sun6i-a31 nearly all have a R_CCU in PRCM part.
+(V3s and R40 do not have it, as they have even no PRCM)
 
-You need an output port to an HDMI connector node and an audio port.
+This patch adds support for the ones on H3/A64.
 
-> +
->  TV Encoder
->  ----------
->  
-> -- 
-> git-series 0.8.11
+Some clock/reset values are reserved for easier extending the support to
+A31/A23, but for this I think some changes to the PRCM MFD should be made,
+see [1] (Although this is only a sketch).
+
+The r_pio device node is also added for A64, as the driver is already
+merged, and its depends (r_ccu) is now met.
+
+[1] https://github.com/wens/linux/commits/sunxi-ng-prcm
+
+Icenowy Zheng (5):
+  dt-bindings: update device tree binding for Allwinner PRCM CCUs
+  clk: sunxi-ng: add support for PRCM CCUs
+  arm64: allwinner: a64: add r_ccu node
+  ARM: sun8i: h3: switch apb0-related clocks to r_ccu
+  arm64: allwinner: a64: add R_PIO pinctrl node
+
+ .../devicetree/bindings/clock/sunxi-ccu.txt        |  18 +-
+ arch/arm/boot/dts/sunxi-h3-h5.dtsi                 |  46 ++---
+ arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi      |  30 +++
+ drivers/clk/sunxi-ng/Kconfig                       |   6 +
+ drivers/clk/sunxi-ng/Makefile                      |   1 +
+ drivers/clk/sunxi-ng/ccu-sun8i-r.c                 | 211 +++++++++++++++++++++
+ drivers/clk/sunxi-ng/ccu-sun8i-r.h                 |  27 +++
+ include/dt-bindings/clock/sun8i-r-ccu.h            |  59 ++++++
+ include/dt-bindings/reset/sun8i-r-ccu.h            |  53 ++++++
+ 9 files changed, 419 insertions(+), 32 deletions(-)
+ create mode 100644 drivers/clk/sunxi-ng/ccu-sun8i-r.c
+ create mode 100644 drivers/clk/sunxi-ng/ccu-sun8i-r.h
+ create mode 100644 include/dt-bindings/clock/sun8i-r-ccu.h
+ create mode 100644 include/dt-bindings/reset/sun8i-r-ccu.h
+
+-- 
+2.12.0
