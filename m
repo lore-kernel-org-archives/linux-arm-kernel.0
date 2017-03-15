@@ -1,36 +1,19 @@
 From: yong.mao@mediatek.com (Yong Mao)
-Date: Wed, 15 Mar 2017 15:26:39 +0800
-Subject: [PATCH v5 2/3] ARM64: dts: mediatek: configure some fixed mmc
- parameters
-In-Reply-To: <1489562800-27431-1-git-send-email-yong.mao@mediatek.com>
-References: <1489562800-27431-1-git-send-email-yong.mao@mediatek.com>
-Message-ID: <1489562800-27431-3-git-send-email-yong.mao@mediatek.com>
+Date: Wed, 15 Mar 2017 15:26:37 +0800
+Subject: [PATCH v5 0/3] Use data tune for CMD line tune 
+Message-ID: <1489562800-27431-1-git-send-email-yong.mao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: yong mao <yong.mao@mediatek.com>
+yong mao (3):
+  mmc: dt-bindings: update Mediatek MMC bindings
+  ARM64: dts: mediatek: configure some fixed mmc parameters
+  mmc: mediatek: Use data tune for CMD line tune
 
-configure some fixed mmc parameters
+ Documentation/devicetree/bindings/mmc/mtk-sd.txt |  12 ++
+ arch/arm64/boot/dts/mediatek/mt8173-evb.dts      |   3 +
+ drivers/mmc/host/mtk-sd.c                        | 168 ++++++++++++++++++++---
+ 3 files changed, 167 insertions(+), 16 deletions(-)
 
-Signed-off-by: Yong Mao <yong.mao@mediatek.com>
-Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
----
- arch/arm64/boot/dts/mediatek/mt8173-evb.dts |    3 +++
- 1 file changed, 3 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
-index 0ecaad4..1c3634f 100644
---- a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
-+++ b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
-@@ -134,6 +134,9 @@
- 	bus-width = <8>;
- 	max-frequency = <50000000>;
- 	cap-mmc-highspeed;
-+	mediatek,hs200-cmd-int-delay=<26>;
-+	mediatek,hs400-cmd-int-delay=<14>;
-+	mediatek,hs400-cmd-resp-sel-rising;
- 	vmmc-supply = <&mt6397_vemc_3v3_reg>;
- 	vqmmc-supply = <&mt6397_vio18_reg>;
- 	non-removable;
 -- 
-1.7.9.5
+1.8.1.1.dirty
