@@ -1,52 +1,49 @@
-From: vigneshr@ti.com (Vignesh R)
-Date: Wed, 15 Mar 2017 17:12:17 +0530
-Subject: [PATCH] serial: 8250: 8250_core: Use dev_name() during
- request_irq()
-In-Reply-To: <CAHp75Vc0Ap53s=6SU2o5QjgdaBDWKC24bym7HUt6jQ69HrpdCg@mail.gmail.com>
-References: <20170308121943.29340-1-vigneshr@ti.com>
- <CAHp75VeFKSbk9hvoJXdK6uOz+JYATD8D057iNv0JDuEnBFS=yw@mail.gmail.com>
- <2a0cf043-6e3f-6807-0794-d9d6f46b77f5@ti.com>
- <CAHp75Vc0Ap53s=6SU2o5QjgdaBDWKC24bym7HUt6jQ69HrpdCg@mail.gmail.com>
-Message-ID: <01911ed2-d64b-6f81-5ca2-7efa9b63d70f@ti.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 15 Mar 2017 11:06:08 +0000
+Subject: [PATCHv2 4/5] mfd: altr_a10sr: Add Arria10 DevKit Reset Controller
+In-Reply-To: <1487783419-10912-5-git-send-email-thor.thayer@linux.intel.com>
+References: <1487783419-10912-1-git-send-email-thor.thayer@linux.intel.com>
+ <1487783419-10912-5-git-send-email-thor.thayer@linux.intel.com>
+Message-ID: <20170315110608.5qgyj5pwsr7lr6zz@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, 22 Feb 2017, thor.thayer at linux.intel.com wrote:
 
+> From: Thor Thayer <thor.thayer@linux.intel.com>
+> 
+> Add Peripheral PHY Reset Controller to the Arria10
+> Development Kit System Resource Chip's MFD.
+> 
+> Signed-off-by: Thor Thayer <thor.thayer@linux.intel.com>
+> ---
+> v2  Changes to commit header & body for clarification.
+> ---
+>  drivers/mfd/altera-a10sr.c | 4 ++++
+>  1 file changed, 4 insertions(+)
 
-On Tuesday 14 March 2017 09:29 PM, Andy Shevchenko wrote:
-> On Tue, Mar 14, 2017 at 3:44 PM, Vignesh R <vigneshr@ti.com> wrote:
->> On Monday 13 March 2017 01:35 AM, Andy Shevchenko wrote:
->>> On Wed, Mar 8, 2017 at 2:19 PM, Vignesh R <vigneshr@ti.com> wrote:
->>>> Passing "serial" as name during request_irq() results in all serial port
->>>> irqs have same name. This does not help much to easily identify which
->>>> irq belongs to which serial port instance. Therefore pass dev_name()
->>>> during request_irq() so that better identifiable name is listed for
->>>> serial ports in cat /proc/interrupts output.
->>>>
->>>> Output of cat /proc/interrupts
->>>> Before this patch:
->>>>  26:        689          0     GICv2 309 Edge      serial
->>>> After this patch:
->>>>  26:        696          0     GICv2 309 Edge      2530c00.serial
-> 
->>  But, this change is making interrupt name more descriptive
-> 
-> It doesn't in PCI case, it makes it worse.
-> 
-> (The world is not DT-centric)
-> 
->>> Besides that imagine what would be the name of PCI device here.
->>> I would suggest adding ID if you need one in a form like
->>> "serial%d", where ID may or may not be supplied by the actual 8250 drivers.
->>>
->>
->> Are you suggesting to use serial_index() as ID?
-> 
-> Yes.
-> 
+Sorry for the delay, I've been AFK on vacation and conferences.
 
-Ok thanks, I will send on incremental fix as this patch is already applied.
+Applied, thanks.
+
+> diff --git a/drivers/mfd/altera-a10sr.c b/drivers/mfd/altera-a10sr.c
+> index 06e1f7f..96e7d2c 100644
+> --- a/drivers/mfd/altera-a10sr.c
+> +++ b/drivers/mfd/altera-a10sr.c
+> @@ -33,6 +33,10 @@
+>  		.name = "altr_a10sr_gpio",
+>  		.of_compatible = "altr,a10sr-gpio",
+>  	},
+> +	{
+> +		.name = "altr_a10sr_reset",
+> +		.of_compatible = "altr,a10sr-reset",
+> +	},
+>  };
+>  
+>  static bool altr_a10sr_reg_readable(struct device *dev, unsigned int reg)
 
 -- 
-Regards
-Vignesh
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
