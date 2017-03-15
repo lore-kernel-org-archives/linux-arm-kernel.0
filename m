@@ -1,56 +1,56 @@
-From: mchehab@s-opensource.com (Mauro Carvalho Chehab)
-Date: Wed, 15 Mar 2017 13:15:11 -0300
-Subject: [PATCH v2] arm: install.sh: don't use /sbin/install if
- cross-compiling
-In-Reply-To: <6675ef47aaa7a186f066c506a564e71c54559776.1489592885.git.mchehab@s-opensource.com>
-References: <6675ef47aaa7a186f066c506a564e71c54559776.1489592885.git.mchehab@s-opensource.com>
-Message-ID: <20170315131511.5344d3a9@vento.lan>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Wed, 15 Mar 2017 17:19:11 +0100
+Subject: [RFC PATCH] tty/serial: atmel: fix TX path in
+ atmel_console_write()
+In-Reply-To: <20170315152948.10978-1-nicolas.ferre@microchip.com>
+References: <CACQ1gAgW4aGJSxSAXDWL7td9eV12UV=Xv=PZR58BqqHxEeRH0g@mail.gmail.com>
+ <20170315152948.10978-1-nicolas.ferre@microchip.com>
+Message-ID: <074d057e-4971-a325-e985-3f5046536225@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Wed, 15 Mar 2017 12:48:59 -0300
-Mauro Carvalho Chehab <mchehab@s-opensource.com> escreveu:
-
-> It doesn't make sense to run the local machine's install
-> script if the Kernel was built using a cross-compiler, as it
-> will try to create symlinks at the rootfs of the local machine:
+On 15/03/2017 16:29, Nicolas Ferre wrote:
+> A side effect of 89d8232411a8 ("tty/serial: atmel_serial: BUG: stop DMA
+> from transmitting in stop_tx") is that the console can be called with
+> TX path disabled. Then the system would hang trying to push charecters
+> out in atmel_console_putchar().
 > 
-> ln: failed to create symbolic link '/boot/System.map': Permission denied
-> ln: failed to create symbolic link '/boot/vmlinuz': Permission denied
-> ln: failed to create symbolic link '/boot/System.map': Permission denied
-> 
-> Signed-off-by: Mauro Carvalho Chehab <mchehab@s-opensource.com>
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+> Fixes: 89d8232411a8 ("tty/serial: atmel_serial: BUG: stop DMA from transmitting
+> in stop_tx")
+> Cc: stable <stable@vger.kernel.org> # 4.4+
 > ---
+> Hi Richard,
 > 
-> v2: keep calling a ~/bin/${INSTALLKERNEL} script, as it can be used to cope with
-> cross builds.
+> I found this to fix the problem with system hang in my linux-4.4-at91 branch
+> (in the atmel_console_putchar() waiting loop actually). I'm open to more
+> insignt.
+> As we cannot figure out if this bit is set or not, I didn't preserve the
+> current status...
 > 
->  arch/arm/boot/install.sh | 7 +++++--
->  1 file changed, 5 insertions(+), 2 deletions(-)
+> Regards,
+
+So, I'm guessing that you may see some lines/characters printed twice on
+the screen, don't you ?
+
+
+>  drivers/tty/serial/atmel_serial.c | 3 +++
+>  1 file changed, 3 insertions(+)
 > 
-> diff --git a/arch/arm/boot/install.sh b/arch/arm/boot/install.sh
-> index 2a45092a40e3..831e63ac8b0f 100644
-> --- a/arch/arm/boot/install.sh
-> +++ b/arch/arm/boot/install.sh
-> @@ -35,8 +35,11 @@ verify "$2"
->  verify "$3"
+> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+> index dcebb28ffbc4..7372dbdb7a4c 100644
+> --- a/drivers/tty/serial/atmel_serial.c
+> +++ b/drivers/tty/serial/atmel_serial.c
+> @@ -2483,6 +2483,9 @@ static void atmel_console_write(struct console *co, const char *s, u_int count)
+>  	pdc_tx = atmel_uart_readl(port, ATMEL_PDC_PTSR) & ATMEL_PDC_TXTEN;
+>  	atmel_uart_writel(port, ATMEL_PDC_PTCR, ATMEL_PDC_TXTDIS);
 >  
->  # User may have a custom install script
-> -if [ -x ~/bin/${INSTALLKERNEL} ]; then exec ~/bin/${INSTALLKERNEL} "$@"; fi
-> -if [ -x /sbin/${INSTALLKERNEL} ]; then exec /sbin/${INSTALLKERNEL} "$@"; fi
+> +	/* Make sure that tx path is actually able to send characters */
+> +	atmel_uart_writel(port, ATMEL_US_CR, ATMEL_US_TXEN);
 > +
-> +  if [ -x ~/bin/${INSTALLKERNEL} ]; then exec ~/bin/ "$@"; fi
-
-Please ignore this one. There's clearly a problem here.
-
-> +if [ "x$CROSS_COMPILE" == "x" ]; then
-> +  if [ -x /sbin/${INSTALLKERNEL} ]; then exec /sbin/${INSTALLKERNEL} "$@"; fi
-> +fi
+>  	uart_console_write(port, s, count, atmel_console_putchar);
 >  
->  if [ "$(basename $2)" = "zImage" ]; then
->  # Compressed install
+>  	/*
+> 
 
-
-
-Thanks,
-Mauro
+Richard.
