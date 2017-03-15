@@ -1,49 +1,84 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 15 Mar 2017 14:21:42 +0100
-Subject: [PATCH 1/7] mfd: syscon: atmel-smc: Add new helpers to ease SMC
- regs manipulation
-In-Reply-To: <20170315121948.ys63ntordjwcm6rb@dell>
-References: <1487609701-10300-1-git-send-email-boris.brezillon@free-electrons.com>
- <1487609701-10300-2-git-send-email-boris.brezillon@free-electrons.com>
- <20170314170003.nfpc7adtyczvhb26@dell>
- <20170314182117.4c6c2162@bbrezillon>
- <20170315121948.ys63ntordjwcm6rb@dell>
-Message-ID: <20170315142142.124b9693@bbrezillon>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 15 Mar 2017 14:23:12 +0100
+Subject: [PATCH V7 0/7] LPC: legacy ISA I/O support
+In-Reply-To: <58C8BD7D.7040207@hisilicon.com>
+References: <1489372963-9000-1-git-send-email-yuanzhichang@hisilicon.com>
+ <CAK8P3a1f33ipk3Q8+wj9L6zP=ccn_AuhTfV0CC0+wAqrO-2beg@mail.gmail.com>
+ <58C8BD7D.7040207@hisilicon.com>
+Message-ID: <CAK8P3a3NJCndFJED4wDcvYndiJHbfTEHjTnPjBUQK6UguOswmg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 15 Mar 2017 12:19:48 +0000
-Lee Jones <lee.jones@linaro.org> wrote:
+On Wed, Mar 15, 2017 at 5:05 AM, zhichang.yuan
+<yuanzhichang@hisilicon.com> wrote:
+>> - I think the libio framework is more generic than it needs to be, but as
+>>   Alex really liked it this way and it was done like this based on his earlier
+>>   comments, I think that's ok.
+>>
+>> - after we went back and forth on the ACPI implementation, we concluded
+>>   that it is correct to do the same as on DT and completely abstract the
+>>   number space for I/O ports. No code should rely on a Linux port number
+>>   to have any particular relation to the physical address or the the address
+>>   on a PCI or LPC bus.
+> Thanks again for your helps in Linaro Connect!
+> I think we are heading for this direction, is it?
 
-> On Tue, 14 Mar 2017, Boris Brezillon wrote:
-> 
-> > On Tue, 14 Mar 2017 17:00:03 +0000
-> > Lee Jones <lee.jones@linaro.org> wrote:
-> >   
-> > > On Mon, 20 Feb 2017, Boris Brezillon wrote:
-> > >   
-> > > > These new helpers + macro definitions are meant to replace the old ones
-> > > > which are unpractical to use.
-> > > > 
-> > > > Note that the macros and function prefixes have been intentionally
-> > > > changed to ATMEL_[H]SMC_XX and atmel_[h]smc_ to reflect the fact that
-> > > > this IP is also embedded in avr32 SoCs (and not only in at91 ones).    
-> > > 
-> > > I'm going to NACK this patch.
-> > > 
-> > > I don't see any reason why all those functions have to be inline and
-> > > shoved into a header file.  
-> > 
-> > Because those are simple conversion helpers, and I thought a
-> > dedicated C file was not required, but I can move them into a C file
-> > and export these functions using EXPORT_SYMBOL_GPL() if you prefer.
-> > 
-> > Would that work for you?  
-> 
-> I think that would be better TBH.  Those functions aren't all that
-> simple.  There is certainly too much meat on the bones for me to be
-> happy for them to be shoved into a header file.
-> 
+Yes, I think so.
 
-I'm fine with that. Are you okay if I put this code in
-drivers/mfd/atmel-smc.c?
+>> - I'm pretty sure the current implementation is broken for the ioport_map
+>>   function that tries to turn an IORESOURCE_IO number into a pointer.
+>>   Forcing CONFIG_GENERIC_IOMAP on would solve this, but also
+>>   make all MMIO operations slower, which we probably don't want.
+>>   It's probably enough to add a check in ioport_map() to see if the range
+>>   is mapped into a virtual address or not.
+>
+>
+> Yes, I think our LIBIO will break the ioport_map() at this moment.
+> I try to solve this issue. Could you help to check the following ideas?
+> I am not deeper understanding the whole I/O framework, the following maybe not correct:(
+>
+> ioport_map seems architecture-dependent. For our LIBIO, we don't want to replace the existing I/O
+> frameworks which support MMIO at this moment. Can we add these two revise to solve this issue?
+> 1) Make LIBIO only target for non GENERIC_IOMAP platforms
+>
+> config LIBIO
+>         bool "Generic logical IO management"
+>         depends on !GENERIC_IOMAP
+
+I don't think there is even a problem with GENERIC_IOMAP: If both are
+set, passing a low number as a pointer will turn an ioread32() into an
+inl(), which is implemented by libio.
+
+>         def_bool y if PCI && (ARC || MN10300 || UNICORE32 || SPARC || MICROBLAZE || S390 || AVR32 || CRIS || BLACKFIN || XTENSA || ARM64)
+
+I think most of these architectures just use their own inb/outb functions,
+and should not use libio at all.
+
+It's also possible that they use an older way of mapping I/O ports by calling
+ioremap() on the physical address and treating the pointer as a 32-bit
+I/O port number (relying on the PCI_IOBASE=0 default). Architectures doing
+that might have other issues with libio, and I wouldn't try converting those.
+
+> 2) Modify the ioport_map() defined in asm-generic/io.h
+> Add the checks to identify the input 'port' is MMIO, otherwise, return NULL;
+
+This seems fine.
+
+>> - We could simplify the lookup a bit by using the trick from arch/ia64
+>>   of using an array instead of linked list for walking the port numbers.
+>>   There, the upper bits of the port number refer to an address space
+>>   number while the lower bits refer to the bus address within that
+>>   address space. This should work just as well as the current
+>>   implementation but would be a little easier to understand. Maybe
+>>   Bjorn can comment on this too, as I think he was involved with the
+>>   ia64 implementation.
+>>
+> Yes, It will be more efficient.
+>
+> But the issue remained here is still how to coexist with the existing I/O frameworks.
+> I will continue to look into.
+
+Ok. Let's wait for Bjorn to reply on this idea before you spend too much time
+on this though.
+
+      Arnd
