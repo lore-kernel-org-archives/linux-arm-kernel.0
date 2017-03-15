@@ -1,56 +1,37 @@
-From: richard.genoud@gmail.com (Richard Genoud)
-Date: Wed, 15 Mar 2017 17:19:11 +0100
-Subject: [RFC PATCH] tty/serial: atmel: fix TX path in
- atmel_console_write()
-In-Reply-To: <20170315152948.10978-1-nicolas.ferre@microchip.com>
-References: <CACQ1gAgW4aGJSxSAXDWL7td9eV12UV=Xv=PZR58BqqHxEeRH0g@mail.gmail.com>
- <20170315152948.10978-1-nicolas.ferre@microchip.com>
-Message-ID: <074d057e-4971-a325-e985-3f5046536225@gmail.com>
+From: David.Laight@ACULAB.COM (David Laight)
+Date: Wed, 15 Mar 2017 16:19:41 +0000
+Subject: Enumerating an empty bus hangs the entire system
+In-Reply-To: <135a0b18-caa3-d3c2-8ea5-6959e70e75ac@free.fr>
+References: <1eeea8ff-0840-a005-38b4-61f3c253cee1@free.fr>
+ <20170315160238.GB5073@bhelgaas-glaptop.roam.corp.google.com>
+ <135a0b18-caa3-d3c2-8ea5-6959e70e75ac@free.fr>
+Message-ID: <063D6719AE5E284EB5DD2968C1650D6DCFFB1ABE@AcuExch.aculab.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/03/2017 16:29, Nicolas Ferre wrote:
-> A side effect of 89d8232411a8 ("tty/serial: atmel_serial: BUG: stop DMA
-> from transmitting in stop_tx") is that the console can be called with
-> TX path disabled. Then the system would hang trying to push charecters
-> out in atmel_console_putchar().
+From: Mason
+> Sent: 15 March 2017 16:14
+> On 15/03/2017 17:02, Bjorn Helgaas wrote:
 > 
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@microchip.com>
-> Fixes: 89d8232411a8 ("tty/serial: atmel_serial: BUG: stop DMA from transmitting
-> in stop_tx")
-> Cc: stable <stable@vger.kernel.org> # 4.4+
-> ---
-> Hi Richard,
+> > If checking for link in your accessor is the best you can do, maybe
+> > that's all you can do.  I thought there was another driver that did
+> > that, but I can't find it now.  It doesn't seem perfectly safe to me,
+> > since the link could go down after you check for "link up" and before
+> > you actually issue the read.
 > 
-> I found this to fix the problem with system hang in my linux-4.4-at91 branch
-> (in the atmel_console_putchar() waiting loop actually). I'm open to more
-> insignt.
-> As we cannot figure out if this bit is set or not, I didn't preserve the
-> current status...
+> Are you thinking of some hotplug scenario?
 > 
-> Regards,
+> My system doesn't support hotplug, and I naively thought that the
+> link would be down if there is no card, and up shortly after reset
+> if there is a card.
 
-So, I'm guessing that you may see some lines/characters printed twice on
-the screen, don't you ?
+Noise on the lines can be enough to take the link down.
 
+We have some very annoying Dell x86 server chassis that generate an
+NMI when the PCIe link has any sort of error.
+The software can be 'hardened' to reads returning ~0u, doing anything
+useful in an NMI handler is almost impossible.
+They also won't boot is there is an error early on.
+Stops us doing a remove, reprogram fpga, rescan.
 
->  drivers/tty/serial/atmel_serial.c | 3 +++
->  1 file changed, 3 insertions(+)
-> 
-> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-> index dcebb28ffbc4..7372dbdb7a4c 100644
-> --- a/drivers/tty/serial/atmel_serial.c
-> +++ b/drivers/tty/serial/atmel_serial.c
-> @@ -2483,6 +2483,9 @@ static void atmel_console_write(struct console *co, const char *s, u_int count)
->  	pdc_tx = atmel_uart_readl(port, ATMEL_PDC_PTSR) & ATMEL_PDC_TXTEN;
->  	atmel_uart_writel(port, ATMEL_PDC_PTCR, ATMEL_PDC_TXTDIS);
->  
-> +	/* Make sure that tx path is actually able to send characters */
-> +	atmel_uart_writel(port, ATMEL_US_CR, ATMEL_US_TXEN);
-> +
->  	uart_console_write(port, s, count, atmel_console_putchar);
->  
->  	/*
-> 
-
-Richard.
+	David
