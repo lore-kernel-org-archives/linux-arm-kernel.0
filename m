@@ -1,20 +1,32 @@
-From: davem@davemloft.net (David Miller)
-Date: Wed, 15 Mar 2017 14:55:12 -0700 (PDT)
-Subject: arch: arm: bpf: Converting cBPF to eBPF for arm 32 bit
-In-Reply-To: <CAHgaXdJL92XRjHae2Nb9j9SerSe65=N=ErDHTQf23sdBxwthzw@mail.gmail.com>
-References: <CAHgaXd+EKJ0FWaaPojsNJtgY_YpdQXu6eMEp97uOpTFAWs4qTQ@mail.gmail.com>
- <CAGXu5jLo8UvpNSQZBHjWZoO959ha6KFQxFzmg7SK44wz=R_QSg@mail.gmail.com>
- <CAHgaXdJL92XRjHae2Nb9j9SerSe65=N=ErDHTQf23sdBxwthzw@mail.gmail.com>
-Message-ID: <20170315.145512.1542025976162251828.davem@davemloft.net>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Wed, 15 Mar 2017 23:24:49 +0100
+Subject: [PATCH v4 02/18] power: supply: power_supply_core: add
+ constant-charge-current optional property
+In-Reply-To: <20170315105537.22349-3-quentin.schulz@free-electrons.com>
+References: <20170315105537.22349-1-quentin.schulz@free-electrons.com>
+ <20170315105537.22349-3-quentin.schulz@free-electrons.com>
+Message-ID: <20170315222449.bvca6r3zoaxoedlb@earth>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shubham Bansal <illusionist.neo@gmail.com>
-Date: Wed, 15 Mar 2017 17:43:44 +0530
+Hi,
 
->> You can't truncate, but you'll have to build 64-bit ops using 32-bit registers.
+On Wed, Mar 15, 2017 at 11:55:21AM +0100, Quentin Schulz wrote:
+> This adds the constant-charge-current property to the list of optional
+> properties for the battery.
 > 
-> A small example would help a lot.
+> The constant charge current is critical for batteries as they can't
+> handle all charge currents.
+> 
+> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
 
-You can simply perform 64-bit operations in C code and see what gcc
-outputs for that code on this 32-bit target.
+Acked-By: Sebastian Reichel <sre@kernel.org>
+
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170315/fb9be2c2/attachment.sig>
