@@ -1,49 +1,39 @@
 From: isubramanian@apm.com (Iyappan Subramanian)
-Date: Wed, 15 Mar 2017 13:27:16 -0700
-Subject: [PATCH net-next 2/7] drivers: net: xgene: Fix hardware checksum
- setting
+Date: Wed, 15 Mar 2017 13:27:17 -0700
+Subject: [PATCH net-next 3/7] drivers: net: xgene: Fix wrong logical operation
 In-Reply-To: <1489609641-31557-1-git-send-email-isubramanian@apm.com>
 References: <1489609641-31557-1-git-send-email-isubramanian@apm.com>
-Message-ID: <1489609641-31557-3-git-send-email-isubramanian@apm.com>
+Message-ID: <1489609641-31557-4-git-send-email-isubramanian@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Quan Nguyen <qnguyen@apm.com>
 
-This patch fixes the hardware checksum settings by properly program
-the classifier. Otherwise, packet may be received with checksum error
-on X-Gene1 SoC.
+This patch fixes the wrong logical OR operation by changing it to
+bit-wise OR operation.
 
-Signed-off-by: Quan Nguyen <qnguyen@apm.com>
+Fixes: 3bb502f83080 ("drivers: net: xgene: fix statistics counters race condition")
 Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
+Signed-off-by: Quan Nguyen <qnguyen@apm.com>
 ---
- drivers/net/ethernet/apm/xgene/xgene_enet_hw.c | 1 +
- drivers/net/ethernet/apm/xgene/xgene_enet_hw.h | 1 +
- 2 files changed, 2 insertions(+)
+ drivers/net/ethernet/apm/xgene/xgene_enet_main.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c b/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c
-index 06e6816..c72a17e 100644
---- a/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c
-+++ b/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c
-@@ -623,6 +623,7 @@ static void xgene_enet_cle_bypass(struct xgene_enet_pdata *pdata,
- 	xgene_enet_rd_csr(pdata, CLE_BYPASS_REG0_0_ADDR, &cb);
- 	cb |= CFG_CLE_BYPASS_EN0;
- 	CFG_CLE_IP_PROTOCOL0_SET(&cb, 3);
-+	CFG_CLE_IP_HDR_LEN_SET(&cb, 0);
- 	xgene_enet_wr_csr(pdata, CLE_BYPASS_REG0_0_ADDR, cb);
+diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_main.c b/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
+index b3568c4..ec43278 100644
+--- a/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
++++ b/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
+@@ -677,9 +677,9 @@ static int xgene_enet_rx_frame(struct xgene_enet_desc_ring *rx_ring,
+ 	buf_pool->rx_skb[skb_index] = NULL;
  
- 	xgene_enet_rd_csr(pdata, CLE_BYPASS_REG1_0_ADDR, &cb);
-diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_hw.h b/drivers/net/ethernet/apm/xgene/xgene_enet_hw.h
-index 5f83037..b6cd625 100644
---- a/drivers/net/ethernet/apm/xgene/xgene_enet_hw.h
-+++ b/drivers/net/ethernet/apm/xgene/xgene_enet_hw.h
-@@ -163,6 +163,7 @@ enum xgene_enet_rm {
- #define CFG_RXCLK_MUXSEL0_SET(dst, val)	xgene_set_bits(dst, val, 26, 3)
- 
- #define CFG_CLE_IP_PROTOCOL0_SET(dst, val)	xgene_set_bits(dst, val, 16, 2)
-+#define CFG_CLE_IP_HDR_LEN_SET(dst, val)	xgene_set_bits(dst, val, 8, 5)
- #define CFG_CLE_DSTQID0_SET(dst, val)		xgene_set_bits(dst, val, 0, 12)
- #define CFG_CLE_FPSEL0_SET(dst, val)		xgene_set_bits(dst, val, 16, 4)
- #define CFG_CLE_NXTFPSEL0_SET(dst, val)		xgene_set_bits(dst, val, 20, 4)
+ 	/* checking for error */
+-	status = (GET_VAL(ELERR, le64_to_cpu(raw_desc->m0)) << LERR_LEN) ||
++	status = (GET_VAL(ELERR, le64_to_cpu(raw_desc->m0)) << LERR_LEN) |
+ 		  GET_VAL(LERR, le64_to_cpu(raw_desc->m0));
+-	if (unlikely(status > 2)) {
++	if (unlikely(status)) {
+ 		dev_kfree_skb_any(skb);
+ 		xgene_enet_free_pagepool(page_pool, raw_desc, exp_desc);
+ 		xgene_enet_parse_error(rx_ring, netdev_priv(rx_ring->ndev),
 -- 
 1.9.1
