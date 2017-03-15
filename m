@@ -1,67 +1,60 @@
 From: yannick.fertre@st.com (Yannick Fertre)
-Date: Wed, 15 Mar 2017 18:02:10 +0100
-Subject: [PATCH v4 4/8] drm/panel: simple: Add support for Ampire
- AM-480272H3TMQW-T01H
+Date: Wed, 15 Mar 2017 18:02:07 +0100
+Subject: [PATCH v4 1/8] dt-bindings: display: add STM32 LTDC driver
 In-Reply-To: <1489597334-16896-1-git-send-email-yannick.fertre@st.com>
 References: <1489597334-16896-1-git-send-email-yannick.fertre@st.com>
-Message-ID: <1489597334-16896-5-git-send-email-yannick.fertre@st.com>
+Message-ID: <1489597334-16896-2-git-send-email-yannick.fertre@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add simple-panel support for the Ampire AM-480272H3TMQW-T01H,
-which is a 4.3" WQVGA panel.
-
+Acked-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Yannick Fertre <yannick.fertre@st.com>
 ---
- drivers/gpu/drm/panel/panel-simple.c | 29 +++++++++++++++++++++++++++++
- 1 file changed, 29 insertions(+)
+ .../devicetree/bindings/display/st,stm32-ltdc.txt  | 36 ++++++++++++++++++++++
+ 1 file changed, 36 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/display/st,stm32-ltdc.txt
 
-diff --git a/drivers/gpu/drm/panel/panel-simple.c b/drivers/gpu/drm/panel/panel-simple.c
-index 89eb042..7818755 100644
---- a/drivers/gpu/drm/panel/panel-simple.c
-+++ b/drivers/gpu/drm/panel/panel-simple.c
-@@ -386,6 +386,32 @@ static void panel_simple_shutdown(struct device *dev)
- 	panel_simple_disable(&panel->base);
- }
- 
-+static const struct drm_display_mode ampire_am_480272h3tmqw_t01h_mode = {
-+	.clock = 9000,
-+	.hdisplay = 480,
-+	.hsync_start = 480 + 2,
-+	.hsync_end = 480 + 2 + 41,
-+	.htotal = 480 + 2 + 41 + 2,
-+	.vdisplay = 272,
-+	.vsync_start = 272 + 2,
-+	.vsync_end = 272 + 2 + 10,
-+	.vtotal = 272 + 2 + 10 + 2,
-+	.vrefresh = 60,
-+	.flags = DRM_MODE_FLAG_PHSYNC | DRM_MODE_FLAG_PVSYNC,
+diff --git a/Documentation/devicetree/bindings/display/st,stm32-ltdc.txt b/Documentation/devicetree/bindings/display/st,stm32-ltdc.txt
+new file mode 100644
+index 0000000..e8d39c5
+--- /dev/null
++++ b/Documentation/devicetree/bindings/display/st,stm32-ltdc.txt
+@@ -0,0 +1,36 @@
++* STMicroelectronics STM32 lcd-tft display controller
++
++- ltdc: lcd-tft display controller host
++  must be a sub-node of st-display-subsystem
++  Required properties:
++  - compatible: "st,stm32-ltdc"
++  - reg: Physical base address of the IP registers and length of memory mapped region.
++  - clocks: A list of phandle + clock-specifier pairs, one for each
++    entry in 'clock-names'.
++  - clock-names: A list of clock names. For ltdc it should contain:
++      - "clk-lcd" for the clock feeding the output pixel clock & IP clock.
++  - resets: reset to be used by the device (defined by use of RCC macro).
++  Required nodes:
++    - Video port for RGB output.
++
++Example:
++
++/ {
++	...
++	soc {
++	...
++		ltdc: display-controller at 40016800 {
++			compatible = "st,stm32-ltdc";
++			reg = <0x40016800 0x200>;
++			interrupts = <88>, <89>;
++			resets = <&rcc STM32F4_APB2_RESET(LTDC)>;
++			clocks = <&rcc 1 CLK_LCD>;
++			clock-names = "lcd";
++
++			port {
++				ltdc_out_rgb: endpoint {
++				};
++			};
++		};
++	};
 +};
-+
-+static const struct panel_desc ampire_am_480272h3tmqw_t01h = {
-+	.modes = &ampire_am_480272h3tmqw_t01h_mode,
-+	.num_modes = 1,
-+	.bpc = 8,
-+
-+	.size = {
-+		.width = 105,
-+		.height = 67,
-+	},
-+	.bus_format = MEDIA_BUS_FMT_RGB888_1X24,
-+};
-+
- static const struct drm_display_mode ampire_am800480r3tmqwa1h_mode = {
- 	.clock = 33333,
- 	.hdisplay = 800,
-@@ -1808,6 +1834,9 @@ static void panel_simple_shutdown(struct device *dev)
- 
- static const struct of_device_id platform_of_match[] = {
- 	{
-+		.compatible = "ampire,am-480272h3tmqw-t01h",
-+		.data = &ampire_am_480272h3tmqw_t01h,
-+	}, {
- 		.compatible = "ampire,am800480r3tmqwa1h",
- 		.data = &ampire_am800480r3tmqwa1h,
- 	}, {
 -- 
 1.9.1
