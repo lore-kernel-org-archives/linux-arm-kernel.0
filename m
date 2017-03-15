@@ -1,46 +1,52 @@
-From: dwmw2@infradead.org (David Woodhouse)
-Date: Wed, 15 Mar 2017 11:41:18 +0000
-Subject: [PATCH v33 00/14] add kdump support
-In-Reply-To: <20170315095656.24992-1-takahiro.akashi@linaro.org>
-References: <20170315095656.24992-1-takahiro.akashi@linaro.org>
-Message-ID: <1489578078.4195.113.camel@infradead.org>
+From: vigneshr@ti.com (Vignesh R)
+Date: Wed, 15 Mar 2017 17:12:17 +0530
+Subject: [PATCH] serial: 8250: 8250_core: Use dev_name() during
+ request_irq()
+In-Reply-To: <CAHp75Vc0Ap53s=6SU2o5QjgdaBDWKC24bym7HUt6jQ69HrpdCg@mail.gmail.com>
+References: <20170308121943.29340-1-vigneshr@ti.com>
+ <CAHp75VeFKSbk9hvoJXdK6uOz+JYATD8D057iNv0JDuEnBFS=yw@mail.gmail.com>
+ <2a0cf043-6e3f-6807-0794-d9d6f46b77f5@ti.com>
+ <CAHp75Vc0Ap53s=6SU2o5QjgdaBDWKC24bym7HUt6jQ69HrpdCg@mail.gmail.com>
+Message-ID: <01911ed2-d64b-6f81-5ca2-7efa9b63d70f@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2017-03-15 at 18:56 +0900, AKASHI Takahiro wrote:
-> This patch series adds kdump support on arm64.
+
+
+On Tuesday 14 March 2017 09:29 PM, Andy Shevchenko wrote:
+> On Tue, Mar 14, 2017 at 3:44 PM, Vignesh R <vigneshr@ti.com> wrote:
+>> On Monday 13 March 2017 01:35 AM, Andy Shevchenko wrote:
+>>> On Wed, Mar 8, 2017 at 2:19 PM, Vignesh R <vigneshr@ti.com> wrote:
+>>>> Passing "serial" as name during request_irq() results in all serial port
+>>>> irqs have same name. This does not help much to easily identify which
+>>>> irq belongs to which serial port instance. Therefore pass dev_name()
+>>>> during request_irq() so that better identifiable name is listed for
+>>>> serial ports in cat /proc/interrupts output.
+>>>>
+>>>> Output of cat /proc/interrupts
+>>>> Before this patch:
+>>>>  26:        689          0     GICv2 309 Edge      serial
+>>>> After this patch:
+>>>>  26:        696          0     GICv2 309 Edge      2530c00.serial
 > 
-> To load a crash-dump kernel to the systems, a series of patches to
-> kexec-tools[1] are also needed. Please use the latest one, v6 [2].
-> For your convinience, you can pick them up from:
-> ?? https://git.linaro.org/people/takahiro.akashi/linux-aarch64.git?arm64/kdump
-> ?? https://git.linaro.org/people/takahiro.akashi/kexec-tools.git?arm64/kdump
+>>  But, this change is making interrupt name more descriptive
 > 
-> To examine vmcore (/proc/vmcore) on a crash-dump kernel, you can use
-> ? - crash utility (v7.1.8 or later) [3]
+> It doesn't in PCI case, it makes it worse.
 > 
-> I tested this patchset on fast model and hikey.
+> (The world is not DT-centric)
+> 
+>>> Besides that imagine what would be the name of PCI device here.
+>>> I would suggest adding ID if you need one in a form like
+>>> "serial%d", where ID may or may not be supplied by the actual 8250 drivers.
+>>>
+>>
+>> Are you suggesting to use serial_index() as ID?
+> 
+> Yes.
+> 
 
-Please build with CONFIG_DEBUG_SECTION_MISMATCH=y.
+Ok thanks, I will send on incremental fix as this patch is already applied.
 
-It might be because I'm using your v32 patchset, hacked late at night
-to apply to a 4.9 kernel, but I see this:
-
-WARNING: vmlinux.o(.text+0x10240): Section mismatch in reference from the function arch_kexec_protect_crashkres() to the function .init.text:create_pgd_mapping()
-The function arch_kexec_protect_crashkres() references
-the function __init create_pgd_mapping().
-This is often because arch_kexec_protect_crashkres lacks a __init?
-annotation or the annotation of create_pgd_mapping is wrong.
-
-WARNING: vmlinux.o(.text+0x102b0): Section mismatch in reference from the function arch_kexec_unprotect_crashkres() to the function .init.text:create_pgd_mapping()
-The function arch_kexec_unprotect_crashkres() references
-the function __init create_pgd_mapping().
-This is often because arch_kexec_unprotect_crashkres lacks a __init?
-annotation or the annotation of create_pgd_mapping is wrong.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: smime.p7s
-Type: application/x-pkcs7-signature
-Size: 4938 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170315/943556e5/attachment-0001.bin>
+-- 
+Regards
+Vignesh
