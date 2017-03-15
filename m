@@ -1,60 +1,192 @@
-From: gabriel.fernandez@st.com (gabriel.fernandez at st.com)
-Date: Wed, 15 Mar 2017 15:27:50 +0100
-Subject: [PATCH 1/2] clk: stm32f4: fix: exclude values 0 and 1 for PLLQ
-In-Reply-To: <1489588071-18164-1-git-send-email-gabriel.fernandez@st.com>
-References: <1489588071-18164-1-git-send-email-gabriel.fernandez@st.com>
-Message-ID: <1489588071-18164-2-git-send-email-gabriel.fernandez@st.com>
+From: huziji@marvell.com (Ziji Hu)
+Date: Wed, 15 Mar 2017 22:31:53 +0800
+Subject: [PATCH v6 09/14] mmc: sdhci-xenon: Add support to PHYs of Marvell
+ Xenon SDHC
+In-Reply-To: <CAPDyKFrQb3NA53o6z9go0+RxxvstwWdeLHpiXtKaXOksxrov3g@mail.gmail.com>
+References: <cover.ff78bebe0384f650a51e5e6f0f1dca6e7894b53b.1487091464.git-series.gregory.clement@free-electrons.com>
+ <b646d28daf3d8cb8e57774ce040f39350364041e.1487091464.git-series.gregory.clement@free-electrons.com>
+ <CAPDyKFrQb3NA53o6z9go0+RxxvstwWdeLHpiXtKaXOksxrov3g@mail.gmail.com>
+Message-ID: <288b58dc-cce7-11c3-e946-7bf0ea5a4863@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Gabriel Fernandez <gabriel.fernandez@st.com>
+Hi Ulf,
 
-0000: PLLQ = 0, wrong configuration
-0001: PLLQ = 1, wrong configuration
-...
-0010: PLLQ = 2
-0011: PLLQ = 3
-0100: PLLQ = 4
-...
-1111: PLLQ = 1
+On 2017/3/15 21:39, Ulf Hansson wrote:
+> On 14 February 2017 at 18:01, Gregory CLEMENT
+> <gregory.clement@free-electrons.com> wrote:
+>> From: Hu Ziji <huziji@marvell.com>
+>>
+<snip>
+>> +
+>> +       /*
+>> +        * FIXME: should depends on the specific board timing.
+>> +        */
+>> +       if ((timing == MMC_TIMING_MMC_HS400) ||
+>> +           (timing == MMC_TIMING_MMC_HS200) ||
+>> +           (timing == MMC_TIMING_UHS_SDR50) ||
+>> +           (timing == MMC_TIMING_UHS_SDR104) ||
+>> +           (timing == MMC_TIMING_UHS_DDR50) ||
+>> +           (timing == MMC_TIMING_UHS_SDR25) ||
+>> +           (timing == MMC_TIMING_MMC_DDR52)) {
+>> +               reg = sdhci_readl(host, phy_regs->timing_adj);
+>> +               reg &= ~XENON_OUTPUT_QSN_PHASE_SELECT;
+>> +               sdhci_writel(host, reg, phy_regs->timing_adj);
+>> +       }
+>> +
+<snip>
+>> +
+>> +       reg = sdhci_readl(host, phy_regs->func_ctrl);
+>> +       if ((timing == MMC_TIMING_UHS_DDR50) ||
+>> +           (timing == MMC_TIMING_MMC_HS400) ||
+>> +           (timing == MMC_TIMING_MMC_DDR52))
+>> +               reg |= (XENON_DQ_DDR_MODE_MASK << XENON_DQ_DDR_MODE_SHIFT) |
+>> +                      XENON_CMD_DDR_MODE;
+>> +       else
+>> +               reg &= ~((XENON_DQ_DDR_MODE_MASK << XENON_DQ_DDR_MODE_SHIFT) |
+>> +                        XENON_CMD_DDR_MODE);
+<snip>
+> 
+> Again you are checking the MMC_TIMING_* in several if statements.
+> Perhaps you can use switch statement instead and build a couple of
+> different register variables, that you use when reading/writing
+> afterwards.
+> 
 
-Use divider table to exclude 0 and 1 values.
+	Sorry. I don't quite understand your comment.
+	Do you mean combine all the related  register settings
+	under a specific MMC_TIMING_*?
 
-Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
----
- drivers/clk/clk-stm32f4.c | 13 ++++++++++---
- 1 file changed, 10 insertions(+), 3 deletions(-)
+	swhich (timing) {
+	case MMC_TIMING_HS400:
+		config reg_1;
+		config reg_2;
+		...
+	case MMC_TIMING_HS200:
+		config reg_2;
+		config reg_3
+		..
+	case ...
+	};
 
-diff --git a/drivers/clk/clk-stm32f4.c b/drivers/clk/clk-stm32f4.c
-index ab609a7..cf9449b3 100644
---- a/drivers/clk/clk-stm32f4.c
-+++ b/drivers/clk/clk-stm32f4.c
-@@ -429,6 +429,13 @@ enum {
- 	{ 0, 2 }, { 1, 4 }, { 2, 6 }, { 3, 8 }, { 0 }
- };
- 
-+static const struct clk_div_table pll_divq_table[] = {
-+	{ 2, 2 }, { 3, 3 }, { 4, 4 }, { 5, 5 }, { 6, 6 }, { 7, 7 },
-+	{ 8, 8 }, { 9, 9 }, { 10, 10 }, { 11, 11 }, { 12, 12 }, { 13, 13 },
-+	{ 14, 14 }, { 15, 15 },
-+	{ 0 }
-+};
-+
- static const struct clk_div_table pll_divr_table[] = {
- 	{ 2, 2 }, { 3, 3 }, { 4, 4 }, { 5, 5 }, { 6, 6 }, { 7, 7 }, { 0 }
- };
-@@ -496,9 +503,9 @@ struct stm32f4_div_data {
- 
- #define MAX_PLL_DIV 3
- static const struct stm32f4_div_data  div_data[MAX_PLL_DIV] = {
--	{ 16, 2, 0,			pll_divp_table	},
--	{ 24, 4, CLK_DIVIDER_ONE_BASED, NULL		},
--	{ 28, 3, 0,			pll_divr_table	},
-+	{ 16, 2, 0, pll_divp_table },
-+	{ 24, 4, 0, pll_divq_table },
-+	{ 28, 3, 0, pll_divr_table },
- };
- 
- struct stm32f4_pll_data {
--- 
-1.9.1
+	I have a little concern that there might be a lot
+	of duplicate register settings. Some PHY operations are
+	irrelevant to the speed mode. They have to be executed in
+	a particular sequence in all speed modes.
+
+>> +}
+>> +
+>> +static int emmc_phy_parse_param_dt(struct sdhci_host *host,
+>> +                                  struct device_node *np,
+>> +                                  struct emmc_phy_params *params)
+>> +{
+>> +       u32 value;
+>> +
+>> +       if (of_property_read_bool(np, "marvell,xenon-phy-slow-mode"))
+>> +               params->slow_mode = true;
+>> +       else
+>> +               params->slow_mode = false;
+>> +
+>> +       if (!of_property_read_u32(np, "marvell,xenon-phy-znr", &value))
+>> +               params->znr = value & XENON_ZNR_MASK;
+>> +       else
+>> +               params->znr = XENON_ZNR_DEF_VALUE;
+>> +
+>> +       if (!of_property_read_u32(np, "marvell,xenon-phy-zpr", &value))
+>> +               params->zpr = value & XENON_ZPR_MASK;
+>> +       else
+>> +               params->zpr = XENON_ZPR_DEF_VALUE;
+>> +
+>> +       if (!of_property_read_u32(np, "marvell,xenon-phy-nr-success-tun",
+>> +                                 &value))
+>> +               params->nr_tun_times = value & XENON_TUN_CONSECUTIVE_TIMES_MASK;
+>> +       else
+>> +               params->nr_tun_times = XENON_TUN_CONSECUTIVE_TIMES;
+>> +
+>> +       if (!of_property_read_u32(np, "marvell,xenon-phy-tun-step-divider",
+>> +                                 &value))
+>> +               params->tun_step_divider = value & 0xFF;
+>> +       else
+>> +               params->tun_step_divider = XENON_TUNING_STEP_DIVIDER;
+>> +
+>> +       return 0;
+> 
+> Instead of all these if-else, let's start by assigning default values
+> instead. This makes the code more readable.
+> 
+	Sure. I'll change it.
+	
+>> +}
+>> +
+>> +/*
+>> + * Setting PHY when card is working in High Speed Mode.
+>> + * HS400 set data strobe line.
+>> + * HS200/SDR104 set tuning config to prepare for tuning.
+>> + */
+>> +static int xenon_hs_delay_adj(struct sdhci_host *host)
+>> +{
+>> +       int ret = 0;
+>> +
+>> +       if (WARN_ON(host->clock <= XENON_DEFAULT_SDCLK_FREQ))
+>> +               return -EINVAL;
+>> +
+>> +       if (host->timing == MMC_TIMING_MMC_HS400) {
+>> +               emmc_phy_strobe_delay_adj(host);
+>> +               return 0;
+>> +       }
+>> +
+>> +       if ((host->timing == MMC_TIMING_MMC_HS200) ||
+>> +           (host->timing == MMC_TIMING_UHS_SDR104))
+>> +               return emmc_phy_config_tuning(host);
+>> +
+>> +       /*
+>> +        * DDR Mode requires driver to scan Sampling Fixed Delay Line,
+>> +        * to find out a perfect operation sampling point.
+>> +        * It is hard to implement such a scan in host driver since initiating
+>> +        * commands by host driver is not safe.
+>> +        * Thus so far just keep PHY Sampling Fixed Delay in default value
+>> +        * in DDR mode.
+>> +        *
+>> +        * If any timing issue occurs in DDR mode on Marvell products,
+>> +        * please contact maintainer to ask for internal support in Marvell.
+>> +        */
+>> +       if ((host->timing == MMC_TIMING_MMC_DDR52) ||
+>> +           (host->timing == MMC_TIMING_UHS_DDR50))
+>> +               dev_warn_once(mmc_dev(host->mmc), "Timing issue might occur in DDR mode\n");
+> 
+> Please consider a to convert to use a switch statment instead of the
+> several if statements.
+> 
+
+	It is a good idea to use switch here.
+
+>> +       return ret;
+>> +}
+>> +
+> 
+<snip>
+>> +int xenon_phy_parse_dt(struct device_node *np, struct sdhci_host *host)
+>> +{
+>> +       const char *phy_type = NULL;
+>> +
+>> +       if (!of_property_read_string(np, "marvell,xenon-phy-type", &phy_type))
+>> +               return add_xenon_phy(np, host, phy_type);
+>> +
+>> +       dev_info(mmc_dev(host->mmc), "Fail to get Xenon PHY type. Use default eMMC 5.1 PHY\n");
+> 
+> Isn't there already a dev_err() being printed for this case. You
+> probably only need one.
+
+	By default, "emmc 5.1 phy" is used on most of our products.
+	Thus this dt property is an optional one.
+	I can remove this dev_info.
+
+> 
+>> +       return add_xenon_phy(np, host, "emmc 5.1 phy");
+>> +}
+> 
+> [...]
+> 
+> Kind regards
+> Uffe
+> 
