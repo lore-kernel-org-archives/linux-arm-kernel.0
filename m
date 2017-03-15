@@ -1,82 +1,43 @@
-From: nicolas.ferre@microchip.com (Nicolas Ferre)
-Date: Wed, 15 Mar 2017 12:48:04 +0100
-Subject: [RFC PATCH] mmc: core: HS DDR switch, don't change timing before
- checking status
-In-Reply-To: <20170310142117.6060-1-ludovic.desroches@atmel.com>
-References: <98664253-9a68-fa59-7f17-438b0d522fe8@microchip.com>
- <20170310142117.6060-1-ludovic.desroches@atmel.com>
-Message-ID: <133e7fc9-2d01-79a2-8f1e-08ce2ebf835f@microchip.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 15 Mar 2017 12:12:12 +0000
+Subject: [PATCH v4 4/5] mfd: exynos-lpass: Use common
+ soc/exynos-regs-pmu.h header
+In-Reply-To: <CAJKOXPeFw-qRcznSvw-+ZYxObXTPjE4bRM37=sGf8aWbR31WEg@mail.gmail.com>
+References: <20170314164653.15771-1-krzk@kernel.org>
+ <20170314164653.15771-5-krzk@kernel.org>
+ <20170315101007.xtnwz7mmkt446sgd@dell>
+ <CAJKOXPeFw-qRcznSvw-+ZYxObXTPjE4bRM37=sGf8aWbR31WEg@mail.gmail.com>
+Message-ID: <20170315121212.p2xu64dzhrzmjbxv@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 10/03/2017 ? 15:21, Ludovic Desroches a ?crit :
-> From: Ludovic Desroches <ludovic.desroches@microchip.com>
+On Wed, 15 Mar 2017, Krzysztof Kozlowski wrote:
+
+> On Wed, Mar 15, 2017 at 12:10 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> > On Tue, 14 Mar 2017, Krzysztof Kozlowski wrote:
+> >
+> >> The MFD-specific header will go away because it duplicates defines from
+> >> exynos-regs-pmu.h.
+> >>
+> >> Reported-by: kbuild test robot <fengguang.wu@intel.com>
+> >> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+> >> Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> >> ---
+> >>  drivers/mfd/exynos-lpass.c | 4 ++--
+> >>  1 file changed, 2 insertions(+), 2 deletions(-)
+> >
+> > Applied, thanks.
 > 
-> The commit e173f8911f09 mmc: core: Update CMD13 polling policy when
-> switch to HS DDR mode in addition to fix the management of CRC error,
-> changes the place where the DDR52 timing is set.
+> Hi,
 > 
-> Before this commit, the sequence was:
-> - set width to 8 with MMC_HS timing
-> - send the switch command
-> - check the status
-> - set width to 8 with MMC_DDR52 timing
-> - send the switch command
-> - check the status
-> Now:
-> - set width to 8 with MMC_HS timing
-> - send the switch command
-> - set width to 8 with MMC_DDR52 timing
-> - check the status
-> 
-> It may lead to get an error when checking the status with some devices.
-> 
-> Signed-off-by: Ludovic Desroches <ludovic.desroches@microchip.com>
+> This is also needed for patch 5/5 in the set so I was wondering if
+> this can be put on separate branch and then shared if phy maintainers
+> would need it?
 
-Tested-by: Nicolas Ferre <nicolas.ferre@microchip.com>
-
-On sama5d2 Xplained (eMMC on sdhci).
-
-Note that without this patch the system is unable to boot. Even if it
-was present on 4.10 but we didn't spot it, I see now this as a regression.
-
-We would also need to add the tags:
-Cc: stable <stable@vger.kernel.org> #4.10+
-Fixes: e173f8911f09 ("mmc: core: Update CMD13 polling policy when switch
-to HS DDR mode")
-
-
-Best regards,
-
-> ---
->  drivers/mmc/core/mmc.c | 5 ++++-
->  1 file changed, 4 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
-> index 0fccca0..b837148 100644
-> --- a/drivers/mmc/core/mmc.c
-> +++ b/drivers/mmc/core/mmc.c
-> @@ -1062,7 +1062,7 @@ static int mmc_select_hs_ddr(struct mmc_card *card)
->  			   EXT_CSD_BUS_WIDTH,
->  			   ext_csd_bits,
->  			   card->ext_csd.generic_cmd6_time,
-> -			   MMC_TIMING_MMC_DDR52,
-> +			   0,
->  			   true, true, true);
->  	if (err) {
->  		pr_err("%s: switch to bus width %d ddr failed\n",
-> @@ -1106,6 +1106,9 @@ static int mmc_select_hs_ddr(struct mmc_card *card)
->  	if (err)
->  		err = __mmc_set_signal_voltage(host, MMC_SIGNAL_VOLTAGE_330);
->  
-> +	if (!err)
-> +		mmc_set_timing(host, MMC_TIMING_MMC_DDR52);
-> +
->  	return err;
->  }
->  
-> 
-
+What is the dependency? 
 
 -- 
-Nicolas Ferre
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
