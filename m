@@ -1,209 +1,28 @@
-From: inki.dae@samsung.com (Inki Dae)
-Date: Wed, 15 Mar 2017 13:50:32 +0900
-Subject: [PATCH] drm/exynos: Print kernel pointers in a restricted form
-In-Reply-To: <20170314183804.13788-1-krzk@kernel.org>
-References: <CGME20170314183912epcas4p2731fbe283583ca0e0183de39694dacfc@epcas4p2.samsung.com>
- <20170314183804.13788-1-krzk@kernel.org>
-Message-ID: <58C8C818.3020700@samsung.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Wed, 15 Mar 2017 12:52:08 +0800
+Subject: [PATCH] vc04_services: Fixing coding and logical guidelines
+In-Reply-To: <1489496944-44038-1-git-send-email-pushkar.iit@gmail.com>
+References: <1489496944-44038-1-git-send-email-pushkar.iit@gmail.com>
+Message-ID: <20170315045208.GA9748@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Merged.
+On Tue, Mar 14, 2017 at 06:39:04PM +0530, Pushkar Jambhlekar wrote:
+> Description:
 
-Thanks,
-Inki Dae
+No need for that line.
 
-2017? 03? 15? 03:38? Krzysztof Kozlowski ?(?) ? ?:
-> Printing raw kernel pointers might reveal information which sometimes we
-> try to hide (e.g. with Kernel Address Space Layout Randomization).  Use
-> the "%pK" format so these pointers will be hidden for unprivileged
-> users.
-> 
-> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
-> ---
->  drivers/gpu/drm/exynos/exynos_drm_dsi.c     |  4 ++--
->  drivers/gpu/drm/exynos/exynos_drm_fimc.c    |  2 +-
->  drivers/gpu/drm/exynos/exynos_drm_gem.c     |  2 +-
->  drivers/gpu/drm/exynos/exynos_drm_gsc.c     |  2 +-
->  drivers/gpu/drm/exynos/exynos_drm_ipp.c     | 22 +++++++++++-----------
->  drivers/gpu/drm/exynos/exynos_drm_rotator.c |  2 +-
->  6 files changed, 17 insertions(+), 17 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/exynos/exynos_drm_dsi.c b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
-> index 812e2ec0761d..202526b20b64 100644
-> --- a/drivers/gpu/drm/exynos/exynos_drm_dsi.c
-> +++ b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
-> @@ -979,7 +979,7 @@ static void exynos_dsi_send_to_fifo(struct exynos_dsi *dsi,
->  	bool first = !xfer->tx_done;
->  	u32 reg;
->  
-> -	dev_dbg(dev, "< xfer %p: tx len %u, done %u, rx len %u, done %u\n",
-> +	dev_dbg(dev, "< xfer %pK: tx len %u, done %u, rx len %u, done %u\n",
->  		xfer, length, xfer->tx_done, xfer->rx_len, xfer->rx_done);
->  
->  	if (length > DSI_TX_FIFO_SIZE)
-> @@ -1177,7 +1177,7 @@ static bool exynos_dsi_transfer_finish(struct exynos_dsi *dsi)
->  	spin_unlock_irqrestore(&dsi->transfer_lock, flags);
->  
->  	dev_dbg(dsi->dev,
-> -		"> xfer %p, tx_len %zu, tx_done %u, rx_len %u, rx_done %u\n",
-> +		"> xfer %pK, tx_len %zu, tx_done %u, rx_len %u, rx_done %u\n",
->  		xfer, xfer->packet.payload_length, xfer->tx_done, xfer->rx_len,
->  		xfer->rx_done);
->  
-> diff --git a/drivers/gpu/drm/exynos/exynos_drm_fimc.c b/drivers/gpu/drm/exynos/exynos_drm_fimc.c
-> index 95871577015d..5b18b5c5fdf2 100644
-> --- a/drivers/gpu/drm/exynos/exynos_drm_fimc.c
-> +++ b/drivers/gpu/drm/exynos/exynos_drm_fimc.c
-> @@ -1695,7 +1695,7 @@ static int fimc_probe(struct platform_device *pdev)
->  		goto err_put_clk;
->  	}
->  
-> -	DRM_DEBUG_KMS("id[%d]ippdrv[%p]\n", ctx->id, ippdrv);
-> +	DRM_DEBUG_KMS("id[%d]ippdrv[%pK]\n", ctx->id, ippdrv);
->  
->  	spin_lock_init(&ctx->lock);
->  	platform_set_drvdata(pdev, ctx);
-> diff --git a/drivers/gpu/drm/exynos/exynos_drm_gem.c b/drivers/gpu/drm/exynos/exynos_drm_gem.c
-> index 4c28f7ffcc4d..55a1579d11b3 100644
-> --- a/drivers/gpu/drm/exynos/exynos_drm_gem.c
-> +++ b/drivers/gpu/drm/exynos/exynos_drm_gem.c
-> @@ -218,7 +218,7 @@ static struct exynos_drm_gem *exynos_drm_gem_init(struct drm_device *dev,
->  		return ERR_PTR(ret);
->  	}
->  
-> -	DRM_DEBUG_KMS("created file object = %p\n", obj->filp);
-> +	DRM_DEBUG_KMS("created file object = %pK\n", obj->filp);
->  
->  	return exynos_gem;
->  }
-> diff --git a/drivers/gpu/drm/exynos/exynos_drm_gsc.c b/drivers/gpu/drm/exynos/exynos_drm_gsc.c
-> index bef57987759d..0506b2b17ac1 100644
-> --- a/drivers/gpu/drm/exynos/exynos_drm_gsc.c
-> +++ b/drivers/gpu/drm/exynos/exynos_drm_gsc.c
-> @@ -1723,7 +1723,7 @@ static int gsc_probe(struct platform_device *pdev)
->  		return ret;
->  	}
->  
-> -	DRM_DEBUG_KMS("id[%d]ippdrv[%p]\n", ctx->id, ippdrv);
-> +	DRM_DEBUG_KMS("id[%d]ippdrv[%pK]\n", ctx->id, ippdrv);
->  
->  	mutex_init(&ctx->lock);
->  	platform_set_drvdata(pdev, ctx);
-> diff --git a/drivers/gpu/drm/exynos/exynos_drm_ipp.c b/drivers/gpu/drm/exynos/exynos_drm_ipp.c
-> index 9c84ee76f18a..3edda18cc2d2 100644
-> --- a/drivers/gpu/drm/exynos/exynos_drm_ipp.c
-> +++ b/drivers/gpu/drm/exynos/exynos_drm_ipp.c
-> @@ -208,7 +208,7 @@ static struct exynos_drm_ippdrv *ipp_find_drv_by_handle(u32 prop_id)
->  	 * e.g PAUSE state, queue buf, command control.
->  	 */
->  	list_for_each_entry(ippdrv, &exynos_drm_ippdrv_list, drv_list) {
-> -		DRM_DEBUG_KMS("count[%d]ippdrv[%p]\n", count++, ippdrv);
-> +		DRM_DEBUG_KMS("count[%d]ippdrv[%pK]\n", count++, ippdrv);
->  
->  		mutex_lock(&ippdrv->cmd_lock);
->  		list_for_each_entry(c_node, &ippdrv->cmd_list, list) {
-> @@ -388,7 +388,7 @@ int exynos_drm_ipp_set_property(struct drm_device *drm_dev, void *data,
->  	}
->  	property->prop_id = ret;
->  
-> -	DRM_DEBUG_KMS("created prop_id[%d]cmd[%d]ippdrv[%p]\n",
-> +	DRM_DEBUG_KMS("created prop_id[%d]cmd[%d]ippdrv[%pK]\n",
->  		property->prop_id, property->cmd, ippdrv);
->  
->  	/* stored property information and ippdrv in private data */
-> @@ -518,7 +518,7 @@ static int ipp_put_mem_node(struct drm_device *drm_dev,
->  {
->  	int i;
->  
-> -	DRM_DEBUG_KMS("node[%p]\n", m_node);
-> +	DRM_DEBUG_KMS("node[%pK]\n", m_node);
->  
->  	if (!m_node) {
->  		DRM_ERROR("invalid dequeue node.\n");
-> @@ -562,7 +562,7 @@ static struct drm_exynos_ipp_mem_node
->  	m_node->buf_id = qbuf->buf_id;
->  	INIT_LIST_HEAD(&m_node->list);
->  
-> -	DRM_DEBUG_KMS("m_node[%p]ops_id[%d]\n", m_node, qbuf->ops_id);
-> +	DRM_DEBUG_KMS("m_node[%pK]ops_id[%d]\n", m_node, qbuf->ops_id);
->  	DRM_DEBUG_KMS("prop_id[%d]buf_id[%d]\n", qbuf->prop_id, m_node->buf_id);
->  
->  	for_each_ipp_planar(i) {
-> @@ -659,7 +659,7 @@ static void ipp_put_event(struct drm_exynos_ipp_cmd_node *c_node,
->  
->  	mutex_lock(&c_node->event_lock);
->  	list_for_each_entry_safe(e, te, &c_node->event_list, base.link) {
-> -		DRM_DEBUG_KMS("count[%d]e[%p]\n", count++, e);
-> +		DRM_DEBUG_KMS("count[%d]e[%pK]\n", count++, e);
->  
->  		/*
->  		 * qbuf == NULL condition means all event deletion.
-> @@ -750,7 +750,7 @@ static struct drm_exynos_ipp_mem_node
->  
->  	/* find memory node from memory list */
->  	list_for_each_entry(m_node, head, list) {
-> -		DRM_DEBUG_KMS("count[%d]m_node[%p]\n", count++, m_node);
-> +		DRM_DEBUG_KMS("count[%d]m_node[%pK]\n", count++, m_node);
->  
->  		/* compare buffer id */
->  		if (m_node->buf_id == qbuf->buf_id)
-> @@ -767,7 +767,7 @@ static int ipp_set_mem_node(struct exynos_drm_ippdrv *ippdrv,
->  	struct exynos_drm_ipp_ops *ops = NULL;
->  	int ret = 0;
->  
-> -	DRM_DEBUG_KMS("node[%p]\n", m_node);
-> +	DRM_DEBUG_KMS("node[%pK]\n", m_node);
->  
->  	if (!m_node) {
->  		DRM_ERROR("invalid queue node.\n");
-> @@ -1232,7 +1232,7 @@ static int ipp_start_property(struct exynos_drm_ippdrv *ippdrv,
->  			m_node = list_first_entry(head,
->  				struct drm_exynos_ipp_mem_node, list);
->  
-> -			DRM_DEBUG_KMS("m_node[%p]\n", m_node);
-> +			DRM_DEBUG_KMS("m_node[%pK]\n", m_node);
->  
->  			ret = ipp_set_mem_node(ippdrv, c_node, m_node);
->  			if (ret) {
-> @@ -1601,7 +1601,7 @@ static int ipp_subdrv_probe(struct drm_device *drm_dev, struct device *dev)
->  		}
->  		ippdrv->prop_list.ipp_id = ret;
->  
-> -		DRM_DEBUG_KMS("count[%d]ippdrv[%p]ipp_id[%d]\n",
-> +		DRM_DEBUG_KMS("count[%d]ippdrv[%pK]ipp_id[%d]\n",
->  			count++, ippdrv, ret);
->  
->  		/* store parent device for node */
-> @@ -1659,7 +1659,7 @@ static int ipp_subdrv_open(struct drm_device *drm_dev, struct device *dev,
->  
->  	file_priv->ipp_dev = dev;
->  
-> -	DRM_DEBUG_KMS("done priv[%p]\n", dev);
-> +	DRM_DEBUG_KMS("done priv[%pK]\n", dev);
->  
->  	return 0;
->  }
-> @@ -1676,7 +1676,7 @@ static void ipp_subdrv_close(struct drm_device *drm_dev, struct device *dev,
->  		mutex_lock(&ippdrv->cmd_lock);
->  		list_for_each_entry_safe(c_node, tc_node,
->  			&ippdrv->cmd_list, list) {
-> -			DRM_DEBUG_KMS("count[%d]ippdrv[%p]\n",
-> +			DRM_DEBUG_KMS("count[%d]ippdrv[%pK]\n",
->  				count++, ippdrv);
->  
->  			if (c_node->filp == file) {
-> diff --git a/drivers/gpu/drm/exynos/exynos_drm_rotator.c b/drivers/gpu/drm/exynos/exynos_drm_rotator.c
-> index 6591e406084c..79282a820ecc 100644
-> --- a/drivers/gpu/drm/exynos/exynos_drm_rotator.c
-> +++ b/drivers/gpu/drm/exynos/exynos_drm_rotator.c
-> @@ -748,7 +748,7 @@ static int rotator_probe(struct platform_device *pdev)
->  		goto err_ippdrv_register;
->  	}
->  
-> -	DRM_DEBUG_KMS("ippdrv[%p]\n", ippdrv);
-> +	DRM_DEBUG_KMS("ippdrv[%pK]\n", ippdrv);
->  
->  	platform_set_drvdata(pdev, rot);
->  
-> 
+>     in file 'vc04_services/interface/vchiq_arm/vchiq_shim.c', making changes to make code according to 'checkpath.pl'.
+
+Why indent?  Also, you need to be specific as to what type of changes
+you made.
+
+> Also, fixing logical issue, i.e. removing break after goto statement.
+
+Don't do multiple things in the same patch, break it up into
+one-patch-per-thing, and no, "checkpatch.pl cleanups" is not "one
+thing" :)
+
+thanks,
+
+greg k-h
