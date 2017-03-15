@@ -1,137 +1,50 @@
-From: anurupvasu@gmail.com (Anurup M)
-Date: Wed, 15 Mar 2017 14:34:34 +0530
-Subject: [PATCH v6 00/11] perf: arm64: Support for Hisilicon SoC Hardware
- event counters
-In-Reply-To: <1489127137-111966-1-git-send-email-anurup.m@huawei.com>
-References: <1489127137-111966-1-git-send-email-anurup.m@huawei.com>
-Message-ID: <58C903A2.6000206@gmail.com>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Wed, 15 Mar 2017 10:07:48 +0100
+Subject: [PATCH 00/15] arm64/kvm: use common sysreg definitions
+In-Reply-To: <87a88tv94d.fsf@on-the-bus.cambridge.arm.com>
+References: <1489079247-31092-1-git-send-email-mark.rutland@arm.com>
+ <87a88tv94d.fsf@on-the-bus.cambridge.arm.com>
+Message-ID: <20170315090748.GK1277@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Please have a look at this patch series. Looking forward for any 
-feedback and comments.
+On Fri, Mar 10, 2017 at 08:17:22AM +0000, Marc Zyngier wrote:
+> On Thu, Mar 09 2017 at  5:07:12 pm GMT, Mark Rutland <mark.rutland@arm.com> wrote:
+> > Currently we duplicate effort in maintaining system register encodings across
+> > arm64's <asm/sysreg.h>, KVM's sysreg tables, and other places. This redundancy
+> > is unfortunate, and as encodings are encoded in-place without any mnemonic,
+> > this ends up more painful to read than necessary.
+> >
+> > This series ameliorates this by making <asm/sysreg.h> the canonical location
+> > for (architected) system register encodings, with other users building atop of
+> > this, e.g. with KVM deriving its sysreg table values from the common mnemonics.
+> >
+> > I've only attacked AArch64-native SYS encodings, and ignored CP{15,14}
+> > registers for now, but these could be handled similarly. Largely, I've stuck to
+> > only what KVM needs, though for the debug and perfmon groups it was easier to
+> > take the whole group from the ARM ARM than to filter them to only what KVM
+> > needed today.
+> >
+> > To verify that I haven't accidentally broken KVM, I've diffed sys_regs.o and
+> > sys_regs_generic_v8.o on a section-by-section basis before and after the series
+> > is applied. The .text, .data, and .rodata sections (and most others) are
+> > identical. The __bug_table section, and some .debug* sections differ, and this
+> > appears to be due to line numbers changing due to removed lines.
+> >
+> > One thing I wasn't sure how to address was banks of registers such as
+> > PMEVCNTR<n>_EL0. We currently enumerate all cases for our GICv3 definitions,
+> > but it seemed painful to expand ~30 cases for PMEVCNTR<n>_EL0 and friends, and
+> > for these I've made the macros take an 'n' parameter. It would be nice to be
+> > consistent either way, and I'm happy to expand those cases.
+> >
+> > I've pushed thes series out to a branch [1] based on v4.11-rc1. It looks like
+> > git rebase is also happy to apply the patches atop of the kvm-arm-for-4.11-rc2
+> > tag.
+> 
+> I had a quick glance at this series, and this looks like a very good
+> piece of work - thanks for doing this.
+
+Agreed.  You can add my acked-by on all the KVM patches if you please.
 
 Thanks,
-Anurup
-
-On Friday 10 March 2017 11:55 AM, Anurup M wrote:
-> Provide Support for Hisilicon SoC(HiP05/06/07) Hardware event counters.
-> The Hisilicon SoC HiP0x series has many uncore or non-CPU performance
-> events and counters units.
->
-> This v6 version is rebased to 4.11-rc1.
->
-> This patch series is implemented refering to arm-cci, Intel/AMD uncore and
-> also the cavium thunderX and xgene uncore pmu patches.
->
-> Support for Hisilicon L3 cache(L3C) and Miscellaneous nodes(MN) hardware
-> events and counters are added in this implementation.
->
-> The uncore PMU units are registered as separate PMUs.
-> e.g. in the case of L3 cache, which consist of 4 banks/instances, each bank
-> is registered with perf as separate PMU, as each bank have separate control
-> registers and interrupts. These units are also not CPU affine in the current
-> chip versions.
->
-> The Hisilicon uncore PMUs can be found under /sys/bus/event_source/devices.
-> The counters are exported via sysfs in the corresponding events files
-> under the PMU directory so the perf tool can list the event names.
->
-> There is no counter overflow IRQ support in hardware for these uncore PMUs.
-> So the driver use poll method using hrtimer to avoid overflow.
->
-> ToDo:
-> 1) ACPI probe and reset support.
->
-> Version history
-> ---------------
-> v6
-> --
-> - Rebase to 4.11-rc1
-> - Modify Copyright year to 2017.
->
-> v5
-> --
-> - Use hrtimer to avoid overflow as MN counter overflow IRQ is broken
->    in hardware.
-> - Remove IRQ handling of MN in driver and update pmu dt-bindings.
-> - Fix reveiw comments in v4 version.
->
-> v4
-> --
-> - Counter overflow IRQ handling for MN PMU.
-> - Use hrtimer to avoid counter overflow in L3 Cache PMU.
-> - Use hisi-cpu- and hisi-io- for djtag compatible field.
-> - Fix reveiw comments in v3 version.
->
-> v3
-> --
-> - Fix review comments of v2 version.
-> - Handle event groups. Do not allow group of mixed PMUs.
-> - Use hip0x prefix for compatible names.
-> - Fix all sparse and gcc W=1 warnings.
->
-> v2
-> --
-> - Fix review comments of v1 version.
-> - Move djtag driver to drivers/perf/hisilicon.
-> - Have separate PMU instance for each L3 cache banks.
-> - Modify device properties in DTS as per review comments.
-> - Handle hardware version difference.
-> - Change compatible names of djtag so use prefix hisi-
->    and remove chip version as driver only depend on djtag
->    hw version.
-> - use devm_kzalloc.
-> - Remove DDRC changes in this series. As the DDRC PMU doesnot
->    depend on djtag it will be send separately.
->
-> v1
-> --
-> -Initial version with support for L3C, MN and DDRC event counters
-> -Djtag driver is used to access registers of L3 cache and MN.
->
-> Anurup M (8):
->    arm64: MAINTAINERS: hisi: Add hisilicon SoC PMU support
->    dt-bindings: perf: hisi: Add Devicetree bindings for Hisilicon SoC PMU
->    Documentation: perf: hisi: Documentation for HiP05/06/07 PMU event
->      counting.
->    drivers: perf: hisi: Update Kconfig for Hisilicon PMU support
->    drivers: perf: hisi: Add support for Hisilicon SoC event counters
->    drivers: perf: hisi: use poll method to avoid L3C counter overflow
->    drivers: perf: hisi: use poll method when no IRQ for MN counter
->      overflow
->    dts: arm64: hip07: Add Hisilicon SoC PMU support
->
-> Shaokun Zhang (1):
->    drivers: perf: hisi: Miscellanous node(MN) event counting in perf
->
-> Tan Xiaojun (2):
->    dt-bindings: hisi: Add Hisilicon HiP05/06/07 Djtag dts bindings
->    drivers: perf: hisi: Add support for Hisilicon Djtag driver
->
->   .../devicetree/bindings/arm/hisilicon/djtag.txt    |  76 ++
->   .../devicetree/bindings/arm/hisilicon/pmu.txt      |  87 +++
->   Documentation/perf/hisi-pmu.txt                    |  76 ++
->   MAINTAINERS                                        |   9 +
->   arch/arm64/boot/dts/hisilicon/hip07.dtsi           |  79 +++
->   drivers/perf/Kconfig                               |   8 +
->   drivers/perf/Makefile                              |   1 +
->   drivers/perf/hisilicon/Makefile                    |   1 +
->   drivers/perf/hisilicon/djtag.c                     | 773 +++++++++++++++++++++
->   drivers/perf/hisilicon/djtag.h                     |  42 ++
->   drivers/perf/hisilicon/hisi_uncore_l3c.c           | 653 +++++++++++++++++
->   drivers/perf/hisilicon/hisi_uncore_mn.c            | 528 ++++++++++++++
->   drivers/perf/hisilicon/hisi_uncore_pmu.c           | 445 ++++++++++++
->   drivers/perf/hisilicon/hisi_uncore_pmu.h           | 137 ++++
->   14 files changed, 2915 insertions(+)
->   create mode 100644 Documentation/devicetree/bindings/arm/hisilicon/djtag.txt
->   create mode 100644 Documentation/devicetree/bindings/arm/hisilicon/pmu.txt
->   create mode 100644 Documentation/perf/hisi-pmu.txt
->   create mode 100644 drivers/perf/hisilicon/Makefile
->   create mode 100644 drivers/perf/hisilicon/djtag.c
->   create mode 100644 drivers/perf/hisilicon/djtag.h
->   create mode 100644 drivers/perf/hisilicon/hisi_uncore_l3c.c
->   create mode 100644 drivers/perf/hisilicon/hisi_uncore_mn.c
->   create mode 100644 drivers/perf/hisilicon/hisi_uncore_pmu.c
->   create mode 100644 drivers/perf/hisilicon/hisi_uncore_pmu.h
->
+-Christoffer
