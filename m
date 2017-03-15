@@ -1,41 +1,75 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 15 Mar 2017 15:36:24 -0500
-Subject: [PATCH v3 1/2] Documentation: bindings: Introduce
- scpi,sensors-scale
-In-Reply-To: <57ff035a-b462-6f5d-0100-051e99e9a2b6@arm.com>
-References: <20170309101759.18081-1-carlo@caione.org>
- <20170309101759.18081-2-carlo@caione.org>
- <57ff035a-b462-6f5d-0100-051e99e9a2b6@arm.com>
-Message-ID: <20170315203624.iylw2c2nuqb4mrqu@rob-hp-laptop>
+From: dwmw2@infradead.org (David Woodhouse)
+Date: Wed, 15 Mar 2017 20:42:20 +0000
+Subject: [PATCH v2 1/4] arm64: enable pci resource mapping using sysfs
+Message-ID: <1489610540.86622.19.camel@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 15, 2017 at 06:20:33PM +0000, Sudeep Holla wrote:
-> 
-> 
-> On 09/03/17 10:17, Carlo Caione wrote:
-> > From: Carlo Caione <carlo@endlessm.com>
-> > 
-> > Document the new property `scpi,sensors-scale` used by the hwmon-scpi
-> > driver to convert the sensor readings to the correct / expected scale.
-> > 
-> 
-> I am fine with DT bindings if DT maintainers agree with having one but I
-> would like to add couple of points to get their feedback:
-> 
-> 1. ARM recognized the drawbacks of SCPI which started informally with
->    ARM Ltd platforms and got adopted by few vendors. It's now being
->    worked on and a much better and scalable replacement protocol is
->    being discussed with vendors now. So future enhancement to this SCPI
->    protocol is unlikely.
-> 
-> 2. AmLogic has diverted from base protocol in many ways and most of them
->    are handled with just compatible so far without any need for
->    additional bindings. Can we avoid it ?
-> 
-> So based on these, I prefer not to add more bindings to handle such
-> deviations but make it just AmLogic specific.
+From: Brijesh Singh <brijess@amazon.com>
 
-Agreed.
+To support PCI resource mapping from userspace, pci_mmap_page_range()
+must be implemented and HAVE_PCI_MMAP defined. This support was absent
+for arm64.
 
-Rob
+[dwmw2: Add WC support]
+Reviewed-by: Erik Quanstrom <quanstro@amazon.com>
+Reviewed-by: Anthony Liguori <aliguori@amazon.com>
+Signed-off-by: Brijesh Singh <brijess@amazon.com>
+Signed-off-by: David Woodhouse <dwmw@amazon.co.uk>
+---
+v2: s/pgprot_uncached/pgprot_device/
+
+ arch/arm64/include/asm/pci.h |  4 ++++
+ arch/arm64/kernel/pci.c      | 19 +++++++++++++++++++
+ 2 files changed, 23 insertions(+)
+
+diff --git a/arch/arm64/include/asm/pci.h b/arch/arm64/include/asm/pci.h
+index b9a7ba9..f73734f 100644
+--- a/arch/arm64/include/asm/pci.h
++++ b/arch/arm64/include/asm/pci.h
+@@ -37,5 +37,9 @@ static inline int pci_proc_domain(struct pci_bus *bus)
+ }
+ #endif  /* CONFIG_PCI */
+ 
++#define HAVE_PCI_MMAP
++extern int pci_mmap_page_range(struct pci_dev *dev, struct vm_area_struct *vma,
++			       enum pci_mmap_state mmap_state, int write_combine);
++
+ #endif  /* __KERNEL__ */
+ #endif  /* __ASM_PCI_H */
+diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
+index 4f0e3eb..9a87b2a 100644
+--- a/arch/arm64/kernel/pci.c
++++ b/arch/arm64/kernel/pci.c
+@@ -228,3 +228,22 @@ void pcibios_remove_bus(struct pci_bus *bus)
+ }
+ 
+ #endif
++
++int pci_mmap_page_range(struct pci_dev *dev, struct vm_area_struct *vma,
++			enum pci_mmap_state mmap_state, int write_combine)
++{
++	if (mmap_state == pci_mmap_io)
++		return -EINVAL;
++
++	if (write_combine)
++		vma->vm_page_prot = pgprot_writecombine(vma->vm_page_prot);
++	else
++		vma->vm_page_prot = pgprot_device(vma->vm_page_prot);
++
++	if (remap_pfn_range(vma, vma->vm_start, vma->vm_pgoff,
++			     vma->vm_end - vma->vm_start,
++			     vma->vm_page_prot))
++		return -EAGAIN;
++
++	return 0;
++}
+-- 
+dwmw2
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: smime.p7s
+Type: application/x-pkcs7-signature
+Size: 4938 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170315/21eba039/attachment-0001.bin>
