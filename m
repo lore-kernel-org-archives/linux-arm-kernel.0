@@ -1,107 +1,159 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Wed, 15 Mar 2017 15:14:59 -0500
-Subject: [PATCH v4 3/5] dt-bindings: Add TI SCI PM Domains
-In-Reply-To: <20170315175341.alba5snfgz5xyrzf@rob-hp-laptop>
-References: <1488882154-21485-1-git-send-email-d-gerlach@ti.com>
- <1488882154-21485-4-git-send-email-d-gerlach@ti.com>
- <20170315175341.alba5snfgz5xyrzf@rob-hp-laptop>
-Message-ID: <4b4e71a1-53d2-cbbb-571f-61a73ada79fc@ti.com>
+From: npcomplete13@gmail.com (Vivek Unune)
+Date: Wed, 15 Mar 2017 16:18:20 -0400
+Subject: [PATCH] ARM: dts: BCM5301X: Add support for Linksys EA9500
+In-Reply-To: <7f5ddeba-6f79-9de5-2c67-a77e6bec0ef9@broadcom.com>
+References: <1489590033-4946-1-git-send-email-npcomplete13@gmail.com>
+ <20170315185214.GF21021@lunn.ch>
+ <CAChtp75xk3LN1-DPVvaHT5qEvrdoFFvXEk-daVCcJ=4rYu_vmw@mail.gmail.com>
+ <7f5ddeba-6f79-9de5-2c67-a77e6bec0ef9@broadcom.com>
+Message-ID: <CAChtp75mzHkSg4rVh602vaMotqs6NtaPOD4383Gef8tVPO37FQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/15/2017 12:53 PM, Rob Herring wrote:
-> On Tue, Mar 07, 2017 at 04:22:32AM -0600, Dave Gerlach wrote:
->> Add a generic power domain implementation, TI SCI PM Domains, that
->> will hook into the genpd framework and allow the TI SCI protocol to
->> control device power states.
+Thanks Florian.
+
+Let me try this out. First I'll try to figure out how to add a mdio node.
+
+Over the weekend I was trying enable DSA driver, but did not see DSA
+under network. I'm using LEDE source with kernel 4.9. Nor did I see it
+when I tried 'make kernel_menuconfig'
+
+Thanks again.
+
+On Wed, Mar 15, 2017 at 3:49 PM, Florian Fainelli
+<florian.fainelli@broadcom.com> wrote:
+> On 03/15/2017 12:34 PM, Vivek Unune wrote:
+>> Andrew,
 >>
->> Also, provide macros representing each device index as understood
->> by TI SCI to be used in the device node power-domain references.
->> These are identifiers for the K2G devices managed by the PMMC.
+>> I'm not entirely sure. But here is what I observed.
 >>
->> Signed-off-by: Nishanth Menon <nm@ti.com>
->> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
->> ---
->>  .../devicetree/bindings/soc/ti/sci-pm-domain.txt   | 59 ++++++++++++++
->>  MAINTAINERS                                        |  2 +
->>  include/dt-bindings/genpd/k2g.h                    | 90 ++++++++++++++++++++++
->>  3 files changed, 151 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/soc/ti/sci-pm-domain.txt
->>  create mode 100644 include/dt-bindings/genpd/k2g.h
+>> Boot loader sets up both the switches. And I can use all 8 ports of the
+>> router when I boot Lede. Only the internal swich is detected and
+>> configurable via swconfig tool
+>> Internal switch is connected to CPU via port 5 same as Netgear R8000.
+>> The other bit here is that I looked through the GPL source and gpio pin
+>> 10 is labeled as EA9500_RST2LANSW_GPIO10_PIN/ResetSwitch. So when I
+>> performed a robo reset of the pin and 5 (labeled 1 thru 5 on the unit)
+>> of the 8 physical ports stopped working (no packets).
 >>
->> diff --git a/Documentation/devicetree/bindings/soc/ti/sci-pm-domain.txt b/Documentation/devicetree/bindings/soc/ti/sci-pm-domain.txt
->> new file mode 100644
->> index 000000000000..86a6a3d52ed6
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/soc/ti/sci-pm-domain.txt
->> @@ -0,0 +1,59 @@
->> +Texas Instruments TI-SCI Generic Power Domain
->> +---------------------------------------------
->> +
->> +Some TI SoCs contain a system controller (like the PMMC, etc...) that is
->> +responsible for controlling the state of the IPs that are present.
->> +Communication between the host processor running an OS and the system
->> +controller happens through a protocol known as TI-SCI [1]. This pm domain
->> +implementation plugs into the generic pm domain framework and makes use of
->> +the TI SCI protocol power on and off each device when needed.
+>> If the external switch were to be connect via dedicated ethernet
+>> interface it should have shown up during the probe. Is in't it?
 >
-> The last sentence is mostly Linux implementation details. The binding is
-> power domains. The Linux framework is PM domains. Let's keep those
-> distinct and the latter doesn't belong in bindings.
-
-Ok, I will send an update to just this patch and drop the last sentence above.
-
-Regards,
-Dave
-
+> Not necessarily, and probably not with LEDE which would treat the
+> external 53125 as a dumb switch and not even see it. With a mainline
+> kernel and the B53 DSA driver you would be able to represent both
+> switches in Device Tree and describe how they are cascading from each other.
 >
->> +
->> +[1] Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
->> +
->> +PM Domain Node
->> +==============
->> +The PM domain node represents the global PM domain managed by the PMMC, which
->> +in this case is the implementation as documented by the generic PM domain
->> +bindings in Documentation/devicetree/bindings/power/power_domain.txt.  Because
->> +this relies on the TI SCI protocol to communicate with the PMMC it must be a
->> +child of the pmmc node.
->> +
->> +Required Properties:
->> +--------------------
->> +- compatible: should be "ti,sci-pm-domain"
->> +- #power-domain-cells: Must be 1 so that an id can be provided in each
->> +		       device node.
->> +
->> +Example (K2G):
->> +-------------
->> +	pmmc: pmmc {
->> +		compatible = "ti,k2g-sci";
->> +		...
->> +
->> +		k2g_pds: power-controller {
->> +			compatible = "ti,sci-pm-domain";
->> +			#power-domain-cells = <1>;
->> +		};
->> +	};
->> +
->> +PM Domain Consumers
->> +===================
->> +Hardware blocks belonging to a PM domain should contain a "power-domains"
->> +property that is a phandle pointing to the corresponding PM domain node
->> +along with an index representing the device id to be passed to the PMMC
->> +for device control.
->> +
->> +Required Properties:
->> +--------------------
->> +- power-domains: phandle pointing to the corresponding PM domain node
->> +		 and an ID representing the device.
->> +
->> +See dt-bindings/genpd/k2g.h for the list of valid identifiers for k2g.
->> +
->> +Example (K2G):
->> +--------------------
->> +	uart0: serial at 02530c00 {
->> +		compatible = "ns16550a";
->> +		...
->> +		power-domains = <&k2g_pds K2G_DEV_UART0>;
->> +	};
+> The potential Device Tree changes could look like this (based on your
+> explanation, but I am not sure) for your platform, assuming the 53125 is
+> actually exposing the front panel ports and that we did introduce a
+> "mdio" node which would be required to expose the external BCM53125 switch.
+>
+>
+> /* There is no MDIO node, there should be one */
+> &mdio {
+>         status = "okay";
+>
+>         switch at 30 {
+>                 #address-cells = <1>;
+>                 #size-cells = <0>;
+>                 reset-gpios = <&gpio 10>;
+>                 reset-names = "robo_reset";
+>
+>                 ports {
+>                         #address-cells = <1>;
+>                         #size-cells = <0>;
+>
+>                         port at 0 {
+>                                 reg = <0>;
+>                                 label = "lan1";
+>                         };
+>
+>                         port at 1 {
+>                                 reg = <1>;
+>                                 label = "lan2";
+>                         };
+>
+>                         port at 2 {
+>                                 reg = <2>;
+>                                 label = "lan3";
+>                         };
+>
+>                         port at 3 {
+>                                 reg = <3>;
+>                                 label = "lan1";
+>                         };
+>
+>                         port at 4 {
+>                                 reg = <4>;
+>                                 label = "wan";
+>                         };
+>
+>                        port at 5 {
+>                                 reg = <5>;
+>                                 label = "cpu";
+>                                 ethernet = <&sw0port8>;
+>                                 fixed-link {
+>                                         speed = <1000>;
+>                                         full-duplex;
+>                                 };
+>                         };
+>                 };
+>         };
+> };
+>
+> &srab {
+>         status = "okay";
+>
+>         ports {
+>                 #address-cells = <1>;
+>                 #size-cells = <0>;
+>
+>                 port at 5 {
+>                         reg = <5>;
+>                         label = "cpu";
+>                         ethernet = <&gmac0>;
+>                         fixed-link {
+>                                 speed = <1000>;
+>                                 full-duplex;
+>                         };
+>                 };
+>
+>                 sw0port8: port at 8 {
+>                         reg = <8>;
+>                         label = "extswitch";
+>
+>                         fixed-link {
+>                                 speed = <1000>;
+>                                 full-duplex;
+>                         };
+>                 };
+>         };
+> };
+>
+>>
+>> Thanks,
+>>
+>> Vivek
+>>
+>>
+>> On Wed, Mar 15, 2017 at 2:52 PM Andrew Lunn <andrew@lunn.ch
+>> <mailto:andrew@lunn.ch>> wrote:
+>>
+>>     Hi Vivek
+>>
+>>     > - It has two switches in order to support 8 lan ports. Internal
+>>     switch is
+>>     >   BCM53012. The external switch BCM53125 currently works as "dumb
+>>     switch"
+>>
+>>     Do you know how the second switch is connected? Is it cascaded off the
+>>     internal switch? Or does it have a dedicated Ethernet interface?
+>>
+>>     Thanks
+>>             Andrew
+>>
+>
+>
+> --
+> Florian
