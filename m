@@ -1,88 +1,126 @@
-From: a.hajda@samsung.com (Andrzej Hajda)
-Date: Wed, 15 Mar 2017 08:32:56 +0100
-Subject: [PATCH] drm/exynos: Print kernel pointers in a restricted form
-In-Reply-To: <e147ef15-0f7c-19f0-8e1b-db6a75930932@math.uni-bielefeld.de>
-References: <20170314183804.13788-1-krzk@kernel.org>
- <e1800491-0b60-74d1-1377-756d5b0bb371@math.uni-bielefeld.de>
- <20170314190859.y55wlc4z7xdsbbxg@kozik-lap>
- <de5e8583-748b-9df2-f7cc-c1b4fb499d17@math.uni-bielefeld.de>
- <20170314195240.gj7jbgql7hfziw42@kozik-lap>
- <CGME20170314204224epcas4p1c8b7716ebbebe60d14463f64da61d135@epcas4p1.samsung.com>
- <e147ef15-0f7c-19f0-8e1b-db6a75930932@math.uni-bielefeld.de>
-Message-ID: <ee50f87d-d79e-d74e-25b3-091c49a5e1d4@samsung.com>
+From: mhocko@kernel.org (Michal Hocko)
+Date: Wed, 15 Mar 2017 08:39:29 +0100
+Subject: [PATCH] mm: move pcp and lru-pcp drainging into single wq
+In-Reply-To: <CADRPPNRE_fEKjdNmSAqEJBAFJ_xDmiJQJk=Hnc16ymC2z_z8jQ@mail.gmail.com>
+References: <20170307131751.24936-1-mhocko@kernel.org>
+ <CADRPPNT9zyc_0sg0eoZEMbTQ+mCHAkmzmHW93zHaOuzpALtzrg@mail.gmail.com>
+ <20170313095836.GI31518@dhcp22.suse.cz>
+ <CADRPPNRE_fEKjdNmSAqEJBAFJ_xDmiJQJk=Hnc16ymC2z_z8jQ@mail.gmail.com>
+Message-ID: <20170315073928.GA32620@dhcp22.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tobias,
+On Tue 14-03-17 18:07:38, Yang Li wrote:
+> On Mon, Mar 13, 2017 at 4:58 AM, Michal Hocko <mhocko@kernel.org> wrote:
+> > On Fri 10-03-17 17:31:56, Yang Li wrote:
+> >> On Tue, Mar 7, 2017 at 7:17 AM, Michal Hocko <mhocko@kernel.org> wrote:
+> >> > From: Michal Hocko <mhocko@suse.com>
+> >> >
+> >> > We currently have 2 specific WQ_RECLAIM workqueues in the mm code.
+> >> > vmstat_wq for updating pcp stats and lru_add_drain_wq dedicated to drain
+> >> > per cpu lru caches. This seems more than necessary because both can run
+> >> > on a single WQ. Both do not block on locks requiring a memory allocation
+> >> > nor perform any allocations themselves. We will save one rescuer thread
+> >> > this way.
+> >> >
+> >> > On the other hand drain_all_pages() queues work on the system wq which
+> >> > doesn't have rescuer and so this depend on memory allocation (when all
+> >> > workers are stuck allocating and new ones cannot be created). This is
+> >> > not critical as there should be somebody invoking the OOM killer (e.g.
+> >> > the forking worker) and get the situation unstuck and eventually
+> >> > performs the draining. Quite annoying though. This worker should be
+> >> > using WQ_RECLAIM as well. We can reuse the same one as for lru draining
+> >> > and vmstat.
+> >> >
+> >> > Changes since v1
+> >> > - rename vmstat_wq to mm_percpu_wq - per Mel
+> >> > - make sure we are not trying to enqueue anything while the WQ hasn't
+> >> >   been intialized yet. This shouldn't happen because the initialization
+> >> >   is done from an init code but some init section might be triggering
+> >> >   those paths indirectly so just warn and skip the draining in that case
+> >> >   per Vlastimil
+> >>
+> >> So what's the plan if this really happens?  Shall we put the
+> >> initialization of the mm_percpu_wq earlier?
+> >
+> > yes
+> >
+> >> Or if it is really harmless we can probably remove the warnings.
+> >
+> > Yeah, it is harmless but if we can move it earlier then it would be
+> > prefferable to fix this.
+> >
+> >>
+> >> I'm seeing this on arm64 with a linux-next tree:
+> > [...]
+> >> [    0.279000] [<ffffff80081636bc>] drain_all_pages+0x244/0x25c
+> >> [    0.279065] [<ffffff80081c675c>] start_isolate_page_range+0x14c/0x1f0
+> >> [    0.279137] [<ffffff8008166a48>] alloc_contig_range+0xec/0x354
+> >> [    0.279203] [<ffffff80081c6c5c>] cma_alloc+0x100/0x1fc
+> >> [    0.279263] [<ffffff8008481714>] dma_alloc_from_contiguous+0x3c/0x44
+> >> [    0.279336] [<ffffff8008b25720>] atomic_pool_init+0x7c/0x208
+> >> [    0.279399] [<ffffff8008b258f0>] arm64_dma_init+0x44/0x4c
+> >> [    0.279461] [<ffffff8008083144>] do_one_initcall+0x38/0x128
+> >> [    0.279525] [<ffffff8008b20d30>] kernel_init_freeable+0x1a0/0x240
+> >> [    0.279596] [<ffffff8008807778>] kernel_init+0x10/0xfc
+> >> [    0.279654] [<ffffff8008082b70>] ret_from_fork+0x10/0x20
+> >
+> > The following should address this. I didn't get to test it yet though.
+> > ---
+> > diff --git a/include/linux/mm.h b/include/linux/mm.h
+> > index 21ee5503c702..8362dca071cb 100644
+> > --- a/include/linux/mm.h
+> > +++ b/include/linux/mm.h
+> > @@ -32,6 +32,8 @@ struct user_struct;
+> >  struct writeback_control;
+> >  struct bdi_writeback;
+> >
+> > +void init_mm_internals(void);
+> > +
+> >  #ifndef CONFIG_NEED_MULTIPLE_NODES     /* Don't use mapnrs, do it properly */
+> >  extern unsigned long max_mapnr;
+> >
+> > diff --git a/init/main.c b/init/main.c
+> > index 51aa8f336819..c72d35250e84 100644
+> > --- a/init/main.c
+> > +++ b/init/main.c
+> > @@ -1023,6 +1023,8 @@ static noinline void __init kernel_init_freeable(void)
+> >
+> >         workqueue_init();
+> >
+> > +       init_mm_internals();
+> > +
+> >         do_pre_smp_initcalls();
+> >         lockup_detector_init();
+> >
+> > diff --git a/mm/vmstat.c b/mm/vmstat.c
+> > index 4bbc775f9d08..d0871fc1aeca 100644
+> > --- a/mm/vmstat.c
+> > +++ b/mm/vmstat.c
+> > @@ -1762,7 +1762,7 @@ static int vmstat_cpu_dead(unsigned int cpu)
+> >
+> >  struct workqueue_struct *mm_percpu_wq;
+> >
+> > -static int __init setup_vmstat(void)
+> > +void __init init_mm_internals(void)
+> >  {
+> >         int ret __maybe_unused;
+> >
+> > @@ -1792,9 +1792,7 @@ static int __init setup_vmstat(void)
+> >         proc_create("vmstat", S_IRUGO, NULL, &proc_vmstat_file_operations);
+> >         proc_create("zoneinfo", S_IRUGO, NULL, &proc_zoneinfo_file_operations);
+> >  #endif
+> > -       return 0;
+> >  }
+> > -module_init(setup_vmstat)
+> >
+> >  #if defined(CONFIG_DEBUG_FS) && defined(CONFIG_COMPACTION)
+> 
+> I did a test on arm64.  This do fix the warnings.
 
-On 14.03.2017 21:41, Tobias Jakobi wrote:
-> Krzysztof Kozlowski wrote:
->> On Tue, Mar 14, 2017 at 08:17:35PM +0100, Tobias Jakobi wrote:
->>> Krzysztof Kozlowski wrote:
->>>> On Tue, Mar 14, 2017 at 08:01:41PM +0100, Tobias Jakobi wrote:
->>>>> Hello Krzysztof,
->>>>>
->>>>> I was wondering about the benefit of this. From a quick look these are
->>>>> all messages that end up in the kernel log / dmesg.
->>>>>
->>>>> IIRC %pK does nothing there, since dmest_restrict is supposed to be used
->>>>> to deny an unpriviliged user the access to the kernel log.
->>>>>
->>>>> Or am I missing something here?
->>>> These are regular printks so depending on kernel options (e.g. dynamic
->>>> debug, drm.debug) these might be printed also in the console. Of course
->>>> we could argue then if access to one of the consoles is worth
->>>> securing.
->>> This here suggests otherwise.
->>> https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/Documentation/sysctl/kernel.txt#n388
->>>
->>> I have not tested this, but IIRC %pK is not honored by the kernel
->>> logging infrastucture. That's why dmesg_restrict is there.
->>>
->>> Correct me if I'm wrong.
->> The %pK will not help for dmesg or /proc/kmsg but it will help for
->> console (/dev/ttySACN, ttySN etc) because effectively it uses the same
->> vsprintf()/pointer() functions.
-> Thanks for the explanation, I didn't know that there was a difference
-> there. In that case, looks good to me.
->
->
+Thanks! Can I assume your
+Tested-by: Yang Li <pku.leo@gmail.com>
 
-Just to clarify %pK:
-
-Documentation/printk-formats.txt:
-        %pK     0x01234567 or 0x0123456789abcdef
-
-        For printing kernel pointers which should be hidden from
-unprivileged
-        users. The behaviour of %pK depends on the kptr_restrict sysctl
-- see
-        Documentation/sysctl/kernel.txt for more details.
-
-Documentation/sysctl/kernel.txt:
-
-kptr_restrict:
-
-This toggle indicates whether restrictions are placed on
-exposing kernel addresses via /proc and other interfaces.
-
-When kptr_restrict is set to (0), the default, there are no restrictions.
-
-When kptr_restrict is set to (1), kernel pointers printed using the %pK
-format specifier will be replaced with 0's unless the user has CAP_SYSLOG
-and effective user and group ids are equal to the real ids. This is
-because %pK checks are done at read() time rather than open() time, so
-if permissions are elevated between the open() and the read() (e.g via
-a setuid binary) then %pK will not leak kernel pointers to unprivileged
-users. Note, this is a temporary solution only. The correct long-term
-solution is to do the permission checks at open() time. Consider removing
-world read permissions from files that use %pK, and using dmesg_restrict
-to protect against uses of %pK in dmesg(8) if leaking kernel pointer
-values to unprivileged users is a concern.
-
-When kptr_restrict is set to (2), kernel pointers printed using
-%pK will be replaced with 0's regardless of privileges.
----
-
-Regards
-Andrzej
+-- 
+Michal Hocko
+SUSE Labs
