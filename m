@@ -1,35 +1,30 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Wed, 15 Mar 2017 18:00:04 +0100
-Subject: [PATCH v3] drm/rockchip: Refactor the component match logic.
-In-Reply-To: <1489573247-9628-1-git-send-email-jeffy.chen@rock-chips.com>
-References: <1489573247-9628-1-git-send-email-jeffy.chen@rock-chips.com>
-Message-ID: <19101003.9xjQ92OS5C@phil>
+From: yannick.fertre@st.com (Yannick Fertre)
+Date: Wed, 15 Mar 2017 18:02:14 +0100
+Subject: [PATCH v4 8/8] ARM: configs: Add STM32 panel simple support in STM32
+ defconfig
+In-Reply-To: <1489597334-16896-1-git-send-email-yannick.fertre@st.com>
+References: <1489597334-16896-1-git-send-email-yannick.fertre@st.com>
+Message-ID: <1489597334-16896-9-git-send-email-yannick.fertre@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 15. M?rz 2017, 18:20:47 CET schrieb Jeffy Chen:
-> Currently we are adding all components from the dts, if one of their
-> drivers been disabled, we would not be able to bring up others.
-> 
-> Refactor component match logic, follow exynos drm.
-> 
-> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
-> Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
+Signed-off-by: Yannick Fertre <yannick.fertre@st.com>
+---
+ arch/arm/configs/stm32_defconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
-This reliably produces null pointer dereference errors in
-	__platform_driver_register called from rockchip_drm_init
-on at least rk3036 and rk3288 (probably more) when applied on top of 
-Linus' tree from today. Log attached and Rockchip drm compiled as module.
-
-I'm currently dug into other areas, so hadn't have time to investigate further 
-yet.
-
-
-Heiko
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: firefly-drm.log
-Type: text/x-log
-Size: 36974 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170315/86183a40/attachment-0001.bin>
+diff --git a/arch/arm/configs/stm32_defconfig b/arch/arm/configs/stm32_defconfig
+index 9c6ba54e..f7ddf29b 100644
+--- a/arch/arm/configs/stm32_defconfig
++++ b/arch/arm/configs/stm32_defconfig
+@@ -50,6 +50,8 @@ CONFIG_SERIAL_STM32_CONSOLE=y
+ # CONFIG_HW_RANDOM is not set
+ # CONFIG_HWMON is not set
+ CONFIG_DRM=y
++CONFIG_DRM_PANEL_SIMPLE=y
++CONFIG_BACKLIGHT_LCD_SUPPORT=y
+ CONFIG_MFD_SYSCON=y
+ # CONFIG_USB_SUPPORT is not set
+ CONFIG_NEW_LEDS=y
+-- 
+1.9.1
