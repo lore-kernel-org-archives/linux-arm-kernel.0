@@ -1,58 +1,50 @@
 From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Wed, 15 Mar 2017 11:55:22 +0100
-Subject: [PATCH v4 03/18] mfd: axp20x: correct name of temperature data ADC
- registers
+Date: Wed, 15 Mar 2017 11:55:20 +0100
+Subject: [PATCH v4 01/18] dt-bindings: power: battery: add
+ constant-charge-current property
 In-Reply-To: <20170315105537.22349-1-quentin.schulz@free-electrons.com>
 References: <20170315105537.22349-1-quentin.schulz@free-electrons.com>
-Message-ID: <20170315105537.22349-4-quentin.schulz@free-electrons.com>
+Message-ID: <20170315105537.22349-2-quentin.schulz@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The registers 0x56 and 0x57 of AXP22X PMIC store the value of the
-internal temperature of the PMIC.
+This adds the constant-charge-current property to the list of optional
+properties of the battery.
 
-This patch modifies the name of these registers from AXP22X_PMIC_ADC_H/L
-to AXP22X_PMIC_TEMP_H/L so their purpose is clearer.
+The constant charge current is critical for batteries as they can't
+handle all charge currents.
 
 Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
-Acked-by: Chen-Yu Tsai <wens@csie.org>
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
+Acked-by: Rob Herring <robh@kernel.org>
 ---
 
-added in v2
+v4:
+ - switch from constant-charge-current-microamp to constant-charge-microamp,
 
- drivers/mfd/axp20x.c       | 2 +-
- include/linux/mfd/axp20x.h | 4 ++--
- 2 files changed, 3 insertions(+), 3 deletions(-)
+added in v3
 
-diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
-index 25115fe..56472c2 100644
---- a/drivers/mfd/axp20x.c
-+++ b/drivers/mfd/axp20x.c
-@@ -100,7 +100,7 @@ static const struct regmap_range axp22x_volatile_ranges[] = {
- 	regmap_reg_range(AXP20X_PWR_INPUT_STATUS, AXP20X_PWR_OP_MODE),
- 	regmap_reg_range(AXP20X_IRQ1_EN, AXP20X_IRQ5_STATE),
- 	regmap_reg_range(AXP22X_GPIO_STATE, AXP22X_GPIO_STATE),
--	regmap_reg_range(AXP22X_PMIC_ADC_H, AXP20X_IPSOUT_V_HIGH_L),
-+	regmap_reg_range(AXP22X_PMIC_TEMP_H, AXP20X_IPSOUT_V_HIGH_L),
- 	regmap_reg_range(AXP20X_FG_RES, AXP20X_FG_RES),
- };
+ Documentation/devicetree/bindings/power/supply/battery.txt | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/power/supply/battery.txt b/Documentation/devicetree/bindings/power/supply/battery.txt
+index 0278617..9594e1e 100644
+--- a/Documentation/devicetree/bindings/power/supply/battery.txt
++++ b/Documentation/devicetree/bindings/power/supply/battery.txt
+@@ -7,6 +7,7 @@ Optional Properties:
+  - voltage-min-design-microvolt: drained battery voltage
+  - energy-full-design-microwatt-hours: battery design energy
+  - charge-full-design-microamp-hours: battery design capacity
++ - constant-charge-microamp: battery constant charge current
  
-diff --git a/include/linux/mfd/axp20x.h b/include/linux/mfd/axp20x.h
-index 0d9a1ff..dc8798c 100644
---- a/include/linux/mfd/axp20x.h
-+++ b/include/linux/mfd/axp20x.h
-@@ -228,8 +228,8 @@ enum axp20x_variants {
- #define AXP20X_OCV_MAX			0xf
+ Because drivers surface properties in sysfs using names derived
+ from enum power_supply_property, e.g.
+@@ -30,6 +31,7 @@ Example:
+ 		voltage-min-design-microvolt = <3200000>;
+ 		energy-full-design-microwatt-hours = <5290000>;
+ 		charge-full-design-microamp-hours = <1430000>;
++		constant-charge-microamp = <300000>;
+ 	};
  
- /* AXP22X specific registers */
--#define AXP22X_PMIC_ADC_H		0x56
--#define AXP22X_PMIC_ADC_L		0x57
-+#define AXP22X_PMIC_TEMP_H		0x56
-+#define AXP22X_PMIC_TEMP_L		0x57
- #define AXP22X_TS_ADC_H			0x58
- #define AXP22X_TS_ADC_L			0x59
- #define AXP22X_BATLOW_THRES1		0xe6
+ 	charger: charger at 11 {
 -- 
 2.9.3
