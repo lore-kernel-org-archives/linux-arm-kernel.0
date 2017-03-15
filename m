@@ -1,117 +1,50 @@
-From: andy.tang@nxp.com (Yuantian Tang)
-Date: Wed, 15 Mar 2017 15:10:25 +0800
-Subject: [PATCH v3] arm64: dts: ls1012a: add thermal monitor node
-Message-ID: <1489561825-42670-1-git-send-email-andy.tang@nxp.com>
+From: yong.mao@mediatek.com (Yong Mao)
+Date: Wed, 15 Mar 2017 15:26:38 +0800
+Subject: [PATCH v5 1/3] mmc: dt-bindings: update Mediatek MMC bindings
+In-Reply-To: <1489562800-27431-1-git-send-email-yong.mao@mediatek.com>
+References: <1489562800-27431-1-git-send-email-yong.mao@mediatek.com>
+Message-ID: <1489562800-27431-2-git-send-email-yong.mao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is a thermal monitoring unit on ls1012a soc which can
-monitor and record the temperature of cores so that appropriate actions
-can be taken or alarm the user when the temperature exceeds a programmed
-temperature threshold.
+From: yong mao <yong.mao@mediatek.com>
 
-Signed-off-by: Tang Yuantian <andy.tang@nxp.com>
+Add description for mediatek,hs200-cmd-int-delay
+Add description for mediatek,hs400-cmd-int-delay
+Add description for mediatek,hs400-cmd-resp-sel-rising
+
+Signed-off-by: Yong Mao <yong.mao@mediatek.com>
 ---
-v3:
-	-- fix alignment and format issue
-v2:
-	-- rebase to latest kernel
- arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi | 76 ++++++++++++++++++++++++++
- 1 file changed, 76 insertions(+)
+ Documentation/devicetree/bindings/mmc/mtk-sd.txt |   12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
-index cffebb4..2cceefd 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
-@@ -43,6 +43,7 @@
-  */
+diff --git a/Documentation/devicetree/bindings/mmc/mtk-sd.txt b/Documentation/devicetree/bindings/mmc/mtk-sd.txt
+index 0120c7f..4182ea3 100644
+--- a/Documentation/devicetree/bindings/mmc/mtk-sd.txt
++++ b/Documentation/devicetree/bindings/mmc/mtk-sd.txt
+@@ -21,6 +21,15 @@ Optional properties:
+ - assigned-clocks: PLL of the source clock
+ - assigned-clock-parents: parent of source clock, used for HS400 mode to get 400Mhz source clock
+ - hs400-ds-delay: HS400 DS delay setting
++- mediatek,hs200-cmd-int-delay: HS200 command internal delay setting.
++				This field has total 32 stages.
++				The value is an integer from 0 to 31.
++- mediatek,hs400-cmd-int-delay: HS400 command internal delay setting
++				This field has total 32 stages.
++				The value is an integer from 0 to 31.
++- mediatek,hs400-cmd-resp-sel-rising:  HS400 command response sample selection
++				       If present,HS400 command responses are sampled on rising edges.
++				       If not present,HS400 command responses are sampled on falling edges.
  
- #include <dt-bindings/interrupt-controller/irq.h>
-+#include <dt-bindings/thermal/thermal.h>
- 
- / {
- 	compatible = "fsl,ls1012a";
-@@ -127,6 +128,81 @@
- 			clocks = <&sysclk>;
- 		};
- 
-+		tmu: tmu at 1f00000 {
-+			compatible = "fsl,qoriq-tmu";
-+			reg = <0x0 0x1f00000 0x0 0x10000>;
-+			interrupts = <0 33 0x4>;
-+			fsl,tmu-range = <0xb0000 0x9002a 0x6004c 0x30062>;
-+			fsl,tmu-calibration = <0x00000000 0x00000026
-+					       0x00000001 0x0000002d
-+					       0x00000002 0x00000032
-+					       0x00000003 0x00000039
-+					       0x00000004 0x0000003f
-+					       0x00000005 0x00000046
-+					       0x00000006 0x0000004d
-+					       0x00000007 0x00000054
-+					       0x00000008 0x0000005a
-+					       0x00000009 0x00000061
-+					       0x0000000a 0x0000006a
-+					       0x0000000b 0x00000071
-+
-+					       0x00010000 0x00000025
-+					       0x00010001 0x0000002c
-+					       0x00010002 0x00000035
-+					       0x00010003 0x0000003d
-+					       0x00010004 0x00000045
-+					       0x00010005 0x0000004e
-+					       0x00010006 0x00000057
-+					       0x00010007 0x00000061
-+					       0x00010008 0x0000006b
-+					       0x00010009 0x00000076
-+
-+					       0x00020000 0x00000029
-+					       0x00020001 0x00000033
-+					       0x00020002 0x0000003d
-+					       0x00020003 0x00000049
-+					       0x00020004 0x00000056
-+					       0x00020005 0x00000061
-+					       0x00020006 0x0000006d
-+
-+					       0x00030000 0x00000021
-+					       0x00030001 0x0000002a
-+					       0x00030002 0x0000003c
-+					       0x00030003 0x0000004e>;
-+			big-endian;
-+			#thermal-sensor-cells = <1>;
-+		};
-+
-+		thermal-zones {
-+			cpu_thermal: cpu-thermal {
-+				polling-delay-passive = <1000>;
-+				polling-delay = <5000>;
-+				thermal-sensors = <&tmu 0>;
-+				trips {
-+					cpu_alert: cpu-alert {
-+						temperature = <85000>;
-+						hysteresis = <2000>;
-+						type = "passive";
-+					};
-+
-+					cpu_crit: cpu-crit {
-+						temperature = <95000>;
-+						hysteresis = <2000>;
-+						type = "critical";
-+					};
-+				};
-+
-+				cooling-maps {
-+					map0 {
-+						trip = <&cpu_alert>;
-+						cooling-device =
-+							<&cpu0 THERMAL_NO_LIMIT
-+							THERMAL_NO_LIMIT>;
-+					};
-+				};
-+			};
-+		};
-+
- 		i2c0: i2c at 2180000 {
- 			compatible = "fsl,vf610-i2c";
- 			#address-cells = <1>;
+ Examples:
+ mmc0: mmc at 11230000 {
+@@ -38,4 +47,7 @@ mmc0: mmc at 11230000 {
+ 	assigned-clocks = <&topckgen CLK_TOP_MSDC50_0_SEL>;
+ 	assigned-clock-parents = <&topckgen CLK_TOP_MSDCPLL_D2>;
+ 	hs400-ds-delay = <0x14015>;
++	mediatek,hs200-cmd-int-delay = <26>;
++	mediatek,hs400-cmd-int-delay = <14>;
++	mediatek,hs400-cmd-resp-sel-rising;
+ };
 -- 
-2.1.0.27.g96db324
+1.7.9.5
