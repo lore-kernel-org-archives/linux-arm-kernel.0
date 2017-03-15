@@ -1,15 +1,15 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Wed, 15 Mar 2017 19:37:16 +0000
-Subject: Applied "spi: davinci: do not use DMA if transfer length is less than
- 16" to the spi tree
-In-Reply-To: <1487872921-26628-5-git-send-email-fisaksen@baylibre.com>
-Message-ID: <E1coEjU-0004gr-QX@debutante>
+Date: Wed, 15 Mar 2017 19:37:19 +0000
+Subject: Applied "spi: davinci: use rx buffer as dummy tx buffer" to the spi
+ tree
+In-Reply-To: <1487327904-28311-4-git-send-email-fisaksen@baylibre.com>
+Message-ID: <E1coEjX-0004ho-PR@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   spi: davinci: do not use DMA if transfer length is less than 16
+   spi: davinci: use rx buffer as dummy tx buffer
 
 has been applied to the spi tree at
 
@@ -34,65 +34,52 @@ to this mail.
 Thanks,
 Mark
 
->From 0718b764880434ac7a5b7c0f5cb2c805c589a807 Mon Sep 17 00:00:00 2001
+>From 6b3a631e7f8eca75a987ed760898d28fb3628143 Mon Sep 17 00:00:00 2001
 From: Frode Isaksen <fisaksen@baylibre.com>
-Date: Thu, 23 Feb 2017 19:01:59 +0100
-Subject: [PATCH] spi: davinci: do not use DMA if transfer length is less than
- 16
+Date: Thu, 23 Feb 2017 19:01:58 +0100
+Subject: [PATCH] spi: davinci: use rx buffer as dummy tx buffer
 
-Higher bitrate and lower CPU load if using PIO in this case.
+When doing rx-only transfer, the transfer will fail
+if the number of SG entries exceeds 20.
+This happens because the eDMA DMA engine is limited
+to 20 SG entries in one transaction, and when the
+DMA transcation is resumed (which takes > 150us),
+rx errors occurs because the slave is still transmitting.
+Fix this by using the rx buffer as the dummy tx buffer,
+so that resuming the rx transcation happens at the same
+time as resuming the tx transcation.
 
 Signed-off-by: Frode Isaksen <fisaksen@baylibre.com>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- drivers/spi/spi-davinci.c | 14 ++++++++------
- 1 file changed, 8 insertions(+), 6 deletions(-)
+ drivers/spi/spi-davinci.c | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/spi/spi-davinci.c b/drivers/spi/spi-davinci.c
-index ca122165a3c6..75c658e4e487 100644
+index 1e24395a04f2..ca122165a3c6 100644
 --- a/drivers/spi/spi-davinci.c
 +++ b/drivers/spi/spi-davinci.c
-@@ -109,6 +109,8 @@
- #define SPIDEF		0x4c
- #define SPIFMT0		0x50
+@@ -655,6 +655,12 @@ static int davinci_spi_bufs(struct spi_device *spi, struct spi_transfer *t)
+ 		if (!rxdesc)
+ 			goto err_desc;
  
-+#define DMA_MIN_BYTES	16
++		if (!t->tx_buf) {
++			/* use rx buffer as dummy tx buffer */
++			t->tx_sg.sgl = t->rx_sg.sgl;
++			t->tx_sg.nents = t->rx_sg.nents;
++		}
 +
- /* SPI Controller driver's private data. */
- struct davinci_spi {
- 	struct spi_bitbang	bitbang;
-@@ -479,7 +481,8 @@ static bool davinci_spi_can_dma(struct spi_master *master,
- 	bool can_dma = false;
- 
- 	if (spicfg)
--		can_dma = spicfg->io_type == SPI_IO_TYPE_DMA;
-+		can_dma = (spicfg->io_type == SPI_IO_TYPE_DMA) &&
-+			(xfer->len >= DMA_MIN_BYTES);
- 
- 	return can_dma;
- }
-@@ -620,10 +623,9 @@ static int davinci_spi_bufs(struct spi_device *spi, struct spi_transfer *t)
- 
- 	reinit_completion(&dspi->done);
- 
--	if (spicfg->io_type == SPI_IO_TYPE_INTR)
--		set_io_bits(dspi->base + SPIINT, SPIINT_MASKINT);
--
--	if (spicfg->io_type != SPI_IO_TYPE_DMA) {
-+	if (!davinci_spi_can_dma(spi->master, spi, t)) {
-+		if (spicfg->io_type != SPI_IO_TYPE_POLL)
-+			set_io_bits(dspi->base + SPIINT, SPIINT_MASKINT);
- 		/* start the transfer */
- 		dspi->wcount--;
- 		tx_data = dspi->get_tx(dspi);
-@@ -698,7 +700,7 @@ static int davinci_spi_bufs(struct spi_device *spi, struct spi_transfer *t)
- 	}
- 
- 	clear_io_bits(dspi->base + SPIINT, SPIINT_MASKALL);
--	if (spicfg->io_type == SPI_IO_TYPE_DMA)
-+	if (davinci_spi_can_dma(spi->master, spi, t))
- 		clear_io_bits(dspi->base + SPIINT, SPIINT_DMA_REQ_EN);
- 
- 	clear_io_bits(dspi->base + SPIGCR1, SPIGCR1_SPIENA_MASK);
+ 		txdesc = dmaengine_prep_slave_sg(dspi->dma_tx,
+ 				t->tx_sg.sgl, t->tx_sg.nents, DMA_MEM_TO_DEV,
+ 				DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
+@@ -957,7 +963,7 @@ static int davinci_spi_probe(struct platform_device *pdev)
+ 	master->bus_num = pdev->id;
+ 	master->num_chipselect = pdata->num_chipselect;
+ 	master->bits_per_word_mask = SPI_BPW_RANGE_MASK(2, 16);
+-	master->flags = (SPI_MASTER_MUST_RX | SPI_MASTER_MUST_TX);
++	master->flags = SPI_MASTER_MUST_RX;
+ 	master->setup = davinci_spi_setup;
+ 	master->cleanup = davinci_spi_cleanup;
+ 	master->can_dma = davinci_spi_can_dma;
 -- 
 2.11.0
