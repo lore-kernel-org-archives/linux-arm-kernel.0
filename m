@@ -1,67 +1,38 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 15 Mar 2017 11:06:36 +0000
-Subject: [PATCHv2 1/5] dt-bindings: mfd: Add Altera Arria10 SR Reset
- Controller bindings
-In-Reply-To: <1487783419-10912-2-git-send-email-thor.thayer@linux.intel.com>
-References: <1487783419-10912-1-git-send-email-thor.thayer@linux.intel.com>
- <1487783419-10912-2-git-send-email-thor.thayer@linux.intel.com>
-Message-ID: <20170315110636.gdqu2tiowfrdacwe@dell>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Wed, 15 Mar 2017 12:11:54 +0100
+Subject: [PATCH v1 0/7] initialize dtsi file and dts file for RK3328 SoCs
+In-Reply-To: <1489572237-6649-1-git-send-email-cl@rock-chips.com>
+References: <1489572237-6649-1-git-send-email-cl@rock-chips.com>
+Message-ID: <2592337.TJConaiLTi@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 22 Feb 2017, thor.thayer at linux.intel.com wrote:
+Hi Liang,
 
-> From: Thor Thayer <thor.thayer@linux.intel.com>
+Am Mittwoch, 15. M?rz 2017, 18:03:50 CET schrieb cl at rock-chips.com:
+> From: Liang Chen <cl@rock-chips.com>
 > 
-> This patch adds documentation for the Altera A10-SR Reset
-> Controller DT bindings.
+> These patchs depend on pinctrl patchs as below:
 > 
-> Signed-off-by: Thor Thayer <thor.thayer@linux.intel.com>
-> ---
-> v2  No change
-> ---
->  Documentation/devicetree/bindings/mfd/altera-a10sr.txt | 11 +++++++++++
->  1 file changed, 11 insertions(+)
+> https://patchwork.kernel.org/patch/9566427/
+> https://patchwork.kernel.org/patch/9566425/
+> https://patchwork.kernel.org/patch/9566431/
+> 
+> Chen Liang (7):
+>   include: dt-bindings: Add pin function index definition for rockchip
+>     pinctrl
+>   dt-bindings: iio: rockchip-saradc: add support for rk3328
+>   dt-bindings: i2c: rk3x: add support for rk3328
+>   dt-bindings: soc: rockchip: grf: add support for rk3328
 
-Applied with Rob's Ack.
+both my inbox as well as the linux-rockchip list did only get patches 1-4 it 
+seems?
 
-> diff --git a/Documentation/devicetree/bindings/mfd/altera-a10sr.txt b/Documentation/devicetree/bindings/mfd/altera-a10sr.txt
-> index ea151f2..c8a7365 100644
-> --- a/Documentation/devicetree/bindings/mfd/altera-a10sr.txt
-> +++ b/Documentation/devicetree/bindings/mfd/altera-a10sr.txt
-> @@ -18,6 +18,7 @@ The A10SR consists of these sub-devices:
->  Device                   Description
->  ------                   ----------
->  a10sr_gpio               GPIO Controller
-> +a10sr_rst                Reset Controller
->  
->  Arria10 GPIO
->  Required Properties:
-> @@ -27,6 +28,11 @@ Required Properties:
->                        the second cell is used to specify flags.
->                        See ../gpio/gpio.txt for more information.
->  
-> +Arria10 Peripheral PHY Reset
-> +Required Properties:
-> +- compatible        : Should be "altr,a10sr-reset"
-> +- #reset-cells      : Should be one.
-> +
->  Example:
->  
->          resource-manager at 0 {
-> @@ -43,4 +49,9 @@ Example:
->  			gpio-controller;
->  			#gpio-cells = <2>;
->  		};
-> +
-> +		a10sr_rst: reset-controller {
-> +			compatible = "altr,a10sr-reset";
-> +			#reset-cells = <1>;
-> +		};
->  	};
+>   arm64: dts: rockchip: add core dtsi file for RK3328 SoCs
+>   arm64: dts: rockchip: add dts file for RK3328 evaluation board
+>   dt-bindings: document rockchip rk3328-evb board
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+So right now I'm missing these next 3. Did something go wrong when sending?
+
+
+Heiko
