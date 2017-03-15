@@ -1,15 +1,14 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Wed, 15 Mar 2017 18:13:03 +0000
-Subject: Applied "ASoC: sun8i-codec: Fix space on audio-routing widget" to the
- asoc tree
-In-Reply-To: <20170309095602.13809-2-mylene.josserand@free-electrons.com>
-Message-ID: <E1coDPz-00025d-Bx@debutante>
+Date: Wed, 15 Mar 2017 18:13:09 +0000
+Subject: Applied "ASoC: sun8i-codec-analog: split out mic2" to the asoc tree
+In-Reply-To: <20170305133709.6288-2-icenowy@aosc.xyz>
+Message-ID: <E1coDQ5-00028R-DE@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   ASoC: sun8i-codec: Fix space on audio-routing widget
+   ASoC: sun8i-codec-analog: split out mic2
 
 has been applied to the asoc tree at
 
@@ -34,39 +33,201 @@ to this mail.
 Thanks,
 Mark
 
->From 80405d44c3721c775f5c508f0cdbcc0e8498eeef Mon Sep 17 00:00:00 2001
-From: =?UTF-8?q?Myl=C3=A8ne=20Josserand?=
- <mylene.josserand@free-electrons.com>
-Date: Thu, 9 Mar 2017 10:56:00 +0100
-Subject: [PATCH] ASoC: sun8i-codec: Fix space on audio-routing widget
-MIME-Version: 1.0
-Content-Type: text/plain; charset=UTF-8
-Content-Transfer-Encoding: 8bit
+>From 3f48947d56ff3e42e2e490714025e984af817f5d Mon Sep 17 00:00:00 2001
+From: Icenowy Zheng <icenowy@aosc.xyz>
+Date: Sun, 5 Mar 2017 21:36:58 +0800
+Subject: [PATCH] ASoC: sun8i-codec-analog: split out mic2
 
-An unwanted space is present in an audio widget's name on the dapm
-routing. It causes an error on the recognition of this widget (error:
-("no dapm match for AIF1 Slot 0 Right").
+Allwinner V3s features an analog codec without MIC2.
 
-Remove the space fixes it.
+Split out this part, in order to prepare for the V3s analog codec.
 
-Signed-off-by: Myl??ne Josserand <mylene.josserand@free-electrons.com>
+Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+Acked-by: Chen-Yu Tsai <wens@csie.org>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- sound/soc/sunxi/sun8i-codec.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ sound/soc/sunxi/sun8i-codec-analog.c | 92 +++++++++++++++++++++++++++++-------
+ 1 file changed, 76 insertions(+), 16 deletions(-)
 
-diff --git a/sound/soc/sunxi/sun8i-codec.c b/sound/soc/sunxi/sun8i-codec.c
-index a75a983974d9..90cda9569503 100644
---- a/sound/soc/sunxi/sun8i-codec.c
-+++ b/sound/soc/sunxi/sun8i-codec.c
-@@ -335,7 +335,7 @@ static const struct snd_soc_dapm_route sun8i_codec_dapm_routes[] = {
- 	/* DAC Mixer Routes */
- 	{ "Left Digital DAC Mixer", "AIF1 Slot 0 Digital DAC Playback Switch",
- 	  "Digital Left DAC"},
--	{ "Right Digital DAC Mixer", "AIF1 Slot 0 Digital DAC Playback Switch ",
-+	{ "Right Digital DAC Mixer", "AIF1 Slot 0 Digital DAC Playback Switch",
- 	  "Digital Right DAC"},
+diff --git a/sound/soc/sunxi/sun8i-codec-analog.c b/sound/soc/sunxi/sun8i-codec-analog.c
+index 72331332b72e..b95ff045cd7f 100644
+--- a/sound/soc/sunxi/sun8i-codec-analog.c
++++ b/sound/soc/sunxi/sun8i-codec-analog.c
+@@ -259,17 +259,11 @@ static const struct snd_kcontrol_new sun8i_codec_common_controls[] = {
+ 	SOC_SINGLE_TLV("Mic1 Playback Volume", SUN8I_ADDA_MICIN_GCTRL,
+ 		       SUN8I_ADDA_MICIN_GCTRL_MIC1G,
+ 		       0x7, 0, sun8i_codec_out_mixer_pregain_scale),
+-	SOC_SINGLE_TLV("Mic2 Playback Volume",
+-		       SUN8I_ADDA_MICIN_GCTRL, SUN8I_ADDA_MICIN_GCTRL_MIC2G,
+-		       0x7, 0, sun8i_codec_out_mixer_pregain_scale),
+ 
+-	/* Microphone Amp boost gains */
++	/* Microphone Amp boost gain */
+ 	SOC_SINGLE_TLV("Mic1 Boost Volume", SUN8I_ADDA_MIC1G_MICBIAS_CTRL,
+ 		       SUN8I_ADDA_MIC1G_MICBIAS_CTRL_MIC1BOOST, 0x7, 0,
+ 		       sun8i_codec_mic_gain_scale),
+-	SOC_SINGLE_TLV("Mic2 Boost Volume", SUN8I_ADDA_MIC2G_CTRL,
+-		       SUN8I_ADDA_MIC2G_CTRL_MIC2BOOST, 0x7, 0,
+-		       sun8i_codec_mic_gain_scale),
+ 
+ 	/* ADC */
+ 	SOC_SINGLE_TLV("ADC Gain Capture Volume", SUN8I_ADDA_ADC_AP_EN,
+@@ -298,9 +292,8 @@ static const struct snd_soc_dapm_widget sun8i_codec_common_widgets[] = {
+ 	/* Line In */
+ 	SND_SOC_DAPM_INPUT("LINEIN"),
+ 
+-	/* Microphone inputs */
++	/* Microphone input */
+ 	SND_SOC_DAPM_INPUT("MIC1"),
+-	SND_SOC_DAPM_INPUT("MIC2"),
+ 
+ 	/* Microphone Bias */
+ 	SND_SOC_DAPM_SUPPLY("MBIAS", SUN8I_ADDA_MIC1G_MICBIAS_CTRL,
+@@ -310,8 +303,6 @@ static const struct snd_soc_dapm_widget sun8i_codec_common_widgets[] = {
+ 	/* Mic input path */
+ 	SND_SOC_DAPM_PGA("Mic1 Amplifier", SUN8I_ADDA_MIC1G_MICBIAS_CTRL,
+ 			 SUN8I_ADDA_MIC1G_MICBIAS_CTRL_MIC1AMPEN, 0, NULL, 0),
+-	SND_SOC_DAPM_PGA("Mic2 Amplifier", SUN8I_ADDA_MIC2G_CTRL,
+-			 SUN8I_ADDA_MIC2G_CTRL_MIC2AMPEN, 0, NULL, 0),
+ 
+ 	/* Mixers */
+ 	SND_SOC_DAPM_MIXER("Left Mixer", SUN8I_ADDA_DAC_PA_SRC,
+@@ -335,35 +326,30 @@ static const struct snd_soc_dapm_widget sun8i_codec_common_widgets[] = {
+ static const struct snd_soc_dapm_route sun8i_codec_common_routes[] = {
+ 	/* Microphone Routes */
+ 	{ "Mic1 Amplifier", NULL, "MIC1"},
+-	{ "Mic2 Amplifier", NULL, "MIC2"},
+ 
+ 	/* Left Mixer Routes */
+ 	{ "Left Mixer", "DAC Playback Switch", "Left DAC" },
+ 	{ "Left Mixer", "DAC Reversed Playback Switch", "Right DAC" },
+ 	{ "Left Mixer", "Line In Playback Switch", "LINEIN" },
+ 	{ "Left Mixer", "Mic1 Playback Switch", "Mic1 Amplifier" },
+-	{ "Left Mixer", "Mic2 Playback Switch", "Mic2 Amplifier" },
+ 
+ 	/* Right Mixer Routes */
+ 	{ "Right Mixer", "DAC Playback Switch", "Right DAC" },
+ 	{ "Right Mixer", "DAC Reversed Playback Switch", "Left DAC" },
+ 	{ "Right Mixer", "Line In Playback Switch", "LINEIN" },
+ 	{ "Right Mixer", "Mic1 Playback Switch", "Mic1 Amplifier" },
+-	{ "Right Mixer", "Mic2 Playback Switch", "Mic2 Amplifier" },
+ 
+ 	/* Left ADC Mixer Routes */
+ 	{ "Left ADC Mixer", "Mixer Capture Switch", "Left Mixer" },
+ 	{ "Left ADC Mixer", "Mixer Reversed Capture Switch", "Right Mixer" },
+ 	{ "Left ADC Mixer", "Line In Capture Switch", "LINEIN" },
+ 	{ "Left ADC Mixer", "Mic1 Capture Switch", "Mic1 Amplifier" },
+-	{ "Left ADC Mixer", "Mic2 Capture Switch", "Mic2 Amplifier" },
+ 
+ 	/* Right ADC Mixer Routes */
+ 	{ "Right ADC Mixer", "Mixer Capture Switch", "Right Mixer" },
+ 	{ "Right ADC Mixer", "Mixer Reversed Capture Switch", "Left Mixer" },
+ 	{ "Right ADC Mixer", "Line In Capture Switch", "LINEIN" },
+ 	{ "Right ADC Mixer", "Mic1 Capture Switch", "Mic1 Amplifier" },
+-	{ "Right ADC Mixer", "Mic2 Capture Switch", "Mic2 Amplifier" },
+ 
+ 	/* ADC Routes */
+ 	{ "Left ADC", NULL, "Left ADC Mixer" },
+@@ -578,19 +564,87 @@ static int sun8i_codec_add_lineout(struct snd_soc_component *cmpnt)
+ 	return 0;
+ }
+ 
++/* mic2 specific controls, widgets and routes */
++static const struct snd_kcontrol_new sun8i_codec_mic2_controls[] = {
++	/* Mixer pre-gain */
++	SOC_SINGLE_TLV("Mic2 Playback Volume",
++		       SUN8I_ADDA_MICIN_GCTRL, SUN8I_ADDA_MICIN_GCTRL_MIC2G,
++		       0x7, 0, sun8i_codec_out_mixer_pregain_scale),
++
++	/* Microphone Amp boost gain */
++	SOC_SINGLE_TLV("Mic2 Boost Volume", SUN8I_ADDA_MIC2G_CTRL,
++		       SUN8I_ADDA_MIC2G_CTRL_MIC2BOOST, 0x7, 0,
++		       sun8i_codec_mic_gain_scale),
++};
++
++static const struct snd_soc_dapm_widget sun8i_codec_mic2_widgets[] = {
++	/* Microphone input */
++	SND_SOC_DAPM_INPUT("MIC2"),
++
++	/* Mic input path */
++	SND_SOC_DAPM_PGA("Mic2 Amplifier", SUN8I_ADDA_MIC2G_CTRL,
++			 SUN8I_ADDA_MIC2G_CTRL_MIC2AMPEN, 0, NULL, 0),
++};
++
++static const struct snd_soc_dapm_route sun8i_codec_mic2_routes[] = {
++	{ "Mic2 Amplifier", NULL, "MIC2"},
++
++	{ "Left Mixer", "Mic2 Playback Switch", "Mic2 Amplifier" },
++
++	{ "Right Mixer", "Mic2 Playback Switch", "Mic2 Amplifier" },
++
++	{ "Left ADC Mixer", "Mic2 Capture Switch", "Mic2 Amplifier" },
++
++	{ "Right ADC Mixer", "Mic2 Capture Switch", "Mic2 Amplifier" },
++};
++
++static int sun8i_codec_add_mic2(struct snd_soc_component *cmpnt)
++{
++	struct snd_soc_dapm_context *dapm = snd_soc_component_get_dapm(cmpnt);
++	struct device *dev = cmpnt->dev;
++	int ret;
++
++	ret = snd_soc_add_component_controls(cmpnt,
++					     sun8i_codec_mic2_controls,
++					     ARRAY_SIZE(sun8i_codec_mic2_controls));
++	if (ret) {
++		dev_err(dev, "Failed to add MIC2 controls: %d\n", ret);
++		return ret;
++	}
++
++	ret = snd_soc_dapm_new_controls(dapm, sun8i_codec_mic2_widgets,
++					ARRAY_SIZE(sun8i_codec_mic2_widgets));
++	if (ret) {
++		dev_err(dev, "Failed to add MIC2 DAPM widgets: %d\n", ret);
++		return ret;
++	}
++
++	ret = snd_soc_dapm_add_routes(dapm, sun8i_codec_mic2_routes,
++				      ARRAY_SIZE(sun8i_codec_mic2_routes));
++	if (ret) {
++		dev_err(dev, "Failed to add MIC2 DAPM routes: %d\n", ret);
++		return ret;
++	}
++
++	return 0;
++}
++
+ struct sun8i_codec_analog_quirks {
+ 	bool has_headphone;
+ 	bool has_hmic;
+ 	bool has_lineout;
++	bool has_mic2;
  };
+ 
+ static const struct sun8i_codec_analog_quirks sun8i_a23_quirks = {
+ 	.has_headphone	= true,
+ 	.has_hmic	= true,
++	.has_mic2	= true,
+ };
+ 
+ static const struct sun8i_codec_analog_quirks sun8i_h3_quirks = {
+ 	.has_lineout	= true,
++	.has_mic2	= true,
+ };
+ 
+ static int sun8i_codec_analog_cmpnt_probe(struct snd_soc_component *cmpnt)
+@@ -626,6 +680,12 @@ static int sun8i_codec_analog_cmpnt_probe(struct snd_soc_component *cmpnt)
+ 			return ret;
+ 	}
+ 
++	if (quirks->has_mic2) {
++		ret = sun8i_codec_add_mic2(cmpnt);
++		if (ret)
++			return ret;
++	}
++
+ 	return 0;
+ }
  
 -- 
 2.11.0
