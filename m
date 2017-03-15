@@ -1,106 +1,60 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 15 Mar 2017 13:50:50 +0000
-Subject: [PATCH 3/3] kvm: arm/arm64: Fix locking for kvm_free_stage2_pgd
-In-Reply-To: <635795ed-7b12-bfb3-3b11-4edcfbc7b1bc@arm.com>
-References: <1489503154-20705-1-git-send-email-suzuki.poulose@arm.com>
- <1489503154-20705-4-git-send-email-suzuki.poulose@arm.com>
- <20170315092147.GM1277@cbox> <314fbde3-17e6-414b-85e6-326de22bdc1c@arm.com>
- <20170315105639.GA31974@cbox> <0e5ff7f7-855c-ea28-fdee-73c062c3d289@arm.com>
- <20170315133542.GP1277@cbox> <635795ed-7b12-bfb3-3b11-4edcfbc7b1bc@arm.com>
-Message-ID: <92c9e125-860d-5f7a-d291-ae5fbb2b4e39@arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 15 Mar 2017 14:52:06 +0100
+Subject: [PATCH v2 1/4] pinctrl: samsung: Fix the width of PINCFG_TYPE_DRV
+ bitfields for Exynos5433
+In-Reply-To: <CAJKOXPd1pRN47Ss5qTHUVAdPwxKqE5vGGevG1OhVH0uSZnotKA@mail.gmail.com>
+References: <CGME20161230041426epcas1p1f827d3cee8b607d81e9921b412ddf301@epcas1p1.samsung.com>
+ <20161230041421.24448-1-andi.shyti@samsung.com>
+ <20161230041421.24448-2-andi.shyti@samsung.com>
+ <CACRpkdbR3x14h38Gg7qpeWnswwD9qsS0zDUrrXCEJH-AdEB+cQ@mail.gmail.com>
+ <58AF7CCB.5070303@samsung.com>
+ <CACRpkda0-k7Vo9Y6yNtLNXu-gGnJW9y83t6W9p032KWjHYdMiw@mail.gmail.com>
+ <CAJKOXPd1pRN47Ss5qTHUVAdPwxKqE5vGGevG1OhVH0uSZnotKA@mail.gmail.com>
+Message-ID: <CACRpkdaCzhShH2O2yZmyVB2LfqqXHXjbm9d=Jj0vPa5F2hx87A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
-
-On 15/03/17 13:43, Marc Zyngier wrote:
-> On 15/03/17 13:35, Christoffer Dall wrote:
->> On Wed, Mar 15, 2017 at 01:28:07PM +0000, Marc Zyngier wrote:
->>> On 15/03/17 10:56, Christoffer Dall wrote:
->>>> On Wed, Mar 15, 2017 at 09:39:26AM +0000, Marc Zyngier wrote:
->>>>> On 15/03/17 09:21, Christoffer Dall wrote:
->>>>>> On Tue, Mar 14, 2017 at 02:52:34PM +0000, Suzuki K Poulose wrote:
->>>>>>> In kvm_free_stage2_pgd() we don't hold the kvm->mmu_lock while calling
->>>>>>> unmap_stage2_range() on the entire memory range for the guest. This could
->>>>>>> cause problems with other callers (e.g, munmap on a memslot) trying to
->>>>>>> unmap a range.
->>>>>>>
->>>>>>> Fixes: commit d5d8184d35c9 ("KVM: ARM: Memory virtualization setup")
->>>>>>> Cc: stable at vger.kernel.org # v3.10+
->>>>>>> Cc: Marc Zyngier <marc.zyngier@arm.com>
->>>>>>> Cc: Christoffer Dall <christoffer.dall@linaro.org>
->>>>>>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
->>>>>>> ---
->>>>>>>  arch/arm/kvm/mmu.c | 3 +++
->>>>>>>  1 file changed, 3 insertions(+)
->>>>>>>
->>>>>>> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
->>>>>>> index 13b9c1f..b361f71 100644
->>>>>>> --- a/arch/arm/kvm/mmu.c
->>>>>>> +++ b/arch/arm/kvm/mmu.c
->>>>>>> @@ -831,7 +831,10 @@ void kvm_free_stage2_pgd(struct kvm *kvm)
->>>>>>>  	if (kvm->arch.pgd == NULL)
->>>>>>>  		return;
->>>>>>>  
->>>>>>> +	spin_lock(&kvm->mmu_lock);
->>>>>>>  	unmap_stage2_range(kvm, 0, KVM_PHYS_SIZE);
->>>>>>> +	spin_unlock(&kvm->mmu_lock);
->>>>>>> +
->>>>>>
->>>>>> This ends up holding the spin lock for potentially quite a while, where
->>>>>> we can do things like __flush_dcache_area(), which I think can fault.
->>>>>
->>>>> I believe we're always using the linear mapping (or kmap on 32bit) in
->>>>> order not to fault.
->>>>>
->>>>
->>>> ok, then there's just the concern that we may be holding a spinlock for
->>>> a very long time.  I seem to recall Mario once added something where he
->>>> unlocked and gave a chance to schedule something else for each PUD or
->>>> something like that, because he ran into the issue during migration.  Am
->>>> I confusing this with something else?
->>>
->>> That definitely rings a bell: stage2_wp_range() uses that kind of trick
->>> to give the system a chance to breathe. Maybe we could use a similar
->>> trick in our S2 unmapping code? How about this (completely untested) patch:
->>>
->>> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
->>> index 962616fd4ddd..1786c24212d4 100644
->>> --- a/arch/arm/kvm/mmu.c
->>> +++ b/arch/arm/kvm/mmu.c
->>> @@ -292,8 +292,13 @@ static void unmap_stage2_range(struct kvm *kvm, phys_addr_t start, u64 size)
->>>  	phys_addr_t addr = start, end = start + size;
->>>  	phys_addr_t next;
->>>  
->>> +	BUG_ON(!spin_is_locked(&kvm->mmu_lock));
-
-Nit: assert_spin_locked() is somewhat more pleasant (and currently looks
-to expand to the exact same code).
-
-Robin.
-
->>> +
->>>  	pgd = kvm->arch.pgd + stage2_pgd_index(addr);
->>>  	do {
->>> +		if (need_resched() || spin_needbreak(&kvm->mmu_lock))
->>> +			cond_resched_lock(&kvm->mmu_lock);
->>> +
->>>  		next = stage2_pgd_addr_end(addr, end);
->>>  		if (!stage2_pgd_none(*pgd))
->>>  			unmap_stage2_puds(kvm, pgd, addr, next);
->>>
->>> The additional BUG_ON() is just for my own peace of mind - we seem to
->>> have missed a couple of these lately, and the "breathing" code makes
->>> it imperative that this lock is being taken prior to entering the
->>> function.
->>>
+On Tue, Mar 14, 2017 at 3:27 PM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+> On Tue, Mar 14, 2017 at 3:47 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+>> On Fri, Feb 24, 2017 at 1:22 AM, Chanwoo Choi <cw00.choi@samsung.com> wrote:
+>>> On 2016? 12? 30? 22:28, Linus Walleij wrote:
+>>>> On Fri, Dec 30, 2016 at 5:14 AM, Andi Shyti <andi.shyti@samsung.com> wrote:
+>> Probably. Send a patch fixing it up so I can apply it.
 >>
->> Looks good to me!
-> 
-> OK. I'll stash that on top of Suzuki's series, and start running some
-> actual tests... ;-)
-> 
-> Thanks,
-> 
-> 	M.
-> 
+>> There are now something like 5 different people submitting Samsung pinctrl
+>> patches without coordination so this will start to happen a lot if you keep
+>> up this development pace.
+>>
+>> As I just wrote in another mail: I want someone to step up and collect
+>> Samsung patches and send them to me using a pull request.
+>
+> I think we can handle it as there are three of us.
+
+I just this week started to get patches from Charles Keepax, and I
+understand that Wolfson Micro has a bunch of Samsung platform
+work going on.
+
+So now it is getting a bit much.
+
+>> Samsung people also need to start reviewing each other's patches
+>> more I guess, but mainly I need help with integration.
+>
+> More or less recently we do the reviews. Sure we can focus more... and
+> actually having an entry gate for patches would ensure at least one
+> more review from the applying person.
+
+Interested in the job? ;)
+
+I got pull requests from you before so I know you are familiar
+with the process.
+
+I would very much appreciate it if all Samsung pin control patches
+were queued by you and sent to me with pull requests based on my
+"devel" or "fixes" branch. If there is going to be a lot of it anyways.
+
+Maybe last merge window was a bit special since Marek did all this
+grunt work of switching S5P & friends over to pin control, in that
+case it is not such a big issue.
+
+Yours,
+Linus Walleij
