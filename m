@@ -1,37 +1,35 @@
-From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Wed, 15 Mar 2017 11:55:37 +0100
-Subject: [PATCH v4 18/18] ARM: sun5i: chip: enable battery power supply subnode
-In-Reply-To: <20170315105537.22349-1-quentin.schulz@free-electrons.com>
-References: <20170315105537.22349-1-quentin.schulz@free-electrons.com>
-Message-ID: <20170315105537.22349-19-quentin.schulz@free-electrons.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Wed, 15 Mar 2017 13:02:51 +0200
+Subject: [PATCH v4 4/5] mfd: exynos-lpass: Use common soc/exynos-regs-pmu.h
+ header
+In-Reply-To: <20170315101007.xtnwz7mmkt446sgd@dell>
+References: <20170314164653.15771-1-krzk@kernel.org>
+ <20170314164653.15771-5-krzk@kernel.org>
+ <20170315101007.xtnwz7mmkt446sgd@dell>
+Message-ID: <CAJKOXPeFw-qRcznSvw-+ZYxObXTPjE4bRM37=sGf8aWbR31WEg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The NextThing Co. CHIP has an AXP209 PMIC with battery connector.
+On Wed, Mar 15, 2017 at 12:10 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> On Tue, 14 Mar 2017, Krzysztof Kozlowski wrote:
+>
+>> The MFD-specific header will go away because it duplicates defines from
+>> exynos-regs-pmu.h.
+>>
+>> Reported-by: kbuild test robot <fengguang.wu@intel.com>
+>> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+>> Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+>> ---
+>>  drivers/mfd/exynos-lpass.c | 4 ++--
+>>  1 file changed, 2 insertions(+), 2 deletions(-)
+>
+> Applied, thanks.
 
-This enables the battery power supply subnode.
+Hi,
 
-Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Acked-by: Chen-Yu Tsai <wens@csie.org>
----
- arch/arm/boot/dts/sun5i-r8-chip.dts | 4 ++++
- 1 file changed, 4 insertions(+)
+This is also needed for patch 5/5 in the set so I was wondering if
+this can be put on separate branch and then shared if phy maintainers
+would need it?
 
-diff --git a/arch/arm/boot/dts/sun5i-r8-chip.dts b/arch/arm/boot/dts/sun5i-r8-chip.dts
-index d078560..879a4b0 100644
---- a/arch/arm/boot/dts/sun5i-r8-chip.dts
-+++ b/arch/arm/boot/dts/sun5i-r8-chip.dts
-@@ -132,6 +132,10 @@
- 	status = "okay";
- };
- 
-+&battery_power_supply {
-+	status = "okay";
-+};
-+
- &i2c1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&i2c1_pins_a>;
--- 
-2.9.3
+Best regards,
+Krzysztof
