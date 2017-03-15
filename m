@@ -1,113 +1,122 @@
-From: zhang.chunyan@linaro.org (Chunyan Zhang)
-Date: Wed, 15 Mar 2017 11:51:39 +0800
-Subject: [2/2] coresight: Fix reference count for software sources
-In-Reply-To: <ddf386ee-0be5-b1ca-174c-89d9e48ba282@arm.com>
-References: <1489073232-5093-3-git-send-email-suzuki.poulose@arm.com>
- <CANLsYkwg_PRcL5Sqd15phOFS-L8-v3SdvF1kBFa9De-==tx9gw@mail.gmail.com>
- <ddf386ee-0be5-b1ca-174c-89d9e48ba282@arm.com>
-Message-ID: <CAG2=9p_+2jv8xxUex=mvNXJswk+cx-kXGRcTbCd9i5-vOf6X4A@mail.gmail.com>
+From: yuanzhichang@hisilicon.com (zhichang.yuan)
+Date: Wed, 15 Mar 2017 12:05:17 +0800
+Subject: [PATCH V7 0/7] LPC: legacy ISA I/O support
+In-Reply-To: <CAK8P3a1f33ipk3Q8+wj9L6zP=ccn_AuhTfV0CC0+wAqrO-2beg@mail.gmail.com>
+References: <1489372963-9000-1-git-send-email-yuanzhichang@hisilicon.com>
+ <CAK8P3a1f33ipk3Q8+wj9L6zP=ccn_AuhTfV0CC0+wAqrO-2beg@mail.gmail.com>
+Message-ID: <58C8BD7D.7040207@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Suzuki,
+Hi, Arnd,
 
-On 15 March 2017 at 02:06, Suzuki K Poulose <Suzuki.Poulose@arm.com> wrote:
-> On 14/03/17 17:40, Mathieu Poirier wrote:
+Many thanks for your review!
+
+On 2017/3/14 16:39, Arnd Bergmann wrote:
+> On Mon, Mar 13, 2017 at 3:42 AM, zhichang.yuan
+> <yuanzhichang@hisilicon.com> wrote:
+>> This patchset supports the IPMI-bt device attached to the Low-Pin-Count
+>> interface implemented on Hisilicon Hip06/Hip07 SoC.
+>>                         -----------
+>>                         | LPC host|
+>>                         |         |
+>>                         -----------
+>>                              |
+>>                 _____________V_______________LPC
+>>                   |                       |
+>>                   V                       V
+>>                                      ------------
+>>                                      |  BT(ipmi)|
+>>                                      ------------
 >>
->> On 14 March 2017 at 11:32, Mathieu Poirier <mathieu.poirier@linaro.org>
->> wrote:
->>>
->>> From: "Suzuki K. Poulose" <Suzuki.Poulose@arm.com>
->>>
->>> For software sources (i.e STM), there could be multiple agents
->>> generating the trace data, unlike the ETMs. So we need to
->>> properly do the accounting for the active number of users
->>> to disable the device when the last user goes away. Right
->>> now, the reference counting is broken for sources as we skip
->>> the actions when we detect that the source is enabled.
->>>
->>> This patch fixes the problem by adding the refcounting for
->>> software sources, even when they are enabled.
->>>
->>> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
->>> Reported-by: Robert Walker <robert.walker@arm.com>
->>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
->>> ---
->>>  drivers/hwtracing/coresight/coresight.c | 13 +++++++++++--
->>>  1 file changed, 11 insertions(+), 2 deletions(-)
->>>
->>> diff --git a/drivers/hwtracing/coresight/coresight.c
->>> b/drivers/hwtracing/coresight/coresight.c
->>> index 34cd1ed..2da9e39 100644
->>> --- a/drivers/hwtracing/coresight/coresight.c
->>> +++ b/drivers/hwtracing/coresight/coresight.c
->>> @@ -552,6 +552,7 @@ int coresight_enable(struct coresight_device *csdev)
->>>         int cpu, ret = 0;
->>>         struct coresight_device *sink;
->>>         struct list_head *path;
->>> +       enum coresight_dev_subtype_source subtype =
->>> csdev->subtype.source_subtype;
->>
->>
->> Checkpatch.pl complains about a line over 80 characters.
->>
->>>
->>>         mutex_lock(&coresight_mutex);
->>>
->>> @@ -559,8 +560,16 @@ int coresight_enable(struct coresight_device *csdev)
->>>         if (ret)
->>>                 goto out;
->>>
->>> -       if (csdev->enable)
->>> +       if (csdev->enable) {
->>> +               /*
->>> +                * There could be multiple applications driving the
->>> software
->>> +                * source. So keep the refcount for each such user when
->>> the
->>> +                * source is already enabled.
->>> +                */
->>> +               if (subtype == CORESIGHT_DEV_SUBTYPE_SOURCE_SOFTWARE)
->>> +                       atomic_inc(csdev->refcnt);
->>>                 goto out;
->>> +       }
->>>
->
-> Btw, should we allow the user to turn on the STM from sysfs (echo 1 >
-> $STM/enable_source) ?
+>> When master accesses those peripherals beneath the Hip06/Hip07 LPC, a specific
+>> LPC driver is needed to make LPC host generate the standard LPC I/O cycles with
+>> the target peripherals'I/O port addresses. But on curent arm64 world, there is
+>> no real I/O accesses. All the I/O operations through in/out pair are based on
+>> MMIO which is not satisfied the I/O mechanism on Hip06/Hip07 LPC.
+>> To solve this issue and keep the relevant existing peripherals' driver
+>> untouched, this patchset implements:
+>>   - introduces a generic I/O space management framwork, LIBIO, to support I/O
+>>     operations of both MMIO buses and the host controllers which access their
+>>     peripherals with host local I/O addresses;
+>>   - redefines the in/out accessors to provide unified interfaces for MMIO and
+>>     legacy I/O. Based on the LIBIO, the calling of in/out() from upper-layer
+>>     drivers, such as ipmi-si, will be redirected to the corresponding
+>>     device-specific I/O hooks to perfrom the I/O accesses.
+>> Based on this patch-set, all the I/O accesses to Hip06/Hip07 LPC peripherals
+>> can be supported without any changes on the existing ipmi-si driver.
+> 
+> Thanks for reposting this. I have a few high-level comments first, based on
+> the walk through the code I did with Gabriele and John last week:
+> 
+> - I think the libio framework is more generic than it needs to be, but as
+>   Alex really liked it this way and it was done like this based on his earlier
+>   comments, I think that's ok.
+> 
+> - after we went back and forth on the ACPI implementation, we concluded
+>   that it is correct to do the same as on DT and completely abstract the
+>   number space for I/O ports. No code should rely on a Linux port number
+>   to have any particular relation to the physical address or the the address
+>   on a PCI or LPC bus.
+Thanks again for your helps in Linaro Connect!
+I think we are heading for this direction, is it?
 
-If enabling STM can not be allowed via sysfs, how should we allow
-users to turn on STM when they want to mmap STM to user space, and
-write STM device from user space directly? For example this kind of
-use case [1].
+> 
+> - The name "libio" still needs to be changed, this is way too generic, as
+>   "I/O" can refer to many things in the kernel, and almost none of them
+>   are related to x86 programmed I/O ports in any way. My suggestion
+>   would be "generic_ioport", or possibly "libioport", "libpio" or "pci_io". Any
+>   of them would work for me, or someone else could come up with a better
+>   name that describes what it is.
 
-> All STM users should set their policy via ioctls and that in turn turns the
-> device on.
+Ok. We will make a better name:)
 
-Yes users can set policy via ioctls to request resource of STM (i.e.
-which STM channel(s) will be written), but they still need to use
-sysfs to enable STM.
+> 
+> - I'm pretty sure the current implementation is broken for the ioport_map
+>   function that tries to turn an IORESOURCE_IO number into a pointer.
+>   Forcing CONFIG_GENERIC_IOMAP on would solve this, but also
+>   make all MMIO operations slower, which we probably don't want.
+>   It's probably enough to add a check in ioport_map() to see if the range
+>   is mapped into a virtual address or not.
 
-> So it doesn't make sense for enable_source to really enable
-> the hardware unless someone really opens it.
 
-Right, there're two ways to enable STM currently, e.g.
-1) echo <addr>.stm  > /sys/class/stm_source/stm_ftrace/stm_source_link
-2) echo 1 > $STM/enable_source
+Yes, I think our LIBIO will break the ioport_map() at this moment.
+I try to solve this issue. Could you help to check the following ideas?
+I am not deeper understanding the whole I/O framework, the following maybe not correct:(
 
-That would probably make people confused, I would appreciate any
-better solution.
+ioport_map seems architecture-dependent. For our LIBIO, we don't want to replace the existing I/O
+frameworks which support MMIO at this moment. Can we add these two revise to solve this issue?
+1) Make LIBIO only target for non GENERIC_IOMAP platforms
 
+config LIBIO
+        bool "Generic logical IO management"
+        depends on !GENERIC_IOMAP
+        def_bool y if PCI && (ARC || MN10300 || UNICORE32 || SPARC || MICROBLAZE || S390 || AVR32 || CRIS || BLACKFIN || XTENSA || ARM64)
+
+2) Modify the ioport_map() defined in asm-generic/io.h
+Add the checks to identify the input 'port' is MMIO, otherwise, return NULL;
+
+Then is it enough to avoid the negative effect on the existing I/O framework?
+
+> 
+> - We could simplify the lookup a bit by using the trick from arch/ia64
+>   of using an array instead of linked list for walking the port numbers.
+>   There, the upper bits of the port number refer to an address space
+>   number while the lower bits refer to the bus address within that
+>   address space. This should work just as well as the current
+>   implementation but would be a little easier to understand. Maybe
+>   Bjorn can comment on this too, as I think he was involved with the
+>   ia64 implementation.
+> 
+Yes, It will be more efficient.
+
+But the issue remained here is still how to coexist with the existing I/O frameworks.
+I will continue to look into.
 
 Thanks,
-Chunyan
+Zhichang
 
-[1] https://github.com/lyrazhang/user-space-tests/tree/mmap-wrapper/mmap-wrapper
-
->
-> Chunyan, Mathieu,
->
-> thoughts ?
->
-> Suzuki
->
+>       Arnd
+> 
+> .
+> 
