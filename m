@@ -1,227 +1,244 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Wed, 15 Mar 2017 17:50:35 +0100
-Subject: [RFC PATCH 2/4] pinctrl: rockchip: convert to raw spinlock
-In-Reply-To: <2549921.4Nq1JGygY8@phil>
-References: <20170313183813.3582-1-john@metanate.com>
- <39203480.lbsBriduiK@phil> <2549921.4Nq1JGygY8@phil>
-Message-ID: <4903591.4kPBt5DNFI@phil>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 15 Mar 2017 17:50:00 +0100
+Subject: [PATCH] [EXPERIMENTAL,
+ v2] enable thin archives and --gc-sections on ARM
+Message-ID: <20170315165109.3451216-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 15. M?rz 2017, 17:41:21 CET schrieb Heiko Stuebner:
-> Am Mittwoch, 15. M?rz 2017, 17:28:56 CET schrieb Heiko Stuebner:
-> > Am Montag, 13. M?rz 2017, 18:38:11 CET schrieb John Keeping:
-> > > This lock is used from rockchip_irq_set_type() which is part of the
-> > > irq_chip implementation and thus must use raw_spinlock_t as documented
-> > > in Documentation/gpio/driver.txt.
-> > > 
-> > > Signed-off-by: John Keeping <john@metanate.com>
-> > 
-> > Looks good
-> > Reviewed-by: Heiko Stuebner <heiko@sntech.de>
-> 
-> I have to take that back.
-> This leaves the spin_lock in the schmitt trigger unconverted and produces
-> compile issues.
-> 
-> So it either needs to be converted or removed - I guess it should be
-> removed.
+I'm still build testing with an experimental change to enable
+thin architeves and --gc-sections on ARM, which should bring
+multiple benefits
 
-Sorry for spamming, but forgot to add, with that problem above fixed, this 
-patch (and all others) can of course keep my Reviewed-by :-)
+- improve build times
+- allow 'allyesconfig' to succeed without exceeding the
+  section size when linking drivers/built-in.o
+- reduce the kernel image size
 
+However, I have now run into a build error binutils commit
+f02cb05 ("Always descend into output section statements in
+lang_do_assignments") in binutils-2.28 and later:
 
-Heiko
+   no __ex_table in  file: vmlinux
 
-> > > ---
-> > > 
-> > >  drivers/pinctrl/pinctrl-rockchip.c | 30 +++++++++++++++---------------
-> > >  1 file changed, 15 insertions(+), 15 deletions(-)
-> > > 
-> > > diff --git a/drivers/pinctrl/pinctrl-rockchip.c
-> > > b/drivers/pinctrl/pinctrl-rockchip.c index 1defe83a5c4d..2f963aea64b2
-> > > 100644
-> > > --- a/drivers/pinctrl/pinctrl-rockchip.c
-> > > +++ b/drivers/pinctrl/pinctrl-rockchip.c
-> > > @@ -163,7 +163,7 @@ struct rockchip_pin_bank {
-> > > 
-> > >  	struct irq_domain		*domain;
-> > >  	struct gpio_chip		gpio_chip;
-> > >  	struct pinctrl_gpio_range	grange;
-> > > 
-> > > -	spinlock_t			slock;
-> > > +	raw_spinlock_t			slock;
-> > > 
-> > >  	u32				toggle_edge_mode;
-> > >  
-> > >  };
-> > > 
-> > > @@ -1292,14 +1292,14 @@ static int rockchip_set_pull(struct
-> > > rockchip_pin_bank *bank,
-> > > 
-> > >  	switch (ctrl->type) {
-> > > 
-> > >  	case RK2928:
-> > > -		spin_lock_irqsave(&bank->slock, flags);
-> > > +		raw_spin_lock_irqsave(&bank->slock, flags);
-> > > 
-> > >  		data = BIT(bit + 16);
-> > >  		if (pull == PIN_CONFIG_BIAS_DISABLE)
-> > >  		
-> > >  			data |= BIT(bit);
-> > >  		
-> > >  		ret = regmap_write(regmap, reg, data);
-> > > 
-> > > -		spin_unlock_irqrestore(&bank->slock, flags);
-> > > +		raw_spin_unlock_irqrestore(&bank->slock, flags);
-> > > 
-> > >  		break;
-> > >  	
-> > >  	case RK1108:
-> > > 
-> > >  	case RK3188:
-> > > @@ -1433,7 +1433,7 @@ static int _rockchip_pmx_gpio_set_direction(struct
-> > > gpio_chip *chip, return ret;
-> > > 
-> > >  	clk_enable(bank->clk);
-> > > 
-> > > -	spin_lock_irqsave(&bank->slock, flags);
-> > > +	raw_spin_lock_irqsave(&bank->slock, flags);
-> > > 
-> > >  	data = readl_relaxed(bank->reg_base + GPIO_SWPORT_DDR);
-> > >  	/* set bit to 1 for output, 0 for input */
-> > > 
-> > > @@ -1443,7 +1443,7 @@ static int _rockchip_pmx_gpio_set_direction(struct
-> > > gpio_chip *chip, data &= ~BIT(pin);
-> > > 
-> > >  	writel_relaxed(data, bank->reg_base + GPIO_SWPORT_DDR);
-> > > 
-> > > -	spin_unlock_irqrestore(&bank->slock, flags);
-> > > +	raw_spin_unlock_irqrestore(&bank->slock, flags);
-> > > 
-> > >  	clk_disable(bank->clk);
-> > >  	
-> > >  	return 0;
-> > > 
-> > > @@ -1874,7 +1874,7 @@ static void rockchip_gpio_set(struct gpio_chip
-> > > *gc,
-> > > unsigned offset, int value) u32 data;
-> > > 
-> > >  	clk_enable(bank->clk);
-> > > 
-> > > -	spin_lock_irqsave(&bank->slock, flags);
-> > > +	raw_spin_lock_irqsave(&bank->slock, flags);
-> > > 
-> > >  	data = readl(reg);
-> > >  	data &= ~BIT(offset);
-> > > 
-> > > @@ -1882,7 +1882,7 @@ static void rockchip_gpio_set(struct gpio_chip
-> > > *gc,
-> > > unsigned offset, int value) data |= BIT(offset);
-> > > 
-> > >  	writel(data, reg);
-> > > 
-> > > -	spin_unlock_irqrestore(&bank->slock, flags);
-> > > +	raw_spin_unlock_irqrestore(&bank->slock, flags);
-> > > 
-> > >  	clk_disable(bank->clk);
-> > >  
-> > >  }
-> > > 
-> > > @@ -1994,7 +1994,7 @@ static void rockchip_irq_demux(struct irq_desc
-> > > *desc)
-> > > 
-> > >  			data = readl_relaxed(bank->reg_base + GPIO_EXT_PORT);
-> > >  			do {
-> > > 
-> > > -				spin_lock_irqsave(&bank->slock, flags);
-> > > +				raw_spin_lock_irqsave(&bank->slock, flags);
-> > > 
-> > >  				polarity = readl_relaxed(bank->reg_base +
-> > >  				
-> > >  							 GPIO_INT_POLARITY);
-> > > 
-> > > @@ -2005,7 +2005,7 @@ static void rockchip_irq_demux(struct irq_desc
-> > > *desc)
-> > > 
-> > >  				writel(polarity,
-> > >  				
-> > >  				       bank->reg_base + GPIO_INT_POLARITY);
-> > > 
-> > > -				spin_unlock_irqrestore(&bank->slock, flags);
-> > > +				raw_spin_unlock_irqrestore(&bank->slock, flags);
-> > > 
-> > >  				data_old = data;
-> > >  				data = readl_relaxed(bank->reg_base +
-> > > 
-> > > @@ -2036,20 +2036,20 @@ static int rockchip_irq_set_type(struct irq_data
-> > > *d, unsigned int type) return ret;
-> > > 
-> > >  	clk_enable(bank->clk);
-> > > 
-> > > -	spin_lock_irqsave(&bank->slock, flags);
-> > > +	raw_spin_lock_irqsave(&bank->slock, flags);
-> > > 
-> > >  	data = readl_relaxed(bank->reg_base + GPIO_SWPORT_DDR);
-> > >  	data &= ~mask;
-> > >  	writel_relaxed(data, bank->reg_base + GPIO_SWPORT_DDR);
-> > > 
-> > > -	spin_unlock_irqrestore(&bank->slock, flags);
-> > > +	raw_spin_unlock_irqrestore(&bank->slock, flags);
-> > > 
-> > >  	if (type & IRQ_TYPE_EDGE_BOTH)
-> > >  	
-> > >  		irq_set_handler_locked(d, handle_edge_irq);
-> > >  	
-> > >  	else
-> > >  	
-> > >  		irq_set_handler_locked(d, handle_level_irq);
-> > > 
-> > > -	spin_lock_irqsave(&bank->slock, flags);
-> > > +	raw_spin_lock_irqsave(&bank->slock, flags);
-> > > 
-> > >  	irq_gc_lock(gc);
-> > >  	
-> > >  	level = readl_relaxed(gc->reg_base + GPIO_INTTYPE_LEVEL);
-> > > 
-> > > @@ -2092,7 +2092,7 @@ static int rockchip_irq_set_type(struct irq_data
-> > > *d,
-> > > unsigned int type) break;
-> > > 
-> > >  	default:
-> > >  		irq_gc_unlock(gc);
-> > > 
-> > > -		spin_unlock_irqrestore(&bank->slock, flags);
-> > > +		raw_spin_unlock_irqrestore(&bank->slock, flags);
-> > > 
-> > >  		clk_disable(bank->clk);
-> > >  		return -EINVAL;
-> > >  	
-> > >  	}
-> > > 
-> > > @@ -2101,7 +2101,7 @@ static int rockchip_irq_set_type(struct irq_data
-> > > *d,
-> > > unsigned int type) writel_relaxed(polarity, gc->reg_base +
-> > > GPIO_INT_POLARITY);
-> > > 
-> > >  	irq_gc_unlock(gc);
-> > > 
-> > > -	spin_unlock_irqrestore(&bank->slock, flags);
-> > > +	raw_spin_unlock_irqrestore(&bank->slock, flags);
-> > > 
-> > >  	clk_disable(bank->clk);
-> > >  	
-> > >  	return 0;
-> > > 
-> > > @@ -2383,7 +2383,7 @@ static struct rockchip_pin_ctrl
-> > > *rockchip_pinctrl_get_soc_data( for (i = 0; i < ctrl->nr_banks; ++i,
-> > > ++bank) {
-> > > 
-> > >  		int bank_pins = 0;
-> > > 
-> > > -		spin_lock_init(&bank->slock);
-> > > +		raw_spin_lock_init(&bank->slock);
-> > > 
-> > >  		bank->drvdata = d;
-> > >  		bank->pin_base = ctrl->nr_pins;
-> > >  		ctrl->nr_pins += bank->nr_pins;
+Any idea what's going wrong here?
+
+Cc: Nicolas Pitre <nico@fluxnic.net>
+Cc: Nicholas Piggin <npiggin@gmail.com>
+Cc: Alan Modra <amodra@gmail.com>
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ arch/arm/Kconfig                  |  2 ++
+ arch/arm/kernel/Makefile          |  3 +++
+ arch/arm/kernel/vmlinux-xip.lds.S | 32 +++++++++++++++++++++-----------
+ arch/arm/kernel/vmlinux.lds.S     | 22 ++++++++++++++++------
+ 4 files changed, 42 insertions(+), 17 deletions(-)
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 27e738b82e45..333a1f685abb 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -89,6 +89,7 @@ config ARM
+ 	select HAVE_UID16
+ 	select HAVE_VIRT_CPU_ACCOUNTING_GEN
+ 	select IRQ_FORCED_THREADING
++	select LD_DEAD_CODE_DATA_ELIMINATION
+ 	select MODULES_USE_ELF_REL
+ 	select NO_BOOTMEM
+ 	select OF_EARLY_FLATTREE if OF
+@@ -98,6 +99,7 @@ config ARM
+ 	select PERF_USE_VMALLOC
+ 	select RTC_LIB
+ 	select SYS_SUPPORTS_APM_EMULATION
++	select THIN_ARCHIVES
+ 	# Above selects are sorted alphabetically; please add new ones
+ 	# according to that.  Thanks.
+ 	help
+diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+index d1b06cd79b23..469b78f5f529 100644
+--- a/arch/arm/kernel/Makefile
++++ b/arch/arm/kernel/Makefile
+@@ -13,6 +13,9 @@ endif
+ 
+ CFLAGS_REMOVE_return_address.o = -pg
+ 
++ccflags-y              += -fno-function-sections -fno-data-sections
++subdir-ccflags-y       += -fno-function-sections -fno-data-sections
++
+ # Object file lists.
+ 
+ obj-y		:= elf.o entry-common.o irq.o opcodes.o \
+diff --git a/arch/arm/kernel/vmlinux-xip.lds.S b/arch/arm/kernel/vmlinux-xip.lds.S
+index 2e5b5f0dbadf..bf900f5421a1 100644
+--- a/arch/arm/kernel/vmlinux-xip.lds.S
++++ b/arch/arm/kernel/vmlinux-xip.lds.S
+@@ -18,17 +18,17 @@
+ #define PROC_INFO							\
+ 	. = ALIGN(4);							\
+ 	VMLINUX_SYMBOL(__proc_info_begin) = .;				\
+-	*(.proc.info.init)						\
++	KEEP(*(.proc.info.init))					\
+ 	VMLINUX_SYMBOL(__proc_info_end) = .;
+ 
+ #define IDMAP_TEXT							\
+ 	ALIGN_FUNCTION();						\
+ 	VMLINUX_SYMBOL(__idmap_text_start) = .;				\
+-	*(.idmap.text)							\
++	KEEP(*(.idmap.text))						\
+ 	VMLINUX_SYMBOL(__idmap_text_end) = .;				\
+ 	. = ALIGN(PAGE_SIZE);						\
+ 	VMLINUX_SYMBOL(__hyp_idmap_text_start) = .;			\
+-	*(.hyp.idmap.text)						\
++	KEEP(*(.hyp.idmap.text))					\
+ 	VMLINUX_SYMBOL(__hyp_idmap_text_end) = .;
+ 
+ #ifdef CONFIG_HOTPLUG_CPU
+@@ -48,6 +48,16 @@
+ #define ARM_EXIT_DISCARD(x)	x
+ #endif
+ 
++#undef TEXT_TEXT
++#define TEXT_TEXT							\
++		ALIGN_FUNCTION();					\
++		*(.text.hot .text.hot.*)				\
++		*(.text.unlikely .text.unlikely.*)			\
++		*(.text .text.*)					\
++		*(.ref.text)						\
++	MEM_KEEP(init.text)						\
++	MEM_KEEP(exit.text)						\
++
+ OUTPUT_ARCH(arm)
+ ENTRY(stext)
+ 
+@@ -121,7 +131,7 @@ SECTIONS
+ 	__ex_table : AT(ADDR(__ex_table) - LOAD_OFFSET) {
+ 		__start___ex_table = .;
+ #ifdef CONFIG_MMU
+-		*(__ex_table)
++		KEEP(*(__ex_table))
+ #endif
+ 		__stop___ex_table = .;
+ 	}
+@@ -133,12 +143,12 @@ SECTIONS
+ 	. = ALIGN(8);
+ 	.ARM.unwind_idx : {
+ 		__start_unwind_idx = .;
+-		*(.ARM.exidx*)
++		KEEP(*(.ARM.exidx*))
+ 		__stop_unwind_idx = .;
+ 	}
+ 	.ARM.unwind_tab : {
+ 		__start_unwind_tab = .;
+-		*(.ARM.extab*)
++		KEEP(*(.ARM.extab*))
+ 		__stop_unwind_tab = .;
+ 	}
+ #endif
+@@ -153,7 +163,7 @@ SECTIONS
+ 	 */
+ 	__vectors_start = .;
+ 	.vectors 0xffff0000 : AT(__vectors_start) {
+-		*(.vectors)
++		KEEP(*(.vectors))
+ 	}
+ 	. = __vectors_start + SIZEOF(.vectors);
+ 	__vectors_end = .;
+@@ -176,24 +186,24 @@ SECTIONS
+ 	}
+ 	.init.arch.info : {
+ 		__arch_info_begin = .;
+-		*(.arch.info.init)
++		KEEP(*(.arch.info.init))
+ 		__arch_info_end = .;
+ 	}
+ 	.init.tagtable : {
+ 		__tagtable_begin = .;
+-		*(.taglist.init)
++		KEEP(*(.taglist.init))
+ 		__tagtable_end = .;
+ 	}
+ #ifdef CONFIG_SMP_ON_UP
+ 	.init.smpalt : {
+ 		__smpalt_begin = .;
+-		*(.alt.smp.init)
++		KEEP(*(.alt.smp.init))
+ 		__smpalt_end = .;
+ 	}
+ #endif
+ 	.init.pv_table : {
+ 		__pv_table_begin = .;
+-		*(.pv_table)
++		KEEP(*(.pv_table))
+ 		__pv_table_end = .;
+ 	}
+ 	.init.data : {
+diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
+index 30f04ce52dde..5f2c8c90beac 100644
+--- a/arch/arm/kernel/vmlinux.lds.S
++++ b/arch/arm/kernel/vmlinux.lds.S
+@@ -17,7 +17,7 @@
+ #define PROC_INFO							\
+ 	. = ALIGN(4);							\
+ 	VMLINUX_SYMBOL(__proc_info_begin) = .;				\
+-	*(.proc.info.init)						\
++	KEEP(*(.proc.info.init))					\
+ 	VMLINUX_SYMBOL(__proc_info_end) = .;
+ 
+ #define HYPERVISOR_TEXT							\
+@@ -35,6 +35,16 @@
+ 	*(.hyp.idmap.text)						\
+ 	VMLINUX_SYMBOL(__hyp_idmap_text_end) = .;
+ 
++#undef TEXT_TEXT
++#define TEXT_TEXT							\
++		ALIGN_FUNCTION();					\
++		*(.text.hot .text.hot.*)				\
++		*(.text.unlikely .text.unlikely.*)			\
++		*(.text .text.*)					\
++		*(.ref.text)						\
++	MEM_KEEP(init.text)						\
++	MEM_KEEP(exit.text)						\
++
+ #ifdef CONFIG_HOTPLUG_CPU
+ #define ARM_CPU_DISCARD(x)
+ #define ARM_CPU_KEEP(x)		x
+@@ -170,7 +180,7 @@ SECTIONS
+ 	 */
+ 	__vectors_start = .;
+ 	.vectors 0xffff0000 : AT(__vectors_start) {
+-		*(.vectors)
++		KEEP(*(.vectors))
+ 	}
+ 	. = __vectors_start + SIZEOF(.vectors);
+ 	__vectors_end = .;
+@@ -193,24 +203,24 @@ SECTIONS
+ 	}
+ 	.init.arch.info : {
+ 		__arch_info_begin = .;
+-		*(.arch.info.init)
++		KEEP(*(.arch.info.init))
+ 		__arch_info_end = .;
+ 	}
+ 	.init.tagtable : {
+ 		__tagtable_begin = .;
+-		*(.taglist.init)
++		KEEP(*(.taglist.init))
+ 		__tagtable_end = .;
+ 	}
+ #ifdef CONFIG_SMP_ON_UP
+ 	.init.smpalt : {
+ 		__smpalt_begin = .;
+-		*(.alt.smp.init)
++		KEEP(*(.alt.smp.init))
+ 		__smpalt_end = .;
+ 	}
+ #endif
+ 	.init.pv_table : {
+ 		__pv_table_begin = .;
+-		*(.pv_table)
++		KEEP(*(.pv_table))
+ 		__pv_table_end = .;
+ 	}
+ 	.init.data : {
+-- 
+2.9.0
