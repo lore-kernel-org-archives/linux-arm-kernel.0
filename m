@@ -1,25 +1,52 @@
-From: dwmw2@infradead.org (David Woodhouse)
-Date: Thu, 16 Mar 2017 10:29:45 +0000
-Subject: [PATCH v33 00/14] add kdump support
-In-Reply-To: <20170316002347.GA11935@linaro.org>
-References: <20170315095656.24992-1-takahiro.akashi@linaro.org>
- <1489578078.4195.113.camel@infradead.org>
- <20170316002347.GA11935@linaro.org>
-Message-ID: <1489660185.4195.219.camel@infradead.org>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Thu, 16 Mar 2017 11:34:38 +0100
+Subject: [PATCH v2 4/7] mfd: syscon: atmel-smc: Remove unused
+ helpers/macros
+In-Reply-To: <20170316101627.ecp63pr5v6l4neam@dell>
+References: <1489653034-17777-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1489653034-17777-5-git-send-email-boris.brezillon@free-electrons.com>
+ <20170316101627.ecp63pr5v6l4neam@dell>
+Message-ID: <20170316113438.790bfb67@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2017-03-16 at 09:23 +0900, AKASHI Takahiro wrote:
-> 
-> I double-checked but saw no warnings like these neither for v32 nor v33.
-> I'm afraid that you might have done something wrong in backporting,
-> particularly patch#5.
+Hi Lee,
 
-Then I apologise for the noise. Thanks for checking.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: smime.p7s
-Type: application/x-pkcs7-signature
-Size: 4938 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170316/dc782041/attachment.bin>
+On Thu, 16 Mar 2017 10:16:27 +0000
+Lee Jones <lee.jones@linaro.org> wrote:
+
+> On Thu, 16 Mar 2017, Boris Brezillon wrote:
+> 
+> > All macros prefixed with AT91[SAM9]_SMC have been replaced by equivalent
+> > definitions prefixed with ATMEL_SMC, and the at91sam9_smc_xxxx() helpers
+> > are no longer used.
+> > Drop these definitions before someone starts using them again.
+> > 
+> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> > ---
+> >  include/linux/mfd/syscon/atmel-smc.h | 152 -----------------------------------
+> >  1 file changed, 152 deletions(-)  
+> 
+> For my own reference:
+>   Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
+> 
+> What is the plan for this set?
+> 
+> I only see 2 patches.
+
+You mean, you only see 2 patches in your Inbox (that would be weird,
+because you're in the CC list of all patches), or only 2 patches that
+should go in your tree?
+
+> Can they both be applied?
+
+All patches should go through the same tree, because changes in
+drivers/memory/atmel-ebi.c are depending on changes done in the MFD
+subsystem.
+
+If Nicolas is okay with that, maybe you can take everything through the
+MFD tree (I don't expect any conflicts in drivers/memory/atmel-ebi.c).
+
+Regards,
+
+Boris
