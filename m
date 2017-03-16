@@ -1,47 +1,29 @@
 From: zyw@rock-chips.com (Chris Zhong)
-Date: Thu, 16 Mar 2017 11:31:44 +0800
-Subject: [PATCH v2 1/4] drm/rockchip/dsi: check phy_cfg_clk only for RK3399
-In-Reply-To: <1489635107-21327-1-git-send-email-zyw@rock-chips.com>
-References: <1489635107-21327-1-git-send-email-zyw@rock-chips.com>
-Message-ID: <1489635107-21327-2-git-send-email-zyw@rock-chips.com>
+Date: Thu, 16 Mar 2017 11:31:43 +0800
+Subject: [PATCH v2 0/4] RK3399 dw-mipi-dsi patches
+Message-ID: <1489635107-21327-1-git-send-email-zyw@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For RK3399, the phy_cfg_clk is a required clock, if phy_cfg_clk is
-disabled, MIPI phy can not work. Let's return a error if there is no
-phy_cfg_clk in dts property, when the pdata match RK3399.
+Hi all
 
-Signed-off-by: Chris Zhong <zyw@rock-chips.com>
----
+This series set the phy_cfg_clk to be a required clock for RK3399, and
+add a grf clock control in dw-mipi-dsi driver. And then correct a
+register name.
 
-Changes in v2: None
 
- drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 10 ++++------
- 1 file changed, 4 insertions(+), 6 deletions(-)
+Changes in v2:
+- check the grf_clk only for RK3399
 
-diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-index f84f9ae..11c4166 100644
---- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-+++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-@@ -1227,15 +1227,13 @@ static int dw_mipi_dsi_bind(struct device *dev, struct device *master,
- 		clk_disable_unprepare(dsi->pclk);
- 	}
- 
--	dsi->phy_cfg_clk = devm_clk_get(dev, "phy_cfg");
--	if (IS_ERR(dsi->phy_cfg_clk)) {
--		ret = PTR_ERR(dsi->phy_cfg_clk);
--		if (ret != -ENOENT) {
-+	if (pdata == &rk3399_mipi_dsi_drv_data) {
-+		dsi->phy_cfg_clk = devm_clk_get(dev, "phy_cfg");
-+		if (IS_ERR(dsi->phy_cfg_clk)) {
-+			ret = PTR_ERR(dsi->phy_cfg_clk);
- 			dev_err(dev, "Unable to get phy_cfg_clk: %d\n", ret);
- 			return ret;
- 		}
--		dsi->phy_cfg_clk = NULL;
--		dev_dbg(dev, "have not phy_cfg_clk\n");
- 	}
- 
- 	ret = clk_prepare_enable(dsi->pllref_clk);
+Chris Zhong (4):
+  drm/rockchip/dsi: check phy_cfg_clk only for RK3399
+  dt-bindings: add the grf clock for dw-mipi-dsi
+  drm/rockchip/dsi: enable the grf clk before writing grf registers
+  drm/rockchip/dsi: correct the grf_switch_reg name
+
+ .../display/rockchip/dw_mipi_dsi_rockchip.txt      |  2 +-
+ drivers/gpu/drm/rockchip/dw-mipi-dsi.c             | 35 +++++++++++++++++-----
+ 2 files changed, 28 insertions(+), 9 deletions(-)
+
 -- 
 2.6.3
