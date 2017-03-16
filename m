@@ -1,43 +1,143 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Thu, 16 Mar 2017 10:24:17 +0800
-Subject: [PATCH v6 08/14] mmc: sdhci-xenon: Add Marvell Xenon SDHC core
- functionality
-In-Reply-To: <10855817-e693-e007-9499-c4e97936fadb@marvell.com>
-References: <cover.ff78bebe0384f650a51e5e6f0f1dca6e7894b53b.1487091464.git-series.gregory.clement@free-electrons.com>
- <cb885ae19e7c467908cdaa1f1cc8d95a7217d663.1487091464.git-series.gregory.clement@free-electrons.com>
- <CAPDyKFpH+RGAZGoVCuCOKJ2iEa+Y=cNNcM-uKhkYaTpmogXCKA@mail.gmail.com>
- <10855817-e693-e007-9499-c4e97936fadb@marvell.com>
-Message-ID: <20170316102417.0909bccc@xhacker>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Thu, 16 Mar 2017 10:34:59 +0800
+Subject: [PATCH V4] dts/imx6q-b850v3: Use megachips-stdpxxxx-ge-b850v3-fw
+ bridges (LVDS-DP++)
+In-Reply-To: <20170314092302.7317-1-peter.senna@collabora.com>
+References: <20170314092302.7317-1-peter.senna@collabora.com>
+Message-ID: <20170316023457.GU3618@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ziji
-
-On Wed, 15 Mar 2017 21:58:43 +0800 Ziji Hu wrote:
-
-> Hi Ulf,
+On Tue, Mar 14, 2017 at 10:23:02AM +0100, Peter Senna Tschudin wrote:
+> Configures the megachips-stdpxxxx-ge-b850v3-fw bridges on the GE
+> B850v3 dts file.
 > 
-> On 2017/3/15 21:11, Ulf Hansson wrote:
-> > On 14 February 2017 at 18:01, Gregory CLEMENT
-> > <gregory.clement@free-electrons.com> wrote:  
-> >> From: Hu Ziji <huziji@marvell.com>  
-> <snip>
-> >> +config MMC_SDHCI_XENON
-> >> +       tristate "Marvell Xenon eMMC/SD/SDIO SDHCI driver"
-> >> +       depends on MMC_SDHCI_PLTFM
-> >> +       help
-> >> +         This selects Marvell Xenon eMMC/SD/SDIO SDHCI.
-> >> +         If you have a machine with integrated Marvell Xenon SDHC IP,  
-> > 
-> > /s/SDHC/SDHCI
-> >   
+> Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> Cc: Martyn Welch <martyn.welch@collabora.co.uk>
+> Cc: Martin Donnelly <martin.donnelly@ge.com>
+> Cc: Javier Martinez Canillas <javier@dowhile0.org>
+> Cc: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+> Cc: Philipp Zabel <p.zabel@pengutronix.de>
+> Cc: Rob Herring <robh@kernel.org>
+> Cc: Fabio Estevam <fabio.estevam@nxp.com>
+> Signed-off-by: Peter Senna Tschudin <peter.senna@collabora.com>
+
+To match i.MX patch style, the subject prefix should be something like
+'ARM: dts: imx6q-b850v3: ...'.
+
+> ---
+> Subject was [PATCH V4 4/4] ...
+> But patches 1, 2, and 3 are already upstream and were not resent.
 > 
-> 	Sorry. I don't get your point.
-> 	Could you please give more detailed comments?
+> Changes from V3:
+>  - Newline fixes
+>  - Removed 'status = "okay";' from '&mux2_i2c2'
+>  - Sorted device nodes in order of unit address
+> 
+> Unchanged since V1.
+>  arch/arm/boot/dts/imx6q-b850v3.dts | 66 ++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 66 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/imx6q-b850v3.dts b/arch/arm/boot/dts/imx6q-b850v3.dts
+> index d78514c..ef67b47 100644
+> --- a/arch/arm/boot/dts/imx6q-b850v3.dts
+> +++ b/arch/arm/boot/dts/imx6q-b850v3.dts
+> @@ -72,6 +72,14 @@
+>  		fsl,data-mapping = "spwg";
+>  		fsl,data-width = <24>;
+>  		status = "okay";
+> +
+> +		port at 4 {
+> +			reg = <4>;
+> +
 
-Ulf want you to s/SDHC/SDHCI in the line "If you have .....", I.E
-change the line to:
-If you have a machine with integrated Marvell Xenon SDHCI IP,
+Great, it's been fixed.
 
-Thanks,
-Jisheng
+> +			lvds0_out: endpoint {
+> +				remote-endpoint = <&stdp4028_in>;
+> +			};
+> +		};
+>  	};
+>  };
+>  
+> @@ -142,3 +150,61 @@
+>  		reg = <0x4a>;
+>  	};
+>  };
+> +
+> +&mux2_i2c2 {
+> +	clock-frequency = <100000>;
+> +
+> +	stdp2690 at 72 {
+> +		compatible = "megachips,stdp2690-ge-b850v3-fw";
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		reg = <0x72>;
+> +
+> +		ports {
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +
+> +			port at 0 {
+> +				reg = <0>;
+
+But this one ...
+
+> +				stdp2690_in: endpoint {
+> +					remote-endpoint = <&stdp4028_out>;
+> +				};
+> +			};
+> +
+> +			port at 1 {
+> +				reg = <1>;
+
+... here ...
+
+> +				stdp2690_out: endpoint {
+> +					/* Connector for external display */
+> +				};
+> +			};
+> +		};
+> +	};
+> +
+> +	stdp4028 at 73 {
+> +		compatible = "megachips,stdp4028-ge-b850v3-fw";
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		reg = <0x73>;
+> +		interrupt-parent = <&gpio2>;
+> +		interrupts = <0 IRQ_TYPE_LEVEL_HIGH>;
+> +
+> +		ports {
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +
+> +			port at 0 {
+> +				reg = <0>;
+
+... here ...
+
+> +				stdp4028_in: endpoint {
+> +					remote-endpoint = <&lvds0_out>;
+> +				};
+> +			};
+> +
+> +			port at 1 {
+> +				reg = <1>;
+
+... and here.
+
+I fixed up all of them and applied patch.
+
+Shawn
+
+> +				stdp4028_out: endpoint {
+> +					remote-endpoint = <&stdp2690_in>;
+> +				};
+> +			};
+> +		};
+> +	};
+> +};
+> -- 
+> 2.9.3
+> 
