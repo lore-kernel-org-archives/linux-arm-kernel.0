@@ -1,101 +1,73 @@
-From: shuahkh@osg.samsung.com (Shuah Khan)
-Date: Thu, 16 Mar 2017 09:32:34 -0600
-Subject: [PATCH] usb: dwc3 dwc3_exynos_probe() change goto labels to
- meaningful names
-In-Reply-To: <20170130192504.19046-1-shuahkh@osg.samsung.com>
-References: <20170130192504.19046-1-shuahkh@osg.samsung.com>
-Message-ID: <8da7ab58-9d4c-2e71-df98-40bbceea8858@osg.samsung.com>
+From: patrice.chotard@st.com (Patrice CHOTARD)
+Date: Thu, 16 Mar 2017 15:39:19 +0000
+Subject: [PATCH 1/1] pinctrl: st: add irq_request_resources callback
+In-Reply-To: <CACRpkdb1WYRYifUp=C9QpEXN4ntxNfFx_H1+mA1-0UJw=dUFPQ@mail.gmail.com>
+References: <1488203368-13574-1-git-send-email-patrice.chotard@st.com>
+ <CACRpkdb1WYRYifUp=C9QpEXN4ntxNfFx_H1+mA1-0UJw=dUFPQ@mail.gmail.com>
+Message-ID: <e80366b0-a044-0908-13bd-49856827a407@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/30/2017 12:25 PM, Shuah Khan wrote:
-> Change goto labels to meaningful names from a series of errNs.
-> 
-> Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
-> ---
-> 
-> Rebased to usb-next
-
-Hi Felipe,
-
-Are you planning to get this in or is there something you are
-waiting in for me to do?
-
-thanks,
--- Shuah
 
 
-> 
->  drivers/usb/dwc3/dwc3-exynos.c | 22 +++++++++++-----------
->  1 file changed, 11 insertions(+), 11 deletions(-)
-> 
-> diff --git a/drivers/usb/dwc3/dwc3-exynos.c b/drivers/usb/dwc3/dwc3-exynos.c
-> index 1515d45..98f74ff 100644
-> --- a/drivers/usb/dwc3/dwc3-exynos.c
-> +++ b/drivers/usb/dwc3/dwc3-exynos.c
-> @@ -147,53 +147,53 @@ static int dwc3_exynos_probe(struct platform_device *pdev)
->  	exynos->vdd33 = devm_regulator_get(dev, "vdd33");
->  	if (IS_ERR(exynos->vdd33)) {
->  		ret = PTR_ERR(exynos->vdd33);
-> -		goto err2;
-> +		goto vdd33_err;
->  	}
->  	ret = regulator_enable(exynos->vdd33);
->  	if (ret) {
->  		dev_err(dev, "Failed to enable VDD33 supply\n");
-> -		goto err2;
-> +		goto vdd33_err;
->  	}
->  
->  	exynos->vdd10 = devm_regulator_get(dev, "vdd10");
->  	if (IS_ERR(exynos->vdd10)) {
->  		ret = PTR_ERR(exynos->vdd10);
-> -		goto err3;
-> +		goto vdd10_err;
->  	}
->  	ret = regulator_enable(exynos->vdd10);
->  	if (ret) {
->  		dev_err(dev, "Failed to enable VDD10 supply\n");
-> -		goto err3;
-> +		goto vdd10_err;
->  	}
->  
->  	ret = dwc3_exynos_register_phys(exynos);
->  	if (ret) {
->  		dev_err(dev, "couldn't register PHYs\n");
-> -		goto err4;
-> +		goto phys_err;
->  	}
->  
->  	if (node) {
->  		ret = of_platform_populate(node, NULL, NULL, dev);
->  		if (ret) {
->  			dev_err(dev, "failed to add dwc3 core\n");
-> -			goto err5;
-> +			goto populate_err;
->  		}
->  	} else {
->  		dev_err(dev, "no device node, failed to add dwc3 core\n");
->  		ret = -ENODEV;
-> -		goto err5;
-> +		goto populate_err;
->  	}
->  
->  	return 0;
->  
-> -err5:
-> +populate_err:
->  	platform_device_unregister(exynos->usb2_phy);
->  	platform_device_unregister(exynos->usb3_phy);
-> -err4:
-> +phys_err:
->  	regulator_disable(exynos->vdd10);
-> -err3:
-> +vdd10_err:
->  	regulator_disable(exynos->vdd33);
-> -err2:
-> +vdd33_err:
->  	clk_disable_unprepare(exynos->axius_clk);
->  axius_clk_err:
->  	clk_disable_unprepare(exynos->susp_clk);
-> 
+On 03/14/2017 03:05 PM, Linus Walleij wrote:
+> On Mon, Feb 27, 2017 at 2:49 PM,  <patrice.chotard@st.com> wrote:
+>
+>> From: Patrice Chotard <patrice.chotard@st.com>
+>>
+>> When using GPIO as IRQ source, the GPIO must be configured
+>> in INPUT. The callback dedicated for this was missing in
+>> pinctrl-st driver.
+>>
+>> This fix the following kernel error when trying to lock a gpio
+>> as IRQ:
+>>
+>> [    7.521095] gpio gpiochip7: (PIO11): gpiochip_lock_as_irq: tried to flag a GPIO set as output for IRQ
+>> [    7.526018] gpio gpiochip7: (PIO11): unable to lock HW IRQ 6 for IRQ
+>> [    7.529405] genirq: Failed to request resources for 0-0053 (irq 81) on irqchip GPIO
+>>
+>> Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
+>
+> I see what problem you are trying to solve.
+>
+>> +static int st_gpio_irq_request_resources(struct irq_data *d)
+>> +{
+>> +       struct gpio_chip *gc = irq_data_get_irq_chip_data(d);
+>> +       int pin = d->hwirq;
+>> +
+>> +       return st_gpio_direction_input(gc, pin);
+>> +}
+> (...)
+>> +       .irq_request_resources  = st_gpio_irq_request_resources,
+>
+> But this is just hiding the problem I'm afraid.
+>
+
+Hi Linus
+
+> Now thay you override .irq_request_resources()
+> gpiochip_irq_reqres() will not be called, so then you have
+> to lock the irq in the driver, with something like:
+>
+> ret = gpiochip_lock_as_irq(&chip->gc, d->hwirq);
+>         if (ret)
+>                 goto out;
+>
+
+Ah yes, i didn't noticed that point, thanks for the tips.
+
+> You also have to implement the .irq_release_resources()
+> callback and unlock the IRQ there.
+
+In this case, yes the release becomes mandatory.
+
+I will send a v2.
+
+Thanks
+
+Patrice
+
+>
+> Yours,
+> Linus Walleij
+>
