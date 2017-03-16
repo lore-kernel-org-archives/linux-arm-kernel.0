@@ -1,118 +1,92 @@
-From: gabriel.fernandez@st.com (gabriel.fernandez at st.com)
-Date: Thu, 16 Mar 2017 09:16:41 +0100
-Subject: [PATCH v2 2/2] clk: stm32f4: fix timeout management for pll and ready
- gate
-In-Reply-To: <1489652201-19889-1-git-send-email-gabriel.fernandez@st.com>
-References: <1489652201-19889-1-git-send-email-gabriel.fernandez@st.com>
-Message-ID: <1489652201-19889-3-git-send-email-gabriel.fernandez@st.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Thu, 16 Mar 2017 09:20:13 +0100
+Subject: [PATCH v4] drm/rockchip: Refactor the component match logic.
+In-Reply-To: <1489629956-32285-1-git-send-email-jeffy.chen@rock-chips.com>
+References: <1489629956-32285-1-git-send-email-jeffy.chen@rock-chips.com>
+Message-ID: <4477033.icEzZGFJNF@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Gabriel Fernandez <gabriel.fernandez@st.com>
+Hi Jeffy,
 
-Use a classic polling to test bit ready.
-And the shift of the bit ready of LSE & LSI were wrongs.
+Am Donnerstag, 16. M?rz 2017, 10:05:56 CET schrieb Jeffy Chen:
+> Currently we are adding all components from the dts, if one of their
+> drivers been disabled, we would not be able to bring up others.
+> 
+> Refactor component match logic, follow exynos drm.
+> 
+> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+> Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
 
-Fixes: 861adc44d290 ("clk: stm32f4: Add LSI & LSE clocks")
+[...]
 
-Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
----
- drivers/clk/clk-stm32f4.c | 43 +++++++++++++++++++++++++++++--------------
- 1 file changed, 29 insertions(+), 14 deletions(-)
+> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
+> b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c index b360e62..51433da 100644
+> --- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
+> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
+> @@ -356,34 +356,42 @@ static const struct dev_pm_ops rockchip_drm_pm_ops = {
+> rockchip_drm_sys_resume)
+>  };
+> 
+> -static int compare_of(struct device *dev, void *data)
+> -{
+> -	struct device_node *np = data;
+> +#define MAX_ROCKCHIP_DRM_DRVS 16
+> +static struct platform_driver *rockchip_drm_drvs[MAX_ROCKCHIP_DRM_DRVS];
+> +static int rockchip_drm_drvs_cnt;
+> 
+> -	return dev->of_node == np;
+> +#define ROCKCHIP_DRM_DRV(drv, cond) { \
+> +	if (IS_ENABLED(cond)) \
+> +		rockchip_drm_drvs[rockchip_drm_drvs_cnt++] = &drv; \
+>  }
 
-diff --git a/drivers/clk/clk-stm32f4.c b/drivers/clk/clk-stm32f4.c
-index cf9449b3..68e2a4e 100644
---- a/drivers/clk/clk-stm32f4.c
-+++ b/drivers/clk/clk-stm32f4.c
-@@ -531,19 +531,26 @@ static int stm32f4_pll_is_enabled(struct clk_hw *hw)
- 	return clk_gate_ops.is_enabled(hw);
- }
- 
-+#define PLL_TIMEOUT 10000
-+
- static int stm32f4_pll_enable(struct clk_hw *hw)
- {
- 	struct clk_gate *gate = to_clk_gate(hw);
- 	struct stm32f4_pll *pll = to_stm32f4_pll(gate);
--	int ret = 0;
--	unsigned long reg;
-+	int bit_status;
-+	unsigned int timeout = PLL_TIMEOUT;
- 
--	ret = clk_gate_ops.enable(hw);
-+	if (clk_gate_ops.is_enabled(hw))
-+		return 0;
-+
-+	clk_gate_ops.enable(hw);
- 
--	ret = readl_relaxed_poll_timeout_atomic(base + STM32F4_RCC_CR, reg,
--			reg & (1 << pll->bit_rdy_idx), 0, 10000);
-+	do {
-+		bit_status = !(readl(gate->reg) & BIT(pll->bit_rdy_idx));
- 
--	return ret;
-+	} while (bit_status && --timeout);
-+
-+	return bit_status;
- }
- 
- static void stm32f4_pll_disable(struct clk_hw *hw)
-@@ -834,24 +841,32 @@ struct stm32_rgate {
- 	u8	bit_rdy_idx;
- };
- 
--#define RTC_TIMEOUT 1000000
-+#define RGATE_TIMEOUT 50000
- 
- static int rgclk_enable(struct clk_hw *hw)
- {
- 	struct clk_gate *gate = to_clk_gate(hw);
- 	struct stm32_rgate *rgate = to_rgclk(gate);
--	u32 reg;
--	int ret;
-+	int bit_status;
-+	unsigned int timeout = RGATE_TIMEOUT;
-+
-+	if (clk_gate_ops.is_enabled(hw))
-+		return 0;
- 
- 	disable_power_domain_write_protection();
- 
- 	clk_gate_ops.enable(hw);
- 
--	ret = readl_relaxed_poll_timeout_atomic(gate->reg, reg,
--			reg & rgate->bit_rdy_idx, 1000, RTC_TIMEOUT);
-+	do {
-+		bit_status = !(readl(gate->reg) & BIT(rgate->bit_rdy_idx));
-+		if (bit_status)
-+			udelay(100);
-+
-+	} while (bit_status && --timeout);
- 
- 	enable_power_domain_write_protection();
--	return ret;
-+
-+	return bit_status;
- }
- 
- static void rgclk_disable(struct clk_hw *hw)
-@@ -1533,7 +1548,7 @@ static void __init stm32f4_rcc_init(struct device_node *np)
- 	}
- 
- 	clks[CLK_LSI] = clk_register_rgate(NULL, "lsi", "clk-lsi", 0,
--			base + STM32F4_RCC_CSR, 0, 2, 0, &stm32f4_clk_lock);
-+			base + STM32F4_RCC_CSR, 0, 1, 0, &stm32f4_clk_lock);
- 
- 	if (IS_ERR(clks[CLK_LSI])) {
- 		pr_err("Unable to register lsi clock\n");
-@@ -1541,7 +1556,7 @@ static void __init stm32f4_rcc_init(struct device_node *np)
- 	}
- 
- 	clks[CLK_LSE] = clk_register_rgate(NULL, "lse", "clk-lse", 0,
--			base + STM32F4_RCC_BDCR, 0, 2, 0, &stm32f4_clk_lock);
-+			base + STM32F4_RCC_BDCR, 0, 1, 0, &stm32f4_clk_lock);
- 
- 	if (IS_ERR(clks[CLK_LSE])) {
- 		pr_err("Unable to register lse clock\n");
--- 
-1.9.1
+[...]
+
+> +static int __init rockchip_drm_init(void)
+> +{
+> +	int ret;
+> +
+> +	rockchip_drm_drvs_cnt = 0;
+> +	ROCKCHIP_DRM_DRV(vop_platform_driver, CONFIG_DRM_ROCKCHIP);
+> +	ROCKCHIP_DRM_DRV(rockchip_dp_driver, CONFIG_ROCKCHIP_ANALOGIX_DP);
+> +	ROCKCHIP_DRM_DRV(cdn_dp_driver, CONFIG_ROCKCHIP_CDN_DP);
+> +	ROCKCHIP_DRM_DRV(dw_hdmi_rockchip_pltfm_driver,
+> +			 CONFIG_ROCKCHIP_DW_HDMI);
+> +	ROCKCHIP_DRM_DRV(dw_mipi_dsi_driver, CONFIG_ROCKCHIP_DW_MIPI_DSI);
+> +	ROCKCHIP_DRM_DRV(inno_hdmi_driver, CONFIG_ROCKCHIP_INNO_HDMI);
+> +
+> +	ret = platform_register_drivers(rockchip_drm_drvs,
+> +					rockchip_drm_drvs_cnt);
+> +	if (ret)
+> +		return ret;
+
+With the following config snippet
+
+CONFIG_DRM_ROCKCHIP=m
+CONFIG_ROCKCHIP_ANALOGIX_DP=y
+# CONFIG_ROCKCHIP_CDN_DP is not set
+CONFIG_ROCKCHIP_DW_HDMI=y
+CONFIG_ROCKCHIP_DW_MIPI_DSI=y
+CONFIG_ROCKCHIP_INNO_HDMI=y
+
+I get these faults on arm32 (1 warning, 1 linker error):
+
+  CC [M]  drivers/gpu/drm/rockchip/rockchip_drm_drv.o
+  CC [M]  drivers/gpu/drm/rockchip/rockchip_drm_fb.o
+  CC [M]  drivers/gpu/drm/rockchip/rockchip_drm_gem.o
+  CC [M]  drivers/gpu/drm/rockchip/rockchip_drm_psr.o
+  CC [M]  drivers/gpu/drm/rockchip/rockchip_drm_vop.o
+  CC [M]  drivers/gpu/drm/rockchip/rockchip_vop_reg.o
+../drivers/gpu/drm/rockchip/rockchip_vop_reg.c:407:31: warning: ?vop_platform_driver? defined but not used [-Wunused-variable]
+ static struct platform_driver vop_platform_driver = {
+                               ^~~~~~~~~~~~~~~~~~~
+  CC [M]  drivers/gpu/drm/rockchip/rockchip_drm_fbdev.o
+  CC [M]  drivers/gpu/drm/rockchip/analogix_dp-rockchip.o
+  CC [M]  drivers/gpu/drm/rockchip/dw_hdmi-rockchip.o
+  CC [M]  drivers/gpu/drm/rockchip/dw-mipi-dsi.o
+  CC [M]  drivers/gpu/drm/rockchip/inno_hdmi.o
+  LD [M]  drivers/gpu/drm/rockchip/rockchipdrm.o
+  Building modules, stage 2.
+  MODPOST 352 modules
+ERROR: "vop_platform_driver" [drivers/gpu/drm/rockchip/rockchipdrm.ko] undefined!
