@@ -1,112 +1,86 @@
-From: guohanjun@huawei.com (Hanjun Guo)
-Date: Thu, 16 Mar 2017 21:00:58 +0800
-Subject: [PATCH 00/14] arm_pmu: ACPI support
-In-Reply-To: <1489143891-11596-1-git-send-email-mark.rutland@arm.com>
-References: <1489143891-11596-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <58CA8C8A.8080405@huawei.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 16 Mar 2017 14:01:19 +0100
+Subject: [PATCH v2 3/4] mmc: pwrseq_simple: Add an optional
+ pre-power-on-delay
+In-Reply-To: <20170306141716.19120-4-romain.perier@collabora.com>
+References: <20170306141716.19120-1-romain.perier@collabora.com>
+ <20170306141716.19120-4-romain.perier@collabora.com>
+Message-ID: <CAPDyKFr90kj9QuCVromx5A24U0WDh1gwVjmdwDsr1JmQbt=DPQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017/3/10 19:04, Mark Rutland wrote:
-> Hi,
+On 6 March 2017 at 15:17, Romain Perier <romain.perier@collabora.com> wrote:
+> Some devices need a while between the enablement of its clk and the time
+> where the reset line is asserted. When this time happens between the
+> pre_power_on and the post_power_on callbacks, there is a need to do an
+> msleep at the end of the pre_power_on callback.
 >
-> This series implements ACPI support in the ARM PMU code. It borrows some code
-> from Jeremy's series [1], but takes a different approach to probing and
-> association, using the usual hotplug state machine, minimising external changes
-> required, and simplifying the relationship with the common arm_pmu code.
+> This commit adds an optional DT property for such devices.
 >
-> The first few patches are preparatory cleanup/refactoring, with the latter half
-> of the series being specific to ACPI support.
+> Signed-off-by: Romain Perier <romain.perier@collabora.com>
+> ---
+>  Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt | 2 ++
+
+Split DT documentation for code changes. And make sure DT maintainers
+are in the loop discussing new DT bindings.
+
+>  drivers/mmc/core/pwrseq_simple.c                            | 6 ++++++
+>  2 files changed, 8 insertions(+)
 >
-> The series is based on my IRQ rework patches [2]. I've pushed the whole series
-> out to the arm/perf/acpi branch [3] of my kernel.org repo.
+> diff --git a/Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt b/Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt
+> index e254368..821feaaf 100644
+> --- a/Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt
+> +++ b/Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt
+> @@ -18,6 +18,8 @@ Optional properties:
+>    "ext_clock" (External clock provided to the card).
+>  - post-power-on-delay-ms : Delay in ms after powering the card and
+>         de-asserting the reset-gpios (if any)
+> +- pre-power-on-delay-ms : Delay in ms before powering the card and
+> +       asserting the reset-gpios (if any)
+
+We have been thinking of adding this before. It seems reasonable to
+me, however in the earlier case we ended up adding a new mmc pwrseq
+variant.
+
+Let's see where we ends up here...
+
 >
-> Due to the innards of the hotplug callback framework, it's not entirely
-> safe to register a PMU in a hotplug callback. Due to this, we can only
-> associated hotplugged CPUs with a PMU if a matching CPU was around at
-> probe time. A similar restriction already applies to DT systems. We may
-> be able to relax this with some future work.
+>  Example:
 >
-> I've given this some testing on a Juno platform (using SPIs). To see that IRQs
-> are correctly associated, I've tested with the following:
+> diff --git a/drivers/mmc/core/pwrseq_simple.c b/drivers/mmc/core/pwrseq_simple.c
+> index e27019f..d8d7166 100644
+> --- a/drivers/mmc/core/pwrseq_simple.c
+> +++ b/drivers/mmc/core/pwrseq_simple.c
+> @@ -27,6 +27,7 @@ struct mmc_pwrseq_simple {
+>         struct mmc_pwrseq pwrseq;
+>         bool clk_enabled;
+>         u32 post_power_on_delay_ms;
+> +       u32 pre_power_on_delay_ms;
+>         struct clk *ext_clk;
+>         struct gpio_descs *reset_gpios;
+>  };
+> @@ -60,6 +61,9 @@ static void mmc_pwrseq_simple_pre_power_on(struct mmc_host *host)
+>         }
 >
->   $ taskset -c ${SOME_CPU_HERE} perf record \
->     -e armv8_pmuv3_0/cpu_cycles/ \
->     -e armv8_pmuv3_1/cpu_cycles/ \
->     cat /proc/interrupts
->  
-> I've also booted with nr_cpus temporarily capped (passing maxcpus=) to test the
-> association logic. This has also been tested in a VM using PPIs; I do not have
-> access to a host machine which itself uses PPIs.
+>         mmc_pwrseq_simple_set_gpios_value(pwrseq, 1);
+> +
+> +       if (pwrseq->pre_power_on_delay_ms)
+> +               msleep(pwrseq->pre_power_on_delay_ms);
+>  }
+>
+>  static void mmc_pwrseq_simple_post_power_on(struct mmc_host *host)
+> @@ -130,6 +134,8 @@ static int mmc_pwrseq_simple_probe(struct platform_device *pdev)
+>
+>         device_property_read_u32(dev, "post-power-on-delay-ms",
+>                                  &pwrseq->post_power_on_delay_ms);
+> +       device_property_read_u32(dev, "pre-power-on-delay-ms",
+> +                                &pwrseq->pre_power_on_delay_ms);
+>
+>         pwrseq->pwrseq.dev = dev;
+>         if (device_property_read_bool(dev, "post-ios-power-on"))
+> --
+> 2.9.3
+>
 
-Booted OK and 'perf list' got on Hisilicon D03:
-
-d03-09:~ # perf list
-
-List of pre-defined events (to be used in -e):
-
-  branch-misses                                      [Hardware event]
-  bus-cycles                                         [Hardware event]
-  cache-misses                                       [Hardware event]
-  cache-references                                   [Hardware event]
-  cpu-cycles OR cycles                               [Hardware event]
-  instructions                                       [Hardware event]
-
-  alignment-faults                                   [Software event]
-  context-switches OR cs                             [Software event]
-  cpu-clock                                          [Software event]
-  cpu-migrations OR migrations                       [Software event]
-  dummy                                              [Software event]
-  emulation-faults                                   [Software event]
-  major-faults                                       [Software event]
-  minor-faults                                       [Software event]
-  page-faults OR faults                              [Software event]
-  task-clock                                         [Software event]
-
-  L1-dcache-load-misses                              [Hardware cache event]
-  L1-dcache-loads                                    [Hardware cache event]
-  L1-dcache-store-misses                             [Hardware cache event]
-  L1-dcache-stores                                   [Hardware cache event]
-  L1-icache-load-misses                              [Hardware cache event]
-  L1-icache-loads                                    [Hardware cache event]
-  branch-load-misses                                 [Hardware cache event]
-  branch-loads                                       [Hardware cache event]
-  dTLB-load-misses                                   [Hardware cache event]
-  iTLB-load-misses                                   [Hardware cache event]
-
-  armv8_pmuv3_0/br_mis_pred/                         [Kernel PMU event]
-  armv8_pmuv3_0/br_pred/                             [Kernel PMU event]
-  armv8_pmuv3_0/bus_access/                          [Kernel PMU event]
-  armv8_pmuv3_0/bus_cycles/                          [Kernel PMU event]
-  armv8_pmuv3_0/cid_write_retired/                   [Kernel PMU event]
-  armv8_pmuv3_0/cpu_cycles/                          [Kernel PMU event]
-  armv8_pmuv3_0/exc_return/                          [Kernel PMU event]
-  armv8_pmuv3_0/exc_taken/                           [Kernel PMU event]
-  armv8_pmuv3_0/inst_retired/                        [Kernel PMU event]
-  armv8_pmuv3_0/inst_spec/                           [Kernel PMU event]
-  armv8_pmuv3_0/l1d_cache/                           [Kernel PMU event]
-  armv8_pmuv3_0/l1d_cache_refill/                    [Kernel PMU event]
-  armv8_pmuv3_0/l1d_cache_wb/                        [Kernel PMU event]
-  armv8_pmuv3_0/l1d_tlb_refill/                      [Kernel PMU event]
-  armv8_pmuv3_0/l1i_cache/                           [Kernel PMU event]
-  armv8_pmuv3_0/l1i_cache_refill/                    [Kernel PMU event]
-  armv8_pmuv3_0/l1i_tlb_refill/                      [Kernel PMU event]
-  armv8_pmuv3_0/l2d_cache/                           [Kernel PMU event]
-  armv8_pmuv3_0/l2d_cache_refill/                    [Kernel PMU event]
-  armv8_pmuv3_0/l2d_cache_wb/                        [Kernel PMU event]
-  armv8_pmuv3_0/mem_access/                          [Kernel PMU event]
-  armv8_pmuv3_0/memory_error/                        [Kernel PMU event]
-  armv8_pmuv3_0/sw_incr/                             [Kernel PMU event]
-  armv8_pmuv3_0/ttbr_write_retired/                  [Kernel PMU event]
-
-  rNNN                                               [Raw hardware event descriptor]
-  cpu/t1=v1[,t2=v2,t3 ...]/modifier                  [Raw hardware event descriptor]
-   (see 'man perf-list' on how to encode it)
-
-  mem:<addr>[/len][:access]                          [Hardware breakpoint]
-
-
-Try some basic perf event and it works, anything else I can try in specific?
-
-Thanks
-Hanjun
+Kind regards
+Uffe
