@@ -1,61 +1,62 @@
-From: dwmw2@infradead.org (David Woodhouse)
-Date: Thu, 16 Mar 2017 12:17:27 +0000
-Subject: [PATCH v2] arm64: pci: add support for pci_mmap_page_range
-In-Reply-To: <20160415130953.GI22906@arm.com>
-References: <1460581856-12380-1-git-send-email-jerin.jacob@caviumnetworks.com>
- <20160415130953.GI22906@arm.com>
-Message-ID: <1489666647.4195.238.camel@infradead.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 16 Mar 2017 12:18:00 +0000
+Subject: [PATCH v2 4/7] mfd: syscon: atmel-smc: Remove unused
+ helpers/macros
+In-Reply-To: <20170316113438.790bfb67@bbrezillon>
+References: <1489653034-17777-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1489653034-17777-5-git-send-email-boris.brezillon@free-electrons.com>
+ <20170316101627.ecp63pr5v6l4neam@dell>
+ <20170316113438.790bfb67@bbrezillon>
+Message-ID: <20170316121800.swpt6d5oti3flpqj@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2016-04-15 at 14:09 +0100, Will Deacon wrote:
+On Thu, 16 Mar 2017, Boris Brezillon wrote:
+
+> Hi Lee,
 > 
-> > +?????if (write_combine)
-> > +?????????????vma->vm_page_prot = pgprot_writecombine(vma->vm_page_prot);
-> > +?????else
-> > +?????????????vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
+> On Thu, 16 Mar 2017 10:16:27 +0000
+> Lee Jones <lee.jones@linaro.org> wrote:
 > 
-> For consistency with ioremap, this should be pgprot_device.
+> > On Thu, 16 Mar 2017, Boris Brezillon wrote:
+> > 
+> > > All macros prefixed with AT91[SAM9]_SMC have been replaced by equivalent
+> > > definitions prefixed with ATMEL_SMC, and the at91sam9_smc_xxxx() helpers
+> > > are no longer used.
+> > > Drop these definitions before someone starts using them again.
+> > > 
+> > > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> > > ---
+> > >  include/linux/mfd/syscon/atmel-smc.h | 152 -----------------------------------
+> > >  1 file changed, 152 deletions(-)  
+> > 
+> > For my own reference:
+> >   Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
+> > 
+> > What is the plan for this set?
+> > 
+> > I only see 2 patches.
+> 
+> You mean, you only see 2 patches in your Inbox (that would be weird,
+> because you're in the CC list of all patches), or only 2 patches that
+> should go in your tree?
 
-What's the difference?
+I meant the former, but another pull down of my mail grabbed the
+remaining patches.
 
-I note that VFIO is using pgprot_noncached() too, in vfio_pci_mmap() ?
-where it open-codes an entirely arch-agnostic version of
-pci_mmap_page_range() all for itself. Should that be changed to
-pgprot_device() too?
+> > Can they both be applied?
+> 
+> All patches should go through the same tree, because changes in
+> drivers/memory/atmel-ebi.c are depending on changes done in the MFD
+> subsystem.
+> 
+> If Nicolas is okay with that, maybe you can take everything through the
+> MFD tree (I don't expect any conflicts in drivers/memory/atmel-ebi.c).
 
-Let me see if I can get this straight...
+That would be okay by me.
 
-We have the legacy interface through /proc/bus/pci, where the user
-passes a "user-visible" bus address not necessarily (on platforms with
-HAVE_PCI_RESOURCE_TO_USER) a host physical address.
-
-The arch-specific pci_mmap_page_range() exists to work around that
-translation, on the two platforms which need it. It *also* has (on
-about three platforms) support for a write-combining mapping.
-
-The sysfs interface theough /sys/bus/pci/devices/*/resource* probably
-doesn't need to use pci_mmap_page_range() at all, *except* for the
-'resourceX_wc' variant which has write-combining support.
-
-How about we do the following (probably not in this order):
-?? Kill pci_mmap_page_range() entirely.
-?? Implement a generic version which has (arch-assisted) WC support
-? ?but no knowledge of the horrid pci_resource_to_user() mapping.
-?? Require pci_user_to_resource() to be provided by platforms with
-? ?HAVE_ARCH_PCI_RESOURCE_TO_USER, and call that from *generic* code,
-? ?for the legacy procfs interface, before invoking the generic
-? ?replacement for pci_mmap_page_range().
-
-(Yes, we still need to support mmap of I/O resources on... is it only
-powerpc? And there are a few inconsistencies, like powerpc forcing WC
-even on the sysfs files that *don't* have _wc in their name, that
-probably want to be cleaned up as we consolidate...)
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: smime.p7s
-Type: application/x-pkcs7-signature
-Size: 4938 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170316/f016edd6/attachment.bin>
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
