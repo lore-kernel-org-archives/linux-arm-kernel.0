@@ -1,95 +1,103 @@
-From: flatmax@flatmax.org (Matt Flax)
-Date: Fri, 17 Mar 2017 09:14:57 +1100
-Subject: [alsa-devel] [PATCH 0/3] ASoC: Enable a new IC master mode:
- bcm2835<=>IC<=>cs42xx8
-In-Reply-To: <8c62f014-d246-e0c1-2b02-a28a2c2786b7@metafoo.de>
-References: <20170226144958.GA5543@camel2.lan>
- <732a71ac-5ec5-37e1-1190-be036ea34555@flatmax.org>
- <20170226221648.GA10974@camel2.lan>
- <7cef41ee-ef00-22b7-830f-517a9d594ed0@flatmax.org>
- <20170227080433.GA2718@delle.lan>
- <170950f7-354f-e6a9-cefb-834a00fadd1b@flatmax.org>
- <20170227103024.GF2718@delle.lan>
- <7b78c782-28e1-4849-5d00-8caf30847d5c@flatmax.org>
- <20170227115108.GA6732@delle.lan>
- <20170228095929.GH2742@localhost.localdomain>
- <20170315190108.y6ybxm3nfgnutajv@sirena.org.uk>
- <7d8d38f7-53aa-cc3d-4bbd-141649528a8a@flatmax.org>
- <8c62f014-d246-e0c1-2b02-a28a2c2786b7@metafoo.de>
-Message-ID: <000fbaa4-4c7c-5b13-0806-7e42672a4a55@flatmax.org>
+From: sakari.ailus@iki.fi (Sakari Ailus)
+Date: Fri, 17 Mar 2017 00:15:35 +0200
+Subject: [PATCH v5 15/39] [media] v4l2: add a frame interval error event
+In-Reply-To: <429b04e6-3922-6568-fc3f-036dc632a55b@gmail.com>
+References: <1489121599-23206-1-git-send-email-steve_longerbeam@mentor.com>
+ <1489121599-23206-16-git-send-email-steve_longerbeam@mentor.com>
+ <5b0a0e76-2524-4140-5ccc-380a8f949cfa@xs4all.nl>
+ <ec05e6e0-79f2-2db2-bde9-4aed00d76faa@gmail.com>
+ <6b574476-77df-0e25-a4d1-32d4fe0aec12@xs4all.nl>
+ <5d5cf4a4-a4d3-586e-cd16-54f543dfcce9@gmail.com>
+ <aa6a5a1d-18fd-8bed-a349-2654d2d1abe0@xs4all.nl>
+ <20170313104538.GF21222@n2100.armlinux.org.uk>
+ <1489508491.28116.8.camel@ndufresne.ca>
+ <429b04e6-3922-6568-fc3f-036dc632a55b@gmail.com>
+Message-ID: <20170316221535.GI10701@valkosipuli.retiisi.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Steve,
 
+On Tue, Mar 14, 2017 at 09:43:09AM -0700, Steve Longerbeam wrote:
+> 
+> 
+> On 03/14/2017 09:21 AM, Nicolas Dufresne wrote:
+> >Le lundi 13 mars 2017 ? 10:45 +0000, Russell King - ARM Linux a ?crit :
+> >>On Mon, Mar 13, 2017 at 11:02:34AM +0100, Hans Verkuil wrote:
+> >>>On 03/11/2017 07:14 PM, Steve Longerbeam wrote:
+> >>>>The event must be user visible, otherwise the user has no indication
+> >>>>the error, and can't correct it by stream restart.
+> >>>In that case the driver can detect this and call vb2_queue_error. It's
+> >>>what it is there for.
+> >>>
+> >>>The event doesn't help you since only this driver has this issue. So nobody
+> >>>will watch this event, unless it is sw specifically written for this SoC.
+> >>>
+> >>>Much better to call vb2_queue_error to signal a fatal error (which this
+> >>>apparently is) since there are more drivers that do this, and vivid supports
+> >>>triggering this condition as well.
+> >>So today, I can fiddle around with the IMX219 registers to help gain
+> >>an understanding of how this sensor works.  Several of the registers
+> >>(such as the PLL setup [*]) require me to disable streaming on the
+> >>sensor while changing them.
+> >>
+> >>This is something I've done many times while testing various ideas,
+> >>and is my primary way of figuring out and testing such things.
+> >>
+> >>Whenever I resume streaming (provided I've let the sensor stop
+> >>streaming at a frame boundary) it resumes as if nothing happened.  If I
+> >>stop the sensor mid-frame, then I get the rolling issue that Steve
+> >>reports, but once the top of the frame becomes aligned with the top of
+> >>the capture, everything then becomes stable again as if nothing happened.
+> >>
+> >>The side effect of what you're proposing is that when I disable streaming
+> >>at the sensor by poking at its registers, rather than the capture just
+> >>stopping, an error is going to be delivered to gstreamer, and gstreamer
+> >>is going to exit, taking the entire capture process down.
+> >Indeed, there is no recovery attempt in GStreamer code, and it's hard
+> >for an higher level programs to handle this. Nothing prevents from
+> >adding something of course, but the errors are really un-specific, so
+> >it would be something pretty blind. For what it has been tested, this
+> >case was never met, usually the error is triggered by a USB camera
+> >being un-plugged, a driver failure or even a firmware crash. Most of
+> >the time, this is not recoverable.
+> >
+> >My main concern here based on what I'm reading, is that this driver is
+> >not even able to notice immediately that a produced frame was corrupted
+> >(because it's out of sync). From usability perspective, this is really
+> >bad.
+> 
+> First, this is an isolated problem, specific to bt.656 and it only
+> occurs when disrupting the analog video source signal in some
+> way (by unplugging the RCA cable from the ADV718x connector
+> for example).
+> 
+> Second, there is no DMA status support in i.MX6 to catch these
+> shifted bt.656 codes, and the ADV718x does not provide any
+> status indicators of this event either. So monitoring frame intervals
+> is the only solution available, until FSL/NXP issues a new silicon rev.
+> 
+> 
+> >  Can't the driver derive a clock from some irq and calculate for
+> >each frame if the timing was correct ?
+> 
+> That's what is being done, essentially.
+> 
+> >  And if not mark the buffer with
+> >V4L2_BUF_FLAG_ERROR ?
+> 
+> I prefer to keep the private event, V4L2_BUF_FLAG_ERROR is too
+> unspecific.
 
-On 17/03/17 08:27, Lars-Peter Clausen wrote:
-> On 03/16/2017 09:51 PM, Matt Flax wrote:
->>
->> On 16/03/17 06:01, Mark Brown wrote:
->>> On Tue, Feb 28, 2017 at 09:59:29AM +0000, Charles Keepax wrote:
->>>> On Mon, Feb 27, 2017 at 12:51:08PM +0100, Matthias Reichl wrote:
->>>>>> I have a bcm2835 (Pi 2 and 3) SoC here. It is producing multichannel (8
->>>>>> out,
->>>>>> 6 in) audio. In ALSA we call that DSP mode - right ?!
->>>>> No. DSP modes are protocol/timing specifications as I2S, PDP, S/PDIF, ...
->>>>> You can look these up in datasheets and if a chip implements such a
->>>>> protocol you can be sure that it adheres to that standard - i.e. it
->>>>> will sync the frames to the pulses on LRclk.
->>>> I agree with the thoughts in this thread really if the AP doesn't
->>>> actually support DSP A mode we shouldn't add DSP A mode.
->>> The trouble here is that this isn't 100% clear, the specifications of
->>> the DSP modes are such that only one edge in the LRCLK matters and so
->>> providing you're doing mono or have exact clocking they interoperate
->>> perfectly well.  We already frequently do similar things the other way,
->>> most of the programmable serial ports can't actually do I2S modes
->>> properly and rely on exact clocking to get things right when operating
->>> as I2S since they only sync on one edge (though they can generally
->>> generate the clocks correctly when operating as master, they just don't
->>> pay attention to the left/right switch edge).
->>>
->>> That said unless we're doing something with the data layout or similar
->>> configuration there's a fairly strong case for putting the mangling for
->>> this in the core, something like just falling back to I2S mode if we set
->>> DSP A and so on.  Which would be a lot nicer if we actually got round to
->>> putting mode capability information in the drivers.
->> I agree, the data layout is already configurable in the bcm2835_i2s.c
->> platform driver. We can already use the "snd_soc_dai_set_bclk_ratio"
->> function to manage word offsets in our machine drivers.
->>
->> There is nothing which says that the bcm2835 SoC is I2S restricted in any
->> way. In fact, the reference document says quite the opposite.
->>
->> In the reference "BCM2835 ARM Peripherals" pdf, they call the audio system
->> an "APB peripheral". They are saying that it is reconfigurable and part of
->> the AMBA family of interconnect schemes.
->>
->> As far as the bcm2835_i2s platform driver goes, it has implemented an AMBA
->> protocol, where audio words are counted from the LR clock onset - for some
->> reason people are insisting this is an I2S bus. Really our implementation is
->> not I2S at all, because word onsets are programmable and flexible in the
->> bcm2835_i2s.c driver.
-> AMBA/APB is the interface which connects the peripheral to the system memory
-> bus. It is the interface over which the CPU does configuration register
-> writes. This has nothing and absolutely nothing to do with the I2S interface
-> that is also implemented by the peripheral that is used to stream audio to
-> and from external components.
->
+Is the reason you prefer an event that you have multiple drivers involved,
+or that the error flag is, well, only telling there was an error with a
+particular frame?
 
-Their (BCM reference) document [1] specifically states "It supports many 
-classic PCM formats including I2S".
+Returning -EIO (by calling vb2_queue_error()) would be a better choice as it
+is documented behaviour.
 
-Do agree with Mark's statement "the specifications of the DSP modes are 
-such that only one edge in the LRCLK matters" ?
+-- 
+Regard,s
 
-If we look at the bcm2835 platform driver setup, it is concerned with 
-bit clock counting to specify the audio data for both of the AMBA/APB 
-channels from serial bitstream into memory. It has two channels into 
-memory, however "it supports many classic PCM formats" ... my vote for 
-one classic format is DSP mode !
-
-Do you see a problem with that ?
-
-thanks
-Matt
-[1] 
-https://www.raspberrypi.org/wp-content/uploads/2012/02/BCM2835-ARM-Peripherals.pdf
+Sakari Ailus
+e-mail: sakari.ailus at iki.fi	XMPP: sailus at retiisi.org.uk
