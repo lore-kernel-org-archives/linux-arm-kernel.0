@@ -1,54 +1,71 @@
-From: shankerd@codeaurora.org (Shanker Donthineni)
-Date: Thu, 16 Mar 2017 09:03:24 -0500
-Subject: [PATCH v2 8/8] irqchip, gicv3-its, cma: Use CMA for allocation of
- large device tables
-In-Reply-To: <a00390ef-808d-59ea-521c-b759a00b5951@arm.com>
-References: <20170306125739.19445-1-rrichter@cavium.com>
- <20170306125739.19445-9-rrichter@cavium.com>
- <3c462655-fb2c-ede7-1dc0-ca5c7f64904f@codeaurora.org>
- <20170315183734.GW16822@rric.localdomain>
- <9b492795-3759-801e-c77d-e74e86c814d1@arm.com>
- <20170316133154.GA16822@rric.localdomain>
- <a00390ef-808d-59ea-521c-b759a00b5951@arm.com>
-Message-ID: <b1ec8924-5154-706d-4d25-4ee44be45fb4@codeaurora.org>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 16 Mar 2017 15:03:24 +0100
+Subject: [PATCH] ARM: dts: hi6220: Reset the mmc hosts
+Message-ID: <1489673004-11075-1-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc/Robert,
+The MMC hosts could be left in an unconsistent or uninitialized state from
+the firmware. Instead of assuming, the firmware did the right things, let's
+reset the host controllers.
 
-On 03/16/2017 08:41 AM, Marc Zyngier wrote:
-> On 16/03/17 13:31, Robert Richter wrote:
->> On 15.03.17 18:46:22, Marc Zyngier wrote:
->>> On 15/03/17 18:37, Robert Richter wrote:
->>>> On 14.03.17 12:40:45, Shanker Donthineni wrote:
->>>>>> @@ -1698,6 +1706,9 @@ static int __init its_init_one(struct its_node *its)
->>>>>>  		return err;
->>>>>>  	}
->>>>>>  
->>>>>> +	/* Setup dma_ops for dmam_alloc_coherent() */
->>>>>> +	arch_setup_dma_ops(&its->dev, 0, 0, NULL, true);
->>>>>> +
->>>>> Why you are hard-coding DMA coherent property to true here ? It
->>>>> breaks the MSI(x) functionally on systems where ITS hardware doesn't
->>>>> support coherency.
->>>> Aren't current ITS tables coherent only?
->>> No, there is no such guarantee. Actually, there is strictly no need for
->>> coherency, as the ITS tables are only written by the ITS itself, for its
->>> own purpose.
->> So no need to change that, right?
-> I don't think there is any. We just need to allocate memory with the
-> relevant constraints (alignment and zeroing, mostly), and make sure we
-> never access it directly. Of course, property tables and command queues
-> would benefit from being allocated as DMA buffers, which would allow the
-> cache flush to be dealt with at the DMA level.
+This change fixes a bug when the mmc2/sdio is initialized leading to a hung
+task:
 
-Agree with Marc, only PROP tables and CMD queue buffers are touched by CPU during runtime. That means DMA coherent property set to true only when both the CMD_BASE (ITS_FLAGS_CMDQ_NEEDS_FLUSHING) and PROP_BASE (RDIST_FLAGS_PROPBASE_NEEDS_FLUSHING) tables support coherency.
+[  242.704294] INFO: task kworker/7:1:675 blocked for more than 120 seconds.
+[  242.711129]       Not tainted 4.9.0-rc8-00017-gcf0251f #3
+[  242.716571] "echo 0 > /proc/sys/kernel/hung_task_timeout_secs" disables this message.
+[  242.724435] kworker/7:1     D    0   675      2 0x00000000
+[  242.729973] Workqueue: events_freezable mmc_rescan
+[  242.734796] Call trace:
+[  242.737269] [<ffff00000808611c>] __switch_to+0xa8/0xb4
+[  242.742437] [<ffff000008d07c04>] __schedule+0x1c0/0x67c
+[  242.747689] [<ffff000008d08254>] schedule+0x40/0xa0
+[  242.752594] [<ffff000008d0b284>] schedule_timeout+0x1c4/0x35c
+[  242.758366] [<ffff000008d08e38>] wait_for_common+0xd0/0x15c
+[  242.763964] [<ffff000008d09008>] wait_for_completion+0x28/0x34
+[  242.769825] [<ffff000008a1a9f4>] mmc_wait_for_req_done+0x40/0x124
+[  242.775949] [<ffff000008a1ab98>] mmc_wait_for_req+0xc0/0xf8
+[  242.781549] [<ffff000008a1ac3c>] mmc_wait_for_cmd+0x6c/0x84
+[  242.787149] [<ffff000008a26610>] mmc_io_rw_direct_host+0x9c/0x114
+[  242.793270] [<ffff000008a26aa0>] sdio_reset+0x34/0x7c
+[  242.798347] [<ffff000008a1d46c>] mmc_rescan+0x2fc/0x360
 
-> Thanks,
->
-> 	M.
+[ ... ]
 
+Cc: stable at vger.kernel.org
+Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+---
+ arch/arm64/boot/dts/hisilicon/hi6220.dtsi | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+index 470461d..1e5129b 100644
+--- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
++++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+@@ -774,6 +774,7 @@
+ 			clocks = <&sys_ctrl 2>, <&sys_ctrl 1>;
+ 			clock-names = "ciu", "biu";
+ 			resets = <&sys_ctrl PERIPH_RSTDIS0_MMC0>;
++			reset-names = "reset";
+ 			bus-width = <0x8>;
+ 			vmmc-supply = <&ldo19>;
+ 			pinctrl-names = "default";
+@@ -797,6 +798,7 @@
+ 			clocks = <&sys_ctrl 4>, <&sys_ctrl 3>;
+ 			clock-names = "ciu", "biu";
+ 			resets = <&sys_ctrl PERIPH_RSTDIS0_MMC1>;
++			reset-names = "reset";
+ 			vqmmc-supply = <&ldo7>;
+ 			vmmc-supply = <&ldo10>;
+ 			bus-width = <0x4>;
+@@ -815,6 +817,7 @@
+ 			clocks = <&sys_ctrl HI6220_MMC2_CIUCLK>, <&sys_ctrl HI6220_MMC2_CLK>;
+ 			clock-names = "ciu", "biu";
+ 			resets = <&sys_ctrl PERIPH_RSTDIS0_MMC2>;
++			reset-names = "reset";
+ 			bus-width = <0x4>;
+ 			broken-cd;
+ 			pinctrl-names = "default", "idle";
 -- 
-Shanker Donthineni
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+1.9.1
