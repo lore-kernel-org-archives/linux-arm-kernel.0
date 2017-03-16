@@ -1,180 +1,187 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 16 Mar 2017 16:16:27 +0100
-Subject: [PATCH 1/2] arm64: marvell: dts: add PPv2.2 description to Armada
- 7K/8K
-In-Reply-To: <1489677388-19320-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1489677388-19320-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1489677388-19320-2-git-send-email-thomas.petazzoni@free-electrons.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 16 Mar 2017 16:18:52 +0100
+Subject: [PATCH 4/4] tty/serial: sh-sci: remove uneeded IS_ERR_OR_NULL
+ calls
+In-Reply-To: <20170306100220.droey65uq2ew3mzu@pengutronix.de>
+References: <20170303191248.wlwjri55ip2x5pgg@pengutronix.de>
+ <CAMuHMdXFrwa2jCVDb+8ecqgARLG0oGrPp9pLs0b6vEiWeKJ+uA@mail.gmail.com>
+ <20170303194414.n76tr3oa2mlrzjre@pengutronix.de>
+ <CAMuHMdXiz5hqW=fm-2H1aNKq_gXD2o0508jD2XjxYUvKoEvHdw@mail.gmail.com>
+ <20170304174819.esxhwwbsxzuq3vyc@pengutronix.de>
+ <CAMuHMdX8BEnaTtNFAbcvfHwJH=oPUmQ2NB+jfouGyhQpJ_m_4A@mail.gmail.com>
+ <20170306085842.yijkfpqi3adcedmm@pengutronix.de>
+ <CAMuHMdV2_vbocY4wCzvYtPAaF+QEX_Y4g6qVu5EqEBf5AnFdaw@mail.gmail.com>
+ <20170306093043.ay4dz3ehp3aakwxh@pengutronix.de>
+ <CAMuHMdWQuvANNU14A7NQuzv6AFp04bq4DG_oc7w9h4wUrG+4aQ@mail.gmail.com>
+ <20170306100220.droey65uq2ew3mzu@pengutronix.de>
+Message-ID: <CACRpkdYeFyr4yjQjDAUpPJwuD_NW2y=wXnzt1xSNoOX0SFCLmw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds the description of the PPv2.2 hardware block for the
-Marvell Armada 7K and Armada 8K processors, and their corresponding Armada
-7040 and 8040 Development boards.
+On Mon, Mar 6, 2017 at 11:02 AM, Uwe Kleine-K?nig
+<u.kleine-koenig@pengutronix.de> wrote:
+> On Mon, Mar 06, 2017 at 10:53:27AM +0100, Geert Uytterhoeven wrote:
+>> On Mon, Mar 6, 2017 at 10:30 AM, Uwe Kleine-K?nig
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+>> > I wouldn't want to code this in each driver (something like:
+>> >
+>> >         if (IS_ENABLED(GPIOLIB) || device_is_instantiated_by_dt(dev) || device_is_instantiated_by_acpi(dev))
+>> >                 gpios = mctrl_gpio_init(...);
+>> >         else
+>> >                 gpios = NULL;
+>> >
+>> > ). Putting this into GPIOLIB is the right approach, and so this is
+>> > another argument for HALFGPIOLIB. This would fix mctrl_gpio_init en
+>> > passant.
+>>
+>> Do we have platforms where DT=y || ACPI=y, but GPIOLIB=n?
+>> Ah, x86 ;-)
+>
+> Yeah, and I think rm -r arch/x86 won't be acceptable :-) I assume you
+> can also configure some arm or powerpc systems without GPIOLIB.
+>
+>> Anyway, for sh-sci.c, platforms either have DT and GPIOLIB, or they do not
+>> need mctrl-gpio.
+>
+> So we're in agreement now that HALFGPIOLIB is the way to go?
+> Linus, what do you think?
+
+OK modem lines over GPIO.
+
+So the problem is that GPIOLIB is needed (obviously) for mctrl_gpio_init() to
+work properly, and then there are some stubs in
+drivers/tty/serial/serial_mctrl_gpio.h
+for !GPIOLIB.
+
+And this whole discussion is all about that !GPIOLIB case really,
+whether DT, ACPI, SFI or board files machine data is used doesn't
+really matter.
+
+We're talking about:
+
+> git grep mctrl_gpio_init
+drivers/tty/serial/atmel_serial.c:      atmel_port->gpios =
+mctrl_gpio_init(&atmel_port->uart, 0);
+drivers/tty/serial/clps711x.c:  s->gpios =
+mctrl_gpio_init_noauto(&pdev->dev, 0);
+drivers/tty/serial/etraxfs-uart.c:      up->gpios =
+mctrl_gpio_init_noauto(&pdev->dev, 0);
+drivers/tty/serial/imx.c:       sport->gpios = mctrl_gpio_init(&sport->port, 0);
+drivers/tty/serial/mxs-auart.c: s->gpios = mctrl_gpio_init_noauto(dev, 0);
+drivers/tty/serial/sh-sci.c:    sciport->gpios =
+mctrl_gpio_init(&sciport->port, 0);
+
+Atmel, ARM, ETRAX, ARM, ARM, Super-H, all have GPIOLIB.
+Right now no x86, correct?
+
+They actually all even do things like this in Kconfig:
+
+config SERIAL_ATMEL
+(...)
+        select SERIAL_MCTRL_GPIO if GPIOLIB
+
+What stops us from removing all the stubs in
+drivers/tty/serial/serial_mctrl_gpio.h
+and just make SERIAL_MCTRL_GPIO depends on GPIOLIB?
+
+>From 2ecc70acc510784d953add707f2a5acfebe484c2 Mon Sep 17 00:00:00 2001
+From: Linus Walleij <linus.walleij@linaro.org>
+Date: Thu, 16 Mar 2017 16:18:21 +0100
+Subject: [PATCH] stab at mctrl
+
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm64/boot/dts/marvell/armada-7040-db.dts     | 25 +++++++++++++++
- arch/arm64/boot/dts/marvell/armada-8040-db.dts     | 16 ++++++++++
- .../boot/dts/marvell/armada-cp110-master.dtsi      | 37 ++++++++++++++++++++++
- .../arm64/boot/dts/marvell/armada-cp110-slave.dtsi | 37 ++++++++++++++++++++++
- 4 files changed, 115 insertions(+)
+ drivers/tty/serial/Kconfig             |  1 +
+ drivers/tty/serial/serial_mctrl_gpio.h | 55 ----------------------------------
+ 2 files changed, 1 insertion(+), 55 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-7040-db.dts b/arch/arm64/boot/dts/marvell/armada-7040-db.dts
-index 070b589..bb0e1e8 100644
---- a/arch/arm64/boot/dts/marvell/armada-7040-db.dts
-+++ b/arch/arm64/boot/dts/marvell/armada-7040-db.dts
-@@ -146,3 +146,28 @@
- &cpm_usb3_1 {
- 	status = "okay";
- };
-+
-+&cpm_mdio {
-+	phy0: ethernet-phy at 0 {
-+		reg = <0>;
-+	};
-+	phy1: ethernet-phy at 1 {
-+		reg = <1>;
-+	};
-+};
-+
-+&cpm_ethernet {
-+	status = "okay";
-+};
-+
-+&cpm_eth1 {
-+	status = "okay";
-+	phy = <&phy0>;
-+	phy-mode = "sgmii";
-+};
-+
-+&cpm_eth2 {
-+	status = "okay";
-+	phy = <&phy1>;
-+	phy-mode = "rgmii-id";
-+};
-diff --git a/arch/arm64/boot/dts/marvell/armada-8040-db.dts b/arch/arm64/boot/dts/marvell/armada-8040-db.dts
-index 6e6f182..80e685e 100644
---- a/arch/arm64/boot/dts/marvell/armada-8040-db.dts
-+++ b/arch/arm64/boot/dts/marvell/armada-8040-db.dts
-@@ -124,6 +124,22 @@
- 	status = "okay";
- };
- 
-+&cpm_mdio {
-+	phy1: ethernet-phy at 1 {
-+		reg = <1>;
-+	};
-+};
-+
-+&cpm_ethernet {
-+	status = "okay";
-+};
-+
-+&cpm_eth2 {
-+	status = "okay";
-+	phy = <&phy1>;
-+	phy-mode = "rgmii-id";
-+};
-+
- /* CON5 on CP1 expansion */
- &cps_pcie2 {
- 	status = "okay";
-diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-index 3a99c36..9a2ce2a 100644
---- a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-@@ -59,6 +59,43 @@
- 			interrupt-parent = <&gic>;
- 			ranges = <0x0 0x0 0xf2000000 0x2000000>;
- 
-+			cpm_ethernet: ethernet at 0 {
-+				compatible = "marvell,armada-7k-pp22";
-+				reg = <0x0 0x100000>, <0x129000 0xb000>;
-+				clocks = <&cpm_syscon0 1 3>, <&cpm_syscon0 1 9>, <&cpm_syscon0 1 5>;
-+				clock-names = "pp_clk", "gop_clk", "mg_clk";
-+				status = "disabled";
-+				dma-coherent;
-+
-+				cpm_eth0: eth0 {
-+					interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
-+					port-id = <0>;
-+					gop-port-id = <0>;
-+					status = "disabled";
-+				};
-+
-+				cpm_eth1: eth1 {
-+					interrupts = <GIC_SPI 38 IRQ_TYPE_LEVEL_HIGH>;
-+					port-id = <1>;
-+					gop-port-id = <2>;
-+					status = "disabled";
-+				};
-+
-+				cpm_eth2: eth2 {
-+					interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>;
-+					port-id = <2>;
-+					gop-port-id = <3>;
-+					status = "disabled";
-+				};
-+			};
-+
-+			cpm_mdio: mdio at 12a200 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				compatible = "marvell,orion-mdio";
-+				reg = <0x12a200 0x10>;
-+			};
-+
- 			cpm_syscon0: system-controller at 440000 {
- 				compatible = "marvell,cp110-system-controller0",
- 					     "syscon";
-diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-index 9e09c4d..c9dfa24 100644
---- a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-@@ -59,6 +59,43 @@
- 			interrupt-parent = <&gic>;
- 			ranges = <0x0 0x0 0xf4000000 0x2000000>;
- 
-+			cps_ethernet: ethernet at 0 {
-+				compatible = "marvell,armada-7k-pp22";
-+				reg = <0x0 0x100000>, <0x129000 0xb000>;
-+				clocks = <&cps_syscon0 1 3>, <&cps_syscon0 1 9>, <&cps_syscon0 1 5>;
-+				clock-names = "pp_clk", "gop_clk", "mg_clk";
-+				status = "disabled";
-+				dma-coherent;
-+
-+				cps_eth0: eth0 {
-+					interrupts = <GIC_SPI 261 IRQ_TYPE_LEVEL_HIGH>;
-+					port-id = <0>;
-+					gop-port-id = <0>;
-+					status = "disabled";
-+				};
-+
-+				cps_eth1: eth1 {
-+					interrupts = <GIC_SPI 262 IRQ_TYPE_LEVEL_HIGH>;
-+					port-id = <1>;
-+					gop-port-id = <2>;
-+					status = "disabled";
-+				};
-+
-+				cps_eth2: eth2 {
-+					interrupts = <GIC_SPI 263 IRQ_TYPE_LEVEL_HIGH>;
-+					port-id = <2>;
-+					gop-port-id = <3>;
-+					status = "disabled";
-+				};
-+			};
-+
-+			cps_mdio: mdio at 12a200 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				compatible = "marvell,orion-mdio";
-+				reg = <0x12a200 0x10>;
-+			};
-+
- 			cps_syscon0: system-controller at 440000 {
- 				compatible = "marvell,cp110-system-controller0",
- 					     "syscon";
+diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
+index 6117ac8da48f..39833d009c18 100644
+--- a/drivers/tty/serial/Kconfig
++++ b/drivers/tty/serial/Kconfig
+@@ -1681,5 +1681,6 @@ endmenu
+
+ config SERIAL_MCTRL_GPIO
+     tristate
++    depends on GPIOLIB
+
+ endif # TTY
+diff --git a/drivers/tty/serial/serial_mctrl_gpio.h
+b/drivers/tty/serial/serial_mctrl_gpio.h
+index fa000bcff217..ba8f8e531d56 100644
+--- a/drivers/tty/serial/serial_mctrl_gpio.h
++++ b/drivers/tty/serial/serial_mctrl_gpio.h
+@@ -40,8 +40,6 @@ enum mctrl_gpio_idx {
+  */
+ struct mctrl_gpios;
+
+-#ifdef CONFIG_GPIOLIB
+-
+ /*
+  * Set state of the modem control output lines via GPIOs.
+  */
+@@ -101,57 +99,4 @@ void mctrl_gpio_enable_ms(struct mctrl_gpios *gpios);
+  */
+ void mctrl_gpio_disable_ms(struct mctrl_gpios *gpios);
+
+-#else /* GPIOLIB */
+-
+-static inline
+-void mctrl_gpio_set(struct mctrl_gpios *gpios, unsigned int mctrl)
+-{
+-}
+-
+-static inline
+-unsigned int mctrl_gpio_get(struct mctrl_gpios *gpios, unsigned int *mctrl)
+-{
+-    return *mctrl;
+-}
+-
+-static inline unsigned int
+-mctrl_gpio_get_outputs(struct mctrl_gpios *gpios, unsigned int *mctrl)
+-{
+-    return *mctrl;
+-}
+-
+-static inline
+-struct gpio_desc *mctrl_gpio_to_gpiod(struct mctrl_gpios *gpios,
+-                      enum mctrl_gpio_idx gidx)
+-{
+-    return ERR_PTR(-ENOSYS);
+-}
+-
+-static inline
+-struct mctrl_gpios *mctrl_gpio_init(struct uart_port *port, unsigned int idx)
+-{
+-    return ERR_PTR(-ENOSYS);
+-}
+-
+-static inline
+-struct mctrl_gpios *mctrl_gpio_init_noauto(struct device *dev,
+unsigned int idx)
+-{
+-    return ERR_PTR(-ENOSYS);
+-}
+-
+-static inline
+-void mctrl_gpio_free(struct device *dev, struct mctrl_gpios *gpios)
+-{
+-}
+-
+-static inline void mctrl_gpio_enable_ms(struct mctrl_gpios *gpios)
+-{
+-}
+-
+-static inline void mctrl_gpio_disable_ms(struct mctrl_gpios *gpios)
+-{
+-}
+-
+-#endif /* GPIOLIB */
+-
+ #endif
 -- 
-2.7.4
+2.9.3
+
+
+Yours,
+Linus Walleij
