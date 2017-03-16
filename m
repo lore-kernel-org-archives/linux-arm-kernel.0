@@ -1,25 +1,98 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 16 Mar 2017 16:21:50 -0500
-Subject: [PATCH v5 01/39] [media] dt-bindings: Add bindings for
- video-multiplexer device
-In-Reply-To: <1489121599-23206-2-git-send-email-steve_longerbeam@mentor.com>
-References: <1489121599-23206-1-git-send-email-steve_longerbeam@mentor.com>
- <1489121599-23206-2-git-send-email-steve_longerbeam@mentor.com>
-Message-ID: <20170316212150.jud4xn436rr5meq5@rob-hp-laptop>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Thu, 16 Mar 2017 22:23:13 +0100
+Subject: [PATCH v2] ARM: zynq: Add #io-channel-cells to (x)adc node for
+ iio-hwmon
+In-Reply-To: <CAJYdmeMg+DtwwbXOM7hPC4ejvkYkR94fcoyvTpx86RSKSswFMg@mail.gmail.com>
+References: <1489003884-2489-1-git-send-email-mdf@kernel.org>
+ <e6da3f38-7039-66e5-5b9d-a44ff42aa9c9@xilinx.com>
+ <CAJYdmeNc48=OOvRiUjqPBJhz9RCbzeaRGu1Tfm=hrvzkJrSsag@mail.gmail.com>
+ <7e4fbe16-8686-5399-748d-af222c630338@xilinx.com>
+ <37f29986-6491-67ab-144c-eb485cc1fdcc@metafoo.de>
+ <CAJYdmeMg+DtwwbXOM7hPC4ejvkYkR94fcoyvTpx86RSKSswFMg@mail.gmail.com>
+Message-ID: <1e25520c-acbf-6512-3070-77e3c852e4f8@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 09, 2017 at 08:52:41PM -0800, Steve Longerbeam wrote:
-> From: Philipp Zabel <p.zabel@pengutronix.de>
+On 03/16/2017 06:54 PM, Moritz Fischer wrote:
+> Hi Lars,
 > 
-> Add bindings documentation for the video multiplexer device.
+> On Thu, Mar 16, 2017 at 9:51 AM, Lars-Peter Clausen <lars@metafoo.de> wrote:
+>> On 03/16/2017 05:45 PM, Michal Simek wrote:
+>>> On 16.3.2017 17:39, Moritz Fischer wrote:
+>>>> On Thu, Mar 16, 2017 at 9:16 AM, Michal Simek <michal.simek@xilinx.com> wrote:
+>>>>> Hi,
+>>>>>
+>>>>> On 8.3.2017 21:11, Moritz Fischer wrote:
+>>>>>> Fix
+>>>>>>
+>>>>>> OF: /iio_hwmon: could not get #io-channel-cells for
+>>>>>> /amba/adc at f8007100
+>>>>>> OF: /iio_hwmon: could not get #io-channel-cells for
+>>>>>> /amba/adc at f8007100
+>>>>>> OF: /iio_hwmon: could not get #io-channel-cells for
+>>>>>> /amba/adc at f8007100
+>>>>>>
+>>>>>> by adding the #io-channel-cells property.
+>>>>>>
+>>>>>> Signed-off-by: Moritz Fischer <mdf@kernel.org>
+>>>>>> Cc: Michal Simek <michal.simek@xilinx.com>
+>>>>>> Cc: S?ren Brinkmann <soren.brinkmann@xilinx.com>
+>>>>>> Cc: Julia Cartwright <julia@ni.com>
+>>>>>> Cc: linux-kernel at vger.kernel.org
+>>>>>> Cc: devicetree at vger.kernel.org
+>>>>>> ---
+>>>>>>
+>>>>>> Changes from v1:
+>>>>>> - fix messed up commit message
+>>>>>> ---
+>>>>>>  arch/arm/boot/dts/zynq-7000.dtsi | 1 +
+>>>>>>  1 file changed, 1 insertion(+)
+>>>>>>
+>>>>>> diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
+>>>>>> index f3ac9bf..98233a8 100644
+>>>>>> --- a/arch/arm/boot/dts/zynq-7000.dtsi
+>>>>>> +++ b/arch/arm/boot/dts/zynq-7000.dtsi
+>>>>>> @@ -72,6 +72,7 @@
+>>>>>>                       interrupts = <0 7 4>;
+>>>>>>                       interrupt-parent = <&intc>;
+>>>>>>                       clocks = <&clkc 12>;
+>>>>>> +                     #io-channel-cells = <1>;
+>>>>>>               };
+>>>>>>
+>>>>>>               can0: can at e0008000 {
+>>>>>>
+>>>>>
+>>>>> I think it will be good to the next step too.
+>>>>> It means also add iio-hwmon node too.
+>>>>>
+>>>>> What do you think?
+>>>>
+>>>> I hadn't put it in there since dts is supposed to describe hw,
+>>>> but obviously putting the actual hwmon in there makes it more useful.
+>>>
+>>> I had one discussion about this with Grant in past and it is common
+>>> mistake. It is simplification of purpose of dts.
+>>>
+>>
+>> If the iio-hwmon binding had gone through review it would have been rejected.
+>>
+>>>>
+>>>> I can resubmit with the hwmon node in there.
+>>>
+>>> If you grep kernel tree you will see that others are using it too.
+>>> Also there is accepted binding for that that's why I can't see big
+>>> problem with it.
+>>
+>> Since this is an application specific binding I wouldn't put it in the
+>> generic DT include file. It's a bit like adding a gpio-key binding for each
+>> of the GPIOs just in case somebody wants to use it.
 > 
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
-> ---
->  .../bindings/media/video-multiplexer.txt           | 59 ++++++++++++++++++++++
->  1 file changed, 59 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/media/video-multiplexer.txt
+> So is your suggestion to move the whole thing from .dtsi -> .dts?
 
-Acked-by: Rob Herring <robh@kernel.org>
+The #io-channels-cells can go into the dtsi, that's a sensible thing to do.
+The number of cells is part of the binding specification for the XADC and
+wont change.
+
+The hwmon bridge on the other hand I wouldn't put into any default
+devicetree. In my opinion is should only used if and only if there are
+legacy applications on a specific system that need to use the hwmon interface.
