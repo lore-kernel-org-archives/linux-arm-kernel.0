@@ -1,37 +1,45 @@
 From: ralph.sennhauser@gmail.com (Ralph Sennhauser)
-Date: Thu, 16 Mar 2017 07:42:17 +0100
-Subject: [PATCH 3/4] ARM: mvebu: Enable SENSORS_PWM_FAN in defconfig
+Date: Thu, 16 Mar 2017 07:42:18 +0100
+Subject: [PATCH 4/4] mvebu: wrt1900ac: Use pwm-fan rather than gpio-fan
 In-Reply-To: <20170316064218.9169-1-ralph.sennhauser@gmail.com>
 References: <20170316064218.9169-1-ralph.sennhauser@gmail.com>
-Message-ID: <20170316064218.9169-4-ralph.sennhauser@gmail.com>
+Message-ID: <20170316064218.9169-5-ralph.sennhauser@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Andrew Lunn <andrew@lunn.ch>
 
-Now that the gpio driver also supports PWM operation, enable the PWM
-framework and fan driver in mvebu_v7_defconfig.
+The mvebu gpio driver can also perform PWM on some pins. Us the pwm-fan
+driver to control the fan of the WRT1900AC, giving us finer grained
+control over its speed and hence noise.
 
 Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-URL: https://patchwork.ozlabs.org/patch/427297/
-[Ralph Sennhauser: add fan driver to defconfig]
+URL: https://patchwork.ozlabs.org/patch/427291/
 Signed-off-by: Ralph Sennhauser <ralph.sennhauser@gmail.com>
 ---
- arch/arm/configs/mvebu_v7_defconfig | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/boot/dts/armada-xp-linksys-mamba.dts | 8 +++-----
+ 1 file changed, 3 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/configs/mvebu_v7_defconfig b/arch/arm/configs/mvebu_v7_defconfig
-index f1a0e25..6955370 100644
---- a/arch/arm/configs/mvebu_v7_defconfig
-+++ b/arch/arm/configs/mvebu_v7_defconfig
-@@ -135,6 +135,8 @@ CONFIG_DMADEVICES=y
- CONFIG_MV_XOR=y
- # CONFIG_IOMMU_SUPPORT is not set
- CONFIG_MEMORY=y
-+CONFIG_PWM=y
-+CONFIG_SENSORS_PWM_FAN=y
- CONFIG_EXT4_FS=y
- CONFIG_ISO9660_FS=y
- CONFIG_JOLIET=y
+diff --git a/arch/arm/boot/dts/armada-xp-linksys-mamba.dts b/arch/arm/boot/dts/armada-xp-linksys-mamba.dts
+index 3744ba3..836b275e 100644
+--- a/arch/arm/boot/dts/armada-xp-linksys-mamba.dts
++++ b/arch/arm/boot/dts/armada-xp-linksys-mamba.dts
+@@ -293,13 +293,11 @@
+ 		};
+ 	};
+ 
+-	gpio_fan {
++	pwm_fan {
+ 		/* SUNON HA4010V4-0000-C99 */
+-		compatible = "gpio-fan";
+-		gpios = <&gpio0 24 0>;
+ 
+-		gpio-fan,speed-map = <0    0
+-				      4500 1>;
++		compatible = "pwm-fan";
++		pwms = <&gpio0 24 4000 0>;
+ 	};
+ 
+ 	dsa {
 -- 
 2.10.2
