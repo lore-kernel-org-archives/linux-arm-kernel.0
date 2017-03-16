@@ -1,62 +1,49 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 16 Mar 2017 12:18:00 +0000
-Subject: [PATCH v2 4/7] mfd: syscon: atmel-smc: Remove unused
- helpers/macros
-In-Reply-To: <20170316113438.790bfb67@bbrezillon>
-References: <1489653034-17777-1-git-send-email-boris.brezillon@free-electrons.com>
- <1489653034-17777-5-git-send-email-boris.brezillon@free-electrons.com>
- <20170316101627.ecp63pr5v6l4neam@dell>
- <20170316113438.790bfb67@bbrezillon>
-Message-ID: <20170316121800.swpt6d5oti3flpqj@dell>
+From: vigneshr@ti.com (Vignesh R)
+Date: Thu, 16 Mar 2017 17:56:53 +0530
+Subject: [PATCH] serial: 8250: 8250_core: Fix irq name for 8250 serial irq
+Message-ID: <20170316122653.19930-1-vigneshr@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 16 Mar 2017, Boris Brezillon wrote:
+Using dev_name() as irq name during request_irq() might be misleading in
+case of serial over PCI. Therefore use a better alternative name for
+identifying serial port irqs as "serial" appended with serial_index of
+the port. This ensures that "serial" string is always present in irq
+name while port index will help in distinguishing b/w different ports.
 
-> Hi Lee,
-> 
-> On Thu, 16 Mar 2017 10:16:27 +0000
-> Lee Jones <lee.jones@linaro.org> wrote:
-> 
-> > On Thu, 16 Mar 2017, Boris Brezillon wrote:
-> > 
-> > > All macros prefixed with AT91[SAM9]_SMC have been replaced by equivalent
-> > > definitions prefixed with ATMEL_SMC, and the at91sam9_smc_xxxx() helpers
-> > > are no longer used.
-> > > Drop these definitions before someone starts using them again.
-> > > 
-> > > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> > > ---
-> > >  include/linux/mfd/syscon/atmel-smc.h | 152 -----------------------------------
-> > >  1 file changed, 152 deletions(-)  
-> > 
-> > For my own reference:
-> >   Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
-> > 
-> > What is the plan for this set?
-> > 
-> > I only see 2 patches.
-> 
-> You mean, you only see 2 patches in your Inbox (that would be weird,
-> because you're in the CC list of all patches), or only 2 patches that
-> should go in your tree?
+Signed-off-by: Vignesh R <vigneshr@ti.com>
+---
 
-I meant the former, but another pull down of my mail grabbed the
-remaining patches.
+Based on top of tty-next.
 
-> > Can they both be applied?
-> 
-> All patches should go through the same tree, because changes in
-> drivers/memory/atmel-ebi.c are depending on changes done in the MFD
-> subsystem.
-> 
-> If Nicolas is okay with that, maybe you can take everything through the
-> MFD tree (I don't expect any conflicts in drivers/memory/atmel-ebi.c).
+ drivers/tty/serial/8250/8250_core.c | 10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
 
-That would be okay by me.
-
+diff --git a/drivers/tty/serial/8250/8250_core.c b/drivers/tty/serial/8250/8250_core.c
+index f83b69f30987..78bf621d6827 100644
+--- a/drivers/tty/serial/8250/8250_core.c
++++ b/drivers/tty/serial/8250/8250_core.c
+@@ -213,12 +213,20 @@ static int serial_link_irq_chain(struct uart_8250_port *up)
+ 
+ 		ret = 0;
+ 	} else {
++		char *irqname = kmalloc(20, GFP_KERNEL);
++		if (!irqname) {
++			spin_unlock_irq(&i->lock);
++			return -ENOMEM;
++		}
++		snprintf(irqname, 20,
++			 "serial%d", serial_index(&up->port));
++
+ 		INIT_LIST_HEAD(&up->list);
+ 		i->head = &up->list;
+ 		spin_unlock_irq(&i->lock);
+ 		irq_flags |= up->port.irqflags;
+ 		ret = request_irq(up->port.irq, serial8250_interrupt,
+-				  irq_flags, dev_name(up->port.dev), i);
++				  irq_flags, irqname, i);
+ 		if (ret < 0)
+ 			serial_do_unlink(i, up);
+ 	}
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+2.11.0
