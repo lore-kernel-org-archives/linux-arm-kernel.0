@@ -1,73 +1,33 @@
-From: slash.tmp@free.fr (Mason)
-Date: Thu, 16 Mar 2017 18:33:09 +0100
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Thu, 16 Mar 2017 18:47:33 +0100 (CET)
 Subject: Legacy PCI interrupt support in PCIe host driver
-In-Reply-To: <5612adb6-af5c-9fbf-e725-813ee7fe1b4b@free.fr>
+In-Reply-To: <8443b350-6aa6-75f8-af48-892c722fc2d9@free.fr>
 References: <5612adb6-af5c-9fbf-e725-813ee7fe1b4b@free.fr>
-Message-ID: <8443b350-6aa6-75f8-af48-892c722fc2d9@free.fr>
+ <8443b350-6aa6-75f8-af48-892c722fc2d9@free.fr>
+Message-ID: <alpine.DEB.2.20.1703161843420.3586@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/03/2017 16:40, Mason wrote:
+On Thu, 16 Mar 2017, Mason wrote:
+> About shared ISRs. Are they supposed to return IRQ_HANDLED
+> if and only if they handled something?
 
-> Here is my current DT:
-> 
-> 		msi0: msi at 2e080 {
-> 			compatible = "sigma,msi";
-> 			reg = <0x2e04c 0x40>;
-> 			interrupt-parent = <&irq0>;
-> 			interrupts = <55 IRQ_TYPE_LEVEL_HIGH>;
-> 			msi-controller;
-> 			num-vectors = <32>;
-> 		};
-> 
-> 		pcie at 30000000 {
-> 			compatible = "sigma,smp8759-pcie";
-> 			reg = <0x30000000 SZ_4M>, <0x2e02c 4>;
-> 			device_type = "pci";
-> 			bus-range = <0 3>;
-> 			#size-cells = <2>;
-> 			#address-cells = <3>;
-> 			#interrupt-cells = <1>;
-> 			ranges = <0x02000000 0x0 0x00400000  0x30400000  0x0 SZ_60M>;
-> 			msi-parent = <&msi0>;
-> 			interrupt-parent = <&irq0>;
-> 			interrupts = <54 IRQ_TYPE_LEVEL_HIGH>;
-> 		};
-> 
-> 
-> I traced the action into pdev_fixup_irq()
-> which calls of_irq_parse_and_map_pci()
-> 
-> How do I tell Linux that
-> - All the legacy PCI interrupts are muxed to a single line
-> - And this line is routed to system interrupt 54
-> 
-> Ooooooh... Wait...
-> 
-> Is this what interrupt-map is used for?
-> 
-> http://elinux.org/Device_Tree_Usage#Advanced_Interrupt_Mapping
+Every interrupt handler is supposed to return IRQ_NONE if it did not handle
+it. That does not depend on shared or not. The handler does not know if
+it's on a shared interrupt line or not. IRQF_SHARED only tells, that the
+handler is capable of sharing the interrupt line with another device.
 
-I added this to my pcie at 30000000 node:
+> Will that stop the next ISR from being called?
 
-	interrupt-map = <0 0 0 1 &irq0 54 IRQ_TYPE_LEVEL_HIGH>;
+No.
 
-to map INTA to system IRQ 54.
+> I guess if two interrupts fire at the same time, we'll just take two
+> separate exceptions?
 
-And now it works much better :-)
+Wrong guess. That might work with level interupts, but with other types
+nothing will raise another exception. Sharing interrupts on edge types is a
+stupid idea, but hardware folks insist on implementing stupid ideas.
 
-# cat /proc/interrupts 
-           CPU0       
- 19:       1529     GIC-0  29 Edge      twd
- 20:        125      irq0   1 Level     serial
- 22:          0      irq0  54 Level     tutu, xhci-hcd:usb1
+Thanks,
 
-About shared ISRs. Are they supposed to return IRQ_HANDLED
-if and only if they handled something?
-
-Will that stop the next ISR from being called?
-
-I guess if two interrupts fire at the same time, we'll
-just take two separate exceptions?
-
-Regards.
+	tglx
