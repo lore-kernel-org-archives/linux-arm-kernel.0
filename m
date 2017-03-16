@@ -1,31 +1,40 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 16 Mar 2017 16:16:28 +0100
-Subject: [PATCH 2/2] arm64: defconfig: enable MVPP2
-In-Reply-To: <1489677388-19320-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1489677388-19320-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1489677388-19320-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Thu, 16 Mar 2017 16:16:26 +0100
+Subject: [PATCH 0/2] arm64: marvell: support network on Armada 7K/8K
+Message-ID: <1489677388-19320-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The MVPP2 network driver is used for the ARM64 Marvell Armada 7K and 8K
-platforms, so enable it in the arm64 defconfig.
+Hello,
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- arch/arm64/configs/defconfig | 1 +
- 1 file changed, 1 insertion(+)
+Now that the PPv2.2 support has been merged in the mvpp2 network
+driver, we can finally enable networking support on the Armada 7K and
+Armada 8K SoCs.
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 7c48028..fece4d3 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -185,6 +185,7 @@ CONFIG_HNS_ENET=y
- CONFIG_E1000E=y
- CONFIG_IGB=y
- CONFIG_IGBVF=y
-+CONFIG_MVPP2=y
- CONFIG_SKY2=y
- CONFIG_RAVB=y
- CONFIG_SMC91X=y
+This small series:
+
+ - Adds the Device Tree description of the PPv2.2 IP in both the
+   master CP110 and slave CP110 (SoC description) and the description
+   of a number of network interfaces available in the Armada 7K and
+   Armada 8K development boards.
+
+ - Enable the mvpp2 driver in the arm64 defconfig, since it's now used
+   on ARM64 platforms.
+
+Thanks!
+
+Thomas
+
+Thomas Petazzoni (2):
+  arm64: marvell: dts: add PPv2.2 description to Armada 7K/8K
+  arm64: defconfig: enable MVPP2
+
+ arch/arm64/boot/dts/marvell/armada-7040-db.dts     | 25 +++++++++++++++
+ arch/arm64/boot/dts/marvell/armada-8040-db.dts     | 16 ++++++++++
+ .../boot/dts/marvell/armada-cp110-master.dtsi      | 37 ++++++++++++++++++++++
+ .../arm64/boot/dts/marvell/armada-cp110-slave.dtsi | 37 ++++++++++++++++++++++
+ arch/arm64/configs/defconfig                       |  1 +
+ 5 files changed, 116 insertions(+)
+
 -- 
 2.7.4
