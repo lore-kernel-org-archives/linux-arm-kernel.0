@@ -1,5 +1,5 @@
-From: mdf@kernel.org (Moritz Fischer)
-Date: Thu, 16 Mar 2017 10:54:33 -0700
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Thu, 16 Mar 2017 19:06:08 +0100
 Subject: [PATCH v2] ARM: zynq: Add #io-channel-cells to (x)adc node for
  iio-hwmon
 In-Reply-To: <37f29986-6491-67ab-144c-eb485cc1fdcc@metafoo.de>
@@ -8,13 +8,11 @@ References: <1489003884-2489-1-git-send-email-mdf@kernel.org>
  <CAJYdmeNc48=OOvRiUjqPBJhz9RCbzeaRGu1Tfm=hrvzkJrSsag@mail.gmail.com>
  <7e4fbe16-8686-5399-748d-af222c630338@xilinx.com>
  <37f29986-6491-67ab-144c-eb485cc1fdcc@metafoo.de>
-Message-ID: <CAJYdmeMg+DtwwbXOM7hPC4ejvkYkR94fcoyvTpx86RSKSswFMg@mail.gmail.com>
+Message-ID: <6767a340-b150-c21a-b6cb-5ca1ce2cd721@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lars,
-
-On Thu, Mar 16, 2017 at 9:51 AM, Lars-Peter Clausen <lars@metafoo.de> wrote:
+On 16.3.2017 17:51, Lars-Peter Clausen wrote:
 > On 03/16/2017 05:45 PM, Michal Simek wrote:
 >> On 16.3.2017 17:39, Moritz Fischer wrote:
 >>> On Thu, Mar 16, 2017 at 9:16 AM, Michal Simek <michal.simek@xilinx.com> wrote:
@@ -71,22 +69,39 @@ On Thu, Mar 16, 2017 at 9:51 AM, Lars-Peter Clausen <lars@metafoo.de> wrote:
 >> I had one discussion about this with Grant in past and it is common
 >> mistake. It is simplification of purpose of dts.
 >>
->
+> 
 > If the iio-hwmon binding had gone through review it would have been rejected.
->
+
+Isn't it a time to deprecate it?
+
+> 
 >>>
 >>> I can resubmit with the hwmon node in there.
 >>
 >> If you grep kernel tree you will see that others are using it too.
 >> Also there is accepted binding for that that's why I can't see big
 >> problem with it.
->
+> 
 > Since this is an application specific binding I wouldn't put it in the
 > generic DT include file. It's a bit like adding a gpio-key binding for each
 > of the GPIOs just in case somebody wants to use it.
 
-So is your suggestion to move the whole thing from .dtsi -> .dts?
+psci is system specific too.
+
+IIRC this driver for zynq was written by ADI or with ADI help that's why
+you know much better than I what's the correct configuration.
+
+This targets PS IP which should be present in the hw all the time.
+Not sure if for all configuration but I expect at least the part of it
+is there all them time.
+
+If binding is incorrect then please remove it with removing from all
+dts/dtsi files which have this. The same is for of probe function in the
+driver itself.
+If this is not done then this is just +1 case.
+
+If you still insist that we shouldn't do it then please at least extend
+commit message and put there example how to wire it on zynq.
 
 Thanks,
-
-Moritz
+Michal
