@@ -1,29 +1,47 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Thu, 16 Mar 2017 11:29:23 +0800
-Subject: [PATCH v5 1/3] ARM: imx: Add GPCv2 power gating driver bindings
-In-Reply-To: <20170314150540.27831-2-andrew.smirnov@gmail.com>
-References: <20170314150540.27831-1-andrew.smirnov@gmail.com>
- <20170314150540.27831-2-andrew.smirnov@gmail.com>
-Message-ID: <20170316032921.GZ3618@dragon>
+From: zyw@rock-chips.com (Chris Zhong)
+Date: Thu, 16 Mar 2017 11:31:44 +0800
+Subject: [PATCH v2 1/4] drm/rockchip/dsi: check phy_cfg_clk only for RK3399
+In-Reply-To: <1489635107-21327-1-git-send-email-zyw@rock-chips.com>
+References: <1489635107-21327-1-git-send-email-zyw@rock-chips.com>
+Message-ID: <1489635107-21327-2-git-send-email-zyw@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 14, 2017 at 08:05:38AM -0700, Andrey Smirnov wrote:
-> Add DT bindings for power domain driver for GPCv2 IP block found in
-> i.MX7 SoCs.
-> 
-> Cc: yurovsky at gmail.com
-> Cc: Lucas Stach <l.stach@pengutronix.de>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Fabio Estevam <fabio.estevam@nxp.com>
-> Cc: devicetree at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> Acked-by: Rob Herring <robh@kernel.org>
-> Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
+For RK3399, the phy_cfg_clk is a required clock, if phy_cfg_clk is
+disabled, MIPI phy can not work. Let's return a error if there is no
+phy_cfg_clk in dts property, when the pdata match RK3399.
 
-Bindings patch should have the subject prefix like 'dt-bindings: ...'
-than 'ARM: imx: ...'.
+Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+---
 
-Shawn
+Changes in v2: None
+
+ drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 10 ++++------
+ 1 file changed, 4 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+index f84f9ae..11c4166 100644
+--- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
++++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+@@ -1227,15 +1227,13 @@ static int dw_mipi_dsi_bind(struct device *dev, struct device *master,
+ 		clk_disable_unprepare(dsi->pclk);
+ 	}
+ 
+-	dsi->phy_cfg_clk = devm_clk_get(dev, "phy_cfg");
+-	if (IS_ERR(dsi->phy_cfg_clk)) {
+-		ret = PTR_ERR(dsi->phy_cfg_clk);
+-		if (ret != -ENOENT) {
++	if (pdata == &rk3399_mipi_dsi_drv_data) {
++		dsi->phy_cfg_clk = devm_clk_get(dev, "phy_cfg");
++		if (IS_ERR(dsi->phy_cfg_clk)) {
++			ret = PTR_ERR(dsi->phy_cfg_clk);
+ 			dev_err(dev, "Unable to get phy_cfg_clk: %d\n", ret);
+ 			return ret;
+ 		}
+-		dsi->phy_cfg_clk = NULL;
+-		dev_dbg(dev, "have not phy_cfg_clk\n");
+ 	}
+ 
+ 	ret = clk_prepare_enable(dsi->pllref_clk);
+-- 
+2.6.3
