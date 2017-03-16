@@ -1,89 +1,43 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 16 Mar 2017 20:00:22 +0000
-Subject: Creating kernel mappings for memory initially marked with
- bootmem NOMAP?
-In-Reply-To: <ef89ec74-91da-b519-6520-8772beca2e28@gmail.com>
-References: <c17b0a16-fde5-9254-f84a-418972201eae@gmail.com>
- <98B5CAFC-C183-42C5-935A-E9E0C30867E8@linaro.org>
- <91620f16-7c0f-970e-eefb-d92cc948656f@gmail.com>
- <CAKv+Gu-407iiKgCZczA-FjxZ9Md=knEvqi=JQNzAR5_7ofP18w@mail.gmail.com>
- <ade0bca0-6547-29cc-ce0c-7520d9292d55@gmail.com>
- <ef89ec74-91da-b519-6520-8772beca2e28@gmail.com>
-Message-ID: <20170316200022.GX21222@n2100.armlinux.org.uk>
+From: oss@buserror.net (Scott Wood)
+Date: Thu, 16 Mar 2017 15:08:32 -0500
+Subject: [PATCH 06/10] soc/qbman: Add ARM equivalent for
+ flush_dcache_range()
+In-Reply-To: <VI1PR04MB3216490369A82C7A79302C4C86260@VI1PR04MB3216.eurprd04.prod.outlook.com>
+References: <VI1PR0401MB2430DA6BD2F857C30EC86A50917F0@VI1PR0401MB2430.eurprd04.prod.outlook.com>
+ <HE1PR0401MB263638F320470CA216990BCC86720@HE1PR0401MB2636.eurprd04.prod.outlook.com>
+ <5414359.8GMja3pNrI@wuerfel>
+ <VI1PR0401MB24303C4A5C0042005E17F1A391770@VI1PR0401MB2430.eurprd04.prod.outlook.com>
+ <CAK8P3a1Gd4bd7GjEp_a9WXc_mTPk0XmP7DH8aPWhbn2K3MMuDQ@mail.gmail.com>
+ <1485570872.9266.22.camel@buserror.net>
+ <d5ca6bcd-1d1a-2a61-1f5c-9086a67f629a@arm.com>
+ <HE1PR0401MB2636FF4D977DDA6888616A26864B0@HE1PR0401MB2636.eurprd04.prod.outlook.com>
+ <3cc42823-0fc9-ed3e-1738-bf6e314dd569@arm.com>
+ <HE1PR0401MB2636B14B4F1637A5A7D5432386400@HE1PR0401MB2636.eurprd04.prod.outlook.com>
+ <20170206223721.GN27312@n2100.armlinux.org.uk>
+ <HE1PR0401MB26362EA8D498B77755DE63A286430@HE1PR0401MB2636.eurprd04.prod.outlook.com>
+ <e15f6ce7-be92-9200-c6b4-2b2dd83f078f@arm.com>
+ <VI1PR04MB32169AF848EE1B75A83B542A86590@VI1PR04MB3216.eurprd04.prod.outlook.com>
+ <VI1PR04MB3216490369A82C7A79302C4C86260@VI1PR04MB3216.eurprd04.prod.outlook.com>
+Message-ID: <1489694912.2944.30.camel@buserror.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 16, 2017 at 12:04:26PM -0700, Florian Fainelli wrote:
-> On 03/08/2017 02:10 PM, Florian Fainelli wrote:
-> >> Yes, it does. But ioremap_cache() is deprecated for mapping normal
-> >> memory. There remains a case for ioremap_cache() on ARM for mapping
-> >> NOR flash (which is arguably a device) with cacheable attributes, but
-> >> for the general case of mapping DRAM, you should not expect new code
-> >> using ioremap_cache() to be accepted upstream.
-> > 
-> > This is very likely going to remain out of tree, and I will keep an eye
-> > on migrating this to memremap() when we update to a newer kernel. Thanks!
+On Thu, 2017-03-16 at 00:43 +0000, Roy Pledge wrote:
+> Just wanted to follow up on this - turns out the no-map; attribute is
+> what I was missing. I now have the suggested mechanism working for ARM.
+> However when I went to test on PowePC the region wasn't being enabled
+> properly. It turns out the Kconfig in arch/powerpc doesn't define
+> HAVE_GENERIC_DMA_COHERENT so this mechanism isn't available. However I
+> added it and everything worked on my PPC board as it did on ARM.
 > 
-> And now I have another interesting problem, self inflicted of course. We
-> have this piece of code here in mm/gup.c [1] which is meant to allow
-> doing O_DIRECT on pages that are now marked as NOMAP.
+> Does anyone know why HAVE_GENERIC_DMA_COHERENT isn't defined for
+> PowerPC? I did a quick search but didn't see previous discussion on this
+> topic.
 
-I think you're wrong.  get_user_pages() retrieves a list of "struct page"
-pointers for the range of user addresses.  NOMAP regions do not have an
-associated "struct page" (they're not declared into the Linux page
-allocator.)
+Probably because nothing on PPC needed it.
 
-> Our middle-ware does a mmap() of some regions initially marked as NOMAP
-> such that it can access this memory and do a mapping "on demand" only
-> when using these physical memory regions. The use case for O_DIRECT is
-> to playback a file directly from e.g: a local hard drive it provides a
-> significant enough performance boost we want to keep bypassing the page
-> cache.
-> 
-> After removing the check in the above mentioned piece of code for
-> !pfn_valid() and making it a !memblock_is_memory(__pfn_to_phys(pfn)) I
-> can move on and everything seems to be fine, except that eventually, we
-> have the following call trace:
+In any case, the problems with doing this on PPC run deeper than that, as I
+pointed out in:
+https://www.spinics.net/lists/arm-kernel/msg560020.html
 
-pfn_valid()'s whole point of existing is to return true only for pfns
-that correspond with pages managed by the Linux page allocator.  You've
-bypassed that, making the test return true for other pfns.  This means
-that:
-
-                page = pte_page(pte);
-
-is going to return rubbish for "page", which will lead to...
-
-> ata_qc_issue -> arm_dma_map_sg -> arm_dma_map_page ->
-> __dma_page_cpu_to_dev -> dma_cache_maint_page
-> 
-> [  170.253148] [00000000] *pgd=07b0e003, *pmd=0bc31003, *pte=00000000
-> [  170.262157] Internal error: Oops: 207 [#1] SMP ARM
-> [  170.279088] CPU: 1 PID: 1688 Comm: nx_io_worker0 Tainted: P
-> O    4.1.20-1.8pre-01028-g970868a93bbc-dirty #6
-> [  170.289708] Hardware name: Broadcom STB (Flattened Device Tree)
-> [  170.295635] task: cd16d500 ti: c7340000 task.ti: c7340000
-> [  170.301048] PC is at dma_cache_maint_page+0x70/0x140
-> [  170.306019] LR is at __dma_page_cpu_to_dev+0x2c/0xa8
-
-exactly this, because DMA cache maintanence relies upon having a
-valid and de-reference-able struct page.
-
-> So I guess my question is: if a process is mapping some physical memory
-> through /dev/mem, could sparsemem somehow populate that section
-> corresponding to this PFN? Everything I see seems to occur at boot time
-> and when memory hotplug is used (maybe I should start using memory hotplug).
-
-If you hotplug the memory into the Linux page allocator, then you will
-need the memory to be mapped, and Linux will integrate it into the
-page allocator, and it will be no different from any other memory.
-
-At that point, you might as well have ignored the NOMAP.
-
-Linux's block IO is just not designed to do device DMA to random bits
-of memory that are not part of the page allocator.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+-Scott
