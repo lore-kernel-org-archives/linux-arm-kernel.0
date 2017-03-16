@@ -1,73 +1,140 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Thu, 16 Mar 2017 22:50:35 +0100
-Subject: [RFC PATCH 10/33] irqchip/gic-v4-its: Allow use of indirect VCPU
- tables
-In-Reply-To: <1484648454-21216-11-git-send-email-marc.zyngier@arm.com>
-References: <1484648454-21216-1-git-send-email-marc.zyngier@arm.com>
- <1484648454-21216-11-git-send-email-marc.zyngier@arm.com>
-Message-ID: <8839c465-109b-b7b1-974d-b244b69fdb06@redhat.com>
+From: gmbnomis@gmail.com (Simon Baatz)
+Date: Thu, 16 Mar 2017 22:50:31 +0100
+Subject: [PATCH] mtd: nand: orion: fix clk handling
+In-Reply-To: <20170316101211.332a53e0@bbrezillon>
+References: <20170312213406.20987-1-gmbnomis@gmail.com>
+ <20170313071241.y5ydl274t22awrys@pengutronix.de>
+ <20170316101211.332a53e0@bbrezillon>
+Message-ID: <20170316215031.GB27118@gandalf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 17/01/2017 11:20, Marc Zyngier wrote:
-> The VCPU tables can be quite sparse as well, and it makes sense
-> to use indirect tables as well if possible.
-
-I think patch title should be irqchip/gic-v3-its:..
-
-Eric
+On Thu, Mar 16, 2017 at 10:12:11AM +0100, Boris Brezillon wrote:
+> On Mon, 13 Mar 2017 08:12:41 +0100
+> Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> wrote:
 > 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  drivers/irqchip/irq-gic-v3-its.c | 20 +++++++++++++-------
->  1 file changed, 13 insertions(+), 7 deletions(-)
+> > Hello Simon,
+> > 
+> > On Sun, Mar 12, 2017 at 10:34:06PM +0100, Simon Baatz wrote:
+> > > The clk handling in orion_nand.c had two problems:
+> > > 
+> > > - In the probe function, clk_put() was called for an enabled clock,
+> > >   which violates the API (see documentation for clk_put() in
+> > >   include/linux/clk.h)
+> > > 
+> > > - In the error path of the probe function, clk_put() could be called
+> > >   twice for the same clock.
+> > > 
+> > > In order to clean this up, use the managed function devm_clk_get() and
+> > > store the pointer to the clk in the driver data.
+> > > 
+> > > Fixes: baffab28b13120694fa3ebab08d3e99667a851d2 ('ARM: Orion: fix driver probe error handling with respect to clk')
+> > > Cc: <stable@vger.kernel.org> # v4.5+
+> > > Signed-off-by: Simon Baatz <gmbnomis@gmail.com>
+> > > ---
+> > >  drivers/mtd/nand/orion_nand.c | 42 +++++++++++++++++++++---------------------
+> > >  1 file changed, 21 insertions(+), 21 deletions(-)
+> > > 
+> > > diff --git a/drivers/mtd/nand/orion_nand.c b/drivers/mtd/nand/orion_nand.c
+> > > index 4a91c5d000be..b355aa738fae 100644
+> > > --- a/drivers/mtd/nand/orion_nand.c
+> > > +++ b/drivers/mtd/nand/orion_nand.c
+> > > @@ -23,6 +23,11 @@
+> > >  #include <asm/sizes.h>
+> > >  #include <linux/platform_data/mtd-orion_nand.h>
+> > >  
+> > > +struct orion_nand_info {
+> > > +	struct nand_chip chip;
+> > > +	struct clk       *clk;
+> > > +};
+> > > +
+> > >  static void orion_nand_cmd_ctrl(struct mtd_info *mtd, int cmd, unsigned int ctrl)
+> > >  {
+> > >  	struct nand_chip *nc = mtd_to_nand(mtd);
+> > > @@ -75,20 +80,21 @@ static void orion_nand_read_buf(struct mtd_info *mtd, uint8_t *buf, int len)
+> > >  
+> > >  static int __init orion_nand_probe(struct platform_device *pdev)
+> > >  {
+> > > +	struct orion_nand_info *info;
+> > >  	struct mtd_info *mtd;
+> > >  	struct nand_chip *nc;
+> > >  	struct orion_nand_data *board;
+> > >  	struct resource *res;
+> > > -	struct clk *clk;
+> > >  	void __iomem *io_base;
+> > >  	int ret = 0;
+> > >  	u32 val = 0;
+> > >  
+> > > -	nc = devm_kzalloc(&pdev->dev,
+> > > -			sizeof(struct nand_chip),
+> > > +	info = devm_kzalloc(&pdev->dev,
+> > > +			sizeof(struct orion_nand_info),
+> > >  			GFP_KERNEL);
+> > > -	if (!nc)
+> > > +	if (!info)
+> > >  		return -ENOMEM;
+> > > +	nc = &info->chip;
+> > >  	mtd = nand_to_mtd(nc);
+> > >  
+> > >  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> > > @@ -145,15 +151,13 @@ static int __init orion_nand_probe(struct platform_device *pdev)
+> > >  	if (board->dev_ready)
+> > >  		nc->dev_ready = board->dev_ready;
+> > >  
+> > > -	platform_set_drvdata(pdev, mtd);
+> > > +	platform_set_drvdata(pdev, info);
+> > >  
+> > >  	/* Not all platforms can gate the clock, so it is not
+> > >  	   an error if the clock does not exists. */
+> > > -	clk = clk_get(&pdev->dev, NULL);
+> > > -	if (!IS_ERR(clk)) {
+> > > -		clk_prepare_enable(clk);
+> > > -		clk_put(clk);
+> > > -	}
+> > > +	info->clk = devm_clk_get(&pdev->dev, NULL);
+> > > +	if (!IS_ERR(info->clk))
+> > > +		clk_prepare_enable(info->clk);  
+> > 
+> > Orthogonal to your patch I suggest:
+> > 
+> > -	info->clk = devm_clk_get(&pdev->dev, NULL);
+> > -	if (!IS_ERR(info->clk))
+> > -		clk_prepare_enable(info->clk);
+> > +	info->clk = devm_clk_get_optional(&pdev->dev, NULL);
+> > +	if (IS_ERR(info->clk)) {
+> > +		ret = PTR_ERR(info->clk);
+> > +		if (ret != -EPROBE_DEFER)
+> > +			dev_err(...);
+> > +		return ret;
+> > +	}
+> > 
 > 
-> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-> index c92ff4d..14305db1 100644
-> --- a/drivers/irqchip/irq-gic-v3-its.c
-> +++ b/drivers/irqchip/irq-gic-v3-its.c
-> @@ -1060,10 +1060,13 @@ static int its_setup_baser(struct its_node *its, struct its_baser *baser,
->  	return 0;
->  }
->  
-> -static bool its_parse_baser_device(struct its_node *its, struct its_baser *baser,
-> -				   u32 psz, u32 *order)
-> +static bool its_parse_indirect_baser(struct its_node *its,
-> +				     struct its_baser *baser,
-> +				     u32 psz, u32 *order)
->  {
-> -	u64 esz = GITS_BASER_ENTRY_SIZE(its_read_baser(its, baser));
-> +	u64 tmp = its_read_baser(its, baser);
-> +	u64 type = GITS_BASER_TYPE(tmp);
-> +	u64 esz = GITS_BASER_ENTRY_SIZE(tmp);
->  	u64 val = GITS_BASER_InnerShareable | GITS_BASER_WaWb;
->  	u32 ids = its->device_ids;
->  	u32 new_order = *order;
-> @@ -1102,8 +1105,9 @@ static bool its_parse_baser_device(struct its_node *its, struct its_baser *baser
->  	if (new_order >= MAX_ORDER) {
->  		new_order = MAX_ORDER - 1;
->  		ids = ilog2(PAGE_ORDER_TO_SIZE(new_order) / (int)esz);
-> -		pr_warn("ITS@%pa: Device Table too large, reduce ids %u->%u\n",
-> -			&its->phys_base, its->device_ids, ids);
-> +		pr_warn("ITS@%pa: %s Table too large, reduce ids %u->%u\n",
-> +			&its->phys_base, its_base_type_string[type],
-> +			its->device_ids, ids);
->  	}
->  
->  	*order = new_order;
-> @@ -1154,8 +1158,10 @@ static int its_alloc_tables(struct its_node *its)
->  		if (type == GITS_BASER_TYPE_NONE)
->  			continue;
->  
-> -		if (type == GITS_BASER_TYPE_DEVICE)
-> -			indirect = its_parse_baser_device(its, baser, psz, &order);
-> +		if (type == GITS_BASER_TYPE_DEVICE ||
-> +		    type == GITS_BASER_TYPE_VCPU)
-> +			indirect = its_parse_indirect_baser(its, baser,
-> +							    psz, &order);
->  
->  		err = its_setup_baser(its, baser, cache, shr, psz, order, indirect);
->  		if (err < 0) {
+> In the meantime, maybe you can do:
 > 
+> 	info->clk = devm_clk_get(&pdev->dev, NULL);
+> 	if (IS_ERR(info->clk)) {
+> 		ret = PTR_ERR(info->clk);
+> 
+> 		if (ret == -ENOENT) {
+> 			/*
+> 			 * This clk is optional, assign it to NULL when
+> 			 * it's not present.
+> 			 */
+> 			info->clk = NULL;
+> 		} else {
+> 			if (ret == -EPROBE_DEFER)
+> 				dev_err(...);
+> 
+> 			return ret;
+> 		}
+> 	}
+> 
+> This way, you won't have to check the info->clk value when you call
+> clk_prepare_enable() or clk_disable_unprepare().
+> 
+
+Yes, this makes things simpler. I will add a second patch improving
+the error handling in v2 as you and Uwe suggested.
+
+
+- Simon
