@@ -1,162 +1,189 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 16 Mar 2017 09:30:30 +0100
-Subject: [PATCH v2 3/7] memory: atmel-ebi: Stop using reg_field objects for
- simple things
+Date: Thu, 16 Mar 2017 09:30:31 +0100
+Subject: [PATCH v2 4/7] mfd: syscon: atmel-smc: Remove unused helpers/macros
 In-Reply-To: <1489653034-17777-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1489653034-17777-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1489653034-17777-4-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1489653034-17777-5-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Turn the ->ebi_csa reg field into a simple offset that can be used with
-with the matrix regmap. Using reg fields was overkill for this use case.
+All macros prefixed with AT91[SAM9]_SMC have been replaced by equivalent
+definitions prefixed with ATMEL_SMC, and the at91sam9_smc_xxxx() helpers
+are no longer used.
+Drop these definitions before someone starts using them again.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/memory/atmel-ebi.c | 55 +++++++++++-----------------------------------
- 1 file changed, 13 insertions(+), 42 deletions(-)
+ include/linux/mfd/syscon/atmel-smc.h | 152 -----------------------------------
+ 1 file changed, 152 deletions(-)
 
-diff --git a/drivers/memory/atmel-ebi.c b/drivers/memory/atmel-ebi.c
-index e1b8590e7d23..8640da386d32 100644
---- a/drivers/memory/atmel-ebi.c
-+++ b/drivers/memory/atmel-ebi.c
-@@ -35,7 +35,7 @@ struct at91_ebi_dev {
+diff --git a/include/linux/mfd/syscon/atmel-smc.h b/include/linux/mfd/syscon/atmel-smc.h
+index 00e6e3c8ee6f..afa266169800 100644
+--- a/include/linux/mfd/syscon/atmel-smc.h
++++ b/include/linux/mfd/syscon/atmel-smc.h
+@@ -17,58 +17,6 @@
+ #include <linux/kernel.h>
+ #include <linux/regmap.h>
  
- struct at91_ebi_caps {
- 	unsigned int available_cs;
--	const struct reg_field *ebi_csa;
-+	unsigned int ebi_csa_offs;
- 	void (*get_config)(struct at91_ebi_dev *ebid,
- 			   struct at91_ebi_dev_config *conf);
- 	int (*xlate_config)(struct at91_ebi_dev *ebid,
-@@ -52,7 +52,6 @@ struct at91_ebi {
- 		struct regmap *regmap;
- 		struct clk *clk;
- 	} smc;
--	struct regmap_field *ebi_csa;
- 
- 	struct device *dev;
- 	const struct at91_ebi_caps *caps;
-@@ -355,9 +354,10 @@ static int at91_ebi_dev_setup(struct at91_ebi *ebi, struct device_node *np,
- 		 * Attach the EBI device to the generic SMC logic if at least
- 		 * one "atmel,smc-" property is present.
- 		 */
--		if (ebi->ebi_csa && apply)
--			regmap_field_update_bits(ebi->ebi_csa,
--						 BIT(cs), 0);
-+		if (ebi->caps->ebi_csa_offs && apply)
-+			regmap_update_bits(ebi->matrix,
-+					   ebi->caps->ebi_csa_offs,
-+					   BIT(cs), 0);
- 
- 		i++;
- 	}
-@@ -367,73 +367,49 @@ static int at91_ebi_dev_setup(struct at91_ebi *ebi, struct device_node *np,
- 	return 0;
- }
- 
--static const struct reg_field at91sam9260_ebi_csa =
--				REG_FIELD(AT91SAM9260_MATRIX_EBICSA, 0,
--					  AT91_MATRIX_EBI_NUM_CS - 1);
+-#define AT91SAM9_SMC_GENERIC		0x00
+-#define AT91SAM9_SMC_GENERIC_BLK_SZ	0x10
 -
- static const struct at91_ebi_caps at91sam9260_ebi_caps = {
- 	.available_cs = 0xff,
--	.ebi_csa = &at91sam9260_ebi_csa,
-+	.ebi_csa_offs = AT91SAM9260_MATRIX_EBICSA,
- 	.get_config = at91sam9_ebi_get_config,
- 	.xlate_config = at91_ebi_xslate_smc_config,
- 	.apply_config = at91sam9_ebi_apply_config,
- };
- 
--static const struct reg_field at91sam9261_ebi_csa =
--				REG_FIELD(AT91SAM9261_MATRIX_EBICSA, 0,
--					  AT91_MATRIX_EBI_NUM_CS - 1);
+-#define SAMA5_SMC_GENERIC		0x600
+-#define SAMA5_SMC_GENERIC_BLK_SZ	0x14
 -
- static const struct at91_ebi_caps at91sam9261_ebi_caps = {
- 	.available_cs = 0xff,
--	.ebi_csa = &at91sam9261_ebi_csa,
-+	.ebi_csa_offs = AT91SAM9261_MATRIX_EBICSA,
- 	.get_config = at91sam9_ebi_get_config,
- 	.xlate_config = at91_ebi_xslate_smc_config,
- 	.apply_config = at91sam9_ebi_apply_config,
- };
- 
--static const struct reg_field at91sam9263_ebi0_csa =
--				REG_FIELD(AT91SAM9263_MATRIX_EBI0CSA, 0,
--					  AT91_MATRIX_EBI_NUM_CS - 1);
+-#define AT91SAM9_SMC_SETUP(o)		((o) + 0x00)
+-#define AT91SAM9_SMC_NWESETUP(x)	(x)
+-#define AT91SAM9_SMC_NCS_WRSETUP(x)	((x) << 8)
+-#define AT91SAM9_SMC_NRDSETUP(x)	((x) << 16)
+-#define AT91SAM9_SMC_NCS_NRDSETUP(x)	((x) << 24)
 -
- static const struct at91_ebi_caps at91sam9263_ebi0_caps = {
- 	.available_cs = 0x3f,
--	.ebi_csa = &at91sam9263_ebi0_csa,
-+	.ebi_csa_offs = AT91SAM9263_MATRIX_EBI0CSA,
- 	.get_config = at91sam9_ebi_get_config,
- 	.xlate_config = at91_ebi_xslate_smc_config,
- 	.apply_config = at91sam9_ebi_apply_config,
- };
- 
--static const struct reg_field at91sam9263_ebi1_csa =
--				REG_FIELD(AT91SAM9263_MATRIX_EBI1CSA, 0,
--					  AT91_MATRIX_EBI_NUM_CS - 1);
+-#define AT91SAM9_SMC_PULSE(o)		((o) + 0x04)
+-#define AT91SAM9_SMC_NWEPULSE(x)	(x)
+-#define AT91SAM9_SMC_NCS_WRPULSE(x)	((x) << 8)
+-#define AT91SAM9_SMC_NRDPULSE(x)	((x) << 16)
+-#define AT91SAM9_SMC_NCS_NRDPULSE(x)	((x) << 24)
 -
- static const struct at91_ebi_caps at91sam9263_ebi1_caps = {
- 	.available_cs = 0x7,
--	.ebi_csa = &at91sam9263_ebi1_csa,
-+	.ebi_csa_offs = AT91SAM9263_MATRIX_EBI1CSA,
- 	.get_config = at91sam9_ebi_get_config,
- 	.xlate_config = at91_ebi_xslate_smc_config,
- 	.apply_config = at91sam9_ebi_apply_config,
- };
- 
--static const struct reg_field at91sam9rl_ebi_csa =
--				REG_FIELD(AT91SAM9RL_MATRIX_EBICSA, 0,
--					  AT91_MATRIX_EBI_NUM_CS - 1);
+-#define AT91SAM9_SMC_CYCLE(o)		((o) + 0x08)
+-#define AT91SAM9_SMC_NWECYCLE(x)	(x)
+-#define AT91SAM9_SMC_NRDCYCLE(x)	((x) << 16)
 -
- static const struct at91_ebi_caps at91sam9rl_ebi_caps = {
- 	.available_cs = 0x3f,
--	.ebi_csa = &at91sam9rl_ebi_csa,
-+	.ebi_csa_offs = AT91SAM9RL_MATRIX_EBICSA,
- 	.get_config = at91sam9_ebi_get_config,
- 	.xlate_config = at91_ebi_xslate_smc_config,
- 	.apply_config = at91sam9_ebi_apply_config,
- };
- 
--static const struct reg_field at91sam9g45_ebi_csa =
--				REG_FIELD(AT91SAM9G45_MATRIX_EBICSA, 0,
--					  AT91_MATRIX_EBI_NUM_CS - 1);
+-#define AT91SAM9_SMC_MODE(o)		((o) + 0x0c)
+-#define SAMA5_SMC_MODE(o)		((o) + 0x10)
+-#define AT91_SMC_READMODE		BIT(0)
+-#define AT91_SMC_READMODE_NCS		(0 << 0)
+-#define AT91_SMC_READMODE_NRD		(1 << 0)
+-#define AT91_SMC_WRITEMODE		BIT(1)
+-#define AT91_SMC_WRITEMODE_NCS		(0 << 1)
+-#define AT91_SMC_WRITEMODE_NWE		(1 << 1)
+-#define AT91_SMC_EXNWMODE		GENMASK(5, 4)
+-#define AT91_SMC_EXNWMODE_DISABLE	(0 << 4)
+-#define AT91_SMC_EXNWMODE_FROZEN	(2 << 4)
+-#define AT91_SMC_EXNWMODE_READY		(3 << 4)
+-#define AT91_SMC_BAT			BIT(8)
+-#define AT91_SMC_BAT_SELECT		(0 << 8)
+-#define AT91_SMC_BAT_WRITE		(1 << 8)
+-#define AT91_SMC_DBW			GENMASK(13, 12)
+-#define AT91_SMC_DBW_8			(0 << 12)
+-#define AT91_SMC_DBW_16			(1 << 12)
+-#define AT91_SMC_DBW_32			(2 << 12)
+-#define AT91_SMC_TDF			GENMASK(19, 16)
+-#define AT91_SMC_TDF_(x)		((((x) - 1) << 16) & AT91_SMC_TDF)
+-#define AT91_SMC_TDF_MAX		16
+-#define AT91_SMC_TDFMODE_OPTIMIZED	BIT(20)
+-#define AT91_SMC_PMEN			BIT(24)
+-#define AT91_SMC_PS			GENMASK(29, 28)
+-#define AT91_SMC_PS_4			(0 << 28)
+-#define AT91_SMC_PS_8			(1 << 28)
+-#define AT91_SMC_PS_16			(2 << 28)
+-#define AT91_SMC_PS_32			(3 << 28)
 -
- static const struct at91_ebi_caps at91sam9g45_ebi_caps = {
- 	.available_cs = 0x3f,
--	.ebi_csa = &at91sam9g45_ebi_csa,
-+	.ebi_csa_offs = AT91SAM9G45_MATRIX_EBICSA,
- 	.get_config = at91sam9_ebi_get_config,
- 	.xlate_config = at91_ebi_xslate_smc_config,
- 	.apply_config = at91sam9_ebi_apply_config,
-@@ -441,7 +417,7 @@ static const struct at91_ebi_caps at91sam9g45_ebi_caps = {
+ #define ATMEL_SMC_SETUP(cs)			(((cs) * 0x10))
+ #define ATMEL_HSMC_SETUP(cs)			(0x600 + ((cs) * 0x14))
+ #define ATMEL_SMC_PULSE(cs)			(((cs) * 0x10) + 0x4)
+@@ -157,104 +105,4 @@ void atmel_smc_cs_conf_get(struct regmap *regmap, int cs,
+ void atmel_hsmc_cs_conf_get(struct regmap *regmap, int cs,
+ 			    struct atmel_smc_cs_conf *conf);
  
- static const struct at91_ebi_caps at91sam9x5_ebi_caps = {
- 	.available_cs = 0x3f,
--	.ebi_csa = &at91sam9263_ebi0_csa,
-+	.ebi_csa_offs = AT91SAM9X5_MATRIX_EBICSA,
- 	.get_config = at91sam9_ebi_get_config,
- 	.xlate_config = at91_ebi_xslate_smc_config,
- 	.apply_config = at91sam9_ebi_apply_config,
-@@ -561,16 +537,11 @@ static int at91_ebi_probe(struct platform_device *pdev)
- 	 * The sama5d3 does not provide an EBICSA register and thus does need
- 	 * to access the matrix registers.
- 	 */
--	if (ebi->caps->ebi_csa) {
-+	if (ebi->caps->ebi_csa_offs) {
- 		ebi->matrix =
- 			syscon_regmap_lookup_by_phandle(np, "atmel,matrix");
- 		if (IS_ERR(ebi->matrix))
- 			return PTR_ERR(ebi->matrix);
+-/*
+- * This function converts a setup timing expressed in nanoseconds into an
+- * encoded value that can be written in the SMC_SETUP register.
+- *
+- * The following formula is described in atmel datasheets (section
+- * "SMC Setup Register"):
+- *
+- * setup length = (128* SETUP[5] + SETUP[4:0])
+- *
+- * where setup length is the timing expressed in cycles.
+- */
+-static inline u32 at91sam9_smc_setup_ns_to_cycles(unsigned int clk_rate,
+-						  u32 timing_ns)
+-{
+-	u32 clk_period = DIV_ROUND_UP(NSEC_PER_SEC, clk_rate);
+-	u32 coded_cycles = 0;
+-	u32 cycles;
 -
--		ebi->ebi_csa = regmap_field_alloc(ebi->matrix,
--						  *ebi->caps->ebi_csa);
--		if (IS_ERR(ebi->ebi_csa))
--			return PTR_ERR(ebi->ebi_csa);
- 	}
- 
- 	ret = of_property_read_u32(np, "#address-cells", &val);
+-	cycles = DIV_ROUND_UP(timing_ns, clk_period);
+-	if (cycles / 32) {
+-		coded_cycles |= 1 << 5;
+-		if (cycles < 128)
+-			cycles = 0;
+-	}
+-
+-	coded_cycles |= cycles % 32;
+-
+-	return coded_cycles;
+-}
+-
+-/*
+- * This function converts a pulse timing expressed in nanoseconds into an
+- * encoded value that can be written in the SMC_PULSE register.
+- *
+- * The following formula is described in atmel datasheets (section
+- * "SMC Pulse Register"):
+- *
+- * pulse length = (256* PULSE[6] + PULSE[5:0])
+- *
+- * where pulse length is the timing expressed in cycles.
+- */
+-static inline u32 at91sam9_smc_pulse_ns_to_cycles(unsigned int clk_rate,
+-						  u32 timing_ns)
+-{
+-	u32 clk_period = DIV_ROUND_UP(NSEC_PER_SEC, clk_rate);
+-	u32 coded_cycles = 0;
+-	u32 cycles;
+-
+-	cycles = DIV_ROUND_UP(timing_ns, clk_period);
+-	if (cycles / 64) {
+-		coded_cycles |= 1 << 6;
+-		if (cycles < 256)
+-			cycles = 0;
+-	}
+-
+-	coded_cycles |= cycles % 64;
+-
+-	return coded_cycles;
+-}
+-
+-/*
+- * This function converts a cycle timing expressed in nanoseconds into an
+- * encoded value that can be written in the SMC_CYCLE register.
+- *
+- * The following formula is described in atmel datasheets (section
+- * "SMC Cycle Register"):
+- *
+- * cycle length = (CYCLE[8:7]*256 + CYCLE[6:0])
+- *
+- * where cycle length is the timing expressed in cycles.
+- */
+-static inline u32 at91sam9_smc_cycle_ns_to_cycles(unsigned int clk_rate,
+-						  u32 timing_ns)
+-{
+-	u32 clk_period = DIV_ROUND_UP(NSEC_PER_SEC, clk_rate);
+-	u32 coded_cycles = 0;
+-	u32 cycles;
+-
+-	cycles = DIV_ROUND_UP(timing_ns, clk_period);
+-	if (cycles / 128) {
+-		coded_cycles = cycles / 256;
+-		cycles %= 256;
+-		if (cycles >= 128) {
+-			coded_cycles++;
+-			cycles = 0;
+-		}
+-
+-		if (coded_cycles > 0x3) {
+-			coded_cycles = 0x3;
+-			cycles = 0x7f;
+-		}
+-
+-		coded_cycles <<= 7;
+-	}
+-
+-	coded_cycles |= cycles % 128;
+-
+-	return coded_cycles;
+-}
+-
+ #endif /* _LINUX_MFD_SYSCON_ATMEL_SMC_H_ */
 -- 
 2.7.4
