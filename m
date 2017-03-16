@@ -1,92 +1,141 @@
-From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
-Date: Thu, 16 Mar 2017 16:38:28 +0530
-Subject: System/uncore PMUs and unit aggregation
-In-Reply-To: <20161117181708.GT22855@arm.com>
-References: <20161117181708.GT22855@arm.com>
-Message-ID: <CAFpQJXXehUbkr7SNTZfYVeADtXTwbH20Ya=Xwkke7LMXbb20=w@mail.gmail.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Thu, 16 Mar 2017 12:14:09 +0100
+Subject: [PATCH v2 1/2] drivers: pwm: pwm-atmel: switch to atomic PWM
+In-Reply-To: <1488468525-28726-2-git-send-email-claudiu.beznea@microchip.com>
+References: <1488468525-28726-1-git-send-email-claudiu.beznea@microchip.com>
+ <1488468525-28726-2-git-send-email-claudiu.beznea@microchip.com>
+Message-ID: <20170316121409.3e910813@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+Hi Claudiu,
 
-On Thu, Nov 17, 2016 at 11:47 PM, Will Deacon <will.deacon@arm.com> wrote:
-> Hi all,
->
-> We currently have support for three arm64 system PMUs in flight:
->
->  [Cavium ThunderX] http://lkml.kernel.org/r/cover.1477741719.git.jglauber at cavium.com
->  [Hisilicon Hip0x] http://lkml.kernel.org/r/1478151727-20250-1-git-send-email-anurup.m at huawei.com
->  [Qualcomm L2] http://lkml.kernel.org/r/1477687813-11412-1-git-send-email-nleeder at codeaurora.org
->
-> Each of which have to deal with multiple underlying hardware units in one
-> way or another. Mark and I recently expressed a desire to expose these
-> units to userspace as individual PMU instances, since this can allow:
->
->   * Fine-grained control of events from userspace, when you want to see
->     individual numbers as opposed to a summed total
->
->   * Potentially ease migration to new SoC revisions, where the units
->     are laid out slightly differently
->
->   * Easier handling of cases where the units aren't quite identical
->
-> however, this received pushback from all of the patch authors, so there's
-> clearly a problem with this approach. I'm hoping we can try to resolve
-> this here.
->
-> Speaking to Mark earlier today, we came up with the following rough rules
-> for drivers that present multiple hardware units as a single PMU:
->
->   1. If the units share some part of the programming interface (e.g. control
->      registers or interrupts), then they must be handled by the same PMU.
->      Otherwise, they should be treated independently as separate PMU
->      instances.
+On Thu, 2 Mar 2017 17:28:44 +0200
+Claudiu Beznea <claudiu.beznea@microchip.com> wrote:
 
-How are we planning to handle multi-node scenario?
-if there are X separate PMUs on single socket, are we going to list 2X PMUs on
-dual socket?
->
->   2. If the units are handled by the same PMU, then care must be taken to
->      handle event groups correctly. That is, if the units cannot be started
->      and stopped atomically, cross-unit groups must be rejected by the
->      driver. Furthermore, any cross-unit scheduling constraints must be
->      honoured so that all the units targetted by a group can schedule the
->      group concurrently.
->
->   3. Summing the counters across units is only permitted if the units
->      can all be started and stopped atomically. Otherwise, the counters
->      should be exposed individually. It's up to the driver author to
->      decide what makes sense to sum.
->
->   4. Unit topology can optionally be described in sysfs (we should pick
->      some standard directory naming here), and then events targetting
->      specific units can have the unit identifier extracted from the topology
->      encoded in some configN fields.
->
-> The million dollar question is: how does that fit in with the drivers I
-> mentioned at the top? Is this overly restrictive, or have we missed stuff?
->
-> We certainly want to allow flexibility in the way in which the drivers
-> talk to the hardware, but given that these decisions directly affect the
-> user ABI, some consistent ground rules are required.
->
-> For Cavium ThunderX, it's not clear whether or not the individual units
-> could be expressed as separate PMUs, or whether they're caught by one of
-> the rules above. The Qualcomm L2 looks like it's doing the right thing
-> and we can't quite work out what the Hisilicon Hip0x topology looks like,
-> since the interaction with djtag is confusing.
->
-> If the driver authors (on To:) could shed some light on this, then that
-> would be much appreciated!
->
-> Thanks,
->
-> Will
->
+> The currently Atmel PWM controllers supported by this driver
+> could change period or duty factor without channel disable,
+> for regular channels (sama5d3 support this by using period
+> or duty factor update registers, sam9rl support this by
+> writing channel update register and select the corresponding
+> update: period or duty factor). The chip doesn't support run
+> time changings of signal polarity. To take advantage of
+> atomic PWM framework and let controller works without glitches,
+> in this patch only the duty factor could be changed without
+> disabling PWM channel. For period and signal polarity the
+> atomic PWM is simulated by disabling + enabling the right PWM channel.
+> 
+> Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
+> 
+> ---
+>  drivers/pwm/pwm-atmel.c | 271 ++++++++++++++++++++++++------------------------
+>  1 file changed, 138 insertions(+), 133 deletions(-)
+> 
+> diff --git a/drivers/pwm/pwm-atmel.c b/drivers/pwm/pwm-atmel.c
+> index 67a7023..3db82c3 100644
+> --- a/drivers/pwm/pwm-atmel.c
+> +++ b/drivers/pwm/pwm-atmel.c
+> @@ -58,17 +58,30 @@
+>  #define PWM_MAX_PRD		0xFFFF
+>  #define PRD_MAX_PRES		10
+>  
+> +struct atmel_pwm_reg_data {
+> +	u8 period;
+> +	u8 period_upd;
+> +	u8 duty;
+> +	u8 duty_upd;
+> +};
+> +
+> +struct atmel_pwm_data {
+> +	void (*update_cdty)(struct pwm_chip *chip, struct pwm_device *pwm,
+> +			    unsigned long cdty);
+> +	void (*set_cprd_cdty)(struct pwm_chip *chip, struct pwm_device *pwm,
+> +			      unsigned long cprd, unsigned long cdty);
+> +	const struct atmel_pwm_reg_data regs;
 
-thanks
-Ganapat
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+If you go for this per-IP reg layout definition approach, you don't need
+the ->update_cdty()/->set_cprd_cdty() hooks anymore.
+
+> +};
+> +
+
+[...]
+
+> +static int atmel_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
+> +			   struct pwm_state *state)
+> +{
+> +	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
+> +	struct pwm_state cstate;
+> +	unsigned long cprd, cdty;
+> +	u32 pres, val;
+> +	bool pwm_reset = false;
+> +	int ret;
+> +
+> +	pwm_get_state(pwm, &cstate);
+> +
+> +	if (cstate.enabled &&
+> +	    (cstate.polarity != state->polarity ||
+> +	     cstate.period != state->period))
+> +		pwm_reset = true;
+
+You can move that in the 'if (state->enabled)' block, but I'm not even
+sure this is really needed (see below).
+
+> +
+> +	if (state->enabled) {
+> +		if (cstate.enabled && !pwm_reset) {
+
+		if (cstate.enabled &&
+		    (cstate.polarity != state->polarity ||
+		     cstate.period != state->period)) {
+
+> +			cprd = atmel_pwm_ch_readl(atmel_pwm, pwm->hwpwm,
+> +						  atmel_pwm->data->regs.period);
+> +			atmel_pwm_calculate_cdty(state, cprd, &cdty);
+> +			atmel_pwm->data->update_cdty(chip, pwm, cdty);
+> +			return 0;
+> +		}
+> +
+> +		ret = atmel_pwm_calculate_cprd_and_pres(chip, state, &cprd,
+> +							&pres);
+> +		if (ret) {
+> +			dev_err(chip->dev,
+> +				"failed to calculate cprd and prescaler\n");
+> +			return ret;
+> +		}
+> +
+> +		atmel_pwm_calculate_cdty(state, cprd, &cdty);
+> +
+> +		if (pwm_reset) {
+
+		if (cstate.enabled) {
+
+> +			atmel_pwm_disable(chip, pwm, false);
+> +		} else {
+> +			ret = clk_enable(atmel_pwm->clk);
+> +			if (ret) {
+> +				dev_err(chip->dev, "failed to enable clock\n");
+> +				return ret;
+> +			}
+> +		}
+> +
+> +		/* It is necessary to preserve CPOL, inside CMR */
+> +		val = atmel_pwm_ch_readl(atmel_pwm, pwm->hwpwm, PWM_CMR);
+> +		val = (val & ~PWM_CMR_CPRE_MSK) | (pres & PWM_CMR_CPRE_MSK);
+> +		if (state->polarity == PWM_POLARITY_NORMAL)
+> +			val &= ~PWM_CMR_CPOL;
+> +		else
+> +			val |= PWM_CMR_CPOL;
+> +		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWM_CMR, val);
+> +		atmel_pwm->data->set_cprd_cdty(chip, pwm, cprd, cdty);
+> +		mutex_lock(&atmel_pwm->isr_lock);
+> +		atmel_pwm->updated_pwms |= atmel_pwm_readl(atmel_pwm, PWM_ISR);
+> +		atmel_pwm->updated_pwms &= ~(1 << pwm->hwpwm);
+> +		mutex_unlock(&atmel_pwm->isr_lock);
+> +		atmel_pwm_writel(atmel_pwm, PWM_ENA, 1 << pwm->hwpwm);
+> +	} else if (cstate.enabled) {
+> +		atmel_pwm_disable(chip, pwm, true);
+> +	}
+> +
+> +	return 0;
+>  }
