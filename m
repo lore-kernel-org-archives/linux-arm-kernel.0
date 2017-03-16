@@ -1,88 +1,220 @@
-From: tixy@linaro.org (Jon Medhurst)
-Date: Thu, 16 Mar 2017 13:53:59 +0000
-Subject: [PATCH] arm: kprobes: Align stack to 8-bytes in test code
-Message-ID: <20170316135359.23019-1-tixy@linaro.org>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Thu, 16 Mar 2017 14:54:03 +0100
+Subject: [PATCH 1/2] pinctrl: meson: gxl: add the missing PWM pin
+ definitions
+In-Reply-To: <CAFBinCCCgbSvh8B81nXP6D11d5WZZ+71jDgvsjYDsWTb=V78Xg@mail.gmail.com>
+References: <20170304212318.27076-1-martin.blumenstingl@googlemail.com>
+ <20170304212318.27076-2-martin.blumenstingl@googlemail.com>
+ <1488811357.2420.18.camel@baylibre.com>
+ <CAFBinCDty8v80tLxHJPR+SHv32LX834dPJUruRNqr6angx3OOQ@mail.gmail.com>
+ <CACRpkdbGfGUhnAQz=9xeFnD2hF6m_xXacu8mZiwte-OCSDMo9w@mail.gmail.com>
+ <b7430d5f-96a7-2445-1c2a-ccc299bfdda2@baylibre.com>
+ <m237ee8id8.fsf@baylibre.com>
+ <CAFBinCCCgbSvh8B81nXP6D11d5WZZ+71jDgvsjYDsWTb=V78Xg@mail.gmail.com>
+Message-ID: <c0dad3a3-bdd4-3563-0ca6-0ca9d5a4ce2f@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-kprobes test cases need to have a stack that is aligned to an 8-byte
-boundary because they call other functions (and the ARM ABI mandates
-that alignment) and because test cases include 64-bit accesses to the
-stack. Unfortunately, GCC doesn't ensure this alignment for inline
-assembler and for the code in question seems to always misalign it by
-pushing just the LR register onto the stack. We therefore need to
-explicitly perform stack alignment at the start of each test case.
+On 03/15/2017 09:11 PM, Martin Blumenstingl wrote:
+> On Wed, Mar 15, 2017 at 8:12 PM, Kevin Hilman <khilman@baylibre.com> wrote:
+>> Neil Armstrong <narmstrong@baylibre.com> writes:
+>>
+>>> On 03/14/2017 04:42 PM, Linus Walleij wrote:
+>>>> On Thu, Mar 9, 2017 at 8:47 PM, Martin Blumenstingl
+>>>> <martin.blumenstingl@googlemail.com> wrote:
+>>>>> On Mon, Mar 6, 2017 at 3:42 PM, Jerome Brunet <jbrunet@baylibre.com> wrote:
+>>>>>> On Sat, 2017-03-04 at 22:23 +0100, Martin Blumenstingl wrote:
+>>>>
+>>>>>>> +     FUNCTION(pwm_f_clk),
+>>>>>>> +     FUNCTION(pwm_f_x),
+>>>>>>
+>>>>>> I wonder if having function named "pwm_f_clk" really makes sense ?
+>>>>>> Shouldn't it be just "pwm_f" ? This is real function, isn't it ?
+>>>>>> The actual pin used will be provided in the dt. Here, I suppose we
+>>>>>> could have this:
+>>>>>>
+>>>>>> +static const char * const pwm_f_groups[] = {
+>>>>>> +       "pwm_f_x", "pwm_f_clk",
+>>>>>> +};
+>>>>>>
+>>>>>> Has far as I can see, on meson arch, the function does not carry much
+>>>>>> information anyway, except for prints.
+>>>>>>
+>>>>>> To be clear, I'm not questioning this change in particular. It looks
+>>>>>> good, and follows what has been done in the past on meson. I know we
+>>>>>> have been this a lot already, but I'm questioning whether we should
+>>>>>> continue to do so ?
+>>>>>>
+>>>>>> I asking because I also have a lot case like this coming up on audio
+>>>>>> for gxl and gxbb, where the same function can use different pins.
+>>>>>
+>>>>> could you please look into Jerome's question?
+>>>>> personally I'm fine with either way, and changing my patch would be
+>>>>> quite trivial. but I'd like to know what's "the way to go" before
+>>>>> changing anything (and reverting that afterwards again).
+>>>>
+>>>> I don't understand the question really.
+>>>>
+>>>> I am not an expert on this system, if the people working with it
+>>>> cannot tell a function from a group I don't know who can... certainly
+>>>> not me.
+>>>>
+>>>> What I can say is that pincontrol combines functions and groups to
+>>>> states using a mapping. The functions should be something you poke
+>>>> into a register, the groups are looser defined but may also be a
+>>>> character of the hardware, but more usual a character of the
+>>>> intended electronic usecase. Groups contain 1..n pins and can
+>>>> be combined with some applicable functions.
+>>>>
+>>>> Please re-read Documentation/pinctrl.txt very closely if anything is
+>>>> unclear, I really put a lot of hours into getting that right. Especially
+>>>> reexamine "Pinmux conventions".
+>>>
+>>> The point pushed by Jerome was purely cosmetic since the groups in the meson
+>>> pinctrl driver are purely cosmetic, since only the GPIO group is handled,
+>>> other groups are all handled the same.
+>>
+>> handled the same... as what?
+>>
+>>> This is because I pushed all the PWM pins in a separate group, but functionnaly
+>>> the internal signal (i.e. PWM F) is the same for multiple pins and should be
+>>> a single "PWM F" group instead of multiple ones.
+>>>
+>>> My advice is to leave the PWM groups as is,
+>>
+>> Do you mean as we have in mainline today?  or as is proposed in $SUBJECT patch?
+>>
+>>> and push new pins/functions/groups
+>>> grouped with the internal signal name if split on multiple pins.
+>>
+>> Can somone do a quick patch for PWM_F for example, also showing how this
+>> will look in the DT if someone wants to switch between the PWM_F on GPIOX
+>> or GPIOCLK?
+> it would look like this (node name, label and group stay the same,
+> function does not contain the _x/_clk suffix anymore):
+> pwm_f_clk_pins: pwm_f_clk {
+>     mux {
+>         groups = "pwm_f_clk";
+>         function = "pwm_f";
+>     };
+> };
+> 
+> pwm_f_x_pins: pwm_f_x {
+>     mux {
+>         groups = "pwm_f_x";
+>         function = "pwm_f";
+>     };
+> };
+> 
+>> We shouldalso verify that the driver is detecting/removing conflicts
+>> properly when something else is already using that pin (e.g. SDIO_IRQ
+>> shares pin GPIOX_7 with PWM_F)
+> if the same pin is assigned to two devices then the pinctrl subsystem
+> will throw an error (we don't have to take care of this, it's how I
+> discovered as GPIOAO_1 was used by uart_rx_ao_a and uart_rx_ao_b).
+> however, I have not tested yet what happens if the same function is
+> assigned to multiple pins (let's say you pass both, pwm_f_clk_pins and
+> pwm_f_x_pins to the pwm_ef node - will this result in the PWM output
+> being routed to *both* pins or just one pin?). if the same function
+> cannot be used by two pins simultaneously then we should probably use
+> function "pwm_f" instead of "pwm_f_x" (just an example) so we can
+> detect these "conflicts".
+> 
+> 
+> Regards,
+> Martin
+> 
+> 
+> [0] https://github.com/torvalds/linux/commit/b27e36482c02a94194fec71fb29696f4c8e9241c
+> 
 
-Without this fix, some test cases will generate alignment faults on
-systems where alignment is enforced. Even if the kernel is configured to
-handle these faults in software, triggering them is ugly. It also
-exposes limitations in the fault handling code which doesn't cope with
-writes to the stack. E.g. when handling this instruction
+Let's resume :
+In the mainline meson pinctrl driver, we have :
+ - pins that represent the PAD name (GPIOX_3 or GPIODV_17)
+ - groups that represent each physical "bit" we set in the control registers, each group can group 1 or multiple physical pins
+For example, the "emmc_nand_d07" sets the mode of multiple pins.
+ - functions are a purely logical set of groups
 
-   strd r6, [sp, #-64]!
+The only C function handling the "function" is :
+static int meson_pmx_set_mux(func_num, group_num)
+{
+...
+	struct meson_pmx_func *func = &pc->data->funcs[func_num];
+...
+	/* Function 0 (GPIO) doesn't need any additional setting */
+	if (func_num)
+		ret = regmap_update_bits(...);
+...
+}
 
-the fault handling code will write to a stack location below the SP
-value at the point the fault occurred, which coincides with where the
-exception handler has pushed the saved register context. This results in
-corruption of those registers.
+So we could have only two big functions :
+is_gpio
+is_not_gpio
 
-Signed-off-by: Jon Medhurst <tixy@linaro.org>
----
+But now we group every logically similar "groups" into the same function, like :
+static const char * const uart_a_groups[] = {
+	"uart_tx_a", "uart_rx_a", "uart_cts_a", "uart_rts_a",
+};
 
-I'm assuming the fact the alignment exception handler doesn't cope with
-instructions that push things to the stack isn't a problem that we need
-to be concerned about, given that compiler generated code and handwitten
-assembler shouldn't trigger this unless it's buggy?
+When I pushed the PWM pins, I did not knew how to handle the fact that the same signal
+is on multiple physical pins, so I added multiple functions for each physical pin mode.
 
-Russell, this is the last of several issues [1] [2] I found when testing
-Masami Hiramatsu's kprobe changes [3]. That is a total of 4 kprobes
-patches and 3 fixes around code patching. Assuming these are acceptable
-I can create a branch and a pull request, or feed them into the patch
-tracker, let me know.
+What jerome pointed is that instead of :
+static const char * const pwm_a_x_groups[] = {
+	"pwm_a_x",
+};
 
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-March/494365.html
-[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-March/494370.html
-[3] https://lkml.org/lkml/2017/2/14/709
+static const char * const pwm_a_y_groups[] = {
+	"pwm_a_y",
+};
 
+we could have single :
+static const char * const pwm_a_groups[] = {
+	"pwm_a_x", "pwm_a_y",
+};
 
- arch/arm/probes/kprobes/test-core.c | 11 ++++++++---
- 1 file changed, 8 insertions(+), 3 deletions(-)
+But we should also change the DT accordingly.
 
-diff --git a/arch/arm/probes/kprobes/test-core.c b/arch/arm/probes/kprobes/test-core.c
-index c893726aa52d..1c98a87786ca 100644
---- a/arch/arm/probes/kprobes/test-core.c
-+++ b/arch/arm/probes/kprobes/test-core.c
-@@ -977,7 +977,10 @@ static void coverage_end(void)
- void __naked __kprobes_test_case_start(void)
- {
- 	__asm__ __volatile__ (
--		"stmdb	sp!, {r4-r11}				\n\t"
-+		"mov	r2, sp					\n\t"
-+		"bic	r3, r2, #7				\n\t"
-+		"mov	sp, r3					\n\t"
-+		"stmdb	sp!, {r2-r11}				\n\t"
- 		"sub	sp, sp, #"__stringify(TEST_MEMORY_SIZE)"\n\t"
- 		"bic	r0, lr, #1  @ r0 = inline data		\n\t"
- 		"mov	r1, sp					\n\t"
-@@ -997,7 +1000,8 @@ void __naked __kprobes_test_case_end_32(void)
- 		"movne	pc, r0					\n\t"
- 		"mov	r0, r4					\n\t"
- 		"add	sp, sp, #"__stringify(TEST_MEMORY_SIZE)"\n\t"
--		"ldmia	sp!, {r4-r11}				\n\t"
-+		"ldmia	sp!, {r2-r11}				\n\t"
-+		"mov	sp, r2					\n\t"
- 		"mov	pc, r0					\n\t"
- 	);
- }
-@@ -1013,7 +1017,8 @@ void __naked __kprobes_test_case_end_16(void)
- 		"bxne	r0					\n\t"
- 		"mov	r0, r4					\n\t"
- 		"add	sp, sp, #"__stringify(TEST_MEMORY_SIZE)"\n\t"
--		"ldmia	sp!, {r4-r11}				\n\t"
-+		"ldmia	sp!, {r2-r11}				\n\t"
-+		"mov	sp, r2					\n\t"
- 		"bx	r0					\n\t"
- 	);
- }
--- 
-2.11.0
+So we can see that from different perspective :
+- from the "pin" perspective : they are different functions, so we leave like it's already mainline
+- from the "signal" perspective : they are the same signal, so we should group
+- both, so we set a function per groupable groups.
+
+for example, on the GXL, we can have UART_AO_B TX&RX on multiple pins, so we can have either :
+static const char * const uart_ao_b_groups[] = {
+ 	"uart_tx_ao_b", "uart_rx_ao_b", "uart_cts_ao_b", "uart_rts_ao_b",
+	"uart_tx_ao_b_0", "uart_rx_ao_b_1",
+};
+
+or
+
+static const char * const uart_ao_b_groups[] = {
+ 	"uart_tx_ao_b", "uart_rx_ao_b", "uart_cts_ao_b", "uart_rts_ao_b",
+};
+
+static const char * const uart_ao_b_0_1_groups[] = {
+	"uart_tx_ao_b_0", "uart_rx_ao_b_1",
+};
+
+or
+
+static const char * const uart_ao_b_groups[] = {
+ 	"uart_tx_ao_b", "uart_rx_ao_b", "uart_cts_ao_b", "uart_rts_ao_b",
+};
+
+static const char * const uart_ao_b_0_1_groups[] = {
+ 	"uart_tx_ao_b_0", "uart_rx_ao_b_1", "uart_cts_ao_b", "uart_rts_ao_b",
+};
+
+The three of these are correct.
+The point Jerome asked was for solution 1, and it what I pushed
+The solution 2 is how functions are today.
+
+The third solution is less easy but still valid.
+
+What I want is :
+ - since it's purely logical, it's not very important and each solution is still valid from
+all perspectives, so leave the PWM functions like this and push new PWMs in the same way
+ - The next functions should behave like solution 1, or solution 3 if better
+
+Neil
