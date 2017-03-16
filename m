@@ -1,79 +1,162 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 16 Mar 2017 10:42:04 +0000
-Subject: [RFC arm64] samples/bpf: explicitly exclude sysreg sections with
- asm macros
-In-Reply-To: <20170315205404.GA43995@C02RW35GFVH8.dhcp.broadcom.net>
-References: <1489101492-15653-1-git-send-email-andy@greyhouse.net>
- <20170310175229.GC18894@arm.com>
- <20170310192656.GA13928@C02RW35GFVH8>
- <20170310204112.GA21382@leverpostej>
- <20170315183130.GB32819@C02RW35GFVH8.dhcp.broadcom.net>
- <20170315191741.GB29452@leverpostej>
- <20170315205404.GA43995@C02RW35GFVH8.dhcp.broadcom.net>
-Message-ID: <20170316104204.GA31101@leverpostej>
+From: olivier.moysan@st.com (Olivier MOYSAN)
+Date: Thu, 16 Mar 2017 10:50:37 +0000
+Subject: [RESEND PATCH v2 1/2] ASoC: stm32: add bindings for SAI
+In-Reply-To: <20170315174606.rrvhuuzplzwwucph@rob-hp-laptop>
+References: <1488879872-7839-1-git-send-email-olivier.moysan@st.com>
+ <1488879872-7839-2-git-send-email-olivier.moysan@st.com>
+ <20170315174606.rrvhuuzplzwwucph@rob-hp-laptop>
+Message-ID: <ecc50cac-46a6-5e89-d07c-05f34a12d997@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 15, 2017 at 04:54:04PM -0400, Andy Gospodarek wrote:
-> On Wed, Mar 15, 2017 at 07:17:41PM +0000, Mark Rutland wrote:
-> > 
-> > On Wed, Mar 15, 2017 at 02:31:30PM -0400, Andy Gospodarek wrote:
-> > > On Fri, Mar 10, 2017 at 08:41:13PM +0000, Mark Rutland wrote:
-> > > > On Fri, Mar 10, 2017 at 02:26:56PM -0500, Andy Gospodarek wrote:
-> > > > > On Fri, Mar 10, 2017 at 05:52:30PM +0000, Will Deacon wrote:
- 
-> > > > > It isn't the ASM itself that causes the compilation to fail, it's the
-> > > > > ASM macros included inside the new ifdef that are problematic.  Here is
-> > > > > what is seen per object file:
-> > > > 
-> > > > > ./arch/arm64/include/asm/barrier.h:62:23: note: expanded from macro
-> > > > > '__smp_store_release'
-> > > > >                 asm volatile ("stlr %1, %0"
-> > > > > \
-> > > > >                                     ^
-> > > > > 1 warning generated.
-> > > > > LLVM ERROR: Inline asm not supported by this streamer because we don't  <----  THIS LINE
-> > > > > have an asm parser for this target
-> > > > 
-> > > > ... so as far as I can see it's the presence of any inline assembly that
-> > > > the tool cannot handle, as LLVM tells us.
+Hello Rob,
 
-> > In the error message, LLVM explicitly states that it does not have a
-> > parser for this target's assembly -- which would be a problem for *any*
-> > inline assembly.
-> > 
-> > How does that specific error relate to the use of assembly macros within
-> > sysreg.h?
-> 
-> This is the only error that is relevant:
-> 
-> LLVM ERROR: Inline asm not supported by this streamer because we don't have an asm parser for this target
-> 
-> Upon inspection it does not appear that this is explicitly related to
-> assembly macros, just simple inline assembly. 
+Thanks for your feedback.
 
-Indeed; as Will and I stated previously.
+On 03/15/2017 06:46 PM, Rob Herring wrote:
+> On Tue, Mar 07, 2017 at 10:44:31AM +0100, olivier moysan wrote:
+>> This patch adds documentation of device tree bindings for the
+>> STM32 SAI ASoC driver.
+>>
+>> Signed-off-by: olivier moysan <olivier.moysan@st.com>
+>> ---
+>>  .../devicetree/bindings/sound/st,stm32-sai.txt     | 79 ++++++++++++++++++++++
+>>  1 file changed, 79 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/sound/st,stm32-sai.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/sound/st,stm32-sai.txt b/Documentation/devicetree/bindings/sound/st,stm32-sai.txt
+>> new file mode 100644
+>> index 0000000..b3be26d
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/sound/st,stm32-sai.txt
+>> @@ -0,0 +1,79 @@
+>> +STMicroelectronics STM32 Serial Audio Interface (SAI).
+>> +
+>> +The SAI interface (Serial Audio Interface) offers a wide set of audio protocols
+>> +as I2S standards, LSB or MSB-justified, PCM/DSP, TDM, and AC'97.
+>> +The SAI contains two independent audio sub-blocks. Each sub-block has
+>> +its own clock generator and I/O lines controller.
+>> +
+>> +Required properties:
+>> +  - compatible: Should be "st,stm32f4-sai"
+>> +  - reg: Base address and size of SAI common register set.
+>> +  - clocks: Must contain phandle and clock specifier pairs for each entry
+>> +	in clock-names.
+>> +  - clock-names: Must contain "clk_x8k" and "clk_x11k"
+>> +	"clk_x8k": SAI parent clock for sampling rates multiple of 8kHz.
+>> +	"clk_x11k": SAI parent clock for sampling rates multiple of 11.025kHz.
+>
+> clk_ is redundant.
+>
 
-> Is this the only inline assembly outside a function that is not inside
-> #ifdef __ASSEMBLY__ in the arm64 tree?
+Do you mean, removing clk_ prefix ?
 
-An __ASSEMBLY__ guard is irrelevant. We need the compiler to handle the
-asm() statement, not the assembler (which cannot even parse it).
+>> +  - interrupts: cpu DAI interrupt line shared by SAI sub-blocks
+>> +
+>> +Note: Each SAI controller should have an alias correctly numbered
+>> +in "aliases" node, to provide explicit name to CPU DAI.
+>
+> No, it shouldn't. Why do you need that?
+>
 
-The kernel uses asm statements outside of functions elsewhere. For
-example, take a look in <linux/export.h>. See that EXPORT_SYMBOL() uses
-__CRC_SYMBOL(), which uses asm statements. The EXPORT_SYMBOL() is used
-outside of functions, on all architectures, arm64 and x86 included.
+Yes, this is not mandatory. This is convenient to identify sai 
+controller, as we may have up to 8 instances.
+I can make it optional, or remove it if you think it is not relevant.
 
-I don't see why being inside a function matters. Given the error
-message, the toolchain presumably can't parse inline assembly in any
-context. We have static inline functions with assembly in headers, which
-are presumably affected.
+>
+>> +
+>> +Optional properties:
+>> +  - resets: Reference to a reset controller asserting the SAI
+>> +
+>> +SAI subnodes:
+>> +Two subnodes corresponding to SAI sub-block instances A et B can be defined.
+>> +Subnode can be omitted for unsused sub-block.
+>> +
+>> +SAI subnodes required properties:
+>> +  - compatible: Should be "st,stm32-sai-sub-a" or "st,stm32-sai-sub-b"
+>> +	for SAI sub-block A or B respectively.
+>> +  - reg: Base address and size of SAI sub-block register set.
+>> +  - clocks: Must contain one phandle and clock specifier pair
+>> +	for sai_ck which feeds the internal clock generator.
+>> +  - clock-names: Must contain "sai_ck".
+>> +  - dmas: see Documentation/devicetree/bindings/dma/stm32-dma.txt
+>> +  - dma-names: identifier string for each DMA request line
+>> +	"tx": if sai sub-block is configured as playback DAI
+>> +	"rx": if sai sub-block is configured as capture DAI
+>> +  - pinctrl-names: should contain only value "default"
+>> +  - pinctrl-0: see Documentation/devicetree/bindings/pinctrl/pinctrl-stm32.txt
+>> +
+>> +Example:
+>> +sai1: sai1 at 40015800 {
+>> +	compatible = "st,stm32f4-sai";
+>> +	reg = <0x40015800 0x400>;
 
-It sounds like the toolchain you are using is lacking in functionality
-that is presumably present when targeting x86, or the error messages are
-simply misleading. In either case, there's a toolchain issue to be
-addressed, and not a kernel issue.
+	reg = <0x40015800 0x4>;
 
-Thanks,
-Mark.
+>> +	clocks = <&rcc 1 CLK_SAIQ_PDIV>, <&rcc 1 CLK_I2SQ_PDIV>;
+>> +	clock-names = "clk_x8k", "clk_x11k";
+>> +	interrupts = <87>;
+>> +	resets = <&rcc 310>;
+>> +
+>> +	sai1b: sai at 1 {
+>
+> unit address needs a reg property.
+>
+> audio-controller at 1
+>
+
+Right. This needs to be updated as follows:
+	sai1b: sai1b at 40015824 {
+		...
+		reg = <0x40015824 0x1C>;
+		...
+	};
+
+>> +		#sound-dai-cells = <0>;
+>> +		compatible = "st,stm32-sai-sub-b";
+>> +		clocks = <&rcc 1 CLK_SAI2>;
+>> +		clock-names = "sai_ck";
+>> +		dmas = <&dma2 5 0 0x400 0x1>;
+>> +		dma-names = "tx";
+>> +	};
+>> +};
+>> +
+>> +sound {
+>> +	compatible = "simple-audio-card";
+>
+> Perhaps you want to use the graph-card here. It's getting close to
+> merging.
+>
+
+mclk-fs property is required when SAI is configured as master.
+It seems that mclk-fs is not supported in current version
+of audio graph card. So I thing I should keep simple card for the time 
+being. Anyway, I plan further updates for SAI, so I will
+have opportunity to change to graph card at that time.
+
+>> +	simple-audio-card,name = "STM32-Sound-Card";
+>> +	status = "okay";
+>> +
+>> +	simple-audio-card,dai-link at 0 {
+>> +		format = "i2s";
+
+		mclk-fs = <256>;
+
+>> +		cpu {
+>> +			sound-dai = <&sai1b>;
+>> +		};
+>> +		codec {
+>> +			sound-dai = <&codec>;
+>> +		};
+>> +	};
+>> +};
+>> +
+>> +aliases {
+>> +	sai1 = &sai1;
+>> +};
+>> --
+>> 1.9.1
+>>
+
+regards
+olivier
