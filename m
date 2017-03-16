@@ -1,41 +1,98 @@
-From: sunil.kovvuri@gmail.com (Sunil Kovvuri)
-Date: Thu, 16 Mar 2017 18:48:57 +0530
-Subject: [PATCH 0/3] IOVA allocation improvements for iommu-dma
-In-Reply-To: <cover.1489581865.git.robin.murphy@arm.com>
-References: <cover.1489581865.git.robin.murphy@arm.com>
-Message-ID: <CA+sq2CfGgYXVEfckC=4VoFaQOuEhn4_vdfH0ZmUjpV_jyCkEHw@mail.gmail.com>
+From: cl@rock-chips.com (cl at rock-chips.com)
+Date: Thu, 16 Mar 2017 21:22:45 +0800
+Subject: [PATCH v2 5/6] arm64: dts: rockchip: add dts file for RK3328
+In-Reply-To: <1489670244-13328-1-git-send-email-cl@rock-chips.com>
+References: <1489670244-13328-1-git-send-email-cl@rock-chips.com>
+Message-ID: <1489670565-14796-1-git-send-email-cl@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 15, 2017 at 7:03 PM, Robin Murphy <robin.murphy@arm.com> wrote:
-> Hi all,
->
-> Here's the first bit of lock contention removal to chew on - feedback
-> welcome! Note that for the current users of the io-pgtable framework,
-> this is most likely to simply push more contention onto the io-pgtable
-> lock, so may not show a great improvement alone. Will and I both have
-> rough proof-of-concept implementations of lock-free io-pgtable code
-> which we need to sit down and agree on at some point, hopefullt fairly
-> soon.
+From: Liang Chen <cl@rock-chips.com>
 
-Thanks for working on this.
-As you said, it's indeed pushing lock contention down to pgtable lock from
-iova rbtree lock but now morethan lock I see issue is with yielding CPU while
-waiting for tlb_sync. Below are some numbers.
+This patch add rk3328-evb.dts for RK3328 evaluation board.
+Tested on RK3328 evb.
 
-I have tweaked '__arm_smmu_tlb_sync' in SMMUv2 driver i.e basically removed
-cpu_relax() and udelay() to make it a busy loop.
+Signed-off-by: Liang Chen <cl@rock-chips.com>
+---
+ arch/arm64/boot/dts/rockchip/Makefile       |  1 +
+ arch/arm64/boot/dts/rockchip/rk3328-evb.dts | 57 +++++++++++++++++++++++++++++
+ 2 files changed, 58 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/rockchip/rk3328-evb.dts
 
-Before: 1.1 Gbps
-With your patches: 1.45Gbps
-With your patches + busy loop in tlb_sync: 7Gbps
-
-If we reduce pgtable contention a bit
-With your patches + busy loop in tlb_sync + Iperf threads reduced to 8
-from 16: ~9Gbps
-
-So looks like along with pgtable lock, some optimization can be done
-to tlb_sync code as well.
-
-Thanks,
-Sunil.
+diff --git a/arch/arm64/boot/dts/rockchip/Makefile b/arch/arm64/boot/dts/rockchip/Makefile
+index 3a86289..853fc7d 100644
+--- a/arch/arm64/boot/dts/rockchip/Makefile
++++ b/arch/arm64/boot/dts/rockchip/Makefile
+@@ -4,6 +4,7 @@ dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-orion-r68-meta.dtb
+ dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-px5-evb.dtb
+ dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-r88.dtb
+ dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3399-evb.dtb
++dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3328-evb.dtb
+ 
+ always		:= $(dtb-y)
+ subdir-y	:= $(dts-dirs)
+diff --git a/arch/arm64/boot/dts/rockchip/rk3328-evb.dts b/arch/arm64/boot/dts/rockchip/rk3328-evb.dts
+new file mode 100644
+index 0000000..cf27239
+--- /dev/null
++++ b/arch/arm64/boot/dts/rockchip/rk3328-evb.dts
+@@ -0,0 +1,57 @@
++/*
++ * Copyright (c) 2017 Fuzhou Rockchip Electronics Co., Ltd
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This library is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This library is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/dts-v1/;
++#include "rk3328.dtsi"
++
++/ {
++	model = "Rockchip RK3328 EVB";
++	compatible = "rockchip,rk3328-evb", "rockchip,rk3328";
++
++	chosen {
++		stdout-path = "serial2:1500000n8";
++	};
++};
++
++&uart2 {
++	status = "okay";
++};
+-- 
+1.9.1
