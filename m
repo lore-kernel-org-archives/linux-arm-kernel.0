@@ -1,52 +1,36 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 16 Mar 2017 10:05:39 +0100
-Subject: [PATCH] mtd: nand: orion: fix clk handling
-In-Reply-To: <20170312213406.20987-1-gmbnomis@gmail.com>
-References: <20170312213406.20987-1-gmbnomis@gmail.com>
-Message-ID: <20170316100539.15bb1828@bbrezillon>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Thu, 16 Mar 2017 09:29:17 +0100
+Subject: [PATCH v1 3/7] dt-bindings: i2c: rk3x: add support for rk3328
+In-Reply-To: <1489572237-6649-4-git-send-email-cl@rock-chips.com>
+References: <1489572237-6649-1-git-send-email-cl@rock-chips.com>
+ <1489572237-6649-4-git-send-email-cl@rock-chips.com>
+Message-ID: <1968844.OUeqAadBkl@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
-
-On Sun, 12 Mar 2017 22:34:06 +0100
-Simon Baatz <gmbnomis@gmail.com> wrote:
-
-> The clk handling in orion_nand.c had two problems:
+Am Mittwoch, 15. M?rz 2017, 18:03:53 CET schrieb cl at rock-chips.com:
+> From: Chen Liang <cl@rock-chips.com>
 > 
-> - In the probe function, clk_put() was called for an enabled clock,
->   which violates the API (see documentation for clk_put() in
->   include/linux/clk.h)
+> The rk3328 i2c is the same as rk3399
 > 
-> - In the error path of the probe function, clk_put() could be called
->   twice for the same clock.
-> 
-> In order to clean this up, use the managed function devm_clk_get() and
-> store the pointer to the clk in the driver data.
-> 
-> Fixes: baffab28b13120694fa3ebab08d3e99667a851d2 ('ARM: Orion: fix driver probe error handling with respect to clk')
-> Cc: <stable@vger.kernel.org> # v4.5+
-> Signed-off-by: Simon Baatz <gmbnomis@gmail.com>
+> Signed-off-by: Chen Liang <cl@rock-chips.com>
 > ---
->  drivers/mtd/nand/orion_nand.c | 42 +++++++++++++++++++++---------------------
->  1 file changed, 21 insertions(+), 21 deletions(-)
+>  Documentation/devicetree/bindings/i2c/i2c-rk3x.txt | 1 +
+>  1 file changed, 1 insertion(+)
 > 
-> diff --git a/drivers/mtd/nand/orion_nand.c b/drivers/mtd/nand/orion_nand.c
-> index 4a91c5d000be..b355aa738fae 100644
-> --- a/drivers/mtd/nand/orion_nand.c
-> +++ b/drivers/mtd/nand/orion_nand.c
-> @@ -23,6 +23,11 @@
->  #include <asm/sizes.h>
->  #include <linux/platform_data/mtd-orion_nand.h>
->  
-> +struct orion_nand_info {
-> +	struct nand_chip chip;
-> +	struct clk       *clk;
+> diff --git a/Documentation/devicetree/bindings/i2c/i2c-rk3x.txt
+> b/Documentation/devicetree/bindings/i2c/i2c-rk3x.txt index bbc5a1e..abfdefd
+> 100644
+> --- a/Documentation/devicetree/bindings/i2c/i2c-rk3x.txt
+> +++ b/Documentation/devicetree/bindings/i2c/i2c-rk3x.txt
+> @@ -12,6 +12,7 @@ Required properties :
+>     - "rockchip,rk3228-i2c": for rk3228
+>     - "rockchip,rk3288-i2c": for rk3288
+>     - "rockchip,rk3399-i2c": for rk3399
+> +   - "rockchip,rk3328-i2c", "rockchip,rk3399-i2c": for rk3328
+>   - interrupts : interrupt number
+>   - clocks: See ../clock/clock-bindings.txt
+>     - For older hardware (rk3066, rk3188, rk3228, rk3288):
 
-Can we avoid this kind of alignment, which will not be preserved if
-someone adds a new field with a type that is longer than "struct
-nand_chip "?
-
-Regards,
-
-Boris
+same as before, not sure how people see that, but maybe place rk3328 before 
+rk3399.
