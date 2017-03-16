@@ -1,43 +1,57 @@
-From: pushkar.iit@gmail.com (Pushkar Jambhlekar)
-Date: Thu, 16 Mar 2017 11:01:38 +0530
-Subject: [PATCH] vc04_services: Fixing coding guideline error
-In-Reply-To: <1489559468-46932-1-git-send-email-pushkar.iit@gmail.com>
-References: <1489559468-46932-1-git-send-email-pushkar.iit@gmail.com>
-Message-ID: <CAMvNc9BT7_5Hu2iFxd1cbEY64jzQxCEZhdgU8cm_p_SDnZFZhQ@mail.gmail.com>
+From: ralph.sennhauser@gmail.com (Ralph Sennhauser)
+Date: Thu, 16 Mar 2017 06:48:40 +0100
+Subject: [PATCH] ARM: dts: mvebu: linksys: enable buffer manager support
+In-Reply-To: <8760jafiy8.fsf@free-electrons.com>
+References: <20170308053312.29243-1-ralph.sennhauser@gmail.com>
+ <8760jafiy8.fsf@free-electrons.com>
+Message-ID: <20170316064840.3398bd26@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Any comment?
+On Wed, 15 Mar 2017 20:17:35 +0100
+Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
 
-On Wed, Mar 15, 2017 at 12:01 PM, Pushkar Jambhlekar
-<pushkar.iit@gmail.com> wrote:
-> Fixing 'if' block coding style. '{' should follow 'if' for multiline block
+> Hi Ralph,
+>  
+>  On mer., mars 08 2017, Ralph Sennhauser <ralph.sennhauser@gmail.com>
+> wrote:
+> 
+> </snip>
 >
-> Signed-off-by: Pushkar Jambhlekar <pushkar.iit@gmail.com>
-> ---
->  drivers/staging/vc04_services/interface/vchiq_arm/vchiq_shim.c | 3 +--
->  1 file changed, 1 insertion(+), 2 deletions(-)
->
-> diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_shim.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_shim.c
-> index 48984ab..ca896a5 100644
-> --- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_shim.c
-> +++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_shim.c
-> @@ -797,8 +797,7 @@ int32_t vchi_get_peer_version(const VCHI_SERVICE_HANDLE_T handle, short *peer_ve
->  {
->         int32_t ret = -1;
->         SHIM_SERVICE_T *service = (SHIM_SERVICE_T *)handle;
-> -       if (service)
-> -       {
-> +       if (service) {
->                 VCHIQ_STATUS_T status;
->
->                 status = vchiq_get_peer_version(service->handle, peer_version);
-> --
-> 2.7.4
->
+> > @@ -88,6 +89,9 @@
+> >  			ethernet at 70000 {
+> >  				status = "okay";
+> >  				phy-mode = "rgmii-id";
+> > +				buffer-manager = <&bm>;
+> > +				bm,pool-long = <1>;
+> > +				bm,pool-short = <3>;
+> >  				fixed-link {
+> >  					speed = <1000>;
+> >  					full-duplex;
+> > @@ -97,6 +101,9 @@
+> >  			ethernet at 34000 {
+> >  				status = "okay";
+> >  				phy-mode = "sgmii";
+> > +				buffer-manager = <&bm>;
+> > +				bm,pool-long = <0>;
+> > +				bm,pool-short = <3>;  
+> Any reason to reuse the same pool than the other port?
+> 
+> As only two ports are used here, then each of them can have use 2 of
+> the 4 availables pools. 
+> 
+> </snip>
 
+Hi Gregory,
 
+It has been quite a while since I have written that patch. Something
+written somewhere in the Documentation / commit message which I can't
+find anymore gave me the impression that using the same for short
+doesn't make a difference. So I went with the pool IDs used for other
+similar boards for "consistency".
 
--- 
-Jambhlekar Pushkar Arun
-M.Tech IIT Roorkee
+Will send a v2 shortly using all independent pools using the IDs witch
+come most natural in context.
+
+Thanks
+Ralph
