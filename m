@@ -1,54 +1,81 @@
-From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Thu, 16 Mar 2017 22:14:46 +0100
-Subject: [PATCH 1/3] devicetree: add vendor prefix for Khadas
-In-Reply-To: <61778a7a-3d96-8de3-fd4f-f18aa0938a68@suse.de>
-References: <20170304215126.7020-1-martin.blumenstingl@googlemail.com>
- <20170304215126.7020-2-martin.blumenstingl@googlemail.com>
- <20170315195737.vckgpw6qad4d4zjm@rob-hp-laptop>
- <61778a7a-3d96-8de3-fd4f-f18aa0938a68@suse.de>
-Message-ID: <CAFBinCAp4G4-Ch7Vunn4mEi-6iWi7UfhA3Uryy9FAhFvwBuyPg@mail.gmail.com>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Thu, 16 Mar 2017 22:17:18 +0100
+Subject: [RFC PATCH 30/33] irqchip/gic-v4: Add VPE command interface
+In-Reply-To: <1484648454-21216-31-git-send-email-marc.zyngier@arm.com>
+References: <1484648454-21216-1-git-send-email-marc.zyngier@arm.com>
+ <1484648454-21216-31-git-send-email-marc.zyngier@arm.com>
+Message-ID: <d9282979-e586-41d9-6ccf-feea48554218@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 16, 2017 at 7:00 AM, Andreas F?rber <afaerber@suse.de> wrote:
-> Am 15.03.2017 um 20:57 schrieb Rob Herring:
->> On Sat, Mar 04, 2017 at 10:51:24PM +0100, Martin Blumenstingl wrote:
->>> Khadas is a new sub-brand of Shenzhen Wesion Technology CO.,LTD. They
->>> are developing Amlogic and Rockchip based "DIY boxes" (single board
->>> computers): http://khadas.com/
->>> They are best know for their latest product: the Khadas VIM (an Amlogic
->>> GXL S905X based SBC).
->>>
->>> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
->>> ---
->>>  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
->>>  1 file changed, 1 insertion(+)
->>
->> Acked-by: Rob Herring <robh@kernel.org>
->
-> Shouldn't the entry reflect what is in the commit message rather than
-> just repeat the prefix? I.e., something like "Khadas by Shenzhen Wesion
-> Technology Co., Ltd." (which I believe is the official spelling and
-> spacing of these abbreviations also for the commit message).
-I took the spelling for "Shenzhen Wesion Technology CO.,LTD." from
-their website: [0]
+Hi
 
-> An Acked-by from the CC'ed vendor would also be desirable. :)
-I asked Gouwa, one of the people behind the Khadas VIM boards for
-clarification some time ago:
-"Khadas is a new brand power by Shenzhen Wesion Technology, 'Khadas'
-is brand, 'VIM' is product serial name, like 'Apple + iPhone'"
-I think I used the vendor-prefixes "pine64" and "radxa" as reference
-(see [1]) when I wrote the patch - and none of the existing entries
-seems to follow the "brand by parent company" schema.
+On 17/01/2017 11:20, Marc Zyngier wrote:
+> Add the required interfaces to schedule a VPE and perform a
+> VINVALL command.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Reviewed-by: Eric Auger <eric.auger@redhat.com>
 
-@Gouwa, Rob: could you please share your opinion on what the official
-"vendor" name for the "khadas" prefix should be?
+I think it would have helped me to get the VPE and VLPI API earlier
+since it brings the user point of you.
 
+Eric
 
-Regards,
-Martin
-
-
-[0] http://szwesion.com/contact/
-[1] http://lxr.free-electrons.com/source/Documentation/devicetree/bindings/vendor-prefixes.txt
+> ---
+>  drivers/irqchip/irq-gic-v4.c       | 31 +++++++++++++++++++++++++++++++
+>  include/linux/irqchip/arm-gic-v4.h |  2 ++
+>  2 files changed, 33 insertions(+)
+> 
+> diff --git a/drivers/irqchip/irq-gic-v4.c b/drivers/irqchip/irq-gic-v4.c
+> index b9a0b34..7d74089 100644
+> --- a/drivers/irqchip/irq-gic-v4.c
+> +++ b/drivers/irqchip/irq-gic-v4.c
+> @@ -109,3 +109,34 @@ void its_free_vcpu_irqs(struct its_vm *vm, int nr_vpes)
+>  
+>  	irq_domain_free_irqs(irq, nr_vpes);
+>  }
+> +
+> +static int its_send_vpe_cmd(struct its_vpe *vpe, struct its_cmd_info *info)
+> +{
+> +	unsigned int irq;
+> +	irq_hw_number_t hwirq;
+> +
+> +	WARN_ON(preemptible());
+> +
+> +	hwirq = vpe->vpe_db_lpi - vpe->its_vm->db_lpi_base;
+> +	irq = irq_find_mapping(vpe->its_vm->domain, hwirq);
+> +
+> +	return irq_set_vcpu_affinity(irq, info);
+> +}
+> +
+> +int its_schedule_vpe(struct its_vpe *vpe, bool on)
+> +{
+> +	struct its_cmd_info info;
+> +
+> +	info.cmd_type = on ? SCHEDULE_VPE : DESCHEDULE_VPE;
+> +
+> +	return its_send_vpe_cmd(vpe, &info);
+> +}
+> +
+> +int its_invall_vpe(struct its_vpe *vpe)
+> +{
+> +	struct its_cmd_info info = {
+> +		.cmd_type = INVALL_VPE,
+> +	};
+> +
+> +	return its_send_vpe_cmd(vpe, &info);
+> +}
+> diff --git a/include/linux/irqchip/arm-gic-v4.h b/include/linux/irqchip/arm-gic-v4.h
+> index 2463d70..1c58add 100644
+> --- a/include/linux/irqchip/arm-gic-v4.h
+> +++ b/include/linux/irqchip/arm-gic-v4.h
+> @@ -91,5 +91,7 @@ struct its_cmd_info {
+>  
+>  int its_alloc_vcpu_irqs(struct its_vm *vm, struct its_vpe **vpes, int nr_vpes);
+>  void its_free_vcpu_irqs(struct its_vm *vm, int nr_vpes);
+> +int its_schedule_vpe(struct its_vpe *vpe, bool on);
+> +int its_invall_vpe(struct its_vpe *vpe);
+>  
+>  #endif
+> 
