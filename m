@@ -1,45 +1,54 @@
-From: ralph.sennhauser@gmail.com (Ralph Sennhauser)
-Date: Thu, 16 Mar 2017 07:42:18 +0100
-Subject: [PATCH 4/4] mvebu: wrt1900ac: Use pwm-fan rather than gpio-fan
-In-Reply-To: <20170316064218.9169-1-ralph.sennhauser@gmail.com>
-References: <20170316064218.9169-1-ralph.sennhauser@gmail.com>
-Message-ID: <20170316064218.9169-5-ralph.sennhauser@gmail.com>
+From: jagan@openedev.com (Jagan Teki)
+Date: Thu, 16 Mar 2017 12:35:38 +0530
+Subject: [PATCH v6 5/8] dt-bindings: input: touchscreen: Add max11801-ts
+ binding
+Message-ID: <1489647939-4966-1-git-send-email-jagan@openedev.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andrew Lunn <andrew@lunn.ch>
+From: Jagan Teki <jagan@amarulasolutions.com>
 
-The mvebu gpio driver can also perform PWM on some pins. Us the pwm-fan
-driver to control the fan of the WRT1900AC, giving us finer grained
-control over its speed and hence noise.
+Add missing documentation of max11801-ts dt-binding details.
 
-Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-URL: https://patchwork.ozlabs.org/patch/427291/
-Signed-off-by: Ralph Sennhauser <ralph.sennhauser@gmail.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Shawn Guo <shawnguo@kernel.org>
+Cc: Michael Trimarchi <michael@amarulasolutions.com>
+Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 ---
- arch/arm/boot/dts/armada-xp-linksys-mamba.dts | 8 +++-----
- 1 file changed, 3 insertions(+), 5 deletions(-)
+Changes for v6:
+- Replace the lable and name of the node
+   ts: max11801 => max11801: touchscreen at 48
+Changes for v5:
+- Newly added patch
 
-diff --git a/arch/arm/boot/dts/armada-xp-linksys-mamba.dts b/arch/arm/boot/dts/armada-xp-linksys-mamba.dts
-index 3744ba3..836b275e 100644
---- a/arch/arm/boot/dts/armada-xp-linksys-mamba.dts
-+++ b/arch/arm/boot/dts/armada-xp-linksys-mamba.dts
-@@ -293,13 +293,11 @@
- 		};
- 	};
- 
--	gpio_fan {
-+	pwm_fan {
- 		/* SUNON HA4010V4-0000-C99 */
--		compatible = "gpio-fan";
--		gpios = <&gpio0 24 0>;
- 
--		gpio-fan,speed-map = <0    0
--				      4500 1>;
-+		compatible = "pwm-fan";
-+		pwms = <&gpio0 24 4000 0>;
- 	};
- 
- 	dsa {
+ .../bindings/input/touchscreen/max11801-ts.txt         | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/input/touchscreen/max11801-ts.txt
+
+diff --git a/Documentation/devicetree/bindings/input/touchscreen/max11801-ts.txt b/Documentation/devicetree/bindings/input/touchscreen/max11801-ts.txt
+new file mode 100644
+index 0000000..4afccbe
+--- /dev/null
++++ b/Documentation/devicetree/bindings/input/touchscreen/max11801-ts.txt
+@@ -0,0 +1,18 @@
++* MAXI MAX11801 Resistive touch screen controller with i2c interface
++
++Required properties:
++- compatible: must be "max11801"
++- reg: i2c slave address
++- interrupt-parent: the phandle for the interrupt controller
++- interrupts: touch controller interrupt
++
++Example:
++
++&i2c1 {
++	max11801: touchscreen at 48 {
++		compatible = "max11801";
++		reg = <0x48>;
++		interrupt-parent = <&gpio3>;
++		interrupts = <31 2>;
++	};
++};
 -- 
-2.10.2
+1.9.1
