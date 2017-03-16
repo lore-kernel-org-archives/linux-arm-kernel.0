@@ -1,112 +1,76 @@
-From: andy@greyhouse.net (Andy Gospodarek)
-Date: Thu, 16 Mar 2017 17:04:55 -0400
-Subject: [RFC arm64] samples/bpf: explicitly exclude sysreg sections with
- asm macros
-In-Reply-To: <20170316104204.GA31101@leverpostej>
-References: <1489101492-15653-1-git-send-email-andy@greyhouse.net>
- <20170310175229.GC18894@arm.com>
- <20170310192656.GA13928@C02RW35GFVH8>
- <20170310204112.GA21382@leverpostej>
- <20170315183130.GB32819@C02RW35GFVH8.dhcp.broadcom.net>
- <20170315191741.GB29452@leverpostej>
- <20170315205404.GA43995@C02RW35GFVH8.dhcp.broadcom.net>
- <20170316104204.GA31101@leverpostej>
-Message-ID: <20170316210454.GA53792@C02RW35GFVH8.dhcp.broadcom.net>
+From: flatmax@flatmax.org (Matt Flax)
+Date: Fri, 17 Mar 2017 07:51:49 +1100
+Subject: [alsa-devel] [PATCH 0/3] ASoC: Enable a new IC master mode:
+ bcm2835<=>IC<=>cs42xx8
+In-Reply-To: <20170315190108.y6ybxm3nfgnutajv@sirena.org.uk>
+References: <20170226144958.GA5543@camel2.lan>
+ <732a71ac-5ec5-37e1-1190-be036ea34555@flatmax.org>
+ <20170226221648.GA10974@camel2.lan>
+ <7cef41ee-ef00-22b7-830f-517a9d594ed0@flatmax.org>
+ <20170227080433.GA2718@delle.lan>
+ <170950f7-354f-e6a9-cefb-834a00fadd1b@flatmax.org>
+ <20170227103024.GF2718@delle.lan>
+ <7b78c782-28e1-4849-5d00-8caf30847d5c@flatmax.org>
+ <20170227115108.GA6732@delle.lan>
+ <20170228095929.GH2742@localhost.localdomain>
+ <20170315190108.y6ybxm3nfgnutajv@sirena.org.uk>
+Message-ID: <7d8d38f7-53aa-cc3d-4bbd-141649528a8a@flatmax.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 16, 2017 at 10:42:04AM +0000, Mark Rutland wrote:
-> On Wed, Mar 15, 2017 at 04:54:04PM -0400, Andy Gospodarek wrote:
-> > On Wed, Mar 15, 2017 at 07:17:41PM +0000, Mark Rutland wrote:
-> > > 
-> > > On Wed, Mar 15, 2017 at 02:31:30PM -0400, Andy Gospodarek wrote:
-> > > > On Fri, Mar 10, 2017 at 08:41:13PM +0000, Mark Rutland wrote:
-> > > > > On Fri, Mar 10, 2017 at 02:26:56PM -0500, Andy Gospodarek wrote:
-> > > > > > On Fri, Mar 10, 2017 at 05:52:30PM +0000, Will Deacon wrote:
->  
-> > > > > > It isn't the ASM itself that causes the compilation to fail, it's the
-> > > > > > ASM macros included inside the new ifdef that are problematic.  Here is
-> > > > > > what is seen per object file:
-> > > > > 
-> > > > > > ./arch/arm64/include/asm/barrier.h:62:23: note: expanded from macro
-> > > > > > '__smp_store_release'
-> > > > > >                 asm volatile ("stlr %1, %0"
-> > > > > > \
-> > > > > >                                     ^
-> > > > > > 1 warning generated.
-> > > > > > LLVM ERROR: Inline asm not supported by this streamer because we don't  <----  THIS LINE
-> > > > > > have an asm parser for this target
-> > > > > 
-> > > > > ... so as far as I can see it's the presence of any inline assembly that
-> > > > > the tool cannot handle, as LLVM tells us.
-> 
-> > > In the error message, LLVM explicitly states that it does not have a
-> > > parser for this target's assembly -- which would be a problem for *any*
-> > > inline assembly.
-> > > 
-> > > How does that specific error relate to the use of assembly macros within
-> > > sysreg.h?
-> > 
-> > This is the only error that is relevant:
-> > 
-> > LLVM ERROR: Inline asm not supported by this streamer because we don't have an asm parser for this target
-> > 
-> > Upon inspection it does not appear that this is explicitly related to
-> > assembly macros, just simple inline assembly. 
-> 
-> Indeed; as Will and I stated previously.
-> 
-> > Is this the only inline assembly outside a function that is not inside
-> > #ifdef __ASSEMBLY__ in the arm64 tree?
-> 
-> An __ASSEMBLY__ guard is irrelevant. We need the compiler to handle the
-> asm() statement, not the assembler (which cannot even parse it).
-> 
-> The kernel uses asm statements outside of functions elsewhere. For
-> example, take a look in <linux/export.h>. See that EXPORT_SYMBOL() uses
-> __CRC_SYMBOL(), which uses asm statements. The EXPORT_SYMBOL() is used
-> outside of functions, on all architectures, arm64 and x86 included.
-> 
-> I don't see why being inside a function matters. Given the error
-> message, the toolchain presumably can't parse inline assembly in any
-> context. We have static inline functions with assembly in headers, which
-> are presumably affected.
 
-You are correct that it appears llvm cannot process any inline asm for
-arm64.  Sadly (or luckily) the inability to process this is not a
-hard-requirement for llvm to properly compile code that includes these
-h-files -- as long as none of #defines/c-macros/inline functions are
-actually *called* in the code I'm trying to compile.
 
-That is the tricky part about this entire problem and why excluding the
-inline assembly allows me to compile properly while leaving all the
-other assembly inside macros or inline functions is just fine.
+On 16/03/17 06:01, Mark Brown wrote:
+> On Tue, Feb 28, 2017 at 09:59:29AM +0000, Charles Keepax wrote:
+>> On Mon, Feb 27, 2017 at 12:51:08PM +0100, Matthias Reichl wrote:
+>>>> I have a bcm2835 (Pi 2 and 3) SoC here. It is producing multichannel (8 out,
+>>>> 6 in) audio. In ALSA we call that DSP mode - right ?!
+>>> No. DSP modes are protocol/timing specifications as I2S, PDP, S/PDIF, ...
+>>> You can look these up in datasheets and if a chip implements such a
+>>> protocol you can be sure that it adheres to that standard - i.e. it
+>>> will sync the frames to the pulses on LRclk.
+>> I agree with the thoughts in this thread really if the AP doesn't
+>> actually support DSP A mode we shouldn't add DSP A mode.
+> The trouble here is that this isn't 100% clear, the specifications of
+> the DSP modes are such that only one edge in the LRCLK matters and so
+> providing you're doing mono or have exact clocking they interoperate
+> perfectly well.  We already frequently do similar things the other way,
+> most of the programmable serial ports can't actually do I2S modes
+> properly and rely on exact clocking to get things right when operating
+> as I2S since they only sync on one edge (though they can generally
+> generate the clocks correctly when operating as master, they just don't
+> pay attention to the left/right switch edge).
+>
+> That said unless we're doing something with the data layout or similar
+> configuration there's a fairly strong case for putting the mangling for
+> this in the core, something like just falling back to I2S mode if we set
+> DSP A and so on.  Which would be a lot nicer if we actually got round to
+> putting mode capability information in the drivers.
 
-Sorry I continue to harp on this, but I've been testing XDP on ARM64
-using some Broadcom SoCs and I'm seeing some really nice performance
-benefits to being able to process so many frames per second using a
-smaller footprint device.  I'd like to see the ARM64 XDP user community
-grow, but without the ability to easily compile the samples in the
-upstream kernel tree today I just don't see this user- or developer-base
-growing.  
+I agree, the data layout is already configurable in the bcm2835_i2s.c 
+platform driver. We can already use the "snd_soc_dai_set_bclk_ratio" 
+function to manage word offsets in our machine drivers.
 
-> It sounds like the toolchain you are using is lacking in functionality
-> that is presumably present when targeting x86, or the error messages are
-> simply misleading. In either case, there's a toolchain issue to be
-> addressed, and not a kernel issue.
+There is nothing which says that the bcm2835 SoC is I2S restricted in 
+any way. In fact, the reference document says quite the opposite.
 
-While I generally agree isn't the entire reason this inline asm exists
--- to fix a binutils issue?  :-)
+In the reference "BCM2835 ARM Peripherals" pdf, they call the audio 
+system an "APB peripheral". They are saying that it is reconfigurable 
+and part of the AMBA family of interconnect schemes.
 
-commit 72c5839515260dce966cd24f54436e6583288e6c
-Author: Catalin Marinas <catalin.marinas@arm.com>
-Date:   Thu Jul 24 14:14:42 2014 +0100
+As far as the bcm2835_i2s platform driver goes, it has implemented an 
+AMBA protocol, where audio words are counted from the LR clock onset - 
+for some reason people are insisting this is an I2S bus. Really our 
+implementation is not I2S at all, because word onsets are programmable 
+and flexible in the bcm2835_i2s.c driver.
 
-    arm64: gicv3: Allow GICv3 compilation with older binutils
-   
-    GICv3 introduces new system registers accessible with the full msr/mrs
-    syntax (e.g. mrs x0, Sop0_op1_CRm_CRn_op2). However, only recent
-    binutils understand the new syntax. This patch introduces msr_s/mrs_s
-    assembly macros which generate the equivalent instructions above and
-    converts the existing GICv3 code (both drivers/irqchip/ and
-    arch/arm64/kernel/).
+What I have been trying to make happen over the past few months is to 
+enable a different capability of the AMBA audio core on the bcm2835. Can 
+you suggest a realistic approach to realising this which is acceptable 
+to the ALSA code base ?
+
+Do you suggest I go back to the approach of implementing the DSP mode 
+for this platform driver ?
+
+thanks
+Matt
