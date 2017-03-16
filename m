@@ -1,84 +1,52 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Thu, 16 Mar 2017 09:59:01 +0100
-Subject: [RFC PATCH 17/33] irqchip/gic-v3-its: Add VLPI configuration hook
-In-Reply-To: <1484648454-21216-18-git-send-email-marc.zyngier@arm.com>
-References: <1484648454-21216-1-git-send-email-marc.zyngier@arm.com>
- <1484648454-21216-18-git-send-email-marc.zyngier@arm.com>
-Message-ID: <fb06cd69-7a5d-0615-89ab-abe861ab4045@redhat.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Thu, 16 Mar 2017 10:05:39 +0100
+Subject: [PATCH] mtd: nand: orion: fix clk handling
+In-Reply-To: <20170312213406.20987-1-gmbnomis@gmail.com>
+References: <20170312213406.20987-1-gmbnomis@gmail.com>
+Message-ID: <20170316100539.15bb1828@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Simon,
 
-On 17/01/2017 11:20, Marc Zyngier wrote:
-> Add the skeleton irq_set_vcpu_affinity method that will be used
-> to configure VLPIs.
+On Sun, 12 Mar 2017 22:34:06 +0100
+Simon Baatz <gmbnomis@gmail.com> wrote:
+
+> The clk handling in orion_nand.c had two problems:
 > 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-Reviewed-by: Eric Auger <eric.auger@redhat.com>
-
-Eric
-
+> - In the probe function, clk_put() was called for an enabled clock,
+>   which violates the API (see documentation for clk_put() in
+>   include/linux/clk.h)
+> 
+> - In the error path of the probe function, clk_put() could be called
+>   twice for the same clock.
+> 
+> In order to clean this up, use the managed function devm_clk_get() and
+> store the pointer to the clk in the driver data.
+> 
+> Fixes: baffab28b13120694fa3ebab08d3e99667a851d2 ('ARM: Orion: fix driver probe error handling with respect to clk')
+> Cc: <stable@vger.kernel.org> # v4.5+
+> Signed-off-by: Simon Baatz <gmbnomis@gmail.com>
 > ---
->  drivers/irqchip/irq-gic-v3-its.c | 33 +++++++++++++++++++++++++++++++++
->  1 file changed, 33 insertions(+)
+>  drivers/mtd/nand/orion_nand.c | 42 +++++++++++++++++++++---------------------
+>  1 file changed, 21 insertions(+), 21 deletions(-)
 > 
-> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-> index 0dbc8b0..1bd78ca 100644
-> --- a/drivers/irqchip/irq-gic-v3-its.c
-> +++ b/drivers/irqchip/irq-gic-v3-its.c
-> @@ -36,6 +36,7 @@
+> diff --git a/drivers/mtd/nand/orion_nand.c b/drivers/mtd/nand/orion_nand.c
+> index 4a91c5d000be..b355aa738fae 100644
+> --- a/drivers/mtd/nand/orion_nand.c
+> +++ b/drivers/mtd/nand/orion_nand.c
+> @@ -23,6 +23,11 @@
+>  #include <asm/sizes.h>
+>  #include <linux/platform_data/mtd-orion_nand.h>
 >  
->  #include <linux/irqchip.h>
->  #include <linux/irqchip/arm-gic-v3.h>
-> +#include <linux/irqchip/arm-gic-v4.h>
->  
->  #include <asm/cputype.h>
->  #include <asm/exception.h>
-> @@ -771,6 +772,37 @@ static int its_irq_set_irqchip_state(struct irq_data *d,
->  	return 0;
->  }
->  
-> +static int its_irq_set_vcpu_affinity(struct irq_data *d, void *vcpu_info)
-> +{
-> +	struct its_device *its_dev = irq_data_get_irq_chip_data(d);
-> +	struct its_cmd_info *info = vcpu_info;
-> +	u32 event = its_get_event_id(d);
-> +
-> +	/* Need a v4 ITS */
-> +	if (!its_dev->its->is_v4 || !info)
-> +		return -EINVAL;
-> +
-> +	switch (info->cmd_type) {
-> +	case MAP_VLPI:
-> +	{
-> +		return 0;
-> +	}
-> +
-> +	case UNMAP_VLPI:
-> +	{
-> +		return 0;
-> +	}
-> +
-> +	case PROP_UPDATE_VLPI:
-> +	{
-> +		return 0;
-> +	}
-> +
-> +	default:
-> +		return -EINVAL;
-> +	}
-> +}
-> +
->  static struct irq_chip its_irq_chip = {
->  	.name			= "ITS",
->  	.irq_mask		= its_mask_irq,
-> @@ -779,6 +811,7 @@ static struct irq_chip its_irq_chip = {
->  	.irq_set_affinity	= its_set_affinity,
->  	.irq_compose_msi_msg	= its_irq_compose_msi_msg,
->  	.irq_set_irqchip_state	= its_irq_set_irqchip_state,
-> +	.irq_set_vcpu_affinity	= its_irq_set_vcpu_affinity,
->  };
->  
->  /*
-> 
+> +struct orion_nand_info {
+> +	struct nand_chip chip;
+> +	struct clk       *clk;
+
+Can we avoid this kind of alignment, which will not be preserved if
+someone adds a new field with a type that is longer than "struct
+nand_chip "?
+
+Regards,
+
+Boris
