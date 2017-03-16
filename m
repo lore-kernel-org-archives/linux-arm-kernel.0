@@ -1,92 +1,36 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Thu, 16 Mar 2017 09:20:13 +0100
-Subject: [PATCH v4] drm/rockchip: Refactor the component match logic.
-In-Reply-To: <1489629956-32285-1-git-send-email-jeffy.chen@rock-chips.com>
-References: <1489629956-32285-1-git-send-email-jeffy.chen@rock-chips.com>
-Message-ID: <4477033.icEzZGFJNF@phil>
+Date: Thu, 16 Mar 2017 09:28:23 +0100
+Subject: [PATCH v1 2/7] dt-bindings: iio: rockchip-saradc: add support for
+ rk3328
+In-Reply-To: <1489572237-6649-3-git-send-email-cl@rock-chips.com>
+References: <1489572237-6649-1-git-send-email-cl@rock-chips.com>
+ <1489572237-6649-3-git-send-email-cl@rock-chips.com>
+Message-ID: <8664375.8vdE6CQfX9@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jeffy,
-
-Am Donnerstag, 16. M?rz 2017, 10:05:56 CET schrieb Jeffy Chen:
-> Currently we are adding all components from the dts, if one of their
-> drivers been disabled, we would not be able to bring up others.
+Am Mittwoch, 15. M?rz 2017, 18:03:52 CET schrieb cl at rock-chips.com:
+> From: Chen Liang <cl@rock-chips.com>
 > 
-> Refactor component match logic, follow exynos drm.
+> The rk3328 saradc is the same as rk3399.
 > 
-> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
-> Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
-
-[...]
-
-> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
-> b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c index b360e62..51433da 100644
-> --- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
-> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
-> @@ -356,34 +356,42 @@ static const struct dev_pm_ops rockchip_drm_pm_ops = {
-> rockchip_drm_sys_resume)
->  };
+> Signed-off-by: Chen Liang <cl@rock-chips.com>
+> ---
+>  Documentation/devicetree/bindings/iio/adc/rockchip-saradc.txt | 1 +
+>  1 file changed, 1 insertion(+)
 > 
-> -static int compare_of(struct device *dev, void *data)
-> -{
-> -	struct device_node *np = data;
-> +#define MAX_ROCKCHIP_DRM_DRVS 16
-> +static struct platform_driver *rockchip_drm_drvs[MAX_ROCKCHIP_DRM_DRVS];
-> +static int rockchip_drm_drvs_cnt;
-> 
-> -	return dev->of_node == np;
-> +#define ROCKCHIP_DRM_DRV(drv, cond) { \
-> +	if (IS_ENABLED(cond)) \
-> +		rockchip_drm_drvs[rockchip_drm_drvs_cnt++] = &drv; \
->  }
+> diff --git a/Documentation/devicetree/bindings/iio/adc/rockchip-saradc.txt
+> b/Documentation/devicetree/bindings/iio/adc/rockchip-saradc.txt index
+> 205593f..f81bc20 100644
+> --- a/Documentation/devicetree/bindings/iio/adc/rockchip-saradc.txt
+> +++ b/Documentation/devicetree/bindings/iio/adc/rockchip-saradc.txt
+> @@ -5,6 +5,7 @@ Required properties:
+>     - "rockchip,saradc": for rk3188, rk3288
+>     - "rockchip,rk3066-tsadc": for rk3036
+>     - "rockchip,rk3399-saradc": for rk3399
+> +   - "rockchip,rk3328-saradc", "rockchip,rk3399-saradc": for rk3328
 
-[...]
+not sure how iio people see that, but I would suggest keeping the order, so 
+put rk3328 above rk3399.
 
-> +static int __init rockchip_drm_init(void)
-> +{
-> +	int ret;
-> +
-> +	rockchip_drm_drvs_cnt = 0;
-> +	ROCKCHIP_DRM_DRV(vop_platform_driver, CONFIG_DRM_ROCKCHIP);
-> +	ROCKCHIP_DRM_DRV(rockchip_dp_driver, CONFIG_ROCKCHIP_ANALOGIX_DP);
-> +	ROCKCHIP_DRM_DRV(cdn_dp_driver, CONFIG_ROCKCHIP_CDN_DP);
-> +	ROCKCHIP_DRM_DRV(dw_hdmi_rockchip_pltfm_driver,
-> +			 CONFIG_ROCKCHIP_DW_HDMI);
-> +	ROCKCHIP_DRM_DRV(dw_mipi_dsi_driver, CONFIG_ROCKCHIP_DW_MIPI_DSI);
-> +	ROCKCHIP_DRM_DRV(inno_hdmi_driver, CONFIG_ROCKCHIP_INNO_HDMI);
-> +
-> +	ret = platform_register_drivers(rockchip_drm_drvs,
-> +					rockchip_drm_drvs_cnt);
-> +	if (ret)
-> +		return ret;
-
-With the following config snippet
-
-CONFIG_DRM_ROCKCHIP=m
-CONFIG_ROCKCHIP_ANALOGIX_DP=y
-# CONFIG_ROCKCHIP_CDN_DP is not set
-CONFIG_ROCKCHIP_DW_HDMI=y
-CONFIG_ROCKCHIP_DW_MIPI_DSI=y
-CONFIG_ROCKCHIP_INNO_HDMI=y
-
-I get these faults on arm32 (1 warning, 1 linker error):
-
-  CC [M]  drivers/gpu/drm/rockchip/rockchip_drm_drv.o
-  CC [M]  drivers/gpu/drm/rockchip/rockchip_drm_fb.o
-  CC [M]  drivers/gpu/drm/rockchip/rockchip_drm_gem.o
-  CC [M]  drivers/gpu/drm/rockchip/rockchip_drm_psr.o
-  CC [M]  drivers/gpu/drm/rockchip/rockchip_drm_vop.o
-  CC [M]  drivers/gpu/drm/rockchip/rockchip_vop_reg.o
-../drivers/gpu/drm/rockchip/rockchip_vop_reg.c:407:31: warning: ?vop_platform_driver? defined but not used [-Wunused-variable]
- static struct platform_driver vop_platform_driver = {
-                               ^~~~~~~~~~~~~~~~~~~
-  CC [M]  drivers/gpu/drm/rockchip/rockchip_drm_fbdev.o
-  CC [M]  drivers/gpu/drm/rockchip/analogix_dp-rockchip.o
-  CC [M]  drivers/gpu/drm/rockchip/dw_hdmi-rockchip.o
-  CC [M]  drivers/gpu/drm/rockchip/dw-mipi-dsi.o
-  CC [M]  drivers/gpu/drm/rockchip/inno_hdmi.o
-  LD [M]  drivers/gpu/drm/rockchip/rockchipdrm.o
-  Building modules, stage 2.
-  MODPOST 352 modules
-ERROR: "vop_platform_driver" [drivers/gpu/drm/rockchip/rockchipdrm.ko] undefined!
+Heiko
