@@ -1,18 +1,38 @@
-From: dan.carpenter@oracle.com (Dan Carpenter)
-Date: Thu, 16 Mar 2017 14:40:45 +0300
-Subject: [PATCH] vc04_services: Fixing coding guideline error
-In-Reply-To: <CAMvNc9BT7_5Hu2iFxd1cbEY64jzQxCEZhdgU8cm_p_SDnZFZhQ@mail.gmail.com>
-References: <1489559468-46932-1-git-send-email-pushkar.iit@gmail.com>
- <CAMvNc9BT7_5Hu2iFxd1cbEY64jzQxCEZhdgU8cm_p_SDnZFZhQ@mail.gmail.com>
-Message-ID: <20170316114045.GD4124@mwanda>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 16 Mar 2017 11:45:33 +0000
+Subject: [PATCH 0/2] KVM: arm/arm64: vgic: Workaround GICC_PMR misreporting
+Message-ID: <20170316114535.25233-1-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 16, 2017 at 11:01:38AM +0530, Pushkar Jambhlekar wrote:
-> Any comment?
-> 
+We have an annoying bug in the way we deal with GICC_PMR being
+reported to userspace. When emulating a GICv2, we only report the top
+5 bits (which is what the HW deals with) in an 8 bit field, completely
+missing the left shift that would make it look like a normal value.
 
-You're too impatient.  Wait for 2 weeks before asking for responses.
+VM save/restore works just fine because we have the same issue on both
+sides, and fixing it without any opt-in would break that migration.
 
-regards,
-dan carpenter
+This series implements a new attribute for the GICv2 emulation that
+can be probed and set by userspace if it is interested in the real PMR
+value. It also implements the reverse hack when emulating GICv2 on a
+GICv3 host...
+
+As this impacts userspace, I'm quite eager to have feedback from
+people dealing with that side of the world.
+
+Marc Zyngier (2):
+  KVM: arm/arm64: vgic-v2: Expose the correct GICC_PMR values to
+    userspace
+  KVM: arm/arm64: vgic-v3: Format PMR to mimic the GICv2 behaviour
+
+ arch/arm/include/uapi/asm/kvm.h     |  4 ++--
+ arch/arm64/include/uapi/asm/kvm.h   |  4 ++--
+ include/kvm/arm_vgic.h              |  5 +++++
+ virt/kvm/arm/vgic/vgic-kvm-device.c |  5 +++++
+ virt/kvm/arm/vgic/vgic-v2.c         | 16 ++++++++++++++++
+ virt/kvm/arm/vgic/vgic-v3.c         | 21 +++++++++++++++++++++
+ 6 files changed, 51 insertions(+), 4 deletions(-)
+
+-- 
+2.11.0
