@@ -1,35 +1,63 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 16 Mar 2017 10:31:33 +0100
-Subject: [PATCH v3 1/2] mtd: ifc: Update dependency of IFC for LS1021A
-In-Reply-To: <DB6PR0401MB2584CFFA50BD3B9A4205DE9FF4590@DB6PR0401MB2584.eurprd04.prod.outlook.com>
-References: <1486968416-13536-1-git-send-email-b18965@freescale.com>
- <20170213083401.5adf8c31@bbrezillon>
- <DB6PR0401MB258411171005499F70EAE505F4590@DB6PR0401MB2584.eurprd04.prod.outlook.com>
- <20170213085546.026865b8@bbrezillon>
- <DB6PR0401MB2584CFFA50BD3B9A4205DE9FF4590@DB6PR0401MB2584.eurprd04.prod.outlook.com>
-Message-ID: <20170316103133.6bc7574b@bbrezillon>
+From: amakarov.linux@gmail.com (Aleksey Makarov)
+Date: Thu, 16 Mar 2017 12:31:53 +0300
+Subject: [PATCH v3] Revert "tty: serial: pl011: add ttyAMA for matching
+ pl011 console"
+In-Reply-To: <CA+7sy7C6zp3giR+ypFXqbsNY_C3ggUgegS1zEWOAybkRBtCn4w@mail.gmail.com>
+References: <20170301122602.30025-1-aleksey.makarov@linaro.org>
+ <20170301152304.29635-1-aleksey.makarov@linaro.org>
+ <d1e067f1-e82f-7692-bcc2-e3549887be63@arm.com>
+ <CA+7sy7C6zp3giR+ypFXqbsNY_C3ggUgegS1zEWOAybkRBtCn4w@mail.gmail.com>
+Message-ID: <008d062d-1095-5a65-3a69-33bee1f648d7@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 13 Feb 2017 08:01:17 +0000
-Alison Wang <alison.wang@nxp.com> wrote:
 
-> > On Mon, 13 Feb 2017 07:39:41 +0000
-> > Alison Wang <alison.wang@nxp.com> wrote:
-> >   
-> > > Hi, Boris,
-> > >
-> > > 	Sorry, I forgot to change them. Should I resend them or you help  
-> > to fix that when applying?
-> > 
-> > I can fix that when applying, no need to resend.
-> > Note that you missed 4.11 (already sent my PR to Brian), I'll queue it
-> > for 4.12.
-> >   
-> [Alison Wang] Ok, I see. Thanks a lot.
 
-Applied both.
+On 03/16/2017 10:11 AM, Jayachandran C. wrote:
+> Hi Greg,
+> 
+> On Tue, Mar 14, 2017 at 9:44 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+>>
+>>
+>> On 01/03/17 15:23, Aleksey Makarov wrote:
+>>> The original patch makes the condition always true, so it is wrong.
+>>>
+>>> It masks (but not fixes) the bug described in the commit message
+>>> but introduces a regression (no console is selected by SPCR)
+>>> in regular (no 'console=ttyAMA') case.
+>>>
+>>> s/||/&&/ would not fix the problem as the root cause was identified
+>>> incorrectly.
+>>>
+>>> This reverts commit aea9a80ba98a0c9b4de88850260e9fbdcc98360b.
+>>>
+>>
+>> Sorry for that, I will test your patches and respond to that. For this
+>> patch:
+>>
+>> Acked-by: Sudeep Holla <sudeep.holla@arm.com>
+>>
+> 
+> This fixes a regression I see in v4.11-rc2
+> 
+> Tested-by: Jayachandran C <jnair@caviumnetworks.com>
+> 
+> I don't see it in the tty/serial tree yet
 
-Thanks,
+It's commit 713b93f1b849 from tty-next branch of 
+https://git.kernel.org/pub/scm/linux/kernel/git/gregkh/tty.git
 
-Boris
+So it looks like it is scheduled for 4.12
+
+Greg, this is a fix for regression.  Can it be applied to 4.11-rcX?
+
+Thank you
+Aleksey Makarov
+
+> 
+> JC.
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-serial" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
