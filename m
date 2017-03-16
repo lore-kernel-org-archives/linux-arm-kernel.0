@@ -1,33 +1,92 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Thu, 16 Mar 2017 18:47:33 +0100 (CET)
-Subject: Legacy PCI interrupt support in PCIe host driver
-In-Reply-To: <8443b350-6aa6-75f8-af48-892c722fc2d9@free.fr>
-References: <5612adb6-af5c-9fbf-e725-813ee7fe1b4b@free.fr>
- <8443b350-6aa6-75f8-af48-892c722fc2d9@free.fr>
-Message-ID: <alpine.DEB.2.20.1703161843420.3586@nanos>
+From: mdf@kernel.org (Moritz Fischer)
+Date: Thu, 16 Mar 2017 10:54:33 -0700
+Subject: [PATCH v2] ARM: zynq: Add #io-channel-cells to (x)adc node for
+ iio-hwmon
+In-Reply-To: <37f29986-6491-67ab-144c-eb485cc1fdcc@metafoo.de>
+References: <1489003884-2489-1-git-send-email-mdf@kernel.org>
+ <e6da3f38-7039-66e5-5b9d-a44ff42aa9c9@xilinx.com>
+ <CAJYdmeNc48=OOvRiUjqPBJhz9RCbzeaRGu1Tfm=hrvzkJrSsag@mail.gmail.com>
+ <7e4fbe16-8686-5399-748d-af222c630338@xilinx.com>
+ <37f29986-6491-67ab-144c-eb485cc1fdcc@metafoo.de>
+Message-ID: <CAJYdmeMg+DtwwbXOM7hPC4ejvkYkR94fcoyvTpx86RSKSswFMg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 16 Mar 2017, Mason wrote:
-> About shared ISRs. Are they supposed to return IRQ_HANDLED
-> if and only if they handled something?
+Hi Lars,
 
-Every interrupt handler is supposed to return IRQ_NONE if it did not handle
-it. That does not depend on shared or not. The handler does not know if
-it's on a shared interrupt line or not. IRQF_SHARED only tells, that the
-handler is capable of sharing the interrupt line with another device.
+On Thu, Mar 16, 2017 at 9:51 AM, Lars-Peter Clausen <lars@metafoo.de> wrote:
+> On 03/16/2017 05:45 PM, Michal Simek wrote:
+>> On 16.3.2017 17:39, Moritz Fischer wrote:
+>>> On Thu, Mar 16, 2017 at 9:16 AM, Michal Simek <michal.simek@xilinx.com> wrote:
+>>>> Hi,
+>>>>
+>>>> On 8.3.2017 21:11, Moritz Fischer wrote:
+>>>>> Fix
+>>>>>
+>>>>> OF: /iio_hwmon: could not get #io-channel-cells for
+>>>>> /amba/adc at f8007100
+>>>>> OF: /iio_hwmon: could not get #io-channel-cells for
+>>>>> /amba/adc at f8007100
+>>>>> OF: /iio_hwmon: could not get #io-channel-cells for
+>>>>> /amba/adc at f8007100
+>>>>>
+>>>>> by adding the #io-channel-cells property.
+>>>>>
+>>>>> Signed-off-by: Moritz Fischer <mdf@kernel.org>
+>>>>> Cc: Michal Simek <michal.simek@xilinx.com>
+>>>>> Cc: S?ren Brinkmann <soren.brinkmann@xilinx.com>
+>>>>> Cc: Julia Cartwright <julia@ni.com>
+>>>>> Cc: linux-kernel at vger.kernel.org
+>>>>> Cc: devicetree at vger.kernel.org
+>>>>> ---
+>>>>>
+>>>>> Changes from v1:
+>>>>> - fix messed up commit message
+>>>>> ---
+>>>>>  arch/arm/boot/dts/zynq-7000.dtsi | 1 +
+>>>>>  1 file changed, 1 insertion(+)
+>>>>>
+>>>>> diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
+>>>>> index f3ac9bf..98233a8 100644
+>>>>> --- a/arch/arm/boot/dts/zynq-7000.dtsi
+>>>>> +++ b/arch/arm/boot/dts/zynq-7000.dtsi
+>>>>> @@ -72,6 +72,7 @@
+>>>>>                       interrupts = <0 7 4>;
+>>>>>                       interrupt-parent = <&intc>;
+>>>>>                       clocks = <&clkc 12>;
+>>>>> +                     #io-channel-cells = <1>;
+>>>>>               };
+>>>>>
+>>>>>               can0: can at e0008000 {
+>>>>>
+>>>>
+>>>> I think it will be good to the next step too.
+>>>> It means also add iio-hwmon node too.
+>>>>
+>>>> What do you think?
+>>>
+>>> I hadn't put it in there since dts is supposed to describe hw,
+>>> but obviously putting the actual hwmon in there makes it more useful.
+>>
+>> I had one discussion about this with Grant in past and it is common
+>> mistake. It is simplification of purpose of dts.
+>>
+>
+> If the iio-hwmon binding had gone through review it would have been rejected.
+>
+>>>
+>>> I can resubmit with the hwmon node in there.
+>>
+>> If you grep kernel tree you will see that others are using it too.
+>> Also there is accepted binding for that that's why I can't see big
+>> problem with it.
+>
+> Since this is an application specific binding I wouldn't put it in the
+> generic DT include file. It's a bit like adding a gpio-key binding for each
+> of the GPIOs just in case somebody wants to use it.
 
-> Will that stop the next ISR from being called?
-
-No.
-
-> I guess if two interrupts fire at the same time, we'll just take two
-> separate exceptions?
-
-Wrong guess. That might work with level interupts, but with other types
-nothing will raise another exception. Sharing interrupts on edge types is a
-stupid idea, but hardware folks insist on implementing stupid ideas.
+So is your suggestion to move the whole thing from .dtsi -> .dts?
 
 Thanks,
 
-	tglx
+Moritz
