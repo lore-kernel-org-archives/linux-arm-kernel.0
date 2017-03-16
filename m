@@ -1,62 +1,132 @@
-From: tixy@linaro.org (Jon Medhurst)
-Date: Thu, 16 Mar 2017 13:29:57 +0000
-Subject: [PATCH 1/2] arm: Fix cache inconsistency when using fixmap
-Message-ID: <20170316132958.22227-1-tixy@linaro.org>
+From: andrew.smirnov@gmail.com (Andrey Smirnov)
+Date: Thu, 16 Mar 2017 06:30:49 -0700
+Subject: [PATCH v6 1/2] dt-bindings: Add GPCv2 power gating driver
+In-Reply-To: <20170316133050.28471-1-andrew.smirnov@gmail.com>
+References: <20170316133050.28471-1-andrew.smirnov@gmail.com>
+Message-ID: <20170316133050.28471-2-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To cope with the variety in ARM architectures and configurations, the
-pagetable attributes for kernel memory are generated at runtime to match
-the system the kernel finds itself on. This calculated value is stored
-in pgprot_kernel.
+Add DT bindings for power domain driver for GPCv2 IP block found in
+i.MX7 SoCs.
 
-However, when early fixmap support was added for arm (commit
-a5f4c561b3b1) the attributes used for mappings were hard coded because
-pgprot_kernel is not set up early enough. Unfortunately, the values used
-didn't include the 'shareable' attribute which means that for later
-non-early fixmap use, when multiple CPUs are running, any cache entries
-allocated for fixmap memory aren't kept consistent between CPUs. This
-can result in different CPUs seeing different memory contents.
-
-This issue was discovered on a dual cluster system by failures with
-kprobes, which uses fixmap to modify the kernel image if
-CONFIG_DEBUG_RODATA is enabled. It will also affect kgdb and jump_labels
-which also make use of the same code to modify the kernel, and any other
-uses of fixmap after secondary CPUs are brought online.
-
-To fix this issue, and to help avoid other potential problems where
-pagetable attributes are incorrect, we change the fixmap code to use the
-same generated value in pgprot_kernel that the rest of the kernel uses,
-and only fall back to a hard coded value if this isn't set - which will
-be early on in boot before other CPUs are brought online.
-
-Fixes: a5f4c561b3b1 ("ARM: 8415/1: early fixmap support for earlycon")
-Cc: stable at vger.kernel.org # v4.3+
-
-Reviewed-by: Stefan Agner <stefan@agner.ch>
-Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Signed-off-by: Jon Medhurst <tixy@linaro.org>
+Cc: yurovsky at gmail.com
+Cc: Lucas Stach <l.stach@pengutronix.de>
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Fabio Estevam <fabio.estevam@nxp.com>
+Cc: devicetree at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 ---
+ .../devicetree/bindings/power/fsl,imx-gpcv2.txt    | 71 ++++++++++++++++++++++
+ include/dt-bindings/power/imx7-power.h             | 18 ++++++
+ 2 files changed, 89 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/power/fsl,imx-gpcv2.txt
+ create mode 100644 include/dt-bindings/power/imx7-power.h
 
-Stefan and Ard reviewed the code in these 2 patches but not the commit
-wording... https://www.spinics.net/lists/arm-kernel/msg565126.html
-
- arch/arm/include/asm/fixmap.h | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/include/asm/fixmap.h b/arch/arm/include/asm/fixmap.h
-index 5c17d2dec777..4e6784dc5668 100644
---- a/arch/arm/include/asm/fixmap.h
-+++ b/arch/arm/include/asm/fixmap.h
-@@ -41,7 +41,8 @@ static const enum fixed_addresses __end_of_fixed_addresses =
- 
- #define FIXMAP_PAGE_COMMON	(L_PTE_YOUNG | L_PTE_PRESENT | L_PTE_XN | L_PTE_DIRTY)
- 
--#define FIXMAP_PAGE_NORMAL	(FIXMAP_PAGE_COMMON | L_PTE_MT_WRITEBACK)
-+#define FIXMAP_PAGE_NORMAL	(pgprot_kernel ? pgprot_kernel | L_PTE_XN : \
-+					FIXMAP_PAGE_COMMON | L_PTE_MT_WRITEBACK)
- #define FIXMAP_PAGE_RO		(FIXMAP_PAGE_NORMAL | L_PTE_RDONLY)
- 
- /* Used by set_fixmap_(io|nocache), both meant for mapping a device */
+diff --git a/Documentation/devicetree/bindings/power/fsl,imx-gpcv2.txt b/Documentation/devicetree/bindings/power/fsl,imx-gpcv2.txt
+new file mode 100644
+index 0000000..02f45c6
+--- /dev/null
++++ b/Documentation/devicetree/bindings/power/fsl,imx-gpcv2.txt
+@@ -0,0 +1,71 @@
++Freescale i.MX General Power Controller v2
++==========================================
++
++The i.MX7S/D General Power Control (GPC) block contains Power Gating
++Control (PGC) for various power domains.
++
++Required properties:
++
++- compatible: Should be "fsl,imx7d-gpc"
++
++- reg: should be register base and length as documented in the
++  datasheet
++
++- interrupts: Should contain GPC interrupt request 1
++
++Power domains contained within GPC node are generic power domain
++providers, documented in
++Documentation/devicetree/bindings/power/power_domain.txt, which are
++described as subnodes of the power gating controller 'pgc' node,
++which, in turn, is expected to contain the following:
++
++Required properties:
++
++- reg: Power domain index. Valid values are defined in
++  include/dt-bindings/power/imx7-power.h
++
++- #power-domain-cells: Should be 0
++
++Optional properties:
++
++- power-supply: Power supply used to power the domain
++
++Example:
++
++	gpc: gpc at 303a0000 {
++		compatible = "fsl,imx7d-gpc";
++		reg = <0x303a0000 0x1000>;
++		interrupt-controller;
++		interrupts = <GIC_SPI 87 IRQ_TYPE_LEVEL_HIGH>;
++		#interrupt-cells = <3>;
++		interrupt-parent = <&intc>;
++
++		pgc {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			pgc_pcie_phy: power-domain at 3 {
++				#power-domain-cells = <0>;
++
++				reg = <IMX7_POWER_DOMAIN_PCIE_PHY>;
++				power-supply = <&reg_1p0d>;
++			};
++		};
++	};
++
++
++Specifying power domain for IP modules
++======================================
++
++IP cores belonging to a power domain should contain a 'power-domains'
++property that is a phandle for PGC node representing the domain.
++
++Example of a device that is part of the PCIE_PHY power domain:
++
++	pcie: pcie at 33800000 {
++	      reg = <0x33800000 0x4000>,
++	            <0x4ff00000 0x80000>;
++		/* ... */
++		power-domains = <&pgc_pcie_phy>;
++		/* ... */
++	};
+diff --git a/include/dt-bindings/power/imx7-power.h b/include/dt-bindings/power/imx7-power.h
+new file mode 100644
+index 0000000..eb70023
+--- /dev/null
++++ b/include/dt-bindings/power/imx7-power.h
+@@ -0,0 +1,18 @@
++/*
++ *  Copyright (C) 2017 Impinj
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#ifndef __DT_BINDINGS_IMX7_POWER_H__
++#define __DT_BINDINGS_IMX7_POWER_H__
++
++#define IMX7_POWER_DOMAIN_USB_HSIC_PHY	0
++#define IMX7_POWER_DOMAIN_USB_OTG2_PHY	1
++#define IMX7_POWER_DOMAIN_USB_OTG1_PHY	2
++#define IMX7_POWER_DOMAIN_PCIE_PHY	3
++#define IMX7_POWER_DOMAIN_MIPI_PHY	4
++
++#endif
 -- 
-2.11.0
+2.9.3
