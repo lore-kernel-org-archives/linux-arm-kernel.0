@@ -1,65 +1,61 @@
-From: jcm@jonmasters.org (Jon Masters)
-Date: Thu, 16 Mar 2017 10:32:39 -0400
-Subject: [PATCH] PCI: ACPI: Fix ThunderX PEM initialization
-In-Reply-To: <20170315113323.GA28027@localhost.localdomain>
-References: <1485793552-12614-1-git-send-email-Vadim.Lomovtsev@caviumnetworks.com>
- <20170130211236.GW20550@bhelgaas-glaptop.roam.corp.google.com>
- <20170131102830.GA13854@localhost.localdomain>
- <20170131142525.GA9942@bhelgaas-glaptop.roam.corp.google.com>
- <20170131145720.GA14231@localhost.localdomain>
- <20170131203109.GA14127@bhelgaas-glaptop.roam.corp.google.com>
- <20170201125325.GA15805@localhost.localdomain>
- <20170201151807.GA15793@bhelgaas-glaptop.roam.corp.google.com>
- <376ae1df-da85-e576-75d6-3ae2ab0f1b41@jonmasters.org>
- <20170315113323.GA28027@localhost.localdomain>
-Message-ID: <251db823-591b-483b-9c55-13c911020fd1@jonmasters.org>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 16 Mar 2017 15:45:53 +0100
+Subject: [PATCH] mmc: mediatek: Fixed bug where clock frequency could be
+ set wrong
+In-Reply-To: <1488611403-30186-2-git-send-email-yong.mao@mediatek.com>
+References: <1488611403-30186-1-git-send-email-yong.mao@mediatek.com>
+ <1488611403-30186-2-git-send-email-yong.mao@mediatek.com>
+Message-ID: <CAPDyKFqzj-UT12rorqZ9536608=Zs37s1LhQb=4GpqV95QoNNw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vadim,
+On 4 March 2017 at 08:10, Yong Mao <yong.mao@mediatek.com> wrote:
+> From: yong mao <yong.mao@mediatek.com>
+>
+> This patch can fix two issues:
+>
+> Issue 1:
+> In previous code, div may be overflow when setting clock frequency
+> as f_min. We can use DIV_ROUND_UP to fix this boundary related
+> issue.
+>
+> Issue 2:
+> In previous code, we can not set the correct clock frequency when
+> div equals 0xff.
+>
+> Signed-off-by: Yong Mao <yong.mao@mediatek.com>
+> Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+> ---
+>  drivers/mmc/host/mtk-sd.c |    4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/mmc/host/mtk-sd.c b/drivers/mmc/host/mtk-sd.c
+> index 07f3236..3ad5228 100644
+> --- a/drivers/mmc/host/mtk-sd.c
+> +++ b/drivers/mmc/host/mtk-sd.c
+> @@ -591,7 +591,7 @@ static void msdc_set_mclk(struct msdc_host *host, unsigned char timing, u32 hz)
+>                 }
+>         }
+>         sdr_set_field(host->base + MSDC_CFG, MSDC_CFG_CKMOD | MSDC_CFG_CKDIV,
+> -                       (mode << 8) | (div % 0xff));
+> +                     (mode << 8) | div);
+>         sdr_set_bits(host->base + MSDC_CFG, MSDC_CFG_CKPDN);
+>         while (!(readl(host->base + MSDC_CFG) & MSDC_CFG_CKSTB))
+>                 cpu_relax();
+> @@ -1692,7 +1692,7 @@ static int msdc_drv_probe(struct platform_device *pdev)
+>         host->src_clk_freq = clk_get_rate(host->src_clk);
+>         /* Set host parameters to mmc */
+>         mmc->ops = &mt_msdc_ops;
+> -       mmc->f_min = host->src_clk_freq / (4 * 255);
+> +       mmc->f_min = DIV_ROUND_UP(host->src_clk_freq, 4 * 255);
+>
+>         mmc->caps |= MMC_CAP_ERASE | MMC_CAP_CMD23;
+>         /* MMC core transfer sizes tunable parameters */
+> --
+> 1.7.9.5
+>
 
-Thanks for your followup and attention to this matter. More below.
+Thanks, applied for fixes!
 
-On 03/15/2017 07:33 AM, Vadim Lomovtsev wrote:
-
->> The upstream Linux kernel contains a quirk matching entry that looks for
->> "THRX". Therefore, you have already agreed (as of at least January) that
->> this is the prefix that you will use in any firmware updates to support
->> the latest upstream Linux kernel. Please register this prefix promptly.
-> 
-> And from what I know for now - we wont going to register this
-> since we have already regsitered "CAV" prefix for that. And this was the part
-> of our discussion also.
-> 
-> We had a bit long review of proper implementation of legacy firmware support,
-> so my apologise on that.
-> 
-> Please take a look at link to the patchset posted by Tomasz.
-> https://www.spinics.net/lists/arm-kernel/msg568741.html
-
-I'll let others comment on the suitability of taking that for upstream.
-
->>>> So the FW will be updated accordingly.
->>
->> Indeed.
-> 
-> Yes, it is now contains "CAVxxx" as _HID for device config object.
-
-Which is different from the version that was merged into upstream. That
-should never have happened. It will never happen again. I have spent some
-time over the past few days ensuring folks understand that I will not
-allow a repeat of this to occur the next time around. We will have
-platforms that are bulletproof and supported by upstream with any
-errata fixes in a very carefully controlled manner. There will
-under no circumstances ever be a situation like this again.
-
->> The version Bjorn merged looks for "THRX". This is the version that you will
->> use, and you will promptly register that prefix with UEFI and provide fixes
->> for existing firmware to correctly use the solution that is upstream.
-> 
-> Cavium FW is updated accordingly to use already registered prefix.
-> For existent FW legacy support is posted by Tomasz.
-
-I'm watching this to ensure it's cleaned up properly.
-
-Jon.
+Kind regards
+Uffe
