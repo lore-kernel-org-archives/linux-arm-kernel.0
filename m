@@ -1,147 +1,95 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Thu, 16 Mar 2017 23:11:22 +0100
-Subject: media / v4l2-mc: wishlist for complex cameras (was Re: [PATCH v4
- 14/36] [media] v4l2-mc: add a function to inherit controls from a
- pipeline)
-In-Reply-To: <20170315172627.6b7cc955@vento.lan>
-References: <20170310223714.GI3220@valkosipuli.retiisi.org.uk>
- <20170311082549.576531d0@vento.lan>
- <20170313124621.GA10701@valkosipuli.retiisi.org.uk>
- <20170314004533.3b3cd44b@vento.lan>
- <e0a6c60b-1735-de0b-21f4-d8c3f4b3f10f@xs4all.nl>
- <20170314072143.498cde9b@vento.lan> <20170314223254.GA7141@amd>
- <20170314215420.6fc63c67@vento.lan> <20170315180421.GA10206@amd>
- <20170315172627.6b7cc955@vento.lan>
-Message-ID: <20170316221122.GA31588@amd>
+From: flatmax@flatmax.org (Matt Flax)
+Date: Fri, 17 Mar 2017 09:14:57 +1100
+Subject: [alsa-devel] [PATCH 0/3] ASoC: Enable a new IC master mode:
+ bcm2835<=>IC<=>cs42xx8
+In-Reply-To: <8c62f014-d246-e0c1-2b02-a28a2c2786b7@metafoo.de>
+References: <20170226144958.GA5543@camel2.lan>
+ <732a71ac-5ec5-37e1-1190-be036ea34555@flatmax.org>
+ <20170226221648.GA10974@camel2.lan>
+ <7cef41ee-ef00-22b7-830f-517a9d594ed0@flatmax.org>
+ <20170227080433.GA2718@delle.lan>
+ <170950f7-354f-e6a9-cefb-834a00fadd1b@flatmax.org>
+ <20170227103024.GF2718@delle.lan>
+ <7b78c782-28e1-4849-5d00-8caf30847d5c@flatmax.org>
+ <20170227115108.GA6732@delle.lan>
+ <20170228095929.GH2742@localhost.localdomain>
+ <20170315190108.y6ybxm3nfgnutajv@sirena.org.uk>
+ <7d8d38f7-53aa-cc3d-4bbd-141649528a8a@flatmax.org>
+ <8c62f014-d246-e0c1-2b02-a28a2c2786b7@metafoo.de>
+Message-ID: <000fbaa4-4c7c-5b13-0806-7e42672a4a55@flatmax.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-
-> > > > mplayer is useful for testing... but that one already works (after you
-> > > > setup the pipeline, and configure exposure/gain).
-> > > > 
-> > > > But thats useful for testing, not really for production. Image will be
-> > > > out of focus and with wrong white balance.
-> > > > 
-> > > > What I would really like is an application to get still photos. For
-> > > > taking pictures with manual settings we need
-> > > > 
-> > > > a) units for controls: user wants to focus on 1m, and take picture
-> > > > with ISO200, 1/125 sec. We should also tell him that lens is f/5.6 and
-> > > > focal length is 20mm with 5mm chip.
-> > > > 
-> > > > But... autofocus/autogain would really be good to have. Thus we need:
-> > > > 
-> > > > b) for each frame, we need exposure settings and focus position at
-> > > > time frame was taken. Otherwise autofocus/autogain will be too
-> > > > slow. At least focus position is going to be tricky -- either kernel
-> > > > would have to compute focus position for us (not trivial) or we'd need
-> > > > enough information to compute it in userspace.
-> > > > 
-> > > > There are more problems: hardware-accelerated preview is not trivial
-> > > > to set up (and I'm unsure if it can be done in generic way). Still
-> > > > photos application needs to switch resolutions between preview and
-> > > > photo capture. Probably hardware-accelerated histograms are needed for
-> > > > white balance, auto gain and auto focus, ....
-> > > > 
-> > > > It seems like there's a _lot_ of stuff to be done before we have
-> > > > useful support for complex cameras...  
-> > > 
-> > > Taking still pictures using a hardware-accelerated preview is
-> > > a sophisticated use case. I don't know any userspace application
-> > > that does that. Ok, several allow taking snapshots, by simply
-> > > storing the image of the current frame.  
-> > 
-> > Well, there are applications that take still pictures. Android has
-> > one. Maemo has another. Then there's fcam-dev. Its open source; with
-> > modified kernel it is fully usable. I have version that runs on recent
-> > nearly-mainline on N900. 
-> 
-> Hmm... it seems that FCam is specific for N900:
-> 	http://fcam.garage.maemo.org/
-> 
-> If so, then we have here just the opposite problem, if want it to be
-> used as a generic application, as very likely it requires OMAP3-specific
-> graph/subdevs.
-
-Well... there's quick and great version on maemo.org. I do have local
-version (still somehow N900-specific), but it no longer uses hardware
-histogram/sharpness support. Should be almost generic.
-
-> > So yes, I'd like solution for problems a) and b).
-
-...but it has camera parameters hardcoded (problem a) and slow
-(problem b). 
-
-> > Question is if camera without autofocus is usable. I'd say "not
-> > really".qv4l2
-> 
-> That actually depends on the sensor and how focus is adjusted.
-> 
-> I'm testing right now this camera module for RPi:
->    https://www.raspberrypi.org/products/camera-module-v2/
-> 
-> I might be wrong, but this sensor doesn't seem to have auto-focus.
-> Instead, it seems to use a wide-angle lens. So, except when the
-> object is too close, the focus look OK.
-
-Well, cameras without autofocus are somehow usable without
-autofocus. But cameras with autofocus don't work too well without one.
-
-> > If we really want to go that way (is not modifying library to access
-> > the right files quite easy?), I believe non-confusing option would be
-> > to have '/dev/video0 -- omap3 camera for legacy applications' which
-> > would include all the controls.
-> 
-> Yeah, keeping /dev/video0 reserved for generic applications is something
-> that could work. Not sure how easy would be to implement it.
-
-Plus advanced applications would just ignore /dev/video0.. and not be confused.
-
-> > > > > > You can get Nokia N900 on aliexpress. If not, they are still available
-> > > > between people :-)  
-> > > 
-> > > I have one. Unfortunately, I never had a chance to use it, as the display
-> > > stopped working one week after I get it.  
-> > 
-> > Well, I guess the easiest option is to just get another one :-).
-> 
-> :-)  Well, I guess very few units of N900 was sold in Brazil. Importing
-> one is too expensive, due to taxes.
-
-Try to ask at local mailing list. Those machines were quite common.
-
-> > But otoh -- N900 is quite usable without the screen. 0xffff tool can
-> > be used to boot the kernel, then you can use nfsroot and usb
-> > networking. It also has serial port (over strange
-> > connector). Connected over ssh over usb network is actually how I do
-> > most of the v4l work.
-> 
-> If you pass me the pointers, I can try it when I have some time.
-
-Ok, I guess I'll do that in private email.
-
-> Anyway, I got myself an ISEE IGEPv2, with the expansion board:
-> 	https://www.isee.biz/products/igep-processor-boards/igepv2-dm3730
-> 	https://www.isee.biz/products/igep-expansion-boards/igepv2-expansion
-> 
-> The expansion board comes with a tvp5150 analog TV demod. So, with
-> this device, I can simply connect it to a composite input signal.
-> I have some sources here that I can use to test it.
-
-Well... it looks like TV capture is a "solved" problem. Taking useful
-photos is what is hard...
 
 
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170316/e7a0287a/attachment-0001.sig>
+On 17/03/17 08:27, Lars-Peter Clausen wrote:
+> On 03/16/2017 09:51 PM, Matt Flax wrote:
+>>
+>> On 16/03/17 06:01, Mark Brown wrote:
+>>> On Tue, Feb 28, 2017 at 09:59:29AM +0000, Charles Keepax wrote:
+>>>> On Mon, Feb 27, 2017 at 12:51:08PM +0100, Matthias Reichl wrote:
+>>>>>> I have a bcm2835 (Pi 2 and 3) SoC here. It is producing multichannel (8
+>>>>>> out,
+>>>>>> 6 in) audio. In ALSA we call that DSP mode - right ?!
+>>>>> No. DSP modes are protocol/timing specifications as I2S, PDP, S/PDIF, ...
+>>>>> You can look these up in datasheets and if a chip implements such a
+>>>>> protocol you can be sure that it adheres to that standard - i.e. it
+>>>>> will sync the frames to the pulses on LRclk.
+>>>> I agree with the thoughts in this thread really if the AP doesn't
+>>>> actually support DSP A mode we shouldn't add DSP A mode.
+>>> The trouble here is that this isn't 100% clear, the specifications of
+>>> the DSP modes are such that only one edge in the LRCLK matters and so
+>>> providing you're doing mono or have exact clocking they interoperate
+>>> perfectly well.  We already frequently do similar things the other way,
+>>> most of the programmable serial ports can't actually do I2S modes
+>>> properly and rely on exact clocking to get things right when operating
+>>> as I2S since they only sync on one edge (though they can generally
+>>> generate the clocks correctly when operating as master, they just don't
+>>> pay attention to the left/right switch edge).
+>>>
+>>> That said unless we're doing something with the data layout or similar
+>>> configuration there's a fairly strong case for putting the mangling for
+>>> this in the core, something like just falling back to I2S mode if we set
+>>> DSP A and so on.  Which would be a lot nicer if we actually got round to
+>>> putting mode capability information in the drivers.
+>> I agree, the data layout is already configurable in the bcm2835_i2s.c
+>> platform driver. We can already use the "snd_soc_dai_set_bclk_ratio"
+>> function to manage word offsets in our machine drivers.
+>>
+>> There is nothing which says that the bcm2835 SoC is I2S restricted in any
+>> way. In fact, the reference document says quite the opposite.
+>>
+>> In the reference "BCM2835 ARM Peripherals" pdf, they call the audio system
+>> an "APB peripheral". They are saying that it is reconfigurable and part of
+>> the AMBA family of interconnect schemes.
+>>
+>> As far as the bcm2835_i2s platform driver goes, it has implemented an AMBA
+>> protocol, where audio words are counted from the LR clock onset - for some
+>> reason people are insisting this is an I2S bus. Really our implementation is
+>> not I2S at all, because word onsets are programmable and flexible in the
+>> bcm2835_i2s.c driver.
+> AMBA/APB is the interface which connects the peripheral to the system memory
+> bus. It is the interface over which the CPU does configuration register
+> writes. This has nothing and absolutely nothing to do with the I2S interface
+> that is also implemented by the peripheral that is used to stream audio to
+> and from external components.
+>
+
+Their (BCM reference) document [1] specifically states "It supports many 
+classic PCM formats including I2S".
+
+Do agree with Mark's statement "the specifications of the DSP modes are 
+such that only one edge in the LRCLK matters" ?
+
+If we look at the bcm2835 platform driver setup, it is concerned with 
+bit clock counting to specify the audio data for both of the AMBA/APB 
+channels from serial bitstream into memory. It has two channels into 
+memory, however "it supports many classic PCM formats" ... my vote for 
+one classic format is DSP mode !
+
+Do you see a problem with that ?
+
+thanks
+Matt
+[1] 
+https://www.raspberrypi.org/wp-content/uploads/2012/02/BCM2835-ARM-Peripherals.pdf
