@@ -1,40 +1,180 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 16 Mar 2017 16:16:26 +0100
-Subject: [PATCH 0/2] arm64: marvell: support network on Armada 7K/8K
-Message-ID: <1489677388-19320-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Thu, 16 Mar 2017 16:16:27 +0100
+Subject: [PATCH 1/2] arm64: marvell: dts: add PPv2.2 description to Armada
+ 7K/8K
+In-Reply-To: <1489677388-19320-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1489677388-19320-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1489677388-19320-2-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+This commit adds the description of the PPv2.2 hardware block for the
+Marvell Armada 7K and Armada 8K processors, and their corresponding Armada
+7040 and 8040 Development boards.
 
-Now that the PPv2.2 support has been merged in the mvpp2 network
-driver, we can finally enable networking support on the Armada 7K and
-Armada 8K SoCs.
-
-This small series:
-
- - Adds the Device Tree description of the PPv2.2 IP in both the
-   master CP110 and slave CP110 (SoC description) and the description
-   of a number of network interfaces available in the Armada 7K and
-   Armada 8K development boards.
-
- - Enable the mvpp2 driver in the arm64 defconfig, since it's now used
-   on ARM64 platforms.
-
-Thanks!
-
-Thomas
-
-Thomas Petazzoni (2):
-  arm64: marvell: dts: add PPv2.2 description to Armada 7K/8K
-  arm64: defconfig: enable MVPP2
-
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
  arch/arm64/boot/dts/marvell/armada-7040-db.dts     | 25 +++++++++++++++
  arch/arm64/boot/dts/marvell/armada-8040-db.dts     | 16 ++++++++++
  .../boot/dts/marvell/armada-cp110-master.dtsi      | 37 ++++++++++++++++++++++
  .../arm64/boot/dts/marvell/armada-cp110-slave.dtsi | 37 ++++++++++++++++++++++
- arch/arm64/configs/defconfig                       |  1 +
- 5 files changed, 116 insertions(+)
+ 4 files changed, 115 insertions(+)
 
+diff --git a/arch/arm64/boot/dts/marvell/armada-7040-db.dts b/arch/arm64/boot/dts/marvell/armada-7040-db.dts
+index 070b589..bb0e1e8 100644
+--- a/arch/arm64/boot/dts/marvell/armada-7040-db.dts
++++ b/arch/arm64/boot/dts/marvell/armada-7040-db.dts
+@@ -146,3 +146,28 @@
+ &cpm_usb3_1 {
+ 	status = "okay";
+ };
++
++&cpm_mdio {
++	phy0: ethernet-phy at 0 {
++		reg = <0>;
++	};
++	phy1: ethernet-phy at 1 {
++		reg = <1>;
++	};
++};
++
++&cpm_ethernet {
++	status = "okay";
++};
++
++&cpm_eth1 {
++	status = "okay";
++	phy = <&phy0>;
++	phy-mode = "sgmii";
++};
++
++&cpm_eth2 {
++	status = "okay";
++	phy = <&phy1>;
++	phy-mode = "rgmii-id";
++};
+diff --git a/arch/arm64/boot/dts/marvell/armada-8040-db.dts b/arch/arm64/boot/dts/marvell/armada-8040-db.dts
+index 6e6f182..80e685e 100644
+--- a/arch/arm64/boot/dts/marvell/armada-8040-db.dts
++++ b/arch/arm64/boot/dts/marvell/armada-8040-db.dts
+@@ -124,6 +124,22 @@
+ 	status = "okay";
+ };
+ 
++&cpm_mdio {
++	phy1: ethernet-phy at 1 {
++		reg = <1>;
++	};
++};
++
++&cpm_ethernet {
++	status = "okay";
++};
++
++&cpm_eth2 {
++	status = "okay";
++	phy = <&phy1>;
++	phy-mode = "rgmii-id";
++};
++
+ /* CON5 on CP1 expansion */
+ &cps_pcie2 {
+ 	status = "okay";
+diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+index 3a99c36..9a2ce2a 100644
+--- a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+@@ -59,6 +59,43 @@
+ 			interrupt-parent = <&gic>;
+ 			ranges = <0x0 0x0 0xf2000000 0x2000000>;
+ 
++			cpm_ethernet: ethernet at 0 {
++				compatible = "marvell,armada-7k-pp22";
++				reg = <0x0 0x100000>, <0x129000 0xb000>;
++				clocks = <&cpm_syscon0 1 3>, <&cpm_syscon0 1 9>, <&cpm_syscon0 1 5>;
++				clock-names = "pp_clk", "gop_clk", "mg_clk";
++				status = "disabled";
++				dma-coherent;
++
++				cpm_eth0: eth0 {
++					interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
++					port-id = <0>;
++					gop-port-id = <0>;
++					status = "disabled";
++				};
++
++				cpm_eth1: eth1 {
++					interrupts = <GIC_SPI 38 IRQ_TYPE_LEVEL_HIGH>;
++					port-id = <1>;
++					gop-port-id = <2>;
++					status = "disabled";
++				};
++
++				cpm_eth2: eth2 {
++					interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>;
++					port-id = <2>;
++					gop-port-id = <3>;
++					status = "disabled";
++				};
++			};
++
++			cpm_mdio: mdio at 12a200 {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				compatible = "marvell,orion-mdio";
++				reg = <0x12a200 0x10>;
++			};
++
+ 			cpm_syscon0: system-controller at 440000 {
+ 				compatible = "marvell,cp110-system-controller0",
+ 					     "syscon";
+diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+index 9e09c4d..c9dfa24 100644
+--- a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+@@ -59,6 +59,43 @@
+ 			interrupt-parent = <&gic>;
+ 			ranges = <0x0 0x0 0xf4000000 0x2000000>;
+ 
++			cps_ethernet: ethernet at 0 {
++				compatible = "marvell,armada-7k-pp22";
++				reg = <0x0 0x100000>, <0x129000 0xb000>;
++				clocks = <&cps_syscon0 1 3>, <&cps_syscon0 1 9>, <&cps_syscon0 1 5>;
++				clock-names = "pp_clk", "gop_clk", "mg_clk";
++				status = "disabled";
++				dma-coherent;
++
++				cps_eth0: eth0 {
++					interrupts = <GIC_SPI 261 IRQ_TYPE_LEVEL_HIGH>;
++					port-id = <0>;
++					gop-port-id = <0>;
++					status = "disabled";
++				};
++
++				cps_eth1: eth1 {
++					interrupts = <GIC_SPI 262 IRQ_TYPE_LEVEL_HIGH>;
++					port-id = <1>;
++					gop-port-id = <2>;
++					status = "disabled";
++				};
++
++				cps_eth2: eth2 {
++					interrupts = <GIC_SPI 263 IRQ_TYPE_LEVEL_HIGH>;
++					port-id = <2>;
++					gop-port-id = <3>;
++					status = "disabled";
++				};
++			};
++
++			cps_mdio: mdio at 12a200 {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				compatible = "marvell,orion-mdio";
++				reg = <0x12a200 0x10>;
++			};
++
+ 			cps_syscon0: system-controller at 440000 {
+ 				compatible = "marvell,cp110-system-controller0",
+ 					     "syscon";
 -- 
 2.7.4
