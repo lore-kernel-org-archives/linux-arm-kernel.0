@@ -1,80 +1,94 @@
-From: ddaney.cavm@gmail.com (David Daney)
-Date: Thu, 16 Mar 2017 09:25:56 -0700
-Subject: [PATCH] PCI: ACPI: Fix ThunderX PEM initialization
-In-Reply-To: <251db823-591b-483b-9c55-13c911020fd1@jonmasters.org>
-References: <1485793552-12614-1-git-send-email-Vadim.Lomovtsev@caviumnetworks.com>
- <20170130211236.GW20550@bhelgaas-glaptop.roam.corp.google.com>
- <20170131102830.GA13854@localhost.localdomain>
- <20170131142525.GA9942@bhelgaas-glaptop.roam.corp.google.com>
- <20170131145720.GA14231@localhost.localdomain>
- <20170131203109.GA14127@bhelgaas-glaptop.roam.corp.google.com>
- <20170201125325.GA15805@localhost.localdomain>
- <20170201151807.GA15793@bhelgaas-glaptop.roam.corp.google.com>
- <376ae1df-da85-e576-75d6-3ae2ab0f1b41@jonmasters.org>
- <20170315113323.GA28027@localhost.localdomain>
- <251db823-591b-483b-9c55-13c911020fd1@jonmasters.org>
-Message-ID: <48b93116-cc0f-e59d-8aa3-704052ad6759@gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 16 Mar 2017 17:37:31 +0100
+Subject: [PATCH 4/4] tty/serial: sh-sci: remove uneeded IS_ERR_OR_NULL
+ calls
+In-Reply-To: <CACRpkdYeFyr4yjQjDAUpPJwuD_NW2y=wXnzt1xSNoOX0SFCLmw@mail.gmail.com>
+References: <20170303194414.n76tr3oa2mlrzjre@pengutronix.de>
+ <CAMuHMdXiz5hqW=fm-2H1aNKq_gXD2o0508jD2XjxYUvKoEvHdw@mail.gmail.com>
+ <20170304174819.esxhwwbsxzuq3vyc@pengutronix.de>
+ <CAMuHMdX8BEnaTtNFAbcvfHwJH=oPUmQ2NB+jfouGyhQpJ_m_4A@mail.gmail.com>
+ <20170306085842.yijkfpqi3adcedmm@pengutronix.de>
+ <CAMuHMdV2_vbocY4wCzvYtPAaF+QEX_Y4g6qVu5EqEBf5AnFdaw@mail.gmail.com>
+ <20170306093043.ay4dz3ehp3aakwxh@pengutronix.de>
+ <CAMuHMdWQuvANNU14A7NQuzv6AFp04bq4DG_oc7w9h4wUrG+4aQ@mail.gmail.com>
+ <20170306100220.droey65uq2ew3mzu@pengutronix.de>
+ <CACRpkdYeFyr4yjQjDAUpPJwuD_NW2y=wXnzt1xSNoOX0SFCLmw@mail.gmail.com>
+Message-ID: <20170316163731.xfx7ybtgdadzbh3m@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/16/2017 07:32 AM, Jon Masters wrote:
-> Hi Vadim,
->
-> Thanks for your followup and attention to this matter. More below.
->
-> On 03/15/2017 07:33 AM, Vadim Lomovtsev wrote:
->
->>> The upstream Linux kernel contains a quirk matching entry that looks for
->>> "THRX". Therefore, you have already agreed (as of at least January) that
->>> this is the prefix that you will use in any firmware updates to support
->>> the latest upstream Linux kernel. Please register this prefix promptly.
->>
->> And from what I know for now - we wont going to register this
->> since we have already regsitered "CAV" prefix for that. And this was the part
->> of our discussion also.
->>
->> We had a bit long review of proper implementation of legacy firmware support,
->> so my apologise on that.
->>
->> Please take a look at link to the patchset posted by Tomasz.
->> https://www.spinics.net/lists/arm-kernel/msg568741.html
->
-> I'll let others comment on the suitability of taking that for upstream.
->
->>>>> So the FW will be updated accordingly.
->>>
->>> Indeed.
->>
->> Yes, it is now contains "CAVxxx" as _HID for device config object.
->
-> Which is different from the version that was merged into upstream. That
-> should never have happened. It will never happen again. I have spent some
-> time over the past few days ensuring folks understand that I will not
-> allow a repeat of this to occur the next time around. We will have
-> platforms that are bulletproof and supported by upstream with any
-> errata fixes in a very carefully controlled manner. There will
-> under no circumstances ever be a situation like this again.
+On Thu, Mar 16, 2017 at 04:18:52PM +0100, Linus Walleij wrote:
+> On Mon, Mar 6, 2017 at 11:02 AM, Uwe Kleine-K?nig
+> <u.kleine-koenig@pengutronix.de> wrote:
+> > On Mon, Mar 06, 2017 at 10:53:27AM +0100, Geert Uytterhoeven wrote:
+> >> On Mon, Mar 6, 2017 at 10:30 AM, Uwe Kleine-K?nig
+> 
+> >> > I wouldn't want to code this in each driver (something like:
+> >> >
+> >> >         if (IS_ENABLED(GPIOLIB) || device_is_instantiated_by_dt(dev) || device_is_instantiated_by_acpi(dev))
+> >> >                 gpios = mctrl_gpio_init(...);
+> >> >         else
+> >> >                 gpios = NULL;
+> >> >
+> >> > ). Putting this into GPIOLIB is the right approach, and so this is
+> >> > another argument for HALFGPIOLIB. This would fix mctrl_gpio_init en
+> >> > passant.
+> >>
+> >> Do we have platforms where DT=y || ACPI=y, but GPIOLIB=n?
+> >> Ah, x86 ;-)
+> >
+> > Yeah, and I think rm -r arch/x86 won't be acceptable :-) I assume you
+> > can also configure some arm or powerpc systems without GPIOLIB.
+> >
+> >> Anyway, for sh-sci.c, platforms either have DT and GPIOLIB, or they do not
+> >> need mctrl-gpio.
+> >
+> > So we're in agreement now that HALFGPIOLIB is the way to go?
+> > Linus, what do you think?
+> 
+> OK modem lines over GPIO.
+> 
+> So the problem is that GPIOLIB is needed (obviously) for mctrl_gpio_init() to
+> work properly, and then there are some stubs in
+> drivers/tty/serial/serial_mctrl_gpio.h
+> for !GPIOLIB.
+> 
+> And this whole discussion is all about that !GPIOLIB case really,
+> whether DT, ACPI, SFI or board files machine data is used doesn't
+> really matter.
+> 
+> We're talking about:
+> 
+> > git grep mctrl_gpio_init
+> drivers/tty/serial/atmel_serial.c:      atmel_port->gpios =
+> mctrl_gpio_init(&atmel_port->uart, 0);
+> drivers/tty/serial/clps711x.c:  s->gpios =
+> mctrl_gpio_init_noauto(&pdev->dev, 0);
+> drivers/tty/serial/etraxfs-uart.c:      up->gpios =
+> mctrl_gpio_init_noauto(&pdev->dev, 0);
+> drivers/tty/serial/imx.c:       sport->gpios = mctrl_gpio_init(&sport->port, 0);
+> drivers/tty/serial/mxs-auart.c: s->gpios = mctrl_gpio_init_noauto(dev, 0);
+> drivers/tty/serial/sh-sci.c:    sciport->gpios =
+> mctrl_gpio_init(&sciport->port, 0);
+> 
+> Atmel, ARM, ETRAX, ARM, ARM, Super-H, all have GPIOLIB.
+> Right now no x86, correct?
+> 
+> They actually all even do things like this in Kconfig:
+> 
+> config SERIAL_ATMEL
+> (...)
+>         select SERIAL_MCTRL_GPIO if GPIOLIB
+> 
+> What stops us from removing all the stubs in
+> drivers/tty/serial/serial_mctrl_gpio.h
+> and just make SERIAL_MCTRL_GPIO depends on GPIOLIB?
 
-We are still evaluating the merits of registering the values that 
-appeared in v4.10, and not changing them.  We should know more in a 
-couple of days.
+Would be ok for me, too. People seem to object to that though.
 
+Best regards
+Uwe
 
->
->>> The version Bjorn merged looks for "THRX". This is the version that you will
->>> use, and you will promptly register that prefix with UEFI and provide fixes
->>> for existing firmware to correctly use the solution that is upstream.
->>
->> Cavium FW is updated accordingly to use already registered prefix.
->> For existent FW legacy support is posted by Tomasz.
->
-> I'm watching this to ensure it's cleaned up properly.
->
-> Jon.
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
