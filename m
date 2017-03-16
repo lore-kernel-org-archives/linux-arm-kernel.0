@@ -1,48 +1,44 @@
-From: jslaby@suse.cz (Jiri Slaby)
-Date: Thu, 16 Mar 2017 13:54:57 +0100
-Subject: [PATCH] serial: 8250: 8250_core: Fix irq name for 8250 serial irq
-In-Reply-To: <051d7223-84d4-b120-f757-abded9c738cb@suse.cz>
-References: <20170316122653.19930-1-vigneshr@ti.com>
- <051d7223-84d4-b120-f757-abded9c738cb@suse.cz>
-Message-ID: <5abf2394-78b5-9b6d-25f6-fe50f5580775@suse.cz>
+From: georgi.djakov@linaro.org (Georgi Djakov)
+Date: Thu, 16 Mar 2017 14:55:09 +0200
+Subject: [PATCH v2 1/2] ARM: dts: qcom: msm8974: Add RPMCC DT node
+Message-ID: <20170316125509.13717-1-georgi.djakov@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/16/2017, 01:46 PM, Jiri Slaby wrote:
-> On 03/16/2017, 01:26 PM, Vignesh R wrote:
->> Using dev_name() as irq name during request_irq() might be misleading in
->> case of serial over PCI. Therefore use a better alternative name for
->> identifying serial port irqs as "serial" appended with serial_index of
->> the port. This ensures that "serial" string is always present in irq
->> name while port index will help in distinguishing b/w different ports.
->>
->> Signed-off-by: Vignesh R <vigneshr@ti.com>
->> ---
->>
->> Based on top of tty-next.
->>
->>  drivers/tty/serial/8250/8250_core.c | 10 +++++++++-
->>  1 file changed, 9 insertions(+), 1 deletion(-)
->>
->> diff --git a/drivers/tty/serial/8250/8250_core.c b/drivers/tty/serial/8250/8250_core.c
->> index f83b69f30987..78bf621d6827 100644
->> --- a/drivers/tty/serial/8250/8250_core.c
->> +++ b/drivers/tty/serial/8250/8250_core.c
->> @@ -213,12 +213,20 @@ static int serial_link_irq_chain(struct uart_8250_port *up)
->>  
->>  		ret = 0;
->>  	} else {
->> +		char *irqname = kmalloc(20, GFP_KERNEL);
->> +		if (!irqname) {
->> +			spin_unlock_irq(&i->lock);
-> 
-> GFP_KERNEL and spin_lock won't play well together.
+Add the RPM Clock Controller DT node for msm8974-based platforms, so that
+drivers can use the clocks provided by the RPM processor.
 
-And you never free the memory. Given we have struct device, can we use
-devm_kmalloc after spin_unlock_irq (you have to check if we cannot
-allocate multiple times)?
+Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
+Reviewed-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+---
 
-thanks,
--- 
-js
-suse labs
+Changes since v1 (https://lkml.org/lkml/2017/2/3/492)
+ * Added Bjorn's Reviewed-by
+
+ arch/arm/boot/dts/qcom-msm8974.dtsi | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi b/arch/arm/boot/dts/qcom-msm8974.dtsi
+index d3e1a61b8671..4b4c61e2ee35 100644
+--- a/arch/arm/boot/dts/qcom-msm8974.dtsi
++++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
+@@ -2,6 +2,7 @@
+ 
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
+ #include <dt-bindings/clock/qcom,gcc-msm8974.h>
++#include <dt-bindings/clock/qcom,rpmcc.h>
+ #include <dt-bindings/gpio/gpio.h>
+ #include <dt-bindings/reset/qcom,gcc-msm8974.h>
+ #include "skeleton.dtsi"
+@@ -760,6 +761,11 @@
+ 				compatible = "qcom,rpm-msm8974";
+ 				qcom,smd-channels = "rpm_requests";
+ 
++				rpmcc: clock-controller {
++					compatible = "qcom,rpmcc-msm8974", "qcom,rpmcc";
++					#clock-cells = <1>;
++				};
++
+ 				pm8841-regulators {
+ 					compatible = "qcom,rpm-pm8841-regulators";
+ 
