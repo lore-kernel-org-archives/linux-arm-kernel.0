@@ -1,21 +1,138 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Wed, 15 Mar 2017 22:50:58 -0700
-Subject: [PATCH] pinctrl: qcom: qdf2xxx: add names to the gpios
-In-Reply-To: <1488843122-7960-1-git-send-email-timur@codeaurora.org>
-References: <1488843122-7960-1-git-send-email-timur@codeaurora.org>
-Message-ID: <CAOCOHw6Epj2ZLB227L_vbZJ02orYb9W5koJcaLxeSJy_gfG+Sg@mail.gmail.com>
+From: ralph.sennhauser@gmail.com (Ralph Sennhauser)
+Date: Thu, 16 Mar 2017 06:53:19 +0100
+Subject: [PATCH v2] ARM: dts: mvebu: linksys: enable buffer manager support
+Message-ID: <20170316055320.7929-1-ralph.sennhauser@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 6, 2017 at 3:32 PM, Timur Tabi <timur@codeaurora.org> wrote:
-> The sysfs and debugfs entries for pin control drivers work better when
-> the individual pins are given real names, even if they are all just
-> "gpio0", "gpio1", etc.
->
+Add appropriate properties to devices in the Linksys WRT AC Series for the
+mvneta driver to use hardware buffer management.
 
-Yeah, you do want "name" for those to play nice.
+Also update "soc" ranges property and set the status of bm and bm-bppi
+to "okay" (SRAM).
 
-Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+Signed-off-by: Ralph Sennhauser <ralph.sennhauser@gmail.com>
+---
 
-Regards,
-Bjorn
+v1 -> v2:
+	Use independent pools for short (suggested by Gregory Clement)
+
+
+ arch/arm/boot/dts/armada-385-linksys.dtsi     | 17 ++++++++++++++++-
+ arch/arm/boot/dts/armada-xp-linksys-mamba.dts | 17 ++++++++++++++++-
+ 2 files changed, 32 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/boot/dts/armada-385-linksys.dtsi b/arch/arm/boot/dts/armada-385-linksys.dtsi
+index df47bf1..aa0d225 100644
+--- a/arch/arm/boot/dts/armada-385-linksys.dtsi
++++ b/arch/arm/boot/dts/armada-385-linksys.dtsi
+@@ -59,7 +59,8 @@
+ 		ranges = <MBUS_ID(0xf0, 0x01) 0 0xf1000000 0x100000
+ 			  MBUS_ID(0x01, 0x1d) 0 0xfff00000 0x100000
+ 			  MBUS_ID(0x09, 0x19) 0 0xf1100000 0x10000
+-			  MBUS_ID(0x09, 0x15) 0 0xf1110000 0x10000>;
++			  MBUS_ID(0x09, 0x15) 0 0xf1110000 0x10000
++			  MBUS_ID(0x0c, 0x04) 0 0xf1200000 0x100000>;
+ 
+ 		internal-regs {
+ 			i2c at 11000 {
+@@ -88,6 +89,9 @@
+ 			ethernet at 70000 {
+ 				status = "okay";
+ 				phy-mode = "rgmii-id";
++				buffer-manager = <&bm>;
++				bm,pool-long = <2>;
++				bm,pool-short = <3>;
+ 				fixed-link {
+ 					speed = <1000>;
+ 					full-duplex;
+@@ -97,6 +101,9 @@
+ 			ethernet at 34000 {
+ 				status = "okay";
+ 				phy-mode = "sgmii";
++				buffer-manager = <&bm>;
++				bm,pool-long = <0>;
++				bm,pool-short = <1>;
+ 				fixed-link {
+ 					speed = <1000>;
+ 					full-duplex;
+@@ -159,6 +166,10 @@
+ 				status = "okay";
+ 			};
+ 
++			bm at c8000 {
++				status = "okay";
++			};
++
+ 			/* USB part of the eSATA/USB 2.0 port */
+ 			usb at 58000 {
+ 				status = "okay";
+@@ -241,6 +252,10 @@
+ 			};
+ 		};
+ 
++		bm-bppi {
++			status = "okay";
++		};
++
+ 		pcie-controller {
+ 			status = "okay";
+ 
+diff --git a/arch/arm/boot/dts/armada-xp-linksys-mamba.dts b/arch/arm/boot/dts/armada-xp-linksys-mamba.dts
+index 3744ba3..9efcf59 100644
+--- a/arch/arm/boot/dts/armada-xp-linksys-mamba.dts
++++ b/arch/arm/boot/dts/armada-xp-linksys-mamba.dts
+@@ -71,7 +71,8 @@
+ 		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xf1000000 0x100000
+ 			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000
+ 			  MBUS_ID(0x09, 0x09) 0 0 0xf1100000 0x10000
+-			  MBUS_ID(0x09, 0x05) 0 0 0xf1110000 0x10000>;
++			  MBUS_ID(0x09, 0x05) 0 0 0xf1110000 0x10000
++			  MBUS_ID(0x0c, 0x04) 0 0 0xf1200000 0x100000>;
+ 
+ 		internal-regs {
+ 
+@@ -95,6 +96,9 @@
+ 				pinctrl-names = "default";
+ 				status = "okay";
+ 				phy-mode = "rgmii-id";
++				buffer-manager = <&bm>;
++				bm,pool-long = <0>;
++				bm,pool-short = <1>;
+ 				fixed-link {
+ 					speed = <1000>;
+ 					full-duplex;
+@@ -106,6 +110,9 @@
+ 				pinctrl-names = "default";
+ 				status = "okay";
+ 				phy-mode = "rgmii-id";
++				buffer-manager = <&bm>;
++				bm,pool-long = <2>;
++				bm,pool-short = <3>;
+ 				fixed-link {
+ 					speed = <1000>;
+ 					full-duplex;
+@@ -186,6 +193,10 @@
+ 				};
+ 			};
+ 
++			bm at c8000 {
++				status = "okay";
++			};
++
+ 			nand at d0000 {
+ 				status = "okay";
+ 				num-cs = <1>;
+@@ -259,6 +270,10 @@
+ 				};
+ 			};
+ 		};
++
++		bm-bppi {
++			status = "okay";
++		};
+ 	};
+ 
+ 	gpio_keys {
+-- 
+2.10.2
