@@ -1,90 +1,25 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 16 Mar 2017 16:10:39 -0500
-Subject: [PATCH V3 3/5] drivers: arm-smmu: Add clock support for
- QCOM_SMMUV2
-In-Reply-To: <1489073748-3659-4-git-send-email-sricharan@codeaurora.org>
-References: <1489073748-3659-1-git-send-email-sricharan@codeaurora.org>
- <1489073748-3659-4-git-send-email-sricharan@codeaurora.org>
-Message-ID: <20170316211039.rbqq262syalyfcs6@rob-hp-laptop>
+From: tj@kernel.org (Tejun Heo)
+Date: Thu, 16 Mar 2017 17:11:21 -0400
+Subject: [PATCH v2] pata: remove the at91 driver
+In-Reply-To: <1489585151-16415-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1489585151-16415-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20170316211121.GA1480@htj.duckdns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 09, 2017 at 09:05:46PM +0530, Sricharan R wrote:
-> The QCOM_SMMUV2 is an implementation of the arm,smmu-v2 architecture.
-> The qcom,smmu is instantiated for each of the multimedia cores (for eg)
-> Venus (video encoder/decoder), mdp (display) etc, and they are connected
-> to the Multimedia Aggregator Interconnect (MMAGIC). So the access to
-> any of the MMU's registers, as well as MMU's downstream bus access,
-> requires the specified MMAGIC clocks to be enabled. So adding a new
-> binding for the qcom,smmu-v2 and the required mmagic clock bindings for
-> the same. Also adding the support for enabling the qcom,smmu-v2 clocks in
-> the driver.
+On Wed, Mar 15, 2017 at 02:39:11PM +0100, Boris Brezillon wrote:
+> This driver is orphan since commit b2026f708e09 ("ARM: at91: remove
+> at91sam9260/at91sam9g20 legacy board support"). Given that nobody cared
+> adding DT support to it, it probably means it's no longer used and is
+> thus a good candidate for removal.
 > 
->                -------------  ---------
->                |   VENUS   |  | MDP   |
-> 	       |	   |  |       |
-> 	       -------------  --------
-> 		     |           |
-> 		     |           |
->                   ------      ---------
->                   |SMMU |     | SMMU  |
->                   |	|     |       |
->                   ------      --------
-> 		    |            |
-> 		    |            |
->        -----------------------------------------
->        |	MMAGIC INTERCONNECT (MMSS NOC) |
->        |                                       |
->        -----------------------------------------
->                    |                 |
-> 		   |           ----------------------------------
->                  -----         | 	SYSTEM NOC		|
->                  |DDR|	       |				|
->                  -----         ---------------------------------
-> 		   |		    |
->                    |               ------
-> 		   |<-------------| CPU|
-> 				  ------
-> 
-> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
-> ---
->  .../devicetree/bindings/iommu/arm,smmu.txt         |   8 ++
->  drivers/iommu/arm-smmu.c                           | 124 +++++++++++++++++++++
->  2 files changed, 132 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu.txt b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-> index b369c13..88e02d6 100644
-> --- a/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-> +++ b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-> @@ -17,6 +17,7 @@ conditions.
->                          "arm,mmu-401"
->                          "arm,mmu-500"
->                          "cavium,smmu-v2"
-> +			"qcom,smmu-v2"
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> Acked-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
 
-I know Cavium did it, but I'd prefer to see SoC specific compatibles 
-here.
+Applied to libata/for-4.12.
 
->  
->                    depending on the particular implementation and/or the
->                    version of the architecture implemented.
-> @@ -74,6 +75,13 @@ conditions.
->                    "cfg_clk" is optional if required to access the TCU's programming
->                    interface, apart from the "tcu_clk".
->  
-> +		  Should have "mmagic_ahb_clk", "mmagic_cfg_ahb_clk",
-> +                              "smmu_core_ahb_clk", "smmu_core_axi_clk",
-> +                              "mmagic_core_axi_clk" for "qcom,smmu-v2"
+Thanks.
 
-This is instead of the above clocks?
-
-Are these clocks all really part of the SMMU or are the mmagic clocks 
-working around no proper driver for the mmagic?
-
-> +
-> +		  "mmagic_core_axi_clk" is required for smmu's access to the
-> +                   downstream bus and rest for the smmu's register group access.
-> +
->  - clocks:         Phandles for respective clocks described by clock-names.
->  
->  - power-domains:  Phandles to SMMU's power domain specifier. This is
+-- 
+tejun
