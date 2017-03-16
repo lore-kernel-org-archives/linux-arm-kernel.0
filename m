@@ -1,76 +1,90 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Thu, 16 Mar 2017 22:08:06 +0100
-Subject: [RFC PATCH 31/33] irqchip/gic-v4: Add VLPI configuration interface
-In-Reply-To: <1484648454-21216-32-git-send-email-marc.zyngier@arm.com>
-References: <1484648454-21216-1-git-send-email-marc.zyngier@arm.com>
- <1484648454-21216-32-git-send-email-marc.zyngier@arm.com>
-Message-ID: <6300fefc-9dc5-88f0-2de1-0d5ba7fac20e@redhat.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 16 Mar 2017 16:10:39 -0500
+Subject: [PATCH V3 3/5] drivers: arm-smmu: Add clock support for
+ QCOM_SMMUV2
+In-Reply-To: <1489073748-3659-4-git-send-email-sricharan@codeaurora.org>
+References: <1489073748-3659-1-git-send-email-sricharan@codeaurora.org>
+ <1489073748-3659-4-git-send-email-sricharan@codeaurora.org>
+Message-ID: <20170316211039.rbqq262syalyfcs6@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 17/01/2017 11:20, Marc Zyngier wrote:
-> Add the required interfaces to map, unmap and update a VLPI.
+On Thu, Mar 09, 2017 at 09:05:46PM +0530, Sricharan R wrote:
+> The QCOM_SMMUV2 is an implementation of the arm,smmu-v2 architecture.
+> The qcom,smmu is instantiated for each of the multimedia cores (for eg)
+> Venus (video encoder/decoder), mdp (display) etc, and they are connected
+> to the Multimedia Aggregator Interconnect (MMAGIC). So the access to
+> any of the MMU's registers, as well as MMU's downstream bus access,
+> requires the specified MMAGIC clocks to be enabled. So adding a new
+> binding for the qcom,smmu-v2 and the required mmagic clock bindings for
+> the same. Also adding the support for enabling the qcom,smmu-v2 clocks in
+> the driver.
 > 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-Reviewed-by: Eric Auger <eric.auger@redhat.com>
-
-Eric
-
+>                -------------  ---------
+>                |   VENUS   |  | MDP   |
+> 	       |	   |  |       |
+> 	       -------------  --------
+> 		     |           |
+> 		     |           |
+>                   ------      ---------
+>                   |SMMU |     | SMMU  |
+>                   |	|     |       |
+>                   ------      --------
+> 		    |            |
+> 		    |            |
+>        -----------------------------------------
+>        |	MMAGIC INTERCONNECT (MMSS NOC) |
+>        |                                       |
+>        -----------------------------------------
+>                    |                 |
+> 		   |           ----------------------------------
+>                  -----         | 	SYSTEM NOC		|
+>                  |DDR|	       |				|
+>                  -----         ---------------------------------
+> 		   |		    |
+>                    |               ------
+> 		   |<-------------| CPU|
+> 				  ------
+> 
+> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
 > ---
->  drivers/irqchip/irq-gic-v4.c       | 29 +++++++++++++++++++++++++++++
->  include/linux/irqchip/arm-gic-v4.h |  3 +++
->  2 files changed, 32 insertions(+)
+>  .../devicetree/bindings/iommu/arm,smmu.txt         |   8 ++
+>  drivers/iommu/arm-smmu.c                           | 124 +++++++++++++++++++++
+>  2 files changed, 132 insertions(+)
 > 
-> diff --git a/drivers/irqchip/irq-gic-v4.c b/drivers/irqchip/irq-gic-v4.c
-> index 7d74089..36ccaac 100644
-> --- a/drivers/irqchip/irq-gic-v4.c
-> +++ b/drivers/irqchip/irq-gic-v4.c
-> @@ -140,3 +140,32 @@ int its_invall_vpe(struct its_vpe *vpe)
+> diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu.txt b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+> index b369c13..88e02d6 100644
+> --- a/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+> +++ b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+> @@ -17,6 +17,7 @@ conditions.
+>                          "arm,mmu-401"
+>                          "arm,mmu-500"
+>                          "cavium,smmu-v2"
+> +			"qcom,smmu-v2"
+
+I know Cavium did it, but I'd prefer to see SoC specific compatibles 
+here.
+
 >  
->  	return its_send_vpe_cmd(vpe, &info);
->  }
-> +
-> +int its_map_vlpi(int irq, struct its_vlpi_map *map)
-> +{
-> +	struct its_cmd_info info = {
-> +		.cmd_type = MAP_VLPI,
-> +		.map      = map,
-> +	};
-> +
-> +	return irq_set_vcpu_affinity(irq, &info);
-> +}
-> +
-> +int its_unmap_vlpi(int irq)
-> +{
-> +	struct its_cmd_info info = {
-> +		.cmd_type = UNMAP_VLPI,
-> +	};
-> +
-> +	return irq_set_vcpu_affinity(irq, &info);
-> +}
-> +
-> +int its_prop_update_vlpi(int irq, u8 config)
-> +{
-> +	struct its_cmd_info info = {
-> +		.cmd_type = PROP_UPDATE_VLPI,
-> +		.config   = config,
-> +	};
-> +
-> +	return irq_set_vcpu_affinity(irq, &info);
-> +}
-> diff --git a/include/linux/irqchip/arm-gic-v4.h b/include/linux/irqchip/arm-gic-v4.h
-> index 1c58add..f85a929 100644
-> --- a/include/linux/irqchip/arm-gic-v4.h
-> +++ b/include/linux/irqchip/arm-gic-v4.h
-> @@ -93,5 +93,8 @@ int its_alloc_vcpu_irqs(struct its_vm *vm, struct its_vpe **vpes, int nr_vpes);
->  void its_free_vcpu_irqs(struct its_vm *vm, int nr_vpes);
->  int its_schedule_vpe(struct its_vpe *vpe, bool on);
->  int its_invall_vpe(struct its_vpe *vpe);
-> +int its_map_vlpi(int irq, struct its_vlpi_map *map);
-> +int its_unmap_vlpi(int irq);
-> +int its_prop_update_vlpi(int irq, u8 config);
+>                    depending on the particular implementation and/or the
+>                    version of the architecture implemented.
+> @@ -74,6 +75,13 @@ conditions.
+>                    "cfg_clk" is optional if required to access the TCU's programming
+>                    interface, apart from the "tcu_clk".
 >  
->  #endif
-> 
+> +		  Should have "mmagic_ahb_clk", "mmagic_cfg_ahb_clk",
+> +                              "smmu_core_ahb_clk", "smmu_core_axi_clk",
+> +                              "mmagic_core_axi_clk" for "qcom,smmu-v2"
+
+This is instead of the above clocks?
+
+Are these clocks all really part of the SMMU or are the mmagic clocks 
+working around no proper driver for the mmagic?
+
+> +
+> +		  "mmagic_core_axi_clk" is required for smmu's access to the
+> +                   downstream bus and rest for the smmu's register group access.
+> +
+>  - clocks:         Phandles for respective clocks described by clock-names.
+>  
+>  - power-domains:  Phandles to SMMU's power domain specifier. This is
