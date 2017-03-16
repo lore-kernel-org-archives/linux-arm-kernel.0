@@ -1,25 +1,25 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 16 Mar 2017 10:48:11 +0100
-Subject: [PATCH v2] generic syscalls: Wire up statx syscall
-In-Reply-To: <CAAG0J99QAwefvpnNxrGRU6XH+0+k1LO6qRW3kLBQCc3nc6QdmA@mail.gmail.com>
-References: <20170313144521.28127-1-shorne@gmail.com>
- <CAAG0J99QAwefvpnNxrGRU6XH+0+k1LO6qRW3kLBQCc3nc6QdmA@mail.gmail.com>
-Message-ID: <CAK8P3a3YPsa_FXvqAmt2rQqRPc+Rby6n_+5MoMR2EV85jQHyjQ@mail.gmail.com>
+Date: Thu, 16 Mar 2017 10:59:55 +0100
+Subject: mainline build: 208 builds: 0 failed, 208 passed,
+ 422 warnings (v4.11-rc2-164-gdefc7d752265)
+In-Reply-To: <CAK8P3a1jHhM=80Zo59JoDNd2RKwTfdR_i61_=ASqqUeJ1oecxg@mail.gmail.com>
+References: <58c97f8f.c4b5190a.8c4e4.300d@mx.google.com>
+ <CAK8P3a1jHhM=80Zo59JoDNd2RKwTfdR_i61_=ASqqUeJ1oecxg@mail.gmail.com>
+Message-ID: <CAK8P3a145sL=DHiyP39c2FrH9Vh9aZBd7GUs96pWd-93NngQDg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 15, 2017 at 11:26 PM, James Hogan <james.hogan@imgtec.com> wrote:
-> On 13 March 2017 at 14:45, Stafford Horne <shorne@gmail.com> wrote:
-
->>  #undef __NR_syscalls
->> -#define __NR_syscalls 291
->> +#define __NR_syscalls 292
+On Wed, Mar 15, 2017 at 9:02 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Wed, Mar 15, 2017 at 6:53 PM, kernelci.org bot <bot@kernelci.org> wrote:
+>>
+>> mainline build: 208 builds: 0 failed, 208 passed, 422 warnings (v4.11-rc2-164-gdefc7d752265)
 >
-> Out of interest, anybody know OTOH which other stat syscalls statx
-> supersedes (such that they could at some point be disabled by default
-> in asm-generic for new arches, and implemented in userspace)?
+> The last build failure in mainline is gone now, though I don't know
+> what fixed it.
+> Let's hope this doesn't come back as the cause was apparently a race condition
+> in Kbuild that might have stopped triggering.
 
-It should replace the entire stat family {old,new,}{f,}stat{at,}{64,}, but not
-the {f,}statfs{64,} family, which will eventually get another replacement.
+Now the failure in x86_64 allmodconfig+CONFIG_OF=n is back, which makes it
+particularly hard to bisect as the problem only shows up sometimes.
 
-      Arnd
+     Arnd
