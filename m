@@ -1,93 +1,194 @@
-From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
-Date: Thu, 16 Mar 2017 16:13:41 +0000
-Subject: [PATCH V7 5/7] ACPI: Delay the enumeration on the devices whose
- dependency has not met
-In-Reply-To: <CAK8P3a2QZ_j9RQ0U=4MoAAcRcZyu0L5AiYM22QZkiRxh7Ca-iA@mail.gmail.com>
-References: <1489372963-9000-1-git-send-email-yuanzhichang@hisilicon.com>
- <1489372963-9000-6-git-send-email-yuanzhichang@hisilicon.com>
- <4600523.rWNiWKrYZC@aspire.rjw.lan> <58C9F6C6.4090700@hisilicon.com>
- <CAK8P3a2QZ_j9RQ0U=4MoAAcRcZyu0L5AiYM22QZkiRxh7Ca-iA@mail.gmail.com>
-Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E20492A4C@FRAEML521-MBX.china.huawei.com>
+From: nwatters@codeaurora.org (Nate Watterson)
+Date: Thu, 16 Mar 2017 12:24:56 -0400
+Subject: [PATCH v2 4/5] iommu/arm-smmu-v3: Install bypass STEs for
+ IOMMU_DOMAIN_IDENTITY domains
+In-Reply-To: <1489178976-15353-5-git-send-email-will.deacon@arm.com>
+References: <1489178976-15353-1-git-send-email-will.deacon@arm.com>
+ <1489178976-15353-5-git-send-email-will.deacon@arm.com>
+Message-ID: <420a5345344b4b574878caf3a916f1f2@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd
+Hi Will,
 
-> -----Original Message-----
-> From: arndbergmann at gmail.com [mailto:arndbergmann at gmail.com] On Behalf
-> Of Arnd Bergmann
-> Sent: 16 March 2017 10:13
-> To: Yuanzhichang
-> Cc: Rafael J. Wysocki; Catalin Marinas; Will Deacon; Rob Herring; Frank
-> Rowand; Bjorn Helgaas; Rafael Wysocki; Mark Rutland; Linux ARM; ACPI
-> Devel Maling List; Lorenzo Pieralisi; Benjamin Herrenschmidt; Linux
-> Kernel Mailing List; Linuxarm; devicetree at vger.kernel.org; linux-pci;
-> linux-serial at vger.kernel.org; Corey Minyard; liviu.dudau at arm.com; Zou
-> Rongrong; John Garry; Gabriele Paoloni; zhichang.yuan02 at gmail.com;
-> kantyzc at 163.com; xuwei (O)
-> Subject: Re: [PATCH V7 5/7] ACPI: Delay the enumeration on the devices
-> whose dependency has not met
+On 2017-03-10 15:49, Will Deacon wrote:
+> In preparation for allowing the default domain type to be overridden,
+> this patch adds support for IOMMU_DOMAIN_IDENTITY domains to the
+> ARM SMMUv3 driver.
 > 
-> On Thu, Mar 16, 2017 at 3:21 AM, zhichang.yuan
-> <yuanzhichang@hisilicon.com> wrote:
-> > Hi, Rafael,
-> >
-> > Thanks for your review!
-> >
-> > On 2017/3/14 5:24, Rafael J. Wysocki wrote:
-> >> On Monday, March 13, 2017 10:42:41 AM zhichang.yuan wrote:
-> >>> In commit 40e7fcb1929(ACPI: Add _DEP support to fix battery issue
-> on Asus
-> >>> T100TA), the '_DEP' was supported to solve the dependency of Asus
-> battery. But
-> >>> this patch is specific to Asus battery device.
-> >>> In the real world, there are other devices which need the
-> dependency to play the
-> >>> role on the enumeration order. For example, all the Hip06 LPC
-> >>> periperals(IPMI-BT, uart, etc) must be scanned after the LPC host
-> driver
-> >>> finished the probing. So, it makes sense to add a checking whether
-> the ACPI
-> >>> device meet all the dependencies during its enumeration slot, if
-> not, the
-> >>> enumeration will be delayed till all dependency master finish their
-> work.
-> >>>
-> >>> This patch adds the dependency checking in ACPI enumeration, also
-> the
-> >>> corresponding handling to retrigger the Hip06 LPC peripherals'
-> scanning.
-> >>
-> >> AFAICS, _DEP is generally abused in the wild and cannot be made
-> generic.  Sorry.
-> >>
-> >
-> > From the ACPI specification, _DEP is for operation region accesses.
-> > You are right...
-> >
-> > How about we add a ACPI handler for our LPC bus?? Just like amba.
-> > In this way, we also can solve the issue about LPC enumeration order.
+> An identity domain is created by placing the corresponding stream table
+> entries into "bypass" mode, which allows transactions to flow through
+> the SMMU without any translation.
 > 
-> As far as I can tell, PCI and LPC have exactly the same requirement
-> here,
-> so whatever you end up doing for one should be used for the other as
-> well.
 
-Well as you know PCI has got his own handler, identified by his own
-namespace id "PNP0A03".
-Now when you say "you end up doing for one should be used for the other"
-are you saying that we should introduce a new class of devices?
-i.e. should we have an ACPI namespace identifier for non-PCI IO Host
-Controllers?  
+What about masters that require SMMU intervention to override their
+native memory attributes to make them consistent with the CCA (acpi)
+or dma-coherent (dt) values specified in FW? To make sure those cases
+are handled, you could store away the master's coherency setting in
+its strtab_ent at attach time and then setup STE[MemAttr/ALLOCCFG/SHCFG]
+so the attributes are forced to the correct values while still
+bypassing translation.
 
-Otherwise, if my understanding is correct, having a specific new ACPI
-handler for HiSilicon LPC would mean to adding another function_init()
-in the list of acpi handlers inits in acpi_scan_init().
-
-But then every vendor would declare his own one...is this really correct?
-
-Many Thanks
-Gab
-
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  drivers/iommu/arm-smmu-v3.c | 58 
+> +++++++++++++++++++++++++++++----------------
+>  1 file changed, 37 insertions(+), 21 deletions(-)
 > 
->       Arnd
+> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+> index e18dbcd26f66..75fa4809f49e 100644
+> --- a/drivers/iommu/arm-smmu-v3.c
+> +++ b/drivers/iommu/arm-smmu-v3.c
+> @@ -554,9 +554,14 @@ struct arm_smmu_s2_cfg {
+>  };
+> 
+>  struct arm_smmu_strtab_ent {
+> -	bool				valid;
+> -
+> -	bool				bypass;	/* Overrides s1/s2 config */
+> +	/*
+> +	 * An STE is "assigned" if the master emitting the corresponding SID
+> +	 * is attached to a domain. The behaviour of an unassigned STE is
+> +	 * determined by the disable_bypass parameter, whereas an assigned
+> +	 * STE behaves according to s1_cfg/s2_cfg, which themselves are
+> +	 * configured according to the domain type.
+> +	 */
+> +	bool				assigned;
+>  	struct arm_smmu_s1_cfg		*s1_cfg;
+>  	struct arm_smmu_s2_cfg		*s2_cfg;
+>  };
+> @@ -632,6 +637,7 @@ enum arm_smmu_domain_stage {
+>  	ARM_SMMU_DOMAIN_S1 = 0,
+>  	ARM_SMMU_DOMAIN_S2,
+>  	ARM_SMMU_DOMAIN_NESTED,
+> +	ARM_SMMU_DOMAIN_BYPASS,
+>  };
+> 
+>  struct arm_smmu_domain {
+> @@ -1005,9 +1011,9 @@ static void arm_smmu_write_strtab_ent(struct
+> arm_smmu_device *smmu, u32 sid,
+>  	 * This is hideously complicated, but we only really care about
+>  	 * three cases at the moment:
+>  	 *
+> -	 * 1. Invalid (all zero) -> bypass  (init)
+> -	 * 2. Bypass -> translation (attach)
+> -	 * 3. Translation -> bypass (detach)
+> +	 * 1. Invalid (all zero) -> bypass/fault (init)
+> +	 * 2. Bypass/fault -> translation/bypass (attach)
+> +	 * 3. Translation/bypass -> bypass/fault (detach)
+>  	 *
+>  	 * Given that we can't update the STE atomically and the SMMU
+>  	 * doesn't read the thing in a defined order, that leaves us
+> @@ -1046,11 +1052,15 @@ static void arm_smmu_write_strtab_ent(struct
+> arm_smmu_device *smmu, u32 sid,
+>  	}
+> 
+>  	/* Nuke the existing STE_0 value, as we're going to rewrite it */
+> -	val = ste->valid ? STRTAB_STE_0_V : 0;
+> +	val = STRTAB_STE_0_V;
+> +
+> +	/* Bypass/fault */
+> +	if (!ste->assigned || !(ste->s1_cfg || ste->s2_cfg)) {
+> +		if (!ste->assigned && disable_bypass)
+> +			val |= STRTAB_STE_0_CFG_ABORT;
+> +		else
+> +			val |= STRTAB_STE_0_CFG_BYPASS;
+> 
+> -	if (ste->bypass) {
+> -		val |= disable_bypass ? STRTAB_STE_0_CFG_ABORT
+> -				      : STRTAB_STE_0_CFG_BYPASS;
+>  		dst[0] = cpu_to_le64(val);
+>  		dst[1] = cpu_to_le64(STRTAB_STE_1_SHCFG_INCOMING
+>  			 << STRTAB_STE_1_SHCFG_SHIFT);
+> @@ -1111,10 +1121,7 @@ static void arm_smmu_write_strtab_ent(struct
+> arm_smmu_device *smmu, u32 sid,
+>  static void arm_smmu_init_bypass_stes(u64 *strtab, unsigned int nent)
+>  {
+>  	unsigned int i;
+> -	struct arm_smmu_strtab_ent ste = {
+> -		.valid	= true,
+> -		.bypass	= true,
+> -	};
+> +	struct arm_smmu_strtab_ent ste = { .assigned = false };
+> 
+>  	for (i = 0; i < nent; ++i) {
+>  		arm_smmu_write_strtab_ent(NULL, -1, strtab, &ste);
+> @@ -1378,7 +1385,9 @@ static struct iommu_domain
+> *arm_smmu_domain_alloc(unsigned type)
+>  {
+>  	struct arm_smmu_domain *smmu_domain;
+> 
+> -	if (type != IOMMU_DOMAIN_UNMANAGED && type != IOMMU_DOMAIN_DMA)
+> +	if (type != IOMMU_DOMAIN_UNMANAGED &&
+> +	    type != IOMMU_DOMAIN_DMA &&
+> +	    type != IOMMU_DOMAIN_IDENTITY)
+>  		return NULL;
+> 
+>  	/*
+> @@ -1509,6 +1518,11 @@ static int arm_smmu_domain_finalise(struct
+> iommu_domain *domain)
+>  	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
+>  	struct arm_smmu_device *smmu = smmu_domain->smmu;
+> 
+> +	if (domain->type == IOMMU_DOMAIN_IDENTITY) {
+> +		smmu_domain->stage = ARM_SMMU_DOMAIN_BYPASS;
+> +		return 0;
+> +	}
+> +
+>  	/* Restrict the stage to what we can actually support */
+>  	if (!(smmu->features & ARM_SMMU_FEAT_TRANS_S1))
+>  		smmu_domain->stage = ARM_SMMU_DOMAIN_S2;
+> @@ -1597,7 +1611,7 @@ static void arm_smmu_detach_dev(struct device 
+> *dev)
+>  {
+>  	struct arm_smmu_master_data *master = dev->iommu_fwspec->iommu_priv;
+> 
+> -	master->ste.bypass = true;
+> +	master->ste.assigned = false;
+>  	arm_smmu_install_ste_for_dev(dev->iommu_fwspec);
+>  }
+> 
+> @@ -1617,7 +1631,7 @@ static int arm_smmu_attach_dev(struct
+> iommu_domain *domain, struct device *dev)
+>  	ste = &master->ste;
+> 
+>  	/* Already attached to a different domain? */
+> -	if (!ste->bypass)
+> +	if (ste->assigned)
+>  		arm_smmu_detach_dev(dev);
+> 
+>  	mutex_lock(&smmu_domain->init_mutex);
+> @@ -1638,10 +1652,12 @@ static int arm_smmu_attach_dev(struct
+> iommu_domain *domain, struct device *dev)
+>  		goto out_unlock;
+>  	}
+> 
+> -	ste->bypass = false;
+> -	ste->valid = true;
+> +	ste->assigned = true;
+> 
+> -	if (smmu_domain->stage == ARM_SMMU_DOMAIN_S1) {
+> +	if (smmu_domain->stage == ARM_SMMU_DOMAIN_BYPASS) {
+> +		ste->s1_cfg = NULL;
+> +		ste->s2_cfg = NULL;
+> +	} else if (smmu_domain->stage == ARM_SMMU_DOMAIN_S1) {
+>  		ste->s1_cfg = &smmu_domain->s1_cfg;
+>  		ste->s2_cfg = NULL;
+>  		arm_smmu_write_ctx_desc(smmu, ste->s1_cfg);
+> @@ -1801,7 +1817,7 @@ static void arm_smmu_remove_device(struct device 
+> *dev)
+> 
+>  	master = fwspec->iommu_priv;
+>  	smmu = master->smmu;
+> -	if (master && master->ste.valid)
+> +	if (master && master->ste.assigned)
+>  		arm_smmu_detach_dev(dev);
+>  	iommu_group_remove_device(dev);
+>  	iommu_device_unlink(&smmu->iommu, dev);
+
+-- 
+Qualcomm Datacenter Technologies, Inc. on behalf of Qualcomm 
+Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a 
+Linux
+Foundation Collaborative Project.
