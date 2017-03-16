@@ -1,107 +1,41 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Thu, 16 Mar 2017 19:06:08 +0100
-Subject: [PATCH v2] ARM: zynq: Add #io-channel-cells to (x)adc node for
- iio-hwmon
-In-Reply-To: <37f29986-6491-67ab-144c-eb485cc1fdcc@metafoo.de>
-References: <1489003884-2489-1-git-send-email-mdf@kernel.org>
- <e6da3f38-7039-66e5-5b9d-a44ff42aa9c9@xilinx.com>
- <CAJYdmeNc48=OOvRiUjqPBJhz9RCbzeaRGu1Tfm=hrvzkJrSsag@mail.gmail.com>
- <7e4fbe16-8686-5399-748d-af222c630338@xilinx.com>
- <37f29986-6491-67ab-144c-eb485cc1fdcc@metafoo.de>
-Message-ID: <6767a340-b150-c21a-b6cb-5ca1ce2cd721@xilinx.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Thu, 16 Mar 2017 11:13:12 -0700
+Subject: [PATCH v2 2/3] drm/vc4: Add HDMI audio support
+In-Reply-To: <20170227202803.12855-2-eric@anholt.net>
+References: <20170227202803.12855-1-eric@anholt.net>
+ <20170227202803.12855-2-eric@anholt.net>
+Message-ID: <87tw6tyts7.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16.3.2017 17:51, Lars-Peter Clausen wrote:
-> On 03/16/2017 05:45 PM, Michal Simek wrote:
->> On 16.3.2017 17:39, Moritz Fischer wrote:
->>> On Thu, Mar 16, 2017 at 9:16 AM, Michal Simek <michal.simek@xilinx.com> wrote:
->>>> Hi,
->>>>
->>>> On 8.3.2017 21:11, Moritz Fischer wrote:
->>>>> Fix
->>>>>
->>>>> OF: /iio_hwmon: could not get #io-channel-cells for
->>>>> /amba/adc at f8007100
->>>>> OF: /iio_hwmon: could not get #io-channel-cells for
->>>>> /amba/adc at f8007100
->>>>> OF: /iio_hwmon: could not get #io-channel-cells for
->>>>> /amba/adc at f8007100
->>>>>
->>>>> by adding the #io-channel-cells property.
->>>>>
->>>>> Signed-off-by: Moritz Fischer <mdf@kernel.org>
->>>>> Cc: Michal Simek <michal.simek@xilinx.com>
->>>>> Cc: S?ren Brinkmann <soren.brinkmann@xilinx.com>
->>>>> Cc: Julia Cartwright <julia@ni.com>
->>>>> Cc: linux-kernel at vger.kernel.org
->>>>> Cc: devicetree at vger.kernel.org
->>>>> ---
->>>>>
->>>>> Changes from v1:
->>>>> - fix messed up commit message
->>>>> ---
->>>>>  arch/arm/boot/dts/zynq-7000.dtsi | 1 +
->>>>>  1 file changed, 1 insertion(+)
->>>>>
->>>>> diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
->>>>> index f3ac9bf..98233a8 100644
->>>>> --- a/arch/arm/boot/dts/zynq-7000.dtsi
->>>>> +++ b/arch/arm/boot/dts/zynq-7000.dtsi
->>>>> @@ -72,6 +72,7 @@
->>>>>                       interrupts = <0 7 4>;
->>>>>                       interrupt-parent = <&intc>;
->>>>>                       clocks = <&clkc 12>;
->>>>> +                     #io-channel-cells = <1>;
->>>>>               };
->>>>>
->>>>>               can0: can at e0008000 {
->>>>>
->>>>
->>>> I think it will be good to the next step too.
->>>> It means also add iio-hwmon node too.
->>>>
->>>> What do you think?
->>>
->>> I hadn't put it in there since dts is supposed to describe hw,
->>> but obviously putting the actual hwmon in there makes it more useful.
->>
->> I had one discussion about this with Grant in past and it is common
->> mistake. It is simplification of purpose of dts.
->>
-> 
-> If the iio-hwmon binding had gone through review it would have been rejected.
+Eric Anholt <eric@anholt.net> writes:
 
-Isn't it a time to deprecate it?
+> The HDMI encoder IP embeds all needed blocks to output audio, with a
+> custom DAI called MAI moving audio between the two parts of the HDMI
+> core.  This driver now exposes a sound card to let users stream audio
+> to their display.
+>
+> Using the hdmi-codec driver has been considered here, but MAI meant
+> having to significantly rework hdmi-codec, and it would have left
+> little shared code with the I2S mode anyway.
+>
+> The encoder requires that the audio be SPDIF-formatted frames only,
+> which alsalib will format-convert for us.
+>
+> This patch is the combined work of Eric Anholt (initial register setup
+> with a separate dmaengine driver and using simple-audio-card) and
+> Boris Brezillon (moving it all into HDMI, massive debug to get it
+> actually working), and which Eric has the permission to release.
+>
+> v2: Drop "-audio" from sound card name, since that's already implied
+>     (suggestion by Boris)
 
-> 
->>>
->>> I can resubmit with the hwmon node in there.
->>
->> If you grep kernel tree you will see that others are using it too.
->> Also there is accepted binding for that that's why I can't see big
->> problem with it.
-> 
-> Since this is an application specific binding I wouldn't put it in the
-> generic DT include file. It's a bit like adding a gpio-key binding for each
-> of the GPIOs just in case somebody wants to use it.
-
-psci is system specific too.
-
-IIRC this driver for zynq was written by ADI or with ADI help that's why
-you know much better than I what's the correct configuration.
-
-This targets PS IP which should be present in the hw all the time.
-Not sure if for all configuration but I expect at least the part of it
-is there all them time.
-
-If binding is incorrect then please remove it with removing from all
-dts/dtsi files which have this. The same is for of probe function in the
-driver itself.
-If this is not done then this is just +1 case.
-
-If you still insist that we shouldn't do it then please at least extend
-commit message and put there example how to wire it on zynq.
-
-Thanks,
-Michal
+On IRC, Mark Brown disclaimed responsibility for reviewing this code, so
+I've merged it to drm-misc-next.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170316/110e9558/attachment.sig>
