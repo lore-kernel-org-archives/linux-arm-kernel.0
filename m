@@ -1,255 +1,68 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Thu, 16 Mar 2017 10:27:03 +0100
-Subject: [RFC PATCH 21/33] irqchip/gic-v3-its: Add VPE irq domain
- allocation/teardown
-In-Reply-To: <1484648454-21216-22-git-send-email-marc.zyngier@arm.com>
-References: <1484648454-21216-1-git-send-email-marc.zyngier@arm.com>
- <1484648454-21216-22-git-send-email-marc.zyngier@arm.com>
-Message-ID: <4fda8fbe-2c65-196e-81ea-fff513a17f11@redhat.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Thu, 16 Mar 2017 10:27:19 +0100
+Subject: [PATCH v2] mtd: nand: tango: Enforce DMA direction type
+In-Reply-To: <72b68483-8a02-f6b8-f6b7-da492585c802@sigmadesigns.com>
+References: <1486979107-15362-1-git-send-email-boris.brezillon@free-electrons.com>
+ <aebe65d0-19c9-e1a7-b98a-c25ff616dad0@sigmadesigns.com>
+ <20170220133547.06c17a12@bbrezillon>
+ <72b68483-8a02-f6b8-f6b7-da492585c802@sigmadesigns.com>
+Message-ID: <20170316102719.199d0f5f@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, 20 Feb 2017 14:10:07 +0100
+Marc Gonzalez <marc_gonzalez@sigmadesigns.com> wrote:
 
-On 17/01/2017 11:20, Marc Zyngier wrote:
-> When creating a VM, the low level GICv4 code is responsible for:
-> - allocating each VPE a unique VPEID
-> - allocating a doorbell interrupt for each VPE
-> - allocating the pending tables for each VPE
-> - allocating the property table for the VM
+> From: Boris Brezillon <boris.brezillon@free-electrons.com>
 > 
-> This of course has to be reversed when the VM is brought down.
+> do_dma() uses an int to pass the DMA data direction information and
+> pass the same value to dmaengine_prep_slave_sg().
 > 
-> All of this is wired into the irq domain alloc/free methods.
+> Currently, DMA_{FROM,TO}_DEVICE match DMA_{DEV_TO_MEM,MEM_TO_DEV}
+> definitions so it works fine, but assuming this will always be the case
+> is not safe.
 > 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> Enforce enum dma_data_direction type in the function prototype and make
+> the enum dma_data_direction -> enum dma_transfer_direction conversion
+> explicit.
+> 
+> Reported-by: Richard Weinberger <richard@nod.at>
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> Acked-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+
+Applied.
+
 > ---
->  drivers/irqchip/irq-gic-v3-its.c | 174 +++++++++++++++++++++++++++++++++++++++
->  1 file changed, 174 insertions(+)
+>  drivers/mtd/nand/tango_nand.c | 8 +++++---
+>  1 file changed, 5 insertions(+), 3 deletions(-)
 > 
-> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-> index ddd8096..54d0075 100644
-> --- a/drivers/irqchip/irq-gic-v3-its.c
-> +++ b/drivers/irqchip/irq-gic-v3-its.c
-> @@ -139,6 +139,7 @@ static struct rdists *gic_rdists;
->  static struct irq_domain *its_parent;
->  
->  static unsigned long its_list_map;
-> +static DEFINE_IDA(its_vpeid_ida);
->  
->  #define gic_data_rdist()		(raw_cpu_ptr(gic_rdists->rdist))
->  #define gic_data_rdist_rd_base()	(gic_data_rdist()->rd_base)
-> @@ -1146,6 +1147,11 @@ static struct page *its_allocate_prop_table(gfp_t gfp_flags)
->  	return prop_page;
+> diff --git a/drivers/mtd/nand/tango_nand.c b/drivers/mtd/nand/tango_nand.c
+> index 4a5e948c62df..05b6e1065203 100644
+> --- a/drivers/mtd/nand/tango_nand.c
+> +++ b/drivers/mtd/nand/tango_nand.c
+> @@ -223,12 +223,13 @@ static void tango_dma_callback(void *arg)
+>  	complete(arg);
 >  }
 >  
-> +static void its_free_prop_table(struct page *prop_page)
-> +{
-> +	free_pages((unsigned long)page_address(prop_page),
-> +		   get_order(LPI_PROPBASE_SZ));
-> +}
->  
->  static int __init its_alloc_lpi_tables(void)
+> -static int do_dma(struct tango_nfc *nfc, int dir, int cmd, const void *buf,
+> -		  int len, int page)
+> +static int do_dma(struct tango_nfc *nfc, enum dma_data_direction dir, int cmd,
+> +		  const void *buf, int len, int page)
 >  {
-> @@ -1444,6 +1450,12 @@ static struct page *its_allocate_pending_table(gfp_t gfp_flags)
->  	return pend_page;
->  }
+>  	void __iomem *addr = nfc->reg_base + NFC_STATUS;
+>  	struct dma_chan *chan = nfc->chan;
+>  	struct dma_async_tx_descriptor *desc;
+> +	enum dma_transfer_direction tdir;
+>  	struct scatterlist sg;
+>  	struct completion tx_done;
+>  	int err = -EIO;
+> @@ -238,7 +239,8 @@ static int do_dma(struct tango_nfc *nfc, int dir, int cmd, const void *buf,
+>  	if (dma_map_sg(chan->device->dev, &sg, 1, dir) != 1)
+>  		return -EIO;
 >  
-> +static void its_free_pending_table(struct page *pt)
-> +{
-> +	free_pages((unsigned long)page_address(pt),
-> +		   get_order(max(LPI_PENDBASE_SZ, SZ_64K)));
-> +}
-> +
->  static void its_cpu_init_lpis(void)
->  {
->  	void __iomem *rbase = gic_data_rdist_rd_base();
-> @@ -1666,6 +1678,34 @@ static bool its_alloc_device_table(struct its_node *its, u32 dev_id)
->  	return its_alloc_table_entry(baser, dev_id);
->  }
+> -	desc = dmaengine_prep_slave_sg(chan, &sg, 1, dir, DMA_PREP_INTERRUPT);
+> +	tdir = dir == DMA_TO_DEVICE ? DMA_MEM_TO_DEV : DMA_DEV_TO_MEM;
+> +	desc = dmaengine_prep_slave_sg(chan, &sg, 1, tdir, DMA_PREP_INTERRUPT);
+>  	if (!desc)
+>  		goto dma_unmap;
 >  
-> +static bool its_alloc_vpe_table(u32 vpe_id)
-> +{
-> +	struct its_node *its;
-> +
-> +	/*
-> +	 * Make sure the L2 tables are allocated on *all* v4 ITSs. We
-> +	 * could try and only do it on ITSs corresponding to devices
-> +	 * that have interrupts targeted at this VPE, but the
-> +	 * complexity becomes crazy (and you have tons of memory
-> +	 * anyway, right?).
-> +	 */
-> +	list_for_each_entry(its, &its_nodes, entry) {
-> +		struct its_baser *baser;
-> +
-> +		if (!its->is_v4)
-> +			continue;
-> +
-> +		baser = its_get_baser(its, GITS_BASER_TYPE_VCPU);
-> +		if (!baser)
-> +			return false;
-
-don't you need to check the vpe_id doesn't overshoot the BASER caps?
-> +
-> +		if (!its_alloc_table_entry(baser, vpe_id))
-> +			return false;
-> +	}
-> +
-> +	return true;
-> +}
-> +
->  static struct its_device *its_create_device(struct its_node *its, u32 dev_id,
->  					    int nvecs)
->  {
-> @@ -1922,7 +1962,141 @@ static struct irq_chip its_vpe_irq_chip = {
->  	.name			= "GICv4-vpe",
->  };
->  
-> +static int its_vpe_id_alloc(void)
-> +{
-> +	return ida_simple_get(&its_vpeid_ida, 0, 1 << 16, GFP_KERNEL);
-> +}
-> +
-> +static void its_vpe_id_free(u16 id)
-> +{
-> +	ida_simple_remove(&its_vpeid_ida, id);
-> +}
-> +
-> +static int its_vpe_init(struct its_vpe *vpe)
-> +{
-> +	struct page *vpt_page;
-> +	int vpe_id;
-> +
-> +	/* Allocate vpe_id */
-> +	vpe_id = its_vpe_id_alloc();
-> +	if (vpe_id < 0)
-> +		return vpe_id;
-> +
-> +	/* Allocate VPT */
-> +	vpt_page = its_allocate_pending_table(GFP_KERNEL);
-> +	if (vpt_page) {
-isn't it !vpt_page?
-> +		its_vpe_id_free(vpe_id);
-> +		return -ENOMEM;
-> +	}
-> +
-> +	if (!its_alloc_vpe_table(vpe_id)) {
-> +		its_vpe_id_free(vpe_id);
-> +		its_free_pending_table(vpe->vpt_page);
-> +		return -ENOMEM;
-> +	}
-> +
-> +	vpe->vpe_id = vpe_id;
-> +	vpe->vpt_page = vpt_page;
-> +
-> +	return 0;
-> +}
-> +
-> +static void its_vpe_teardown(struct its_vpe *vpe)
-> +{
-> +	its_vpe_id_free(vpe->vpe_id);
-> +	its_free_pending_table(vpe->vpt_page);
-don't you need to remove the VPE entry as well?
-> +}
-> +
-> +static int its_vpe_irq_domain_alloc(struct irq_domain *domain, unsigned int virq,
-> +				    unsigned int nr_irqs, void *args)
-> +{
-> +	msi_alloc_info_t *info = args;
-> +	struct its_vpe **vpes = info->scratchpad[0].ptr;
-> +	struct its_vm *vm = vpes[0]->its_vm;
-> +	unsigned long *bitmap;
-> +	struct page *vprop_page;
-> +	int base, nr_ids, i, err = 0;
-> +
-> +	bitmap = its_lpi_alloc_chunks(nr_irqs, &base, &nr_ids);
-> +	if (!bitmap)
-> +		return -ENOMEM;
-> +
-> +	if (nr_ids < nr_irqs) {
-> +		its_lpi_free_chunks(bitmap, base, nr_ids);
-> +		return -ENOMEM;
-> +	}
-> +
-> +	vprop_page = its_allocate_prop_table(GFP_KERNEL);
-> +	if (!vprop_page) {
-> +		its_lpi_free_chunks(bitmap, base, nr_ids);
-> +		return ENOMEM;
--ENOMEM
-> +	}
-> +
-> +	for (i = 0; i < nr_irqs; i++) {
-> +		vpes[i]->vpe_db_lpi = base + i;
-> +		err = its_vpe_init(vpes[i]);
-> +		if (err)
-> +			break;
-> +		irq_domain_set_hwirq_and_chip(domain,
-> +					      virq + i, vpes[i]->vpe_db_lpi,
-> +					      &its_vpe_irq_chip, vpes[i]);
-> +		set_bit(i, bitmap);
-> +	}
-> +
-> +	if (err) {
-> +		while (--i >= 0) {
-> +			its_vpe_teardown(vpes[i]);
-> +			clear_bit(i, bitmap);
-> +		}
-> +
-> +		its_lpi_free_chunks(bitmap, base, nr_ids);
-> +		its_free_prop_table(vprop_page);
-> +
-> +		return err;
-> +	}
-> +
-> +	vm->db_bitmap = bitmap;
-> +	vm->db_lpi_base = base;
-> +	vm->nr_db_lpis = nr_ids;
-> +	vm->vprop_page = vprop_page;
-> +
-> +	return 0;
-> +}
-> +
-> +static void its_vpe_irq_domain_free(struct irq_domain *domain,
-> +				    unsigned int virq,
-> +				    unsigned int nr_irqs)
-> +{
-> +	struct its_vm *vm = NULL;
-> +	int i;
-> +
-> +	for (i = 0; i < nr_irqs; i++) {
-> +		struct irq_data *data = irq_domain_get_irq_data(domain, virq);
-> +		struct its_vpe *vpe = irq_data_get_irq_chip_data(data);
-> +
-> +		BUG_ON(vm && vm != vpe->its_vm);
-> +		if (!vm)
-> +			vm = vpe->its_vm;
-I don't get the above. actually I missed who does set its_vm field on
-the vpe.
-
-Thanks
-
-Eric
-> +
-> +		clear_bit(vpe->vpe_db_lpi - vm->db_lpi_base, vm->db_bitmap);
-> +		its_vpe_teardown(vpe);
-> +		irq_domain_reset_irq_data(data);
-> +	}
-> +
-> +	if (!vm)
-> +		return;
-> +
-> +	if (bitmap_empty(vm->db_bitmap, vm->nr_db_lpis)) {
-> +		its_lpi_free_chunks(vm->db_bitmap, vm->db_lpi_base, vm->nr_db_lpis);
-> +		its_free_prop_table(vm->vprop_page);
-> +	}
-> +
-> +	irq_domain_free_irqs_parent(domain, virq, nr_irqs);
-> +}
-> +
->  static const struct irq_domain_ops its_vpe_domain_ops = {
-> +	.alloc			= its_vpe_irq_domain_alloc,
-> +	.free			= its_vpe_irq_domain_free,
->  };
->  
->  static int its_force_quiescent(void __iomem *base)
-> 
