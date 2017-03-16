@@ -1,40 +1,30 @@
 From: cl@rock-chips.com (cl at rock-chips.com)
-Date: Thu, 16 Mar 2017 21:17:18 +0800
-Subject: [PATCH v2 0/6] initialize dtsi file and dts file for RK3328 SoCs
-Message-ID: <1489670244-13328-1-git-send-email-cl@rock-chips.com>
+Date: Thu, 16 Mar 2017 21:17:21 +0800
+Subject: [PATCH v2 3/6] dt-bindings: soc: rockchip: grf: add support for rk3328
+In-Reply-To: <1489670244-13328-1-git-send-email-cl@rock-chips.com>
+References: <1489670244-13328-1-git-send-email-cl@rock-chips.com>
+Message-ID: <1489670244-13328-4-git-send-email-cl@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Liang Chen <cl@rock-chips.com>
 
-Changes in v2:
-    Remove RK_FUNC_* in dtsi as it dose not help understand things better.
-    Adjust the order of description in dt-bindings.
+Signed-off-by: Liang Chen <cl@rock-chips.com>
+---
+ Documentation/devicetree/bindings/soc/rockchip/grf.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-These patchs depend on pinctrl patchs as below:
-
-https://patchwork.kernel.org/patch/9566427/
-https://patchwork.kernel.org/patch/9566425/
-https://patchwork.kernel.org/patch/9566431/
-
-Liang Chen (6):
-  dt-bindings: iio: rockchip-saradc: add support for rk3328
-  dt-bindings: i2c: rk3x: add support for rk3328
-  dt-bindings: soc: rockchip: grf: add support for rk3328
-  arm64: dts: rockchip: add core dtsi file for RK3328 SoCs
-  arm64: dts: rockchip: add dts file for RK3328
-  dt-bindings: document rockchip rk3328-evb board
-
- Documentation/devicetree/bindings/arm/rockchip.txt |    4 +
- Documentation/devicetree/bindings/i2c/i2c-rk3x.txt |    1 +
- .../bindings/iio/adc/rockchip-saradc.txt           |    1 +
- .../devicetree/bindings/soc/rockchip/grf.txt       |    1 +
- arch/arm64/boot/dts/rockchip/Makefile              |    1 +
- arch/arm64/boot/dts/rockchip/rk3328-evb.dts        |   57 +
- arch/arm64/boot/dts/rockchip/rk3328.dtsi           | 1362 ++++++++++++++++++++
- 7 files changed, 1427 insertions(+)
- create mode 100644 arch/arm64/boot/dts/rockchip/rk3328-evb.dts
- create mode 100644 arch/arm64/boot/dts/rockchip/rk3328.dtsi
-
+diff --git a/Documentation/devicetree/bindings/soc/rockchip/grf.txt b/Documentation/devicetree/bindings/soc/rockchip/grf.txt
+index a0685c2..de8b983 100644
+--- a/Documentation/devicetree/bindings/soc/rockchip/grf.txt
++++ b/Documentation/devicetree/bindings/soc/rockchip/grf.txt
+@@ -16,6 +16,7 @@ Required Properties:
+    - "rockchip,rk3188-grf", "syscon": for rk3188
+    - "rockchip,rk3228-grf", "syscon": for rk3228
+    - "rockchip,rk3288-grf", "syscon": for rk3288
++   - "rockchip,rk3328-grf", "syscon": for rk3328
+    - "rockchip,rk3368-grf", "syscon": for rk3368
+    - "rockchip,rk3399-grf", "syscon": for rk3399
+ - compatible: PMUGRF should be one of the following:
 -- 
 1.9.1
