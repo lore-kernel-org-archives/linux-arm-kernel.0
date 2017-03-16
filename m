@@ -1,70 +1,101 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 16 Mar 2017 08:29:25 -0700
-Subject: [PATCH] ARM: omap2+: Revert omap-smp.c changes resetting CPU1
- during boot
-In-Reply-To: <20170315172200.GM20572@atomide.com>
-References: <20170313205231.1593-1-tony@atomide.com>
- <0bade322-5bee-412f-ef21-972c99846e84@ti.com>
- <20170314151725.GC20572@atomide.com>
- <d0fe191f-66f8-b72d-0a2a-00815e663a8d@ti.com>
- <20170314164106.GE20572@atomide.com>
- <ea09d676-29f6-7100-4c68-88920deaeb7c@ti.com>
- <20170314181425.GF20572@atomide.com>
- <20170315172200.GM20572@atomide.com>
-Message-ID: <20170316152925.GO20572@atomide.com>
+From: shuahkh@osg.samsung.com (Shuah Khan)
+Date: Thu, 16 Mar 2017 09:32:34 -0600
+Subject: [PATCH] usb: dwc3 dwc3_exynos_probe() change goto labels to
+ meaningful names
+In-Reply-To: <20170130192504.19046-1-shuahkh@osg.samsung.com>
+References: <20170130192504.19046-1-shuahkh@osg.samsung.com>
+Message-ID: <8da7ab58-9d4c-2e71-df98-40bbceea8858@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [170315 10:24]:
-> * Tony Lindgren <tony@atomide.com> [170314 11:16]:
-> > * Andrew F. Davis <afd@ti.com> [170314 10:59]:
-> > Then onto the other related patches..
-> > 
-> > > We re-park cpu1 in bootROM in U-Boot already, in the U-Boot tree:
-> > > arch/arm/mach-omap2/omap5/sec_entry_cpu1.S
-> > 
-> > OK good to hear.
-> > 
-> > > omap_smc_sec_cpu1() wakes up cpu1 into the function cpu1_entry(), this
-> > > makes an SMC call to setup the core, then re-parks itself back in bootROM.
-> > > Relevant code to run on cpu1:
-> > > 
-> > > > #define AUX_CORE_BOOT_0		0x48281800
-> > > > #define AUX_CORE_BOOT_1		0x48281804
-> > > > /* DRA7xx ROM code function "startup_BootSlave". This function is where CPU1
-> > > >  * waits on WFE, polling on AUX_CORE_BOOT_x registers.
-> > > >  * This address is same for J6 and J6 Eco.
-> > > >  */
-> > > > #define ROM_FXN_STARTUP_BOOTSLAVE     0x00038a64
-> > > >
-> > > > ldr	r4, =AUX_CORE_BOOT_0
-> > > > mov	r5, #0x0
-> > > > str	r5, [r4]
-> > > > ldr	r4, =ROM_FXN_STARTUP_BOOTSLAVE
-> > > > bx	r4	@ Jump back to ROM
-> > > 
-> > > We would have to do this in kernel. The issue I'm thinking we are going
-> > > to hit is that the parking function in bootROM expects the MMU to be
-> > > off. Although we don't really need to turn it off as long as we can
-> > > identity map the bootROM area, the AUX_CORE_BOOT_0/1 space, and wherever
-> > > we plan to exit the parking loop.
-> > 
-> > Would be good to hear what Russell thinks we should do here to park
-> > CPU1.
+On 01/30/2017 12:25 PM, Shuah Khan wrote:
+> Change goto labels to meaningful names from a series of errNs.
 > 
-> How about we introduce smp_park_secondary()?
+> Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
+> ---
 > 
-> Then soft_restart() can call it between setup_mm_for_reboot()
-> and cpu_proc_fin()?
+> Rebased to usb-next
 
-Hmm that probably won't help as we'd have to still have a 1:1
-mapping in cpu_die() to put CPU1 into WFI and release it in
-smp_park_secondary() to the bootrom.
+Hi Felipe,
 
-Anyways, I think in your use case it's the suspend/resume that needs
-the state preserved for CPU1. Do you need kexec working in your use
-case?
+Are you planning to get this in or is there something you are
+waiting in for me to do?
 
-Regards,
+thanks,
+-- Shuah
 
-Tony
+
+> 
+>  drivers/usb/dwc3/dwc3-exynos.c | 22 +++++++++++-----------
+>  1 file changed, 11 insertions(+), 11 deletions(-)
+> 
+> diff --git a/drivers/usb/dwc3/dwc3-exynos.c b/drivers/usb/dwc3/dwc3-exynos.c
+> index 1515d45..98f74ff 100644
+> --- a/drivers/usb/dwc3/dwc3-exynos.c
+> +++ b/drivers/usb/dwc3/dwc3-exynos.c
+> @@ -147,53 +147,53 @@ static int dwc3_exynos_probe(struct platform_device *pdev)
+>  	exynos->vdd33 = devm_regulator_get(dev, "vdd33");
+>  	if (IS_ERR(exynos->vdd33)) {
+>  		ret = PTR_ERR(exynos->vdd33);
+> -		goto err2;
+> +		goto vdd33_err;
+>  	}
+>  	ret = regulator_enable(exynos->vdd33);
+>  	if (ret) {
+>  		dev_err(dev, "Failed to enable VDD33 supply\n");
+> -		goto err2;
+> +		goto vdd33_err;
+>  	}
+>  
+>  	exynos->vdd10 = devm_regulator_get(dev, "vdd10");
+>  	if (IS_ERR(exynos->vdd10)) {
+>  		ret = PTR_ERR(exynos->vdd10);
+> -		goto err3;
+> +		goto vdd10_err;
+>  	}
+>  	ret = regulator_enable(exynos->vdd10);
+>  	if (ret) {
+>  		dev_err(dev, "Failed to enable VDD10 supply\n");
+> -		goto err3;
+> +		goto vdd10_err;
+>  	}
+>  
+>  	ret = dwc3_exynos_register_phys(exynos);
+>  	if (ret) {
+>  		dev_err(dev, "couldn't register PHYs\n");
+> -		goto err4;
+> +		goto phys_err;
+>  	}
+>  
+>  	if (node) {
+>  		ret = of_platform_populate(node, NULL, NULL, dev);
+>  		if (ret) {
+>  			dev_err(dev, "failed to add dwc3 core\n");
+> -			goto err5;
+> +			goto populate_err;
+>  		}
+>  	} else {
+>  		dev_err(dev, "no device node, failed to add dwc3 core\n");
+>  		ret = -ENODEV;
+> -		goto err5;
+> +		goto populate_err;
+>  	}
+>  
+>  	return 0;
+>  
+> -err5:
+> +populate_err:
+>  	platform_device_unregister(exynos->usb2_phy);
+>  	platform_device_unregister(exynos->usb3_phy);
+> -err4:
+> +phys_err:
+>  	regulator_disable(exynos->vdd10);
+> -err3:
+> +vdd10_err:
+>  	regulator_disable(exynos->vdd33);
+> -err2:
+> +vdd33_err:
+>  	clk_disable_unprepare(exynos->axius_clk);
+>  axius_clk_err:
+>  	clk_disable_unprepare(exynos->susp_clk);
+> 
