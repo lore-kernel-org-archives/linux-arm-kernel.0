@@ -1,31 +1,71 @@
-From: oss@buserror.net (Scott Wood)
-Date: Thu, 16 Mar 2017 15:39:23 -0500
-Subject: [RFC 4/7] soc/qman: add helper functions needed by caam/qi driver
-In-Reply-To: <1488552733-20806-5-git-send-email-horia.geanta@nxp.com>
-References: <1488552733-20806-1-git-send-email-horia.geanta@nxp.com>
- <1488552733-20806-5-git-send-email-horia.geanta@nxp.com>
-Message-ID: <1489696763.2944.42.camel@buserror.net>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Fri, 17 Mar 2017 04:47:40 +0800
+Subject: [PATCH v2 0/8] Initial Allwinner Display Engine 2.0 Support
+Message-ID: <20170316204748.8596-1-icenowy@aosc.xyz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2017-03-03 at 16:52 +0200, Horia Geant? wrote:
-> Add helper functions, macros, #defines for accessing / enabling
-> qman functionality from caam/qi driver, such that this driver
-> is not aware of the need for data conversion to big endian.
+This patchset is the initial patchset for Allwinner DE2 support.
 
-Why? ?I complained about that (probably internally) when this driver was
-originally submitted.
+It contains the support of clocks in DE2 and the mixers in DE2.
 
-Having a bunch of accessors in a header file that just do an assignment with
-an endian conversion just obfuscates things. ?The driver still needs to know
-that the conversion needs to happen, or else it wouldn't know that the fields
-can't be accessed directly... and it gets particularly ridiculous when a
-single field has a growing pile of accessors depending on exactly what flags
-you want to set (e.g. qm_sg_entry_set_*). ?Just open-code it unless an
-accessor is justified by the call sites getting unwieldy or numerous.
+The SoC used to develop this patchset is V3s, as V3s is the simplest
+one of the SoCs that have DE2.
+(Allwinner V3s features only one mixer, although its clock control
+unit contains support for second mixer's clock; and its only video
+output is RGB LCD, which is already supported in our TCON driver)
 
-It looks like GCC 6 has added an attribute (scalar_storage_order) that could
-be used on structs to avoid having to manually swap such things. ?I look
-forward to the day when GCC 6 is old enough for the kernel to depend on this.
+The last patch is only a testing patch, it shouldn't be merged; and
+for the patch to be really usable, the RFC fix of the TCON driver [1]
+is needed.
 
--Scott
+No HDMI, TV encoder or other internal bridges' support is included
+in this patchset, which makes it currently not usable on H3.
+
+Thanks to Jean-Francois Moine and Jernej Skrabec for their efforts
+to discover the internal of DE2!
+
+[1] https://lists.freedesktop.org/archives/dri-devel/2016-December/126264.html
+
+Icenowy Zheng (8):
+  dt-bindings: add binding for the Allwinner DE2 CCU
+  clk: sunxi-ng: add support for DE2 CCU
+  dt-bindings: add bindings for DE2 on V3s SoC
+  drm/sun4i: add support for sun8i DE2 mixers and display engines
+  drm/sun4i: tcon: add support for V3s TCON
+  ARM: dts: sun8i: add DE2 nodes for V3s SoC
+  ARM: dts: sun8i: add pinmux for LCD pins of V3s SoC
+  ARM: dts: sun8i: enable LCD panel of Lichee Pi Zero
+
+ .../devicetree/bindings/clock/sun8i-de2.txt        |  31 ++
+ .../bindings/display/sunxi/sun4i-drm.txt           |  37 +-
+ arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts      |  36 ++
+ arch/arm/boot/dts/sun8i-v3s.dtsi                   |  96 +++++
+ drivers/clk/sunxi-ng/Kconfig                       |   5 +
+ drivers/clk/sunxi-ng/Makefile                      |   1 +
+ drivers/clk/sunxi-ng/ccu-sun8i-de2.c               | 204 +++++++++++
+ drivers/clk/sunxi-ng/ccu-sun8i-de2.h               |  28 ++
+ drivers/gpu/drm/sun4i/Kconfig                      |   9 +
+ drivers/gpu/drm/sun4i/Makefile                     |   3 +-
+ drivers/gpu/drm/sun4i/sun4i_crtc.c                 |  14 +-
+ drivers/gpu/drm/sun4i/sun4i_crtc.h                 |   2 +
+ drivers/gpu/drm/sun4i/sun4i_drv.c                  |   4 +-
+ drivers/gpu/drm/sun4i/sun4i_drv.h                  |   1 +
+ drivers/gpu/drm/sun4i/sun4i_layer.c                |  94 ++++-
+ drivers/gpu/drm/sun4i/sun4i_layer.h                |   3 +
+ drivers/gpu/drm/sun4i/sun4i_tcon.c                 |   7 +-
+ drivers/gpu/drm/sun4i/sun8i_mixer.c                | 385 +++++++++++++++++++++
+ drivers/gpu/drm/sun4i/sun8i_mixer.h                | 166 +++++++++
+ include/dt-bindings/clock/sun8i-de2.h              |  54 +++
+ include/dt-bindings/reset/sun8i-de2.h              |  50 +++
+ 21 files changed, 1203 insertions(+), 27 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/sun8i-de2.txt
+ create mode 100644 drivers/clk/sunxi-ng/ccu-sun8i-de2.c
+ create mode 100644 drivers/clk/sunxi-ng/ccu-sun8i-de2.h
+ create mode 100644 drivers/gpu/drm/sun4i/sun8i_mixer.c
+ create mode 100644 drivers/gpu/drm/sun4i/sun8i_mixer.h
+ create mode 100644 include/dt-bindings/clock/sun8i-de2.h
+ create mode 100644 include/dt-bindings/reset/sun8i-de2.h
+
+-- 
+2.12.0
