@@ -1,108 +1,102 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Thu, 16 Mar 2017 09:59:33 +0100
-Subject: [RFC PATCH 19/33] irqchip/gic-v3-its: Add VLPI configuration
- handling
-In-Reply-To: <1484648454-21216-20-git-send-email-marc.zyngier@arm.com>
-References: <1484648454-21216-1-git-send-email-marc.zyngier@arm.com>
- <1484648454-21216-20-git-send-email-marc.zyngier@arm.com>
-Message-ID: <b459a98c-e2bc-d338-82c0-08bd06060e92@redhat.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Thu, 16 Mar 2017 09:03:35 +0000
+Subject: [PATCH v3 0/7] ARM: Fix dma_alloc_coherent() and friends for NOMMU
+In-Reply-To: <1489137839-549-1-git-send-email-vladimir.murzin@arm.com>
+References: <1489137839-549-1-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <90e219f3-7139-c11c-a635-509173d4148a@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Gentle ping!
 
-On 17/01/2017 11:20, Marc Zyngier wrote:
-> When a VLPI is reconfigured (enabled, disabled, change in priority),
-> the full configuration byte must be written, and the caches invalidated.
+On 10/03/17 09:23, Vladimir Murzin wrote:
+> It seem that addition of cache support for M-class CPUs uncovered
+> latent bug in DMA usage. NOMMU memory model has been treated as being
+> always consistent; however, for R/M CPU classes memory can be covered
+> by MPU which in turn might configure RAM as Normal i.e. bufferable and
+> cacheable. It breaks dma_alloc_coherent() and friends, since data can
+> stuck in caches now or be buffered.
 > 
-> Also, when using the irq_mask/irq_unmask methods, it is necessary
-> to disable the doorbell for that particular interrupt (by mapping it
-> to 1023) on top of clearing the Enable bit.
+> This patch set is trying to address the issue by providing region of
+> memory suitable for consistent DMA operations. It is supposed that
+> such region is marked by MPU as non-cacheable. Robin suggested to
+> advertise such memory as reserved shared-dma-pool, rather then using
+> homebrew command line option, and extend dma-coherent to provide
+> default DMA area in the similar way as it is done for CMA (PATCH
+> 4/7). It allows us to offload all bookkeeping on generic coherent DMA
+> framework, and it seems that it might be reused by other architectures
+> like c6x and blackfin.
 > 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-Reviewed-by: Eric Auger <eric.auger@redhat.com>
-
-> ---
->  drivers/irqchip/irq-gic-v3-its.c | 37 +++++++++++++++++++++++++++++++++++--
->  1 file changed, 35 insertions(+), 2 deletions(-)
+> While reviewing/testing previous vesrions of the patch set it turned
+> out that dma-coherent does not take into account "dma-ranges" device
+> tree property, so it is addressed in PATCH 3/7.
 > 
-> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-> index d50a019..6931018 100644
-> --- a/drivers/irqchip/irq-gic-v3-its.c
-> +++ b/drivers/irqchip/irq-gic-v3-its.c
-> @@ -796,11 +796,18 @@ static inline u32 its_get_event_id(struct irq_data *d)
->  static void lpi_update_config(struct irq_data *d, u8 clr, u8 set)
->  {
->  	struct its_device *its_dev = irq_data_get_irq_chip_data(d);
-> -	irq_hw_number_t hwirq = d->hwirq;
-> +	irq_hw_number_t hwirq;
->  	struct page *prop_page;
->  	u8 *cfg;
->  
-> -	prop_page = gic_rdists->prop_page;
-> +	if (irqd_is_forwarded_to_vcpu(d)) {
-> +		u32 event = its_get_event_id(d);
-> +		prop_page = its_dev->event_map.vlpi_map->vpes[0]->its_vm->vprop_page;
-> +		hwirq = its_dev->event_map.vlpi_map->vlpis[event].vintid;
-> +	} else {
-> +		prop_page = gic_rdists->prop_page;
-> +		hwirq = d->hwirq;
-> +	}
->  
->  	cfg = page_address(prop_page) + hwirq - 8192;
->  	*cfg &= ~clr;
-> @@ -818,13 +825,28 @@ static void lpi_update_config(struct irq_data *d, u8 clr, u8 set)
->  	its_send_inv(its_dev, its_get_event_id(d));
->  }
->  
-> +static void its_vlpi_set_doorbell(struct irq_data *d, bool enable)
-> +{
-> +	struct its_device *its_dev = irq_data_get_irq_chip_data(d);
-> +	u32 event = its_get_event_id(d);
-> +
-> +	its_dev->event_map.vlpi_map->vlpis[event].db_enabled = enable;
-> +	its_send_vmapti(its_dev, event);
-> +}
-> +
->  static void its_mask_irq(struct irq_data *d)
->  {
-> +	if (irqd_is_forwarded_to_vcpu(d))
-> +		its_vlpi_set_doorbell(d, false);
-> +
->  	lpi_update_config(d, LPI_PROP_ENABLED, 0);
->  }
->  
->  static void its_unmask_irq(struct irq_data *d)
->  {
-> +	if (irqd_is_forwarded_to_vcpu(d))
-> +		its_vlpi_set_doorbell(d, true);
-> +
->  	lpi_update_config(d, 0, LPI_PROP_ENABLED);
->  }
->  
-> @@ -837,6 +859,10 @@ static int its_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
->  	struct its_collection *target_col;
->  	u32 id = its_get_event_id(d);
->  
-> +	/* A forwarded interrupt should use irq_set_vcpu_affinity */
-> +	if (irqd_is_forwarded_to_vcpu(d))
-> +		return -EINVAL;
-> +
->         /* lpi cannot be routed to a redistributor that is on a foreign node */
->  	if (its_dev->its->flags & ITS_FLAGS_WORKAROUND_CAVIUM_23144) {
->  		if (its_dev->its->numa_node >= 0) {
-> @@ -969,6 +995,13 @@ static int its_irq_set_vcpu_affinity(struct irq_data *d, void *vcpu_info)
->  
->  	case PROP_UPDATE_VLPI:
->  	{
-> +		if (!its_dev->event_map.vlpi_map ||
-> +		    !irqd_is_forwarded_to_vcpu(d))
-> +			return -EINVAL;
-> +
-> +		lpi_update_config(d, 0xff, info->config);
-> +		its_vlpi_set_doorbell(d, !!(info->config & LPI_PROP_ENABLED));
-> +
->  		return 0;
->  	}
->  
+> For ARM, dedicated DMA region is required for cases other than:
+>  - MMU/MPU is off
+>  - cpu is v7m w/o cache support
+>  - device is coherent
+> 
+> In case one of the above conditions is true dma operations are forced
+> to be coherent and wired with dma_noop_ops.
+> 
+> To make life easier NOMMU dma operations are kept in separate
+> compilation unit.
+> 
+> Since the issue was reported in the same time as Benjamin sent his
+> patch [1] to allow mmap for NOMMU, his case is also addressed in this
+> series (PATCH 1/7 and PATCH 2/7).
+> 
+> Thanks!
+> 
+> [1] http://www.armlinux.org.uk/developer/patches/viewpatch.php?id=8633/1
+> 
+> Cc: Joerg Roedel <jroedel@suse.de>
+> Cc: Christian Borntraeger <borntraeger@de.ibm.com>
+> Cc: Michal Nazarewicz <mina86@mina86.com>
+> Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+> Cc: Alan Stern <stern@rowland.harvard.edu>
+> Cc: Yoshinori Sato <ysato@users.sourceforge.jp>
+> Cc: Rich Felker <dalias@libc.org>
+> Cc: Roger Quadros <rogerq@ti.com>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Doug Ledford <dledford@redhat.com>
+> 
+> Changelog:
+> 	    v2 -> v3
+> 	       - fixed warnings reported by Alexandre and kbuild robot
+> 
+> 	    v1 -> v2
+> 	       - rebased on v4.11-rc1
+> 	       - added Robin's Reviewed-by
+> 	       - dedicated flag is introduced to use dev->dma_pfn_offset
+> 	         rather than mem->device_base in case memory region is
+> 		 configured via device tree (so Tested-by discarded there)
+> 
+> 	RFC v6 -> v1
+> 	       - dropped RFC tag
+> 	       - added Alexandre's Tested-by
+> 
+> Vladimir Murzin (7):
+>   dma: Take into account dma_pfn_offset
+>   dma: Add simple dma_noop_mmap
+>   drivers: dma-coherent: Account dma_pfn_offset when used with device
+>     tree
+>   drivers: dma-coherent: Introduce default DMA pool
+>   ARM: NOMMU: Introduce dma operations for noMMU
+>   ARM: NOMMU: Set ARM_DMA_MEM_BUFFERABLE for M-class cpus
+>   ARM: dma-mapping: Remove traces of NOMMU code
+> 
+>  .../bindings/reserved-memory/reserved-memory.txt   |   3 +
+>  arch/arm/Kconfig                                   |   1 +
+>  arch/arm/include/asm/dma-mapping.h                 |   2 +-
+>  arch/arm/mm/Kconfig                                |   2 +-
+>  arch/arm/mm/Makefile                               |   5 +-
+>  arch/arm/mm/dma-mapping-nommu.c                    | 253 +++++++++++++++++++++
+>  arch/arm/mm/dma-mapping.c                          |  29 +--
+>  drivers/base/dma-coherent.c                        |  74 +++++-
+>  lib/dma-noop.c                                     |  29 ++-
+>  9 files changed, 354 insertions(+), 44 deletions(-)
+>  create mode 100644 arch/arm/mm/dma-mapping-nommu.c
 > 
