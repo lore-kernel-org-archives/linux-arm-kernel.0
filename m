@@ -1,81 +1,28 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Thu, 16 Mar 2017 22:03:56 +0100
-Subject: [RFC PATCH 23/33] irqchip/gic-v3-its: Add VPENDBASER/VPROPBASER
- accessors
-In-Reply-To: <1484648454-21216-24-git-send-email-marc.zyngier@arm.com>
-References: <1484648454-21216-1-git-send-email-marc.zyngier@arm.com>
- <1484648454-21216-24-git-send-email-marc.zyngier@arm.com>
-Message-ID: <155b4430-60ba-66bd-3843-469bb2509ad5@redhat.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Thu, 16 Mar 2017 14:04:25 -0700
+Subject: [PATCH] ARM: dts: NSP: GPIO reboot open-source
+In-Reply-To: <1488409348-6371-1-git-send-email-jon.mason@broadcom.com>
+References: <1488409348-6371-1-git-send-email-jon.mason@broadcom.com>
+Message-ID: <20170316210425.3683-1-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 17/01/2017 11:20, Marc Zyngier wrote:
-> V{PEND,PROP}BASER being 64bit registers, they need some ad-hoc
-> accessors on 32bit, specially given that VPENDBASER contains
-> a Valid bit, making the access a bit convoluted.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-Reviewed-by: Eric Auger <eric.auger@redhat.com>
-
-Eric
+On Wed, 1 Mar 2017 18:02:28 -0500, Jon Mason <jon.mason@broadcom.com> wrote:
+> The libgpio code pre-sets the GPIO values for the gpio-reset in the
+> device tree. This results in the device being reset during bringup.
+> To prevent this pre-setting, use the "open-source" flag in the device
+> tree.
+>
+> Signed-off-by: Jon Mason <jon.mason@broadcom.com>
+> Fixes: b1aaf88 ("ARM: dts: NSP: Add GPIO reboot method to bcm958625hr DTS file")
+> Fixes: 10baed1 ("ARM: dts: NSP: Add GPIO reboot method to bcm958625xmc DTS file")
+> Fixes: 088e3148 ("ARM: dts: NSP: Add new DT file for bcm958522er")
+> Fixes: e3227c1 ("ARM: dts: NSP: Add new DT file for bcm958525er")
+> Fixes: 2f8bc00 ("ARM: dts: NSP: Add new DT file for bcm958622hr")
+> Fixes: d454c37 ("ARM: dts: NSP: Add new DT file for bcm958623hr")
+> Fixes: f27eacf ("ARM: dts: NSP: Add new DT file for bcm988312hr")
 > ---
->  arch/arm/include/asm/arch_gicv3.h   | 28 ++++++++++++++++++++++++++++
->  arch/arm64/include/asm/arch_gicv3.h |  5 +++++
->  2 files changed, 33 insertions(+)
-> 
-> diff --git a/arch/arm/include/asm/arch_gicv3.h b/arch/arm/include/asm/arch_gicv3.h
-> index 2747590..3f18832 100644
-> --- a/arch/arm/include/asm/arch_gicv3.h
-> +++ b/arch/arm/include/asm/arch_gicv3.h
-> @@ -291,5 +291,33 @@ static inline u64 __gic_readq_nonatomic(const volatile void __iomem *addr)
->   */
->  #define gits_write_cwriter(v, c)	__gic_writeq_nonatomic(v, c)
->  
-> +/*
-> + * GITS_VPROPBASER - hi and lo bits may be accessed independently.
-> + */
-> +#define gits_write_vpropbaser(v, c)	__gic_writeq_nonatomic(v, c)
-> +
-> +/*
-> + * GITS_VPENDBASER - the Valid bit must be cleared before changing
-> + * anything else.
-> + */
-> +static inline void gits_write_vpendbaser(u64 val, void * __iomem addr)
-> +{
-> +	u32 tmp;
-> +
-> +	tmp = readl_relaxed(addr + 4);
-> +	if (tmp & GICR_PENDBASER_Valid) {
-> +		tmp &= ~GICR_PENDBASER_Valid;
-> +		writel_relaxed(tmp, addr + 4);
-> +	}
-> +
-> +	/*
-> +	 * Use the fact that __gic_writeq_nonatomic writes the second
-> +	 * half of the 64bit quantity after the first.
-> +	 */
-> +	__gic_writeq_nonatomic(val, addr);
-> +}
-> +
-> +#define gits_read_vpendbaser(c)		__gic_readq_nonatomic(c)
-> +
->  #endif /* !__ASSEMBLY__ */
->  #endif /* !__ASM_ARCH_GICV3_H */
-> diff --git a/arch/arm64/include/asm/arch_gicv3.h b/arch/arm64/include/asm/arch_gicv3.h
-> index f37e3a2..9420b7a 100644
-> --- a/arch/arm64/include/asm/arch_gicv3.h
-> +++ b/arch/arm64/include/asm/arch_gicv3.h
-> @@ -188,5 +188,10 @@ static inline void gic_write_bpr1(u32 val)
->  #define gicr_write_pendbaser(v, c)	writeq_relaxed(v, c)
->  #define gicr_read_pendbaser(c)		readq_relaxed(c)
->  
-> +#define gits_write_vpropbaser(v, c)	writeq_relaxed(v, c)
-> +
-> +#define gits_write_vpendbaser(v, c)	writeq_relaxed(v, c)
-> +#define gits_read_vpendbaser(c)		readq_relaxed(c)
-> +
->  #endif /* __ASSEMBLY__ */
->  #endif /* __ASM_ARCH_GICV3_H */
-> 
+
+Applied, thanks!
+--
+Florian
