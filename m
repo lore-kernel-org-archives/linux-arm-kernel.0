@@ -1,57 +1,46 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Thu, 16 Mar 2017 11:01:56 +0100
-Subject: media / v4l2-mc: wishlist for complex cameras (was Re: [PATCH
- v4 14/36] [media] v4l2-mc: add a function to inherit controls from a
- pipeline)
-In-Reply-To: <20170316094729.GA5595@frolo.macqel>
-References: <20170311082549.576531d0@vento.lan>
- <20170313124621.GA10701@valkosipuli.retiisi.org.uk>
- <20170314004533.3b3cd44b@vento.lan>
- <e0a6c60b-1735-de0b-21f4-d8c3f4b3f10f@xs4all.nl>
- <20170314072143.498cde9b@vento.lan> <20170314223254.GA7141@amd>
- <20170314215420.6fc63c67@vento.lan> <20170315105049.GA12099@frolo.macqel>
- <1489604109.4593.4.camel@ndufresne.ca>
- <1489656360.2303.2.camel@pengutronix.de>
- <20170316094729.GA5595@frolo.macqel>
-Message-ID: <1489658516.2303.11.camel@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 16 Mar 2017 11:13:01 +0100
+Subject: [PATCH V7 5/7] ACPI: Delay the enumeration on the devices whose
+ dependency has not met
+In-Reply-To: <58C9F6C6.4090700@hisilicon.com>
+References: <1489372963-9000-1-git-send-email-yuanzhichang@hisilicon.com>
+ <1489372963-9000-6-git-send-email-yuanzhichang@hisilicon.com>
+ <4600523.rWNiWKrYZC@aspire.rjw.lan> <58C9F6C6.4090700@hisilicon.com>
+Message-ID: <CAK8P3a2QZ_j9RQ0U=4MoAAcRcZyu0L5AiYM22QZkiRxh7Ca-iA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2017-03-16 at 10:47 +0100, Philippe De Muyter wrote:
-> On Thu, Mar 16, 2017 at 10:26:00AM +0100, Philipp Zabel wrote:
-> > On Wed, 2017-03-15 at 14:55 -0400, Nicolas Dufresne wrote:
-> > > Le mercredi 15 mars 2017 ? 11:50 +0100, Philippe De Muyter a ?crit :
-> > > > > I would say: camorama, xawtv3, zbar, google talk, skype. If it runs
-> > > > > with those, it will likely run with any other application.
-> > > > > 
-> > > > 
-> > > > I would like to add the 'v4l2src' plugin of gstreamer, and on the
-> > > > imx6 its
-> > > 
-> > > While it would be nice if somehow you would get v4l2src to work (in
-> > > some legacy/emulation mode through libv4l2),
-> > 
-> > v4l2src works just fine, provided the pipeline is configured manually in
-> > advance via media-ctl.
-> 
-> Including choosing the framerate ?  Sorry, I have no time these days
-> to test it myself.
+On Thu, Mar 16, 2017 at 3:21 AM, zhichang.yuan
+<yuanzhichang@hisilicon.com> wrote:
+> Hi, Rafael,
+>
+> Thanks for your review!
+>
+> On 2017/3/14 5:24, Rafael J. Wysocki wrote:
+>> On Monday, March 13, 2017 10:42:41 AM zhichang.yuan wrote:
+>>> In commit 40e7fcb1929(ACPI: Add _DEP support to fix battery issue on Asus
+>>> T100TA), the '_DEP' was supported to solve the dependency of Asus battery. But
+>>> this patch is specific to Asus battery device.
+>>> In the real world, there are other devices which need the dependency to play the
+>>> role on the enumeration order. For example, all the Hip06 LPC
+>>> periperals(IPMI-BT, uart, etc) must be scanned after the LPC host driver
+>>> finished the probing. So, it makes sense to add a checking whether the ACPI
+>>> device meet all the dependencies during its enumeration slot, if not, the
+>>> enumeration will be delayed till all dependency master finish their work.
+>>>
+>>> This patch adds the dependency checking in ACPI enumeration, also the
+>>> corresponding handling to retrigger the Hip06 LPC peripherals' scanning.
+>>
+>> AFAICS, _DEP is generally abused in the wild and cannot be made generic.  Sorry.
+>>
+>
+> From the ACPI specification, _DEP is for operation region accesses.
+> You are right...
+>
+> How about we add a ACPI handler for our LPC bus?? Just like amba.
+> In this way, we also can solve the issue about LPC enumeration order.
 
-No, the framerate is set with media-ctl on the CSI output pad. To really
-choose the framerate, the element would indeed need a deeper
-understanding of the pipeline, as the resulting framerate depends on at
-least the source v4l2_subdevice (sensor) framerate and the CSI frame
-skipping.
+As far as I can tell, PCI and LPC have exactly the same requirement here,
+so whatever you end up doing for one should be used for the other as well.
 
-> And I cited imxv4l2videosrc for its ability to provide the physical address
-> of the image buffers for further processing by other (not necessarily next
-> in gstreamer pipeline, or for all frames) hardware-accelerated plugins likes
-> the h.264 video encoder.  As I am stuck with fsl/nxp kernel and driver on that
-> matter, I don't know how the interfaces have evolved in current linux kernels.
-
-The physical address of the image buffers is hidden from userspace by
-dma-buf objects, but those can be passed around to the next driver
-without copying the image data.
-
-regards
-Philipp
+      Arnd
