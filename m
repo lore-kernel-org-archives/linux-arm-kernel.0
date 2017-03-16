@@ -1,43 +1,40 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu, 16 Mar 2017 17:05:42 +0000
-Subject: [PATCH 2/2] irqchip/gic-v3-its: always check for cacheability
- attributes
-In-Reply-To: <20170316170542.3568-1-andre.przywara@arm.com>
-References: <20170316170542.3568-1-andre.przywara@arm.com>
-Message-ID: <20170316170542.3568-3-andre.przywara@arm.com>
+From: jon.mason@broadcom.com (Jon Mason)
+Date: Thu, 16 Mar 2017 13:07:33 -0400
+Subject: [PATCH] ARM: dts: BCM953012HR: Add ethernet aliases
+In-Reply-To: <1489611575-18684-1-git-send-email-steven.lin1@broadcom.com>
+References: <1489611575-18684-1-git-send-email-steven.lin1@broadcom.com>
+Message-ID: <CAC3K-4pV=+Qherf-=aOAP40NUBUm680StQWo_G8M6=gmPdM5KQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently we only enable cache flushing if the redistributor denied
-our shareability attribute, because we turn off cacheability in this
-case.
-But if it would just turn down our cacheability request, we would miss
-setting the flag.
+On Wed, Mar 15, 2017 at 4:59 PM, Steve Lin <steven.lin1@broadcom.com> wrote:
+> Adding ethernet aliases.  These are used, for example, by bootloaders,
+> to modify the MAC addresses in the device tree.
+>
+> Signed-off-by: Steve Lin <steven.lin1@broadcom.com>
 
-Re-check the cacheability attribute as reported back by the
-redistributor to make sure we flush properly if needed.
+LGTM
 
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
----
- drivers/irqchip/irq-gic-v3-its.c | 5 +++++
- 1 file changed, 5 insertions(+)
+Acked-by: Jon Mason <jon.mason@broadcom.com>
 
-diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index b777c57..5cd4d58 100644
---- a/drivers/irqchip/irq-gic-v3-its.c
-+++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -1156,7 +1156,12 @@ static int its_cpu_init_lpis(void)
- 				 GICR_PROPBASER_CACHEABILITY_MASK);
- 			val |= GICR_PROPBASER_nC;
- 			gicr_write_propbaser(val, rbase + GICR_PROPBASER);
-+			tmp = gicr_read_propbaser(rbase + GICR_PROPBASER);
- 		}
-+	}
-+
-+	if (((tmp & GICR_PROPBASER_CACHEABILITY_MASK) == GICR_PROPBASER_nC) ||
-+	    ((tmp & GICR_PROPBASER_CACHEABILITY_MASK) == GICR_PROPBASER_nCnB)) {
- 		pr_info_once("GIC: using cache flushing for LPI property table\n");
- 		gic_rdists->flags |= RDIST_FLAGS_PROPBASE_NEEDS_FLUSHING;
- 	}
--- 
-2.9.0
+> ---
+>  arch/arm/boot/dts/bcm953012hr.dts | 3 +++
+>  1 file changed, 3 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/bcm953012hr.dts b/arch/arm/boot/dts/bcm953012hr.dts
+> index 85f9b0b..766aa71 100644
+> --- a/arch/arm/boot/dts/bcm953012hr.dts
+> +++ b/arch/arm/boot/dts/bcm953012hr.dts
+> @@ -41,6 +41,9 @@
+>
+>         aliases {
+>                 serial0 = &uart0;
+> +               ethernet0 = &gmac0;
+> +               ethernet1 = &gmac1;
+> +               ethernet2 = &gmac2;
+>         };
+>
+>         chosen {
+> --
+> 2.1.0
+>
