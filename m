@@ -1,49 +1,25 @@
-From: phdm@macq.eu (Philippe De Muyter)
-Date: Thu, 16 Mar 2017 10:47:29 +0100
-Subject: media / v4l2-mc: wishlist for complex cameras (was Re: [PATCH
- v4 14/36] [media] v4l2-mc: add a function to inherit controls from
- a pipeline)
-In-Reply-To: <1489656360.2303.2.camel@pengutronix.de>
-References: <20170311082549.576531d0@vento.lan>
- <20170313124621.GA10701@valkosipuli.retiisi.org.uk>
- <20170314004533.3b3cd44b@vento.lan>
- <e0a6c60b-1735-de0b-21f4-d8c3f4b3f10f@xs4all.nl>
- <20170314072143.498cde9b@vento.lan> <20170314223254.GA7141@amd>
- <20170314215420.6fc63c67@vento.lan> <20170315105049.GA12099@frolo.macqel>
- <1489604109.4593.4.camel@ndufresne.ca>
- <1489656360.2303.2.camel@pengutronix.de>
-Message-ID: <20170316094729.GA5595@frolo.macqel>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 16 Mar 2017 10:48:11 +0100
+Subject: [PATCH v2] generic syscalls: Wire up statx syscall
+In-Reply-To: <CAAG0J99QAwefvpnNxrGRU6XH+0+k1LO6qRW3kLBQCc3nc6QdmA@mail.gmail.com>
+References: <20170313144521.28127-1-shorne@gmail.com>
+ <CAAG0J99QAwefvpnNxrGRU6XH+0+k1LO6qRW3kLBQCc3nc6QdmA@mail.gmail.com>
+Message-ID: <CAK8P3a3YPsa_FXvqAmt2rQqRPc+Rby6n_+5MoMR2EV85jQHyjQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 16, 2017 at 10:26:00AM +0100, Philipp Zabel wrote:
-> On Wed, 2017-03-15 at 14:55 -0400, Nicolas Dufresne wrote:
-> > Le mercredi 15 mars 2017 ? 11:50 +0100, Philippe De Muyter a ?crit :
-> > > > I would say: camorama, xawtv3, zbar, google talk, skype. If it runs
-> > > > with those, it will likely run with any other application.
-> > > > 
-> > > 
-> > > I would like to add the 'v4l2src' plugin of gstreamer, and on the
-> > > imx6 its
-> > 
-> > While it would be nice if somehow you would get v4l2src to work (in
-> > some legacy/emulation mode through libv4l2),
-> 
-> v4l2src works just fine, provided the pipeline is configured manually in
-> advance via media-ctl.
+On Wed, Mar 15, 2017 at 11:26 PM, James Hogan <james.hogan@imgtec.com> wrote:
+> On 13 March 2017 at 14:45, Stafford Horne <shorne@gmail.com> wrote:
 
-Including choosing the framerate ?  Sorry, I have no time these days
-to test it myself.
+>>  #undef __NR_syscalls
+>> -#define __NR_syscalls 291
+>> +#define __NR_syscalls 292
+>
+> Out of interest, anybody know OTOH which other stat syscalls statx
+> supersedes (such that they could at some point be disabled by default
+> in asm-generic for new arches, and implemented in userspace)?
 
-And I cited imxv4l2videosrc for its ability to provide the physical address
-of the image buffers for further processing by other (not necessarily next
-in gstreamer pipeline, or for all frames) hardware-accelerated plugins likes
-the h.264 video encoder.  As I am stuck with fsl/nxp kernel and driver on that
-matter, I don't know how the interfaces have evolved in current linux kernels.
+It should replace the entire stat family {old,new,}{f,}stat{at,}{64,}, but not
+the {f,}statfs{64,} family, which will eventually get another replacement.
 
-BR
-
-Philippe
-
--- 
-Philippe De Muyter +32 2 6101532 Macq SA rue de l'Aeronef 2 B-1140 Bruxelles
+      Arnd
