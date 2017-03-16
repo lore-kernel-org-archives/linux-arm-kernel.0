@@ -1,85 +1,70 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Thu, 16 Mar 2017 16:25:43 +0100
-Subject: [PATCH v3 01/19] KVM: arm/arm64: Add vITS save/restore API
- documentation
-In-Reply-To: <CAFEAcA_VqJQ-BFQPpdnK07x6B=cN-HcPY7pBr7=J5UGXm4iSnQ@mail.gmail.com>
-References: <1488800074-21991-1-git-send-email-eric.auger@redhat.com>
- <1488800074-21991-2-git-send-email-eric.auger@redhat.com>
- <CAFEAcA_hobSQZvOQHGgdoJYw9q099GNrY=5ffjYO5YeePtKdNA@mail.gmail.com>
- <6f86ec3f-6b9e-34ba-628a-c2ef7b8c3529@redhat.com>
- <CAFEAcA_VqJQ-BFQPpdnK07x6B=cN-HcPY7pBr7=J5UGXm4iSnQ@mail.gmail.com>
-Message-ID: <23365078-ef4e-fa69-40d2-7177ca603862@redhat.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 16 Mar 2017 08:29:25 -0700
+Subject: [PATCH] ARM: omap2+: Revert omap-smp.c changes resetting CPU1
+ during boot
+In-Reply-To: <20170315172200.GM20572@atomide.com>
+References: <20170313205231.1593-1-tony@atomide.com>
+ <0bade322-5bee-412f-ef21-972c99846e84@ti.com>
+ <20170314151725.GC20572@atomide.com>
+ <d0fe191f-66f8-b72d-0a2a-00815e663a8d@ti.com>
+ <20170314164106.GE20572@atomide.com>
+ <ea09d676-29f6-7100-4c68-88920deaeb7c@ti.com>
+ <20170314181425.GF20572@atomide.com>
+ <20170315172200.GM20572@atomide.com>
+Message-ID: <20170316152925.GO20572@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
-
-On 13/03/2017 18:38, Peter Maydell wrote:
-> On 13 March 2017 at 15:42, Auger Eric <eric.auger@redhat.com> wrote:
->> On 13/03/2017 14:08, Peter Maydell wrote:
->>> These CTE/ITE/DTE formats don't seem to have any kind of
->>> "escape hatch" for allowing backwards compatible extensions
->>> to the format. Do we need one? (I think that's particularly
->>> likely to be useful where there's an ITS feature we don't
->>> currently implement but might perhaps want to in future,
->>> like GICv4 virtual interrupt injection.)
->>
->> Maybe we could rely on the ITS registers (that must be restored before
->> the tables) to get any info about the format used to encode the table
->> entries. We have GITS_CTLR[1] that can help discriminate between GICv3/
->> GICv4. GITS_BASER.Entry_size can be 8B for current implementation and
->> 16B for an enhanced implementation. CTE[52:62] can be used to encode a
->> format version.
+* Tony Lindgren <tony@atomide.com> [170315 10:24]:
+> * Tony Lindgren <tony@atomide.com> [170314 11:16]:
+> > * Andrew F. Davis <afd@ti.com> [170314 10:59]:
+> > Then onto the other related patches..
+> > 
+> > > We re-park cpu1 in bootROM in U-Boot already, in the U-Boot tree:
+> > > arch/arm/mach-omap2/omap5/sec_entry_cpu1.S
+> > 
+> > OK good to hear.
+> > 
+> > > omap_smc_sec_cpu1() wakes up cpu1 into the function cpu1_entry(), this
+> > > makes an SMC call to setup the core, then re-parks itself back in bootROM.
+> > > Relevant code to run on cpu1:
+> > > 
+> > > > #define AUX_CORE_BOOT_0		0x48281800
+> > > > #define AUX_CORE_BOOT_1		0x48281804
+> > > > /* DRA7xx ROM code function "startup_BootSlave". This function is where CPU1
+> > > >  * waits on WFE, polling on AUX_CORE_BOOT_x registers.
+> > > >  * This address is same for J6 and J6 Eco.
+> > > >  */
+> > > > #define ROM_FXN_STARTUP_BOOTSLAVE     0x00038a64
+> > > >
+> > > > ldr	r4, =AUX_CORE_BOOT_0
+> > > > mov	r5, #0x0
+> > > > str	r5, [r4]
+> > > > ldr	r4, =ROM_FXN_STARTUP_BOOTSLAVE
+> > > > bx	r4	@ Jump back to ROM
+> > > 
+> > > We would have to do this in kernel. The issue I'm thinking we are going
+> > > to hit is that the parking function in bootROM expects the MMU to be
+> > > off. Although we don't really need to turn it off as long as we can
+> > > identity map the bootROM area, the AUX_CORE_BOOT_0/1 space, and wherever
+> > > we plan to exit the parking loop.
+> > 
+> > Would be good to hear what Russell thinks we should do here to park
+> > CPU1.
 > 
-> Using the registers seems like a good idea, though I
-> don't know about the specific fields. The most obvious
-> place to keep something like this would be GITS_IIDR.Revision
-> I suppose. Using the "size of the table entry" fields would
-> work too.
+> How about we introduce smp_park_secondary()?
 > 
-> If we have to make all these tables double the size if
-> we move to 16b/entry in future, is that a significant
-> increase in memory used, or a don't-really-care increase?
-Sorry for the delay, I tried to have a better understanding of the GICv4
-new features before answering.
+> Then soft_restart() can call it between setup_mm_for_reboot()
+> and cpu_proc_fin()?
 
-I don't think the device table nor the collection table are impacted by
-GICv4. To me only the ITT is impacted and ITE would certainly become
-2*8Bytes since there are new fields to encode (vPE, doorbell INTID). We
-would also need to save/restore the vPE table.
+Hmm that probably won't help as we'd have to still have a 1:1
+mapping in cpu_die() to put CPU1 into WFI and release it in
+smp_park_secondary() to the bootrom.
 
-ITT size for 1 device is nb_supported_eventids_for_the_device * 8 or 16
-Bytes
+Anyways, I think in your use case it's the suspend/resume that needs
+the state preserved for CPU1. Do you need kexec working in your use
+case?
 
-I would tempt to think this falls under the category of don't-really-care.
-> 
-> I guess what we should do is:
->  * identify obviously imminently upcoming features (like
->    GICv4 support, wider physaddrs) and make sure the format
->    supports them
->    [let's say, anything we think we're definitely likely
->    to be adding in the next 12 months]
-- support of GICv4 on guest side. I guess this relates to nested
-virtualization use case.
-- extension of phys addrs, Marc? is there any requirement/plan?
->  * decide on our 'escape hatch' plan for anything
->    more vague
-OK I will formalize this. My understanding is if we need to update the
-ITE format, we will directly encode all the fields and update the ITE
-size to a 2x 8B entry. This change is easily recognizable through
-GITS_TYPER register.
->  * test that we do correctly fail migration for an
->    incoming ITS state that asks for an unsupported Revision
-OK I will do that
->  * document how the 'escape hatch' is intended to work
->    so we don't then invent a different approach in the
->    future :-)
-OK
+Regards,
 
-Thanks
-
-Eric
-> 
-> thanks
-> -- PMM
-> 
+Tony
