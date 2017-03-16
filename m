@@ -1,41 +1,86 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Thu, 16 Mar 2017 17:32:55 -0400
-Subject: [PATCH v2 0/3] ATA/ARM: convert ARM/DaVinci to use libata PATA
- drivers
-In-Reply-To: <1489509414-11491-1-git-send-email-b.zolnierkie@samsung.com>
-References: <CGME20170314163738epcas5p3db719229d59550476c918a15d8c16d63@epcas5p3.samsung.com>
- <1489509414-11491-1-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <20170316213255.GF1480@htj.duckdns.org>
+From: shankerd@codeaurora.org (Shanker Donthineni)
+Date: Thu, 16 Mar 2017 16:41:14 -0500
+Subject: [RFC PATCH 24/33] irqchip/gic-v3-its: Add VPE scheduling
+In-Reply-To: <c5351eb6-54be-1bf1-a49e-35304e40ec6b@redhat.com>
+References: <1484648454-21216-1-git-send-email-marc.zyngier@arm.com>
+ <1484648454-21216-25-git-send-email-marc.zyngier@arm.com>
+ <c5351eb6-54be-1bf1-a49e-35304e40ec6b@redhat.com>
+Message-ID: <dd1f709f-8d4b-69bf-eaf3-f290bfe37536@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 14, 2017 at 05:36:51PM +0100, Bartlomiej Zolnierkiewicz wrote:
+Hi Eric,
+
+
+On 03/16/2017 04:23 PM, Auger Eric wrote:
 > Hi,
-> 
-> This patchset adds Palmchip BK3710 IDE controller driver to
-> libata and switches ARM/DaVinci to use it (instead of the old
-> IDE driver).
-> 
-> Sekhar, please check that it still works after changes, thanks.
-> 
-> Changes since v1
-> (https://www.spinics.net/lists/arm-kernel/msg567442.html):
-> - addressed review comments from Sergei Shtylyov
-> - fixed cycle_time unitialized variable issue
-> 
-> Changes since v0.1 draft patch version
-> (https://www.spinics.net/lists/arm-kernel/msg566932.html):
-> - fixed cycle_time build warning
-> - added platform support fixes from Sekhar
-> - added defconfig changes from Sekhar
-> - preserved platform support for the old IDE driver
-> - split it on 3 patches
+>
+> On 17/01/2017 11:20, Marc Zyngier wrote:
+>> When a VPE is scheduled to run, the corresponding redistributor must
+>> be told so, by setting VPROPBASER to the VM's property table, and
+>> VPENDBASER to the vcpu's pending table.
+>>
+>> When scheduled out, we preserve the IDAI and PendingLast bits. The
+>> latter is specially important, as it tells the hypervisor that
+>> there are pending interrupts for this vcpu.
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  drivers/irqchip/irq-gic-v3-its.c   | 57 ++++++++++++++++++++++++++++++++++
+>>  include/linux/irqchip/arm-gic-v3.h | 63 ++++++++++++++++++++++++++++++++++++++
+>>  2 files changed, 120 insertions(+)
+>>
+>> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+>> index 598e25b..f918d59 100644
+>> --- a/drivers/irqchip/irq-gic-v3-its.c
+>> +++ b/drivers/irqchip/irq-gic-v3-its.c
+>> @@ -143,6 +143,7 @@ static DEFINE_IDA(its_vpeid_ida);
+>>  
+>>  #define gic_data_rdist()		(raw_cpu_ptr(gic_rdists->rdist))
+>>  #define gic_data_rdist_rd_base()	(gic_data_rdist()->rd_base)
+>> +#define gic_data_rdist_vlpi_base()	(gic_data_rdist_rd_base() + SZ_128K)
+>>  
+>>  static struct its_collection *dev_event_to_col(struct its_device *its_dev,
+>>  					       u32 event)
+>> @@ -2039,8 +2040,64 @@ static const struct irq_domain_ops its_domain_ops = {
+>>  	.deactivate		= its_irq_domain_deactivate,
+>>  };
+>>  
+>> +static int its_vpe_set_vcpu_affinity(struct irq_data *d, void *vcpu_info)
+>> +{
+>> +	struct its_vpe *vpe = irq_data_get_irq_chip_data(d);
+>> +	struct its_cmd_info *info = vcpu_info;
+>> +	u64 val;
+>> +
+>> +	switch (info->cmd_type) {
+>> +	case SCHEDULE_VPE:
+>> +	{
+>> +		void * __iomem vlpi_base = gic_data_rdist_vlpi_base();
+>> +
+>> +		/* Schedule the VPE */
+>> +		val  = virt_to_phys(page_address(vpe->its_vm->vprop_page)) &
+>> +			GENMASK_ULL(51, 12);
+>> +		val |= (LPI_NRBITS - 1) & GICR_VPROPBASER_IDBITS_MASK;
+>> +		val |= GICR_VPROPBASER_RaWb;
+>> +		val |= GICR_VPROPBASER_InnerShareable;
+>> +		gits_write_vpropbaser(val, vlpi_base + GICR_VPROPBASER);
+>> +
+>> +		val  = virt_to_phys(page_address(vpe->vpt_page)) & GENMASK(51, 16);
+>> +		val |= GICR_VPENDBASER_WaWb;
+>> +		val |= GICR_VPENDBASER_NonShareable;
+>> +		val |= GICR_PENDBASER_PendingLast;
+> don't you want to restore the vpe->pending_last here? anyway I
+> understand this will force the HW to read the LPI pending table.
 
-Looks fine to me from libata side.  Once it gets tested, how should
-the patches be routed?  I don't think it'd make sense to route them
-separately.
+It's not a good idea to set PendLast bit always. There is no correctness issue but causes a huge impact on the system performance. No need to read pending table contents from memory if no VLPI are pending on vPE that is being scheduled.
 
-Thanks.
+> Reviewed-by: Eric Auger <eric.auger@redhat.com>
+>
+> Eric
+>
+> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
 
 -- 
-tejun
+Shanker Donthineni
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
