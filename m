@@ -1,223 +1,127 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Thu, 16 Mar 2017 15:07:26 +0100
-Subject: [PATCH v2 4/4] ARM: dts: r8a7745: Add reset control properties
-In-Reply-To: <1489673246-11015-1-git-send-email-geert+renesas@glider.be>
-References: <1489673246-11015-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1489673246-11015-5-git-send-email-geert+renesas@glider.be>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 16 Mar 2017 14:11:33 +0000
+Subject: Applied "spi: loopback-test: add option to use vmalloc'ed buffers" to
+ the spi tree
+In-Reply-To: <1487872921-26628-7-git-send-email-fisaksen@baylibre.com>
+Message-ID: <E1coW7p-0002m1-7z@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add properties to describe the reset topology for on-SoC devices:
-  - Add the "#reset-cells" property to the CPG/MSSR device node,
-  - Add resets and reset-names properties to the various device nodes.
+The patch
 
-This allows to reset SoC devices using the Reset Controller API.
+   spi: loopback-test: add option to use vmalloc'ed buffers
 
-Note that all resets added match the corresponding module clocks.
+has been applied to the spi tree at
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git 
+
+All being well this means that it will be integrated into the linux-next
+tree (usually sometime in the next 24 hours) and sent to Linus during
+the next merge window (or sooner if it is a bug fix), however if
+problems are discovered then the patch may be dropped or reverted.  
+
+You may get further e-mails resulting from automated or manual testing
+and review of the tree, please engage with people reporting problems and
+send followup patches addressing any issues that are reported if needed.
+
+If any updates are required or you are submitting further changes they
+should be sent as incremental updates against current git, existing
+patches will not be replaced.
+
+Please add any relevant lists and maintainers to the CCs when replying
+to this mail.
+
+Thanks,
+Mark
+
+>From 576333a1fb940767e8638fafea908214682e8acd Mon Sep 17 00:00:00 2001
+From: Frode Isaksen <fisaksen@baylibre.com>
+Date: Thu, 23 Feb 2017 19:02:01 +0100
+Subject: [PATCH] spi: loopback-test: add option to use vmalloc'ed buffers
+
+Using vmalloc'ed buffers will use one SG entry for each page,
+that may provoke DMA errors for large transfers.
+Also vmalloc'ed buffers may cause errors on CPU's with VIVT cache.
+Add this option to catch these errors when testing.
+Note that to catch VIVT cache errors, checking the rx range
+has to be disabled, so this option has been added as well.
+
+Signed-off-by: Frode Isaksen <fisaksen@baylibre.com>
+Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
-v2:
-  - No changes.
----
- arch/arm/boot/dts/r8a7745.dtsi | 24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
+ drivers/spi/spi-loopback-test.c | 34 +++++++++++++++++++++++++++-------
+ 1 file changed, 27 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7745.dtsi b/arch/arm/boot/dts/r8a7745.dtsi
-index bca88715fadad81b..2feb0084bb3b1b51 100644
---- a/arch/arm/boot/dts/r8a7745.dtsi
-+++ b/arch/arm/boot/dts/r8a7745.dtsi
-@@ -62,6 +62,7 @@
- 			clocks = <&cpg CPG_MOD 408>;
- 			clock-names = "clk";
- 			power-domains = <&sysc R8A7745_PD_ALWAYS_ON>;
-+			resets = <&cpg 408>;
- 		};
+diff --git a/drivers/spi/spi-loopback-test.c b/drivers/spi/spi-loopback-test.c
+index 50e620f4e8fe..35960515382e 100644
+--- a/drivers/spi/spi-loopback-test.c
++++ b/drivers/spi/spi-loopback-test.c
+@@ -55,6 +55,18 @@ module_param(run_only_test, int, 0);
+ MODULE_PARM_DESC(run_only_test,
+ 		 "only run the test with this number (0-based !)");
  
- 		irqc: interrupt-controller at e61c0000 {
-@@ -81,6 +82,7 @@
- 				     <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&cpg CPG_MOD 407>;
- 			power-domains = <&sysc R8A7745_PD_ALWAYS_ON>;
-+			resets = <&cpg 407>;
- 		};
++/* use vmalloc'ed buffers */
++int use_vmalloc;
++module_param(use_vmalloc, int, 0644);
++MODULE_PARM_DESC(use_vmalloc,
++		 "use vmalloc'ed buffers instead of kmalloc'ed");
++
++/* check rx ranges */
++int check_ranges = 1;
++module_param(check_ranges, int, 0644);
++MODULE_PARM_DESC(check_ranges,
++		 "checks rx_buffer pattern are valid");
++
+ /* the actual tests to execute */
+ static struct spi_test spi_tests[] = {
+ 	{
+@@ -492,9 +504,11 @@ static int spi_test_check_loopback_result(struct spi_device *spi,
+ 	int ret;
  
- 		timer {
-@@ -102,6 +104,7 @@
- 			clock-names = "extal", "usb_extal";
- 			#clock-cells = <2>;
- 			#power-domain-cells = <0>;
-+			#reset-cells = <1>;
- 		};
+ 	/* checks rx_buffer pattern are valid with loopback or without */
+-	ret = spi_check_rx_ranges(spi, msg, rx);
+-	if (ret)
+-		return ret;
++	if (check_ranges) {
++		ret = spi_check_rx_ranges(spi, msg, rx);
++		if (ret)
++			return ret;
++	}
  
- 		prr: chipid at ff000044 {
-@@ -148,6 +151,7 @@
- 			clocks = <&cpg CPG_MOD 219>;
- 			clock-names = "fck";
- 			power-domains = <&sysc R8A7745_PD_ALWAYS_ON>;
-+			resets = <&cpg 219>;
- 			#dma-cells = <1>;
- 			dma-channels = <15>;
- 		};
-@@ -180,6 +184,7 @@
- 			clocks = <&cpg CPG_MOD 218>;
- 			clock-names = "fck";
- 			power-domains = <&sysc R8A7745_PD_ALWAYS_ON>;
-+			resets = <&cpg 218>;
- 			#dma-cells = <1>;
- 			dma-channels = <15>;
- 		};
-@@ -195,6 +200,7 @@
- 			       <&dmac1 0x21>, <&dmac1 0x22>;
- 			dma-names = "tx", "rx", "tx", "rx";
- 			power-domains = <&sysc R8A7745_PD_ALWAYS_ON>;
-+			resets = <&cpg 204>;
- 			status = "disabled";
- 		};
+ 	/* if we run without loopback, then return now */
+ 	if (!loopback)
+@@ -965,13 +979,19 @@ int spi_test_run_tests(struct spi_device *spi,
+ 	/* allocate rx/tx buffers of 128kB size without devm
+ 	 * in the hope that is on a page boundary
+ 	 */
+-	rx = kzalloc(SPI_TEST_MAX_SIZE_PLUS, GFP_KERNEL);
++	if (use_vmalloc)
++		rx = vmalloc(SPI_TEST_MAX_SIZE_PLUS);
++	else
++		rx = kzalloc(SPI_TEST_MAX_SIZE_PLUS, GFP_KERNEL);
+ 	if (!rx) {
+ 		ret = -ENOMEM;
+ 		goto out;
+ 	}
  
-@@ -209,6 +215,7 @@
- 			       <&dmac1 0x25>, <&dmac1 0x26>;
- 			dma-names = "tx", "rx", "tx", "rx";
- 			power-domains = <&sysc R8A7745_PD_ALWAYS_ON>;
-+			resets = <&cpg 203>;
- 			status = "disabled";
- 		};
+-	tx = kzalloc(SPI_TEST_MAX_SIZE_PLUS, GFP_KERNEL);
++	if (use_vmalloc)
++		tx = vmalloc(SPI_TEST_MAX_SIZE_PLUS);
++	else
++		tx = kzalloc(SPI_TEST_MAX_SIZE_PLUS, GFP_KERNEL);
+ 	if (!tx) {
+ 		ret = -ENOMEM;
+ 		goto out;
+@@ -999,8 +1019,8 @@ int spi_test_run_tests(struct spi_device *spi,
+ 	}
  
-@@ -223,6 +230,7 @@
- 			       <&dmac1 0x27>, <&dmac1 0x28>;
- 			dma-names = "tx", "rx", "tx", "rx";
- 			power-domains = <&sysc R8A7745_PD_ALWAYS_ON>;
-+			resets = <&cpg 202>;
- 			status = "disabled";
- 		};
- 
-@@ -237,6 +245,7 @@
- 			       <&dmac1 0x1b>, <&dmac1 0x1c>;
- 			dma-names = "tx", "rx", "tx", "rx";
- 			power-domains = <&sysc R8A7745_PD_ALWAYS_ON>;
-+			resets = <&cpg 1106>;
- 			status = "disabled";
- 		};
- 
-@@ -251,6 +260,7 @@
- 			       <&dmac1 0x1f>, <&dmac1 0x20>;
- 			dma-names = "tx", "rx", "tx", "rx";
- 			power-domains = <&sysc R8A7745_PD_ALWAYS_ON>;
-+			resets = <&cpg 1107>;
- 			status = "disabled";
- 		};
- 
-@@ -265,6 +275,7 @@
- 			       <&dmac1 0x23>, <&dmac1 0x24>;
- 			dma-names = "tx", "rx", "tx", "rx";
- 			power-domains = <&sysc R8A7745_PD_ALWAYS_ON>;
-+			resets = <&cpg 1108>;
- 			status = "disabled";
- 		};
- 
-@@ -279,6 +290,7 @@
- 			       <&dmac1 0x3d>, <&dmac1 0x3e>;
- 			dma-names = "tx", "rx", "tx", "rx";
- 			power-domains = <&sysc R8A7745_PD_ALWAYS_ON>;
-+			resets = <&cpg 206>;
- 			status = "disabled";
- 		};
- 
-@@ -293,6 +305,7 @@
- 			       <&dmac1 0x19>, <&dmac1 0x1a>;
- 			dma-names = "tx", "rx", "tx", "rx";
- 			power-domains = <&sysc R8A7745_PD_ALWAYS_ON>;
-+			resets = <&cpg 207>;
- 			status = "disabled";
- 		};
- 
-@@ -307,6 +320,7 @@
- 			       <&dmac1 0x1d>, <&dmac1 0x1e>;
- 			dma-names = "tx", "rx", "tx", "rx";
- 			power-domains = <&sysc R8A7745_PD_ALWAYS_ON>;
-+			resets = <&cpg 216>;
- 			status = "disabled";
- 		};
- 
-@@ -322,6 +336,7 @@
- 			       <&dmac1 0x29>, <&dmac1 0x2a>;
- 			dma-names = "tx", "rx", "tx", "rx";
- 			power-domains = <&sysc R8A7745_PD_ALWAYS_ON>;
-+			resets = <&cpg 721>;
- 			status = "disabled";
- 		};
- 
-@@ -337,6 +352,7 @@
- 			       <&dmac1 0x2d>, <&dmac1 0x2e>;
- 			dma-names = "tx", "rx", "tx", "rx";
- 			power-domains = <&sysc R8A7745_PD_ALWAYS_ON>;
-+			resets = <&cpg 720>;
- 			status = "disabled";
- 		};
- 
-@@ -352,6 +368,7 @@
- 			       <&dmac1 0x2b>, <&dmac1 0x2c>;
- 			dma-names = "tx", "rx", "tx", "rx";
- 			power-domains = <&sysc R8A7745_PD_ALWAYS_ON>;
-+			resets = <&cpg 719>;
- 			status = "disabled";
- 		};
- 
-@@ -367,6 +384,7 @@
- 			       <&dmac1 0x2f>, <&dmac1 0x30>;
- 			dma-names = "tx", "rx", "tx", "rx";
- 			power-domains = <&sysc R8A7745_PD_ALWAYS_ON>;
-+			resets = <&cpg 718>;
- 			status = "disabled";
- 		};
- 
-@@ -382,6 +400,7 @@
- 			       <&dmac1 0xfb>, <&dmac1 0xfc>;
- 			dma-names = "tx", "rx", "tx", "rx";
- 			power-domains = <&sysc R8A7745_PD_ALWAYS_ON>;
-+			resets = <&cpg 715>;
- 			status = "disabled";
- 		};
- 
-@@ -397,6 +416,7 @@
- 			       <&dmac1 0xfd>, <&dmac1 0xfe>;
- 			dma-names = "tx", "rx", "tx", "rx";
- 			power-domains = <&sysc R8A7745_PD_ALWAYS_ON>;
-+			resets = <&cpg 714>;
- 			status = "disabled";
- 		};
- 
-@@ -412,6 +432,7 @@
- 			       <&dmac1 0x39>, <&dmac1 0x3a>;
- 			dma-names = "tx", "rx", "tx", "rx";
- 			power-domains = <&sysc R8A7745_PD_ALWAYS_ON>;
-+			resets = <&cpg 717>;
- 			status = "disabled";
- 		};
- 
-@@ -427,6 +448,7 @@
- 			       <&dmac1 0x4d>, <&dmac1 0x4e>;
- 			dma-names = "tx", "rx", "tx", "rx";
- 			power-domains = <&sysc R8A7745_PD_ALWAYS_ON>;
-+			resets = <&cpg 716>;
- 			status = "disabled";
- 		};
- 
-@@ -442,6 +464,7 @@
- 			       <&dmac1 0x3b>, <&dmac1 0x3c>;
- 			dma-names = "tx", "rx", "tx", "rx";
- 			power-domains = <&sysc R8A7745_PD_ALWAYS_ON>;
-+			resets = <&cpg 713>;
- 			status = "disabled";
- 		};
- 
-@@ -451,6 +474,7 @@
- 			interrupts = <GIC_SPI 162 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&cpg CPG_MOD 813>;
- 			power-domains = <&sysc R8A7745_PD_ALWAYS_ON>;
-+			resets = <&cpg 813>;
- 			phy-mode = "rmii";
- 			#address-cells = <1>;
- 			#size-cells = <0>;
+ out:
+-	kfree(rx);
+-	kfree(tx);
++	kvfree(rx);
++	kvfree(tx);
+ 	return ret;
+ }
+ EXPORT_SYMBOL_GPL(spi_test_run_tests);
 -- 
-2.7.4
+2.11.0
