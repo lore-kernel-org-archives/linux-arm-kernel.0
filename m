@@ -1,53 +1,213 @@
-From: sakari.ailus@iki.fi (Sakari Ailus)
-Date: Fri, 17 Mar 2017 00:17:27 +0200
-Subject: [PATCH v5 18/39] [media] v4l: subdev: Add function to validate
- frame interval
-In-Reply-To: <dc2836e2-c110-4e4f-1717-8df9622fdf04@gmail.com>
-References: <1489121599-23206-1-git-send-email-steve_longerbeam@mentor.com>
- <1489121599-23206-19-git-send-email-steve_longerbeam@mentor.com>
- <20170311134119.GO3220@valkosipuli.retiisi.org.uk>
- <dc2836e2-c110-4e4f-1717-8df9622fdf04@gmail.com>
-Message-ID: <20170316221727.GJ10701@valkosipuli.retiisi.org.uk>
+From: robdclark@gmail.com (Rob Clark)
+Date: Thu, 16 Mar 2017 18:52:15 -0400
+Subject: [PATCH V3 2/5] iommu/arm-smmu: Add support for MMU40x/500 clocks
+In-Reply-To: <1489073748-3659-3-git-send-email-sricharan@codeaurora.org>
+References: <1489073748-3659-1-git-send-email-sricharan@codeaurora.org>
+ <1489073748-3659-3-git-send-email-sricharan@codeaurora.org>
+Message-ID: <CAF6AEGv3FAyWfXGT_8=bcn+UL8Ug1pE8EGu=MQC70U++wUOioA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 11, 2017 at 12:31:24PM -0800, Steve Longerbeam wrote:
-> 
-> 
-> On 03/11/2017 05:41 AM, Sakari Ailus wrote:
-> >Hi Steve,
-> >
-> >On Thu, Mar 09, 2017 at 08:52:58PM -0800, Steve Longerbeam wrote:
-> >>If the pads on both sides of a link specify a frame interval, then
-> >>those frame intervals should match. Create the exported function
-> >>v4l2_subdev_link_validate_frame_interval() to verify this. This
-> >>function can be called in a subdevice's media_entity_operations
-> >>or v4l2_subdev_pad_ops link_validate callbacks.
-> >>
-> >>Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
-> >
-> >If your only goal is to configure frame dropping on a sub-device, I suggest
-> >to implement s_frame_interval() on the pads of that sub-device only. The
-> >frames are then dropped according to the configured frame rates between the
-> >sink and source pads. Say, configuring sink for 1/30 s and source 1/15 would
-> >drop half of the incoming frames.
-> >
-> >Considering that supporting specific frame interval on most sub-devices adds
-> >no value or is not the interface through which it the frame rate configured,
-> >I think it is overkill to change the link validation to expect otherwise.
-> 
-> 
-> Well, while I think this function might still have validity in the future, I
-> do agree with you that a subdev that has no control over
-> frame rate has no business implementing the get|set ops.
-> 
-> In the imx-media subdevs, the only one that can affect frame rate (via
-> frame skipping) is the CSI. So I'll go ahead and remove the
-> [gs]_frame_interval ops from the others. I can remove this patch as
-> a result.
+On Thu, Mar 9, 2017 at 10:35 AM, Sricharan R <sricharan@codeaurora.org> wrote:
+> The MMU400x/500 is the implementation of the SMMUv2
+> arch specification. It is split in to two blocks
+> TBU, TCU. TBU caches the page table, instantiated
+> for each master locally, clocked by the TBUn_clk.
+> TCU manages the address translation with PTW and has
+> the programming interface as well, clocked using the
+> TCU_CLK. The TBU can also be sharing the same clock
+> domain as TCU, in which case both are clocked using
+> the TCU_CLK.
+>
+> This defines the clock bindings for the same and adds the
+> init, enable and disable functions for handling the
+> clocks.
+>
+> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+> ---
+>  .../devicetree/bindings/iommu/arm,smmu.txt         | 27 ++++++
+>  drivers/iommu/arm-smmu.c                           | 95 +++++++++++++++++++++-
+>  2 files changed, 121 insertions(+), 1 deletion(-)
+>
+> diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu.txt b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+> index 6cdf32d..b369c13 100644
+> --- a/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+> +++ b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+> @@ -60,6 +60,28 @@ conditions.
+>                    aliases of secure registers have to be used during
+>                    SMMU configuration.
+>
+> +- clock-names:    Should be "tbu_clk" and "tcu_clk" and "cfg_clk" for
+> +                  "arm,mmu-400", "arm,mmu-401" and "arm,mmu-500"
 
-Agreed.
+I guess that should be: "Should be "tbu_clk" *or* "tcu_clk" and
+"cfg_clk" for..."
 
--- 
-Sakari Ailus
-e-mail: sakari.ailus at iki.fi	XMPP: sailus at retiisi.org.uk
+Also, possibly we should define our own compat strings for various
+SoC's that require these clks so we can properly describe when they
+are required?  I guess that would address Rob H's comment.
+
+BR,
+-R
+
+> +                  "tcu_clk" is required for smmu's register access using the
+> +                  programming interface and ptw for downstream bus access.
+> +
+> +                  "tbu_clk" is required for access to the TBU connected to the
+> +                  master locally. This clock is optional and not required when
+> +                  TBU is in the same clock domain as the TCU or when the TBU is
+> +                  clocked along with the master.
+> +
+> +                  "cfg_clk" is optional if required to access the TCU's programming
+> +                  interface, apart from the "tcu_clk".
+> +
+> +- clocks:         Phandles for respective clocks described by clock-names.
+> +
+> +- power-domains:  Phandles to SMMU's power domain specifier. This is
+> +                  required even if SMMU belongs to the master's power
+> +                  domain, as the SMMU will have to be enabled and
+> +                  accessed before master gets enabled and linked to its
+> +                  SMMU.
+> +
+>  ** Deprecated properties:
+>
+>  - mmu-masters (deprecated in favour of the generic "iommus" binding) :
+> @@ -84,6 +106,11 @@ conditions.
+>                               <0 36 4>,
+>                               <0 37 4>;
+>                  #iommu-cells = <1>;
+> +                clocks = <&gcc GCC_SMMU_CFG_CLK>,
+> +                         <&gcc GCC_APSS_TCU_CLK>,
+> +                        <&gcc GCC_MDP_TBU_CLK>;
+> +
+> +               clock-names = "cfg_clk", "tcu_clk", "tbu_clk";
+>          };
+>
+>          /* device with two stream IDs, 0 and 7 */
+> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> index f7e11d3..720a1ef 100644
+> --- a/drivers/iommu/arm-smmu.c
+> +++ b/drivers/iommu/arm-smmu.c
+> @@ -341,6 +341,12 @@ struct arm_smmu_master_cfg {
+>  #define for_each_cfg_sme(fw, i, idx) \
+>         for (i = 0; idx = fwspec_smendx(fw, i), i < fw->num_ids; ++i)
+>
+> +struct mmu500_clk {
+> +       struct clk *cfg_clk;
+> +       struct clk *tcu_clk;
+> +       struct clk *tbu_clk;
+> +};
+> +
+>  struct arm_smmu_clks {
+>         void *clks;
+>         int (*init_clocks)(struct arm_smmu_device *smmu);
+> @@ -455,6 +461,92 @@ static struct arm_smmu_domain *to_smmu_domain(struct iommu_domain *dom)
+>         return container_of(dom, struct arm_smmu_domain, domain);
+>  }
+>
+> +static int mmu500_enable_clocks(struct arm_smmu_device *smmu)
+> +{
+> +       int ret = 0;
+> +       struct mmu500_clk *sclks = smmu->smmu_clks.clks;
+> +
+> +       if (!sclks)
+> +               return 0;
+> +
+> +       ret = clk_prepare_enable(sclks->cfg_clk);
+> +       if (ret) {
+> +               dev_err(smmu->dev, "Couldn't enable cfg_clk");
+> +               return ret;
+> +       }
+> +
+> +       ret = clk_prepare_enable(sclks->tcu_clk);
+> +       if (ret) {
+> +               dev_err(smmu->dev, "Couldn't enable tcu_clk");
+> +               clk_disable_unprepare(sclks->cfg_clk);
+> +               return ret;
+> +       }
+> +
+> +       ret = clk_prepare_enable(sclks->tbu_clk);
+> +       if (ret) {
+> +               dev_err(smmu->dev, "Couln't enable tbu_clk");
+> +               clk_disable_unprepare(sclks->tcu_clk);
+> +               clk_disable_unprepare(sclks->cfg_clk);
+> +               return ret;
+> +       }
+> +
+> +       return 0;
+> +}
+> +
+> +static void mmu500_disable_clocks(struct arm_smmu_device *smmu)
+> +{
+> +       struct mmu500_clk *sclks = smmu->smmu_clks.clks;
+> +
+> +       if (!sclks) {
+> +               clk_disable_unprepare(sclks->tbu_clk);
+> +               clk_disable_unprepare(sclks->tcu_clk);
+> +               clk_disable_unprepare(sclks->cfg_clk);
+> +       }
+> +}
+> +
+> +static int mmu500_init_clocks(struct arm_smmu_device *smmu)
+> +{
+> +       struct device *dev = smmu->dev;
+> +       struct mmu500_clk *sclks;
+> +       int err;
+> +
+> +       if (!of_find_property(dev->of_node, "clocks", NULL))
+> +               return 0;
+> +
+> +       sclks = devm_kzalloc(dev, sizeof(*sclks), GFP_KERNEL);
+> +       if (!sclks)
+> +               return -ENOMEM;
+> +
+> +       sclks->cfg_clk = devm_clk_get(dev, "cfg_clk");
+> +       if (IS_ERR(sclks->cfg_clk)) {
+> +               err = PTR_ERR(sclks->cfg_clk);
+> +               /* Ignore all, except -EPROBE_DEFER for optional clocks */
+> +               if (err == -EPROBE_DEFER)
+> +                       return err;
+> +               else
+> +                       sclks->cfg_clk = NULL;
+> +       }
+> +
+> +       sclks->tcu_clk = devm_clk_get(dev, "tcu_clk");
+> +       if (IS_ERR(sclks->tcu_clk)) {
+> +               dev_err(dev, "Couldn't get tcu_clk");
+> +               return PTR_ERR(sclks->tcu_clk);
+> +       }
+> +
+> +       sclks->tbu_clk = devm_clk_get(dev, "tbu_clk");
+> +       if (IS_ERR(sclks->tbu_clk)) {
+> +               err = PTR_ERR(sclks->tbu_clk);
+> +               /* Ignore all, ecept -EPROBE_DEFER for optional clocks */
+> +               if (err == -EPROBE_DEFER)
+> +                       return err;
+> +               else
+> +                       sclks->tbu_clk = NULL;
+> +       }
+> +
+> +       smmu->smmu_clks.clks = sclks;
+> +       return 0;
+> +}
+> +
+>  static void parse_driver_options(struct arm_smmu_device *smmu)
+>  {
+>         int i = 0;
+> @@ -1981,7 +2073,8 @@ struct arm_smmu_match_data {
+>                     NULL, NULL, NULL);
+>  ARM_SMMU_MATCH_DATA(arm_mmu401, ARM_SMMU_V1_64K, GENERIC_SMMU,
+>                     NULL, NULL, NULL);
+> -ARM_SMMU_MATCH_DATA(arm_mmu500, ARM_SMMU_V2, ARM_MMU500, NULL, NULL, NULL);
+> +ARM_SMMU_MATCH_DATA(arm_mmu500, ARM_SMMU_V2, ARM_MMU500, mmu500_init_clocks,
+> +                   mmu500_enable_clocks, mmu500_disable_clocks);
+>  ARM_SMMU_MATCH_DATA(cavium_smmuv2, ARM_SMMU_V2, CAVIUM_SMMUV2,
+>                     NULL, NULL, NULL);
+>
+> --
+> QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+>
+> _______________________________________________
+> iommu mailing list
+> iommu at lists.linux-foundation.org
+> https://lists.linuxfoundation.org/mailman/listinfo/iommu
