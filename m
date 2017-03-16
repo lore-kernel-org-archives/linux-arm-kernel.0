@@ -1,73 +1,88 @@
-From: patrice.chotard@st.com (Patrice CHOTARD)
-Date: Thu, 16 Mar 2017 15:39:19 +0000
-Subject: [PATCH 1/1] pinctrl: st: add irq_request_resources callback
-In-Reply-To: <CACRpkdb1WYRYifUp=C9QpEXN4ntxNfFx_H1+mA1-0UJw=dUFPQ@mail.gmail.com>
-References: <1488203368-13574-1-git-send-email-patrice.chotard@st.com>
- <CACRpkdb1WYRYifUp=C9QpEXN4ntxNfFx_H1+mA1-0UJw=dUFPQ@mail.gmail.com>
-Message-ID: <e80366b0-a044-0908-13bd-49856827a407@st.com>
+From: slash.tmp@free.fr (Mason)
+Date: Thu, 16 Mar 2017 16:40:50 +0100
+Subject: Legacy PCI interrupt support in PCIe host driver
+Message-ID: <5612adb6-af5c-9fbf-e725-813ee7fe1b4b@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello,
+
+I am writing code for my platform's PCI Express controller.
+
+I am stuck at the legacy PCI interrupt handling.
+
+Interrupt requests are routed like this:
+
+Cortex A9 MP <-- GIC(v1?) <-- system_intc <-- PCIe_root_complex
+
+The PCIe root complex drives two interrupt signals to the system_intc
+
+1) system_intc 54 = non-MSI interrupts
+2) system_intc 55 = MSI interrupts
+
+I think the MSI handling mostly works (although it's 340 lines long,
+which seems excessive for such a common task; maybe the maintainers
+will spot lots of redundant code when I submit).
+
+As for non-MSI interrupts, there are 8 possible sources:
+
+  system_error
+  dma_read_ready
+  dma_write_ready
+  unsupported completion request
+  configuration request retry status
+  completer abort event
+  completion timeout event
+  legacy interrupt asserted (any of the 4 legacy interrupts)
+
+Basically, I need to deal with the first 7 interrupts "internally"
+in my PCIe root complex driver. But the last interrupt, I need to
+"forward" it to the proper ISR (e.g. XHCI ISR).
+
+For the "internal" handling, I think I need to register my own ISR
+with the IRQF_SHARED flag. Then other drivers will be able to
+register their ISR on the same interrupt line.
+
+But how do I tell the PCI core that it's supposed to use interrupt 54
+for legacy interrupts?
+
+Here is my current DT:
+
+		msi0: msi@2e080 {
+			compatible = "sigma,msi";
+			reg = <0x2e04c 0x40>;
+			interrupt-parent = <&irq0>;
+			interrupts = <55 IRQ_TYPE_LEVEL_HIGH>;
+			msi-controller;
+			num-vectors = <32>;
+		};
+
+		pcie at 30000000 {
+			compatible = "sigma,smp8759-pcie";
+			reg = <0x30000000 SZ_4M>, <0x2e02c 4>;
+			device_type = "pci";
+			bus-range = <0 3>;
+			#size-cells = <2>;
+			#address-cells = <3>;
+			#interrupt-cells = <1>;
+			ranges = <0x02000000 0x0 0x00400000  0x30400000  0x0 SZ_60M>;
+			msi-parent = <&msi0>;
+			interrupt-parent = <&irq0>;
+			interrupts = <54 IRQ_TYPE_LEVEL_HIGH>;
+		};
 
 
-On 03/14/2017 03:05 PM, Linus Walleij wrote:
-> On Mon, Feb 27, 2017 at 2:49 PM,  <patrice.chotard@st.com> wrote:
->
->> From: Patrice Chotard <patrice.chotard@st.com>
->>
->> When using GPIO as IRQ source, the GPIO must be configured
->> in INPUT. The callback dedicated for this was missing in
->> pinctrl-st driver.
->>
->> This fix the following kernel error when trying to lock a gpio
->> as IRQ:
->>
->> [    7.521095] gpio gpiochip7: (PIO11): gpiochip_lock_as_irq: tried to flag a GPIO set as output for IRQ
->> [    7.526018] gpio gpiochip7: (PIO11): unable to lock HW IRQ 6 for IRQ
->> [    7.529405] genirq: Failed to request resources for 0-0053 (irq 81) on irqchip GPIO
->>
->> Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
->
-> I see what problem you are trying to solve.
->
->> +static int st_gpio_irq_request_resources(struct irq_data *d)
->> +{
->> +       struct gpio_chip *gc = irq_data_get_irq_chip_data(d);
->> +       int pin = d->hwirq;
->> +
->> +       return st_gpio_direction_input(gc, pin);
->> +}
-> (...)
->> +       .irq_request_resources  = st_gpio_irq_request_resources,
->
-> But this is just hiding the problem I'm afraid.
->
+I traced the action into pdev_fixup_irq()
+which calls of_irq_parse_and_map_pci()
 
-Hi Linus
+How do I tell Linux that
+- All the legacy PCI interrupts are muxed to a single line
+- And this line is routed to system interrupt 54
 
-> Now thay you override .irq_request_resources()
-> gpiochip_irq_reqres() will not be called, so then you have
-> to lock the irq in the driver, with something like:
->
-> ret = gpiochip_lock_as_irq(&chip->gc, d->hwirq);
->         if (ret)
->                 goto out;
->
+Ooooooh... Wait...
 
-Ah yes, i didn't noticed that point, thanks for the tips.
+Is this what interrupt-map is used for?
 
-> You also have to implement the .irq_release_resources()
-> callback and unlock the IRQ there.
+http://elinux.org/Device_Tree_Usage#Advanced_Interrupt_Mapping
 
-In this case, yes the release becomes mandatory.
-
-I will send a v2.
-
-Thanks
-
-Patrice
-
->
-> Yours,
-> Linus Walleij
->
+Regards.
