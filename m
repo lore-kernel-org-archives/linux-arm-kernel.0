@@ -1,137 +1,49 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Thu, 16 Mar 2017 09:58:46 +0100
-Subject: [RFC PATCH 15/33] irqchip/gic-v4: Add management structure
- definitions
-In-Reply-To: <1484648454-21216-16-git-send-email-marc.zyngier@arm.com>
-References: <1484648454-21216-1-git-send-email-marc.zyngier@arm.com>
- <1484648454-21216-16-git-send-email-marc.zyngier@arm.com>
-Message-ID: <d5ebd612-96f0-943e-df01-28251c77c327@redhat.com>
+From: phdm@macq.eu (Philippe De Muyter)
+Date: Thu, 16 Mar 2017 10:47:29 +0100
+Subject: media / v4l2-mc: wishlist for complex cameras (was Re: [PATCH
+ v4 14/36] [media] v4l2-mc: add a function to inherit controls from
+ a pipeline)
+In-Reply-To: <1489656360.2303.2.camel@pengutronix.de>
+References: <20170311082549.576531d0@vento.lan>
+ <20170313124621.GA10701@valkosipuli.retiisi.org.uk>
+ <20170314004533.3b3cd44b@vento.lan>
+ <e0a6c60b-1735-de0b-21f4-d8c3f4b3f10f@xs4all.nl>
+ <20170314072143.498cde9b@vento.lan> <20170314223254.GA7141@amd>
+ <20170314215420.6fc63c67@vento.lan> <20170315105049.GA12099@frolo.macqel>
+ <1489604109.4593.4.camel@ndufresne.ca>
+ <1489656360.2303.2.camel@pengutronix.de>
+Message-ID: <20170316094729.GA5595@frolo.macqel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 17/01/2017 11:20, Marc Zyngier wrote:
-> Add a bunch of GICv4-specific data structures that will get used in
-> subsequent patches.
+On Thu, Mar 16, 2017 at 10:26:00AM +0100, Philipp Zabel wrote:
+> On Wed, 2017-03-15 at 14:55 -0400, Nicolas Dufresne wrote:
+> > Le mercredi 15 mars 2017 ? 11:50 +0100, Philippe De Muyter a ?crit :
+> > > > I would say: camorama, xawtv3, zbar, google talk, skype. If it runs
+> > > > with those, it will likely run with any other application.
+> > > > 
+> > > 
+> > > I would like to add the 'v4l2src' plugin of gstreamer, and on the
+> > > imx6 its
+> > 
+> > While it would be nice if somehow you would get v4l2src to work (in
+> > some legacy/emulation mode through libv4l2),
 > 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  include/linux/irqchip/arm-gic-v4.h | 92 ++++++++++++++++++++++++++++++++++++++
->  1 file changed, 92 insertions(+)
->  create mode 100644 include/linux/irqchip/arm-gic-v4.h
-> 
-> diff --git a/include/linux/irqchip/arm-gic-v4.h b/include/linux/irqchip/arm-gic-v4.h
-> new file mode 100644
-> index 0000000..6e9c2b3
-> --- /dev/null
-> +++ b/include/linux/irqchip/arm-gic-v4.h
-> @@ -0,0 +1,92 @@
-> +/*
-> + * Copyright (C) 2016 ARM Limited, All Rights Reserved.
-> + * Author: Marc Zyngier <marc.zyngier@arm.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +
-> +#ifndef __LINUX_IRQCHIP_ARM_GIC_V4_H
-> +#define __LINUX_IRQCHIP_ARM_GIC_V4_H
-> +
-> +/* Embedded in kvm.arch */
-> +struct its_vm {
-> +	struct irq_domain	*domain;
-> +	struct page		*vprop_page;
-> +	irq_hw_number_t		db_lpi_base;
-> +	unsigned long		*db_bitmap;
-> +	int			nr_db_lpis;
-> +};
-> +
-> +/* Embedded in kvm_vcpu.arch */
-> +struct its_vpe {
-> +	struct page 		*vpt_page;
-> +	struct its_vm		*its_vm;
-> +	irq_hw_number_t		vpe_db_lpi;
-> +	u16			col_idx;
-the role of the collection id remains obscure to me. Are collections
-still used for VLPIs? On VMAPTI the vPE is directly provided whereas on
-MAPTI we used the collection indirection to the actual PE, right? So
-what is it used for?
-> +	u16			vpe_id;
-> +	bool			idai;
-> +	bool			pending_last;
-where is it used?
-> +};
-> +
-> +/*
-> + * struct its_vlpi: structure describing a VLPI. Only to be
-> + * interpreted in the context of a physical interrupt it complements.
-> + *
-> + * @vintid:	Virtual LPI number
-> + * @db_enabled:	Is the VPE doorbell to be generated?
-> + * @vpe_idx:	Index (0-based) of the VPE in this VM. Not the vpe_id!
-> + */
-> +struct its_vlpi {
-> +	u32			vintid;
-> +	bool			db_enabled;
-> +	u16			vpe_idx;
-> +};
-> +
-> +/*
-> + * struct its_vlpi_map: structure describing the mappings of all vlpis
-> + * for a single device. To be used as the vcpu_info passed to
-> + * irq_set_vcpu_affinity().
-> + *
-> + * @vpes: Array of struct its_vpe, describing the GICv4 view of the
-> + * 	  vpus.
-> + * @vlpis: Array of struct vlpi, each one matching one the
-> + *	   corresponding LPI
-s/one the/a/?
-> + * @nr_vpes: Size of the @vpes array
-> + * @nr_vlpis: Size of the @vlpis array
-> + */
-> +struct its_vlpi_map {
-> +	/* nr_vpes  */
-to be removed?
-> +	struct its_vpe		**vpes;
-> +	struct its_vlpi		*vlpis;
-> +	int			nr_vpes;
-> +	int			nr_vlpis;
-> +};
-> +
-> +enum its_cmd_type {
-> +	MAP_VLPI,
-> +	UNMAP_VLPI,
-> +	PROP_UPDATE_VLPI,
-> +	SCHEDULE_VPE,
-> +	DESCHEDULE_VPE,
-> +	INVALL_VPE,
-> +};
+> v4l2src works just fine, provided the pipeline is configured manually in
+> advance via media-ctl.
 
-its_vcpu_info_cmd_type? At the first reading I mixed that with GITS_CMD_*
+Including choosing the framerate ?  Sorry, I have no time these days
+to test it myself.
 
-Thanks
+And I cited imxv4l2videosrc for its ability to provide the physical address
+of the image buffers for further processing by other (not necessarily next
+in gstreamer pipeline, or for all frames) hardware-accelerated plugins likes
+the h.264 video encoder.  As I am stuck with fsl/nxp kernel and driver on that
+matter, I don't know how the interfaces have evolved in current linux kernels.
 
-Eric
+BR
 
+Philippe
 
-> +
-> +struct its_cmd_info {
-> +	enum its_cmd_type		cmd_type;
-> +	union {
-> +		struct its_vlpi_map	*map;
-> +		u8			config;
-> +	};
-> +};
-> +
-> +#endif
-> 
+-- 
+Philippe De Muyter +32 2 6101532 Macq SA rue de l'Aeronef 2 B-1140 Bruxelles
