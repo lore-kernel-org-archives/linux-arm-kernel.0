@@ -1,33 +1,53 @@
-From: cl@rock-chips.com (cl at rock-chips.com)
-Date: Thu, 16 Mar 2017 21:23:06 +0800
-Subject: [PATCH v2 6/6] dt-bindings: document rockchip rk3328-evb board
-In-Reply-To: <1489670244-13328-1-git-send-email-cl@rock-chips.com>
-References: <1489670244-13328-1-git-send-email-cl@rock-chips.com>
-Message-ID: <1489670586-16120-1-git-send-email-cl@rock-chips.com>
+From: tixy@linaro.org (Jon Medhurst)
+Date: Thu, 16 Mar 2017 13:29:58 +0000
+Subject: [PATCH 2/2] arm: Make fixmap memory type defines work with
+ STRICT_MM_TYPECHECKS
+In-Reply-To: <20170316132958.22227-1-tixy@linaro.org>
+References: <20170316132958.22227-1-tixy@linaro.org>
+Message-ID: <20170316132958.22227-2-tixy@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Liang Chen <cl@rock-chips.com>
+Change fixmap's defines for memory types to make use of the same
+constructs as in pgtable.h. This results in the code compiling when
+STRICT_MM_TYPECHECKS is defined and enables us to directly use the
+PAGE_KERNEL define rather than open coding a separate equivalent.
 
-Use "rockchip,rk3328-evb" compatible string for Rockchip RK3328
-evaluation board.
+Whilst changing these defines, also rename FIXMAP_PAGE_COMMON to
+have a double underscore prefix as this is an internal implementation
+factor and not a memory type definition to be used with fixmap the APIs.
 
-Signed-off-by: Liang Chen <cl@rock-chips.com>
+Reviewed-by: Stefan Agner <stefan@agner.ch>
+Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Signed-off-by: Jon Medhurst <tixy@linaro.org>
 ---
- Documentation/devicetree/bindings/arm/rockchip.txt | 4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm/include/asm/fixmap.h | 11 ++++++-----
+ 1 file changed, 6 insertions(+), 5 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/rockchip.txt b/Documentation/devicetree/bindings/arm/rockchip.txt
-index cc4ace6..17611cd 100644
---- a/Documentation/devicetree/bindings/arm/rockchip.txt
-+++ b/Documentation/devicetree/bindings/arm/rockchip.txt
-@@ -141,3 +141,7 @@ Rockchip platforms device tree bindings
- - Tronsmart Orion R68 Meta
-     Required root node properties:
-       - compatible = "tronsmart,orion-r68-meta", "rockchip,rk3368";
-+
-+- Rockchip RK3328 evb:
-+    Required root node properties:
-+      - compatible = "rockchip,rk3328-evb", "rockchip,rk3328";
+diff --git a/arch/arm/include/asm/fixmap.h b/arch/arm/include/asm/fixmap.h
+index 4e6784dc5668..c376dd9ac1ae 100644
+--- a/arch/arm/include/asm/fixmap.h
++++ b/arch/arm/include/asm/fixmap.h
+@@ -39,14 +39,15 @@ static const enum fixed_addresses __end_of_fixed_addresses =
+ 	__end_of_fixmap_region > __end_of_early_ioremap_region ?
+ 	__end_of_fixmap_region : __end_of_early_ioremap_region;
+ 
+-#define FIXMAP_PAGE_COMMON	(L_PTE_YOUNG | L_PTE_PRESENT | L_PTE_XN | L_PTE_DIRTY)
++#define __FIXMAP_PAGE_COMMON	(L_PTE_YOUNG | L_PTE_PRESENT | L_PTE_XN | L_PTE_DIRTY)
+ 
+-#define FIXMAP_PAGE_NORMAL	(pgprot_kernel ? pgprot_kernel | L_PTE_XN : \
+-					FIXMAP_PAGE_COMMON | L_PTE_MT_WRITEBACK)
+-#define FIXMAP_PAGE_RO		(FIXMAP_PAGE_NORMAL | L_PTE_RDONLY)
++#define FIXMAP_PAGE_NORMAL	(pgprot_val(pgprot_kernel) ? PAGE_KERNEL : \
++				 __pgprot(__FIXMAP_PAGE_COMMON | L_PTE_MT_WRITEBACK))
++#define FIXMAP_PAGE_RO		_MOD_PROT(FIXMAP_PAGE_NORMAL, L_PTE_RDONLY)
+ 
+ /* Used by set_fixmap_(io|nocache), both meant for mapping a device */
+-#define FIXMAP_PAGE_IO		(FIXMAP_PAGE_COMMON | L_PTE_MT_DEV_SHARED | L_PTE_SHARED)
++#define FIXMAP_PAGE_IO		__pgprot(__FIXMAP_PAGE_COMMON | L_PTE_MT_DEV_SHARED | \
++					 L_PTE_SHARED)
+ #define FIXMAP_PAGE_NOCACHE	FIXMAP_PAGE_IO
+ 
+ #define __early_set_fixmap	__set_fixmap
 -- 
-1.9.1
+2.11.0
