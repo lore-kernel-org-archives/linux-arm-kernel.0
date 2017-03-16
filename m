@@ -1,42 +1,81 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 16 Mar 2017 16:12:26 -0500
-Subject: [PATCH v4 1/3] usb: orion-echi: Add support for the Armada 3700
-In-Reply-To: <20170309175258.20076-2-gregory.clement@free-electrons.com>
-References: <20170309175258.20076-1-gregory.clement@free-electrons.com>
- <20170309175258.20076-2-gregory.clement@free-electrons.com>
-Message-ID: <20170316211226.krnhlrwk3gd3qpce@rob-hp-laptop>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Thu, 16 Mar 2017 16:12:43 -0500
+Subject: [PATCH 03/20] asm-generic/io.h: add PCI config space remap
+ interface
+In-Reply-To: <20170227151436.18698-4-lorenzo.pieralisi@arm.com>
+References: <20170227151436.18698-1-lorenzo.pieralisi@arm.com>
+ <20170227151436.18698-4-lorenzo.pieralisi@arm.com>
+Message-ID: <20170316211243.GE9739@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 09, 2017 at 06:52:56PM +0100, Gregory CLEMENT wrote:
-> From: Hua Jing <jinghua@marvell.com>
+[+cc Luis]
 
-s/echi/ehci/ in the subject.
-
+On Mon, Feb 27, 2017 at 03:14:14PM +0000, Lorenzo Pieralisi wrote:
+> The PCI specifications (Rev 3.0, 3.2.5 "Transaction Ordering and
+> Posting") mandate non-posted configuration transactions. As further
+> highlighted in the PCIe specifications (4.0 - Rev0.3, "Ordering
+> Considerations for the Enhanced Configuration Access Mechanism"),
+> through ECAM and ECAM-derivative configuration mechanism, the memory
+> mapped transactions from the host CPU into Configuration Requests on the
+> PCI express fabric may create ordering problems for software because
+> writes to memory address are typically posted transactions (unless the
+> architecture can enforce through virtual address mapping non-posted
+> write transactions behaviour) but writes to Configuration Space are not
+> posted on the PCI express fabric.
 > 
-> - Add a new compatible string for the Armada 3700 SoCs
+> Current DT and ACPI host bridge controllers map PCI configuration space
+> (ECAM and ECAM-derivative) into the virtual address space through
+> ioremap() calls, that are non-cacheable device accesses on most
+> architectures, but may provide "bufferable" or "posted" write semantics
+> in architecture like eg ARM/ARM64 that allow ioremap'ed regions writes
+> to be buffered in the bus connecting the host CPU to the PCI fabric;
+> this behaviour, as underlined in the PCIe specifications, may trigger
+> transactions ordering rules and must be prevented.
 > 
-> - add sbuscfg support for orion usb controller driver. For the SoCs
->   without hlock, need to program BAWR/BARD/AHBBRST fields in the sbuscfg
->   register to guarantee the AHB master's burst would not overrun or
->   underrun the FIFO.
+> Introduce a new generic and explicit API to create a memory
+> mapping for ECAM and ECAM-derivative config space area that
+> defaults to ioremap_nocache() (which should provide a sane default
+> behaviour) but still allowing architectures on which ioremap_nocache()
+> results in posted write transactions to override the function
+> call with an arch specific implementation that complies with
+> the PCI specifications for configuration transactions.
 > 
-> - the sbuscfg register has to be set after the usb controller reset,
->   otherwise the value would be overridden to 0. In order to do this, the
->   reset callback is registered.
-> 
-> [gregory.clement at free-electrons.com: - reword commit and comments
-> 				     - fix error path in ehci_orion_drv_reset()
-> 				     - fix checkpatch warning]
-> Signed-off-by: Hua Jing <jinghua@marvell.com>
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> Reviewed-by: Andrew Lunn <andrew@lunn.ch>
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Bjorn Helgaas <bhelgaas@google.com>
+> Cc: Russell King <linux@armlinux.org.uk>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
 > ---
->  .../devicetree/bindings/usb/ehci-orion.txt         |  4 ++-
+>  include/asm-generic/io.h | 9 +++++++++
+>  1 file changed, 9 insertions(+)
+> 
+> diff --git a/include/asm-generic/io.h b/include/asm-generic/io.h
+> index 7ef015e..52dda81 100644
+> --- a/include/asm-generic/io.h
+> +++ b/include/asm-generic/io.h
+> @@ -915,6 +915,15 @@ extern void ioport_unmap(void __iomem *p);
+>  #endif /* CONFIG_GENERIC_IOMAP */
+>  #endif /* CONFIG_HAS_IOPORT_MAP */
+>  
+> +#ifndef pci_remap_cfgspace
+> +#define pci_remap_cfgspace pci_remap_cfgspace
+> +static inline void __iomem *pci_remap_cfgspace(phys_addr_t offset,
+> +					       size_t size)
+> +{
+> +	return ioremap_nocache(offset, size);
+> +}
 
-Otherwise,
+I'm fine with this conceptually, but I think it would make more sense
+if the name weren't specific to PCI or config space, e.g.,
+ioremap_nopost() or something.
 
-Acked-by: Rob Herring <robh@kernel.org>
-
->  drivers/usb/host/ehci-orion.c                      | 36 ++++++++++++++++++++++
->  2 files changed, 39 insertions(+), 1 deletion(-)
+> +#endif
+> +
+>  #ifndef xlate_dev_kmem_ptr
+>  #define xlate_dev_kmem_ptr xlate_dev_kmem_ptr
+>  static inline void *xlate_dev_kmem_ptr(void *addr)
+> -- 
+> 2.10.0
+> 
