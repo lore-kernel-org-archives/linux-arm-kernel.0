@@ -1,138 +1,40 @@
-From: ralph.sennhauser@gmail.com (Ralph Sennhauser)
-Date: Thu, 16 Mar 2017 06:53:19 +0100
-Subject: [PATCH v2] ARM: dts: mvebu: linksys: enable buffer manager support
-Message-ID: <20170316055320.7929-1-ralph.sennhauser@gmail.com>
+From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
+Date: Thu, 16 Mar 2017 07:00:55 +0100
+Subject: [PATCH 1/3] devicetree: add vendor prefix for Khadas
+In-Reply-To: <20170315195737.vckgpw6qad4d4zjm@rob-hp-laptop>
+References: <20170304215126.7020-1-martin.blumenstingl@googlemail.com>
+ <20170304215126.7020-2-martin.blumenstingl@googlemail.com>
+ <20170315195737.vckgpw6qad4d4zjm@rob-hp-laptop>
+Message-ID: <61778a7a-3d96-8de3-fd4f-f18aa0938a68@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add appropriate properties to devices in the Linksys WRT AC Series for the
-mvneta driver to use hardware buffer management.
+Am 15.03.2017 um 20:57 schrieb Rob Herring:
+> On Sat, Mar 04, 2017 at 10:51:24PM +0100, Martin Blumenstingl wrote:
+>> Khadas is a new sub-brand of Shenzhen Wesion Technology CO.,LTD. They
+>> are developing Amlogic and Rockchip based "DIY boxes" (single board
+>> computers): http://khadas.com/
+>> They are best know for their latest product: the Khadas VIM (an Amlogic
+>> GXL S905X based SBC).
+>>
+>> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+>> ---
+>>  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+>>  1 file changed, 1 insertion(+)
+> 
+> Acked-by: Rob Herring <robh@kernel.org>
 
-Also update "soc" ranges property and set the status of bm and bm-bppi
-to "okay" (SRAM).
+Shouldn't the entry reflect what is in the commit message rather than
+just repeat the prefix? I.e., something like "Khadas by Shenzhen Wesion
+Technology Co., Ltd." (which I believe is the official spelling and
+spacing of these abbreviations also for the commit message).
 
-Signed-off-by: Ralph Sennhauser <ralph.sennhauser@gmail.com>
----
+An Acked-by from the CC'ed vendor would also be desirable. :)
 
-v1 -> v2:
-	Use independent pools for short (suggested by Gregory Clement)
+Regards,
+Andreas
 
-
- arch/arm/boot/dts/armada-385-linksys.dtsi     | 17 ++++++++++++++++-
- arch/arm/boot/dts/armada-xp-linksys-mamba.dts | 17 ++++++++++++++++-
- 2 files changed, 32 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/boot/dts/armada-385-linksys.dtsi b/arch/arm/boot/dts/armada-385-linksys.dtsi
-index df47bf1..aa0d225 100644
---- a/arch/arm/boot/dts/armada-385-linksys.dtsi
-+++ b/arch/arm/boot/dts/armada-385-linksys.dtsi
-@@ -59,7 +59,8 @@
- 		ranges = <MBUS_ID(0xf0, 0x01) 0 0xf1000000 0x100000
- 			  MBUS_ID(0x01, 0x1d) 0 0xfff00000 0x100000
- 			  MBUS_ID(0x09, 0x19) 0 0xf1100000 0x10000
--			  MBUS_ID(0x09, 0x15) 0 0xf1110000 0x10000>;
-+			  MBUS_ID(0x09, 0x15) 0 0xf1110000 0x10000
-+			  MBUS_ID(0x0c, 0x04) 0 0xf1200000 0x100000>;
- 
- 		internal-regs {
- 			i2c at 11000 {
-@@ -88,6 +89,9 @@
- 			ethernet at 70000 {
- 				status = "okay";
- 				phy-mode = "rgmii-id";
-+				buffer-manager = <&bm>;
-+				bm,pool-long = <2>;
-+				bm,pool-short = <3>;
- 				fixed-link {
- 					speed = <1000>;
- 					full-duplex;
-@@ -97,6 +101,9 @@
- 			ethernet at 34000 {
- 				status = "okay";
- 				phy-mode = "sgmii";
-+				buffer-manager = <&bm>;
-+				bm,pool-long = <0>;
-+				bm,pool-short = <1>;
- 				fixed-link {
- 					speed = <1000>;
- 					full-duplex;
-@@ -159,6 +166,10 @@
- 				status = "okay";
- 			};
- 
-+			bm at c8000 {
-+				status = "okay";
-+			};
-+
- 			/* USB part of the eSATA/USB 2.0 port */
- 			usb at 58000 {
- 				status = "okay";
-@@ -241,6 +252,10 @@
- 			};
- 		};
- 
-+		bm-bppi {
-+			status = "okay";
-+		};
-+
- 		pcie-controller {
- 			status = "okay";
- 
-diff --git a/arch/arm/boot/dts/armada-xp-linksys-mamba.dts b/arch/arm/boot/dts/armada-xp-linksys-mamba.dts
-index 3744ba3..9efcf59 100644
---- a/arch/arm/boot/dts/armada-xp-linksys-mamba.dts
-+++ b/arch/arm/boot/dts/armada-xp-linksys-mamba.dts
-@@ -71,7 +71,8 @@
- 		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xf1000000 0x100000
- 			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000
- 			  MBUS_ID(0x09, 0x09) 0 0 0xf1100000 0x10000
--			  MBUS_ID(0x09, 0x05) 0 0 0xf1110000 0x10000>;
-+			  MBUS_ID(0x09, 0x05) 0 0 0xf1110000 0x10000
-+			  MBUS_ID(0x0c, 0x04) 0 0 0xf1200000 0x100000>;
- 
- 		internal-regs {
- 
-@@ -95,6 +96,9 @@
- 				pinctrl-names = "default";
- 				status = "okay";
- 				phy-mode = "rgmii-id";
-+				buffer-manager = <&bm>;
-+				bm,pool-long = <0>;
-+				bm,pool-short = <1>;
- 				fixed-link {
- 					speed = <1000>;
- 					full-duplex;
-@@ -106,6 +110,9 @@
- 				pinctrl-names = "default";
- 				status = "okay";
- 				phy-mode = "rgmii-id";
-+				buffer-manager = <&bm>;
-+				bm,pool-long = <2>;
-+				bm,pool-short = <3>;
- 				fixed-link {
- 					speed = <1000>;
- 					full-duplex;
-@@ -186,6 +193,10 @@
- 				};
- 			};
- 
-+			bm at c8000 {
-+				status = "okay";
-+			};
-+
- 			nand at d0000 {
- 				status = "okay";
- 				num-cs = <1>;
-@@ -259,6 +270,10 @@
- 				};
- 			};
- 		};
-+
-+		bm-bppi {
-+			status = "okay";
-+		};
- 	};
- 
- 	gpio_keys {
 -- 
-2.10.2
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Graham Norton
+HRB 21284 (AG N?rnberg)
