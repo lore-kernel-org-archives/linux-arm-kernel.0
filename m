@@ -1,76 +1,76 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 16 Mar 2017 17:44:05 +0100
-Subject: [PATCH] Revert "clocksource/drivers/tcb_clksrc: Use 32 bit tcb as
- sched_clock"
-In-Reply-To: <20170316164208.GB6579@mai>
-References: <20170316164208.GB6579@mai>
-Message-ID: <1489682645-11369-1-git-send-email-daniel.lezcano@linaro.org>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Thu, 16 Mar 2017 17:45:57 +0100
+Subject: [PATCH v2] ARM: zynq: Add #io-channel-cells to (x)adc node for
+ iio-hwmon
+In-Reply-To: <CAJYdmeNc48=OOvRiUjqPBJhz9RCbzeaRGu1Tfm=hrvzkJrSsag@mail.gmail.com>
+References: <1489003884-2489-1-git-send-email-mdf@kernel.org>
+ <e6da3f38-7039-66e5-5b9d-a44ff42aa9c9@xilinx.com>
+ <CAJYdmeNc48=OOvRiUjqPBJhz9RCbzeaRGu1Tfm=hrvzkJrSsag@mail.gmail.com>
+Message-ID: <7e4fbe16-8686-5399-748d-af222c630338@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Romain Izard <romain.izard.pro@gmail.com>
+On 16.3.2017 17:39, Moritz Fischer wrote:
+> On Thu, Mar 16, 2017 at 9:16 AM, Michal Simek <michal.simek@xilinx.com> wrote:
+>> Hi,
+>>
+>> On 8.3.2017 21:11, Moritz Fischer wrote:
+>>> Fix
+>>>
+>>> OF: /iio_hwmon: could not get #io-channel-cells for
+>>> /amba/adc at f8007100
+>>> OF: /iio_hwmon: could not get #io-channel-cells for
+>>> /amba/adc at f8007100
+>>> OF: /iio_hwmon: could not get #io-channel-cells for
+>>> /amba/adc at f8007100
+>>>
+>>> by adding the #io-channel-cells property.
+>>>
+>>> Signed-off-by: Moritz Fischer <mdf@kernel.org>
+>>> Cc: Michal Simek <michal.simek@xilinx.com>
+>>> Cc: S?ren Brinkmann <soren.brinkmann@xilinx.com>
+>>> Cc: Julia Cartwright <julia@ni.com>
+>>> Cc: linux-kernel at vger.kernel.org
+>>> Cc: devicetree at vger.kernel.org
+>>> ---
+>>>
+>>> Changes from v1:
+>>> - fix messed up commit message
+>>> ---
+>>>  arch/arm/boot/dts/zynq-7000.dtsi | 1 +
+>>>  1 file changed, 1 insertion(+)
+>>>
+>>> diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
+>>> index f3ac9bf..98233a8 100644
+>>> --- a/arch/arm/boot/dts/zynq-7000.dtsi
+>>> +++ b/arch/arm/boot/dts/zynq-7000.dtsi
+>>> @@ -72,6 +72,7 @@
+>>>                       interrupts = <0 7 4>;
+>>>                       interrupt-parent = <&intc>;
+>>>                       clocks = <&clkc 12>;
+>>> +                     #io-channel-cells = <1>;
+>>>               };
+>>>
+>>>               can0: can at e0008000 {
+>>>
+>>
+>> I think it will be good to the next step too.
+>> It means also add iio-hwmon node too.
+>>
+>> What do you think?
+> 
+> I hadn't put it in there since dts is supposed to describe hw,
+> but obviously putting the actual hwmon in there makes it more useful.
 
-This reverts commit 7b9f1d16e6d1 ("clocksource/drivers/tcb_clksrc: Use
-32 bit tcb as sched_clock"). In the current state, the kernel warns
-against a late registration of the new sched_clock, the printk clock
-resets after only a few minutes, and it seems that scheduling can be
-affected as well.
+I had one discussion about this with Grant in past and it is common
+mistake. It is simplification of purpose of dts.
 
-Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
-Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
----
- drivers/clocksource/tcb_clksrc.c | 16 +---------------
- 1 file changed, 1 insertion(+), 15 deletions(-)
+> 
+> I can resubmit with the hwmon node in there.
 
-diff --git a/drivers/clocksource/tcb_clksrc.c b/drivers/clocksource/tcb_clksrc.c
-index 745844e..d4ca996 100644
---- a/drivers/clocksource/tcb_clksrc.c
-+++ b/drivers/clocksource/tcb_clksrc.c
-@@ -10,7 +10,6 @@
- #include <linux/io.h>
- #include <linux/platform_device.h>
- #include <linux/atmel_tc.h>
--#include <linux/sched_clock.h>
- 
- 
- /*
-@@ -57,14 +56,9 @@ static u64 tc_get_cycles(struct clocksource *cs)
- 	return (upper << 16) | lower;
- }
- 
--static u32 tc_get_cv32(void)
--{
--	return __raw_readl(tcaddr + ATMEL_TC_REG(0, CV));
--}
--
- static u64 tc_get_cycles32(struct clocksource *cs)
- {
--	return tc_get_cv32();
-+	return __raw_readl(tcaddr + ATMEL_TC_REG(0, CV));
- }
- 
- static struct clocksource clksrc = {
-@@ -75,11 +69,6 @@ static struct clocksource clksrc = {
- 	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
- };
- 
--static u64 notrace tc_read_sched_clock(void)
--{
--	return tc_get_cv32();
--}
--
- #ifdef CONFIG_GENERIC_CLOCKEVENTS
- 
- struct tc_clkevt_device {
-@@ -350,9 +339,6 @@ static int __init tcb_clksrc_init(void)
- 		clksrc.read = tc_get_cycles32;
- 		/* setup ony channel 0 */
- 		tcb_setup_single_chan(tc, best_divisor_idx);
--
--		/* register sched_clock on chips with single 32 bit counter */
--		sched_clock_register(tc_read_sched_clock, 32, divided_rate);
- 	} else {
- 		/* tclib will give us three clocks no matter what the
- 		 * underlying platform supports.
--- 
-2.7.4
+If you grep kernel tree you will see that others are using it too.
+Also there is accepted binding for that that's why I can't see big
+problem with it.
+
+Thanks,
+Michal
