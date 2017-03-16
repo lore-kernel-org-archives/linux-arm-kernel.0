@@ -1,71 +1,30 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 16 Mar 2017 15:03:24 +0100
-Subject: [PATCH] ARM: dts: hi6220: Reset the mmc hosts
-Message-ID: <1489673004-11075-1-git-send-email-daniel.lezcano@linaro.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 16 Mar 2017 14:06:53 +0000
+Subject: Applied "ASoC: sun8i-codec: Update mixer to use SOC_DAPM_DOUBLE"
+ to the asoc tree
+In-Reply-To: <CAGb2v67-b+8CM0MqhT_YQeuNxEnVoxG-COZPy8LW32Eb-QE67Q@mail.gmail.com>
+References: <20170210094133.11382-3-mylene.josserand@free-electrons.com>
+ <E1clbY9-0000DH-LY@finisterre>
+ <CAGb2v6428PpYPzpHngLgaeziwKN8u-TYiNO1bs7TFw-7VrQOAg@mail.gmail.com>
+ <20170315134323.i3pvla3pzejmkxwh@sirena.org.uk>
+ <CAGb2v67-b+8CM0MqhT_YQeuNxEnVoxG-COZPy8LW32Eb-QE67Q@mail.gmail.com>
+Message-ID: <20170316140653.jjnta4le6kws36l5@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The MMC hosts could be left in an unconsistent or uninitialized state from
-the firmware. Instead of assuming, the firmware did the right things, let's
-reset the host controllers.
+On Wed, Mar 15, 2017 at 10:15:22PM +0800, Chen-Yu Tsai wrote:
 
-This change fixes a bug when the mmc2/sdio is initialized leading to a hung
-task:
+> It depends on the second half of commit 4aa8146c89f3 ("ASoC: sun8i-codec:
+> Remove analog "HP" widget"), which is also a cleanup. Would it be OK
+> to pick these two over to fixes then? Or should we send a clean version
+> instead?
 
-[  242.704294] INFO: task kworker/7:1:675 blocked for more than 120 seconds.
-[  242.711129]       Not tainted 4.9.0-rc8-00017-gcf0251f #3
-[  242.716571] "echo 0 > /proc/sys/kernel/hung_task_timeout_secs" disables this message.
-[  242.724435] kworker/7:1     D    0   675      2 0x00000000
-[  242.729973] Workqueue: events_freezable mmc_rescan
-[  242.734796] Call trace:
-[  242.737269] [<ffff00000808611c>] __switch_to+0xa8/0xb4
-[  242.742437] [<ffff000008d07c04>] __schedule+0x1c0/0x67c
-[  242.747689] [<ffff000008d08254>] schedule+0x40/0xa0
-[  242.752594] [<ffff000008d0b284>] schedule_timeout+0x1c4/0x35c
-[  242.758366] [<ffff000008d08e38>] wait_for_common+0xd0/0x15c
-[  242.763964] [<ffff000008d09008>] wait_for_completion+0x28/0x34
-[  242.769825] [<ffff000008a1a9f4>] mmc_wait_for_req_done+0x40/0x124
-[  242.775949] [<ffff000008a1ab98>] mmc_wait_for_req+0xc0/0xf8
-[  242.781549] [<ffff000008a1ac3c>] mmc_wait_for_cmd+0x6c/0x84
-[  242.787149] [<ffff000008a26610>] mmc_io_rw_direct_host+0x9c/0x114
-[  242.793270] [<ffff000008a26aa0>] sdio_reset+0x34/0x7c
-[  242.798347] [<ffff000008a1d46c>] mmc_rescan+0x2fc/0x360
-
-[ ... ]
-
-Cc: stable at vger.kernel.org
-Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
----
- arch/arm64/boot/dts/hisilicon/hi6220.dtsi | 3 +++
- 1 file changed, 3 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-index 470461d..1e5129b 100644
---- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-+++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-@@ -774,6 +774,7 @@
- 			clocks = <&sys_ctrl 2>, <&sys_ctrl 1>;
- 			clock-names = "ciu", "biu";
- 			resets = <&sys_ctrl PERIPH_RSTDIS0_MMC0>;
-+			reset-names = "reset";
- 			bus-width = <0x8>;
- 			vmmc-supply = <&ldo19>;
- 			pinctrl-names = "default";
-@@ -797,6 +798,7 @@
- 			clocks = <&sys_ctrl 4>, <&sys_ctrl 3>;
- 			clock-names = "ciu", "biu";
- 			resets = <&sys_ctrl PERIPH_RSTDIS0_MMC1>;
-+			reset-names = "reset";
- 			vqmmc-supply = <&ldo7>;
- 			vmmc-supply = <&ldo10>;
- 			bus-width = <0x4>;
-@@ -815,6 +817,7 @@
- 			clocks = <&sys_ctrl HI6220_MMC2_CIUCLK>, <&sys_ctrl HI6220_MMC2_CLK>;
- 			clock-names = "ciu", "biu";
- 			resets = <&sys_ctrl PERIPH_RSTDIS0_MMC2>;
-+			reset-names = "reset";
- 			bus-width = <0x4>;
- 			broken-cd;
- 			pinctrl-names = "default", "idle";
--- 
-1.9.1
+That also doesn't pick over cleanly, can you send a new version against
+Linus' tree, that'll be easiest and safest I think.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170316/69d56a4b/attachment.sig>
