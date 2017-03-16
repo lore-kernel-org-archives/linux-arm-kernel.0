@@ -1,115 +1,206 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Thu, 16 Mar 2017 22:02:05 +0100
-Subject: [RFC PATCH 32/33] irqchip/gic-v4: Add some basic documentation
-In-Reply-To: <1484648454-21216-33-git-send-email-marc.zyngier@arm.com>
-References: <1484648454-21216-1-git-send-email-marc.zyngier@arm.com>
- <1484648454-21216-33-git-send-email-marc.zyngier@arm.com>
-Message-ID: <8d0c0d26-e28e-5328-00a6-a7cea4df9ffe@redhat.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 16 Mar 2017 16:03:31 -0500
+Subject: [PATCH V3 2/5] iommu/arm-smmu: Add support for MMU40x/500 clocks
+In-Reply-To: <1489073748-3659-3-git-send-email-sricharan@codeaurora.org>
+References: <1489073748-3659-1-git-send-email-sricharan@codeaurora.org>
+ <1489073748-3659-3-git-send-email-sricharan@codeaurora.org>
+Message-ID: <20170316210331.i47xkr6opm6he3lk@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 17/01/2017 11:20, Marc Zyngier wrote:
-> Do a braindump of the way things are supposed to work.
+On Thu, Mar 09, 2017 at 09:05:45PM +0530, Sricharan R wrote:
+> The MMU400x/500 is the implementation of the SMMUv2
+> arch specification. It is split in to two blocks
+> TBU, TCU. TBU caches the page table, instantiated
+> for each master locally, clocked by the TBUn_clk.
+> TCU manages the address translation with PTW and has
+> the programming interface as well, clocked using the
+> TCU_CLK. The TBU can also be sharing the same clock
+> domain as TCU, in which case both are clocked using
+> the TCU_CLK.
 > 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> This defines the clock bindings for the same and adds the
+> init, enable and disable functions for handling the
+> clocks.
+> 
+> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
 > ---
->  drivers/irqchip/irq-gic-v4.c | 59 ++++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 59 insertions(+)
+>  .../devicetree/bindings/iommu/arm,smmu.txt         | 27 ++++++
+>  drivers/iommu/arm-smmu.c                           | 95 +++++++++++++++++++++-
+>  2 files changed, 121 insertions(+), 1 deletion(-)
 > 
-> diff --git a/drivers/irqchip/irq-gic-v4.c b/drivers/irqchip/irq-gic-v4.c
-> index 36ccaac..8b2d9ee 100644
-> --- a/drivers/irqchip/irq-gic-v4.c
-> +++ b/drivers/irqchip/irq-gic-v4.c
-> @@ -22,6 +22,65 @@
+> diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu.txt b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+> index 6cdf32d..b369c13 100644
+> --- a/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+> +++ b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+> @@ -60,6 +60,28 @@ conditions.
+>                    aliases of secure registers have to be used during
+>                    SMMU configuration.
 >  
->  #include <linux/irqchip/arm-gic-v4.h>
->  
-> +/*
-> + * WARNING: The blurb below assumes that you understand the
-> + * intricacies of GICv3, GICv4, and how a guest's view of a GICv3 gets
-> + * translated into GICv4 comands. So it effectively targets at most
-s/comands/commands
-> + * two individuals. You know who you are.
-> + *
-> + * The core GICv4 code is designed to *avoid* exposing too much of the
-> + * core GIC code (that would in turn leak into the hypervisor code),
-> + * and instead provide a hypervisor agnostic interface to the HW (of
-> + * course, the astute reader will quickly realize that hypervisor
-> + * agnostic actually means KVM-specific - what were you thinking?).
-> + *
-> + * In order to achieve a modicum of isolation, we try to hide most of
-> + * the GICv4 "stuff" behind normal irqchip operations:
-> + *
-> + * - Any guest-visible VLPI is backed by a Linux interrupt (and a
-> + *   physical LPI which gets deconfigured
-unmapped?
- when the guest maps the
-> + *   VLPI). This allows the same DevID/Event pair to be either mapped
-s/Event/Eventid
-> + *   to the LPI (host) or the VLPI (guest).
-> + *
-> + * - Enabling/disabling a VLPI is done by issuing mask/unmask calls.
-> + *
-> + * - Guest INT/CLEAR commands are implemented through
-> + *   irq_set_irqchip_state().
-does it also work for vLPI? The spec mentions ICID/pINTID only.
-> + *
-> + * - The *bizarre* stuff (mapping/unmapping an interrupt to a VLPI, or
-> + *   issuing an INV after changing a priority) gets shoved into the
-> + *   irq_set_vcpu_affinity() method. While this is quite horrible
-> + *   (let's face it, this is the irqchip version of an ioctl), it
-> + *   confines the crap to a single location. And map/unmap really is
-> + *   about setting the affinity of a VLPI to a vcpu, so only INV is
-> + *   majorly out of place. So there.
-I would put the above paragraph before the enable/disable and guest
-INT/CLEAR bullet.
+> +- clock-names:    Should be "tbu_clk" and "tcu_clk" and "cfg_clk" for
 
-What is difficult to understand is there is also another mapping between
-the vPE and the physical RDist which is handled by the below
-irq_set_affinity.
-> + *
-> + * But handling VLPIs is only one side of the job of the GICv4
-> + * code. The other (darker) side is to take care of the doorbell
-> + * interrupts which are delivered when a VLPI targeting a non-running
-> + * vcpu is being made pending.
-> + *
-> + * The choice made here is that each vcpu (VPE in old northern GICv4
-> + * dialect) gets a single doorbell
-s/doorbell/doorbell LPI?
-, no matter how many interrupts are
-> + * targeting it. This has a nice property, which is that the interrupt
-> + * becomes a handle for the VPE, and that the hypervisor code can
-> + * manipulate it through the normal interrupt API:
-> + *
-> + * - VMs (or rather the VM abstraction that matters to the GIC)
-> + *   contain an irq domain where each interrupt maps to a VPE. In
-> + *   turn, this domain stis on top of the normal LPI allocator, and a
-s/stis/sits
-> + *   specially crafted irq_chip implementation.
-> + *
-> + * - mask/unmask do what is expected on the doorbell interrupt.
-> + *
-> + * - irq_set_affinity is used to move a VPE from one redistributor to
-> + *   another.
-So that's the odd part for me because I would have imagined set_affinity
-would have applied to this doorbell LPI and change the affinity of this
-physical MSI. But as the doorbell MSI embodies the VPE, well this makes
-sense to me
-> + *
-> + * - irq_set_vcpu_affinity once again gets hijacked for the purpose of
-> + *   creating a new sub-API, namely scheduling/descheduling a VPE and
-> + *   performing INVALL operations.
-So this programs VPROPBASER and VPENDBASER
-> + */
+_clk is redundant
+
+> +                  "arm,mmu-400", "arm,mmu-401" and "arm,mmu-500"
 > +
->  static struct irq_domain *its_vpe_domain;
+> +                  "tcu_clk" is required for smmu's register access using the
+> +                  programming interface and ptw for downstream bus access.
+> +
+> +                  "tbu_clk" is required for access to the TBU connected to the
+> +                  master locally. This clock is optional and not required when
+> +                  TBU is in the same clock domain as the TCU or when the TBU is
+> +                  clocked along with the master.
+> +
+> +                  "cfg_clk" is optional if required to access the TCU's programming
+> +                  interface, apart from the "tcu_clk".
+
+Clocks generally shouldn't be optional. Either the h/w has a clock or it 
+doesn't.
+
+> +
+> +- clocks:         Phandles for respective clocks described by clock-names.
+> +
+> +- power-domains:  Phandles to SMMU's power domain specifier. This is
+> +                  required even if SMMU belongs to the master's power
+> +                  domain, as the SMMU will have to be enabled and
+> +                  accessed before master gets enabled and linked to its
+> +                  SMMU.
+> +
+>  ** Deprecated properties:
 >  
->  static struct irq_chip its_vcpu_irq_chip = {
+>  - mmu-masters (deprecated in favour of the generic "iommus" binding) :
+> @@ -84,6 +106,11 @@ conditions.
+>                               <0 36 4>,
+>                               <0 37 4>;
+>                  #iommu-cells = <1>;
+> +                clocks = <&gcc GCC_SMMU_CFG_CLK>,
+> +                         <&gcc GCC_APSS_TCU_CLK>,
+> +			 <&gcc GCC_MDP_TBU_CLK>;
+> +
+> +		clock-names = "cfg_clk", "tcu_clk", "tbu_clk";
+>          };
+>  
+>          /* device with two stream IDs, 0 and 7 */
+> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> index f7e11d3..720a1ef 100644
+> --- a/drivers/iommu/arm-smmu.c
+> +++ b/drivers/iommu/arm-smmu.c
+> @@ -341,6 +341,12 @@ struct arm_smmu_master_cfg {
+>  #define for_each_cfg_sme(fw, i, idx) \
+>  	for (i = 0; idx = fwspec_smendx(fw, i), i < fw->num_ids; ++i)
+>  
+> +struct mmu500_clk {
+> +	struct clk *cfg_clk;
+> +	struct clk *tcu_clk;
+> +	struct clk *tbu_clk;
+> +};
+> +
+>  struct arm_smmu_clks {
+>  	void *clks;
+>  	int (*init_clocks)(struct arm_smmu_device *smmu);
+> @@ -455,6 +461,92 @@ static struct arm_smmu_domain *to_smmu_domain(struct iommu_domain *dom)
+>  	return container_of(dom, struct arm_smmu_domain, domain);
+>  }
+>  
+> +static int mmu500_enable_clocks(struct arm_smmu_device *smmu)
+> +{
+> +	int ret = 0;
+> +	struct mmu500_clk *sclks = smmu->smmu_clks.clks;
+> +
+> +	if (!sclks)
+> +		return 0;
+> +
+> +	ret = clk_prepare_enable(sclks->cfg_clk);
+> +	if (ret) {
+> +		dev_err(smmu->dev, "Couldn't enable cfg_clk");
+> +		return ret;
+> +	}
+> +
+> +	ret = clk_prepare_enable(sclks->tcu_clk);
+> +	if (ret) {
+> +		dev_err(smmu->dev, "Couldn't enable tcu_clk");
+> +		clk_disable_unprepare(sclks->cfg_clk);
+> +		return ret;
+> +	}
+> +
+> +	ret = clk_prepare_enable(sclks->tbu_clk);
+> +	if (ret) {
+> +		dev_err(smmu->dev, "Couln't enable tbu_clk");
+> +		clk_disable_unprepare(sclks->tcu_clk);
+> +		clk_disable_unprepare(sclks->cfg_clk);
+> +		return ret;
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static void mmu500_disable_clocks(struct arm_smmu_device *smmu)
+> +{
+> +	struct mmu500_clk *sclks = smmu->smmu_clks.clks;
+> +
+> +	if (!sclks) {
+> +		clk_disable_unprepare(sclks->tbu_clk);
+> +		clk_disable_unprepare(sclks->tcu_clk);
+> +		clk_disable_unprepare(sclks->cfg_clk);
+> +	}
+> +}
+> +
+> +static int mmu500_init_clocks(struct arm_smmu_device *smmu)
+> +{
+> +	struct device *dev = smmu->dev;
+> +	struct mmu500_clk *sclks;
+> +	int err;
+> +
+> +	if (!of_find_property(dev->of_node, "clocks", NULL))
+> +		return 0;
+> +
+> +	sclks = devm_kzalloc(dev, sizeof(*sclks), GFP_KERNEL);
+> +	if (!sclks)
+> +		return -ENOMEM;
+> +
+> +	sclks->cfg_clk = devm_clk_get(dev, "cfg_clk");
+> +	if (IS_ERR(sclks->cfg_clk)) {
+> +		err = PTR_ERR(sclks->cfg_clk);
+> +		/* Ignore all, except -EPROBE_DEFER for optional clocks */
+> +		if (err == -EPROBE_DEFER)
+> +			return err;
+> +		else
+> +			sclks->cfg_clk = NULL;
+> +	}
+> +
+> +	sclks->tcu_clk = devm_clk_get(dev, "tcu_clk");
+> +	if (IS_ERR(sclks->tcu_clk)) {
+> +		dev_err(dev, "Couldn't get tcu_clk");
+> +		return PTR_ERR(sclks->tcu_clk);
+> +	}
+> +
+> +	sclks->tbu_clk = devm_clk_get(dev, "tbu_clk");
+> +	if (IS_ERR(sclks->tbu_clk)) {
+> +		err = PTR_ERR(sclks->tbu_clk);
+> +		/* Ignore all, ecept -EPROBE_DEFER for optional clocks */
+> +		if (err == -EPROBE_DEFER)
+> +			return err;
+> +		else
+> +			sclks->tbu_clk = NULL;
+> +	}
+> +
+> +	smmu->smmu_clks.clks = sclks;
+> +	return 0;
+> +}
+> +
+>  static void parse_driver_options(struct arm_smmu_device *smmu)
+>  {
+>  	int i = 0;
+> @@ -1981,7 +2073,8 @@ struct arm_smmu_match_data {
+>  		    NULL, NULL, NULL);
+>  ARM_SMMU_MATCH_DATA(arm_mmu401, ARM_SMMU_V1_64K, GENERIC_SMMU,
+>  		    NULL, NULL, NULL);
+> -ARM_SMMU_MATCH_DATA(arm_mmu500, ARM_SMMU_V2, ARM_MMU500, NULL, NULL, NULL);
+> +ARM_SMMU_MATCH_DATA(arm_mmu500, ARM_SMMU_V2, ARM_MMU500, mmu500_init_clocks,
+> +		    mmu500_enable_clocks, mmu500_disable_clocks);
+>  ARM_SMMU_MATCH_DATA(cavium_smmuv2, ARM_SMMU_V2, CAVIUM_SMMUV2,
+>  		    NULL, NULL, NULL);
+>  
+> -- 
+> QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
 > 
-
-Reviewed-by: Eric Auger <eric.auger@redhat.com>
-
-
-Eric
