@@ -1,805 +1,1390 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Thu, 16 Mar 2017 09:28:43 +0800
-Subject: [PATCH v2] ARM: dts: imx: add Gateworks Ventana GW5904 support
-In-Reply-To: <1489590834-20424-1-git-send-email-tharvey@gateworks.com>
-References: <1489178411-6559-1-git-send-email-tharvey@gateworks.com>
- <1489590834-20424-1-git-send-email-tharvey@gateworks.com>
-Message-ID: <20170316012839.GS3618@dragon>
+From: cl@rock-chips.com (cl at rock-chips.com)
+Date: Thu, 16 Mar 2017 09:44:33 +0800
+Subject: [PATCH v1 5/7] arm64: dts: rockchip: add core dtsi file for RK3328
+ SoCs
+In-Reply-To: <1489572237-6649-1-git-send-email-cl@rock-chips.com>
+References: <1489572237-6649-1-git-send-email-cl@rock-chips.com>
+Message-ID: <1489628673-31122-1-git-send-email-cl@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 15, 2017 at 08:13:54AM -0700, Tim Harvey wrote:
-> The Gateworks Ventana GW5904 is a single-board computer based on the NXP
-> IMX6 SoC with the following features:
->  * IMX6 DualLite Soc (supports IMX6S,IMX6DL,IMX6Q)
->  * 2048MB DDR3 DRAM (4x64bit) (options up to 4GiB)
->  * 8GB eMMC
->  * Gateworks System Controller:
->   - hardware watchdog
->   - hardware monitor
->   - pushbutton controller
->   - EEPROM storage
->   - power control
->  * JTAG programmable
->  * 1x miniPCIe socket (with PCIe, USB)
->  * 1x miniPCIe socket (USB)
->  * 1x M.2 socket (USB, 2x SIM)
->  * Inertial Module (LSM9DS1 9DOF: 3x acc, 3x rate, 3x mag)
->  * GPS (optional uBlox EVA-M8M)
->  * Application headers:
->   - 2x RS232 UART (TX/RX/CTS/RTS)
->   - 8x TTL GPIO (3x configurable as PWM)
->   - 1x LVDS display 3D+C with i2c touch and PWM backlight
->  * MV88E6176 GbE Switch (uplink to IMX FEC)
->  * Front panel connectors:
->   - 1x user programmable LED
->   - 1x configurable user pushbutton
->   - 1x USB OTG
->   - 4x GbE LAN
-> 
-> Signed-off-by: Tim Harvey <tharvey@gateworks.com>
-> ---
-> v2:
->  - updated switch to latest dsa bindings
->  - update to GPL/X11 dual license
->  - use stdout-path instead of bootargs
->  - sort devices under i2c by address
->  - fix node/label name on touchscreen node
->  - removed unnecessary status okay for pps node
->  - removed unnecessary container node in iomuxc
->  - replaced deprecated fsl,uart-has-rtscts with uart-has-rtscts
-> ---
->  arch/arm/boot/dts/Makefile            |   2 +
->  arch/arm/boot/dts/imx6dl-gw5904.dts   |  19 +
->  arch/arm/boot/dts/imx6q-gw5904.dts    |  23 ++
->  arch/arm/boot/dts/imx6qdl-gw5904.dtsi | 641 ++++++++++++++++++++++++++++++++++
->  4 files changed, 685 insertions(+)
->  create mode 100644 arch/arm/boot/dts/imx6dl-gw5904.dts
->  create mode 100644 arch/arm/boot/dts/imx6q-gw5904.dts
->  create mode 100644 arch/arm/boot/dts/imx6qdl-gw5904.dtsi
-> 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index ccecd79..7843b65 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -352,6 +352,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
->  	imx6dl-gw551x.dtb \
->  	imx6dl-gw552x.dtb \
->  	imx6dl-gw553x.dtb \
-> +	imx6dl-gw5904.dtb \
->  	imx6dl-hummingboard.dtb \
->  	imx6dl-icore.dtb \
->  	imx6dl-icore-rqs.dtb \
-> @@ -395,6 +396,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
->  	imx6q-gw551x.dtb \
->  	imx6q-gw552x.dtb \
->  	imx6q-gw553x.dtb \
-> +	imx6q-gw5904.dtb \
->  	imx6q-h100.dtb \
->  	imx6q-hummingboard.dtb \
->  	imx6q-icore.dtb \
-> diff --git a/arch/arm/boot/dts/imx6dl-gw5904.dts b/arch/arm/boot/dts/imx6dl-gw5904.dts
-> new file mode 100644
-> index 0000000..2318a55
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/imx6dl-gw5904.dts
-> @@ -0,0 +1,19 @@
-> +/*
-> + * Copyright 2017 Gateworks Corporation
-> + *
-> + * The code contained herein is licensed under the GNU General Public
-> + * License. You may obtain a copy of the GNU General Public License
-> + * Version 2 or later at the following locations:
-> + *
-> + * http://www.opensource.org/licenses/gpl-license.html
-> + * http://www.gnu.org/copyleft/gpl.html
-> + */
-> +
-> +/dts-v1/;
-> +#include "imx6dl.dtsi"
-> +#include "imx6qdl-gw5904.dtsi"
-> +
-> +/ {
-> +	model = "Gateworks Ventana i.MX6 DualLite/Solo GW5904";
-> +	compatible = "gw,imx6dl-gw5904", "gw,ventana", "fsl,imx6dl";
-> +};
-> diff --git a/arch/arm/boot/dts/imx6q-gw5904.dts b/arch/arm/boot/dts/imx6q-gw5904.dts
-> new file mode 100644
-> index 0000000..357dd7e
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/imx6q-gw5904.dts
-> @@ -0,0 +1,23 @@
-> +/*
-> + * Copyright 2017 Gateworks Corporation
-> + *
-> + * The code contained herein is licensed under the GNU General Public
-> + * License. You may obtain a copy of the GNU General Public License
-> + * Version 2 or later at the following locations:
-> + *
-> + * http://www.opensource.org/licenses/gpl-license.html
-> + * http://www.gnu.org/copyleft/gpl.html
-> + */
+From: Chen Liang <cl@rock-chips.com>
 
-You want to use the same licence as imx6qdl-gw5904.dtsi for above two
-files, don't you?
+This patch adds core dtsi file for Rockchip RK3328 SoCs.
 
-> +
-> +/dts-v1/;
-> +#include "imx6q.dtsi"
-> +#include "imx6qdl-gw5904.dtsi"
-> +
-> +/ {
-> +	model = "Gateworks Ventana i.MX6 Dual/Quad GW5904";
-> +	compatible = "gw,imx6q-gw5904", "gw,ventana", "fsl,imx6q";
-> +};
-> +
-> +&sata {
-> +	status = "okay";
-> +};
-> diff --git a/arch/arm/boot/dts/imx6qdl-gw5904.dtsi b/arch/arm/boot/dts/imx6qdl-gw5904.dtsi
-> new file mode 100644
-> index 0000000..ed1fa97
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/imx6qdl-gw5904.dtsi
-> @@ -0,0 +1,641 @@
-> +/*
-> + * Copyright 2017 Gateworks Corporation
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of
-> + *     the License, or (at your option) any later version.
-> + *
-> + *     This file is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + *     You should have received a copy of the GNU General Public
-> + *     License along with this file; if not, write to the Free
-> + *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
-> + *     MA 02110-1301 USA
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
-> +
-> +#include <dt-bindings/gpio/gpio.h>
-> +
-> +/ {
-> +	/* these are used by bootloader for disabling nodes */
-> +	aliases {
-> +		led0 = &led0;
-> +		led1 = &led1;
-> +		led2 = &led2;
-> +		usb0 = &usbh1;
-> +		usb1 = &usbotg;
-> +	};
-> +
-> +	chosen {
-> +		stdout-path = &uart2;
-> +	};
-> +
-> +	backlight {
-> +		compatible = "pwm-backlight";
-> +		pwms = <&pwm4 0 5000000>;
-> +		brightness-levels = <0 4 8 16 32 64 128 255>;
-> +		default-brightness-level = <7>;
-> +	};
-> +
-> +	leds {
-> +		compatible = "gpio-leds";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&pinctrl_gpio_leds>;
-> +
-> +		led0: user1 {
-> +			label = "user1";
-> +			gpios = <&gpio4 6 GPIO_ACTIVE_HIGH>; /* MX6_PANLEDG */
-> +			default-state = "on";
-> +			linux,default-trigger = "heartbeat";
-> +		};
-> +
-> +		led1: user2 {
-> +			label = "user2";
-> +			gpios = <&gpio4 7 GPIO_ACTIVE_HIGH>; /* MX6_PANLEDR */
-> +			default-state = "off";
-> +		};
-> +
-> +		led2: user3 {
-> +			label = "user3";
-> +			gpios = <&gpio4 15 GPIO_ACTIVE_LOW>; /* MX6_LOCLED# */
-> +			default-state = "off";
-> +		};
-> +	};
-> +
-> +	memory {
-> +		reg = <0x10000000 0x40000000>;
-> +	};
-> +
-> +	pps {
-> +		compatible = "pps-gpio";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&pinctrl_pps>;
-> +		gpios = <&gpio1 26 GPIO_ACTIVE_HIGH>;
-> +	};
-> +
-> +	reg_1p0v: regulator-1p0v {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "1P0V";
-> +		regulator-min-microvolt = <1000000>;
-> +		regulator-max-microvolt = <1000000>;
-> +		regulator-always-on;
-> +	};
-> +
-> +	reg_3p3v: regulator-3p3v {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "3P3V";
-> +		regulator-min-microvolt = <3300000>;
-> +		regulator-max-microvolt = <3300000>;
-> +		regulator-always-on;
-> +	};
-> +
-> +	reg_usb_h1_vbus: regulator-usb-h1-vbus {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "usb_h1_vbus";
-> +		regulator-min-microvolt = <5000000>;
-> +		regulator-max-microvolt = <5000000>;
-> +		regulator-always-on;
-> +	};
-> +
-> +	reg_usb_otg_vbus: regulator-usb-otg-vbus {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "usb_otg_vbus";
-> +		regulator-min-microvolt = <5000000>;
-> +		regulator-max-microvolt = <5000000>;
-> +		gpio = <&gpio3 22 GPIO_ACTIVE_HIGH>;
-> +		enable-active-high;
-> +	};
-> +};
-> +
-> +&clks {
-> +	assigned-clocks = <&clks IMX6QDL_CLK_LDB_DI0_SEL>,
-> +			  <&clks IMX6QDL_CLK_LDB_DI1_SEL>;
-> +	assigned-clock-parents = <&clks IMX6QDL_CLK_PLL3_USB_OTG>,
-> +				 <&clks IMX6QDL_CLK_PLL3_USB_OTG>;
-> +};
-> +
-> +&fec {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_enet>;
-> +	phy-mode = "rgmii-id";
-> +	status = "okay";
-> +
-> +	fixed-link {
-> +		speed = <1000>;
-> +		full-duplex;
-> +	};
-> +
-> +	mdio {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		switch0 at 0 {
+Signed-off-by: Chen Liang <cl@rock-chips.com>
+---
+ arch/arm64/boot/dts/rockchip/rk3328.dtsi | 1362 ++++++++++++++++++++++++++++++
+ 1 file changed, 1362 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/rockchip/rk3328.dtsi
 
-switch at 0
-
-> +			compatible = "marvell,mv88e6085";
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +			reg = <0>;
-> +
-> +			ports {
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +
-> +				port at 0 {
-> +					reg = <0>;
-> +					label = "lan4";
-> +				};
-> +
-> +				port at 1 {
-> +					reg = <1>;
-> +					label = "lan3";
-> +				};
-> +
-> +				port at 2 {
-> +					reg = <2>;
-> +					label = "lan2";
-> +				};
-> +
-> +				port at 3 {
-> +					reg = <3>;
-> +					label = "lan1";
-> +				};
-> +
-> +				port at 5 {
-> +					reg = <5>;
-> +					label = "cpu";
-> +					ethernet = <&fec>;
-> +				};
-> +			};
-> +		};
-> +	};
-> +};
-> +
-> +&i2c1 {
-> +	clock-frequency = <100000>;
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_i2c1>;
-> +	status = "okay";
-> +
-> +	gpio: pca9555 at 23 {
-
-Node name should be generic while label can be specific.  That said,
-switching the names between node and label looks better:
-
-	pca9555: gpio at 23 {
-
-> +		compatible = "nxp,pca9555";
-> +		reg = <0x23>;
-> +		gpio-controller;
-> +		#gpio-cells = <2>;
-> +	};
-> +
-> +	eeprom1: eeprom at 50 {
-> +		compatible = "atmel,24c02";
-> +		reg = <0x50>;
-> +		pagesize = <16>;
-> +	};
-> +
-> +	eeprom2: eeprom at 51 {
-> +		compatible = "atmel,24c02";
-> +		reg = <0x51>;
-> +		pagesize = <16>;
-> +	};
-> +
-> +	eeprom3: eeprom at 52 {
-> +		compatible = "atmel,24c02";
-> +		reg = <0x52>;
-> +		pagesize = <16>;
-> +	};
-> +
-> +	eeprom4: eeprom at 53 {
-> +		compatible = "atmel,24c02";
-> +		reg = <0x53>;
-> +		pagesize = <16>;
-> +	};
-> +
-> +	rtc: ds1672 at 68 {
-
-	ds1672: rtc at 68 {
-
-> +		compatible = "dallas,ds1672";
-> +		reg = <0x68>;
-> +	};
-> +};
-> +
-> +&i2c2 {
-> +	clock-frequency = <100000>;
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_i2c2>;
-> +	status = "okay";
-> +
-> +	ltc3676: pmic at 3c {
-> +		compatible = "lltc,ltc3676";
-> +		reg = <0x3c>;
-> +		interrupt-parent = <&gpio1>;
-> +		interrupts = <8 IRQ_TYPE_EDGE_FALLING>;
-> +
-> +		regulators {
-> +			/* VDD_SOC (1+R1/R2 = 1.635) */
-> +			reg_vdd_soc: sw1 {
-> +				regulator-name = "vddsoc";
-> +				regulator-min-microvolt = <674400>;
-> +				regulator-max-microvolt = <1308000>;
-> +				lltc,fb-voltage-divider = <127000 200000>;
-> +				regulator-ramp-delay = <7000>;
-> +				regulator-boot-on;
-> +				regulator-always-on;
-> +			};
-> +
-> +			/* VDD_1P8 (1+R1/R2 = 2.505): GbE switch */
-> +			reg_1p8v: sw2 {
-> +				regulator-name = "vdd1p8";
-> +				regulator-min-microvolt = <1033310>;
-> +				regulator-max-microvolt = <2004000>;
-> +				lltc,fb-voltage-divider = <301000 200000>;
-> +				regulator-ramp-delay = <7000>;
-> +				regulator-boot-on;
-> +				regulator-always-on;
-> +			};
-> +
-> +			/* VDD_ARM (1+R1/R2 = 1.635) */
-> +			reg_vdd_arm: sw3 {
-> +				regulator-name = "vddarm";
-> +				regulator-min-microvolt = <674400>;
-> +				regulator-max-microvolt = <1308000>;
-> +				lltc,fb-voltage-divider = <127000 200000>;
-> +				regulator-ramp-delay = <7000>;
-> +				regulator-boot-on;
-> +				regulator-always-on;
-> +			};
-> +
-> +			/* VDD_DDR (1+R1/R2 = 2.105) */
-> +			reg_vdd_ddr: sw4 {
-> +				regulator-name = "vddddr";
-> +				regulator-min-microvolt = <868310>;
-> +				regulator-max-microvolt = <1684000>;
-> +				lltc,fb-voltage-divider = <221000 200000>;
-> +				regulator-ramp-delay = <7000>;
-> +				regulator-boot-on;
-> +				regulator-always-on;
-> +			};
-> +
-> +			/* VDD_2P5 (1+R1/R2 = 3.435): PCIe/ENET-PHY */
-> +			reg_2p5v: ldo2 {
-> +				regulator-name = "vdd2p5";
-> +				regulator-min-microvolt = <2490375>;
-> +				regulator-max-microvolt = <2490375>;
-> +				lltc,fb-voltage-divider = <487000 200000>;
-> +				regulator-boot-on;
-> +				regulator-always-on;
-> +			};
-> +
-> +			/* VDD_HIGH (1+R1/R2 = 4.17) */
-> +			reg_3p0v: ldo4 {
-> +				regulator-name = "vdd3p0";
-> +				regulator-min-microvolt = <3023250>;
-> +				regulator-max-microvolt = <3023250>;
-> +				lltc,fb-voltage-divider = <634000 200000>;
-> +				regulator-boot-on;
-> +				regulator-always-on;
-> +			};
-> +		};
-> +	};
-> +};
-> +
-> +&i2c3 {
-> +	clock-frequency = <100000>;
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_i2c3>;
-> +	status = "okay";
-> +
-> +	egalax_ts: touchscreen at 04 {
-
-Drop the leading zeros in unit-address.
-
-Shawn
-
-> +		compatible = "eeti,egalax_ts";
-> +		reg = <0x04>;
-> +		interrupt-parent = <&gpio1>;
-> +		interrupts = <11 IRQ_TYPE_EDGE_FALLING>;
-> +		wakeup-gpios = <&gpio1 11 GPIO_ACTIVE_LOW>;
-> +	};
-> +};
-> +
-> +&ldb {
-> +	status = "okay";
-> +
-> +	lvds-channel at 0 {
-> +		fsl,data-mapping = "spwg";
-> +		fsl,data-width = <18>;
-> +		status = "okay";
-> +
-> +		display-timings {
-> +			native-mode = <&timing0>;
-> +			timing0: hsd100pxn1 {
-> +				clock-frequency = <65000000>;
-> +				hactive = <1024>;
-> +				vactive = <768>;
-> +				hback-porch = <220>;
-> +				hfront-porch = <40>;
-> +				vback-porch = <21>;
-> +				vfront-porch = <7>;
-> +				hsync-len = <60>;
-> +				vsync-len = <10>;
-> +			};
-> +		};
-> +	};
-> +};
-> +
-> +&pcie {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_pcie>;
-> +	reset-gpio = <&gpio1 0 GPIO_ACTIVE_LOW>;
-> +	status = "okay";
-> +};
-> +
-> +&pwm2 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_pwm2>; /* MX6_DIO1 */
-> +	status = "disabled";
-> +};
-> +
-> +&pwm3 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_pwm3>; /* MX6_DIO2 */
-> +	status = "disabled";
-> +};
-> +
-> +&pwm4 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_pwm4>;
-> +	status = "okay";
-> +};
-> +
-> +&uart1 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_uart1>;
-> +	status = "okay";
-> +};
-> +
-> +&uart2 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_uart2>;
-> +	status = "okay";
-> +};
-> +
-> +&uart3 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_uart3>;
-> +	uart-has-rtscts;
-> +	status = "okay";
-> +};
-> +
-> +&uart4 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_uart4>;
-> +	uart-has-rtscts;
-> +	status = "okay";
-> +};
-> +
-> +&uart5 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_uart5>;
-> +	status = "okay";
-> +};
-> +
-> +&usbotg {
-> +	vbus-supply = <&reg_usb_otg_vbus>;
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_usbotg>;
-> +	disable-over-current;
-> +	status = "okay";
-> +};
-> +
-> +&usbh1 {
-> +	vbus-supply = <&reg_usb_h1_vbus>;
-> +	status = "okay";
-> +};
-> +
-> +&usdhc3 {
-> +	pinctrl-names = "default", "state_100mhz", "state_200mhz";
-> +	pinctrl-0 = <&pinctrl_usdhc3>;
-> +	pinctrl-1 = <&pinctrl_usdhc3_100mhz>;
-> +	pinctrl-2 = <&pinctrl_usdhc3_200mhz>;
-> +	non-removable;
-> +	vmmc-supply = <&reg_3p3v>;
-> +	keep-power-in-suspend;
-> +	status = "okay";
-> +};
-> +
-> +&wdog1 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_wdog>;
-> +	fsl,ext-reset-output;
-> +};
-> +
-> +&iomuxc {
-> +	pinctrl_enet: enetgrp {
-> +		fsl,pins = <
-> +			MX6QDL_PAD_RGMII_RXC__RGMII_RXC		0x1b030
-> +			MX6QDL_PAD_RGMII_RD0__RGMII_RD0		0x1b030
-> +			MX6QDL_PAD_RGMII_RD1__RGMII_RD1		0x1b030
-> +			MX6QDL_PAD_RGMII_RD2__RGMII_RD2		0x1b030
-> +			MX6QDL_PAD_RGMII_RD3__RGMII_RD3		0x1b030
-> +			MX6QDL_PAD_RGMII_RX_CTL__RGMII_RX_CTL	0x1b030
-> +			MX6QDL_PAD_RGMII_TXC__RGMII_TXC		0x1b030
-> +			MX6QDL_PAD_RGMII_TD0__RGMII_TD0		0x1b030
-> +			MX6QDL_PAD_RGMII_TD1__RGMII_TD1		0x1b030
-> +			MX6QDL_PAD_RGMII_TD2__RGMII_TD2		0x1b030
-> +			MX6QDL_PAD_RGMII_TD3__RGMII_TD3		0x1b030
-> +			MX6QDL_PAD_RGMII_TX_CTL__RGMII_TX_CTL	0x1b030
-> +			MX6QDL_PAD_ENET_REF_CLK__ENET_TX_CLK	0x1b0b0
-> +			MX6QDL_PAD_ENET_MDIO__ENET_MDIO		0x1b0b0
-> +			MX6QDL_PAD_ENET_MDC__ENET_MDC		0x1b0b0
-> +			MX6QDL_PAD_GPIO_16__ENET_REF_CLK	0x4001b0a8
-> +			MX6QDL_PAD_ENET_TXD0__GPIO1_IO30	0x4001b0b0 /* PHY_RST# */
-> +		>;
-> +	};
-> +
-> +	pinctrl_gpio_leds: gpioledsgrp {
-> +		fsl,pins = <
-> +			MX6QDL_PAD_KEY_COL0__GPIO4_IO06		0x1b0b0
-> +			MX6QDL_PAD_KEY_ROW0__GPIO4_IO07		0x1b0b0
-> +			MX6QDL_PAD_KEY_ROW4__GPIO4_IO15		0x1b0b0
-> +		>;
-> +	};
-> +
-> +	pinctrl_i2c1: i2c1grp {
-> +		fsl,pins = <
-> +			MX6QDL_PAD_EIM_D21__I2C1_SCL		0x4001b8b1
-> +			MX6QDL_PAD_EIM_D28__I2C1_SDA		0x4001b8b1
-> +		>;
-> +	};
-> +
-> +	pinctrl_i2c2: i2c2grp {
-> +		fsl,pins = <
-> +			MX6QDL_PAD_KEY_COL3__I2C2_SCL		0x4001b8b1
-> +			MX6QDL_PAD_KEY_ROW3__I2C2_SDA		0x4001b8b1
-> +		>;
-> +	};
-> +
-> +	pinctrl_i2c3: i2c3grp {
-> +		fsl,pins = <
-> +			MX6QDL_PAD_GPIO_3__I2C3_SCL		0x4001b8b1
-> +			MX6QDL_PAD_GPIO_6__I2C3_SDA		0x4001b8b1
-> +		>;
-> +	};
-> +
-> +	pinctrl_pcie: pciegrp {
-> +		fsl,pins = <
-> +			MX6QDL_PAD_GPIO_0__GPIO1_IO00	0x1b0b0 /* PCIE RST */
-> +		>;
-> +	};
-> +
-> +	pinctrl_pmic: pmicgrp {
-> +		fsl,pins = <
-> +			MX6QDL_PAD_GPIO_8__GPIO1_IO08	0x1b0b0 /* PMIC_IRQ# */
-> +		>;
-> +	};
-> +
-> +	pinctrl_pps: ppsgrp {
-> +		fsl,pins = <
-> +			MX6QDL_PAD_ENET_RXD1__GPIO1_IO26	0x1b0b1
-> +		>;
-> +	};
-> +
-> +	pinctrl_pwm2: pwm2grp {
-> +		fsl,pins = <
-> +			MX6QDL_PAD_SD1_DAT2__PWM2_OUT		0x1b0b1
-> +		>;
-> +	};
-> +
-> +	pinctrl_pwm3: pwm3grp {
-> +		fsl,pins = <
-> +			MX6QDL_PAD_SD1_DAT1__PWM3_OUT		0x1b0b1
-> +		>;
-> +	};
-> +
-> +	pinctrl_pwm4: pwm4grp {
-> +		fsl,pins = <
-> +			MX6QDL_PAD_SD1_CMD__PWM4_OUT		0x1b0b1
-> +		>;
-> +	};
-> +
-> +	pinctrl_uart1: uart1grp {
-> +		fsl,pins = <
-> +			MX6QDL_PAD_CSI0_DAT10__UART1_TX_DATA	0x1b0b1
-> +			MX6QDL_PAD_CSI0_DAT11__UART1_RX_DATA	0x1b0b1
-> +		>;
-> +	};
-> +
-> +	pinctrl_uart2: uart2grp {
-> +		fsl,pins = <
-> +			MX6QDL_PAD_SD4_DAT7__UART2_TX_DATA	0x1b0b1
-> +			MX6QDL_PAD_SD4_DAT4__UART2_RX_DATA	0x1b0b1
-> +		>;
-> +	};
-> +
-> +	pinctrl_uart3: uart3grp {
-> +		fsl,pins = <
-> +			MX6QDL_PAD_EIM_D23__UART3_CTS_B         0x1b0b1
-> +			MX6QDL_PAD_EIM_D24__UART3_TX_DATA       0x1b0b1
-> +			MX6QDL_PAD_EIM_D25__UART3_RX_DATA       0x1b0b1
-> +			MX6QDL_PAD_EIM_D31__UART3_RTS_B         0x1b0b1
-> +		>;
-> +	};
-> +
-> +	pinctrl_uart4: uart4grp {
-> +		fsl,pins = <
-> +			MX6QDL_PAD_CSI0_DAT12__UART4_TX_DATA    0x1b0b1
-> +			MX6QDL_PAD_CSI0_DAT13__UART4_RX_DATA    0x1b0b1
-> +			MX6QDL_PAD_CSI0_DAT16__UART4_RTS_B      0x1b0b1
-> +			MX6QDL_PAD_CSI0_DAT17__UART4_CTS_B      0x1b0b1
-> +		>;
-> +	};
-> +
-> +	pinctrl_uart5: uart5grp {
-> +		fsl,pins = <
-> +			MX6QDL_PAD_KEY_COL1__UART5_TX_DATA	0x1b0b1
-> +			MX6QDL_PAD_KEY_ROW1__UART5_RX_DATA	0x1b0b1
-> +		>;
-> +	};
-> +
-> +	pinctrl_usbotg: usbotggrp {
-> +		fsl,pins = <
-> +			MX6QDL_PAD_GPIO_1__USB_OTG_ID		0x17059
-> +			MX6QDL_PAD_EIM_D22__GPIO3_IO22		0x1b0b0 /* PWR_EN */
-> +			MX6QDL_PAD_KEY_COL4__GPIO4_IO14		0x1b0b0 /* OC */
-> +		>;
-> +	};
-> +
-> +	pinctrl_usdhc3: usdhc3grp {
-> +		fsl,pins = <
-> +			MX6QDL_PAD_SD3_CMD__SD3_CMD		0x17059
-> +			MX6QDL_PAD_SD3_CLK__SD3_CLK		0x10059
-> +			MX6QDL_PAD_SD3_RST__SD3_RESET		0x10059
-> +			MX6QDL_PAD_SD3_DAT0__SD3_DATA0		0x17059
-> +			MX6QDL_PAD_SD3_DAT1__SD3_DATA1		0x17059
-> +			MX6QDL_PAD_SD3_DAT2__SD3_DATA2		0x17059
-> +			MX6QDL_PAD_SD3_DAT3__SD3_DATA3		0x17059
-> +			MX6QDL_PAD_SD3_DAT4__SD3_DATA4		0x17059
-> +			MX6QDL_PAD_SD3_DAT5__SD3_DATA5		0x17059
-> +			MX6QDL_PAD_SD3_DAT6__SD3_DATA6		0x17059
-> +			MX6QDL_PAD_SD3_DAT7__SD3_DATA7		0x17059
-> +		>;
-> +	};
-> +
-> +	pinctrl_usdhc3_100mhz: usdhc3grp100mhz {
-> +		fsl,pins = <
-> +			MX6QDL_PAD_SD3_CMD__SD3_CMD		0x170b9
-> +			MX6QDL_PAD_SD3_CLK__SD3_CLK		0x100b9
-> +			MX6QDL_PAD_SD3_RST__SD3_RESET		0x100b9
-> +			MX6QDL_PAD_SD3_DAT0__SD3_DATA0		0x170b9
-> +			MX6QDL_PAD_SD3_DAT1__SD3_DATA1		0x170b9
-> +			MX6QDL_PAD_SD3_DAT2__SD3_DATA2		0x170b9
-> +			MX6QDL_PAD_SD3_DAT3__SD3_DATA3		0x170b9
-> +			MX6QDL_PAD_SD3_DAT4__SD3_DATA4		0x170b9
-> +			MX6QDL_PAD_SD3_DAT5__SD3_DATA5		0x170b9
-> +			MX6QDL_PAD_SD3_DAT6__SD3_DATA6		0x170b9
-> +			MX6QDL_PAD_SD3_DAT7__SD3_DATA7		0x170b9
-> +		>;
-> +	};
-> +
-> +	pinctrl_usdhc3_200mhz: usdhc3grp200mhz {
-> +		fsl,pins = <
-> +			MX6QDL_PAD_SD3_CMD__SD3_CMD		0x170f9
-> +			MX6QDL_PAD_SD3_CLK__SD3_CLK		0x100f9
-> +			MX6QDL_PAD_SD3_RST__SD3_RESET		0x100f9
-> +			MX6QDL_PAD_SD3_DAT0__SD3_DATA0		0x170f9
-> +			MX6QDL_PAD_SD3_DAT1__SD3_DATA1		0x170f9
-> +			MX6QDL_PAD_SD3_DAT2__SD3_DATA2		0x170f9
-> +			MX6QDL_PAD_SD3_DAT3__SD3_DATA3		0x170f9
-> +			MX6QDL_PAD_SD3_DAT4__SD3_DATA4		0x170f9
-> +			MX6QDL_PAD_SD3_DAT5__SD3_DATA5		0x170f9
-> +			MX6QDL_PAD_SD3_DAT6__SD3_DATA6		0x170f9
-> +			MX6QDL_PAD_SD3_DAT7__SD3_DATA7		0x170f9
-> +		>;
-> +	};
-> +
-> +	pinctrl_wdog: wdoggrp {
-> +		fsl,pins = <
-> +			MX6QDL_PAD_DISP0_DAT8__WDOG1_B		0x1b0b0
-> +		>;
-> +	};
-> +};
-> -- 
-> 2.7.4
-> 
+diff --git a/arch/arm64/boot/dts/rockchip/rk3328.dtsi b/arch/arm64/boot/dts/rockchip/rk3328.dtsi
+new file mode 100644
+index 0000000..ff53af9
+--- /dev/null
++++ b/arch/arm64/boot/dts/rockchip/rk3328.dtsi
+@@ -0,0 +1,1362 @@
++/*
++ * Copyright (c) 2017 Fuzhou Rockchip Electronics Co., Ltd
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This library is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This library is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++#include <dt-bindings/clock/rk3328-cru.h>
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/interrupt-controller/arm-gic.h>
++#include <dt-bindings/interrupt-controller/irq.h>
++#include <dt-bindings/pinctrl/rockchip.h>
++#include <dt-bindings/soc/rockchip,boot-mode.h>
++#include <dt-bindings/power/rk3328-power.h>
++
++/ {
++	compatible = "rockchip,rk3328";
++
++	interrupt-parent = <&gic>;
++	#address-cells = <2>;
++	#size-cells = <2>;
++
++	aliases {
++		serial0 = &uart0;
++		serial1 = &uart1;
++		serial2 = &uart2;
++		i2c0 = &i2c0;
++		i2c1 = &i2c1;
++		i2c2 = &i2c2;
++		i2c3 = &i2c3;
++	};
++
++	cpus {
++		#address-cells = <2>;
++		#size-cells = <0>;
++
++		cpu0: cpu at 0 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a53", "arm,armv8";
++			reg = <0x0 0x0>;
++			enable-method = "psci";
++			clocks = <&cru ARMCLK>;
++		};
++		cpu1: cpu at 1 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a53", "arm,armv8";
++			reg = <0x0 0x1>;
++			enable-method = "psci";
++		};
++		cpu2: cpu at 2 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a53", "arm,armv8";
++			reg = <0x0 0x2>;
++			enable-method = "psci";
++		};
++		cpu3: cpu at 3 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a53", "arm,armv8";
++			reg = <0x0 0x3>;
++			enable-method = "psci";
++		};
++	};
++
++	arm-pmu {
++		compatible = "arm,cortex-a53-pmu";
++		interrupts = <GIC_SPI 100 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 101 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 102 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 103 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-affinity = <&cpu0>, <&cpu1>, <&cpu2>, <&cpu3>;
++	};
++
++	psci {
++		compatible = "arm,psci-1.0";
++		method = "smc";
++	};
++
++	timer {
++		compatible = "arm,armv8-timer";
++		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
++			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
++			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
++			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
++	};
++
++	xin24m: xin24m {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <24000000>;
++		clock-output-names = "xin24m";
++	};
++
++	grf: syscon at ff100000 {
++		compatible = "rockchip,rk3328-grf", "syscon", "simple-mfd";
++		reg = <0x0 0xff100000 0x0 0x1000>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++
++		power: power-controller {
++			compatible = "rockchip,rk3328-power-controller";
++			#power-domain-cells = <1>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			status = "disabled";
++
++			pd_hevc at RK3328_PD_HEVC {
++				reg = <RK3328_PD_HEVC>;
++			};
++			pd_video at RK3328_PD_VIDEO {
++				reg = <RK3328_PD_VIDEO>;
++			};
++			pd_vpu at RK3328_PD_VPU {
++				reg = <RK3328_PD_VPU>;
++			};
++		};
++
++		reboot-mode {
++			compatible = "syscon-reboot-mode";
++			offset = <0x5c8>;
++			mode-normal = <BOOT_NORMAL>;
++			mode-recovery = <BOOT_RECOVERY>;
++			mode-bootloader = <BOOT_FASTBOOT>;
++			mode-loader = <BOOT_BL_DOWNLOAD>;
++		};
++
++	};
++
++	uart0: serial at ff110000 {
++		compatible = "rockchip,rk3328-uart", "snps,dw-apb-uart";
++		reg = <0x0 0xff110000 0x0 0x100>;
++		interrupts = <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&cru SCLK_UART0>, <&cru PCLK_UART0>;
++		clock-names = "baudclk", "apb_pclk";
++		reg-shift = <2>;
++		reg-io-width = <4>;
++		dmas = <&dmac 2>, <&dmac 3>;
++		#dma-cells = <2>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&uart0_xfer &uart0_cts &uart0_rts>;
++		status = "disabled";
++	};
++
++	uart1: serial at ff120000 {
++		compatible = "rockchip,rk3328-uart", "snps,dw-apb-uart";
++		reg = <0x0 0xff120000 0x0 0x100>;
++		interrupts = <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&cru SCLK_UART1>, <&cru PCLK_UART1>;
++		clock-names = "sclk_uart", "pclk_uart";
++		reg-shift = <2>;
++		reg-io-width = <4>;
++		dmas = <&dmac 4>, <&dmac 5>;
++		#dma-cells = <2>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&uart1_xfer &uart1_cts &uart1_rts>;
++		status = "disabled";
++	};
++
++	uart2: serial at ff130000 {
++		compatible = "rockchip,rk3328-uart", "snps,dw-apb-uart";
++		reg = <0x0 0xff130000 0x0 0x100>;
++		interrupts = <GIC_SPI 57 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&cru SCLK_UART2>, <&cru PCLK_UART2>;
++		clock-names = "baudclk", "apb_pclk";
++		reg-shift = <2>;
++		reg-io-width = <4>;
++		dmas = <&dmac 6>, <&dmac 7>;
++		#dma-cells = <2>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&uart2m1_xfer>;
++		status = "disabled";
++	};
++
++	i2c0: i2c at ff150000 {
++		compatible = "rockchip,rk3328-i2c", "rockchip,rk3399-i2c";
++		reg = <0x0 0xff150000 0x0 0x1000>;
++		interrupts = <GIC_SPI 36 IRQ_TYPE_LEVEL_HIGH>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		clocks = <&cru SCLK_I2C0>, <&cru PCLK_I2C0>;
++		clock-names = "i2c", "pclk";
++		pinctrl-names = "default";
++		pinctrl-0 = <&i2c0_xfer>;
++		status = "disabled";
++	};
++
++	i2c1: i2c at ff160000 {
++		compatible = "rockchip,rk3328-i2c", "rockchip,rk3399-i2c";
++		reg = <0x0 0xff160000 0x0 0x1000>;
++		interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		clocks = <&cru SCLK_I2C1>, <&cru PCLK_I2C1>;
++		clock-names = "i2c", "pclk";
++		pinctrl-names = "default";
++		pinctrl-0 = <&i2c1_xfer>;
++		status = "disabled";
++	};
++
++	i2c2: i2c at ff170000 {
++		compatible = "rockchip,rk3328-i2c", "rockchip,rk3399-i2c";
++		reg = <0x0 0xff170000 0x0 0x1000>;
++		interrupts = <GIC_SPI 38 IRQ_TYPE_LEVEL_HIGH>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		clocks = <&cru SCLK_I2C2>, <&cru PCLK_I2C2>;
++		clock-names = "i2c", "pclk";
++		pinctrl-names = "default";
++		pinctrl-0 = <&i2c2_xfer>;
++		status = "disabled";
++	};
++
++	i2c3: i2c at ff180000 {
++		compatible = "rockchip,rk3328-i2c", "rockchip,rk3399-i2c";
++		reg = <0x0 0xff180000 0x0 0x1000>;
++		interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		clocks = <&cru SCLK_I2C3>, <&cru PCLK_I2C3>;
++		clock-names = "i2c", "pclk";
++		pinctrl-names = "default";
++		pinctrl-0 = <&i2c3_xfer>;
++		status = "disabled";
++	};
++
++	spi0: spi at ff190000 {
++		compatible = "rockchip,rk3328-spi", "rockchip,rk3066-spi";
++		reg = <0x0 0xff190000 0x0 0x1000>;
++		interrupts = <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		clocks = <&cru SCLK_SPI>, <&cru PCLK_SPI>;
++		clock-names = "spiclk", "apb_pclk";
++		dmas = <&dmac 8>, <&dmac 9>;
++		#dma-cells = <2>;
++		dma-names = "tx", "rx";
++		pinctrl-names = "default";
++		pinctrl-0 = <&spi0m2_clk &spi0m2_tx &spi0m2_rx &spi0m2_cs0>;
++		status = "disabled";
++	};
++
++	wdt: watchdog at ff1a0000 {
++		compatible = "snps,dw-wdt";
++		reg = <0x0 0xff1a0000 0x0 0x100>;
++		interrupts = <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>;
++		status = "disabled";
++	};
++
++	amba {
++		compatible = "simple-bus";
++		#address-cells = <2>;
++		#size-cells = <2>;
++		ranges;
++
++		dmac: dmac at ff1f0000 {
++			compatible = "arm,pl330", "arm,primecell";
++			reg = <0x0 0xff1f0000 0x0 0x4000>;
++			interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cru ACLK_DMAC>;
++			clock-names = "apb_pclk";
++			#dma-cells = <1>;
++		};
++	};
++
++	saradc: saradc at ff280000 {
++		compatible = "rockchip,rk3328-saradc", "rockchip,rk3399-saradc";
++		reg = <0x0 0xff280000 0x0 0x100>;
++		interrupts = <GIC_SPI 80 IRQ_TYPE_LEVEL_HIGH>;
++		#io-channel-cells = <1>;
++		clocks = <&cru SCLK_SARADC>, <&cru PCLK_SARADC>;
++		clock-names = "saradc", "apb_pclk";
++		resets = <&cru SRST_SARADC_P>;
++		reset-names = "saradc-apb";
++		status = "disabled";
++	};
++
++	cru: clock-controller at ff440000 {
++		compatible = "rockchip,rk3328-cru", "rockchip,cru", "syscon";
++		reg = <0x0 0xff440000 0x0 0x1000>;
++		rockchip,grf = <&grf>;
++		#clock-cells = <1>;
++		#reset-cells = <1>;
++		assigned-clocks =
++			<&cru DCLK_LCDC>, <&cru SCLK_PDM>,
++			<&cru SCLK_RTC32K>, <&cru SCLK_UART0>,
++			<&cru SCLK_UART1>, <&cru SCLK_UART2>,
++			<&cru ACLK_BUS_PRE>, <&cru ACLK_PERI_PRE>,
++			<&cru ACLK_VIO_PRE>, <&cru ACLK_RGA_PRE>,
++			<&cru ACLK_VOP_PRE>, <&cru ACLK_RKVDEC_PRE>,
++			<&cru ACLK_RKVENC>, <&cru ACLK_VPU_PRE>,
++			<&cru SCLK_VDEC_CABAC>, <&cru SCLK_VDEC_CORE>,
++			<&cru SCLK_VENC_CORE>, <&cru SCLK_VENC_DSP>,
++			<&cru SCLK_SDIO>, <&cru SCLK_TSP>,
++			<&cru SCLK_WIFI>, <&cru ARMCLK>,
++			<&cru PLL_GPLL>, <&cru PLL_CPLL>,
++			<&cru ACLK_BUS_PRE>, <&cru HCLK_BUS_PRE>,
++			<&cru PCLK_BUS_PRE>, <&cru ACLK_PERI_PRE>,
++			<&cru HCLK_PERI>, <&cru PCLK_PERI>,
++			<&cru ACLK_VIO_PRE>, <&cru HCLK_VIO_PRE>,
++			<&cru ACLK_RGA_PRE>, <&cru SCLK_RGA>,
++			<&cru ACLK_VOP_PRE>, <&cru ACLK_RKVDEC_PRE>,
++			<&cru ACLK_RKVENC>, <&cru ACLK_VPU_PRE>,
++			<&cru SCLK_VDEC_CABAC>, <&cru SCLK_VDEC_CORE>,
++			<&cru SCLK_VENC_CORE>, <&cru SCLK_VENC_DSP>,
++			<&cru SCLK_EFUSE>, <&cru PCLK_DDR>,
++			<&cru ACLK_GMAC>, <&cru PCLK_GMAC>,
++			<&cru SCLK_RTC32K>, <&cru SCLK_USB3OTG_SUSPEND>;
++		assigned-clock-parents =
++			<&cru HDMIPHY>, <&cru PLL_APLL>,
++			<&cru PLL_GPLL>, <&xin24m>,
++			<&xin24m>, <&xin24m>;
++		assigned-clock-rates =
++			<0>, <61440000>,
++			<0>, <24000000>,
++			<24000000>, <24000000>,
++			<15000000>, <15000000>,
++			<100000000>, <100000000>,
++			<100000000>, <100000000>,
++			<50000000>, <100000000>,
++			<100000000>, <100000000>,
++			<50000000>, <50000000>,
++			<50000000>, <50000000>,
++			<24000000>, <600000000>,
++			<491520000>, <1200000000>,
++			<150000000>, <75000000>,
++			<75000000>, <150000000>,
++			<75000000>, <75000000>,
++			<300000000>, <100000000>,
++			<300000000>, <200000000>,
++			<400000000>, <500000000>,
++			<200000000>, <300000000>,
++			<300000000>, <250000000>,
++			<200000000>, <100000000>,
++			<24000000>, <100000000>,
++			<150000000>, <50000000>,
++			<32768>, <32768>;
++	};
++
++	gmac2io: eth at ff540000 {
++		compatible = "rockchip,rk3328-gmac";
++		reg = <0x0 0xff540000 0x0 0x10000>;
++		rockchip,grf = <&grf>;
++		interrupts = <GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-names = "macirq";
++		clocks = <&cru SCLK_MAC2IO>, <&cru SCLK_MAC2IO_RX>,
++			 <&cru SCLK_MAC2IO_TX>, <&cru SCLK_MAC2IO_REF>,
++			 <&cru SCLK_MAC2IO_REFOUT>, <&cru ACLK_MAC2IO>,
++			 <&cru PCLK_MAC2IO>;
++		clock-names = "stmmaceth", "mac_clk_rx",
++			      "mac_clk_tx", "clk_mac_ref",
++			      "clk_mac_refout", "aclk_mac",
++			      "pclk_mac";
++		resets = <&cru SRST_GMAC2IO_A>;
++		reset-names = "stmmaceth";
++		status = "disabled";
++	};
++
++	gic: interrupt-controller at ff811000 {
++		compatible = "arm,gic-400";
++		#interrupt-cells = <3>;
++		#address-cells = <0>;
++		interrupt-controller;
++		reg = <0x0 0xff811000 0 0x1000>,
++		      <0x0 0xff812000 0 0x2000>,
++		      <0x0 0xff814000 0 0x2000>,
++		      <0x0 0xff816000 0 0x2000>;
++		interrupts = <GIC_PPI 9
++		      (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
++	};
++
++	pinctrl: pinctrl {
++		compatible = "rockchip,rk3328-pinctrl";
++		rockchip,grf = <&grf>;
++		#address-cells = <2>;
++		#size-cells = <2>;
++		ranges;
++
++		gpio0: gpio0 at ff210000 {
++			compatible = "rockchip,gpio-bank";
++			reg = <0x0 0xff210000 0x0 0x100>;
++			interrupts = <GIC_SPI 51 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cru PCLK_GPIO0>;
++
++			gpio-controller;
++			#gpio-cells = <2>;
++
++			interrupt-controller;
++			#interrupt-cells = <2>;
++		};
++
++		gpio1: gpio1 at ff220000 {
++			compatible = "rockchip,gpio-bank";
++			reg = <0x0 0xff220000 0x0 0x100>;
++			interrupts = <GIC_SPI 52 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cru PCLK_GPIO1>;
++
++			gpio-controller;
++			#gpio-cells = <2>;
++
++			interrupt-controller;
++			#interrupt-cells = <2>;
++		};
++
++		gpio2: gpio2 at ff230000 {
++			compatible = "rockchip,gpio-bank";
++			reg = <0x0 0xff230000 0x0 0x100>;
++			interrupts = <GIC_SPI 53 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cru PCLK_GPIO2>;
++
++			gpio-controller;
++			#gpio-cells = <2>;
++
++			interrupt-controller;
++			#interrupt-cells = <2>;
++		};
++
++		gpio3: gpio3 at ff240000 {
++			compatible = "rockchip,gpio-bank";
++			reg = <0x0 0xff240000 0x0 0x100>;
++			interrupts = <GIC_SPI 54 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cru PCLK_GPIO3>;
++
++			gpio-controller;
++			#gpio-cells = <2>;
++
++			interrupt-controller;
++			#interrupt-cells = <2>;
++		};
++
++		pcfg_pull_up: pcfg-pull-up {
++			bias-pull-up;
++		};
++
++		pcfg_pull_down: pcfg-pull-down {
++			bias-pull-down;
++		};
++
++		pcfg_pull_none: pcfg-pull-none {
++			bias-disable;
++		};
++
++		pcfg_pull_none_2ma: pcfg-pull-none-2ma {
++			bias-disable;
++			drive-strength = <2>;
++		};
++
++		pcfg_pull_up_2ma: pcfg-pull-up-2ma {
++			bias-pull-up;
++			drive-strength = <2>;
++		};
++
++		pcfg_pull_up_4ma: pcfg-pull-up-4ma {
++			bias-pull-up;
++			drive-strength = <4>;
++		};
++
++		pcfg_pull_none_4ma: pcfg-pull-none-4ma {
++			bias-disable;
++			drive-strength = <4>;
++		};
++
++		pcfg_pull_down_4ma: pcfg-pull-down-4ma {
++			bias-pull-down;
++			drive-strength = <4>;
++		};
++
++		pcfg_pull_none_8ma: pcfg-pull-none-8ma {
++			bias-disable;
++			drive-strength = <8>;
++		};
++
++		pcfg_pull_up_8ma: pcfg-pull-up-8ma {
++			bias-pull-up;
++			drive-strength = <8>;
++		};
++
++		pcfg_pull_none_12ma: pcfg-pull-none-12ma {
++			bias-disable;
++			drive-strength = <12>;
++		};
++
++		pcfg_pull_up_12ma: pcfg-pull-up-12ma {
++			bias-pull-up;
++			drive-strength = <12>;
++		};
++
++		pcfg_output_high: pcfg-output-high {
++			output-high;
++		};
++
++		pcfg_output_low: pcfg-output-low {
++			output-low;
++		};
++
++		pcfg_input_high: pcfg-input-high {
++			bias-pull-up;
++			input-enable;
++		};
++
++		pcfg_input: pcfg-input {
++			input-enable;
++		};
++
++		i2c0 {
++			i2c0_xfer: i2c0-xfer {
++				rockchip,pins =
++					<2 RK_PD0 RK_FUNC_1 &pcfg_pull_none>,
++					<2 RK_PD1 RK_FUNC_1 &pcfg_pull_none>;
++			};
++		};
++
++		i2c1 {
++			i2c1_xfer: i2c1-xfer {
++				rockchip,pins =
++					<2 RK_PA4 RK_FUNC_2 &pcfg_pull_none>,
++					<2 RK_PA5 RK_FUNC_2 &pcfg_pull_none>;
++			};
++		};
++
++		i2c2 {
++			i2c2_xfer: i2c2-xfer {
++				rockchip,pins =
++					<2 RK_PB5 RK_FUNC_1 &pcfg_pull_none>,
++					<2 RK_PB6 RK_FUNC_1 &pcfg_pull_none>;
++			};
++		};
++
++		i2c3 {
++			i2c3_xfer: i2c3-xfer {
++				rockchip,pins =
++					<0 RK_PA5 RK_FUNC_2 &pcfg_pull_none>,
++					<0 RK_PA6 RK_FUNC_2 &pcfg_pull_none>;
++			};
++			i2c3_gpio: i2c3-gpio {
++				rockchip,pins =
++					<0 RK_PA5 RK_FUNC_GPIO &pcfg_pull_none>,
++					<0 RK_PA6 RK_FUNC_GPIO &pcfg_pull_none>;
++			};
++		};
++
++		hdmi_i2c {
++			hdmii2c_xfer: hdmii2c-xfer {
++				rockchip,pins =
++					<0 RK_PA5 RK_FUNC_1 &pcfg_pull_none>,
++					<0 RK_PA6 RK_FUNC_1 &pcfg_pull_none>;
++			};
++		};
++
++		tsadc {
++			otp_gpio: otp-gpio {
++				rockchip,pins =
++					<2 RK_PB5 RK_FUNC_GPIO &pcfg_pull_none>;
++			};
++
++			otp_out: otp-out {
++				rockchip,pins =
++					<2 RK_PB5 RK_FUNC_1 &pcfg_pull_none>;
++			};
++		};
++
++		uart0 {
++			uart0_xfer: uart0-xfer {
++				rockchip,pins =
++					<1 RK_PB1 RK_FUNC_1 &pcfg_pull_up>,
++					<1 RK_PB0 RK_FUNC_1 &pcfg_pull_none>;
++			};
++
++			uart0_cts: uart0-cts {
++				rockchip,pins =
++					<1 RK_PB3 RK_FUNC_1 &pcfg_pull_none>;
++			};
++
++			uart0_rts: uart0-rts {
++				rockchip,pins =
++					<1 RK_PB2 RK_FUNC_1 &pcfg_pull_none>;
++			};
++
++			uart0_rts_gpio: uart0-rts-gpio {
++				rockchip,pins =
++					<1 RK_PB2 RK_FUNC_GPIO &pcfg_pull_none>;
++			};
++		};
++
++		uart1 {
++			uart1_xfer: uart1-xfer {
++				rockchip,pins =
++					<3 RK_PA4 RK_FUNC_4 &pcfg_pull_up>,
++					<3 RK_PA6 RK_FUNC_4 &pcfg_pull_none>;
++			};
++
++			uart1_cts: uart1-cts {
++				rockchip,pins =
++					<3 RK_PA7 RK_FUNC_4 &pcfg_pull_none>;
++			};
++
++			uart1_rts: uart1-rts {
++				rockchip,pins =
++					<3 RK_PA5 RK_FUNC_4 &pcfg_pull_none>;
++			};
++
++			uart1_rts_gpio: uart1-rts-gpio {
++				rockchip,pins =
++					<3 RK_PA5 RK_FUNC_GPIO &pcfg_pull_none>;
++			};
++		};
++
++		uart2-0 {
++			uart2m0_xfer: uart2m0-xfer {
++				rockchip,pins =
++					<1 RK_PA0 RK_FUNC_2 &pcfg_pull_up>,
++					<1 RK_PA1 RK_FUNC_2 &pcfg_pull_none>;
++			};
++		};
++
++		uart2-1 {
++			uart2m1_xfer: uart2m1-xfer {
++				rockchip,pins =
++					<2 RK_PA0 RK_FUNC_1 &pcfg_pull_up>,
++					<2 RK_PA1 RK_FUNC_1 &pcfg_pull_none>;
++			};
++		};
++
++		spi0-0 {
++			spi0m0_clk: spi0m0-clk {
++				rockchip,pins =
++					<2 RK_PB0 RK_FUNC_1 &pcfg_pull_up>;
++			};
++
++			spi0m0_cs0: spi0m0-cs0 {
++				rockchip,pins =
++					<2 RK_PB3 RK_FUNC_1 &pcfg_pull_up>;
++			};
++
++			spi0m0_tx: spi0m0-tx {
++				rockchip,pins =
++					<2 RK_PB1 RK_FUNC_1 &pcfg_pull_up>;
++			};
++
++			spi0m0_rx: spi0m0-rx {
++				rockchip,pins =
++					<2 RK_PB2 RK_FUNC_1 &pcfg_pull_up>;
++			};
++
++			spi0m0_cs1: spi0m0-cs1 {
++				rockchip,pins =
++					<2 RK_PB4 RK_FUNC_1 &pcfg_pull_up>;
++			};
++		};
++
++		spi0-1 {
++			spi0m1_clk: spi0m1-clk {
++				rockchip,pins =
++					<3 RK_PC7 RK_FUNC_2 &pcfg_pull_up>;
++			};
++
++			spi0m1_cs0: spi0m1-cs0 {
++				rockchip,pins =
++					<3 RK_PD2 RK_FUNC_2 &pcfg_pull_up>;
++			};
++
++			spi0m1_tx: spi0m1-tx {
++				rockchip,pins =
++					<3 RK_PD1 RK_FUNC_2 &pcfg_pull_up>;
++			};
++
++			spi0m1_rx: spi0m1-rx {
++				rockchip,pins =
++					<3 RK_PD0 RK_FUNC_2 &pcfg_pull_up>;
++			};
++
++			spi0m1_cs1: spi0m1-cs1 {
++				rockchip,pins =
++					<3 RK_PD3 RK_FUNC_2 &pcfg_pull_up>;
++			};
++		};
++
++		spi0-2 {
++			spi0m2_clk: spi0m2-clk {
++				rockchip,pins =
++					<3 RK_PA0 RK_FUNC_4 &pcfg_pull_up>;
++			};
++
++			spi0m2_cs0: spi0m2-cs0 {
++				rockchip,pins =
++					<3 RK_PB0 RK_FUNC_3 &pcfg_pull_up>;
++			};
++
++			spi0m2_tx: spi0m2-tx {
++				rockchip,pins =
++					<3 RK_PA1 RK_FUNC_4 &pcfg_pull_up>;
++			};
++
++			spi0m2_rx: spi0m2-rx {
++				rockchip,pins =
++					<3 RK_PA2 RK_FUNC_4 &pcfg_pull_up>;
++			};
++		};
++
++		i2s1 {
++			i2s1_mclk: i2s1-mclk {
++				rockchip,pins =
++					<2 RK_PB7 RK_FUNC_1 &pcfg_pull_none>;
++			};
++
++			i2s1_sclk: i2s1-sclk {
++				rockchip,pins =
++					<2 RK_PC2 RK_FUNC_1 &pcfg_pull_none>;
++			};
++
++			i2s1_lrckrx: i2s1-lrckrx {
++				rockchip,pins =
++					<2 RK_PC0 RK_FUNC_1 &pcfg_pull_none>;
++			};
++
++			i2s1_lrcktx: i2s1-lrcktx {
++				rockchip,pins =
++					<2 RK_PC1 RK_FUNC_1 &pcfg_pull_none>;
++			};
++
++			i2s1_sdi: i2s1-sdi {
++				rockchip,pins =
++					<2 RK_PC3 RK_FUNC_1 &pcfg_pull_none>;
++			};
++
++			i2s1_sdo: i2s1-sdo {
++				rockchip,pins =
++					<2 RK_PC7 RK_FUNC_1 &pcfg_pull_none>;
++			};
++
++			i2s1_sdio1: i2s1-sdio1 {
++				rockchip,pins =
++					<2 RK_PC4 RK_FUNC_1 &pcfg_pull_none>;
++			};
++
++			i2s1_sdio2: i2s1-sdio2 {
++				rockchip,pins =
++					<2 RK_PC5 RK_FUNC_1 &pcfg_pull_none>;
++			};
++
++			i2s1_sdio3: i2s1-sdio3 {
++				rockchip,pins =
++					<2 RK_PC6 RK_FUNC_1 &pcfg_pull_none>;
++			};
++
++			i2s1_sleep: i2s1-sleep {
++				rockchip,pins =
++					<2 RK_PB7 RK_FUNC_GPIO &pcfg_input_high>,
++					<2 RK_PC0 RK_FUNC_GPIO &pcfg_input_high>,
++					<2 RK_PC1 RK_FUNC_GPIO &pcfg_input_high>,
++					<2 RK_PC2 RK_FUNC_GPIO &pcfg_input_high>,
++					<2 RK_PC3 RK_FUNC_GPIO &pcfg_input_high>,
++					<2 RK_PC4 RK_FUNC_GPIO &pcfg_input_high>,
++					<2 RK_PC5 RK_FUNC_GPIO &pcfg_input_high>,
++					<2 RK_PC6 RK_FUNC_GPIO &pcfg_input_high>,
++					<2 RK_PC7 RK_FUNC_GPIO &pcfg_input_high>;
++			};
++		};
++
++		i2s2-0 {
++			i2s2m0_mclk: i2s2m0-mclk {
++				rockchip,pins =
++					<1 RK_PC5 RK_FUNC_1 &pcfg_pull_none>;
++			};
++
++			i2s2m0_sclk: i2s2m0-sclk {
++				rockchip,pins =
++					<1 RK_PC6 RK_FUNC_1 &pcfg_pull_none>;
++			};
++
++			i2s2m0_lrckrx: i2s2m0-lrckrx {
++				rockchip,pins =
++					<1 RK_PD2 RK_FUNC_1 &pcfg_pull_none>;
++			};
++
++			i2s2m0_lrcktx: i2s2m0-lrcktx {
++				rockchip,pins =
++					<1 RK_PC7 RK_FUNC_1 &pcfg_pull_none>;
++			};
++
++			i2s2m0_sdi: i2s2m0-sdi {
++				rockchip,pins =
++					<1 RK_PD0 RK_FUNC_1 &pcfg_pull_none>;
++			};
++
++			i2s2m0_sdo: i2s2m0-sdo {
++				rockchip,pins =
++					<1 RK_PD1 RK_FUNC_1 &pcfg_pull_none>;
++			};
++
++			i2s2m0_sleep: i2s2m0-sleep {
++				rockchip,pins =
++					<1 RK_PC5 RK_FUNC_GPIO &pcfg_input_high>,
++					<1 RK_PC6 RK_FUNC_GPIO &pcfg_input_high>,
++					<1 RK_PD2 RK_FUNC_GPIO &pcfg_input_high>,
++					<1 RK_PC7 RK_FUNC_GPIO &pcfg_input_high>,
++					<1 RK_PD0 RK_FUNC_GPIO &pcfg_input_high>,
++					<1 RK_PD1 RK_FUNC_GPIO &pcfg_input_high>;
++			};
++		};
++
++		i2s2-1 {
++			i2s2m1_mclk: i2s2m1-mclk {
++				rockchip,pins =
++					<1 RK_PC5 RK_FUNC_1 &pcfg_pull_none>;
++			};
++
++			i2s2m1_sclk: i2s2m1-sclk {
++				rockchip,pins =
++					<3 RK_PA0 RK_FUNC_6 &pcfg_pull_none>;
++			};
++
++			i2s2m1_lrckrx: i2sm1-lrckrx {
++				rockchip,pins =
++					<3 RK_PB0 RK_FUNC_6 &pcfg_pull_none>;
++			};
++
++			i2s2m1_lrcktx: i2s2m1-lrcktx {
++				rockchip,pins =
++					<3 RK_PB0 RK_FUNC_4 &pcfg_pull_none>;
++			};
++
++			i2s2m1_sdi: i2s2m1-sdi {
++				rockchip,pins =
++					<3 RK_PA2 RK_FUNC_6 &pcfg_pull_none>;
++			};
++
++			i2s2m1_sdo: i2s2m1-sdo {
++				rockchip,pins =
++					<3 RK_PA1 RK_FUNC_6 &pcfg_pull_none>;
++			};
++
++			i2s2m1_sleep: i2s2m1-sleep {
++				rockchip,pins =
++					<1 RK_PC5 RK_FUNC_GPIO &pcfg_input_high>,
++					<3 RK_PA0 RK_FUNC_GPIO &pcfg_input_high>,
++					<3 RK_PB0 RK_FUNC_GPIO &pcfg_input_high>,
++					<3 RK_PA2 RK_FUNC_GPIO &pcfg_input_high>,
++					<3 RK_PA1 RK_FUNC_GPIO &pcfg_input_high>;
++			};
++		};
++
++		spdif-0 {
++			spdifm0_tx: spdifm0-tx {
++				rockchip,pins =
++					<0 RK_PD3 RK_FUNC_1 &pcfg_pull_none>;
++			};
++		};
++
++		spdif-1 {
++			spdifm1_tx: spdifm1-tx {
++				rockchip,pins =
++					<2 RK_PC1 RK_FUNC_2 &pcfg_pull_none>;
++			};
++		};
++
++		spdif-2 {
++			spdifm2_tx: spdifm2-tx {
++				rockchip,pins =
++					<0 RK_PA2 RK_FUNC_2 &pcfg_pull_none>;
++			};
++		};
++
++		sdmmc0-0 {
++			sdmmc0m0_pwren: sdmmc0m0-pwren {
++				rockchip,pins =
++					<2 RK_PA7 RK_FUNC_1 &pcfg_pull_up_4ma>;
++			};
++
++			sdmmc0m0_gpio: sdmmc0m0-gpio {
++				rockchip,pins =
++					<2 RK_PA7 RK_FUNC_GPIO &pcfg_pull_up_4ma>;
++			};
++		};
++
++		sdmmc0-1 {
++			sdmmc0m1_pwren: sdmmc0m1-pwren {
++				rockchip,pins =
++					<0 RK_PD6 RK_FUNC_3 &pcfg_pull_up_4ma>;
++			};
++
++			sdmmc0m1_gpio: sdmmc0m1-gpio {
++				rockchip,pins =
++					<0 RK_PD6 RK_FUNC_GPIO &pcfg_pull_up_4ma>;
++			};
++		};
++
++		sdmmc0 {
++			sdmmc0_clk: sdmmc0-clk {
++				rockchip,pins =
++					<1 RK_PA6 RK_FUNC_1 &pcfg_pull_none_4ma>;
++			};
++
++			sdmmc0_cmd: sdmmc0-cmd {
++				rockchip,pins =
++					<1 RK_PA4 RK_FUNC_1 &pcfg_pull_up_4ma>;
++			};
++
++			sdmmc0_dectn: sdmmc0-dectn {
++				rockchip,pins =
++					<1 RK_PA5 RK_FUNC_1 &pcfg_pull_up_4ma>;
++			};
++
++			sdmmc0_wrprt: sdmmc0-wrprt {
++				rockchip,pins =
++					<1 RK_PA7 RK_FUNC_1 &pcfg_pull_up_4ma>;
++			};
++
++			sdmmc0_bus1: sdmmc0-bus1 {
++				rockchip,pins =
++					<1 RK_PA0 RK_FUNC_1 &pcfg_pull_up_4ma>;
++			};
++
++			sdmmc0_bus4: sdmmc0-bus4 {
++				rockchip,pins =
++					<1 RK_PA0 RK_FUNC_1 &pcfg_pull_up_4ma>,
++					<1 RK_PA1 RK_FUNC_1 &pcfg_pull_up_4ma>,
++					<1 RK_PA2 RK_FUNC_1 &pcfg_pull_up_4ma>,
++					<1 RK_PA3 RK_FUNC_1 &pcfg_pull_up_4ma>;
++			};
++
++			sdmmc0_gpio: sdmmc0-gpio {
++				rockchip,pins =
++					<1 RK_PA6 RK_FUNC_GPIO &pcfg_pull_up_4ma>,
++					<1 RK_PA4 RK_FUNC_GPIO &pcfg_pull_up_4ma>,
++					<1 RK_PA5 RK_FUNC_GPIO &pcfg_pull_up_4ma>,
++					<1 RK_PA7 RK_FUNC_GPIO &pcfg_pull_up_4ma>,
++					<1 RK_PA3 RK_FUNC_GPIO &pcfg_pull_up_4ma>,
++					<1 RK_PA2 RK_FUNC_GPIO &pcfg_pull_up_4ma>,
++					<1 RK_PA1 RK_FUNC_GPIO &pcfg_pull_up_4ma>,
++					<1 RK_PA0 RK_FUNC_GPIO &pcfg_pull_up_4ma>;
++			};
++		};
++
++		sdmmc0ext {
++			sdmmc0ext_clk: sdmmc0ext-clk {
++				rockchip,pins =
++					<3 RK_PA2 RK_FUNC_3 &pcfg_pull_none_4ma>;
++			};
++
++			sdmmc0ext_cmd: sdmmc0ext-cmd {
++				rockchip,pins =
++					<3 RK_PA0 RK_FUNC_3 &pcfg_pull_up_4ma>;
++			};
++
++			sdmmc0ext_wrprt: sdmmc0ext-wrprt {
++				rockchip,pins =
++					<3 RK_PA3 RK_FUNC_3 &pcfg_pull_up_4ma>;
++			};
++
++			sdmmc0ext_dectn: sdmmc0ext-dectn {
++				rockchip,pins =
++					<3 RK_PA1 RK_FUNC_3 &pcfg_pull_up_4ma>;
++			};
++
++			sdmmc0ext_bus1: sdmmc0ext-bus1 {
++				rockchip,pins =
++					<3 RK_PA4 RK_FUNC_3 &pcfg_pull_up_4ma>;
++			};
++
++			sdmmc0ext_bus4: sdmmc0ext-bus4 {
++				rockchip,pins =
++					<3 RK_PA4 RK_FUNC_3 &pcfg_pull_up_4ma>,
++					<3 RK_PA5 RK_FUNC_3 &pcfg_pull_up_4ma>,
++					<3 RK_PA6 RK_FUNC_3 &pcfg_pull_up_4ma>,
++					<3 RK_PA7 RK_FUNC_3 &pcfg_pull_up_4ma>;
++			};
++
++			sdmmc0ext_gpio: sdmmc0ext-gpio {
++				rockchip,pins =
++					<3 RK_PA0 RK_FUNC_GPIO &pcfg_pull_up_4ma>,
++					<3 RK_PA1 RK_FUNC_GPIO &pcfg_pull_up_4ma>,
++					<3 RK_PA2 RK_FUNC_GPIO &pcfg_pull_up_4ma>,
++					<3 RK_PA3 RK_FUNC_GPIO &pcfg_pull_up_4ma>,
++					<3 RK_PA4 RK_FUNC_GPIO &pcfg_pull_up_4ma>,
++					<3 RK_PA5 RK_FUNC_GPIO &pcfg_pull_up_4ma>,
++					<3 RK_PA6 RK_FUNC_GPIO &pcfg_pull_up_4ma>,
++					<3 RK_PA7 RK_FUNC_GPIO &pcfg_pull_up_4ma>;
++			};
++		};
++
++		sdmmc1 {
++			sdmmc1_clk: sdmmc1-clk {
++				rockchip,pins =
++					<1 RK_PB4 RK_FUNC_1 &pcfg_pull_none_8ma>;
++			};
++
++			sdmmc1_cmd: sdmmc1-cmd {
++				rockchip,pins =
++					<1 RK_PB5 RK_FUNC_1 &pcfg_pull_up_8ma>;
++			};
++
++			sdmmc1_pwren: sdmmc1-pwren {
++				rockchip,pins =
++					<1 RK_PC2 RK_FUNC_1 &pcfg_pull_up_8ma>;
++			};
++
++			sdmmc1_wrprt: sdmmc1-wrprt {
++				rockchip,pins =
++					<1 RK_PC4 RK_FUNC_1 &pcfg_pull_up_8ma>;
++			};
++
++			sdmmc1_dectn: sdmmc1-dectn {
++				rockchip,pins =
++					<1 RK_PC3 RK_FUNC_1 &pcfg_pull_up_8ma>;
++			};
++
++			sdmmc1_bus1: sdmmc1-bus1 {
++				rockchip,pins =
++					<1 RK_PB6 RK_FUNC_1 &pcfg_pull_up_8ma>;
++			};
++
++			sdmmc1_bus4: sdmmc1-bus4 {
++				rockchip,pins =
++					<1 RK_PB4 RK_FUNC_1 &pcfg_pull_up_8ma>,
++					<1 RK_PB5 RK_FUNC_1 &pcfg_pull_up_8ma>,
++					<1 RK_PC0 RK_FUNC_1 &pcfg_pull_up_8ma>,
++					<1 RK_PC1 RK_FUNC_1 &pcfg_pull_up_8ma>;
++			};
++
++			sdmmc1_gpio: sdmmc1-gpio {
++				rockchip,pins =
++					<1 RK_PB4 RK_FUNC_GPIO &pcfg_pull_up_4ma>,
++					<1 RK_PB5 RK_FUNC_GPIO &pcfg_pull_up_4ma>,
++					<1 RK_PB6 RK_FUNC_GPIO &pcfg_pull_up_4ma>,
++					<1 RK_PB7 RK_FUNC_GPIO &pcfg_pull_up_4ma>,
++					<1 RK_PC0 RK_FUNC_GPIO &pcfg_pull_up_4ma>,
++					<1 RK_PC1 RK_FUNC_GPIO &pcfg_pull_up_4ma>,
++					<1 RK_PC2 RK_FUNC_GPIO &pcfg_pull_up_4ma>,
++					<1 RK_PC3 RK_FUNC_GPIO &pcfg_pull_up_4ma>,
++					<1 RK_PC4 RK_FUNC_GPIO &pcfg_pull_up_4ma>;
++			};
++		};
++
++		emmc {
++			emmc_clk: emmc-clk {
++				rockchip,pins =
++					<3 RK_PC5 RK_FUNC_2 &pcfg_pull_none_12ma>;
++			};
++
++			emmc_cmd: emmc-cmd {
++				rockchip,pins =
++					<3 RK_PC3 RK_FUNC_2 &pcfg_pull_up_12ma>;
++			};
++
++			emmc_pwren: emmc-pwren {
++				rockchip,pins =
++					<3 RK_PC6 RK_FUNC_2 &pcfg_pull_none>;
++			};
++
++			emmc_rstnout: emmc-rstnout {
++				rockchip,pins =
++					<3 RK_PC4 RK_FUNC_2 &pcfg_pull_none>;
++			};
++
++			emmc_bus1: emmc-bus1 {
++				rockchip,pins =
++					<0 RK_PA7 RK_FUNC_2 &pcfg_pull_up_12ma>;
++			};
++
++			emmc_bus4: emmc-bus4 {
++				rockchip,pins =
++					<0 RK_PA7 RK_FUNC_2 &pcfg_pull_up_12ma>,
++					<2 RK_PD4 RK_FUNC_2 &pcfg_pull_up_12ma>,
++					<2 RK_PD5 RK_FUNC_2 &pcfg_pull_up_12ma>,
++					<2 RK_PD6 RK_FUNC_2 &pcfg_pull_up_12ma>;
++			};
++
++			emmc_bus8: emmc-bus8 {
++				rockchip,pins =
++					<0 RK_PA7 RK_FUNC_2 &pcfg_pull_up_12ma>,
++					<2 RK_PD4 RK_FUNC_2 &pcfg_pull_up_12ma>,
++					<2 RK_PD5 RK_FUNC_2 &pcfg_pull_up_12ma>,
++					<2 RK_PD6 RK_FUNC_2 &pcfg_pull_up_12ma>,
++					<2 RK_PD7 RK_FUNC_2 &pcfg_pull_up_12ma>,
++					<3 RK_PC0 RK_FUNC_2 &pcfg_pull_up_12ma>,
++					<3 RK_PC1 RK_FUNC_2 &pcfg_pull_up_12ma>,
++					<3 RK_PC2 RK_FUNC_2 &pcfg_pull_up_12ma>;
++			};
++		};
++
++		pwm0 {
++			pwm0_pin: pwm0-pin {
++				rockchip,pins =
++					<2 RK_PA4 RK_FUNC_1 &pcfg_pull_none>;
++			};
++		};
++
++		pwm1 {
++			pwm1_pin: pwm1-pin {
++				rockchip,pins =
++					<2 RK_PA5 RK_FUNC_1 &pcfg_pull_none>;
++			};
++		};
++
++		pwm2 {
++			pwm2_pin: pwm2-pin {
++				rockchip,pins =
++					<2 RK_PA6 RK_FUNC_1 &pcfg_pull_none>;
++			};
++		};
++
++		pwmir {
++			pwmir_pin: pwmir-pin {
++				rockchip,pins =
++					<2 RK_PA2 RK_FUNC_1 &pcfg_pull_none>;
++			};
++		};
++
++		gmac-1 {
++			rgmiim1_pins: rgmiim1-pins {
++				rockchip,pins =
++					/* mac_txclk */
++					<1 RK_PB4 RK_FUNC_2 &pcfg_pull_none_12ma>,
++					/* mac_rxclk */
++					<1 RK_PB5 RK_FUNC_2 &pcfg_pull_none_2ma>,
++					/* mac_mdio */
++					<1 RK_PC3 RK_FUNC_2 &pcfg_pull_none_2ma>,
++					/* mac_txen */
++					<1 RK_PD1 RK_FUNC_2 &pcfg_pull_none_12ma>,
++					/* mac_clk */
++					<1 RK_PC5 RK_FUNC_2 &pcfg_pull_none_2ma>,
++					/* mac_rxdv */
++					<1 RK_PC6 RK_FUNC_2 &pcfg_pull_none_2ma>,
++					/* mac_mdc */
++					<1 RK_PC7 RK_FUNC_2 &pcfg_pull_none_2ma>,
++					/* mac_rxd1 */
++					<1 RK_PB2 RK_FUNC_2 &pcfg_pull_none_2ma>,
++					/* mac_rxd0 */
++					<1 RK_PB3 RK_FUNC_2 &pcfg_pull_none_2ma>,
++					/* mac_txd1 */
++					<1 RK_PB0 RK_FUNC_2 &pcfg_pull_none_12ma>,
++					/* mac_txd0 */
++					<1 RK_PB1 RK_FUNC_2 &pcfg_pull_none_12ma>,
++					/* mac_rxd3 */
++					<1 RK_PB6 RK_FUNC_2 &pcfg_pull_none_2ma>,
++					/* mac_rxd2 */
++					<1 RK_PB7 RK_FUNC_2 &pcfg_pull_none_2ma>,
++					/* mac_txd3 */
++					<1 RK_PC0 RK_FUNC_2 &pcfg_pull_none_12ma>,
++					/* mac_txd2 */
++					<1 RK_PC1 RK_FUNC_2 &pcfg_pull_none_12ma>,
++
++					/* mac_txclk */
++					<0 RK_PB0 RK_FUNC_1 &pcfg_pull_none>,
++					/* mac_txen */
++					<0 RK_PB4 RK_FUNC_1 &pcfg_pull_none>,
++					/* mac_clk */
++					<0 RK_PD0 RK_FUNC_1 &pcfg_pull_none>,
++					/* mac_txd1 */
++					<0 RK_PC0 RK_FUNC_1 &pcfg_pull_none>,
++					/* mac_txd0 */
++					<0 RK_PC1 RK_FUNC_1 &pcfg_pull_none>,
++					/* mac_txd3 */
++					<0 RK_PC7 RK_FUNC_1 &pcfg_pull_none>,
++					/* mac_txd2 */
++					<0 RK_PC6 RK_FUNC_1 &pcfg_pull_none>;
++			};
++
++			rmiim1_pins: rmiim1-pins {
++				rockchip,pins =
++					/* mac_mdio */
++					<1 RK_PC3 RK_FUNC_2 &pcfg_pull_none_2ma>,
++					/* mac_txen */
++					<1 RK_PD1 RK_FUNC_2 &pcfg_pull_none_12ma>,
++					/* mac_clk */
++					<1 RK_PC5 RK_FUNC_2 &pcfg_pull_none_2ma>,
++					/* mac_rxer */
++					<1 RK_PD0 RK_FUNC_2 &pcfg_pull_none_2ma>,
++					/* mac_rxdv */
++					<1 RK_PC6 RK_FUNC_2 &pcfg_pull_none_2ma>,
++					/* mac_mdc */
++					<1 RK_PC7 RK_FUNC_2 &pcfg_pull_none_2ma>,
++					/* mac_rxd1 */
++					<1 RK_PB2 RK_FUNC_2 &pcfg_pull_none_2ma>,
++					/* mac_rxd0 */
++					<1 RK_PB3 RK_FUNC_2 &pcfg_pull_none_2ma>,
++					/* mac_txd1 */
++					<1 RK_PB0 RK_FUNC_2 &pcfg_pull_none_12ma>,
++					/* mac_txd0 */
++					<1 RK_PB1 RK_FUNC_2 &pcfg_pull_none_12ma>,
++
++					/* mac_mdio */
++					<0 RK_PB3 RK_FUNC_1 &pcfg_pull_none>,
++					/* mac_txen */
++					<0 RK_PB4 RK_FUNC_1 &pcfg_pull_none>,
++					/* mac_clk */
++					<0 RK_PD0 RK_FUNC_1 &pcfg_pull_none>,
++					/* mac_mdc */
++					<0 RK_PC3 RK_FUNC_1 &pcfg_pull_none>,
++					/* mac_txd1 */
++					<0 RK_PC0 RK_FUNC_1 &pcfg_pull_none>,
++					/* mac_txd0 */
++					<0 RK_PC1 RK_FUNC_1 &pcfg_pull_none>;
++			};
++		};
++
++		gmac2phy {
++			fephyled_speed100: fephyled-speed100 {
++				rockchip,pins =
++					<0 RK_PD7 RK_FUNC_1 &pcfg_pull_none>;
++			};
++
++			fephyled_speed10: fephyled-speed10 {
++				rockchip,pins =
++					<0 RK_PD6 RK_FUNC_1 &pcfg_pull_none>;
++			};
++
++			fephyled_duplex: fephyled-duplex {
++				rockchip,pins =
++					<0 RK_PD6 RK_FUNC_2 &pcfg_pull_none>;
++			};
++
++			fephyled_rxm0: fephyled-rxm0 {
++				rockchip,pins =
++					<0 RK_PD5 RK_FUNC_1 &pcfg_pull_none>;
++			};
++
++			fephyled_txm0: fephyled-txm0 {
++				rockchip,pins =
++					<0 RK_PD5 RK_FUNC_2 &pcfg_pull_none>;
++			};
++
++			fephyled_linkm0: fephyled-linkm0 {
++				rockchip,pins =
++					<0 RK_PD4 RK_FUNC_1 &pcfg_pull_none>;
++			};
++
++			fephyled_rxm1: fephyled-rxm1 {
++				rockchip,pins =
++					<2 RK_PD1 RK_FUNC_2 &pcfg_pull_none>;
++			};
++
++			fephyled_txm1: fephyled-txm1 {
++				rockchip,pins =
++					<2 RK_PD1 RK_FUNC_3 &pcfg_pull_none>;
++			};
++
++			fephyled_linkm1: fephyled-linkm1 {
++				rockchip,pins =
++					<2 RK_PD0 RK_FUNC_2 &pcfg_pull_none>;
++			};
++		};
++
++		tsadc_pin {
++			tsadc_int: tsadc-int {
++				rockchip,pins =
++					<2 RK_PB5 RK_FUNC_2 &pcfg_pull_none>;
++			};
++			tsadc_gpio: tsadc-gpio {
++				rockchip,pins =
++					<2 RK_PB5 RK_FUNC_GPIO &pcfg_pull_none>;
++			};
++		};
++
++		hdmi_pin {
++			hdmi_cec: hdmi-cec {
++				rockchip,pins =
++					<0 RK_PA3 RK_FUNC_1 &pcfg_pull_none>;
++			};
++
++			hdmi_hpd: hdmi-hpd {
++				rockchip,pins =
++					<0 RK_PA4 RK_FUNC_1 &pcfg_pull_down>;
++			};
++		};
++
++		cif-0 {
++			dvp_d2d9_m0:dvp-d2d9-m0 {
++				rockchip,pins =
++					/* cif_d0 */
++					<3 RK_PA4 RK_FUNC_2 &pcfg_pull_none>,
++					/* cif_d1 */
++					<3 RK_PA5 RK_FUNC_2 &pcfg_pull_none>,
++					/* cif_d2 */
++					<3 RK_PA6 RK_FUNC_2 &pcfg_pull_none>,
++					/* cif_d3 */
++					<3 RK_PA7 RK_FUNC_2 &pcfg_pull_none>,
++					/* cif_d4 */
++					<3 RK_PB0 RK_FUNC_2 &pcfg_pull_none>,
++					/* cif_d5m0 */
++					<3 RK_PB1 RK_FUNC_2 &pcfg_pull_none>,
++					/* cif_d6m0 */
++					<3 RK_PB2 RK_FUNC_2 &pcfg_pull_none>,
++					/* cif_d7m0 */
++					<3 RK_PB3 RK_FUNC_2 &pcfg_pull_none>,
++					/* cif_href */
++					<3 RK_PA1 RK_FUNC_2 &pcfg_pull_none>,
++					/* cif_vsync */
++					<3 RK_PA0 RK_FUNC_2 &pcfg_pull_none>,
++					/* cif_clkoutm0 */
++					<3 RK_PA3 RK_FUNC_2 &pcfg_pull_none>,
++					/* cif_clkin */
++					<3 RK_PA2 RK_FUNC_2 &pcfg_pull_none>;
++			};
++		};
++
++		cif-1 {
++			dvp_d2d9_m1:dvp-d2d9-m1 {
++				rockchip,pins =
++					/* cif_d0 */
++					<3 RK_PA4 RK_FUNC_2 &pcfg_pull_none>,
++					/* cif_d1 */
++					<3 RK_PA5 RK_FUNC_2 &pcfg_pull_none>,
++					/* cif_d2 */
++					<3 RK_PA6 RK_FUNC_2 &pcfg_pull_none>,
++					/* cif_d3 */
++					<3 RK_PA7 RK_FUNC_2 &pcfg_pull_none>,
++					/* cif_d4 */
++					<3 RK_PB0 RK_FUNC_2 &pcfg_pull_none>,
++					/* cif_d5m1 */
++					<2 RK_PC0 RK_FUNC_4 &pcfg_pull_none>,
++					/* cif_d6m1 */
++					<2 RK_PC1 RK_FUNC_4 &pcfg_pull_none>,
++					/* cif_d7m1 */
++					<2 RK_PC2 RK_FUNC_4 &pcfg_pull_none>,
++					/* cif_href */
++					<3 RK_PA1 RK_FUNC_2 &pcfg_pull_none>,
++					/* cif_vsync */
++					<3 RK_PA0 RK_FUNC_2 &pcfg_pull_none>,
++					/* cif_clkoutm1 */
++					<2 RK_PB7 RK_FUNC_4 &pcfg_pull_none>,
++					/* cif_clkin */
++					<3 RK_PA2 RK_FUNC_2 &pcfg_pull_none>;
++			};
++		};
++	};
++};
+-- 
+1.9.1
