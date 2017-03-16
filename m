@@ -1,82 +1,85 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Thu, 16 Mar 2017 17:51:30 +0100
-Subject: [PATCH v2] ARM: zynq: Add #io-channel-cells to (x)adc node for
- iio-hwmon
-In-Reply-To: <7e4fbe16-8686-5399-748d-af222c630338@xilinx.com>
-References: <1489003884-2489-1-git-send-email-mdf@kernel.org>
- <e6da3f38-7039-66e5-5b9d-a44ff42aa9c9@xilinx.com>
- <CAJYdmeNc48=OOvRiUjqPBJhz9RCbzeaRGu1Tfm=hrvzkJrSsag@mail.gmail.com>
- <7e4fbe16-8686-5399-748d-af222c630338@xilinx.com>
-Message-ID: <37f29986-6491-67ab-144c-eb485cc1fdcc@metafoo.de>
+From: nwatters@codeaurora.org (Nate Watterson)
+Date: Thu, 16 Mar 2017 12:55:43 -0400
+Subject: [PATCH v2 3/5] iommu/arm-smmu-v3: Make
+ arm_smmu_install_ste_for_dev return void
+In-Reply-To: <1489178976-15353-4-git-send-email-will.deacon@arm.com>
+References: <1489178976-15353-1-git-send-email-will.deacon@arm.com>
+ <1489178976-15353-4-git-send-email-will.deacon@arm.com>
+Message-ID: <93c35ad741a3c4572ae9a8ce0057d688@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/16/2017 05:45 PM, Michal Simek wrote:
-> On 16.3.2017 17:39, Moritz Fischer wrote:
->> On Thu, Mar 16, 2017 at 9:16 AM, Michal Simek <michal.simek@xilinx.com> wrote:
->>> Hi,
->>>
->>> On 8.3.2017 21:11, Moritz Fischer wrote:
->>>> Fix
->>>>
->>>> OF: /iio_hwmon: could not get #io-channel-cells for
->>>> /amba/adc at f8007100
->>>> OF: /iio_hwmon: could not get #io-channel-cells for
->>>> /amba/adc at f8007100
->>>> OF: /iio_hwmon: could not get #io-channel-cells for
->>>> /amba/adc at f8007100
->>>>
->>>> by adding the #io-channel-cells property.
->>>>
->>>> Signed-off-by: Moritz Fischer <mdf@kernel.org>
->>>> Cc: Michal Simek <michal.simek@xilinx.com>
->>>> Cc: S?ren Brinkmann <soren.brinkmann@xilinx.com>
->>>> Cc: Julia Cartwright <julia@ni.com>
->>>> Cc: linux-kernel at vger.kernel.org
->>>> Cc: devicetree at vger.kernel.org
->>>> ---
->>>>
->>>> Changes from v1:
->>>> - fix messed up commit message
->>>> ---
->>>>  arch/arm/boot/dts/zynq-7000.dtsi | 1 +
->>>>  1 file changed, 1 insertion(+)
->>>>
->>>> diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
->>>> index f3ac9bf..98233a8 100644
->>>> --- a/arch/arm/boot/dts/zynq-7000.dtsi
->>>> +++ b/arch/arm/boot/dts/zynq-7000.dtsi
->>>> @@ -72,6 +72,7 @@
->>>>                       interrupts = <0 7 4>;
->>>>                       interrupt-parent = <&intc>;
->>>>                       clocks = <&clkc 12>;
->>>> +                     #io-channel-cells = <1>;
->>>>               };
->>>>
->>>>               can0: can at e0008000 {
->>>>
->>>
->>> I think it will be good to the next step too.
->>> It means also add iio-hwmon node too.
->>>
->>> What do you think?
->>
->> I hadn't put it in there since dts is supposed to describe hw,
->> but obviously putting the actual hwmon in there makes it more useful.
-> 
-> I had one discussion about this with Grant in past and it is common
-> mistake. It is simplification of purpose of dts.
-> 
+Hi Will,
 
-If the iio-hwmon binding had gone through review it would have been rejected.
-
->>
->> I can resubmit with the hwmon node in there.
+On 2017-03-10 15:49, Will Deacon wrote:
+> arm_smmu_install_ste_for_dev cannot fail and always returns 0, however
+> the fact that it returns int means that callers end up implementing
+> redundant error handling code which complicates STE tracking and is
+> never executed.
 > 
-> If you grep kernel tree you will see that others are using it too.
-> Also there is accepted binding for that that's why I can't see big
-> problem with it.
+> This patch changes the return type of arm_smmu_install_ste_for_dev
+> to avoid, to make it explicit that it cannot fail.
+Did you mean "a void" or just "void" instead of "avoid"?
 
-Since this is an application specific binding I wouldn't put it in the
-generic DT include file. It's a bit like adding a gpio-key binding for each
-of the GPIOs just in case somebody wants to use it.
+> 
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  drivers/iommu/arm-smmu-v3.c | 12 +++---------
+>  1 file changed, 3 insertions(+), 9 deletions(-)
+> 
+> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+> index 3d38e682071a..e18dbcd26f66 100644
+> --- a/drivers/iommu/arm-smmu-v3.c
+> +++ b/drivers/iommu/arm-smmu-v3.c
+> @@ -1579,7 +1579,7 @@ static __le64 *arm_smmu_get_step_for_sid(struct
+> arm_smmu_device *smmu, u32 sid)
+>  	return step;
+>  }
+> 
+> -static int arm_smmu_install_ste_for_dev(struct iommu_fwspec *fwspec)
+> +static void arm_smmu_install_ste_for_dev(struct iommu_fwspec *fwspec)
+>  {
+>  	int i;
+>  	struct arm_smmu_master_data *master = fwspec->iommu_priv;
+> @@ -1591,8 +1591,6 @@ static int arm_smmu_install_ste_for_dev(struct
+> iommu_fwspec *fwspec)
+> 
+>  		arm_smmu_write_strtab_ent(smmu, sid, step, &master->ste);
+>  	}
+> -
+> -	return 0;
+>  }
+> 
+>  static void arm_smmu_detach_dev(struct device *dev)
+> @@ -1600,8 +1598,7 @@ static void arm_smmu_detach_dev(struct device 
+> *dev)
+>  	struct arm_smmu_master_data *master = dev->iommu_fwspec->iommu_priv;
+> 
+>  	master->ste.bypass = true;
+> -	if (arm_smmu_install_ste_for_dev(dev->iommu_fwspec) < 0)
+> -		dev_warn(dev, "failed to install bypass STE\n");
+> +	arm_smmu_install_ste_for_dev(dev->iommu_fwspec);
+>  }
+> 
+>  static int arm_smmu_attach_dev(struct iommu_domain *domain, struct 
+> device *dev)
+> @@ -1653,10 +1650,7 @@ static int arm_smmu_attach_dev(struct
+> iommu_domain *domain, struct device *dev)
+>  		ste->s2_cfg = &smmu_domain->s2_cfg;
+>  	}
+> 
+> -	ret = arm_smmu_install_ste_for_dev(dev->iommu_fwspec);
+> -	if (ret < 0)
+> -		ste->valid = false;
+> -
+> +	arm_smmu_install_ste_for_dev(dev->iommu_fwspec);
+>  out_unlock:
+>  	mutex_unlock(&smmu_domain->init_mutex);
+>  	return ret;
+
+-- 
+Qualcomm Datacenter Technologies, Inc. on behalf of Qualcomm 
+Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a 
+Linux
+Foundation Collaborative Project.
