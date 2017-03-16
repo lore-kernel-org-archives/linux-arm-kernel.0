@@ -1,58 +1,45 @@
-From: gmbnomis@gmail.com (Simon Baatz)
-Date: Thu, 16 Mar 2017 22:44:21 +0100
-Subject: [PATCH] mtd: nand: orion: fix clk handling
-In-Reply-To: <20170316100539.15bb1828@bbrezillon>
-References: <20170312213406.20987-1-gmbnomis@gmail.com>
- <20170316100539.15bb1828@bbrezillon>
-Message-ID: <20170316214420.GA27118@gandalf>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 16 Mar 2017 22:46:06 +0100
+Subject: [PATCH] serial: 8250: 8250_core: Fix irq name for 8250 serial irq
+In-Reply-To: <20170316122653.19930-1-vigneshr@ti.com>
+References: <20170316122653.19930-1-vigneshr@ti.com>
+Message-ID: <6515939.2USCG1AhyO@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Boris,
-
-On Thu, Mar 16, 2017 at 10:05:39AM +0100, Boris Brezillon wrote:
-> Hi Simon,
+On Thursday, March 16, 2017 5:56:53 PM CET Vignesh R wrote:
+> Using dev_name() as irq name during request_irq() might be misleading in
+> case of serial over PCI. Therefore use a better alternative name for
+> identifying serial port irqs as "serial" appended with serial_index of
+> the port. This ensures that "serial" string is always present in irq
+> name while port index will help in distinguishing b/w different ports.
 > 
-> On Sun, 12 Mar 2017 22:34:06 +0100
-> Simon Baatz <gmbnomis@gmail.com> wrote:
+> Signed-off-by: Vignesh R <vigneshr@ti.com>
+> ---
 > 
-> > The clk handling in orion_nand.c had two problems:
-> > 
-> > - In the probe function, clk_put() was called for an enabled clock,
-> >   which violates the API (see documentation for clk_put() in
-> >   include/linux/clk.h)
-> > 
-> > - In the error path of the probe function, clk_put() could be called
-> >   twice for the same clock.
-> > 
-> > In order to clean this up, use the managed function devm_clk_get() and
-> > store the pointer to the clk in the driver data.
-> > 
-> > Fixes: baffab28b13120694fa3ebab08d3e99667a851d2 ('ARM: Orion: fix driver probe error handling with respect to clk')
-> > Cc: <stable@vger.kernel.org> # v4.5+
-> > Signed-off-by: Simon Baatz <gmbnomis@gmail.com>
-> > ---
-> >  drivers/mtd/nand/orion_nand.c | 42 +++++++++++++++++++++---------------------
-> >  1 file changed, 21 insertions(+), 21 deletions(-)
-> > 
-> > diff --git a/drivers/mtd/nand/orion_nand.c b/drivers/mtd/nand/orion_nand.c
-> > index 4a91c5d000be..b355aa738fae 100644
-> > --- a/drivers/mtd/nand/orion_nand.c
-> > +++ b/drivers/mtd/nand/orion_nand.c
-> > @@ -23,6 +23,11 @@
-> >  #include <asm/sizes.h>
-> >  #include <linux/platform_data/mtd-orion_nand.h>
-> >  
-> > +struct orion_nand_info {
-> > +	struct nand_chip chip;
-> > +	struct clk       *clk;
+> Based on top of tty-next.
 > 
-> Can we avoid this kind of alignment, which will not be preserved if
-> someone adds a new field with a type that is longer than "struct
-> nand_chip "?
+>  drivers/tty/serial/8250/8250_core.c | 10 +++++++++-
+>  1 file changed, 9 insertions(+), 1 deletion(-)
 > 
+> diff --git a/drivers/tty/serial/8250/8250_core.c b/drivers/tty/serial/8250/8250_core.c
+> index f83b69f30987..78bf621d6827 100644
+> --- a/drivers/tty/serial/8250/8250_core.c
+> +++ b/drivers/tty/serial/8250/8250_core.c
+> @@ -213,12 +213,20 @@ static int serial_link_irq_chain(struct uart_8250_port *up)
+>  
+>  		ret = 0;
+>  	} else {
+> +		char *irqname = kmalloc(20, GFP_KERNEL);
+> +		if (!irqname) {
+> +			spin_unlock_irq(&i->lock);
+> +			return -ENOMEM;
+> +		}
+> +		snprintf(irqname, 20,
+> +			 "serial%d", serial_index(&up->port));
 
-Sure. I will change that in v2.
+kasprintf()?
 
+Also, you need to free the memory after free_irq().
 
-- Simon
+	Arnd
