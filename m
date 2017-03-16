@@ -1,62 +1,73 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 16 Mar 2017 17:27:35 +0000
-Subject: [GIT PULL] arm64 fixes for 4.11-rc3
-Message-ID: <20170316172733.GA5128@e104818-lin.cambridge.arm.com>
+From: slash.tmp@free.fr (Mason)
+Date: Thu, 16 Mar 2017 18:33:09 +0100
+Subject: Legacy PCI interrupt support in PCIe host driver
+In-Reply-To: <5612adb6-af5c-9fbf-e725-813ee7fe1b4b@free.fr>
+References: <5612adb6-af5c-9fbf-e725-813ee7fe1b4b@free.fr>
+Message-ID: <8443b350-6aa6-75f8-af48-892c722fc2d9@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On 16/03/2017 16:40, Mason wrote:
 
-In Will's absence I'm sending the arm64 fixes he queued for 4.11-rc3.
-Thanks.
+> Here is my current DT:
+> 
+> 		msi0: msi at 2e080 {
+> 			compatible = "sigma,msi";
+> 			reg = <0x2e04c 0x40>;
+> 			interrupt-parent = <&irq0>;
+> 			interrupts = <55 IRQ_TYPE_LEVEL_HIGH>;
+> 			msi-controller;
+> 			num-vectors = <32>;
+> 		};
+> 
+> 		pcie at 30000000 {
+> 			compatible = "sigma,smp8759-pcie";
+> 			reg = <0x30000000 SZ_4M>, <0x2e02c 4>;
+> 			device_type = "pci";
+> 			bus-range = <0 3>;
+> 			#size-cells = <2>;
+> 			#address-cells = <3>;
+> 			#interrupt-cells = <1>;
+> 			ranges = <0x02000000 0x0 0x00400000  0x30400000  0x0 SZ_60M>;
+> 			msi-parent = <&msi0>;
+> 			interrupt-parent = <&irq0>;
+> 			interrupts = <54 IRQ_TYPE_LEVEL_HIGH>;
+> 		};
+> 
+> 
+> I traced the action into pdev_fixup_irq()
+> which calls of_irq_parse_and_map_pci()
+> 
+> How do I tell Linux that
+> - All the legacy PCI interrupts are muxed to a single line
+> - And this line is routed to system interrupt 54
+> 
+> Ooooooh... Wait...
+> 
+> Is this what interrupt-map is used for?
+> 
+> http://elinux.org/Device_Tree_Usage#Advanced_Interrupt_Mapping
 
-The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
+I added this to my pcie at 30000000 node:
 
-  Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
+	interrupt-map = <0 0 0 1 &irq0 54 IRQ_TYPE_LEVEL_HIGH>;
 
-are available in the git repository at:
+to map INTA to system IRQ 54.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux tags/arm64-fixes
+And now it works much better :-)
 
-for you to fetch changes up to 0e4c0e6ea7d4a988a5ae2791c7cb5769b5256dad:
+# cat /proc/interrupts 
+           CPU0       
+ 19:       1529     GIC-0  29 Edge      twd
+ 20:        125      irq0   1 Level     serial
+ 22:          0      irq0  54 Level     tutu, xhci-hcd:usb1
 
-  arm64: kernel: Update kerneldoc for cpu_suspend() rename (2017-03-10 18:06:24 +0000)
+About shared ISRs. Are they supposed to return IRQ_HANDLED
+if and only if they handled something?
 
-----------------------------------------------------------------
-arm64 fixes/cleanups:
+Will that stop the next ISR from being called?
 
-- Fix arm64 kernel boot warning when DEBUG_VIRTUAL and KASAN are enabled
+I guess if two interrupts fire at the same time, we'll
+just take two separate exceptions?
 
-- Enable KEYS_COMPAT for keyctl compat support
-
-- Use cpus_have_const_cap() for system_uses_ttbr0_pan() (slight
-  performance improvement)
-
-- Update kerneldoc for cpu_suspend() rename
-
-- Remove the arm64-specific kprobe_exceptions_notify (weak generic
-  variant defined)
-
-----------------------------------------------------------------
-Eric Biggers (1):
-      arm64: support keyctl() system call in 32-bit mode
-
-Geert Uytterhoeven (1):
-      arm64: kernel: Update kerneldoc for cpu_suspend() rename
-
-Mark Rutland (2):
-      arm64: kasan: avoid bad virt_to_pfn()
-      arm64: use const cap for system_uses_ttbr0_pan()
-
-Naveen N. Rao (1):
-      arm64: kprobes: remove kprobe_exceptions_notify
-
- arch/arm64/Kconfig                  | 4 ++++
- arch/arm64/include/asm/cpufeature.h | 2 +-
- arch/arm64/kernel/cpuidle.c         | 2 +-
- arch/arm64/kernel/probes/kprobes.c  | 6 ------
- arch/arm64/mm/kasan_init.c          | 2 +-
- 5 files changed, 7 insertions(+), 9 deletions(-)
-
--- 
-Catalin
+Regards.
