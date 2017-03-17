@@ -1,58 +1,114 @@
 From: cedric.madianga@gmail.com (M'boumba Cedric Madianga)
-Date: Fri, 17 Mar 2017 10:58:54 +0100
-Subject: [PATCH 1/5] dt-bindings: i2c-stm32: Document the STM32F7 I2C bindings
+Date: Fri, 17 Mar 2017 10:58:55 +0100
+Subject: [PATCH 2/5] i2c: i2c-stm32f4: use generic definition of speed enum
 In-Reply-To: <1489744738-21632-1-git-send-email-cedric.madianga@gmail.com>
 References: <1489744738-21632-1-git-send-email-cedric.madianga@gmail.com>
-Message-ID: <1489744738-21632-2-git-send-email-cedric.madianga@gmail.com>
+Message-ID: <1489744738-21632-3-git-send-email-cedric.madianga@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the documentation of device tree bindings for STM32F7 I2C
+This patch uses a more generic definition of speed enum for i2c-stm32f4
+driver.
 
 Signed-off-by: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
+Reviewed-by: Ludovic BARRE <ludovic.barre@st.com>
 ---
- .../devicetree/bindings/i2c/i2c-stm32.txt          | 22 +++++++++++++++++++---
- 1 file changed, 19 insertions(+), 3 deletions(-)
+ drivers/i2c/busses/i2c-stm32.h   | 20 ++++++++++++++++++++
+ drivers/i2c/busses/i2c-stm32f4.c | 18 +++++++-----------
+ 2 files changed, 27 insertions(+), 11 deletions(-)
+ create mode 100644 drivers/i2c/busses/i2c-stm32.h
 
-diff --git a/Documentation/devicetree/bindings/i2c/i2c-stm32.txt b/Documentation/devicetree/bindings/i2c/i2c-stm32.txt
-index 78eaf7b..8288724 100644
---- a/Documentation/devicetree/bindings/i2c/i2c-stm32.txt
-+++ b/Documentation/devicetree/bindings/i2c/i2c-stm32.txt
-@@ -1,7 +1,9 @@
- * I2C controller embedded in STMicroelectronics STM32 I2C platform
+diff --git a/drivers/i2c/busses/i2c-stm32.h b/drivers/i2c/busses/i2c-stm32.h
+new file mode 100644
+index 0000000..dab5176
+--- /dev/null
++++ b/drivers/i2c/busses/i2c-stm32.h
+@@ -0,0 +1,20 @@
++/*
++ * i2c-stm32.h
++ *
++ * Copyright (C) M'boumba Cedric Madianga 2017
++ * Author: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
++ *
++ * License terms:  GNU General Public License (GPL), version 2
++ */
++
++#ifndef _I2C_STM32_H
++#define _I2C_STM32_H
++
++enum stm32_i2c_speed {
++	STM32_I2C_SPEED_STANDARD, /* 100 kHz */
++	STM32_I2C_SPEED_FAST, /* 400 kHz */
++	STM32_I2C_SPEED_FAST_PLUS, /* 1 MHz */
++	STM32_I2C_SPEED_END,
++};
++
++#endif /* _I2C_STM32_H */
+diff --git a/drivers/i2c/busses/i2c-stm32f4.c b/drivers/i2c/busses/i2c-stm32f4.c
+index f9dd7e8..b81557d 100644
+--- a/drivers/i2c/busses/i2c-stm32f4.c
++++ b/drivers/i2c/busses/i2c-stm32f4.c
+@@ -27,6 +27,8 @@
+ #include <linux/platform_device.h>
+ #include <linux/reset.h>
  
- Required properties :
--- compatible : Must be "st,stm32f4-i2c"
-+- compatible : Must be one of the following
-+  - "st,stm32f4-i2c"
-+  - "st,stm32f7-i2c"
- - reg : Offset and length of the register set for the device
- - interrupts : Must contain the interrupt id for I2C event and then the
-   interrupt id for I2C error.
-@@ -14,8 +16,22 @@ Required properties :
++#include "i2c-stm32.h"
++
+ /* STM32F4 I2C offset registers */
+ #define STM32F4_I2C_CR1			0x00
+ #define STM32F4_I2C_CR2			0x04
+@@ -90,12 +92,6 @@
+ #define STM32F4_I2C_MAX_FREQ		46U
+ #define HZ_TO_MHZ			1000000
  
- Optional properties :
- - clock-frequency : Desired I2C bus clock frequency in Hz. If not specified,
--  the default 100 kHz frequency will be used. As only Normal and Fast modes
--  are supported, possible values are 100000 and 400000.
-+  the default 100 kHz frequency will be used.
-+  For STM32F4 SoC Standard-mode and Fast-mode are supported, possible values are
-+  100000 and 400000.
-+  For STM32F7 SoC, Standard-mode, Fast-mode and Fast-mode Plus are supported,
-+  possible values are 100000, 400000 and 1000000.
-+- st,i2c-timing : A 32-bit I2C timing refister value.
-+  This value is only required for "st,stm32f7-i2c".
-+  A specific external tool delivered by ST is used to compute the value to be
-+  set here according to i2C speed frequency, i2c clock source frequency,
-+  i2c rise time and i2c fall time inputs.
-+  - bit 31:28: PRESC[3:0]: Timing prescaler
-+  - bit 27:24: Reserved
-+  - bit 23:20: SCLDEL[3:0]: Data setup time
-+  - bit 19:16: SDADEL[3:0]: Data hold time
-+  - bit 15:8:  SCLH[7:0]: SCL high period
-+  - bit 7:0:   SCLL[7:0]: SCL low period
+-enum stm32f4_i2c_speed {
+-	STM32F4_I2C_SPEED_STANDARD, /* 100 kHz */
+-	STM32F4_I2C_SPEED_FAST, /* 400 kHz */
+-	STM32F4_I2C_SPEED_END,
+-};
+-
+ /**
+  * struct stm32f4_i2c_msg - client specific data
+  * @addr: 8-bit slave addr, including r/w bit
+@@ -159,7 +155,7 @@ static int stm32f4_i2c_set_periph_clk_freq(struct stm32f4_i2c_dev *i2c_dev)
+ 	i2c_dev->parent_rate = clk_get_rate(i2c_dev->clk);
+ 	freq = DIV_ROUND_UP(i2c_dev->parent_rate, HZ_TO_MHZ);
  
- Example :
+-	if (i2c_dev->speed == STM32F4_I2C_SPEED_STANDARD) {
++	if (i2c_dev->speed == STM32_I2C_SPEED_STANDARD) {
+ 		/*
+ 		 * To reach 100 kHz, the parent clk frequency should be between
+ 		 * a minimum value of 2 MHz and a maximum value of 46 MHz due
+@@ -216,7 +212,7 @@ static void stm32f4_i2c_set_rise_time(struct stm32f4_i2c_dev *i2c_dev)
+ 	 * is not higher than 46 MHz . As a result trise is at most 4 bits wide
+ 	 * and so fits into the TRISE bits [5:0].
+ 	 */
+-	if (i2c_dev->speed == STM32F4_I2C_SPEED_STANDARD)
++	if (i2c_dev->speed == STM32_I2C_SPEED_STANDARD)
+ 		trise = freq + 1;
+ 	else
+ 		trise = freq * 3 / 10 + 1;
+@@ -230,7 +226,7 @@ static void stm32f4_i2c_set_speed_mode(struct stm32f4_i2c_dev *i2c_dev)
+ 	u32 val;
+ 	u32 ccr = 0;
+ 
+-	if (i2c_dev->speed == STM32F4_I2C_SPEED_STANDARD) {
++	if (i2c_dev->speed == STM32_I2C_SPEED_STANDARD) {
+ 		/*
+ 		 * In standard mode:
+ 		 * t_scl_high = t_scl_low = CCR * I2C parent clk period
+@@ -808,10 +804,10 @@ static int stm32f4_i2c_probe(struct platform_device *pdev)
+ 	udelay(2);
+ 	reset_control_deassert(rst);
+ 
+-	i2c_dev->speed = STM32F4_I2C_SPEED_STANDARD;
++	i2c_dev->speed = STM32_I2C_SPEED_STANDARD;
+ 	ret = of_property_read_u32(np, "clock-frequency", &clk_rate);
+ 	if (!ret && clk_rate >= 400000)
+-		i2c_dev->speed = STM32F4_I2C_SPEED_FAST;
++		i2c_dev->speed = STM32_I2C_SPEED_FAST;
+ 
+ 	i2c_dev->dev = &pdev->dev;
  
 -- 
 1.9.1
