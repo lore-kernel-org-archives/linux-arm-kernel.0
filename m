@@ -1,75 +1,135 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Fri, 17 Mar 2017 15:53:18 +0100
-Subject: [PATCH 3/5] i2c: i2c-stm32f7: add driver
-In-Reply-To: <CAOAejn0Hs7QOgcrHM2t3NsFQeD9dyvThDK-8iM1Lvb7Qv4fGGQ@mail.gmail.com>
-References: <1489744738-21632-1-git-send-email-cedric.madianga@gmail.com>
- <1489744738-21632-4-git-send-email-cedric.madianga@gmail.com>
- <6ae90186-0e8d-654b-c9e3-2d1b4daf6198@baylibre.com>
- <CAOAejn0Hs7QOgcrHM2t3NsFQeD9dyvThDK-8iM1Lvb7Qv4fGGQ@mail.gmail.com>
-Message-ID: <971895d3-2fe6-ecb6-9dc3-ee71193b34ee@baylibre.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Fri, 17 Mar 2017 15:03:13 +0000
+Subject: [PATCH v3 08/19] KVM: arm64: ITS: Interpret MAPD Size field and
+ check related errors
+In-Reply-To: <1488800074-21991-9-git-send-email-eric.auger@redhat.com>
+References: <1488800074-21991-1-git-send-email-eric.auger@redhat.com>
+ <1488800074-21991-9-git-send-email-eric.auger@redhat.com>
+Message-ID: <7daaac71-1dbf-94c9-2b6b-fadf94a5b776@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/17/2017 02:52 PM, M'boumba Cedric Madianga wrote:
-> Hi,
-> 
-> 
->>> +static int stm32f7_i2c_hw_config(struct stm32f7_i2c_dev *i2c_dev)
->>> +{
->>> +     struct device_node *of_node = i2c_dev->dev->of_node;
->>> +     u32 timing;
->>> +     int ret;
->>> +
->>> +     ret = of_property_read_u32(of_node, "st,i2c-timing", &timing);
->>> +     if (ret) {
->>> +             dev_err(i2c_dev->dev, "Error: missing i2c timing property\n");
->>> +             return ret;
->>> +     }
->>> +
->>> +     /* Timing settings */
->>> +     writel_relaxed(timing, i2c_dev->base + STM32F7_I2C_TIMINGR);
->>
->> Hi,
->>
->> Using a register value in DT is quite ugly since the requirement to calculate the timings
->> is quite easy, and well documented.
->>
->> I wrote it for Zephyr, you can find it here :
->> https://github.com/zephyrproject-rtos/zephyr/blob/master/drivers/i2c/i2c_stm32lx.c#L31
-> 
-> Thanks for this code. It is very interesting.
-> With our formula, I just notice that we don't use any i2c rise time or
-> fall time but they have some impacts in i2c timing computation.
-> So, the user could not be able to select these values for him use case. Right ?
+Hi,
 
-Sorry I don't understand.
-The value you use from the DT and the one calculated from the setup/hold/high/low value
-with the algorithm I developed will set the same values.
-
-The main difference is that you won't need the ST tool to calculate these, and even better
-you can provide generic binding for whatever APB frequency the I2C peripheral is running
-on.
-
+On 06/03/17 11:34, Eric Auger wrote:
+> Up to now the MAPD's ITT size field has been ignored. It encodes
+> the number of eventid bit minus 1. It should be used to check
+> the eventid when a MAPTI command is issued on a device. Let's
+> store the nb_eventid_bits in the its_device and do the check
+> on MAPTI. Also make sure the ITT size field does not exceed the
+> GITS_TYPER IDBITS field.
 > 
+> Signed-off-by: Eric Auger <eric.auger@redhat.com>
 > 
->>
->> Another point, maybe you should find a better name for the driver, since this I2C IP is share
->> with the STM32Lx also and is not tied to STM32F7.
+> ---
+> ---
+>  include/linux/irqchip/arm-gic-v3.h |  2 ++
+>  virt/kvm/arm/vgic/vgic-its.c       | 14 +++++++++++++-
+>  2 files changed, 15 insertions(+), 1 deletion(-)
 > 
-> As far as I know, we don't have any STM32Lx SoC integrated in the
-> linux kernel mainline.
-> I choose i2c-stm32f7 name as it is the first Soc integrated in the
-> linux kernel mainline where this IP could be used.
+> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+> index d81f10f..a7a5548 100644
+> --- a/include/linux/irqchip/arm-gic-v3.h
+> +++ b/include/linux/irqchip/arm-gic-v3.h
+> @@ -338,9 +338,11 @@
+>  #define E_ITS_INT_UNMAPPED_INTERRUPT		0x010307
+>  #define E_ITS_CLEAR_UNMAPPED_INTERRUPT		0x010507
+>  #define E_ITS_MAPD_DEVICE_OOR			0x010801
+> +#define E_ITS_MAPD_ITTSIZE_OOR			0x010802
+>  #define E_ITS_MAPC_PROCNUM_OOR			0x010902
+>  #define E_ITS_MAPC_COLLECTION_OOR		0x010903
+>  #define E_ITS_MAPTI_UNMAPPED_DEVICE		0x010a04
+> +#define E_ITS_MAPTI_ID_OOR			0x010a05
+>  #define E_ITS_MAPTI_PHYSICALID_OOR		0x010a06
+>  #define E_ITS_INV_UNMAPPED_INTERRUPT		0x010c07
+>  #define E_ITS_INVALL_UNMAPPED_COLLECTION	0x010d09
+> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+> index 6d84508..56bcd92 100644
+> --- a/virt/kvm/arm/vgic/vgic-its.c
+> +++ b/virt/kvm/arm/vgic/vgic-its.c
+> @@ -99,6 +99,7 @@ struct its_device {
+>  
+>  	/* the head for the list of ITTEs */
+>  	struct list_head itt_head;
+> +	u32 nb_eventid_bits;
+>  	u32 device_id;
+>  };
+>  
+> @@ -177,6 +178,7 @@ static struct its_ite *find_ite(struct vgic_its *its, u32 device_id,
+>  #define GIC_LPI_OFFSET 8192
+>  
+>  #define VITS_ESZ 8
+> +#define VITS_TYPER_IDBITS 0xF
 
-Having the STM32L4 running mainline won't be hard, maybe useless, but not hard.
-My point is that you can somehow consider the STM32F0/F1/F4 I2C IP to be "v1" or "gen1",
-and the L0/L4/F6 (and H7 ?) to be "v2" or "gen2" then prepend a generic compatible to
-have something like :
-compatible = "st,stm32-i2c-v2", "st,stm32f7-i2c"
+Alone for consistency reasons I'd use "16" here and subtract one upon
+encoding this into the TYPER register.
 
-> BR,
-> Cedric
+>  
+>  /*
+>   * Finds and returns a collection in the ITS collection table.
+> @@ -400,7 +402,7 @@ static unsigned long vgic_mmio_read_its_typer(struct kvm *kvm,
+>  	 * DevBits low - as least for the time being.
+>  	 */
+>  	reg |= 0x0f << GITS_TYPER_DEVBITS_SHIFT;
+> -	reg |= 0x0f << GITS_TYPER_IDBITS_SHIFT;
+> +	reg |= VITS_TYPER_IDBITS << GITS_TYPER_IDBITS_SHIFT;
+>  	reg |= (VITS_ESZ - 1) << GITS_TYPER_ITT_ENTRY_SIZE_SHIFT;
+>  
+>  	return extract_bytes(reg, addr & 7, len);
+> @@ -560,6 +562,7 @@ static u64 its_cmd_mask_field(u64 *its_cmd, int word, int shift, int size)
+>  #define its_cmd_get_collection(cmd)	its_cmd_mask_field(cmd, 2,  0, 16)
+>  #define its_cmd_get_target_addr(cmd)	its_cmd_mask_field(cmd, 2, 16, 32)
+>  #define its_cmd_get_validbit(cmd)	its_cmd_mask_field(cmd, 2, 63,  1)
+> +#define its_cmd_get_size(cmd)		its_cmd_mask_field(cmd, 1, 0,  5)
+
+Can you please move this up to be in order with the other fields?
+
+>  /*
+>   * The DISCARD command frees an Interrupt Translation Table Entry (ITTE).
+> @@ -745,6 +748,9 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
+>  	if (!device)
+>  		return E_ITS_MAPTI_UNMAPPED_DEVICE;
+>  
+> +	if (event_id >= (2 << device->nb_eventid_bits))
+
+And I'd find it less confusing to hold the actual bit size in
+nb_eventid_bits (and abstract from the particular encoding in TYPER).
+That would avoid this slightly odd (2 << ...) here, for instance.
+
+> +		return E_ITS_MAPTI_ID_OOR;
+> +
+>  	if (its_cmd_get_command(its_cmd) == GITS_CMD_MAPTI)
+>  		lpi_nr = its_cmd_get_physical_id(its_cmd);
+>  	else
+> @@ -825,11 +831,15 @@ static int vgic_its_cmd_handle_mapd(struct kvm *kvm, struct vgic_its *its,
+>  {
+>  	u32 device_id = its_cmd_get_deviceid(its_cmd);
+>  	bool valid = its_cmd_get_validbit(its_cmd);
+> +	size_t size = its_cmd_get_size(its_cmd);
+
+If you add 1 here, you'd make clear that this is an encoding property.
+
+Cheers,
+Andre.
+
+>  	struct its_device *device;
+>  
+>  	if (!vgic_its_check_id(its, its->baser_device_table, device_id))
+>  		return E_ITS_MAPD_DEVICE_OOR;
+>  
+> +	if (valid && size > VITS_TYPER_IDBITS)
+> +		return E_ITS_MAPD_ITTSIZE_OOR;
+> +
+>  	device = find_its_device(its, device_id);
+>  
+>  	/*
+> @@ -852,6 +862,8 @@ static int vgic_its_cmd_handle_mapd(struct kvm *kvm, struct vgic_its *its,
+>  		return -ENOMEM;
+>  
+>  	device->device_id = device_id;
+> +	device->nb_eventid_bits = size + 1;
+> +
+>  	INIT_LIST_HEAD(&device->itt_head);
+>  
+>  	list_add_tail(&device->dev_list, &its->device_list);
 > 
-
-Thanks,
-Neil
