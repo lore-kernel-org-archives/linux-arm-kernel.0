@@ -1,45 +1,45 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 17 Mar 2017 11:09:38 +0200
-Subject: [PATCHv2 6/9] ARM: OMAP2+: timer: add support for fetching fck handle
- from DT
-In-Reply-To: <1489741781-12816-1-git-send-email-t-kristo@ti.com>
-References: <1489741781-12816-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1489741781-12816-7-git-send-email-t-kristo@ti.com>
+Date: Fri, 17 Mar 2017 11:09:32 +0200
+Subject: [PATCHv2 0/9] clk: ti: add support for clkctrl clocks
+Message-ID: <1489741781-12816-1-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mux clock handle shall be provided via "fck" DT handle. This avoids
-the need to lookup the main clock via hwmod core, which will not work
-with the clkctrl clock support anymore; the main clock is not going to
-be a mux.
+Hi,
 
-Signed-off-by: Tero Kristo <t-kristo@ti.com>
----
- arch/arm/mach-omap2/timer.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+>From functional code point of view, this is mostly just a rebase of v1 of the
+series on top of 4.11-rc1:
 
-diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-index 07dd692..af90f95 100644
---- a/arch/arm/mach-omap2/timer.c
-+++ b/arch/arm/mach-omap2/timer.c
-@@ -255,6 +255,8 @@ static int __init omap_dm_timer_init_one(struct omap_dm_timer *timer,
- 
- 		timer->io_base = of_iomap(np, 0);
- 
-+		timer->fclk = of_clk_get_by_name(np, "fck");
-+
- 		of_node_put(np);
- 	} else {
- 		if (omap_dm_timer_reserve_systimer(timer->id))
-@@ -292,7 +294,8 @@ static int __init omap_dm_timer_init_one(struct omap_dm_timer *timer,
- 	omap_hwmod_setup_one(oh_name);
- 
- 	/* After the dmtimer is using hwmod these clocks won't be needed */
--	timer->fclk = clk_get(NULL, omap_hwmod_get_main_clk(oh));
-+	if (IS_ERR_OR_NULL(timer->fclk))
-+		timer->fclk = clk_get(NULL, omap_hwmod_get_main_clk(oh));
- 	if (IS_ERR(timer->fclk))
- 		return PTR_ERR(timer->fclk);
- 
--- 
-1.9.1
+https://www.spinics.net/lists/arm-kernel/msg562460.html
+
+This series depends on the TI clock cleanup series I posted last week:
+
+https://www.spinics.net/lists/arm-kernel/msg567920.html
+
+Patch #5 has been changed to accommodate for the existence of multiple
+hwmods under single DT node, for example the "ocp" node for omap4
+contains 3 hwmods for the different buses; support for this is enabled
+by accepting index for the clkctrl clocks also.
+
+Patch #6 is a new one to properly assign the clock for timers. This is
+needed as currently timer code only fetches the main clock info from
+hwmod itself.
+
+Patches #7, #8 and #9 add the DT data for omap4.
+
+Boot tested on am335x-evm, am335x-evmsk, am47x-evm, am437x-sk, am437x-gp-evm,
+  am57xx-evm, omap3-beagle-xm, omap3-beagle, am335x-boneblack, craneboard,
+  dra72x-evm, dra7xx-evm, n900, omap5-uevm, omap4-panda-es, omap4-panda,
+  omap2430-sdp, omap3430-sdp, omap4430-sdp.
+
+Suspend-resume tested on omap4-panda-es.
+
+Any additional testing on omap4 welcome as this series basically
+tweaks every possible peripheral clock on the SoC.
+
+Branch available on top of 4.11-rc1 (+ the cleanup series) here:
+
+tree: https://github.com/t-kristo/linux-pm.git
+branch: for-4.12-ti-clkctrl
+
+-Tero
