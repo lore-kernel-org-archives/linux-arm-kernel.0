@@ -1,28 +1,56 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Fri, 17 Mar 2017 09:39:00 -0400
-Subject: [PATCH] pata_pcmcia: add EBSA110's PCMCIA slot support
-In-Reply-To: <1533391.BtkrkgvqUW@amdc3058>
-References: <CGME20170314175046epcas1p43f98daad14a2bac7f314e7d39e120232@epcas1p4.samsung.com>
- <3458240.9SL7iGif3L@amdc3058>
- <20170316212654.GD1480@htj.duckdns.org>
- <1533391.BtkrkgvqUW@amdc3058>
-Message-ID: <20170317133900.GA5078@htj.duckdns.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 17 Mar 2017 13:50:39 +0000
+Subject: [PATCH v3] irqchip/gicv3-its: Avoid memory over allocation for
+ ITEs
+In-Reply-To: <1488896720-6223-1-git-send-email-shankerd@codeaurora.org>
+References: <1488896720-6223-1-git-send-email-shankerd@codeaurora.org>
+Message-ID: <b74f8fbb-0d9a-b1e2-83d2-ba9c1a858222@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Fri, Mar 17, 2017 at 12:59:56PM +0100, Bartlomiej Zolnierkiewicz wrote:
-> There is no support for this device in the upstream ide driver but
-> Russell has a hacky patch to make it work by redefining inb()/outb()
-> operations globally for the whole ide subsystem, please see:
+On 07/03/17 14:25, Shanker Donthineni wrote:
+> We are always allocating extra 255Bytes of memory to handle ITE
+> physical address alignment requirement. The kmalloc() satisfies
+> the ITE alignment since the ITS driver is requesting a minimum
+> size of ITS_ITT_ALIGN bytes.
 > 
-> https://www.spinics.net/lists/arm-kernel/msg567454.html
+> Let's try to allocate the exact amount of memory that is required
+> for ITEs to avoid wastage.
+> 
+> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
+> ---
+> v2: removed 'Change-Id: Ia8084189833f2081ff13c392deb5070c46a64038' from commit.
+> v3: changed from IITE to ITE.
+> 
+>  drivers/irqchip/irq-gic-v3-its.c | 7 ++++++-
+>  1 file changed, 6 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+> index 86bd428..5aeca78 100644
+> --- a/drivers/irqchip/irq-gic-v3-its.c
+> +++ b/drivers/irqchip/irq-gic-v3-its.c
+> @@ -1329,8 +1329,13 @@ static struct its_device *its_create_device(struct its_node *its, u32 dev_id,
+>  	 */
+>  	nr_ites = max(2UL, roundup_pow_of_two(nvecs));
+>  	sz = nr_ites * its->ite_size;
+> -	sz = max(sz, ITS_ITT_ALIGN) + ITS_ITT_ALIGN - 1;
+> +	sz = max(sz, ITS_ITT_ALIGN);
+>  	itt = kzalloc(sz, GFP_KERNEL);
+> +	if (itt && !IS_ALIGNED(virt_to_phys(itt), ITS_ITT_ALIGN)) {
+> +		kfree(itt);
+> +		itt = kzalloc(sz + ITS_ITT_ALIGN - 1, GFP_KERNEL);
+> +	}
+> +
 
-Well, that mail says that the hardware is a museum piece.  What's the
-point here?  This can't even be tested, can it?
+Is this really worth the complexity? Are you aware of a system where the
+accumulation of overallocation actually shows up as being an issue?
 
-Thanks.
+If you want to be absolutely exact in your allocation, then I'd suggest
+doing it all the time, and have a proper dedicated allocator that always
+do the right thing, without a wasteful fallback like you still have here.
 
+Thanks,
+
+	M.
 -- 
-tejun
+Jazz is not dead. It just smells funny...
