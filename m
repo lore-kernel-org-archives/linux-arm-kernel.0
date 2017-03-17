@@ -1,56 +1,63 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 17 Mar 2017 13:50:39 +0000
-Subject: [PATCH v3] irqchip/gicv3-its: Avoid memory over allocation for
- ITEs
-In-Reply-To: <1488896720-6223-1-git-send-email-shankerd@codeaurora.org>
-References: <1488896720-6223-1-git-send-email-shankerd@codeaurora.org>
-Message-ID: <b74f8fbb-0d9a-b1e2-83d2-ba9c1a858222@arm.com>
+From: sjoerd.simons@collabora.co.uk (Sjoerd Simons)
+Date: Fri, 17 Mar 2017 14:51:17 +0100
+Subject: [PATCH] ARM: dts: rockchip: Enable sata support on rock2 square
+Message-ID: <20170317135118.17333-1-sjoerd.simons@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/03/17 14:25, Shanker Donthineni wrote:
-> We are always allocating extra 255Bytes of memory to handle ITE
-> physical address alignment requirement. The kmalloc() satisfies
-> the ITE alignment since the ITS driver is requesting a minimum
-> size of ITS_ITT_ALIGN bytes.
-> 
-> Let's try to allocate the exact amount of memory that is required
-> for ITEs to avoid wastage.
-> 
-> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
-> ---
-> v2: removed 'Change-Id: Ia8084189833f2081ff13c392deb5070c46a64038' from commit.
-> v3: changed from IITE to ITE.
-> 
->  drivers/irqchip/irq-gic-v3-its.c | 7 ++++++-
->  1 file changed, 6 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-> index 86bd428..5aeca78 100644
-> --- a/drivers/irqchip/irq-gic-v3-its.c
-> +++ b/drivers/irqchip/irq-gic-v3-its.c
-> @@ -1329,8 +1329,13 @@ static struct its_device *its_create_device(struct its_node *its, u32 dev_id,
->  	 */
->  	nr_ites = max(2UL, roundup_pow_of_two(nvecs));
->  	sz = nr_ites * its->ite_size;
-> -	sz = max(sz, ITS_ITT_ALIGN) + ITS_ITT_ALIGN - 1;
-> +	sz = max(sz, ITS_ITT_ALIGN);
->  	itt = kzalloc(sz, GFP_KERNEL);
-> +	if (itt && !IS_ALIGNED(virt_to_phys(itt), ITS_ITT_ALIGN)) {
-> +		kfree(itt);
-> +		itt = kzalloc(sz + ITS_ITT_ALIGN - 1, GFP_KERNEL);
-> +	}
-> +
+The Rock 2 square board has a USB -> SATA converter hooked up to its usb
+host1 connection. Enable the usb controller and always turn on the power
+on the 5V sata power connector (controlled by gpio).
 
-Is this really worth the complexity? Are you aware of a system where the
-accumulation of overallocation actually shows up as being an issue?
+Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
 
-If you want to be absolutely exact in your allocation, then I'd suggest
-doing it all the time, and have a proper dedicated allocator that always
-do the right thing, without a wasteful fallback like you still have here.
+---
 
-Thanks,
+ arch/arm/boot/dts/rk3288-rock2-square.dts | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
 
-	M.
+diff --git a/arch/arm/boot/dts/rk3288-rock2-square.dts b/arch/arm/boot/dts/rk3288-rock2-square.dts
+index fbf11d410c42..a23a94811be8 100644
+--- a/arch/arm/boot/dts/rk3288-rock2-square.dts
++++ b/arch/arm/boot/dts/rk3288-rock2-square.dts
+@@ -81,6 +81,17 @@
+ 		};
+ 	};
+ 
++	sata_pwr: sata-prw-regulator {
++		compatible = "regulator-fixed";
++		enable-active-high;
++		gpio = <&gpio0 13 GPIO_ACTIVE_HIGH>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&sata_pwr_en>;
++		/* Always turn on the 5V sata power connector */
++		regulator-always-on;
++		regulator-name = "sata_pwr";
++	};
++
+ 	spdif_out: spdif-out {
+ 		compatible = "linux,spdif-dit";
+ 		#sound-dai-cells = <0>;
+@@ -237,6 +248,12 @@
+ 		};
+ 	};
+ 
++	sata {
++		sata_pwr_en: sata-pwr-en {
++			rockchip,pins = <0 13 RK_FUNC_GPIO &pcfg_pull_none>;
++		};
++	};
++
+ 	sdmmc {
+ 		sdmmc_pwr: sdmmc-pwr {
+ 			rockchip,pins = <7 11 RK_FUNC_GPIO &pcfg_pull_none>;
+@@ -265,3 +282,7 @@
+ &usb_host0_ehci {
+ 	status = "okay";
+ };
++
++&usb_host1 {
++	status = "okay";
++};
 -- 
-Jazz is not dead. It just smells funny...
+2.11.0
