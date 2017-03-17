@@ -1,213 +1,90 @@
-From: robdclark@gmail.com (Rob Clark)
-Date: Thu, 16 Mar 2017 18:52:15 -0400
-Subject: [PATCH V3 2/5] iommu/arm-smmu: Add support for MMU40x/500 clocks
-In-Reply-To: <1489073748-3659-3-git-send-email-sricharan@codeaurora.org>
-References: <1489073748-3659-1-git-send-email-sricharan@codeaurora.org>
- <1489073748-3659-3-git-send-email-sricharan@codeaurora.org>
-Message-ID: <CAF6AEGv3FAyWfXGT_8=bcn+UL8Ug1pE8EGu=MQC70U++wUOioA@mail.gmail.com>
+From: mcgrof@kernel.org (Luis R. Rodriguez)
+Date: Fri, 17 Mar 2017 01:08:03 +0100
+Subject: [PATCH 03/20] asm-generic/io.h: add PCI config space remap
+ interface
+In-Reply-To: <20170316211243.GE9739@bhelgaas-glaptop.roam.corp.google.com>
+References: <20170227151436.18698-1-lorenzo.pieralisi@arm.com>
+ <20170227151436.18698-4-lorenzo.pieralisi@arm.com>
+ <20170316211243.GE9739@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <20170317000803.GA28800@wotan.suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 9, 2017 at 10:35 AM, Sricharan R <sricharan@codeaurora.org> wrote:
-> The MMU400x/500 is the implementation of the SMMUv2
-> arch specification. It is split in to two blocks
-> TBU, TCU. TBU caches the page table, instantiated
-> for each master locally, clocked by the TBUn_clk.
-> TCU manages the address translation with PTW and has
-> the programming interface as well, clocked using the
-> TCU_CLK. The TBU can also be sharing the same clock
-> domain as TCU, in which case both are clocked using
-> the TCU_CLK.
->
-> This defines the clock bindings for the same and adds the
-> init, enable and disable functions for handling the
-> clocks.
->
-> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
-> ---
->  .../devicetree/bindings/iommu/arm,smmu.txt         | 27 ++++++
->  drivers/iommu/arm-smmu.c                           | 95 +++++++++++++++++++++-
->  2 files changed, 121 insertions(+), 1 deletion(-)
->
-> diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu.txt b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-> index 6cdf32d..b369c13 100644
-> --- a/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-> +++ b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-> @@ -60,6 +60,28 @@ conditions.
->                    aliases of secure registers have to be used during
->                    SMMU configuration.
->
-> +- clock-names:    Should be "tbu_clk" and "tcu_clk" and "cfg_clk" for
-> +                  "arm,mmu-400", "arm,mmu-401" and "arm,mmu-500"
+On Thu, Mar 16, 2017 at 04:12:43PM -0500, Bjorn Helgaas wrote:
+> [+cc Luis]
+> 
+> On Mon, Feb 27, 2017 at 03:14:14PM +0000, Lorenzo Pieralisi wrote:
+> > The PCI specifications (Rev 3.0, 3.2.5 "Transaction Ordering and
+> > Posting") mandate non-posted configuration transactions. As further
+> > highlighted in the PCIe specifications (4.0 - Rev0.3, "Ordering
+> > Considerations for the Enhanced Configuration Access Mechanism"),
+> > through ECAM and ECAM-derivative configuration mechanism, the memory
+> > mapped transactions from the host CPU into Configuration Requests on the
+> > PCI express fabric may create ordering problems for software because
+> > writes to memory address are typically posted transactions (unless the
+> > architecture can enforce through virtual address mapping non-posted
+> > write transactions behaviour) but writes to Configuration Space are not
+> > posted on the PCI express fabric.
+> > 
+> > Current DT and ACPI host bridge controllers map PCI configuration space
+> > (ECAM and ECAM-derivative) into the virtual address space through
+> > ioremap() calls, that are non-cacheable device accesses on most
+> > architectures, but may provide "bufferable" or "posted" write semantics
+> > in architecture like eg ARM/ARM64 that allow ioremap'ed regions writes
+> > to be buffered in the bus connecting the host CPU to the PCI fabric;
+> > this behaviour, as underlined in the PCIe specifications, may trigger
+> > transactions ordering rules and must be prevented.
+> > 
+> > Introduce a new generic and explicit API to create a memory
+> > mapping for ECAM and ECAM-derivative config space area that
+> > defaults to ioremap_nocache() (which should provide a sane default
+> > behaviour) but still allowing architectures on which ioremap_nocache()
+> > results in posted write transactions to override the function
+> > call with an arch specific implementation that complies with
+> > the PCI specifications for configuration transactions.
 
-I guess that should be: "Should be "tbu_clk" *or* "tcu_clk" and
-"cfg_clk" for..."
+So... I take it this is actually fixing a series of odd issues also,
+do we at least have some reports or actual issues ?
 
-Also, possibly we should define our own compat strings for various
-SoC's that require these clks so we can properly describe when they
-are required?  I guess that would address Rob H's comment.
+> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > Cc: Arnd Bergmann <arnd@arndb.de>
+> > Cc: Will Deacon <will.deacon@arm.com>
+> > Cc: Bjorn Helgaas <bhelgaas@google.com>
+> > Cc: Russell King <linux@armlinux.org.uk>
+> > Cc: Catalin Marinas <catalin.marinas@arm.com>
+> > ---
+> >  include/asm-generic/io.h | 9 +++++++++
+> >  1 file changed, 9 insertions(+)
+> > 
+> > diff --git a/include/asm-generic/io.h b/include/asm-generic/io.h
+> > index 7ef015e..52dda81 100644
+> > --- a/include/asm-generic/io.h
+> > +++ b/include/asm-generic/io.h
+> > @@ -915,6 +915,15 @@ extern void ioport_unmap(void __iomem *p);
+> >  #endif /* CONFIG_GENERIC_IOMAP */
+> >  #endif /* CONFIG_HAS_IOPORT_MAP */
+> >  
+> > +#ifndef pci_remap_cfgspace
+> > +#define pci_remap_cfgspace pci_remap_cfgspace
+> > +static inline void __iomem *pci_remap_cfgspace(phys_addr_t offset,
+> > +					       size_t size)
+> > +{
+> > +	return ioremap_nocache(offset, size);
+> > +}
+> 
+> I'm fine with this conceptually, but I think it would make more sense
+> if the name weren't specific to PCI or config space, e.g.,
+> ioremap_nopost() or something.
 
-BR,
--R
+Seems reasonable to me -- but are there other buses that could use this already
+as well ? Wouldn't these other buses also run into similar issues ? Can someone
+also bounce me a copy of the patches that use this ?
 
-> +                  "tcu_clk" is required for smmu's register access using the
-> +                  programming interface and ptw for downstream bus access.
-> +
-> +                  "tbu_clk" is required for access to the TBU connected to the
-> +                  master locally. This clock is optional and not required when
-> +                  TBU is in the same clock domain as the TCU or when the TBU is
-> +                  clocked along with the master.
-> +
-> +                  "cfg_clk" is optional if required to access the TCU's programming
-> +                  interface, apart from the "tcu_clk".
-> +
-> +- clocks:         Phandles for respective clocks described by clock-names.
-> +
-> +- power-domains:  Phandles to SMMU's power domain specifier. This is
-> +                  required even if SMMU belongs to the master's power
-> +                  domain, as the SMMU will have to be enabled and
-> +                  accessed before master gets enabled and linked to its
-> +                  SMMU.
-> +
->  ** Deprecated properties:
->
->  - mmu-masters (deprecated in favour of the generic "iommus" binding) :
-> @@ -84,6 +106,11 @@ conditions.
->                               <0 36 4>,
->                               <0 37 4>;
->                  #iommu-cells = <1>;
-> +                clocks = <&gcc GCC_SMMU_CFG_CLK>,
-> +                         <&gcc GCC_APSS_TCU_CLK>,
-> +                        <&gcc GCC_MDP_TBU_CLK>;
-> +
-> +               clock-names = "cfg_clk", "tcu_clk", "tbu_clk";
->          };
->
->          /* device with two stream IDs, 0 and 7 */
-> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> index f7e11d3..720a1ef 100644
-> --- a/drivers/iommu/arm-smmu.c
-> +++ b/drivers/iommu/arm-smmu.c
-> @@ -341,6 +341,12 @@ struct arm_smmu_master_cfg {
->  #define for_each_cfg_sme(fw, i, idx) \
->         for (i = 0; idx = fwspec_smendx(fw, i), i < fw->num_ids; ++i)
->
-> +struct mmu500_clk {
-> +       struct clk *cfg_clk;
-> +       struct clk *tcu_clk;
-> +       struct clk *tbu_clk;
-> +};
-> +
->  struct arm_smmu_clks {
->         void *clks;
->         int (*init_clocks)(struct arm_smmu_device *smmu);
-> @@ -455,6 +461,92 @@ static struct arm_smmu_domain *to_smmu_domain(struct iommu_domain *dom)
->         return container_of(dom, struct arm_smmu_domain, domain);
->  }
->
-> +static int mmu500_enable_clocks(struct arm_smmu_device *smmu)
-> +{
-> +       int ret = 0;
-> +       struct mmu500_clk *sclks = smmu->smmu_clks.clks;
-> +
-> +       if (!sclks)
-> +               return 0;
-> +
-> +       ret = clk_prepare_enable(sclks->cfg_clk);
-> +       if (ret) {
-> +               dev_err(smmu->dev, "Couldn't enable cfg_clk");
-> +               return ret;
-> +       }
-> +
-> +       ret = clk_prepare_enable(sclks->tcu_clk);
-> +       if (ret) {
-> +               dev_err(smmu->dev, "Couldn't enable tcu_clk");
-> +               clk_disable_unprepare(sclks->cfg_clk);
-> +               return ret;
-> +       }
-> +
-> +       ret = clk_prepare_enable(sclks->tbu_clk);
-> +       if (ret) {
-> +               dev_err(smmu->dev, "Couln't enable tbu_clk");
-> +               clk_disable_unprepare(sclks->tcu_clk);
-> +               clk_disable_unprepare(sclks->cfg_clk);
-> +               return ret;
-> +       }
-> +
-> +       return 0;
-> +}
-> +
-> +static void mmu500_disable_clocks(struct arm_smmu_device *smmu)
-> +{
-> +       struct mmu500_clk *sclks = smmu->smmu_clks.clks;
-> +
-> +       if (!sclks) {
-> +               clk_disable_unprepare(sclks->tbu_clk);
-> +               clk_disable_unprepare(sclks->tcu_clk);
-> +               clk_disable_unprepare(sclks->cfg_clk);
-> +       }
-> +}
-> +
-> +static int mmu500_init_clocks(struct arm_smmu_device *smmu)
-> +{
-> +       struct device *dev = smmu->dev;
-> +       struct mmu500_clk *sclks;
-> +       int err;
-> +
-> +       if (!of_find_property(dev->of_node, "clocks", NULL))
-> +               return 0;
-> +
-> +       sclks = devm_kzalloc(dev, sizeof(*sclks), GFP_KERNEL);
-> +       if (!sclks)
-> +               return -ENOMEM;
-> +
-> +       sclks->cfg_clk = devm_clk_get(dev, "cfg_clk");
-> +       if (IS_ERR(sclks->cfg_clk)) {
-> +               err = PTR_ERR(sclks->cfg_clk);
-> +               /* Ignore all, except -EPROBE_DEFER for optional clocks */
-> +               if (err == -EPROBE_DEFER)
-> +                       return err;
-> +               else
-> +                       sclks->cfg_clk = NULL;
-> +       }
-> +
-> +       sclks->tcu_clk = devm_clk_get(dev, "tcu_clk");
-> +       if (IS_ERR(sclks->tcu_clk)) {
-> +               dev_err(dev, "Couldn't get tcu_clk");
-> +               return PTR_ERR(sclks->tcu_clk);
-> +       }
-> +
-> +       sclks->tbu_clk = devm_clk_get(dev, "tbu_clk");
-> +       if (IS_ERR(sclks->tbu_clk)) {
-> +               err = PTR_ERR(sclks->tbu_clk);
-> +               /* Ignore all, ecept -EPROBE_DEFER for optional clocks */
-> +               if (err == -EPROBE_DEFER)
-> +                       return err;
-> +               else
-> +                       sclks->tbu_clk = NULL;
-> +       }
-> +
-> +       smmu->smmu_clks.clks = sclks;
-> +       return 0;
-> +}
-> +
->  static void parse_driver_options(struct arm_smmu_device *smmu)
->  {
->         int i = 0;
-> @@ -1981,7 +2073,8 @@ struct arm_smmu_match_data {
->                     NULL, NULL, NULL);
->  ARM_SMMU_MATCH_DATA(arm_mmu401, ARM_SMMU_V1_64K, GENERIC_SMMU,
->                     NULL, NULL, NULL);
-> -ARM_SMMU_MATCH_DATA(arm_mmu500, ARM_SMMU_V2, ARM_MMU500, NULL, NULL, NULL);
-> +ARM_SMMU_MATCH_DATA(arm_mmu500, ARM_SMMU_V2, ARM_MMU500, mmu500_init_clocks,
-> +                   mmu500_enable_clocks, mmu500_disable_clocks);
->  ARM_SMMU_MATCH_DATA(cavium_smmuv2, ARM_SMMU_V2, CAVIUM_SMMUV2,
->                     NULL, NULL, NULL);
->
-> --
-> QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
->
-> _______________________________________________
-> iommu mailing list
-> iommu at lists.linux-foundation.org
-> https://lists.linuxfoundation.org/mailman/listinfo/iommu
+While at it, please add some documentation too, the above commit log is huge,
+and yet for the person eyeballing the code they won't have any clue why this
+was added exactly. Since this is about helping with picking the right
+ioremap due to certain semantics / requirements on the PCI config space,
+we should clarify then what exactly are the expectations here. The clearer
+you are the less in trouble we can get later.
+
+  Luis
