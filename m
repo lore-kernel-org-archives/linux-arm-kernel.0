@@ -1,82 +1,73 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 17 Mar 2017 17:17:44 +0000
-Subject: [RFC arm64] samples/bpf: explicitly exclude sysreg sections with
- asm macros
-In-Reply-To: <20170316210454.GA53792@C02RW35GFVH8.dhcp.broadcom.net>
-References: <1489101492-15653-1-git-send-email-andy@greyhouse.net>
- <20170310175229.GC18894@arm.com>
- <20170310192656.GA13928@C02RW35GFVH8>
- <20170310204112.GA21382@leverpostej>
- <20170315183130.GB32819@C02RW35GFVH8.dhcp.broadcom.net>
- <20170315191741.GB29452@leverpostej>
- <20170315205404.GA43995@C02RW35GFVH8.dhcp.broadcom.net>
- <20170316104204.GA31101@leverpostej>
- <20170316210454.GA53792@C02RW35GFVH8.dhcp.broadcom.net>
-Message-ID: <20170317171744.GM5940@leverpostej>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Fri, 17 Mar 2017 18:18:37 +0100
+Subject: [PATCH v2 3/6] dt-bindings: rk1108-cru: rename RK1108 to RV1108
+In-Reply-To: <20170317171840.4683-1-heiko@sntech.de>
+References: <20170317171840.4683-1-heiko@sntech.de>
+Message-ID: <20170317171840.4683-4-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 16, 2017 at 05:04:55PM -0400, Andy Gospodarek wrote:
-> On Thu, Mar 16, 2017 at 10:42:04AM +0000, Mark Rutland wrote:
-> > On Wed, Mar 15, 2017 at 04:54:04PM -0400, Andy Gospodarek wrote:
-> > > On Wed, Mar 15, 2017 at 07:17:41PM +0000, Mark Rutland wrote:
-> > > > On Wed, Mar 15, 2017 at 02:31:30PM -0400, Andy Gospodarek wrote:
-> > > > > On Fri, Mar 10, 2017 at 08:41:13PM +0000, Mark Rutland wrote:
+From: Andy Yan <andy.yan@rock-chips.com>
 
-> > > > > > ... so as far as I can see it's the presence of any inline assembly that
-> > > > > > the tool cannot handle, as LLVM tells us.
+Rockchip finally named the SOC as RV1108, so change it.
 
-> > > LLVM ERROR: Inline asm not supported by this streamer because we
-> > > don't have an asm parser for this target
-> > > 
-> > > Upon inspection it does not appear that this is explicitly related to
-> > > assembly macros, just simple inline assembly. 
+Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
+Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ .../{rockchip,rk1108-cru.txt => rockchip,rv1108-cru.txt}     | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
+ rename Documentation/devicetree/bindings/clock/{rockchip,rk1108-cru.txt => rockchip,rv1108-cru.txt} (83%)
 
-> You are correct that it appears llvm cannot process any inline asm for
-> arm64.  Sadly (or luckily) the inability to process this is not a
-> hard-requirement for llvm to properly compile code that includes these
-> h-files -- as long as none of #defines/c-macros/inline functions are
-> actually *called* in the code I'm trying to compile.
-
-The Linux-internal arm64 headers are there to build the kernel using a
-supported toolchain. From my PoV, if you want to use the Linux-internal
-arm64 headers, you need to be compatible with the toolchain(s) that we
-target. 
-
-I would imagine the x86 developers would have a similar feeling, were
-this issue to crop up on x86.
-
-> Sorry I continue to harp on this, but I've been testing XDP on ARM64
-> using some Broadcom SoCs and I'm seeing some really nice performance
-> benefits to being able to process so many frames per second using a
-> smaller footprint device.  I'd like to see the ARM64 XDP user community
-> grow, but without the ability to easily compile the samples in the
-> upstream kernel tree today I just don't see this user- or developer-base
-> growing.  
-
-Please talk to the LLVM community, and see what is necessary in order to
-make it compatible with the toolchains we support.
-
-> > It sounds like the toolchain you are using is lacking in functionality
-> > that is presumably present when targeting x86, or the error messages are
-> > simply misleading. In either case, there's a toolchain issue to be
-> > addressed, and not a kernel issue.
-> 
-> While I generally agree isn't the entire reason this inline asm exists
-> -- to fix a binutils issue?  :-)
-> 
-> commit 72c5839515260dce966cd24f54436e6583288e6c
-> Author: Catalin Marinas <catalin.marinas@arm.com>
-> Date:   Thu Jul 24 14:14:42 2014 +0100
-> 
->     arm64: gicv3: Allow GICv3 compilation with older binutils
-
-We introduced this code so as to *retain* compatibility with a toolchain
-that we explicitly supported, but accidentally broke with the addition
-of the GICv3 code.
-
-We have clearly never supoprted a toolchain that cannot parse inline
-asembly.
-
-Thanks,
-Mark.
+diff --git a/Documentation/devicetree/bindings/clock/rockchip,rk1108-cru.txt b/Documentation/devicetree/bindings/clock/rockchip,rv1108-cru.txt
+similarity index 83%
+rename from Documentation/devicetree/bindings/clock/rockchip,rk1108-cru.txt
+rename to Documentation/devicetree/bindings/clock/rockchip,rv1108-cru.txt
+index 4da126116cf0..161326a4f9c1 100644
+--- a/Documentation/devicetree/bindings/clock/rockchip,rk1108-cru.txt
++++ b/Documentation/devicetree/bindings/clock/rockchip,rv1108-cru.txt
+@@ -1,12 +1,12 @@
+-* Rockchip RK1108 Clock and Reset Unit
++* Rockchip RV1108 Clock and Reset Unit
+ 
+-The RK1108 clock controller generates and supplies clock to various
++The RV1108 clock controller generates and supplies clock to various
+ controllers within the SoC and also implements a reset controller for SoC
+ peripherals.
+ 
+ Required Properties:
+ 
+-- compatible: should be "rockchip,rk1108-cru"
++- compatible: should be "rockchip,rv1108-cru"
+ - reg: physical base address of the controller and length of memory mapped
+   region.
+ - #clock-cells: should be 1.
+@@ -19,7 +19,7 @@ Optional Properties:
+ 
+ Each clock is assigned an identifier and client nodes can use this identifier
+ to specify the clock which they consume. All available clocks are defined as
+-preprocessor macros in the dt-bindings/clock/rk1108-cru.h headers and can be
++preprocessor macros in the dt-bindings/clock/rv1108-cru.h headers and can be
+ used in device tree sources. Similar macros exist for the reset sources in
+ these files.
+ 
+@@ -38,7 +38,7 @@ clock-output-names:
+ Example: Clock controller node:
+ 
+ 	cru: cru at 20200000 {
+-		compatible = "rockchip,rk1108-cru";
++		compatible = "rockchip,rv1108-cru";
+ 		reg = <0x20200000 0x1000>;
+ 		rockchip,grf = <&grf>;
+ 
+@@ -50,7 +50,7 @@ Example: UART controller node that consumes the clock generated by the clock
+   controller:
+ 
+ 	uart0: serial at 10230000 {
+-		compatible = "rockchip,rk1108-uart", "snps,dw-apb-uart";
++		compatible = "rockchip,rv1108-uart", "snps,dw-apb-uart";
+ 		reg = <0x10230000 0x100>;
+ 		interrupts = <GIC_SPI 44 IRQ_TYPE_LEVEL_HIGH>;
+ 		reg-shift = <2>;
+-- 
+2.11.0
