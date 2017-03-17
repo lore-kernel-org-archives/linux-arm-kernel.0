@@ -1,59 +1,157 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 17 Mar 2017 16:57:20 +0000
-Subject: [RFC arm64] samples/bpf: explicitly exclude sysreg sections with
- asm macros
-In-Reply-To: <20170317135836.GA58086@C02RW35GFVH8.dhcp.broadcom.net>
-References: <1489101492-15653-1-git-send-email-andy@greyhouse.net>
- <20170310175229.GC18894@arm.com> <20170310192656.GA13928@C02RW35GFVH8>
- <20170310204112.GA21382@leverpostej>
- <20170315183130.GB32819@C02RW35GFVH8.dhcp.broadcom.net>
- <20170315191741.GB29452@leverpostej>
- <20170315205404.GA43995@C02RW35GFVH8.dhcp.broadcom.net>
- <20170316104204.GA31101@leverpostej>
- <20170316210454.GA53792@C02RW35GFVH8.dhcp.broadcom.net>
- <e842a237-9206-99ed-624b-4f3cf15cc557@arm.com>
- <20170317135836.GA58086@C02RW35GFVH8.dhcp.broadcom.net>
-Message-ID: <383e1626-335b-01fe-5921-5956d7201cf4@arm.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Fri, 17 Mar 2017 17:01:03 +0000
+Subject: [PATCH v3 12/19] KVM: arm64: ITS: vgic_its_alloc_ite/device
+In-Reply-To: <1488800074-21991-13-git-send-email-eric.auger@redhat.com>
+References: <1488800074-21991-1-git-send-email-eric.auger@redhat.com>
+ <1488800074-21991-13-git-send-email-eric.auger@redhat.com>
+Message-ID: <f913a9be-d994-9c18-3a30-e60e1778480a@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/03/17 13:58, Andy Gospodarek wrote:
-> On Fri, Mar 17, 2017 at 11:11:59AM +0000, Robin Murphy wrote:
->> On 16/03/17 21:04, Andy Gospodarek wrote:
->>>
->>> While I generally agree isn't the entire reason this inline asm exists
->>> -- to fix a binutils issue?  :-)
->>
->> Binutils is required to build the arm64 kernel; if certain versions of
->> binutils packaged by arm64 distros can't cope with certain instructions
->> we need to use, we have to do what we can to make it build. However, if
->> LLVM cannot cope with inline assembly on arm64, then it's pretty clear
->> that the kernel cannot be built with LLVM anyway, thus there is nothing
->> to work around in that regard. Sorry, you've got a straw man there ;)
+Hi,
+
+On 06/03/17 11:34, Eric Auger wrote:
+> Add two new helpers to allocate an its ite and an its device.
+> This will avoid duplication on restore path.
 > 
-> I know, right?  I'll see if I can come up with something that appears to
-> be less fragile and/or intrusive to the arm64 arch code as I'd really
-> like to stop carrying a patch in my devel tree for this.
+> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+> 
+> ---
+> 
+> v1 -> v2:
+> - report itt_size fix and remove ITE_SIZE
+> - s/itte/ite/g
+> ---
+>  virt/kvm/arm/vgic/vgic-its.c | 70 +++++++++++++++++++++++++++++---------------
+>  1 file changed, 47 insertions(+), 23 deletions(-)
+> 
+> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+> index dd7545a..9792110 100644
+> --- a/virt/kvm/arm/vgic/vgic-its.c
+> +++ b/virt/kvm/arm/vgic/vgic-its.c
+> @@ -734,6 +734,26 @@ static void vgic_its_free_collection(struct vgic_its *its, u32 coll_id)
+>  	kfree(collection);
+>  }
+>  
 
-I'm honestly not sure if I'm serious or not, but:
+Can you please propagate the:
+"Must be called with its_lock mutex held." comment here?
 
-diff --git a/samples/bpf/Makefile b/samples/bpf/Makefile
-index 72c58675973e..f52ebad7b096 100644
---- a/samples/bpf/Makefile
-+++ b/samples/bpf/Makefile
-@@ -154,6 +154,6 @@ $(src)/*.c: verify_target_bpf
- # useless for BPF samples.
- $(obj)/%.o: $(src)/%.c
-        $(CLANG) $(NOSTDINC_FLAGS) $(LINUXINCLUDE) $(EXTRA_CFLAGS) \
--               -D__KERNEL__ -D__ASM_SYSREG_H -Wno-unused-value
--Wno-pointer-sign \
-+               -D__KERNEL__ -D'asm(...)' -Wno-unused-value
--Wno-pointer-sign \
-                -Wno-compare-distinct-pointer-types \
-                -O2 -emit-llvm -c $< -o -| $(LLC) -march=bpf
--filetype=obj -o $@
+> +static int vgic_its_alloc_ite(struct its_device *device,
+> +			       struct its_ite **itep,
+> +			       struct its_collection *collection,
+> +			       u32 lpi_id, u32 event_id)
+> +{
+> +	struct its_ite *ite;
+> +
+> +	ite = kzalloc(sizeof(ite), GFP_KERNEL);
 
+That should be sizeof(*ite) or sizeof(struct its_ite).
 
-?
+> +	if (!ite)
+> +		return -ENOMEM;
+> +
+> +	ite->event_id	= event_id;
+> +	ite->collection = collection;
+> +	ite->lpi = lpi_id;
+> +
+> +	list_add_tail(&ite->ite_list, &device->itt_head);
+> +	*itep = ite;
+> +	return 0;
+> +}
+> +
+>  /*
+>   * The MAPTI and MAPI commands map LPIs to ITTEs.
+>   * Must be called with its_lock mutex held.
+> @@ -747,7 +767,7 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
+>  	struct its_ite *ite;
+>  	struct its_device *device;
+>  	struct its_collection *collection, *new_coll = NULL;
+> -	int lpi_nr;
+> +	int lpi_nr, ret;
+>  	struct vgic_irq *irq;
+>  
+>  	device = find_its_device(its, device_id);
+> @@ -777,19 +797,13 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
+>  		new_coll = collection;
+>  	}
+>  
+> -	ite = kzalloc(sizeof(struct its_ite), GFP_KERNEL);
+> -	if (!ite) {
+> +	ret = vgic_its_alloc_ite(device, &ite, collection, lpi_nr, event_id);
+> +	if (ret) {
+>  		if (new_coll)
+>  			vgic_its_free_collection(its, coll_id);
+> -		return -ENOMEM;
+> +		return ret;
+>  	}
+>  
+> -	ite->event_id	= event_id;
+> -	list_add_tail(&ite->ite_list, &device->itt_head);
+> -
+> -	ite->collection = collection;
+> -	ite->lpi = lpi_nr;
+> -
+>  	irq = vgic_add_lpi(kvm, lpi_nr);
+>  	if (IS_ERR(irq)) {
+>  		if (new_coll)
+> @@ -828,6 +842,28 @@ static void vgic_its_unmap_device(struct kvm *kvm, struct its_device *device)
+>  	kfree(device);
+>  }
+>  
+> +static int vgic_its_alloc_device(struct vgic_its *its,
+> +				 struct its_device **devp,
+> +				 u32 device_id, gpa_t itt_addr_field,
+> +				 size_t size_field)
+> +{
+> +	struct its_device *device;
+> +
+> +	device = kzalloc(sizeof(*device), GFP_KERNEL);
+> +	if (!device)
+> +		return -ENOMEM;
+> +
+> +	device->device_id = device_id;
+> +	device->itt_addr = itt_addr_field << 8;
+> +	device->nb_eventid_bits = size_field + 1;
 
-Robin.
+I'd rather see these command buffer entry decodings done at the source,
+not here (though this isn't in this patch).
+
+The rest looks fine.
+
+Cheers,
+Andre
+
+> +	INIT_LIST_HEAD(&device->itt_head);
+> +
+> +	list_add_tail(&device->dev_list, &its->device_list);
+> +	*devp = device;
+> +
+> +	return 0;
+> +}
+> +
+>  /*
+>   * MAPD maps or unmaps a device ID to Interrupt Translation Tables (ITTs).
+>   * Must be called with the its_lock mutex held.
+> @@ -864,19 +900,7 @@ static int vgic_its_cmd_handle_mapd(struct kvm *kvm, struct vgic_its *its,
+>  	if (!valid)
+>  		return 0;
+>  
+> -	device = kzalloc(sizeof(struct its_device), GFP_KERNEL);
+> -	if (!device)
+> -		return -ENOMEM;
+> -
+> -	device->device_id = device_id;
+> -	device->itt_addr = itt_addr << 8;
+> -	device->nb_eventid_bits = size + 1;
+> -
+> -	INIT_LIST_HEAD(&device->itt_head);
+> -
+> -	list_add_tail(&device->dev_list, &its->device_list);
+> -
+> -	return 0;
+> +	return vgic_its_alloc_device(its, &device, device_id, itt_addr, size);
+>  }
+>  
+>  /*
+> 
