@@ -1,100 +1,68 @@
-From: richard.genoud@gmail.com (Richard Genoud)
-Date: Fri, 17 Mar 2017 16:11:49 +0100
-Subject: [RFC PATCH] tty/serial: atmel: fix TX path in
- atmel_console_write()
-In-Reply-To: <d3abc5aa-b010-a6cc-4ab9-74078149a692@microchip.com>
-References: <CACQ1gAgW4aGJSxSAXDWL7td9eV12UV=Xv=PZR58BqqHxEeRH0g@mail.gmail.com>
- <20170315152948.10978-1-nicolas.ferre@microchip.com>
- <074d057e-4971-a325-e985-3f5046536225@gmail.com>
- <d3abc5aa-b010-a6cc-4ab9-74078149a692@microchip.com>
-Message-ID: <6fc2b136-3717-df85-92ec-55bb7b91971b@gmail.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Fri, 17 Mar 2017 15:19:49 +0000
+Subject: [PATCH v3 09/19] KVM: arm64: ITS: Interpret MAPD ITT_addr field
+In-Reply-To: <1488800074-21991-10-git-send-email-eric.auger@redhat.com>
+References: <1488800074-21991-1-git-send-email-eric.auger@redhat.com>
+ <1488800074-21991-10-git-send-email-eric.auger@redhat.com>
+Message-ID: <4ba972ac-1287-b898-74e7-de74106c49fd@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-03-15 17:56 GMT+01:00 Nicolas Ferre <nicolas.ferre@microchip.com>:
-> Le 15/03/2017 ? 17:19, Richard Genoud a ?crit :
->> On 15/03/2017 16:29, Nicolas Ferre wrote:
->>> A side effect of 89d8232411a8 ("tty/serial: atmel_serial: BUG: stop DMA
->>> from transmitting in stop_tx") is that the console can be called with
->>> TX path disabled. Then the system would hang trying to push charecters
->>> out in atmel_console_putchar().
->>>
->>> Signed-off-by: Nicolas Ferre <nicolas.ferre@microchip.com>
->>> Fixes: 89d8232411a8 ("tty/serial: atmel_serial: BUG: stop DMA from transmitting
->>> in stop_tx")
->>> Cc: stable <stable@vger.kernel.org> # 4.4+
->>> ---
->>> Hi Richard,
->>>
->>> I found this to fix the problem with system hang in my linux-4.4-at91 branch
->>> (in the atmel_console_putchar() waiting loop actually). I'm open to more
->>> insignt.
->>> As we cannot figure out if this bit is set or not, I didn't preserve the
->>> current status...
->>>
->>> Regards,
->>
->> So, I'm guessing that you may see some lines/characters printed twice on
->> the screen, don't you ?
->
-> Well, actually, I don't think so because the repetitions that I see are
-> probably due to open/close/open/close/re-open/... of the serial console
-> itself.
->
-> Same with the line "random: udevd: uninitialized urandom read (16 bytes
-> read, 21 bits of entropy available)", they happen at different moment in
-> time => the printk log timestamping seem to indicate that they are
-> different.
-Hi Nicolas,
+On 06/03/17 11:34, Eric Auger wrote:
+> Up to now the MAPD ITT_addr had been ignored. We will need it
+> for save/restore. Let's record it in the its_device struct.
+> 
+> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+> ---
+>  virt/kvm/arm/vgic/vgic-its.c | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+> index 56bcd92..694023f 100644
+> --- a/virt/kvm/arm/vgic/vgic-its.c
+> +++ b/virt/kvm/arm/vgic/vgic-its.c
+> @@ -99,6 +99,7 @@ struct its_device {
+>  
+>  	/* the head for the list of ITTEs */
+>  	struct list_head itt_head;
+> +	gpa_t itt_addr;
+>  	u32 nb_eventid_bits;
+>  	u32 device_id;
+>  };
+> @@ -562,6 +563,7 @@ static u64 its_cmd_mask_field(u64 *its_cmd, int word, int shift, int size)
+>  #define its_cmd_get_collection(cmd)	its_cmd_mask_field(cmd, 2,  0, 16)
+                            --> here?
+>  #define its_cmd_get_target_addr(cmd)	its_cmd_mask_field(cmd, 2, 16, 32)
+>  #define its_cmd_get_validbit(cmd)	its_cmd_mask_field(cmd, 2, 63,  1)
+> +#define its_cmd_get_ittaddr(cmd)	its_cmd_mask_field(cmd, 2, 8,  44)
 
-It seems that the problem is between atmel_tx_dma() and its callback
-atmel_complete_tx_dma().
+Can you please move this up ^
+And adjust the spacing to align the commas?
+(heavily influenced by suppressed OCD today ;-)
 
-At some point, atmel_tx_dma() is called, does the job, and then, just
-before the callback is called, the xmit->head and xmit->tail pointers
-are set to zero (by uart_flush_buffer())
-So, when atmel_complete_tx_dma() is called, it does:
-xmit->tail += atmel_port->tx_len;
-not knowing that the head and tail pointers have been reseted.
-=> it's like there's (UART_XMIT_SIZE - atmel_port->tx_len) characters to
-transmit on the serial line.
+>  #define its_cmd_get_size(cmd)		its_cmd_mask_field(cmd, 1, 0,  5)
+>  
+>  /*
+> @@ -832,6 +834,7 @@ static int vgic_its_cmd_handle_mapd(struct kvm *kvm, struct vgic_its *its,
+>  	u32 device_id = its_cmd_get_deviceid(its_cmd);
+>  	bool valid = its_cmd_get_validbit(its_cmd);
+>  	size_t size = its_cmd_get_size(its_cmd);
+> +	gpa_t itt_addr = its_cmd_get_ittaddr(its_cmd);
 
-PS: I can trigger this bug by holding down the d key at login and then
-ctrl - basically, a ctrl-d just after sending text - with a rate success
-of about 1/5 :)
+And do the "<< 8" already here?
 
-Could you try this patch to see if it corrects also your system hang ?
+Cheers,
+Andre.
 
-(The patch is small, but the bug hunt was a headache :))
-
-[PATCH] tty/serial: atmel: fix race condition (TX+DMA)
-
-If uart_flush_buffer() is called between atmel_tx_dma() and
-atmel_complete_tx_dma(), the circular buffer has been cleared, but not
-atmel_port->tx_len.
-That leads to a circular buffer overflow (dumping (UART_XMIT_SIZE -
-atmel_port->tx_len) bytes).
-
-Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
----
- drivers/tty/serial/atmel_serial.c | 5 +++++
- 1 file changed, 5 insertions(+)
-
-diff --git a/drivers/tty/serial/atmel_serial.c
-b/drivers/tty/serial/atmel_serial.c
-index 833d3d80446f..89552157e334 100644
---- a/drivers/tty/serial/atmel_serial.c
-+++ b/drivers/tty/serial/atmel_serial.c
-@@ -1934,6 +1934,11 @@ static void atmel_flush_buffer(struct uart_port
-*port)
- 		atmel_uart_writel(port, ATMEL_PDC_TCR, 0);
- 		atmel_port->pdc_tx.ofs = 0;
- 	}
-+	/*
-+	 * in uart_flush_buffer(), the xmit circular buffer has just
-+	 * been cleared, so we have to reset tx_len accordingly.
-+	 */
-+	atmel_port->tx_len = 0;
- }
-
- /*
+>  	struct its_device *device;
+>  
+>  	if (!vgic_its_check_id(its, its->baser_device_table, device_id))
+> @@ -862,6 +865,7 @@ static int vgic_its_cmd_handle_mapd(struct kvm *kvm, struct vgic_its *its,
+>  		return -ENOMEM;
+>  
+>  	device->device_id = device_id;
+> +	device->itt_addr = itt_addr << 8;
+>  	device->nb_eventid_bits = size + 1;
+>  
+>  	INIT_LIST_HEAD(&device->itt_head);
+> 
