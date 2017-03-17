@@ -1,129 +1,67 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Fri, 17 Mar 2017 09:45:52 +0100
-Subject: [PATCH v1 6/7] arm64: dts: rockchip: add dts file for RK3328
- evaluation board
-In-Reply-To: <58CB4945.9020408@rock-chips.com>
-References: <1489572237-6649-1-git-send-email-cl@rock-chips.com>
- <63969127-3fcd-658c-2986-8ded6d93c433@arm.com>
- <58CB4945.9020408@rock-chips.com>
-Message-ID: <4559383.EsY2O1vJ7P@phil>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Fri, 17 Mar 2017 09:48:15 +0100
+Subject: [PATCH v2 3/3] kvm: arm/arm64: Fix locking for kvm_free_stage2_pgd
+In-Reply-To: <1489688451-17520-4-git-send-email-suzuki.poulose@arm.com>
+References: <1489688451-17520-1-git-send-email-suzuki.poulose@arm.com>
+ <1489688451-17520-4-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20170317084815.GU1277@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, 17. M?rz 2017, 10:26:13 CET schrieb ??:
-> ? 2017?03?17? 00:18, Andre Przywara ??:
-> > Hi Chen,
-> > 
-> > On 16/03/17 01:45, cl at rock-chips.com wrote:
-> >> From: Chen Liang <cl@rock-chips.com>
-> >> 
-> >> This patch add rk3328-evb.dts for RK3328 evaluation board.
-> >> Tested on RK3328 evb.
-> >> 
-> >> Signed-off-by: Chen Liang <cl@rock-chips.com>
-> >> ---
-> >> 
-> >>   arch/arm64/boot/dts/rockchip/Makefile       |  1 +
-> >>   arch/arm64/boot/dts/rockchip/rk3328-evb.dts | 57
-> >>   +++++++++++++++++++++++++++++ 2 files changed, 58 insertions(+)
-> >>   create mode 100644 arch/arm64/boot/dts/rockchip/rk3328-evb.dts
-> >> 
-> >> diff --git a/arch/arm64/boot/dts/rockchip/Makefile
-> >> b/arch/arm64/boot/dts/rockchip/Makefile index 3a86289..853fc7d 100644
-> >> --- a/arch/arm64/boot/dts/rockchip/Makefile
-> >> +++ b/arch/arm64/boot/dts/rockchip/Makefile
-> >> @@ -4,6 +4,7 @@ dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-orion-r68-meta.dtb
-> >> 
-> >>   dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-px5-evb.dtb
-> >>   dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-r88.dtb
-> >>   dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3399-evb.dtb
-> >> 
-> >> +dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3328-evb.dtb
-> >> 
-> >>   always		:= $(dtb-y)
-> >>   subdir-y	:= $(dts-dirs)
-> >> 
-> >> diff --git a/arch/arm64/boot/dts/rockchip/rk3328-evb.dts
-> >> b/arch/arm64/boot/dts/rockchip/rk3328-evb.dts new file mode 100644
-> >> index 0000000..cf27239
-> >> --- /dev/null
-> >> +++ b/arch/arm64/boot/dts/rockchip/rk3328-evb.dts
-> >> @@ -0,0 +1,57 @@
-> >> +/*
-> >> + * Copyright (c) 2017 Fuzhou Rockchip Electronics Co., Ltd
-> >> + *
-> >> + * This file is dual-licensed: you can use it either under the terms
-> >> + * of the GPL or the X11 license, at your option. Note that this dual
-> >> + * licensing only applies to this file, and not this project as a
-> >> + * whole.
-> >> + *
-> >> + *  a) This library is free software; you can redistribute it and/or
-> >> + *     modify it under the terms of the GNU General Public License as
-> >> + *     published by the Free Software Foundation; either version 2 of
-> >> the
-> >> + *     License, or (at your option) any later version.
-> >> + *
-> >> + *     This library is distributed in the hope that it will be useful,
-> >> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> >> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> >> + *     GNU General Public License for more details.
-> >> + *
-> >> + * Or, alternatively,
-> >> + *
-> >> + *  b) Permission is hereby granted, free of charge, to any person
-> >> + *     obtaining a copy of this software and associated documentation
-> >> + *     files (the "Software"), to deal in the Software without
-> >> + *     restriction, including without limitation the rights to use,
-> >> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> >> + *     sell copies of the Software, and to permit persons to whom the
-> >> + *     Software is furnished to do so, subject to the following
-> >> + *     conditions:
-> >> + *
-> >> + *     The above copyright notice and this permission notice shall be
-> >> + *     included in all copies or substantial portions of the Software.
-> >> + *
-> >> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> >> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> >> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> >> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> >> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> >> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> >> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> >> + *     OTHER DEALINGS IN THE SOFTWARE.
-> >> + */
-> >> +
-> >> +/dts-v1/;
-> >> +#include "rk3328.dtsi"
-> >> +
-> >> +/ {
-> >> +	model = "Rockchip RK3328 EVB";
-> >> +	compatible = "rockchip,rk3328-evb", "rockchip,rk3328";
-> >> +
-> >> +	chosen {
-> >> +		stdout-path = "serial2:1500000n8";
-> > 
-> > Is that really 1.5MBit/s?
+On Thu, Mar 16, 2017 at 06:20:51PM +0000, Suzuki K Poulose wrote:
+> In kvm_free_stage2_pgd() we don't hold the kvm->mmu_lock while calling
+> unmap_stage2_range() on the entire memory range for the guest. This could
+> cause problems with other callers (e.g, munmap on a memslot) trying to
+> unmap a range. And since we have to unmap the entire Guest memory range
+> holding a spinlock, make sure we yield the lock if necessary, after we
+> unmap each PUD range.
 > 
-> Yes, the RK3328 EVB board use 1.5MBit/s baud rate.
+> Fixes: commit d5d8184d35c9 ("KVM: ARM: Memory virtualization setup")
+> Cc: stable at vger.kernel.org # v3.10+
+> Cc: Paolo Bonzini <pbonzin@redhat.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> [ Avoid vCPU starvation and lockup detector warnings ]
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+
+Reviewed-by: Christoffer Dall <cdall@linaro.org>
+
+> ---
+>  arch/arm/kvm/mmu.c | 9 +++++++++
+>  1 file changed, 9 insertions(+)
 > 
-> >> +	};
-> >> +};
-> >> +
-> >> +&uart2 {
-> >> +	status = "okay";
-> >> +};
-> > 
-> > I don't have the board, but would expect to see more peripherals
-> > mentioned in the .dtsi enabled here.
-> > For sure the board has an (micro)SD card slot, possibly even Ethernet?
+> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+> index 13b9c1f..7628ef1 100644
+> --- a/arch/arm/kvm/mmu.c
+> +++ b/arch/arm/kvm/mmu.c
+> @@ -292,8 +292,14 @@ static void unmap_stage2_range(struct kvm *kvm, phys_addr_t start, u64 size)
+>  	phys_addr_t addr = start, end = start + size;
+>  	phys_addr_t next;
+>  
+> +	assert_spin_locked(&kvm->mmu_lock);
+>  	pgd = kvm->arch.pgd + stage2_pgd_index(addr);
+>  	do {
+> +		/*
+> +		 * If the range is too large, release the kvm->mmu_lock
+> +		 * to prevent starvation and lockup detector warnings.
+> +		 */
+> +		cond_resched_lock(&kvm->mmu_lock);
+>  		next = stage2_pgd_addr_end(addr, end);
+>  		if (!stage2_pgd_none(*pgd))
+>  			unmap_stage2_puds(kvm, pgd, addr, next);
+> @@ -831,7 +837,10 @@ void kvm_free_stage2_pgd(struct kvm *kvm)
+>  	if (kvm->arch.pgd == NULL)
+>  		return;
+>  
+> +	spin_lock(&kvm->mmu_lock);
+>  	unmap_stage2_range(kvm, 0, KVM_PHYS_SIZE);
+> +	spin_unlock(&kvm->mmu_lock);
+> +
+>  	/* Free the HW pgd, one page at a time */
+>  	free_pages_exact(kvm->arch.pgd, S2_PGD_SIZE);
+>  	kvm->arch.pgd = NULL;
+> -- 
+> 2.7.4
 > 
-> The codes for other peripherals are not ready now for new kernel, so i
-> push a base dtsi, and other configration will be pushed later if it is ok.
-
-for me that approach is fine in general, but here, you could enable at least 
-the watchdog as well?
-
-But no need to resend just now, I still need to look at the big dtsi.
-
-
-Heiko
