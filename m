@@ -1,67 +1,75 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Fri, 17 Mar 2017 14:42:09 +0000
-Subject: [PATCH] arm: kprobes: Align stack to 8-bytes in test code
-In-Reply-To: <20170317140610.GF21222@n2100.armlinux.org.uk>
-References: <20170316135359.23019-1-tixy@linaro.org>
- <20170317121025.GD21222@n2100.armlinux.org.uk>
- <1489755542.3063.2.camel@linaro.org>
- <20170317140610.GF21222@n2100.armlinux.org.uk>
-Message-ID: <1489761729.3063.7.camel@linaro.org>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Fri, 17 Mar 2017 15:53:18 +0100
+Subject: [PATCH 3/5] i2c: i2c-stm32f7: add driver
+In-Reply-To: <CAOAejn0Hs7QOgcrHM2t3NsFQeD9dyvThDK-8iM1Lvb7Qv4fGGQ@mail.gmail.com>
+References: <1489744738-21632-1-git-send-email-cedric.madianga@gmail.com>
+ <1489744738-21632-4-git-send-email-cedric.madianga@gmail.com>
+ <6ae90186-0e8d-654b-c9e3-2d1b4daf6198@baylibre.com>
+ <CAOAejn0Hs7QOgcrHM2t3NsFQeD9dyvThDK-8iM1Lvb7Qv4fGGQ@mail.gmail.com>
+Message-ID: <971895d3-2fe6-ecb6-9dc3-ee71193b34ee@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2017-03-17 at 14:06 +0000, Russell King - ARM Linux wrote:
-> On Fri, Mar 17, 2017 at 12:59:02PM +0000, Jon Medhurst (Tixy) wrote:
-> > 
-[...]
-> > It isn't, because GCC turns code like this
-> > 
-> > void foo(void)
-> > {
-> >         asm volatile("bl __kprobes_test_case_start"
-> >                      : : : "r0", "r1", "r2", "r3", "ip", "lr", "memory", "cc");
-> > }
-> > 
-> > into this...
-> > 
-> > 8010e4ac <foo>:
-> > 8010e4ac:       e52de004        push    {lr}            ; (str lr, [sp, #-4]!)
-> > 8010e4b0:       eb002c99        bl      8011971c <__kprobes_test_case_start>
-> > 8010e4b4:       e49df004        pop     {pc}            ; (ldr pc, [sp], #4)
-> > 
-> > Perhaps we need a way of telling GCC we are using the stack but I've not
-> > managed to spot a way of doing that.
+On 03/17/2017 02:52 PM, M'boumba Cedric Madianga wrote:
+> Hi,
 > 
-> Using which compiler options?
+> 
+>>> +static int stm32f7_i2c_hw_config(struct stm32f7_i2c_dev *i2c_dev)
+>>> +{
+>>> +     struct device_node *of_node = i2c_dev->dev->of_node;
+>>> +     u32 timing;
+>>> +     int ret;
+>>> +
+>>> +     ret = of_property_read_u32(of_node, "st,i2c-timing", &timing);
+>>> +     if (ret) {
+>>> +             dev_err(i2c_dev->dev, "Error: missing i2c timing property\n");
+>>> +             return ret;
+>>> +     }
+>>> +
+>>> +     /* Timing settings */
+>>> +     writel_relaxed(timing, i2c_dev->base + STM32F7_I2C_TIMINGR);
+>>
+>> Hi,
+>>
+>> Using a register value in DT is quite ugly since the requirement to calculate the timings
+>> is quite easy, and well documented.
+>>
+>> I wrote it for Zephyr, you can find it here :
+>> https://github.com/zephyrproject-rtos/zephyr/blob/master/drivers/i2c/i2c_stm32lx.c#L31
+> 
+> Thanks for this code. It is very interesting.
+> With our formula, I just notice that we don't use any i2c rise time or
+> fall time but they have some impacts in i2c timing computation.
+> So, the user could not be able to select these values for him use case. Right ?
 
-The ones the Linux makefile picks when building with vexpress_defconfig.
-I hacked a kernel file to build the above example but the behaviour is
-what I observed with the real kprobes code. I've pasted the commanline
-produced by building with V=1 at the end of this email.
+Sorry I don't understand.
+The value you use from the DT and the one calculated from the setup/hold/high/low value
+with the algorithm I developed will set the same values.
 
-One thing I've noticed playing around just now is that if I add "sp" to
-the clobber list, and use a newer GCC (gcc-linaro-6.2.1-2016.11) then it
-does allign the stack correctly. "sp" makes no difference with GCC 5.3 or
-4.8.
+The main difference is that you won't need the ST tool to calculate these, and even better
+you can provide generic binding for whatever APB frequency the I2C peripheral is running
+on.
 
-That commandline ...
+> 
+> 
+>>
+>> Another point, maybe you should find a better name for the driver, since this I2C IP is share
+>> with the STM32Lx also and is not tied to STM32F7.
+> 
+> As far as I know, we don't have any STM32Lx SoC integrated in the
+> linux kernel mainline.
+> I choose i2c-stm32f7 name as it is the first Soc integrated in the
+> linux kernel mainline where this IP could be used.
 
-/data/arm32/aarch32-toolchain/gcc-linaro-5.3.1-2016.05-x86_64_arm-linux-gnueabihf/bin/arm-linux-gnueabihf-gcc
--Wp,-MD,arch/arm/kernel/.patch.o.d  -nostdinc -isystem
-/data/arm32/aarch32-toolchain/gcc-linaro-5.3.1-2016.05-x86_64_arm-linux-gnueabihf/bin/../lib/gcc/arm-linux-gnueabihf/5.3.1/include
--I./arch/arm/include -I./arch/arm/include/generated/uapi
--I./arch/arm/include/generated  -I./include -I./arch/arm/include/uapi
--I./include/uapi -I./include/generated/uapi -include ./include/linux/kconfig.h
--D__KERNEL__ -mlittle-endian -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs
--fno-strict-aliasing -fno-common -Werror-implicit-function-declaration
--Wno-format-security -std=gnu89 -fno-PIE -fno-dwarf2-cfi-asm -fno-ipa-sra
--mabi=aapcs-linux -mno-thumb-interwork -mfpu=vfp -funwind-tables -marm
--D__LINUX_ARM_ARCH__=7 -march=armv7-a -msoft-float -Uarm
--fno-delete-null-pointer-checks -O2 --param=allow-store-data-races=0
--Wframe-larger-than=1024 -fno-stack-protector -Wno-unused-but-set-variable
--fomit-frame-pointer -fno-var-tracking-assignments -g
--fno-inline-functions-called-once -Wdeclaration-after-statement
--Wno-pointer-sign -fno-strict-overflow -fconserve-stack -Werror=implicit-int
--Werror=strict-prototypes -Werror=date-time -Werror=incompatible-pointer-types
--DCC_HAVE_ASM_GOTO    -DKBUILD_BASENAME='"patch"'  -DKBUILD_MODNAME='"patch"' -c
--o arch/arm/kernel/patch.o arch/arm/kernel/patch.c
+Having the STM32L4 running mainline won't be hard, maybe useless, but not hard.
+My point is that you can somehow consider the STM32F0/F1/F4 I2C IP to be "v1" or "gen1",
+and the L0/L4/F6 (and H7 ?) to be "v2" or "gen2" then prepend a generic compatible to
+have something like :
+compatible = "st,stm32-i2c-v2", "st,stm32f7-i2c"
+
+> BR,
+> Cedric
+> 
+
+Thanks,
+Neil
