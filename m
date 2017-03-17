@@ -1,63 +1,43 @@
-From: sjoerd.simons@collabora.co.uk (Sjoerd Simons)
-Date: Fri, 17 Mar 2017 14:51:17 +0100
-Subject: [PATCH] ARM: dts: rockchip: Enable sata support on rock2 square
-Message-ID: <20170317135118.17333-1-sjoerd.simons@collabora.co.uk>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Fri, 17 Mar 2017 14:51:10 +0100
+Subject: [PATCH v4 14/36] [media] v4l2-mc: add a function to inherit
+ controls from a pipeline
+In-Reply-To: <20170317102410.18c966ae@vento.lan>
+References: <20170310130733.GU21222@n2100.armlinux.org.uk>
+ <c679f755-52a6-3c6f-3d65-277db46676cc@xs4all.nl>
+ <20170310140124.GV21222@n2100.armlinux.org.uk>
+ <cc8900b0-c091-b14b-96f4-01f8fa72431c@xs4all.nl>
+ <20170310125342.7f047acf@vento.lan>
+ <20170310223714.GI3220@valkosipuli.retiisi.org.uk>
+ <20170311082549.576531d0@vento.lan>
+ <20170313124621.GA10701@valkosipuli.retiisi.org.uk>
+ <20170314004533.3b3cd44b@vento.lan>
+ <e0a6c60b-1735-de0b-21f4-d8c3f4b3f10f@xs4all.nl>
+ <20170317114203.GZ21222@n2100.armlinux.org.uk>
+ <44161453-02f9-0019-3868-7501967a6a82@linux.intel.com>
+ <20170317102410.18c966ae@vento.lan>
+Message-ID: <1489758670.2905.52.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Rock 2 square board has a USB -> SATA converter hooked up to its usb
-host1 connection. Enable the usb controller and always turn on the power
-on the 5V sata power connector (controlled by gpio).
+On Fri, 2017-03-17 at 10:24 -0300, Mauro Carvalho Chehab wrote:
+[...]
+> The big question, waiting for an answer on the last 8 years is
+> who would do that? Such person would need to have several different
+> hardware from different vendors, in order to ensure that it has
+> a generic solution.
+> 
+> It is a way more feasible that the Kernel developers that already 
+> have a certain hardware on their hands to add support inside the
+> driver to forward the controls through the pipeline and to setup
+> a "default" pipeline that would cover the common use cases at
+> driver's probe.
 
-Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+Actually, would setting pipeline via libv4l2 plugin and letting drivers
+provide a sane enabled default pipeline configuration be mutually
+exclusive? Not sure about the control forwarding, but at least a simple
+link setup and format forwarding would also be possible in the kernel
+without hindering userspace from doing it themselves later.
 
----
-
- arch/arm/boot/dts/rk3288-rock2-square.dts | 21 +++++++++++++++++++++
- 1 file changed, 21 insertions(+)
-
-diff --git a/arch/arm/boot/dts/rk3288-rock2-square.dts b/arch/arm/boot/dts/rk3288-rock2-square.dts
-index fbf11d410c42..a23a94811be8 100644
---- a/arch/arm/boot/dts/rk3288-rock2-square.dts
-+++ b/arch/arm/boot/dts/rk3288-rock2-square.dts
-@@ -81,6 +81,17 @@
- 		};
- 	};
- 
-+	sata_pwr: sata-prw-regulator {
-+		compatible = "regulator-fixed";
-+		enable-active-high;
-+		gpio = <&gpio0 13 GPIO_ACTIVE_HIGH>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&sata_pwr_en>;
-+		/* Always turn on the 5V sata power connector */
-+		regulator-always-on;
-+		regulator-name = "sata_pwr";
-+	};
-+
- 	spdif_out: spdif-out {
- 		compatible = "linux,spdif-dit";
- 		#sound-dai-cells = <0>;
-@@ -237,6 +248,12 @@
- 		};
- 	};
- 
-+	sata {
-+		sata_pwr_en: sata-pwr-en {
-+			rockchip,pins = <0 13 RK_FUNC_GPIO &pcfg_pull_none>;
-+		};
-+	};
-+
- 	sdmmc {
- 		sdmmc_pwr: sdmmc-pwr {
- 			rockchip,pins = <7 11 RK_FUNC_GPIO &pcfg_pull_none>;
-@@ -265,3 +282,7 @@
- &usb_host0_ehci {
- 	status = "okay";
- };
-+
-+&usb_host1 {
-+	status = "okay";
-+};
--- 
-2.11.0
+regards
+Philipp
