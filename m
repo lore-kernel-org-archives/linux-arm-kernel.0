@@ -1,56 +1,55 @@
-From: james.morse@arm.com (James Morse)
-Date: Fri, 17 Mar 2017 16:43:11 +0000
-Subject: [PATCH V12 05/10] acpi: apei: handle SEA notification type for
- ARMv8
-In-Reply-To: <1488833103-21082-6-git-send-email-tbaicar@codeaurora.org>
-References: <1488833103-21082-1-git-send-email-tbaicar@codeaurora.org>
- <1488833103-21082-6-git-send-email-tbaicar@codeaurora.org>
-Message-ID: <58CC121F.5030807@arm.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Fri, 17 Mar 2017 16:47:54 +0000
+Subject: [v3 3/5] coresight: add support for debug module
+In-Reply-To: <20170317162836.GD2020@leoy-linaro>
+References: <1488520809-31670-4-git-send-email-leo.yan@linaro.org>
+ <011fdac0-59bf-b539-2de3-0b59a41bc922@arm.com>
+ <20170309175915.GA964@leoy-linaro>
+ <3f27efee-3b63-81fd-eb96-73fd7e6f5e92@arm.com>
+ <20170313165600.GB32431@linaro.org>
+ <516f8989-4dde-2686-d549-0761feb14d1b@arm.com>
+ <CANLsYkzJsGvr4ZzNbTwcPu1Qki6=Szvu+bMjHZ_rza==DqFChw@mail.gmail.com>
+ <20170317101328.GA19877@leoy-linaro> <20170317155007.GA20435@linaro.org>
+ <20170317162836.GD2020@leoy-linaro>
+Message-ID: <5995f6a7-08b1-c868-fc88-a145d1748a33@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tyler,
+On 17/03/17 16:28, Leo Yan wrote:
+> On Fri, Mar 17, 2017 at 09:50:07AM -0600, Mathieu Poirier wrote:
+>
+> [...]
+>
+>> If we don't check for "nohlt" some platform may freeze, others may work.  If we
+>> mandate that "nohlt" be present on the kernel cmd line it works in all cases.
+>> As such mandating that "nohlt" be present is a better way to go.
+>
+> Sure, so I will add below checking code in the probe function, please
+> let me know if you have alter better way to implement this:
+>
+> +       if (IS_ENABLED(CONFIG_CPU_IDLE) &&
+> +                       !strstr(boot_command_line, "nohlt")) {
+> +               dev_err(dev, "May not be accessible in CPU power domain.\n");
+> +               return -EPERM;
+> +       }
+>
 
-On 06/03/17 20:44, Tyler Baicar wrote:
-> ARM APEI extension proposal added SEA (Synchronous External Abort)
-> notification type for ARMv8.
-> Add a new GHES error source handling function for SEA. If an error
-> source's notification type is SEA, then this function can be registered
-> into the SEA exception handler. That way GHES will parse and report
-> SEA exceptions when they occur.
-> An SEA can interrupt code that had interrupts masked and is treated as
-> an NMI. To aid this the page of address space for mapping APEI buffers
-> while in_nmi() is always reserved, and ghes_ioremap_pfn_nmi() is
-> changed to use the helper methods to find the prot_t to map with in
-> the same way as ghes_ioremap_pfn_irq().
+There is an API which kind of achieves what "nohlt" does at runtime :
 
-> diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
-> index b25e7cf..b0596ba 100644
-> --- a/drivers/acpi/apei/ghes.c
-> +++ b/drivers/acpi/apei/ghes.c
-> @@ -1023,6 +1075,13 @@ static int ghes_probe(struct platform_device *ghes_dev)
->  		pr_warning(GHES_PFX "Generic hardware error source: %d notified via local interrupt is not supported!\n",
->  			   generic->header.source_id);
->  		goto err;
-> +	case ACPI_HEST_NOTIFY_GPIO:
-> +	case ACPI_HEST_NOTIFY_SEI:
-> +	case ACPI_HEST_NOTIFY_GSIV:
-> +		pr_warn(GHES_PFX "Generic hardware error source: %d notified via notification type %u is not supported\n",
-> +			generic->header.source_id, generic->header.source_id);
-> +		rc = -ENOTSUPP;
-> +		goto err;
->  	default:
->  		pr_warning(FW_WARN GHES_PFX "Unknown notification type: %u for generic hardware error source: %d\n",
->  			   generic->notify.type, generic->header.source_id);
+   cpu_idle_poll_ctrl(true)
 
+So may be we could use that instead of depending on "nohlt". The other side
+of the issues is "when do we decide to use the API". May be we could add something
+like : enable_debug, which could then trigger the panic notifier registrations
+and the above. That would still leave us with a case where the system crashes
+even before the user gets a terminal. May be the following is the best option :
 
-This hunk will conflict with Shiju Jose's patch[0] that adds GPIO and GSIV
-support. Can we remove it?
+1) Dedicated kernel command line parameter for enabling the CPU debug at boot/probe.
 
+and
 
-Thanks,
+2) Runtime enable method via sysfs.
 
-James
+What do you think ?
 
-
-[0] https://www.spinics.net/lists/linux-acpi/msg72654.html
+Suzuki
