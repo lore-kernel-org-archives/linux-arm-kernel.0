@@ -1,58 +1,45 @@
-From: shawn.lin@rock-chips.com (Shawn Lin)
-Date: Fri, 17 Mar 2017 17:25:17 +0800
-Subject: [PATCH 1/2] arm64: dts: rockchip: add rk3368 dw-mmc resets
-In-Reply-To: <20170317083951.14343-1-heiko@sntech.de>
-References: <20170317083951.14343-1-heiko@sntech.de>
-Message-ID: <d1621710-a93d-aa8e-ef2b-f61632814752@rock-chips.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Fri, 17 Mar 2017 11:09:38 +0200
+Subject: [PATCHv2 6/9] ARM: OMAP2+: timer: add support for fetching fck handle
+ from DT
+In-Reply-To: <1489741781-12816-1-git-send-email-t-kristo@ti.com>
+References: <1489741781-12816-1-git-send-email-t-kristo@ti.com>
+Message-ID: <1489741781-12816-7-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2017/3/17 16:39, Heiko Stuebner ??:
-> dw-mmc got its reset-properties specified, so add the softresets
-> for it on the rk3368.
->
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+The mux clock handle shall be provided via "fck" DT handle. This avoids
+the need to lookup the main clock via hwmod core, which will not work
+with the clkctrl clock support anymore; the main clock is not going to
+be a mux.
 
-Reviewed-by: Shawn Lin <shawn.lin@rock-chips.com>
+Signed-off-by: Tero Kristo <t-kristo@ti.com>
+---
+ arch/arm/mach-omap2/timer.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-> ---
->  arch/arm64/boot/dts/rockchip/rk3368.dtsi | 6 ++++++
->  1 file changed, 6 insertions(+)
->
-> diff --git a/arch/arm64/boot/dts/rockchip/rk3368.dtsi b/arch/arm64/boot/dts/rockchip/rk3368.dtsi
-> index a635adc47e74..06fa6e00904d 100644
-> --- a/arch/arm64/boot/dts/rockchip/rk3368.dtsi
-> +++ b/arch/arm64/boot/dts/rockchip/rk3368.dtsi
-> @@ -237,6 +237,8 @@
->  		clock-names = "biu", "ciu", "ciu-drive", "ciu-sample";
->  		fifo-depth = <0x100>;
->  		interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
-> +		resets = <&cru SRST_MMC0>;
-> +		reset-names = "reset";
->  		status = "disabled";
->  	};
->
-> @@ -249,6 +251,8 @@
->  		clock-names = "biu", "ciu", "ciu_drv", "ciu_sample";
->  		fifo-depth = <0x100>;
->  		interrupts = <GIC_SPI 33 IRQ_TYPE_LEVEL_HIGH>;
-> +		resets = <&cru SRST_SDIO0>;
-> +		reset-names = "reset";
->  		status = "disabled";
->  	};
->
-> @@ -261,6 +265,8 @@
->  		clock-names = "biu", "ciu", "ciu-drive", "ciu-sample";
->  		fifo-depth = <0x100>;
->  		interrupts = <GIC_SPI 35 IRQ_TYPE_LEVEL_HIGH>;
-> +		resets = <&cru SRST_EMMC>;
-> +		reset-names = "reset";
->  		status = "disabled";
->  	};
->
->
-
-
+diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+index 07dd692..af90f95 100644
+--- a/arch/arm/mach-omap2/timer.c
++++ b/arch/arm/mach-omap2/timer.c
+@@ -255,6 +255,8 @@ static int __init omap_dm_timer_init_one(struct omap_dm_timer *timer,
+ 
+ 		timer->io_base = of_iomap(np, 0);
+ 
++		timer->fclk = of_clk_get_by_name(np, "fck");
++
+ 		of_node_put(np);
+ 	} else {
+ 		if (omap_dm_timer_reserve_systimer(timer->id))
+@@ -292,7 +294,8 @@ static int __init omap_dm_timer_init_one(struct omap_dm_timer *timer,
+ 	omap_hwmod_setup_one(oh_name);
+ 
+ 	/* After the dmtimer is using hwmod these clocks won't be needed */
+-	timer->fclk = clk_get(NULL, omap_hwmod_get_main_clk(oh));
++	if (IS_ERR_OR_NULL(timer->fclk))
++		timer->fclk = clk_get(NULL, omap_hwmod_get_main_clk(oh));
+ 	if (IS_ERR(timer->fclk))
+ 		return PTR_ERR(timer->fclk);
+ 
 -- 
-Best Regards
-Shawn Lin
+1.9.1
