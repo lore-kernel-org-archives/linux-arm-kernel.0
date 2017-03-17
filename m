@@ -1,33 +1,44 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Fri, 17 Mar 2017 23:22:24 +0800
-Subject: [PATCH v3 4/5] clk: hi6220: add debug APB clock
-In-Reply-To: <20170303235808.GX25384@codeaurora.org>
-References: <1488520809-31670-1-git-send-email-leo.yan@linaro.org>
- <1488520809-31670-5-git-send-email-leo.yan@linaro.org>
- <20170303235808.GX25384@codeaurora.org>
-Message-ID: <20170317152224.GB2020@leoy-linaro>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Fri, 17 Mar 2017 16:25:19 +0100
+Subject: outreachy
+In-Reply-To: <20170309212021.GA24433@kroah.com>
+References: <alpine.DEB.2.20.1703092133340.2306@hadrien>
+ <443f0143-aec1-2559-a2c2-73b245632948@broadcom.com>
+ <2da12619-5fcb-9e0f-b6c1-c83cbf491e8d@wwwdotorg.org>
+ <20170309212021.GA24433@kroah.com>
+Message-ID: <20170317152519.GA8684@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+Hi!
 
-On Fri, Mar 03, 2017 at 03:58:08PM -0800, Stephen Boyd wrote:
-> On 03/03, Leo Yan wrote:
-> > The debug APB clock is absent in hi6220 driver, so this patch is to add
-> > support for it.
-> > 
-> > Signed-off-by: Leo Yan <leo.yan@linaro.org>
-> > ---
 > 
-> Acked-by: Stephen Boyd <sboyd@codeaurora.org>
+> Hah!  That's the joy of being a maintainer of a driver in staging.  Even
+> if you filter out outreachy, you are going to get a lot of "basic
+> mistakes" and other type patches cc:ed to you.
+> 
+> I strongly suggest, that if you all don't like this type of stuff,
+> either:
+> 	- work to get the code out of staging as soon as possible (i.e.
+> 	  send me coding style fixes for everything right now, and then
+> 	  fix up the rest of the stuff.)
+> 	- take yourself off the maintainer list for this code.
+> 
+> It's your choice, outreachy right now is a lot of patches, but again,
+> it's not going to keep you from getting the "basic" stuff sent to you
+> in ways that is totally wrong.
 
-I found this patch introduces regression on Hikey, after I enable
-CPUIdle with this patch the kernel booting will hang. I committed a
-new version patch:
-https://patchwork.kernel.org/patch/9630931/
-
-So please drop v3 patch and help review v4 patch. Really Sorry for
-inconvinence.
-
-Thanks,
-Leo Yan
+Could we get these trivial patches off the lkml? Yes, lkml already has
+a lot of traffic, but no, this is not useful :-(.
+									
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170317/249c043f/attachment-0001.sig>
