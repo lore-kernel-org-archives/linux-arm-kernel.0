@@ -1,100 +1,118 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 17 Mar 2017 17:10:26 +0000
-Subject: [PATCH v33 00/14] add kdump support
-In-Reply-To: <e75aaa3f-0d87-2523-d7d7-cef56e5bd480@arm.com>
-References: <20170315095656.24992-1-takahiro.akashi@linaro.org>
- <1489750991.17202.40.camel@infradead.org>
- <1489759373.17202.44.camel@infradead.org> <20170317153358.GI5940@leverpostej>
- <1489765628.17202.59.camel@infradead.org> <20170317162421.GK5940@leverpostej>
- <e75aaa3f-0d87-2523-d7d7-cef56e5bd480@arm.com>
-Message-ID: <372d44fe-2d78-596a-55c6-307cb36d60a2@arm.com>
+From: nicolas.ferre@microchip.com (Nicolas Ferre)
+Date: Fri, 17 Mar 2017 18:16:31 +0100
+Subject: [RFC PATCH] tty/serial: atmel: fix TX path in
+ atmel_console_write()
+In-Reply-To: <6fc2b136-3717-df85-92ec-55bb7b91971b@gmail.com>
+References: <CACQ1gAgW4aGJSxSAXDWL7td9eV12UV=Xv=PZR58BqqHxEeRH0g@mail.gmail.com>
+ <20170315152948.10978-1-nicolas.ferre@microchip.com>
+ <074d057e-4971-a325-e985-3f5046536225@gmail.com>
+ <d3abc5aa-b010-a6cc-4ab9-74078149a692@microchip.com>
+ <6fc2b136-3717-df85-92ec-55bb7b91971b@gmail.com>
+Message-ID: <9b13c00d-ed52-4c8d-8690-16e25886437f@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/03/17 16:59, Marc Zyngier wrote:
-> On 17/03/17 16:24, Mark Rutland wrote:
->> On Fri, Mar 17, 2017 at 03:47:08PM +0000, David Woodhouse wrote:
->>> On Fri, 2017-03-17 at 15:33 +0000, Mark Rutland wrote:
->>> No, in this case the CPUs *were* offlined correctly, or at least "as
->>> designed", by smp_send_crash_stop(). And if that hadn't worked, as
->>> verified by *its* synchronisation method based on the atomic_t
->>> waiting_for_crash_ipi, then *it* would have complained for itself:
+Le 17/03/2017 ? 16:11, Richard Genoud a ?crit :
+> 2017-03-15 17:56 GMT+01:00 Nicolas Ferre <nicolas.ferre@microchip.com>:
+>> Le 15/03/2017 ? 17:19, Richard Genoud a ?crit :
+>>> On 15/03/2017 16:29, Nicolas Ferre wrote:
+>>>> A side effect of 89d8232411a8 ("tty/serial: atmel_serial: BUG: stop DMA
+>>>> from transmitting in stop_tx") is that the console can be called with
+>>>> TX path disabled. Then the system would hang trying to push charecters
+>>>> out in atmel_console_putchar().
+>>>>
+>>>> Signed-off-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+>>>> Fixes: 89d8232411a8 ("tty/serial: atmel_serial: BUG: stop DMA from transmitting
+>>>> in stop_tx")
+>>>> Cc: stable <stable@vger.kernel.org> # 4.4+
+>>>> ---
+>>>> Hi Richard,
+>>>>
+>>>> I found this to fix the problem with system hang in my linux-4.4-at91 branch
+>>>> (in the atmel_console_putchar() waiting loop actually). I'm open to more
+>>>> insignt.
+>>>> As we cannot figure out if this bit is set or not, I didn't preserve the
+>>>> current status...
+>>>>
+>>>> Regards,
 >>>
->>> 	if (atomic_read(&waiting_for_crash_ipi) > 0)
->>> 		pr_warning("SMP: failed to stop secondary CPUs %*pbl\n",
->>> 			   cpumask_pr_args(cpu_online_mask));
->>>
->>> It's just that smp_send_crash_stop() (or more specifically
->>> ipi_cpu_crash_stop()) doesn't touch the online cpu mask. Unlike the
->>> ARM32 equivalent function machien_crash_nonpanic_core(), which does.
->>>
->>> It wasn't clear if that was *intentional*, to allow the original
->>> contents of the online mask before the crash to be seen in the
->>> resulting vmcore... or purely an accident. 
+>>> So, I'm guessing that you may see some lines/characters printed twice on
+>>> the screen, don't you ?
 >>
->> Looking at this, there's a larger mess.
+>> Well, actually, I don't think so because the repetitions that I see are
+>> probably due to open/close/open/close/re-open/... of the serial console
+>> itself.
 >>
->> The waiting_for_crash_ipi dance only tells us if CPUs have taken the
->> IPI, not wether they've been offlined (i.e. actually left the kernel).
->> We need something closer to the usual cpu_{disable,die,kill} dance,
->> clearing online as appropriate.
->>
->> If CPUs haven't left the kernel, we still need to warn about that.
->>
->>> FWIW if I trigger a crash on CPU 1 my kdump (still 4.9.8+v32) doesn't work.
->>> I end up booting the kdump kernel on CPU#1 and then it gets distinctly unhappy...
->>>
->>> [    0.000000] Booting Linux on physical CPU 0x1
->>> ...
->>> [    0.017125] Detected PIPT I-cache on CPU1
->>> [    0.017138] GICv3: CPU1: found redistributor 0 region 0:0x00000000f0280000
->>> [    0.017147] CPU1: Booted secondary processor [411fd073]
->>> [    0.017339] Detected PIPT I-cache on CPU2
->>> [    0.017347] GICv3: CPU2: found redistributor 2 region 0:0x00000000f02c0000
->>> [    0.017354] CPU2: Booted secondary processor [411fd073]
->>> [    0.017537] Detected PIPT I-cache on CPU3
->>> [    0.017545] GICv3: CPU3: found redistributor 3 region 0:0x00000000f02e0000
->>> [    0.017551] CPU3: Booted secondary processor [411fd073]
->>> [    0.017576] Brought up 4 CPUs
->>> [    0.017587] SMP: Total of 4 processors activated.
->>> ...
->>> [   31.745809] INFO: rcu_sched detected stalls on CPUs/tasks:
->>> [   31.751299] 	1-...: (30 GPs behind) idle=c90/0/0 softirq=0/0 fqs=0 
->>> [   31.757557] 	2-...: (30 GPs behind) idle=608/0/0 softirq=0/0 fqs=0 
->>> [   31.763814] 	3-...: (30 GPs behind) idle=604/0/0 softirq=0/0 fqs=0 
->>> [   31.770069] 	(detected by 0, t=5252 jiffies, g=-270, c=-271, q=0)
->>> [   31.776161] Task dump for CPU 1:
->>> [   31.779381] swapper/1       R  running task        0     0      1 0x00000080
->>> [   31.786446] Task dump for CPU 2:
->>> [   31.789666] swapper/2       R  running task        0     0      1 0x00000080
->>> [   31.796725] Task dump for CPU 3:
->>> [   31.799945] swapper/3       R  running task        0     0      1 0x00000080
->>>
->>> Is some of that platform-specific?
->>
->> That sounds like timer interrupts aren't being taken.
->>
->> Given that the CPUs have come up, my suspicion would be that the GIC's
->> been left in some odd state, that the kdump kernel hasn't managed to
->> recover from.
->>
->> Marc may have an idea.
+>> Same with the line "random: udevd: uninitialized urandom read (16 bytes
+>> read, 21 bits of entropy available)", they happen at different moment in
+>> time => the printk log timestamping seem to indicate that they are
+>> different.
+> Hi Nicolas,
 > 
-> I thought kdump was UP only? Anyway, this doesn't look too good.
+> It seems that the problem is between atmel_tx_dma() and its callback
+> atmel_complete_tx_dma().
 > 
-> It would be interesting to find out whether we're still taking
-> interrupts. Also, being able to reproduce this on mainline would be useful.
+> At some point, atmel_tx_dma() is called, does the job, and then, just
+> before the callback is called, the xmit->head and xmit->tail pointers
+> are set to zero (by uart_flush_buffer())
+> So, when atmel_complete_tx_dma() is called, it does:
+> xmit->tail += atmel_port->tx_len;
+> not knowing that the head and tail pointers have been reseted.
+> => it's like there's (UART_XMIT_SIZE - atmel_port->tx_len) characters to
+> transmit on the serial line.
 > 
-> I wonder if we don't have a bug when booting on something other than
-> CPU#0, possibly on a GICv3 platform... I'll give it a go.
+> PS: I can trigger this bug by holding down the d key at login and then
+> ctrl - basically, a ctrl-d just after sending text - with a rate success
+> of about 1/5 :)
+> 
+> Could you try this patch to see if it corrects also your system hang ?
 
-Went ahead and tried a couple of kexecs with various CPUs disabled in
-order to force kexec not to boot on CPU#0, and the VM did boot just fine.
+Just tried, it doesn't fix the system hang.
 
-So I'd really appreciate a mainline reproducer.
+But it seems to solve the issue that I had while halting the system: a
+kind of flush of a previous buffer in the console.
+So, I think it does solve something.
 
-Thanks,
+So, with both my patch and yours:
+Tested-by: Nicolas Ferre <nicolas.ferre@microchip.com>
 
-	M.
+Regards,
+
+> (The patch is small, but the bug hunt was a headache :))
+> 
+> [PATCH] tty/serial: atmel: fix race condition (TX+DMA)
+> 
+> If uart_flush_buffer() is called between atmel_tx_dma() and
+> atmel_complete_tx_dma(), the circular buffer has been cleared, but not
+> atmel_port->tx_len.
+> That leads to a circular buffer overflow (dumping (UART_XMIT_SIZE -
+> atmel_port->tx_len) bytes).
+> 
+> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
+> ---
+>  drivers/tty/serial/atmel_serial.c | 5 +++++
+>  1 file changed, 5 insertions(+)
+> 
+> diff --git a/drivers/tty/serial/atmel_serial.c
+> b/drivers/tty/serial/atmel_serial.c
+> index 833d3d80446f..89552157e334 100644
+> --- a/drivers/tty/serial/atmel_serial.c
+> +++ b/drivers/tty/serial/atmel_serial.c
+> @@ -1934,6 +1934,11 @@ static void atmel_flush_buffer(struct uart_port
+> *port)
+>  		atmel_uart_writel(port, ATMEL_PDC_TCR, 0);
+>  		atmel_port->pdc_tx.ofs = 0;
+>  	}
+> +	/*
+> +	 * in uart_flush_buffer(), the xmit circular buffer has just
+> +	 * been cleared, so we have to reset tx_len accordingly.
+> +	 */
+> +	atmel_port->tx_len = 0;
+>  }
+> 
+>  /*
+> 
+
+
 -- 
-Jazz is not dead. It just smells funny...
+Nicolas Ferre
