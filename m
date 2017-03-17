@@ -1,150 +1,122 @@
-From: Claudiu.Beznea@microchip.com (m18063)
-Date: Fri, 17 Mar 2017 11:07:43 +0200
-Subject: [PATCH v2 1/2] drivers: pwm: pwm-atmel: switch to atomic PWM
-In-Reply-To: <20170316121409.3e910813@bbrezillon>
-References: <1488468525-28726-1-git-send-email-claudiu.beznea@microchip.com>
- <1488468525-28726-2-git-send-email-claudiu.beznea@microchip.com>
- <20170316121409.3e910813@bbrezillon>
-Message-ID: <7947e576-d2fa-9e5a-3b46-8001344218e7@microchip.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Fri, 17 Mar 2017 11:09:33 +0200
+Subject: [PATCHv2 1/9] Documentation: dt-bindings: Add binding documentation
+ for TI clkctrl clocks
+In-Reply-To: <1489741781-12816-1-git-send-email-t-kristo@ti.com>
+References: <1489741781-12816-1-git-send-email-t-kristo@ti.com>
+Message-ID: <1489741781-12816-2-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
+From: Tony Lindgren <tony@atomide.com>
 
+Texas Instruments omap variant SoCs starting with omap4 have a clkctrl
+clock controller instance for each interconnect target module. The clkctrl
+controls functional and interface clocks for the module.
 
-On 16.03.2017 13:14, Boris Brezillon wrote:
-> Hi Claudiu,
->
-> On Thu, 2 Mar 2017 17:28:44 +0200
-> Claudiu Beznea <claudiu.beznea@microchip.com> wrote:
->
->> The currently Atmel PWM controllers supported by this driver
->> could change period or duty factor without channel disable,
->> for regular channels (sama5d3 support this by using period
->> or duty factor update registers, sam9rl support this by
->> writing channel update register and select the corresponding
->> update: period or duty factor). The chip doesn't support run
->> time changings of signal polarity. To take advantage of
->> atomic PWM framework and let controller works without glitches,
->> in this patch only the duty factor could be changed without
->> disabling PWM channel. For period and signal polarity the
->> atomic PWM is simulated by disabling + enabling the right PWM channel.
->>
->> Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
->>
->> ---
->>  drivers/pwm/pwm-atmel.c | 271 ++++++++++++++++++++++++------------------------
->>  1 file changed, 138 insertions(+), 133 deletions(-)
->>
->> diff --git a/drivers/pwm/pwm-atmel.c b/drivers/pwm/pwm-atmel.c
->> index 67a7023..3db82c3 100644
->> --- a/drivers/pwm/pwm-atmel.c
->> +++ b/drivers/pwm/pwm-atmel.c
->> @@ -58,17 +58,30 @@
->>  #define PWM_MAX_PRD		0xFFFF
->>  #define PRD_MAX_PRES		10
->>  
->> +struct atmel_pwm_reg_data {
->> +	u8 period;
->> +	u8 period_upd;
->> +	u8 duty;
->> +	u8 duty_upd;
->> +};
->> +
->> +struct atmel_pwm_data {
->> +	void (*update_cdty)(struct pwm_chip *chip, struct pwm_device *pwm,
->> +			    unsigned long cdty);
->> +	void (*set_cprd_cdty)(struct pwm_chip *chip, struct pwm_device *pwm,
->> +			      unsigned long cprd, unsigned long cdty);
->> +	const struct atmel_pwm_reg_data regs;
-> If you go for this per-IP reg layout definition approach, you don't need
-> the ->update_cdty()/->set_cprd_cdty() hooks anymore.
+The clkctrl clocks are currently handled by arch/arm/mach-omap2 hwmod code.
+With this binding and a related clock device driver we can start moving the
+clkctrl clock handling to live in drivers/clk/ti.
 
-Agree, I will send another version.
+Note that this binding allows keeping the clockdomain related parts out of
+drivers/clock. The CLKCTCTRL and DYNAMICDEP registers can be handled by
+a separate driver in drivers/soc/ti and genpd. If the clockdomain driver
+needs to know it's clocks, we can just set the the clkctrl device
+instances to be children of the related clockdomain device.
 
->
->> +};
->> +
-> [...]
->
->> +static int atmel_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
->> +			   struct pwm_state *state)
->> +{
->> +	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
->> +	struct pwm_state cstate;
->> +	unsigned long cprd, cdty;
->> +	u32 pres, val;
->> +	bool pwm_reset = false;
->> +	int ret;
->> +
->> +	pwm_get_state(pwm, &cstate);
->> +
->> +	if (cstate.enabled &&
->> +	    (cstate.polarity != state->polarity ||
->> +	     cstate.period != state->period))
->> +		pwm_reset = true;
-> You can move that in the 'if (state->enabled)' block, but I'm not even
-> sure this is really needed (see below).
+Each clkctrl clock can have multiple optional gate clocks, and multiple
+optional mux clocks. To represent this in device tree, it seems that
+it is best done using four clock cells #clock-cells = <2> property.
 
-Agree. I will send another version. Sorry for the noise.
+The reasons for using #clock-cells = <2> are:
 
->
->> +
->> +	if (state->enabled) {
->> +		if (cstate.enabled && !pwm_reset) {
-> 		if (cstate.enabled &&
-> 		    (cstate.polarity != state->polarity ||
-> 		     cstate.period != state->period)) {
->
->> +			cprd = atmel_pwm_ch_readl(atmel_pwm, pwm->hwpwm,
->> +						  atmel_pwm->data->regs.period);
->> +			atmel_pwm_calculate_cdty(state, cprd, &cdty);
->> +			atmel_pwm->data->update_cdty(chip, pwm, cdty);
->> +			return 0;
->> +		}
->> +
->> +		ret = atmel_pwm_calculate_cprd_and_pres(chip, state, &cprd,
->> +							&pres);
->> +		if (ret) {
->> +			dev_err(chip->dev,
->> +				"failed to calculate cprd and prescaler\n");
->> +			return ret;
->> +		}
->> +
->> +		atmel_pwm_calculate_cdty(state, cprd, &cdty);
->> +
->> +		if (pwm_reset) {
-> 		if (cstate.enabled) {
->
->> +			atmel_pwm_disable(chip, pwm, false);
->> +		} else {
->> +			ret = clk_enable(atmel_pwm->clk);
->> +			if (ret) {
->> +				dev_err(chip->dev, "failed to enable clock\n");
->> +				return ret;
->> +			}
->> +		}
->> +
->> +		/* It is necessary to preserve CPOL, inside CMR */
->> +		val = atmel_pwm_ch_readl(atmel_pwm, pwm->hwpwm, PWM_CMR);
->> +		val = (val & ~PWM_CMR_CPRE_MSK) | (pres & PWM_CMR_CPRE_MSK);
->> +		if (state->polarity == PWM_POLARITY_NORMAL)
->> +			val &= ~PWM_CMR_CPOL;
->> +		else
->> +			val |= PWM_CMR_CPOL;
->> +		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWM_CMR, val);
->> +		atmel_pwm->data->set_cprd_cdty(chip, pwm, cprd, cdty);
->> +		mutex_lock(&atmel_pwm->isr_lock);
->> +		atmel_pwm->updated_pwms |= atmel_pwm_readl(atmel_pwm, PWM_ISR);
->> +		atmel_pwm->updated_pwms &= ~(1 << pwm->hwpwm);
->> +		mutex_unlock(&atmel_pwm->isr_lock);
->> +		atmel_pwm_writel(atmel_pwm, PWM_ENA, 1 << pwm->hwpwm);
->> +	} else if (cstate.enabled) {
->> +		atmel_pwm_disable(chip, pwm, true);
->> +	}
->> +
->> +	return 0;
->>  }
+1. We need to specify the clkctrl offset from the instance base. Otherwise
+   we end up with a large number of device tree nodes that need to be
+   patched when new clocks are discovered in a clkctrl clock with minor
+   hardware revision changes for example
 
-Thank you,
-Claudiu
+2. On omap5 CM_L3INIT_USB_HOST_HS_CLKCTRL has ten OPTFCLKEN bits. So we
+   need to use a separate cell for optional gate clocks to avoid address
+   space conflicts
+
+There is probably no need to list input clocks for each clkctrl clock
+instance in the binding. If we want to add them, the standard clocks
+binding can be used for that.
+
+For hardware reference, see omap4430 TRM "Table 3-1312. L4PER_CM2 Registers
+Mapping Summary" for example. It shows one instance of a clkctrl clock
+controller with multiple clkctrl registers.
+
+Cc: Paul Walmsley <paul@pwsan.com>
+Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+Signed-off-by: Tero Kristo <t-kristo@ti.com>
+---
+ .../devicetree/bindings/clock/ti-clkctrl.txt       | 56 ++++++++++++++++++++++
+ 1 file changed, 56 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/ti-clkctrl.txt
+
+diff --git a/Documentation/devicetree/bindings/clock/ti-clkctrl.txt b/Documentation/devicetree/bindings/clock/ti-clkctrl.txt
+new file mode 100644
+index 0000000..7e5d9f5
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/ti-clkctrl.txt
+@@ -0,0 +1,56 @@
++Texas Instruments clkctrl clock binding
++
++Texas Instruments SoCs can have a clkctrl clock controller for each
++interconnect target module. The clkctrl clock controller manages functional
++and interface clocks for each module. Each clkctrl controller can also
++gate one or more optional functional clocks for a module, and can have one
++or more clock muxes. There is a clkctrl clock controller typically for each
++interconnect target module on omap4 and later variants.
++
++The clock consumers can specify the index of the clkctrl clock using
++the hardware offset from the clkctrl instance register space. The optional
++clocks can be specified by clkctrl hardware offset and the index of the
++optional clock.
++
++For more information, please see the Linux clock framework binding at
++Documentation/devicetree/bindings/clock/clock-bindings.txt.
++
++Required properties :
++- compatible : shall be "ti,clkctrl"
++- #clock-cells : shall contain 2 with the first entry being the instance
++		 offset from the clock domain base and the second being the
++		 clock index
++
++Example: Clock controller node on omap 4430:
++
++&cm2 {
++	l4per: cm at 1400 {
++		cm_l4per at 0 {
++			cm_l4per_clkctrl: clk at 20 {
++				compatible = "ti,clkctrl";
++				reg = <0x20 0x1b0>;
++				#clock-cells = <4>;
++			};
++		};
++	};
++};
++
++Example: Preprocessor helper macros in dt-bindings/clock/ti-clkctrl.h
++
++#define OMAP4_CLKCTRL_OFFSET		0x20
++#define OMAP4_CLKCTRL_INDEX(offset)	((offset) - OMAP4_CLKCTRL_OFFSET)
++#define MODULEMODE_HWCTRL		1
++#define MODULEMODE_SWCTRL		2
++
++#define OMAP4_GPTIMER10_CLKTRL		OMAP4_CLKCTRL_INDEX(0x28)
++#define OMAP4_GPTIMER11_CLKTRL		OMAP4_CLKCTRL_INDEX(0x30)
++#define OMAP4_GPTIMER2_CLKTRL		OMAP4_CLKCTRL_INDEX(0x38)
++...
++#define OMAP4_GPIO2_CLKCTRL		OMAP_CLKCTRL_INDEX(0x60)
++
++Example: Clock consumer node for GPIO2:
++
++&gpio2 {
++       clocks = <&cm_l4per_clkctrl OMAP4_GPIO2_CLKCTRL 0
++		 &cm_l4per_clkctrl OMAP4_GPIO2_CLKCTRL 8>;
++};
+-- 
+1.9.1
