@@ -1,34 +1,32 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Fri, 17 Mar 2017 08:14:43 +0100
-Subject: [PATCH v3] ARM: pxa: magician: Add support for ADS7846 touchscreen
-In-Reply-To: <bca1b7cc-e4d6-d101-0591-61694c07bfd8@tul.cz> (Petr Cvek's
- message of "Mon, 13 Mar 2017 09:05:49 +0100")
-References: <bca1b7cc-e4d6-d101-0591-61694c07bfd8@tul.cz>
-Message-ID: <87wpbofk7w.fsf@belgarion.home>
+From: andr2000@gmail.com (Oleksandr Andrushchenko)
+Date: Fri, 17 Mar 2017 09:27:42 +0200
+Subject: [PATCH v1] arm64: Add support for on-demand backtrace of other CPUs
+Message-ID: <1489735663-2091-1-git-send-email-andr2000@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Petr Cvek <petr.cvek@tul.cz> writes:
+From: Oleksandr Andrushchenko <oleksandr_andrushchenko@epam.com>
 
-> This patch adds a support for ADS7846 touchscreen driver.
->
-> The basic functionality was tested, x_plate_ohms and y_plate_ohms were
-> physically measured. The value pressure_max was empirically set to match
-> the measured range, which is affected by x_plate_ohms and ADS samples.
->
-> The value of keep_vref_on should be set. A tested model (T-Mobile MDA
-> Compact PM10A) doesn't seem to use Vref pin as the input from an external
-> source. On this model the unset keep_vref_on cause high jitter of measured
-> values.
->
-> SPI framing pin (gpio_cs) must be used in GPIO mode due to an incompatible
-> autoframing of PXA27x controller and ADS7846 device.
->
-> Signed-off-by: Petr Cvek <petr.cvek@tul.cz>
-Applied to pxa/for-next, unless Philipp objects in the next couple of days,
-thanks.
+Hi, all!
 
-Cheers.
+Please ignore initial version of the patch in favor of this one:
+this is the rebased and updated version of the [1] which unfortunately
+haven't landed into the kernel and stuck at RFC stage.
 
---
-Robert
+Thank you,
+Oleksandr Andrushchenko
+
+
+[1] https://lkml.org/lkml/2016/8/19/591
+
+Daniel Thompson (1):
+  arm64: Add support for on-demand backtrace of other CPUs
+
+ arch/arm64/include/asm/hardirq.h |  2 +-
+ arch/arm64/include/asm/irq.h     |  6 ++++++
+ arch/arm64/kernel/smp.c          | 30 +++++++++++++++++++++++++++++-
+ lib/nmi_backtrace.c              |  8 ++++++--
+ 4 files changed, 42 insertions(+), 4 deletions(-)
+
+-- 
+2.7.4
