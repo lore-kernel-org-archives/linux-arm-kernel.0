@@ -1,53 +1,59 @@
-From: julia.lawall@lip6.fr (Julia Lawall)
-Date: Fri, 17 Mar 2017 17:55:42 +0100 (CET)
-Subject: outreachy
-In-Reply-To: <20170317152519.GA8684@amd>
-References: <alpine.DEB.2.20.1703092133340.2306@hadrien>
- <443f0143-aec1-2559-a2c2-73b245632948@broadcom.com>
- <2da12619-5fcb-9e0f-b6c1-c83cbf491e8d@wwwdotorg.org>
- <20170309212021.GA24433@kroah.com> <20170317152519.GA8684@amd>
-Message-ID: <alpine.DEB.2.20.1703171753550.4098@hadrien>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 17 Mar 2017 16:57:20 +0000
+Subject: [RFC arm64] samples/bpf: explicitly exclude sysreg sections with
+ asm macros
+In-Reply-To: <20170317135836.GA58086@C02RW35GFVH8.dhcp.broadcom.net>
+References: <1489101492-15653-1-git-send-email-andy@greyhouse.net>
+ <20170310175229.GC18894@arm.com> <20170310192656.GA13928@C02RW35GFVH8>
+ <20170310204112.GA21382@leverpostej>
+ <20170315183130.GB32819@C02RW35GFVH8.dhcp.broadcom.net>
+ <20170315191741.GB29452@leverpostej>
+ <20170315205404.GA43995@C02RW35GFVH8.dhcp.broadcom.net>
+ <20170316104204.GA31101@leverpostej>
+ <20170316210454.GA53792@C02RW35GFVH8.dhcp.broadcom.net>
+ <e842a237-9206-99ed-624b-4f3cf15cc557@arm.com>
+ <20170317135836.GA58086@C02RW35GFVH8.dhcp.broadcom.net>
+Message-ID: <383e1626-335b-01fe-5921-5956d7201cf4@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 17/03/17 13:58, Andy Gospodarek wrote:
+> On Fri, Mar 17, 2017 at 11:11:59AM +0000, Robin Murphy wrote:
+>> On 16/03/17 21:04, Andy Gospodarek wrote:
+>>>
+>>> While I generally agree isn't the entire reason this inline asm exists
+>>> -- to fix a binutils issue?  :-)
+>>
+>> Binutils is required to build the arm64 kernel; if certain versions of
+>> binutils packaged by arm64 distros can't cope with certain instructions
+>> we need to use, we have to do what we can to make it build. However, if
+>> LLVM cannot cope with inline assembly on arm64, then it's pretty clear
+>> that the kernel cannot be built with LLVM anyway, thus there is nothing
+>> to work around in that regard. Sorry, you've got a straw man there ;)
+> 
+> I know, right?  I'll see if I can come up with something that appears to
+> be less fragile and/or intrusive to the arm64 arch code as I'd really
+> like to stop carrying a patch in my devel tree for this.
+
+I'm honestly not sure if I'm serious or not, but:
+
+diff --git a/samples/bpf/Makefile b/samples/bpf/Makefile
+index 72c58675973e..f52ebad7b096 100644
+--- a/samples/bpf/Makefile
++++ b/samples/bpf/Makefile
+@@ -154,6 +154,6 @@ $(src)/*.c: verify_target_bpf
+ # useless for BPF samples.
+ $(obj)/%.o: $(src)/%.c
+        $(CLANG) $(NOSTDINC_FLAGS) $(LINUXINCLUDE) $(EXTRA_CFLAGS) \
+-               -D__KERNEL__ -D__ASM_SYSREG_H -Wno-unused-value
+-Wno-pointer-sign \
++               -D__KERNEL__ -D'asm(...)' -Wno-unused-value
+-Wno-pointer-sign \
+                -Wno-compare-distinct-pointer-types \
+                -O2 -emit-llvm -c $< -o -| $(LLC) -march=bpf
+-filetype=obj -o $@
 
 
-On Fri, 17 Mar 2017, Pavel Machek wrote:
+?
 
-> Hi!
->
-> >
-> > Hah!  That's the joy of being a maintainer of a driver in staging.  Even
-> > if you filter out outreachy, you are going to get a lot of "basic
-> > mistakes" and other type patches cc:ed to you.
-> >
-> > I strongly suggest, that if you all don't like this type of stuff,
-> > either:
-> > 	- work to get the code out of staging as soon as possible (i.e.
-> > 	  send me coding style fixes for everything right now, and then
-> > 	  fix up the rest of the stuff.)
-> > 	- take yourself off the maintainer list for this code.
-> >
-> > It's your choice, outreachy right now is a lot of patches, but again,
-> > it's not going to keep you from getting the "basic" stuff sent to you
-> > in ways that is totally wrong.
->
-> Could we get these trivial patches off the lkml? Yes, lkml already has
-> a lot of traffic, but no, this is not useful :-(.
-
-The outreachy instructions say to use the -nol argument to
-get_maintainers, which would prevent them from being sent to any mailing
-list.  However others thought that all patches should be sent to mailing
-lists, and so I haven't enforced anything for people who have omitted
--nol.  However I have tried to remove bcm maintainers from CC lists on
-replies and reminded people not to send you patches,
-
-julia
-
-
->
-> 									Pavel
-> --
-> (english) http://www.livejournal.com/~pavelmachek
-> (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
->
+Robin.
