@@ -1,219 +1,65 @@
-From: mdf@kernel.org (Moritz Fischer)
-Date: Thu, 16 Mar 2017 17:51:50 -0700
-Subject: [PATCH v2 2/2] fpga: Add support for Xilinx LogiCORE PR Decoupler
-In-Reply-To: <1489711910-17443-1-git-send-email-mdf@kernel.org>
-References: <1489711910-17443-1-git-send-email-mdf@kernel.org>
-Message-ID: <1489711910-17443-2-git-send-email-mdf@kernel.org>
+From: zyw@rock-chips.com (Chris Zhong)
+Date: Fri, 17 Mar 2017 09:19:06 +0800
+Subject: [PATCH v2 1/4] drm/rockchip/dsi: check phy_cfg_clk only for RK3399
+In-Reply-To: <20170316105500.675b413f.john@metanate.com>
+References: <1489635107-21327-1-git-send-email-zyw@rock-chips.com>
+ <1489635107-21327-2-git-send-email-zyw@rock-chips.com>
+ <20170316105500.675b413f.john@metanate.com>
+Message-ID: <58CB398A.9050800@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds support for the Xilinx LogiCORE PR Decoupler
-soft-ip that does decoupling of PR regions in the FPGA
-fabric during partial reconfiguration.
+Hi John
 
-Signed-off-by: Moritz Fischer <mdf@kernel.org>
-Cc: Michal Simek <michal.simek@xilinx.com>
-Cc: S?ren Brinkmann <soren.brinkmann@xilinx.com>
-Cc: linux-kernel at vger.kernel.org
-Cc: devicetree at vger.kernel.org
----
+On 03/16/2017 06:55 PM, John Keeping wrote:
+> On Thu, 16 Mar 2017 11:31:44 +0800, Chris Zhong wrote:
+>
+>> For RK3399, the phy_cfg_clk is a required clock, if phy_cfg_clk is
+>> disabled, MIPI phy can not work. Let's return a error if there is no
+>> phy_cfg_clk in dts property, when the pdata match RK3399.
+>>
+>> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+>> ---
+>>
+>> Changes in v2: None
+>>
+>>   drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 10 ++++------
+>>   1 file changed, 4 insertions(+), 6 deletions(-)
+>>
+>> diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+>> index f84f9ae..11c4166 100644
+>> --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+>> +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+>> @@ -1227,15 +1227,13 @@ static int dw_mipi_dsi_bind(struct device *dev, struct device *master,
+>>   		clk_disable_unprepare(dsi->pclk);
+>>   	}
+>>   
+>> -	dsi->phy_cfg_clk = devm_clk_get(dev, "phy_cfg");
+>> -	if (IS_ERR(dsi->phy_cfg_clk)) {
+>> -		ret = PTR_ERR(dsi->phy_cfg_clk);
+>> -		if (ret != -ENOENT) {
+>> +	if (pdata == &rk3399_mipi_dsi_drv_data) {
+> This will get messy if the next SOC also needs phy_cfg_clk.  Can we do
+> something like:
+>
+> 	if (pdata->flags & DW_MIPI_NEEDS_PHY_CFG_CLK) {
+> 		...
+Thanks, good idea. I think RK3368 mipi-dsi driver is on the way. :)
 
-Changes from v1:
-- Added Michal as Co-Author since I pulled in some of his code
-- Reworked clk handling in _remove()
-- Pulled in Michal's version of show_enable(), ditched priv->enabled
 
----
- drivers/fpga/Kconfig               |   9 +++
- drivers/fpga/Makefile              |   1 +
- drivers/fpga/xilinx-pr-decoupler.c | 147 +++++++++++++++++++++++++++++++++++++
- 3 files changed, 157 insertions(+)
- create mode 100644 drivers/fpga/xilinx-pr-decoupler.c
+>> +		dsi->phy_cfg_clk = devm_clk_get(dev, "phy_cfg");
+>> +		if (IS_ERR(dsi->phy_cfg_clk)) {
+>> +			ret = PTR_ERR(dsi->phy_cfg_clk);
+>>   			dev_err(dev, "Unable to get phy_cfg_clk: %d\n", ret);
+>>   			return ret;
+>>   		}
+>> -		dsi->phy_cfg_clk = NULL;
+>> -		dev_dbg(dev, "have not phy_cfg_clk\n");
+>>   	}
+>>   
+>>   	ret = clk_prepare_enable(dsi->pllref_clk);
+>
+>
 
-diff --git a/drivers/fpga/Kconfig b/drivers/fpga/Kconfig
-index 967cda4..e42c7dc 100644
---- a/drivers/fpga/Kconfig
-+++ b/drivers/fpga/Kconfig
-@@ -69,6 +69,15 @@ config ALTERA_FREEZE_BRIDGE
- 	  isolate one region of the FPGA from the busses while that
- 	  region is being reprogrammed.
- 
-+config XILINX_PR_DECOUPLER
-+	tristate "Xilinx LogiCORE PR Decoupler"
-+	depends on FPGA_BRIDGE
-+	help
-+	  Say Y to enable drivers for Xilinx LogiCORE PR Decoupler.
-+	  The PR Decoupler exists in the FPGA fabric to isolate one
-+	  region of the FPGA from the busses while that region is
-+	  being reprogrammed during partial reconfig.
-+
- endif # FPGA
- 
- endmenu
-diff --git a/drivers/fpga/Makefile b/drivers/fpga/Makefile
-index cc0d364..3f04bcf 100644
---- a/drivers/fpga/Makefile
-+++ b/drivers/fpga/Makefile
-@@ -15,6 +15,7 @@ obj-$(CONFIG_FPGA_MGR_ZYNQ_FPGA)	+= zynq-fpga.o
- obj-$(CONFIG_FPGA_BRIDGE)		+= fpga-bridge.o
- obj-$(CONFIG_SOCFPGA_FPGA_BRIDGE)	+= altera-hps2fpga.o altera-fpga2sdram.o
- obj-$(CONFIG_ALTERA_FREEZE_BRIDGE)	+= altera-freeze-bridge.o
-+obj-$(CONFIG_XILINX_PR_DECOUPLER)	+= xilinx-pr-decoupler.o
- 
- # High Level Interfaces
- obj-$(CONFIG_FPGA_REGION)		+= fpga-region.o
-diff --git a/drivers/fpga/xilinx-pr-decoupler.c b/drivers/fpga/xilinx-pr-decoupler.c
-new file mode 100644
-index 0000000..761700c
---- /dev/null
-+++ b/drivers/fpga/xilinx-pr-decoupler.c
-@@ -0,0 +1,147 @@
-+/*
-+ * Copyright (c) 2017, National Instruments Corp.
-+ * Copyright (c) 2017, Xilix Inc
-+ *
-+ * FPGA Bridge Driver for the Xilinx LogiCORE Partial Reconfiguration
-+ * Decoupler IP Core.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; version 2 of the License.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/clk.h>
-+#include <linux/io.h>
-+#include <linux/kernel.h>
-+#include <linux/of_device.h>
-+#include <linux/module.h>
-+#include <linux/fpga/fpga-bridge.h>
-+
-+#define CTRL_CMD_DECOUPLE	BIT(0)
-+#define CTRL_CMD_COUPLE		~BIT(0)
-+
-+struct xlnx_pr_decoupler_data {
-+	void __iomem *io_base;
-+	struct clk *clk;
-+};
-+
-+static int xlnx_pr_decoupler_enable_set(struct fpga_bridge *bridge, bool enable)
-+{
-+	int err;
-+	struct xlnx_pr_decoupler_data *priv = bridge->priv;
-+
-+	err = clk_enable(priv->clk);
-+	if (err)
-+		return err;
-+
-+	if (enable)
-+		writel(CTRL_CMD_COUPLE, priv->io_base);
-+	else
-+		writel(CTRL_CMD_DECOUPLE, priv->io_base);
-+
-+	clk_disable(priv->clk);
-+
-+	return 0;
-+}
-+
-+static int xlnx_pr_decoupler_enable_show(struct fpga_bridge *bridge)
-+{
-+	const struct xlnx_pr_decoupler_data *priv = bridge->priv;
-+	u32 status;
-+	int err;
-+
-+	err = clk_enable(priv->clk);
-+	if (err)
-+		return err;
-+
-+	status = readl(priv->io_base);
-+
-+	clk_disable(priv->clk);
-+
-+	return !status;
-+}
-+
-+static struct fpga_bridge_ops xlnx_pr_decoupler_br_ops = {
-+	.enable_set = xlnx_pr_decoupler_enable_set,
-+	.enable_show = xlnx_pr_decoupler_enable_show,
-+};
-+
-+static const struct of_device_id xlnx_pr_decoupler_of_match[] = {
-+	{ .compatible = "xlnx,pr-decoupler-1.00", },
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, xlnx_pr_decoupler_of_match);
-+
-+static int xlnx_pr_decoupler_probe(struct platform_device *pdev)
-+{
-+	struct xlnx_pr_decoupler_data *priv;
-+	int err;
-+	struct resource *res;
-+
-+	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
-+	if (!priv)
-+		return -ENOMEM;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	priv->io_base = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(priv->io_base))
-+		return PTR_ERR(priv->io_base);
-+
-+	priv->clk = devm_clk_get(&pdev->dev, "aclk");
-+	if (IS_ERR(priv->clk)) {
-+		dev_err(&pdev->dev, "input clock not found\n");
-+		return PTR_ERR(priv->clk);
-+	}
-+
-+	err = clk_prepare_enable(priv->clk);
-+	if (err) {
-+		dev_err(&pdev->dev, "unable to enable clock\n");
-+		return err;
-+	}
-+
-+	clk_disable(priv->clk);
-+
-+	err = fpga_bridge_register(&pdev->dev, "Xilinx PR Decoupler",
-+				   &xlnx_pr_decoupler_br_ops, priv);
-+
-+	if (err) {
-+		dev_err(&pdev->dev, "unable to register Xilinx PR Decoupler");
-+		clk_unprepare(priv->clk);
-+		return err;
-+	}
-+
-+	return 0;
-+}
-+
-+static int xlnx_pr_decoupler_remove(struct platform_device *pdev)
-+{
-+	struct fpga_bridge *bridge = platform_get_drvdata(pdev);
-+	struct xlnx_pr_decoupler_data *p = bridge->priv;
-+
-+	fpga_bridge_unregister(&pdev->dev);
-+
-+	clk_unprepare(p->clk);
-+
-+	return 0;
-+}
-+
-+static struct platform_driver xlnx_pr_decoupler_driver = {
-+	.probe = xlnx_pr_decoupler_probe,
-+	.remove = xlnx_pr_decoupler_remove,
-+	.driver = {
-+		.name = "xlnx_pr_decoupler",
-+		.of_match_table = of_match_ptr(xlnx_pr_decoupler_of_match),
-+	},
-+};
-+
-+module_platform_driver(xlnx_pr_decoupler_driver);
-+
-+MODULE_DESCRIPTION("Xilinx Partial Reconfiguration Decoupler");
-+MODULE_AUTHOR("Moritz Fischer <mdf@kernel.org>");
-+MODULE_AUTHOR("Michal Simek <michal.simek@xilinx.com>");
-+MODULE_LICENSE("GPL v2");
 -- 
-2.7.4
+Chris Zhong
