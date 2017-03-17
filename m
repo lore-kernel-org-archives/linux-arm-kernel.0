@@ -1,47 +1,65 @@
-From: agustinv@codeaurora.org (Agustin Vega-Frias)
-Date: Fri, 17 Mar 2017 10:30:33 -0400
-Subject: [PATCH V4] perf: qcom: Add L3 cache PMU driver
-In-Reply-To: <1489760657-26961-1-git-send-email-agustinv@codeaurora.org>
-References: <1489760657-26961-1-git-send-email-agustinv@codeaurora.org>
-Message-ID: <74bb476166cc6b7f378de337cfd4bfe7@codeaurora.org>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Fri, 17 Mar 2017 14:38:56 +0000
+Subject: [PATCH v3 03/19] arm/arm64: vgic: turn vgic_find_mmio_region into
+ public
+In-Reply-To: <1488800074-21991-4-git-send-email-eric.auger@redhat.com>
+References: <1488800074-21991-1-git-send-email-eric.auger@redhat.com>
+ <1488800074-21991-4-git-send-email-eric.auger@redhat.com>
+Message-ID: <7b4aa19d-d413-7714-a317-b9e59a2fbf88@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017-03-17 10:24, Agustin Vega-Frias wrote:
-> This adds a new dynamic PMU to the Perf Events framework to program
-> and control the L3 cache PMUs in some Qualcomm Technologies SOCs.
-> 
-> The driver supports a distributed cache architecture where the overall
-> cache for a socket is comprised of multiple slices each with its own 
-> PMU.
-> Access to each individual PMU is provided even though all CPUs share 
-> all
-> the slices. User space needs to aggregate to individual counts to 
-> provide
-> a global picture.
-> 
-> The driver exports formatting and event information to sysfs so it can
-> be used by the perf user space tools with the syntaxes:
->    perf stat -a -e l3cache_0_0/read-miss/
->    perf stat -a -e l3cache_0_0/event=0x21/
-> 
-> Signed-off-by: Agustin Vega-Frias <agustinv@codeaurora.org>
+Hi Eric,
+
+On 06/03/17 11:34, Eric Auger wrote:
+> We plan to use vgic_find_mmio_region in vgic-its.c so let's
+> turn it into a public function.
+
+Just a nit below, but for the patch:
+
+> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+
+Reviewed-by: Andre Przywara <andre.przywara@arm.com>
+
 > ---
->  Documentation/perf/qcom_l3_pmu.txt |  25 ++
->  drivers/perf/Kconfig               |  10 +
->  drivers/perf/Makefile              |   1 +
->  drivers/perf/qcom_l3_pmu.c         | 825 
-> +++++++++++++++++++++++++++++++++++++
->  include/linux/cpuhotplug.h         |   1 +
->  5 files changed, 862 insertions(+)
->  create mode 100644 Documentation/perf/qcom_l3_pmu.txt
->  create mode 100644 drivers/perf/qcom_l3_pmu.c
+>  virt/kvm/arm/vgic/vgic-mmio.c | 3 +--
+>  virt/kvm/arm/vgic/vgic-mmio.h | 5 +++++
+>  2 files changed, 6 insertions(+), 2 deletions(-)
+> 
+> diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
+> index 3654b4c..0427ddb 100644
+> --- a/virt/kvm/arm/vgic/vgic-mmio.c
+> +++ b/virt/kvm/arm/vgic/vgic-mmio.c
+> @@ -430,8 +430,7 @@ static int match_region(const void *key, const void *elt)
+>  	return 0;
+>  }
+>  
+> -/* Find the proper register handler entry given a certain address offset. */
+> -static const struct vgic_register_region *
+> +const struct vgic_register_region *
+>  vgic_find_mmio_region(const struct vgic_register_region *region, int nr_regions,
+>  		      unsigned int offset)
+>  {
+> diff --git a/virt/kvm/arm/vgic/vgic-mmio.h b/virt/kvm/arm/vgic/vgic-mmio.h
+> index 98bb566..055ad42 100644
+> --- a/virt/kvm/arm/vgic/vgic-mmio.h
+> +++ b/virt/kvm/arm/vgic/vgic-mmio.h
+> @@ -192,4 +192,9 @@ u64 vgic_sanitise_shareability(u64 reg);
+>  u64 vgic_sanitise_field(u64 reg, u64 field_mask, int field_shift,
+>  			u64 (*sanitise_fn)(u64));
+>  
+> +/* Find the proper register handler entry given a certain address offset */
+> +const struct vgic_register_region *
+> +vgic_find_mmio_region(const struct vgic_register_region *region,
 
-This was built and tested on top of v4.11-rc2.
-The perf fuzzer was run overnight and no stability issues were found.
+I wonder if we should use the opportunity to use the plural in the
+variable name here ("regions") to make it clear that this is an array
+(just needed some time myself here to remember what it does).
 
--- 
-Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm 
-Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a 
-Linux Foundation Collaborative Project.
+Cheers,
+Andre.
+
+> +		      int nr_regions, unsigned int offset);
+> +
+>  #endif
+> 
