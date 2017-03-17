@@ -1,43 +1,54 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Fri, 17 Mar 2017 14:51:10 +0100
-Subject: [PATCH v4 14/36] [media] v4l2-mc: add a function to inherit
- controls from a pipeline
-In-Reply-To: <20170317102410.18c966ae@vento.lan>
-References: <20170310130733.GU21222@n2100.armlinux.org.uk>
- <c679f755-52a6-3c6f-3d65-277db46676cc@xs4all.nl>
- <20170310140124.GV21222@n2100.armlinux.org.uk>
- <cc8900b0-c091-b14b-96f4-01f8fa72431c@xs4all.nl>
- <20170310125342.7f047acf@vento.lan>
- <20170310223714.GI3220@valkosipuli.retiisi.org.uk>
- <20170311082549.576531d0@vento.lan>
- <20170313124621.GA10701@valkosipuli.retiisi.org.uk>
- <20170314004533.3b3cd44b@vento.lan>
- <e0a6c60b-1735-de0b-21f4-d8c3f4b3f10f@xs4all.nl>
- <20170317114203.GZ21222@n2100.armlinux.org.uk>
- <44161453-02f9-0019-3868-7501967a6a82@linux.intel.com>
- <20170317102410.18c966ae@vento.lan>
-Message-ID: <1489758670.2905.52.camel@pengutronix.de>
+From: cedric.madianga@gmail.com (M'boumba Cedric Madianga)
+Date: Fri, 17 Mar 2017 14:52:44 +0100
+Subject: [PATCH 3/5] i2c: i2c-stm32f7: add driver
+In-Reply-To: <6ae90186-0e8d-654b-c9e3-2d1b4daf6198@baylibre.com>
+References: <1489744738-21632-1-git-send-email-cedric.madianga@gmail.com>
+ <1489744738-21632-4-git-send-email-cedric.madianga@gmail.com>
+ <6ae90186-0e8d-654b-c9e3-2d1b4daf6198@baylibre.com>
+Message-ID: <CAOAejn0Hs7QOgcrHM2t3NsFQeD9dyvThDK-8iM1Lvb7Qv4fGGQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2017-03-17 at 10:24 -0300, Mauro Carvalho Chehab wrote:
-[...]
-> The big question, waiting for an answer on the last 8 years is
-> who would do that? Such person would need to have several different
-> hardware from different vendors, in order to ensure that it has
-> a generic solution.
-> 
-> It is a way more feasible that the Kernel developers that already 
-> have a certain hardware on their hands to add support inside the
-> driver to forward the controls through the pipeline and to setup
-> a "default" pipeline that would cover the common use cases at
-> driver's probe.
+Hi,
 
-Actually, would setting pipeline via libv4l2 plugin and letting drivers
-provide a sane enabled default pipeline configuration be mutually
-exclusive? Not sure about the control forwarding, but at least a simple
-link setup and format forwarding would also be possible in the kernel
-without hindering userspace from doing it themselves later.
 
-regards
-Philipp
+>> +static int stm32f7_i2c_hw_config(struct stm32f7_i2c_dev *i2c_dev)
+>> +{
+>> +     struct device_node *of_node = i2c_dev->dev->of_node;
+>> +     u32 timing;
+>> +     int ret;
+>> +
+>> +     ret = of_property_read_u32(of_node, "st,i2c-timing", &timing);
+>> +     if (ret) {
+>> +             dev_err(i2c_dev->dev, "Error: missing i2c timing property\n");
+>> +             return ret;
+>> +     }
+>> +
+>> +     /* Timing settings */
+>> +     writel_relaxed(timing, i2c_dev->base + STM32F7_I2C_TIMINGR);
+>
+> Hi,
+>
+> Using a register value in DT is quite ugly since the requirement to calculate the timings
+> is quite easy, and well documented.
+>
+> I wrote it for Zephyr, you can find it here :
+> https://github.com/zephyrproject-rtos/zephyr/blob/master/drivers/i2c/i2c_stm32lx.c#L31
+
+Thanks for this code. It is very interesting.
+With our formula, I just notice that we don't use any i2c rise time or
+fall time but they have some impacts in i2c timing computation.
+So, the user could not be able to select these values for him use case. Right ?
+
+
+>
+> Another point, maybe you should find a better name for the driver, since this I2C IP is share
+> with the STM32Lx also and is not tied to STM32F7.
+
+As far as I know, we don't have any STM32Lx SoC integrated in the
+linux kernel mainline.
+I choose i2c-stm32f7 name as it is the first Soc integrated in the
+linux kernel mainline where this IP could be used.
+
+BR,
+Cedric
