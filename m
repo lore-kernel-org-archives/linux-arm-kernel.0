@@ -1,93 +1,53 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Fri, 17 Mar 2017 18:13:28 +0800
-Subject: [v3 3/5] coresight: add support for debug module
-In-Reply-To: <CANLsYkzJsGvr4ZzNbTwcPu1Qki6=Szvu+bMjHZ_rza==DqFChw@mail.gmail.com>
-References: <1488520809-31670-4-git-send-email-leo.yan@linaro.org>
- <011fdac0-59bf-b539-2de3-0b59a41bc922@arm.com>
- <20170309175915.GA964@leoy-linaro>
- <3f27efee-3b63-81fd-eb96-73fd7e6f5e92@arm.com>
- <20170313165600.GB32431@linaro.org>
- <516f8989-4dde-2686-d549-0761feb14d1b@arm.com>
- <CANLsYkzJsGvr4ZzNbTwcPu1Qki6=Szvu+bMjHZ_rza==DqFChw@mail.gmail.com>
-Message-ID: <20170317101328.GA19877@leoy-linaro>
+From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
+Date: Fri, 17 Mar 2017 15:54:22 +0530
+Subject: [PATCH 14/14] arm64: pmuv3: use arm_pmu ACPI framework
+In-Reply-To: <20170314105108.GA15248@leverpostej>
+References: <1489143891-11596-1-git-send-email-mark.rutland@arm.com>
+ <1489143891-11596-15-git-send-email-mark.rutland@arm.com>
+ <CAFpQJXUQm84-DTCAng1RQq-wv-nqw=+MTe=vGTL7Sw=yL2sd+A@mail.gmail.com>
+ <20170314105108.GA15248@leverpostej>
+Message-ID: <CAFpQJXULZP+Azyp_F7KDL-i8=CxN+LwGqewoJq=UZHb9nDrvuA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 15, 2017 at 02:41:59PM -0600, Mathieu Poirier wrote:
-> On 15 March 2017 at 10:44, Suzuki K Poulose <Suzuki.Poulose@arm.com> wrote:
-> > On 13/03/17 16:56, Mathieu Poirier wrote:
-> >> On Fri, Mar 10, 2017 at 02:29:53PM +0000, Suzuki K Poulose wrote:
+On Tue, Mar 14, 2017 at 4:21 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> Hi Ganapatrao,
+>
+> On Tue, Mar 14, 2017 at 11:30:17AM +0530, Ganapatrao Kulkarni wrote:
+>> > +int __init armv8_pmu_driver_init(void)
+>> > +{
+>> > +       if (acpi_disabled)
+>> > +               return platform_driver_register(&armv8_pmu_driver);
+>> > +       else
+>> > +               return arm_pmu_acpi_probe(armv8_pmuv3_init);
+>>
+>> i think this function needs to be updated to
+>> probe SoC specific init (armv8_a53_pmu_init, armv8_vulcan_pmu_init
+>> etc)  as well.
+>
+> Only exposing generic PMUv3 here was a deliberate decision, based on
+> prior discussions, so as to keep things consistent on ACPI platforms
+> regardless of which CPU types the PMU code is immediately aware of.
+>
+> I should have documented this better; sorry about that.
+>
+> All events which can be enumerated via the PMU ID registers will be
+> exposed via sysfs.
+>
+> Other events (e.g. those which are implementation defined) will not be
+> exposed via sysfs, but can still be used as raw events.
+>
+> There's been some perf tool work to allow these to be enumerated in
+> userspace based on JSON files. This allows new events to be supported
+> with a userspace update, event when the kernel itself is older than the
+> CPU in question, and does not know anything about its events.
 
-[...]
+At present, i see JSON script being added to x86 and powerpc
+is anybody working on it to extend this to arm64 as well?
 
-> >>> Btw, I don't see any PM calls to make sure the power domain (at least the
-> >>> debug domain)
-> >>> is up, which could cause problems with accesses to some of these
-> >>> registers (leave alone the
-> >>> ones in CPU power domain), especially the EDPRSR. We could also do
-> >>> pm_runtime_get on the
-> >>> CPU's power domain, if the CPU is online, before we access the pcsr.
-> >>
-> >>
-> >> I thought about PM runtime operations a little while back but wondered if
-> >> it is
-> >> really a good thing to have them around.  When this code is called the
-> >> system
-> >> has crashed and as such making PM runtimes call isn't a good idea.
-> >
-> >
-> > You are right. It is not safe to make such calls when we have crashed.
-> > The other side effect is, if we don't have the debug power domain up,
-> > we could possibly hang the system and prevent other registered notifiers
-> > from running, which doesn't sound good either.
-> >
-> >>
-> >> One thing we could do is _not_ call pm_runtime_put() at the end of the
-> >> probe()
-> >> operation.  That way we wouldn't have to mess around with PM runtime
-> >> operations
-> >> on an unstable system.  This, of course, is costly in terms of power
-> >> consumption
-> >> but the system is under test/debug anyway.
-> >
-> >
-> > May be control the behavior via kernel command line ? Something like
-> > coresight_debug={on or 1} or
-> > even use the "nohlt" ?
-> 
-> We need to deal with the debug and CPU power domains.
-> 
-> For the former I suggest we do what coresight does and use the
-> "power-domains" binding[1].  For the CPU power domain we can re-use
-> the "nohlt" flag.  In the probe function if the "nohlt" cmd line flag
-> is not set the code bails out.  If it is set pm_runtime_put() is _not_
-> called and the driver can be used without worries of hanging the
-> system when the panic handler is invoked.
-> 
-> Am I forgetting something?
+>
+> Thanks,
+> Mark.
 
-I tested this drvier on Hikey and DB410c. For Hikey we must pass
-"nohlt" to disable low power states, otherwise the kernel will hang
-during initialization. But for DB410c, this driver even can work well
-without "nohlt" and I checked the CPUIdle has been really enabled with
-below sysfs entries:
-
-root at linaro-developer:~# cat /sys/devices/system/cpu/cpu*/cpuidle/state*/usage
-5992
-6988
-4225
-4547
-2790
-23696
-4202
-3899
-
-And from my previous experience, I'm quite sure some SoCs can access
-the debug module registers with CPUIdle enabled, and it will read
-back 0xFFFF_FFFF_FFFF_FFFF when the CPU stays in low power state.
-So I prefer we could keep current method to suggest to use "nohlt" in
-Kconfig's help description but it's not mandotory to check this in
-the code. How about you think for this?
-
-Thanks,
-Leo Yan
+thanks
+Ganapat
