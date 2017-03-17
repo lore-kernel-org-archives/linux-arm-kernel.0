@@ -1,58 +1,69 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Fri, 17 Mar 2017 14:04:21 +0900
-Subject: [PATCH v3] Revert "tty: serial: pl011: add ttyAMA for matching
- pl011 console"
-In-Reply-To: <008d062d-1095-5a65-3a69-33bee1f648d7@gmail.com>
-References: <20170301122602.30025-1-aleksey.makarov@linaro.org>
- <20170301152304.29635-1-aleksey.makarov@linaro.org>
- <d1e067f1-e82f-7692-bcc2-e3549887be63@arm.com>
- <CA+7sy7C6zp3giR+ypFXqbsNY_C3ggUgegS1zEWOAybkRBtCn4w@mail.gmail.com>
- <008d062d-1095-5a65-3a69-33bee1f648d7@gmail.com>
-Message-ID: <20170317050421.GA9400@kroah.com>
+From: chunyan.zhang@spreadtrum.com (Chunyan Zhang)
+Date: Fri, 17 Mar 2017 13:51:34 +0800
+Subject: [PATCH V4 0/4] Add Spreadtrum SP9860G support
+Message-ID: <1489729898-774-1-git-send-email-chunyan.zhang@spreadtrum.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 16, 2017 at 12:31:53PM +0300, Aleksey Makarov wrote:
-> 
-> 
-> On 03/16/2017 10:11 AM, Jayachandran C. wrote:
-> > Hi Greg,
-> > 
-> > On Tue, Mar 14, 2017 at 9:44 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
-> >>
-> >>
-> >> On 01/03/17 15:23, Aleksey Makarov wrote:
-> >>> The original patch makes the condition always true, so it is wrong.
-> >>>
-> >>> It masks (but not fixes) the bug described in the commit message
-> >>> but introduces a regression (no console is selected by SPCR)
-> >>> in regular (no 'console=ttyAMA') case.
-> >>>
-> >>> s/||/&&/ would not fix the problem as the root cause was identified
-> >>> incorrectly.
-> >>>
-> >>> This reverts commit aea9a80ba98a0c9b4de88850260e9fbdcc98360b.
-> >>>
-> >>
-> >> Sorry for that, I will test your patches and respond to that. For this
-> >> patch:
-> >>
-> >> Acked-by: Sudeep Holla <sudeep.holla@arm.com>
-> >>
-> > 
-> > This fixes a regression I see in v4.11-rc2
-> > 
-> > Tested-by: Jayachandran C <jnair@caviumnetworks.com>
-> > 
-> > I don't see it in the tty/serial tree yet
-> 
-> It's commit 713b93f1b849 from tty-next branch of 
-> https://git.kernel.org/pub/scm/linux/kernel/git/gregkh/tty.git
-> 
-> So it looks like it is scheduled for 4.12
-> 
-> Greg, this is a fix for regression.  Can it be applied to 4.11-rcX?
+SC9860 is a Spreadtrum SoC with eight Cortex A53, which are divided
+into 4 Big cores and 4 little cores.
 
-Yes, will do that now, thanks.
+This patch-set provides a basic configuration for SC9860 in device tree
+to make it run to console.  After this we will continue to submit other
+device drivers step by step, which are using on most of Spreadtrum's SoCs.
 
-greg k-h
+Changes from v3:
+* Rebased v4.11-rc2;
+* Added Reviewed-by of Mathieu;
+* Addressed Rob's comments:
+  - Documented sprd serial competible according to Rob's suggestion
+  - Revised serial node name to match its offset;
+* Added STM device node in dt.
+
+Changes from v2:
+* Addressed comments from Mathieu:
+  - Removed CoreSight devices' lables from DT;
+  - Added another level of imbrication for ETFs which have more than one port;
+* Addressed comments from Rob:
+  - Switched to use SPDX-License-Identifier tag instead;
+  - Moved the 26m fixed clock node to top level in DT;
+  - Splited the patch into two, since they were revising two dt-bindings;
+  - Removed redundant space from sprd-usrt.txt;
+  - Removed useless property from the sprd_uart example of DT configuration.
+
+Changes from v1:
+* Removed useless idle-state node 'deep_sleep' from DT
+* Removed useless property 'sc-id' from DT
+* Removed 'clock-frequency' property from the node 'timer'
+* Added another compatible string '"arm,cortex-a53-pmu"' and property
+  'interrupt-affinity' for pmu
+* Kept using the existed compatible string of sprd_serial driver, and added
+  a new one for sc9860 in DT.
+
+Thanks,
+Chunyan
+
+Chunyan Zhang (2):
+  dt-bindings: arm: Add bindings for SP9860G
+  dt-bindings: serial: add a new compatible string for SC9860
+
+Orson Zhai (1):
+  arm64: dts: Add basic DT to support Spreadtrum's SP9860G
+
+Wei Qiao (1):
+  serial: sprd: adjust TIMEOUT to a big value
+
+ Documentation/devicetree/bindings/arm/sprd.txt     |  13 +-
+ .../devicetree/bindings/serial/sprd-uart.txt       |  14 +-
+ arch/arm64/boot/dts/sprd/Makefile                  |   3 +-
+ arch/arm64/boot/dts/sprd/sc9860.dtsi               | 569 +++++++++++++++++++++
+ arch/arm64/boot/dts/sprd/sp9860g-1h10.dts          |  56 ++
+ arch/arm64/boot/dts/sprd/whale2.dtsi               |  71 +++
+ drivers/tty/serial/sprd_serial.c                   |   2 +-
+ 7 files changed, 720 insertions(+), 8 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/sprd/sc9860.dtsi
+ create mode 100644 arch/arm64/boot/dts/sprd/sp9860g-1h10.dts
+ create mode 100644 arch/arm64/boot/dts/sprd/whale2.dtsi
+
+-- 
+2.7.4
