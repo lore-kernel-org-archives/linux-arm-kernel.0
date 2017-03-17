@@ -1,144 +1,75 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Fri, 17 Mar 2017 23:43:43 +0800
-Subject: [PATCH 3/3] ARM: dts: sun8i: add device tree for Lichee Pi Zero with
- Dock
-In-Reply-To: <20170317154343.39921-1-icenowy@aosc.xyz>
-References: <20170317154343.39921-1-icenowy@aosc.xyz>
-Message-ID: <20170317154343.39921-4-icenowy@aosc.xyz>
+From: james.morse@arm.com (James Morse)
+Date: Fri, 17 Mar 2017 15:48:46 +0000
+Subject: [PATCH] KVM: arm/arm64: Signal SIGBUS when stage2 discovers
+ hwpoison memory
+In-Reply-To: <87wpbohrj3.fsf@e105922-lin.cambridge.arm.com>
+References: <20170315160727.16465-1-james.morse@arm.com>
+ <87wpbohrj3.fsf@e105922-lin.cambridge.arm.com>
+Message-ID: <58CC055E.50800@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Lichee Pi Zero features a dock, which adds some functions, and should be
-soldered with the core board of Lichee Pi Zero.
+Hi Punit,
 
-Add support for the dock as a new dts, as soldering is needed to make
-the dock usable and there's functions enabled on the dock that is
-unavailable at the 2.54mm pins of the core board.
+On 17/03/17 15:06, Punit Agrawal wrote:
+> James Morse <james.morse@arm.com> writes:
+>> Once we enable ARCH_SUPPORTS_MEMORY_FAILURE on arm64[0], notifications for
+>> broken memory can call memory_failure() in mm/memory-failure.c to deliver
+>> SIGBUS to any user space process using the page, and notify all the
+>> in-kernel users.
+>>
+>> If the page corresponded with guest memory, KVM will unmap this page
+>> from its stage2 page tables. The user space process that allocated
+>> this memory may have never touched this page in which case it may not
+>> be mapped meaning SIGBUS won't be delivered.
+>>
+>> When this happens KVM discovers pfn == KVM_PFN_ERR_HWPOISON when it
+>> comes to process the stage2 fault.
+>>
+>> Do as x86 does, and deliver the SIGBUS when we discover
+>> KVM_PFN_ERR_HWPOISON. Use the stage2 mapping size as the si_addr_lsb
+>> as this matches the user space mapping size.
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
----
- arch/arm/boot/dts/Makefile                         |  3 +-
- arch/arm/boot/dts/sun8i-v3s-licheepi-zero-dock.dts | 98 ++++++++++++++++++++++
- 2 files changed, 100 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/sun8i-v3s-licheepi-zero-dock.dts
+>> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+>> index 962616fd4ddd..9d1aa294e88f 100644
+>> --- a/arch/arm/kvm/mmu.c
+>> +++ b/arch/arm/kvm/mmu.c
+>> @@ -1237,6 +1239,23 @@ static void coherent_cache_guest_page(struct kvm_vcpu *vcpu, kvm_pfn_t pfn,
+>>  	__coherent_cache_guest_page(vcpu, pfn, size);
+>>  }
+>>  
+>> +static void kvm_send_hwpoison_signal(unsigned long address, bool hugetlb)
+>> +{
+>> +	siginfo_t info;
+>> +
+>> +	info.si_signo   = SIGBUS;
+>> +	info.si_errno   = 0;
+>> +	info.si_code    = BUS_MCEERR_AR;
+>> +	info.si_addr    = (void __user *)address;
+>> +
+>> +	if (hugetlb)
+>> +		info.si_addr_lsb = PMD_SHIFT;
+>> +	else
+>> +		info.si_addr_lsb = PAGE_SHIFT;
+>> +
+>> +	send_sig_info(SIGBUS, &info, current);
+>> +}
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 43c27b624f94..de52d403f818 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -878,7 +878,8 @@ dtb-$(CONFIG_MACH_SUN8I) += \
- 	sun8i-h3-orangepi-plus.dtb \
- 	sun8i-h3-orangepi-plus2e.dtb \
- 	sun8i-r16-parrot.dtb \
--	sun8i-v3s-licheepi-zero.dtb
-+	sun8i-v3s-licheepi-zero.dtb \
-+	sun8i-v3s-licheepi-zero-dock.dtb
- dtb-$(CONFIG_MACH_SUN9I) += \
- 	sun9i-a80-optimus.dtb \
- 	sun9i-a80-cubieboard4.dtb
-diff --git a/arch/arm/boot/dts/sun8i-v3s-licheepi-zero-dock.dts b/arch/arm/boot/dts/sun8i-v3s-licheepi-zero-dock.dts
-new file mode 100644
-index 000000000000..956fa47fde53
---- /dev/null
-+++ b/arch/arm/boot/dts/sun8i-v3s-licheepi-zero-dock.dts
-@@ -0,0 +1,98 @@
-+/*
-+ * Copyright (C) 2016 Icenowy Zheng <icenowy@aosc.xyz>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+#include "sun8i-v3s-licheepi-zero.dts"
-+
-+#include <dt-bindings/input/input.h>
-+
-+/ {
-+	model = "Lichee Pi Zero with Dock";
-+	compatible = "licheepi,licheepi-zero-dock", "licheepi,licheepi-zero",
-+		     "allwinner,sun8i-v3s";
-+};
-+
-+&leds {
-+	/* The LEDs conflict with MMC1 slot */
-+	status = "disabled";
-+};
-+
-+&lradc {
-+	vref-supply = <&reg_vcc3v0>;
-+	status = "okay";
-+
-+	button at 200 {
-+		label = "Volume Up";
-+		linux,code = <KEY_VOLUMEUP>;
-+		channel = <0>;
-+		voltage = <200000>;
-+	};
-+
-+	button at 400 {
-+		label = "Volume Down";
-+		linux,code = <KEY_VOLUMEDOWN>;
-+		channel = <0>;
-+		voltage = <400000>;
-+	};
-+
-+	button at 600 {
-+		label = "Select";
-+		linux,code = <KEY_SELECT>;
-+		channel = <0>;
-+		voltage = <600000>;
-+	};
-+
-+	button at 800 {
-+		label = "Start";
-+		linux,code = <KEY_OK>;
-+		channel = <0>;
-+		voltage = <800000>;
-+	};
-+};
-+
-+&mmc1 {
-+	pinctrl-0 = <&mmc1_pins>;
-+	pinctrl-names = "default";
-+	broken-cd;
-+	bus-width = <4>;
-+	vmmc-supply = <&reg_vcc3v3>;
-+	status = "okay";
-+};
--- 
-2.12.0
+> The changes look good to me. Though in essence as mentioned in the
+> commit log we are not doing anything different to x86 here. Worth moving
+> kvm_send_hwpoison_signal to an architecture agostic location and using
+> it from there?
+
+I had an earlier version that did exactly that, but the x86 version always
+reports PAGE_SHIFT as the si_addr_lsb value. I don't know enough about their
+version of stage2 to know if that's a bug or an implementation detail, so I
+chose not to copy it.
+
+
+> In any case, FWIW,
+> 
+> Reviewed-by: Punit Agrawal <punit.agrawal@arm.com>
+
+Thanks!
+
+James
