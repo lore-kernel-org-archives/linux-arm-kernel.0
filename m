@@ -1,31 +1,79 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 17 Mar 2017 15:04:12 +0000
-Subject: [PATCH v33 00/14] add kdump support
-In-Reply-To: <1489759373.17202.44.camel@infradead.org>
-References: <20170315095656.24992-1-takahiro.akashi@linaro.org>
- <1489750991.17202.40.camel@infradead.org>
- <1489759373.17202.44.camel@infradead.org>
-Message-ID: <20170317150411.GH5940@leverpostej>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Fri, 17 Mar 2017 15:09:23 +0000
+Subject: [PATCH v4 2/7] coresight: of_get_coresight_platform_data: Add
+ missing of_node_put
+In-Reply-To: <1489762943-25849-3-git-send-email-leo.yan@linaro.org>
+References: <1489762943-25849-1-git-send-email-leo.yan@linaro.org>
+ <1489762943-25849-3-git-send-email-leo.yan@linaro.org>
+Message-ID: <574d8e6b-cd2d-c1be-6c14-09e8be147e93@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 17, 2017 at 02:02:53PM +0000, David Woodhouse wrote:
-> On Fri, 2017-03-17 at 11:43 +0000, David Woodhouse wrote:
-> > 
-> > Is this one going to be be my fault too?
-> 
-> Looks like it isn't my fault. In ipi_cpu_crash_stop() we don't modify
-> the online mask. Which is reasonable enough if we want to preserve its
-> original contents from before the crash, but it does make that
-> WARN_ON() in machine_kexec() a false positive.
-> 
-> Btw, why is this a normal IPI and not something... less maskable?
-> On x86 we use NMI for that...
+On 17/03/17 15:02, Leo Yan wrote:
+> From: Suzuki K Poulose <suzuki.poulose@arm.com>
+>
+> The of_get_coresight_platform_data iterates over the possible CPU nodes
+> to find a given cpu phandle. However it does not drop the reference
+> to the node pointer returned by the of_get_coresight_platform_data.
+>
+> [Leo: minor tweaks for of_get_coresight_platform_data]
+>
+> Cc: Leo Yan <leo.yan@linaro.org>
+> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 
-Architecturally, arm64 does not have an NMI.
+You should add your Signed-off-by here when you send somebody's patch, irrespective
+of whether you have modified it or not.
+e.g:
 
-There's been some work to try to get pseudo-NMIs using GICv3 priorities,
-but that's about the closest we can get today.
+Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+[Leo: minor tweaks for of_get_coresight_platform_data]
+Signed-off-by: Leo Yan <leo.yan@linaro.org>
 
-Thanks,
-Mark.
+
+> ---
+>  drivers/hwtracing/coresight/of_coresight.c | 17 ++++++++++-------
+>  1 file changed, 10 insertions(+), 7 deletions(-)
+>
+> diff --git a/drivers/hwtracing/coresight/of_coresight.c b/drivers/hwtracing/coresight/of_coresight.c
+> index 629e031..917ca39 100644
+> --- a/drivers/hwtracing/coresight/of_coresight.c
+> +++ b/drivers/hwtracing/coresight/of_coresight.c
+> @@ -108,7 +108,8 @@ struct coresight_platform_data *of_get_coresight_platform_data(
+>  	struct coresight_platform_data *pdata;
+>  	struct of_endpoint endpoint, rendpoint;
+>  	struct device *rdev;
+> -	struct device_node *dn;
+> +	bool found;
+> +	struct device_node *dn, *np;
+>  	struct device_node *ep = NULL;
+>  	struct device_node *rparent = NULL;
+>  	struct device_node *rport = NULL;
+> @@ -175,17 +176,19 @@ struct coresight_platform_data *of_get_coresight_platform_data(
+>  		} while (ep);
+>  	}
+>
+> -	/* Affinity defaults to CPU0 */
+> -	pdata->cpu = 0;
+>  	dn = of_parse_phandle(node, "cpu", 0);
+> -	for (cpu = 0; dn && cpu < nr_cpu_ids; cpu++) {
+> -		if (dn == of_get_cpu_node(cpu, NULL)) {
+> -			pdata->cpu = cpu;
+> +	for_each_possible_cpu(cpu) {
+> +		np = of_get_cpu_node(cpu, NULL);
+> +		found = (dn == np);
+> +		of_node_put(np);
+> +		if (found)
+>  			break;
+> -		}
+>  	}
+>  	of_node_put(dn);
+>
+> +	/* Affinity to CPU0 if no cpu nodes are found */
+> +	pdata->cpu = found ? cpu : 0;
+> +
+>  	return pdata;
+>  }
+>  EXPORT_SYMBOL_GPL(of_get_coresight_platform_data);
+>
