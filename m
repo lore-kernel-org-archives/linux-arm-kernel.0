@@ -1,39 +1,41 @@
-From: mylene.josserand@free-electrons.com (Mylene Josserand)
-Date: Fri, 17 Mar 2017 09:13:36 +0100
-Subject: Applied "ASoC: sun8i-codec: Update mixer to use SOC_DAPM_DOUBLE"
- to the asoc tree
-In-Reply-To: <20170316140653.jjnta4le6kws36l5@sirena.org.uk>
-References: <20170210094133.11382-3-mylene.josserand@free-electrons.com>
- <E1clbY9-0000DH-LY@finisterre>
- <CAGb2v6428PpYPzpHngLgaeziwKN8u-TYiNO1bs7TFw-7VrQOAg@mail.gmail.com>
- <20170315134323.i3pvla3pzejmkxwh@sirena.org.uk>
- <CAGb2v67-b+8CM0MqhT_YQeuNxEnVoxG-COZPy8LW32Eb-QE67Q@mail.gmail.com>
- <20170316140653.jjnta4le6kws36l5@sirena.org.uk>
-Message-ID: <e90d7737-0dab-b656-c431-68e48aba073d@free-electrons.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Fri, 17 Mar 2017 09:39:51 +0100
+Subject: [PATCH 2/2] arm64: dts: rockchip: add rk3399 dw-mmc resets
+In-Reply-To: <20170317083951.14343-1-heiko@sntech.de>
+References: <20170317083951.14343-1-heiko@sntech.de>
+Message-ID: <20170317083951.14343-2-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+dw-mmc got its reset-properties specified, so add the softresets
+for it on the rk3399.
 
-On 16/03/2017 15:06, Mark Brown wrote:
-> On Wed, Mar 15, 2017 at 10:15:22PM +0800, Chen-Yu Tsai wrote:
->
->> It depends on the second half of commit 4aa8146c89f3 ("ASoC: sun8i-codec:
->> Remove analog "HP" widget"), which is also a cleanup. Would it be OK
->> to pick these two over to fixes then? Or should we send a clean version
->> instead?
->
-> That also doesn't pick over cleanly, can you send a new version against
-> Linus' tree, that'll be easiest and safest I think.
->
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-No problem, I will do that.
-
-Thank you!
-
-Best regards,
-
+diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+index 8e6d1bdeb9c3..c228898eda81 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+@@ -241,6 +241,8 @@
+ 			 <&cru SCLK_SDIO_DRV>, <&cru SCLK_SDIO_SAMPLE>;
+ 		clock-names = "biu", "ciu", "ciu-drive", "ciu-sample";
+ 		fifo-depth = <0x100>;
++		resets = <&cru SRST_SDIO0>;
++		reset-names = "reset";
+ 		status = "disabled";
+ 	};
+ 
+@@ -255,6 +257,8 @@
+ 		clock-names = "biu", "ciu", "ciu-drive", "ciu-sample";
+ 		fifo-depth = <0x100>;
+ 		power-domains = <&power RK3399_PD_SD>;
++		resets = <&cru SRST_SDMMC>;
++		reset-names = "reset";
+ 		status = "disabled";
+ 	};
+ 
 -- 
-Myl?ne Josserand, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+2.11.0
