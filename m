@@ -1,147 +1,133 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri, 17 Mar 2017 07:36:57 +0100
-Subject: [PATCH] mtd: nand: orion: fix clk handling
-In-Reply-To: <20170316215031.GB27118@gandalf>
-References: <20170312213406.20987-1-gmbnomis@gmail.com>
- <20170313071241.y5ydl274t22awrys@pengutronix.de>
- <20170316101211.332a53e0@bbrezillon>
- <20170316215031.GB27118@gandalf>
-Message-ID: <20170317073657.7dee7c51@bbrezillon>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Fri, 17 Mar 2017 07:46:17 +0100
+Subject: [PATCH v2] ARM: zynq: Add #io-channel-cells to (x)adc node for
+ iio-hwmon
+In-Reply-To: <1027ba77-6141-5d6e-e5e8-b15df29957f2@metafoo.de>
+References: <1489003884-2489-1-git-send-email-mdf@kernel.org>
+ <e6da3f38-7039-66e5-5b9d-a44ff42aa9c9@xilinx.com>
+ <CAJYdmeNc48=OOvRiUjqPBJhz9RCbzeaRGu1Tfm=hrvzkJrSsag@mail.gmail.com>
+ <7e4fbe16-8686-5399-748d-af222c630338@xilinx.com>
+ <37f29986-6491-67ab-144c-eb485cc1fdcc@metafoo.de>
+ <6767a340-b150-c21a-b6cb-5ca1ce2cd721@xilinx.com>
+ <1027ba77-6141-5d6e-e5e8-b15df29957f2@metafoo.de>
+Message-ID: <1cb2a735-59cd-3d8c-b55e-bd775ded3fc0@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 16 Mar 2017 22:50:31 +0100
-Simon Baatz <gmbnomis@gmail.com> wrote:
-
-> On Thu, Mar 16, 2017 at 10:12:11AM +0100, Boris Brezillon wrote:
-> > On Mon, 13 Mar 2017 08:12:41 +0100
-> > Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> wrote:
-> >   
-> > > Hello Simon,
-> > > 
-> > > On Sun, Mar 12, 2017 at 10:34:06PM +0100, Simon Baatz wrote:  
-> > > > The clk handling in orion_nand.c had two problems:
-> > > > 
-> > > > - In the probe function, clk_put() was called for an enabled clock,
-> > > >   which violates the API (see documentation for clk_put() in
-> > > >   include/linux/clk.h)
-> > > > 
-> > > > - In the error path of the probe function, clk_put() could be called
-> > > >   twice for the same clock.
-> > > > 
-> > > > In order to clean this up, use the managed function devm_clk_get() and
-> > > > store the pointer to the clk in the driver data.
-> > > > 
-> > > > Fixes: baffab28b13120694fa3ebab08d3e99667a851d2 ('ARM: Orion: fix driver probe error handling with respect to clk')
-> > > > Cc: <stable@vger.kernel.org> # v4.5+
-> > > > Signed-off-by: Simon Baatz <gmbnomis@gmail.com>
-> > > > ---
-> > > >  drivers/mtd/nand/orion_nand.c | 42 +++++++++++++++++++++---------------------
-> > > >  1 file changed, 21 insertions(+), 21 deletions(-)
-> > > > 
-> > > > diff --git a/drivers/mtd/nand/orion_nand.c b/drivers/mtd/nand/orion_nand.c
-> > > > index 4a91c5d000be..b355aa738fae 100644
-> > > > --- a/drivers/mtd/nand/orion_nand.c
-> > > > +++ b/drivers/mtd/nand/orion_nand.c
-> > > > @@ -23,6 +23,11 @@
-> > > >  #include <asm/sizes.h>
-> > > >  #include <linux/platform_data/mtd-orion_nand.h>
-> > > >  
-> > > > +struct orion_nand_info {
-> > > > +	struct nand_chip chip;
-> > > > +	struct clk       *clk;
-> > > > +};
-> > > > +
-> > > >  static void orion_nand_cmd_ctrl(struct mtd_info *mtd, int cmd, unsigned int ctrl)
-> > > >  {
-> > > >  	struct nand_chip *nc = mtd_to_nand(mtd);
-> > > > @@ -75,20 +80,21 @@ static void orion_nand_read_buf(struct mtd_info *mtd, uint8_t *buf, int len)
-> > > >  
-> > > >  static int __init orion_nand_probe(struct platform_device *pdev)
-> > > >  {
-> > > > +	struct orion_nand_info *info;
-> > > >  	struct mtd_info *mtd;
-> > > >  	struct nand_chip *nc;
-> > > >  	struct orion_nand_data *board;
-> > > >  	struct resource *res;
-> > > > -	struct clk *clk;
-> > > >  	void __iomem *io_base;
-> > > >  	int ret = 0;
-> > > >  	u32 val = 0;
-> > > >  
-> > > > -	nc = devm_kzalloc(&pdev->dev,
-> > > > -			sizeof(struct nand_chip),
-> > > > +	info = devm_kzalloc(&pdev->dev,
-> > > > +			sizeof(struct orion_nand_info),
-> > > >  			GFP_KERNEL);
-> > > > -	if (!nc)
-> > > > +	if (!info)
-> > > >  		return -ENOMEM;
-> > > > +	nc = &info->chip;
-> > > >  	mtd = nand_to_mtd(nc);
-> > > >  
-> > > >  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> > > > @@ -145,15 +151,13 @@ static int __init orion_nand_probe(struct platform_device *pdev)
-> > > >  	if (board->dev_ready)
-> > > >  		nc->dev_ready = board->dev_ready;
-> > > >  
-> > > > -	platform_set_drvdata(pdev, mtd);
-> > > > +	platform_set_drvdata(pdev, info);
-> > > >  
-> > > >  	/* Not all platforms can gate the clock, so it is not
-> > > >  	   an error if the clock does not exists. */
-> > > > -	clk = clk_get(&pdev->dev, NULL);
-> > > > -	if (!IS_ERR(clk)) {
-> > > > -		clk_prepare_enable(clk);
-> > > > -		clk_put(clk);
-> > > > -	}
-> > > > +	info->clk = devm_clk_get(&pdev->dev, NULL);
-> > > > +	if (!IS_ERR(info->clk))
-> > > > +		clk_prepare_enable(info->clk);    
-> > > 
-> > > Orthogonal to your patch I suggest:
-> > > 
-> > > -	info->clk = devm_clk_get(&pdev->dev, NULL);
-> > > -	if (!IS_ERR(info->clk))
-> > > -		clk_prepare_enable(info->clk);
-> > > +	info->clk = devm_clk_get_optional(&pdev->dev, NULL);
-> > > +	if (IS_ERR(info->clk)) {
-> > > +		ret = PTR_ERR(info->clk);
-> > > +		if (ret != -EPROBE_DEFER)
-> > > +			dev_err(...);
-> > > +		return ret;
-> > > +	}
-> > >   
-> > 
-> > In the meantime, maybe you can do:
-> > 
-> > 	info->clk = devm_clk_get(&pdev->dev, NULL);
-> > 	if (IS_ERR(info->clk)) {
-> > 		ret = PTR_ERR(info->clk);
-> > 
-> > 		if (ret == -ENOENT) {
-> > 			/*
-> > 			 * This clk is optional, assign it to NULL when
-> > 			 * it's not present.
-> > 			 */
-> > 			info->clk = NULL;
-> > 		} else {
-> > 			if (ret == -EPROBE_DEFER)
-
-I meant != -EPROBE_DEFER here.
-
-> > 				dev_err(...);
-> > 
-> > 			return ret;
-> > 		}
-> > 	}
-> > 
-> > This way, you won't have to check the info->clk value when you call
-> > clk_prepare_enable() or clk_disable_unprepare().
-> >   
+On 16.3.2017 22:20, Lars-Peter Clausen wrote:
+> On 03/16/2017 07:06 PM, Michal Simek wrote:
+>> On 16.3.2017 17:51, Lars-Peter Clausen wrote:
+>>> On 03/16/2017 05:45 PM, Michal Simek wrote:
+>>>> On 16.3.2017 17:39, Moritz Fischer wrote:
+>>>>> On Thu, Mar 16, 2017 at 9:16 AM, Michal Simek <michal.simek@xilinx.com> wrote:
+>>>>>> Hi,
+>>>>>>
+>>>>>> On 8.3.2017 21:11, Moritz Fischer wrote:
+>>>>>>> Fix
+>>>>>>>
+>>>>>>> OF: /iio_hwmon: could not get #io-channel-cells for
+>>>>>>> /amba/adc at f8007100
+>>>>>>> OF: /iio_hwmon: could not get #io-channel-cells for
+>>>>>>> /amba/adc at f8007100
+>>>>>>> OF: /iio_hwmon: could not get #io-channel-cells for
+>>>>>>> /amba/adc at f8007100
+>>>>>>>
+>>>>>>> by adding the #io-channel-cells property.
+>>>>>>>
+>>>>>>> Signed-off-by: Moritz Fischer <mdf@kernel.org>
+>>>>>>> Cc: Michal Simek <michal.simek@xilinx.com>
+>>>>>>> Cc: S?ren Brinkmann <soren.brinkmann@xilinx.com>
+>>>>>>> Cc: Julia Cartwright <julia@ni.com>
+>>>>>>> Cc: linux-kernel at vger.kernel.org
+>>>>>>> Cc: devicetree at vger.kernel.org
+>>>>>>> ---
+>>>>>>>
+>>>>>>> Changes from v1:
+>>>>>>> - fix messed up commit message
+>>>>>>> ---
+>>>>>>>  arch/arm/boot/dts/zynq-7000.dtsi | 1 +
+>>>>>>>  1 file changed, 1 insertion(+)
+>>>>>>>
+>>>>>>> diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
+>>>>>>> index f3ac9bf..98233a8 100644
+>>>>>>> --- a/arch/arm/boot/dts/zynq-7000.dtsi
+>>>>>>> +++ b/arch/arm/boot/dts/zynq-7000.dtsi
+>>>>>>> @@ -72,6 +72,7 @@
+>>>>>>>                       interrupts = <0 7 4>;
+>>>>>>>                       interrupt-parent = <&intc>;
+>>>>>>>                       clocks = <&clkc 12>;
+>>>>>>> +                     #io-channel-cells = <1>;
+>>>>>>>               };
+>>>>>>>
+>>>>>>>               can0: can at e0008000 {
+>>>>>>>
+>>>>>>
+>>>>>> I think it will be good to the next step too.
+>>>>>> It means also add iio-hwmon node too.
+>>>>>>
+>>>>>> What do you think?
+>>>>>
+>>>>> I hadn't put it in there since dts is supposed to describe hw,
+>>>>> but obviously putting the actual hwmon in there makes it more useful.
+>>>>
+>>>> I had one discussion about this with Grant in past and it is common
+>>>> mistake. It is simplification of purpose of dts.
+>>>>
+>>>
+>>> If the iio-hwmon binding had gone through review it would have been rejected.
+>>
+>> Isn't it a time to deprecate it?
 > 
-> Yes, this makes things simpler. I will add a second patch improving
-> the error handling in v2 as you and Uwe suggested.
+> Well, it's ABI now and has to stay forever. Deprecating it makes only sense
+> if there is a replacement, which there is not. The iio-hwmon bridge has its
+> usecases it's just instantiating it via devicetree which is not so nice.
 > 
+>>
+>>>
+>>>>>
+>>>>> I can resubmit with the hwmon node in there.
+>>>>
+>>>> If you grep kernel tree you will see that others are using it too.
+>>>> Also there is accepted binding for that that's why I can't see big
+>>>> problem with it.
+>>>
+>>> Since this is an application specific binding I wouldn't put it in the
+>>> generic DT include file. It's a bit like adding a gpio-key binding for each
+>>> of the GPIOs just in case somebody wants to use it.
+>>
+>> psci is system specific too.
+>>
+>> IIRC this driver for zynq was written by ADI or with ADI help that's why
+>> you know much better than I what's the correct configuration.
+>>
+>> This targets PS IP which should be present in the hw all the time.
+>> Not sure if for all configuration but I expect at least the part of it
+>> is there all them time.
+>>
+>> If binding is incorrect then please remove it with removing from all
+>> dts/dtsi files which have this. The same is for of probe function in the
+>> driver itself.
+>> If this is not done then this is just +1 case.
+>>
+>> If you still insist that we shouldn't do it then please at least extend
+>> commit message and put there example how to wire it on zynq.
 > 
-> - Simon
+> There is a IIO driver for the XADC, this driver has a userspace interface
+> that exposes the measurements provided by the hardware. Using the hwmon
+> bridge will expose the same information just through a hwmon interface.
+> 
+> One reason for using the iio-hwmon bridge is because you have a legacy
+> application that expects the a hwmon interface. But new applications that
+> want to access the XADC should really use the IIO interface if possible.
+> 
+> In my opinion instantiating the hwmon bridge by default will only cause
+> confusion. There are now redundant interfaces and users will wonder what is
+> the difference between the two. Is it the same data, is it different data?
+> Which is the preferred interface? Which one is 'better'?
+
+IMHO this should be covered by documentation. One paragraph in iio-hwmon
+binding can have answers for this and it will be very clear what people
+should use.
+
+Thanks,
+Michal
