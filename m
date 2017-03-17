@@ -1,40 +1,33 @@
-From: arnaud.pouliquen@st.com (Arnaud Pouliquen)
-Date: Fri, 17 Mar 2017 15:08:22 +0100
-Subject: [PATCH v3 09/11] ASoC: codec: add DT support in dmic codec
-In-Reply-To: <1489759704-30217-1-git-send-email-arnaud.pouliquen@st.com>
-References: <1489759704-30217-1-git-send-email-arnaud.pouliquen@st.com>
-Message-ID: <1489759704-30217-10-git-send-email-arnaud.pouliquen@st.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 17 Mar 2017 07:18:13 -0700
+Subject: [PATCHv2 1/9] Documentation: dt-bindings: Add binding
+ documentation for TI clkctrl clocks
+In-Reply-To: <1489741781-12816-2-git-send-email-t-kristo@ti.com>
+References: <1489741781-12816-1-git-send-email-t-kristo@ti.com>
+ <1489741781-12816-2-git-send-email-t-kristo@ti.com>
+Message-ID: <20170317141813.GS20572@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add of_table to allows DT probing.
+* Tero Kristo <t-kristo@ti.com> [170317 02:12]:
+> From: Tony Lindgren <tony@atomide.com>
+> +Example: Clock controller node on omap 4430:
+> +
+> +&cm2 {
+> +	l4per: cm at 1400 {
+> +		cm_l4per at 0 {
+> +			cm_l4per_clkctrl: clk at 20 {
+> +				compatible = "ti,clkctrl";
+> +				reg = <0x20 0x1b0>;
+> +				#clock-cells = <4>;
+> +			};
+> +		};
+> +	};
+> +};
 
-Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
----
- sound/soc/codecs/dmic.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
+The #clock-cells = <4> is a typo left over from earlier revisions,
+care to update it to 2 like the binding doc specifies?
 
-diff --git a/sound/soc/codecs/dmic.c b/sound/soc/codecs/dmic.c
-index c82b9dc..d04cac9 100644
---- a/sound/soc/codecs/dmic.c
-+++ b/sound/soc/codecs/dmic.c
-@@ -73,9 +73,17 @@ static int dmic_dev_remove(struct platform_device *pdev)
- 
- MODULE_ALIAS("platform:dmic-codec");
- 
-+static const struct of_device_id dmic_dev_match[] = {
-+	{
-+		.compatible = "dmic-codec",
-+	},
-+	{},
-+};
-+
- static struct platform_driver dmic_driver = {
- 	.driver = {
- 		.name = "dmic-codec",
-+		.of_match_table = dmic_dev_match,
- 	},
- 	.probe = dmic_dev_probe,
- 	.remove = dmic_dev_remove,
--- 
-1.9.1
+Regards,
+
+Tony
