@@ -1,128 +1,337 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 17 Mar 2017 11:09:37 +0200
-Subject: [PATCHv2 5/9] ARM: OMAP2+: hwmod: assign main clock from DT if
- available
+Date: Fri, 17 Mar 2017 11:09:40 +0200
+Subject: [PATCHv2 8/9] ARM: dts: omap4: add clkctrl nodes
 In-Reply-To: <1489741781-12816-1-git-send-email-t-kristo@ti.com>
 References: <1489741781-12816-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1489741781-12816-6-git-send-email-t-kristo@ti.com>
+Message-ID: <1489741781-12816-9-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix the main clock assignment to assign clkctrl clk from DT as the main
-clock if available. If main clock is assigned via DT, the direct PRCM
-access for module handling is not used on OMAP4+ architectures either,
-as it is assumed the main clock will be doing this instead.
-
-This patch also drops the obsolete "_mod_ck" search as the implementation
-required for this was not accepted upstream.
+Add clkctrl nodes for OMAP4 SoC. These are going to be acting as
+replacement for part of the existing clock data and the existing
+clkctrl hooks under hwmod data.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/mach-omap2/omap_hwmod.c | 57 ++++++++++++++++++++++++++--------------
- 1 file changed, 37 insertions(+), 20 deletions(-)
+ arch/arm/boot/dts/omap4.dtsi           |   1 +
+ arch/arm/boot/dts/omap44xx-clocks.dtsi | 289 +++++++++++++++++++++++++++++++++
+ 2 files changed, 290 insertions(+)
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index 0da4f2e..99783f1 100644
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -731,31 +731,48 @@ static int _del_initiator_dep(struct omap_hwmod *oh, struct omap_hwmod *init_oh)
- /**
-  * _init_main_clk - get a struct clk * for the the hwmod's main functional clk
-  * @oh: struct omap_hwmod *
-+ * @np: device node mapped to this hwmod
-  *
-  * Called from _init_clocks().  Populates the @oh _clk (main
-  * functional clock pointer) if a clock matching the hwmod name is found,
-  * or a main_clk is present.  Returns 0 on success or -EINVAL on error.
-  */
--static int _init_main_clk(struct omap_hwmod *oh)
-+static int _init_main_clk(struct omap_hwmod *oh, struct device_node *np)
- {
- 	int ret = 0;
--	char name[MOD_CLK_MAX_NAME_LEN];
--	struct clk *clk;
--	static const char modck[] = "_mod_ck";
--
--	if (strlen(oh->name) >= MOD_CLK_MAX_NAME_LEN - strlen(modck))
--		pr_warn("%s: warning: cropping name for %s\n", __func__,
--			oh->name);
-+	struct clk *clk = NULL;
-+	int i;
-+	int count;
-+	const char *name;
-+	char clk_name[strlen("clkctrl-x") + 1];
+diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+index 0cbd6c1..3ecf616 100644
+--- a/arch/arm/boot/dts/omap4.dtsi
++++ b/arch/arm/boot/dts/omap4.dtsi
+@@ -9,6 +9,7 @@
+ #include <dt-bindings/gpio/gpio.h>
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
+ #include <dt-bindings/pinctrl/omap.h>
++#include <dt-bindings/clock/omap4.h>
  
--	strlcpy(name, oh->name, MOD_CLK_MAX_NAME_LEN - strlen(modck));
--	strlcat(name, modck, MOD_CLK_MAX_NAME_LEN);
-+	if (np) {
-+		clk = of_clk_get_by_name(np, "clkctrl");
-+		if (IS_ERR(clk)) {
-+			/* Try matching by hwmod name */
-+			count = of_property_count_strings(np, "ti,hwmods");
-+			for (i = 0; i < count; i++) {
-+				ret = of_property_read_string_index(np,
-+								    "ti,hwmods",
-+								    i, &name);
-+				if (ret)
-+					continue;
-+				if (!strcmp(name, oh->name)) {
-+					sprintf(clk_name, "clkctrl-%d", i);
-+					clk = of_clk_get_by_name(np, clk_name);
-+				}
-+			}
-+		}
-+		if (!IS_ERR(clk)) {
-+			pr_debug("%s: mapped main_clk %s for %s\n", __func__,
-+				 __clk_get_name(clk), oh->name);
-+			oh->main_clk = __clk_get_name(clk);
-+			oh->_clk = clk;
-+			soc_ops.disable_direct_prcm(oh);
-+		}
-+	}
- 
--	clk = clk_get(NULL, name);
--	if (!IS_ERR(clk)) {
--		oh->_clk = clk;
--		soc_ops.disable_direct_prcm(oh);
--		oh->main_clk = kstrdup(name, GFP_KERNEL);
--	} else {
-+	if (IS_ERR_OR_NULL(clk)) {
- 		if (!oh->main_clk)
- 			return 0;
- 
-@@ -1547,13 +1564,13 @@ static int _init_clkdm(struct omap_hwmod *oh)
-  * _init_clocks - clk_get() all clocks associated with this hwmod. Retrieve as
-  * well the clockdomain.
-  * @oh: struct omap_hwmod *
-- * @data: not used; pass NULL
-+ * @np: device_node mapped to this hwmod
-  *
-  * Called by omap_hwmod_setup_*() (after omap2_clk_init()).
-  * Resolves all clock names embedded in the hwmod.  Returns 0 on
-  * success, or a negative error code on failure.
-  */
--static int _init_clocks(struct omap_hwmod *oh, void *data)
-+static int _init_clocks(struct omap_hwmod *oh, struct device_node *np)
- {
- 	int ret = 0;
- 
-@@ -1565,7 +1582,7 @@ static int _init_clocks(struct omap_hwmod *oh, void *data)
- 	if (soc_ops.init_clkdm)
- 		ret |= soc_ops.init_clkdm(oh);
- 
--	ret |= _init_main_clk(oh);
-+	ret |= _init_main_clk(oh, np);
- 	ret |= _init_interface_clks(oh);
- 	ret |= _init_opt_clks(oh);
- 
-@@ -2420,7 +2437,7 @@ static int __init _init(struct omap_hwmod *oh, void *data)
- 		return 0;
- 	}
- 
--	r = _init_clocks(oh, NULL);
-+	r = _init_clocks(oh, np);
- 	if (r < 0) {
- 		WARN(1, "omap_hwmod: %s: couldn't init clocks\n", oh->name);
- 		return -EINVAL;
+ / {
+ 	compatible = "ti,omap4430", "ti,omap4";
+diff --git a/arch/arm/boot/dts/omap44xx-clocks.dtsi b/arch/arm/boot/dts/omap44xx-clocks.dtsi
+index 9573b37..c7d517c 100644
+--- a/arch/arm/boot/dts/omap44xx-clocks.dtsi
++++ b/arch/arm/boot/dts/omap44xx-clocks.dtsi
+@@ -622,6 +622,7 @@
+ 		clock-frequency = <0>;
+ 	};
+ };
++
+ &prm_clocks {
+ 	sys_clkin_ck: sys_clkin_ck at 110 {
+ 		#clock-cells = <0>;
+@@ -1641,3 +1642,291 @@
+ 		reg = <0x0224>;
+ 	};
+ };
++
++&cm1 {
++	mpuss_cm: mpuss_cm at 300 {
++		compatible = "ti,omap4-cm";
++		reg = <0x300 0x100>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges = <0 0x300 0x100>;
++
++		mpuss_clkctrl: clk at 20 {
++			compatible = "ti,clkctrl";
++			reg = <0x20 0x4>;
++			#clock-cells = <2>;
++		};
++	};
++
++	tesla_cm: tesla_cm at 400 {
++		compatible = "ti,omap4-cm";
++		reg = <0x400 0x100>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges = <0 0x400 0x100>;
++
++		tesla_clkctrl: clk at 20 {
++			compatible = "ti,clkctrl";
++			reg = <0x20 0x4>;
++			#clock-cells = <2>;
++		};
++	};
++
++	abe_cm: abe_cm at 500 {
++		compatible = "ti,omap4-cm";
++		reg = <0x500 0x100>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges = <0 0x500 0x100>;
++
++		abe_clkctrl: clk at 20 {
++			compatible = "ti,clkctrl";
++			reg = <0x20 0x6c>;
++			#clock-cells = <2>;
++		};
++	};
++
++};
++
++&cm2 {
++	l4_ao_cm: l4_ao_cm at 600 {
++		compatible = "ti,omap4-cm";
++		reg = <0x600 0x100>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges = <0 0x600 0x100>;
++
++		l4_ao_clkctrl: clk at 20 {
++			compatible = "ti,clkctrl";
++			reg = <0x20 0x1c>;
++			#clock-cells = <2>;
++		};
++	};
++
++	l3_1_cm: l3_1_cm at 700 {
++		compatible = "ti,omap4-cm";
++		reg = <0x700 0x100>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges = <0 0x700 0x100>;
++
++		l3_1_clkctrl: clk at 20 {
++			compatible = "ti,clkctrl";
++			reg = <0x20 0x4>;
++			#clock-cells = <2>;
++		};
++	};
++
++	l3_2_cm: l3_2_cm at 800 {
++		compatible = "ti,omap4-cm";
++		reg = <0x800 0x100>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges = <0 0x800 0x100>;
++
++		l3_2_clkctrl: clk at 20 {
++			compatible = "ti,clkctrl";
++			reg = <0x20 0x14>;
++			#clock-cells = <2>;
++		};
++	};
++
++	ducati_cm: ducati_cm at 900 {
++		compatible = "ti,omap4-cm";
++		reg = <0x900 0x100>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges = <0 0x900 0x100>;
++
++		ducati_clkctrl: clk at 20 {
++			compatible = "ti,clkctrl";
++			reg = <0x20 0x4>;
++			#clock-cells = <2>;
++		};
++	};
++
++	l3_dma_cm: l3_dma_cm at a00 {
++		compatible = "ti,omap4-cm";
++		reg = <0xa00 0x100>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges = <0 0xa00 0x100>;
++
++		l3_dma_clkctrl: clk at 20 {
++			compatible = "ti,clkctrl";
++			reg = <0x20 0x4>;
++			#clock-cells = <2>;
++		};
++	};
++
++	l3_emif_cm: l3_emif_cm at b00 {
++		compatible = "ti,omap4-cm";
++		reg = <0xb00 0x100>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges = <0 0xb00 0x100>;
++
++		l3_emif_clkctrl: clk at 20 {
++			compatible = "ti,clkctrl";
++			reg = <0x20 0x1c>;
++			#clock-cells = <2>;
++		};
++	};
++
++	d2d_cm: d2d_cm at c00 {
++		compatible = "ti,omap4-cm";
++		reg = <0xc00 0x100>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges = <0 0xc00 0x100>;
++
++		d2d_clkctrl: clk at 20 {
++			compatible = "ti,clkctrl";
++			reg = <0x20 0x4>;
++			#clock-cells = <2>;
++		};
++	};
++
++	l4_cfg_cm: l4_cfg_cm at d00 {
++		compatible = "ti,omap4-cm";
++		reg = <0xd00 0x100>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges = <0 0xd00 0x100>;
++
++		l4_cfg_clkctrl: clk at 20 {
++			compatible = "ti,clkctrl";
++			reg = <0x20 0x14>;
++			#clock-cells = <2>;
++		};
++	};
++
++	l3_instr_cm: l3_instr_cm at e00 {
++		compatible = "ti,omap4-cm";
++		reg = <0xe00 0x100>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges = <0 0xe00 0x100>;
++
++		l3_instr_clkctrl: clk at 20 {
++			compatible = "ti,clkctrl";
++			reg = <0x20 0x24>;
++			#clock-cells = <2>;
++		};
++	};
++
++	ivahd_cm: ivahd_cm at f00 {
++		compatible = "ti,omap4-cm";
++		reg = <0xf00 0x100>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges = <0 0xf00 0x100>;
++
++		ivahd_clkctrl: clk at 20 {
++			compatible = "ti,clkctrl";
++			reg = <0x20 0xc>;
++			#clock-cells = <2>;
++		};
++	};
++
++	iss_cm: iss_cm at 1000 {
++		compatible = "ti,omap4-cm";
++		reg = <0x1000 0x100>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges = <0 0x1000 0x100>;
++
++		iss_clkctrl: clk at 20 {
++			compatible = "ti,clkctrl";
++			reg = <0x20 0xc>;
++			#clock-cells = <2>;
++		};
++	};
++
++	l3_dss_cm: l3_dss_cm at 1100 {
++		compatible = "ti,omap4-cm";
++		reg = <0x1100 0x100>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges = <0 0x1100 0x100>;
++
++		l3_dss_clkctrl: clk at 20 {
++			compatible = "ti,clkctrl";
++			reg = <0x20 0x4>;
++			#clock-cells = <2>;
++		};
++	};
++
++	l3_gfx_cm: l3_gfx_cm at 1200 {
++		compatible = "ti,omap4-cm";
++		reg = <0x1200 0x100>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges = <0 0x1200 0x100>;
++
++		l3_gfx_clkctrl: clk at 20 {
++			compatible = "ti,clkctrl";
++			reg = <0x20 0x4>;
++			#clock-cells = <2>;
++		};
++	};
++
++	l3_init_cm: l3_init_cm at 1300 {
++		compatible = "ti,omap4-cm";
++		reg = <0x1300 0x100>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges = <0 0x1300 0x100>;
++
++		l3_init_clkctrl: clk at 20 {
++			compatible = "ti,clkctrl";
++			reg = <0x20 0xc4>;
++			#clock-cells = <2>;
++		};
++	};
++
++	l4_per_cm: l4_per_cm at 1400 {
++		compatible = "ti,omap4-cm";
++		reg = <0x1400 0x200>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges = <0 0x1400 0x200>;
++
++		l4_per_clkctrl: clk at 20 {
++			compatible = "ti,clkctrl";
++			reg = <0x20 0x144>;
++			#clock-cells = <2>;
++		};
++	};
++
++};
++
++&prm {
++	l4_wkup_cm: l4_wkup_cm at 1800 {
++		compatible = "ti,omap4-cm";
++		reg = <0x1800 0x100>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges = <0 0x1800 0x100>;
++
++		l4_wkup_clkctrl: clk at 20 {
++			compatible = "ti,clkctrl";
++			reg = <0x20 0x5c>;
++			#clock-cells = <2>;
++		};
++	};
++
++	emu_sys_cm: emu_sys_cm at 1a00 {
++		compatible = "ti,omap4-cm";
++		reg = <0x1a00 0x100>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges = <0 0x1a00 0x100>;
++
++		emu_sys_clkctrl: clk at 20 {
++			compatible = "ti,clkctrl";
++			reg = <0x20 0x4>;
++			#clock-cells = <2>;
++		};
++	};
++};
 -- 
 1.9.1
