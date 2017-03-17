@@ -1,157 +1,62 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Fri, 17 Mar 2017 13:54:28 -0500
-Subject: [PATCH 1/2] gpio: omap: return error if requested debounce time
- is not possible
-In-Reply-To: <20170317135413.78118dc2.drivshin@awxrd.com>
-References: <20170317005704.11971-1-drivshin@awxrd.com>
- <20170317005704.11971-2-drivshin@awxrd.com>
- <d1200407-5efd-ca7b-f936-fa37b206e1ea@ti.com>
- <20170317135413.78118dc2.drivshin@awxrd.com>
-Message-ID: <dc614a7a-e0fa-c071-478b-2124724d95e9@ti.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 17 Mar 2017 19:05:42 +0000
+Subject: [PATCH v21 04/13] clocksource: arm_arch_timer: split
+ arch_timer_rate for different types of timer
+In-Reply-To: <20170206185015.12296-5-fu.wei@linaro.org>
+References: <20170206185015.12296-1-fu.wei@linaro.org>
+ <20170206185015.12296-5-fu.wei@linaro.org>
+Message-ID: <20170317190539.GD15909@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Feb 07, 2017 at 02:50:06AM +0800, fu.wei at linaro.org wrote:
+> From: Fu Wei <fu.wei@linaro.org>
+> 
+> Currently, arch_timer_rate is used to store the frequency got from per-cpu
+> arch-timer or the memory-mapped (MMIO) timers. But those values come from
+> different registers which should all be initialized by firmware.
+> 
+> This patch remove arch_timer_rate, and use arch_timer_sysreg_freq and
+> arch_timer_mmio_freq instead.
+> 
+> Signed-off-by: Fu Wei <fu.wei@linaro.org>
 
+Thanks for attacking this. Generally, I do think this is the right thing
+to do.
 
-On 03/17/2017 12:54 PM, David Rivshin wrote:
-> Hi Grygorii,
-> 
-> On Fri, 17 Mar 2017 11:45:56 -0500
-> Grygorii Strashko <grygorii.strashko@ti.com> wrote:
-> 
->> On 03/16/2017 07:57 PM, David Rivshin wrote:
->>> From: David Rivshin <DRivshin@allworx.com>
->>>
->>> omap_gpio_debounce() does not validate that the requested debounce
->>> is within a range it can handle. Instead it lets the register value
->>> wrap silently, and always returns success.
->>>
->>> This can lead to all sorts of unexpected behavior, such as gpio_keys
->>> asking for a too-long debounce, but getting a very short debounce in
->>> practice.
->>>
->>> Fix this by returning -EINVAL if the requested value does not fit into
->>> the register field. If there is no debounce clock available at all,
->>> return -ENOTSUPP.  
->>
->> In general this patch looks good, but there is one thing I'm worry about..
->>
->>>
->>> Fixes: e85ec6c3047b ("gpio: omap: fix omap2_set_gpio_debounce")
->>> Cc: <stable@vger.kernel.org> # 4.3+
->>> Signed-off-by: David Rivshin <drivshin@allworx.com>
->>> ---
->>>  drivers/gpio/gpio-omap.c | 16 +++++++++++-----
->>>  1 file changed, 11 insertions(+), 5 deletions(-)
->>>
->>> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
->>> index efc85a2..33ec02d 100644
->>> --- a/drivers/gpio/gpio-omap.c
->>> +++ b/drivers/gpio/gpio-omap.c
->>> @@ -208,8 +208,10 @@ static inline void omap_gpio_dbck_disable(struct gpio_bank *bank)
->>>   * OMAP's debounce time is in 31us steps
->>>   *   <debounce time> = (GPIO_DEBOUNCINGTIME[7:0].DEBOUNCETIME + 1) x 31
->>>   * so we need to convert and round up to the closest unit.
->>> + *
->>> + * Return: 0 on success, negative error otherwise.
->>>   */
->>> -static void omap2_set_gpio_debounce(struct gpio_bank *bank, unsigned offset,
->>> +static int omap2_set_gpio_debounce(struct gpio_bank *bank, unsigned offset,
->>>  				    unsigned debounce)
->>>  {
->>>  	void __iomem		*reg;
->>> @@ -218,11 +220,12 @@ static void omap2_set_gpio_debounce(struct gpio_bank *bank, unsigned offset,
->>>  	bool			enable = !!debounce;
->>>  
->>>  	if (!bank->dbck_flag)
->>> -		return;
->>> +		return -ENOTSUPP;
->>>  
->>>  	if (enable) {
->>>  		debounce = DIV_ROUND_UP(debounce, 31) - 1;
->>> -		debounce &= OMAP4_GPIO_DEBOUNCINGTIME_MASK;
->>> +		if ((debounce & OMAP4_GPIO_DEBOUNCINGTIME_MASK) != debounce)
->>> +			return -EINVAL;  
->>
->> This might cause boot issues as current drivers may expect this op to succeed even if
->> configured value is wrong - just think, may be we can do warn here and use max value as
->> fallback?
-> 
-> I have not looked through all drivers to be sure, but at least the gpio-keys 
-> driver requires set_debounce to return an error if it can't satisfy the request. 
-> In that case gpio-keys will use a software timer instead. 
-> 
->                 if (button->debounce_interval) {
->                         error = gpiod_set_debounce(bdata->gpiod,
->                                         button->debounce_interval * 1000);
->                         /* use timer if gpiolib doesn't provide debounce */
->                         if (error < 0)
->                                 bdata->software_debounce =
->                                                 button->debounce_interval;
->                 }
-> 
-> Also, at least some other GPIO drivers (e.g. gpio-max7760) return -EINVAL in 
-> such a case. And gpiolib will return -ENOTSUPP if there is no debounce 
-> callback at all. So I expect all drivers which use gpiod_set_debounce() to 
-> handle error returns gracefully. 
-> 
-> So I certainly understand the concern about backwards compatibility, but I 
-> think clipping to max is the greater of the evils in this case. Even a 
-> warning may be too much, because it's not necessarily anything wrong. 
-> Perhaps an info or debug message would be helpful, though?
-> 
-> If you prefer, I can try to go through all callers of gpiod_set_debounce()
-> and see how they'd handle an error return. The handful I've looked through so 
-> far all behave like gpio-keys. The only ones I'd be particularly concerned
-> about are platform-specific drivers which were perhaps never used with other
-> gpio drivers. Do you know of that I should pay special attention to?
+However...
 
-Yeh agree. But the problem here will be not only with drivers itself - it can be wrong data in DT :(
-As result, even  gpio-keys driver will just silently switch to software_debounce
-without any notification.
+> @@ -1070,10 +1077,9 @@ static int __init arch_timer_mem_init(struct device_node *np)
+>  	 * Try to determine the frequency from the device tree,
+>  	 * if fail, get the frequency from the CNTFRQ reg of MMIO timer.
+>  	 */
+> -	if (!arch_timer_rate &&
+> -	    of_property_read_u32(np, "clock-frequency", &arch_timer_rate))
+> -		arch_timer_rate = arch_timer_get_mmio_freq(base);
+> -	if (!arch_timer_rate) {
+> +	if (of_property_read_u32(np, "clock-frequency", &arch_timer_mmio_freq))
+> +		arch_timer_mmio_freq = arch_timer_get_mmio_freq(base);
+> +	if (!arch_timer_mmio_freq) {
+>  		pr_err(FW_BUG "frequency not available for MMIO timer.\n");
+>  		ret = -EINVAL;
+>  		goto out;
 
-But agree - max might not be a good choose, so can you add dev_err() below, pls. 
+... unfortunately, I believe that this will break some DT platforms that
+have been (unintentionally) relying on the way currently allow the
+frequency to be probed from either the MMIO timer or the sysreg timer.
 
-> 
->>
->>>  	}
->>>  
->>>  	l = BIT(offset);
->>> @@ -255,6 +258,8 @@ static void omap2_set_gpio_debounce(struct gpio_bank *bank, unsigned offset,
->>>  		bank->context.debounce = debounce;
->>>  		bank->context.debounce_en = val;
->>>  	}
->>> +
->>> +	return 0;
->>>  }
->>>  
->>>  /**
->>> @@ -964,14 +969,15 @@ static int omap_gpio_debounce(struct gpio_chip *chip, unsigned offset,
->>>  {
->>>  	struct gpio_bank *bank;
->>>  	unsigned long flags;
->>> +	int ret;
->>>  
->>>  	bank = gpiochip_get_data(chip);
->>>  
->>>  	raw_spin_lock_irqsave(&bank->lock, flags);
->>> -	omap2_set_gpio_debounce(bank, offset, debounce);
->>> +	ret = omap2_set_gpio_debounce(bank, offset, debounce);
->>>  	raw_spin_unlock_irqrestore(&bank->lock, flags);
+So while the above was my suggestion, it was not my best.
 
-if (ret) dev_err();
+For the timebeing, let's leave the single arch_timer_rate, but ensure
+that it doesn't get in the way fo the ACPI code, by making the ACPI
+probe path:
 
->>>  
->>> -	return 0;
->>> +	return ret;
->>>  }
->>>  
->>>  static int omap_gpio_set_config(struct gpio_chip *chip, unsigned offset,
->>>   
->>
-> 
-> 
+* Probe the sysreg timers first, using the sysreg cntfrq().
 
--- 
-regards,
--grygorii
+* Probe the MMIO timers second, verifying that each MMIO cntfrq matches
+  the already-probed sysreg cntfrq.
+
+... which is what I believe you suggested previously. 
+
+Thanks,
+Mark.
