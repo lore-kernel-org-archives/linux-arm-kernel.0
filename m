@@ -1,69 +1,83 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 17 Mar 2017 22:01:10 +0000
-Subject: Applied "spi: davinci: add comment about dummy tx buffer usage" to
- the spi tree
-In-Reply-To: <1489765270-17950-1-git-send-email-fisaksen@baylibre.com>
-Message-ID: <E1cozvq-0002ly-L9@debutante>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 17 Mar 2017 15:17:29 -0700
+Subject: [PATCHv2 5/9] ARM: OMAP2+: hwmod: assign main clock from DT if
+ available
+In-Reply-To: <f7c795dc-13db-9157-cdcc-b61892cc73f9@ti.com>
+References: <1489741781-12816-1-git-send-email-t-kristo@ti.com>
+ <1489741781-12816-6-git-send-email-t-kristo@ti.com>
+ <20170317154126.GU20572@atomide.com>
+ <f7c795dc-13db-9157-cdcc-b61892cc73f9@ti.com>
+Message-ID: <20170317221728.GX20572@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+* Tero Kristo <t-kristo@ti.com> [170317 14:42]:
+> On 17/03/17 17:41, Tony Lindgren wrote:
+> > * Tero Kristo <t-kristo@ti.com> [170317 02:12]:
+> > > -static int _init_main_clk(struct omap_hwmod *oh)
+> > > +static int _init_main_clk(struct omap_hwmod *oh, struct device_node *np)
+> > >  {
+> > >  	int ret = 0;
+> > > -	char name[MOD_CLK_MAX_NAME_LEN];
+> > > -	struct clk *clk;
+> > > -	static const char modck[] = "_mod_ck";
+> > > -
+> > > -	if (strlen(oh->name) >= MOD_CLK_MAX_NAME_LEN - strlen(modck))
+> > > -		pr_warn("%s: warning: cropping name for %s\n", __func__,
+> > > -			oh->name);
+> > > +	struct clk *clk = NULL;
+> > > +	int i;
+> > > +	int count;
+> > > +	const char *name;
+> > > +	char clk_name[strlen("clkctrl-x") + 1];
+> > > 
+> > > -	strlcpy(name, oh->name, MOD_CLK_MAX_NAME_LEN - strlen(modck));
+> > > -	strlcat(name, modck, MOD_CLK_MAX_NAME_LEN);
+> > > +	if (np) {
+> > > +		clk = of_clk_get_by_name(np, "clkctrl");
+> > > +		if (IS_ERR(clk)) {
+> > > +			/* Try matching by hwmod name */
+> > > +			count = of_property_count_strings(np, "ti,hwmods");
+> > > +			for (i = 0; i < count; i++) {
+> > > +				ret = of_property_read_string_index(np,
+> > > +								    "ti,hwmods",
+> > > +								    i, &name);
+> > > +				if (ret)
+> > > +					continue;
+> > > +				if (!strcmp(name, oh->name)) {
+> > > +					sprintf(clk_name, "clkctrl-%d", i);
+> > > +					clk = of_clk_get_by_name(np, clk_name);
+> > > +				}
+> > > +			}
+> > > +		}
+> > > +		if (!IS_ERR(clk)) {
+> > > +			pr_debug("%s: mapped main_clk %s for %s\n", __func__,
+> > > +				 __clk_get_name(clk), oh->name);
+> > > +			oh->main_clk = __clk_get_name(clk);
+> > > +			oh->_clk = clk;
+> > > +			soc_ops.disable_direct_prcm(oh);
+> > > +		}
+> > > +	}
+> > 
+> > You should bail out and do nothing here if legacy "ti,hwmods" property is
+> > not found. Eventually it will be the interconnect target IP wrapper module
+> > that will manage the clock and populate the rest of the hwmod data
+> > dynamically.
+> 
+> This is only for transitional support of hwmod, this patch will not be
+> needed for anything later on; or you probably need to do something similar
+> within the interconnect driver itself. The code still needs to care for the
+> cases where we want to find the main clock based on the clock link within
+> hwmod data, so bailing out early will break any boards that don't support
+> the new clkctrl clocks yet.
 
-   spi: davinci: add comment about dummy tx buffer usage
+Well we really don't want hwmod code parsing anything out of the dtb
+unless "ti,hwmods" property is set. That makes moving driver like features
+to live under drivers much harder.
 
-has been applied to the spi tree at
+I don't quite follow you, what breaks if you fall back to the old clock
+lookup if no "ti,hwmods" is set?
 
-   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git 
+Regards,
 
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
-
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
-
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
-
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
-
-Thanks,
-Mark
-
->From 1234e8398fe03267bf2e353e36825dbd0abc2fc6 Mon Sep 17 00:00:00 2001
-From: Frode Isaksen <fisaksen@baylibre.com>
-Date: Fri, 17 Mar 2017 16:41:10 +0100
-Subject: [PATCH] spi: davinci: add comment about dummy tx buffer usage
-
-Add explanation about using the the rx buffer as the
-dummy tx buffer.
-
-Signed-off-by: Frode Isaksen <fisaksen@baylibre.com>
-Signed-off-by: Mark Brown <broonie@kernel.org>
----
- drivers/spi/spi-davinci.c | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/spi/spi-davinci.c b/drivers/spi/spi-davinci.c
-index f37bbdd18d61..595acdcfc7d0 100644
---- a/drivers/spi/spi-davinci.c
-+++ b/drivers/spi/spi-davinci.c
-@@ -660,7 +660,11 @@ static int davinci_spi_bufs(struct spi_device *spi, struct spi_transfer *t)
- 			goto err_desc;
- 
- 		if (!t->tx_buf) {
--			/* use rx buffer as dummy tx buffer */
-+			/* To avoid errors when doing rx-only transfers with
-+			 * many SG entries (> 20), use the rx buffer as the
-+			 * dummy tx buffer so that dma reloads are done at the
-+			 * same time for rx and tx.
-+			 */
- 			t->tx_sg.sgl = t->rx_sg.sgl;
- 			t->tx_sg.nents = t->rx_sg.nents;
- 		}
--- 
-2.11.0
+Tony
