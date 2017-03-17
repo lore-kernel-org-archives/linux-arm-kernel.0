@@ -1,137 +1,58 @@
-From: drivshin@awxrd.com (David Rivshin)
-Date: Fri, 17 Mar 2017 13:54:13 -0400
-Subject: [PATCH 1/2] gpio: omap: return error if requested debounce time
- is not possible
-In-Reply-To: <d1200407-5efd-ca7b-f936-fa37b206e1ea@ti.com>
-References: <20170317005704.11971-1-drivshin@awxrd.com>
- <20170317005704.11971-2-drivshin@awxrd.com>
- <d1200407-5efd-ca7b-f936-fa37b206e1ea@ti.com>
-Message-ID: <20170317135413.78118dc2.drivshin@awxrd.com>
+From: labbott@redhat.com (Laura Abbott)
+Date: Fri, 17 Mar 2017 11:02:34 -0700
+Subject: [RFC PATCH 08/12] cma: Store a name in the cma structure
+In-Reply-To: <CAO_48GEHxuMMwZO71ytaVhRkapMYaAWBWd1gW+ktspnQg=b8Sw@mail.gmail.com>
+References: <1488491084-17252-1-git-send-email-labbott@redhat.com>
+ <1488491084-17252-9-git-send-email-labbott@redhat.com>
+ <CAO_48GEHxuMMwZO71ytaVhRkapMYaAWBWd1gW+ktspnQg=b8Sw@mail.gmail.com>
+Message-ID: <7c750fb1-d019-03c1-a682-3bc04c6730ac@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Grygorii,
-
-On Fri, 17 Mar 2017 11:45:56 -0500
-Grygorii Strashko <grygorii.strashko@ti.com> wrote:
-
-> On 03/16/2017 07:57 PM, David Rivshin wrote:
-> > From: David Rivshin <DRivshin@allworx.com>
-> > 
-> > omap_gpio_debounce() does not validate that the requested debounce
-> > is within a range it can handle. Instead it lets the register value
-> > wrap silently, and always returns success.
-> > 
-> > This can lead to all sorts of unexpected behavior, such as gpio_keys
-> > asking for a too-long debounce, but getting a very short debounce in
-> > practice.
-> > 
-> > Fix this by returning -EINVAL if the requested value does not fit into
-> > the register field. If there is no debounce clock available at all,
-> > return -ENOTSUPP.  
+On 03/10/2017 12:53 AM, Sumit Semwal wrote:
+> Hi Laura,
 > 
-> In general this patch looks good, but there is one thing I'm worry about..
+> Thanks for the patch.
 > 
-> > 
-> > Fixes: e85ec6c3047b ("gpio: omap: fix omap2_set_gpio_debounce")
-> > Cc: <stable@vger.kernel.org> # 4.3+
-> > Signed-off-by: David Rivshin <drivshin@allworx.com>
-> > ---
-> >  drivers/gpio/gpio-omap.c | 16 +++++++++++-----
-> >  1 file changed, 11 insertions(+), 5 deletions(-)
-> > 
-> > diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-> > index efc85a2..33ec02d 100644
-> > --- a/drivers/gpio/gpio-omap.c
-> > +++ b/drivers/gpio/gpio-omap.c
-> > @@ -208,8 +208,10 @@ static inline void omap_gpio_dbck_disable(struct gpio_bank *bank)
-> >   * OMAP's debounce time is in 31us steps
-> >   *   <debounce time> = (GPIO_DEBOUNCINGTIME[7:0].DEBOUNCETIME + 1) x 31
-> >   * so we need to convert and round up to the closest unit.
-> > + *
-> > + * Return: 0 on success, negative error otherwise.
-> >   */
-> > -static void omap2_set_gpio_debounce(struct gpio_bank *bank, unsigned offset,
-> > +static int omap2_set_gpio_debounce(struct gpio_bank *bank, unsigned offset,
-> >  				    unsigned debounce)
-> >  {
-> >  	void __iomem		*reg;
-> > @@ -218,11 +220,12 @@ static void omap2_set_gpio_debounce(struct gpio_bank *bank, unsigned offset,
-> >  	bool			enable = !!debounce;
-> >  
-> >  	if (!bank->dbck_flag)
-> > -		return;
-> > +		return -ENOTSUPP;
-> >  
-> >  	if (enable) {
-> >  		debounce = DIV_ROUND_UP(debounce, 31) - 1;
-> > -		debounce &= OMAP4_GPIO_DEBOUNCINGTIME_MASK;
-> > +		if ((debounce & OMAP4_GPIO_DEBOUNCINGTIME_MASK) != debounce)
-> > +			return -EINVAL;  
+> On 3 March 2017 at 03:14, Laura Abbott <labbott@redhat.com> wrote:
+>>
+>> Frameworks that may want to enumerate CMA heaps (e.g. Ion) will find it
+>> useful to have an explicit name attached to each region. Store the name
+>> in each CMA structure.
+>>
+>> Signed-off-by: Laura Abbott <labbott@redhat.com>
+>> ---
+>>  drivers/base/dma-contiguous.c |  5 +++--
+>>  include/linux/cma.h           |  4 +++-
+>>  mm/cma.c                      | 11 +++++++++--
+>>  mm/cma.h                      |  1 +
+>>  mm/cma_debug.c                |  2 +-
+>>  5 files changed, 17 insertions(+), 6 deletions(-)
+>>
+> <snip>
+>> +const char *cma_get_name(const struct cma *cma)
+>> +{
+>> +       return cma->name ? cma->name : "(undefined)";
+>> +}
+>> +
+> Would it make sense to perhaps have the idx stored as the name,
+> instead of 'undefined'? That would make sure that the various cma
+> names are still unique.
 > 
-> This might cause boot issues as current drivers may expect this op to succeed even if
-> configured value is wrong - just think, may be we can do warn here and use max value as
-> fallback?
 
-I have not looked through all drivers to be sure, but at least the gpio-keys 
-driver requires set_debounce to return an error if it can't satisfy the request. 
-In that case gpio-keys will use a software timer instead. 
+Good suggestion. I'll see about cleaning that up.
 
-                if (button->debounce_interval) {
-                        error = gpiod_set_debounce(bdata->gpiod,
-                                        button->debounce_interval * 1000);
-                        /* use timer if gpiolib doesn't provide debounce */
-                        if (error < 0)
-                                bdata->software_debounce =
-                                                button->debounce_interval;
-                }
-
-Also, at least some other GPIO drivers (e.g. gpio-max7760) return -EINVAL in 
-such a case. And gpiolib will return -ENOTSUPP if there is no debounce 
-callback at all. So I expect all drivers which use gpiod_set_debounce() to 
-handle error returns gracefully. 
-
-So I certainly understand the concern about backwards compatibility, but I 
-think clipping to max is the greater of the evils in this case. Even a 
-warning may be too much, because it's not necessarily anything wrong. 
-Perhaps an info or debug message would be helpful, though?
-
-If you prefer, I can try to go through all callers of gpiod_set_debounce()
-and see how they'd handle an error return. The handful I've looked through so 
-far all behave like gpio-keys. The only ones I'd be particularly concerned
-about are platform-specific drivers which were perhaps never used with other
-gpio drivers. Do you know of that I should pay special attention to?
-
+>>  static unsigned long cma_bitmap_aligned_mask(const struct cma *cma,
+>>                                              int align_order)
+>>  {
+>> @@ -168,6 +173,7 @@ core_initcall(cma_init_reserved_areas);
+>>   */
+>>  int __init cma_init_reserved_mem(phys_addr_t base, phys_addr_t size,
+>>                                  unsigned int order_per_bit,
+>> +                                const char *name,
+>>                                  struct cma **res_cma)
+>>  {
 > 
-> >  	}
-> >  
-> >  	l = BIT(offset);
-> > @@ -255,6 +258,8 @@ static void omap2_set_gpio_debounce(struct gpio_bank *bank, unsigned offset,
-> >  		bank->context.debounce = debounce;
-> >  		bank->context.debounce_en = val;
-> >  	}
-> > +
-> > +	return 0;
-> >  }
-> >  
-> >  /**
-> > @@ -964,14 +969,15 @@ static int omap_gpio_debounce(struct gpio_chip *chip, unsigned offset,
-> >  {
-> >  	struct gpio_bank *bank;
-> >  	unsigned long flags;
-> > +	int ret;
-> >  
-> >  	bank = gpiochip_get_data(chip);
-> >  
-> >  	raw_spin_lock_irqsave(&bank->lock, flags);
-> > -	omap2_set_gpio_debounce(bank, offset, debounce);
-> > +	ret = omap2_set_gpio_debounce(bank, offset, debounce);
-> >  	raw_spin_unlock_irqrestore(&bank->lock, flags);
-> >  
-> > -	return 0;
-> > +	return ret;
-> >  }
-> >  
-> >  static int omap_gpio_set_config(struct gpio_chip *chip, unsigned offset,
-> >   
+> Best regards,
+> Sumit.
 > 
