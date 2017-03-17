@@ -1,48 +1,39 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Fri, 17 Mar 2017 09:39:50 +0100
-Subject: [PATCH 1/2] arm64: dts: rockchip: add rk3368 dw-mmc resets
-Message-ID: <20170317083951.14343-1-heiko@sntech.de>
+From: balbi@kernel.org (Felipe Balbi)
+Date: Fri, 17 Mar 2017 10:42:49 +0200
+Subject: [PATCH] usb: dwc3 dwc3_exynos_probe() change goto labels to
+ meaningful names
+In-Reply-To: <8da7ab58-9d4c-2e71-df98-40bbceea8858@osg.samsung.com>
+References: <20170130192504.19046-1-shuahkh@osg.samsung.com>
+ <8da7ab58-9d4c-2e71-df98-40bbceea8858@osg.samsung.com>
+Message-ID: <87y3w4uwdy.fsf@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-dw-mmc got its reset-properties specified, so add the softresets
-for it on the rk3368.
+Shuah Khan <shuahkh@osg.samsung.com> writes:
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
- arch/arm64/boot/dts/rockchip/rk3368.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+> On 01/30/2017 12:25 PM, Shuah Khan wrote:
+>> Change goto labels to meaningful names from a series of errNs.
+>> 
+>> Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
+>> ---
+>> 
+>> Rebased to usb-next
+>
+> Hi Felipe,
+>
+> Are you planning to get this in or is there something you are
+> waiting in for me to do?
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3368.dtsi b/arch/arm64/boot/dts/rockchip/rk3368.dtsi
-index a635adc47e74..06fa6e00904d 100644
---- a/arch/arm64/boot/dts/rockchip/rk3368.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3368.dtsi
-@@ -237,6 +237,8 @@
- 		clock-names = "biu", "ciu", "ciu-drive", "ciu-sample";
- 		fifo-depth = <0x100>;
- 		interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
-+		resets = <&cru SRST_MMC0>;
-+		reset-names = "reset";
- 		status = "disabled";
- 	};
- 
-@@ -249,6 +251,8 @@
- 		clock-names = "biu", "ciu", "ciu_drv", "ciu_sample";
- 		fifo-depth = <0x100>;
- 		interrupts = <GIC_SPI 33 IRQ_TYPE_LEVEL_HIGH>;
-+		resets = <&cru SRST_SDIO0>;
-+		reset-names = "reset";
- 		status = "disabled";
- 	};
- 
-@@ -261,6 +265,8 @@
- 		clock-names = "biu", "ciu", "ciu-drive", "ciu-sample";
- 		fifo-depth = <0x100>;
- 		interrupts = <GIC_SPI 35 IRQ_TYPE_LEVEL_HIGH>;
-+		resets = <&cru SRST_EMMC>;
-+		reset-names = "reset";
- 		status = "disabled";
- 	};
- 
+already in testing/next
+
+https://git.kernel.org/pub/scm/linux/kernel/git/balbi/usb.git/commit/?h=testing/next&id=e529082c33a0deaccfc8b28ef1436494ed95365f
+
 -- 
-2.11.0
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170317/9950fdc5/attachment-0001.sig>
