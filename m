@@ -1,55 +1,56 @@
-From: afzal.mohd.ma@gmail.com (afzal mohammed)
-Date: Fri, 17 Mar 2017 22:10:34 +0530
-Subject: [PATCH] ARM: nommu: access ID_PFR1 only if CPUID scheme
-Message-ID: <20170317164034.4036-1-afzal.mohd.ma@gmail.com>
+From: james.morse@arm.com (James Morse)
+Date: Fri, 17 Mar 2017 16:43:11 +0000
+Subject: [PATCH V12 05/10] acpi: apei: handle SEA notification type for
+ ARMv8
+In-Reply-To: <1488833103-21082-6-git-send-email-tbaicar@codeaurora.org>
+References: <1488833103-21082-1-git-send-email-tbaicar@codeaurora.org>
+ <1488833103-21082-6-git-send-email-tbaicar@codeaurora.org>
+Message-ID: <58CC121F.5030807@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Greg upon trying to boot no-MMU Kernel on ARM926EJ reported boot
-failure. He root caused it to ID_PFR1 access introduced by the
-commit mentioned in the fixes tag below.
+Hi Tyler,
 
-All CP15 processors need not have processor feature registers, only
-for architectures defined by CPUID scheme would have it. Hence check
-for it before accessing processor feature register, ID_PFR1.
+On 06/03/17 20:44, Tyler Baicar wrote:
+> ARM APEI extension proposal added SEA (Synchronous External Abort)
+> notification type for ARMv8.
+> Add a new GHES error source handling function for SEA. If an error
+> source's notification type is SEA, then this function can be registered
+> into the SEA exception handler. That way GHES will parse and report
+> SEA exceptions when they occur.
+> An SEA can interrupt code that had interrupts masked and is treated as
+> an NMI. To aid this the page of address space for mapping APEI buffers
+> while in_nmi() is always reserved, and ghes_ioremap_pfn_nmi() is
+> changed to use the helper methods to find the prot_t to map with in
+> the same way as ghes_ioremap_pfn_irq().
 
-Fixes: f8300a0b5de0 ("ARM: 8647/2: nommu: dynamic exception base address setting")
-Reported-by: Greg Ungerer <gerg@uclinux.org>
-Signed-off-by: afzal mohammed <afzal.mohd.ma@gmail.com>
----
+> diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
+> index b25e7cf..b0596ba 100644
+> --- a/drivers/acpi/apei/ghes.c
+> +++ b/drivers/acpi/apei/ghes.c
+> @@ -1023,6 +1075,13 @@ static int ghes_probe(struct platform_device *ghes_dev)
+>  		pr_warning(GHES_PFX "Generic hardware error source: %d notified via local interrupt is not supported!\n",
+>  			   generic->header.source_id);
+>  		goto err;
+> +	case ACPI_HEST_NOTIFY_GPIO:
+> +	case ACPI_HEST_NOTIFY_SEI:
+> +	case ACPI_HEST_NOTIFY_GSIV:
+> +		pr_warn(GHES_PFX "Generic hardware error source: %d notified via notification type %u is not supported\n",
+> +			generic->header.source_id, generic->header.source_id);
+> +		rc = -ENOTSUPP;
+> +		goto err;
+>  	default:
+>  		pr_warning(FW_WARN GHES_PFX "Unknown notification type: %u for generic hardware error source: %d\n",
+>  			   generic->notify.type, generic->header.source_id);
 
-Hi Russell,
 
-It would be good to have the fix go in during -rc, as,
+This hunk will conflict with Shiju Jose's patch[0] that adds GPIO and GSIV
+support. Can we remove it?
 
-1. Culprit commit went in during the last merge window
-2. Though nothing supported in mainline is known to be broken, the
-    original change needs to be modified to be reliable
 
-Vladimir, this is being posted as the issue is taken care run time.
+Thanks,
 
-Regards
-afzal
+James
 
----
- arch/arm/mm/nommu.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mm/nommu.c b/arch/arm/mm/nommu.c
-index 3b5c7aaf9c76..33a45bd96860 100644
---- a/arch/arm/mm/nommu.c
-+++ b/arch/arm/mm/nommu.c
-@@ -303,7 +303,10 @@ static inline void set_vbar(unsigned long val)
-  */
- static inline bool security_extensions_enabled(void)
- {
--	return !!cpuid_feature_extract(CPUID_EXT_PFR1, 4);
-+	/* Check CPUID Identification Scheme before ID_PFR1 read */
-+	if ((read_cpuid_id() & 0x000f0000) == 0x000f0000)
-+		return !!cpuid_feature_extract(CPUID_EXT_PFR1, 4);
-+	return 0;
- }
- 
- static unsigned long __init setup_vectors_base(void)
--- 
-2.12.0
+[0] https://www.spinics.net/lists/linux-acpi/msg72654.html
