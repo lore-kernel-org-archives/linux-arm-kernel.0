@@ -1,104 +1,138 @@
-From: dwmw2@infradead.org (David Woodhouse)
-Date: Fri, 17 Mar 2017 15:47:08 +0000
-Subject: [PATCH v33 00/14] add kdump support
-In-Reply-To: <20170317153358.GI5940@leverpostej>
-References: <20170315095656.24992-1-takahiro.akashi@linaro.org>
- <1489750991.17202.40.camel@infradead.org>
- <1489759373.17202.44.camel@infradead.org>
- <20170317153358.GI5940@leverpostej>
-Message-ID: <1489765628.17202.59.camel@infradead.org>
+From: fabrice.gasnier@st.com (Fabrice Gasnier)
+Date: Fri, 17 Mar 2017 16:59:39 +0100
+Subject: [PATCH v3 1/6] dt-bindings: iio: introduce trigger providers,
+ consumers
+In-Reply-To: <20170315192521.l7mb3egh4hbxdpx6@rob-hp-laptop>
+References: <1488300679-3259-1-git-send-email-fabrice.gasnier@st.com>
+ <1488300679-3259-2-git-send-email-fabrice.gasnier@st.com>
+ <20170303062126.5bewa5u6o7wu7sy4@rob-hp-laptop>
+ <948e5b96-7a8f-406d-6d03-d129d1b2ce54@kernel.org>
+ <12a6a2f8-9ff6-a4f0-c9a2-c7de037019ef@kernel.org>
+ <20170315192521.l7mb3egh4hbxdpx6@rob-hp-laptop>
+Message-ID: <f44cccd8-a607-117d-e444-ea3174eced18@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2017-03-17 at 15:33 +0000, Mark Rutland wrote:
+On 03/15/2017 08:25 PM, Rob Herring wrote:
+> On Sun, Mar 05, 2017 at 12:13:36PM +0000, Jonathan Cameron wrote:
+>> On 05/03/17 11:43, Jonathan Cameron wrote:
+>>> On 03/03/17 06:21, Rob Herring wrote:
+>>>> On Tue, Feb 28, 2017 at 05:51:14PM +0100, Fabrice Gasnier wrote:
+>>>>> Document iio provider and consumer bindings.
+>>>>>
+>>>>> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+>>>>> ---
+>>>>>  .../devicetree/bindings/iio/iio-bindings.txt       | 38 ++++++++++++++++++++++
+>>>>>  1 file changed, 38 insertions(+)
+>>>>>
+>>>>> diff --git a/Documentation/devicetree/bindings/iio/iio-bindings.txt b/Documentation/devicetree/bindings/iio/iio-bindings.txt
+>>>>> index 68d6f8c..01765e9 100644
+>>>>> --- a/Documentation/devicetree/bindings/iio/iio-bindings.txt
+>>>>> +++ b/Documentation/devicetree/bindings/iio/iio-bindings.txt
+>>>>> @@ -95,3 +95,41 @@ vdd channel is connected to output 0 of the &ref device.
+>>>>>  		io-channels = <&adc 10>, <&adc 11>;
+>>>>>  		io-channel-names = "adc1", "adc2";
+>>>>>  	};
+>>>>> +
+>>>>> +==IIO trigger providers==
+>>>>> +Sources of IIO triggers can be represented by any node in the device
+>>>>> +tree. Those nodes are designated as IIO trigger providers. IIO trigger
+>>>>> +consumer uses a phandle and an IIO trigger specifier to connect to an
+>>>>> +IIO trigger provider.
+>>>>> +An IIO trigger specifier is an array of one or more cells identifying
+>>>>> +the IIO trigger output on a device. The length of an IIO trigger
+>>>>> +specifier is defined by the value of a #io-trigger-cells property in
+>>>>> +the IIO trigger provider node.
+>>>>> +
+>>>>> +Required properties:
+>>>>> +#io-trigger-cells:
+>>>>> +		Number of cells in an IIO trigger specifier; Typically
+>>>>> +		0 for nodes with a simple IIO trigger output.
+>>>>> +
+>>>>> +Example:
+>>>>> +	trig0: interrupt-trigger0 {
+>>>>> +		#io-trigger-cells = <0>;
+>>>>> +		compatible = "interrupt-trigger";
+>>>>> +		interrupts = <11 0>;
+>>>>> +		interrupt-parent = <&gpioa>;
+>>>>> +	}
+>>>>> +
+>>>>> +==IIO trigger consumers==
+>>>>> +Required properties:
+>>>>> +- io-triggers:	List of phandle representing the IIO trigger specifier.
+>>>>> +
+>>>>> +Optional properties:
+>>>>> +- io-trigger-names :
+>>>>> +		List of IIO trigger name strings that matches elements
+>>>>> +		in 'io-triggers' list property.
+>>>>> +
+>>>>> +Example:
+>>>>> +	some_trigger_consumer {
+>>>>> +		io-triggers = <&trig0>;
+>>>>> +		io-trigger-names = "mytrig";
+>>>>> +	}
+>>>>
+>>>> I have some reservations about this. We could just as easily add the 
+>>>> interrupt directly to the consumer node and use "trigger" for a standard 
+>>>> interrupt name. So the question is whether this extra level of 
+>>>> indirection is needed? 
+>>>
+>>> First thing to note here, is that Fabrice's use of the generic interrupt
+>>> trigger is an extremely 'unusual' one! Normal use case is that we have
+Hi Rob, Jonathan,
+
+Yes, I agree this is unusual.
+
+>>> a random gpio pin providing interrupts to driver triggering on random
+>>> devices - there need be no association between the two whatsoever.
+>>> So what we are doing here is 'allowing' an interrupt to provide a trigger.
+>>> It's not necessarily the one going to be used by any particular device
+>>> driver.  The decision of which trigger to use is definitely one for
+>>> userspace, not something that should be configured in to the device tree.
+>>>
+>>> For this particular case you could in theory just do it by using an interrupt
+>>> as you describe.  Ultimately though we should be able to play more complex
+>>> games with this device and having it able to handle any trigger - which 
+>>> includes those not using the direct hardware route.  It'll be up to the
+>>> driver to figure out when it can use the fast method and when it can't.
+Agreed. Still, to benefit from hw capabilities, driver needs to have a
+way to identify a particular trigger as a direct hardware route, or not
+(and then default software handling, btw, that still needs to be
+addressed in stm32-adc). DT Provider/consumer may help to achieve this.
+
+>>>
+>>> Conversely, even when we are using this hardware route to drive the
+>>> triggering it should be possible to hang off a device to be triggered
+>>> by the interrupt via the kernel rather than directly. 
+>>>
+>>> So from a device tree point of view we are just describing the fact that
+>>> there is a pin, which may be used to trigger something.  What that something
+>>> is, is a question for userspace not the device tree.
+>>>
+>> Ah, I'm half asleep this morning.  Clearly there is a more general follow
+>> up question.  If we are arguing these are generic, why are we setting
+>> up the mapping in device tree?
+>>
+>> My gut feeling is we shouldn't be.  So I think we need the first chunk
+>> above but the latter part should be a job for userspace not the devicetree.
 > 
-> We can certainly log a better message, e.g.
-> ????????
-> ????????bool kdump = (image == kexec_crash_image);
-> ????????bool stuck_cpus = cpus_are_stuck_in_kernel() ||
-> ????????????????????????? num_online_cpus() > 1;
+> So you mean keep the provider side, but get rid of the consumer? That 
+> makes sense to me.
+In case getting rid of the consumer part, I still need one way, on
+consumer side (stm32-adc) to specifically map EXTI signal in ADC
+hardware, do some checks on trigger to validate hardware route.
+I'm not sure how to handle this if I get rid of consumer part.
+Shall I use something else not mentioned here? (put trigger dt node as
+child node of stm32 adc, then use dev bus? ...)
+
+Another way is as suggested by Rob in earlier comment: directly use this
+interrupt in consumer dt node, e.g. in stm32-adc node. And register
+relevant trigger and so on, from stm32-adc driver.
+Please advise.
+
+Thanks for reviewing
+Best Regards,
+Fabrice
 > 
-> ????????BUG_ON(stuck_cpus && !kdump);
-> ????????WARN(stuck_cpus, "Unable to offline CPUs, kdump will be unreliable.\n");
-
-No, in this case the CPUs *were* offlined correctly, or at least "as
-designed", by smp_send_crash_stop(). And if that hadn't worked, as
-verified by *its* synchronisation method based on the atomic_t
-waiting_for_crash_ipi, then *it* would have complained for itself:
-
-	if (atomic_read(&waiting_for_crash_ipi) > 0)
-		pr_warning("SMP: failed to stop secondary CPUs %*pbl\n",
-			???cpumask_pr_args(cpu_online_mask));
-
-It's just that smp_send_crash_stop() (or more specifically
-ipi_cpu_crash_stop()) doesn't touch the online cpu mask. Unlike the
-ARM32 equivalent function machien_crash_nonpanic_core(), which does.
-
-It wasn't clear if that was *intentional*, to allow the original
-contents of the online mask before the crash to be seen in the
-resulting vmcore... or purely an accident.?
-
-FWIW if I trigger a crash on CPU 1 my kdump (still 4.9.8+v32) doesn't work.
-I end up booting the kdump kernel on CPU#1 and then it gets distinctly unhappy...
-
-[????0.000000] Booting Linux on physical CPU 0x1
-...
-[????0.017125] Detected PIPT I-cache on CPU1
-[????0.017138] GICv3: CPU1: found redistributor 0 region 0:0x00000000f0280000
-[????0.017147] CPU1: Booted secondary processor [411fd073]
-[????0.017339] Detected PIPT I-cache on CPU2
-[????0.017347] GICv3: CPU2: found redistributor 2 region 0:0x00000000f02c0000
-[????0.017354] CPU2: Booted secondary processor [411fd073]
-[????0.017537] Detected PIPT I-cache on CPU3
-[????0.017545] GICv3: CPU3: found redistributor 3 region 0:0x00000000f02e0000
-[????0.017551] CPU3: Booted secondary processor [411fd073]
-[????0.017576] Brought up 4 CPUs
-[????0.017587] SMP: Total of 4 processors activated.
-...
-[???31.745809] INFO: rcu_sched detected stalls on CPUs/tasks:
-[???31.751299]?	1-...: (30 GPs behind) idle=c90/0/0 softirq=0/0 fqs=0?
-[???31.757557]?	2-...: (30 GPs behind) idle=608/0/0 softirq=0/0 fqs=0?
-[???31.763814]?	3-...: (30 GPs behind) idle=604/0/0 softirq=0/0 fqs=0?
-[???31.770069]?	(detected by 0, t=5252 jiffies, g=-270, c=-271, q=0)
-[???31.776161] Task dump for CPU 1:
-[???31.779381] swapper/1???????R??running task????????0?????0??????1 0x00000080
-[???31.786446] Task dump for CPU 2:
-[???31.789666] swapper/2???????R??running task????????0?????0??????1 0x00000080
-[???31.796725] Task dump for CPU 3:
-[???31.799945] swapper/3???????R??running task????????0?????0??????1 0x00000080
-
-Is some of that platform-specific?
-
-diff --git a/drivers/tty/sysrq.c b/drivers/tty/sysrq.c
-index 701c085..41d238e 100644
---- a/drivers/tty/sysrq.c
-+++ b/drivers/tty/sysrq.c
-@@ -129,7 +129,7 @@ static struct sysrq_key_op sysrq_unraw_op = {
-?#define sysrq_unraw_op (*(struct sysrq_key_op *)NULL)
-?#endif /* CONFIG_VT */
-?
--static void sysrq_handle_crash(int key)
-+static void do_sysrq_handle_crash(int key)
-?{
-?	char *killer = NULL;
-?
-@@ -143,6 +143,12 @@ static void sysrq_handle_crash(int key)
-?	wmb();
-?	*killer = 1;
-?}
-+
-+static void sysrq_handle_crash(int key)
-+{
-+	smp_call_on_cpu(1, (void *)do_sysrq_handle_crash, 0, 1);
-+}
-+
-?static struct sysrq_key_op sysrq_crash_op = {
-?	.handler	= sysrq_handle_crash,
-?	.help_msg	= "crash(c)",
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: smime.p7s
-Type: application/x-pkcs7-signature
-Size: 4938 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170317/07272be7/attachment-0001.bin>
+> Rob
+> 
