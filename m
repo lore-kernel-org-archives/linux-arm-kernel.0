@@ -1,152 +1,103 @@
-From: slash.tmp@free.fr (Mason)
-Date: Fri, 17 Mar 2017 17:11:50 +0100
-Subject: [RFC PATCH v0.001] PCI: Add support for tango PCIe controller
-Message-ID: <ab110ce2-8678-9b34-6bd1-6cfaaa7fea04@free.fr>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Fri, 17 Mar 2017 10:13:35 -0600
+Subject: [PATCH v4 1/7] coresight: bindings for CPU debug module
+In-Reply-To: <1489762943-25849-2-git-send-email-leo.yan@linaro.org>
+References: <1489762943-25849-1-git-send-email-leo.yan@linaro.org>
+ <1489762943-25849-2-git-send-email-leo.yan@linaro.org>
+Message-ID: <20170317161335.GB20435@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is version 0.001 pre-alpha.
+On Fri, Mar 17, 2017 at 11:02:17PM +0800, Leo Yan wrote:
+> According to ARMv8 architecture reference manual (ARM DDI 0487A.k)
+> Chapter 'Part H: External debug', the CPU can integrate debug module
+> and it can support self-hosted debug and external debug. Especially
+> for supporting self-hosted debug, this means the program can access
+> the debug module from mmio region; and usually the mmio region is
+> integrated with coresight.
+> 
+> So add document for binding debug component, includes binding to APB
+> clock; and also need specify the CPU node which the debug module is
+> dedicated to specific CPU.
+> 
+> Suggested-by: Mike Leach <mike.leach@linaro.org>
+> Reviewed-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+> Signed-off-by: Leo Yan <leo.yan@linaro.org>
+> ---
+>  .../bindings/arm/coresight-cpu-debug.txt           | 46 ++++++++++++++++++++++
+>  1 file changed, 46 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/coresight-cpu-debug.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/coresight-cpu-debug.txt b/Documentation/devicetree/bindings/arm/coresight-cpu-debug.txt
+> new file mode 100644
+> index 0000000..f6855c3
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/coresight-cpu-debug.txt
+> @@ -0,0 +1,46 @@
+> +* CoreSight CPU Debug Component:
+> +
+> +CoreSight cpu debug component are compliant with the ARMv8 architecture
+> +reference manual (ARM DDI 0487A.k) Chapter 'Part H: External debug'. The
+> +external debug module is mainly used for two modes: self-hosted debug and
+> +external debug, and it can be accessed from mmio region from Coresight
+> +and eventually the debug module connects with CPU for debugging. And the
+> +debug module provides sample-based profiling extension, which can be used
+> +to sample CPU program counter, secure state and exception level, etc;
+> +usually every CPU has one dedicated debug module to be connected.
+> +
+> +Required properties:
+> +
+> +- compatible : should be
+> +	     * "arm,coresight-cpu-debug"; supplemented with "arm,primecell"
+> +	       since this driver is using the AMBA bus interface.
 
-I have several questions embedded as comments in the code.
-Bjorn, can you tell me if something looks really wrong,
-or if this driver can be accepted in this shape?
+This description needs to be refactored - see my comment from an earlier post
+for more details.
 
-Regards.
----
- drivers/pci/host/pcie-tango.c | 125 ++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 125 insertions(+)
- create mode 100644 drivers/pci/host/pcie-tango.c
+> +
+> +- reg : physical base address and length of the register set.
+> +
+> +- clocks : the clock associated to this component.
+> +
+> +- clock-names : the name of the clock referenced by the code. Since we are
+> +                using the AMBA framework, the name of the clock providing
+> +		the interconnect should be "apb_pclk" and the clock is
+> +		mandatory. The interface between the debug logic and the
+> +		processor core is clocked by the internal CPU clock, so it
+> +		is enabled with CPU clock by default.
+> +
+> +- cpu : the cpu phandle the debug module is affined to. When omitted
+> +	the module is considered to belong to CPU0.
+> +
+> +Optional properties:
 
-diff --git a/drivers/pci/host/pcie-tango.c b/drivers/pci/host/pcie-tango.c
-new file mode 100644
-index 000000000000..9d7fed75fd1d
---- /dev/null
-+++ b/drivers/pci/host/pcie-tango.c
-@@ -0,0 +1,125 @@
-+#include <linux/pci-ecam.h>
-+
-+#define VENDOR_SIGMA	0x1105
-+
-+/*
-+ * How do I reach dev->driver_data in the config accessors?
-+ */
-+static void __iomem *mux;
-+
-+static int smp8759_config_read(struct pci_bus *bus,
-+		unsigned int devfn, int where, int size, u32 *val)
-+{
-+	int ret;
-+
-+	/*
-+	 * QUIRK #1
-+	 * Reads in configuration space outside devfn 0 return garbage.
-+	 */
-+	if (devfn != 0) {
-+		*val = 0xffffffff; /* ~0 means "nothing here" right? */
-+		return PCIBIOS_SUCCESSFUL; /* Should we return error or success? */
-+	}
-+
-+	/*
-+	 * QUIRK #2
-+	 * The root complex advertizes a fake BAR, which is used to filter
-+	 * bus-to-cpu requests. Hide it from Linux.
-+	 */
-+	if (where == PCI_BASE_ADDRESS_0 && bus->number == 0) {
-+		*val = 0; /* 0 or ~0 to hide the BAR from Linux? */
-+		return PCIBIOS_SUCCESSFUL; /* Should we return error or success? */
-+	}
-+
-+	/*
-+	 * QUIRK #3
-+	 * Unfortunately, config and mem spaces are muxed.
-+	 * Linux does not support such a setting, since drivers are free
-+	 * to access mem space directly, at any time.
-+	 * Therefore, we can only PRAY that config and mem space accesses
-+	 * NEVER occur concurrently.
-+	 */
-+	writel(1, mux);
-+	ret = pci_generic_config_read(bus, devfn, where, size, val);
-+	writel(0, mux);
-+
-+	return ret;
-+}
-+
-+static int smp8759_config_write(struct pci_bus *bus,
-+		unsigned int devfn, int where, int size, u32 val)
-+{
-+	int ret;
-+
-+	writel(1, mux);
-+	ret = pci_generic_config_write(bus, devfn, where, size, val);
-+	writel(0, mux);
-+
-+	return ret;
-+}
-+
-+static struct pci_ecam_ops smp8759_ecam_ops = {
-+	.bus_shift	= 20,
-+	.pci_ops	= {
-+		.map_bus	= pci_ecam_map_bus,
-+		.read		= smp8759_config_read,
-+		.write		= smp8759_config_write,
-+	}
-+};
-+
-+static const struct of_device_id tango_pcie_ids[] = {
-+	{ .compatible = "sigma,smp8759-pcie" },
-+	{ /* sentinel */ },
-+};
-+
-+static int tango_pcie_probe(struct platform_device *pdev)
-+{
-+	void __iomem *base;
-+	struct resource *res;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-+	base = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(base))
-+		return PTR_ERR(base);
-+
-+	mux = base + 0x48;
-+
-+	return pci_host_common_probe(pdev, &smp8759_ecam_ops);
-+}
-+
-+static struct platform_driver tango_pcie_driver = {
-+	.probe = tango_pcie_probe,
-+	.driver = {
-+		.name = KBUILD_MODNAME,
-+		.of_match_table = tango_pcie_ids,
-+	},
-+};
-+
-+/*
-+ * This should probably be module_platform_driver ?
-+ */
-+builtin_platform_driver(tango_pcie_driver);
-+
-+/*
-+ * QUIRK #4
-+ * The root complex advertizes the wrong device class.
-+ * Header Type 1 are handled by PCI-to-PCI bridges.
-+ */
-+static void tango_fixup_class(struct pci_dev *dev)
-+{
-+	dev->class = PCI_CLASS_BRIDGE_PCI << 8;
-+}
-+DECLARE_PCI_FIXUP_EARLY(VENDOR_SIGMA, PCI_ANY_ID, tango_fixup_class);
-+
-+/*
-+ * QUIRK #5
-+ * Only transfers within the BAR are forwarded to the host.
-+ * By default, the DMA framework expects that
-+ * PCI address 0x8000_0000 -> CPU address 0x8000_0000
-+ * which is where DRAM0 is mapped.
-+ */
-+static void tango_fixup_bar(struct pci_dev *dev)
-+{
-+        pci_write_config_dword(dev, PCI_BASE_ADDRESS_0, 0x80000000);
-+}
-+DECLARE_PCI_FIXUP_FINAL(VENDOR_SIGMA, PCI_ANY_ID, tango_fixup_bar);
--- 
-2.10.0
+s/properties/property
+
+> +
+> +- power-domains: a phandle to power domain node for debug module. We can
+> +		 use "nohlt" to ensure CPU power domain is enabled.
+
+The "power-domains" property is to take care of the debug power domain.  The
+"nohlt" is to make sure registers in the CPU power domain are accessible - both
+are independent from one another.  As such the description for this binding
+shoudl be:
+
+"a phandle to the debug power domain".
+
+Thanks,
+Mathieu
+
+> +
+> +
+> +Example:
+> +
+> +	debug at f6590000 {
+> +		compatible = "arm,coresight-cpu-debug","arm,primecell";
+> +		reg = <0 0xf6590000 0 0x1000>;
+> +		clocks = <&sys_ctrl HI6220_DAPB_CLK>;
+> +		clock-names = "apb_pclk";
+> +		cpu = <&cpu0>;
+> +	};
+> -- 
+> 2.7.4
+> 
