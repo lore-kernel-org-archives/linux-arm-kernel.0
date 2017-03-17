@@ -1,154 +1,179 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Fri, 17 Mar 2017 11:54:23 +0100
-Subject: [PATCH v2 2/2] fpga: Add support for Xilinx LogiCORE PR Decoupler
-In-Reply-To: <1489711910-17443-2-git-send-email-mdf@kernel.org>
-References: <1489711910-17443-1-git-send-email-mdf@kernel.org>
- <1489711910-17443-2-git-send-email-mdf@kernel.org>
-Message-ID: <f2d3ae3f-1f74-1ce6-b7af-f51b383d3a5d@xilinx.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 17 Mar 2017 11:01:26 +0000
+Subject: [PATCH 1/2] irqchip/gic-v3-its: bail out on already enabled LPIs
+In-Reply-To: <db757dab-7ef8-45fd-873d-43cfcb59e264@codeaurora.org>
+References: <20170316170542.3568-1-andre.przywara@arm.com>
+ <20170316170542.3568-2-andre.przywara@arm.com>
+ <e640f2c6-9445-ef85-ff80-6826fb230371@codeaurora.org>
+ <8f9e3620-8c38-126b-2d90-ed5b07432e7e@arm.com>
+ <db757dab-7ef8-45fd-873d-43cfcb59e264@codeaurora.org>
+Message-ID: <446825ce-8a75-5567-f648-1946e75ce764@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17.3.2017 01:51, Moritz Fischer wrote:
-> This adds support for the Xilinx LogiCORE PR Decoupler
-> soft-ip that does decoupling of PR regions in the FPGA
-> fabric during partial reconfiguration.
+On 17/03/17 10:43, Shanker Donthineni wrote:
+> Hi Marc,
 > 
-> Signed-off-by: Moritz Fischer <mdf@kernel.org>
-> Cc: Michal Simek <michal.simek@xilinx.com>
-> Cc: S?ren Brinkmann <soren.brinkmann@xilinx.com>
-> Cc: linux-kernel at vger.kernel.org
-> Cc: devicetree at vger.kernel.org
-> ---
 > 
-> Changes from v1:
-> - Added Michal as Co-Author since I pulled in some of his code
-> - Reworked clk handling in _remove()
-> - Pulled in Michal's version of show_enable(), ditched priv->enabled
+> On 03/17/2017 04:46 AM, Marc Zyngier wrote:
+>> Hi Shanker,
+>>
+>> On 16/03/17 17:25, Shanker Donthineni wrote:
+>>> Hi Andre,
+>>>
+>>>
+>>> On 03/16/2017 12:05 PM, Andre Przywara wrote:
+>>>> The GICv3 spec says that once LPIs have been enabled, they can't be
+>>>> disabled anymore:
+>>>> "When a write changes this bit from 0 to 1, this bit becomes RES1 ..."
+>>>> As we can't setup the pending and property table registers when LPIs are
+>>>> enabled, we have to bail out here in this case.
+>>>> But first try to disable LPIs anyway, to check whether this actually works.
+>>>> If not, return an error.
+>>>>
+>>>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>>>> ---
+>>>>  drivers/irqchip/irq-gic-v3-its.c | 36 ++++++++++++++++++++++++++++--------
+>>>>  1 file changed, 28 insertions(+), 8 deletions(-)
+>>>>
+>>>> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+>>>> index f77f840..b777c57 100644
+>>>> --- a/drivers/irqchip/irq-gic-v3-its.c
+>>>> +++ b/drivers/irqchip/irq-gic-v3-its.c
+>>>> @@ -1082,12 +1082,30 @@ static int its_alloc_collections(struct its_node *its)
+>>>>  	return 0;
+>>>>  }
+>>>>  
+>>>> -static void its_cpu_init_lpis(void)
+>>>> +static int its_cpu_init_lpis(void)
+>>>>  {
+>>>>  	void __iomem *rbase = gic_data_rdist_rd_base();
+>>>>  	struct page *pend_page;
+>>>>  	u64 val, tmp;
+>>>>  
+>>>> +	/*
+>>>> +	 * Architecturally, once LPIs have been enabled on a specific
+>>>> +	 * redistributor, they can't be disabled anymore (the enable
+>>>> +	 * bit becomes RES1).
+>>>> +	 * But as we can't setup the pending and property table registers
+>>>> +	 * while LPIs are enabled, we are basically screwed in this case.
+>>>> +	 * But be slightly more optimistic here, and actually check whether
+>>>> +	 * this is really implemented like this.
+>>>> +	 */
+>>>> +	val = readl_relaxed(rbase + GICR_CTLR);
+>>>> +	val &= ~GICR_CTLR_ENABLE_LPIS;
+>>>> +	writel_relaxed(val, rbase + GICR_CTLR);
+>>> Spec says we are not supposed to disable once it is enabled, why code
+>>> is trying to disable? Why can't we check the enable bit without a
+>>> write operation?
+>> The reasoning here is that some implementation could support having
+>> their LPI disabled (hint: a software implementation like the one we have
+>> in KVM). As much as I'm willing to follow the architecture, I see little
+>> value in not supporting something that trivial. But maybe we could quirk
+>> it and not do that in the general case. Andre, what do you think?
+>>
+>>>> +	if (readl_relaxed(rbase + GICR_CTLR) & GICR_CTLR_ENABLE_LPIS) {
+>>>> +		pr_warn("CPU%d: LPIs already enabled, cannot initialize redistributor\n",
+>>>> +			smp_processor_id());
+>>>> +		return -EBUSY;
+>>>> +	}
+>>>> +
+>>>>  	/* If we didn't allocate the pending table yet, do it now */
+>>>>  	pend_page = gic_data_rdist()->pend_page;
+>>>>  	if (!pend_page) {
+>>>> @@ -1101,7 +1119,7 @@ static void its_cpu_init_lpis(void)
+>>>>  		if (!pend_page) {
+>>>>  			pr_err("Failed to allocate PENDBASE for CPU%d\n",
+>>>>  			       smp_processor_id());
+>>>> -			return;
+>>>> +			return -ENOMEM;
+>>>>  		}
+>>>>  
+>>>>  		/* Make sure the GIC will observe the zero-ed page */
+>>>> @@ -1113,11 +1131,6 @@ static void its_cpu_init_lpis(void)
+>>>>  		gic_data_rdist()->pend_page = pend_page;
+>>>>  	}
+>>>>  
+>>>> -	/* Disable LPIs */
+>>>> -	val = readl_relaxed(rbase + GICR_CTLR);
+>>>> -	val &= ~GICR_CTLR_ENABLE_LPIS;
+>>>> -	writel_relaxed(val, rbase + GICR_CTLR);
+>>>> -
+>>>>  	/*
+>>>>  	 * Make sure any change to the table is observable by the GIC.
+>>>>  	 */
+>>>> @@ -1174,6 +1187,8 @@ static void its_cpu_init_lpis(void)
+>>>>  
+>>>>  	/* Make sure the GIC has seen the above */
+>>>>  	dsb(sy);
+>>>> +
+>>>> +	return 0;
+>>>>  }
+>>>>  
+>>>>  static void its_cpu_init_collection(void)
+>>>> @@ -1789,12 +1804,17 @@ static bool gic_rdists_supports_plpis(void)
+>>>>  
+>>>>  int its_cpu_init(void)
+>>>>  {
+>>>> +	int ret;
+>>>> +
+>>>>  	if (!list_empty(&its_nodes)) {
+>>>>  		if (!gic_rdists_supports_plpis()) {
+>>>>  			pr_info("CPU%d: LPIs not supported\n", smp_processor_id());
+>>>>  			return -ENXIO;
+>>>>  		}
+>>>> -		its_cpu_init_lpis();
+>>>> +		ret = its_cpu_init_lpis();
+>>>> +		if (ret)
+>>>> +			return ret;
+>>> This is not enough, you have to skip all the disabled collections
+>>> inside the function its_set_affinity() when mapping an event to
+>>> collection. Otherwise all LPIs might mapped to collection 0, causes
+>>> the possibility of memory corruption by GICR hardware on updating
+>>> incorrect PENDING table.
+>> I'm not sure I understand what you mean here.
 > 
-> ---
->  drivers/fpga/Kconfig               |   9 +++
->  drivers/fpga/Makefile              |   1 +
->  drivers/fpga/xilinx-pr-decoupler.c | 147 +++++++++++++++++++++++++++++++++++++
->  3 files changed, 157 insertions(+)
->  create mode 100644 drivers/fpga/xilinx-pr-decoupler.c
+> Don't initialize a collection in case of errors is the right approach
+> but rest of the ITS driver should not be accessing the disabled
+> collection. It would be better to keep some kind of validation check
+> inside function its_set_affinity().
 > 
-> diff --git a/drivers/fpga/Kconfig b/drivers/fpga/Kconfig
-> index 967cda4..e42c7dc 100644
-> --- a/drivers/fpga/Kconfig
-> +++ b/drivers/fpga/Kconfig
-> @@ -69,6 +69,15 @@ config ALTERA_FREEZE_BRIDGE
->  	  isolate one region of the FPGA from the busses while that
->  	  region is being reprogrammed.
->  
-> +config XILINX_PR_DECOUPLER
-> +	tristate "Xilinx LogiCORE PR Decoupler"
-> +	depends on FPGA_BRIDGE
-> +	help
-> +	  Say Y to enable drivers for Xilinx LogiCORE PR Decoupler.
-> +	  The PR Decoupler exists in the FPGA fabric to isolate one
-> +	  region of the FPGA from the busses while that region is
-> +	  being reprogrammed during partial reconfig.
-> +
->  endif # FPGA
->  
->  endmenu
-> diff --git a/drivers/fpga/Makefile b/drivers/fpga/Makefile
-> index cc0d364..3f04bcf 100644
-> --- a/drivers/fpga/Makefile
-> +++ b/drivers/fpga/Makefile
-> @@ -15,6 +15,7 @@ obj-$(CONFIG_FPGA_MGR_ZYNQ_FPGA)	+= zynq-fpga.o
->  obj-$(CONFIG_FPGA_BRIDGE)		+= fpga-bridge.o
->  obj-$(CONFIG_SOCFPGA_FPGA_BRIDGE)	+= altera-hps2fpga.o altera-fpga2sdram.o
->  obj-$(CONFIG_ALTERA_FREEZE_BRIDGE)	+= altera-freeze-bridge.o
-> +obj-$(CONFIG_XILINX_PR_DECOUPLER)	+= xilinx-pr-decoupler.o
->  
->  # High Level Interfaces
->  obj-$(CONFIG_FPGA_REGION)		+= fpga-region.o
-> diff --git a/drivers/fpga/xilinx-pr-decoupler.c b/drivers/fpga/xilinx-pr-decoupler.c
-> new file mode 100644
-> index 0000000..761700c
-> --- /dev/null
-> +++ b/drivers/fpga/xilinx-pr-decoupler.c
-> @@ -0,0 +1,147 @@
-> +/*
-> + * Copyright (c) 2017, National Instruments Corp.
-> + * Copyright (c) 2017, Xilix Inc
-> + *
-> + * FPGA Bridge Driver for the Xilinx LogiCORE Partial Reconfiguration
-> + * Decoupler IP Core.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; version 2 of the License.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include <linux/clk.h>
-> +#include <linux/io.h>
-> +#include <linux/kernel.h>
-> +#include <linux/of_device.h>
-> +#include <linux/module.h>
-> +#include <linux/fpga/fpga-bridge.h>
-> +
-> +#define CTRL_CMD_DECOUPLE	BIT(0)
-> +#define CTRL_CMD_COUPLE		~BIT(0)
-> +
-> +struct xlnx_pr_decoupler_data {
-> +	void __iomem *io_base;
-> +	struct clk *clk;
-> +};
-> +
-> +static int xlnx_pr_decoupler_enable_set(struct fpga_bridge *bridge, bool enable)
-> +{
-> +	int err;
-> +	struct xlnx_pr_decoupler_data *priv = bridge->priv;
-> +
-> +	err = clk_enable(priv->clk);
-> +	if (err)
-> +		return err;
-> +
-> +	if (enable)
-> +		writel(CTRL_CMD_COUPLE, priv->io_base);
-> +	else
-> +		writel(CTRL_CMD_DECOUPLE, priv->io_base);
-> +
-> +	clk_disable(priv->clk);
-> +
-> +	return 0;
-> +}
-> +
-> +static int xlnx_pr_decoupler_enable_show(struct fpga_bridge *bridge)
-> +{
-> +	const struct xlnx_pr_decoupler_data *priv = bridge->priv;
-> +	u32 status;
-> +	int err;
-> +
-> +	err = clk_enable(priv->clk);
-> +	if (err)
-> +		return err;
-> +
-> +	status = readl(priv->io_base);
-> +
-> +	clk_disable(priv->clk);
-> +
-> +	return !status;
-> +}
-> +
-> +static struct fpga_bridge_ops xlnx_pr_decoupler_br_ops = {
-> +	.enable_set = xlnx_pr_decoupler_enable_set,
-> +	.enable_show = xlnx_pr_decoupler_enable_show,
-> +};
-> +
-> +static const struct of_device_id xlnx_pr_decoupler_of_match[] = {
-> +	{ .compatible = "xlnx,pr-decoupler-1.00", },
+> static int its_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
+>                 bool force)
+> {
+> ...
+> 
+>     target_col = &its_dev->its->collections[cpu];
+>     its_send_movi(its_dev, target_col, id);
+>     its_dev->event_map.col_map[id] = cpu;
+> 
+>     return IRQ_SET_MASK_OK_DONE;
+> }
 
-I would add here that generic compatible string too.
+I think the big picture is to disable the ITS *and* not present it as an
+MSI controller to the rest of the system. We should not even get here if
+we find that we're in an unsafe situation. This may require significant
+changes to the way we initialize the ITS.
 
-Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+>> But in any case, memory corruption may already have happened, and you
+>> have no idea where. In general, finding LPIs being already enabled is
+>> terminally unsafe unless we can key it on a particular implementation.
+>>
+> 
+> Yes, because we are not disabling the ITS hardware in the first
+> kernel. Better approach would be disable ITS hardware during the
+> kernel shutdown path, but not during driver probe time. This way we
+> can guarantee no memory corruption happens in the second (KEXEC0ed)
+> kernel.
+
+Again, that's a different thing altogether. I've long been toying with
+the idea of having a .reset irqchip operation which could be called as
+we're about to kexec another payload. This would nicely replace the
+hacks we currently have to try and shut off interrupts. I'll try to cook
+something.
 
 Thanks,
-Michal
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
