@@ -1,60 +1,73 @@
-From: andy@greyhouse.net (Andy Gospodarek)
-Date: Fri, 17 Mar 2017 13:43:35 -0400
-Subject: [RFC arm64] samples/bpf: explicitly exclude sysreg sections with
- asm macros
-In-Reply-To: <383e1626-335b-01fe-5921-5956d7201cf4@arm.com>
-References: <20170310192656.GA13928@C02RW35GFVH8>
- <20170310204112.GA21382@leverpostej>
- <20170315183130.GB32819@C02RW35GFVH8.dhcp.broadcom.net>
- <20170315191741.GB29452@leverpostej>
- <20170315205404.GA43995@C02RW35GFVH8.dhcp.broadcom.net>
- <20170316104204.GA31101@leverpostej>
- <20170316210454.GA53792@C02RW35GFVH8.dhcp.broadcom.net>
- <e842a237-9206-99ed-624b-4f3cf15cc557@arm.com>
- <20170317135836.GA58086@C02RW35GFVH8.dhcp.broadcom.net>
- <383e1626-335b-01fe-5921-5956d7201cf4@arm.com>
-Message-ID: <20170317174335.GA63516@C02RW35GFVH8.dhcp.broadcom.net>
+From: mchehab@s-opensource.com (Mauro Carvalho Chehab)
+Date: Fri, 17 Mar 2017 14:49:27 -0300
+Subject: [PATCH v4 14/36] [media] v4l2-mc: add a function to inherit
+ controls from a pipeline
+In-Reply-To: <20170317121608.GE21222@n2100.armlinux.org.uk>
+References: <20170310140124.GV21222@n2100.armlinux.org.uk>
+ <cc8900b0-c091-b14b-96f4-01f8fa72431c@xs4all.nl>
+ <20170310125342.7f047acf@vento.lan>
+ <20170310223714.GI3220@valkosipuli.retiisi.org.uk>
+ <20170311082549.576531d0@vento.lan>
+ <20170313124621.GA10701@valkosipuli.retiisi.org.uk>
+ <20170314004533.3b3cd44b@vento.lan>
+ <e0a6c60b-1735-de0b-21f4-d8c3f4b3f10f@xs4all.nl>
+ <20170317114203.GZ21222@n2100.armlinux.org.uk>
+ <1489752127.2905.49.camel@pengutronix.de>
+ <20170317121608.GE21222@n2100.armlinux.org.uk>
+Message-ID: <20170317144927.1298d5b3@vento.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 17, 2017 at 04:57:20PM +0000, Robin Murphy wrote:
-> On 17/03/17 13:58, Andy Gospodarek wrote:
-> > On Fri, Mar 17, 2017 at 11:11:59AM +0000, Robin Murphy wrote:
-> >> On 16/03/17 21:04, Andy Gospodarek wrote:
-> >>>
-> >>> While I generally agree isn't the entire reason this inline asm exists
-> >>> -- to fix a binutils issue?  :-)
-> >>
-> >> Binutils is required to build the arm64 kernel; if certain versions of
-> >> binutils packaged by arm64 distros can't cope with certain instructions
-> >> we need to use, we have to do what we can to make it build. However, if
-> >> LLVM cannot cope with inline assembly on arm64, then it's pretty clear
-> >> that the kernel cannot be built with LLVM anyway, thus there is nothing
-> >> to work around in that regard. Sorry, you've got a straw man there ;)
-> > 
-> > I know, right?  I'll see if I can come up with something that appears to
-> > be less fragile and/or intrusive to the arm64 arch code as I'd really
-> > like to stop carrying a patch in my devel tree for this.
-> 
-> I'm honestly not sure if I'm serious or not, but:
-> 
-> diff --git a/samples/bpf/Makefile b/samples/bpf/Makefile
-> index 72c58675973e..f52ebad7b096 100644
-> --- a/samples/bpf/Makefile
-> +++ b/samples/bpf/Makefile
-> @@ -154,6 +154,6 @@ $(src)/*.c: verify_target_bpf
->  # useless for BPF samples.
->  $(obj)/%.o: $(src)/%.c
->         $(CLANG) $(NOSTDINC_FLAGS) $(LINUXINCLUDE) $(EXTRA_CFLAGS) \
-> -               -D__KERNEL__ -D__ASM_SYSREG_H -Wno-unused-value
-> -Wno-pointer-sign \
-> +               -D__KERNEL__ -D'asm(...)' -Wno-unused-value
-> -Wno-pointer-sign \
->                 -Wno-compare-distinct-pointer-types \
->                 -O2 -emit-llvm -c $< -o -| $(LLC) -march=bpf
-> -filetype=obj -o $@
-> 
+Em Fri, 17 Mar 2017 12:16:08 +0000
+Russell King - ARM Linux <linux@armlinux.org.uk> escreveu:
 
-Hahahaha, I know what you mean.
+> On Fri, Mar 17, 2017 at 01:02:07PM +0100, Philipp Zabel wrote:
+> > I think most of the simple, fixed pipeline use cases could be handled by
+> > libv4l2, by allowing to pass a v4l2 subdevice path to v4l2_open. If that
+> > function internally would set up the media links to the
+> > nearest /dev/video interface, propagate format, resolution and frame
+> > intervals if necessary, and return an fd to the video device, there'd be
+> > no additional complexity for the users beyond selecting the v4l2_subdev
+> > instead of the video device.  
+> 
+> ... which would then require gstreamer to be modified too. The gstreamer
+> v4l2 plugin looks for /dev/video* or /dev/v4l2/video* devices and monitors
+> these for changes, so gstreamer applications know which capture devices
+> are available:
+> 
+>   const gchar *paths[] = { "/dev", "/dev/v4l2", NULL };
+>   const gchar *names[] = { "video", NULL };
+> 
+>   /* Add some depedency, so the dynamic features get updated upon changes in
+>    * /dev/video* */
+>   gst_plugin_add_dependency (plugin,
+>       NULL, paths, names, GST_PLUGIN_DEPENDENCY_FLAG_FILE_NAME_IS_PREFIX);
+> 
+> I haven't checked yet whether sys/v4l2/gstv4l2deviceprovider.c knows
+> anything about the v4l2 subdevs.
 
-Scarily, I had a similar thought.  :-) 
+Not only gstreamer do that, but all simple V4L2 applications, although
+on most of them, you can either pass a command line argument or setup
+the patch via GUI.
+
+Btw, I've no idea from where gstreamer took /dev/v4l2 :-)
+I'm yet to find a distribution using it.
+
+On the other hand, /dev/v4l/by-patch and /dev/v4l/by-id are usual directories
+where V4L2 devices can be found, and should provide persistent names. So, IMHO,
+gst should prefer those names, when they exist:
+
+$ tree /dev/v4l
+/dev/v4l
+??? by-id
+??? ??? usb-046d_HD_Pro_Webcam_C920_55DA1CCF-video-index0 -> ../../video1
+??? ??? usb-Sunplus_mMobile_Inc_USB_Web-CAM-video-index0 -> ../../video0
+??? by-path
+    ??? platform-3f980000.usb-usb-0:1.2:1.0-video-index0 -> ../../video1
+    ??? platform-3f980000.usb-usb-0:1.5:1.0-video-index0 -> ../../video0
+
+
+
+
+Thanks,
+Mauro
