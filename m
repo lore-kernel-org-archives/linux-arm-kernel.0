@@ -1,68 +1,33 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 17 Mar 2017 15:19:49 +0000
-Subject: [PATCH v3 09/19] KVM: arm64: ITS: Interpret MAPD ITT_addr field
-In-Reply-To: <1488800074-21991-10-git-send-email-eric.auger@redhat.com>
-References: <1488800074-21991-1-git-send-email-eric.auger@redhat.com>
- <1488800074-21991-10-git-send-email-eric.auger@redhat.com>
-Message-ID: <4ba972ac-1287-b898-74e7-de74106c49fd@arm.com>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Fri, 17 Mar 2017 23:22:24 +0800
+Subject: [PATCH v3 4/5] clk: hi6220: add debug APB clock
+In-Reply-To: <20170303235808.GX25384@codeaurora.org>
+References: <1488520809-31670-1-git-send-email-leo.yan@linaro.org>
+ <1488520809-31670-5-git-send-email-leo.yan@linaro.org>
+ <20170303235808.GX25384@codeaurora.org>
+Message-ID: <20170317152224.GB2020@leoy-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/03/17 11:34, Eric Auger wrote:
-> Up to now the MAPD ITT_addr had been ignored. We will need it
-> for save/restore. Let's record it in the its_device struct.
+Hi Stephen,
+
+On Fri, Mar 03, 2017 at 03:58:08PM -0800, Stephen Boyd wrote:
+> On 03/03, Leo Yan wrote:
+> > The debug APB clock is absent in hi6220 driver, so this patch is to add
+> > support for it.
+> > 
+> > Signed-off-by: Leo Yan <leo.yan@linaro.org>
+> > ---
 > 
-> Signed-off-by: Eric Auger <eric.auger@redhat.com>
-> ---
->  virt/kvm/arm/vgic/vgic-its.c | 4 ++++
->  1 file changed, 4 insertions(+)
-> 
-> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-> index 56bcd92..694023f 100644
-> --- a/virt/kvm/arm/vgic/vgic-its.c
-> +++ b/virt/kvm/arm/vgic/vgic-its.c
-> @@ -99,6 +99,7 @@ struct its_device {
->  
->  	/* the head for the list of ITTEs */
->  	struct list_head itt_head;
-> +	gpa_t itt_addr;
->  	u32 nb_eventid_bits;
->  	u32 device_id;
->  };
-> @@ -562,6 +563,7 @@ static u64 its_cmd_mask_field(u64 *its_cmd, int word, int shift, int size)
->  #define its_cmd_get_collection(cmd)	its_cmd_mask_field(cmd, 2,  0, 16)
-                            --> here?
->  #define its_cmd_get_target_addr(cmd)	its_cmd_mask_field(cmd, 2, 16, 32)
->  #define its_cmd_get_validbit(cmd)	its_cmd_mask_field(cmd, 2, 63,  1)
-> +#define its_cmd_get_ittaddr(cmd)	its_cmd_mask_field(cmd, 2, 8,  44)
+> Acked-by: Stephen Boyd <sboyd@codeaurora.org>
 
-Can you please move this up ^
-And adjust the spacing to align the commas?
-(heavily influenced by suppressed OCD today ;-)
+I found this patch introduces regression on Hikey, after I enable
+CPUIdle with this patch the kernel booting will hang. I committed a
+new version patch:
+https://patchwork.kernel.org/patch/9630931/
 
->  #define its_cmd_get_size(cmd)		its_cmd_mask_field(cmd, 1, 0,  5)
->  
->  /*
-> @@ -832,6 +834,7 @@ static int vgic_its_cmd_handle_mapd(struct kvm *kvm, struct vgic_its *its,
->  	u32 device_id = its_cmd_get_deviceid(its_cmd);
->  	bool valid = its_cmd_get_validbit(its_cmd);
->  	size_t size = its_cmd_get_size(its_cmd);
-> +	gpa_t itt_addr = its_cmd_get_ittaddr(its_cmd);
+So please drop v3 patch and help review v4 patch. Really Sorry for
+inconvinence.
 
-And do the "<< 8" already here?
-
-Cheers,
-Andre.
-
->  	struct its_device *device;
->  
->  	if (!vgic_its_check_id(its, its->baser_device_table, device_id))
-> @@ -862,6 +865,7 @@ static int vgic_its_cmd_handle_mapd(struct kvm *kvm, struct vgic_its *its,
->  		return -ENOMEM;
->  
->  	device->device_id = device_id;
-> +	device->itt_addr = itt_addr << 8;
->  	device->nb_eventid_bits = size + 1;
->  
->  	INIT_LIST_HEAD(&device->itt_head);
-> 
+Thanks,
+Leo Yan
