@@ -1,14 +1,15 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Fri, 17 Mar 2017 21:55:05 +0000
-Subject: Applied "spi: loopback-test: fix compile error on x86" to the spi tree
-In-Reply-To: <1489748878-15020-1-git-send-email-fisaksen@baylibre.com>
-Message-ID: <E1cozpx-0002AM-Pb@debutante>
+Date: Fri, 17 Mar 2017 22:01:10 +0000
+Subject: Applied "spi: davinci: add comment about dummy tx buffer usage" to
+ the spi tree
+In-Reply-To: <1489765270-17950-1-git-send-email-fisaksen@baylibre.com>
+Message-ID: <E1cozvq-0002ly-L9@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   spi: loopback-test: fix compile error on x86
+   spi: davinci: add comment about dummy tx buffer usage
 
 has been applied to the spi tree at
 
@@ -33,31 +34,36 @@ to this mail.
 Thanks,
 Mark
 
->From e542f7e63cb17242fcfc1be5edd69532cf434697 Mon Sep 17 00:00:00 2001
+>From 1234e8398fe03267bf2e353e36825dbd0abc2fc6 Mon Sep 17 00:00:00 2001
 From: Frode Isaksen <fisaksen@baylibre.com>
-Date: Fri, 17 Mar 2017 12:07:58 +0100
-Subject: [PATCH] spi: loopback-test: fix compile error on x86
+Date: Fri, 17 Mar 2017 16:41:10 +0100
+Subject: [PATCH] spi: davinci: add comment about dummy tx buffer usage
 
-Fix compile error caused by missing vmalloc() definition
-on x86 (and maybe other platforms) by including vmalloc.h.
+Add explanation about using the the rx buffer as the
+dummy tx buffer.
 
 Signed-off-by: Frode Isaksen <fisaksen@baylibre.com>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- drivers/spi/spi-loopback-test.c | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/spi/spi-davinci.c | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/spi/spi-loopback-test.c b/drivers/spi/spi-loopback-test.c
-index 35960515382e..4e7843ec8aac 100644
---- a/drivers/spi/spi-loopback-test.c
-+++ b/drivers/spi/spi-loopback-test.c
-@@ -25,6 +25,7 @@
- #include <linux/module.h>
- #include <linux/of_device.h>
- #include <linux/printk.h>
-+#include <linux/vmalloc.h>
- #include <linux/spi/spi.h>
+diff --git a/drivers/spi/spi-davinci.c b/drivers/spi/spi-davinci.c
+index f37bbdd18d61..595acdcfc7d0 100644
+--- a/drivers/spi/spi-davinci.c
++++ b/drivers/spi/spi-davinci.c
+@@ -660,7 +660,11 @@ static int davinci_spi_bufs(struct spi_device *spi, struct spi_transfer *t)
+ 			goto err_desc;
  
- #include "spi-test.h"
+ 		if (!t->tx_buf) {
+-			/* use rx buffer as dummy tx buffer */
++			/* To avoid errors when doing rx-only transfers with
++			 * many SG entries (> 20), use the rx buffer as the
++			 * dummy tx buffer so that dma reloads are done at the
++			 * same time for rx and tx.
++			 */
+ 			t->tx_sg.sgl = t->rx_sg.sgl;
+ 			t->tx_sg.nents = t->rx_sg.nents;
+ 		}
 -- 
 2.11.0
