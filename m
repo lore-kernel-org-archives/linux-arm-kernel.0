@@ -1,157 +1,93 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 17 Mar 2017 17:01:03 +0000
-Subject: [PATCH v3 12/19] KVM: arm64: ITS: vgic_its_alloc_ite/device
-In-Reply-To: <1488800074-21991-13-git-send-email-eric.auger@redhat.com>
-References: <1488800074-21991-1-git-send-email-eric.auger@redhat.com>
- <1488800074-21991-13-git-send-email-eric.auger@redhat.com>
-Message-ID: <f913a9be-d994-9c18-3a30-e60e1778480a@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 17 Mar 2017 16:59:28 +0000
+Subject: [PATCH v33 00/14] add kdump support
+In-Reply-To: <20170317162421.GK5940@leverpostej>
+References: <20170315095656.24992-1-takahiro.akashi@linaro.org>
+ <1489750991.17202.40.camel@infradead.org>
+ <1489759373.17202.44.camel@infradead.org> <20170317153358.GI5940@leverpostej>
+ <1489765628.17202.59.camel@infradead.org> <20170317162421.GK5940@leverpostej>
+Message-ID: <e75aaa3f-0d87-2523-d7d7-cef56e5bd480@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 06/03/17 11:34, Eric Auger wrote:
-> Add two new helpers to allocate an its ite and an its device.
-> This will avoid duplication on restore path.
+On 17/03/17 16:24, Mark Rutland wrote:
+> On Fri, Mar 17, 2017 at 03:47:08PM +0000, David Woodhouse wrote:
+>> On Fri, 2017-03-17 at 15:33 +0000, Mark Rutland wrote:
+>> No, in this case the CPUs *were* offlined correctly, or at least "as
+>> designed", by smp_send_crash_stop(). And if that hadn't worked, as
+>> verified by *its* synchronisation method based on the atomic_t
+>> waiting_for_crash_ipi, then *it* would have complained for itself:
+>>
+>> 	if (atomic_read(&waiting_for_crash_ipi) > 0)
+>> 		pr_warning("SMP: failed to stop secondary CPUs %*pbl\n",
+>> 			   cpumask_pr_args(cpu_online_mask));
+>>
+>> It's just that smp_send_crash_stop() (or more specifically
+>> ipi_cpu_crash_stop()) doesn't touch the online cpu mask. Unlike the
+>> ARM32 equivalent function machien_crash_nonpanic_core(), which does.
+>>
+>> It wasn't clear if that was *intentional*, to allow the original
+>> contents of the online mask before the crash to be seen in the
+>> resulting vmcore... or purely an accident. 
 > 
-> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+> Looking at this, there's a larger mess.
 > 
-> ---
+> The waiting_for_crash_ipi dance only tells us if CPUs have taken the
+> IPI, not wether they've been offlined (i.e. actually left the kernel).
+> We need something closer to the usual cpu_{disable,die,kill} dance,
+> clearing online as appropriate.
 > 
-> v1 -> v2:
-> - report itt_size fix and remove ITE_SIZE
-> - s/itte/ite/g
-> ---
->  virt/kvm/arm/vgic/vgic-its.c | 70 +++++++++++++++++++++++++++++---------------
->  1 file changed, 47 insertions(+), 23 deletions(-)
+> If CPUs haven't left the kernel, we still need to warn about that.
 > 
-> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-> index dd7545a..9792110 100644
-> --- a/virt/kvm/arm/vgic/vgic-its.c
-> +++ b/virt/kvm/arm/vgic/vgic-its.c
-> @@ -734,6 +734,26 @@ static void vgic_its_free_collection(struct vgic_its *its, u32 coll_id)
->  	kfree(collection);
->  }
->  
-
-Can you please propagate the:
-"Must be called with its_lock mutex held." comment here?
-
-> +static int vgic_its_alloc_ite(struct its_device *device,
-> +			       struct its_ite **itep,
-> +			       struct its_collection *collection,
-> +			       u32 lpi_id, u32 event_id)
-> +{
-> +	struct its_ite *ite;
-> +
-> +	ite = kzalloc(sizeof(ite), GFP_KERNEL);
-
-That should be sizeof(*ite) or sizeof(struct its_ite).
-
-> +	if (!ite)
-> +		return -ENOMEM;
-> +
-> +	ite->event_id	= event_id;
-> +	ite->collection = collection;
-> +	ite->lpi = lpi_id;
-> +
-> +	list_add_tail(&ite->ite_list, &device->itt_head);
-> +	*itep = ite;
-> +	return 0;
-> +}
-> +
->  /*
->   * The MAPTI and MAPI commands map LPIs to ITTEs.
->   * Must be called with its_lock mutex held.
-> @@ -747,7 +767,7 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
->  	struct its_ite *ite;
->  	struct its_device *device;
->  	struct its_collection *collection, *new_coll = NULL;
-> -	int lpi_nr;
-> +	int lpi_nr, ret;
->  	struct vgic_irq *irq;
->  
->  	device = find_its_device(its, device_id);
-> @@ -777,19 +797,13 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
->  		new_coll = collection;
->  	}
->  
-> -	ite = kzalloc(sizeof(struct its_ite), GFP_KERNEL);
-> -	if (!ite) {
-> +	ret = vgic_its_alloc_ite(device, &ite, collection, lpi_nr, event_id);
-> +	if (ret) {
->  		if (new_coll)
->  			vgic_its_free_collection(its, coll_id);
-> -		return -ENOMEM;
-> +		return ret;
->  	}
->  
-> -	ite->event_id	= event_id;
-> -	list_add_tail(&ite->ite_list, &device->itt_head);
-> -
-> -	ite->collection = collection;
-> -	ite->lpi = lpi_nr;
-> -
->  	irq = vgic_add_lpi(kvm, lpi_nr);
->  	if (IS_ERR(irq)) {
->  		if (new_coll)
-> @@ -828,6 +842,28 @@ static void vgic_its_unmap_device(struct kvm *kvm, struct its_device *device)
->  	kfree(device);
->  }
->  
-> +static int vgic_its_alloc_device(struct vgic_its *its,
-> +				 struct its_device **devp,
-> +				 u32 device_id, gpa_t itt_addr_field,
-> +				 size_t size_field)
-> +{
-> +	struct its_device *device;
-> +
-> +	device = kzalloc(sizeof(*device), GFP_KERNEL);
-> +	if (!device)
-> +		return -ENOMEM;
-> +
-> +	device->device_id = device_id;
-> +	device->itt_addr = itt_addr_field << 8;
-> +	device->nb_eventid_bits = size_field + 1;
-
-I'd rather see these command buffer entry decodings done at the source,
-not here (though this isn't in this patch).
-
-The rest looks fine.
-
-Cheers,
-Andre
-
-> +	INIT_LIST_HEAD(&device->itt_head);
-> +
-> +	list_add_tail(&device->dev_list, &its->device_list);
-> +	*devp = device;
-> +
-> +	return 0;
-> +}
-> +
->  /*
->   * MAPD maps or unmaps a device ID to Interrupt Translation Tables (ITTs).
->   * Must be called with the its_lock mutex held.
-> @@ -864,19 +900,7 @@ static int vgic_its_cmd_handle_mapd(struct kvm *kvm, struct vgic_its *its,
->  	if (!valid)
->  		return 0;
->  
-> -	device = kzalloc(sizeof(struct its_device), GFP_KERNEL);
-> -	if (!device)
-> -		return -ENOMEM;
-> -
-> -	device->device_id = device_id;
-> -	device->itt_addr = itt_addr << 8;
-> -	device->nb_eventid_bits = size + 1;
-> -
-> -	INIT_LIST_HEAD(&device->itt_head);
-> -
-> -	list_add_tail(&device->dev_list, &its->device_list);
-> -
-> -	return 0;
-> +	return vgic_its_alloc_device(its, &device, device_id, itt_addr, size);
->  }
->  
->  /*
+>> FWIW if I trigger a crash on CPU 1 my kdump (still 4.9.8+v32) doesn't work.
+>> I end up booting the kdump kernel on CPU#1 and then it gets distinctly unhappy...
+>>
+>> [    0.000000] Booting Linux on physical CPU 0x1
+>> ...
+>> [    0.017125] Detected PIPT I-cache on CPU1
+>> [    0.017138] GICv3: CPU1: found redistributor 0 region 0:0x00000000f0280000
+>> [    0.017147] CPU1: Booted secondary processor [411fd073]
+>> [    0.017339] Detected PIPT I-cache on CPU2
+>> [    0.017347] GICv3: CPU2: found redistributor 2 region 0:0x00000000f02c0000
+>> [    0.017354] CPU2: Booted secondary processor [411fd073]
+>> [    0.017537] Detected PIPT I-cache on CPU3
+>> [    0.017545] GICv3: CPU3: found redistributor 3 region 0:0x00000000f02e0000
+>> [    0.017551] CPU3: Booted secondary processor [411fd073]
+>> [    0.017576] Brought up 4 CPUs
+>> [    0.017587] SMP: Total of 4 processors activated.
+>> ...
+>> [   31.745809] INFO: rcu_sched detected stalls on CPUs/tasks:
+>> [   31.751299] 	1-...: (30 GPs behind) idle=c90/0/0 softirq=0/0 fqs=0 
+>> [   31.757557] 	2-...: (30 GPs behind) idle=608/0/0 softirq=0/0 fqs=0 
+>> [   31.763814] 	3-...: (30 GPs behind) idle=604/0/0 softirq=0/0 fqs=0 
+>> [   31.770069] 	(detected by 0, t=5252 jiffies, g=-270, c=-271, q=0)
+>> [   31.776161] Task dump for CPU 1:
+>> [   31.779381] swapper/1       R  running task        0     0      1 0x00000080
+>> [   31.786446] Task dump for CPU 2:
+>> [   31.789666] swapper/2       R  running task        0     0      1 0x00000080
+>> [   31.796725] Task dump for CPU 3:
+>> [   31.799945] swapper/3       R  running task        0     0      1 0x00000080
+>>
+>> Is some of that platform-specific?
 > 
+> That sounds like timer interrupts aren't being taken.
+> 
+> Given that the CPUs have come up, my suspicion would be that the GIC's
+> been left in some odd state, that the kdump kernel hasn't managed to
+> recover from.
+> 
+> Marc may have an idea.
+
+I thought kdump was UP only? Anyway, this doesn't look too good.
+
+It would be interesting to find out whether we're still taking
+interrupts. Also, being able to reproduce this on mainline would be useful.
+
+I wonder if we don't have a bug when booting on something other than
+CPU#0, possibly on a GICv3 platform... I'll give it a go.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
