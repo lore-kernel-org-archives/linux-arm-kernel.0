@@ -1,70 +1,58 @@
-From: gerg@linux-m68k.org (Greg Ungerer)
-Date: Fri, 17 Mar 2017 15:03:03 +1000
-Subject: [PATCH 2/2] spi: imx: fix use of native chip-selects with devicetree
-In-Reply-To: <1489726983-17706-1-git-send-email-gerg@linux-m68k.org>
-References: <1489726983-17706-1-git-send-email-gerg@linux-m68k.org>
-Message-ID: <1489726983-17706-3-git-send-email-gerg@linux-m68k.org>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Fri, 17 Mar 2017 14:04:21 +0900
+Subject: [PATCH v3] Revert "tty: serial: pl011: add ttyAMA for matching
+ pl011 console"
+In-Reply-To: <008d062d-1095-5a65-3a69-33bee1f648d7@gmail.com>
+References: <20170301122602.30025-1-aleksey.makarov@linaro.org>
+ <20170301152304.29635-1-aleksey.makarov@linaro.org>
+ <d1e067f1-e82f-7692-bcc2-e3549887be63@arm.com>
+ <CA+7sy7C6zp3giR+ypFXqbsNY_C3ggUgegS1zEWOAybkRBtCn4w@mail.gmail.com>
+ <008d062d-1095-5a65-3a69-33bee1f648d7@gmail.com>
+Message-ID: <20170317050421.GA9400@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The commonly used mechanism of specifying the hardware or native
-chip-select on an SPI device in devicetree (that is "cs-gpios = <0>")
-does not result in the native chip-select being configured for use.
-So external SPI devices that require use of the native chip-select
-will not work.
+On Thu, Mar 16, 2017 at 12:31:53PM +0300, Aleksey Makarov wrote:
+> 
+> 
+> On 03/16/2017 10:11 AM, Jayachandran C. wrote:
+> > Hi Greg,
+> > 
+> > On Tue, Mar 14, 2017 at 9:44 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+> >>
+> >>
+> >> On 01/03/17 15:23, Aleksey Makarov wrote:
+> >>> The original patch makes the condition always true, so it is wrong.
+> >>>
+> >>> It masks (but not fixes) the bug described in the commit message
+> >>> but introduces a regression (no console is selected by SPCR)
+> >>> in regular (no 'console=ttyAMA') case.
+> >>>
+> >>> s/||/&&/ would not fix the problem as the root cause was identified
+> >>> incorrectly.
+> >>>
+> >>> This reverts commit aea9a80ba98a0c9b4de88850260e9fbdcc98360b.
+> >>>
+> >>
+> >> Sorry for that, I will test your patches and respond to that. For this
+> >> patch:
+> >>
+> >> Acked-by: Sudeep Holla <sudeep.holla@arm.com>
+> >>
+> > 
+> > This fixes a regression I see in v4.11-rc2
+> > 
+> > Tested-by: Jayachandran C <jnair@caviumnetworks.com>
+> > 
+> > I don't see it in the tty/serial tree yet
+> 
+> It's commit 713b93f1b849 from tty-next branch of 
+> https://git.kernel.org/pub/scm/linux/kernel/git/gregkh/tty.git
+> 
+> So it looks like it is scheduled for 4.12
+> 
+> Greg, this is a fix for regression.  Can it be applied to 4.11-rcX?
 
-You can successfully specify native chip-selects if using a platform
-setup by specifying the cs-gpio as negative offset by 32. And that
-works correctly. You cannot use the same method in devicetree.
+Yes, will do that now, thanks.
 
-The logic in the spi-imx.c driver during probe uses core spi function
-of_spi_register_master() in spi.c to parse the "cs-gpios" devicetree tag.
-For valid GPIO values that will be recorded for use, all other entries in
-the cs_gpios list will be set to -ENOENT. So entries like "<0>" will be
-set to -ENOENT in the cs_gpios list.
-
-When the SPI device registers are setup the code will use the GPIO
-listed in the cs_gpios list for the desired chip-select. If the cs_gpio
-is less then 0 then it is intended to be for a native chip-select, and
-its cs_gpio value is added to 32 to get the chipselect number to use.
-Problem is that with devicetree this can only ever be -ENOENT (which
-is -2), and that alone results in an invalid chip-select number. But also
-doesn't allow selection of the native chip-select at all.
-
-To fix, if the cs_gpio specified for this spi device is not a
-valid GPIO then use the "chip_select" (that is the native chip-select
-number) for hardware setup.
-
-Signed-off-by: Greg Ungerer <gerg@linux-m68k.org>
----
- drivers/spi/spi-imx.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/spi/spi-imx.c b/drivers/spi/spi-imx.c
-index 9a7c62f..dbb482c 100644
---- a/drivers/spi/spi-imx.c
-+++ b/drivers/spi/spi-imx.c
-@@ -516,8 +516,8 @@ static int mx31_config(struct spi_device *spi, struct spi_imx_config *config)
- 		reg |= MX31_CSPICTRL_POL;
- 	if (spi->mode & SPI_CS_HIGH)
- 		reg |= MX31_CSPICTRL_SSPOL;
--	if (spi->cs_gpio < 0)
--		reg |= (spi->cs_gpio + 32) <<
-+	if (!gpio_is_valid(spi->cs_gpio))
-+		reg |= (spi->chip_select) <<
- 			(is_imx35_cspi(spi_imx) ? MX35_CSPICTRL_CS_SHIFT :
- 						  MX31_CSPICTRL_CS_SHIFT);
- 
-@@ -608,8 +608,8 @@ static int mx21_config(struct spi_device *spi, struct spi_imx_config *config)
- 		reg |= MX21_CSPICTRL_POL;
- 	if (spi->mode & SPI_CS_HIGH)
- 		reg |= MX21_CSPICTRL_SSPOL;
--	if (spi->cs_gpio < 0)
--		reg |= (spi->cs_gpio + 32) << MX21_CSPICTRL_CS_SHIFT;
-+	if (!gpio_is_valid(spi->cs_gpio))
-+		reg |= spi->chip_select << MX21_CSPICTRL_CS_SHIFT;
- 
- 	writel(reg, spi_imx->base + MXC_CSPICTRL);
- 
--- 
-1.9.1
+greg k-h
