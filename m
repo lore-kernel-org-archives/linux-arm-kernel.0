@@ -1,55 +1,53 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Fri, 17 Mar 2017 16:47:54 +0000
-Subject: [v3 3/5] coresight: add support for debug module
-In-Reply-To: <20170317162836.GD2020@leoy-linaro>
-References: <1488520809-31670-4-git-send-email-leo.yan@linaro.org>
- <011fdac0-59bf-b539-2de3-0b59a41bc922@arm.com>
- <20170309175915.GA964@leoy-linaro>
- <3f27efee-3b63-81fd-eb96-73fd7e6f5e92@arm.com>
- <20170313165600.GB32431@linaro.org>
- <516f8989-4dde-2686-d549-0761feb14d1b@arm.com>
- <CANLsYkzJsGvr4ZzNbTwcPu1Qki6=Szvu+bMjHZ_rza==DqFChw@mail.gmail.com>
- <20170317101328.GA19877@leoy-linaro> <20170317155007.GA20435@linaro.org>
- <20170317162836.GD2020@leoy-linaro>
-Message-ID: <5995f6a7-08b1-c868-fc88-a145d1748a33@arm.com>
+From: julia.lawall@lip6.fr (Julia Lawall)
+Date: Fri, 17 Mar 2017 17:55:42 +0100 (CET)
+Subject: outreachy
+In-Reply-To: <20170317152519.GA8684@amd>
+References: <alpine.DEB.2.20.1703092133340.2306@hadrien>
+ <443f0143-aec1-2559-a2c2-73b245632948@broadcom.com>
+ <2da12619-5fcb-9e0f-b6c1-c83cbf491e8d@wwwdotorg.org>
+ <20170309212021.GA24433@kroah.com> <20170317152519.GA8684@amd>
+Message-ID: <alpine.DEB.2.20.1703171753550.4098@hadrien>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/03/17 16:28, Leo Yan wrote:
-> On Fri, Mar 17, 2017 at 09:50:07AM -0600, Mathieu Poirier wrote:
+
+
+On Fri, 17 Mar 2017, Pavel Machek wrote:
+
+> Hi!
 >
-> [...]
+> >
+> > Hah!  That's the joy of being a maintainer of a driver in staging.  Even
+> > if you filter out outreachy, you are going to get a lot of "basic
+> > mistakes" and other type patches cc:ed to you.
+> >
+> > I strongly suggest, that if you all don't like this type of stuff,
+> > either:
+> > 	- work to get the code out of staging as soon as possible (i.e.
+> > 	  send me coding style fixes for everything right now, and then
+> > 	  fix up the rest of the stuff.)
+> > 	- take yourself off the maintainer list for this code.
+> >
+> > It's your choice, outreachy right now is a lot of patches, but again,
+> > it's not going to keep you from getting the "basic" stuff sent to you
+> > in ways that is totally wrong.
 >
->> If we don't check for "nohlt" some platform may freeze, others may work.  If we
->> mandate that "nohlt" be present on the kernel cmd line it works in all cases.
->> As such mandating that "nohlt" be present is a better way to go.
+> Could we get these trivial patches off the lkml? Yes, lkml already has
+> a lot of traffic, but no, this is not useful :-(.
+
+The outreachy instructions say to use the -nol argument to
+get_maintainers, which would prevent them from being sent to any mailing
+list.  However others thought that all patches should be sent to mailing
+lists, and so I haven't enforced anything for people who have omitted
+-nol.  However I have tried to remove bcm maintainers from CC lists on
+replies and reminded people not to send you patches,
+
+julia
+
+
 >
-> Sure, so I will add below checking code in the probe function, please
-> let me know if you have alter better way to implement this:
+> 									Pavel
+> --
+> (english) http://www.livejournal.com/~pavelmachek
+> (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
 >
-> +       if (IS_ENABLED(CONFIG_CPU_IDLE) &&
-> +                       !strstr(boot_command_line, "nohlt")) {
-> +               dev_err(dev, "May not be accessible in CPU power domain.\n");
-> +               return -EPERM;
-> +       }
->
-
-There is an API which kind of achieves what "nohlt" does at runtime :
-
-   cpu_idle_poll_ctrl(true)
-
-So may be we could use that instead of depending on "nohlt". The other side
-of the issues is "when do we decide to use the API". May be we could add something
-like : enable_debug, which could then trigger the panic notifier registrations
-and the above. That would still leave us with a case where the system crashes
-even before the user gets a terminal. May be the following is the best option :
-
-1) Dedicated kernel command line parameter for enabling the CPU debug at boot/probe.
-
-and
-
-2) Runtime enable method via sysfs.
-
-What do you think ?
-
-Suzuki
