@@ -1,28 +1,28 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Fri, 17 Mar 2017 20:31:18 +0900
+From: dwmw2@infradead.org (David Woodhouse)
+Date: Fri, 17 Mar 2017 11:32:35 +0000
 Subject: [PATCH v33 04/14] arm64: kdump: reserve memory for crash dump
  kernel
-In-Reply-To: <1489747566.17202.19.camel@infradead.org>
+In-Reply-To: <20170317113116.GB11935@linaro.org>
 References: <20170315095656.24992-1-takahiro.akashi@linaro.org>
  <20170315095941.25119-2-takahiro.akashi@linaro.org>
  <1489747566.17202.19.camel@infradead.org>
-Message-ID: <20170317113116.GB11935@linaro.org>
+ <20170317113116.GB11935@linaro.org>
+Message-ID: <1489750355.17202.34.camel@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 17, 2017 at 10:46:06AM +0000, David Woodhouse wrote:
-> On Wed, 2017-03-15 at 18:59 +0900, AKASHI Takahiro wrote:
-> > 
-> > +pr_info("crashkernel reserved: 0x%016llx - 0x%016llx (%lld MB)\n",
-> > +crash_base, crash_base + crash_size, crash_size >> 20);
+On Fri, 2017-03-17 at 20:31 +0900, AKASHI Takahiro wrote:
 > 
-> There's a typo there ? it says MB but you mean MiB.
-> 
-> Unless you meant crash_size / 1000000 and not crash_size >> 20?
+> Yes and no.
+> This notation is consistent with other places like mem_init()
+> in mm/init.c.]
 
-Yes and no.
-This notation is consistent with other places like mem_init()
-in mm/init.c.
-
-Thanks,
--Takahiro AKASHI
+Well, perhaps we should fix those too then. But we certainly shouldn't
+add *more* errors.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: smime.p7s
+Type: application/x-pkcs7-signature
+Size: 4938 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170317/c2db2ad8/attachment.bin>
