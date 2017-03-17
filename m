@@ -1,505 +1,245 @@
-From: somasundaram.a@hpe.com (Arunachalam, Somasundaram)
-Date: Fri, 17 Mar 2017 04:09:53 +0000
-Subject: [PATCH] ACPI:RASF- Adding support for RASF PCC interfaces.
-References: <1477094344-14816-1-git-send-email-somasundaram.a@hpe.com>   
-Message-ID: <CS1PR84MB0038718F49DBC0FF03919E1184390@CS1PR84MB0038.NAMPRD84.PROD.OUTLOOK.COM>
+From: sricharan@codeaurora.org (Sricharan R)
+Date: Fri, 17 Mar 2017 10:13:38 +0530
+Subject: [PATCH V3 2/5] iommu/arm-smmu: Add support for MMU40x/500 clocks
+In-Reply-To: <CAF6AEGv3FAyWfXGT_8=bcn+UL8Ug1pE8EGu=MQC70U++wUOioA@mail.gmail.com>
+References: <1489073748-3659-1-git-send-email-sricharan@codeaurora.org>
+ <1489073748-3659-3-git-send-email-sricharan@codeaurora.org>
+ <CAF6AEGv3FAyWfXGT_8=bcn+UL8Ug1pE8EGu=MQC70U++wUOioA@mail.gmail.com>
+Message-ID: <6d4a47e3-bab7-4dda-c9db-cef6a699adf1@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, All, 
+Hi,
 
-Can you pls help review this patch and let me know your valuable comments. I agree that, it is somewhat big. But I have splited in to logically coherent functional pieces, and this is first of them. Pls refer to ACPI 5.1 (or) above, RASF Table (section 5.2.20), for the concept implemented. I have tested with by enabling this on Linux, and tested on QEMU-ARM. It is stable.
+On 3/17/2017 4:22 AM, Rob Clark wrote:
+> On Thu, Mar 9, 2017 at 10:35 AM, Sricharan R <sricharan@codeaurora.org> wrote:
+>> The MMU400x/500 is the implementation of the SMMUv2
+>> arch specification. It is split in to two blocks
+>> TBU, TCU. TBU caches the page table, instantiated
+>> for each master locally, clocked by the TBUn_clk.
+>> TCU manages the address translation with PTW and has
+>> the programming interface as well, clocked using the
+>> TCU_CLK. The TBU can also be sharing the same clock
+>> domain as TCU, in which case both are clocked using
+>> the TCU_CLK.
+>>
+>> This defines the clock bindings for the same and adds the
+>> init, enable and disable functions for handling the
+>> clocks.
+>>
+>> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+>> ---
+>>  .../devicetree/bindings/iommu/arm,smmu.txt         | 27 ++++++
+>>  drivers/iommu/arm-smmu.c                           | 95 +++++++++++++++++++++-
+>>  2 files changed, 121 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu.txt b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+>> index 6cdf32d..b369c13 100644
+>> --- a/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+>> +++ b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+>> @@ -60,6 +60,28 @@ conditions.
+>>                    aliases of secure registers have to be used during
+>>                    SMMU configuration.
+>>
+>> +- clock-names:    Should be "tbu_clk" and "tcu_clk" and "cfg_clk" for
+>> +                  "arm,mmu-400", "arm,mmu-401" and "arm,mmu-500"
+>
+> I guess that should be: "Should be "tbu_clk" *or* "tcu_clk" and
+> "cfg_clk" for..."
+>
+> Also, possibly we should define our own compat strings for various
+> SoC's that require these clks so we can properly describe when they
+> are required?  I guess that would address Rob H's comment.
+>
 
-Thanks again in advance for your help.
+Ok, calling "optional" does not look correct. But i was trying to define
+something which would be right for all implementations of MMU-500, but
+looks like that's not the right way. Making it soc specific would give a
+exact description, except for the number of compatibles and have to
+change the code to not consider any of tbu , tcu, cfg clk as mandatory
+for adding support for other compatibles later which are mostly similar.
+So i am trying to setup the clocks using functions specific for each
+compatible. Not sure, if at this point, some soc specific callback from 
+the driver where these things can be initialized might be good.
 
-With Best Regards,
-Somasundaram.	
+Regards,
+  Sricharan
 
 
------Original Message-----
-From: A, Somasundaram 
-Sent: Saturday, October 22, 2016 5:29 AM
-To: linux-acpi at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-Cc: Sajjan, Vikas C <vikas.cha.sajjan@hpe.com>; A, Somasundaram <somasundaram.a@hpe.com>
-Subject: [PATCH] ACPI:RASF- Adding support for RASF PCC interfaces.
 
-From: A Somasundaram <somasundaram.a@hpe.com>
+Regards,
+  Sricharan
 
-These files contains pcc interfaces for rasf table, and basic rasf init, as per ACPI 5.1 & upwards revision. section 5.2.20, chapter 14 Platform communication channel are references for this implementation.
-This module uses  pcc interfaces to talk to ACPI HW. This version has PCC interfaces ready.
-The functions to send RASF commands to be used by OSPM is planned for future revision of the file(rasf_acpi.c).
+> BR,
+> -R
+>
+>> +                  "tcu_clk" is required for smmu's register access using the
+>> +                  programming interface and ptw for downstream bus access.
+>> +
+>> +                  "tbu_clk" is required for access to the TBU connected to the
+>> +                  master locally. This clock is optional and not required when
+>> +                  TBU is in the same clock domain as the TCU or when the TBU is
+>> +                  clocked along with the master.
+>> +
+>> +                  "cfg_clk" is optional if required to access the TCU's programming
+>> +                  interface, apart from the "tcu_clk".
+>> +
+>> +- clocks:         Phandles for respective clocks described by clock-names.
+>> +
+>> +- power-domains:  Phandles to SMMU's power domain specifier. This is
+>> +                  required even if SMMU belongs to the master's power
+>> +                  domain, as the SMMU will have to be enabled and
+>> +                  accessed before master gets enabled and linked to its
+>> +                  SMMU.
+>> +
+>>  ** Deprecated properties:
+>>
+>>  - mmu-masters (deprecated in favour of the generic "iommus" binding) :
+>> @@ -84,6 +106,11 @@ conditions.
+>>                               <0 36 4>,
+>>                               <0 37 4>;
+>>                  #iommu-cells = <1>;
+>> +                clocks = <&gcc GCC_SMMU_CFG_CLK>,
+>> +                         <&gcc GCC_APSS_TCU_CLK>,
+>> +                        <&gcc GCC_MDP_TBU_CLK>;
+>> +
+>> +               clock-names = "cfg_clk", "tcu_clk", "tbu_clk";
+>>          };
+>>
+>>          /* device with two stream IDs, 0 and 7 */
+>> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+>> index f7e11d3..720a1ef 100644
+>> --- a/drivers/iommu/arm-smmu.c
+>> +++ b/drivers/iommu/arm-smmu.c
+>> @@ -341,6 +341,12 @@ struct arm_smmu_master_cfg {
+>>  #define for_each_cfg_sme(fw, i, idx) \
+>>         for (i = 0; idx = fwspec_smendx(fw, i), i < fw->num_ids; ++i)
+>>
+>> +struct mmu500_clk {
+>> +       struct clk *cfg_clk;
+>> +       struct clk *tcu_clk;
+>> +       struct clk *tbu_clk;
+>> +};
+>> +
+>>  struct arm_smmu_clks {
+>>         void *clks;
+>>         int (*init_clocks)(struct arm_smmu_device *smmu);
+>> @@ -455,6 +461,92 @@ static struct arm_smmu_domain *to_smmu_domain(struct iommu_domain *dom)
+>>         return container_of(dom, struct arm_smmu_domain, domain);
+>>  }
+>>
+>> +static int mmu500_enable_clocks(struct arm_smmu_device *smmu)
+>> +{
+>> +       int ret = 0;
+>> +       struct mmu500_clk *sclks = smmu->smmu_clks.clks;
+>> +
+>> +       if (!sclks)
+>> +               return 0;
+>> +
+>> +       ret = clk_prepare_enable(sclks->cfg_clk);
+>> +       if (ret) {
+>> +               dev_err(smmu->dev, "Couldn't enable cfg_clk");
+>> +               return ret;
+>> +       }
+>> +
+>> +       ret = clk_prepare_enable(sclks->tcu_clk);
+>> +       if (ret) {
+>> +               dev_err(smmu->dev, "Couldn't enable tcu_clk");
+>> +               clk_disable_unprepare(sclks->cfg_clk);
+>> +               return ret;
+>> +       }
+>> +
+>> +       ret = clk_prepare_enable(sclks->tbu_clk);
+>> +       if (ret) {
+>> +               dev_err(smmu->dev, "Couln't enable tbu_clk");
+>> +               clk_disable_unprepare(sclks->tcu_clk);
+>> +               clk_disable_unprepare(sclks->cfg_clk);
+>> +               return ret;
+>> +       }
+>> +
+>> +       return 0;
+>> +}
+>> +
+>> +static void mmu500_disable_clocks(struct arm_smmu_device *smmu)
+>> +{
+>> +       struct mmu500_clk *sclks = smmu->smmu_clks.clks;
+>> +
+>> +       if (!sclks) {
+>> +               clk_disable_unprepare(sclks->tbu_clk);
+>> +               clk_disable_unprepare(sclks->tcu_clk);
+>> +               clk_disable_unprepare(sclks->cfg_clk);
+>> +       }
+>> +}
+>> +
+>> +static int mmu500_init_clocks(struct arm_smmu_device *smmu)
+>> +{
+>> +       struct device *dev = smmu->dev;
+>> +       struct mmu500_clk *sclks;
+>> +       int err;
+>> +
+>> +       if (!of_find_property(dev->of_node, "clocks", NULL))
+>> +               return 0;
+>> +
+>> +       sclks = devm_kzalloc(dev, sizeof(*sclks), GFP_KERNEL);
+>> +       if (!sclks)
+>> +               return -ENOMEM;
+>> +
+>> +       sclks->cfg_clk = devm_clk_get(dev, "cfg_clk");
+>> +       if (IS_ERR(sclks->cfg_clk)) {
+>> +               err = PTR_ERR(sclks->cfg_clk);
+>> +               /* Ignore all, except -EPROBE_DEFER for optional clocks */
+>> +               if (err == -EPROBE_DEFER)
+>> +                       return err;
+>> +               else
+>> +                       sclks->cfg_clk = NULL;
+>> +       }
+>> +
+>> +       sclks->tcu_clk = devm_clk_get(dev, "tcu_clk");
+>> +       if (IS_ERR(sclks->tcu_clk)) {
+>> +               dev_err(dev, "Couldn't get tcu_clk");
+>> +               return PTR_ERR(sclks->tcu_clk);
+>> +       }
+>> +
+>> +       sclks->tbu_clk = devm_clk_get(dev, "tbu_clk");
+>> +       if (IS_ERR(sclks->tbu_clk)) {
+>> +               err = PTR_ERR(sclks->tbu_clk);
+>> +               /* Ignore all, ecept -EPROBE_DEFER for optional clocks */
+>> +               if (err == -EPROBE_DEFER)
+>> +                       return err;
+>> +               else
+>> +                       sclks->tbu_clk = NULL;
+>> +       }
+>> +
+>> +       smmu->smmu_clks.clks = sclks;
+>> +       return 0;
+>> +}
+>> +
+>>  static void parse_driver_options(struct arm_smmu_device *smmu)
+>>  {
+>>         int i = 0;
+>> @@ -1981,7 +2073,8 @@ struct arm_smmu_match_data {
+>>                     NULL, NULL, NULL);
+>>  ARM_SMMU_MATCH_DATA(arm_mmu401, ARM_SMMU_V1_64K, GENERIC_SMMU,
+>>                     NULL, NULL, NULL);
+>> -ARM_SMMU_MATCH_DATA(arm_mmu500, ARM_SMMU_V2, ARM_MMU500, NULL, NULL, NULL);
+>> +ARM_SMMU_MATCH_DATA(arm_mmu500, ARM_SMMU_V2, ARM_MMU500, mmu500_init_clocks,
+>> +                   mmu500_enable_clocks, mmu500_disable_clocks);
+>>  ARM_SMMU_MATCH_DATA(cavium_smmuv2, ARM_SMMU_V2, CAVIUM_SMMUV2,
+>>                     NULL, NULL, NULL);
+>>
+>> --
+>> QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+>>
+>> _______________________________________________
+>> iommu mailing list
+>> iommu at lists.linux-foundation.org
+>> https://lists.linuxfoundation.org/mailman/listinfo/iommu
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
 
-Signed-off-by:somasundaram.a at hpe.com
----
- drivers/acpi/Kconfig            |  15 ++
- drivers/acpi/Makefile           |   1 +
- drivers/acpi/processor_driver.c |   6 +-
- drivers/acpi/rasf_acpi.c        | 330 ++++++++++++++++++++++++++++++++++++++++
- include/acpi/rasf_acpi.h        |  58 +++++++
- 5 files changed, 409 insertions(+), 1 deletion(-)  create mode 100644 drivers/acpi/rasf_acpi.c  create mode 100644 include/acpi/rasf_acpi.h
-
-diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig index 445ce28..3a1b24fd 100644
---- a/drivers/acpi/Kconfig
-+++ b/drivers/acpi/Kconfig
-@@ -238,6 +238,21 @@ config ACPI_CPPC_LIB
- 	  If your platform does not support CPPC in firmware,
- 	  leave this option disabled.
- 
-+config ACPI_RASF_LIB
-+	bool
-+	depends on ACPI_PROCESSOR
-+	select MAILBOX
-+	select PCC
-+	default y
-+	help
-+          The files corresponding to this option implements pcc interfaces
-+          (platform communication channel) to talk to RASF(RAS Feature table)
-+          in the ACPI Complaint hardware platform. The first revision(current one)
-+          contains basic init of RASF(extraction of RASF Table, from OS system table) 
-+          and, pcc interfaces.
-+          Subsequent revision will contain OSPM interfaces to send RASF
-+          Memory patrol scrub commands to the ACPI hardware.
-+
- config ACPI_PROCESSOR
- 	tristate "Processor"
- 	depends on X86 || IA64 || ARM64
-diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile index 5ae9d85..0bbf0d8 100644
---- a/drivers/acpi/Makefile
-+++ b/drivers/acpi/Makefile
-@@ -81,6 +81,7 @@ obj-$(CONFIG_ACPI_EC_DEBUGFS)	+= ec_sys.o
- obj-$(CONFIG_ACPI_CUSTOM_METHOD)+= custom_method.o
- obj-$(CONFIG_ACPI_BGRT)		+= bgrt.o
- obj-$(CONFIG_ACPI_CPPC_LIB)	+= cppc_acpi.o
-+obj-$(CONFIG_ACPI_RASF_LIB)	+= rasf_acpi.o
- obj-$(CONFIG_ACPI_DEBUGGER_USER) += acpi_dbg.o
- 
- # processor has its own "processor." module_param namespace diff --git a/drivers/acpi/processor_driver.c b/drivers/acpi/processor_driver.c index 0553aee..c7aea1a 100644
---- a/drivers/acpi/processor_driver.c
-+++ b/drivers/acpi/processor_driver.c
-@@ -32,7 +32,7 @@
- #include <linux/cpuidle.h>
- #include <linux/slab.h>
- #include <linux/acpi.h>
--
-+#include<acpi/rasf_acpi.h>
- #include <acpi/processor.h>
- 
- #include "internal.h"
-@@ -66,6 +66,8 @@ static struct device_driver acpi_processor_driver = {
- 	.remove = acpi_processor_stop,
- };
- 
-+extern RASF_STATUS rasf_acpi_init(void );
-+
- static void acpi_processor_notify(acpi_handle handle, u32 event, void *data)  {
- 	struct acpi_device *device = data;
-@@ -257,6 +259,8 @@ static int __acpi_processor_start(struct acpi_device *device)
- 
- 	status = acpi_install_notify_handler(device->handle, ACPI_DEVICE_NOTIFY,
- 					     acpi_processor_notify, device);
-+         rasf_acpi_init();
-+        pr_info("rasf init called \n");
- 	if (ACPI_SUCCESS(status))
- 		return 0;
- 
-diff --git a/drivers/acpi/rasf_acpi.c b/drivers/acpi/rasf_acpi.c new file mode 100644 index 0000000..1d378cf
---- /dev/null
-+++ b/drivers/acpi/rasf_acpi.c
-@@ -0,0 +1,330 @@
-+/*
-+ * (C) Copyright 2014, 2015 Hewlett-Packard Enterprises.
-+ * A.Somasundaram, email: somasundaram.a at hpe.com
-+ * This file contains
-+ * RASF - ACPI 6.1 Specification, section 5.2.20
-+ * PCC(Platform Communications Channel) - ACPI 6.1 Specification , 
-+chapter 14
-+ * This file contains PCC(Platform communication channel) interfaces, 
-+and basic RASF Init, which extracts the RASF table and
-+ *  Registers the PCC channel for communicating with the ACPI compliant 
-+platform that contains RASF command support in hardware
-+ *
-+ *Next revision of this file will contain functions for sending RASF 
-+commands for memory patrol scrubbing. This version contains
-+ * core framework of PCC communication and RASF Init.
-+ *
-+ */
-+
-+#define pr_fmt(fmt)	"ACPI RASF: " fmt
-+#include<linux/export.h>
-+#include<acpi/rasf_acpi.h>
-+#include <linux/delay.h>
-+#include <linux/ktime.h>
-+#include<acpi/acpixf.h>
-+
-+#ifdef NEXT_REV
-+/*
-+ * Lock to provide mutually exclusive access to pcc channel, this is for next version.
-+ * when functions for RASF command send/recv are implemented.
-+ */
-+static DEFINE_SPINLOCK(rasf_lock);
-+#endif
-+
-+
-+/* Data structure for pcc communication  and rasf table */
-+
-+static struct mbox_chan *pcc_channel;
-+static void __iomem *pcc_comm_addr;
-+static u64 comm_base_addr;
-+static int pcc_subspace_idx = -1;
-+static bool pcc_channel_acquired;
-+static ktime_t deadline;
-+static unsigned int pcc_mpar, pcc_mrtt; static struct acpi_table_rasf 
-+*pRasfTable = NULL; RASF_STATUS rasf_acpi_init(void );
-+
-+#ifdef NEXT_REV
-+/* pcc mapped address + header size + offset within PCC subspace
-+ * This will be useful in next revision, when functions for RASF Command send/recv are implemented. 
-+ */
-+#define RASF_VADDR(offs) (pcc_comm_addr + 0x8 + (offs)) #endif
-+
-+/*
-+ * Arbitrary Retries for pcc commands.
-+ */
-+#define NUM_RETRIES 600
-+
-+/*
-+ *This function checks the pcc channel availability
-+ *
-+ *
-+ */
-+static int rasf_check_pcc_chan(void)
-+{
-+	int ret = -EIO;
-+	
-+        struct acpi_rasf_shared_memory  __iomem *generic_comm_base = pcc_comm_addr;
-+	ktime_t next_deadline = ktime_add(ktime_get(), deadline);
-+
-+	while (!ktime_after(ktime_get(), next_deadline)) {
-+		/*
-+		 * As per ACPI spec, the PCC space wil be initialized by
-+		 * platform and should have set the command completion bit when
-+		 * PCC can be used by OSPM
-+		 */
-+		if (readw_relaxed(&generic_comm_base->status) & RASF_PCC_CMD_COMPLETE) {
-+			ret = 0;
-+			break;
-+		}
-+		/*
-+		 * Reducing the bus traffic in case this loop takes longer than
-+		 * a few retries.
-+		 */
-+		udelay(3);
-+	}
-+
-+	return ret;
-+}
-+
-+static int rasf_send_pcc_cmd(u16 cmd)
-+{
-+	int ret = -EIO;
-+
-+        struct acpi_rasf_shared_memory  *generic_comm_base =
-+		(struct acpi_rasf_shared_memory *) pcc_comm_addr;
-+	static ktime_t last_cmd_cmpl_time, last_mpar_reset;
-+	static int mpar_count;
-+	unsigned int time_delta;
-+
-+	/*
-+	 * For CMD_WRITE we know for a fact the caller should have checked
-+	 * the channel before writing to PCC space
-+	 */
-+	if (cmd == RASF_CMD_READ) {
-+		ret = rasf_check_pcc_chan();
-+		if (ret)
-+			return ret;
-+	}
-+
-+	/*
-+	 * Handle the Minimum Request Turnaround Time(MRTT)
-+	 * "The minimum amount of time that OSPM must wait after the completion
-+	 * of a command before issuing the next command, in microseconds"
-+	 */
-+	if (pcc_mrtt) {
-+		time_delta = ktime_us_delta(ktime_get(), last_cmd_cmpl_time);
-+		if (pcc_mrtt > time_delta)
-+			udelay(pcc_mrtt - time_delta);
-+	}
-+
-+	/*
-+	 * Handle the non-zero Maximum Periodic Access Rate(MPAR)
-+	 * "The maximum number of periodic requests that the subspace channel can
-+	 * support, reported in commands per minute. 0 indicates no limitation."
-+	 *
-+	 * This parameter should be ideally zero or large enough so that it can
-+	 * handle maximum number of requests that all the cores in the system can
-+	 * collectively generate. If it is not, we will follow the spec and just
-+	 * not send the request to the platform after hitting the MPAR limit in
-+	 * any 60s window
-+	 */
-+	if (pcc_mpar) {
-+		if (mpar_count == 0) {
-+			time_delta = ktime_ms_delta(ktime_get(), last_mpar_reset);
-+			if (time_delta < 60 * MSEC_PER_SEC) {
-+				pr_debug("PCC cmd not sent due to MPAR limit");
-+				return -EIO;
-+			}
-+			last_mpar_reset = ktime_get();
-+			mpar_count = pcc_mpar;
-+		}
-+		mpar_count--;
-+	}
-+
-+	/* Write to the shared comm region. */
-+	writew_relaxed(cmd, &generic_comm_base->command);
-+
-+	/* Flip CMD COMPLETE bit */
-+	writew_relaxed(0, &generic_comm_base->status);
-+
-+	/* Ring doorbell */
-+	ret = mbox_send_message(pcc_channel, &cmd);
-+	if (ret < 0) {
-+		pr_err("Err sending PCC mbox message. cmd:%d, ret:%d\n",
-+				cmd, ret);
-+		return ret;
-+	}
-+
-+	/*
-+	 * For READs we need to ensure the cmd completed to ensure
-+	 * the ensuing read()s can proceed. For WRITEs we dont care
-+	 * because the actual write()s are done before coming here
-+	 * and the next READ or WRITE will check if the channel
-+	 * is busy/free@the entry of this call.
-+	 *
-+	 * If Minimum Request Turnaround Time is non-zero, we need
-+	 * to record the completion time of both READ and WRITE
-+	 * command for proper handling of MRTT, so we need to check
-+	 * for pcc_mrtt in addition to CMD_READ
-+	 */
-+	if (cmd == RASF_CMD_READ || pcc_mrtt) {
-+		ret = rasf_check_pcc_chan();
-+		if (pcc_mrtt)
-+			last_cmd_cmpl_time = ktime_get();
-+	}
-+
-+	mbox_client_txdone(pcc_channel, ret);
-+	return ret;
-+}
-+
-+static void rasf_chan_tx_done(struct mbox_client *cl, void *msg, int 
-+ret) {
-+	if (ret < 0)
-+		pr_debug("TX did not complete: CMD sent:%x, ret:%d\n",
-+				*(u16 *)msg, ret);
-+	else
-+		pr_debug("TX completed. CMD sent:%x, ret:%d\n",
-+				*(u16 *)msg, ret);
-+}
-+
-+struct mbox_client rasf_mbox_cl = {
-+	.tx_done = rasf_chan_tx_done,
-+	.knows_txdone = true,
-+};
-+
-+
-+
-+static int rasf_register_pcc_channel(int pcc_subspace_idx) {
-+	struct acpi_pcct_hw_reduced *rasf_ss;
-+	unsigned int len;
-+	u64 usecs_lat;
-+
-+	if (pcc_subspace_idx >= 0) {
-+		pcc_channel = pcc_mbox_request_channel(&rasf_mbox_cl,
-+				pcc_subspace_idx);
-+
-+		if (IS_ERR(pcc_channel)) {
-+			pr_err("Failed to find PCC communication channel\n");
-+			return -ENODEV;
-+		}
-+
-+		/*
-+		 * The PCC mailbox controller driver should
-+		 * have parsed the PCCT (global table of all
-+		 * PCC channels) and stored pointers to the
-+		 * subspace communication region in con_priv.
-+		 */
-+		rasf_ss = pcc_channel->con_priv;
-+
-+		if (!rasf_ss) {
-+			pr_err("No PCC subspace found for CPPC\n");
-+			return -ENODEV;
-+		}
-+
-+		/*
-+		 * This is the shared communication region
-+		 * for the OS and Platform to communicate over.
-+		 */
-+		comm_base_addr = rasf_ss->base_address;
-+		len = rasf_ss->length;
-+
-+		/*
-+		 * rasf_ss->latency is just a Nominal value. In reality
-+		 * the remote processor could be much slower to reply.
-+		 * So add an arbitrary amount of wait on top of Nominal.
-+		 */
-+		usecs_lat = NUM_RETRIES * rasf_ss->latency;
-+		deadline = ns_to_ktime(usecs_lat * NSEC_PER_USEC);
-+		pcc_mrtt = rasf_ss->min_turnaround_time;
-+		pcc_mpar = rasf_ss->max_access_rate;
-+
-+		pcc_comm_addr = acpi_os_ioremap(comm_base_addr, len);
-+		if (!pcc_comm_addr) {
-+			pr_err("Failed to ioremap PCC comm region mem\n");
-+			return -ENOMEM;
-+		}
-+
-+		/* Set flag so that we dont come here for each CPU. */
-+		pcc_channel_acquired = true;
-+	}
-+
-+	return 0;
-+}
-+
-+#ifdef NEXT_REV
-+
-+/* The next revision of this file will contain the implementation of 
-+the following functions
-+ *
-+ *These functions are used for processing/sending RASF Commands.
-+ *
-+ */
-+/*
-+ * The below functions are exposed to OSPM, to query and, initiate memory range patrol.
-+ *
-+ *
-+ */
-+bool DoPatrolScrub(....)
-+{
-+}
-+
-+bool IsPatrolScrubExposedtoSw(...)
-+{
-+/* send command, for read */
-+
-+}
-+
-+bool GetPatrolParams(...)
-+{
-+}
-+
-+bool SetPatrolParams(...)
-+{
-+/*    start patrol
-+    stop patrol
-+*/
-+}
-+#endif
-+
-+RASF_STATUS rasf_acpi_init(void )
-+{
-+   struct acpi_table_header *pAcpiTable = NULL;
-+   acpi_size irasf_size = 0;
-+   acpi_status status = AE_OK;
-+   
-+   
-+   status = acpi_get_table_with_size("RASF", 0, &pAcpiTable, 
-+ &irasf_size);
-+
-+   if (ACPI_FAILURE(status)) 
-+   {
-+       
-+	pr_err("rasf driver failed to initialize, get table failed\n");
-+
-+         pr_info("RASF Init failed \n");
-+       return(RASF_FAILURE);
-+   }
-+   
-+   pRasfTable = kmalloc(sizeof(struct acpi_table_header), GFP_KERNEL);
-+
-+
-+    if(NULL == pRasfTable)
-+    {
-+         pr_err("ptr to RasfTable, kmalloc failed \n");
-+
-+         pr_info("RASF Init failed \n");
-+         /* error debug print */
-+          return(RASF_FAILURE);
-+    }
-+    memcpy(pRasfTable, pAcpiTable, irasf_size);
-+
-+/* extract the pcc subspace channel id from the table */
-+     pRasfTable = (struct acpi_table_rasf *)pAcpiTable;
-+     memcpy(&pcc_subspace_idx, &pRasfTable->channel_id,12);
-+     rasf_register_pcc_channel(pcc_subspace_idx);
-+     pr_info("RASF Init Success \n");
-+     return(RASF_SUCCESS);
-+
-+
-+}
-+EXPORT_SYMBOL_GPL(rasf_acpi_init);
-+
-+
-+
-diff --git a/include/acpi/rasf_acpi.h b/include/acpi/rasf_acpi.h new file mode 100644 index 0000000..2f28ad3
---- /dev/null
-+++ b/include/acpi/rasf_acpi.h
-@@ -0,0 +1,58 @@
-+/*
-+ * RASF(feature for patrol scrubbing of memory ranges , if exposed to 
-+software)
-+ * RASF Diagnostic driver header file
-+ *
-+ * (C) Copyright 2014, 2015 Hewlett-Packard Enterprises
-+ * Author: A.Somasundaram (somasundaram.a at hpe.com)
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; version 2
-+ * of the License.
-+ */
-+
-+#ifndef _RASF_ACPI_H
-+#define _RASF_ACPI_H
-+
-+#include <linux/acpi.h>
-+#include <linux/mailbox_controller.h>
-+#include <linux/mailbox_client.h>
-+#include <linux/types.h>
-+
-+typedef int RASF_STATUS;
-+
-+#define RASF_NUM_ENT	21
-+#define RASF_REV	2
-+
-+#define RASF_PCC_CMD_COMPLETE 1
-+
-+/* CPPC specific PCC commands. */
-+#define	RASF_CMD_READ 0
-+#define	RASF_CMD_WRITE 1
-+
-+#define RASF_FAILURE 0
-+#define RASF_SUCCESS 1
-+
-+/* Each register has the folowing format. */ struct rasf_reg {
-+	u8 descriptor;
-+	u16 length;
-+	u8 space_id;
-+	u8 bit_width;
-+	u8 bit_offset;
-+	u8 access_width;
-+	u64 __iomem address;
-+} __packed;
-+
-+struct rasf_register_resource {
-+	acpi_object_type type;
-+	union {
-+		struct rasf_reg reg;
-+		u64 int_value;
-+	} rasf_entry;
-+};
-+/* Methods to interact with the PCC mailbox controller. */ extern 
-+struct mbox_chan *
-+	pcc_mbox_request_channel(struct mbox_client *, unsigned int);
-+
-+#endif /* _CPPC_ACPI_H*/
---
-1.9.1
+-- 
+"QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a 
+member of Code Aurora Forum, hosted by The Linux Foundation
