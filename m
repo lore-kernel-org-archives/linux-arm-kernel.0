@@ -1,21 +1,27 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 17 Mar 2017 08:43:33 -0700
-Subject: [PATCHv2 8/9] ARM: dts: omap4: add clkctrl nodes
-In-Reply-To: <1489741781-12816-9-git-send-email-t-kristo@ti.com>
-References: <1489741781-12816-1-git-send-email-t-kristo@ti.com>
- <1489741781-12816-9-git-send-email-t-kristo@ti.com>
-Message-ID: <20170317154333.GW20572@atomide.com>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Fri, 17 Mar 2017 23:43:40 +0800
+Subject: [PATCH 0/3] Basical Lichee Pi Zero with Dock support
+Message-ID: <20170317154343.39921-1-icenowy@aosc.xyz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tero Kristo <t-kristo@ti.com> [170317 02:12]:
-> Add clkctrl nodes for OMAP4 SoC. These are going to be acting as
-> replacement for part of the existing clock data and the existing
-> clkctrl hooks under hwmod data.
+Lichee Pi Zero have an official dock, which makes use of all stamp hole pins.
 
-It seems to be actually this patch in the series that breaks booting
-if the last patch in this series is not applied.
+Some extra functionalities are availble via the dock, e.g. an extra MMC slot
+and some keys connected to LRADC.
 
-Regards,
+This patchset adds the support of these two features of the dock.
 
-Tony
+Icenowy Zheng (3):
+  ARM: sun8i: v3s: add LRADC device node
+  ARM: dts: sun8i: add pinmux for V3s mmc1
+  ARM: dts: sun8i: add device tree for Lichee Pi Zero with Dock
+
+ arch/arm/boot/dts/Makefile                         |  3 +-
+ arch/arm/boot/dts/sun8i-v3s-licheepi-zero-dock.dts | 98 ++++++++++++++++++++++
+ arch/arm/boot/dts/sun8i-v3s.dtsi                   | 15 ++++
+ 3 files changed, 115 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/sun8i-v3s-licheepi-zero-dock.dts
+
+-- 
+2.12.0
