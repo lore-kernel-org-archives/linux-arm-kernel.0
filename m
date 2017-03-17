@@ -1,85 +1,90 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Fri, 17 Mar 2017 17:17:15 +0800
-Subject: [PATCH] of: Mark property::value as const
-In-Reply-To: <148951941955.30407.4217812594792852642@sboyd-linaro>
-Message-ID: <201703171613.IWm6RSo1%fengguang.wu@intel.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 17 Mar 2017 09:24:58 +0000
+Subject: [PATCH] ARM: omap2+: Revert omap-smp.c changes resetting CPU1
+ during boot
+In-Reply-To: <20170316152925.GO20572@atomide.com>
+References: <20170313205231.1593-1-tony@atomide.com>
+ <0bade322-5bee-412f-ef21-972c99846e84@ti.com>
+ <20170314151725.GC20572@atomide.com>
+ <d0fe191f-66f8-b72d-0a2a-00815e663a8d@ti.com>
+ <20170314164106.GE20572@atomide.com>
+ <ea09d676-29f6-7100-4c68-88920deaeb7c@ti.com>
+ <20170314181425.GF20572@atomide.com>
+ <20170315172200.GM20572@atomide.com>
+ <20170316152925.GO20572@atomide.com>
+Message-ID: <20170317092458.GJ23750@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+On Thu, Mar 16, 2017 at 08:29:25AM -0700, Tony Lindgren wrote:
+> * Tony Lindgren <tony@atomide.com> [170315 10:24]:
+> > * Tony Lindgren <tony@atomide.com> [170314 11:16]:
+> > > * Andrew F. Davis <afd@ti.com> [170314 10:59]:
+> > > Then onto the other related patches..
+> > > 
+> > > > We re-park cpu1 in bootROM in U-Boot already, in the U-Boot tree:
+> > > > arch/arm/mach-omap2/omap5/sec_entry_cpu1.S
+> > > 
+> > > OK good to hear.
+> > > 
+> > > > omap_smc_sec_cpu1() wakes up cpu1 into the function cpu1_entry(), this
+> > > > makes an SMC call to setup the core, then re-parks itself back in bootROM.
+> > > > Relevant code to run on cpu1:
+> > > > 
+> > > > > #define AUX_CORE_BOOT_0		0x48281800
+> > > > > #define AUX_CORE_BOOT_1		0x48281804
+> > > > > /* DRA7xx ROM code function "startup_BootSlave". This function is where CPU1
+> > > > >  * waits on WFE, polling on AUX_CORE_BOOT_x registers.
+> > > > >  * This address is same for J6 and J6 Eco.
+> > > > >  */
+> > > > > #define ROM_FXN_STARTUP_BOOTSLAVE     0x00038a64
+> > > > >
+> > > > > ldr	r4, =AUX_CORE_BOOT_0
+> > > > > mov	r5, #0x0
+> > > > > str	r5, [r4]
+> > > > > ldr	r4, =ROM_FXN_STARTUP_BOOTSLAVE
+> > > > > bx	r4	@ Jump back to ROM
+> > > > 
+> > > > We would have to do this in kernel. The issue I'm thinking we are going
+> > > > to hit is that the parking function in bootROM expects the MMU to be
+> > > > off. Although we don't really need to turn it off as long as we can
+> > > > identity map the bootROM area, the AUX_CORE_BOOT_0/1 space, and wherever
+> > > > we plan to exit the parking loop.
+> > > 
+> > > Would be good to hear what Russell thinks we should do here to park
+> > > CPU1.
+> > 
+> > How about we introduce smp_park_secondary()?
+> > 
+> > Then soft_restart() can call it between setup_mm_for_reboot()
+> > and cpu_proc_fin()?
+> 
+> Hmm that probably won't help as we'd have to still have a 1:1
+> mapping in cpu_die() to put CPU1 into WFI and release it in
+> smp_park_secondary() to the bootrom.
+> 
+> Anyways, I think in your use case it's the suspend/resume that needs
+> the state preserved for CPU1. Do you need kexec working in your use
+> case?
 
-[auto build test ERROR on linus/master]
-[also build test ERROR on v4.11-rc2 next-20170310]
-[cannot apply to glikely/devicetree/next]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+I think you're trying way too hard and making this too complicated.  I
+put forward my comments on it via email on Monday - is there a reason
+why you can't follow my recommendations (which are exactly what Linux
+expects) of the to-be-unplugged CPU?
 
-url:    https://github.com/0day-ci/linux/commits/Stephen-Boyd/of-Mark-property-value-as-const/20170317-143414
-config: powerpc-allnoconfig (attached as .config)
-compiler: powerpc-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=powerpc 
+Why do you need the CPU to spin in the kernel when you hot-unplug it?
 
-All errors (new ones prefixed by >>):
+Why can't you reset the CPU when it's died, possibly releasing the
+reset again to get it into the boot rom (which is where it'll be at
+boot time.)
 
-   arch/powerpc/kernel/pci_32.c: In function 'pcibios_make_OF_bus_map':
->> arch/powerpc/kernel/pci_32.c:141:10: error: passing argument 1 of 'memcpy' discards 'const' qualifier from pointer target type [-Werror=discarded-qualifiers]
-      memcpy(map_prop->value, pci_to_OF_bus_map, pci_bus_count);
-             ^~~~~~~~
-   In file included from include/linux/string.h:18:0,
-                    from include/uapi/linux/uuid.h:21,
-                    from include/linux/uuid.h:19,
-                    from include/linux/mod_devicetable.h:12,
-                    from include/linux/pci.h:20,
-                    from arch/powerpc/kernel/pci_32.c:6:
-   arch/powerpc/include/asm/string.h:21:15: note: expected 'void *' but argument is of type 'const void *'
-    extern void * memcpy(void *,const void *,__kernel_size_t);
-                  ^~~~~~
-   cc1: all warnings being treated as errors
+To detect older kernels, you could write a magic identifier into the
+boot address registers from a new kernel when taking the CPU offline.
+(eg, the value it has at normal system boot.)  When you attempt to
+bring CPUs online, check the value, if it isn't set correctly, assume
+that the CPU has gone awol, and reset it as you're doing now.
 
-vim +141 arch/powerpc/kernel/pci_32.c
-
-e05b3b4a Paul Mackerras   2006-01-15  125  	 */
-e05b3b4a Paul Mackerras   2006-01-15  126  	for (i=0; i<pci_bus_count; i++)
-e05b3b4a Paul Mackerras   2006-01-15  127  		pci_to_OF_bus_map[i] = 0xff;
-e05b3b4a Paul Mackerras   2006-01-15  128  
-e05b3b4a Paul Mackerras   2006-01-15  129  	/* For each hose, we begin searching bridges */
-a4c9e328 Kumar Gala       2007-06-27  130  	list_for_each_entry_safe(hose, tmp, &hose_list, list_node) {
-44ef3390 Stephen Rothwell 2007-12-10  131  		struct device_node* node = hose->dn;
-44ef3390 Stephen Rothwell 2007-12-10  132  
-e05b3b4a Paul Mackerras   2006-01-15  133  		if (!node)
-e05b3b4a Paul Mackerras   2006-01-15  134  			continue;
-e05b3b4a Paul Mackerras   2006-01-15  135  		make_one_node_map(node, hose->first_busno);
-e05b3b4a Paul Mackerras   2006-01-15  136  	}
-8c8dc322 Stephen Rothwell 2007-04-24  137  	dn = of_find_node_by_path("/");
-8c8dc322 Stephen Rothwell 2007-04-24  138  	map_prop = of_find_property(dn, "pci-OF-bus-map", NULL);
-a7f67bdf Jeremy Kerr      2006-07-12  139  	if (map_prop) {
-a7f67bdf Jeremy Kerr      2006-07-12  140  		BUG_ON(pci_bus_count > map_prop->length);
-a7f67bdf Jeremy Kerr      2006-07-12 @141  		memcpy(map_prop->value, pci_to_OF_bus_map, pci_bus_count);
-a7f67bdf Jeremy Kerr      2006-07-12  142  	}
-8c8dc322 Stephen Rothwell 2007-04-24  143  	of_node_put(dn);
-e05b3b4a Paul Mackerras   2006-01-15  144  #ifdef DEBUG
-e05b3b4a Paul Mackerras   2006-01-15  145  	printk("PCI->OF bus map:\n");
-e05b3b4a Paul Mackerras   2006-01-15  146  	for (i=0; i<pci_bus_count; i++) {
-e05b3b4a Paul Mackerras   2006-01-15  147  		if (pci_to_OF_bus_map[i] == 0xff)
-e05b3b4a Paul Mackerras   2006-01-15  148  			continue;
-e05b3b4a Paul Mackerras   2006-01-15  149  		printk("%d -> %d\n", i, pci_to_OF_bus_map[i]);
-
-:::::: The code at line 141 was first introduced by commit
-:::::: a7f67bdf2c9f24509b8e81e0f35573b611987c80 [POWERPC] Constify & voidify get_property()
-
-:::::: TO: Jeremy Kerr <jk@ozlabs.org>
-:::::: CC: Paul Mackerras <paulus@samba.org>
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 6114 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170317/1359e19c/attachment.gz>
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
