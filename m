@@ -1,83 +1,82 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 17 Mar 2017 15:17:29 -0700
-Subject: [PATCHv2 5/9] ARM: OMAP2+: hwmod: assign main clock from DT if
- available
-In-Reply-To: <f7c795dc-13db-9157-cdcc-b61892cc73f9@ti.com>
-References: <1489741781-12816-1-git-send-email-t-kristo@ti.com>
- <1489741781-12816-6-git-send-email-t-kristo@ti.com>
- <20170317154126.GU20572@atomide.com>
- <f7c795dc-13db-9157-cdcc-b61892cc73f9@ti.com>
-Message-ID: <20170317221728.GX20572@atomide.com>
+From: peda@axentia.se (Peter Rosin)
+Date: Fri, 17 Mar 2017 23:24:46 +0100
+Subject: [PATCH] ARM: dts: at91: add envelope detector mux to the Axentia
+ TSE-850
+Message-ID: <1489789486-30985-1-git-send-email-peda@axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tero Kristo <t-kristo@ti.com> [170317 14:42]:
-> On 17/03/17 17:41, Tony Lindgren wrote:
-> > * Tero Kristo <t-kristo@ti.com> [170317 02:12]:
-> > > -static int _init_main_clk(struct omap_hwmod *oh)
-> > > +static int _init_main_clk(struct omap_hwmod *oh, struct device_node *np)
-> > >  {
-> > >  	int ret = 0;
-> > > -	char name[MOD_CLK_MAX_NAME_LEN];
-> > > -	struct clk *clk;
-> > > -	static const char modck[] = "_mod_ck";
-> > > -
-> > > -	if (strlen(oh->name) >= MOD_CLK_MAX_NAME_LEN - strlen(modck))
-> > > -		pr_warn("%s: warning: cropping name for %s\n", __func__,
-> > > -			oh->name);
-> > > +	struct clk *clk = NULL;
-> > > +	int i;
-> > > +	int count;
-> > > +	const char *name;
-> > > +	char clk_name[strlen("clkctrl-x") + 1];
-> > > 
-> > > -	strlcpy(name, oh->name, MOD_CLK_MAX_NAME_LEN - strlen(modck));
-> > > -	strlcat(name, modck, MOD_CLK_MAX_NAME_LEN);
-> > > +	if (np) {
-> > > +		clk = of_clk_get_by_name(np, "clkctrl");
-> > > +		if (IS_ERR(clk)) {
-> > > +			/* Try matching by hwmod name */
-> > > +			count = of_property_count_strings(np, "ti,hwmods");
-> > > +			for (i = 0; i < count; i++) {
-> > > +				ret = of_property_read_string_index(np,
-> > > +								    "ti,hwmods",
-> > > +								    i, &name);
-> > > +				if (ret)
-> > > +					continue;
-> > > +				if (!strcmp(name, oh->name)) {
-> > > +					sprintf(clk_name, "clkctrl-%d", i);
-> > > +					clk = of_clk_get_by_name(np, clk_name);
-> > > +				}
-> > > +			}
-> > > +		}
-> > > +		if (!IS_ERR(clk)) {
-> > > +			pr_debug("%s: mapped main_clk %s for %s\n", __func__,
-> > > +				 __clk_get_name(clk), oh->name);
-> > > +			oh->main_clk = __clk_get_name(clk);
-> > > +			oh->_clk = clk;
-> > > +			soc_ops.disable_direct_prcm(oh);
-> > > +		}
-> > > +	}
-> > 
-> > You should bail out and do nothing here if legacy "ti,hwmods" property is
-> > not found. Eventually it will be the interconnect target IP wrapper module
-> > that will manage the clock and populate the rest of the hwmod data
-> > dynamically.
-> 
-> This is only for transitional support of hwmod, this patch will not be
-> needed for anything later on; or you probably need to do something similar
-> within the interconnect driver itself. The code still needs to care for the
-> cases where we want to find the main clock based on the clock link within
-> hwmod data, so bailing out early will break any boards that don't support
-> the new clkctrl clocks yet.
+The envelope detector can analyze 6 different signals, selectable with a
+mux controlled by three gpio pins.
 
-Well we really don't want hwmod code parsing anything out of the dtb
-unless "ti,hwmods" property is set. That makes moving driver like features
-to live under drivers much harder.
+Signed-off-by: Peter Rosin <peda@axentia.se>
+---
 
-I don't quite follow you, what breaks if you fall back to the old clock
-lookup if no "ti,hwmods" is set?
+Hi!
 
-Regards,
+This patch makes use of the mux subsystem and a couple of drivers
+available in linux-next since a week or two. The stuff this depends
+on has relevant acks, specifically on the DT bindings, so the bindings
+should be stable and not cause trouble for this patch. Which is why I
+thought I'd try to get this in for v4.12-rc1 along with that mux
+subsystem series.
 
-Tony
+Please consider applying.
+
+Cheers,
+peda
+
+arch/arm/boot/dts/at91-tse850-3.dts | 29 ++++++++++++++++++++++++++++-
+ 1 file changed, 28 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/at91-tse850-3.dts b/arch/arm/boot/dts/at91-tse850-3.dts
+index 669a2c6bdefc..7a68805a4eb5 100644
+--- a/arch/arm/boot/dts/at91-tse850-3.dts
++++ b/arch/arm/boot/dts/at91-tse850-3.dts
+@@ -86,16 +86,43 @@
+ 		#io-channel-cells = <1>;
+ 	};
+ 
+-	envelope-detector {
++	env_det: envelope-detector {
+ 		compatible = "axentia,tse850-envelope-detector";
+ 		io-channels = <&dac 0>;
+ 		io-channel-names = "dac";
++		#io-channel-cells = <1>;
+ 
+ 		interrupt-parent = <&pioA>;
+ 		interrupts = <3 IRQ_TYPE_EDGE_RISING>;
+ 		interrupt-names = "comp";
+ 	};
+ 
++	mux: mux-controller {
++		compatible = "mux-gpio";
++		#mux-control-cells = <0>;
++
++		mux-gpios = <&pioA 0 GPIO_ACTIVE_HIGH>,
++			    <&pioA 1 GPIO_ACTIVE_HIGH>,
++			    <&pioA 2 GPIO_ACTIVE_HIGH>;
++		idle-state = <0>;
++	};
++
++	envelope-detector-mux {
++		compatible = "io-channel-mux";
++		io-channels = <&env_det 0>;
++		io-channel-names = "parent";
++
++		mux-controls = <&mux>;
++
++		channels = "", "",
++			 "sync-1",
++			 "in",
++			 "out",
++			 "sync-2",
++			 "sys-reg",
++			 "ana-reg";
++	};
++
+ 	leds {
+ 		compatible = "gpio-leds";
+ 
+-- 
+2.1.4
