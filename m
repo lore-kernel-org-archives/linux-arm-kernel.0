@@ -1,45 +1,54 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 17 Mar 2017 11:09:32 +0200
-Subject: [PATCHv2 0/9] clk: ti: add support for clkctrl clocks
-Message-ID: <1489741781-12816-1-git-send-email-t-kristo@ti.com>
+From: shawn.lin@rock-chips.com (Shawn Lin)
+Date: Fri, 17 Mar 2017 17:27:03 +0800
+Subject: [PATCH 2/2] arm64: dts: rockchip: add rk3399 dw-mmc resets
+In-Reply-To: <20170317083951.14343-2-heiko@sntech.de>
+References: <20170317083951.14343-1-heiko@sntech.de>
+ <20170317083951.14343-2-heiko@sntech.de>
+Message-ID: <b238a878-ab58-4c25-dbaf-a0d299311bae@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+? 2017/3/17 16:39, Heiko Stuebner ??:
+> dw-mmc got its reset-properties specified, so add the softresets
+> for it on the rk3399.
+>
 
->From functional code point of view, this is mostly just a rebase of v1 of the
-series on top of 4.11-rc1:
+I now have a RK3399 platform at hand and it works fine with
+this patch applied, so
 
-https://www.spinics.net/lists/arm-kernel/msg562460.html
+Tested-by: Shawn Lin <shawn.lin@rock-chips.com>
+Reviewed-by: Shawn Lin <shawn.lin@rock-chips.com>
 
-This series depends on the TI clock cleanup series I posted last week:
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> ---
+>  arch/arm64/boot/dts/rockchip/rk3399.dtsi | 4 ++++
+>  1 file changed, 4 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> index 8e6d1bdeb9c3..c228898eda81 100644
+> --- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> +++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> @@ -241,6 +241,8 @@
+>  			 <&cru SCLK_SDIO_DRV>, <&cru SCLK_SDIO_SAMPLE>;
+>  		clock-names = "biu", "ciu", "ciu-drive", "ciu-sample";
+>  		fifo-depth = <0x100>;
+> +		resets = <&cru SRST_SDIO0>;
+> +		reset-names = "reset";
+>  		status = "disabled";
+>  	};
+>
+> @@ -255,6 +257,8 @@
+>  		clock-names = "biu", "ciu", "ciu-drive", "ciu-sample";
+>  		fifo-depth = <0x100>;
+>  		power-domains = <&power RK3399_PD_SD>;
+> +		resets = <&cru SRST_SDMMC>;
+> +		reset-names = "reset";
+>  		status = "disabled";
+>  	};
+>
+>
 
-https://www.spinics.net/lists/arm-kernel/msg567920.html
 
-Patch #5 has been changed to accommodate for the existence of multiple
-hwmods under single DT node, for example the "ocp" node for omap4
-contains 3 hwmods for the different buses; support for this is enabled
-by accepting index for the clkctrl clocks also.
-
-Patch #6 is a new one to properly assign the clock for timers. This is
-needed as currently timer code only fetches the main clock info from
-hwmod itself.
-
-Patches #7, #8 and #9 add the DT data for omap4.
-
-Boot tested on am335x-evm, am335x-evmsk, am47x-evm, am437x-sk, am437x-gp-evm,
-  am57xx-evm, omap3-beagle-xm, omap3-beagle, am335x-boneblack, craneboard,
-  dra72x-evm, dra7xx-evm, n900, omap5-uevm, omap4-panda-es, omap4-panda,
-  omap2430-sdp, omap3430-sdp, omap4430-sdp.
-
-Suspend-resume tested on omap4-panda-es.
-
-Any additional testing on omap4 welcome as this series basically
-tweaks every possible peripheral clock on the SoC.
-
-Branch available on top of 4.11-rc1 (+ the cleanup series) here:
-
-tree: https://github.com/t-kristo/linux-pm.git
-branch: for-4.12-ti-clkctrl
-
--Tero
+-- 
+Best Regards
+Shawn Lin
