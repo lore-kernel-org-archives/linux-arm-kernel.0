@@ -1,87 +1,32 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Fri, 17 Mar 2017 10:57:18 +0100
-Subject: [PATCH v2 1/2] doc: Add bindings document for Xilinx LogiCore PR
- Decoupler
-In-Reply-To: <1489711910-17443-1-git-send-email-mdf@kernel.org>
-References: <1489711910-17443-1-git-send-email-mdf@kernel.org>
-Message-ID: <9f823c88-ccd5-7534-9999-019c8a9f082a@xilinx.com>
+From: cedric.madianga@gmail.com (M'boumba Cedric Madianga)
+Date: Fri, 17 Mar 2017 10:58:53 +0100
+Subject: [PATCH 0/5] Add support for the STM32F7 I2C
+Message-ID: <1489744738-21632-1-git-send-email-cedric.madianga@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17.3.2017 01:51, Moritz Fischer wrote:
-> This adds the binding documentation for the Xilinx LogiCORE PR
-> Decoupler soft core.
-> 
-> Signed-off-by: Moritz Fischer <mdf@kernel.org>
-> Cc: Michal Simek <michal.simek@xilinx.com>
-> Cc: S?ren Brinkmann <soren.brinkmann@xilinx.com>
-> Cc: linux-kernel at vger.kernel.org
-> Cc: devicetree at vger.kernel.org
-> ---
-> 
-> Changes from v1:
-> - Added clock names & clock to example
-> - Merged some of the description from Michal's version
-> 
-> ---
->  .../bindings/fpga/xilinx-pr-decoupler.txt          | 32 ++++++++++++++++++++++
->  1 file changed, 32 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/fpga/xilinx-pr-decoupler.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/fpga/xilinx-pr-decoupler.txt b/Documentation/devicetree/bindings/fpga/xilinx-pr-decoupler.txt
-> new file mode 100644
-> index 0000000..2080006
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/fpga/xilinx-pr-decoupler.txt
-> @@ -0,0 +1,32 @@
-> +Xilinx LogiCORE Partial Reconfig Decoupler Softcore
-> +
-> +The Xilinx LogiCORE Partial Reconfig Decoupler manages one or more
-> +decouplers / fpga bridges.
-> +The controller can decouple/disable the bridges which prevents signal
-> +changes from passing through the bridge.  The controller can also
-> +couple / enable the bridges which allows traffic to pass through the
-> +bridge normally.
-> +
-> +The Driver supports only MMIO handling. A PR region can have multiple
-> +PR Decouples which can bhe handled independently or chaines via decouple/
-> +decouple_status signals.
-> +
-> +Required properties:
-> +- compatible		: Should contain "xlnx,pr-decoupler-1.00"
+This patchset adds support for the I2C controller embedded in STM32F7xx SoC.
+It enables I2C transfer in interrupt mode with Standard-mode, Fast-mode and
+Fast-mode+ bus speed.
 
-should
+M'boumba Cedric Madianga (5):
+  dt-bindings: i2c-stm32: Document the STM32F7 I2C bindings
+  i2c: i2c-stm32f4: use generic definition of speed enum
+  i2c: i2c-stm32f7: add driver
+  ARM: dts: stm32: Add I2C1 support for STM32F746 SoC
+  ARM: dts: stm32: Add I2C1 support for STM32F746 eval board
 
-I would tend to do this as
-"xlnx,pr-decoupler-1.00" and/or  "xlnx,pr_decoupler"
+ .../devicetree/bindings/i2c/i2c-stm32.txt          |  22 +-
+ arch/arm/boot/dts/stm32746g-eval.dts               |   6 +
+ arch/arm/boot/dts/stm32f746.dtsi                   |  23 +
+ drivers/i2c/busses/Kconfig                         |  10 +
+ drivers/i2c/busses/Makefile                        |   1 +
+ drivers/i2c/busses/i2c-stm32.h                     |  20 +
+ drivers/i2c/busses/i2c-stm32f4.c                   |  18 +-
+ drivers/i2c/busses/i2c-stm32f7.c                   | 562 +++++++++++++++++++++
+ 8 files changed, 648 insertions(+), 14 deletions(-)
+ create mode 100644 drivers/i2c/busses/i2c-stm32.h
+ create mode 100644 drivers/i2c/busses/i2c-stm32f7.c
 
-
-> +- regs			: base address and size for decoupler module
-> +- clocks		: input clock to IP
-> +- clock-names		: should contain "aclk"
-> +
-> +Optional properties:
-> +- bridge-enable		: 0 if driver should disable bridge at startup
-> +			  1 if driver should enable bridge at startup
-> +			  Default is to leave bridge in current state.
-
-Interesting that this is not a bool.
-But anyway this should be link to bridge binding because I expect this
-is the same for all.
-
-> +
-> +Example:
-> +	fpga-bridge at 100000450 {
-> +		compatible = "xlnx,pr-decoupler-1.00";
-
-"xlnx,pr-decoupler-1.00", "xlnx,pr_decoupler";
-
-> +		regs = <0x1000 0x10>;
-> +		clocks = <&clkc 15>;
-> +		clock-names = "aclk";
-> +		bridge-enable = <0>;
-> +	};
-> 
-
-Thanks,
-Michal
+-- 
+1.9.1
