@@ -1,75 +1,102 @@
-From: james.morse@arm.com (James Morse)
-Date: Fri, 17 Mar 2017 15:48:46 +0000
-Subject: [PATCH] KVM: arm/arm64: Signal SIGBUS when stage2 discovers
- hwpoison memory
-In-Reply-To: <87wpbohrj3.fsf@e105922-lin.cambridge.arm.com>
-References: <20170315160727.16465-1-james.morse@arm.com>
- <87wpbohrj3.fsf@e105922-lin.cambridge.arm.com>
-Message-ID: <58CC055E.50800@arm.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Fri, 17 Mar 2017 09:50:07 -0600
+Subject: [v3 3/5] coresight: add support for debug module
+In-Reply-To: <20170317101328.GA19877@leoy-linaro>
+References: <1488520809-31670-4-git-send-email-leo.yan@linaro.org>
+ <011fdac0-59bf-b539-2de3-0b59a41bc922@arm.com>
+ <20170309175915.GA964@leoy-linaro>
+ <3f27efee-3b63-81fd-eb96-73fd7e6f5e92@arm.com>
+ <20170313165600.GB32431@linaro.org>
+ <516f8989-4dde-2686-d549-0761feb14d1b@arm.com>
+ <CANLsYkzJsGvr4ZzNbTwcPu1Qki6=Szvu+bMjHZ_rza==DqFChw@mail.gmail.com>
+ <20170317101328.GA19877@leoy-linaro>
+Message-ID: <20170317155007.GA20435@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Punit,
-
-On 17/03/17 15:06, Punit Agrawal wrote:
-> James Morse <james.morse@arm.com> writes:
->> Once we enable ARCH_SUPPORTS_MEMORY_FAILURE on arm64[0], notifications for
->> broken memory can call memory_failure() in mm/memory-failure.c to deliver
->> SIGBUS to any user space process using the page, and notify all the
->> in-kernel users.
->>
->> If the page corresponded with guest memory, KVM will unmap this page
->> from its stage2 page tables. The user space process that allocated
->> this memory may have never touched this page in which case it may not
->> be mapped meaning SIGBUS won't be delivered.
->>
->> When this happens KVM discovers pfn == KVM_PFN_ERR_HWPOISON when it
->> comes to process the stage2 fault.
->>
->> Do as x86 does, and deliver the SIGBUS when we discover
->> KVM_PFN_ERR_HWPOISON. Use the stage2 mapping size as the si_addr_lsb
->> as this matches the user space mapping size.
-
->> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
->> index 962616fd4ddd..9d1aa294e88f 100644
->> --- a/arch/arm/kvm/mmu.c
->> +++ b/arch/arm/kvm/mmu.c
->> @@ -1237,6 +1239,23 @@ static void coherent_cache_guest_page(struct kvm_vcpu *vcpu, kvm_pfn_t pfn,
->>  	__coherent_cache_guest_page(vcpu, pfn, size);
->>  }
->>  
->> +static void kvm_send_hwpoison_signal(unsigned long address, bool hugetlb)
->> +{
->> +	siginfo_t info;
->> +
->> +	info.si_signo   = SIGBUS;
->> +	info.si_errno   = 0;
->> +	info.si_code    = BUS_MCEERR_AR;
->> +	info.si_addr    = (void __user *)address;
->> +
->> +	if (hugetlb)
->> +		info.si_addr_lsb = PMD_SHIFT;
->> +	else
->> +		info.si_addr_lsb = PAGE_SHIFT;
->> +
->> +	send_sig_info(SIGBUS, &info, current);
->> +}
-
-> The changes look good to me. Though in essence as mentioned in the
-> commit log we are not doing anything different to x86 here. Worth moving
-> kvm_send_hwpoison_signal to an architecture agostic location and using
-> it from there?
-
-I had an earlier version that did exactly that, but the x86 version always
-reports PAGE_SHIFT as the si_addr_lsb value. I don't know enough about their
-version of stage2 to know if that's a bug or an implementation detail, so I
-chose not to copy it.
-
-
-> In any case, FWIW,
+On Fri, Mar 17, 2017 at 06:13:28PM +0800, Leo Yan wrote:
+> On Wed, Mar 15, 2017 at 02:41:59PM -0600, Mathieu Poirier wrote:
+> > On 15 March 2017 at 10:44, Suzuki K Poulose <Suzuki.Poulose@arm.com> wrote:
+> > > On 13/03/17 16:56, Mathieu Poirier wrote:
+> > >> On Fri, Mar 10, 2017 at 02:29:53PM +0000, Suzuki K Poulose wrote:
 > 
-> Reviewed-by: Punit Agrawal <punit.agrawal@arm.com>
+> [...]
+> 
+> > >>> Btw, I don't see any PM calls to make sure the power domain (at least the
+> > >>> debug domain)
+> > >>> is up, which could cause problems with accesses to some of these
+> > >>> registers (leave alone the
+> > >>> ones in CPU power domain), especially the EDPRSR. We could also do
+> > >>> pm_runtime_get on the
+> > >>> CPU's power domain, if the CPU is online, before we access the pcsr.
+> > >>
+> > >>
+> > >> I thought about PM runtime operations a little while back but wondered if
+> > >> it is
+> > >> really a good thing to have them around.  When this code is called the
+> > >> system
+> > >> has crashed and as such making PM runtimes call isn't a good idea.
+> > >
+> > >
+> > > You are right. It is not safe to make such calls when we have crashed.
+> > > The other side effect is, if we don't have the debug power domain up,
+> > > we could possibly hang the system and prevent other registered notifiers
+> > > from running, which doesn't sound good either.
+> > >
+> > >>
+> > >> One thing we could do is _not_ call pm_runtime_put() at the end of the
+> > >> probe()
+> > >> operation.  That way we wouldn't have to mess around with PM runtime
+> > >> operations
+> > >> on an unstable system.  This, of course, is costly in terms of power
+> > >> consumption
+> > >> but the system is under test/debug anyway.
+> > >
+> > >
+> > > May be control the behavior via kernel command line ? Something like
+> > > coresight_debug={on or 1} or
+> > > even use the "nohlt" ?
+> > 
+> > We need to deal with the debug and CPU power domains.
+> > 
+> > For the former I suggest we do what coresight does and use the
+> > "power-domains" binding[1].  For the CPU power domain we can re-use
+> > the "nohlt" flag.  In the probe function if the "nohlt" cmd line flag
+> > is not set the code bails out.  If it is set pm_runtime_put() is _not_
+> > called and the driver can be used without worries of hanging the
+> > system when the panic handler is invoked.
+> > 
+> > Am I forgetting something?
+> 
+> I tested this drvier on Hikey and DB410c. For Hikey we must pass
+> "nohlt" to disable low power states, otherwise the kernel will hang
+> during initialization. But for DB410c, this driver even can work well
+> without "nohlt" and I checked the CPUIdle has been really enabled with
+> below sysfs entries:
+> 
+> root at linaro-developer:~# cat /sys/devices/system/cpu/cpu*/cpuidle/state*/usage
+> 5992
+> 6988
+> 4225
+> 4547
+> 2790
+> 23696
+> 4202
+> 3899
+> 
+> And from my previous experience, I'm quite sure some SoCs can access
+> the debug module registers with CPUIdle enabled, and it will read
+> back 0xFFFF_FFFF_FFFF_FFFF when the CPU stays in low power state.
+> So I prefer we could keep current method to suggest to use "nohlt" in
+> Kconfig's help description but it's not mandotory to check this in
+> the code. How about you think for this?
 
-Thanks!
+If we don't check for "nohlt" some platform may freeze, others may work.  If we
+mandate that "nohlt" be present on the kernel cmd line it works in all cases.
+As such mandating that "nohlt" be present is a better way to go.
 
-James
+Mathieu
+
+> 
+> Thanks,
+> Leo Yan
