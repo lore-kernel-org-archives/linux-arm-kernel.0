@@ -1,113 +1,75 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Fri, 17 Mar 2017 15:06:08 +0000
-Subject: [PATCH] KVM: arm/arm64: Signal SIGBUS when stage2 discovers
- hwpoison memory
-In-Reply-To: <20170315160727.16465-1-james.morse@arm.com> (James Morse's
- message of "Wed, 15 Mar 2017 16:07:27 +0000")
-References: <20170315160727.16465-1-james.morse@arm.com>
-Message-ID: <87wpbohrj3.fsf@e105922-lin.cambridge.arm.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 17 Mar 2017 15:05:57 +0000
+Subject: [PATCH] arm: kprobes: Align stack to 8-bytes in test code
+In-Reply-To: <1489761729.3063.7.camel@linaro.org>
+References: <20170316135359.23019-1-tixy@linaro.org>
+ <20170317121025.GD21222@n2100.armlinux.org.uk>
+ <1489755542.3063.2.camel@linaro.org>
+ <20170317140610.GF21222@n2100.armlinux.org.uk>
+ <1489761729.3063.7.camel@linaro.org>
+Message-ID: <20170317150557.GI21222@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi James,
+On Fri, Mar 17, 2017 at 02:42:09PM +0000, Jon Medhurst (Tixy) wrote:
+> On Fri, 2017-03-17 at 14:06 +0000, Russell King - ARM Linux wrote:
+> > On Fri, Mar 17, 2017 at 12:59:02PM +0000, Jon Medhurst (Tixy) wrote:
+> > > 
+> [...]
+> > > It isn't, because GCC turns code like this
+> > > 
+> > > void foo(void)
+> > > {
+> > >         asm volatile("bl __kprobes_test_case_start"
+> > >                      : : : "r0", "r1", "r2", "r3", "ip", "lr", "memory", "cc");
+> > > }
+> > > 
+> > > into this...
+> > > 
+> > > 8010e4ac <foo>:
+> > > 8010e4ac:       e52de004        push    {lr}            ; (str lr, [sp, #-4]!)
+> > > 8010e4b0:       eb002c99        bl      8011971c <__kprobes_test_case_start>
+> > > 8010e4b4:       e49df004        pop     {pc}            ; (ldr pc, [sp], #4)
+> > > 
+> > > Perhaps we need a way of telling GCC we are using the stack but I've not
+> > > managed to spot a way of doing that.
+> > 
+> > Using which compiler options?
+> 
+> The ones the Linux makefile picks when building with vexpress_defconfig.
+> I hacked a kernel file to build the above example but the behaviour is
+> what I observed with the real kprobes code. I've pasted the commanline
+> produced by building with V=1 at the end of this email.
+> 
+> One thing I've noticed playing around just now is that if I add "sp" to
+> the clobber list, and use a newer GCC (gcc-linaro-6.2.1-2016.11) then it
+> does allign the stack correctly. "sp" makes no difference with GCC 5.3 or
+> 4.8.
 
-One comment at the end.
+Meanwhile the kernel images I have here all have code to align the stack
+after pushing registers in functions, except for __csum_ipv6_magic and
+__memzero, which are both assembly.  That's gcc 4.7.4 building iMX6 only
+(which is also armv7-a.)
 
-James Morse <james.morse@arm.com> writes:
+I suspect we're into compiler behavioural differences, which can't be
+relied upon, so I guess we do need to do something in
+__kprobes_test_case_start() to work around it.
 
-> Once we enable ARCH_SUPPORTS_MEMORY_FAILURE on arm64[0], notifications for
-> broken memory can call memory_failure() in mm/memory-failure.c to deliver
-> SIGBUS to any user space process using the page, and notify all the
-> in-kernel users.
->
-> If the page corresponded with guest memory, KVM will unmap this page
-> from its stage2 page tables. The user space process that allocated
-> this memory may have never touched this page in which case it may not
-> be mapped meaning SIGBUS won't be delivered.
->
-> When this happens KVM discovers pfn == KVM_PFN_ERR_HWPOISON when it
-> comes to process the stage2 fault.
->
-> Do as x86 does, and deliver the SIGBUS when we discover
-> KVM_PFN_ERR_HWPOISON. Use the stage2 mapping size as the si_addr_lsb
-> as this matches the user space mapping size.
->
-> Signed-off-by: James Morse <james.morse@arm.com>
-> CC: gengdongjiu <gengdj.1984@gmail.com>
-> ---
->  Without this patch both kvmtool and Qemu exit as the KVM_RUN ioctl() returns
->  EFAULT.
->  QEMU: error: kvm run failed Bad address
->  LVKM: KVM_RUN failed: Bad address
->
->  With this patch both kvmtool and Qemu receive SIGBUS ... and then exit.
->  In the future Qemu can use this signal to notify the guest, for more details
->  see hwpoison[1].
->
->  [0] https://www.spinics.net/lists/arm-kernel/msg560009.html
->  [1] https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/Documentation/vm/hwpoison.txt
->
->
->  arch/arm/kvm/mmu.c | 23 +++++++++++++++++++++++
->  1 file changed, 23 insertions(+)
->
-> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-> index 962616fd4ddd..9d1aa294e88f 100644
-> --- a/arch/arm/kvm/mmu.c
-> +++ b/arch/arm/kvm/mmu.c
-> @@ -20,8 +20,10 @@
->  #include <linux/kvm_host.h>
->  #include <linux/io.h>
->  #include <linux/hugetlb.h>
-> +#include <linux/sched/signal.h>
->  #include <trace/events/kvm.h>
->  #include <asm/pgalloc.h>
-> +#include <asm/siginfo.h>
->  #include <asm/cacheflush.h>
->  #include <asm/kvm_arm.h>
->  #include <asm/kvm_mmu.h>
-> @@ -1237,6 +1239,23 @@ static void coherent_cache_guest_page(struct kvm_vcpu *vcpu, kvm_pfn_t pfn,
->  	__coherent_cache_guest_page(vcpu, pfn, size);
->  }
->  
-> +static void kvm_send_hwpoison_signal(unsigned long address, bool hugetlb)
-> +{
-> +	siginfo_t info;
-> +
-> +	info.si_signo   = SIGBUS;
-> +	info.si_errno   = 0;
-> +	info.si_code    = BUS_MCEERR_AR;
-> +	info.si_addr    = (void __user *)address;
-> +
-> +	if (hugetlb)
-> +		info.si_addr_lsb = PMD_SHIFT;
-> +	else
-> +		info.si_addr_lsb = PAGE_SHIFT;
-> +
-> +	send_sig_info(SIGBUS, &info, current);
-> +}
-> +
->  static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
->  			  struct kvm_memory_slot *memslot, unsigned long hva,
->  			  unsigned long fault_status)
-> @@ -1306,6 +1325,10 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
->  	smp_rmb();
->  
->  	pfn = gfn_to_pfn_prot(kvm, gfn, write_fault, &writable);
-> +	if (pfn == KVM_PFN_ERR_HWPOISON) {
-> +		kvm_send_hwpoison_signal(hva, hugetlb);
-> +		return 0;
-> +	}
->  	if (is_error_noslot_pfn(pfn))
->  		return -EFAULT;
+I'd do:
 
-The changes look good to me. Though in essence as mentioned in the
-commit log we are not doing anything different to x86 here. Worth moving
-kvm_send_hwpoison_signal to an architecture agostic location and using
-it from there?
+	mov	ip, sp
+	tst	sp, #4
+	subeq	sp, sp, #4		@ need to mis-align as we don't save
+	stmfd	sp!, {r4 - r11, ip}	@ an even number of registers to end
+	sub	sp, sp, #size		@ up with an aligned stack here
 
-In any case, FWIW,
+and when restoring:
 
-Reviewed-by: Punit Agrawal <punit.agrawal@arm.com>
+	add	ip, sp, #size
+	ldmfd	ip, {r4 - r11, sp}
+	bx	r0
 
-Thanks.
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
