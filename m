@@ -1,54 +1,87 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Fri, 17 Mar 2017 12:59:56 +0100
-Subject: [PATCH] pata_pcmcia: add EBSA110's PCMCIA slot support
-In-Reply-To: <20170316212654.GD1480@htj.duckdns.org>
-References: <CGME20170314175046epcas1p43f98daad14a2bac7f314e7d39e120232@epcas1p4.samsung.com>
- <3458240.9SL7iGif3L@amdc3058> <20170316212654.GD1480@htj.duckdns.org>
-Message-ID: <1533391.BtkrkgvqUW@amdc3058>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 17 Mar 2017 13:02:26 +0100
+Subject: [PATCH v2 05/23] MAINTAINERS: Add file patterns for dove device
+ tree bindings
+In-Reply-To: <20170313130138.GV11350@io.lakedaemon.net>
+References: <1489324627-19126-1-git-send-email-geert@linux-m68k.org>
+ <1489324627-19126-6-git-send-email-geert@linux-m68k.org>
+ <20170313130138.GV11350@io.lakedaemon.net>
+Message-ID: <CAMuHMdXYX8kk_EKkX7vS9tWG=JvfKcRGCNYDTnYCk_xZCdMYQg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Jason,
 
-Hi,
+On Mon, Mar 13, 2017 at 2:01 PM, Jason Cooper <jason@lakedaemon.net> wrote:
+> On Sun, Mar 12, 2017 at 02:16:49PM +0100, Geert Uytterhoeven wrote:
+>> Submitters of device tree binding documentation may forget to CC
+>> the subsystem maintainer if this is missing.
+>>
+>> Signed-off-by: Geert Uytterhoeven <geert@linux-m68k.org>
+>> Cc: Jason Cooper <jason@lakedaemon.net>
+>> Cc: Andrew Lunn <andrew@lunn.ch>
+>> Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+>> Cc: Gregory Clement <gregory.clement@free-electrons.com>
+>> Cc: linux-arm-kernel at lists.infradead.org
+>> ---
+>> Please apply this patch directly if you want to be involved in device
+>> tree binding documentation for your subsystem.
+>>
+>> v2:
+>>   - No changes.
+>>
+>> Impact on next-20170310:
+>>
+>> +Jason Cooper <jason@lakedaemon.net> (maintainer:ARM/Marvell Dove/MV78xx0/Orion SOC support)
+>> +Andrew Lunn <andrew@lunn.ch> (maintainer:ARM/Marvell Dove/MV78xx0/Orion SOC support)
+>> +Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> (maintainer:ARM/Marvell Dove/MV78xx0/Orion SOC support)
+>> +Gregory Clement <gregory.clement@free-electrons.com> (maintainer:ARM/Marvell Dove/MV78xx0/Orion SOC support)
+>>  Rob Herring <robh+dt@kernel.org> (maintainer:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS)
+>>  Mark Rutland <mark.rutland@arm.com> (maintainer:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS)
+>> +linux-arm-kernel at lists.infradead.org (moderated list:ARM/Marvell Dove/MV78xx0/Orion SOC support)
+>>  devicetree at vger.kernel.org (open list:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS)
+>>  linux-kernel at vger.kernel.org (open list)
+>> ---
+>>  MAINTAINERS | 1 +
+>>  1 file changed, 1 insertion(+)
+>>
+>> diff --git a/MAINTAINERS b/MAINTAINERS
+>> index 6428d3c82fce9670..ce461fefec6c9463 100644
+>> --- a/MAINTAINERS
+>> +++ b/MAINTAINERS
+>> @@ -1486,6 +1486,7 @@ M:      Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+>>  M:   Gregory Clement <gregory.clement@free-electrons.com>
+>>  L:   linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+>>  S:   Maintained
+>> +F:   Documentation/devicetree/bindings/soc/dove/
+>
+> I'm not opposed to the idea, but I'm not seeing how we can do this
+> completely.  What you've added only covers dove soc bindings.  There's
+> orion5x, kirkwood, and all the newer mvebu socs.  Not to mention a lot
+> of IP blocks we care about that aren't SoC- or Marvell-specific.
 
-On Thursday, March 16, 2017 05:26:54 PM Tejun Heo wrote:
-> Hello,
-> 
-> On Tue, Mar 14, 2017 at 06:50:43PM +0100, Bartlomiej Zolnierkiewicz wrote:
-> > +static struct ata_port_operations pcmcia_ebsa110_port_ops = {
-> > +	.inherits		= &ata_sff_port_ops,
-> > +	.sff_dev_select		= pmcmia_ebsa110_dev_select,
->                                   ^^^^^^
-> > +	.sff_set_devctl         = pcmcia_ebsa110_set_devctl,
-> > +	.sff_check_status	= pcmcia_ebsa110_check_status,
-> > +	.sff_check_altstatus    = pcmcia_ebsa110_check_altstatus,
-> > +	.sff_tf_load		= pcmcia_ebsa110_tf_load,
-> > +	.sff_tf_read		= pcmcia_ebsa110_tf_read,
-> > +	.sff_exec_command	= pcmcia_ebsa110_exec_command,
-> > +	.sff_data_xfer		= ata_sff_data_xfer_noirq,
-> > +	.softreset		= pata_pcmcia_ebsa110_softreset,
-> > +	.cable_detect		= ata_cable_40wire,
-> > +	.set_mode		= pcmcia_set_mode,
-> > +};
-> 
-> Heh, that's a fat driver for a sff device.  I suppose this is mostly
-> copied from the matching ide driver but it'd be nice to explain why it
-> needs duplicate most standard functions.  Is it because PCMCIA
-> assigned address doesn't fall under the usual read/io boundary on the
-> arch?
+There's no orion5x, kirkwood, mvebu, ... under
+Documentation/devicetree/bindings/soc.
 
-There is no support for this device in the upstream ide driver but
-Russell has a hacky patch to make it work by redefining inb()/outb()
-operations globally for the whole ide subsystem, please see:
+> The dts files have a much more clear file pattern -> maintainer pairing.
+> Perhaps we should make checkpatch smarter?  e.g. compatible strings
+> found in changed binding docs are searched for in dts{i} files.  Hits
+> are mapped to maintainers.
 
-https://www.spinics.net/lists/arm-kernel/msg567454.html
+The DTS files are maintained by a platform maintainer, while my patch
+series was about Linux kernel subsystem maintainers.
 
-and
+In this particular case both maintainers are the same, but this is not true in
+general.  Hence deriving a platform maintainer from a Linux subsystem specific
+binding document is the wrong way around.
 
-arch/arm/mach-ebsa110/io.c
+Gr{oetje,eeting}s,
 
-Best regards,
+                        Geert
+
 --
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
