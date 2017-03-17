@@ -1,68 +1,88 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Fri, 17 Mar 2017 16:51:13 +0100
-Subject: [PATCH] pata_pcmcia: add EBSA110's PCMCIA slot support
-In-Reply-To: <20170317141313.GC5078@htj.duckdns.org>
-References: <CGME20170314175046epcas1p43f98daad14a2bac7f314e7d39e120232@epcas1p4.samsung.com>
- <11380780.Ccg1NEX8q5@amdc3058> <20170317141313.GC5078@htj.duckdns.org>
-Message-ID: <5827966.LxfQpi93qC@amdc3058>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Fri, 17 Mar 2017 16:51:32 +0100
+Subject: [PATCH 3/5] i2c: i2c-stm32f7: add driver
+In-Reply-To: <CAOAejn0ScANyMEWnBfe0G8xQ5TbR-XYwEdXLkNexqC=AigBNJA@mail.gmail.com>
+References: <1489744738-21632-1-git-send-email-cedric.madianga@gmail.com>
+ <1489744738-21632-4-git-send-email-cedric.madianga@gmail.com>
+ <6ae90186-0e8d-654b-c9e3-2d1b4daf6198@baylibre.com>
+ <CAOAejn0Hs7QOgcrHM2t3NsFQeD9dyvThDK-8iM1Lvb7Qv4fGGQ@mail.gmail.com>
+ <971895d3-2fe6-ecb6-9dc3-ee71193b34ee@baylibre.com>
+ <CAOAejn0ScANyMEWnBfe0G8xQ5TbR-XYwEdXLkNexqC=AigBNJA@mail.gmail.com>
+Message-ID: <5539f058-f2a1-ff78-6dd8-aa2119ce8c49@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, March 17, 2017 10:13:13 AM Tejun Heo wrote:
-> Hello,
+Hi Cedric,
+
+On 03/17/2017 04:35 PM, M'boumba Cedric Madianga wrote:
+>> Sorry I don't understand.
+>> The value you use from the DT and the one calculated from the setup/hold/high/low value
+>> with the algorithm I developed will set the same values.
 > 
-> On Fri, Mar 17, 2017 at 03:08:56PM +0100, Bartlomiej Zolnierkiewicz wrote:
-> > To be honest, the main point here is to make Russell happy. ;-)
-> > 
-> > This is the second time he brought EBSA110 issue while talking about
-> > conversion of ARM platforms to use libata PATA so I've finally decided
-> > to do the patch just to have a reference example of how to deal with
-> > this and similar devices in a proper way.
-> > 
-> > Even though the patch can't be tested EBSA110 is still a supported ARM
-> > platform and the patch should work fine in theory (+ it cannot break
-> > anything).  OTOH it adds an extra code which has some cost from the
-> > long-term maintenance POV.  Anyway, it is up to you to decide what to
-> > do with it. :-)
+> With the ST tool, I could set the following values:
+> I2C speed mode (Master, Fast Mode, Fast Mode Plus)
+> I2C speed frequency
+> I2C clock source frequency
+> I2C rise time
+> I2C fall time
 > 
-> It's fairly low impact and I don't think it's gonna add noticeable
-> maintenance overhead at all, so that part is fine but it's super weird
-> to add code which we know not to have any users.  It looks like we
-> can't even test it.
+> The values set in the DT in this patchset is 0x40202537 for the
+> following input values:
+> I2C speed mode  = Master mode
+> I2C speed frequency= 100 kHz
+> I2C clock source frequency = 48 MHz
+> I2C rise time = 25 ns
+> I2C fall time = 10 ns
+> 
+> If I keep all the above values and just change I2C rise time with 100
+> ns, I will have TIMINGR value at 0x10805E89
+>
+>>
+>> The main difference is that you won't need the ST tool to calculate these, and even better
+>> you can provide generic binding for whatever APB frequency the I2C peripheral is running
+>> on.
+> 
+> As, I2C rise/fall time have some impacts in I2C timings value, the
+> question is: it is very relevant to let customer control these
+> parameters ?
 
-Well, this is more general problem.  We keep things like ARM EBSA110
-platform support in the kernel for some reason.. maybe we shouldn't?
+Actually, you could specify a different rise time in DT if it's relevant for
+a specific design, this is why you have the following DT attributes :
+- i2c-scl-falling-time-ns
+- i2c-scl-internal-delay-ns
+- i2c-scl-rising-time-ns
+- i2c-sda-falling-time-ns
 
-> What's the end game here?  Is it part of the effort to remove ide?  If
-> so, I have no objection to that but think it isn't a pressing issue
-> either and the ultimate decision has to come from Dave.
+> If the answer is NO, I agree with you, it is better to use your
+> formula and remove this property from DT.
+> If the answer is YES, I think we should keep ST tool.
 
-I'm just helping in migrating users that are still using ide to libata,
-enhancing libata's hardware support in the process. I would prefer to
-have ide removed in the long-term (once there are no known users of
-it) but Dave has a valid point (see below).  This particular patch is
-more a by-product of the above work than a part of it itself.
+Note that the ST tool calculations are tied to the clock source frequency, so either
+you provide a table for all the possible clock source frequencies or calculate dynamically.
+Having a single parameter for a single frequency is, from my point of view, not acceptable.
 
-Dave's current opinion is that we can't prove that all configurations
-currently supported by ide are supported by libata.  Since it can never
-be really proved (as there are ide drivers for hardware that cannot be
-tested because of having no active users) he is fine with ide staying
-in the kernel forever. Which may be not as bad for me personally as
-I have a lot of contributions there. ;-)
+And, I don't think it's a military secret to have (at least) a simplified algorithm from ST...
+since you have very detailed explanations in the public manuals !
 
-Theoretically another option is to finish ide's evolution into "ide
-compat" layer for SCSI/libata. This would give us full git history from
-ide to libata support + thin compatibility layer. However with libata
-PATA availability and hardware being obsolete there is no real need
-for it and the cost to finish such transition is much higher than cost
-of ide staying in the kernel forever. Moreover it would need to happen
-outside of the upstream kernel and there are no guarantees that it
-would be ever merged (ide is in deep maintenance policy and treated
-as a "safe fallback" for libata; SCSI & libata changes would need to
-be agreed on).
+> 
+>> Having the STM32L4 running mainline won't be hard, maybe useless, but not hard.
+>> My point is that you can somehow consider the STM32F0/F1/F4 I2C IP to be "v1" or "gen1",
+>> and the L0/L4/F6 (and H7 ?) to be "v2" or "gen2" then prepend a generic compatible to
+>> have something like :
+>> compatible = "st,stm32-i2c-v2", "st,stm32f7-i2c"
+> 
+> This is not the strategy chosen by the company.
+> They decided to push all driver with ip_name-stm32.c if the driver is
+> common for all Soc.
+> If it not the case, the suffix to be used is the name of the first
+> supported SoC that introduced the IP in the mainline kernel.
 
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+OK, but I think the I2C and DT maintainers are also involved in these kind of decisions.
+They should also give their advice.
+
+Neil
+
+> 
+> BR,
+> Cedric
+> 
