@@ -1,82 +1,43 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 17 Mar 2017 16:24:21 +0000
-Subject: [PATCH v33 00/14] add kdump support
-In-Reply-To: <1489765628.17202.59.camel@infradead.org>
-References: <20170315095656.24992-1-takahiro.akashi@linaro.org>
- <1489750991.17202.40.camel@infradead.org>
- <1489759373.17202.44.camel@infradead.org>
- <20170317153358.GI5940@leverpostej>
- <1489765628.17202.59.camel@infradead.org>
-Message-ID: <20170317162421.GK5940@leverpostej>
+From: mcgrof@kernel.org (Luis R. Rodriguez)
+Date: Fri, 17 Mar 2017 17:26:18 +0100
+Subject: [PATCH 02/20] PCI: fix pci_remap_iospace() remap attribute
+In-Reply-To: <20170317104339.GD24830@bart.dudau.co.uk>
+References: <20170227151436.18698-1-lorenzo.pieralisi@arm.com>
+ <20170227151436.18698-3-lorenzo.pieralisi@arm.com>
+ <20170316214844.GA17769@bhelgaas-glaptop.roam.corp.google.com>
+ <20170317003321.GB28800@wotan.suse.de>
+ <20170317104339.GD24830@bart.dudau.co.uk>
+Message-ID: <20170317162617.GC28800@wotan.suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 17, 2017 at 03:47:08PM +0000, David Woodhouse wrote:
-> On Fri, 2017-03-17 at 15:33 +0000, Mark Rutland wrote:
-> No, in this case the CPUs *were* offlined correctly, or at least "as
-> designed", by smp_send_crash_stop(). And if that hadn't worked, as
-> verified by *its* synchronisation method based on the atomic_t
-> waiting_for_crash_ipi, then *it* would have complained for itself:
+On Fri, Mar 17, 2017 at 10:43:39AM +0000, Liviu Dudau wrote:
+> On Fri, Mar 17, 2017 at 01:33:21AM +0100, Luis R. Rodriguez wrote:
+> > a) should we then use a Fixes tag for this patch ?
 > 
-> 	if (atomic_read(&waiting_for_crash_ipi) > 0)
-> 		pr_warning("SMP: failed to stop secondary CPUs %*pbl\n",
-> 			???cpumask_pr_args(cpu_online_mask));
+> I'm not aware of issues being reported, but Lorenzo might have more info on this.
+
+Lorenzo ? If not what exactly made you discover this ? If it is a fix, and only 
+ARM64 is implicated, seems like a worthy change to consider for stable for the
+sake of stable ARM64 kernels. But, that would leave the PCI config space without
+a simple 1 liner fix too -- so maybe its not worth it. Distributions wanting
+to support ARM64 however would like to carry these changes, so some annotations
+such as Fixes should help.
+
+> > b) it does not seem clear what the semantics for pgprot_device() or even
+> >    pgprot_noncached(). Can you add some ?
+> > 
+> > 8b921acfeffdb ("PCI: Add pci_remap_iospace() to map bus I/O resources")
+> > 
+> > Also this patch claims archs can override this call alone, as its __weak.
+> > So is the right thing to do to change pci_remap_iospace() to pgprot_noncached()
+> > or is it for archs to add their own pci_remap_iospace()? If so why ? Without
+> > proper semantics defined for these helpers this is all fuzzy.
 > 
-> It's just that smp_send_crash_stop() (or more specifically
-> ipi_cpu_crash_stop()) doesn't touch the online cpu mask. Unlike the
-> ARM32 equivalent function machien_crash_nonpanic_core(), which does.
-> 
-> It wasn't clear if that was *intentional*, to allow the original
-> contents of the online mask before the crash to be seen in the
-> resulting vmcore... or purely an accident.?
+> That was the initial intention, to let arches / platforms overwrite the whole
+> pci_remap_iospace(). I guess the reality is that no one needs to overwrite it except
+> for the AArch64 quirk, so probably easier to remove the __weak and fix the attributes for arm64.
 
-Looking at this, there's a larger mess.
+Sounds much more reasonable to me.
 
-The waiting_for_crash_ipi dance only tells us if CPUs have taken the
-IPI, not wether they've been offlined (i.e. actually left the kernel).
-We need something closer to the usual cpu_{disable,die,kill} dance,
-clearing online as appropriate.
-
-If CPUs haven't left the kernel, we still need to warn about that.
-
-> FWIW if I trigger a crash on CPU 1 my kdump (still 4.9.8+v32) doesn't work.
-> I end up booting the kdump kernel on CPU#1 and then it gets distinctly unhappy...
-> 
-> [????0.000000] Booting Linux on physical CPU 0x1
-> ...
-> [????0.017125] Detected PIPT I-cache on CPU1
-> [????0.017138] GICv3: CPU1: found redistributor 0 region 0:0x00000000f0280000
-> [????0.017147] CPU1: Booted secondary processor [411fd073]
-> [????0.017339] Detected PIPT I-cache on CPU2
-> [????0.017347] GICv3: CPU2: found redistributor 2 region 0:0x00000000f02c0000
-> [????0.017354] CPU2: Booted secondary processor [411fd073]
-> [????0.017537] Detected PIPT I-cache on CPU3
-> [????0.017545] GICv3: CPU3: found redistributor 3 region 0:0x00000000f02e0000
-> [????0.017551] CPU3: Booted secondary processor [411fd073]
-> [????0.017576] Brought up 4 CPUs
-> [????0.017587] SMP: Total of 4 processors activated.
-> ...
-> [???31.745809] INFO: rcu_sched detected stalls on CPUs/tasks:
-> [???31.751299]?	1-...: (30 GPs behind) idle=c90/0/0 softirq=0/0 fqs=0?
-> [???31.757557]?	2-...: (30 GPs behind) idle=608/0/0 softirq=0/0 fqs=0?
-> [???31.763814]?	3-...: (30 GPs behind) idle=604/0/0 softirq=0/0 fqs=0?
-> [???31.770069]?	(detected by 0, t=5252 jiffies, g=-270, c=-271, q=0)
-> [???31.776161] Task dump for CPU 1:
-> [???31.779381] swapper/1???????R??running task????????0?????0??????1 0x00000080
-> [???31.786446] Task dump for CPU 2:
-> [???31.789666] swapper/2???????R??running task????????0?????0??????1 0x00000080
-> [???31.796725] Task dump for CPU 3:
-> [???31.799945] swapper/3???????R??running task????????0?????0??????1 0x00000080
-> 
-> Is some of that platform-specific?
-
-That sounds like timer interrupts aren't being taken.
-
-Given that the CPUs have come up, my suspicion would be that the GIC's
-been left in some odd state, that the kdump kernel hasn't managed to
-recover from.
-
-Marc may have an idea.
-
-Thanks,
-Mark.
+  Luis
