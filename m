@@ -1,40 +1,39 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 17 Mar 2017 18:05:13 +0000
-Subject: [PATCH v21 01/13] clocksource: arm_arch_timer: introduce two
- functions to get the frequency from mmio and sysreg.
-In-Reply-To: <20170206185015.12296-2-fu.wei@linaro.org>
+Date: Fri, 17 Mar 2017 18:07:26 +0000
+Subject: [PATCH v21 03/13] clocksource: arm_arch_timer: remove
+ arch_timer_detect_rate
+In-Reply-To: <20170206185015.12296-4-fu.wei@linaro.org>
 References: <20170206185015.12296-1-fu.wei@linaro.org>
- <20170206185015.12296-2-fu.wei@linaro.org>
-Message-ID: <20170317180513.GB15909@leverpostej>
+ <20170206185015.12296-4-fu.wei@linaro.org>
+Message-ID: <20170317180725.GC15909@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 07, 2017 at 02:50:03AM +0800, fu.wei at linaro.org wrote:
-> +static u32 arch_timer_get_sysreg_freq(void)
-> +{
-> +	/*
-> +	 * Try to get the frequency from the CNTFRQ of sysreg.
-> +	 */
-> +	return arch_timer_get_cntfrq();
-> +}
+On Tue, Feb 07, 2017 at 02:50:05AM +0800, fu.wei at linaro.org wrote:
+> From: Fu Wei <fu.wei@linaro.org>
+> 
+> The original counter frequency detection call(arch_timer_detect_rate)
+> include getting the frequency from the per-cpu arch-timer and the
+> memory-mapped (MMIO) timer interfaces. But they will be needed only when
+> the system initializes the relevant timer.
+> 
+> This patch remove arch_timer_detect_rate founction, and use the
+> arch_timer_get_sysreg_freq and arch_timer_get_mmio_freq directly.
+> 
+> Signed-off-by: Fu Wei <fu.wei@linaro.org>
 
-We already have arch_timer_get_cntfrq(), so I don't see the point in
-this wrapper.
+Could you please fold this with the prior patch?
 
-> +static u32 arch_timer_get_mmio_freq(void __iomem *cntbase)
-> +{
-> +	/*
-> +	 * Try to get the frequency from the CNTFRQ of timer frame registers.
-> +	 * Note: please verify cntbase in caller.
-> +	 */
-> +	return readl_relaxed(cntbase + CNTFRQ);
-> +}
+> @@ -1087,7 +1072,12 @@ static int __init arch_timer_mem_init(struct device_node *np)
+>  	 */
+>  	if (!arch_timer_rate &&
+>  	    of_property_read_u32(np, "clock-frequency", &arch_timer_rate))
+> -		arch_timer_detect_rate(base);
+> +		arch_timer_rate = arch_timer_get_mmio_freq(base);
+> +	if (!arch_timer_rate) {
+> +		pr_err(FW_BUG "frequency not available for MMIO timer.\n");
 
-Wrapping the MMIO read makes sense if we're going to do this in more
-than one place, so I'm happy with this wrapper.
-
-If you can s/arch_timer_get_mmio_freq/arch_timer_get_cntfrq/, and drop
-the comments, then this looks fine to me.
+It would be better to say "MMIO frequency not available.\n" here.
 
 Thanks,
 Mark.
