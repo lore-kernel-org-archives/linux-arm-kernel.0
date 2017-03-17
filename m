@@ -1,46 +1,75 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 17 Mar 2017 11:53:21 +0000
-Subject: [PATCH 1/2] arm: Fix cache inconsistency when using fixmap
-In-Reply-To: <20170316132958.22227-1-tixy@linaro.org>
-References: <20170316132958.22227-1-tixy@linaro.org>
-Message-ID: <20170317115321.GB21222@n2100.armlinux.org.uk>
+From: sakari.ailus@linux.intel.com (Sakari Ailus)
+Date: Fri, 17 Mar 2017 13:55:33 +0200
+Subject: [PATCH v4 14/36] [media] v4l2-mc: add a function to inherit
+ controls from a pipeline
+In-Reply-To: <20170317114203.GZ21222@n2100.armlinux.org.uk>
+References: <20170310130733.GU21222@n2100.armlinux.org.uk>
+ <c679f755-52a6-3c6f-3d65-277db46676cc@xs4all.nl>
+ <20170310140124.GV21222@n2100.armlinux.org.uk>
+ <cc8900b0-c091-b14b-96f4-01f8fa72431c@xs4all.nl>
+ <20170310125342.7f047acf@vento.lan>
+ <20170310223714.GI3220@valkosipuli.retiisi.org.uk>
+ <20170311082549.576531d0@vento.lan>
+ <20170313124621.GA10701@valkosipuli.retiisi.org.uk>
+ <20170314004533.3b3cd44b@vento.lan>
+ <e0a6c60b-1735-de0b-21f4-d8c3f4b3f10f@xs4all.nl>
+ <20170317114203.GZ21222@n2100.armlinux.org.uk>
+Message-ID: <44161453-02f9-0019-3868-7501967a6a82@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 16, 2017 at 01:29:57PM +0000, Jon Medhurst wrote:
-> To cope with the variety in ARM architectures and configurations, the
-> pagetable attributes for kernel memory are generated at runtime to match
-> the system the kernel finds itself on. This calculated value is stored
-> in pgprot_kernel.
+Hi Russell,
+
+On 03/17/17 13:42, Russell King - ARM Linux wrote:
+> On Tue, Mar 14, 2017 at 08:55:36AM +0100, Hans Verkuil wrote:
+>> We're all very driver-development-driven, and userspace gets very little
+>> attention in general. So before just throwing in the towel we should take
+>> a good look at the reasons why there has been little or no development: is
+>> it because of fundamental design defects, or because nobody paid attention
+>> to it?
+>>
+>> I strongly suspect it is the latter.
+>>
+>> In addition, I suspect end-users of these complex devices don't really care
+>> about a plugin: they want full control and won't typically use generic
+>> applications. If they would need support for that, we'd have seen much more
+>> interest. The main reason for having a plugin is to simplify testing and
+>> if this is going to be used on cheap hobbyist devkits.
 > 
-> However, when early fixmap support was added for arm (commit
-> a5f4c561b3b1) the attributes used for mappings were hard coded because
-> pgprot_kernel is not set up early enough. Unfortunately, the values used
-> didn't include the 'shareable' attribute which means that for later
-> non-early fixmap use, when multiple CPUs are running, any cache entries
-> allocated for fixmap memory aren't kept consistent between CPUs. This
-> can result in different CPUs seeing different memory contents.
-
-This also likely causes unpredictable behaviour (aliased attributes).
-
-> This issue was discovered on a dual cluster system by failures with
-> kprobes, which uses fixmap to modify the kernel image if
-> CONFIG_DEBUG_RODATA is enabled. It will also affect kgdb and jump_labels
-> which also make use of the same code to modify the kernel, and any other
-> uses of fixmap after secondary CPUs are brought online.
+> I think you're looking at it with a programmers hat on, not a users hat.
 > 
-> To fix this issue, and to help avoid other potential problems where
-> pagetable attributes are incorrect, we change the fixmap code to use the
-> same generated value in pgprot_kernel that the rest of the kernel uses,
-> and only fall back to a hard coded value if this isn't set - which will
-> be early on in boot before other CPUs are brought online.
+> Are you really telling me that requiring users to 'su' to root, and then
+> use media-ctl to manually configure the capture device is what most
+> users "want" ?
 
-I'm not happy with this - if we need to create early fixmaps, then
-we need to know the correct attributes to use, so let's move the
-attribute initialisation earlier.  This solution feels too much like
-hacking around the problem.
+It depends on who the user is. I don't think anyone is suggesting a
+regular end user is the user of all these APIs: it is either an
+application tailored for that given device, a skilled user with his test
+scripts or as suggested previously, a libv4l plugin knowing the device
+or a generic library geared towards providing best effort service. The
+last one of this list does not exist yet and the second last item
+requires help.
+
+Typically this class of devices is simply not up to provide the level of
+service you're requesting without additional user space control library
+which is responsible for automatic white balance, exposure and focus.
+
+Making use of the full potential of the hardware requires using a more
+expressive interface. That's what the kernel interface must provide. If
+we decide to limit ourselves to a small sub-set of that potential on the
+level of the kernel interface, we have made a wrong decision. It's as
+simple as that. This is why the functionality (and which requires taking
+a lot of policy decisions) belongs to the user space. We cannot have
+multiple drivers providing multiple kernel interfaces for the same hardware.
+
+That said, I'm not trying to provide an excuse for not having libraries
+available to help the user to configure and control the device more or
+less automatically even in terms of best effort. It's something that
+does require attention, a lot more of it than it has received in recent
+few years.
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Kind regards,
+
+Sakari Ailus
+sakari.ailus at linux.intel.com
