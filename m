@@ -1,41 +1,67 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Fri, 17 Mar 2017 15:08:56 +0100
-Subject: [PATCH] pata_pcmcia: add EBSA110's PCMCIA slot support
-In-Reply-To: <20170317133900.GA5078@htj.duckdns.org>
-References: <CGME20170314175046epcas1p43f98daad14a2bac7f314e7d39e120232@epcas1p4.samsung.com>
- <1533391.BtkrkgvqUW@amdc3058> <20170317133900.GA5078@htj.duckdns.org>
-Message-ID: <11380780.Ccg1NEX8q5@amdc3058>
+From: arnaud.pouliquen@st.com (Arnaud Pouliquen)
+Date: Fri, 17 Mar 2017 15:08:20 +0100
+Subject: [PATCH v3 07/11] IIO: consumer: allow to set buffer sizes
+In-Reply-To: <1489759704-30217-1-git-send-email-arnaud.pouliquen@st.com>
+References: <1489759704-30217-1-git-send-email-arnaud.pouliquen@st.com>
+Message-ID: <1489759704-30217-8-git-send-email-arnaud.pouliquen@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, March 17, 2017 09:39:00 AM Tejun Heo wrote:
-> Hello,
-> 
-> On Fri, Mar 17, 2017 at 12:59:56PM +0100, Bartlomiej Zolnierkiewicz wrote:
-> > There is no support for this device in the upstream ide driver but
-> > Russell has a hacky patch to make it work by redefining inb()/outb()
-> > operations globally for the whole ide subsystem, please see:
-> > 
-> > https://www.spinics.net/lists/arm-kernel/msg567454.html
-> 
-> Well, that mail says that the hardware is a museum piece.  What's the
-> point here?  This can't even be tested, can it?
+Add iio consumer API to set buffer size and watermark according
+to sysfs API.
 
-To be honest, the main point here is to make Russell happy. ;-)
+Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
+---
+ drivers/iio/buffer/industrialio-buffer-cb.c | 12 ++++++++++++
+ include/linux/iio/consumer.h                | 13 +++++++++++++
+ 2 files changed, 25 insertions(+)
 
-This is the second time he brought EBSA110 issue while talking about
-conversion of ARM platforms to use libata PATA so I've finally decided
-to do the patch just to have a reference example of how to deal with
-this and similar devices in a proper way.
-
-Even though the patch can't be tested EBSA110 is still a supported ARM
-platform and the patch should work fine in theory (+ it cannot break
-anything).  OTOH it adds an extra code which has some cost from the
-long-term maintenance POV.  Anyway, it is up to you to decide what to
-do with it. :-)
-
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+diff --git a/drivers/iio/buffer/industrialio-buffer-cb.c b/drivers/iio/buffer/industrialio-buffer-cb.c
+index b8f550e..43c066a 100644
+--- a/drivers/iio/buffer/industrialio-buffer-cb.c
++++ b/drivers/iio/buffer/industrialio-buffer-cb.c
+@@ -103,6 +103,18 @@ struct iio_cb_buffer *iio_channel_get_all_cb(struct device *dev,
+ }
+ EXPORT_SYMBOL_GPL(iio_channel_get_all_cb);
+ 
++int iio_channel_cb_set_buffer_params(struct iio_cb_buffer *cb_buff,
++				      size_t length, size_t watermark)
++{
++	if (!length || length < watermark)
++		return -EINVAL;
++	cb_buff->buffer.watermark = watermark;
++	cb_buff->buffer.length = length;
++
++	return 0;
++}
++EXPORT_SYMBOL_GPL(iio_channel_start_all_cb);
++
+ int iio_channel_start_all_cb(struct iio_cb_buffer *cb_buff)
+ {
+ 	return iio_update_buffers(cb_buff->indio_dev, &cb_buff->buffer,
+diff --git a/include/linux/iio/consumer.h b/include/linux/iio/consumer.h
+index cb44771..0f6e94d 100644
+--- a/include/linux/iio/consumer.h
++++ b/include/linux/iio/consumer.h
+@@ -134,6 +134,19 @@ struct iio_cb_buffer *iio_channel_get_all_cb(struct device *dev,
+ 						       void *private),
+ 					     void *private);
+ /**
++ * iio_channel_cb_set_buffer_size() - set the buffer length.
++ * @cb_buffer:		The callback buffer from whom we want the channel
++ *			information.
++ * @length: buffer length in bytes
++ * @watermark: buffer watermark in bytes
++ *
++ * This function allows to configure the buffer length. The watermark if
++ * forced to half of the buffer.
++ */
++int iio_channel_cb_set_buffer_params(struct iio_cb_buffer *cb_buffer,
++				     size_t length, size_t watermark);
++
++/**
+  * iio_channel_release_all_cb() - release and unregister the callback.
+  * @cb_buffer:		The callback buffer that was allocated.
+  */
+-- 
+1.9.1
