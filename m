@@ -1,170 +1,143 @@
-From: shankerd@codeaurora.org (Shanker Donthineni)
-Date: Fri, 17 Mar 2017 05:43:36 -0500
-Subject: [PATCH 1/2] irqchip/gic-v3-its: bail out on already enabled LPIs
-In-Reply-To: <8f9e3620-8c38-126b-2d90-ed5b07432e7e@arm.com>
-References: <20170316170542.3568-1-andre.przywara@arm.com>
- <20170316170542.3568-2-andre.przywara@arm.com>
- <e640f2c6-9445-ef85-ff80-6826fb230371@codeaurora.org>
- <8f9e3620-8c38-126b-2d90-ed5b07432e7e@arm.com>
-Message-ID: <db757dab-7ef8-45fd-873d-43cfcb59e264@codeaurora.org>
+From: liviu@dudau.co.uk (Liviu Dudau)
+Date: Fri, 17 Mar 2017 10:43:39 +0000
+Subject: [PATCH 02/20] PCI: fix pci_remap_iospace() remap attribute
+In-Reply-To: <20170317003321.GB28800@wotan.suse.de>
+References: <20170227151436.18698-1-lorenzo.pieralisi@arm.com>
+ <20170227151436.18698-3-lorenzo.pieralisi@arm.com>
+ <20170316214844.GA17769@bhelgaas-glaptop.roam.corp.google.com>
+ <20170317003321.GB28800@wotan.suse.de>
+Message-ID: <20170317104339.GD24830@bart.dudau.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+On Fri, Mar 17, 2017 at 01:33:21AM +0100, Luis R. Rodriguez wrote:
+> On Thu, Mar 16, 2017 at 04:48:44PM -0500, Bjorn Helgaas wrote:
+> > [+cc Luis]
+> > 
+> > On Mon, Feb 27, 2017 at 03:14:13PM +0000, Lorenzo Pieralisi wrote:
+> > > According to the PCI local bus specifications (Revision 3.0, 3.2.5),
+> > > I/O Address space transactions are non-posted. On architectures where
+> > > I/O space is implemented through a chunk of memory mapped space mapped
+> > > to PCI address space (ie IA64/ARM/ARM64) the memory mapping for the
+> > > region backing I/O Address Space transactions determines the I/O
+> > > transactions attributes (before the transactions actually reaches the
+> > > PCI bus where it is handled according to the PCI specifications).
+> > > 
+> > > Current pci_remap_iospace() interface, that is used to map the PCI I/O
+> > > Address Space into virtual address space, use pgprot_device() as memory
+> > > attribute for the virtual address mapping, that in some architectures
+> > > (ie ARM64) provides non-cacheable but write bufferable mappings (ie
+> > > posted writes), 
+> 
+> <sarcasm>
+> Gee wiz, I am glad this is so well documented.
+> </sarcasm>
+> 
+> > > which clash with the non-posted write behaviour for I/O
+> > > Address Space mandated by the PCI specifications.
+> > > 
+> > > Update the prot ioremap_page_range() parameter in pci_remap_iospace()
+> > > to pgprot_noncached to ensure that the virtual mapping backing
+> > > I/O Address Space guarantee non-posted write transactions issued
+> > > when addressing I/O Address Space through the MMIO mapping.
+> 
+> How did we end up with pgprot_device() then in the first place Liviu Dudau [0] ?
+> I ask for two reasons:
 
+[replying using personal email as the corporate email system is taking its sweet time
+to deliver the email to my inbox]
 
-On 03/17/2017 04:46 AM, Marc Zyngier wrote:
-> Hi Shanker,
->
-> On 16/03/17 17:25, Shanker Donthineni wrote:
->> Hi Andre,
->>
->>
->> On 03/16/2017 12:05 PM, Andre Przywara wrote:
->>> The GICv3 spec says that once LPIs have been enabled, they can't be
->>> disabled anymore:
->>> "When a write changes this bit from 0 to 1, this bit becomes RES1 ..."
->>> As we can't setup the pending and property table registers when LPIs are
->>> enabled, we have to bail out here in this case.
->>> But first try to disable LPIs anyway, to check whether this actually works.
->>> If not, return an error.
->>>
->>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
->>> ---
->>>  drivers/irqchip/irq-gic-v3-its.c | 36 ++++++++++++++++++++++++++++--------
->>>  1 file changed, 28 insertions(+), 8 deletions(-)
->>>
->>> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
->>> index f77f840..b777c57 100644
->>> --- a/drivers/irqchip/irq-gic-v3-its.c
->>> +++ b/drivers/irqchip/irq-gic-v3-its.c
->>> @@ -1082,12 +1082,30 @@ static int its_alloc_collections(struct its_node *its)
->>>  	return 0;
->>>  }
->>>  
->>> -static void its_cpu_init_lpis(void)
->>> +static int its_cpu_init_lpis(void)
->>>  {
->>>  	void __iomem *rbase = gic_data_rdist_rd_base();
->>>  	struct page *pend_page;
->>>  	u64 val, tmp;
->>>  
->>> +	/*
->>> +	 * Architecturally, once LPIs have been enabled on a specific
->>> +	 * redistributor, they can't be disabled anymore (the enable
->>> +	 * bit becomes RES1).
->>> +	 * But as we can't setup the pending and property table registers
->>> +	 * while LPIs are enabled, we are basically screwed in this case.
->>> +	 * But be slightly more optimistic here, and actually check whether
->>> +	 * this is really implemented like this.
->>> +	 */
->>> +	val = readl_relaxed(rbase + GICR_CTLR);
->>> +	val &= ~GICR_CTLR_ENABLE_LPIS;
->>> +	writel_relaxed(val, rbase + GICR_CTLR);
->> Spec says we are not supposed to disable once it is enabled, why code
->> is trying to disable? Why can't we check the enable bit without a
->> write operation?
-> The reasoning here is that some implementation could support having
-> their LPI disabled (hint: a software implementation like the one we have
-> in KVM). As much as I'm willing to follow the architecture, I see little
-> value in not supporting something that trivial. But maybe we could quirk
-> it and not do that in the general case. Andre, what do you think?
->
->>> +	if (readl_relaxed(rbase + GICR_CTLR) & GICR_CTLR_ENABLE_LPIS) {
->>> +		pr_warn("CPU%d: LPIs already enabled, cannot initialize redistributor\n",
->>> +			smp_processor_id());
->>> +		return -EBUSY;
->>> +	}
->>> +
->>>  	/* If we didn't allocate the pending table yet, do it now */
->>>  	pend_page = gic_data_rdist()->pend_page;
->>>  	if (!pend_page) {
->>> @@ -1101,7 +1119,7 @@ static void its_cpu_init_lpis(void)
->>>  		if (!pend_page) {
->>>  			pr_err("Failed to allocate PENDBASE for CPU%d\n",
->>>  			       smp_processor_id());
->>> -			return;
->>> +			return -ENOMEM;
->>>  		}
->>>  
->>>  		/* Make sure the GIC will observe the zero-ed page */
->>> @@ -1113,11 +1131,6 @@ static void its_cpu_init_lpis(void)
->>>  		gic_data_rdist()->pend_page = pend_page;
->>>  	}
->>>  
->>> -	/* Disable LPIs */
->>> -	val = readl_relaxed(rbase + GICR_CTLR);
->>> -	val &= ~GICR_CTLR_ENABLE_LPIS;
->>> -	writel_relaxed(val, rbase + GICR_CTLR);
->>> -
->>>  	/*
->>>  	 * Make sure any change to the table is observable by the GIC.
->>>  	 */
->>> @@ -1174,6 +1187,8 @@ static void its_cpu_init_lpis(void)
->>>  
->>>  	/* Make sure the GIC has seen the above */
->>>  	dsb(sy);
->>> +
->>> +	return 0;
->>>  }
->>>  
->>>  static void its_cpu_init_collection(void)
->>> @@ -1789,12 +1804,17 @@ static bool gic_rdists_supports_plpis(void)
->>>  
->>>  int its_cpu_init(void)
->>>  {
->>> +	int ret;
->>> +
->>>  	if (!list_empty(&its_nodes)) {
->>>  		if (!gic_rdists_supports_plpis()) {
->>>  			pr_info("CPU%d: LPIs not supported\n", smp_processor_id());
->>>  			return -ENXIO;
->>>  		}
->>> -		its_cpu_init_lpis();
->>> +		ret = its_cpu_init_lpis();
->>> +		if (ret)
->>> +			return ret;
->> This is not enough, you have to skip all the disabled collections
->> inside the function its_set_affinity() when mapping an event to
->> collection. Otherwise all LPIs might mapped to collection 0, causes
->> the possibility of memory corruption by GICR hardware on updating
->> incorrect PENDING table.
-> I'm not sure I understand what you mean here.
+I've asked the people with the right knowledge about the correct API to use (Hi Catalin!),
+and during the review it did not throw any red flags. I guess, given Bjorn's comment,
+that everyone assumed AArch64 is the same as all other architectures and pgprot_device
+is synonymous to pgprot_noncached.
 
-Don't initialize a collection in case of errors is the right approach but rest of the ITS driver should not be accessing the disabled collection. It would be better to keep some kind of validation check inside function its_set_affinity().
+> 
+> a) should we then use a Fixes tag for this patch ?
 
-static int its_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
-                bool force)
-{
-...
+I'm not aware of issues being reported, but Lorenzo might have more info on this.
 
-    target_col = &its_dev->its->collections[cpu];
-    its_send_movi(its_dev, target_col, id);
-    its_dev->event_map.col_map[id] = cpu;
+> b) it does not seem clear what the semantics for pgprot_device() or even
+>    pgprot_noncached(). Can you add some ?
+> 
+> 8b921acfeffdb ("PCI: Add pci_remap_iospace() to map bus I/O resources")
+> 
+> Also this patch claims archs can override this call alone, as its __weak.
+> So is the right thing to do to change pci_remap_iospace() to pgprot_noncached()
+> or is it for archs to add their own pci_remap_iospace()? If so why ? Without
+> proper semantics defined for these helpers this is all fuzzy.
 
-    return IRQ_SET_MASK_OK_DONE;
-}
+That was the initial intention, to let arches / platforms overwrite the whole
+pci_remap_iospace(). I guess the reality is that no one needs to overwrite it except
+for the AArch64 quirk, so probably easier to remove the __weak and fix the attributes for arm64.
 
+Best regards,
+Liviu
 
-
->
-> But in any case, memory corruption may already have happened, and you
-> have no idea where. In general, finding LPIs being already enabled is
-> terminally unsafe unless we can key it on a particular implementation.
->
-
-Yes, because we are not disabling the ITS hardware in the first kernel. Better approach would be disable ITS hardware during the kernel shutdown path, but not during driver probe time. This way we can guarantee no memory corruption happens in the second (KEXEC0ed) kernel.
-
->> I believe better fix would be disable ITS on this condition.
-> This is certainly an additional fix so that we don't generate additional
-> traffic, and it would make sure that we don't lure PCI drivers into
-> using MSIs.
->
-> Thanks,
->
-> 	M.
+> 
+> > > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > > Cc: Arnd Bergmann <arnd@arndb.de>
+> > > Cc: Will Deacon <will.deacon@arm.com>
+> > > Cc: Bjorn Helgaas <bhelgaas@google.com>
+> > > Cc: Russell King <linux@armlinux.org.uk>
+> > > Cc: Catalin Marinas <catalin.marinas@arm.com>
+> > > ---
+> > >  drivers/pci/pci.c | 2 +-
+> > >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > > 
+> > > diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+> > > index bd98674..bfb3c6e 100644
+> > > --- a/drivers/pci/pci.c
+> > > +++ b/drivers/pci/pci.c
+> > > @@ -3375,7 +3375,7 @@ int pci_remap_iospace(const struct resource *res, phys_addr_t phys_addr)
+> > >  		return -EINVAL;
+> > >  
+> > >  	return ioremap_page_range(vaddr, vaddr + resource_size(res), phys_addr,
+> > > -				  pgprot_device(PAGE_KERNEL));
+> > > +				  pgprot_noncached(PAGE_KERNEL));
+> > 
+> > pgprot_device() is equivalent to pgprot_noncached() on all arches
+> > except ARM64, and I trust you're doing the right thing on ARM64, so
+> > I'm fine with this from a PCI perspective.
+> > 
+> > I do find this puzzling because I naively expected pgprot_noncached()
+> > to match up with ioremap_nocache(), and apparently it doesn't.
+> > 
+> > For example, ARM64 ioremap_nocache() uses PROT_DEVICE_nGnRE, which
+> > doesn't match the MT_DEVICE_nGnRnE in pgprot_noncached().
+> > 
+> > The point of these patches is to use non-posted mappings.  Apparently
+> > you can do that with pgprot_noncached() here, but ioremap_nocache()
+> > isn't enough for the config space mappings?
+> 
+> This is for iospace it seems, so the other patch I think was for
+> config space.
+> 
+>   Luis
+> 
+> > I suppose that's a consequence of the pgprot_noncached() vs
+> > ioremap_nocache() mismatch, but this is all extremely confusing.
+> > 
+> > >  #else
+> > >  	/* this architecture does not have memory mapped I/O space,
+> > >  	   so this function should never be called */
+> > > -- 
+> > > 2.10.0
+> > > 
+> > > 
+> > > _______________________________________________
+> > > linux-arm-kernel mailing list
+> > > linux-arm-kernel at lists.infradead.org
+> > > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> > 
+> 
+> -- 
+> Luis Rodriguez, SUSE LINUX GmbH
+> Maxfeldstrasse 5; D-90409 Nuernberg
 
 -- 
-Shanker Donthineni
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+   _
+ _|_|_
+ ('_')
+ (?  )?
+ |_|_|
