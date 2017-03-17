@@ -1,82 +1,54 @@
-From: peda@axentia.se (Peter Rosin)
-Date: Fri, 17 Mar 2017 23:24:46 +0100
-Subject: [PATCH] ARM: dts: at91: add envelope detector mux to the Axentia
- TSE-850
-Message-ID: <1489789486-30985-1-git-send-email-peda@axentia.se>
+From: cedric.madianga@gmail.com (M'boumba Cedric Madianga)
+Date: Fri, 17 Mar 2017 23:38:19 +0100
+Subject: [PATCH 3/5] i2c: i2c-stm32f7: add driver
+In-Reply-To: <5539f058-f2a1-ff78-6dd8-aa2119ce8c49@baylibre.com>
+References: <1489744738-21632-1-git-send-email-cedric.madianga@gmail.com>
+ <1489744738-21632-4-git-send-email-cedric.madianga@gmail.com>
+ <6ae90186-0e8d-654b-c9e3-2d1b4daf6198@baylibre.com>
+ <CAOAejn0Hs7QOgcrHM2t3NsFQeD9dyvThDK-8iM1Lvb7Qv4fGGQ@mail.gmail.com>
+ <971895d3-2fe6-ecb6-9dc3-ee71193b34ee@baylibre.com>
+ <CAOAejn0ScANyMEWnBfe0G8xQ5TbR-XYwEdXLkNexqC=AigBNJA@mail.gmail.com>
+ <5539f058-f2a1-ff78-6dd8-aa2119ce8c49@baylibre.com>
+Message-ID: <CAOAejn00O7n1UAyH7VTbgT076ZxS20TSvzfEfgw8bsA80Qgdyg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The envelope detector can analyze 6 different signals, selectable with a
-mux controlled by three gpio pins.
+Hi Neil,
 
-Signed-off-by: Peter Rosin <peda@axentia.se>
----
+>> As, I2C rise/fall time have some impacts in I2C timings value, the
+>> question is: it is very relevant to let customer control these
+>> parameters ?
+>
+> Actually, you could specify a different rise time in DT if it's relevant for
+> a specific design, this is why you have the following DT attributes :
+> - i2c-scl-falling-time-ns
+> - i2c-scl-internal-delay-ns
+> - i2c-scl-rising-time-ns
+> - i2c-sda-falling-time-ns
+>
+>> If the answer is NO, I agree with you, it is better to use your
+>> formula and remove this property from DT.
+>> If the answer is YES, I think we should keep ST tool.
+>
+> Note that the ST tool calculations are tied to the clock source frequency, so either
+> you provide a table for all the possible clock source frequencies or calculate dynamically.
+> Having a single parameter for a single frequency is, from my point of view, not acceptable.
+>
+> And, I don't think it's a military secret to have (at least) a simplified algorithm from ST...
+> since you have very detailed explanations in the public manuals !
 
-Hi!
+OK. I will do some trials with your algorithm and push it in the V2.
+Thanks
 
-This patch makes use of the mux subsystem and a couple of drivers
-available in linux-next since a week or two. The stuff this depends
-on has relevant acks, specifically on the DT bindings, so the bindings
-should be stable and not cause trouble for this patch. Which is why I
-thought I'd try to get this in for v4.12-rc1 along with that mux
-subsystem series.
+>
+> OK, but I think the I2C and DT maintainers are also involved in these kind of decisions.
+> They should also give their advice.
 
-Please consider applying.
+I already upstream an I2C driver with this approach: "i2c-stm32f4".
+I don't think that Wolfram or Rob will change the philosophy for this driver.
+Then, I also don't think that the machine code for F0/F1/L0/L4 will be
+pushed in the mainline as it will be completely useless to port a
+linux kernel for this kind of chip.
 
-Cheers,
-peda
-
-arch/arm/boot/dts/at91-tse850-3.dts | 29 ++++++++++++++++++++++++++++-
- 1 file changed, 28 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/at91-tse850-3.dts b/arch/arm/boot/dts/at91-tse850-3.dts
-index 669a2c6bdefc..7a68805a4eb5 100644
---- a/arch/arm/boot/dts/at91-tse850-3.dts
-+++ b/arch/arm/boot/dts/at91-tse850-3.dts
-@@ -86,16 +86,43 @@
- 		#io-channel-cells = <1>;
- 	};
- 
--	envelope-detector {
-+	env_det: envelope-detector {
- 		compatible = "axentia,tse850-envelope-detector";
- 		io-channels = <&dac 0>;
- 		io-channel-names = "dac";
-+		#io-channel-cells = <1>;
- 
- 		interrupt-parent = <&pioA>;
- 		interrupts = <3 IRQ_TYPE_EDGE_RISING>;
- 		interrupt-names = "comp";
- 	};
- 
-+	mux: mux-controller {
-+		compatible = "mux-gpio";
-+		#mux-control-cells = <0>;
-+
-+		mux-gpios = <&pioA 0 GPIO_ACTIVE_HIGH>,
-+			    <&pioA 1 GPIO_ACTIVE_HIGH>,
-+			    <&pioA 2 GPIO_ACTIVE_HIGH>;
-+		idle-state = <0>;
-+	};
-+
-+	envelope-detector-mux {
-+		compatible = "io-channel-mux";
-+		io-channels = <&env_det 0>;
-+		io-channel-names = "parent";
-+
-+		mux-controls = <&mux>;
-+
-+		channels = "", "",
-+			 "sync-1",
-+			 "in",
-+			 "out",
-+			 "sync-2",
-+			 "sys-reg",
-+			 "ana-reg";
-+	};
-+
- 	leds {
- 		compatible = "gpio-leds";
- 
--- 
-2.1.4
+BR,
+Cedric
