@@ -1,32 +1,36 @@
-From: cedric.madianga@gmail.com (M'boumba Cedric Madianga)
-Date: Fri, 17 Mar 2017 10:58:58 +0100
-Subject: [PATCH 5/5] ARM: dts: stm32: Add I2C1 support for STM32F746 eval board
-In-Reply-To: <1489744738-21632-1-git-send-email-cedric.madianga@gmail.com>
-References: <1489744738-21632-1-git-send-email-cedric.madianga@gmail.com>
-Message-ID: <1489744738-21632-6-git-send-email-cedric.madianga@gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 17 Mar 2017 09:59:46 +0000
+Subject: [PATCH] ARM: wire up statx syscall
+In-Reply-To: <20170317094204.15630-1-chris.packham@alliedtelesis.co.nz>
+References: <20170317094204.15630-1-chris.packham@alliedtelesis.co.nz>
+Message-ID: <20170317095945.GY21222@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds I2C1 support for STM32F746 eval board
+You obviously have not looked in linux-next.
 
-Signed-off-by: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
----
- arch/arm/boot/dts/stm32746g-eval.dts | 6 ++++++
- 1 file changed, 6 insertions(+)
+Not applying _your_ patch.
 
-diff --git a/arch/arm/boot/dts/stm32746g-eval.dts b/arch/arm/boot/dts/stm32746g-eval.dts
-index aa03fac..19cb82d 100644
---- a/arch/arm/boot/dts/stm32746g-eval.dts
-+++ b/arch/arm/boot/dts/stm32746g-eval.dts
-@@ -94,3 +94,9 @@
- 	pinctrl-names = "default";
- 	status = "okay";
- };
-+
-+&i2c1 {
-+	pinctrl-0 = <&i2c1_pins_b>;
-+	pinctrl-names = "default";
-+	status = "okay";
-+};
+On Fri, Mar 17, 2017 at 10:42:04PM +1300, Chris Packham wrote:
+> Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
+> ---
+>  arch/arm/tools/syscall.tbl | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/tools/syscall.tbl b/arch/arm/tools/syscall.tbl
+> index 3c2cb5d5adfa..0bb0e9c6376c 100644
+> --- a/arch/arm/tools/syscall.tbl
+> +++ b/arch/arm/tools/syscall.tbl
+> @@ -411,3 +411,4 @@
+>  394	common	pkey_mprotect		sys_pkey_mprotect
+>  395	common	pkey_alloc		sys_pkey_alloc
+>  396	common	pkey_free		sys_pkey_free
+> +397	common	statx			sys_statx
+> -- 
+> 2.11.0.24.ge6920cf
+> 
+
 -- 
-1.9.1
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
