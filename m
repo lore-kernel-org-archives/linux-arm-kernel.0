@@ -1,34 +1,65 @@
-From: fisaksen@baylibre.com (Frode Isaksen)
-Date: Fri, 17 Mar 2017 16:41:10 +0100
-Subject: [PATCH] spi: davinci: add comment about dummy tx buffer usage
-Message-ID: <1489765270-17950-1-git-send-email-fisaksen@baylibre.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 17 Mar 2017 08:41:26 -0700
+Subject: [PATCHv2 5/9] ARM: OMAP2+: hwmod: assign main clock from DT if
+ available
+In-Reply-To: <1489741781-12816-6-git-send-email-t-kristo@ti.com>
+References: <1489741781-12816-1-git-send-email-t-kristo@ti.com>
+ <1489741781-12816-6-git-send-email-t-kristo@ti.com>
+Message-ID: <20170317154126.GU20572@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add explanation about using the the rx buffer as the
-dummy tx buffer.
+* Tero Kristo <t-kristo@ti.com> [170317 02:12]:
+> -static int _init_main_clk(struct omap_hwmod *oh)
+> +static int _init_main_clk(struct omap_hwmod *oh, struct device_node *np)
+>  {
+>  	int ret = 0;
+> -	char name[MOD_CLK_MAX_NAME_LEN];
+> -	struct clk *clk;
+> -	static const char modck[] = "_mod_ck";
+> -
+> -	if (strlen(oh->name) >= MOD_CLK_MAX_NAME_LEN - strlen(modck))
+> -		pr_warn("%s: warning: cropping name for %s\n", __func__,
+> -			oh->name);
+> +	struct clk *clk = NULL;
+> +	int i;
+> +	int count;
+> +	const char *name;
+> +	char clk_name[strlen("clkctrl-x") + 1];
+>  
+> -	strlcpy(name, oh->name, MOD_CLK_MAX_NAME_LEN - strlen(modck));
+> -	strlcat(name, modck, MOD_CLK_MAX_NAME_LEN);
+> +	if (np) {
+> +		clk = of_clk_get_by_name(np, "clkctrl");
+> +		if (IS_ERR(clk)) {
+> +			/* Try matching by hwmod name */
+> +			count = of_property_count_strings(np, "ti,hwmods");
+> +			for (i = 0; i < count; i++) {
+> +				ret = of_property_read_string_index(np,
+> +								    "ti,hwmods",
+> +								    i, &name);
+> +				if (ret)
+> +					continue;
+> +				if (!strcmp(name, oh->name)) {
+> +					sprintf(clk_name, "clkctrl-%d", i);
+> +					clk = of_clk_get_by_name(np, clk_name);
+> +				}
+> +			}
+> +		}
+> +		if (!IS_ERR(clk)) {
+> +			pr_debug("%s: mapped main_clk %s for %s\n", __func__,
+> +				 __clk_get_name(clk), oh->name);
+> +			oh->main_clk = __clk_get_name(clk);
+> +			oh->_clk = clk;
+> +			soc_ops.disable_direct_prcm(oh);
+> +		}
+> +	}
 
-Signed-off-by: Frode Isaksen <fisaksen@baylibre.com>
----
- drivers/spi/spi-davinci.c | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+You should bail out and do nothing here if legacy "ti,hwmods" property is
+not found. Eventually it will be the interconnect target IP wrapper module
+that will manage the clock and populate the rest of the hwmod data
+dynamically.
 
-diff --git a/drivers/spi/spi-davinci.c b/drivers/spi/spi-davinci.c
-index f37bbdd..595acdc 100644
---- a/drivers/spi/spi-davinci.c
-+++ b/drivers/spi/spi-davinci.c
-@@ -660,7 +660,11 @@ static int davinci_spi_bufs(struct spi_device *spi, struct spi_transfer *t)
- 			goto err_desc;
- 
- 		if (!t->tx_buf) {
--			/* use rx buffer as dummy tx buffer */
-+			/* To avoid errors when doing rx-only transfers with
-+			 * many SG entries (> 20), use the rx buffer as the
-+			 * dummy tx buffer so that dma reloads are done at the
-+			 * same time for rx and tx.
-+			 */
- 			t->tx_sg.sgl = t->rx_sg.sgl;
- 			t->tx_sg.nents = t->rx_sg.nents;
- 		}
--- 
-2.7.4
+Regards,
+
+Tony
