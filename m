@@ -1,101 +1,84 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 17 Mar 2017 20:01:54 +0000
-Subject: [PATCH v21 13/13] acpi/arm64: Add SBSA Generic Watchdog support
- in GTDT driver
-In-Reply-To: <20170206185015.12296-14-fu.wei@linaro.org>
-References: <20170206185015.12296-1-fu.wei@linaro.org>
- <20170206185015.12296-14-fu.wei@linaro.org>
-Message-ID: <20170317200153.GF15909@leverpostej>
+From: dwmw2@infradead.org (David Woodhouse)
+Date: Fri, 17 Mar 2017 20:03:11 +0000
+Subject: [PATCH v33 00/14] add kdump support
+In-Reply-To: <372d44fe-2d78-596a-55c6-307cb36d60a2@arm.com>
+References: <20170315095656.24992-1-takahiro.akashi@linaro.org>
+ <1489750991.17202.40.camel@infradead.org>
+ <1489759373.17202.44.camel@infradead.org>
+ <20170317153358.GI5940@leverpostej>
+ <1489765628.17202.59.camel@infradead.org>
+ <20170317162421.GK5940@leverpostej>
+ <e75aaa3f-0d87-2523-d7d7-cef56e5bd480@arm.com>
+ <372d44fe-2d78-596a-55c6-307cb36d60a2@arm.com>
+Message-ID: <1489780991.17202.70.camel@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 07, 2017 at 02:50:15AM +0800, fu.wei at linaro.org wrote:
-> +static int __init gtdt_import_sbsa_gwdt(struct acpi_gtdt_watchdog *wd,
-> +					int index)
-> +{
-> +	struct platform_device *pdev;
-> +	int irq = map_gt_gsi(wd->timer_interrupt, wd->timer_flags);
-> +	int no_irq = 1;
-> +
-> +	/*
-> +	 * According to SBSA specification the size of refresh and control
-> +	 * frames of SBSA Generic Watchdog is SZ_4K(Offset 0x000 ? 0xFFF).
-> +	 */
-> +	struct resource res[] = {
-> +		DEFINE_RES_MEM(wd->control_frame_address, SZ_4K),
-> +		DEFINE_RES_MEM(wd->refresh_frame_address, SZ_4K),
-> +		DEFINE_RES_IRQ(irq),
-> +	};
-> +
-> +	pr_debug("found a Watchdog (0x%llx/0x%llx gsi:%u flags:0x%x).\n",
-> +		 wd->refresh_frame_address, wd->control_frame_address,
-> +		 wd->timer_interrupt, wd->timer_flags);
-> +
-> +	if (!(wd->refresh_frame_address && wd->control_frame_address)) {
-> +		pr_err(FW_BUG "failed to get the Watchdog base address.\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	if (!wd->timer_interrupt)
-> +		pr_warn(FW_BUG "failed to get the Watchdog interrupt.\n");
+On Fri, 2017-03-17 at 17:10 +0000, Marc Zyngier wrote:
+> 
+> > > > 
+> > > > FWIW if I trigger a crash on CPU 1 my kdump (still 4.9.8+v32) doesn't work.
+> > > > I end up booting the kdump kernel on CPU#1 and then it gets distinctly unhappy...
+> > > > 
+> > > > [????0.000000] Booting Linux on physical CPU 0x1
+> > > > ...
+> > > > [????0.017125] Detected PIPT I-cache on CPU1
+> > > > [????0.017138] GICv3: CPU1: found redistributor 0 region 0:0x00000000f0280000
+> > > > [????0.017147] CPU1: Booted secondary processor [411fd073]
+> > > > [????0.017339] Detected PIPT I-cache on CPU2
+> > > > [????0.017347] GICv3: CPU2: found redistributor 2 region 0:0x00000000f02c0000
+> > > > [????0.017354] CPU2: Booted secondary processor [411fd073]
+> > > > [????0.017537] Detected PIPT I-cache on CPU3
+> > > > [????0.017545] GICv3: CPU3: found redistributor 3 region 0:0x00000000f02e0000
+> > > > [????0.017551] CPU3: Booted secondary processor [411fd073]
+> > > > [????0.017576] Brought up 4 CPUs
+> > > > [????0.017587] SMP: Total of 4 processors activated.
+> > > > ...
+> > > > [???31.745809] INFO: rcu_sched detected stalls on CPUs/tasks:
+> > > > [???31.751299]?	1-...: (30 GPs behind) idle=c90/0/0 softirq=0/0 fqs=0?
+> > > > [???31.757557]?	2-...: (30 GPs behind) idle=608/0/0 softirq=0/0 fqs=0?
+> > > > [???31.763814]?	3-...: (30 GPs behind) idle=604/0/0 softirq=0/0 fqs=0?
+> > > > [???31.770069]?	(detected by 0, t=5252 jiffies, g=-270, c=-271, q=0)
+> > > > [???31.776161] Task dump for CPU 1:
+> > > > [???31.779381] swapper/1???????R??running task????????0?????0??????1 0x00000080
+> > > > [???31.786446] Task dump for CPU 2:
+> > > > [???31.789666] swapper/2???????R??running task????????0?????0??????1 0x00000080
+> > > > [???31.796725] Task dump for CPU 3:
+> > > > [???31.799945] swapper/3???????R??running task????????0?????0??????1 0x00000080
+> > > > 
+> > > > Is some of that platform-specific?
+> > > That sounds like timer interrupts aren't being taken.
+> > > 
+> > > Given that the CPUs have come up, my suspicion would be that the GIC's
+> > > been left in some odd state, that the kdump kernel hasn't managed to
+> > > recover from.
+> > > 
+> > > Marc may have an idea.
+> > I thought kdump was UP only? Anyway, this doesn't look too good.
+> > 
+> > It would be interesting to find out whether we're still taking
+> > interrupts. Also, being able to reproduce this on mainline would be useful.
+> > 
+> > I wonder if we don't have a bug when booting on something other than
+> > CPU#0, possibly on a GICv3 platform... I'll give it a go.
+> Went ahead and tried a couple of kexecs with various CPUs disabled in
+> order to force kexec not to boot on CPU#0, and the VM did boot just fine.
+> 
+> So I'd really appreciate a mainline reproducer.
 
-I've not been able to find where the ACPI spec says that zero is not a
-valid GSIV. This may simply be an oversight/ambiguity in the spec.
+I booted an up-to-date 4.11-rc2 kernel with the v33 patch set. I cannot
+reproduce.
 
-Is there any statement to that effect?
+But then again, I can't reproduce it on 4.9 *either* any more. And that
+is precisely the same kernel image I uploaded earlier. So it appears to
+be sporadic, and just *happened* to hit me the first time I tried...
+which is probably just as well or I'd never have tried that again :)
 
-> +	else if (irq <= 0)
-> +		pr_warn("failed to map the Watchdog interrupt.\n");
-> +	else
-> +		no_irq = 0;
-> +
-> +	/*
-> +	 * Add a platform device named "sbsa-gwdt" to match the platform driver.
-> +	 * "sbsa-gwdt": SBSA(Server Base System Architecture) Generic Watchdog
-> +	 * The platform driver (like drivers/watchdog/sbsa_gwdt.c)can get device
-> +	 * info below by matching this name.
-> +	 */
-> +	pdev = platform_device_register_simple("sbsa-gwdt", index, res,
-> +					       ARRAY_SIZE(res) - no_irq);
-
-This no_irq variable is messy and confusing.
-
-Get rid of no_irq, and replace it with nr_res, initialised to
-ARRAY_SIZE(res). If there's no interrupt, subtract one.
-
-[...]
-
-> +	for_each_platform_timer(platform_timer) {
-> +		if (is_watchdog(platform_timer)) {
-> +			ret = gtdt_import_sbsa_gwdt(platform_timer, i);
-> +			if (ret)
-> +				break;
-> +			i++;
-> +		}
-> +	}
-> +
-> +	if (i)
-> +		pr_info("found %d SBSA generic Watchdog(s).\n", i);
-
-My reading of SBSA is that there is one watchdog in the system.
-
-Is that not the case?
-
-[...]
-
-> diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
-> index acb00b5..c899df1 100644
-> --- a/drivers/watchdog/Kconfig
-> +++ b/drivers/watchdog/Kconfig
-> @@ -219,6 +219,7 @@ config ARM_SBSA_WATCHDOG
->  	tristate "ARM SBSA Generic Watchdog"
->  	depends on ARM64
->  	depends on ARM_ARCH_TIMER
-> +	depends on ACPI_GTDT || !ACPI
-
-I don't think this is necessary.
-
-This series hasn't touched this driver code at all.
-
-Thanks,
-Mark.
+I'll keep trying.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: smime.p7s
+Type: application/x-pkcs7-signature
+Size: 4938 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170317/a232a3dc/attachment-0001.bin>
