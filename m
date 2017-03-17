@@ -1,50 +1,49 @@
-From: mka@chromium.org (Matthias Kaehlcke)
-Date: Fri, 17 Mar 2017 14:01:33 -0700
-Subject: [PATCH] [media] vcodec: mediatek: Remove double parentheses
-Message-ID: <20170317210133.9662-1-mka@chromium.org>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Sat, 18 Mar 2017 05:23:15 +0800
+Subject: [PATCH] ARM: sun8i: a23/a33: drop bl_en_pin GPIO pinmux in reference
+ design DTSI
+Message-ID: <20170317212315.2561-1-icenowy@aosc.xyz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The extra pairs of parentheses are not needed and cause clang
-warnings like this:
+The bl_en_pin GPIO pinmux is configured as "gpio_in", which makes it
+conflicts with the real GPIO usage (out), and makes the backlight not
+usable.
 
-drivers/media/platform/mtk-vcodec/venc/venc_vp8_if.c:158:32: error: equality comparison with extraneous parentheses [-Werror,-Wparentheses-equality]
-                if ((inst->work_bufs[i].size == 0))
-                     ~~~~~~~~~~~~~~~~~~~~~~~~^~~~
-drivers/media/platform/mtk-vcodec/venc/venc_vp8_if.c:158:32: note: remove extraneous parentheses around the comparison to silence this warning
-                if ((inst->work_bufs[i].size == 0))
-                    ~                        ^   ~
-drivers/media/platform/mtk-vcodec/venc/venc_vp8_if.c:158:32: note: use '=' to turn this equality comparison into an assignment
-                if ((inst->work_bufs[i].size == 0))
-                                             ^~
-                                             =
+Drop the GPIO pinmux for it, thus this GPIO can be correctly used.
 
-Signed-off-by: Matthias Kaehlcke <mka@chromium.org>
+Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
 ---
- drivers/media/platform/mtk-vcodec/venc/venc_vp8_if.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/media/platform/mtk-vcodec/venc/venc_vp8_if.c b/drivers/media/platform/mtk-vcodec/venc/venc_vp8_if.c
-index 544f57186243..129cc74b4fe4 100644
---- a/drivers/media/platform/mtk-vcodec/venc/venc_vp8_if.c
-+++ b/drivers/media/platform/mtk-vcodec/venc/venc_vp8_if.c
-@@ -155,7 +155,7 @@ static void vp8_enc_free_work_buf(struct venc_vp8_inst *inst)
+Please patch latest git tree master too, as this issue affects 4.11-rc.
+
+ arch/arm/boot/dts/sun8i-reference-design-tablet.dtsi | 7 -------
+ 1 file changed, 7 deletions(-)
+
+diff --git a/arch/arm/boot/dts/sun8i-reference-design-tablet.dtsi b/arch/arm/boot/dts/sun8i-reference-design-tablet.dtsi
+index 9f097a3d723d..4ae638901159 100644
+--- a/arch/arm/boot/dts/sun8i-reference-design-tablet.dtsi
++++ b/arch/arm/boot/dts/sun8i-reference-design-tablet.dtsi
+@@ -50,8 +50,6 @@
  
- 	/* Buffers need to be freed by AP. */
- 	for (i = 0; i < VENC_VP8_VPU_WORK_BUF_MAX; i++) {
--		if ((inst->work_bufs[i].size == 0))
-+		if (inst->work_bufs[i].size == 0)
- 			continue;
- 		mtk_vcodec_mem_free(inst->ctx, &inst->work_bufs[i]);
- 	}
-@@ -172,7 +172,7 @@ static int vp8_enc_alloc_work_buf(struct venc_vp8_inst *inst)
- 	mtk_vcodec_debug_enter(inst);
+ 	backlight: backlight {
+ 		compatible = "pwm-backlight";
+-		pinctrl-names = "default";
+-		pinctrl-0 = <&bl_en_pin>;
+ 		pwms = <&pwm 0 50000 PWM_POLARITY_INVERTED>;
+ 		brightness-levels = <0 10 20 30 40 50 60 70 80 90 100>;
+ 		default-brightness-level = <8>;
+@@ -83,11 +81,6 @@
+ };
  
- 	for (i = 0; i < VENC_VP8_VPU_WORK_BUF_MAX; i++) {
--		if ((wb[i].size == 0))
-+		if (wb[i].size == 0)
- 			continue;
- 		/*
- 		 * This 'wb' structure is set by VPU side and shared to AP for
+ &pio {
+-	bl_en_pin: bl_en_pin at 0 {
+-		pins = "PH6";
+-		function = "gpio_in";
+-	};
+-
+ 	mmc0_cd_pin: mmc0_cd_pin at 0 {
+ 		pins = "PB4";
+ 		function = "gpio_in";
 -- 
-2.12.0.367.g23dc2f6d3c-goog
+2.12.0
