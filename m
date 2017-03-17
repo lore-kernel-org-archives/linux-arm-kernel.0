@@ -1,84 +1,111 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 17 Mar 2017 14:39:11 +0000
-Subject: [PATCH v3 07/19] KVM: arm64: ITS: Report the ITE size in
- GITS_TYPER
-In-Reply-To: <1488800074-21991-8-git-send-email-eric.auger@redhat.com>
-References: <1488800074-21991-1-git-send-email-eric.auger@redhat.com>
- <1488800074-21991-8-git-send-email-eric.auger@redhat.com>
-Message-ID: <abdb6d8a-4572-a604-cee3-6e2dd0ffa181@arm.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 17 Mar 2017 14:37:43 +0000
+Subject: [PATCH v4 14/36] [media] v4l2-mc: add a function to inherit
+ controls from a pipeline
+In-Reply-To: <1489758670.2905.52.camel@pengutronix.de>
+References: <20170310125342.7f047acf@vento.lan>
+ <20170310223714.GI3220@valkosipuli.retiisi.org.uk>
+ <20170311082549.576531d0@vento.lan>
+ <20170313124621.GA10701@valkosipuli.retiisi.org.uk>
+ <20170314004533.3b3cd44b@vento.lan>
+ <e0a6c60b-1735-de0b-21f4-d8c3f4b3f10f@xs4all.nl>
+ <20170317114203.GZ21222@n2100.armlinux.org.uk>
+ <44161453-02f9-0019-3868-7501967a6a82@linux.intel.com>
+ <20170317102410.18c966ae@vento.lan>
+ <1489758670.2905.52.camel@pengutronix.de>
+Message-ID: <20170317143743.GG21222@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 06/03/17 11:34, Eric Auger wrote:
-> An ITE size of 8 Bytes is reported to the guest. Combining this
-> information with the number of event IDs the guest wants to support,
-> this latter will be able to allocate each device's ITT with the
-> right size.
+On Fri, Mar 17, 2017 at 02:51:10PM +0100, Philipp Zabel wrote:
+> On Fri, 2017-03-17 at 10:24 -0300, Mauro Carvalho Chehab wrote:
+> [...]
+> > The big question, waiting for an answer on the last 8 years is
+> > who would do that? Such person would need to have several different
+> > hardware from different vendors, in order to ensure that it has
+> > a generic solution.
+> > 
+> > It is a way more feasible that the Kernel developers that already 
+> > have a certain hardware on their hands to add support inside the
+> > driver to forward the controls through the pipeline and to setup
+> > a "default" pipeline that would cover the common use cases at
+> > driver's probe.
 > 
-> Signed-off-by: Eric Auger <eric.auger@redhat.com>
-> 
-> ---
-> 
-> v1 -> v2:
-> - correct ITT_ENTRY_SIZE field
-> - remove ITE_SIZE since all entries become 8 bytes
-> ---
->  include/linux/irqchip/arm-gic-v3.h | 1 +
->  virt/kvm/arm/vgic/vgic-its.c       | 5 ++++-
->  2 files changed, 5 insertions(+), 1 deletion(-)
-> 
-> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-> index 672cfef..d81f10f 100644
-> --- a/include/linux/irqchip/arm-gic-v3.h
-> +++ b/include/linux/irqchip/arm-gic-v3.h
-> @@ -232,6 +232,7 @@
->  #define GITS_CTLR_QUIESCENT		(1U << 31)
->  
->  #define GITS_TYPER_PLPIS		(1UL << 0)
-> +#define GITS_TYPER_ITT_ENTRY_SIZE_SHIFT	4
->  #define GITS_TYPER_IDBITS_SHIFT		8
->  #define GITS_TYPER_DEVBITS_SHIFT	13
->  #define GITS_TYPER_DEVBITS(r)		((((r) >> GITS_TYPER_DEVBITS_SHIFT) & 0x1f) + 1)
-> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-> index 6120c6e..6d84508 100644
-> --- a/virt/kvm/arm/vgic/vgic-its.c
-> +++ b/virt/kvm/arm/vgic/vgic-its.c
-> @@ -176,6 +176,8 @@ static struct its_ite *find_ite(struct vgic_its *its, u32 device_id,
->  
->  #define GIC_LPI_OFFSET 8192
->  
-> +#define VITS_ESZ 8
-> +
->  /*
->   * Finds and returns a collection in the ITS collection table.
->   * Must be called with the its_lock mutex held.
-> @@ -399,6 +401,7 @@ static unsigned long vgic_mmio_read_its_typer(struct kvm *kvm,
->  	 */
->  	reg |= 0x0f << GITS_TYPER_DEVBITS_SHIFT;
->  	reg |= 0x0f << GITS_TYPER_IDBITS_SHIFT;
-> +	reg |= (VITS_ESZ - 1) << GITS_TYPER_ITT_ENTRY_SIZE_SHIFT;
->  
->  	return extract_bytes(reg, addr & 7, len);
->  }
-> @@ -1387,7 +1390,7 @@ static int vgic_register_its_iodev(struct kvm *kvm, struct vgic_its *its)
->  	(GIC_BASER_CACHEABILITY(GITS_BASER, INNER, RaWb)		| \
->  	 GIC_BASER_CACHEABILITY(GITS_BASER, OUTER, SameAsInner)		| \
->  	 GIC_BASER_SHAREABILITY(GITS_BASER, InnerShareable)		| \
-> -	 ((8ULL - 1) << GITS_BASER_ENTRY_SIZE_SHIFT)			| \
-> +	 ((u64)(VITS_ESZ - 1) << GITS_BASER_ENTRY_SIZE_SHIFT)		| \
+> Actually, would setting pipeline via libv4l2 plugin and letting drivers
+> provide a sane enabled default pipeline configuration be mutually
+> exclusive? Not sure about the control forwarding, but at least a simple
+> link setup and format forwarding would also be possible in the kernel
+> without hindering userspace from doing it themselves later.
 
-Nit: wouldn't (VITS_ESZ - 1ULL) save you the cast? Or you define
-VITS_ESZ to 8ULL above.
+I think this is the exact same problem as controls in ALSA.
 
-But apart from that:
-Reviewed-by: Andre Przywara <andre.przywara@arm.com>
+When ALSA started off in life, the requirement was that all controls
+shall default to minimum, and the user is expected to adjust controls
+after the system is running.
 
-Cheers,
-Andre.
+After OSS, this gave quite a marked change in system behaviour, and
+led to a lot of "why doesn't my sound work anymore" problems, because
+people then had to figure out which combination of controls had to be
+set to get sound out of their systems.
 
->  	 GITS_BASER_PAGE_SIZE_64K)
->  
->  #define INITIAL_PROPBASER_VALUE						  \
-> 
+Now it seems to be much better, where install Linux on a platform, and
+you have a working sound system (assuming that the drivers are all there
+which is generally the case for x86.)
+
+However, it's still possible to adjust all the controls from userspace.
+All that's changed is the defaults.
+
+Why am I mentioning this - because from what I understand Mauro saying,
+it's no different from this situation.  Userspace will still have the
+power to disable all links and setup its own.  The difference is that
+there will be a default configuration that the kernel sets up at boot
+time that will be functional, rather than the current default
+configuration where the system is completely non-functional until
+manually configured.
+
+However, at the end of the day, I don't care _where_ the usability
+problems are solved, only that there is some kind of solution.  It's not
+the _where_ that's the real issue here, but the _how_, and discussion of
+the _how_ is completely missing.
+
+So, let's try kicking off a discussion about _how_ to do things.
+
+_How_ do we setup a media controller system so that we end up with a
+usable configuration - let's start with the obvious bit... which links
+should be enabled.
+
+I think the first pre-requisit is that we stop exposing capture devices
+that can never be functional for the hardware that's present on the board,
+so that there isn't this plentora of useless /dev/video* nodes and useless
+subdevices.
+
+One possible solution to finding a default path may be "find the shortest
+path between the capture device and the sensor and enable intervening
+links".
+
+Then we need to try configuring that path with format/resolution
+information.
+
+However, what if something in the shortest path can't handle the format
+that the sensor produces?  I think at that point, we'd need to drop that
+subdev out of the path resolution, re-run the "find the shortest path"
+algorithm, and try again.
+
+Repeat until success or no path between the capture and sensor exists.
+
+This works fine if you have just one sensor visible from a capture device,
+but not if there's more than one (which I suspect is the case with the
+Sabrelite board with its two cameras and video receiver.)  That breaks
+the "find the shortest path" algorithm.
+
+So, maybe it's a lot better to just let the board people provide via DT
+a default setup for the connectivity of the modules somehow - certainly
+one big step forward would be to disable in DT parts of the capture
+system that can never be used (remembering that boards like the RPi /
+Hummingboard may end up using DT overlays to describe this for different
+cameras, so the capture setup may change after initial boot.)
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
