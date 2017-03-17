@@ -1,41 +1,47 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Fri, 17 Mar 2017 10:13:13 -0400
-Subject: [PATCH] pata_pcmcia: add EBSA110's PCMCIA slot support
-In-Reply-To: <11380780.Ccg1NEX8q5@amdc3058>
-References: <CGME20170314175046epcas1p43f98daad14a2bac7f314e7d39e120232@epcas1p4.samsung.com>
- <1533391.BtkrkgvqUW@amdc3058>
- <20170317133900.GA5078@htj.duckdns.org>
- <11380780.Ccg1NEX8q5@amdc3058>
-Message-ID: <20170317141313.GC5078@htj.duckdns.org>
+From: shuahkh@osg.samsung.com (Shuah Khan)
+Date: Fri, 17 Mar 2017 08:27:08 -0600
+Subject: [PATCH] usb: dwc3 dwc3_exynos_probe() change goto labels to
+ meaningful names
+In-Reply-To: <CAFp+6iEQxO7HcW5xJscc9ZWkTy+LoDm7AiNsK8YOd_S3okOGfg@mail.gmail.com>
+References: <20170130192504.19046-1-shuahkh@osg.samsung.com>
+ <CAFp+6iEQxO7HcW5xJscc9ZWkTy+LoDm7AiNsK8YOd_S3okOGfg@mail.gmail.com>
+Message-ID: <3abd0519-3435-4cd4-2c64-6d648aed944b@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Fri, Mar 17, 2017 at 03:08:56PM +0100, Bartlomiej Zolnierkiewicz wrote:
-> To be honest, the main point here is to make Russell happy. ;-)
+On 03/17/2017 12:24 AM, Vivek Gautam wrote:
+> On Tue, Jan 31, 2017 at 12:55 AM, Shuah Khan <shuahkh@osg.samsung.com> wrote:
+>> Change goto labels to meaningful names from a series of errNs.
+>>
+>> Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
+>> ---
+>>
+>> Rebased to usb-next
+>>
+>>  drivers/usb/dwc3/dwc3-exynos.c | 22 +++++++++++-----------
+>>  1 file changed, 11 insertions(+), 11 deletions(-)
+>>
+>> diff --git a/drivers/usb/dwc3/dwc3-exynos.c b/drivers/usb/dwc3/dwc3-exynos.c
+>> index 1515d45..98f74ff 100644
+>> --- a/drivers/usb/dwc3/dwc3-exynos.c
+>> +++ b/drivers/usb/dwc3/dwc3-exynos.c
+>> @@ -147,53 +147,53 @@ static int dwc3_exynos_probe(struct platform_device *pdev)
+>>         exynos->vdd33 = devm_regulator_get(dev, "vdd33");
+>>         if (IS_ERR(exynos->vdd33)) {
+>>                 ret = PTR_ERR(exynos->vdd33);
+>> -               goto err2;
+>> +               goto vdd33_err;
 > 
-> This is the second time he brought EBSA110 issue while talking about
-> conversion of ARM platforms to use libata PATA so I've finally decided
-> to do the patch just to have a reference example of how to deal with
-> this and similar devices in a proper way.
+> While you are changing this in probe, care to change in
+> dwc3_exynos_register_phys() as well ?
+
+Yes I can do that.
+
 > 
-> Even though the patch can't be tested EBSA110 is still a supported ARM
-> platform and the patch should work fine in theory (+ it cannot break
-> anything).  OTOH it adds an extra code which has some cost from the
-> long-term maintenance POV.  Anyway, it is up to you to decide what to
-> do with it. :-)
+> [snip]
+> 
+> Regards
+> Vivek
 
-It's fairly low impact and I don't think it's gonna add noticeable
-maintenance overhead at all, so that part is fine but it's super weird
-to add code which we know not to have any users.  It looks like we
-can't even test it.
-
-What's the end game here?  Is it part of the effort to remove ide?  If
-so, I have no objection to that but think it isn't a pressing issue
-either and the ultimate decision has to come from Dave.
-
-Thanks.
-
--- 
-tejun
+thanks,
+-- Shuah
