@@ -1,51 +1,82 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Fri, 17 Mar 2017 18:18:35 +0100
-Subject: [PATCH v2 1/6] dt-bindings: rockchip, pinctrl: rename RK1108 to RV1108
-In-Reply-To: <20170317171840.4683-1-heiko@sntech.de>
-References: <20170317171840.4683-1-heiko@sntech.de>
-Message-ID: <20170317171840.4683-2-heiko@sntech.de>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 17 Mar 2017 17:17:44 +0000
+Subject: [RFC arm64] samples/bpf: explicitly exclude sysreg sections with
+ asm macros
+In-Reply-To: <20170316210454.GA53792@C02RW35GFVH8.dhcp.broadcom.net>
+References: <1489101492-15653-1-git-send-email-andy@greyhouse.net>
+ <20170310175229.GC18894@arm.com>
+ <20170310192656.GA13928@C02RW35GFVH8>
+ <20170310204112.GA21382@leverpostej>
+ <20170315183130.GB32819@C02RW35GFVH8.dhcp.broadcom.net>
+ <20170315191741.GB29452@leverpostej>
+ <20170315205404.GA43995@C02RW35GFVH8.dhcp.broadcom.net>
+ <20170316104204.GA31101@leverpostej>
+ <20170316210454.GA53792@C02RW35GFVH8.dhcp.broadcom.net>
+Message-ID: <20170317171744.GM5940@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andy Yan <andy.yan@rock-chips.com>
+On Thu, Mar 16, 2017 at 05:04:55PM -0400, Andy Gospodarek wrote:
+> On Thu, Mar 16, 2017 at 10:42:04AM +0000, Mark Rutland wrote:
+> > On Wed, Mar 15, 2017 at 04:54:04PM -0400, Andy Gospodarek wrote:
+> > > On Wed, Mar 15, 2017 at 07:17:41PM +0000, Mark Rutland wrote:
+> > > > On Wed, Mar 15, 2017 at 02:31:30PM -0400, Andy Gospodarek wrote:
+> > > > > On Fri, Mar 10, 2017 at 08:41:13PM +0000, Mark Rutland wrote:
 
-Rockchip finally named the SOC as RV1108, so change it.
-Also move the compatible list to one compatible per line.
+> > > > > > ... so as far as I can see it's the presence of any inline assembly that
+> > > > > > the tool cannot handle, as LLVM tells us.
 
-Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
-Acked-by: Rob Herring <robh@kernel.org>
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
- .../devicetree/bindings/pinctrl/rockchip,pinctrl.txt    | 17 ++++++++++++-----
- 1 file changed, 12 insertions(+), 5 deletions(-)
+> > > LLVM ERROR: Inline asm not supported by this streamer because we
+> > > don't have an asm parser for this target
+> > > 
+> > > Upon inspection it does not appear that this is explicitly related to
+> > > assembly macros, just simple inline assembly. 
 
-diff --git a/Documentation/devicetree/bindings/pinctrl/rockchip,pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/rockchip,pinctrl.txt
-index 403b5a272f56..ee01ab58224d 100644
---- a/Documentation/devicetree/bindings/pinctrl/rockchip,pinctrl.txt
-+++ b/Documentation/devicetree/bindings/pinctrl/rockchip,pinctrl.txt
-@@ -19,11 +19,18 @@ The pins are grouped into up to 5 individual pin banks which need to be
- defined as gpio sub-nodes of the pinmux controller.
- 
- Required properties for iomux controller:
--  - compatible: one of "rockchip,rk1108-pinctrl", "rockchip,rk2928-pinctrl"
--		       "rockchip,rk3066a-pinctrl", "rockchip,rk3066b-pinctrl"
--		       "rockchip,rk3188-pinctrl", "rockchip,rk3228-pinctrl"
--		       "rockchip,rk3288-pinctrl", "rockchip,rk3328-pinctrl"
--		       "rockchip,rk3368-pinctrl", "rockchip,rk3399-pinctrl"
-+  - compatible: should be
-+		"rockchip,rv1108-pinctrl":  for Rockchip RV1108
-+		"rockchip,rk2928-pinctrl":  for Rockchip RK2928
-+		"rockchip,rk3066a-pinctrl": for Rockchip RK3066a
-+		"rockchip,rk3066b-pinctrl": for Rockchip RK3066b
-+		"rockchip,rk3188-pinctrl":  for Rockchip RK3188
-+		"rockchip,rk3228-pinctrl":  for Rockchip RK3228
-+		"rockchip,rk3288-pinctrl":  for Rockchip RK3288
-+		"rockchip,rk3328-pinctrl":  for Rockchip RK3328
-+		"rockchip,rk3368-pinctrl":  for Rockchip RK3368
-+		"rockchip,rk3399-pinctrl":  for Rockchip RK3399
-+
-   - rockchip,grf: phandle referencing a syscon providing the
- 	 "general register files"
- 
--- 
-2.11.0
+> You are correct that it appears llvm cannot process any inline asm for
+> arm64.  Sadly (or luckily) the inability to process this is not a
+> hard-requirement for llvm to properly compile code that includes these
+> h-files -- as long as none of #defines/c-macros/inline functions are
+> actually *called* in the code I'm trying to compile.
+
+The Linux-internal arm64 headers are there to build the kernel using a
+supported toolchain. From my PoV, if you want to use the Linux-internal
+arm64 headers, you need to be compatible with the toolchain(s) that we
+target. 
+
+I would imagine the x86 developers would have a similar feeling, were
+this issue to crop up on x86.
+
+> Sorry I continue to harp on this, but I've been testing XDP on ARM64
+> using some Broadcom SoCs and I'm seeing some really nice performance
+> benefits to being able to process so many frames per second using a
+> smaller footprint device.  I'd like to see the ARM64 XDP user community
+> grow, but without the ability to easily compile the samples in the
+> upstream kernel tree today I just don't see this user- or developer-base
+> growing.  
+
+Please talk to the LLVM community, and see what is necessary in order to
+make it compatible with the toolchains we support.
+
+> > It sounds like the toolchain you are using is lacking in functionality
+> > that is presumably present when targeting x86, or the error messages are
+> > simply misleading. In either case, there's a toolchain issue to be
+> > addressed, and not a kernel issue.
+> 
+> While I generally agree isn't the entire reason this inline asm exists
+> -- to fix a binutils issue?  :-)
+> 
+> commit 72c5839515260dce966cd24f54436e6583288e6c
+> Author: Catalin Marinas <catalin.marinas@arm.com>
+> Date:   Thu Jul 24 14:14:42 2014 +0100
+> 
+>     arm64: gicv3: Allow GICv3 compilation with older binutils
+
+We introduced this code so as to *retain* compatibility with a toolchain
+that we explicitly supported, but accidentally broke with the addition
+of the GICv3 code.
+
+We have clearly never supoprted a toolchain that cannot parse inline
+asembly.
+
+Thanks,
+Mark.
