@@ -1,71 +1,41 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 17 Mar 2017 14:06:10 +0000
-Subject: [PATCH] arm: kprobes: Align stack to 8-bytes in test code
-In-Reply-To: <1489755542.3063.2.camel@linaro.org>
-References: <20170316135359.23019-1-tixy@linaro.org>
- <20170317121025.GD21222@n2100.armlinux.org.uk>
- <1489755542.3063.2.camel@linaro.org>
-Message-ID: <20170317140610.GF21222@n2100.armlinux.org.uk>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Fri, 17 Mar 2017 15:08:56 +0100
+Subject: [PATCH] pata_pcmcia: add EBSA110's PCMCIA slot support
+In-Reply-To: <20170317133900.GA5078@htj.duckdns.org>
+References: <CGME20170314175046epcas1p43f98daad14a2bac7f314e7d39e120232@epcas1p4.samsung.com>
+ <1533391.BtkrkgvqUW@amdc3058> <20170317133900.GA5078@htj.duckdns.org>
+Message-ID: <11380780.Ccg1NEX8q5@amdc3058>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 17, 2017 at 12:59:02PM +0000, Jon Medhurst (Tixy) wrote:
-> On Fri, 2017-03-17 at 12:10 +0000, Russell King - ARM Linux wrote:
-> > On Thu, Mar 16, 2017 at 01:53:59PM +0000, Jon Medhurst wrote:
-> > > Without this fix, some test cases will generate alignment faults on
-> > > systems where alignment is enforced. Even if the kernel is configured to
-> > > handle these faults in software, triggering them is ugly. It also
-> > > exposes limitations in the fault handling code which doesn't cope with
-> > > writes to the stack. E.g. when handling this instruction
-> > > 
-> > >    strd r6, [sp, #-64]!
-> > > 
-> > > the fault handling code will write to a stack location below the SP
-> > > value at the point the fault occurred, which coincides with where the
-> > > exception handler has pushed the saved register context. This results in
-> > > corruption of those registers.
+On Friday, March 17, 2017 09:39:00 AM Tejun Heo wrote:
+> Hello,
+> 
+> On Fri, Mar 17, 2017 at 12:59:56PM +0100, Bartlomiej Zolnierkiewicz wrote:
+> > There is no support for this device in the upstream ide driver but
+> > Russell has a hacky patch to make it work by redefining inb()/outb()
+> > operations globally for the whole ide subsystem, please see:
 > > 
-> > The general rule today is that the stack must always be 64-bit aligned,
-> > so an even number of registers must always be pushed to the stack.
-> > 
-> > > diff --git a/arch/arm/probes/kprobes/test-core.c b/arch/arm/probes/kprobes/test-core.c
-> > > index c893726aa52d..1c98a87786ca 100644
-> > > --- a/arch/arm/probes/kprobes/test-core.c
-> > > +++ b/arch/arm/probes/kprobes/test-core.c
-> > > @@ -977,7 +977,10 @@ static void coverage_end(void)
-> > >  void __naked __kprobes_test_case_start(void)
-> > >  {
-> > >  	__asm__ __volatile__ (
-> > > -		"stmdb	sp!, {r4-r11}				\n\t"
-> > > +		"mov	r2, sp					\n\t"
-> > > +		"bic	r3, r2, #7				\n\t"
-> > > +		"mov	sp, r3					\n\t"
-> > > +		"stmdb	sp!, {r2-r11}				\n\t"
-> > 
-> > I'm not sure these is where the problem is - on entry, the stack
-> > should be 64-bit aligned
+> > https://www.spinics.net/lists/arm-kernel/msg567454.html
 > 
-> It isn't, because GCC turns code like this
-> 
-> void foo(void)
-> {
->         asm volatile("bl __kprobes_test_case_start"
->                      : : : "r0", "r1", "r2", "r3", "ip", "lr", "memory", "cc");
-> }
-> 
-> into this...
-> 
-> 8010e4ac <foo>:
-> 8010e4ac:       e52de004        push    {lr}            ; (str lr, [sp, #-4]!)
-> 8010e4b0:       eb002c99        bl      8011971c <__kprobes_test_case_start>
-> 8010e4b4:       e49df004        pop     {pc}            ; (ldr pc, [sp], #4)
-> 
-> Perhaps we need a way of telling GCC we are using the stack but I've not
-> managed to spot a way of doing that.
+> Well, that mail says that the hardware is a museum piece.  What's the
+> point here?  This can't even be tested, can it?
 
-Using which compiler options?
+To be honest, the main point here is to make Russell happy. ;-)
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+This is the second time he brought EBSA110 issue while talking about
+conversion of ARM platforms to use libata PATA so I've finally decided
+to do the patch just to have a reference example of how to deal with
+this and similar devices in a proper way.
+
+Even though the patch can't be tested EBSA110 is still a supported ARM
+platform and the patch should work fine in theory (+ it cannot break
+anything).  OTOH it adds an extra code which has some cost from the
+long-term maintenance POV.  Anyway, it is up to you to decide what to
+do with it. :-)
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
