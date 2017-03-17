@@ -1,104 +1,48 @@
 From: leo.yan@linaro.org (Leo Yan)
-Date: Fri, 17 Mar 2017 23:02:19 +0800
-Subject: [PATCH v4 3/7] coresight: refactor with function of_coresight_get_cpu
+Date: Fri, 17 Mar 2017 23:02:21 +0800
+Subject: [PATCH v4 5/7] clk: hi6220: add debug APB clock
 In-Reply-To: <1489762943-25849-1-git-send-email-leo.yan@linaro.org>
 References: <1489762943-25849-1-git-send-email-leo.yan@linaro.org>
-Message-ID: <1489762943-25849-4-git-send-email-leo.yan@linaro.org>
+Message-ID: <1489762943-25849-6-git-send-email-leo.yan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is refactor to add function of_coresight_get_cpu(), so it's used to
-retrieve CPU id for coresight component. Finally can use it as a common
-function for multiple places.
+The debug APB clock is absent in hi6220 driver, so this patch is to add
+support for it.
 
-Suggested-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 Signed-off-by: Leo Yan <leo.yan@linaro.org>
 ---
- drivers/hwtracing/coresight/of_coresight.c | 42 +++++++++++++++++++-----------
- include/linux/coresight.h                  |  2 ++
- 2 files changed, 29 insertions(+), 15 deletions(-)
+ drivers/clk/hisilicon/clk-hi6220.c       | 1 +
+ include/dt-bindings/clock/hi6220-clock.h | 5 ++++-
+ 2 files changed, 5 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/hwtracing/coresight/of_coresight.c b/drivers/hwtracing/coresight/of_coresight.c
-index 917ca39..7a60f2b 100644
---- a/drivers/hwtracing/coresight/of_coresight.c
-+++ b/drivers/hwtracing/coresight/of_coresight.c
-@@ -101,15 +101,38 @@ static int of_coresight_alloc_memory(struct device *dev,
- 	return 0;
- }
+diff --git a/drivers/clk/hisilicon/clk-hi6220.c b/drivers/clk/hisilicon/clk-hi6220.c
+index c0e8e1f..2ae151c 100644
+--- a/drivers/clk/hisilicon/clk-hi6220.c
++++ b/drivers/clk/hisilicon/clk-hi6220.c
+@@ -134,6 +134,7 @@ static struct hisi_gate_clock hi6220_separated_gate_clks_sys[] __initdata = {
+ 	{ HI6220_UART4_PCLK,    "uart4_pclk",    "uart4_src",      CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x230, 8,  0, },
+ 	{ HI6220_SPI_CLK,       "spi_clk",       "clk_150m",       CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x230, 9,  0, },
+ 	{ HI6220_TSENSOR_CLK,   "tsensor_clk",   "clk_bus",        CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x230, 12, 0, },
++	{ HI6220_DAPB_CLK,      "dapb_clk",      "cs_dapb",        CLK_SET_RATE_PARENT|CLK_IS_CRITICAL,   0x230, 18, 0, },
+ 	{ HI6220_MMU_CLK,       "mmu_clk",       "ddrc_axi1",      CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x240, 11, 0, },
+ 	{ HI6220_HIFI_SEL,      "hifi_sel",      "hifi_src",       CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x270, 0,  0, },
+ 	{ HI6220_MMC0_SYSPLL,   "mmc0_syspll",   "syspll",         CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x270, 1,  0, },
+diff --git a/include/dt-bindings/clock/hi6220-clock.h b/include/dt-bindings/clock/hi6220-clock.h
+index 6b03c84..b8ba665 100644
+--- a/include/dt-bindings/clock/hi6220-clock.h
++++ b/include/dt-bindings/clock/hi6220-clock.h
+@@ -124,7 +124,10 @@
+ #define HI6220_CS_DAPB		57
+ #define HI6220_CS_ATB_DIV	58
  
-+int of_coresight_get_cpu(struct device_node *node)
-+{
-+	int cpu;
-+	bool found;
-+	struct device_node *dn, *np;
+-#define HI6220_SYS_NR_CLKS	59
++/* gate clock */
++#define HI6220_DAPB_CLK		59
 +
-+	dn = of_parse_phandle(node, "cpu", 0);
-+
-+	/* Affinity defaults to CPU0 */
-+	if (!dn)
-+		return 0;
-+
-+	for_each_possible_cpu(cpu) {
-+		np = of_get_cpu_node(cpu, NULL);
-+		found = (dn == np);
-+		of_node_put(np);
-+		if (found)
-+			break;
-+	}
-+	of_node_put(dn);
-+
-+	/* Affinity to CPU0 if no cpu nodes are found */
-+	return found ? cpu : 0;
-+}
-+
- struct coresight_platform_data *of_get_coresight_platform_data(
- 				struct device *dev, struct device_node *node)
- {
--	int i = 0, ret = 0, cpu;
-+	int i = 0, ret = 0;
- 	struct coresight_platform_data *pdata;
- 	struct of_endpoint endpoint, rendpoint;
- 	struct device *rdev;
--	bool found;
--	struct device_node *dn, *np;
- 	struct device_node *ep = NULL;
- 	struct device_node *rparent = NULL;
- 	struct device_node *rport = NULL;
-@@ -176,18 +199,7 @@ struct coresight_platform_data *of_get_coresight_platform_data(
- 		} while (ep);
- 	}
++#define HI6220_SYS_NR_CLKS	60
  
--	dn = of_parse_phandle(node, "cpu", 0);
--	for_each_possible_cpu(cpu) {
--		np = of_get_cpu_node(cpu, NULL);
--		found = (dn == np);
--		of_node_put(np);
--		if (found)
--			break;
--	}
--	of_node_put(dn);
--
--	/* Affinity to CPU0 if no cpu nodes are found */
--	pdata->cpu = found ? cpu : 0;
-+	pdata->cpu = of_coresight_get_cpu(node);
- 
- 	return pdata;
- }
-diff --git a/include/linux/coresight.h b/include/linux/coresight.h
-index 2a5982c..7b29743 100644
---- a/include/linux/coresight.h
-+++ b/include/linux/coresight.h
-@@ -263,9 +263,11 @@ static inline int coresight_timeout(void __iomem *addr, u32 offset,
- #endif
- 
- #ifdef CONFIG_OF
-+extern int of_coresight_get_cpu(struct device_node *node);
- extern struct coresight_platform_data *of_get_coresight_platform_data(
- 				struct device *dev, struct device_node *node);
- #else
-+static int of_coresight_get_cpu(struct device_node *node) { return 0; }
- static inline struct coresight_platform_data *of_get_coresight_platform_data(
- 	struct device *dev, struct device_node *node) { return NULL; }
- #endif
+ /* clk in Hi6220 media controller */
+ /* gate clocks */
 -- 
 2.7.4
