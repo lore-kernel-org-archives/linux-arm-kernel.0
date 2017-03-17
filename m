@@ -1,62 +1,84 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 17 Mar 2017 19:05:42 +0000
-Subject: [PATCH v21 04/13] clocksource: arm_arch_timer: split
- arch_timer_rate for different types of timer
-In-Reply-To: <20170206185015.12296-5-fu.wei@linaro.org>
+Date: Fri, 17 Mar 2017 19:40:55 +0000
+Subject: [PATCH v21 11/13] acpi/arm64: Add memory-mapped timer support in
+ GTDT driver
+In-Reply-To: <20170206185015.12296-12-fu.wei@linaro.org>
 References: <20170206185015.12296-1-fu.wei@linaro.org>
- <20170206185015.12296-5-fu.wei@linaro.org>
-Message-ID: <20170317190539.GD15909@leverpostej>
+ <20170206185015.12296-12-fu.wei@linaro.org>
+Message-ID: <20170317194055.GE15909@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 07, 2017 at 02:50:06AM +0800, fu.wei at linaro.org wrote:
-> From: Fu Wei <fu.wei@linaro.org>
-> 
-> Currently, arch_timer_rate is used to store the frequency got from per-cpu
-> arch-timer or the memory-mapped (MMIO) timers. But those values come from
-> different registers which should all be initialized by firmware.
-> 
-> This patch remove arch_timer_rate, and use arch_timer_sysreg_freq and
-> arch_timer_mmio_freq instead.
-> 
-> Signed-off-by: Fu Wei <fu.wei@linaro.org>
+Hi,
 
-Thanks for attacking this. Generally, I do think this is the right thing
-to do.
+On Tue, Feb 07, 2017 at 02:50:13AM +0800, fu.wei at linaro.org wrote:
+> +static int __init gtdt_parse_timer_block(struct acpi_gtdt_timer_block *block,
+> +					 struct arch_timer_mem *data)
 
-However...
+Please s/data/timer_mem/ here, to match the rest of the timer code.
 
-> @@ -1070,10 +1077,9 @@ static int __init arch_timer_mem_init(struct device_node *np)
->  	 * Try to determine the frequency from the device tree,
->  	 * if fail, get the frequency from the CNTFRQ reg of MMIO timer.
->  	 */
-> -	if (!arch_timer_rate &&
-> -	    of_property_read_u32(np, "clock-frequency", &arch_timer_rate))
-> -		arch_timer_rate = arch_timer_get_mmio_freq(base);
-> -	if (!arch_timer_rate) {
-> +	if (of_property_read_u32(np, "clock-frequency", &arch_timer_mmio_freq))
-> +		arch_timer_mmio_freq = arch_timer_get_mmio_freq(base);
-> +	if (!arch_timer_mmio_freq) {
->  		pr_err(FW_BUG "frequency not available for MMIO timer.\n");
->  		ret = -EINVAL;
->  		goto out;
+> +{
+> +	int i, j;
+> +	struct acpi_gtdt_timer_entry *frame;
 
-... unfortunately, I believe that this will break some DT platforms that
-have been (unintentionally) relying on the way currently allow the
-frequency to be probed from either the MMIO timer or the sysreg timer.
+So as to make it clear what this is, and to make things a litlte simpler
+below, please s/frame/gtdt_frame/ here.
 
-So while the above was my suggestion, it was not my best.
+> +
+> +	if (!block->timer_count) {
+> +		pr_err(FW_BUG "GT block present, but frame count is zero.");
+> +		return -ENODEV;
+> +	}
+> +
+> +	if (block->timer_count > ARCH_TIMER_MEM_MAX_FRAMES) {
+> +		pr_err(FW_BUG "GT block lists %d frames, ACPI spec only allows 8\n",
+> +		       block->timer_count);
+> +		return -EINVAL;
+> +	}
+> +
+> +	data->cntctlbase = (phys_addr_t)block->block_address;
+> +	/*
+> +	 * According to "Table * CNTCTLBase memory map" of
+> +	 * <ARM Architecture Reference Manual> for ARMv8,
+> +	 * The size of the CNTCTLBase frame is 4KB(Offset 0x000 ? 0xFFC).
+> +	 */
 
-For the timebeing, let's leave the single arch_timer_rate, but ensure
-that it doesn't get in the way fo the ACPI code, by making the ACPI
-probe path:
+As a general thing, please cite the version of the ARM ARM you're
+referring to, as over time the internal numbering (and the headings)
+change.
 
-* Probe the sysreg timers first, using the sysreg cntfrq().
+e.g.
+	/*
+	 * The CNTCTLBase frame is 4KB (register offsets 0x000 - 0xFFC).
+	 * See ARM DDI 0487A.k_iss10775, page I1-5129, Table I1-3
+	 * "CNTCTLBase memory map".
+	 */
 
-* Probe the MMIO timers second, verifying that each MMIO cntfrq matches
-  the already-probed sysreg cntfrq.
+> +	data->size = SZ_4K;
+> +
+> +	frame = (void *)block + block->timer_offset;
+> +	if (frame + block->timer_count != (void *)block + block->header.length)
+> +		return -EINVAL;
+> +
+> +	/*
+> +	 * Get the GT timer Frame data for every GT Block Timer
+> +	 */
+> +	for (i = 0, j = 0; i < block->timer_count; i++, frame++) {
 
-... which is what I believe you suggested previously. 
+With the gtdt_frame rename as above, here we can do:
+
+	struct arch_timer_mem_frame *frame = &timer_mem->frame[j];
+
+> +		if (frame->common_flags & ACPI_GTDT_GT_IS_SECURE_TIMER)
+> +			continue;
+> +
+> +		if (!frame->base_address || !frame->timer_interrupt)
+> +			return -EINVAL;
+> +
+> +		data->frame[j].phys_irq = map_gt_gsi(frame->timer_interrupt,
+> +						     frame->timer_flags);
+
+... allowing us to simplify lines like this.
 
 Thanks,
 Mark.
