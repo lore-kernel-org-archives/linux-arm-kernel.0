@@ -1,49 +1,27 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Sat, 18 Mar 2017 05:23:15 +0800
-Subject: [PATCH] ARM: sun8i: a23/a33: drop bl_en_pin GPIO pinmux in reference
- design DTSI
-Message-ID: <20170317212315.2561-1-icenowy@aosc.xyz>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Fri, 17 Mar 2017 23:37:18 +0200
+Subject: [PATCHv2 0/9] clk: ti: add support for clkctrl clocks
+In-Reply-To: <20170317152536.GT20572@atomide.com>
+References: <1489741781-12816-1-git-send-email-t-kristo@ti.com>
+ <20170317152536.GT20572@atomide.com>
+Message-ID: <94d20a17-5072-ffab-3529-4bbb14327a10@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The bl_en_pin GPIO pinmux is configured as "gpio_in", which makes it
-conflicts with the real GPIO usage (out), and makes the backlight not
-usable.
+On 17/03/17 17:25, Tony Lindgren wrote:
+> * Tero Kristo <t-kristo@ti.com> [170317 02:12]:
+>> Any additional testing on omap4 welcome as this series basically
+>> tweaks every possible peripheral clock on the SoC.
+>
+> Without the last patch in this series, booting fails for me:
+>
+> [    5.074890] l4_per_cm:clk:0120:0: failed to disable
+> [    5.085113] l4_per_cm:clk:0128:0: failed to disable
+>
+> Care to check that booting keeps working for each patch in the
+> series to avoid breaking git bisect for booting?
 
-Drop the GPIO pinmux for it, thus this GPIO can be correctly used.
+Hmm, I think patch 8+9 need to be squashed then. I can double check this 
+next week though.
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
----
-
-Please patch latest git tree master too, as this issue affects 4.11-rc.
-
- arch/arm/boot/dts/sun8i-reference-design-tablet.dtsi | 7 -------
- 1 file changed, 7 deletions(-)
-
-diff --git a/arch/arm/boot/dts/sun8i-reference-design-tablet.dtsi b/arch/arm/boot/dts/sun8i-reference-design-tablet.dtsi
-index 9f097a3d723d..4ae638901159 100644
---- a/arch/arm/boot/dts/sun8i-reference-design-tablet.dtsi
-+++ b/arch/arm/boot/dts/sun8i-reference-design-tablet.dtsi
-@@ -50,8 +50,6 @@
- 
- 	backlight: backlight {
- 		compatible = "pwm-backlight";
--		pinctrl-names = "default";
--		pinctrl-0 = <&bl_en_pin>;
- 		pwms = <&pwm 0 50000 PWM_POLARITY_INVERTED>;
- 		brightness-levels = <0 10 20 30 40 50 60 70 80 90 100>;
- 		default-brightness-level = <8>;
-@@ -83,11 +81,6 @@
- };
- 
- &pio {
--	bl_en_pin: bl_en_pin at 0 {
--		pins = "PH6";
--		function = "gpio_in";
--	};
--
- 	mmc0_cd_pin: mmc0_cd_pin at 0 {
- 		pins = "PB4";
- 		function = "gpio_in";
--- 
-2.12.0
+-Tero
