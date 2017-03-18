@@ -1,172 +1,125 @@
-From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
-Date: Sat, 18 Mar 2017 01:06:03 +0100
-Subject: [PATCH V2 2/2] thermal: broadcom: add Raspberry Pi thermal driver
-In-Reply-To: <20170318000603.10158-1-zajec5@gmail.com>
-References: <20170318000132.9212-1-zajec5@gmail.com>
- <20170318000603.10158-1-zajec5@gmail.com>
-Message-ID: <20170318000603.10158-2-zajec5@gmail.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Fri, 17 Mar 2017 19:06:47 -0500
+Subject: [PATCH 2/2] gpio: omap: compute debounce-time from actual
+ debounce-clock rate
+In-Reply-To: <20170317191419.021bdd84.drivshin@awxrd.com>
+References: <20170317005704.11971-1-drivshin@awxrd.com>
+ <20170317005704.11971-3-drivshin@awxrd.com>
+ <adc98bfd-ebce-49f0-5991-3c6a1e99ec25@ti.com>
+ <20170317191419.021bdd84.drivshin@awxrd.com>
+Message-ID: <5d0fab0d-bc9d-5148-063c-8bfe9e26f9a5@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rafa? Mi?ecki <rafal@milecki.pl>
+CC: Tero
 
-Raspberry Pi devices use BCM283[567] SoCs with a thermal device inside.
-Querying it is possible using Raspberry specific firmware interface.
-This simple driver allows reading SoC temperature.
+On 03/17/2017 06:14 PM, David Rivshin wrote:
+> On Fri, 17 Mar 2017 14:43:02 -0500
+> Grygorii Strashko <grygorii.strashko@ti.com> wrote:
+>
+>> On 03/16/2017 07:57 PM, David Rivshin wrote:
+>>> From: David Rivshin <DRivshin@allworx.com>
+>>>
+>>> omap2_set_gpio_debounce() assumes the debounce clock runs at 32768Hz,
+>>> leading to 31us granularity. In reality the debounce clock (which
+>>> is provided by other modules) could be at different rate, leading to
+>>> an incorrect computation of the number of debounce clock cycles for
+>>> GPIO_DEBOUNCINGTIME[DEBOUNCETIME].
+>>>
+>>> Also, even with a standard 32768Hz input clock, the actual granularity
+>>> is ~30.5us. This leads to the actual debounce time being ~1.5% too
+>>> short.
+>>>
+>>> Fix both issues by simply querying the dbck rate, rather than
+>>> hardcoding.
+>>
+>> Pls, hold on with this - I'm trying to check it, as it doesn't follow TRMs.
+>
+> Yes, the TRMs are somewhat cryptic about the details, perhaps I can give
+> some more background on how I came to this. I think the chapters for the
+> GPIO block are written with a strong assumption that the input debounce
+> clock is 32768Hz, and further round 1/32768Hz to the nearest whole
+> microsecond (~30.5us->31us).
+>
+> However, at least on AM335x the debounce clock (i.e. the CLK_32KHZ) can
+> be made to run at other rates via the Control Module.
+>
+> Here is an example from clk_summary:
+>  clk_24mhz                    1            1    24000000          0 0
+>     clkdiv32k_ck              1            1       65536          0 0
+>        clkdiv32k_ick          2            6       65536          0 0
+>           timer7_fck          1            1       65536          0 0
+>           wdt1_fck            0            1       65536          0 0
+>           gpio3_dbclk         0            2       65536          0 0
+>           gpio2_dbclk         0            2       65536          0 0
+>           gpio1_dbclk         0            2       65536          0 0
+>
+> This is accomplished by setting clk32kdivratio_ctl[clkdivopp50_en] to 1
+> even while in OPP100, and adjusting the devicetree to match. Timer7 is
+> known to truly have a 65536Hz fck by configuring it as a 50% duty cycle
+> PWM and measuring with an oscilloscope.
+>
+> Here are some relevant sections from the AM335x TRM (spruh73o):
+>   25.2.2 GPIO Clock and Reset Management
+>     Debounce Functional clock (GPIO[123]) comes from CLK_32KHZ.
+>   8.1.6.8 Peripheral PLL Description
+>     CLK_32KHZ is CLK_24 divided by either 732.4219 or 366.2109.
+>     In OPP100 this results in either 32768Hz or 65536Hz.
+>     In OPP50 this results in either 16384Hz or 32768Hz.
+>   9.3.1.8 clk32kdivratio_ctrl Register
+>     Names of the register and field differ from 8.1.6.8, but it's
+>      clear they are the same.
+>
+> I'm not sure if other devices can be similarly cajoled into running
+> their equivalent 32KHZ clocks at a different rate, but it certainly
+> works for AM335x. Checking OMAP4430 TRM as an example makes it look
+> like OMAP44xx has a fixed 32768Hz clock with no adjustment possible
+> (backed up by omap44xx-clocks.dtsi having it just be a fixed-clock).
+>
+>
+>>>
+>>> Fixes: e85ec6c3047b ("gpio: omap: fix omap2_set_gpio_debounce")
+>>> Cc: <stable@vger.kernel.org> # 4.3+
+>>> Signed-off-by: David Rivshin <drivshin@allworx.com>
+>>> ---
+>>>
+>>> This logical bug existed before e85ec6c3047b, but if backporting
+>>> further it's probably best to just cherry-pick/backport e85ec6c3047b
+>>> first.
+>>>
+>>>  drivers/gpio/gpio-omap.c | 8 +++++---
+>>>  1 file changed, 5 insertions(+), 3 deletions(-)
+>>>
+>>> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+>>> index 33ec02d..865a831 100644
+>>> --- a/drivers/gpio/gpio-omap.c
+>>> +++ b/drivers/gpio/gpio-omap.c
+>>> @@ -205,8 +205,8 @@ static inline void omap_gpio_dbck_disable(struct gpio_bank *bank)
+>>>   * @offset: the gpio number on this @bank
+>>>   * @debounce: debounce time to use
+>>>   *
+>>> - * OMAP's debounce time is in 31us steps
+>>> - *   <debounce time> = (GPIO_DEBOUNCINGTIME[7:0].DEBOUNCETIME + 1) x 31
+>>> + * OMAP's debounce time is in 1/DBCK steps
+>>> + *   <debounce time> = (GPIO_DEBOUNCINGTIME[7:0].DEBOUNCETIME + 1) / DBCK
+>>>   * so we need to convert and round up to the closest unit.
+>>>   *
+>>>   * Return: 0 on success, negative error otherwise.
+>>> @@ -223,7 +223,9 @@ static int omap2_set_gpio_debounce(struct gpio_bank *bank, unsigned offset,
+>>>  		return -ENOTSUPP;
+>>>
+>>>  	if (enable) {
+>>> -		debounce = DIV_ROUND_UP(debounce, 31) - 1;
+>>> +		u64 tmp = (u64)debounce * clk_get_rate(bank->dbck);
+>>> +
+>>> +		debounce = DIV_ROUND_UP_ULL(tmp, 1000000) - 1;
+>>>  		if ((debounce & OMAP4_GPIO_DEBOUNCINGTIME_MASK) != debounce)
+>>>  			return -EINVAL;
+>>>  	}
+>>>
+>>
+>
 
-Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
----
-V2: Update Kconfig help message. I forgot to locally rebase & fixup  before
-    sending, sorry.
----
- drivers/thermal/Kconfig                        |  5 ++
- drivers/thermal/Makefile                       |  1 +
- drivers/thermal/broadcom/Kconfig               |  7 +++
- drivers/thermal/broadcom/Makefile              |  1 +
- drivers/thermal/broadcom/raspberrypi-thermal.c | 85 ++++++++++++++++++++++++++
- 5 files changed, 99 insertions(+)
- create mode 100644 drivers/thermal/broadcom/Kconfig
- create mode 100644 drivers/thermal/broadcom/Makefile
- create mode 100644 drivers/thermal/broadcom/raspberrypi-thermal.c
-
-diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
-index 776b34396144..008e173ec825 100644
---- a/drivers/thermal/Kconfig
-+++ b/drivers/thermal/Kconfig
-@@ -392,6 +392,11 @@ config MTK_THERMAL
- 	  Enable this option if you want to have support for thermal management
- 	  controller present in Mediatek SoCs
- 
-+menu "Broadcom thermal drivers"
-+depends on ARCH_BCM || COMPILE_TEST
-+source "drivers/thermal/broadcom/Kconfig"
-+endmenu
-+
- menu "Texas Instruments thermal drivers"
- depends on ARCH_HAS_BANDGAP || COMPILE_TEST
- depends on HAS_IOMEM
-diff --git a/drivers/thermal/Makefile b/drivers/thermal/Makefile
-index 7adae2029355..549d81b6363c 100644
---- a/drivers/thermal/Makefile
-+++ b/drivers/thermal/Makefile
-@@ -27,6 +27,7 @@ thermal_sys-$(CONFIG_CLOCK_THERMAL)	+= clock_cooling.o
- thermal_sys-$(CONFIG_DEVFREQ_THERMAL) += devfreq_cooling.o
- 
- # platform thermal drivers
-+obj-y				+= broadcom/
- obj-$(CONFIG_QCOM_SPMI_TEMP_ALARM)	+= qcom-spmi-temp-alarm.o
- obj-$(CONFIG_SPEAR_THERMAL)	+= spear_thermal.o
- obj-$(CONFIG_ROCKCHIP_THERMAL)	+= rockchip_thermal.o
-diff --git a/drivers/thermal/broadcom/Kconfig b/drivers/thermal/broadcom/Kconfig
-new file mode 100644
-index 000000000000..2524b2ff16f6
---- /dev/null
-+++ b/drivers/thermal/broadcom/Kconfig
-@@ -0,0 +1,7 @@
-+config RASPBERRYPI_THERMAL
-+	tristate "Raspberry Pi thermal driver"
-+	depends on ARCH_BCM2835 || COMPILE_TEST
-+	depends on RASPBERRYPI_FIRMWARE=y
-+	help
-+	  This enables support for the RPi thermal that is part of BCM2835 SoC
-+	  and can be accessed using firmware interface.
-diff --git a/drivers/thermal/broadcom/Makefile b/drivers/thermal/broadcom/Makefile
-new file mode 100644
-index 000000000000..5ea7f8819b7d
---- /dev/null
-+++ b/drivers/thermal/broadcom/Makefile
-@@ -0,0 +1 @@
-+obj-$(CONFIG_RASPBERRYPI_THERMAL)	+= raspberrypi-thermal.o
-diff --git a/drivers/thermal/broadcom/raspberrypi-thermal.c b/drivers/thermal/broadcom/raspberrypi-thermal.c
-new file mode 100644
-index 000000000000..d9c1db06f806
---- /dev/null
-+++ b/drivers/thermal/broadcom/raspberrypi-thermal.c
-@@ -0,0 +1,85 @@
-+/*
-+ * Copyright (C) 2017 Rafa? Mi?ecki <rafal@milecki.pl>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
-+#include <linux/thermal.h>
-+
-+#include <soc/bcm2835/raspberrypi-firmware.h>
-+
-+struct rpi_thermal {
-+	struct rpi_firmware *fw;
-+};
-+
-+static int rpi_thermal_get_temp(void *data, int *temp)
-+{
-+	struct rpi_thermal *rpi_thermal = data;
-+	struct {
-+		u32 id;
-+		u32 temp;
-+	} tag_data = {};
-+	int err;
-+
-+	err = rpi_firmware_property(rpi_thermal->fw,
-+				    RPI_FIRMWARE_GET_TEMPERATURE,
-+				    &tag_data, sizeof(tag_data));
-+	if (!err)
-+		*temp = tag_data.temp;
-+
-+	return err;
-+}
-+
-+const struct thermal_zone_of_device_ops rpi_thermal_ops = {
-+	.get_temp = rpi_thermal_get_temp,
-+};
-+
-+static int rpi_thermal_probe(struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	struct rpi_thermal *rpi_thermal;
-+	struct device_node *fw_np;
-+	struct thermal_zone_device *tzd;
-+
-+	rpi_thermal = devm_kzalloc(dev, sizeof(*rpi_thermal), GFP_KERNEL);
-+	if (!rpi_thermal)
-+		return -ENOMEM;
-+
-+	fw_np = of_parse_phandle(dev->of_node, "firmware", 0);
-+	if (!fw_np) {
-+		dev_err(dev, "Failed to get firmware phandle\n");
-+		return -ENOENT;
-+	}
-+
-+	rpi_thermal->fw = rpi_firmware_get(fw_np);
-+	of_node_put(fw_np);
-+	if (!rpi_thermal->fw)
-+		return -ENODEV;
-+
-+	tzd = devm_thermal_zone_of_sensor_register(dev, 0, rpi_thermal,
-+						   &rpi_thermal_ops);
-+
-+	return PTR_ERR_OR_ZERO(tzd);
-+}
-+
-+static const struct of_device_id rpi_thermal_of_match[] = {
-+	{ .compatible = "raspberrypi,bcm2835-thermal", },
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, rpi_thermal_of_match);
-+
-+static struct platform_driver rpi_thermal_driver = {
-+	.probe		= rpi_thermal_probe,
-+	.driver = {
-+		.name = "raspberrypi-thermal",
-+		.of_match_table = rpi_thermal_of_match,
-+	},
-+};
-+module_platform_driver(rpi_thermal_driver);
-+
-+MODULE_DESCRIPTION("Raspberry Pi thermal driver");
-+MODULE_LICENSE("GPL v2");
 -- 
-2.11.0
+regards,
+-grygorii
