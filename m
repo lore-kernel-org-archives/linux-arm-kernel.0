@@ -1,54 +1,40 @@
 From: labbott@redhat.com (Laura Abbott)
-Date: Fri, 17 Mar 2017 17:54:34 -0700
-Subject: [RFC PATCHv2 02/21] cma: Introduce cma_for_each_area
+Date: Fri, 17 Mar 2017 17:54:35 -0700
+Subject: [RFC PATCHv2 03/21] staging: android: ion: Remove dmap_cnt
 In-Reply-To: <1489798493-16600-1-git-send-email-labbott@redhat.com>
 References: <1489798493-16600-1-git-send-email-labbott@redhat.com>
-Message-ID: <1489798493-16600-3-git-send-email-labbott@redhat.com>
+Message-ID: <1489798493-16600-4-git-send-email-labbott@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-Frameworks (e.g. Ion) may want to iterate over each possible CMA area to
-allow for enumeration. Introduce a function to allow a callback.
+The reference counting of dma_map calls was removed. Remove the
+associated counter field as well.
 
 Signed-off-by: Laura Abbott <labbott@redhat.com>
 ---
- include/linux/cma.h |  2 ++
- mm/cma.c            | 14 ++++++++++++++
- 2 files changed, 16 insertions(+)
+ drivers/staging/android/ion/ion_priv.h | 2 --
+ 1 file changed, 2 deletions(-)
 
-diff --git a/include/linux/cma.h b/include/linux/cma.h
-index d41d1f8..3e8fbf5 100644
---- a/include/linux/cma.h
-+++ b/include/linux/cma.h
-@@ -34,4 +34,6 @@ extern int cma_init_reserved_mem(phys_addr_t base, phys_addr_t size,
- extern struct page *cma_alloc(struct cma *cma, size_t count, unsigned int align,
- 			      gfp_t gfp_mask);
- extern bool cma_release(struct cma *cma, const struct page *pages, unsigned int count);
-+
-+extern int cma_for_each_area(int (*it)(struct cma *cma, void *data), void *data);
- #endif
-diff --git a/mm/cma.c b/mm/cma.c
-index 0d187b1..9a040e1 100644
---- a/mm/cma.c
-+++ b/mm/cma.c
-@@ -498,3 +498,17 @@ bool cma_release(struct cma *cma, const struct page *pages, unsigned int count)
- 
- 	return true;
- }
-+
-+int cma_for_each_area(int (*it)(struct cma *cma, void *data), void *data)
-+{
-+	int i;
-+
-+	for (i = 0; i < cma_area_count; i++) {
-+		int ret = it(&cma_areas[i], data);
-+
-+		if (ret)
-+			return ret;
-+	}
-+
-+	return 0;
-+}
+diff --git a/drivers/staging/android/ion/ion_priv.h b/drivers/staging/android/ion/ion_priv.h
+index 5b3059c..46d3ff5 100644
+--- a/drivers/staging/android/ion/ion_priv.h
++++ b/drivers/staging/android/ion/ion_priv.h
+@@ -44,7 +44,6 @@
+  * @lock:		protects the buffers cnt fields
+  * @kmap_cnt:		number of times the buffer is mapped to the kernel
+  * @vaddr:		the kernel mapping if kmap_cnt is not zero
+- * @dmap_cnt:		number of times the buffer is mapped for dma
+  * @sg_table:		the sg table for the buffer if dmap_cnt is not zero
+  * @pages:		flat array of pages in the buffer -- used by fault
+  *			handler and only valid for buffers that are faulted in
+@@ -70,7 +69,6 @@ struct ion_buffer {
+ 	struct mutex lock;
+ 	int kmap_cnt;
+ 	void *vaddr;
+-	int dmap_cnt;
+ 	struct sg_table *sg_table;
+ 	struct page **pages;
+ 	struct list_head vmas;
 -- 
 2.7.4
