@@ -1,136 +1,83 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Sat, 18 Mar 2017 13:56:56 +0100
-Subject: [PATCH] KVM: arm64: Ensure LRs are clear when they should be
-Message-ID: <20170318125656.16523-1-cdall@linaro.org>
+From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
+Date: Sat, 18 Mar 2017 14:00:11 +0100
+Subject: [PATCH v2 0/2] Meson GXL USB2 PHY driver
+In-Reply-To: <20170304222231.14496-1-martin.blumenstingl@googlemail.com>
+References: <20170304222231.14496-1-martin.blumenstingl@googlemail.com>
+Message-ID: <20170318130013.20771-1-martin.blumenstingl@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Christoffer Dall <christoffer.dall@linaro.org>
+This series adds a driver for the USB2 PHYs found in Amlogic Meson GXL
+(and GXM) SoCs.
+Devicetree changes are intentionally missing in this series because of
+various other problems that need to be resolved before we get USB host
+support working.
 
-We currently have some code to clear the list registers on GICv3, but we
-never call this code, because the caller got nuked when removing the old
-vgic.  We also used to have a similar GICv2 part, but that got lost in
-the process too.
+As usual we unfortunately don't have any documentation available. The
+register definitions were taken from the vendor's GPL kernel sources
+(see [5] if you are really interested). Translation to human readable
+names is done using the "best effort" algorithm.
 
-Let's reintroduce the logic for GICv2 and call the logic when we
-initialize the use of hypervisors on the CPU, for example when first
-loading KVM or when exiting a low power state.
+The USB situation on GXL and GXM is a bit special:
+the SoCs include both, a dwc3 and a dwc2 controller. The dwc3 controller
+IP only supports host-mode, while the dwc2 controller IP only supports
+device mode.
+The dwc3 controller has all USB3 ports disabled. GXL has two USB2 ports
+enabled on dwc3's internal hub, while GXM has three USB2 ports enabled.
+This makes the initialization a bit special: to enable any of the dwc3
+controller's USB2 ports *ALL* PHYs have to be initialized (probably due
+to the hub's routing logic).
+The first USB2 PHY (hardware-wise) also supports OTG mode. The vendor
+kernel implements this through the USB3 PHY by re-routing the first
+USB2 PHY from the dwc3 controller to the dwc2 controller (which is
+disabled by default, but if the USB3 PHY detects that the port should
+enter device mode it enables the dwc2 controller).
 
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
----
-Marc, Eric, Andre,
+To get USB host mode working the following steps are needed:
+- xhci-plat must be able to manage more than one PHY for a controller,
+  this is work-in-progress, see [0]
+- there are some DMA handling issues in dwc3 and the rest of the USB
+  stack, this is solved by the "sysdev" patches from [1]
+- adding all USB related bits to meson-gxl.dtsi - this is work in
+  progress but depends on the previous TODOs, see [2] and [3]
 
-I'm unable to convince myself that the LRs should already be clear via
-the reset of the hardware, and for any power management scenario I
-suppose it's possible for secure-side firmware to have messed with the
-LRs behind our backs; plus we used to have this functionality and it got
-dropped for the new vgic.  Am I forgetting some discussion where we
-decided it wasn't needed anymore?
+This supersedes my previous series "Meson GXL and GXM USB support" [4].
 
-Thanks,
--Christoffer
 
- arch/arm/kvm/arm.c            |  3 +++
- include/kvm/arm_vgic.h        |  1 +
- virt/kvm/arm/vgic/vgic-init.c | 19 +++++++++++++++++++
- virt/kvm/arm/vgic/vgic-v2.c   | 15 +++++++++++++++
- virt/kvm/arm/vgic/vgic.h      |  2 ++
- 5 files changed, 40 insertions(+)
+Changes since v1:
+- rebased to the next branch of Kishon's linux-phy tree (currently at
+  fe0134d071 "phy: phy-exynos-pcie: make it explicitly non-modular")
+- added a missing call to phy_meson_gxl_usb2_power_off in the error
+  case in phy_meson_gxl_usb2_power_on - thanks to Hendrik v. Raven for
+  spotting this!
+- moved the reset logic into a separate function and expose it through
+  phy_ops.reset so it can be used by consumers of this PHY.
+  phy_meson_gxl_usb2_set_mode still resets the PHY directly because
+  this PHY will be configured by xhci-plat (from which we cannot call
+  phy_reset() - see the discussion based on v1 of this patch: [6])
+- added Rob Herring's ACK to patch #1 (the dt-binding documentation)
 
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index c9a2103..d775aac 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -1121,6 +1121,9 @@ static void cpu_hyp_reinit(void)
- 		if (__hyp_get_vectors() == hyp_default_vectors)
- 			cpu_init_hyp_mode(NULL);
- 	}
-+
-+	if (vgic_present)
-+		kvm_vgic_init_cpu_hardware();
- }
- 
- static void cpu_hyp_reset(void)
-diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index b72dd2a..c0b3d99 100644
---- a/include/kvm/arm_vgic.h
-+++ b/include/kvm/arm_vgic.h
-@@ -295,6 +295,7 @@ void kvm_vgic_vcpu_early_init(struct kvm_vcpu *vcpu);
- void kvm_vgic_vcpu_destroy(struct kvm_vcpu *vcpu);
- int kvm_vgic_map_resources(struct kvm *kvm);
- int kvm_vgic_hyp_init(void);
-+void kvm_vgic_init_cpu_hardware(void);
- 
- int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
- 			bool level);
-diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
-index 276139a..702f810 100644
---- a/virt/kvm/arm/vgic/vgic-init.c
-+++ b/virt/kvm/arm/vgic/vgic-init.c
-@@ -392,6 +392,25 @@ static irqreturn_t vgic_maintenance_handler(int irq, void *data)
- }
- 
- /**
-+ * kvm_vgic_init_cpu_hardware - initialize the GIC VE hardware
-+ *
-+ * For a specific CPU, initialize the GIC VE hardware.
-+ */
-+void kvm_vgic_init_cpu_hardware(void)
-+{
-+	BUG_ON(preemptible());
-+
-+	/*
-+	 * We want to make sure the list registers start out clear so that we
-+	 * only have the program the used registers.
-+	 */
-+	if (kvm_vgic_global_state.type == VGIC_V2)
-+		vgic_v2_init_lrs();
-+	else
-+		kvm_call_hyp(__vgic_v3_init_lrs);
-+}
-+
-+/**
-  * kvm_vgic_hyp_init: populates the kvm_vgic_global_state variable
-  * according to the host GIC model. Accordingly calls either
-  * vgic_v2/v3_probe which registers the KVM_DEVICE that can be
-diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
-index b834ecd..94cf4b9 100644
---- a/virt/kvm/arm/vgic/vgic-v2.c
-+++ b/virt/kvm/arm/vgic/vgic-v2.c
-@@ -36,6 +36,21 @@ static unsigned long *u64_to_bitmask(u64 *val)
- 	return (unsigned long *)val;
- }
- 
-+static inline void vgic_v2_write_lr(int lr, u32 val)
-+{
-+	void __iomem *base = kvm_vgic_global_state.vctrl_base;
-+
-+	writel_relaxed(val, base + GICH_LR0 + (lr * 4));
-+}
-+
-+void vgic_v2_init_lrs(void)
-+{
-+	int i;
-+
-+	for (i = 0; i < kvm_vgic_global_state.nr_lr; i++)
-+		vgic_v2_write_lr(i, 0);
-+}
-+
- void vgic_v2_process_maintenance(struct kvm_vcpu *vcpu)
- {
- 	struct vgic_v2_cpu_if *cpuif = &vcpu->arch.vgic_cpu.vgic_v2;
-diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-index db28f7c..91566f5 100644
---- a/virt/kvm/arm/vgic/vgic.h
-+++ b/virt/kvm/arm/vgic/vgic.h
-@@ -130,6 +130,8 @@ int vgic_v2_map_resources(struct kvm *kvm);
- int vgic_register_dist_iodev(struct kvm *kvm, gpa_t dist_base_address,
- 			     enum vgic_type);
- 
-+void vgic_v2_init_lrs(void);
-+
- static inline void vgic_get_irq_kref(struct vgic_irq *irq)
- {
- 	if (irq->intid < VGIC_MIN_LPI)
+
+[0] https://www.spinics.net/lists/linux-usb/msg151837.html
+[1] http://www.mail-archive.com/linux-usb at vger.kernel.org/msg87077.html
+[2] https://github.com/xdarklight/linux/commit/e2b83785687fe859ae4bba8da8bb2fb2d7e32bfb
+[3] https://github.com/xdarklight/linux/commit/203ab9ea5d1bea0bf066b6738010c8072b821d87
+[4] http://lists.infradead.org/pipermail/linux-amlogic/2016-November/001721.html
+[5] https://github.com/khadas/linux/blob/76fd19ac41bb774e396ce8009ff665f29c26c535/include/linux/amlogic/usb-gxl.h
+[6] http://lists.infradead.org/pipermail/linux-amlogic/2017-March/002777.html
+
+Martin Blumenstingl (2):
+  Documentation: dt-bindings: Add documentation for the Meson GXL USB2
+    PHY
+  phy: meson: add USB2 PHY support for Meson GXL and GXM
+
+ .../devicetree/bindings/phy/meson-gxl-usb2-phy.txt |  17 ++
+ drivers/phy/Kconfig                                |  14 ++
+ drivers/phy/Makefile                               |   1 +
+ drivers/phy/phy-meson-gxl-usb2.c                   | 273 +++++++++++++++++++++
+ 4 files changed, 305 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/phy/meson-gxl-usb2-phy.txt
+ create mode 100644 drivers/phy/phy-meson-gxl-usb2.c
+
 -- 
-2.9.0
+2.12.0
