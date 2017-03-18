@@ -1,223 +1,172 @@
-From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Sat, 18 Mar 2017 15:37:28 +0100
-Subject: [RFT PATCH 1/1] ARM64: dts: meson-gxbb: convert devices to use
- pwm-leds
-In-Reply-To: <20170318143728.16535-1-martin.blumenstingl@googlemail.com>
-References: <20170318143728.16535-1-martin.blumenstingl@googlemail.com>
-Message-ID: <20170318143728.16535-2-martin.blumenstingl@googlemail.com>
+From: ralph.sennhauser@gmail.com (Ralph Sennhauser)
+Date: Sat, 18 Mar 2017 16:43:02 +0100
+Subject: [PATCH v2 2/4] mvebu: xp: Add pwm properties to .dtsi files
+In-Reply-To: <20170318154305.28348-1-ralph.sennhauser@gmail.com>
+References: <20170318154305.28348-1-ralph.sennhauser@gmail.com>
+Message-ID: <20170318154305.28348-3-ralph.sennhauser@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All supported GXBB devices have their system LED connected to GPIOAO_13.
-This pin can be driven by the PWM_AO controller (PWM_AO_B). Use the
-pwm-leds driver (instead of gpio-leds) for these LEDs instead to enable
-dimming (setting the brightness).
+From: Andrew Lunn <andrew@lunn.ch>
 
-Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+Add properties to the gpio nodes to allow them to be also used as pwm
+lines.
+
+Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+URL: https://patchwork.ozlabs.org/patch/427294/
+Signed-off-by: Ralph Sennhauser <ralph.sennhauser@gmail.com>
 ---
- .../boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts    | 18 +++++++++++----
- .../arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts | 16 ++++++++++---
- .../boot/dts/amlogic/meson-gxbb-vega-s95.dtsi      | 17 ++++++++++----
- .../boot/dts/amlogic/meson-gxbb-wetek-hub.dts      | 19 +++++++++++----
- .../boot/dts/amlogic/meson-gxbb-wetek-play2.dts    | 27 ++++++++++++++++------
- 5 files changed, 74 insertions(+), 23 deletions(-)
+ arch/arm/boot/dts/armada-370.dtsi        | 10 ++++++++--
+ arch/arm/boot/dts/armada-xp-mv78230.dtsi | 10 ++++++++--
+ arch/arm/boot/dts/armada-xp-mv78260.dtsi |  8 ++++++--
+ arch/arm/boot/dts/armada-xp-mv78460.dtsi | 10 ++++++++--
+ 4 files changed, 30 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts
-index dbfa441f479e..283dad3b0be3 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts
-@@ -65,12 +65,14 @@
- 		reg = <0x0 0x0 0x0 0x40000000>;
- 	};
+diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
+index cc011c8..aa9fe72 100644
+--- a/arch/arm/boot/dts/armada-370.dtsi
++++ b/arch/arm/boot/dts/armada-370.dtsi
+@@ -138,24 +138,30 @@
  
--	leds {
--		compatible = "gpio-leds";
-+	pwmleds {
-+		compatible = "pwm-leds";
-+
- 		blue {
- 			label = "a95x:system-status";
--			gpios = <&gpio_ao GPIOAO_13 GPIO_ACTIVE_LOW>;
--			linux,default-trigger = "heartbeat";
-+			pwms = <&pwm_AO_ab 1 7812500 0>;
-+			max-brightness = <255>;
-+			linux,default-trigger = "default-on";
- 			default-state = "off";
+ 			gpio0: gpio at 18100 {
+ 				compatible = "marvell,orion-gpio";
+-				reg = <0x18100 0x40>;
++				reg = <0x18100 0x40>, <0x181c0 0x08>;
++				reg-names = "gpio", "pwm";
+ 				ngpios = <32>;
+ 				gpio-controller;
+ 				#gpio-cells = <2>;
++				#pwm-cells = <2>;
+ 				interrupt-controller;
+ 				#interrupt-cells = <2>;
+ 				interrupts = <82>, <83>, <84>, <85>;
++				clocks = <&coreclk 0>;
+ 			};
+ 
+ 			gpio1: gpio at 18140 {
+ 				compatible = "marvell,orion-gpio";
+-				reg = <0x18140 0x40>;
++				reg = <0x18140 0x40>, <0x181c8 0x08>;
++				reg-names = "gpio", "pwm";
+ 				ngpios = <32>;
+ 				gpio-controller;
+ 				#gpio-cells = <2>;
++				#pwm-cells = <2>;
+ 				interrupt-controller;
+ 				#interrupt-cells = <2>;
+ 				interrupts = <87>, <88>, <89>, <90>;
++				clocks = <&coreclk 0>;
+ 			};
+ 
+ 			gpio2: gpio at 18180 {
+diff --git a/arch/arm/boot/dts/armada-xp-mv78230.dtsi b/arch/arm/boot/dts/armada-xp-mv78230.dtsi
+index 07c5090..fc3934f 100644
+--- a/arch/arm/boot/dts/armada-xp-mv78230.dtsi
++++ b/arch/arm/boot/dts/armada-xp-mv78230.dtsi
+@@ -203,24 +203,30 @@
+ 		internal-regs {
+ 			gpio0: gpio at 18100 {
+ 				compatible = "marvell,orion-gpio";
+-				reg = <0x18100 0x40>;
++				reg = <0x18100 0x40>, <0x181c0 0x08>;
++				reg-names = "gpio", "pwm";
+ 				ngpios = <32>;
+ 				gpio-controller;
+ 				#gpio-cells = <2>;
++				#pwm-cells = <2>;
+ 				interrupt-controller;
+ 				#interrupt-cells = <2>;
+ 				interrupts = <82>, <83>, <84>, <85>;
++				clocks = <&coreclk 0>;
+ 			};
+ 
+ 			gpio1: gpio at 18140 {
+ 				compatible = "marvell,orion-gpio";
+-				reg = <0x18140 0x40>;
++				reg = <0x18140 0x40>, <0x181c8 0x08>;
++				reg-names = "gpio", "pwm";
+ 				ngpios = <17>;
+ 				gpio-controller;
+ 				#gpio-cells = <2>;
++				#pwm-cells = <2>;
+ 				interrupt-controller;
+ 				#interrupt-cells = <2>;
+ 				interrupts = <87>, <88>, <89>;
++				clocks = <&coreclk 0>;
+ 			};
  		};
  	};
-@@ -249,6 +251,14 @@
- 	vqmmc-supply = <&vddio_boot>;
- };
+diff --git a/arch/arm/boot/dts/armada-xp-mv78260.dtsi b/arch/arm/boot/dts/armada-xp-mv78260.dtsi
+index 64e936a..04dda6a 100644
+--- a/arch/arm/boot/dts/armada-xp-mv78260.dtsi
++++ b/arch/arm/boot/dts/armada-xp-mv78260.dtsi
+@@ -286,24 +286,28 @@
+ 		internal-regs {
+ 			gpio0: gpio at 18100 {
+ 				compatible = "marvell,orion-gpio";
+-				reg = <0x18100 0x40>;
++				reg = <0x18100 0x40>, <0x181c0 0x08>;
++				reg-names = "gpio", "pwm";
+ 				ngpios = <32>;
+ 				gpio-controller;
+ 				#gpio-cells = <2>;
++				#pwm-cells = <2>;
+ 				interrupt-controller;
+ 				#interrupt-cells = <2>;
+ 				interrupts = <82>, <83>, <84>, <85>;
++				clocks = <&coreclk 0>;
+ 			};
  
-+&pwm_AO_ab {
-+	status = "okay";
-+	pinctrl-0 = <&pwm_ao_b_pins>;
-+	pinctrl-names = "default";
-+	clocks = <&clkc CLKID_FCLK_DIV4>;
-+	clock-names = "clkin0";
-+};
-+
- &pwm_ef {
- 	status = "okay";
- 	pinctrl-0 = <&pwm_e_pins>;
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
-index c80d3a913907..7f9de1b236ed 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
-@@ -76,11 +76,13 @@
- 		enable-active-high;
- 	};
+ 			gpio1: gpio at 18140 {
+ 				compatible = "marvell,orion-gpio";
+-				reg = <0x18140 0x40>;
++				reg = <0x18140 0x40>, <0x181c8 0x08>;
+ 				ngpios = <32>;
+ 				gpio-controller;
+ 				#gpio-cells = <2>;
+ 				interrupt-controller;
+ 				#interrupt-cells = <2>;
+ 				interrupts = <87>, <88>, <89>, <90>;
++				clocks = <&coreclk 0>;
+ 			};
  
--	leds {
--		compatible = "gpio-leds";
-+	pwmleds {
-+		compatible = "pwm-leds";
-+
- 		blue {
- 			label = "c2:blue:alive";
--			gpios = <&gpio_ao GPIOAO_13 GPIO_ACTIVE_LOW>;
-+			pwms = <&pwm_AO_ab 1 7812500 0>;
-+			max-brightness = <255>;
- 			linux,default-trigger = "heartbeat";
- 			default-state = "off";
- 		};
-@@ -201,6 +203,14 @@
- 	status = "okay";
- };
+ 			gpio2: gpio at 18180 {
+diff --git a/arch/arm/boot/dts/armada-xp-mv78460.dtsi b/arch/arm/boot/dts/armada-xp-mv78460.dtsi
+index d1383dd..fb6d28a 100644
+--- a/arch/arm/boot/dts/armada-xp-mv78460.dtsi
++++ b/arch/arm/boot/dts/armada-xp-mv78460.dtsi
+@@ -324,24 +324,30 @@
+ 		internal-regs {
+ 			gpio0: gpio at 18100 {
+ 				compatible = "marvell,orion-gpio";
+-				reg = <0x18100 0x40>;
++				reg = <0x18100 0x40>, <0x181c0 0x08>;
++				reg-names = "gpio", "pwm";
+ 				ngpios = <32>;
+ 				gpio-controller;
+ 				#gpio-cells = <2>;
++				#pwm-cells = <2>;
+ 				interrupt-controller;
+ 				#interrupt-cells = <2>;
+ 				interrupts = <82>, <83>, <84>, <85>;
++				clocks = <&coreclk 0>;
+ 			};
  
-+&pwm_AO_ab {
-+	status = "okay";
-+	pinctrl-0 = <&pwm_ao_b_pins>;
-+	pinctrl-names = "default";
-+	clocks = <&clkc CLKID_FCLK_DIV4>;
-+	clock-names = "clkin0";
-+};
-+
- /* SD */
- &sd_emmc_b {
- 	status = "okay";
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi
-index aefa66dff72d..6b9608e5a488 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi
-@@ -53,13 +53,14 @@
- 		stdout-path = "serial0:115200n8";
- 	};
+ 			gpio1: gpio at 18140 {
+ 				compatible = "marvell,orion-gpio";
+-				reg = <0x18140 0x40>;
++				reg = <0x18140 0x40>, <0x181c8 0x08>;
++				reg-names = "gpio", "pwm";
+ 				ngpios = <32>;
+ 				gpio-controller;
+ 				#gpio-cells = <2>;
++				#pwm-cells = <2>;
+ 				interrupt-controller;
+ 				#interrupt-cells = <2>;
+ 				interrupts = <87>, <88>, <89>, <90>;
++				clocks = <&coreclk 0>;
+ 			};
  
--	leds {
--		compatible = "gpio-leds";
-+	pwmleds {
-+		compatible = "pwm-leds";
- 
- 		blue {
- 			label = "vega-s95:blue:on";
--			gpios = <&gpio_ao GPIOAO_13 GPIO_ACTIVE_HIGH>;
--			default-state = "on";
-+			pwms = <&pwm_AO_ab 1 7812500 0>;
-+			max-brightness = <255>;
-+			linux,default-trigger = "default-on";
- 			panic-indicator;
- 		};
- 	};
-@@ -229,6 +230,14 @@
- 	vmmcq-sumpply = <&vcc_1v8>;
- };
- 
-+&pwm_AO_ab {
-+	status = "okay";
-+	pinctrl-0 = <&pwm_ao_b_pins>;
-+	pinctrl-names = "default";
-+	clocks = <&clkc CLKID_FCLK_DIV4>;
-+	clock-names = "clkin0";
-+};
-+
- &pwm_ef {
- 	status = "okay";
- 	pinctrl-0 = <&pwm_e_pins>;
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-wetek-hub.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-wetek-hub.dts
-index f057fb48fee5..1d94e2d4c927 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxbb-wetek-hub.dts
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-wetek-hub.dts
-@@ -49,13 +49,14 @@
- 	compatible = "wetek,hub", "amlogic,meson-gxbb";
- 	model = "WeTek Hub";
- 
--	leds {
--		compatible = "gpio-leds";
-+	pwmleds {
-+		compatible = "pwm-leds";
- 
- 		system {
--			label = "wetek-play:system-status";
--			gpios = <&gpio_ao GPIOAO_13 GPIO_ACTIVE_HIGH>;
--			default-state = "on";
-+			label = "wetek-hub:system-status";
-+			pwms = <&pwm_AO_ab 1 7812500 0>;
-+			max-brightness = <255>;
-+			linux,default-trigger = "default-on";
- 			panic-indicator;
- 		};
- 	};
-@@ -90,3 +91,11 @@
- 		};
- 	};
- };
-+
-+&pwm_AO_ab {
-+	status = "okay";
-+	pinctrl-0 = <&pwm_ao_b_pins>;
-+	pinctrl-names = "default";
-+	clocks = <&clkc CLKID_FCLK_DIV4>;
-+	clock-names = "clkin0";
-+};
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-wetek-play2.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-wetek-play2.dts
-index 743acb5f5d06..5114d645d733 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxbb-wetek-play2.dts
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-wetek-play2.dts
-@@ -53,13 +53,6 @@
- 	leds {
- 		compatible = "gpio-leds";
- 
--		system {
--			label = "wetek-play:system-status";
--			gpios = <&gpio_ao GPIOAO_13 GPIO_ACTIVE_HIGH>;
--			default-state = "on";
--			panic-indicator;
--		};
--
- 		wifi {
- 			label = "wetek-play:wifi-status";
- 			gpios = <&gpio GPIODV_26 GPIO_ACTIVE_HIGH>;
-@@ -73,6 +66,18 @@
- 		};
- 	};
- 
-+	pwmleds {
-+		compatible = "pwm-leds";
-+
-+		system {
-+			label = "wetek-play:system-status";
-+			pwms = <&pwm_AO_ab 1 7812500 0>;
-+			max-brightness = <255>;
-+			linux,default-trigger = "default-on";
-+			panic-indicator;
-+		};
-+	};
-+
- 	gpio-keys-polled {
- 		compatible = "gpio-keys-polled";
- 		#address-cells = <1>;
-@@ -118,3 +123,11 @@
- 	pinctrl-0 = <&i2c_a_pins>;
- 	pinctrl-names = "default";
- };
-+
-+&pwm_AO_ab {
-+	status = "okay";
-+	pinctrl-0 = <&pwm_ao_b_pins>;
-+	pinctrl-names = "default";
-+	clocks = <&clkc CLKID_FCLK_DIV4>;
-+	clock-names = "clkin0";
-+};
+ 			gpio2: gpio at 18180 {
 -- 
-2.12.0
+2.10.2
