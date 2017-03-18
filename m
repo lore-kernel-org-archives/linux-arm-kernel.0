@@ -1,37 +1,43 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 18 Mar 2017 09:59:42 +0100
-Subject: [PATCH 0/2] move the ICST library to common clocks
-Message-ID: <20170318085944.15899-1-linus.walleij@linaro.org>
+Date: Sat, 18 Mar 2017 09:59:43 +0100
+Subject: [PATCH 1/2] ARM: plat-versatile: remove stale clock header
+In-Reply-To: <20170318085944.15899-1-linus.walleij@linaro.org>
+References: <20170318085944.15899-1-linus.walleij@linaro.org>
+Message-ID: <20170318085944.15899-2-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This consolidates the last piece of the Versatile clocks, the ICST
-clock divider, into drivers/clk/*
+All the Versatile platforms (Integrator, Versatile, RealView
+Versatile Express) have been migrated to use the drivers/clk
+subsystem. Clean out this header that is not referenced
+anywhere anymore.
 
-If the series is OK I suggest we take this through ARM SoC since
-the first patch needs to be applied there, alternatively they
-can both go into the clk tree.
-
-Linus Walleij (2):
-  ARM: plat-versatile: remove stale clock header
-  ARM/clk: move the ICST library to drivers/clk
-
- arch/arm/common/Kconfig                                   |  3 ---
- arch/arm/common/Makefile                                  |  1 -
- arch/arm/plat-versatile/include/plat/clock.h              | 15 ---------------
- drivers/clk/versatile/Kconfig                             |  3 +++
- drivers/clk/versatile/Makefile                            |  2 +-
- drivers/clk/versatile/clk-icst.c                          |  1 +
- drivers/clk/versatile/clk-icst.h                          |  2 --
- drivers/clk/versatile/clk-impd1.c                         |  1 +
- drivers/clk/versatile/clk-realview.c                      |  1 +
- drivers/clk/versatile/clk-versatile.c                     |  1 +
- {arch/arm/common => drivers/clk/versatile}/icst.c         |  2 +-
- .../include/asm/hardware => drivers/clk/versatile}/icst.h |  6 ++----
- 12 files changed, 11 insertions(+), 27 deletions(-)
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/plat-versatile/include/plat/clock.h | 15 ---------------
+ 1 file changed, 15 deletions(-)
  delete mode 100644 arch/arm/plat-versatile/include/plat/clock.h
- rename {arch/arm/common => drivers/clk/versatile}/icst.c (98%)
- rename {arch/arm/include/asm/hardware => drivers/clk/versatile}/icst.h (94%)
 
+diff --git a/arch/arm/plat-versatile/include/plat/clock.h b/arch/arm/plat-versatile/include/plat/clock.h
+deleted file mode 100644
+index 3cfb024ccd70..000000000000
+--- a/arch/arm/plat-versatile/include/plat/clock.h
++++ /dev/null
+@@ -1,15 +0,0 @@
+-#ifndef PLAT_CLOCK_H
+-#define PLAT_CLOCK_H
+-
+-#include <asm/hardware/icst.h>
+-
+-struct clk_ops {
+-	long	(*round)(struct clk *, unsigned long);
+-	int	(*set)(struct clk *, unsigned long);
+-	void	(*setvco)(struct clk *, struct icst_vco);
+-};
+-
+-int icst_clk_set(struct clk *, unsigned long);
+-long icst_clk_round(struct clk *, unsigned long);
+-
+-#endif
 -- 
 2.9.3
