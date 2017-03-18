@@ -1,35 +1,29 @@
-From: mylene.josserand@free-electrons.com (=?UTF-8?q?Myl=C3=A8ne=20Josserand?=)
-Date: Sat, 18 Mar 2017 08:55:09 +0100
-Subject: [PATCH v3 5/5] ARM: dts: sun8i: Update audio-routing with renamed
- widgets
-In-Reply-To: <20170318075509.3836-1-mylene.josserand@free-electrons.com>
-References: <20170318075509.3836-1-mylene.josserand@free-electrons.com>
-Message-ID: <20170318075509.3836-6-mylene.josserand@free-electrons.com>
+From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
+Date: Sat, 18 Mar 2017 09:58:45 +0100
+Subject: [PATCH 1/2] dt-bindings: thermal: add support for Raspberry Pi
+ thermal
+In-Reply-To: <871stvjvj3.fsf@eliezer.anholt.net>
+References: <20170318000132.9212-1-zajec5@gmail.com>
+ <871stvjvj3.fsf@eliezer.anholt.net>
+Message-ID: <CACna6ryC9v+Gg4_hDz44KPRR57gAAyAqWN=iNDRN4Bc01zN4fA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The digital AIF interfaces has been renamed in the sun8i audio codec
-driver so the audio-routing in the device tree must be renamed too.
+On 18 March 2017 at 01:09, Eric Anholt <eric@anholt.net> wrote:
+> Rafa? Mi?ecki <zajec5@gmail.com> writes:
+>
+>> From: Rafa? Mi?ecki <rafal@milecki.pl>
+>>
+>> This commit documents binding for BCM2835 SoC thermal used in Raspberry
+>> Pi devices.
+>
+> There's already a native (non-firmware) thermal driver just waiting for
+> the maintainer to merge it.
+>
+> https://www.spinics.net/lists/arm-kernel/msg566217.html
 
-Signed-off-by: Myl?ne Josserand <mylene.josserand@free-electrons.com>
----
- arch/arm/boot/dts/sun8i-a33.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Oh my, you did a nice work there guys! Well, this patch can obviously
+be dropped.
 
-diff --git a/arch/arm/boot/dts/sun8i-a33.dtsi b/arch/arm/boot/dts/sun8i-a33.dtsi
-index 18c174fef84f..0467fb365bfc 100644
---- a/arch/arm/boot/dts/sun8i-a33.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a33.dtsi
-@@ -113,8 +113,8 @@
- 		simple-audio-card,mclk-fs = <512>;
- 		simple-audio-card,aux-devs = <&codec_analog>;
- 		simple-audio-card,routing =
--			"Left DAC", "Digital Left DAC",
--			"Right DAC", "Digital Right DAC";
-+			"Left DAC", "AIF1 Slot 0 Left",
-+			"Right DAC", "AIF1 Slot 0 Right";
- 		status = "disabled";
- 
- 		simple-audio-card,cpu {
 -- 
-2.11.0
+Rafa?
