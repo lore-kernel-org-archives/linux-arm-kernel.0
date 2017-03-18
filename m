@@ -1,56 +1,42 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Fri, 17 Mar 2017 17:54:46 -0700
-Subject: [RFC PATCHv2 14/21] staging: android: ion: Stop butchering the DMA
- address
-In-Reply-To: <1489798493-16600-1-git-send-email-labbott@redhat.com>
-References: <1489798493-16600-1-git-send-email-labbott@redhat.com>
-Message-ID: <1489798493-16600-15-git-send-email-labbott@redhat.com>
+From: sergio.prado@e-labworks.com (Sergio Prado)
+Date: Fri, 17 Mar 2017 22:13:51 -0300
+Subject: [PATCH v5 0/2] mmc: host: s3cmci: add device tree support
+Message-ID: <1489799633-29278-1-git-send-email-sergio.prado@e-labworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This series adds support for configuring Samsung's S3C24XX MMC/SD/SDIO
+controller via device tree.
 
-Now that we have proper caching, stop setting the DMA address manually.
-It should be set after properly calling dma_map.
+Tested on FriendlyARM mini2440, based on s3c2440 SoC.
 
-Signed-off-by: Laura Abbott <labbott@redhat.com>
----
- drivers/staging/android/ion/ion.c | 17 +----------------
- 1 file changed, 1 insertion(+), 16 deletions(-)
+Changes since v4 (as suggested by Jaehoon Chung):
+- using just a flag as a data structure for the driver to check for
+  s3c2400 compatibility
 
-diff --git a/drivers/staging/android/ion/ion.c b/drivers/staging/android/ion/ion.c
-index 3d979ef5..65638f5 100644
---- a/drivers/staging/android/ion/ion.c
-+++ b/drivers/staging/android/ion/ion.c
-@@ -81,8 +81,7 @@ static struct ion_buffer *ion_buffer_create(struct ion_heap *heap,
- {
- 	struct ion_buffer *buffer;
- 	struct sg_table *table;
--	struct scatterlist *sg;
--	int i, ret;
-+	int ret;
- 
- 	buffer = kzalloc(sizeof(*buffer), GFP_KERNEL);
- 	if (!buffer)
-@@ -119,20 +118,6 @@ static struct ion_buffer *ion_buffer_create(struct ion_heap *heap,
- 	INIT_LIST_HEAD(&buffer->vmas);
- 	INIT_LIST_HEAD(&buffer->attachments);
- 	mutex_init(&buffer->lock);
--	/*
--	 * this will set up dma addresses for the sglist -- it is not
--	 * technically correct as per the dma api -- a specific
--	 * device isn't really taking ownership here.  However, in practice on
--	 * our systems the only dma_address space is physical addresses.
--	 * Additionally, we can't afford the overhead of invalidating every
--	 * allocation via dma_map_sg. The implicit contract here is that
--	 * memory coming from the heaps is ready for dma, ie if it has a
--	 * cached mapping that mapping has been invalidated
--	 */
--	for_each_sg(buffer->sg_table->sgl, sg, buffer->sg_table->nents, i) {
--		sg_dma_address(sg) = sg_phys(sg);
--		sg_dma_len(sg) = sg->length;
--	}
- 	mutex_lock(&dev->buffer_lock);
- 	ion_buffer_add(dev, buffer);
- 	mutex_unlock(&dev->buffer_lock);
+Changes since v3 (as suggested by Rob Herring):
+- describing properties that wasn't documented and removing unnecessary
+  comment in the device tree binding
+
+Changes since v2:
+- struct "s3cmci_drv_data" and flag "is2440" renamed
+- copying the whole driver data struct instead of only its member so
+  it will be easier to extend the information in the future
+- using mmc_of_parse() to read "cd-gpios" and "wp-gpios" properties
+  from device tree
+
+Changes since v1:
+- pinctrl description removed from DT binding
+- unit and label on DT binding renamed to mmc
+
+Sergio Prado (2):
+  dt-bindings: mmc: add DT binding for S3C24XX MMC/SD/SDIO controller
+  mmc: host: s3cmci: allow probing from device tree
+
+ .../devicetree/bindings/mmc/samsung,s3cmci.txt     |  42 ++++
+ drivers/mmc/host/s3cmci.c                          | 257 ++++++++++-----------
+ 2 files changed, 168 insertions(+), 131 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mmc/samsung,s3cmci.txt
+
 -- 
-2.7.4
+1.9.1
