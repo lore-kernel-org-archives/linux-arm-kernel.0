@@ -1,58 +1,94 @@
 From: mylene.josserand@free-electrons.com (=?UTF-8?q?Myl=C3=A8ne=20Josserand?=)
-Date: Sat, 18 Mar 2017 08:55:04 +0100
-Subject: [PATCH v3 0/5] ASoC: sun8i-a33 clean-up for 4.11
-Message-ID: <20170318075509.3836-1-mylene.josserand@free-electrons.com>
+Date: Sat, 18 Mar 2017 08:55:06 +0100
+Subject: [PATCH v3 2/5] ASoC: sun8i-codec: Update mixer to use SOC_DAPM_DOUBLE
+In-Reply-To: <20170318075509.3836-1-mylene.josserand@free-electrons.com>
+References: <20170318075509.3836-1-mylene.josserand@free-electrons.com>
+Message-ID: <20170318075509.3836-3-mylene.josserand@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
+Update the driver to use the new SOC_DAPM_DOUBLE definition
+on the digital DAC mixer.
+Update the names accordingly as, when they are shared, the
+controls are not prefixed with the widget's name anymore.
 
-As discussed in this thread [1], here are a V3 of the cleanup series for
-the sun8i-a33 driver (introduced in v4.11-rc1) as fixes for v4.11.
+Signed-off-by: Myl?ne Josserand <mylene.josserand@free-electrons.com>
+---
+ sound/soc/sunxi/sun8i-codec.c | 45 ++++++++++++++++++++-----------------------
+ 1 file changed, 21 insertions(+), 24 deletions(-)
 
-Based on: Linus repository - master branch
-Last commit: 8841b5f0cd ("Merge tag 'nfs-for-4.11-2' of
-     git://git.linux-nfs.org/projects/anna/linux-nfs")
-
-Changes since v1 and v2:
-	- Patch 01: No changes from v1, it applies directly
-	- Patch 02: No changes from v1, it applies directly
-	once patch 01 has been applied.
-	- Patch 03: No changes from v2, it applies directly
-	- Patch 04: Rebased on master branch
-	- Patch 05: No changes from v2, it applies directly
-
-Patch 01 removes some unnecessary widgets.
-Patch 02 updates the driver to use SOC_DAPM_DOUBLE.
-Patch 03 removes a space on a widget name that implies an error
-on audio routing as the widget is unknown.
-Patch 04 improves some widgets (names and types).
-As widget names changed in patch 04, the patch 05 is needed to use
-the same names on audio routing. Otherwise, the device tree for sun8i-a33
-will be broken and the audio codec will not work.
-
-Only patches 01 and 02 were initially wanted as fixes for v4.11 but, with Chen-Yu,
-we thought that patch 03 and 04 could be also applied as fixes. As patch 04
-creates a break with the device tree, I added patch 05 in this series.
-
-Let me know what you think.
-
-[1]: https://lkml.org/lkml/2017/3/14/4
-
-Thank you in advance,
-
-Best regards,
-
-Myl?ne Josserand (5):
-  ASoC: sun8i-codec: Remove analog "HP" widget
-  ASoC: sun8i-codec: Update mixer to use SOC_DAPM_DOUBLE
-  ASoC: sun8i-codec: Fix space on audio-routing widget
-  ASoC: sun8i-codec: Convert to use SND_SOC_DAPM_AIF_IN
-  ARM: dts: sun8i: Update audio-routing with renamed widgets
-
- arch/arm/boot/dts/sun8i-a33.dtsi |  4 +--
- sound/soc/sunxi/sun8i-codec.c    | 67 ++++++++++++++++++----------------------
- 2 files changed, 32 insertions(+), 39 deletions(-)
-
+diff --git a/sound/soc/sunxi/sun8i-codec.c b/sound/soc/sunxi/sun8i-codec.c
+index d60f6fbd36a2..107fa8213600 100644
+--- a/sound/soc/sunxi/sun8i-codec.c
++++ b/sound/soc/sunxi/sun8i-codec.c
+@@ -259,25 +259,20 @@ static int sun8i_codec_hw_params(struct snd_pcm_substream *substream,
+ 	return 0;
+ }
+ 
+-static const struct snd_kcontrol_new sun8i_output_left_mixer_controls[] = {
+-	SOC_DAPM_SINGLE("LSlot 0", SUN8I_DAC_MXR_SRC,
+-			SUN8I_DAC_MXR_SRC_DACL_MXR_SRC_AIF1DA0L, 1, 0),
+-	SOC_DAPM_SINGLE("LSlot 1", SUN8I_DAC_MXR_SRC,
+-			SUN8I_DAC_MXR_SRC_DACL_MXR_SRC_AIF1DA1L, 1, 0),
+-	SOC_DAPM_SINGLE("DACL", SUN8I_DAC_MXR_SRC,
+-			SUN8I_DAC_MXR_SRC_DACL_MXR_SRC_AIF2DACL, 1, 0),
+-	SOC_DAPM_SINGLE("ADCL", SUN8I_DAC_MXR_SRC,
+-			SUN8I_DAC_MXR_SRC_DACL_MXR_SRC_ADCL, 1, 0),
+-};
+-
+-static const struct snd_kcontrol_new sun8i_output_right_mixer_controls[] = {
+-	SOC_DAPM_SINGLE("RSlot 0", SUN8I_DAC_MXR_SRC,
++static const struct snd_kcontrol_new sun8i_dac_mixer_controls[] = {
++	SOC_DAPM_DOUBLE("AIF1 Slot 0 Digital DAC Playback Switch",
++			SUN8I_DAC_MXR_SRC,
++			SUN8I_DAC_MXR_SRC_DACL_MXR_SRC_AIF1DA0L,
+ 			SUN8I_DAC_MXR_SRC_DACR_MXR_SRC_AIF1DA0R, 1, 0),
+-	SOC_DAPM_SINGLE("RSlot 1", SUN8I_DAC_MXR_SRC,
++	SOC_DAPM_DOUBLE("AIF1 Slot 1 Digital DAC Playback Switch",
++			SUN8I_DAC_MXR_SRC,
++			SUN8I_DAC_MXR_SRC_DACL_MXR_SRC_AIF1DA1L,
+ 			SUN8I_DAC_MXR_SRC_DACR_MXR_SRC_AIF1DA1R, 1, 0),
+-	SOC_DAPM_SINGLE("DACR", SUN8I_DAC_MXR_SRC,
++	SOC_DAPM_DOUBLE("AIF2 Digital DAC Playback Switch", SUN8I_DAC_MXR_SRC,
++			SUN8I_DAC_MXR_SRC_DACL_MXR_SRC_AIF2DACL,
+ 			SUN8I_DAC_MXR_SRC_DACR_MXR_SRC_AIF2DACR, 1, 0),
+-	SOC_DAPM_SINGLE("ADCR", SUN8I_DAC_MXR_SRC,
++	SOC_DAPM_DOUBLE("ADC Digital DAC Playback Switch", SUN8I_DAC_MXR_SRC,
++			SUN8I_DAC_MXR_SRC_DACL_MXR_SRC_ADCL,
+ 			SUN8I_DAC_MXR_SRC_DACR_MXR_SRC_ADCR, 1, 0),
+ };
+ 
+@@ -293,12 +288,12 @@ static const struct snd_soc_dapm_widget sun8i_codec_dapm_widgets[] = {
+ 			 SUN8I_AIF1_DACDAT_CTRL_AIF1_DA0R_ENA, 0),
+ 
+ 	/* DAC Mixers */
+-	SND_SOC_DAPM_MIXER("Left DAC Mixer", SND_SOC_NOPM, 0, 0,
+-			   sun8i_output_left_mixer_controls,
+-			   ARRAY_SIZE(sun8i_output_left_mixer_controls)),
+-	SND_SOC_DAPM_MIXER("Right DAC Mixer", SND_SOC_NOPM, 0, 0,
+-			   sun8i_output_right_mixer_controls,
+-			   ARRAY_SIZE(sun8i_output_right_mixer_controls)),
++	SND_SOC_DAPM_MIXER("Left Digital DAC Mixer", SND_SOC_NOPM, 0, 0,
++			   sun8i_dac_mixer_controls,
++			   ARRAY_SIZE(sun8i_dac_mixer_controls)),
++	SND_SOC_DAPM_MIXER("Right Digital DAC Mixer", SND_SOC_NOPM, 0, 0,
++			   sun8i_dac_mixer_controls,
++			   ARRAY_SIZE(sun8i_dac_mixer_controls)),
+ 
+ 	/* Clocks */
+ 	SND_SOC_DAPM_SUPPLY("MODCLK AFI1", SUN8I_MOD_CLK_ENA,
+@@ -340,8 +335,10 @@ static const struct snd_soc_dapm_route sun8i_codec_dapm_routes[] = {
+ 	{ "Digital Right DAC", NULL, "DAC" },
+ 
+ 	/* DAC Mixer Routes */
+-	{ "Left DAC Mixer", "LSlot 0", "Digital Left DAC"},
+-	{ "Right DAC Mixer", "RSlot 0", "Digital Right DAC"},
++	{ "Left Digital DAC Mixer", "AIF1 Slot 0 Digital DAC Playback Switch",
++	  "Digital Left DAC"},
++	{ "Right Digital DAC Mixer", "AIF1 Slot 0 Digital DAC Playback Switch ",
++	  "Digital Right DAC"},
+ };
+ 
+ static struct snd_soc_dai_ops sun8i_codec_dai_ops = {
 -- 
 2.11.0
