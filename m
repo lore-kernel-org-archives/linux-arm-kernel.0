@@ -1,25 +1,125 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 18 Mar 2017 17:32:43 +0100
-Subject: [PATCH 4/4] RFT: irqchip: replace moxa with ftintc010
-In-Reply-To: <CACmBeS0BAUPgP7N1FMYvWK583kAOU2ogZ0PqE2hQA2sE5nBpUg@mail.gmail.com>
-References: <20170311231505.16056-1-linus.walleij@linaro.org>
- <CACmBeS2rNKnJKsFXeqwuCO5YBgfO8Nv=Wr+cG8DS-gfpfsxENg@mail.gmail.com>
- <CACRpkdYExzp0zRdnYad6XG+58saeCUNNN04-n+hPR-X=1gezOQ@mail.gmail.com>
- <CACmBeS0BAUPgP7N1FMYvWK583kAOU2ogZ0PqE2hQA2sE5nBpUg@mail.gmail.com>
-Message-ID: <CACRpkdbKaxroN9-jDYgEvu-nxgtPALOGwJpt8rt0X49bD+gZiw@mail.gmail.com>
+Date: Sat, 18 Mar 2017 17:40:01 +0100
+Subject: [PATCH] ARM: dts: Adjust moxart IRQ controller and flags
+Message-ID: <20170318164001.4967-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 14, 2017 at 3:58 PM, Jonas Jensen <jonas.jensen@gmail.com> wrote:
+The moxart interrupt line flags were not respected in previous
+driver: instead of assigning them per-consumer, a fixes mask
+was set in the controller.
 
-> Thanks! everything appear to work right with that patch (see log [1]),
-> however, DTC can no longer compile the dtb so the following is a patch
-> for that:
+With the migration to a standard Faraday driver we need to
+set up and handle the consumer flags correctly. Also remove
+the Moxart-specific flags when switching to using real consumer
+flags.
 
-Thanks! I folded this into the patch and added your Tested-by.
+Extend the register window to 0x100 bytes as we may have a few
+more registers in there and it doesn't hurt.
 
-I will send this separately to the ARM SoC maintainers so they
-can prepare the ground by correcting the device tree.
+Tested-by: Jonas Jensen <jonas.jensen@gmail.com>
+Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ARM SoC folks: can you please apply this directly to whatever
+DTS branch is applicable for Moxart? We are switching to a
+generic Faraday Technology interrupt controller driver that
+actually make use of the trigger flags so this needs to be
+rectified.
+---
+ arch/arm/boot/dts/moxart-uc7112lx.dts |  2 +-
+ arch/arm/boot/dts/moxart.dtsi         | 17 +++++++++--------
+ 2 files changed, 10 insertions(+), 9 deletions(-)
 
-Yours,
-Linus Walleij
+diff --git a/arch/arm/boot/dts/moxart-uc7112lx.dts b/arch/arm/boot/dts/moxart-uc7112lx.dts
+index 10d088df0c35..4a962a26482d 100644
+--- a/arch/arm/boot/dts/moxart-uc7112lx.dts
++++ b/arch/arm/boot/dts/moxart-uc7112lx.dts
+@@ -6,7 +6,7 @@
+  */
+ 
+ /dts-v1/;
+-/include/ "moxart.dtsi"
++#include "moxart.dtsi"
+ 
+ / {
+ 	model = "MOXA UC-7112-LX";
+diff --git a/arch/arm/boot/dts/moxart.dtsi b/arch/arm/boot/dts/moxart.dtsi
+index 10a8184e0ce9..e86f8c905ac5 100644
+--- a/arch/arm/boot/dts/moxart.dtsi
++++ b/arch/arm/boot/dts/moxart.dtsi
+@@ -6,6 +6,7 @@
+  */
+ 
+ /include/ "skeleton.dtsi"
++#include <dt-bindings/interrupt-controller/irq.h>
+ 
+ / {
+ 	compatible = "moxa,moxart";
+@@ -36,8 +37,8 @@
+ 		ranges;
+ 
+ 		intc: interrupt-controller at 98800000 {
+-			compatible = "moxa,moxart-ic";
+-			reg = <0x98800000 0x38>;
++			compatible = "moxa,moxart-ic", "faraday,ftintc010";
++			reg = <0x98800000 0x100>;
+ 			interrupt-controller;
+ 			#interrupt-cells = <2>;
+ 			interrupt-mask = <0x00080000>;
+@@ -59,7 +60,7 @@
+ 		timer: timer at 98400000 {
+ 			compatible = "moxa,moxart-timer";
+ 			reg = <0x98400000 0x42>;
+-			interrupts = <19 1>;
++			interrupts = <19 IRQ_TYPE_EDGE_FALLING>;
+ 			clocks = <&clk_apb>;
+ 		};
+ 
+@@ -80,7 +81,7 @@
+ 		dma: dma at 90500000 {
+ 			compatible = "moxa,moxart-dma";
+ 			reg = <0x90500080 0x40>;
+-			interrupts = <24 0>;
++			interrupts = <24 IRQ_TYPE_LEVEL_HIGH>;
+ 			#dma-cells = <1>;
+ 		};
+ 
+@@ -93,7 +94,7 @@
+ 		sdhci: sdhci at 98e00000 {
+ 			compatible = "moxa,moxart-sdhci";
+ 			reg = <0x98e00000 0x5C>;
+-			interrupts = <5 0>;
++			interrupts = <5 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&clk_apb>;
+ 			dmas =  <&dma 5>,
+ 				<&dma 5>;
+@@ -120,7 +121,7 @@
+ 		mac0: mac at 90900000 {
+ 			compatible = "moxa,moxart-mac";
+ 			reg = <0x90900000 0x90>;
+-			interrupts = <25 0>;
++			interrupts = <25 IRQ_TYPE_LEVEL_HIGH>;
+ 			phy-handle = <&ethphy0>;
+ 			phy-mode = "mii";
+ 			status = "disabled";
+@@ -129,7 +130,7 @@
+ 		mac1: mac at 92000000 {
+ 			compatible = "moxa,moxart-mac";
+ 			reg = <0x92000000 0x90>;
+-			interrupts = <27 0>;
++			interrupts = <27 IRQ_TYPE_LEVEL_HIGH>;
+ 			phy-handle = <&ethphy1>;
+ 			phy-mode = "mii";
+ 			status = "disabled";
+@@ -138,7 +139,7 @@
+ 		uart0: uart at 98200000 {
+ 			compatible = "ns16550a";
+ 			reg = <0x98200000 0x20>;
+-			interrupts = <31 8>;
++			interrupts = <31 IRQ_TYPE_LEVEL_HIGH>;
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+ 			clock-frequency = <14745600>;
+-- 
+2.9.3
