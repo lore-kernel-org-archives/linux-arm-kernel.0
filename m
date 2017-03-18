@@ -1,29 +1,37 @@
-From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
-Date: Sat, 18 Mar 2017 09:58:45 +0100
-Subject: [PATCH 1/2] dt-bindings: thermal: add support for Raspberry Pi
- thermal
-In-Reply-To: <871stvjvj3.fsf@eliezer.anholt.net>
-References: <20170318000132.9212-1-zajec5@gmail.com>
- <871stvjvj3.fsf@eliezer.anholt.net>
-Message-ID: <CACna6ryC9v+Gg4_hDz44KPRR57gAAyAqWN=iNDRN4Bc01zN4fA@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sat, 18 Mar 2017 09:59:42 +0100
+Subject: [PATCH 0/2] move the ICST library to common clocks
+Message-ID: <20170318085944.15899-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 March 2017 at 01:09, Eric Anholt <eric@anholt.net> wrote:
-> Rafa? Mi?ecki <zajec5@gmail.com> writes:
->
->> From: Rafa? Mi?ecki <rafal@milecki.pl>
->>
->> This commit documents binding for BCM2835 SoC thermal used in Raspberry
->> Pi devices.
->
-> There's already a native (non-firmware) thermal driver just waiting for
-> the maintainer to merge it.
->
-> https://www.spinics.net/lists/arm-kernel/msg566217.html
+This consolidates the last piece of the Versatile clocks, the ICST
+clock divider, into drivers/clk/*
 
-Oh my, you did a nice work there guys! Well, this patch can obviously
-be dropped.
+If the series is OK I suggest we take this through ARM SoC since
+the first patch needs to be applied there, alternatively they
+can both go into the clk tree.
+
+Linus Walleij (2):
+  ARM: plat-versatile: remove stale clock header
+  ARM/clk: move the ICST library to drivers/clk
+
+ arch/arm/common/Kconfig                                   |  3 ---
+ arch/arm/common/Makefile                                  |  1 -
+ arch/arm/plat-versatile/include/plat/clock.h              | 15 ---------------
+ drivers/clk/versatile/Kconfig                             |  3 +++
+ drivers/clk/versatile/Makefile                            |  2 +-
+ drivers/clk/versatile/clk-icst.c                          |  1 +
+ drivers/clk/versatile/clk-icst.h                          |  2 --
+ drivers/clk/versatile/clk-impd1.c                         |  1 +
+ drivers/clk/versatile/clk-realview.c                      |  1 +
+ drivers/clk/versatile/clk-versatile.c                     |  1 +
+ {arch/arm/common => drivers/clk/versatile}/icst.c         |  2 +-
+ .../include/asm/hardware => drivers/clk/versatile}/icst.h |  6 ++----
+ 12 files changed, 11 insertions(+), 27 deletions(-)
+ delete mode 100644 arch/arm/plat-versatile/include/plat/clock.h
+ rename {arch/arm/common => drivers/clk/versatile}/icst.c (98%)
+ rename {arch/arm/include/asm/hardware => drivers/clk/versatile}/icst.h (94%)
 
 -- 
-Rafa?
+2.9.3
