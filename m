@@ -1,125 +1,86 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 18 Mar 2017 17:40:01 +0100
-Subject: [PATCH] ARM: dts: Adjust moxart IRQ controller and flags
-Message-ID: <20170318164001.4967-1-linus.walleij@linaro.org>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Sat, 18 Mar 2017 09:41:56 -0700
+Subject: [PATCH v3 1/2] ARM: dts: bcm5301x: Add TWD WD Support to DT
+In-Reply-To: <ece3845e-fdaf-3d90-6667-790dcfdcbe9c@gmail.com>
+References: <1488817485-7503-1-git-send-email-jon.mason@broadcom.com>
+ <1488817485-7503-2-git-send-email-jon.mason@broadcom.com>
+ <03eb99e1-f18c-d4a3-32bf-d90640b14ab1@gmail.com>
+ <ece3845e-fdaf-3d90-6667-790dcfdcbe9c@gmail.com>
+Message-ID: <171eeda6-76d7-a241-b8cf-19c7e4283ca2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The moxart interrupt line flags were not respected in previous
-driver: instead of assigning them per-consumer, a fixes mask
-was set in the controller.
 
-With the migration to a standard Faraday driver we need to
-set up and handle the consumer flags correctly. Also remove
-the Moxart-specific flags when switching to using real consumer
-flags.
 
-Extend the register window to 0x100 bytes as we may have a few
-more registers in there and it doesn't hurt.
+On 03/18/2017 03:36 AM, Rafa? Mi?ecki wrote:
+> On 03/15/2017 10:53 PM, Florian Fainelli wrote:
+>> On 03/06/2017 08:24 AM, Jon Mason wrote:
+>>> From: Jon Mason <jonmason@broadcom.com>
+>>>
+>>> Add support for the ARM TWD Watchdog to the bcm5301x device tree.  The
+>>> ARM TWD timer allocated the register space for the WDT, so this patch
+>>> necessitated shrinking that.  Also, the GIC masks were added for these.
+>>>
+>>> Signed-off-by: Jon Mason <jonmason@broadcom.com>
+>>
+>> There were some minor conflicts that have been resolved, applied, thanks!
+> 
+> Solving conflict by removing a reg property? ;)
+> timer at 20600 {
+>     compatible = "arm,cortex-a9-twd-timer";
+>     interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) |
+>                   IRQ_TYPE_EDGE_RISING)>;
+>     clocks = <&periph_clk>;
+> };
 
-Tested-by: Jonas Jensen <jonas.jensen@gmail.com>
-Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-ARM SoC folks: can you please apply this directly to whatever
-DTS branch is applicable for Moxart? We are switching to a
-generic Faraday Technology interrupt controller driver that
-actually make use of the trigger flags so this needs to be
-rectified.
----
- arch/arm/boot/dts/moxart-uc7112lx.dts |  2 +-
- arch/arm/boot/dts/moxart.dtsi         | 17 +++++++++--------
- 2 files changed, 10 insertions(+), 9 deletions(-)
+Sorry about that, the new commit is pushed to the same branch:
 
-diff --git a/arch/arm/boot/dts/moxart-uc7112lx.dts b/arch/arm/boot/dts/moxart-uc7112lx.dts
-index 10d088df0c35..4a962a26482d 100644
---- a/arch/arm/boot/dts/moxart-uc7112lx.dts
-+++ b/arch/arm/boot/dts/moxart-uc7112lx.dts
-@@ -6,7 +6,7 @@
-  */
- 
- /dts-v1/;
--/include/ "moxart.dtsi"
-+#include "moxart.dtsi"
- 
- / {
- 	model = "MOXA UC-7112-LX";
-diff --git a/arch/arm/boot/dts/moxart.dtsi b/arch/arm/boot/dts/moxart.dtsi
-index 10a8184e0ce9..e86f8c905ac5 100644
---- a/arch/arm/boot/dts/moxart.dtsi
-+++ b/arch/arm/boot/dts/moxart.dtsi
-@@ -6,6 +6,7 @@
-  */
- 
- /include/ "skeleton.dtsi"
-+#include <dt-bindings/interrupt-controller/irq.h>
- 
- / {
- 	compatible = "moxa,moxart";
-@@ -36,8 +37,8 @@
- 		ranges;
- 
- 		intc: interrupt-controller at 98800000 {
--			compatible = "moxa,moxart-ic";
--			reg = <0x98800000 0x38>;
-+			compatible = "moxa,moxart-ic", "faraday,ftintc010";
-+			reg = <0x98800000 0x100>;
- 			interrupt-controller;
- 			#interrupt-cells = <2>;
- 			interrupt-mask = <0x00080000>;
-@@ -59,7 +60,7 @@
- 		timer: timer at 98400000 {
- 			compatible = "moxa,moxart-timer";
- 			reg = <0x98400000 0x42>;
--			interrupts = <19 1>;
-+			interrupts = <19 IRQ_TYPE_EDGE_FALLING>;
- 			clocks = <&clk_apb>;
- 		};
- 
-@@ -80,7 +81,7 @@
- 		dma: dma at 90500000 {
- 			compatible = "moxa,moxart-dma";
- 			reg = <0x90500080 0x40>;
--			interrupts = <24 0>;
-+			interrupts = <24 IRQ_TYPE_LEVEL_HIGH>;
- 			#dma-cells = <1>;
- 		};
- 
-@@ -93,7 +94,7 @@
- 		sdhci: sdhci at 98e00000 {
- 			compatible = "moxa,moxart-sdhci";
- 			reg = <0x98e00000 0x5C>;
--			interrupts = <5 0>;
-+			interrupts = <5 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&clk_apb>;
- 			dmas =  <&dma 5>,
- 				<&dma 5>;
-@@ -120,7 +121,7 @@
- 		mac0: mac at 90900000 {
- 			compatible = "moxa,moxart-mac";
- 			reg = <0x90900000 0x90>;
--			interrupts = <25 0>;
-+			interrupts = <25 IRQ_TYPE_LEVEL_HIGH>;
- 			phy-handle = <&ethphy0>;
- 			phy-mode = "mii";
- 			status = "disabled";
-@@ -129,7 +130,7 @@
- 		mac1: mac at 92000000 {
- 			compatible = "moxa,moxart-mac";
- 			reg = <0x92000000 0x90>;
--			interrupts = <27 0>;
-+			interrupts = <27 IRQ_TYPE_LEVEL_HIGH>;
- 			phy-handle = <&ethphy1>;
- 			phy-mode = "mii";
- 			status = "disabled";
-@@ -138,7 +139,7 @@
- 		uart0: uart at 98200000 {
- 			compatible = "ns16550a";
- 			reg = <0x98200000 0x20>;
--			interrupts = <31 8>;
-+			interrupts = <31 IRQ_TYPE_LEVEL_HIGH>;
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
- 			clock-frequency = <14745600>;
+https://github.com/Broadcom/stblinux/commit/f22c635e585471d01a38b829c0753c1467b5058e
+
+and it now incorporates:
+
+ARM: dts: BCM5301X: Correct GIC_PPI interrupt flags
+
+which was applied to devicetree/fixes and not devicetree/next.
+
+> 
+> This may be a bad idea :P
+> [    0.020330] ------------[ cut here ]------------
+> [    0.025280] WARNING: CPU: 0 PID: 0 at arch/arm/kernel/smp_twd.c:412
+> twd_local_timer_of_register+0x6c/0x80()
+> [    0.035653] twd_local_timer_of_register failed (-12)
+> [    0.040924] Modules linked in:
+> [    0.044171] CPU: 0 PID: 0 Comm: swapper/0 Not tainted 4.4.53 #0
+> [    0.050462] Hardware name: BCM5301X
+> [    0.054161] Backtrace:
+> [    0.056781] [<c0017050>] (dump_backtrace) from [<c001724c>]
+> (show_stack+0x18/0x1c)
+> [    0.064831]  r7:0000019c r6:c03ea15e r5:600000d3 r4:00000000
+> [    0.070992] [<c0017234>] (show_stack) from [<c0181724>]
+> (dump_stack+0x84/0xa4)
+> [    0.078688] [<c01816a0>] (dump_stack) from [<c0021534>]
+> (warn_slowpath_common+0x8c/0xb8)
+> [    0.087294]  r5:00000009 r4:c0497f48
+> [    0.091188] [<c00214a8>] (warn_slowpath_common) from [<c0021598>]
+> (warn_slowpath_fmt+0x38/0x40)
+> [    0.100444]  r8:c7ffe700 r7:c04b0a14 r6:c04983c0 r5:00000002 r4:c6de78f0
+> [    0.107721] [<c0021564>] (warn_slowpath_fmt) from [<c0464010>]
+> (twd_local_timer_of_register+0x6c/0x80)
+> [    0.117629]  r3:fffffff4 r2:c03ea135
+> [    0.121512] [<c0463fa4>] (twd_local_timer_of_register) from
+> [<c04760b0>] (clocksource_probe+0x54/0x94)
+> [    0.131410]  r5:00000002 r4:c6de78f0
+> [    0.135299] [<c047605c>] (clocksource_probe) from [<c046366c>]
+> (time_init+0x30/0x38)
+> [    0.143532]  r5:ffffffff r4:00000000
+> [    0.147412] [<c046363c>] (time_init) from [<c0460be0>]
+> (start_kernel+0x274/0x3f4)
+> [    0.155376] [<c046096c>] (start_kernel) from [<0000807c>] (0x807c)
+> [    0.161944]  r10:00000000 r9:413fc090 r8:0000406a r7:c049acd4
+> r6:c0488a24 r5:c0498444
+> [    0.170454]  r4:c04b0b20
+> [    0.173213] ---[ end trace f24b6c88ae00fa9a ]---
+> 
+
 -- 
-2.9.3
+Florian
