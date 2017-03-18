@@ -1,44 +1,61 @@
 From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Sat, 18 Mar 2017 13:27:34 +0100
-Subject: [PATCH v2 0/2] meson-gxl pinctrl - add the missing PWM pins
-In-Reply-To: <20170304212318.27076-1-martin.blumenstingl@googlemail.com>
-References: <20170304212318.27076-1-martin.blumenstingl@googlemail.com>
-Message-ID: <20170318122736.11592-1-martin.blumenstingl@googlemail.com>
+Date: Sat, 18 Mar 2017 13:36:54 +0100
+Subject: [PATCH v2 0/3] Khadas VIM support (Amlogic Meson GXL S905X)
+In-Reply-To: <20170304215126.7020-1-martin.blumenstingl@googlemail.com>
+References: <20170304215126.7020-1-martin.blumenstingl@googlemail.com>
+Message-ID: <20170318123657.13798-1-martin.blumenstingl@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Due to the lack of a public GXL or GXM datasheet most of the PWM pin
-definitions are currently missing.
-However, the people behind the Khadas VIM boards were kind enough to
-share the PWM pins and their corresponding register offsets and bits
-with me.
+This series adds support for the Khadas VIM and Khadas VIM Pro boards
+(both are provided through a single .dts as the only two differences are
+the eMMC size and different SDIO WIFI chips - both are Broadcom brcmfmac
+based though).
+More details can be found on the official website: [0]
 
-This patch adds all missing PWM pins to the GXL pinctrl driver. The
-upcoming Khadas VIM board support patch only needs PWM_F and PWM_AO_A.
-I still decided to add all PWM pins just in case there's no public GXL
-datasheet release soon.
+I have tested this on a Khadas VIM Pro board. It would be nice if someone
+with a non-Pro board could give it a try as well.
+
+
+This patchset depends on:
+- "meson-gxl pinctrl - add the missing PWM pins" see [2]
+- "ARM64: dts: meson-gxl: improve support for the P212 reference design"
+  see [4] - already merged in v4.12/dt64 of Kevin's Amlogic tree
+- "ARM64: defconfig: enable the leds-pwm driver and default-on trigger"
+  see [1] - already merged in v4.12/defconfig of Kevin's Amlogic tree
+- "brcmfmac: add support for BCM43455 with modalias sdio:c00v02D0dA9BF"
+  see [3], this is NOT a direct dependency (it's only required to get
+  WIFI working on the Khadas VIM Pro) and it's already merged for v4.11
+  (commit a62a77881b1b6708ffeddd9bf0529494f7b199e3)
 
 
 Changes since v1:
-- combined previously separate functions for example: there were
-  separate functions pwm_ao_a_3 and pwm_ao_a_8) into one function
-  (in the previous example: pwm_ao_a). this affects both, the dtsi
-  and driver patches and was done for pwm_ao_a and pwm_f.
-  this is the result of a discussion [0] based on v1 of these patches
-  along with re-reading Linus Walleij's pinctrl documentation [1]
-- added Neil Armstrong's Reviewed-By and Tested-By
+- updated the cover-letter to inclulde the P212 reference design patch
+  as dependency. also re-ordered the dependencies so the PWM series
+  is on top (as it's the only dependency which is not merged yet)
+- rebased onto the v4.12/dt64 branch of Kevin's Amlogic tree
+- added Rob Herring's ACK on patch #1 and #2
+- added Neil Armstrong's Tested-By to patch #3
 
 
-[0] http://lists.infradead.org/pipermail/linux-amlogic/2017-March/002864.html
-[1] http://lists.infradead.org/pipermail/linux-amlogic/2017-March/002816.html
+[0] http://khadas.com/vim/
+[1] http://lists.infradead.org/pipermail/linux-amlogic/2017-February/002474.html
+[2] http://lists.infradead.org/pipermail/linux-amlogic/2017-March/002658.html
+[3] https://www.spinics.net/lists/linux-mmc/msg41627.html
+[4] http://lists.infradead.org/pipermail/linux-amlogic/2017-March/002638.html
 
-Martin Blumenstingl (2):
-  pinctrl: meson: gxl: add the missing PWM pin definitions
-  ARM64: dts: amlogic: meson-gxl: add the missing PWM pins
 
- arch/arm64/boot/dts/amlogic/meson-gxl.dtsi | 56 ++++++++++++++++++++++++++++++
- drivers/pinctrl/meson/pinctrl-meson-gxl.c  | 54 ++++++++++++++++++++++++++++
- 2 files changed, 110 insertions(+)
+Martin Blumenstingl (3):
+  devicetree: add vendor prefix for Khadas
+  dt-bindings: amlogic: add the Khadas VIM
+  ARM64: dts: meson-gxl: add support for the Khadas VIM board
+
+ Documentation/devicetree/bindings/arm/amlogic.txt  |   2 +
+ .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+ arch/arm64/boot/dts/amlogic/Makefile               |   1 +
+ .../dts/amlogic/meson-gxl-s905x-khadas-vim.dts     | 114 +++++++++++++++++++++
+ 4 files changed, 118 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxl-s905x-khadas-vim.dts
 
 -- 
 2.12.0
