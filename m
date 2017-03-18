@@ -1,283 +1,173 @@
 From: labbott@redhat.com (Laura Abbott)
-Date: Fri, 17 Mar 2017 17:54:36 -0700
-Subject: [RFC PATCHv2 04/21] staging: android: ion: Remove alignment from
- allocation field
+Date: Fri, 17 Mar 2017 17:54:42 -0700
+Subject: [RFC PATCHv2 10/21] staging: android: ion: Remove import interface
 In-Reply-To: <1489798493-16600-1-git-send-email-labbott@redhat.com>
 References: <1489798493-16600-1-git-send-email-labbott@redhat.com>
-Message-ID: <1489798493-16600-5-git-send-email-labbott@redhat.com>
+Message-ID: <1489798493-16600-11-git-send-email-labbott@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-The align field was supposed to be used to specify the alignment of
-the allocation. Nobody actually does anything with it except to check
-if the alignment specified is out of bounds. Since this has no effect
-on the actual allocation, just remove it.
+With the expansion of dma-buf and the move for Ion to be come just an
+allocator, the import mechanism is mostly useless. There isn't a kernel
+component to Ion anymore and handles are private to Ion. Remove this
+interface.
 
 Signed-off-by: Laura Abbott <labbott@redhat.com>
 ---
- drivers/staging/android/ion/ion-ioctl.c         |  1 -
- drivers/staging/android/ion/ion.c               | 14 ++++++--------
- drivers/staging/android/ion/ion.h               |  5 +----
- drivers/staging/android/ion/ion_carveout_heap.c | 10 +++-------
- drivers/staging/android/ion/ion_chunk_heap.c    |  9 +++------
- drivers/staging/android/ion/ion_cma_heap.c      |  5 +----
- drivers/staging/android/ion/ion_priv.h          |  2 +-
- drivers/staging/android/ion/ion_system_heap.c   |  9 +--------
- 8 files changed, 16 insertions(+), 39 deletions(-)
+ drivers/staging/android/ion/compat_ion.c |  1 -
+ drivers/staging/android/ion/ion-ioctl.c  | 11 -----
+ drivers/staging/android/ion/ion.c        | 76 --------------------------------
+ drivers/staging/android/uapi/ion.h       |  9 ----
+ 4 files changed, 97 deletions(-)
 
+diff --git a/drivers/staging/android/ion/compat_ion.c b/drivers/staging/android/ion/compat_ion.c
+index 5b192ea..ae1ffc3 100644
+--- a/drivers/staging/android/ion/compat_ion.c
++++ b/drivers/staging/android/ion/compat_ion.c
+@@ -145,7 +145,6 @@ long compat_ion_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
+ 	}
+ 	case ION_IOC_SHARE:
+ 	case ION_IOC_MAP:
+-	case ION_IOC_IMPORT:
+ 		return filp->f_op->unlocked_ioctl(filp, cmd,
+ 						(unsigned long)compat_ptr(arg));
+ 	default:
 diff --git a/drivers/staging/android/ion/ion-ioctl.c b/drivers/staging/android/ion/ion-ioctl.c
-index 9ff815a..5b2e93f 100644
+index 2b475bf..7b54eea 100644
 --- a/drivers/staging/android/ion/ion-ioctl.c
 +++ b/drivers/staging/android/ion/ion-ioctl.c
-@@ -95,7 +95,6 @@ long ion_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
- 		struct ion_handle *handle;
- 
- 		handle = ion_alloc(client, data.allocation.len,
--						data.allocation.align,
- 						data.allocation.heap_id_mask,
- 						data.allocation.flags);
- 		if (IS_ERR(handle))
+@@ -131,17 +131,6 @@ long ion_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
+ 			ret = data.fd.fd;
+ 		break;
+ 	}
+-	case ION_IOC_IMPORT:
+-	{
+-		struct ion_handle *handle;
+-
+-		handle = ion_import_dma_buf_fd(client, data.fd.fd);
+-		if (IS_ERR(handle))
+-			ret = PTR_ERR(handle);
+-		else
+-			data.handle.handle = handle->id;
+-		break;
+-	}
+ 	case ION_IOC_HEAP_QUERY:
+ 		ret = ion_query_heaps(client, &data.query);
+ 		break;
 diff --git a/drivers/staging/android/ion/ion.c b/drivers/staging/android/ion/ion.c
-index f45115f..c2adfe1 100644
+index 125c537..3d979ef5 100644
 --- a/drivers/staging/android/ion/ion.c
 +++ b/drivers/staging/android/ion/ion.c
-@@ -103,7 +103,6 @@ static void ion_buffer_add(struct ion_device *dev,
- static struct ion_buffer *ion_buffer_create(struct ion_heap *heap,
- 					    struct ion_device *dev,
- 					    unsigned long len,
--					    unsigned long align,
- 					    unsigned long flags)
- {
- 	struct ion_buffer *buffer;
-@@ -119,15 +118,14 @@ static struct ion_buffer *ion_buffer_create(struct ion_heap *heap,
- 	buffer->flags = flags;
- 	kref_init(&buffer->ref);
- 
--	ret = heap->ops->allocate(heap, buffer, len, align, flags);
-+	ret = heap->ops->allocate(heap, buffer, len, flags);
- 
- 	if (ret) {
- 		if (!(heap->flags & ION_HEAP_FLAG_DEFER_FREE))
- 			goto err2;
- 
- 		ion_heap_freelist_drain(heap, 0);
--		ret = heap->ops->allocate(heap, buffer, len, align,
--					  flags);
-+		ret = heap->ops->allocate(heap, buffer, len, flags);
- 		if (ret)
- 			goto err2;
- 	}
-@@ -401,7 +399,7 @@ static int ion_handle_add(struct ion_client *client, struct ion_handle *handle)
+@@ -274,24 +274,6 @@ int ion_handle_put(struct ion_handle *handle)
+ 	return ret;
  }
  
- struct ion_handle *ion_alloc(struct ion_client *client, size_t len,
--			     size_t align, unsigned int heap_id_mask,
-+			     unsigned int heap_id_mask,
- 			     unsigned int flags)
+-static struct ion_handle *ion_handle_lookup(struct ion_client *client,
+-					    struct ion_buffer *buffer)
+-{
+-	struct rb_node *n = client->handles.rb_node;
+-
+-	while (n) {
+-		struct ion_handle *entry = rb_entry(n, struct ion_handle, node);
+-
+-		if (buffer < entry->buffer)
+-			n = n->rb_left;
+-		else if (buffer > entry->buffer)
+-			n = n->rb_right;
+-		else
+-			return entry;
+-	}
+-	return ERR_PTR(-EINVAL);
+-}
+-
+ struct ion_handle *ion_handle_get_by_id_nolock(struct ion_client *client,
+ 					       int id)
  {
- 	struct ion_handle *handle;
-@@ -410,8 +408,8 @@ struct ion_handle *ion_alloc(struct ion_client *client, size_t len,
- 	struct ion_heap *heap;
- 	int ret;
+@@ -1023,64 +1005,6 @@ int ion_share_dma_buf_fd(struct ion_client *client, struct ion_handle *handle)
+ }
+ EXPORT_SYMBOL(ion_share_dma_buf_fd);
  
--	pr_debug("%s: len %zu align %zu heap_id_mask %u flags %x\n", __func__,
--		 len, align, heap_id_mask, flags);
-+	pr_debug("%s: len %zu heap_id_mask %u flags %x\n", __func__,
-+		 len, heap_id_mask, flags);
- 	/*
- 	 * traverse the list of heaps available in this system in priority
- 	 * order.  If the heap type is supported by the client, and matches the
-@@ -428,7 +426,7 @@ struct ion_handle *ion_alloc(struct ion_client *client, size_t len,
- 		/* if the caller didn't specify this heap id */
- 		if (!((1 << heap->id) & heap_id_mask))
- 			continue;
--		buffer = ion_buffer_create(heap, dev, len, align, flags);
-+		buffer = ion_buffer_create(heap, dev, len, flags);
- 		if (!IS_ERR(buffer))
- 			break;
- 	}
-diff --git a/drivers/staging/android/ion/ion.h b/drivers/staging/android/ion/ion.h
-index 93dafb4..3b4bff5 100644
---- a/drivers/staging/android/ion/ion.h
-+++ b/drivers/staging/android/ion/ion.h
-@@ -45,7 +45,6 @@ struct ion_buffer;
-  * @name:	used for debug purposes
-  * @base:	base address of heap in physical memory if applicable
-  * @size:	size of the heap in bytes if applicable
-- * @align:	required alignment in physical memory if applicable
-  * @priv:	private info passed from the board file
-  *
-  * Provided by the board file.
-@@ -93,8 +92,6 @@ void ion_client_destroy(struct ion_client *client);
-  * ion_alloc - allocate ion memory
-  * @client:		the client
-  * @len:		size of the allocation
-- * @align:		requested allocation alignment, lots of hardware blocks
-- *			have alignment requirements of some kind
-  * @heap_id_mask:	mask of heaps to allocate from, if multiple bits are set
-  *			heaps will be tried in order from highest to lowest
-  *			id
-@@ -106,7 +103,7 @@ void ion_client_destroy(struct ion_client *client);
-  * an opaque handle to it.
-  */
- struct ion_handle *ion_alloc(struct ion_client *client, size_t len,
--			     size_t align, unsigned int heap_id_mask,
-+			     unsigned int heap_id_mask,
- 			     unsigned int flags);
+-struct ion_handle *ion_import_dma_buf(struct ion_client *client,
+-				      struct dma_buf *dmabuf)
+-{
+-	struct ion_buffer *buffer;
+-	struct ion_handle *handle;
+-	int ret;
+-
+-	/* if this memory came from ion */
+-
+-	if (dmabuf->ops != &dma_buf_ops) {
+-		pr_err("%s: can not import dmabuf from another exporter\n",
+-		       __func__);
+-		return ERR_PTR(-EINVAL);
+-	}
+-	buffer = dmabuf->priv;
+-
+-	mutex_lock(&client->lock);
+-	/* if a handle exists for this buffer just take a reference to it */
+-	handle = ion_handle_lookup(client, buffer);
+-	if (!IS_ERR(handle)) {
+-		ion_handle_get(handle);
+-		mutex_unlock(&client->lock);
+-		goto end;
+-	}
+-
+-	handle = ion_handle_create(client, buffer);
+-	if (IS_ERR(handle)) {
+-		mutex_unlock(&client->lock);
+-		goto end;
+-	}
+-
+-	ret = ion_handle_add(client, handle);
+-	mutex_unlock(&client->lock);
+-	if (ret) {
+-		ion_handle_put(handle);
+-		handle = ERR_PTR(ret);
+-	}
+-
+-end:
+-	return handle;
+-}
+-EXPORT_SYMBOL(ion_import_dma_buf);
+-
+-struct ion_handle *ion_import_dma_buf_fd(struct ion_client *client, int fd)
+-{
+-	struct dma_buf *dmabuf;
+-	struct ion_handle *handle;
+-
+-	dmabuf = dma_buf_get(fd);
+-	if (IS_ERR(dmabuf))
+-		return ERR_CAST(dmabuf);
+-
+-	handle = ion_import_dma_buf(client, dmabuf);
+-	dma_buf_put(dmabuf);
+-	return handle;
+-}
+-EXPORT_SYMBOL(ion_import_dma_buf_fd);
+-
+ int ion_query_heaps(struct ion_client *client, struct ion_heap_query *query)
+ {
+ 	struct ion_device *dev = client->dev;
+diff --git a/drivers/staging/android/uapi/ion.h b/drivers/staging/android/uapi/ion.h
+index 8ff471d..3a59044 100644
+--- a/drivers/staging/android/uapi/ion.h
++++ b/drivers/staging/android/uapi/ion.h
+@@ -185,15 +185,6 @@ struct ion_heap_query {
+ #define ION_IOC_SHARE		_IOWR(ION_IOC_MAGIC, 4, struct ion_fd_data)
  
  /**
-diff --git a/drivers/staging/android/ion/ion_carveout_heap.c b/drivers/staging/android/ion/ion_carveout_heap.c
-index a8ea973..9bf8e98 100644
---- a/drivers/staging/android/ion/ion_carveout_heap.c
-+++ b/drivers/staging/android/ion/ion_carveout_heap.c
-@@ -34,8 +34,7 @@ struct ion_carveout_heap {
- };
- 
- static ion_phys_addr_t ion_carveout_allocate(struct ion_heap *heap,
--					     unsigned long size,
--					     unsigned long align)
-+					     unsigned long size)
- {
- 	struct ion_carveout_heap *carveout_heap =
- 		container_of(heap, struct ion_carveout_heap, heap);
-@@ -60,16 +59,13 @@ static void ion_carveout_free(struct ion_heap *heap, ion_phys_addr_t addr,
- 
- static int ion_carveout_heap_allocate(struct ion_heap *heap,
- 				      struct ion_buffer *buffer,
--				      unsigned long size, unsigned long align,
-+				      unsigned long size,
- 				      unsigned long flags)
- {
- 	struct sg_table *table;
- 	ion_phys_addr_t paddr;
- 	int ret;
- 
--	if (align > PAGE_SIZE)
--		return -EINVAL;
+- * DOC: ION_IOC_IMPORT - imports a shared file descriptor
+- *
+- * Takes an ion_fd_data struct with the fd field populated with a valid file
+- * descriptor obtained from ION_IOC_SHARE and returns the struct with the handle
+- * filed set to the corresponding opaque handle.
+- */
+-#define ION_IOC_IMPORT		_IOWR(ION_IOC_MAGIC, 5, struct ion_fd_data)
 -
- 	table = kmalloc(sizeof(*table), GFP_KERNEL);
- 	if (!table)
- 		return -ENOMEM;
-@@ -77,7 +73,7 @@ static int ion_carveout_heap_allocate(struct ion_heap *heap,
- 	if (ret)
- 		goto err_free;
- 
--	paddr = ion_carveout_allocate(heap, size, align);
-+	paddr = ion_carveout_allocate(heap, size);
- 	if (paddr == ION_CARVEOUT_ALLOCATE_FAIL) {
- 		ret = -ENOMEM;
- 		goto err_free_table;
-diff --git a/drivers/staging/android/ion/ion_chunk_heap.c b/drivers/staging/android/ion/ion_chunk_heap.c
-index 70495dc..8c41889 100644
---- a/drivers/staging/android/ion/ion_chunk_heap.c
-+++ b/drivers/staging/android/ion/ion_chunk_heap.c
-@@ -35,7 +35,7 @@ struct ion_chunk_heap {
- 
- static int ion_chunk_heap_allocate(struct ion_heap *heap,
- 				   struct ion_buffer *buffer,
--				   unsigned long size, unsigned long align,
-+				   unsigned long size,
- 				   unsigned long flags)
- {
- 	struct ion_chunk_heap *chunk_heap =
-@@ -46,9 +46,6 @@ static int ion_chunk_heap_allocate(struct ion_heap *heap,
- 	unsigned long num_chunks;
- 	unsigned long allocated_size;
- 
--	if (align > chunk_heap->chunk_size)
--		return -EINVAL;
--
- 	allocated_size = ALIGN(size, chunk_heap->chunk_size);
- 	num_chunks = allocated_size / chunk_heap->chunk_size;
- 
-@@ -160,8 +157,8 @@ struct ion_heap *ion_chunk_heap_create(struct ion_platform_heap *heap_data)
- 	chunk_heap->heap.ops = &chunk_heap_ops;
- 	chunk_heap->heap.type = ION_HEAP_TYPE_CHUNK;
- 	chunk_heap->heap.flags = ION_HEAP_FLAG_DEFER_FREE;
--	pr_debug("%s: base %lu size %zu align %ld\n", __func__,
--		 chunk_heap->base, heap_data->size, heap_data->align);
-+	pr_debug("%s: base %lu size %zu \n", __func__,
-+		 chunk_heap->base, heap_data->size);
- 
- 	return &chunk_heap->heap;
- 
-diff --git a/drivers/staging/android/ion/ion_cma_heap.c b/drivers/staging/android/ion/ion_cma_heap.c
-index 6c40685..d562fd7 100644
---- a/drivers/staging/android/ion/ion_cma_heap.c
-+++ b/drivers/staging/android/ion/ion_cma_heap.c
-@@ -40,7 +40,7 @@ struct ion_cma_buffer_info {
- 
- /* ION CMA heap operations functions */
- static int ion_cma_allocate(struct ion_heap *heap, struct ion_buffer *buffer,
--			    unsigned long len, unsigned long align,
-+			    unsigned long len,
- 			    unsigned long flags)
- {
- 	struct ion_cma_heap *cma_heap = to_cma_heap(heap);
-@@ -52,9 +52,6 @@ static int ion_cma_allocate(struct ion_heap *heap, struct ion_buffer *buffer,
- 	if (buffer->flags & ION_FLAG_CACHED)
- 		return -EINVAL;
- 
--	if (align > PAGE_SIZE)
--		return -EINVAL;
--
- 	info = kzalloc(sizeof(*info), GFP_KERNEL);
- 	if (!info)
- 		return -ENOMEM;
-diff --git a/drivers/staging/android/ion/ion_priv.h b/drivers/staging/android/ion/ion_priv.h
-index 46d3ff5..b09bc7c 100644
---- a/drivers/staging/android/ion/ion_priv.h
-+++ b/drivers/staging/android/ion/ion_priv.h
-@@ -172,7 +172,7 @@ struct ion_handle {
- struct ion_heap_ops {
- 	int (*allocate)(struct ion_heap *heap,
- 			struct ion_buffer *buffer, unsigned long len,
--			unsigned long align, unsigned long flags);
-+			unsigned long flags);
- 	void (*free)(struct ion_buffer *buffer);
- 	void * (*map_kernel)(struct ion_heap *heap, struct ion_buffer *buffer);
- 	void (*unmap_kernel)(struct ion_heap *heap, struct ion_buffer *buffer);
-diff --git a/drivers/staging/android/ion/ion_system_heap.c b/drivers/staging/android/ion/ion_system_heap.c
-index 3ebbb75..6cb2fe7 100644
---- a/drivers/staging/android/ion/ion_system_heap.c
-+++ b/drivers/staging/android/ion/ion_system_heap.c
-@@ -129,7 +129,7 @@ static struct page *alloc_largest_available(struct ion_system_heap *heap,
- 
- static int ion_system_heap_allocate(struct ion_heap *heap,
- 				    struct ion_buffer *buffer,
--				    unsigned long size, unsigned long align,
-+				    unsigned long size,
- 				    unsigned long flags)
- {
- 	struct ion_system_heap *sys_heap = container_of(heap,
-@@ -143,9 +143,6 @@ static int ion_system_heap_allocate(struct ion_heap *heap,
- 	unsigned long size_remaining = PAGE_ALIGN(size);
- 	unsigned int max_order = orders[0];
- 
--	if (align > PAGE_SIZE)
--		return -EINVAL;
--
- 	if (size / PAGE_SIZE > totalram_pages / 2)
- 		return -ENOMEM;
- 
-@@ -372,7 +369,6 @@ void ion_system_heap_destroy(struct ion_heap *heap)
- static int ion_system_contig_heap_allocate(struct ion_heap *heap,
- 					   struct ion_buffer *buffer,
- 					   unsigned long len,
--					   unsigned long align,
- 					   unsigned long flags)
- {
- 	int order = get_order(len);
-@@ -381,9 +377,6 @@ static int ion_system_contig_heap_allocate(struct ion_heap *heap,
- 	unsigned long i;
- 	int ret;
- 
--	if (align > (PAGE_SIZE << order))
--		return -EINVAL;
--
- 	page = alloc_pages(low_order_gfp_flags, order);
- 	if (!page)
- 		return -ENOMEM;
+-/**
+  * DOC: ION_IOC_HEAP_QUERY - information about available heaps
+  *
+  * Takes an ion_heap_query structure and populates information about
 -- 
 2.7.4
