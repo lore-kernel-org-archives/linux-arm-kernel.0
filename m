@@ -1,108 +1,164 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sat, 18 Mar 2017 16:52:18 +0300
-Subject: [PATCH v2 1/3] ata: add Palmchip BK3710 PATA controller driver
-In-Reply-To: <1489509414-11491-2-git-send-email-b.zolnierkie@samsung.com>
-References: <1489509414-11491-1-git-send-email-b.zolnierkie@samsung.com>
- <CGME20170314163742epcas5p32a49df6b4ae6c21ee159c79320df5781@epcas5p3.samsung.com>
- <1489509414-11491-2-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <bc9a2d9b-1f16-4b59-0033-235686c76dcb@cogentembedded.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Sat, 18 Mar 2017 14:07:47 +0000
+Subject: [PATCH] KVM: arm64: Ensure LRs are clear when they should be
+In-Reply-To: <20170318125656.16523-1-cdall@linaro.org> (Christoffer Dall's
+ message of "Sat, 18 Mar 2017 13:56:56 +0100")
+References: <20170318125656.16523-1-cdall@linaro.org>
+Message-ID: <874lyqsmoc.fsf@on-the-bus.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello!
+On Sat, Mar 18 2017 at 12:56:56 pm GMT, Christoffer Dall <cdall@linaro.org> wrote:
 
-On 3/14/2017 7:36 PM, Bartlomiej Zolnierkiewicz wrote:
+Hi Christoffer,
 
-> Add Palmchip BK3710 PATA controller driver.
+> From: Christoffer Dall <christoffer.dall@linaro.org>
 >
-> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-[...]
-> diff --git a/drivers/ata/pata_bk3710.c b/drivers/ata/pata_bk3710.c
-> new file mode 100644
-> index 0000000..6d77217
-> --- /dev/null
-> +++ b/drivers/ata/pata_bk3710.c
-> @@ -0,0 +1,386 @@
-[...]
-> +static void pata_bk3710_chipinit(void __iomem *base)
+> We currently have some code to clear the list registers on GICv3, but we
+> never call this code, because the caller got nuked when removing the old
+> vgic.  We also used to have a similar GICv2 part, but that got lost in
+> the process too.
+>
+> Let's reintroduce the logic for GICv2 and call the logic when we
+> initialize the use of hypervisors on the CPU, for example when first
+> loading KVM or when exiting a low power state.
+>
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> ---
+> Marc, Eric, Andre,
+>
+> I'm unable to convince myself that the LRs should already be clear via
+> the reset of the hardware, and for any power management scenario I
+> suppose it's possible for secure-side firmware to have messed with the
+> LRs behind our backs; plus we used to have this functionality and it got
+> dropped for the new vgic.  Am I forgetting some discussion where we
+> decided it wasn't needed anymore?
+
+No, that's definitely something we overlooked while transitioning from
+one implementation to another. Thanks for noticing it!
+
+>
+> Thanks,
+> -Christoffer
+>
+>  arch/arm/kvm/arm.c            |  3 +++
+>  include/kvm/arm_vgic.h        |  1 +
+>  virt/kvm/arm/vgic/vgic-init.c | 19 +++++++++++++++++++
+>  virt/kvm/arm/vgic/vgic-v2.c   | 15 +++++++++++++++
+>  virt/kvm/arm/vgic/vgic.h      |  2 ++
+>  5 files changed, 40 insertions(+)
+>
+> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+> index c9a2103..d775aac 100644
+> --- a/arch/arm/kvm/arm.c
+> +++ b/arch/arm/kvm/arm.c
+> @@ -1121,6 +1121,9 @@ static void cpu_hyp_reinit(void)
+>  		if (__hyp_get_vectors() == hyp_default_vectors)
+>  			cpu_init_hyp_mode(NULL);
+>  	}
+> +
+> +	if (vgic_present)
+> +		kvm_vgic_init_cpu_hardware();
+
+We didn't have this before, but that's certainly an improvement. It is
+not so much that secure could have messed with the LRs themselves, but
+that the LRs reset value is UNDEF out of reset.
+
+>  }
+>  
+>  static void cpu_hyp_reset(void)
+> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+> index b72dd2a..c0b3d99 100644
+> --- a/include/kvm/arm_vgic.h
+> +++ b/include/kvm/arm_vgic.h
+> @@ -295,6 +295,7 @@ void kvm_vgic_vcpu_early_init(struct kvm_vcpu *vcpu);
+>  void kvm_vgic_vcpu_destroy(struct kvm_vcpu *vcpu);
+>  int kvm_vgic_map_resources(struct kvm *kvm);
+>  int kvm_vgic_hyp_init(void);
+> +void kvm_vgic_init_cpu_hardware(void);
+>  
+>  int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
+>  			bool level);
+> diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
+> index 276139a..702f810 100644
+> --- a/virt/kvm/arm/vgic/vgic-init.c
+> +++ b/virt/kvm/arm/vgic/vgic-init.c
+> @@ -392,6 +392,25 @@ static irqreturn_t vgic_maintenance_handler(int irq, void *data)
+>  }
+>  
+>  /**
+> + * kvm_vgic_init_cpu_hardware - initialize the GIC VE hardware
+> + *
+> + * For a specific CPU, initialize the GIC VE hardware.
+> + */
+> +void kvm_vgic_init_cpu_hardware(void)
 > +{
-[...]
-> +	/*
-> +	 * IORDYTMP IORDY Timer for Primary Register
-> +	 * (ATA_IORDYTMP_IORDYTMP     , 0xffff  )
-> +	 */
-> +	iowrite32(0xFFFF, base + BK3710_IORDYTMP);
-
-    As I've already said, this is useless as we don't handle the IORDY timeout 
-interrupt anyway; writing 0 would be fine.
-
+> +	BUG_ON(preemptible());
 > +
 > +	/*
-> +	 * Configure BMISP Register
-> +	 * (ATA_BMISP_DMAEN1	, DISABLE )	|
-> +	 * (ATA_BMISP_DMAEN0	, DISABLE )	|
-> +	 * (ATA_BMISP_IORDYINT	, CLEAR)	|
-> +	 * (ATA_BMISP_INTRSTAT	, CLEAR)	|
-> +	 * (ATA_BMISP_DMAERROR	, CLEAR)
+> +	 * We want to make sure the list registers start out clear so that we
+> +	 * only have the program the used registers.
 > +	 */
-> +	iowrite16(0, base + BK3710_BMISP);
-
-    Bits 0-3 cane only be cleared by writing 1, so this write can't clear 
-them, contrary to what the comment says. Might be a material for a follow-up 
-patch tho...
-
-[...]
-> +static int __init pata_bk3710_probe(struct platform_device *pdev)
+> +	if (kvm_vgic_global_state.type == VGIC_V2)
+> +		vgic_v2_init_lrs();
+> +	else
+> +		kvm_call_hyp(__vgic_v3_init_lrs);
+> +}
+> +
+> +/**
+>   * kvm_vgic_hyp_init: populates the kvm_vgic_global_state variable
+>   * according to the host GIC model. Accordingly calls either
+>   * vgic_v2/v3_probe which registers the KVM_DEVICE that can be
+> diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
+> index b834ecd..94cf4b9 100644
+> --- a/virt/kvm/arm/vgic/vgic-v2.c
+> +++ b/virt/kvm/arm/vgic/vgic-v2.c
+> @@ -36,6 +36,21 @@ static unsigned long *u64_to_bitmask(u64 *val)
+>  	return (unsigned long *)val;
+>  }
+>  
+> +static inline void vgic_v2_write_lr(int lr, u32 val)
 > +{
-> +	struct clk *clk;
-> +	struct resource *mem;
-> +	struct ata_host *host;
-> +	struct ata_port *ap;
-> +	void __iomem *base;
-> +	unsigned long rate;
-> +	int irq;
+> +	void __iomem *base = kvm_vgic_global_state.vctrl_base;
 > +
-> +	clk = devm_clk_get(&pdev->dev, NULL);
-> +	if (IS_ERR(clk))
-> +		return -ENODEV;
+> +	writel_relaxed(val, base + GICH_LR0 + (lr * 4));
+> +}
 > +
-> +	clk_enable(clk);
-> +	rate = clk_get_rate(clk);
-> +	if (!rate)
-> +		return -EINVAL;
+> +void vgic_v2_init_lrs(void)
+> +{
+> +	int i;
 > +
-> +	/* NOTE:  round *down* to meet minimum timings; we count in clocks */
-> +	ideclk_period = 1000000000UL / rate;
-> +
-> +	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	if (mem == NULL) {
-> +		pr_err(DRV_NAME ": failed to get memory region resource\n");
-> +		return -ENODEV;
-> +	}
+> +	for (i = 0; i < kvm_vgic_global_state.nr_lr; i++)
+> +		vgic_v2_write_lr(i, 0);
+> +}
 
-    NULL check not needed here, devm_ioremap_resource() checks this anyway.
+Nit: do you need to have two functions here? Or is that something that
+you're going to reuse in the near future?
 
 > +
-> +	irq = platform_get_irq(pdev, 0);
-> +	if (irq < 0) {
-> +		pr_err(DRV_NAME ": failed to get IRQ resource\n");
-> +		return irq;
-> +	}
+>  void vgic_v2_process_maintenance(struct kvm_vcpu *vcpu)
+>  {
+>  	struct vgic_v2_cpu_if *cpuif = &vcpu->arch.vgic_cpu.vgic_v2;
+> diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
+> index db28f7c..91566f5 100644
+> --- a/virt/kvm/arm/vgic/vgic.h
+> +++ b/virt/kvm/arm/vgic/vgic.h
+> @@ -130,6 +130,8 @@ int vgic_v2_map_resources(struct kvm *kvm);
+>  int vgic_register_dist_iodev(struct kvm *kvm, gpa_t dist_base_address,
+>  			     enum vgic_type);
+>  
+> +void vgic_v2_init_lrs(void);
 > +
-> +	base = devm_ioremap_resource(&pdev->dev, mem);
-> +	if (IS_ERR(base))
-> +		return PTR_ERR(base);
-> +
-[...]
-> +/* work with hotplug and coldplug */
-> +MODULE_ALIAS("platform:palm_bk3710");
-> +
-> +static struct platform_driver pata_bk3710_driver = {
-> +	.driver = {
-> +		.name = "palm_bk3710",
+>  static inline void vgic_get_irq_kref(struct vgic_irq *irq)
+>  {
+>  	if (irq->intid < VGIC_MIN_LPI)
 
-    Not DRV_NAME?
+Looks good to me!
 
-[...]
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 
-MBR, Sergei
+Thanks,
+
+	M.
+-- 
+Jazz is not dead, it just smell funny.
