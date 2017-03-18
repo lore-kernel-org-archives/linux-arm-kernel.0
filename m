@@ -1,139 +1,56 @@
 From: labbott@redhat.com (Laura Abbott)
-Date: Fri, 17 Mar 2017 17:54:48 -0700
-Subject: [RFC PATCHv2 16/21] staging: android: ion: Get rid of ion_phys_addr_t
+Date: Fri, 17 Mar 2017 17:54:46 -0700
+Subject: [RFC PATCHv2 14/21] staging: android: ion: Stop butchering the DMA
+ address
 In-Reply-To: <1489798493-16600-1-git-send-email-labbott@redhat.com>
 References: <1489798493-16600-1-git-send-email-labbott@redhat.com>
-Message-ID: <1489798493-16600-17-git-send-email-labbott@redhat.com>
+Message-ID: <1489798493-16600-15-git-send-email-labbott@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-Once upon a time, phys_addr_t was not everywhere in the kernel. These
-days it is used enough places that having a separate Ion type doesn't
-make sense. Remove the extra type and just use phys_addr_t directly.
+Now that we have proper caching, stop setting the DMA address manually.
+It should be set after properly calling dma_map.
 
 Signed-off-by: Laura Abbott <labbott@redhat.com>
 ---
- drivers/staging/android/ion/ion.h               | 12 ++----------
- drivers/staging/android/ion/ion_carveout_heap.c | 10 +++++-----
- drivers/staging/android/ion/ion_chunk_heap.c    |  6 +++---
- drivers/staging/android/ion/ion_heap.c          |  4 ++--
- 4 files changed, 12 insertions(+), 20 deletions(-)
+ drivers/staging/android/ion/ion.c | 17 +----------------
+ 1 file changed, 1 insertion(+), 16 deletions(-)
 
-diff --git a/drivers/staging/android/ion/ion.h b/drivers/staging/android/ion/ion.h
-index 3b4bff5..e8a6ffe 100644
---- a/drivers/staging/android/ion/ion.h
-+++ b/drivers/staging/android/ion/ion.h
-@@ -28,14 +28,6 @@ struct ion_mapper;
- struct ion_client;
- struct ion_buffer;
- 
--/*
-- * This should be removed some day when phys_addr_t's are fully
-- * plumbed in the kernel, and all instances of ion_phys_addr_t should
-- * be converted to phys_addr_t.  For the time being many kernel interfaces
-- * do not accept phys_addr_t's that would have to
-- */
--#define ion_phys_addr_t unsigned long
--
- /**
-  * struct ion_platform_heap - defines a heap in the given platform
-  * @type:	type of the heap from ion_heap_type enum
-@@ -53,9 +45,9 @@ struct ion_platform_heap {
- 	enum ion_heap_type type;
- 	unsigned int id;
- 	const char *name;
--	ion_phys_addr_t base;
-+	phys_addr_t base;
- 	size_t size;
--	ion_phys_addr_t align;
-+	phys_addr_t align;
- 	void *priv;
- };
- 
-diff --git a/drivers/staging/android/ion/ion_carveout_heap.c b/drivers/staging/android/ion/ion_carveout_heap.c
-index e0e360f..1419a89 100644
---- a/drivers/staging/android/ion/ion_carveout_heap.c
-+++ b/drivers/staging/android/ion/ion_carveout_heap.c
-@@ -30,10 +30,10 @@
- struct ion_carveout_heap {
- 	struct ion_heap heap;
- 	struct gen_pool *pool;
--	ion_phys_addr_t base;
-+	phys_addr_t base;
- };
- 
--static ion_phys_addr_t ion_carveout_allocate(struct ion_heap *heap,
-+static phys_addr_t ion_carveout_allocate(struct ion_heap *heap,
- 					     unsigned long size)
+diff --git a/drivers/staging/android/ion/ion.c b/drivers/staging/android/ion/ion.c
+index 3d979ef5..65638f5 100644
+--- a/drivers/staging/android/ion/ion.c
++++ b/drivers/staging/android/ion/ion.c
+@@ -81,8 +81,7 @@ static struct ion_buffer *ion_buffer_create(struct ion_heap *heap,
  {
- 	struct ion_carveout_heap *carveout_heap =
-@@ -46,7 +46,7 @@ static ion_phys_addr_t ion_carveout_allocate(struct ion_heap *heap,
- 	return offset;
- }
- 
--static void ion_carveout_free(struct ion_heap *heap, ion_phys_addr_t addr,
-+static void ion_carveout_free(struct ion_heap *heap, phys_addr_t addr,
- 			      unsigned long size)
- {
- 	struct ion_carveout_heap *carveout_heap =
-@@ -63,7 +63,7 @@ static int ion_carveout_heap_allocate(struct ion_heap *heap,
- 				      unsigned long flags)
- {
+ 	struct ion_buffer *buffer;
  	struct sg_table *table;
--	ion_phys_addr_t paddr;
-+	phys_addr_t paddr;
- 	int ret;
+-	struct scatterlist *sg;
+-	int i, ret;
++	int ret;
  
- 	table = kmalloc(sizeof(*table), GFP_KERNEL);
-@@ -96,7 +96,7 @@ static void ion_carveout_heap_free(struct ion_buffer *buffer)
- 	struct ion_heap *heap = buffer->heap;
- 	struct sg_table *table = buffer->sg_table;
- 	struct page *page = sg_page(table->sgl);
--	ion_phys_addr_t paddr = PFN_PHYS(page_to_pfn(page));
-+	phys_addr_t paddr = PFN_PHYS(page_to_pfn(page));
- 
- 	ion_heap_buffer_zero(buffer);
- 
-diff --git a/drivers/staging/android/ion/ion_chunk_heap.c b/drivers/staging/android/ion/ion_chunk_heap.c
-index 46e13f6..606f25f 100644
---- a/drivers/staging/android/ion/ion_chunk_heap.c
-+++ b/drivers/staging/android/ion/ion_chunk_heap.c
-@@ -27,7 +27,7 @@
- struct ion_chunk_heap {
- 	struct ion_heap heap;
- 	struct gen_pool *pool;
--	ion_phys_addr_t base;
-+	phys_addr_t base;
- 	unsigned long chunk_size;
- 	unsigned long size;
- 	unsigned long allocated;
-@@ -151,8 +151,8 @@ struct ion_heap *ion_chunk_heap_create(struct ion_platform_heap *heap_data)
- 	chunk_heap->heap.ops = &chunk_heap_ops;
- 	chunk_heap->heap.type = ION_HEAP_TYPE_CHUNK;
- 	chunk_heap->heap.flags = ION_HEAP_FLAG_DEFER_FREE;
--	pr_debug("%s: base %lu size %zu \n", __func__,
--		 chunk_heap->base, heap_data->size);
-+	pr_debug("%s: base %pa size %zu \n", __func__,
-+		 &chunk_heap->base, heap_data->size);
- 
- 	return &chunk_heap->heap;
- 
-diff --git a/drivers/staging/android/ion/ion_heap.c b/drivers/staging/android/ion/ion_heap.c
-index c69d0bd..03b554f 100644
---- a/drivers/staging/android/ion/ion_heap.c
-+++ b/drivers/staging/android/ion/ion_heap.c
-@@ -343,9 +343,9 @@ struct ion_heap *ion_heap_create(struct ion_platform_heap *heap_data)
- 	}
- 
- 	if (IS_ERR_OR_NULL(heap)) {
--		pr_err("%s: error creating heap %s type %d base %lu size %zu\n",
-+		pr_err("%s: error creating heap %s type %d base %pa size %zu\n",
- 		       __func__, heap_data->name, heap_data->type,
--		       heap_data->base, heap_data->size);
-+		       &heap_data->base, heap_data->size);
- 		return ERR_PTR(-EINVAL);
- 	}
- 
+ 	buffer = kzalloc(sizeof(*buffer), GFP_KERNEL);
+ 	if (!buffer)
+@@ -119,20 +118,6 @@ static struct ion_buffer *ion_buffer_create(struct ion_heap *heap,
+ 	INIT_LIST_HEAD(&buffer->vmas);
+ 	INIT_LIST_HEAD(&buffer->attachments);
+ 	mutex_init(&buffer->lock);
+-	/*
+-	 * this will set up dma addresses for the sglist -- it is not
+-	 * technically correct as per the dma api -- a specific
+-	 * device isn't really taking ownership here.  However, in practice on
+-	 * our systems the only dma_address space is physical addresses.
+-	 * Additionally, we can't afford the overhead of invalidating every
+-	 * allocation via dma_map_sg. The implicit contract here is that
+-	 * memory coming from the heaps is ready for dma, ie if it has a
+-	 * cached mapping that mapping has been invalidated
+-	 */
+-	for_each_sg(buffer->sg_table->sgl, sg, buffer->sg_table->nents, i) {
+-		sg_dma_address(sg) = sg_phys(sg);
+-		sg_dma_len(sg) = sg->length;
+-	}
+ 	mutex_lock(&dev->buffer_lock);
+ 	ion_buffer_add(dev, buffer);
+ 	mutex_unlock(&dev->buffer_lock);
 -- 
 2.7.4
