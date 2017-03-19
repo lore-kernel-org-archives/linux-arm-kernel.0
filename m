@@ -1,174 +1,104 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Sun, 19 Mar 2017 20:25:04 +0100
-Subject: [PATCH] KVM: arm64: Ensure LRs are clear when they should be
-In-Reply-To: <874lyqsmoc.fsf@on-the-bus.cambridge.arm.com>
-References: <20170318125656.16523-1-cdall@linaro.org>
- <874lyqsmoc.fsf@on-the-bus.cambridge.arm.com>
-Message-ID: <20170319192504.GY1277@cbox>
+From: cphealy@gmail.com (Chris Healy)
+Date: Sun, 19 Mar 2017 13:03:42 -0700
+Subject: [PATCH] drm/etnaviv: add etnaviv cooling device
+In-Reply-To: <20170315140541.GT21222@n2100.armlinux.org.uk>
+References: <E1cn8jj-0002mp-SO@rmk-PC.armlinux.org.uk>
+ <1489582989.16018.4.camel@pengutronix.de>
+ <20170315140541.GT21222@n2100.armlinux.org.uk>
+Message-ID: <CAFXsbZoT22pz2CuRWaQ2M2TyomNcByHc-SfmNn6=KrfNaubnjQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 18, 2017 at 02:07:47PM +0000, Marc Zyngier wrote:
-> On Sat, Mar 18 2017 at 12:56:56 pm GMT, Christoffer Dall <cdall@linaro.org> wrote:
-> 
-> Hi Christoffer,
-> 
-> > From: Christoffer Dall <christoffer.dall@linaro.org>
-> >
-> > We currently have some code to clear the list registers on GICv3, but we
-> > never call this code, because the caller got nuked when removing the old
-> > vgic.  We also used to have a similar GICv2 part, but that got lost in
-> > the process too.
-> >
-> > Let's reintroduce the logic for GICv2 and call the logic when we
-> > initialize the use of hypervisors on the CPU, for example when first
-> > loading KVM or when exiting a low power state.
-> >
-> > Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> > ---
-> > Marc, Eric, Andre,
-> >
-> > I'm unable to convince myself that the LRs should already be clear via
-> > the reset of the hardware, and for any power management scenario I
-> > suppose it's possible for secure-side firmware to have messed with the
-> > LRs behind our backs; plus we used to have this functionality and it got
-> > dropped for the new vgic.  Am I forgetting some discussion where we
-> > decided it wasn't needed anymore?
-> 
-> No, that's definitely something we overlooked while transitioning from
-> one implementation to another. Thanks for noticing it!
-> 
-> >
-> > Thanks,
-> > -Christoffer
-> >
-> >  arch/arm/kvm/arm.c            |  3 +++
-> >  include/kvm/arm_vgic.h        |  1 +
-> >  virt/kvm/arm/vgic/vgic-init.c | 19 +++++++++++++++++++
-> >  virt/kvm/arm/vgic/vgic-v2.c   | 15 +++++++++++++++
-> >  virt/kvm/arm/vgic/vgic.h      |  2 ++
-> >  5 files changed, 40 insertions(+)
-> >
-> > diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-> > index c9a2103..d775aac 100644
-> > --- a/arch/arm/kvm/arm.c
-> > +++ b/arch/arm/kvm/arm.c
-> > @@ -1121,6 +1121,9 @@ static void cpu_hyp_reinit(void)
-> >  		if (__hyp_get_vectors() == hyp_default_vectors)
-> >  			cpu_init_hyp_mode(NULL);
-> >  	}
-> > +
-> > +	if (vgic_present)
-> > +		kvm_vgic_init_cpu_hardware();
-> 
-> We didn't have this before, but that's certainly an improvement. It is
-> not so much that secure could have messed with the LRs themselves, but
-> that the LRs reset value is UNDEF out of reset.
-> 
+I don't have any input on this binary divider subject but I do want to
+bring up some observations regarding Etnaviv GPU power management that
+seems relevant.
 
-ok, is the other scenario with secure side messing with the LRs not
-still potentially possible though?  (someone impementing a misguided
-power management solution for example)
+I've done some comparisons between the Freescale Vivante GPU driver
+stack (1) and the Marvell PXA1928 Vivante GPU driver stack (2) and see
+more functionality in the PXA1928 stack than the Freescale i.MX6 stack
+that may be of value for Etnaviv.  When I look at the Marvell PXA1928
+Vivante GPU driver stack, (2) I see "gpufreq" code (3) that includes
+support for conservative, ondemand, performance, powersave, and
+userspace governors.  Additionally, AFAIK the key feature needed to
+support a gpufreq driver and associated governors is to be able to
+know what the load is on the GPU.  When looking at the PXA1928 driver,
+it seems that it is looking at some load counters within the GPU that
+are likely to be common across platforms.  (Check
+"gpufreq_get_gpu_load" (4) in gpufreq.c.)
 
-> >  }
-> >  
-> >  static void cpu_hyp_reset(void)
-> > diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-> > index b72dd2a..c0b3d99 100644
-> > --- a/include/kvm/arm_vgic.h
-> > +++ b/include/kvm/arm_vgic.h
-> > @@ -295,6 +295,7 @@ void kvm_vgic_vcpu_early_init(struct kvm_vcpu *vcpu);
-> >  void kvm_vgic_vcpu_destroy(struct kvm_vcpu *vcpu);
-> >  int kvm_vgic_map_resources(struct kvm *kvm);
-> >  int kvm_vgic_hyp_init(void);
-> > +void kvm_vgic_init_cpu_hardware(void);
-> >  
-> >  int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
-> >  			bool level);
-> > diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
-> > index 276139a..702f810 100644
-> > --- a/virt/kvm/arm/vgic/vgic-init.c
-> > +++ b/virt/kvm/arm/vgic/vgic-init.c
-> > @@ -392,6 +392,25 @@ static irqreturn_t vgic_maintenance_handler(int irq, void *data)
-> >  }
-> >  
-> >  /**
-> > + * kvm_vgic_init_cpu_hardware - initialize the GIC VE hardware
-> > + *
-> > + * For a specific CPU, initialize the GIC VE hardware.
-> > + */
-> > +void kvm_vgic_init_cpu_hardware(void)
-> > +{
-> > +	BUG_ON(preemptible());
-> > +
-> > +	/*
-> > +	 * We want to make sure the list registers start out clear so that we
-> > +	 * only have the program the used registers.
-> > +	 */
-> > +	if (kvm_vgic_global_state.type == VGIC_V2)
-> > +		vgic_v2_init_lrs();
-> > +	else
-> > +		kvm_call_hyp(__vgic_v3_init_lrs);
-> > +}
-> > +
-> > +/**
-> >   * kvm_vgic_hyp_init: populates the kvm_vgic_global_state variable
-> >   * according to the host GIC model. Accordingly calls either
-> >   * vgic_v2/v3_probe which registers the KVM_DEVICE that can be
-> > diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
-> > index b834ecd..94cf4b9 100644
-> > --- a/virt/kvm/arm/vgic/vgic-v2.c
-> > +++ b/virt/kvm/arm/vgic/vgic-v2.c
-> > @@ -36,6 +36,21 @@ static unsigned long *u64_to_bitmask(u64 *val)
-> >  	return (unsigned long *)val;
-> >  }
-> >  
-> > +static inline void vgic_v2_write_lr(int lr, u32 val)
-> > +{
-> > +	void __iomem *base = kvm_vgic_global_state.vctrl_base;
-> > +
-> > +	writel_relaxed(val, base + GICH_LR0 + (lr * 4));
-> > +}
-> > +
-> > +void vgic_v2_init_lrs(void)
-> > +{
-> > +	int i;
-> > +
-> > +	for (i = 0; i < kvm_vgic_global_state.nr_lr; i++)
-> > +		vgic_v2_write_lr(i, 0);
-> > +}
-> 
-> Nit: do you need to have two functions here? Or is that something that
-> you're going to reuse in the near future?
-> 
+Also, given the wealth of counters present in the 3DGPU and my
+understanding that there are 3 different controllable GPU frequencies
+(at least with the i.MX6), it seems that one could dynamically adjust
+each of these 3 different controllable frequencies independently based
+on associated load counters.  The i.MX6 has 3 different frequencies,
+IIRC, AXI, 3DGPU core, and 3DGPU shader.  I believe there are counters
+associated with each of these GPU sub-blocks so it seems feasible to
+adjust each of the 3 buses based on the sub-block load.  (I'm no
+expert by any means with any of this so this may be crazy talk...)
 
-I have some optimization patches to GICv2 lying around that will
-eventually use vgic_v2_write_lr directly, but I don't mind combining it
-now and splitting it later when introducting those patches if you
-prefer?
+If my observations are correct that the gpufreq functionality present
+in the PXA1928 driver is portable across SoC platforms with the
+Vivante 3D GPUs, does it make sense to add a gpufreq driver with the
+Etnaviv driver?
 
-> > +
-> >  void vgic_v2_process_maintenance(struct kvm_vcpu *vcpu)
-> >  {
-> >  	struct vgic_v2_cpu_if *cpuif = &vcpu->arch.vgic_cpu.vgic_v2;
-> > diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-> > index db28f7c..91566f5 100644
-> > --- a/virt/kvm/arm/vgic/vgic.h
-> > +++ b/virt/kvm/arm/vgic/vgic.h
-> > @@ -130,6 +130,8 @@ int vgic_v2_map_resources(struct kvm *kvm);
-> >  int vgic_register_dist_iodev(struct kvm *kvm, gpa_t dist_base_address,
-> >  			     enum vgic_type);
-> >  
-> > +void vgic_v2_init_lrs(void);
-> > +
-> >  static inline void vgic_get_irq_kref(struct vgic_irq *irq)
-> >  {
-> >  	if (irq->intid < VGIC_MIN_LPI)
-> 
-> Looks good to me!
-> 
-> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-> 
+What are the benefits and drawbacks of implementing a gpufreq driver
+with associated governors in comparison to adding this cooling device
+driver functionality?  (It seems to me that a gpufreq driver is more
+proactive and the cooling device is more reactive.)
 
-Thanks,
--Christoffer
+Can and should gpufreq driver functionality (such as that present in
+the PXA1928 driver) and the proposed cooling device functionality
+co-exist?
+
+(1) - https://github.com/etnaviv/vivante_kernel_drivers/tree/master/imx6_v4_0_0
+(2) - https://github.com/etnaviv/vivante_kernel_drivers/tree/master/pxa1928
+(3) - https://github.com/etnaviv/vivante_kernel_drivers/tree/master/pxa1928/hal/os/linux/kernel/gpufreq
+(4) - https://github.com/etnaviv/vivante_kernel_drivers/blob/master/pxa1928/hal/os/linux/kernel/gpufreq/gpufreq.c#L1294
+
+On Wed, Mar 15, 2017 at 7:05 AM, Russell King - ARM Linux
+<linux@armlinux.org.uk> wrote:
+> On Wed, Mar 15, 2017 at 02:03:09PM +0100, Lucas Stach wrote:
+>> Am Sonntag, den 12.03.2017, 19:00 +0000 schrieb Russell King:
+>> > Each Vivante GPU contains a clock divider which can divide the GPU clock
+>> > by 2^n, which can lower the power dissipation from the GPU.  It has been
+>> > suggested that the GC600 on Dove is responsible for 20-30% of the power
+>> > dissipation from the SoC, so lowering the GPU clock rate provides a way
+>> > to throttle the power dissiptation, and reduce the temperature when the
+>> > SoC gets hot.
+>> >
+>> > This patch hooks the Etnaviv driver into the kernel's thermal management
+>> > to allow the GPUs to be throttled when necessary, allowing a reduction in
+>> > GPU clock rate from /1 to /64 in power of 2 steps.
+>>
+>> Are those power of 2 steps a hardware limitation, or is it something you
+>> implemented this way to get a smaller number of steps, with a more
+>> meaningful difference in clock speed?
+>> My understanding was that the FSCALE value is just a regular divider
+>> with all steps values in the range of 1-64 being usable.
+>
+> I don't share your understanding.  The Vivante GAL kernel driver only
+> ever sets power-of-two values.  I have no evidence to support your
+> suggestion.
+>
+> There's evidence that says your understanding is incorrect however.
+> It isn't a divider.  A value of 0x40 gives the fastest clock rate,
+> a value of 0x01 gives the slowest.  If it were a binary divider,
+> a value of 0x7f would give the slowest rate - so why doesn't Vivante
+> use that in galcore when putting the GPU into idle/lower power - why
+> do they just 0x01.
+>
+> This all leads me to believe that it's not a binary divider, but a
+> set of bits that select the clock from a set of divide-by-two stages,
+> and having more than one bit set is invalid.
+>
+> However, without definitive information from Vivante, we'll never
+> really know.  We're unlikely to get that.
+>
+> --
+> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+> according to speedtest.net.
+> _______________________________________________
+> etnaviv mailing list
+> etnaviv at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/etnaviv
