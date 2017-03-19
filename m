@@ -1,104 +1,100 @@
 From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Sun, 19 Mar 2017 10:48:57 +0000
-Subject: [PATCH 2/4] media: imx: allow bayer pixel formats to be looked up
+Date: Sun, 19 Mar 2017 10:49:08 +0000
+Subject: [PATCH 4/4] media: imx-media-capture: add frame sizes/interval
+ enumeration
 In-Reply-To: <20170319103801.GQ21222@n2100.armlinux.org.uk>
 References: <20170319103801.GQ21222@n2100.armlinux.org.uk>
-Message-ID: <E1cpYOP-0006Eg-RQ@rmk-PC.armlinux.org.uk>
+Message-ID: <E1cpYOa-0006Eu-CL@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allow imx_media_find_format() to look up bayer formats, which is
-required to support frame size and interval enumeration.
+Add support for enumerating frame sizes and frame intervals from the
+first subdev via the V4L2 interfaces.
 
 Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 ---
- drivers/staging/media/imx/imx-media-capture.c | 11 ++++++-----
- drivers/staging/media/imx/imx-media-utils.c   |  6 +++---
- drivers/staging/media/imx/imx-media.h         |  2 +-
- 3 files changed, 10 insertions(+), 9 deletions(-)
+ drivers/staging/media/imx/imx-media-capture.c | 62 +++++++++++++++++++++++++++
+ 1 file changed, 62 insertions(+)
 
 diff --git a/drivers/staging/media/imx/imx-media-capture.c b/drivers/staging/media/imx/imx-media-capture.c
-index ee914396080f..cdeb2cd8b1d7 100644
+index cdeb2cd8b1d7..bc99d9310e36 100644
 --- a/drivers/staging/media/imx/imx-media-capture.c
 +++ b/drivers/staging/media/imx/imx-media-capture.c
-@@ -164,10 +164,10 @@ static int capture_try_fmt_vid_cap(struct file *file, void *fh,
- 			CS_SEL_YUV : CS_SEL_RGB;
- 		fourcc = f->fmt.pix.pixelformat;
- 
--		cc = imx_media_find_format(fourcc, cs_sel);
-+		cc = imx_media_find_format(fourcc, cs_sel, false);
- 		if (!cc) {
- 			imx_media_enum_format(&fourcc, 0, cs_sel);
--			cc = imx_media_find_format(fourcc, cs_sel);
-+			cc = imx_media_find_format(fourcc, cs_sel, false);
- 		}
- 	}
- 
-@@ -193,7 +193,7 @@ static int capture_s_fmt_vid_cap(struct file *file, void *fh,
- 
- 	priv->vdev.fmt.fmt.pix = f->fmt.pix;
- 	priv->vdev.cc = imx_media_find_format(f->fmt.pix.pixelformat,
--					      CS_SEL_ANY);
-+					      CS_SEL_ANY, false);
- 
+@@ -82,6 +82,65 @@ static int vidioc_querycap(struct file *file, void *fh,
  	return 0;
  }
-@@ -505,7 +505,8 @@ void imx_media_capture_device_set_format(struct imx_media_video_dev *vdev,
  
- 	mutex_lock(&priv->mutex);
- 	priv->vdev.fmt.fmt.pix = *pix;
--	priv->vdev.cc = imx_media_find_format(pix->pixelformat, CS_SEL_ANY);
-+	priv->vdev.cc = imx_media_find_format(pix->pixelformat, CS_SEL_ANY,
-+					      false);
- 	mutex_unlock(&priv->mutex);
- }
- EXPORT_SYMBOL_GPL(imx_media_capture_device_set_format);
-@@ -614,7 +615,7 @@ int imx_media_capture_device_register(struct imx_media_video_dev *vdev)
- 	imx_media_mbus_fmt_to_pix_fmt(&vdev->fmt.fmt.pix,
- 				      &fmt_src.format, NULL);
- 	vdev->cc = imx_media_find_format(vdev->fmt.fmt.pix.pixelformat,
--					 CS_SEL_ANY);
-+					 CS_SEL_ANY, false);
- 
- 	v4l2_info(sd, "Registered %s as /dev/%s\n", vfd->name,
- 		  video_device_node_name(vfd));
-diff --git a/drivers/staging/media/imx/imx-media-utils.c b/drivers/staging/media/imx/imx-media-utils.c
-index 6eb7e3c5279e..d048e4a080d0 100644
---- a/drivers/staging/media/imx/imx-media-utils.c
-+++ b/drivers/staging/media/imx/imx-media-utils.c
-@@ -329,9 +329,9 @@ static int enum_format(u32 *fourcc, u32 *code, u32 index,
- }
- 
- const struct imx_media_pixfmt *
--imx_media_find_format(u32 fourcc, enum codespace_sel cs_sel)
-+imx_media_find_format(u32 fourcc, enum codespace_sel cs_sel, bool allow_bayer)
++static int capture_enum_framesizes(struct file *file, void *fh,
++				   struct v4l2_frmsizeenum *fsize)
++{
++	struct capture_priv *priv = video_drvdata(file);
++	const struct imx_media_pixfmt *cc;
++	struct v4l2_subdev_frame_size_enum fse = {
++		.index = fsize->index,
++		.pad = priv->src_sd_pad,
++		.which = V4L2_SUBDEV_FORMAT_ACTIVE,
++	};
++	int ret;
++
++	cc = imx_media_find_format(fsize->pixel_format, CS_SEL_ANY, true);
++	if (!cc)
++		return -EINVAL;
++
++	fse.code = cc->codes[0];
++
++	ret = v4l2_subdev_call(priv->src_sd, pad, enum_frame_size, NULL, &fse);
++	if (ret)
++		return ret;
++
++	fsize->type = V4L2_FRMSIZE_TYPE_DISCRETE;
++	fsize->discrete.width = fse.min_width;
++	fsize->discrete.height = fse.max_height;
++
++	return 0;
++}
++
++static int capture_enum_frameintervals(struct file *file, void *fh,
++				       struct v4l2_frmivalenum *fival)
++{
++	struct capture_priv *priv = video_drvdata(file);
++	const struct imx_media_pixfmt *cc;
++	struct v4l2_subdev_frame_interval_enum fie = {
++		.index = fival->index,
++		.pad = priv->src_sd_pad,
++		.width = fival->width,
++		.height = fival->height,
++		.which = V4L2_SUBDEV_FORMAT_ACTIVE,
++	};
++	int ret;
++
++	cc = imx_media_find_format(fival->pixel_format, CS_SEL_ANY, true);
++	if (!cc)
++		return -EINVAL;
++
++	fie.code = cc->codes[0];
++
++	ret = v4l2_subdev_call(priv->src_sd, pad, enum_frame_interval, NULL, &fie);
++	if (ret)
++		return ret;
++
++	fival->type = V4L2_FRMIVAL_TYPE_DISCRETE;
++	fival->discrete = fie.interval;
++
++	return 0;
++}
++
+ static int capture_enum_fmt_vid_cap(struct file *file, void *fh,
+ 				    struct v4l2_fmtdesc *f)
  {
--	return find_format(fourcc, 0, cs_sel, true, false);
-+	return find_format(fourcc, 0, cs_sel, true, allow_bayer);
- }
- EXPORT_SYMBOL_GPL(imx_media_find_format);
+@@ -270,6 +329,9 @@ static int capture_s_parm(struct file *file, void *fh,
+ static const struct v4l2_ioctl_ops capture_ioctl_ops = {
+ 	.vidioc_querycap	= vidioc_querycap,
  
-@@ -524,7 +524,7 @@ int imx_media_ipu_image_to_mbus_fmt(struct v4l2_mbus_framefmt *mbus,
- {
- 	const struct imx_media_pixfmt *fmt;
- 
--	fmt = imx_media_find_format(image->pix.pixelformat, CS_SEL_ANY);
-+	fmt = imx_media_find_format(image->pix.pixelformat, CS_SEL_ANY, false);
- 	if (!fmt)
- 		return -EINVAL;
- 
-diff --git a/drivers/staging/media/imx/imx-media.h b/drivers/staging/media/imx/imx-media.h
-index 234242271a13..d8c9536bf1f8 100644
---- a/drivers/staging/media/imx/imx-media.h
-+++ b/drivers/staging/media/imx/imx-media.h
-@@ -178,7 +178,7 @@ enum codespace_sel {
- };
- 
- const struct imx_media_pixfmt *
--imx_media_find_format(u32 fourcc, enum codespace_sel cs_sel);
-+imx_media_find_format(u32 fourcc, enum codespace_sel cs_sel, bool allow_bayer);
- int imx_media_enum_format(u32 *fourcc, u32 index, enum codespace_sel cs_sel);
- const struct imx_media_pixfmt *
- imx_media_find_mbus_format(u32 code, enum codespace_sel cs_sel,
++	.vidioc_enum_framesizes = capture_enum_framesizes,
++	.vidioc_enum_frameintervals = capture_enum_frameintervals,
++
+ 	.vidioc_enum_fmt_vid_cap        = capture_enum_fmt_vid_cap,
+ 	.vidioc_g_fmt_vid_cap           = capture_g_fmt_vid_cap,
+ 	.vidioc_try_fmt_vid_cap         = capture_try_fmt_vid_cap,
 -- 
 2.7.4
