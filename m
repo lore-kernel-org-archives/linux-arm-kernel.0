@@ -1,94 +1,140 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Sun, 19 Mar 2017 18:04:57 +0000
+From: slongerbeam@gmail.com (Steve Longerbeam)
+Date: Sun, 19 Mar 2017 11:37:15 -0700
 Subject: [PATCH v5 00/39] i.MX Media Driver
-In-Reply-To: <9b3311a8-34a7-2b5b-9bc7-836371e1e0a4@gmail.com>
+In-Reply-To: <20170319121402.GS21222@n2100.armlinux.org.uk>
 References: <1489121599-23206-1-git-send-email-steve_longerbeam@mentor.com>
  <20170318192258.GL21222@n2100.armlinux.org.uk>
  <aef6c412-5464-726b-42f6-a24b7323aa9c@mentor.com>
- <20170319103801.GQ21222@n2100.armlinux.org.uk>
- <9b3311a8-34a7-2b5b-9bc7-836371e1e0a4@gmail.com>
-Message-ID: <20170319180457.GX21222@n2100.armlinux.org.uk>
+ <20170319121402.GS21222@n2100.armlinux.org.uk>
+Message-ID: <6e2879a0-1f2e-9da7-b7e1-d134a0301ca2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 19, 2017 at 10:54:22AM -0700, Steve Longerbeam wrote:
-> 
-> 
-> On 03/19/2017 03:38 AM, Russell King - ARM Linux wrote:
-> >On Sat, Mar 18, 2017 at 12:58:27PM -0700, Steve Longerbeam wrote:
-> >>Right, imx-media-capture.c (the "standard" v4l2 user interface module)
-> >>is not implementing VIDIOC_ENUM_FRAMESIZES. It should, but it can only
-> >>return the single frame size that the pipeline has configured (the mbus
-> >>format of the attached source pad).
-> >I now have a set of patches that enumerate the frame sizes and intervals
-> >from the source pad of the first subdev (since you're setting the formats
-> >etc there from the capture device, it seems sensible to return what it
-> >can support.)  This means my patch set doesn't add to non-CSI subdevs.
-> >
-> >>Can you share your gstreamer pipeline? For now, until
-> >>VIDIOC_ENUM_FRAMESIZES is implemented, try a pipeline that
-> >>does not attempt to specify a frame rate. I use the attached
-> >>script for testing, which works for me.
-> >Note that I'm not specifying a frame rate on gstreamer - I'm setting
-> >the pipeline up for 60fps, but gstreamer in its wisdom is unable to
-> >enumerate the frame sizes, and therefore is unable to enumerate the
-> >frame intervals (frame intervals depend on frame sizes), so it
-> >falls back to the "tvnorms" which are basically 25/1 and 30000/1001.
-> >
-> >It sees 60fps via G_PARM, and then decides to set 30000/1001 via S_PARM.
-> >So, we end up with most of the pipeline operating at 60fps, with CSI
-> >doing frame skipping to reduce the frame rate to 30fps.
-> >
-> >gstreamer doesn't complain, doesn't issue any warnings, the only way
-> >you can spot this is to enable debugging and look through the copious
-> >debug log, or use -v and check the pad capabilities.
-> >
-> >Testing using gstreamer, and only using "does it produce video" is a
-> >good simple test, but it's just that - it's a simple test.  It doesn't
-> >tell you that what you're seeing is what you intended to see (such as
-> >video at the frame rate you expected) without more work.
-> >
-> >>Thanks, I've fixed most of v4l2-compliance issues, but this is not
-> >>done yet. Is that something you can help with?
-> >What did you do with:
-> >
-> >ioctl(3, VIDIOC_REQBUFS, {count=0, type=0 /* V4L2_BUF_TYPE_??? */, memory=0 /* V4L2_MEMORY_??? */}) = -1 EINVAL (Invalid argument)
-> >                 test VIDIOC_REQBUFS/CREATE_BUFS/QUERYBUF: OK
-> >ioctl(3, VIDIOC_EXPBUF, 0xbef405bc)     = -1 EINVAL (Invalid argument)
-> >                 fail: v4l2-test-buffers.cpp(571): q.has_expbuf(node)
-> >                 test VIDIOC_EXPBUF: FAIL
-> >
-> >To me, this looks like a bug in v4l2-compliance (I'm using 1.10.0).
-> >I'm not sure what buffer VIDIOC_EXPBUF is expected to export, since
-> >afaics no buffers have been allocated, so of course it's going to fail.
-> >Either that, or the v4l2 core vb2 code is non-compliant with v4l2's
-> >interface requirements.
-> >
-> >In any case, it doesn't look like the buffer management is being
-> >tested at all by v4l2-compliance - we know that gstreamer works, so
-> >buffers _can_ be allocated, and I've also used dmabufs with gstreamer,
-> >so I also know that VIDIOC_EXPBUF works there.
-> >
-> 
-> I wouldn't be surprised if you hit on a bug in v4l2-compliance. I stopped
-> with v4l2-compliance
-> at a different test failure that also didn't make sense to me:
 
-It isn't - the problem is that the results are misleading.  The
-VIDIOC_REQBUFS depends on the GET_FMT test succeeding, so it knows
-which buffer formats are valid.
 
-Since the GET_FMT test fails due to the colorspace issue, it decides
-that it can't trust the format, so it ends up with no formats to test.
-This causes the "VIDIOC_REQBUFS/CREATE_BUFS/QUERYBUF" test to pass,
-but then it moves on to testing "VIDIOC_EXPBUF" with no available
-buffers, which then fails.
+On 03/19/2017 05:14 AM, Russell King - ARM Linux wrote:
+> On Sat, Mar 18, 2017 at 12:58:27PM -0700, Steve Longerbeam wrote:
+>> On 03/18/2017 12:22 PM, Russell King - ARM Linux wrote:
+>>> 0:00:01.955927879 20954  0x15ffe90 INFO                    v4l2 gstv4l2object.c:3811:gst_v4l2_object_get_caps:<v4l2src0> probed caps: video/x-bayer, format=(string)rggb, framerate=(fraction)30000/1001, width=(int)816, height=(int)616, pixel-aspect-ratio=(fraction)1/1; video/x-raw, format=(string)I420, framerate=(fraction)30000/1001, width=(int)816, height=(int)616, interlace-mode=(string)progressive, pixel-aspect-ratio=(fraction)1/1; video/x-raw, format=(string)YV12, framerate=(fraction)30000/1001, width=(int)816, height=(int)616, interlace-mode=(string)progressive, pixel-aspect-ratio=(fraction)1/1; video/x-raw, format=(string)BGR, framerate=(fraction)30000/1001, width=(int)816, height=(int)616, interlace-mode=(string)progressive, pixel-aspect-ratio=(fraction)1/1; video/x-raw, format=(string)RGB, framerate=(fraction)30000/1001, width=(int)816, height=(int)616, interlace-mode=(string)progressive, pixel-aspect-ratio=(fraction)1/1
+>>>
+>>>     despite the media pipeline actually being configured for 60fps.
+>>>
+>>>     Forcing it by adjusting the pipeline only results in gstreamer
+>>>     failing, because it believes that v4l2 is unable to operate at
+>>>     60fps.
+>>>
+>>>     Also note the complaints from v4l2src about the non-compliance...
+>> Thanks, I've fixed most of v4l2-compliance issues, but this is not
+>> done yet. Is that something you can help with?
+> I've looked at this, and IMHO it's yet another media control API mess.
+>
+> - media-ctl itself allows setting the format on subdev pads via
+>    struct v4l2_subdev_format.
+>
+> - struct v4l2_subdev_format contains a struct v4l2_mbus_framefmt.
+>
+> - struct v4l2_mbus_framefmt contains:
+>    * @width:      frame width
+>    * @height:     frame height
+>    * @code:       data format code (from enum v4l2_mbus_pixelcode)
+>    * @field:      used interlacing type (from enum v4l2_field)
+>    * @colorspace: colorspace of the data (from enum v4l2_colorspace)
+>    * @ycbcr_enc:  YCbCr encoding of the data (from enum v4l2_ycbcr_encoding)
+>    * @quantization: quantization of the data (from enum v4l2_quantization)
+>    * @xfer_func:  transfer function of the data (from enum v4l2_xfer_func)
+>
+> - media-ctl sets width, height, code and field, but nothing else.
+>
+> We're already agreed that the fields that media-ctl are part of the
+> format negotiation between the ultimate source, flowing down to the
+> capture device.  However, there's no support in media-ctl to deal
+> with these other fields - so media-ctl in itself is only half-
+> implemented.
+>
+>  From what I can tell, _we_ are doing the right thing in imx-media-capture.
+>
+> However, I think part of the problem is the set_fmt implementation.
+> When a source pad is configured via set_fmt(), any fields that can
+> not be altered (eg, because the subdev doesn't support colorspace
+> conversion) need to be preserved from the subdev's sink pad.
+>
+> Right now, CSI doesn't do that - it only looks at the width, height,
+> code, and field.
 
-Fixing GET_FMT (which I've done locally) to return proper colorspace
-information results in GET_FMT passing, and also solves the EXPBUF
-problem too.
+Correct, there is currently no propagation of the colorimetry
+parameters (colorspace, ycbcr_enc, quantization, and xfer_func).
+For the most part, those are just ignored ATM. Philipp Zabel did
+do some work earlier to start propagating those, but that's still
+TODO.
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+>
+> I think we've got other bugs though that haven't been picked up by any
+> review - csi_try_fmt() adjusts the format using the _current_
+> configuration of the sink pad, even when using V4L2_SUBDEV_FORMAT_TRY.
+> This seems wrong according to the docs: the purpose of the try
+> mechanism is to be able to setup the _entire_ pipeline using the TRY
+> mechanism to work out whether the configuration works, before then
+> setting for real.  If we're validating the TRY formats against the
+> live configuration, then we're not doing that.
+
+I don't believe that is correct. csi_try_fmt() for the source pads calls
+__csi_get_fmt(priv, cfg, CSI_SINK_PAD, sdformat->which) to get
+the sink format, and for the TRY trial-run from csi_set_fmt(),
+sdformat->which will be set to TRY, so the returned sink format
+is the TRY format.
+
+But I haven't tested a complete pipeline configuration under the
+TRY case, there still could be issues there. But I've checked the
+CSI, VDIC, and PRPENCVF subdevs, and for set_fmt() trial-runs,
+those should be working correctly using the TRY mechanism.
+
+
+> There's calls for:
+>
+> v4l2_subdev_get_try_format
+> v4l2_subdev_get_try_crop
+> v4l2_subdev_get_try_compose
+>
+> to get the try configuration - we hardly make use of all of these.
+
+Not sure what you mean, the first two are currently
+being used for TRY setup. And I don't think
+v4l2_subdev_get_try_compose() is needed.
+
+>   I
+> would suggest that we change the approach to implementing the various
+> subdevs such that:
+>
+> 1) like __csi_get_fmt(), we have accessors that gets a pointer to the
+>     correct state for the TRY/live settings.
+
+I've verified that CSI, VDIC, and PRPENCVF subdevs do that.
+
+>
+> 2) everywhere we're asked to get or set parameters that can be TRY/live,
+>     we use these accessors to retrieve a pointer to the correct state to
+>     not only read, but also modify.
+
+Yes, that is currently being done in CSI, VDIC, and PRPENCVF subdevs.
+
+>
+> 3) when we're evaluating parameters against another pad, we use these
+>     accessors to obtain the other pad's configuration, rather than poking
+>     about in the state saved in the subdev's priv-> (which is irrelevant
+>     for the TRY variant.)
+
+Again, that is being done already:
+
+__vdic_get_fmt()
+__prp_get_fmt() (in both prp and prpencvf subdevs)
+__csi_get_fmt()
+
+
+>
+> 4) ensure that all parameters which the subdev itself does not support
+>     modification of are correctly propagated from the sink pad to all
+>     source pads, and are unable to be modified via the source pad.
+
+That is currently true except for the colorimetry params as I mentioned.
+
+Steve
