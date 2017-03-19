@@ -1,72 +1,39 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Sun, 19 Mar 2017 10:38:01 +0000
-Subject: [PATCH v5 00/39] i.MX Media Driver
-In-Reply-To: <aef6c412-5464-726b-42f6-a24b7323aa9c@mentor.com>
-References: <1489121599-23206-1-git-send-email-steve_longerbeam@mentor.com>
- <20170318192258.GL21222@n2100.armlinux.org.uk>
- <aef6c412-5464-726b-42f6-a24b7323aa9c@mentor.com>
-Message-ID: <20170319103801.GQ21222@n2100.armlinux.org.uk>
+From: rmk+kernel@armlinux.org.uk (Russell King)
+Date: Sun, 19 Mar 2017 10:48:52 +0000
+Subject: [PATCH 1/4] media: imx-media-csi: fix v4l2-compliance check
+In-Reply-To: <20170319103801.GQ21222@n2100.armlinux.org.uk>
+References: <20170319103801.GQ21222@n2100.armlinux.org.uk>
+Message-ID: <E1cpYOK-0006EZ-No@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 18, 2017 at 12:58:27PM -0700, Steve Longerbeam wrote:
-> Right, imx-media-capture.c (the "standard" v4l2 user interface module)
-> is not implementing VIDIOC_ENUM_FRAMESIZES. It should, but it can only
-> return the single frame size that the pipeline has configured (the mbus
-> format of the attached source pad).
+v4l2-compliance was failing with:
 
-I now have a set of patches that enumerate the frame sizes and intervals
-from the source pad of the first subdev (since you're setting the formats
-etc there from the capture device, it seems sensible to return what it
-can support.)  This means my patch set doesn't add to non-CSI subdevs.
+                fail: v4l2-test-formats.cpp(1076): cap->timeperframe.numerator == 0 || cap->timeperframe.denominator == 0
+                test VIDIOC_G/S_PARM: FAIL
 
-> Can you share your gstreamer pipeline? For now, until
-> VIDIOC_ENUM_FRAMESIZES is implemented, try a pipeline that
-> does not attempt to specify a frame rate. I use the attached
-> script for testing, which works for me.
+Fix this.
 
-Note that I'm not specifying a frame rate on gstreamer - I'm setting
-the pipeline up for 60fps, but gstreamer in its wisdom is unable to
-enumerate the frame sizes, and therefore is unable to enumerate the
-frame intervals (frame intervals depend on frame sizes), so it
-falls back to the "tvnorms" which are basically 25/1 and 30000/1001.
+Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+---
+ drivers/staging/media/imx/imx-media-csi.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-It sees 60fps via G_PARM, and then decides to set 30000/1001 via S_PARM.
-So, we end up with most of the pipeline operating at 60fps, with CSI
-doing frame skipping to reduce the frame rate to 30fps.
-
-gstreamer doesn't complain, doesn't issue any warnings, the only way
-you can spot this is to enable debugging and look through the copious
-debug log, or use -v and check the pad capabilities.
-
-Testing using gstreamer, and only using "does it produce video" is a
-good simple test, but it's just that - it's a simple test.  It doesn't
-tell you that what you're seeing is what you intended to see (such as
-video at the frame rate you expected) without more work.
-
-> Thanks, I've fixed most of v4l2-compliance issues, but this is not
-> done yet. Is that something you can help with?
-
-What did you do with:
-
-ioctl(3, VIDIOC_REQBUFS, {count=0, type=0 /* V4L2_BUF_TYPE_??? */, memory=0 /* V4L2_MEMORY_??? */}) = -1 EINVAL (Invalid argument)
-                test VIDIOC_REQBUFS/CREATE_BUFS/QUERYBUF: OK
-ioctl(3, VIDIOC_EXPBUF, 0xbef405bc)     = -1 EINVAL (Invalid argument)
-                fail: v4l2-test-buffers.cpp(571): q.has_expbuf(node)
-                test VIDIOC_EXPBUF: FAIL
-
-To me, this looks like a bug in v4l2-compliance (I'm using 1.10.0).
-I'm not sure what buffer VIDIOC_EXPBUF is expected to export, since
-afaics no buffers have been allocated, so of course it's going to fail.
-Either that, or the v4l2 core vb2 code is non-compliant with v4l2's
-interface requirements.
-
-In any case, it doesn't look like the buffer management is being
-tested at all by v4l2-compliance - we know that gstreamer works, so
-buffers _can_ be allocated, and I've also used dmabufs with gstreamer,
-so I also know that VIDIOC_EXPBUF works there.
-
+diff --git a/drivers/staging/media/imx/imx-media-csi.c b/drivers/staging/media/imx/imx-media-csi.c
+index 0336891069dc..65346e789dd6 100644
+--- a/drivers/staging/media/imx/imx-media-csi.c
++++ b/drivers/staging/media/imx/imx-media-csi.c
+@@ -680,8 +680,10 @@ static const struct csi_skip_desc *csi_find_best_skip(struct v4l2_fract *in,
+ 
+ 	/* Default to 1:1 ratio */
+ 	if (out->numerator == 0 || out->denominator == 0 ||
+-	    in->numerator == 0 || in->denominator == 0)
++	    in->numerator == 0 || in->denominator == 0) {
++		*out = *in;
+ 		return best_skip;
++	}
+ 
+ 	want_us = div_u64((u64)USEC_PER_SEC * out->numerator, out->denominator);
+ 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+2.7.4
