@@ -1,111 +1,128 @@
 From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Sun, 19 Mar 2017 15:18:16 -0700
-Subject: [PATCH 3/4] media: imx-csi: add frame size/interval enumeration
-In-Reply-To: <E1cpYOU-0006En-Vd@rmk-PC.armlinux.org.uk>
+Date: Sun, 19 Mar 2017 15:21:37 -0700
+Subject: [PATCH 4/4] media: imx-media-capture: add frame sizes/interval
+ enumeration
+In-Reply-To: <E1cpYOa-0006Eu-CL@rmk-PC.armlinux.org.uk>
 References: <20170319103801.GQ21222@n2100.armlinux.org.uk>
- <E1cpYOU-0006En-Vd@rmk-PC.armlinux.org.uk>
-Message-ID: <1aa415ea-6096-fa4f-1e7d-7761bf11187a@gmail.com>
+ <E1cpYOa-0006Eu-CL@rmk-PC.armlinux.org.uk>
+Message-ID: <a9f6445c-97e4-fee9-d795-50724e98a766@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
 On 03/19/2017 03:49 AM, Russell King wrote:
-> Add frame size and frame interval enumeration to CSI.
->
-> CSI can scale the image independently horizontally and vertically by a
-> factor of two, which enumerates to four different frame sizes.
->
-> CSI can also drop frames, resulting in frame rate reduction, so
-> enumerate the resulting possible output frame rates.
+> Add support for enumerating frame sizes and frame intervals from the
+> first subdev via the V4L2 interfaces.
 >
 > Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 > ---
->   drivers/staging/media/imx/imx-media-csi.c | 51 +++++++++++++++++++++++++++++++
->   1 file changed, 51 insertions(+)
+>   drivers/staging/media/imx/imx-media-capture.c | 62 +++++++++++++++++++++++++++
+>   1 file changed, 62 insertions(+)
 >
-> diff --git a/drivers/staging/media/imx/imx-media-csi.c b/drivers/staging/media/imx/imx-media-csi.c
-> index 65346e789dd6..d19659d7ddc2 100644
-> --- a/drivers/staging/media/imx/imx-media-csi.c
-> +++ b/drivers/staging/media/imx/imx-media-csi.c
-> @@ -1073,6 +1073,55 @@ static int csi_enum_mbus_code(struct v4l2_subdev *sd,
->   	return ret;
+> diff --git a/drivers/staging/media/imx/imx-media-capture.c b/drivers/staging/media/imx/imx-media-capture.c
+> index cdeb2cd8b1d7..bc99d9310e36 100644
+> --- a/drivers/staging/media/imx/imx-media-capture.c
+> +++ b/drivers/staging/media/imx/imx-media-capture.c
+> @@ -82,6 +82,65 @@ static int vidioc_querycap(struct file *file, void *fh,
+>   	return 0;
 >   }
 >   
-> +static int csi_enum_frame_size(struct v4l2_subdev *sd,
-> +			       struct v4l2_subdev_pad_config *cfg,
-> +			       struct v4l2_subdev_frame_size_enum *fse)
+> +static int capture_enum_framesizes(struct file *file, void *fh,
+> +				   struct v4l2_frmsizeenum *fsize)
 > +{
-> +	struct csi_priv *priv = v4l2_get_subdevdata(sd);
-> +	struct v4l2_mbus_framefmt *fmt;
-> +	int ret = 0;
+> +	struct capture_priv *priv = video_drvdata(file);
+> +	const struct imx_media_pixfmt *cc;
+> +	struct v4l2_subdev_frame_size_enum fse = {
+> +		.index = fsize->index,
+> +		.pad = priv->src_sd_pad,
+> +		.which = V4L2_SUBDEV_FORMAT_ACTIVE,
+> +	};
+> +	int ret;
 > +
-> +	if (fse->pad >= CSI_NUM_PADS ||
-> +	    fse->index > (fse->pad == CSI_SINK_PAD ? 0 : 3))
+> +	cc = imx_media_find_format(fsize->pixel_format, CS_SEL_ANY, true);
+> +	if (!cc)
 > +		return -EINVAL;
 > +
-> +	mutex_lock(&priv->lock);
-> +	fmt = __csi_get_fmt(priv, cfg, fse->pad, fse->which);
-> +	fse->min_width = fse->max_width = fse->index & 1 ?
-> +					    fmt->width >> 1 : fmt->width;
-> +	fse->min_height = fse->max_height = fse->index & 2 ?
-> +					      fmt->height >> 1 : fmt->height;
-> +	mutex_unlock(&priv->lock);
+> +	fse.code = cc->codes[0];
 > +
-> +	return ret;
+> +	ret = v4l2_subdev_call(priv->src_sd, pad, enum_frame_size, NULL, &fse);
+> +	if (ret)
+> +		return ret;
+> +
+> +	fsize->type = V4L2_FRMSIZE_TYPE_DISCRETE;
+> +	fsize->discrete.width = fse.min_width;
+> +	fsize->discrete.height = fse.max_height;
+> +
+> +	return 0;
 > +}
 
-This will only enumerate the currently set/tried format at the sink
-pad. But the sink pad supports a range of widths/heights.
 
-I think this function should call csi_try_fmt() at the sink pad.
+The PRP ENC/VF subdevices will return a continuous range of
+supported frame sizes at their source pad, so this should be
+modified to:
 
-The other media drivers do the same, they return a supported range at
-the sinks rather than only the last set/tried values.
-
-So the sink enumeration should return a continuous range.
-The source enumeration should behave the same as you have it above
-however, i.e. a discrete set of 4 possibilities since the CSI is limited to
-only /2 downsizing in both dimensions.
+...
+     if (fse.min_width == fse.max_width &&
+         fse.min_height == fse.max_height) {
+         fsize->type = V4L2_FRMSIZE_TYPE_DISCRETE;
+         fsize->discrete.width = fse.min_width;
+         fsize->discrete.height = fse.min_height;
+     } else {
+         fsize->type = V4L2_FRMSIZE_TYPE_CONTINUOUS;
+         fsize->stepwise.min_width = fse.min_width;
+         fsize->stepwise.max_width = fse.max_width;
+         fsize->stepwise.min_height = fse.min_height;
+         fsize->stepwise.max_height = fse.max_height;
+         fsize->stepwise.step_width = 1;
+         fsize->stepwise.step_height = 1;
+     }
+...
 
 Steve
 
+
 > +
-> +static int csi_enum_frame_interval(struct v4l2_subdev *sd,
-> +				   struct v4l2_subdev_pad_config *cfg,
-> +				   struct v4l2_subdev_frame_interval_enum *fie)
+> +static int capture_enum_frameintervals(struct file *file, void *fh,
+> +				       struct v4l2_frmivalenum *fival)
 > +{
-> +	struct csi_priv *priv = v4l2_get_subdevdata(sd);
-> +	struct v4l2_mbus_framefmt *fmt;
-> +	int ret = 0;
+> +	struct capture_priv *priv = video_drvdata(file);
+> +	const struct imx_media_pixfmt *cc;
+> +	struct v4l2_subdev_frame_interval_enum fie = {
+> +		.index = fival->index,
+> +		.pad = priv->src_sd_pad,
+> +		.width = fival->width,
+> +		.height = fival->height,
+> +		.which = V4L2_SUBDEV_FORMAT_ACTIVE,
+> +	};
+> +	int ret;
 > +
-> +	if (fie->pad >= CSI_NUM_PADS ||
-> +	    fie->index >= (fie->pad == CSI_SINK_PAD ? 1 : ARRAY_SIZE(csi_skip)))
+> +	cc = imx_media_find_format(fival->pixel_format, CS_SEL_ANY, true);
+> +	if (!cc)
 > +		return -EINVAL;
 > +
-> +	mutex_lock(&priv->lock);
-> +	fmt = __csi_get_fmt(priv, cfg, fie->pad, fie->which);
-> +	if ((fie->width == fmt->width || fie->width == fmt->width / 2) &&
-> +	    (fie->height == fmt->height || fie->height == fmt->height / 2)) {
-> +		fie->interval = priv->frame_interval;
-> +		csi_apply_skip_interval(&csi_skip[fie->index], &fie->interval);
-> +	} else {
-> +		ret = -EINVAL;
-> +	}
-> +	mutex_unlock(&priv->lock);
+> +	fie.code = cc->codes[0];
 > +
-> +	return ret;
+> +	ret = v4l2_subdev_call(priv->src_sd, pad, enum_frame_interval, NULL, &fie);
+> +	if (ret)
+> +		return ret;
+> +
+> +	fival->type = V4L2_FRMIVAL_TYPE_DISCRETE;
+> +	fival->discrete = fie.interval;
+> +
+> +	return 0;
 > +}
 > +
->   static int csi_get_fmt(struct v4l2_subdev *sd,
->   		       struct v4l2_subdev_pad_config *cfg,
->   		       struct v4l2_subdev_format *sdformat)
-> @@ -1473,6 +1522,8 @@ static struct v4l2_subdev_video_ops csi_video_ops = {
+>   static int capture_enum_fmt_vid_cap(struct file *file, void *fh,
+>   				    struct v4l2_fmtdesc *f)
+>   {
+> @@ -270,6 +329,9 @@ static int capture_s_parm(struct file *file, void *fh,
+>   static const struct v4l2_ioctl_ops capture_ioctl_ops = {
+>   	.vidioc_querycap	= vidioc_querycap,
 >   
->   static struct v4l2_subdev_pad_ops csi_pad_ops = {
->   	.enum_mbus_code = csi_enum_mbus_code,
-> +	.enum_frame_size = csi_enum_frame_size,
-> +	.enum_frame_interval = csi_enum_frame_interval,
->   	.get_fmt = csi_get_fmt,
->   	.set_fmt = csi_set_fmt,
->   	.get_selection = csi_get_selection,
+> +	.vidioc_enum_framesizes = capture_enum_framesizes,
+> +	.vidioc_enum_frameintervals = capture_enum_frameintervals,
+> +
+>   	.vidioc_enum_fmt_vid_cap        = capture_enum_fmt_vid_cap,
+>   	.vidioc_g_fmt_vid_cap           = capture_g_fmt_vid_cap,
+>   	.vidioc_try_fmt_vid_cap         = capture_try_fmt_vid_cap,
