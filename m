@@ -1,140 +1,53 @@
-From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Sun, 19 Mar 2017 11:37:15 -0700
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Sun, 19 Mar 2017 18:51:33 +0000
 Subject: [PATCH v5 00/39] i.MX Media Driver
-In-Reply-To: <20170319121402.GS21222@n2100.armlinux.org.uk>
+In-Reply-To: <6e2879a0-1f2e-9da7-b7e1-d134a0301ca2@gmail.com>
 References: <1489121599-23206-1-git-send-email-steve_longerbeam@mentor.com>
  <20170318192258.GL21222@n2100.armlinux.org.uk>
  <aef6c412-5464-726b-42f6-a24b7323aa9c@mentor.com>
  <20170319121402.GS21222@n2100.armlinux.org.uk>
-Message-ID: <6e2879a0-1f2e-9da7-b7e1-d134a0301ca2@gmail.com>
+ <6e2879a0-1f2e-9da7-b7e1-d134a0301ca2@gmail.com>
+Message-ID: <20170319185132.GY21222@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Sun, Mar 19, 2017 at 11:37:15AM -0700, Steve Longerbeam wrote:
+> On 03/19/2017 05:14 AM, Russell King - ARM Linux wrote:
+> >Right now, CSI doesn't do that - it only looks at the width, height,
+> >code, and field.
+> 
+> Correct, there is currently no propagation of the colorimetry
+> parameters (colorspace, ycbcr_enc, quantization, and xfer_func).
+> For the most part, those are just ignored ATM. Philipp Zabel did
+> do some work earlier to start propagating those, but that's still
+> TODO.
 
 
-On 03/19/2017 05:14 AM, Russell King - ARM Linux wrote:
-> On Sat, Mar 18, 2017 at 12:58:27PM -0700, Steve Longerbeam wrote:
->> On 03/18/2017 12:22 PM, Russell King - ARM Linux wrote:
->>> 0:00:01.955927879 20954  0x15ffe90 INFO                    v4l2 gstv4l2object.c:3811:gst_v4l2_object_get_caps:<v4l2src0> probed caps: video/x-bayer, format=(string)rggb, framerate=(fraction)30000/1001, width=(int)816, height=(int)616, pixel-aspect-ratio=(fraction)1/1; video/x-raw, format=(string)I420, framerate=(fraction)30000/1001, width=(int)816, height=(int)616, interlace-mode=(string)progressive, pixel-aspect-ratio=(fraction)1/1; video/x-raw, format=(string)YV12, framerate=(fraction)30000/1001, width=(int)816, height=(int)616, interlace-mode=(string)progressive, pixel-aspect-ratio=(fraction)1/1; video/x-raw, format=(string)BGR, framerate=(fraction)30000/1001, width=(int)816, height=(int)616, interlace-mode=(string)progressive, pixel-aspect-ratio=(fraction)1/1; video/x-raw, format=(string)RGB, framerate=(fraction)30000/1001, width=(int)816, height=(int)616, interlace-mode=(string)progressive, pixel-aspect-ratio=(fraction)1/1
->>>
->>>     despite the media pipeline actually being configured for 60fps.
->>>
->>>     Forcing it by adjusting the pipeline only results in gstreamer
->>>     failing, because it believes that v4l2 is unable to operate at
->>>     60fps.
->>>
->>>     Also note the complaints from v4l2src about the non-compliance...
->> Thanks, I've fixed most of v4l2-compliance issues, but this is not
->> done yet. Is that something you can help with?
-> I've looked at this, and IMHO it's yet another media control API mess.
->
-> - media-ctl itself allows setting the format on subdev pads via
->    struct v4l2_subdev_format.
->
-> - struct v4l2_subdev_format contains a struct v4l2_mbus_framefmt.
->
-> - struct v4l2_mbus_framefmt contains:
->    * @width:      frame width
->    * @height:     frame height
->    * @code:       data format code (from enum v4l2_mbus_pixelcode)
->    * @field:      used interlacing type (from enum v4l2_field)
->    * @colorspace: colorspace of the data (from enum v4l2_colorspace)
->    * @ycbcr_enc:  YCbCr encoding of the data (from enum v4l2_ycbcr_encoding)
->    * @quantization: quantization of the data (from enum v4l2_quantization)
->    * @xfer_func:  transfer function of the data (from enum v4l2_xfer_func)
->
-> - media-ctl sets width, height, code and field, but nothing else.
->
-> We're already agreed that the fields that media-ctl are part of the
-> format negotiation between the ultimate source, flowing down to the
-> capture device.  However, there's no support in media-ctl to deal
-> with these other fields - so media-ctl in itself is only half-
-> implemented.
->
->  From what I can tell, _we_ are doing the right thing in imx-media-capture.
->
-> However, I think part of the problem is the set_fmt implementation.
-> When a source pad is configured via set_fmt(), any fields that can
-> not be altered (eg, because the subdev doesn't support colorspace
-> conversion) need to be preserved from the subdev's sink pad.
->
-> Right now, CSI doesn't do that - it only looks at the width, height,
-> code, and field.
+> 
+> >
+> >I think we've got other bugs though that haven't been picked up by any
+> >review - csi_try_fmt() adjusts the format using the _current_
+> >configuration of the sink pad, even when using V4L2_SUBDEV_FORMAT_TRY.
+> >This seems wrong according to the docs: the purpose of the try
+> >mechanism is to be able to setup the _entire_ pipeline using the TRY
+> >mechanism to work out whether the configuration works, before then
+> >setting for real.  If we're validating the TRY formats against the
+> >live configuration, then we're not doing that.
+> 
+> I don't believe that is correct. csi_try_fmt() for the source pads calls
+> __csi_get_fmt(priv, cfg, CSI_SINK_PAD, sdformat->which) to get
+> the sink format, and for the TRY trial-run from csi_set_fmt(),
+> sdformat->which will be set to TRY, so the returned sink format
+> is the TRY format.
 
-Correct, there is currently no propagation of the colorimetry
-parameters (colorspace, ycbcr_enc, quantization, and xfer_func).
-For the most part, those are just ignored ATM. Philipp Zabel did
-do some work earlier to start propagating those, but that's still
-TODO.
+Look at csi_try_fmt() - it validates the source pad against
+priv->crop, which is the actively live cropping rectangle, not the
+one which has been configured for the TRY trial-run.
 
->
-> I think we've got other bugs though that haven't been picked up by any
-> review - csi_try_fmt() adjusts the format using the _current_
-> configuration of the sink pad, even when using V4L2_SUBDEV_FORMAT_TRY.
-> This seems wrong according to the docs: the purpose of the try
-> mechanism is to be able to setup the _entire_ pipeline using the TRY
-> mechanism to work out whether the configuration works, before then
-> setting for real.  If we're validating the TRY formats against the
-> live configuration, then we're not doing that.
+Also, as I mention elsewhere, I believe the way we're doing scaling
+is completely wrong...
 
-I don't believe that is correct. csi_try_fmt() for the source pads calls
-__csi_get_fmt(priv, cfg, CSI_SINK_PAD, sdformat->which) to get
-the sink format, and for the TRY trial-run from csi_set_fmt(),
-sdformat->which will be set to TRY, so the returned sink format
-is the TRY format.
-
-But I haven't tested a complete pipeline configuration under the
-TRY case, there still could be issues there. But I've checked the
-CSI, VDIC, and PRPENCVF subdevs, and for set_fmt() trial-runs,
-those should be working correctly using the TRY mechanism.
-
-
-> There's calls for:
->
-> v4l2_subdev_get_try_format
-> v4l2_subdev_get_try_crop
-> v4l2_subdev_get_try_compose
->
-> to get the try configuration - we hardly make use of all of these.
-
-Not sure what you mean, the first two are currently
-being used for TRY setup. And I don't think
-v4l2_subdev_get_try_compose() is needed.
-
->   I
-> would suggest that we change the approach to implementing the various
-> subdevs such that:
->
-> 1) like __csi_get_fmt(), we have accessors that gets a pointer to the
->     correct state for the TRY/live settings.
-
-I've verified that CSI, VDIC, and PRPENCVF subdevs do that.
-
->
-> 2) everywhere we're asked to get or set parameters that can be TRY/live,
->     we use these accessors to retrieve a pointer to the correct state to
->     not only read, but also modify.
-
-Yes, that is currently being done in CSI, VDIC, and PRPENCVF subdevs.
-
->
-> 3) when we're evaluating parameters against another pad, we use these
->     accessors to obtain the other pad's configuration, rather than poking
->     about in the state saved in the subdev's priv-> (which is irrelevant
->     for the TRY variant.)
-
-Again, that is being done already:
-
-__vdic_get_fmt()
-__prp_get_fmt() (in both prp and prpencvf subdevs)
-__csi_get_fmt()
-
-
->
-> 4) ensure that all parameters which the subdev itself does not support
->     modification of are correctly propagated from the sink pad to all
->     source pads, and are unable to be modified via the source pad.
-
-That is currently true except for the colorimetry params as I mentioned.
-
-Steve
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
