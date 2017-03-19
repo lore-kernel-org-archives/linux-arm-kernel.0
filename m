@@ -1,80 +1,73 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Sun, 19 Mar 2017 15:22:33 +0000
-Subject: [PATCH v5 38/39] media: imx: csi: fix crop rectangle reset in
- sink set_fmt
-In-Reply-To: <1489121599-23206-39-git-send-email-steve_longerbeam@mentor.com>
-References: <1489121599-23206-1-git-send-email-steve_longerbeam@mentor.com>
- <1489121599-23206-39-git-send-email-steve_longerbeam@mentor.com>
-Message-ID: <20170319152233.GW21222@n2100.armlinux.org.uk>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Mon, 20 Mar 2017 00:19:43 +0800
+Subject: [PATCH v4 0/8] Add dual-role OTG support for Allwinner H3
+Message-ID: <20170319161951.55834-1-icenowy@aosc.xyz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 09, 2017 at 08:53:18PM -0800, Steve Longerbeam wrote:
-> From: Philipp Zabel <p.zabel@pengutronix.de>
-> 
-> The csi_try_crop call in set_fmt should compare the cropping rectangle
-> to the currently set input format, not to the previous input format.
+Allwinner H3 have a its USB PHY0 routed to two USB controllers: one is
+a MUSB controller, which can work in peripheral mode, but works badly in
+host mode (several hardware will fail on the MUSB controller, even connect
+one MUSB controller in peripheral mode to another one in host mode cannot
+work); the other is a pair of EHCI/OHCI controller, which can work only
+in host mode, but have better compatibillity. The route is controlled in
+a register, which we have set it to HCI only when we do not know about
+it well.
 
-Are we really sure that the cropping support is implemented correctly?
+Add support to route to the best controller according to current USB mode
+(host/peripheral).
 
-I came across this while looking at what we're doing with the
-V4L2_SEL_FLAG_KEEP_CONFIG flag.
+Note: Currently even if hardware only support hostmode, we should still
+enable the MUSB controller, as it controls the USB mode. (Some this kind
+of hardware can also work in peripheral mode by settings in the sysfs
+node of MUSB, then connect it to another host via a USB Type-A to Type-A
+cable.)
 
-Documentation/media/uapi/v4l/dev-subdev.rst defines the behaviour of
-the user API, and "Order of configuration and format propagation" says:
+Patch 1 changes the device tree binding to include the "pmu0" for HCI pair.
 
-  The coordinates to a step always refer to the actual size of the
-  previous step. The exception to this rule is the source compose
-  rectangle, which refers to the sink compose bounds rectangle --- if it
-  is supported by the hardware.
-  
-  1. Sink pad format. The user configures the sink pad format. This format
-     defines the parameters of the image the entity receives through the
-     pad for further processing.
-  
-  2. Sink pad actual crop selection. The sink pad crop defines the crop
-     performed to the sink pad format.
-  
-  3. Sink pad actual compose selection. The size of the sink pad compose
-     rectangle defines the scaling ratio compared to the size of the sink
-     pad crop rectangle. The location of the compose rectangle specifies
-     the location of the actual sink compose rectangle in the sink compose
-     bounds rectangle.
-  
-  4. Source pad actual crop selection. Crop on the source pad defines crop
-     performed to the image in the sink compose bounds rectangle.
-  
-  5. Source pad format. The source pad format defines the output pixel
-     format of the subdev, as well as the other parameters with the
-     exception of the image width and height. Width and height are defined
-     by the size of the source pad actual crop selection.
-  
-  Accessing any of the above rectangles not supported by the subdev will
-  return ``EINVAL``. Any rectangle referring to a previous unsupported
-  rectangle coordinates will instead refer to the previous supported
-  rectangle. For example, if sink crop is not supported, the compose
-  selection will refer to the sink pad format dimensions instead.
+Patch 2 and 3 are fixes for H3 PHY, in order to make MUSB really working
+on H3.
 
-Note step 3 above: scaling is defined by the ratio of the _sink_ crop
-rectangle to the _sink_ compose rectangle.
+Patch 4 adds support for auto routing of PHY0. It's currently only enabled
+on H3, but it's easy to extend it to other SoCs which feature this
+route control.
 
-So, lets say that the camera produces a 1280x720 image, and the sink
-pad format is configured with 1280x720.  That's step 1.
+Patch 5 adds necessary device tree nodes to the H3/H5 DTSI file. Note: The
+phy is not bind for OHCI/EHCI0, as OHCI/EHCI drivers will keep the VBUS
+on. Only MUSB driver can properly handle a dual-role PHY.
 
-The sink crop operates within that rectangle, cropping it to an area.
-Let's say we're only interested in its centre, so we'd chose 640x360
-with the top-left as 320,180.  This is step 2.
+Patch 6 enables USB OTG functionality on Orange Pi One board, which is
+the only H3 board I have that have proper OTG function. It's easy to
+enable OTG on other boards with their schematics.
 
-Then, if we want to down-scale by a factor of two, we'd set the sink
-compose selection to 320x180.
+Patch 7 enables USB OTG functionality on Orange Pi Zero board, as the
+board cannot output power on Vbus, I only enabled peripheral mode by
+default.
 
-This seems to be at odds with how the scaling is done in CSI at
-present: the selection implementations all reject attempts to
-configure the sink pad, instead only supporting crop rectangles on
-the source, and we use the source crop rectangle to define the
-down-scaling.
+Patch 8 enables USB OTG funcionality on Orange Pi PC2 board, which is
+the newly support H5 board, and have USB-related pins same as Orange
+Pi One.
+
+The USB PHY on V3s/A64 SoCs also feature this capability, and it will
+be soon enabled on these SoCs after this patchset is merged.
+
+Icenowy Zheng (8):
+  dt: bindings: add pmu0 regs for USB PHYs on Allwinner H3/V3s/A64
+  phy: sun4i-usb: change PHYCTL register clearing code
+  phy: sun4i-usb: add PHYCTL offset for H3 SoC
+  phy: sun4i-usb: support automatically switch PHY0 route to MUSB/HCI
+  ARM: sunxi: h3/h5: add usb_otg and OHCI/EHCI for usbc0 on H3/H5
+  ARM: sun8i: h3: enable USB OTG on Orange Pi One
+  ARM: sun8i: h2+: enable USB OTG for Orange Pi Zero board
+  arm64: allwinner: h5: enable USB OTG on Orange Pi PC 2 board
+
+ .../devicetree/bindings/phy/sun4i-usb-phy.txt      |  1 +
+ arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts  | 20 +++++++-
+ arch/arm/boot/dts/sun8i-h3-orangepi-one.dts        | 22 ++++++++-
+ arch/arm/boot/dts/sunxi-h3-h5.dtsi                 | 32 ++++++++++++
+ .../boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts  | 27 +++++++++-
+ drivers/phy/phy-sun4i-usb.c                        | 57 ++++++++++++++--------
+ 6 files changed, 135 insertions(+), 24 deletions(-)
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+2.12.0
