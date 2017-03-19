@@ -1,7 +1,7 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Sat, 18 Mar 2017 21:50:39 -0700
+Date: Sat, 18 Mar 2017 21:53:20 -0700
 Subject: [PATCH] ARM: dts: sun7i: lamobo-r1: Fix CPU port RGMII settings
-Message-ID: <20170319045039.6163-1-f.fainelli@gmail.com>
+Message-ID: <20170319045321.6454-1-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
