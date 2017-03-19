@@ -1,89 +1,76 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Sun, 19 Mar 2017 22:39:31 +0000
-Subject: [PATCH 4/4] media: imx-media-capture: add frame sizes/interval
- enumeration
-In-Reply-To: <a9f6445c-97e4-fee9-d795-50724e98a766@gmail.com>
-References: <20170319103801.GQ21222@n2100.armlinux.org.uk>
- <E1cpYOa-0006Eu-CL@rmk-PC.armlinux.org.uk>
- <a9f6445c-97e4-fee9-d795-50724e98a766@gmail.com>
-Message-ID: <20170319223931.GB21222@n2100.armlinux.org.uk>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Sun, 19 Mar 2017 22:44:02 +0000
+Subject: [PATCH v3 07/11] IIO: consumer: allow to set buffer sizes
+In-Reply-To: <1489759704-30217-8-git-send-email-arnaud.pouliquen@st.com>
+References: <1489759704-30217-1-git-send-email-arnaud.pouliquen@st.com>
+ <1489759704-30217-8-git-send-email-arnaud.pouliquen@st.com>
+Message-ID: <951c19fa-d3b8-f4cd-cac1-64e3b8d1cf01@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 19, 2017 at 03:21:37PM -0700, Steve Longerbeam wrote:
+On 17/03/17 14:08, Arnaud Pouliquen wrote:
+> Add iio consumer API to set buffer size and watermark according
+> to sysfs API.
 > 
-> 
-> On 03/19/2017 03:49 AM, Russell King wrote:
-> >Add support for enumerating frame sizes and frame intervals from the
-> >first subdev via the V4L2 interfaces.
-> >
-> >Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
-> >---
-> >  drivers/staging/media/imx/imx-media-capture.c | 62 +++++++++++++++++++++++++++
-> >  1 file changed, 62 insertions(+)
-> >
-> >diff --git a/drivers/staging/media/imx/imx-media-capture.c b/drivers/staging/media/imx/imx-media-capture.c
-> >index cdeb2cd8b1d7..bc99d9310e36 100644
-> >--- a/drivers/staging/media/imx/imx-media-capture.c
-> >+++ b/drivers/staging/media/imx/imx-media-capture.c
-> >@@ -82,6 +82,65 @@ static int vidioc_querycap(struct file *file, void *fh,
-> >  	return 0;
-> >  }
-> >+static int capture_enum_framesizes(struct file *file, void *fh,
-> >+				   struct v4l2_frmsizeenum *fsize)
-> >+{
-> >+	struct capture_priv *priv = video_drvdata(file);
-> >+	const struct imx_media_pixfmt *cc;
-> >+	struct v4l2_subdev_frame_size_enum fse = {
-> >+		.index = fsize->index,
-> >+		.pad = priv->src_sd_pad,
-> >+		.which = V4L2_SUBDEV_FORMAT_ACTIVE,
-> >+	};
-> >+	int ret;
-> >+
-> >+	cc = imx_media_find_format(fsize->pixel_format, CS_SEL_ANY, true);
-> >+	if (!cc)
-> >+		return -EINVAL;
-> >+
-> >+	fse.code = cc->codes[0];
-> >+
-> >+	ret = v4l2_subdev_call(priv->src_sd, pad, enum_frame_size, NULL, &fse);
-> >+	if (ret)
-> >+		return ret;
-> >+
-> >+	fsize->type = V4L2_FRMSIZE_TYPE_DISCRETE;
-> >+	fsize->discrete.width = fse.min_width;
-> >+	fsize->discrete.height = fse.max_height;
-> >+
-> >+	return 0;
-> >+}
-> 
-> 
-> The PRP ENC/VF subdevices will return a continuous range of
-> supported frame sizes at their source pad, so this should be
-> modified to:
-> 
-> ...
->     if (fse.min_width == fse.max_width &&
->         fse.min_height == fse.max_height) {
->         fsize->type = V4L2_FRMSIZE_TYPE_DISCRETE;
->         fsize->discrete.width = fse.min_width;
->         fsize->discrete.height = fse.min_height;
->     } else {
->         fsize->type = V4L2_FRMSIZE_TYPE_CONTINUOUS;
->         fsize->stepwise.min_width = fse.min_width;
->         fsize->stepwise.max_width = fse.max_width;
->         fsize->stepwise.min_height = fse.min_height;
->         fsize->stepwise.max_height = fse.max_height;
->         fsize->stepwise.step_width = 1;
->         fsize->stepwise.step_height = 1;
->     }
-> ...
+> Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
+Hmm. Not keen on the length one.  Setting a requested watermark
+is fair enough.  There is no actually buffer in these cases though
+so setting it's length is downright odd..
 
-Fine by me - I don't have any experience of those subdevices as they're
-unusable for me.
+Guess this is part of the hacks we need to clean up by doing
+the dma buffer consumer stuff right...
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Jonathan
+> ---
+>  drivers/iio/buffer/industrialio-buffer-cb.c | 12 ++++++++++++
+>  include/linux/iio/consumer.h                | 13 +++++++++++++
+>  2 files changed, 25 insertions(+)
+> 
+> diff --git a/drivers/iio/buffer/industrialio-buffer-cb.c b/drivers/iio/buffer/industrialio-buffer-cb.c
+> index b8f550e..43c066a 100644
+> --- a/drivers/iio/buffer/industrialio-buffer-cb.c
+> +++ b/drivers/iio/buffer/industrialio-buffer-cb.c
+> @@ -103,6 +103,18 @@ struct iio_cb_buffer *iio_channel_get_all_cb(struct device *dev,
+>  }
+>  EXPORT_SYMBOL_GPL(iio_channel_get_all_cb);
+>  
+> +int iio_channel_cb_set_buffer_params(struct iio_cb_buffer *cb_buff,
+> +				      size_t length, size_t watermark)
+> +{
+> +	if (!length || length < watermark)
+> +		return -EINVAL;
+> +	cb_buff->buffer.watermark = watermark;
+> +	cb_buff->buffer.length = length;
+> +
+> +	return 0;
+> +}
+> +EXPORT_SYMBOL_GPL(iio_channel_start_all_cb);
+> +
+>  int iio_channel_start_all_cb(struct iio_cb_buffer *cb_buff)
+>  {
+>  	return iio_update_buffers(cb_buff->indio_dev, &cb_buff->buffer,
+> diff --git a/include/linux/iio/consumer.h b/include/linux/iio/consumer.h
+> index cb44771..0f6e94d 100644
+> --- a/include/linux/iio/consumer.h
+> +++ b/include/linux/iio/consumer.h
+> @@ -134,6 +134,19 @@ struct iio_cb_buffer *iio_channel_get_all_cb(struct device *dev,
+>  						       void *private),
+>  					     void *private);
+>  /**
+> + * iio_channel_cb_set_buffer_size() - set the buffer length.
+> + * @cb_buffer:		The callback buffer from whom we want the channel
+> + *			information.
+> + * @length: buffer length in bytes
+> + * @watermark: buffer watermark in bytes
+> + *
+> + * This function allows to configure the buffer length. The watermark if
+> + * forced to half of the buffer.
+> + */
+> +int iio_channel_cb_set_buffer_params(struct iio_cb_buffer *cb_buffer,
+> +				     size_t length, size_t watermark);
+> +
+> +/**
+>   * iio_channel_release_all_cb() - release and unregister the callback.
+>   * @cb_buffer:		The callback buffer that was allocated.
+>   */
+> 
