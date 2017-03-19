@@ -1,55 +1,47 @@
-From: mzoran@crowfest.net (Michael Zoran)
-Date: Sun, 19 Mar 2017 03:22:08 -0700
-Subject: outreachy/moving a driver out of staging
-In-Reply-To: <20170319091536.GO21222@n2100.armlinux.org.uk>
-References: <alpine.DEB.2.20.1703092133340.2306@hadrien>
- <443f0143-aec1-2559-a2c2-73b245632948@broadcom.com>
- <2da12619-5fcb-9e0f-b6c1-c83cbf491e8d@wwwdotorg.org>
- <20170309212021.GA24433@kroah.com> <1489909067.1536.14.camel@crowfest.net>
- <20170319091536.GO21222@n2100.armlinux.org.uk>
-Message-ID: <1489918928.1536.17.camel@crowfest.net>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Sun, 19 Mar 2017 10:34:22 +0000
+Subject: [PATCH v1 2/7] dt-bindings: iio: rockchip-saradc: add support for
+ rk3328
+In-Reply-To: <8664375.8vdE6CQfX9@phil>
+References: <1489572237-6649-1-git-send-email-cl@rock-chips.com>
+ <1489572237-6649-3-git-send-email-cl@rock-chips.com>
+ <8664375.8vdE6CQfX9@phil>
+Message-ID: <fff0d197-c88e-fd04-0f56-c4fbc982bae4@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2017-03-19 at 09:15 +0000, Russell King - ARM Linux wrote:
-> On Sun, Mar 19, 2017 at 12:37:47AM -0700, Michael Zoran wrote:
-> > I just noticed this e-mail.??What exactly is the requirement to get
-> > a
-> > driver or subsystem out of staging?
+On 16/03/17 08:28, Heiko Stuebner wrote:
+> Am Mittwoch, 15. M?rz 2017, 18:03:52 CET schrieb cl at rock-chips.com:
+>> From: Chen Liang <cl@rock-chips.com>
+>>
+>> The rk3328 saradc is the same as rk3399.
+>>
+>> Signed-off-by: Chen Liang <cl@rock-chips.com>
+>> ---
+>>  Documentation/devicetree/bindings/iio/adc/rockchip-saradc.txt | 1 +
+>>  1 file changed, 1 insertion(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/iio/adc/rockchip-saradc.txt
+>> b/Documentation/devicetree/bindings/iio/adc/rockchip-saradc.txt index
+>> 205593f..f81bc20 100644
+>> --- a/Documentation/devicetree/bindings/iio/adc/rockchip-saradc.txt
+>> +++ b/Documentation/devicetree/bindings/iio/adc/rockchip-saradc.txt
+>> @@ -5,6 +5,7 @@ Required properties:
+>>     - "rockchip,saradc": for rk3188, rk3288
+>>     - "rockchip,rk3066-tsadc": for rk3036
+>>     - "rockchip,rk3399-saradc": for rk3399
+>> +   - "rockchip,rk3328-saradc", "rockchip,rk3399-saradc": for rk3328
 > 
-> This is why each driver in staging is supposed to have a TODO file
-> listing each point that needs to be addressed, and when each point
-> is addressed, the TODO file should be updated.??The TODO file tells
-> people what the remaining faults are with the driver.
-> 
-> I see that there's a todo file here:
-> 
-> drivers/staging/vc04_services/interface/vchi/TODO
-> 
-> and the very first thing I looked at was:
-> 
-> ? - Figure out an alternative to the dmac_map_area() hack.
-> 
-> $ grep -r dmac_map_area drivers/staging/vc04_services/interface/vchi
-> drivers/staging/vc04_services/interface/vchi/TODO:??- Figure out an
-> alternative
-> to the dmac_map_area() hack.
-> 
-> So that one looks like it's resolved, so the TODO file is out of
-> date.
-> The first step, therefore, is to get the TODO files updated with the
-> work that has been done, so it's possible to know what work remains.
-> 
-> I notice also that drivers/staging/vc04_services/interface/vchiq_arm
-> does not have a TODO file, so that needs reviewing and a TODO file
-> generated.
-> 
+> not sure how iio people see that, but I would suggest keeping the order, so 
+> put rk3328 above rk3399.
+In my case I'm not that fussed either way. Still if this list keeps growing
+I can see it would be better to keep it in numeric order!
 
-I've actually been submitting changes to the TODO files as I've been
-going.  Just these days I'm not sure which tree things are being
-applied to anymore.
-
-So I'm assuming once all the TODO items are addressed, and everything
-is checkpatch.pl clean it can be moved out of staging?  I would assume
-an existing subsystem would need to agree to accept it into their topic
-branch correct?
+Jonathan
+> 
+> Heiko
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
