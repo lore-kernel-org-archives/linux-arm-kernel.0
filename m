@@ -1,148 +1,75 @@
 From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Mon, 20 Mar 2017 00:19:47 +0800
-Subject: [PATCH v4 4/8] phy: sun4i-usb: support automatically switch PHY0
- route to MUSB/HCI
-In-Reply-To: <20170319161951.55834-1-icenowy@aosc.xyz>
-References: <20170319161951.55834-1-icenowy@aosc.xyz>
-Message-ID: <20170319161951.55834-5-icenowy@aosc.xyz>
+Date: Mon, 20 Mar 2017 00:31:15 +0800
+Subject: [PATCH v4 5/8] ARM: sunxi: h3/h5: add usb_otg and OHCI/EHCI for usbc0
+ on H3/H5
+Message-ID: <20170319163118.56301-1-icenowy@aosc.xyz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On newer Allwinner SoCs (H3 and after), the PHY0 node is routed to both
-MUSB controller for peripheral and host support (the host support is
-slightly broken), and a pair of EHCI/OHCI controllers, which provide a
-better support for host mode.
+Allwinner H3/H5 have a dual-routed USB PHY0 -- routed to either OHCI/EHCI
+or MUSB controller.
 
-Add support for automatically switch the route of PHY0 according to the
-status of dr_mode and id det pin.
-
-Only H3 have this function enabled in this patch, as further SoCs will
-be tested later and then have it enabled.
-
-As H5 is reusing the PHY driver of H3, this function is also enabled.
+Add device nodes for these controllers.
 
 Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
-Acked-by: Chen-Yu Tsai <wens@csie.org>
 ---
+Changes in v4:
+- Add h5 to commit message.
 Changes in v3:
-- Add Chen-Yu's ACK. (I made a patch 1 that changes dt binding)
-Changes in v2:
-- Re-route after force session end.
-- Drop id_det based on role code in reroute function, as we already
-  properly set id_det in id_det getting function.
+- Add "h3:" to commit message.
 
- drivers/phy/phy-sun4i-usb.c | 50 ++++++++++++++++++++++++++++++---------------
- 1 file changed, 33 insertions(+), 17 deletions(-)
+ arch/arm/boot/dts/sunxi-h3-h5.dtsi | 32 ++++++++++++++++++++++++++++++++
+ 1 file changed, 32 insertions(+)
 
-diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
-index a650f283f6ff..f86a2574b953 100644
---- a/drivers/phy/phy-sun4i-usb.c
-+++ b/drivers/phy/phy-sun4i-usb.c
-@@ -49,12 +49,14 @@
- #define REG_PHYBIST			0x08
- #define REG_PHYTUNE			0x0c
- #define REG_PHYCTL_A33			0x10
--#define REG_PHY_UNK_H3			0x20
-+#define REG_PHY_OTGCTL			0x20
+diff --git a/arch/arm/boot/dts/sunxi-h3-h5.dtsi b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
+index 2494ea063cd4..213a2befe3af 100644
+--- a/arch/arm/boot/dts/sunxi-h3-h5.dtsi
++++ b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
+@@ -144,6 +144,19 @@
+ 			#size-cells = <0>;
+ 		};
  
- #define REG_PMU_UNK1			0x10
- 
- #define PHYCTL_DATA			BIT(7)
- 
-+#define OTGCTL_ROUTE_MUSB		BIT(0)
++		usb_otg: usb at 01c19000 {
++			compatible = "allwinner,sun8i-h3-musb";
++			reg = <0x01c19000 0x0400>;
++			clocks = <&ccu CLK_BUS_OTG>;
++			resets = <&ccu RST_BUS_OTG>;
++			interrupts = <GIC_SPI 71 IRQ_TYPE_LEVEL_HIGH>;
++			interrupt-names = "mc";
++			phys = <&usbphy 0>;
++			phy-names = "usb";
++			extcon = <&usbphy 0>;
++			status = "disabled";
++		};
 +
- #define SUNXI_AHB_ICHR8_EN		BIT(10)
- #define SUNXI_AHB_INCR4_BURST_EN	BIT(9)
- #define SUNXI_AHB_INCRX_ALIGN_EN	BIT(8)
-@@ -110,6 +112,7 @@ struct sun4i_usb_phy_cfg {
- 	u8 phyctl_offset;
- 	bool dedicated_clocks;
- 	bool enable_pmu_unk1;
-+	bool phy0_dual_route;
- };
+ 		usbphy: phy at 01c19400 {
+ 			compatible = "allwinner,sun8i-h3-usb-phy";
+ 			reg = <0x01c19400 0x2c>,
+@@ -176,6 +189,25 @@
+ 			#phy-cells = <1>;
+ 		};
  
- struct sun4i_usb_phy_data {
-@@ -269,23 +272,16 @@ static int sun4i_usb_phy_init(struct phy *_phy)
- 		writel(val & ~2, phy->pmu + REG_PMU_UNK1);
- 	}
- 
--	if (data->cfg->type == sun8i_h3_phy) {
--		if (phy->index == 0) {
--			val = readl(data->base + REG_PHY_UNK_H3);
--			writel(val & ~1, data->base + REG_PHY_UNK_H3);
--		}
--	} else {
--		/* Enable USB 45 Ohm resistor calibration */
--		if (phy->index == 0)
--			sun4i_usb_phy_write(phy, PHY_RES45_CAL_EN, 0x01, 1);
-+	/* Enable USB 45 Ohm resistor calibration */
-+	if (phy->index == 0)
-+		sun4i_usb_phy_write(phy, PHY_RES45_CAL_EN, 0x01, 1);
- 
--		/* Adjust PHY's magnitude and rate */
--		sun4i_usb_phy_write(phy, PHY_TX_AMPLITUDE_TUNE, 0x14, 5);
-+	/* Adjust PHY's magnitude and rate */
-+	sun4i_usb_phy_write(phy, PHY_TX_AMPLITUDE_TUNE, 0x14, 5);
- 
--		/* Disconnect threshold adjustment */
--		sun4i_usb_phy_write(phy, PHY_DISCON_TH_SEL,
--				    data->cfg->disc_thresh, 2);
--	}
-+	/* Disconnect threshold adjustment */
-+	sun4i_usb_phy_write(phy, PHY_DISCON_TH_SEL,
-+			    data->cfg->disc_thresh, 2);
- 
- 	sun4i_usb_phy_passby(phy, 1);
- 
-@@ -484,6 +480,21 @@ static const struct phy_ops sun4i_usb_phy_ops = {
- 	.owner		= THIS_MODULE,
- };
- 
-+static void sun4i_usb_phy0_reroute(struct sun4i_usb_phy_data *data, int id_det)
-+{
-+	u32 regval;
++		ehci0: usb at 01c1a000 {
++			compatible = "allwinner,sun8i-h3-ehci", "generic-ehci";
++			reg = <0x01c1a000 0x100>;
++			interrupts = <GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&ccu CLK_BUS_EHCI0>, <&ccu CLK_BUS_OHCI0>;
++			resets = <&ccu RST_BUS_EHCI0>, <&ccu RST_BUS_OHCI0>;
++			status = "disabled";
++		};
 +
-+	regval = readl(data->base + REG_PHY_OTGCTL);
-+	if (id_det == 0) {
-+		/* Host mode. Route phy0 to EHCI/OHCI */
-+		regval &= ~OTGCTL_ROUTE_MUSB;
-+	} else {
-+		/* Peripheral mode. Route phy0 to MUSB */
-+		regval |= OTGCTL_ROUTE_MUSB;
-+	}
-+	writel(regval, data->base + REG_PHY_OTGCTL);
-+}
++		ohci0: usb at 01c1a400 {
++			compatible = "allwinner,sun8i-h3-ohci", "generic-ohci";
++			reg = <0x01c1a400 0x100>;
++			interrupts = <GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&ccu CLK_BUS_EHCI0>, <&ccu CLK_BUS_OHCI0>,
++				 <&ccu CLK_USB_OHCI0>;
++			resets = <&ccu RST_BUS_EHCI0>, <&ccu RST_BUS_OHCI0>;
++			status = "disabled";
++		};
 +
- static void sun4i_usb_phy0_id_vbus_det_scan(struct work_struct *work)
- {
- 	struct sun4i_usb_phy_data *data =
-@@ -544,6 +555,10 @@ static void sun4i_usb_phy0_id_vbus_det_scan(struct work_struct *work)
- 			sun4i_usb_phy0_set_vbus_detect(phy0, 1);
- 			mutex_unlock(&phy0->mutex);
- 		}
-+
-+		/* Re-route PHY0 if necessary */
-+		if (data->cfg->phy0_dual_route)
-+			sun4i_usb_phy0_reroute(data, id_det);
- 	}
- 
- 	if (vbus_notify)
-@@ -698,7 +713,7 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
- 			return PTR_ERR(phy->reset);
- 		}
- 
--		if (i) { /* No pmu for usbc0 */
-+		if (i || data->cfg->phy0_dual_route) { /* No pmu for musb */
- 			snprintf(name, sizeof(name), "pmu%d", i);
- 			res = platform_get_resource_byname(pdev,
- 							IORESOURCE_MEM, name);
-@@ -824,6 +839,7 @@ static const struct sun4i_usb_phy_cfg sun8i_h3_cfg = {
- 	.phyctl_offset = REG_PHYCTL_A33,
- 	.dedicated_clocks = true,
- 	.enable_pmu_unk1 = true,
-+	.phy0_dual_route = true,
- };
- 
- static const struct sun4i_usb_phy_cfg sun8i_v3s_cfg = {
+ 		ehci1: usb at 01c1b000 {
+ 			compatible = "allwinner,sun8i-h3-ehci", "generic-ehci";
+ 			reg = <0x01c1b000 0x100>;
 -- 
 2.12.0
