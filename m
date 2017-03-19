@@ -1,83 +1,35 @@
 From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Mon, 20 Mar 2017 00:31:18 +0800
-Subject: [PATCH v4 8/8] arm64: allwinner: h5: enable USB OTG on Orange Pi PC 2
- board
-In-Reply-To: <20170319163118.56301-1-icenowy@aosc.xyz>
-References: <20170319163118.56301-1-icenowy@aosc.xyz>
-Message-ID: <20170319163118.56301-4-icenowy@aosc.xyz>
+Date: Mon, 20 Mar 2017 00:19:46 +0800
+Subject: [PATCH v4 3/8] phy: sun4i-usb: add PHYCTL offset for H3 SoC
+In-Reply-To: <20170319161951.55834-1-icenowy@aosc.xyz>
+References: <20170319161951.55834-1-icenowy@aosc.xyz>
+Message-ID: <20170319161951.55834-4-icenowy@aosc.xyz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Orange Pi PC 2 board features a OTG port like the one on older H3 Orange
-Pi's, with PG12 pin being the id det pin and PL2 being the vbus driver
-pin.
+The config structure of H3 in phy-sun4i-usb driver have the PHYCTL
+register offset missing.
 
-Add support for it.
+Add it. Because it's a SoC after A33, its PHYCTL offset should be 0x10.
 
 Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
 ---
 New patch in v4.
- .../boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts  | 27 +++++++++++++++++++++-
- 1 file changed, 26 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts
-index 30639729920d..dfecc17dcc92 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts
-@@ -90,6 +90,16 @@
- 			gpios = <&r_pio 0 3 GPIO_ACTIVE_LOW>;
- 		};
- 	};
-+
-+	reg_usb0_vbus: usb0-vbus {
-+		compatible = "regulator-fixed";
-+		regulator-name = "usb0-vbus";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		enable-active-high;
-+		gpio = <&r_pio 0 2 GPIO_ACTIVE_HIGH>; /* PL2 */
-+		status = "okay";
-+	};
- };
- 
- &codec {
-@@ -100,6 +110,10 @@
- 	status = "okay";
- };
- 
-+&ehci0 {
-+	status = "okay";
-+};
-+
- &ehci1 {
- 	status = "okay";
- };
-@@ -127,6 +141,10 @@
- 	status = "okay";
- };
- 
-+&ohci0 {
-+	status = "okay";
-+};
-+
- &ohci1 {
- 	status = "okay";
- };
-@@ -157,7 +175,14 @@
- 	status = "disabled";
- };
- 
-+&usb_otg {
-+	dr_mode = "otg";
-+	status = "okay";
-+};
-+
- &usbphy {
--	/* USB VBUS is always on */
-+	/* USB Type-A ports' VBUS is always on */
-+	usb0_id_det-gpios = <&pio 6 12 GPIO_ACTIVE_HIGH>; /* PG12 */
-+	usb0_vbus-supply = <&reg_usb0_vbus>;
- 	status = "okay";
+ drivers/phy/phy-sun4i-usb.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
+index 62b4d25448c6..a650f283f6ff 100644
+--- a/drivers/phy/phy-sun4i-usb.c
++++ b/drivers/phy/phy-sun4i-usb.c
+@@ -821,6 +821,7 @@ static const struct sun4i_usb_phy_cfg sun8i_h3_cfg = {
+ 	.num_phys = 4,
+ 	.type = sun8i_h3_phy,
+ 	.disc_thresh = 3,
++	.phyctl_offset = REG_PHYCTL_A33,
+ 	.dedicated_clocks = true,
+ 	.enable_pmu_unk1 = true,
  };
 -- 
 2.12.0
