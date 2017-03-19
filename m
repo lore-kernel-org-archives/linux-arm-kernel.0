@@ -1,83 +1,58 @@
 From: nicolas@ndufresne.ca (Nicolas Dufresne)
-Date: Sun, 19 Mar 2017 10:33:25 -0400
+Date: Sun, 19 Mar 2017 10:45:15 -0400
 Subject: [PATCH v5 00/39] i.MX Media Driver
-In-Reply-To: <20170319005453.GN21222@n2100.armlinux.org.uk>
+In-Reply-To: <20170319095558.GP21222@n2100.armlinux.org.uk>
 References: <1489121599-23206-1-git-send-email-steve_longerbeam@mentor.com>
  <20170318192258.GL21222@n2100.armlinux.org.uk>
  <aef6c412-5464-726b-42f6-a24b7323aa9c@mentor.com>
  <20170318204324.GM21222@n2100.armlinux.org.uk>
  <1489884074.21659.7.camel@ndufresne.ca>
- <20170319005453.GN21222@n2100.armlinux.org.uk>
-Message-ID: <1489934005.3388.1.camel@ndufresne.ca>
+ <20170319095558.GP21222@n2100.armlinux.org.uk>
+Message-ID: <1489934715.3388.3.camel@ndufresne.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le dimanche 19 mars 2017 ? 00:54 +0000, Russell King - ARM Linux a
+Le dimanche 19 mars 2017 ? 09:55 +0000, Russell King - ARM Linux a
 ?crit?:
-> > 
-> > In practice, I have the impression there is a fair reason why
-> > framerate
-> > enumeration isn't implemented (considering there is only 1 valid
-> > rate).
+> 2) would it also make sense to allow gstreamer's v4l2src to try
+> setting
+> ?? a these parameters, and only fail if it's unable to set it?? IOW,
+> if
+> ?? I use:
 > 
-> That's actually completely incorrect.
+> gst-launch-1.0 v4l2src device=/dev/video10 ! \
+> ????????video/x-bayer,format=RGGB,framerate=20/1 ! ...
 > 
-> With the capture device interfacing directly with CSI, it's possible
-> _today_ to select:
-> 
-> * the CSI sink pad's resolution
-> * the CSI sink pad's resolution with the width and/or height halved
-> * the CSI sink pad's frame rate
-> * the CSI sink pad's frame rate divided by the frame drop factor
-> 
-> To put it another way, these are possible:
-> 
-> # v4l2-ctl -d /dev/video10 --list-formats-ext
-> ioctl: VIDIOC_ENUM_FMT
-> ??????? Index?????? : 0
-> ??????? Type??????? : Video Capture
-> ??????? Pixel Format: 'RGGB'
-> ??????? Name??????? : 8-bit Bayer RGRG/GBGB
-> ??????????????? Size: Discrete 816x616
-> ??????????????????????? Interval: Discrete 0.040s (25.000 fps)
-> ??????????????????????? Interval: Discrete 0.048s (20.833 fps)
-> ??????????????????????? Interval: Discrete 0.050s (20.000 fps)
-> ??????????????????????? Interval: Discrete 0.053s (18.750 fps)
-> ??????????????????????? Interval: Discrete 0.060s (16.667 fps)
-> ??????????????????????? Interval: Discrete 0.067s (15.000 fps)
-> ??????????????????????? Interval: Discrete 0.080s (12.500 fps)
-> ??????????????????????? Interval: Discrete 0.100s (10.000 fps)
-> ??????????????????????? Interval: Discrete 0.120s (8.333 fps)
-> ??????????????????????? Interval: Discrete 0.160s (6.250 fps)
-> ??????????????????????? Interval: Discrete 0.200s (5.000 fps)
-> ??????????????????????? Interval: Discrete 0.240s (4.167 fps)
-> ??????????????? Size: Discrete 408x616
-> <same intervals>
-> ??????????????? Size: Discrete 816x308
-> <same intervals>
-> ??????????????? Size: Discrete 408x308
-> <same intervals>
-> 
-> These don't become possible as a result of implementing the enums,
-> they're all already requestable through /dev/video10.
+> ?? where G_PARM says its currently configured for 25fps, but a S_PARM
+> ?? with 20fps would actually succeed.
 
-Ok that wasn't clear. So basically video9 is a front-end to video10,
-and it does not proxy the enumerations. I understand this is what you
-are now fixing. And this has to be fixed, because I can image cases
-where the front-end could support only a subset of the sub-dev. So
-having userspace enumerate on another device (and having to find this
-device by walking the tree) is unlikely to work in all scenarios.
+In current design, v4l2src will "probe" all possible formats, cache
+this, and use this information for negotiation. So after the caps has
+been probed, there will be no TRY_FMT or anything like this happening
+until it's too late. You have spotted a bug though, it should be
+reading back the parm structure to validate (and probably produce a
+not-negotiated error here).
 
-regards,
+Recently, specially for the IMX work done by Pengutronix, there was
+contributions to enhance this probing to support probing capabilities
+that are not enumerable (e.g. interlacing, colorimetry) using TRY_FMT.
+There is no TRY_PARM in the API to implement similar fallback. Also,
+those ended up creating a massive disaster for slow cameras. We now
+have UVC cameras that takes 6s or more to start. I have no other choice
+but to rewrite that now. We will negotiate the non-enumerable at the
+last minute with TRY_FMT (when the subset is at it's smallest). This
+will by accident add support for this camera interface, but that wasn't
+the goal. It would still fail with application that enumerates the
+possible resolutions and framerate and let you select them with a drop-
+down (like cheese). In general, I can only conclude that making
+everything that matter enumerable is the only working way to go for
+generic userspace. 
+
 Nicolas
-
-p.s. This is why caps negotiation is annoyingly complex in GStreamer,
-specially that there is no shortcut, you connect pads, and they figure-
-out what format they will use between each other.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 181 bytes
 Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170319/b0407c9d/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170319/efd02a55/attachment.sig>
