@@ -1,30 +1,29 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Sun, 19 Mar 2017 20:50:38 +0000
-Subject: [PATCH] drm/etnaviv: add etnaviv cooling device
-In-Reply-To: <CAFXsbZoT22pz2CuRWaQ2M2TyomNcByHc-SfmNn6=KrfNaubnjQ@mail.gmail.com>
-References: <E1cn8jj-0002mp-SO@rmk-PC.armlinux.org.uk>
- <1489582989.16018.4.camel@pengutronix.de>
- <20170315140541.GT21222@n2100.armlinux.org.uk>
- <CAFXsbZoT22pz2CuRWaQ2M2TyomNcByHc-SfmNn6=KrfNaubnjQ@mail.gmail.com>
-Message-ID: <20170319205038.GA21222@n2100.armlinux.org.uk>
+From: Chris.Packham@alliedtelesis.co.nz (Chris Packham)
+Date: Sun, 19 Mar 2017 20:51:12 +0000
+Subject: [PATCH] ARM: wire up statx syscall
+References: <20170317094204.15630-1-chris.packham@alliedtelesis.co.nz>
+ <20170317095945.GY21222@n2100.armlinux.org.uk>
+ <a1a1f1cccadb48d599ac9ac013ee7fab@svr-chch-ex1.atlnz.lc>
+ <20170319204648.GZ21222@n2100.armlinux.org.uk>
+Message-ID: <35211f89b4ab497aa02679b1611ea65a@svr-chch-ex1.atlnz.lc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 19, 2017 at 01:03:42PM -0700, Chris Healy wrote:
-> I don't have any input on this binary divider subject but I do want to
-> bring up some observations regarding Etnaviv GPU power management that
-> seems relevant.
+On 20/03/17 09:47, Russell King - ARM Linux wrote:
+> On Sun, Mar 19, 2017 at 08:12:48PM +0000, Chris Packham wrote:
+>> On 17/03/17 23:00, Russell King - ARM Linux wrote:
+>>> You obviously have not looked in linux-next.
+>>
+>> No I haven't. But even now I see nothing in
+>> git://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git master
+>
+> Hmm, looks like our regular linux-next updates stop at 10th March,
+> which is rather unfortunate.  If it was being updated, it would have
+> been in there.
+>
+> If not, in order to see what I currently have merged for linux-next:
+>
+>   http://git.armlinux.org.uk/cgit/linux-arm.git/log/?h=for-next
+>
 
-GPU cooling isn't really to do with GPU power management, it's more
-to do with helping avoid the SoC overheating, and going into emergency
-shutdown.
-
-So, it's solving a completely different problem.
-
-However, thank you for the links, it'll be something to be researched
-at some point.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+OK I see it now. By the way the table based syscall stuff is great.
