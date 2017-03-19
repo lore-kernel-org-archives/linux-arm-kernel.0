@@ -1,61 +1,76 @@
-From: dingtianhong@huawei.com (Ding Tianhong)
-Date: Sun, 19 Mar 2017 15:15:25 +0800
-Subject: [PATCH] arm64: add dump_stack to show_regs
-Message-ID: <e84a5cf9-f4c4-2b27-ed59-363e2f8ab5bc@huawei.com>
+From: mzoran@crowfest.net (Michael Zoran)
+Date: Sun, 19 Mar 2017 00:37:47 -0700
+Subject: outreachy/moving a driver out of staging
+In-Reply-To: <20170309212021.GA24433@kroah.com>
+References: <alpine.DEB.2.20.1703092133340.2306@hadrien>
+ <443f0143-aec1-2559-a2c2-73b245632948@broadcom.com>
+ <2da12619-5fcb-9e0f-b6c1-c83cbf491e8d@wwwdotorg.org>
+ <20170309212021.GA24433@kroah.com>
+Message-ID: <1489909067.1536.14.camel@crowfest.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Recently I found that when the system trigger a soft lockup in interrupt,
-there is only showing the regs, but no stack trace, it is very difficult
-to locate the problem:
+On Thu, 2017-03-09 at 22:20 +0100, Greg KH wrote:
+> On Thu, Mar 09, 2017 at 01:56:49PM -0700, Stephen Warren wrote:
+> > On 03/09/2017 01:51 PM, Scott Branden wrote:
+> > > Hi Julia,
+> > > 
+> > > On 17-03-09 12:36 PM, Julia Lawall wrote:
+> > > > Hello,
+> > > > 
+> > > > I discussed the issue of outreachy patches for bcm with Greg,
+> > > > and we are
+> > > > not convinced that not having the patches CCd to you is such a
+> > > > good idea.
+> > > > While we don't want to spam you with noise, some of the
+> > > > applicants are
+> > > > starting to make more significant changes that it could be
+> > > > useful for you
+> > > > to be aware of.
+> > > > 
+> > > > Could we try a compromise where you are not CCd on whitespace
+> > > > patches,
+> > > > but
+> > > > you are CCd on patches that actually modify the code?
+> > > 
+> > > All I'm asking is you work through your outreachy patches
+> > > internal first
+> > > to get rid of the most basic mistakes and email traffic it is
+> > > geerating.
+> > > ?Once that learning process is through then they can be sent out
+> > > like
+> > > any other patches to the kernel mailing lists and maintainers.
+> > 
+> > +1 from me too; I find these patches rather high volume and had to
+> > add a
+> > filter to keep them out of my primary inbox.
+> 
+> Hah!??That's the joy of being a maintainer of a driver in
+> staging.??Even
+> if you filter out outreachy, you are going to get a lot of "basic
+> mistakes" and other type patches cc:ed to you.
+> 
+> I strongly suggest, that if you all don't like this type of stuff,
+> either:
+> 	- work to get the code out of staging as soon as possible (i.e.
+> 	??send me coding style fixes for everything right now, and then
+> 	??fix up the rest of the stuff.)
+> 	- take yourself off the maintainer list for this code.
+> 
+> It's your choice, outreachy right now is a lot of patches, but again,
+> it's not going to keep you from getting the "basic" stuff sent to you
+> in ways that is totally wrong.
+> 
+> thanks,
+> 
+> greg k-h
+> 
 
-===========================================
+Hi Greg,
 
-[10072.999437] NMI watchdog: BUG: soft lockup - CPU#16 stuck for 23s! [ksoftirqd/16:88]
-.....
-[10073.041254] CPU: 16 PID: 88 Comm: ksoftirqd/16 Tainted: G         4.x.x #1
-[10073.041258] Hardware name: xxxxx, BIOS 1.17 01/04/2017
-[10073.041261] task: ffff803f6cb06200 ti: ffff803f6cb50000 task.ti: ffff803f6cb50000
-[10073.041274] PC is at _raw_spin_unlock_irqrestore+0x24/0x30
-[10073.041280] LR is at blk_run_queue+0x3c/0x48
-[10073.041282] pc : [<ffff800000a3df14>] lr : [<ffff8000004f3a7c>] pstate: 60000145
-[10073.041285] sp : ffff803f6cb53b20
-[10073.041286] x29: ffff803f6cb53b20 x28: 0000000000001000
-[10073.041290] x27: 0000000000000000 x26: ffff800001226000
-[10073.041294] x25: 0000000000000000 x24: 0000000000000140
-[10073.041297] x23: ffff803f62e108c8 x22: ffff800001037000
-[10073.041302] x21: ffff843f66800040 x20: 0000000000000140
-[10073.041305] x19: ffff803f62e108c8 x18: 0000000000000007
-[10073.041309] x17: 000000000000000e x16: 0000000000000001
-[10073.041312] x15: 0000000000000019 x14: 0000000000000033
-[10073.041317] x13: 000000000000004c x12: 0000000000000000
-[10073.041320] x11: 0000000000001000 x10: 0000000000000010
-[10073.041323] x9 : ffff8000004f3a7c x8 : ffff803f69b59120
-[10073.041327] x7 : 0000000000000000 x6 : 0000000000000002
-[10073.041331] x5 : 0000000000000244 x4 : 00000000000244d9
-[10073.041334] x3 : ffff843f653ab918 x2 : 0000000000004074
-[10073.041337] x1 : 0000000000000140 x0 : ffff803f62e10e58
+I just noticed this e-mail.  What exactly is the requirement to get a
+driver or subsystem out of staging?
 
-===============================================
-
-So add the general dump_stack to show_regs to support showing the stack.
-
-Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
----
- arch/arm64/kernel/process.c | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-index 043d373..60c5c26 100644
---- a/arch/arm64/kernel/process.c
-+++ b/arch/arm64/kernel/process.c
-@@ -212,6 +212,7 @@ void show_regs(struct pt_regs * regs)
- {
- 	printk("\n");
- 	__show_regs(regs);
-+	dump_stack();
- }
-
- static void tls_thread_flush(void)
--- 
-1.9.0
+I can image a day when vc04_services or VideoCore gets moved out of
+staging at some point. What exactly would it take to make something
+like that happen?
