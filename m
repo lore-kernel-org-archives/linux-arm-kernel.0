@@ -1,57 +1,100 @@
 From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Sun, 19 Mar 2017 11:56:06 -0700
-Subject: [PATCH v5 00/39] i.MX Media Driver
-In-Reply-To: <20170319185132.GY21222@n2100.armlinux.org.uk>
+Date: Sun, 19 Mar 2017 12:08:02 -0700
+Subject: [PATCH v5 38/39] media: imx: csi: fix crop rectangle reset in
+ sink set_fmt
+In-Reply-To: <20170319152233.GW21222@n2100.armlinux.org.uk>
 References: <1489121599-23206-1-git-send-email-steve_longerbeam@mentor.com>
- <20170318192258.GL21222@n2100.armlinux.org.uk>
- <aef6c412-5464-726b-42f6-a24b7323aa9c@mentor.com>
- <20170319121402.GS21222@n2100.armlinux.org.uk>
- <6e2879a0-1f2e-9da7-b7e1-d134a0301ca2@gmail.com>
- <20170319185132.GY21222@n2100.armlinux.org.uk>
-Message-ID: <7cd11fe4-642b-167b-d719-ce0f207441f8@gmail.com>
+ <1489121599-23206-39-git-send-email-steve_longerbeam@mentor.com>
+ <20170319152233.GW21222@n2100.armlinux.org.uk>
+Message-ID: <327d67d9-68c1-7f74-0c0f-f6aee1c4b546@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 03/19/2017 11:51 AM, Russell King - ARM Linux wrote:
-> On Sun, Mar 19, 2017 at 11:37:15AM -0700, Steve Longerbeam wrote:
->> On 03/19/2017 05:14 AM, Russell King - ARM Linux wrote:
->>> Right now, CSI doesn't do that - it only looks at the width, height,
->>> code, and field.
->> Correct, there is currently no propagation of the colorimetry
->> parameters (colorspace, ycbcr_enc, quantization, and xfer_func).
->> For the most part, those are just ignored ATM. Philipp Zabel did
->> do some work earlier to start propagating those, but that's still
->> TODO.
+On 03/19/2017 08:22 AM, Russell King - ARM Linux wrote:
+> On Thu, Mar 09, 2017 at 08:53:18PM -0800, Steve Longerbeam wrote:
+>> From: Philipp Zabel <p.zabel@pengutronix.de>
+>>
+>> The csi_try_crop call in set_fmt should compare the cropping rectangle
+>> to the currently set input format, not to the previous input format.
+> Are we really sure that the cropping support is implemented correctly?
 >
->>> I think we've got other bugs though that haven't been picked up by any
->>> review - csi_try_fmt() adjusts the format using the _current_
->>> configuration of the sink pad, even when using V4L2_SUBDEV_FORMAT_TRY.
->>> This seems wrong according to the docs: the purpose of the try
->>> mechanism is to be able to setup the _entire_ pipeline using the TRY
->>> mechanism to work out whether the configuration works, before then
->>> setting for real.  If we're validating the TRY formats against the
->>> live configuration, then we're not doing that.
->> I don't believe that is correct. csi_try_fmt() for the source pads calls
->> __csi_get_fmt(priv, cfg, CSI_SINK_PAD, sdformat->which) to get
->> the sink format, and for the TRY trial-run from csi_set_fmt(),
->> sdformat->which will be set to TRY, so the returned sink format
->> is the TRY format.
-> Look at csi_try_fmt() - it validates the source pad against
-> priv->crop, which is the actively live cropping rectangle, not the
-> one which has been configured for the TRY trial-run.
-
-Ah yes, crop, I missed that. Yes you are right, looks like we
-need to add a __csi_get_crop().
-
+> I came across this while looking at what we're doing with the
+> V4L2_SEL_FLAG_KEEP_CONFIG flag.
 >
-> Also, as I mention elsewhere, I believe the way we're doing scaling
-> is completely wrong...
+> Documentation/media/uapi/v4l/dev-subdev.rst defines the behaviour of
+> the user API, and "Order of configuration and format propagation" says:
+>
+>    The coordinates to a step always refer to the actual size of the
+>    previous step. The exception to this rule is the source compose
+>    rectangle, which refers to the sink compose bounds rectangle --- if it
+>    is supported by the hardware.
+>    
+>    1. Sink pad format. The user configures the sink pad format. This format
+>       defines the parameters of the image the entity receives through the
+>       pad for further processing.
+>    
+>    2. Sink pad actual crop selection. The sink pad crop defines the crop
+>       performed to the sink pad format.
+>    
+>    3. Sink pad actual compose selection. The size of the sink pad compose
+>       rectangle defines the scaling ratio compared to the size of the sink
+>       pad crop rectangle. The location of the compose rectangle specifies
+>       the location of the actual sink compose rectangle in the sink compose
+>       bounds rectangle.
+>    
+>    4. Source pad actual crop selection. Crop on the source pad defines crop
+>       performed to the image in the sink compose bounds rectangle.
+>    
+>    5. Source pad format. The source pad format defines the output pixel
+>       format of the subdev, as well as the other parameters with the
+>       exception of the image width and height. Width and height are defined
+>       by the size of the source pad actual crop selection.
+>    
+>    Accessing any of the above rectangles not supported by the subdev will
+>    return ``EINVAL``. Any rectangle referring to a previous unsupported
+>    rectangle coordinates will instead refer to the previous supported
+>    rectangle. For example, if sink crop is not supported, the compose
+>    selection will refer to the sink pad format dimensions instead.
+>
+> Note step 3 above: scaling is defined by the ratio of the _sink_ crop
+> rectangle to the _sink_ compose rectangle.
+>
+> So, lets say that the camera produces a 1280x720 image, and the sink
+> pad format is configured with 1280x720.  That's step 1.
+>
+> The sink crop operates within that rectangle, cropping it to an area.
+> Let's say we're only interested in its centre, so we'd chose 640x360
+> with the top-left as 320,180.  This is step 2.
+>
+> Then, if we want to down-scale by a factor of two, we'd set the sink
+> compose selection to 320x180.
+>
+> This seems to be at odds with how the scaling is done in CSI at
+> present: the selection implementations all reject attempts to
+> configure the sink pad, instead only supporting crop rectangles on
+> the source,
 
-You might be right there too. Initially, I had no support for the 
-down-scaling
-in the CSI. That was added later by Philipp, I will respond with more 
-there...
+Correct. Currently cropping is only supported at the source pad
+(step 4).
+
+Initially the CSI didn't support down-scaling, so step 3 is not supported,
+so the sink pad format/crop selection rectangle/crop compose rectangle
+are collapsed into the same sink pad format rectangle.
+
+Philipp later added support for /2 downscaling, but we didn't put this in
+the correct API, looks like this needs to move into the selection API at
+step 3 (sink pad compose rectangle).
+
+
+>   and we use the source crop rectangle to define the
+> down-scaling.
+
+Yes. And maybe there is nothing wrong with that, because scaling is also
+defined by the source/sink _format_ ratios (if I'm not mistaken), so looking
+at this another way, we're just defining scaling in the CSI via another
+legal API.
+
 
 Steve
