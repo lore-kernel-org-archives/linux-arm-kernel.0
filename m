@@ -1,111 +1,111 @@
 From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Sun, 19 Mar 2017 15:02:08 -0700
-Subject: [PATCH 2/4] media: imx: allow bayer pixel formats to be looked up
-In-Reply-To: <E1cpYOP-0006Eg-RQ@rmk-PC.armlinux.org.uk>
+Date: Sun, 19 Mar 2017 15:18:16 -0700
+Subject: [PATCH 3/4] media: imx-csi: add frame size/interval enumeration
+In-Reply-To: <E1cpYOU-0006En-Vd@rmk-PC.armlinux.org.uk>
 References: <20170319103801.GQ21222@n2100.armlinux.org.uk>
- <E1cpYOP-0006Eg-RQ@rmk-PC.armlinux.org.uk>
-Message-ID: <c747d3d8-7730-d537-4432-47fa431addab@gmail.com>
+ <E1cpYOU-0006En-Vd@rmk-PC.armlinux.org.uk>
+Message-ID: <1aa415ea-6096-fa4f-1e7d-7761bf11187a@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is good too, but if it's all right with you I would prefer to
-squash this with the "redo  pixel format enumeration and
-negotiation" patch, to keep the patch count down.
-
-Steve
 
 
-On 03/19/2017 03:48 AM, Russell King wrote:
-> Allow imx_media_find_format() to look up bayer formats, which is
-> required to support frame size and interval enumeration.
+On 03/19/2017 03:49 AM, Russell King wrote:
+> Add frame size and frame interval enumeration to CSI.
+>
+> CSI can scale the image independently horizontally and vertically by a
+> factor of two, which enumerates to four different frame sizes.
+>
+> CSI can also drop frames, resulting in frame rate reduction, so
+> enumerate the resulting possible output frame rates.
 >
 > Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 > ---
->   drivers/staging/media/imx/imx-media-capture.c | 11 ++++++-----
->   drivers/staging/media/imx/imx-media-utils.c   |  6 +++---
->   drivers/staging/media/imx/imx-media.h         |  2 +-
->   3 files changed, 10 insertions(+), 9 deletions(-)
+>   drivers/staging/media/imx/imx-media-csi.c | 51 +++++++++++++++++++++++++++++++
+>   1 file changed, 51 insertions(+)
 >
-> diff --git a/drivers/staging/media/imx/imx-media-capture.c b/drivers/staging/media/imx/imx-media-capture.c
-> index ee914396080f..cdeb2cd8b1d7 100644
-> --- a/drivers/staging/media/imx/imx-media-capture.c
-> +++ b/drivers/staging/media/imx/imx-media-capture.c
-> @@ -164,10 +164,10 @@ static int capture_try_fmt_vid_cap(struct file *file, void *fh,
->   			CS_SEL_YUV : CS_SEL_RGB;
->   		fourcc = f->fmt.pix.pixelformat;
->   
-> -		cc = imx_media_find_format(fourcc, cs_sel);
-> +		cc = imx_media_find_format(fourcc, cs_sel, false);
->   		if (!cc) {
->   			imx_media_enum_format(&fourcc, 0, cs_sel);
-> -			cc = imx_media_find_format(fourcc, cs_sel);
-> +			cc = imx_media_find_format(fourcc, cs_sel, false);
->   		}
->   	}
->   
-> @@ -193,7 +193,7 @@ static int capture_s_fmt_vid_cap(struct file *file, void *fh,
->   
->   	priv->vdev.fmt.fmt.pix = f->fmt.pix;
->   	priv->vdev.cc = imx_media_find_format(f->fmt.pix.pixelformat,
-> -					      CS_SEL_ANY);
-> +					      CS_SEL_ANY, false);
->   
->   	return 0;
->   }
-> @@ -505,7 +505,8 @@ void imx_media_capture_device_set_format(struct imx_media_video_dev *vdev,
->   
->   	mutex_lock(&priv->mutex);
->   	priv->vdev.fmt.fmt.pix = *pix;
-> -	priv->vdev.cc = imx_media_find_format(pix->pixelformat, CS_SEL_ANY);
-> +	priv->vdev.cc = imx_media_find_format(pix->pixelformat, CS_SEL_ANY,
-> +					      false);
->   	mutex_unlock(&priv->mutex);
->   }
->   EXPORT_SYMBOL_GPL(imx_media_capture_device_set_format);
-> @@ -614,7 +615,7 @@ int imx_media_capture_device_register(struct imx_media_video_dev *vdev)
->   	imx_media_mbus_fmt_to_pix_fmt(&vdev->fmt.fmt.pix,
->   				      &fmt_src.format, NULL);
->   	vdev->cc = imx_media_find_format(vdev->fmt.fmt.pix.pixelformat,
-> -					 CS_SEL_ANY);
-> +					 CS_SEL_ANY, false);
->   
->   	v4l2_info(sd, "Registered %s as /dev/%s\n", vfd->name,
->   		  video_device_node_name(vfd));
-> diff --git a/drivers/staging/media/imx/imx-media-utils.c b/drivers/staging/media/imx/imx-media-utils.c
-> index 6eb7e3c5279e..d048e4a080d0 100644
-> --- a/drivers/staging/media/imx/imx-media-utils.c
-> +++ b/drivers/staging/media/imx/imx-media-utils.c
-> @@ -329,9 +329,9 @@ static int enum_format(u32 *fourcc, u32 *code, u32 index,
+> diff --git a/drivers/staging/media/imx/imx-media-csi.c b/drivers/staging/media/imx/imx-media-csi.c
+> index 65346e789dd6..d19659d7ddc2 100644
+> --- a/drivers/staging/media/imx/imx-media-csi.c
+> +++ b/drivers/staging/media/imx/imx-media-csi.c
+> @@ -1073,6 +1073,55 @@ static int csi_enum_mbus_code(struct v4l2_subdev *sd,
+>   	return ret;
 >   }
 >   
->   const struct imx_media_pixfmt *
-> -imx_media_find_format(u32 fourcc, enum codespace_sel cs_sel)
-> +imx_media_find_format(u32 fourcc, enum codespace_sel cs_sel, bool allow_bayer)
->   {
-> -	return find_format(fourcc, 0, cs_sel, true, false);
-> +	return find_format(fourcc, 0, cs_sel, true, allow_bayer);
->   }
->   EXPORT_SYMBOL_GPL(imx_media_find_format);
+> +static int csi_enum_frame_size(struct v4l2_subdev *sd,
+> +			       struct v4l2_subdev_pad_config *cfg,
+> +			       struct v4l2_subdev_frame_size_enum *fse)
+> +{
+> +	struct csi_priv *priv = v4l2_get_subdevdata(sd);
+> +	struct v4l2_mbus_framefmt *fmt;
+> +	int ret = 0;
+> +
+> +	if (fse->pad >= CSI_NUM_PADS ||
+> +	    fse->index > (fse->pad == CSI_SINK_PAD ? 0 : 3))
+> +		return -EINVAL;
+> +
+> +	mutex_lock(&priv->lock);
+> +	fmt = __csi_get_fmt(priv, cfg, fse->pad, fse->which);
+> +	fse->min_width = fse->max_width = fse->index & 1 ?
+> +					    fmt->width >> 1 : fmt->width;
+> +	fse->min_height = fse->max_height = fse->index & 2 ?
+> +					      fmt->height >> 1 : fmt->height;
+> +	mutex_unlock(&priv->lock);
+> +
+> +	return ret;
+> +}
+
+This will only enumerate the currently set/tried format at the sink
+pad. But the sink pad supports a range of widths/heights.
+
+I think this function should call csi_try_fmt() at the sink pad.
+
+The other media drivers do the same, they return a supported range at
+the sinks rather than only the last set/tried values.
+
+So the sink enumeration should return a continuous range.
+The source enumeration should behave the same as you have it above
+however, i.e. a discrete set of 4 possibilities since the CSI is limited to
+only /2 downsizing in both dimensions.
+
+Steve
+
+> +
+> +static int csi_enum_frame_interval(struct v4l2_subdev *sd,
+> +				   struct v4l2_subdev_pad_config *cfg,
+> +				   struct v4l2_subdev_frame_interval_enum *fie)
+> +{
+> +	struct csi_priv *priv = v4l2_get_subdevdata(sd);
+> +	struct v4l2_mbus_framefmt *fmt;
+> +	int ret = 0;
+> +
+> +	if (fie->pad >= CSI_NUM_PADS ||
+> +	    fie->index >= (fie->pad == CSI_SINK_PAD ? 1 : ARRAY_SIZE(csi_skip)))
+> +		return -EINVAL;
+> +
+> +	mutex_lock(&priv->lock);
+> +	fmt = __csi_get_fmt(priv, cfg, fie->pad, fie->which);
+> +	if ((fie->width == fmt->width || fie->width == fmt->width / 2) &&
+> +	    (fie->height == fmt->height || fie->height == fmt->height / 2)) {
+> +		fie->interval = priv->frame_interval;
+> +		csi_apply_skip_interval(&csi_skip[fie->index], &fie->interval);
+> +	} else {
+> +		ret = -EINVAL;
+> +	}
+> +	mutex_unlock(&priv->lock);
+> +
+> +	return ret;
+> +}
+> +
+>   static int csi_get_fmt(struct v4l2_subdev *sd,
+>   		       struct v4l2_subdev_pad_config *cfg,
+>   		       struct v4l2_subdev_format *sdformat)
+> @@ -1473,6 +1522,8 @@ static struct v4l2_subdev_video_ops csi_video_ops = {
 >   
-> @@ -524,7 +524,7 @@ int imx_media_ipu_image_to_mbus_fmt(struct v4l2_mbus_framefmt *mbus,
->   {
->   	const struct imx_media_pixfmt *fmt;
->   
-> -	fmt = imx_media_find_format(image->pix.pixelformat, CS_SEL_ANY);
-> +	fmt = imx_media_find_format(image->pix.pixelformat, CS_SEL_ANY, false);
->   	if (!fmt)
->   		return -EINVAL;
->   
-> diff --git a/drivers/staging/media/imx/imx-media.h b/drivers/staging/media/imx/imx-media.h
-> index 234242271a13..d8c9536bf1f8 100644
-> --- a/drivers/staging/media/imx/imx-media.h
-> +++ b/drivers/staging/media/imx/imx-media.h
-> @@ -178,7 +178,7 @@ enum codespace_sel {
->   };
->   
->   const struct imx_media_pixfmt *
-> -imx_media_find_format(u32 fourcc, enum codespace_sel cs_sel);
-> +imx_media_find_format(u32 fourcc, enum codespace_sel cs_sel, bool allow_bayer);
->   int imx_media_enum_format(u32 *fourcc, u32 index, enum codespace_sel cs_sel);
->   const struct imx_media_pixfmt *
->   imx_media_find_mbus_format(u32 code, enum codespace_sel cs_sel,
+>   static struct v4l2_subdev_pad_ops csi_pad_ops = {
+>   	.enum_mbus_code = csi_enum_mbus_code,
+> +	.enum_frame_size = csi_enum_frame_size,
+> +	.enum_frame_interval = csi_enum_frame_interval,
+>   	.get_fmt = csi_get_fmt,
+>   	.set_fmt = csi_set_fmt,
+>   	.get_selection = csi_get_selection,
