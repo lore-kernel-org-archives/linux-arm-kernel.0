@@ -1,8 +1,8 @@
 From: lkp@intel.com (kbuild test robot)
-Date: Mon, 20 Mar 2017 01:30:30 +0800
+Date: Mon, 20 Mar 2017 01:48:01 +0800
 Subject: [PATCH v2 2/2] fpga: Add support for Xilinx LogiCORE PR Decoupler
 In-Reply-To: <1489711910-17443-2-git-send-email-mdf@kernel.org>
-Message-ID: <201703200150.3izmZBcU%fengguang.wu@intel.com>
+Message-ID: <201703200126.2MmFLhlY%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,42 +13,33 @@ Hi Moritz,
 [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
 url:    https://github.com/0day-ci/linux/commits/Moritz-Fischer/doc-Add-bindings-document-for-Xilinx-LogiCore-PR-Decoupler/20170320-005406
-config: ia64-allmodconfig (attached as .config)
-compiler: ia64-linux-gcc (GCC) 6.2.0
+config: alpha-allyesconfig (attached as .config)
+compiler: alpha-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
 reproduce:
         wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
         chmod +x ~/bin/make.cross
         # save the attached .config to linux build tree
-        make.cross ARCH=ia64 
+        make.cross ARCH=alpha 
 
 All warnings (new ones prefixed by >>):
 
-   In file included from include/linux/io.h:25:0,
-                    from drivers/fpga/xilinx-pr-decoupler.c:19:
    drivers/fpga/xilinx-pr-decoupler.c: In function 'xlnx_pr_decoupler_enable_set':
-   arch/ia64/include/asm/io.h:395:30: warning: large integer implicitly truncated to unsigned type [-Woverflow]
-    #define writel(v,a) __writel((v), (a))
-                                 ^
->> drivers/fpga/xilinx-pr-decoupler.c:43:3: note: in expansion of macro 'writel'
+>> drivers/fpga/xilinx-pr-decoupler.c:26:26: warning: large integer implicitly truncated to unsigned type [-Woverflow]
+    #define CTRL_CMD_COUPLE  ~BIT(0)
+                             ^
+>> drivers/fpga/xilinx-pr-decoupler.c:43:10: note: in expansion of macro 'CTRL_CMD_COUPLE'
       writel(CTRL_CMD_COUPLE, priv->io_base);
-      ^~~~~~
+             ^~~~~~~~~~~~~~~
 
-vim +/writel +43 drivers/fpga/xilinx-pr-decoupler.c
+vim +26 drivers/fpga/xilinx-pr-decoupler.c
 
-    13	 * but WITHOUT ANY WARRANTY; without even the implied warranty of
-    14	 * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-    15	 * GNU General Public License for more details.
-    16	 */
-    17	
-    18	#include <linux/clk.h>
-  > 19	#include <linux/io.h>
     20	#include <linux/kernel.h>
     21	#include <linux/of_device.h>
     22	#include <linux/module.h>
     23	#include <linux/fpga/fpga-bridge.h>
     24	
     25	#define CTRL_CMD_DECOUPLE	BIT(0)
-    26	#define CTRL_CMD_COUPLE		~BIT(0)
+  > 26	#define CTRL_CMD_COUPLE		~BIT(0)
     27	
     28	struct xlnx_pr_decoupler_data {
     29		void __iomem *io_base;
@@ -77,6 +68,6 @@ https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
 A non-text attachment was scrubbed...
 Name: .config.gz
 Type: application/gzip
-Size: 46770 bytes
+Size: 49587 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170320/93af8024/attachment-0001.gz>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170320/b7f6fac4/attachment-0001.gz>
