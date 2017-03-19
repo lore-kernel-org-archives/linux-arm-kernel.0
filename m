@@ -1,73 +1,99 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Mon, 20 Mar 2017 01:48:01 +0800
-Subject: [PATCH v2 2/2] fpga: Add support for Xilinx LogiCORE PR Decoupler
-In-Reply-To: <1489711910-17443-2-git-send-email-mdf@kernel.org>
-Message-ID: <201703200126.2MmFLhlY%fengguang.wu@intel.com>
+From: slongerbeam@gmail.com (Steve Longerbeam)
+Date: Sun, 19 Mar 2017 10:54:22 -0700
+Subject: [PATCH v5 00/39] i.MX Media Driver
+In-Reply-To: <20170319103801.GQ21222@n2100.armlinux.org.uk>
+References: <1489121599-23206-1-git-send-email-steve_longerbeam@mentor.com>
+ <20170318192258.GL21222@n2100.armlinux.org.uk>
+ <aef6c412-5464-726b-42f6-a24b7323aa9c@mentor.com>
+ <20170319103801.GQ21222@n2100.armlinux.org.uk>
+Message-ID: <9b3311a8-34a7-2b5b-9bc7-836371e1e0a4@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Moritz,
 
-[auto build test WARNING on linus/master]
-[also build test WARNING on v4.11-rc2 next-20170310]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-url:    https://github.com/0day-ci/linux/commits/Moritz-Fischer/doc-Add-bindings-document-for-Xilinx-LogiCore-PR-Decoupler/20170320-005406
-config: alpha-allyesconfig (attached as .config)
-compiler: alpha-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=alpha 
+On 03/19/2017 03:38 AM, Russell King - ARM Linux wrote:
+> On Sat, Mar 18, 2017 at 12:58:27PM -0700, Steve Longerbeam wrote:
+>> Right, imx-media-capture.c (the "standard" v4l2 user interface module)
+>> is not implementing VIDIOC_ENUM_FRAMESIZES. It should, but it can only
+>> return the single frame size that the pipeline has configured (the mbus
+>> format of the attached source pad).
+> I now have a set of patches that enumerate the frame sizes and intervals
+> from the source pad of the first subdev (since you're setting the formats
+> etc there from the capture device, it seems sensible to return what it
+> can support.)  This means my patch set doesn't add to non-CSI subdevs.
+>
+>> Can you share your gstreamer pipeline? For now, until
+>> VIDIOC_ENUM_FRAMESIZES is implemented, try a pipeline that
+>> does not attempt to specify a frame rate. I use the attached
+>> script for testing, which works for me.
+> Note that I'm not specifying a frame rate on gstreamer - I'm setting
+> the pipeline up for 60fps, but gstreamer in its wisdom is unable to
+> enumerate the frame sizes, and therefore is unable to enumerate the
+> frame intervals (frame intervals depend on frame sizes), so it
+> falls back to the "tvnorms" which are basically 25/1 and 30000/1001.
+>
+> It sees 60fps via G_PARM, and then decides to set 30000/1001 via S_PARM.
+> So, we end up with most of the pipeline operating at 60fps, with CSI
+> doing frame skipping to reduce the frame rate to 30fps.
+>
+> gstreamer doesn't complain, doesn't issue any warnings, the only way
+> you can spot this is to enable debugging and look through the copious
+> debug log, or use -v and check the pad capabilities.
+>
+> Testing using gstreamer, and only using "does it produce video" is a
+> good simple test, but it's just that - it's a simple test.  It doesn't
+> tell you that what you're seeing is what you intended to see (such as
+> video at the frame rate you expected) without more work.
+>
+>> Thanks, I've fixed most of v4l2-compliance issues, but this is not
+>> done yet. Is that something you can help with?
+> What did you do with:
+>
+> ioctl(3, VIDIOC_REQBUFS, {count=0, type=0 /* V4L2_BUF_TYPE_??? */, memory=0 /* V4L2_MEMORY_??? */}) = -1 EINVAL (Invalid argument)
+>                  test VIDIOC_REQBUFS/CREATE_BUFS/QUERYBUF: OK
+> ioctl(3, VIDIOC_EXPBUF, 0xbef405bc)     = -1 EINVAL (Invalid argument)
+>                  fail: v4l2-test-buffers.cpp(571): q.has_expbuf(node)
+>                  test VIDIOC_EXPBUF: FAIL
+>
+> To me, this looks like a bug in v4l2-compliance (I'm using 1.10.0).
+> I'm not sure what buffer VIDIOC_EXPBUF is expected to export, since
+> afaics no buffers have been allocated, so of course it's going to fail.
+> Either that, or the v4l2 core vb2 code is non-compliant with v4l2's
+> interface requirements.
+>
+> In any case, it doesn't look like the buffer management is being
+> tested at all by v4l2-compliance - we know that gstreamer works, so
+> buffers _can_ be allocated, and I've also used dmabufs with gstreamer,
+> so I also know that VIDIOC_EXPBUF works there.
+>
 
-All warnings (new ones prefixed by >>):
+I wouldn't be surprised if you hit on a bug in v4l2-compliance. I 
+stopped with v4l2-compliance
+at a different test failure that also didn't make sense to me:
 
-   drivers/fpga/xilinx-pr-decoupler.c: In function 'xlnx_pr_decoupler_enable_set':
->> drivers/fpga/xilinx-pr-decoupler.c:26:26: warning: large integer implicitly truncated to unsigned type [-Woverflow]
-    #define CTRL_CMD_COUPLE  ~BIT(0)
-                             ^
->> drivers/fpga/xilinx-pr-decoupler.c:43:10: note: in expansion of macro 'CTRL_CMD_COUPLE'
-      writel(CTRL_CMD_COUPLE, priv->io_base);
-             ^~~~~~~~~~~~~~~
+Streaming ioctls:
+     test read/write: OK (Not Supported)
+         Video Capture:
+         Buffer: 0 Sequence: 0 Field: Any Timestamp: 41.664259s
+         fail: 
+.../v4l-utils-1.6.2/utils/v4l2-compliance/v4l2-test-buffers.cpp(281): 
+!(g_flags() & (V4L2_BUF_FLAG_DONE | V4L2_BUF_FLAG_ERROR))
+         fail: 
+.../v4l-utils-1.6.2/utils/v4l2-compliance/v4l2-test-buffers.cpp(610): 
+buf.check(q, last_seq)
+         fail: 
+.../v4l-utils-1.6.2/utils/v4l2-compliance/v4l2-test-buffers.cpp(883): 
+captureBufs(node, q, m2m_q, frame_count, false)
+     test MMAP: FAIL
+     test USERPTR: OK (Not Supported)
+     test DMABUF: Cannot test, specify --expbuf-device
 
-vim +26 drivers/fpga/xilinx-pr-decoupler.c
+Total: 42, Succeeded: 38, Failed: 4, Warnings: 0
 
-    20	#include <linux/kernel.h>
-    21	#include <linux/of_device.h>
-    22	#include <linux/module.h>
-    23	#include <linux/fpga/fpga-bridge.h>
-    24	
-    25	#define CTRL_CMD_DECOUPLE	BIT(0)
-  > 26	#define CTRL_CMD_COUPLE		~BIT(0)
-    27	
-    28	struct xlnx_pr_decoupler_data {
-    29		void __iomem *io_base;
-    30		struct clk *clk;
-    31	};
-    32	
-    33	static int xlnx_pr_decoupler_enable_set(struct fpga_bridge *bridge, bool enable)
-    34	{
-    35		int err;
-    36		struct xlnx_pr_decoupler_data *priv = bridge->priv;
-    37	
-    38		err = clk_enable(priv->clk);
-    39		if (err)
-    40			return err;
-    41	
-    42		if (enable)
-  > 43			writel(CTRL_CMD_COUPLE, priv->io_base);
-    44		else
-    45			writel(CTRL_CMD_DECOUPLE, priv->io_base);
-    46	
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 49587 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170320/b7f6fac4/attachment-0001.gz>
+In this case the driver completed and returned only one buffer, and it set
+VB2_BUF_STATE_DONE, so these test failures didn't make sense to me. I
+was using version 1.6.2 at the time.
+
+Steve
