@@ -1,108 +1,40 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Mon, 20 Mar 2017 11:02:16 +0100
-Subject: [PATCH v3 2/2] fpga: Add support for Xilinx LogiCORE PR Decoupler
-In-Reply-To: <1489781473-30772-2-git-send-email-mdf@kernel.org>
-References: <1489781473-30772-1-git-send-email-mdf@kernel.org>
- <1489781473-30772-2-git-send-email-mdf@kernel.org>
-Message-ID: <ce16ea40-bf9b-7aa3-b7ac-07c05932cd99@xilinx.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 20 Mar 2017 11:03:03 +0100
+Subject: [PATCH 4/4] tty/serial: sh-sci: remove uneeded IS_ERR_OR_NULL
+ calls
+In-Reply-To: <CAMuHMdXGn35bEsJKnUi5o3AytL4AJN2fBfoB79v5W-jOVFQx6g@mail.gmail.com>
+References: <20170303191248.wlwjri55ip2x5pgg@pengutronix.de>
+ <CAMuHMdXFrwa2jCVDb+8ecqgARLG0oGrPp9pLs0b6vEiWeKJ+uA@mail.gmail.com>
+ <20170303194414.n76tr3oa2mlrzjre@pengutronix.de>
+ <CAMuHMdXiz5hqW=fm-2H1aNKq_gXD2o0508jD2XjxYUvKoEvHdw@mail.gmail.com>
+ <20170304174819.esxhwwbsxzuq3vyc@pengutronix.de>
+ <CAMuHMdX8BEnaTtNFAbcvfHwJH=oPUmQ2NB+jfouGyhQpJ_m_4A@mail.gmail.com>
+ <20170306085842.yijkfpqi3adcedmm@pengutronix.de>
+ <CAMuHMdV2_vbocY4wCzvYtPAaF+QEX_Y4g6qVu5EqEBf5AnFdaw@mail.gmail.com>
+ <20170306093043.ay4dz3ehp3aakwxh@pengutronix.de>
+ <CAMuHMdWQuvANNU14A7NQuzv6AFp04bq4DG_oc7w9h4wUrG+4aQ@mail.gmail.com>
+ <20170306100220.droey65uq2ew3mzu@pengutronix.de>
+ <CACRpkdYeFyr4yjQjDAUpPJwuD_NW2y=wXnzt1xSNoOX0SFCLmw@mail.gmail.com>
+ <CAMuHMdWv-xs12UqutEtXJGR8qqgx6DeDhkKvvYhhyW+XTVsUNQ@mail.gmail.com>
+ <CAMuHMdXGn35bEsJKnUi5o3AytL4AJN2fBfoB79v5W-jOVFQx6g@mail.gmail.com>
+Message-ID: <CAMuHMdUy1Oa0Am6QdK6nffSn5x2RinwhOwhaW_JyLAnxPA0rWQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17.3.2017 21:11, Moritz Fischer wrote:
-> This adds support for the Xilinx LogiCORE PR Decoupler
-> soft-ip that does decoupling of PR regions in the FPGA
-> fabric during partial reconfiguration.
-> 
-> Signed-off-by: Moritz Fischer <mdf@kernel.org>
-> Cc: Michal Simek <michal.simek@xilinx.com>
-> Cc: S?ren Brinkmann <soren.brinkmann@xilinx.com>
-> Cc: linux-kernel at vger.kernel.org
-> Cc: devicetree at vger.kernel.org
-> ---
-> Changes from v2:
-> - Added Michal's Signed-off-by
+On Mon, Mar 20, 2017 at 10:56 AM, Geert Uytterhoeven
+<geert@linux-m68k.org> wrote:
+> drivers/tty/serial/serial_mctrl_gpio.o already compiles fine if
+> CONFIG_GPIOLIB=n, which reduces its size by ca. 25%.
 
-btw: you forgot to add it above. :-)
+That is: after removing the #ifdef and dummies in serial_mctrl_gpio.h
 
-> - Added "xlnx,pr-decoupler" unversioned fallback
-> 
-> Changes from v1:
-> - Added Michal as Co-Author since I pulled in some of his code
-> - Reworked clk handling in _remove()
-> - Pulled in Michal's version of show_enable(), ditched priv->enabled
-> 
-> ---
->  drivers/fpga/Kconfig               |   9 +++
->  drivers/fpga/Makefile              |   1 +
->  drivers/fpga/xilinx-pr-decoupler.c | 148 +++++++++++++++++++++++++++++++++++++
->  3 files changed, 158 insertions(+)
->  create mode 100644 drivers/fpga/xilinx-pr-decoupler.c
-> 
-> diff --git a/drivers/fpga/Kconfig b/drivers/fpga/Kconfig
-> index ce861a2..ce0c91d 100644
-> --- a/drivers/fpga/Kconfig
-> +++ b/drivers/fpga/Kconfig
-> @@ -63,6 +63,15 @@ config ALTERA_FREEZE_BRIDGE
->  	  isolate one region of the FPGA from the busses while that
->  	  region is being reprogrammed.
->  
-> +config XILINX_PR_DECOUPLER
-> +	tristate "Xilinx LogiCORE PR Decoupler"
-> +	depends on FPGA_BRIDGE
-> +	help
-> +	  Say Y to enable drivers for Xilinx LogiCORE PR Decoupler.
-> +	  The PR Decoupler exists in the FPGA fabric to isolate one
-> +	  region of the FPGA from the busses while that region is
-> +	  being reprogrammed during partial reconfig.
-> +
->  endif # FPGA
->  
->  endmenu
-> diff --git a/drivers/fpga/Makefile b/drivers/fpga/Makefile
-> index 8df07bc..ba94b79 100644
-> --- a/drivers/fpga/Makefile
-> +++ b/drivers/fpga/Makefile
-> @@ -14,6 +14,7 @@ obj-$(CONFIG_FPGA_MGR_ZYNQ_FPGA)	+= zynq-fpga.o
->  obj-$(CONFIG_FPGA_BRIDGE)		+= fpga-bridge.o
->  obj-$(CONFIG_SOCFPGA_FPGA_BRIDGE)	+= altera-hps2fpga.o altera-fpga2sdram.o
->  obj-$(CONFIG_ALTERA_FREEZE_BRIDGE)	+= altera-freeze-bridge.o
-> +obj-$(CONFIG_XILINX_PR_DECOUPLER)	+= xilinx-pr-decoupler.o
->  
->  # High Level Interfaces
->  obj-$(CONFIG_FPGA_REGION)		+= fpga-region.o
-> diff --git a/drivers/fpga/xilinx-pr-decoupler.c b/drivers/fpga/xilinx-pr-decoupler.c
-> new file mode 100644
-> index 0000000..dd37b1c
-> --- /dev/null
-> +++ b/drivers/fpga/xilinx-pr-decoupler.c
-> @@ -0,0 +1,148 @@
-> +/*
-> + * Copyright (c) 2017, National Instruments Corp.
-> + * Copyright (c) 2017, Xilix Inc
-> + *
-> + * FPGA Bridge Driver for the Xilinx LogiCORE Partial Reconfiguration
-> + * Decoupler IP Core.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; version 2 of the License.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include <linux/clk.h>
-> +#include <linux/io.h>
-> +#include <linux/kernel.h>
-> +#include <linux/of_device.h>
-> +#include <linux/module.h>
-> +#include <linux/fpga/fpga-bridge.h>
-> +
-> +#define CTRL_CMD_DECOUPLE	BIT(0)
-> +#define CTRL_CMD_COUPLE		~BIT(0)
+Gr{oetje,eeting}s,
 
-for others - this was reported by 0-day testing system as a warning.
+                        Geert
 
-M
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
