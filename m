@@ -1,87 +1,61 @@
-From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Mon, 20 Mar 2017 12:48:11 -0700
-Subject: [PATCH v5 38/39] media: imx: csi: fix crop rectangle reset in
- sink set_fmt
-In-Reply-To: <1490018451.2917.86.camel@pengutronix.de>
-References: <1489121599-23206-1-git-send-email-steve_longerbeam@mentor.com>
- <1489121599-23206-39-git-send-email-steve_longerbeam@mentor.com>
- <20170319152233.GW21222@n2100.armlinux.org.uk>
- <327d67d9-68c1-7f74-0c0f-f6aee1c4b546@gmail.com>
- <1490010926.2917.59.camel@pengutronix.de>
- <20170320120855.GH21222@n2100.armlinux.org.uk>
- <1490018451.2917.86.camel@pengutronix.de>
-Message-ID: <709728d3-83ab-90cf-44d4-dcf41e6fbee7@gmail.com>
+From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
+Date: Mon, 20 Mar 2017 20:56:04 +0100
+Subject: [RFT PATCH 0/1] Meson GXBB: use pwm-leds on supported devices
+In-Reply-To: <a5b18444-6158-7bc2-cb19-0b5a44ea9316@baylibre.com>
+References: <20170318143728.16535-1-martin.blumenstingl@googlemail.com>
+ <a5b18444-6158-7bc2-cb19-0b5a44ea9316@baylibre.com>
+Message-ID: <CAFBinCCuNM1LSgtVr18A9=hsLNRYoaatVJ8ZshD9xzy1S1wi3w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Neil,
 
-
-On 03/20/2017 07:00 AM, Philipp Zabel wrote:
-> On Mon, 2017-03-20 at 12:08 +0000, Russell King - ARM Linux wrote:
->> On Mon, Mar 20, 2017 at 12:55:26PM +0100, Philipp Zabel wrote:
->>> The above paragraph suggests we skip any rectangles that are not
->>> supported. In our case that would be 3. and 4., since the CSI can't
->>> compose into a larger frame. I hadn't realised that the crop selection
->>> currently happens on the source pad.
->> I'd recommend viewing the documentation in its post-processed version,
->> because then you get the examples as pictures, and they say that a
->> picture is worth 1000 words.  See
+On Mon, Mar 20, 2017 at 9:43 AM, Neil Armstrong <narmstrong@baylibre.com> wrote:
+> On 03/18/2017 03:37 PM, Martin Blumenstingl wrote:
+>> This patch enables brightness support through the pwm-leds driver for
+>> the GXBB devices which use GPIOAO_13 for their system/status LED.
 >>
->>    https://linuxtv.org/downloads/v4l-dvb-apis/uapi/v4l/dev-subdev.html
+>> Affected devices are:
+>> - NEXBOX A95X (GXBB, S905 variant)
+>> - Odroid-C2
+>> - the Tronsmart Vega S95 series (Meta, Pro, Telos)
+>> - WeTek Hub
+>> - WeTek Play 2
 >>
->> There is almost an exact example of what we're trying to do - it's
->> figure 4.6.  Here, we have a sink pad with a cropping rectangle on
->> the input, which is then scaled to a composition rectangle (there's
->> no bounds rectangle, and it's specified that in such a case the
->> top,left of the composition rectangle will always be 0,0 - see quote
->> below).
+>> unfortunately my GXBB board (a Tronsmart Vega S95 Meta clone) is not
+>> working anymore, so I can't test this at all.
+>> if it works on one of the devices then we can probably assume that it
+>> works fine on all other devices as well.
 >>
->> Where it differs is that the example also supports source cropping
->> for two source pads.  We don't support that.
 >>
->> The same document says:
+>> Martin Blumenstingl (1):
+>>   ARM64: dts: meson-gxbb: convert devices to use pwm-leds
 >>
->>    Scaling support is optional. When supported by a subdev, the crop
->>    rectangle on the subdev's sink pad is scaled to the size configured
->>    using the
->>    :ref:`VIDIOC_SUBDEV_S_SELECTION <VIDIOC_SUBDEV_G_SELECTION>` IOCTL
->>    using ``V4L2_SEL_TGT_COMPOSE`` selection target on the same pad. If the
->>    subdev supports scaling but not composing, the top and left values are
->>    not used and must always be set to zero.
-> Right, this sentence does imply that when scaling is supported, there
-> must be a sink compose rectangle, even when composing is not.
-
-Ok, this all makes consistent sense to me too. So:
-
-- the CSI hardware cropping rectangle should be specified via the
-   sink pad crop selection.
-
-- the CSI hardware /2 downscaler should be specified via the
-   sink pad compose selection.
-
-- the final source pad rectangle is the same as the sink pad
-   compose rectangle.
-
-So that leaves only step 4 (source pad crop selection) as
-unsupported.
-
-Steve
-
-
-> I have previously set up scaling like this:
+>>  .../boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts    | 18 +++++++++++----
+>>  .../arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts | 16 ++++++++++---
+>>  .../boot/dts/amlogic/meson-gxbb-vega-s95.dtsi      | 17 ++++++++++----
+>>  .../boot/dts/amlogic/meson-gxbb-wetek-hub.dts      | 19 +++++++++++----
+>>  .../boot/dts/amlogic/meson-gxbb-wetek-play2.dts    | 27 ++++++++++++++++------
+>>  5 files changed, 74 insertions(+), 23 deletions(-)
+>>
 >
-> media-ctl --set-v4l2 "'ipu1_csi0_mux':2[fmt:UYVY2X8/1920x1080 at 1/60]"
-> media-ctl --set-v4l2 "'ipu1_csi0':2[fmt:AYUV32/960x540 at 1/30]"
+> Hi Martin,
 >
-> Does this mean, it should work like this instead?
+> I'm concerned about how the LED is managed by the firmware.
+> The system led is usually managed by the firmware and color is changed
+> when in suspend or poweroff mode.
+> But I'm not sure of the behavior if the pin mode is set to PWM.
 >
-> media-ctl --set-v4l2 "'ipu1_csi0_mux':2[fmt:UYVY2X8/1920x1080 at 1/60]"
-> media-ctl --set-v4l2 "'ipu1_csi0':0[fmt:UYVY2X8/1920x1080 at 1/60,compose:(0,0)/960x540]"
-> media-ctl --set-v4l2 "'ipu1_csi0':2[fmt:AYUV32/960x540 at 1/30]"
->
-> I suppose setting the source pad format should not be allowed to modify
-> the sink compose rectangle.
->
-> regards
-> Philipp
->
+> Can you check this ?
+I have tested this on the Khadas VIM before: it seems to work fine
+(the LED changes it's color when the device is powered off, even if a
+kernel which used pwm-leds was booted before).
+it might depend on the bootloader / firmware though - but I guess the
+only way to find out is by testing this.
+
+
+Regards,
+Martin
+
+
+[0] https://github.com/khadas/linux/commit/94602ef5562978a8d8b5c7770c113074a714dbdb
