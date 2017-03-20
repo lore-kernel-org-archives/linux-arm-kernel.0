@@ -1,295 +1,95 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 20 Mar 2017 15:43:46 +0000
-Subject: [RFC PATCH] iommu/dma/pci: account pci host bridge dma_mask for
- IOVA allocation
-In-Reply-To: <6c34297b77de0fc7fc4b44b17749cfd2@mail.gmail.com>
-References: <6c34297b77de0fc7fc4b44b17749cfd2@mail.gmail.com>
-Message-ID: <bddd4c81-7d71-4207-4c5f-b632403daec9@arm.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 20 Mar 2017 15:43:39 +0000
+Subject: [PATCH v5 00/39] i.MX Media Driver
+In-Reply-To: <1490016016.2917.68.camel@pengutronix.de>
+References: <1489121599-23206-1-git-send-email-steve_longerbeam@mentor.com>
+ <20170318192258.GL21222@n2100.armlinux.org.uk>
+ <aef6c412-5464-726b-42f6-a24b7323aa9c@mentor.com>
+ <20170319121402.GS21222@n2100.armlinux.org.uk>
+ <1490016016.2917.68.camel@pengutronix.de>
+Message-ID: <20170320154339.GN21222@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/03/17 08:57, Oza Oza wrote:
-> +  linux-pci
-> 
-> Regards,
-> Oza.
-> 
-> -----Original Message-----
-> From: Oza Pawandeep [mailto:oza.oza at broadcom.com]
-> Sent: Friday, March 17, 2017 11:41 AM
-> To: Joerg Roedel; Robin Murphy
-> Cc: iommu at lists.linux-foundation.org; linux-kernel at vger.kernel.org;
-> linux-arm-kernel at lists.infradead.org; devicetree at vger.kernel.org;
-> bcm-kernel-feedback-list at broadcom.com; Oza Pawandeep
-> Subject: [RFC PATCH] iommu/dma: account pci host bridge dma_mask for IOVA
-> allocation
-> 
-> It is possible that PCI device supports 64-bit DMA addressing, and thus
-> it's driver sets device's dma_mask to DMA_BIT_MASK(64), however PCI host
-> bridge may have limitations on the inbound transaction addressing. As an
-> example, consider NVME SSD device connected to iproc-PCIe controller.
-> 
-> Currently, the IOMMU DMA ops only considers PCI device dma_mask when
-> allocating an IOVA. This is particularly problematic on
-> ARM/ARM64 SOCs where the IOMMU (i.e. SMMU) translates IOVA to PA for
-> in-bound transactions only after PCI Host has forwarded these transactions
-> on SOC IO bus. This means on such ARM/ARM64 SOCs the IOVA of in-bound
-> transactions has to honor the addressing restrictions of the PCI Host.
-> 
-> this patch is inspired by
-> http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1306545.html
-> http://www.spinics.net/lists/arm-kernel/msg566947.html
-> 
-> but above inspiraiton solves the half of the problem.
-> the rest of the problem is descrbied below, what we face on iproc based
-> SOCs.
-> 
-> current pcie frmework and of framework integration assumes dma-ranges in a
-> way where memory-mapped devices define their dma-ranges.
-> dma-ranges: (child-bus-address, parent-bus-address, length).
-> 
-> but iproc based SOCs and even Rcar based SOCs has PCI world dma-ranges.
-> dma-ranges = <0x43000000 0x00 0x00 0x00 0x00 0x80 0x00>;
-> 
-> of_dma_configure is specifically witten to take care of memory mapped
-> devices.
-> but no implementation exists for pci to take care of pcie based memory
-> ranges.
-> in fact pci world doesnt seem to define standard dma-ranges since there is
-> an absense of the same, the dma_mask used to remain 32bit because of
-> 0 size return (parsed by of_dma_configure())
-> 
-> this patch also implements of_pci_get_dma_ranges to cater to pci world
-> dma-ranges.
-> so then the returned size get best possible (largest) dma_mask.
-> for e.g.
-> dma-ranges = <0x43000000 0x00 0x00 0x00 0x00 0x80 0x00>; we should get
-> dev->coherent_dma_mask=0x7fffffffff.
-> 
-> conclusion: there are following problems
-> 1) linux pci and iommu framework integration has glitches with respect to
-> dma-ranges
-> 2) pci linux framework look very uncertain about dma-ranges, rather
-> binding is not defined
->    the way it is defined for memory mapped devices.
->    rcar and iproc based SOCs use their custom one dma-ranges
->    (rather can be standard)
-> 3) even if in case of default parser of_dma_get_ranges,:
->    it throws and erro"
->    "no dma-ranges found for node"
->    because of the bug which exists.
->    following lines should be moved to the end of while(1)
-> 	839                 node = of_get_next_parent(node);
-> 	840                 if (!node)
-> 	841                         break;
+On Mon, Mar 20, 2017 at 02:20:16PM +0100, Philipp Zabel wrote:
+> To set and read colorimetry information:
+> https://patchwork.linuxtv.org/patch/39350/
 
-Right, having made sense of this and looked into things myself I think I
-understand now; what this boils down to is that the existing
-implementation of of_dma_get_range() expects always to be given a leaf
-device_node, and doesn't cope with being given a device_node for the
-given device's parent bus directly. That's really all there is; it's not
-specific to PCI (there are other probeable and DMA-capable buses whose
-children aren't described in DT, like the fsl-mc thing), and it
-definitely doesn't have anything to do with IOMMUs.
+Thanks, I've applied all four of your patches, but there's a side effect
+from that.  Old media-ctl (modified by me):
 
-Now, that's certainly something to fix, but AFAICS this patch doesn't do
-that, only adds some PCI-specific code which is never called.
+- entity 53: imx219 0-0010 (2 pads, 2 links)
+             type V4L2 subdev subtype Unknown flags 0
+             device node name /dev/v4l-subdev9
+        pad0: Source
+                [fmt:SRGGB8/816x616 field:none
+                 frame_interval:1/25]
+                -> "imx6-mipi-csi2":0 [ENABLED]
+        pad1: Sink
+                [fmt:SRGGB10/3280x2464 field:none
+                 crop.bounds:(0,0)/3280x2464
+                 crop:(0,0)/3264x2464
+                 compose.bounds:(0,0)/3264x2464
+                 compose:(0,0)/816x616]
+                <- "imx219 pixel 0-0010":0 [ENABLED,IMMUTABLE]
 
-DMA mask inheritance for arm64 is another issue, which again is general,
-but does tend to be more visible in the IOMMU case. That still needs
-some work on the APCI side - all the DT-centric approaches so far either
-regress or at best do nothing for ACPI. I've made a note to try to look
-into that soon, but from what I recall I fear there is still an open
-question about what to do for a default in the absence of IORT or _DMA
-(once the current assumption that drivers can override our arbitrary
-default at will is closed down).
+New media-ctl:
 
-In the meantime, have you tried 4.11-rc1 or later on the affected
-system? One of the ulterior motives behind 122fac030e91 was that in many
-cases it also happens to paper over most versions of this problem for
-PCI devices, and makes the IOMMU at least useable (on systems which
-don't need to dma_map_*() vast amounts of RAM all at once) while we fix
-the underlying things properly.
+- entity 53: imx219 0-0010 (2 pads, 2 links)
+             type V4L2 subdev subtype Unknown flags 0
+             device node name /dev/v4l-subdev9
+        pad0: Source
+                [fmt:SRGGB8_1X8/816x616@1/25 field:none colorspace:srgb xfer:srgb]
+                -> "imx6-mipi-csi2":0 [ENABLED]
+        pad1: Sink
+                <- "imx219 pixel 0-0010":0 [ENABLED,IMMUTABLE]
 
-Robin.
+It looks like we successfully retrieve the frame interval for pad 0
+and print it, but when we try to retrieve the frame interval for pad 1,
+we get EINVAL (because that's what I'm returning, but I'm wondering if
+that's the correct thing to do...) and that prevents _all_ format
+information being output.
 
-> Reviewed-by: Anup Patel <anup.patel@broadcom.com>
-> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
-> Signed-off-by: Oza Pawandeep <oza.oza@broadcom.com>
-> 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig index
-> 8c7c244..20cfff7 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -217,6 +217,9 @@ config NEED_DMA_MAP_STATE  config NEED_SG_DMA_LENGTH
->  	def_bool y
-> 
-> +config ARCH_HAS_DMA_SET_COHERENT_MASK
-> +	def_bool y
-> +
->  config SMP
->  	def_bool y
-> 
-> diff --git a/arch/arm64/include/asm/device.h
-> b/arch/arm64/include/asm/device.h index 73d5bab..64b4dc3 100644
-> --- a/arch/arm64/include/asm/device.h
-> +++ b/arch/arm64/include/asm/device.h
-> @@ -20,6 +20,7 @@ struct dev_archdata {
->  #ifdef CONFIG_IOMMU_API
->  	void *iommu;			/* private IOMMU data */
->  #endif
-> +	u64 parent_dma_mask;
->  	bool dma_coherent;
->  };
-> 
-> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-> index 81cdb2e..5845ecd 100644
-> --- a/arch/arm64/mm/dma-mapping.c
-> +++ b/arch/arm64/mm/dma-mapping.c
-> @@ -564,6 +564,7 @@ static void flush_page(struct device *dev, const void
-> *virt, phys_addr_t phys)
->  	__dma_flush_area(virt, PAGE_SIZE);
->  }
-> 
-> +
->  static void *__iommu_alloc_attrs(struct device *dev, size_t size,
->  				 dma_addr_t *handle, gfp_t gfp,
->  				 unsigned long attrs)
-> @@ -795,6 +796,20 @@ static void __iommu_unmap_sg_attrs(struct device
-> *dev,
->  	iommu_dma_unmap_sg(dev, sgl, nelems, dir, attrs);  }
-> 
-> +static int __iommu_set_dma_mask(struct device *dev, u64 mask) {
-> +	/* device is not DMA capable */
-> +	if (!dev->dma_mask)
-> +		return -EIO;
-> +
-> +	if (mask > dev->archdata.parent_dma_mask)
-> +		mask = dev->archdata.parent_dma_mask;
-> +
-> +	*dev->dma_mask = mask;
-> +
-> +	return 0;
-> +}
-> +
->  static const struct dma_map_ops iommu_dma_ops = {
->  	.alloc = __iommu_alloc_attrs,
->  	.free = __iommu_free_attrs,
-> @@ -811,8 +826,21 @@ static void __iommu_unmap_sg_attrs(struct device
-> *dev,
->  	.map_resource = iommu_dma_map_resource,
->  	.unmap_resource = iommu_dma_unmap_resource,
->  	.mapping_error = iommu_dma_mapping_error,
-> +	.set_dma_mask = __iommu_set_dma_mask,
->  };
-> 
-> +int dma_set_coherent_mask(struct device *dev, u64 mask) {
-> +	if (get_dma_ops(dev) == &iommu_dma_ops &&
-> +	    mask > dev->archdata.parent_dma_mask)
-> +		mask = dev->archdata.parent_dma_mask;
-> +
-> +	dev->coherent_dma_mask = mask;
-> +	return 0;
-> +}
-> +EXPORT_SYMBOL(dma_set_coherent_mask);
-> +
-> +
->  /*
->   * TODO: Right now __iommu_setup_dma_ops() gets called too early to do
->   * everything it needs to - the device is only partially created and the
-> @@ -975,6 +1003,8 @@ void arch_setup_dma_ops(struct device *dev, u64
-> dma_base, u64 size,
->  	if (!dev->dma_ops)
->  		dev->dma_ops = &swiotlb_dma_ops;
-> 
-> +	dev->archdata.parent_dma_mask = size - 1;
-> +
->  	dev->archdata.dma_coherent = coherent;
->  	__iommu_setup_dma_ops(dev, dma_base, size, iommu);  } diff --git
-> a/drivers/of/of_pci.c b/drivers/of/of_pci.c index 0ee42c3..5804717 100644
-> --- a/drivers/of/of_pci.c
-> +++ b/drivers/of/of_pci.c
-> @@ -283,6 +283,51 @@ int of_pci_get_host_bridge_resources(struct
-> device_node *dev,
->  	return err;
->  }
->  EXPORT_SYMBOL_GPL(of_pci_get_host_bridge_resources);
-> +
-> +int of_pci_get_dma_ranges(struct device_node *np, u64 *dma_addr, u64
-> +*paddr, u64 *size) {
-> +	struct device_node *node = of_node_get(np);
-> +	int rlen, naddr, nsize, pna;
-> +	int ret = 0;
-> +	const int na = 3, ns = 2;
-> +	struct of_pci_range_parser parser;
-> +	struct of_pci_range range;
-> +
-> +	if (!node)
-> +		return -EINVAL;
-> +
-> +	parser.node = node;
-> +	parser.pna = of_n_addr_cells(node);
-> +	parser.np = parser.pna + na + ns;
-> +
-> +	parser.range = of_get_property(node, "dma-ranges", &rlen);
-> +
-> +	if (!parser.range) {
-> +		pr_debug("pcie device has no dma-ranges defined for
-> node(%s)\n", np->full_name);
-> +		ret = -ENODEV;
-> +		goto out;
-> +	}
-> +
-> +	parser.end = parser.range + rlen / sizeof(__be32);
-> +
-> +	/* how do we take care of multiple dma windows ?. */
-> +	for_each_of_pci_range(&parser, &range) {
-> +		*dma_addr = range.pci_addr;
-> +		*size = range.size;
-> +		*paddr = range.cpu_addr;
-> +	}
-> +
-> +	pr_debug("dma_addr(%llx) cpu_addr(%llx) size(%llx)\n",
-> +		 *dma_addr, *paddr, *size);
-> +		 *dma_addr = range.pci_addr;
-> +		 *size = range.size;
-> +
-> +out:
-> +	of_node_put(node);
-> +	return ret;
-> +
-> +}
-> +EXPORT_SYMBOL_GPL(of_pci_get_dma_ranges);
->  #endif /* CONFIG_OF_ADDRESS */
-> 
->  #ifdef CONFIG_PCI_MSI
-> diff --git a/include/linux/of_pci.h b/include/linux/of_pci.h index
-> 0e0974e..907ace0 100644
-> --- a/include/linux/of_pci.h
-> +++ b/include/linux/of_pci.h
-> @@ -76,6 +76,7 @@ static inline void of_pci_check_probe_only(void) { }
-> int of_pci_get_host_bridge_resources(struct device_node *dev,
->  			unsigned char busno, unsigned char bus_max,
->  			struct list_head *resources, resource_size_t
-> *io_base);
-> +int of_pci_get_dma_ranges(struct device_node *np, u64 *dma_addr, u64
-> +*paddr, u64 *size);
->  #else
->  static inline int of_pci_get_host_bridge_resources(struct device_node
-> *dev,
->  			unsigned char busno, unsigned char bus_max, @@
-> -83,6 +84,11 @@ static inline int of_pci_get_host_bridge_resources(struct
-> device_node *dev,  {
->  	return -EINVAL;
->  }
-> +
-> +static inline int of_pci_get_dma_ranges(struct device_node *np, u64
-> +*dma_addr, u64 *paddr, u64 *size) {
-> +	return -EINVAL;
-> +}
->  #endif
-> 
->  #if defined(CONFIG_OF) && defined(CONFIG_PCI_MSI)
-> --
-> 1.9.1
-> 
+Maybe something like the following would be a better idea?
+
+ utils/media-ctl/media-ctl.c | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/utils/media-ctl/media-ctl.c b/utils/media-ctl/media-ctl.c
+index f61963a..a50a559 100644
+--- a/utils/media-ctl/media-ctl.c
++++ b/utils/media-ctl/media-ctl.c
+@@ -81,22 +81,22 @@ static void v4l2_subdev_print_format(struct media_entity *entity,
+ 	struct v4l2_mbus_framefmt format;
+ 	struct v4l2_fract interval = { 0, 0 };
+ 	struct v4l2_rect rect;
+-	int ret;
++	int ret, err_fi;
+ 
+ 	ret = v4l2_subdev_get_format(entity, &format, pad, which);
+ 	if (ret != 0)
+ 		return;
+ 
+-	ret = v4l2_subdev_get_frame_interval(entity, &interval, pad);
+-	if (ret != 0 && ret != -ENOTTY)
+-		return;
++	err_fi = v4l2_subdev_get_frame_interval(entity, &interval, pad);
+ 
+ 	printf("\t\t[fmt:%s/%ux%u",
+ 	       v4l2_subdev_pixelcode_to_string(format.code),
+ 	       format.width, format.height);
+ 
+-	if (interval.numerator || interval.denominator)
++	if (err_fi == 0 && (interval.numerator || interval.denominator))
+ 		printf("@%u/%u", interval.numerator, interval.denominator);
++	else if (err_fi != -ENOTTY)
++		printf("@<error: %s>", strerror(-err_fi));
+ 
+ 	if (format.field)
+ 		printf(" field:%s", v4l2_subdev_field_to_string(format.field));
+
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
