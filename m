@@ -1,78 +1,88 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Mon, 20 Mar 2017 11:06:36 -0500
-Subject: [PATCH 02/20] PCI: fix pci_remap_iospace() remap attribute
-In-Reply-To: <20170317003321.GB28800@wotan.suse.de>
-References: <20170227151436.18698-1-lorenzo.pieralisi@arm.com>
- <20170227151436.18698-3-lorenzo.pieralisi@arm.com>
- <20170316214844.GA17769@bhelgaas-glaptop.roam.corp.google.com>
- <20170317003321.GB28800@wotan.suse.de>
-Message-ID: <20170320160636.GB24572@bhelgaas-glaptop.roam.corp.google.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 20 Mar 2017 16:10:03 +0000
+Subject: [PATCH v4 14/36] [media] v4l2-mc: add a function to inherit
+ controls from a pipeline
+In-Reply-To: <20170320123938.0503c931@vento.lan>
+References: <cc8900b0-c091-b14b-96f4-01f8fa72431c@xs4all.nl>
+ <20170310125342.7f047acf@vento.lan>
+ <20170310223714.GI3220@valkosipuli.retiisi.org.uk>
+ <20170311082549.576531d0@vento.lan>
+ <20170313124621.GA10701@valkosipuli.retiisi.org.uk>
+ <20170314004533.3b3cd44b@vento.lan>
+ <e0a6c60b-1735-de0b-21f4-d8c3f4b3f10f@xs4all.nl>
+ <20170314072143.498cde9b@vento.lan>
+ <5c935062-61f4-40e7-0ee9-87655197e661@xs4all.nl>
+ <20170320123938.0503c931@vento.lan>
+Message-ID: <20170320161003.GO21222@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 17, 2017 at 01:33:21AM +0100, Luis R. Rodriguez wrote:
-> On Thu, Mar 16, 2017 at 04:48:44PM -0500, Bjorn Helgaas wrote:
-> > [+cc Luis]
-> > 
-> > On Mon, Feb 27, 2017 at 03:14:13PM +0000, Lorenzo Pieralisi wrote:
-> > > According to the PCI local bus specifications (Revision 3.0, 3.2.5),
-> > > I/O Address space transactions are non-posted. On architectures where
-> > > I/O space is implemented through a chunk of memory mapped space mapped
-> > > to PCI address space (ie IA64/ARM/ARM64) the memory mapping for the
-> > > region backing I/O Address Space transactions determines the I/O
-> > > transactions attributes (before the transactions actually reaches the
-> > > PCI bus where it is handled according to the PCI specifications).
-> > > 
-> > > Current pci_remap_iospace() interface, that is used to map the PCI I/O
-> > > Address Space into virtual address space, use pgprot_device() as memory
-> > > attribute for the virtual address mapping, that in some architectures
-> > > (ie ARM64) provides non-cacheable but write bufferable mappings (ie
-> > > posted writes), 
+On Mon, Mar 20, 2017 at 12:39:38PM -0300, Mauro Carvalho Chehab wrote:
+> Em Mon, 20 Mar 2017 14:24:25 +0100
+> Hans Verkuil <hverkuil@xs4all.nl> escreveu:
+> > I don't think this control inheritance patch will magically prevent you
+> > from needed a plugin.
 > 
-> <sarcasm>
-> Gee wiz, I am glad this is so well documented.
-> </sarcasm>
-
-I'm not sure this is actionable feedback.  The two paragraphs above
-seem clear and useful to me.  How would you like to see them improved?
-
-> > > ...
-> > > @@ -3375,7 +3375,7 @@ int pci_remap_iospace(const struct resource *res, phys_addr_t phys_addr)
-> > >  		return -EINVAL;
-> > >  
-> > >  	return ioremap_page_range(vaddr, vaddr + resource_size(res), phys_addr,
-> > > -				  pgprot_device(PAGE_KERNEL));
-> > > +				  pgprot_noncached(PAGE_KERNEL));
-> > 
-> > ...
-> > I do find this puzzling because I naively expected pgprot_noncached()
-> > to match up with ioremap_nocache(), and apparently it doesn't.
-> > 
-> > For example, ARM64 ioremap_nocache() uses PROT_DEVICE_nGnRE, which
-> > doesn't match the MT_DEVICE_nGnRnE in pgprot_noncached().
-> > 
-> > The point of these patches is to use non-posted mappings.  Apparently
-> > you can do that with pgprot_noncached() here, but ioremap_nocache()
-> > isn't enough for the config space mappings?
+> Yeah, it is not just control inheritance. The driver needs to work
+> without subdev API, e. g. mbus settings should also be done via the
+> video devnode.
 > 
-> This is for iospace it seems, so the other patch I think was for
-> config space.
+> Btw, Sakari made a good point on IRC: what happens if some app 
+> try to change the pipeline or subdev settings while another
+> application is using the device? The driver should block such 
+> changes, maybe using the V4L2 priority mechanism.
 
-I understand that 02/20 is for PCI I/O port space and 03/20 is for PCI
-config space.  I'm confused because I thought we wanted the same
-non-posted mapping for both, but looks like they're different.
+My understanding is that there are already mechanisms in place to
+prevent that, but it's driver dependent - certainly several of the
+imx driver subdevs check whether they have an active stream, and
+refuse (eg) all set_fmt calls with -EBUSY if that is so.
 
-Patch 02/20 uses ioremap_page_range(..., pgprot_noncached(PAGE_KERNEL))
-to map PCI I/O port space:
+(That statement raises another question in my mind: if the subdev is
+streaming, should it refuse all set_fmt, even for the TRY stuff?)
 
-  #define pgprot_noncached(prot) \
-          __pgprot_modify(prot, PTE_ATTRINDX_MASK, PTE_ATTRINDX(MT_DEVICE_nGnRnE) | PTE_PXN | PTE_UXN)
+> In parallel, someone has to fix libv4l for it to be default on
+> applications like gstreamer, e. g. adding support for DMABUF
+> and fixing other issues that are preventing it to be used by
+> default.
 
-Patch 03/20 uses ioremap_nocache() to map PCI config space:
+Hmm, not sure what you mean there - I've used dmabuf with gstreamer's
+v4l2src linked to libv4l2, importing the buffers into etnaviv using
+a custom plugin.  There are distros around (ubuntu) where the v4l2
+plugin is built against libv4l2.
 
-  #define ioremap_nocache(addr, size)     __ioremap((addr), (size), __pgprot(PROT_DEVICE_nGnRE))
+> My understanding here is that there are developers wanting/needing
+> to have standard V4L2 apps support for (some) i.MX6 devices. Those are
+> the ones that may/will allocate some time for it to happen.
 
-So the I/O port mapping uses MT_DEVICE_nGnRnE, while the config space
-mapping uses PROT_DEVICE_nGnRE, which looks different.
+Quite - but we need to first know what is acceptable to the v4l2
+community before we waste a lot of effort coding something up that
+may not be suitable.  Like everyone else, there's only a limited
+amount of effort available, so using it wisely is a very good idea.
 
-Bjorn
+Up until recently, it seemed that the only solution was to solve the
+userspace side of the media controller API via v4l2 plugins and the
+like.
+
+Much of my time that I have available to look at the imx6 capture
+stuff at the moment is taken up by triping over UAPI issues with the
+current code (such as the ones about CSI scaling, colorimetry, etc)
+and trying to get concensus on what the right solution to fix those
+issues actually is, and at the moment I don't have spare time to
+start addressing any kind of v4l2 plugin for user controls nor any
+other solution.
+
+Eg, I spent much of this last weekend sorting out my IMX219 camera
+sensor driver for my new understanding about how scaling is supposed
+to work, the frame enumeration issue (which I've posted patches for)
+and the CSI scaling issue (which I've some half-baked patch for at the
+moment, but probably by the time I've finished sorting that, Philipp
+or Steve will already have a solution.)
+
+That said, my new understanding of the scaling impacts the four patches
+I posted, and probably makes the frame size enumeration in CSI (due to
+its scaling) rather obsolete.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
