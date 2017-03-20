@@ -1,66 +1,62 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 20 Mar 2017 09:57:56 +0100
-Subject: [PATCH 17/31] ARM: dts: r8a7791: Add INTC-SYS clock to device tree
+Date: Mon, 20 Mar 2017 09:57:59 +0100
+Subject: [PATCH 20/31] ARM: dts: r8a7791: Tidyup Audio-DMAC channel for DVC
 In-Reply-To: <cover.1489999062.git.horms+renesas@verge.net.au>
 References: <cover.1489999062.git.horms+renesas@verge.net.au>
-Message-ID: <c2f2e266acb39f86bda1461874568ced7eaa6752.1489999063.git.horms+renesas@verge.net.au>
+Message-ID: <d49db72b567d6273f41f045b0c146837d3e50f8d.1489999063.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-Link the ARM GIC to the INTC-SYS module clock, and add it to the "always
-on" PM Domain, so it can be power managed using that clock.
+Current	Audio-DMAC is assigned "rx" as Audio-DMAC0, "tx" as Audio-DMAC1.
+Thus, DVC "tx" should be assigned as Audio-DMAC1, instead of Audio-DMAC0.
 
-Note that currently the GIC-400 driver doesn't support module clocks nor
-Runtime PM, so this must be handled as a critical clock.
+Because of this, current platform board (using SRC/DVC/SSI)
+Playback/Capture both will use same Audio-DMAC0
+(but it depends on audio data path).
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+First note is that this "rx" and "tx" are from each IP point,
+it doesn't mean Playback/Capture.
+Second note is that Audio DMAC assigned on DT is only for
+Audio-DMAC, Audio-DMAC-peri-peri has no entry.
+
+=> Audio-DMAC
+-> Audio-DMAC-peri-peri
+-- HW connection
+
+Playback case
+
+	[Mem] => [SRC]--[DVC] -> [SSI]--[Codec]
+	      rx ~~~~~~~~~~~~
+Capture
+
+	[Mem] <= [DVC]--[SRC] <- [SSI]--[Codec]
+	      tx ~~~~~~~~~~~~
+
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7791.dtsi            | 9 ++++++---
- include/dt-bindings/clock/r8a7791-clock.h | 1 +
- 2 files changed, 7 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/r8a7791.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
-index 7cad65a28f25..525377df16ee 100644
+index 525377df16ee..b319ef4d57b0 100644
 --- a/arch/arm/boot/dts/r8a7791.dtsi
 +++ b/arch/arm/boot/dts/r8a7791.dtsi
-@@ -117,6 +117,9 @@
- 			<0 0xf1004000 0 0x2000>,
- 			<0 0xf1006000 0 0x2000>;
- 		interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>;
-+		clocks = <&mstp4_clks R8A7791_CLK_INTC_SYS>;
-+		clock-names = "clk";
-+		power-domains = <&sysc R8A7791_PD_ALWAYS_ON>;
- 	};
+@@ -1779,11 +1779,11 @@
  
- 	gpio0: gpio at e6050000 {
-@@ -1365,10 +1368,10 @@
- 		mstp4_clks: mstp4_clks at e6150140 {
- 			compatible = "renesas,r8a7791-mstp-clocks", "renesas,cpg-mstp-clocks";
- 			reg = <0 0xe6150140 0 4>, <0 0xe615004c 0 4>;
--			clocks = <&cp_clk>;
-+			clocks = <&cp_clk>, <&zs_clk>;
- 			#clock-cells = <1>;
--			clock-indices = <R8A7791_CLK_IRQC>;
--			clock-output-names = "irqc";
-+			clock-indices = <R8A7791_CLK_IRQC R8A7791_CLK_INTC_SYS>;
-+			clock-output-names = "irqc", "intc-sys";
+ 		rcar_sound,dvc {
+ 			dvc0: dvc-0 {
+-				dmas = <&audma0 0xbc>;
++				dmas = <&audma1 0xbc>;
+ 				dma-names = "tx";
+ 			};
+ 			dvc1: dvc-1 {
+-				dmas = <&audma0 0xbe>;
++				dmas = <&audma1 0xbe>;
+ 				dma-names = "tx";
+ 			};
  		};
- 		mstp5_clks: mstp5_clks at e6150144 {
- 			compatible = "renesas,r8a7791-mstp-clocks", "renesas,cpg-mstp-clocks";
-diff --git a/include/dt-bindings/clock/r8a7791-clock.h b/include/dt-bindings/clock/r8a7791-clock.h
-index ffa11379b3f0..adc50dc31ab3 100644
---- a/include/dt-bindings/clock/r8a7791-clock.h
-+++ b/include/dt-bindings/clock/r8a7791-clock.h
-@@ -72,6 +72,7 @@
- 
- /* MSTP4 */
- #define R8A7791_CLK_IRQC		7
-+#define R8A7791_CLK_INTC_SYS		8
- 
- /* MSTP5 */
- #define R8A7791_CLK_AUDIO_DMAC1		1
 -- 
 2.7.0.rc3.207.g0ac5344
