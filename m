@@ -1,42 +1,48 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 20 Mar 2017 16:43:55 +0000
-Subject: [PATCH 05/20] ARM: implement pci_remap_cfgspace() interface
-In-Reply-To: <20170227151436.18698-6-lorenzo.pieralisi@arm.com>
-References: <20170227151436.18698-1-lorenzo.pieralisi@arm.com>
- <20170227151436.18698-6-lorenzo.pieralisi@arm.com>
-Message-ID: <20170320164354.GQ21222@n2100.armlinux.org.uk>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Mon, 20 Mar 2017 18:48:51 +0200
+Subject: [PATCH] MAINTAINERS: pinctrl: Add git tree to Samsung pinctrl entry
+Message-ID: <20170320164851.5999-1-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 27, 2017 at 03:14:16PM +0000, Lorenzo Pieralisi wrote:
-> The PCI bus specifications (rev 3.0, 3.2.5 "Transaction Ordering
-> and Posting") define rules for PCI configuration space transactions
-> ordering and posting, that state that configuration writes have to
-> be non-posted transactions.
-> 
-> Current ioremap interface on ARM provides mapping functions that
-> provide "bufferable" writes transactions (ie ioremap uses MT_DEVICE
-> memory type) aka posted writes, so PCI host controller drivers have
-> no arch interface to remap PCI configuration space with memory
-> attributes that comply with the PCI specifications for configuration
-> space.
-> 
-> Implement an ARM specific pci_remap_cfgspace() interface that allows to
-> map PCI config memory regions with MT_UNCACHED memory type (ie strongly
-> ordered - non-posted writes), providing a remap function that complies
-> with PCI specifications for config space transactions.
+Add a Git tree on @kernel.org for maintaining the Samsung pinctrl
+drivers.  The tree will be maintained in a shared model between current
+Samsung pinctrl maintainers.  Pull requests will be going to Linus
+Walleij.
 
-Doesn't this have the side effect that configuration writes can bypass
-writes to device memory if there isn't an intervening dsb?  (They
-probably can do on some CPUs today anyway.)
+Also add the patchwork for linux-samsung-soc mailing list which will be
+used for handling the patches.
 
-So, in any case, this looks like an improvement:
+Cc: Tomasz Figa <tomasz.figa@gmail.com>
+Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 
-Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
+---
 
-Thanks.
+As of now, only I have the access to this git tree. Tomasz is welcomed
+to join anytime. We are also waiting for Sywlester to get account on
+kernel.org.
 
+For the Patchwork, I use it also for Exynos/Samsung ARM architecture
+maintenance.  I will add appropriate permissions to Sylwester so we can
+share it.
+---
+ MAINTAINERS | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/MAINTAINERS b/MAINTAINERS
+index e922e0b9f0d5..83f53534c47a 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -9979,6 +9979,8 @@ M:	Krzysztof Kozlowski <krzk@kernel.org>
+ M:	Sylwester Nawrocki <s.nawrocki@samsung.com>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ L:	linux-samsung-soc at vger.kernel.org (moderated for non-subscribers)
++Q:	https://patchwork.kernel.org/project/linux-samsung-soc/list/
++T:	git git://git.kernel.org/pub/scm/linux/kernel/git/pinctrl/samsung.git
+ S:	Maintained
+ F:	drivers/pinctrl/samsung/
+ F:	include/dt-bindings/pinctrl/samsung.h
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+2.9.3
