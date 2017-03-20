@@ -1,36 +1,47 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 20 Mar 2017 09:58:23 +0100
-Subject: [GIT PULL] Renesas ARM Based SoC Drivers Updates for v4.12
-Message-ID: <cover.1490000158.git.horms+renesas@verge.net.au>
+Date: Mon, 20 Mar 2017 09:58:24 +0100
+Subject: [PATCH 2/2] soc: renesas: Identify RZ/G1N
+In-Reply-To: <cover.1490000158.git.horms+renesas@verge.net.au>
+References: <cover.1490000158.git.horms+renesas@verge.net.au>
+Message-ID: <cd59de80dd34dd2d1a3ca97d7a6e712c048b135a.1490000158.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Please consider these Renesas ARM based SoC drivers updates for v4.12.
+Add support for identifying the RZ/G1N (r8a7744) SoC.
 
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ drivers/soc/renesas/renesas-soc.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
-
-  Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
-
-are available in the git repository at:
-
-  https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-drivers-for-v4.12
-
-for you to fetch changes up to cd59de80dd34dd2d1a3ca97d7a6e712c048b135a:
-
-  soc: renesas: Identify RZ/G1N (2017-03-13 10:26:08 +0100)
-
-----------------------------------------------------------------
-Renesas ARM Based SoC Drivers Updates for v4.12
-
-* Identify RZ/G1N and RZ/G1H
-
-----------------------------------------------------------------
-Geert Uytterhoeven (2):
-      soc: renesas: Identify RZ/G1H
-      soc: renesas: Identify RZ/G1N
-
- drivers/soc/renesas/renesas-soc.c | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+diff --git a/drivers/soc/renesas/renesas-soc.c b/drivers/soc/renesas/renesas-soc.c
+index f0172e59c040..b894cf64225b 100644
+--- a/drivers/soc/renesas/renesas-soc.c
++++ b/drivers/soc/renesas/renesas-soc.c
+@@ -90,6 +90,11 @@ static const struct renesas_soc soc_rz_g1m __initconst __maybe_unused = {
+ 	.id	= 0x47,
+ };
+ 
++static const struct renesas_soc soc_rz_g1n __initconst __maybe_unused = {
++	.family	= &fam_rzg,
++	.id	= 0x4b,
++};
++
+ static const struct renesas_soc soc_rz_g1e __initconst __maybe_unused = {
+ 	.family	= &fam_rzg,
+ 	.id	= 0x4c,
+@@ -161,6 +166,9 @@ static const struct of_device_id renesas_socs[] __initconst = {
+ #ifdef CONFIG_ARCH_R8A7743
+ 	{ .compatible = "renesas,r8a7743",	.data = &soc_rz_g1m },
+ #endif
++#ifdef CONFIG_ARCH_R8A7744
++	{ .compatible = "renesas,r8a7744",	.data = &soc_rz_g1n },
++#endif
+ #ifdef CONFIG_ARCH_R8A7745
+ 	{ .compatible = "renesas,r8a7745",	.data = &soc_rz_g1e },
+ #endif
+-- 
+2.7.0.rc3.207.g0ac5344
