@@ -1,67 +1,92 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Mon, 20 Mar 2017 17:14:23 +0100
-Subject: outreachy
-In-Reply-To: <20170320103008.GA3047@kroah.com>
-References: <alpine.DEB.2.20.1703092133340.2306@hadrien>
- <443f0143-aec1-2559-a2c2-73b245632948@broadcom.com>
- <2da12619-5fcb-9e0f-b6c1-c83cbf491e8d@wwwdotorg.org>
- <20170309212021.GA24433@kroah.com> <20170317152519.GA8684@amd>
- <alpine.DEB.2.20.1703171753550.4098@hadrien>
- <20170320102032.GA17959@amd> <20170320103008.GA3047@kroah.com>
-Message-ID: <20170320161423.GB31596@amd>
+From: delicious.quinoa@gmail.com (Alan Tull)
+Date: Mon, 20 Mar 2017 11:17:29 -0500
+Subject: [PATCH v3 1/2] doc: Add bindings document for Xilinx LogiCore PR
+ Decoupler
+In-Reply-To: <1489781473-30772-1-git-send-email-mdf@kernel.org>
+References: <1489781473-30772-1-git-send-email-mdf@kernel.org>
+Message-ID: <CANk1AXRD4WVa4qrc4Mh64seu1ha+Kff=sGuZ7t98V1PnnBD9Cg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon 2017-03-20 11:30:08, Greg KH wrote:
-> On Mon, Mar 20, 2017 at 11:20:32AM +0100, Pavel Machek wrote:
-> > Hi!
-> > 
-> > > > > Hah!  That's the joy of being a maintainer of a driver in staging.  Even
-> > > > > if you filter out outreachy, you are going to get a lot of "basic
-> > > > > mistakes" and other type patches cc:ed to you.
-> > > > >
-> > > > > I strongly suggest, that if you all don't like this type of stuff,
-> > > > > either:
-> > > > > 	- work to get the code out of staging as soon as possible (i.e.
-> > > > > 	  send me coding style fixes for everything right now, and then
-> > > > > 	  fix up the rest of the stuff.)
-> > > > > 	- take yourself off the maintainer list for this code.
-> > > > >
-> > > > > It's your choice, outreachy right now is a lot of patches, but again,
-> > > > > it's not going to keep you from getting the "basic" stuff sent to you
-> > > > > in ways that is totally wrong.
-> > > >
-> > > > Could we get these trivial patches off the lkml? Yes, lkml already has
-> > > > a lot of traffic, but no, this is not useful :-(.
-> > > 
-> > > The outreachy instructions say to use the -nol argument to
-> > > get_maintainers, which would prevent them from being sent to any mailing
-> > > list.  However others thought that all patches should be sent to mailing
-> > > lists, and so I haven't enforced anything for people who have omitted
-> > > -nol.  However I have tried to remove bcm maintainers from CC lists on
-> > > replies and reminded people not to send you patches,
-> > 
-> > Wonderful :-(.
-> > 
-> > Can we at least make  those people put the word "outreachy" in the
-> > subject so the emails are easier to delete?
-> 
-> It's easy for you to filter away as-is if you want to to by just looking
-> at the cc: list for outreachy right now, don't make a new step for
-> people to jump through because you don't want to be bothered.  You only
-> have 10 more days of it if you want to just ignore any patch until
-> then...
+On Fri, Mar 17, 2017 at 3:11 PM, Moritz Fischer <mdf@kernel.org> wrote:
 
-10 more days... I can survive 10 more days. I was afraid we would be
-stuck with it "forever".
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170320/651d0dcc/attachment.sig>
+Hi Moritz,
+
+Minor nits below.  Otherwise, looks good.
+
+> This adds the binding documentation for the Xilinx LogiCORE PR
+> Decoupler soft core.
+>
+> Signed-off-by: Moritz Fischer <mdf@kernel.org>
+> Cc: Michal Simek <michal.simek@xilinx.com>
+> Cc: S?ren Brinkmann <soren.brinkmann@xilinx.com>
+> Cc: linux-kernel at vger.kernel.org
+> Cc: devicetree at vger.kernel.org
+
+Acked-by: Alan Tull <atull@kernel.org>
+
+> ---
+>
+> Changes from v2:
+> - Added refence to generic fpga-region bindings
+> - Fixed up reg property in example
+> - Added fallback to "xlnx,pr-decoupler" without version
+>
+> Changes from v1:
+> - Added clock names & clock to example
+> - Merged some of the description from Michal's version
+>
+> ---
+>  .../bindings/fpga/xilinx-pr-decoupler.txt          | 35 ++++++++++++++++++++++
+>  1 file changed, 35 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/fpga/xilinx-pr-decoupler.txt
+>
+> diff --git a/Documentation/devicetree/bindings/fpga/xilinx-pr-decoupler.txt b/Documentation/devicetree/bindings/fpga/xilinx-pr-decoupler.txt
+> new file mode 100644
+> index 0000000..16141bd
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/fpga/xilinx-pr-decoupler.txt
+> @@ -0,0 +1,35 @@
+> +Xilinx LogiCORE Partial Reconfig Decoupler Softcore
+> +
+> +The Xilinx LogiCORE Partial Reconfig Decoupler manages one or more
+> +decouplers / fpga bridges.
+> +The controller can decouple/disable the bridges which prevents signal
+> +changes from passing through the bridge.  The controller can also
+> +couple / enable the bridges which allows traffic to pass through the
+> +bridge normally.
+> +
+> +The Driver supports only MMIO handling. A PR region can have multiple
+> +PR Decouples which can bhe handled independently or chaines via decouple/
+
+s/PR Decoupler/PR Decouplers/
+s/bhe/be/
+s/chaines/chained/
+
+> +decouple_status signals.
+> +
+> +Required properties:
+> +- compatible           : Should contain "xlnx,pr-decoupler-1.00"
+> +- regs                 : base address and size for decoupler module
+> +- clocks               : input clock to IP
+> +- clock-names          : should contain "aclk"
+> +
+> +Optional properties:
+> +- bridge-enable                : 0 if driver should disable bridge at startup
+> +                         1 if driver should enable bridge at startup
+> +                         Default is to leave bridge in current state.
+> +
+> +See Documentation/devicetree/bindings/fpga/fpga-region.txt for generic bindings.
+> +
+> +Example:
+> +       fpga-bridge at 100000450 {
+> +               compatible = "xlnx,pr-decoupler-1.00",
+> +                            "xlnx-pr-decoupler";
+> +               regs = <0x10000045 0x10>;
+> +               clocks = <&clkc 15>;
+> +               clock-names = "aclk";
+> +               bridge-enable = <0>;
+> +       };
+> --
+> 2.7.4
+>
