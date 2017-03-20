@@ -1,72 +1,60 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon, 20 Mar 2017 13:43:52 -0400
-Subject: [PATCH V4 0/3] PCI/ASPM: reconfigure ASPM following hotplug for
- POLICY_DEFAULT
-In-Reply-To: <8fa282de-9896-0e2a-01cb-7146817268e6@codeaurora.org>
-References: <1489438085-2055-1-git-send-email-okaya@codeaurora.org>
- <20170313214616.GE8232@bhelgaas-glaptop.roam.corp.google.com>
- <c6b78903-ea09-9719-7073-c679b0b64a05@codeaurora.org>
- <20170313230855.GG8232@bhelgaas-glaptop.roam.corp.google.com>
- <b44fa6b3-7db5-bea4-7f2e-7f880362d171@codeaurora.org>
- <20170314192138.GA26264@bhelgaas-glaptop.roam.corp.google.com>
- <8fa282de-9896-0e2a-01cb-7146817268e6@codeaurora.org>
-Message-ID: <5049bf09-6283-b617-2c21-acf56a1faab3@codeaurora.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 20 Mar 2017 17:48:12 +0000
+Subject: [PATCH v2 01/18] arm64: Allow checking of a CPU-local erratum
+In-Reply-To: <20170320174829.28182-1-marc.zyngier@arm.com>
+References: <20170320174829.28182-1-marc.zyngier@arm.com>
+Message-ID: <20170320174829.28182-2-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
+this_cpu_has_cap() only checks the feature array, and not the errata
+one. In order to be able to check for a CPU-local erratum, allow it
+to inspect the latter as well.
 
-On 3/15/2017 10:33 AM, Sinan Kaya wrote:
-> On 3/14/2017 3:21 PM, Bjorn Helgaas wrote:
->> On Mon, Mar 13, 2017 at 07:21:42PM -0400, Sinan Kaya wrote:
->>> On 3/13/2017 7:08 PM, Bjorn Helgaas wrote:
->>>> On Mon, Mar 13, 2017 at 06:05:55PM -0400, Sinan Kaya wrote:
->>>>> On 3/13/2017 5:46 PM, Bjorn Helgaas wrote:
->>>>>> What is this series based on?  Unless they depend on other in-flight
->>>>>> patches, I apply patches to branches based on my "master" branch,
->>>>>> which is typically -rc1 or -rc2 (it's currently v4.11-rc1).  These
->>>>>> don't apply to either.
->>>>>
->>>>> It looks like I am on 4.10. I can rebase and post again. 
->>>>
->>>> Rebasing would be good, but I can give you some comments on your v4,
->>>> now that I can apply it and see what it looks like.
->>>>
->>>
->>> Thanks, 
->>>
->>> I'm mostly done with the rebase. I'll have to retest tomorrow morning and
->>> then post.
->>>
->>> I had to drop this
->>>
->>>    - for endpoints, have pcie_aspm_init_link_state() do the actual ASPM
->>>       setup of the link as it currently does.
->>>
->>> during rebase.
->>>
->>> The reason is that the clock configuration needs to switch to common clock
->>> mode across all the devices before any ASPM latency is read/configured.
->>>
->>> Common clock configuration seem to be trying to walk the device list.
->>>
->>> Here is the untested version. It might not even compile.
->>> I'll wait until I receive your comments.
->>
->> I had already started looking at v4, so these comments are based on
->> that.  Your v4 is a great start and these are all general comments so
->> I didn't try to match each one up with the code.
->>
->>   - Goal: retain BIOS ASPM config of bridge even if children are
->>     removed and re-added.  Is there a bugzilla for this problem?
-> 
+This is consistent with cpus_have_cap()'s behaviour, which includes
+errata already.
 
-Is there a common place to add code after the bus scan similar to pci_init_capabilities(). 
-I really don't like the ASPM call in the middle of scan function.
+Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm64/kernel/cpufeature.c | 13 +++++++++++--
+ 1 file changed, 11 insertions(+), 2 deletions(-)
 
-Sinan
-
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index abda8e861865..6eb77ae99b79 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -1090,20 +1090,29 @@ static void __init setup_feature_capabilities(void)
+  * Check if the current CPU has a given feature capability.
+  * Should be called from non-preemptible context.
+  */
+-bool this_cpu_has_cap(unsigned int cap)
++static bool __this_cpu_has_cap(const struct arm64_cpu_capabilities *cap_array,
++			       unsigned int cap)
+ {
+ 	const struct arm64_cpu_capabilities *caps;
+ 
+ 	if (WARN_ON(preemptible()))
+ 		return false;
+ 
+-	for (caps = arm64_features; caps->desc; caps++)
++	for (caps = cap_array; caps->desc; caps++)
+ 		if (caps->capability == cap && caps->matches)
+ 			return caps->matches(caps, SCOPE_LOCAL_CPU);
+ 
+ 	return false;
+ }
+ 
++extern const struct arm64_cpu_capabilities arm64_errata[];
++
++bool this_cpu_has_cap(unsigned int cap)
++{
++	return (__this_cpu_has_cap(arm64_features, cap) ||
++		__this_cpu_has_cap(arm64_errata, cap));
++}
++
+ void __init setup_cpu_features(void)
+ {
+ 	u32 cwg;
 -- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+2.11.0
