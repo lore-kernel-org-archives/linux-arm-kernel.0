@@ -1,87 +1,101 @@
 From: vivek.gautam@codeaurora.org (Vivek Gautam)
-Date: Mon, 20 Mar 2017 19:24:02 +0530
-Subject: [PATCH v6 0/4] phy: USB and PCIe phy drivers for Qcom chipsets
-Message-ID: <1490018046-8549-1-git-send-email-vivek.gautam@codeaurora.org>
+Date: Mon, 20 Mar 2017 19:24:03 +0530
+Subject: [PATCH v6 1/4] dt-bindings: phy: Add support for QUSB2 phy
+In-Reply-To: <1490018046-8549-1-git-send-email-vivek.gautam@codeaurora.org>
+References: <1490018046-8549-1-git-send-email-vivek.gautam@codeaurora.org>
+Message-ID: <1490018046-8549-2-git-send-email-vivek.gautam@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series adds couple of PHY drivers for Qualcomm chipsets.
-a) qcom-qusb2 phy driver: that provides High Speed USB functionality.
-b) qcom-qmp phy driver: that is a combo phy providing support for
-   USB3, PCIe, UFS and few other controllers.
+Qualcomm chipsets have QUSB2 phy controller that provides
+HighSpeed functionality for DWC3 controller.
+Adding dt binding information for the same.
 
-The patches are based on next branch of linux-phy tree, and depends
-on phy driver grouping series[1]:
-[PATCH v4 0/3] phy: Group phy drivers based on vendor listing.
-
-These patches have been tested on Dragon board db820c hardware with
-required set of dt patches and the patches to get rpm up on msm8996.
-Couple of other patches [2, 3] fixing DMA config for XHCI are also
-pulled in for testing.
-The complete branch is available in github [4].
+Signed-off-by: Vivek Gautam <vivek.gautam@codeaurora.org>
+Acked-by: Rob Herring <robh@kernel.org>
+---
 
 Changes since v5:
- - Addressed review comments from Bjorn:
-   - Removed instances of readl/wirtel_relaxed calls from the drivers.
-     Instead, using simple readl/writel. Inserting a readl after a writel
-     to ensure the write is through to the device.
-   - Replaced regulator handling with regulator_bulk_** apis. This helps
-     in cutting down a lot of regulator handling code.
-   - Fixed minor return statements.
+ - Removed leading 0 from the address in 'reg' property.
 
 Changes since v4:
- - Addressed comment to add child nodes for qmp phy driver. Each phy lane
-   now has a separate child node under the main qmp node.
- - Modified the clock and reset initialization and enable methods.
-   Different phys - pcie, usb and later ufs, have varying number of clocks
-   and resets that are mandatory. So adding provision for clocks and reset
-   lists helps in requesting all mandatory resources for individual phys
-   and handle their failure cases accordingly.
+ - None.
 
 Changes since v3:
- - Addressed review comments given by Rob and Stephen for qusb2 phy
-   and qmp phy bindings respectively.
- - Addressed review comments given by Stephen and Bjorn for qmp phy driver.
+ - Added 'Acked-by' from Rob.
+ - Removed 'reset-names' and 'nvmem-cell-names' from the bindings
+   since we use only one cell.
 
 Changes since v2:
- - Addressed review comments given by Rob and Stephen for bindings.
- - Addressed the review comments given by Stephen for the qusb2 and qmp
-   phy drivers.
+ - Removed binding for "ref_clk_src" since we don't request this
+   clock in the driver.
+ - Addressed s/vdda-phy-dpdm/vdda-phy-dpdm-supply.
+ - Addressed s/ref_clk/ref. Don't need to add '_clk' suffix to clock names.
+ - Addressed s/tune2_hstx_trim_efuse/tune2_hstx_trim. Don't need to add
+   'efuse' suffix to nvmem cell.
+ - Addressed s/qusb2phy/phy for the node name.
 
 Changes since v1:
- - Moved device tree binding documentation to separate patches, as suggested
-   by Rob.
- - Addressed review comment regarding qfprom accesses by qusb2 phy driver,
-   given by Rob.
- - Addressed review comments from Kishon.
- - Addressed review comments from Srinivas for QMP phy driver.
- - Addressed kbuild warning.
+ - New patch, forked out of the original driver patch:
+   "phy: qcom-qusb2: New driver for QUSB2 PHY on Qcom chips"
+ - Updated dt bindings to remove 'hstx-trim-bit-offset' and
+   'hstx-trim-bit-len' bindings.
 
-Please see individual patches for detailed changelogs.
-
-[1] https://www.spinics.net/lists/arm-kernel/msg569990.html
-[2] https://patchwork.kernel.org/patch/9567767/
-[3] https://patchwork.kernel.org/patch/9567779/
-[4] https://github.com/vivekgautam1/linux/tree/linux-phy-next-qcom-phy-db820c
-
-Vivek Gautam (4):
-  dt-bindings: phy: Add support for QUSB2 phy
-  phy: qcom-qusb2: New driver for QUSB2 PHY on Qcom chips
-  dt-bindings: phy: Add support for QMP phy
-  phy: qcom-qmp: new qmp phy driver for qcom-chipsets
-
- .../devicetree/bindings/phy/qcom-qmp-phy.txt       |  106 ++
- .../devicetree/bindings/phy/qcom-qusb2-phy.txt     |   45 +
- drivers/phy/qualcomm/Kconfig                       |   18 +
- drivers/phy/qualcomm/Makefile                      |    2 +
- drivers/phy/qualcomm/phy-qcom-qmp.c                | 1153 ++++++++++++++++++++
- drivers/phy/qualcomm/phy-qcom-qusb2.c              |  491 +++++++++
- 6 files changed, 1815 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/phy/qcom-qmp-phy.txt
+ .../devicetree/bindings/phy/qcom-qusb2-phy.txt     | 45 ++++++++++++++++++++++
+ 1 file changed, 45 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/phy/qcom-qusb2-phy.txt
- create mode 100644 drivers/phy/qualcomm/phy-qcom-qmp.c
- create mode 100644 drivers/phy/qualcomm/phy-qcom-qusb2.c
 
+diff --git a/Documentation/devicetree/bindings/phy/qcom-qusb2-phy.txt b/Documentation/devicetree/bindings/phy/qcom-qusb2-phy.txt
+new file mode 100644
+index 000000000000..a6d19acde9e0
+--- /dev/null
++++ b/Documentation/devicetree/bindings/phy/qcom-qusb2-phy.txt
+@@ -0,0 +1,45 @@
++Qualcomm QUSB2 phy controller
++=============================
++
++QUSB2 controller supports LS/FS/HS usb connectivity on Qualcomm chipsets.
++
++Required properties:
++ - compatible: compatible list, contains "qcom,msm8996-qusb2-phy".
++ - reg: offset and length of the PHY register set.
++ - #phy-cells: must be 0.
++
++ - clocks: a list of phandles and clock-specifier pairs,
++	   one for each entry in clock-names.
++ - clock-names: must be "cfg_ahb" for phy config clock,
++			"ref" for 19.2 MHz ref clk,
++			"iface" for phy interface clock (Optional).
++
++ - vdd-phy-supply: Phandle to a regulator supply to PHY core block.
++ - vdda-pll-supply: Phandle to 1.8V regulator supply to PHY refclk pll block.
++ - vdda-phy-dpdm-supply: Phandle to 3.1V regulator supply to Dp/Dm port signals.
++
++ - resets: Phandle to reset to phy block.
++
++Optional properties:
++ - nvmem-cells: Phandle to nvmem cell that contains 'HS Tx trim'
++		tuning parameter value for qusb2 phy.
++
++ - qcom,tcsr-syscon: Phandle to TCSR syscon register region.
++
++Example:
++	hsusb_phy: phy at 7411000 {
++		compatible = "qcom,msm8996-qusb2-phy";
++		reg = <0x7411000 0x180>;
++		#phy-cells = <0>;
++
++		clocks = <&gcc GCC_USB_PHY_CFG_AHB2PHY_CLK>,
++			<&gcc GCC_RX1_USB2_CLKREF_CLK>,
++		clock-names = "cfg_ahb", "ref";
++
++		vdd-phy-supply = <&pm8994_s2>;
++		vdda-pll-supply = <&pm8994_l12>;
++		vdda-phy-dpdm-supply = <&pm8994_l24>;
++
++		resets = <&gcc GCC_QUSB2PHY_PRIM_BCR>;
++		nvmem-cells = <&qusb2p_hstx_trim>;
++        };
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 a Linux Foundation Collaborative Project
