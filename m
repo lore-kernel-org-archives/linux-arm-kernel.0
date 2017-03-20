@@ -1,50 +1,33 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Mon, 20 Mar 2017 10:43:14 +0100
-Subject: [PATCH 7/8] dt-bindings: imx-gpc: correct the DOMAIN_INDEX using
-In-Reply-To: <1489990547-1510-8-git-send-email-aisheng.dong@nxp.com>
-References: <1489990547-1510-1-git-send-email-aisheng.dong@nxp.com>
- <1489990547-1510-8-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1490002994.2895.18.camel@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 20 Mar 2017 10:47:54 +0100
+Subject: [PATCH 1/2] [media] vcodec: mediatek: add missing linux/slab.h include
+Message-ID: <20170320094812.1365229-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, den 20.03.2017, 14:15 +0800 schrieb Dong Aisheng:
-> Actually DOMAIN_INDEX is not used by the client devices to refer to
-> the power domain, it uses phandle. Corrent the binding doc a bit
-> to avoid confusing.
-> 
-> Cc: Lucas Stach <l.stach@pengutronix.de>
-> Cc: Shawn Guo <shawnguo@kernel.org>
-> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+With the newly added driver, I have run into randconfig failures like:
 
-Thanks for the catch. Must have slipped through when changing the
-binding.
+drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c: In function 'mtk_jpeg_open':
+drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c:1017:8: error: implicit declaration of function 'kzalloc';did you mean 'kvzalloc'? [-Werror=implicit-function-declaration]
 
-Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
+Including the header with the declaration solves the problem.
 
-> ---
->  Documentation/devicetree/bindings/power/fsl,imx-gpc.txt | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/power/fsl,imx-gpc.txt b/Documentation/devicetree/bindings/power/fsl,imx-gpc.txt
-> index 06040a4..58d323c 100644
-> --- a/Documentation/devicetree/bindings/power/fsl,imx-gpc.txt
-> +++ b/Documentation/devicetree/bindings/power/fsl,imx-gpc.txt
-> @@ -20,8 +20,7 @@ subnodes of the power gating controller 'pgc' node of the GPC and should
->  contain the following:
->  
->  Required properties:
-> -- reg: the DOMAIN_INDEX as used by the client devices to refer to this
-> -  power domain
-> +- reg: Must contain the DOMAIN_INDEX of this power domain
->    The following DOMAIN_INDEX values are valid for i.MX6Q:
->    ARM_DOMAIN     0
->    PU_DOMAIN      1
-> @@ -54,6 +53,7 @@ Example:
->  				reg = <0>;
->  				#power-domain-cells = <0>;
->  			};
-> +
->  			pd_pu: power-domain at 1 {
->  				reg = <1>;
->  				#power-domain-cells = <0>;
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c b/drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c
+index b10183f7942b..f9bd58ce7d32 100644
+--- a/drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c
++++ b/drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c
+@@ -22,6 +22,7 @@
+ #include <linux/of_platform.h>
+ #include <linux/platform_device.h>
+ #include <linux/pm_runtime.h>
++#include <linux/slab.h>
+ #include <linux/spinlock.h>
+ #include <media/v4l2-event.h>
+ #include <media/v4l2-mem2mem.h>
+-- 
+2.9.0
