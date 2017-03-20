@@ -1,403 +1,57 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Mon, 20 Mar 2017 11:58:10 +0100
-Subject: [PATCH 1/9] KVM: arm/arm64: vgic: Defer touching GICH_VMCR to
- vcpu_load/put
+Date: Mon, 20 Mar 2017 11:58:11 +0100
+Subject: [PATCH 2/9] KVM: arm/arm64: vgic: Avoid flushing vgic state when
+ there's no pending IRQ
 In-Reply-To: <20170320105818.20481-1-cdall@linaro.org>
 References: <20170320105818.20481-1-cdall@linaro.org>
-Message-ID: <20170320105818.20481-2-cdall@linaro.org>
+Message-ID: <20170320105818.20481-3-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Christoffer Dall <cdall@cs.columbia.edu>
+From: Shih-Wei Li <shihwei@cs.columbia.edu>
 
-We don't have to save/restore the VMCR on every entry to/from the guest,
-since on GICv2 we can access the control interface from EL1 and on VHE
-systems with GICv3 we can access the control interface from KVM running
-in EL2.
+We do not need to flush vgic states in each world switch unless
+there is pending IRQ queued to the vgic's ap list. We can thus reduce
+the overhead by not grabbing the spinlock and not making the extra
+function call to vgic_flush_lr_state.
 
-GICv3 systems without VHE becomes the rare case, which has to
-save/restore the register on each round trip.
-
-For in-context accesses to the VMCR, meaning emulation code needs access
-to the value of the VCPU that is currently running within vcpu_load
-and vcpu_put will detect that the it should load the VMCR from the
-physical GIC instead of using the cached memory value.  While this extra
-checking adds some code complexity we end up moving code out of the
-critical path.
-
-Note that userspace accesses may see out-of-date values if the VCPU is
-running while accessing the VGIC state via the KVM device API, but this
-is already the case.
-
-Signed-off-by: Christoffer Dall <cdall@cs.columbia.edu>
+Signed-off-by: Shih-Wei Li <shihwei@cs.columbia.edu>
 Signed-off-by: Christoffer Dall <cdall@linaro.org>
 ---
- arch/arm/include/asm/kvm_asm.h   |  3 +++
- arch/arm/kvm/arm.c               | 11 +++++-----
- arch/arm64/include/asm/kvm_asm.h |  2 ++
- include/kvm/arm_vgic.h           |  3 +++
- virt/kvm/arm/hyp/vgic-v2-sr.c    |  3 ---
- virt/kvm/arm/hyp/vgic-v3-sr.c    | 14 ++++++++----
- virt/kvm/arm/vgic/vgic-init.c    | 12 +++++++++++
- virt/kvm/arm/vgic/vgic-v2.c      | 46 ++++++++++++++++++++++++++++++++++++++--
- virt/kvm/arm/vgic/vgic-v3.c      | 42 ++++++++++++++++++++++++++++++++++--
- virt/kvm/arm/vgic/vgic.c         | 22 +++++++++++++++++++
- virt/kvm/arm/vgic/vgic.h         |  6 ++++++
- 11 files changed, 148 insertions(+), 16 deletions(-)
+ virt/kvm/arm/vgic/vgic.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
-index 8ef0538..dd16044 100644
---- a/arch/arm/include/asm/kvm_asm.h
-+++ b/arch/arm/include/asm/kvm_asm.h
-@@ -75,7 +75,10 @@ extern void __init_stage2_translation(void);
- extern void __kvm_hyp_reset(unsigned long);
- 
- extern u64 __vgic_v3_get_ich_vtr_el2(void);
-+extern u64 __vgic_v3_read_vmcr(void);
-+extern void __vgic_v3_write_vmcr(u32 vmcr);
- extern void __vgic_v3_init_lrs(void);
-+
- #endif
- 
- #endif /* __ARM_KVM_ASM_H__ */
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index d775aac..cfdf2f5 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -348,15 +348,14 @@ void kvm_arch_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
- 	vcpu->arch.host_cpu_context = this_cpu_ptr(kvm_host_cpu_state);
- 
- 	kvm_arm_set_running_vcpu(vcpu);
-+
-+	kvm_vgic_load(vcpu);
- }
- 
- void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
- {
--	/*
--	 * The arch-generic KVM code expects the cpu field of a vcpu to be -1
--	 * if the vcpu is no longer assigned to a cpu.  This is used for the
--	 * optimized make_all_cpus_request path.
--	 */
-+	kvm_vgic_put(vcpu);
-+
- 	vcpu->cpu = -1;
- 
- 	kvm_arm_set_running_vcpu(NULL);
-@@ -630,7 +629,9 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 		 * non-preemptible context.
- 		 */
- 		preempt_disable();
-+
- 		kvm_pmu_flush_hwstate(vcpu);
-+
- 		kvm_timer_flush_hwstate(vcpu);
- 		kvm_vgic_flush_hwstate(vcpu);
- 
-diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
-index ec3553eb..49f99cd 100644
---- a/arch/arm64/include/asm/kvm_asm.h
-+++ b/arch/arm64/include/asm/kvm_asm.h
-@@ -59,6 +59,8 @@ extern void __kvm_tlb_flush_local_vmid(struct kvm_vcpu *vcpu);
- extern int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
- 
- extern u64 __vgic_v3_get_ich_vtr_el2(void);
-+extern u64 __vgic_v3_read_vmcr(void);
-+extern void __vgic_v3_write_vmcr(u32 vmcr);
- extern void __vgic_v3_init_lrs(void);
- 
- extern u32 __kvm_get_mdcr_el2(void);
-diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index c0b3d99..8d7c3a7 100644
---- a/include/kvm/arm_vgic.h
-+++ b/include/kvm/arm_vgic.h
-@@ -307,6 +307,9 @@ bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, unsigned int virt_irq);
- 
- int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu);
- 
-+void kvm_vgic_load(struct kvm_vcpu *vcpu);
-+void kvm_vgic_put(struct kvm_vcpu *vcpu);
-+
- #define irqchip_in_kernel(k)	(!!((k)->arch.vgic.in_kernel))
- #define vgic_initialized(k)	((k)->arch.vgic.initialized)
- #define vgic_ready(k)		((k)->arch.vgic.ready)
-diff --git a/virt/kvm/arm/hyp/vgic-v2-sr.c b/virt/kvm/arm/hyp/vgic-v2-sr.c
-index c8aeb7b..d3d3b9b 100644
---- a/virt/kvm/arm/hyp/vgic-v2-sr.c
-+++ b/virt/kvm/arm/hyp/vgic-v2-sr.c
-@@ -114,8 +114,6 @@ void __hyp_text __vgic_v2_save_state(struct kvm_vcpu *vcpu)
- 	if (!base)
- 		return;
- 
--	cpu_if->vgic_vmcr = readl_relaxed(base + GICH_VMCR);
--
- 	if (vcpu->arch.vgic_cpu.live_lrs) {
- 		cpu_if->vgic_apr = readl_relaxed(base + GICH_APR);
- 
-@@ -165,7 +163,6 @@ void __hyp_text __vgic_v2_restore_state(struct kvm_vcpu *vcpu)
- 		}
- 	}
- 
--	writel_relaxed(cpu_if->vgic_vmcr, base + GICH_VMCR);
- 	vcpu->arch.vgic_cpu.live_lrs = live_lrs;
- }
- 
-diff --git a/virt/kvm/arm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
-index 3947095..e51ee7e 100644
---- a/virt/kvm/arm/hyp/vgic-v3-sr.c
-+++ b/virt/kvm/arm/hyp/vgic-v3-sr.c
-@@ -159,8 +159,6 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
- 	if (!cpu_if->vgic_sre)
- 		dsb(st);
- 
--	cpu_if->vgic_vmcr  = read_gicreg(ICH_VMCR_EL2);
--
- 	if (vcpu->arch.vgic_cpu.live_lrs) {
- 		int i;
- 		u32 max_lr_idx, nr_pri_bits;
-@@ -261,8 +259,6 @@ void __hyp_text __vgic_v3_restore_state(struct kvm_vcpu *vcpu)
- 			live_lrs |= (1 << i);
- 	}
- 
--	write_gicreg(cpu_if->vgic_vmcr, ICH_VMCR_EL2);
--
- 	if (live_lrs) {
- 		write_gicreg(cpu_if->vgic_hcr, ICH_HCR_EL2);
- 
-@@ -326,3 +322,13 @@ u64 __hyp_text __vgic_v3_get_ich_vtr_el2(void)
- {
- 	return read_gicreg(ICH_VTR_EL2);
- }
-+
-+u64 __hyp_text __vgic_v3_read_vmcr(void)
-+{
-+	return read_gicreg(ICH_VMCR_EL2);
-+}
-+
-+void __hyp_text __vgic_v3_write_vmcr(u32 vmcr)
-+{
-+	write_gicreg(vmcr, ICH_VMCR_EL2);
-+}
-diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
-index 702f810..3762fd1 100644
---- a/virt/kvm/arm/vgic/vgic-init.c
-+++ b/virt/kvm/arm/vgic/vgic-init.c
-@@ -262,6 +262,18 @@ int vgic_init(struct kvm *kvm)
- 	vgic_debug_init(kvm);
- 
- 	dist->initialized = true;
-+
-+	/*
-+	 * If we're initializing GICv2 on-demand when first running the VCPU
-+	 * then we need to load the VGIC state onto the CPU.  We can detect
-+	 * this easily by checking if we are in between vcpu_load and vcpu_put
-+	 * when we just initialized the VGIC.
-+	 */
-+	preempt_disable();
-+	vcpu = kvm_arm_get_running_vcpu();
-+	if (vcpu)
-+		kvm_vgic_load(vcpu);
-+	preempt_enable();
- out:
- 	return ret;
- }
-diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
-index 94cf4b9..dfe6e5e 100644
---- a/virt/kvm/arm/vgic/vgic-v2.c
-+++ b/virt/kvm/arm/vgic/vgic-v2.c
-@@ -199,6 +199,9 @@ void vgic_v2_clear_lr(struct kvm_vcpu *vcpu, int lr)
- 
- void vgic_v2_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
- {
-+	struct vgic_dist *vgic = &vcpu->kvm->arch.vgic;
-+	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
-+	int cpu;
- 	u32 vmcr;
- 
- 	vmcr  = (vmcrp->ctlr << GICH_VMCR_CTRL_SHIFT) & GICH_VMCR_CTRL_MASK;
-@@ -209,12 +212,35 @@ void vgic_v2_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
- 	vmcr |= (vmcrp->pmr << GICH_VMCR_PRIMASK_SHIFT) &
- 		GICH_VMCR_PRIMASK_MASK;
- 
--	vcpu->arch.vgic_cpu.vgic_v2.vgic_vmcr = vmcr;
-+	cpu_if->vgic_vmcr = vmcr;
-+
-+	cpu = get_cpu();
-+	if (vcpu->cpu == cpu)
-+		/*
-+		 * We have run vcpu_load and we're on VHE which means the VMCR
-+		 * has already been flushed to the CPU; flush it again.
-+		 */
-+		writel_relaxed(vmcr, vgic->vctrl_base + GICH_VMCR);
-+	put_cpu();
- }
- 
- void vgic_v2_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
- {
--	u32 vmcr = vcpu->arch.vgic_cpu.vgic_v2.vgic_vmcr;
-+	struct vgic_dist *vgic = &vcpu->kvm->arch.vgic;
-+	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
-+	int cpu;
-+	u32 vmcr;
-+
-+	cpu = get_cpu();
-+	if (vcpu->cpu == cpu)
-+		/*
-+		 * We have run vcpu_load and which means the VMCR
-+		 * has already been flushed to the CPU; sync it back.
-+		 */
-+		cpu_if->vgic_vmcr = readl_relaxed(vgic->vctrl_base + GICH_VMCR);
-+	put_cpu();
-+
-+	vmcr = cpu_if->vgic_vmcr;
- 
- 	vmcrp->ctlr = (vmcr & GICH_VMCR_CTRL_MASK) >>
- 			GICH_VMCR_CTRL_SHIFT;
-@@ -390,3 +416,19 @@ int vgic_v2_probe(const struct gic_kvm_info *info)
- 
- 	return ret;
- }
-+
-+void vgic_v2_load(struct kvm_vcpu *vcpu)
-+{
-+	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
-+	struct vgic_dist *vgic = &vcpu->kvm->arch.vgic;
-+
-+	writel_relaxed(cpu_if->vgic_vmcr, vgic->vctrl_base + GICH_VMCR);
-+}
-+
-+void vgic_v2_put(struct kvm_vcpu *vcpu)
-+{
-+	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
-+	struct vgic_dist *vgic = &vcpu->kvm->arch.vgic;
-+
-+	cpu_if->vgic_vmcr = readl_relaxed(vgic->vctrl_base + GICH_VMCR);
-+}
-diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-index edc6ee2..3d7796c 100644
---- a/virt/kvm/arm/vgic/vgic-v3.c
-+++ b/virt/kvm/arm/vgic/vgic-v3.c
-@@ -173,7 +173,9 @@ void vgic_v3_clear_lr(struct kvm_vcpu *vcpu, int lr)
- 
- void vgic_v3_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
- {
-+	struct vgic_v3_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v3;
- 	u32 vmcr;
-+	int cpu;
- 
- 	/*
- 	 * Ignore the FIQen bit, because GIC emulation always implies
-@@ -188,12 +190,34 @@ void vgic_v3_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
- 	vmcr |= (vmcrp->grpen0 << ICH_VMCR_ENG0_SHIFT) & ICH_VMCR_ENG0_MASK;
- 	vmcr |= (vmcrp->grpen1 << ICH_VMCR_ENG1_SHIFT) & ICH_VMCR_ENG1_MASK;
- 
--	vcpu->arch.vgic_cpu.vgic_v3.vgic_vmcr = vmcr;
-+	cpu_if->vgic_vmcr = vmcr;
-+
-+	cpu = get_cpu();
-+	if (vcpu->cpu == cpu)
-+		/*
-+		 * We have run vcpu_load which means the VMCR
-+		 * has already been flushed to the CPU; flush it again.
-+		 */
-+		kvm_call_hyp(__vgic_v3_write_vmcr, vmcr);
-+	put_cpu();
- }
- 
- void vgic_v3_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
- {
--	u32 vmcr = vcpu->arch.vgic_cpu.vgic_v3.vgic_vmcr;
-+	struct vgic_v3_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v3;
-+	int cpu;
-+	u32 vmcr;
-+
-+	cpu = get_cpu();
-+	if (vcpu->cpu == cpu)
-+		/*
-+		 * We have run vcpu_load and which means the VMCR
-+		 * has already been flushed to the CPU; sync it back.
-+		 */
-+		cpu_if->vgic_vmcr = kvm_call_hyp(__vgic_v3_read_vmcr);
-+	put_cpu();
-+
-+	vmcr = cpu_if->vgic_vmcr;
- 
- 	/*
- 	 * Ignore the FIQen bit, because GIC emulation always implies
-@@ -383,3 +407,17 @@ int vgic_v3_probe(const struct gic_kvm_info *info)
- 
- 	return 0;
- }
-+
-+void vgic_v3_load(struct kvm_vcpu *vcpu)
-+{
-+	struct vgic_v3_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v3;
-+
-+	kvm_call_hyp(__vgic_v3_write_vmcr, cpu_if->vgic_vmcr);
-+}
-+
-+void vgic_v3_put(struct kvm_vcpu *vcpu)
-+{
-+	struct vgic_v3_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v3;
-+
-+	cpu_if->vgic_vmcr = kvm_call_hyp(__vgic_v3_read_vmcr);
-+}
 diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-index 654dfd4..2ac0def 100644
+index 2ac0def..1436c2e 100644
 --- a/virt/kvm/arm/vgic/vgic.c
 +++ b/virt/kvm/arm/vgic/vgic.c
-@@ -656,6 +656,28 @@ void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu)
- 	spin_unlock(&vcpu->arch.vgic_cpu.ap_list_lock);
+@@ -637,12 +637,17 @@ static void vgic_flush_lr_state(struct kvm_vcpu *vcpu)
+ /* Sync back the hardware VGIC state into our emulation after a guest's run. */
+ void kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
+ {
++	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
++
+ 	if (unlikely(!vgic_initialized(vcpu->kvm)))
+ 		return;
+ 
+ 	vgic_process_maintenance_interrupt(vcpu);
+ 	vgic_fold_lr_state(vcpu);
+ 	vgic_prune_ap_list(vcpu);
++
++	/* Make sure we can fast-path in flush_hwstate */
++	vgic_cpu->used_lrs = 0;
  }
  
-+void kvm_vgic_load(struct kvm_vcpu *vcpu)
-+{
-+	if (unlikely(!vgic_initialized(vcpu->kvm)))
+ /* Flush our emulation state into the GIC hardware before entering the guest. */
+@@ -651,6 +656,9 @@ void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu)
+ 	if (unlikely(!vgic_initialized(vcpu->kvm)))
+ 		return;
+ 
++	if (list_empty(&vcpu->arch.vgic_cpu.ap_list_head))
 +		return;
 +
-+	if (kvm_vgic_global_state.type == VGIC_V2)
-+		vgic_v2_load(vcpu);
-+	else
-+		vgic_v3_load(vcpu);
-+}
-+
-+void kvm_vgic_put(struct kvm_vcpu *vcpu)
-+{
-+	if (unlikely(!vgic_initialized(vcpu->kvm)))
-+		return;
-+
-+	if (kvm_vgic_global_state.type == VGIC_V2)
-+		vgic_v2_put(vcpu);
-+	else
-+		vgic_v3_put(vcpu);
-+}
-+
- int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu)
- {
- 	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
-diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-index 91566f5..3f64220 100644
---- a/virt/kvm/arm/vgic/vgic.h
-+++ b/virt/kvm/arm/vgic/vgic.h
-@@ -132,6 +132,9 @@ int vgic_register_dist_iodev(struct kvm *kvm, gpa_t dist_base_address,
- 
- void vgic_v2_init_lrs(void);
- 
-+void vgic_v2_load(struct kvm_vcpu *vcpu);
-+void vgic_v2_put(struct kvm_vcpu *vcpu);
-+
- static inline void vgic_get_irq_kref(struct vgic_irq *irq)
- {
- 	if (irq->intid < VGIC_MIN_LPI)
-@@ -152,6 +155,9 @@ int vgic_v3_probe(const struct gic_kvm_info *info);
- int vgic_v3_map_resources(struct kvm *kvm);
- int vgic_register_redist_iodevs(struct kvm *kvm, gpa_t dist_base_address);
- 
-+void vgic_v3_load(struct kvm_vcpu *vcpu);
-+void vgic_v3_put(struct kvm_vcpu *vcpu);
-+
- int vgic_register_its_iodevs(struct kvm *kvm);
- bool vgic_has_its(struct kvm *kvm);
- int kvm_vgic_register_its_device(void);
+ 	spin_lock(&vcpu->arch.vgic_cpu.ap_list_lock);
+ 	vgic_flush_lr_state(vcpu);
+ 	spin_unlock(&vcpu->arch.vgic_cpu.ap_list_lock);
 -- 
 2.9.0
