@@ -1,89 +1,67 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 20 Mar 2017 17:48:11 +0000
-Subject: [PATCH v2 00/18] clocksource/arch_timer: Errata workaround
- infrastructure rework
-Message-ID: <20170320174829.28182-1-marc.zyngier@arm.com>
+Date: Mon, 20 Mar 2017 17:48:13 +0000
+Subject: [PATCH v2 02/18] arm64: Add CNTVCT_EL0 trap handler
+In-Reply-To: <20170320174829.28182-1-marc.zyngier@arm.com>
+References: <20170320174829.28182-1-marc.zyngier@arm.com>
+Message-ID: <20170320174829.28182-3-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It has recently become obvious that a number of arm64 systems have
-been blessed with a set of timers that are slightly less than perfect,
-and require a bit of hand-holding. We already have a bunch of
-errata-specific code to deal with this, but as we're adding more
-potential detection methods (DT, ACPI, capability), things are getting
-a bit out of hands.
+Since people seem to make a point in breaking the userspace visible
+counter, we have no choice but to trap the access. Add the required
+handler.
 
-Instead of adding more ad-hoc fixes to an already difficult code base,
-let's give ourselves a bit of an infrastructure that can deal with
-this and hide most of the uggliness behind frendly accessors.
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm64/include/asm/esr.h |  2 ++
+ arch/arm64/kernel/traps.c    | 14 ++++++++++++++
+ 2 files changed, 16 insertions(+)
 
-The series is structured as such:
-
-- A bunch of arm64 specific patches that allow the rest of the
-  workaround infrastructure to be built upon (such as being able to
-  trap userspace access to the virtual counter). These are now
-  separate in order to allow the creation of a shared branch between
-  the arm64 and clocksource trees.
-
-- The following patches rework the existing workarounds, allowing
-  errata to be matched using a given detection method
-
-- Another patch allows a workaround to affect a subset of the CPUs,
-  and not the whole system
-
-- We then work around a Cortex-A73 erratum, whose counter can return a
-  wrong value if read while crossing a 32bit boundary
-
-- Finally, we add some ACPI-specific workarounds for HiSilicon
-  platforms that have the HISILICON_ERRATUM_161010101 defect.
-
-Note that so far, we only deal with arm64. Once the infrastructure is
-agreed upon, we can look at generalizing it (to some extent) to 32bit
-ARM (typical use case would be a 32bit guest running on an affected
-host).
-
-* From v1:
-  - Addressed Hanjun and Mark review comments
-  - Moved arm64 specific patches to the beginning of the series,
-    leaving the clocksource patches at the end, resulting in an extra
-    patch.
-  - Added RBs, TBs, and Acks.
-
-Marc Zyngier (18):
-  arm64: Allow checking of a CPU-local erratum
-  arm64: Add CNTVCT_EL0 trap handler
-  arm64: Define Cortex-A73 MIDR
-  arm64: cpu_errata: Allow an erratum to be match for all revisions of a
-    core
-  arm64: cpu_errata: Add capability to advertise Cortex-A73 erratum
-    858921
-  arm64: arch_timer: Add infrastructure for multiple erratum detection
-    methods
-  arm64: arch_timer: Add erratum handler for globally defined capability
-  arm64: arch_timer: Add erratum handler for CPU-specific capability
-  arm64: arch_timer: Move arch_timer_reg_read/write around
-  arm64: arch_timer: Get rid of erratum_workaround_set_sne
-  arm64: arch_timer: Rework the set_next_event workarounds
-  arm64: arch_timer: Make workaround methods optional
-  arm64: arch_timer: Allows a CPU-specific erratum to only affect a
-    subset of CPUs
-  arm64: arch_timer: Move clocksource_counter and co around
-  arm64: arch_timer: Enable CNTVCT_EL0 trap if workaround is enabled
-  arm64: arch_timer: Workaround for Cortex-A73 erratum 858921
-  arm64: arch_timer: Allow erratum matching with ACPI OEM information
-  arm64: arch_timer: Add HISILICON_ERRATUM_161010101 ACPI matching data
-
- Documentation/arm64/silicon-errata.txt |   1 +
- arch/arm64/include/asm/arch_timer.h    |  44 ++-
- arch/arm64/include/asm/cpucaps.h       |   3 +-
- arch/arm64/include/asm/cputype.h       |   2 +
- arch/arm64/include/asm/esr.h           |   2 +
- arch/arm64/kernel/cpu_errata.c         |  15 +
- arch/arm64/kernel/cpufeature.c         |  13 +-
- arch/arm64/kernel/traps.c              |  14 +
- drivers/clocksource/Kconfig            |  11 +
- drivers/clocksource/arm_arch_timer.c   | 535 +++++++++++++++++++++++----------
- 10 files changed, 471 insertions(+), 169 deletions(-)
-
+diff --git a/arch/arm64/include/asm/esr.h b/arch/arm64/include/asm/esr.h
+index d14c478976d0..ad42e79a5d4d 100644
+--- a/arch/arm64/include/asm/esr.h
++++ b/arch/arm64/include/asm/esr.h
+@@ -175,6 +175,8 @@
+ #define ESR_ELx_SYS64_ISS_SYS_CTR_READ	(ESR_ELx_SYS64_ISS_SYS_CTR | \
+ 					 ESR_ELx_SYS64_ISS_DIR_READ)
+ 
++#define ESR_ELx_SYS64_ISS_SYS_CNTVCT	(ESR_ELx_SYS64_ISS_SYS_VAL(3, 3, 2, 14, 0) | \
++					 ESR_ELx_SYS64_ISS_DIR_READ)
+ #ifndef __ASSEMBLY__
+ #include <asm/types.h>
+ 
+diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+index e52be6aa44ee..1de444e6c669 100644
+--- a/arch/arm64/kernel/traps.c
++++ b/arch/arm64/kernel/traps.c
+@@ -505,6 +505,14 @@ static void ctr_read_handler(unsigned int esr, struct pt_regs *regs)
+ 	regs->pc += 4;
+ }
+ 
++static void cntvct_read_handler(unsigned int esr, struct pt_regs *regs)
++{
++	int rt = (esr & ESR_ELx_SYS64_ISS_RT_MASK) >> ESR_ELx_SYS64_ISS_RT_SHIFT;
++
++	pt_regs_write_reg(regs, rt, arch_counter_get_cntvct());
++	regs->pc += 4;
++}
++
+ struct sys64_hook {
+ 	unsigned int esr_mask;
+ 	unsigned int esr_val;
+@@ -523,6 +531,12 @@ static struct sys64_hook sys64_hooks[] = {
+ 		.esr_val = ESR_ELx_SYS64_ISS_SYS_CTR_READ,
+ 		.handler = ctr_read_handler,
+ 	},
++	{
++		/* Trap read access to CNTVCT_EL0 */
++		.esr_mask = ESR_ELx_SYS64_ISS_SYS_OP_MASK,
++		.esr_val = ESR_ELx_SYS64_ISS_SYS_CNTVCT,
++		.handler = cntvct_read_handler,
++	},
+ 	{},
+ };
+ 
 -- 
 2.11.0
