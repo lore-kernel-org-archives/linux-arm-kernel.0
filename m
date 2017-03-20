@@ -1,40 +1,33 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 20 Mar 2017 09:57:15 +0100
-Subject: [PATCH 04/32] arm64: dts: r8a7795: salvator-x: Enable I2C for DVFS
- device
-In-Reply-To: <cover.1489999913.git.horms+renesas@verge.net.au>
-References: <cover.1489999913.git.horms+renesas@verge.net.au>
-Message-ID: <006ced572a3b2247639ce06443aff00704888001.1489999913.git.horms+renesas@verge.net.au>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 20 Mar 2017 09:58:08 +0100
+Subject: [PATCH] clk: sunxi-ng: Fix div/mult settings for osc12M on A64
+In-Reply-To: <1489577038-34773-1-git-send-email-philipp.tomsich@theobroma-systems.com>
+References: <1489577038-34773-1-git-send-email-philipp.tomsich@theobroma-systems.com>
+Message-ID: <20170320085808.ofixt6jacim3rzuj@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Keita Kobayashi <keita.kobayashi.ym@renesas.com>
+On Wed, Mar 15, 2017 at 12:23:58PM +0100, Philipp Tomsich wrote:
+> The mult/div for osc12M was previously backwards (giving a 48M rate
+> for osc12M). Fix it.
+> 
+> X-AffectedPlatforms: A64-uQ7
+> Signed-off-by: Philipp Tomsich <philipp.tomsich@theobroma-systems.com>
+> Tested-by: Christoph Muellner <christoph.muellner@theobroma-systems.com>
+> 
+> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-This patch enables I2C for DVFS device for for Salvator-X board on
-R8A7795 SoC.
+I dropped your extra tag, and queued it for 4.11, thanks!
+Maxime
 
-Signed-off-by: Keita Kobayashi <keita.kobayashi.ym@renesas.com>
-Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
- arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts | 4 ++++
- 1 file changed, 4 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
-index 7a8986edcdc0..dc1177c76aa5 100644
---- a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
-+++ b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
-@@ -485,6 +485,10 @@
- 	clock-frequency = <22579200>;
- };
- 
-+&i2c_dvfs {
-+	status = "okay";
-+};
-+
- &avb {
- 	pinctrl-0 = <&avb_pins>;
- 	pinctrl-names = "default";
 -- 
-2.7.0.rc3.207.g0ac5344
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170320/67e3347c/attachment-0001.sig>
