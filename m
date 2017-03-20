@@ -1,86 +1,87 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 20 Mar 2017 19:26:17 +0000
-Subject: [PATCH 1/2] arm: Fix cache inconsistency when using fixmap
-In-Reply-To: <1490036951.2945.8.camel@linaro.org>
-References: <20170316132958.22227-1-tixy@linaro.org>
- <20170317115321.GB21222@n2100.armlinux.org.uk>
- <1489767002.3063.10.camel@linaro.org>
- <CAKv+Gu8hLcfT6t90qbMT2qxzTMoJHiPxaCvHirQEVmKjYDvqBw@mail.gmail.com>
- <1490036951.2945.8.camel@linaro.org>
-Message-ID: <CAKv+Gu_5yJc=pv-dc8yJpzh84jz-X3B89qwakX0=RJecKrQW2w@mail.gmail.com>
+From: slongerbeam@gmail.com (Steve Longerbeam)
+Date: Mon, 20 Mar 2017 12:48:11 -0700
+Subject: [PATCH v5 38/39] media: imx: csi: fix crop rectangle reset in
+ sink set_fmt
+In-Reply-To: <1490018451.2917.86.camel@pengutronix.de>
+References: <1489121599-23206-1-git-send-email-steve_longerbeam@mentor.com>
+ <1489121599-23206-39-git-send-email-steve_longerbeam@mentor.com>
+ <20170319152233.GW21222@n2100.armlinux.org.uk>
+ <327d67d9-68c1-7f74-0c0f-f6aee1c4b546@gmail.com>
+ <1490010926.2917.59.camel@pengutronix.de>
+ <20170320120855.GH21222@n2100.armlinux.org.uk>
+ <1490018451.2917.86.camel@pengutronix.de>
+Message-ID: <709728d3-83ab-90cf-44d4-dcf41e6fbee7@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 March 2017 at 19:09, Jon Medhurst (Tixy) <tixy@linaro.org> wrote:
-> On Fri, 2017-03-17 at 16:18 +0000, Ard Biesheuvel wrote:
->> On 17 March 2017 at 16:10, Jon Medhurst (Tixy) <tixy@linaro.org> wrote:
->> >
-> [...]
->> > It looks to me that build_mem_type_table doesn't have much in the way of
->> > dependencies so can probably be just called earlier. So, is the correct
->> > solution to
->> >
->> > a) call build_mem_type_table from setup_arch before early_fixmap_init
->> > b) move call to build_mem_type_table into early_fixmap_init
->> > c) call build_mem_type_table from early_fixmap_init as well as
->> > paging_init and have a test in build_mem_type_table so it only exectutes
->> > once
->> > d) something else
->> >
->> > a) seems simplest, b) seems wrong, c) seems over the top
->> >
->> > Anyway, below is an alternative to $subject patch that works for my
->> > kprobes test cases. Note, the removal of FIXMAP_PAGE_{NORMAL,RO} means
->> > the generic fixmap code will define these from PAGE_KERNEL{,_RO}.
->> >
->> > Not knowing how early fixmap is used, I hope Stefan and/or Ard have
->> > testcases they could run.
->> >
+
+
+On 03/20/2017 07:00 AM, Philipp Zabel wrote:
+> On Mon, 2017-03-20 at 12:08 +0000, Russell King - ARM Linux wrote:
+>> On Mon, Mar 20, 2017 at 12:55:26PM +0100, Philipp Zabel wrote:
+>>> The above paragraph suggests we skip any rectangles that are not
+>>> supported. In our case that would be 3. and 4., since the CSI can't
+>>> compose into a larger frame. I hadn't realised that the crop selection
+>>> currently happens on the source pad.
+>> I'd recommend viewing the documentation in its post-processed version,
+>> because then you get the examples as pictures, and they say that a
+>> picture is worth 1000 words.  See
 >>
->> The early UEFI boot code maps firmware tables using early_ioremap(),
->> which is layered on top of early_fixmap(). This code executes after
->> early_ioremap_init(), so moving build_mem_type_table() before that
->> sounds like the obvious fix to me. The other use case is earlycon,
->> which uses early_fixmap() directly, but afaict, the same applies there
->> as well.
->
-> So is that 'code should work, no need to test'? Guess it should be safe
-> to skip if those use cases use FIXMAP_PAGE_NOCACHE and FIXMAP_PAGE_IO
-> and we don't change those defines.
->
-
-In fact, the UEFI code uses early_memremap() not early_ioremap(), and
-it does use the memory defines, not the device ones.
-
-So yes, I should test it, but I don't see any reason for huge concern,
-given that the UEFI code maps and unmaps those tables when we're still
-running UP
-
->> In terms of code changes, there is a d) option where the call sequence
->> build_mem_type/early_fixmap_init/early_ioremap_init is grouped into a
->> new function in mm/mmu.c, which you can call from setup_arch(). That
->> would be the cleanest approach imo.
->
-> Any suggestion on a name for that function?
->
-
-early_mm_init?
-
+>>    https://linuxtv.org/downloads/v4l-dvb-apis/uapi/v4l/dev-subdev.html
 >>
->> > I'm also wondering if the existing definition of FIXMAP_PAGE_IO is
->> > correc
->> > t and should not also be based on some platform specific value
->> > calculated
->> >  in build_mem_type_table?
+>> There is almost an exact example of what we're trying to do - it's
+>> figure 4.6.  Here, we have a sink pad with a cropping rectangle on
+>> the input, which is then scaled to a composition rectangle (there's
+>> no bounds rectangle, and it's specified that in such a case the
+>> top,left of the composition rectangle will always be 0,0 - see quote
+>> below).
+>>
+>> Where it differs is that the example also supports source cropping
+>> for two source pads.  We don't support that.
+>>
+>> The same document says:
+>>
+>>    Scaling support is optional. When supported by a subdev, the crop
+>>    rectangle on the subdev's sink pad is scaled to the size configured
+>>    using the
+>>    :ref:`VIDIOC_SUBDEV_S_SELECTION <VIDIOC_SUBDEV_G_SELECTION>` IOCTL
+>>    using ``V4L2_SEL_TGT_COMPOSE`` selection target on the same pad. If the
+>>    subdev supports scaling but not composing, the top and left values are
+>>    not used and must always be set to zero.
+> Right, this sentence does imply that when scaling is supported, there
+> must be a sink compose rectangle, even when composing is not.
+
+Ok, this all makes consistent sense to me too. So:
+
+- the CSI hardware cropping rectangle should be specified via the
+   sink pad crop selection.
+
+- the CSI hardware /2 downscaler should be specified via the
+   sink pad compose selection.
+
+- the final source pad rectangle is the same as the sink pad
+   compose rectangle.
+
+So that leaves only step 4 (source pad crop selection) as
+unsupported.
+
+Steve
+
+
+> I have previously set up scaling like this:
 >
-> Answering myself. FIXMAP_PAGE_IO is defined with the same values as
-> mem_types[MT_DEVICE].prot_pte which doesn't get modified at runtime, so
-> should be correct... Unless the device being mapped needs Non-shareable
-> Device memory (MT_DEVICE_NONSHARED) in which case we're onto dodgy
-> ground. I can't see how we can detect that in code or help someone using
-> the API to avoid that. I certainly don't intend trying to redesign the
-> API and implementation of early_ioremap to fix these limitations.
+> media-ctl --set-v4l2 "'ipu1_csi0_mux':2[fmt:UYVY2X8/1920x1080 at 1/60]"
+> media-ctl --set-v4l2 "'ipu1_csi0':2[fmt:AYUV32/960x540 at 1/30]"
 >
-> --
-> Tixy
+> Does this mean, it should work like this instead?
+>
+> media-ctl --set-v4l2 "'ipu1_csi0_mux':2[fmt:UYVY2X8/1920x1080 at 1/60]"
+> media-ctl --set-v4l2 "'ipu1_csi0':0[fmt:UYVY2X8/1920x1080 at 1/60,compose:(0,0)/960x540]"
+> media-ctl --set-v4l2 "'ipu1_csi0':2[fmt:AYUV32/960x540 at 1/30]"
+>
+> I suppose setting the source pad format should not be allowed to modify
+> the sink compose rectangle.
+>
+> regards
+> Philipp
 >
