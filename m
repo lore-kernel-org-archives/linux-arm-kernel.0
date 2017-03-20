@@ -1,40 +1,63 @@
-From: richard.genoud@gmail.com (Richard Genoud)
-Date: Mon, 20 Mar 2017 11:52:41 +0100
-Subject: [PATCH] tty/serial: atmel: fix race condition (TX+DMA)
-Message-ID: <20170320105241.25648-1-richard.genoud@gmail.com>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Mon, 20 Mar 2017 11:58:09 +0100
+Subject: [PATCH 0/9] KVM: arm/arm64: vgic: Improvements and optimizations
+Message-ID: <20170320105818.20481-1-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If uart_flush_buffer() is called between atmel_tx_dma() and
-atmel_complete_tx_dma(), the circular buffer has been cleared, but not
-atmel_port->tx_len.
-That leads to a circular buffer overflow (dumping (UART_XMIT_SIZE -
-atmel_port->tx_len) bytes).
+We can improve the performance of our VGIC implementation a bit and
+clean up a lot of the implementation while we're at it.
 
-Tested-by: Nicolas Ferre <nicolas.ferre@microchip.com>
-Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
-Cc: stable <stable@vger.kernel.org> # 3.12+
----
-NB: this will apply on kernels 4.3+, for kernels before 4.3, the code
-will be:
-sg_dma_len(&atmel_port->sg_tx) = 0;
+At first, patch 1 may seem excessive for a single register, the VMCR,
+but whlie it adds complexity it does move logic out of the critical path
+and into the vcpu_load/put hooks, which are executed much more rarely.
+It also provides an infrastructure to move more things into the
+vgic_load/put functions later one.
 
- drivers/tty/serial/atmel_serial.c | 5 +++++
- 1 file changed, 5 insertions(+)
+Avoiding the need to take a spinlock in the common case where there are
+no virtual interrupts in flight are actually measurable and well worth
+the effort.
 
-diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-index d9c05e05d896..5c23fb4e552b 100644
---- a/drivers/tty/serial/atmel_serial.c
-+++ b/drivers/tty/serial/atmel_serial.c
-@@ -1954,6 +1954,11 @@ static void atmel_flush_buffer(struct uart_port *port)
- 		atmel_uart_writel(port, ATMEL_PDC_TCR, 0);
- 		atmel_port->pdc_tx.ofs = 0;
- 	}
-+	/*
-+	 * in uart_flush_buffer(), the xmit circular buffer has just
-+	 * been cleared, so we have to reset tx_len accordingly.
-+	 */
-+	atmel_port->tx_len = 0;
- }
- 
- /*
+The implementation cleanups boil down to maintaining a single count of
+the used lrs instead of an additional bitmap, avoiding the need to deel
+with the MISR and EISR fields, and doing an early init of the VGIC to
+avoid a number of vgic_initialized() checks.
+
+Tested on Mustang and TC2, and Thunder-X.
+
+Patches also available on:
+git://git.kernel.org/pub/scm/linux/kernel/git/cdall/linux.git gic-optimize
+
+Thanks,
+-Christoffer
+
+Christoffer Dall (8):
+  KVM: arm/arm64: vgic: Defer touching GICH_VMCR to vcpu_load/put
+  KVM: arm/arm64: vgic: Get rid of live_lrs
+  KVM: arm/arm64: vgic: Get rid of unnecessary process_maintenance
+    operation
+  KVM: arm/arm64: vgic: Get rid of unnecessary save_maint_int_state
+  KVM: arm/arm64: vgic: Get rid of MISR and EISR fields
+  KVM: arm/arm64: vgic: Implement early VGIC init functionality
+  KVM: arm/arm64: vgic: Don't check vgic_initialized in flush_hwstate
+  KVM: arm/arm64: vgic: Improve sync_hwstate performance
+
+Shih-Wei Li (1):
+  KVM: arm/arm64: vgic: Avoid flushing vgic state when there's no
+    pending IRQ
+
+ arch/arm/include/asm/kvm_asm.h   |   3 ++
+ arch/arm/kvm/arm.c               |  11 ++--
+ arch/arm64/include/asm/kvm_asm.h |   2 +
+ include/kvm/arm_vgic.h           |   9 ++--
+ virt/kvm/arm/hyp/vgic-v2-sr.c    |  78 +++-------------------------
+ virt/kvm/arm/hyp/vgic-v3-sr.c    |  79 +++++++---------------------
+ virt/kvm/arm/vgic/vgic-init.c    | 108 ++++++++++++++++++++++++---------------
+ virt/kvm/arm/vgic/vgic-v2.c      | 101 ++++++++++++++++++++----------------
+ virt/kvm/arm/vgic/vgic-v3.c      |  89 +++++++++++++++++++-------------
+ virt/kvm/arm/vgic/vgic.c         |  44 +++++++++++++---
+ virt/kvm/arm/vgic/vgic.h         |  10 +++-
+ 11 files changed, 261 insertions(+), 273 deletions(-)
+
+-- 
+2.9.0
