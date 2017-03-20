@@ -1,109 +1,63 @@
-From: james.morse@arm.com (James Morse)
-Date: Mon, 20 Mar 2017 13:44:31 +0000
-Subject: [PATCH v2 3/3] arm64: KVM: add guest SEI support
-In-Reply-To: <0d082cbb-8163-1163-cdd3-3daecd57a823@huawei.com>
-References: <1488946181-130774-1-git-send-email-xiexiuqi@huawei.com>
- <1488946181-130774-4-git-send-email-xiexiuqi@huawei.com>
- <58C7BBA2.4080208@arm.com> <0d082cbb-8163-1163-cdd3-3daecd57a823@huawei.com>
-Message-ID: <58CFDCBF.4060409@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 20 Mar 2017 13:51:58 +0000
+Subject: [PATCH 01/17] arm64: arch_timer: Add infrastructure for multiple
+ erratum detection methods
+In-Reply-To: <20170306112622.13853-2-marc.zyngier@arm.com>
+References: <20170306112622.13853-1-marc.zyngier@arm.com>
+ <20170306112622.13853-2-marc.zyngier@arm.com>
+Message-ID: <20170320135158.GC31213@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Xie XiuQi,
+Hi,
 
-On 20/03/17 07:48, Xie XiuQi wrote:
-> On 2017/3/14 17:45, James Morse wrote:
->> On 08/03/17 04:09, Xie XiuQi wrote:
->>> Add ghes handling for SEI so that the host kernel could parse and
->>> report detailed error information for SEI which occur in the guest
->>> kernel.
->>
->> How does this interact with Synchronous External Abort as a notify method?
->> Both of these take the in_nmi() path through APEI.
->>
->> SError Interrupts are masked during exception processing, so we don't have to
->> worry about them becoming recursive.
+On Mon, Mar 06, 2017 at 11:26:06AM +0000, Marc Zyngier wrote:
+> We're currently stuck with DT when it comes to handling errata, which
+> is pretty restrictive. In order to make things more flexible, let's
+> introduce an infrastructure that could support alternative discovery
+> methods. No change in functionnality.
+
+Nit: functionality
+
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm64/include/asm/arch_timer.h  |  7 +++-
+>  drivers/clocksource/arm_arch_timer.c | 80 +++++++++++++++++++++++++++++++-----
+>  2 files changed, 75 insertions(+), 12 deletions(-)
 > 
-> If we use firmware first mode, SEI will be routed to EL3 first, in which mode
-> the interrupt cannot be masked by the PSTATE.{A,I,F}.
-> 
->> For SEA the firmware has to promise not to invoke another SEA while we are still
->> processing the first, and SEI will be masked if we took it as an exception.
->>
-> 
-> Yes, for SEI the firmware should also promise not to invoke another SEI while the
-> first SEI processing.
+> diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
+> index b4b34004a21e..1c92d52619a6 100644
+> --- a/arch/arm64/include/asm/arch_timer.h
+> +++ b/arch/arm64/include/asm/arch_timer.h
+> @@ -37,9 +37,14 @@ extern struct static_key_false arch_timer_read_ool_enabled;
+>  #define needs_unstable_timer_counter_workaround()  false
+>  #endif
+>  
+> +enum arch_timer_erratum_match_type {
+> +	ate_match_dt,
+> +};
+>  
+>  struct arch_timer_erratum_workaround {
+> -	const char *id;		/* Indicate the Erratum ID */
+> +	enum arch_timer_erratum_match_type match_type;
+> +	const void *id;		/* Indicate the Erratum ID */
 
-Because the OS can mask the exception while it does the work this should be easy.
+This comment isn't much help. Can we drop it?
 
+Either that, or expand on what it is in each case, e.g.
 
-> But I have a question here, how to handle this case: on the same cpu, another SEA
-> is taken while we are processing the first SEA. Should firmware detect this case and
-> reset the system directly?
+	/*
+	 * Data specific to the match_type.
+	 *
+	 * For ate_match_dt, this is a DT property name to look for.
+	 */
+	const void *id;
 
-For SEA firmware has to only deliver one at a time. Tyler's comment[0] on this was:
-Tyler Baicar wrote:
-> Firmware that supports the new specs should only generate one of these at a
-> time, it will wait for the ack from kernel before sending a second error
-> (patch 1 of this series).
+> +	const char *desc_str;
 
-I think this is what the read ack register in GHESv2 is for.
+Elesewhere we just the name desc for strings like this.
 
-What should happen here is up to firmware. System reset sounds sensible, if
-possible it would be good if any such firmware could write both sets of error
-records somewhere persistent and hand them to the OS via the BERT on the next boot.
-
-
-> The same question is also for SEI.
-
-I think SEI is different because it can be masked. For KVM we already have
-kvm_inject_vabt() which sets the VSE bit in HCR_EL2. The hardware will deliver
-an SError Interrupt to the guest when it next runs with SError unmasked.
-
-If the guest was already running the APEI SEI code it should have SError masked
-until its finished.
-
-This should be the same for firmware, I don't know enough about how physical
-SError is triggered.
-
-
->> What happens if we take an SEA while processing another event notified via SEI?
->> Can this happen on your platform? Can someone else build a platform where this
->> happens? Does the GHES APEI code need to be able to handle this?
-> 
-> IMO, the system should be panic if we take an SEA while processing another event
-> notified via SEI on the same cpu, and it's not necessary to parse the GHES for the
-> second SEA. However, if on different cpu, it might be taken simultaneously.
-
-For a different CPU we will spin waiting for the APEI locks, this should all
-work properly today.
-
-How can we know that SEA interrupted a CPU that was running the APEI SEI code?
-
-The CPU masks SError when we take an exception so we can't use PSTATE.A to tell.
-Judging from the range of PC values or setting some per-cpu variable is likely
-to get messy.
-
-I think the cleanest thing is to initially make SEI and SEA mutually exclusive
-using Kconfig, then refactor the APEI GHES code to allow interactions like this:
-
->> If we need to support both at the same time we will need to change Linux's APEI
->> code to reserve a page of virtual address space per GHES entry, instead of one
->> for NMI and one for IRQ.
-
-This way it doesn't matter if SEA interrupts SEI. I will have a go at writing this.
-
-
-> We cannot assume that firmware could prevent the SEA notify to OS while SEI is
-> processing on different cpu. Because firmware use two different GHES for SEA and SEI.
-
-I agree. We should handle any sequence of APEI notify methods that the hardware
-allows to happen.
-
-
+Can we s/desc_str/desc/, please?
 
 Thanks,
-
-James
-
-[0] https://www.spinics.net/lists/arm-kernel/msg567837.html
+Mark.
