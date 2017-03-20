@@ -1,62 +1,43 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 20 Mar 2017 09:58:00 +0100
-Subject: [PATCH 21/31] ARM: dts: r8a7793: Tidyup Audio-DMAC channel for DVC
+Date: Mon, 20 Mar 2017 09:58:06 +0100
+Subject: [PATCH 27/31] ARM: dts: koelsch: Drop superfluous status updates for
+ frequency overrides
 In-Reply-To: <cover.1489999062.git.horms+renesas@verge.net.au>
 References: <cover.1489999062.git.horms+renesas@verge.net.au>
-Message-ID: <d2b10f99962aa5ec9865a77827931bf20211a39c.1489999063.git.horms+renesas@verge.net.au>
+Message-ID: <b20b1de4b542749a500c426796bb7fa400b03e58.1489999063.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Current	Audio-DMAC is assigned "rx" as Audio-DMAC0, "tx" as Audio-DMAC1.
-Thus, DVC "tx" should be assigned as Audio-DMAC1, instead of Audio-DMAC0.
+The scif_clk and pcie_bus_clk device nodes are already enabled in
+r8a7791.dtsi, so there is no need to update their statuses again.
 
-Because of this, current platform board (using SRC/DVC/SSI)
-Playback/Capture both will use same Audio-DMAC0
-(but it depends on audio data path).
-
-First note is that this "rx" and "tx" are from each IP point,
-it doesn't mean Playback/Capture.
-Second note is that Audio DMAC assigned on DT is only for
-Audio-DMAC, Audio-DMAC-peri-peri has no entry.
-
-=> Audio-DMAC
--> Audio-DMAC-peri-peri
--- HW connection
-
-Playback case
-
-	[Mem] => [SRC]--[DVC] -> [SSI]--[Codec]
-	      rx ~~~~~~~~~~~~
-Capture
-
-	[Mem] <= [DVC]--[SRC] <- [SSI]--[Codec]
-	      tx ~~~~~~~~~~~~
-
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7793.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/r8a7791-koelsch.dts | 2 --
+ 1 file changed, 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7793.dtsi b/arch/arm/boot/dts/r8a7793.dtsi
-index 38506f563b2b..53c89b47eaf0 100644
---- a/arch/arm/boot/dts/r8a7793.dtsi
-+++ b/arch/arm/boot/dts/r8a7793.dtsi
-@@ -1425,11 +1425,11 @@
+diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts b/arch/arm/boot/dts/r8a7791-koelsch.dts
+index 5405d337d744..59beb8402a36 100644
+--- a/arch/arm/boot/dts/r8a7791-koelsch.dts
++++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
+@@ -516,7 +516,6 @@
  
- 		rcar_sound,dvc {
- 			dvc0: dvc-0 {
--				dmas = <&audma0 0xbc>;
-+				dmas = <&audma1 0xbc>;
- 				dma-names = "tx";
- 			};
- 			dvc1: dvc-1 {
--				dmas = <&audma0 0xbe>;
-+				dmas = <&audma1 0xbe>;
- 				dma-names = "tx";
- 			};
- 		};
+ &scif_clk {
+ 	clock-frequency = <14745600>;
+-	status = "okay";
+ };
+ 
+ &sdhi0 {
+@@ -767,7 +766,6 @@
+ 
+ &pcie_bus_clk {
+ 	clock-frequency = <100000000>;
+-	status = "okay";
+ };
+ 
+ &pciec {
 -- 
 2.7.0.rc3.207.g0ac5344
