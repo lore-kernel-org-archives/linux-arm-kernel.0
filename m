@@ -1,77 +1,48 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Mon, 20 Mar 2017 14:09:16 +0000
-Subject: [PATCH 03/17] arm64: Allow checking of a CPU-local erratum
-In-Reply-To: <20170320135641.GD31213@leverpostej>
-References: <20170306112622.13853-1-marc.zyngier@arm.com>
- <20170306112622.13853-4-marc.zyngier@arm.com>
- <20170320135641.GD31213@leverpostej>
-Message-ID: <8b6c1423-ad78-0f51-7134-a1062791577f@arm.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 20 Mar 2017 15:10:23 +0100
+Subject: [PATCH 1/5] ARM: tegra: WARN if flowctrl is not supported
+In-Reply-To: <1489584715-23138-2-git-send-email-jonathanh@nvidia.com>
+References: <1489584715-23138-1-git-send-email-jonathanh@nvidia.com>
+ <1489584715-23138-2-git-send-email-jonathanh@nvidia.com>
+Message-ID: <20170320141023.GB28203@ulmo.ba.sec>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/03/17 13:56, Mark Rutland wrote:
-> On Mon, Mar 06, 2017 at 11:26:08AM +0000, Marc Zyngier wrote:
->> this_cpu_has_cap() only checks the feature array, and not the errata
->> one. In order to be able to check for a CPU-local erratum, allow it
->> to inspect the latter as well.
->>
->> This is consistent with cpus_have_cap()'s behaviour, which includes
->> errata already.
->>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->
-> This sounds sensible to me.
->
-> Suzuki, any comments?
+On Wed, Mar 15, 2017 at 01:31:51PM +0000, Jon Hunter wrote:
+> If we fail to map the IO space for the Tegra flowctrl module in
+> tegra_flowctrl_init(), then if any of the public APIs for the Tegra
+> flowctrl driver are called we still still attempt to access the
+> hardware. Fix this by only accessing the hardware if the
+> 'tegra_flowctrl_base' address has not been setup correctly and warn
+> if we attempt to access the hardware when it has not.
+> 
+> Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
+> ---
+>  arch/arm/mach-tegra/flowctrl.c | 6 ++++++
+>  1 file changed, 6 insertions(+)
+> 
+> diff --git a/arch/arm/mach-tegra/flowctrl.c b/arch/arm/mach-tegra/flowctrl.c
+> index 475e783992fd..40b15e39f849 100644
+> --- a/arch/arm/mach-tegra/flowctrl.c
+> +++ b/arch/arm/mach-tegra/flowctrl.c
+> @@ -47,6 +47,9 @@ static void __iomem *tegra_flowctrl_base;
+>  
+>  static void flowctrl_update(u8 offset, u32 value)
+>  {
+> +	if (WARN_ONCE(!tegra_flowctrl_base, "Tegra flowctrl not supported!"))
 
-Yes, this looks fine to me.
+Technically I think this string needs a terminating "\n" because it is
+eventually passed to printk(), even though the WARN_ONCE() will probably
+format the output correctly even without it.
 
-Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+Also, "not supported" isn't a very accurate description. This has to do
+with the flow controller not having been initialized yet.
 
->
-> Thanks,
-> Mark.
->
->> ---
->>  arch/arm64/kernel/cpufeature.c | 13 +++++++++++--
->>  1 file changed, 11 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
->> index abda8e861865..6eb77ae99b79 100644
->> --- a/arch/arm64/kernel/cpufeature.c
->> +++ b/arch/arm64/kernel/cpufeature.c
->> @@ -1090,20 +1090,29 @@ static void __init setup_feature_capabilities(void)
->>   * Check if the current CPU has a given feature capability.
->>   * Should be called from non-preemptible context.
->>   */
->> -bool this_cpu_has_cap(unsigned int cap)
->> +static bool __this_cpu_has_cap(const struct arm64_cpu_capabilities *cap_array,
->> +			       unsigned int cap)
->>  {
->>  	const struct arm64_cpu_capabilities *caps;
->>
->>  	if (WARN_ON(preemptible()))
->>  		return false;
->>
->> -	for (caps = arm64_features; caps->desc; caps++)
->> +	for (caps = cap_array; caps->desc; caps++)
->>  		if (caps->capability == cap && caps->matches)
->>  			return caps->matches(caps, SCOPE_LOCAL_CPU);
->>
->>  	return false;
->>  }
->>
->> +extern const struct arm64_cpu_capabilities arm64_errata[];
->> +
->> +bool this_cpu_has_cap(unsigned int cap)
->> +{
->> +	return (__this_cpu_has_cap(arm64_features, cap) ||
->> +		__this_cpu_has_cap(arm64_errata, cap));
->> +}
->> +
->>  void __init setup_cpu_features(void)
->>  {
->>  	u32 cwg;
->> --
->> 2.11.0
->>
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170320/bc2710c7/attachment-0001.sig>
