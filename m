@@ -1,82 +1,71 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 20 Mar 2017 16:35:47 +0000
-Subject: [PATCH v5 00/39] i.MX Media Driver
-In-Reply-To: <1490027347.2917.97.camel@pengutronix.de>
-References: <1489121599-23206-1-git-send-email-steve_longerbeam@mentor.com>
- <20170318192258.GL21222@n2100.armlinux.org.uk>
- <aef6c412-5464-726b-42f6-a24b7323aa9c@mentor.com>
- <20170319121402.GS21222@n2100.armlinux.org.uk>
- <1490016016.2917.68.camel@pengutronix.de>
- <20170320154339.GN21222@n2100.armlinux.org.uk>
- <1490027347.2917.97.camel@pengutronix.de>
-Message-ID: <20170320163547.GP21222@n2100.armlinux.org.uk>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Mon, 20 Mar 2017 11:38:43 -0500
+Subject: [PATCH 02/20] PCI: fix pci_remap_iospace() remap attribute
+In-Reply-To: <20170320162627.GE7632@red-moon>
+References: <20170227151436.18698-1-lorenzo.pieralisi@arm.com>
+ <20170227151436.18698-3-lorenzo.pieralisi@arm.com>
+ <20170316214844.GA17769@bhelgaas-glaptop.roam.corp.google.com>
+ <20170317003321.GB28800@wotan.suse.de>
+ <20170320160636.GB24572@bhelgaas-glaptop.roam.corp.google.com>
+ <20170320162627.GE7632@red-moon>
+Message-ID: <20170320163843.GD24572@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 20, 2017 at 05:29:07PM +0100, Philipp Zabel wrote:
-> According to the documentation [1], you are doing the right thing:
+On Mon, Mar 20, 2017 at 04:26:27PM +0000, Lorenzo Pieralisi wrote:
+> On Mon, Mar 20, 2017 at 11:06:36AM -0500, Bjorn Helgaas wrote:
 > 
->     The struct v4l2_subdev_frame_interval pad references a non-existing
->     pad, or the pad doesn?t support frame intervals.
+> [...]
 > 
-> But v4l2_subdev_call returns -ENOIOCTLCMD if the g_frame_interval op is
-> not implemented at all, which is turned into -ENOTTY by video_usercopy.
-> 
-> [1] https://linuxtv.org/downloads/v4l-dvb-apis/uapi/v4l/vidioc-subdev-g-frame-interval.html#return-value
-
-Thanks for confirming.
-
-> > Maybe something like the following would be a better idea?
+> > > > > @@ -3375,7 +3375,7 @@ int pci_remap_iospace(const struct resource *res, phys_addr_t phys_addr)
+> > > > >  		return -EINVAL;
+> > > > >  
+> > > > >  	return ioremap_page_range(vaddr, vaddr + resource_size(res), phys_addr,
+> > > > > -				  pgprot_device(PAGE_KERNEL));
+> > > > > +				  pgprot_noncached(PAGE_KERNEL));
+> > > > 
+> > > > ...
+> > > > I do find this puzzling because I naively expected pgprot_noncached()
+> > > > to match up with ioremap_nocache(), and apparently it doesn't.
+> > > > 
+> > > > For example, ARM64 ioremap_nocache() uses PROT_DEVICE_nGnRE, which
+> > > > doesn't match the MT_DEVICE_nGnRnE in pgprot_noncached().
+> > > > 
+> > > > The point of these patches is to use non-posted mappings.  Apparently
+> > > > you can do that with pgprot_noncached() here, but ioremap_nocache()
+> > > > isn't enough for the config space mappings?
+> > > 
+> > > This is for iospace it seems, so the other patch I think was for
+> > > config space.
 > > 
-> >  utils/media-ctl/media-ctl.c | 10 +++++-----
-> >  1 file changed, 5 insertions(+), 5 deletions(-)
+> > I understand that 02/20 is for PCI I/O port space and 03/20 is for PCI
+> > config space.  I'm confused because I thought we wanted the same
+> > non-posted mapping for both, but looks like they're different.
 > > 
-> > diff --git a/utils/media-ctl/media-ctl.c b/utils/media-ctl/media-ctl.c
-> > index f61963a..a50a559 100644
-> > --- a/utils/media-ctl/media-ctl.c
-> > +++ b/utils/media-ctl/media-ctl.c
-> > @@ -81,22 +81,22 @@ static void v4l2_subdev_print_format(struct media_entity *entity,
-> >  	struct v4l2_mbus_framefmt format;
-> >  	struct v4l2_fract interval = { 0, 0 };
-> >  	struct v4l2_rect rect;
-> > -	int ret;
-> > +	int ret, err_fi;
-> >  
-> >  	ret = v4l2_subdev_get_format(entity, &format, pad, which);
-> >  	if (ret != 0)
-> >  		return;
-> >  
-> > -	ret = v4l2_subdev_get_frame_interval(entity, &interval, pad);
-> > -	if (ret != 0 && ret != -ENOTTY)
-> > -		return;
-> > +	err_fi = v4l2_subdev_get_frame_interval(entity, &interval, pad);
+> > Patch 02/20 uses ioremap_page_range(..., pgprot_noncached(PAGE_KERNEL))
+> > to map PCI I/O port space:
+> > 
+> >   #define pgprot_noncached(prot) \
+> >           __pgprot_modify(prot, PTE_ATTRINDX_MASK, PTE_ATTRINDX(MT_DEVICE_nGnRnE) | PTE_PXN | PTE_UXN)
+> > 
+> > Patch 03/20 uses ioremap_nocache() to map PCI config space:
+> > 
+> >   #define ioremap_nocache(addr, size)     __ioremap((addr), (size), __pgprot(PROT_DEVICE_nGnRE))
+> > 
+> > So the I/O port mapping uses MT_DEVICE_nGnRnE, while the config space
+> > mapping uses PROT_DEVICE_nGnRE, which looks different.
 > 
-> Not supporting frame intervals doesn't warrant a visible error message,
-> I think -EINVAL should also be ignored above, if the spec is to be
-> believed.
-> 
-> >  
-> >  	printf("\t\t[fmt:%s/%ux%u",
-> >  	       v4l2_subdev_pixelcode_to_string(format.code),
-> >  	       format.width, format.height);
-> >  
-> > -	if (interval.numerator || interval.denominator)
-> > +	if (err_fi == 0 && (interval.numerator || interval.denominator))
-> >  		printf("@%u/%u", interval.numerator, interval.denominator);
-> > +	else if (err_fi != -ENOTTY)
-> > +		printf("@<error: %s>", strerror(-err_fi));
-> 
-> Or here.
+> On ARM64 (PATCH 4) and ARM (PATCH 5) we override pci_remap_cfgspace()
+> with implementations that provide non-posted writes bus attributes,
+> PATCH 3 is just there to provide a "safe" (well, I need input on that)
+> fall-back.
 
-I don't mind which - I could change this to:
+Ah, thanks, that makes sense to me finally!  After patch 4,
+pci_remap_cfgspace() uses PROT_DEVICE_nGnRnE, which does look like the
+MT_DEVICE_nGnRnE used in the ioremap_page_range() path.
 
-	else if (err_fi != -ENOTTY && err_fi != -EINVAL)
+I wonder if we can get rid of pgprot_device() altogether?  Patch 2
+removed the use in pci_remap_iospace(), and patch 18 removes the use
+in tegra_pcie_bus_alloc().
 
-Or an alternative would be to print an error (ignoring ENOTTY and EINVAL)
-to stderr at the "v4l2_subdev_get_frame_interval" callsite and continue
-on (ensuring that interval is zeroed).
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Bjorn
