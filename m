@@ -1,26 +1,30 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 20 Mar 2017 22:31:48 +0800
-Subject: [linux-sunxi] [PATCH v4 1/8] dt: bindings: add pmu0 regs for USB
- PHYs on Allwinner H3/V3s/A64
-In-Reply-To: <20170319161951.55834-2-icenowy@aosc.xyz>
-References: <20170319161951.55834-1-icenowy@aosc.xyz>
- <20170319161951.55834-2-icenowy@aosc.xyz>
-Message-ID: <CAGb2v66mZC2e=sZvZL2kmV0YAfVx3eeHUMvbGiEXN9pFgXtaXA@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 20 Mar 2017 07:34:33 -0700
+Subject: [PATCHv2 5/9] ARM: OMAP2+: hwmod: assign main clock from DT if
+ available
+In-Reply-To: <95b7142f-8cc7-5909-764e-05dbad434298@ti.com>
+References: <1489741781-12816-1-git-send-email-t-kristo@ti.com>
+ <1489741781-12816-6-git-send-email-t-kristo@ti.com>
+ <20170317154126.GU20572@atomide.com>
+ <f7c795dc-13db-9157-cdcc-b61892cc73f9@ti.com>
+ <20170317221728.GX20572@atomide.com>
+ <95b7142f-8cc7-5909-764e-05dbad434298@ti.com>
+Message-ID: <20170320143433.GG20572@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 20, 2017 at 12:19 AM, Icenowy Zheng <icenowy@aosc.xyz> wrote:
-> Allwinner H3/V3s/A64 SoCs have a special USB PHY0 that can route to two
-> controllers: one is MUSB and the other is a EHCI/OHCI pair.
->
-> When it's routed to EHCI/OHCI pair, it will needs a "pmu0" regs to
-> tweak, like other EHCI/OHCI pairs in Allwinner SoCs.
->
-> Add this to the binding of USB PHYs on Allwinner H3/V3s/A64.
->
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+* Tero Kristo <t-kristo@ti.com> [170320 06:25]:
+> On 18/03/17 00:17, Tony Lindgren wrote:
+> > I don't quite follow you, what breaks if you fall back to the old clock
+> > lookup if no "ti,hwmods" is set?
+> 
+> I think I misunderstood your earlier comment. So basically the code already
+> bails out early if ti,hwmods is not set. In this case, the earlier lookup
+> done by hwmod core sets the node pointer for this code to be NULL, and this
+> just parses the existing main_clk info.
 
-Acked-by: Chen-Yu Tsai <wens@csie.org>
+OK thanks for confirming that.
 
-Please keep acks and review tags from others if you haven't changed the
-patch.
+Regards,
+
+Tony
