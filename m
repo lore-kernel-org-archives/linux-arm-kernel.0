@@ -1,128 +1,97 @@
-From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
-Date: Mon, 20 Mar 2017 23:41:34 +0530
-Subject: [PATCH 00/14] arm_pmu: ACPI support
-In-Reply-To: <58CA8C8A.8080405@huawei.com>
-References: <1489143891-11596-1-git-send-email-mark.rutland@arm.com>
- <58CA8C8A.8080405@huawei.com>
-Message-ID: <CAFpQJXVe_=42R+0Ch-tLwCcvhX3xJa20mhgYCWWNty-sn1Gp+g@mail.gmail.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Mon, 20 Mar 2017 18:14:52 +0000
+Subject: [PATCH v3 13/19] KVM: arm64: ITS: Sort the device and ITE lists
+In-Reply-To: <1488800074-21991-14-git-send-email-eric.auger@redhat.com>
+References: <1488800074-21991-1-git-send-email-eric.auger@redhat.com>
+ <1488800074-21991-14-git-send-email-eric.auger@redhat.com>
+Message-ID: <02ff8c85-abd9-ba29-bbc7-bb88761aeaa2@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hanjun,
+Hi Eric,
 
-On Thu, Mar 16, 2017 at 6:30 PM, Hanjun Guo <guohanjun@huawei.com> wrote:
-> On 2017/3/10 19:04, Mark Rutland wrote:
->> Hi,
->>
->> This series implements ACPI support in the ARM PMU code. It borrows some code
->> from Jeremy's series [1], but takes a different approach to probing and
->> association, using the usual hotplug state machine, minimising external changes
->> required, and simplifying the relationship with the common arm_pmu code.
->>
->> The first few patches are preparatory cleanup/refactoring, with the latter half
->> of the series being specific to ACPI support.
->>
->> The series is based on my IRQ rework patches [2]. I've pushed the whole series
->> out to the arm/perf/acpi branch [3] of my kernel.org repo.
->>
->> Due to the innards of the hotplug callback framework, it's not entirely
->> safe to register a PMU in a hotplug callback. Due to this, we can only
->> associated hotplugged CPUs with a PMU if a matching CPU was around at
->> probe time. A similar restriction already applies to DT systems. We may
->> be able to relax this with some future work.
->>
->> I've given this some testing on a Juno platform (using SPIs). To see that IRQs
->> are correctly associated, I've tested with the following:
->>
->>   $ taskset -c ${SOME_CPU_HERE} perf record \
->>     -e armv8_pmuv3_0/cpu_cycles/ \
->>     -e armv8_pmuv3_1/cpu_cycles/ \
->>     cat /proc/interrupts
->>
->> I've also booted with nr_cpus temporarily capped (passing maxcpus=) to test the
->> association logic. This has also been tested in a VM using PPIs; I do not have
->> access to a host machine which itself uses PPIs.
->
-> Booted OK and 'perf list' got on Hisilicon D03:
->
-> d03-09:~ # perf list
->
-> List of pre-defined events (to be used in -e):
->
->   branch-misses                                      [Hardware event]
->   bus-cycles                                         [Hardware event]
->   cache-misses                                       [Hardware event]
->   cache-references                                   [Hardware event]
->   cpu-cycles OR cycles                               [Hardware event]
->   instructions                                       [Hardware event]
->
->   alignment-faults                                   [Software event]
->   context-switches OR cs                             [Software event]
->   cpu-clock                                          [Software event]
->   cpu-migrations OR migrations                       [Software event]
->   dummy                                              [Software event]
->   emulation-faults                                   [Software event]
->   major-faults                                       [Software event]
->   minor-faults                                       [Software event]
->   page-faults OR faults                              [Software event]
->   task-clock                                         [Software event]
->
->   L1-dcache-load-misses                              [Hardware cache event]
->   L1-dcache-loads                                    [Hardware cache event]
->   L1-dcache-store-misses                             [Hardware cache event]
->   L1-dcache-stores                                   [Hardware cache event]
->   L1-icache-load-misses                              [Hardware cache event]
->   L1-icache-loads                                    [Hardware cache event]
->   branch-load-misses                                 [Hardware cache event]
->   branch-loads                                       [Hardware cache event]
->   dTLB-load-misses                                   [Hardware cache event]
->   iTLB-load-misses                                   [Hardware cache event]
->
->   armv8_pmuv3_0/br_mis_pred/                         [Kernel PMU event]
->   armv8_pmuv3_0/br_pred/                             [Kernel PMU event]
->   armv8_pmuv3_0/bus_access/                          [Kernel PMU event]
->   armv8_pmuv3_0/bus_cycles/                          [Kernel PMU event]
->   armv8_pmuv3_0/cid_write_retired/                   [Kernel PMU event]
->   armv8_pmuv3_0/cpu_cycles/                          [Kernel PMU event]
->   armv8_pmuv3_0/exc_return/                          [Kernel PMU event]
->   armv8_pmuv3_0/exc_taken/                           [Kernel PMU event]
->   armv8_pmuv3_0/inst_retired/                        [Kernel PMU event]
->   armv8_pmuv3_0/inst_spec/                           [Kernel PMU event]
->   armv8_pmuv3_0/l1d_cache/                           [Kernel PMU event]
->   armv8_pmuv3_0/l1d_cache_refill/                    [Kernel PMU event]
->   armv8_pmuv3_0/l1d_cache_wb/                        [Kernel PMU event]
->   armv8_pmuv3_0/l1d_tlb_refill/                      [Kernel PMU event]
->   armv8_pmuv3_0/l1i_cache/                           [Kernel PMU event]
->   armv8_pmuv3_0/l1i_cache_refill/                    [Kernel PMU event]
->   armv8_pmuv3_0/l1i_tlb_refill/                      [Kernel PMU event]
->   armv8_pmuv3_0/l2d_cache/                           [Kernel PMU event]
->   armv8_pmuv3_0/l2d_cache_refill/                    [Kernel PMU event]
->   armv8_pmuv3_0/l2d_cache_wb/                        [Kernel PMU event]
->   armv8_pmuv3_0/mem_access/                          [Kernel PMU event]
->   armv8_pmuv3_0/memory_error/                        [Kernel PMU event]
->   armv8_pmuv3_0/sw_incr/                             [Kernel PMU event]
->   armv8_pmuv3_0/ttbr_write_retired/                  [Kernel PMU event]
->
->   rNNN                                               [Raw hardware event descriptor]
->   cpu/t1=v1[,t2=v2,t3 ...]/modifier                  [Raw hardware event descriptor]
->    (see 'man perf-list' on how to encode it)
->
->   mem:<addr>[/len][:access]                          [Hardware breakpoint]
->
->
-> Try some basic perf event and it works, anything else I can try in specific?
+On 06/03/17 11:34, Eric Auger wrote:
+> Natively sort the device and ITE lists in ascending
+> deviceId/eventid order. This paves the way to optimized
+> DTE and ITE scan in guest RAM table where entries are chained
+> together using a next ID offset.
+> 
+> Signed-off-by: Eric Auger <eric.auger@redhat.com>
 
-you can try perf fuzzer
+Looks correct to me.
 
-thanks
-Ganapat
+Reviewed-by: Andre Przywara <andre.przywara@arm.com>
 
->
-> Thanks
-> Hanjun
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> ---
+>  virt/kvm/arm/vgic/vgic-its.c | 36 ++++++++++++++++++++++++++++++++++--
+>  1 file changed, 34 insertions(+), 2 deletions(-)
+> 
+> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+> index 9792110..1cd6ae6 100644
+> --- a/virt/kvm/arm/vgic/vgic-its.c
+> +++ b/virt/kvm/arm/vgic/vgic-its.c
+> @@ -734,6 +734,21 @@ static void vgic_its_free_collection(struct vgic_its *its, u32 coll_id)
+>  	kfree(collection);
+>  }
+>  
+> +static void ite_list_insert_sorted(struct list_head *h, struct its_ite *ite)
+> +{
+> +	struct list_head *pos = h->next;
+> +	u32 id = ite->event_id;
+> +
+> +	while (pos != h) {
+> +		struct its_ite *iter =
+> +			list_entry(pos, struct its_ite, ite_list);
+> +		if (id < iter->event_id)
+> +			break;
+> +		pos = pos->next;
+> +	}
+> +	list_add_tail(&ite->ite_list, pos);
+> +}
+> +
+>  static int vgic_its_alloc_ite(struct its_device *device,
+>  			       struct its_ite **itep,
+>  			       struct its_collection *collection,
+> @@ -749,7 +764,7 @@ static int vgic_its_alloc_ite(struct its_device *device,
+>  	ite->collection = collection;
+>  	ite->lpi = lpi_id;
+>  
+> -	list_add_tail(&ite->ite_list, &device->itt_head);
+> +	ite_list_insert_sorted(&device->itt_head, ite);
+>  	*itep = ite;
+>  	return 0;
+>  }
+> @@ -842,6 +857,22 @@ static void vgic_its_unmap_device(struct kvm *kvm, struct its_device *device)
+>  	kfree(device);
+>  }
+>  
+> +static void device_list_insert_sorted(struct list_head *h,
+> +				      struct its_device *dev)
+> +{
+> +	struct list_head *pos = h->next;
+> +	u32 id = dev->device_id;
+> +
+> +	while (pos != h) {
+> +		struct its_device *iter =
+> +			list_entry(pos, struct its_device, dev_list);
+> +		if (id < iter->device_id)
+> +			break;
+> +		pos = pos->next;
+> +	}
+> +	list_add_tail(&dev->dev_list, pos);
+> +}
+> +
+>  static int vgic_its_alloc_device(struct vgic_its *its,
+>  				 struct its_device **devp,
+>  				 u32 device_id, gpa_t itt_addr_field,
+> @@ -858,7 +889,8 @@ static int vgic_its_alloc_device(struct vgic_its *its,
+>  	device->nb_eventid_bits = size_field + 1;
+>  	INIT_LIST_HEAD(&device->itt_head);
+>  
+> -	list_add_tail(&device->dev_list, &its->device_list);
+> +	device_list_insert_sorted(&its->device_list, device);
+> +
+>  	*devp = device;
+>  
+>  	return 0;
+> 
