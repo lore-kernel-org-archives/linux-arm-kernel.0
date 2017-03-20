@@ -1,162 +1,150 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 20 Mar 2017 17:48:21 +0000
-Subject: [PATCH v2 10/18] arm64: arch_timer: Get rid of
- erratum_workaround_set_sne
+Date: Mon, 20 Mar 2017 17:48:24 +0000
+Subject: [PATCH v2 13/18] arm64: arch_timer: Allows a CPU-specific erratum to
+ only affect a subset of CPUs
 In-Reply-To: <20170320174829.28182-1-marc.zyngier@arm.com>
 References: <20170320174829.28182-1-marc.zyngier@arm.com>
-Message-ID: <20170320174829.28182-11-marc.zyngier@arm.com>
+Message-ID: <20170320174829.28182-14-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Let's move the handling of workarounds affecting set_next_event
-to the affected function, instead of overriding the pointers
-as an afterthough. Yes, this is an extra indirection on the
-erratum handling path, but the HW is busted anyway.
+Instead of applying a CPU-specific workaround to all CPUs in the system,
+allow it to only affect a subset of them (typical big-little case).
 
-This will allow for some more flexibility later.
+This is done by turning the erratum pointer into a per-CPU variable.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/clocksource/arm_arch_timer.c | 89 ++++++++++++++++--------------------
- 1 file changed, 40 insertions(+), 49 deletions(-)
+ arch/arm64/include/asm/arch_timer.h  | 31 ++++++++++++++++----------
+ drivers/clocksource/arm_arch_timer.c | 42 +++++++++++++++++++++++++-----------
+ 2 files changed, 50 insertions(+), 23 deletions(-)
 
+diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
+index d46cf21e8b80..3cba3a5e4ba1 100644
+--- a/arch/arm64/include/asm/arch_timer.h
++++ b/arch/arm64/include/asm/arch_timer.h
+@@ -25,6 +25,7 @@
+ #include <linux/bug.h>
+ #include <linux/init.h>
+ #include <linux/jump_label.h>
++#include <linux/smp.h>
+ #include <linux/types.h>
+ 
+ #include <clocksource/arm_arch_timer.h>
+@@ -56,17 +57,25 @@ struct arch_timer_erratum_workaround {
+ 	int (*set_next_event_virt)(unsigned long, struct clock_event_device *);
+ };
+ 
+-extern const struct arch_timer_erratum_workaround *timer_unstable_counter_workaround;
+-
+-#define arch_timer_reg_read_stable(reg) 		\
+-({							\
+-	u64 _val;					\
+-	if (needs_unstable_timer_counter_workaround() &&		\
+-	    timer_unstable_counter_workaround->read_##reg)		\
+-		_val = timer_unstable_counter_workaround->read_##reg();	\
+-	else						\
+-		_val = read_sysreg(reg);		\
+-	_val;						\
++DECLARE_PER_CPU(const struct arch_timer_erratum_workaround *,
++		timer_unstable_counter_workaround);
++
++#define arch_timer_reg_read_stable(reg)					\
++({									\
++	u64 _val;							\
++	if (needs_unstable_timer_counter_workaround()) {		\
++		const struct arch_timer_erratum_workaround *wa;		\
++		preempt_disable();					\
++		wa = __this_cpu_read(timer_unstable_counter_workaround); \
++		if (wa && wa->read_##reg)				\
++			_val = wa->read_##reg();			\
++		else							\
++			_val = read_sysreg(reg);			\
++		preempt_enable();					\
++	} else {							\
++		_val = read_sysreg(reg);				\
++	}								\
++	_val;								\
+ })
+ 
+ /*
 diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index e0e4b0e6825d..4caafbdefb9d 100644
+index b9f01daafdfa..2b17b99922a1 100644
 --- a/drivers/clocksource/arm_arch_timer.c
 +++ b/drivers/clocksource/arm_arch_timer.c
-@@ -241,6 +241,38 @@ EXPORT_SYMBOL_GPL(timer_unstable_counter_workaround);
+@@ -235,7 +235,8 @@ static u64 notrace hisi_161010101_read_cntvct_el0(void)
+ #endif
+ 
+ #ifdef CONFIG_ARM_ARCH_TIMER_OOL_WORKAROUND
+-const struct arch_timer_erratum_workaround *timer_unstable_counter_workaround = NULL;
++DEFINE_PER_CPU(const struct arch_timer_erratum_workaround *,
++	       timer_unstable_counter_workaround);
+ EXPORT_SYMBOL_GPL(timer_unstable_counter_workaround);
+ 
  DEFINE_STATIC_KEY_FALSE(arch_timer_read_ool_enabled);
- EXPORT_SYMBOL_GPL(arch_timer_read_ool_enabled);
- 
-+static void erratum_set_next_event_tval_generic(const int access, unsigned long evt,
-+						struct clock_event_device *clk)
-+{
-+	unsigned long ctrl;
-+	u64 cval = evt + arch_counter_get_cntvct();
-+
-+	ctrl = arch_timer_reg_read(access, ARCH_TIMER_REG_CTRL, clk);
-+	ctrl |= ARCH_TIMER_CTRL_ENABLE;
-+	ctrl &= ~ARCH_TIMER_CTRL_IT_MASK;
-+
-+	if (access == ARCH_TIMER_PHYS_ACCESS)
-+		write_sysreg(cval, cntp_cval_el0);
-+	else
-+		write_sysreg(cval, cntv_cval_el0);
-+
-+	arch_timer_reg_write(access, ARCH_TIMER_REG_CTRL, ctrl, clk);
-+}
-+
-+static int erratum_set_next_event_tval_virt(unsigned long evt,
-+					    struct clock_event_device *clk)
-+{
-+	erratum_set_next_event_tval_generic(ARCH_TIMER_VIRT_ACCESS, evt, clk);
-+	return 0;
-+}
-+
-+static int erratum_set_next_event_tval_phys(unsigned long evt,
-+					    struct clock_event_device *clk)
-+{
-+	erratum_set_next_event_tval_generic(ARCH_TIMER_PHYS_ACCESS, evt, clk);
-+	return 0;
-+}
-+
- static const struct arch_timer_erratum_workaround ool_workarounds[] = {
- #ifdef CONFIG_FSL_ERRATUM_A008585
- 	{
-@@ -354,6 +386,8 @@ static void arch_timer_check_ool_workaround(enum arch_timer_erratum_match_type t
- 
- #else
- #define arch_timer_check_ool_workaround(t,a)		do { } while(0)
-+#define erratum_set_next_event_tval_virt(...)		({BUG(); 0;})
-+#define erratum_set_next_event_tval_phys(...)		({BUG(); 0;})
- #endif /* CONFIG_ARM_ARCH_TIMER_OOL_WORKAROUND */
- 
- static __always_inline irqreturn_t timer_handler(const int access,
-@@ -443,43 +477,12 @@ static __always_inline void set_next_event(const int access, unsigned long evt,
- 	arch_timer_reg_write(access, ARCH_TIMER_REG_CTRL, ctrl, clk);
+@@ -345,9 +346,18 @@ arch_timer_iterate_errata(enum arch_timer_erratum_match_type type,
  }
  
--#ifdef CONFIG_ARM_ARCH_TIMER_OOL_WORKAROUND
--static __always_inline void erratum_set_next_event_generic(const int access,
--		unsigned long evt, struct clock_event_device *clk)
--{
--	unsigned long ctrl;
--	u64 cval = evt + arch_counter_get_cntvct();
--
--	ctrl = arch_timer_reg_read(access, ARCH_TIMER_REG_CTRL, clk);
--	ctrl |= ARCH_TIMER_CTRL_ENABLE;
--	ctrl &= ~ARCH_TIMER_CTRL_IT_MASK;
--
--	if (access == ARCH_TIMER_PHYS_ACCESS)
--		write_sysreg(cval, cntp_cval_el0);
--	else if (access == ARCH_TIMER_VIRT_ACCESS)
--		write_sysreg(cval, cntv_cval_el0);
--
--	arch_timer_reg_write(access, ARCH_TIMER_REG_CTRL, ctrl, clk);
--}
--
--static int erratum_set_next_event_virt(unsigned long evt,
--					   struct clock_event_device *clk)
--{
--	erratum_set_next_event_generic(ARCH_TIMER_VIRT_ACCESS, evt, clk);
--	return 0;
--}
--
--static int erratum_set_next_event_phys(unsigned long evt,
--					   struct clock_event_device *clk)
--{
--	erratum_set_next_event_generic(ARCH_TIMER_PHYS_ACCESS, evt, clk);
--	return 0;
--}
--#endif /* CONFIG_ARM_ARCH_TIMER_OOL_WORKAROUND */
--
- static int arch_timer_set_next_event_virt(unsigned long evt,
- 					  struct clock_event_device *clk)
+ static
+-void arch_timer_enable_workaround(const struct arch_timer_erratum_workaround *wa)
++void arch_timer_enable_workaround(const struct arch_timer_erratum_workaround *wa,
++				  bool local)
  {
-+	if (needs_unstable_timer_counter_workaround())
-+		return erratum_set_next_event_tval_virt(evt, clk);
+-	timer_unstable_counter_workaround = wa;
++	int i;
 +
- 	set_next_event(ARCH_TIMER_VIRT_ACCESS, evt, clk);
- 	return 0;
- }
-@@ -487,6 +490,9 @@ static int arch_timer_set_next_event_virt(unsigned long evt,
- static int arch_timer_set_next_event_phys(unsigned long evt,
- 					  struct clock_event_device *clk)
- {
-+	if (needs_unstable_timer_counter_workaround())
-+		return erratum_set_next_event_tval_phys(evt, clk);
++	if (local) {
++		__this_cpu_write(timer_unstable_counter_workaround, wa);
++	} else {
++		for_each_possible_cpu(i)
++			per_cpu(timer_unstable_counter_workaround, i) = wa;
++	}
 +
- 	set_next_event(ARCH_TIMER_PHYS_ACCESS, evt, clk);
- 	return 0;
- }
-@@ -505,19 +511,6 @@ static int arch_timer_set_next_event_phys_mem(unsigned long evt,
- 	return 0;
+ 	static_branch_enable(&arch_timer_read_ool_enabled);
  }
  
--static void erratum_workaround_set_sne(struct clock_event_device *clk)
--{
--#ifdef CONFIG_ARM_ARCH_TIMER_OOL_WORKAROUND
--	if (!static_branch_unlikely(&arch_timer_read_ool_enabled))
+@@ -376,14 +386,17 @@ static void arch_timer_check_ool_workaround(enum arch_timer_erratum_match_type t
+ 		return;
+ 
+ 	if (static_branch_unlikely(&arch_timer_read_ool_enabled)) {
+-		if (wa != timer_unstable_counter_workaround)
++		const struct arch_timer_erratum_workaround *__wa;
++		__wa = __this_cpu_read(timer_unstable_counter_workaround);
++		if (__wa && wa != __wa)
+ 			pr_warn("Can't enable workaround for %s (clashes with %s\n)",
+-				wa->desc,
+-				timer_unstable_counter_workaround->desc);
 -		return;
--
--	if (arch_timer_uses_ppi == VIRT_PPI)
--		clk->set_next_event = erratum_set_next_event_virt;
--	else
--		clk->set_next_event = erratum_set_next_event_phys;
--#endif
--}
--
- static void __arch_timer_setup(unsigned type,
- 			       struct clock_event_device *clk)
- {
-@@ -548,8 +541,6 @@ static void __arch_timer_setup(unsigned type,
- 		}
++				wa->desc, __wa->desc);
++
++		if (__wa)
++			return;
+ 	}
  
- 		arch_timer_check_ool_workaround(ate_match_local_cap_id, NULL);
--
--		erratum_workaround_set_sne(clk);
- 	} else {
- 		clk->features |= CLOCK_EVT_FEAT_DYNIRQ;
- 		clk->name = "arch_mem_timer";
+-	arch_timer_enable_workaround(wa);
++	arch_timer_enable_workaround(wa, local);
+ 	pr_info("Enabling %s workaround for %s\n",
+ 		local ? "local" : "global", wa->desc);
+ }
+@@ -391,10 +404,15 @@ static void arch_timer_check_ool_workaround(enum arch_timer_erratum_match_type t
+ #define erratum_handler(fn, r, ...)					\
+ ({									\
+ 	bool __val;							\
+-	if (needs_unstable_timer_counter_workaround() &&		\
+-	    timer_unstable_counter_workaround->fn) {			\
+-		r = timer_unstable_counter_workaround->fn(__VA_ARGS__);	\
+-		__val = true;						\
++	if (needs_unstable_timer_counter_workaround()) {		\
++		const struct arch_timer_erratum_workaround *__wa;	\
++		__wa = __this_cpu_read(timer_unstable_counter_workaround); \
++		if (__wa && __wa->fn) {					\
++			r = __wa->fn(__VA_ARGS__);			\
++			__val = true;					\
++		} else {						\
++			__val = false;					\
++		}							\
+ 	} else {							\
+ 		__val = false;						\
+ 	}								\
 -- 
 2.11.0
