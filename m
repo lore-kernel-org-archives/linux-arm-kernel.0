@@ -1,43 +1,147 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 20 Mar 2017 15:39:38 +0800
-Subject: [PATCH 2/2] spi: imx: fix use of native chip-selects with
- devicetree
-In-Reply-To: <1489726983-17706-3-git-send-email-gerg@linux-m68k.org>
-References: <1489726983-17706-1-git-send-email-gerg@linux-m68k.org>
- <1489726983-17706-3-git-send-email-gerg@linux-m68k.org>
-Message-ID: <20170320073937.GE3443@dragon>
+From: gengdongjiu@huawei.com (Dongjiu Geng)
+Date: Mon, 20 Mar 2017 15:55:34 +0800
+Subject: [PATCH] kvm: pass the virtual SEI syndrome to guest OS
+Message-ID: <1489996534-8270-1-git-send-email-gengdongjiu@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 17, 2017 at 03:03:03PM +1000, Greg Ungerer wrote:
-> The commonly used mechanism of specifying the hardware or native
-> chip-select on an SPI device in devicetree (that is "cs-gpios = <0>")
-> does not result in the native chip-select being configured for use.
-> So external SPI devices that require use of the native chip-select
-> will not work.
-> 
-> You can successfully specify native chip-selects if using a platform
-> setup by specifying the cs-gpio as negative offset by 32. And that
-> works correctly. You cannot use the same method in devicetree.
-> 
-> The logic in the spi-imx.c driver during probe uses core spi function
-> of_spi_register_master() in spi.c to parse the "cs-gpios" devicetree tag.
-> For valid GPIO values that will be recorded for use, all other entries in
-> the cs_gpios list will be set to -ENOENT. So entries like "<0>" will be
-> set to -ENOENT in the cs_gpios list.
-> 
-> When the SPI device registers are setup the code will use the GPIO
-> listed in the cs_gpios list for the desired chip-select. If the cs_gpio
-> is less then 0 then it is intended to be for a native chip-select, and
-> its cs_gpio value is added to 32 to get the chipselect number to use.
-> Problem is that with devicetree this can only ever be -ENOENT (which
-> is -2), and that alone results in an invalid chip-select number. But also
-> doesn't allow selection of the native chip-select at all.
-> 
-> To fix, if the cs_gpio specified for this spi device is not a
-> valid GPIO then use the "chip_select" (that is the native chip-select
-> number) for hardware setup.
-> 
-> Signed-off-by: Greg Ungerer <gerg@linux-m68k.org>
+In the RAS implementation, hardware pass the virtual SEI
+syndrome information through the VSESR_EL2, so set the virtual
+SEI syndrome using physical SEI syndrome el2_elr to pass to
+the guest OS
 
-Acked-by: Shawn Guo <shawnguo@kernel.org>
+Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
+Signed-off-by: Quanming wu <wuquanming@huawei.com>
+---
+ arch/arm64/Kconfig                   |  8 ++++++++
+ arch/arm64/include/asm/esr.h         |  1 +
+ arch/arm64/include/asm/kvm_emulate.h | 12 ++++++++++++
+ arch/arm64/include/asm/kvm_host.h    |  4 ++++
+ arch/arm64/kvm/hyp/switch.c          | 15 ++++++++++++++-
+ arch/arm64/kvm/inject_fault.c        | 10 ++++++++++
+ 6 files changed, 49 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 8c7c244247b6..ea62170a3b75 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -908,6 +908,14 @@ endmenu
+ 
+ menu "ARMv8.2 architectural features"
+ 
++config HAS_RAS_EXTENSION
++	bool "Support arm64 RAS extension"
++	default n
++	help
++	  Reliability, Availability, Serviceability(RAS; part of the ARMv8.2 Extensions).
++
++	  Selecting this option OS will try to recover the error that RAS hardware node detected.
++
+ config ARM64_UAO
+ 	bool "Enable support for User Access Override (UAO)"
+ 	default y
+diff --git a/arch/arm64/include/asm/esr.h b/arch/arm64/include/asm/esr.h
+index d14c478976d0..e38d32b2bdad 100644
+--- a/arch/arm64/include/asm/esr.h
++++ b/arch/arm64/include/asm/esr.h
+@@ -111,6 +111,7 @@
+ #define ESR_ELx_COND_MASK	(UL(0xF) << ESR_ELx_COND_SHIFT)
+ #define ESR_ELx_WFx_ISS_WFE	(UL(1) << 0)
+ #define ESR_ELx_xVC_IMM_MASK	((1UL << 16) - 1)
++#define VSESR_ELx_IDS_ISS_MASK    ((1UL << 25) - 1)
+ 
+ /* ESR value templates for specific events */
+ 
+diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
+index f5ea0ba70f07..20d4da7f5dce 100644
+--- a/arch/arm64/include/asm/kvm_emulate.h
++++ b/arch/arm64/include/asm/kvm_emulate.h
+@@ -148,6 +148,18 @@ static inline u32 kvm_vcpu_get_hsr(const struct kvm_vcpu *vcpu)
+ 	return vcpu->arch.fault.esr_el2;
+ }
+ 
++#ifdef CONFIG_HAS_RAS_EXTENSION
++static inline u32 kvm_vcpu_get_vsesr(const struct kvm_vcpu *vcpu)
++{
++	return vcpu->arch.fault.vsesr_el2;
++}
++
++static inline void kvm_vcpu_set_vsesr(struct kvm_vcpu *vcpu, unsigned long val)
++{
++	vcpu->arch.fault.vsesr_el2 = val;
++}
++#endif
++
+ static inline int kvm_vcpu_get_condition(const struct kvm_vcpu *vcpu)
+ {
+ 	u32 esr = kvm_vcpu_get_hsr(vcpu);
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index e7705e7bb07b..f9e3bb57c461 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -83,6 +83,10 @@ struct kvm_mmu_memory_cache {
+ };
+ 
+ struct kvm_vcpu_fault_info {
++#ifdef CONFIG_HAS_RAS_EXTENSION
++	/* Virtual SError Exception Syndrome Register */
++	u32 vsesr_el2;
++#endif
+ 	u32 esr_el2;		/* Hyp Syndrom Register */
+ 	u64 far_el2;		/* Hyp Fault Address Register */
+ 	u64 hpfar_el2;		/* Hyp IPA Fault Address Register */
+diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+index aede1658aeda..770a153fb6ba 100644
+--- a/arch/arm64/kvm/hyp/switch.c
++++ b/arch/arm64/kvm/hyp/switch.c
+@@ -86,6 +86,13 @@ static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu)
+ 		isb();
+ 	}
+ 	write_sysreg(val, hcr_el2);
++#ifdef CONFIG_HAS_RAS_EXTENSION
++	/* If virtual System Error or Asynchronous Abort is pending. set
++	 * the virtual exception syndrome information
++	 */
++	if (vcpu->arch.hcr_el2 & HCR_VSE)
++		write_sysreg(vcpu->arch.fault.vsesr_el2, vsesr_el2);
++#endif
+ 	/* Trap on AArch32 cp15 c15 accesses (EL1 or EL0) */
+ 	write_sysreg(1 << 15, hstr_el2);
+ 	/*
+@@ -139,8 +146,14 @@ static void __hyp_text __deactivate_traps(struct kvm_vcpu *vcpu)
+ 	 * the crucial bit is "On taking a vSError interrupt,
+ 	 * HCR_EL2.VSE is cleared to 0."
+ 	 */
+-	if (vcpu->arch.hcr_el2 & HCR_VSE)
++	if (vcpu->arch.hcr_el2 & HCR_VSE) {
+ 		vcpu->arch.hcr_el2 = read_sysreg(hcr_el2);
++#ifdef CONFIG_HAS_RAS_EXTENSION
++		/* set vsesr_el2[24:0] with esr_el2[24:0] */
++		kvm_vcpu_set_vsesr(vcpu, read_sysreg_el2(esr)
++					& VSESR_ELx_IDS_ISS_MASK);
++#endif
++	}
+ 
+ 	__deactivate_traps_arch()();
+ 	write_sysreg(0, hstr_el2);
+diff --git a/arch/arm64/kvm/inject_fault.c b/arch/arm64/kvm/inject_fault.c
+index da6a8cfa54a0..08a13dfe28a8 100644
+--- a/arch/arm64/kvm/inject_fault.c
++++ b/arch/arm64/kvm/inject_fault.c
+@@ -242,4 +242,14 @@ void kvm_inject_undefined(struct kvm_vcpu *vcpu)
+ void kvm_inject_vabt(struct kvm_vcpu *vcpu)
+ {
+ 	vcpu_set_hcr(vcpu, vcpu_get_hcr(vcpu) | HCR_VSE);
++#ifdef CONFIG_HAS_RAS_EXTENSION
++	/* If virtual System Error or Asynchronous Abort is set. set
++	 * the virtual exception syndrome information
++	 */
++	kvm_vcpu_set_vsesr(vcpu, ((kvm_vcpu_get_vsesr(vcpu)
++				& (~VSESR_ELx_IDS_ISS_MASK))
++				| (kvm_vcpu_get_hsr(vcpu)
++				& VSESR_ELx_IDS_ISS_MASK)));
++#endif
++
+ }
+-- 
+2.11.0
