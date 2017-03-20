@@ -1,58 +1,77 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 20 Mar 2017 14:20:16 +0100
-Subject: [PATCH v5 00/39] i.MX Media Driver
-In-Reply-To: <20170319121402.GS21222@n2100.armlinux.org.uk>
-References: <1489121599-23206-1-git-send-email-steve_longerbeam@mentor.com>
- <20170318192258.GL21222@n2100.armlinux.org.uk>
- <aef6c412-5464-726b-42f6-a24b7323aa9c@mentor.com>
- <20170319121402.GS21222@n2100.armlinux.org.uk>
-Message-ID: <1490016016.2917.68.camel@pengutronix.de>
+From: vladimir_zapolskiy@mentor.com (Vladimir Zapolskiy)
+Date: Mon, 20 Mar 2017 15:22:15 +0200
+Subject: [PATCH 2/2] spi: imx: fix use of native chip-selects with
+ devicetree
+In-Reply-To: <1489726983-17706-3-git-send-email-gerg@linux-m68k.org>
+References: <1489726983-17706-1-git-send-email-gerg@linux-m68k.org>
+ <1489726983-17706-3-git-send-email-gerg@linux-m68k.org>
+Message-ID: <f1cf2001-28b4-6a74-b98a-13336d74ff9d@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2017-03-19 at 12:14 +0000, Russell King - ARM Linux wrote:
-> On Sat, Mar 18, 2017 at 12:58:27PM -0700, Steve Longerbeam wrote:
-> > On 03/18/2017 12:22 PM, Russell King - ARM Linux wrote:
-> > >0:00:01.955927879 20954  0x15ffe90 INFO                    v4l2 gstv4l2object.c:3811:gst_v4l2_object_get_caps:<v4l2src0> probed caps: video/x-bayer, format=(string)rggb, framerate=(fraction)30000/1001, width=(int)816, height=(int)616, pixel-aspect-ratio=(fraction)1/1; video/x-raw, format=(string)I420, framerate=(fraction)30000/1001, width=(int)816, height=(int)616, interlace-mode=(string)progressive, pixel-aspect-ratio=(fraction)1/1; video/x-raw, format=(string)YV12, framerate=(fraction)30000/1001, width=(int)816, height=(int)616, interlace-mode=(string)progressive, pixel-aspect-ratio=(fraction)1/1; video/x-raw, format=(string)BGR, framerate=(fraction)30000/1001, width=(int)816, height=(int)616, interlace-mode=(string)progressive, pixel-aspect-ratio=(fraction)1/1; video/x-raw, format=(string)RGB, framerate=(fraction)30000/1001, width=(int)816, height=(int)616, interlace-mode=(string)progressive, pixel-aspect-ratio=(fraction)1/1
-> > >
-> > >    despite the media pipeline actually being configured for 60fps.
-> > >
-> > >    Forcing it by adjusting the pipeline only results in gstreamer
-> > >    failing, because it believes that v4l2 is unable to operate at
-> > >    60fps.
-> > >
-> > >    Also note the complaints from v4l2src about the non-compliance...
-> > 
-> > Thanks, I've fixed most of v4l2-compliance issues, but this is not
-> > done yet. Is that something you can help with?
-> 
-> I've looked at this, and IMHO it's yet another media control API mess.
-> 
-> - media-ctl itself allows setting the format on subdev pads via
->   struct v4l2_subdev_format.
-> 
-> - struct v4l2_subdev_format contains a struct v4l2_mbus_framefmt.
-> 
-> - struct v4l2_mbus_framefmt contains:
->   * @width:      frame width
->   * @height:     frame height
->   * @code:       data format code (from enum v4l2_mbus_pixelcode)
->   * @field:      used interlacing type (from enum v4l2_field)
->   * @colorspace: colorspace of the data (from enum v4l2_colorspace)
->   * @ycbcr_enc:  YCbCr encoding of the data (from enum v4l2_ycbcr_encoding)
->   * @quantization: quantization of the data (from enum v4l2_quantization)
->   * @xfer_func:  transfer function of the data (from enum v4l2_xfer_func)
-> 
-> - media-ctl sets width, height, code and field, but nothing else.
-> 
-> We're already agreed that the fields that media-ctl are part of the
-> format negotiation between the ultimate source, flowing down to the
-> capture device.  However, there's no support in media-ctl to deal
-> with these other fields - so media-ctl in itself is only half-
-> implemented.
+Hi Greg,
 
-To set and read colorimetry information:
-https://patchwork.linuxtv.org/patch/39350/
+On 03/17/2017 07:03 AM, Greg Ungerer wrote:
+> The commonly used mechanism of specifying the hardware or native
+> chip-select on an SPI device in devicetree (that is "cs-gpios = <0>")
+> does not result in the native chip-select being configured for use.
+> So external SPI devices that require use of the native chip-select
+> will not work.
+> 
+> You can successfully specify native chip-selects if using a platform
+> setup by specifying the cs-gpio as negative offset by 32. And that
+> works correctly. You cannot use the same method in devicetree.
+> 
+> The logic in the spi-imx.c driver during probe uses core spi function
+> of_spi_register_master() in spi.c to parse the "cs-gpios" devicetree tag.
+> For valid GPIO values that will be recorded for use, all other entries in
+> the cs_gpios list will be set to -ENOENT. So entries like "<0>" will be
+> set to -ENOENT in the cs_gpios list.
+> 
+> When the SPI device registers are setup the code will use the GPIO
+> listed in the cs_gpios list for the desired chip-select. If the cs_gpio
+> is less then 0 then it is intended to be for a native chip-select, and
+> its cs_gpio value is added to 32 to get the chipselect number to use.
+> Problem is that with devicetree this can only ever be -ENOENT (which
+> is -2), and that alone results in an invalid chip-select number. But also
+> doesn't allow selection of the native chip-select at all.
+> 
+> To fix, if the cs_gpio specified for this spi device is not a
+> valid GPIO then use the "chip_select" (that is the native chip-select
+> number) for hardware setup.
+> 
 
-regards
-Philipp
+Can you please share an example of "cs-gpios" property for a particular
+case, which I'm able to test? It is an Atmel AT93C66A EEPROM connected
+to CSPI1 and sitting on chip select 2 (= selected by CSPI1_SS2), there
+is no other SPI devices on CSPI1.
+
+Since I raise the question, please add the correspondent updates and
+and an example to Documentation/devicetree/bindings/spi/fsl-imx-cspi.txt
+
+In fact my expectation would be to have a device description like one
+below:
+
+&spi1 {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_cspi1>;
+
+	eeprom at 2 {
+		compatible = "atmel,at93c66a";
+		reg = <2>;
+		spi-cs-high;
+		spi-max-frequency = <1000000>;
+	};
+};
+
+Note, that there is no cs-gpios property at all, which is mandatory
+at the moment, and unit address / reg property defines chip select
+number.
+
+For that type of bindings locally I have a hackish spi-imx driver change,
+which supports this option, but I'm unsure if it is universal enough.
+
+--
+With best wishes,
+Vladimir
