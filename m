@@ -1,124 +1,133 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 20 Mar 2017 16:48:19 -0500
-Subject: [PATCH v4 14/23] PCI: dwc: dra7xx: Workaround for errata id i870
-In-Reply-To: <20170313142259.25397-15-kishon@ti.com>
-References: <20170313142259.25397-1-kishon@ti.com>
- <20170313142259.25397-15-kishon@ti.com>
-Message-ID: <20170320214819.5azzdbgncfemhujo@rob-hp-laptop>
+Date: Mon, 20 Mar 2017 16:52:50 -0500
+Subject: [PATCH 1/2] dt-bindings: Document the STM32 MDMA bindings
+In-Reply-To: <1489417599-31308-2-git-send-email-cedric.madianga@gmail.com>
+References: <1489417599-31308-1-git-send-email-cedric.madianga@gmail.com>
+ <1489417599-31308-2-git-send-email-cedric.madianga@gmail.com>
+Message-ID: <20170320215250.wwhq6lzwe45jmwks@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 13, 2017 at 07:52:50PM +0530, Kishon Vijay Abraham I wrote:
-> According to errata i870, access to the PCIe slave port
-> that are not 32-bit aligned will result in incorrect mapping
-> to TLP Address and Byte enable fields.
+On Mon, Mar 13, 2017 at 04:06:38PM +0100, M'boumba Cedric Madianga wrote:
+> This patch adds documentation of device tree bindings for the STM32 MDMA
+> controller.
 > 
-> Accessing non 32-bit aligned data causes incorrect data in the target
-> buffer if memcpy is used. Implement the workaround for this
-> errata here.
-> 
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> Signed-off-by: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
+> Reviewed-by: Ludovic BARRE <ludovic.barre@st.com>
 > ---
->  drivers/pci/dwc/pci-dra7xx.c | 53 ++++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 53 insertions(+)
+>  .../devicetree/bindings/dma/stm32-mdma.txt         | 94 ++++++++++++++++++++++
+>  1 file changed, 94 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/dma/stm32-mdma.txt
 > 
-> diff --git a/drivers/pci/dwc/pci-dra7xx.c b/drivers/pci/dwc/pci-dra7xx.c
-> index 35c18534469c..147d37a7fe58 100644
-> --- a/drivers/pci/dwc/pci-dra7xx.c
-> +++ b/drivers/pci/dwc/pci-dra7xx.c
-> @@ -26,6 +26,8 @@
->  #include <linux/pm_runtime.h>
->  #include <linux/resource.h>
->  #include <linux/types.h>
-> +#include <linux/mfd/syscon.h>
-> +#include <linux/regmap.h>
->  
->  #include "pcie-designware.h"
->  
-> @@ -528,6 +530,51 @@ static const struct of_device_id of_dra7xx_pcie_match[] = {
->  	{},
->  };
->  
-> +/*
-> + * dra7xx_pcie_ep_unaligned_memaccess: workaround for AM572x/AM571x Errata i870
-> + * @dra7xx: the dra7xx device where the workaround should be applied
-> + *
-> + * Access to the PCIe slave port that are not 32-bit aligned will result
-> + * in incorrect mapping to TLP Address and Byte enable fields. Therefore,
-> + * byte and half-word accesses are not possible to byte offset 0x1, 0x2, or
-> + * 0x3.
-> + *
-> + * To avoid this issue set PCIE_SS1_AXI2OCP_LEGACY_MODE_ENABLE to 1.
-> + */
-> +static int dra7xx_pcie_ep_unaligned_memaccess(struct device *dev)
-> +{
-> +	int ret;
-> +	struct device_node *np = dev->of_node;
-> +	struct regmap *regmap;
-> +	unsigned int reg;
-> +	unsigned int field;
+> diff --git a/Documentation/devicetree/bindings/dma/stm32-mdma.txt b/Documentation/devicetree/bindings/dma/stm32-mdma.txt
+> new file mode 100644
+> index 0000000..26a930c
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/dma/stm32-mdma.txt
+> @@ -0,0 +1,94 @@
+> +* STMicroelectronics STM32 MDMA controller
 > +
-> +	regmap = syscon_regmap_lookup_by_phandle(np,
-> +						 "ti,syscon-unaligned-access");
-> +	if (IS_ERR(regmap)) {
-> +		dev_dbg(dev, "can't get ti,syscon-unaligned-access\n");
-> +		return -EINVAL;
-> +	}
+> +The STM32 MDMA is a general-purpose direct memory access controller capable of
+> +supporting 64 independent DMA channels with 256 HW requests.
 > +
-> +	if (of_property_read_u32_index(np, "ti,syscon-unaligned-access", 1,
-> +				       &reg)) {
-> +		dev_err(dev, "couldn't get legacy mode register offset\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	if (of_property_read_u32_index(np, "ti,syscon-unaligned-access", 2,
-> +				       &field)) {
-> +		dev_err(dev, "can't get bit field for setting legacy mode\n");
-> +		return -EINVAL;
-> +	}
+> +Required properties:
+> +- compatible: Should be "st,stm32-mdma"
 
-If this remains, it's screaming for a helper function. 
-of_parse_phandle_with_args already exists, but maybe a syscon specific 
-function is in order.
+Should be more specific.
+
+> +- reg: Should contain MDMA registers location and length. This should include
+> +  all of the per-channel registers.
+> +- interrupts: Should contain the MDMA interrupt.
+> +- clocks: Should contain the input clock of the DMA instance.
+> +- resets: Reference to a reset controller asserting the DMA controller.
+> +- #dma-cells : Must be <5>. See DMA client paragraph for more details.
+> +
+> +Optional properties:
+> +- dma-channels: Number of DMA channels supported by the controller.
+> +- dma-requests: Number of DMA request signals supported by the controller.
+> +- st,ahb-addr-masks: Array of u32 mask to list memory devices addressed via
+> +  AHB bus.
+
+I don't understand what this is.
 
 > +
-> +	ret = regmap_update_bits(regmap, reg, field, field);
-> +	if (ret)
-> +		dev_err(dev, "failed to enable unaligned access\n");
-> +
-> +	return ret;
-> +}
-> +
->  static int __init dra7xx_pcie_probe(struct platform_device *pdev)
->  {
->  	u32 reg;
-> @@ -637,6 +684,7 @@ static int __init dra7xx_pcie_probe(struct platform_device *pdev)
->  	case DW_PCIE_RC_TYPE:
->  		dra7xx_pcie_writel(dra7xx, PCIECTRL_TI_CONF_DEVICE_TYPE,
->  				   DEVICE_TYPE_RC);
-> +
+> +Example:
 
-Unnecessary WS change.
+Put the 2 examples together.
 
->  		ret = dra7xx_add_pcie_port(dra7xx, pdev);
->  		if (ret < 0)
->  			goto err_gpio;
-> @@ -644,6 +692,11 @@ static int __init dra7xx_pcie_probe(struct platform_device *pdev)
->  	case DW_PCIE_EP_TYPE:
->  		dra7xx_pcie_writel(dra7xx, PCIECTRL_TI_CONF_DEVICE_TYPE,
->  				   DEVICE_TYPE_EP);
 > +
-> +		ret = dra7xx_pcie_ep_unaligned_memaccess(dev);
-> +		if (ret)
-> +			goto err_gpio;
+> +	mdma1: dma at 52000000 {
+> +		compatible = "st,stm32-mdma";
+> +		reg = <0x52000000 0x1000>;
+> +		interrupts = <122>;
+> +		clocks = <&clk_dummy>;
+> +		resets = <&rcc 992>;
+> +		#dma-cells = <5>;
+> +		dma-channels = <16>;
+> +		dma-requests = <32>;
+> +		st,ahb-addr-masks = <0x20000000>, <0x00000000>;
+> +	};
 > +
->  		ret = dra7xx_add_pcie_ep(dra7xx, pdev);
->  		if (ret < 0)
->  			goto err_gpio;
+> +* DMA client
+> +
+> +DMA clients connected to the STM32 MDMA controller must use the format
+> +described in the dma.txt file, using a six-cell specifier for each channel:
+> +a phandle to the MDMA controller plus the following five integer cells:
+> +
+> +1. The request line number
+> +2. The priority level
+> +	0x00: Low
+> +	0x01: Medium
+> +	0x10: High
+> +	0x11: Very high
+> +3. A 32bit mask specifying the DMA channel configuration
+> + -bit 0-1: Source increment mode
+> +	0x00: Source address pointer is fixed
+> +	0x10: Source address pointer is incremented after each data transfer
+> +	0x11: Source address pointer is decremented after each data transfer
+> + -bit 2-3: Destination increment mode
+> +	0x00: Destination address pointer is fixed
+> +	0x10: Destination address pointer is incremented after each data
+> +	transfer
+> +	0x11: Destination address pointer is decremented after each data
+> +	transfer
+> + -bit 8-9: Source increment offset size
+> +	0x00: byte (8bit)
+> +	0x01: half-word (16bit)
+> +	0x10: word (32bit)
+> +	0x11: double-word (64bit)
+> + -bit 10-11: Destination increment offset size
+> +	0x00: byte (8bit)
+> +	0x01: half-word (16bit)
+> +	0x10: word (32bit)
+> +	0x11: double-word (64bit)
+> +-bit 25-18: The number of bytes to be transferred in a single transfer
+> +	(min = 1 byte, max = 128 bytes)
+> +-bit 29:28: Trigger Mode
+> +	0x00: Each MDMA request triggers a buffer transfer (max 128 bytes)
+> +	0x01: Each MDMA request triggers a block transfer (max 64K bytes)
+> +	0x10: Each MDMA request triggers a repeated block transfer
+> +	0x11: Each MDMA request triggers a linked list transfer
+> +4. A 32bit value specifying the register to be used to acknowledge the request
+> +   if no HW ack signal is used by the MDMA client
+> +5. A 32bit mask specifying the value to be written to acknowledge the request
+> +   if no HW ack signal is used by the MDMA client
+> +
+> +Example:
+> +
+> +	i2c4: i2c at 5c002000 {
+> +		compatible = "st,stm32f7-i2c";
+> +		reg = <0x5c002000 0x400>;
+> +		interrupts = <GIC_SPI 95 IRQ_TYPE_NONE>,
+> +			     <GIC_SPI 96 IRQ_TYPE_NONE>;
+> +		clocks = <&clk_hsi>;
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		dmas = <&mdma1 36 0x0 0x40008 0x0 0x0>,
+> +		       <&mdma1 37 0x0 0x40002 0x0 0x0>;
+> +		dma-names = "rx", "tx";
+> +		status = "disabled";
+> +	};
 > -- 
-> 2.11.0
+> 1.9.1
 > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
