@@ -1,67 +1,130 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 20 Mar 2017 14:17:05 +0000
-Subject: [PATCH v5 38/39] media: imx: csi: fix crop rectangle reset in
- sink set_fmt
-In-Reply-To: <1490018451.2917.86.camel@pengutronix.de>
-References: <1489121599-23206-1-git-send-email-steve_longerbeam@mentor.com>
- <1489121599-23206-39-git-send-email-steve_longerbeam@mentor.com>
- <20170319152233.GW21222@n2100.armlinux.org.uk>
- <327d67d9-68c1-7f74-0c0f-f6aee1c4b546@gmail.com>
- <1490010926.2917.59.camel@pengutronix.de>
- <20170320120855.GH21222@n2100.armlinux.org.uk>
- <1490018451.2917.86.camel@pengutronix.de>
-Message-ID: <20170320141705.GL21222@n2100.armlinux.org.uk>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Mon, 20 Mar 2017 15:24:25 +0100
+Subject: [PATCH 1/2] KVM: arm/arm64: vgic-v2: Expose the correct GICC_PMR
+ values to userspace
+In-Reply-To: <20170316114535.25233-2-marc.zyngier@arm.com>
+References: <20170316114535.25233-1-marc.zyngier@arm.com>
+ <20170316114535.25233-2-marc.zyngier@arm.com>
+Message-ID: <20170320142425.GB20711@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 20, 2017 at 03:00:51PM +0100, Philipp Zabel wrote:
-> On Mon, 2017-03-20 at 12:08 +0000, Russell King - ARM Linux wrote:
-> > The same document says:
-> > 
-> >   Scaling support is optional. When supported by a subdev, the crop
-> >   rectangle on the subdev's sink pad is scaled to the size configured
-> >   using the
-> >   :ref:`VIDIOC_SUBDEV_S_SELECTION <VIDIOC_SUBDEV_G_SELECTION>` IOCTL
-> >   using ``V4L2_SEL_TGT_COMPOSE`` selection target on the same pad. If the
-> >   subdev supports scaling but not composing, the top and left values are
-> >   not used and must always be set to zero.
+On Thu, Mar 16, 2017 at 11:45:34AM +0000, Marc Zyngier wrote:
+> We allow userspace to save/restore the GICC_PMR values in order
+> to allow migration. This value is extracted from GICH_PMCR, where
+> it occupies a 5 bit field. But the canonical PMR is an 8 bit
+> value and we fail to shift the virtual priority, resulting in
+> a non-sensical value being reported to userspace.
 > 
-> Right, this sentence does imply that when scaling is supported, there
-> must be a sink compose rectangle, even when composing is not.
-> 
-> I have previously set up scaling like this:
-> 
-> media-ctl --set-v4l2 "'ipu1_csi0_mux':2[fmt:UYVY2X8/1920x1080 at 1/60]"
-> media-ctl --set-v4l2 "'ipu1_csi0':2[fmt:AYUV32/960x540 at 1/30]"
-> 
-> Does this mean, it should work like this instead?
-> 
-> media-ctl --set-v4l2 "'ipu1_csi0_mux':2[fmt:UYVY2X8/1920x1080 at 1/60]"
-> media-ctl --set-v4l2 "'ipu1_csi0':0[fmt:UYVY2X8/1920x1080 at 1/60,compose:(0,0)/960x540]"
-> media-ctl --set-v4l2 "'ipu1_csi0':2[fmt:AYUV32/960x540 at 1/30]"
-> 
-> I suppose setting the source pad format should not be allowed to modify
-> the sink compose rectangle.
+> Fixing it once and for all would be ideal, but that would break
+> migration of guest from old to new kernels. We thus introduce
+> a new GICv2 attribute (KVM_DEV_ARM_VGIC_CTRL_CANONICAL_PMR)
+> that allows userspace to register its interest for the one true
+> representation of PMR.
 
-That is what I believe having read these documents several times, but
-we need v4l2 people to confirm.
+Thinking about this some more, I think we should just leave the ABI as
+is without introducing the flag, because we do not loose any information
+by doing so, and we can completely leave it up to userspace to work
+around our funny ABI.
 
-Note that setting the format on 'ipu1_csi0':0 should already be done by
-the previous media-ctl command, so it should be possible to simplify
-that to:
+In the end, considering my comments on the next patch, the result would
+be amusing, and look something like this patch instead:
 
-media-ctl --set-v4l2 "'ipu1_csi0_mux':2[fmt:UYVY2X8/1920x1080 at 1/60]"
-media-ctl --set-v4l2 "'ipu1_csi0':0[compose:(0,0)/960x540]"
-media-ctl --set-v4l2 "'ipu1_csi0':2[fmt:AYUV32/960x540 at 1/30]"
 
-I have tripped over a bug in media-ctl when specifying both a crop and
-compose rectangle - the --help output suggests that "," should be used
-to separate them.  media-ctl rejects that, telling me the character at
-the "," should be "]".  Replacing the "," with " " allows media-ctl to
-accept it and set both rectangles, so it sounds like a parser bug - I've
-not looked into this any further yet.
+diff --git a/Documentation/virtual/kvm/devices/arm-vgic.txt b/Documentation/virtual/kvm/devices/arm-vgic.txt
+index 76e61c8..b2f60ca 100644
+--- a/Documentation/virtual/kvm/devices/arm-vgic.txt
++++ b/Documentation/virtual/kvm/devices/arm-vgic.txt
+@@ -83,6 +83,12 @@ Groups:
+ 
+     Bits for undefined preemption levels are RAZ/WI.
+ 
++    For historical reasons and to provide ABI compatibility with userspace we
++    export the GICC_PMR register in the format of the GICH_VMCR.VMPriMask
++    field in the lower 5 bits of a word, meaning that userspace must always
++    use the lower 5 bits to communicate with the KVM device and must shift the
++    value left by 3 places to obtain the actual priority mask level.
++
+   Limitations:
+     - Priorities are not implemented, and registers are RAZ/WI
+     - Currently only implemented for KVM_DEV_TYPE_ARM_VGIC_V2.
+diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+index a3ad7ff..7b7ecac 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
++++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+@@ -229,7 +229,14 @@ static unsigned long vgic_mmio_read_vcpuif(struct kvm_vcpu *vcpu,
+ 		val = vmcr.ctlr;
+ 		break;
+ 	case GIC_CPU_PRIMASK:
+-		val = vmcr.pmr;
++		/*
++		 * Our KVM_DEV_TYPE_ARM_VGIC_V2 device ABI exports the
++		 * the PMR field as GICH_VMCR.VMPriMask rather than
++		 * GICC_PMR.Priority, so we expose the upper five bits of
++		 * priority mask to userspace using the lower bits in the
++		 * unsigned long.
++		 */
++		val = vmcr.pmr >> 3;
+ 		break;
+ 	case GIC_CPU_BINPOINT:
+ 		val = vmcr.bpr;
+@@ -262,7 +269,14 @@ static void vgic_mmio_write_vcpuif(struct kvm_vcpu *vcpu,
+ 		vmcr.ctlr = val;
+ 		break;
+ 	case GIC_CPU_PRIMASK:
+-		vmcr.pmr = val;
++		/*
++		 * Our KVM_DEV_TYPE_ARM_VGIC_V2 device ABI exports the
++		 * the PMR field as GICH_VMCR.VMPriMask rather than
++		 * GICC_PMR.Priority, so we expose the upper five bits of
++		 * priority mask to userspace using the lower bits in the
++		 * unsigned long.
++		 */
++		vmcr.pmr = val << 3;
+ 		break;
+ 	case GIC_CPU_BINPOINT:
+ 		vmcr.bpr = val;
+diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
+index b834ecd..95739cc 100644
+--- a/virt/kvm/arm/vgic/vgic-v2.c
++++ b/virt/kvm/arm/vgic/vgic-v2.c
+@@ -191,7 +191,7 @@ void vgic_v2_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
+ 		GICH_VMCR_ALIAS_BINPOINT_MASK;
+ 	vmcr |= (vmcrp->bpr << GICH_VMCR_BINPOINT_SHIFT) &
+ 		GICH_VMCR_BINPOINT_MASK;
+-	vmcr |= (vmcrp->pmr << GICH_VMCR_PRIMASK_SHIFT) &
++	vmcr |= ((vmcrp->pmr >> 3) << GICH_VMCR_PRIMASK_SHIFT) &
+ 		GICH_VMCR_PRIMASK_MASK;
+ 
+ 	vcpu->arch.vgic_cpu.vgic_v2.vgic_vmcr = vmcr;
+@@ -207,8 +207,8 @@ void vgic_v2_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
+ 			GICH_VMCR_ALIAS_BINPOINT_SHIFT;
+ 	vmcrp->bpr  = (vmcr & GICH_VMCR_BINPOINT_MASK) >>
+ 			GICH_VMCR_BINPOINT_SHIFT;
+-	vmcrp->pmr  = (vmcr & GICH_VMCR_PRIMASK_MASK) >>
+-			GICH_VMCR_PRIMASK_SHIFT;
++	vmcrp->pmr  = ((vmcr & GICH_VMCR_PRIMASK_MASK) >>
++			GICH_VMCR_PRIMASK_SHIFT) << 3;
+ }
+ 
+ void vgic_v2_enable(struct kvm_vcpu *vcpu)
+diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
+index db28f7c..64b70b4 100644
+--- a/virt/kvm/arm/vgic/vgic.h
++++ b/virt/kvm/arm/vgic/vgic.h
+@@ -85,7 +85,8 @@ struct vgic_vmcr {
+ 	u32	ctlr;
+ 	u32	abpr;
+ 	u32	bpr;
+-	u32	pmr;
++	u32	pmr;  /* Priority mask field in the GICC_PMR and
++		       * ICC_PMR_EL1 priority field format */
+ 	/* Below member variable are valid only for GICv3 */
+ 	u32	grpen0;
+ 	u32	grpen1;
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+
+Let me know what you think.
+
+Thanks,
+-Christoffer
