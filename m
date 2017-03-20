@@ -1,64 +1,74 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Mon, 20 Mar 2017 15:30:55 +0000
-Subject: [PATCH 13/17] arm64: cpu_errata: Allow an erratum to be match for
- all revisions of a core
-In-Reply-To: <20170320145613.GH31213@leverpostej>
-References: <20170306112622.13853-1-marc.zyngier@arm.com>
- <20170306112622.13853-14-marc.zyngier@arm.com>
- <20170320145613.GH31213@leverpostej>
-Message-ID: <6f99785b-abc8-a1d4-fd6f-c9aa303f9c94@arm.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Mon, 20 Mar 2017 09:32:15 -0600
+Subject: [PATCH v4 1/7] coresight: bindings for CPU debug module
+In-Reply-To: <20170320114953.GA19581@leoy-linaro>
+References: <1489762943-25849-1-git-send-email-leo.yan@linaro.org>
+ <1489762943-25849-2-git-send-email-leo.yan@linaro.org>
+ <20170317161335.GB20435@linaro.org>
+ <20170320114953.GA19581@leoy-linaro>
+Message-ID: <20170320153215.GA15068@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/03/17 14:56, Mark Rutland wrote:
-> On Mon, Mar 06, 2017 at 11:26:18AM +0000, Marc Zyngier wrote:
->> Some minor erratum may not be fixed in further revisions of a core,
->> leading to a situation where the workaround needs to be updated each
->> time an updated core is released.
->
-> That is somewhat unfortunate. :(
->
->> Introduce a MIDR_ALL_VERSIONS match helper that will work for all
->> versions of that MIDR, once and for all.
->>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->
-> This looks sane to me. FWIW:
->
-> Acked-by: Mark Rutland <mark.rutland@arm.com>
->
-> Suzuki, any thoughts?
+On Mon, Mar 20, 2017 at 07:49:53PM +0800, Leo Yan wrote:
+> Hi Mathieu,
+> 
+> On Fri, Mar 17, 2017 at 10:13:35AM -0600, Mathieu Poirier wrote:
+> 
+> [...]
+> 
+> > > +- compatible : should be
+> > > +	     * "arm,coresight-cpu-debug"; supplemented with "arm,primecell"
+> > > +	       since this driver is using the AMBA bus interface.
+> > 
+> > This description needs to be refactored - see my comment from an earlier post
+> > for more details.
+> 
+> I have refined this description according to your suggestion:
+> http://archive.armlinux.org.uk/lurker/message/20170301.154550.f55a09d5.en.html
 
-Fine by me.
+My apologies here, I did not express myself properly.  You got the wording right
+but the format is a little bizarre.  The line break after "should be" and the
+sentence that starts with a '*' on the next line feel unatural.  Simply
 
-Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+compatible : should be "arm,coresight-cpu-debug"; supplemented with
+             "arm,primecell" since this driver is using the AMBA bus interface.
 
+will be fine.
 
->
-> Mark.
->
->> ---
->>  arch/arm64/kernel/cpu_errata.c | 7 +++++++
->>  1 file changed, 7 insertions(+)
->>
->> diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
->> index f6cc67e7626e..2be1d1c05303 100644
->> --- a/arch/arm64/kernel/cpu_errata.c
->> +++ b/arch/arm64/kernel/cpu_errata.c
->> @@ -53,6 +53,13 @@ static int cpu_enable_trap_ctr_access(void *__unused)
->>  	.midr_range_min = min, \
->>  	.midr_range_max = max
->>
->> +#define MIDR_ALL_VERSIONS(model) \
->> +	.def_scope = SCOPE_LOCAL_CPU, \
->> +	.matches = is_affected_midr_range, \
->> +	.midr_model = model, \
->> +	.midr_range_min = 0, \
->> +	.midr_range_max = (MIDR_VARIANT_MASK | MIDR_REVISION_MASK)
->> +
->>  const struct arm64_cpu_capabilities arm64_errata[] = {
->>  #if	defined(CONFIG_ARM64_ERRATUM_826319) || \
->>  	defined(CONFIG_ARM64_ERRATUM_827319) || \
->> --
->> 2.11.0
->>
+> 
+> Am I missing anthing for this?
+> 
+> > > +- reg : physical base address and length of the register set.
+> > > +
+> > > +- clocks : the clock associated to this component.
+> > > +
+> > > +- clock-names : the name of the clock referenced by the code. Since we are
+> > > +                using the AMBA framework, the name of the clock providing
+> > > +		the interconnect should be "apb_pclk" and the clock is
+> > > +		mandatory. The interface between the debug logic and the
+> > > +		processor core is clocked by the internal CPU clock, so it
+> > > +		is enabled with CPU clock by default.
+> > > +
+> > > +- cpu : the cpu phandle the debug module is affined to. When omitted
+> > > +	the module is considered to belong to CPU0.
+> > > +
+> > > +Optional properties:
+> > 
+> > s/properties/property
+> > 
+> > > +
+> > > +- power-domains: a phandle to power domain node for debug module. We can
+> > > +		 use "nohlt" to ensure CPU power domain is enabled.
+> > 
+> > The "power-domains" property is to take care of the debug power domain.  The
+> > "nohlt" is to make sure registers in the CPU power domain are accessible - both
+> > are independent from one another.  As such the description for this binding
+> > shoudl be:
+> > 
+> > "a phandle to the debug power domain".
+> 
+> Will fix for upper two comments.
+> 
+> Thanks,
+> Leo Yan
