@@ -1,233 +1,114 @@
-From: delicious.quinoa@gmail.com (Alan Tull)
-Date: Mon, 20 Mar 2017 11:28:39 -0500
-Subject: [PATCH v3 2/2] fpga: Add support for Xilinx LogiCORE PR Decoupler
-In-Reply-To: <1489781473-30772-2-git-send-email-mdf@kernel.org>
-References: <1489781473-30772-1-git-send-email-mdf@kernel.org>
- <1489781473-30772-2-git-send-email-mdf@kernel.org>
-Message-ID: <CANk1AXT_WetixZndGtT-A8gi+UK754AjnELaH_6f3bxgdpkmfg@mail.gmail.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Mon, 20 Mar 2017 17:29:07 +0100
+Subject: [PATCH v5 00/39] i.MX Media Driver
+In-Reply-To: <20170320154339.GN21222@n2100.armlinux.org.uk>
+References: <1489121599-23206-1-git-send-email-steve_longerbeam@mentor.com>
+ <20170318192258.GL21222@n2100.armlinux.org.uk>
+ <aef6c412-5464-726b-42f6-a24b7323aa9c@mentor.com>
+ <20170319121402.GS21222@n2100.armlinux.org.uk>
+ <1490016016.2917.68.camel@pengutronix.de>
+ <20170320154339.GN21222@n2100.armlinux.org.uk>
+Message-ID: <1490027347.2917.97.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 17, 2017 at 3:11 PM, Moritz Fischer <mdf@kernel.org> wrote:
+On Mon, 2017-03-20 at 15:43 +0000, Russell King - ARM Linux wrote:
+> On Mon, Mar 20, 2017 at 02:20:16PM +0100, Philipp Zabel wrote:
+> > To set and read colorimetry information:
+> > https://patchwork.linuxtv.org/patch/39350/
+> 
+> Thanks, I've applied all four of your patches, but there's a side effect
+> from that.  Old media-ctl (modified by me):
+> 
+> - entity 53: imx219 0-0010 (2 pads, 2 links)
+>              type V4L2 subdev subtype Unknown flags 0
+>              device node name /dev/v4l-subdev9
+>         pad0: Source
+>                 [fmt:SRGGB8/816x616 field:none
+>                  frame_interval:1/25]
+>                 -> "imx6-mipi-csi2":0 [ENABLED]
+>         pad1: Sink
+>                 [fmt:SRGGB10/3280x2464 field:none
+>                  crop.bounds:(0,0)/3280x2464
+>                  crop:(0,0)/3264x2464
+>                  compose.bounds:(0,0)/3264x2464
+>                  compose:(0,0)/816x616]
+>                 <- "imx219 pixel 0-0010":0 [ENABLED,IMMUTABLE]
+> 
+> New media-ctl:
+> 
+> - entity 53: imx219 0-0010 (2 pads, 2 links)
+>              type V4L2 subdev subtype Unknown flags 0
+>              device node name /dev/v4l-subdev9
+>         pad0: Source
+>                 [fmt:SRGGB8_1X8/816x616 at 1/25 field:none colorspace:srgb xfer:srgb]
+>                 -> "imx6-mipi-csi2":0 [ENABLED]
+>         pad1: Sink
+>                 <- "imx219 pixel 0-0010":0 [ENABLED,IMMUTABLE]
+> 
+> It looks like we successfully retrieve the frame interval for pad 0
+> and print it, but when we try to retrieve the frame interval for pad 1,
+> we get EINVAL (because that's what I'm returning, but I'm wondering if
+> that's the correct thing to do...) and that prevents _all_ format
+> information being output.
 
-Hi Moritz,
+According to the documentation [1], you are doing the right thing:
 
-Looks good except for the kbuild robot warnings that need to be fixed.
+    The struct v4l2_subdev_frame_interval pad references a non-existing
+    pad, or the pad doesn?t support frame intervals.
 
-Alan
+But v4l2_subdev_call returns -ENOIOCTLCMD if the g_frame_interval op is
+not implemented at all, which is turned into -ENOTTY by video_usercopy.
 
-> This adds support for the Xilinx LogiCORE PR Decoupler
-> soft-ip that does decoupling of PR regions in the FPGA
-> fabric during partial reconfiguration.
->
-> Signed-off-by: Moritz Fischer <mdf@kernel.org>
-> Cc: Michal Simek <michal.simek@xilinx.com>
-> Cc: S?ren Brinkmann <soren.brinkmann@xilinx.com>
-> Cc: linux-kernel at vger.kernel.org
-> Cc: devicetree at vger.kernel.org
-> ---
-> Changes from v2:
-> - Added Michal's Signed-off-by
-> - Added "xlnx,pr-decoupler" unversioned fallback
->
-> Changes from v1:
-> - Added Michal as Co-Author since I pulled in some of his code
-> - Reworked clk handling in _remove()
-> - Pulled in Michal's version of show_enable(), ditched priv->enabled
->
-> ---
->  drivers/fpga/Kconfig               |   9 +++
->  drivers/fpga/Makefile              |   1 +
->  drivers/fpga/xilinx-pr-decoupler.c | 148 +++++++++++++++++++++++++++++++++++++
->  3 files changed, 158 insertions(+)
->  create mode 100644 drivers/fpga/xilinx-pr-decoupler.c
->
-> diff --git a/drivers/fpga/Kconfig b/drivers/fpga/Kconfig
-> index ce861a2..ce0c91d 100644
-> --- a/drivers/fpga/Kconfig
-> +++ b/drivers/fpga/Kconfig
-> @@ -63,6 +63,15 @@ config ALTERA_FREEZE_BRIDGE
->           isolate one region of the FPGA from the busses while that
->           region is being reprogrammed.
->
-> +config XILINX_PR_DECOUPLER
-> +       tristate "Xilinx LogiCORE PR Decoupler"
-> +       depends on FPGA_BRIDGE
-> +       help
-> +         Say Y to enable drivers for Xilinx LogiCORE PR Decoupler.
-> +         The PR Decoupler exists in the FPGA fabric to isolate one
-> +         region of the FPGA from the busses while that region is
-> +         being reprogrammed during partial reconfig.
-> +
->  endif # FPGA
->
->  endmenu
-> diff --git a/drivers/fpga/Makefile b/drivers/fpga/Makefile
-> index 8df07bc..ba94b79 100644
-> --- a/drivers/fpga/Makefile
-> +++ b/drivers/fpga/Makefile
-> @@ -14,6 +14,7 @@ obj-$(CONFIG_FPGA_MGR_ZYNQ_FPGA)      += zynq-fpga.o
->  obj-$(CONFIG_FPGA_BRIDGE)              += fpga-bridge.o
->  obj-$(CONFIG_SOCFPGA_FPGA_BRIDGE)      += altera-hps2fpga.o altera-fpga2sdram.o
->  obj-$(CONFIG_ALTERA_FREEZE_BRIDGE)     += altera-freeze-bridge.o
-> +obj-$(CONFIG_XILINX_PR_DECOUPLER)      += xilinx-pr-decoupler.o
->
->  # High Level Interfaces
->  obj-$(CONFIG_FPGA_REGION)              += fpga-region.o
-> diff --git a/drivers/fpga/xilinx-pr-decoupler.c b/drivers/fpga/xilinx-pr-decoupler.c
-> new file mode 100644
-> index 0000000..dd37b1c
-> --- /dev/null
-> +++ b/drivers/fpga/xilinx-pr-decoupler.c
-> @@ -0,0 +1,148 @@
-> +/*
-> + * Copyright (c) 2017, National Instruments Corp.
-> + * Copyright (c) 2017, Xilix Inc
-> + *
-> + * FPGA Bridge Driver for the Xilinx LogiCORE Partial Reconfiguration
-> + * Decoupler IP Core.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; version 2 of the License.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include <linux/clk.h>
-> +#include <linux/io.h>
-> +#include <linux/kernel.h>
-> +#include <linux/of_device.h>
-> +#include <linux/module.h>
-> +#include <linux/fpga/fpga-bridge.h>
-> +
-> +#define CTRL_CMD_DECOUPLE      BIT(0)
-> +#define CTRL_CMD_COUPLE                ~BIT(0)
-> +
-> +struct xlnx_pr_decoupler_data {
-> +       void __iomem *io_base;
-> +       struct clk *clk;
-> +};
-> +
-> +static int xlnx_pr_decoupler_enable_set(struct fpga_bridge *bridge, bool enable)
-> +{
-> +       int err;
-> +       struct xlnx_pr_decoupler_data *priv = bridge->priv;
-> +
-> +       err = clk_enable(priv->clk);
-> +       if (err)
-> +               return err;
-> +
-> +       if (enable)
-> +               writel(CTRL_CMD_COUPLE, priv->io_base);
-> +       else
-> +               writel(CTRL_CMD_DECOUPLE, priv->io_base);
-> +
-> +       clk_disable(priv->clk);
-> +
-> +       return 0;
-> +}
-> +
-> +static int xlnx_pr_decoupler_enable_show(struct fpga_bridge *bridge)
-> +{
-> +       const struct xlnx_pr_decoupler_data *priv = bridge->priv;
-> +       u32 status;
-> +       int err;
-> +
-> +       err = clk_enable(priv->clk);
-> +       if (err)
-> +               return err;
-> +
-> +       status = readl(priv->io_base);
-> +
-> +       clk_disable(priv->clk);
-> +
-> +       return !status;
-> +}
-> +
-> +static struct fpga_bridge_ops xlnx_pr_decoupler_br_ops = {
-> +       .enable_set = xlnx_pr_decoupler_enable_set,
-> +       .enable_show = xlnx_pr_decoupler_enable_show,
-> +};
-> +
-> +static const struct of_device_id xlnx_pr_decoupler_of_match[] = {
-> +       { .compatible = "xlnx,pr-decoupler-1.00", },
-> +       { .compatible = "xlnx,pr-decoupler", },
-> +       {},
-> +};
-> +MODULE_DEVICE_TABLE(of, xlnx_pr_decoupler_of_match);
-> +
-> +static int xlnx_pr_decoupler_probe(struct platform_device *pdev)
-> +{
-> +       struct xlnx_pr_decoupler_data *priv;
-> +       int err;
-> +       struct resource *res;
-> +
-> +       priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
-> +       if (!priv)
-> +               return -ENOMEM;
-> +
-> +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +       priv->io_base = devm_ioremap_resource(&pdev->dev, res);
-> +       if (IS_ERR(priv->io_base))
-> +               return PTR_ERR(priv->io_base);
-> +
-> +       priv->clk = devm_clk_get(&pdev->dev, "aclk");
-> +       if (IS_ERR(priv->clk)) {
-> +               dev_err(&pdev->dev, "input clock not found\n");
-> +               return PTR_ERR(priv->clk);
-> +       }
-> +
-> +       err = clk_prepare_enable(priv->clk);
-> +       if (err) {
-> +               dev_err(&pdev->dev, "unable to enable clock\n");
-> +               return err;
-> +       }
-> +
-> +       clk_disable(priv->clk);
-> +
-> +       err = fpga_bridge_register(&pdev->dev, "Xilinx PR Decoupler",
-> +                                  &xlnx_pr_decoupler_br_ops, priv);
-> +
-> +       if (err) {
-> +               dev_err(&pdev->dev, "unable to register Xilinx PR Decoupler");
-> +               clk_unprepare(priv->clk);
-> +               return err;
-> +       }
-> +
-> +       return 0;
-> +}
-> +
-> +static int xlnx_pr_decoupler_remove(struct platform_device *pdev)
-> +{
-> +       struct fpga_bridge *bridge = platform_get_drvdata(pdev);
-> +       struct xlnx_pr_decoupler_data *p = bridge->priv;
-> +
-> +       fpga_bridge_unregister(&pdev->dev);
-> +
-> +       clk_unprepare(p->clk);
-> +
-> +       return 0;
-> +}
-> +
-> +static struct platform_driver xlnx_pr_decoupler_driver = {
-> +       .probe = xlnx_pr_decoupler_probe,
-> +       .remove = xlnx_pr_decoupler_remove,
-> +       .driver = {
-> +               .name = "xlnx_pr_decoupler",
-> +               .of_match_table = of_match_ptr(xlnx_pr_decoupler_of_match),
-> +       },
-> +};
-> +
-> +module_platform_driver(xlnx_pr_decoupler_driver);
-> +
-> +MODULE_DESCRIPTION("Xilinx Partial Reconfiguration Decoupler");
-> +MODULE_AUTHOR("Moritz Fischer <mdf@kernel.org>");
-> +MODULE_AUTHOR("Michal Simek <michal.simek@xilinx.com>");
-> +MODULE_LICENSE("GPL v2");
-> --
-> 2.7.4
->
+[1] https://linuxtv.org/downloads/v4l-dvb-apis/uapi/v4l/vidioc-subdev-g-frame-interval.html#return-value
+
+> Maybe something like the following would be a better idea?
+> 
+>  utils/media-ctl/media-ctl.c | 10 +++++-----
+>  1 file changed, 5 insertions(+), 5 deletions(-)
+> 
+> diff --git a/utils/media-ctl/media-ctl.c b/utils/media-ctl/media-ctl.c
+> index f61963a..a50a559 100644
+> --- a/utils/media-ctl/media-ctl.c
+> +++ b/utils/media-ctl/media-ctl.c
+> @@ -81,22 +81,22 @@ static void v4l2_subdev_print_format(struct media_entity *entity,
+>  	struct v4l2_mbus_framefmt format;
+>  	struct v4l2_fract interval = { 0, 0 };
+>  	struct v4l2_rect rect;
+> -	int ret;
+> +	int ret, err_fi;
+>  
+>  	ret = v4l2_subdev_get_format(entity, &format, pad, which);
+>  	if (ret != 0)
+>  		return;
+>  
+> -	ret = v4l2_subdev_get_frame_interval(entity, &interval, pad);
+> -	if (ret != 0 && ret != -ENOTTY)
+> -		return;
+> +	err_fi = v4l2_subdev_get_frame_interval(entity, &interval, pad);
+
+Not supporting frame intervals doesn't warrant a visible error message,
+I think -EINVAL should also be ignored above, if the spec is to be
+believed.
+
+>  
+>  	printf("\t\t[fmt:%s/%ux%u",
+>  	       v4l2_subdev_pixelcode_to_string(format.code),
+>  	       format.width, format.height);
+>  
+> -	if (interval.numerator || interval.denominator)
+> +	if (err_fi == 0 && (interval.numerator || interval.denominator))
+>  		printf("@%u/%u", interval.numerator, interval.denominator);
+> +	else if (err_fi != -ENOTTY)
+> +		printf("@<error: %s>", strerror(-err_fi));
+
+Or here.
+
+>  
+>  	if (format.field)
+>  		printf(" field:%s", v4l2_subdev_field_to_string(format.field));
+> 
+> 
+
+regards
+Philipp
