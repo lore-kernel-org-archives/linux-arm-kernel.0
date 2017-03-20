@@ -1,95 +1,137 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 20 Mar 2017 15:43:39 +0000
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Mon, 20 Mar 2017 16:57:54 +0100
 Subject: [PATCH v5 00/39] i.MX Media Driver
-In-Reply-To: <1490016016.2917.68.camel@pengutronix.de>
+In-Reply-To: <20170320141158.GK21222@n2100.armlinux.org.uk>
 References: <1489121599-23206-1-git-send-email-steve_longerbeam@mentor.com>
  <20170318192258.GL21222@n2100.armlinux.org.uk>
  <aef6c412-5464-726b-42f6-a24b7323aa9c@mentor.com>
- <20170319121402.GS21222@n2100.armlinux.org.uk>
- <1490016016.2917.68.camel@pengutronix.de>
-Message-ID: <20170320154339.GN21222@n2100.armlinux.org.uk>
+ <20170319103801.GQ21222@n2100.armlinux.org.uk>
+ <9b3311a8-34a7-2b5b-9bc7-836371e1e0a4@gmail.com>
+ <179aca0a-deb5-7937-f955-26cc6d93afba@xs4all.nl>
+ <20170320132930.GJ21222@n2100.armlinux.org.uk>
+ <d0e2a9c2-5e94-d810-7ef4-ae089a6b25f5@xs4all.nl>
+ <20170320141158.GK21222@n2100.armlinux.org.uk>
+Message-ID: <40e08d05-58cd-a295-3174-123147ee2ac5@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 20, 2017 at 02:20:16PM +0100, Philipp Zabel wrote:
-> To set and read colorimetry information:
-> https://patchwork.linuxtv.org/patch/39350/
+On 03/20/2017 03:11 PM, Russell King - ARM Linux wrote:
+> On Mon, Mar 20, 2017 at 02:57:03PM +0100, Hans Verkuil wrote:
+>> On 03/20/2017 02:29 PM, Russell King - ARM Linux wrote:
+>>> It's what I have - remember, not everyone is happy to constantly replace
+>>> their distro packages with random new stuff.
+>>
+>> This is a compliance test, which is continuously developed in tandem with
+>> new kernel versions. If you are working with an upstream kernel, then you
+>> should also use the corresponding v4l2-compliance test. What's the point
+>> of using an old one?
+>>
+>> I will not support driver developers that use an old version of the
+>> compliance test, that's a waste of my time.
+> 
+> The reason that people may _not_ wish to constantly update v4l-utils
+> is that it changes the libraries installed on their systems.
+> 
+> So, the solution to that is not to complain about developers not using
+> the latest version, but instead to de-couple it from the rest of the
+> package, and provide it as a separate, stand-alone package that doesn't
+> come with all the extra baggage.
+> 
+> Now, there's two possible answers to that:
+> 
+> 1. it depends on the libv4l2 version.  If that's so, then you are
+>    insisting that people constantly move to the latest libv4l2 because
+>    of API changes, and those API changes may upset applications they're
+>    using.  So this isn't really on.
+> 
+> 2. it doesn't depend on libv4l2 version, in which case there's no reason
+>    for it to be packaged with v4l-utils.
 
-Thanks, I've applied all four of your patches, but there's a side effect
-from that.  Old media-ctl (modified by me):
+Run configure with --disable-v4l2-compliance-libv4l.
 
-- entity 53: imx219 0-0010 (2 pads, 2 links)
-             type V4L2 subdev subtype Unknown flags 0
-             device node name /dev/v4l-subdev9
-        pad0: Source
-                [fmt:SRGGB8/816x616 field:none
-                 frame_interval:1/25]
-                -> "imx6-mipi-csi2":0 [ENABLED]
-        pad1: Sink
-                [fmt:SRGGB10/3280x2464 field:none
-                 crop.bounds:(0,0)/3280x2464
-                 crop:(0,0)/3264x2464
-                 compose.bounds:(0,0)/3264x2464
-                 compose:(0,0)/816x616]
-                <- "imx219 pixel 0-0010":0 [ENABLED,IMMUTABLE]
+This avoids linking with libv4l and allows you to build it stand-alone.
 
-New media-ctl:
+Perhaps I should invert this option since in most cases you don't want to
+run v4l2-compliance with libv4l (it's off by default unless you pass the
+-w option to v4l2-compliance).
 
-- entity 53: imx219 0-0010 (2 pads, 2 links)
-             type V4L2 subdev subtype Unknown flags 0
-             device node name /dev/v4l-subdev9
-        pad0: Source
-                [fmt:SRGGB8_1X8/816x616@1/25 field:none colorspace:srgb xfer:srgb]
-                -> "imx6-mipi-csi2":0 [ENABLED]
-        pad1: Sink
-                <- "imx219 pixel 0-0010":0 [ENABLED,IMMUTABLE]
+> 
+> The reality is that v4l2-compliance links with libv4l2, so I'm not sure
+> which it is.  What I am sure of is that I don't want to upgrade libv4l2
+> on an ad-hoc basis, potentially causing issues with applications.
+> 
+>>>> To test actual streaming you need to provide the -s option.
+>>>>
+>>>> Note: v4l2-compliance has been developed for 'regular' video devices,
+>>>> not MC devices. It may or may not work with the -s option.
+>>>
+>>> Right, and it exists to verify that the establised v4l2 API is correctly
+>>> implemented.  If the v4l2 API is being offered to user applications,
+>>> then it must be conformant, otherwise it's not offering the v4l2 API.
+>>> (That's very much a definition statement in itself.)
+>>>
+>>> So, are we really going to say MC devices do not offer the v4l2 API to
+>>> userspace, but something that might work?  We've already seen today
+>>> one user say that they're not going to use mainline because of the
+>>> crud surrounding MC.
+>>>
+>>
+>> Actually, my understanding was that he was stuck on the old kernel code.
+> 
+> Err, sorry, I really don't follow.  Who is "he"?
 
-It looks like we successfully retrieve the frame interval for pad 0
-and print it, but when we try to retrieve the frame interval for pad 1,
-we get EINVAL (because that's what I'm returning, but I'm wondering if
-that's the correct thing to do...) and that prevents _all_ format
-information being output.
+"one user say that they're not going to use mainline because of the
+crud surrounding MC."
 
-Maybe something like the following would be a better idea?
+> 
+> _I_ was the one who reported the EXPBUF problem.  Your comment makes no
+> sense.
+> 
+>> In the case of v4l2-compliance, I never had the time to make it work with
+>> MC devices. Same for that matter of certain memory to memory devices.
+>>
+>> Just like MC devices these too behave differently. They are partially
+>> supported in v4l2-compliance, but not fully.
+> 
+> It seems you saying that the API provided by /dev/video* for a MC device
+> breaks the v4l2-compliance tests?
 
- utils/media-ctl/media-ctl.c | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+There may be tests in the compliance suite that do not apply for MC devices
+and for which I never check. The compliance suite was never written with MC
+devices in mind, and it certainly hasn't been tested much with such devices.
 
-diff --git a/utils/media-ctl/media-ctl.c b/utils/media-ctl/media-ctl.c
-index f61963a..a50a559 100644
---- a/utils/media-ctl/media-ctl.c
-+++ b/utils/media-ctl/media-ctl.c
-@@ -81,22 +81,22 @@ static void v4l2_subdev_print_format(struct media_entity *entity,
- 	struct v4l2_mbus_framefmt format;
- 	struct v4l2_fract interval = { 0, 0 };
- 	struct v4l2_rect rect;
--	int ret;
-+	int ret, err_fi;
- 
- 	ret = v4l2_subdev_get_format(entity, &format, pad, which);
- 	if (ret != 0)
- 		return;
- 
--	ret = v4l2_subdev_get_frame_interval(entity, &interval, pad);
--	if (ret != 0 && ret != -ENOTTY)
--		return;
-+	err_fi = v4l2_subdev_get_frame_interval(entity, &interval, pad);
- 
- 	printf("\t\t[fmt:%s/%ux%u",
- 	       v4l2_subdev_pixelcode_to_string(format.code),
- 	       format.width, format.height);
- 
--	if (interval.numerator || interval.denominator)
-+	if (err_fi == 0 && (interval.numerator || interval.denominator))
- 		printf("@%u/%u", interval.numerator, interval.denominator);
-+	else if (err_fi != -ENOTTY)
-+		printf("@<error: %s>", strerror(-err_fi));
- 
- 	if (format.field)
- 		printf(" field:%s", v4l2_subdev_field_to_string(format.field));
+It's only very recent that I even got hardware that has MC support...
 
+>From what I can tell from the feedback I got it seems to be OKish, but I
+just can't guarantee that the compliance utility is correct for such devices.
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+In particular I doubt the streaming tests (-s, -f, etc.) will work. The -s
+test *might* work if the pipeline is configured correctly before running
+v4l2-compliance. I can't imagine that the -f option would work at all since
+I would expect pipeline validation errors.
+
+I've been gently pushing Helen Koike to finish her virtual MC driver
+(https://patchwork.kernel.org/patch/9312783/) since having a virtual driver
+makes writing compliance tests much easier.
+
+> _No one_ has mentioned using v4l2-compliance on the subdevs.
+> 
+>> Complaining about this really won't help. We know it's a problem and unless
+>> someone (me perhaps?) manages to get paid to work on this it's unlikely to
+>> change for now.
+> 
+> Like the above comment, your comment makes no sense.  I'm not complaining,
+> I'm trying to find out the details.
+
+Must be me then, it did feel like complaining...
+
+> Yes, MC stuff sucks big time right now, the documentation is poor, there's
+> a lack of understanding on all sides of the issues (which can be seen by
+> the different opinions that people hold.)  The only way to resolve these
+> differences is via discussion, and if you're going to start thinking that
+> everyone is complaining, then there's not going to be any forward progress.
+> 
+
+Regards,
+
+	Hans
