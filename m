@@ -1,54 +1,40 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Mon, 20 Mar 2017 11:30:08 +0100
-Subject: outreachy
-In-Reply-To: <20170320102032.GA17959@amd>
-References: <alpine.DEB.2.20.1703092133340.2306@hadrien>
- <443f0143-aec1-2559-a2c2-73b245632948@broadcom.com>
- <2da12619-5fcb-9e0f-b6c1-c83cbf491e8d@wwwdotorg.org>
- <20170309212021.GA24433@kroah.com> <20170317152519.GA8684@amd>
- <alpine.DEB.2.20.1703171753550.4098@hadrien>
- <20170320102032.GA17959@amd>
-Message-ID: <20170320103008.GA3047@kroah.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 20 Mar 2017 11:31:13 +0100
+Subject: [PATCH 4/4] tty/serial: sh-sci: remove uneeded IS_ERR_OR_NULL
+ calls
+In-Reply-To: <CAMuHMdXGn35bEsJKnUi5o3AytL4AJN2fBfoB79v5W-jOVFQx6g@mail.gmail.com>
+References: <20170304174819.esxhwwbsxzuq3vyc@pengutronix.de>
+ <CAMuHMdX8BEnaTtNFAbcvfHwJH=oPUmQ2NB+jfouGyhQpJ_m_4A@mail.gmail.com>
+ <20170306085842.yijkfpqi3adcedmm@pengutronix.de>
+ <CAMuHMdV2_vbocY4wCzvYtPAaF+QEX_Y4g6qVu5EqEBf5AnFdaw@mail.gmail.com>
+ <20170306093043.ay4dz3ehp3aakwxh@pengutronix.de>
+ <CAMuHMdWQuvANNU14A7NQuzv6AFp04bq4DG_oc7w9h4wUrG+4aQ@mail.gmail.com>
+ <20170306100220.droey65uq2ew3mzu@pengutronix.de>
+ <CACRpkdYeFyr4yjQjDAUpPJwuD_NW2y=wXnzt1xSNoOX0SFCLmw@mail.gmail.com>
+ <CAMuHMdWv-xs12UqutEtXJGR8qqgx6DeDhkKvvYhhyW+XTVsUNQ@mail.gmail.com>
+ <CAMuHMdXGn35bEsJKnUi5o3AytL4AJN2fBfoB79v5W-jOVFQx6g@mail.gmail.com>
+Message-ID: <20170320103113.tpveoq2onzrwmkdt@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 20, 2017 at 11:20:32AM +0100, Pavel Machek wrote:
-> Hi!
-> 
-> > > > Hah!  That's the joy of being a maintainer of a driver in staging.  Even
-> > > > if you filter out outreachy, you are going to get a lot of "basic
-> > > > mistakes" and other type patches cc:ed to you.
-> > > >
-> > > > I strongly suggest, that if you all don't like this type of stuff,
-> > > > either:
-> > > > 	- work to get the code out of staging as soon as possible (i.e.
-> > > > 	  send me coding style fixes for everything right now, and then
-> > > > 	  fix up the rest of the stuff.)
-> > > > 	- take yourself off the maintainer list for this code.
-> > > >
-> > > > It's your choice, outreachy right now is a lot of patches, but again,
-> > > > it's not going to keep you from getting the "basic" stuff sent to you
-> > > > in ways that is totally wrong.
-> > >
-> > > Could we get these trivial patches off the lkml? Yes, lkml already has
-> > > a lot of traffic, but no, this is not useful :-(.
-> > 
-> > The outreachy instructions say to use the -nol argument to
-> > get_maintainers, which would prevent them from being sent to any mailing
-> > list.  However others thought that all patches should be sent to mailing
-> > lists, and so I haven't enforced anything for people who have omitted
-> > -nol.  However I have tried to remove bcm maintainers from CC lists on
-> > replies and reminded people not to send you patches,
-> 
-> Wonderful :-(.
-> 
-> Can we at least make  those people put the word "outreachy" in the
-> subject so the emails are easier to delete?
+Hello Geert,
 
-It's easy for you to filter away as-is if you want to to by just looking
-at the cc: list for outreachy right now, don't make a new step for
-people to jump through because you don't want to be bothered.  You only
-have 10 more days of it if you want to just ignore any patch until
-then...
+On Mon, Mar 20, 2017 at 10:56:14AM +0100, Geert Uytterhoeven wrote:
+> Documentation/gpio/consumer.txt rightfully sates:
+> | Note that gpio_get*_optional() functions (and their managed variants), unlike
+> | the rest of gpiolib API, also return NULL when gpiolib support is disabled.
+> | This is helpful to driver authors, since they do not need to special case
+> | -ENOSYS return codes.  System integrators should however be careful to enable
+> | gpiolib on systems that need it.
 
-greg k-h
+I cannot find this paragraph in Documentation/gpio/consumer.txt:
+
+	$ git grep -e 'ENOSYS' v4.11-rc3 -- Documentation/gpio/
+	<void>
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
