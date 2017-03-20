@@ -1,38 +1,52 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 20 Mar 2017 09:50:08 +0000
-Subject: [PATCH] drm/etnaviv: add etnaviv cooling device
-In-Reply-To: <1490001575.2895.8.camel@pengutronix.de>
-References: <E1cn8jj-0002mp-SO@rmk-PC.armlinux.org.uk>
- <1489582989.16018.4.camel@pengutronix.de>
- <20170315140541.GT21222@n2100.armlinux.org.uk>
- <CAFXsbZoT22pz2CuRWaQ2M2TyomNcByHc-SfmNn6=KrfNaubnjQ@mail.gmail.com>
- <1490001575.2895.8.camel@pengutronix.de>
-Message-ID: <20170320095007.GE21222@n2100.armlinux.org.uk>
+From: shankerd@codeaurora.org (Shanker Donthineni)
+Date: Mon, 20 Mar 2017 04:52:29 -0500
+Subject: [PATCH] irqchip: gic-v3-its: Don't assume GICv3 hardware supports
+ 16bit INTID
+In-Reply-To: <a7e9f0a6-6118-a8a1-c6e9-8e6841c49f30@arm.com>
+References: <1489556815-27121-1-git-send-email-shankerd@codeaurora.org>
+ <a7e9f0a6-6118-a8a1-c6e9-8e6841c49f30@arm.com>
+Message-ID: <e951b77e-5bc0-1895-928c-1d699091dcbd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 20, 2017 at 10:19:35AM +0100, Lucas Stach wrote:
-> Yes, probably we want to have both at some point. The cooling-device
-> stuff is about throttling the GPU when the SoC reaches critical
-> temperatures.
-> 
-> The devfreq governors are about providing exactly the right performance
-> point.
-> Though as I have not yet seen any SoCs where the voltage would be scaled
-> with GPU frequency, downclocking the GPU is of limited value. For most
-> of those SoCs a race-to-idle policy is probably okay, as this allows
-> other components of the system like the DRAM to go into lower power
-> operating modes when the GPU is idle.
+Hi Marc,
 
-However, since we already have runtime PM support in etnaviv (where we
-even power the GPU off on some SoCs) the lack of voltage scaling does
-suggest that GPU frequency scaling would be of limited value in terms
-of overall power usage.
 
-It's also worth bearing in mind that Vivante GPUs internally control
-clock gates to various modules when they're on.
+On 03/17/2017 10:49 AM, Marc Zyngier wrote:
+> On 15/03/17 05:46, Shanker Donthineni wrote:
+>> The current ITS driver is assuming every ITS hardware implementation
+>> supports minimum of 16bit INTID. But this is not true, as per GICv3
+>> specification, INTID field is IMPLEMENTATION DEFINED in the range of
+>> 14-24 bits. We might see an unpredictable system behavior on systems
+>> where hardware support less than 16bits and software tries to use
+>> 64K LPI interrupts.
+>>
+>> On Qualcomm Datacenter Technologies QDF2400 platform, boot log shows
+>> confusing information about number of LPI chunks as shown below. The
+>> QDF2400 ITS hardware supports 24bit INTID.
+>>
+>> This patch allocates the memory resources for PEND/PROP tables based
+>> on discoverable value which is specified in GITS_TYPER.IDbits. Also
+>> taking this opportunity to increase number of LPI/MSI(x) to 128K if
+>> the hardware is capable, and show log message that reflects the
+>> correct number of LPI chunks.
+> As much as I like the idea of fixing the obvious bug that assuming 16bit
+> of ID space is, what is the rational of capping the support to another
+> arbitrary value?
+
+I believe 128K LPIs are sufficient so capped to 17 bits.
+
+> Why can't we (just like other tables) try and allocate the full amount
+> required (with a possible back-off if allocations fail)?
+
+Qualcomm ITS hardware supports 24bit LPI, it requires lot of memory to handle  2^24  entry property and pending table.
+
+>
+> Thanks,
+>
+> 	M.
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Shanker Donthineni
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
