@@ -1,94 +1,57 @@
-From: al.kochet@gmail.com (Alexander Kochetkov)
-Date: Mon, 20 Mar 2017 16:18:49 +0300
-Subject: [PATCH v6 0/5] Implement clocksource for rockchip SoC using
- rockchip timer
-In-Reply-To: <1485866596-32254-1-git-send-email-al.kochet@gmail.com>
-References: <1485866596-32254-1-git-send-email-al.kochet@gmail.com>
-Message-ID: <F14EA552-9783-4083-A00F-9151AB7E5C99@gmail.com>
+From: vivek.gautam@codeaurora.org (Vivek Gautam)
+Date: Mon, 20 Mar 2017 18:49:55 +0530
+Subject: [PATCH v4 1/3] phy: qcom-usb: Remove unused ulpi phy header
+In-Reply-To: <1490015997-12956-1-git-send-email-vivek.gautam@codeaurora.org>
+References: <1490015997-12956-1-git-send-email-vivek.gautam@codeaurora.org>
+Message-ID: <1490015997-12956-2-git-send-email-vivek.gautam@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello, Daniel.
+Ulpi phy header is not used for anything. Remove the same
+from qcom-hs and qcom-hsic phy drivers.
 
-Sorry for bothering you, but could you please take a look at v6[1] series and tell what do you think about it?
-I see your commit[2] in the git, but I don?t understand well how to use it in rockchip driver.
+Signed-off-by: Vivek Gautam <vivek.gautam@codeaurora.org>
+Suggested-by: Stephen Boyd <stephen.boyd@linaro.org>
+Cc: Kishon Vijay Abraham I <kishon@ti.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-arm-msm at vger.kernel.org
+Cc: linux-kernel at vger.kernel.org
+Cc: linux-usb at vger.kernel.org
+---
 
-[1] https://lkml.org/lkml/2017/1/31/401
-[2] https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/commit/drivers/clocksource?id=376bc27150f180d9f5eddec6a14117780177589d
+ - New patch added in the series.
+   Removing headers as per Stephen's suggestion.
 
-Regards,
-Alexander.
+ drivers/phy/phy-qcom-usb-hs.c   | 2 --
+ drivers/phy/phy-qcom-usb-hsic.c | 2 --
+ 2 files changed, 4 deletions(-)
 
-> 31 ???. 2017 ?., ? 15:43, Alexander Kochetkov <al.kochet@gmail.com> ???????(?):
-> 
-> From: Alexander Kochetkov <akochetkov@lintech.ru>
-> 
-> Hello, Daniel, Heiko.
-> 
-> Here is try 6 :) Thanks a lot for helping me to bring the code
-> into kernel!
-> 
-> This patch series contain:
-> - devicetree bindings clarification for rockchip timers
-> - dts files fixes for rk3228-evb, rk3229-evb and rk3188
-> - implementation of clocksource and sched clock for rockchip SoC
-> 
-> The clock supplying the arm-global-timer on the rk3188 is coming from the
-> the cpu clock itself and thus changes its rate everytime cpufreq adjusts
-> the cpu frequency making this timer unsuitable as a stable clocksource.
-> 
-> The rk3188, rk3288 and following socs share a separate timer block already
-> handled by the rockchip-timer driver. Therefore adapt this driver to also
-> be able to act as clocksource on rk3188.
-> 
-> In order to test clocksource you can run following commands and check
-> how much time it take in real. On rk3188 it take about ~45 seconds.
-> 
->       cpufreq-set -f 1.6GHZ
->       date; sleep 60; date
-> 
-> rk3288 (and probably anything newer) is irrelevant to this patch,
-> as it has the arch timer interface. This patch may be usefull
-> for Cortex-A9/A5 based parts.
-> 
-> Regards,
-> Alexander.
-> 
-> Changes in v6:
-> - Removed Reviewed-by: Heiko St?bner <heiko@sntech.de> tag
-> - Merge 5/8, 6/8, 7/8, 8/9 into single file
-> - split init paths into rk_clkevt_init() and rk_clksrc_init()
->  so the driver code could be adopted to CLOCKEVENT_OF_DECLARE()
-> - clockevents implemented using clocksource_mmio_init()
-> - fixed commit message for 4/8 (thanks a lot Daniel)
-> 
-> Changes in v5:
-> - Add Acked-by: Rob Herring <robh@kernel.org> to 1/8
->  http://lists.infradead.org/pipermail/linux-rockchip/2016-December/013308.html
-> - Add Reviwed-by: Heiko St?bner <heiko@sntech.de> to series
-> - change timer compatible property in the rk322x.dtsi 2/8
->  http://lists.infradead.org/pipermail/linux-rockchip/2017-January/013784.html
-> - updated comment message for 4/8
->  http://lists.infradead.org/pipermail/linux-rockchip/2017-January/013786.html
-> - updated comment message for 5/8
->  http://lists.infradead.org/pipermail/linux-rockchip/2017-January/013787.html
-> - fixed build error for 8/8
->  http://lists.infradead.org/pipermail/linux-rockchip/2017-January/013789.html
-> 
-> Alexander Kochetkov (5):
->  dt-bindings: clarify compatible property for rockchip timers
->  ARM: dts: rockchip: update compatible property for rk322x timer
->  clocksource/drivers/rockchip_timer: implement clocksource timer
->  ARM: dts: rockchip: add timer entries to rk3188 SoC
->  ARM: dts: rockchip: disable arm-global-timer for rk3188
-> 
-> .../bindings/timer/rockchip,rk-timer.txt           |   12 +-
-> arch/arm/boot/dts/rk3188.dtsi                      |   17 ++
-> arch/arm/boot/dts/rk322x.dtsi                      |    2 +-
-> drivers/clocksource/Kconfig                        |    1 +
-> drivers/clocksource/rockchip_timer.c               |  218 ++++++++++++++------
-> 5 files changed, 185 insertions(+), 65 deletions(-)
-> 
-> -- 
-> 1.7.9.5
-> 
+diff --git a/drivers/phy/phy-qcom-usb-hs.c b/drivers/phy/phy-qcom-usb-hs.c
+index 94dfbfd739c3..43704f4f23e9 100644
+--- a/drivers/phy/phy-qcom-usb-hs.c
++++ b/drivers/phy/phy-qcom-usb-hs.c
+@@ -15,8 +15,6 @@
+ #include <linux/extcon.h>
+ #include <linux/notifier.h>
+ 
+-#include "ulpi_phy.h"
+-
+ #define ULPI_PWR_CLK_MNG_REG		0x88
+ # define ULPI_PWR_OTG_COMP_DISABLE	BIT(0)
+ 
+diff --git a/drivers/phy/phy-qcom-usb-hsic.c b/drivers/phy/phy-qcom-usb-hsic.c
+index 47690f9945b9..6dcaf04fa367 100644
+--- a/drivers/phy/phy-qcom-usb-hsic.c
++++ b/drivers/phy/phy-qcom-usb-hsic.c
+@@ -13,8 +13,6 @@
+ #include <linux/delay.h>
+ #include <linux/clk.h>
+ 
+-#include "ulpi_phy.h"
+-
+ #define ULPI_HSIC_CFG		0x30
+ #define ULPI_HSIC_IO_CAL	0x33
+ 
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
