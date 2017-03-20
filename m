@@ -1,56 +1,35 @@
-From: briannorris@chromium.org (Brian Norris)
-Date: Mon, 20 Mar 2017 16:07:48 -0700
-Subject: [PATCH v2 1/6] arm64: dts: Add symlinks for cros-ec-keyboard and
- cros-ec-sbs
-In-Reply-To: <1529949.5djtX72aeJ@phil>
-References: <20170210010521.78872-1-briannorris@chromium.org>
- <20170210010521.78872-2-briannorris@chromium.org>
- <CAOesGMiim2WFfEAg-bJmWTwWn69=V_GuEg6AxsxPYMyzd3KFUw@mail.gmail.com>
- <1529949.5djtX72aeJ@phil>
-Message-ID: <20170320230748.GA97915@google.com>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Mon, 20 Mar 2017 18:25:26 -0500
+Subject: [PATCH v2 2/2] efi: arm-stub: Round up FDT allocation to mapping
+ size
+In-Reply-To: <1486676573-19237-2-git-send-email-ard.biesheuvel@linaro.org>
+References: <1486676573-19237-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1486676573-19237-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <CAOZdJXVrpKQOigp9uDMJ=wW=j_y4XzNf+Ham9huFUTbc6UxDSw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In case this thread is easier to notice...
+On Thu, Feb 9, 2017 at 3:42 PM, Ard Biesheuvel
+<ard.biesheuvel@linaro.org> wrote:
+> The FDT is mapped via a fixmap entry that is at least 2 MB in size and
+> 2 MB aligned on 4 KB page size kernels.
+>
+> On UEFI systems, the FDT allocation may share this 2 MB block with a
+> reserved region, or another memory region that we should never map,
+> unless we account for this in the size of the allocation (the alignment
+> is already 2 MB)
+>
+> So instead of taking guesses at the needed space, simply allocate 2 MB
+> immediately. The allocation will be recorded as a EFI_LOADER_DATA, and
+> the kernel only memblock_reserve()'s the actual size of the FDT, so the
+> unused space will be released to the kernel.
+>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-Olof,
+This patch is over a month old, and it's been reviewed and tested.  We
+really need this in 4.11.  Please get this merged into 4.11-rc4.
 
-On Mon, Feb 27, 2017 at 07:20:48PM +0100, Heiko Stuebner wrote:
-> Am Dienstag, 21. Februar 2017, 15:47:31 CET schrieb Olof Johansson:
-> > On Thu, Feb 9, 2017 at 5:05 PM, Brian Norris <briannorris@chromium.org> wrote:
-> > > From: Douglas Anderson <dianders@chromium.org>
-> > > 
-> > > We'd like to be able to use the cros-ec-keyboard.dtsi and
-> > > cros-ec-sbs.dtsi snippets for arm64 devices.  Currently those files live
-> > > in the arm/boot/dts directory.
-> > > 
-> > > Let's follow the convention set by commit 8ee57b8182c4 ("ARM64: dts:
-> > > vexpress: Use a symlink to vexpress-v2m-rs1.dtsi from arch=arm") and use
-> > > a symlink.  Note that in this case we put the files in a new
-> > > "include/common" directory since these snippets may need to be
-> > > referenced by dts files in many different subdirectories.
-> > 
-> > I'd rather have something like this:
-> > 
-> > https://marc.info/?m=147547436324674&w=2
-> > 
-> > Instead of having everybody move things over. I.e. make it easy to
-> > refer to the arm version from arm64 instead of creating a "common"
-> > layer inbetween.
-> 
-> just so it gets noticed, I've done and tested [0], which hopefully should
-> implement your suggestions above.
-> 
-> If that looks ok, how do you want that picked up? Should I just include
-> them in my regular rockchip branches or do you to pick them into some
-> immutable branch, if other surprise-users turn up in time for 4.12?
-
-Ping? I suppose we can prevent users in 4.12 by never merging this :)
-
-Brian
-
-> 
-> 
-> [0] http://lists.infradead.org/pipermail/linux-rockchip/2017-February/014226.html
-> 
-> 
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
