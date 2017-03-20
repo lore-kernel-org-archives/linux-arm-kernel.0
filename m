@@ -1,73 +1,72 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 20 Mar 2017 18:40:21 +0100
-Subject: [PATCH v5 38/39] media: imx: csi: fix crop rectangle reset in
- sink set_fmt
-In-Reply-To: <20170320141705.GL21222@n2100.armlinux.org.uk>
-References: <1489121599-23206-1-git-send-email-steve_longerbeam@mentor.com>
- <1489121599-23206-39-git-send-email-steve_longerbeam@mentor.com>
- <20170319152233.GW21222@n2100.armlinux.org.uk>
- <327d67d9-68c1-7f74-0c0f-f6aee1c4b546@gmail.com>
- <1490010926.2917.59.camel@pengutronix.de>
- <20170320120855.GH21222@n2100.armlinux.org.uk>
- <1490018451.2917.86.camel@pengutronix.de>
- <20170320141705.GL21222@n2100.armlinux.org.uk>
-Message-ID: <1490031621.2917.110.camel@pengutronix.de>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Mon, 20 Mar 2017 13:43:52 -0400
+Subject: [PATCH V4 0/3] PCI/ASPM: reconfigure ASPM following hotplug for
+ POLICY_DEFAULT
+In-Reply-To: <8fa282de-9896-0e2a-01cb-7146817268e6@codeaurora.org>
+References: <1489438085-2055-1-git-send-email-okaya@codeaurora.org>
+ <20170313214616.GE8232@bhelgaas-glaptop.roam.corp.google.com>
+ <c6b78903-ea09-9719-7073-c679b0b64a05@codeaurora.org>
+ <20170313230855.GG8232@bhelgaas-glaptop.roam.corp.google.com>
+ <b44fa6b3-7db5-bea4-7f2e-7f880362d171@codeaurora.org>
+ <20170314192138.GA26264@bhelgaas-glaptop.roam.corp.google.com>
+ <8fa282de-9896-0e2a-01cb-7146817268e6@codeaurora.org>
+Message-ID: <5049bf09-6283-b617-2c21-acf56a1faab3@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2017-03-20 at 14:17 +0000, Russell King - ARM Linux wrote:
-> On Mon, Mar 20, 2017 at 03:00:51PM +0100, Philipp Zabel wrote:
-> > On Mon, 2017-03-20 at 12:08 +0000, Russell King - ARM Linux wrote:
-> > > The same document says:
-> > > 
-> > >   Scaling support is optional. When supported by a subdev, the crop
-> > >   rectangle on the subdev's sink pad is scaled to the size configured
-> > >   using the
-> > >   :ref:`VIDIOC_SUBDEV_S_SELECTION <VIDIOC_SUBDEV_G_SELECTION>` IOCTL
-> > >   using ``V4L2_SEL_TGT_COMPOSE`` selection target on the same pad. If the
-> > >   subdev supports scaling but not composing, the top and left values are
-> > >   not used and must always be set to zero.
-> > 
-> > Right, this sentence does imply that when scaling is supported, there
-> > must be a sink compose rectangle, even when composing is not.
-> > 
-> > I have previously set up scaling like this:
-> > 
-> > media-ctl --set-v4l2 "'ipu1_csi0_mux':2[fmt:UYVY2X8/1920x1080 at 1/60]"
-> > media-ctl --set-v4l2 "'ipu1_csi0':2[fmt:AYUV32/960x540 at 1/30]"
-> > 
-> > Does this mean, it should work like this instead?
-> > 
-> > media-ctl --set-v4l2 "'ipu1_csi0_mux':2[fmt:UYVY2X8/1920x1080 at 1/60]"
-> > media-ctl --set-v4l2 "'ipu1_csi0':0[fmt:UYVY2X8/1920x1080 at 1/60,compose:(0,0)/960x540]"
-> > media-ctl --set-v4l2 "'ipu1_csi0':2[fmt:AYUV32/960x540 at 1/30]"
-> > 
-> > I suppose setting the source pad format should not be allowed to modify
-> > the sink compose rectangle.
+Hi Bjorn,
+
+On 3/15/2017 10:33 AM, Sinan Kaya wrote:
+> On 3/14/2017 3:21 PM, Bjorn Helgaas wrote:
+>> On Mon, Mar 13, 2017 at 07:21:42PM -0400, Sinan Kaya wrote:
+>>> On 3/13/2017 7:08 PM, Bjorn Helgaas wrote:
+>>>> On Mon, Mar 13, 2017 at 06:05:55PM -0400, Sinan Kaya wrote:
+>>>>> On 3/13/2017 5:46 PM, Bjorn Helgaas wrote:
+>>>>>> What is this series based on?  Unless they depend on other in-flight
+>>>>>> patches, I apply patches to branches based on my "master" branch,
+>>>>>> which is typically -rc1 or -rc2 (it's currently v4.11-rc1).  These
+>>>>>> don't apply to either.
+>>>>>
+>>>>> It looks like I am on 4.10. I can rebase and post again. 
+>>>>
+>>>> Rebasing would be good, but I can give you some comments on your v4,
+>>>> now that I can apply it and see what it looks like.
+>>>>
+>>>
+>>> Thanks, 
+>>>
+>>> I'm mostly done with the rebase. I'll have to retest tomorrow morning and
+>>> then post.
+>>>
+>>> I had to drop this
+>>>
+>>>    - for endpoints, have pcie_aspm_init_link_state() do the actual ASPM
+>>>       setup of the link as it currently does.
+>>>
+>>> during rebase.
+>>>
+>>> The reason is that the clock configuration needs to switch to common clock
+>>> mode across all the devices before any ASPM latency is read/configured.
+>>>
+>>> Common clock configuration seem to be trying to walk the device list.
+>>>
+>>> Here is the untested version. It might not even compile.
+>>> I'll wait until I receive your comments.
+>>
+>> I had already started looking at v4, so these comments are based on
+>> that.  Your v4 is a great start and these are all general comments so
+>> I didn't try to match each one up with the code.
+>>
+>>   - Goal: retain BIOS ASPM config of bridge even if children are
+>>     removed and re-added.  Is there a bugzilla for this problem?
 > 
-> That is what I believe having read these documents several times, but
-> we need v4l2 people to confirm.
-> 
-> Note that setting the format on 'ipu1_csi0':0 should already be done by
-> the previous media-ctl command, so it should be possible to simplify
-> that to:
-> 
-> media-ctl --set-v4l2 "'ipu1_csi0_mux':2[fmt:UYVY2X8/1920x1080 at 1/60]"
-> media-ctl --set-v4l2 "'ipu1_csi0':0[compose:(0,0)/960x540]"
-> media-ctl --set-v4l2 "'ipu1_csi0':2[fmt:AYUV32/960x540 at 1/30]"
 
-Thanks, that works, too.
+Is there a common place to add code after the bus scan similar to pci_init_capabilities(). 
+I really don't like the ASPM call in the middle of scan function.
 
-> I have tripped over a bug in media-ctl when specifying both a crop and
-> compose rectangle - the --help output suggests that "," should be used
-> to separate them.  media-ctl rejects that, telling me the character at
-> the "," should be "]".  Replacing the "," with " " allows media-ctl to
-> accept it and set both rectangles, so it sounds like a parser bug - I've
-> not looked into this any further yet.
+Sinan
 
-I can confirm this. I don't see any place in
-v4l2_subdev_parse_pad_format that handles the "," separator. There's
-just whitespace skipping between the v4l2-properties.
-
-regards
-Philipp
+-- 
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
