@@ -1,40 +1,65 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 20 Mar 2017 11:03:03 +0100
-Subject: [PATCH 4/4] tty/serial: sh-sci: remove uneeded IS_ERR_OR_NULL
- calls
-In-Reply-To: <CAMuHMdXGn35bEsJKnUi5o3AytL4AJN2fBfoB79v5W-jOVFQx6g@mail.gmail.com>
-References: <20170303191248.wlwjri55ip2x5pgg@pengutronix.de>
- <CAMuHMdXFrwa2jCVDb+8ecqgARLG0oGrPp9pLs0b6vEiWeKJ+uA@mail.gmail.com>
- <20170303194414.n76tr3oa2mlrzjre@pengutronix.de>
- <CAMuHMdXiz5hqW=fm-2H1aNKq_gXD2o0508jD2XjxYUvKoEvHdw@mail.gmail.com>
- <20170304174819.esxhwwbsxzuq3vyc@pengutronix.de>
- <CAMuHMdX8BEnaTtNFAbcvfHwJH=oPUmQ2NB+jfouGyhQpJ_m_4A@mail.gmail.com>
- <20170306085842.yijkfpqi3adcedmm@pengutronix.de>
- <CAMuHMdV2_vbocY4wCzvYtPAaF+QEX_Y4g6qVu5EqEBf5AnFdaw@mail.gmail.com>
- <20170306093043.ay4dz3ehp3aakwxh@pengutronix.de>
- <CAMuHMdWQuvANNU14A7NQuzv6AFp04bq4DG_oc7w9h4wUrG+4aQ@mail.gmail.com>
- <20170306100220.droey65uq2ew3mzu@pengutronix.de>
- <CACRpkdYeFyr4yjQjDAUpPJwuD_NW2y=wXnzt1xSNoOX0SFCLmw@mail.gmail.com>
- <CAMuHMdWv-xs12UqutEtXJGR8qqgx6DeDhkKvvYhhyW+XTVsUNQ@mail.gmail.com>
- <CAMuHMdXGn35bEsJKnUi5o3AytL4AJN2fBfoB79v5W-jOVFQx6g@mail.gmail.com>
-Message-ID: <CAMuHMdUy1Oa0Am6QdK6nffSn5x2RinwhOwhaW_JyLAnxPA0rWQ@mail.gmail.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Mon, 20 Mar 2017 11:03:02 +0100
+Subject: [PATCH v3 1/2] doc: Add bindings document for Xilinx LogiCore PR
+ Decoupler
+In-Reply-To: <1489781473-30772-1-git-send-email-mdf@kernel.org>
+References: <1489781473-30772-1-git-send-email-mdf@kernel.org>
+Message-ID: <bc6ea50e-321c-3eb4-b1c3-10dadf984d81@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 20, 2017 at 10:56 AM, Geert Uytterhoeven
-<geert@linux-m68k.org> wrote:
-> drivers/tty/serial/serial_mctrl_gpio.o already compiles fine if
-> CONFIG_GPIOLIB=n, which reduces its size by ca. 25%.
+On 17.3.2017 21:11, Moritz Fischer wrote:
+> This adds the binding documentation for the Xilinx LogiCORE PR
+> Decoupler soft core.
+> 
+> Signed-off-by: Moritz Fischer <mdf@kernel.org>
+> Cc: Michal Simek <michal.simek@xilinx.com>
+> Cc: S?ren Brinkmann <soren.brinkmann@xilinx.com>
+> Cc: linux-kernel at vger.kernel.org
+> Cc: devicetree at vger.kernel.org
+> ---
+> 
+> Changes from v2:
+> - Added refence to generic fpga-region bindings
+> - Fixed up reg property in example
+> - Added fallback to "xlnx,pr-decoupler" without version
+> 
+> Changes from v1:
+> - Added clock names & clock to example
+> - Merged some of the description from Michal's version
+> 
+> ---
+>  .../bindings/fpga/xilinx-pr-decoupler.txt          | 35 ++++++++++++++++++++++
+>  1 file changed, 35 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/fpga/xilinx-pr-decoupler.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/fpga/xilinx-pr-decoupler.txt b/Documentation/devicetree/bindings/fpga/xilinx-pr-decoupler.txt
+> new file mode 100644
+> index 0000000..16141bd
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/fpga/xilinx-pr-decoupler.txt
+> @@ -0,0 +1,35 @@
+> +Xilinx LogiCORE Partial Reconfig Decoupler Softcore
+> +
+> +The Xilinx LogiCORE Partial Reconfig Decoupler manages one or more
+> +decouplers / fpga bridges.
+> +The controller can decouple/disable the bridges which prevents signal
+> +changes from passing through the bridge.  The controller can also
+> +couple / enable the bridges which allows traffic to pass through the
+> +bridge normally.
+> +
+> +The Driver supports only MMIO handling. A PR region can have multiple
+> +PR Decouples which can bhe handled independently or chaines via decouple/
+> +decouple_status signals.
+> +
+> +Required properties:
+> +- compatible		: Should contain "xlnx,pr-decoupler-1.00"
 
-That is: after removing the #ifdef and dummies in serial_mctrl_gpio.h
+here should be also that "xlnx-pr-decoupler" too.
 
-Gr{oetje,eeting}s,
+Other than this all looks good.
 
-                        Geert
+Signed-off-by: Michal Simek <michal.simek@xilinx.com>
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Thanks,
+Michal
