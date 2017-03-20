@@ -1,38 +1,47 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 20 Mar 2017 10:35:28 +0100
-Subject: [PATCH] staging: vc04_services: make BCM_VIDEOCORE tristate
-Message-ID: <20170320093544.1213296-1-arnd@arndb.de>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Mon, 20 Mar 2017 10:26:14 +0100
+Subject: [PATCH 4/8] soc: imx: gpc: fix imx6sl gpc power domain regression
+In-Reply-To: <1489990547-1510-5-git-send-email-aisheng.dong@nxp.com>
+References: <1489990547-1510-1-git-send-email-aisheng.dong@nxp.com>
+ <1489990547-1510-5-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <1490001974.2895.11.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding the 'bool' symbol brought back a randconfig build bug that
-I had fixed before:
+Am Montag, den 20.03.2017, 14:15 +0800 schrieb Dong Aisheng:
+> Commit 721cabf6c660 ("soc: imx: move PGC handling to a new GPC driver")
+> broke the MX6SL GPC power domain support.
+> It always got the following error:
+> [    1.248364] imx-gpc 20dc000.gpc: could not find pgc DT node
+> This patch adds back the legecy support.
 
-drivers/staging/built-in.o: In function `vchiq_probe':
-(.text+0x1da30): undefined reference to `rpi_firmware_get'
-drivers/staging/built-in.o: In function `vchiq_platform_init':
-(.text+0x27494): undefined reference to `rpi_firmware_property'
+This patch removes a safeguard against abusing the old binding for new
+SoCs. Please leave this check in place and instead loosen the check to
+also allow the old i.MX6SL binding.
 
-The problem is that when RASPBERRYPI_FIRMWARE is a loadable module,
-but BCM2835_VCHIQ can again be built-in. Making BCM_VIDEOCORE
-itself tristate will make Kconfig honor the dependency correctly.
-
-Fixes: 6bbfe4a76158 ("staging: vc04_services: Create new BCM_VIDEOCORE setting for VideoCore services.")
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- drivers/staging/vc04_services/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/staging/vc04_services/Kconfig b/drivers/staging/vc04_services/Kconfig
-index f905df2275cf..9e2763663ab8 100644
---- a/drivers/staging/vc04_services/Kconfig
-+++ b/drivers/staging/vc04_services/Kconfig
-@@ -1,5 +1,5 @@
- menuconfig BCM_VIDEOCORE
--	bool "Broadcom VideoCore support"
-+	tristate "Broadcom VideoCore support"
- 	depends on HAS_DMA
- 	depends on OF
- 	depends on RASPBERRYPI_FIRMWARE || (COMPILE_TEST && !RASPBERRYPI_FIRMWARE)
--- 
-2.9.0
+> 
+> Cc: Lucas Stach <l.stach@pengutronix.de>
+> Cc: Shawn Guo <shawnguo@kernel.org>
+> Fixes: 721cabf6c660 ("soc: imx: move PGC handling to a new GPC driver")
+> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> ---
+>  drivers/soc/imx/gpc.c | 6 ------
+>  1 file changed, 6 deletions(-)
+> 
+> diff --git a/drivers/soc/imx/gpc.c b/drivers/soc/imx/gpc.c
+> index ba6e7ab..c1d0e67 100644
+> --- a/drivers/soc/imx/gpc.c
+> +++ b/drivers/soc/imx/gpc.c
+> @@ -385,12 +385,6 @@ static int imx_gpc_probe(struct platform_device *pdev)
+>  	}
+>  
+>  	if (!pgc_node) {
+> -		/* old DT layout is only supported for mx6q aka 2 domains */
+> -		if (of_id_data->num_domains != 2) {
+> -			dev_err(&pdev->dev, "could not find pgc DT node\n");
+> -			return -ENODEV;
+> -		}
+> -
+>  		ret = imx_gpc_old_dt_init(&pdev->dev, regmap);
+>  		if (ret)
+>  			return ret;
