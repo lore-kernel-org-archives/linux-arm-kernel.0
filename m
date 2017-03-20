@@ -1,205 +1,128 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon, 20 Mar 2017 18:13:18 +0000
-Subject: [PATCH v3 05/19] KVM: arm64: ITS: Implement
- vgic_its_has_attr_regs and attr_regs_access
-In-Reply-To: <1488800074-21991-6-git-send-email-eric.auger@redhat.com>
-References: <1488800074-21991-1-git-send-email-eric.auger@redhat.com>
- <1488800074-21991-6-git-send-email-eric.auger@redhat.com>
-Message-ID: <3002064c-edd7-93a4-afdd-52ccb95f854e@arm.com>
+From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
+Date: Mon, 20 Mar 2017 23:41:34 +0530
+Subject: [PATCH 00/14] arm_pmu: ACPI support
+In-Reply-To: <58CA8C8A.8080405@huawei.com>
+References: <1489143891-11596-1-git-send-email-mark.rutland@arm.com>
+ <58CA8C8A.8080405@huawei.com>
+Message-ID: <CAFpQJXVe_=42R+0Ch-tLwCcvhX3xJa20mhgYCWWNty-sn1Gp+g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
+Hi Hanjun,
 
-On 06/03/17 11:34, Eric Auger wrote:
-> This patch implements vgic_its_has_attr_regs and vgic_its_attr_regs_access
-> upon the MMIO framework. VGIC ITS KVM device KVM_DEV_ARM_VGIC_GRP_ITS_REGS
-> group becomes functional.
-> 
-> At least GITS_CREADR requires to differentiate a guest write action from a
-> user access. As such let's introduce a new uaccess_its_write
-> vgic_register_region callback.
-> 
-> Signed-off-by: Eric Auger <eric.auger@redhat.com>
-> ---
->  virt/kvm/arm/vgic/vgic-its.c  | 74 ++++++++++++++++++++++++++++++++++++-------
->  virt/kvm/arm/vgic/vgic-mmio.h |  9 ++++--
->  2 files changed, 69 insertions(+), 14 deletions(-)
-> 
-> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-> index 43bb17e..e9c8f9f 100644
-> --- a/virt/kvm/arm/vgic/vgic-its.c
-> +++ b/virt/kvm/arm/vgic/vgic-its.c
-> @@ -1287,13 +1287,14 @@ static void vgic_mmio_write_its_baser(struct kvm *kvm,
->  	*regptr = reg;
->  }
->  
-> -#define REGISTER_ITS_DESC(off, rd, wr, length, acc)		\
-> +#define REGISTER_ITS_DESC(off, rd, wr, uwr, length, acc)		\
->  {								\
->  	.reg_offset = off,					\
->  	.len = length,						\
->  	.access_flags = acc,					\
->  	.its_read = rd,						\
->  	.its_write = wr,					\
-> +	.uaccess_its_write = uwr,					\
+On Thu, Mar 16, 2017 at 6:30 PM, Hanjun Guo <guohanjun@huawei.com> wrote:
+> On 2017/3/10 19:04, Mark Rutland wrote:
+>> Hi,
+>>
+>> This series implements ACPI support in the ARM PMU code. It borrows some code
+>> from Jeremy's series [1], but takes a different approach to probing and
+>> association, using the usual hotplug state machine, minimising external changes
+>> required, and simplifying the relationship with the common arm_pmu code.
+>>
+>> The first few patches are preparatory cleanup/refactoring, with the latter half
+>> of the series being specific to ACPI support.
+>>
+>> The series is based on my IRQ rework patches [2]. I've pushed the whole series
+>> out to the arm/perf/acpi branch [3] of my kernel.org repo.
+>>
+>> Due to the innards of the hotplug callback framework, it's not entirely
+>> safe to register a PMU in a hotplug callback. Due to this, we can only
+>> associated hotplugged CPUs with a PMU if a matching CPU was around at
+>> probe time. A similar restriction already applies to DT systems. We may
+>> be able to relax this with some future work.
+>>
+>> I've given this some testing on a Juno platform (using SPIs). To see that IRQs
+>> are correctly associated, I've tested with the following:
+>>
+>>   $ taskset -c ${SOME_CPU_HERE} perf record \
+>>     -e armv8_pmuv3_0/cpu_cycles/ \
+>>     -e armv8_pmuv3_1/cpu_cycles/ \
+>>     cat /proc/interrupts
+>>
+>> I've also booted with nr_cpus temporarily capped (passing maxcpus=) to test the
+>> association logic. This has also been tested in a VM using PPIs; I do not have
+>> access to a host machine which itself uses PPIs.
+>
+> Booted OK and 'perf list' got on Hisilicon D03:
+>
+> d03-09:~ # perf list
+>
+> List of pre-defined events (to be used in -e):
+>
+>   branch-misses                                      [Hardware event]
+>   bus-cycles                                         [Hardware event]
+>   cache-misses                                       [Hardware event]
+>   cache-references                                   [Hardware event]
+>   cpu-cycles OR cycles                               [Hardware event]
+>   instructions                                       [Hardware event]
+>
+>   alignment-faults                                   [Software event]
+>   context-switches OR cs                             [Software event]
+>   cpu-clock                                          [Software event]
+>   cpu-migrations OR migrations                       [Software event]
+>   dummy                                              [Software event]
+>   emulation-faults                                   [Software event]
+>   major-faults                                       [Software event]
+>   minor-faults                                       [Software event]
+>   page-faults OR faults                              [Software event]
+>   task-clock                                         [Software event]
+>
+>   L1-dcache-load-misses                              [Hardware cache event]
+>   L1-dcache-loads                                    [Hardware cache event]
+>   L1-dcache-store-misses                             [Hardware cache event]
+>   L1-dcache-stores                                   [Hardware cache event]
+>   L1-icache-load-misses                              [Hardware cache event]
+>   L1-icache-loads                                    [Hardware cache event]
+>   branch-load-misses                                 [Hardware cache event]
+>   branch-loads                                       [Hardware cache event]
+>   dTLB-load-misses                                   [Hardware cache event]
+>   iTLB-load-misses                                   [Hardware cache event]
+>
+>   armv8_pmuv3_0/br_mis_pred/                         [Kernel PMU event]
+>   armv8_pmuv3_0/br_pred/                             [Kernel PMU event]
+>   armv8_pmuv3_0/bus_access/                          [Kernel PMU event]
+>   armv8_pmuv3_0/bus_cycles/                          [Kernel PMU event]
+>   armv8_pmuv3_0/cid_write_retired/                   [Kernel PMU event]
+>   armv8_pmuv3_0/cpu_cycles/                          [Kernel PMU event]
+>   armv8_pmuv3_0/exc_return/                          [Kernel PMU event]
+>   armv8_pmuv3_0/exc_taken/                           [Kernel PMU event]
+>   armv8_pmuv3_0/inst_retired/                        [Kernel PMU event]
+>   armv8_pmuv3_0/inst_spec/                           [Kernel PMU event]
+>   armv8_pmuv3_0/l1d_cache/                           [Kernel PMU event]
+>   armv8_pmuv3_0/l1d_cache_refill/                    [Kernel PMU event]
+>   armv8_pmuv3_0/l1d_cache_wb/                        [Kernel PMU event]
+>   armv8_pmuv3_0/l1d_tlb_refill/                      [Kernel PMU event]
+>   armv8_pmuv3_0/l1i_cache/                           [Kernel PMU event]
+>   armv8_pmuv3_0/l1i_cache_refill/                    [Kernel PMU event]
+>   armv8_pmuv3_0/l1i_tlb_refill/                      [Kernel PMU event]
+>   armv8_pmuv3_0/l2d_cache/                           [Kernel PMU event]
+>   armv8_pmuv3_0/l2d_cache_refill/                    [Kernel PMU event]
+>   armv8_pmuv3_0/l2d_cache_wb/                        [Kernel PMU event]
+>   armv8_pmuv3_0/mem_access/                          [Kernel PMU event]
+>   armv8_pmuv3_0/memory_error/                        [Kernel PMU event]
+>   armv8_pmuv3_0/sw_incr/                             [Kernel PMU event]
+>   armv8_pmuv3_0/ttbr_write_retired/                  [Kernel PMU event]
+>
+>   rNNN                                               [Raw hardware event descriptor]
+>   cpu/t1=v1[,t2=v2,t3 ...]/modifier                  [Raw hardware event descriptor]
+>    (see 'man perf-list' on how to encode it)
+>
+>   mem:<addr>[/len][:access]                          [Hardware breakpoint]
+>
+>
+> Try some basic perf event and it works, anything else I can try in specific?
 
-I was wondering if it would create less churn to keep this definition
-here (with .uaccess_its_write automatically becoming NULL), and then
-either open-code the one special case below or provide a second wrapper
-macro. But I guess either way is not really nice, so we could go with
-this approach here as well.
+you can try perf fuzzer
 
->  }
->  
->  static void its_mmio_write_wi(struct kvm *kvm, struct vgic_its *its,
-> @@ -1304,28 +1305,28 @@ static void its_mmio_write_wi(struct kvm *kvm, struct vgic_its *its,
->  
->  static struct vgic_register_region its_registers[] = {
->  	REGISTER_ITS_DESC(GITS_CTLR,
-> -		vgic_mmio_read_its_ctlr, vgic_mmio_write_its_ctlr, 4,
-> +		vgic_mmio_read_its_ctlr, vgic_mmio_write_its_ctlr, NULL, 4,
->  		VGIC_ACCESS_32bit),
->  	REGISTER_ITS_DESC(GITS_IIDR,
-> -		vgic_mmio_read_its_iidr, its_mmio_write_wi, 4,
-> +		vgic_mmio_read_its_iidr, its_mmio_write_wi, NULL, 4,
->  		VGIC_ACCESS_32bit),
->  	REGISTER_ITS_DESC(GITS_TYPER,
-> -		vgic_mmio_read_its_typer, its_mmio_write_wi, 8,
-> +		vgic_mmio_read_its_typer, its_mmio_write_wi, NULL, 8,
->  		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
->  	REGISTER_ITS_DESC(GITS_CBASER,
-> -		vgic_mmio_read_its_cbaser, vgic_mmio_write_its_cbaser, 8,
-> +		vgic_mmio_read_its_cbaser, vgic_mmio_write_its_cbaser, NULL, 8,
->  		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
->  	REGISTER_ITS_DESC(GITS_CWRITER,
-> -		vgic_mmio_read_its_cwriter, vgic_mmio_write_its_cwriter, 8,
-> -		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
-> +		vgic_mmio_read_its_cwriter, vgic_mmio_write_its_cwriter, NULL,
-> +		8, VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
->  	REGISTER_ITS_DESC(GITS_CREADR,
-> -		vgic_mmio_read_its_creadr, its_mmio_write_wi, 8,
-> +		vgic_mmio_read_its_creadr, its_mmio_write_wi, NULL, 8,
->  		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
->  	REGISTER_ITS_DESC(GITS_BASER,
-> -		vgic_mmio_read_its_baser, vgic_mmio_write_its_baser, 0x40,
-> +		vgic_mmio_read_its_baser, vgic_mmio_write_its_baser, NULL, 0x40,
->  		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
->  	REGISTER_ITS_DESC(GITS_IDREGS_BASE,
-> -		vgic_mmio_read_its_idregs, its_mmio_write_wi, 0x30,
-> +		vgic_mmio_read_its_idregs, its_mmio_write_wi, NULL, 0x30,
->  		VGIC_ACCESS_32bit),
->  };
->  
-> @@ -1448,14 +1449,63 @@ static void vgic_its_destroy(struct kvm_device *kvm_dev)
->  int vgic_its_has_attr_regs(struct kvm_device *dev,
->  			   struct kvm_device_attr *attr)
->  {
-> -	return -ENXIO;
-> +	const struct vgic_register_region *region;
-> +	struct vgic_io_device iodev = {
-> +		.regions = its_registers,
-> +		.nr_regions = ARRAY_SIZE(its_registers),
-> +	};
-> +	gpa_t offset;
-> +
-> +	offset = attr->attr;
+thanks
+Ganapat
 
-Those two can be on one line.
-But actually why not just put attr->attr below and save that variable at
-all?
-
-> +
-> +	region = vgic_find_mmio_region(iodev.regions,
-> +				       iodev.nr_regions,
-> +				       offset);
-> +	if (!region)
-> +		return -ENXIO;
-
-Nit: empty line here?
-
-> +	return 0;
->  }
->  
->  int vgic_its_attr_regs_access(struct kvm_device *dev,
->  			      struct kvm_device_attr *attr,
->  			      u64 *reg, bool is_write)
->  {
-> -	return -ENXIO;
-> +	const struct vgic_register_region *region;
-> +	struct vgic_io_device iodev = {
-> +		.regions = its_registers,
-> +		.nr_regions = ARRAY_SIZE(its_registers),
-> +	};
-> +	struct vgic_its *its = dev->private;
-> +	gpa_t addr, offset;
-> +	unsigned int len;
-> +
-> +	if (IS_VGIC_ADDR_UNDEF(its->vgic_its_base))
-> +		return -ENXIO;
-> +
-> +	offset = attr->attr;
-> +	if (offset & 0x7)
-> +		return -EINVAL;
-
-Isn't this still breaking IIDR reads (a 32-bit register at offset 0x4)?
-
-> +
-> +	addr = its->vgic_its_base + offset;
-> +
-> +	region = vgic_find_mmio_region(iodev.regions,
-> +				       iodev.nr_regions,
-> +				       offset);
-> +	if (!region)
-> +		return -ENXIO;
-> +
-> +	len = region->access_flags & VGIC_ACCESS_64bit ? 8 : 4;
-
-Can you add a comment that states that we only support full register
-accesses via this interface (deviating from the spec which allows split
-accesses to 64-bit registers)? I think that's mentioned somewhere else
-(Documentation/...), but it avoids confusion for the casual reader here.
-
-Also I am wondering if that way of using the pointer here for both 32-
-and 64-bit registers breaks on big endian? Or is it specified somewhere
-that this interface uses LE only?
-
-The rest looks fine, thanks!
-
-Cheers,
-Andre.
-
-> +	if (is_write) {
-> +		if (region->uaccess_its_write)
-> +			region->uaccess_its_write(dev->kvm, its, addr,
-> +						  len, *reg);
-> +		else
-> +			region->its_write(dev->kvm, its, addr, len, *reg);
-> +	} else {
-> +		*reg = region->its_read(dev->kvm, its, addr, len);
-> +	}
-> +	return 0;
->  }
->  
->  static int vgic_its_has_attr(struct kvm_device *dev,
-> diff --git a/virt/kvm/arm/vgic/vgic-mmio.h b/virt/kvm/arm/vgic/vgic-mmio.h
-> index 055ad42..ad8a585 100644
-> --- a/virt/kvm/arm/vgic/vgic-mmio.h
-> +++ b/virt/kvm/arm/vgic/vgic-mmio.h
-> @@ -36,8 +36,13 @@ struct vgic_register_region {
->  	};
->  	unsigned long (*uaccess_read)(struct kvm_vcpu *vcpu, gpa_t addr,
->  				      unsigned int len);
-> -	void (*uaccess_write)(struct kvm_vcpu *vcpu, gpa_t addr,
-> -			      unsigned int len, unsigned long val);
-> +	union {
-> +		void (*uaccess_write)(struct kvm_vcpu *vcpu, gpa_t addr,
-> +				      unsigned int len, unsigned long val);
-> +		void (*uaccess_its_write)(struct kvm *kvm, struct vgic_its *its,
-> +					  gpa_t addr, unsigned int len,
-> +					  unsigned long val);
-> +	};
->  };
->  
->  extern struct kvm_io_device_ops kvm_io_gic_ops;
-> 
+>
+> Thanks
+> Hanjun
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
