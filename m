@@ -1,47 +1,36 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 20 Mar 2017 09:58:23 +0100
-Subject: [PATCH 1/2] soc: renesas: Identify RZ/G1H
-In-Reply-To: <cover.1490000158.git.horms+renesas@verge.net.au>
-References: <cover.1490000158.git.horms+renesas@verge.net.au>
-Message-ID: <8848e1b14231a40ed66229fb3ee98519b32f2ae7.1490000158.git.horms+renesas@verge.net.au>
+Date: Mon, 20 Mar 2017 09:58:32 +0100
+Subject: [GIT PULL] Renesas ARM Based SoC DT Bindings Updates for v4.12
+Message-ID: <cover.1490000005.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+Hi Olof, Hi Kevin, Hi Arnd,
 
-Add support for identifying the RZ/G1H (r8a7742) SoC.
+Please consider these Renesas ARM based SoC DT bindings updates for v4.12.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- drivers/soc/renesas/renesas-soc.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
 
-diff --git a/drivers/soc/renesas/renesas-soc.c b/drivers/soc/renesas/renesas-soc.c
-index 330960312296..f0172e59c040 100644
---- a/drivers/soc/renesas/renesas-soc.c
-+++ b/drivers/soc/renesas/renesas-soc.c
-@@ -80,6 +80,11 @@ static const struct renesas_soc soc_rmobile_a1 __initconst __maybe_unused = {
- 	.id	= 0x40,
- };
- 
-+static const struct renesas_soc soc_rz_g1h __initconst __maybe_unused = {
-+	.family	= &fam_rzg,
-+	.id	= 0x45,
-+};
-+
- static const struct renesas_soc soc_rz_g1m __initconst __maybe_unused = {
- 	.family	= &fam_rzg,
- 	.id	= 0x47,
-@@ -150,6 +155,9 @@ static const struct of_device_id renesas_socs[] __initconst = {
- #ifdef CONFIG_ARCH_R8A7740
- 	{ .compatible = "renesas,r8a7740",	.data = &soc_rmobile_a1 },
- #endif
-+#ifdef CONFIG_ARCH_R8A7742
-+	{ .compatible = "renesas,r8a7742",	.data = &soc_rz_g1h },
-+#endif
- #ifdef CONFIG_ARCH_R8A7743
- 	{ .compatible = "renesas,r8a7743",	.data = &soc_rz_g1m },
- #endif
--- 
-2.7.0.rc3.207.g0ac5344
+The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
+
+  Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
+
+are available in the git repository at:
+
+  https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt-bindings-for-v4.12
+
+for you to fetch changes up to cfb9f93437eb6663ca99e85c47bb3656ccfe59c5:
+
+  ARM: shmobile: Document RZ/G1N SoC DT binding (2017-03-13 10:24:14 +0100)
+
+----------------------------------------------------------------
+Renesas ARM Based SoC DT Bindings Updates for v4.12
+
+* Document RZ/G1N and RZ/G1H SoC DT bindings
+
+----------------------------------------------------------------
+Geert Uytterhoeven (2):
+      ARM: shmobile: Document RZ/G1H SoC DT binding
+      ARM: shmobile: Document RZ/G1N SoC DT binding
+
+ Documentation/devicetree/bindings/arm/shmobile.txt | 4 ++++
+ 1 file changed, 4 insertions(+)
