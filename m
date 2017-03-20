@@ -1,38 +1,86 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Mon, 20 Mar 2017 20:11:37 +0100
-Subject: [PATCH v4 00/18] add support for AXP20X and AXP22X power supply
- drivers
-In-Reply-To: <949439a1-2f66-bdb7-04ae-ff88cb388809@free-electrons.com>
-References: <20170315105537.22349-1-quentin.schulz@free-electrons.com>
- <20170315121450.bl5dxdjzazwsrvni@dell>
- <bc829791-c543-220a-8c42-1023b1a82963@free-electrons.com>
- <20170315224647.suhnptpczykuoffd@earth>
- <949439a1-2f66-bdb7-04ae-ff88cb388809@free-electrons.com>
-Message-ID: <20170320191136.rs77k6v2jvpqnayc@earth>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 20 Mar 2017 19:26:17 +0000
+Subject: [PATCH 1/2] arm: Fix cache inconsistency when using fixmap
+In-Reply-To: <1490036951.2945.8.camel@linaro.org>
+References: <20170316132958.22227-1-tixy@linaro.org>
+ <20170317115321.GB21222@n2100.armlinux.org.uk>
+ <1489767002.3063.10.camel@linaro.org>
+ <CAKv+Gu8hLcfT6t90qbMT2qxzTMoJHiPxaCvHirQEVmKjYDvqBw@mail.gmail.com>
+ <1490036951.2945.8.camel@linaro.org>
+Message-ID: <CAKv+Gu_5yJc=pv-dc8yJpzh84jz-X3B89qwakX0=RJecKrQW2w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Quentin,
+On 20 March 2017 at 19:09, Jon Medhurst (Tixy) <tixy@linaro.org> wrote:
+> On Fri, 2017-03-17 at 16:18 +0000, Ard Biesheuvel wrote:
+>> On 17 March 2017 at 16:10, Jon Medhurst (Tixy) <tixy@linaro.org> wrote:
+>> >
+> [...]
+>> > It looks to me that build_mem_type_table doesn't have much in the way of
+>> > dependencies so can probably be just called earlier. So, is the correct
+>> > solution to
+>> >
+>> > a) call build_mem_type_table from setup_arch before early_fixmap_init
+>> > b) move call to build_mem_type_table into early_fixmap_init
+>> > c) call build_mem_type_table from early_fixmap_init as well as
+>> > paging_init and have a test in build_mem_type_table so it only exectutes
+>> > once
+>> > d) something else
+>> >
+>> > a) seems simplest, b) seems wrong, c) seems over the top
+>> >
+>> > Anyway, below is an alternative to $subject patch that works for my
+>> > kprobes test cases. Note, the removal of FIXMAP_PAGE_{NORMAL,RO} means
+>> > the generic fixmap code will define these from PAGE_KERNEL{,_RO}.
+>> >
+>> > Not knowing how early fixmap is used, I hope Stefan and/or Ard have
+>> > testcases they could run.
+>> >
+>>
+>> The early UEFI boot code maps firmware tables using early_ioremap(),
+>> which is layered on top of early_fixmap(). This code executes after
+>> early_ioremap_init(), so moving build_mem_type_table() before that
+>> sounds like the obvious fix to me. The other use case is earlycon,
+>> which uses early_fixmap() directly, but afaict, the same applies there
+>> as well.
+>
+> So is that 'code should work, no need to test'? Guess it should be safe
+> to skip if those use cases use FIXMAP_PAGE_NOCACHE and FIXMAP_PAGE_IO
+> and we don't change those defines.
+>
 
-On Mon, Mar 20, 2017 at 12:34:03PM +0100, Quentin Schulz wrote:
-> As there are still some discussion going on Liam's patch series on
-> which my patch series depends, I propose to wait for it to be
-> merged and then I'll rework these battery driver patches. Is there
-> anything I can do to help the merging of Liam's patch series?
+In fact, the UEFI code uses early_memremap() not early_ioremap(), and
+it does use the memory defines, not the device ones.
 
-He just sent an updated version today, that I have not yet reviewed.
+So yes, I should test it, but I don't see any reason for huge concern,
+given that the UEFI code maps and unmaps those tables when we're still
+running UP
 
-> Could you ping me when it is merged? The easiest way would be to
-> Cc me to the next version though so I can follow the discussion :)
+>> In terms of code changes, there is a d) option where the call sequence
+>> build_mem_type/early_fixmap_init/early_ioremap_init is grouped into a
+>> new function in mm/mmu.c, which you can call from setup_arch(). That
+>> would be the cleanest approach imo.
+>
+> Any suggestion on a name for that function?
+>
 
-I will try to remember pinging you. CC'ing will have to be done by
-Liam.
+early_mm_init?
 
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170320/099c5704/attachment-0001.sig>
+>>
+>> > I'm also wondering if the existing definition of FIXMAP_PAGE_IO is
+>> > correc
+>> > t and should not also be based on some platform specific value
+>> > calculated
+>> >  in build_mem_type_table?
+>
+> Answering myself. FIXMAP_PAGE_IO is defined with the same values as
+> mem_types[MT_DEVICE].prot_pte which doesn't get modified at runtime, so
+> should be correct... Unless the device being mapped needs Non-shareable
+> Device memory (MT_DEVICE_NONSHARED) in which case we're onto dodgy
+> ground. I can't see how we can detect that in code or help someone using
+> the API to avoid that. I certainly don't intend trying to redesign the
+> API and implementation of early_ioremap to fix these limitations.
+>
+> --
+> Tixy
+>
