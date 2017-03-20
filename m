@@ -1,69 +1,43 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Mon, 20 Mar 2017 10:38:21 +0100
-Subject: [PATCH 2/8] soc: imx: gpc: fix the wrong using of regmap cache
-In-Reply-To: <1489990547-1510-3-git-send-email-aisheng.dong@nxp.com>
-References: <1489990547-1510-1-git-send-email-aisheng.dong@nxp.com>
- <1489990547-1510-3-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1490002701.2895.13.camel@pengutronix.de>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Mon, 20 Mar 2017 10:39:56 +0100
+Subject: [GIT PULL] ARM: OXNAS SoC update for 4.12
+Message-ID: <cd2d94ef-9098-6e4e-ed65-74191d45370e@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, den 20.03.2017, 14:15 +0800 schrieb Dong Aisheng:
-> Without providing the proper reg_defaults, the regmap registers first
-> read out may be always 0 if enabling cache, which results in the
-> following issue we met.
-> e.g. During driver probe in imx6_pm_domain_power_on():
-> regmap_read(pd->regmap, pd->reg_offs + GPC_PGC_PUPSCR_OFFS, &val);
-> The PGC_PUPSCR register val is always 0 but it's actually 0xf01 in HW.
-> 
-> Since GPC registers are tightly related to CPU bring up and may be
-> changed in bootloader, we don't want to provide defaults.
-> And the cache really does not save too much for GPC module.
-> 
-> Therefore, simply disable cache to fix the issue and make life easy.
+Dear arm-soc maintainers,
 
-While I agree that not using the cache may be the right thing to do
-here, bypassing the cache by not providing the volatile function is only
-half the fix.
+The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
 
-Please also set the cache type to REGCACHE_NONE, to make it clear that
-the cache isn't used.
+  Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
 
-Regards,
-Lucas
+are available in the git repository at:
 
-> Cc: Lucas Stach <l.stach@pengutronix.de>
-> Cc: Shawn Guo <shawnguo@kernel.org>
-> Fixes: 721cabf6c660 ("soc: imx: move PGC handling to a new GPC driver")
-> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
-> ---
->  drivers/soc/imx/gpc.c | 10 ----------
->  1 file changed, 10 deletions(-)
-> 
-> diff --git a/drivers/soc/imx/gpc.c b/drivers/soc/imx/gpc.c
-> index c9bfdfd..7e6a672 100644
-> --- a/drivers/soc/imx/gpc.c
-> +++ b/drivers/soc/imx/gpc.c
-> @@ -289,22 +289,12 @@ static bool imx_gpc_readable_reg(struct device *dev, unsigned int reg)
->  	return (reg % 4 == 0) && (reg <= 0x2ac);
->  }
->  
-> -static bool imx_gpc_volatile_reg(struct device *dev, unsigned int reg)
-> -{
-> -	if (reg == GPC_CNTR)
-> -		return true;
-> -
-> -	return false;
-> -}
-> -
->  static const struct regmap_config imx_gpc_regmap_config = {
-> -	.cache_type = REGCACHE_FLAT,
->  	.reg_bits = 32,
->  	.val_bits = 32,
->  	.reg_stride = 4,
->  
->  	.readable_reg = imx_gpc_readable_reg,
-> -	.volatile_reg = imx_gpc_volatile_reg,
->  
->  	.max_register = 0x2ac,
->  };
+  https://github.com/OXNAS/linux.git tags/oxnas-arm-soc-for-4.12
+
+for you to fetch changes up to b44327d198b4f1bbebaf83f714cde450471de644:
+
+  ARM: oxnas: remove redundant select CPU_V6K (2017-03-20 10:13:45 +0100)
+
+----------------------------------------------------------------
+- Fix OX820 Kconfig
+
+----------------------------------------------------------------
+Masahiro Yamada (1):
+      ARM: oxnas: remove redundant select CPU_V6K
+
+ arch/arm/mach-oxnas/Kconfig | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/arch/arm/mach-oxnas/Kconfig b/arch/arm/mach-oxnas/Kconfig
+index 8fa4557..e3610c5 100644
+--- a/arch/arm/mach-oxnas/Kconfig
++++ b/arch/arm/mach-oxnas/Kconfig
+@@ -28,7 +28,6 @@ config MACH_OX820
+ 	depends on ARCH_MULTI_V6
+ 	select ARM_GIC
+ 	select DMA_CACHE_RWFO if SMP
+-	select CPU_V6K
+ 	select HAVE_SMP
+ 	select HAVE_ARM_SCU if SMP
+ 	select HAVE_ARM_TWD if SMP
