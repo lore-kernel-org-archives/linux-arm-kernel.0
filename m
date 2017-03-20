@@ -1,94 +1,117 @@
-From: wangkefeng.wang@huawei.com (Kefeng Wang)
-Date: Mon, 20 Mar 2017 21:05:04 +0800
-Subject: [PATCH] arm64: add dump_stack to show_regs
-In-Reply-To: <20170320110216.GB18585@leverpostej>
-References: <e84a5cf9-f4c4-2b27-ed59-363e2f8ab5bc@huawei.com>
- <20170320110216.GB18585@leverpostej>
-Message-ID: <ad975a0a-8888-3255-3ed1-117e75fd7109@huawei.com>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Mon, 20 Mar 2017 14:10:30 +0100
+Subject: [PATCH v4 14/36] [media] v4l2-mc: add a function to inherit
+ controls from a pipeline
+In-Reply-To: <20170317143743.GG21222@n2100.armlinux.org.uk>
+References: <20170310125342.7f047acf@vento.lan>
+ <20170310223714.GI3220@valkosipuli.retiisi.org.uk>
+ <20170311082549.576531d0@vento.lan>
+ <20170313124621.GA10701@valkosipuli.retiisi.org.uk>
+ <20170314004533.3b3cd44b@vento.lan>
+ <e0a6c60b-1735-de0b-21f4-d8c3f4b3f10f@xs4all.nl>
+ <20170317114203.GZ21222@n2100.armlinux.org.uk>
+ <44161453-02f9-0019-3868-7501967a6a82@linux.intel.com>
+ <20170317102410.18c966ae@vento.lan> <1489758670.2905.52.camel@pengutronix.de>
+ <20170317143743.GG21222@n2100.armlinux.org.uk>
+Message-ID: <5b57773a-a747-285b-eb3e-3b3f0acd8079@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 2017/3/20 19:02, Mark Rutland wrote:
-> On Sun, Mar 19, 2017 at 03:15:25PM +0800, Ding Tianhong wrote:
->> Recently I found that when the system trigger a soft lockup in interrupt,
->> there is only showing the regs, but no stack trace, it is very difficult
->> to locate the problem:
+On 03/17/2017 03:37 PM, Russell King - ARM Linux wrote:
+> On Fri, Mar 17, 2017 at 02:51:10PM +0100, Philipp Zabel wrote:
+>> On Fri, 2017-03-17 at 10:24 -0300, Mauro Carvalho Chehab wrote:
+>> [...]
+>>> The big question, waiting for an answer on the last 8 years is
+>>> who would do that? Such person would need to have several different
+>>> hardware from different vendors, in order to ensure that it has
+>>> a generic solution.
+>>>
+>>> It is a way more feasible that the Kernel developers that already 
+>>> have a certain hardware on their hands to add support inside the
+>>> driver to forward the controls through the pipeline and to setup
+>>> a "default" pipeline that would cover the common use cases at
+>>> driver's probe.
 >>
->> ===========================================
->>
->> [10072.999437] NMI watchdog: BUG: soft lockup - CPU#16 stuck for 23s! [ksoftirqd/16:88]
->> .....
->> [10073.041254] CPU: 16 PID: 88 Comm: ksoftirqd/16 Tainted: G         4.x.x #1
->> [10073.041258] Hardware name: xxxxx, BIOS 1.17 01/04/2017
->> [10073.041261] task: ffff803f6cb06200 ti: ffff803f6cb50000 task.ti: ffff803f6cb50000
->> [10073.041274] PC is at _raw_spin_unlock_irqrestore+0x24/0x30
->> [10073.041280] LR is at blk_run_queue+0x3c/0x48
->> [10073.041282] pc : [<ffff800000a3df14>] lr : [<ffff8000004f3a7c>] pstate: 60000145
->> [10073.041285] sp : ffff803f6cb53b20
->> [10073.041286] x29: ffff803f6cb53b20 x28: 0000000000001000
->> [10073.041290] x27: 0000000000000000 x26: ffff800001226000
->> [10073.041294] x25: 0000000000000000 x24: 0000000000000140
->> [10073.041297] x23: ffff803f62e108c8 x22: ffff800001037000
->> [10073.041302] x21: ffff843f66800040 x20: 0000000000000140
->> [10073.041305] x19: ffff803f62e108c8 x18: 0000000000000007
->> [10073.041309] x17: 000000000000000e x16: 0000000000000001
->> [10073.041312] x15: 0000000000000019 x14: 0000000000000033
->> [10073.041317] x13: 000000000000004c x12: 0000000000000000
->> [10073.041320] x11: 0000000000001000 x10: 0000000000000010
->> [10073.041323] x9 : ffff8000004f3a7c x8 : ffff803f69b59120
->> [10073.041327] x7 : 0000000000000000 x6 : 0000000000000002
->> [10073.041331] x5 : 0000000000000244 x4 : 00000000000244d9
->> [10073.041334] x3 : ffff843f653ab918 x2 : 0000000000004074
->> [10073.041337] x1 : 0000000000000140 x0 : ffff803f62e10e58
->>
->> ===============================================
->>
->> So add the general dump_stack to show_regs to support showing the stack.
->>
->> Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
->> ---
->>  arch/arm64/kernel/process.c | 1 +
->>  1 file changed, 1 insertion(+)
->>
->> diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
->> index 043d373..60c5c26 100644
->> --- a/arch/arm64/kernel/process.c
->> +++ b/arch/arm64/kernel/process.c
->> @@ -212,6 +212,7 @@ void show_regs(struct pt_regs * regs)
->>  {
->>  	printk("\n");
->>  	__show_regs(regs);
->> +	dump_stack();
->>  }
+>> Actually, would setting pipeline via libv4l2 plugin and letting drivers
+>> provide a sane enabled default pipeline configuration be mutually
+>> exclusive? Not sure about the control forwarding, but at least a simple
+>> link setup and format forwarding would also be possible in the kernel
+>> without hindering userspace from doing it themselves later.
 > 
-> I don't think this is quite right.
+> I think this is the exact same problem as controls in ALSA.
+> 
+> When ALSA started off in life, the requirement was that all controls
+> shall default to minimum, and the user is expected to adjust controls
+> after the system is running.
+> 
+> After OSS, this gave quite a marked change in system behaviour, and
+> led to a lot of "why doesn't my sound work anymore" problems, because
+> people then had to figure out which combination of controls had to be
+> set to get sound out of their systems.
+> 
+> Now it seems to be much better, where install Linux on a platform, and
+> you have a working sound system (assuming that the drivers are all there
+> which is generally the case for x86.)
+> 
+> However, it's still possible to adjust all the controls from userspace.
+> All that's changed is the defaults.
+> 
+> Why am I mentioning this - because from what I understand Mauro saying,
+> it's no different from this situation.  Userspace will still have the
+> power to disable all links and setup its own.  The difference is that
+> there will be a default configuration that the kernel sets up at boot
+> time that will be functional, rather than the current default
+> configuration where the system is completely non-functional until
+> manually configured.
+> 
+> However, at the end of the day, I don't care _where_ the usability
+> problems are solved, only that there is some kind of solution.  It's not
+> the _where_ that's the real issue here, but the _how_, and discussion of
+> the _how_ is completely missing.
+> 
+> So, let's try kicking off a discussion about _how_ to do things.
+> 
+> _How_ do we setup a media controller system so that we end up with a
+> usable configuration - let's start with the obvious bit... which links
+> should be enabled.
+> 
+> I think the first pre-requisit is that we stop exposing capture devices
+> that can never be functional for the hardware that's present on the board,
+> so that there isn't this plentora of useless /dev/video* nodes and useless
+> subdevices.
+> 
+> One possible solution to finding a default path may be "find the shortest
+> path between the capture device and the sensor and enable intervening
+> links".
+> 
+> Then we need to try configuring that path with format/resolution
+> information.
+> 
+> However, what if something in the shortest path can't handle the format
+> that the sensor produces?  I think at that point, we'd need to drop that
+> subdev out of the path resolution, re-run the "find the shortest path"
+> algorithm, and try again.
+> 
+> Repeat until success or no path between the capture and sensor exists.
+> 
+> This works fine if you have just one sensor visible from a capture device,
+> but not if there's more than one (which I suspect is the case with the
+> Sabrelite board with its two cameras and video receiver.)  That breaks
+> the "find the shortest path" algorithm.
+> 
+> So, maybe it's a lot better to just let the board people provide via DT
+> a default setup for the connectivity of the modules somehow - certainly
+> one big step forward would be to disable in DT parts of the capture
+> system that can never be used (remembering that boards like the RPi /
+> Hummingboard may end up using DT overlays to describe this for different
+> cameras, so the capture setup may change after initial boot.)
 
-I found the same logic exists in arm32.
+The MC was developed before the device tree came along. But now that the DT
+is here, I think this could be a sensible idea to let the DT provide an
+initial path.
 
-> 
-> I see that x86's show_regs() will dump a kernel stack, but it starts
-> from the stack described by the regs, not the stack used to call
-> dump_stack().
-> 
-> Also, for longjmp_break_handler() I think we only want the current
-> registers, and not the stack.
+Sakari, Laurent, Mauro: any opinions?
 
-Is there a better way to show the kernel stack? it is not early to address issue
-if only show regs. Making a new show_regs() to call dump_mem()/dump_backtrace()/dump_instr()?
+Regards,
 
-Thanks,
-Kefeng
-
-> 
-> Thanks,
-> Mark.
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-> .
-> 
+	Hans
