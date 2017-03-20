@@ -1,32 +1,40 @@
-From: rric@kernel.org (Robert Richter)
-Date: Mon, 20 Mar 2017 11:49:46 +0100
-Subject: [PATCH 1/2] PCI: Use Cavium assigned hardware ID for ThunderX
- host controller
-In-Reply-To: <1489564155-3881-2-git-send-email-tn@semihalf.com>
-References: <1489564155-3881-1-git-send-email-tn@semihalf.com>
- <1489564155-3881-2-git-send-email-tn@semihalf.com>
-Message-ID: <20170320104946.GL4906@rric.localdomain>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Mon, 20 Mar 2017 11:52:41 +0100
+Subject: [PATCH] tty/serial: atmel: fix race condition (TX+DMA)
+Message-ID: <20170320105241.25648-1-richard.genoud@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Bjorn,
+If uart_flush_buffer() is called between atmel_tx_dma() and
+atmel_complete_tx_dma(), the circular buffer has been cleared, but not
+atmel_port->tx_len.
+That leads to a circular buffer overflow (dumping (UART_XMIT_SIZE -
+atmel_port->tx_len) bytes).
 
-On 15.03.17 08:49:14, Tomasz Nowicki wrote:
-> "CAV" is the only PNP/ACPI hardware ID vendor prefix assigned to Cavium
-> so fix this as it should be from day one.
-> 
-> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+Tested-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
+Cc: stable <stable@vger.kernel.org> # 3.12+
+---
+NB: this will apply on kernels 4.3+, for kernels before 4.3, the code
+will be:
+sg_dma_len(&atmel_port->sg_tx) = 0;
 
-there is no firmware with 'THRX0002', so tagging this as
-stable. Tested with latest firmware.
+ drivers/tty/serial/atmel_serial.c | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-Fixes: 44f22bd91e88 ("PCI: Add MCFG quirks for Cavium ThunderX pass2.x host controller")
-Cc: <stable@vger.kernel.org> # v4.10
-Tested-by: Robert Richter <rrichter@cavium.com>
-Acked-by: Robert Richter <rrichter@cavium.com>
-
-Please apply.
-
-Thanks,
-
--Robert
+diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+index d9c05e05d896..5c23fb4e552b 100644
+--- a/drivers/tty/serial/atmel_serial.c
++++ b/drivers/tty/serial/atmel_serial.c
+@@ -1954,6 +1954,11 @@ static void atmel_flush_buffer(struct uart_port *port)
+ 		atmel_uart_writel(port, ATMEL_PDC_TCR, 0);
+ 		atmel_port->pdc_tx.ofs = 0;
+ 	}
++	/*
++	 * in uart_flush_buffer(), the xmit circular buffer has just
++	 * been cleared, so we have to reset tx_len accordingly.
++	 */
++	atmel_port->tx_len = 0;
+ }
+ 
+ /*
