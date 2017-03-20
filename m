@@ -1,50 +1,29 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 20 Mar 2017 11:38:52 +0100
-Subject: [PATCH 4/4] tty/serial: sh-sci: remove uneeded IS_ERR_OR_NULL
- calls
-In-Reply-To: <20170320103113.tpveoq2onzrwmkdt@pengutronix.de>
-References: <20170304174819.esxhwwbsxzuq3vyc@pengutronix.de>
- <CAMuHMdX8BEnaTtNFAbcvfHwJH=oPUmQ2NB+jfouGyhQpJ_m_4A@mail.gmail.com>
- <20170306085842.yijkfpqi3adcedmm@pengutronix.de>
- <CAMuHMdV2_vbocY4wCzvYtPAaF+QEX_Y4g6qVu5EqEBf5AnFdaw@mail.gmail.com>
- <20170306093043.ay4dz3ehp3aakwxh@pengutronix.de>
- <CAMuHMdWQuvANNU14A7NQuzv6AFp04bq4DG_oc7w9h4wUrG+4aQ@mail.gmail.com>
- <20170306100220.droey65uq2ew3mzu@pengutronix.de>
- <CACRpkdYeFyr4yjQjDAUpPJwuD_NW2y=wXnzt1xSNoOX0SFCLmw@mail.gmail.com>
- <CAMuHMdWv-xs12UqutEtXJGR8qqgx6DeDhkKvvYhhyW+XTVsUNQ@mail.gmail.com>
- <CAMuHMdXGn35bEsJKnUi5o3AytL4AJN2fBfoB79v5W-jOVFQx6g@mail.gmail.com>
- <20170320103113.tpveoq2onzrwmkdt@pengutronix.de>
-Message-ID: <CAMuHMdWbwA+3UGVnHYJOs26vTj13Yn+s4B8tE9kyy25JcjyZGg@mail.gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 20 Mar 2017 10:41:46 +0000
+Subject: [PATCH 4/4] media: imx-media-capture: add frame sizes/interval
+ enumeration
+In-Reply-To: <20170320092330.GA28094@frolo.macqel>
+References: <20170319103801.GQ21222@n2100.armlinux.org.uk>
+ <E1cpYOa-0006Eu-CL@rmk-PC.armlinux.org.uk>
+ <20170320085512.GA20923@frolo.macqel>
+ <20170320090524.GC21222@n2100.armlinux.org.uk>
+ <20170320092330.GA28094@frolo.macqel>
+Message-ID: <20170320104146.GF21222@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+On Mon, Mar 20, 2017 at 10:23:30AM +0100, Philippe De Muyter wrote:
+> So existing gstreamer applications using /dev/video* to control framerate,
+> and even gain and exposure won't work anymore :( ?
+> 
+> I had hoped to keep compatibility, with added robustness and functionality.
+> 
+> I seems like I'll stay with my NXP/Freescale old and imperfect kernel.
 
-On Mon, Mar 20, 2017 at 11:31 AM, Uwe Kleine-K?nig
-<u.kleine-koenig@pengutronix.de> wrote:
-> On Mon, Mar 20, 2017 at 10:56:14AM +0100, Geert Uytterhoeven wrote:
->> Documentation/gpio/consumer.txt rightfully sates:
->> | Note that gpio_get*_optional() functions (and their managed variants), unlike
->> | the rest of gpiolib API, also return NULL when gpiolib support is disabled.
->> | This is helpful to driver authors, since they do not need to special case
->> | -ENOSYS return codes.  System integrators should however be careful to enable
->> | gpiolib on systems that need it.
->
-> I cannot find this paragraph in Documentation/gpio/consumer.txt:
->
->         $ git grep -e 'ENOSYS' v4.11-rc3 -- Documentation/gpio/
->         <void>
+Thank you for saying this, this supports my views which I've already
+stated about what influences which kernel people will use.
 
-It was added by commit 22c403676dbbb7c6 ("gpio: return NULL from
-gpiod_get_optional when GPIOLIB is disabled")
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
