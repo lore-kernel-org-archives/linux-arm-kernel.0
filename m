@@ -1,106 +1,120 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 20 Mar 2017 22:30:01 +0800
-Subject: [linux-sunxi] [PATCH v3 5/5] ARM: dts: sun8i: h2+: enable USB OTG
- for Orange Pi Zero board
-In-Reply-To: <20170320113931.dPmCTite@smtp2h.mail.yandex.net>
-References: <20170320113931.dPmCTite@smtp2h.mail.yandex.net>
-Message-ID: <CAGb2v644jM_R_4BgRWz7vHTaGwtBC_MSJnppbsQtBKf-qAS2hA@mail.gmail.com>
+From: sricharan@codeaurora.org (Sricharan R)
+Date: Mon, 20 Mar 2017 20:01:53 +0530
+Subject: [PATCH V3 3/5] drivers: arm-smmu: Add clock support for
+ QCOM_SMMUV2
+In-Reply-To: <20170316211039.rbqq262syalyfcs6@rob-hp-laptop>
+References: <1489073748-3659-1-git-send-email-sricharan@codeaurora.org>
+ <1489073748-3659-4-git-send-email-sricharan@codeaurora.org>
+ <20170316211039.rbqq262syalyfcs6@rob-hp-laptop>
+Message-ID: <fa0a35be-a717-44ca-1ec5-208827bfb503@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 15, 2017 at 5:09 PM, Icenowy Zheng <icenowy@aosc.xyz> wrote:
->
-> 2017?3?15? 15:16? Chen-Yu Tsai <wens@csie.org>???
->>
->> Hi,
->>
->> On Tue, Mar 7, 2017 at 6:34 AM, Icenowy Zheng <icenowy@aosc.xyz> wrote:
->> > Orange Pi Zero board features a USB OTG port, which has a ID pin, and
->> > can be used to power up the board. However, even if the board is powered
->> > via +5V pin in GPIO/expansion headers, the VBUS in the OTG port cannot
->> > be powered up, thus it's impossible to use it in host mode with simple
->> > OTG cables.
->> >
->> > Add support for it in peripheral mode.
->> >
->> > If someone really want to use it in host mode, the mode of PHY can be
->> > switch via sysfs, then use a powered USB OTG cable or powered USB HUB to
->> > power up external USB devices.
->> >
->> > Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
->> > ---
->> > New patch in v3.
->> >
->> >  arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts | 14 ++++++++++++++
->> >  1 file changed, 14 insertions(+)
->> >
->> > diff --git a/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts b/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts
->> > index b7ca916d871d..63f819394b98 100644
->> > --- a/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts
->> > +++ b/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts
->> > @@ -96,6 +96,10 @@
->> >         };
->> >  };
->> >
->> > +&ehci0 {
->> > +       status = "okay";
->> > +};
->> > +
->> >  &ehci1 {
->> >         status = "okay";
->> >  };
->> > @@ -132,6 +136,10 @@
->> >         bias-pull-up;
->> >  };
->> >
->> > +&ohci0 {
->> > +       status = "okay";
->> > +};
->> > +
->> >  &ohci1 {
->> >         status = "okay";
->> >  };
->> > @@ -154,7 +162,13 @@
->> >         status = "disabled";
->> >  };
->> >
->> > +&usb_otg {
->> > +       dr_mode = "peripheral";
->> > +       status = "okay";
->> > +};
->> > +
->> >  &usbphy {
->> >         /* USB VBUS is always on */
->>
->> This comment does not match your commit message, which says it's always off.
->
-> Oh I should say "USB Type-A port VBUS".
+Hi Rob,
 
-Yes you should probably update that comment, and also mention the OTG port's
-VBUS is always off.
-
-ChenYu
-
+On 3/17/2017 2:40 AM, Rob Herring wrote:
+> On Thu, Mar 09, 2017 at 09:05:46PM +0530, Sricharan R wrote:
+>> The QCOM_SMMUV2 is an implementation of the arm,smmu-v2 architecture.
+>> The qcom,smmu is instantiated for each of the multimedia cores (for eg)
+>> Venus (video encoder/decoder), mdp (display) etc, and they are connected
+>> to the Multimedia Aggregator Interconnect (MMAGIC). So the access to
+>> any of the MMU's registers, as well as MMU's downstream bus access,
+>> requires the specified MMAGIC clocks to be enabled. So adding a new
+>> binding for the qcom,smmu-v2 and the required mmagic clock bindings for
+>> the same. Also adding the support for enabling the qcom,smmu-v2 clocks in
+>> the driver.
 >>
->> ChenYu
+>>                -------------  ---------
+>>                |   VENUS   |  | MDP   |
+>> 	       |	   |  |       |
+>> 	       -------------  --------
+>> 		     |           |
+>> 		     |           |
+>>                   ------      ---------
+>>                   |SMMU |     | SMMU  |
+>>                   |	|     |       |
+>>                   ------      --------
+>> 		    |            |
+>> 		    |            |
+>>        -----------------------------------------
+>>        |	MMAGIC INTERCONNECT (MMSS NOC) |
+>>        |                                       |
+>>        -----------------------------------------
+>>                    |                 |
+>> 		   |           ----------------------------------
+>>                  -----         | 	SYSTEM NOC		|
+>>                  |DDR|	       |				|
+>>                  -----         ---------------------------------
+>> 		   |		    |
+>>                    |               ------
+>> 		   |<-------------| CPU|
+>> 				  ------
 >>
->> >         status = "okay";
->> > +       usb0_id_det-gpios = <&pio 6 12 GPIO_ACTIVE_HIGH>; /* PG12 */
->> >  };
->> > --
->> > 2.11.1
->> >
->> > --
->> > You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
->> > To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
->> > For more options, visit https://groups.google.com/d/optout.
+>> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+>> ---
+>>  .../devicetree/bindings/iommu/arm,smmu.txt         |   8 ++
+>>  drivers/iommu/arm-smmu.c                           | 124 +++++++++++++++++++++
+>>  2 files changed, 132 insertions(+)
 >>
->> --
->> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
->> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
->> For more options, visit https://groups.google.com/d/optout.
+>> diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu.txt b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+>> index b369c13..88e02d6 100644
+>> --- a/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+>> +++ b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+>> @@ -17,6 +17,7 @@ conditions.
+>>                          "arm,mmu-401"
+>>                          "arm,mmu-500"
+>>                          "cavium,smmu-v2"
+>> +			"qcom,smmu-v2"
 >
-> --
-> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
-> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
-> For more options, visit https://groups.google.com/d/optout.
+> I know Cavium did it, but I'd prefer to see SoC specific compatibles
+> here.
+
+ok, will change it to be soc specific.
+
+>
+>>
+>>                    depending on the particular implementation and/or the
+>>                    version of the architecture implemented.
+>> @@ -74,6 +75,13 @@ conditions.
+>>                    "cfg_clk" is optional if required to access the TCU's programming
+>>                    interface, apart from the "tcu_clk".
+>>
+>> +		  Should have "mmagic_ahb_clk", "mmagic_cfg_ahb_clk",
+>> +                              "smmu_core_ahb_clk", "smmu_core_axi_clk",
+>> +                              "mmagic_core_axi_clk" for "qcom,smmu-v2"
+>
+> This is instead of the above clocks?
+>
+
+These clocks are for 'qcom,smmu-v2'. I should have put
+that first, then the clock names.
+
+> Are these clocks all really part of the SMMU or are the mmagic clocks
+> working around no proper driver for the mmagic?
+>
+
+infact because of the absence of the mmagic driver to handle it.
+But i think, i will have to rework this, because handling mmagic
+clocks is going to pushed elsewhere, to the the gdscs(powerdomains).
+So adding the mmagic clocks should not be required here after that.
+
+Regards,
+  Sricharan
+
+>> +
+>> +		  "mmagic_core_axi_clk" is required for smmu's access to the
+>> +                   downstream bus and rest for the smmu's register group access.
+>> +
+>>  - clocks:         Phandles for respective clocks described by clock-names.
+>>
+>>  - power-domains:  Phandles to SMMU's power domain specifier. This is
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+
+-- 
+"QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a 
+member of Code Aurora Forum, hosted by The Linux Foundation
