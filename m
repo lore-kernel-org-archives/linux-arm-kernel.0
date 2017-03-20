@@ -1,28 +1,43 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 20 Mar 2017 08:07:39 -0700
-Subject: [PATCHv2 8/9] ARM: dts: omap4: add clkctrl nodes
-In-Reply-To: <3a82add5-7d85-458c-f8c1-9e58db6a8949@ti.com>
-References: <1489741781-12816-1-git-send-email-t-kristo@ti.com>
- <1489741781-12816-9-git-send-email-t-kristo@ti.com>
- <20170317154333.GW20572@atomide.com>
- <9456caee-4f45-044a-0b2e-305fa2d0d274@ti.com>
- <b602ccba-489f-e78f-0011-6d808bca9f84@ti.com>
- <20170320143538.GH20572@atomide.com>
- <3a82add5-7d85-458c-f8c1-9e58db6a8949@ti.com>
-Message-ID: <20170320150738.GJ20572@atomide.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 20 Mar 2017 15:07:53 +0000
+Subject: [PATCH 00/17] clocksource/arch_timer: Errara workaround
+ infrastructure rework
+In-Reply-To: <20170306112622.13853-1-marc.zyngier@arm.com>
+References: <20170306112622.13853-1-marc.zyngier@arm.com>
+Message-ID: <20170320150752.GK31213@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tero Kristo <t-kristo@ti.com> [170320 07:54]:
-> - You can introduce the DTS changes on a clkctrl module basis, e.g.
-> introduce the node for l4_per_clkctrl along with the clock node changes for
-> the same
+On Mon, Mar 06, 2017 at 11:26:05AM +0000, Marc Zyngier wrote:
+> It has recently become obvious that a number of arm64 systems have
+> been blessed with a set of timers that are slightly less than perfect,
+> and require a bit of hand-holding. We already have a bunch of
+> errata-specific code to deal with this, but as we're adding more
+> potential detection methods (DT, ACPI, capability), things are getting
+> a bit out of hands.
+> 
+> Instead of adding more ad-hoc fixes to an already difficult code base,
+> let's give ourselves a bit of an infrastructure that can deal with
+> this and hide most of the uggliness behind frendly accessors.
 
-I don't mind introducing them all at once, I'm worried about
-reverting in case of trouble. But as long as we can revert things on
-a clkctrl module basis in case of trouble, we should be good to go as
-far as I'm concerned.
+>  Documentation/arm64/silicon-errata.txt |   1 +
+>  arch/arm64/include/asm/arch_timer.h    |  44 ++-
+>  arch/arm64/include/asm/cpucaps.h       |   3 +-
+>  arch/arm64/include/asm/cputype.h       |   2 +
+>  arch/arm64/include/asm/esr.h           |   2 +
+>  arch/arm64/kernel/cpu_errata.c         |  15 +
+>  arch/arm64/kernel/cpufeature.c         |  13 +-
+>  arch/arm64/kernel/traps.c              |  14 +
+>  drivers/clocksource/Kconfig            |  11 +
+>  drivers/clocksource/arm_arch_timer.c   | 529 +++++++++++++++++++++++----------
+>  10 files changed, 465 insertions(+), 169 deletions(-)
 
-Regards,
+Largely this looks ok.
 
-Tony
+What's the plan for merging this?
+
+If you can respin this, I can see about collating this with the ACPI
+GTDT patches, but I'm not sure what to do about the arch/arm64/ parts.
+
+Thanks,
+Mark.
