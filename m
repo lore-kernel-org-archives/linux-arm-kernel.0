@@ -1,33 +1,58 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 20 Mar 2017 14:58:03 +0000
-Subject: [PATCH 15/17] arm64: arch_timer: Workaround for Cortex-A73
- erratum 858921
-In-Reply-To: <20170306112622.13853-16-marc.zyngier@arm.com>
+Date: Mon, 20 Mar 2017 15:00:55 +0000
+Subject: [PATCH 17/17] arm64: arch_timer: Add HISILICON_ERRATUM_161010101
+ ACPI matching data
+In-Reply-To: <13e4473e-e1ec-c193-4d5a-63787d149dda@linaro.org>
 References: <20170306112622.13853-1-marc.zyngier@arm.com>
- <20170306112622.13853-16-marc.zyngier@arm.com>
-Message-ID: <20170320145803.GI31213@leverpostej>
+ <20170306112622.13853-18-marc.zyngier@arm.com>
+ <13e4473e-e1ec-c193-4d5a-63787d149dda@linaro.org>
+Message-ID: <20170320150055.GJ31213@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 06, 2017 at 11:26:20AM +0000, Marc Zyngier wrote:
-> Cortex-A73 (all versions) counter read can return a wrong value
-> when the counter crosses a 32bit boundary.
+On Tue, Mar 07, 2017 at 09:19:21PM +0800, Hanjun Guo wrote:
+> On 2017/3/6 19:26, Marc Zyngier wrote:
+> >In order to deal with ACPI enabled platforms suffering from the
+> >HISILICON_ERRATUM_161010101, let's add the required OEM data that
+> >allow the workaround to be enabled.
+> >
+> >Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> >---
+> > drivers/clocksource/arm_arch_timer.c | 29 +++++++++++++++++++++++++++++
+> > 1 file changed, 29 insertions(+)
+> >
+> >diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+> >index 6182871af4eb..b46584f058b6 100644
+> >--- a/drivers/clocksource/arm_arch_timer.c
+> >+++ b/drivers/clocksource/arm_arch_timer.c
+> >@@ -270,6 +270,25 @@ static u64 notrace hisi_161010101_read_cntvct_el0(void)
+> > {
+> > 	return __hisi_161010101_read_reg(cntvct_el0);
+> > }
+> >+
+> >+static struct ate_acpi_oem_info hisi_161010101_oem_info[] = {
+> >+	{
+> >+		.oem_id		= "HISI  ",
+> >+		.oem_table_id	= "HIP05   ",
+> >+		.oem_revision	= 0,
+> >+	},
+> >+	{
+> >+		.oem_id		= "HISI  ",
+> >+		.oem_table_id	= "HIP06   ",
+> >+		.oem_revision	= 0,
+> >+	},
+> >+	{
+> >+		.oem_id		= "HISI  ",
+> >+		.oem_table_id	= "HIP07   ",
+> >+		.oem_revision	= 0,
+> >+	},
+> >+	{ },
 > 
-> The workaround involves performing the read twice, and to return
-> one or the other depending on whether a transition has taken place.
- 
-> +#ifdef CONFIG_ARM64_ERRATUM_858921
-> +static u64 notrace arm64_858921_read_cntvct_el0(void)
-> +{
-> +	u64 _old, _new;
-> +
-> +	_old = read_sysreg(cntvct_el0);
-> +	_new = read_sysreg(cntvct_el0);
-> +	return (((_old ^ _new) >> 32) & 1) ? _old : _new;
-> +}
-> +#endif
+> Maybe it's better to add a comments that to say "It's needed to match
+> the end of oem info", but it's up to you :)
 
-Given this is a static inline, I think we can drop the underscores here.
+Indeed. A comment as to why the sapces are necessary would be very
+helpful.
 
 Thanks,
 Mark.
