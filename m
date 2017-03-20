@@ -1,43 +1,49 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 20 Mar 2017 09:57:53 +0100
-Subject: [PATCH 14/31] ARM: dts: r7s72100: Add watchdog timer
+Date: Mon, 20 Mar 2017 09:57:47 +0100
+Subject: [PATCH 08/31] ARM: dts: r8a7790: Remove unit-addresses and regs from
+ integrated caches
 In-Reply-To: <cover.1489999062.git.horms+renesas@verge.net.au>
 References: <cover.1489999062.git.horms+renesas@verge.net.au>
-Message-ID: <69ed50de582eff6307fd3fa050fdc505731f0a2d.1489999062.git.horms+renesas@verge.net.au>
+Message-ID: <d492909c84b895564d7ac413546ae988945c68db.1489999062.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Chris Brandt <chris.brandt@renesas.com>
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Add watchdog timer support for RZ/A1.
-For the RZ/A1, the only way to do a reset is to overflow the WDT, so this
-is useful even if you don't need the watchdog functionality.
+The Cortex-A15/A7 cache controllers are integrated controllers, and thus
+the device nodes representing them should not have unit-addresses or reg
+properties.
 
-Signed-off-by: Chris Brandt <chris.brandt@renesas.com>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Acked-by: Guenter Roeck <linux@roeck-us.net>
+Fixes: 2c3de36700d4f3a5 ("ARM: dts: r8a7790: Fix W=1 dtc warnings")
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r7s72100.dtsi | 7 +++++++
- 1 file changed, 7 insertions(+)
+ arch/arm/boot/dts/r8a7790.dtsi | 6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r7s72100.dtsi b/arch/arm/boot/dts/r7s72100.dtsi
-index 614ba79a9774..9b12d73e67dc 100644
---- a/arch/arm/boot/dts/r7s72100.dtsi
-+++ b/arch/arm/boot/dts/r7s72100.dtsi
-@@ -371,6 +371,13 @@
- 			<0xe8202000 0x1000>;
- 	};
+diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
+index 6d10450de6d7..20cf191e0852 100644
+--- a/arch/arm/boot/dts/r8a7790.dtsi
++++ b/arch/arm/boot/dts/r8a7790.dtsi
+@@ -129,17 +129,15 @@
+ 			next-level-cache = <&L2_CA7>;
+ 		};
  
-+	wdt: watchdog at fcfe0000 {
-+		compatible = "renesas,r7s72100-wdt", "renesas,rza-wdt";
-+		reg = <0xfcfe0000 0x6>;
-+		interrupts = <GIC_SPI 106 IRQ_TYPE_EDGE_RISING>;
-+		clocks = <&p0_clk>;
-+	};
-+
- 	i2c0: i2c at fcfee000 {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
+-		L2_CA15: cache-controller at 0 {
++		L2_CA15: cache-controller-0 {
+ 			compatible = "cache";
+-			reg = <0>;
+ 			power-domains = <&sysc R8A7790_PD_CA15_SCU>;
+ 			cache-unified;
+ 			cache-level = <2>;
+ 		};
+ 
+-		L2_CA7: cache-controller at 100 {
++		L2_CA7: cache-controller-1 {
+ 			compatible = "cache";
+-			reg = <0x100>;
+ 			power-domains = <&sysc R8A7790_PD_CA7_SCU>;
+ 			cache-unified;
+ 			cache-level = <2>;
 -- 
 2.7.0.rc3.207.g0ac5344
