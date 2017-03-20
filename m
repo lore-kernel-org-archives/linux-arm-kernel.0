@@ -1,73 +1,40 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 20 Mar 2017 09:05:25 +0000
-Subject: [PATCH 4/4] media: imx-media-capture: add frame sizes/interval
- enumeration
-In-Reply-To: <20170320085512.GA20923@frolo.macqel>
-References: <20170319103801.GQ21222@n2100.armlinux.org.uk>
- <E1cpYOa-0006Eu-CL@rmk-PC.armlinux.org.uk>
- <20170320085512.GA20923@frolo.macqel>
-Message-ID: <20170320090524.GC21222@n2100.armlinux.org.uk>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Mon, 20 Mar 2017 09:57:46 +0100
+Subject: [PATCH 07/31] ARM: dts: r8a7745: Remove unit-address and reg from
+ integrated cache
+In-Reply-To: <cover.1489999062.git.horms+renesas@verge.net.au>
+References: <cover.1489999062.git.horms+renesas@verge.net.au>
+Message-ID: <51c00a9f730dd27da23e9dec593c22c0f9f5a1b1.1489999062.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 20, 2017 at 09:55:12AM +0100, Philippe De Muyter wrote:
-> Hi Russel,
-> 
-> On Sun, Mar 19, 2017 at 10:49:08AM +0000, Russell King wrote:
-> > Add support for enumerating frame sizes and frame intervals from the
-> > first subdev via the V4L2 interfaces.
-> > 
-> > Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
-> > ---
-> >  drivers/staging/media/imx/imx-media-capture.c | 62 +++++++++++++++++++++++++++
-> >  1 file changed, 62 insertions(+)
-> > 
-> ...
-> > +static int capture_enum_frameintervals(struct file *file, void *fh,
-> > +				       struct v4l2_frmivalenum *fival)
-> > +{
-> > +	struct capture_priv *priv = video_drvdata(file);
-> > +	const struct imx_media_pixfmt *cc;
-> > +	struct v4l2_subdev_frame_interval_enum fie = {
-> > +		.index = fival->index,
-> > +		.pad = priv->src_sd_pad,
-> > +		.width = fival->width,
-> > +		.height = fival->height,
-> > +		.which = V4L2_SUBDEV_FORMAT_ACTIVE,
-> > +	};
-> > +	int ret;
-> > +
-> > +	cc = imx_media_find_format(fival->pixel_format, CS_SEL_ANY, true);
-> > +	if (!cc)
-> > +		return -EINVAL;
-> > +
-> > +	fie.code = cc->codes[0];
-> > +
-> > +	ret = v4l2_subdev_call(priv->src_sd, pad, enum_frame_interval, NULL, &fie);
-> > +	if (ret)
-> > +		return ret;
-> > +
-> > +	fival->type = V4L2_FRMIVAL_TYPE_DISCRETE;
-> > +	fival->discrete = fie.interval;
-> 
-> For some parallel sensors (mine is a E2V ev76c560) "any" frame interval is possible,
-> and hence type should be V4L2_FRMIVAL_TYPE_CONTINUOUS.
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-For my sensor, any frame interval is also possible, but that isn't the
-point here.
+The Cortex-A7 cache controller is an integrated controller, and thus the
+device node representing it should not have a unit-addresses or reg
+property.
 
-/dev/video* only talks to the CSI source pad, not it's sink pad.  The
-sink pad gets configured with the sensor frame rate via the media
-controller API.  /dev/video* itself has no control over the sensor
-frame rate.
+Fixes: c95360247bdd67d3 ("ARM: dts: r8a7745: initial SoC device tree")
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/boot/dts/r8a7745.dtsi | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-The media controller stuff completely changes the way the established
-/dev/video* functionality works - the ability to select arbitary frame
-sizes and frame rates supported by the ultimate sensor is gone.  All
-that needs to be setup through the media controller pipeline, one
-subdev at a time.
-
+diff --git a/arch/arm/boot/dts/r8a7745.dtsi b/arch/arm/boot/dts/r8a7745.dtsi
+index 25175a74b6b7..bca88715fada 100644
+--- a/arch/arm/boot/dts/r8a7745.dtsi
++++ b/arch/arm/boot/dts/r8a7745.dtsi
+@@ -32,9 +32,8 @@
+ 			next-level-cache = <&L2_CA7>;
+ 		};
+ 
+-		L2_CA7: cache-controller at 0 {
++		L2_CA7: cache-controller-0 {
+ 			compatible = "cache";
+-			reg = <0>;
+ 			cache-unified;
+ 			cache-level = <2>;
+ 			power-domains = <&sysc R8A7745_PD_CA7_SCU>;
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+2.7.0.rc3.207.g0ac5344
