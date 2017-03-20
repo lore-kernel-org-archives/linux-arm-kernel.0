@@ -1,51 +1,50 @@
-From: richard.genoud@gmail.com (Richard Genoud)
-Date: Mon, 20 Mar 2017 11:33:30 +0100
-Subject: [RFC PATCH] tty/serial: atmel: fix TX path in
- atmel_console_write()
-In-Reply-To: <20170315152948.10978-1-nicolas.ferre@microchip.com>
-References: <CACQ1gAgW4aGJSxSAXDWL7td9eV12UV=Xv=PZR58BqqHxEeRH0g@mail.gmail.com>
- <20170315152948.10978-1-nicolas.ferre@microchip.com>
-Message-ID: <05f5c67b-67d8-02b4-e170-52f2484d0927@gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 20 Mar 2017 11:38:52 +0100
+Subject: [PATCH 4/4] tty/serial: sh-sci: remove uneeded IS_ERR_OR_NULL
+ calls
+In-Reply-To: <20170320103113.tpveoq2onzrwmkdt@pengutronix.de>
+References: <20170304174819.esxhwwbsxzuq3vyc@pengutronix.de>
+ <CAMuHMdX8BEnaTtNFAbcvfHwJH=oPUmQ2NB+jfouGyhQpJ_m_4A@mail.gmail.com>
+ <20170306085842.yijkfpqi3adcedmm@pengutronix.de>
+ <CAMuHMdV2_vbocY4wCzvYtPAaF+QEX_Y4g6qVu5EqEBf5AnFdaw@mail.gmail.com>
+ <20170306093043.ay4dz3ehp3aakwxh@pengutronix.de>
+ <CAMuHMdWQuvANNU14A7NQuzv6AFp04bq4DG_oc7w9h4wUrG+4aQ@mail.gmail.com>
+ <20170306100220.droey65uq2ew3mzu@pengutronix.de>
+ <CACRpkdYeFyr4yjQjDAUpPJwuD_NW2y=wXnzt1xSNoOX0SFCLmw@mail.gmail.com>
+ <CAMuHMdWv-xs12UqutEtXJGR8qqgx6DeDhkKvvYhhyW+XTVsUNQ@mail.gmail.com>
+ <CAMuHMdXGn35bEsJKnUi5o3AytL4AJN2fBfoB79v5W-jOVFQx6g@mail.gmail.com>
+ <20170320103113.tpveoq2onzrwmkdt@pengutronix.de>
+Message-ID: <CAMuHMdWbwA+3UGVnHYJOs26vTj13Yn+s4B8tE9kyy25JcjyZGg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/03/2017 16:29, Nicolas Ferre wrote:
-> A side effect of 89d8232411a8 ("tty/serial: atmel_serial: BUG: stop DMA
-> from transmitting in stop_tx") is that the console can be called with
-> TX path disabled. Then the system would hang trying to push charecters
-> out in atmel_console_putchar().
-> 
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@microchip.com>
-> Fixes: 89d8232411a8 ("tty/serial: atmel_serial: BUG: stop DMA from transmitting
-> in stop_tx")
-> Cc: stable <stable@vger.kernel.org> # 4.4+
-> ---
-> Hi Richard,
-> 
-> I found this to fix the problem with system hang in my linux-4.4-at91 branch
-> (in the atmel_console_putchar() waiting loop actually). I'm open to more
-> insignt.
-> As we cannot figure out if this bit is set or not, I didn't preserve the
-> current status...
-> 
-> Regards,
-> 
->  drivers/tty/serial/atmel_serial.c | 3 +++
->  1 file changed, 3 insertions(+)
-> 
-> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-> index dcebb28ffbc4..7372dbdb7a4c 100644
-> --- a/drivers/tty/serial/atmel_serial.c
-> +++ b/drivers/tty/serial/atmel_serial.c
-> @@ -2483,6 +2483,9 @@ static void atmel_console_write(struct console *co, const char *s, u_int count)
->  	pdc_tx = atmel_uart_readl(port, ATMEL_PDC_PTSR) & ATMEL_PDC_TXTEN;
->  	atmel_uart_writel(port, ATMEL_PDC_PTCR, ATMEL_PDC_TXTDIS);
->  
-> +	/* Make sure that tx path is actually able to send characters */
-> +	atmel_uart_writel(port, ATMEL_US_CR, ATMEL_US_TXEN);
-> +
->  	uart_console_write(port, s, count, atmel_console_putchar);
->  
->  	/*
-> 
-Acked-by: Richard Genoud <richard.genoud@gmail.com>
+Hi Uwe,
+
+On Mon, Mar 20, 2017 at 11:31 AM, Uwe Kleine-K?nig
+<u.kleine-koenig@pengutronix.de> wrote:
+> On Mon, Mar 20, 2017 at 10:56:14AM +0100, Geert Uytterhoeven wrote:
+>> Documentation/gpio/consumer.txt rightfully sates:
+>> | Note that gpio_get*_optional() functions (and their managed variants), unlike
+>> | the rest of gpiolib API, also return NULL when gpiolib support is disabled.
+>> | This is helpful to driver authors, since they do not need to special case
+>> | -ENOSYS return codes.  System integrators should however be careful to enable
+>> | gpiolib on systems that need it.
+>
+> I cannot find this paragraph in Documentation/gpio/consumer.txt:
+>
+>         $ git grep -e 'ENOSYS' v4.11-rc3 -- Documentation/gpio/
+>         <void>
+
+It was added by commit 22c403676dbbb7c6 ("gpio: return NULL from
+gpiod_get_optional when GPIOLIB is disabled")
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
