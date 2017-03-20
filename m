@@ -1,73 +1,46 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 20 Mar 2017 15:14:34 +0100
-Subject: [PATCH 3/5] soc/tegra: Move Tegra flowctrl driver
-In-Reply-To: <1489584715-23138-4-git-send-email-jonathanh@nvidia.com>
-References: <1489584715-23138-1-git-send-email-jonathanh@nvidia.com>
- <1489584715-23138-4-git-send-email-jonathanh@nvidia.com>
-Message-ID: <20170320141434.GC28203@ulmo.ba.sec>
+From: slash.tmp@free.fr (Mason)
+Date: Mon, 20 Mar 2017 15:14:38 +0100
+Subject: [RFC PATCH v0.001] PCI: Add support for tango PCIe controller
+In-Reply-To: <ab110ce2-8678-9b34-6bd1-6cfaaa7fea04@free.fr>
+References: <ab110ce2-8678-9b34-6bd1-6cfaaa7fea04@free.fr>
+Message-ID: <09f95471-a7c1-033f-0037-ae004623cf82@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 15, 2017 at 01:31:53PM +0000, Jon Hunter wrote:
-[...]
-> +static int __init tegra_flowctrl_init(void)
-> +{
-> +	/* hardcoded fallback if device tree node is missing */
-> +	unsigned long base = 0x60007000;
-> +	unsigned long size = SZ_4K;
-> +	struct device_node *np;
-> +
-> +	if (!soc_is_tegra())
-> +		return 0;
-> +
-> +	np = of_find_matching_node(NULL, matches);
-> +	if (np) {
-> +		struct resource res;
-> +
-> +		if (of_address_to_resource(np, 0, &res) == 0) {
-> +			size = resource_size(&res);
-> +			base = res.start;
-> +		}
-> +
-> +		of_node_put(np);
-> +	}
-> +
-> +	tegra_flowctrl_base = ioremap_nocache(base, size);
-> +
-> +	if (!tegra_flowctrl_base)
-> +		return -ENXIO;
-> +
-> +	return 0;
-> +}
-> +early_initcall(tegra_flowctrl_init);
+On 17/03/2017 17:11, Mason wrote:
 
-Do we want to implement a hand-off to a proper driver at some point,
-similar to what we have for PMC?
-
-> diff --git a/include/soc/tegra/flowctrl.h b/include/soc/tegra/flowctrl.h
-[...]
-> +#ifndef __ASSEMBLY__
-> +u32 flowctrl_read_cpu_csr(unsigned int cpuid);
-> +void flowctrl_write_cpu_csr(unsigned int cpuid, u32 value);
-> +void flowctrl_write_cpu_halt(unsigned int cpuid, u32 value);
+> diff --git a/drivers/pci/host/pcie-tango.c b/drivers/pci/host/pcie-tango.c
+> new file mode 100644
+> index 000000000000..9d7fed75fd1d
+> --- /dev/null
+> +++ b/drivers/pci/host/pcie-tango.c
+> @@ -0,0 +1,125 @@
+> +#include <linux/pci-ecam.h>
 > +
-> +void flowctrl_cpu_suspend_enter(unsigned int cpuid);
-> +void flowctrl_cpu_suspend_exit(unsigned int cpuid);
-> +#endif
+> +#define VENDOR_SIGMA	0x1105
+> +
+> +/*
+> + * How do I reach dev->driver_data in the config accessors?
+> + */
+> +static void __iomem *mux;
 
-Perhaps we want the same type of dummy functions scheme here for
-!SOC_TEGRA_FLOWCTRL that Arnd proposed for !SOC_TEGRA_PMC?
+	struct pci_config_window *cfg = bus->sysdata;
+	dev_get_drvdata(cfg->parent);
 
 
-> +
-> +#endif
-> -- 
-> 2.7.4
-> 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170320/dc5df8d7/attachment.sig>
+/*
+ * struct to hold the mappings of a config space window. This
+ * is expected to be used as sysdata for PCI controllers that
+ * use ECAM.
+ */
+struct pci_config_window {
+	struct resource			res;
+	struct resource			busr;
+	void				*priv;
+	struct pci_ecam_ops		*ops;
+	union {
+		void __iomem		*win;	/* 64-bit single mapping */
+		void __iomem		**winp; /* 32-bit per-bus mapping */
+	};
+	struct device			*parent;/* ECAM res was from this dev */
+};
