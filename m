@@ -1,133 +1,33 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 20 Mar 2017 16:52:50 -0500
-Subject: [PATCH 1/2] dt-bindings: Document the STM32 MDMA bindings
-In-Reply-To: <1489417599-31308-2-git-send-email-cedric.madianga@gmail.com>
-References: <1489417599-31308-1-git-send-email-cedric.madianga@gmail.com>
- <1489417599-31308-2-git-send-email-cedric.madianga@gmail.com>
-Message-ID: <20170320215250.wwhq6lzwe45jmwks@rob-hp-laptop>
+From: jon.mason@broadcom.com (Jon Mason)
+Date: Mon, 20 Mar 2017 18:12:14 -0400
+Subject: [PATCH] clk: ns2: Correct SDIO bits
+Message-ID: <1490047934-3061-1-git-send-email-jon.mason@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 13, 2017 at 04:06:38PM +0100, M'boumba Cedric Madianga wrote:
-> This patch adds documentation of device tree bindings for the STM32 MDMA
-> controller.
-> 
-> Signed-off-by: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
-> Reviewed-by: Ludovic BARRE <ludovic.barre@st.com>
-> ---
->  .../devicetree/bindings/dma/stm32-mdma.txt         | 94 ++++++++++++++++++++++
->  1 file changed, 94 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/dma/stm32-mdma.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/dma/stm32-mdma.txt b/Documentation/devicetree/bindings/dma/stm32-mdma.txt
-> new file mode 100644
-> index 0000000..26a930c
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/dma/stm32-mdma.txt
-> @@ -0,0 +1,94 @@
-> +* STMicroelectronics STM32 MDMA controller
-> +
-> +The STM32 MDMA is a general-purpose direct memory access controller capable of
-> +supporting 64 independent DMA channels with 256 HW requests.
-> +
-> +Required properties:
-> +- compatible: Should be "st,stm32-mdma"
+From: Bharat Kumar Reddy Gooty <bharat.gooty@broadcom.com>
 
-Should be more specific.
+Corrected the bits for power and iso.
 
-> +- reg: Should contain MDMA registers location and length. This should include
-> +  all of the per-channel registers.
-> +- interrupts: Should contain the MDMA interrupt.
-> +- clocks: Should contain the input clock of the DMA instance.
-> +- resets: Reference to a reset controller asserting the DMA controller.
-> +- #dma-cells : Must be <5>. See DMA client paragraph for more details.
-> +
-> +Optional properties:
-> +- dma-channels: Number of DMA channels supported by the controller.
-> +- dma-requests: Number of DMA request signals supported by the controller.
-> +- st,ahb-addr-masks: Array of u32 mask to list memory devices addressed via
-> +  AHB bus.
+Signed-off-by: Bharat Kumar Reddy Gooty <bharat.gooty@broadcom.com>
+Signed-off-by: Jon Mason <jon.mason@broadcom.com>
+Fixes: f7225a83 ("clk: ns2: add clock support for Broadcom Northstar 2 SoC")
+---
+ drivers/clk/bcm/clk-ns2.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-I don't understand what this is.
-
-> +
-> +Example:
-
-Put the 2 examples together.
-
-> +
-> +	mdma1: dma at 52000000 {
-> +		compatible = "st,stm32-mdma";
-> +		reg = <0x52000000 0x1000>;
-> +		interrupts = <122>;
-> +		clocks = <&clk_dummy>;
-> +		resets = <&rcc 992>;
-> +		#dma-cells = <5>;
-> +		dma-channels = <16>;
-> +		dma-requests = <32>;
-> +		st,ahb-addr-masks = <0x20000000>, <0x00000000>;
-> +	};
-> +
-> +* DMA client
-> +
-> +DMA clients connected to the STM32 MDMA controller must use the format
-> +described in the dma.txt file, using a six-cell specifier for each channel:
-> +a phandle to the MDMA controller plus the following five integer cells:
-> +
-> +1. The request line number
-> +2. The priority level
-> +	0x00: Low
-> +	0x01: Medium
-> +	0x10: High
-> +	0x11: Very high
-> +3. A 32bit mask specifying the DMA channel configuration
-> + -bit 0-1: Source increment mode
-> +	0x00: Source address pointer is fixed
-> +	0x10: Source address pointer is incremented after each data transfer
-> +	0x11: Source address pointer is decremented after each data transfer
-> + -bit 2-3: Destination increment mode
-> +	0x00: Destination address pointer is fixed
-> +	0x10: Destination address pointer is incremented after each data
-> +	transfer
-> +	0x11: Destination address pointer is decremented after each data
-> +	transfer
-> + -bit 8-9: Source increment offset size
-> +	0x00: byte (8bit)
-> +	0x01: half-word (16bit)
-> +	0x10: word (32bit)
-> +	0x11: double-word (64bit)
-> + -bit 10-11: Destination increment offset size
-> +	0x00: byte (8bit)
-> +	0x01: half-word (16bit)
-> +	0x10: word (32bit)
-> +	0x11: double-word (64bit)
-> +-bit 25-18: The number of bytes to be transferred in a single transfer
-> +	(min = 1 byte, max = 128 bytes)
-> +-bit 29:28: Trigger Mode
-> +	0x00: Each MDMA request triggers a buffer transfer (max 128 bytes)
-> +	0x01: Each MDMA request triggers a block transfer (max 64K bytes)
-> +	0x10: Each MDMA request triggers a repeated block transfer
-> +	0x11: Each MDMA request triggers a linked list transfer
-> +4. A 32bit value specifying the register to be used to acknowledge the request
-> +   if no HW ack signal is used by the MDMA client
-> +5. A 32bit mask specifying the value to be written to acknowledge the request
-> +   if no HW ack signal is used by the MDMA client
-> +
-> +Example:
-> +
-> +	i2c4: i2c at 5c002000 {
-> +		compatible = "st,stm32f7-i2c";
-> +		reg = <0x5c002000 0x400>;
-> +		interrupts = <GIC_SPI 95 IRQ_TYPE_NONE>,
-> +			     <GIC_SPI 96 IRQ_TYPE_NONE>;
-> +		clocks = <&clk_hsi>;
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		dmas = <&mdma1 36 0x0 0x40008 0x0 0x0>,
-> +		       <&mdma1 37 0x0 0x40002 0x0 0x0>;
-> +		dma-names = "rx", "tx";
-> +		status = "disabled";
-> +	};
-> -- 
-> 1.9.1
-> 
+diff --git a/drivers/clk/bcm/clk-ns2.c b/drivers/clk/bcm/clk-ns2.c
+index a564e92..adc1414 100644
+--- a/drivers/clk/bcm/clk-ns2.c
++++ b/drivers/clk/bcm/clk-ns2.c
+@@ -103,7 +103,7 @@ CLK_OF_DECLARE(ns2_genpll_src_clk, "brcm,ns2-genpll-scr",
+ 
+ static const struct iproc_pll_ctrl genpll_sw = {
+ 	.flags = IPROC_CLK_AON | IPROC_CLK_PLL_SPLIT_STAT_CTRL,
+-	.aon = AON_VAL(0x0, 2, 9, 8),
++	.aon = AON_VAL(0x0, 1, 11, 10),
+ 	.reset = RESET_VAL(0x4, 2, 1),
+ 	.dig_filter = DF_VAL(0x0, 9, 3, 5, 4, 2, 3),
+ 	.ndiv_int = REG_VAL(0x8, 4, 10),
+-- 
+2.7.4
