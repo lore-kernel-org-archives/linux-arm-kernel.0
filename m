@@ -1,150 +1,107 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 20 Mar 2017 17:48:24 +0000
-Subject: [PATCH v2 13/18] arm64: arch_timer: Allows a CPU-specific erratum to
- only affect a subset of CPUs
+Date: Mon, 20 Mar 2017 17:48:26 +0000
+Subject: [PATCH v2 15/18] arm64: arch_timer: Enable CNTVCT_EL0 trap if
+ workaround is enabled
 In-Reply-To: <20170320174829.28182-1-marc.zyngier@arm.com>
 References: <20170320174829.28182-1-marc.zyngier@arm.com>
-Message-ID: <20170320174829.28182-14-marc.zyngier@arm.com>
+Message-ID: <20170320174829.28182-16-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of applying a CPU-specific workaround to all CPUs in the system,
-allow it to only affect a subset of them (typical big-little case).
-
-This is done by turning the erratum pointer into a per-CPU variable.
+Userspace being allowed to use read CNTVCT_EL0 anytime (and not
+only in the VDSO), we need to enable trapping whenever a cntvct
+workaround is enabled on a given CPU.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/arch_timer.h  | 31 ++++++++++++++++----------
  drivers/clocksource/arm_arch_timer.c | 42 +++++++++++++++++++++++++-----------
- 2 files changed, 50 insertions(+), 23 deletions(-)
+ 1 file changed, 30 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
-index d46cf21e8b80..3cba3a5e4ba1 100644
---- a/arch/arm64/include/asm/arch_timer.h
-+++ b/arch/arm64/include/asm/arch_timer.h
-@@ -25,6 +25,7 @@
- #include <linux/bug.h>
- #include <linux/init.h>
- #include <linux/jump_label.h>
-+#include <linux/smp.h>
- #include <linux/types.h>
- 
- #include <clocksource/arm_arch_timer.h>
-@@ -56,17 +57,25 @@ struct arch_timer_erratum_workaround {
- 	int (*set_next_event_virt)(unsigned long, struct clock_event_device *);
- };
- 
--extern const struct arch_timer_erratum_workaround *timer_unstable_counter_workaround;
--
--#define arch_timer_reg_read_stable(reg) 		\
--({							\
--	u64 _val;					\
--	if (needs_unstable_timer_counter_workaround() &&		\
--	    timer_unstable_counter_workaround->read_##reg)		\
--		_val = timer_unstable_counter_workaround->read_##reg();	\
--	else						\
--		_val = read_sysreg(reg);		\
--	_val;						\
-+DECLARE_PER_CPU(const struct arch_timer_erratum_workaround *,
-+		timer_unstable_counter_workaround);
-+
-+#define arch_timer_reg_read_stable(reg)					\
-+({									\
-+	u64 _val;							\
-+	if (needs_unstable_timer_counter_workaround()) {		\
-+		const struct arch_timer_erratum_workaround *wa;		\
-+		preempt_disable();					\
-+		wa = __this_cpu_read(timer_unstable_counter_workaround); \
-+		if (wa && wa->read_##reg)				\
-+			_val = wa->read_##reg();			\
-+		else							\
-+			_val = read_sysreg(reg);			\
-+		preempt_enable();					\
-+	} else {							\
-+		_val = read_sysreg(reg);				\
-+	}								\
-+	_val;								\
- })
- 
- /*
 diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index b9f01daafdfa..2b17b99922a1 100644
+index 70eb42bd6784..eccff0fedf2c 100644
 --- a/drivers/clocksource/arm_arch_timer.c
 +++ b/drivers/clocksource/arm_arch_timer.c
-@@ -235,7 +235,8 @@ static u64 notrace hisi_161010101_read_cntvct_el0(void)
- #endif
+@@ -83,6 +83,7 @@ static enum ppi_nr arch_timer_uses_ppi = VIRT_PPI;
+ static bool arch_timer_c3stop;
+ static bool arch_timer_mem_use_virtual;
+ static bool arch_counter_suspend_stop;
++static bool vdso_default = true;
  
- #ifdef CONFIG_ARM_ARCH_TIMER_OOL_WORKAROUND
--const struct arch_timer_erratum_workaround *timer_unstable_counter_workaround = NULL;
-+DEFINE_PER_CPU(const struct arch_timer_erratum_workaround *,
-+	       timer_unstable_counter_workaround);
- EXPORT_SYMBOL_GPL(timer_unstable_counter_workaround);
+ static bool evtstrm_enable = IS_ENABLED(CONFIG_ARM_ARCH_TIMER_EVTSTREAM);
  
- DEFINE_STATIC_KEY_FALSE(arch_timer_read_ool_enabled);
-@@ -345,9 +346,18 @@ arch_timer_iterate_errata(enum arch_timer_erratum_match_type type,
- }
- 
- static
--void arch_timer_enable_workaround(const struct arch_timer_erratum_workaround *wa)
-+void arch_timer_enable_workaround(const struct arch_timer_erratum_workaround *wa,
-+				  bool local)
- {
--	timer_unstable_counter_workaround = wa;
-+	int i;
-+
-+	if (local) {
-+		__this_cpu_write(timer_unstable_counter_workaround, wa);
-+	} else {
-+		for_each_possible_cpu(i)
-+			per_cpu(timer_unstable_counter_workaround, i) = wa;
-+	}
-+
- 	static_branch_enable(&arch_timer_read_ool_enabled);
- }
- 
-@@ -376,14 +386,17 @@ static void arch_timer_check_ool_workaround(enum arch_timer_erratum_match_type t
- 		return;
- 
- 	if (static_branch_unlikely(&arch_timer_read_ool_enabled)) {
--		if (wa != timer_unstable_counter_workaround)
-+		const struct arch_timer_erratum_workaround *__wa;
-+		__wa = __this_cpu_read(timer_unstable_counter_workaround);
-+		if (__wa && wa != __wa)
- 			pr_warn("Can't enable workaround for %s (clashes with %s\n)",
--				wa->desc,
--				timer_unstable_counter_workaround->desc);
--		return;
-+				wa->desc, __wa->desc);
-+
-+		if (__wa)
-+			return;
+@@ -390,6 +391,17 @@ void arch_timer_enable_workaround(const struct arch_timer_erratum_workaround *wa
  	}
  
--	arch_timer_enable_workaround(wa);
-+	arch_timer_enable_workaround(wa, local);
- 	pr_info("Enabling %s workaround for %s\n",
- 		local ? "local" : "global", wa->desc);
+ 	static_branch_enable(&arch_timer_read_ool_enabled);
++
++	/*
++	 * Don't use the vdso fastpath if errata require using the
++	 * out-of-line counter accessor. We may change our mind pretty
++	 * late in the game (with a per-CPU erratum, for example), so
++	 * change both the default value and the vdso itself.
++	 */
++	if (wa->read_cntvct_el0) {
++		clocksource_counter.archdata.vdso_direct = false;
++		vdso_default = false;
++	}
  }
-@@ -391,10 +404,15 @@ static void arch_timer_check_ool_workaround(enum arch_timer_erratum_match_type t
- #define erratum_handler(fn, r, ...)					\
- ({									\
- 	bool __val;							\
--	if (needs_unstable_timer_counter_workaround() &&		\
--	    timer_unstable_counter_workaround->fn) {			\
--		r = timer_unstable_counter_workaround->fn(__VA_ARGS__);	\
--		__val = true;						\
-+	if (needs_unstable_timer_counter_workaround()) {		\
-+		const struct arch_timer_erratum_workaround *__wa;	\
-+		__wa = __this_cpu_read(timer_unstable_counter_workaround); \
-+		if (__wa && __wa->fn) {					\
-+			r = __wa->fn(__VA_ARGS__);			\
-+			__val = true;					\
-+		} else {						\
-+			__val = false;					\
-+		}							\
- 	} else {							\
- 		__val = false;						\
- 	}								\
+ 
+ static void arch_timer_check_ool_workaround(enum arch_timer_erratum_match_type type,
+@@ -450,11 +462,19 @@ static void arch_timer_check_ool_workaround(enum arch_timer_erratum_match_type t
+ 	__val;								\
+ })
+ 
++static bool arch_timer_this_cpu_has_cntvct_wa(void)
++{
++	const struct arch_timer_erratum_workaround *wa;
++
++	wa = __this_cpu_read(timer_unstable_counter_workaround);
++	return wa && wa->read_cntvct_el0;
++}
+ #else
+ #define arch_timer_check_ool_workaround(t,a)		do { } while(0)
+ #define erratum_set_next_event_tval_virt(...)		({BUG(); 0;})
+ #define erratum_set_next_event_tval_phys(...)		({BUG(); 0;})
+ #define erratum_handler(fn, r, ...)			({false;})
++#define arch_timer_this_cpu_has_cntvct_wa()		({false;})
+ #endif /* CONFIG_ARM_ARCH_TIMER_OOL_WORKAROUND */
+ 
+ static __always_inline irqreturn_t timer_handler(const int access,
+@@ -674,8 +694,15 @@ static void arch_counter_set_user_access(void)
+ 			| ARCH_TIMER_VIRT_EVT_EN
+ 			| ARCH_TIMER_USR_PCT_ACCESS_EN);
+ 
+-	/* Enable user access to the virtual counter */
+-	cntkctl |= ARCH_TIMER_USR_VCT_ACCESS_EN;
++	/*
++	 * Enable user access to the virtual counter if it doesn't
++	 * need to be workaround. The vdso may have been already
++	 * disabled though.
++	 */
++	if (arch_timer_this_cpu_has_cntvct_wa())
++		pr_info("CPU%d: Trapping CNTVCT access\n", smp_processor_id());
++	else
++		cntkctl |= ARCH_TIMER_USR_VCT_ACCESS_EN;
+ 
+ 	arch_timer_set_cntkctl(cntkctl);
+ }
+@@ -798,16 +825,7 @@ static void __init arch_counter_register(unsigned type)
+ 		else
+ 			arch_timer_read_counter = arch_counter_get_cntpct;
+ 
+-		clocksource_counter.archdata.vdso_direct = true;
+-
+-#ifdef CONFIG_ARM_ARCH_TIMER_OOL_WORKAROUND
+-		/*
+-		 * Don't use the vdso fastpath if errata require using
+-		 * the out-of-line counter accessor.
+-		 */
+-		if (static_branch_unlikely(&arch_timer_read_ool_enabled))
+-			clocksource_counter.archdata.vdso_direct = false;
+-#endif
++		clocksource_counter.archdata.vdso_direct = vdso_default;
+ 	} else {
+ 		arch_timer_read_counter = arch_counter_get_cntvct_mem;
+ 	}
 -- 
 2.11.0
