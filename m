@@ -1,42 +1,43 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 20 Mar 2017 09:57:36 +0100
-Subject: [PATCH 25/32] arm64: dts: r8a7796: Add Cortex-A57 PMU node
+Date: Mon, 20 Mar 2017 09:57:41 +0100
+Subject: [PATCH 30/32] arm64: dts: r8a7795: salvator-x: Drop superfluous
+ status updates for frequency overrides
 In-Reply-To: <cover.1489999913.git.horms+renesas@verge.net.au>
 References: <cover.1489999913.git.horms+renesas@verge.net.au>
-Message-ID: <9fccf4d6103eeb5db88c1ae026d61b87f722414a.1489999913.git.horms+renesas@verge.net.au>
+Message-ID: <971939d1da07c7b55d35aca31288cce297731c71.1489999913.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Enable the performance monitor unit for the Cortex-A57 cores on the
-R8A7796 SoC.
+The scif_clk and pcie_bus_clk device nodes are already enabled in
+r8a7795.dtsi, so there is no need to update their statuses again.
 
-Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a7796.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts | 2 --
+ 1 file changed, 2 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7796.dtsi b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-index d2a2110fc7fc..454e1292f910 100644
---- a/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-@@ -252,6 +252,14 @@
- 			reg = <0 0xe6060000 0 0x50c>;
- 		};
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
+index 277ab8484e0c..f25241921067 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
++++ b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
+@@ -362,7 +362,6 @@
  
-+		pmu_a57 {
-+			compatible = "arm,cortex-a57-pmu";
-+			interrupts = <GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-affinity = <&a57_0>,
-+					     <&a57_1>;
-+		};
-+
- 		cpg: clock-controller at e6150000 {
- 			compatible = "renesas,r8a7796-cpg-mssr";
- 			reg = <0 0xe6150000 0 0x1000>;
+ &scif_clk {
+ 	clock-frequency = <14745600>;
+-	status = "okay";
+ };
+ 
+ &i2c2 {
+@@ -574,7 +573,6 @@
+ 
+ &pcie_bus_clk {
+ 	clock-frequency = <100000000>;
+-	status = "okay";
+ };
+ 
+ &pciec0 {
 -- 
 2.7.0.rc3.207.g0ac5344
