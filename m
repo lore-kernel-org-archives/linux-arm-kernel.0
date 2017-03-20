@@ -1,44 +1,35 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 20 Mar 2017 17:48:15 +0000
-Subject: [PATCH v2 04/18] arm64: cpu_errata: Allow an erratum to be match for
- all revisions of a core
+Date: Mon, 20 Mar 2017 17:48:23 +0000
+Subject: [PATCH v2 12/18] arm64: arch_timer: Make workaround methods optional
 In-Reply-To: <20170320174829.28182-1-marc.zyngier@arm.com>
 References: <20170320174829.28182-1-marc.zyngier@arm.com>
-Message-ID: <20170320174829.28182-5-marc.zyngier@arm.com>
+Message-ID: <20170320174829.28182-13-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some minor erratum may not be fixed in further revisions of a core,
-leading to a situation where the workaround needs to be updated each
-time an updated core is released.
+Not all errata need to workaround all access types. Allow them to
+be optional.
 
-Introduce a MIDR_ALL_VERSIONS match helper that will work for all
-versions of that MIDR, once and for all.
-
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/kernel/cpu_errata.c | 7 +++++++
- 1 file changed, 7 insertions(+)
+ arch/arm64/include/asm/arch_timer.h | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-index f6cc67e7626e..2be1d1c05303 100644
---- a/arch/arm64/kernel/cpu_errata.c
-+++ b/arch/arm64/kernel/cpu_errata.c
-@@ -53,6 +53,13 @@ static int cpu_enable_trap_ctr_access(void *__unused)
- 	.midr_range_min = min, \
- 	.midr_range_max = max
- 
-+#define MIDR_ALL_VERSIONS(model) \
-+	.def_scope = SCOPE_LOCAL_CPU, \
-+	.matches = is_affected_midr_range, \
-+	.midr_model = model, \
-+	.midr_range_min = 0, \
-+	.midr_range_max = (MIDR_VARIANT_MASK | MIDR_REVISION_MASK)
-+
- const struct arm64_cpu_capabilities arm64_errata[] = {
- #if	defined(CONFIG_ARM64_ERRATUM_826319) || \
- 	defined(CONFIG_ARM64_ERRATUM_827319) || \
+diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
+index 58572d38e9db..d46cf21e8b80 100644
+--- a/arch/arm64/include/asm/arch_timer.h
++++ b/arch/arm64/include/asm/arch_timer.h
+@@ -61,8 +61,9 @@ extern const struct arch_timer_erratum_workaround *timer_unstable_counter_workar
+ #define arch_timer_reg_read_stable(reg) 		\
+ ({							\
+ 	u64 _val;					\
+-	if (needs_unstable_timer_counter_workaround())		\
+-		_val = timer_unstable_counter_workaround->read_##reg();\
++	if (needs_unstable_timer_counter_workaround() &&		\
++	    timer_unstable_counter_workaround->read_##reg)		\
++		_val = timer_unstable_counter_workaround->read_##reg();	\
+ 	else						\
+ 		_val = read_sysreg(reg);		\
+ 	_val;						\
 -- 
 2.11.0
