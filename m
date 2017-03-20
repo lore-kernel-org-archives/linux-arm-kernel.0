@@ -1,90 +1,63 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 20 Mar 2017 18:45:27 +0000
-Subject: [PATCH 03/20] asm-generic/io.h: add PCI config space remap
- interface
-In-Reply-To: <20170316211243.GE9739@bhelgaas-glaptop.roam.corp.google.com>
-References: <20170227151436.18698-1-lorenzo.pieralisi@arm.com>
- <20170227151436.18698-4-lorenzo.pieralisi@arm.com>
- <20170316211243.GE9739@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <20170320184527.GA8332@red-moon>
+From: Scott.Lurndal@cavium.com (Lurndal, Scott)
+Date: Mon, 20 Mar 2017 11:50:02 -0700
+Subject: [Linaro-acpi] [PATCH v21 13/13] acpi/arm64: Add SBSA Generic
+ Watchdog support in GTDT driver
+In-Reply-To: <20170320180949.GM31213@leverpostej>
+References: <20170206185015.12296-1-fu.wei@linaro.org>
+ <20170206185015.12296-14-fu.wei@linaro.org>
+ <20170317200153.GF15909@leverpostej>
+ <CADyBb7uZV2Qe0ga4TTS_iis5MtwJ=u6PKYSV6ED103Cmh5_O3g@mail.gmail.com>
+ <20170320180949.GM31213@leverpostej>
+Message-ID: <20170320185002.GT31496@slurndal-lnx1.caveonetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 16, 2017 at 04:12:43PM -0500, Bjorn Helgaas wrote:
-> [+cc Luis]
+On Mon, Mar 20, 2017 at 06:09:50PM +0000, Mark Rutland wrote:
+> On Tue, Mar 21, 2017 at 01:57:58AM +0800, Fu Wei wrote:
+> > On 18 March 2017 at 04:01, Mark Rutland <mark.rutland@arm.com> wrote:
+> > > On Tue, Feb 07, 2017 at 02:50:15AM +0800, fu.wei at linaro.org wrote:
 > 
-> On Mon, Feb 27, 2017 at 03:14:14PM +0000, Lorenzo Pieralisi wrote:
-> > The PCI specifications (Rev 3.0, 3.2.5 "Transaction Ordering and
-> > Posting") mandate non-posted configuration transactions. As further
-> > highlighted in the PCIe specifications (4.0 - Rev0.3, "Ordering
-> > Considerations for the Enhanced Configuration Access Mechanism"),
-> > through ECAM and ECAM-derivative configuration mechanism, the memory
-> > mapped transactions from the host CPU into Configuration Requests on the
-> > PCI express fabric may create ordering problems for software because
-> > writes to memory address are typically posted transactions (unless the
-> > architecture can enforce through virtual address mapping non-posted
-> > write transactions behaviour) but writes to Configuration Space are not
-> > posted on the PCI express fabric.
+> > > I've not been able to find where the ACPI spec says that zero is not a
+> > > valid GSIV. This may simply be an oversight/ambiguity in the spec.
+> > >
+> > > Is there any statement to that effect?
 > > 
-> > Current DT and ACPI host bridge controllers map PCI configuration space
-> > (ECAM and ECAM-derivative) into the virtual address space through
-> > ioremap() calls, that are non-cacheable device accesses on most
-> > architectures, but may provide "bufferable" or "posted" write semantics
-> > in architecture like eg ARM/ARM64 that allow ioremap'ed regions writes
-> > to be buffered in the bus connecting the host CPU to the PCI fabric;
-> > this behaviour, as underlined in the PCIe specifications, may trigger
-> > transactions ordering rules and must be prevented.
-> > 
-> > Introduce a new generic and explicit API to create a memory
-> > mapping for ECAM and ECAM-derivative config space area that
-> > defaults to ioremap_nocache() (which should provide a sane default
-> > behaviour) but still allowing architectures on which ioremap_nocache()
-> > results in posted write transactions to override the function
-> > call with an arch specific implementation that complies with
-> > the PCI specifications for configuration transactions.
-> > 
-> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > Cc: Arnd Bergmann <arnd@arndb.de>
-> > Cc: Will Deacon <will.deacon@arm.com>
-> > Cc: Bjorn Helgaas <bhelgaas@google.com>
-> > Cc: Russell King <linux@armlinux.org.uk>
-> > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> > ---
-> >  include/asm-generic/io.h | 9 +++++++++
-> >  1 file changed, 9 insertions(+)
-> > 
-> > diff --git a/include/asm-generic/io.h b/include/asm-generic/io.h
-> > index 7ef015e..52dda81 100644
-> > --- a/include/asm-generic/io.h
-> > +++ b/include/asm-generic/io.h
-> > @@ -915,6 +915,15 @@ extern void ioport_unmap(void __iomem *p);
-> >  #endif /* CONFIG_GENERIC_IOMAP */
-> >  #endif /* CONFIG_HAS_IOPORT_MAP */
-> >  
-> > +#ifndef pci_remap_cfgspace
-> > +#define pci_remap_cfgspace pci_remap_cfgspace
-> > +static inline void __iomem *pci_remap_cfgspace(phys_addr_t offset,
-> > +					       size_t size)
-> > +{
-> > +	return ioremap_nocache(offset, size);
-> > +}
+> > you are right, zero is a  valid GSIV, I will delete this check. Thanks
 > 
-> I'm fine with this conceptually, but I think it would make more sense
-> if the name weren't specific to PCI or config space, e.g.,
-> ioremap_nopost() or something.
+> That being the case, how does one describe a watchdog that does not have
+> an interrupt?
+> 
+> As I mentioned, I think this is an oversight/ambiguity in the spec tat
+> we should address.
+> 
+> > > My reading of SBSA is that there is one watchdog in the system.
+> > >
+> > > Is that not the case?
+> > 
+> > do you mean:
+> > ---------------
+> > 4.2.4 Watchdogs
+> > The base server system implements a Generic Watchdog as specified in
+> > APPENDIX A: Generic Watchdog.
+> > ---------------
+> > 
+> > I am not sure about that if this is saying "we only have one SBSA
+> > watchdog in a system"
+> > 
+> > would you let me know where mention it? Do I miss something?
+> 
+> My reading was that the 'a' above meant a single element. i.e.
+> 
+> 	The base server system implements _a_ Generic Watchdog as
+> 	specified in APPENDIX A: Generic Watchdog.
 
-I agree with you since there is not much PCI specific in the ioremap
-implementation we are introducing (and it may be used more by other
-subsystems too), I suspect it is all about finding a reasonable
-ioremap_ naming extension (ioremap_nowb() ?).
+  It is a requirement of a conforming implementation that there
+be a generic watchdog (impl as per the appendix).   That doesn't preclude
+an implmentation from providing additional watchdogs (for example, if
+the processor implements EL3, it is likely that an implementation
+will include a secure watchdog as well as a non-secure watchdog).
 
-On the other hand having an explicit pci_remap_cfgspace() interface
-would simplify preventing drivers to sneak into the kernel with the
-wrong ioremap API for config space (even though when all existing
-ones are converted new drivers would just be based on existing ones
-so it should be fine).
+  The SBSA describes the minimal hardware requirements for a
+compliant server.
 
-Suggestions welcome.
-
-Thanks !
-Lorenzo
+scott
