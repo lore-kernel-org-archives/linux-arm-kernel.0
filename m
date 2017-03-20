@@ -1,57 +1,62 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 20 Mar 2017 19:49:03 +0800
-Subject: [PATCH v3 4/5] ASoC: sun8i-codec: Convert to use
- SND_SOC_DAPM_AIF_IN
-In-Reply-To: <20170318075509.3836-5-mylene.josserand@free-electrons.com>
-References: <20170318075509.3836-1-mylene.josserand@free-electrons.com>
- <20170318075509.3836-5-mylene.josserand@free-electrons.com>
-Message-ID: <CAGb2v6733y=UVXyhsSUK6whjWd_t_eXb1_aqnjyaj-_TFeGZqw@mail.gmail.com>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Mon, 20 Mar 2017 19:49:53 +0800
+Subject: [PATCH v4 1/7] coresight: bindings for CPU debug module
+In-Reply-To: <20170317161335.GB20435@linaro.org>
+References: <1489762943-25849-1-git-send-email-leo.yan@linaro.org>
+ <1489762943-25849-2-git-send-email-leo.yan@linaro.org>
+ <20170317161335.GB20435@linaro.org>
+Message-ID: <20170320114953.GA19581@leoy-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 18, 2017 at 3:55 PM, Myl?ne Josserand
-<mylene.josserand@free-electrons.com> wrote:
-> Update the driver to use SND_SOC_DAPM_AIF_IN instead of
-> SND_SOC_DAPM_DAC.
-> Rename the interface's widgets to be more precise on which slot
-> the interface is connected.
->
-> Signed-off-by: Myl?ne Josserand <mylene.josserand@free-electrons.com>
-> ---
->  sound/soc/sunxi/sun8i-codec.c | 20 +++++++++++---------
->  1 file changed, 11 insertions(+), 9 deletions(-)
->
-> diff --git a/sound/soc/sunxi/sun8i-codec.c b/sound/soc/sunxi/sun8i-codec.c
-> index adb13fbd2006..7527ba29a5a0 100644
-> --- a/sound/soc/sunxi/sun8i-codec.c
-> +++ b/sound/soc/sunxi/sun8i-codec.c
+Hi Mathieu,
+
+On Fri, Mar 17, 2017 at 10:13:35AM -0600, Mathieu Poirier wrote:
 
 [...]
 
-> @@ -331,14 +333,14 @@ static const struct snd_soc_dapm_route sun8i_codec_dapm_routes[] = {
->         { "DAC", NULL, "MODCLK DAC" },
->
->         /* DAC Routes */
-> -       { "Digital Left DAC", NULL, "DAC" },
-> -       { "Digital Right DAC", NULL, "DAC" },
-> +       { "AIF1 Slot 0 Right", NULL, "DAC" },
-> +       { "AIF1 Slot 0 Left", NULL, "DAC" },
+> > +- compatible : should be
+> > +	     * "arm,coresight-cpu-debug"; supplemented with "arm,primecell"
+> > +	       since this driver is using the AMBA bus interface.
+> 
+> This description needs to be refactored - see my comment from an earlier post
+> for more details.
 
-Nit on the order (should be left before right), but otherwise
+I have refined this description according to your suggestion:
+http://archive.armlinux.org.uk/lurker/message/20170301.154550.f55a09d5.en.html
 
-Acked-by: Chen-Yu Tsai <wens@csie.org>
+Am I missing anthing for this?
 
->
->         /* DAC Mixer Routes */
->         { "Left Digital DAC Mixer", "AIF1 Slot 0 Digital DAC Playback Switch",
-> -         "Digital Left DAC"},
-> +         "AIF1 Slot 0 Left"},
->         { "Right Digital DAC Mixer", "AIF1 Slot 0 Digital DAC Playback Switch",
-> -         "Digital Right DAC"},
-> +         "AIF1 Slot 0 Right"},
->  };
->
->  static struct snd_soc_dai_ops sun8i_codec_dai_ops = {
-> --
-> 2.11.0
->
+> > +- reg : physical base address and length of the register set.
+> > +
+> > +- clocks : the clock associated to this component.
+> > +
+> > +- clock-names : the name of the clock referenced by the code. Since we are
+> > +                using the AMBA framework, the name of the clock providing
+> > +		the interconnect should be "apb_pclk" and the clock is
+> > +		mandatory. The interface between the debug logic and the
+> > +		processor core is clocked by the internal CPU clock, so it
+> > +		is enabled with CPU clock by default.
+> > +
+> > +- cpu : the cpu phandle the debug module is affined to. When omitted
+> > +	the module is considered to belong to CPU0.
+> > +
+> > +Optional properties:
+> 
+> s/properties/property
+> 
+> > +
+> > +- power-domains: a phandle to power domain node for debug module. We can
+> > +		 use "nohlt" to ensure CPU power domain is enabled.
+> 
+> The "power-domains" property is to take care of the debug power domain.  The
+> "nohlt" is to make sure registers in the CPU power domain are accessible - both
+> are independent from one another.  As such the description for this binding
+> shoudl be:
+> 
+> "a phandle to the debug power domain".
+
+Will fix for upper two comments.
+
+Thanks,
+Leo Yan
