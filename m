@@ -1,54 +1,80 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 20 Mar 2017 16:52:11 +0200
-Subject: [PATCHv2 8/9] ARM: dts: omap4: add clkctrl nodes
-In-Reply-To: <20170320143538.GH20572@atomide.com>
-References: <1489741781-12816-1-git-send-email-t-kristo@ti.com>
- <1489741781-12816-9-git-send-email-t-kristo@ti.com>
- <20170317154333.GW20572@atomide.com>
- <9456caee-4f45-044a-0b2e-305fa2d0d274@ti.com>
- <b602ccba-489f-e78f-0011-6d808bca9f84@ti.com>
- <20170320143538.GH20572@atomide.com>
-Message-ID: <3a82add5-7d85-458c-f8c1-9e58db6a8949@ti.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 20 Mar 2017 14:52:07 +0000
+Subject: [PATCH 10/17] arm64: Add CNTVCT_EL0 trap handler
+In-Reply-To: <20170306112622.13853-11-marc.zyngier@arm.com>
+References: <20170306112622.13853-1-marc.zyngier@arm.com>
+ <20170306112622.13853-11-marc.zyngier@arm.com>
+Message-ID: <20170320145204.GG31213@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/03/17 16:35, Tony Lindgren wrote:
-> * Tero Kristo <t-kristo@ti.com> [170320 06:27]:
->> On 17/03/17 23:41, Tero Kristo wrote:
->>> On 17/03/17 17:43, Tony Lindgren wrote:
->>>> * Tero Kristo <t-kristo@ti.com> [170317 02:12]:
->>>>> Add clkctrl nodes for OMAP4 SoC. These are going to be acting as
->>>>> replacement for part of the existing clock data and the existing
->>>>> clkctrl hooks under hwmod data.
->>>>
->>>> It seems to be actually this patch in the series that breaks booting
->>>> if the last patch in this series is not applied.
->>>
->>> Yea I guess we need to squash this and patch #9, I'll double check next
->>> week. Sorry about not catching this one.
->>
->> Yes, patch #8 and #9 must be squashed. What happens with patch #8 alone, is
->> that you get all the clkctrl clocks registered, but as nobody is using them,
->> the clock core disables them later on in clk_disable_unused.
->
-> So how hard would it to do a mixed approach where we don't need
-> to have everything in place in the dts in order to flip a SoC?
->
-> This atomic transaction worries me..
+On Mon, Mar 06, 2017 at 11:26:15AM +0000, Marc Zyngier wrote:
+> Since people seem to make a point in breaking the userspace visible
+> counter, we have no choice but to trap the access. Add the required
+> handler.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm64/include/asm/esr.h |  2 ++
+>  arch/arm64/kernel/traps.c    | 14 ++++++++++++++
+>  2 files changed, 16 insertions(+)
+> 
+> diff --git a/arch/arm64/include/asm/esr.h b/arch/arm64/include/asm/esr.h
+> index d14c478976d0..ad42e79a5d4d 100644
+> --- a/arch/arm64/include/asm/esr.h
+> +++ b/arch/arm64/include/asm/esr.h
+> @@ -175,6 +175,8 @@
+>  #define ESR_ELx_SYS64_ISS_SYS_CTR_READ	(ESR_ELx_SYS64_ISS_SYS_CTR | \
+>  					 ESR_ELx_SYS64_ISS_DIR_READ)
+>  
+> +#define ESR_ELx_SYS64_ISS_SYS_CNTVCT	(ESR_ELx_SYS64_ISS_SYS_VAL(3, 3, 2, 14, 0) | \
+> +					 ESR_ELx_SYS64_ISS_DIR_READ)
+>  #ifndef __ASSEMBLY__
+>  #include <asm/types.h>
+>  
+> diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+> index e52be6aa44ee..1de444e6c669 100644
+> --- a/arch/arm64/kernel/traps.c
+> +++ b/arch/arm64/kernel/traps.c
+> @@ -505,6 +505,14 @@ static void ctr_read_handler(unsigned int esr, struct pt_regs *regs)
+>  	regs->pc += 4;
+>  }
+>  
+> +static void cntvct_read_handler(unsigned int esr, struct pt_regs *regs)
+> +{
+> +	int rt = (esr & ESR_ELx_SYS64_ISS_RT_MASK) >> ESR_ELx_SYS64_ISS_RT_SHIFT;
+> +
+> +	pt_regs_write_reg(regs, rt, arch_counter_get_cntvct());
+> +	regs->pc += 4;
+> +}
 
-Well, you could do few things.
+I was going to suggest it'd be worth using AARCH64_INSN_SIZE, but I see
+most of the other handlers in this file don't, so I guess that's not a
+big deal.
 
-- You can use clk_ignore_unused cmdline option between patch #8 and #9 
-and it should work, but will most likely break PM.
-- You can introduce the DTS changes on a clkctrl module basis, e.g. 
-introduce the node for l4_per_clkctrl along with the clock node changes 
-for the same
-- Do some sort of split between DTS / vs. clkctrl data introduction 
-within the clock driver, this forces the files to be in sync with each 
-other though.
-- Try parsing the DTs for matching clock handles while registering DT 
-clocks, if not found, toss our a pr_warn and skip registering the clock. 
-Will be very ineffective though as one needs to parse the whole DTS to 
-find the clock entries. This clock parsing could be dropped later.
+Otherwise, this looks fine to me. FWIW:
 
--Tero
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+
+Mark.
+
+> +
+>  struct sys64_hook {
+>  	unsigned int esr_mask;
+>  	unsigned int esr_val;
+> @@ -523,6 +531,12 @@ static struct sys64_hook sys64_hooks[] = {
+>  		.esr_val = ESR_ELx_SYS64_ISS_SYS_CTR_READ,
+>  		.handler = ctr_read_handler,
+>  	},
+> +	{
+> +		/* Trap read access to CNTVCT_EL0 */
+> +		.esr_mask = ESR_ELx_SYS64_ISS_SYS_OP_MASK,
+> +		.esr_val = ESR_ELx_SYS64_ISS_SYS_CNTVCT,
+> +		.handler = cntvct_read_handler,
+> +	},
+>  	{},
+>  };
+>  
+> -- 
+> 2.11.0
+> 
