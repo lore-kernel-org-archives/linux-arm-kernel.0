@@ -1,52 +1,69 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 20 Mar 2017 12:07:18 +0100
-Subject: [PATCH 4/4] tty/serial: sh-sci: remove uneeded IS_ERR_OR_NULL
- calls
-In-Reply-To: <CAMuHMdWbwA+3UGVnHYJOs26vTj13Yn+s4B8tE9kyy25JcjyZGg@mail.gmail.com>
-References: <20170306085842.yijkfpqi3adcedmm@pengutronix.de>
- <CAMuHMdV2_vbocY4wCzvYtPAaF+QEX_Y4g6qVu5EqEBf5AnFdaw@mail.gmail.com>
- <20170306093043.ay4dz3ehp3aakwxh@pengutronix.de>
- <CAMuHMdWQuvANNU14A7NQuzv6AFp04bq4DG_oc7w9h4wUrG+4aQ@mail.gmail.com>
- <20170306100220.droey65uq2ew3mzu@pengutronix.de>
- <CACRpkdYeFyr4yjQjDAUpPJwuD_NW2y=wXnzt1xSNoOX0SFCLmw@mail.gmail.com>
- <CAMuHMdWv-xs12UqutEtXJGR8qqgx6DeDhkKvvYhhyW+XTVsUNQ@mail.gmail.com>
- <CAMuHMdXGn35bEsJKnUi5o3AytL4AJN2fBfoB79v5W-jOVFQx6g@mail.gmail.com>
- <20170320103113.tpveoq2onzrwmkdt@pengutronix.de>
- <CAMuHMdWbwA+3UGVnHYJOs26vTj13Yn+s4B8tE9kyy25JcjyZGg@mail.gmail.com>
-Message-ID: <20170320110718.e44s2gip36m75bqj@pengutronix.de>
+From: fu.wei@linaro.org (Fu Wei)
+Date: Mon, 20 Mar 2017 19:09:56 +0800
+Subject: [PATCH v21 01/13] clocksource: arm_arch_timer: introduce two
+ functions to get the frequency from mmio and sysreg.
+In-Reply-To: <20170320104153.GA18585@leverpostej>
+References: <20170206185015.12296-1-fu.wei@linaro.org>
+ <20170206185015.12296-2-fu.wei@linaro.org>
+ <20170317180513.GB15909@leverpostej>
+ <CADyBb7vZ4G+q1y6w6OVQ7i-ZiTtcdx_w2BOSWqy=2jWhAV6Hmw@mail.gmail.com>
+ <CADyBb7vawnjnL6Phxc_owTnEK0qf95cYAUWPga9axGqEWc46Ww@mail.gmail.com>
+ <20170320104153.GA18585@leverpostej>
+Message-ID: <CADyBb7udtijHnXXqGDhtE1YxeLBqJeDFRs97Yc-P0enCA2z8Lg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Geert,
+Hi Mark,
 
-On Mon, Mar 20, 2017 at 11:38:52AM +0100, Geert Uytterhoeven wrote:
-> On Mon, Mar 20, 2017 at 11:31 AM, Uwe Kleine-K?nig
-> <u.kleine-koenig@pengutronix.de> wrote:
-> > On Mon, Mar 20, 2017 at 10:56:14AM +0100, Geert Uytterhoeven wrote:
-> >> Documentation/gpio/consumer.txt rightfully sates:
-> >> | Note that gpio_get*_optional() functions (and their managed variants), unlike
-> >> | the rest of gpiolib API, also return NULL when gpiolib support is disabled.
-> >> | This is helpful to driver authors, since they do not need to special case
-> >> | -ENOSYS return codes.  System integrators should however be careful to enable
-> >> | gpiolib on systems that need it.
-> >
-> > I cannot find this paragraph in Documentation/gpio/consumer.txt:
-> >
-> >         $ git grep -e 'ENOSYS' v4.11-rc3 -- Documentation/gpio/
-> >         <void>
-> 
-> It was added by commit 22c403676dbbb7c6 ("gpio: return NULL from
-> gpiod_get_optional when GPIOLIB is disabled")
+On 20 March 2017 at 18:41, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Mon, Mar 20, 2017 at 05:43:29PM +0800, Fu Wei wrote:
+>> On 20 March 2017 at 15:36, Fu Wei <fu.wei@linaro.org> wrote:
+>> > On 18 March 2017 at 02:05, Mark Rutland <mark.rutland@arm.com> wrote:
+>> >> On Tue, Feb 07, 2017 at 02:50:03AM +0800, fu.wei at linaro.org wrote:
+>
+>> >>> +static u32 arch_timer_get_mmio_freq(void __iomem *cntbase)
+>> >>> +{
+>> >>> +     /*
+>> >>> +      * Try to get the frequency from the CNTFRQ of timer frame registers.
+>> >>> +      * Note: please verify cntbase in caller.
+>> >>> +      */
+>> >>> +     return readl_relaxed(cntbase + CNTFRQ);
+>> >>> +}
+>> >>
+>> >> Wrapping the MMIO read makes sense if we're going to do this in more
+>> >> than one place, so I'm happy with this wrapper.
+>> >>
+>> >> If you can s/arch_timer_get_mmio_freq/arch_timer_get_cntfrq/, and drop
+>> >
+>> > sorry, May I guess that is
+>> > "s/arch_timer_get_mmio_freq/arch_timer_get_mmio_cntfrq/"
+>> > or
+>> > "s/arch_timer_get_mmio_freq/arch_timer_mem_get_cntfrq/"
+>> >
+>> > which one do you prefer? :-)
+>>
+>> keeping using arch_timer_get_cntfrq();  for per-CPU arch timer, then
+>>
+>> +static u32 arch_timer_mem_get_cntfrq(void __iomem *cntbase)
+>> +{
+>> +       return readl_relaxed(cntbase + CNTFRQ);
+>> +}
+>> +
+>
+> That looks perfect to me.
+>
+> Sorry for the confusion above!
 
-Ah, that's in next.
+Great, thanks , doing this way :-)
 
-I still think this is wrong and I'm a bit disappointed that Linus merged
-this patch (without saying so in the thread even) as I thought Linus and
-I agreed on this being a bad idea.
+>
+> Mark.
 
-Best regards
-Uwe
+
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Best regards,
+
+Fu Wei
+Software Engineer
+Red Hat
