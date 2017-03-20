@@ -1,35 +1,30 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 20 Mar 2017 10:09:19 +0100
-Subject: [PATCH v2 2/5] arm64: only select PINCTRL for Allwinner platforms
-In-Reply-To: <CACRpkdYJfycBqcAfu-K0i8TnEMwOZmDGvujHA25YWbBax6+6MA@mail.gmail.com>
-References: <20170301180111.12365-1-icenowy@aosc.xyz>
- <20170301180111.12365-3-icenowy@aosc.xyz>
- <CACRpkdYJfycBqcAfu-K0i8TnEMwOZmDGvujHA25YWbBax6+6MA@mail.gmail.com>
-Message-ID: <20170320090919.ifngfkrwu2rcyegt@lukather>
+Date: Mon, 20 Mar 2017 10:33:55 +0100
+Subject: [PATCH] clk: sunxi-ng: fix recalc_rate formula of NKMP clocks
+In-Reply-To: <20170317201943.45190-1-icenowy@aosc.xyz>
+References: <20170317201943.45190-1-icenowy@aosc.xyz>
+Message-ID: <20170320093355.wougjul675q3hru7@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 14, 2017 at 02:12:34PM +0100, Linus Walleij wrote:
-> On Wed, Mar 1, 2017 at 7:01 PM, Icenowy Zheng <icenowy@aosc.xyz> wrote:
+On Sat, Mar 18, 2017 at 04:19:43AM +0800, Icenowy Zheng wrote:
+> In commit e66f81bbd746 ("clk: sunxi-ng: Implement factors offsets"), the
+> final formula of NKMP clocks' recalc_rate is refactored; however, the
+> refactored formula broke the calculation due to some C language operand
+> priority problem -- the priority of operand >> is lower than * and /,
+> makes the formula being parsed as "(parent_rate * n * k) >> (p / m)", but
+> it should be "(parent_rate * n * k >> p) / m".
 > 
-> > As the pinctrl driver selecting is refactored in Kconfig file of
-> > pinctrl-sunxi, now we can select only PINCTRL for Allwinner platform,
-> > and the default value of several pinctrl drivers useful on ARM64
-> > Allwinner SoCs will become Y.
-> >
-> > This is the situation of 32-bit ARM ARCH_SUNXI option.
-> >
-> > Drop the select of per-SoC pinctrl choices, but keep selecting PINCTRL.
-> >
-> > Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
-> > ---
-> > Changes in v2:
+> Add the pair of parentheses to fix up this issue. This pair of
+> parentheses used to exist in the old formula.
 > 
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> 
-> Please funnel this through the ARM SoC tree.
+> Fixes: commit e66f81bbd746 ("clk: sunxi-ng: Implement factors offsets")
 
-Applied!
+You shouldn't have commit here.
+
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+
+Fixed it, and applied, thanks!
 Maxime
 
 -- 
@@ -42,4 +37,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170320/81991dab/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170320/5741ef4a/attachment.sig>
