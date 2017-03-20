@@ -1,64 +1,65 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 20 Mar 2017 10:43:29 +0000
-Subject: [RESEND PATCH v4 1/9] mfd: axp20x: correct name of temperature
- data ADC registers
-In-Reply-To: <20170320081653.8884-2-quentin.schulz@free-electrons.com>
+Date: Mon, 20 Mar 2017 10:43:45 +0000
+Subject: [RESEND PATCH v4 3/9] mfd: axp20x: add ADC cells for AXP20X and
+ AXP22X PMICs
+In-Reply-To: <20170320081653.8884-4-quentin.schulz@free-electrons.com>
 References: <20170320081653.8884-1-quentin.schulz@free-electrons.com>
- <20170320081653.8884-2-quentin.schulz@free-electrons.com>
-Message-ID: <20170320104329.ymusypmxljnitmwr@dell>
+ <20170320081653.8884-4-quentin.schulz@free-electrons.com>
+Message-ID: <20170320104345.3qjsv3j3cip7uj4i@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Mon, 20 Mar 2017, Quentin Schulz wrote:
 
-> The registers 0x56 and 0x57 of AXP22X PMIC store the value of the
-> internal temperature of the PMIC.
-> 
-> This patch modifies the name of these registers from AXP22X_PMIC_ADC_H/L
-> to AXP22X_PMIC_TEMP_H/L so their purpose is clearer.
+> This adds the AXP20X/AXP22x ADCs driver to the mfd cells of the AXP209,
+> AXP221 and AXP223 MFD.
 > 
 > Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
-> Acked-by: Chen-Yu Tsai <wens@csie.org>
 > Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 > Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
+> Acked-by: Chen-Yu Tsai <wens@csie.org>
 > ---
 > 
-> added in v2
+> v3:
+>  - removed of_compatible as DT node has been removed,
+>  - use different names to probe the ADC driver,
 > 
->  drivers/mfd/axp20x.c       | 2 +-
->  include/linux/mfd/axp20x.h | 4 ++--
->  2 files changed, 3 insertions(+), 3 deletions(-)
+>  drivers/mfd/axp20x.c | 6 ++++++
+>  1 file changed, 6 insertions(+)
 
 Applied, thanks.
 
 > diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
-> index 0512900..e02edf1 100644
+> index e02edf1..46bdd23 100644
 > --- a/drivers/mfd/axp20x.c
 > +++ b/drivers/mfd/axp20x.c
-> @@ -101,7 +101,7 @@ static const struct regmap_range axp22x_volatile_ranges[] = {
->  	regmap_reg_range(AXP20X_PWR_INPUT_STATUS, AXP20X_PWR_OP_MODE),
->  	regmap_reg_range(AXP20X_IRQ1_EN, AXP20X_IRQ5_STATE),
->  	regmap_reg_range(AXP22X_GPIO_STATE, AXP22X_GPIO_STATE),
-> -	regmap_reg_range(AXP22X_PMIC_ADC_H, AXP20X_IPSOUT_V_HIGH_L),
-> +	regmap_reg_range(AXP22X_PMIC_TEMP_H, AXP20X_IPSOUT_V_HIGH_L),
->  	regmap_reg_range(AXP20X_FG_RES, AXP20X_FG_RES),
->  };
->  
-> diff --git a/include/linux/mfd/axp20x.h b/include/linux/mfd/axp20x.h
-> index 0d9a1ff..dc8798c 100644
-> --- a/include/linux/mfd/axp20x.h
-> +++ b/include/linux/mfd/axp20x.h
-> @@ -228,8 +228,8 @@ enum axp20x_variants {
->  #define AXP20X_OCV_MAX			0xf
->  
->  /* AXP22X specific registers */
-> -#define AXP22X_PMIC_ADC_H		0x56
-> -#define AXP22X_PMIC_ADC_L		0x57
-> +#define AXP22X_PMIC_TEMP_H		0x56
-> +#define AXP22X_PMIC_TEMP_L		0x57
->  #define AXP22X_TS_ADC_H			0x58
->  #define AXP22X_TS_ADC_L			0x59
->  #define AXP22X_BATLOW_THRES1		0xe6
+> @@ -590,6 +590,8 @@ static struct mfd_cell axp20x_cells[] = {
+>  	}, {
+>  		.name		= "axp20x-regulator",
+>  	}, {
+> +		.name		= "axp20x-adc",
+> +	}, {
+>  		.name		= "axp20x-ac-power-supply",
+>  		.of_compatible	= "x-powers,axp202-ac-power-supply",
+>  		.num_resources	= ARRAY_SIZE(axp20x_ac_power_supply_resources),
+> @@ -610,6 +612,8 @@ static struct mfd_cell axp221_cells[] = {
+>  	}, {
+>  		.name		= "axp20x-regulator",
+>  	}, {
+> +		.name		= "axp22x-adc"
+> +	}, {
+>  		.name		= "axp20x-usb-power-supply",
+>  		.of_compatible	= "x-powers,axp221-usb-power-supply",
+>  		.num_resources	= ARRAY_SIZE(axp22x_usb_power_supply_resources),
+> @@ -623,6 +627,8 @@ static struct mfd_cell axp223_cells[] = {
+>  		.num_resources		= ARRAY_SIZE(axp22x_pek_resources),
+>  		.resources		= axp22x_pek_resources,
+>  	}, {
+> +		.name		= "axp22x-adc",
+> +	}, {
+>  		.name			= "axp20x-regulator",
+>  	}, {
+>  		.name		= "axp20x-usb-power-supply",
 
 -- 
 Lee Jones
