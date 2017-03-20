@@ -1,85 +1,137 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon, 20 Mar 2017 18:14:01 +0000
-Subject: [PATCH v3 06/19] KVM: arm64: ITS: Implement
- vgic_mmio_uaccess_write_its_creadr
-In-Reply-To: <1488800074-21991-7-git-send-email-eric.auger@redhat.com>
+Date: Mon, 20 Mar 2017 18:21:51 +0000
+Subject: [PATCH v3 19/19] KVM: arm64: ITS: Pending table save/restore
+In-Reply-To: <1488800074-21991-20-git-send-email-eric.auger@redhat.com>
 References: <1488800074-21991-1-git-send-email-eric.auger@redhat.com>
- <1488800074-21991-7-git-send-email-eric.auger@redhat.com>
-Message-ID: <f5e4781d-3d13-e956-1056-2339a2fb2247@arm.com>
+ <1488800074-21991-20-git-send-email-eric.auger@redhat.com>
+Message-ID: <6e2f94c2-8afe-9b5f-d097-a43e168b95df@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Eric,
 
+just fast-forwarded to the end and noticed this one:
+
+
 On 06/03/17 11:34, Eric Auger wrote:
-> GITS_CREADR needs to be restored so let's implement the associated
-> uaccess_write_its callback.
+> Save and restore the pending tables.
+> 
+> Pending table restore obviously requires the pendbaser to be
+> already set.
 > 
 > Signed-off-by: Eric Auger <eric.auger@redhat.com>
-
-Can you please rebase this (whole series) on the latest kernel? My patch
-to fix command processing with the ITS being disabled got merged just a
-few patches after -rc1. This will conflict here, but looks like a
-requirement anyway.
-
 > 
 > ---
+> 
+> v1 -> v2:
+> - do not care about the 1st KB which should be zeroed according to
+>   the spec.
 > ---
->  virt/kvm/arm/vgic/vgic-its.c | 22 +++++++++++++++++++++-
->  1 file changed, 21 insertions(+), 1 deletion(-)
+>  virt/kvm/arm/vgic/vgic-its.c | 71 ++++++++++++++++++++++++++++++++++++++++++--
+>  1 file changed, 69 insertions(+), 2 deletions(-)
 > 
 > diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-> index e9c8f9f..6120c6e 100644
+> index 27ebabd..24824be 100644
 > --- a/virt/kvm/arm/vgic/vgic-its.c
 > +++ b/virt/kvm/arm/vgic/vgic-its.c
-> @@ -1225,6 +1225,25 @@ static unsigned long vgic_mmio_read_its_creadr(struct kvm *kvm,
->  	return extract_bytes(its->creadr, addr & 0x7, len);
->  }
->  
-> +static void vgic_mmio_uaccess_write_its_creadr(struct kvm *kvm,
-> +					       struct vgic_its *its,
-> +					       gpa_t addr, unsigned int len,
-> +					       unsigned long val)
-> +{
-> +	u32 reg;
+> @@ -1736,7 +1736,48 @@ static int lookup_table(struct vgic_its *its, gpa_t base, int size, int esz,
+>   */
+>  static int vgic_its_flush_pending_tables(struct vgic_its *its)
+>  {
+> -	return -ENXIO;
+> +	struct kvm *kvm = its->dev->kvm;
+> +	struct vgic_dist *dist = &kvm->arch.vgic;
+> +	struct vgic_irq *irq;
+> +	int ret;
 > +
-> +	mutex_lock(&its->cmd_lock);
-> +	reg = update_64bit_reg(its->creadr, addr & 7, len, val);
-> +	reg = ITS_CMD_OFFSET(reg);
-> +	if (reg >= ITS_CMD_BUFFER_SIZE(its->cbaser)) {
-> +		mutex_unlock(&its->cmd_lock);
-> +		return;
-> +	}
+> +	/**
+> +	 * we do not take the dist->lpi_list_lock since we have a garantee
+> +	 * the LPI list is not touched while the its lock is held
 
-So do we need to specify some register order here? I think since CREADR
-is RO in the spec this isn't covered there, but I see issues here otherwise:
-- If we write CREADR while the ITS is enabled, this will probably
-confuse the state machine, since only the ITS (emulation engine) is
-supposed to change CREADR. So we should forbid setting CREADR in this
-case (easily doable with the fix mentioned above).
-- CBASER resets both CREADR (as said in the spec) and CWRITER (our
-implementation choice), so it should be restored before any of those get
-restored. I think that should be mentioned in arm-vgic-its.txt.
+Can you elaborate on what gives us this guarantee? I see that we have a
+locking *order*, but that doesn't mean we can avoid taking the lock. So
+to me it looks like we need to take the lpi_list_lock spinlock here,
+which unfortunately breaks the kvm_read_guest() calls below.
+
+If you agree on this, you can take a look at the INVALL implementation,
+where I faced the same issue. The solution we came up with is
+vgic_copy_lpi_list(), which you can call under the lock to create a
+(private) copy of the LPI list, which you can later iterate without
+holding the lock - and thus are free to call sleeping functions.
 
 Cheers,
 Andre.
 
+> +	 */
+> +	list_for_each_entry(irq, &dist->lpi_list_head, lpi_list) {
+> +		struct kvm_vcpu *vcpu;
+> +		gpa_t pendbase, ptr;
+> +		bool stored;
+> +		u8 val;
 > +
-> +	its->creadr = reg;
-> +	mutex_unlock(&its->cmd_lock);
-> +}
+> +		vcpu = irq->target_vcpu;
+> +		if (!vcpu)
+> +			return -EINVAL;
 > +
->  #define BASER_INDEX(addr) (((addr) / sizeof(u64)) & 0x7)
->  static unsigned long vgic_mmio_read_its_baser(struct kvm *kvm,
->  					      struct vgic_its *its,
-> @@ -1320,7 +1339,8 @@ static struct vgic_register_region its_registers[] = {
->  		vgic_mmio_read_its_cwriter, vgic_mmio_write_its_cwriter, NULL,
->  		8, VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
->  	REGISTER_ITS_DESC(GITS_CREADR,
-> -		vgic_mmio_read_its_creadr, its_mmio_write_wi, NULL, 8,
-> +		vgic_mmio_read_its_creadr, its_mmio_write_wi,
-> +		vgic_mmio_uaccess_write_its_creadr, 8,
->  		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
->  	REGISTER_ITS_DESC(GITS_BASER,
->  		vgic_mmio_read_its_baser, vgic_mmio_write_its_baser, NULL, 0x40,
+> +		pendbase = PENDBASER_ADDRESS(vcpu->arch.vgic_cpu.pendbaser);
+> +
+> +		ptr = pendbase + (irq->intid / BITS_PER_BYTE);
+> +
+> +		ret = kvm_read_guest(kvm, (gpa_t)ptr, &val, 1);
+> +		if (ret)
+> +			return ret;
+> +
+> +		stored = val & (irq->intid % BITS_PER_BYTE);
+> +		if (stored == irq->pending_latch)
+> +			continue;
+> +
+> +		if (irq->pending_latch)
+> +			val |= 1 << (irq->intid % BITS_PER_BYTE);
+> +		else
+> +			val &= ~(1 << (irq->intid % BITS_PER_BYTE));
+> +
+> +		ret = kvm_write_guest(kvm, (gpa_t)ptr, &val, 1);
+> +		if (ret)
+> +			return ret;
+> +	}
+> +
+> +	return 0;
+>  }
+>  
+>  /**
+> @@ -1745,7 +1786,33 @@ static int vgic_its_flush_pending_tables(struct vgic_its *its)
+>   */
+>  static int vgic_its_restore_pending_tables(struct vgic_its *its)
+>  {
+> -	return -ENXIO;
+> +	struct vgic_irq *irq;
+> +	struct kvm *kvm = its->dev->kvm;
+> +	struct vgic_dist *dist = &kvm->arch.vgic;
+> +	int ret;
+> +
+> +	list_for_each_entry(irq, &dist->lpi_list_head, lpi_list) {
+> +		struct kvm_vcpu *vcpu;
+> +		gpa_t pendbase, ptr;
+> +		u8 val;
+> +
+> +		vcpu = irq->target_vcpu;
+> +		if (!vcpu)
+> +			return -EINVAL;
+> +
+> +		if (!(vcpu->arch.vgic_cpu.pendbaser & GICR_PENDBASER_PTZ))
+> +			return 0;
+> +
+> +		pendbase = PENDBASER_ADDRESS(vcpu->arch.vgic_cpu.pendbaser);
+> +
+> +		ptr = pendbase + (irq->intid / BITS_PER_BYTE);
+> +
+> +		ret = kvm_read_guest(kvm, (gpa_t)ptr, &val, 1);
+> +		if (ret)
+> +			return ret;
+> +		irq->pending_latch = val & (1 << (irq->intid % BITS_PER_BYTE));
+> +	}
+> +	return 0;
+>  }
+>  
+>  static int vgic_its_flush_ite(struct vgic_its *its, struct its_device *dev,
 > 
