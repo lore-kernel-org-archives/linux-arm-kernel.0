@@ -1,51 +1,72 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 20 Mar 2017 09:57:18 +0100
-Subject: [PATCH 07/32] arm64: dts: r8a7795: salvator-x: Fix EthernetAVB PHY
- timing
+Date: Mon, 20 Mar 2017 09:57:24 +0100
+Subject: [PATCH 13/32] arm64: dts: r8a7796: Enable SCIF DMA
 In-Reply-To: <cover.1489999913.git.horms+renesas@verge.net.au>
 References: <cover.1489999913.git.horms+renesas@verge.net.au>
-Message-ID: <0e45da1c6ea6b18616d95c697ecd6234bc504ef6.1489999913.git.horms+renesas@verge.net.au>
+Message-ID: <dbcae5ea4bd27409291e3329c9106f37f0118590.1489999913.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kazuya Mizuguchi <kazuya.mizuguchi.ks@renesas.com>
+From: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
 
-Set PHY rxc-skew-ps to 1500 and all other values to their default values.
-
-This is intended to to address failures in the case of 1Gbps communication
-using the by salvator-x board with the KSZ9031RNX phy. This has been
-reported to occur with both the r8a7795 (H3) and r8a7796 (M3-W) SoCs.
-
-Signed-off-by: Kazuya Mizuguchi <kazuya.mizuguchi.ks@renesas.com>
-Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+Signed-off-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts | 13 +------------
- 1 file changed, 1 insertion(+), 12 deletions(-)
+ arch/arm64/boot/dts/renesas/r8a7796.dtsi | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
-index dc1177c76aa5..5158ba3f9ce3 100644
---- a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
-+++ b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
-@@ -497,18 +497,7 @@
- 	status = "okay";
- 
- 	phy0: ethernet-phy at 0 {
--		rxc-skew-ps = <900>;
--		rxdv-skew-ps = <0>;
--		rxd0-skew-ps = <0>;
--		rxd1-skew-ps = <0>;
--		rxd2-skew-ps = <0>;
--		rxd3-skew-ps = <0>;
--		txc-skew-ps = <900>;
--		txen-skew-ps = <0>;
--		txd0-skew-ps = <0>;
--		txd1-skew-ps = <0>;
--		txd2-skew-ps = <0>;
--		txd3-skew-ps = <0>;
-+		rxc-skew-ps = <1500>;
- 		reg = <0>;
- 		interrupt-parent = <&gpio2>;
- 		interrupts = <11 IRQ_TYPE_LEVEL_LOW>;
+diff --git a/arch/arm64/boot/dts/renesas/r8a7796.dtsi b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
+index 5fb93fc043c2..951e351ddae1 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7796.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
+@@ -568,6 +568,9 @@
+ 				 <&cpg CPG_CORE R8A7796_CLK_S3D1>,
+ 				 <&scif_clk>;
+ 			clock-names = "fck", "brg_int", "scif_clk";
++			dmas = <&dmac1 0x51>, <&dmac1 0x50>,
++			       <&dmac2 0x51>, <&dmac2 0x50>;
++			dma-names = "tx", "rx", "tx", "rx";
+ 			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
+ 			status = "disabled";
+ 		};
+@@ -581,6 +584,9 @@
+ 				 <&cpg CPG_CORE R8A7796_CLK_S3D1>,
+ 				 <&scif_clk>;
+ 			clock-names = "fck", "brg_int", "scif_clk";
++			dmas = <&dmac1 0x53>, <&dmac1 0x52>,
++			       <&dmac2 0x53>, <&dmac2 0x52>;
++			dma-names = "tx", "rx", "tx", "rx";
+ 			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
+ 			status = "disabled";
+ 		};
+@@ -607,6 +613,8 @@
+ 				 <&cpg CPG_CORE R8A7796_CLK_S3D1>,
+ 				 <&scif_clk>;
+ 			clock-names = "fck", "brg_int", "scif_clk";
++			dmas = <&dmac0 0x57>, <&dmac0 0x56>;
++			dma-names = "tx", "rx";
+ 			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
+ 			status = "disabled";
+ 		};
+@@ -620,6 +628,8 @@
+ 				 <&cpg CPG_CORE R8A7796_CLK_S3D1>,
+ 				 <&scif_clk>;
+ 			clock-names = "fck", "brg_int", "scif_clk";
++			dmas = <&dmac0 0x59>, <&dmac0 0x58>;
++			dma-names = "tx", "rx";
+ 			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
+ 			status = "disabled";
+ 		};
+@@ -633,6 +643,9 @@
+ 				 <&cpg CPG_CORE R8A7796_CLK_S3D1>,
+ 				 <&scif_clk>;
+ 			clock-names = "fck", "brg_int", "scif_clk";
++			dmas = <&dmac1 0x5b>, <&dmac1 0x5a>,
++			       <&dmac2 0x5b>, <&dmac2 0x5a>;
++			dma-names = "tx", "rx", "tx", "rx";
+ 			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
+ 			status = "disabled";
+ 		};
 -- 
 2.7.0.rc3.207.g0ac5344
