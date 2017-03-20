@@ -1,43 +1,26 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 20 Mar 2017 15:07:53 +0000
-Subject: [PATCH 00/17] clocksource/arch_timer: Errara workaround
- infrastructure rework
-In-Reply-To: <20170306112622.13853-1-marc.zyngier@arm.com>
-References: <20170306112622.13853-1-marc.zyngier@arm.com>
-Message-ID: <20170320150752.GK31213@leverpostej>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 20 Mar 2017 10:09:06 -0500
+Subject: [PATCH v2 06/11] Documentation: DT: bindings: input:
+ touschcreen: remove sun4i documentation
+In-Reply-To: <20170310103921.19469-7-quentin.schulz@free-electrons.com>
+References: <20170310103921.19469-1-quentin.schulz@free-electrons.com>
+ <20170310103921.19469-7-quentin.schulz@free-electrons.com>
+Message-ID: <20170320150906.piixax6ejrpm6ljv@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 06, 2017 at 11:26:05AM +0000, Marc Zyngier wrote:
-> It has recently become obvious that a number of arm64 systems have
-> been blessed with a set of timers that are slightly less than perfect,
-> and require a bit of hand-holding. We already have a bunch of
-> errata-specific code to deal with this, but as we're adding more
-> potential detection methods (DT, ACPI, capability), things are getting
-> a bit out of hands.
+On Fri, Mar 10, 2017 at 11:39:16AM +0100, Quentin Schulz wrote:
+> This patch removes the sun4i touchscreen controller binding
+> documentation since it has been merged with the sun4i GPADC binding
+> documentation.
 > 
-> Instead of adding more ad-hoc fixes to an already difficult code base,
-> let's give ourselves a bit of an infrastructure that can deal with
-> this and hide most of the uggliness behind frendly accessors.
+> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+> ---
+> 
+> added in v2
+> 
+>  .../bindings/input/touchscreen/sun4i.txt           | 38 ----------------------
+>  1 file changed, 38 deletions(-)
+>  delete mode 100644 Documentation/devicetree/bindings/input/touchscreen/sun4i.txt
 
->  Documentation/arm64/silicon-errata.txt |   1 +
->  arch/arm64/include/asm/arch_timer.h    |  44 ++-
->  arch/arm64/include/asm/cpucaps.h       |   3 +-
->  arch/arm64/include/asm/cputype.h       |   2 +
->  arch/arm64/include/asm/esr.h           |   2 +
->  arch/arm64/kernel/cpu_errata.c         |  15 +
->  arch/arm64/kernel/cpufeature.c         |  13 +-
->  arch/arm64/kernel/traps.c              |  14 +
->  drivers/clocksource/Kconfig            |  11 +
->  drivers/clocksource/arm_arch_timer.c   | 529 +++++++++++++++++++++++----------
->  10 files changed, 465 insertions(+), 169 deletions(-)
-
-Largely this looks ok.
-
-What's the plan for merging this?
-
-If you can respin this, I can see about collating this with the ACPI
-GTDT patches, but I'm not sure what to do about the arch/arm64/ parts.
-
-Thanks,
-Mark.
+Acked-by: Rob Herring <robh@kernel.org>
