@@ -1,105 +1,83 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 20 Mar 2017 17:48:28 +0000
-Subject: [PATCH v2 17/18] arm64: arch_timer: Allow erratum matching with ACPI
- OEM information
+Date: Mon, 20 Mar 2017 17:48:27 +0000
+Subject: [PATCH v2 16/18] arm64: arch_timer: Workaround for Cortex-A73 erratum
+ 858921
 In-Reply-To: <20170320174829.28182-1-marc.zyngier@arm.com>
 References: <20170320174829.28182-1-marc.zyngier@arm.com>
-Message-ID: <20170320174829.28182-18-marc.zyngier@arm.com>
+Message-ID: <20170320174829.28182-17-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Just as we're able to identify a broken platform using some DT
-information, let's enable a way to spot the offenders with ACPI.
+Cortex-A73 (all versions) counter read can return a wrong value
+when the counter crosses a 32bit boundary.
 
-The difference is that we can only match on some OEM info instead
-of implementation-specific properties. So in order to avoid the
-insane multiplication of errata structures, we allow an array
-of OEM descriptions to be attached to an erratum structure.
+The workaround involves performing the read twice, and to return
+one or the other depending on whether a transition has taken place.
 
-Tested-by: dann frazier <dann.frazier@canonical.com>
-Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
-Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/arch_timer.h  |  1 +
- drivers/clocksource/arm_arch_timer.c | 32 ++++++++++++++++++++++++++++++++
- 2 files changed, 33 insertions(+)
+ drivers/clocksource/Kconfig          | 11 +++++++++++
+ drivers/clocksource/arm_arch_timer.c | 19 +++++++++++++++++++
+ 2 files changed, 30 insertions(+)
 
-diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
-index 3cba3a5e4ba1..a79c6932bf3f 100644
---- a/arch/arm64/include/asm/arch_timer.h
-+++ b/arch/arm64/include/asm/arch_timer.h
-@@ -42,6 +42,7 @@ enum arch_timer_erratum_match_type {
- 	ate_match_dt,
- 	ate_match_global_cap_id,
- 	ate_match_local_cap_id,
-+	ate_match_acpi_oem_info,
- };
+diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+index 3356ab821624..af80a7c44faf 100644
+--- a/drivers/clocksource/Kconfig
++++ b/drivers/clocksource/Kconfig
+@@ -366,6 +366,17 @@ config HISILICON_ERRATUM_161010101
+ 	  161010101. The workaround will be active if the hisilicon,erratum-161010101
+ 	  property is found in the timer node.
  
- struct clock_event_device;
++config ARM64_ERRATUM_858921
++	bool "Workaround for Cortex-A73 erratum 858921"
++	default y
++	select ARM_ARCH_TIMER_OOL_WORKAROUND
++	depends on ARM_ARCH_TIMER && ARM64
++	help
++	  This option enables a workaround applicable to Cortex-A73
++	  (all versions), whose counter may return incorrect values.
++	  The workaround will be dynamically enabled when an affected
++	  core is detected.
++
+ config ARM_GLOBAL_TIMER
+ 	bool "Support for the ARM global timer" if COMPILE_TEST
+ 	select CLKSRC_OF if OF
 diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index ba4be5859aa4..9e8cef63e59e 100644
+index eccff0fedf2c..ba4be5859aa4 100644
 --- a/drivers/clocksource/arm_arch_timer.c
 +++ b/drivers/clocksource/arm_arch_timer.c
-@@ -190,6 +190,12 @@ static struct cyclecounter cyclecounter __ro_after_init = {
- 	.mask	= CLOCKSOURCE_MASK(56),
+@@ -266,6 +266,17 @@ static u64 notrace hisi_161010101_read_cntvct_el0(void)
+ }
+ #endif
+ 
++#ifdef CONFIG_ARM64_ERRATUM_858921
++static u64 notrace arm64_858921_read_cntvct_el0(void)
++{
++	u64 old, new;
++
++	old = read_sysreg(cntvct_el0);
++	new = read_sysreg(cntvct_el0);
++	return (((old ^ new) >> 32) & 1) ? old : new;
++}
++#endif
++
+ #ifdef CONFIG_ARM_ARCH_TIMER_OOL_WORKAROUND
+ DEFINE_PER_CPU(const struct arch_timer_erratum_workaround *,
+ 	       timer_unstable_counter_workaround);
+@@ -331,6 +342,14 @@ static const struct arch_timer_erratum_workaround ool_workarounds[] = {
+ 		.set_next_event_virt = erratum_set_next_event_tval_virt,
+ 	},
+ #endif
++#ifdef CONFIG_ARM64_ERRATUM_858921
++	{
++		.match_type = ate_match_local_cap_id,
++		.id = (void *)ARM64_WORKAROUND_858921,
++		.desc = "ARM erratum 858921",
++		.read_cntvct_el0 = arm64_858921_read_cntvct_el0,
++	},
++#endif
  };
  
-+struct ate_acpi_oem_info {
-+	char oem_id[ACPI_OEM_ID_SIZE + 1];
-+	char oem_table_id[ACPI_OEM_TABLE_ID_SIZE + 1];
-+	u32 oem_revision;
-+};
-+
- #ifdef CONFIG_FSL_ERRATUM_A008585
- /*
-  * The number of retries is an arbitrary value well beyond the highest number
-@@ -378,6 +384,28 @@ bool arch_timer_check_local_cap_erratum(const struct arch_timer_erratum_workarou
- 	return this_cpu_has_cap((uintptr_t)wa->id);
- }
- 
-+
-+static
-+bool arch_timer_check_acpi_oem_erratum(const struct arch_timer_erratum_workaround *wa,
-+				       const void *arg)
-+{
-+	static const struct ate_acpi_oem_info empty_oem_info = {};
-+	const struct ate_acpi_oem_info *info = wa->id;
-+	const struct acpi_table_header *table = arg;
-+
-+	/* Iterate over the ACPI OEM info array, looking for a match */
-+	while (memcmp(info, &empty_oem_info, sizeof(*info))) {
-+		if (!memcmp(info->oem_id, table->oem_id, ACPI_OEM_ID_SIZE) &&
-+		    !memcmp(info->oem_table_id, table->oem_table_id, ACPI_OEM_TABLE_ID_SIZE) &&
-+		    info->oem_revision == table->oem_revision)
-+			return true;
-+
-+		info++;
-+	}
-+
-+	return false;
-+}
-+
- static const struct arch_timer_erratum_workaround *
- arch_timer_iterate_errata(enum arch_timer_erratum_match_type type,
- 			  ate_match_fn_t match_fn,
-@@ -441,6 +469,9 @@ static void arch_timer_check_ool_workaround(enum arch_timer_erratum_match_type t
- 		match_fn = arch_timer_check_local_cap_erratum;
- 		local = true;
- 		break;
-+	case ate_match_acpi_oem_info:
-+		match_fn = arch_timer_check_acpi_oem_erratum;
-+		break;
- 	}
- 
- 	wa = arch_timer_iterate_errata(type, match_fn, arg);
-@@ -1286,6 +1317,7 @@ static int __init arch_timer_acpi_init(struct acpi_table_header *table)
- 
- 	/* Check for globally applicable workarounds */
- 	arch_timer_check_ool_workaround(ate_match_global_cap_id, NULL);
-+	arch_timer_check_ool_workaround(ate_match_acpi_oem_info, table);
- 
- 	arch_timer_init();
- 	return 0;
+ typedef bool (*ate_match_fn_t)(const struct arch_timer_erratum_workaround *,
 -- 
 2.11.0
