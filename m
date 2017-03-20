@@ -1,53 +1,26 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 20 Mar 2017 15:32:00 +0100
-Subject: [PATCH 4/5] dt-bindings: tegra: Update compatible strings for
- Tegra flowctrl
-In-Reply-To: <1489584715-23138-5-git-send-email-jonathanh@nvidia.com>
-References: <1489584715-23138-1-git-send-email-jonathanh@nvidia.com>
- <1489584715-23138-5-git-send-email-jonathanh@nvidia.com>
-Message-ID: <20170320143200.GA17169@ulmo.ba.sec>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 20 Mar 2017 22:31:48 +0800
+Subject: [linux-sunxi] [PATCH v4 1/8] dt: bindings: add pmu0 regs for USB
+ PHYs on Allwinner H3/V3s/A64
+In-Reply-To: <20170319161951.55834-2-icenowy@aosc.xyz>
+References: <20170319161951.55834-1-icenowy@aosc.xyz>
+ <20170319161951.55834-2-icenowy@aosc.xyz>
+Message-ID: <CAGb2v66mZC2e=sZvZL2kmV0YAfVx3eeHUMvbGiEXN9pFgXtaXA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 15, 2017 at 01:31:54PM +0000, Jon Hunter wrote:
-> Update the compatible strings for Tegra Flow Control driver to match
-> the device-tree source files for Tegra.
-> 
-> Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
-> ---
->  .../devicetree/bindings/arm/tegra/nvidia,tegra20-flowctrl.txt     | 8 +++++++-
->  1 file changed, 7 insertions(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-flowctrl.txt b/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-flowctrl.txt
-> index ccf0adddc820..d92bf782985f 100644
-> --- a/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-flowctrl.txt
-> +++ b/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-flowctrl.txt
-> @@ -1,7 +1,13 @@
->  NVIDIA Tegra Flow Controller
->  
->  Required properties:
-> -- compatible: Should be "nvidia,tegra<chip>-flowctrl"
-> +- compatible: Should contain one of the following:
-> +	For Tegra20 must contain "nvidia,tegra20-flowctrl".
-> +	For Tegra30 must contain "nvidia,tegra30-flowctrl".
-> +	For Tegra114 must contain "nvidia,tegra114-flowctrl"
-> +	For Tegra124 must contain "nvidia,tegra124-flowctrl"
-> +	For Tegra132 must contain "nvidia,tegra124-flowctrl"
-> +	For Tegra210 must contain "nvidia,tegra210-flowctrl"
+On Mon, Mar 20, 2017 at 12:19 AM, Icenowy Zheng <icenowy@aosc.xyz> wrote:
+> Allwinner H3/V3s/A64 SoCs have a special USB PHY0 that can route to two
+> controllers: one is MUSB and the other is a EHCI/OHCI pair.
+>
+> When it's routed to EHCI/OHCI pair, it will needs a "pmu0" regs to
+> tweak, like other EHCI/OHCI pairs in Allwinner SoCs.
+>
+> Add this to the binding of USB PHYs on Allwinner H3/V3s/A64.
+>
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
 
-I have a slight preference for the format:
+Acked-by: Chen-Yu Tsai <wens@csie.org>
 
-	"nvidia,tegraXXX-flowctrl...": for TegraXXX
-
-since that's what we've used in other bindings and is also closer to
-what is, I think, planned for the longer term (i.e. DT bindings with
-YAML(-like) syntax).
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170320/75111c55/attachment.sig>
+Please keep acks and review tags from others if you haven't changed the
+patch.
