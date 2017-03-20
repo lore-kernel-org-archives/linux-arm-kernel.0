@@ -1,61 +1,62 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 20 Mar 2017 10:43:58 +0000
-Subject: [RESEND PATCH v4 4/9] mfd: axp20x: add AC power supply cells for
- AXP22X PMICs
-In-Reply-To: <20170320081653.8884-5-quentin.schulz@free-electrons.com>
+Date: Mon, 20 Mar 2017 10:44:16 +0000
+Subject: [RESEND PATCH v4 9/9] mfd: axp20x: add CHRG_CTRL1/2/3 to
+ writeable regs for AXP20X/AXP22X
+In-Reply-To: <20170320081653.8884-10-quentin.schulz@free-electrons.com>
 References: <20170320081653.8884-1-quentin.schulz@free-electrons.com>
- <20170320081653.8884-5-quentin.schulz@free-electrons.com>
-Message-ID: <20170320104358.37h3tn2ikwpyhalj@dell>
+ <20170320081653.8884-10-quentin.schulz@free-electrons.com>
+Message-ID: <20170320104416.ph2wbvsie5tj53up@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Mon, 20 Mar 2017, Quentin Schulz wrote:
 
-> The X-Powers AXP20X and AXP22X PMICs expose the status of AC power
-> supply.
+> The CHRG_CTRL1 and CHRG_CTRL2 registers are made for controlling
+> different battery charging settings such as the constant current charge
+> value.
 > 
-> This adds the AC power supply driver to the MFD cells of the AXP22X
-> PMICs.
+> The AXP22X also have a third register CHRG_CTRL3 which has settings for
+> battery charging too.
+> 
+> This adds the CHRG_CTRL1, CHRG_CTRL2 and CHRG_CTRL3 registers to the
+> list of writeable registers for AXP20X and AXP22X PMICs.
 > 
 > Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
 > Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Acked-By: Sebastian Reichel <sre@kernel.org>
 > Acked-by: Chen-Yu Tsai <wens@csie.org>
 > Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
 > ---
->  drivers/mfd/axp20x.c | 10 ++++++++++
->  1 file changed, 10 insertions(+)
+> 
+> v2:
+>  - added AXP20X_CHRG_CTRL2 and AXP20X_CHRG_CTRL3 to the writeable
+>  registers table,
+>  - removed added reg range for ADC data in volatile regs range,
+> 
+>  drivers/mfd/axp20x.c | 2 ++
+>  1 file changed, 2 insertions(+)
 
 Applied, thanks.
 
 > diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
-> index 46bdd23..37643b1 100644
+> index 37643b1..5ba3b04 100644
 > --- a/drivers/mfd/axp20x.c
 > +++ b/drivers/mfd/axp20x.c
-> @@ -614,6 +614,11 @@ static struct mfd_cell axp221_cells[] = {
->  	}, {
->  		.name		= "axp22x-adc"
->  	}, {
-> +		.name		= "axp20x-ac-power-supply",
-> +		.of_compatible	= "x-powers,axp221-ac-power-supply",
-> +		.num_resources	= ARRAY_SIZE(axp20x_ac_power_supply_resources),
-> +		.resources	= axp20x_ac_power_supply_resources,
-> +	}, {
->  		.name		= "axp20x-usb-power-supply",
->  		.of_compatible	= "x-powers,axp221-usb-power-supply",
->  		.num_resources	= ARRAY_SIZE(axp22x_usb_power_supply_resources),
-> @@ -631,6 +636,11 @@ static struct mfd_cell axp223_cells[] = {
->  	}, {
->  		.name			= "axp20x-regulator",
->  	}, {
-> +		.name		= "axp20x-ac-power-supply",
-> +		.of_compatible	= "x-powers,axp221-ac-power-supply",
-> +		.num_resources	= ARRAY_SIZE(axp20x_ac_power_supply_resources),
-> +		.resources	= axp20x_ac_power_supply_resources,
-> +	}, {
->  		.name		= "axp20x-usb-power-supply",
->  		.of_compatible	= "x-powers,axp223-usb-power-supply",
->  		.num_resources	= ARRAY_SIZE(axp22x_usb_power_supply_resources),
+> @@ -68,6 +68,7 @@ static const struct regmap_access_table axp152_volatile_table = {
+>  
+>  static const struct regmap_range axp20x_writeable_ranges[] = {
+>  	regmap_reg_range(AXP20X_DATACACHE(0), AXP20X_IRQ5_STATE),
+> +	regmap_reg_range(AXP20X_CHRG_CTRL1, AXP20X_CHRG_CTRL2),
+>  	regmap_reg_range(AXP20X_DCDC_MODE, AXP20X_FG_RES),
+>  	regmap_reg_range(AXP20X_RDC_H, AXP20X_OCV(AXP20X_OCV_MAX)),
+>  };
+> @@ -94,6 +95,7 @@ static const struct regmap_access_table axp20x_volatile_table = {
+>  /* AXP22x ranges are shared with the AXP809, as they cover the same range */
+>  static const struct regmap_range axp22x_writeable_ranges[] = {
+>  	regmap_reg_range(AXP20X_DATACACHE(0), AXP20X_IRQ5_STATE),
+> +	regmap_reg_range(AXP20X_CHRG_CTRL1, AXP22X_CHRG_CTRL3),
+>  	regmap_reg_range(AXP20X_DCDC_MODE, AXP22X_BATLOW_THRES1),
+>  };
+>  
 
 -- 
 Lee Jones
