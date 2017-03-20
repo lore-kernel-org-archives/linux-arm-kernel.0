@@ -1,163 +1,51 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 20 Mar 2017 10:33:17 +0000
-Subject: [PATCH] KVM: arm64: Ensure LRs are clear when they should be
-In-Reply-To: <20170319192504.GY1277@cbox>
-References: <20170318125656.16523-1-cdall@linaro.org>
- <874lyqsmoc.fsf@on-the-bus.cambridge.arm.com> <20170319192504.GY1277@cbox>
-Message-ID: <be5d46a3-195f-2da6-fc5f-8231a9b72b87@arm.com>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Mon, 20 Mar 2017 11:33:30 +0100
+Subject: [RFC PATCH] tty/serial: atmel: fix TX path in
+ atmel_console_write()
+In-Reply-To: <20170315152948.10978-1-nicolas.ferre@microchip.com>
+References: <CACQ1gAgW4aGJSxSAXDWL7td9eV12UV=Xv=PZR58BqqHxEeRH0g@mail.gmail.com>
+ <20170315152948.10978-1-nicolas.ferre@microchip.com>
+Message-ID: <05f5c67b-67d8-02b4-e170-52f2484d0927@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/03/17 19:25, Christoffer Dall wrote:
-> On Sat, Mar 18, 2017 at 02:07:47PM +0000, Marc Zyngier wrote:
->> On Sat, Mar 18 2017 at 12:56:56 pm GMT, Christoffer Dall <cdall@linaro.org> wrote:
->>
->> Hi Christoffer,
->>
->>> From: Christoffer Dall <christoffer.dall@linaro.org>
->>>
->>> We currently have some code to clear the list registers on GICv3, but we
->>> never call this code, because the caller got nuked when removing the old
->>> vgic.  We also used to have a similar GICv2 part, but that got lost in
->>> the process too.
->>>
->>> Let's reintroduce the logic for GICv2 and call the logic when we
->>> initialize the use of hypervisors on the CPU, for example when first
->>> loading KVM or when exiting a low power state.
->>>
->>> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
->>> ---
->>> Marc, Eric, Andre,
->>>
->>> I'm unable to convince myself that the LRs should already be clear via
->>> the reset of the hardware, and for any power management scenario I
->>> suppose it's possible for secure-side firmware to have messed with the
->>> LRs behind our backs; plus we used to have this functionality and it got
->>> dropped for the new vgic.  Am I forgetting some discussion where we
->>> decided it wasn't needed anymore?
->>
->> No, that's definitely something we overlooked while transitioning from
->> one implementation to another. Thanks for noticing it!
->>
->>>
->>> Thanks,
->>> -Christoffer
->>>
->>>  arch/arm/kvm/arm.c            |  3 +++
->>>  include/kvm/arm_vgic.h        |  1 +
->>>  virt/kvm/arm/vgic/vgic-init.c | 19 +++++++++++++++++++
->>>  virt/kvm/arm/vgic/vgic-v2.c   | 15 +++++++++++++++
->>>  virt/kvm/arm/vgic/vgic.h      |  2 ++
->>>  5 files changed, 40 insertions(+)
->>>
->>> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
->>> index c9a2103..d775aac 100644
->>> --- a/arch/arm/kvm/arm.c
->>> +++ b/arch/arm/kvm/arm.c
->>> @@ -1121,6 +1121,9 @@ static void cpu_hyp_reinit(void)
->>>  		if (__hyp_get_vectors() == hyp_default_vectors)
->>>  			cpu_init_hyp_mode(NULL);
->>>  	}
->>> +
->>> +	if (vgic_present)
->>> +		kvm_vgic_init_cpu_hardware();
->>
->> We didn't have this before, but that's certainly an improvement. It is
->> not so much that secure could have messed with the LRs themselves, but
->> that the LRs reset value is UNDEF out of reset.
->>
+On 15/03/2017 16:29, Nicolas Ferre wrote:
+> A side effect of 89d8232411a8 ("tty/serial: atmel_serial: BUG: stop DMA
+> from transmitting in stop_tx") is that the console can be called with
+> TX path disabled. Then the system would hang trying to push charecters
+> out in atmel_console_putchar().
 > 
-> ok, is the other scenario with secure side messing with the LRs not
-> still potentially possible though?  (someone impementing a misguided
-> power management solution for example)
-
-Once you end-up on the secure side, everything is possible, including
-wiping memory. We have to trust that it is not going to do anything
-silly... My approach to the secure side is that it is part of the HW. If
-it screws you over, you're done.
-
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+> Fixes: 89d8232411a8 ("tty/serial: atmel_serial: BUG: stop DMA from transmitting
+> in stop_tx")
+> Cc: stable <stable@vger.kernel.org> # 4.4+
+> ---
+> Hi Richard,
 > 
->>>  }
->>>  
->>>  static void cpu_hyp_reset(void)
->>> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
->>> index b72dd2a..c0b3d99 100644
->>> --- a/include/kvm/arm_vgic.h
->>> +++ b/include/kvm/arm_vgic.h
->>> @@ -295,6 +295,7 @@ void kvm_vgic_vcpu_early_init(struct kvm_vcpu *vcpu);
->>>  void kvm_vgic_vcpu_destroy(struct kvm_vcpu *vcpu);
->>>  int kvm_vgic_map_resources(struct kvm *kvm);
->>>  int kvm_vgic_hyp_init(void);
->>> +void kvm_vgic_init_cpu_hardware(void);
->>>  
->>>  int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
->>>  			bool level);
->>> diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
->>> index 276139a..702f810 100644
->>> --- a/virt/kvm/arm/vgic/vgic-init.c
->>> +++ b/virt/kvm/arm/vgic/vgic-init.c
->>> @@ -392,6 +392,25 @@ static irqreturn_t vgic_maintenance_handler(int irq, void *data)
->>>  }
->>>  
->>>  /**
->>> + * kvm_vgic_init_cpu_hardware - initialize the GIC VE hardware
->>> + *
->>> + * For a specific CPU, initialize the GIC VE hardware.
->>> + */
->>> +void kvm_vgic_init_cpu_hardware(void)
->>> +{
->>> +	BUG_ON(preemptible());
->>> +
->>> +	/*
->>> +	 * We want to make sure the list registers start out clear so that we
->>> +	 * only have the program the used registers.
->>> +	 */
->>> +	if (kvm_vgic_global_state.type == VGIC_V2)
->>> +		vgic_v2_init_lrs();
->>> +	else
->>> +		kvm_call_hyp(__vgic_v3_init_lrs);
->>> +}
->>> +
->>> +/**
->>>   * kvm_vgic_hyp_init: populates the kvm_vgic_global_state variable
->>>   * according to the host GIC model. Accordingly calls either
->>>   * vgic_v2/v3_probe which registers the KVM_DEVICE that can be
->>> diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
->>> index b834ecd..94cf4b9 100644
->>> --- a/virt/kvm/arm/vgic/vgic-v2.c
->>> +++ b/virt/kvm/arm/vgic/vgic-v2.c
->>> @@ -36,6 +36,21 @@ static unsigned long *u64_to_bitmask(u64 *val)
->>>  	return (unsigned long *)val;
->>>  }
->>>  
->>> +static inline void vgic_v2_write_lr(int lr, u32 val)
->>> +{
->>> +	void __iomem *base = kvm_vgic_global_state.vctrl_base;
->>> +
->>> +	writel_relaxed(val, base + GICH_LR0 + (lr * 4));
->>> +}
->>> +
->>> +void vgic_v2_init_lrs(void)
->>> +{
->>> +	int i;
->>> +
->>> +	for (i = 0; i < kvm_vgic_global_state.nr_lr; i++)
->>> +		vgic_v2_write_lr(i, 0);
->>> +}
->>
->> Nit: do you need to have two functions here? Or is that something that
->> you're going to reuse in the near future?
->>
+> I found this to fix the problem with system hang in my linux-4.4-at91 branch
+> (in the atmel_console_putchar() waiting loop actually). I'm open to more
+> insignt.
+> As we cannot figure out if this bit is set or not, I didn't preserve the
+> current status...
 > 
-> I have some optimization patches to GICv2 lying around that will
-> eventually use vgic_v2_write_lr directly, but I don't mind combining it
-> now and splitting it later when introducting those patches if you
-> prefer?
-
-No, that's fine. I'll queue it as is.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> Regards,
+> 
+>  drivers/tty/serial/atmel_serial.c | 3 +++
+>  1 file changed, 3 insertions(+)
+> 
+> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+> index dcebb28ffbc4..7372dbdb7a4c 100644
+> --- a/drivers/tty/serial/atmel_serial.c
+> +++ b/drivers/tty/serial/atmel_serial.c
+> @@ -2483,6 +2483,9 @@ static void atmel_console_write(struct console *co, const char *s, u_int count)
+>  	pdc_tx = atmel_uart_readl(port, ATMEL_PDC_PTSR) & ATMEL_PDC_TXTEN;
+>  	atmel_uart_writel(port, ATMEL_PDC_PTCR, ATMEL_PDC_TXTDIS);
+>  
+> +	/* Make sure that tx path is actually able to send characters */
+> +	atmel_uart_writel(port, ATMEL_US_CR, ATMEL_US_TXEN);
+> +
+>  	uart_console_write(port, s, count, atmel_console_putchar);
+>  
+>  	/*
+> 
+Acked-by: Richard Genoud <richard.genoud@gmail.com>
