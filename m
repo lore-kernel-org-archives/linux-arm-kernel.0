@@ -1,57 +1,51 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 20 Mar 2017 09:57:16 +0100
-Subject: [PATCH 05/32] arm64: dts: h3ulcb: Update memory node to 4 GiB map
+Date: Mon, 20 Mar 2017 09:57:18 +0100
+Subject: [PATCH 07/32] arm64: dts: r8a7795: salvator-x: Fix EthernetAVB PHY
+ timing
 In-Reply-To: <cover.1489999913.git.horms+renesas@verge.net.au>
 References: <cover.1489999913.git.horms+renesas@verge.net.au>
-Message-ID: <a262d66224c4c34bc2bee16d4d37d460a738788c.1489999913.git.horms+renesas@verge.net.au>
+Message-ID: <0e45da1c6ea6b18616d95c697ecd6234bc504ef6.1489999913.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vladimir Barinov <vladimir.barinov+renesas@cogentembedded.com>
+From: Kazuya Mizuguchi <kazuya.mizuguchi.ks@renesas.com>
 
-This patch adds memory region:
+Set PHY rxc-skew-ps to 1500 and all other values to their default values.
 
-  - After changes, the H3ULCB board has the following map:
-    Bank0: 1GiB RAM : 0x000048000000 -> 0x0007fffffff
-    Bank1: 1GiB RAM : 0x000500000000 -> 0x0053fffffff
-    Bank2: 1GiB RAM : 0x000600000000 -> 0x0063fffffff
-    Bank3: 1GiB RAM : 0x000700000000 -> 0x0073fffffff
+This is intended to to address failures in the case of 1Gbps communication
+using the by salvator-x board with the KSZ9031RNX phy. This has been
+reported to occur with both the r8a7795 (H3) and r8a7796 (M3-W) SoCs.
 
-  - Before changes, the old map looked like this:
-    Bank0: 1GiB RAM : 0x000048000000 -> 0x0007fffffff
-
-Signed-off-by: Vladimir Barinov <vladimir.barinov+renesas@cogentembedded.com>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Kazuya Mizuguchi <kazuya.mizuguchi.ks@renesas.com>
+Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts | 13 +------------
+ 1 file changed, 1 insertion(+), 12 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts b/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
-index c5f8f69a4f5f..9811534f296e 100644
---- a/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
-+++ b/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
-@@ -33,6 +33,21 @@
- 		reg = <0x0 0x48000000 0x0 0x38000000>;
- 	};
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
+index dc1177c76aa5..5158ba3f9ce3 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
++++ b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
+@@ -497,18 +497,7 @@
+ 	status = "okay";
  
-+	memory at 500000000 {
-+		device_type = "memory";
-+		reg = <0x5 0x00000000 0x0 0x40000000>;
-+	};
-+
-+	memory at 600000000 {
-+		device_type = "memory";
-+		reg = <0x6 0x00000000 0x0 0x40000000>;
-+	};
-+
-+	memory at 700000000 {
-+		device_type = "memory";
-+		reg = <0x7 0x00000000 0x0 0x40000000>;
-+	};
-+
- 	leds {
- 		compatible = "gpio-leds";
- 
+ 	phy0: ethernet-phy at 0 {
+-		rxc-skew-ps = <900>;
+-		rxdv-skew-ps = <0>;
+-		rxd0-skew-ps = <0>;
+-		rxd1-skew-ps = <0>;
+-		rxd2-skew-ps = <0>;
+-		rxd3-skew-ps = <0>;
+-		txc-skew-ps = <900>;
+-		txen-skew-ps = <0>;
+-		txd0-skew-ps = <0>;
+-		txd1-skew-ps = <0>;
+-		txd2-skew-ps = <0>;
+-		txd3-skew-ps = <0>;
++		rxc-skew-ps = <1500>;
+ 		reg = <0>;
+ 		interrupt-parent = <&gpio2>;
+ 		interrupts = <11 IRQ_TYPE_LEVEL_LOW>;
 -- 
 2.7.0.rc3.207.g0ac5344
