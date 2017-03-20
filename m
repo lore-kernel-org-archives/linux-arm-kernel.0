@@ -1,76 +1,75 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Mon, 20 Mar 2017 10:40:00 -0600
-Subject: [v3 3/5] coresight: add support for debug module
-In-Reply-To: <5995f6a7-08b1-c868-fc88-a145d1748a33@arm.com>
-References: <1488520809-31670-4-git-send-email-leo.yan@linaro.org>
- <011fdac0-59bf-b539-2de3-0b59a41bc922@arm.com>
- <20170309175915.GA964@leoy-linaro>
- <3f27efee-3b63-81fd-eb96-73fd7e6f5e92@arm.com>
- <20170313165600.GB32431@linaro.org>
- <516f8989-4dde-2686-d549-0761feb14d1b@arm.com>
- <CANLsYkzJsGvr4ZzNbTwcPu1Qki6=Szvu+bMjHZ_rza==DqFChw@mail.gmail.com>
- <20170317101328.GA19877@leoy-linaro> <20170317155007.GA20435@linaro.org>
- <20170317162836.GD2020@leoy-linaro>
- <5995f6a7-08b1-c868-fc88-a145d1748a33@arm.com>
-Message-ID: <CANLsYkyiAnSGW4Ujs6L-yBKK3no3zigbyBgOCWbm06ZdV-f2Hw@mail.gmail.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Mon, 20 Mar 2017 16:37:58 +0000
+Subject: [PATCH 3/5] soc/tegra: Move Tegra flowctrl driver
+In-Reply-To: <20170320141434.GC28203@ulmo.ba.sec>
+References: <1489584715-23138-1-git-send-email-jonathanh@nvidia.com>
+ <1489584715-23138-4-git-send-email-jonathanh@nvidia.com>
+ <20170320141434.GC28203@ulmo.ba.sec>
+Message-ID: <c0b18931-1377-813d-c8a3-60aea4379aa6@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 March 2017 at 10:47, Suzuki K Poulose <Suzuki.Poulose@arm.com> wrote:
-> On 17/03/17 16:28, Leo Yan wrote:
->>
->> On Fri, Mar 17, 2017 at 09:50:07AM -0600, Mathieu Poirier wrote:
->>
->> [...]
->>
->>> If we don't check for "nohlt" some platform may freeze, others may work.
->>> If we
->>> mandate that "nohlt" be present on the kernel cmd line it works in all
->>> cases.
->>> As such mandating that "nohlt" be present is a better way to go.
->>
->>
->> Sure, so I will add below checking code in the probe function, please
->> let me know if you have alter better way to implement this:
->>
->> +       if (IS_ENABLED(CONFIG_CPU_IDLE) &&
->> +                       !strstr(boot_command_line, "nohlt")) {
->> +               dev_err(dev, "May not be accessible in CPU power
->> domain.\n");
->> +               return -EPERM;
->> +       }
->>
->
-> There is an API which kind of achieves what "nohlt" does at runtime :
->
->   cpu_idle_poll_ctrl(true)
->
-> So may be we could use that instead of depending on "nohlt". The other side
-> of the issues is "when do we decide to use the API". May be we could add
-> something
-> like : enable_debug, which could then trigger the panic notifier
-> registrations
-> and the above. That would still leave us with a case where the system
-> crashes
-> even before the user gets a terminal. May be the following is the best
-> option :
->
-> 1) Dedicated kernel command line parameter for enabling the CPU debug at
-> boot/probe.
->
-> and
->
-> 2) Runtime enable method via sysfs.
->
-> What do you think ?
 
-In my opinion booting with "nohlt" on the cmd line is sufficient to
-determine if we should use the driver or not.  That way we also avoid
-declaring yet another sysfs flag, something I really want to avoid.
 
-Thanks,
-Mathieu
+On 20/03/17 14:14, Thierry Reding wrote:
+> * PGP Signed by an unknown key
+> 
+> On Wed, Mar 15, 2017 at 01:31:53PM +0000, Jon Hunter wrote:
+> [...]
+>> +static int __init tegra_flowctrl_init(void)
+>> +{
+>> +	/* hardcoded fallback if device tree node is missing */
+>> +	unsigned long base = 0x60007000;
+>> +	unsigned long size = SZ_4K;
+>> +	struct device_node *np;
+>> +
+>> +	if (!soc_is_tegra())
+>> +		return 0;
+>> +
+>> +	np = of_find_matching_node(NULL, matches);
+>> +	if (np) {
+>> +		struct resource res;
+>> +
+>> +		if (of_address_to_resource(np, 0, &res) == 0) {
+>> +			size = resource_size(&res);
+>> +			base = res.start;
+>> +		}
+>> +
+>> +		of_node_put(np);
+>> +	}
+>> +
+>> +	tegra_flowctrl_base = ioremap_nocache(base, size);
+>> +
+>> +	if (!tegra_flowctrl_base)
+>> +		return -ENXIO;
+>> +
+>> +	return 0;
+>> +}
+>> +early_initcall(tegra_flowctrl_init);
+> 
+> Do we want to implement a hand-off to a proper driver at some point,
+> similar to what we have for PMC?
 
->
-> Suzuki
->
+Yes I can add, it won't do much apart from remap the io-space, but at
+least it is registered as a device then.
+
+>> diff --git a/include/soc/tegra/flowctrl.h b/include/soc/tegra/flowctrl.h
+> [...]
+>> +#ifndef __ASSEMBLY__
+>> +u32 flowctrl_read_cpu_csr(unsigned int cpuid);
+>> +void flowctrl_write_cpu_csr(unsigned int cpuid, u32 value);
+>> +void flowctrl_write_cpu_halt(unsigned int cpuid, u32 value);
+>> +
+>> +void flowctrl_cpu_suspend_enter(unsigned int cpuid);
+>> +void flowctrl_cpu_suspend_exit(unsigned int cpuid);
+>> +#endif
+> 
+> Perhaps we want the same type of dummy functions scheme here for
+> !SOC_TEGRA_FLOWCTRL that Arnd proposed for !SOC_TEGRA_PMC?
+
+Yes that is a better solution, so will do the same here.
+
+Jon
+
+-- 
+nvpublic
