@@ -1,62 +1,57 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 20 Mar 2017 18:09:50 +0000
-Subject: [PATCH v21 13/13] acpi/arm64: Add SBSA Generic Watchdog support
- in GTDT driver
-In-Reply-To: <CADyBb7uZV2Qe0ga4TTS_iis5MtwJ=u6PKYSV6ED103Cmh5_O3g@mail.gmail.com>
-References: <20170206185015.12296-1-fu.wei@linaro.org>
- <20170206185015.12296-14-fu.wei@linaro.org>
- <20170317200153.GF15909@leverpostej>
- <CADyBb7uZV2Qe0ga4TTS_iis5MtwJ=u6PKYSV6ED103Cmh5_O3g@mail.gmail.com>
-Message-ID: <20170320180949.GM31213@leverpostej>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Mon, 20 Mar 2017 18:12:52 +0000
+Subject: [PATCH v3 04/19] KVM: arm64: ITS: KVM_DEV_ARM_VGIC_GRP_ITS_REGS
+ group
+In-Reply-To: <1488800074-21991-5-git-send-email-eric.auger@redhat.com>
+References: <1488800074-21991-1-git-send-email-eric.auger@redhat.com>
+ <1488800074-21991-5-git-send-email-eric.auger@redhat.com>
+Message-ID: <0fc9f005-bc80-c66f-ad23-9baaae07fcde@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 21, 2017 at 01:57:58AM +0800, Fu Wei wrote:
-> On 18 March 2017 at 04:01, Mark Rutland <mark.rutland@arm.com> wrote:
-> > On Tue, Feb 07, 2017 at 02:50:15AM +0800, fu.wei at linaro.org wrote:
+Hi Eric,
 
-> > I've not been able to find where the ACPI spec says that zero is not a
-> > valid GSIV. This may simply be an oversight/ambiguity in the spec.
-> >
-> > Is there any statement to that effect?
+On 06/03/17 11:34, Eric Auger wrote:
+> The ITS KVM device exposes a new KVM_DEV_ARM_VGIC_GRP_ITS_REGS
+> group which allows the userspace to save/restore ITS registers.
 > 
-> you are right, zero is a  valid GSIV, I will delete this check. Thanks
-
-That being the case, how does one describe a watchdog that does not have
-an interrupt?
-
-As I mentioned, I think this is an oversight/ambiguity in the spec tat
-we should address.
-
-> > My reading of SBSA is that there is one watchdog in the system.
-> >
-> > Is that not the case?
+> At this stage the get/set/has operations are not yet implemented.
 > 
-> do you mean:
-> ---------------
-> 4.2.4 Watchdogs
-> The base server system implements a Generic Watchdog as specified in
-> APPENDIX A: Generic Watchdog.
-> ---------------
-> 
-> I am not sure about that if this is saying "we only have one SBSA
-> watchdog in a system"
-> 
-> would you let me know where mention it? Do I miss something?
+> Signed-off-by: Eric Auger <eric.auger@redhat.com>
 
-My reading was that the 'a' above meant a single element. i.e.
+Reviewed-by: Andre Przywara <andre.przywara@arm.com>
 
-	The base server system implements _a_ Generic Watchdog as
-	specified in APPENDIX A: Generic Watchdog.
+> ---
+>  arch/arm/include/uapi/asm/kvm.h   |  1 +
+>  arch/arm64/include/uapi/asm/kvm.h |  1 +
+>  virt/kvm/arm/vgic/vgic-its.c      | 36 +++++++++++++++++++++++++++++++++++-
+>  3 files changed, 37 insertions(+), 1 deletion(-)
 
-Subsequently in 4.2.5, it is stated:
+....
 
-	In this scenario, the system wakeup timer or generic watchdog is
-	still required to send its interrupt.
+> @@ -1520,10 +1544,20 @@ static int vgic_its_get_attr(struct kvm_device *dev,
+>  		if (copy_to_user(uaddr, &addr, sizeof(addr)))
+>  			return -EFAULT;
+>  		break;
+> +	}
+> +	case KVM_DEV_ARM_VGIC_GRP_ITS_REGS: {
+> +		u64 __user *uaddr = (u64 __user *)(long)attr->addr;
+> +		u64 reg;
+> +		int ret;
+> +
+> +		ret = vgic_its_attr_regs_access(dev, attr, &reg, false);
+> +		if (ret)
+> +			return ret;
+> +		return put_user(reg, uaddr);
+> +	}
+>  	default:
+>  		return -ENXIO;
+>  	}
+> -	}
 
-... which only makes sense if there is a single watchdog in the system.
+And thanks for finding and fixing this nasty mishap. Fortunately C
+doesn't care about blocks in switch statements too much, so I think this
+works as intended (so it's not a "real" bug).
 
-Perhaps this is an oversight in the specification.
-
-Thanks,
-Mark.
+Cheers,
+Andre.
