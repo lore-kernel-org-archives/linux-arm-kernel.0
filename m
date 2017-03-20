@@ -1,47 +1,62 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 20 Mar 2017 09:57:39 +0100
-Subject: [PATCH 28/32] arm64: dts: r8a7796: Add Cortex-A53 PMU node
+Date: Mon, 20 Mar 2017 09:57:34 +0100
+Subject: [PATCH 23/32] arm64: dts: r8a7795: Tidyup Audio-DMAC channel for DVC
 In-Reply-To: <cover.1489999913.git.horms+renesas@verge.net.au>
 References: <cover.1489999913.git.horms+renesas@verge.net.au>
-Message-ID: <ccc499330dbcaa8f6065bd1b10a64ca09fa96c3e.1489999913.git.horms+renesas@verge.net.au>
+Message-ID: <b5a8ffad0eb0c1e5e601253edac163b2da9e855d.1489999913.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-Enable the performance monitor unit for the Cortex-A53 cores on the
-R8A7796 SoC.
+Current	Audio-DMAC is assigned "rx" as Audio-DMAC0, "tx" as Audio-DMAC1.
+Thus, DVC "tx" should be assigned as Audio-DMAC1, instead of Audio-DMAC0.
 
-Extracted from a patch by Takeshi Kihara in the BSP.
+Because of this, current platform board (using SRC/DVC/SSI)
+Playback/Capture both will use same Audio-DMAC0
+(but it depends on audio data path).
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+First note is that this "rx" and "tx" are from each IP point,
+it doesn't mean Playback/Capture.
+Second note is that Audio DMAC assigned on DT is only for
+Audio-DMAC, Audio-DMAC-peri-peri has no entry.
+
+=> Audio-DMAC
+-> Audio-DMAC-peri-peri
+-- HW connection
+
+Playback case
+
+	[Mem] => [SRC]--[DVC] -> [SSI]--[Codec]
+	      rx ~~~~~~~~~~~~
+Capture
+
+	[Mem] <= [DVC]--[SRC] <- [SSI]--[Codec]
+	      tx ~~~~~~~~~~~~
+
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a7796.dtsi | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7796.dtsi b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-index b32a180009dd..a90abf14dc4e 100644
---- a/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-@@ -303,6 +303,18 @@
- 					     <&a57_1>;
- 		};
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+index 14772bc02125..55c09f1b89c9 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+@@ -1075,11 +1075,11 @@
  
-+		pmu_a53 {
-+			compatible = "arm,cortex-a53-pmu";
-+			interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 87 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-affinity = <&a53_0>,
-+					     <&a53_1>,
-+					     <&a53_2>,
-+					     <&a53_3>;
-+		};
-+
- 		cpg: clock-controller at e6150000 {
- 			compatible = "renesas,r8a7796-cpg-mssr";
- 			reg = <0 0xe6150000 0 0x1000>;
+ 			rcar_sound,dvc {
+ 				dvc0: dvc-0 {
+-					dmas = <&audma0 0xbc>;
++					dmas = <&audma1 0xbc>;
+ 					dma-names = "tx";
+ 				};
+ 				dvc1: dvc-1 {
+-					dmas = <&audma0 0xbe>;
++					dmas = <&audma1 0xbe>;
+ 					dma-names = "tx";
+ 				};
+ 			};
 -- 
 2.7.0.rc3.207.g0ac5344
