@@ -1,120 +1,53 @@
-From: sricharan@codeaurora.org (Sricharan R)
-Date: Mon, 20 Mar 2017 20:01:53 +0530
-Subject: [PATCH V3 3/5] drivers: arm-smmu: Add clock support for
- QCOM_SMMUV2
-In-Reply-To: <20170316211039.rbqq262syalyfcs6@rob-hp-laptop>
-References: <1489073748-3659-1-git-send-email-sricharan@codeaurora.org>
- <1489073748-3659-4-git-send-email-sricharan@codeaurora.org>
- <20170316211039.rbqq262syalyfcs6@rob-hp-laptop>
-Message-ID: <fa0a35be-a717-44ca-1ec5-208827bfb503@codeaurora.org>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 20 Mar 2017 15:32:00 +0100
+Subject: [PATCH 4/5] dt-bindings: tegra: Update compatible strings for
+ Tegra flowctrl
+In-Reply-To: <1489584715-23138-5-git-send-email-jonathanh@nvidia.com>
+References: <1489584715-23138-1-git-send-email-jonathanh@nvidia.com>
+ <1489584715-23138-5-git-send-email-jonathanh@nvidia.com>
+Message-ID: <20170320143200.GA17169@ulmo.ba.sec>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+On Wed, Mar 15, 2017 at 01:31:54PM +0000, Jon Hunter wrote:
+> Update the compatible strings for Tegra Flow Control driver to match
+> the device-tree source files for Tegra.
+> 
+> Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
+> ---
+>  .../devicetree/bindings/arm/tegra/nvidia,tegra20-flowctrl.txt     | 8 +++++++-
+>  1 file changed, 7 insertions(+), 1 deletion(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-flowctrl.txt b/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-flowctrl.txt
+> index ccf0adddc820..d92bf782985f 100644
+> --- a/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-flowctrl.txt
+> +++ b/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-flowctrl.txt
+> @@ -1,7 +1,13 @@
+>  NVIDIA Tegra Flow Controller
+>  
+>  Required properties:
+> -- compatible: Should be "nvidia,tegra<chip>-flowctrl"
+> +- compatible: Should contain one of the following:
+> +	For Tegra20 must contain "nvidia,tegra20-flowctrl".
+> +	For Tegra30 must contain "nvidia,tegra30-flowctrl".
+> +	For Tegra114 must contain "nvidia,tegra114-flowctrl"
+> +	For Tegra124 must contain "nvidia,tegra124-flowctrl"
+> +	For Tegra132 must contain "nvidia,tegra124-flowctrl"
+> +	For Tegra210 must contain "nvidia,tegra210-flowctrl"
 
-On 3/17/2017 2:40 AM, Rob Herring wrote:
-> On Thu, Mar 09, 2017 at 09:05:46PM +0530, Sricharan R wrote:
->> The QCOM_SMMUV2 is an implementation of the arm,smmu-v2 architecture.
->> The qcom,smmu is instantiated for each of the multimedia cores (for eg)
->> Venus (video encoder/decoder), mdp (display) etc, and they are connected
->> to the Multimedia Aggregator Interconnect (MMAGIC). So the access to
->> any of the MMU's registers, as well as MMU's downstream bus access,
->> requires the specified MMAGIC clocks to be enabled. So adding a new
->> binding for the qcom,smmu-v2 and the required mmagic clock bindings for
->> the same. Also adding the support for enabling the qcom,smmu-v2 clocks in
->> the driver.
->>
->>                -------------  ---------
->>                |   VENUS   |  | MDP   |
->> 	       |	   |  |       |
->> 	       -------------  --------
->> 		     |           |
->> 		     |           |
->>                   ------      ---------
->>                   |SMMU |     | SMMU  |
->>                   |	|     |       |
->>                   ------      --------
->> 		    |            |
->> 		    |            |
->>        -----------------------------------------
->>        |	MMAGIC INTERCONNECT (MMSS NOC) |
->>        |                                       |
->>        -----------------------------------------
->>                    |                 |
->> 		   |           ----------------------------------
->>                  -----         | 	SYSTEM NOC		|
->>                  |DDR|	       |				|
->>                  -----         ---------------------------------
->> 		   |		    |
->>                    |               ------
->> 		   |<-------------| CPU|
->> 				  ------
->>
->> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
->> ---
->>  .../devicetree/bindings/iommu/arm,smmu.txt         |   8 ++
->>  drivers/iommu/arm-smmu.c                           | 124 +++++++++++++++++++++
->>  2 files changed, 132 insertions(+)
->>
->> diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu.txt b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
->> index b369c13..88e02d6 100644
->> --- a/Documentation/devicetree/bindings/iommu/arm,smmu.txt
->> +++ b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
->> @@ -17,6 +17,7 @@ conditions.
->>                          "arm,mmu-401"
->>                          "arm,mmu-500"
->>                          "cavium,smmu-v2"
->> +			"qcom,smmu-v2"
->
-> I know Cavium did it, but I'd prefer to see SoC specific compatibles
-> here.
+I have a slight preference for the format:
 
-ok, will change it to be soc specific.
+	"nvidia,tegraXXX-flowctrl...": for TegraXXX
 
->
->>
->>                    depending on the particular implementation and/or the
->>                    version of the architecture implemented.
->> @@ -74,6 +75,13 @@ conditions.
->>                    "cfg_clk" is optional if required to access the TCU's programming
->>                    interface, apart from the "tcu_clk".
->>
->> +		  Should have "mmagic_ahb_clk", "mmagic_cfg_ahb_clk",
->> +                              "smmu_core_ahb_clk", "smmu_core_axi_clk",
->> +                              "mmagic_core_axi_clk" for "qcom,smmu-v2"
->
-> This is instead of the above clocks?
->
+since that's what we've used in other bindings and is also closer to
+what is, I think, planned for the longer term (i.e. DT bindings with
+YAML(-like) syntax).
 
-These clocks are for 'qcom,smmu-v2'. I should have put
-that first, then the clock names.
-
-> Are these clocks all really part of the SMMU or are the mmagic clocks
-> working around no proper driver for the mmagic?
->
-
-infact because of the absence of the mmagic driver to handle it.
-But i think, i will have to rework this, because handling mmagic
-clocks is going to pushed elsewhere, to the the gdscs(powerdomains).
-So adding the mmagic clocks should not be required here after that.
-
-Regards,
-  Sricharan
-
->> +
->> +		  "mmagic_core_axi_clk" is required for smmu's access to the
->> +                   downstream bus and rest for the smmu's register group access.
->> +
->>  - clocks:         Phandles for respective clocks described by clock-names.
->>
->>  - power-domains:  Phandles to SMMU's power domain specifier. This is
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
-
--- 
-"QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a 
-member of Code Aurora Forum, hosted by The Linux Foundation
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170320/75111c55/attachment.sig>
