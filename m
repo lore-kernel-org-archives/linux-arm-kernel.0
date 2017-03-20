@@ -1,33 +1,37 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Mon, 20 Mar 2017 18:12:48 +0530
-Subject: [PATCH v33 00/14] add kdump support
-In-Reply-To: <20170315095656.24992-1-takahiro.akashi@linaro.org>
-References: <20170315095656.24992-1-takahiro.akashi@linaro.org>
-Message-ID: <2d0f8fbf-f815-e773-9a6b-05242eb9abfd@redhat.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 20 Mar 2017 13:44:22 +0100
+Subject: [PATCH] ARM: tegra: Select SOC_TEGRA_PMC to fix linking error
+In-Reply-To: <20170311202614.6052-1-krzk@kernel.org>
+References: <20170311202614.6052-1-krzk@kernel.org>
+Message-ID: <20170320124422.GB22463@ulmo.ba.sec>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Sat, Mar 11, 2017 at 10:26:14PM +0200, Krzysztof Kozlowski wrote:
+> It is possible to create a ARMv7 config with ARCH_TEGRA but without any
+> SoC specific flavors.  Such configs fails because mach-tegra/pm.c is
+> compiled always and it references SOC_TEGRA_PMC driver:
+> 
+> 	arch/arm/mach-tegra/built-in.o: In function `tegra_pm_set':
+> 	arch/arm/mach-tegra/pm.c:188: undefined reference to `tegra_pmc_enter_suspend_mode'
+> 
+> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+> ---
+>  arch/arm/mach-tegra/Kconfig | 1 +
+>  drivers/soc/tegra/Kconfig   | 4 ----
+>  2 files changed, 1 insertion(+), 4 deletions(-)
 
+I was going to apply this, when Arnd sent in a variant that fixes this
+in a way that is more in line with how we handle this for other drivers.
 
-On Wednesday 15 March 2017 03:26 PM, AKASHI Takahiro wrote:
-> This patch series adds kdump support on arm64.
->
-> To load a crash-dump kernel to the systems, a series of patches to
-> kexec-tools[1] are also needed. Please use the latest one, v6 [2].
-> For your convinience, you can pick them up from:
->    https://git.linaro.org/people/takahiro.akashi/linux-aarch64.git arm64/kdump
->    https://git.linaro.org/people/takahiro.akashi/kexec-tools.git arm64/kdump
->
-> To examine vmcore (/proc/vmcore) on a crash-dump kernel, you can use
->   - crash utility (v7.1.8 or later) [3]
->
-> I tested this patchset on fast model and hikey.
->
-> The previous versions were also:
-> Tested-by: Pratyush Anand <panand@redhat.com> (v32, mustang and seattle)
+I've credited you with a Reported-by, though.
 
-You have it for this version as well.
-
-Thanks for the patchset.
-
-~Pratyush
+Thanks,
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170320/75050c8d/attachment.sig>
