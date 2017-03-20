@@ -1,100 +1,69 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 20 Mar 2017 12:08:17 +0000
-Subject: [PATCH 6/6] arm64: KVM: Add support for VPIPT I-caches
-In-Reply-To: <1489177945-8590-6-git-send-email-will.deacon@arm.com>
-References: <1489177945-8590-1-git-send-email-will.deacon@arm.com>
- <1489177945-8590-6-git-send-email-will.deacon@arm.com>
-Message-ID: <20170320120816.GA31213@leverpostej>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 20 Mar 2017 12:08:55 +0000
+Subject: [PATCH v5 38/39] media: imx: csi: fix crop rectangle reset in
+ sink set_fmt
+In-Reply-To: <1490010926.2917.59.camel@pengutronix.de>
+References: <1489121599-23206-1-git-send-email-steve_longerbeam@mentor.com>
+ <1489121599-23206-39-git-send-email-steve_longerbeam@mentor.com>
+ <20170319152233.GW21222@n2100.armlinux.org.uk>
+ <327d67d9-68c1-7f74-0c0f-f6aee1c4b546@gmail.com>
+ <1490010926.2917.59.camel@pengutronix.de>
+Message-ID: <20170320120855.GH21222@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 10, 2017 at 08:32:25PM +0000, Will Deacon wrote:
-> A VPIPT I-cache has two main properties:
-> 
-> 1. Lines allocated into the cache are tagged by VMID and a lookup can
->    only hit lines that were allocated with the current VMID.
-> 
-> 2. I-cache invalidation from EL1/0 only invalidates lines that match the
->    current VMID of the CPU doing the invalidation.
-> 
-> This can cause issues with non-VHE configurations, where the host runs
-> at EL1 and wants to invalidate I-cache entries for a guest running with
-> a different VMID. VHE is not affected, because the host runs at EL2 and
-> I-cache invalidation applies as expected.
-> 
-> This patch solves the problem by invalidating the I-cache when unmapping
-> a page at stage 2 on a system with a VPIPT I-cache but not running with
-> VHE enabled. Hopefully this is an obscure enough configuration that the
-> overhead isn't anything to worry about, although it does mean that the
-> by-range I-cache invalidation currently performed when mapping at stage
-> 2 can be elided on such systems, because the I-cache will be clean for
-> the guest VMID following a rollover event.
-> 
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm64/include/asm/kvm_mmu.h |  9 +++++----
->  arch/arm64/kvm/hyp/tlb.c         | 22 ++++++++++++++++++++++
->  2 files changed, 27 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-> index dc3624d8b9db..d2293d49f555 100644
-> --- a/arch/arm64/include/asm/kvm_mmu.h
-> +++ b/arch/arm64/include/asm/kvm_mmu.h
-> @@ -242,12 +242,13 @@ static inline void __coherent_cache_guest_page(struct kvm_vcpu *vcpu,
->  
->  	kvm_flush_dcache_to_poc(va, size);
->  
-> -	if (!icache_is_aliasing()) {		/* PIPT */
-> -		flush_icache_range((unsigned long)va,
-> -				   (unsigned long)va + size);
-> -	} else {
-> +	if (icache_is_aliasing()) {
->  		/* any kind of VIPT cache */
->  		__flush_icache_all();
-> +	} else if (is_kernel_in_hyp_mode() || !icache_is_vpipt()) {
-> +		/* PIPT or VPIPT at EL2 (see comment in __kvm_tlb_flush_vmid_ipa) */
-> +		flush_icache_range((unsigned long)va,
-> +				   (unsigned long)va + size);
->  	}
->  }
->  
-> diff --git a/arch/arm64/kvm/hyp/tlb.c b/arch/arm64/kvm/hyp/tlb.c
-> index e8e7ba2bc11f..f02c7e6a8db4 100644
-> --- a/arch/arm64/kvm/hyp/tlb.c
-> +++ b/arch/arm64/kvm/hyp/tlb.c
-> @@ -46,6 +46,28 @@ void __hyp_text __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
->  	dsb(ish);
->  	isb();
->  
-> +	/*
-> +	 * If the host is running at EL1 and we have a VPIPT I-cache,
-> +	 * then we must perform I-cache maintenance at EL2 in order for
-> +	 * it to have an effect on the guest. Since the guest cannot hit
-> +	 * I-cache lines allocated with a different VMID, we don't need
-> +	 * to worry about junk out of guest reset (we nuke the I-cache on
-> +	 * VMID rollover), but we do need to be careful when remapping
-> +	 * executable pages for the same guest. This can happen when KSM
-> +	 * takes a CoW fault on an executable page, copies the page into
-> +	 * a page that was previously mapped in the guest and then needs
-> +	 * to invalidate the guest view of the I-cache for that page
-> +	 * from EL1. To solve this, we invalidate the entire I-cache when
-> +	 * unmapping a page from a guest if we have a VPIPT I-cache but
-> +	 * the host is running at EL1. As above, we could do better if
-> +	 * we had the VA.
-> +	 *
-> +	 * The moral of this story is: if you have a VPIPT I-cache, then
-> +	 * you should be running with VHE enabled.
-> +	 */
-> +	if (!has_vhe() && icache_is_vpipt())
-> +		__flush_icache_all();
+On Mon, Mar 20, 2017 at 12:55:26PM +0100, Philipp Zabel wrote:
+> The above paragraph suggests we skip any rectangles that are not
+> supported. In our case that would be 3. and 4., since the CSI can't
+> compose into a larger frame. I hadn't realised that the crop selection
+> currently happens on the source pad.
 
-The is_kernel_in_hyp_mode() / has_vhe() inconsistency across these two
-functions is somewhat confusing.
+I'd recommend viewing the documentation in its post-processed version,
+because then you get the examples as pictures, and they say that a
+picture is worth 1000 words.  See
 
-Is there any reason __coherent_cache_guest_page() can't use has_vhe()
-too?
+  https://linuxtv.org/downloads/v4l-dvb-apis/uapi/v4l/dev-subdev.html
 
-Otherwise, this all looks sane to me.
+There is almost an exact example of what we're trying to do - it's
+figure 4.6.  Here, we have a sink pad with a cropping rectangle on
+the input, which is then scaled to a composition rectangle (there's
+no bounds rectangle, and it's specified that in such a case the
+top,left of the composition rectangle will always be 0,0 - see quote
+below).
 
-Thanks,
-Mark.
+Where it differs is that the example also supports source cropping
+for two source pads.  We don't support that.
+
+The same document says:
+
+  Scaling support is optional. When supported by a subdev, the crop
+  rectangle on the subdev's sink pad is scaled to the size configured
+  using the
+  :ref:`VIDIOC_SUBDEV_S_SELECTION <VIDIOC_SUBDEV_G_SELECTION>` IOCTL
+  using ``V4L2_SEL_TGT_COMPOSE`` selection target on the same pad. If the
+  subdev supports scaling but not composing, the top and left values are
+  not used and must always be set to zero.
+
+which in itself describes _exactly_ our hardware here as far as the
+cropping and scaling the hardware supports.
+
+> Except when composing is not supported. If the sink compose and source
+> crop rectangles are not supported, the source pad format takes their
+> place in determining the scaling output resolution. At least that's how
+> I read the documentation.
+
+This isn't how I read it.  Scaling is the relationship between the size
+of the sink crop and sink compose rectangle.  Composition requires that
+there be a composition bounds rectangle to define the composition space,
+and the top,left of the composition rectangle be adjustable to place
+the composition rectangle within that space.
+
+The above quoted paragraph from the documentation backs up my view in
+its final sentence - it doesn't say "if the subdev supports scaling
+but not composing, there is no composition rectangle" but says that
+there _is_ one but its top,left coordinates are always zero.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
