@@ -1,50 +1,50 @@
 From: l.stach@pengutronix.de (Lucas Stach)
-Date: Mon, 20 Mar 2017 10:43:47 +0100
-Subject: [PATCH 8/8] soc: imx: gpc: remove unnecessary readable_reg
- callback
-In-Reply-To: <1489990547-1510-9-git-send-email-aisheng.dong@nxp.com>
+Date: Mon, 20 Mar 2017 10:43:14 +0100
+Subject: [PATCH 7/8] dt-bindings: imx-gpc: correct the DOMAIN_INDEX using
+In-Reply-To: <1489990547-1510-8-git-send-email-aisheng.dong@nxp.com>
 References: <1489990547-1510-1-git-send-email-aisheng.dong@nxp.com>
- <1489990547-1510-9-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1490003027.2895.19.camel@pengutronix.de>
+ <1489990547-1510-8-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <1490002994.2895.18.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Am Montag, den 20.03.2017, 14:15 +0800 schrieb Dong Aisheng:
-> It is not really necessary to provide the current .readable_reg
-> implementation as we know what we're doing in our driver
-> and the regmap core has already done the partial check for
-> available maximum regs.
+> Actually DOMAIN_INDEX is not used by the client devices to refer to
+> the power domain, it uses phandle. Corrent the binding doc a bit
+> to avoid confusing.
 > 
 > Cc: Lucas Stach <l.stach@pengutronix.de>
 > Cc: Shawn Guo <shawnguo@kernel.org>
 > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 
-Acked-by: Lucas Stach <l.stach@pengutronix.de>
+Thanks for the catch. Must have slipped through when changing the
+binding.
+
+Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
 
 > ---
->  drivers/soc/imx/gpc.c | 8 --------
->  1 file changed, 8 deletions(-)
+>  Documentation/devicetree/bindings/power/fsl,imx-gpc.txt | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 > 
-> diff --git a/drivers/soc/imx/gpc.c b/drivers/soc/imx/gpc.c
-> index a744f7e..4885ec2 100644
-> --- a/drivers/soc/imx/gpc.c
-> +++ b/drivers/soc/imx/gpc.c
-> @@ -284,18 +284,10 @@ static const struct of_device_id imx_gpc_dt_ids[] = {
->  	{ }
->  };
+> diff --git a/Documentation/devicetree/bindings/power/fsl,imx-gpc.txt b/Documentation/devicetree/bindings/power/fsl,imx-gpc.txt
+> index 06040a4..58d323c 100644
+> --- a/Documentation/devicetree/bindings/power/fsl,imx-gpc.txt
+> +++ b/Documentation/devicetree/bindings/power/fsl,imx-gpc.txt
+> @@ -20,8 +20,7 @@ subnodes of the power gating controller 'pgc' node of the GPC and should
+>  contain the following:
 >  
-> -static bool imx_gpc_readable_reg(struct device *dev, unsigned int reg)
-> -{
-> -	return (reg % 4 == 0) && (reg <= 0x2ac);
-> -}
-> -
->  static const struct regmap_config imx_gpc_regmap_config = {
->  	.reg_bits = 32,
->  	.val_bits = 32,
->  	.reg_stride = 4,
-> -
-> -	.readable_reg = imx_gpc_readable_reg,
-> -
->  	.max_register = 0x2ac,
->  };
->  
+>  Required properties:
+> -- reg: the DOMAIN_INDEX as used by the client devices to refer to this
+> -  power domain
+> +- reg: Must contain the DOMAIN_INDEX of this power domain
+>    The following DOMAIN_INDEX values are valid for i.MX6Q:
+>    ARM_DOMAIN     0
+>    PU_DOMAIN      1
+> @@ -54,6 +53,7 @@ Example:
+>  				reg = <0>;
+>  				#power-domain-cells = <0>;
+>  			};
+> +
+>  			pd_pu: power-domain at 1 {
+>  				reg = <1>;
+>  				#power-domain-cells = <0>;
