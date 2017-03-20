@@ -1,36 +1,34 @@
 From: horms+renesas@verge.net.au (Simon Horman)
 Date: Mon, 20 Mar 2017 09:58:32 +0100
-Subject: [GIT PULL] Renesas ARM Based SoC DT Bindings Updates for v4.12
-Message-ID: <cover.1490000005.git.horms+renesas@verge.net.au>
+Subject: [PATCH 1/2] ARM: shmobile: Document RZ/G1H SoC DT binding
+In-Reply-To: <cover.1490000005.git.horms+renesas@verge.net.au>
+References: <cover.1490000005.git.horms+renesas@verge.net.au>
+Message-ID: <368d03531f39ffaa793a98b9a17c79d660b1cd1a.1490000005.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Please consider these Renesas ARM based SoC DT bindings updates for v4.12.
+Document the RZ/G1H (r8a7742) SoC.
 
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ Documentation/devicetree/bindings/arm/shmobile.txt | 2 ++
+ 1 file changed, 2 insertions(+)
 
-The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
-
-  Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
-
-are available in the git repository at:
-
-  https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt-bindings-for-v4.12
-
-for you to fetch changes up to cfb9f93437eb6663ca99e85c47bb3656ccfe59c5:
-
-  ARM: shmobile: Document RZ/G1N SoC DT binding (2017-03-13 10:24:14 +0100)
-
-----------------------------------------------------------------
-Renesas ARM Based SoC DT Bindings Updates for v4.12
-
-* Document RZ/G1N and RZ/G1H SoC DT bindings
-
-----------------------------------------------------------------
-Geert Uytterhoeven (2):
-      ARM: shmobile: Document RZ/G1H SoC DT binding
-      ARM: shmobile: Document RZ/G1N SoC DT binding
-
- Documentation/devicetree/bindings/arm/shmobile.txt | 4 ++++
- 1 file changed, 4 insertions(+)
+diff --git a/Documentation/devicetree/bindings/arm/shmobile.txt b/Documentation/devicetree/bindings/arm/shmobile.txt
+index c9502634316d..b8155a209c58 100644
+--- a/Documentation/devicetree/bindings/arm/shmobile.txt
++++ b/Documentation/devicetree/bindings/arm/shmobile.txt
+@@ -13,6 +13,8 @@ SoCs:
+     compatible = "renesas,r8a73a4"
+   - R-Mobile A1 (R8A77400)
+     compatible = "renesas,r8a7740"
++  - RZ/G1H (R8A77420)
++    compatible = "renesas,r8a7742"
+   - RZ/G1M (R8A77430)
+     compatible = "renesas,r8a7743"
+   - RZ/G1E (R8A77450)
+-- 
+2.7.0.rc3.207.g0ac5344
