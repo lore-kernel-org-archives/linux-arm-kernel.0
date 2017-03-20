@@ -1,82 +1,78 @@
-From: tiwai@suse.de (Takashi Iwai)
-Date: Mon, 20 Mar 2017 10:27:13 +0100
-Subject: [PATCHv3 13/16] ALSA: Use set_memory.h header
-In-Reply-To: <1488920133-27229-14-git-send-email-labbott@redhat.com>
-References: <1488920133-27229-1-git-send-email-labbott@redhat.com>
- <1488920133-27229-14-git-send-email-labbott@redhat.com>
-Message-ID: <s5h1stsxpqm.wl-tiwai@suse.de>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 20 Mar 2017 10:31:50 +0100
+Subject: [PATCH v2 0/4] arm: renesas: Add reset control properties
+In-Reply-To: <20170320082852.GC21538@verge.net.au>
+References: <1489673246-11015-1-git-send-email-geert+renesas@glider.be>
+ <20170320082852.GC21538@verge.net.au>
+Message-ID: <CAMuHMdUdFUBh=2azMLWJ1Bm34pP3OnesqdvR1ZQ14JgMtuqecw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 07 Mar 2017 21:55:30 +0100,
-Laura Abbott wrote:
-> 
-> set_memory_* functions have moved to set_memory.h. Switch to this
-> explicitly.
-> 
-> Signed-off-by: Laura Abbott <labbott@redhat.com>
-> ---
-> v3: Add a few other files caught by 0day bot
+Hi Simon, Shimoda-san,
 
-I hoped we could get rid of the ifdef, but other than that, feel free
-to take my ack for the sound part:
+On Mon, Mar 20, 2017 at 9:28 AM, Simon Horman <horms@verge.net.au> wrote:
+> On Thu, Mar 16, 2017 at 03:07:22PM +0100, Geert Uytterhoeven wrote:
+>> This patch series describes the reset control topology for on-SoC devices
+>> connected to the Renesas Clock Pulse Generator / Module Standby and
+>> Software Reset module on the R-Car H3 and M3-W, RZ/G1M, and RZ/G1E SoCs.
+>>
+>> Resets usually match the corresponding module clocks.  Exceptions are:
+>>   - The Display Unit has only 2 resets, one per channel pair, cfr.
+>>     "[PATCH v2] dt-bindings: drm: rcar-du: Document optional reset
+>>     properties" (http://www.spinics.net/lists/dri-devel/msg134637.html),
+>>   - The audio module has resets for the Serial Sound Interfaces only.
+>>     Adding resets and reset-names properties depends on a DT binding
+>>     update for renesas,rsnd (note: the DT binding documentation in
+>>     Documentation/devicetree/bindings/sound/renesas,rsnd.txt doesn't
+>>     even document clocks and clock-names?).
+>> Upon request from Laurent for the DU, and upon a DT bindings update
+>> for rcar_sound, the addition of resets (and reset-names) properties for
+>> these complex modules is postponed.
+>>
+>> Note that this patch series contains hardware description only.
+>> Actual reset policy is to be defined and implemented separately.
+>> Also, this is an optional feature, to be enabled explicitly using
+>> CONFIG_RESET_CONTROLLER=y.  When enabled, an on-SoC device can be reset
+>> easily using device_reset(), or by using the reset_control_*() API when
+>> more fine-grained control is desired.
+>>
+>> Possible use cases are (not exhaustive):
+>>   - Reset a device before use, to make sure it's in a predefined state, and
+>>     doesn't depend on earlier configuration by e.g. the boot loader,
+>>   - Reset a device after detecting an anomaly,
+>>   - Reset a device to verify suspend/resume is handled correctly by the
+>>     driver in case the device would be part of a power domain on a
+>>     different/future SoC.
+>>
+>> Dependencies and impact:
+>>   - The corresponding driver changes to the CGP/MSSR driver are already
+>>     present in v4.11-rc1.
+>>   - These patches have no impact as long as CONFIG_RESET_CONTROLLER=n.
+>>     However, if CONFIG_RESET_CONTROLLER=y and resets properties are
+>>     prsesent in DTS, the EHCI and OHCI drivers already deassert reset as
+>>     part of their initialization sequences, and put the devices back
+>>     into reset state in case initialization failed, or on unbind.
+>>     I'm not aware of other relevant drivers already using reset control.
+>
+> It appears that for arm64 defconfig CONFIG_RESET_CONTROLLER=y is true so
+> by default there will be a behavioural change on arm64. I'd like to
+> understand if it is a desirable (or at least not undesirable) change.
 
-Acked-by: Takashi Iwai <tiwai@suse.de>
+V1 of this patch series has been part of renesas-drivers since
+renesas-drivers-2017-01-24-v4.10-rc5, so I'd hope any negative impact would
+have been discovered by now.
 
+Shimoda-san: Have you noticed any oddities w.r.t. USB?
 
-thanks,
+Thanks!
 
-Takashi
+Gr{oetje,eeting}s,
 
+                        Geert
 
-> ---
->  sound/pci/hda/hda_intel.c    | 2 +-
->  sound/pci/intel8x0.c         | 4 +++-
->  sound/x86/intel_hdmi_audio.c | 2 +-
->  3 files changed, 5 insertions(+), 3 deletions(-)
-> 
-> diff --git a/sound/pci/hda/hda_intel.c b/sound/pci/hda/hda_intel.c
-> index c8256a8..64d6a34 100644
-> --- a/sound/pci/hda/hda_intel.c
-> +++ b/sound/pci/hda/hda_intel.c
-> @@ -53,7 +53,7 @@
->  #ifdef CONFIG_X86
->  /* for snoop control */
->  #include <asm/pgtable.h>
-> -#include <asm/cacheflush.h>
-> +#include <asm/set_memory.h>
->  #include <asm/cpufeature.h>
->  #endif
->  #include <sound/core.h>
-> diff --git a/sound/pci/intel8x0.c b/sound/pci/intel8x0.c
-> index 9720a30..6d17b17 100644
-> --- a/sound/pci/intel8x0.c
-> +++ b/sound/pci/intel8x0.c
-> @@ -40,7 +40,9 @@
->  #include <sound/initval.h>
->  /* for 440MX workaround */
->  #include <asm/pgtable.h>
-> -#include <asm/cacheflush.h>
-> +#ifdef CONFIG_X86
-> +#include <asm/set_memory.h>
-> +#endif
->  
->  MODULE_AUTHOR("Jaroslav Kysela <perex@perex.cz>");
->  MODULE_DESCRIPTION("Intel 82801AA,82901AB,i810,i820,i830,i840,i845,MX440; SiS 7012; Ali 5455");
-> diff --git a/sound/x86/intel_hdmi_audio.c b/sound/x86/intel_hdmi_audio.c
-> index c505b01..664b7fe 100644
-> --- a/sound/x86/intel_hdmi_audio.c
-> +++ b/sound/x86/intel_hdmi_audio.c
-> @@ -30,7 +30,7 @@
->  #include <linux/pm_runtime.h>
->  #include <linux/dma-mapping.h>
->  #include <linux/delay.h>
-> -#include <asm/cacheflush.h>
-> +#include <asm/set_memory.h>
->  #include <sound/core.h>
->  #include <sound/asoundef.h>
->  #include <sound/pcm.h>
-> -- 
-> 2.7.4
-> 
-> 
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
