@@ -1,65 +1,38 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 20 Mar 2017 10:50:04 +0100
-Subject: [GIT PULL] Allwinner clock fixes for 4.11
-Message-ID: <20170320095004.4vd2edph2u7kxi7l@lukather>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 20 Mar 2017 09:50:08 +0000
+Subject: [PATCH] drm/etnaviv: add etnaviv cooling device
+In-Reply-To: <1490001575.2895.8.camel@pengutronix.de>
+References: <E1cn8jj-0002mp-SO@rmk-PC.armlinux.org.uk>
+ <1489582989.16018.4.camel@pengutronix.de>
+ <20170315140541.GT21222@n2100.armlinux.org.uk>
+ <CAFXsbZoT22pz2CuRWaQ2M2TyomNcByHc-SfmNn6=KrfNaubnjQ@mail.gmail.com>
+ <1490001575.2895.8.camel@pengutronix.de>
+Message-ID: <20170320095007.GE21222@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike, Stephen,
+On Mon, Mar 20, 2017 at 10:19:35AM +0100, Lucas Stach wrote:
+> Yes, probably we want to have both at some point. The cooling-device
+> stuff is about throttling the GPU when the SoC reaches critical
+> temperatures.
+> 
+> The devfreq governors are about providing exactly the right performance
+> point.
+> Though as I have not yet seen any SoCs where the voltage would be scaled
+> with GPU frequency, downclocking the GPU is of limited value. For most
+> of those SoCs a race-to-idle policy is probably okay, as this allows
+> other components of the system like the DRAM to go into lower power
+> operating modes when the GPU is idle.
 
-Please pull the following patches for one of the 4.11's rc
+However, since we already have runtime PM support in etnaviv (where we
+even power the GPU off on some SoCs) the lack of voltage scaling does
+suggest that GPU frequency scaling would be of limited value in terms
+of overall power usage.
 
-Thanks!
-Maxime
-
-The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
-
-  Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
-
-are available in the git repository at:
-
-  https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-clk-fixes-for-4.11
-
-for you to fetch changes up to b467e08a15563dede0d37d3233baa24fb97a7310:
-
-  clk: sunxi-ng: fix recalc_rate formula of NKMP clocks (2017-03-20 10:34:05 +0100)
-
-----------------------------------------------------------------
-Allwinner clock fixes for 4.11
-
-A few fixes for a bunch of clocks on a few SoCs. The most important one is
-probably one that fixes the NKMP clock frequency calculation and could end
-up with clocking the CPU frequency to out of bounds rates.
-
-----------------------------------------------------------------
-Arnd Bergmann (1):
-      clk: sunxi: ccu-sun5i needs nkmp
-
-Chen-Yu Tsai (2):
-      clk: sunxi-ng: mp: Adjust parent rate for pre-dividers
-      clk: sunxi-ng: sun6i: Fix enable bit offset for hdmi-ddc module clock
-
-Icenowy Zheng (1):
-      clk: sunxi-ng: fix recalc_rate formula of NKMP clocks
-
-Philipp Tomsich (1):
-      clk: sunxi-ng: Fix div/mult settings for osc12M on A64
-
- drivers/clk/sunxi-ng/Kconfig          | 1 +
- drivers/clk/sunxi-ng/ccu-sun50i-a64.c | 2 +-
- drivers/clk/sunxi-ng/ccu-sun6i-a31.c  | 2 +-
- drivers/clk/sunxi-ng/ccu_mp.c         | 8 ++++++++
- drivers/clk/sunxi-ng/ccu_nkmp.c       | 2 +-
- 5 files changed, 12 insertions(+), 3 deletions(-)
+It's also worth bearing in mind that Vivante GPUs internally control
+clock gates to various modules when they're on.
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170320/fc32e56b/attachment.sig>
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
