@@ -1,101 +1,165 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 20 Mar 2017 17:48:19 +0000
-Subject: [PATCH v2 08/18] arm64: arch_timer: Add erratum handler for
- CPU-specific capability
+Date: Mon, 20 Mar 2017 17:48:20 +0000
+Subject: [PATCH v2 09/18] arm64: arch_timer: Move arch_timer_reg_read/write
+ around
 In-Reply-To: <20170320174829.28182-1-marc.zyngier@arm.com>
 References: <20170320174829.28182-1-marc.zyngier@arm.com>
-Message-ID: <20170320174829.28182-9-marc.zyngier@arm.com>
+Message-ID: <20170320174829.28182-10-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Should we ever have a workaround for an erratum that is detected using
-a capability and affecting a particular CPU, it'd be nice to have
-a way to probe them directly.
+As we're about to move things around, let's start with the low
+level read/write functions. This allows us to use these functions
+in the errata handling code without having to use forward declaration
+of static functions.
 
+Acked-by: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/arch_timer.h  |  1 +
- drivers/clocksource/arm_arch_timer.c | 28 ++++++++++++++++++++++++----
- 2 files changed, 25 insertions(+), 4 deletions(-)
+ drivers/clocksource/arm_arch_timer.c | 124 +++++++++++++++++------------------
+ 1 file changed, 62 insertions(+), 62 deletions(-)
 
-diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
-index 48bd730d568f..e5325299aa6d 100644
---- a/arch/arm64/include/asm/arch_timer.h
-+++ b/arch/arm64/include/asm/arch_timer.h
-@@ -40,6 +40,7 @@ extern struct static_key_false arch_timer_read_ool_enabled;
- enum arch_timer_erratum_match_type {
- 	ate_match_dt,
- 	ate_match_global_cap_id,
-+	ate_match_local_cap_id,
- };
- 
- struct arch_timer_erratum_workaround {
 diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index a0b1108a4a24..5069cb3d4326 100644
+index 5069cb3d4326..e0e4b0e6825d 100644
 --- a/drivers/clocksource/arm_arch_timer.c
 +++ b/drivers/clocksource/arm_arch_timer.c
-@@ -221,6 +221,13 @@ bool arch_timer_check_global_cap_erratum(const struct arch_timer_erratum_workaro
- 	return cpus_have_cap((uintptr_t)wa->id);
- }
+@@ -96,6 +96,68 @@ early_param("clocksource.arm_arch_timer.evtstrm", early_evtstrm_cfg);
+  * Architected system timer support.
+  */
  
-+static
-+bool arch_timer_check_local_cap_erratum(const struct arch_timer_erratum_workaround *wa,
-+					const void *arg)
++static __always_inline
++void arch_timer_reg_write(int access, enum arch_timer_reg reg, u32 val,
++			  struct clock_event_device *clk)
 +{
-+	return this_cpu_has_cap((uintptr_t)wa->id);
++	if (access == ARCH_TIMER_MEM_PHYS_ACCESS) {
++		struct arch_timer *timer = to_arch_timer(clk);
++		switch (reg) {
++		case ARCH_TIMER_REG_CTRL:
++			writel_relaxed(val, timer->base + CNTP_CTL);
++			break;
++		case ARCH_TIMER_REG_TVAL:
++			writel_relaxed(val, timer->base + CNTP_TVAL);
++			break;
++		}
++	} else if (access == ARCH_TIMER_MEM_VIRT_ACCESS) {
++		struct arch_timer *timer = to_arch_timer(clk);
++		switch (reg) {
++		case ARCH_TIMER_REG_CTRL:
++			writel_relaxed(val, timer->base + CNTV_CTL);
++			break;
++		case ARCH_TIMER_REG_TVAL:
++			writel_relaxed(val, timer->base + CNTV_TVAL);
++			break;
++		}
++	} else {
++		arch_timer_reg_write_cp15(access, reg, val);
++	}
 +}
 +
- static const struct arch_timer_erratum_workaround *
- arch_timer_iterate_errata(enum arch_timer_erratum_match_type type,
- 			  ate_match_fn_t match_fn,
-@@ -251,9 +258,7 @@ static void arch_timer_check_ool_workaround(enum arch_timer_erratum_match_type t
- {
- 	const struct arch_timer_erratum_workaround *wa;
- 	ate_match_fn_t match_fn = NULL;
--
--	if (static_branch_unlikely(&arch_timer_read_ool_enabled))
--		return;
-+	bool local = false;
- 
- 	switch (type) {
- 	case ate_match_dt:
-@@ -262,14 +267,27 @@ static void arch_timer_check_ool_workaround(enum arch_timer_erratum_match_type t
- 	case ate_match_global_cap_id:
- 		match_fn = arch_timer_check_global_cap_erratum;
- 		break;
-+	case ate_match_local_cap_id:
-+		match_fn = arch_timer_check_local_cap_erratum;
-+		local = true;
-+		break;
- 	}
- 
- 	wa = arch_timer_iterate_errata(type, match_fn, arg);
- 	if (!wa)
- 		return;
- 
-+	if (static_branch_unlikely(&arch_timer_read_ool_enabled)) {
-+		if (wa != timer_unstable_counter_workaround)
-+			pr_warn("Can't enable workaround for %s (clashes with %s\n)",
-+				wa->desc,
-+				timer_unstable_counter_workaround->desc);
-+		return;
++static __always_inline
++u32 arch_timer_reg_read(int access, enum arch_timer_reg reg,
++			struct clock_event_device *clk)
++{
++	u32 val;
++
++	if (access == ARCH_TIMER_MEM_PHYS_ACCESS) {
++		struct arch_timer *timer = to_arch_timer(clk);
++		switch (reg) {
++		case ARCH_TIMER_REG_CTRL:
++			val = readl_relaxed(timer->base + CNTP_CTL);
++			break;
++		case ARCH_TIMER_REG_TVAL:
++			val = readl_relaxed(timer->base + CNTP_TVAL);
++			break;
++		}
++	} else if (access == ARCH_TIMER_MEM_VIRT_ACCESS) {
++		struct arch_timer *timer = to_arch_timer(clk);
++		switch (reg) {
++		case ARCH_TIMER_REG_CTRL:
++			val = readl_relaxed(timer->base + CNTV_CTL);
++			break;
++		case ARCH_TIMER_REG_TVAL:
++			val = readl_relaxed(timer->base + CNTV_TVAL);
++			break;
++		}
++	} else {
++		val = arch_timer_reg_read_cp15(access, reg);
 +	}
 +
- 	arch_timer_enable_workaround(wa);
--	pr_info("Enabling global workaround for %s\n", wa->desc);
-+	pr_info("Enabling %s workaround for %s\n",
-+		local ? "local" : "global", wa->desc);
- }
- 
- #else
-@@ -529,6 +547,8 @@ static void __arch_timer_setup(unsigned type,
- 			BUG();
- 		}
- 
-+		arch_timer_check_ool_workaround(ate_match_local_cap_id, NULL);
++	return val;
++}
 +
- 		erratum_workaround_set_sne(clk);
- 	} else {
- 		clk->features |= CLOCK_EVT_FEAT_DYNIRQ;
+ #ifdef CONFIG_FSL_ERRATUM_A008585
+ /*
+  * The number of retries is an arbitrary value well beyond the highest number
+@@ -294,68 +356,6 @@ static void arch_timer_check_ool_workaround(enum arch_timer_erratum_match_type t
+ #define arch_timer_check_ool_workaround(t,a)		do { } while(0)
+ #endif /* CONFIG_ARM_ARCH_TIMER_OOL_WORKAROUND */
+ 
+-static __always_inline
+-void arch_timer_reg_write(int access, enum arch_timer_reg reg, u32 val,
+-			  struct clock_event_device *clk)
+-{
+-	if (access == ARCH_TIMER_MEM_PHYS_ACCESS) {
+-		struct arch_timer *timer = to_arch_timer(clk);
+-		switch (reg) {
+-		case ARCH_TIMER_REG_CTRL:
+-			writel_relaxed(val, timer->base + CNTP_CTL);
+-			break;
+-		case ARCH_TIMER_REG_TVAL:
+-			writel_relaxed(val, timer->base + CNTP_TVAL);
+-			break;
+-		}
+-	} else if (access == ARCH_TIMER_MEM_VIRT_ACCESS) {
+-		struct arch_timer *timer = to_arch_timer(clk);
+-		switch (reg) {
+-		case ARCH_TIMER_REG_CTRL:
+-			writel_relaxed(val, timer->base + CNTV_CTL);
+-			break;
+-		case ARCH_TIMER_REG_TVAL:
+-			writel_relaxed(val, timer->base + CNTV_TVAL);
+-			break;
+-		}
+-	} else {
+-		arch_timer_reg_write_cp15(access, reg, val);
+-	}
+-}
+-
+-static __always_inline
+-u32 arch_timer_reg_read(int access, enum arch_timer_reg reg,
+-			struct clock_event_device *clk)
+-{
+-	u32 val;
+-
+-	if (access == ARCH_TIMER_MEM_PHYS_ACCESS) {
+-		struct arch_timer *timer = to_arch_timer(clk);
+-		switch (reg) {
+-		case ARCH_TIMER_REG_CTRL:
+-			val = readl_relaxed(timer->base + CNTP_CTL);
+-			break;
+-		case ARCH_TIMER_REG_TVAL:
+-			val = readl_relaxed(timer->base + CNTP_TVAL);
+-			break;
+-		}
+-	} else if (access == ARCH_TIMER_MEM_VIRT_ACCESS) {
+-		struct arch_timer *timer = to_arch_timer(clk);
+-		switch (reg) {
+-		case ARCH_TIMER_REG_CTRL:
+-			val = readl_relaxed(timer->base + CNTV_CTL);
+-			break;
+-		case ARCH_TIMER_REG_TVAL:
+-			val = readl_relaxed(timer->base + CNTV_TVAL);
+-			break;
+-		}
+-	} else {
+-		val = arch_timer_reg_read_cp15(access, reg);
+-	}
+-
+-	return val;
+-}
+-
+ static __always_inline irqreturn_t timer_handler(const int access,
+ 					struct clock_event_device *evt)
+ {
 -- 
 2.11.0
