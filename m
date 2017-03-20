@@ -1,165 +1,70 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 20 Mar 2017 17:48:20 +0000
-Subject: [PATCH v2 09/18] arm64: arch_timer: Move arch_timer_reg_read/write
- around
+Date: Mon, 20 Mar 2017 17:48:16 +0000
+Subject: [PATCH v2 05/18] arm64: cpu_errata: Add capability to advertise
+ Cortex-A73 erratum 858921
 In-Reply-To: <20170320174829.28182-1-marc.zyngier@arm.com>
 References: <20170320174829.28182-1-marc.zyngier@arm.com>
-Message-ID: <20170320174829.28182-10-marc.zyngier@arm.com>
+Message-ID: <20170320174829.28182-6-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As we're about to move things around, let's start with the low
-level read/write functions. This allows us to use these functions
-in the errata handling code without having to use forward declaration
-of static functions.
+In order to work around Cortex-A73 erratum 858921 in a subsequent
+patch, add the required capability that advertise the erratum.
 
-Acked-by: Mark Rutland <mark.rutland@arm.com>
+As the configuration option it depends on is not present yet,
+this has no immediate effect.
+
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/clocksource/arm_arch_timer.c | 124 +++++++++++++++++------------------
- 1 file changed, 62 insertions(+), 62 deletions(-)
+ Documentation/arm64/silicon-errata.txt | 1 +
+ arch/arm64/include/asm/cpucaps.h       | 3 ++-
+ arch/arm64/kernel/cpu_errata.c         | 8 ++++++++
+ 3 files changed, 11 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index 5069cb3d4326..e0e4b0e6825d 100644
---- a/drivers/clocksource/arm_arch_timer.c
-+++ b/drivers/clocksource/arm_arch_timer.c
-@@ -96,6 +96,68 @@ early_param("clocksource.arm_arch_timer.evtstrm", early_evtstrm_cfg);
-  * Architected system timer support.
-  */
+diff --git a/Documentation/arm64/silicon-errata.txt b/Documentation/arm64/silicon-errata.txt
+index 2f66683500b8..10f2dddbf449 100644
+--- a/Documentation/arm64/silicon-errata.txt
++++ b/Documentation/arm64/silicon-errata.txt
+@@ -54,6 +54,7 @@ stable kernels.
+ | ARM            | Cortex-A57      | #852523         | N/A                         |
+ | ARM            | Cortex-A57      | #834220         | ARM64_ERRATUM_834220        |
+ | ARM            | Cortex-A72      | #853709         | N/A                         |
++| ARM            | Cortex-A73      | #858921         | ARM64_ERRATUM_858921        |
+ | ARM            | MMU-500         | #841119,#826419 | N/A                         |
+ |                |                 |                 |                             |
+ | Cavium         | ThunderX ITS    | #22375, #24313  | CAVIUM_ERRATUM_22375        |
+diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
+index fb78a5d3b60b..b3aab8a17868 100644
+--- a/arch/arm64/include/asm/cpucaps.h
++++ b/arch/arm64/include/asm/cpucaps.h
+@@ -37,7 +37,8 @@
+ #define ARM64_HAS_NO_FPSIMD			16
+ #define ARM64_WORKAROUND_REPEAT_TLBI		17
+ #define ARM64_WORKAROUND_QCOM_FALKOR_E1003	18
++#define ARM64_WORKAROUND_858921			19
  
-+static __always_inline
-+void arch_timer_reg_write(int access, enum arch_timer_reg reg, u32 val,
-+			  struct clock_event_device *clk)
-+{
-+	if (access == ARCH_TIMER_MEM_PHYS_ACCESS) {
-+		struct arch_timer *timer = to_arch_timer(clk);
-+		switch (reg) {
-+		case ARCH_TIMER_REG_CTRL:
-+			writel_relaxed(val, timer->base + CNTP_CTL);
-+			break;
-+		case ARCH_TIMER_REG_TVAL:
-+			writel_relaxed(val, timer->base + CNTP_TVAL);
-+			break;
-+		}
-+	} else if (access == ARCH_TIMER_MEM_VIRT_ACCESS) {
-+		struct arch_timer *timer = to_arch_timer(clk);
-+		switch (reg) {
-+		case ARCH_TIMER_REG_CTRL:
-+			writel_relaxed(val, timer->base + CNTV_CTL);
-+			break;
-+		case ARCH_TIMER_REG_TVAL:
-+			writel_relaxed(val, timer->base + CNTV_TVAL);
-+			break;
-+		}
-+	} else {
-+		arch_timer_reg_write_cp15(access, reg, val);
-+	}
-+}
-+
-+static __always_inline
-+u32 arch_timer_reg_read(int access, enum arch_timer_reg reg,
-+			struct clock_event_device *clk)
-+{
-+	u32 val;
-+
-+	if (access == ARCH_TIMER_MEM_PHYS_ACCESS) {
-+		struct arch_timer *timer = to_arch_timer(clk);
-+		switch (reg) {
-+		case ARCH_TIMER_REG_CTRL:
-+			val = readl_relaxed(timer->base + CNTP_CTL);
-+			break;
-+		case ARCH_TIMER_REG_TVAL:
-+			val = readl_relaxed(timer->base + CNTP_TVAL);
-+			break;
-+		}
-+	} else if (access == ARCH_TIMER_MEM_VIRT_ACCESS) {
-+		struct arch_timer *timer = to_arch_timer(clk);
-+		switch (reg) {
-+		case ARCH_TIMER_REG_CTRL:
-+			val = readl_relaxed(timer->base + CNTV_CTL);
-+			break;
-+		case ARCH_TIMER_REG_TVAL:
-+			val = readl_relaxed(timer->base + CNTV_TVAL);
-+			break;
-+		}
-+	} else {
-+		val = arch_timer_reg_read_cp15(access, reg);
-+	}
-+
-+	return val;
-+}
-+
- #ifdef CONFIG_FSL_ERRATUM_A008585
- /*
-  * The number of retries is an arbitrary value well beyond the highest number
-@@ -294,68 +356,6 @@ static void arch_timer_check_ool_workaround(enum arch_timer_erratum_match_type t
- #define arch_timer_check_ool_workaround(t,a)		do { } while(0)
- #endif /* CONFIG_ARM_ARCH_TIMER_OOL_WORKAROUND */
+-#define ARM64_NCAPS				19
++#define ARM64_NCAPS				20
  
--static __always_inline
--void arch_timer_reg_write(int access, enum arch_timer_reg reg, u32 val,
--			  struct clock_event_device *clk)
--{
--	if (access == ARCH_TIMER_MEM_PHYS_ACCESS) {
--		struct arch_timer *timer = to_arch_timer(clk);
--		switch (reg) {
--		case ARCH_TIMER_REG_CTRL:
--			writel_relaxed(val, timer->base + CNTP_CTL);
--			break;
--		case ARCH_TIMER_REG_TVAL:
--			writel_relaxed(val, timer->base + CNTP_TVAL);
--			break;
--		}
--	} else if (access == ARCH_TIMER_MEM_VIRT_ACCESS) {
--		struct arch_timer *timer = to_arch_timer(clk);
--		switch (reg) {
--		case ARCH_TIMER_REG_CTRL:
--			writel_relaxed(val, timer->base + CNTV_CTL);
--			break;
--		case ARCH_TIMER_REG_TVAL:
--			writel_relaxed(val, timer->base + CNTV_TVAL);
--			break;
--		}
--	} else {
--		arch_timer_reg_write_cp15(access, reg, val);
--	}
--}
--
--static __always_inline
--u32 arch_timer_reg_read(int access, enum arch_timer_reg reg,
--			struct clock_event_device *clk)
--{
--	u32 val;
--
--	if (access == ARCH_TIMER_MEM_PHYS_ACCESS) {
--		struct arch_timer *timer = to_arch_timer(clk);
--		switch (reg) {
--		case ARCH_TIMER_REG_CTRL:
--			val = readl_relaxed(timer->base + CNTP_CTL);
--			break;
--		case ARCH_TIMER_REG_TVAL:
--			val = readl_relaxed(timer->base + CNTP_TVAL);
--			break;
--		}
--	} else if (access == ARCH_TIMER_MEM_VIRT_ACCESS) {
--		struct arch_timer *timer = to_arch_timer(clk);
--		switch (reg) {
--		case ARCH_TIMER_REG_CTRL:
--			val = readl_relaxed(timer->base + CNTV_CTL);
--			break;
--		case ARCH_TIMER_REG_TVAL:
--			val = readl_relaxed(timer->base + CNTV_TVAL);
--			break;
--		}
--	} else {
--		val = arch_timer_reg_read_cp15(access, reg);
--	}
--
--	return val;
--}
--
- static __always_inline irqreturn_t timer_handler(const int access,
- 					struct clock_event_device *evt)
- {
+ #endif /* __ASM_CPUCAPS_H */
+diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+index 2be1d1c05303..2ed2a7657711 100644
+--- a/arch/arm64/kernel/cpu_errata.c
++++ b/arch/arm64/kernel/cpu_errata.c
+@@ -158,6 +158,14 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
+ 			   MIDR_CPU_VAR_REV(0, 0)),
+ 	},
+ #endif
++#ifdef CONFIG_ARM64_ERRATUM_858921
++	{
++	/* Cortex-A73 all versions */
++		.desc = "ARM erratum 858921",
++		.capability = ARM64_WORKAROUND_858921,
++		MIDR_ALL_VERSIONS(MIDR_CORTEX_A73),
++	},
++#endif
+ 	{
+ 	}
+ };
 -- 
 2.11.0
