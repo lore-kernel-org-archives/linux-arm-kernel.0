@@ -1,106 +1,49 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 20 Mar 2017 09:57:23 +0100
-Subject: [PATCH 12/32] arm64: dts: r8a7796: Add all SCIF nodes
+Date: Mon, 20 Mar 2017 09:57:19 +0100
+Subject: [PATCH 08/32] arm64: dts: h3ulcb: Fix EthernetAVB PHY timing
 In-Reply-To: <cover.1489999913.git.horms+renesas@verge.net.au>
 References: <cover.1489999913.git.horms+renesas@verge.net.au>
-Message-ID: <19d76f3ec8fc6ff38f1c5ca534d75a957c8661ea.1489999913.git.horms+renesas@verge.net.au>
+Message-ID: <5b9fd1962f605a31842371471e559407c293131f.1489999913.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
+From: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
 
-Add the device nodes for all R-Car H3 SCIF serial ports, incl. clocks
-and power domain.
+Set PHY rxc-skew-ps to 1500 and all other values to their default values.
 
-Signed-off-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+This is intended to to address failures in the case of 1Gbps communication
+using the by h3ulcb board with the KSZ9031RNX phy.
+
+Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a7796.dtsi | 65 ++++++++++++++++++++++++++++++++
- 1 file changed, 65 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts | 13 +------------
+ 1 file changed, 1 insertion(+), 12 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7796.dtsi b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-index 714fd96b29eb..5fb93fc043c2 100644
---- a/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-@@ -559,6 +559,32 @@
- 			status = "disabled";
- 		};
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts b/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
+index 9811534f296e..69c623faf80c 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
++++ b/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
+@@ -354,18 +354,7 @@
+ 	status = "okay";
  
-+		scif0: serial at e6e60000 {
-+			compatible = "renesas,scif-r8a7796",
-+				     "renesas,rcar-gen3-scif", "renesas,scif";
-+			reg = <0 0xe6e60000 0 64>;
-+			interrupts = <GIC_SPI 152 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 207>,
-+				 <&cpg CPG_CORE R8A7796_CLK_S3D1>,
-+				 <&scif_clk>;
-+			clock-names = "fck", "brg_int", "scif_clk";
-+			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
-+			status = "disabled";
-+		};
-+
-+		scif1: serial at e6e68000 {
-+			compatible = "renesas,scif-r8a7796",
-+				     "renesas,rcar-gen3-scif", "renesas,scif";
-+			reg = <0 0xe6e68000 0 64>;
-+			interrupts = <GIC_SPI 153 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 206>,
-+				 <&cpg CPG_CORE R8A7796_CLK_S3D1>,
-+				 <&scif_clk>;
-+			clock-names = "fck", "brg_int", "scif_clk";
-+			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
-+			status = "disabled";
-+		};
-+
- 		scif2: serial at e6e88000 {
- 			compatible = "renesas,scif-r8a7796",
- 				     "renesas,rcar-gen3-scif", "renesas,scif";
-@@ -572,6 +598,45 @@
- 			status = "disabled";
- 		};
- 
-+		scif3: serial at e6c50000 {
-+			compatible = "renesas,scif-r8a7796",
-+				     "renesas,rcar-gen3-scif", "renesas,scif";
-+			reg = <0 0xe6c50000 0 64>;
-+			interrupts = <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 204>,
-+				 <&cpg CPG_CORE R8A7796_CLK_S3D1>,
-+				 <&scif_clk>;
-+			clock-names = "fck", "brg_int", "scif_clk";
-+			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
-+			status = "disabled";
-+		};
-+
-+		scif4: serial at e6c40000 {
-+			compatible = "renesas,scif-r8a7796",
-+				     "renesas,rcar-gen3-scif", "renesas,scif";
-+			reg = <0 0xe6c40000 0 64>;
-+			interrupts = <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 203>,
-+				 <&cpg CPG_CORE R8A7796_CLK_S3D1>,
-+				 <&scif_clk>;
-+			clock-names = "fck", "brg_int", "scif_clk";
-+			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
-+			status = "disabled";
-+		};
-+
-+		scif5: serial at e6f30000 {
-+			compatible = "renesas,scif-r8a7796",
-+				     "renesas,rcar-gen3-scif", "renesas,scif";
-+			reg = <0 0xe6f30000 0 64>;
-+			interrupts = <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 202>,
-+				 <&cpg CPG_CORE R8A7796_CLK_S3D1>,
-+				 <&scif_clk>;
-+			clock-names = "fck", "brg_int", "scif_clk";
-+			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
-+			status = "disabled";
-+		};
-+
- 		msiof0: spi at e6e90000 {
- 			compatible = "renesas,msiof-r8a7796",
- 				     "renesas,rcar-gen3-msiof";
+ 	phy0: ethernet-phy at 0 {
+-		rxc-skew-ps = <900>;
+-		rxdv-skew-ps = <0>;
+-		rxd0-skew-ps = <0>;
+-		rxd1-skew-ps = <0>;
+-		rxd2-skew-ps = <0>;
+-		rxd3-skew-ps = <0>;
+-		txc-skew-ps = <900>;
+-		txen-skew-ps = <0>;
+-		txd0-skew-ps = <0>;
+-		txd1-skew-ps = <0>;
+-		txd2-skew-ps = <0>;
+-		txd3-skew-ps = <0>;
++		rxc-skew-ps = <1500>;
+ 		reg = <0>;
+ 		interrupt-parent = <&gpio2>;
+ 		interrupts = <11 IRQ_TYPE_LEVEL_LOW>;
 -- 
 2.7.0.rc3.207.g0ac5344
