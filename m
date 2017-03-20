@@ -1,31 +1,57 @@
-From: smueller@chronox.de (Stephan =?ISO-8859-1?Q?M=FCller?=)
-Date: Mon, 20 Mar 2017 14:39:47 +0100
-Subject: Question - seeding the hw pseudo random number generator
-In-Reply-To: <20170320132858.GA27044@gondor.apana.org.au>
-References: <20170318092554.lggkhfg5eko23o3k@kozik-lap>
- <CANc+2y5gv2ygSM4HF69XCW7Bb8UUHN+qJKq0os-mOvYknH+SeQ@mail.gmail.com>
- <20170320132858.GA27044@gondor.apana.org.au>
-Message-ID: <1509135.hmo2UhaKWe@tauon.atsec.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 20 Mar 2017 13:42:17 +0000
+Subject: [PATCH 1/4] spi: pl022: remove nonexistent properties from DT
+ binding example
+In-Reply-To: <20170320095721.6724-1-borneo.antonio@gmail.com>
+References: <20170320095721.6724-1-borneo.antonio@gmail.com>
+Message-ID: <20170320134217.GB31213@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, 20. M?rz 2017, 14:28:58 CET schrieb Herbert Xu:
-
-Hi Herbert,
-
-> On Mon, Mar 20, 2017 at 12:19:32PM +0530, PrasannaKumar Muralidharan wrote:
-> > AF_ALG interface for rng does have seeding support. I think hw_random
-> > does not provide seeding support intentionally as I understand that
-> > True RNG need not require seeding (please correct me if I am wrong).
+On Mon, Mar 20, 2017 at 10:57:18AM +0100, Antonio Borneo wrote:
+> The properties "pl022,hierarchy" and "pl022,slave-tx-disable" were
+> initially proposed till patch V4 [1] but then discarded in V5 [2]
+> when the patch set was taken over by another developer, as
+> explained in patch history in [3].
+> The above properties never landed in mainline code but were then
+> listed in the binding example by a following commit dc715452e914
+> ("spi: pl022: use generic DMA slave configuration if possible")
+> and later on they were copy-paste in some board's DT.
 > 
-> Yes.  We should be converting PRNGs in hwrng over to algif_rng.
+> Remove the nonexistent properties from the example.
+> Also remove a spaces-only line at the end of the file.
+> 
+> [1] https://lkml.org/lkml/2012/7/9/421
+> [2] https://lkml.org/lkml/2012/8/21/427
+> [3] https://lkml.org/lkml/2012/8/21/436
+> 
+> Signed-off-by: Antonio Borneo <borneo.antonio@gmail.com>
 
-IMHO this not only applies to the PRNGs in drivers/crypto (which should simply 
-register with crypto_register_rngs) but also to ~/hacking/sources/linux/arch/
-s390/crypto/prng.c which exports a /dev/prandom file.
+For the series:
 
-For the seeding, it may make sense to follow the example given with crypto/
-drbg.c using the add_random_ready_callback function.
+Acked-by: Mark Rutland <mark.rutland@arm.com>
 
-Ciao
-Stephan
+Mark.
+
+> diff --git a/Documentation/devicetree/bindings/spi/spi_pl022.txt b/Documentation/devicetree/bindings/spi/spi_pl022.txt
+> index 4d1673ca8cf8..2692a5726c3f 100644
+> --- a/Documentation/devicetree/bindings/spi/spi_pl022.txt
+> +++ b/Documentation/devicetree/bindings/spi/spi_pl022.txt
+> @@ -56,9 +56,7 @@ Example:
+>  			spi-max-frequency = <12000000>;
+>  			spi-cpol;
+>  			spi-cpha;
+> -			pl022,hierarchy = <0>;
+>  			pl022,interface = <0>;
+> -			pl022,slave-tx-disable;
+>  			pl022,com-mode = <0x2>;
+>  			pl022,rx-level-trig = <0>;
+>  			pl022,tx-level-trig = <0>;
+> @@ -67,4 +65,3 @@ Example:
+>  			pl022,duplex = <0>;
+>  		};
+>  	};
+> -	
+> -- 
+> 2.12.0
+> 
