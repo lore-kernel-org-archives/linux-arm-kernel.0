@@ -1,432 +1,152 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 20 Mar 2017 18:23:24 +0100
-Subject: [PATCH v5 38/39] media: imx: csi: fix crop rectangle reset in
- sink set_fmt
-In-Reply-To: <20170320141705.GL21222@n2100.armlinux.org.uk>
-References: <1489121599-23206-1-git-send-email-steve_longerbeam@mentor.com>
- <1489121599-23206-39-git-send-email-steve_longerbeam@mentor.com>
- <20170319152233.GW21222@n2100.armlinux.org.uk>
- <327d67d9-68c1-7f74-0c0f-f6aee1c4b546@gmail.com>
- <1490010926.2917.59.camel@pengutronix.de>
- <20170320120855.GH21222@n2100.armlinux.org.uk>
- <1490018451.2917.86.camel@pengutronix.de>
- <20170320141705.GL21222@n2100.armlinux.org.uk>
-Message-ID: <1490030604.2917.103.camel@pengutronix.de>
+From: mchehab@s-opensource.com (Mauro Carvalho Chehab)
+Date: Mon, 20 Mar 2017 14:37:15 -0300
+Subject: [PATCH v4 14/36] [media] v4l2-mc: add a function to inherit
+ controls from a pipeline
+In-Reply-To: <20170320161003.GO21222@n2100.armlinux.org.uk>
+References: <cc8900b0-c091-b14b-96f4-01f8fa72431c@xs4all.nl>
+ <20170310125342.7f047acf@vento.lan>
+ <20170310223714.GI3220@valkosipuli.retiisi.org.uk>
+ <20170311082549.576531d0@vento.lan>
+ <20170313124621.GA10701@valkosipuli.retiisi.org.uk>
+ <20170314004533.3b3cd44b@vento.lan>
+ <e0a6c60b-1735-de0b-21f4-d8c3f4b3f10f@xs4all.nl>
+ <20170314072143.498cde9b@vento.lan>
+ <5c935062-61f4-40e7-0ee9-87655197e661@xs4all.nl>
+ <20170320123938.0503c931@vento.lan>
+ <20170320161003.GO21222@n2100.armlinux.org.uk>
+Message-ID: <20170320143715.66860222@vento.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Steve, Russell,
+Em Mon, 20 Mar 2017 16:10:03 +0000
+Russell King - ARM Linux <linux@armlinux.org.uk> escreveu:
 
-On Mon, 2017-03-20 at 14:17 +0000, Russell King - ARM Linux wrote:
-> On Mon, Mar 20, 2017 at 03:00:51PM +0100, Philipp Zabel wrote:
-> > On Mon, 2017-03-20 at 12:08 +0000, Russell King - ARM Linux wrote:
-> > > The same document says:
-> > > 
-> > >   Scaling support is optional. When supported by a subdev, the crop
-> > >   rectangle on the subdev's sink pad is scaled to the size configured
-> > >   using the
-> > >   :ref:`VIDIOC_SUBDEV_S_SELECTION <VIDIOC_SUBDEV_G_SELECTION>` IOCTL
-> > >   using ``V4L2_SEL_TGT_COMPOSE`` selection target on the same pad. If the
-> > >   subdev supports scaling but not composing, the top and left values are
-> > >   not used and must always be set to zero.
+> On Mon, Mar 20, 2017 at 12:39:38PM -0300, Mauro Carvalho Chehab wrote:
+> > Em Mon, 20 Mar 2017 14:24:25 +0100
+> > Hans Verkuil <hverkuil@xs4all.nl> escreveu:  
+> > > I don't think this control inheritance patch will magically prevent you
+> > > from needed a plugin.  
 > > 
-> > Right, this sentence does imply that when scaling is supported, there
-> > must be a sink compose rectangle, even when composing is not.
+> > Yeah, it is not just control inheritance. The driver needs to work
+> > without subdev API, e. g. mbus settings should also be done via the
+> > video devnode.
 > > 
-> > I have previously set up scaling like this:
-> > 
-> > media-ctl --set-v4l2 "'ipu1_csi0_mux':2[fmt:UYVY2X8/1920x1080 at 1/60]"
-> > media-ctl --set-v4l2 "'ipu1_csi0':2[fmt:AYUV32/960x540 at 1/30]"
-> > 
-> > Does this mean, it should work like this instead?
-> > 
-> > media-ctl --set-v4l2 "'ipu1_csi0_mux':2[fmt:UYVY2X8/1920x1080 at 1/60]"
-> > media-ctl --set-v4l2 "'ipu1_csi0':0[fmt:UYVY2X8/1920x1080 at 1/60,compose:(0,0)/960x540]"
-> > media-ctl --set-v4l2 "'ipu1_csi0':2[fmt:AYUV32/960x540 at 1/30]"
-> > 
-> > I suppose setting the source pad format should not be allowed to modify
-> > the sink compose rectangle.
+> > Btw, Sakari made a good point on IRC: what happens if some app 
+> > try to change the pipeline or subdev settings while another
+> > application is using the device? The driver should block such 
+> > changes, maybe using the V4L2 priority mechanism.  
 > 
-> That is what I believe having read these documents several times, but
-> we need v4l2 people to confirm.
+> My understanding is that there are already mechanisms in place to
+> prevent that, but it's driver dependent - certainly several of the
+> imx driver subdevs check whether they have an active stream, and
+> refuse (eg) all set_fmt calls with -EBUSY if that is so.
+> 
+> (That statement raises another question in my mind: if the subdev is
+> streaming, should it refuse all set_fmt, even for the TRY stuff?)
 
-What do you think of this:
+Returning -EBUSY only when streaming is too late, as ioctl's
+may be changing the pipeline configuration and/or buffer allocation,
+while the application is sending other ioctls in order to prepare
+for streaming.
 
-----------8<----------
->From 2830aebc404bdfc9d7fc1ec94e5282d0b668e8f6 Mon Sep 17 00:00:00 2001
-From: Philipp Zabel <p.zabel@pengutronix.de>
-Date: Mon, 20 Mar 2017 17:10:21 +0100
-Subject: [PATCH] media: imx: csi: add sink selection rectangles
+V4L2 has a mechanism of blocking other apps to change such
+parameters via VIDIOC_S_PRIORITY[1]. If an application sets
+priority to V4L2_PRIORITY_RECORD, any other application attempting
+to change the device via some other file descriptor will fail.
+So, it is a sort of "exclusive write access".
 
-Move the crop rectangle to the sink pad and add a sink compose rectangle
-to configure scaling. Also propagate rectangles from sink pad to crop
-rectangle, to compose rectangle, and to the source pads both in ACTIVE
-and TRY variants of set_fmt/selection, and initialize the default crop
-and compose rectangles.
+On a quick look at V4L2 core, currently, sending a 
+VIDIOC_S_PRIORITY ioctl to a /dev/video device doesn't seem to have
+any effect at either MC or V4L2 subdev API for the subdevs connected
+to it. We'll likely need to add some code at v4l2_prio_change()
+for it to notify the subdevs for them to return -EBUSY if one
+would try to change something there, while the device is priorized.
 
-Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
----
- drivers/staging/media/imx/imx-media-csi.c | 216 +++++++++++++++++++++---------
- 1 file changed, 152 insertions(+), 64 deletions(-)
+[1] https://linuxtv.org/downloads/v4l-dvb-apis/uapi/v4l/vidioc-g-priority.html
 
-diff --git a/drivers/staging/media/imx/imx-media-csi.c b/drivers/staging/media/imx/imx-media-csi.c
-index 560da3abdd70b..b026a5d602ddf 100644
---- a/drivers/staging/media/imx/imx-media-csi.c
-+++ b/drivers/staging/media/imx/imx-media-csi.c
-@@ -79,6 +79,7 @@ struct csi_priv {
- 	const struct imx_media_pixfmt *cc[CSI_NUM_PADS];
- 	struct v4l2_fract frame_interval;
- 	struct v4l2_rect crop;
-+	struct v4l2_rect compose;
- 	const struct csi_skip_desc *skip[CSI_NUM_PADS - 1];
- 
- 	/* active vb2 buffers to send to video dev sink */
-@@ -574,8 +575,8 @@ static int csi_setup(struct csi_priv *priv)
- 	ipu_csi_set_window(priv->csi, &priv->crop);
- 
- 	ipu_csi_set_downsize(priv->csi,
--			     priv->crop.width == 2 * outfmt->width,
--			     priv->crop.height == 2 * outfmt->height);
-+			     priv->crop.width == 2 * priv->compose.width,
-+			     priv->crop.height == 2 * priv->compose.height);
- 
- 	ipu_csi_init_interface(priv->csi, &sensor_mbus_cfg, &if_fmt);
- 
-@@ -1001,6 +1002,27 @@ __csi_get_fmt(struct csi_priv *priv, struct v4l2_subdev_pad_config *cfg,
- 		return &priv->format_mbus[pad];
- }
- 
-+static struct v4l2_rect *
-+__csi_get_crop(struct csi_priv *priv, struct v4l2_subdev_pad_config *cfg,
-+	       enum v4l2_subdev_format_whence which)
-+{
-+	if (which == V4L2_SUBDEV_FORMAT_TRY)
-+		return v4l2_subdev_get_try_crop(&priv->sd, cfg, CSI_SINK_PAD);
-+	else
-+		return &priv->crop;
-+}
-+
-+static struct v4l2_rect *
-+__csi_get_compose(struct csi_priv *priv, struct v4l2_subdev_pad_config *cfg,
-+		  enum v4l2_subdev_format_whence which)
-+{
-+	if (which == V4L2_SUBDEV_FORMAT_TRY)
-+		return v4l2_subdev_get_try_compose(&priv->sd, cfg,
-+						   CSI_SINK_PAD);
-+	else
-+		return &priv->compose;
-+}
-+
- static void csi_try_crop(struct csi_priv *priv,
- 			 struct v4l2_rect *crop,
- 			 struct v4l2_subdev_pad_config *cfg,
-@@ -1159,6 +1181,7 @@ static void csi_try_fmt(struct csi_priv *priv,
- 			struct v4l2_subdev_pad_config *cfg,
- 			struct v4l2_subdev_format *sdformat,
- 			struct v4l2_rect *crop,
-+			struct v4l2_rect *compose,
- 			const struct imx_media_pixfmt **cc)
- {
- 	const struct imx_media_pixfmt *incc;
-@@ -1173,15 +1196,8 @@ static void csi_try_fmt(struct csi_priv *priv,
- 		incc = imx_media_find_mbus_format(infmt->code,
- 						  CS_SEL_ANY, true);
- 
--		if (sdformat->format.width < priv->crop.width * 3 / 4)
--			sdformat->format.width = priv->crop.width / 2;
--		else
--			sdformat->format.width = priv->crop.width;
--
--		if (sdformat->format.height < priv->crop.height * 3 / 4)
--			sdformat->format.height = priv->crop.height / 2;
--		else
--			sdformat->format.height = priv->crop.height;
-+		sdformat->format.width = compose->width;
-+		sdformat->format.height = compose->height;
- 
- 		if (incc->bayer) {
- 			sdformat->format.code = infmt->code;
-@@ -1217,11 +1233,17 @@ static void csi_try_fmt(struct csi_priv *priv,
- 		v4l_bound_align_image(&sdformat->format.width, MIN_W, MAX_W,
- 				      W_ALIGN, &sdformat->format.height,
- 				      MIN_H, MAX_H, H_ALIGN, S_ALIGN);
-+
-+		/* Reset crop and compose rectangles */
- 		crop->left = 0;
- 		crop->top = 0;
- 		crop->width = sdformat->format.width;
- 		crop->height = sdformat->format.height;
- 		csi_try_crop(priv, crop, cfg, &sdformat->format, sensor);
-+		compose->left = 0;
-+		compose->top = 0;
-+		compose->width = crop->width;
-+		compose->height = crop->height;
- 
- 		*cc = imx_media_find_mbus_format(sdformat->format.code,
- 						 CS_SEL_ANY, true);
-@@ -1245,7 +1267,8 @@ static int csi_set_fmt(struct v4l2_subdev *sd,
- 	const struct imx_media_pixfmt *cc;
- 	struct imx_media_subdev *sensor;
- 	struct v4l2_pix_format vdev_fmt;
--	struct v4l2_rect crop;
-+	struct v4l2_mbus_framefmt *fmt;
-+	struct v4l2_rect *crop, *compose;
- 	int ret = 0;
- 
- 	if (sdformat->pad >= CSI_NUM_PADS)
-@@ -1264,37 +1287,42 @@ static int csi_set_fmt(struct v4l2_subdev *sd,
- 		goto out;
- 	}
- 
--	csi_try_fmt(priv, sensor, cfg, sdformat, &crop, &cc);
-+	crop = __csi_get_crop(priv, cfg, sdformat->which);
-+	compose = __csi_get_compose(priv, cfg, sdformat->which);
- 
--	if (sdformat->which == V4L2_SUBDEV_FORMAT_TRY) {
--		cfg->try_fmt = sdformat->format;
--		goto out;
--	}
-+	csi_try_fmt(priv, sensor, cfg, sdformat, crop, compose, &cc);
- 
--	priv->format_mbus[sdformat->pad] = sdformat->format;
--	priv->cc[sdformat->pad] = cc;
-+	fmt = __csi_get_fmt(priv, cfg, sdformat->pad, sdformat->which);
-+	*fmt = sdformat->format;
- 
- 	if (sdformat->pad == CSI_SINK_PAD) {
- 		int pad;
- 
--		/* reset the crop window */
--		priv->crop = crop;
--
- 		/* propagate format to source pads */
- 		for (pad = CSI_SINK_PAD + 1; pad < CSI_NUM_PADS; pad++) {
- 			const struct imx_media_pixfmt *outcc;
- 			struct v4l2_subdev_format format;
-+			struct v4l2_mbus_framefmt *outfmt;
- 
- 			format.pad = pad;
--			format.which = V4L2_SUBDEV_FORMAT_ACTIVE;
-+			format.which = sdformat->which;
- 			format.format = sdformat->format;
--			csi_try_fmt(priv, sensor, cfg, &format, &crop, &outcc);
-+			csi_try_fmt(priv, sensor, cfg, &format, NULL, compose,
-+				    &outcc);
- 
--			priv->format_mbus[pad] = format.format;
--			priv->cc[pad] = outcc;
-+			outfmt = __csi_get_fmt(priv, cfg, pad, sdformat->which);
-+			*outfmt = format.format;
-+
-+			if (sdformat->which == V4L2_SUBDEV_FORMAT_ACTIVE)
-+				priv->cc[pad] = outcc;
- 		}
- 	}
- 
-+	if (sdformat->which == V4L2_SUBDEV_FORMAT_TRY)
-+		goto out;
-+
-+	priv->cc[sdformat->pad] = cc;
-+
- 	/* propagate IDMAC output pad format to capture device */
- 	imx_media_mbus_fmt_to_pix_fmt(&vdev_fmt,
- 				      &priv->format_mbus[CSI_SRC_PAD_IDMAC],
-@@ -1314,18 +1342,17 @@ static int csi_get_selection(struct v4l2_subdev *sd,
- {
- 	struct csi_priv *priv = v4l2_get_subdevdata(sd);
- 	struct v4l2_mbus_framefmt *infmt;
-+	struct v4l2_rect *crop, *compose;
- 	int ret = 0;
- 
--	if (sel->pad >= CSI_NUM_PADS || sel->pad == CSI_SINK_PAD)
-+	if (sel->pad != CSI_SINK_PAD)
- 		return -EINVAL;
- 
- 	mutex_lock(&priv->lock);
- 
- 	infmt = __csi_get_fmt(priv, cfg, CSI_SINK_PAD, sel->which);
--	if (!infmt) {
--		ret = -EINVAL;
--		goto out;
--	}
-+	crop = __csi_get_crop(priv, cfg, sel->which);
-+	compose = __csi_get_compose(priv, cfg, sel->which);
- 
- 	switch (sel->target) {
- 	case V4L2_SEL_TGT_CROP_BOUNDS:
-@@ -1335,36 +1362,54 @@ static int csi_get_selection(struct v4l2_subdev *sd,
- 		sel->r.height = infmt->height;
- 		break;
- 	case V4L2_SEL_TGT_CROP:
--		if (sel->which == V4L2_SUBDEV_FORMAT_TRY) {
--			struct v4l2_rect *try_crop =
--				v4l2_subdev_get_try_crop(&priv->sd,
--							 cfg, sel->pad);
--			sel->r = *try_crop;
--		} else {
--			sel->r = priv->crop;
--		}
-+		sel->r = *crop;
-+		break;
-+	case V4L2_SEL_TGT_COMPOSE_BOUNDS:
-+		sel->r.left = 0;
-+		sel->r.top = 0;
-+		sel->r.width = crop->width;
-+		sel->r.height = crop->height;
-+		break;
-+	case V4L2_SEL_TGT_COMPOSE:
-+		sel->r = *compose;
- 		break;
- 	default:
- 		ret = -EINVAL;
- 	}
- 
--out:
- 	mutex_unlock(&priv->lock);
- 	return ret;
- }
- 
-+static int csi_set_scale(u32 *compose, u32 crop, u32 flags)
-+{
-+	if ((flags & (V4L2_SEL_FLAG_LE | V4L2_SEL_FLAG_GE)) ==
-+		     (V4L2_SEL_FLAG_LE | V4L2_SEL_FLAG_GE) &&
-+	    *compose != crop && *compose != crop / 2)
-+		return -ERANGE;
-+
-+	if (*compose <= crop / 2 ||
-+	    (*compose < crop * 3 / 4 && !(flags & V4L2_SEL_FLAG_GE)) ||
-+	    (*compose < crop && (flags & V4L2_SEL_FLAG_LE)))
-+		*compose = crop / 2;
-+	else
-+		*compose = crop;
-+
-+	return 0;
-+}
-+
- static int csi_set_selection(struct v4l2_subdev *sd,
- 			     struct v4l2_subdev_pad_config *cfg,
- 			     struct v4l2_subdev_selection *sel)
- {
- 	struct csi_priv *priv = v4l2_get_subdevdata(sd);
- 	struct v4l2_mbus_framefmt *infmt;
-+	struct v4l2_rect *crop, *compose;
- 	struct imx_media_subdev *sensor;
-+	int pad;
- 	int ret = 0;
- 
--	if (sel->pad >= CSI_NUM_PADS ||
--	    sel->pad == CSI_SINK_PAD ||
--	    sel->target != V4L2_SEL_TGT_CROP)
-+	if (sel->pad != CSI_SINK_PAD)
- 		return -EINVAL;
- 
- 	sensor = imx_media_find_sensor(priv->md, &priv->sd.entity);
-@@ -1380,31 +1425,68 @@ static int csi_set_selection(struct v4l2_subdev *sd,
- 		goto out;
- 	}
- 
--	/*
--	 * Modifying the crop rectangle always changes the format on the source
--	 * pad. If the KEEP_CONFIG flag is set, just return the current crop
--	 * rectangle.
--	 */
--	if (sel->flags & V4L2_SEL_FLAG_KEEP_CONFIG) {
--		sel->r = priv->crop;
--		if (sel->which == V4L2_SUBDEV_FORMAT_TRY)
--			cfg->try_crop = sel->r;
-+	infmt = __csi_get_fmt(priv, cfg, CSI_SINK_PAD, sel->which);
-+	crop = __csi_get_crop(priv, cfg, sel->which);
-+	compose = __csi_get_compose(priv, cfg, sel->which);
-+
-+	switch (sel->target) {
-+	case V4L2_SEL_TGT_CROP:
-+		/*
-+		 * Modifying the crop rectangle always changes the format on
-+		 * the source pads. If the KEEP_CONFIG flag is set, just return
-+		 * the current crop rectangle.
-+		 */
-+		if (sel->flags & V4L2_SEL_FLAG_KEEP_CONFIG) {
-+			sel->r = priv->crop;
-+			if (sel->which == V4L2_SUBDEV_FORMAT_TRY)
-+				*crop = sel->r;
-+			goto out;
-+		}
-+
-+		csi_try_crop(priv, &sel->r, cfg, infmt, sensor);
-+
-+		*crop = sel->r;
-+
-+		/* Reset scaling to 1:1 */
-+		compose->width = crop->width;
-+		compose->height = crop->height;
-+		break;
-+	case V4L2_SEL_TGT_COMPOSE:
-+		/*
-+		 * Modifying the compose rectangle always changes the format on
-+		 * the source pads. If the KEEP_CONFIG flag is set, just return
-+		 * the current compose rectangle.
-+		 */
-+		if (sel->flags & V4L2_SEL_FLAG_KEEP_CONFIG) {
-+			sel->r = priv->compose;
-+			if (sel->which == V4L2_SUBDEV_FORMAT_TRY)
-+				*compose = sel->r;
-+			goto out;
-+		}
-+
-+		sel->r.left = 0;
-+		sel->r.top = 0;
-+		ret = csi_set_scale(&sel->r.width, crop->width, sel->flags);
-+		if (ret)
-+			goto out;
-+		ret = csi_set_scale(&sel->r.height, crop->height, sel->flags);
-+		if (ret)
-+			goto out;
-+
-+		*compose = sel->r;
-+		break;
-+	default:
-+		ret = -EINVAL;
- 		goto out;
- 	}
- 
--	infmt = __csi_get_fmt(priv, cfg, CSI_SINK_PAD, sel->which);
--	csi_try_crop(priv, &sel->r, cfg, infmt, sensor);
--
--	if (sel->which == V4L2_SUBDEV_FORMAT_TRY) {
--		cfg->try_crop = sel->r;
--	} else {
--		struct v4l2_mbus_framefmt *outfmt =
--			&priv->format_mbus[sel->pad];
-+	/* Reset source pads to sink compose rectangle */
-+	for (pad = CSI_SINK_PAD + 1; pad < CSI_NUM_PADS; pad++) {
-+		struct v4l2_mbus_framefmt *outfmt;
- 
--		priv->crop = sel->r;
--		/* Update the source format */
--		outfmt->width = sel->r.width;
--		outfmt->height = sel->r.height;
-+		outfmt = __csi_get_fmt(priv, cfg, pad, sel->which);
-+		outfmt->width = compose->width;
-+		outfmt->height = compose->height;
- 	}
- 
- out:
-@@ -1467,6 +1549,12 @@ static int csi_registered(struct v4l2_subdev *sd)
- 			priv->skip[i - 1] = &csi_skip[0];
- 	}
- 
-+	/* init default crop and compose rectangle sizes */
-+	priv->crop.width = 640;
-+	priv->crop.height = 480;
-+	priv->compose.width = 640;
-+	priv->compose.height = 480;
-+
- 	/* init default frame interval */
- 	priv->frame_interval.numerator = 1;
- 	priv->frame_interval.denominator = 30;
--- 
-2.11.0
----------->8----------
+> > In parallel, someone has to fix libv4l for it to be default on
+> > applications like gstreamer, e. g. adding support for DMABUF
+> > and fixing other issues that are preventing it to be used by
+> > default.  
+> 
+> Hmm, not sure what you mean there - I've used dmabuf with gstreamer's
+> v4l2src linked to libv4l2, importing the buffers into etnaviv using
+> a custom plugin.  There are distros around (ubuntu) where the v4l2
+> plugin is built against libv4l2.
 
-regards
-Philipp
+Hmm... I guess some gst developer mentioned that there are/where
+some restrictions at libv4l2 with regards to DMABUF. I may be
+wrong.
+
+> 
+> > My understanding here is that there are developers wanting/needing
+> > to have standard V4L2 apps support for (some) i.MX6 devices. Those are
+> > the ones that may/will allocate some time for it to happen.  
+> 
+> Quite - but we need to first know what is acceptable to the v4l2
+> community before we waste a lot of effort coding something up that
+> may not be suitable.  Like everyone else, there's only a limited
+> amount of effort available, so using it wisely is a very good idea.
+
+Sure. That's why we're discussing here :-)
+
+> Up until recently, it seemed that the only solution was to solve the
+> userspace side of the media controller API via v4l2 plugins and the
+> like.
+> 
+> Much of my time that I have available to look at the imx6 capture
+> stuff at the moment is taken up by triping over UAPI issues with the
+> current code (such as the ones about CSI scaling, colorimetry, etc)
+> and trying to get concensus on what the right solution to fix those
+> issues actually is, and at the moment I don't have spare time to
+> start addressing any kind of v4l2 plugin for user controls nor any
+> other solution.
+
+I hear you. A solution via libv4l could be more elegant, but it
+doesn't seem simple, as nobody did it before, and depends on the
+libv4l plugin mechanism, with is currently unused.
+
+Also, I think it is easier to provide a solution using DT and some
+driver and/or core support for it, specially since, AFAICT,
+currently there's no way request exclusive access to MC and subdevs.
+
+It is probably not possible do to that exclusively in userspace.
+
+> Eg, I spent much of this last weekend sorting out my IMX219 camera
+> sensor driver for my new understanding about how scaling is supposed
+> to work, the frame enumeration issue (which I've posted patches for)
+> and the CSI scaling issue (which I've some half-baked patch for at the
+> moment, but probably by the time I've finished sorting that, Philipp
+> or Steve will already have a solution.)
+> 
+> That said, my new understanding of the scaling impacts the four patches
+> I posted, and probably makes the frame size enumeration in CSI (due to
+> its scaling) rather obsolete.
+
+Yeah, when there's no scaler, it should report just the resolution(s)
+supported by the sensor (actually, at the CSI) via
+V4L2_FRMSIZE_TYPE_DISCRETE.
+
+However, when there's a scaler at the pipeline, it should report the
+range supported by the scaler, e. g.:
+
+- V4L2_FRMSIZE_TYPE_CONTINUOUS - when an entire range of resolutions
+  is supported with step = 1 for both H and V .
+
+- V4L2_FRMSIZE_TYPE_STEPWISE - when there's either a H or V step at
+  the possible values for resolutions. This is actually more common
+  in practice, as several encodings take a 2x2 pixel block. So, the
+  step should be at least 2.
+
+There is something to be considered by the logic that forwards the
+resolution to the CSI: a lower resolution there means a higher number of
+frames per second.
+
+So, if the driver is setting the resolution via a V4L2 device, it
+will provide a higher number of fps if it selects the lowest 
+resolution at CSI that it is greater or equal to the resolution
+set at the scaler. On the other hand, the image quality could be 
+better if it doesn't scale at CSI.
+
+Thanks,
+Mauro
