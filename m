@@ -1,130 +1,209 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Mon, 20 Mar 2017 14:57:03 +0100
-Subject: [PATCH v5 00/39] i.MX Media Driver
-In-Reply-To: <20170320132930.GJ21222@n2100.armlinux.org.uk>
-References: <1489121599-23206-1-git-send-email-steve_longerbeam@mentor.com>
- <20170318192258.GL21222@n2100.armlinux.org.uk>
- <aef6c412-5464-726b-42f6-a24b7323aa9c@mentor.com>
- <20170319103801.GQ21222@n2100.armlinux.org.uk>
- <9b3311a8-34a7-2b5b-9bc7-836371e1e0a4@gmail.com>
- <179aca0a-deb5-7937-f955-26cc6d93afba@xs4all.nl>
- <20170320132930.GJ21222@n2100.armlinux.org.uk>
-Message-ID: <d0e2a9c2-5e94-d810-7ef4-ae089a6b25f5@xs4all.nl>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 20 Mar 2017 13:58:32 +0000
+Subject: [PATCH] kvm: pass the virtual SEI syndrome to guest OS
+In-Reply-To: <b912c293-4314-7c90-30a4-2f986feb1670@huawei.com>
+References: <1489996534-8270-1-git-send-email-gengdongjiu@huawei.com>
+ <7055772d-2a20-6e0c-2bf8-204bc9ef52a5@arm.com>
+ <b912c293-4314-7c90-30a4-2f986feb1670@huawei.com>
+Message-ID: <22fb583f-a33e-15f8-a059-fb112b27dd4f@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/20/2017 02:29 PM, Russell King - ARM Linux wrote:
-> On Mon, Mar 20, 2017 at 02:01:58PM +0100, Hans Verkuil wrote:
->> On 03/19/2017 06:54 PM, Steve Longerbeam wrote:
+On 20/03/17 12:28, gengdongjiu wrote:
+> 
+> 
+> On 2017/3/20 19:24, Marc Zyngier wrote:
+>> Please include James Morse on anything RAS related, as he's already
+>> looking at related patches.
+>>
+>> On 20/03/17 07:55, Dongjiu Geng wrote:
+>>> In the RAS implementation, hardware pass the virtual SEI
+>>> syndrome information through the VSESR_EL2, so set the virtual
+>>> SEI syndrome using physical SEI syndrome el2_elr to pass to
+>>> the guest OS
 >>>
+>>> Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
+>>> Signed-off-by: Quanming wu <wuquanming@huawei.com>
+>>> ---
+>>>  arch/arm64/Kconfig                   |  8 ++++++++
+>>>  arch/arm64/include/asm/esr.h         |  1 +
+>>>  arch/arm64/include/asm/kvm_emulate.h | 12 ++++++++++++
+>>>  arch/arm64/include/asm/kvm_host.h    |  4 ++++
+>>>  arch/arm64/kvm/hyp/switch.c          | 15 ++++++++++++++-
+>>>  arch/arm64/kvm/inject_fault.c        | 10 ++++++++++
+>>>  6 files changed, 49 insertions(+), 1 deletion(-)
 >>>
->>> On 03/19/2017 03:38 AM, Russell King - ARM Linux wrote:
->>>> What did you do with:
->>>>
->>>> ioctl(3, VIDIOC_REQBUFS, {count=0, type=0 /* V4L2_BUF_TYPE_??? */, memory=0 /* V4L2_MEMORY_??? */}) = -1 EINVAL (Invalid argument)
->>>>                  test VIDIOC_REQBUFS/CREATE_BUFS/QUERYBUF: OK
->>>> ioctl(3, VIDIOC_EXPBUF, 0xbef405bc)     = -1 EINVAL (Invalid argument)
->>>>                  fail: v4l2-test-buffers.cpp(571): q.has_expbuf(node)
+>>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+>>> index 8c7c244247b6..ea62170a3b75 100644
+>>> --- a/arch/arm64/Kconfig
+>>> +++ b/arch/arm64/Kconfig
+>>> @@ -908,6 +908,14 @@ endmenu
+>>>  
+>>>  menu "ARMv8.2 architectural features"
+>>>  
+>>> +config HAS_RAS_EXTENSION
+>>> +	bool "Support arm64 RAS extension"
+>>> +	default n
+>>> +	help
+>>> +	  Reliability, Availability, Serviceability(RAS; part of the ARMv8.2 Extensions).
+>>> +
+>>> +	  Selecting this option OS will try to recover the error that RAS hardware node detected.
+>>> +
 >>
->> This is really a knock-on effect from an earlier issue where the compliance test
->> didn't detect support for MEMORY_MMAP.
+>> As this is an architectural extension, this should be controlled by the
+>> CPU feature mechanism, and not be chosen at compile time. What you have
+>> here will break horribly when booted on a CPU that doesn't implement RAS.
 > 
-> So why does it succeed when I fix the compliance errors with VIDIOC_G_FMT?
-> With that fixed, I now get:
+> thanks very much for your review, yes, it is, you are right.
 > 
->         Format ioctls:
->                 test VIDIOC_ENUM_FMT/FRAMESIZES/FRAMEINTERVALS: OK
->                 test VIDIOC_G/S_PARM: OK
->                 test VIDIOC_G_FBUF: OK (Not Supported)
->                 test VIDIOC_G_FMT: OK
->                 test VIDIOC_TRY_FMT: OK
->                 test VIDIOC_S_FMT: OK
->                 test VIDIOC_G_SLICED_VBI_CAP: OK (Not Supported)
->                 test Cropping: OK (Not Supported)
->                 test Composing: OK (Not Supported)
->                 test Scaling: OK (Not Supported)
-> 
->         Buffer ioctls:
->                 test VIDIOC_REQBUFS/CREATE_BUFS/QUERYBUF: OK
->                 test VIDIOC_EXPBUF: OK
-> 
-> The reason is, if you look at the code, VIDIOC_G_FMT populates a list
-> of possible buffer formats "node->valid_buftypes".  If the VIDIOC_G_FMT
-> test fails, then node->valid_buftypes is zero.
-> 
-> This causes testReqBufs() to only check for the all-zeroed VIDIOC_REQBUFS
-> and declare it conformant, without creating any buffers (it can't, it
-> doesn't know which formats are supported.)
-> 
-> This causes node->valid_memorytype to be zero.
-
-It should fail on this and return a more understandable error message.
-
-> 
-> We then go on to testExpBuf(), and valid_memorytype zero, claiming (falsely)
-> that MMAP is not supported.  The reality is that it _is_ supported, but
-> it's just the non-compliant VICIOC_G_FMT call (due to the colorspace
-> issue) causes the sequence of tests to fail.
-
-Yeah, you're not the first to complain about this. I plan on fixing this this
-week.
-
-> 
->> Always build from the master repo. 1.10 is pretty old.
-> 
-> It's what I have - remember, not everyone is happy to constantly replace
-> their distro packages with random new stuff.
-
-This is a compliance test, which is continuously developed in tandem with
-new kernel versions. If you are working with an upstream kernel, then you
-should also use the corresponding v4l2-compliance test. What's the point
-of using an old one?
-
-I will not support driver developers that use an old version of the
-compliance test, that's a waste of my time.
-
-> 
->>>> In any case, it doesn't look like the buffer management is being
->>>> tested at all by v4l2-compliance - we know that gstreamer works, so
->>>> buffers _can_ be allocated, and I've also used dmabufs with gstreamer,
->>>> so I also know that VIDIOC_EXPBUF works there.
 >>
->> To test actual streaming you need to provide the -s option.
+>>>  config ARM64_UAO
+>>>  	bool "Enable support for User Access Override (UAO)"
+>>>  	default y
+>>> diff --git a/arch/arm64/include/asm/esr.h b/arch/arm64/include/asm/esr.h
+>>> index d14c478976d0..e38d32b2bdad 100644
+>>> --- a/arch/arm64/include/asm/esr.h
+>>> +++ b/arch/arm64/include/asm/esr.h
+>>> @@ -111,6 +111,7 @@
+>>>  #define ESR_ELx_COND_MASK	(UL(0xF) << ESR_ELx_COND_SHIFT)
+>>>  #define ESR_ELx_WFx_ISS_WFE	(UL(1) << 0)
+>>>  #define ESR_ELx_xVC_IMM_MASK	((1UL << 16) - 1)
+>>> +#define VSESR_ELx_IDS_ISS_MASK    ((1UL << 25) - 1)
+>>>  
+>>>  /* ESR value templates for specific events */
+>>>  
+>>> diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
+>>> index f5ea0ba70f07..20d4da7f5dce 100644
+>>> --- a/arch/arm64/include/asm/kvm_emulate.h
+>>> +++ b/arch/arm64/include/asm/kvm_emulate.h
+>>> @@ -148,6 +148,18 @@ static inline u32 kvm_vcpu_get_hsr(const struct kvm_vcpu *vcpu)
+>>>  	return vcpu->arch.fault.esr_el2;
+>>>  }
+>>>  
+>>> +#ifdef CONFIG_HAS_RAS_EXTENSION
+>>> +static inline u32 kvm_vcpu_get_vsesr(const struct kvm_vcpu *vcpu)
+>>> +{
+>>> +	return vcpu->arch.fault.vsesr_el2;
+>>> +}
+>>> +
+>>> +static inline void kvm_vcpu_set_vsesr(struct kvm_vcpu *vcpu, unsigned long val)
+>>> +{
+>>> +	vcpu->arch.fault.vsesr_el2 = val;
+>>> +}
+>>> +#endif
+>>> +
+>>>  static inline int kvm_vcpu_get_condition(const struct kvm_vcpu *vcpu)
+>>>  {
+>>>  	u32 esr = kvm_vcpu_get_hsr(vcpu);
+>>> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+>>> index e7705e7bb07b..f9e3bb57c461 100644
+>>> --- a/arch/arm64/include/asm/kvm_host.h
+>>> +++ b/arch/arm64/include/asm/kvm_host.h
+>>> @@ -83,6 +83,10 @@ struct kvm_mmu_memory_cache {
+>>>  };
+>>>  
+>>>  struct kvm_vcpu_fault_info {
+>>> +#ifdef CONFIG_HAS_RAS_EXTENSION
+>>> +	/* Virtual SError Exception Syndrome Register */
+>>> +	u32 vsesr_el2;
+>>> +#endif
+>>>  	u32 esr_el2;		/* Hyp Syndrom Register */
+>>>  	u64 far_el2;		/* Hyp Fault Address Register */
+>>>  	u64 hpfar_el2;		/* Hyp IPA Fault Address Register */
+>>> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+>>> index aede1658aeda..770a153fb6ba 100644
+>>> --- a/arch/arm64/kvm/hyp/switch.c
+>>> +++ b/arch/arm64/kvm/hyp/switch.c
+>>> @@ -86,6 +86,13 @@ static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu)
+>>>  		isb();
+>>>  	}
+>>>  	write_sysreg(val, hcr_el2);
+>>> +#ifdef CONFIG_HAS_RAS_EXTENSION
+>>> +	/* If virtual System Error or Asynchronous Abort is pending. set
+>>> +	 * the virtual exception syndrome information
+>>> +	 */
+>>> +	if (vcpu->arch.hcr_el2 & HCR_VSE)
+>>> +		write_sysreg(vcpu->arch.fault.vsesr_el2, vsesr_el2);
+>>> +#endif
+>>>  	/* Trap on AArch32 cp15 c15 accesses (EL1 or EL0) */
+>>>  	write_sysreg(1 << 15, hstr_el2);
+>>>  	/*
+>>> @@ -139,8 +146,14 @@ static void __hyp_text __deactivate_traps(struct kvm_vcpu *vcpu)
+>>>  	 * the crucial bit is "On taking a vSError interrupt,
+>>>  	 * HCR_EL2.VSE is cleared to 0."
+>>>  	 */
+>>> -	if (vcpu->arch.hcr_el2 & HCR_VSE)
+>>> +	if (vcpu->arch.hcr_el2 & HCR_VSE) {
+>>>  		vcpu->arch.hcr_el2 = read_sysreg(hcr_el2);
+>>> +#ifdef CONFIG_HAS_RAS_EXTENSION
+>>> +		/* set vsesr_el2[24:0] with esr_el2[24:0] */
+>>> +		kvm_vcpu_set_vsesr(vcpu, read_sysreg_el2(esr)
+>>> +					& VSESR_ELx_IDS_ISS_MASK);
 >>
->> Note: v4l2-compliance has been developed for 'regular' video devices,
->> not MC devices. It may or may not work with the -s option.
+>> What guarantees that ESR_EL2 still contains the latest exception? What
+>> does it mean to store something that is the current EL2 exception
+>> syndrome together with an SError that has already been injected?
 > 
-> Right, and it exists to verify that the establised v4l2 API is correctly
-> implemented.  If the v4l2 API is being offered to user applications,
-> then it must be conformant, otherwise it's not offering the v4l2 API.
-> (That's very much a definition statement in itself.)
+> yes, thanks for the review, I will add a judgement condition for the "exit_code"
+> if the "exit_code == ARM_EXCEPTION_EL1_SERROR" then set the vsesr_el2.
 > 
-> So, are we really going to say MC devices do not offer the v4l2 API to
-> userspace, but something that might work?  We've already seen today
-> one user say that they're not going to use mainline because of the
-> crud surrounding MC.
+> for the aarch32, it only need set the "ExT, bit [12]" and AET, "bits [15:14]", other bit is RES0
 > 
+>>
+>> Also, is it correct to directly copy the ESR_EL2 bits into VSESR_EL2? My
+> please see below spec description, it virtual SERROR syndrome from VSESR_EL2.
+> -----
+> ? Control returns to the OS, and the ESB instruction is re-executed.
+> ? The physical asynchronous SError interrupt has been cleared, so it is not taken again.
+> ? The PE sets VDISR_EL2.A to 1 and records the syndrome from VSESR_EL2 in VDISR_EL2.
+> -----
 
-Actually, my understanding was that he was stuck on the old kernel code.
+Which doesn't say anything about directly using ESR_EL2 and propagating
+it directly to the guest, specially when there is *already* an SError
+pending (just in case you haven't noticed, this is the *exit* path, and
+I can't see why you would overload VSESR_EL2 at at point).
 
-In the case of v4l2-compliance, I never had the time to make it work with
-MC devices. Same for that matter of certain memory to memory devices.
+> 
+>> own reading of the specification seem to imply that there is at least
+>> differences when the guest is AArch32. Surely there would be some
+>> processing here.
+> 
+> 
+> 
+>>
+>>> +#endif
+>>> +	}
+>>>  
+>>>  	__deactivate_traps_arch()();
+>>>  	write_sysreg(0, hstr_el2);
+>>> diff --git a/arch/arm64/kvm/inject_fault.c b/arch/arm64/kvm/inject_fault.c
+>>> index da6a8cfa54a0..08a13dfe28a8 100644
+>>> --- a/arch/arm64/kvm/inject_fault.c
+>>> +++ b/arch/arm64/kvm/inject_fault.c
+>>> @@ -242,4 +242,14 @@ void kvm_inject_undefined(struct kvm_vcpu *vcpu)
+>>>  void kvm_inject_vabt(struct kvm_vcpu *vcpu)
+>>>  {
+>>>  	vcpu_set_hcr(vcpu, vcpu_get_hcr(vcpu) | HCR_VSE);
+>>> +#ifdef CONFIG_HAS_RAS_EXTENSION
+>>> +	/* If virtual System Error or Asynchronous Abort is set. set
+>>> +	 * the virtual exception syndrome information
+>>> +	 */
+>>> +	kvm_vcpu_set_vsesr(vcpu, ((kvm_vcpu_get_vsesr(vcpu)
+>>> +				& (~VSESR_ELx_IDS_ISS_MASK))
+>>> +				| (kvm_vcpu_get_hsr(vcpu)
+>>> +				& VSESR_ELx_IDS_ISS_MASK)));
+>>
+>> What is the rational for setting VSESR_EL2 with the EL1 syndrome
+>> information? That doesn't make any sense to me.
+> thanks, I set the VSESR_EL2 using the  EL2 syndrome information, "kvm_vcpu_get_hsr"
+> return the value of esr_el2, not EL1 syndrome information
 
-Just like MC devices these too behave differently. They are partially
-supported in v4l2-compliance, but not fully.
+Ah, good point. But that doesn't make it more valid. I still don't see
+anything in the spec that supports this behaviour, and I still propose
+that when RAS is enabled, the VSError injection is mediated by userspace.
 
-Why? NO TIME.
+Thanks,
 
-Be glad there *is* a v4l2-compliance test at all! It's really, really useful
-already, but it took *years* to develop, little bit by little bit. And yes,
-I would really like to update it to fully support codecs and MC devices.
-And with a bit of luck I hope to get permission from my boss to work on
-this (among others) later in the year.
-
-Complaining about this really won't help. We know it's a problem and unless
-someone (me perhaps?) manages to get paid to work on this it's unlikely to
-change for now.
-
-Regards,
-
-	Hans
+	M.
+-- 
+Jazz is not dead. It just smells funny...
