@@ -1,46 +1,43 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 20 Mar 2017 15:38:16 +0800
-Subject: [PATCH 1/2] spi: imx: set correct chip_select in platform setup
-In-Reply-To: <1489726983-17706-2-git-send-email-gerg@linux-m68k.org>
+Date: Mon, 20 Mar 2017 15:39:38 +0800
+Subject: [PATCH 2/2] spi: imx: fix use of native chip-selects with
+ devicetree
+In-Reply-To: <1489726983-17706-3-git-send-email-gerg@linux-m68k.org>
 References: <1489726983-17706-1-git-send-email-gerg@linux-m68k.org>
- <1489726983-17706-2-git-send-email-gerg@linux-m68k.org>
-Message-ID: <20170320073815.GD3443@dragon>
+ <1489726983-17706-3-git-send-email-gerg@linux-m68k.org>
+Message-ID: <20170320073937.GE3443@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 17, 2017 at 03:03:02PM +1000, Greg Ungerer wrote:
-> Some platform based configuration setup of spi-imx SPI devices does
-> not set the "chip_select" to the actual hardware chip select used.
-> This works because the cs_gpio mapping that is associated with this
-> platform setup maps the chip_select offset used to the appropriate
-> hardware chip select. The spi-imx driver uses the chip_select as an
-> index into the cs_gpio array and ultimately gets the correct hardware
-> chip select for its hardware setup.
+On Fri, Mar 17, 2017 at 03:03:03PM +1000, Greg Ungerer wrote:
+> The commonly used mechanism of specifying the hardware or native
+> chip-select on an SPI device in devicetree (that is "cs-gpios = <0>")
+> does not result in the native chip-select being configured for use.
+> So external SPI devices that require use of the native chip-select
+> will not work.
 > 
-> The motivation is to be able to eventually modify the spi-imx code to
-> use the "chip_select" directly for harwdare setup instead of indirectly
-> via the cs_gpio mapping array.
+> You can successfully specify native chip-selects if using a platform
+> setup by specifying the cs-gpio as negative offset by 32. And that
+> works correctly. You cannot use the same method in devicetree.
 > 
-> This change only affects platforms using the hardware chip select
-> addressing method for their SPI devices (sometimes called native chip
-> select). The majority of devices using the spi-imx driver use the GPIO
-> addressing method.
+> The logic in the spi-imx.c driver during probe uses core spi function
+> of_spi_register_master() in spi.c to parse the "cs-gpios" devicetree tag.
+> For valid GPIO values that will be recorded for use, all other entries in
+> the cs_gpios list will be set to -ENOENT. So entries like "<0>" will be
+> set to -ENOENT in the cs_gpios list.
 > 
-> The change to use the correct "chip_select" is strait forward. But the
-> cs_gpio mapping arrary also needs to be modifed to match that change. In
-> simple terms the cs_gpio mapping should always have the hardware chip
-> select number at its same index offset.
+> When the SPI device registers are setup the code will use the GPIO
+> listed in the cs_gpios list for the desired chip-select. If the cs_gpio
+> is less then 0 then it is intended to be for a native chip-select, and
+> its cs_gpio value is added to 32 to get the chipselect number to use.
+> Problem is that with devicetree this can only ever be -ENOENT (which
+> is -2), and that alone results in an invalid chip-select number. But also
+> doesn't allow selection of the native chip-select at all.
 > 
-> There is no functional change with these patches. The three affected
-> platforms should work exactly as before. However I don't have any of
-> these platforms (or access to them) and so I can't test them. So this
-> patch is compile tested only.
+> To fix, if the cs_gpio specified for this spi device is not a
+> valid GPIO then use the "chip_select" (that is the native chip-select
+> number) for hardware setup.
 > 
 > Signed-off-by: Greg Ungerer <gerg@linux-m68k.org>
 
-The subject prefix should be 'ARM: imx: ...'.
-
-Since the patch can go independently, I fix up the prefix and applied
-the patch.  Thanks.
-
-Shawn
+Acked-by: Shawn Guo <shawnguo@kernel.org>
