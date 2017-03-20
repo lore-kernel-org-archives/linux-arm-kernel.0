@@ -1,88 +1,67 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 20 Mar 2017 16:10:03 +0000
-Subject: [PATCH v4 14/36] [media] v4l2-mc: add a function to inherit
- controls from a pipeline
-In-Reply-To: <20170320123938.0503c931@vento.lan>
-References: <cc8900b0-c091-b14b-96f4-01f8fa72431c@xs4all.nl>
- <20170310125342.7f047acf@vento.lan>
- <20170310223714.GI3220@valkosipuli.retiisi.org.uk>
- <20170311082549.576531d0@vento.lan>
- <20170313124621.GA10701@valkosipuli.retiisi.org.uk>
- <20170314004533.3b3cd44b@vento.lan>
- <e0a6c60b-1735-de0b-21f4-d8c3f4b3f10f@xs4all.nl>
- <20170314072143.498cde9b@vento.lan>
- <5c935062-61f4-40e7-0ee9-87655197e661@xs4all.nl>
- <20170320123938.0503c931@vento.lan>
-Message-ID: <20170320161003.GO21222@n2100.armlinux.org.uk>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Mon, 20 Mar 2017 17:14:23 +0100
+Subject: outreachy
+In-Reply-To: <20170320103008.GA3047@kroah.com>
+References: <alpine.DEB.2.20.1703092133340.2306@hadrien>
+ <443f0143-aec1-2559-a2c2-73b245632948@broadcom.com>
+ <2da12619-5fcb-9e0f-b6c1-c83cbf491e8d@wwwdotorg.org>
+ <20170309212021.GA24433@kroah.com> <20170317152519.GA8684@amd>
+ <alpine.DEB.2.20.1703171753550.4098@hadrien>
+ <20170320102032.GA17959@amd> <20170320103008.GA3047@kroah.com>
+Message-ID: <20170320161423.GB31596@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 20, 2017 at 12:39:38PM -0300, Mauro Carvalho Chehab wrote:
-> Em Mon, 20 Mar 2017 14:24:25 +0100
-> Hans Verkuil <hverkuil@xs4all.nl> escreveu:
-> > I don't think this control inheritance patch will magically prevent you
-> > from needed a plugin.
+On Mon 2017-03-20 11:30:08, Greg KH wrote:
+> On Mon, Mar 20, 2017 at 11:20:32AM +0100, Pavel Machek wrote:
+> > Hi!
+> > 
+> > > > > Hah!  That's the joy of being a maintainer of a driver in staging.  Even
+> > > > > if you filter out outreachy, you are going to get a lot of "basic
+> > > > > mistakes" and other type patches cc:ed to you.
+> > > > >
+> > > > > I strongly suggest, that if you all don't like this type of stuff,
+> > > > > either:
+> > > > > 	- work to get the code out of staging as soon as possible (i.e.
+> > > > > 	  send me coding style fixes for everything right now, and then
+> > > > > 	  fix up the rest of the stuff.)
+> > > > > 	- take yourself off the maintainer list for this code.
+> > > > >
+> > > > > It's your choice, outreachy right now is a lot of patches, but again,
+> > > > > it's not going to keep you from getting the "basic" stuff sent to you
+> > > > > in ways that is totally wrong.
+> > > >
+> > > > Could we get these trivial patches off the lkml? Yes, lkml already has
+> > > > a lot of traffic, but no, this is not useful :-(.
+> > > 
+> > > The outreachy instructions say to use the -nol argument to
+> > > get_maintainers, which would prevent them from being sent to any mailing
+> > > list.  However others thought that all patches should be sent to mailing
+> > > lists, and so I haven't enforced anything for people who have omitted
+> > > -nol.  However I have tried to remove bcm maintainers from CC lists on
+> > > replies and reminded people not to send you patches,
+> > 
+> > Wonderful :-(.
+> > 
+> > Can we at least make  those people put the word "outreachy" in the
+> > subject so the emails are easier to delete?
 > 
-> Yeah, it is not just control inheritance. The driver needs to work
-> without subdev API, e. g. mbus settings should also be done via the
-> video devnode.
-> 
-> Btw, Sakari made a good point on IRC: what happens if some app 
-> try to change the pipeline or subdev settings while another
-> application is using the device? The driver should block such 
-> changes, maybe using the V4L2 priority mechanism.
+> It's easy for you to filter away as-is if you want to to by just looking
+> at the cc: list for outreachy right now, don't make a new step for
+> people to jump through because you don't want to be bothered.  You only
+> have 10 more days of it if you want to just ignore any patch until
+> then...
 
-My understanding is that there are already mechanisms in place to
-prevent that, but it's driver dependent - certainly several of the
-imx driver subdevs check whether they have an active stream, and
-refuse (eg) all set_fmt calls with -EBUSY if that is so.
-
-(That statement raises another question in my mind: if the subdev is
-streaming, should it refuse all set_fmt, even for the TRY stuff?)
-
-> In parallel, someone has to fix libv4l for it to be default on
-> applications like gstreamer, e. g. adding support for DMABUF
-> and fixing other issues that are preventing it to be used by
-> default.
-
-Hmm, not sure what you mean there - I've used dmabuf with gstreamer's
-v4l2src linked to libv4l2, importing the buffers into etnaviv using
-a custom plugin.  There are distros around (ubuntu) where the v4l2
-plugin is built against libv4l2.
-
-> My understanding here is that there are developers wanting/needing
-> to have standard V4L2 apps support for (some) i.MX6 devices. Those are
-> the ones that may/will allocate some time for it to happen.
-
-Quite - but we need to first know what is acceptable to the v4l2
-community before we waste a lot of effort coding something up that
-may not be suitable.  Like everyone else, there's only a limited
-amount of effort available, so using it wisely is a very good idea.
-
-Up until recently, it seemed that the only solution was to solve the
-userspace side of the media controller API via v4l2 plugins and the
-like.
-
-Much of my time that I have available to look at the imx6 capture
-stuff at the moment is taken up by triping over UAPI issues with the
-current code (such as the ones about CSI scaling, colorimetry, etc)
-and trying to get concensus on what the right solution to fix those
-issues actually is, and at the moment I don't have spare time to
-start addressing any kind of v4l2 plugin for user controls nor any
-other solution.
-
-Eg, I spent much of this last weekend sorting out my IMX219 camera
-sensor driver for my new understanding about how scaling is supposed
-to work, the frame enumeration issue (which I've posted patches for)
-and the CSI scaling issue (which I've some half-baked patch for at the
-moment, but probably by the time I've finished sorting that, Philipp
-or Steve will already have a solution.)
-
-That said, my new understanding of the scaling impacts the four patches
-I posted, and probably makes the frame size enumeration in CSI (due to
-its scaling) rather obsolete.
-
+10 more days... I can survive 10 more days. I was afraid we would be
+stuck with it "forever".
+									Pavel
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170320/651d0dcc/attachment.sig>
