@@ -1,56 +1,62 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 20 Mar 2017 17:59:57 +0000
-Subject: [PATCH v5 38/39] media: imx: csi: fix crop rectangle reset in
- sink set_fmt
-In-Reply-To: <1490031621.2917.110.camel@pengutronix.de>
-References: <1489121599-23206-1-git-send-email-steve_longerbeam@mentor.com>
- <1489121599-23206-39-git-send-email-steve_longerbeam@mentor.com>
- <20170319152233.GW21222@n2100.armlinux.org.uk>
- <327d67d9-68c1-7f74-0c0f-f6aee1c4b546@gmail.com>
- <1490010926.2917.59.camel@pengutronix.de>
- <20170320120855.GH21222@n2100.armlinux.org.uk>
- <1490018451.2917.86.camel@pengutronix.de>
- <20170320141705.GL21222@n2100.armlinux.org.uk>
- <1490031621.2917.110.camel@pengutronix.de>
-Message-ID: <20170320175957.GS21222@n2100.armlinux.org.uk>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 20 Mar 2017 18:09:50 +0000
+Subject: [PATCH v21 13/13] acpi/arm64: Add SBSA Generic Watchdog support
+ in GTDT driver
+In-Reply-To: <CADyBb7uZV2Qe0ga4TTS_iis5MtwJ=u6PKYSV6ED103Cmh5_O3g@mail.gmail.com>
+References: <20170206185015.12296-1-fu.wei@linaro.org>
+ <20170206185015.12296-14-fu.wei@linaro.org>
+ <20170317200153.GF15909@leverpostej>
+ <CADyBb7uZV2Qe0ga4TTS_iis5MtwJ=u6PKYSV6ED103Cmh5_O3g@mail.gmail.com>
+Message-ID: <20170320180949.GM31213@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 20, 2017 at 06:40:21PM +0100, Philipp Zabel wrote:
-> On Mon, 2017-03-20 at 14:17 +0000, Russell King - ARM Linux wrote:
-> > I have tripped over a bug in media-ctl when specifying both a crop and
-> > compose rectangle - the --help output suggests that "," should be used
-> > to separate them.  media-ctl rejects that, telling me the character at
-> > the "," should be "]".  Replacing the "," with " " allows media-ctl to
-> > accept it and set both rectangles, so it sounds like a parser bug - I've
-> > not looked into this any further yet.
+On Tue, Mar 21, 2017 at 01:57:58AM +0800, Fu Wei wrote:
+> On 18 March 2017 at 04:01, Mark Rutland <mark.rutland@arm.com> wrote:
+> > On Tue, Feb 07, 2017 at 02:50:15AM +0800, fu.wei at linaro.org wrote:
+
+> > I've not been able to find where the ACPI spec says that zero is not a
+> > valid GSIV. This may simply be an oversight/ambiguity in the spec.
+> >
+> > Is there any statement to that effect?
 > 
-> I can confirm this. I don't see any place in
-> v4l2_subdev_parse_pad_format that handles the "," separator. There's
-> just whitespace skipping between the v4l2-properties.
+> you are right, zero is a  valid GSIV, I will delete this check. Thanks
 
-Maybe this is the easiest solution:
+That being the case, how does one describe a watchdog that does not have
+an interrupt?
 
- utils/media-ctl/options.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+As I mentioned, I think this is an oversight/ambiguity in the spec tat
+we should address.
 
-diff --git a/utils/media-ctl/options.c b/utils/media-ctl/options.c
-index 83ca1ca..8b97874 100644
---- a/utils/media-ctl/options.c
-+++ b/utils/media-ctl/options.c
-@@ -65,7 +65,7 @@ static void usage(const char *argv0)
- 	printf("\tentity          = entity-number | ( '\"' entity-name '\"' ) ;\n");
- 	printf("\n");
- 	printf("\tv4l2            = pad '[' v4l2-properties ']' ;\n");
--	printf("\tv4l2-properties = v4l2-property { ',' v4l2-property } ;\n");
-+	printf("\tv4l2-properties = v4l2-property { ' '* v4l2-property } ;\n");
- 	printf("\tv4l2-property   = v4l2-mbusfmt | v4l2-crop | v4l2-interval\n");
- 	printf("\t                | v4l2-compose | v4l2-interval ;\n");
- 	printf("\tv4l2-mbusfmt    = 'fmt:' fcc '/' size ; { 'field:' v4l2-field ; } { 'colorspace:' v4l2-colorspace ; }\n");
+> > My reading of SBSA is that there is one watchdog in the system.
+> >
+> > Is that not the case?
+> 
+> do you mean:
+> ---------------
+> 4.2.4 Watchdogs
+> The base server system implements a Generic Watchdog as specified in
+> APPENDIX A: Generic Watchdog.
+> ---------------
+> 
+> I am not sure about that if this is saying "we only have one SBSA
+> watchdog in a system"
+> 
+> would you let me know where mention it? Do I miss something?
 
-;)
+My reading was that the 'a' above meant a single element. i.e.
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+	The base server system implements _a_ Generic Watchdog as
+	specified in APPENDIX A: Generic Watchdog.
+
+Subsequently in 4.2.5, it is stated:
+
+	In this scenario, the system wakeup timer or generic watchdog is
+	still required to send its interrupt.
+
+... which only makes sense if there is a single watchdog in the system.
+
+Perhaps this is an oversight in the specification.
+
+Thanks,
+Mark.
