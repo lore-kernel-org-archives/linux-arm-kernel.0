@@ -1,137 +1,31 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon, 20 Mar 2017 18:21:51 +0000
-Subject: [PATCH v3 19/19] KVM: arm64: ITS: Pending table save/restore
-In-Reply-To: <1488800074-21991-20-git-send-email-eric.auger@redhat.com>
-References: <1488800074-21991-1-git-send-email-eric.auger@redhat.com>
- <1488800074-21991-20-git-send-email-eric.auger@redhat.com>
-Message-ID: <6e2f94c2-8afe-9b5f-d097-a43e168b95df@arm.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Mon, 20 Mar 2017 20:24:01 +0200
+Subject: Question - seeding the hw pseudo random number generator
+In-Reply-To: <20170320132858.GA27044@gondor.apana.org.au>
+References: <20170318092554.lggkhfg5eko23o3k@kozik-lap>
+ <CANc+2y5gv2ygSM4HF69XCW7Bb8UUHN+qJKq0os-mOvYknH+SeQ@mail.gmail.com>
+ <20170320132858.GA27044@gondor.apana.org.au>
+Message-ID: <20170320182401.x2yhl5pcpqihcvj3@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
-
-just fast-forwarded to the end and noticed this one:
-
-
-On 06/03/17 11:34, Eric Auger wrote:
-> Save and restore the pending tables.
+On Mon, Mar 20, 2017 at 09:28:58PM +0800, Herbert Xu wrote:
+> On Mon, Mar 20, 2017 at 12:19:32PM +0530, PrasannaKumar Muralidharan wrote:
+> >
+> > AF_ALG interface for rng does have seeding support. I think hw_random
+> > does not provide seeding support intentionally as I understand that
+> > True RNG need not require seeding (please correct me if I am wrong).
 > 
-> Pending table restore obviously requires the pendbaser to be
-> already set.
-> 
-> Signed-off-by: Eric Auger <eric.auger@redhat.com>
-> 
-> ---
-> 
-> v1 -> v2:
-> - do not care about the 1st KB which should be zeroed according to
->   the spec.
-> ---
->  virt/kvm/arm/vgic/vgic-its.c | 71 ++++++++++++++++++++++++++++++++++++++++++--
->  1 file changed, 69 insertions(+), 2 deletions(-)
-> 
-> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-> index 27ebabd..24824be 100644
-> --- a/virt/kvm/arm/vgic/vgic-its.c
-> +++ b/virt/kvm/arm/vgic/vgic-its.c
-> @@ -1736,7 +1736,48 @@ static int lookup_table(struct vgic_its *its, gpa_t base, int size, int esz,
->   */
->  static int vgic_its_flush_pending_tables(struct vgic_its *its)
->  {
-> -	return -ENXIO;
-> +	struct kvm *kvm = its->dev->kvm;
-> +	struct vgic_dist *dist = &kvm->arch.vgic;
-> +	struct vgic_irq *irq;
-> +	int ret;
-> +
-> +	/**
-> +	 * we do not take the dist->lpi_list_lock since we have a garantee
-> +	 * the LPI list is not touched while the its lock is held
+> Yes.  We should be converting PRNGs in hwrng over to algif_rng.
 
-Can you elaborate on what gives us this guarantee? I see that we have a
-locking *order*, but that doesn't mean we can avoid taking the lock. So
-to me it looks like we need to take the lpi_list_lock spinlock here,
-which unfortunately breaks the kvm_read_guest() calls below.
+The actual hardware block can be seeded from true RNG (taking data
+from thermal noise) so the solutions (if I understand correctly) for
+exynos-rng might be:
+1. Seed from internal TRNG making it a proper hwrandom device,
+2. Convert to AF_ALG and seed with data from user-space through that
+   interface.
 
-If you agree on this, you can take a look at the INVALL implementation,
-where I faced the same issue. The solution we came up with is
-vgic_copy_lpi_list(), which you can call under the lock to create a
-(private) copy of the LPI list, which you can later iterate without
-holding the lock - and thus are free to call sleeping functions.
+Thanks for explanation, I'll queue it to my tasks list.
 
-Cheers,
-Andre.
-
-> +	 */
-> +	list_for_each_entry(irq, &dist->lpi_list_head, lpi_list) {
-> +		struct kvm_vcpu *vcpu;
-> +		gpa_t pendbase, ptr;
-> +		bool stored;
-> +		u8 val;
-> +
-> +		vcpu = irq->target_vcpu;
-> +		if (!vcpu)
-> +			return -EINVAL;
-> +
-> +		pendbase = PENDBASER_ADDRESS(vcpu->arch.vgic_cpu.pendbaser);
-> +
-> +		ptr = pendbase + (irq->intid / BITS_PER_BYTE);
-> +
-> +		ret = kvm_read_guest(kvm, (gpa_t)ptr, &val, 1);
-> +		if (ret)
-> +			return ret;
-> +
-> +		stored = val & (irq->intid % BITS_PER_BYTE);
-> +		if (stored == irq->pending_latch)
-> +			continue;
-> +
-> +		if (irq->pending_latch)
-> +			val |= 1 << (irq->intid % BITS_PER_BYTE);
-> +		else
-> +			val &= ~(1 << (irq->intid % BITS_PER_BYTE));
-> +
-> +		ret = kvm_write_guest(kvm, (gpa_t)ptr, &val, 1);
-> +		if (ret)
-> +			return ret;
-> +	}
-> +
-> +	return 0;
->  }
->  
->  /**
-> @@ -1745,7 +1786,33 @@ static int vgic_its_flush_pending_tables(struct vgic_its *its)
->   */
->  static int vgic_its_restore_pending_tables(struct vgic_its *its)
->  {
-> -	return -ENXIO;
-> +	struct vgic_irq *irq;
-> +	struct kvm *kvm = its->dev->kvm;
-> +	struct vgic_dist *dist = &kvm->arch.vgic;
-> +	int ret;
-> +
-> +	list_for_each_entry(irq, &dist->lpi_list_head, lpi_list) {
-> +		struct kvm_vcpu *vcpu;
-> +		gpa_t pendbase, ptr;
-> +		u8 val;
-> +
-> +		vcpu = irq->target_vcpu;
-> +		if (!vcpu)
-> +			return -EINVAL;
-> +
-> +		if (!(vcpu->arch.vgic_cpu.pendbaser & GICR_PENDBASER_PTZ))
-> +			return 0;
-> +
-> +		pendbase = PENDBASER_ADDRESS(vcpu->arch.vgic_cpu.pendbaser);
-> +
-> +		ptr = pendbase + (irq->intid / BITS_PER_BYTE);
-> +
-> +		ret = kvm_read_guest(kvm, (gpa_t)ptr, &val, 1);
-> +		if (ret)
-> +			return ret;
-> +		irq->pending_latch = val & (1 << (irq->intid % BITS_PER_BYTE));
-> +	}
-> +	return 0;
->  }
->  
->  static int vgic_its_flush_ite(struct vgic_its *its, struct its_device *dev,
-> 
+Best regards,
+Krzysztof
