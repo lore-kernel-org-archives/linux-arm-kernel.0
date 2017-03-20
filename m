@@ -1,56 +1,112 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 20 Mar 2017 15:25:47 +0000
-Subject: [PATCH 00/17] clocksource/arch_timer: Errara workaround
- infrastructure rework
-In-Reply-To: <20170320150752.GK31213@leverpostej>
-References: <20170306112622.13853-1-marc.zyngier@arm.com>
- <20170320150752.GK31213@leverpostej>
-Message-ID: <29778c14-f737-568e-c3ea-b73d97d6c057@arm.com>
+From: mylene.josserand@free-electrons.com (Mylene Josserand)
+Date: Mon, 20 Mar 2017 16:30:32 +0100
+Subject: [PATCH v3 2/5] ASoC: sun8i-codec: Update mixer to use
+ SOC_DAPM_DOUBLE
+In-Reply-To: <CAGb2v65RSi-yxK1aJb8vnMKNTmLmH8nqSzFs1RLxErQyYcL-4w@mail.gmail.com>
+References: <20170318075509.3836-1-mylene.josserand@free-electrons.com>
+ <20170318075509.3836-3-mylene.josserand@free-electrons.com>
+ <CAGb2v65RSi-yxK1aJb8vnMKNTmLmH8nqSzFs1RLxErQyYcL-4w@mail.gmail.com>
+Message-ID: <8183f4bb-497d-2839-fd0c-2527a02dd276@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/03/17 15:07, Mark Rutland wrote:
-> On Mon, Mar 06, 2017 at 11:26:05AM +0000, Marc Zyngier wrote:
->> It has recently become obvious that a number of arm64 systems have
->> been blessed with a set of timers that are slightly less than perfect,
->> and require a bit of hand-holding. We already have a bunch of
->> errata-specific code to deal with this, but as we're adding more
->> potential detection methods (DT, ACPI, capability), things are getting
->> a bit out of hands.
+Hi Chen-Yu,
+
+On 20/03/2017 12:46, Chen-Yu Tsai wrote:
+> On Sat, Mar 18, 2017 at 3:55 PM, Myl?ne Josserand
+> <mylene.josserand@free-electrons.com> wrote:
+>> Update the driver to use the new SOC_DAPM_DOUBLE definition
+>> on the digital DAC mixer.
+>> Update the names accordingly as, when they are shared, the
+>> controls are not prefixed with the widget's name anymore.
 >>
->> Instead of adding more ad-hoc fixes to an already difficult code base,
->> let's give ourselves a bit of an infrastructure that can deal with
->> this and hide most of the uggliness behind frendly accessors.
-> 
->>  Documentation/arm64/silicon-errata.txt |   1 +
->>  arch/arm64/include/asm/arch_timer.h    |  44 ++-
->>  arch/arm64/include/asm/cpucaps.h       |   3 +-
->>  arch/arm64/include/asm/cputype.h       |   2 +
->>  arch/arm64/include/asm/esr.h           |   2 +
->>  arch/arm64/kernel/cpu_errata.c         |  15 +
->>  arch/arm64/kernel/cpufeature.c         |  13 +-
->>  arch/arm64/kernel/traps.c              |  14 +
->>  drivers/clocksource/Kconfig            |  11 +
->>  drivers/clocksource/arm_arch_timer.c   | 529 +++++++++++++++++++++++----------
->>  10 files changed, 465 insertions(+), 169 deletions(-)
-> 
-> Largely this looks ok.
-> 
-> What's the plan for merging this?
-> 
-> If you can respin this, I can see about collating this with the ACPI
-> GTDT patches, but I'm not sure what to do about the arch/arm64/ parts.
+>> Signed-off-by: Myl?ne Josserand <mylene.josserand@free-electrons.com>
+>> ---
+>>  sound/soc/sunxi/sun8i-codec.c | 45 ++++++++++++++++++++-----------------------
+>>  1 file changed, 21 insertions(+), 24 deletions(-)
+>>
+>> diff --git a/sound/soc/sunxi/sun8i-codec.c b/sound/soc/sunxi/sun8i-codec.c
+>> index d60f6fbd36a2..107fa8213600 100644
+>> --- a/sound/soc/sunxi/sun8i-codec.c
+>> +++ b/sound/soc/sunxi/sun8i-codec.c
+>> @@ -259,25 +259,20 @@ static int sun8i_codec_hw_params(struct snd_pcm_substream *substream,
+>>         return 0;
+>>  }
+>>
+>> -static const struct snd_kcontrol_new sun8i_output_left_mixer_controls[] = {
+>> -       SOC_DAPM_SINGLE("LSlot 0", SUN8I_DAC_MXR_SRC,
+>> -                       SUN8I_DAC_MXR_SRC_DACL_MXR_SRC_AIF1DA0L, 1, 0),
+>> -       SOC_DAPM_SINGLE("LSlot 1", SUN8I_DAC_MXR_SRC,
+>> -                       SUN8I_DAC_MXR_SRC_DACL_MXR_SRC_AIF1DA1L, 1, 0),
+>> -       SOC_DAPM_SINGLE("DACL", SUN8I_DAC_MXR_SRC,
+>> -                       SUN8I_DAC_MXR_SRC_DACL_MXR_SRC_AIF2DACL, 1, 0),
+>> -       SOC_DAPM_SINGLE("ADCL", SUN8I_DAC_MXR_SRC,
+>> -                       SUN8I_DAC_MXR_SRC_DACL_MXR_SRC_ADCL, 1, 0),
+>> -};
+>> -
+>> -static const struct snd_kcontrol_new sun8i_output_right_mixer_controls[] = {
+>> -       SOC_DAPM_SINGLE("RSlot 0", SUN8I_DAC_MXR_SRC,
+>> +static const struct snd_kcontrol_new sun8i_dac_mixer_controls[] = {
+>> +       SOC_DAPM_DOUBLE("AIF1 Slot 0 Digital DAC Playback Switch",
+>> +                       SUN8I_DAC_MXR_SRC,
+>> +                       SUN8I_DAC_MXR_SRC_DACL_MXR_SRC_AIF1DA0L,
+>>                         SUN8I_DAC_MXR_SRC_DACR_MXR_SRC_AIF1DA0R, 1, 0),
+>> -       SOC_DAPM_SINGLE("RSlot 1", SUN8I_DAC_MXR_SRC,
+>> +       SOC_DAPM_DOUBLE("AIF1 Slot 1 Digital DAC Playback Switch",
+>> +                       SUN8I_DAC_MXR_SRC,
+>> +                       SUN8I_DAC_MXR_SRC_DACL_MXR_SRC_AIF1DA1L,
+>>                         SUN8I_DAC_MXR_SRC_DACR_MXR_SRC_AIF1DA1R, 1, 0),
+>> -       SOC_DAPM_SINGLE("DACR", SUN8I_DAC_MXR_SRC,
+>> +       SOC_DAPM_DOUBLE("AIF2 Digital DAC Playback Switch", SUN8I_DAC_MXR_SRC,
+>> +                       SUN8I_DAC_MXR_SRC_DACL_MXR_SRC_AIF2DACL,
+>>                         SUN8I_DAC_MXR_SRC_DACR_MXR_SRC_AIF2DACR, 1, 0),
+>> -       SOC_DAPM_SINGLE("ADCR", SUN8I_DAC_MXR_SRC,
+>> +       SOC_DAPM_DOUBLE("ADC Digital DAC Playback Switch", SUN8I_DAC_MXR_SRC,
+>> +                       SUN8I_DAC_MXR_SRC_DACL_MXR_SRC_ADCL,
+>>                         SUN8I_DAC_MXR_SRC_DACR_MXR_SRC_ADCR, 1, 0),
+>>  };
+>>
+>> @@ -293,12 +288,12 @@ static const struct snd_soc_dapm_widget sun8i_codec_dapm_widgets[] = {
+>>                          SUN8I_AIF1_DACDAT_CTRL_AIF1_DA0R_ENA, 0),
+>>
+>>         /* DAC Mixers */
+>> -       SND_SOC_DAPM_MIXER("Left DAC Mixer", SND_SOC_NOPM, 0, 0,
+>> -                          sun8i_output_left_mixer_controls,
+>> -                          ARRAY_SIZE(sun8i_output_left_mixer_controls)),
+>> -       SND_SOC_DAPM_MIXER("Right DAC Mixer", SND_SOC_NOPM, 0, 0,
+>> -                          sun8i_output_right_mixer_controls,
+>> -                          ARRAY_SIZE(sun8i_output_right_mixer_controls)),
+>> +       SND_SOC_DAPM_MIXER("Left Digital DAC Mixer", SND_SOC_NOPM, 0, 0,
+>> +                          sun8i_dac_mixer_controls,
+>> +                          ARRAY_SIZE(sun8i_dac_mixer_controls)),
+>> +       SND_SOC_DAPM_MIXER("Right Digital DAC Mixer", SND_SOC_NOPM, 0, 0,
+>> +                          sun8i_dac_mixer_controls,
+>> +                          ARRAY_SIZE(sun8i_dac_mixer_controls)),
+>>
+>>         /* Clocks */
+>>         SND_SOC_DAPM_SUPPLY("MODCLK AFI1", SUN8I_MOD_CLK_ENA,
+>> @@ -340,8 +335,10 @@ static const struct snd_soc_dapm_route sun8i_codec_dapm_routes[] = {
+>>         { "Digital Right DAC", NULL, "DAC" },
+>>
+>>         /* DAC Mixer Routes */
+>> -       { "Left DAC Mixer", "LSlot 0", "Digital Left DAC"},
+>> -       { "Right DAC Mixer", "RSlot 0", "Digital Right DAC"},
+>> +       { "Left Digital DAC Mixer", "AIF1 Slot 0 Digital DAC Playback Switch",
+>> +         "Digital Left DAC"},
+>> +       { "Right Digital DAC Mixer", "AIF1 Slot 0 Digital DAC Playback Switch ",
+>
+> The extra space fixed in the next patch could be squashed into this
+> patch. Otherwise,
 
-If Will/Catalin agree with the arm64-specific patches (which I can
-probably move to the beginning of the series), we can have a shared
-branch that gets merged via both the arm64 and clocksource trees.
+Oh, yes, sorry about that.
 
-Or we get everything merged via arm64, which wouldn't be that bad either
-given that this code (and the GTDT patches) only targets arm64. We'd
-need Daniel's Ack though.
+I will send a V4 with the fixes you pointed me on this series.
 
-Thanks,
+Thanks!
 
-	M.
+Best regards,
+
 -- 
-Jazz is not dead. It just smells funny...
+Myl?ne Josserand, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
