@@ -1,31 +1,122 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Mon, 20 Mar 2017 20:24:01 +0200
-Subject: Question - seeding the hw pseudo random number generator
-In-Reply-To: <20170320132858.GA27044@gondor.apana.org.au>
-References: <20170318092554.lggkhfg5eko23o3k@kozik-lap>
- <CANc+2y5gv2ygSM4HF69XCW7Bb8UUHN+qJKq0os-mOvYknH+SeQ@mail.gmail.com>
- <20170320132858.GA27044@gondor.apana.org.au>
-Message-ID: <20170320182401.x2yhl5pcpqihcvj3@kozik-lap>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Mon, 20 Mar 2017 18:26:42 +0000
+Subject: [PATCH] kvm: arm/arm64: Rework gpa callback handlers
+Message-ID: <1490034402-28850-1-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 20, 2017 at 09:28:58PM +0800, Herbert Xu wrote:
-> On Mon, Mar 20, 2017 at 12:19:32PM +0530, PrasannaKumar Muralidharan wrote:
-> >
-> > AF_ALG interface for rng does have seeding support. I think hw_random
-> > does not provide seeding support intentionally as I understand that
-> > True RNG need not require seeding (please correct me if I am wrong).
-> 
-> Yes.  We should be converting PRNGs in hwrng over to algif_rng.
+In order to perform an operation on a gpa range, the hyp iterates
+over each page in a user memory slot for the given range. This is
+inefficient while dealing with a big range (e.g, a VMA), especially
+while unmaping a range. At present, with stage2 unmap on a range with
+a hugepage backed region, we clear the PMD when we unmap the first
+page in the loop. The remaining iterations simply traverse the page table
+down to the PMD level only to see that nothing is in there.
 
-The actual hardware block can be seeded from true RNG (taking data
-from thermal noise) so the solutions (if I understand correctly) for
-exynos-rng might be:
-1. Seed from internal TRNG making it a proper hwrandom device,
-2. Convert to AF_ALG and seed with data from user-space through that
-   interface.
+This patch reworks the code to invoke the callback handlers on the
+biggest range possible within the memory slot to avoid reduce the
+number of iterations.
 
-Thanks for explanation, I'll queue it to my tasks list.
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Christoffer Dall <christoffer.dall@linaro.org>
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+---
+ arch/arm/kvm/mmu.c | 31 +++++++++++++------------------
+ 1 file changed, 13 insertions(+), 18 deletions(-)
 
-Best regards,
-Krzysztof
+diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+index 37e67f5..8357fed 100644
+--- a/arch/arm/kvm/mmu.c
++++ b/arch/arm/kvm/mmu.c
+@@ -1524,7 +1524,8 @@ static int handle_hva_to_gpa(struct kvm *kvm,
+ 			     unsigned long start,
+ 			     unsigned long end,
+ 			     int (*handler)(struct kvm *kvm,
+-					    gpa_t gpa, void *data),
++					    gpa_t gpa, u64 size,
++					    void *data),
+ 			     void *data)
+ {
+ 	struct kvm_memslots *slots;
+@@ -1536,7 +1537,7 @@ static int handle_hva_to_gpa(struct kvm *kvm,
+ 	/* we only care about the pages that the guest sees */
+ 	kvm_for_each_memslot(memslot, slots) {
+ 		unsigned long hva_start, hva_end;
+-		gfn_t gfn, gfn_end;
++		gfn_t gpa;
+ 
+ 		hva_start = max(start, memslot->userspace_addr);
+ 		hva_end = min(end, memslot->userspace_addr +
+@@ -1544,25 +1545,16 @@ static int handle_hva_to_gpa(struct kvm *kvm,
+ 		if (hva_start >= hva_end)
+ 			continue;
+ 
+-		/*
+-		 * {gfn(page) | page intersects with [hva_start, hva_end)} =
+-		 * {gfn_start, gfn_start+1, ..., gfn_end-1}.
+-		 */
+-		gfn = hva_to_gfn_memslot(hva_start, memslot);
+-		gfn_end = hva_to_gfn_memslot(hva_end + PAGE_SIZE - 1, memslot);
+-
+-		for (; gfn < gfn_end; ++gfn) {
+-			gpa_t gpa = gfn << PAGE_SHIFT;
+-			ret |= handler(kvm, gpa, data);
+-		}
++		gpa = hva_to_gfn_memslot(hva_start, memslot) << PAGE_SHIFT;
++		ret |= handler(kvm, gpa, (u64)(hva_end - hva_start), data);
+ 	}
+ 
+ 	return ret;
+ }
+ 
+-static int kvm_unmap_hva_handler(struct kvm *kvm, gpa_t gpa, void *data)
++static int kvm_unmap_hva_handler(struct kvm *kvm, gpa_t gpa, u64 size, void *data)
+ {
+-	unmap_stage2_range(kvm, gpa, PAGE_SIZE);
++	unmap_stage2_range(kvm, gpa, size);
+ 	return 0;
+ }
+ 
+@@ -1589,10 +1581,11 @@ int kvm_unmap_hva_range(struct kvm *kvm,
+ 	return 0;
+ }
+ 
+-static int kvm_set_spte_handler(struct kvm *kvm, gpa_t gpa, void *data)
++static int kvm_set_spte_handler(struct kvm *kvm, gpa_t gpa, u64 size, void *data)
+ {
+ 	pte_t *pte = (pte_t *)data;
+ 
++	WARN_ON(size != PAGE_SIZE);
+ 	/*
+ 	 * We can always call stage2_set_pte with KVM_S2PTE_FLAG_LOGGING_ACTIVE
+ 	 * flag clear because MMU notifiers will have unmapped a huge PMD before
+@@ -1618,11 +1611,12 @@ void kvm_set_spte_hva(struct kvm *kvm, unsigned long hva, pte_t pte)
+ 	handle_hva_to_gpa(kvm, hva, end, &kvm_set_spte_handler, &stage2_pte);
+ }
+ 
+-static int kvm_age_hva_handler(struct kvm *kvm, gpa_t gpa, void *data)
++static int kvm_age_hva_handler(struct kvm *kvm, gpa_t gpa, u64 size, void *data)
+ {
+ 	pmd_t *pmd;
+ 	pte_t *pte;
+ 
++	WARN_ON(size != PAGE_SIZE && size != PMD_SIZE);
+ 	pmd = stage2_get_pmd(kvm, NULL, gpa);
+ 	if (!pmd || pmd_none(*pmd))	/* Nothing there */
+ 		return 0;
+@@ -1637,11 +1631,12 @@ static int kvm_age_hva_handler(struct kvm *kvm, gpa_t gpa, void *data)
+ 	return stage2_ptep_test_and_clear_young(pte);
+ }
+ 
+-static int kvm_test_age_hva_handler(struct kvm *kvm, gpa_t gpa, void *data)
++static int kvm_test_age_hva_handler(struct kvm *kvm, gpa_t gpa, u64 size, void *data)
+ {
+ 	pmd_t *pmd;
+ 	pte_t *pte;
+ 
++	WARN_ON(size != PAGE_SIZE && size != PMD_SIZE);
+ 	pmd = stage2_get_pmd(kvm, NULL, gpa);
+ 	if (!pmd || pmd_none(*pmd))	/* Nothing there */
+ 		return 0;
+-- 
+2.7.4
