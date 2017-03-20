@@ -1,61 +1,71 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 20 Mar 2017 16:59:19 +0000
-Subject: [PATCH 06/17] arm64: arch_timer: Get rid of
- erratum_workaround_set_sne
-In-Reply-To: <20170320140618.GF31213@leverpostej>
-References: <20170306112622.13853-1-marc.zyngier@arm.com>
- <20170306112622.13853-7-marc.zyngier@arm.com>
- <20170320140618.GF31213@leverpostej>
-Message-ID: <035fc83b-cd2c-ed00-ccb7-5dc9686c70b4@arm.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 20 Mar 2017 18:00:40 +0100
+Subject: [PATCH 3/5] soc/tegra: Move Tegra flowctrl driver
+In-Reply-To: <c0b18931-1377-813d-c8a3-60aea4379aa6@nvidia.com>
+References: <1489584715-23138-1-git-send-email-jonathanh@nvidia.com>
+ <1489584715-23138-4-git-send-email-jonathanh@nvidia.com>
+ <20170320141434.GC28203@ulmo.ba.sec>
+ <c0b18931-1377-813d-c8a3-60aea4379aa6@nvidia.com>
+Message-ID: <20170320170040.GC14787@ulmo.ba.sec>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/03/17 14:06, Mark Rutland wrote:
-> On Mon, Mar 06, 2017 at 11:26:11AM +0000, Marc Zyngier wrote:
->> Let's move the handling of workarounds affecting set_next_event
->> to the affected function, instead of overwriding the pointers
+On Mon, Mar 20, 2017 at 04:37:58PM +0000, Jon Hunter wrote:
 > 
-> Nit: overriding
 > 
->> as an afterthough. Yes, this is an extra indirection on the
->> erratum handling path, but the HW is busted anyway.
+> On 20/03/17 14:14, Thierry Reding wrote:
+> > * PGP Signed by an unknown key
+> > 
+> > On Wed, Mar 15, 2017 at 01:31:53PM +0000, Jon Hunter wrote:
+> > [...]
+> >> +static int __init tegra_flowctrl_init(void)
+> >> +{
+> >> +	/* hardcoded fallback if device tree node is missing */
+> >> +	unsigned long base = 0x60007000;
+> >> +	unsigned long size = SZ_4K;
+> >> +	struct device_node *np;
+> >> +
+> >> +	if (!soc_is_tegra())
+> >> +		return 0;
+> >> +
+> >> +	np = of_find_matching_node(NULL, matches);
+> >> +	if (np) {
+> >> +		struct resource res;
+> >> +
+> >> +		if (of_address_to_resource(np, 0, &res) == 0) {
+> >> +			size = resource_size(&res);
+> >> +			base = res.start;
+> >> +		}
+> >> +
+> >> +		of_node_put(np);
+> >> +	}
+> >> +
+> >> +	tegra_flowctrl_base = ioremap_nocache(base, size);
+> >> +
+> >> +	if (!tegra_flowctrl_base)
+> >> +		return -ENXIO;
+> >> +
+> >> +	return 0;
+> >> +}
+> >> +early_initcall(tegra_flowctrl_init);
+> > 
+> > Do we want to implement a hand-off to a proper driver at some point,
+> > similar to what we have for PMC?
 > 
-> [...]
-> 
->> +#define erratum_set_next_event_tval_virt(...)		({BUG_ON(1); 0;})
->> +#define erratum_set_next_event_tval_phys(...)		({BUG_ON(1); 0;})
-> 
-> Nit: BUG()
-> 
-> [...]
-> 
->>  {
->> +	if (needs_unstable_timer_counter_workaround())
->> +		return erratum_set_next_event_tval_virt(evt, clk);
->> +
->>  	set_next_event(ARCH_TIMER_VIRT_ACCESS, evt, clk);
->>  	return 0;
->>  }
->> @@ -487,6 +490,9 @@ static int arch_timer_set_next_event_virt(unsigned long evt,
->>  static int arch_timer_set_next_event_phys(unsigned long evt,
->>  					  struct clock_event_device *clk)
->>  {
->> +	if (needs_unstable_timer_counter_workaround())
->> +		return erratum_set_next_event_tval_phys(evt, clk);
->> +
->>  	set_next_event(ARCH_TIMER_PHYS_ACCESS, evt, clk);
->>  	return 0;
->>  }
-> 
-> I take it that the new conditionals are NOPs in the !erratum case, so
-> this doesn't adversely affect the usual case.
+> Yes I can add, it won't do much apart from remap the io-space, but at
+> least it is registered as a device then.
 
-Indeed, we only get an extra NOP on the normal path. The erratum path
-triggers the insertion of a jump targeting the end of the function,
-where the workaround gets handled.
+Yeah, the same is true for PMC, but I find it quite convenient to have a
+struct device * around. Ideally, of course, we'd be able to somehow have
+deferred probe take care of the dependencies so that we wouldn't have to
+muck about with these initcalls, but I don't think we're there yet. That
+"partial" driver would at least be some way in the right direction.
 
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170320/182906aa/attachment.sig>
