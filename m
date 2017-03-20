@@ -1,77 +1,88 @@
-From: vladimir_zapolskiy@mentor.com (Vladimir Zapolskiy)
-Date: Mon, 20 Mar 2017 15:22:15 +0200
-Subject: [PATCH 2/2] spi: imx: fix use of native chip-selects with
- devicetree
-In-Reply-To: <1489726983-17706-3-git-send-email-gerg@linux-m68k.org>
-References: <1489726983-17706-1-git-send-email-gerg@linux-m68k.org>
- <1489726983-17706-3-git-send-email-gerg@linux-m68k.org>
-Message-ID: <f1cf2001-28b4-6a74-b98a-13336d74ff9d@mentor.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Mon, 20 Mar 2017 15:23:27 +0200
+Subject: [PATCHv2 5/9] ARM: OMAP2+: hwmod: assign main clock from DT if
+ available
+In-Reply-To: <20170317221728.GX20572@atomide.com>
+References: <1489741781-12816-1-git-send-email-t-kristo@ti.com>
+ <1489741781-12816-6-git-send-email-t-kristo@ti.com>
+ <20170317154126.GU20572@atomide.com>
+ <f7c795dc-13db-9157-cdcc-b61892cc73f9@ti.com>
+ <20170317221728.GX20572@atomide.com>
+Message-ID: <95b7142f-8cc7-5909-764e-05dbad434298@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Greg,
+On 18/03/17 00:17, Tony Lindgren wrote:
+> * Tero Kristo <t-kristo@ti.com> [170317 14:42]:
+>> On 17/03/17 17:41, Tony Lindgren wrote:
+>>> * Tero Kristo <t-kristo@ti.com> [170317 02:12]:
+>>>> -static int _init_main_clk(struct omap_hwmod *oh)
+>>>> +static int _init_main_clk(struct omap_hwmod *oh, struct device_node *np)
+>>>>  {
+>>>>  	int ret = 0;
+>>>> -	char name[MOD_CLK_MAX_NAME_LEN];
+>>>> -	struct clk *clk;
+>>>> -	static const char modck[] = "_mod_ck";
+>>>> -
+>>>> -	if (strlen(oh->name) >= MOD_CLK_MAX_NAME_LEN - strlen(modck))
+>>>> -		pr_warn("%s: warning: cropping name for %s\n", __func__,
+>>>> -			oh->name);
+>>>> +	struct clk *clk = NULL;
+>>>> +	int i;
+>>>> +	int count;
+>>>> +	const char *name;
+>>>> +	char clk_name[strlen("clkctrl-x") + 1];
+>>>>
+>>>> -	strlcpy(name, oh->name, MOD_CLK_MAX_NAME_LEN - strlen(modck));
+>>>> -	strlcat(name, modck, MOD_CLK_MAX_NAME_LEN);
+>>>> +	if (np) {
+>>>> +		clk = of_clk_get_by_name(np, "clkctrl");
+>>>> +		if (IS_ERR(clk)) {
+>>>> +			/* Try matching by hwmod name */
+>>>> +			count = of_property_count_strings(np, "ti,hwmods");
+>>>> +			for (i = 0; i < count; i++) {
+>>>> +				ret = of_property_read_string_index(np,
+>>>> +								    "ti,hwmods",
+>>>> +								    i, &name);
+>>>> +				if (ret)
+>>>> +					continue;
+>>>> +				if (!strcmp(name, oh->name)) {
+>>>> +					sprintf(clk_name, "clkctrl-%d", i);
+>>>> +					clk = of_clk_get_by_name(np, clk_name);
+>>>> +				}
+>>>> +			}
+>>>> +		}
+>>>> +		if (!IS_ERR(clk)) {
+>>>> +			pr_debug("%s: mapped main_clk %s for %s\n", __func__,
+>>>> +				 __clk_get_name(clk), oh->name);
+>>>> +			oh->main_clk = __clk_get_name(clk);
+>>>> +			oh->_clk = clk;
+>>>> +			soc_ops.disable_direct_prcm(oh);
+>>>> +		}
+>>>> +	}
+>>>
+>>> You should bail out and do nothing here if legacy "ti,hwmods" property is
+>>> not found. Eventually it will be the interconnect target IP wrapper module
+>>> that will manage the clock and populate the rest of the hwmod data
+>>> dynamically.
+>>
+>> This is only for transitional support of hwmod, this patch will not be
+>> needed for anything later on; or you probably need to do something similar
+>> within the interconnect driver itself. The code still needs to care for the
+>> cases where we want to find the main clock based on the clock link within
+>> hwmod data, so bailing out early will break any boards that don't support
+>> the new clkctrl clocks yet.
+>
+> Well we really don't want hwmod code parsing anything out of the dtb
+> unless "ti,hwmods" property is set. That makes moving driver like features
+> to live under drivers much harder.
+>
+> I don't quite follow you, what breaks if you fall back to the old clock
+> lookup if no "ti,hwmods" is set?
 
-On 03/17/2017 07:03 AM, Greg Ungerer wrote:
-> The commonly used mechanism of specifying the hardware or native
-> chip-select on an SPI device in devicetree (that is "cs-gpios = <0>")
-> does not result in the native chip-select being configured for use.
-> So external SPI devices that require use of the native chip-select
-> will not work.
-> 
-> You can successfully specify native chip-selects if using a platform
-> setup by specifying the cs-gpio as negative offset by 32. And that
-> works correctly. You cannot use the same method in devicetree.
-> 
-> The logic in the spi-imx.c driver during probe uses core spi function
-> of_spi_register_master() in spi.c to parse the "cs-gpios" devicetree tag.
-> For valid GPIO values that will be recorded for use, all other entries in
-> the cs_gpios list will be set to -ENOENT. So entries like "<0>" will be
-> set to -ENOENT in the cs_gpios list.
-> 
-> When the SPI device registers are setup the code will use the GPIO
-> listed in the cs_gpios list for the desired chip-select. If the cs_gpio
-> is less then 0 then it is intended to be for a native chip-select, and
-> its cs_gpio value is added to 32 to get the chipselect number to use.
-> Problem is that with devicetree this can only ever be -ENOENT (which
-> is -2), and that alone results in an invalid chip-select number. But also
-> doesn't allow selection of the native chip-select at all.
-> 
-> To fix, if the cs_gpio specified for this spi device is not a
-> valid GPIO then use the "chip_select" (that is the native chip-select
-> number) for hardware setup.
-> 
+I think I misunderstood your earlier comment. So basically the code 
+already bails out early if ti,hwmods is not set. In this case, the 
+earlier lookup done by hwmod core sets the node pointer for this code to 
+be NULL, and this just parses the existing main_clk info.
 
-Can you please share an example of "cs-gpios" property for a particular
-case, which I'm able to test? It is an Atmel AT93C66A EEPROM connected
-to CSPI1 and sitting on chip select 2 (= selected by CSPI1_SS2), there
-is no other SPI devices on CSPI1.
-
-Since I raise the question, please add the correspondent updates and
-and an example to Documentation/devicetree/bindings/spi/fsl-imx-cspi.txt
-
-In fact my expectation would be to have a device description like one
-below:
-
-&spi1 {
-	status = "okay";
-	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_cspi1>;
-
-	eeprom at 2 {
-		compatible = "atmel,at93c66a";
-		reg = <2>;
-		spi-cs-high;
-		spi-max-frequency = <1000000>;
-	};
-};
-
-Note, that there is no cs-gpios property at all, which is mandatory
-at the moment, and unit address / reg property defines chip select
-number.
-
-For that type of bindings locally I have a hackish spi-imx driver change,
-which supports this option, but I'm unsure if it is universal enough.
-
---
-With best wishes,
-Vladimir
+-Tero
