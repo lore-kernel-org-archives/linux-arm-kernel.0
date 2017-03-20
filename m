@@ -1,54 +1,61 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Mon, 20 Mar 2017 18:58:41 +0200
-Subject: [PATCH] MAINTAINERS: pinctrl: Add git tree to Samsung pinctrl
- entry
-In-Reply-To: <20170320164851.5999-1-krzk@kernel.org>
-References: <20170320164851.5999-1-krzk@kernel.org>
-Message-ID: <20170320165841.gpbevoscf2fjvods@kozik-lap>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 20 Mar 2017 16:59:19 +0000
+Subject: [PATCH 06/17] arm64: arch_timer: Get rid of
+ erratum_workaround_set_sne
+In-Reply-To: <20170320140618.GF31213@leverpostej>
+References: <20170306112622.13853-1-marc.zyngier@arm.com>
+ <20170306112622.13853-7-marc.zyngier@arm.com>
+ <20170320140618.GF31213@leverpostej>
+Message-ID: <035fc83b-cd2c-ed00-ccb7-5dc9686c70b4@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 20, 2017 at 06:48:51PM +0200, Krzysztof Kozlowski wrote:
-> Add a Git tree on @kernel.org for maintaining the Samsung pinctrl
-> drivers.  The tree will be maintained in a shared model between current
-> Samsung pinctrl maintainers.  Pull requests will be going to Linus
-> Walleij.
+On 20/03/17 14:06, Mark Rutland wrote:
+> On Mon, Mar 06, 2017 at 11:26:11AM +0000, Marc Zyngier wrote:
+>> Let's move the handling of workarounds affecting set_next_event
+>> to the affected function, instead of overwriding the pointers
 > 
-> Also add the patchwork for linux-samsung-soc mailing list which will be
-> used for handling the patches.
+> Nit: overriding
 > 
-> Cc: Tomasz Figa <tomasz.figa@gmail.com>
-> Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+>> as an afterthough. Yes, this is an extra indirection on the
+>> erratum handling path, but the HW is busted anyway.
 > 
-> ---
+> [...]
 > 
-> As of now, only I have the access to this git tree. Tomasz is welcomed
-> to join anytime. We are also waiting for Sywlester to get account on
-> kernel.org.
+>> +#define erratum_set_next_event_tval_virt(...)		({BUG_ON(1); 0;})
+>> +#define erratum_set_next_event_tval_phys(...)		({BUG_ON(1); 0;})
 > 
-> For the Patchwork, I use it also for Exynos/Samsung ARM architecture
-> maintenance.  I will add appropriate permissions to Sylwester so we can
-> share it.
-> ---
+> Nit: BUG()
+> 
+> [...]
+> 
+>>  {
+>> +	if (needs_unstable_timer_counter_workaround())
+>> +		return erratum_set_next_event_tval_virt(evt, clk);
+>> +
+>>  	set_next_event(ARCH_TIMER_VIRT_ACCESS, evt, clk);
+>>  	return 0;
+>>  }
+>> @@ -487,6 +490,9 @@ static int arch_timer_set_next_event_virt(unsigned long evt,
+>>  static int arch_timer_set_next_event_phys(unsigned long evt,
+>>  					  struct clock_event_device *clk)
+>>  {
+>> +	if (needs_unstable_timer_counter_workaround())
+>> +		return erratum_set_next_event_tval_phys(evt, clk);
+>> +
+>>  	set_next_event(ARCH_TIMER_PHYS_ACCESS, evt, clk);
+>>  	return 0;
+>>  }
+> 
+> I take it that the new conditionals are NOPs in the !erratum case, so
+> this doesn't adversely affect the usual case.
 
-Linus,
+Indeed, we only get an extra NOP on the normal path. The erratum path
+triggers the insertion of a jump targeting the end of the function,
+where the workaround gets handled.
 
-I talked with Sylwester few days ago and we agreed on a shared mainainer
-model.  Mostly because:
-1. Only Sylwester from three of us works in Samsung,
-2. It helps distributing the load in case of any holidays/travel etc,
-3. It might also make easier for future transitions.
+Thanks,
 
-For this release I can start taking the patches. Please let me know:
-1. Can I base on Torvalds' rc-1 or you prefer basing on top of your
-   branches? In the second case your branches should not be rebased.
-2. When do you expect pull requests (preferred time and acceptable late
-   stuff)?
-
-
-Also, I will add this tree to the linux-next + auto-builders.
-
-Best regards,
-Krzysztof
+	M.
+-- 
+Jazz is not dead. It just smells funny...
