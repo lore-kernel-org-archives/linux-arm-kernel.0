@@ -1,43 +1,43 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Mon, 20 Mar 2017 10:39:56 +0100
-Subject: [GIT PULL] ARM: OXNAS SoC update for 4.12
-Message-ID: <cd2d94ef-9098-6e4e-ed65-74191d45370e@baylibre.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Mon, 20 Mar 2017 10:40:40 +0100
+Subject: [PATCH 3/8] soc: imx: gpc: fix domain_index sanity check issue
+In-Reply-To: <1489990547-1510-4-git-send-email-aisheng.dong@nxp.com>
+References: <1489990547-1510-1-git-send-email-aisheng.dong@nxp.com>
+ <1489990547-1510-4-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <1490002840.2895.15.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear arm-soc maintainers,
+Am Montag, den 20.03.2017, 14:15 +0800 schrieb Dong Aisheng:
+> ARRAY_SIZE(imx_gpc_domains) represents all power domains supported
+> by different SoCs. Driver should use SoC specific of_id_data->num_domains
+> instead to do power domain index sanity check.
+> e.g. MX6Q supports two power domains while MX6SL supports three.
 
-The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
+It's a sanity check against writing into memory outside the array. We
+don't really need to guard more against wrong DTs, but as this patch is
+also equally correct:
 
-  Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
+Acked-by: Lucas Stach <l.stach@pengutronix.de>
 
-are available in the git repository at:
-
-  https://github.com/OXNAS/linux.git tags/oxnas-arm-soc-for-4.12
-
-for you to fetch changes up to b44327d198b4f1bbebaf83f714cde450471de644:
-
-  ARM: oxnas: remove redundant select CPU_V6K (2017-03-20 10:13:45 +0100)
-
-----------------------------------------------------------------
-- Fix OX820 Kconfig
-
-----------------------------------------------------------------
-Masahiro Yamada (1):
-      ARM: oxnas: remove redundant select CPU_V6K
-
- arch/arm/mach-oxnas/Kconfig | 1 -
- 1 file changed, 1 deletion(-)
-
-diff --git a/arch/arm/mach-oxnas/Kconfig b/arch/arm/mach-oxnas/Kconfig
-index 8fa4557..e3610c5 100644
---- a/arch/arm/mach-oxnas/Kconfig
-+++ b/arch/arm/mach-oxnas/Kconfig
-@@ -28,7 +28,6 @@ config MACH_OX820
- 	depends on ARCH_MULTI_V6
- 	select ARM_GIC
- 	select DMA_CACHE_RWFO if SMP
--	select CPU_V6K
- 	select HAVE_SMP
- 	select HAVE_ARM_SCU if SMP
- 	select HAVE_ARM_TWD if SMP
+> Cc: Lucas Stach <l.stach@pengutronix.de>
+> Cc: Shawn Guo <shawnguo@kernel.org>
+> Fixes: 721cabf6c660 ("soc: imx: move PGC handling to a new GPC driver")
+> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> ---
+>  drivers/soc/imx/gpc.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/soc/imx/gpc.c b/drivers/soc/imx/gpc.c
+> index 7e6a672..ba6e7ab 100644
+> --- a/drivers/soc/imx/gpc.c
+> +++ b/drivers/soc/imx/gpc.c
+> @@ -413,7 +413,7 @@ static int imx_gpc_probe(struct platform_device *pdev)
+>  				of_node_put(np);
+>  				return ret;
+>  			}
+> -			if (domain_index >= ARRAY_SIZE(imx_gpc_domains))
+> +			if (domain_index >= of_id_data->num_domains)
+>  				continue;
+>  
+>  			domain = &imx_gpc_domains[domain_index];
