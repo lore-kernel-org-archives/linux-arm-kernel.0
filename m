@@ -1,157 +1,101 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 20 Mar 2017 17:48:17 +0000
-Subject: [PATCH v2 06/18] arm64: arch_timer: Add infrastructure for multiple
- erratum detection methods
+Date: Mon, 20 Mar 2017 17:48:25 +0000
+Subject: [PATCH v2 14/18] arm64: arch_timer: Move clocksource_counter and co
+ around
 In-Reply-To: <20170320174829.28182-1-marc.zyngier@arm.com>
 References: <20170320174829.28182-1-marc.zyngier@arm.com>
-Message-ID: <20170320174829.28182-7-marc.zyngier@arm.com>
+Message-ID: <20170320174829.28182-15-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We're currently stuck with DT when it comes to handling errata, which
-is pretty restrictive. In order to make things more flexible, let's
-introduce an infrastructure that could support alternative discovery
-methods. No change in functionality.
+In order to access clocksource_counter from the errata handling code,
+move it (together with the related structures and functions) towards
+the top of the file.
 
-Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/arch_timer.h  |  7 +++-
- drivers/clocksource/arm_arch_timer.c | 80 +++++++++++++++++++++++++++++++-----
- 2 files changed, 75 insertions(+), 12 deletions(-)
+ drivers/clocksource/arm_arch_timer.c | 62 ++++++++++++++++++------------------
+ 1 file changed, 31 insertions(+), 31 deletions(-)
 
-diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
-index b4b34004a21e..5cd964e90d11 100644
---- a/arch/arm64/include/asm/arch_timer.h
-+++ b/arch/arm64/include/asm/arch_timer.h
-@@ -37,9 +37,14 @@ extern struct static_key_false arch_timer_read_ool_enabled;
- #define needs_unstable_timer_counter_workaround()  false
- #endif
- 
-+enum arch_timer_erratum_match_type {
-+	ate_match_dt,
-+};
- 
- struct arch_timer_erratum_workaround {
--	const char *id;		/* Indicate the Erratum ID */
-+	enum arch_timer_erratum_match_type match_type;
-+	const void *id;
-+	const char *desc;
- 	u32 (*read_cntp_tval_el0)(void);
- 	u32 (*read_cntv_tval_el0)(void);
- 	u64 (*read_cntvct_el0)(void);
 diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index 7a8a4117f123..6a0f0e161a0f 100644
+index 2b17b99922a1..70eb42bd6784 100644
 --- a/drivers/clocksource/arm_arch_timer.c
 +++ b/drivers/clocksource/arm_arch_timer.c
-@@ -182,7 +182,9 @@ EXPORT_SYMBOL_GPL(arch_timer_read_ool_enabled);
- static const struct arch_timer_erratum_workaround ool_workarounds[] = {
+@@ -158,6 +158,37 @@ u32 arch_timer_reg_read(int access, enum arch_timer_reg reg,
+ 	return val;
+ }
+ 
++/*
++ * Default to cp15 based access because arm64 uses this function for
++ * sched_clock() before DT is probed and the cp15 method is guaranteed
++ * to exist on arm64. arm doesn't use this before DT is probed so even
++ * if we don't have the cp15 accessors we won't have a problem.
++ */
++u64 (*arch_timer_read_counter)(void) = arch_counter_get_cntvct;
++
++static u64 arch_counter_read(struct clocksource *cs)
++{
++	return arch_timer_read_counter();
++}
++
++static u64 arch_counter_read_cc(const struct cyclecounter *cc)
++{
++	return arch_timer_read_counter();
++}
++
++static struct clocksource clocksource_counter = {
++	.name	= "arch_sys_counter",
++	.rating	= 400,
++	.read	= arch_counter_read,
++	.mask	= CLOCKSOURCE_MASK(56),
++	.flags	= CLOCK_SOURCE_IS_CONTINUOUS,
++};
++
++static struct cyclecounter cyclecounter __ro_after_init = {
++	.read	= arch_counter_read_cc,
++	.mask	= CLOCKSOURCE_MASK(56),
++};
++
  #ifdef CONFIG_FSL_ERRATUM_A008585
- 	{
-+		.match_type = ate_match_dt,
- 		.id = "fsl,erratum-a008585",
-+		.desc = "Freescale erratum a005858",
- 		.read_cntp_tval_el0 = fsl_a008585_read_cntp_tval_el0,
- 		.read_cntv_tval_el0 = fsl_a008585_read_cntv_tval_el0,
- 		.read_cntvct_el0 = fsl_a008585_read_cntvct_el0,
-@@ -190,13 +192,78 @@ static const struct arch_timer_erratum_workaround ool_workarounds[] = {
- #endif
- #ifdef CONFIG_HISILICON_ERRATUM_161010101
- 	{
-+		.match_type = ate_match_dt,
- 		.id = "hisilicon,erratum-161010101",
-+		.desc = "HiSilicon erratum 161010101",
- 		.read_cntp_tval_el0 = hisi_161010101_read_cntp_tval_el0,
- 		.read_cntv_tval_el0 = hisi_161010101_read_cntv_tval_el0,
- 		.read_cntvct_el0 = hisi_161010101_read_cntvct_el0,
- 	},
- #endif
- };
-+
-+typedef bool (*ate_match_fn_t)(const struct arch_timer_erratum_workaround *,
-+			       const void *);
-+
-+static
-+bool arch_timer_check_dt_erratum(const struct arch_timer_erratum_workaround *wa,
-+				 const void *arg)
-+{
-+	const struct device_node *np = arg;
-+
-+	return of_property_read_bool(np, wa->id);
-+}
-+
-+static const struct arch_timer_erratum_workaround *
-+arch_timer_iterate_errata(enum arch_timer_erratum_match_type type,
-+			  ate_match_fn_t match_fn,
-+			  void *arg)
-+{
-+	int i;
-+
-+	for (i = 0; i < ARRAY_SIZE(ool_workarounds); i++) {
-+		if (ool_workarounds[i].match_type != type)
-+			continue;
-+
-+		if (match_fn(&ool_workarounds[i], arg))
-+			return &ool_workarounds[i];
-+	}
-+
-+	return NULL;
-+}
-+
-+static
-+void arch_timer_enable_workaround(const struct arch_timer_erratum_workaround *wa)
-+{
-+	timer_unstable_counter_workaround = wa;
-+	static_branch_enable(&arch_timer_read_ool_enabled);
-+}
-+
-+static void arch_timer_check_ool_workaround(enum arch_timer_erratum_match_type type,
-+					    void *arg)
-+{
-+	const struct arch_timer_erratum_workaround *wa;
-+	ate_match_fn_t match_fn = NULL;
-+
-+	if (static_branch_unlikely(&arch_timer_read_ool_enabled))
-+		return;
-+
-+	switch (type) {
-+	case ate_match_dt:
-+		match_fn = arch_timer_check_dt_erratum;
-+		break;
-+	}
-+
-+	wa = arch_timer_iterate_errata(type, match_fn, arg);
-+	if (!wa)
-+		return;
-+
-+	arch_timer_enable_workaround(wa);
-+	pr_info("Enabling global workaround for %s\n", wa->desc);
-+}
-+
-+#else
-+#define arch_timer_check_ool_workaround(t,a)		do { } while(0)
- #endif /* CONFIG_ARM_ARCH_TIMER_OOL_WORKAROUND */
+ /*
+  * The number of retries is an arbitrary value well beyond the highest number
+@@ -749,37 +780,6 @@ static u64 arch_counter_get_cntvct_mem(void)
+ 	return ((u64) vct_hi << 32) | vct_lo;
+ }
  
- static __always_inline
-@@ -960,17 +1027,8 @@ static int __init arch_timer_of_init(struct device_node *np)
+-/*
+- * Default to cp15 based access because arm64 uses this function for
+- * sched_clock() before DT is probed and the cp15 method is guaranteed
+- * to exist on arm64. arm doesn't use this before DT is probed so even
+- * if we don't have the cp15 accessors we won't have a problem.
+- */
+-u64 (*arch_timer_read_counter)(void) = arch_counter_get_cntvct;
+-
+-static u64 arch_counter_read(struct clocksource *cs)
+-{
+-	return arch_timer_read_counter();
+-}
+-
+-static u64 arch_counter_read_cc(const struct cyclecounter *cc)
+-{
+-	return arch_timer_read_counter();
+-}
+-
+-static struct clocksource clocksource_counter = {
+-	.name	= "arch_sys_counter",
+-	.rating	= 400,
+-	.read	= arch_counter_read,
+-	.mask	= CLOCKSOURCE_MASK(56),
+-	.flags	= CLOCK_SOURCE_IS_CONTINUOUS,
+-};
+-
+-static struct cyclecounter cyclecounter __ro_after_init = {
+-	.read	= arch_counter_read_cc,
+-	.mask	= CLOCKSOURCE_MASK(56),
+-};
+-
+ static struct arch_timer_kvm_info arch_timer_kvm_info;
  
- 	arch_timer_c3stop = !of_property_read_bool(np, "always-on");
- 
--#ifdef CONFIG_ARM_ARCH_TIMER_OOL_WORKAROUND
--	for (i = 0; i < ARRAY_SIZE(ool_workarounds); i++) {
--		if (of_property_read_bool(np, ool_workarounds[i].id)) {
--			timer_unstable_counter_workaround = &ool_workarounds[i];
--			static_branch_enable(&arch_timer_read_ool_enabled);
--			pr_info("arch_timer: Enabling workaround for %s\n",
--				timer_unstable_counter_workaround->id);
--			break;
--		}
--	}
--#endif
-+	/* Check for globally applicable workarounds */
-+	arch_timer_check_ool_workaround(ate_match_dt, np);
- 
- 	/*
- 	 * If we cannot rely on firmware initializing the timer registers then
+ struct arch_timer_kvm_info *arch_timer_get_kvm_info(void)
 -- 
 2.11.0
