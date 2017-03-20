@@ -1,61 +1,46 @@
-From: fu.wei@linaro.org (Fu Wei)
-Date: Mon, 20 Mar 2017 15:36:36 +0800
-Subject: [PATCH v21 01/13] clocksource: arm_arch_timer: introduce two
- functions to get the frequency from mmio and sysreg.
-In-Reply-To: <20170317180513.GB15909@leverpostej>
-References: <20170206185015.12296-1-fu.wei@linaro.org>
- <20170206185015.12296-2-fu.wei@linaro.org>
- <20170317180513.GB15909@leverpostej>
-Message-ID: <CADyBb7vZ4G+q1y6w6OVQ7i-ZiTtcdx_w2BOSWqy=2jWhAV6Hmw@mail.gmail.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 20 Mar 2017 15:38:16 +0800
+Subject: [PATCH 1/2] spi: imx: set correct chip_select in platform setup
+In-Reply-To: <1489726983-17706-2-git-send-email-gerg@linux-m68k.org>
+References: <1489726983-17706-1-git-send-email-gerg@linux-m68k.org>
+ <1489726983-17706-2-git-send-email-gerg@linux-m68k.org>
+Message-ID: <20170320073815.GD3443@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+On Fri, Mar 17, 2017 at 03:03:02PM +1000, Greg Ungerer wrote:
+> Some platform based configuration setup of spi-imx SPI devices does
+> not set the "chip_select" to the actual hardware chip select used.
+> This works because the cs_gpio mapping that is associated with this
+> platform setup maps the chip_select offset used to the appropriate
+> hardware chip select. The spi-imx driver uses the chip_select as an
+> index into the cs_gpio array and ultimately gets the correct hardware
+> chip select for its hardware setup.
+> 
+> The motivation is to be able to eventually modify the spi-imx code to
+> use the "chip_select" directly for harwdare setup instead of indirectly
+> via the cs_gpio mapping array.
+> 
+> This change only affects platforms using the hardware chip select
+> addressing method for their SPI devices (sometimes called native chip
+> select). The majority of devices using the spi-imx driver use the GPIO
+> addressing method.
+> 
+> The change to use the correct "chip_select" is strait forward. But the
+> cs_gpio mapping arrary also needs to be modifed to match that change. In
+> simple terms the cs_gpio mapping should always have the hardware chip
+> select number at its same index offset.
+> 
+> There is no functional change with these patches. The three affected
+> platforms should work exactly as before. However I don't have any of
+> these platforms (or access to them) and so I can't test them. So this
+> patch is compile tested only.
+> 
+> Signed-off-by: Greg Ungerer <gerg@linux-m68k.org>
 
-On 18 March 2017 at 02:05, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Tue, Feb 07, 2017 at 02:50:03AM +0800, fu.wei at linaro.org wrote:
->> +static u32 arch_timer_get_sysreg_freq(void)
->> +{
->> +     /*
->> +      * Try to get the frequency from the CNTFRQ of sysreg.
->> +      */
->> +     return arch_timer_get_cntfrq();
->> +}
->
-> We already have arch_timer_get_cntfrq(), so I don't see the point in
-> this wrapper.
->
->> +static u32 arch_timer_get_mmio_freq(void __iomem *cntbase)
->> +{
->> +     /*
->> +      * Try to get the frequency from the CNTFRQ of timer frame registers.
->> +      * Note: please verify cntbase in caller.
->> +      */
->> +     return readl_relaxed(cntbase + CNTFRQ);
->> +}
->
-> Wrapping the MMIO read makes sense if we're going to do this in more
-> than one place, so I'm happy with this wrapper.
->
-> If you can s/arch_timer_get_mmio_freq/arch_timer_get_cntfrq/, and drop
+The subject prefix should be 'ARM: imx: ...'.
 
-sorry, May I guess that is
-"s/arch_timer_get_mmio_freq/arch_timer_get_mmio_cntfrq/"
-or
-"s/arch_timer_get_mmio_freq/arch_timer_mem_get_cntfrq/"
+Since the patch can go independently, I fix up the prefix and applied
+the patch.  Thanks.
 
-which one do you prefer? :-)
-
-> the comments, then this looks fine to me.
->
-> Thanks,
-> Mark.
-
-
-
--- 
-Best regards,
-
-Fu Wei
-Software Engineer
-Red Hat
+Shawn
