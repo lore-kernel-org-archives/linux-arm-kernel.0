@@ -1,33 +1,66 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 20 Mar 2017 12:31:50 +0000
-Subject: mainline build: 208 builds: 0 failed, 208 passed, 422 warnings
- (v4.11-rc2-164-gdefc7d752265)
-In-Reply-To: <CAK8P3a1jHhM=80Zo59JoDNd2RKwTfdR_i61_=ASqqUeJ1oecxg@mail.gmail.com>
-References: <58c97f8f.c4b5190a.8c4e4.300d@mx.google.com>
- <CAK8P3a1jHhM=80Zo59JoDNd2RKwTfdR_i61_=ASqqUeJ1oecxg@mail.gmail.com>
-Message-ID: <20170320123150.GJ17263@arm.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 20 Mar 2017 12:32:04 +0000
+Subject: [PATCH] serial: 8250: 8250_core: Fix irq name for 8250 serial irq
+In-Reply-To: <CAHp75Vd7Q_0MZ69kojA_S_A4OOgdD5sR1MKW_NLXrZa6h+3GSA@mail.gmail.com>
+References: <20170316122653.19930-1-vigneshr@ti.com>
+ <20170316133632.GV21222@n2100.armlinux.org.uk>
+ <9a6dcf55-0ace-e617-73bc-0472a939b36c@arm.com>
+ <CAHp75Vd7Q_0MZ69kojA_S_A4OOgdD5sR1MKW_NLXrZa6h+3GSA@mail.gmail.com>
+Message-ID: <20170320123204.GI21222@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 15, 2017 at 09:02:06PM +0100, Arnd Bergmann wrote:
-> On Wed, Mar 15, 2017 at 6:53 PM, kernelci.org bot <bot@kernelci.org> wrote:
+On Thu, Mar 16, 2017 at 10:58:54PM +0200, Andy Shevchenko wrote:
+> On Thu, Mar 16, 2017 at 4:55 PM, Robin Murphy <robin.murphy@arm.com> wrote:
+> > On 16/03/17 13:36, Russell King - ARM Linux wrote:
+> >> On Thu, Mar 16, 2017 at 05:56:53PM +0530, Vignesh R wrote:
+> >>> Using dev_name() as irq name during request_irq() might be misleading in
+> >>> case of serial over PCI. Therefore use a better alternative name for
+> >>> identifying serial port irqs as "serial" appended with serial_index of
+> >>> the port. This ensures that "serial" string is always present in irq
+> >>> name while port index will help in distinguishing b/w different ports.
+> >>
+> >> Wouldn't it be better to use the device name (iow, ttySx) rather than
+> >> "serialx" ?
+> >>
+> >> Maybe a helper function in serial_core.c to format the device name into
+> >> a supplied string, which can be re-used elsewhere, eg, uart_report_port()
+> >> and uart_suspend_port().  IOW:
+> >>
+> >> const char *uart_port_name(char *buf, size_t n, struct uart_driver *drv,
+> >>                          struct uart_port *port)
+> >> {
+> >>       snprintf(buf, n, "%s%d", drv->dev_name,
+> >>                drv->tty_driver->name_base + port->line);
+> >>
+> >>       return buf;
+> >> }
+> >>
+> >> which means you can do this:
+> >>
+> >>       char name[16];
+> >>
+> >>       request_irq(..., uart_port_name(name, sizeof(name), driver, port), ...)
+> >>
+> >> which also avoids the allocation.
 > >
-> > mainline build: 208 builds: 0 failed, 208 passed, 422 warnings (v4.11-rc2-164-gdefc7d752265)
+> > ...and makes 'cat /proc/interrupts' particularly fun later:
+> >
+> >   8:          0          GICv2  72 Level     ? ?h       ????V!
+> >
+> > Unless a suitably long-lived string already exists somewhere else in the
+> > serial core, the allocation is unavoidable, although kasprintf() (or its
+> > devm_ variant) might make matters a little simpler.
 > 
-> The last build failure in mainline is gone now, though I don't know
-> what fixed it.
-> Let's hope this doesn't come back as the cause was apparently a race condition
-> in Kbuild that might have stopped triggering.
-> 
-> > Warnings summary:
-> > 409 :1325:2: warning: #warning syscall statx not implemented [-Wcpp]
-> 
-> The warning triggers for arm, arm64 and mips on every build. I saw a patch
-> was posted for asm-generic, which takes care of arm64.
-> 
-> Catalin and Will: can you take this through the arm64 tree? I don't have
-> anything else for asm-generic at the moment.
+> What prevents us to create a field in uart_port (uart8250_port?) where
+> we put the uart_port_name() for future use as long as uart_port is
+> alive?
 
-Yes, I'll pick that up.
+Probably a good idea - I didn't check whether request_irq() just uses
+the pointer to the string or takes a copy of the string (I should've
+done before making the suggestion...)
 
-Will
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
