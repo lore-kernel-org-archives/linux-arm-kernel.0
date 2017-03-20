@@ -1,36 +1,77 @@
-From: colin.king@canonical.com (Colin King)
-Date: Mon, 20 Mar 2017 14:08:50 +0000
-Subject: [PATCH] staging: vc04_services: fix NULL pointer dereference on
- pointer 'service'
-Message-ID: <20170320140850.10570-1-colin.king@canonical.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Mon, 20 Mar 2017 14:09:16 +0000
+Subject: [PATCH 03/17] arm64: Allow checking of a CPU-local erratum
+In-Reply-To: <20170320135641.GD31213@leverpostej>
+References: <20170306112622.13853-1-marc.zyngier@arm.com>
+ <20170306112622.13853-4-marc.zyngier@arm.com>
+ <20170320135641.GD31213@leverpostej>
+Message-ID: <8b6c1423-ad78-0f51-7134-a1062791577f@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Colin Ian King <colin.king@canonical.com>
+On 20/03/17 13:56, Mark Rutland wrote:
+> On Mon, Mar 06, 2017 at 11:26:08AM +0000, Marc Zyngier wrote:
+>> this_cpu_has_cap() only checks the feature array, and not the errata
+>> one. In order to be able to check for a CPU-local erratum, allow it
+>> to inspect the latter as well.
+>>
+>> This is consistent with cpus_have_cap()'s behaviour, which includes
+>> errata already.
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>
+> This sounds sensible to me.
+>
+> Suzuki, any comments?
 
-Currently, if pservice is null then service is set to NULL and immediately
-afterwards service is dereferenced causing a null pointer dereference. Fix
-this by bailing out early of the function with a null return.
+Yes, this looks fine to me.
 
-Detected by CoverityScan, CID#1419681 ("Explicit null dereferenced")
+Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 
-Signed-off-by: Colin Ian King <colin.king@canonical.com>
----
- drivers/staging/vc04_services/interface/vchiq_arm/vchiq_core.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_core.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_core.c
-index dc9f85c2a5da..4f9e738abddf 100644
---- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_core.c
-+++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_core.c
-@@ -2673,7 +2673,7 @@ vchiq_add_service_internal(VCHIQ_STATE_T *state,
- 
- 	if (!pservice) {
- 		kfree(service);
--		service = NULL;
-+		return NULL;
- 	}
- 
- 	service_quota = &state->service_quotas[service->localport];
--- 
-2.11.0
+>
+> Thanks,
+> Mark.
+>
+>> ---
+>>  arch/arm64/kernel/cpufeature.c | 13 +++++++++++--
+>>  1 file changed, 11 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+>> index abda8e861865..6eb77ae99b79 100644
+>> --- a/arch/arm64/kernel/cpufeature.c
+>> +++ b/arch/arm64/kernel/cpufeature.c
+>> @@ -1090,20 +1090,29 @@ static void __init setup_feature_capabilities(void)
+>>   * Check if the current CPU has a given feature capability.
+>>   * Should be called from non-preemptible context.
+>>   */
+>> -bool this_cpu_has_cap(unsigned int cap)
+>> +static bool __this_cpu_has_cap(const struct arm64_cpu_capabilities *cap_array,
+>> +			       unsigned int cap)
+>>  {
+>>  	const struct arm64_cpu_capabilities *caps;
+>>
+>>  	if (WARN_ON(preemptible()))
+>>  		return false;
+>>
+>> -	for (caps = arm64_features; caps->desc; caps++)
+>> +	for (caps = cap_array; caps->desc; caps++)
+>>  		if (caps->capability == cap && caps->matches)
+>>  			return caps->matches(caps, SCOPE_LOCAL_CPU);
+>>
+>>  	return false;
+>>  }
+>>
+>> +extern const struct arm64_cpu_capabilities arm64_errata[];
+>> +
+>> +bool this_cpu_has_cap(unsigned int cap)
+>> +{
+>> +	return (__this_cpu_has_cap(arm64_features, cap) ||
+>> +		__this_cpu_has_cap(arm64_errata, cap));
+>> +}
+>> +
+>>  void __init setup_cpu_features(void)
+>>  {
+>>  	u32 cwg;
+>> --
+>> 2.11.0
+>>
