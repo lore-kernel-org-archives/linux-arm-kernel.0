@@ -1,38 +1,55 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 20 Mar 2017 13:50:26 +0100
-Subject: [PATCH 0/3] Basical Lichee Pi Zero with Dock support
-In-Reply-To: <20170317154343.39921-1-icenowy@aosc.xyz>
-References: <20170317154343.39921-1-icenowy@aosc.xyz>
-Message-ID: <20170320125026.t35nyadmeupuckc7@lukather>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Mon, 20 Mar 2017 14:00:50 +0100
+Subject: [PATCH] pata_pcmcia: add EBSA110's PCMCIA slot support
+In-Reply-To: <5827966.LxfQpi93qC@amdc3058>
+References: <CGME20170314175046epcas1p43f98daad14a2bac7f314e7d39e120232@epcas1p4.samsung.com>
+ <20170317141313.GC5078@htj.duckdns.org> <5827966.LxfQpi93qC@amdc3058>
+Message-ID: <19614027.eE1GoeCQeE@amdc3058>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Friday, March 17, 2017 04:51:13 PM Bartlomiej Zolnierkiewicz wrote:
 
-On Fri, Mar 17, 2017 at 11:43:40PM +0800, Icenowy Zheng wrote:
-> Lichee Pi Zero have an official dock, which makes use of all stamp hole pins.
+> > What's the end game here?  Is it part of the effort to remove ide?  If
+> > so, I have no objection to that but think it isn't a pressing issue
+> > either and the ultimate decision has to come from Dave.
 > 
-> Some extra functionalities are availble via the dock, e.g. an extra
-> MMC slot and some keys connected to LRADC.
+> I'm just helping in migrating users that are still using ide to libata,
+> enhancing libata's hardware support in the process. I would prefer to
+> have ide removed in the long-term (once there are no known users of
+> it) but Dave has a valid point (see below).  This particular patch is
+> more a by-product of the above work than a part of it itself.
 > 
-> This patchset adds the support of these two features of the dock.
+> Dave's current opinion is that we can't prove that all configurations
+> currently supported by ide are supported by libata.  Since it can never
+> be really proved (as there are ide drivers for hardware that cannot be
+> tested because of having no active users) he is fine with ide staying
+> in the kernel forever. Which may be not as bad for me personally as
+> I have a lot of contributions there. ;-)
 
-I'm a bit skeptical about the whole approach to have a split DTS for
-expansion boards.
+I've given some more thought on this over the weekend.
 
-This is not fundamentally different than having expansion boards, that
-we already deal with with overlays. This one is just bigger.
+I completely agree with Dave's opinion now. He has a good understanding
+of a long-term kernel development process (his opinions on ide were right
+back in 2009 and 2005).
 
-Maxime
+We keep support for hardware that has no active users "just in case" until
+the maintenance cost becomes too high or it blocks (in major way) some new
+developments.  This is not the case with ide (even with all active users
+ported to libata we will still be left with some support for hardware which
+can no longer be tested) and it should stay unless some of above conditions
+change. My personal wish to have coherent PATA support in the kernel doesn't
+really matter here.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170320/31466216/attachment.sig>
+I would apologize for being wrong on this and I'm sorry for waisting
+people's time.
+
+Coming back to the pata_pcmcia patch, Tejun, please just ignore it. It is
+now in mailing list's archives and this is sufficient to reference it if
+ever needed.
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
