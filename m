@@ -1,92 +1,76 @@
-From: arnaud.pouliquen@st.com (Arnaud Pouliquen)
-Date: Mon, 20 Mar 2017 12:30:48 +0100
-Subject: [PATCH v3 07/11] IIO: consumer: allow to set buffer sizes
-In-Reply-To: <951c19fa-d3b8-f4cd-cac1-64e3b8d1cf01@kernel.org>
-References: <1489759704-30217-1-git-send-email-arnaud.pouliquen@st.com>
- <1489759704-30217-8-git-send-email-arnaud.pouliquen@st.com>
- <951c19fa-d3b8-f4cd-cac1-64e3b8d1cf01@kernel.org>
-Message-ID: <b2715233-63e7-4c9d-49fc-ad6ca8be0d75@st.com>
+From: quentin.schulz@free-electrons.com (Quentin Schulz)
+Date: Mon, 20 Mar 2017 12:34:03 +0100
+Subject: [PATCH v4 00/18] add support for AXP20X and AXP22X power supply
+ drivers
+In-Reply-To: <20170315224647.suhnptpczykuoffd@earth>
+References: <20170315105537.22349-1-quentin.schulz@free-electrons.com>
+ <20170315121450.bl5dxdjzazwsrvni@dell>
+ <bc829791-c543-220a-8c42-1023b1a82963@free-electrons.com>
+ <20170315224647.suhnptpczykuoffd@earth>
+Message-ID: <949439a1-2f66-bdb7-04ae-ff88cb388809@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Sebastian and Liam,
 
-
-On 03/19/2017 11:44 PM, Jonathan Cameron wrote:
-> On 17/03/17 14:08, Arnaud Pouliquen wrote:
->> Add iio consumer API to set buffer size and watermark according
->> to sysfs API.
+On 15/03/2017 23:46, Sebastian Reichel wrote:
+> On Wed, Mar 15, 2017 at 02:18:56PM +0100, Quentin Schulz wrote:
+>> Hi Lee,
 >>
->> Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
-> Hmm. Not keen on the length one.  Setting a requested watermark
-> is fair enough.  There is no actually buffer in these cases though
-> so setting it's length is downright odd..
-Length and watermark are configurable from user land through sysfs.
-Seems to me logic to also propose it in inkern API...
-But I can clean length , no problem.
-
-> 
-> Guess this is part of the hacks we need to clean up by doing
-> the dma buffer consumer stuff right...
-Yes all is linked :-).
-
-> 
-> Jonathan
->> ---
->>  drivers/iio/buffer/industrialio-buffer-cb.c | 12 ++++++++++++
->>  include/linux/iio/consumer.h                | 13 +++++++++++++
->>  2 files changed, 25 insertions(+)
+>> On 15/03/2017 13:14, Lee Jones wrote:
+>>> On Wed, 15 Mar 2017, Quentin Schulz wrote:
+>>>
+>>>> The X-Powers AXP20X and AXP22X PMICs have multiple ADCs. They expose
+>>>> information and data of the various power supplies they support such as
+>>>> ACIN, battery and VBUS. For example, they expose the current battery
+>>>> voltage, charge or discharge, as well as ACIN and VBUS current voltages
+>>>> and currents, internal PMIC temperature and ADC on 2 different GPIOs
+>>>> when in the right mode (for the AXP209 only).
+>>>
+>>> What are you missing from this set now?  What Acks etc?  And what's
+>>> the plan with regards to route to Mainline?  Where are the dependencies
+>>> etc?
+>>>
 >>
->> diff --git a/drivers/iio/buffer/industrialio-buffer-cb.c b/drivers/iio/buffer/industrialio-buffer-cb.c
->> index b8f550e..43c066a 100644
->> --- a/drivers/iio/buffer/industrialio-buffer-cb.c
->> +++ b/drivers/iio/buffer/industrialio-buffer-cb.c
->> @@ -103,6 +103,18 @@ struct iio_cb_buffer *iio_channel_get_all_cb(struct device *dev,
->>  }
->>  EXPORT_SYMBOL_GPL(iio_channel_get_all_cb);
->>  
->> +int iio_channel_cb_set_buffer_params(struct iio_cb_buffer *cb_buff,
->> +				      size_t length, size_t watermark)
->> +{
->> +	if (!length || length < watermark)
->> +		return -EINVAL;
->> +	cb_buff->buffer.watermark = watermark;
->> +	cb_buff->buffer.length = length;
->> +
->> +	return 0;
->> +}
->> +EXPORT_SYMBOL_GPL(iio_channel_start_all_cb);
->> +
->>  int iio_channel_start_all_cb(struct iio_cb_buffer *cb_buff)
->>  {
->>  	return iio_update_buffers(cb_buff->indio_dev, &cb_buff->buffer,
->> diff --git a/include/linux/iio/consumer.h b/include/linux/iio/consumer.h
->> index cb44771..0f6e94d 100644
->> --- a/include/linux/iio/consumer.h
->> +++ b/include/linux/iio/consumer.h
->> @@ -134,6 +134,19 @@ struct iio_cb_buffer *iio_channel_get_all_cb(struct device *dev,
->>  						       void *private),
->>  					     void *private);
->>  /**
->> + * iio_channel_cb_set_buffer_size() - set the buffer length.
->> + * @cb_buffer:		The callback buffer from whom we want the channel
->> + *			information.
->> + * @length: buffer length in bytes
->> + * @watermark: buffer watermark in bytes
->> + *
->> + * This function allows to configure the buffer length. The watermark if
->> + * forced to half of the buffer.
->> + */
->> +int iio_channel_cb_set_buffer_params(struct iio_cb_buffer *cb_buffer,
->> +				     size_t length, size_t watermark);
->> +
->> +/**
->>   * iio_channel_release_all_cb() - release and unregister the callback.
->>   * @cb_buffer:		The callback buffer that was allocated.
->>   */
+>> Basically, a consensus on how we should named the DT property I added in
+>> patch 01 and 02 (which is used afterwards in battery driver). All other
+>> patches have ACKs.
 >>
+>> I added some logic to the battery driver so if anyone wants to review
+>> that you're welcome. I already got several ACKs from the v3 though.
+>>
+>> No dependencies except for the battery driver (and the first two
+>> patches) which needs the battery "framework" in the Power Supply
+>> subsystem. A v9 of this framework has been sent a little bit more than a
+>> week ago, I need this to be merged first or the battery driver will just
+>> not compile. I think the other patches are ready to be merged.
 > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> FWIW I expect, that the axp battery patches go through my tree, since
+> there doesn't seem to be a compile time dependency to the other
+> patches from this series nor vice versa. I'm aware of the dependency
+> to the bq27xxx series of course.
 > 
+
+As there are still some discussion going on Liam's patch series on which
+my patch series depends, I propose to wait for it to be merged and then
+I'll rework these battery driver patches. Is there anything I can do to
+help the merging of Liam's patch series?
+
+Could you ping me when it is merged? The easiest way would be to Cc me
+to the next version though so I can follow the discussion :)
+
+Thanks,
+Quentin
+
+-- 
+Quentin Schulz, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170320/3218d507/attachment.sig>
