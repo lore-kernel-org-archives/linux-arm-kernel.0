@@ -1,33 +1,57 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 20 Mar 2017 09:58:08 +0100
-Subject: [PATCH] clk: sunxi-ng: Fix div/mult settings for osc12M on A64
-In-Reply-To: <1489577038-34773-1-git-send-email-philipp.tomsich@theobroma-systems.com>
-References: <1489577038-34773-1-git-send-email-philipp.tomsich@theobroma-systems.com>
-Message-ID: <20170320085808.ofixt6jacim3rzuj@lukather>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Mon, 20 Mar 2017 09:57:14 +0100
+Subject: [PATCH 03/32] arm64: dts: r8a7795: Add I2C for DVFS core to dtsi
+In-Reply-To: <cover.1489999913.git.horms+renesas@verge.net.au>
+References: <cover.1489999913.git.horms+renesas@verge.net.au>
+Message-ID: <d7e0d64a46f97f67ecbc0194ce6a394f512109c5.1489999913.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 15, 2017 at 12:23:58PM +0100, Philipp Tomsich wrote:
-> The mult/div for osc12M was previously backwards (giving a 48M rate
-> for osc12M). Fix it.
-> 
-> X-AffectedPlatforms: A64-uQ7
-> Signed-off-by: Philipp Tomsich <philipp.tomsich@theobroma-systems.com>
-> Tested-by: Christoph Muellner <christoph.muellner@theobroma-systems.com>
-> 
-> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+From: Keita Kobayashi <keita.kobayashi.ym@renesas.com>
 
-I dropped your extra tag, and queued it for 4.11, thanks!
-Maxime
+This patch adds I2C for DVFS device support for R8A7795 SoC.
 
+Signed-off-by: Keita Kobayashi <keita.kobayashi.ym@renesas.com>
+Signed-off-by: Gaku Inami <gaku.inami.xw@bp.renesas.com>
+Signed-off-by: Dien Pham <dien.pham.ry@rvc.renesas.com>
+Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+index eac4f29aa5cd..fe266bb3d913 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+@@ -25,6 +25,7 @@
+ 		i2c4 = &i2c4;
+ 		i2c5 = &i2c5;
+ 		i2c6 = &i2c6;
++		i2c7 = &i2c_dvfs;
+ 	};
+ 
+ 	psci {
+@@ -793,6 +794,19 @@
+ 			status = "disabled";
+ 		};
+ 
++		i2c_dvfs: i2c at e60b0000 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			compatible = "renesas,iic-r8a7795",
++				     "renesas,rcar-gen3-iic",
++				     "renesas,rmobile-iic";
++			reg = <0 0xe60b0000 0 0x425>;
++			interrupts = <GIC_SPI 173 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 926>;
++			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
++			status = "disabled";
++		};
++
+ 		i2c0: i2c at e6500000 {
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170320/67e3347c/attachment-0001.sig>
+2.7.0.rc3.207.g0ac5344
