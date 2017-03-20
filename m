@@ -1,92 +1,233 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Mon, 20 Mar 2017 11:27:16 -0500
-Subject: [PATCH 03/20] asm-generic/io.h: add PCI config space remap
- interface
-In-Reply-To: <20170317000803.GA28800@wotan.suse.de>
-References: <20170227151436.18698-1-lorenzo.pieralisi@arm.com>
- <20170227151436.18698-4-lorenzo.pieralisi@arm.com>
- <20170316211243.GE9739@bhelgaas-glaptop.roam.corp.google.com>
- <20170317000803.GA28800@wotan.suse.de>
-Message-ID: <20170320162716.GC24572@bhelgaas-glaptop.roam.corp.google.com>
+From: delicious.quinoa@gmail.com (Alan Tull)
+Date: Mon, 20 Mar 2017 11:28:39 -0500
+Subject: [PATCH v3 2/2] fpga: Add support for Xilinx LogiCORE PR Decoupler
+In-Reply-To: <1489781473-30772-2-git-send-email-mdf@kernel.org>
+References: <1489781473-30772-1-git-send-email-mdf@kernel.org>
+ <1489781473-30772-2-git-send-email-mdf@kernel.org>
+Message-ID: <CANk1AXT_WetixZndGtT-A8gi+UK754AjnELaH_6f3bxgdpkmfg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 17, 2017 at 01:08:03AM +0100, Luis R. Rodriguez wrote:
-> On Thu, Mar 16, 2017 at 04:12:43PM -0500, Bjorn Helgaas wrote:
-> > [+cc Luis]
-> > 
-> > On Mon, Feb 27, 2017 at 03:14:14PM +0000, Lorenzo Pieralisi wrote:
-> > > The PCI specifications (Rev 3.0, 3.2.5 "Transaction Ordering and
-> > > Posting") mandate non-posted configuration transactions. As further
-> > > highlighted in the PCIe specifications (4.0 - Rev0.3, "Ordering
-> > > Considerations for the Enhanced Configuration Access Mechanism"),
-> > > through ECAM and ECAM-derivative configuration mechanism, the memory
-> > > mapped transactions from the host CPU into Configuration Requests on the
-> > > PCI express fabric may create ordering problems for software because
-> > > writes to memory address are typically posted transactions (unless the
-> > > architecture can enforce through virtual address mapping non-posted
-> > > write transactions behaviour) but writes to Configuration Space are not
-> > > posted on the PCI express fabric.
-> > > 
-> > > Current DT and ACPI host bridge controllers map PCI configuration space
-> > > (ECAM and ECAM-derivative) into the virtual address space through
-> > > ioremap() calls, that are non-cacheable device accesses on most
-> > > architectures, but may provide "bufferable" or "posted" write semantics
-> > > in architecture like eg ARM/ARM64 that allow ioremap'ed regions writes
-> > > to be buffered in the bus connecting the host CPU to the PCI fabric;
-> > > this behaviour, as underlined in the PCIe specifications, may trigger
-> > > transactions ordering rules and must be prevented.
-> > > 
-> > > Introduce a new generic and explicit API to create a memory
-> > > mapping for ECAM and ECAM-derivative config space area that
-> > > defaults to ioremap_nocache() (which should provide a sane default
-> > > behaviour) but still allowing architectures on which ioremap_nocache()
-> > > results in posted write transactions to override the function
-> > > call with an arch specific implementation that complies with
-> > > the PCI specifications for configuration transactions.
-> > ...
+On Fri, Mar 17, 2017 at 3:11 PM, Moritz Fischer <mdf@kernel.org> wrote:
 
-> > > +#ifndef pci_remap_cfgspace
-> > > +#define pci_remap_cfgspace pci_remap_cfgspace
-> > > +static inline void __iomem *pci_remap_cfgspace(phys_addr_t offset,
-> > > +					       size_t size)
-> > > +{
-> > > +	return ioremap_nocache(offset, size);
-> > > +}
-> > 
-> > I'm fine with this conceptually, but I think it would make more sense
-> > if the name weren't specific to PCI or config space, e.g.,
-> > ioremap_nopost() or something.
-> 
-> Seems reasonable to me -- but are there other buses that could use
-> this already as well ? Wouldn't these other buses also run into
-> similar issues ? Can someone also bounce me a copy of the patches
-> that use this ?
+Hi Moritz,
 
-I forwarded a copy of the initial posting of all 20 patches to you.
+Looks good except for the kbuild robot warnings that need to be fixed.
 
-> While at it, please add some documentation too, the above commit log
-> is huge, and yet for the person eyeballing the code they won't have
-> any clue why this was added exactly. Since this is about helping
-> with picking the right ioremap due to certain semantics /
-> requirements on the PCI config space, we should clarify then what
-> exactly are the expectations here. The clearer you are the less in
-> trouble we can get later.
+Alan
 
-I think the documentation above does contain the critical facts that:
-
-  - Accesses to PCI config space and PCI I/O port space should be
-    non-posted
-
-  - ARM64 currently maps them as posted, which may cause ordering
-    problems
-
-It's possible the changelog could be made clearer by *removing* text,
-but I'm not sure what Lorenzo could *add* to make it better.
-
-This particular patch is generic (not ARM64-specific), so maybe all we
-need to say here is that PCI requires non-posted mappings in some
-cases, and we currently don't have a generic ioremap() to make them,
-so we're adding a way for an arch to provide such an interface.
-
-Bjorn
+> This adds support for the Xilinx LogiCORE PR Decoupler
+> soft-ip that does decoupling of PR regions in the FPGA
+> fabric during partial reconfiguration.
+>
+> Signed-off-by: Moritz Fischer <mdf@kernel.org>
+> Cc: Michal Simek <michal.simek@xilinx.com>
+> Cc: S?ren Brinkmann <soren.brinkmann@xilinx.com>
+> Cc: linux-kernel at vger.kernel.org
+> Cc: devicetree at vger.kernel.org
+> ---
+> Changes from v2:
+> - Added Michal's Signed-off-by
+> - Added "xlnx,pr-decoupler" unversioned fallback
+>
+> Changes from v1:
+> - Added Michal as Co-Author since I pulled in some of his code
+> - Reworked clk handling in _remove()
+> - Pulled in Michal's version of show_enable(), ditched priv->enabled
+>
+> ---
+>  drivers/fpga/Kconfig               |   9 +++
+>  drivers/fpga/Makefile              |   1 +
+>  drivers/fpga/xilinx-pr-decoupler.c | 148 +++++++++++++++++++++++++++++++++++++
+>  3 files changed, 158 insertions(+)
+>  create mode 100644 drivers/fpga/xilinx-pr-decoupler.c
+>
+> diff --git a/drivers/fpga/Kconfig b/drivers/fpga/Kconfig
+> index ce861a2..ce0c91d 100644
+> --- a/drivers/fpga/Kconfig
+> +++ b/drivers/fpga/Kconfig
+> @@ -63,6 +63,15 @@ config ALTERA_FREEZE_BRIDGE
+>           isolate one region of the FPGA from the busses while that
+>           region is being reprogrammed.
+>
+> +config XILINX_PR_DECOUPLER
+> +       tristate "Xilinx LogiCORE PR Decoupler"
+> +       depends on FPGA_BRIDGE
+> +       help
+> +         Say Y to enable drivers for Xilinx LogiCORE PR Decoupler.
+> +         The PR Decoupler exists in the FPGA fabric to isolate one
+> +         region of the FPGA from the busses while that region is
+> +         being reprogrammed during partial reconfig.
+> +
+>  endif # FPGA
+>
+>  endmenu
+> diff --git a/drivers/fpga/Makefile b/drivers/fpga/Makefile
+> index 8df07bc..ba94b79 100644
+> --- a/drivers/fpga/Makefile
+> +++ b/drivers/fpga/Makefile
+> @@ -14,6 +14,7 @@ obj-$(CONFIG_FPGA_MGR_ZYNQ_FPGA)      += zynq-fpga.o
+>  obj-$(CONFIG_FPGA_BRIDGE)              += fpga-bridge.o
+>  obj-$(CONFIG_SOCFPGA_FPGA_BRIDGE)      += altera-hps2fpga.o altera-fpga2sdram.o
+>  obj-$(CONFIG_ALTERA_FREEZE_BRIDGE)     += altera-freeze-bridge.o
+> +obj-$(CONFIG_XILINX_PR_DECOUPLER)      += xilinx-pr-decoupler.o
+>
+>  # High Level Interfaces
+>  obj-$(CONFIG_FPGA_REGION)              += fpga-region.o
+> diff --git a/drivers/fpga/xilinx-pr-decoupler.c b/drivers/fpga/xilinx-pr-decoupler.c
+> new file mode 100644
+> index 0000000..dd37b1c
+> --- /dev/null
+> +++ b/drivers/fpga/xilinx-pr-decoupler.c
+> @@ -0,0 +1,148 @@
+> +/*
+> + * Copyright (c) 2017, National Instruments Corp.
+> + * Copyright (c) 2017, Xilix Inc
+> + *
+> + * FPGA Bridge Driver for the Xilinx LogiCORE Partial Reconfiguration
+> + * Decoupler IP Core.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; version 2 of the License.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/clk.h>
+> +#include <linux/io.h>
+> +#include <linux/kernel.h>
+> +#include <linux/of_device.h>
+> +#include <linux/module.h>
+> +#include <linux/fpga/fpga-bridge.h>
+> +
+> +#define CTRL_CMD_DECOUPLE      BIT(0)
+> +#define CTRL_CMD_COUPLE                ~BIT(0)
+> +
+> +struct xlnx_pr_decoupler_data {
+> +       void __iomem *io_base;
+> +       struct clk *clk;
+> +};
+> +
+> +static int xlnx_pr_decoupler_enable_set(struct fpga_bridge *bridge, bool enable)
+> +{
+> +       int err;
+> +       struct xlnx_pr_decoupler_data *priv = bridge->priv;
+> +
+> +       err = clk_enable(priv->clk);
+> +       if (err)
+> +               return err;
+> +
+> +       if (enable)
+> +               writel(CTRL_CMD_COUPLE, priv->io_base);
+> +       else
+> +               writel(CTRL_CMD_DECOUPLE, priv->io_base);
+> +
+> +       clk_disable(priv->clk);
+> +
+> +       return 0;
+> +}
+> +
+> +static int xlnx_pr_decoupler_enable_show(struct fpga_bridge *bridge)
+> +{
+> +       const struct xlnx_pr_decoupler_data *priv = bridge->priv;
+> +       u32 status;
+> +       int err;
+> +
+> +       err = clk_enable(priv->clk);
+> +       if (err)
+> +               return err;
+> +
+> +       status = readl(priv->io_base);
+> +
+> +       clk_disable(priv->clk);
+> +
+> +       return !status;
+> +}
+> +
+> +static struct fpga_bridge_ops xlnx_pr_decoupler_br_ops = {
+> +       .enable_set = xlnx_pr_decoupler_enable_set,
+> +       .enable_show = xlnx_pr_decoupler_enable_show,
+> +};
+> +
+> +static const struct of_device_id xlnx_pr_decoupler_of_match[] = {
+> +       { .compatible = "xlnx,pr-decoupler-1.00", },
+> +       { .compatible = "xlnx,pr-decoupler", },
+> +       {},
+> +};
+> +MODULE_DEVICE_TABLE(of, xlnx_pr_decoupler_of_match);
+> +
+> +static int xlnx_pr_decoupler_probe(struct platform_device *pdev)
+> +{
+> +       struct xlnx_pr_decoupler_data *priv;
+> +       int err;
+> +       struct resource *res;
+> +
+> +       priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
+> +       if (!priv)
+> +               return -ENOMEM;
+> +
+> +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +       priv->io_base = devm_ioremap_resource(&pdev->dev, res);
+> +       if (IS_ERR(priv->io_base))
+> +               return PTR_ERR(priv->io_base);
+> +
+> +       priv->clk = devm_clk_get(&pdev->dev, "aclk");
+> +       if (IS_ERR(priv->clk)) {
+> +               dev_err(&pdev->dev, "input clock not found\n");
+> +               return PTR_ERR(priv->clk);
+> +       }
+> +
+> +       err = clk_prepare_enable(priv->clk);
+> +       if (err) {
+> +               dev_err(&pdev->dev, "unable to enable clock\n");
+> +               return err;
+> +       }
+> +
+> +       clk_disable(priv->clk);
+> +
+> +       err = fpga_bridge_register(&pdev->dev, "Xilinx PR Decoupler",
+> +                                  &xlnx_pr_decoupler_br_ops, priv);
+> +
+> +       if (err) {
+> +               dev_err(&pdev->dev, "unable to register Xilinx PR Decoupler");
+> +               clk_unprepare(priv->clk);
+> +               return err;
+> +       }
+> +
+> +       return 0;
+> +}
+> +
+> +static int xlnx_pr_decoupler_remove(struct platform_device *pdev)
+> +{
+> +       struct fpga_bridge *bridge = platform_get_drvdata(pdev);
+> +       struct xlnx_pr_decoupler_data *p = bridge->priv;
+> +
+> +       fpga_bridge_unregister(&pdev->dev);
+> +
+> +       clk_unprepare(p->clk);
+> +
+> +       return 0;
+> +}
+> +
+> +static struct platform_driver xlnx_pr_decoupler_driver = {
+> +       .probe = xlnx_pr_decoupler_probe,
+> +       .remove = xlnx_pr_decoupler_remove,
+> +       .driver = {
+> +               .name = "xlnx_pr_decoupler",
+> +               .of_match_table = of_match_ptr(xlnx_pr_decoupler_of_match),
+> +       },
+> +};
+> +
+> +module_platform_driver(xlnx_pr_decoupler_driver);
+> +
+> +MODULE_DESCRIPTION("Xilinx Partial Reconfiguration Decoupler");
+> +MODULE_AUTHOR("Moritz Fischer <mdf@kernel.org>");
+> +MODULE_AUTHOR("Michal Simek <michal.simek@xilinx.com>");
+> +MODULE_LICENSE("GPL v2");
+> --
+> 2.7.4
+>
