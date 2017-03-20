@@ -1,39 +1,38 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 20 Mar 2017 16:37:22 -0500
-Subject: [PATCH 3/5] dt-bindings: stm32-dma: Add property to handle STM32
- DMAMUX
-In-Reply-To: <1489414561-28912-4-git-send-email-cedric.madianga@gmail.com>
-References: <1489414561-28912-1-git-send-email-cedric.madianga@gmail.com>
- <1489414561-28912-4-git-send-email-cedric.madianga@gmail.com>
-Message-ID: <20170320213722.oj3ipmslbw2mp27d@rob-hp-laptop>
+Date: Mon, 20 Mar 2017 16:43:16 -0500
+Subject: [PATCH v4 15/23] dt-bindings: PCI: dra7xx: Add dt bindings to
+ enable unaligned access
+In-Reply-To: <20170313142259.25397-16-kishon@ti.com>
+References: <20170313142259.25397-1-kishon@ti.com>
+ <20170313142259.25397-16-kishon@ti.com>
+Message-ID: <20170320214316.yah5cvfdabiceywf@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 13, 2017 at 03:15:59PM +0100, M'boumba Cedric Madianga wrote:
-> This patch adds an optional property needed for STM32 DMA controller
-> addressed via STM32 DMAMUX.
+On Mon, Mar 13, 2017 at 07:52:51PM +0530, Kishon Vijay Abraham I wrote:
+> Update device tree binding documentation of TI's dra7xx PCI
+> controller to include property for enabling unaligned mem access.
 > 
-> Signed-off-by: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 > ---
->  Documentation/devicetree/bindings/dma/stm32-dma.txt | 3 +++
->  1 file changed, 3 insertions(+)
+>  Documentation/devicetree/bindings/pci/ti-pci.txt | 5 +++++
+>  1 file changed, 5 insertions(+)
 > 
-> diff --git a/Documentation/devicetree/bindings/dma/stm32-dma.txt b/Documentation/devicetree/bindings/dma/stm32-dma.txt
-> index 4408af6..7b5e91a 100644
-> --- a/Documentation/devicetree/bindings/dma/stm32-dma.txt
-> +++ b/Documentation/devicetree/bindings/dma/stm32-dma.txt
-> @@ -16,6 +16,9 @@ Optional properties:
->  - resets: Reference to a reset controller asserting the DMA controller
->  - st,mem2mem: boolean; if defined, it indicates that the controller supports
->    memory-to-memory transfer
-> +- st,dmamux: boolean; if defined, it indicates that the controller is behind a
-> +  DMA multiplexer. In that case, using dma instances doesn't work for DMA
-> +  clients. They have to use dma-router instances.
+> diff --git a/Documentation/devicetree/bindings/pci/ti-pci.txt b/Documentation/devicetree/bindings/pci/ti-pci.txt
+> index 190828a5f32a..b69dd7dbd29e 100644
+> --- a/Documentation/devicetree/bindings/pci/ti-pci.txt
+> +++ b/Documentation/devicetree/bindings/pci/ti-pci.txt
+> @@ -39,6 +39,11 @@ DEVICE MODE
+>   - interrupts : one interrupt entries must be specified for main interrupt.
+>   - num-ib-windows : number of inbound address translation windows
+>   - num-ob-windows : number of outbound address translation windows
+> + - ti,syscon-unaligned-access: phandle to the syscon dt node. The 1st argument
+> +			       should contain the register offset within syscon
+> +			       and the 2nd argument should contain the bit field
+> +			       for setting the bit to enable unaligned
+> +			       access.
 
-This should not be needed for the same reason we don't need anything 
-like this for chained interrupt controllers.
-
-Also, the compatible string should be specific enough to provide this 
-information.
+This should be setup by the firmware/bootloader or some platform code. 
+Why does the PCI host need to configure this?
 
 Rob
