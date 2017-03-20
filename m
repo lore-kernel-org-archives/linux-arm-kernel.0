@@ -1,78 +1,87 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Mon, 20 Mar 2017 14:51:32 +0800
-Subject: [alsa-devel] [PATCH v3 03/11] IIO: ADC: add sigma delta
- modulator support
-In-Reply-To: <1489759704-30217-4-git-send-email-arnaud.pouliquen@st.com>
-Message-ID: <201703201458.zf1CdM1e%fengguang.wu@intel.com>
+From: sean.wang@mediatek.com (sean.wang at mediatek.com)
+Date: Mon, 20 Mar 2017 14:47:23 +0800
+Subject: [PATCH v6 0/4] leds: add leds-mt6323 support on MT7623 SoC
+Message-ID: <1489992447-13007-1-git-send-email-sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnaud,
+From: Sean Wang <sean.wang@mediatek.com>
 
-[auto build test WARNING on asoc/for-next]
-[also build test WARNING on v4.11-rc3]
-[cannot apply to iio/togreg next-20170310]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+MT7623 SoC uses MT6323 PMIC as the default power supply which has LED function
+insides. The patchset introduces the LED support for MT6323 with on, off and
+hardware dimmed and blinked and it should work on other similar SoCs if also
+using MT6323.
 
-url:    https://github.com/0day-ci/linux/commits/Arnaud-Pouliquen/Add-STM32-DFSDM-support/20170320-133247
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git for-next
-config: x86_64-allmodconfig (attached as .config)
-compiler: gcc-6 (Debian 6.2.0-3) 6.2.0 20160901
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=x86_64 
+Changes since v1:
+- fixed typo in the comments
+- sorted include directives alphabetically
+- applied all register definitions with MT6323 prefix
+- removed the redundant structure declaration
+- fixed coding style defined in kernel doc format consistently
+- added error handling into all the occurrences where regmap APIs
+  are used
+- removed loudly debug message
+- made magic constant into meaningful macro
+- added missing mutex_destroy when module removed called
+- updated module license with GPL
+- fixed sparse warnings
 
-All warnings (new ones prefixed by >>):
+Changes since v2:
+- fixed the typo in devicetree Documentation
+- cleaned up the style and explanation in the comments
+- applied all macro/struct/function definitions with MT6323 prefix
+- put the logic about the setup from device tree into function for simplicity
 
-   In file included from drivers/iio/adc/sd_adc_modulator.c:23:0:
-   drivers/iio/adc/sd_adc_modulator.c:84:25: error: 'adc081c_of_match' undeclared here (not in a function)
-    MODULE_DEVICE_TABLE(of, adc081c_of_match);
-                            ^
-   include/linux/module.h:212:21: note: in definition of macro 'MODULE_DEVICE_TABLE'
-    extern const typeof(name) __mod_##type##__##name##_device_table  \
-                        ^~~~
-   include/linux/module.h:212:27: error: '__mod_of__adc081c_of_match_device_table' aliased to undefined symbol 'adc081c_of_match'
-    extern const typeof(name) __mod_##type##__##name##_device_table  \
-                              ^
->> drivers/iio/adc/sd_adc_modulator.c:84:1: note: in expansion of macro 'MODULE_DEVICE_TABLE'
-    MODULE_DEVICE_TABLE(of, adc081c_of_match);
-    ^~~~~~~~~~~~~~~~~~~
+Changes since v3:
+- changed the variable current_brightness into the proper type
+- removed the redundant member led_num from mt6323_leds structure
+- collected the brightness setting into mt6323_led_hw_brightness() call
+- added brightness_get() support into the core layer
+- fixed zero duty cycle handling due to hardware doesn't support
+- fixed duty cycle calculation mapping to the hardware register
+- added the brightness as the input in mt6323_led_hw_on() call
+- enhanced error handling in mt6323_led_set_dt_default() call
+- fixed potential issue which caused accessing unallocated memory if excessive
+  the led controller nodes are defined
+- fixed redundant memory allocation in mt6323_leds structure
+- added reg property for defining the led controller for which the child
+  node is predestined
 
-vim +/MODULE_DEVICE_TABLE +84 drivers/iio/adc/sd_adc_modulator.c
+Changes since v4:
+- enhanced the example in leds-mt6323.txt for patch 1/4 with adding the missing
+  #address-cell and #size-cell, correcting sub-node naming with led at 0 style,
+  removing the unrelated setup for LED and moving the description for the node
+  properties into the right place
+- enhanced the documentation in mt6397.txt for patch 2/4
+- changed the subject prefixes into "dt-bindings: ..." for the device tree commits
+- fixed that missing of_node_put() in the error path called from mt6323_led_probe()
+- fixed that incorrect duty_cycle calculation mapping into the hardware register in
+case duty ratio is lower than 1/64 rather than 0
 
-    68		iio->info = &iio_sd_mod_iio_info;
-    69		iio->modes = INDIO_BUFFER_HARDWARE;
-    70	
-    71		iio->num_channels = 1;
-    72		iio->channels = &stm32_dfsdm_ch;
-    73	
-    74		platform_set_drvdata(pdev, iio);
-    75	
-    76		return devm_iio_device_register(&pdev->dev, iio);
-    77	}
-    78	
-    79	static const struct of_device_id sd_adc_of_match[] = {
-    80		{ .compatible = "sd-modulator" },
-    81		{ .compatible = "ads1201" },
-    82		{ }
-    83	};
-  > 84	MODULE_DEVICE_TABLE(of, adc081c_of_match);
-    85	
-    86	static struct platform_driver iio_sd_mod_adc = {
-    87		.driver = {
-    88			.name = "iio_sd_adc_mod",
-    89			.of_match_table = of_match_ptr(sd_adc_of_match),
-    90		},
-    91		.probe = iio_sd_mod_probe,
-    92	};
+Changes since v5:
+- changed codebase into 4.11-rc1
+- split the already merged ones out from patch #2 and #4 on v4
+- fixed line wrap to 72-80 char for patch #1
+- grouped properties by required and optional for patch #1
+- enhanced the node identifier for the example with "mt6323: pmic" instead of
+"pmic: mt6323" for patch #1
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 58882 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170320/50f8caa9/attachment-0001.gz>
+Sean Wang (4):
+  dt-bindings: leds: Add document bindings for leds-mt6323
+  dt-bindings: mfd: Add the description for LED as the sub module
+  leds: Add LED support for MT6323 PMIC
+  mfd: mt6397: Align the placement at which the mfd_cell of LED is
+    defined
+
+ .../devicetree/bindings/leds/leds-mt6323.txt       |  60 +++
+ Documentation/devicetree/bindings/mfd/mt6397.txt   |   1 +
+ drivers/leds/Kconfig                               |   8 +
+ drivers/leds/Makefile                              |   1 +
+ drivers/leds/leds-mt6323.c                         | 502 +++++++++++++++++++++
+ drivers/mfd/mt6397-core.c                          |   3 +-
+ 6 files changed, 573 insertions(+), 2 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/leds/leds-mt6323.txt
+ create mode 100644 drivers/leds/leds-mt6323.c
+
+-- 
+1.9.1
