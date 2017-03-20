@@ -1,47 +1,40 @@
-From: fu.wei@linaro.org (Fu Wei)
-Date: Mon, 20 Mar 2017 13:09:39 +0800
-Subject: [PATCH v21 00/13] acpi, clocksource: add GTDT driver and GTDT
- support in arm_arch_timer
-In-Reply-To: <20170317200346.GG15909@leverpostej>
-References: <20170206185015.12296-1-fu.wei@linaro.org>
- <CADyBb7t_zrLetPQQ8=k8oN6iMHhuMHO8O3XTZqGYvTT9p0evKw@mail.gmail.com>
- <CADyBb7urVf87LTsyrtoaAExTeOZSBAvT91enGBK4cm6723q+1Q@mail.gmail.com>
- <20170317200346.GG15909@leverpostej>
-Message-ID: <CADyBb7uinO7HVRusFa2hXFdKGXZ_5FnEb-7-S-xUNx=W2+NfCA@mail.gmail.com>
+From: smitha.t@samsung.com (Smitha T Murthy)
+Date: Mon, 20 Mar 2017 10:57:57 +0530
+Subject: [Patch v2 02/11] s5p-mfc: Adding initial support for MFC v10.10
+In-Reply-To: <20170315195250.kq4tywgzmvnzuy4j@rob-hp-laptop>
+References: <1488532036-13044-1-git-send-email-smitha.t@samsung.com>
+ <CGME20170303090436epcas1p2097d589d9c5e6f7ee634ab9917cc987e@epcas1p2.samsung.com>
+ <1488532036-13044-3-git-send-email-smitha.t@samsung.com>
+ <20170315195250.kq4tywgzmvnzuy4j@rob-hp-laptop>
+Message-ID: <1489987677.27807.145.camel@smitha-fedora>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
-
-On 18 March 2017 at 04:03, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Thu, Mar 09, 2017 at 11:47:16PM +0100, Fu Wei wrote:
->> Hi Mark, Marc,
->
-> Hi,
->
->> I have tried to rebase all the 19(6+13) patches  on 4.11-rc1,
->> all the patchse can directly apply on  4.11-rc1,
->>
->> Could you help to review the patches, and see if there is anywhere I
->> can improve ?
->
-> I'm sorry I have taken so long to review this posting.
->
-> This is generally looking much better. I'm not sure about a few details
-> relating to the watchdog, but I'm largely happy to pick up the rest of
-> the series, if you can address my comments.
-
-Great thanks for your review, I will post a new v22 ASAP(before your Tuesday).
-
->
-> Thanks,
-> Mark.
-
-
-
--- 
-Best regards,
-
-Fu Wei
-Software Engineer
-Red Hat
+On Wed, 2017-03-15 at 14:52 -0500, Rob Herring wrote:
+> On Fri, Mar 03, 2017 at 02:37:07PM +0530, Smitha T Murthy wrote:
+> > Adding the support for MFC v10.10, with new register file and
+> > necessary hw control, decoder, encoder and structural changes.
+> > 
+> > Signed-off-by: Smitha T Murthy <smitha.t@samsung.com>
+> > CC: Rob Herring <robh+dt@kernel.org>
+> > CC: devicetree at vger.kernel.org
+> > ---
+> >  .../devicetree/bindings/media/s5p-mfc.txt          |    1 +
+> 
+> Acked-by: Rob Herring <robh@kernel.org>
+> 
+Thank you for the Acked-by.
+Regards,
+Smitha T Murthy
+> >  drivers/media/platform/s5p-mfc/regs-mfc-v10.h      |   36 ++++++++++++++++
+> >  drivers/media/platform/s5p-mfc/s5p_mfc.c           |   30 +++++++++++++
+> >  drivers/media/platform/s5p-mfc/s5p_mfc_common.h    |    4 +-
+> >  drivers/media/platform/s5p-mfc/s5p_mfc_ctrl.c      |    4 ++
+> >  drivers/media/platform/s5p-mfc/s5p_mfc_dec.c       |   44 +++++++++++---------
+> >  drivers/media/platform/s5p-mfc/s5p_mfc_enc.c       |   21 +++++----
+> >  drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c    |    9 +++-
+> >  drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.h    |    2 +
+> >  9 files changed, 118 insertions(+), 33 deletions(-)
+> >  create mode 100644 drivers/media/platform/s5p-mfc/regs-mfc-v10.h
+> 
+> 
