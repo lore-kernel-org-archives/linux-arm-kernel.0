@@ -1,92 +1,56 @@
-From: delicious.quinoa@gmail.com (Alan Tull)
-Date: Mon, 20 Mar 2017 11:17:29 -0500
-Subject: [PATCH v3 1/2] doc: Add bindings document for Xilinx LogiCore PR
- Decoupler
-In-Reply-To: <1489781473-30772-1-git-send-email-mdf@kernel.org>
-References: <1489781473-30772-1-git-send-email-mdf@kernel.org>
-Message-ID: <CANk1AXRD4WVa4qrc4Mh64seu1ha+Kff=sGuZ7t98V1PnnBD9Cg@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 20 Mar 2017 16:19:33 +0000
+Subject: [PATCH 02/20] PCI: fix pci_remap_iospace() remap attribute
+In-Reply-To: <20170317162617.GC28800@wotan.suse.de>
+References: <20170227151436.18698-1-lorenzo.pieralisi@arm.com>
+ <20170227151436.18698-3-lorenzo.pieralisi@arm.com>
+ <20170316214844.GA17769@bhelgaas-glaptop.roam.corp.google.com>
+ <20170317003321.GB28800@wotan.suse.de>
+ <20170317104339.GD24830@bart.dudau.co.uk>
+ <20170317162617.GC28800@wotan.suse.de>
+Message-ID: <20170320161933.GD7632@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 17, 2017 at 3:11 PM, Moritz Fischer <mdf@kernel.org> wrote:
+On Fri, Mar 17, 2017 at 05:26:18PM +0100, Luis R. Rodriguez wrote:
+> On Fri, Mar 17, 2017 at 10:43:39AM +0000, Liviu Dudau wrote:
+> > On Fri, Mar 17, 2017 at 01:33:21AM +0100, Luis R. Rodriguez wrote:
+> > > a) should we then use a Fixes tag for this patch ?
+> > 
+> > I'm not aware of issues being reported, but Lorenzo might have more info on this.
+> 
+> Lorenzo ? If not what exactly made you discover this ? If it is a fix, and only 
+> ARM64 is implicated, seems like a worthy change to consider for stable for the
+> sake of stable ARM64 kernels. But, that would leave the PCI config space without
+> a simple 1 liner fix too -- so maybe its not worth it. Distributions wanting
+> to support ARM64 however would like to carry these changes, so some annotations
+> such as Fixes should help.
 
-Hi Moritz,
+It started with this thread:
 
-Minor nits below.  Otherwise, looks good.
+http://lists.infradead.org/pipermail/linux-arm-kernel/2017-January/477353.html
 
-> This adds the binding documentation for the Xilinx LogiCORE PR
-> Decoupler soft core.
->
-> Signed-off-by: Moritz Fischer <mdf@kernel.org>
-> Cc: Michal Simek <michal.simek@xilinx.com>
-> Cc: S?ren Brinkmann <soren.brinkmann@xilinx.com>
-> Cc: linux-kernel at vger.kernel.org
-> Cc: devicetree at vger.kernel.org
+this series is not fixing any current issue I am aware of (but I am not
+keen on leaving code as-is either) hence adding a Fixes: tag is problematic.
 
-Acked-by: Alan Tull <atull@kernel.org>
+I would leave stable kernels alone for the time being.
 
-> ---
->
-> Changes from v2:
-> - Added refence to generic fpga-region bindings
-> - Fixed up reg property in example
-> - Added fallback to "xlnx,pr-decoupler" without version
->
-> Changes from v1:
-> - Added clock names & clock to example
-> - Merged some of the description from Michal's version
->
-> ---
->  .../bindings/fpga/xilinx-pr-decoupler.txt          | 35 ++++++++++++++++++++++
->  1 file changed, 35 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/fpga/xilinx-pr-decoupler.txt
->
-> diff --git a/Documentation/devicetree/bindings/fpga/xilinx-pr-decoupler.txt b/Documentation/devicetree/bindings/fpga/xilinx-pr-decoupler.txt
-> new file mode 100644
-> index 0000000..16141bd
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/fpga/xilinx-pr-decoupler.txt
-> @@ -0,0 +1,35 @@
-> +Xilinx LogiCORE Partial Reconfig Decoupler Softcore
-> +
-> +The Xilinx LogiCORE Partial Reconfig Decoupler manages one or more
-> +decouplers / fpga bridges.
-> +The controller can decouple/disable the bridges which prevents signal
-> +changes from passing through the bridge.  The controller can also
-> +couple / enable the bridges which allows traffic to pass through the
-> +bridge normally.
-> +
-> +The Driver supports only MMIO handling. A PR region can have multiple
-> +PR Decouples which can bhe handled independently or chaines via decouple/
+Lorenzo
 
-s/PR Decoupler/PR Decouplers/
-s/bhe/be/
-s/chaines/chained/
-
-> +decouple_status signals.
-> +
-> +Required properties:
-> +- compatible           : Should contain "xlnx,pr-decoupler-1.00"
-> +- regs                 : base address and size for decoupler module
-> +- clocks               : input clock to IP
-> +- clock-names          : should contain "aclk"
-> +
-> +Optional properties:
-> +- bridge-enable                : 0 if driver should disable bridge at startup
-> +                         1 if driver should enable bridge at startup
-> +                         Default is to leave bridge in current state.
-> +
-> +See Documentation/devicetree/bindings/fpga/fpga-region.txt for generic bindings.
-> +
-> +Example:
-> +       fpga-bridge at 100000450 {
-> +               compatible = "xlnx,pr-decoupler-1.00",
-> +                            "xlnx-pr-decoupler";
-> +               regs = <0x10000045 0x10>;
-> +               clocks = <&clkc 15>;
-> +               clock-names = "aclk";
-> +               bridge-enable = <0>;
-> +       };
-> --
-> 2.7.4
->
+> > > b) it does not seem clear what the semantics for pgprot_device() or even
+> > >    pgprot_noncached(). Can you add some ?
+> > > 
+> > > 8b921acfeffdb ("PCI: Add pci_remap_iospace() to map bus I/O resources")
+> > > 
+> > > Also this patch claims archs can override this call alone, as its __weak.
+> > > So is the right thing to do to change pci_remap_iospace() to pgprot_noncached()
+> > > or is it for archs to add their own pci_remap_iospace()? If so why ? Without
+> > > proper semantics defined for these helpers this is all fuzzy.
+> > 
+> > That was the initial intention, to let arches / platforms overwrite the whole
+> > pci_remap_iospace(). I guess the reality is that no one needs to overwrite it except
+> > for the AArch64 quirk, so probably easier to remove the __weak and fix the attributes for arm64.
+> 
+> Sounds much more reasonable to me.
+> 
+>   Luis
