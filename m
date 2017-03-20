@@ -1,71 +1,76 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Mon, 20 Mar 2017 11:38:43 -0500
-Subject: [PATCH 02/20] PCI: fix pci_remap_iospace() remap attribute
-In-Reply-To: <20170320162627.GE7632@red-moon>
-References: <20170227151436.18698-1-lorenzo.pieralisi@arm.com>
- <20170227151436.18698-3-lorenzo.pieralisi@arm.com>
- <20170316214844.GA17769@bhelgaas-glaptop.roam.corp.google.com>
- <20170317003321.GB28800@wotan.suse.de>
- <20170320160636.GB24572@bhelgaas-glaptop.roam.corp.google.com>
- <20170320162627.GE7632@red-moon>
-Message-ID: <20170320163843.GD24572@bhelgaas-glaptop.roam.corp.google.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Mon, 20 Mar 2017 10:40:00 -0600
+Subject: [v3 3/5] coresight: add support for debug module
+In-Reply-To: <5995f6a7-08b1-c868-fc88-a145d1748a33@arm.com>
+References: <1488520809-31670-4-git-send-email-leo.yan@linaro.org>
+ <011fdac0-59bf-b539-2de3-0b59a41bc922@arm.com>
+ <20170309175915.GA964@leoy-linaro>
+ <3f27efee-3b63-81fd-eb96-73fd7e6f5e92@arm.com>
+ <20170313165600.GB32431@linaro.org>
+ <516f8989-4dde-2686-d549-0761feb14d1b@arm.com>
+ <CANLsYkzJsGvr4ZzNbTwcPu1Qki6=Szvu+bMjHZ_rza==DqFChw@mail.gmail.com>
+ <20170317101328.GA19877@leoy-linaro> <20170317155007.GA20435@linaro.org>
+ <20170317162836.GD2020@leoy-linaro>
+ <5995f6a7-08b1-c868-fc88-a145d1748a33@arm.com>
+Message-ID: <CANLsYkyiAnSGW4Ujs6L-yBKK3no3zigbyBgOCWbm06ZdV-f2Hw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 20, 2017 at 04:26:27PM +0000, Lorenzo Pieralisi wrote:
-> On Mon, Mar 20, 2017 at 11:06:36AM -0500, Bjorn Helgaas wrote:
-> 
-> [...]
-> 
-> > > > > @@ -3375,7 +3375,7 @@ int pci_remap_iospace(const struct resource *res, phys_addr_t phys_addr)
-> > > > >  		return -EINVAL;
-> > > > >  
-> > > > >  	return ioremap_page_range(vaddr, vaddr + resource_size(res), phys_addr,
-> > > > > -				  pgprot_device(PAGE_KERNEL));
-> > > > > +				  pgprot_noncached(PAGE_KERNEL));
-> > > > 
-> > > > ...
-> > > > I do find this puzzling because I naively expected pgprot_noncached()
-> > > > to match up with ioremap_nocache(), and apparently it doesn't.
-> > > > 
-> > > > For example, ARM64 ioremap_nocache() uses PROT_DEVICE_nGnRE, which
-> > > > doesn't match the MT_DEVICE_nGnRnE in pgprot_noncached().
-> > > > 
-> > > > The point of these patches is to use non-posted mappings.  Apparently
-> > > > you can do that with pgprot_noncached() here, but ioremap_nocache()
-> > > > isn't enough for the config space mappings?
-> > > 
-> > > This is for iospace it seems, so the other patch I think was for
-> > > config space.
-> > 
-> > I understand that 02/20 is for PCI I/O port space and 03/20 is for PCI
-> > config space.  I'm confused because I thought we wanted the same
-> > non-posted mapping for both, but looks like they're different.
-> > 
-> > Patch 02/20 uses ioremap_page_range(..., pgprot_noncached(PAGE_KERNEL))
-> > to map PCI I/O port space:
-> > 
-> >   #define pgprot_noncached(prot) \
-> >           __pgprot_modify(prot, PTE_ATTRINDX_MASK, PTE_ATTRINDX(MT_DEVICE_nGnRnE) | PTE_PXN | PTE_UXN)
-> > 
-> > Patch 03/20 uses ioremap_nocache() to map PCI config space:
-> > 
-> >   #define ioremap_nocache(addr, size)     __ioremap((addr), (size), __pgprot(PROT_DEVICE_nGnRE))
-> > 
-> > So the I/O port mapping uses MT_DEVICE_nGnRnE, while the config space
-> > mapping uses PROT_DEVICE_nGnRE, which looks different.
-> 
-> On ARM64 (PATCH 4) and ARM (PATCH 5) we override pci_remap_cfgspace()
-> with implementations that provide non-posted writes bus attributes,
-> PATCH 3 is just there to provide a "safe" (well, I need input on that)
-> fall-back.
+On 17 March 2017 at 10:47, Suzuki K Poulose <Suzuki.Poulose@arm.com> wrote:
+> On 17/03/17 16:28, Leo Yan wrote:
+>>
+>> On Fri, Mar 17, 2017 at 09:50:07AM -0600, Mathieu Poirier wrote:
+>>
+>> [...]
+>>
+>>> If we don't check for "nohlt" some platform may freeze, others may work.
+>>> If we
+>>> mandate that "nohlt" be present on the kernel cmd line it works in all
+>>> cases.
+>>> As such mandating that "nohlt" be present is a better way to go.
+>>
+>>
+>> Sure, so I will add below checking code in the probe function, please
+>> let me know if you have alter better way to implement this:
+>>
+>> +       if (IS_ENABLED(CONFIG_CPU_IDLE) &&
+>> +                       !strstr(boot_command_line, "nohlt")) {
+>> +               dev_err(dev, "May not be accessible in CPU power
+>> domain.\n");
+>> +               return -EPERM;
+>> +       }
+>>
+>
+> There is an API which kind of achieves what "nohlt" does at runtime :
+>
+>   cpu_idle_poll_ctrl(true)
+>
+> So may be we could use that instead of depending on "nohlt". The other side
+> of the issues is "when do we decide to use the API". May be we could add
+> something
+> like : enable_debug, which could then trigger the panic notifier
+> registrations
+> and the above. That would still leave us with a case where the system
+> crashes
+> even before the user gets a terminal. May be the following is the best
+> option :
+>
+> 1) Dedicated kernel command line parameter for enabling the CPU debug at
+> boot/probe.
+>
+> and
+>
+> 2) Runtime enable method via sysfs.
+>
+> What do you think ?
 
-Ah, thanks, that makes sense to me finally!  After patch 4,
-pci_remap_cfgspace() uses PROT_DEVICE_nGnRnE, which does look like the
-MT_DEVICE_nGnRnE used in the ioremap_page_range() path.
+In my opinion booting with "nohlt" on the cmd line is sufficient to
+determine if we should use the driver or not.  That way we also avoid
+declaring yet another sysfs flag, something I really want to avoid.
 
-I wonder if we can get rid of pgprot_device() altogether?  Patch 2
-removed the use in pci_remap_iospace(), and patch 18 removes the use
-in tegra_pcie_bus_alloc().
+Thanks,
+Mathieu
 
-Bjorn
+>
+> Suzuki
+>
