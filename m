@@ -1,30 +1,26 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 20 Mar 2017 11:42:39 -0500
-Subject: [PATCH 1/4] irqchip: augment Gemini bindings to reflect Faraday
- origin
-In-Reply-To: <20170311231350.15857-1-linus.walleij@linaro.org>
-References: <20170311231350.15857-1-linus.walleij@linaro.org>
-Message-ID: <20170320164238.2whmughx6nhlpt5b@rob-hp-laptop>
+From: kvalo@codeaurora.org (Kalle Valo)
+Date: Mon, 20 Mar 2017 16:43:36 +0000 (UTC)
+Subject: atmel: remove time_t usage
+In-Reply-To: <20170223161445.19200-1-alexandre.belloni@free-electrons.com>
+References: <20170223161445.19200-1-alexandre.belloni@free-electrons.com>
+Message-ID: <20170320164337.6A21860300@smtp.codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 12, 2017 at 12:13:50AM +0100, Linus Walleij wrote:
-> When we merged the Gemini interrupt controller it was not yet
-> discovered that this IP block is actually a standard Faraday
-> Technology interrupt controller.
+Alexandre Belloni <alexandre.belloni@free-electrons.com> wrote:
+> last_qual never really holds a time. It only holds jiffies. Make it the
+> same type as jiffies.
 > 
-> As the IP block will probably appear in other designs as well,
-> let's augment the DT bindings to reflect that it is first and
-> foremost a standard Faraday part with a function name (FTINTC010)
-> so that people reusing the IP easily find the driver they need.
-> 
-> Sorry for the mistakes due to lack of information.
-> 
-> Greentime Hu <green.hu@gmail.com>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
->  ...,gemini-interrupt-controller.txt => faraday,ftintc010.txt} | 11 +++++++----
->  1 file changed, 7 insertions(+), 4 deletions(-)
->  rename Documentation/devicetree/bindings/interrupt-controller/{cortina,gemini-interrupt-controller.txt => faraday,ftintc010.txt} (63%)
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
-Acked-by: Rob Herring <robh@kernel.org>
+Patch applied to wireless-drivers-next.git, thanks.
+
+5c5105666de5 atmel: remove time_t usage
+
+-- 
+https://patchwork.kernel.org/patch/9588521/
+
+Documentation about submitting wireless patches and checking status
+from patchwork:
+
+https://wireless.wiki.kernel.org/en/developers/documentation/submittingpatches
