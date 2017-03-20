@@ -1,37 +1,34 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 20 Mar 2017 13:44:22 +0100
-Subject: [PATCH] ARM: tegra: Select SOC_TEGRA_PMC to fix linking error
-In-Reply-To: <20170311202614.6052-1-krzk@kernel.org>
-References: <20170311202614.6052-1-krzk@kernel.org>
-Message-ID: <20170320124422.GB22463@ulmo.ba.sec>
+From: wangkefeng.wang@huawei.com (Kefeng Wang)
+Date: Mon, 20 Mar 2017 20:42:55 +0800
+Subject: [PATCH] arm64: drop unnecessary newlines in show_regs()
+Message-ID: <1490013775-22475-1-git-send-email-wangkefeng.wang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 11, 2017 at 10:26:14PM +0200, Krzysztof Kozlowski wrote:
-> It is possible to create a ARMv7 config with ARCH_TEGRA but without any
-> SoC specific flavors.  Such configs fails because mach-tegra/pm.c is
-> compiled always and it references SOC_TEGRA_PMC driver:
-> 
-> 	arch/arm/mach-tegra/built-in.o: In function `tegra_pm_set':
-> 	arch/arm/mach-tegra/pm.c:188: undefined reference to `tegra_pmc_enter_suspend_mode'
-> 
-> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
-> ---
->  arch/arm/mach-tegra/Kconfig | 1 +
->  drivers/soc/tegra/Kconfig   | 4 ----
->  2 files changed, 1 insertion(+), 4 deletions(-)
+There are two unnecessary newlines, one is in show_regs, another
+is in __show_regs(), drop them.
 
-I was going to apply this, when Arnd sent in a variant that fixes this
-in a way that is more in line with how we handle this for other drivers.
+Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+---
+ arch/arm64/kernel/process.c | 2 --
+ 1 file changed, 2 deletions(-)
 
-I've credited you with a Reported-by, though.
-
-Thanks,
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170320/75050c8d/attachment.sig>
+diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+index 043d373..ae2a835 100644
+--- a/arch/arm64/kernel/process.c
++++ b/arch/arm64/kernel/process.c
+@@ -205,12 +205,10 @@ void __show_regs(struct pt_regs *regs)
+ 
+ 		pr_cont("\n");
+ 	}
+-	printk("\n");
+ }
+ 
+ void show_regs(struct pt_regs * regs)
+ {
+-	printk("\n");
+ 	__show_regs(regs);
+ }
+ 
+-- 
+1.7.12.4
