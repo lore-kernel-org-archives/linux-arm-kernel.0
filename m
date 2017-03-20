@@ -1,57 +1,59 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 20 Mar 2017 09:57:14 +0100
-Subject: [PATCH 03/32] arm64: dts: r8a7795: Add I2C for DVFS core to dtsi
+Date: Mon, 20 Mar 2017 09:57:17 +0100
+Subject: [PATCH 06/32] arm64: dts: r8a7795: Use rgmii-txid phy-mode for
+ EthernetAVB
 In-Reply-To: <cover.1489999913.git.horms+renesas@verge.net.au>
 References: <cover.1489999913.git.horms+renesas@verge.net.au>
-Message-ID: <d7e0d64a46f97f67ecbc0194ce6a394f512109c5.1489999913.git.horms+renesas@verge.net.au>
+Message-ID: <dda3887907d743385f2599fa18c765bd295ae2da.1489999913.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Keita Kobayashi <keita.kobayashi.ym@renesas.com>
+From: Kazuya Mizuguchi <kazuya.mizuguchi.ks@renesas.com>
 
-This patch adds I2C for DVFS device support for R8A7795 SoC.
+Since commit 61fccb2d6274 ("ravb: Add tx and rx clock internal delays mode
+of APSR") the EthernetAVB driver enables tx and rx clock internal delay
+modes (TDM and RDM) depending on the phy mode as follows:
 
-Signed-off-by: Keita Kobayashi <keita.kobayashi.ym@renesas.com>
-Signed-off-by: Gaku Inami <gaku.inami.xw@bp.renesas.com>
-Signed-off-by: Dien Pham <dien.pham.ry@rvc.renesas.com>
+    phy mode   | ASPR delay mode
+    -----------+----------------
+    rgmii-id   | TDM and RDM
+    rgmii-rxid | RDM
+    rgmii-txid | TDM
+
+And prior to the above commit no internal delay mode settings were
+implemented for any phy mode.
+
+With this and the above change present tx internal delay mode is enabled
+which has been observed to address failures in the case of 1Gbps
+communication using the by salvator-x board with the KSZ9031RNX phy. This
+has been reported to occur with both the r8a7795 (H3) and r8a7796 (M3-W)
+SoCs.
+
+With the above patch present but this patch present tx and rx internal
+delay modes are enabled; and with the above patch and this present absent
+no internal delay modes are enabled. In both cases failures have been
+observed when using 1Gbps communication in the environments described
+above.
+
+Signed-off-by: Kazuya Mizuguchi <kazuya.mizuguchi.ks@renesas.com>
 Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm64/boot/dts/renesas/r8a7795.dtsi | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-index eac4f29aa5cd..fe266bb3d913 100644
+index fe266bb3d913..382a8987bca9 100644
 --- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
 +++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-@@ -25,6 +25,7 @@
- 		i2c4 = &i2c4;
- 		i2c5 = &i2c5;
- 		i2c6 = &i2c6;
-+		i2c7 = &i2c_dvfs;
- 	};
- 
- 	psci {
-@@ -793,6 +794,19 @@
- 			status = "disabled";
- 		};
- 
-+		i2c_dvfs: i2c at e60b0000 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "renesas,iic-r8a7795",
-+				     "renesas,rcar-gen3-iic",
-+				     "renesas,rmobile-iic";
-+			reg = <0 0xe60b0000 0 0x425>;
-+			interrupts = <GIC_SPI 173 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 926>;
-+			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
-+			status = "disabled";
-+		};
-+
- 		i2c0: i2c at e6500000 {
+@@ -564,7 +564,7 @@
+ 					  "ch24";
+ 			clocks = <&cpg CPG_MOD 812>;
+ 			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
+-			phy-mode = "rgmii-id";
++			phy-mode = "rgmii-txid";
  			#address-cells = <1>;
  			#size-cells = <0>;
+ 			status = "disabled";
 -- 
 2.7.0.rc3.207.g0ac5344
