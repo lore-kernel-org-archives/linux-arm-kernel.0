@@ -1,33 +1,37 @@
 From: aisheng.dong@nxp.com (Dong Aisheng)
-Date: Mon, 20 Mar 2017 14:15:44 +0800
-Subject: [PATCH 5/8] soc: imx: gpc: fix comment when power up domain
+Date: Mon, 20 Mar 2017 14:15:42 +0800
+Subject: [PATCH 3/8] soc: imx: gpc: fix domain_index sanity check issue
 In-Reply-To: <1489990547-1510-1-git-send-email-aisheng.dong@nxp.com>
 References: <1489990547-1510-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1489990547-1510-6-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <1489990547-1510-4-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The correct comment should be power up domain.
+ARRAY_SIZE(imx_gpc_domains) represents all power domains supported
+by different SoCs. Driver should use SoC specific of_id_data->num_domains
+instead to do power domain index sanity check.
+e.g. MX6Q supports two power domains while MX6SL supports three.
 
 Cc: Lucas Stach <l.stach@pengutronix.de>
 Cc: Shawn Guo <shawnguo@kernel.org>
+Fixes: 721cabf6c660 ("soc: imx: move PGC handling to a new GPC driver")
 Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 ---
  drivers/soc/imx/gpc.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/drivers/soc/imx/gpc.c b/drivers/soc/imx/gpc.c
-index c1d0e67..19f4e6b 100644
+index 7e6a672..ba6e7ab 100644
 --- a/drivers/soc/imx/gpc.c
 +++ b/drivers/soc/imx/gpc.c
-@@ -104,7 +104,7 @@ static int imx6_pm_domain_power_on(struct generic_pm_domain *genpd)
- 	regmap_update_bits(pd->regmap, pd->reg_offs + GPC_PGC_PDN_OFFS,
- 			   0x1, 0x1);
+@@ -413,7 +413,7 @@ static int imx_gpc_probe(struct platform_device *pdev)
+ 				of_node_put(np);
+ 				return ret;
+ 			}
+-			if (domain_index >= ARRAY_SIZE(imx_gpc_domains))
++			if (domain_index >= of_id_data->num_domains)
+ 				continue;
  
--	/* Read ISO and ISO2SW power down delays */
-+	/* Read ISO and ISO2SW power up delays */
- 	regmap_read(pd->regmap, pd->reg_offs + GPC_PGC_PUPSCR_OFFS, &val);
- 	sw = val & 0x3f;
- 	sw2iso = (val >> 8) & 0x3f;
+ 			domain = &imx_gpc_domains[domain_index];
 -- 
 2.7.4
