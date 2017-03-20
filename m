@@ -1,39 +1,61 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 20 Mar 2017 23:40:35 +0000
-Subject: [PATCH v2 2/2] efi: arm-stub: Round up FDT allocation to mapping
- size
-In-Reply-To: <CAOZdJXVrpKQOigp9uDMJ=wW=j_y4XzNf+Ham9huFUTbc6UxDSw@mail.gmail.com>
-References: <1486676573-19237-1-git-send-email-ard.biesheuvel@linaro.org>
- <1486676573-19237-2-git-send-email-ard.biesheuvel@linaro.org>
- <CAOZdJXVrpKQOigp9uDMJ=wW=j_y4XzNf+Ham9huFUTbc6UxDSw@mail.gmail.com>
-Message-ID: <CAKv+Gu9heMeechSf7y2w_5ZSNG4AXjZMASnRQM1tNTpvypM97Q@mail.gmail.com>
+From: briannorris@chromium.org (Brian Norris)
+Date: Mon, 20 Mar 2017 16:53:41 -0700
+Subject: [PATCH v3 1/4] dt-bindings: Document rk3399 Gru/Kevin
+In-Reply-To: <20170320235344.126298-1-briannorris@chromium.org>
+References: <20170320235344.126298-1-briannorris@chromium.org>
+Message-ID: <20170320235344.126298-2-briannorris@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 March 2017 at 23:25, Timur Tabi <timur@codeaurora.org> wrote:
-> On Thu, Feb 9, 2017 at 3:42 PM, Ard Biesheuvel
-> <ard.biesheuvel@linaro.org> wrote:
->> The FDT is mapped via a fixmap entry that is at least 2 MB in size and
->> 2 MB aligned on 4 KB page size kernels.
->>
->> On UEFI systems, the FDT allocation may share this 2 MB block with a
->> reserved region, or another memory region that we should never map,
->> unless we account for this in the size of the allocation (the alignment
->> is already 2 MB)
->>
->> So instead of taking guesses at the needed space, simply allocate 2 MB
->> immediately. The allocation will be recorded as a EFI_LOADER_DATA, and
->> the kernel only memblock_reserve()'s the actual size of the FDT, so the
->> unused space will be released to the kernel.
->>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->
-> This patch is over a month old, and it's been reviewed and tested.  We
-> really need this in 4.11.  Please get this merged into 4.11-rc4.
->
+Gru is a base dev board for a family of devices, including Kevin. Both
+utilize Rockchip RK3399, and they share much of their design.
 
-We never queue non-critical changes right before the merge window
-opens, so it was queued for v4.12 instead.
+Signed-off-by: Brian Norris <briannorris@chromium.org>
+Acked-by: Rob Herring <robh@kernel.org>
+---
+v3:
+ * added Rob's ack
+---
+ Documentation/devicetree/bindings/arm/rockchip.txt | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
-If it is so important that this ends up in v4.11, you should have
-mentioned this at the time, or over the course of the past four weeks.
+diff --git a/Documentation/devicetree/bindings/arm/rockchip.txt b/Documentation/devicetree/bindings/arm/rockchip.txt
+index 226ee9131078..a18308c5bdf1 100644
+--- a/Documentation/devicetree/bindings/arm/rockchip.txt
++++ b/Documentation/devicetree/bindings/arm/rockchip.txt
+@@ -59,6 +59,17 @@ Rockchip platforms device tree bindings
+       - compatible = "google,veyron-brain-rev0", "google,veyron-brain",
+ 		     "google,veyron", "rockchip,rk3288";
+ 
++- Google Gru (dev-board):
++    Required root node properties:
++      - compatible = "google,gru-rev15", "google,gru-rev14",
++		     "google,gru-rev13", "google,gru-rev12",
++		     "google,gru-rev11", "google,gru-rev10",
++		     "google,gru-rev9", "google,gru-rev8",
++		     "google,gru-rev7", "google,gru-rev6",
++		     "google,gru-rev5", "google,gru-rev4",
++		     "google,gru-rev3", "google,gru-rev2",
++		     "google,gru", "rockchip,rk3399";
++
+ - Google Jaq (Haier Chromebook 11 and more):
+     Required root node properties:
+       - compatible = "google,veyron-jaq-rev5", "google,veyron-jaq-rev4",
+@@ -73,6 +84,15 @@ Rockchip platforms device tree bindings
+ 		     "google,veyron-jerry-rev3", "google,veyron-jerry",
+ 		     "google,veyron", "rockchip,rk3288";
+ 
++- Google Kevin:
++    Required root node properties:
++      - compatible = "google,kevin-rev15", "google,kevin-rev14",
++		     "google,kevin-rev13", "google,kevin-rev12",
++		     "google,kevin-rev11", "google,kevin-rev10",
++		     "google,kevin-rev9", "google,kevin-rev8",
++		     "google,kevin-rev7", "google,kevin-rev6",
++		     "google,kevin", "google,gru", "rockchip,rk3399";
++
+ - Google Mickey (Asus Chromebit CS10):
+     Required root node properties:
+       - compatible = "google,veyron-mickey-rev8", "google,veyron-mickey-rev7",
+-- 
+2.12.0.367.g23dc2f6d3c-goog
