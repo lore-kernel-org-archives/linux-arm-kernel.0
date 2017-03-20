@@ -1,66 +1,68 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 20 Mar 2017 10:55:25 +0100
-Subject: [PATCH v2 1/8] dt-bindings: add binding for the Allwinner DE2 CCU
-In-Reply-To: <20170316204748.8596-2-icenowy@aosc.xyz>
-References: <20170316204748.8596-1-icenowy@aosc.xyz>
- <20170316204748.8596-2-icenowy@aosc.xyz>
-Message-ID: <20170320095525.osvx5zba4xkfqm25@lukather>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 20 Mar 2017 10:56:14 +0100
+Subject: [PATCH 4/4] tty/serial: sh-sci: remove uneeded IS_ERR_OR_NULL
+ calls
+In-Reply-To: <CAMuHMdWv-xs12UqutEtXJGR8qqgx6DeDhkKvvYhhyW+XTVsUNQ@mail.gmail.com>
+References: <20170303191248.wlwjri55ip2x5pgg@pengutronix.de>
+ <CAMuHMdXFrwa2jCVDb+8ecqgARLG0oGrPp9pLs0b6vEiWeKJ+uA@mail.gmail.com>
+ <20170303194414.n76tr3oa2mlrzjre@pengutronix.de>
+ <CAMuHMdXiz5hqW=fm-2H1aNKq_gXD2o0508jD2XjxYUvKoEvHdw@mail.gmail.com>
+ <20170304174819.esxhwwbsxzuq3vyc@pengutronix.de>
+ <CAMuHMdX8BEnaTtNFAbcvfHwJH=oPUmQ2NB+jfouGyhQpJ_m_4A@mail.gmail.com>
+ <20170306085842.yijkfpqi3adcedmm@pengutronix.de>
+ <CAMuHMdV2_vbocY4wCzvYtPAaF+QEX_Y4g6qVu5EqEBf5AnFdaw@mail.gmail.com>
+ <20170306093043.ay4dz3ehp3aakwxh@pengutronix.de>
+ <CAMuHMdWQuvANNU14A7NQuzv6AFp04bq4DG_oc7w9h4wUrG+4aQ@mail.gmail.com>
+ <20170306100220.droey65uq2ew3mzu@pengutronix.de>
+ <CACRpkdYeFyr4yjQjDAUpPJwuD_NW2y=wXnzt1xSNoOX0SFCLmw@mail.gmail.com>
+ <CAMuHMdWv-xs12UqutEtXJGR8qqgx6DeDhkKvvYhhyW+XTVsUNQ@mail.gmail.com>
+Message-ID: <CAMuHMdXGn35bEsJKnUi5o3AytL4AJN2fBfoB79v5W-jOVFQx6g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 17, 2017 at 04:47:41AM +0800, Icenowy Zheng wrote:
-> Allwinner "Display Engine 2.0" contains some clock controls in it.
-> 
-> Add them as a clock driver, and make a device tree binding.
-> 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
-> ---
->  .../devicetree/bindings/clock/sun8i-de2.txt        | 31 ++++++++++++++++++++++
->  1 file changed, 31 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/clock/sun8i-de2.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/clock/sun8i-de2.txt b/Documentation/devicetree/bindings/clock/sun8i-de2.txt
-> new file mode 100644
-> index 000000000000..c19496f037a4
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/clock/sun8i-de2.txt
-> @@ -0,0 +1,31 @@
-> +Allwinner Display Engine 2.0 Clock Control Binding
-> +--------------------------------------------------
-> +
-> +Required properties :
-> +- compatible: must contain one of the following compatibles:
-> +		- "allwinner,sun8i-a83t-de2-clk"
-> +		- "allwinner,sun50i-a64-de2-clk"
-> +		- "allwinner,sun50i-h5-de2-clk"
-> +
-> +- reg: Must contain the registers base address and length
-> +- clocks: phandle to the clocks feeding the display engine subsystem.
-> +	  Three are needed:
-> +  - "mod": the display engine module clock
-> +  - "bus": the bus clock for the whole display engine subsystem
-> +- clock-names: Must contain the clock names described just above
-> +- resets: phandle to the reset control for the display engine subsystem.
-> +- #clock-cells : must contain 1
-> +- #reset-cells : must contain 1
-> +
-> +Example:
-> +de2_clocks: clock at 01000000 {
-> +	compatible = "allwinner,sun50i-a64-de2-clk";
-> +	reg = <0x01000000 0x1c>;
+Hi Linus,
 
-Please use the full size of the memory area allocated to that device.
+On Thu, Mar 16, 2017 at 5:38 PM, Geert Uytterhoeven
+<geert@linux-m68k.org> wrote:
+>> They actually all even do things like this in Kconfig:
+>>
+>> config SERIAL_ATMEL
+>> (...)
+>>         select SERIAL_MCTRL_GPIO if GPIOLIB
+>>
+>> What stops us from removing all the stubs in
+>> drivers/tty/serial/serial_mctrl_gpio.h
+>> and just make SERIAL_MCTRL_GPIO depends on GPIOLIB?
+>
+> Removing the stubs implies adding #ifdefs to the drivers that need
+> to handle the !SERIAL_MCTRL_GPIO case.
+>
+> E.g. I don't want to break the sh-sci serial driver on SuperH platforms that
+> (a) don't select GPIOLIB, and
+> (b) don't use mtrl_gpio.
 
-Maxime
+Alternatively, after commit 22c403676dbbb7c6 ("gpio: return NULL from
+gpiod_get_optional when GPIOLIB is disabled") we might just drop the
+dependency of SERIAL_MCTRL_GPIO on GPIOLIB? Then no special handling
+is needed in drivers, as all GPIOs will just be considered not present.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170320/f2d8df95/attachment.sig>
+Documentation/gpio/consumer.txt rightfully sates:
+| Note that gpio_get*_optional() functions (and their managed variants), unlike
+| the rest of gpiolib API, also return NULL when gpiolib support is disabled.
+| This is helpful to driver authors, since they do not need to special case
+| -ENOSYS return codes.  System integrators should however be careful to enable
+| gpiolib on systems that need it.
+
+drivers/tty/serial/serial_mctrl_gpio.o already compiles fine if
+CONFIG_GPIOLIB=n, which reduces its size by ca. 25%.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
