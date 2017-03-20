@@ -1,40 +1,68 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 20 Mar 2017 10:33:55 +0100
-Subject: [PATCH] clk: sunxi-ng: fix recalc_rate formula of NKMP clocks
-In-Reply-To: <20170317201943.45190-1-icenowy@aosc.xyz>
-References: <20170317201943.45190-1-icenowy@aosc.xyz>
-Message-ID: <20170320093355.wougjul675q3hru7@lukather>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Mon, 20 Mar 2017 09:35:40 +0000
+Subject: Tegra baseline test results for v4.11-rc3
+Message-ID: <e5529230-d606-0113-fb7d-7348dda6c002@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 18, 2017 at 04:19:43AM +0800, Icenowy Zheng wrote:
-> In commit e66f81bbd746 ("clk: sunxi-ng: Implement factors offsets"), the
-> final formula of NKMP clocks' recalc_rate is refactored; however, the
-> refactored formula broke the calculation due to some C language operand
-> priority problem -- the priority of operand >> is lower than * and /,
-> makes the formula being parsed as "(parent_rate * n * k) >> (p / m)", but
-> it should be "(parent_rate * n * k >> p) / m".
-> 
-> Add the pair of parentheses to fix up this issue. This pair of
-> parentheses used to exist in the old formula.
-> 
-> Fixes: commit e66f81bbd746 ("clk: sunxi-ng: Implement factors offsets")
+Here are some basic Tegra test results for Linux v4.11-rc3.
+Logs and other details at:
 
-You shouldn't have commit here.
+    https://nvtb.github.io//linux/test_v4.11-rc3/20170319193104/
 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
 
-Fixed it, and applied, thanks!
-Maxime
+Test summary
+------------
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170320/5741ef4a/attachment.sig>
+Build: zImage:
+    Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
+
+Build: Image:
+    Pass: ( 1/ 1): defconfig
+
+Boot to userspace: defconfig:
+    Pass: ( 4/ 4): qemu-vexpress64, tegra132-norrin,
+		   tegra210-p2371-0000, tegra210-smaug
+
+Boot to userspace: multi_v7_defconfig:
+    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+
+Boot to userspace: tegra_defconfig:
+    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+
+PM: System suspend: multi_v7_defconfig:
+    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+
+PM: System suspend: tegra_defconfig:
+    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+
+
+vmlinux object size
+(delta in bytes from test_v4.11-rc2 (4495c08e84729385774601b5146d51d9e5849f81)):
+   text     data      bss    total  kernel
+  +3507     +336        0    +3843  defconfig
+  +1447      +64        0    +1511  multi_v7_defconfig
+  +5531      -72        0    +5459  tegra_defconfig
+
+
+Boot-time memory difference
+(delta in bytes from test_v4.11-rc2 (4495c08e84729385774601b5146d51d9e5849f81))
+    avail    rsrvd     high    freed                board              kconfig                  dtb
+      -4k       4k        .        .      qemu-vexpress64            defconfig           __internal
+        .        .        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
+        .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
+        .        .        .        .  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
+        .        .        .        .  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
+        .        .        .        .    tegra124-nyan-big   multi_v7_defconfig    tegra124-nyan-big
+        .        .        .        .    tegra124-nyan-big      tegra_defconfig    tegra124-nyan-big
+        .        .        .        .      tegra132-norrin            defconfig      tegra132-norrin
+        .        .        .        .    tegra20-trimslice   multi_v7_defconfig    tegra20-trimslice
+        .        .        .        .    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
+      -4k       4k        .        .  tegra210-p2371-0000            defconfig  tegra210-p2371-0000
+        .        .        .        .       tegra210-smaug            defconfig       tegra210-smaug
+        .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
+        .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
