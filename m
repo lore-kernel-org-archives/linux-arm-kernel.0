@@ -1,55 +1,41 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Mon, 20 Mar 2017 11:20:32 +0100
-Subject: outreachy
-In-Reply-To: <alpine.DEB.2.20.1703171753550.4098@hadrien>
-References: <alpine.DEB.2.20.1703092133340.2306@hadrien>
- <443f0143-aec1-2559-a2c2-73b245632948@broadcom.com>
- <2da12619-5fcb-9e0f-b6c1-c83cbf491e8d@wwwdotorg.org>
- <20170309212021.GA24433@kroah.com> <20170317152519.GA8684@amd>
- <alpine.DEB.2.20.1703171753550.4098@hadrien>
-Message-ID: <20170320102032.GA17959@amd>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 20 Mar 2017 10:24:04 +0000
+Subject: [PATCH 1/3] arm64: enable pci resource mapping using sysfs
+In-Reply-To: <1489605496.4195.182.camel@infradead.org>
+References: <1489598266.86622.12.camel@infradead.org>
+ <20170315175353.GA29452@leverpostej>
+ <1489605496.4195.182.camel@infradead.org>
+Message-ID: <20170320102403.GC17263@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-
-> > > Hah!  That's the joy of being a maintainer of a driver in staging.  Even
-> > > if you filter out outreachy, you are going to get a lot of "basic
-> > > mistakes" and other type patches cc:ed to you.
-> > >
-> > > I strongly suggest, that if you all don't like this type of stuff,
-> > > either:
-> > > 	- work to get the code out of staging as soon as possible (i.e.
-> > > 	  send me coding style fixes for everything right now, and then
-> > > 	  fix up the rest of the stuff.)
-> > > 	- take yourself off the maintainer list for this code.
-> > >
-> > > It's your choice, outreachy right now is a lot of patches, but again,
-> > > it's not going to keep you from getting the "basic" stuff sent to you
-> > > in ways that is totally wrong.
-> >
-> > Could we get these trivial patches off the lkml? Yes, lkml already has
-> > a lot of traffic, but no, this is not useful :-(.
+On Wed, Mar 15, 2017 at 07:18:16PM +0000, David Woodhouse wrote:
+> On Wed, 2017-03-15 at 17:54 +0000, Mark Rutland wrote:
+> > It's not so much "broken" as "not currently supported".
 > 
-> The outreachy instructions say to use the -nol argument to
-> get_maintainers, which would prevent them from being sent to any mailing
-> list.  However others thought that all patches should be sent to mailing
-> lists, and so I haven't enforced anything for people who have omitted
-> -nol.  However I have tried to remove bcm maintainers from CC lists on
-> replies and reminded people not to send you patches,
+> Yeah, I thought that when I inherited the commit, but didn't get as far
+> as rephrasing it. Will do so.
+> 
+> > [...]
+> > 
+> > > 
+> > > +#define HAVE_PCI_MMAP
+> > > +extern int pci_mmap_page_range(struct pci_dev *dev, struct vm_area_struct *vma,
+> > > +			???????enum pci_mmap_state mmap_state, int write_combine);
+> > > +
+> > Per the prior attempt at this [1], we only want to expose the sysfs
+> > interface, and not the legacy procfs interface, and need the two
+> > decoupled [2].
+> 
+> I do not like that idea. The procfs horridness is legacy, sure, but
+> it's not actually an arch-specific interface. You get to mess with
+> 'legacy' syscalls all you like on a new architecture, but there could
+> exist arch-agnostic code which uses the procfs interface, surely?
 
-Wonderful :-(.
+Just to be clear here: I'm not against exposing the proc interface if
+something actually needs it, but all the requests we've had for this have
+been concerned only with the sysfs API. So I'd rather start with just that,
+instead of exposing both and have new software written to the proc interface,
+which we certainly want to discourage.
 
-Can we at least make  those people put the word "outreachy" in the
-subject so the emails are easier to delete?
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170320/ef0cfae7/attachment.sig>
+Will
