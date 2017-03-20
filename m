@@ -1,30 +1,45 @@
-From: robert.richter@cavium.com (Robert Richter)
-Date: Mon, 20 Mar 2017 12:02:41 +0100
-Subject: [PATCH 2/2] PCI: Add legacy firmware support for Cavium ThunderX
- host controller
-In-Reply-To: <1489564155-3881-3-git-send-email-tn@semihalf.com>
-References: <1489564155-3881-1-git-send-email-tn@semihalf.com>
- <1489564155-3881-3-git-send-email-tn@semihalf.com>
-Message-ID: <20170320110241.GG16822@rric.localdomain>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Mon, 20 Mar 2017 16:35:16 +0530
+Subject: [PATCH 2/4] ARM: SPEAr: DT: Remove nonexistent properties
+In-Reply-To: <20170320095721.6724-2-borneo.antonio@gmail.com>
+References: <20170320095721.6724-1-borneo.antonio@gmail.com>
+ <20170320095721.6724-2-borneo.antonio@gmail.com>
+Message-ID: <20170320110516.GG25659@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15.03.17 08:49:15, Tomasz Nowicki wrote:
-> During early days of PCI quirks support ThunderX firmware did not provide
-> PNP0c02 node with PCI configuration space and PEM-specific register ranges.
-> This means that for legacy FW we are not reserving these resources and
-> cannot gather PEM-specific resources for further PEM initialization.
+On 20-03-17, 10:57, Antonio Borneo wrote:
+> The properties "pl022,hierarchy" and "pl022,slave-tx-disable" are
+> not documented in DT binding and don't exist in the driver code.
+> They have no effect and can be removed.
 > 
-> In order to support already deployed legacy FW calculate PEM-specific ranges
-> and provide resources reservation as fallback scenario into PEM driver when
-> we could not gather PEM reg base from ACPI tables.
-> 
-> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-> Signed-off-by: Vadim Lomovtsev <Vadim.Lomovtsev@caviumnetworks.com>
+> Signed-off-by: Antonio Borneo <borneo.antonio@gmail.com>
+> ---
+> Cc: Mark Brown <broonie@kernel.org>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> To: Viresh Kumar <vireshk@kernel.org>
+> To: Shiraz Hashim <shiraz.linux.kernel@gmail.com>
+> Cc: Russell King <linux@armlinux.org.uk>
+> Cc: Brijesh Singh <brijeshkumar.singh@amd.com>
+> Cc: Suravee Suthikulpanit <suravee.suthikulpanit@amd.com>
+> Cc: Tom Lendacky <thomas.lendacky@amd.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Ray Jui <rjui@broadcom.com>
+> Cc: Scott Branden <sbranden@broadcom.com>
+> Cc: Jon Mason <jonmason@broadcom.com>
+> Cc: bcm-kernel-feedback-list at broadcom.com
+> Cc: linux-spi at vger.kernel.org
+> Cc: devicetree at vger.kernel.org
+> Cc: linux-kernel at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> ---
+>  arch/arm/boot/dts/spear1310-evb.dts | 6 ------
+>  arch/arm/boot/dts/spear1340-evb.dts | 6 ------
+>  2 files changed, 12 deletions(-)
 
-Works with old and new firmware.
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 
-Tested-by: Robert Richter <rrichter@cavium.com>
-Acked-by: Robert Richter <rrichter@cavium.com>
-
--Robert
+-- 
+viresh
