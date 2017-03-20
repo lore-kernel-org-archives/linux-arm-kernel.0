@@ -1,129 +1,28 @@
-From: mchehab@s-opensource.com (Mauro Carvalho Chehab)
-Date: Mon, 20 Mar 2017 12:06:38 -0300
-Subject: [PATCH v4 14/36] [media] v4l2-mc: add a function to inherit
- controls from a pipeline
-In-Reply-To: <5b57773a-a747-285b-eb3e-3b3f0acd8079@xs4all.nl>
-References: <20170310125342.7f047acf@vento.lan>
- <20170310223714.GI3220@valkosipuli.retiisi.org.uk>
- <20170311082549.576531d0@vento.lan>
- <20170313124621.GA10701@valkosipuli.retiisi.org.uk>
- <20170314004533.3b3cd44b@vento.lan>
- <e0a6c60b-1735-de0b-21f4-d8c3f4b3f10f@xs4all.nl>
- <20170317114203.GZ21222@n2100.armlinux.org.uk>
- <44161453-02f9-0019-3868-7501967a6a82@linux.intel.com>
- <20170317102410.18c966ae@vento.lan>
- <1489758670.2905.52.camel@pengutronix.de>
- <20170317143743.GG21222@n2100.armlinux.org.uk>
- <5b57773a-a747-285b-eb3e-3b3f0acd8079@xs4all.nl>
-Message-ID: <20170320120638.09ba5621@vento.lan>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 20 Mar 2017 08:07:39 -0700
+Subject: [PATCHv2 8/9] ARM: dts: omap4: add clkctrl nodes
+In-Reply-To: <3a82add5-7d85-458c-f8c1-9e58db6a8949@ti.com>
+References: <1489741781-12816-1-git-send-email-t-kristo@ti.com>
+ <1489741781-12816-9-git-send-email-t-kristo@ti.com>
+ <20170317154333.GW20572@atomide.com>
+ <9456caee-4f45-044a-0b2e-305fa2d0d274@ti.com>
+ <b602ccba-489f-e78f-0011-6d808bca9f84@ti.com>
+ <20170320143538.GH20572@atomide.com>
+ <3a82add5-7d85-458c-f8c1-9e58db6a8949@ti.com>
+Message-ID: <20170320150738.GJ20572@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Mon, 20 Mar 2017 14:10:30 +0100
-Hans Verkuil <hverkuil@xs4all.nl> escreveu:
+* Tero Kristo <t-kristo@ti.com> [170320 07:54]:
+> - You can introduce the DTS changes on a clkctrl module basis, e.g.
+> introduce the node for l4_per_clkctrl along with the clock node changes for
+> the same
 
-> On 03/17/2017 03:37 PM, Russell King - ARM Linux wrote:
-> > On Fri, Mar 17, 2017 at 02:51:10PM +0100, Philipp Zabel wrote:  
-> >> On Fri, 2017-03-17 at 10:24 -0300, Mauro Carvalho Chehab wrote:
-> >> [...]  
-> >>> The big question, waiting for an answer on the last 8 years is
-> >>> who would do that? Such person would need to have several different
-> >>> hardware from different vendors, in order to ensure that it has
-> >>> a generic solution.
-> >>>
-> >>> It is a way more feasible that the Kernel developers that already 
-> >>> have a certain hardware on their hands to add support inside the
-> >>> driver to forward the controls through the pipeline and to setup
-> >>> a "default" pipeline that would cover the common use cases at
-> >>> driver's probe.  
-> >>
-> >> Actually, would setting pipeline via libv4l2 plugin and letting drivers
-> >> provide a sane enabled default pipeline configuration be mutually
-> >> exclusive? Not sure about the control forwarding, but at least a simple
-> >> link setup and format forwarding would also be possible in the kernel
-> >> without hindering userspace from doing it themselves later.  
-> > 
-> > I think this is the exact same problem as controls in ALSA.
-> > 
-> > When ALSA started off in life, the requirement was that all controls
-> > shall default to minimum, and the user is expected to adjust controls
-> > after the system is running.
-> > 
-> > After OSS, this gave quite a marked change in system behaviour, and
-> > led to a lot of "why doesn't my sound work anymore" problems, because
-> > people then had to figure out which combination of controls had to be
-> > set to get sound out of their systems.
-> > 
-> > Now it seems to be much better, where install Linux on a platform, and
-> > you have a working sound system (assuming that the drivers are all there
-> > which is generally the case for x86.)
-> > 
-> > However, it's still possible to adjust all the controls from userspace.
-> > All that's changed is the defaults.
-> > 
-> > Why am I mentioning this - because from what I understand Mauro saying,
-> > it's no different from this situation.  Userspace will still have the
-> > power to disable all links and setup its own.  The difference is that
-> > there will be a default configuration that the kernel sets up at boot
-> > time that will be functional, rather than the current default
-> > configuration where the system is completely non-functional until
-> > manually configured.
-> > 
-> > However, at the end of the day, I don't care _where_ the usability
-> > problems are solved, only that there is some kind of solution.  It's not
-> > the _where_ that's the real issue here, but the _how_, and discussion of
-> > the _how_ is completely missing.
-> > 
-> > So, let's try kicking off a discussion about _how_ to do things.
-> > 
-> > _How_ do we setup a media controller system so that we end up with a
-> > usable configuration - let's start with the obvious bit... which links
-> > should be enabled.
-> > 
-> > I think the first pre-requisit is that we stop exposing capture devices
-> > that can never be functional for the hardware that's present on the board,
-> > so that there isn't this plentora of useless /dev/video* nodes and useless
-> > subdevices.
-> > 
-> > One possible solution to finding a default path may be "find the shortest
-> > path between the capture device and the sensor and enable intervening
-> > links".
-> > 
-> > Then we need to try configuring that path with format/resolution
-> > information.
-> > 
-> > However, what if something in the shortest path can't handle the format
-> > that the sensor produces?  I think at that point, we'd need to drop that
-> > subdev out of the path resolution, re-run the "find the shortest path"
-> > algorithm, and try again.
-> > 
-> > Repeat until success or no path between the capture and sensor exists.
-> > 
-> > This works fine if you have just one sensor visible from a capture device,
-> > but not if there's more than one (which I suspect is the case with the
-> > Sabrelite board with its two cameras and video receiver.)  That breaks
-> > the "find the shortest path" algorithm.
-> > 
-> > So, maybe it's a lot better to just let the board people provide via DT
-> > a default setup for the connectivity of the modules somehow - certainly
-> > one big step forward would be to disable in DT parts of the capture
-> > system that can never be used (remembering that boards like the RPi /
-> > Hummingboard may end up using DT overlays to describe this for different
-> > cameras, so the capture setup may change after initial boot.)  
-> 
-> The MC was developed before the device tree came along. But now that the DT
-> is here, I think this could be a sensible idea to let the DT provide an
-> initial path.
-> 
-> Sakari, Laurent, Mauro: any opinions?
-
-It makes perfect sense to me.
-
-By setting the pipeline via DT on boards with simple configurations,
-e. g. just one CSI physical interface, it can create just one
-devnode (e. g. /dev/video0) with would fully control the device,
-without enabling subdev API for such hardware, making the hardware
-usable with all V4L2 applications.
+I don't mind introducing them all at once, I'm worried about
+reverting in case of trouble. But as long as we can revert things on
+a clkctrl module basis in case of trouble, we should be good to go as
+far as I'm concerned.
 
 Regards,
-Mauro
+
+Tony
