@@ -1,80 +1,56 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 20 Mar 2017 14:52:07 +0000
-Subject: [PATCH 10/17] arm64: Add CNTVCT_EL0 trap handler
-In-Reply-To: <20170306112622.13853-11-marc.zyngier@arm.com>
+Date: Mon, 20 Mar 2017 14:56:14 +0000
+Subject: [PATCH 13/17] arm64: cpu_errata: Allow an erratum to be match
+ for all revisions of a core
+In-Reply-To: <20170306112622.13853-14-marc.zyngier@arm.com>
 References: <20170306112622.13853-1-marc.zyngier@arm.com>
- <20170306112622.13853-11-marc.zyngier@arm.com>
-Message-ID: <20170320145204.GG31213@leverpostej>
+ <20170306112622.13853-14-marc.zyngier@arm.com>
+Message-ID: <20170320145613.GH31213@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 06, 2017 at 11:26:15AM +0000, Marc Zyngier wrote:
-> Since people seem to make a point in breaking the userspace visible
-> counter, we have no choice but to trap the access. Add the required
-> handler.
+On Mon, Mar 06, 2017 at 11:26:18AM +0000, Marc Zyngier wrote:
+> Some minor erratum may not be fixed in further revisions of a core,
+> leading to a situation where the workaround needs to be updated each
+> time an updated core is released.
+
+That is somewhat unfortunate. :(
+
+> Introduce a MIDR_ALL_VERSIONS match helper that will work for all
+> versions of that MIDR, once and for all.
 > 
 > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm64/include/asm/esr.h |  2 ++
->  arch/arm64/kernel/traps.c    | 14 ++++++++++++++
->  2 files changed, 16 insertions(+)
-> 
-> diff --git a/arch/arm64/include/asm/esr.h b/arch/arm64/include/asm/esr.h
-> index d14c478976d0..ad42e79a5d4d 100644
-> --- a/arch/arm64/include/asm/esr.h
-> +++ b/arch/arm64/include/asm/esr.h
-> @@ -175,6 +175,8 @@
->  #define ESR_ELx_SYS64_ISS_SYS_CTR_READ	(ESR_ELx_SYS64_ISS_SYS_CTR | \
->  					 ESR_ELx_SYS64_ISS_DIR_READ)
->  
-> +#define ESR_ELx_SYS64_ISS_SYS_CNTVCT	(ESR_ELx_SYS64_ISS_SYS_VAL(3, 3, 2, 14, 0) | \
-> +					 ESR_ELx_SYS64_ISS_DIR_READ)
->  #ifndef __ASSEMBLY__
->  #include <asm/types.h>
->  
-> diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-> index e52be6aa44ee..1de444e6c669 100644
-> --- a/arch/arm64/kernel/traps.c
-> +++ b/arch/arm64/kernel/traps.c
-> @@ -505,6 +505,14 @@ static void ctr_read_handler(unsigned int esr, struct pt_regs *regs)
->  	regs->pc += 4;
->  }
->  
-> +static void cntvct_read_handler(unsigned int esr, struct pt_regs *regs)
-> +{
-> +	int rt = (esr & ESR_ELx_SYS64_ISS_RT_MASK) >> ESR_ELx_SYS64_ISS_RT_SHIFT;
-> +
-> +	pt_regs_write_reg(regs, rt, arch_counter_get_cntvct());
-> +	regs->pc += 4;
-> +}
 
-I was going to suggest it'd be worth using AARCH64_INSN_SIZE, but I see
-most of the other handlers in this file don't, so I guess that's not a
-big deal.
-
-Otherwise, this looks fine to me. FWIW:
+This looks sane to me. FWIW:
 
 Acked-by: Mark Rutland <mark.rutland@arm.com>
 
+Suzuki, any thoughts?
+
 Mark.
 
-> +
->  struct sys64_hook {
->  	unsigned int esr_mask;
->  	unsigned int esr_val;
-> @@ -523,6 +531,12 @@ static struct sys64_hook sys64_hooks[] = {
->  		.esr_val = ESR_ELx_SYS64_ISS_SYS_CTR_READ,
->  		.handler = ctr_read_handler,
->  	},
-> +	{
-> +		/* Trap read access to CNTVCT_EL0 */
-> +		.esr_mask = ESR_ELx_SYS64_ISS_SYS_OP_MASK,
-> +		.esr_val = ESR_ELx_SYS64_ISS_SYS_CNTVCT,
-> +		.handler = cntvct_read_handler,
-> +	},
->  	{},
->  };
+> ---
+>  arch/arm64/kernel/cpu_errata.c | 7 +++++++
+>  1 file changed, 7 insertions(+)
+> 
+> diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+> index f6cc67e7626e..2be1d1c05303 100644
+> --- a/arch/arm64/kernel/cpu_errata.c
+> +++ b/arch/arm64/kernel/cpu_errata.c
+> @@ -53,6 +53,13 @@ static int cpu_enable_trap_ctr_access(void *__unused)
+>  	.midr_range_min = min, \
+>  	.midr_range_max = max
 >  
+> +#define MIDR_ALL_VERSIONS(model) \
+> +	.def_scope = SCOPE_LOCAL_CPU, \
+> +	.matches = is_affected_midr_range, \
+> +	.midr_model = model, \
+> +	.midr_range_min = 0, \
+> +	.midr_range_max = (MIDR_VARIANT_MASK | MIDR_REVISION_MASK)
+> +
+>  const struct arm64_cpu_capabilities arm64_errata[] = {
+>  #if	defined(CONFIG_ARM64_ERRATUM_826319) || \
+>  	defined(CONFIG_ARM64_ERRATUM_827319) || \
 > -- 
 > 2.11.0
 > 
