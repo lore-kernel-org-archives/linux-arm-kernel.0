@@ -1,56 +1,57 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Sun, 19 Mar 2017 15:09:22 +0000
-Subject: [PATCH v5 00/39] i.MX Media Driver
-In-Reply-To: <51e2be34-6fa2-9d91-5111-adcd697b3e3f@mentor.com>
-References: <1489121599-23206-1-git-send-email-steve_longerbeam@mentor.com>
- <20170318192258.GL21222@n2100.armlinux.org.uk>
- <aef6c412-5464-726b-42f6-a24b7323aa9c@mentor.com>
- <20170318204324.GM21222@n2100.armlinux.org.uk>
- <4e7f91fa-e1c4-1cbc-2542-2aaf19a35329@mentor.com>
- <20170319142110.GT21222@n2100.armlinux.org.uk>
- <20170319142240.GA23922@n2100.armlinux.org.uk>
- <51e2be34-6fa2-9d91-5111-adcd697b3e3f@mentor.com>
-Message-ID: <20170319150922.GV21222@n2100.armlinux.org.uk>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Mon, 20 Mar 2017 15:09:30 +0800
+Subject: [PATCH v6 0/4] i.MX7 PCI support
+In-Reply-To: <20170314151827.31248-1-andrew.smirnov@gmail.com>
+References: <20170314151827.31248-1-andrew.smirnov@gmail.com>
+Message-ID: <20170320070930.GB11325@b29396-OptiPlex-7040>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 19, 2017 at 05:00:08PM +0200, Vladimir Zapolskiy wrote:
-> On 03/19/2017 04:22 PM, Russell King - ARM Linux wrote:
-> > On Sun, Mar 19, 2017 at 02:21:10PM +0000, Russell King - ARM Linux wrote:
-> >> There's a good reason why I dumped a full debug log using GST_DEBUG=*:9,
-> >> analysed it for the cause of the failure, and tried several different
-> >> pipelines, including the standard bayer2rgb plugin.
-> >>
-> >> Please don't blame this on random stuff after analysis of the logs _and_
-> >> reading the appropriate plugin code has shown where the problem is.  I
-> >> know gstreamer can be very complex, but it's very possible to analyse
-> >> the cause of problems and pin them down with detailed logs in conjunction
-> >> with the source code.
-> > 
-> > Oh, and the proof of correct analysis is that fixing the kernel capture
-> > driver to enumerate the frame sizes and intervals fixes the issue, even
-> > with bayer2rgbneon being used.
-> > 
-> > Therefore, there is _no way_ what so ever that it could be caused by that
-> > plugin.
-> > 
+On Tue, Mar 14, 2017 at 08:18:23AM -0700, Andrey Smirnov wrote:
+> Hello, everyone:
 > 
-> Hey, no blaming of the unknown to me bayer2rgbneon element from my side,
-> I've just asked an innocent question, thanks for reply. I failed to find
-> the source code of the plugin, I was interested to compare its performance
-> and features with mine in-house NEON powered RGGB/BGGR to RGB24 GStreamer
-> conversion element, which is written years ago. My question was offtopic.
+> This is a sixth iteration of the code that adds PCI-subsystem bits
+> necessary for enabling PCI support on i.MX7.
+> 
 
-If you wanted to know where to get it from, you should've asked that.
-You can find all the bits here:
+....
 
-	https://git.phytec.de/
+> Andrey Smirnov (4):
+>   PCI: imx6: Add code to support i.MX7D
+>   PCI: imx6: Do not wait for speed change on i.MX7
+>   PCI: imx6: Do not switch speed if Gen2 is disabled
+>   PCI: imx6: Allow probe deferal by reset GPIO
+> 
+>  .../devicetree/bindings/pci/fsl,imx6q-pcie.txt     |  13 +-
+>  drivers/pci/host/pci-imx6.c                        | 199 +++++++++++++++------
 
-You need bayer2rgb-neon and gst-bayer2rgb-neon, and it requires some
-fixes to the configure script and Makefiles get it to build if you
-don't have gengenopt available.
+Can't apply and test it.
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+The directory has been changed to drivers/pci/host/dwc/pci-imx6.c
+since the commit below:
+commit 950bf6388bc22c2749b8b66c501df1462639d6bd
+Author: Kishon Vijay Abraham I <kishon@ti.com>
+Date:   Fri Jan 6 18:22:48 2017 +0530
+
+    PCI: Move DesignWare IP support to new drivers/pci/dwc/ directory
+    
+    Group all the PCI drivers that use DesignWare core in dwc directory.
+    dwc IP is capable of operating in both host mode and device mode and
+    keeping it inside the *host* directory is misleading.
+    
+    Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+    Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
+    Acked-by: Jingoo Han <jingoohan1@gmail.com>
+    Acked-By: Joao Pinto <jpinto@synopsys.com>
+
+Regards
+Dong Aisheng
+
+>  include/linux/mfd/syscon/imx7-iomuxc-gpr.h         |   4 +
+>  3 files changed, 161 insertions(+), 55 deletions(-)
+> 
+
+
+> -- 
+> 2.9.3
+> 
