@@ -1,81 +1,65 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 20 Mar 2017 10:47:55 +0100
-Subject: [PATCH 2/2] [media] vcodec: mediatek: mark pm functions as
- __maybe_unused
-In-Reply-To: <20170320094812.1365229-1-arnd@arndb.de>
-References: <20170320094812.1365229-1-arnd@arndb.de>
-Message-ID: <20170320094812.1365229-2-arnd@arndb.de>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 20 Mar 2017 10:50:04 +0100
+Subject: [GIT PULL] Allwinner clock fixes for 4.11
+Message-ID: <20170320095004.4vd2edph2u7kxi7l@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When CONFIG_PM is disabled, we get a couple of unused functions:
+Hi Mike, Stephen,
 
-drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c:927:13: error: 'mtk_jpeg_clk_off' defined but not used [-Werror=unused-function]
- static void mtk_jpeg_clk_off(struct mtk_jpeg_dev *jpeg)
-             ^~~~~~~~~~~~~~~~
-drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c:916:13: error: 'mtk_jpeg_clk_on' defined but not used [-Werror=unused-function]
- static void mtk_jpeg_clk_on(struct mtk_jpeg_dev *jpeg)
+Please pull the following patches for one of the 4.11's rc
 
-Rather than adding more error-prone #ifdefs around those, this patch
-removes the existing #ifdef checks and marks the PM functions as __maybe_unused
-to let gcc do the right thing.
+Thanks!
+Maxime
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c | 12 ++++--------
- 1 file changed, 4 insertions(+), 8 deletions(-)
+The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
 
-diff --git a/drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c b/drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c
-index f9bd58ce7d32..7103b6da25d2 100644
---- a/drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c
-+++ b/drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c
-@@ -1224,8 +1224,7 @@ static int mtk_jpeg_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
--#ifdef CONFIG_PM
--static int mtk_jpeg_pm_suspend(struct device *dev)
-+static __maybe_unused int mtk_jpeg_pm_suspend(struct device *dev)
- {
- 	struct mtk_jpeg_dev *jpeg = dev_get_drvdata(dev);
- 
-@@ -1235,7 +1234,7 @@ static int mtk_jpeg_pm_suspend(struct device *dev)
- 	return 0;
- }
- 
--static int mtk_jpeg_pm_resume(struct device *dev)
-+static __maybe_unused int mtk_jpeg_pm_resume(struct device *dev)
- {
- 	struct mtk_jpeg_dev *jpeg = dev_get_drvdata(dev);
- 
-@@ -1244,10 +1243,8 @@ static int mtk_jpeg_pm_resume(struct device *dev)
- 
- 	return 0;
- }
--#endif /* CONFIG_PM */
- 
--#ifdef CONFIG_PM_SLEEP
--static int mtk_jpeg_suspend(struct device *dev)
-+static __maybe_unused int mtk_jpeg_suspend(struct device *dev)
- {
- 	int ret;
- 
-@@ -1258,7 +1255,7 @@ static int mtk_jpeg_suspend(struct device *dev)
- 	return ret;
- }
- 
--static int mtk_jpeg_resume(struct device *dev)
-+static __maybe_unused int mtk_jpeg_resume(struct device *dev)
- {
- 	int ret;
- 
-@@ -1269,7 +1266,6 @@ static int mtk_jpeg_resume(struct device *dev)
- 
- 	return ret;
- }
--#endif /* CONFIG_PM_SLEEP */
- 
- static const struct dev_pm_ops mtk_jpeg_pm_ops = {
- 	SET_SYSTEM_SLEEP_PM_OPS(mtk_jpeg_suspend, mtk_jpeg_resume)
+  Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
+
+are available in the git repository at:
+
+  https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-clk-fixes-for-4.11
+
+for you to fetch changes up to b467e08a15563dede0d37d3233baa24fb97a7310:
+
+  clk: sunxi-ng: fix recalc_rate formula of NKMP clocks (2017-03-20 10:34:05 +0100)
+
+----------------------------------------------------------------
+Allwinner clock fixes for 4.11
+
+A few fixes for a bunch of clocks on a few SoCs. The most important one is
+probably one that fixes the NKMP clock frequency calculation and could end
+up with clocking the CPU frequency to out of bounds rates.
+
+----------------------------------------------------------------
+Arnd Bergmann (1):
+      clk: sunxi: ccu-sun5i needs nkmp
+
+Chen-Yu Tsai (2):
+      clk: sunxi-ng: mp: Adjust parent rate for pre-dividers
+      clk: sunxi-ng: sun6i: Fix enable bit offset for hdmi-ddc module clock
+
+Icenowy Zheng (1):
+      clk: sunxi-ng: fix recalc_rate formula of NKMP clocks
+
+Philipp Tomsich (1):
+      clk: sunxi-ng: Fix div/mult settings for osc12M on A64
+
+ drivers/clk/sunxi-ng/Kconfig          | 1 +
+ drivers/clk/sunxi-ng/ccu-sun50i-a64.c | 2 +-
+ drivers/clk/sunxi-ng/ccu-sun6i-a31.c  | 2 +-
+ drivers/clk/sunxi-ng/ccu_mp.c         | 8 ++++++++
+ drivers/clk/sunxi-ng/ccu_nkmp.c       | 2 +-
+ 5 files changed, 12 insertions(+), 3 deletions(-)
+
 -- 
-2.9.0
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170320/fc32e56b/attachment.sig>
