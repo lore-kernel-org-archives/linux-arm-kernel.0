@@ -1,31 +1,31 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 20 Mar 2017 09:57:45 +0100
-Subject: [PATCH 06/31] ARM: dts: r8a7743: Remove unit-address and reg from
- integrated cache
+Date: Mon, 20 Mar 2017 09:57:44 +0100
+Subject: [PATCH 05/31] ARM: dts: r8a73a4: Remove unit-addresses and regs from
+ integrated caches
 In-Reply-To: <cover.1489999062.git.horms+renesas@verge.net.au>
 References: <cover.1489999062.git.horms+renesas@verge.net.au>
-Message-ID: <37f0c804e57ac93ca37a98aa5a210c6b73e6572a.1489999062.git.horms+renesas@verge.net.au>
+Message-ID: <cdaf6417b723e380501f46e555abf0c1c3090124.1489999062.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-The Cortex-A15 cache controller is an integrated controller, and thus
-the device node representing it should not have a unit-addresses or reg
-property.
+The Cortex-A15/A7 cache controllers are integrated controllers, and thus
+the device nodes representing them should not have unit-addresses or reg
+properties.
 
-Fixes: 34e8d993a68ae459 ("ARM: dts: r8a7743: initial SoC device tree")
+Fixes: b0da45c60d2f7b08 ("ARM: dts: r8a73a4: Fix W=1 dtc warnings")
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7743.dtsi | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ arch/arm/boot/dts/r8a73a4.dtsi | 6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7743.dtsi b/arch/arm/boot/dts/r8a7743.dtsi
-index c166be2f18e0..cd908796fb3b 100644
---- a/arch/arm/boot/dts/r8a7743.dtsi
-+++ b/arch/arm/boot/dts/r8a7743.dtsi
-@@ -32,9 +32,8 @@
+diff --git a/arch/arm/boot/dts/r8a73a4.dtsi b/arch/arm/boot/dts/r8a73a4.dtsi
+index 00eb9a7114dc..6fb7eaba9126 100644
+--- a/arch/arm/boot/dts/r8a73a4.dtsi
++++ b/arch/arm/boot/dts/r8a73a4.dtsi
+@@ -32,18 +32,16 @@
  			next-level-cache = <&L2_CA15>;
  		};
  
@@ -33,8 +33,18 @@ index c166be2f18e0..cd908796fb3b 100644
 +		L2_CA15: cache-controller-0 {
  			compatible = "cache";
 -			reg = <0>;
+ 			clocks = <&cpg_clocks R8A73A4_CLK_Z>;
+ 			power-domains = <&pd_a3sm>;
  			cache-unified;
  			cache-level = <2>;
- 			power-domains = <&sysc R8A7743_PD_CA15_SCU>;
+ 		};
+ 
+-		L2_CA7: cache-controller at 100 {
++		L2_CA7: cache-controller-1 {
+ 			compatible = "cache";
+-			reg = <0x100>;
+ 			clocks = <&cpg_clocks R8A73A4_CLK_Z2>;
+ 			power-domains = <&pd_a3km>;
+ 			cache-unified;
 -- 
 2.7.0.rc3.207.g0ac5344
