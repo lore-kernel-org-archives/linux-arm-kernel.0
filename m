@@ -1,127 +1,100 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 20 Mar 2017 12:55:26 +0100
-Subject: [PATCH v5 38/39] media: imx: csi: fix crop rectangle reset in
- sink set_fmt
-In-Reply-To: <327d67d9-68c1-7f74-0c0f-f6aee1c4b546@gmail.com>
-References: <1489121599-23206-1-git-send-email-steve_longerbeam@mentor.com>
- <1489121599-23206-39-git-send-email-steve_longerbeam@mentor.com>
- <20170319152233.GW21222@n2100.armlinux.org.uk>
- <327d67d9-68c1-7f74-0c0f-f6aee1c4b546@gmail.com>
-Message-ID: <1490010926.2917.59.camel@pengutronix.de>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 20 Mar 2017 12:08:17 +0000
+Subject: [PATCH 6/6] arm64: KVM: Add support for VPIPT I-caches
+In-Reply-To: <1489177945-8590-6-git-send-email-will.deacon@arm.com>
+References: <1489177945-8590-1-git-send-email-will.deacon@arm.com>
+ <1489177945-8590-6-git-send-email-will.deacon@arm.com>
+Message-ID: <20170320120816.GA31213@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2017-03-19 at 12:08 -0700, Steve Longerbeam wrote:
+On Fri, Mar 10, 2017 at 08:32:25PM +0000, Will Deacon wrote:
+> A VPIPT I-cache has two main properties:
 > 
-> On 03/19/2017 08:22 AM, Russell King - ARM Linux wrote:
-> > On Thu, Mar 09, 2017 at 08:53:18PM -0800, Steve Longerbeam wrote:
-> >> From: Philipp Zabel <p.zabel@pengutronix.de>
-> >>
-> >> The csi_try_crop call in set_fmt should compare the cropping rectangle
-> >> to the currently set input format, not to the previous input format.
-> > Are we really sure that the cropping support is implemented correctly?
-> >
-> > I came across this while looking at what we're doing with the
-> > V4L2_SEL_FLAG_KEEP_CONFIG flag.
-> >
-> > Documentation/media/uapi/v4l/dev-subdev.rst defines the behaviour of
-> > the user API, and "Order of configuration and format propagation" says:
-> >
-> >    The coordinates to a step always refer to the actual size of the
-> >    previous step. The exception to this rule is the source compose
-> >    rectangle, which refers to the sink compose bounds rectangle --- if it
-> >    is supported by the hardware.
-> >    
-> >    1. Sink pad format. The user configures the sink pad format. This format
-> >       defines the parameters of the image the entity receives through the
-> >       pad for further processing.
-> >    
-> >    2. Sink pad actual crop selection. The sink pad crop defines the crop
-> >       performed to the sink pad format.
-> >    
-> >    3. Sink pad actual compose selection. The size of the sink pad compose
-> >       rectangle defines the scaling ratio compared to the size of the sink
-> >       pad crop rectangle. The location of the compose rectangle specifies
-> >       the location of the actual sink compose rectangle in the sink compose
-> >       bounds rectangle.
-> >    
-> >    4. Source pad actual crop selection. Crop on the source pad defines crop
-> >       performed to the image in the sink compose bounds rectangle.
-> >    
-> >    5. Source pad format. The source pad format defines the output pixel
-> >       format of the subdev, as well as the other parameters with the
-> >       exception of the image width and height. Width and height are defined
-> >       by the size of the source pad actual crop selection.
-> >    
-> >    Accessing any of the above rectangles not supported by the subdev will
-> >    return ``EINVAL``. Any rectangle referring to a previous unsupported
-> >    rectangle coordinates will instead refer to the previous supported
-> >    rectangle. For example, if sink crop is not supported, the compose
-> >    selection will refer to the sink pad format dimensions instead.
-> >
-> > Note step 3 above: scaling is defined by the ratio of the _sink_ crop
-> > rectangle to the _sink_ compose rectangle.
-
-The above paragraph suggests we skip any rectangles that are not
-supported. In our case that would be 3. and 4., since the CSI can't
-compose into a larger frame. I hadn't realised that the crop selection
-currently happens on the source pad.
-The hardware actually only supports cropping of the input (the crop
-rectangle we write into the window registers are before downscaling). So
-the crop rectangle should be moved to the sink pad.
-
-> > So, lets say that the camera produces a 1280x720 image, and the sink
-> > pad format is configured with 1280x720.  That's step 1.
-> >
-> > The sink crop operates within that rectangle, cropping it to an area.
-> > Let's say we're only interested in its centre, so we'd chose 640x360
-> > with the top-left as 320,180.  This is step 2.
->>
-> > Then, if we want to down-scale by a factor of two, we'd set the sink
-> > compose selection to 320x180.
-
-Except when composing is not supported. If the sink compose and source
-crop rectangles are not supported, the source pad format takes their
-place in determining the scaling output resolution. At least that's how
-I read the documentation.
-
-> > This seems to be at odds with how the scaling is done in CSI at
-> > present: the selection implementations all reject attempts to
-> > configure the sink pad, instead only supporting crop rectangles on
-> > the source,
+> 1. Lines allocated into the cache are tagged by VMID and a lookup can
+>    only hit lines that were allocated with the current VMID.
 > 
-> Correct. Currently cropping is only supported at the source pad
-> (step 4).
+> 2. I-cache invalidation from EL1/0 only invalidates lines that match the
+>    current VMID of the CPU doing the invalidation.
 > 
-> Initially the CSI didn't support down-scaling, so step 3 is not supported,
-> so the sink pad format/crop selection rectangle/crop compose rectangle
-> are collapsed into the same sink pad format rectangle.
+> This can cause issues with non-VHE configurations, where the host runs
+> at EL1 and wants to invalidate I-cache entries for a guest running with
+> a different VMID. VHE is not affected, because the host runs at EL2 and
+> I-cache invalidation applies as expected.
 > 
-> Philipp later added support for /2 downscaling, but we didn't put this in
-> the correct API, looks like this needs to move into the selection API at
-> step 3 (sink pad compose rectangle).
+> This patch solves the problem by invalidating the I-cache when unmapping
+> a page at stage 2 on a system with a VPIPT I-cache but not running with
+> VHE enabled. Hopefully this is an obscure enough configuration that the
+> overhead isn't anything to worry about, although it does mean that the
+> by-range I-cache invalidation currently performed when mapping at stage
+> 2 can be elided on such systems, because the I-cache will be clean for
+> the guest VMID following a rollover event.
+> 
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm64/include/asm/kvm_mmu.h |  9 +++++----
+>  arch/arm64/kvm/hyp/tlb.c         | 22 ++++++++++++++++++++++
+>  2 files changed, 27 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+> index dc3624d8b9db..d2293d49f555 100644
+> --- a/arch/arm64/include/asm/kvm_mmu.h
+> +++ b/arch/arm64/include/asm/kvm_mmu.h
+> @@ -242,12 +242,13 @@ static inline void __coherent_cache_guest_page(struct kvm_vcpu *vcpu,
+>  
+>  	kvm_flush_dcache_to_poc(va, size);
+>  
+> -	if (!icache_is_aliasing()) {		/* PIPT */
+> -		flush_icache_range((unsigned long)va,
+> -				   (unsigned long)va + size);
+> -	} else {
+> +	if (icache_is_aliasing()) {
+>  		/* any kind of VIPT cache */
+>  		__flush_icache_all();
+> +	} else if (is_kernel_in_hyp_mode() || !icache_is_vpipt()) {
+> +		/* PIPT or VPIPT at EL2 (see comment in __kvm_tlb_flush_vmid_ipa) */
+> +		flush_icache_range((unsigned long)va,
+> +				   (unsigned long)va + size);
+>  	}
+>  }
+>  
+> diff --git a/arch/arm64/kvm/hyp/tlb.c b/arch/arm64/kvm/hyp/tlb.c
+> index e8e7ba2bc11f..f02c7e6a8db4 100644
+> --- a/arch/arm64/kvm/hyp/tlb.c
+> +++ b/arch/arm64/kvm/hyp/tlb.c
+> @@ -46,6 +46,28 @@ void __hyp_text __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
+>  	dsb(ish);
+>  	isb();
+>  
+> +	/*
+> +	 * If the host is running at EL1 and we have a VPIPT I-cache,
+> +	 * then we must perform I-cache maintenance at EL2 in order for
+> +	 * it to have an effect on the guest. Since the guest cannot hit
+> +	 * I-cache lines allocated with a different VMID, we don't need
+> +	 * to worry about junk out of guest reset (we nuke the I-cache on
+> +	 * VMID rollover), but we do need to be careful when remapping
+> +	 * executable pages for the same guest. This can happen when KSM
+> +	 * takes a CoW fault on an executable page, copies the page into
+> +	 * a page that was previously mapped in the guest and then needs
+> +	 * to invalidate the guest view of the I-cache for that page
+> +	 * from EL1. To solve this, we invalidate the entire I-cache when
+> +	 * unmapping a page from a guest if we have a VPIPT I-cache but
+> +	 * the host is running at EL1. As above, we could do better if
+> +	 * we had the VA.
+> +	 *
+> +	 * The moral of this story is: if you have a VPIPT I-cache, then
+> +	 * you should be running with VHE enabled.
+> +	 */
+> +	if (!has_vhe() && icache_is_vpipt())
+> +		__flush_icache_all();
 
-I am not sure about this. Wouldn't moving the input crop to the sink pad
-be enough? If we added support for the sink pad compose rectangle, that
-wouldn't actually allow to compose the CSI output into a larger frame.
-Since the subdevice can't compose, I'd leave the sink compose rectangle
-disabled.
+The is_kernel_in_hyp_mode() / has_vhe() inconsistency across these two
+functions is somewhat confusing.
 
-> >   and we use the source crop rectangle to define the
-> > down-scaling.
+Is there any reason __coherent_cache_guest_page() can't use has_vhe()
+too?
 
-We use the source pad format to define the downscaling relative to the
-source crop rectangle (which is wrong, it should be relative to the sink
-crop rectangle).
+Otherwise, this all looks sane to me.
 
-> Yes. And maybe there is nothing wrong with that, because scaling is also
-> defined by the source/sink _format_ ratios (if I'm not mistaken), so looking
-> at this another way, we're just defining scaling in the CSI via another
-> legal API.
-
-I didn't touch the crop rectangle at all, just setting the input
-resolution on the sink pad and the desired output resolution on the
-source pad should work.
-
-regards
-Philipp
+Thanks,
+Mark.
