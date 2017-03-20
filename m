@@ -1,63 +1,72 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 20 Mar 2017 13:51:58 +0000
-Subject: [PATCH 01/17] arm64: arch_timer: Add infrastructure for multiple
- erratum detection methods
-In-Reply-To: <20170306112622.13853-2-marc.zyngier@arm.com>
-References: <20170306112622.13853-1-marc.zyngier@arm.com>
- <20170306112622.13853-2-marc.zyngier@arm.com>
-Message-ID: <20170320135158.GC31213@leverpostej>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Mon, 20 Mar 2017 22:52:19 +0900
+Subject: [PATCH 1/6] arm64: Use full path in KBUILD_IMAGE definition
+In-Reply-To: <20170320121328.GH17263@arm.com>
+References: <20161122213434.14788-1-mmarek@suse.com>
+ <20170310175854.GE18894@arm.com>
+ <ba676afc-d52c-5f79-1794-2b751054bf53@suse.com>
+ <CAK7LNAToohT8a0Xz2Jh53PFcU5e8gCie+ktYhB_j1wzNhRF--A@mail.gmail.com>
+ <20170320121328.GH17263@arm.com>
+Message-ID: <CAK7LNATQ-xOLgCBosxkfvjPOkm419WDe=06z7+1LkBUaWHbL4w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+2017-03-20 21:13 GMT+09:00 Will Deacon <will.deacon@arm.com>:
+> On Sat, Mar 18, 2017 at 10:14:41PM +0900, Masahiro Yamada wrote:
+>> 2017-03-11 6:20 GMT+09:00 Michal Marek <mmarek@suse.com>:
+>> > Dne 10.3.2017 v 18:58 Will Deacon napsal(a):
+>> >> On Tue, Nov 22, 2016 at 10:34:29PM +0100, Michal Marek wrote:
+>> >>> The KBUILD_IMAGE variable is used by the rpm and deb-pkg targets, which
+>> >>> expect it to point to the image file in the build directory. The
+>> >>> builddeb script has a workaround for architectures which only provide
+>> >>> the basename, but let's provide a clean interface for packaging tools.
+>> >>>
+>> >>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>> >>> Cc: Will Deacon <will.deacon@arm.com>
+>> >>> Cc: linux-arm-kernel at lists.infradead.org
+>> >>> Signed-off-by: Michal Marek <mmarek@suse.com>
+>> >>> ---
+>> >>>  arch/arm64/Makefile | 6 +++---
+>> >>>  1 file changed, 3 insertions(+), 3 deletions(-)
+>> >>
+>> >> What's the plan for this patch? I'm happy to merge it,
+>> >
+>> > Great, please merge it.
+>> >
+>> >> but I don't see
+>> >> the rest of the series queued anywhere.
+>> >
+>> > I'll see what remains and submit the rest via the kbuild tree.
+>> >
+>>
+>> I like this approach, rather than fixing scripts/package/mkspec.
+>>
+>>
+>> So, how shall we handle this series?
+>>
+>>
+>> I am OK with getting 1/6 in through arm64 tree,
+>> but 6/6 will be postponed in the case.
+>>
+>>
+>>
+>> If Will issues Acked-by, I can pick-up the whole series
+>> to linux-kbuild.
+>
+> Ok, that works for me too. For the first patch:
+>
+> Acked-by: Will Deacon <will.deacon@arm.com>
+>
+> So please take this via linux-kbuild.
+>
+> Will
 
-On Mon, Mar 06, 2017 at 11:26:06AM +0000, Marc Zyngier wrote:
-> We're currently stuck with DT when it comes to handling errata, which
-> is pretty restrictive. In order to make things more flexible, let's
-> introduce an infrastructure that could support alternative discovery
-> methods. No change in functionnality.
 
-Nit: functionality
+Applied to linux-kbuild/misc.  Thanks!
 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm64/include/asm/arch_timer.h  |  7 +++-
->  drivers/clocksource/arm_arch_timer.c | 80 +++++++++++++++++++++++++++++++-----
->  2 files changed, 75 insertions(+), 12 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
-> index b4b34004a21e..1c92d52619a6 100644
-> --- a/arch/arm64/include/asm/arch_timer.h
-> +++ b/arch/arm64/include/asm/arch_timer.h
-> @@ -37,9 +37,14 @@ extern struct static_key_false arch_timer_read_ool_enabled;
->  #define needs_unstable_timer_counter_workaround()  false
->  #endif
->  
-> +enum arch_timer_erratum_match_type {
-> +	ate_match_dt,
-> +};
->  
->  struct arch_timer_erratum_workaround {
-> -	const char *id;		/* Indicate the Erratum ID */
-> +	enum arch_timer_erratum_match_type match_type;
-> +	const void *id;		/* Indicate the Erratum ID */
 
-This comment isn't much help. Can we drop it?
 
-Either that, or expand on what it is in each case, e.g.
 
-	/*
-	 * Data specific to the match_type.
-	 *
-	 * For ate_match_dt, this is a DT property name to look for.
-	 */
-	const void *id;
-
-> +	const char *desc_str;
-
-Elesewhere we just the name desc for strings like this.
-
-Can we s/desc_str/desc/, please?
-
-Thanks,
-Mark.
+-- 
+Best Regards
+Masahiro Yamada
