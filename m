@@ -1,59 +1,51 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 20 Mar 2017 09:57:20 +0100
-Subject: [PATCH 09/32] arm64: dts: r8a7796: Use rgmii-txid phy-mode for
- EthernetAVB
+Date: Mon, 20 Mar 2017 09:57:21 +0100
+Subject: [PATCH 10/32] arm64: dts: r8a7796: salvator-x: Fix EthernetAVB PHY
+ timing
 In-Reply-To: <cover.1489999913.git.horms+renesas@verge.net.au>
 References: <cover.1489999913.git.horms+renesas@verge.net.au>
-Message-ID: <325f39010b431f6a1ece74d69f10dcca2329c08d.1489999913.git.horms+renesas@verge.net.au>
+Message-ID: <ef3f08c83fd186ab4bbad6a6250c5a347fbf6551.1489999913.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Kazuya Mizuguchi <kazuya.mizuguchi.ks@renesas.com>
 
-Since commit 61fccb2d6274 ("ravb: Add tx and rx clock internal delays mode
-of APSR") the EthernetAVB driver enables tx and rx clock internal delay
-modes (TDM and RDM) depending on the phy mode as follows:
+Set PHY rxc-skew-ps to 1500 and all other values to their default values.
 
-    phy mode   | ASPR delay mode
-    -----------+----------------
-    rgmii-id   | TDM and RDM
-    rgmii-rxid | RDM
-    rgmii-txid | TDM
-
-And prior to the above commit no internal delay mode settings were
-implemented for any phy mode.
-
-With this and the above change present tx internal delay mode is enabled
-which has been observed to address failures in the case of 1Gbps
-communication using the by salvator-x board with the KSZ9031RNX phy. This
-has been reported to occur with both the r8a7795 (H3) and r8a7796 (M3-W)
-SoCs.
-
-With the above patch present but this patch present tx and rx internal
-delay modes are enabled; and with the above patch and this present absent
-no internal delay modes are enabled. In both cases failures have been
-observed when using 1Gbps communication in the environments described
-above.
+This is intended to to address failures in the case of 1Gbps communication
+using the by salvator-x board with the KSZ9031RNX phy. This has been
+reported to occur with both the r8a7795 (H3) and r8a7796 (M3-W) SoCs.
 
 Signed-off-by: Kazuya Mizuguchi <kazuya.mizuguchi.ks@renesas.com>
 Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a7796.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts | 13 +------------
+ 1 file changed, 1 insertion(+), 12 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7796.dtsi b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-index c95ad177b097..1c1c1eae9cba 100644
---- a/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-@@ -483,7 +483,7 @@
- 					  "ch24";
- 			clocks = <&cpg CPG_MOD 812>;
- 			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
--			phy-mode = "rgmii-id";
-+			phy-mode = "rgmii-txid";
- 			#address-cells = <1>;
- 			#size-cells = <0>;
- 			status = "disabled";
+diff --git a/arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts b/arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts
+index 61f4662db497..93ed23ab71bb 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts
++++ b/arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts
+@@ -172,18 +172,7 @@
+ 	status = "okay";
+ 
+ 	phy0: ethernet-phy at 0 {
+-		rxc-skew-ps = <900>;
+-		rxdv-skew-ps = <0>;
+-		rxd0-skew-ps = <0>;
+-		rxd1-skew-ps = <0>;
+-		rxd2-skew-ps = <0>;
+-		rxd3-skew-ps = <0>;
+-		txc-skew-ps = <900>;
+-		txen-skew-ps = <0>;
+-		txd0-skew-ps = <0>;
+-		txd1-skew-ps = <0>;
+-		txd2-skew-ps = <0>;
+-		txd3-skew-ps = <0>;
++		rxc-skew-ps = <1500>;
+ 		reg = <0>;
+ 		interrupt-parent = <&gpio2>;
+ 		interrupts = <11 IRQ_TYPE_LEVEL_LOW>;
 -- 
 2.7.0.rc3.207.g0ac5344
