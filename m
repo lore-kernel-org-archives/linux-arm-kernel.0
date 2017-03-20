@@ -1,35 +1,62 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 20 Mar 2017 09:58:05 +0100
-Subject: [PATCH 26/31] ARM: dts: lager: Drop superfluous status update for
- frequency override
+Date: Mon, 20 Mar 2017 09:58:00 +0100
+Subject: [PATCH 21/31] ARM: dts: r8a7793: Tidyup Audio-DMAC channel for DVC
 In-Reply-To: <cover.1489999062.git.horms+renesas@verge.net.au>
 References: <cover.1489999062.git.horms+renesas@verge.net.au>
-Message-ID: <2507e3d41a3f0f09e7d756b34e3bb953d6d3b76d.1489999063.git.horms+renesas@verge.net.au>
+Message-ID: <d2b10f99962aa5ec9865a77827931bf20211a39c.1489999063.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-The scif_clk device node is already enabled in r8a7790.dtsi, so there is
-no need to update its status again.
+Current	Audio-DMAC is assigned "rx" as Audio-DMAC0, "tx" as Audio-DMAC1.
+Thus, DVC "tx" should be assigned as Audio-DMAC1, instead of Audio-DMAC0.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Because of this, current platform board (using SRC/DVC/SSI)
+Playback/Capture both will use same Audio-DMAC0
+(but it depends on audio data path).
+
+First note is that this "rx" and "tx" are from each IP point,
+it doesn't mean Playback/Capture.
+Second note is that Audio DMAC assigned on DT is only for
+Audio-DMAC, Audio-DMAC-peri-peri has no entry.
+
+=> Audio-DMAC
+-> Audio-DMAC-peri-peri
+-- HW connection
+
+Playback case
+
+	[Mem] => [SRC]--[DVC] -> [SSI]--[Codec]
+	      rx ~~~~~~~~~~~~
+Capture
+
+	[Mem] <= [DVC]--[SRC] <- [SSI]--[Codec]
+	      tx ~~~~~~~~~~~~
+
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7790-lager.dts | 1 -
- 1 file changed, 1 deletion(-)
+ arch/arm/boot/dts/r8a7793.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
-index bd512c86e852..ba100a6f67ca 100644
---- a/arch/arm/boot/dts/r8a7790-lager.dts
-+++ b/arch/arm/boot/dts/r8a7790-lager.dts
-@@ -581,7 +581,6 @@
+diff --git a/arch/arm/boot/dts/r8a7793.dtsi b/arch/arm/boot/dts/r8a7793.dtsi
+index 38506f563b2b..53c89b47eaf0 100644
+--- a/arch/arm/boot/dts/r8a7793.dtsi
++++ b/arch/arm/boot/dts/r8a7793.dtsi
+@@ -1425,11 +1425,11 @@
  
- &scif_clk {
- 	clock-frequency = <14745600>;
--	status = "okay";
- };
- 
- &msiof1 {
+ 		rcar_sound,dvc {
+ 			dvc0: dvc-0 {
+-				dmas = <&audma0 0xbc>;
++				dmas = <&audma1 0xbc>;
+ 				dma-names = "tx";
+ 			};
+ 			dvc1: dvc-1 {
+-				dmas = <&audma0 0xbe>;
++				dmas = <&audma1 0xbe>;
+ 				dma-names = "tx";
+ 			};
+ 		};
 -- 
 2.7.0.rc3.207.g0ac5344
