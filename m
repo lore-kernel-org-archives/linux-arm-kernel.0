@@ -1,55 +1,54 @@
-From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Mon, 20 Mar 2017 11:55:27 +0530
-Subject: [PATCH v6 5/8] dt-bindings: input: touchscreen: Add max11801-ts
- binding
-In-Reply-To: <20170320023622.GA3443@dragon>
-References: <1489647939-4966-1-git-send-email-jagan@openedev.com>
- <20170320023622.GA3443@dragon>
-Message-ID: <CAMty3ZC=mS6L8ajEnZDPJsvMvOH0NF5MBHdc+MYofBXBfe9JXg@mail.gmail.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Mon, 20 Mar 2017 14:24:40 +0800
+Subject: [alsa-devel] [PATCH v3 03/11] IIO: ADC: add sigma delta
+ modulator support
+In-Reply-To: <1489759704-30217-4-git-send-email-arnaud.pouliquen@st.com>
+Message-ID: <201703201445.oGjnTFdP%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 20, 2017 at 8:06 AM, Shawn Guo <shawnguo@kernel.org> wrote:
-> On Thu, Mar 16, 2017 at 12:35:38PM +0530, Jagan Teki wrote:
->> From: Jagan Teki <jagan@amarulasolutions.com>
->>
->> Add missing documentation of max11801-ts dt-binding details.
->>
->> Cc: Mark Rutland <mark.rutland@arm.com>
->> Cc: Rob Herring <robh+dt@kernel.org>
->> Cc: Shawn Guo <shawnguo@kernel.org>
->> Cc: Michael Trimarchi <michael@amarulasolutions.com>
->> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
->> ---
->> Changes for v6:
->> - Replace the lable and name of the node
->>    ts: max11801 => max11801: touchscreen at 48
->> Changes for v5:
->> - Newly added patch
->>
->>  .../bindings/input/touchscreen/max11801-ts.txt         | 18 ++++++++++++++++++
->>  1 file changed, 18 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/input/touchscreen/max11801-ts.txt
->>
->> diff --git a/Documentation/devicetree/bindings/input/touchscreen/max11801-ts.txt b/Documentation/devicetree/bindings/input/touchscreen/max11801-ts.txt
->> new file mode 100644
->> index 0000000..4afccbe
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/input/touchscreen/max11801-ts.txt
->> @@ -0,0 +1,18 @@
->> +* MAXI MAX11801 Resistive touch screen controller with i2c interface
->> +
->> +Required properties:
->> +- compatible: must be "max11801"
->
-> Shouldn't it have a vendor prefix?
+Hi Arnaud,
 
-Drivers i2c_device_id.name doesn't have vendor prefix, should I fix
-that one as well?
+[auto build test ERROR on asoc/for-next]
+[also build test ERROR on v4.11-rc3]
+[cannot apply to iio/togreg next-20170310]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-thanks!
--- 
-Jagan Teki
-Senior Linux Kernel Engineer | Amarula Solutions
-U-Boot, Linux | Upstream Maintainer
-Hyderabad, India.
+url:    https://github.com/0day-ci/linux/commits/Arnaud-Pouliquen/Add-STM32-DFSDM-support/20170320-133247
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git for-next
+config: tile-allmodconfig (attached as .config)
+compiler: tilegx-linux-gcc (GCC) 4.6.2
+reproduce:
+        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=tile 
+
+All errors (new ones prefixed by >>):
+
+   drivers/iio/adc/sd_adc_modulator.c:84:1: error: 'adc081c_of_match' undeclared here (not in a function)
+>> drivers/iio/adc/sd_adc_modulator.c:84:1: error: '__mod_of__adc081c_of_match_device_table' aliased to undefined symbol 'adc081c_of_match'
+
+vim +84 drivers/iio/adc/sd_adc_modulator.c
+
+    78	
+    79	static const struct of_device_id sd_adc_of_match[] = {
+    80		{ .compatible = "sd-modulator" },
+    81		{ .compatible = "ads1201" },
+    82		{ }
+    83	};
+  > 84	MODULE_DEVICE_TABLE(of, adc081c_of_match);
+    85	
+    86	static struct platform_driver iio_sd_mod_adc = {
+    87		.driver = {
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 48060 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170320/5988d74d/attachment-0001.gz>
