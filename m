@@ -1,69 +1,153 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 21 Mar 2017 11:27:41 +0000
-Subject: [PATCH v5 38/39] media: imx: csi: fix crop rectangle reset in
- sink set_fmt
-In-Reply-To: <1490030604.2917.103.camel@pengutronix.de>
-References: <1489121599-23206-1-git-send-email-steve_longerbeam@mentor.com>
- <1489121599-23206-39-git-send-email-steve_longerbeam@mentor.com>
- <20170319152233.GW21222@n2100.armlinux.org.uk>
- <327d67d9-68c1-7f74-0c0f-f6aee1c4b546@gmail.com>
- <1490010926.2917.59.camel@pengutronix.de>
- <20170320120855.GH21222@n2100.armlinux.org.uk>
- <1490018451.2917.86.camel@pengutronix.de>
- <20170320141705.GL21222@n2100.armlinux.org.uk>
- <1490030604.2917.103.camel@pengutronix.de>
-Message-ID: <20170321112741.GV21222@n2100.armlinux.org.uk>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Tue, 21 Mar 2017 12:34:28 +0100
+Subject: [PATCH] kvm: pass the virtual SEI syndrome to guest OS
+In-Reply-To: <76795e20-2f20-1e54-cfa5-7444f28b18ee@huawei.com>
+References: <1489996534-8270-1-git-send-email-gengdongjiu@huawei.com>
+ <7055772d-2a20-6e0c-2bf8-204bc9ef52a5@arm.com>
+ <b912c293-4314-7c90-30a4-2f986feb1670@huawei.com>
+ <22fb583f-a33e-15f8-a059-fb112b27dd4f@arm.com>
+ <58CFF058.8020205@arm.com>
+ <76795e20-2f20-1e54-cfa5-7444f28b18ee@huawei.com>
+Message-ID: <20170321113428.GC15920@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 20, 2017 at 06:23:24PM +0100, Philipp Zabel wrote:
-> @@ -1173,15 +1196,8 @@ static void csi_try_fmt(struct csi_priv *priv,
->  		incc = imx_media_find_mbus_format(infmt->code,
->  						  CS_SEL_ANY, true);
->  
-> -		if (sdformat->format.width < priv->crop.width * 3 / 4)
-> -			sdformat->format.width = priv->crop.width / 2;
-> -		else
-> -			sdformat->format.width = priv->crop.width;
-> -
-> -		if (sdformat->format.height < priv->crop.height * 3 / 4)
-> -			sdformat->format.height = priv->crop.height / 2;
-> -		else
-> -			sdformat->format.height = priv->crop.height;
-> +		sdformat->format.width = compose->width;
-> +		sdformat->format.height = compose->height;
->  
->  		if (incc->bayer) {
->  			sdformat->format.code = infmt->code;
+On Tue, Mar 21, 2017 at 02:32:29PM +0800, gengdongjiu wrote:
+> 
+> 
+> On 2017/3/20 23:08, James Morse wrote:
+> > Hi Dongjiu Geng,
+> > 
+> > On 20/03/17 13:58, Marc Zyngier wrote:
+> >> On 20/03/17 12:28, gengdongjiu wrote:
+> >>> On 2017/3/20 19:24, Marc Zyngier wrote:
+> >>>> Please include James Morse on anything RAS related, as he's already
+> >>>> looking at related patches.
+> > 
+> > (Thanks Marc,)
+> > 
+> >>>> On 20/03/17 07:55, Dongjiu Geng wrote:
+> >>>>> In the RAS implementation, hardware pass the virtual SEI
+> >>>>> syndrome information through the VSESR_EL2, so set the virtual
+> >>>>> SEI syndrome using physical SEI syndrome el2_elr to pass to
+> >>>>> the guest OS
+> > 
+> > How does this work with firmware first?
+> 
+> I explained it in previous mail about the work flow.
 
-We need to do more in here, because right now setting the source pads
-overwrites the colorimetry etc information.  Maybe something like the
-below?  I'm wondering if it would be a saner approach to copy the
-sink format and update the parameters that can be changed, rather than
-trying to list all the parameters that shouldn't be changed.  What if
-the format structure gains a new member?
+When delivering and reporting SEIs to the VM, should this happen
+directly to the OS running in the VM, or to the guest firmware (e.g.
+UEFI) running in the VM as well?
 
-diff --git a/drivers/staging/media/imx/imx-media-csi.c b/drivers/staging/media/imx/imx-media-csi.c
-index 1492b92e1970..756204ced53c 100644
---- a/drivers/staging/media/imx/imx-media-csi.c
-+++ b/drivers/staging/media/imx/imx-media-csi.c
-@@ -1221,6 +1221,12 @@ static void csi_try_fmt(struct csi_priv *priv,
- 			sdformat->format.field =  (infmt->height == 480) ?
- 				V4L2_FIELD_SEQ_TB : V4L2_FIELD_SEQ_BT;
- 		}
-+
-+		/* copy settings we can't change */
-+		sdformat->format.colorspace = infmt->colorspace;
-+		sdformat->format.ycbcr_enc = infmt->ycbcr_enc;
-+		sdformat->format.quantization = infmt->quantization;
-+		sdformat->format.xfer_func = infmt->xfer_func;
- 		break;
- 	case CSI_SINK_PAD:
- 		v4l_bound_align_image(&sdformat->format.width, MIN_W, MAX_W,
+Thanks,
+-Christoffer
 
-
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+> 
+> when the Guest OS triggers an SEI, it will firstly trap to EL3 firmware, El3 firmware records the error
+> info to the APEI table, then copy the ESR_EL3 ELR_EL3 to ESR_EL2 ELR_EL2 and transfers control to the
+> hypervisor, hypervisor delegates the error exception to EL1 guest OS by setting HCR_EL2.VSE to 1 and pass the
+> virtual SEI syndrome through vsesr_el2. The EL1 guest OS check the DISR_EL1 syndrome information to decide to
+> terminate the application, or do some other recovery action. because the HCR_EL2.AMO is set, so in fact, read
+> DISR_EL1, it returns the VDISR_EL2. and VDISR_EL2 is loaded from VSESR_EL2, so here I pass the virtual SEI
+> syndrome vsesr_el2.
+> 
+> > If we took a Physical SError Interrupt the CPER records are in the hosts memory.
+> > To deliver a RAS event to the guest something needs to generate CPER records and
+> > put them in the guest memory. Only Qemu knows where these memory regions are.
+> > 
+> > Put another way, what is the guest expected to do with this SError interrupt?
+> No, we do not only panic,if it is EL0 application SEI. the OS error recovery
+> agent will terminate the EL0 application to isolate the error; If it is EL1 guest
+> OS SError, guest OS can see whether it can recover. if the error was in a read-only file cache buffer, guest OS
+> can invalidate the page and reload the data from disk.
+> 
+> if all of the above are failed, OS will panic.
+> 
+> 
+> > The only choice is panic(). We should send this via Qemu so that we can add
+> > proper guest RAS support later. Once Qemu has written the CPER records into
+> > guest memory, it can notify the guest.
+> > 
+> > Is anyone from Huawei looking at adding RAS support for Qemu?
+>  yes, I am looking at Qemu and want to add RAS support.
+>  do you mean let Qemu inject both the SEA and SEI?
+> 
+> > 
+> > 
+> > It looks like we should save/restore VSESR_EL2 as part of the guest CPU state,
+> > but this needs doing with the cpufeature framework so that the single-image
+> > kernel works on platforms with and without these features.
+>  yes, you are right, we will follow cpufeature framework.
+> 
+> 
+> > 
+> > Xie XiuQi's series for SEI also touches the cpufeature framework.
+> > 
+> > 
+> >>>>> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+> >>>>> index aede1658aeda..770a153fb6ba 100644
+> >>>>> --- a/arch/arm64/kvm/hyp/switch.c
+> >>>>> +++ b/arch/arm64/kvm/hyp/switch.c
+> >>>>> @@ -86,6 +86,13 @@ static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu)
+> >>>>>  		isb();
+> >>>>>  	}
+> >>>>>  	write_sysreg(val, hcr_el2);
+> >>>>> +#ifdef CONFIG_HAS_RAS_EXTENSION
+> >>>>> +	/* If virtual System Error or Asynchronous Abort is pending. set
+> >>>>> +	 * the virtual exception syndrome information
+> >>>>> +	 */
+> >>>>> +	if (vcpu->arch.hcr_el2 & HCR_VSE)
+> > 
+> >>>>> +		write_sysreg(vcpu->arch.fault.vsesr_el2, vsesr_el2);
+> > 
+> > This won't build with versions of binutils that don't recognise vsesr_el2.
+> > Is there another patch out there that adds a sysreg definition for vsesr_el2?
+> > 
+> > 
+> >>>>> diff --git a/arch/arm64/kvm/inject_fault.c b/arch/arm64/kvm/inject_fault.c
+> >>>>> index da6a8cfa54a0..08a13dfe28a8 100644
+> >>>>> --- a/arch/arm64/kvm/inject_fault.c
+> >>>>> +++ b/arch/arm64/kvm/inject_fault.c
+> >>>>> @@ -242,4 +242,14 @@ void kvm_inject_undefined(struct kvm_vcpu *vcpu)
+> >>>>>  void kvm_inject_vabt(struct kvm_vcpu *vcpu)
+> >>>>>  {
+> >>>>>  	vcpu_set_hcr(vcpu, vcpu_get_hcr(vcpu) | HCR_VSE);
+> >>>>> +#ifdef CONFIG_HAS_RAS_EXTENSION
+> >>>>> +	/* If virtual System Error or Asynchronous Abort is set. set
+> >>>>> +	 * the virtual exception syndrome information
+> >>>>> +	 */
+> >>>>> +	kvm_vcpu_set_vsesr(vcpu, ((kvm_vcpu_get_vsesr(vcpu)
+> >>>>> +				& (~VSESR_ELx_IDS_ISS_MASK))
+> >>>>> +				| (kvm_vcpu_get_hsr(vcpu)
+> >>>>> +				& VSESR_ELx_IDS_ISS_MASK)));
+> >>>>
+> >>>> What is the rational for setting VSESR_EL2 with the EL1 syndrome
+> >>>> information? That doesn't make any sense to me.
+> >>> thanks, I set the VSESR_EL2 using the  EL2 syndrome information, "kvm_vcpu_get_hsr"
+> >>> return the value of esr_el2, not EL1 syndrome information
+> >>
+> >> Ah, good point. But that doesn't make it more valid. I still don't see
+> >> anything in the spec that supports this behaviour, and I still propose
+> >> that when RAS is enabled, the VSError injection is mediated by userspace.
+> > 
+> > I agree, we should be handling RAS errors as firmware-first, and Qemu plays the
+> > part of firmware for a guest. We will probably need to have a KVM API for Qemu
+> > to pend an SError with a specific ESR value.
+> > 
+> > If this isn't a firmware-first RAS error the existing code will pend an SError
+> > for the guest.
+> > 
+> so for both SEA and SEI, do you prefer to below steps?
+> EL0/EL1 SEI/SEA ---> EL3 firmware first handle ------> EL2 hypervisor notify the Qemu to inject SEI/SEA------>Qemu call KVM API to inject SEA/SEI---->KVM inject SEA/SEI to guest OS
+> 
+> 
+> > 
+> > Thanks,
+> > 
+> > James
+> > 
+> > 
+> > .
+> > 
+> 
