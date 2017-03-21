@@ -1,141 +1,483 @@
-From: gengdongjiu@huawei.com (gengdongjiu)
-Date: Tue, 21 Mar 2017 14:32:29 +0800
-Subject: [PATCH] kvm: pass the virtual SEI syndrome to guest OS
-In-Reply-To: <58CFF058.8020205@arm.com>
-References: <1489996534-8270-1-git-send-email-gengdongjiu@huawei.com>
- <7055772d-2a20-6e0c-2bf8-204bc9ef52a5@arm.com>
- <b912c293-4314-7c90-30a4-2f986feb1670@huawei.com>
- <22fb583f-a33e-15f8-a059-fb112b27dd4f@arm.com> <58CFF058.8020205@arm.com>
-Message-ID: <76795e20-2f20-1e54-cfa5-7444f28b18ee@huawei.com>
+From: jeffy.chen@rock-chips.com (Jeffy Chen)
+Date: Tue, 21 Mar 2017 14:42:11 +0800
+Subject: [PATCH v7] drm/rockchip: Refactor the component match logic.
+Message-ID: <1490078531-5100-1-git-send-email-jeffy.chen@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Currently we are adding all components from the dts, if one of their
+drivers been disabled, we would not be able to bring up others.
 
+Refactor component match logic, follow exynos drm.
 
-On 2017/3/20 23:08, James Morse wrote:
-> Hi Dongjiu Geng,
-> 
-> On 20/03/17 13:58, Marc Zyngier wrote:
->> On 20/03/17 12:28, gengdongjiu wrote:
->>> On 2017/3/20 19:24, Marc Zyngier wrote:
->>>> Please include James Morse on anything RAS related, as he's already
->>>> looking at related patches.
-> 
-> (Thanks Marc,)
-> 
->>>> On 20/03/17 07:55, Dongjiu Geng wrote:
->>>>> In the RAS implementation, hardware pass the virtual SEI
->>>>> syndrome information through the VSESR_EL2, so set the virtual
->>>>> SEI syndrome using physical SEI syndrome el2_elr to pass to
->>>>> the guest OS
-> 
-> How does this work with firmware first?
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
+Acked-by: Mark Yao <mark.yao@rock-chips.com>
+Tested-by: Heiko Stuebner <heiko@sntech.de>
 
-I explained it in previous mail about the work flow.
+---
 
-when the Guest OS triggers an SEI, it will firstly trap to EL3 firmware, El3 firmware records the error
-info to the APEI table, then copy the ESR_EL3 ELR_EL3 to ESR_EL2 ELR_EL2 and transfers control to the
-hypervisor, hypervisor delegates the error exception to EL1 guest OS by setting HCR_EL2.VSE to 1 and pass the
-virtual SEI syndrome through vsesr_el2. The EL1 guest OS check the DISR_EL1 syndrome information to decide to
-terminate the application, or do some other recovery action. because the HCR_EL2.AMO is set, so in fact, read
-DISR_EL1, it returns the VDISR_EL2. and VDISR_EL2 is loaded from VSESR_EL2, so here I pass the virtual SEI
-syndrome vsesr_el2.
+Changes in v7:
+Add Heiko Stuebner <heiko@sntech.de>'s Tested-by.
 
-> If we took a Physical SError Interrupt the CPER records are in the hosts memory.
-> To deliver a RAS event to the guest something needs to generate CPER records and
-> put them in the guest memory. Only Qemu knows where these memory regions are.
-> 
-> Put another way, what is the guest expected to do with this SError interrupt?
-No, we do not only panic,if it is EL0 application SEI. the OS error recovery
-agent will terminate the EL0 application to isolate the error; If it is EL1 guest
-OS SError, guest OS can see whether it can recover. if the error was in a read-only file cache buffer, guest OS
-can invalidate the page and reload the data from disk.
+Changes in v6:
+Add Mark Yao <mark.yao@rock-chips.com>'s Acked-by.
 
-if all of the above are failed, OS will panic.
+Changes in v5:
+Fix compile error reported by Heiko Stuebner <heiko@sntech.de>.
 
+Changes in v4:
+Use platform_driver helpers to register/unregister drivers.
+Fix null pointer error reported by Heiko Stuebner <heiko@sntech.de>.
 
-> The only choice is panic(). We should send this via Qemu so that we can add
-> proper guest RAS support later. Once Qemu has written the CPER records into
-> guest memory, it can notify the guest.
-> 
-> Is anyone from Huawei looking at adding RAS support for Qemu?
- yes, I am looking at Qemu and want to add RAS support.
- do you mean let Qemu inject both the SEA and SEI?
+Changes in v3:
+Address Andrzej Hajda <a.hajda@samsung.com>'s comments.
 
-> 
-> 
-> It looks like we should save/restore VSESR_EL2 as part of the guest CPU state,
-> but this needs doing with the cpufeature framework so that the single-image
-> kernel works on platforms with and without these features.
- yes, you are right, we will follow cpufeature framework.
+Changes in v2:
+Address Sean Paul <seanpaul@chromium.org>'s comments.
 
+ drivers/gpu/drm/rockchip/Kconfig                |  10 +-
+ drivers/gpu/drm/rockchip/Makefile               |  16 +--
+ drivers/gpu/drm/rockchip/analogix_dp-rockchip.c |   9 +-
+ drivers/gpu/drm/rockchip/cdn-dp-core.c          |   8 +-
+ drivers/gpu/drm/rockchip/dw-mipi-dsi.c          |   8 +-
+ drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c     |  10 +-
+ drivers/gpu/drm/rockchip/inno_hdmi.c            |  10 +-
+ drivers/gpu/drm/rockchip/rockchip_drm_drv.c     | 138 +++++++++++++++---------
+ drivers/gpu/drm/rockchip/rockchip_drm_drv.h     |   6 ++
+ drivers/gpu/drm/rockchip/rockchip_vop_reg.c     |   8 +-
+ 10 files changed, 115 insertions(+), 108 deletions(-)
 
-> 
-> Xie XiuQi's series for SEI also touches the cpufeature framework.
-> 
-> 
->>>>> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
->>>>> index aede1658aeda..770a153fb6ba 100644
->>>>> --- a/arch/arm64/kvm/hyp/switch.c
->>>>> +++ b/arch/arm64/kvm/hyp/switch.c
->>>>> @@ -86,6 +86,13 @@ static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu)
->>>>>  		isb();
->>>>>  	}
->>>>>  	write_sysreg(val, hcr_el2);
->>>>> +#ifdef CONFIG_HAS_RAS_EXTENSION
->>>>> +	/* If virtual System Error or Asynchronous Abort is pending. set
->>>>> +	 * the virtual exception syndrome information
->>>>> +	 */
->>>>> +	if (vcpu->arch.hcr_el2 & HCR_VSE)
-> 
->>>>> +		write_sysreg(vcpu->arch.fault.vsesr_el2, vsesr_el2);
-> 
-> This won't build with versions of binutils that don't recognise vsesr_el2.
-> Is there another patch out there that adds a sysreg definition for vsesr_el2?
-> 
-> 
->>>>> diff --git a/arch/arm64/kvm/inject_fault.c b/arch/arm64/kvm/inject_fault.c
->>>>> index da6a8cfa54a0..08a13dfe28a8 100644
->>>>> --- a/arch/arm64/kvm/inject_fault.c
->>>>> +++ b/arch/arm64/kvm/inject_fault.c
->>>>> @@ -242,4 +242,14 @@ void kvm_inject_undefined(struct kvm_vcpu *vcpu)
->>>>>  void kvm_inject_vabt(struct kvm_vcpu *vcpu)
->>>>>  {
->>>>>  	vcpu_set_hcr(vcpu, vcpu_get_hcr(vcpu) | HCR_VSE);
->>>>> +#ifdef CONFIG_HAS_RAS_EXTENSION
->>>>> +	/* If virtual System Error or Asynchronous Abort is set. set
->>>>> +	 * the virtual exception syndrome information
->>>>> +	 */
->>>>> +	kvm_vcpu_set_vsesr(vcpu, ((kvm_vcpu_get_vsesr(vcpu)
->>>>> +				& (~VSESR_ELx_IDS_ISS_MASK))
->>>>> +				| (kvm_vcpu_get_hsr(vcpu)
->>>>> +				& VSESR_ELx_IDS_ISS_MASK)));
->>>>
->>>> What is the rational for setting VSESR_EL2 with the EL1 syndrome
->>>> information? That doesn't make any sense to me.
->>> thanks, I set the VSESR_EL2 using the  EL2 syndrome information, "kvm_vcpu_get_hsr"
->>> return the value of esr_el2, not EL1 syndrome information
->>
->> Ah, good point. But that doesn't make it more valid. I still don't see
->> anything in the spec that supports this behaviour, and I still propose
->> that when RAS is enabled, the VSError injection is mediated by userspace.
-> 
-> I agree, we should be handling RAS errors as firmware-first, and Qemu plays the
-> part of firmware for a guest. We will probably need to have a KVM API for Qemu
-> to pend an SError with a specific ESR value.
-> 
-> If this isn't a firmware-first RAS error the existing code will pend an SError
-> for the guest.
-> 
-so for both SEA and SEI, do you prefer to below steps?
-EL0/EL1 SEI/SEA ---> EL3 firmware first handle ------> EL2 hypervisor notify the Qemu to inject SEI/SEA------>Qemu call KVM API to inject SEA/SEI---->KVM inject SEA/SEI to guest OS
-
-
-> 
-> Thanks,
-> 
-> James
-> 
-> 
-> .
-> 
+diff --git a/drivers/gpu/drm/rockchip/Kconfig b/drivers/gpu/drm/rockchip/Kconfig
+index 0e4eb84..50c41c0 100644
+--- a/drivers/gpu/drm/rockchip/Kconfig
++++ b/drivers/gpu/drm/rockchip/Kconfig
+@@ -13,7 +13,7 @@ config DRM_ROCKCHIP
+ 	  IP found on the SoC.
+ 
+ config ROCKCHIP_ANALOGIX_DP
+-	tristate "Rockchip specific extensions for Analogix DP driver"
++	bool "Rockchip specific extensions for Analogix DP driver"
+ 	depends on DRM_ROCKCHIP
+ 	select DRM_ANALOGIX_DP
+ 	help
+@@ -22,7 +22,7 @@ config ROCKCHIP_ANALOGIX_DP
+ 	  on RK3288 based SoC, you should selet this option.
+ 
+ config ROCKCHIP_CDN_DP
+-        tristate "Rockchip cdn DP"
++        bool "Rockchip cdn DP"
+         depends on DRM_ROCKCHIP
+ 	depends on EXTCON
+ 	select SND_SOC_HDMI_CODEC if SND_SOC
+@@ -33,7 +33,7 @@ config ROCKCHIP_CDN_DP
+ 	  option.
+ 
+ config ROCKCHIP_DW_HDMI
+-        tristate "Rockchip specific extensions for Synopsys DW HDMI"
++        bool "Rockchip specific extensions for Synopsys DW HDMI"
+         depends on DRM_ROCKCHIP
+         select DRM_DW_HDMI
+         help
+@@ -43,7 +43,7 @@ config ROCKCHIP_DW_HDMI
+ 	  option.
+ 
+ config ROCKCHIP_DW_MIPI_DSI
+-	tristate "Rockchip specific extensions for Synopsys DW MIPI DSI"
++	bool "Rockchip specific extensions for Synopsys DW MIPI DSI"
+ 	depends on DRM_ROCKCHIP
+ 	select DRM_MIPI_DSI
+ 	help
+@@ -53,7 +53,7 @@ config ROCKCHIP_DW_MIPI_DSI
+ 	 option.
+ 
+ config ROCKCHIP_INNO_HDMI
+-	tristate "Rockchip specific extensions for Innosilicon HDMI"
++	bool "Rockchip specific extensions for Innosilicon HDMI"
+ 	depends on DRM_ROCKCHIP
+ 	help
+ 	  This selects support for Rockchip SoC specific extensions
+diff --git a/drivers/gpu/drm/rockchip/Makefile b/drivers/gpu/drm/rockchip/Makefile
+index c931e2a..fa8dc9d 100644
+--- a/drivers/gpu/drm/rockchip/Makefile
++++ b/drivers/gpu/drm/rockchip/Makefile
+@@ -3,14 +3,14 @@
+ # Direct Rendering Infrastructure (DRI) in XFree86 4.1.0 and higher.
+ 
+ rockchipdrm-y := rockchip_drm_drv.o rockchip_drm_fb.o \
+-		rockchip_drm_gem.o rockchip_drm_psr.o rockchip_drm_vop.o
++		rockchip_drm_gem.o rockchip_drm_psr.o \
++		rockchip_drm_vop.o rockchip_vop_reg.o
+ rockchipdrm-$(CONFIG_DRM_FBDEV_EMULATION) += rockchip_drm_fbdev.o
+ 
+-obj-$(CONFIG_ROCKCHIP_ANALOGIX_DP) += analogix_dp-rockchip.o
+-obj-$(CONFIG_ROCKCHIP_CDN_DP) += cdn-dp.o
+-cdn-dp-objs := cdn-dp-core.o cdn-dp-reg.o
+-obj-$(CONFIG_ROCKCHIP_DW_HDMI) += dw_hdmi-rockchip.o
+-obj-$(CONFIG_ROCKCHIP_DW_MIPI_DSI) += dw-mipi-dsi.o
+-obj-$(CONFIG_ROCKCHIP_INNO_HDMI) += inno_hdmi.o
++rockchipdrm-$(CONFIG_ROCKCHIP_ANALOGIX_DP) += analogix_dp-rockchip.o
++rockchipdrm-$(CONFIG_ROCKCHIP_CDN_DP) += cdn-dp-core.o cdn-dp-reg.o
++rockchipdrm-$(CONFIG_ROCKCHIP_DW_HDMI) += dw_hdmi-rockchip.o
++rockchipdrm-$(CONFIG_ROCKCHIP_DW_MIPI_DSI) += dw-mipi-dsi.o
++rockchipdrm-$(CONFIG_ROCKCHIP_INNO_HDMI) += inno_hdmi.o
+ 
+-obj-$(CONFIG_DRM_ROCKCHIP) += rockchipdrm.o rockchip_vop_reg.o
++obj-$(CONFIG_DRM_ROCKCHIP) += rockchipdrm.o
+diff --git a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
+index 8548e82..91ebe5c 100644
+--- a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
++++ b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
+@@ -507,7 +507,7 @@ static const struct of_device_id rockchip_dp_dt_ids[] = {
+ };
+ MODULE_DEVICE_TABLE(of, rockchip_dp_dt_ids);
+ 
+-static struct platform_driver rockchip_dp_driver = {
++struct platform_driver rockchip_dp_driver = {
+ 	.probe = rockchip_dp_probe,
+ 	.remove = rockchip_dp_remove,
+ 	.driver = {
+@@ -516,10 +516,3 @@ static struct platform_driver rockchip_dp_driver = {
+ 		   .of_match_table = of_match_ptr(rockchip_dp_dt_ids),
+ 	},
+ };
+-
+-module_platform_driver(rockchip_dp_driver);
+-
+-MODULE_AUTHOR("Yakir Yang <ykk@rock-chips.com>");
+-MODULE_AUTHOR("Jeff chen <jeff.chen@rock-chips.com>");
+-MODULE_DESCRIPTION("Rockchip Specific Analogix-DP Driver Extension");
+-MODULE_LICENSE("GPL v2");
+diff --git a/drivers/gpu/drm/rockchip/cdn-dp-core.c b/drivers/gpu/drm/rockchip/cdn-dp-core.c
+index fd79a70..e1796d0 100644
+--- a/drivers/gpu/drm/rockchip/cdn-dp-core.c
++++ b/drivers/gpu/drm/rockchip/cdn-dp-core.c
+@@ -1243,7 +1243,7 @@ static const struct dev_pm_ops cdn_dp_pm_ops = {
+ 				cdn_dp_resume)
+ };
+ 
+-static struct platform_driver cdn_dp_driver = {
++struct platform_driver cdn_dp_driver = {
+ 	.probe = cdn_dp_probe,
+ 	.remove = cdn_dp_remove,
+ 	.shutdown = cdn_dp_shutdown,
+@@ -1254,9 +1254,3 @@ static struct platform_driver cdn_dp_driver = {
+ 		   .pm = &cdn_dp_pm_ops,
+ 	},
+ };
+-
+-module_platform_driver(cdn_dp_driver);
+-
+-MODULE_AUTHOR("Chris Zhong <zyw@rock-chips.com>");
+-MODULE_DESCRIPTION("cdn DP Driver");
+-MODULE_LICENSE("GPL v2");
+diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+index f84f9ae..9360250 100644
+--- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
++++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+@@ -1304,7 +1304,7 @@ static int dw_mipi_dsi_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
+-static struct platform_driver dw_mipi_dsi_driver = {
++struct platform_driver dw_mipi_dsi_driver = {
+ 	.probe		= dw_mipi_dsi_probe,
+ 	.remove		= dw_mipi_dsi_remove,
+ 	.driver		= {
+@@ -1312,9 +1312,3 @@ static struct platform_driver dw_mipi_dsi_driver = {
+ 		.name	= DRIVER_NAME,
+ 	},
+ };
+-module_platform_driver(dw_mipi_dsi_driver);
+-
+-MODULE_DESCRIPTION("ROCKCHIP MIPI DSI host controller driver");
+-MODULE_AUTHOR("Chris Zhong <zyw@rock-chips.com>");
+-MODULE_LICENSE("GPL");
+-MODULE_ALIAS("platform:" DRIVER_NAME);
+diff --git a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
+index a6d4a02..976ea79 100644
+--- a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
++++ b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
+@@ -326,7 +326,7 @@ static int dw_hdmi_rockchip_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
+-static struct platform_driver dw_hdmi_rockchip_pltfm_driver = {
++struct platform_driver dw_hdmi_rockchip_pltfm_driver = {
+ 	.probe  = dw_hdmi_rockchip_probe,
+ 	.remove = dw_hdmi_rockchip_remove,
+ 	.driver = {
+@@ -334,11 +334,3 @@ static struct platform_driver dw_hdmi_rockchip_pltfm_driver = {
+ 		.of_match_table = dw_hdmi_rockchip_dt_ids,
+ 	},
+ };
+-
+-module_platform_driver(dw_hdmi_rockchip_pltfm_driver);
+-
+-MODULE_AUTHOR("Andy Yan <andy.yan@rock-chips.com>");
+-MODULE_AUTHOR("Yakir Yang <ykk@rock-chips.com>");
+-MODULE_DESCRIPTION("Rockchip Specific DW-HDMI Driver Extension");
+-MODULE_LICENSE("GPL");
+-MODULE_ALIAS("platform:dwhdmi-rockchip");
+diff --git a/drivers/gpu/drm/rockchip/inno_hdmi.c b/drivers/gpu/drm/rockchip/inno_hdmi.c
+index 006260d..7d9b75e 100644
+--- a/drivers/gpu/drm/rockchip/inno_hdmi.c
++++ b/drivers/gpu/drm/rockchip/inno_hdmi.c
+@@ -923,7 +923,7 @@ static const struct of_device_id inno_hdmi_dt_ids[] = {
+ };
+ MODULE_DEVICE_TABLE(of, inno_hdmi_dt_ids);
+ 
+-static struct platform_driver inno_hdmi_driver = {
++struct platform_driver inno_hdmi_driver = {
+ 	.probe  = inno_hdmi_probe,
+ 	.remove = inno_hdmi_remove,
+ 	.driver = {
+@@ -931,11 +931,3 @@ static struct platform_driver inno_hdmi_driver = {
+ 		.of_match_table = inno_hdmi_dt_ids,
+ 	},
+ };
+-
+-module_platform_driver(inno_hdmi_driver);
+-
+-MODULE_AUTHOR("Zheng Yang <zhengyang@rock-chips.com>");
+-MODULE_AUTHOR("Yakir Yang <ykk@rock-chips.com>");
+-MODULE_DESCRIPTION("Rockchip Specific INNO-HDMI Driver");
+-MODULE_LICENSE("GPL v2");
+-MODULE_ALIAS("platform:innohdmi-rockchip");
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
+index ccf4569..c4fd077 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
+@@ -304,34 +304,42 @@ static const struct dev_pm_ops rockchip_drm_pm_ops = {
+ 				rockchip_drm_sys_resume)
+ };
+ 
+-static int compare_of(struct device *dev, void *data)
+-{
+-	struct device_node *np = data;
++#define MAX_ROCKCHIP_DRM_DRVS 16
++static struct platform_driver *rockchip_drm_drvs[MAX_ROCKCHIP_DRM_DRVS];
++static int rockchip_drm_drvs_cnt;
+ 
+-	return dev->of_node == np;
++#define ROCKCHIP_DRM_DRV(drv, cond) { \
++	if (IS_ENABLED(cond)) \
++		rockchip_drm_drvs[rockchip_drm_drvs_cnt++] = &drv; \
+ }
+ 
+-static void rockchip_add_endpoints(struct device *dev,
+-				   struct component_match **match,
+-				   struct device_node *port)
++static int compare_dev(struct device *dev, void *data)
+ {
+-	struct device_node *ep, *remote;
++	return dev == (struct device *)data;
++}
+ 
+-	for_each_child_of_node(port, ep) {
+-		remote = of_graph_get_remote_port_parent(ep);
+-		if (!remote || !of_device_is_available(remote)) {
+-			of_node_put(remote);
+-			continue;
+-		} else if (!of_device_is_available(remote->parent)) {
+-			dev_warn(dev, "parent device of %s is not available\n",
+-				 remote->full_name);
+-			of_node_put(remote);
+-			continue;
+-		}
++static struct component_match *rockchip_drm_match_add(struct device *dev)
++{
++	struct component_match *match = NULL;
++	int i;
+ 
+-		drm_of_component_match_add(dev, match, compare_of, remote);
+-		of_node_put(remote);
++	for (i = 0; i < rockchip_drm_drvs_cnt; i++) {
++		struct platform_driver *drv = rockchip_drm_drvs[i];
++		struct device *p = NULL, *d;
++
++		do {
++			d = bus_find_device(&platform_bus_type, p, &drv->driver,
++					    (void *)platform_bus_type.match);
++			put_device(p);
++			p = d;
++
++			if (!d)
++				break;
++			component_match_add(dev, &match, compare_dev, d);
++		} while (true);
+ 	}
++
++	return match ?: ERR_PTR(-ENODEV);
+ }
+ 
+ static const struct component_master_ops rockchip_drm_ops = {
+@@ -339,21 +347,16 @@ static const struct component_master_ops rockchip_drm_ops = {
+ 	.unbind = rockchip_drm_unbind,
+ };
+ 
+-static int rockchip_drm_platform_probe(struct platform_device *pdev)
++static int rockchip_drm_platform_of_probe(struct device *dev)
+ {
+-	struct device *dev = &pdev->dev;
+-	struct component_match *match = NULL;
+ 	struct device_node *np = dev->of_node;
+ 	struct device_node *port;
++	bool found = false;
+ 	int i;
+ 
+ 	if (!np)
+ 		return -ENODEV;
+-	/*
+-	 * Bind the crtc ports first, so that
+-	 * drm_of_find_possible_crtcs called from encoder .bind callbacks
+-	 * works as expected.
+-	 */
++
+ 	for (i = 0;; i++) {
+ 		struct device_node *iommu;
+ 
+@@ -377,9 +380,9 @@ static int rockchip_drm_platform_probe(struct platform_device *pdev)
+ 			is_support_iommu = false;
+ 		}
+ 
++		found = true;
++
+ 		of_node_put(iommu);
+-		drm_of_component_match_add(dev, &match, compare_of,
+-					   port->parent);
+ 		of_node_put(port);
+ 	}
+ 
+@@ -388,27 +391,27 @@ static int rockchip_drm_platform_probe(struct platform_device *pdev)
+ 		return -ENODEV;
+ 	}
+ 
+-	if (!match) {
++	if (!found) {
+ 		dev_err(dev, "No available vop found for display-subsystem.\n");
+ 		return -ENODEV;
+ 	}
+-	/*
+-	 * For each bound crtc, bind the encoders attached to its
+-	 * remote endpoint.
+-	 */
+-	for (i = 0;; i++) {
+-		port = of_parse_phandle(np, "ports", i);
+-		if (!port)
+-			break;
+ 
+-		if (!of_device_is_available(port->parent)) {
+-			of_node_put(port);
+-			continue;
+-		}
++	return 0;
++}
+ 
+-		rockchip_add_endpoints(dev, &match, port);
+-		of_node_put(port);
+-	}
++static int rockchip_drm_platform_probe(struct platform_device *pdev)
++{
++	struct device *dev = &pdev->dev;
++	struct component_match *match = NULL;
++	int ret;
++
++	ret = rockchip_drm_platform_of_probe(dev);
++	if (ret)
++		return ret;
++
++	match = rockchip_drm_match_add(dev);
++	if (IS_ERR(match))
++		return PTR_ERR(match);
+ 
+ 	return component_master_add_with_match(dev, &rockchip_drm_ops, match);
+ }
+@@ -436,7 +439,46 @@ static struct platform_driver rockchip_drm_platform_driver = {
+ 	},
+ };
+ 
+-module_platform_driver(rockchip_drm_platform_driver);
++static int __init rockchip_drm_init(void)
++{
++	int ret;
++
++	rockchip_drm_drvs_cnt = 0;
++	ROCKCHIP_DRM_DRV(vop_platform_driver, CONFIG_DRM_ROCKCHIP);
++	ROCKCHIP_DRM_DRV(rockchip_dp_driver, CONFIG_ROCKCHIP_ANALOGIX_DP);
++	ROCKCHIP_DRM_DRV(cdn_dp_driver, CONFIG_ROCKCHIP_CDN_DP);
++	ROCKCHIP_DRM_DRV(dw_hdmi_rockchip_pltfm_driver,
++			 CONFIG_ROCKCHIP_DW_HDMI);
++	ROCKCHIP_DRM_DRV(dw_mipi_dsi_driver, CONFIG_ROCKCHIP_DW_MIPI_DSI);
++	ROCKCHIP_DRM_DRV(inno_hdmi_driver, CONFIG_ROCKCHIP_INNO_HDMI);
++
++	ret = platform_register_drivers(rockchip_drm_drvs,
++					rockchip_drm_drvs_cnt);
++	if (ret)
++		return ret;
++
++	ret = platform_driver_register(&rockchip_drm_platform_driver);
++	if (ret)
++		goto err_unreg_drivers;
++
++	return 0;
++
++err_unreg_drivers:
++	platform_unregister_drivers(rockchip_drm_drvs,
++				    rockchip_drm_drvs_cnt);
++	return ret;
++}
++
++static void __exit rockchip_drm_fini(void)
++{
++	platform_driver_unregister(&rockchip_drm_platform_driver);
++
++	platform_unregister_drivers(rockchip_drm_drvs,
++				    rockchip_drm_drvs_cnt);
++}
++
++module_init(rockchip_drm_init);
++module_exit(rockchip_drm_fini);
+ 
+ MODULE_AUTHOR("Mark Yao <mark.yao@rock-chips.com>");
+ MODULE_DESCRIPTION("ROCKCHIP DRM Driver");
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.h b/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
+index 8aca219..a48fcce 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
+@@ -65,4 +65,10 @@ void rockchip_drm_dma_detach_device(struct drm_device *drm_dev,
+ int rockchip_drm_wait_line_flag(struct drm_crtc *crtc, unsigned int line_num,
+ 				unsigned int mstimeout);
+ 
++extern struct platform_driver cdn_dp_driver;
++extern struct platform_driver dw_hdmi_rockchip_pltfm_driver;
++extern struct platform_driver dw_mipi_dsi_driver;
++extern struct platform_driver inno_hdmi_driver;
++extern struct platform_driver rockchip_dp_driver;
++extern struct platform_driver vop_platform_driver;
+ #endif /* _ROCKCHIP_DRM_DRV_H_ */
+diff --git a/drivers/gpu/drm/rockchip/rockchip_vop_reg.c b/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
+index 91fbc7b..0da4444 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
++++ b/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
+@@ -404,7 +404,7 @@ static int vop_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
+-static struct platform_driver vop_platform_driver = {
++struct platform_driver vop_platform_driver = {
+ 	.probe = vop_probe,
+ 	.remove = vop_remove,
+ 	.driver = {
+@@ -412,9 +412,3 @@ static struct platform_driver vop_platform_driver = {
+ 		.of_match_table = of_match_ptr(vop_driver_dt_match),
+ 	},
+ };
+-
+-module_platform_driver(vop_platform_driver);
+-
+-MODULE_AUTHOR("Mark Yao <mark.yao@rock-chips.com>");
+-MODULE_DESCRIPTION("ROCKCHIP VOP Driver");
+-MODULE_LICENSE("GPL v2");
+-- 
+2.1.4
