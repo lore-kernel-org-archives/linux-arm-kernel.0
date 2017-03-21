@@ -1,72 +1,69 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 21 Mar 2017 19:20:42 +0000
-Subject: [PATCH v4 12/28] ARM: KVM: Convert KVM to use HVC_GET_VECTORS
+Date: Tue, 21 Mar 2017 19:20:46 +0000
+Subject: [PATCH v4 16/28] ARM: hyp-stub: Implement HVC_RESET_VECTORS stub
+ hypercall
 In-Reply-To: <20170321192058.9300-1-marc.zyngier@arm.com>
 References: <20170321192058.9300-1-marc.zyngier@arm.com>
-Message-ID: <20170321192058.9300-13-marc.zyngier@arm.com>
+Message-ID: <20170321192058.9300-17-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The conversion of the HYP stub ABI to something similar to arm64
-left the KVM code broken, as it doesn't know about the new
-stub numbering. Let's move the various #defines to virt.h, and
-let KVM use HVC_GET_VECTORS.
+Let's define a new stub hypercall that resets the HYP configuration
+to its default: hyp-stub vectors, and MMU disabled.
+
+Of course, for the hyp-stub itself, this is a trivial no-op.
+Hypervisors will have a bit more work to do.
 
 Tested-by: Keerthy <j-keerthy@ti.com>
 Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/asm/virt.h  | 8 ++++++++
- arch/arm/kernel/hyp-stub.S   | 4 ----
- arch/arm/kvm/hyp/hyp-entry.S | 2 +-
- 3 files changed, 9 insertions(+), 5 deletions(-)
+ arch/arm/include/asm/virt.h |  3 +++
+ arch/arm/kernel/hyp-stub.S  | 11 ++++++++++-
+ 2 files changed, 13 insertions(+), 1 deletion(-)
 
 diff --git a/arch/arm/include/asm/virt.h b/arch/arm/include/asm/virt.h
-index 6dae1956c74d..4ea16fcaf2ed 100644
+index 4ea16fcaf2ed..5186718aab68 100644
 --- a/arch/arm/include/asm/virt.h
 +++ b/arch/arm/include/asm/virt.h
-@@ -94,6 +94,14 @@ extern char __hyp_text_start[];
- extern char __hyp_text_end[];
- #endif
+@@ -101,6 +101,9 @@ extern char __hyp_text_end[];
+ #define HVC_GET_VECTORS 0
+ #define HVC_SET_VECTORS 1
+ #define HVC_SOFT_RESTART 2
++#define HVC_RESET_VECTORS 3
++
++#define HVC_STUB_HCALL_NR 4
  
-+#else
-+
-+/* Only assembly code should need those */
-+
-+#define HVC_GET_VECTORS 0
-+#define HVC_SET_VECTORS 1
-+#define HVC_SOFT_RESTART 2
-+
  #endif /* __ASSEMBLY__ */
  
- #endif /* ! VIRT_H */
 diff --git a/arch/arm/kernel/hyp-stub.S b/arch/arm/kernel/hyp-stub.S
-index 82915231c6f8..8301db963d83 100644
+index 15eaa14322a7..21794d4a8f36 100644
 --- a/arch/arm/kernel/hyp-stub.S
 +++ b/arch/arm/kernel/hyp-stub.S
-@@ -22,10 +22,6 @@
- #include <asm/assembler.h>
- #include <asm/virt.h>
+@@ -216,7 +216,10 @@ __hyp_stub_do_trap:
+ 	bne	1f
+ 	bx	r1
  
--#define HVC_GET_VECTORS 0
--#define HVC_SET_VECTORS 1
--#define HVC_SOFT_RESTART 2
--
+-1:	mov	r0, #-1
++1:	teq	r0, #HVC_RESET_VECTORS
++	beq	__hyp_stub_exit
++
++	mov	r0, #-1
+ 
+ __hyp_stub_exit:
+ 	__ERET
+@@ -264,6 +267,12 @@ ENTRY(__hyp_soft_restart)
+ 	ret	lr
+ ENDPROC(__hyp_soft_restart)
+ 
++ENTRY(__hyp_reset_vectors)
++	mov	r0, #HVC_RESET_VECTORS
++	__HVC(0)
++	ret	lr
++ENDPROC(__hyp_reset_vectors)
++
  #ifndef ZIMAGE
- /*
-  * For the kernel proper, we need to find out the CPU boot mode long after
-diff --git a/arch/arm/kvm/hyp/hyp-entry.S b/arch/arm/kvm/hyp/hyp-entry.S
-index 96beb53934c9..1f8db7d21fc5 100644
---- a/arch/arm/kvm/hyp/hyp-entry.S
-+++ b/arch/arm/kvm/hyp/hyp-entry.S
-@@ -127,7 +127,7 @@ hyp_hvc:
- 	pop	{r0, r1, r2}
- 
- 	/* Check for __hyp_get_vectors */
--	cmp	r0, #-1
-+	cmp	r0, #HVC_GET_VECTORS
- 	mrceq	p15, 4, r0, c12, c0, 0	@ get HVBAR
- 	beq	1f
- 
+ .align 2
+ .L__boot_cpu_mode_offset:
 -- 
 2.11.0
