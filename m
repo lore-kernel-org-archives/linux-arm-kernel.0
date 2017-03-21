@@ -1,19 +1,19 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Tue, 21 Mar 2017 18:45:54 +0000
-Subject: Applied "ASoC: sun8i-codec: Update mixer to use SOC_DAPM_DOUBLE" to
- the asoc tree
-In-Reply-To: <20170210094133.11382-3-mylene.josserand@free-electrons.com>
-Message-ID: <E1cqOn4-0001AS-7Z@debutante>
+Date: Tue, 21 Mar 2017 18:46:17 +0000
+Subject: Applied "spi: pl022: remove nonexistent properties from DT binding
+ example" to the spi tree
+In-Reply-To: <20170320095721.6724-1-borneo.antonio@gmail.com>
+Message-ID: <E1cqOnR-0001Kb-2t@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   ASoC: sun8i-codec: Update mixer to use SOC_DAPM_DOUBLE
+   spi: pl022: remove nonexistent properties from DT binding example
 
-has been applied to the asoc tree at
+has been applied to the spi tree at
 
-   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
+   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git 
 
 All being well this means that it will be integrated into the linux-next
 tree (usually sometime in the next 24 hours) and sent to Linus during
@@ -34,99 +34,52 @@ to this mail.
 Thanks,
 Mark
 
->From 649d55436137b397accb6a9d1b6975598c693bcd Mon Sep 17 00:00:00 2001
-From: =?UTF-8?q?Myl=C3=A8ne=20Josserand?=
- <mylene.josserand@free-electrons.com>
-Date: Sat, 18 Mar 2017 08:55:06 +0100
-Subject: [PATCH] ASoC: sun8i-codec: Update mixer to use SOC_DAPM_DOUBLE
-MIME-Version: 1.0
-Content-Type: text/plain; charset=UTF-8
-Content-Transfer-Encoding: 8bit
+>From e6a72e057fa3e0ad38ec59c4779647a7bd390a37 Mon Sep 17 00:00:00 2001
+From: Antonio Borneo <borneo.antonio@gmail.com>
+Date: Mon, 20 Mar 2017 10:57:18 +0100
+Subject: [PATCH] spi: pl022: remove nonexistent properties from DT binding
+ example
 
-Update the driver to use the new SOC_DAPM_DOUBLE definition
-on the digital DAC mixer.
-Update the names accordingly as, when they are shared, the
-controls are not prefixed with the widget's name anymore.
+The properties "pl022,hierarchy" and "pl022,slave-tx-disable" were
+initially proposed till patch V4 [1] but then discarded in V5 [2]
+when the patch set was taken over by another developer, as
+explained in patch history in [3].
+The above properties never landed in mainline code but were then
+listed in the binding example by a following commit dc715452e914
+("spi: pl022: use generic DMA slave configuration if possible")
+and later on they were copy-paste in some board's DT.
 
-Signed-off-by: Myl??ne Josserand <mylene.josserand@free-electrons.com>
-Acked-by: Chen-Yu Tsai <wens@csie.org>
+Remove the nonexistent properties from the example.
+Also remove a spaces-only line at the end of the file.
+
+[1] https://lkml.org/lkml/2012/7/9/421
+[2] https://lkml.org/lkml/2012/8/21/427
+[3] https://lkml.org/lkml/2012/8/21/436
+
+Signed-off-by: Antonio Borneo <borneo.antonio@gmail.com>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- sound/soc/sunxi/sun8i-codec.c | 45 ++++++++++++++++++++-----------------------
- 1 file changed, 21 insertions(+), 24 deletions(-)
+ Documentation/devicetree/bindings/spi/spi_pl022.txt | 3 ---
+ 1 file changed, 3 deletions(-)
 
-diff --git a/sound/soc/sunxi/sun8i-codec.c b/sound/soc/sunxi/sun8i-codec.c
-index d60f6fbd36a2..107fa8213600 100644
---- a/sound/soc/sunxi/sun8i-codec.c
-+++ b/sound/soc/sunxi/sun8i-codec.c
-@@ -259,25 +259,20 @@ static int sun8i_codec_hw_params(struct snd_pcm_substream *substream,
- 	return 0;
- }
- 
--static const struct snd_kcontrol_new sun8i_output_left_mixer_controls[] = {
--	SOC_DAPM_SINGLE("LSlot 0", SUN8I_DAC_MXR_SRC,
--			SUN8I_DAC_MXR_SRC_DACL_MXR_SRC_AIF1DA0L, 1, 0),
--	SOC_DAPM_SINGLE("LSlot 1", SUN8I_DAC_MXR_SRC,
--			SUN8I_DAC_MXR_SRC_DACL_MXR_SRC_AIF1DA1L, 1, 0),
--	SOC_DAPM_SINGLE("DACL", SUN8I_DAC_MXR_SRC,
--			SUN8I_DAC_MXR_SRC_DACL_MXR_SRC_AIF2DACL, 1, 0),
--	SOC_DAPM_SINGLE("ADCL", SUN8I_DAC_MXR_SRC,
--			SUN8I_DAC_MXR_SRC_DACL_MXR_SRC_ADCL, 1, 0),
--};
--
--static const struct snd_kcontrol_new sun8i_output_right_mixer_controls[] = {
--	SOC_DAPM_SINGLE("RSlot 0", SUN8I_DAC_MXR_SRC,
-+static const struct snd_kcontrol_new sun8i_dac_mixer_controls[] = {
-+	SOC_DAPM_DOUBLE("AIF1 Slot 0 Digital DAC Playback Switch",
-+			SUN8I_DAC_MXR_SRC,
-+			SUN8I_DAC_MXR_SRC_DACL_MXR_SRC_AIF1DA0L,
- 			SUN8I_DAC_MXR_SRC_DACR_MXR_SRC_AIF1DA0R, 1, 0),
--	SOC_DAPM_SINGLE("RSlot 1", SUN8I_DAC_MXR_SRC,
-+	SOC_DAPM_DOUBLE("AIF1 Slot 1 Digital DAC Playback Switch",
-+			SUN8I_DAC_MXR_SRC,
-+			SUN8I_DAC_MXR_SRC_DACL_MXR_SRC_AIF1DA1L,
- 			SUN8I_DAC_MXR_SRC_DACR_MXR_SRC_AIF1DA1R, 1, 0),
--	SOC_DAPM_SINGLE("DACR", SUN8I_DAC_MXR_SRC,
-+	SOC_DAPM_DOUBLE("AIF2 Digital DAC Playback Switch", SUN8I_DAC_MXR_SRC,
-+			SUN8I_DAC_MXR_SRC_DACL_MXR_SRC_AIF2DACL,
- 			SUN8I_DAC_MXR_SRC_DACR_MXR_SRC_AIF2DACR, 1, 0),
--	SOC_DAPM_SINGLE("ADCR", SUN8I_DAC_MXR_SRC,
-+	SOC_DAPM_DOUBLE("ADC Digital DAC Playback Switch", SUN8I_DAC_MXR_SRC,
-+			SUN8I_DAC_MXR_SRC_DACL_MXR_SRC_ADCL,
- 			SUN8I_DAC_MXR_SRC_DACR_MXR_SRC_ADCR, 1, 0),
- };
- 
-@@ -293,12 +288,12 @@ static const struct snd_soc_dapm_widget sun8i_codec_dapm_widgets[] = {
- 			 SUN8I_AIF1_DACDAT_CTRL_AIF1_DA0R_ENA, 0),
- 
- 	/* DAC Mixers */
--	SND_SOC_DAPM_MIXER("Left DAC Mixer", SND_SOC_NOPM, 0, 0,
--			   sun8i_output_left_mixer_controls,
--			   ARRAY_SIZE(sun8i_output_left_mixer_controls)),
--	SND_SOC_DAPM_MIXER("Right DAC Mixer", SND_SOC_NOPM, 0, 0,
--			   sun8i_output_right_mixer_controls,
--			   ARRAY_SIZE(sun8i_output_right_mixer_controls)),
-+	SND_SOC_DAPM_MIXER("Left Digital DAC Mixer", SND_SOC_NOPM, 0, 0,
-+			   sun8i_dac_mixer_controls,
-+			   ARRAY_SIZE(sun8i_dac_mixer_controls)),
-+	SND_SOC_DAPM_MIXER("Right Digital DAC Mixer", SND_SOC_NOPM, 0, 0,
-+			   sun8i_dac_mixer_controls,
-+			   ARRAY_SIZE(sun8i_dac_mixer_controls)),
- 
- 	/* Clocks */
- 	SND_SOC_DAPM_SUPPLY("MODCLK AFI1", SUN8I_MOD_CLK_ENA,
-@@ -340,8 +335,10 @@ static const struct snd_soc_dapm_route sun8i_codec_dapm_routes[] = {
- 	{ "Digital Right DAC", NULL, "DAC" },
- 
- 	/* DAC Mixer Routes */
--	{ "Left DAC Mixer", "LSlot 0", "Digital Left DAC"},
--	{ "Right DAC Mixer", "RSlot 0", "Digital Right DAC"},
-+	{ "Left Digital DAC Mixer", "AIF1 Slot 0 Digital DAC Playback Switch",
-+	  "Digital Left DAC"},
-+	{ "Right Digital DAC Mixer", "AIF1 Slot 0 Digital DAC Playback Switch ",
-+	  "Digital Right DAC"},
- };
- 
- static struct snd_soc_dai_ops sun8i_codec_dai_ops = {
+diff --git a/Documentation/devicetree/bindings/spi/spi_pl022.txt b/Documentation/devicetree/bindings/spi/spi_pl022.txt
+index 4d1673ca8cf8..2692a5726c3f 100644
+--- a/Documentation/devicetree/bindings/spi/spi_pl022.txt
++++ b/Documentation/devicetree/bindings/spi/spi_pl022.txt
+@@ -56,9 +56,7 @@ Example:
+ 			spi-max-frequency = <12000000>;
+ 			spi-cpol;
+ 			spi-cpha;
+-			pl022,hierarchy = <0>;
+ 			pl022,interface = <0>;
+-			pl022,slave-tx-disable;
+ 			pl022,com-mode = <0x2>;
+ 			pl022,rx-level-trig = <0>;
+ 			pl022,tx-level-trig = <0>;
+@@ -67,4 +65,3 @@ Example:
+ 			pl022,duplex = <0>;
+ 		};
+ 	};
+-	
 -- 
 2.11.0
