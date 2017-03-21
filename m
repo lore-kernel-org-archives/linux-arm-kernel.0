@@ -1,34 +1,78 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 21 Mar 2017 21:52:56 +0100
-Subject: [PATCH] ARM: gemini: don't select SERIAL_OF_PLATFORM
-Message-ID: <20170321205310.188381-1-arnd@arndb.de>
+From: eric@anholt.net (Eric Anholt)
+Date: Tue, 21 Mar 2017 13:54:18 -0700
+Subject: [PATCH v4 1/8] dt-bindings: display: add STM32 LTDC driver
+In-Reply-To: <1489597334-16896-2-git-send-email-yannick.fertre@st.com>
+References: <1489597334-16896-1-git-send-email-yannick.fertre@st.com>
+ <1489597334-16896-2-git-send-email-yannick.fertre@st.com>
+Message-ID: <87k27inyf9.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We cannot select the option when SERIAL_8250 is not also set:
+Yannick Fertre <yannick.fertre@st.com> writes:
 
-warning: (ARCH_GEMINI) selects SERIAL_OF_PLATFORM which has unmet direct dependencies (TTY && HAS_IOMEM && SERIAL_8250 && OF)
+> Acked-by: Rob Herring <robh@kernel.org>
+> Signed-off-by: Yannick Fertre <yannick.fertre@st.com>
+> ---
+>  .../devicetree/bindings/display/st,stm32-ltdc.txt  | 36 ++++++++++++++++++++++
+>  1 file changed, 36 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/display/st,stm32-ltdc.txt
+>
+> diff --git a/Documentation/devicetree/bindings/display/st,stm32-ltdc.txt b/Documentation/devicetree/bindings/display/st,stm32-ltdc.txt
+> new file mode 100644
+> index 0000000..e8d39c5
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/display/st,stm32-ltdc.txt
+> @@ -0,0 +1,36 @@
+> +* STMicroelectronics STM32 lcd-tft display controller
+> +
+> +- ltdc: lcd-tft display controller host
+> +  must be a sub-node of st-display-subsystem
+> +  Required properties:
+> +  - compatible: "st,stm32-ltdc"
+> +  - reg: Physical base address of the IP registers and length of memory mapped region.
+> +  - clocks: A list of phandle + clock-specifier pairs, one for each
+> +    entry in 'clock-names'.
+> +  - clock-names: A list of clock names. For ltdc it should contain:
+> +      - "clk-lcd" for the clock feeding the output pixel clock & IP clock.
 
-This removes the 'select' statement, requiring that users enable the
-option manually. Alternatively, we could make it a conditional
-'select SERIAL_OF_PLATFORM if SERIAL_8250' or also select a handful
-of other symbols that it depends on.
+I think you meant "lcd" here.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- arch/arm/mach-gemini/Kconfig | 1 -
- 1 file changed, 1 deletion(-)
-
-diff --git a/arch/arm/mach-gemini/Kconfig b/arch/arm/mach-gemini/Kconfig
-index a5ee5fbab796..4162396af6de 100644
---- a/arch/arm/mach-gemini/Kconfig
-+++ b/arch/arm/mach-gemini/Kconfig
-@@ -8,6 +8,5 @@ menuconfig ARCH_GEMINI
- 	select GPIOLIB
- 	select POWER_RESET
- 	select POWER_RESET_SYSCON
--	select SERIAL_OF_PLATFORM
- 	help
- 	  Support for the Cortina Systems Gemini family SoCs
--- 
-2.9.0
+> +  - resets: reset to be used by the device (defined by use of RCC macro).
+> +  Required nodes:
+> +    - Video port for RGB output.
+> +
+> +Example:
+> +
+> +/ {
+> +	...
+> +	soc {
+> +	...
+> +		ltdc: display-controller at 40016800 {
+> +			compatible = "st,stm32-ltdc";
+> +			reg = <0x40016800 0x200>;
+> +			interrupts = <88>, <89>;
+> +			resets = <&rcc STM32F4_APB2_RESET(LTDC)>;
+> +			clocks = <&rcc 1 CLK_LCD>;
+> +			clock-names = "lcd";
+> +
+> +			port {
+> +				ltdc_out_rgb: endpoint {
+> +				};
+> +			};
+> +		};
+> +	};
+> +};
+> -- 
+> 1.9.1
+>
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170321/eec68f6b/attachment-0001.sig>
