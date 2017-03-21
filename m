@@ -1,157 +1,64 @@
-From: flatmax@flatmax.org (Matt Flax)
-Date: Wed, 22 Mar 2017 10:29:33 +1100
-Subject: [alsa-devel] [PATCH 0/3] ASoC: Enable a new IC master mode:
- bcm2835<=>IC<=>cs42xx8
-In-Reply-To: <20170321221145.GA7258@camel2.lan>
-References: <170950f7-354f-e6a9-cefb-834a00fadd1b@flatmax.org>
- <20170227103024.GF2718@delle.lan>
- <7b78c782-28e1-4849-5d00-8caf30847d5c@flatmax.org>
- <20170227115108.GA6732@delle.lan>
- <20170228095929.GH2742@localhost.localdomain>
- <20170315190108.y6ybxm3nfgnutajv@sirena.org.uk>
- <7d8d38f7-53aa-cc3d-4bbd-141649528a8a@flatmax.org>
- <8c62f014-d246-e0c1-2b02-a28a2c2786b7@metafoo.de>
- <000fbaa4-4c7c-5b13-0806-7e42672a4a55@flatmax.org>
- <e0adcc6c-8bf4-adae-874b-c291e71e5712@laposte.net>
- <20170321221145.GA7258@camel2.lan>
-Message-ID: <579f0763-a5bd-f820-b36f-b6437e331b4b@flatmax.org>
+From: mturquette@baylibre.com (Michael Turquette)
+Date: Tue, 21 Mar 2017 16:28:02 -0700
+Subject: [PATCH v3 1/3] clk: meson-gxbb: Add MALI clock IDS
+In-Reply-To: <1489064027-18004-2-git-send-email-narmstrong@baylibre.com>
+References: <1489064027-18004-1-git-send-email-narmstrong@baylibre.com>
+ <1489064027-18004-2-git-send-email-narmstrong@baylibre.com>
+Message-ID: <149013888277.54062.3821586656841121329@resonance>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Quoting Neil Armstrong (2017-03-09 04:53:45)
+> Add missing MALI clock IDs and expose the muxes and gates in the dt-bindings.
+> 
+> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 
+Looks good to me.
 
-On 22/03/17 09:11, Matthias Reichl wrote:
-> On Tue, Mar 21, 2017 at 10:21:04PM +0100, Emmanuel Fust? wrote:
->> Le 16/03/2017 ? 23:14, Matt Flax a ?crit :
->>>
->>> On 17/03/17 08:27, Lars-Peter Clausen wrote:
->>>> On 03/16/2017 09:51 PM, Matt Flax wrote:
->>>>> On 16/03/17 06:01, Mark Brown wrote:
->>>>>> On Tue, Feb 28, 2017 at 09:59:29AM +0000, Charles Keepax wrote:
->>>>>>> On Mon, Feb 27, 2017 at 12:51:08PM +0100, Matthias Reichl wrote:
->>>>>>>>> I have a bcm2835 (Pi 2 and 3) SoC here. It is producing
->>>>>>>>> multichannel (8
->>>>>>>>> out,
->>>>>>>>> 6 in) audio. In ALSA we call that DSP mode - right ?!
->>>>>>>> No. DSP modes are protocol/timing specifications as I2S, PDP,
->>>>>>>> S/PDIF, ...
->>>>>>>> You can look these up in datasheets and if a chip implements such a
->>>>>>>> protocol you can be sure that it adheres to that standard - i.e. it
->>>>>>>> will sync the frames to the pulses on LRclk.
->>>>>>> I agree with the thoughts in this thread really if the AP doesn't
->>>>>>> actually support DSP A mode we shouldn't add DSP A mode.
->>>>>> The trouble here is that this isn't 100% clear, the specifications of
->>>>>> the DSP modes are such that only one edge in the LRCLK matters and so
->>>>>> providing you're doing mono or have exact clocking they interoperate
->>>>>> perfectly well.  We already frequently do similar things the other
->>>>>> way,
->>>>>> most of the programmable serial ports can't actually do I2S modes
->>>>>> properly and rely on exact clocking to get things right when operating
->>>>>> as I2S since they only sync on one edge (though they can generally
->>>>>> generate the clocks correctly when operating as master, they just
->>>>>> don't
->>>>>> pay attention to the left/right switch edge).
->>>>>>
->>>>>> That said unless we're doing something with the data layout or similar
->>>>>> configuration there's a fairly strong case for putting the mangling
->>>>>> for
->>>>>> this in the core, something like just falling back to I2S mode if we
->>>>>> set
->>>>>> DSP A and so on.  Which would be a lot nicer if we actually got
->>>>>> round to
->>>>>> putting mode capability information in the drivers.
->>>>> I agree, the data layout is already configurable in the bcm2835_i2s.c
->>>>> platform driver. We can already use the "snd_soc_dai_set_bclk_ratio"
->>>>> function to manage word offsets in our machine drivers.
->>>>>
->>>>> There is nothing which says that the bcm2835 SoC is I2S restricted in
->>>>> any
->>>>> way. In fact, the reference document says quite the opposite.
->>>>>
->>>>> In the reference "BCM2835 ARM Peripherals" pdf, they call the audio
->>>>> system
->>>>> an "APB peripheral". They are saying that it is reconfigurable and
->>>>> part of
->>>>> the AMBA family of interconnect schemes.
->>>>>
->>>>> As far as the bcm2835_i2s platform driver goes, it has implemented an
->>>>> AMBA
->>>>> protocol, where audio words are counted from the LR clock onset - for
->>>>> some
->>>>> reason people are insisting this is an I2S bus. Really our
->>>>> implementation is
->>>>> not I2S at all, because word onsets are programmable and flexible in
->>>>> the
->>>>> bcm2835_i2s.c driver.
->>>> AMBA/APB is the interface which connects the peripheral to the system
->>>> memory
->>>> bus. It is the interface over which the CPU does configuration register
->>>> writes. This has nothing and absolutely nothing to do with the I2S
->>>> interface
->>>> that is also implemented by the peripheral that is used to stream audio
->>>> to
->>>> and from external components.
->>>>
->>> Their (BCM reference) document [1] specifically states "It supports many
->>> classic PCM formats including I2S".
->>>
->>> Do agree with Mark's statement "the specifications of the DSP modes are
->>> such that only one edge in the LRCLK matters" ?
->>>
->>> If we look at the bcm2835 platform driver setup, it is concerned with bit
->>> clock counting to specify the audio data for both of the AMBA/APB channels
->> >from serial bitstream into memory. It has two channels into memory,
->>> however "it supports many classic PCM formats" ... my vote for one classic
->>> format is DSP mode !
->>>
->>> Do you see a problem with that ?
->>>
->>> thanks
->>> Matt
->>> [1] https://www.raspberrypi.org/wp-content/uploads/2012/02/BCM2835-ARM-Peripherals.pdf
->>> _______________________________________________
->>>
->> Re-reading this document, the bcm2835 PCM IP block SHOULD support real DSP
->> mode, with one BCLK pulsed LRCLK, zero BCLK delay etc...
->> It just need to be properly setup.
-> I've re-read the document, too, last week and noticed the framesync
-> registers - sorry, I had completely forgotten about these. I guess it
-> should be possible to configure the bcm2835 to DSP mode but it'd still be
-> limited to 2 channel setups - the hardware only has 2 channel position
-> registers for each direction.
->
->> According to the same document, you could program the bmc up to 16 32bits
->> channels when in master mode, so I suspect that you could go up to this
->> limit in slave mode.
->> But as it is designed, it could only use up to two of any channels among the
->> 16.
-> I'm not quite sure if I can follow you on this - how would you
-> configure 16 channels when there are only 2 channel position registers?
->
-> With bclk ratio eg set to 16*32=512 BCM2835 will only transmit 2*32
-> bits of data (at configurable bit positions), the remaining 448
-> bits will be zero.
->
-The document seems to stipulate that the PCM audio device is an AMBA 
-device with 2 APB data channels. The first sync edge marks the beginning 
-of the two data words. Their frame lengths can be up to 1024+32 bits in 
-length !
+Regards,
+Mike
 
-I think the point is that they intended their PCM audio interface to be 
-configurable, they say in their document "It supports many classic PCM 
-formats".
-
-The important point here is that in ALSA we can only have I2S or DSP 
-modes - right ?
-Unless we want to create a new ALSA mode (which clearly worries people) 
-then we need to support the versatility of the bcm2835 PCM hardware 
-using either DSP or I2S modes. Now, we have already implemented the I2S 
-mode, so logically the only available mode left is the DSP mode. Using 
-this mode, we can implement more features of this device.
-
-People seem to want to reserve DSP and I2S modes for strictly I2S and 
-DSP protocols. At the same time people don't want to allow a looser 
-"APB" mode into ALSA. For that reason, we have a lack of functionality 
-for perfectly versatile hardware - the bcm2835 hardware.
-
-Matt
+> ---
+>  drivers/clk/meson/gxbb.h              | 9 ++++++++-
+>  include/dt-bindings/clock/gxbb-clkc.h | 5 +++++
+>  2 files changed, 13 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/clk/meson/gxbb.h b/drivers/clk/meson/gxbb.h
+> index 274f587..73efdc3 100644
+> --- a/drivers/clk/meson/gxbb.h
+> +++ b/drivers/clk/meson/gxbb.h
+> @@ -268,8 +268,15 @@
+>  /* CLKID_SAR_ADC_CLK */
+>  /* CLKID_SAR_ADC_SEL */
+>  #define CLKID_SAR_ADC_DIV        99
+> +/* CLKID_MALI_0_SEL */
+> +#define CLKID_MALI_0_DIV        101
+> +/* CLKID_MALI_0        */
+> +/* CLKID_MALI_1_SEL */
+> +#define CLKID_MALI_1_DIV        104
+> +/* CLKID_MALI_1        */
+> +/* CLKID_MALI  */
+>  
+> -#define NR_CLKS                          100
+> +#define NR_CLKS                          107
+>  
+>  /* include the CLKIDs that have been made part of the stable DT binding */
+>  #include <dt-bindings/clock/gxbb-clkc.h>
+> diff --git a/include/dt-bindings/clock/gxbb-clkc.h b/include/dt-bindings/clock/gxbb-clkc.h
+> index f08f06d..ef7d6b7 100644
+> --- a/include/dt-bindings/clock/gxbb-clkc.h
+> +++ b/include/dt-bindings/clock/gxbb-clkc.h
+> @@ -35,5 +35,10 @@
+>  #define CLKID_SD_EMMC_C                96
+>  #define CLKID_SAR_ADC_CLK      97
+>  #define CLKID_SAR_ADC_SEL      98
+> +#define CLKID_MALI_0_SEL       100
+> +#define CLKID_MALI_0           102
+> +#define CLKID_MALI_1_SEL       103
+> +#define CLKID_MALI_1           105
+> +#define CLKID_MALI             106
+>  
+>  #endif /* __GXBB_CLKC_H */
+> -- 
+> 1.9.1
+> 
