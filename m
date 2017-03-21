@@ -1,62 +1,95 @@
-From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Tue, 21 Mar 2017 09:22:00 +0800
-Subject: [PATCH v4 1/8] phy: phy-mt65xx-usb3: improve RX detection
- stable time
-In-Reply-To: <1489213373-2544-1-git-send-email-chunfeng.yun@mediatek.com>
-References: <1489213373-2544-1-git-send-email-chunfeng.yun@mediatek.com>
-Message-ID: <1490059320.29981.3.camel@mhfsdcap03>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Tue, 21 Mar 2017 10:31:37 +0900
+Subject: [PATCH] pinctrl: samsung: fix segfault when using external
+ interrupts on s3c24xx
+In-Reply-To: <CAJKOXPdUQ8DSPR_4cDs8WyrV9Mmy6isncW72BNiTyiRb79qf7g@mail.gmail.com>
+References: <1488489799-18136-1-git-send-email-sergio.prado@e-labworks.com>
+ <20170304081504.unv6sihbmp76ynfy@kozik-lap> <20170306131516.GA6095@n1>
+ <20170308163434.obhtg6fwmjwqv7jm@kozik-lap>
+ <CA+Ln22FEYfO2EmvLKTRSHNFPpKSOw38vSDvg-nPv_j08cApqCw@mail.gmail.com>
+ <CAJKOXPdUQ8DSPR_4cDs8WyrV9Mmy6isncW72BNiTyiRb79qf7g@mail.gmail.com>
+Message-ID: <CA+Ln22E55XD92vzG=+3DYxozQiXc=DOEzSg655fYY5gVep6Diw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kishon,
+2017-03-09 15:42 GMT+09:00 Krzysztof Kozlowski <krzk@kernel.org>:
+> On Thu, Mar 9, 2017 at 7:56 AM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+>> 2017-03-09 1:34 GMT+09:00 Krzysztof Kozlowski <krzk@kernel.org>:
+>>> On Mon, Mar 06, 2017 at 09:15:16AM -0400, Sergio Prado wrote:
+>>>> Hi Krzysztof,
+>>>>
+>>>> > > This is a regression from commit 8b1bd11c1f8f529057369c5b3702d13fd24e2765.
+>>>> >
+>>>> > Checkpatch should complain here about commit format.
+>>>> >
+>>>> > >
+>>>> > > Tested on FriendlyARM mini2440.
+>>>> > >
+>>>> >
+>>>> > Please add:
+>>>> >   Fixes: 8b1bd11c1f8f ("pinctrl: samsung: Add the support the multiple IORESOURCE_MEM for one pin-bank")
+>>>> >   Cc: <stable@vger.kernel.org>
+>>>> >
+>>>>
+>>>> OK.
+>>>>
+>>>> > > Signed-off-by: Sergio Prado <sergio.prado@e-labworks.com>
+>>>> > > ---
+>>>> > >  drivers/pinctrl/samsung/pinctrl-s3c24xx.c | 4 ++--
+>>>> > >  1 file changed, 2 insertions(+), 2 deletions(-)
+>>>> > >
+>>>> > > diff --git a/drivers/pinctrl/samsung/pinctrl-s3c24xx.c b/drivers/pinctrl/samsung/pinctrl-s3c24xx.c
+>>>> > > index b82a003546ae..1b8d887796e8 100644
+>>>> > > --- a/drivers/pinctrl/samsung/pinctrl-s3c24xx.c
+>>>> > > +++ b/drivers/pinctrl/samsung/pinctrl-s3c24xx.c
+>>>> > > @@ -356,8 +356,8 @@ static inline void s3c24xx_demux_eint(struct irq_desc *desc,
+>>>> > >  {
+>>>> > >   struct s3c24xx_eint_data *data = irq_desc_get_handler_data(desc);
+>>>> > >   struct irq_chip *chip = irq_desc_get_chip(desc);
+>>>> > > - struct irq_data *irqd = irq_desc_get_irq_data(desc);
+>>>> > > - struct samsung_pin_bank *bank = irq_data_get_irq_chip_data(irqd);
+>>>> > > + struct samsung_pinctrl_drv_data *d = data->drvdata;
+>>>> > > + struct samsung_pin_bank *bank = d->pin_banks;
+>>>> >
+>>>> > I think 'pin_banks' point to all banks of given controller not to the
+>>>> > currently accessed one.
+>>>>
+>>>> Understood. I think it worked in my tests because on s3c2440 all banks
+>>>> have the same eint base address.
+>>>>
+>>>> So what do you think is the best approach to solve this problem?
+>>>
+>>> Maybe you can get to this through:
+>>>         s3c24xx_eint_domain_data = s3c24xx_eint_data->domains[virq].host_data;
+>>>         s3c24xx_eint_domain_data->bank
+>>>
+>>> It is getting slightly more complicated...
+>>
+>> How about the suggestions I made in my reply from March 4 (JST)?
+>
+> Yes, this also looks like solution. I am not sure how much you would
+> like to revert but wouldn't it create duplicated members in pinctrl
+> structures? One for Exynos and other for S3C?
 
-    Do you have any comments or suggestions on the series of patches?
+I would actually lean towards introducing one duplicated member
+(drvdata->pctl_base) versus adding unnecessarily complex special ways
+of calculating the addresses from current (unsuitable) set of data.
 
-Thanks a lot
 
-On Sat, 2017-03-11 at 14:22 +0800, Chunfeng Yun wrote:
-> The default value of RX detection stable time is 10us, and this
-> margin is too big for some critical cases which cause U3 link fail
-> and link to U2(probability is about 1%). So change it to 5us.
-> 
-> Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
-> ---
->  drivers/phy/phy-mt65xx-usb3.c |   18 ++++++++++++++++++
->  1 file changed, 18 insertions(+)
-> 
-> diff --git a/drivers/phy/phy-mt65xx-usb3.c b/drivers/phy/phy-mt65xx-usb3.c
-> index d972067..fe2392a 100644
-> --- a/drivers/phy/phy-mt65xx-usb3.c
-> +++ b/drivers/phy/phy-mt65xx-usb3.c
-> @@ -112,6 +112,14 @@
->  #define P3D_RG_CDR_BIR_LTD0		GENMASK(12, 8)
->  #define P3D_RG_CDR_BIR_LTD0_VAL(x)	((0x1f & (x)) << 8)
->  
-> +#define U3P_U3_PHYD_RXDET1		(SSUSB_SIFSLV_U3PHYD_BASE + 0x128)
-> +#define P3D_RG_RXDET_STB2_SET		GENMASK(17, 9)
-> +#define P3D_RG_RXDET_STB2_SET_VAL(x)	((0x1ff & (x)) << 9)
-> +
-> +#define U3P_U3_PHYD_RXDET2		(SSUSB_SIFSLV_U3PHYD_BASE + 0x12c)
-> +#define P3D_RG_RXDET_STB2_SET_P3	GENMASK(8, 0)
-> +#define P3D_RG_RXDET_STB2_SET_P3_VAL(x)	(0x1ff & (x))
-> +
->  #define U3P_XTALCTL3		(SSUSB_SIFSLV_SPLLC + 0x0018)
->  #define XC3_RG_U3_XTAL_RX_PWD		BIT(9)
->  #define XC3_RG_U3_FRC_XTAL_RX_PWD	BIT(8)
-> @@ -295,6 +303,16 @@ static void phy_instance_init(struct mt65xx_u3phy *u3phy,
->  	tmp |= P3D_RG_CDR_BIR_LTD0_VAL(0xc) | P3D_RG_CDR_BIR_LTD1_VAL(0x3);
->  	writel(tmp, port_base + U3P_PHYD_CDR1);
->  
-> +	tmp = readl(port_base + U3P_U3_PHYD_RXDET1);
-> +	tmp &= ~P3D_RG_RXDET_STB2_SET;
-> +	tmp |= P3D_RG_RXDET_STB2_SET_VAL(0x10);
-> +	writel(tmp, port_base + U3P_U3_PHYD_RXDET1);
-> +
-> +	tmp = readl(port_base + U3P_U3_PHYD_RXDET2);
-> +	tmp &= ~P3D_RG_RXDET_STB2_SET_P3;
-> +	tmp |= P3D_RG_RXDET_STB2_SET_P3_VAL(0x10);
-> +	writel(tmp, port_base + U3P_U3_PHYD_RXDET2);
-> +
->  	dev_dbg(u3phy->dev, "%s(%d)\n", __func__, index);
->  }
->  
+By the way, I think I just found yet another bug introduced by that
+patch. In exynos_irq_request_resources() and
+exynos_irq_release_resources(), the address of CON register is
+calculated from bank->eint_base, while I believe it should be
+calculated from bank->pctl_base (which is also what
+samsung_pinmux_setup() uses).
+
+[1] https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/tree/drivers/pinctrl/samsung/pinctrl-exynos.c?id=refs/tags/next-20170320#n174
+
+Ehh, I think I regret letting that patch be merged as it made some of
+the code quite messy and we actually found a better way to support
+those strange banks later (group banks by their pctl_base and only
+allow eint_base to be selectable per bank; then we could just keep
+drvdata->pctl_base constant over all related banks).
+
+Best regards,
+Tomasz
