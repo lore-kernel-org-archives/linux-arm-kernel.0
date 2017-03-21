@@ -1,20 +1,33 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 21 Mar 2017 15:40:09 +0530
-Subject: [PATCH] arm: spear6xx: add labels to various nodes in
- spear600.dtsi
-In-Reply-To: <1490090858-8866-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1490090858-8866-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20170321101009.GQ25659@vireshk-i7>
+From: slash.tmp@free.fr (Mason)
+Date: Tue, 21 Mar 2017 11:15:16 +0100
+Subject: [RFC PATCH v0.001] PCI: Add support for tango PCIe controller
+In-Reply-To: <ab110ce2-8678-9b34-6bd1-6cfaaa7fea04@free.fr>
+References: <ab110ce2-8678-9b34-6bd1-6cfaaa7fea04@free.fr>
+Message-ID: <f13c385d-dcc9-dacd-2b2c-ca098228f4f4@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21-03-17, 11:07, Thomas Petazzoni wrote:
-> Having labels allows to more easily reference nodes in .dts files
-> including spear600.dtsi.
+[ Adding iommu ML ]
 
-And who is going to use these labels? If you already have some code
-using them, then please send that as well. This patch by itself
-doesn't provide any benefits.
+On 17/03/2017 17:11, Mason wrote:
 
--- 
-viresh
+> + * QUIRK #5
+> + * Only transfers within the BAR are forwarded to the host.
+> + * By default, the DMA framework expects that
+> + * PCI address 0x8000_0000 -> CPU address 0x8000_0000
+> + * which is where DRAM0 is mapped.
+
+I have an additional question on this topic.
+
+In a typical system, PCI bus masters are able to access all of RAM,
+unless there is some kind of IOMMU, right?
+
+I suppose one may consider the above limitation ("Only transfers
+within the BAR are forwarded to the host") as some form of weird
+IOMMU? (There is, in fact, some remapping logic in the controller
+setup which I haven't discussed so far.)
+
+Since this SoC is used for TV, the media cartels mandate some way
+to limit where PCI bus masters can peek/poke in RAM.
+
+Regards.
