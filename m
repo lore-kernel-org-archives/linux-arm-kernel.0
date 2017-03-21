@@ -1,116 +1,98 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 21 Mar 2017 19:20:56 +0000
-Subject: [PATCH v4 26/28] ARM: hyp-stub/KVM: Kill __hyp_get_vectors
-In-Reply-To: <20170321192058.9300-1-marc.zyngier@arm.com>
-References: <20170321192058.9300-1-marc.zyngier@arm.com>
-Message-ID: <20170321192058.9300-27-marc.zyngier@arm.com>
+From: isubramanian@apm.com (Iyappan Subramanian)
+Date: Tue, 21 Mar 2017 12:24:42 -0700
+Subject: [PATCH net-next 3/4] drivers: net: xgene-v2: Fix port reset
+In-Reply-To: <1490124283-10371-1-git-send-email-isubramanian@apm.com>
+References: <1490124283-10371-1-git-send-email-isubramanian@apm.com>
+Message-ID: <1490124283-10371-4-git-send-email-isubramanian@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nobody is using __hyp_get_vectors anymore, so let's remove both
-implementations (hyp-stub and KVM).
+Fixed port reset sequence by adding ECC init.
 
-Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
 ---
- arch/arm/include/asm/virt.h | 10 ++++------
- arch/arm/kernel/hyp-stub.S  | 13 +------------
- arch/arm/kvm/init.S         |  7 +------
- arch/arm/kvm/interrupts.S   |  4 ----
- 4 files changed, 6 insertions(+), 28 deletions(-)
+ drivers/net/ethernet/apm/xgene-v2/enet.c | 24 ++++++++++++++++++------
+ drivers/net/ethernet/apm/xgene-v2/enet.h |  2 ++
+ drivers/net/ethernet/apm/xgene-v2/mac.h  |  1 -
+ 3 files changed, 20 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/include/asm/virt.h b/arch/arm/include/asm/virt.h
-index 8d5625b790b5..5f45969d4063 100644
---- a/arch/arm/include/asm/virt.h
-+++ b/arch/arm/include/asm/virt.h
-@@ -53,7 +53,6 @@ static inline void sync_boot_mode(void)
+diff --git a/drivers/net/ethernet/apm/xgene-v2/enet.c b/drivers/net/ethernet/apm/xgene-v2/enet.c
+index b49edee..5998da0 100644
+--- a/drivers/net/ethernet/apm/xgene-v2/enet.c
++++ b/drivers/net/ethernet/apm/xgene-v2/enet.c
+@@ -38,10 +38,24 @@ u32 xge_rd_csr(struct xge_pdata *pdata, u32 offset)
+ int xge_port_reset(struct net_device *ndev)
+ {
+ 	struct xge_pdata *pdata = netdev_priv(ndev);
++	struct device *dev = &pdata->pdev->dev;
++	u32 data, wait = 10;
+ 
+-	xge_wr_csr(pdata, ENET_SRST, 0x3);
+-	xge_wr_csr(pdata, ENET_SRST, 0x2);
+-	xge_wr_csr(pdata, ENET_SRST, 0x0);
++	xge_wr_csr(pdata, ENET_CLKEN, 0x3);
++	xge_wr_csr(pdata, ENET_SRST, 0xf);
++	xge_wr_csr(pdata, ENET_SRST, 0);
++	xge_wr_csr(pdata, CFG_MEM_RAM_SHUTDOWN, 1);
++	xge_wr_csr(pdata, CFG_MEM_RAM_SHUTDOWN, 0);
++
++	do {
++		usleep_range(100, 110);
++		data = xge_rd_csr(pdata, BLOCK_MEM_RDY);
++	} while (data != MEM_RDY && wait--);
++
++	if (data != MEM_RDY) {
++		dev_err(dev, "ECC init failed: %x\n", data);
++		return -ETIMEDOUT;
++	}
+ 
+ 	xge_wr_csr(pdata, ENET_SHIM, DEVM_ARAUX_COH | DEVM_AWAUX_COH);
+ 
+@@ -59,13 +73,11 @@ static void xge_traffic_resume(struct net_device *ndev)
+ 	xge_wr_csr(pdata, RX_DV_GATE_REG, 1);
  }
  
- void __hyp_set_vectors(unsigned long phys_vector_base);
--unsigned long __hyp_get_vectors(void);
- void __hyp_reset_vectors(void);
- #else
- #define __boot_cpu_mode	(SVC_MODE)
-@@ -99,12 +98,11 @@ extern char __hyp_text_end[];
+-int xge_port_init(struct net_device *ndev)
++void xge_port_init(struct net_device *ndev)
+ {
+ 	struct xge_pdata *pdata = netdev_priv(ndev);
  
- /* Only assembly code should need those */
- 
--#define HVC_GET_VECTORS 0
--#define HVC_SET_VECTORS 1
--#define HVC_SOFT_RESTART 2
--#define HVC_RESET_VECTORS 3
-+#define HVC_SET_VECTORS 0
-+#define HVC_SOFT_RESTART 1
-+#define HVC_RESET_VECTORS 2
- 
--#define HVC_STUB_HCALL_NR 4
-+#define HVC_STUB_HCALL_NR 3
- 
- #endif /* __ASSEMBLY__ */
- 
-diff --git a/arch/arm/kernel/hyp-stub.S b/arch/arm/kernel/hyp-stub.S
-index 3cb01e8a291d..68bf72777ac7 100644
---- a/arch/arm/kernel/hyp-stub.S
-+++ b/arch/arm/kernel/hyp-stub.S
-@@ -202,12 +202,7 @@ ARM_BE8(orr	r7, r7, #(1 << 25))     @ HSCTLR.EE
- ENDPROC(__hyp_stub_install_secondary)
- 
- __hyp_stub_do_trap:
--	teq	r0, #HVC_GET_VECTORS
--	bne	1f
--	mrc	p15, 4, r0, c12, c0, 0	@ get HVBAR
--	b	__hyp_stub_exit
+ 	pdata->phy_speed = SPEED_1000;
+ 	xge_mac_init(pdata);
+ 	xge_traffic_resume(ndev);
 -
--1:	teq	r0, #HVC_SET_VECTORS
-+	teq	r0, #HVC_SET_VECTORS
- 	bne	1f
- 	mcr	p15, 4, r1, c12, c0, 0	@ set HVBAR
- 	b	__hyp_stub_exit
-@@ -247,12 +242,6 @@ ENDPROC(__hyp_stub_do_trap)
-  * so you will need to set that to something sensible@the new hypervisor's
-  * initialisation entry point.
-  */
--ENTRY(__hyp_get_vectors)
--	mov	r0, #HVC_GET_VECTORS
--	__HVC(0)
--	ret	lr
--ENDPROC(__hyp_get_vectors)
--
- ENTRY(__hyp_set_vectors)
- 	mov	r1, r0
- 	mov	r0, #HVC_SET_VECTORS
-diff --git a/arch/arm/kvm/init.S b/arch/arm/kvm/init.S
-index c92e092103b2..3cff15152800 100644
---- a/arch/arm/kvm/init.S
-+++ b/arch/arm/kvm/init.S
-@@ -122,12 +122,7 @@ __do_hyp_init:
- 	eret
+-	return 0;
+ }
+diff --git a/drivers/net/ethernet/apm/xgene-v2/enet.h b/drivers/net/ethernet/apm/xgene-v2/enet.h
+index 40371cf..3fd36dc6 100644
+--- a/drivers/net/ethernet/apm/xgene-v2/enet.h
++++ b/drivers/net/ethernet/apm/xgene-v2/enet.h
+@@ -28,6 +28,7 @@
+ #define CFG_MEM_RAM_SHUTDOWN	0xd070
+ #define BLOCK_MEM_RDY		0xd074
  
- ENTRY(__kvm_handle_stub_hvc)
--	cmp	r0, #HVC_GET_VECTORS
--	bne	1f
--	mrc	p15, 4, r0, c12, c0, 0	@ get HVBAR
--	b	exit
--
--1:	cmp	r0, #HVC_SOFT_RESTART
-+	cmp	r0, #HVC_SOFT_RESTART
- 	bne	1f
++#define MEM_RDY			0xffffffff
+ #define DEVM_ARAUX_COH		BIT(19)
+ #define DEVM_AWAUX_COH		BIT(3)
  
- 	/* The target is expected in r1 */
-diff --git a/arch/arm/kvm/interrupts.S b/arch/arm/kvm/interrupts.S
-index b1bd316f14c0..80a1d6cd261c 100644
---- a/arch/arm/kvm/interrupts.S
-+++ b/arch/arm/kvm/interrupts.S
-@@ -37,10 +37,6 @@
-  * in Hyp mode (see init_hyp_mode in arch/arm/kvm/arm.c).  Return values are
-  * passed in r0 (strictly 32bit).
-  *
-- * A function pointer with a value of 0xffffffff has a special meaning,
-- * and is used to implement __hyp_get_vectors in the same way as in
-- * arch/arm/kernel/hyp_stub.S.
-- *
-  * The calling convention follows the standard AAPCS:
-  *   r0 - r3: caller save
-  *   r12:     caller save
+@@ -39,5 +40,6 @@
+ void xge_wr_csr(struct xge_pdata *pdata, u32 offset, u32 val);
+ u32 xge_rd_csr(struct xge_pdata *pdata, u32 offset);
+ int xge_port_reset(struct net_device *ndev);
++void xge_port_init(struct net_device *ndev);
+ 
+ #endif  /* __XGENE_ENET_V2_ENET__H__ */
+diff --git a/drivers/net/ethernet/apm/xgene-v2/mac.h b/drivers/net/ethernet/apm/xgene-v2/mac.h
+index 74397c9..18a9c9d 100644
+--- a/drivers/net/ethernet/apm/xgene-v2/mac.h
++++ b/drivers/net/ethernet/apm/xgene-v2/mac.h
+@@ -105,7 +105,6 @@ static inline u32 xgene_get_reg_bits(u32 var, int pos, int len)
+ void xge_mac_enable(struct xge_pdata *pdata);
+ void xge_mac_disable(struct xge_pdata *pdata);
+ void xge_mac_init(struct xge_pdata *pdata);
+-int xge_port_init(struct net_device *ndev);
+ void xge_mac_set_station_addr(struct xge_pdata *pdata);
+ 
+ #endif /* __XGENE_ENET_V2_MAC_H__ */
 -- 
-2.11.0
+1.9.1
