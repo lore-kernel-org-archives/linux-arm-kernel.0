@@ -1,47 +1,62 @@
-From: james.morse@arm.com (James Morse)
-Date: Tue, 21 Mar 2017 19:11:44 +0000
-Subject: [PATCH] kvm: pass the virtual SEI syndrome to guest OS
-In-Reply-To: <20170321113428.GC15920@cbox>
-References: <1489996534-8270-1-git-send-email-gengdongjiu@huawei.com>
- <7055772d-2a20-6e0c-2bf8-204bc9ef52a5@arm.com>
- <b912c293-4314-7c90-30a4-2f986feb1670@huawei.com>
- <22fb583f-a33e-15f8-a059-fb112b27dd4f@arm.com> <58CFF058.8020205@arm.com>
- <76795e20-2f20-1e54-cfa5-7444f28b18ee@huawei.com>
- <20170321113428.GC15920@cbox>
-Message-ID: <58D17AF0.2010802@arm.com>
+From: borneo.antonio@gmail.com (Antonio Borneo)
+Date: Tue, 21 Mar 2017 20:13:29 +0100
+Subject: [PATCH] arm64: dts: hi6220: enable DMA in spi0
+In-Reply-To: <20170321070818.3247-1-guodong.xu@linaro.org>
+References: <20170321070818.3247-1-guodong.xu@linaro.org>
+Message-ID: <CAAj6DX3kvc-wy+xSPBC26Xw0s6BBApTJQGrVS1BsiFgfDybBbw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoffer,
+On Tue, Mar 21, 2017 at 8:08 AM, Guodong Xu <guodong.xu@linaro.org> wrote:
+> From: Wang Xiaoyin <hw.wangxiaoyin@hisilicon.com>
+>
+> Enable DMA in spi0.
 
-On 21/03/17 11:34, Christoffer Dall wrote:
-> On Tue, Mar 21, 2017 at 02:32:29PM +0800, gengdongjiu wrote:
->> On 2017/3/20 23:08, James Morse wrote:
->>>>>> On 20/03/17 07:55, Dongjiu Geng wrote:
->>>>>>> In the RAS implementation, hardware pass the virtual SEI
->>>>>>> syndrome information through the VSESR_EL2, so set the virtual
->>>>>>> SEI syndrome using physical SEI syndrome el2_elr to pass to
->>>>>>> the guest OS
->>>
->>> How does this work with firmware first?
->>
->> I explained it in previous mail about the work flow.
-> 
-> When delivering and reporting SEIs to the VM, should this happen
-> directly to the OS running in the VM, or to the guest firmware (e.g.
-> UEFI) running in the VM as well?
+Hi Guodong, Xiaoyin,
 
-'firmware first' is the ACPI specs name for x86's BIOS or management-mode
-handling the error. On arm64 we have multiple things called firmware, so the
-name might be more confusing than helpful.
+added linux-spi in copy.
 
-As far as I understand it, firmware here refers to the secure-world and EL3.
-Something like ATF can use SCR_EL3.EA to claim SErrors and external aborts,
-routing them to EL3 where secure platform specific firmware generates CPER records.
-For a guest, Qemu takes the role of this EL3-firmware.
+Actually the patch does not enable the DMA. The commit message is not correct.
 
+> Cc: Antonio Borneo <borneo.antonio@gmail.com>
+> Signed-off-by: Zhong Kaihua <zhongkaihua@huawei.com>
+> Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
+> Signed-off-by: Wang Xiaoyin <hw.wangxiaoyin@hisilicon.com>
+> ---
+>  arch/arm64/boot/dts/hisilicon/hi6220.dtsi | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+> index 470461d..e40625f 100644
+> --- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+> +++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+> @@ -682,7 +682,8 @@
+>                         reg = <0x0 0xf7106000 0x0 0x1000>;
+>                         interrupts = <0 50 4>;
+>                         bus-id = <0>;
+> -                       enable-dma = <0>;
+> +                       dmas =  <&dma0 0 &dma0 1>;
+> +                       dma-names = "rx", "tx";
 
+The controller spi0 is a standard ARM PL022.
+This patch removes the nonexistent property "enable-dma" and specifies
+which DMA controller and which DMA channels are connected to spi0.
+The values are coherent with the documentation available for hi6220.
 
-Thanks,
+Apart from the commit message, I'm fine with this patch.
 
-James
+On PL022 the DMA is not enabled in the DT node of the controller but
+in the DT node of each spi device, through the property
+"pl022,com-mode".
+A separate patch should eventually enable the DMA for those spi
+devices that require it.
+
+Best Regards,
+Antonio
+
+>                         clocks = <&sys_ctrl HI6220_SPI_CLK>;
+>                         clock-names = "apb_pclk";
+>                         pinctrl-names = "default";
+> --
+> 2.10.2
+>
