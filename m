@@ -1,49 +1,96 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 21 Mar 2017 17:26:06 +0000
-Subject: [PATCH v3 01/25] arm64: hyp-stub: Implement HVC_RESET_VECTORS
- stub hypercall
-In-Reply-To: <20170321170407.GD21829@e104818-lin.cambridge.arm.com>
-References: <20170306142458.8875-1-marc.zyngier@arm.com>
- <20170306142458.8875-2-marc.zyngier@arm.com>
- <20170321170407.GD21829@e104818-lin.cambridge.arm.com>
-Message-ID: <11a10d32-700f-d969-556a-4d1748c2e92f@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 21 Mar 2017 17:26:34 +0000
+Subject: [PATCH v6 09/11] drivers: perf: hisi: Miscellanous node(MN)
+ event counting in perf
+In-Reply-To: <1489127333-112865-1-git-send-email-anurup.m@huawei.com>
+References: <1489127333-112865-1-git-send-email-anurup.m@huawei.com>
+Message-ID: <20170321172634.GD29116@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/03/17 17:04, Catalin Marinas wrote:
-> On Mon, Mar 06, 2017 at 02:24:34PM +0000, Marc Zyngier wrote:
->> Let's define a new stub hypercall that resets the HYP configuration
->> to its default: hyp-stub vectors, and MMU disabled.
->>
->> Of course, for the hyp-stub itself, this is a trivial no-op.
->> Hypervisors will have a bit more work to do.
->>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  arch/arm64/include/asm/virt.h |  9 +++++++++
->>  arch/arm64/kernel/hyp-stub.S  | 13 ++++++++++++-
->>  2 files changed, 21 insertions(+), 1 deletion(-)
-> [...]
->> +ENTRY(__hyp_reset_vectors)
->> +	str	lr, [sp, #-16]!
->> +	mov	x0, #HVC_RESET_VECTORS
->> +	hvc	#0
->> +	ldr	lr, [sp], #16
->> +	ret
->> +ENDPROC(__hyp_reset_vectors)
-> 
-> Why do we need to specifically preserve lr across the hvc call? Is it
-> corrupted by the EL2 code (if yes, are other caller-saved registers that
-> need preserving)? I don't see something similar in the arch/arm code.
+On Fri, Mar 10, 2017 at 01:28:53AM -0500, Anurup M wrote:
+> +static u32 hisi_mn_read_counter(struct hisi_mn_data *mn_data, int cntr_idx)
+> +{
+> +	struct hisi_djtag_client *client = mn_data->client;
+> +	u32 module_id = GET_MODULE_ID(mn_data);
+> +	u32 reg_off, value;
+> +
+> +	reg_off = get_counter_reg_off(cntr_idx);
+> +	hisi_djtag_readreg(module_id, MN1_BANK_SELECT, reg_off,
+> +			   client, &value);
 
-Yeah, that's another oddity. The KVM code uses it as a temp register,
-but that feels quite wrong, now that you mention it. If should be saved
-there, and definitely not in the stubs.
+You need to handle this failing.
 
-Let me grab a hammer, and I'll set that one straight.
+[...]
+
+> +	do {
+> +		/* Get count from the MN */
+> +		prev_raw_count = local64_read(&hwc->prev_count);
+> +		new_raw_count =	hisi_mn_read_counter(mn_data, idx);
+> +		delta = (new_raw_count - prev_raw_count) & HISI_MAX_PERIOD;
+> +
+> +		local64_add(delta, &event->count);
+> +	} while (local64_cmpxchg(&hwc->prev_count, prev_raw_count,
+> +				 new_raw_count) != prev_raw_count);
+
+Same comment as for the l3 event update loop.
+
+[...]
+
+> +	/*
+> +	 * Value to write to event select register
+> +	 * Each byte in the 32 bit select register is used to
+> +	 * configure the event code. Each byte correspond to a
+> +	 * counter register to use.
+> +	 */
+> +	val = event_value << (8 * idx);
+> +
+> +	/*
+> +	 * Set the event in MN_EVENT_TYPE Register
+> +	 */
+> +	hisi_djtag_readreg(module_id, MN1_BANK_SELECT, MN1_EVTYPE_REG_OFF,
+> +			   client, &value);
+> +	value &= ~(0xff << (8 * idx));
+> +	value |= val;
+> +	hisi_djtag_writereg(module_id, MN1_BANK_SELECT, MN1_EVTYPE_REG_OFF,
+> +			    value, client);
+
+Use a helper for this common pattern.
+
+[...]
+
+> +static int hisi_mn_pmu_init(struct hisi_pmu *mn_pmu,
+> +				struct hisi_djtag_client *client)
+> +{
+> +	struct device *dev = &client->dev;
+> +
+> +	mn_pmu->num_events = HISI_HWEVENT_MN_EVENT_MAX;
+> +	mn_pmu->num_counters = HISI_IDX_MN_COUNTER_MAX;
+> +	mn_pmu->scl_id = hisi_djtag_get_sclid(client);
+> +
+> +	mn_pmu->name = kasprintf(GFP_KERNEL, "hisi_mn_%d", mn_pmu->scl_id);
+
+This is leaked if we fail in hisi_pmu_mn_dev_probe()...
+
+> +static int hisi_pmu_mn_dev_probe(struct hisi_djtag_client *client)
+> +{
+> +	struct hisi_pmu *mn_pmu;
+> +	struct device *dev = &client->dev;
+> +	int ret;
+> +
+> +	mn_pmu = hisi_pmu_alloc(dev);
+> +	if (!mn_pmu)
+> +		return -ENOMEM;
+> +
+> +	ret = hisi_mn_pmu_init(mn_pmu, client);
+> +	if (ret)
+> +		return ret;
+> +
+> +	ret = hisi_mn_init_data(mn_pmu, client);
+> +	if (ret)
+> +		return ret;
+
+... e.g. here.
 
 Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Mark.
