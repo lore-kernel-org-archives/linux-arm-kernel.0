@@ -1,194 +1,84 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 21 Mar 2017 14:45:21 +0000
-Subject: [PATCH v9 15/15] irqchip: mbigen: Add ACPI support
-In-Reply-To: <1488890410-15503-16-git-send-email-guohanjun@huawei.com>
-References: <1488890410-15503-1-git-send-email-guohanjun@huawei.com>
- <1488890410-15503-16-git-send-email-guohanjun@huawei.com>
-Message-ID: <20170321144521.GA4392@red-moon>
+From: andrew.smirnov@gmail.com (Andrey Smirnov)
+Date: Tue, 21 Mar 2017 07:50:02 -0700
+Subject: [PATCH v7 0/2] GPCv2 power gating driver
+Message-ID: <20170321145004.21265-1-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 07, 2017 at 08:40:10PM +0800, Hanjun Guo wrote:
-> From: Hanjun Guo <hanjun.guo@linaro.org>
-> 
-> With the preparation of platform msi support and interrupt producer
-> in DSDT, we can add mbigen ACPI support now.
-> 
-> We are using Interrupt resource type in _CRS methd to indicate number
-> of irq pins instead of num_pins in DT to avoid _DSD usage in this case.
-> 
-> For mbigen,
->     Device(MBI0) {
->           Name(_HID, "HISI0152")
->           Name(_UID, Zero)
->           Name(_CRS, ResourceTemplate() {
->                   Memory32Fixed(ReadWrite, 0xa0080000, 0x10000)
-> 		  Interrupt(ResourceProducer,...) {12,14,....}
+Shawn,
 
-What do these interrupt numbers represent ? This looks wrong to me.
-An interrupt descriptor is there to describe the interrupts a device
-can generate; you are using it just to add a "standard" (that is
-not standard at all) way of counting the number of vectors allocated
-to this specific chip and that's just wrong.
+Here's v7 of GPCv2 patches with feedback from Dong incorporated.
 
-Can't you use something like Agustin did in the QCOM combiner:
+Let me know if you want to do any of renaming that Dong suggested and
+if there's more to be improved in general.
 
-drivers/irqchip/qcom-irq-combiner.c
+Thanks,
+Andrey Smirnov
 
-to detect the MSI vector length (ie by describing the MBIgen through
-generic registers and use the bit width to compute the vector
-lenght) ? I am not sure how feasible it is given that my knowledge
-of MBIgen is pretty poor.
+Changes since v6 (see [v6]):
 
-I understand we want to avoid _DSD properties but we should not
-work around standard bindings to achieve that goal.
+	- Drop .readable_reg related code
 
-Side effect: IIUC the kernel will allocate an array of resources for
-your MBIgen interrupts whose size equal the Interrupt descriptor,
-which is as bad as it can get given that those resources are to
-the best of my knowledge unused.
+	- Switch regmap to REGCACHE_NONE and drop .volatile_reg
 
-Lorenzo
+	- Remove unnecessary #include directives
 
->           })
->     }
-> 
-> For devices,
->    Device(COM0) {
->           Name(_HID, "ACPIIDxx")
->           Name(_UID, Zero)
->           Name(_CRS, ResourceTemplate() {
->                  Memory32Fixed(ReadWrite, 0xb0030000, 0x10000)
-> 		 Interrupt(ResourceConsumer,..., "\_SB.MBI0") {12}
->           })
->     }
-> 
-> With the help of platform msi and interrupt producer, then devices
-> will get the virq from mbigen's irqdomain.
-> 
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Ma Jun <majun258@huawei.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> ---
->  drivers/irqchip/irq-mbigen.c | 70 ++++++++++++++++++++++++++++++++++++++++++--
->  1 file changed, 67 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/irqchip/irq-mbigen.c b/drivers/irqchip/irq-mbigen.c
-> index 3756408..e6bb503 100644
-> --- a/drivers/irqchip/irq-mbigen.c
-> +++ b/drivers/irqchip/irq-mbigen.c
-> @@ -16,6 +16,7 @@
->   * along with this program.  If not, see <http://www.gnu.org/licenses/>.
->   */
->  
-> +#include <linux/acpi.h>
->  #include <linux/interrupt.h>
->  #include <linux/irqchip.h>
->  #include <linux/module.h>
-> @@ -180,7 +181,7 @@ static int mbigen_domain_translate(struct irq_domain *d,
->  				    unsigned long *hwirq,
->  				    unsigned int *type)
->  {
-> -	if (is_of_node(fwspec->fwnode)) {
-> +	if (is_of_node(fwspec->fwnode) || is_acpi_device_node(fwspec->fwnode)) {
->  		if (fwspec->param_count != 2)
->  			return -EINVAL;
->  
-> @@ -271,6 +272,54 @@ static int mbigen_of_create_domain(struct platform_device *pdev,
->  	return 0;
->  }
->  
-> +#ifdef CONFIG_ACPI
-> +static acpi_status mbigen_acpi_process_resource(struct acpi_resource *ares,
-> +					     void *context)
-> +{
-> +	struct acpi_resource_extended_irq *ext_irq;
-> +	u32 *num_irqs = context;
-> +
-> +	switch (ares->type) {
-> +	case ACPI_RESOURCE_TYPE_EXTENDED_IRQ:
-> +		ext_irq = &ares->data.extended_irq;
-> +		*num_irqs += ext_irq->interrupt_count;
-> +		break;
-> +	default:
-> +		break;
-> +	}
-> +
-> +	return AE_OK;
-> +}
-> +
-> +static int mbigen_acpi_create_domain(struct platform_device *pdev,
-> +				     struct mbigen_device *mgn_chip)
-> +{
-> +	struct irq_domain *domain;
-> +	u32 num_msis = 0;
-> +	acpi_status status;
-> +
-> +	status = acpi_walk_resources(ACPI_HANDLE(&pdev->dev), METHOD_NAME__CRS,
-> +				     mbigen_acpi_process_resource, &num_msis);
-> +	if (ACPI_FAILURE(status) || num_msis == 0)
-> +		return -EINVAL;
-> +
-> +	domain = platform_msi_create_device_domain(&pdev->dev, num_msis,
-> +						   mbigen_write_msg,
-> +						   &mbigen_domain_ops,
-> +						   mgn_chip);
-> +	if (!domain)
-> +		return -ENOMEM;
-> +
-> +	return 0;
-> +}
-> +#else
-> +static inline int mbigen_acpi_create_domain(struct platform_device *pdev,
-> +					    struct mbigen_device *mgn_chip)
-> +{
-> +	return -ENODEV;
-> +}
-> +#endif
-> +
->  static int mbigen_device_probe(struct platform_device *pdev)
->  {
->  	struct mbigen_device *mgn_chip;
-> @@ -289,9 +338,17 @@ static int mbigen_device_probe(struct platform_device *pdev)
->  	if (IS_ERR(mgn_chip->base))
->  		return PTR_ERR(mgn_chip->base);
->  
-> -	err = mbigen_of_create_domain(pdev, mgn_chip);
-> -	if (err)
-> +	if (IS_ENABLED(CONFIG_OF) && pdev->dev.of_node)
-> +		err = mbigen_of_create_domain(pdev, mgn_chip);
-> +	else if (ACPI_COMPANION(&pdev->dev))
-> +		err = mbigen_acpi_create_domain(pdev, mgn_chip);
-> +	else
-> +		err = -EINVAL;
-> +
-> +	if (err) {
-> +		dev_err(&pdev->dev, "Failed to create mbi-gen@%p irqdomain", mgn_chip->base);
->  		return err;
-> +	}
->  
->  	platform_set_drvdata(pdev, mgn_chip);
->  	return 0;
-> @@ -303,10 +360,17 @@ static int mbigen_device_probe(struct platform_device *pdev)
->  };
->  MODULE_DEVICE_TABLE(of, mbigen_of_match);
->  
-> +static const struct acpi_device_id mbigen_acpi_match[] = {
-> +	{ "HISI0152", 0 },
-> +	{}
-> +};
-> +MODULE_DEVICE_TABLE(acpi, mbigen_acpi_match);
-> +
->  static struct platform_driver mbigen_platform_driver = {
->  	.driver = {
->  		.name		= "Hisilicon MBIGEN-V2",
->  		.of_match_table	= mbigen_of_match,
-> +		.acpi_match_table = ACPI_PTR(mbigen_acpi_match),
->  	},
->  	.probe			= mbigen_device_probe,
->  };
-> -- 
-> 1.7.12.4
-> 
+Changes since v5 (see [v5]):
+
+	- Apply reverse tree variable declartaion fromatting to
+          imx_gpcv2_probe() and imx7_gpc_pu_pgc_sw_pxx_req()
+
+	- Drop patch #3 in favour of defaulting to y in Kconfig
+	
+Changes since v4 (see [v4]):
+
+	- Single patch is split into multiple as per Shawn's reques
+
+	- Incorporated various feedback from Shawn
+
+Changes since v3 (see [v3]):
+
+	- Minor device tree bindings documentation fixes as per
+          feedback from Rob Herring
+	- Collect Acked-by from Rob
+
+Changes since v2 (see [v2]):
+
+	- Fix a critical bug where incorrect state of a bit was
+          expected in a busy wait loop (bit set instead of bit
+          cleared) imx7_gpc_pu_pgc_sw_pxx_req()
+
+	- Add missing step (setting of PCR in GPC_PGC_nCTRL) in power
+          down procedure
+
+Changes since v1 (see [v1]):
+
+	- Various small DT bindings description fixes as per feedback
+          from Rob Herring
+
+
+[v1] https://lkml.org/lkml/2017/2/6/554
+[v2] https://lkml.org/lkml/2017/2/13/489
+[v3] https://lkml.org/lkml/2017/2/20/338
+[v4] https://lkml.org/lkml/2017/2/28/738
+[v5] https://lkml.org/lkml/2017/3/14/547
+[v6] https://lkml.org/lkml/2017/3/16/357
+
+Andrey Smirnov (2):
+  dt-bindings: Add GPCv2 power gating driver
+  soc/imx: Add GPCv2 power gating driver
+
+ .../devicetree/bindings/power/fsl,imx-gpcv2.txt    |  71 ++++
+ drivers/soc/Kconfig                                |   1 +
+ drivers/soc/imx/Kconfig                            |  10 +
+ drivers/soc/imx/Makefile                           |   1 +
+ drivers/soc/imx/gpcv2.c                            | 365 +++++++++++++++++++++
+ include/dt-bindings/power/imx7-power.h             |  18 +
+ 6 files changed, 466 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/power/fsl,imx-gpcv2.txt
+ create mode 100644 drivers/soc/imx/Kconfig
+ create mode 100644 drivers/soc/imx/gpcv2.c
+ create mode 100644 include/dt-bindings/power/imx7-power.h
+
+-- 
+2.9.3
