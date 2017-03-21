@@ -1,74 +1,69 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Tue, 21 Mar 2017 15:13:24 +0100
-Subject: [PATCH 9/9] KVM: arm/arm64: vgic: Improve sync_hwstate performance
-In-Reply-To: <822a56eb-0989-493a-545e-15deb3de7ddc@arm.com>
-References: <20170320105818.20481-1-cdall@linaro.org>
- <20170320105818.20481-10-cdall@linaro.org>
- <822a56eb-0989-493a-545e-15deb3de7ddc@arm.com>
-Message-ID: <20170321141324.GH15920@cbox>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Tue, 21 Mar 2017 15:17:17 +0100
+Subject: [PATCH] PCI: ACPI: Fix ThunderX PEM initialization
+In-Reply-To: <20170321134744.GA13150@bhelgaas-glaptop.roam.corp.google.com>
+References: <20170131142525.GA9942@bhelgaas-glaptop.roam.corp.google.com>
+ <20170131145720.GA14231@localhost.localdomain>
+ <20170131203109.GA14127@bhelgaas-glaptop.roam.corp.google.com>
+ <20170201125325.GA15805@localhost.localdomain>
+ <20170201151807.GA15793@bhelgaas-glaptop.roam.corp.google.com>
+ <376ae1df-da85-e576-75d6-3ae2ab0f1b41@jonmasters.org>
+ <20170315113323.GA28027@localhost.localdomain>
+ <251db823-591b-483b-9c55-13c911020fd1@jonmasters.org>
+ <48b93116-cc0f-e59d-8aa3-704052ad6759@gmail.com>
+ <c3392131-9243-24d3-30b4-4d7e84019d6f@jonmasters.org>
+ <20170321134744.GA13150@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <b50b6a7f-30be-4206-4f38-2539ea936228@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 21, 2017 at 01:29:06PM +0000, Marc Zyngier wrote:
-> On 20/03/17 10:58, Christoffer Dall wrote:
-> > There is no need to call any functions to fold LRs when we don't use any
-> > LRs and we don't need to mess with overflow flags, take spinlocks, or
-> > prune the AP list if the AP list is empty.
-> > 
-> > Note: list_empty is a single atomic read (uses READ_ONCE) and can
-> > therefore check if a list is empty or not without the need to take the
-> > spinlock protecting the list.
-> > 
-> > Signed-off-by: Christoffer Dall <cdall@linaro.org>
-> > ---
-> >  virt/kvm/arm/vgic/vgic.c | 13 ++++++++-----
-> >  1 file changed, 8 insertions(+), 5 deletions(-)
-> > 
-> > diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-> > index 093873e..8ecb009 100644
-> > --- a/virt/kvm/arm/vgic/vgic.c
-> > +++ b/virt/kvm/arm/vgic/vgic.c
-> > @@ -639,15 +639,18 @@ void kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
-> >  {
-> >  	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
-> >  
-> > -	if (unlikely(!vgic_initialized(vcpu->kvm)))
-> 
-> Could this be folded with the previous patch? It is the same optimisation.
-> 
+Hi Bjorn,
 
-Sure.
+On 21.03.2017 14:47, Bjorn Helgaas wrote:
+> On Tue, Mar 21, 2017 at 07:38:07AM -0400, Jon Masters wrote:
+>> On 03/16/2017 12:25 PM, David Daney wrote:
+>>> On 03/16/2017 07:32 AM, Jon Masters wrote:
+>>
+>>>>> Yes, it is now contains "CAVxxx" as _HID for device config object.
+>>>>
+>>>> Which is different from the version that was merged into upstream. That
+>>>> should never have happened. It will never happen again. I have spent some
+>>>> time over the past few days ensuring folks understand that I will not
+>>>> allow a repeat of this to occur the next time around. We will have
+>>>> platforms that are bulletproof and supported by upstream with any
+>>>> errata fixes in a very carefully controlled manner. There will
+>>>> under no circumstances ever be a situation like this again.
+>>>
+>>> We are still evaluating the merits of registering the values that appeared
+>>> in v4.10, and not changing them.  We should know more in a couple of days.
+>>
+>> Thanks David. What was the verdict? (for the public record). If we need to
+>> get a change into upstream, let's get that teed up before 4.12 merge.
+>>
+>> And for other folks following along with this thread: I'm not just picking
+>> on Cavium here. I'll be doing the same with *every* ARM server SoC company
+>> as necessary over the coming months. We are going to have militantly
+>> compliant standards adherence in this industry and every ARM server SoC is
+>> going to "just work" with an upstream Linux kernel with an ACPI enabled
+>> platform. This will be so utterly clean and boring it'll be amazing.
+>
+> Thanks for keeping on top of this, Jon.  I agree, we should not be
+> using unregistered vendor prefixes, e.g., the "THRX" added by
+> 44f22bd91e88 ("PCI: Add MCFG quirks for Cavium ThunderX pass2.x host
+> controller").  I'm sorry I merged that without doing the due
+> diligence.
 
-> > +	/* An empty ap_list_head implies used_lrs == 0 */
-> > +	if (list_empty(&vcpu->arch.vgic_cpu.ap_list_head))
-> >  		return;
-> >  
-> >  	vgic_clear_uie(vcpu);
-> > -	vgic_fold_lr_state(vcpu);
-> > -	vgic_prune_ap_list(vcpu);
-> >  
-> > -	/* Make sure we can fast-path in flush_hwstate */
-> > -	vgic_cpu->used_lrs = 0;
-> > +	if (vgic_cpu->used_lrs) {
-> > +		vgic_fold_lr_state(vcpu);
-> > +		vgic_cpu->used_lrs = 0;
-> 
-> This zeroing could also be moved to vgic_fold_lr_state(), though I don't
-> feel strongly about it.
-> 
+Honestly, it is me who is responsible for this since I submitted the patch.
 
-Hmm, I'll have a look.
+>
+> I suspect the resolution will be to register "THRX".  If that doesn't
+> happen, I'll propose reverting 44f22bd91e88, not because I want to
+> break things, but only because I'm not personally in a position to do
+> anything smarter.  So please propose a better solution that fits
+> within the ACPI _HID/_CID model :)
 
-> > +	}
-> > +
-> > +	vgic_prune_ap_list(vcpu);
-> >  }
-> >  
-> >  /* Flush our emulation state into the GIC hardware before entering the guest. */
-> > 
-> 
-> Otherwise looks good to me.
-> 
+I already submitted the patch to fix this. Please see:
+https://patchwork.ozlabs.org/patch/739042/
 
 Thanks,
--Christoffer
+Tomasz
