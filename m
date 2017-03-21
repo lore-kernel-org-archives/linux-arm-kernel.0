@@ -1,172 +1,169 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Tue, 21 Mar 2017 17:57:14 +0000
-Subject: [PATCH v3 08/19] KVM: arm64: ITS: Interpret MAPD Size field and
- check related errors
-In-Reply-To: <22002901-88f6-119f-8465-3557fa4bd8e6@redhat.com>
-References: <1488800074-21991-1-git-send-email-eric.auger@redhat.com>
- <1488800074-21991-9-git-send-email-eric.auger@redhat.com>
- <7daaac71-1dbf-94c9-2b6b-fadf94a5b776@arm.com>
- <22002901-88f6-119f-8465-3557fa4bd8e6@redhat.com>
-Message-ID: <3d1ad0a8-ef14-0cf0-80c3-5c9f94606651@arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 21 Mar 2017 18:00:40 +0000
+Subject: [PATCH 12/14] arm64: kill acpi_set_mailbox_entry()
+In-Reply-To: <1489143891-11596-13-git-send-email-mark.rutland@arm.com>
+References: <1489143891-11596-1-git-send-email-mark.rutland@arm.com>
+ <1489143891-11596-13-git-send-email-mark.rutland@arm.com>
+Message-ID: <20170321180040.GA4849@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
+On Fri, Mar 10, 2017 at 11:04:49AM +0000, Mark Rutland wrote:
+> Now that we have acpi_cpu_get_madt_gicc(), we can use values from the
+> MADT GICC table directly, and no longer need to stash a copy in our own
+> datastructure.
+> 
+> This allows us to kill off the acpi_set_mailbox_entry() callback, too.
+> 
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm64/include/asm/acpi.h             |  5 ----
+>  arch/arm64/kernel/acpi_parking_protocol.c | 38 +++++++++----------------------
+>  arch/arm64/kernel/smp.c                   | 11 ---------
+>  3 files changed, 11 insertions(+), 43 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
+> index 0e99978..ebf88e3 100644
+> --- a/arch/arm64/include/asm/acpi.h
+> +++ b/arch/arm64/include/asm/acpi.h
+> @@ -96,13 +96,8 @@ static inline void acpi_init_cpus(void) { }
+>  
+>  #ifdef CONFIG_ARM64_ACPI_PARKING_PROTOCOL
+>  bool acpi_parking_protocol_valid(int cpu);
+> -void __init
+> -acpi_set_mailbox_entry(int cpu, struct acpi_madt_generic_interrupt *processor);
+>  #else
+>  static inline bool acpi_parking_protocol_valid(int cpu) { return false; }
+> -static inline void
+> -acpi_set_mailbox_entry(int cpu, struct acpi_madt_generic_interrupt *processor)
+> -{}
+>  #endif
+>  
+>  static inline const char *acpi_get_enable_method(int cpu)
+> diff --git a/arch/arm64/kernel/acpi_parking_protocol.c b/arch/arm64/kernel/acpi_parking_protocol.c
+> index 1f5655c..700a83a 100644
+> --- a/arch/arm64/kernel/acpi_parking_protocol.c
+> +++ b/arch/arm64/kernel/acpi_parking_protocol.c
+> @@ -28,36 +28,21 @@ struct parking_protocol_mailbox {
+>  	__le64 entry_point;
+>  };
+>  
+> -struct cpu_mailbox_entry {
+> -	struct parking_protocol_mailbox __iomem *mailbox;
+> -	phys_addr_t mailbox_addr;
+> -	u8 version;
+> -	u8 gic_cpu_id;
+> -};
+> -
+> -static struct cpu_mailbox_entry cpu_mailbox_entries[NR_CPUS];
+> -
+> -void __init acpi_set_mailbox_entry(int cpu,
+> -				   struct acpi_madt_generic_interrupt *p)
+> -{
+> -	struct cpu_mailbox_entry *cpu_entry = &cpu_mailbox_entries[cpu];
+> -
+> -	cpu_entry->mailbox_addr = p->parked_address;
+> -	cpu_entry->version = p->parking_version;
+> -	cpu_entry->gic_cpu_id = p->cpu_interface_number;
+> -}
+> +static struct parking_protocol_mailbox __iomem *mailboxes[NR_CPUS];
 
-On 21/03/17 17:40, Auger Eric wrote:
-> Hi Andre,
-> 
-> On 17/03/2017 16:03, Andre Przywara wrote:
->> Hi,
->>
->> On 06/03/17 11:34, Eric Auger wrote:
->>> Up to now the MAPD's ITT size field has been ignored. It encodes
->>> the number of eventid bit minus 1. It should be used to check
->>> the eventid when a MAPTI command is issued on a device. Let's
->>> store the nb_eventid_bits in the its_device and do the check
->>> on MAPTI. Also make sure the ITT size field does not exceed the
->>> GITS_TYPER IDBITS field.
->>>
->>> Signed-off-by: Eric Auger <eric.auger@redhat.com>
->>>
->>> ---
->>> ---
->>>  include/linux/irqchip/arm-gic-v3.h |  2 ++
->>>  virt/kvm/arm/vgic/vgic-its.c       | 14 +++++++++++++-
->>>  2 files changed, 15 insertions(+), 1 deletion(-)
->>>
->>> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
->>> index d81f10f..a7a5548 100644
->>> --- a/include/linux/irqchip/arm-gic-v3.h
->>> +++ b/include/linux/irqchip/arm-gic-v3.h
->>> @@ -338,9 +338,11 @@
->>>  #define E_ITS_INT_UNMAPPED_INTERRUPT		0x010307
->>>  #define E_ITS_CLEAR_UNMAPPED_INTERRUPT		0x010507
->>>  #define E_ITS_MAPD_DEVICE_OOR			0x010801
->>> +#define E_ITS_MAPD_ITTSIZE_OOR			0x010802
->>>  #define E_ITS_MAPC_PROCNUM_OOR			0x010902
->>>  #define E_ITS_MAPC_COLLECTION_OOR		0x010903
->>>  #define E_ITS_MAPTI_UNMAPPED_DEVICE		0x010a04
->>> +#define E_ITS_MAPTI_ID_OOR			0x010a05
->>>  #define E_ITS_MAPTI_PHYSICALID_OOR		0x010a06
->>>  #define E_ITS_INV_UNMAPPED_INTERRUPT		0x010c07
->>>  #define E_ITS_INVALL_UNMAPPED_COLLECTION	0x010d09
->>> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
->>> index 6d84508..56bcd92 100644
->>> --- a/virt/kvm/arm/vgic/vgic-its.c
->>> +++ b/virt/kvm/arm/vgic/vgic-its.c
->>> @@ -99,6 +99,7 @@ struct its_device {
->>>  
->>>  	/* the head for the list of ITTEs */
->>>  	struct list_head itt_head;
->>> +	u32 nb_eventid_bits;
->>>  	u32 device_id;
->>>  };
->>>  
->>> @@ -177,6 +178,7 @@ static struct its_ite *find_ite(struct vgic_its *its, u32 device_id,
->>>  #define GIC_LPI_OFFSET 8192
->>>  
->>>  #define VITS_ESZ 8
->>> +#define VITS_TYPER_IDBITS 0xF
->>
->> Alone for consistency reasons I'd use "16" here and subtract one upon
->> encoding this into the TYPER register.
-> OK done
->>
->>>  
->>>  /*
->>>   * Finds and returns a collection in the ITS collection table.
->>> @@ -400,7 +402,7 @@ static unsigned long vgic_mmio_read_its_typer(struct kvm *kvm,
->>>  	 * DevBits low - as least for the time being.
->>>  	 */
->>>  	reg |= 0x0f << GITS_TYPER_DEVBITS_SHIFT;
->>> -	reg |= 0x0f << GITS_TYPER_IDBITS_SHIFT;
->>> +	reg |= VITS_TYPER_IDBITS << GITS_TYPER_IDBITS_SHIFT;
->>>  	reg |= (VITS_ESZ - 1) << GITS_TYPER_ITT_ENTRY_SIZE_SHIFT;
->>>  
->>>  	return extract_bytes(reg, addr & 7, len);
->>> @@ -560,6 +562,7 @@ static u64 its_cmd_mask_field(u64 *its_cmd, int word, int shift, int size)
->>>  #define its_cmd_get_collection(cmd)	its_cmd_mask_field(cmd, 2,  0, 16)
->>>  #define its_cmd_get_target_addr(cmd)	its_cmd_mask_field(cmd, 2, 16, 32)
->>>  #define its_cmd_get_validbit(cmd)	its_cmd_mask_field(cmd, 2, 63,  1)
->>> +#define its_cmd_get_size(cmd)		its_cmd_mask_field(cmd, 1, 0,  5)
->>
->> Can you please move this up to be in order with the other fields?
-> done
->>
->>>  /*
->>>   * The DISCARD command frees an Interrupt Translation Table Entry (ITTE).
->>> @@ -745,6 +748,9 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
->>>  	if (!device)
->>>  		return E_ITS_MAPTI_UNMAPPED_DEVICE;
->>>  
->>> +	if (event_id >= (2 << device->nb_eventid_bits))
->>
->> And I'd find it less confusing to hold the actual bit size in
->> nb_eventid_bits (and abstract from the particular encoding in TYPER).
->> That would avoid this slightly odd (2 << ...) here, for instance.
-> OK I replaced nb_eventid_bits by nb_eventids which corresponds to the
-> the max number of eventids for this device
-> 
-> More than odd, the shift is completely wrong. Now I use BIT_ULL() as you
-> mentioned later on.
-> 
-> The only drawback is that when flushing the DTE I need to use ilog2 to
-> encode the size field again.
+Nit: If I am not mistaken it can be made a percpu pointer.
 
-Oh sorry, I am fine (and actually prefer) to encode the number of bits,
-but the *actual* number of bits, not something like -1. This seems to be
-a bit inconsistent throughout the series, I was suspecting that those "2
-<< x" expressions were to take care of the -1/+1 encoding.
-The problem with using the actual number (apart from the ilog2 issue) is
-that you can't really cover exactly 32 bits worth of devices.
+Other than that:
 
-So sorry for the confusion, and hope you can easily revert your change ;-)
+Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 
-Cheers,
-Andre.
-
->>
->>> +		return E_ITS_MAPTI_ID_OOR;
->>> +
->>>  	if (its_cmd_get_command(its_cmd) == GITS_CMD_MAPTI)
->>>  		lpi_nr = its_cmd_get_physical_id(its_cmd);
->>>  	else
->>> @@ -825,11 +831,15 @@ static int vgic_its_cmd_handle_mapd(struct kvm *kvm, struct vgic_its *its,
->>>  {
->>>  	u32 device_id = its_cmd_get_deviceid(its_cmd);
->>>  	bool valid = its_cmd_get_validbit(its_cmd);
->>> +	size_t size = its_cmd_get_size(its_cmd);
->>
->> If you add 1 here, you'd make clear that this is an encoding property.
-> done
+>  bool acpi_parking_protocol_valid(int cpu)
+>  {
+> -	struct cpu_mailbox_entry *cpu_entry = &cpu_mailbox_entries[cpu];
+> +	struct acpi_madt_generic_interrupt *p = acpi_cpu_get_madt_gicc(cpu);
+>  
+> -	return cpu_entry->mailbox_addr && cpu_entry->version;
+> +	return p->parked_address && p->parking_version;
+>  }
+>  
+>  static int acpi_parking_protocol_cpu_init(unsigned int cpu)
+>  {
+> +	struct acpi_madt_generic_interrupt *p = acpi_cpu_get_madt_gicc(cpu);
+> +
+>  	pr_debug("%s: ACPI parked addr=%llx\n", __func__,
+> -		  cpu_mailbox_entries[cpu].mailbox_addr);
+> +		 p->parked_address);
+>  
+>  	return 0;
+>  }
+> @@ -69,7 +54,7 @@ static int acpi_parking_protocol_cpu_prepare(unsigned int cpu)
+>  
+>  static int acpi_parking_protocol_cpu_boot(unsigned int cpu)
+>  {
+> -	struct cpu_mailbox_entry *cpu_entry = &cpu_mailbox_entries[cpu];
+> +	struct acpi_madt_generic_interrupt *p = acpi_cpu_get_madt_gicc(cpu);
+>  	struct parking_protocol_mailbox __iomem *mailbox;
+>  	__le32 cpu_id;
+>  
+> @@ -84,7 +69,7 @@ static int acpi_parking_protocol_cpu_boot(unsigned int cpu)
+>  	 * by the kernel (it clashes with the linear mapping attributes
+>  	 * specifications).
+>  	 */
+> -	mailbox = ioremap(cpu_entry->mailbox_addr, sizeof(*mailbox));
+> +	mailbox = ioremap(p->parked_address, sizeof(*mailbox));
+>  	if (!mailbox)
+>  		return -EIO;
+>  
+> @@ -102,7 +87,7 @@ static int acpi_parking_protocol_cpu_boot(unsigned int cpu)
+>  	 * stash the mailbox address mapping to use it for further FW
+>  	 * checks in the postboot method
+>  	 */
+> -	cpu_entry->mailbox = mailbox;
+> +	mailboxes[cpu] = mailbox;
+>  
+>  	/*
+>  	 * We write the entry point and cpu id as LE regardless of the
+> @@ -111,7 +96,7 @@ static int acpi_parking_protocol_cpu_boot(unsigned int cpu)
+>  	 * Boot-Loader's endianness before jumping.
+>  	 */
+>  	writeq_relaxed(__pa_symbol(secondary_entry), &mailbox->entry_point);
+> -	writel_relaxed(cpu_entry->gic_cpu_id, &mailbox->cpu_id);
+> +	writel_relaxed(p->cpu_interface_number, &mailbox->cpu_id);
+>  
+>  	arch_send_wakeup_ipi_mask(cpumask_of(cpu));
+>  
+> @@ -121,8 +106,7 @@ static int acpi_parking_protocol_cpu_boot(unsigned int cpu)
+>  static void acpi_parking_protocol_cpu_postboot(void)
+>  {
+>  	int cpu = smp_processor_id();
+> -	struct cpu_mailbox_entry *cpu_entry = &cpu_mailbox_entries[cpu];
+> -	struct parking_protocol_mailbox __iomem *mailbox = cpu_entry->mailbox;
+> +	struct parking_protocol_mailbox __iomem *mailbox = mailboxes[cpu];
+>  	__le64 entry_point;
+>  
+>  	entry_point = readl_relaxed(&mailbox->entry_point);
+> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+> index 390c277..b37dd83 100644
+> --- a/arch/arm64/kernel/smp.c
+> +++ b/arch/arm64/kernel/smp.c
+> @@ -572,17 +572,6 @@ struct acpi_madt_generic_interrupt *acpi_cpu_get_madt_gicc(int cpu)
+>  
+>  	cpu_madt_gicc[cpu_count] = *processor;
+>  
+> -	/*
+> -	 * Set-up the ACPI parking protocol cpu entries
+> -	 * while initializing the cpu_logical_map to
+> -	 * avoid parsing MADT entries multiple times for
+> -	 * nothing (ie a valid cpu_logical_map entry should
+> -	 * contain a valid parking protocol data set to
+> -	 * initialize the cpu if the parking protocol is
+> -	 * the only available enable method).
+> -	 */
+> -	acpi_set_mailbox_entry(cpu_count, processor);
+> -
+>  	early_map_cpu_to_node(cpu_count, acpi_numa_get_nid(cpu_count, hwid));
+>  
+>  	cpu_count++;
+> -- 
+> 1.9.1
 > 
-> Thanks
-> 
-> Eric
-> 
->>
->> Cheers,
->> Andre.
->>
->>>  	struct its_device *device;
->>>  
->>>  	if (!vgic_its_check_id(its, its->baser_device_table, device_id))
->>>  		return E_ITS_MAPD_DEVICE_OOR;
->>>  
->>> +	if (valid && size > VITS_TYPER_IDBITS)
->>> +		return E_ITS_MAPD_ITTSIZE_OOR;
->>> +
->>>  	device = find_its_device(its, device_id);
->>>  
->>>  	/*
->>> @@ -852,6 +862,8 @@ static int vgic_its_cmd_handle_mapd(struct kvm *kvm, struct vgic_its *its,
->>>  		return -ENOMEM;
->>>  
->>>  	device->device_id = device_id;
->>> +	device->nb_eventid_bits = size + 1;
->>> +
->>>  	INIT_LIST_HEAD(&device->itt_head);
->>>  
->>>  	list_add_tail(&device->dev_list, &its->device_list);
->>>
