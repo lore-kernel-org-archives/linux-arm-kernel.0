@@ -1,103 +1,193 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Tue, 21 Mar 2017 18:04:17 +0000
-Subject: [PATCH 3/7] arm64: hugetlb: Refactor find_num_contig
-In-Reply-To: <20170321180421.18332-1-punit.agrawal@arm.com>
-References: <20170321180421.18332-1-punit.agrawal@arm.com>
-Message-ID: <20170321180421.18332-4-punit.agrawal@arm.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Tue, 21 Mar 2017 18:12:40 +0000
+Subject: [PATCH v3 14/19] KVM: arm64: ITS: Add infrastructure for table
+ lookup
+In-Reply-To: <1488800074-21991-15-git-send-email-eric.auger@redhat.com>
+References: <1488800074-21991-1-git-send-email-eric.auger@redhat.com>
+ <1488800074-21991-15-git-send-email-eric.auger@redhat.com>
+Message-ID: <841f3278-b101-b920-c4a9-0d97b34c9a8a@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Steve Capper <steve.capper@arm.com>
+Hi,
 
-As we regularly check for contiguous pte's in the huge accessors, remove
-this extra check from find_num_contig.
+On 06/03/17 11:34, Eric Auger wrote:
+> Add a generic lookup_table() helper whose role consists in
+> scanning a contiguous table located in guest RAM and applying
+> a callback on each entry. Entries can be handled as linked lists
+> since the callback may return an offset to the next entry and
+> also tell that an entry is the last one.
+> 
+> Helper functions also are added to compute the device/event ID
+> offset to the next DTE/ITE.
+> 
+> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+> ---
+>  virt/kvm/arm/vgic/vgic-its.c | 119 +++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 119 insertions(+)
+> 
+> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+> index 1cd6ae6..cf04776 100644
+> --- a/virt/kvm/arm/vgic/vgic-its.c
+> +++ b/virt/kvm/arm/vgic/vgic-its.c
+> @@ -181,6 +181,8 @@ static struct its_ite *find_ite(struct vgic_its *its, u32 device_id,
+>  #define VITS_ESZ 8
+>  #define VITS_TYPER_IDBITS 0xF
+>  #define VITS_TYPER_DEVBITS 0xF
+> +#define VITS_DTE_MAX_DEVID_OFFSET GENMASK(19, 0)
+> +#define VITS_ITE_MAX_EVENTID_OFFSET GENMASK(16, 0)
 
-Cc: David Woods <dwoods@mellanox.com>
-Signed-off-by: Steve Capper <steve.capper@arm.com>
-Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
----
- arch/arm64/mm/hugetlbpage.c | 17 ++++++++---------
- 1 file changed, 8 insertions(+), 9 deletions(-)
+GENMASK here is a bit misleading, I think (BIT(20) - 1) would be
+clearer, wouldn't it?
 
-diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
-index aacbe18e6640..81bc6e4cf714 100644
---- a/arch/arm64/mm/hugetlbpage.c
-+++ b/arch/arm64/mm/hugetlbpage.c
-@@ -42,15 +42,13 @@ int pud_huge(pud_t pud)
- }
- 
- static int find_num_contig(struct mm_struct *mm, unsigned long addr,
--			   pte_t *ptep, pte_t pte, size_t *pgsize)
-+			   pte_t *ptep, size_t *pgsize)
- {
- 	pgd_t *pgd = pgd_offset(mm, addr);
- 	pud_t *pud;
- 	pmd_t *pmd;
- 
- 	*pgsize = PAGE_SIZE;
--	if (!pte_cont(pte))
--		return 1;
- 	pud = pud_offset(pgd, addr);
- 	pmd = pmd_offset(pud, addr);
- 	if ((pte_t *)pmd == ptep) {
-@@ -65,7 +63,7 @@ void set_huge_pte_at(struct mm_struct *mm, unsigned long addr,
- {
- 	size_t pgsize;
- 	int i;
--	int ncontig = find_num_contig(mm, addr, ptep, pte, &pgsize);
-+	int ncontig;
- 	unsigned long pfn;
- 	pgprot_t hugeprot;
- 
-@@ -75,11 +73,12 @@ void set_huge_pte_at(struct mm_struct *mm, unsigned long addr,
- 	 */
- 	WARN_ON(!pte_present(pte));
- 
--	if (ncontig == 1) {
-+	if (!pte_cont(pte)) {
- 		set_pte_at(mm, addr, ptep, pte);
- 		return;
- 	}
- 
-+	ncontig = find_num_contig(mm, addr, ptep, &pgsize);
- 	pfn = pte_pfn(pte);
- 	hugeprot = __pgprot(pte_val(pfn_pte(pfn, __pgprot(0))) ^ pte_val(pte));
- 	for (i = 0; i < ncontig; i++) {
-@@ -203,7 +202,7 @@ pte_t huge_ptep_get_and_clear(struct mm_struct *mm,
- 		bool is_dirty = false;
- 
- 		cpte = huge_pte_offset(mm, addr);
--		ncontig = find_num_contig(mm, addr, cpte, *cpte, &pgsize);
-+		ncontig = find_num_contig(mm, addr, cpte, &pgsize);
- 		/* save the 1st pte to return */
- 		pte = ptep_get_and_clear(mm, addr, cpte);
- 		for (i = 1, addr += pgsize; i < ncontig; ++i, addr += pgsize) {
-@@ -243,7 +242,7 @@ int huge_ptep_set_access_flags(struct vm_area_struct *vma,
- 		cpte = huge_pte_offset(vma->vm_mm, addr);
- 		pfn = pte_pfn(*cpte);
- 		ncontig = find_num_contig(vma->vm_mm, addr, cpte,
--					  *cpte, &pgsize);
-+					  &pgsize);
- 		for (i = 0; i < ncontig; ++i, ++cpte, addr += pgsize) {
- 			changed |= ptep_set_access_flags(vma, addr, cpte,
- 							pfn_pte(pfn,
-@@ -266,7 +265,7 @@ void huge_ptep_set_wrprotect(struct mm_struct *mm,
- 		size_t pgsize = 0;
- 
- 		cpte = huge_pte_offset(mm, addr);
--		ncontig = find_num_contig(mm, addr, cpte, *cpte, &pgsize);
-+		ncontig = find_num_contig(mm, addr, cpte, &pgsize);
- 		for (i = 0; i < ncontig; ++i, ++cpte, addr += pgsize)
- 			ptep_set_wrprotect(mm, addr, cpte);
- 	} else {
-@@ -284,7 +283,7 @@ void huge_ptep_clear_flush(struct vm_area_struct *vma,
- 
- 		cpte = huge_pte_offset(vma->vm_mm, addr);
- 		ncontig = find_num_contig(vma->vm_mm, addr, cpte,
--					  *cpte, &pgsize);
-+					  &pgsize);
- 		for (i = 0; i < ncontig; ++i, ++cpte, addr += pgsize)
- 			ptep_clear_flush(vma, addr, cpte);
- 	} else {
--- 
-2.11.0
+>  
+>  /*
+>   * Finds and returns a collection in the ITS collection table.
+> @@ -1607,6 +1609,123 @@ int vgic_its_attr_regs_access(struct kvm_device *dev,
+>  	return 0;
+>  }
+>  
+> +static u32 compute_next_devid_offset(struct list_head *h,
+> +				     struct its_device *dev)
+> +{
+> +	struct list_head *e = &dev->dev_list;
+> +	struct its_device *next;
+> +	u32 next_offset;
+> +
+> +	if (e->next == h)
+> +		return 0;
+> +	next = list_entry(e->next, struct its_device, dev_list);
+> +	next_offset = next->device_id - dev->device_id;
+> +
+> +	return next_offset < VITS_DTE_MAX_DEVID_OFFSET ?
+> +			next_offset : VITS_DTE_MAX_DEVID_OFFSET;
+
+	return min(next_offset, VITS_DTE_MAX_DEVID_OFFSET);
+
+> +}
+> +
+> +static u32 compute_next_eventid_offset(struct list_head *h,
+> +				       struct its_ite *ite)
+> +{
+> +	struct list_head *e = &ite->ite_list;
+> +	struct its_ite *next;
+> +	u32 next_offset;
+> +
+> +	if (e->next == h)
+> +		return 0;
+> +	next = list_entry(e->next, struct its_ite, ite_list);
+> +	next_offset = next->event_id - ite->event_id;
+> +
+> +	return next_offset < VITS_ITE_MAX_EVENTID_OFFSET ?
+> +			next_offset : VITS_ITE_MAX_EVENTID_OFFSET;
+
+	return min(next_offset, VITS_ITE_MAX_EVENTID_OFFSET);
+
+> +}
+> +
+> +static int next_segment(unsigned long len, int offset)
+
+Isn't "segment" a page, really? And thus should be named like this?
+
+> +{
+> +	if (len > PAGE_SIZE - offset)
+> +		return PAGE_SIZE - offset;
+> +	else
+> +		return len;
+> +}
+
+Can be: return min(len, PAGE_SIZE - offset); which means it could be a
+macro even.
+
+> +
+> +/**
+> + * entry_fn_t - Callback called on a table entry restore path
+> + * @its: its handle
+> + * @id: id of the entry
+> + * @addr: kernel VA of the entry
+> + * @opaque: pointer to an opaque data
+> + * @next_offset: minimal ID offset to the next entry. 0 if this
+> + * entry is the last one, 1 if the entry is invalid, >= 1 if an
+> + * entry's next_offset field was truly decoded
+> + *
+> + * Return: < 0 on error, 0 otherwise
+> + */
+> +typedef int (*entry_fn_t)(struct vgic_its *its, u32 id, void *addr,
+> +			  void *opaque, u32 *next_offset);
+> +
+> +/**
+> + * lookup_table - scans a contiguous table in guest RAM and applies a function
+> + * to each entry
+> + *
+> + * @its: its handle
+> + * @base: base gpa of the table
+> + * @size: size of the table in bytes
+> + * @esz: entry size in bytes
+> + * @start_id: first entry's ID
+> + * @fn: function to apply on each entry
+> + *
+> + * Return: < 0 on error, 1 if last element identified, 0 otherwise
+> + */
+> +static int lookup_table(struct vgic_its *its, gpa_t base, int size, int esz,
+
+   ^^^^^^
+Won't this trigger a build warning when building at this patch only?
+
+The rest looks fine.
+
+Cheers,
+Andre
+
+
+> +			int start_id, entry_fn_t fn, void *opaque)
+> +{
+> +	gpa_t gpa = base, top = base + size - 1;
+> +	unsigned long len = top - gpa;
+> +	int ret, seg, offset = offset_in_page(gpa);
+> +	gfn_t gfn = gpa >> PAGE_SHIFT;
+> +	u32 id = start_id + (gpa - base)/esz;
+> +	struct kvm *kvm = its->dev->kvm;
+> +	kvm_pfn_t pfn;
+> +
+> +	while ((seg = next_segment(len, offset)) != 0) {
+> +		u32 next_offset;
+> +		bool writeable;
+> +		void *addr;
+> +
+> +		pfn = gfn_to_pfn_prot(kvm, gfn, true, &writeable);
+> +		if (is_error_noslot_pfn(pfn))
+> +			return -EINVAL;
+> +		addr = phys_to_virt((u64)pfn << PAGE_SHIFT);
+> +		addr += offset;
+> +
+> +		while (seg > 0) {
+> +			size_t byte_offset;
+> +
+> +			ret = fn(its, id, addr, opaque, &next_offset);
+> +			if (ret < 0 || (!ret && !next_offset))
+> +				goto out;
+> +
+> +			byte_offset = next_offset * esz;
+> +
+> +			id += next_offset;
+> +			gpa += byte_offset;
+> +			addr += byte_offset;
+> +			seg -= byte_offset;
+> +		}
+> +		kvm_release_pfn_clean(pfn);
+> +
+> +		len = top - gpa;
+> +		offset = offset_in_page(gpa);
+> +		gfn = gpa >> PAGE_SHIFT;
+> +		id = start_id + (gpa - base)/esz;
+> +	}
+> +	return 0;
+> +out:
+> +	kvm_release_pfn_clean(pfn);
+> +	return (ret < 0 ? ret : 1);
+> +}
+> +
+>  /**
+>   * vgic_its_flush_pending_tables - Flush the pending tables into guest RAM
+>   */
+> 
