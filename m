@@ -1,130 +1,194 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 21 Mar 2017 14:36:00 +0000
-Subject: [PATCH 5/5] KVM: arm/arm64: vgic: Get rid of struct vmcr for GICv2
-In-Reply-To: <20170321110530.15857-6-cdall@linaro.org>
-References: <20170321110530.15857-1-cdall@linaro.org>
- <20170321110530.15857-6-cdall@linaro.org>
-Message-ID: <8db97d92-be13-2e9a-90c6-e834e442ba5e@arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 21 Mar 2017 14:45:21 +0000
+Subject: [PATCH v9 15/15] irqchip: mbigen: Add ACPI support
+In-Reply-To: <1488890410-15503-16-git-send-email-guohanjun@huawei.com>
+References: <1488890410-15503-1-git-send-email-guohanjun@huawei.com>
+ <1488890410-15503-16-git-send-email-guohanjun@huawei.com>
+Message-ID: <20170321144521.GA4392@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/03/17 11:05, Christoffer Dall wrote:
-> There is no common code in the VGIC that uses the VMCR, so we have no
-> use of the intermediate architecture-agnostic representation of the VMCR
-> and might as well manipulate the bits specifically using the logic for
-> the version of the GIC that the code supports.
+On Tue, Mar 07, 2017 at 08:40:10PM +0800, Hanjun Guo wrote:
+> From: Hanjun Guo <hanjun.guo@linaro.org>
 > 
-> For GICv2, this means translating between the GICH_VMCR register format
-> stored in memory and the GICC_X registers exported to user space, with
-> the annoying quirk around the format of the GICC_PMR, where we export
-> the 8 bit prority field using the lower 5 bits and always assuming
-> bits[2:0] are clear.
+> With the preparation of platform msi support and interrupt producer
+> in DSDT, we can add mbigen ACPI support now.
 > 
-> This now lets us get completely rid of struct vmcr and its common
-> accessor functions.
+> We are using Interrupt resource type in _CRS methd to indicate number
+> of irq pins instead of num_pins in DT to avoid _DSD usage in this case.
 > 
-> Signed-off-by: Christoffer Dall <cdall@linaro.org>
+> For mbigen,
+>     Device(MBI0) {
+>           Name(_HID, "HISI0152")
+>           Name(_UID, Zero)
+>           Name(_CRS, ResourceTemplate() {
+>                   Memory32Fixed(ReadWrite, 0xa0080000, 0x10000)
+> 		  Interrupt(ResourceProducer,...) {12,14,....}
+
+What do these interrupt numbers represent ? This looks wrong to me.
+An interrupt descriptor is there to describe the interrupts a device
+can generate; you are using it just to add a "standard" (that is
+not standard at all) way of counting the number of vectors allocated
+to this specific chip and that's just wrong.
+
+Can't you use something like Agustin did in the QCOM combiner:
+
+drivers/irqchip/qcom-irq-combiner.c
+
+to detect the MSI vector length (ie by describing the MBIgen through
+generic registers and use the bit width to compute the vector
+lenght) ? I am not sure how feasible it is given that my knowledge
+of MBIgen is pretty poor.
+
+I understand we want to avoid _DSD properties but we should not
+work around standard bindings to achieve that goal.
+
+Side effect: IIUC the kernel will allocate an array of resources for
+your MBIgen interrupts whose size equal the Interrupt descriptor,
+which is as bad as it can get given that those resources are to
+the best of my knowledge unused.
+
+Lorenzo
+
+>           })
+>     }
+> 
+> For devices,
+>    Device(COM0) {
+>           Name(_HID, "ACPIIDxx")
+>           Name(_UID, Zero)
+>           Name(_CRS, ResourceTemplate() {
+>                  Memory32Fixed(ReadWrite, 0xb0030000, 0x10000)
+> 		 Interrupt(ResourceConsumer,..., "\_SB.MBI0") {12}
+>           })
+>     }
+> 
+> With the help of platform msi and interrupt producer, then devices
+> will get the virq from mbigen's irqdomain.
+> 
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Ma Jun <majun258@huawei.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
 > ---
->  virt/kvm/arm/vgic/vgic-mmio-v2.c | 51 +++++++++++++++++++++++++++++-----------
->  virt/kvm/arm/vgic/vgic-mmio.c    | 16 -------------
->  virt/kvm/arm/vgic/vgic-v2.c      | 29 -----------------------
->  virt/kvm/arm/vgic/vgic.h         | 14 -----------
->  4 files changed, 37 insertions(+), 73 deletions(-)
+>  drivers/irqchip/irq-mbigen.c | 70 ++++++++++++++++++++++++++++++++++++++++++--
+>  1 file changed, 67 insertions(+), 3 deletions(-)
 > 
-> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-> index a3ad7ff..1bdb990 100644
-> --- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
-> +++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-> @@ -219,23 +219,33 @@ static void vgic_mmio_write_sgipends(struct kvm_vcpu *vcpu,
->  static unsigned long vgic_mmio_read_vcpuif(struct kvm_vcpu *vcpu,
->  					   gpa_t addr, unsigned int len)
+> diff --git a/drivers/irqchip/irq-mbigen.c b/drivers/irqchip/irq-mbigen.c
+> index 3756408..e6bb503 100644
+> --- a/drivers/irqchip/irq-mbigen.c
+> +++ b/drivers/irqchip/irq-mbigen.c
+> @@ -16,6 +16,7 @@
+>   * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+>   */
+>  
+> +#include <linux/acpi.h>
+>  #include <linux/interrupt.h>
+>  #include <linux/irqchip.h>
+>  #include <linux/module.h>
+> @@ -180,7 +181,7 @@ static int mbigen_domain_translate(struct irq_domain *d,
+>  				    unsigned long *hwirq,
+>  				    unsigned int *type)
 >  {
-> -	struct vgic_vmcr vmcr;
-> +	u32 vmcr = vcpu->arch.vgic_cpu.vgic_v2.vgic_vmcr;
->  	u32 val;
+> -	if (is_of_node(fwspec->fwnode)) {
+> +	if (is_of_node(fwspec->fwnode) || is_acpi_device_node(fwspec->fwnode)) {
+>  		if (fwspec->param_count != 2)
+>  			return -EINVAL;
 >  
-> -	vgic_get_vmcr(vcpu, &vmcr);
+> @@ -271,6 +272,54 @@ static int mbigen_of_create_domain(struct platform_device *pdev,
+>  	return 0;
+>  }
 >  
->  	switch (addr & 0xff) {
->  	case GIC_CPU_CTRL:
-> -		val = vmcr.ctlr;
-> +		val = (vmcr & GICH_VMCR_CTRL_MASK) >>
-> +			GICH_VMCR_CTRL_SHIFT;
->  		break;
->  	case GIC_CPU_PRIMASK:
-> -		val = vmcr.pmr;
-> +		/*
-> +		 * Our KVM_DEV_TYPE_ARM_VGIC_V2 device ABI exports the
-> +		 * the PMR field as GICH_VMCR.VMPriMask rather than
-> +		 * GICC_PMR.Priority, so we expose the upper five bits of
-> +		 * priority mask to userspace using the lower bits in the
-> +		 * 32-bit word provided by userspace.
-> +		 */
-> +		val = (vmcr & GICH_VMCR_PRIMASK_MASK) >>
-> +			GICH_VMCR_PRIMASK_SHIFT;
->  		break;
->  	case GIC_CPU_BINPOINT:
-> -		val = vmcr.bpr;
-> +		val = (vmcr & GICH_VMCR_BINPOINT_MASK) >>
-> +			GICH_VMCR_BINPOINT_SHIFT;
->  		break;
->  	case GIC_CPU_ALIAS_BINPOINT:
-> -		val = vmcr.abpr;
-> +		val = (vmcr & GICH_VMCR_ALIAS_BINPOINT_MASK) >>
-> +			GICH_VMCR_ALIAS_BINPOINT_SHIFT;
->  		break;
->  	case GIC_CPU_IDENT:
->  		val = ((PRODUCT_ID_KVM << 20) |
-> @@ -253,26 +263,39 @@ static void vgic_mmio_write_vcpuif(struct kvm_vcpu *vcpu,
->  				   gpa_t addr, unsigned int len,
->  				   unsigned long val)
->  {
-> -	struct vgic_vmcr vmcr;
-> -
-> -	vgic_get_vmcr(vcpu, &vmcr);
-> +	u32 *vmcr = &vcpu->arch.vgic_cpu.vgic_v2.vgic_vmcr;
-> +	u32 mask, field;
->  
->  	switch (addr & 0xff) {
->  	case GIC_CPU_CTRL:
-> -		vmcr.ctlr = val;
-> +		mask = GICH_VMCR_CTRL_MASK;
-> +		field = val << GICH_VMCR_CTRL_SHIFT;
->  		break;
->  	case GIC_CPU_PRIMASK:
-> -		vmcr.pmr = val;
-> +		/*
-> +		 * Our KVM_DEV_TYPE_ARM_VGIC_V2 device ABI exports the
-> +		 * the PMR field as GICH_VMCR.VMPriMask rather than
-> +		 * GICC_PMR.Priority, so we obtain the upper five bits of
-> +		 * priority mask from userspace using the lower bits in the
-> +		 * 32-bit word provided by userspace.
-> +		 */
-> +		mask = GICH_VMCR_PRIMASK_MASK;
-> +		field = val << GICH_VMCR_PRIMASK_SHIFT;
->  		break;
->  	case GIC_CPU_BINPOINT:
-> -		vmcr.bpr = val;
-> +		mask = GICH_VMCR_BINPOINT_MASK;
-> +		field = val << GICH_VMCR_BINPOINT_SHIFT;
->  		break;
->  	case GIC_CPU_ALIAS_BINPOINT:
-> -		vmcr.abpr = val;
-> +		mask = GICH_VMCR_ALIAS_BINPOINT_MASK;
-> +		field = val << GICH_VMCR_ALIAS_BINPOINT_SHIFT;
->  		break;
+> +#ifdef CONFIG_ACPI
+> +static acpi_status mbigen_acpi_process_resource(struct acpi_resource *ares,
+> +					     void *context)
+> +{
+> +	struct acpi_resource_extended_irq *ext_irq;
+> +	u32 *num_irqs = context;
+> +
+> +	switch (ares->type) {
+> +	case ACPI_RESOURCE_TYPE_EXTENDED_IRQ:
+> +		ext_irq = &ares->data.extended_irq;
+> +		*num_irqs += ext_irq->interrupt_count;
+> +		break;
 > +	default:
-> +		return;
-
-
-Something seems fishy here. If I have a GICv2-on-GICv3, my vmcr is still
-that of a GICv3, not of a GICv2. Here, you're cramming everything into a
-v2 representation, which is not going to work on GICv3.
-
-Or am I missing something?
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> +		break;
+> +	}
+> +
+> +	return AE_OK;
+> +}
+> +
+> +static int mbigen_acpi_create_domain(struct platform_device *pdev,
+> +				     struct mbigen_device *mgn_chip)
+> +{
+> +	struct irq_domain *domain;
+> +	u32 num_msis = 0;
+> +	acpi_status status;
+> +
+> +	status = acpi_walk_resources(ACPI_HANDLE(&pdev->dev), METHOD_NAME__CRS,
+> +				     mbigen_acpi_process_resource, &num_msis);
+> +	if (ACPI_FAILURE(status) || num_msis == 0)
+> +		return -EINVAL;
+> +
+> +	domain = platform_msi_create_device_domain(&pdev->dev, num_msis,
+> +						   mbigen_write_msg,
+> +						   &mbigen_domain_ops,
+> +						   mgn_chip);
+> +	if (!domain)
+> +		return -ENOMEM;
+> +
+> +	return 0;
+> +}
+> +#else
+> +static inline int mbigen_acpi_create_domain(struct platform_device *pdev,
+> +					    struct mbigen_device *mgn_chip)
+> +{
+> +	return -ENODEV;
+> +}
+> +#endif
+> +
+>  static int mbigen_device_probe(struct platform_device *pdev)
+>  {
+>  	struct mbigen_device *mgn_chip;
+> @@ -289,9 +338,17 @@ static int mbigen_device_probe(struct platform_device *pdev)
+>  	if (IS_ERR(mgn_chip->base))
+>  		return PTR_ERR(mgn_chip->base);
+>  
+> -	err = mbigen_of_create_domain(pdev, mgn_chip);
+> -	if (err)
+> +	if (IS_ENABLED(CONFIG_OF) && pdev->dev.of_node)
+> +		err = mbigen_of_create_domain(pdev, mgn_chip);
+> +	else if (ACPI_COMPANION(&pdev->dev))
+> +		err = mbigen_acpi_create_domain(pdev, mgn_chip);
+> +	else
+> +		err = -EINVAL;
+> +
+> +	if (err) {
+> +		dev_err(&pdev->dev, "Failed to create mbi-gen@%p irqdomain", mgn_chip->base);
+>  		return err;
+> +	}
+>  
+>  	platform_set_drvdata(pdev, mgn_chip);
+>  	return 0;
+> @@ -303,10 +360,17 @@ static int mbigen_device_probe(struct platform_device *pdev)
+>  };
+>  MODULE_DEVICE_TABLE(of, mbigen_of_match);
+>  
+> +static const struct acpi_device_id mbigen_acpi_match[] = {
+> +	{ "HISI0152", 0 },
+> +	{}
+> +};
+> +MODULE_DEVICE_TABLE(acpi, mbigen_acpi_match);
+> +
+>  static struct platform_driver mbigen_platform_driver = {
+>  	.driver = {
+>  		.name		= "Hisilicon MBIGEN-V2",
+>  		.of_match_table	= mbigen_of_match,
+> +		.acpi_match_table = ACPI_PTR(mbigen_acpi_match),
+>  	},
+>  	.probe			= mbigen_device_probe,
+>  };
+> -- 
+> 1.7.12.4
+> 
