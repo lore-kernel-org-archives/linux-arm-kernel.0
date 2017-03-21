@@ -1,35 +1,29 @@
-From: al.kochet@gmail.com (Alexander Kochetkov)
-Date: Tue, 21 Mar 2017 18:40:22 +0300
-Subject: [PATCH] ARM: dts: rockchip: increase SD clock frequency on Radxa Rock
-Message-ID: <1490110822-3310-1-git-send-email-al.kochet@gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 21 Mar 2017 15:43:32 +0000
+Subject: [PATCH 1/2] arm64: reduce el2_setup branching
+In-Reply-To: <1487170457-17986-2-git-send-email-mark.rutland@arm.com>
+References: <1487170457-17986-1-git-send-email-mark.rutland@arm.com>
+ <1487170457-17986-2-git-send-email-mark.rutland@arm.com>
+Message-ID: <3832b7de-ef7c-8e7c-c9b0-de3e1f44cbb0@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch set SD clock frequency to maximum possible to SD-card
-(50MHz). This change actual clock frequency from 32MHz to 48MHz
-(speedup 1.5X).
+On 15/02/17 14:54, Mark Rutland wrote:
+> The early el2_setup code is a little convoluted, with two branches where
+> one would do. This makes the code more painful to read than is
+> necessary.
+> 
+> We can remove a branch and simplify the logic by moving the early return
+> in the booted-at-EL1 case earlier in the function. This separates it
+> from all the setup logic that only makes sense for EL2.
+> 
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
 
-Banner line before patch: 'mmc_host mmc0: Bus speed (slot 0) = 32000000Hz
-(slot req 50000000Hz, actual 32000000HZ div = 0)'.
-Banner line after patch: 'mmc_host mmc0: Bus speed (slot 0) = 96000000Hz
-(slot req 50000000Hz, actual 48000000HZ div = 1)'
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
-Signed-off-by: Alexander Kochetkov <al.kochet@gmail.com>
----
- arch/arm/boot/dts/rk3188-radxarock.dts |    1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/boot/dts/rk3188-radxarock.dts b/arch/arm/boot/dts/rk3188-radxarock.dts
-index 1da46d1..5b7daa4 100644
---- a/arch/arm/boot/dts/rk3188-radxarock.dts
-+++ b/arch/arm/boot/dts/rk3188-radxarock.dts
-@@ -302,6 +302,7 @@
- 	pinctrl-0 = <&sd0_clk>, <&sd0_cmd>, <&sd0_cd>, <&sd0_bus4>;
- 	vmmc-supply = <&vcc_sd0>;
- 
-+	clock-frequency = <50000000>;
- 	bus-width = <4>;
- 	cap-mmc-highspeed;
- 	cap-sd-highspeed;
+	M.
 -- 
-1.7.9.5
+Jazz is not dead. It just smells funny...
