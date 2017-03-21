@@ -1,25 +1,38 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 21 Mar 2017 14:09:54 +0530
-Subject: [PATCH v2 0/3] ATA/ARM: convert ARM/DaVinci to use libata PATA
- drivers
-In-Reply-To: <1489509414-11491-1-git-send-email-b.zolnierkie@samsung.com>
-References: <CGME20170314163738epcas5p3db719229d59550476c918a15d8c16d63@epcas5p3.samsung.com>
- <1489509414-11491-1-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <969837fd-a5a6-5583-f463-60cf924a4372@ti.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 21 Mar 2017 16:42:45 +0800
+Subject: [PATCH] arm64: dts: zte: remove zx296718 pll_vga clock
+Message-ID: <1490085765-16428-1-git-send-email-shawnguo@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 14 March 2017 10:06 PM, Bartlomiej Zolnierkiewicz wrote:
-> Hi,
-> 
-> This patchset adds Palmchip BK3710 IDE controller driver to
-> libata and switches ARM/DaVinci to use it (instead of the old
-> IDE driver).
-> 
-> Sekhar, please check that it still works after changes, thanks.
+From: Shawn Guo <shawn.guo@linaro.org>
 
-It looks like there are some comments pending. I would like to test
-again after those are dispositioned. Hope thats fine.
+Rather than a fixed rate clock, pll_vga is a PLL can be programmed into
+different freqencies.  Let's drop it from device tree and get it
+registered from clock driver.
 
-Thanks,
-Sekhar
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ arch/arm64/boot/dts/zte/zx296718.dtsi | 7 -------
+ 1 file changed, 7 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/zte/zx296718.dtsi b/arch/arm64/boot/dts/zte/zx296718.dtsi
+index 0c24f73e6c54..8c20d295fa86 100644
+--- a/arch/arm64/boot/dts/zte/zx296718.dtsi
++++ b/arch/arm64/boot/dts/zte/zx296718.dtsi
+@@ -235,13 +235,6 @@
+ 		clock-output-names = "pll_mac";
+ 	};
+ 
+-	pll_vga: clk-pll-1073m {
+-		compatible = "fixed-clock";
+-		#clock-cells = <0>;
+-		clock-frequency = <1073000000>;
+-		clock-output-names = "pll_vga";
+-	};
+-
+ 	pll_mm0: clk-pll-1188m {
+ 		compatible = "fixed-clock";
+ 		#clock-cells = <0>;
+-- 
+1.9.1
