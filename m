@@ -1,15 +1,20 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Wed, 22 Mar 2017 08:56:34 +0900
-Subject: arm64: dts: uniphier: UniPhier DT updates (64bit) for v4.12
-Message-ID: <CAK7LNASO1Ep2zb=dpwe3CbNmh9CBeBU5D2q90Ncpae-fwqzURQ@mail.gmail.com>
+Date: Wed, 22 Mar 2017 08:59:30 +0900
+Subject: [GIT PULL] (REPOST) arm64: dts: uniphier: UniPhier DT updates (64bit)
+ for v4.12
+Message-ID: <CAK7LNAR5SZH7eR781De80SrSsfczf7vU2Ok+kybYhZ_TXQaqRg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Arnd, Olof,
 
+
+I forgot to add [GIT PULL] tag,
+I am re-sending.  Sorry.
+
+
 Here are UniPhier DT (64bit) updates for the v4.12 merge window.
 Please pull!
-
 
 The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
 
@@ -44,7 +49,6 @@ Masahiro Yamada (4):
  arch/arm64/boot/dts/socionext/uniphier-ld20-ref.dts | 10 +++++-----
  arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi    |  4 +++-
  4 files changed, 22 insertions(+), 15 deletions(-)
-
 
 -- 
 Best Regards
