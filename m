@@ -1,35 +1,37 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 21 Mar 2017 11:51:57 +0000
-Subject: [PATCH] [v2] arm64: define BUG() instruction without CONFIG_BUG
-In-Reply-To: <CAK8P3a2d71PL4EaJ_hCAsjg3szG=0CFrLZ8U2AZvch=k3bv2gQ@mail.gmail.com>
-References: <20170314213939.3874497-1-arnd@arndb.de>
- <20170320190939.GR17263@arm.com>
- <CAK8P3a2d71PL4EaJ_hCAsjg3szG=0CFrLZ8U2AZvch=k3bv2gQ@mail.gmail.com>
-Message-ID: <20170321115156.GB12766@arm.com>
+From: gerg@linux-m68k.org (Greg Ungerer)
+Date: Tue, 21 Mar 2017 21:53:52 +1000
+Subject: [PATCH 2/2] spi: imx: fix use of native chip-selects with
+ devicetree
+In-Reply-To: <20170321080551.ie4xm5hr3fki365s@pengutronix.de>
+References: <1489726983-17706-1-git-send-email-gerg@linux-m68k.org>
+ <1489726983-17706-3-git-send-email-gerg@linux-m68k.org>
+ <f1cf2001-28b4-6a74-b98a-13336d74ff9d@mentor.com>
+ <4a8449d9-cc38-d642-0853-246f46ee7059@linux-m68k.org>
+ <20170321080551.ie4xm5hr3fki365s@pengutronix.de>
+Message-ID: <942cfc4b-445b-ca51-1823-2391cea62abf@linux-m68k.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 21, 2017 at 11:35:16AM +0100, Arnd Bergmann wrote:
-> On Mon, Mar 20, 2017 at 8:09 PM, Will Deacon <will.deacon@arm.com> wrote:
-> 
-> >>
-> >> -#define BUG() do {                           \
-> >> -     _BUG_FLAGS(0);                          \
-> >> -     unreachable();                          \
-> >> +#define _BUG_FLAGS(flags) __BUG_FLAGS(flags)
-> >
-> > What is this for? I don't see _BUG_FLAGS used anywhere, but I could
-> > be missing some macro expansion.
-> 
-> I think I accidentally left this after removing the last user from an
-> intermediate
-> version of the patch. Do you want me to send an updated version, or could
-> you just drop this line when applying?
+On 21/03/17 18:05, Uwe Kleine-K?nig wrote:
+> On Tue, Mar 21, 2017 at 12:05:20PM +1000, Greg Ungerer wrote:
+>> On 20/03/17 23:22, Vladimir Zapolskiy wrote:
+>>> For that type of bindings locally I have a hackish spi-imx driver change,
+>>> which supports this option, but I'm unsure if it is universal enough.
+>>
+>> Do you mean supporting no cs-gpios tag?
+>> That would be nice, but it would seem not many users of this are
+>> using native chip selects.
+>
+> The reason for this is that the native chip selects are less flexible
+> than gpios because you cannot control when they deassert. IIRC they do
+> it too much for some chips. So the only reason to stick to them is that
+> on some SoCs not all pins have a GPIO function. Not sure if transfer
+> speed is another reason, but I would expect that the gain isn't that
+> big.
 
-I suspect Catalin can do that when he takes the patch. With that fixup:
+For the particular SPI device I am using, a Silicon Labs 32260,
+it actually wants the assertion and de-assertion of the chip-select
+between each byte. So it is the only way it can work for me.
 
-Acked-by: Will Deacon <will.deacon@arm.com>
-
-Thanks,
-
-Will
+Regards
+Greg
