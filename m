@@ -1,70 +1,99 @@
 From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Tue, 21 Mar 2017 16:36:05 +0100
-Subject: [PATCH v3 05/11] Documentation: DT: bindings: input: touschcreen:
- remove sun4i documentation
+Date: Tue, 21 Mar 2017 16:36:09 +0100
+Subject: [PATCH v3 09/11] ARM: dtsi: sun8i: a33: add CPU thermal throttling
 In-Reply-To: <20170321153611.16228-1-quentin.schulz@free-electrons.com>
 References: <20170321153611.16228-1-quentin.schulz@free-electrons.com>
-Message-ID: <20170321153611.16228-6-quentin.schulz@free-electrons.com>
+Message-ID: <20170321153611.16228-10-quentin.schulz@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch removes the sun4i touchscreen controller binding
-documentation since it has been merged with the sun4i GPADC binding
-documentation.
+This adds CPU thermal throttling for the Allwinner A33. It uses the
+thermal sensor present in the SoC's GPADC.
 
 Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
-Acked-by: Rob Herring <robh@kernel.org>
 ---
 
-added in v2
+v3:
+  - switched to new phandle because of modified DT node name for the GPADC
+  (named THS),
+  - got rid of cooling-min-level and cooling-max-level as it's not used in any
+  code in the kernel,
 
- .../bindings/input/touchscreen/sun4i.txt           | 38 ----------------------
- 1 file changed, 38 deletions(-)
- delete mode 100644 Documentation/devicetree/bindings/input/touchscreen/sun4i.txt
+v2:
+  - updated cooling-max-level to reflect newly added OPPs,
 
-diff --git a/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt b/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt
-deleted file mode 100644
-index 89abecd..0000000
---- a/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt
-+++ /dev/null
-@@ -1,38 +0,0 @@
--sun4i resistive touchscreen controller
----------------------------------------
--
--Required properties:
-- - compatible: "allwinner,sun4i-a10-ts", "allwinner,sun5i-a13-ts" or
--   "allwinner,sun6i-a31-ts"
-- - reg: mmio address range of the chip
-- - interrupts: interrupt to which the chip is connected
-- - #thermal-sensor-cells: shall be 0
--
--Optional properties:
-- - allwinner,ts-attached	 : boolean indicating that an actual touchscreen
--				   is attached to the controller
-- - allwinner,tp-sensitive-adjust : integer (4 bits)
--				   adjust sensitivity of pen down detection
--				   between 0 (least sensitive) and 15
--				   (defaults to 15)
-- - allwinner,filter-type	 : integer (2 bits)
--				   select median and averaging filter
--				   samples used for median / averaging filter
--				   0: 4/2
--				   1: 5/3
--				   2: 8/4
--				   3: 16/8
--				   (defaults to 1)
--
--Example:
--
--	rtp: rtp at 01c25000 {
--		compatible = "allwinner,sun4i-a10-ts";
--		reg = <0x01c25000 0x100>;
--		interrupts = <29>;
--		allwinner,ts-attached;
--		#thermal-sensor-cells = <0>;
--		/* sensitive/noisy touch panel */
--		allwinner,tp-sensitive-adjust = <0>;
--		allwinner,filter-type = <3>;
--	};
+ arch/arm/boot/dts/sun8i-a33.dtsi | 45 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 45 insertions(+)
+
+diff --git a/arch/arm/boot/dts/sun8i-a33.dtsi b/arch/arm/boot/dts/sun8i-a33.dtsi
+index f391f71..73552bb 100644
+--- a/arch/arm/boot/dts/sun8i-a33.dtsi
++++ b/arch/arm/boot/dts/sun8i-a33.dtsi
+@@ -43,6 +43,7 @@
+  */
+ 
+ #include "sun8i-a23-a33.dtsi"
++#include <dt-bindings/thermal/thermal.h>
+ 
+ / {
+ 	cpu0_opp_table: opp_table0 {
+@@ -127,6 +128,7 @@
+ 			clocks = <&ccu CLK_CPUX>;
+ 			clock-names = "cpu";
+ 			operating-points-v2 = <&cpu0_opp_table>;
++			#cooling-cells = <2>;
+ 		};
+ 
+ 		cpu at 1 {
+@@ -170,6 +172,49 @@
+ 		};
+ 	};
+ 
++	thermal-zones {
++		cpu_thermal {
++			/* milliseconds */
++			polling-delay-passive = <250>;
++			polling-delay = <1000>;
++			thermal-sensors = <&ths>;
++
++			cooling-maps {
++				map0 {
++					trip = <&cpu_alert0>;
++					cooling-device = <&cpu0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
++				};
++				map1 {
++					trip = <&cpu_alert1>;
++					cooling-device = <&cpu0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
++				};
++			};
++
++			trips {
++				cpu_alert0: cpu_alert0 {
++					/* milliCelsius */
++					temperature = <75000>;
++					hysteresis = <2000>;
++					type = "passive";
++				};
++
++				cpu_alert1: cpu_alert1 {
++					/* milliCelsius */
++					temperature = <90000>;
++					hysteresis = <2000>;
++					type = "hot";
++				};
++
++				cpu_crit: cpu_crit {
++					/* milliCelsius */
++					temperature = <110000>;
++					hysteresis = <2000>;
++					type = "critical";
++				};
++			};
++		};
++	};
++
+ 	memory {
+ 		reg = <0x40000000 0x80000000>;
+ 	};
 -- 
 2.9.3
