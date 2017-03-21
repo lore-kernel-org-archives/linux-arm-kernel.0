@@ -1,55 +1,58 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Tue, 21 Mar 2017 20:52:09 +0800
-Subject: [arm-platforms:timers/errata-rework 10/18]
- drivers/clocksource/arm_arch_timer.c:483:6: error: implicit declaration of
- function 'needs_unstable_timer_counter_workaround'
-Message-ID: <201703212006.FklvpAFk%fengguang.wu@intel.com>
+From: thibaud_cornic@sigmadesigns.com (Thibaud Cornic)
+Date: Tue, 21 Mar 2017 13:53:41 +0100
+Subject: [RFC PATCH v0.001] PCI: Add support for tango PCIe controller
+In-Reply-To: <89fab12d-82b1-512f-df48-666861eab22f@free.fr>
+References: <ab110ce2-8678-9b34-6bd1-6cfaaa7fea04@free.fr>
+ <f13c385d-dcc9-dacd-2b2c-ca098228f4f4@free.fr>
+ <9d23357c-fa59-d638-11ba-f1ab24dbeb43@arm.com>
+ <89fab12d-82b1-512f-df48-666861eab22f@free.fr>
+Message-ID: <3b91a0e8-c913-06bd-fa3f-6ba1acdd731c@sigmadesigns.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git timers/errata-rework
-head:   317327df79aeca1621758debe2c4c07f97f43f68
-commit: ffc9559fe76cd5bbd6562cf3a68f87b8c38e8176 [10/18] arm64: arch_timer: Get rid of erratum_workaround_set_sne
-config: arm-sunxi_defconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout ffc9559fe76cd5bbd6562cf3a68f87b8c38e8176
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+On 21/03/2017 13:43, Mason wrote:
+> On 21/03/2017 12:36, Robin Murphy wrote:
+>
+>> On 21/03/17 10:15, Mason wrote:
+>>
+>>> I suppose one may consider the above limitation ("Only transfers
+>>> within the BAR are forwarded to the host") as some form of weird
+>>> IOMMU? (There is, in fact, some remapping logic in the controller
+>>> setup which I haven't discussed so far.)
+>> Not really. If it's the 8x128MB region thing mentioned elsewhere, that's
+>> far too coarse a granularity to be much use with the existing IOMMU API
+>> (this vaguely reminds me of a similar discussion about programmable
+>> interconnects ages ago). Unless it's actually got some sort of GART-type
+>> thing or better capable of page-granularity mappings within a
+>> significantly-sized region, I'd put that idea to bed.
+> I had a feeling my use-case was too quirky for a sane API :-)
+>
+>>> Since this SoC is used for TV, the media cartels mandate some way
+>>> to limit where PCI bus masters can peek/poke in RAM.
+>> FWIW, since that sounds like more of a box-ticking exercise than a real
+>> practical concern, I'd point out that content protection is more or less
+>> the poster child for TrustZone, and your TZASC should help tick that box
+>> regardless.
+> Interesting. In fact, our Linux runs as the non-secure OS,
+> and we do have a custom "secure" OS running in parallel.
+>
+> My knowledge of TZ is limited to "call this SMC to offline
+> that CPU", but our local TZ expert is CCed :-)
+>
+> TZASC = TrustZone Address Space Controller
+>
+> http://infocenter.arm.com/help/topic/com.arm.doc.ddi0431c/CHDBBGIC.html
+>
+> Is there a TZASC embedded in every ARM core?
+> We're using Cortex-A9 MPCore r3p0 + PL310 r3p2
+We don't have the TZASC, but a proprietary solution, on which the PCIe
+can't be distinguished from other I/Os (e.g. SATA, USB).
+But the requirement of limiting device accesses to only certain regions
+of the DRAM is only for PCIe (it's special in the sense the device can
+initiate accesses without any action on our chip's side).
+Since we already had those 8x128MB remaps (which we now understand seem
+wrong, as the root complex is not supposed to expose a BAR, but rather
+forward all accesses to the internal bus), we simply put a lock on them,
+and our partners were satisfied.
 
-Note: the arm-platforms/timers/errata-rework HEAD 317327df79aeca1621758debe2c4c07f97f43f68 builds fine.
-      It only hurts bisectibility.
-
-All errors (new ones prefixed by >>):
-
-   drivers/clocksource/arm_arch_timer.c: In function 'arch_timer_set_next_event_virt':
->> drivers/clocksource/arm_arch_timer.c:483:6: error: implicit declaration of function 'needs_unstable_timer_counter_workaround' [-Werror=implicit-function-declaration]
-     if (needs_unstable_timer_counter_workaround())
-         ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-   cc1: some warnings being treated as errors
-
-vim +/needs_unstable_timer_counter_workaround +483 drivers/clocksource/arm_arch_timer.c
-
-   477		arch_timer_reg_write(access, ARCH_TIMER_REG_CTRL, ctrl, clk);
-   478	}
-   479	
-   480	static int arch_timer_set_next_event_virt(unsigned long evt,
-   481						  struct clock_event_device *clk)
-   482	{
- > 483		if (needs_unstable_timer_counter_workaround())
-   484			return erratum_set_next_event_tval_virt(evt, clk);
-   485	
-   486		set_next_event(ARCH_TIMER_VIRT_ACCESS, evt, clk);
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 20777 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170321/09721aab/attachment-0001.gz>
+Regards.
