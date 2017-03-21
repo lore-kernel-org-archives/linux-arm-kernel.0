@@ -1,129 +1,48 @@
-From: james.morse@arm.com (James Morse)
-Date: Tue, 21 Mar 2017 13:10:22 +0000
-Subject: [PATCH] kvm: pass the virtual SEI syndrome to guest OS
-In-Reply-To: <76795e20-2f20-1e54-cfa5-7444f28b18ee@huawei.com>
-References: <1489996534-8270-1-git-send-email-gengdongjiu@huawei.com>
- <7055772d-2a20-6e0c-2bf8-204bc9ef52a5@arm.com>
- <b912c293-4314-7c90-30a4-2f986feb1670@huawei.com>
- <22fb583f-a33e-15f8-a059-fb112b27dd4f@arm.com> <58CFF058.8020205@arm.com>
- <76795e20-2f20-1e54-cfa5-7444f28b18ee@huawei.com>
-Message-ID: <58D1263E.90800@arm.com>
+From: gerg@linux-m68k.org (Greg Ungerer)
+Date: Tue, 21 Mar 2017 23:22:27 +1000
+Subject: [PATCH 2/2] spi: imx: fix use of native chip-selects with
+ devicetree
+In-Reply-To: <20170321121133.jcmhhbszj2d42h3w@pengutronix.de>
+References: <1489726983-17706-1-git-send-email-gerg@linux-m68k.org>
+ <1489726983-17706-3-git-send-email-gerg@linux-m68k.org>
+ <f1cf2001-28b4-6a74-b98a-13336d74ff9d@mentor.com>
+ <4a8449d9-cc38-d642-0853-246f46ee7059@linux-m68k.org>
+ <20170321080551.ie4xm5hr3fki365s@pengutronix.de>
+ <942cfc4b-445b-ca51-1823-2391cea62abf@linux-m68k.org>
+ <20170321121133.jcmhhbszj2d42h3w@pengutronix.de>
+Message-ID: <20678cef-f667-9915-aa00-8877ad152a8c@linux-m68k.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Uwe,
 
-On 21/03/17 06:32, gengdongjiu wrote:
-> On 2017/3/20 23:08, James Morse wrote:
->> On 20/03/17 13:58, Marc Zyngier wrote:
->>> On 20/03/17 12:28, gengdongjiu wrote:
->>>> On 2017/3/20 19:24, Marc Zyngier wrote:
->>>>> On 20/03/17 07:55, Dongjiu Geng wrote:
->>>>>> In the RAS implementation, hardware pass the virtual SEI
->>>>>> syndrome information through the VSESR_EL2, so set the virtual
->>>>>> SEI syndrome using physical SEI syndrome el2_elr to pass to
->>>>>> the guest OS
-
-(I've juggled the order of your replies:)
-
-> so for both SEA and SEI, do you prefer to below steps?
-> EL0/EL1 SEI/SEA ---> EL3 firmware first handle ------> EL2 hypervisor notify >
-the Qemu to inject SEI/SEA------>Qemu call KVM API to inject SEA/SEI---->KVM >
-inject SEA/SEI to guest OS
-
-Yes, to expand your EL2 hypervisor notify Qemu step:
-1 The host should call its APEI code to parse the CPER records.
-2 User space processes are then notified via SIGBUS (or for rasdaemon, trace
-  points).
-3 Qemu can take the address delivered via SIGBUS and generate CPER records for
-  the guest. It knows how to convert host addresses to guest IPAs, and it knows
-  where in guest memory to write the CPER records.
-4 Qemu can then notify the guest via whatever mechanism it advertised via the
-  HEST/GHES table. It might not be the same mechanism that the host received
-  the notification through.
-
-Steps 1 and 2 are the same even if no guest is running, so we don't have to add
-any special case for KVM. This is existing code that x86 uses.
-We can test the Qemu parts without any firmware support and the APEI path in the
-host and guest is the same.
-
-
->> Is anyone from Huawei looking at adding RAS support for Qemu?
->  yes, I am looking at Qemu and want to add RAS support.
-
-Great, support in Qemu is one of the missing pieces. On x86 it looks like it
-emulates machine-check-exceptions, which is how x86 did this before
-firmware-first and APEI became the standard.
-
-
->  do you mean let Qemu inject both the SEA and SEI?
-
-To do the notification, yes. It needs to happen after the CPER records have been
-written, and the mechanism and CPER memory location need to match what the guest
-was told via the HEST/GHES table.
-
-If Qemu didn't tell the guest about firmware-first, it can still deliver the
-guest an SError Interrupt.
-
-
-SEA should be possible to do with the KVM_SET_REG API, GPIO/GSIV and the other
-kind of interrupts can use irqfd. For SEI we may need to add an API call to KVM
-to let it pend SError with a specific ESR.
-
-
-
->> How does this work with firmware first?
-
-> when the Guest OS triggers an SEI, it will firstly trap to EL3 firmware, El3 firmware records the error
-> info to the APEI table, 
-
-These are CPER records in a memory area pointed to by one of HEST's GHES entries?
-
-
-> then copy the ESR_EL3 ELR_EL3 to ESR_EL2 ELR_EL2 and transfers control to the
-> hypervisor, hypervisor delegates the error exception to EL1 guest
-
-This is a problem, just because the error occurred while the guest was running
-doesn't mean we should deliver it directly to the guest. Some of these errors
-will be fatal for the CPU and the host should try and power it off to contain
-the fault. For example: CPER's 'micro-architectural error', should the guest
-power-off the vCPU? All that really does is return to the hypervisor, the error
-hasn't been contained.
-
-Firmware should handle the error first, then the host, finally the guest via Qemu.
-
-
-> OS by setting HCR_EL2.VSE to 1 and pass the virtual SEI syndrome through vsesr_el2. 
-> The EL1 guest OS check the DISR_EL1 syndrome information to decide to
-> terminate the application, or do some other recovery action. because the HCR_EL2.AMO is set, so in fact, read
-> DISR_EL1, it returns the VDISR_EL2. and VDISR_EL2 is loaded from VSESR_EL2, so here I pass the virtual SEI
-> syndrome vsesr_el2.
-
-So this is how an SError Interrupt's ESR gets into a guest. How does it get hold
-of the CPER records?
-
-
->> If we took a Physical SError Interrupt the CPER records are in the hosts memory.
->> To deliver a RAS event to the guest something needs to generate CPER records and
->> put them in the guest memory. Only Qemu knows where these memory regions are.
+On 21/03/17 22:11, Uwe Kleine-K?nig wrote:
+> On Tue, Mar 21, 2017 at 09:53:52PM +1000, Greg Ungerer wrote:
+>> On 21/03/17 18:05, Uwe Kleine-K?nig wrote:
+>>> On Tue, Mar 21, 2017 at 12:05:20PM +1000, Greg Ungerer wrote:
+>>>> On 20/03/17 23:22, Vladimir Zapolskiy wrote:
+>>>>> For that type of bindings locally I have a hackish spi-imx driver change,
+>>>>> which supports this option, but I'm unsure if it is universal enough.
+>>>>
+>>>> Do you mean supporting no cs-gpios tag?
+>>>> That would be nice, but it would seem not many users of this are
+>>>> using native chip selects.
+>>>
+>>> The reason for this is that the native chip selects are less flexible
+>>> than gpios because you cannot control when they deassert. IIRC they do
+>>> it too much for some chips. So the only reason to stick to them is that
+>>> on some SoCs not all pins have a GPIO function. Not sure if transfer
+>>> speed is another reason, but I would expect that the gain isn't that
+>>> big.
 >>
->> Put another way, what is the guest expected to do with this SError interrupt?
+>> For the particular SPI device I am using, a Silicon Labs 32260,
+>> it actually wants the assertion and de-assertion of the chip-select
+>> between each byte. So it is the only way it can work for me.
 >
-> No, we do not only panic,if it is EL0 application SEI. the OS error recovery
-> agent will terminate the EL0 application to isolate the error; If it is EL1 guest
-> OS SError, guest OS can see whether it can recover. if the error was in a read-only file cache buffer, guest OS
-> can invalidate the page and reload the data from disk.
+> That should be doable with gpio-cs, too. You just need the right flags
+> in your spi transfer IIRC.
 
-How do we get an address for memory failure? SError is asynchronous, I don't
-think it sets the FAR. (SEA is synchronous and its not guaranteed to set the
-FAR..). As far as I understand this information is in the CPER records in host
-memory.
+Do you know which flag(s)  do that?
 
-If we did have an address it would be a host address, how is it converted to a
-guest IPA? I think Qemu should do this as part of its CPER record generation,
-once the host has decided the error wasn't catastrophic.
-
-
-Thanks,
-
-James
+Regards
+Greg
