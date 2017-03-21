@@ -1,73 +1,169 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Tue, 21 Mar 2017 22:10:51 +0100
-Subject: [PATCH v2 02/10] KVM: arm/arm64: vgic: Avoid flushing vgic state when
- there's no pending IRQ
+Date: Tue, 21 Mar 2017 22:10:57 +0100
+Subject: [PATCH v2 08/10] KVM: arm/arm64: vgic: Implement early VGIC init
+ functionality
 In-Reply-To: <20170321211059.8719-1-cdall@linaro.org>
 References: <20170321211059.8719-1-cdall@linaro.org>
-Message-ID: <20170321211059.8719-3-cdall@linaro.org>
+Message-ID: <20170321211059.8719-9-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shih-Wei Li <shihwei@cs.columbia.edu>
+Implement early initialization for both the distributor and the CPU
+interfaces.  The basic idea is that even though the VGIC is not
+functional or not requested from user space, the critical path of the
+run loop can still call VGIC functions that just won't do anything,
+without them having to check additional initialization flags to ensure
+they don't look at uninitialized data structures.
 
-We do not need to flush vgic states in each world switch unless
-there is pending IRQ queued to the vgic's ap list. We can thus reduce
-the overhead by not grabbing the spinlock and not making the extra
-function call to vgic_flush_lr_state.
-
-Note: list_empty is a single atomic read (uses READ_ONCE) and can
-therefore check if a list is empty or not without the need to take the
-spinlock protecting the list.
-
-Signed-off-by: Shih-Wei Li <shihwei@cs.columbia.edu>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <cdall@linaro.org>
 ---
-Changes since v1:
- - Added comment in kvm_vgic_flush_hwstate
+ virt/kvm/arm/vgic/vgic-init.c | 96 +++++++++++++++++++++++++------------------
+ 1 file changed, 56 insertions(+), 40 deletions(-)
 
- virt/kvm/arm/vgic/vgic.c | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
-
-diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-index 2ac0def..1043291 100644
---- a/virt/kvm/arm/vgic/vgic.c
-+++ b/virt/kvm/arm/vgic/vgic.c
-@@ -637,12 +637,17 @@ static void vgic_flush_lr_state(struct kvm_vcpu *vcpu)
- /* Sync back the hardware VGIC state into our emulation after a guest's run. */
- void kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
- {
-+	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
-+
- 	if (unlikely(!vgic_initialized(vcpu->kvm)))
- 		return;
+diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
+index 3762fd1..25fd1b9 100644
+--- a/virt/kvm/arm/vgic/vgic-init.c
++++ b/virt/kvm/arm/vgic/vgic-init.c
+@@ -24,7 +24,12 @@
  
- 	vgic_process_maintenance_interrupt(vcpu);
- 	vgic_fold_lr_state(vcpu);
- 	vgic_prune_ap_list(vcpu);
+ /*
+  * Initialization rules: there are multiple stages to the vgic
+- * initialization, both for the distributor and the CPU interfaces.
++ * initialization, both for the distributor and the CPU interfaces.  The basic
++ * idea is that even though the VGIC is not functional or not requested from
++ * user space, the critical path of the run loop can still call VGIC functions
++ * that just won't do anything, without them having to check additional
++ * initialization flags to ensure they don't look at uninitialized data
++ * structures.
+  *
+  * Distributor:
+  *
+@@ -39,23 +44,67 @@
+  *
+  * CPU Interface:
+  *
+- * - kvm_vgic_cpu_early_init(): initialization of static data that
++ * - kvm_vgic_vcpu_early_init(): initialization of static data that
+  *   doesn't depend on any sizing information or emulation type. No
+  *   allocation is allowed there.
+  */
+ 
+ /* EARLY INIT */
+ 
+-/*
+- * Those 2 functions should not be needed anymore but they
+- * still are called from arm.c
++/**
++ * kvm_vgic_early_init() - Initialize static VGIC VCPU data structures
++ * @kvm: The VM whose VGIC districutor should be initialized
++ *
++ * Only do initialization of static structures that don't require any
++ * allocation or sizing information from userspace.  vgic_init() called
++ * kvm_vgic_dist_init() which takes care of the rest.
+  */
+ void kvm_vgic_early_init(struct kvm *kvm)
+ {
++	struct vgic_dist *dist = &kvm->arch.vgic;
 +
-+	/* Make sure we can fast-path in flush_hwstate */
-+	vgic_cpu->used_lrs = 0;
++	INIT_LIST_HEAD(&dist->lpi_list_head);
++	spin_lock_init(&dist->lpi_list_lock);
  }
  
- /* Flush our emulation state into the GIC hardware before entering the guest. */
-@@ -651,6 +656,18 @@ void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu)
- 	if (unlikely(!vgic_initialized(vcpu->kvm)))
- 		return;
- 
-+	/*
-+	 * If there are no virtual interrupts active or pending for this
-+	 * VCPU, then there is no work to do and we can bail out without
-+	 * taking any lock.  There is a potential race with someone injecting
-+	 * interrupts to the VCPU, but it is a benign race as the VCPU will
-+	 * either observe the new interrupt before or after doing this check,
-+	 * and introducing additional synchronization mechanism doesn't change
-+	 * this.
-+	 */
-+	if (list_empty(&vcpu->arch.vgic_cpu.ap_list_head))
-+		return;
++/**
++ * kvm_vgic_vcpu_early_init() - Initialize static VGIC VCPU data structures
++ * @vcpu: The VCPU whose VGIC data structures whould be initialized
++ *
++ * Only do initialization, but do not actually enable the VGIC CPU interface
++ * yet.
++ */
+ void kvm_vgic_vcpu_early_init(struct kvm_vcpu *vcpu)
+ {
++	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
++	int i;
 +
- 	spin_lock(&vcpu->arch.vgic_cpu.ap_list_lock);
- 	vgic_flush_lr_state(vcpu);
- 	spin_unlock(&vcpu->arch.vgic_cpu.ap_list_lock);
++	INIT_LIST_HEAD(&vgic_cpu->ap_list_head);
++	spin_lock_init(&vgic_cpu->ap_list_lock);
++
++	/*
++	 * Enable and configure all SGIs to be edge-triggered and
++	 * configure all PPIs as level-triggered.
++	 */
++	for (i = 0; i < VGIC_NR_PRIVATE_IRQS; i++) {
++		struct vgic_irq *irq = &vgic_cpu->private_irqs[i];
++
++		INIT_LIST_HEAD(&irq->ap_list);
++		spin_lock_init(&irq->irq_lock);
++		irq->intid = i;
++		irq->vcpu = NULL;
++		irq->target_vcpu = vcpu;
++		irq->targets = 1U << vcpu->vcpu_id;
++		kref_init(&irq->refcount);
++		if (vgic_irq_is_sgi(i)) {
++			/* SGIs */
++			irq->enabled = 1;
++			irq->config = VGIC_CONFIG_EDGE;
++		} else {
++			/* PPIs */
++			irq->config = VGIC_CONFIG_LEVEL;
++		}
++	}
+ }
+ 
+ /* CREATION */
+@@ -148,9 +197,6 @@ static int kvm_vgic_dist_init(struct kvm *kvm, unsigned int nr_spis)
+ 	struct kvm_vcpu *vcpu0 = kvm_get_vcpu(kvm, 0);
+ 	int i;
+ 
+-	INIT_LIST_HEAD(&dist->lpi_list_head);
+-	spin_lock_init(&dist->lpi_list_lock);
+-
+ 	dist->spis = kcalloc(nr_spis, sizeof(struct vgic_irq), GFP_KERNEL);
+ 	if (!dist->spis)
+ 		return  -ENOMEM;
+@@ -181,41 +227,11 @@ static int kvm_vgic_dist_init(struct kvm *kvm, unsigned int nr_spis)
+ }
+ 
+ /**
+- * kvm_vgic_vcpu_init: initialize the vcpu data structures and
+- * enable the VCPU interface
+- * @vcpu: the VCPU which's VGIC should be initialized
++ * kvm_vgic_vcpu_init() - Enable the VCPU interface
++ * @vcpu: the VCPU which's VGIC should be enabled
+  */
+ static void kvm_vgic_vcpu_init(struct kvm_vcpu *vcpu)
+ {
+-	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+-	int i;
+-
+-	INIT_LIST_HEAD(&vgic_cpu->ap_list_head);
+-	spin_lock_init(&vgic_cpu->ap_list_lock);
+-
+-	/*
+-	 * Enable and configure all SGIs to be edge-triggered and
+-	 * configure all PPIs as level-triggered.
+-	 */
+-	for (i = 0; i < VGIC_NR_PRIVATE_IRQS; i++) {
+-		struct vgic_irq *irq = &vgic_cpu->private_irqs[i];
+-
+-		INIT_LIST_HEAD(&irq->ap_list);
+-		spin_lock_init(&irq->irq_lock);
+-		irq->intid = i;
+-		irq->vcpu = NULL;
+-		irq->target_vcpu = vcpu;
+-		irq->targets = 1U << vcpu->vcpu_id;
+-		kref_init(&irq->refcount);
+-		if (vgic_irq_is_sgi(i)) {
+-			/* SGIs */
+-			irq->enabled = 1;
+-			irq->config = VGIC_CONFIG_EDGE;
+-		} else {
+-			/* PPIs */
+-			irq->config = VGIC_CONFIG_LEVEL;
+-		}
+-	}
+ 	if (kvm_vgic_global_state.type == VGIC_V2)
+ 		vgic_v2_enable(vcpu);
+ 	else
 -- 
 2.9.0
