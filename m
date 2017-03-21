@@ -1,76 +1,70 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 21 Mar 2017 19:20:58 +0000
-Subject: [PATCH v4 28/28] arm/arm64: Add hyp-stub API documentation
-In-Reply-To: <20170321192058.9300-1-marc.zyngier@arm.com>
-References: <20170321192058.9300-1-marc.zyngier@arm.com>
-Message-ID: <20170321192058.9300-29-marc.zyngier@arm.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 21 Mar 2017 19:48:55 -0000
+Subject: [PATCH 1/2] ARM: dts: r8a7792: add IMR-L[S]X3 clocks
+Message-ID: <20170321194820.477663240@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to help people understanding the hyp-stub API that exists
-between the host kernel and the hypervisor mode (whether a hypervisor
-has been installed or not), let's document said API.
+Add the IMR-L[S]X3 clocks to the R8A7792 device tree.
 
-As with any form of documentation, I expect it to become obsolete
-and completely misleading within 20 minutes after having being merged.
+Based on the original patch by Roman Meshkevich
+<roman.meshkevich@cogentembedded.com>.
 
-Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+
 ---
- Documentation/virtual/kvm/arm/hyp-abi.txt | 45 +++++++++++++++++++++++++++++++
- 1 file changed, 45 insertions(+)
- create mode 100644 Documentation/virtual/kvm/arm/hyp-abi.txt
+ arch/arm/boot/dts/r8a7792.dtsi            |   15 ++++++++++++---
+ include/dt-bindings/clock/r8a7792-clock.h |    7 +++++++
+ 2 files changed, 19 insertions(+), 3 deletions(-)
 
-diff --git a/Documentation/virtual/kvm/arm/hyp-abi.txt b/Documentation/virtual/kvm/arm/hyp-abi.txt
-new file mode 100644
-index 000000000000..a1e0314d2249
---- /dev/null
-+++ b/Documentation/virtual/kvm/arm/hyp-abi.txt
-@@ -0,0 +1,45 @@
-+* Internal ABI between the kernel and HYP
-+
-+This file documents the interaction between the Linux kernel and the
-+hypervisor layer when running Linux as a hypervisor (for example
-+KVM). It doesn't cover the interaction of the kernel with the
-+hypervisor when running as a guest (under Xen, KVM or any other
-+hypervisor), or any hypervisor-specific interaction when the kernel is
-+used as a host.
-+
-+On arm and arm64 (without VHE), the kernel doesn't run in hypervisor
-+mode, but still needs to interact with it, allowing a built-in
-+hypervisor to be either installed or torn down.
-+
-+In order to achieve this, the kernel must be booted at HYP (arm) or
-+EL2 (arm64), allowing it to install a set of stubs before dropping to
-+SVC/EL1. These stubs are accessible by using a 'hvc #0' instruction,
-+and only act on individual CPUs.
-+
-+Unless specified otherwise, any built-in hypervisor must implement
-+these functions (see arch/arm{,64}/include/asm/virt.h):
-+
-+* r0/x0 = HVC_SET_VECTORS
-+  r1/x1 = vectors
-+
-+  Set HVBAR/VBAR_EL2 to 'vectors' to enable a hypervisor. 'vectors'
-+  must be a physical address, and respect the alignment requirements
-+  of the architecture. Only implemented by the initial stubs.
-+
-+* r0/x0 = HVC_RESET_VECTORS
-+
-+  Turn HYP/EL2 MMU off, and reset HVBAR/VBAR_EL2 to the default
-+  value. This effectively disables an existing hypervisor.
-+
-+* r0/x0 = HVC_SOFT_RESTART
-+  r1/x1 = restart address
-+  x2 = x0's value when entering the next payload (arm64)
-+  x3 = x1's value when entering the next payload (arm64)
-+  x4 = x2's value when entering the next payload (arm64)
-+
-+  Mask all exceptions, disable the MMU, move the arguments into place
-+  (arm64 only), and jump to the restart address while at HYP/EL2. This
-+  hypercall is not expected to return to its caller.
-+
-+Any other value of r0/x0 triggers a hypervisor-specific handling,
-+which is not documented here.
--- 
-2.11.0
+Index: renesas/arch/arm/boot/dts/r8a7792.dtsi
+===================================================================
+--- renesas.orig/arch/arm/boot/dts/r8a7792.dtsi
++++ renesas/arch/arm/boot/dts/r8a7792.dtsi
+@@ -927,16 +927,25 @@
+ 				     "renesas,cpg-mstp-clocks";
+ 			reg = <0 0xe6150990 0 4>, <0 0xe61509a0 0 4>;
+ 			clocks = <&zg_clk>, <&zg_clk>, <&zg_clk>, <&zg_clk>,
+-			         <&zg_clk>, <&zg_clk>, <&hp_clk>;
++				 <&zg_clk>, <&zg_clk>, <&hp_clk>, <&zg_clk>,
++				 <&zg_clk>, <&zg_clk>, <&zg_clk>, <&zg_clk>,
++				 <&zg_clk>, <&zg_clk>;
+ 			#clock-cells = <1>;
+ 			clock-indices = <
+ 				R8A7792_CLK_VIN5 R8A7792_CLK_VIN4
+ 				R8A7792_CLK_VIN3 R8A7792_CLK_VIN2
+ 				R8A7792_CLK_VIN1 R8A7792_CLK_VIN0
+-				R8A7792_CLK_ETHERAVB
++				R8A7792_CLK_ETHERAVB R8A7792_CLK_IMR_LX3
++				R8A7792_CLK_IMR_LSX3_1 R8A7792_CLK_IMR_LSX3_0
++				R8A7792_CLK_IMR_LSX3_5 R8A7792_CLK_IMR_LSX3_4
++				R8A7792_CLK_IMR_LSX3_3 R8A7792_CLK_IMR_LSX3_2
+ 			>;
+ 			clock-output-names = "vin5", "vin4", "vin3", "vin2",
+-					     "vin1", "vin0", "etheravb";
++					     "vin1", "vin0",
++					     "etheravb", "imr-lx3",
++					     "imr-lsx3-1", "imr-lsx3-0",
++					     "imr-lsx3-5", "imr-lsx3-4",
++					     "imr-lsx3-3", "imr-lsx3-2";
+ 		};
+ 		mstp9_clks: mstp9_clks at e6150994 {
+ 			compatible = "renesas,r8a7792-mstp-clocks",
+Index: renesas/include/dt-bindings/clock/r8a7792-clock.h
+===================================================================
+--- renesas.orig/include/dt-bindings/clock/r8a7792-clock.h
++++ renesas/include/dt-bindings/clock/r8a7792-clock.h
+@@ -70,6 +70,13 @@
+ #define R8A7792_CLK_VIN1		10
+ #define R8A7792_CLK_VIN0		11
+ #define R8A7792_CLK_ETHERAVB		12
++#define R8A7792_CLK_IMR_LX3		21
++#define R8A7792_CLK_IMR_LSX3_1		22
++#define R8A7792_CLK_IMR_LSX3_0		23
++#define R8A7792_CLK_IMR_LSX3_5		25
++#define R8A7792_CLK_IMR_LSX3_4		26
++#define R8A7792_CLK_IMR_LSX3_3		27
++#define R8A7792_CLK_IMR_LSX3_2		28
+ 
+ /* MSTP9 */
+ #define R8A7792_CLK_GPIO7		4
