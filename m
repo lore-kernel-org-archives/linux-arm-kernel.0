@@ -1,59 +1,58 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 21 Mar 2017 15:52:51 +0000
-Subject: [PATCH] efifb: avoid reconfiguration of BAR that covers the
- framebuffer
-In-Reply-To: <CAKv+Gu9oLVWY4QOf=eONT6a8v1+m8BKUUR79LUamysKZhbb2CQ@mail.gmail.com>
-References: <1490048037-1850-1-git-send-email-ard.biesheuvel@linaro.org>
- <20170321115447.GA3667@red-moon>
- <CAKv+Gu9oLVWY4QOf=eONT6a8v1+m8BKUUR79LUamysKZhbb2CQ@mail.gmail.com>
-Message-ID: <20170321155251.GB4799@red-moon>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 21 Mar 2017 15:39:23 +0000
+Subject: [PATCH v3 3/5] coresight: add support for debug module
+In-Reply-To: <1488520809-31670-4-git-send-email-leo.yan@linaro.org>
+References: <1488520809-31670-1-git-send-email-leo.yan@linaro.org>
+ <1488520809-31670-4-git-send-email-leo.yan@linaro.org>
+Message-ID: <671a0b39-b635-6e0e-d3fa-967651f2e29c@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 21, 2017 at 11:59:16AM +0000, Ard Biesheuvel wrote:
 
-[...]
 
-> >> +static void efifb_fixup_resources(struct pci_dev *dev)
-> >> +{
-> >> +     u64 fb_base = screen_info.lfb_base;
-> >> +     u64 fb_size = screen_info.lfb_size;
-> >> +     int i;
-> >> +
-> >> +     if (resource_found || screen_info.orig_video_isVGA != VIDEO_TYPE_EFI)
-> >> +             return;
-> >> +
-> >> +     if (screen_info.capabilities & VIDEO_CAPABILITY_64BIT_BASE)
-> >> +             fb_base |= (u64)screen_info.ext_lfb_base << 32;
-> >> +
-> >> +     if (!fb_base)
-> >> +             return;
-> >> +
-> >> +     for (i = 0; i < PCI_STD_RESOURCE_END; i++) {
-> >> +             struct resource *res = &dev->resource[i];
-> >> +
-> >> +             if (!(res->flags & IORESOURCE_MEM))
-> >> +                     continue;
-> >> +
-> >> +             if (res->start <= fb_base && res->end >= fb_base + fb_size) {
-> >
-> > You are checking for a live resource here right (ie PCI device should be
-> > enabled) ? I am not sure that just checking the resource range is safe
-> > (I mean it would be most certainly a FW bug to have a PCI disabled
-> > device with memory BAR programmed with the FB addresses but thought it
-> > was worth mentioning).
-> >
+On 03/03/17 06:00, Leo Yan wrote:
+> Coresight includes debug module and usually the module connects with CPU
+> debug logic. ARMv8 architecture reference manual (ARM DDI 0487A.k) has
+> description for related info in "Part H: External Debug".
 > 
-> It is implied that the device is enabled. The GOP protocol exposes a
-> live framebuffer base/size with some metadata regarding the pixel
-> format/color depth etc. It contains no annotations as to whether the
-> device is PCI or simply a framebuffer mapped in system memory, and so
-> we can only assume that the device is enabled.
+> Chapter H7 "The Sample-based Profiling Extension" introduces several
+> sampling registers, e.g. we can check program counter value with
+> combined CPU exception level, secure state, etc. So this is helpful for
+> analysis CPU lockup scenarios, e.g. if one CPU has run into infinite
+> loop with IRQ disabled. In this case the CPU cannot switch context and
+> handle any interrupt (including IPIs), as the result it cannot handle
+> SMP call for stack dump.
+> 
+> This patch is to enable coresight debug module, so firstly this driver
+> is to bind apb clock for debug module and this is to ensure the debug
+> module can be accessed from program or external debugger. And the driver
+> uses sample-based registers for debug purpose, e.g. when system detects
+> the CPU lockup and trigger panic, the driver will dump program counter
+> and combined context registers (EDCIDSR, EDVIDSR); by parsing context
+> registers so can quickly get to know CPU secure state, exception level,
+> etc.
+> 
+> Some of the debug module registers are located in CPU power domain, so
+> in the driver it has checked the power state for CPU before accessing
+> registers within CPU power domain. For most safe way to use this driver,
+> it's suggested to disable CPU low power states, this can simply set
+> "nohlt" in kernel command line.
+> 
 
-That's why I think you should actually check that the device memory
-cycles are enabled to prevent setting a fixed resource for the wrong
-PCI device (we could argue that would be a FW bug - better play it
-safe though).
+I disagree with this approach. One of the main usefulness of such self
+hosted debug feature is to debug issues around features like cpuidle.
+Adding constraints like "cpuidle needs to be disabled" is not good IMO.
+There are ways to make it work with cpuidle enabled. Please explore
+them. In particular refer H9.2.39 EDPRCR, External Debug Power/Reset
+Control Register.
 
-Thanks,
-Lorenzo
+So, "nohlt" option is not an option. I prefer some sysfs option like
+Suzuki suggested to enable this feature on demand if power saving in
+normal usecase is the concern. Using "nohlt" just disables idle and
+doesn't ensure the debug power domain is ON. Using the flag directly in
+this driver to enable debug power domain also sounds misuse of that flag
+for me.
+
+-- 
+Regards,
+Sudeep
