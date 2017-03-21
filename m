@@ -1,46 +1,66 @@
 From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Tue, 21 Mar 2017 18:04:15 +0000
-Subject: [PATCH 1/7] arm64: hugetlb: set_huge_pte_at Add WARN_ON on
- !pte_present
+Date: Tue, 21 Mar 2017 18:04:16 +0000
+Subject: [PATCH 2/7] arm64: hugetlb: Cleanup setup_hugepagesz
 In-Reply-To: <20170321180421.18332-1-punit.agrawal@arm.com>
 References: <20170321180421.18332-1-punit.agrawal@arm.com>
-Message-ID: <20170321180421.18332-2-punit.agrawal@arm.com>
+Message-ID: <20170321180421.18332-3-punit.agrawal@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Steve Capper <steve.capper@arm.com>
 
-This patch adds a WARN_ON to set_huge_pte_at as the accessor assumes
-that entries to be written down are all present. (There are separate
-accessors to clear huge ptes).
+Replace a lot of if statements with switch and case labels to make it
+much clearer which huge page sizes are supported.
 
-We will need to handle the !pte_present case where memory offlining
-is used on hugetlb pages. swap and migration entries will be supplied
-to set_huge_pte_at in this case.
+Also, we prevent PUD_SIZE from being used on systems not running with
+4KB PAGE_SIZE. Before if one supplied PUD_SIZE in these circumstances,
+then unusuable huge page sizes would be in use.
 
+Fixes: 084bd29810a5 ("ARM64: mm: HugeTLB support.")
 Cc: David Woods <dwoods@mellanox.com>
 Signed-off-by: Steve Capper <steve.capper@arm.com>
 Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
 ---
- arch/arm64/mm/hugetlbpage.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm64/mm/hugetlbpage.c | 26 +++++++++++++-------------
+ 1 file changed, 13 insertions(+), 13 deletions(-)
 
 diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
-index e25584d72396..a686f8705ef3 100644
+index a686f8705ef3..aacbe18e6640 100644
 --- a/arch/arm64/mm/hugetlbpage.c
 +++ b/arch/arm64/mm/hugetlbpage.c
-@@ -69,6 +69,12 @@ void set_huge_pte_at(struct mm_struct *mm, unsigned long addr,
- 	unsigned long pfn;
- 	pgprot_t hugeprot;
+@@ -296,20 +296,20 @@ static __init int setup_hugepagesz(char *opt)
+ {
+ 	unsigned long ps = memparse(opt, &opt);
  
-+	/*
-+	 * Code needs to be expanded to handle huge swap and migration
-+	 * entries. Needed for HUGETLB and MEMORY_FAILURE.
-+	 */
-+	WARN_ON(!pte_present(pte));
+-	if (ps == PMD_SIZE) {
+-		hugetlb_add_hstate(PMD_SHIFT - PAGE_SHIFT);
+-	} else if (ps == PUD_SIZE) {
+-		hugetlb_add_hstate(PUD_SHIFT - PAGE_SHIFT);
+-	} else if (ps == (PAGE_SIZE * CONT_PTES)) {
+-		hugetlb_add_hstate(CONT_PTE_SHIFT);
+-	} else if (ps == (PMD_SIZE * CONT_PMDS)) {
+-		hugetlb_add_hstate((PMD_SHIFT + CONT_PMD_SHIFT) - PAGE_SHIFT);
+-	} else {
+-		hugetlb_bad_size();
+-		pr_err("hugepagesz: Unsupported page size %lu K\n", ps >> 10);
+-		return 0;
++	switch (ps) {
++#ifdef CONFIG_ARM64_4K_PAGES
++	case PUD_SIZE:
++#endif
++	case PMD_SIZE * CONT_PMDS:
++	case PMD_SIZE:
++	case PAGE_SIZE * CONT_PTES:
++		hugetlb_add_hstate(ilog2(ps) - PAGE_SHIFT);
++		return 1;
+ 	}
+-	return 1;
 +
- 	if (ncontig == 1) {
- 		set_pte_at(mm, addr, ptep, pte);
- 		return;
++	hugetlb_bad_size();
++	pr_err("hugepagesz: Unsupported page size %lu K\n", ps >> 10);
++	return 0;
+ }
+ __setup("hugepagesz=", setup_hugepagesz);
+ 
 -- 
 2.11.0
