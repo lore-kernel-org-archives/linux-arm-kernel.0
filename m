@@ -1,121 +1,146 @@
-From: fu.wei@linaro.org (fu.wei at linaro.org)
-Date: Wed, 22 Mar 2017 00:31:19 +0800
-Subject: [PATCH v22 08/11] clocksource: arm_arch_timer: simplify ACPI support
- code.
-In-Reply-To: <20170321163122.9183-1-fu.wei@linaro.org>
-References: <20170321163122.9183-1-fu.wei@linaro.org>
-Message-ID: <20170321163122.9183-9-fu.wei@linaro.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 21 Mar 2017 17:36:15 +0100
+Subject: [PATCH v3 7/8] clk: qcom: Add MSM8960/APQ8064 LPASS clock
+ controller (LCC) driver
+In-Reply-To: <1421719535-28398-8-git-send-email-sboyd@codeaurora.org>
+References: <1421719535-28398-1-git-send-email-sboyd@codeaurora.org>
+ <1421719535-28398-8-git-send-email-sboyd@codeaurora.org>
+Message-ID: <CACRpkdaJpJm7z3JbX3a=hg2UhZLVe55HjjC+JcP+iZFBwu1CFQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fu Wei <fu.wei@linaro.org>
+When looking at this and trying to adapt it to MSM8660/APQ8060
+like Neil did with MDM9615 I get pretty confused.
 
-The patch update arm_arch_timer driver to use the function
-provided by the new GTDT driver of ACPI.
-By this way, arm_arch_timer.c can be simplified, and separate
-all the ACPI GTDT knowledge from this timer driver.
+On Tue, Jan 20, 2015 at 3:05 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
 
-Signed-off-by: Fu Wei <fu.wei@linaro.org>
-Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-Tested-by: Xiongfeng Wang <wangxiongfeng2@huawei.com>
-Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
-Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
----
- drivers/clocksource/arm_arch_timer.c | 54 ++++++++++++------------------------
- 1 file changed, 17 insertions(+), 37 deletions(-)
+> Add an LCC driver for MSM8960/APQ8064 that supports the i2s,
+> slimbus, and pcm clocks.
+>
+> Change-Id: I2549b821f7bf467c1bd80d4827a1a7621e725659
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+(...)
 
-diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index 3ada5dc..ef747f3 100644
---- a/drivers/clocksource/arm_arch_timer.c
-+++ b/drivers/clocksource/arm_arch_timer.c
-@@ -1141,63 +1141,36 @@ static int __init arch_timer_mem_of_init(struct device_node *np)
- CLOCKSOURCE_OF_DECLARE(armv7_arch_timer_mem, "arm,armv7-timer-mem",
- 		       arch_timer_mem_of_init);
- 
--#ifdef CONFIG_ACPI
--static int __init map_generic_timer_interrupt(u32 interrupt, u32 flags)
--{
--	int trigger, polarity;
--
--	if (!interrupt)
--		return 0;
--
--	trigger = (flags & ACPI_GTDT_INTERRUPT_MODE) ? ACPI_EDGE_SENSITIVE
--			: ACPI_LEVEL_SENSITIVE;
--
--	polarity = (flags & ACPI_GTDT_INTERRUPT_POLARITY) ? ACPI_ACTIVE_LOW
--			: ACPI_ACTIVE_HIGH;
--
--	return acpi_register_gsi(NULL, interrupt, trigger, polarity);
--}
--
-+#ifdef CONFIG_ACPI_GTDT
- /* Initialize per-processor generic timer */
- static int __init arch_timer_acpi_init(struct acpi_table_header *table)
- {
- 	int ret;
--	struct acpi_table_gtdt *gtdt;
- 
- 	if (arch_timers_present & ARCH_TIMER_TYPE_CP15) {
- 		pr_warn("already initialized, skipping\n");
- 		return -EINVAL;
- 	}
- 
--	gtdt = container_of(table, struct acpi_table_gtdt, header);
--
- 	arch_timers_present |= ARCH_TIMER_TYPE_CP15;
- 
--	arch_timer_ppi[ARCH_TIMER_PHYS_SECURE_PPI] =
--		map_generic_timer_interrupt(gtdt->secure_el1_interrupt,
--		gtdt->secure_el1_flags);
-+	ret = acpi_gtdt_init(table, NULL);
-+	if (ret) {
-+		pr_err("Failed to init GTDT table.\n");
-+		return ret;
-+	}
- 
- 	arch_timer_ppi[ARCH_TIMER_PHYS_NONSECURE_PPI] =
--		map_generic_timer_interrupt(gtdt->non_secure_el1_interrupt,
--		gtdt->non_secure_el1_flags);
-+		acpi_gtdt_map_ppi(ARCH_TIMER_PHYS_NONSECURE_PPI);
- 
- 	arch_timer_ppi[ARCH_TIMER_VIRT_PPI] =
--		map_generic_timer_interrupt(gtdt->virtual_timer_interrupt,
--		gtdt->virtual_timer_flags);
-+		acpi_gtdt_map_ppi(ARCH_TIMER_VIRT_PPI);
- 
- 	arch_timer_ppi[ARCH_TIMER_HYP_PPI] =
--		map_generic_timer_interrupt(gtdt->non_secure_el2_interrupt,
--		gtdt->non_secure_el2_flags);
-+		acpi_gtdt_map_ppi(ARCH_TIMER_HYP_PPI);
- 
- 	arch_timer_kvm_info.virtual_irq = arch_timer_ppi[ARCH_TIMER_VIRT_PPI];
- 
--	/* Get the frequency from the sysreg CNTFRQ */
--	arch_timer_rate = arch_timer_get_cntfrq();
--	if (!arch_timer_rate) {
--		pr_err(FW_BUG "frequency not available.\n");
--		return -EINVAL;
--	}
--
- 	arch_timer_uses_ppi = arch_timer_select_ppi();
- 	if (!arch_timer_ppi[arch_timer_uses_ppi]) {
- 		pr_err("No interrupt available, giving up\n");
-@@ -1205,7 +1178,14 @@ static int __init arch_timer_acpi_init(struct acpi_table_header *table)
- 	}
- 
- 	/* Always-on capability */
--	arch_timer_c3stop = !(gtdt->non_secure_el1_flags & ACPI_GTDT_ALWAYS_ON);
-+	arch_timer_c3stop = acpi_gtdt_c3stop(arch_timer_uses_ppi);
-+
-+	/* Get the frequency from the sysreg CNTFRQ */
-+	arch_timer_rate = arch_timer_get_cntfrq();
-+	if (!arch_timer_rate) {
-+		pr_err(FW_BUG "frequency not available.\n");
-+		return -EINVAL;
-+	}
- 
- 	ret = arch_timer_register();
- 	if (ret)
--- 
-2.9.3
+So this:
+
+> +static const u8 lcc_pxo_pll4_map[] = {
+> +       [P_PXO]         = 0,
+> +       [P_PLL4]        = 2,
+> +};
+> +
+> +static const char *lcc_pxo_pll4[] = {
+> +       "pxo",
+> +       "pll4_vote",
+> +};
+
+> +static struct clk_rcg mi2s_osr_src = {
+> +               .parent_map = lcc_pxo_pll4_map,
+> +                       .parent_names = lcc_pxo_pll4,
+
+> +static const char *lcc_mi2s_parents[] = {
+> +       "mi2s_osr_src",
+
+> +static struct clk_branch mi2s_osr_clk = {
+> +                       .parent_names = lcc_mi2s_parents,
+> +                       .num_parents = 1,
+
+> +static struct clk_regmap_div mi2s_div_clk = {
+> +                       .parent_names = lcc_mi2s_parents,
+> +                       .num_parents = 1,
+
+> +static struct clk_branch mi2s_bit_div_clk = {
+> +                       .parent_names = (const char *[]){ "mi2s_div_clk" },
+> +                       .num_parents = 1,
+
+> +static struct clk_regmap_mux mi2s_bit_clk = {
+> +                       .parent_names = (const char *[]){
+> +                               "mi2s_bit_div_clk",
+> +                               "mi2s_codec_clk",
+> +                       },
+> +                       .num_parents = 2,
+
+So:
+
+PXO | PLL4
+  -> mi2s_osr_src
+     -> mi2s_osr_clk
+  -> mi2s_div_clk
+     -> mi2s_bit_div_clk
+        -> mi2s_bit_clk
+
+If I select the only existing parent.
+
+This funky mi2s_codec_clk parent does not seem to exist in this
+or any of the drivers copying this. What is that? Do we have a
+orphan clock parent?
+
+Anyway: when I look in the vendor tree, this parent selection etc
+does not seem to exist. Am I looking at the wrong code? I'm
+on android-msm-3.4 arch/arm/mach-msm/clock-8960.c
+It more seems like the reparenting is a later invention, and I
+can't figure out where to learn about this.
+
+Does MSM8660 even have the same structure? I would guess so
+but it looks simpler somewhat when I inspect the vendor tree.
+
+The MSM8960 does this:
+
+static CLK_AIF_OSR(mi2s_osr, LCC_MI2S_NS_REG, LCC_MI2S_MD_REG,
+                LCC_MI2S_STATUS_REG);
+static CLK_AIF_BIT(mi2s_bit, LCC_MI2S_NS_REG, LCC_MI2S_STATUS_REG);
+
+static CLK_AIF_OSR_DIV(codec_i2s_mic_osr, LCC_CODEC_I2S_MIC_NS_REG,
+                LCC_CODEC_I2S_MIC_MD_REG, LCC_CODEC_I2S_MIC_STATUS_REG);
+static CLK_AIF_BIT_DIV(codec_i2s_mic_bit, LCC_CODEC_I2S_MIC_NS_REG,
+                LCC_CODEC_I2S_MIC_STATUS_REG);
+
+static CLK_AIF_OSR_DIV(spare_i2s_mic_osr, LCC_SPARE_I2S_MIC_NS_REG,
+                LCC_SPARE_I2S_MIC_MD_REG, LCC_SPARE_I2S_MIC_STATUS_REG);
+static CLK_AIF_BIT_DIV(spare_i2s_mic_bit, LCC_SPARE_I2S_MIC_NS_REG,
+                LCC_SPARE_I2S_MIC_STATUS_REG);
+
+static CLK_AIF_OSR_DIV(codec_i2s_spkr_osr, LCC_CODEC_I2S_SPKR_NS_REG,
+                LCC_CODEC_I2S_SPKR_MD_REG, LCC_CODEC_I2S_SPKR_STATUS_REG);
+static CLK_AIF_BIT_DIV(codec_i2s_spkr_bit, LCC_CODEC_I2S_SPKR_NS_REG,
+                LCC_CODEC_I2S_SPKR_STATUS_REG);
+
+static CLK_AIF_OSR_DIV(spare_i2s_spkr_osr, LCC_SPARE_I2S_SPKR_NS_REG,
+                LCC_SPARE_I2S_SPKR_MD_REG, LCC_SPARE_I2S_SPKR_STATUS_REG);
+static CLK_AIF_BIT_DIV(spare_i2s_spkr_bit, LCC_SPARE_I2S_SPKR_NS_REG,
+                LCC_SPARE_I2S_SPKR_STATUS_REG);
+
+While the MSM8x60 does this:
+
+static CLK_AIF_OSR(mi2s_osr, LCC_MI2S_NS_REG, LCC_MI2S_MD_REG,
+                LCC_MI2S_STATUS_REG);
+static CLK_AIF_BIT(mi2s_bit, LCC_MI2S_NS_REG, LCC_MI2S_STATUS_REG);
+
+static CLK_AIF_OSR(codec_i2s_mic_osr, LCC_CODEC_I2S_MIC_NS_REG,
+                LCC_CODEC_I2S_MIC_MD_REG, LCC_CODEC_I2S_MIC_STATUS_REG);
+static CLK_AIF_BIT(codec_i2s_mic_bit, LCC_CODEC_I2S_MIC_NS_REG,
+                LCC_CODEC_I2S_MIC_STATUS_REG);
+
+static CLK_AIF_OSR(spare_i2s_mic_osr, LCC_SPARE_I2S_MIC_NS_REG,
+                LCC_SPARE_I2S_MIC_MD_REG, LCC_SPARE_I2S_MIC_STATUS_REG);
+static CLK_AIF_BIT(spare_i2s_mic_bit, LCC_SPARE_I2S_MIC_NS_REG,
+                LCC_SPARE_I2S_MIC_STATUS_REG);
+
+static CLK_AIF_OSR(codec_i2s_spkr_osr, LCC_CODEC_I2S_SPKR_NS_REG,
+                LCC_CODEC_I2S_SPKR_MD_REG, LCC_CODEC_I2S_SPKR_STATUS_REG);
+static CLK_AIF_BIT(codec_i2s_spkr_bit, LCC_CODEC_I2S_SPKR_NS_REG,
+                LCC_CODEC_I2S_SPKR_STATUS_REG);
+
+static CLK_AIF_OSR(spare_i2s_spkr_osr, LCC_SPARE_I2S_SPKR_NS_REG,
+                LCC_SPARE_I2S_SPKR_MD_REG, LCC_SPARE_I2S_SPKR_STATUS_REG);
+static CLK_AIF_BIT(spare_i2s_spkr_bit, LCC_SPARE_I2S_SPKR_NS_REG,
+                LCC_SPARE_I2S_SPKR_STATUS_REG);
+
+So seemingly this "BIT_DIV" whatever that is, does not exist on the
+MSM8660, yet the first two clocks look like that for MSM8960 yet translates
+into that complex reparenting mechanism with 5 clocks instead of just 2
+like in the vendor tree.
+
+It's a bit hard to follow this...
+
+Yours,
+Linus Walleij
