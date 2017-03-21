@@ -1,129 +1,151 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 21 Mar 2017 19:20:57 +0000
-Subject: [PATCH v4 27/28] arm64: hyp-stub/KVM: Kill __hyp_get_vectors
+Date: Tue, 21 Mar 2017 19:20:41 +0000
+Subject: [PATCH v4 11/28] ARM: soft-reboot into same mode that we entered the
+ kernel
 In-Reply-To: <20170321192058.9300-1-marc.zyngier@arm.com>
 References: <20170321192058.9300-1-marc.zyngier@arm.com>
-Message-ID: <20170321192058.9300-28-marc.zyngier@arm.com>
+Message-ID: <20170321192058.9300-12-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nobody is using __hyp_get_vectors anymore, so let's remove both
-implementations (hyp-stub and KVM).
+From: Russell King <rmk+kernel@armlinux.org.uk>
 
+When we soft-reboot (eg, kexec) from one kernel into the next, we need
+to ensure that we enter the new kernel in the same processor mode as
+when we were entered, so that (eg) the new kernel can install its own
+hypervisor - the old kernel's hypervisor will have been overwritten.
+
+In order to do this, we need to pass a flag to cpu_reset() so it knows
+what to do, and we need to modify the kernel's own hypervisor stub to
+allow it to handle a soft-reboot.
+
+As we are always guaranteed to install our own hypervisor if we're
+entered in HYP32 mode, and KVM will have moved itself out of the way
+on kexec/normal reboot, we can assume that our hypervisor is in place
+when we want to kexec, so changing our hypervisor API should not be a
+problem.
+
+Tested-by: Keerthy <j-keerthy@ti.com>
+Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/virt.h | 12 ++++--------
- arch/arm64/kernel/hyp-stub.S  | 13 +------------
- arch/arm64/kvm/hyp-init.S     |  7 +------
- arch/arm64/kvm/hyp.S          |  2 +-
- 4 files changed, 7 insertions(+), 27 deletions(-)
+ arch/arm/include/asm/proc-fns.h |  4 ++--
+ arch/arm/kernel/hyp-stub.S      | 13 +++++++++++++
+ arch/arm/kernel/reboot.c        |  7 +++++--
+ arch/arm/mm/proc-v7.S           | 12 ++++++++----
+ 4 files changed, 28 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
-index f24f1eb72dc0..a7c9dfdd6430 100644
---- a/arch/arm64/include/asm/virt.h
-+++ b/arch/arm64/include/asm/virt.h
-@@ -24,28 +24,25 @@
-  * Any other value is used as a pointer to the function to call.
-  */
+diff --git a/arch/arm/include/asm/proc-fns.h b/arch/arm/include/asm/proc-fns.h
+index 8877ad5ffe10..f2e1af45bd6f 100644
+--- a/arch/arm/include/asm/proc-fns.h
++++ b/arch/arm/include/asm/proc-fns.h
+@@ -43,7 +43,7 @@ extern struct processor {
+ 	/*
+ 	 * Special stuff for a reset
+ 	 */
+-	void (*reset)(unsigned long addr) __attribute__((noreturn));
++	void (*reset)(unsigned long addr, bool hvc) __attribute__((noreturn));
+ 	/*
+ 	 * Idle the processor
+ 	 */
+@@ -88,7 +88,7 @@ extern void cpu_set_pte_ext(pte_t *ptep, pte_t pte);
+ #else
+ extern void cpu_set_pte_ext(pte_t *ptep, pte_t pte, unsigned int ext);
+ #endif
+-extern void cpu_reset(unsigned long addr) __attribute__((noreturn));
++extern void cpu_reset(unsigned long addr, bool hvc) __attribute__((noreturn));
  
--/* HVC_GET_VECTORS - Return the value of the vbar_el2 register. */
--#define HVC_GET_VECTORS 0
--
+ /* These three are private to arch/arm/kernel/suspend.c */
+ extern void cpu_do_suspend(void *);
+diff --git a/arch/arm/kernel/hyp-stub.S b/arch/arm/kernel/hyp-stub.S
+index f3e9ba5fb642..82915231c6f8 100644
+--- a/arch/arm/kernel/hyp-stub.S
++++ b/arch/arm/kernel/hyp-stub.S
+@@ -24,6 +24,7 @@
+ 
+ #define HVC_GET_VECTORS 0
+ #define HVC_SET_VECTORS 1
++#define HVC_SOFT_RESTART 2
+ 
+ #ifndef ZIMAGE
  /*
-  * HVC_SET_VECTORS - Set the value of the vbar_el2 register.
-  *
-  * @x1: Physical address of the new vector table.
-  */
--#define HVC_SET_VECTORS 1
-+#define HVC_SET_VECTORS 0
+@@ -215,6 +216,10 @@ __hyp_stub_do_trap:
+ 	mcr	p15, 4, r1, c12, c0, 0	@ set HVBAR
+ 	b	__hyp_stub_exit
+ 
++1:	teq	r0, #HVC_SOFT_RESTART
++	bne	1f
++	bx	r3
++
+ 1:	mov	r0, #-1
+ 
+ __hyp_stub_exit:
+@@ -256,6 +261,14 @@ ENTRY(__hyp_set_vectors)
+ 	ret	lr
+ ENDPROC(__hyp_set_vectors)
+ 
++ENTRY(__hyp_soft_restart)
++	mov	r3, r0
++	mov	r0, #HVC_SOFT_RESTART
++	__HVC(0)
++	mov	r0, r3
++	ret	lr
++ENDPROC(__hyp_soft_restart)
++
+ #ifndef ZIMAGE
+ .align 2
+ .L__boot_cpu_mode_offset:
+diff --git a/arch/arm/kernel/reboot.c b/arch/arm/kernel/reboot.c
+index 3fa867a2aae6..3b2aa9a9fe26 100644
+--- a/arch/arm/kernel/reboot.c
++++ b/arch/arm/kernel/reboot.c
+@@ -12,10 +12,11 @@
+ 
+ #include <asm/cacheflush.h>
+ #include <asm/idmap.h>
++#include <asm/virt.h>
+ 
+ #include "reboot.h"
+ 
+-typedef void (*phys_reset_t)(unsigned long);
++typedef void (*phys_reset_t)(unsigned long, bool);
  
  /*
-  * HVC_SOFT_RESTART - CPU soft reset, used by the cpu_soft_restart routine.
-  */
--#define HVC_SOFT_RESTART 2
-+#define HVC_SOFT_RESTART 1
+  * Function pointers to optional machine specific functions
+@@ -51,7 +52,9 @@ static void __soft_restart(void *addr)
  
- /*
-  * HVC_RESET_VECTORS - Restore the vectors to the original HYP stubs
-  */
--#define HVC_RESET_VECTORS 3
-+#define HVC_RESET_VECTORS 2
+ 	/* Switch to the identity mapping. */
+ 	phys_reset = (phys_reset_t)virt_to_idmap(cpu_reset);
+-	phys_reset((unsigned long)addr);
++
++	/* original stub should be restored by kvm */
++	phys_reset((unsigned long)addr, is_hyp_mode_available());
  
- /* Max number of HYP stub hypercalls */
--#define HVC_STUB_HCALL_NR 4
-+#define HVC_STUB_HCALL_NR 3
- 
- #define BOOT_CPU_MODE_EL1	(0xe11)
- #define BOOT_CPU_MODE_EL2	(0xe12)
-@@ -69,7 +66,6 @@
- extern u32 __boot_cpu_mode[2];
- 
- void __hyp_set_vectors(phys_addr_t phys_vector_base);
--phys_addr_t __hyp_get_vectors(void);
- void __hyp_reset_vectors(void);
- 
- /* Reports the availability of HYP mode */
-diff --git a/arch/arm64/kernel/hyp-stub.S b/arch/arm64/kernel/hyp-stub.S
-index dd0a7522fbe1..210bd6b3849d 100644
---- a/arch/arm64/kernel/hyp-stub.S
-+++ b/arch/arm64/kernel/hyp-stub.S
-@@ -55,12 +55,7 @@ ENDPROC(__hyp_stub_vectors)
- 	.align 11
- 
- el1_sync:
--	cmp	x0, #HVC_GET_VECTORS
--	b.ne	1f
--	mrs	x0, vbar_el2
--	b	9f
--
--1:	cmp	x0, #HVC_SET_VECTORS
-+	cmp	x0, #HVC_SET_VECTORS
- 	b.ne	2f
- 	msr	vbar_el2, x1
- 	b	9f
-@@ -118,12 +113,6 @@ ENDPROC(\label)
-  * initialisation entry point.
-  */
- 
--ENTRY(__hyp_get_vectors)
--	mov	x0, #HVC_GET_VECTORS
--	hvc	#0
--	ret
--ENDPROC(__hyp_get_vectors)
--
- ENTRY(__hyp_set_vectors)
- 	mov	x1, x0
- 	mov	x0, #HVC_SET_VECTORS
-diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
-index 128d6e9732b9..cf01cdb8bc61 100644
---- a/arch/arm64/kvm/hyp-init.S
-+++ b/arch/arm64/kvm/hyp-init.S
-@@ -124,12 +124,7 @@ __do_hyp_init:
- ENDPROC(__kvm_hyp_init)
- 
- ENTRY(__kvm_handle_stub_hvc)
--	cmp	x0, #HVC_GET_VECTORS
--	b.ne	1f
--	mrs	x0, vbar_el2
--	b	exit
--
--1:	cmp	x0, #HVC_SOFT_RESTART
-+	cmp	x0, #HVC_SOFT_RESTART
- 	b.ne	1f
- 
- 	/* This is where we're about to jump, staying at EL2 */
-diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
-index 2726635dceba..09391cf0c93c 100644
---- a/arch/arm64/kvm/hyp.S
-+++ b/arch/arm64/kvm/hyp.S
-@@ -36,7 +36,7 @@
-  * passed in x0.
-  *
-  * A function pointer with a value less than 0xfff has a special meaning,
-- * and is used to implement __hyp_get_vectors in the same way as in
-+ * and is used to implement hyp stubs in the same way as in
-  * arch/arm64/kernel/hyp_stub.S.
-  * HVC behaves as a 'bl' call and will clobber lr.
-  */
+ 	/* Should never get here. */
+ 	BUG();
+diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+index d00d52c9de3e..1846ca4255d0 100644
+--- a/arch/arm/mm/proc-v7.S
++++ b/arch/arm/mm/proc-v7.S
+@@ -53,11 +53,15 @@ ENDPROC(cpu_v7_proc_fin)
+ 	.align	5
+ 	.pushsection	.idmap.text, "ax"
+ ENTRY(cpu_v7_reset)
+-	mrc	p15, 0, r1, c1, c0, 0		@ ctrl register
+-	bic	r1, r1, #0x1			@ ...............m
+- THUMB(	bic	r1, r1, #1 << 30 )		@ SCTLR.TE (Thumb exceptions)
+-	mcr	p15, 0, r1, c1, c0, 0		@ disable MMU
++	mrc	p15, 0, r2, c1, c0, 0		@ ctrl register
++	bic	r2, r2, #0x1			@ ...............m
++ THUMB(	bic	r2, r2, #1 << 30 )		@ SCTLR.TE (Thumb exceptions)
++	mcr	p15, 0, r2, c1, c0, 0		@ disable MMU
+ 	isb
++#ifdef CONFIG_ARM_VIRT_EXT
++	teq	r1, #0
++	bne	__hyp_soft_restart
++#endif
+ 	bx	r0
+ ENDPROC(cpu_v7_reset)
+ 	.popsection
 -- 
 2.11.0
