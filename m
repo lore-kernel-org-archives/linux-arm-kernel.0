@@ -1,39 +1,28 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Tue, 21 Mar 2017 21:51:42 +0800
-Subject: [PATCH] kvm: pass the virtual SEI syndrome to guest OS
-In-Reply-To: <1489996534-8270-1-git-send-email-gengdongjiu@huawei.com>
-Message-ID: <201703212147.SBN9HPTf%fengguang.wu@intel.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Tue, 21 Mar 2017 14:57:09 +0100
+Subject: N900 failure in next-20170321
+Message-ID: <20170321135708.GA22358@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dongjiu,
+Hi!
 
-[auto build test ERROR on arm64/for-next/core]
-[also build test ERROR on v4.11-rc3 next-20170321]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+Tony asked me to test linux-next from time to time. I did... today I
+moved from next-20170309 to next-20170321. Kernel boots and seems to
+work fine (including audio and X startup), but if I leave it sitting
+for a while RGB LED reverts from "system alive" to charging indication
+that was disabled before and system does not react to any input.
 
-url:    https://github.com/0day-ci/linux/commits/Dongjiu-Geng/kvm-pass-the-virtual-SEI-syndrome-to-guest-OS/20170321-152433
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git for-next/core
-config: arm64-allmodconfig (attached as .config)
-compiler: aarch64-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm64 
+Any ideas?
 
-All errors (new ones prefixed by >>):
-
-   /tmp/ccWmLqCE.s: Assembler messages:
->> /tmp/ccWmLqCE.s:677: Error: selected processor does not support system register name 'vsesr_el2'
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 53610 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170321/69b058c2/attachment-0001.gz>
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170321/97b76c13/attachment.sig>
