@@ -1,15 +1,15 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Tue, 21 Mar 2017 18:45:46 +0000
-Subject: Applied "ASoC: sun8i-codec: Convert to use SND_SOC_DAPM_AIF_IN" to
- the asoc tree
-In-Reply-To: <20170318075509.3836-5-mylene.josserand@free-electrons.com>
-Message-ID: <E1cqOmw-00017o-D1@debutante>
+Date: Tue, 21 Mar 2017 18:45:51 +0000
+Subject: Applied "ASoC: sun8i-codec: Fix space on audio-routing widget" to the
+ asoc tree
+In-Reply-To: <20170309095602.13809-2-mylene.josserand@free-electrons.com>
+Message-ID: <E1cqOn1-00019C-9I@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   ASoC: sun8i-codec: Convert to use SND_SOC_DAPM_AIF_IN
+   ASoC: sun8i-codec: Fix space on audio-routing widget
 
 has been applied to the asoc tree at
 
@@ -34,68 +34,40 @@ to this mail.
 Thanks,
 Mark
 
->From d1792285ca63e17f8a7eb42efa48834c261a2d8f Mon Sep 17 00:00:00 2001
+>From 79e26de81448fad80f6c15ae1e3c9e7fca2740cd Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Myl=C3=A8ne=20Josserand?=
  <mylene.josserand@free-electrons.com>
-Date: Sat, 18 Mar 2017 08:55:08 +0100
-Subject: [PATCH] ASoC: sun8i-codec: Convert to use SND_SOC_DAPM_AIF_IN
+Date: Sat, 18 Mar 2017 08:55:07 +0100
+Subject: [PATCH] ASoC: sun8i-codec: Fix space on audio-routing widget
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8
 Content-Transfer-Encoding: 8bit
 
-Update the driver to use SND_SOC_DAPM_AIF_IN instead of
-SND_SOC_DAPM_DAC.
-Rename the interface's widgets to be more precise on which slot
-the interface is connected.
+An unwanted space is present in an audio widget's name on the dapm
+routing. It causes an error on the recognition of this widget (error:
+("no dapm match for AIF1 Slot 0 Right").
+
+Remove the space fixes it.
 
 Signed-off-by: Myl??ne Josserand <mylene.josserand@free-electrons.com>
 Acked-by: Chen-Yu Tsai <wens@csie.org>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- sound/soc/sunxi/sun8i-codec.c | 20 +++++++++++---------
- 1 file changed, 11 insertions(+), 9 deletions(-)
+ sound/soc/sunxi/sun8i-codec.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/sound/soc/sunxi/sun8i-codec.c b/sound/soc/sunxi/sun8i-codec.c
-index adb13fbd2006..7527ba29a5a0 100644
+index 107fa8213600..adb13fbd2006 100644
 --- a/sound/soc/sunxi/sun8i-codec.c
 +++ b/sound/soc/sunxi/sun8i-codec.c
-@@ -281,11 +281,13 @@ static const struct snd_soc_dapm_widget sun8i_codec_dapm_widgets[] = {
- 	SND_SOC_DAPM_SUPPLY("DAC", SUN8I_DAC_DIG_CTRL, SUN8I_DAC_DIG_CTRL_ENDA,
- 			    0, NULL, 0),
- 
--	/* Analog DAC */
--	SND_SOC_DAPM_DAC("Digital Left DAC", "Playback", SUN8I_AIF1_DACDAT_CTRL,
--			 SUN8I_AIF1_DACDAT_CTRL_AIF1_DA0L_ENA, 0),
--	SND_SOC_DAPM_DAC("Digital Right DAC", "Playback", SUN8I_AIF1_DACDAT_CTRL,
--			 SUN8I_AIF1_DACDAT_CTRL_AIF1_DA0R_ENA, 0),
-+	/* Analog DAC AIF */
-+	SND_SOC_DAPM_AIF_IN("AIF1 Slot 0 Left", "Playback", 0,
-+			    SUN8I_AIF1_DACDAT_CTRL,
-+			    SUN8I_AIF1_DACDAT_CTRL_AIF1_DA0L_ENA, 0),
-+	SND_SOC_DAPM_AIF_IN("AIF1 Slot 0 Right", "Playback", 0,
-+			    SUN8I_AIF1_DACDAT_CTRL,
-+			    SUN8I_AIF1_DACDAT_CTRL_AIF1_DA0R_ENA, 0),
- 
- 	/* DAC Mixers */
- 	SND_SOC_DAPM_MIXER("Left Digital DAC Mixer", SND_SOC_NOPM, 0, 0,
-@@ -331,14 +333,14 @@ static const struct snd_soc_dapm_route sun8i_codec_dapm_routes[] = {
- 	{ "DAC", NULL, "MODCLK DAC" },
- 
- 	/* DAC Routes */
--	{ "Digital Left DAC", NULL, "DAC" },
--	{ "Digital Right DAC", NULL, "DAC" },
-+	{ "AIF1 Slot 0 Right", NULL, "DAC" },
-+	{ "AIF1 Slot 0 Left", NULL, "DAC" },
- 
+@@ -337,7 +337,7 @@ static const struct snd_soc_dapm_route sun8i_codec_dapm_routes[] = {
  	/* DAC Mixer Routes */
  	{ "Left Digital DAC Mixer", "AIF1 Slot 0 Digital DAC Playback Switch",
--	  "Digital Left DAC"},
-+	  "AIF1 Slot 0 Left"},
- 	{ "Right Digital DAC Mixer", "AIF1 Slot 0 Digital DAC Playback Switch",
--	  "Digital Right DAC"},
-+	  "AIF1 Slot 0 Right"},
+ 	  "Digital Left DAC"},
+-	{ "Right Digital DAC Mixer", "AIF1 Slot 0 Digital DAC Playback Switch ",
++	{ "Right Digital DAC Mixer", "AIF1 Slot 0 Digital DAC Playback Switch",
+ 	  "Digital Right DAC"},
  };
  
- static struct snd_soc_dai_ops sun8i_codec_dai_ops = {
 -- 
 2.11.0
