@@ -1,131 +1,121 @@
-From: cl@rock-chips.com (=?UTF-8?B?6ZmI5Lqu?=)
-Date: Tue, 21 Mar 2017 15:59:50 +0800
-Subject: [PATCH v1 6/7] arm64: dts: rockchip: add dts file for RK3328
- evaluation board
-In-Reply-To: <4559383.EsY2O1vJ7P@phil>
-References: <1489572237-6649-1-git-send-email-cl@rock-chips.com>
- <63969127-3fcd-658c-2986-8ded6d93c433@arm.com>
- <58CB4945.9020408@rock-chips.com> <4559383.EsY2O1vJ7P@phil>
-Message-ID: <58D0DD76.8090909@rock-chips.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 21 Mar 2017 09:02:00 +0100
+Subject: [PATCH v6 0/5] Implement clocksource for rockchip SoC using
+ rockchip timer
+In-Reply-To: <F14EA552-9783-4083-A00F-9151AB7E5C99@gmail.com>
+References: <1485866596-32254-1-git-send-email-al.kochet@gmail.com>
+ <F14EA552-9783-4083-A00F-9151AB7E5C99@gmail.com>
+Message-ID: <6b897768-d11f-bfd2-7eeb-bd7a41ea7669@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko?
+On 20/03/2017 14:18, Alexander Kochetkov wrote:
+> Hello, Daniel.
+> 
+> Sorry for bothering you, but could you please take a look at v6[1] series and tell what do you think about it?
+> I see your commit[2] in the git, but I don?t understand well how to use it in rockchip driver.
+> 
+> [1] https://lkml.org/lkml/2017/1/31/401
+> [2] https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/commit/drivers/clocksource?id=376bc27150f180d9f5eddec6a14117780177589d
 
-         Is there any advice about the big dtsi?
-         I would like to send next version , thanks.
+Hi Alexander,
 
-? 2017?03?17? 16:45, Heiko Stuebner ??:
-> Am Freitag, 17. M?rz 2017, 10:26:13 CET schrieb ??:
->> ? 2017?03?17? 00:18, Andre Przywara ??:
->>> Hi Chen,
->>>
->>> On 16/03/17 01:45, cl at rock-chips.com wrote:
->>>> From: Chen Liang <cl@rock-chips.com>
->>>>
->>>> This patch add rk3328-evb.dts for RK3328 evaluation board.
->>>> Tested on RK3328 evb.
->>>>
->>>> Signed-off-by: Chen Liang <cl@rock-chips.com>
->>>> ---
->>>>
->>>>    arch/arm64/boot/dts/rockchip/Makefile       |  1 +
->>>>    arch/arm64/boot/dts/rockchip/rk3328-evb.dts | 57
->>>>    +++++++++++++++++++++++++++++ 2 files changed, 58 insertions(+)
->>>>    create mode 100644 arch/arm64/boot/dts/rockchip/rk3328-evb.dts
->>>>
->>>> diff --git a/arch/arm64/boot/dts/rockchip/Makefile
->>>> b/arch/arm64/boot/dts/rockchip/Makefile index 3a86289..853fc7d 100644
->>>> --- a/arch/arm64/boot/dts/rockchip/Makefile
->>>> +++ b/arch/arm64/boot/dts/rockchip/Makefile
->>>> @@ -4,6 +4,7 @@ dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-orion-r68-meta.dtb
->>>>
->>>>    dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-px5-evb.dtb
->>>>    dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-r88.dtb
->>>>    dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3399-evb.dtb
->>>>
->>>> +dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3328-evb.dtb
->>>>
->>>>    always		:= $(dtb-y)
->>>>    subdir-y	:= $(dts-dirs)
->>>>
->>>> diff --git a/arch/arm64/boot/dts/rockchip/rk3328-evb.dts
->>>> b/arch/arm64/boot/dts/rockchip/rk3328-evb.dts new file mode 100644
->>>> index 0000000..cf27239
->>>> --- /dev/null
->>>> +++ b/arch/arm64/boot/dts/rockchip/rk3328-evb.dts
->>>> @@ -0,0 +1,57 @@
->>>> +/*
->>>> + * Copyright (c) 2017 Fuzhou Rockchip Electronics Co., Ltd
->>>> + *
->>>> + * This file is dual-licensed: you can use it either under the terms
->>>> + * of the GPL or the X11 license, at your option. Note that this dual
->>>> + * licensing only applies to this file, and not this project as a
->>>> + * whole.
->>>> + *
->>>> + *  a) This library is free software; you can redistribute it and/or
->>>> + *     modify it under the terms of the GNU General Public License as
->>>> + *     published by the Free Software Foundation; either version 2 of
->>>> the
->>>> + *     License, or (at your option) any later version.
->>>> + *
->>>> + *     This library is distributed in the hope that it will be useful,
->>>> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
->>>> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->>>> + *     GNU General Public License for more details.
->>>> + *
->>>> + * Or, alternatively,
->>>> + *
->>>> + *  b) Permission is hereby granted, free of charge, to any person
->>>> + *     obtaining a copy of this software and associated documentation
->>>> + *     files (the "Software"), to deal in the Software without
->>>> + *     restriction, including without limitation the rights to use,
->>>> + *     copy, modify, merge, publish, distribute, sublicense, and/or
->>>> + *     sell copies of the Software, and to permit persons to whom the
->>>> + *     Software is furnished to do so, subject to the following
->>>> + *     conditions:
->>>> + *
->>>> + *     The above copyright notice and this permission notice shall be
->>>> + *     included in all copies or substantial portions of the Software.
->>>> + *
->>>> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
->>>> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
->>>> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
->>>> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
->>>> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
->>>> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
->>>> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
->>>> + *     OTHER DEALINGS IN THE SOFTWARE.
->>>> + */
->>>> +
->>>> +/dts-v1/;
->>>> +#include "rk3328.dtsi"
->>>> +
->>>> +/ {
->>>> +	model = "Rockchip RK3328 EVB";
->>>> +	compatible = "rockchip,rk3328-evb", "rockchip,rk3328";
->>>> +
->>>> +	chosen {
->>>> +		stdout-path = "serial2:1500000n8";
->>> Is that really 1.5MBit/s?
->> Yes, the RK3328 EVB board use 1.5MBit/s baud rate.
+I have been through the patchset and it is ok except for the patch 3/5.
+I wanted to investigate a bit on this one because of the patch [2] you
+are mentioning.
+
+I think there is small missing piece of devicetree binding to specify
+'clocksource' or 'clockevent'. Rob Herring is ok with an attribute of
+this kind.
+
+That would help to clearly separate these drivers without ambiguity.
+
+However, it results on some duplicated code I'm not very happy with, so
+that is my major issue with this approach I would like to solve. That is
+the status today.
+
+I wanted to take the opportunity of your changes to investigate this area.
+
+
+>> 31 ???. 2017 ?., ? 15:43, Alexander Kochetkov <al.kochet@gmail.com> ???????(?):
 >>
->>>> +	};
->>>> +};
->>>> +
->>>> +&uart2 {
->>>> +	status = "okay";
->>>> +};
->>> I don't have the board, but would expect to see more peripherals
->>> mentioned in the .dtsi enabled here.
->>> For sure the board has an (micro)SD card slot, possibly even Ethernet?
->> The codes for other peripherals are not ready now for new kernel, so i
->> push a base dtsi, and other configration will be pushed later if it is ok.
-> for me that approach is fine in general, but here, you could enable at least
-> the watchdog as well?
->
-> But no need to resend just now, I still need to look at the big dtsi.
->
->
-> Heiko
->
+>> From: Alexander Kochetkov <akochetkov@lintech.ru>
+>>
+>> Hello, Daniel, Heiko.
+>>
+>> Here is try 6 :) Thanks a lot for helping me to bring the code
+>> into kernel!
+>>
+>> This patch series contain:
+>> - devicetree bindings clarification for rockchip timers
+>> - dts files fixes for rk3228-evb, rk3229-evb and rk3188
+>> - implementation of clocksource and sched clock for rockchip SoC
+>>
+>> The clock supplying the arm-global-timer on the rk3188 is coming from the
+>> the cpu clock itself and thus changes its rate everytime cpufreq adjusts
+>> the cpu frequency making this timer unsuitable as a stable clocksource.
+>>
+>> The rk3188, rk3288 and following socs share a separate timer block already
+>> handled by the rockchip-timer driver. Therefore adapt this driver to also
+>> be able to act as clocksource on rk3188.
+>>
+>> In order to test clocksource you can run following commands and check
+>> how much time it take in real. On rk3188 it take about ~45 seconds.
+>>
+>>       cpufreq-set -f 1.6GHZ
+>>       date; sleep 60; date
+>>
+>> rk3288 (and probably anything newer) is irrelevant to this patch,
+>> as it has the arch timer interface. This patch may be usefull
+>> for Cortex-A9/A5 based parts.
+>>
+>> Regards,
+>> Alexander.
+>>
+>> Changes in v6:
+>> - Removed Reviewed-by: Heiko St?bner <heiko@sntech.de> tag
+>> - Merge 5/8, 6/8, 7/8, 8/9 into single file
+>> - split init paths into rk_clkevt_init() and rk_clksrc_init()
+>>  so the driver code could be adopted to CLOCKEVENT_OF_DECLARE()
+>> - clockevents implemented using clocksource_mmio_init()
+>> - fixed commit message for 4/8 (thanks a lot Daniel)
+>>
+>> Changes in v5:
+>> - Add Acked-by: Rob Herring <robh@kernel.org> to 1/8
+>>  http://lists.infradead.org/pipermail/linux-rockchip/2016-December/013308.html
+>> - Add Reviwed-by: Heiko St?bner <heiko@sntech.de> to series
+>> - change timer compatible property in the rk322x.dtsi 2/8
+>>  http://lists.infradead.org/pipermail/linux-rockchip/2017-January/013784.html
+>> - updated comment message for 4/8
+>>  http://lists.infradead.org/pipermail/linux-rockchip/2017-January/013786.html
+>> - updated comment message for 5/8
+>>  http://lists.infradead.org/pipermail/linux-rockchip/2017-January/013787.html
+>> - fixed build error for 8/8
+>>  http://lists.infradead.org/pipermail/linux-rockchip/2017-January/013789.html
+>>
+>> Alexander Kochetkov (5):
+>>  dt-bindings: clarify compatible property for rockchip timers
+>>  ARM: dts: rockchip: update compatible property for rk322x timer
+>>  clocksource/drivers/rockchip_timer: implement clocksource timer
+>>  ARM: dts: rockchip: add timer entries to rk3188 SoC
+>>  ARM: dts: rockchip: disable arm-global-timer for rk3188
+>>
+>> .../bindings/timer/rockchip,rk-timer.txt           |   12 +-
+>> arch/arm/boot/dts/rk3188.dtsi                      |   17 ++
+>> arch/arm/boot/dts/rk322x.dtsi                      |    2 +-
+>> drivers/clocksource/Kconfig                        |    1 +
+>> drivers/clocksource/rockchip_timer.c               |  218 ++++++++++++++------
+>> 5 files changed, 185 insertions(+), 65 deletions(-)
+>>
+>> -- 
+>> 1.7.9.5
+>>
+> 
+
+
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
