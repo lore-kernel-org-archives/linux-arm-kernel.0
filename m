@@ -1,59 +1,44 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 21 Mar 2017 09:43:24 +0000
-Subject: [PATCH] irqchip/gic-v3: Support v2m frame backwards compatibility
- mode
-In-Reply-To: <20170320223614.1351-1-sboyd@codeaurora.org>
-References: <20170320223614.1351-1-sboyd@codeaurora.org>
-Message-ID: <bac1e827-3860-d92c-7bb4-eaf9840c608f@arm.com>
+From: dwmw2@infradead.org (David Woodhouse)
+Date: Tue, 21 Mar 2017 09:42:23 +0000
+Subject: [PATCH v33 00/14] add kdump support
+In-Reply-To: <20170321073452.GA17298@linaro.org>
+References: <20170315095656.24992-1-takahiro.akashi@linaro.org>
+ <1489750991.17202.40.camel@infradead.org>
+ <1489759373.17202.44.camel@infradead.org>
+ <20170317153358.GI5940@leverpostej>
+ <1489765628.17202.59.camel@infradead.org>
+ <20170317162421.GK5940@leverpostej> <20170321073452.GA17298@linaro.org>
+Message-ID: <1490089343.5036.92.camel@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/03/17 22:36, Stephen Boyd wrote:
-> Some GIC configurations don't have an ITS or v2m frame, but they
-> want to support MSIs through the distributor's "v2m backwards
-> compatible" mode. This mode allows software written for the v2m
-> to treat the distributor as the only frame and support a limited
-> number of MSIs through a direct write to the same register offset
-> (0x40) as what exists in v2m.
-> 
-> Support this mode of operation by detecting if a gicv3 device
-> node has the "msi-controller" property, and then probe the v2m
-> frame code on top of the distributor base. Rely on existing v2m
-> DT properties to tell us about the number of SPIs and where they
-> start from because the GICD_TYPER register doesn't tell us this
-> information.
+On Tue, 2017-03-21 at 16:34 +0900, AKASHI Takahiro wrote:
+> Yes, it is intentional. I removed 'offline' code in my v14 (2016/3/4).
+> As you assumed, I'd expect 'online' status of all CPUs to be kept
+> unchanged in the core dump.
 
-Hi Stephen,
+I wonder if it would be better to take a *copy* of it and put it back
+after we're done taking the CPUs down? As things stand, we now have
+*three* different methods of taking down all the CPUs... and *none* of
+them allow a platform to override it with an NMI-based or STONITH-based 
+method, which seems like something of an oversight.
 
-The whole idea behind this GICD_SETSPI_NSR is to offer a way to signal
-SPIs using memory transaction, even allowing level interrupts (in
-combinaison with the GICD_CLRSPI_NSR at offset 0x48). This is *not* a
-GICv2m at all - only the offset is the same.
+> If you can agree, I would like to modify this disputed warning code to:
+>?
+> +	BUG_ON(!in_kexec_crash && (stuck_cpus || (num_online_cpus() > 1)));
+> +	WARN(in_kexec_crash && (stuck_cpus || smp_crash_stop_failed()),
+> +		"Some CPUs may be stale, kdump will be unreliable.\n");
 
-The reasoning is that firmware would program the various devices with
-the GICD_{CLR,SET}SPI_NSR addresses and the payload, and simply describe
-this as an SPI in the device tree. Another reason for doing so is that
-while we can always twist the DT to express anything, this cannot be
-described in ACPI at all.
+That works; thanks.
 
-Also, as you noticed, there is no provision in the architecture to
-describe the range of message-based SPIs, because any SPI can be
-signalled through that mechanism. It makes it impossible to distinguish
-SPIs that are statically allocated (because it is a real wire) from
-those that can be dynamically allocated (because it is just a number).
-
-You end-up having to describe the range of SPIs that can be generated
-through messages at least on a per SoC basis, and maybe on a per board
-basis. Not to mention that you're still only describing half of the
-capability of the HW (what about level interrupts?).
-
-If we really want to support this kind of thing, I'd like to see level
-interrupts supported as a first class citizen in our generic MSI
-infrastructure, and then the GICv3 message-based SPIs as an client of
-that infrastructure.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+FWIW I'm currently blaming my platform's firmware for my sporadic
+crash-on-CPU#1 failures. If your testing includes crashes on non-boot
+CPUs (perhaps using the sysrq hack I posted) and it reliably passes for
+you, then let's ignore that for now.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: smime.p7s
+Type: application/x-pkcs7-signature
+Size: 4938 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170321/3266da88/attachment-0001.bin>
