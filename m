@@ -1,68 +1,88 @@
-From: mturquette@baylibre.com (Michael Turquette)
-Date: Tue, 21 Mar 2017 16:49:56 -0700
-Subject: [PATCH 3/5] clk: meson-gxbb: Add GXL/GXM GP0 Variant
-In-Reply-To: <1489411604-18700-4-git-send-email-narmstrong@baylibre.com>
-References: <1489411604-18700-1-git-send-email-narmstrong@baylibre.com>
- <1489411604-18700-4-git-send-email-narmstrong@baylibre.com>
-Message-ID: <149014019624.54062.687648107621865354@resonance>
+From: slongerbeam@gmail.com (Steve Longerbeam)
+Date: Tue, 21 Mar 2017 16:56:52 -0700
+Subject: [PATCH v5 38/39] media: imx: csi: fix crop rectangle reset in
+ sink set_fmt
+In-Reply-To: <20170321112741.GV21222@n2100.armlinux.org.uk>
+References: <1489121599-23206-1-git-send-email-steve_longerbeam@mentor.com>
+ <1489121599-23206-39-git-send-email-steve_longerbeam@mentor.com>
+ <20170319152233.GW21222@n2100.armlinux.org.uk>
+ <327d67d9-68c1-7f74-0c0f-f6aee1c4b546@gmail.com>
+ <1490010926.2917.59.camel@pengutronix.de>
+ <20170320120855.GH21222@n2100.armlinux.org.uk>
+ <1490018451.2917.86.camel@pengutronix.de>
+ <20170320141705.GL21222@n2100.armlinux.org.uk>
+ <1490030604.2917.103.camel@pengutronix.de>
+ <20170321112741.GV21222@n2100.armlinux.org.uk>
+Message-ID: <1d382b89-fac3-a413-55a3-06cd2b751322@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Neil,
 
-Quoting Neil Armstrong (2017-03-13 06:26:42)
-> @@ -821,6 +893,7 @@ struct pll_params_table gxbb_gp0_params_table[] = {
->         &gxbb_hdmi_pll,
->         &gxbb_sys_pll,
->         &gxbb_gp0_pll,
-> +       &gxl_gp0_pll,
 
-Is there a reason for adding the pointer to this array here? It seems to
-me that the gxbb_gp0_pll and gxl_gp0_pll are mutually exclusive, so
-perhaps two different tables should be used?
+On 03/21/2017 04:27 AM, Russell King - ARM Linux wrote:
+> On Mon, Mar 20, 2017 at 06:23:24PM +0100, Philipp Zabel wrote:
+>> @@ -1173,15 +1196,8 @@ static void csi_try_fmt(struct csi_priv *priv,
+>>  		incc = imx_media_find_mbus_format(infmt->code,
+>>  						  CS_SEL_ANY, true);
+>>
+>> -		if (sdformat->format.width < priv->crop.width * 3 / 4)
+>> -			sdformat->format.width = priv->crop.width / 2;
+>> -		else
+>> -			sdformat->format.width = priv->crop.width;
+>> -
+>> -		if (sdformat->format.height < priv->crop.height * 3 / 4)
+>> -			sdformat->format.height = priv->crop.height / 2;
+>> -		else
+>> -			sdformat->format.height = priv->crop.height;
+>> +		sdformat->format.width = compose->width;
+>> +		sdformat->format.height = compose->height;
+>>
+>>  		if (incc->bayer) {
+>>  			sdformat->format.code = infmt->code;
+>
+> We need to do more in here, because right now setting the source pads
+> overwrites the colorimetry etc information.  Maybe something like the
+> below?
 
->  };
->  
->  static struct meson_clk_mpll *const gxbb_clk_mplls[] = {
-> @@ -923,6 +996,10 @@ static int gxbb_clkc_probe(struct platform_device *pdev)
->         struct clk *parent_clk;
->         struct device *dev = &pdev->dev;
->  
-> +       /* Override GP0 clock for GXL/GXM */
-> +       if (of_device_is_compatible(dev->of_node, "amlogic,gxl-clkc"))
-> +               gxbb_hw_onecell_data.hws[CLKID_GP0_PLL] = &gxl_gp0_pll.hw;
+I'm thinking, to support propagating the colorimetry params, there
+should be a util function
 
-Similarly, this above is a little ugly compared to dedicated tables for
-each variant.
+void imx_media_copy_colorimetry(struct v4l2_mbus_framefmt *out,
+				struct v4l2_mbus_framefmt *in);
 
-Regards,
-Mike
+that can be used throughout the pipeline, that does exactly what
+you add below.
 
+>  I'm wondering if it would be a saner approach to copy the
+> sink format and update the parameters that can be changed, rather than
+> trying to list all the parameters that shouldn't be changed.
+
+For CSI that is a bit difficult, because the source formats are
+hardly related to the sink formats, so so much would have to be
+modified after copying the sink format that it would be rather
+pointless, except to forward the colorimetry params.
+
+Steve
+
+>  What if the format structure gains a new member?
+>
+> diff --git a/drivers/staging/media/imx/imx-media-csi.c b/drivers/staging/media/imx/imx-media-csi.c
+> index 1492b92e1970..756204ced53c 100644
+> --- a/drivers/staging/media/imx/imx-media-csi.c
+> +++ b/drivers/staging/media/imx/imx-media-csi.c
+> @@ -1221,6 +1221,12 @@ static void csi_try_fmt(struct csi_priv *priv,
+>  			sdformat->format.field =  (infmt->height == 480) ?
+>  				V4L2_FIELD_SEQ_TB : V4L2_FIELD_SEQ_BT;
+>  		}
 > +
->         /*  Generic clocks and PLLs */
->         clk_base = of_iomap(dev->of_node, 0);
->         if (!clk_base) {
-> @@ -996,6 +1073,7 @@ static int gxbb_clkc_probe(struct platform_device *pdev)
->  
->  static const struct of_device_id gxbb_clkc_match_table[] = {
->         { .compatible = "amlogic,gxbb-clkc" },
-> +       { .compatible = "amlogic,gxl-clkc" },
->         { }
->  };
->  
-> diff --git a/drivers/clk/meson/gxbb.h b/drivers/clk/meson/gxbb.h
-> index 8ee2022..7f99bf6 100644
-> --- a/drivers/clk/meson/gxbb.h
-> +++ b/drivers/clk/meson/gxbb.h
-> @@ -71,6 +71,8 @@
->  #define HHI_GP0_PLL_CNTL2              0x44 /* 0x11 offset in data sheet */
->  #define HHI_GP0_PLL_CNTL3              0x48 /* 0x12 offset in data sheet */
->  #define HHI_GP0_PLL_CNTL4              0x4c /* 0x13 offset in data sheet */
-> +#define        HHI_GP0_PLL_CNTL5               0x50 /* 0x14 offset in data sheet */
-> +#define        HHI_GP0_PLL_CNTL1               0x58 /* 0x16 offset in data sheet */
->  
->  #define HHI_XTAL_DIVN_CNTL             0xbc /* 0x2f offset in data sheet */
->  #define HHI_TIMER90K                   0xec /* 0x3b offset in data sheet */
-> -- 
-> 1.9.1
-> 
+> +		/* copy settings we can't change */
+> +		sdformat->format.colorspace = infmt->colorspace;
+> +		sdformat->format.ycbcr_enc = infmt->ycbcr_enc;
+> +		sdformat->format.quantization = infmt->quantization;
+> +		sdformat->format.xfer_func = infmt->xfer_func;
+>  		break;
+>  	case CSI_SINK_PAD:
+>  		v4l_bound_align_image(&sdformat->format.width, MIN_W, MAX_W,
+>
+>
+>
