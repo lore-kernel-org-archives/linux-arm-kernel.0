@@ -1,210 +1,52 @@
-From: mturquette@baylibre.com (Michael Turquette)
-Date: Tue, 21 Mar 2017 16:31:11 -0700
-Subject: [PATCH v3 2/3] clk: meson-gxbb: Add MALI clocks
-In-Reply-To: <1489064027-18004-3-git-send-email-narmstrong@baylibre.com>
-References: <1489064027-18004-1-git-send-email-narmstrong@baylibre.com>
- <1489064027-18004-3-git-send-email-narmstrong@baylibre.com>
-Message-ID: <149013907135.54062.15157425339137707641@resonance>
+From: slongerbeam@gmail.com (Steve Longerbeam)
+Date: Tue, 21 Mar 2017 16:33:29 -0700
+Subject: [PATCH v5 38/39] media: imx: csi: fix crop rectangle reset in
+ sink set_fmt
+In-Reply-To: <1490030604.2917.103.camel@pengutronix.de>
+References: <1489121599-23206-1-git-send-email-steve_longerbeam@mentor.com>
+ <1489121599-23206-39-git-send-email-steve_longerbeam@mentor.com>
+ <20170319152233.GW21222@n2100.armlinux.org.uk>
+ <327d67d9-68c1-7f74-0c0f-f6aee1c4b546@gmail.com>
+ <1490010926.2917.59.camel@pengutronix.de>
+ <20170320120855.GH21222@n2100.armlinux.org.uk>
+ <1490018451.2917.86.camel@pengutronix.de>
+ <20170320141705.GL21222@n2100.armlinux.org.uk>
+ <1490030604.2917.103.camel@pengutronix.de>
+Message-ID: <80b516fe-6050-c122-1de6-9235bc7ade68@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Neil,
+Hi Philipp, Russell,
 
-Quoting Neil Armstrong (2017-03-09 04:53:46)
-> The Mali is clocked by two identical clock paths behind a glitch free mux
-> to safely change frequency while running.
-> 
-> The two "mali_0" and "mali_1" clocks are composed of a mux, divider and gate.
-> Expose these two clocks trees using generic clocks.
-> Finally the glitch free mux is added as "mali" clock.
-> 
-> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
-> ---
->  drivers/clk/meson/gxbb.c | 139 +++++++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 139 insertions(+)
-> 
-> diff --git a/drivers/clk/meson/gxbb.c b/drivers/clk/meson/gxbb.c
-> index 5059c7b..d9f7fef 100644
-> --- a/drivers/clk/meson/gxbb.c
-> +++ b/drivers/clk/meson/gxbb.c
-> @@ -634,6 +634,131 @@
->         },
->  };
->  
-> +/*
-> + * The MALI IP is clocked by two identical clocks (mali_0 and mali_1)
-> + * muxed by a glitch-free switch.
-> + */
-> +
-> +static u32 mux_table_mali_0_1[] = {0, 1, 2, 3, 4, 5, 6, 7};
-> +static const char *gxbb_mali_0_1_parent_names[] = {
-> +       "xtal", "gp0_pll", "mpll2", "mpll1", "fclk_div7",
-> +       "fclk_div4", "fclk_div3", "fclk_div5"
-> +};
-> +
-> +static struct clk_mux gxbb_mali_0_sel = {
-> +       .reg = (void *)HHI_MALI_CLK_CNTL,
-> +       .mask = 0x7,
-> +       .shift = 9,
-> +       .table = mux_table_mali_0_1,
-> +       .lock = &clk_lock,
-> +       .hw.init = &(struct clk_init_data){
-> +               .name = "mali_0_sel",
-> +               .ops = &clk_mux_ops,
-> +               /*
-> +                * bits 10:9 selects from 8 possible parents:
-> +                * xtal, gp0_pll, mpll2, mpll1, fclk_div7,
-> +                * fclk_div4, fclk_div3, fclk_div5
-> +                */
-> +               .parent_names = gxbb_mali_0_1_parent_names,
-> +               .num_parents = 8,
-> +               .flags = (CLK_SET_RATE_NO_REPARENT | CLK_IGNORE_UNUSED),
 
-Are all of these CLK_IGNORE_UNUSED flags necessary? If so, why? I'm just
-wondering if this is yet another display-related use case where a
-hand-off mechanism would work better?
+On 03/20/2017 10:23 AM, Philipp Zabel wrote:
+> Hi Steve, Russell,
+>
+> <snip>
+>
+> What do you think of this:
+>
+> ----------8<----------
+> From 2830aebc404bdfc9d7fc1ec94e5282d0b668e8f6 Mon Sep 17 00:00:00 2001
+> From: Philipp Zabel <p.zabel@pengutronix.de>
+> Date: Mon, 20 Mar 2017 17:10:21 +0100
+> Subject: [PATCH] media: imx: csi: add sink selection rectangles
+>
+> Move the crop rectangle to the sink pad and add a sink compose rectangle
+> to configure scaling. Also propagate rectangles from sink pad to crop
+> rectangle, to compose rectangle, and to the source pads both in ACTIVE
+> and TRY variants of set_fmt/selection, and initialize the default crop
+> and compose rectangles.
+>
 
-Thanks,
-Mike
 
-> +       },
-> +};
-> +
-> +static struct clk_divider gxbb_mali_0_div = {
-> +       .reg = (void *)HHI_MALI_CLK_CNTL,
-> +       .shift = 0,
-> +       .width = 7,
-> +       .lock = &clk_lock,
-> +       .hw.init = &(struct clk_init_data){
-> +               .name = "mali_0_div",
-> +               .ops = &clk_divider_ops,
-> +               .parent_names = (const char *[]){ "mali_0_sel" },
-> +               .num_parents = 1,
-> +               .flags = (CLK_SET_RATE_NO_REPARENT | CLK_IGNORE_UNUSED),
-> +       },
-> +};
-> +
-> +static struct clk_gate gxbb_mali_0 = {
-> +       .reg = (void *)HHI_MALI_CLK_CNTL,
-> +       .bit_idx = 8,
-> +       .lock = &clk_lock,
-> +       .hw.init = &(struct clk_init_data){
-> +               .name = "mali_0",
-> +               .ops = &clk_gate_ops,
-> +               .parent_names = (const char *[]){ "mali_0_div" },
-> +               .num_parents = 1,
-> +               .flags = (CLK_SET_RATE_PARENT | CLK_IGNORE_UNUSED),
-> +       },
-> +};
-> +
-> +static struct clk_mux gxbb_mali_1_sel = {
-> +       .reg = (void *)HHI_MALI_CLK_CNTL,
-> +       .mask = 0x7,
-> +       .shift = 25,
-> +       .table = mux_table_mali_0_1,
-> +       .lock = &clk_lock,
-> +       .hw.init = &(struct clk_init_data){
-> +               .name = "mali_1_sel",
-> +               .ops = &clk_mux_ops,
-> +               /*
-> +                * bits 10:9 selects from 8 possible parents:
-> +                * xtal, gp0_pll, mpll2, mpll1, fclk_div7,
-> +                * fclk_div4, fclk_div3, fclk_div5
-> +                */
-> +               .parent_names = gxbb_mali_0_1_parent_names,
-> +               .num_parents = 8,
-> +               .flags = (CLK_SET_RATE_NO_REPARENT | CLK_IGNORE_UNUSED),
-> +       },
-> +};
-> +
-> +static struct clk_divider gxbb_mali_1_div = {
-> +       .reg = (void *)HHI_MALI_CLK_CNTL,
-> +       .shift = 16,
-> +       .width = 7,
-> +       .lock = &clk_lock,
-> +       .hw.init = &(struct clk_init_data){
-> +               .name = "mali_1_div",
-> +               .ops = &clk_divider_ops,
-> +               .parent_names = (const char *[]){ "mali_1_sel" },
-> +               .num_parents = 1,
-> +               .flags = (CLK_SET_RATE_NO_REPARENT | CLK_IGNORE_UNUSED),
-> +       },
-> +};
-> +
-> +static struct clk_gate gxbb_mali_1 = {
-> +       .reg = (void *)HHI_MALI_CLK_CNTL,
-> +       .bit_idx = 24,
-> +       .lock = &clk_lock,
-> +       .hw.init = &(struct clk_init_data){
-> +               .name = "mali_1",
-> +               .ops = &clk_gate_ops,
-> +               .parent_names = (const char *[]){ "mali_1_div" },
-> +               .num_parents = 1,
-> +               .flags = (CLK_SET_RATE_PARENT | CLK_IGNORE_UNUSED),
-> +       },
-> +};
-> +
-> +static u32 mux_table_mali[] = {0, 1};
-> +static const char *gxbb_mali_parent_names[] = {
-> +       "mali_0", "mali_1"
-> +};
-> +
-> +static struct clk_mux gxbb_mali = {
-> +       .reg = (void *)HHI_MALI_CLK_CNTL,
-> +       .mask = 1,
-> +       .shift = 31,
-> +       .table = mux_table_mali,
-> +       .lock = &clk_lock,
-> +       .hw.init = &(struct clk_init_data){
-> +               .name = "mali",
-> +               .ops = &clk_mux_ops,
-> +               .parent_names = gxbb_mali_parent_names,
-> +               .num_parents = 2,
-> +               .flags = (CLK_SET_RATE_NO_REPARENT | CLK_IGNORE_UNUSED),
-> +       },
-> +};
-> +
->  /* Everything Else (EE) domain gates */
->  static MESON_GATE(gxbb_ddr, HHI_GCLK_MPEG0, 0);
->  static MESON_GATE(gxbb_dos, HHI_GCLK_MPEG0, 1);
-> @@ -827,6 +952,13 @@
->                 [CLKID_SAR_ADC_CLK]         = &gxbb_sar_adc_clk.hw,
->                 [CLKID_SAR_ADC_SEL]         = &gxbb_sar_adc_clk_sel.hw,
->                 [CLKID_SAR_ADC_DIV]         = &gxbb_sar_adc_clk_div.hw,
-> +               [CLKID_MALI_0_SEL]          = &gxbb_mali_0_sel.hw,
-> +               [CLKID_MALI_0_DIV]          = &gxbb_mali_0_div.hw,
-> +               [CLKID_MALI_0]              = &gxbb_mali_0.hw,
-> +               [CLKID_MALI_1_SEL]          = &gxbb_mali_1_sel.hw,
-> +               [CLKID_MALI_1_DIV]          = &gxbb_mali_1_div.hw,
-> +               [CLKID_MALI_1]              = &gxbb_mali_1.hw,
-> +               [CLKID_MALI]                = &gxbb_mali.hw,
->         },
->         .num = NR_CLKS,
->  };
-> @@ -930,16 +1062,23 @@
->         &gxbb_emmc_b,
->         &gxbb_emmc_c,
->         &gxbb_sar_adc_clk,
-> +       &gxbb_mali_0,
-> +       &gxbb_mali_1,
->  };
->  
->  static struct clk_mux *const gxbb_clk_muxes[] = {
->         &gxbb_mpeg_clk_sel,
->         &gxbb_sar_adc_clk_sel,
-> +       &gxbb_mali_0_sel,
-> +       &gxbb_mali_1_sel,
-> +       &gxbb_mali,
->  };
->  
->  static struct clk_divider *const gxbb_clk_dividers[] = {
->         &gxbb_mpeg_clk_div,
->         &gxbb_sar_adc_clk_div,
-> +       &gxbb_mali_0_div,
-> +       &gxbb_mali_1_div,
->  };
->  
->  static int gxbb_clkc_probe(struct platform_device *pdev)
-> -- 
-> 1.9.1
-> 
+I applied this patch.
+
+I noticed Philipp fixed a bug in the sink->source pad format
+propagation. I was only propagating the active runs, and not
+the trial runs. I fixed this everywhere in the pipeline, applied
+to the "propagate sink pad formats to source pads" patch. Try
+runs should now work correctly across the whole pipeline, but
+I haven't tested this.
+
+Steve
