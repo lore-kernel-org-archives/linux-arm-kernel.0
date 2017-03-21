@@ -1,78 +1,54 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Tue, 21 Mar 2017 18:41:06 +0100
-Subject: [PATCH v3 09/19] KVM: arm64: ITS: Interpret MAPD ITT_addr field
-In-Reply-To: <4ba972ac-1287-b898-74e7-de74106c49fd@arm.com>
-References: <1488800074-21991-1-git-send-email-eric.auger@redhat.com>
- <1488800074-21991-10-git-send-email-eric.auger@redhat.com>
- <4ba972ac-1287-b898-74e7-de74106c49fd@arm.com>
-Message-ID: <aacc8bda-e069-71b9-0f8c-7624515ca635@redhat.com>
+From: james.morse@arm.com (James Morse)
+Date: Tue, 21 Mar 2017 17:41:54 +0000
+Subject: [PATCH v3 01/25] arm64: hyp-stub: Implement HVC_RESET_VECTORS
+ stub hypercall
+In-Reply-To: <0cce34c1-cb6f-0ba3-ac98-c0a0e986dc86@arm.com>
+References: <20170306142458.8875-1-marc.zyngier@arm.com>
+ <20170306142458.8875-2-marc.zyngier@arm.com>
+ <20170321170407.GD21829@e104818-lin.cambridge.arm.com>
+ <58D1620E.30001@arm.com> <0cce34c1-cb6f-0ba3-ac98-c0a0e986dc86@arm.com>
+Message-ID: <58D165E2.7050501@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 17/03/2017 16:19, Andre Przywara wrote:
-> On 06/03/17 11:34, Eric Auger wrote:
->> Up to now the MAPD ITT_addr had been ignored. We will need it
->> for save/restore. Let's record it in the its_device struct.
+On 21/03/17 17:37, Marc Zyngier wrote:
+> On 21/03/17 17:25, James Morse wrote:
+>> On 21/03/17 17:04, Catalin Marinas wrote:
+>>> On Mon, Mar 06, 2017 at 02:24:34PM +0000, Marc Zyngier wrote:
+>>>> Let's define a new stub hypercall that resets the HYP configuration
+>>>> to its default: hyp-stub vectors, and MMU disabled.
+>>>>
+>>>> Of course, for the hyp-stub itself, this is a trivial no-op.
+>>>> Hypervisors will have a bit more work to do.
+>>>>
+>>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>>>> ---
+>>>>  arch/arm64/include/asm/virt.h |  9 +++++++++
+>>>>  arch/arm64/kernel/hyp-stub.S  | 13 ++++++++++++-
+>>>>  2 files changed, 21 insertions(+), 1 deletion(-)
+>>> [...]
+>>>> +ENTRY(__hyp_reset_vectors)
+>>>> +	str	lr, [sp, #-16]!
+>>>> +	mov	x0, #HVC_RESET_VECTORS
+>>>> +	hvc	#0
+>>>> +	ldr	lr, [sp], #16
+>>>> +	ret
+>>>> +ENDPROC(__hyp_reset_vectors)
+>>>
+>>> Why do we need to specifically preserve lr across the hvc call? Is it
+>>> corrupted by the EL2 code (if yes, are other caller-saved registers that
+>>> need preserving)? I don't see something similar in the arch/arm code.
 >>
->> Signed-off-by: Eric Auger <eric.auger@redhat.com>
->> ---
->>  virt/kvm/arm/vgic/vgic-its.c | 4 ++++
->>  1 file changed, 4 insertions(+)
->>
->> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
->> index 56bcd92..694023f 100644
->> --- a/virt/kvm/arm/vgic/vgic-its.c
->> +++ b/virt/kvm/arm/vgic/vgic-its.c
->> @@ -99,6 +99,7 @@ struct its_device {
->>  
->>  	/* the head for the list of ITTEs */
->>  	struct list_head itt_head;
->> +	gpa_t itt_addr;
->>  	u32 nb_eventid_bits;
->>  	u32 device_id;
->>  };
->> @@ -562,6 +563,7 @@ static u64 its_cmd_mask_field(u64 *its_cmd, int word, int shift, int size)
->>  #define its_cmd_get_collection(cmd)	its_cmd_mask_field(cmd, 2,  0, 16)
->                             --> here?
->>  #define its_cmd_get_target_addr(cmd)	its_cmd_mask_field(cmd, 2, 16, 32)
->>  #define its_cmd_get_validbit(cmd)	its_cmd_mask_field(cmd, 2, 63,  1)
->> +#define its_cmd_get_ittaddr(cmd)	its_cmd_mask_field(cmd, 2, 8,  44)
+>> Kexec on arm64 needed a register to clobber in the hyp-stub's el1_sync code. We
+>> wanted to preserve all the registers so soft_restart() could look more like a
+>> function call.
 > 
-> Can you please move this up ^
-> And adjust the spacing to align the commas?
-> (heavily influenced by suppressed OCD today ;-)
-sure
-> 
->>  #define its_cmd_get_size(cmd)		its_cmd_mask_field(cmd, 1, 0,  5)
->>  
->>  /*
->> @@ -832,6 +834,7 @@ static int vgic_its_cmd_handle_mapd(struct kvm *kvm, struct vgic_its *its,
->>  	u32 device_id = its_cmd_get_deviceid(its_cmd);
->>  	bool valid = its_cmd_get_validbit(its_cmd);
->>  	size_t size = its_cmd_get_size(its_cmd);
->> +	gpa_t itt_addr = its_cmd_get_ittaddr(its_cmd);
-> 
-> And do the "<< 8" already here?
-sure
+> I don't think we need this anymore. Once we enter __cpu_soft_restart(),
+> there is no turning back. Or am I missing something else?
 
-Thanks
+My recollection of the history may be wrong: but we needed to mess with esr_el2
+before we know its a soft_restart() call, at which point we didn't want to
+clobber the registers. This was the strange use of x18 in kexec.
 
-Eric
-> 
-> Cheers,
-> Andre.
-> 
->>  	struct its_device *device;
->>  
->>  	if (!vgic_its_check_id(its, its->baser_device_table, device_id))
->> @@ -862,6 +865,7 @@ static int vgic_its_cmd_handle_mapd(struct kvm *kvm, struct vgic_its *its,
->>  		return -ENOMEM;
->>  
->>  	device->device_id = device_id;
->> +	device->itt_addr = itt_addr << 8;
->>  	device->nb_eventid_bits = size + 1;
->>  
->>  	INIT_LIST_HEAD(&device->itt_head);
->>
+
+James
