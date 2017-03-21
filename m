@@ -1,19 +1,40 @@
 From: l.stach@pengutronix.de (Lucas Stach)
-Date: Tue, 21 Mar 2017 14:49:30 +0100
-Subject: [PATCH v7 2/4] PCI: imx6: Allow probe deferal by reset GPIO
-In-Reply-To: <20170321134203.26325-3-andrew.smirnov@gmail.com>
+Date: Tue, 21 Mar 2017 14:50:40 +0100
+Subject: [PATCH v7 3/4] PCI: imx6: Do not wait for speed change on i.MX7
+In-Reply-To: <20170321134203.26325-4-andrew.smirnov@gmail.com>
 References: <20170321134203.26325-1-andrew.smirnov@gmail.com>
- <20170321134203.26325-3-andrew.smirnov@gmail.com>
-Message-ID: <1490104170.2895.21.camel@pengutronix.de>
+ <20170321134203.26325-4-andrew.smirnov@gmail.com>
+Message-ID: <1490104240.2895.22.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Am Dienstag, den 21.03.2017, 06:42 -0700 schrieb Andrey Smirnov:
-> Some designs implement reset GPIO via a GPIO expander connected to a
-> peripheral bus. One such example would be i.MX7 Sabre board where said
-> GPIO is provided by SPI shift register connected to a bitbanged SPI
-> bus. In order to support such designs allow reset GPIO request to defer
-> probing of the driver.
+> As can be seen from [1]:
+> 
+> "...the different behavior between iMX6Q PCIe and iMX7D PCIe maybe
+> caused by the different controller version.
+> 
+> Regarding to the DOC description, the DIRECT_SPEED_CHANGE should be
+> cleared after the speed change from GEN1 to GEN2. Unfortunately, when
+> GEN1 device is used, the behavior is not documented.
+> 
+> So, IC design guys run the simulation and
+> find out the following behaviors:
+> 
+>      1. DIRECT_SPEED_CHANGE will be cleared in 7D after speed change
+>      	from GEN1 to GEN2. This matches doc?s description
+> 
+>      2. set MAX link speed(PCIE_CAP_TARGET_LINK_SPEED=0x01) as GEN1 and
+>      	re-run the simulation, DIRECT_SPEED_CHANGE will not be cleared;
+>      	remain as 1, this matches your result, but function test is
+>      	passed, so this bit should not affect the normal PCIe function.
+> ..."
+> 
+> imx6_pcie_wait_for_speed_change will report false failures for Gen1 ->
+> Gen1 speed transition, so avoid doing that check and just rely on
+> imx6_pcie_wait_for_link only.
+> 
+> [1] https://community.nxp.com/message/867943
 > 
 > Cc: yurovsky at gmail.com
 > Cc: Lucas Stach <l.stach@pengutronix.de>
@@ -27,74 +48,36 @@ Am Dienstag, den 21.03.2017, 06:42 -0700 schrieb Andrey Smirnov:
 Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
 
 > ---
->  drivers/pci/dwc/pci-imx6.c | 25 +++++++++++++++++--------
->  1 file changed, 17 insertions(+), 8 deletions(-)
+>  drivers/pci/dwc/pci-imx6.c | 19 +++++++++++++++----
+>  1 file changed, 15 insertions(+), 4 deletions(-)
 > 
 > diff --git a/drivers/pci/dwc/pci-imx6.c b/drivers/pci/dwc/pci-imx6.c
-> index e0c36d6..64de9bb 100644
+> index 64de9bb..c731e41 100644
 > --- a/drivers/pci/dwc/pci-imx6.c
 > +++ b/drivers/pci/dwc/pci-imx6.c
-> @@ -595,8 +595,8 @@ static struct dw_pcie_host_ops imx6_pcie_host_ops = {
->  	.host_init = imx6_pcie_host_init,
->  };
+> @@ -545,10 +545,21 @@ static int imx6_pcie_establish_link(struct imx6_pcie *imx6_pcie)
+>  	tmp |= PORT_LOGIC_SPEED_CHANGE;
+>  	dw_pcie_writel_dbi(pci, PCIE_LINK_WIDTH_SPEED_CONTROL, tmp);
 >  
-> -static int __init imx6_add_pcie_port(struct imx6_pcie *imx6_pcie,
-> -				     struct platform_device *pdev)
-> +static int imx6_add_pcie_port(struct imx6_pcie *imx6_pcie,
-> +			      struct platform_device *pdev)
->  {
->  	struct dw_pcie *pci = imx6_pcie->pci;
->  	struct pcie_port *pp = &pci->pp;
-> @@ -636,7 +636,7 @@ static const struct dw_pcie_ops dw_pcie_ops = {
->  	.link_up = imx6_pcie_link_up,
->  };
->  
-> -static int __init imx6_pcie_probe(struct platform_device *pdev)
-> +static int imx6_pcie_probe(struct platform_device *pdev)
->  {
->  	struct device *dev = &pdev->dev;
->  	struct dw_pcie *pci;
-> @@ -660,10 +660,6 @@ static int __init imx6_pcie_probe(struct platform_device *pdev)
->  	imx6_pcie->variant =
->  		(enum imx6_pcie_variants)of_device_get_match_data(dev);
->  
-> -	/* Added for PCI abort handling */
-> -	hook_fault_code(16 + 6, imx6q_pcie_abort_handler, SIGBUS, 0,
-> -		"imprecise external abort");
-> -
->  	dbi_base = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->  	pci->dbi_base = devm_ioremap_resource(dev, dbi_base);
->  	if (IS_ERR(pci->dbi_base))
-> @@ -683,6 +679,8 @@ static int __init imx6_pcie_probe(struct platform_device *pdev)
->  			dev_err(dev, "unable to get reset gpio\n");
->  			return ret;
->  		}
-> +	} else if (imx6_pcie->reset_gpio == -EPROBE_DEFER) {
-> +		return imx6_pcie->reset_gpio;
+> -	ret = imx6_pcie_wait_for_speed_change(imx6_pcie);
+> -	if (ret) {
+> -		dev_err(dev, "Failed to bring link up!\n");
+> -		goto err_reset_phy;
+> +	if (imx6_pcie->variant != IMX7D) {
+> +		/*
+> +		 * On i.MX7, DIRECT_SPEED_CHANGE behaves differently
+> +		 * from i.MX6 family when no link speed transition
+> +		 * occurs and we go Gen1 -> yep, Gen1. The difference
+> +		 * is that, in such case, it will not be cleared by HW
+> +		 * which will cause the following code to report false
+> +		 * failure.
+> +		 */
+> +
+> +		ret = imx6_pcie_wait_for_speed_change(imx6_pcie);
+> +		if (ret) {
+> +			dev_err(dev, "Failed to bring link up!\n");
+> +			goto err_reset_phy;
+> +		}
 >  	}
 >  
->  	/* Fetch clocks */
-> @@ -796,11 +794,22 @@ static struct platform_driver imx6_pcie_driver = {
->  		.name	= "imx6q-pcie",
->  		.of_match_table = imx6_pcie_of_match,
->  	},
-> +	.probe    = imx6_pcie_probe,
->  	.shutdown = imx6_pcie_shutdown,
->  };
->  
->  static int __init imx6_pcie_init(void)
->  {
-> -	return platform_driver_probe(&imx6_pcie_driver, imx6_pcie_probe);
-> +	/*
-> +	 * Since probe() can be deferred we need to make sure that
-> +	 * hook_fault_code is not called after __init memory is freed
-> +	 * by kernel and since imx6q_pcie_abort_handler() is a no-op
-> +	 * we can install the handler here without risking it
-> +	 * accessing some unitialized driver state
-> +	 */
-> +	hook_fault_code(16 + 6, imx6q_pcie_abort_handler, SIGBUS, 0,
-> +			"imprecise external abort");
-> +
-> +	return platform_driver_register(&imx6_pcie_driver);
->  }
->  device_initcall(imx6_pcie_init);
+>  	/* Make sure link training is finished as well! */
