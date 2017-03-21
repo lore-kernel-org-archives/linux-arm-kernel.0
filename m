@@ -1,273 +1,179 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 21 Mar 2017 10:29:08 +0000
-Subject: [PATCH 1/9] KVM: arm/arm64: vgic: Defer touching GICH_VMCR to
- vcpu_load/put
-In-Reply-To: <20170320105818.20481-2-cdall@linaro.org>
-References: <20170320105818.20481-1-cdall@linaro.org>
- <20170320105818.20481-2-cdall@linaro.org>
-Message-ID: <a4683f7c-498d-85f3-8987-f6e002f1ebb3@arm.com>
+From: olivier.moysan@st.com (Olivier MOYSAN)
+Date: Tue, 21 Mar 2017 10:31:54 +0000
+Subject: [RESEND PATCH v2 1/2] ASoC: stm32: add bindings for SAI
+In-Reply-To: <f6a9354e-dbab-f485-c763-21c8e3af3d62@st.com>
+References: <f6a9354e-dbab-f485-c763-21c8e3af3d62@st.com>
+Message-ID: <2d9ee6db-e030-39ef-1988-b8305bcf042f@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/03/17 10:58, Christoffer Dall wrote:
-> From: Christoffer Dall <cdall@cs.columbia.edu>
-> 
-> We don't have to save/restore the VMCR on every entry to/from the guest,
-> since on GICv2 we can access the control interface from EL1 and on VHE
-> systems with GICv3 we can access the control interface from KVM running
-> in EL2.
-> 
-> GICv3 systems without VHE becomes the rare case, which has to
-> save/restore the register on each round trip.
-> 
-> For in-context accesses to the VMCR, meaning emulation code needs access
-> to the value of the VCPU that is currently running within vcpu_load
-> and vcpu_put will detect that the it should load the VMCR from the
-> physical GIC instead of using the cached memory value.  While this extra
-> checking adds some code complexity we end up moving code out of the
-> critical path.
-> 
-> Note that userspace accesses may see out-of-date values if the VCPU is
-> running while accessing the VGIC state via the KVM device API, but this
-> is already the case.
-> 
-> Signed-off-by: Christoffer Dall <cdall@cs.columbia.edu>
-> Signed-off-by: Christoffer Dall <cdall@linaro.org>
-> ---
->  arch/arm/include/asm/kvm_asm.h   |  3 +++
->  arch/arm/kvm/arm.c               | 11 +++++-----
->  arch/arm64/include/asm/kvm_asm.h |  2 ++
->  include/kvm/arm_vgic.h           |  3 +++
->  virt/kvm/arm/hyp/vgic-v2-sr.c    |  3 ---
->  virt/kvm/arm/hyp/vgic-v3-sr.c    | 14 ++++++++----
->  virt/kvm/arm/vgic/vgic-init.c    | 12 +++++++++++
->  virt/kvm/arm/vgic/vgic-v2.c      | 46 ++++++++++++++++++++++++++++++++++++++--
->  virt/kvm/arm/vgic/vgic-v3.c      | 42 ++++++++++++++++++++++++++++++++++--
->  virt/kvm/arm/vgic/vgic.c         | 22 +++++++++++++++++++
->  virt/kvm/arm/vgic/vgic.h         |  6 ++++++
->  11 files changed, 148 insertions(+), 16 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
-> index 8ef0538..dd16044 100644
-> --- a/arch/arm/include/asm/kvm_asm.h
-> +++ b/arch/arm/include/asm/kvm_asm.h
-> @@ -75,7 +75,10 @@ extern void __init_stage2_translation(void);
->  extern void __kvm_hyp_reset(unsigned long);
->  
->  extern u64 __vgic_v3_get_ich_vtr_el2(void);
-> +extern u64 __vgic_v3_read_vmcr(void);
-> +extern void __vgic_v3_write_vmcr(u32 vmcr);
->  extern void __vgic_v3_init_lrs(void);
-> +
->  #endif
->  
->  #endif /* __ARM_KVM_ASM_H__ */
-> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-> index d775aac..cfdf2f5 100644
-> --- a/arch/arm/kvm/arm.c
-> +++ b/arch/arm/kvm/arm.c
-> @@ -348,15 +348,14 @@ void kvm_arch_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
->  	vcpu->arch.host_cpu_context = this_cpu_ptr(kvm_host_cpu_state);
->  
->  	kvm_arm_set_running_vcpu(vcpu);
-> +
-> +	kvm_vgic_load(vcpu);
->  }
->  
->  void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
->  {
-> -	/*
-> -	 * The arch-generic KVM code expects the cpu field of a vcpu to be -1
-> -	 * if the vcpu is no longer assigned to a cpu.  This is used for the
-> -	 * optimized make_all_cpus_request path.
-> -	 */
-> +	kvm_vgic_put(vcpu);
-> +
->  	vcpu->cpu = -1;
->  
->  	kvm_arm_set_running_vcpu(NULL);
-> @@ -630,7 +629,9 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
->  		 * non-preemptible context.
->  		 */
->  		preempt_disable();
-> +
->  		kvm_pmu_flush_hwstate(vcpu);
-> +
->  		kvm_timer_flush_hwstate(vcpu);
->  		kvm_vgic_flush_hwstate(vcpu);
->  
-> diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
-> index ec3553eb..49f99cd 100644
-> --- a/arch/arm64/include/asm/kvm_asm.h
-> +++ b/arch/arm64/include/asm/kvm_asm.h
-> @@ -59,6 +59,8 @@ extern void __kvm_tlb_flush_local_vmid(struct kvm_vcpu *vcpu);
->  extern int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
->  
->  extern u64 __vgic_v3_get_ich_vtr_el2(void);
-> +extern u64 __vgic_v3_read_vmcr(void);
-> +extern void __vgic_v3_write_vmcr(u32 vmcr);
->  extern void __vgic_v3_init_lrs(void);
->  
->  extern u32 __kvm_get_mdcr_el2(void);
-> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-> index c0b3d99..8d7c3a7 100644
-> --- a/include/kvm/arm_vgic.h
-> +++ b/include/kvm/arm_vgic.h
-> @@ -307,6 +307,9 @@ bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, unsigned int virt_irq);
->  
->  int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu);
->  
-> +void kvm_vgic_load(struct kvm_vcpu *vcpu);
-> +void kvm_vgic_put(struct kvm_vcpu *vcpu);
-> +
->  #define irqchip_in_kernel(k)	(!!((k)->arch.vgic.in_kernel))
->  #define vgic_initialized(k)	((k)->arch.vgic.initialized)
->  #define vgic_ready(k)		((k)->arch.vgic.ready)
-> diff --git a/virt/kvm/arm/hyp/vgic-v2-sr.c b/virt/kvm/arm/hyp/vgic-v2-sr.c
-> index c8aeb7b..d3d3b9b 100644
-> --- a/virt/kvm/arm/hyp/vgic-v2-sr.c
-> +++ b/virt/kvm/arm/hyp/vgic-v2-sr.c
-> @@ -114,8 +114,6 @@ void __hyp_text __vgic_v2_save_state(struct kvm_vcpu *vcpu)
->  	if (!base)
->  		return;
->  
-> -	cpu_if->vgic_vmcr = readl_relaxed(base + GICH_VMCR);
-> -
->  	if (vcpu->arch.vgic_cpu.live_lrs) {
->  		cpu_if->vgic_apr = readl_relaxed(base + GICH_APR);
->  
-> @@ -165,7 +163,6 @@ void __hyp_text __vgic_v2_restore_state(struct kvm_vcpu *vcpu)
->  		}
->  	}
->  
-> -	writel_relaxed(cpu_if->vgic_vmcr, base + GICH_VMCR);
->  	vcpu->arch.vgic_cpu.live_lrs = live_lrs;
->  }
->  
-> diff --git a/virt/kvm/arm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
-> index 3947095..e51ee7e 100644
-> --- a/virt/kvm/arm/hyp/vgic-v3-sr.c
-> +++ b/virt/kvm/arm/hyp/vgic-v3-sr.c
-> @@ -159,8 +159,6 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
->  	if (!cpu_if->vgic_sre)
->  		dsb(st);
->  
-> -	cpu_if->vgic_vmcr  = read_gicreg(ICH_VMCR_EL2);
-> -
->  	if (vcpu->arch.vgic_cpu.live_lrs) {
->  		int i;
->  		u32 max_lr_idx, nr_pri_bits;
-> @@ -261,8 +259,6 @@ void __hyp_text __vgic_v3_restore_state(struct kvm_vcpu *vcpu)
->  			live_lrs |= (1 << i);
->  	}
->  
-> -	write_gicreg(cpu_if->vgic_vmcr, ICH_VMCR_EL2);
-> -
->  	if (live_lrs) {
->  		write_gicreg(cpu_if->vgic_hcr, ICH_HCR_EL2);
->  
-> @@ -326,3 +322,13 @@ u64 __hyp_text __vgic_v3_get_ich_vtr_el2(void)
->  {
->  	return read_gicreg(ICH_VTR_EL2);
->  }
-> +
-> +u64 __hyp_text __vgic_v3_read_vmcr(void)
-> +{
-> +	return read_gicreg(ICH_VMCR_EL2);
-> +}
-> +
-> +void __hyp_text __vgic_v3_write_vmcr(u32 vmcr)
-> +{
-> +	write_gicreg(vmcr, ICH_VMCR_EL2);
-> +}
-> diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
-> index 702f810..3762fd1 100644
-> --- a/virt/kvm/arm/vgic/vgic-init.c
-> +++ b/virt/kvm/arm/vgic/vgic-init.c
-> @@ -262,6 +262,18 @@ int vgic_init(struct kvm *kvm)
->  	vgic_debug_init(kvm);
->  
->  	dist->initialized = true;
-> +
-> +	/*
-> +	 * If we're initializing GICv2 on-demand when first running the VCPU
-> +	 * then we need to load the VGIC state onto the CPU.  We can detect
-> +	 * this easily by checking if we are in between vcpu_load and vcpu_put
-> +	 * when we just initialized the VGIC.
-> +	 */
-> +	preempt_disable();
-> +	vcpu = kvm_arm_get_running_vcpu();
-> +	if (vcpu)
-> +		kvm_vgic_load(vcpu);
-> +	preempt_enable();
->  out:
->  	return ret;
->  }
-> diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
-> index 94cf4b9..dfe6e5e 100644
-> --- a/virt/kvm/arm/vgic/vgic-v2.c
-> +++ b/virt/kvm/arm/vgic/vgic-v2.c
-> @@ -199,6 +199,9 @@ void vgic_v2_clear_lr(struct kvm_vcpu *vcpu, int lr)
->  
->  void vgic_v2_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
->  {
-> +	struct vgic_dist *vgic = &vcpu->kvm->arch.vgic;
-> +	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
-> +	int cpu;
->  	u32 vmcr;
->  
->  	vmcr  = (vmcrp->ctlr << GICH_VMCR_CTRL_SHIFT) & GICH_VMCR_CTRL_MASK;
-> @@ -209,12 +212,35 @@ void vgic_v2_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
->  	vmcr |= (vmcrp->pmr << GICH_VMCR_PRIMASK_SHIFT) &
->  		GICH_VMCR_PRIMASK_MASK;
->  
-> -	vcpu->arch.vgic_cpu.vgic_v2.vgic_vmcr = vmcr;
-> +	cpu_if->vgic_vmcr = vmcr;
-> +
-> +	cpu = get_cpu();
-> +	if (vcpu->cpu == cpu)
-> +		/*
-> +		 * We have run vcpu_load and we're on VHE which means the VMCR
-> +		 * has already been flushed to the CPU; flush it again.
-> +		 */
+Hello Rob,
 
-I don't understand this comment. What has VHE to do with this?
+On 03/18/2017 09:43 PM, Rob Herring wrote:
+> On Thu, Mar 16, 2017 at 5:50 AM, Olivier MOYSAN <olivier.moysan@st.com> wrote:
+>> Hello Rob,
+>>
+>> Thanks for your feedback.
+>>
+>> On 03/15/2017 06:46 PM, Rob Herring wrote:
+>>> On Tue, Mar 07, 2017 at 10:44:31AM +0100, olivier moysan wrote:
+>>>> This patch adds documentation of device tree bindings for the
+>>>> STM32 SAI ASoC driver.
+>>>>
+>>>> Signed-off-by: olivier moysan <olivier.moysan@st.com>
+>>>> ---
+>>>>  .../devicetree/bindings/sound/st,stm32-sai.txt     | 79 ++++++++++++++++++++++
+>>>>  1 file changed, 79 insertions(+)
+>>>>  create mode 100644 Documentation/devicetree/bindings/sound/st,stm32-sai.txt
+>>>>
+>>>> diff --git a/Documentation/devicetree/bindings/sound/st,stm32-sai.txt b/Documentation/devicetree/bindings/sound/st,stm32-sai.txt
+>>>> new file mode 100644
+>>>> index 0000000..b3be26d
+>>>> --- /dev/null
+>>>> +++ b/Documentation/devicetree/bindings/sound/st,stm32-sai.txt
+>>>> @@ -0,0 +1,79 @@
+>>>> +STMicroelectronics STM32 Serial Audio Interface (SAI).
+>>>> +
+>>>> +The SAI interface (Serial Audio Interface) offers a wide set of audio protocols
+>>>> +as I2S standards, LSB or MSB-justified, PCM/DSP, TDM, and AC'97.
+>>>> +The SAI contains two independent audio sub-blocks. Each sub-block has
+>>>> +its own clock generator and I/O lines controller.
+>>>> +
+>>>> +Required properties:
+>>>> +  - compatible: Should be "st,stm32f4-sai"
+>>>> +  - reg: Base address and size of SAI common register set.
+>>>> +  - clocks: Must contain phandle and clock specifier pairs for each entry
+>>>> +    in clock-names.
+>>>> +  - clock-names: Must contain "clk_x8k" and "clk_x11k"
+>>>> +    "clk_x8k": SAI parent clock for sampling rates multiple of 8kHz.
+>>>> +    "clk_x11k": SAI parent clock for sampling rates multiple of 11.025kHz.
+>>>
+>>> clk_ is redundant.
+>>>
+>>
+>> Do you mean, removing clk_ prefix ?
+>
+> Yes.
+>
+>>
+>>>> +  - interrupts: cpu DAI interrupt line shared by SAI sub-blocks
+>>>> +
+>>>> +Note: Each SAI controller should have an alias correctly numbered
+>>>> +in "aliases" node, to provide explicit name to CPU DAI.
+>>>
+>>> No, it shouldn't. Why do you need that?
+>>>
+>>
+>> Yes, this is not mandatory. This is convenient to identify sai
+>> controller, as we may have up to 8 instances.
+>> I can make it optional, or remove it if you think it is not relevant.
+>
+> Remove it.
+>
 
-> +		writel_relaxed(vmcr, vgic->vctrl_base + GICH_VMCR);
-> +	put_cpu();
+One more thing regarding aliases.
+In future patches, I will add alsa controls to configure sai.
+Some stm32 socs exhibit several sai (4 instances for H7)
+It will be necessary to identify to which sai each control apply,
+through the control names:
+	SAI1A control X
+	SAI2A control X
+	...
+sub-node compatible already allows to identify A or B sub-instance.
 
-There is one thing I don't quite get: I thought we could only get there
-with a userspace access. I understand that we've run vcpu_load()
-already, and that we end-up with a stale configuration in the HW. But
-why do we need to immediately propagate it? Surely we can rely on the
-vcpu thread doing a vcpu_load itself to load the new value, right? I
-must be missing something...
+An alternative to alias, may be to use dev_name information to identify 
+sai instance. But this does not produce user friendly control names.
 
->  }
->  
->  void vgic_v2_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
->  {
-> -	u32 vmcr = vcpu->arch.vgic_cpu.vgic_v2.vgic_vmcr;
-> +	struct vgic_dist *vgic = &vcpu->kvm->arch.vgic;
-> +	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
-> +	int cpu;
-> +	u32 vmcr;
-> +
-> +	cpu = get_cpu();
-> +	if (vcpu->cpu == cpu)
-> +		/*
-> +		 * We have run vcpu_load and which means the VMCR
-> +		 * has already been flushed to the CPU; sync it back.
-> +		 */
-> +		cpu_if->vgic_vmcr = readl_relaxed(vgic->vctrl_base + GICH_VMCR);
-> +	put_cpu();
-> +
-> +	vmcr = cpu_if->vgic_vmcr;
+Another way is to use compatible also. The drawback here
+is to multiply compatible names. (many soc families and many instances)
 
-Same comment as above.
+What is your recommendation ?
+If there is another solution, I did not consider, please let me know.
 
-Thanks,
+>>
+>>>
+>>>> +
+>>>> +Optional properties:
+>>>> +  - resets: Reference to a reset controller asserting the SAI
+>>>> +
+>>>> +SAI subnodes:
+>>>> +Two subnodes corresponding to SAI sub-block instances A et B can be defined.
+>>>> +Subnode can be omitted for unsused sub-block.
+>>>> +
+>>>> +SAI subnodes required properties:
+>>>> +  - compatible: Should be "st,stm32-sai-sub-a" or "st,stm32-sai-sub-b"
+>>>> +    for SAI sub-block A or B respectively.
+>>>> +  - reg: Base address and size of SAI sub-block register set.
+>>>> +  - clocks: Must contain one phandle and clock specifier pair
+>>>> +    for sai_ck which feeds the internal clock generator.
+>>>> +  - clock-names: Must contain "sai_ck".
+>>>> +  - dmas: see Documentation/devicetree/bindings/dma/stm32-dma.txt
+>>>> +  - dma-names: identifier string for each DMA request line
+>>>> +    "tx": if sai sub-block is configured as playback DAI
+>>>> +    "rx": if sai sub-block is configured as capture DAI
+>>>> +  - pinctrl-names: should contain only value "default"
+>>>> +  - pinctrl-0: see Documentation/devicetree/bindings/pinctrl/pinctrl-stm32.txt
+>>>> +
+>>>> +Example:
+>>>> +sai1: sai1 at 40015800 {
+>>>> +    compatible = "st,stm32f4-sai";
+>>>> +    reg = <0x40015800 0x400>;
+>>
+>>         reg = <0x40015800 0x4>;
+>>
+>>>> +    clocks = <&rcc 1 CLK_SAIQ_PDIV>, <&rcc 1 CLK_I2SQ_PDIV>;
+>>>> +    clock-names = "clk_x8k", "clk_x11k";
+>>>> +    interrupts = <87>;
+>>>> +    resets = <&rcc 310>;
+>>>> +
+>>>> +    sai1b: sai at 1 {
+>>>
+>>> unit address needs a reg property.
+>>>
+>>> audio-controller at 1
+>>>
+>>
+>> Right. This needs to be updated as follows:
+>>         sai1b: sai1b at 40015824 {
+>
+> audio-controller at ...
+>
+>>                 ...
+>>                 reg = <0x40015824 0x1C>;
+>>                 ...
+>>         };
+>>
+>>>> +            #sound-dai-cells = <0>;
+>>>> +            compatible = "st,stm32-sai-sub-b";
+>>>> +            clocks = <&rcc 1 CLK_SAI2>;
+>>>> +            clock-names = "sai_ck";
+>>>> +            dmas = <&dma2 5 0 0x400 0x1>;
+>>>> +            dma-names = "tx";
+>>>> +    };
+>>>> +};
+>>>> +
+>>>> +sound {
+>>>> +    compatible = "simple-audio-card";
+>>>
+>>> Perhaps you want to use the graph-card here. It's getting close to
+>>> merging.
+>>>
+>>
+>> mclk-fs property is required when SAI is configured as master.
+>> It seems that mclk-fs is not supported in current version
+>> of audio graph card. So I thing I should keep simple card for the time
+>> being. Anyway, I plan further updates for SAI, so I will
+>> have opportunity to change to graph card at that time.
+>
+> Well, it's not easy to switch later and maintain compatibility. Is it
+> complicated to add mclk-fs property? The intent is graph-card supports
+> everything simple-card supports.
+>
+> Rob
+>
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Right, it should not be too complicated to add mclk-fs support to 
+graph-card.
+
+BRs
+olivier
