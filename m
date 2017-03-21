@@ -1,33 +1,46 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 21 Mar 2017 12:08:15 +0000
-Subject: [PATCH 8/9] KVM: arm/arm64: vgic: Don't check vgic_initialized in
- flush_hwstate
-In-Reply-To: <20170320105818.20481-9-cdall@linaro.org>
-References: <20170320105818.20481-1-cdall@linaro.org>
- <20170320105818.20481-9-cdall@linaro.org>
-Message-ID: <96b0efe2-d764-7b52-8335-0383a9357a1f@arm.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 21 Mar 2017 13:11:33 +0100
+Subject: [PATCH 2/2] spi: imx: fix use of native chip-selects with
+ devicetree
+In-Reply-To: <942cfc4b-445b-ca51-1823-2391cea62abf@linux-m68k.org>
+References: <1489726983-17706-1-git-send-email-gerg@linux-m68k.org>
+ <1489726983-17706-3-git-send-email-gerg@linux-m68k.org>
+ <f1cf2001-28b4-6a74-b98a-13336d74ff9d@mentor.com>
+ <4a8449d9-cc38-d642-0853-246f46ee7059@linux-m68k.org>
+ <20170321080551.ie4xm5hr3fki365s@pengutronix.de>
+ <942cfc4b-445b-ca51-1823-2391cea62abf@linux-m68k.org>
+Message-ID: <20170321121133.jcmhhbszj2d42h3w@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/03/17 10:58, Christoffer Dall wrote:
-> Now when we do an early init of the static parts of the VGIC data
-> structures, we can do things like checking if the AP lists are empty
-> directly without having to explicitly check if the vgic is initialized
-> and reduce a bit of work in our criticial path.
-
-                                  critical
-
-> Note: list_empty is a single atomic read (uses READ_ONCE) and can
-> therefore check if a list is empty or not without the need to take the
-> spinlock protecting the list.
-
-This note might be better placed in patch #2.
-
+On Tue, Mar 21, 2017 at 09:53:52PM +1000, Greg Ungerer wrote:
+> On 21/03/17 18:05, Uwe Kleine-K?nig wrote:
+> > On Tue, Mar 21, 2017 at 12:05:20PM +1000, Greg Ungerer wrote:
+> > > On 20/03/17 23:22, Vladimir Zapolskiy wrote:
+> > > > For that type of bindings locally I have a hackish spi-imx driver change,
+> > > > which supports this option, but I'm unsure if it is universal enough.
+> > > 
+> > > Do you mean supporting no cs-gpios tag?
+> > > That would be nice, but it would seem not many users of this are
+> > > using native chip selects.
+> > 
+> > The reason for this is that the native chip selects are less flexible
+> > than gpios because you cannot control when they deassert. IIRC they do
+> > it too much for some chips. So the only reason to stick to them is that
+> > on some SoCs not all pins have a GPIO function. Not sure if transfer
+> > speed is another reason, but I would expect that the gain isn't that
+> > big.
 > 
-> Signed-off-by: Christoffer Dall <cdall@linaro.org>
+> For the particular SPI device I am using, a Silicon Labs 32260,
+> it actually wants the assertion and de-assertion of the chip-select
+> between each byte. So it is the only way it can work for me.
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+That should be doable with gpio-cs, too. You just need the right flags
+in your spi transfer IIRC.
 
-	M.
+Best regards
+Uwe
+
 -- 
-Jazz is not dead. It just smells funny...
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
