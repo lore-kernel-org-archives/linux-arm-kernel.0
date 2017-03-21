@@ -1,49 +1,129 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 21 Mar 2017 19:20:51 +0000
-Subject: [PATCH v4 21/28] ARM: KVM: Implement HVC_SOFT_RESTART in the init code
+Date: Tue, 21 Mar 2017 19:20:57 +0000
+Subject: [PATCH v4 27/28] arm64: hyp-stub/KVM: Kill __hyp_get_vectors
 In-Reply-To: <20170321192058.9300-1-marc.zyngier@arm.com>
 References: <20170321192058.9300-1-marc.zyngier@arm.com>
-Message-ID: <20170321192058.9300-22-marc.zyngier@arm.com>
+Message-ID: <20170321192058.9300-28-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Another missing stub hypercall is HVC_SOFT_RESTART. It turns out
-that it is pretty easy to implement in terms of HVC_RESET_VECTORS
-(since it needs to turn the MMU off).
+Nobody is using __hyp_get_vectors anymore, so let's remove both
+implementations (hyp-stub and KVM).
 
-Tested-by: Keerthy <j-keerthy@ti.com>
-Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/kvm/init.S | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+ arch/arm64/include/asm/virt.h | 12 ++++--------
+ arch/arm64/kernel/hyp-stub.S  | 13 +------------
+ arch/arm64/kvm/hyp-init.S     |  7 +------
+ arch/arm64/kvm/hyp.S          |  2 +-
+ 4 files changed, 7 insertions(+), 27 deletions(-)
 
-diff --git a/arch/arm/kvm/init.S b/arch/arm/kvm/init.S
-index 7335a510eee4..c92e092103b2 100644
---- a/arch/arm/kvm/init.S
-+++ b/arch/arm/kvm/init.S
-@@ -127,8 +127,22 @@ ENTRY(__kvm_handle_stub_hvc)
- 	mrc	p15, 4, r0, c12, c0, 0	@ get HVBAR
- 	b	exit
+diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
+index f24f1eb72dc0..a7c9dfdd6430 100644
+--- a/arch/arm64/include/asm/virt.h
++++ b/arch/arm64/include/asm/virt.h
+@@ -24,28 +24,25 @@
+  * Any other value is used as a pointer to the function to call.
+  */
  
-+1:	cmp	r0, #HVC_SOFT_RESTART
-+	bne	1f
-+
-+	/* The target is expected in r1 */
-+	msr	ELR_hyp, r1
-+	mrs	r0, cpsr
-+	bic	r0, r0, #MODE_MASK
-+	orr	r0, r0, #HYP_MODE
-+THUMB(	orr	r0, r0, #PSR_T_BIT	)
-+	msr	spsr_cxsf, r0
-+	b	reset
-+
- 1:	cmp	r0, #HVC_RESET_VECTORS
- 	bne	1f
-+
-+reset:
- 	/* We're now in idmap, disable MMU */
- 	mrc	p15, 4, r1, c1, c0, 0	@ HSCTLR
- 	ldr	r0, =(HSCTLR_M | HSCTLR_A | HSCTLR_C | HSCTLR_I)
+-/* HVC_GET_VECTORS - Return the value of the vbar_el2 register. */
+-#define HVC_GET_VECTORS 0
+-
+ /*
+  * HVC_SET_VECTORS - Set the value of the vbar_el2 register.
+  *
+  * @x1: Physical address of the new vector table.
+  */
+-#define HVC_SET_VECTORS 1
++#define HVC_SET_VECTORS 0
+ 
+ /*
+  * HVC_SOFT_RESTART - CPU soft reset, used by the cpu_soft_restart routine.
+  */
+-#define HVC_SOFT_RESTART 2
++#define HVC_SOFT_RESTART 1
+ 
+ /*
+  * HVC_RESET_VECTORS - Restore the vectors to the original HYP stubs
+  */
+-#define HVC_RESET_VECTORS 3
++#define HVC_RESET_VECTORS 2
+ 
+ /* Max number of HYP stub hypercalls */
+-#define HVC_STUB_HCALL_NR 4
++#define HVC_STUB_HCALL_NR 3
+ 
+ #define BOOT_CPU_MODE_EL1	(0xe11)
+ #define BOOT_CPU_MODE_EL2	(0xe12)
+@@ -69,7 +66,6 @@
+ extern u32 __boot_cpu_mode[2];
+ 
+ void __hyp_set_vectors(phys_addr_t phys_vector_base);
+-phys_addr_t __hyp_get_vectors(void);
+ void __hyp_reset_vectors(void);
+ 
+ /* Reports the availability of HYP mode */
+diff --git a/arch/arm64/kernel/hyp-stub.S b/arch/arm64/kernel/hyp-stub.S
+index dd0a7522fbe1..210bd6b3849d 100644
+--- a/arch/arm64/kernel/hyp-stub.S
++++ b/arch/arm64/kernel/hyp-stub.S
+@@ -55,12 +55,7 @@ ENDPROC(__hyp_stub_vectors)
+ 	.align 11
+ 
+ el1_sync:
+-	cmp	x0, #HVC_GET_VECTORS
+-	b.ne	1f
+-	mrs	x0, vbar_el2
+-	b	9f
+-
+-1:	cmp	x0, #HVC_SET_VECTORS
++	cmp	x0, #HVC_SET_VECTORS
+ 	b.ne	2f
+ 	msr	vbar_el2, x1
+ 	b	9f
+@@ -118,12 +113,6 @@ ENDPROC(\label)
+  * initialisation entry point.
+  */
+ 
+-ENTRY(__hyp_get_vectors)
+-	mov	x0, #HVC_GET_VECTORS
+-	hvc	#0
+-	ret
+-ENDPROC(__hyp_get_vectors)
+-
+ ENTRY(__hyp_set_vectors)
+ 	mov	x1, x0
+ 	mov	x0, #HVC_SET_VECTORS
+diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
+index 128d6e9732b9..cf01cdb8bc61 100644
+--- a/arch/arm64/kvm/hyp-init.S
++++ b/arch/arm64/kvm/hyp-init.S
+@@ -124,12 +124,7 @@ __do_hyp_init:
+ ENDPROC(__kvm_hyp_init)
+ 
+ ENTRY(__kvm_handle_stub_hvc)
+-	cmp	x0, #HVC_GET_VECTORS
+-	b.ne	1f
+-	mrs	x0, vbar_el2
+-	b	exit
+-
+-1:	cmp	x0, #HVC_SOFT_RESTART
++	cmp	x0, #HVC_SOFT_RESTART
+ 	b.ne	1f
+ 
+ 	/* This is where we're about to jump, staying at EL2 */
+diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
+index 2726635dceba..09391cf0c93c 100644
+--- a/arch/arm64/kvm/hyp.S
++++ b/arch/arm64/kvm/hyp.S
+@@ -36,7 +36,7 @@
+  * passed in x0.
+  *
+  * A function pointer with a value less than 0xfff has a special meaning,
+- * and is used to implement __hyp_get_vectors in the same way as in
++ * and is used to implement hyp stubs in the same way as in
+  * arch/arm64/kernel/hyp_stub.S.
+  * HVC behaves as a 'bl' call and will clobber lr.
+  */
 -- 
 2.11.0
