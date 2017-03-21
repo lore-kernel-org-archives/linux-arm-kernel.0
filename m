@@ -1,49 +1,42 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 20 Mar 2017 20:08:07 -0500
-Subject: [PATCH v2 04/20] ARM: sun8i: dt: Add DT bindings documentation
- for Allwinner syscon
-In-Reply-To: <20170314141856.24560-5-clabbe.montjoie@gmail.com>
-References: <20170314141856.24560-1-clabbe.montjoie@gmail.com>
- <20170314141856.24560-5-clabbe.montjoie@gmail.com>
-Message-ID: <20170321010807.rhx6xvysunujkcjk@rob-hp-laptop>
+From: rick.chang@mediatek.com (Rick Chang)
+Date: Tue, 21 Mar 2017 09:22:15 +0800
+Subject: [PATCH 1/2] [media] vcodec: mediatek: add missing linux/slab.h
+ include
+In-Reply-To: <20170320094812.1365229-1-arnd@arndb.de>
+References: <20170320094812.1365229-1-arnd@arndb.de>
+Message-ID: <1490059335.27725.7.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 14, 2017 at 03:18:40PM +0100, Corentin Labbe wrote:
-> Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+Hi Arnd,
+
+Thank you for the patch, but someone has fixed the same problem.
+
+Regards,
+Rick
+
+On Mon, 2017-03-20 at 10:47 +0100, Arnd Bergmann wrote:
+> With the newly added driver, I have run into randconfig failures like:
+> 
+> drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c: In function 'mtk_jpeg_open':
+> drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c:1017:8: error: implicit declaration of function 'kzalloc';did you mean 'kvzalloc'? [-Werror=implicit-function-declaration]
+> 
+> Including the header with the declaration solves the problem.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 > ---
->  .../devicetree/bindings/misc/allwinner,syscon.txt     | 19 +++++++++++++++++++
->  1 file changed, 19 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/misc/allwinner,syscon.txt
+>  drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c | 1 +
+>  1 file changed, 1 insertion(+)
 > 
-> diff --git a/Documentation/devicetree/bindings/misc/allwinner,syscon.txt b/Documentation/devicetree/bindings/misc/allwinner,syscon.txt
-> new file mode 100644
-> index 0000000..9f5f1f5
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/misc/allwinner,syscon.txt
-> @@ -0,0 +1,19 @@
-> +* Allwinner sun8i system controller
-> +
-> +This file describes the bindings for the system controller present in
-> +Allwinner SoC H3, A83T and A64.
-> +The principal function of this syscon is to control EMAC PHY choice and
-> +config.
-> +
-> +Required properties for the system controller:
-> +- reg: address and length of the register for the device.
-> +- compatible: should be "syscon" and one of the following string:
-> +		"allwinner,sun8i-h3-system-controller"
-> +		"allwinner,sun8i-a64-system-controller"
-> +		"allwinner,sun8i-a83t-system-controller"
-> +
-> +Example:
-> +syscon: syscon at 01c00000 {
-> +	compatible = "syscon", "allwinner,sun8i-h3-system-controller";
-
-Wrong order of compatibles.
-
-> +	reg = <0x01c00000 0x1000>;
-> +};
-> -- 
-> 2.10.2
-> 
+> diff --git a/drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c b/drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c
+> index b10183f7942b..f9bd58ce7d32 100644
+> --- a/drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c
+> +++ b/drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c
+> @@ -22,6 +22,7 @@
+>  #include <linux/of_platform.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/pm_runtime.h>
+> +#include <linux/slab.h>
+>  #include <linux/spinlock.h>
+>  #include <media/v4l2-event.h>
+>  #include <media/v4l2-mem2mem.h>
