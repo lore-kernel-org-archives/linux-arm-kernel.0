@@ -1,61 +1,72 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Tue, 21 Mar 2017 22:10:53 +0100
-Subject: [PATCH v2 04/10] KVM: arm/arm64: vgic: Only set underflow when
- actually out of LRs
+Date: Tue, 21 Mar 2017 22:10:56 +0100
+Subject: [PATCH v2 07/10] KVM: arm/arm64: vgic: Get rid of MISR and EISR fields
 In-Reply-To: <20170321211059.8719-1-cdall@linaro.org>
 References: <20170321211059.8719-1-cdall@linaro.org>
-Message-ID: <20170321211059.8719-5-cdall@linaro.org>
+Message-ID: <20170321211059.8719-8-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We currently assume that all the interrupts in our AP list will be
-queued to LRs, but that's not necessarily the case, because some of them
-could have been migrated away to different VCPUs and only the VCPU
-thread itself can remove interrupts from its AP list.
+From: Christoffer Dall <christoffer.dall@linaro.org>
 
-Therefore, slightly change the logic to only setting the underflow
-interrupt when we actually run out of LRs.
+We don't use these fields anymore so let's nuke them completely.
 
-As it turns out, this allows us to further simplify the handling in
-vgic_sync_hwstate in later patches.
-
-Signed-off-by: Christoffer Dall <cdall@linaro.org>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
-Changes since v1:
- - New patch
+ include/kvm/arm_vgic.h        | 4 ----
+ virt/kvm/arm/hyp/vgic-v2-sr.c | 2 --
+ virt/kvm/arm/hyp/vgic-v3-sr.c | 2 --
+ 3 files changed, 8 deletions(-)
 
- virt/kvm/arm/vgic/vgic.c | 10 ++++++----
- 1 file changed, 6 insertions(+), 4 deletions(-)
-
-diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-index 1043291..442f7df 100644
---- a/virt/kvm/arm/vgic/vgic.c
-+++ b/virt/kvm/arm/vgic/vgic.c
-@@ -601,10 +601,8 @@ static void vgic_flush_lr_state(struct kvm_vcpu *vcpu)
+diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+index fa12d99..581a59e 100644
+--- a/include/kvm/arm_vgic.h
++++ b/include/kvm/arm_vgic.h
+@@ -225,8 +225,6 @@ struct vgic_dist {
+ struct vgic_v2_cpu_if {
+ 	u32		vgic_hcr;
+ 	u32		vgic_vmcr;
+-	u32		vgic_misr;	/* Saved only */
+-	u64		vgic_eisr;	/* Saved only */
+ 	u64		vgic_elrsr;	/* Saved only */
+ 	u32		vgic_apr;
+ 	u32		vgic_lr[VGIC_V2_MAX_LRS];
+@@ -236,8 +234,6 @@ struct vgic_v3_cpu_if {
+ 	u32		vgic_hcr;
+ 	u32		vgic_vmcr;
+ 	u32		vgic_sre;	/* Restored only, change ignored */
+-	u32		vgic_misr;	/* Saved only */
+-	u32		vgic_eisr;	/* Saved only */
+ 	u32		vgic_elrsr;	/* Saved only */
+ 	u32		vgic_ap0r[4];
+ 	u32		vgic_ap1r[4];
+diff --git a/virt/kvm/arm/hyp/vgic-v2-sr.c b/virt/kvm/arm/hyp/vgic-v2-sr.c
+index a4c3bb0..a3f18d3 100644
+--- a/virt/kvm/arm/hyp/vgic-v2-sr.c
++++ b/virt/kvm/arm/hyp/vgic-v2-sr.c
+@@ -77,9 +77,7 @@ void __hyp_text __vgic_v2_save_state(struct kvm_vcpu *vcpu)
  
- 	DEBUG_SPINLOCK_BUG_ON(!spin_is_locked(&vgic_cpu->ap_list_lock));
- 
--	if (compute_ap_list_depth(vcpu) > kvm_vgic_global_state.nr_lr) {
--		vgic_set_underflow(vcpu);
-+	if (compute_ap_list_depth(vcpu) > kvm_vgic_global_state.nr_lr)
- 		vgic_sort_ap_list(vcpu);
--	}
- 
- 	list_for_each_entry(irq, &vgic_cpu->ap_list_head, ap_list) {
- 		spin_lock(&irq->irq_lock);
-@@ -623,8 +621,12 @@ static void vgic_flush_lr_state(struct kvm_vcpu *vcpu)
- next:
- 		spin_unlock(&irq->irq_lock);
- 
--		if (count == kvm_vgic_global_state.nr_lr)
-+		if (count == kvm_vgic_global_state.nr_lr) {
-+			if (!list_is_last(&irq->ap_list,
-+					  &vgic_cpu->ap_list_head))
-+				vgic_set_underflow(vcpu);
- 			break;
-+		}
+ 		writel_relaxed(0, base + GICH_HCR);
+ 	} else {
+-		cpu_if->vgic_eisr = 0;
+ 		cpu_if->vgic_elrsr = ~0UL;
+-		cpu_if->vgic_misr = 0;
+ 		cpu_if->vgic_apr = 0;
  	}
- 
- 	vcpu->arch.vgic_cpu.used_lrs = count;
+ }
+diff --git a/virt/kvm/arm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
+index 41bbbb0..3d0b1dd 100644
+--- a/virt/kvm/arm/hyp/vgic-v3-sr.c
++++ b/virt/kvm/arm/hyp/vgic-v3-sr.c
+@@ -170,8 +170,6 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
+ 			cpu_if->vgic_ap1r[0] = read_gicreg(ICH_AP1R0_EL2);
+ 		}
+ 	} else {
+-		cpu_if->vgic_misr  = 0;
+-		cpu_if->vgic_eisr  = 0;
+ 		cpu_if->vgic_elrsr = 0xffff;
+ 		cpu_if->vgic_ap0r[0] = 0;
+ 		cpu_if->vgic_ap0r[1] = 0;
 -- 
 2.9.0
