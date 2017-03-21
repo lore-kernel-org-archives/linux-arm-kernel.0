@@ -1,113 +1,51 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Tue, 21 Mar 2017 22:10:59 +0100
-Subject: [PATCH v2 10/10] KVM: arm/arm64: vgic: Improve sync_hwstate
- performance
+Date: Tue, 21 Mar 2017 22:10:58 +0100
+Subject: [PATCH v2 09/10] KVM: arm/arm64: vgic: Don't check vgic_initialized
+ in sync/flush
 In-Reply-To: <20170321211059.8719-1-cdall@linaro.org>
 References: <20170321211059.8719-1-cdall@linaro.org>
-Message-ID: <20170321211059.8719-11-cdall@linaro.org>
+Message-ID: <20170321211059.8719-10-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is no need to call any functions to fold LRs when we don't use any
-LRs and we don't need to mess with overflow flags, take spinlocks, or
-prune the AP list if the AP list is empty.
+Now when we do an early init of the static parts of the VGIC data
+structures, we can do things like checking if the AP lists are empty
+directly without having to explicitly check if the vgic is initialized
+and reduce a bit of work in our critical path.
 
-Note: list_empty is a single atomic read (uses READ_ONCE) and can
-therefore check if a list is empty or not without the need to take the
-spinlock protecting the list.
-
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <cdall@linaro.org>
 ---
 Changes since v1:
- - Moved clearing used_lrs into fold_lr_state
- - Moved hunk that removes check for vgic_initialized into previous
-   patch
+ - Moved note about checking list_empty to other patch commit message
+ - Removed check in both sync/flush in this patch
 
- virt/kvm/arm/vgic/vgic-v2.c |  7 +++++--
- virt/kvm/arm/vgic/vgic-v3.c |  7 +++++--
- virt/kvm/arm/vgic/vgic.c    | 10 ++++++----
- 3 files changed, 16 insertions(+), 8 deletions(-)
+ virt/kvm/arm/vgic/vgic.c | 6 ------
+ 1 file changed, 6 deletions(-)
 
-diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
-index f9c4329..a1fc07a 100644
---- a/virt/kvm/arm/vgic/vgic-v2.c
-+++ b/virt/kvm/arm/vgic/vgic-v2.c
-@@ -59,12 +59,13 @@ static bool lr_signals_eoi_mi(u32 lr_val)
-  */
- void vgic_v2_fold_lr_state(struct kvm_vcpu *vcpu)
- {
--	struct vgic_v2_cpu_if *cpuif = &vcpu->arch.vgic_cpu.vgic_v2;
-+	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
-+	struct vgic_v2_cpu_if *cpuif = &vgic_cpu->vgic_v2;
- 	int lr;
- 
- 	cpuif->vgic_hcr &= ~GICH_HCR_UIE;
- 
--	for (lr = 0; lr < vcpu->arch.vgic_cpu.used_lrs; lr++) {
-+	for (lr = 0; lr < vgic_cpu->used_lrs; lr++) {
- 		u32 val = cpuif->vgic_lr[lr];
- 		u32 intid = val & GICH_LR_VIRTUALID;
- 		struct vgic_irq *irq;
-@@ -106,6 +107,8 @@ void vgic_v2_fold_lr_state(struct kvm_vcpu *vcpu)
- 		spin_unlock(&irq->irq_lock);
- 		vgic_put_irq(vcpu->kvm, irq);
- 	}
-+
-+	vgic_cpu->used_lrs = 0;
- }
- 
- /*
-diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-index c7ac9b1..2bcee2e 100644
---- a/virt/kvm/arm/vgic/vgic-v3.c
-+++ b/virt/kvm/arm/vgic/vgic-v3.c
-@@ -36,13 +36,14 @@ static bool lr_signals_eoi_mi(u64 lr_val)
- 
- void vgic_v3_fold_lr_state(struct kvm_vcpu *vcpu)
- {
--	struct vgic_v3_cpu_if *cpuif = &vcpu->arch.vgic_cpu.vgic_v3;
-+	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
-+	struct vgic_v3_cpu_if *cpuif = &vgic_cpu->vgic_v3;
- 	u32 model = vcpu->kvm->arch.vgic.vgic_model;
- 	int lr;
- 
- 	cpuif->vgic_hcr &= ~ICH_HCR_UIE;
- 
--	for (lr = 0; lr < vcpu->arch.vgic_cpu.used_lrs; lr++) {
-+	for (lr = 0; lr < vgic_cpu->used_lrs; lr++) {
- 		u64 val = cpuif->vgic_lr[lr];
- 		u32 intid;
- 		struct vgic_irq *irq;
-@@ -92,6 +93,8 @@ void vgic_v3_fold_lr_state(struct kvm_vcpu *vcpu)
- 		spin_unlock(&irq->irq_lock);
- 		vgic_put_irq(vcpu->kvm, irq);
- 	}
-+
-+	vgic_cpu->used_lrs = 0;
- }
- 
- /* Requires the irq to be locked already */
 diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-index 04a405a..3d0979c 100644
+index b64b143..04a405a 100644
 --- a/virt/kvm/arm/vgic/vgic.c
 +++ b/virt/kvm/arm/vgic/vgic.c
-@@ -633,11 +633,13 @@ void kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
+@@ -633,9 +633,6 @@ void kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
  {
  	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
  
--	vgic_fold_lr_state(vcpu);
--	vgic_prune_ap_list(vcpu);
-+	/* An empty ap_list_head implies used_lrs == 0 */
-+	if (list_empty(&vcpu->arch.vgic_cpu.ap_list_head))
-+		return;
+-	if (unlikely(!vgic_initialized(vcpu->kvm)))
+-		return;
+-
+ 	vgic_fold_lr_state(vcpu);
+ 	vgic_prune_ap_list(vcpu);
  
--	/* Make sure we can fast-path in flush_hwstate */
--	vgic_cpu->used_lrs = 0;
-+	if (vgic_cpu->used_lrs)
-+		vgic_fold_lr_state(vcpu);
-+	vgic_prune_ap_list(vcpu);
- }
- 
+@@ -646,9 +643,6 @@ void kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
  /* Flush our emulation state into the GIC hardware before entering the guest. */
+ void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu)
+ {
+-	if (unlikely(!vgic_initialized(vcpu->kvm)))
+-		return;
+-
+ 	/*
+ 	 * If there are no virtual interrupts active or pending for this
+ 	 * VCPU, then there is no work to do and we can bail out without
 -- 
 2.9.0
