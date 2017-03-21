@@ -1,35 +1,26 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Tue, 21 Mar 2017 14:00:52 +0530
-Subject: [PATCH v6 0/4] Broadcom SBA RAID support
-In-Reply-To: <1488793408-25592-1-git-send-email-anup.patel@broadcom.com>
-References: <1488793408-25592-1-git-send-email-anup.patel@broadcom.com>
-Message-ID: <20170321083052.GY2843@localhost>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 21 Mar 2017 14:04:38 +0530
+Subject: [PATCH v2 1/3] ata: add Palmchip BK3710 PATA controller driver
+In-Reply-To: <1489509414-11491-2-git-send-email-b.zolnierkie@samsung.com>
+References: <1489509414-11491-1-git-send-email-b.zolnierkie@samsung.com>
+ <CGME20170314163742epcas5p32a49df6b4ae6c21ee159c79320df5781@epcas5p3.samsung.com>
+ <1489509414-11491-2-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <8fc9171f-15b7-2c6a-d0b5-3af21cc88405@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 06, 2017 at 03:13:24PM +0530, Anup Patel wrote:
-> The Broadcom SBA RAID is a stream-based device which provides
-> RAID5/6 offload.
+Hi,
+
+On Tuesday 14 March 2017 10:06 PM, Bartlomiej Zolnierkiewicz wrote:
+> Add Palmchip BK3710 PATA controller driver.
 > 
-> It requires a SoC specific ring manager (such as Broadcom FlexRM
-> ring manager) to provide ring-based programming interface. Due to
-> this, the Broadcom SBA RAID driver (mailbox client) implements
-> DMA device having one DMA channel using a set of mailbox channels
-> provided by Broadcom SoC specific ring manager driver (mailbox
-> controller).
-> 
-> The Broadcom SBA RAID hardware requires PQ disk position instead
-> of PQ disk coefficient. To address this, we have added raid_gflog
-> table which will help driver to convert PQ disk coefficient to PQ
-> disk position.
-> 
-> This patchset is based on Linux-4.11-rc1 and depends on patchset
-> "[PATCH v5 0/2] Broadcom FlexRM ring manager support"
+> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 
-Okay I applied and was about to push when I noticed this :(
+There are some checkpatch suggestions that are worth fixing, I think.
 
-So what is the status of this..?
+[PATCH v2 1_3] ata: add Palmchip BK3710 PATA controller driver - Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com> - 2017-03-14 2206.eml:277: CHECK: Alignment should match open parenthesis
+[PATCH v2 1_3] ata: add Palmchip BK3710 PATA controller driver - Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com> - 2017-03-14 2206.eml:320: CHECK: Alignment should match open parenthesis
+[PATCH v2 1_3] ata: add Palmchip BK3710 PATA controller driver - Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com> - 2017-03-14 2206.eml:489: CHECK: Comparison to NULL could be written "!mem"
 
-
--- 
-~Vinod
+Thanks,
+Sekhar
