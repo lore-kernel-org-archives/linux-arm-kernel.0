@@ -1,71 +1,49 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 21 Mar 2017 17:33:52 +0000
-Subject: [PATCH v2 4/5] iommu/arm-smmu-v3: Install bypass STEs for
- IOMMU_DOMAIN_IDENTITY domains
-In-Reply-To: <20170321170816.GE30948@arm.com>
-References: <1489178976-15353-1-git-send-email-will.deacon@arm.com>
- <1489178976-15353-5-git-send-email-will.deacon@arm.com>
- <420a5345344b4b574878caf3a916f1f2@codeaurora.org>
- <7d39363e-90e8-4119-3b7e-b1c4f6250879@arm.com>
- <20170321170816.GE30948@arm.com>
-Message-ID: <3a0e2b6c-a360-3f0c-3ae3-88f996d1e7c4@arm.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Tue, 21 Mar 2017 18:35:43 +0100
+Subject: [GIT PULL] Reset controller fixes for v4.11
+Message-ID: <1490117743.6403.8.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/03/17 17:08, Will Deacon wrote:
-> Hi Robin,
-> 
-> On Thu, Mar 16, 2017 at 06:19:48PM +0000, Robin Murphy wrote:
->> On 16/03/17 16:24, Nate Watterson wrote:
->>> On 2017-03-10 15:49, Will Deacon wrote:
->>>> In preparation for allowing the default domain type to be overridden,
->>>> this patch adds support for IOMMU_DOMAIN_IDENTITY domains to the
->>>> ARM SMMUv3 driver.
->>>>
->>>> An identity domain is created by placing the corresponding stream table
->>>> entries into "bypass" mode, which allows transactions to flow through
->>>> the SMMU without any translation.
->>>>
->>>
->>> What about masters that require SMMU intervention to override their
->>> native memory attributes to make them consistent with the CCA (acpi)
->>> or dma-coherent (dt) values specified in FW?
->>
->> Well, we've already broken them ;) My interpretation of "dma-coherent"
->> is as the equivalent of DACS=1,CPM=1, i.e. not dependent on SMMU
->> override. For the CCA=1,DACS=0 case (I'm going to pretend the DT
->> equivalent will never exist...) the first problem to solve is how to
->> inherit the appropriate configuration from the firmware, because right
->> now we're not even pretending to support that.
-> 
-> Indeed, and that would need to be added as a separate patch series when
-> the need arises.
-> 
->>>>      /* Nuke the existing STE_0 value, as we're going to rewrite it */
->>>> -    val = ste->valid ? STRTAB_STE_0_V : 0;
->>>> +    val = STRTAB_STE_0_V;
->>>> +
->>>> +    /* Bypass/fault */
->>>> +    if (!ste->assigned || !(ste->s1_cfg || ste->s2_cfg)) {
->>>> +        if (!ste->assigned && disable_bypass)
->>
->> ...yuck. After about 5 minutes of staring at that, I've convinced myself
->> that it would make much more sense to always clear the strtab_ent
->> configs on detach, such that you never need the outer !ste->assigned
->> check here...
-> 
-> I was deliberately keeping the strtab_ent intact in case we ever grow
-> support for nested translation, where we might well want to detach a
-> stage 1 but keep the stage 2 installed. I don't think the code is that
-> bad, so I'd like to leave it like it is for now.
+Dear arm-soc maintainers,
 
-Sure, it would certainly be more awkward to recreate this logic from
-scratch in future if we need it again. I suggested the cleanup since it
-looked like an oversight, but if it's a conscious decision then that's
-fine by me.
+please consider merging this tag, which completes an already merged
+commit in case the RESET_CONTROLLER config option is disabled.
 
-Robin.
+I have already sent a few patches that make use of the new behaviour
+introduced by commit bb475230b8e5 ("reset: make optional functions
+really optional"). It would be nice if those could be merged for v4.11,
+as without this fix they could cause drivers to fail probing if
+RESET_CONTROLLER is disabled.
 
-> 
-> Will
-> 
+regards
+Philipp
+
+The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
+
+  Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
+
+are available in the git repository at:
+
+  git://git.pengutronix.de/git/pza/linux.git tags/reset-fixes-for-4.11
+
+for you to fetch changes up to 0ca10b60ceeb5372da01798ca68c116ae45a6eb6:
+
+  reset: fix optional reset_control_get stubs to return NULL (2017-03-21 18:19:43 +0100)
+
+----------------------------------------------------------------
+Reset controller fixes for v4.11
+
+Fix optional reset_control_get_stubs to return NULL and remove warnings
+from reset_control_* stubs.
+This fixes commit bb475230b8e5 ("reset: make optional  functions really
+optional"), which was merged in reset-for-4.11, and would cause consumer
+drivers depending on the new behaviour of optional resets to fail probing
+if RESET_CONTROLLER Kconfig option is disabled.
+
+----------------------------------------------------------------
+Philipp Zabel (1):
+      reset: fix optional reset_control_get stubs to return NULL
+
+ include/linux/reset.h | 9 ++-------
+ 1 file changed, 2 insertions(+), 7 deletions(-)
