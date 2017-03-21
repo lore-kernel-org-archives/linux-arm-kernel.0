@@ -1,65 +1,49 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Tue, 21 Mar 2017 09:54:34 +0900
-Subject: [PATCH] MAINTAINERS: pinctrl: Add git tree to Samsung pinctrl
- entry
-In-Reply-To: <20170320165841.gpbevoscf2fjvods@kozik-lap>
-References: <20170320164851.5999-1-krzk@kernel.org>
- <20170320165841.gpbevoscf2fjvods@kozik-lap>
-Message-ID: <CA+Ln22HW-oAtgdzrjcm2CXK4j4SURdVNV_eZsr51peg4n4AUSA@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 20 Mar 2017 20:08:07 -0500
+Subject: [PATCH v2 04/20] ARM: sun8i: dt: Add DT bindings documentation
+ for Allwinner syscon
+In-Reply-To: <20170314141856.24560-5-clabbe.montjoie@gmail.com>
+References: <20170314141856.24560-1-clabbe.montjoie@gmail.com>
+ <20170314141856.24560-5-clabbe.montjoie@gmail.com>
+Message-ID: <20170321010807.rhx6xvysunujkcjk@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-03-21 1:58 GMT+09:00 Krzysztof Kozlowski <krzk@kernel.org>:
-> On Mon, Mar 20, 2017 at 06:48:51PM +0200, Krzysztof Kozlowski wrote:
->> Add a Git tree on @kernel.org for maintaining the Samsung pinctrl
->> drivers.  The tree will be maintained in a shared model between current
->> Samsung pinctrl maintainers.  Pull requests will be going to Linus
->> Walleij.
->>
->> Also add the patchwork for linux-samsung-soc mailing list which will be
->> used for handling the patches.
->>
->> Cc: Tomasz Figa <tomasz.figa@gmail.com>
->> Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
->> Cc: Linus Walleij <linus.walleij@linaro.org>
->> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+On Tue, Mar 14, 2017 at 03:18:40PM +0100, Corentin Labbe wrote:
+> Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+> ---
+>  .../devicetree/bindings/misc/allwinner,syscon.txt     | 19 +++++++++++++++++++
+>  1 file changed, 19 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/misc/allwinner,syscon.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/misc/allwinner,syscon.txt b/Documentation/devicetree/bindings/misc/allwinner,syscon.txt
+> new file mode 100644
+> index 0000000..9f5f1f5
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/misc/allwinner,syscon.txt
+> @@ -0,0 +1,19 @@
+> +* Allwinner sun8i system controller
+> +
+> +This file describes the bindings for the system controller present in
+> +Allwinner SoC H3, A83T and A64.
+> +The principal function of this syscon is to control EMAC PHY choice and
+> +config.
+> +
+> +Required properties for the system controller:
+> +- reg: address and length of the register for the device.
+> +- compatible: should be "syscon" and one of the following string:
+> +		"allwinner,sun8i-h3-system-controller"
+> +		"allwinner,sun8i-a64-system-controller"
+> +		"allwinner,sun8i-a83t-system-controller"
+> +
+> +Example:
+> +syscon: syscon at 01c00000 {
+> +	compatible = "syscon", "allwinner,sun8i-h3-system-controller";
 
-Acked-by: Tomasz Figa <tomasz.figa@gmail.com>
+Wrong order of compatibles.
 
->>
->> ---
->>
->> As of now, only I have the access to this git tree. Tomasz is welcomed
->> to join anytime. We are also waiting for Sywlester to get account on
->> kernel.org.
-
-I'll stay alerted. :) Please let me know whenever you both guys are
-busy and I can kick in. Will keep reviewing the patches as well.
-
->>
->> For the Patchwork, I use it also for Exynos/Samsung ARM architecture
->> maintenance.  I will add appropriate permissions to Sylwester so we can
->> share it.
->> ---
->
-> Linus,
->
-> I talked with Sylwester few days ago and we agreed on a shared mainainer
-> model.  Mostly because:
-> 1. Only Sylwester from three of us works in Samsung,
-> 2. It helps distributing the load in case of any holidays/travel etc,
-> 3. It might also make easier for future transitions.
->
-> For this release I can start taking the patches. Please let me know:
-> 1. Can I base on Torvalds' rc-1 or you prefer basing on top of your
->    branches? In the second case your branches should not be rebased.
-> 2. When do you expect pull requests (preferred time and acceptable late
->    stuff)?
->
->
-> Also, I will add this tree to the linux-next + auto-builders.
-
-Thanks Krzysztof, you're doing some really good work here! :)
-
-Best regards,
-Tomasz
+> +	reg = <0x01c00000 0x1000>;
+> +};
+> -- 
+> 2.10.2
+> 
