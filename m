@@ -1,71 +1,129 @@
-From: slash.tmp@free.fr (Mason)
-Date: Tue, 21 Mar 2017 14:01:57 +0100
-Subject: [RFC PATCH v0.001] PCI: Add support for tango PCIe controller
-In-Reply-To: <20170321123129.GB6816@e110455-lin.cambridge.arm.com>
-References: <ab110ce2-8678-9b34-6bd1-6cfaaa7fea04@free.fr>
- <f13c385d-dcc9-dacd-2b2c-ca098228f4f4@free.fr>
- <20170321123129.GB6816@e110455-lin.cambridge.arm.com>
-Message-ID: <d5062453-39cc-1435-bb13-87c81b6ef0b3@free.fr>
+From: james.morse@arm.com (James Morse)
+Date: Tue, 21 Mar 2017 13:10:22 +0000
+Subject: [PATCH] kvm: pass the virtual SEI syndrome to guest OS
+In-Reply-To: <76795e20-2f20-1e54-cfa5-7444f28b18ee@huawei.com>
+References: <1489996534-8270-1-git-send-email-gengdongjiu@huawei.com>
+ <7055772d-2a20-6e0c-2bf8-204bc9ef52a5@arm.com>
+ <b912c293-4314-7c90-30a4-2f986feb1670@huawei.com>
+ <22fb583f-a33e-15f8-a059-fb112b27dd4f@arm.com> <58CFF058.8020205@arm.com>
+ <76795e20-2f20-1e54-cfa5-7444f28b18ee@huawei.com>
+Message-ID: <58D1263E.90800@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/03/2017 13:31, Liviu Dudau wrote:
+Hi,
 
-> On Tue, Mar 21, 2017 at 11:15:16AM +0100, Mason wrote:
+On 21/03/17 06:32, gengdongjiu wrote:
+> On 2017/3/20 23:08, James Morse wrote:
+>> On 20/03/17 13:58, Marc Zyngier wrote:
+>>> On 20/03/17 12:28, gengdongjiu wrote:
+>>>> On 2017/3/20 19:24, Marc Zyngier wrote:
+>>>>> On 20/03/17 07:55, Dongjiu Geng wrote:
+>>>>>> In the RAS implementation, hardware pass the virtual SEI
+>>>>>> syndrome information through the VSESR_EL2, so set the virtual
+>>>>>> SEI syndrome using physical SEI syndrome el2_elr to pass to
+>>>>>> the guest OS
+
+(I've juggled the order of your replies:)
+
+> so for both SEA and SEI, do you prefer to below steps?
+> EL0/EL1 SEI/SEA ---> EL3 firmware first handle ------> EL2 hypervisor notify >
+the Qemu to inject SEI/SEA------>Qemu call KVM API to inject SEA/SEI---->KVM >
+inject SEA/SEI to guest OS
+
+Yes, to expand your EL2 hypervisor notify Qemu step:
+1 The host should call its APEI code to parse the CPER records.
+2 User space processes are then notified via SIGBUS (or for rasdaemon, trace
+  points).
+3 Qemu can take the address delivered via SIGBUS and generate CPER records for
+  the guest. It knows how to convert host addresses to guest IPAs, and it knows
+  where in guest memory to write the CPER records.
+4 Qemu can then notify the guest via whatever mechanism it advertised via the
+  HEST/GHES table. It might not be the same mechanism that the host received
+  the notification through.
+
+Steps 1 and 2 are the same even if no guest is running, so we don't have to add
+any special case for KVM. This is existing code that x86 uses.
+We can test the Qemu parts without any firmware support and the APEI path in the
+host and guest is the same.
+
+
+>> Is anyone from Huawei looking at adding RAS support for Qemu?
+>  yes, I am looking at Qemu and want to add RAS support.
+
+Great, support in Qemu is one of the missing pieces. On x86 it looks like it
+emulates machine-check-exceptions, which is how x86 did this before
+firmware-first and APEI became the standard.
+
+
+>  do you mean let Qemu inject both the SEA and SEI?
+
+To do the notification, yes. It needs to happen after the CPER records have been
+written, and the mechanism and CPER memory location need to match what the guest
+was told via the HEST/GHES table.
+
+If Qemu didn't tell the guest about firmware-first, it can still deliver the
+guest an SError Interrupt.
+
+
+SEA should be possible to do with the KVM_SET_REG API, GPIO/GSIV and the other
+kind of interrupts can use irqfd. For SEI we may need to add an API call to KVM
+to let it pend SError with a specific ESR.
+
+
+
+>> How does this work with firmware first?
+
+> when the Guest OS triggers an SEI, it will firstly trap to EL3 firmware, El3 firmware records the error
+> info to the APEI table, 
+
+These are CPER records in a memory area pointed to by one of HEST's GHES entries?
+
+
+> then copy the ESR_EL3 ELR_EL3 to ESR_EL2 ELR_EL2 and transfers control to the
+> hypervisor, hypervisor delegates the error exception to EL1 guest
+
+This is a problem, just because the error occurred while the guest was running
+doesn't mean we should deliver it directly to the guest. Some of these errors
+will be fatal for the CPU and the host should try and power it off to contain
+the fault. For example: CPER's 'micro-architectural error', should the guest
+power-off the vCPU? All that really does is return to the hypervisor, the error
+hasn't been contained.
+
+Firmware should handle the error first, then the host, finally the guest via Qemu.
+
+
+> OS by setting HCR_EL2.VSE to 1 and pass the virtual SEI syndrome through vsesr_el2. 
+> The EL1 guest OS check the DISR_EL1 syndrome information to decide to
+> terminate the application, or do some other recovery action. because the HCR_EL2.AMO is set, so in fact, read
+> DISR_EL1, it returns the VDISR_EL2. and VDISR_EL2 is loaded from VSESR_EL2, so here I pass the virtual SEI
+> syndrome vsesr_el2.
+
+So this is how an SError Interrupt's ESR gets into a guest. How does it get hold
+of the CPER records?
+
+
+>> If we took a Physical SError Interrupt the CPER records are in the hosts memory.
+>> To deliver a RAS event to the guest something needs to generate CPER records and
+>> put them in the guest memory. Only Qemu knows where these memory regions are.
 >>
->> On 17/03/2017 17:11, Mason wrote:
->>
->>> + * QUIRK #5
->>> + * Only transfers within the BAR are forwarded to the host.
->>> + * By default, the DMA framework expects that
->>> + * PCI address 0x8000_0000 -> CPU address 0x8000_0000
->>> + * which is where DRAM0 is mapped.
->>
->> I have an additional question on this topic.
->>
->> In a typical system, PCI bus masters are able to access all of RAM,
->> unless there is some kind of IOMMU, right?
-> 
-> Depends where the ATS (Address translation service) lives and what gets
-> programmed there, but usually one can restrict the RAM (or system address
-> space, to be more precise) that can be accessed from the PCI bus masters
-> by only providing PCI(e)-to-system bus mappings that make sense. Remember
-> that on any PCI bus you can only see addresses that are a subset of your
-> parent bus addresses. If the root PCI bus only allows access to a predefined
-> range of addresses, then that is all you can access in the system.
+>> Put another way, what is the guest expected to do with this SError interrupt?
+>
+> No, we do not only panic,if it is EL0 application SEI. the OS error recovery
+> agent will terminate the EL0 application to isolate the error; If it is EL1 guest
+> OS SError, guest OS can see whether it can recover. if the error was in a read-only file cache buffer, guest OS
+> can invalidate the page and reload the data from disk.
 
-Hmmm, where do I configure the range of addresses which the root
-PCI bus allows access to? In the DT?
+How do we get an address for memory failure? SError is asynchronous, I don't
+think it sets the FAR. (SEA is synchronous and its not guaranteed to set the
+FAR..). As far as I understand this information is in the CPER records in host
+memory.
 
->> I suppose one may consider the above limitation ("Only transfers
->> within the BAR are forwarded to the host") as some form of weird
->> IOMMU? (There is, in fact, some remapping logic in the controller
->> setup which I haven't discussed so far.)
-> 
-> Not sure I understand the quirk. What BAR are you referring to when you say
-> "within the BAR"? The bus master's? Are you saying that only if you write
-> to a PCI bus address XXXXXXX that is in the range assigned by the parent
-> bus then you can escape your bus hierarchy and target the system RAM? That
-> sounds backwards to me.
+If we did have an address it would be a host address, how is it converted to a
+guest IPA? I think Qemu should do this as part of its CPER record generation,
+once the host has decided the error wasn't catastrophic.
 
-My PCIe controller is b/d/f 0/0/0.
-It ignores all PCI addresses that do not fall within the range
-defined in BAR0 of b/d/f 0/0/0.
 
-BAR0 has a configurable width of 2^(23+i) bytes, i < 8
-It is implicitly split in 8 regions, which can map to
-anywhere in CPU space. However, my understanding is that,
-by default, the DMA framework expects PCI address X to
-map to CPU address X...
-(My understanding of that part is still a bit hazy.)
+Thanks,
 
->> Since this SoC is used for TV, the media cartels mandate some way
->> to limit where PCI bus masters can peek/poke in RAM.
-> 
-> And that is usually done by either having a TrustZone controller on top of
-> your PCI host bridge or by putting an IOMMU.
-
-It seems we don't have this HW, therefore some kind of custom
-HW quirk was required.
-
-Regards.
+James
