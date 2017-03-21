@@ -1,32 +1,38 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Tue, 21 Mar 2017 12:56:50 -0400
-Subject: [PATCH v2 0/3] ATA/ARM: convert ARM/DaVinci to use libata PATA
- drivers
-In-Reply-To: <3c115ec1-2d11-695e-eca7-25a75f71b96f@ti.com>
-References: <CGME20170314163738epcas5p3db719229d59550476c918a15d8c16d63@epcas5p3.samsung.com>
- <1489509414-11491-1-git-send-email-b.zolnierkie@samsung.com>
- <20170316213255.GF1480@htj.duckdns.org>
- <3c115ec1-2d11-695e-eca7-25a75f71b96f@ti.com>
-Message-ID: <20170321165650.GA3706@htj.duckdns.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 21 Mar 2017 17:04:08 +0000
+Subject: [PATCH v3 01/25] arm64: hyp-stub: Implement HVC_RESET_VECTORS
+ stub hypercall
+In-Reply-To: <20170306142458.8875-2-marc.zyngier@arm.com>
+References: <20170306142458.8875-1-marc.zyngier@arm.com>
+ <20170306142458.8875-2-marc.zyngier@arm.com>
+Message-ID: <20170321170407.GD21829@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Tue, Mar 21, 2017 at 02:08:26PM +0530, Sekhar Nori wrote:
-> > Looks fine to me from libata side.  Once it gets tested, how should
-> > the patches be routed?  I don't think it'd make sense to route them
-> > separately.
+On Mon, Mar 06, 2017 at 02:24:34PM +0000, Marc Zyngier wrote:
+> Let's define a new stub hypercall that resets the HYP configuration
+> to its default: hyp-stub vectors, and MMU disabled.
 > 
-> Hi Tejun, I can take the series through ARM-SoC tree with your ack.
+> Of course, for the hyp-stub itself, this is a trivial no-op.
+> Hypervisors will have a bit more work to do.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm64/include/asm/virt.h |  9 +++++++++
+>  arch/arm64/kernel/hyp-stub.S  | 13 ++++++++++++-
+>  2 files changed, 21 insertions(+), 1 deletion(-)
+[...]
+> +ENTRY(__hyp_reset_vectors)
+> +	str	lr, [sp, #-16]!
+> +	mov	x0, #HVC_RESET_VECTORS
+> +	hvc	#0
+> +	ldr	lr, [sp], #16
+> +	ret
+> +ENDPROC(__hyp_reset_vectors)
 
-Once the review points are addressed, please feel free to add
-
- Acked-by: Tejun Heo <tj@kernel.org>
-
-and route through the arm tree.
-
-Thanks.
+Why do we need to specifically preserve lr across the hvc call? Is it
+corrupted by the EL2 code (if yes, are other caller-saved registers that
+need preserving)? I don't see something similar in the arch/arm code.
 
 -- 
-tejun
+Catalin
