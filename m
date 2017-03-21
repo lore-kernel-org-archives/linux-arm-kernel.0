@@ -1,61 +1,250 @@
 From: fu.wei@linaro.org (fu.wei at linaro.org)
-Date: Wed, 22 Mar 2017 00:31:16 +0800
-Subject: [PATCH v22 05/11] clocksource: arm_arch_timer: introduce some new
- structs to prepare for GTDT
+Date: Wed, 22 Mar 2017 00:31:17 +0800
+Subject: [PATCH v22 06/11] clocksource: arm_arch_timer: refactor MMIO timer
+ probing.
 In-Reply-To: <20170321163122.9183-1-fu.wei@linaro.org>
 References: <20170321163122.9183-1-fu.wei@linaro.org>
-Message-ID: <20170321163122.9183-6-fu.wei@linaro.org>
+Message-ID: <20170321163122.9183-7-fu.wei@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Fu Wei <fu.wei@linaro.org>
 
-The patch introduce two new structs: arch_timer_mem, arch_timer_mem_frame.
-And also introduce a new define: ARCH_TIMER_MEM_MAX_FRAMES
+Currently the code to probe MMIO architected timers mixes DT parsing with
+actual poking of hardware. This makes the code harder than necessary to
+understand, and makes it difficult to add support for probing via ACPI.
 
-These will be used for refactoring the memory-mapped timer init code to
-prepare for GTDT
+This patch factors all the DT-specific logic out of arch_timer_mem_init(),
+into a new function arch_timer_mem_of_init().
+The former pokes the hardware and determines the suitablility of frames
+based on a datastructure populated by the latter.
+
+This cleanly separates the two and will make it possible to add probing
+using the ACPI GTDT in subsequent patches.
 
 Signed-off-by: Fu Wei <fu.wei@linaro.org>
 Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
 ---
- include/clocksource/arm_arch_timer.h | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+ drivers/clocksource/arm_arch_timer.c | 158 +++++++++++++++++++++++++----------
+ 1 file changed, 112 insertions(+), 46 deletions(-)
 
-diff --git a/include/clocksource/arm_arch_timer.h b/include/clocksource/arm_arch_timer.h
-index 4a98c06..b7dd185 100644
---- a/include/clocksource/arm_arch_timer.h
-+++ b/include/clocksource/arm_arch_timer.h
-@@ -57,6 +57,8 @@ enum arch_timer_spi_nr {
- #define ARCH_TIMER_MEM_PHYS_ACCESS	2
- #define ARCH_TIMER_MEM_VIRT_ACCESS	3
+diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+index 4b29a6d..3ada5dc 100644
+--- a/drivers/clocksource/arm_arch_timer.c
++++ b/drivers/clocksource/arm_arch_timer.c
+@@ -977,17 +977,21 @@ static int __init arch_timer_of_init(struct device_node *np)
+ CLOCKSOURCE_OF_DECLARE(armv7_arch_timer, "arm,armv7-timer", arch_timer_of_init);
+ CLOCKSOURCE_OF_DECLARE(armv8_arch_timer, "arm,armv8-timer", arch_timer_of_init);
  
-+#define ARCH_TIMER_MEM_MAX_FRAMES	8
-+
- #define ARCH_TIMER_USR_PCT_ACCESS_EN	(1 << 0) /* physical counter */
- #define ARCH_TIMER_USR_VCT_ACCESS_EN	(1 << 1) /* virtual counter */
- #define ARCH_TIMER_VIRT_EVT_EN		(1 << 2)
-@@ -72,6 +74,21 @@ struct arch_timer_kvm_info {
- 	int virtual_irq;
- };
+-static int __init arch_timer_mem_init(struct device_node *np)
++static int __init arch_timer_mem_init(struct arch_timer_mem *timer_mem)
+ {
+-	struct device_node *frame, *best_frame = NULL;
+ 	void __iomem *cntctlbase, *base;
+-	unsigned int irq, ret = -EINVAL;
++	struct arch_timer_mem_frame *best_frame = NULL;
++	u32 arch_timer_mem_freq;
++	unsigned int irq;
+ 	u32 cnttidr;
++	int i, ret;
  
-+struct arch_timer_mem_frame {
-+	int frame_nr;
-+	phys_addr_t cntbase;
-+	size_t size;
-+	int phys_irq;
-+	int virt_irq;
-+};
+-	arch_timers_present |= ARCH_TIMER_TYPE_MEM;
+-	cntctlbase = of_iomap(np, 0);
++	if (!timer_mem->num_frames)
++		return -ENODEV;
 +
-+struct arch_timer_mem {
-+	phys_addr_t cntctlbase;
-+	size_t size;
-+	int num_frames;
-+	struct arch_timer_mem_frame frame[ARCH_TIMER_MEM_MAX_FRAMES];
-+};
-+
- #ifdef CONFIG_ARM_ARCH_TIMER
++	cntctlbase = ioremap(timer_mem->cntctlbase, timer_mem->size);
+ 	if (!cntctlbase) {
+-		pr_err("Can't find CNTCTLBase\n");
++		pr_err("Can't map CNTCTLBase.\n");
+ 		return -ENXIO;
+ 	}
  
- extern u32 arch_timer_get_rate(void);
+@@ -997,26 +1001,18 @@ static int __init arch_timer_mem_init(struct device_node *np)
+ 	 * Try to find a virtual capable frame. Otherwise fall back to a
+ 	 * physical capable frame.
+ 	 */
+-	for_each_available_child_of_node(np, frame) {
+-		int n;
+-		u32 cntacr;
+-
+-		if (of_property_read_u32(frame, "frame-number", &n)) {
+-			pr_err("Missing frame-number\n");
+-			of_node_put(frame);
+-			goto out;
+-		}
++	for (i = 0; i < timer_mem->num_frames; i++) {
++		u32 cntacr = CNTACR_RFRQ | CNTACR_RWPT | CNTACR_RPCT |
++			     CNTACR_RWVT | CNTACR_RVOFF | CNTACR_RVCT;
++		int n = timer_mem->frame[i].frame_nr;
+ 
+ 		/* Try enabling everything, and see what sticks */
+-		cntacr = CNTACR_RFRQ | CNTACR_RWPT | CNTACR_RPCT |
+-			 CNTACR_RWVT | CNTACR_RVOFF | CNTACR_RVCT;
+ 		writel_relaxed(cntacr, cntctlbase + CNTACR(n));
+ 		cntacr = readl_relaxed(cntctlbase + CNTACR(n));
+ 
+ 		if ((cnttidr & CNTTIDR_VIRT(n)) &&
+ 		    !(~cntacr & (CNTACR_RWVT | CNTACR_RVCT))) {
+-			of_node_put(best_frame);
+-			best_frame = frame;
++			best_frame = &timer_mem->frame[i];
+ 			arch_timer_mem_use_virtual = true;
+ 			break;
+ 		}
+@@ -1024,56 +1020,126 @@ static int __init arch_timer_mem_init(struct device_node *np)
+ 		if (~cntacr & (CNTACR_RWPT | CNTACR_RPCT))
+ 			continue;
+ 
+-		of_node_put(best_frame);
+-		best_frame = of_node_get(frame);
++		best_frame = &timer_mem->frame[i];
+ 	}
++	iounmap(cntctlbase);
+ 
+-	ret= -ENXIO;
+-	base = arch_counter_base = of_io_request_and_map(best_frame, 0,
+-							 "arch_mem_timer");
+-	if (IS_ERR(base)) {
+-		pr_err("Can't map frame's registers\n");
+-		goto out;
++	if (!best_frame) {
++		pr_err("Can't find frame for register\n");
++		return -EINVAL;
+ 	}
+ 
+ 	if (arch_timer_mem_use_virtual)
+-		irq = irq_of_parse_and_map(best_frame, ARCH_TIMER_VIRT_SPI);
++		irq = best_frame->virt_irq;
+ 	else
+-		irq = irq_of_parse_and_map(best_frame, ARCH_TIMER_PHYS_SPI);
++		irq = best_frame->phys_irq;
+ 
+-	ret = -EINVAL;
+ 	if (!irq) {
+ 		pr_err("Frame missing %s irq.\n",
+ 		       arch_timer_mem_use_virtual ? "virt" : "phys");
++		return -EINVAL;
++	}
++
++	if (!request_mem_region(best_frame->cntbase, best_frame->size,
++				"arch_mem_timer"))
++		return -EBUSY;
++
++	base = ioremap(best_frame->cntbase, best_frame->size);
++	if (!base) {
++		pr_err("Can't map frame's registers\n");
++		return -ENXIO;
++	}
++
++	arch_timer_mem_freq = arch_timer_mem_get_cntfrq(base);
++	if (!arch_timer_rate && arch_timer_mem_freq) {
++		arch_timer_rate = arch_timer_mem_freq;
++	} else if (!arch_timer_rate || arch_timer_rate != arch_timer_mem_freq) {
++		pr_err(FW_BUG "invalid MMIO frequency.\n");
++		iounmap(base);
++		return -EINVAL;
++	}
++
++	ret = arch_timer_mem_register(base, irq);
++	if (ret) {
++		iounmap(base);
++		return ret;
++	}
++
++	arch_counter_base = base;
++	arch_timers_present |= ARCH_TIMER_TYPE_MEM;
++
++	return 0;
++}
++
++static int __init arch_timer_mem_of_init(struct device_node *np)
++{
++	struct arch_timer_mem *timer_mem;
++	struct device_node *frame_node;
++	struct resource res;
++	int i, ret = -EINVAL;
++
++	timer_mem = kzalloc(sizeof(*timer_mem), GFP_KERNEL);
++	if (!timer_mem)
++		return -ENOMEM;
++
++	if (of_address_to_resource(np, 0, &res))
+ 		goto out;
++	timer_mem->cntctlbase = res.start;
++	timer_mem->size = resource_size(&res);
++
++	i = 0;
++	for_each_available_child_of_node(np, frame_node) {
++		int n;
++		struct arch_timer_mem_frame *frame;
++
++		if (i >= ARCH_TIMER_MEM_MAX_FRAMES) {
++			pr_err(FW_BUG "too many frames, only %u are permitted.\n",
++			       ARCH_TIMER_MEM_MAX_FRAMES);
++			goto out;
++		}
++
++		frame = &timer_mem->frame[i];
++
++		if (of_property_read_u32(frame_node, "frame-number", &n)) {
++			pr_err(FW_BUG "Missing frame-number\n");
++			of_node_put(frame_node);
++			goto out;
++		}
++		frame->frame_nr = n;
++
++		if (of_address_to_resource(frame_node, 0, &res)) {
++			of_node_put(frame_node);
++			goto out;
++		}
++		frame->cntbase = res.start;
++		frame->size = resource_size(&res);
++
++		frame->virt_irq = irq_of_parse_and_map(frame_node,
++						       ARCH_TIMER_VIRT_SPI);
++		frame->phys_irq = irq_of_parse_and_map(frame_node,
++						       ARCH_TIMER_PHYS_SPI);
++
++		i++;
+ 	}
++	timer_mem->num_frames = i;
+ 
+ 	/*
+-	 * Try to determine the frequency from the device tree,
+-	 * if fail, get the frequency from the CNTFRQ reg of MMIO timer.
++	 * Try to get the frequency from the device tree,
++	 * if fail, we will try the CNTFRQ register in arch_timer_mem_init.
+ 	 */
+-	if (!arch_timer_rate &&
+-	    of_property_read_u32(np, "clock-frequency", &arch_timer_rate))
+-		arch_timer_rate = arch_timer_mem_get_cntfrq(base);
+ 	if (!arch_timer_rate) {
+-		pr_err(FW_BUG "MMIO frequency not available.\n");
+-		ret = -EINVAL;
+-		goto out;
++		of_property_read_u32(np, "clock-frequency", &arch_timer_rate);
+ 	}
+ 
+-	ret = arch_timer_mem_register(base, irq);
+-	if (ret)
+-		goto out;
+-
+-	if (!arch_timer_needs_of_probing())
++	ret = arch_timer_mem_init(timer_mem);
++	if (!ret && !arch_timer_needs_of_probing())
+ 		ret = arch_timer_common_init();
+ out:
+-	iounmap(cntctlbase);
+-	of_node_put(best_frame);
++	kfree(timer_mem);
+ 	return ret;
+ }
+ CLOCKSOURCE_OF_DECLARE(armv7_arch_timer_mem, "arm,armv7-timer-mem",
+-		       arch_timer_mem_init);
++		       arch_timer_mem_of_init);
+ 
+ #ifdef CONFIG_ACPI
+ static int __init map_generic_timer_interrupt(u32 interrupt, u32 flags)
 -- 
 2.9.3
