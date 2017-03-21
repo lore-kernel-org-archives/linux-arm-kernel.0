@@ -1,38 +1,68 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Tue, 21 Mar 2017 13:30:51 +0100
-Subject: [PATCH 8/9] KVM: arm/arm64: vgic: Don't check vgic_initialized
- in flush_hwstate
-In-Reply-To: <96b0efe2-d764-7b52-8335-0383a9357a1f@arm.com>
-References: <20170320105818.20481-1-cdall@linaro.org>
- <20170320105818.20481-9-cdall@linaro.org>
- <96b0efe2-d764-7b52-8335-0383a9357a1f@arm.com>
-Message-ID: <20170321123051.GF15920@cbox>
+From: liviu.dudau@arm.com (Liviu Dudau)
+Date: Tue, 21 Mar 2017 12:31:29 +0000
+Subject: [RFC PATCH v0.001] PCI: Add support for tango PCIe controller
+In-Reply-To: <f13c385d-dcc9-dacd-2b2c-ca098228f4f4@free.fr>
+References: <ab110ce2-8678-9b34-6bd1-6cfaaa7fea04@free.fr>
+ <f13c385d-dcc9-dacd-2b2c-ca098228f4f4@free.fr>
+Message-ID: <20170321123129.GB6816@e110455-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 21, 2017 at 12:08:15PM +0000, Marc Zyngier wrote:
-> On 20/03/17 10:58, Christoffer Dall wrote:
-> > Now when we do an early init of the static parts of the VGIC data
-> > structures, we can do things like checking if the AP lists are empty
-> > directly without having to explicitly check if the vgic is initialized
-> > and reduce a bit of work in our criticial path.
+On Tue, Mar 21, 2017 at 11:15:16AM +0100, Mason wrote:
+> [ Adding iommu ML ]
 > 
->                                   critical
+> On 17/03/2017 17:11, Mason wrote:
 > 
-> > Note: list_empty is a single atomic read (uses READ_ONCE) and can
-> > therefore check if a list is empty or not without the need to take the
-> > spinlock protecting the list.
+> > + * QUIRK #5
+> > + * Only transfers within the BAR are forwarded to the host.
+> > + * By default, the DMA framework expects that
+> > + * PCI address 0x8000_0000 -> CPU address 0x8000_0000
+> > + * which is where DRAM0 is mapped.
 > 
-> This note might be better placed in patch #2.
+> I have an additional question on this topic.
+> 
+> In a typical system, PCI bus masters are able to access all of RAM,
+> unless there is some kind of IOMMU, right?
 
-Agreed.
+Depends where the ATS (Address translation service) lives and what gets
+programmed there, but usually one can restrict the RAM (or system address
+space, to be more precise) that can be accessed from the PCI bus masters
+by only providing PCI(e)-to-system bus mappings that make sense. Remember
+that on any PCI bus you can only see addresses that are a subset of your
+parent bus addresses. If the root PCI bus only allows access to a predefined
+range of addresses, then that is all you can access in the system.
 
 > 
-> > 
-> > Signed-off-by: Christoffer Dall <cdall@linaro.org>
-> 
-> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-> 
+> I suppose one may consider the above limitation ("Only transfers
+> within the BAR are forwarded to the host") as some form of weird
+> IOMMU? (There is, in fact, some remapping logic in the controller
+> setup which I haven't discussed so far.)
 
-Thanks,
--Christoffer
+Not sure I understand the quirk. What BAR are you referring to when you say
+"within the BAR"? The bus master's? Are you saying that only if you write
+to a PCI bus address XXXXXXX that is in the range assigned by the parent
+bus then you can escape your bus hierarchy and target the system RAM? That
+sounds backwards to me.
+
+> 
+> Since this SoC is used for TV, the media cartels mandate some way
+> to limit where PCI bus masters can peek/poke in RAM.
+
+And that is usually done by either having a TrustZone controller on top of
+your PCI host bridge or by putting an IOMMU.
+
+Best regards,
+Liviu
+
+> 
+> Regards.
+
+-- 
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
