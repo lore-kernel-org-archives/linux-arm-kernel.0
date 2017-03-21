@@ -1,133 +1,45 @@
-From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Tue, 21 Mar 2017 07:50:03 -0700
-Subject: [PATCH v7 1/2] dt-bindings: Add GPCv2 power gating driver
-In-Reply-To: <20170321145004.21265-1-andrew.smirnov@gmail.com>
-References: <20170321145004.21265-1-andrew.smirnov@gmail.com>
-Message-ID: <20170321145004.21265-2-andrew.smirnov@gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 21 Mar 2017 15:50:54 +0100
+Subject: stmmac still supporting spear600 ?
+In-Reply-To: <79049eda-5d37-6b70-8945-2d3ab55e56b8@st.com>
+References: <20170309093412.33c0277d@free-electrons.com>
+ <373e2760-94c5-4349-33aa-158bc8f4b19e@st.com>
+ <20170309103236.3e16304f@free-electrons.com>
+ <79049eda-5d37-6b70-8945-2d3ab55e56b8@st.com>
+Message-ID: <20170321155054.2f4cb921@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DT bindings for power domain driver for GPCv2 IP block found in
-i.MX7 SoCs.
+Hello,
 
-Cc: yurovsky at gmail.com
-Cc: Lucas Stach <l.stach@pengutronix.de>
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Fabio Estevam <fabio.estevam@nxp.com>
-Cc: Dong Aisheng <dongas86@gmail.com>
-Cc: devicetree at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
-Acked-by: Rob Herring <robh@kernel.org>
-Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
----
- .../devicetree/bindings/power/fsl,imx-gpcv2.txt    | 71 ++++++++++++++++++++++
- include/dt-bindings/power/imx7-power.h             | 18 ++++++
- 2 files changed, 89 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/power/fsl,imx-gpcv2.txt
- create mode 100644 include/dt-bindings/power/imx7-power.h
+On Thu, 9 Mar 2017 15:56:31 +0100, Giuseppe CAVALLARO wrote:
 
-diff --git a/Documentation/devicetree/bindings/power/fsl,imx-gpcv2.txt b/Documentation/devicetree/bindings/power/fsl,imx-gpcv2.txt
-new file mode 100644
-index 0000000..02f45c6
---- /dev/null
-+++ b/Documentation/devicetree/bindings/power/fsl,imx-gpcv2.txt
-@@ -0,0 +1,71 @@
-+Freescale i.MX General Power Controller v2
-+==========================================
-+
-+The i.MX7S/D General Power Control (GPC) block contains Power Gating
-+Control (PGC) for various power domains.
-+
-+Required properties:
-+
-+- compatible: Should be "fsl,imx7d-gpc"
-+
-+- reg: should be register base and length as documented in the
-+  datasheet
-+
-+- interrupts: Should contain GPC interrupt request 1
-+
-+Power domains contained within GPC node are generic power domain
-+providers, documented in
-+Documentation/devicetree/bindings/power/power_domain.txt, which are
-+described as subnodes of the power gating controller 'pgc' node,
-+which, in turn, is expected to contain the following:
-+
-+Required properties:
-+
-+- reg: Power domain index. Valid values are defined in
-+  include/dt-bindings/power/imx7-power.h
-+
-+- #power-domain-cells: Should be 0
-+
-+Optional properties:
-+
-+- power-supply: Power supply used to power the domain
-+
-+Example:
-+
-+	gpc: gpc at 303a0000 {
-+		compatible = "fsl,imx7d-gpc";
-+		reg = <0x303a0000 0x1000>;
-+		interrupt-controller;
-+		interrupts = <GIC_SPI 87 IRQ_TYPE_LEVEL_HIGH>;
-+		#interrupt-cells = <3>;
-+		interrupt-parent = <&intc>;
-+
-+		pgc {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			pgc_pcie_phy: power-domain at 3 {
-+				#power-domain-cells = <0>;
-+
-+				reg = <IMX7_POWER_DOMAIN_PCIE_PHY>;
-+				power-supply = <&reg_1p0d>;
-+			};
-+		};
-+	};
-+
-+
-+Specifying power domain for IP modules
-+======================================
-+
-+IP cores belonging to a power domain should contain a 'power-domains'
-+property that is a phandle for PGC node representing the domain.
-+
-+Example of a device that is part of the PCIE_PHY power domain:
-+
-+	pcie: pcie at 33800000 {
-+	      reg = <0x33800000 0x4000>,
-+	            <0x4ff00000 0x80000>;
-+		/* ... */
-+		power-domains = <&pgc_pcie_phy>;
-+		/* ... */
-+	};
-diff --git a/include/dt-bindings/power/imx7-power.h b/include/dt-bindings/power/imx7-power.h
-new file mode 100644
-index 0000000..eb70023
---- /dev/null
-+++ b/include/dt-bindings/power/imx7-power.h
-@@ -0,0 +1,18 @@
-+/*
-+ *  Copyright (C) 2017 Impinj
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#ifndef __DT_BINDINGS_IMX7_POWER_H__
-+#define __DT_BINDINGS_IMX7_POWER_H__
-+
-+#define IMX7_POWER_DOMAIN_USB_HSIC_PHY	0
-+#define IMX7_POWER_DOMAIN_USB_OTG2_PHY	1
-+#define IMX7_POWER_DOMAIN_USB_OTG1_PHY	2
-+#define IMX7_POWER_DOMAIN_PCIE_PHY	3
-+#define IMX7_POWER_DOMAIN_MIPI_PHY	4
-+
-+#endif
+> On 3/9/2017 10:32 AM, Thomas Petazzoni wrote:
+> 
+> > OK, I'll have a look. However, I'm still confused by this DMA_RESET bit
+> > that never clears, contrary to what the datasheet says. Are there some
+> > erratas?  
+> 
+> I suggest you to take a look at the tx/rx clocks from PHY.
+> You have to provide these otherwise you cannot reset the engine.
+
+Thanks for the hint.
+
+Further research has revealed that everything is working fine on a
+platform with a Gigabit PHY connected via GMII.
+
+However, on a different platform (which I'm using) with a 10/100 PHY
+connected via MII, DMA_RESET never clears, and networking doesn't work.
+The SMSC PHY LAN8700 is also supposed to be providing the clock through
+its TX_CLK pin. I double checked, and both the MAC and PHY are in MII
+mode, but still no luck so far.
+
+Of course, if you have any suggestion or hint, I'm all ears :)
+
+Thanks,
+
+Thomas
 -- 
-2.9.3
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
