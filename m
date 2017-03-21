@@ -1,54 +1,93 @@
-From: james.morse@arm.com (James Morse)
-Date: Tue, 21 Mar 2017 17:41:54 +0000
-Subject: [PATCH v3 01/25] arm64: hyp-stub: Implement HVC_RESET_VECTORS
- stub hypercall
-In-Reply-To: <0cce34c1-cb6f-0ba3-ac98-c0a0e986dc86@arm.com>
-References: <20170306142458.8875-1-marc.zyngier@arm.com>
- <20170306142458.8875-2-marc.zyngier@arm.com>
- <20170321170407.GD21829@e104818-lin.cambridge.arm.com>
- <58D1620E.30001@arm.com> <0cce34c1-cb6f-0ba3-ac98-c0a0e986dc86@arm.com>
-Message-ID: <58D165E2.7050501@arm.com>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Tue, 21 Mar 2017 18:42:05 +0100
+Subject: [PATCH v3 10/19] KVM: arm64: ITS: Check the device id matches
+ TYPER DEVBITS range
+In-Reply-To: <1ce84330-42bb-4e8d-5446-d481ac4419f2@arm.com>
+References: <1488800074-21991-1-git-send-email-eric.auger@redhat.com>
+ <1488800074-21991-11-git-send-email-eric.auger@redhat.com>
+ <1ce84330-42bb-4e8d-5446-d481ac4419f2@arm.com>
+Message-ID: <42523ba8-ab6d-172c-1ab7-cc52986780ac@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/03/17 17:37, Marc Zyngier wrote:
-> On 21/03/17 17:25, James Morse wrote:
->> On 21/03/17 17:04, Catalin Marinas wrote:
->>> On Mon, Mar 06, 2017 at 02:24:34PM +0000, Marc Zyngier wrote:
->>>> Let's define a new stub hypercall that resets the HYP configuration
->>>> to its default: hyp-stub vectors, and MMU disabled.
->>>>
->>>> Of course, for the hyp-stub itself, this is a trivial no-op.
->>>> Hypervisors will have a bit more work to do.
->>>>
->>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->>>> ---
->>>>  arch/arm64/include/asm/virt.h |  9 +++++++++
->>>>  arch/arm64/kernel/hyp-stub.S  | 13 ++++++++++++-
->>>>  2 files changed, 21 insertions(+), 1 deletion(-)
->>> [...]
->>>> +ENTRY(__hyp_reset_vectors)
->>>> +	str	lr, [sp, #-16]!
->>>> +	mov	x0, #HVC_RESET_VECTORS
->>>> +	hvc	#0
->>>> +	ldr	lr, [sp], #16
->>>> +	ret
->>>> +ENDPROC(__hyp_reset_vectors)
->>>
->>> Why do we need to specifically preserve lr across the hvc call? Is it
->>> corrupted by the EL2 code (if yes, are other caller-saved registers that
->>> need preserving)? I don't see something similar in the arch/arm code.
->>
->> Kexec on arm64 needed a register to clobber in the hyp-stub's el1_sync code. We
->> wanted to preserve all the registers so soft_restart() could look more like a
->> function call.
+Hi,
+
+On 17/03/2017 16:41, Andre Przywara wrote:
+> Hi,
 > 
-> I don't think we need this anymore. Once we enter __cpu_soft_restart(),
-> there is no turning back. Or am I missing something else?
+> On 06/03/17 11:34, Eric Auger wrote:
+>> On MAPD we currently check the device id can be stored in the device table.
+>> Let's first check it can be encoded within the range defined by TYPER
+>> DEVBITS.
+>>
+>> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+>> ---
+>>  virt/kvm/arm/vgic/vgic-its.c | 8 ++++++--
+>>  1 file changed, 6 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+>> index 694023f..322e370 100644
+>> --- a/virt/kvm/arm/vgic/vgic-its.c
+>> +++ b/virt/kvm/arm/vgic/vgic-its.c
+>> @@ -180,6 +180,7 @@ static struct its_ite *find_ite(struct vgic_its *its, u32 device_id,
+>>  
+>>  #define VITS_ESZ 8
+>>  #define VITS_TYPER_IDBITS 0xF
+>> +#define VITS_TYPER_DEVBITS 0xF
+> 
+> Same comment as for the other, please use 16 here.
+done
+> 
+>>  /*
+>>   * Finds and returns a collection in the ITS collection table.
+>> @@ -402,7 +403,7 @@ static unsigned long vgic_mmio_read_its_typer(struct kvm *kvm,
+>>  	 * To avoid memory waste in the guest, we keep the number of IDBits and
+>>  	 * DevBits low - as least for the time being.
+>>  	 */
+>> -	reg |= 0x0f << GITS_TYPER_DEVBITS_SHIFT;
+>> +	reg |= VITS_TYPER_DEVBITS << GITS_TYPER_DEVBITS_SHIFT;
+>>  	reg |= VITS_TYPER_IDBITS << GITS_TYPER_IDBITS_SHIFT;
+>>  	reg |= (VITS_ESZ - 1) << GITS_TYPER_ITT_ENTRY_SIZE_SHIFT;
+>>  
+>> @@ -631,7 +632,7 @@ static int vgic_its_cmd_handle_movi(struct kvm *kvm, struct vgic_its *its,
+>>   * Check whether an ID can be stored into the corresponding guest table.
+>>   * For a direct table this is pretty easy, but gets a bit nasty for
+>>   * indirect tables. We check whether the resulting guest physical address
+>> - * is actually valid (covered by a memslot and guest accessbible).
+>> + * is actually valid (covered by a memslot and guest accessible).
+> 
+> Good lord, nice catch ;-)
+> 
+>>   * For this we have to read the respective first level entry.
+>>   */
+>>  static bool vgic_its_check_id(struct vgic_its *its, u64 baser, int id)
+> 
+> Just seeing that "int" might not be sufficient here, since a device ID
+> can go up to (2^32 - 1). I wonder if you can fix it on the way.
+> 
+>> @@ -642,6 +643,9 @@ static bool vgic_its_check_id(struct vgic_its *its, u64 baser, int id)
+>>  	gfn_t gfn;
+>>  	int esz = GITS_BASER_ENTRY_SIZE(baser);
+>>  
+>> +	if (id >= (2 << (VITS_TYPER_DEVBITS + 1)))
+> 
+> But shouldn't this be "1 << " if you add one already?
+Yes that's definitively wrong!
+> So if you use 16 as mentioned above, wouldn't BIT(VITS_TYPER_DEVBITS) be
+> more readable? Or even better use BIT_ULL to cover the worst case of 32
+> bits of device ID here as well.
+I adopted BIT_ULL()
 
-My recollection of the history may be wrong: but we needed to mess with esr_el2
-before we know its a soft_restart() call, at which point we didn't want to
-clobber the registers. This was the strange use of x18 in kexec.
+Thanks
 
-
-James
+Eric
+> 
+> Cheers,
+> Andre.
+> 
+>> +		return false;
+>> +
+>>  	if (!(baser & GITS_BASER_INDIRECT)) {
+>>  		phys_addr_t addr;
+>>  
+>>
