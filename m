@@ -1,50 +1,72 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 21 Mar 2017 19:20:55 +0000
-Subject: [PATCH v4 25/28] ARM: decompressor: Remove __hyp_get_vectors usage
+Date: Tue, 21 Mar 2017 19:20:42 +0000
+Subject: [PATCH v4 12/28] ARM: KVM: Convert KVM to use HVC_GET_VECTORS
 In-Reply-To: <20170321192058.9300-1-marc.zyngier@arm.com>
 References: <20170321192058.9300-1-marc.zyngier@arm.com>
-Message-ID: <20170321192058.9300-26-marc.zyngier@arm.com>
+Message-ID: <20170321192058.9300-13-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the compressed image needs to be relocated to avoid being
-overwritten by the decompression process, we need to relocate
-the hyp vectors as well so that we can find them once the
-decompression has taken effect.
+The conversion of the HYP stub ABI to something similar to arm64
+left the KVM code broken, as it doesn't know about the new
+stub numbering. Let's move the various #defines to virt.h, and
+let KVM use HVC_GET_VECTORS.
 
-For that, we perform the following calculation:
-	u32 v = __hyp_get_vectors();
-	v += offset;
-	__hyp_set_vectors(v);
-
-But we're guaranteed that the initial value of v as returned by
-__hyp_get_vectors is always __hyp_stub_vectors, because we have
-just set it by calling __hyp_stub_install.
-
-So let's remove the use of __hyp_get_vectors, and directly use
-__hyp_stub_vectors instead.
-
+Tested-by: Keerthy <j-keerthy@ti.com>
 Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/boot/compressed/head.S | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+ arch/arm/include/asm/virt.h  | 8 ++++++++
+ arch/arm/kernel/hyp-stub.S   | 4 ----
+ arch/arm/kvm/hyp/hyp-entry.S | 2 +-
+ 3 files changed, 9 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-index 9150f9732785..d58bb104c6e8 100644
---- a/arch/arm/boot/compressed/head.S
-+++ b/arch/arm/boot/compressed/head.S
-@@ -422,7 +422,10 @@ dtb_check_done:
- 		cmp	r0, #HYP_MODE
- 		bne	1f
+diff --git a/arch/arm/include/asm/virt.h b/arch/arm/include/asm/virt.h
+index 6dae1956c74d..4ea16fcaf2ed 100644
+--- a/arch/arm/include/asm/virt.h
++++ b/arch/arm/include/asm/virt.h
+@@ -94,6 +94,14 @@ extern char __hyp_text_start[];
+ extern char __hyp_text_end[];
+ #endif
  
--		bl	__hyp_get_vectors
-+0:		adr	r0, 0b
-+		movw	r1, #:lower16:__hyp_stub_vectors - 0b
-+		movt	r1, #:upper16:__hyp_stub_vectors - 0b
-+		add	r0, r0, r1
- 		sub	r0, r0, r5
- 		add	r0, r0, r10
- 		bl	__hyp_set_vectors
++#else
++
++/* Only assembly code should need those */
++
++#define HVC_GET_VECTORS 0
++#define HVC_SET_VECTORS 1
++#define HVC_SOFT_RESTART 2
++
+ #endif /* __ASSEMBLY__ */
+ 
+ #endif /* ! VIRT_H */
+diff --git a/arch/arm/kernel/hyp-stub.S b/arch/arm/kernel/hyp-stub.S
+index 82915231c6f8..8301db963d83 100644
+--- a/arch/arm/kernel/hyp-stub.S
++++ b/arch/arm/kernel/hyp-stub.S
+@@ -22,10 +22,6 @@
+ #include <asm/assembler.h>
+ #include <asm/virt.h>
+ 
+-#define HVC_GET_VECTORS 0
+-#define HVC_SET_VECTORS 1
+-#define HVC_SOFT_RESTART 2
+-
+ #ifndef ZIMAGE
+ /*
+  * For the kernel proper, we need to find out the CPU boot mode long after
+diff --git a/arch/arm/kvm/hyp/hyp-entry.S b/arch/arm/kvm/hyp/hyp-entry.S
+index 96beb53934c9..1f8db7d21fc5 100644
+--- a/arch/arm/kvm/hyp/hyp-entry.S
++++ b/arch/arm/kvm/hyp/hyp-entry.S
+@@ -127,7 +127,7 @@ hyp_hvc:
+ 	pop	{r0, r1, r2}
+ 
+ 	/* Check for __hyp_get_vectors */
+-	cmp	r0, #-1
++	cmp	r0, #HVC_GET_VECTORS
+ 	mrceq	p15, 4, r0, c12, c0, 0	@ get HVBAR
+ 	beq	1f
+ 
 -- 
 2.11.0
