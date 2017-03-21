@@ -1,125 +1,68 @@
-From: tbaicar@codeaurora.org (Tyler Baicar)
-Date: Tue, 21 Mar 2017 16:47:04 -0600
-Subject: [PATCH V13 09/10] trace, ras: add ARM processor error trace event
-In-Reply-To: <1490136425-4324-1-git-send-email-tbaicar@codeaurora.org>
-References: <1490136425-4324-1-git-send-email-tbaicar@codeaurora.org>
-Message-ID: <1490136425-4324-10-git-send-email-tbaicar@codeaurora.org>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Wed, 22 Mar 2017 00:14:28 +0100
+Subject: [PATCH] ARM: dts: rockchip: fix PPI misconfiguration on Cortex-A9 socs
+Message-ID: <20170321231428.23802-1-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently there are trace events for the various RAS
-errors with the exception of ARM processor type errors.
-Add a new trace event for such errors so that the user
-will know when they occur. These trace events are
-consistent with the ARM processor error section type
-defined in UEFI 2.6 spec section N.2.4.4.
+According to [0] pointed out by Marc Zyngier in a report about a
+similar error message, PPIs 11 and 13 are edge triggered on
+Cortex-A9 socs including the rk3066 and rk3188 which currently
+mark them as level triggered.
 
-Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
-Acked-by: Steven Rostedt <rostedt@goodmis.org>
+Until some time ago the gic did not care but commit 992345a58e0c
+("irqchip/gic: WARN if setting the interrupt type for a PPI fails")
+introduced a warning for that case.
+
+Fix the warning on these socs by describing the interrupts correctly
+and also using the binding constants for easier reading in the future.
+
+[0] http://infocenter.arm.com/help/topic/com.arm.doc.ddi0407f/CCHEIGIC.html
+
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
- drivers/acpi/apei/ghes.c    |  8 +++++++-
- drivers/firmware/efi/cper.c |  1 +
- drivers/ras/ras.c           |  1 +
- include/ras/ras_event.h     | 45 +++++++++++++++++++++++++++++++++++++++++++++
- 4 files changed, 54 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/rk3188.dtsi | 4 ++--
+ arch/arm/boot/dts/rk3xxx.dtsi | 4 ++--
+ 2 files changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
-index 3ecbacc..230b095 100644
---- a/drivers/acpi/apei/ghes.c
-+++ b/drivers/acpi/apei/ghes.c
-@@ -515,7 +515,13 @@ static void ghes_do_proc(struct ghes *ghes,
- 		}
- #endif
- #ifdef CONFIG_RAS
--		else if (trace_unknown_sec_event_enabled()) {
-+		else if (!uuid_le_cmp(sec_type, CPER_SEC_PROC_ARM) &&
-+			 trace_arm_event_enabled()) {
-+			struct cper_sec_proc_arm *arm_err;
-+
-+			arm_err = acpi_hest_generic_data_payload(gdata);
-+			trace_arm_event(arm_err);
-+		} else if (trace_unknown_sec_event_enabled()) {
- 			void *unknown_err = acpi_hest_generic_data_payload(gdata);
- 			trace_unknown_sec_event(&sec_type,
- 					fru_id, fru_text, sec_sev,
-diff --git a/drivers/firmware/efi/cper.c b/drivers/firmware/efi/cper.c
-index d263bc8..37a39af 100644
---- a/drivers/firmware/efi/cper.c
-+++ b/drivers/firmware/efi/cper.c
-@@ -35,6 +35,7 @@
- #include <linux/printk.h>
- #include <linux/bcd.h>
- #include <acpi/ghes.h>
-+#include <ras/ras_event.h>
+diff --git a/arch/arm/boot/dts/rk3188.dtsi b/arch/arm/boot/dts/rk3188.dtsi
+index cf91254d0a43..fa1bdb8875ae 100644
+--- a/arch/arm/boot/dts/rk3188.dtsi
++++ b/arch/arm/boot/dts/rk3188.dtsi
+@@ -529,11 +529,11 @@
+ };
  
- #define INDENT_SP	" "
+ &global_timer {
+-	interrupts = <GIC_PPI 11 0xf04>;
++	interrupts = <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_EDGE_RISING)>;
+ };
  
-diff --git a/drivers/ras/ras.c b/drivers/ras/ras.c
-index fb2500b..8ba5a94 100644
---- a/drivers/ras/ras.c
-+++ b/drivers/ras/ras.c
-@@ -28,3 +28,4 @@ static int __init ras_init(void)
- #endif
- EXPORT_TRACEPOINT_SYMBOL_GPL(mc_event);
- EXPORT_TRACEPOINT_SYMBOL_GPL(unknown_sec_event);
-+EXPORT_TRACEPOINT_SYMBOL_GPL(arm_event);
-diff --git a/include/ras/ras_event.h b/include/ras/ras_event.h
-index 5861b6f..13befad 100644
---- a/include/ras/ras_event.h
-+++ b/include/ras/ras_event.h
-@@ -162,6 +162,51 @@
- );
+ &local_timer {
+-	interrupts = <GIC_PPI 13 0xf04>;
++	interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_EDGE_RISING)>;
+ };
  
- /*
-+ * ARM Processor Events Report
-+ *
-+ * This event is generated when hardware detects an ARM processor error
-+ * has occurred. UEFI 2.6 spec section N.2.4.4.
-+ */
-+TRACE_EVENT(arm_event,
-+
-+	TP_PROTO(const struct cper_sec_proc_arm *proc),
-+
-+	TP_ARGS(proc),
-+
-+	TP_STRUCT__entry(
-+		__field(u64, mpidr)
-+		__field(u64, midr)
-+		__field(u32, running_state)
-+		__field(u32, psci_state)
-+		__field(u8, affinity)
-+	),
-+
-+	TP_fast_assign(
-+		if (proc->validation_bits & CPER_ARM_VALID_AFFINITY_LEVEL)
-+			__entry->affinity = proc->affinity_level;
-+		else
-+			__entry->affinity = ~0;
-+		if (proc->validation_bits & CPER_ARM_VALID_MPIDR)
-+			__entry->mpidr = proc->mpidr;
-+		else
-+			__entry->mpidr = 0ULL;
-+		__entry->midr = proc->midr;
-+		if (proc->validation_bits & CPER_ARM_VALID_RUNNING_STATE) {
-+			__entry->running_state = proc->running_state;
-+			__entry->psci_state = proc->psci_state;
-+		} else {
-+			__entry->running_state = ~0;
-+			__entry->psci_state = ~0;
-+		}
-+	),
-+
-+	TP_printk("affinity level: %d; MPIDR: %016llx; MIDR: %016llx; "
-+		  "running state: %d; PSCI state: %d",
-+		  __entry->affinity, __entry->mpidr, __entry->midr,
-+		  __entry->running_state, __entry->psci_state)
-+);
-+
-+/*
-  * Unknown Section Report
-  *
-  * This event is generated when hardware detected a hardware
+ &i2c0 {
+diff --git a/arch/arm/boot/dts/rk3xxx.dtsi b/arch/arm/boot/dts/rk3xxx.dtsi
+index 4480534d1b46..39e3f8bded1c 100644
+--- a/arch/arm/boot/dts/rk3xxx.dtsi
++++ b/arch/arm/boot/dts/rk3xxx.dtsi
+@@ -132,14 +132,14 @@
+ 	global_timer: global-timer at 1013c200 {
+ 		compatible = "arm,cortex-a9-global-timer";
+ 		reg = <0x1013c200 0x20>;
+-		interrupts = <GIC_PPI 11 0x304>;
++		interrupts = <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_EDGE_RISING)>;
+ 		clocks = <&cru CORE_PERI>;
+ 	};
+ 
+ 	local_timer: local-timer at 1013c600 {
+ 		compatible = "arm,cortex-a9-twd-timer";
+ 		reg = <0x1013c600 0x20>;
+-		interrupts = <GIC_PPI 13 0x304>;
++		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_EDGE_RISING)>;
+ 		clocks = <&cru CORE_PERI>;
+ 	};
+ 
 -- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project.
+2.11.0
