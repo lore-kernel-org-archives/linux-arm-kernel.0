@@ -1,97 +1,35 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Tue, 21 Mar 2017 16:25:49 +0100
-Subject: [PATCH v2 12/13] drm/meson: Add RST to bring together kerneldoc
-In-Reply-To: <1490109950-21421-1-git-send-email-narmstrong@baylibre.com>
-References: <1490109950-21421-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1490109950-21421-13-git-send-email-narmstrong@baylibre.com>
+From: quentin.schulz@free-electrons.com (Quentin Schulz)
+Date: Tue, 21 Mar 2017 16:36:03 +0100
+Subject: [PATCH v3 03/11] ARM: dts: sun8i: sina33: add cpu-supply
+In-Reply-To: <20170321153611.16228-1-quentin.schulz@free-electrons.com>
+References: <20170321153611.16228-1-quentin.schulz@free-electrons.com>
+Message-ID: <20170321153611.16228-4-quentin.schulz@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
----
- Documentation/gpu/index.rst |  1 +
- Documentation/gpu/meson.rst | 61 +++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 62 insertions(+)
- create mode 100644 Documentation/gpu/meson.rst
+This adds the cpu-supply DT property to the cpu0 DT node needed by
+the board to adapt the regulator voltage depending on the currently used
+OPP.
 
-diff --git a/Documentation/gpu/index.rst b/Documentation/gpu/index.rst
-index e998ee0..7eceb97 100644
---- a/Documentation/gpu/index.rst
-+++ b/Documentation/gpu/index.rst
-@@ -11,6 +11,7 @@ Linux GPU Driver Developer's Guide
-    drm-kms-helpers
-    drm-uapi
-    i915
-+   meson
-    tinydrm
-    vc4
-    vga-switcheroo
-diff --git a/Documentation/gpu/meson.rst b/Documentation/gpu/meson.rst
-new file mode 100644
-index 0000000..479f6f5
---- /dev/null
-+++ b/Documentation/gpu/meson.rst
-@@ -0,0 +1,61 @@
-+=============================================
-+drm/meson AmLogic Meson Video Processing Unit
-+=============================================
+Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+---
+ arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts b/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts
+index cde14b3..d84f1bd 100644
+--- a/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts
++++ b/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts
+@@ -83,6 +83,10 @@
+ 	status = "okay";
+ };
+ 
++&cpu0 {
++	cpu-supply = <&reg_dcdc3>;
++};
 +
-+.. kernel-doc:: drivers/gpu/drm/meson/meson_drv.c
-+   :doc: Video Processing Unit
-+
-+Video Processing Unit
-+=====================
-+
-+The Amlogic Meson Display controller is composed of several components
-+that are going to be documented below:
-+
-+.. code::
-+
-+  DMC|---------------VPU (Video Processing Unit)----------------|------HHI------|
-+     | vd1   _______     _____________    _________________     |               |
-+  D  |-------|      |----|            |   |                |    |   HDMI PLL    |
-+  D  | vd2   | VIU  |    | Video Post |   | Video Encoders |<---|-----VCLK      |
-+  R  |-------|      |----| Processing |   |                |    |               |
-+     | osd2  |      |    |            |---| Enci ----------|----|-----VDAC------|
-+  R  |-------| CSC  |----| Scalers    |   | Encp ----------|----|----HDMI-TX----|
-+  A  | osd1  |      |    | Blenders   |   | Encl ----------|----|---------------|
-+  M  |-------|______|----|____________|   |________________|    |               |
-+  ___|__________________________________________________________|_______________|
-+
-+Video Input Unit
-+================
-+
-+.. kernel-doc:: drivers/gpu/drm/meson/meson_viu.c
-+   :doc: Video Input Unit
-+
-+Video Post Processing
-+=====================
-+
-+.. kernel-doc:: drivers/gpu/drm/meson/meson_vpp.c
-+   :doc: Video Post Processing
-+
-+Video Encoder
-+=============
-+
-+.. kernel-doc:: drivers/gpu/drm/meson/meson_venc.c
-+   :doc: Video Encoder
-+
-+Video Canvas Management
-+=======================
-+
-+.. kernel-doc:: drivers/gpu/drm/meson/meson_canvas.c
-+   :doc: Canvas
-+
-+Video Clocks
-+============
-+
-+.. kernel-doc:: drivers/gpu/drm/meson/meson_vclk.c
-+   :doc: Video Clocks
-+
-+HDMI Video Output
-+=================
-+
-+.. kernel-doc:: drivers/gpu/drm/meson/meson_dw_hdmi.c
-+   :doc: HDMI Output
+ &de {
+ 	status = "okay";
+ };
 -- 
-1.9.1
+2.9.3
