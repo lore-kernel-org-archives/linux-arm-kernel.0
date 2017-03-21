@@ -1,50 +1,67 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 21 Mar 2017 19:20:45 +0000
-Subject: [PATCH v4 15/28] ARM: Expose the VA/IDMAP offset
+Date: Tue, 21 Mar 2017 19:20:37 +0000
+Subject: [PATCH v4 07/28] arm64: KVM: Allow the main HYP code to use the init
+ hyp stub implementation
 In-Reply-To: <20170321192058.9300-1-marc.zyngier@arm.com>
 References: <20170321192058.9300-1-marc.zyngier@arm.com>
-Message-ID: <20170321192058.9300-16-marc.zyngier@arm.com>
+Message-ID: <20170321192058.9300-8-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The KVM code needs to be able to compute the address of
-symbols in its idmap page (the equivalent of a virt_to_idmap()
-call). Unfortunately, virt_to_idmap is slightly complicated,
-depending on the use of arch_phys_to_idmap_offset or not, and
-none of that is readily available at HYP.
+We now have a full hyp-stub implementation in the KVM init code,
+but the main KVM code only supports HVC_GET_VECTORS, which is not
+enough.
 
-Instead, expose a single kimage_voffset variable which contains the
-offset between a kernel VA and its idmap address, enabling the
-VA->IDMAP conversion. This allows the KVM code to behave similarily
-to its arm64 counterpart.
+Instead of reinventing the wheel, let's reuse the init implementation
+by branching to the idmap page when called with a hyp-stub hypercall.
 
-Tested-by: Keerthy <j-keerthy@ti.com>
-Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
+Reviewed-by: James Morse <james.morse@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/mm/mmu.c | 5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm64/kvm/hyp/hyp-entry.S | 24 +++++++++++++++++++-----
+ 1 file changed, 19 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index 4e016d7f37b3..e98a2b5c4e85 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -87,6 +87,8 @@ struct cachepolicy {
- #define s2_policy(policy)	0
- #endif
+diff --git a/arch/arm64/kvm/hyp/hyp-entry.S b/arch/arm64/kvm/hyp/hyp-entry.S
+index d8ef788646c6..4f34c5996f86 100644
+--- a/arch/arm64/kvm/hyp/hyp-entry.S
++++ b/arch/arm64/kvm/hyp/hyp-entry.S
+@@ -87,10 +87,24 @@ alternative_endif
+ 	/* Here, we're pretty sure the host called HVC. */
+ 	ldp	x0, x1, [sp], #16
  
-+unsigned long kimage_voffset __ro_after_init;
+-	cmp	x0, #HVC_GET_VECTORS
+-	b.ne	1f
+-	mrs	x0, vbar_el2
+-	b	2f
++	/* Check for a stub HVC call */
++	cmp	x0, #HVC_STUB_HCALL_NR
++	b.hs	1f
 +
- static struct cachepolicy cache_policies[] __initdata = {
- 	{
- 		.policy		= "uncached",
-@@ -1635,4 +1637,7 @@ void __init paging_init(const struct machine_desc *mdesc)
++	/*
++	 * Compute the idmap address of __kvm_handle_stub_hvc and
++	 * jump there. Since we use kimage_voffset, do not use the
++	 * HYP VA for __kvm_handle_stub_hvc, but the kernel VA instead
++	 * (by loading it from the constant pool).
++	 *
++	 * Preserve x0-x4, which may contain stub parameters.
++	 */
++	ldr	x5, =__kvm_handle_stub_hvc
++	ldr_l	x6, kimage_voffset
++
++	/* x5 = __pa(x5) */
++	sub	x5, x5, x6
++	br	x5
  
- 	empty_zero_page = virt_to_page(zero_page);
- 	__flush_dcache_page(NULL, empty_zero_page);
-+
-+	/* Compute the virt/idmap offset, mostly for the sake of KVM */
-+	kimage_voffset = (unsigned long)&kimage_voffset - virt_to_idmap(&kimage_voffset);
- }
+ 1:
+ 	/*
+@@ -99,7 +113,7 @@ alternative_endif
+ 	kern_hyp_va	x0
+ 	do_el2_call
+ 
+-2:	eret
++	eret
+ 
+ el1_trap:
+ 	/*
 -- 
 2.11.0
