@@ -1,85 +1,47 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 21 Mar 2017 18:46:17 +0000
-Subject: Applied "spi: pl022: remove nonexistent properties from DT binding
- example" to the spi tree
-In-Reply-To: <20170320095721.6724-1-borneo.antonio@gmail.com>
-Message-ID: <E1cqOnR-0001Kb-2t@debutante>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 21 Mar 2017 18:53:10 +0000
+Subject: [PATCH 12/14] arm64: kill acpi_set_mailbox_entry()
+In-Reply-To: <20170321183755.GA2976@red-moon>
+References: <1489143891-11596-1-git-send-email-mark.rutland@arm.com>
+ <1489143891-11596-13-git-send-email-mark.rutland@arm.com>
+ <20170321180040.GA4849@red-moon>
+ <20170321181554.GF29116@leverpostej>
+ <20170321183755.GA2976@red-moon>
+Message-ID: <20170321185310.GG29116@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+On Tue, Mar 21, 2017 at 06:37:55PM +0000, Lorenzo Pieralisi wrote:
+> On Tue, Mar 21, 2017 at 06:15:54PM +0000, Mark Rutland wrote:
+> > On Tue, Mar 21, 2017 at 06:00:40PM +0000, Lorenzo Pieralisi wrote:
+> > > On Fri, Mar 10, 2017 at 11:04:49AM +0000, Mark Rutland wrote:
+> > 
+> > > > +static struct parking_protocol_mailbox __iomem *mailboxes[NR_CPUS];
+> > > 
+> > > Nit: If I am not mistaken it can be made a percpu pointer.
+> > 
+> > Unfortunately, we don't set up the percpu areas until we know how many
+> > CPUs are possible (i.e. after we've parsed the MADT).
+> > 
+> > The flow looks like:
+> > 
+> > start_kernel()
+> >   setup_arch()
+> >     smp_init_cpus()
+> >       acpi_table_parse_madt()
+> >         acpi_parse_gic_cpu_interface()
+> >           acpi_map_gic_cpu_interface() // setup cpu mailbox here
+> 
+> The mailbox data yes, not the pointer at which it is mapped (which
+> is what gets stashed in mailboxes[]).
 
-   spi: pl022: remove nonexistent properties from DT binding example
+Sorry, I got myself confused here between this and the MADT GICC
+stashing to which the above does apply.
 
-has been applied to the spi tree at
+You are correct that this can and should be a percpu pointer.
 
-   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git 
-
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
-
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
-
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
-
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
+I'll fix this up. I just need to figure out where the __iomem attribute
+is supposed to live on a percpu definition.
 
 Thanks,
-Mark
-
->From e6a72e057fa3e0ad38ec59c4779647a7bd390a37 Mon Sep 17 00:00:00 2001
-From: Antonio Borneo <borneo.antonio@gmail.com>
-Date: Mon, 20 Mar 2017 10:57:18 +0100
-Subject: [PATCH] spi: pl022: remove nonexistent properties from DT binding
- example
-
-The properties "pl022,hierarchy" and "pl022,slave-tx-disable" were
-initially proposed till patch V4 [1] but then discarded in V5 [2]
-when the patch set was taken over by another developer, as
-explained in patch history in [3].
-The above properties never landed in mainline code but were then
-listed in the binding example by a following commit dc715452e914
-("spi: pl022: use generic DMA slave configuration if possible")
-and later on they were copy-paste in some board's DT.
-
-Remove the nonexistent properties from the example.
-Also remove a spaces-only line at the end of the file.
-
-[1] https://lkml.org/lkml/2012/7/9/421
-[2] https://lkml.org/lkml/2012/8/21/427
-[3] https://lkml.org/lkml/2012/8/21/436
-
-Signed-off-by: Antonio Borneo <borneo.antonio@gmail.com>
-Signed-off-by: Mark Brown <broonie@kernel.org>
----
- Documentation/devicetree/bindings/spi/spi_pl022.txt | 3 ---
- 1 file changed, 3 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/spi/spi_pl022.txt b/Documentation/devicetree/bindings/spi/spi_pl022.txt
-index 4d1673ca8cf8..2692a5726c3f 100644
---- a/Documentation/devicetree/bindings/spi/spi_pl022.txt
-+++ b/Documentation/devicetree/bindings/spi/spi_pl022.txt
-@@ -56,9 +56,7 @@ Example:
- 			spi-max-frequency = <12000000>;
- 			spi-cpol;
- 			spi-cpha;
--			pl022,hierarchy = <0>;
- 			pl022,interface = <0>;
--			pl022,slave-tx-disable;
- 			pl022,com-mode = <0x2>;
- 			pl022,rx-level-trig = <0>;
- 			pl022,tx-level-trig = <0>;
-@@ -67,4 +65,3 @@ Example:
- 			pl022,duplex = <0>;
- 		};
- 	};
--	
--- 
-2.11.0
+Mark.
