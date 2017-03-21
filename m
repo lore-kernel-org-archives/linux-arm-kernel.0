@@ -1,83 +1,47 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 21 Mar 2017 18:45:57 +0000
-Subject: Applied "ASoC: sun8i-codec: Remove analog "HP" widget" to the asoc
- tree
-In-Reply-To: <20170210094133.11382-2-mylene.josserand@free-electrons.com>
-Message-ID: <E1cqOn7-0001Bk-6c@debutante>
+From: james.morse@arm.com (James Morse)
+Date: Tue, 21 Mar 2017 19:11:44 +0000
+Subject: [PATCH] kvm: pass the virtual SEI syndrome to guest OS
+In-Reply-To: <20170321113428.GC15920@cbox>
+References: <1489996534-8270-1-git-send-email-gengdongjiu@huawei.com>
+ <7055772d-2a20-6e0c-2bf8-204bc9ef52a5@arm.com>
+ <b912c293-4314-7c90-30a4-2f986feb1670@huawei.com>
+ <22fb583f-a33e-15f8-a059-fb112b27dd4f@arm.com> <58CFF058.8020205@arm.com>
+ <76795e20-2f20-1e54-cfa5-7444f28b18ee@huawei.com>
+ <20170321113428.GC15920@cbox>
+Message-ID: <58D17AF0.2010802@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+Hi Christoffer,
 
-   ASoC: sun8i-codec: Remove analog "HP" widget
+On 21/03/17 11:34, Christoffer Dall wrote:
+> On Tue, Mar 21, 2017 at 02:32:29PM +0800, gengdongjiu wrote:
+>> On 2017/3/20 23:08, James Morse wrote:
+>>>>>> On 20/03/17 07:55, Dongjiu Geng wrote:
+>>>>>>> In the RAS implementation, hardware pass the virtual SEI
+>>>>>>> syndrome information through the VSESR_EL2, so set the virtual
+>>>>>>> SEI syndrome using physical SEI syndrome el2_elr to pass to
+>>>>>>> the guest OS
+>>>
+>>> How does this work with firmware first?
+>>
+>> I explained it in previous mail about the work flow.
+> 
+> When delivering and reporting SEIs to the VM, should this happen
+> directly to the OS running in the VM, or to the guest firmware (e.g.
+> UEFI) running in the VM as well?
 
-has been applied to the asoc tree at
+'firmware first' is the ACPI specs name for x86's BIOS or management-mode
+handling the error. On arm64 we have multiple things called firmware, so the
+name might be more confusing than helpful.
 
-   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
+As far as I understand it, firmware here refers to the secure-world and EL3.
+Something like ATF can use SCR_EL3.EA to claim SErrors and external aborts,
+routing them to EL3 where secure platform specific firmware generates CPER records.
+For a guest, Qemu takes the role of this EL3-firmware.
 
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
 
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
-
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
-
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
 
 Thanks,
-Mark
 
->From a82f16188a32a3c889916c582ea2d9188e3c2734 Mon Sep 17 00:00:00 2001
-From: =?UTF-8?q?Myl=C3=A8ne=20Josserand?=
- <mylene.josserand@free-electrons.com>
-Date: Sat, 18 Mar 2017 08:55:05 +0100
-Subject: [PATCH] ASoC: sun8i-codec: Remove analog "HP" widget
-MIME-Version: 1.0
-Content-Type: text/plain; charset=UTF-8
-Content-Transfer-Encoding: 8bit
-
-The "HP" widget is already present and take part to
-the analog part (sun8i-codec-analog).
-
-Remove it from the digital part as it is unnecessary.
-
-Signed-off-by: Myl??ne Josserand <mylene.josserand@free-electrons.com>
-Acked-by: Chen-Yu Tsai <wens@csie.org>
-Signed-off-by: Mark Brown <broonie@kernel.org>
----
- sound/soc/sunxi/sun8i-codec.c | 6 ------
- 1 file changed, 6 deletions(-)
-
-diff --git a/sound/soc/sunxi/sun8i-codec.c b/sound/soc/sunxi/sun8i-codec.c
-index b92bdc8361af..d60f6fbd36a2 100644
---- a/sound/soc/sunxi/sun8i-codec.c
-+++ b/sound/soc/sunxi/sun8i-codec.c
-@@ -321,8 +321,6 @@ static const struct snd_soc_dapm_widget sun8i_codec_dapm_widgets[] = {
- 			    SUN8I_MOD_RST_CTL_AIF1, 0, NULL, 0),
- 	SND_SOC_DAPM_SUPPLY("RST DAC", SUN8I_MOD_RST_CTL,
- 			    SUN8I_MOD_RST_CTL_DAC, 0, NULL, 0),
--
--	SND_SOC_DAPM_OUTPUT("HP"),
- };
- 
- static const struct snd_soc_dapm_route sun8i_codec_dapm_routes[] = {
-@@ -344,10 +342,6 @@ static const struct snd_soc_dapm_route sun8i_codec_dapm_routes[] = {
- 	/* DAC Mixer Routes */
- 	{ "Left DAC Mixer", "LSlot 0", "Digital Left DAC"},
- 	{ "Right DAC Mixer", "RSlot 0", "Digital Right DAC"},
--
--	/* End of route : HP out */
--	{ "HP", NULL, "Left DAC Mixer" },
--	{ "HP", NULL, "Right DAC Mixer" },
- };
- 
- static struct snd_soc_dai_ops sun8i_codec_dai_ops = {
--- 
-2.11.0
+James
