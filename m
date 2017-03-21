@@ -1,16 +1,14 @@
-From: james.morse@arm.com (James Morse)
-Date: Tue, 21 Mar 2017 17:25:34 +0000
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 21 Mar 2017 17:26:06 +0000
 Subject: [PATCH v3 01/25] arm64: hyp-stub: Implement HVC_RESET_VECTORS
  stub hypercall
 In-Reply-To: <20170321170407.GD21829@e104818-lin.cambridge.arm.com>
 References: <20170306142458.8875-1-marc.zyngier@arm.com>
  <20170306142458.8875-2-marc.zyngier@arm.com>
  <20170321170407.GD21829@e104818-lin.cambridge.arm.com>
-Message-ID: <58D1620E.30001@arm.com>
+Message-ID: <11a10d32-700f-d969-556a-4d1748c2e92f@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-Hi Catalin,
 
 On 21/03/17 17:04, Catalin Marinas wrote:
 > On Mon, Mar 06, 2017 at 02:24:34PM +0000, Marc Zyngier wrote:
@@ -38,11 +36,14 @@ On 21/03/17 17:04, Catalin Marinas wrote:
 > corrupted by the EL2 code (if yes, are other caller-saved registers that
 > need preserving)? I don't see something similar in the arch/arm code.
 
-Kexec on arm64 needed a register to clobber in the hyp-stub's el1_sync code. We
-wanted to preserve all the registers so soft_restart() could look more like a
-function call.
+Yeah, that's another oddity. The KVM code uses it as a temp register,
+but that feels quite wrong, now that you mention it. If should be saved
+there, and definitely not in the stubs.
 
+Let me grab a hammer, and I'll set that one straight.
 
 Thanks,
 
-James
+	M.
+-- 
+Jazz is not dead. It just smells funny...
