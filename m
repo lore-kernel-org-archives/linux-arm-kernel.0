@@ -1,29 +1,32 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 21 Mar 2017 16:53:50 +0000
-Subject: [PATCH 05/20] ARM: implement pci_remap_cfgspace() interface
-In-Reply-To: <20170321152636.GA4799@red-moon>
-References: <20170227151436.18698-1-lorenzo.pieralisi@arm.com>
- <20170227151436.18698-6-lorenzo.pieralisi@arm.com>
- <20170320164354.GQ21222@n2100.armlinux.org.uk>
- <20170321152636.GA4799@red-moon>
-Message-ID: <20170321165349.GB21222@n2100.armlinux.org.uk>
+From: tj@kernel.org (Tejun Heo)
+Date: Tue, 21 Mar 2017 12:56:50 -0400
+Subject: [PATCH v2 0/3] ATA/ARM: convert ARM/DaVinci to use libata PATA
+ drivers
+In-Reply-To: <3c115ec1-2d11-695e-eca7-25a75f71b96f@ti.com>
+References: <CGME20170314163738epcas5p3db719229d59550476c918a15d8c16d63@epcas5p3.samsung.com>
+ <1489509414-11491-1-git-send-email-b.zolnierkie@samsung.com>
+ <20170316213255.GF1480@htj.duckdns.org>
+ <3c115ec1-2d11-695e-eca7-25a75f71b96f@ti.com>
+Message-ID: <20170321165650.GA3706@htj.duckdns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 21, 2017 at 03:26:36PM +0000, Lorenzo Pieralisi wrote:
-> I assumed that in plain terms, the difference between MT_DEVICE and
-> MT_UNCACHED is write posting (aka bufferable) behaviour (across CPU
-> architecture versions) and that does not affect write ordering rules.
+Hello,
 
-Having looked it up in the ARM ARM, I think we're fine.  Device and
-strongly ordered accesses are both ordered as one group, so can be
-thought of as the same.  The only difference is that Device can
-complete from the CPU's perspective before it hits the peripheral,
-whereas strongly ordered only completes once it's hit the peripheral.
+On Tue, Mar 21, 2017 at 02:08:26PM +0530, Sekhar Nori wrote:
+> > Looks fine to me from libata side.  Once it gets tested, how should
+> > the patches be routed?  I don't think it'd make sense to route them
+> > separately.
+> 
+> Hi Tejun, I can take the series through ARM-SoC tree with your ack.
 
-So this looks like exactly the right thing to do here.
+Once the review points are addressed, please feel free to add
+
+ Acked-by: Tejun Heo <tj@kernel.org>
+
+and route through the arm tree.
+
+Thanks.
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+tejun
