@@ -1,93 +1,168 @@
 From: eric.auger@redhat.com (Auger Eric)
-Date: Tue, 21 Mar 2017 18:42:05 +0100
-Subject: [PATCH v3 10/19] KVM: arm64: ITS: Check the device id matches
- TYPER DEVBITS range
-In-Reply-To: <1ce84330-42bb-4e8d-5446-d481ac4419f2@arm.com>
+Date: Tue, 21 Mar 2017 18:42:43 +0100
+Subject: [PATCH v3 12/19] KVM: arm64: ITS: vgic_its_alloc_ite/device
+In-Reply-To: <f913a9be-d994-9c18-3a30-e60e1778480a@arm.com>
 References: <1488800074-21991-1-git-send-email-eric.auger@redhat.com>
- <1488800074-21991-11-git-send-email-eric.auger@redhat.com>
- <1ce84330-42bb-4e8d-5446-d481ac4419f2@arm.com>
-Message-ID: <42523ba8-ab6d-172c-1ab7-cc52986780ac@redhat.com>
+ <1488800074-21991-13-git-send-email-eric.auger@redhat.com>
+ <f913a9be-d994-9c18-3a30-e60e1778480a@arm.com>
+Message-ID: <4b9ac0cb-2950-7515-e603-f70483edc0ee@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi
 
-On 17/03/2017 16:41, Andre Przywara wrote:
+On 17/03/2017 18:01, Andre Przywara wrote:
 > Hi,
 > 
 > On 06/03/17 11:34, Eric Auger wrote:
->> On MAPD we currently check the device id can be stored in the device table.
->> Let's first check it can be encoded within the range defined by TYPER
->> DEVBITS.
+>> Add two new helpers to allocate an its ite and an its device.
+>> This will avoid duplication on restore path.
 >>
 >> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+>>
 >> ---
->>  virt/kvm/arm/vgic/vgic-its.c | 8 ++++++--
->>  1 file changed, 6 insertions(+), 2 deletions(-)
+>>
+>> v1 -> v2:
+>> - report itt_size fix and remove ITE_SIZE
+>> - s/itte/ite/g
+>> ---
+>>  virt/kvm/arm/vgic/vgic-its.c | 70 +++++++++++++++++++++++++++++---------------
+>>  1 file changed, 47 insertions(+), 23 deletions(-)
 >>
 >> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
->> index 694023f..322e370 100644
+>> index dd7545a..9792110 100644
 >> --- a/virt/kvm/arm/vgic/vgic-its.c
 >> +++ b/virt/kvm/arm/vgic/vgic-its.c
->> @@ -180,6 +180,7 @@ static struct its_ite *find_ite(struct vgic_its *its, u32 device_id,
+>> @@ -734,6 +734,26 @@ static void vgic_its_free_collection(struct vgic_its *its, u32 coll_id)
+>>  	kfree(collection);
+>>  }
 >>  
->>  #define VITS_ESZ 8
->>  #define VITS_TYPER_IDBITS 0xF
->> +#define VITS_TYPER_DEVBITS 0xF
 > 
-> Same comment as for the other, please use 16 here.
-done
+> Can you please propagate the:
+> "Must be called with its_lock mutex held." comment here?
+sure
 > 
+>> +static int vgic_its_alloc_ite(struct its_device *device,
+>> +			       struct its_ite **itep,
+>> +			       struct its_collection *collection,
+>> +			       u32 lpi_id, u32 event_id)
+>> +{
+>> +	struct its_ite *ite;
+>> +
+>> +	ite = kzalloc(sizeof(ite), GFP_KERNEL);
+> 
+> That should be sizeof(*ite) or sizeof(struct its_ite).
+definitively! thanks. I don't get how this didn't crash.
+> 
+>> +	if (!ite)
+>> +		return -ENOMEM;
+>> +
+>> +	ite->event_id	= event_id;
+>> +	ite->collection = collection;
+>> +	ite->lpi = lpi_id;
+>> +
+>> +	list_add_tail(&ite->ite_list, &device->itt_head);
+>> +	*itep = ite;
+>> +	return 0;
+>> +}
+>> +
 >>  /*
->>   * Finds and returns a collection in the ITS collection table.
->> @@ -402,7 +403,7 @@ static unsigned long vgic_mmio_read_its_typer(struct kvm *kvm,
->>  	 * To avoid memory waste in the guest, we keep the number of IDBits and
->>  	 * DevBits low - as least for the time being.
->>  	 */
->> -	reg |= 0x0f << GITS_TYPER_DEVBITS_SHIFT;
->> +	reg |= VITS_TYPER_DEVBITS << GITS_TYPER_DEVBITS_SHIFT;
->>  	reg |= VITS_TYPER_IDBITS << GITS_TYPER_IDBITS_SHIFT;
->>  	reg |= (VITS_ESZ - 1) << GITS_TYPER_ITT_ENTRY_SIZE_SHIFT;
+>>   * The MAPTI and MAPI commands map LPIs to ITTEs.
+>>   * Must be called with its_lock mutex held.
+>> @@ -747,7 +767,7 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
+>>  	struct its_ite *ite;
+>>  	struct its_device *device;
+>>  	struct its_collection *collection, *new_coll = NULL;
+>> -	int lpi_nr;
+>> +	int lpi_nr, ret;
+>>  	struct vgic_irq *irq;
 >>  
->> @@ -631,7 +632,7 @@ static int vgic_its_cmd_handle_movi(struct kvm *kvm, struct vgic_its *its,
->>   * Check whether an ID can be stored into the corresponding guest table.
->>   * For a direct table this is pretty easy, but gets a bit nasty for
->>   * indirect tables. We check whether the resulting guest physical address
->> - * is actually valid (covered by a memslot and guest accessbible).
->> + * is actually valid (covered by a memslot and guest accessible).
-> 
-> Good lord, nice catch ;-)
-> 
->>   * For this we have to read the respective first level entry.
->>   */
->>  static bool vgic_its_check_id(struct vgic_its *its, u64 baser, int id)
-> 
-> Just seeing that "int" might not be sufficient here, since a device ID
-> can go up to (2^32 - 1). I wonder if you can fix it on the way.
-> 
->> @@ -642,6 +643,9 @@ static bool vgic_its_check_id(struct vgic_its *its, u64 baser, int id)
->>  	gfn_t gfn;
->>  	int esz = GITS_BASER_ENTRY_SIZE(baser);
+>>  	device = find_its_device(its, device_id);
+>> @@ -777,19 +797,13 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
+>>  		new_coll = collection;
+>>  	}
 >>  
->> +	if (id >= (2 << (VITS_TYPER_DEVBITS + 1)))
+>> -	ite = kzalloc(sizeof(struct its_ite), GFP_KERNEL);
+>> -	if (!ite) {
+>> +	ret = vgic_its_alloc_ite(device, &ite, collection, lpi_nr, event_id);
+>> +	if (ret) {
+>>  		if (new_coll)
+>>  			vgic_its_free_collection(its, coll_id);
+>> -		return -ENOMEM;
+>> +		return ret;
+>>  	}
+>>  
+>> -	ite->event_id	= event_id;
+>> -	list_add_tail(&ite->ite_list, &device->itt_head);
+>> -
+>> -	ite->collection = collection;
+>> -	ite->lpi = lpi_nr;
+>> -
+>>  	irq = vgic_add_lpi(kvm, lpi_nr);
+>>  	if (IS_ERR(irq)) {
+>>  		if (new_coll)
+>> @@ -828,6 +842,28 @@ static void vgic_its_unmap_device(struct kvm *kvm, struct its_device *device)
+>>  	kfree(device);
+>>  }
+>>  
+>> +static int vgic_its_alloc_device(struct vgic_its *its,
+>> +				 struct its_device **devp,
+>> +				 u32 device_id, gpa_t itt_addr_field,
+>> +				 size_t size_field)
+>> +{
+>> +	struct its_device *device;
+>> +
+>> +	device = kzalloc(sizeof(*device), GFP_KERNEL);
+>> +	if (!device)
+>> +		return -ENOMEM;
+>> +
+>> +	device->device_id = device_id;
+>> +	device->itt_addr = itt_addr_field << 8;
+>> +	device->nb_eventid_bits = size_field + 1;
 > 
-> But shouldn't this be "1 << " if you add one already?
-Yes that's definitively wrong!
-> So if you use 16 as mentioned above, wouldn't BIT(VITS_TYPER_DEVBITS) be
-> more readable? Or even better use BIT_ULL to cover the worst case of 32
-> bits of device ID here as well.
-I adopted BIT_ULL()
+> I'd rather see these command buffer entry decodings done at the source,
+> not here (though this isn't in this patch).
+yes that's corrected now
 
 Thanks
 
 Eric
 > 
-> Cheers,
-> Andre.
+> The rest looks fine.
 > 
->> +		return false;
+> Cheers,
+> Andre
+> 
+>> +	INIT_LIST_HEAD(&device->itt_head);
 >> +
->>  	if (!(baser & GITS_BASER_INDIRECT)) {
->>  		phys_addr_t addr;
+>> +	list_add_tail(&device->dev_list, &its->device_list);
+>> +	*devp = device;
+>> +
+>> +	return 0;
+>> +}
+>> +
+>>  /*
+>>   * MAPD maps or unmaps a device ID to Interrupt Translation Tables (ITTs).
+>>   * Must be called with the its_lock mutex held.
+>> @@ -864,19 +900,7 @@ static int vgic_its_cmd_handle_mapd(struct kvm *kvm, struct vgic_its *its,
+>>  	if (!valid)
+>>  		return 0;
 >>  
+>> -	device = kzalloc(sizeof(struct its_device), GFP_KERNEL);
+>> -	if (!device)
+>> -		return -ENOMEM;
+>> -
+>> -	device->device_id = device_id;
+>> -	device->itt_addr = itt_addr << 8;
+>> -	device->nb_eventid_bits = size + 1;
+>> -
+>> -	INIT_LIST_HEAD(&device->itt_head);
+>> -
+>> -	list_add_tail(&device->dev_list, &its->device_list);
+>> -
+>> -	return 0;
+>> +	return vgic_its_alloc_device(its, &device, device_id, itt_addr, size);
+>>  }
+>>  
+>>  /*
 >>
