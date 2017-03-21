@@ -1,58 +1,100 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Tue, 21 Mar 2017 08:47:44 -0500
-Subject: [PATCH] PCI: ACPI: Fix ThunderX PEM initialization
-In-Reply-To: <c3392131-9243-24d3-30b4-4d7e84019d6f@jonmasters.org>
-References: <20170131142525.GA9942@bhelgaas-glaptop.roam.corp.google.com>
- <20170131145720.GA14231@localhost.localdomain>
- <20170131203109.GA14127@bhelgaas-glaptop.roam.corp.google.com>
- <20170201125325.GA15805@localhost.localdomain>
- <20170201151807.GA15793@bhelgaas-glaptop.roam.corp.google.com>
- <376ae1df-da85-e576-75d6-3ae2ab0f1b41@jonmasters.org>
- <20170315113323.GA28027@localhost.localdomain>
- <251db823-591b-483b-9c55-13c911020fd1@jonmasters.org>
- <48b93116-cc0f-e59d-8aa3-704052ad6759@gmail.com>
- <c3392131-9243-24d3-30b4-4d7e84019d6f@jonmasters.org>
-Message-ID: <20170321134744.GA13150@bhelgaas-glaptop.roam.corp.google.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Tue, 21 Mar 2017 14:49:30 +0100
+Subject: [PATCH v7 2/4] PCI: imx6: Allow probe deferal by reset GPIO
+In-Reply-To: <20170321134203.26325-3-andrew.smirnov@gmail.com>
+References: <20170321134203.26325-1-andrew.smirnov@gmail.com>
+ <20170321134203.26325-3-andrew.smirnov@gmail.com>
+Message-ID: <1490104170.2895.21.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 21, 2017 at 07:38:07AM -0400, Jon Masters wrote:
-> On 03/16/2017 12:25 PM, David Daney wrote:
-> > On 03/16/2017 07:32 AM, Jon Masters wrote:
+Am Dienstag, den 21.03.2017, 06:42 -0700 schrieb Andrey Smirnov:
+> Some designs implement reset GPIO via a GPIO expander connected to a
+> peripheral bus. One such example would be i.MX7 Sabre board where said
+> GPIO is provided by SPI shift register connected to a bitbanged SPI
+> bus. In order to support such designs allow reset GPIO request to defer
+> probing of the driver.
 > 
-> >>> Yes, it is now contains "CAVxxx" as _HID for device config object.
-> >>
-> >> Which is different from the version that was merged into upstream. That
-> >> should never have happened. It will never happen again. I have spent some
-> >> time over the past few days ensuring folks understand that I will not
-> >> allow a repeat of this to occur the next time around. We will have
-> >> platforms that are bulletproof and supported by upstream with any
-> >> errata fixes in a very carefully controlled manner. There will
-> >> under no circumstances ever be a situation like this again.
-> > 
-> > We are still evaluating the merits of registering the values that appeared
-> > in v4.10, and not changing them.  We should know more in a couple of days.
+> Cc: yurovsky at gmail.com
+> Cc: Lucas Stach <l.stach@pengutronix.de>
+> Cc: Bjorn Helgaas <bhelgaas@google.com>
+> Cc: Fabio Estevam <fabio.estevam@nxp.com>
+> Cc: Dong Aisheng <dongas86@gmail.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
+
+Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
+
+> ---
+>  drivers/pci/dwc/pci-imx6.c | 25 +++++++++++++++++--------
+>  1 file changed, 17 insertions(+), 8 deletions(-)
 > 
-> Thanks David. What was the verdict? (for the public record). If we need to
-> get a change into upstream, let's get that teed up before 4.12 merge.
-> 
-> And for other folks following along with this thread: I'm not just picking
-> on Cavium here. I'll be doing the same with *every* ARM server SoC company
-> as necessary over the coming months. We are going to have militantly
-> compliant standards adherence in this industry and every ARM server SoC is
-> going to "just work" with an upstream Linux kernel with an ACPI enabled 
-> platform. This will be so utterly clean and boring it'll be amazing.
-
-Thanks for keeping on top of this, Jon.  I agree, we should not be
-using unregistered vendor prefixes, e.g., the "THRX" added by
-44f22bd91e88 ("PCI: Add MCFG quirks for Cavium ThunderX pass2.x host
-controller").  I'm sorry I merged that without doing the due
-diligence.
-
-I suspect the resolution will be to register "THRX".  If that doesn't
-happen, I'll propose reverting 44f22bd91e88, not because I want to
-break things, but only because I'm not personally in a position to do
-anything smarter.  So please propose a better solution that fits
-within the ACPI _HID/_CID model :)
-
-Bjorn
+> diff --git a/drivers/pci/dwc/pci-imx6.c b/drivers/pci/dwc/pci-imx6.c
+> index e0c36d6..64de9bb 100644
+> --- a/drivers/pci/dwc/pci-imx6.c
+> +++ b/drivers/pci/dwc/pci-imx6.c
+> @@ -595,8 +595,8 @@ static struct dw_pcie_host_ops imx6_pcie_host_ops = {
+>  	.host_init = imx6_pcie_host_init,
+>  };
+>  
+> -static int __init imx6_add_pcie_port(struct imx6_pcie *imx6_pcie,
+> -				     struct platform_device *pdev)
+> +static int imx6_add_pcie_port(struct imx6_pcie *imx6_pcie,
+> +			      struct platform_device *pdev)
+>  {
+>  	struct dw_pcie *pci = imx6_pcie->pci;
+>  	struct pcie_port *pp = &pci->pp;
+> @@ -636,7 +636,7 @@ static const struct dw_pcie_ops dw_pcie_ops = {
+>  	.link_up = imx6_pcie_link_up,
+>  };
+>  
+> -static int __init imx6_pcie_probe(struct platform_device *pdev)
+> +static int imx6_pcie_probe(struct platform_device *pdev)
+>  {
+>  	struct device *dev = &pdev->dev;
+>  	struct dw_pcie *pci;
+> @@ -660,10 +660,6 @@ static int __init imx6_pcie_probe(struct platform_device *pdev)
+>  	imx6_pcie->variant =
+>  		(enum imx6_pcie_variants)of_device_get_match_data(dev);
+>  
+> -	/* Added for PCI abort handling */
+> -	hook_fault_code(16 + 6, imx6q_pcie_abort_handler, SIGBUS, 0,
+> -		"imprecise external abort");
+> -
+>  	dbi_base = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>  	pci->dbi_base = devm_ioremap_resource(dev, dbi_base);
+>  	if (IS_ERR(pci->dbi_base))
+> @@ -683,6 +679,8 @@ static int __init imx6_pcie_probe(struct platform_device *pdev)
+>  			dev_err(dev, "unable to get reset gpio\n");
+>  			return ret;
+>  		}
+> +	} else if (imx6_pcie->reset_gpio == -EPROBE_DEFER) {
+> +		return imx6_pcie->reset_gpio;
+>  	}
+>  
+>  	/* Fetch clocks */
+> @@ -796,11 +794,22 @@ static struct platform_driver imx6_pcie_driver = {
+>  		.name	= "imx6q-pcie",
+>  		.of_match_table = imx6_pcie_of_match,
+>  	},
+> +	.probe    = imx6_pcie_probe,
+>  	.shutdown = imx6_pcie_shutdown,
+>  };
+>  
+>  static int __init imx6_pcie_init(void)
+>  {
+> -	return platform_driver_probe(&imx6_pcie_driver, imx6_pcie_probe);
+> +	/*
+> +	 * Since probe() can be deferred we need to make sure that
+> +	 * hook_fault_code is not called after __init memory is freed
+> +	 * by kernel and since imx6q_pcie_abort_handler() is a no-op
+> +	 * we can install the handler here without risking it
+> +	 * accessing some unitialized driver state
+> +	 */
+> +	hook_fault_code(16 + 6, imx6q_pcie_abort_handler, SIGBUS, 0,
+> +			"imprecise external abort");
+> +
+> +	return platform_driver_register(&imx6_pcie_driver);
+>  }
+>  device_initcall(imx6_pcie_init);
