@@ -1,46 +1,38 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Tue, 21 Mar 2017 12:05:25 +0100
-Subject: [PATCH 0/5] Clarify GICC_PMR export format and remove struct vmcr
-Message-ID: <20170321110530.15857-1-cdall@linaro.org>
+Date: Tue, 21 Mar 2017 12:05:26 +0100
+Subject: [PATCH 1/5] KVM: arm/arm64: Clarify GICC_PMR export format
+In-Reply-To: <20170321110530.15857-1-cdall@linaro.org>
+References: <20170321110530.15857-1-cdall@linaro.org>
+Message-ID: <20170321110530.15857-2-cdall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series addresses two issues with the way we export the GIC
-CPU interface registers to userspace.
+We are exporting the format of the priority field as it's stored in the
+GICH_VMCR.VMPriMask field using the lower five bits when accessing
+register state using the GICC_PMR offset.  This is unfortunate, but it's
+ABI already, so we simply have to make it clear.
 
-First, we clarify that the ABI is slightly broken and misleading, in
-that we export the GICC_PMR using an invented format where we put the
-GICH_VMCR.VMPriMask field in the lower five bits of the GICC_PMR
-exported to userspace.
+Signed-off-by: Christoffer Dall <cdall@linaro.org>
+---
+ Documentation/virtual/kvm/devices/arm-vgic.txt | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-Second, since we don't have any non-version-specific users of the struct
-vmcr representation, we don't have any clear benefit of using this
-indirection inside the kernel, and this has already led to confusion.
-Instead, slightly rework some of the user access functions and get rid
-of the VMCR structure entirely, which results in a rather nice diffstat
-considering I've added quite a few lines of comments.
-
-Based on v4.11-rc1.
-
-Thanks,
--Christoffer
-
-Christoffer Dall (5):
-  KVM: arm/arm64: Clarify GICC_PMR export format
-  KVM: arm64: vgic: Factor out access_gic_ctlr into separate r/w
-    functions
-  KVM: arm64: vgic: Rename vgic_v3_cpu to vgic_cpu
-  KVM: arm64: vgic: Get rid of struct vmcr for GICv3
-  KVM: arm/arm64: vgic: Get rid of struct vmcr for GICv2
-
- Documentation/virtual/kvm/devices/arm-vgic.txt |   6 +
- arch/arm64/kvm/vgic-sys-reg-v3.c               | 239 ++++++++++++-------------
- virt/kvm/arm/vgic/vgic-mmio-v2.c               |  51 ++++--
- virt/kvm/arm/vgic/vgic-mmio.c                  |  16 --
- virt/kvm/arm/vgic/vgic-v2.c                    |  29 ---
- virt/kvm/arm/vgic/vgic-v3.c                    |  38 ----
- virt/kvm/arm/vgic/vgic.h                       |  16 --
- 7 files changed, 155 insertions(+), 240 deletions(-)
-
+diff --git a/Documentation/virtual/kvm/devices/arm-vgic.txt b/Documentation/virtual/kvm/devices/arm-vgic.txt
+index 76e61c8..975a904 100644
+--- a/Documentation/virtual/kvm/devices/arm-vgic.txt
++++ b/Documentation/virtual/kvm/devices/arm-vgic.txt
+@@ -83,6 +83,12 @@ Groups:
+ 
+     Bits for undefined preemption levels are RAZ/WI.
+ 
++    For historical reasons we export the GICC_PMR register in the format of the
++    GICH_VMCR.VMPriMask field in the lower 5 bits of a word, meaning that
++    userspace must always use the lower 5 bits to communicate with the KVM
++    device and must shift the value left by 3 places to obtain the actual
++    priority mask level.
++
+   Limitations:
+     - Priorities are not implemented, and registers are RAZ/WI
+     - Currently only implemented for KVM_DEV_TYPE_ARM_VGIC_V2.
 -- 
 2.9.0
