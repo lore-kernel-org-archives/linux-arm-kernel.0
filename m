@@ -1,20 +1,28 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 21 Mar 2017 15:56:55 +0000
-Subject: [PATCH] arm64: struct debug_info: Check CONFIG_HAVE_HW_BREAKPOINT
-In-Reply-To: <20170316221043.GA29802@credmon.mdns.org>
-References: <20170316221043.GA29802@credmon.mdns.org>
-Message-ID: <20170321155655.GB21829@e104818-lin.cambridge.arm.com>
+Date: Tue, 21 Mar 2017 16:03:32 +0000
+Subject: [PATCH 0/2] arm64: head.S cleanup
+In-Reply-To: <f11d505b-f27c-e42c-5131-86363bcca9b0@arm.com>
+References: <1487170457-17986-1-git-send-email-mark.rutland@arm.com>
+ <20170321153711.GC8319@e104818-lin.cambridge.arm.com>
+ <f11d505b-f27c-e42c-5131-86363bcca9b0@arm.com>
+Message-ID: <20170321160331.GC21829@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 16, 2017 at 06:10:43PM -0400, Chris Redmon wrote:
-> Check if CONFIG_HAVE_HW_BREAKPOINT is enabled before compiling in extra
-> data required for hardware breakpoints. Compiling out this code when hw
-> breakpoints are disabled saves about 272 bytes per struct task_struct.
+On Tue, Mar 21, 2017 at 03:51:55PM +0000, Marc Zyngier wrote:
+> On 21/03/17 15:37, Catalin Marinas wrote:
+> > On Wed, Feb 15, 2017 at 02:54:15PM +0000, Mark Rutland wrote:
+> >> Mark Rutland (2):
+> >>   arm64: reduce el2_setup branching
+> >>   arm64: move !VHE work to end of el2_setup
+> > 
+> > Mark, Marc, do these patches conflict with the hyp stub cleanup? If
+> > there is some overlap, I'm happy for them to go via the kvm tree
+> > together with the others.
 > 
-> Signed-off-by: Chris Redmon <credmonster@gmail.com>
+> I don't think there is any overlap, my changes stay clear of head.S.
 
-Queued for 4.12. Thanks.
+Thanks (for the ack as well). Queued for 4.12.
 
 -- 
 Catalin
