@@ -1,71 +1,201 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 21 Mar 2017 18:17:29 +0000
-Subject: [PATCH v2 5/5] iommu: Allow default domain type to be set on the
- kernel command line
-In-Reply-To: <807ecbb0-c9d7-fc0a-25d2-93b5c4374107@arm.com>
-References: <1489178976-15353-1-git-send-email-will.deacon@arm.com>
- <1489178976-15353-6-git-send-email-will.deacon@arm.com>
- <20170321154527.GB29659@8bytes.org>
- <20170321172137.GF30948@arm.com>
- <807ecbb0-c9d7-fc0a-25d2-93b5c4374107@arm.com>
-Message-ID: <20170321181729.GG30948@arm.com>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Tue, 21 Mar 2017 18:04:20 +0000
+Subject: [PATCH 6/7] arm64: hugetlb: Spring clean huge pte accessors
+In-Reply-To: <20170321180421.18332-1-punit.agrawal@arm.com>
+References: <20170321180421.18332-1-punit.agrawal@arm.com>
+Message-ID: <20170321180421.18332-7-punit.agrawal@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 21, 2017 at 05:46:29PM +0000, Robin Murphy wrote:
-> On 21/03/17 17:21, Will Deacon wrote:
-> > On Tue, Mar 21, 2017 at 04:45:27PM +0100, Joerg Roedel wrote:
-> >> On Fri, Mar 10, 2017 at 08:49:36PM +0000, Will Deacon wrote:
-> >>> @@ -1014,8 +1027,8 @@ struct iommu_group *iommu_group_get_for_dev(struct device *dev)
-> >>>  	 * IOMMU driver.
-> >>>  	 */
-> >>>  	if (!group->default_domain) {
-> >>> -		group->default_domain = __iommu_domain_alloc(dev->bus,
-> >>> -							     IOMMU_DOMAIN_DMA);
-> >>> +		group->default_domain =
-> >>> +			__iommu_domain_alloc(dev->bus, iommu_def_domain_type);
-> >>
-> >> It would be good to have a fall-back here if we are talking to an IOMMU
-> >> driver that uses default domains, but does not support identity-mapped
-> >> domains (yet). Exynos and Rockchip IOMMU drivers seem to fall into this
-> >> category. A dev_warn() also makes sense in case allocating a identity
-> >> domain fails.
-> > 
-> > Sure, something like the diff below?
-> > 
-> > Will
-> > 
-> > --->8
-> > 
-> > 
-> > diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
-> > index 42a842e3f95f..f787626a745d 100644
-> > --- a/drivers/iommu/iommu.c
-> > +++ b/drivers/iommu/iommu.c
-> > @@ -1027,10 +1027,19 @@ struct iommu_group *iommu_group_get_for_dev(struct device *dev)
-> >  	 * IOMMU driver.
-> >  	 */
-> >  	if (!group->default_domain) {
-> > -		group->default_domain =
-> > -			__iommu_domain_alloc(dev->bus, iommu_def_domain_type);
-> > +		struct iommu_domain *dom;
-> > +
-> > +		dom = __iommu_domain_alloc(dev->bus, iommu_def_domain_type);
-> > +		if (!dom) {
-> > +			dev_warn(dev,
-> > +				 "failed to allocate default IOMMU domain of type %u; falling back to IOMMU_DOMAIN_DMA",
-> > +				 iommu_def_domain_type);
-> 
-> Conversely, that's going to be noisy if iommu_def_domain_type was
-> IOMMU_DOMAIN_DMA to begin with. I think it makes sense to warn if the
-> user asked for a specific default domain type on the command line and
-> that didn't work, but maybe not to bother otherwise. Plus, if they asked
-> for passthrough, then not allocating a default domain at all is probably
-> closer to the desired result than installing a DMA ops domain would be.
+From: Steve Capper <steve.capper@arm.com>
 
-You're right -- I'll hack this about to check if the default type isn't
-DOMAIN_DMA before warning about the allocation failure.
+This patch aims to re-structure the huge pte accessors without affecting
+their functionality. Control flow is changed to reduce indentation and
+expanded use is made of post for loop variable modification.
 
-Cheers,
+It is then much easier to add break-before-make semantics in a subsequent
+patch.
 
-Will
+Cc: David Woods <dwoods@mellanox.com>
+Signed-off-by: Steve Capper <steve.capper@arm.com>
+Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+---
+ arch/arm64/mm/hugetlbpage.c | 121 ++++++++++++++++++++------------------------
+ 1 file changed, 55 insertions(+), 66 deletions(-)
+
+diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
+index c868c80a9d6b..ef85d0656039 100644
+--- a/arch/arm64/mm/hugetlbpage.c
++++ b/arch/arm64/mm/hugetlbpage.c
+@@ -74,7 +74,7 @@ void set_huge_pte_at(struct mm_struct *mm, unsigned long addr,
+ 	size_t pgsize;
+ 	int i;
+ 	int ncontig;
+-	unsigned long pfn;
++	unsigned long pfn, dpfn;
+ 	pgprot_t hugeprot;
+ 
+ 	/*
+@@ -90,14 +90,13 @@ void set_huge_pte_at(struct mm_struct *mm, unsigned long addr,
+ 
+ 	ncontig = find_num_contig(mm, addr, ptep, &pgsize);
+ 	pfn = pte_pfn(pte);
++	dpfn = pgsize >> PAGE_SHIFT;
+ 	hugeprot = pte_pgprot(pte);
+-	for (i = 0; i < ncontig; i++) {
++
++	for (i = 0; i < ncontig; i++, ptep++, addr += pgsize, pfn += dpfn) {
+ 		pr_debug("%s: set pte %p to 0x%llx\n", __func__, ptep,
+ 			 pte_val(pfn_pte(pfn, hugeprot)));
+ 		set_pte_at(mm, addr, ptep, pfn_pte(pfn, hugeprot));
+-		ptep++;
+-		pfn += pgsize >> PAGE_SHIFT;
+-		addr += pgsize;
+ 	}
+ }
+ 
+@@ -203,91 +202,81 @@ pte_t arch_make_huge_pte(pte_t entry, struct vm_area_struct *vma,
+ pte_t huge_ptep_get_and_clear(struct mm_struct *mm,
+ 			      unsigned long addr, pte_t *ptep)
+ {
+-	pte_t pte;
+-
+-	if (pte_cont(*ptep)) {
+-		int ncontig, i;
+-		size_t pgsize;
+-		bool is_dirty = false;
+-
+-		ncontig = find_num_contig(mm, addr, ptep, &pgsize);
+-		/* save the 1st pte to return */
+-		pte = ptep_get_and_clear(mm, addr, ptep);
+-		for (i = 1, addr += pgsize; i < ncontig; ++i, addr += pgsize) {
+-			/*
+-			 * If HW_AFDBM is enabled, then the HW could
+-			 * turn on the dirty bit for any of the page
+-			 * in the set, so check them all.
+-			 */
+-			++ptep;
+-			if (pte_dirty(ptep_get_and_clear(mm, addr, ptep)))
+-				is_dirty = true;
+-		}
+-		if (is_dirty)
+-			return pte_mkdirty(pte);
+-		else
+-			return pte;
+-	} else {
++	int ncontig, i;
++	size_t pgsize;
++	pte_t orig_pte = huge_ptep_get(ptep);
++
++	if (!pte_cont(orig_pte))
+ 		return ptep_get_and_clear(mm, addr, ptep);
++
++	ncontig = find_num_contig(mm, addr, ptep, &pgsize);
++	for (i = 0; i < ncontig; i++, addr += pgsize, ptep++) {
++		/*
++		 * If HW_AFDBM is enabled, then the HW could
++		 * turn on the dirty bit for any of the page
++		 * in the set, so check them all.
++		 */
++		if (pte_dirty(ptep_get_and_clear(mm, addr, ptep)))
++			orig_pte = pte_mkdirty(orig_pte);
+ 	}
++
++	return orig_pte;
+ }
+ 
+ int huge_ptep_set_access_flags(struct vm_area_struct *vma,
+ 			       unsigned long addr, pte_t *ptep,
+ 			       pte_t pte, int dirty)
+ {
+-	if (pte_cont(pte)) {
+-		int ncontig, i, changed = 0;
+-		size_t pgsize = 0;
+-		unsigned long pfn = pte_pfn(pte);
+-		/* Select all bits except the pfn */
+-		pgprot_t hugeprot = pte_pgprot(pte);
+-
+-		pfn = pte_pfn(pte);
+-		ncontig = find_num_contig(vma->vm_mm, addr, ptep,
+-					  &pgsize);
+-		for (i = 0; i < ncontig; ++i, ++ptep, addr += pgsize) {
+-			changed |= ptep_set_access_flags(vma, addr, ptep,
+-							pfn_pte(pfn,
+-								hugeprot),
+-							dirty);
+-			pfn += pgsize >> PAGE_SHIFT;
+-		}
+-		return changed;
+-	} else {
++	int ncontig, i, changed = 0;
++	size_t pgsize = 0;
++	unsigned long pfn = pte_pfn(pte), dpfn;
++	pgprot_t hugeprot;
++
++	if (!pte_cont(pte))
+ 		return ptep_set_access_flags(vma, addr, ptep, pte, dirty);
++
++	ncontig = find_num_contig(vma->vm_mm, addr, ptep, &pgsize);
++	dpfn = pgsize >> PAGE_SHIFT;
++	hugeprot = pte_pgprot(pte);
++
++	for (i = 0; i < ncontig; i++, ptep++, addr += pgsize, pfn += dpfn) {
++		changed |= ptep_set_access_flags(vma, addr, ptep,
++				pfn_pte(pfn, hugeprot), dirty);
+ 	}
++
++	return changed;
+ }
+ 
+ void huge_ptep_set_wrprotect(struct mm_struct *mm,
+ 			     unsigned long addr, pte_t *ptep)
+ {
+-	if (pte_cont(*ptep)) {
+-		int ncontig, i;
+-		size_t pgsize = 0;
+-
+-		ncontig = find_num_contig(mm, addr, ptep, &pgsize);
+-		for (i = 0; i < ncontig; ++i, ++ptep, addr += pgsize)
+-			ptep_set_wrprotect(mm, addr, ptep);
+-	} else {
++	int ncontig, i;
++	size_t pgsize;
++
++	if (!pte_cont(*ptep)) {
+ 		ptep_set_wrprotect(mm, addr, ptep);
++		return;
+ 	}
++
++	ncontig = find_num_contig(mm, addr, ptep, &pgsize);
++	for (i = 0; i < ncontig; i++, ptep++, addr += pgsize)
++		ptep_set_wrprotect(mm, addr, ptep);
+ }
+ 
+ void huge_ptep_clear_flush(struct vm_area_struct *vma,
+ 			   unsigned long addr, pte_t *ptep)
+ {
+-	if (pte_cont(*ptep)) {
+-		int ncontig, i;
+-		size_t pgsize = 0;
+-
+-		ncontig = find_num_contig(vma->vm_mm, addr, ptep,
+-					  &pgsize);
+-		for (i = 0; i < ncontig; ++i, ++ptep, addr += pgsize)
+-			ptep_clear_flush(vma, addr, ptep);
+-	} else {
++	int ncontig, i;
++	size_t pgsize;
++
++	if (!pte_cont(*ptep)) {
+ 		ptep_clear_flush(vma, addr, ptep);
++		return;
+ 	}
++
++	ncontig = find_num_contig(vma->vm_mm, addr, ptep, &pgsize);
++	for (i = 0; i < ncontig; i++, ptep++, addr += pgsize)
++		ptep_clear_flush(vma, addr, ptep);
+ }
+ 
+ static __init int setup_hugepagesz(char *opt)
+-- 
+2.11.0
