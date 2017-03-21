@@ -1,37 +1,58 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 21 Mar 2017 16:52:59 +0800
-Subject: [PATCH 1/3] arm64: dts: zte: add mmc devices for zx296718
+Date: Tue, 21 Mar 2017 16:53:00 +0800
+Subject: [PATCH 2/3] arm64: dts: zte: add vou and hdmi devices for zx296718
 In-Reply-To: <1490086381-17030-1-git-send-email-shawnguo@kernel.org>
 References: <1490086381-17030-1-git-send-email-shawnguo@kernel.org>
-Message-ID: <1490086381-17030-2-git-send-email-shawnguo@kernel.org>
+Message-ID: <1490086381-17030-3-git-send-email-shawnguo@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jun Nie <jun.nie@linaro.org>
+From: Shawn Guo <shawn.guo@linaro.org>
 
-Add three mmc devices for zx296718 SoC, and enable the SD and eMMMC on
-zx296718-evb board.
+It adds VOU DPC device and enables HDMI support, which includes both
+display and audio through SPDIF interface.
 
-Signed-off-by: Jun Nie <jun.nie@linaro.org>
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- arch/arm64/boot/dts/zte/zx296718-evb.dts |  8 ++++
- arch/arm64/boot/dts/zte/zx296718.dtsi    | 66 ++++++++++++++++++++++++++++++++
- 2 files changed, 74 insertions(+)
+ arch/arm64/boot/dts/zte/zx296718-evb.dts | 20 ++++++++++++++
+ arch/arm64/boot/dts/zte/zx296718.dtsi    | 46 ++++++++++++++++++++++++++++++++
+ 2 files changed, 66 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/zte/zx296718-evb.dts b/arch/arm64/boot/dts/zte/zx296718-evb.dts
-index e164ff6de5fc..238311b4cf0f 100644
+index 238311b4cf0f..bb900d2bbcfb 100644
 --- a/arch/arm64/boot/dts/zte/zx296718-evb.dts
 +++ b/arch/arm64/boot/dts/zte/zx296718-evb.dts
-@@ -59,6 +59,14 @@
+@@ -57,16 +57,36 @@
+ 		reg = <0x40000000 0x40000000>;
+ 	};
  
++	sound0 {
++		compatible = "simple-audio-card";
++		simple-audio-card,name = "zx_snd_spdif0";
++
++		simple-audio-card,cpu {
++			sound-dai = <&spdif0>;
++		};
++
++		simple-audio-card,codec {
++			sound-dai = <&hdmi>;
++		};
++	};
  };
  
-+&emmc {
+ &emmc {
+ 	status = "okay";
+ };
+ 
++&hdmi {
 +	status = "okay";
 +};
 +
-+&sd1 {
+ &sd1 {
+ 	status = "okay";
+ };
+ 
++&spdif0 {
 +	status = "okay";
 +};
 +
@@ -39,88 +60,68 @@ index e164ff6de5fc..238311b4cf0f 100644
  	status = "okay";
  };
 diff --git a/arch/arm64/boot/dts/zte/zx296718.dtsi b/arch/arm64/boot/dts/zte/zx296718.dtsi
-index 8c20d295fa86..921f3ec52a1a 100644
+index 921f3ec52a1a..7b2bb962daf1 100644
 --- a/arch/arm64/boot/dts/zte/zx296718.dtsi
 +++ b/arch/arm64/boot/dts/zte/zx296718.dtsi
-@@ -298,6 +298,51 @@
- 			status = "disabled";
+@@ -366,6 +366,40 @@
+ 			#clock-cells = <1>;
  		};
  
-+		sd0: mmc at 1110000 {
-+			compatible = "zte,zx296718-dw-mshc";
++		vou: vou at 1440000 {
++			compatible = "zte,zx296718-vou";
 +			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0x01110000 0x1000>;
-+			interrupts = <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>;
-+			fifo-depth = <32>;
-+			data-addr = <0x200>;
-+			fifo-watermark-aligned;
-+			bus-width = <4>;
-+			clock-frequency = <50000000>;
-+			clocks = <&topcrm SD0_AHB>, <&topcrm SD0_WCLK>;
-+			clock-names = "biu", "ciu";
-+			num-slots = <1>;
-+			max-frequency = <50000000>;
-+			cap-sdio-irq;
-+			cap-sd-highspeed;
-+			sd-uhs-sdr12;
-+			sd-uhs-sdr25;
-+			sd-uhs-sdr50;
-+			sd-uhs-sdr104;
-+			sd-uhs-ddr50;
-+			status = "disabled";
++			#size-cells = <1>;
++			ranges = <0 0x1440000 0x10000>;
++
++			dpc: dpc at 0 {
++				compatible = "zte,zx296718-dpc";
++				reg = <0x0000 0x1000>, <0x1000 0x1000>,
++				      <0x5000 0x1000>, <0x6000 0x1000>,
++				      <0xa000 0x1000>;
++				reg-names = "osd", "timing_ctrl",
++					    "dtrc", "vou_ctrl",
++					    "otfppu";
++				interrupts = <GIC_SPI 81 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&topcrm VOU_ACLK>, <&topcrm VOU_PPU_WCLK>,
++					 <&topcrm VOU_MAIN_WCLK>, <&topcrm VOU_AUX_WCLK>;
++				clock-names = "aclk", "ppu_wclk",
++					      "main_wclk", "aux_wclk";
++			};
++
++			hdmi: hdmi at c000 {
++				compatible = "zte,zx296718-hdmi";
++				reg = <0xc000 0x4000>;
++				interrupts = <GIC_SPI 82 IRQ_TYPE_EDGE_RISING>;
++				clocks = <&topcrm HDMI_OSC_CEC>,
++					 <&topcrm HDMI_OSC_CLK>,
++					 <&topcrm HDMI_XCLK>;
++				clock-names = "osc_cec", "osc_clk", "xclk";
++				#sound-dai-cells = <0>;
++				status = "disabled";
++			};
 +		};
 +
-+		sd1: mmc at 1111000 {
-+			compatible = "zte,zx296718-dw-mshc";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0x01111000 0x1000>;
-+			interrupts = <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>;
-+			fifo-depth = <32>;
-+			data-addr = <0x200>;
-+			fifo-watermark-aligned;
-+			bus-width = <4>;
-+			clock-frequency = <167000000>;
-+			clocks = <&topcrm SD1_AHB>, <&topcrm SD1_WCLK>;
-+			clock-names = "biu", "ciu";
-+			num-slots = <1>;
-+			max-frequency = <167000000>;
-+			cap-sdio-irq;
-+			cap-sd-highspeed;
-+			status = "disabled";
-+		};
-+
- 		dma: dma-controller at 1460000 {
- 			compatible = "zte,zx296702-dma";
- 			reg = <0x01460000 0x1000>;
-@@ -332,6 +377,27 @@
- 			reg = <0x1463000 0x1000>;
- 		};
- 
-+		emmc: mmc at 1470000{
-+			compatible = "zte,zx296718-dw-mshc";
-+			reg = <0x01470000 0x1000>;
-+			interrupts = <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>;
-+			zte,aon-syscon = <&aon_sysctrl>;
-+			bus-width = <8>;
-+			fifo-depth = <128>;
-+			data-addr = <0x200>;
-+			fifo-watermark-aligned;
-+			clock-frequency = <167000000>;
-+			clocks = <&topcrm EMMC_NAND_AHB>, <&topcrm EMMC_WCLK>;
-+			clock-names = "biu", "ciu";
-+			max-frequency = <167000000>;
-+			cap-mmc-highspeed;
-+			mmc-ddr-1_8v;
-+			mmc-hs200-1_8v;
-+			non-removable;
-+			disable-wp;
-+			status = "disabled";
-+		};
-+
- 		audiocrm: clock-controller at 1480000 {
- 			compatible = "zte,zx296718-audiocrm";
+ 		topcrm: clock-controller at 1461000 {
+ 			compatible = "zte,zx296718-topcrm";
+ 			reg = <0x01461000 0x1000>;
+@@ -403,6 +437,18 @@
  			reg = <0x01480000 0x1000>;
+ 			#clock-cells = <1>;
+ 		};
++
++		spdif0: spdif at 1488000 {
++			compatible = "zte,zx296702-spdif";
++			reg = <0x1488000 0x1000>;
++			clocks = <&audiocrm AUDIO_SPDIF0_WCLK>;
++			clock-names = "tx";
++			interrupts = <GIC_SPI 33 IRQ_TYPE_LEVEL_HIGH>;
++			#sound-dai-cells = <0>;
++			dmas = <&dma 30>;
++			dma-names = "tx";
++			status = "disabled";
++		};
+ 	};
+ };
+ 
 -- 
 1.9.1
