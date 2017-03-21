@@ -1,447 +1,133 @@
 From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Tue, 21 Mar 2017 07:50:04 -0700
-Subject: [PATCH v7 2/2] soc/imx: Add GPCv2 power gating driver
+Date: Tue, 21 Mar 2017 07:50:03 -0700
+Subject: [PATCH v7 1/2] dt-bindings: Add GPCv2 power gating driver
 In-Reply-To: <20170321145004.21265-1-andrew.smirnov@gmail.com>
 References: <20170321145004.21265-1-andrew.smirnov@gmail.com>
-Message-ID: <20170321145004.21265-3-andrew.smirnov@gmail.com>
+Message-ID: <20170321145004.21265-2-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add code allowing for control of various power domains managed by GPCv2
-IP block found in i.MX7 series of SoCs. Power domains covered by this
-patch are:
-
-    - PCIE PHY
-    - MIPI PHY
-    - USB HSIC PHY
-    - USB OTG1/2 PHY
-
-Support for any other power domain controlled by GPC is not present, and
-can be added at some later point.
-
-Testing of this code was done against a PCIe driver.
+Add DT bindings for power domain driver for GPCv2 IP block found in
+i.MX7 SoCs.
 
 Cc: yurovsky at gmail.com
 Cc: Lucas Stach <l.stach@pengutronix.de>
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Mark Rutland <mark.rutland@arm.com>
 Cc: Fabio Estevam <fabio.estevam@nxp.com>
 Cc: Dong Aisheng <dongas86@gmail.com>
+Cc: devicetree at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
+Acked-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 ---
- drivers/soc/Kconfig      |   1 +
- drivers/soc/imx/Kconfig  |  10 ++
- drivers/soc/imx/Makefile |   1 +
- drivers/soc/imx/gpcv2.c  | 365 +++++++++++++++++++++++++++++++++++++++++++++++
- 4 files changed, 377 insertions(+)
- create mode 100644 drivers/soc/imx/Kconfig
- create mode 100644 drivers/soc/imx/gpcv2.c
+ .../devicetree/bindings/power/fsl,imx-gpcv2.txt    | 71 ++++++++++++++++++++++
+ include/dt-bindings/power/imx7-power.h             | 18 ++++++
+ 2 files changed, 89 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/power/fsl,imx-gpcv2.txt
+ create mode 100644 include/dt-bindings/power/imx7-power.h
 
-diff --git a/drivers/soc/Kconfig b/drivers/soc/Kconfig
-index f09023f..8943543 100644
---- a/drivers/soc/Kconfig
-+++ b/drivers/soc/Kconfig
-@@ -2,6 +2,7 @@ menu "SOC (System On Chip) specific Drivers"
- 
- source "drivers/soc/bcm/Kconfig"
- source "drivers/soc/fsl/Kconfig"
-+source "drivers/soc/imx/Kconfig"
- source "drivers/soc/mediatek/Kconfig"
- source "drivers/soc/qcom/Kconfig"
- source "drivers/soc/rockchip/Kconfig"
-diff --git a/drivers/soc/imx/Kconfig b/drivers/soc/imx/Kconfig
+diff --git a/Documentation/devicetree/bindings/power/fsl,imx-gpcv2.txt b/Documentation/devicetree/bindings/power/fsl,imx-gpcv2.txt
 new file mode 100644
-index 0000000..bc7f0ee0
+index 0000000..02f45c6
 --- /dev/null
-+++ b/drivers/soc/imx/Kconfig
-@@ -0,0 +1,10 @@
-+menu "i.MX SoC drivers"
++++ b/Documentation/devicetree/bindings/power/fsl,imx-gpcv2.txt
+@@ -0,0 +1,71 @@
++Freescale i.MX General Power Controller v2
++==========================================
 +
-+config IMX7_PM_DOMAINS
-+	bool "i.MX7 PM domains"
-+	select PM_GENERIC_DOMAINS
-+	depends on SOC_IMX7D || (COMPILE_TEST && OF)
-+	default y if SOC_IMX7D
++The i.MX7S/D General Power Control (GPC) block contains Power Gating
++Control (PGC) for various power domains.
 +
-+endmenu
++Required properties:
 +
-diff --git a/drivers/soc/imx/Makefile b/drivers/soc/imx/Makefile
-index 35861f5..5b6e396 100644
---- a/drivers/soc/imx/Makefile
-+++ b/drivers/soc/imx/Makefile
-@@ -1 +1,2 @@
- obj-y += gpc.o
-+obj-$(CONFIG_IMX7_PM_DOMAINS) += gpcv2.o
-diff --git a/drivers/soc/imx/gpcv2.c b/drivers/soc/imx/gpcv2.c
++- compatible: Should be "fsl,imx7d-gpc"
++
++- reg: should be register base and length as documented in the
++  datasheet
++
++- interrupts: Should contain GPC interrupt request 1
++
++Power domains contained within GPC node are generic power domain
++providers, documented in
++Documentation/devicetree/bindings/power/power_domain.txt, which are
++described as subnodes of the power gating controller 'pgc' node,
++which, in turn, is expected to contain the following:
++
++Required properties:
++
++- reg: Power domain index. Valid values are defined in
++  include/dt-bindings/power/imx7-power.h
++
++- #power-domain-cells: Should be 0
++
++Optional properties:
++
++- power-supply: Power supply used to power the domain
++
++Example:
++
++	gpc: gpc at 303a0000 {
++		compatible = "fsl,imx7d-gpc";
++		reg = <0x303a0000 0x1000>;
++		interrupt-controller;
++		interrupts = <GIC_SPI 87 IRQ_TYPE_LEVEL_HIGH>;
++		#interrupt-cells = <3>;
++		interrupt-parent = <&intc>;
++
++		pgc {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			pgc_pcie_phy: power-domain at 3 {
++				#power-domain-cells = <0>;
++
++				reg = <IMX7_POWER_DOMAIN_PCIE_PHY>;
++				power-supply = <&reg_1p0d>;
++			};
++		};
++	};
++
++
++Specifying power domain for IP modules
++======================================
++
++IP cores belonging to a power domain should contain a 'power-domains'
++property that is a phandle for PGC node representing the domain.
++
++Example of a device that is part of the PCIE_PHY power domain:
++
++	pcie: pcie at 33800000 {
++	      reg = <0x33800000 0x4000>,
++	            <0x4ff00000 0x80000>;
++		/* ... */
++		power-domains = <&pgc_pcie_phy>;
++		/* ... */
++	};
+diff --git a/include/dt-bindings/power/imx7-power.h b/include/dt-bindings/power/imx7-power.h
 new file mode 100644
-index 0000000..a27c5f8
+index 0000000..eb70023
 --- /dev/null
-+++ b/drivers/soc/imx/gpcv2.c
-@@ -0,0 +1,365 @@
++++ b/include/dt-bindings/power/imx7-power.h
+@@ -0,0 +1,18 @@
 +/*
-+ * Copyright 2017 Impinj, Inc
-+ * Author: Andrey Smirnov <andrew.smirnov@gmail.com>
++ *  Copyright (C) 2017 Impinj
 + *
-+ * Based on the code of analogus driver:
-+ *
-+ * Copyright 2015-2017 Pengutronix, Lucas Stach <kernel@pengutronix.de>
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
 + */
 +
-+#include <linux/platform_device.h>
-+#include <linux/pm_domain.h>
-+#include <linux/regmap.h>
-+#include <linux/regulator/consumer.h>
-+#include <dt-bindings/power/imx7-power.h>
++#ifndef __DT_BINDINGS_IMX7_POWER_H__
++#define __DT_BINDINGS_IMX7_POWER_H__
 +
-+#define GPC_PGC_CPU_MAPPING	0xec
-+#define USB_HSIC_PHY_A7_DOMAIN	BIT(6)
-+#define USB_OTG2_PHY_A7_DOMAIN	BIT(5)
-+#define USB_OTG1_PHY_A7_DOMAIN	BIT(4)
-+#define PCIE_PHY_A7_DOMAIN	BIT(3)
-+#define MIPI_PHY_A7_DOMAIN	BIT(2)
++#define IMX7_POWER_DOMAIN_USB_HSIC_PHY	0
++#define IMX7_POWER_DOMAIN_USB_OTG2_PHY	1
++#define IMX7_POWER_DOMAIN_USB_OTG1_PHY	2
++#define IMX7_POWER_DOMAIN_PCIE_PHY	3
++#define IMX7_POWER_DOMAIN_MIPI_PHY	4
 +
-+#define GPC_PU_PGC_SW_PUP_REQ	0xf8
-+#define GPC_PU_PGC_SW_PDN_REQ	0x104
-+#define USB_HSIC_PHY_SW_Pxx_REQ	BIT(4)
-+#define USB_OTG2_PHY_SW_Pxx_REQ	BIT(3)
-+#define USB_OTG1_PHY_SW_Pxx_REQ	BIT(2)
-+#define PCIE_PHY_SW_Pxx_REQ	BIT(1)
-+#define MIPI_PHY_SW_Pxx_REQ	BIT(0)
-+
-+#define GPC_MAX_REGISTER	0x1000
-+
-+#define GPC_PGC_nCTRL_PCR	BIT(0)
-+
-+struct imx7_pgc_domain {
-+	struct generic_pm_domain genpd;
-+	struct regmap *regmap;
-+	struct regulator *regulator;
-+
-+	unsigned int pgc_nctrl;
-+
-+	const struct {
-+		u32 pxx;
-+		u32 map;
-+	} bits;
-+
-+	const int voltage;
-+	struct device *dev;
-+};
-+
-+static int imx7_gpc_pu_pgc_sw_pxx_req(struct generic_pm_domain *genpd,
-+				      bool on)
-+{
-+	struct imx7_pgc_domain *domain = container_of(genpd,
-+						      struct imx7_pgc_domain,
-+						      genpd);
-+	unsigned int offset = on ?
-+		GPC_PU_PGC_SW_PUP_REQ : GPC_PU_PGC_SW_PDN_REQ;
-+	const bool enable_power_control = domain->pgc_nctrl && !on;
-+	const bool has_regulator = !IS_ERR(domain->regulator);
-+	unsigned long deadline;
-+	int ret = 0;
-+
-+	regmap_update_bits(domain->regmap, GPC_PGC_CPU_MAPPING,
-+			   domain->bits.map, domain->bits.map);
-+
-+	if (has_regulator && on) {
-+		ret = regulator_enable(domain->regulator);
-+		if (ret) {
-+			dev_err(domain->dev, "failed to enable regulator\n");
-+			goto unmap;
-+		}
-+	}
-+
-+	if (enable_power_control)
-+		regmap_update_bits(domain->regmap, domain->pgc_nctrl,
-+				   GPC_PGC_nCTRL_PCR, GPC_PGC_nCTRL_PCR);
-+
-+	regmap_update_bits(domain->regmap, offset,
-+			   domain->bits.pxx, domain->bits.pxx);
-+
-+	/*
-+	 * As per "5.5.9.4 Example Code 4" in IMX7DRM.pdf wait
-+	 * for PUP_REQ/PDN_REQ bit to be cleared
-+	 */
-+	deadline = jiffies + msecs_to_jiffies(1);
-+	while (true) {
-+		u32 pxx_req;
-+
-+		regmap_read(domain->regmap, offset, &pxx_req);
-+
-+		if (!(pxx_req & domain->bits.pxx))
-+			break;
-+
-+		if (time_after(jiffies, deadline)) {
-+			dev_err(domain->dev, "falied to command PGC\n");
-+			ret = -ETIMEDOUT;
-+			/*
-+			 * If we were in a process of enabling a
-+			 * domain and failed we might as well disable
-+			 * the regulator we just enabled. And if it
-+			 * was the opposite situation and we failed to
-+			 * power down -- keep the regulator on
-+			 */
-+			on = !on;
-+			break;
-+		}
-+
-+		cpu_relax();
-+	}
-+
-+	if (enable_power_control)
-+		regmap_update_bits(domain->regmap, domain->pgc_nctrl,
-+				   GPC_PGC_nCTRL_PCR, 0);
-+
-+	if (has_regulator && !on) {
-+		int err;
-+
-+		err = regulator_disable(domain->regulator);
-+		if (err)
-+			dev_err(domain->dev,
-+				"failed to disable regulator: %d\n", ret);
-+		/* Preserve earlier error code */
-+		ret = ret ?: err;
-+	}
-+unmap:
-+	regmap_update_bits(domain->regmap, GPC_PGC_CPU_MAPPING,
-+			   domain->bits.map, 0);
-+	return ret;
-+}
-+
-+static int imx7_gpc_pu_pgc_sw_pup_req(struct generic_pm_domain *genpd)
-+{
-+	return imx7_gpc_pu_pgc_sw_pxx_req(genpd, true);
-+}
-+
-+static int imx7_gpc_pu_pgc_sw_pdn_req(struct generic_pm_domain *genpd)
-+{
-+	return imx7_gpc_pu_pgc_sw_pxx_req(genpd, false);
-+}
-+
-+static struct imx7_pgc_domain imx7_pgc_domains[] = {
-+	[IMX7_POWER_DOMAIN_USB_HSIC_PHY] = {
-+		.genpd = {
-+			.name      = "usb-hsic-phy",
-+		},
-+		.bits  = {
-+			.pxx = USB_HSIC_PHY_SW_Pxx_REQ,
-+			.map = USB_HSIC_PHY_A7_DOMAIN,
-+		},
-+		.voltage   = 1200000,
-+		.pgc_nctrl = 0x0d00,
-+	},
-+
-+	[IMX7_POWER_DOMAIN_USB_OTG2_PHY] = {
-+		.genpd = {
-+			.name      = "usb-otg2-phy",
-+		},
-+		.bits  = {
-+			.pxx = USB_OTG2_PHY_SW_Pxx_REQ,
-+			.map = USB_OTG2_PHY_A7_DOMAIN,
-+		},
-+	},
-+
-+	[IMX7_POWER_DOMAIN_USB_OTG1_PHY] = {
-+		.genpd = {
-+			.name      = "usb-otg1-phy",
-+		},
-+		.bits  = {
-+			.pxx = USB_OTG1_PHY_SW_Pxx_REQ,
-+			.map = USB_OTG1_PHY_A7_DOMAIN,
-+		},
-+	},
-+
-+	[IMX7_POWER_DOMAIN_PCIE_PHY] = {
-+		.genpd = {
-+			.name      = "pcie-phy",
-+		},
-+		.bits  = {
-+			.pxx = PCIE_PHY_SW_Pxx_REQ,
-+			.map = PCIE_PHY_A7_DOMAIN,
-+		},
-+		.voltage   = 1000000,
-+		.pgc_nctrl = 0x0c40,
-+	},
-+
-+	[IMX7_POWER_DOMAIN_MIPI_PHY] = {
-+		.genpd = {
-+			.name      = "mipi-phy",
-+		},
-+		.bits  = {
-+			.pxx = MIPI_PHY_SW_Pxx_REQ,
-+			.map = MIPI_PHY_A7_DOMAIN,
-+		},
-+		.voltage   = 1000000,
-+		.pgc_nctrl = 0x0c00,
-+	},
-+};
-+
-+static int imx7_pgc_domain_probe(struct platform_device *pdev)
-+{
-+	struct imx7_pgc_domain *domain = pdev->dev.platform_data;
-+	int ret;
-+
-+	domain->dev = &pdev->dev;
-+
-+	ret = pm_genpd_init(&domain->genpd, NULL, true);
-+	if (ret) {
-+		dev_err(domain->dev, "Failed to init power domain\n");
-+		return ret;
-+	}
-+
-+	domain->regulator = devm_regulator_get_optional(domain->dev, "power");
-+	if (IS_ERR(domain->regulator) &&
-+	    PTR_ERR(domain->regulator) != -ENODEV) {
-+		dev_err(domain->dev, "Failed to get domain's regulator\n");
-+		return PTR_ERR(domain->regulator);
-+	}
-+
-+	if (!IS_ERR(domain->regulator)) {
-+		if (!domain->voltage) {
-+			WARN(1, "No voltage configured for domain's regulator");
-+			return -EINVAL;
-+		}
-+
-+		regulator_set_voltage(domain->regulator,
-+				      domain->voltage, domain->voltage);
-+	}
-+
-+	ret = of_genpd_add_provider_simple(domain->dev->of_node,
-+					   &domain->genpd);
-+	if (ret) {
-+		dev_err(domain->dev, "Failed to add genpd provider\n");
-+		pm_genpd_remove(&domain->genpd);
-+	}
-+
-+	return ret;
-+}
-+
-+static int imx7_pgc_domain_remove(struct platform_device *pdev)
-+{
-+	struct imx7_pgc_domain *domain = pdev->dev.platform_data;
-+
-+	of_genpd_del_provider(domain->dev->of_node);
-+	pm_genpd_remove(&domain->genpd);
-+
-+	return 0;
-+}
-+
-+static const struct platform_device_id imx7_pgc_domain_id[] = {
-+	{ "imx7-pgc-domain", },
-+	{ },
-+};
-+
-+static struct platform_driver imx7_pgc_domain_driver = {
-+	.driver = {
-+		.name = "imx7-pgc",
-+	},
-+	.probe    = imx7_pgc_domain_probe,
-+	.remove   = imx7_pgc_domain_remove,
-+	.id_table = imx7_pgc_domain_id,
-+};
-+builtin_platform_driver(imx7_pgc_domain_driver)
-+
-+static int imx_gpcv2_probe(struct platform_device *pdev)
-+{
-+	static const struct regmap_config regmap_config = {
-+		.cache_type	= REGCACHE_NONE,
-+		.reg_bits	= 32,
-+		.val_bits	= 32,
-+		.reg_stride	= 4,
-+		.max_register	= GPC_MAX_REGISTER,
-+	};
-+	struct device *dev = &pdev->dev;
-+	struct device_node *pgc_np, *np;
-+	struct regmap *regmap;
-+	struct resource *res;
-+	void __iomem *base;
-+	int ret;
-+
-+	pgc_np = of_get_child_by_name(dev->of_node, "pgc");
-+	if (!pgc_np) {
-+		dev_err(dev, "No power domains specified in DT\n");
-+		return -EINVAL;
-+	}
-+
-+	res  = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	base = devm_ioremap_resource(dev, res);
-+	if (IS_ERR(base))
-+		return PTR_ERR(base);
-+
-+	regmap = devm_regmap_init_mmio(dev, base, &regmap_config);
-+	if (IS_ERR(regmap)) {
-+		ret = PTR_ERR(regmap);
-+		dev_err(dev, "failed to init regmap (%d)\n", ret);
-+		return ret;
-+	}
-+
-+	for_each_child_of_node(pgc_np, np) {
-+		struct platform_device *pd_pdev;
-+		struct imx7_pgc_domain *domain;
-+		u32 domain_index;
-+
-+		ret = of_property_read_u32(np, "reg", &domain_index);
-+		if (ret) {
-+			dev_err(dev, "Failed to read 'reg' property\n");
-+			of_node_put(np);
-+			return ret;
-+		}
-+
-+		if (domain_index >= ARRAY_SIZE(imx7_pgc_domains)) {
-+			dev_warn(dev,
-+				 "Domain index %d is out of bounds\n",
-+				 domain_index);
-+			continue;
-+		}
-+
-+		domain = &imx7_pgc_domains[domain_index];
-+		domain->regmap = regmap;
-+		domain->genpd.power_on  = imx7_gpc_pu_pgc_sw_pup_req;
-+		domain->genpd.power_off = imx7_gpc_pu_pgc_sw_pdn_req;
-+
-+		pd_pdev = platform_device_alloc("imx7-pgc-domain",
-+						domain_index);
-+		if (!pd_pdev) {
-+			dev_err(dev, "Failed to allocate platform device\n");
-+			of_node_put(np);
-+			return -ENOMEM;
-+		}
-+
-+		pd_pdev->dev.platform_data = domain;
-+		pd_pdev->dev.parent = dev;
-+		pd_pdev->dev.of_node = np;
-+
-+		ret = platform_device_add(pd_pdev);
-+		if (ret) {
-+			platform_device_put(pd_pdev);
-+			of_node_put(np);
-+			return ret;
-+		}
-+	}
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id imx_gpcv2_dt_ids[] = {
-+	{ .compatible = "fsl,imx7d-gpc" },
-+	{ }
-+};
-+
-+static struct platform_driver imx_gpc_driver = {
-+	.driver = {
-+		.name = "imx-gpcv2",
-+		.of_match_table = imx_gpcv2_dt_ids,
-+	},
-+	.probe = imx_gpcv2_probe,
-+};
-+builtin_platform_driver(imx_gpc_driver)
++#endif
 -- 
 2.9.3
