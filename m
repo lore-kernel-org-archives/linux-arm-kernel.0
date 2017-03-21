@@ -1,61 +1,37 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 21 Mar 2017 16:35:55 +0000
-Subject: [PATCH net-next 0/7] Clean up PHY MMD accessors
-Message-ID: <20170321163555.GA21222@n2100.armlinux.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 21 Mar 2017 16:42:41 +0000
+Subject: [PATCH v2 0/5] Implement SMMU passthrough using the default domain
+In-Reply-To: <20170321154624.GC29659@8bytes.org>
+References: <1489178976-15353-1-git-send-email-will.deacon@arm.com>
+ <20170321154624.GC29659@8bytes.org>
+Message-ID: <20170321164241.GD30948@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series cleans up phylib's MMD accessors, so that we have a common
-way of accessing the Clause 45 register set.
+Hi Joerg,
 
-The current situation is far from ideal - we have phy_(read|write)_mmd()
-which accesses Clause 45 registers over Clause 45 accesses, and we have
-phy_(read|write)_mmd_indirect(), which accesses Clause 45 registers via
-Clause 22 register 13/14.
+On Tue, Mar 21, 2017 at 04:46:24PM +0100, Joerg Roedel wrote:
+> On Fri, Mar 10, 2017 at 08:49:31PM +0000, Will Deacon wrote:
+> > Will Deacon (5):
+> >   iommu/arm-smmu: Restrict domain attributes to UNMANAGED domains
+> >   iommu/arm-smmu: Install bypass S2CRs for IOMMU_DOMAIN_IDENTITY domains
+> >   iommu/arm-smmu-v3: Make arm_smmu_install_ste_for_dev return void
+> >   iommu/arm-smmu-v3: Install bypass STEs for IOMMU_DOMAIN_IDENTITY
+> >     domains
+> >   iommu: Allow default domain type to be set on the kernel command line
+> > 
+> >  Documentation/admin-guide/kernel-parameters.txt |  6 ++
+> >  drivers/iommu/arm-smmu-v3.c                     | 76 +++++++++++++++----------
+> >  drivers/iommu/arm-smmu.c                        | 26 ++++++++-
+> >  drivers/iommu/iommu.c                           | 17 +++++-
+> >  4 files changed, 90 insertions(+), 35 deletions(-)
+> 
+> Besides my one comment on the last patch this series looks good to me.
+> Do you plan to include it (with the fall-back) into your pull-request?
 
-Generic code uses the indirect methods to access standard Clause 45
-features, and when we come to add Clause 45 PHY support to phylib, we
-would need to make these conditional upon the PHY type, or duplicate
-these functions.
+Yes, that would certainly be easiest for me, given the changes to the
+SMMU drivers. However, if you prefer it separately then I can do that too.
 
-An alternative solution is to merge these accessors together, and select
-the appropriate access method depending upon the 802.3 clause that the
-PHY conforms with.  The result is that we have a single set of
-phy_(read|write)_mmd() accessors.
+Cheers,
 
-For cases which require special handling, we still allow PHY drivers to
-override all MMD accesses - except rather than just overriding the
-indirect accesses.  This keeps existing overrides working.
-
-Combining the two also has another beneficial side effect - we get rid
-of similar functions that take arguments in different orders.  The
-old direct accessors took the phy structure, devad and register number,
-whereas the indirect accessors took the phy structure, register number
-and devad in that order.  Care must be taken when updating future
-drivers that the argument order is correct, and the function name is
-not merely replaced.
-
-This patch set is against net-next.
-
- drivers/net/phy/Makefile      |   2 +-
- drivers/net/phy/bcm-phy-lib.c |  12 ++---
- drivers/net/phy/dp83867.c     |  25 +++++-----
- drivers/net/phy/intel-xway.c  |  26 +++++-----
- drivers/net/phy/micrel.c      |  13 +++--
- drivers/net/phy/microchip.c   |   5 +-
- drivers/net/phy/phy-core.c    | 101 ++++++++++++++++++++++++++++++++++++++
- drivers/net/phy/phy.c         | 110 ++++--------------------------------------
- drivers/net/phy/phy_device.c  |   4 +-
- drivers/net/usb/lan78xx.c     |  10 ++--
- include/linux/phy.h           |  80 +++++++++---------------------
- 11 files changed, 178 insertions(+), 210 deletions(-)
-
-RFC->v1:
-- minor update patch 2 to resolve a build error that the 0-day builder
-  discovered.
-- reviewed-by / acked-bys added
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Will
