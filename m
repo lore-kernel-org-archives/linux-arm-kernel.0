@@ -1,78 +1,69 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Tue, 21 Mar 2017 12:17:06 +0100
-Subject: [PATCH 2/9] KVM: arm/arm64: vgic: Avoid flushing vgic state when
- there's no pending IRQ
-In-Reply-To: <0583faa8-4b61-f960-f761-901e4963d3fe@arm.com>
-References: <20170320105818.20481-1-cdall@linaro.org>
- <20170320105818.20481-3-cdall@linaro.org>
- <0583faa8-4b61-f960-f761-901e4963d3fe@arm.com>
-Message-ID: <20170321111706.GB15920@cbox>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 21 Mar 2017 11:27:41 +0000
+Subject: [PATCH v5 38/39] media: imx: csi: fix crop rectangle reset in
+ sink set_fmt
+In-Reply-To: <1490030604.2917.103.camel@pengutronix.de>
+References: <1489121599-23206-1-git-send-email-steve_longerbeam@mentor.com>
+ <1489121599-23206-39-git-send-email-steve_longerbeam@mentor.com>
+ <20170319152233.GW21222@n2100.armlinux.org.uk>
+ <327d67d9-68c1-7f74-0c0f-f6aee1c4b546@gmail.com>
+ <1490010926.2917.59.camel@pengutronix.de>
+ <20170320120855.GH21222@n2100.armlinux.org.uk>
+ <1490018451.2917.86.camel@pengutronix.de>
+ <20170320141705.GL21222@n2100.armlinux.org.uk>
+ <1490030604.2917.103.camel@pengutronix.de>
+Message-ID: <20170321112741.GV21222@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 21, 2017 at 10:57:49AM +0000, Marc Zyngier wrote:
-> On 20/03/17 10:58, Christoffer Dall wrote:
-> > From: Shih-Wei Li <shihwei@cs.columbia.edu>
-> > 
-> > We do not need to flush vgic states in each world switch unless
-> > there is pending IRQ queued to the vgic's ap list. We can thus reduce
-> > the overhead by not grabbing the spinlock and not making the extra
-> > function call to vgic_flush_lr_state.
-> > 
-> > Signed-off-by: Shih-Wei Li <shihwei@cs.columbia.edu>
-> > Signed-off-by: Christoffer Dall <cdall@linaro.org>
-> > ---
-> >  virt/kvm/arm/vgic/vgic.c | 8 ++++++++
-> >  1 file changed, 8 insertions(+)
-> > 
-> > diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-> > index 2ac0def..1436c2e 100644
-> > --- a/virt/kvm/arm/vgic/vgic.c
-> > +++ b/virt/kvm/arm/vgic/vgic.c
-> > @@ -637,12 +637,17 @@ static void vgic_flush_lr_state(struct kvm_vcpu *vcpu)
-> >  /* Sync back the hardware VGIC state into our emulation after a guest's run. */
-> >  void kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
-> >  {
-> > +	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
-> > +
-> >  	if (unlikely(!vgic_initialized(vcpu->kvm)))
-> >  		return;
-> >  
-> >  	vgic_process_maintenance_interrupt(vcpu);
-> >  	vgic_fold_lr_state(vcpu);
-> >  	vgic_prune_ap_list(vcpu);
-> > +
-> > +	/* Make sure we can fast-path in flush_hwstate */
-> > +	vgic_cpu->used_lrs = 0;
-> >  }
-> >  
-> >  /* Flush our emulation state into the GIC hardware before entering the guest. */
-> > @@ -651,6 +656,9 @@ void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu)
-> >  	if (unlikely(!vgic_initialized(vcpu->kvm)))
-> >  		return;
-> >  
-> > +	if (list_empty(&vcpu->arch.vgic_cpu.ap_list_head))
-> > +		return;
-> > +
-> 
-> While I can see the READ_ONCE in list_empty(), it is not completely
-> obvious that the race with another CPU injecting an interrupt is safe
-> (if I get it correctly, it will have the same effect as if it was added
-> right after the critical section below).
+On Mon, Mar 20, 2017 at 06:23:24PM +0100, Philipp Zabel wrote:
+> @@ -1173,15 +1196,8 @@ static void csi_try_fmt(struct csi_priv *priv,
+>  		incc = imx_media_find_mbus_format(infmt->code,
+>  						  CS_SEL_ANY, true);
+>  
+> -		if (sdformat->format.width < priv->crop.width * 3 / 4)
+> -			sdformat->format.width = priv->crop.width / 2;
+> -		else
+> -			sdformat->format.width = priv->crop.width;
+> -
+> -		if (sdformat->format.height < priv->crop.height * 3 / 4)
+> -			sdformat->format.height = priv->crop.height / 2;
+> -		else
+> -			sdformat->format.height = priv->crop.height;
+> +		sdformat->format.width = compose->width;
+> +		sdformat->format.height = compose->height;
+>  
+>  		if (incc->bayer) {
+>  			sdformat->format.code = infmt->code;
 
-Yes, you either observe virtual interrupts or not, that's a benign race.
+We need to do more in here, because right now setting the source pads
+overwrites the colorimetry etc information.  Maybe something like the
+below?  I'm wondering if it would be a saner approach to copy the
+sink format and update the parameters that can be changed, rather than
+trying to list all the parameters that shouldn't be changed.  What if
+the format structure gains a new member?
 
-> 
-> Can we have a nice comment explaining this?
-> 
+diff --git a/drivers/staging/media/imx/imx-media-csi.c b/drivers/staging/media/imx/imx-media-csi.c
+index 1492b92e1970..756204ced53c 100644
+--- a/drivers/staging/media/imx/imx-media-csi.c
++++ b/drivers/staging/media/imx/imx-media-csi.c
+@@ -1221,6 +1221,12 @@ static void csi_try_fmt(struct csi_priv *priv,
+ 			sdformat->format.field =  (infmt->height == 480) ?
+ 				V4L2_FIELD_SEQ_TB : V4L2_FIELD_SEQ_BT;
+ 		}
++
++		/* copy settings we can't change */
++		sdformat->format.colorspace = infmt->colorspace;
++		sdformat->format.ycbcr_enc = infmt->ycbcr_enc;
++		sdformat->format.quantization = infmt->quantization;
++		sdformat->format.xfer_func = infmt->xfer_func;
+ 		break;
+ 	case CSI_SINK_PAD:
+ 		v4l_bound_align_image(&sdformat->format.width, MIN_W, MAX_W,
 
-You sure can, I will add something.
 
-> >  	spin_lock(&vcpu->arch.vgic_cpu.ap_list_lock);
-> >  	vgic_flush_lr_state(vcpu);
-> >  	spin_unlock(&vcpu->arch.vgic_cpu.ap_list_lock);
-> > 
-> 
 
-Thanks,
--Christoffer
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
