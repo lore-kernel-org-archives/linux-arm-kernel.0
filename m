@@ -1,37 +1,99 @@
-From: gerg@linux-m68k.org (Greg Ungerer)
-Date: Tue, 21 Mar 2017 21:53:52 +1000
-Subject: [PATCH 2/2] spi: imx: fix use of native chip-selects with
- devicetree
-In-Reply-To: <20170321080551.ie4xm5hr3fki365s@pengutronix.de>
-References: <1489726983-17706-1-git-send-email-gerg@linux-m68k.org>
- <1489726983-17706-3-git-send-email-gerg@linux-m68k.org>
- <f1cf2001-28b4-6a74-b98a-13336d74ff9d@mentor.com>
- <4a8449d9-cc38-d642-0853-246f46ee7059@linux-m68k.org>
- <20170321080551.ie4xm5hr3fki365s@pengutronix.de>
-Message-ID: <942cfc4b-445b-ca51-1823-2391cea62abf@linux-m68k.org>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 21 Mar 2017 11:54:48 +0000
+Subject: [PATCH] efifb: avoid reconfiguration of BAR that covers the
+ framebuffer
+In-Reply-To: <1490048037-1850-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1490048037-1850-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20170321115447.GA3667@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/03/17 18:05, Uwe Kleine-K?nig wrote:
-> On Tue, Mar 21, 2017 at 12:05:20PM +1000, Greg Ungerer wrote:
->> On 20/03/17 23:22, Vladimir Zapolskiy wrote:
->>> For that type of bindings locally I have a hackish spi-imx driver change,
->>> which supports this option, but I'm unsure if it is universal enough.
->>
->> Do you mean supporting no cs-gpios tag?
->> That would be nice, but it would seem not many users of this are
->> using native chip selects.
->
-> The reason for this is that the native chip selects are less flexible
-> than gpios because you cannot control when they deassert. IIRC they do
-> it too much for some chips. So the only reason to stick to them is that
-> on some SoCs not all pins have a GPIO function. Not sure if transfer
-> speed is another reason, but I would expect that the gain isn't that
-> big.
+[+Bjorn]
 
-For the particular SPI device I am using, a Silicon Labs 32260,
-it actually wants the assertion and de-assertion of the chip-select
-between each byte. So it is the only way it can work for me.
+On Mon, Mar 20, 2017 at 10:13:57PM +0000, Ard Biesheuvel wrote:
+> On UEFI systems, the PCI subsystem is enumerated by the firmware,
+> and if a graphical framebuffer is exposed by a PCI device, its base
+> address and size are exposed to the OS via the Graphics Output
+> Protocol (GOP).
+> 
+> On arm64 PCI systems, the entire PCI hierarchy is reconfigured from
+> scratch at boot. This may result in the GOP framebuffer address to
+> become stale, if the BAR covering the framebuffer is modified. This
+> will cause the framebuffer to become unresponsive, and may in some
+> cases result in unpredictable behavior if the range is reassigned to
+> another device.
 
-Regards
-Greg
+How does it currently work on eg x86 ? I suspect it just works because
+on x86 resources are claimed at boot and if the FB memory BAR contains
+reasonable values it is left alone by the kernel code reassigning
+resources on x86.
+
+> So add a quirk to the EFI fb driver to find the BAR associated with
+> the GOP base address, and set the IORESOURCE_PCI_FIXED attribute so
+> that the PCI core will leave it alone.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  drivers/video/fbdev/efifb.c | 33 ++++++++++++++++++++
+>  1 file changed, 33 insertions(+)
+> 
+> diff --git a/drivers/video/fbdev/efifb.c b/drivers/video/fbdev/efifb.c
+> index 8c4dc1e1f94f..97a3b15b6f04 100644
+> --- a/drivers/video/fbdev/efifb.c
+> +++ b/drivers/video/fbdev/efifb.c
+> @@ -10,6 +10,7 @@
+>  #include <linux/efi.h>
+>  #include <linux/errno.h>
+>  #include <linux/fb.h>
+> +#include <linux/pci.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/screen_info.h>
+>  #include <video/vga.h>
+> @@ -360,3 +361,35 @@ static struct platform_driver efifb_driver = {
+>  };
+>  
+>  builtin_platform_driver(efifb_driver);
+> +
+> +static bool resource_found;
+> +
+> +static void efifb_fixup_resources(struct pci_dev *dev)
+> +{
+> +	u64 fb_base = screen_info.lfb_base;
+> +	u64 fb_size = screen_info.lfb_size;
+> +	int i;
+> +
+> +	if (resource_found || screen_info.orig_video_isVGA != VIDEO_TYPE_EFI)
+> +		return;
+> +
+> +	if (screen_info.capabilities & VIDEO_CAPABILITY_64BIT_BASE)
+> +		fb_base |= (u64)screen_info.ext_lfb_base << 32;
+> +
+> +	if (!fb_base)
+> +		return;
+> +
+> +	for (i = 0; i < PCI_STD_RESOURCE_END; i++) {
+> +		struct resource *res = &dev->resource[i];
+> +
+> +		if (!(res->flags & IORESOURCE_MEM))
+> +			continue;
+> +
+> +		if (res->start <= fb_base && res->end >= fb_base + fb_size) {
+
+You are checking for a live resource here right (ie PCI device should be
+enabled) ? I am not sure that just checking the resource range is safe
+(I mean it would be most certainly a FW bug to have a PCI disabled
+device with memory BAR programmed with the FB addresses but thought it
+was worth mentioning).
+
+Lorenzo
+
+> +			res->flags |= IORESOURCE_PCI_FIXED;
+> +			resource_found = true;
+> +			break;
+> +		}
+> +	}
+> +}
+> +DECLARE_PCI_FIXUP_HEADER(PCI_ANY_ID, PCI_ANY_ID, efifb_fixup_resources);
+> -- 
+> 2.7.4
+> 
