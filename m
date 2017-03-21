@@ -1,193 +1,87 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Tue, 21 Mar 2017 18:12:40 +0000
-Subject: [PATCH v3 14/19] KVM: arm64: ITS: Add infrastructure for table
- lookup
-In-Reply-To: <1488800074-21991-15-git-send-email-eric.auger@redhat.com>
+Date: Tue, 21 Mar 2017 18:12:54 +0000
+Subject: [PATCH v3 16/19] KVM: arm64: ITS: vgic_its_check_id returns the
+ entry's GPA
+In-Reply-To: <1488800074-21991-17-git-send-email-eric.auger@redhat.com>
 References: <1488800074-21991-1-git-send-email-eric.auger@redhat.com>
- <1488800074-21991-15-git-send-email-eric.auger@redhat.com>
-Message-ID: <841f3278-b101-b920-c4a9-0d97b34c9a8a@arm.com>
+ <1488800074-21991-17-git-send-email-eric.auger@redhat.com>
+Message-ID: <be79d92f-2522-a754-f006-66901d26e94c@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
 On 06/03/17 11:34, Eric Auger wrote:
-> Add a generic lookup_table() helper whose role consists in
-> scanning a contiguous table located in guest RAM and applying
-> a callback on each entry. Entries can be handled as linked lists
-> since the callback may return an offset to the next entry and
-> also tell that an entry is the last one.
-> 
-> Helper functions also are added to compute the device/event ID
-> offset to the next DTE/ITE.
+> As vgic_its_check_id() computes the device/collection entry's
+> GPA, let's return it so that new callers can retrieve it easily.
 > 
 > Signed-off-by: Eric Auger <eric.auger@redhat.com>
+> 
 > ---
->  virt/kvm/arm/vgic/vgic-its.c | 119 +++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 119 insertions(+)
+> 
+> v2: new
+> ---
+>  virt/kvm/arm/vgic/vgic-its.c | 11 ++++++++---
+>  1 file changed, 8 insertions(+), 3 deletions(-)
 > 
 > diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-> index 1cd6ae6..cf04776 100644
+> index ad67759..1060125 100644
 > --- a/virt/kvm/arm/vgic/vgic-its.c
 > +++ b/virt/kvm/arm/vgic/vgic-its.c
-> @@ -181,6 +181,8 @@ static struct its_ite *find_ite(struct vgic_its *its, u32 device_id,
->  #define VITS_ESZ 8
->  #define VITS_TYPER_IDBITS 0xF
->  #define VITS_TYPER_DEVBITS 0xF
-> +#define VITS_DTE_MAX_DEVID_OFFSET GENMASK(19, 0)
-> +#define VITS_ITE_MAX_EVENTID_OFFSET GENMASK(16, 0)
-
-GENMASK here is a bit misleading, I think (BIT(20) - 1) would be
-clearer, wouldn't it?
-
+> @@ -637,7 +637,8 @@ static int vgic_its_cmd_handle_movi(struct kvm *kvm, struct vgic_its *its,
+>   * is actually valid (covered by a memslot and guest accessible).
+>   * For this we have to read the respective first level entry.
+>   */
+> -static bool vgic_its_check_id(struct vgic_its *its, u64 baser, int id)
+> +static bool vgic_its_check_id(struct vgic_its *its, u64 baser, int id,
+> +			      gpa_t *eaddr)
+>  {
+>  	int l1_tbl_size = GITS_BASER_NR_PAGES(baser) * SZ_64K;
+>  	int index;
+> @@ -657,6 +658,7 @@ static bool vgic_its_check_id(struct vgic_its *its, u64 baser, int id)
+>  		addr = BASER_ADDRESS(baser) + id * esz;
+>  		gfn = addr >> PAGE_SHIFT;
 >  
->  /*
->   * Finds and returns a collection in the ITS collection table.
-> @@ -1607,6 +1609,123 @@ int vgic_its_attr_regs_access(struct kvm_device *dev,
->  	return 0;
->  }
->  
-> +static u32 compute_next_devid_offset(struct list_head *h,
-> +				     struct its_device *dev)
-> +{
-> +	struct list_head *e = &dev->dev_list;
-> +	struct its_device *next;
-> +	u32 next_offset;
-> +
-> +	if (e->next == h)
-> +		return 0;
-> +	next = list_entry(e->next, struct its_device, dev_list);
-> +	next_offset = next->device_id - dev->device_id;
-> +
-> +	return next_offset < VITS_DTE_MAX_DEVID_OFFSET ?
-> +			next_offset : VITS_DTE_MAX_DEVID_OFFSET;
+> +		*eaddr = addr;
 
-	return min(next_offset, VITS_DTE_MAX_DEVID_OFFSET);
-
-> +}
-> +
-> +static u32 compute_next_eventid_offset(struct list_head *h,
-> +				       struct its_ite *ite)
-> +{
-> +	struct list_head *e = &ite->ite_list;
-> +	struct its_ite *next;
-> +	u32 next_offset;
-> +
-> +	if (e->next == h)
-> +		return 0;
-> +	next = list_entry(e->next, struct its_ite, ite_list);
-> +	next_offset = next->event_id - ite->event_id;
-> +
-> +	return next_offset < VITS_ITE_MAX_EVENTID_OFFSET ?
-> +			next_offset : VITS_ITE_MAX_EVENTID_OFFSET;
-
-	return min(next_offset, VITS_ITE_MAX_EVENTID_OFFSET);
-
-> +}
-> +
-> +static int next_segment(unsigned long len, int offset)
-
-Isn't "segment" a page, really? And thus should be named like this?
-
-> +{
-> +	if (len > PAGE_SIZE - offset)
-> +		return PAGE_SIZE - offset;
-> +	else
-> +		return len;
-> +}
-
-Can be: return min(len, PAGE_SIZE - offset); which means it could be a
-macro even.
-
-> +
-> +/**
-> + * entry_fn_t - Callback called on a table entry restore path
-> + * @its: its handle
-> + * @id: id of the entry
-> + * @addr: kernel VA of the entry
-> + * @opaque: pointer to an opaque data
-> + * @next_offset: minimal ID offset to the next entry. 0 if this
-> + * entry is the last one, 1 if the entry is invalid, >= 1 if an
-> + * entry's next_offset field was truly decoded
-> + *
-> + * Return: < 0 on error, 0 otherwise
-> + */
-> +typedef int (*entry_fn_t)(struct vgic_its *its, u32 id, void *addr,
-> +			  void *opaque, u32 *next_offset);
-> +
-> +/**
-> + * lookup_table - scans a contiguous table in guest RAM and applies a function
-> + * to each entry
-> + *
-> + * @its: its handle
-> + * @base: base gpa of the table
-> + * @size: size of the table in bytes
-> + * @esz: entry size in bytes
-> + * @start_id: first entry's ID
-> + * @fn: function to apply on each entry
-> + *
-> + * Return: < 0 on error, 1 if last element identified, 0 otherwise
-> + */
-> +static int lookup_table(struct vgic_its *its, gpa_t base, int size, int esz,
-
-   ^^^^^^
-Won't this trigger a build warning when building at this patch only?
-
-The rest looks fine.
+If you check that eaddr is not NULL before writing to it, you can save
+the dummy variable in the two callers below (which doesn't hurt, but
+does not help readability either).
 
 Cheers,
-Andre
+Andre.
 
-
-> +			int start_id, entry_fn_t fn, void *opaque)
-> +{
-> +	gpa_t gpa = base, top = base + size - 1;
-> +	unsigned long len = top - gpa;
-> +	int ret, seg, offset = offset_in_page(gpa);
-> +	gfn_t gfn = gpa >> PAGE_SHIFT;
-> +	u32 id = start_id + (gpa - base)/esz;
-> +	struct kvm *kvm = its->dev->kvm;
-> +	kvm_pfn_t pfn;
-> +
-> +	while ((seg = next_segment(len, offset)) != 0) {
-> +		u32 next_offset;
-> +		bool writeable;
-> +		void *addr;
-> +
-> +		pfn = gfn_to_pfn_prot(kvm, gfn, true, &writeable);
-> +		if (is_error_noslot_pfn(pfn))
-> +			return -EINVAL;
-> +		addr = phys_to_virt((u64)pfn << PAGE_SHIFT);
-> +		addr += offset;
-> +
-> +		while (seg > 0) {
-> +			size_t byte_offset;
-> +
-> +			ret = fn(its, id, addr, opaque, &next_offset);
-> +			if (ret < 0 || (!ret && !next_offset))
-> +				goto out;
-> +
-> +			byte_offset = next_offset * esz;
-> +
-> +			id += next_offset;
-> +			gpa += byte_offset;
-> +			addr += byte_offset;
-> +			seg -= byte_offset;
-> +		}
-> +		kvm_release_pfn_clean(pfn);
-> +
-> +		len = top - gpa;
-> +		offset = offset_in_page(gpa);
-> +		gfn = gpa >> PAGE_SHIFT;
-> +		id = start_id + (gpa - base)/esz;
-> +	}
-> +	return 0;
-> +out:
-> +	kvm_release_pfn_clean(pfn);
-> +	return (ret < 0 ? ret : 1);
-> +}
-> +
->  /**
->   * vgic_its_flush_pending_tables - Flush the pending tables into guest RAM
->   */
+>  		return kvm_is_visible_gfn(its->dev->kvm, gfn);
+>  	}
+>  
+> @@ -689,6 +691,7 @@ static bool vgic_its_check_id(struct vgic_its *its, u64 baser, int id)
+>  	indirect_ptr += index * esz;
+>  	gfn = indirect_ptr >> PAGE_SHIFT;
+>  
+> +	*eaddr = indirect_ptr;
+>  	return kvm_is_visible_gfn(its->dev->kvm, gfn);
+>  }
+>  
+> @@ -697,8 +700,9 @@ static int vgic_its_alloc_collection(struct vgic_its *its,
+>  				     u32 coll_id)
+>  {
+>  	struct its_collection *collection;
+> +	gpa_t eaddr;
+>  
+> -	if (!vgic_its_check_id(its, its->baser_coll_table, coll_id))
+> +	if (!vgic_its_check_id(its, its->baser_coll_table, coll_id, &eaddr))
+>  		return E_ITS_MAPC_COLLECTION_OOR;
+>  
+>  	collection = kzalloc(sizeof(*collection), GFP_KERNEL);
+> @@ -910,8 +914,9 @@ static int vgic_its_cmd_handle_mapd(struct kvm *kvm, struct vgic_its *its,
+>  	size_t size = its_cmd_get_size(its_cmd);
+>  	gpa_t itt_addr = its_cmd_get_ittaddr(its_cmd);
+>  	struct its_device *device;
+> +	gpa_t eaddr;
+>  
+> -	if (!vgic_its_check_id(its, its->baser_device_table, device_id))
+> +	if (!vgic_its_check_id(its, its->baser_device_table, device_id, &eaddr))
+>  		return E_ITS_MAPD_DEVICE_OOR;
+>  
+>  	if (valid && size > VITS_TYPER_IDBITS)
 > 
