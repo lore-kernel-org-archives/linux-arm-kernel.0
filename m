@@ -1,42 +1,50 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 21 Mar 2017 19:20:43 +0000
-Subject: [PATCH v4 13/28] ARM: Update cpu_v7_reset documentation
+Date: Tue, 21 Mar 2017 19:20:55 +0000
+Subject: [PATCH v4 25/28] ARM: decompressor: Remove __hyp_get_vectors usage
 In-Reply-To: <20170321192058.9300-1-marc.zyngier@arm.com>
 References: <20170321192058.9300-1-marc.zyngier@arm.com>
-Message-ID: <20170321192058.9300-14-marc.zyngier@arm.com>
+Message-ID: <20170321192058.9300-26-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-cpu_v7_reset() now takes a second parameter indicating whether
-we should reboot in HYP or not. Update the documentation to
-reflect this.
+When the compressed image needs to be relocated to avoid being
+overwritten by the decompression process, we need to relocate
+the hyp vectors as well so that we can find them once the
+decompression has taken effect.
 
-Tested-by: Keerthy <j-keerthy@ti.com>
+For that, we perform the following calculation:
+	u32 v = __hyp_get_vectors();
+	v += offset;
+	__hyp_set_vectors(v);
+
+But we're guaranteed that the initial value of v as returned by
+__hyp_get_vectors is always __hyp_stub_vectors, because we have
+just set it by calling __hyp_stub_install.
+
+So let's remove the use of __hyp_get_vectors, and directly use
+__hyp_stub_vectors instead.
+
 Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/mm/proc-v7.S | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ arch/arm/boot/compressed/head.S | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-index 1846ca4255d0..01d64c0b2563 100644
---- a/arch/arm/mm/proc-v7.S
-+++ b/arch/arm/mm/proc-v7.S
-@@ -39,13 +39,14 @@ ENTRY(cpu_v7_proc_fin)
- ENDPROC(cpu_v7_proc_fin)
+diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+index 9150f9732785..d58bb104c6e8 100644
+--- a/arch/arm/boot/compressed/head.S
++++ b/arch/arm/boot/compressed/head.S
+@@ -422,7 +422,10 @@ dtb_check_done:
+ 		cmp	r0, #HYP_MODE
+ 		bne	1f
  
- /*
-- *	cpu_v7_reset(loc)
-+ *	cpu_v7_reset(loc, hyp)
-  *
-  *	Perform a soft reset of the system.  Put the CPU into the
-  *	same state as it would be if it had been reset, and branch
-  *	to what would be the reset vector.
-  *
-  *	- loc   - location to jump to for soft reset
-+ *	- hyp   - indicate if restart occurs in HYP mode
-  *
-  *	This code must be executed using a flat identity mapping with
-  *      caches disabled.
+-		bl	__hyp_get_vectors
++0:		adr	r0, 0b
++		movw	r1, #:lower16:__hyp_stub_vectors - 0b
++		movt	r1, #:upper16:__hyp_stub_vectors - 0b
++		add	r0, r0, r1
+ 		sub	r0, r0, r5
+ 		add	r0, r0, r10
+ 		bl	__hyp_set_vectors
 -- 
 2.11.0
