@@ -1,178 +1,83 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 21 Mar 2017 19:00:37 +0000
-Subject: [PATCH v2] arm: Fix memory attribute inconsistencies when using
- fixmap
-In-Reply-To: <1490117781.3136.9.camel@linaro.org>
-References: <20170321173030.7751-1-tixy@linaro.org>
- <1490117781.3136.9.camel@linaro.org>
-Message-ID: <CAKv+Gu82PsyyC=fQHxUn5mrCdmQvhwK+DK342-vv8y53mLcpng@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 21 Mar 2017 18:45:57 +0000
+Subject: Applied "ASoC: sun8i-codec: Remove analog "HP" widget" to the asoc
+ tree
+In-Reply-To: <20170210094133.11382-2-mylene.josserand@free-electrons.com>
+Message-ID: <E1cqOn7-0001Bk-6c@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 March 2017 at 17:36, Jon Medhurst (Tixy) <tixy@linaro.org> wrote:
-> On Tue, 2017-03-21 at 17:30 +0000, Jon Medhurst wrote:
->> To cope with the variety in ARM architectures and configurations, the
->> pagetable attributes for kernel memory are generated at runtime to match
->> the system the kernel finds itself on. This calculated value is stored
->> in pgprot_kernel.
->>
->> However, when early fixmap support was added for arm (commit
->> a5f4c561b3b1) the attributes used for mappings were hard coded because
->> pgprot_kernel is not set up early enough. Unfortunately, when fixmap is
->> used after early boot this means the memory being mapped can have
->> different attributes to existing mappings, potentially leading to
->> unpredictable behaviour. A specific problem also exists due to the hard
->> coded values not include the 'shareable' attribute which means on
->> systems where this matters (e.g. those with multiple CPU clusters) the
->> cache contents for a memory location can become inconsistent between
->> CPUs.
->>
->> To resolve these issues we change fixmap to use the same memory
->> attributes (from pgprot_kernel) that the rest of the kernel uses. To
->> enable this we need to refactor the initialisation code so
->> build_mem_type_table is called early enough. Note, that relies on early
->> param parsing for memory type overrides passed via the kernel command
->> line, so we need to make sure this call is still after
->> parse_early_params().
->>
->> Fixes: a5f4c561b3b1 ("ARM: 8415/1: early fixmap support for earlycon")
->> Cc: stable at vger.kernel.org # v4.3+
->
-> Sorry, this should have...
-> Signed-off-by: Jon Medhurst <tixy@linaro.org>
->
+The patch
 
-Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+   ASoC: sun8i-codec: Remove analog "HP" widget
 
-UEFI boot and earlycon both still work for me, so
+has been applied to the asoc tree at
 
-Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
 
-It looks like nommu should be unaffected, but it is worth giving it a
-spin as well
+All being well this means that it will be integrated into the linux-next
+tree (usually sometime in the next 24 hours) and sent to Linus during
+the next merge window (or sooner if it is a bug fix), however if
+problems are discovered then the patch may be dropped or reverted.  
 
+You may get further e-mails resulting from automated or manual testing
+and review of the tree, please engage with people reporting problems and
+send followup patches addressing any issues that are reported if needed.
+
+If any updates are required or you are submitting further changes they
+should be sent as incremental updates against current git, existing
+patches will not be replaced.
+
+Please add any relevant lists and maintainers to the CCs when replying
+to this mail.
 
 Thanks,
-Ard.
+Mark
 
+>From a82f16188a32a3c889916c582ea2d9188e3c2734 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Myl=C3=A8ne=20Josserand?=
+ <mylene.josserand@free-electrons.com>
+Date: Sat, 18 Mar 2017 08:55:05 +0100
+Subject: [PATCH] ASoC: sun8i-codec: Remove analog "HP" widget
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
 
->> ---
->>
->> Changes since v1:
->> - Completely rewritten based on Russell's and Ard's sugestions
->> - Subject changed from "arm: Fix cache inconsistency when using fixmap"
->>
->>
->>  arch/arm/include/asm/fixmap.h |  7 +------
->>  arch/arm/include/asm/mmu.h    |  2 ++
->>  arch/arm/kernel/setup.c       |  5 +----
->>  arch/arm/mm/mmu.c             | 12 ++++++++++--
->>  4 files changed, 14 insertions(+), 12 deletions(-)
->>
->> diff --git a/arch/arm/include/asm/fixmap.h b/arch/arm/include/asm/fixmap.h
->> index 5c17d2dec777..c54f06ace2a1 100644
->> --- a/arch/arm/include/asm/fixmap.h
->> +++ b/arch/arm/include/asm/fixmap.h
->> @@ -41,7 +41,7 @@ static const enum fixed_addresses __end_of_fixed_addresses =
->>
->>  #define FIXMAP_PAGE_COMMON   (L_PTE_YOUNG | L_PTE_PRESENT | L_PTE_XN | L_PTE_DIRTY)
->>
->> -#define FIXMAP_PAGE_NORMAL   (FIXMAP_PAGE_COMMON | L_PTE_MT_WRITEBACK)
->> +#define FIXMAP_PAGE_NORMAL   (pgprot_kernel | L_PTE_XN)
->>  #define FIXMAP_PAGE_RO               (FIXMAP_PAGE_NORMAL | L_PTE_RDONLY)
->>
->>  /* Used by set_fixmap_(io|nocache), both meant for mapping a device */
->> @@ -53,13 +53,8 @@ static const enum fixed_addresses __end_of_fixed_addresses =
->>  #ifdef CONFIG_MMU
->>
->>  void __set_fixmap(enum fixed_addresses idx, phys_addr_t phys, pgprot_t prot);
->> -void __init early_fixmap_init(void);
->>
->>  #include <asm-generic/fixmap.h>
->>
->> -#else
->> -
->> -static inline void early_fixmap_init(void) { }
->> -
->>  #endif
->>  #endif
->> diff --git a/arch/arm/include/asm/mmu.h b/arch/arm/include/asm/mmu.h
->> index a5b47421059d..920d29ca5c3b 100644
->> --- a/arch/arm/include/asm/mmu.h
->> +++ b/arch/arm/include/asm/mmu.h
->> @@ -24,6 +24,8 @@ typedef struct {
->>  #define ASID(mm)     (0)
->>  #endif
->>
->> +void early_mm_init(void);
->> +
->>  #else
->>
->>  /*
->> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
->> index f4e54503afa9..37c59589aac3 100644
->> --- a/arch/arm/kernel/setup.c
->> +++ b/arch/arm/kernel/setup.c
->> @@ -40,7 +40,6 @@
->>  #include <asm/efi.h>
->>  #include <asm/elf.h>
->>  #include <asm/early_ioremap.h>
->> -#include <asm/fixmap.h>
->>  #include <asm/procinfo.h>
->>  #include <asm/psci.h>
->>  #include <asm/sections.h>
->> @@ -1082,12 +1081,10 @@ void __init setup_arch(char **cmdline_p)
->>       strlcpy(cmd_line, boot_command_line, COMMAND_LINE_SIZE);
->>       *cmdline_p = cmd_line;
->>
->> -     early_fixmap_init();
->> -     early_ioremap_init();
->> -
->>       parse_early_param();
->>
->>  #ifdef CONFIG_MMU
->> +     early_mm_init();
->>       early_paging_init(mdesc);
->>  #endif
->>       setup_dma_zone(mdesc);
->> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
->> index 4e016d7f37b3..f81809e6bd10 100644
->> --- a/arch/arm/mm/mmu.c
->> +++ b/arch/arm/mm/mmu.c
->> @@ -22,6 +22,7 @@
->>  #include <asm/cputype.h>
->>  #include <asm/sections.h>
->>  #include <asm/cachetype.h>
->> +#include <asm/early_ioremap.h>
->>  #include <asm/fixmap.h>
->>  #include <asm/sections.h>
->>  #include <asm/setup.h>
->> @@ -382,7 +383,7 @@ static inline pmd_t * __init fixmap_pmd(unsigned long addr)
->>       return pmd;
->>  }
->>
->> -void __init early_fixmap_init(void)
->> +static void __init early_fixmap_init(void)
->>  {
->>       pmd_t *pmd;
->>
->> @@ -1616,7 +1617,6 @@ void __init paging_init(const struct machine_desc *mdesc)
->>  {
->>       void *zero_page;
->>
->> -     build_mem_type_table();
->>       prepare_page_table();
->>       map_lowmem();
->>       memblock_set_current_limit(arm_lowmem_limit);
->> @@ -1636,3 +1636,11 @@ void __init paging_init(const struct machine_desc *mdesc)
->>       empty_zero_page = virt_to_page(zero_page);
->>       __flush_dcache_page(NULL, empty_zero_page);
->>  }
->> +
->> +void __init early_mm_init(void)
->> +{
->> +     build_mem_type_table();
->> +
->> +     early_fixmap_init();
->> +     early_ioremap_init();
->> +}
+The "HP" widget is already present and take part to
+the analog part (sun8i-codec-analog).
+
+Remove it from the digital part as it is unnecessary.
+
+Signed-off-by: Myl??ne Josserand <mylene.josserand@free-electrons.com>
+Acked-by: Chen-Yu Tsai <wens@csie.org>
+Signed-off-by: Mark Brown <broonie@kernel.org>
+---
+ sound/soc/sunxi/sun8i-codec.c | 6 ------
+ 1 file changed, 6 deletions(-)
+
+diff --git a/sound/soc/sunxi/sun8i-codec.c b/sound/soc/sunxi/sun8i-codec.c
+index b92bdc8361af..d60f6fbd36a2 100644
+--- a/sound/soc/sunxi/sun8i-codec.c
++++ b/sound/soc/sunxi/sun8i-codec.c
+@@ -321,8 +321,6 @@ static const struct snd_soc_dapm_widget sun8i_codec_dapm_widgets[] = {
+ 			    SUN8I_MOD_RST_CTL_AIF1, 0, NULL, 0),
+ 	SND_SOC_DAPM_SUPPLY("RST DAC", SUN8I_MOD_RST_CTL,
+ 			    SUN8I_MOD_RST_CTL_DAC, 0, NULL, 0),
+-
+-	SND_SOC_DAPM_OUTPUT("HP"),
+ };
+ 
+ static const struct snd_soc_dapm_route sun8i_codec_dapm_routes[] = {
+@@ -344,10 +342,6 @@ static const struct snd_soc_dapm_route sun8i_codec_dapm_routes[] = {
+ 	/* DAC Mixer Routes */
+ 	{ "Left DAC Mixer", "LSlot 0", "Digital Left DAC"},
+ 	{ "Right DAC Mixer", "RSlot 0", "Digital Right DAC"},
+-
+-	/* End of route : HP out */
+-	{ "HP", NULL, "Left DAC Mixer" },
+-	{ "HP", NULL, "Right DAC Mixer" },
+ };
+ 
+ static struct snd_soc_dai_ops sun8i_codec_dai_ops = {
+-- 
+2.11.0
