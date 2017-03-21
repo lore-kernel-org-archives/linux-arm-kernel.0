@@ -1,70 +1,92 @@
 From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 21 Mar 2017 19:48:55 -0000
-Subject: [PATCH 1/2] ARM: dts: r8a7792: add IMR-L[S]X3 clocks
-Message-ID: <20170321194820.477663240@cogentembedded.com>
+Date: Tue, 21 Mar 2017 19:49:05 -0000
+Subject: [PATCH 2/2] ARM: dts: r8a7792: add IMR-L[S]X3 support
+Message-ID: <20170321194830.621344167@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the IMR-L[S]X3 clocks to the R8A7792 device tree.
+Describe the IMR-LX3 and 6 IMR-LSX3 devices in the R8A7792 device tree.
 
 Based on the original patch by Roman Meshkevich
-<roman.meshkevich@cogentembedded.com>.
+<roman.meshkevich@cogentembedded.com>
 
 Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
 ---
- arch/arm/boot/dts/r8a7792.dtsi            |   15 ++++++++++++---
- include/dt-bindings/clock/r8a7792-clock.h |    7 +++++++
- 2 files changed, 19 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/r8a7792.dtsi |   63 +++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 63 insertions(+)
 
 Index: renesas/arch/arm/boot/dts/r8a7792.dtsi
 ===================================================================
 --- renesas.orig/arch/arm/boot/dts/r8a7792.dtsi
 +++ renesas/arch/arm/boot/dts/r8a7792.dtsi
-@@ -927,16 +927,25 @@
- 				     "renesas,cpg-mstp-clocks";
- 			reg = <0 0xe6150990 0 4>, <0 0xe61509a0 0 4>;
- 			clocks = <&zg_clk>, <&zg_clk>, <&zg_clk>, <&zg_clk>,
--			         <&zg_clk>, <&zg_clk>, <&hp_clk>;
-+				 <&zg_clk>, <&zg_clk>, <&hp_clk>, <&zg_clk>,
-+				 <&zg_clk>, <&zg_clk>, <&zg_clk>, <&zg_clk>,
-+				 <&zg_clk>, <&zg_clk>;
- 			#clock-cells = <1>;
- 			clock-indices = <
- 				R8A7792_CLK_VIN5 R8A7792_CLK_VIN4
- 				R8A7792_CLK_VIN3 R8A7792_CLK_VIN2
- 				R8A7792_CLK_VIN1 R8A7792_CLK_VIN0
--				R8A7792_CLK_ETHERAVB
-+				R8A7792_CLK_ETHERAVB R8A7792_CLK_IMR_LX3
-+				R8A7792_CLK_IMR_LSX3_1 R8A7792_CLK_IMR_LSX3_0
-+				R8A7792_CLK_IMR_LSX3_5 R8A7792_CLK_IMR_LSX3_4
-+				R8A7792_CLK_IMR_LSX3_3 R8A7792_CLK_IMR_LSX3_2
- 			>;
- 			clock-output-names = "vin5", "vin4", "vin3", "vin2",
--					     "vin1", "vin0", "etheravb";
-+					     "vin1", "vin0",
-+					     "etheravb", "imr-lx3",
-+					     "imr-lsx3-1", "imr-lsx3-0",
-+					     "imr-lsx3-5", "imr-lsx3-4",
-+					     "imr-lsx3-3", "imr-lsx3-2";
+@@ -734,6 +734,69 @@
+ 			status = "disabled";
  		};
- 		mstp9_clks: mstp9_clks at e6150994 {
- 			compatible = "renesas,r8a7792-mstp-clocks",
-Index: renesas/include/dt-bindings/clock/r8a7792-clock.h
-===================================================================
---- renesas.orig/include/dt-bindings/clock/r8a7792-clock.h
-+++ renesas/include/dt-bindings/clock/r8a7792-clock.h
-@@ -70,6 +70,13 @@
- #define R8A7792_CLK_VIN1		10
- #define R8A7792_CLK_VIN0		11
- #define R8A7792_CLK_ETHERAVB		12
-+#define R8A7792_CLK_IMR_LX3		21
-+#define R8A7792_CLK_IMR_LSX3_1		22
-+#define R8A7792_CLK_IMR_LSX3_0		23
-+#define R8A7792_CLK_IMR_LSX3_5		25
-+#define R8A7792_CLK_IMR_LSX3_4		26
-+#define R8A7792_CLK_IMR_LSX3_3		27
-+#define R8A7792_CLK_IMR_LSX3_2		28
  
- /* MSTP9 */
- #define R8A7792_CLK_GPIO7		4
++		imr-lsx3 at fe840000 {
++			compatible = "renesas,r8a7792-imr-lsx3",
++				     "renesas,imr-lsx3";
++			reg = <0 0xfe840000 0 0x2000>;
++			interrupts = <GIC_SPI 194 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&mstp8_clks R8A7792_CLK_IMR_LSX3_0>;
++			power-domains = <&sysc R8A7792_PD_ALWAYS_ON>;
++		};
++
++		imr-lsx3 at fe850000 {
++			compatible = "renesas,r8a7792-imr-lsx3",
++				     "renesas,imr-lsx3";
++			reg = <0 0xfe850000 0 0x2000>;
++			interrupts = <GIC_SPI 195 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&mstp8_clks R8A7792_CLK_IMR_LSX3_1>;
++			power-domains = <&sysc R8A7792_PD_ALWAYS_ON>;
++		};
++
++		imr-lsx3 at fe860000 {
++			compatible = "renesas,r8a7792-imr-lsx3",
++				     "renesas,imr-lsx3";
++			reg = <0 0xfe860000 0 0x2000>;
++			interrupts = <GIC_SPI 148 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&mstp8_clks R8A7792_CLK_IMR_LSX3_2>;
++			power-domains = <&sysc R8A7792_PD_ALWAYS_ON>;
++		};
++
++		imr-lsx3 at fe870000 {
++			compatible = "renesas,r8a7792-imr-lsx3",
++				     "renesas,imr-lsx3";
++			reg = <0 0xfe870000 0 0x2000>;
++			interrupts = <GIC_SPI 149 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&mstp8_clks R8A7792_CLK_IMR_LSX3_3>;
++			power-domains = <&sysc R8A7792_PD_ALWAYS_ON>;
++		};
++
++		imr-lsx3 at fe880000 {
++			compatible = "renesas,r8a7792-imr-lsx3",
++				     "renesas,imr-lsx3";
++			reg = <0 0xfe880000 0 0x2000>;
++			interrupts = <GIC_SPI 150 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&mstp8_clks R8A7792_CLK_IMR_LSX3_4>;
++			power-domains = <&sysc R8A7792_PD_ALWAYS_ON>;
++		};
++
++		imr-lsx3 at fe890000 {
++			compatible = "renesas,r8a7792-imr-lsx3",
++				     "renesas,imr-lsx3";
++			reg = <0 0xfe890000 0 0x2000>;
++			interrupts = <GIC_SPI 151 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&mstp8_clks R8A7792_CLK_IMR_LSX3_5>;
++			power-domains = <&sysc R8A7792_PD_ALWAYS_ON>;
++		};
++
++		imr-lx3 at fead0000 {
++			compatible = "renesas,r8a7792-imr-lx3",
++				     "renesas,imr-lx3";
++			reg = <0 0xfead0000 0 0x2000>;
++			interrupts = <GIC_SPI 192 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&mstp8_clks R8A7792_CLK_IMR_LX3>;
++			power-domains = <&sysc R8A7792_PD_ALWAYS_ON>;
++		};
++
+ 		vsp1 at fe928000 {
+ 			compatible = "renesas,vsp1";
+ 			reg = <0 0xfe928000 0 0x8000>;
