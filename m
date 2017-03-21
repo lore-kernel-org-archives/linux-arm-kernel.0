@@ -1,21 +1,33 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 21 Mar 2017 17:17:24 +0000
-Subject: [PATCH v6 10/11] drivers: perf: hisi: use poll method when no
- IRQ for MN counter overflow
-In-Reply-To: <1489127341-112908-1-git-send-email-anurup.m@huawei.com>
-References: <1489127341-112908-1-git-send-email-anurup.m@huawei.com>
-Message-ID: <20170321171724.GC29116@leverpostej>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Tue, 21 Mar 2017 19:18:00 +0200
+Subject: [PATCH v2 0/3] arm64: exynos: Enable drivers for Exynos5433
+In-Reply-To: <20170314171028.20337-1-krzk@kernel.org>
+References: <20170314171028.20337-1-krzk@kernel.org>
+Message-ID: <20170321171800.6kn5efw425np4h7h@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 10, 2017 at 01:29:01AM -0500, Anurup M wrote:
-> When no IRQ is supported in hardware, use hrtimer to poll and
-> update event counter and avoid overflow condition for MN PMU.
-> An interval of 8 seconds is used for the hrtimer.
+On Tue, Mar 14, 2017 at 07:10:25PM +0200, Krzysztof Kozlowski wrote:
+> Hi,
+> 
+> 
+> Patches are independent but I organized them into one patchset
+> as they have common goal - enable more drivers for ARMv8 Exynos chips.
+> 
+> If there are no objections, I can take it through samsung-soc.
+> 
+> Changes since v1:
+> ================
+> 1. Patch 1/3: Do not enable entire DRM stack but only drivers
+>    supporting Exynos5433 and Exynos7 (suggested by Bartlomiej).
+> 2. Add Bartlomiej's and Alim's reviews.
+> 
+> 
+> Best regards,
+> Krzysztof
+>
 
-Please fold this into the main MN patch.
+I appled all three to samsung-soc and I will push them through arm-soc.
 
-The comments on the L3 hrtimer patch also apply here.
-
-Thanks,
-Mark.
+Best regards,
+Krzysztof
