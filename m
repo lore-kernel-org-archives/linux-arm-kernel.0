@@ -1,51 +1,51 @@
-From: slash.tmp@free.fr (Mason)
-Date: Tue, 21 Mar 2017 13:43:21 +0100
-Subject: [RFC PATCH v0.001] PCI: Add support for tango PCIe controller
-In-Reply-To: <9d23357c-fa59-d638-11ba-f1ab24dbeb43@arm.com>
-References: <ab110ce2-8678-9b34-6bd1-6cfaaa7fea04@free.fr>
- <f13c385d-dcc9-dacd-2b2c-ca098228f4f4@free.fr>
- <9d23357c-fa59-d638-11ba-f1ab24dbeb43@arm.com>
-Message-ID: <89fab12d-82b1-512f-df48-666861eab22f@free.fr>
+From: Scott.Lurndal@cavium.com (Lurndal, Scott)
+Date: Tue, 21 Mar 2017 05:48:13 -0700
+Subject: [Linaro-acpi] [PATCH v21 13/13] acpi/arm64: Add SBSA Generic
+ Watchdog support in GTDT driver
+In-Reply-To: <CADyBb7vgzLCoFO6p=mu=D93VSHwuFh6cLEwVD9PvvuOUGxEgcw@mail.gmail.com>
+References: <20170206185015.12296-1-fu.wei@linaro.org>
+ <20170206185015.12296-14-fu.wei@linaro.org>
+ <20170317200153.GF15909@leverpostej>
+ <CADyBb7uZV2Qe0ga4TTS_iis5MtwJ=u6PKYSV6ED103Cmh5_O3g@mail.gmail.com>
+ <20170320180949.GM31213@leverpostej>
+ <20170320185002.GT31496@slurndal-lnx1.caveonetworks.com>
+ <CADyBb7vgzLCoFO6p=mu=D93VSHwuFh6cLEwVD9PvvuOUGxEgcw@mail.gmail.com>
+Message-ID: <20170321124813.GB31496@slurndal-lnx1.caveonetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/03/2017 12:36, Robin Murphy wrote:
-
-> On 21/03/17 10:15, Mason wrote:
->
->> I suppose one may consider the above limitation ("Only transfers
->> within the BAR are forwarded to the host") as some form of weird
->> IOMMU? (There is, in fact, some remapping logic in the controller
->> setup which I haven't discussed so far.)
+On Tue, Mar 21, 2017 at 11:48:02AM +0800, Fu Wei wrote:
+> Hi Mark, Lurndal,
 > 
-> Not really. If it's the 8x128MB region thing mentioned elsewhere, that's
-> far too coarse a granularity to be much use with the existing IOMMU API
-> (this vaguely reminds me of a similar discussion about programmable
-> interconnects ages ago). Unless it's actually got some sort of GART-type
-> thing or better capable of page-granularity mappings within a
-> significantly-sized region, I'd put that idea to bed.
-
-I had a feeling my use-case was too quirky for a sane API :-)
-
->> Since this SoC is used for TV, the media cartels mandate some way
->> to limit where PCI bus masters can peek/poke in RAM.
+> >>       The base server system implements _a_ Generic Watchdog as
+> >>       specified in APPENDIX A: Generic Watchdog.
+> >
+> >   It is a requirement of a conforming implementation that there
+> > be a generic watchdog (impl as per the appendix).   That doesn't preclude
+> > an implmentation from providing additional watchdogs (for example, if
+> > the processor implements EL3, it is likely that an implementation
+> > will include a secure watchdog as well as a non-secure watchdog).
+> >
+> >   The SBSA describes the minimal hardware requirements for a
+> > compliant server.
 > 
-> FWIW, since that sounds like more of a box-ticking exercise than a real
-> practical concern, I'd point out that content protection is more or less
-> the poster child for TrustZone, and your TZASC should help tick that box
-> regardless.
+> So I think, for the SBSA watchdog:
+> 
+> (1) there maybe more then one non-secure watchdog in GTDT
 
-Interesting. In fact, our Linux runs as the non-secure OS,
-and we do have a custom "secure" OS running in parallel.
+I suppose a firmware vendor could chose to expose more than the
+platform minimum to linux.   Not quite sure what linux would
+do with it :-)
 
-My knowledge of TZ is limited to "call this SMC to offline
-that CPU", but our local TZ expert is CCed :-)
+> 
+> (2) we may also need to skip  secure watchdogs in GTDT,
+> and only register non-secure watchdogs into platform resources.
 
-TZASC = TrustZone Address Space Controller
+The secure watchdog will, be definition, never be accessible
+to non-secure EL2 or non-secure EL1, so only in the case of
+a secure EL1 operating system would the secure watchdog ever
+be conveyed through ACPI.   I don't think secure EL1 is in
+the scope of the SBSA, or something that needs to be accomodated
+in the GTDT at this time.
 
-http://infocenter.arm.com/help/topic/com.arm.doc.ddi0431c/CHDBBGIC.html
-
-Is there a TZASC embedded in every ARM core?
-We're using Cortex-A9 MPCore r3p0 + PL310 r3p2
-
-Regards.
+scott
