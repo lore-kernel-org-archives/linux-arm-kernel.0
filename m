@@ -1,69 +1,70 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 21 Mar 2017 19:20:46 +0000
-Subject: [PATCH v4 16/28] ARM: hyp-stub: Implement HVC_RESET_VECTORS stub
- hypercall
+Date: Tue, 21 Mar 2017 19:20:50 +0000
+Subject: [PATCH v4 20/28] ARM: KVM: Convert __cpu_reset_hyp_mode to using
+ __hyp_reset_vectors
 In-Reply-To: <20170321192058.9300-1-marc.zyngier@arm.com>
 References: <20170321192058.9300-1-marc.zyngier@arm.com>
-Message-ID: <20170321192058.9300-17-marc.zyngier@arm.com>
+Message-ID: <20170321192058.9300-21-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Let's define a new stub hypercall that resets the HYP configuration
-to its default: hyp-stub vectors, and MMU disabled.
-
-Of course, for the hyp-stub itself, this is a trivial no-op.
-Hypervisors will have a bit more work to do.
+We are now able to use the hyp stub to reset HYP mode. Time to
+kiss __kvm_hyp_reset goodbye, and use __hyp_reset_vectors.
 
 Tested-by: Keerthy <j-keerthy@ti.com>
 Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/asm/virt.h |  3 +++
- arch/arm/kernel/hyp-stub.S  | 11 ++++++++++-
- 2 files changed, 13 insertions(+), 1 deletion(-)
+ arch/arm/include/asm/kvm_asm.h  | 2 --
+ arch/arm/include/asm/kvm_host.h | 2 +-
+ arch/arm/kvm/init.S             | 2 --
+ 3 files changed, 1 insertion(+), 5 deletions(-)
 
-diff --git a/arch/arm/include/asm/virt.h b/arch/arm/include/asm/virt.h
-index 4ea16fcaf2ed..5186718aab68 100644
---- a/arch/arm/include/asm/virt.h
-+++ b/arch/arm/include/asm/virt.h
-@@ -101,6 +101,9 @@ extern char __hyp_text_end[];
- #define HVC_GET_VECTORS 0
- #define HVC_SET_VECTORS 1
- #define HVC_SOFT_RESTART 2
-+#define HVC_RESET_VECTORS 3
-+
-+#define HVC_STUB_HCALL_NR 4
+diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
+index 8ef05381984b..7ccb6f1aac5b 100644
+--- a/arch/arm/include/asm/kvm_asm.h
++++ b/arch/arm/include/asm/kvm_asm.h
+@@ -72,8 +72,6 @@ extern int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
  
- #endif /* __ASSEMBLY__ */
+ extern void __init_stage2_translation(void);
  
-diff --git a/arch/arm/kernel/hyp-stub.S b/arch/arm/kernel/hyp-stub.S
-index 15eaa14322a7..21794d4a8f36 100644
---- a/arch/arm/kernel/hyp-stub.S
-+++ b/arch/arm/kernel/hyp-stub.S
-@@ -216,7 +216,10 @@ __hyp_stub_do_trap:
+-extern void __kvm_hyp_reset(unsigned long);
+-
+ extern u64 __vgic_v3_get_ich_vtr_el2(void);
+ extern void __vgic_v3_init_lrs(void);
+ #endif
+diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+index 31ee468ce667..adea30753185 100644
+--- a/arch/arm/include/asm/kvm_host.h
++++ b/arch/arm/include/asm/kvm_host.h
+@@ -273,7 +273,7 @@ static inline void __cpu_init_stage2(void)
+ static inline void __cpu_reset_hyp_mode(unsigned long vector_ptr,
+ 					phys_addr_t phys_idmap_start)
+ {
+-	kvm_call_hyp((void *)virt_to_idmap(__kvm_hyp_reset), vector_ptr);
++	__hyp_reset_vectors();
+ }
+ 
+ static inline int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext)
+diff --git a/arch/arm/kvm/init.S b/arch/arm/kvm/init.S
+index 0da120b71c2e..7335a510eee4 100644
+--- a/arch/arm/kvm/init.S
++++ b/arch/arm/kvm/init.S
+@@ -129,7 +129,6 @@ ENTRY(__kvm_handle_stub_hvc)
+ 
+ 1:	cmp	r0, #HVC_RESET_VECTORS
  	bne	1f
- 	bx	r1
+-ENTRY(__kvm_hyp_reset)
+ 	/* We're now in idmap, disable MMU */
+ 	mrc	p15, 4, r1, c1, c0, 0	@ HSCTLR
+ 	ldr	r0, =(HSCTLR_M | HSCTLR_A | HSCTLR_C | HSCTLR_I)
+@@ -151,7 +150,6 @@ ENTRY(__kvm_hyp_reset)
+ exit:
+ 	eret
+ ENDPROC(__kvm_handle_stub_hvc)
+-ENDPROC(__kvm_hyp_reset)
  
--1:	mov	r0, #-1
-+1:	teq	r0, #HVC_RESET_VECTORS
-+	beq	__hyp_stub_exit
-+
-+	mov	r0, #-1
+ 	.ltorg
  
- __hyp_stub_exit:
- 	__ERET
-@@ -264,6 +267,12 @@ ENTRY(__hyp_soft_restart)
- 	ret	lr
- ENDPROC(__hyp_soft_restart)
- 
-+ENTRY(__hyp_reset_vectors)
-+	mov	r0, #HVC_RESET_VECTORS
-+	__HVC(0)
-+	ret	lr
-+ENDPROC(__hyp_reset_vectors)
-+
- #ifndef ZIMAGE
- .align 2
- .L__boot_cpu_mode_offset:
 -- 
 2.11.0
