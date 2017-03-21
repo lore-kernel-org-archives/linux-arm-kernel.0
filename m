@@ -1,161 +1,54 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Tue, 21 Mar 2017 17:36:21 +0000
-Subject: [PATCH v2] arm: Fix memory attribute inconsistencies when using
- fixmap
-In-Reply-To: <20170321173030.7751-1-tixy@linaro.org>
-References: <20170321173030.7751-1-tixy@linaro.org>
-Message-ID: <1490117781.3136.9.camel@linaro.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 21 Mar 2017 17:37:04 +0000
+Subject: [PATCH v3 01/25] arm64: hyp-stub: Implement HVC_RESET_VECTORS
+ stub hypercall
+In-Reply-To: <58D1620E.30001@arm.com>
+References: <20170306142458.8875-1-marc.zyngier@arm.com>
+ <20170306142458.8875-2-marc.zyngier@arm.com>
+ <20170321170407.GD21829@e104818-lin.cambridge.arm.com>
+ <58D1620E.30001@arm.com>
+Message-ID: <0cce34c1-cb6f-0ba3-ac98-c0a0e986dc86@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2017-03-21 at 17:30 +0000, Jon Medhurst wrote:
-> To cope with the variety in ARM architectures and configurations, the
-> pagetable attributes for kernel memory are generated at runtime to match
-> the system the kernel finds itself on. This calculated value is stored
-> in pgprot_kernel.
+On 21/03/17 17:25, James Morse wrote:
+> Hi Catalin,
 > 
-> However, when early fixmap support was added for arm (commit
-> a5f4c561b3b1) the attributes used for mappings were hard coded because
-> pgprot_kernel is not set up early enough. Unfortunately, when fixmap is
-> used after early boot this means the memory being mapped can have
-> different attributes to existing mappings, potentially leading to
-> unpredictable behaviour. A specific problem also exists due to the hard
-> coded values not include the 'shareable' attribute which means on
-> systems where this matters (e.g. those with multiple CPU clusters) the
-> cache contents for a memory location can become inconsistent between
-> CPUs.
+> On 21/03/17 17:04, Catalin Marinas wrote:
+>> On Mon, Mar 06, 2017 at 02:24:34PM +0000, Marc Zyngier wrote:
+>>> Let's define a new stub hypercall that resets the HYP configuration
+>>> to its default: hyp-stub vectors, and MMU disabled.
+>>>
+>>> Of course, for the hyp-stub itself, this is a trivial no-op.
+>>> Hypervisors will have a bit more work to do.
+>>>
+>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>>> ---
+>>>  arch/arm64/include/asm/virt.h |  9 +++++++++
+>>>  arch/arm64/kernel/hyp-stub.S  | 13 ++++++++++++-
+>>>  2 files changed, 21 insertions(+), 1 deletion(-)
+>> [...]
+>>> +ENTRY(__hyp_reset_vectors)
+>>> +	str	lr, [sp, #-16]!
+>>> +	mov	x0, #HVC_RESET_VECTORS
+>>> +	hvc	#0
+>>> +	ldr	lr, [sp], #16
+>>> +	ret
+>>> +ENDPROC(__hyp_reset_vectors)
+>>
+>> Why do we need to specifically preserve lr across the hvc call? Is it
+>> corrupted by the EL2 code (if yes, are other caller-saved registers that
+>> need preserving)? I don't see something similar in the arch/arm code.
 > 
-> To resolve these issues we change fixmap to use the same memory
-> attributes (from pgprot_kernel) that the rest of the kernel uses. To
-> enable this we need to refactor the initialisation code so
-> build_mem_type_table is called early enough. Note, that relies on early
-> param parsing for memory type overrides passed via the kernel command
-> line, so we need to make sure this call is still after
-> parse_early_params().
-> 
-> Fixes: a5f4c561b3b1 ("ARM: 8415/1: early fixmap support for earlycon")
-> Cc: stable at vger.kernel.org # v4.3+
+> Kexec on arm64 needed a register to clobber in the hyp-stub's el1_sync code. We
+> wanted to preserve all the registers so soft_restart() could look more like a
+> function call.
 
-Sorry, this should have...
-Signed-off-by: Jon Medhurst <tixy@linaro.org>
+I don't think we need this anymore. Once we enter __cpu_soft_restart(),
+there is no turning back. Or am I missing something else?
 
-> ---
-> 
-> Changes since v1:
-> - Completely rewritten based on Russell's and Ard's sugestions
-> - Subject changed from "arm: Fix cache inconsistency when using fixmap"
-> 
-> 
->  arch/arm/include/asm/fixmap.h |  7 +------
->  arch/arm/include/asm/mmu.h    |  2 ++
->  arch/arm/kernel/setup.c       |  5 +----
->  arch/arm/mm/mmu.c             | 12 ++++++++++--
->  4 files changed, 14 insertions(+), 12 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/fixmap.h b/arch/arm/include/asm/fixmap.h
-> index 5c17d2dec777..c54f06ace2a1 100644
-> --- a/arch/arm/include/asm/fixmap.h
-> +++ b/arch/arm/include/asm/fixmap.h
-> @@ -41,7 +41,7 @@ static const enum fixed_addresses __end_of_fixed_addresses =
->  
->  #define FIXMAP_PAGE_COMMON	(L_PTE_YOUNG | L_PTE_PRESENT | L_PTE_XN | L_PTE_DIRTY)
->  
-> -#define FIXMAP_PAGE_NORMAL	(FIXMAP_PAGE_COMMON | L_PTE_MT_WRITEBACK)
-> +#define FIXMAP_PAGE_NORMAL	(pgprot_kernel | L_PTE_XN)
->  #define FIXMAP_PAGE_RO		(FIXMAP_PAGE_NORMAL | L_PTE_RDONLY)
->  
->  /* Used by set_fixmap_(io|nocache), both meant for mapping a device */
-> @@ -53,13 +53,8 @@ static const enum fixed_addresses __end_of_fixed_addresses =
->  #ifdef CONFIG_MMU
->  
->  void __set_fixmap(enum fixed_addresses idx, phys_addr_t phys, pgprot_t prot);
-> -void __init early_fixmap_init(void);
->  
->  #include <asm-generic/fixmap.h>
->  
-> -#else
-> -
-> -static inline void early_fixmap_init(void) { }
-> -
->  #endif
->  #endif
-> diff --git a/arch/arm/include/asm/mmu.h b/arch/arm/include/asm/mmu.h
-> index a5b47421059d..920d29ca5c3b 100644
-> --- a/arch/arm/include/asm/mmu.h
-> +++ b/arch/arm/include/asm/mmu.h
-> @@ -24,6 +24,8 @@ typedef struct {
->  #define ASID(mm)	(0)
->  #endif
->  
-> +void early_mm_init(void);
-> +
->  #else
->  
->  /*
-> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-> index f4e54503afa9..37c59589aac3 100644
-> --- a/arch/arm/kernel/setup.c
-> +++ b/arch/arm/kernel/setup.c
-> @@ -40,7 +40,6 @@
->  #include <asm/efi.h>
->  #include <asm/elf.h>
->  #include <asm/early_ioremap.h>
-> -#include <asm/fixmap.h>
->  #include <asm/procinfo.h>
->  #include <asm/psci.h>
->  #include <asm/sections.h>
-> @@ -1082,12 +1081,10 @@ void __init setup_arch(char **cmdline_p)
->  	strlcpy(cmd_line, boot_command_line, COMMAND_LINE_SIZE);
->  	*cmdline_p = cmd_line;
->  
-> -	early_fixmap_init();
-> -	early_ioremap_init();
-> -
->  	parse_early_param();
->  
->  #ifdef CONFIG_MMU
-> +	early_mm_init();
->  	early_paging_init(mdesc);
->  #endif
->  	setup_dma_zone(mdesc);
-> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-> index 4e016d7f37b3..f81809e6bd10 100644
-> --- a/arch/arm/mm/mmu.c
-> +++ b/arch/arm/mm/mmu.c
-> @@ -22,6 +22,7 @@
->  #include <asm/cputype.h>
->  #include <asm/sections.h>
->  #include <asm/cachetype.h>
-> +#include <asm/early_ioremap.h>
->  #include <asm/fixmap.h>
->  #include <asm/sections.h>
->  #include <asm/setup.h>
-> @@ -382,7 +383,7 @@ static inline pmd_t * __init fixmap_pmd(unsigned long addr)
->  	return pmd;
->  }
->  
-> -void __init early_fixmap_init(void)
-> +static void __init early_fixmap_init(void)
->  {
->  	pmd_t *pmd;
->  
-> @@ -1616,7 +1617,6 @@ void __init paging_init(const struct machine_desc *mdesc)
->  {
->  	void *zero_page;
->  
-> -	build_mem_type_table();
->  	prepare_page_table();
->  	map_lowmem();
->  	memblock_set_current_limit(arm_lowmem_limit);
-> @@ -1636,3 +1636,11 @@ void __init paging_init(const struct machine_desc *mdesc)
->  	empty_zero_page = virt_to_page(zero_page);
->  	__flush_dcache_page(NULL, empty_zero_page);
->  }
-> +
-> +void __init early_mm_init(void)
-> +{
-> +	build_mem_type_table();
-> +
-> +	early_fixmap_init();
-> +	early_ioremap_init();
-> +}
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
