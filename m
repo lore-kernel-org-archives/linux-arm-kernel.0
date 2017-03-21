@@ -1,28 +1,63 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 21 Mar 2017 16:03:32 +0000
-Subject: [PATCH 0/2] arm64: head.S cleanup
-In-Reply-To: <f11d505b-f27c-e42c-5131-86363bcca9b0@arm.com>
-References: <1487170457-17986-1-git-send-email-mark.rutland@arm.com>
- <20170321153711.GC8319@e104818-lin.cambridge.arm.com>
- <f11d505b-f27c-e42c-5131-86363bcca9b0@arm.com>
-Message-ID: <20170321160331.GC21829@e104818-lin.cambridge.arm.com>
+From: slash.tmp@free.fr (Mason)
+Date: Tue, 21 Mar 2017 17:19:29 +0100
+Subject: [RFC PATCH v0.001] PCI: Add support for tango PCIe controller
+In-Reply-To: <20170321142305.GC6816@e110455-lin.cambridge.arm.com>
+References: <ab110ce2-8678-9b34-6bd1-6cfaaa7fea04@free.fr>
+ <f13c385d-dcc9-dacd-2b2c-ca098228f4f4@free.fr>
+ <20170321123129.GB6816@e110455-lin.cambridge.arm.com>
+ <d5062453-39cc-1435-bb13-87c81b6ef0b3@free.fr>
+ <20170321142305.GC6816@e110455-lin.cambridge.arm.com>
+Message-ID: <c4115685-577c-aa6a-3bf7-422ab711d214@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 21, 2017 at 03:51:55PM +0000, Marc Zyngier wrote:
-> On 21/03/17 15:37, Catalin Marinas wrote:
-> > On Wed, Feb 15, 2017 at 02:54:15PM +0000, Mark Rutland wrote:
-> >> Mark Rutland (2):
-> >>   arm64: reduce el2_setup branching
-> >>   arm64: move !VHE work to end of el2_setup
-> > 
-> > Mark, Marc, do these patches conflict with the hyp stub cleanup? If
-> > there is some overlap, I'm happy for them to go via the kvm tree
-> > together with the others.
+On 21/03/2017 15:23, Liviu Dudau wrote:
+
+> On Tue, Mar 21, 2017 at 02:01:57PM +0100, Mason wrote:
+>
+>> My PCIe controller is b/d/f 0/0/0.
+>> It ignores all PCI addresses that do not fall within the range
+>> defined in BAR0 of b/d/f 0/0/0.
+>>
+>> BAR0 has a configurable width of 2^(23+i) bytes, i < 8
+>> It is implicitly split in 8 regions, which can map to
+>> anywhere in CPU space. However, my understanding is that,
+>> by default, the DMA framework expects PCI address X to
+>> map to CPU address X...
+>> (My understanding of that part is still a bit hazy.)
 > 
-> I don't think there is any overlap, my changes stay clear of head.S.
+> It looks very much like your PCIe controller (host bridge) has the configuration
+> registers on the wrong side of the bridge (PCIe one vs the more normal host side).
+> But otherwise it does look very much like an ATS system, where you program how the
+> PCIe bus addresses map into the system (you call them CPU) addresses. Do you also
+> have a way of controlling the direction of the mapping? (in other words, those 8
+> regions are only for translating request coming out of the PCIe bus into system
+> addresses, or can you also set the direct mapping of system address to PCIe address?).
 
-Thanks (for the ack as well). Queued for 4.12.
+There are two (asymmetric) features for these mappings.
 
--- 
-Catalin
+For bus-to-system accesses, the scheme described above
+of "bus addresses within BAR0 fall into 1 of 8 regions,
+and 8 registers define 8 target system addresses".
+
+For system-to-bus accesses, there is a single "offset"
+register which gets added to the system address, to form
+the bus address. I just use a 0 offset.
+
+(This is made slightly more complex on later chips because
+someone in marketing thought it would look good on the
+data sheet to support 4 GB of RAM in a SoC using 32-bit
+processors. There is an additional cpu-to-foo mapping.)
+
+> As for DMA framework expectations, I'm not sure how that plays a role, unless you
+> have some DMA engines on the PCIe bus.
+
+I think the USB3 PCIe card I'm using is a bus master, so
+it's able to push data to RAM without any help from the
+ARM core.
+
+Regards.
+
+P.S. something in your message is confusing my MUA, likely
+your Mail-Followup-To field. My MUA thinks it should not
+send you my reply. Is that really what you want?
