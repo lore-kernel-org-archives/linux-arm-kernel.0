@@ -1,192 +1,133 @@
-From: fu.wei@linaro.org (fu.wei at linaro.org)
-Date: Wed, 22 Mar 2017 00:31:20 +0800
-Subject: [PATCH v22 09/11] acpi/arm64: Add memory-mapped timer support in GTDT
- driver
-In-Reply-To: <20170321163122.9183-1-fu.wei@linaro.org>
-References: <20170321163122.9183-1-fu.wei@linaro.org>
-Message-ID: <20170321163122.9183-10-fu.wei@linaro.org>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Tue, 21 Mar 2017 17:01:03 +0100
+Subject: [PATCH 5/5] KVM: arm/arm64: vgic: Get rid of struct vmcr for GICv2
+In-Reply-To: <8db97d92-be13-2e9a-90c6-e834e442ba5e@arm.com>
+References: <20170321110530.15857-1-cdall@linaro.org>
+ <20170321110530.15857-6-cdall@linaro.org>
+ <8db97d92-be13-2e9a-90c6-e834e442ba5e@arm.com>
+Message-ID: <20170321160103.GA31111@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fu Wei <fu.wei@linaro.org>
+On Tue, Mar 21, 2017 at 02:36:00PM +0000, Marc Zyngier wrote:
+> On 21/03/17 11:05, Christoffer Dall wrote:
+> > There is no common code in the VGIC that uses the VMCR, so we have no
+> > use of the intermediate architecture-agnostic representation of the VMCR
+> > and might as well manipulate the bits specifically using the logic for
+> > the version of the GIC that the code supports.
+> > 
+> > For GICv2, this means translating between the GICH_VMCR register format
+> > stored in memory and the GICC_X registers exported to user space, with
+> > the annoying quirk around the format of the GICC_PMR, where we export
+> > the 8 bit prority field using the lower 5 bits and always assuming
+> > bits[2:0] are clear.
+> > 
+> > This now lets us get completely rid of struct vmcr and its common
+> > accessor functions.
+> > 
+> > Signed-off-by: Christoffer Dall <cdall@linaro.org>
+> > ---
+> >  virt/kvm/arm/vgic/vgic-mmio-v2.c | 51 +++++++++++++++++++++++++++++-----------
+> >  virt/kvm/arm/vgic/vgic-mmio.c    | 16 -------------
+> >  virt/kvm/arm/vgic/vgic-v2.c      | 29 -----------------------
+> >  virt/kvm/arm/vgic/vgic.h         | 14 -----------
+> >  4 files changed, 37 insertions(+), 73 deletions(-)
+> > 
+> > diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+> > index a3ad7ff..1bdb990 100644
+> > --- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
+> > +++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+> > @@ -219,23 +219,33 @@ static void vgic_mmio_write_sgipends(struct kvm_vcpu *vcpu,
+> >  static unsigned long vgic_mmio_read_vcpuif(struct kvm_vcpu *vcpu,
+> >  					   gpa_t addr, unsigned int len)
+> >  {
+> > -	struct vgic_vmcr vmcr;
+> > +	u32 vmcr = vcpu->arch.vgic_cpu.vgic_v2.vgic_vmcr;
+> >  	u32 val;
+> >  
+> > -	vgic_get_vmcr(vcpu, &vmcr);
+> >  
+> >  	switch (addr & 0xff) {
+> >  	case GIC_CPU_CTRL:
+> > -		val = vmcr.ctlr;
+> > +		val = (vmcr & GICH_VMCR_CTRL_MASK) >>
+> > +			GICH_VMCR_CTRL_SHIFT;
+> >  		break;
+> >  	case GIC_CPU_PRIMASK:
+> > -		val = vmcr.pmr;
+> > +		/*
+> > +		 * Our KVM_DEV_TYPE_ARM_VGIC_V2 device ABI exports the
+> > +		 * the PMR field as GICH_VMCR.VMPriMask rather than
+> > +		 * GICC_PMR.Priority, so we expose the upper five bits of
+> > +		 * priority mask to userspace using the lower bits in the
+> > +		 * 32-bit word provided by userspace.
+> > +		 */
+> > +		val = (vmcr & GICH_VMCR_PRIMASK_MASK) >>
+> > +			GICH_VMCR_PRIMASK_SHIFT;
+> >  		break;
+> >  	case GIC_CPU_BINPOINT:
+> > -		val = vmcr.bpr;
+> > +		val = (vmcr & GICH_VMCR_BINPOINT_MASK) >>
+> > +			GICH_VMCR_BINPOINT_SHIFT;
+> >  		break;
+> >  	case GIC_CPU_ALIAS_BINPOINT:
+> > -		val = vmcr.abpr;
+> > +		val = (vmcr & GICH_VMCR_ALIAS_BINPOINT_MASK) >>
+> > +			GICH_VMCR_ALIAS_BINPOINT_SHIFT;
+> >  		break;
+> >  	case GIC_CPU_IDENT:
+> >  		val = ((PRODUCT_ID_KVM << 20) |
+> > @@ -253,26 +263,39 @@ static void vgic_mmio_write_vcpuif(struct kvm_vcpu *vcpu,
+> >  				   gpa_t addr, unsigned int len,
+> >  				   unsigned long val)
+> >  {
+> > -	struct vgic_vmcr vmcr;
+> > -
+> > -	vgic_get_vmcr(vcpu, &vmcr);
+> > +	u32 *vmcr = &vcpu->arch.vgic_cpu.vgic_v2.vgic_vmcr;
+> > +	u32 mask, field;
+> >  
+> >  	switch (addr & 0xff) {
+> >  	case GIC_CPU_CTRL:
+> > -		vmcr.ctlr = val;
+> > +		mask = GICH_VMCR_CTRL_MASK;
+> > +		field = val << GICH_VMCR_CTRL_SHIFT;
+> >  		break;
+> >  	case GIC_CPU_PRIMASK:
+> > -		vmcr.pmr = val;
+> > +		/*
+> > +		 * Our KVM_DEV_TYPE_ARM_VGIC_V2 device ABI exports the
+> > +		 * the PMR field as GICH_VMCR.VMPriMask rather than
+> > +		 * GICC_PMR.Priority, so we obtain the upper five bits of
+> > +		 * priority mask from userspace using the lower bits in the
+> > +		 * 32-bit word provided by userspace.
+> > +		 */
+> > +		mask = GICH_VMCR_PRIMASK_MASK;
+> > +		field = val << GICH_VMCR_PRIMASK_SHIFT;
+> >  		break;
+> >  	case GIC_CPU_BINPOINT:
+> > -		vmcr.bpr = val;
+> > +		mask = GICH_VMCR_BINPOINT_MASK;
+> > +		field = val << GICH_VMCR_BINPOINT_SHIFT;
+> >  		break;
+> >  	case GIC_CPU_ALIAS_BINPOINT:
+> > -		vmcr.abpr = val;
+> > +		mask = GICH_VMCR_ALIAS_BINPOINT_MASK;
+> > +		field = val << GICH_VMCR_ALIAS_BINPOINT_SHIFT;
+> >  		break;
+> > +	default:
+> > +		return;
+> 
+> 
+> Something seems fishy here. If I have a GICv2-on-GICv3, my vmcr is still
+> that of a GICv3, not of a GICv2. Here, you're cramming everything into a
+> v2 representation, which is not going to work on GICv3.
+> 
+> Or am I missing something?
+> 
+No, you're right, that is the reason for having the indirection, which I
+competely missed.  I'll drop this series and revert back to my original
+patch for the VMCR.
 
-On platforms booting with ACPI, architected memory-mapped timers'
-configuration data is provided by firmware through the ACPI GTDT
-static table.
-
-The clocksource architected timer kernel driver requires a firmware
-interface to collect timer configuration and configure its driver.
-this infrastructure is present for device tree systems, but it is
-missing on systems booting with ACPI.
-
-Implement the kernel infrastructure required to parse the static
-ACPI GTDT table so that the architected timer clocksource driver can
-make use of it on systems booting with ACPI, therefore enabling
-the corresponding timers configuration.
-
-Signed-off-by: Fu Wei <fu.wei@linaro.org>
-Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
----
- drivers/acpi/arm64/gtdt.c | 130 ++++++++++++++++++++++++++++++++++++++++++++++
- include/linux/acpi.h      |   1 +
- 2 files changed, 131 insertions(+)
-
-diff --git a/drivers/acpi/arm64/gtdt.c b/drivers/acpi/arm64/gtdt.c
-index 8a03b4b..f471873 100644
---- a/drivers/acpi/arm64/gtdt.c
-+++ b/drivers/acpi/arm64/gtdt.c
-@@ -37,6 +37,28 @@ struct acpi_gtdt_descriptor {
- 
- static struct acpi_gtdt_descriptor acpi_gtdt_desc __initdata;
- 
-+static inline void *next_platform_timer(void *platform_timer)
-+{
-+	struct acpi_gtdt_header *gh = platform_timer;
-+
-+	platform_timer += gh->length;
-+	if (platform_timer < acpi_gtdt_desc.gtdt_end)
-+		return platform_timer;
-+
-+	return NULL;
-+}
-+
-+#define for_each_platform_timer(_g)				\
-+	for (_g = acpi_gtdt_desc.platform_timer; _g;	\
-+	     _g = next_platform_timer(_g))
-+
-+static inline bool is_timer_block(void *platform_timer)
-+{
-+	struct acpi_gtdt_header *gh = platform_timer;
-+
-+	return gh->type == ACPI_GTDT_TYPE_TIMER_BLOCK;
-+}
-+
- static int __init map_gt_gsi(u32 interrupt, u32 flags)
- {
- 	int trigger, polarity;
-@@ -155,3 +177,111 @@ int __init acpi_gtdt_init(struct acpi_table_header *table,
- 
- 	return ret;
- }
-+
-+static int __init gtdt_parse_timer_block(struct acpi_gtdt_timer_block *block,
-+					 struct arch_timer_mem *timer_mem)
-+{
-+	int i, j;
-+	struct acpi_gtdt_timer_entry *gtdt_frame;
-+
-+	if (!block->timer_count) {
-+		pr_err(FW_BUG "GT block present, but frame count is zero.");
-+		return -ENODEV;
-+	}
-+
-+	if (block->timer_count > ARCH_TIMER_MEM_MAX_FRAMES) {
-+		pr_err(FW_BUG "GT block lists %d frames, ACPI spec only allows 8\n",
-+		       block->timer_count);
-+		return -EINVAL;
-+	}
-+
-+	timer_mem->cntctlbase = (phys_addr_t)block->block_address;
-+	/*
-+	 * The CNTCTLBase frame is 4KB (register offsets 0x000 - 0xFFC).
-+	 * See ARM DDI 0487A.k_iss10775, page I1-5129, Table I1-3
-+	 * "CNTCTLBase memory map".
-+	 */
-+	timer_mem->size = SZ_4K;
-+
-+	gtdt_frame = (void *)block + block->timer_offset;
-+	if (gtdt_frame + block->timer_count != (void *)block + block->header.length)
-+		return -EINVAL;
-+
-+	/*
-+	 * Get the GT timer Frame data for every GT Block Timer
-+	 */
-+	for (i = 0, j = 0; i < block->timer_count; i++, gtdt_frame++) {
-+		struct arch_timer_mem_frame *frame = &timer_mem->frame[j];
-+
-+		if (gtdt_frame->common_flags & ACPI_GTDT_GT_IS_SECURE_TIMER)
-+			continue;
-+
-+		if (!gtdt_frame->base_address || !gtdt_frame->timer_interrupt)
-+			return -EINVAL;
-+
-+		frame->phys_irq = map_gt_gsi(gtdt_frame->timer_interrupt,
-+					     gtdt_frame->timer_flags);
-+		if (frame->phys_irq <= 0) {
-+			pr_warn("failed to map physical timer irq in frame %d.\n",
-+				i);
-+			return -EINVAL;
-+		}
-+
-+		frame->virt_irq =
-+			map_gt_gsi(gtdt_frame->virtual_timer_interrupt,
-+				   gtdt_frame->virtual_timer_flags);
-+		if (frame->virt_irq <= 0) {
-+			pr_warn("failed to map virtual timer irq in frame %d.\n",
-+				i);
-+			acpi_unregister_gsi(gtdt_frame->timer_interrupt);
-+			return -EINVAL;
-+		}
-+
-+		frame->frame_nr = gtdt_frame->frame_number;
-+		frame->cntbase = gtdt_frame->base_address;
-+		/*
-+		 * The CNTBaseN frame is 4KB (register offsets 0x000 - 0xFFC).
-+		 * See ARM DDI 0487A.k_iss10775, page I1-5130, Table I1-4
-+		 * "CNTBaseN memory map".
-+		 */
-+		frame->size = SZ_4K;
-+		j++;
-+	}
-+	timer_mem->num_frames = j;
-+
-+	return 0;
-+}
-+
-+/**
-+ * acpi_arch_timer_mem_init() - Get the info of all GT blocks in GTDT table.
-+ * @timer_mem:	the pointer to the array of struct arch_timer_mem for returning
-+ *		the result of parsing. The element number of this array should
-+ *		be platform_timer_count(the total number of platform timers).
-+ * @count:	The pointer of int variate for returning the number of GT
-+ *		blocks we have parsed.
-+ *
-+ * Return: 0 if success, -EINVAL/-ENODEV if error.
-+ */
-+int __init acpi_arch_timer_mem_init(struct arch_timer_mem *timer_mem,
-+				    int *timer_count)
-+{
-+	int ret;
-+	void *platform_timer;
-+
-+	*timer_count = 0;
-+	for_each_platform_timer(platform_timer) {
-+		if (is_timer_block(platform_timer)) {
-+			ret = gtdt_parse_timer_block(platform_timer, timer_mem);
-+			if (ret)
-+				return ret;
-+			timer_mem++;
-+			(*timer_count)++;
-+		}
-+	}
-+
-+	if (*timer_count)
-+		pr_info("found %d memory-mapped timer block(s).\n",
-+			*timer_count);
-+
-+	return 0;
-+}
-diff --git a/include/linux/acpi.h b/include/linux/acpi.h
-index 4b5c146..3193724 100644
---- a/include/linux/acpi.h
-+++ b/include/linux/acpi.h
-@@ -599,6 +599,7 @@ int acpi_reconfig_notifier_unregister(struct notifier_block *nb);
- int acpi_gtdt_init(struct acpi_table_header *table, int *platform_timer_count);
- int acpi_gtdt_map_ppi(int type);
- bool acpi_gtdt_c3stop(int type);
-+int acpi_arch_timer_mem_init(struct arch_timer_mem *timer_mem, int *timer_count);
- #endif
- 
- #else	/* !CONFIG_ACPI */
--- 
-2.9.3
+Thanks for having a look and sorry about the noise.
+-Christoffer
