@@ -1,90 +1,54 @@
 From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Tue, 21 Mar 2017 16:36:10 +0100
-Subject: [PATCH v3 10/11] ARM: sun8i: a33: Add devfreq-based GPU cooling
+Date: Tue, 21 Mar 2017 16:36:08 +0100
+Subject: [PATCH v3 08/11] ARM: dtsi: sun8i: a33: add thermal sensor
 In-Reply-To: <20170321153611.16228-1-quentin.schulz@free-electrons.com>
 References: <20170321153611.16228-1-quentin.schulz@free-electrons.com>
-Message-ID: <20170321153611.16228-11-quentin.schulz@free-electrons.com>
+Message-ID: <20170321153611.16228-9-quentin.schulz@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Maxime Ripard <maxime.ripard@free-electrons.com>
+This adds the DT node for the thermal sensor present in the Allwinner
+A33 GPADC.
 
-This adds GPU thermal throttling for the Allwinner A33.
-
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
 ---
 
 v3:
-  - got rid of cooling-min-level and cooling-max-level as it's not used in any
-  code in the kernel,
+  - switched compatible to allwinner,sun8i-a33-ths,
+  - renamed DT node name and label to ths to better match datasheet's name,
 
-added in v2
+ arch/arm/boot/dts/sun8i-a33.dtsi | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
- arch/arm/boot/dts/sun8i-a23-a33.dtsi |  1 +
- arch/arm/boot/dts/sun8i-a33.dtsi     | 24 ++++++++++++++++++++++++
- 2 files changed, 25 insertions(+)
-
-diff --git a/arch/arm/boot/dts/sun8i-a23-a33.dtsi b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-index 5e8725d..6d81a6d 100644
---- a/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-@@ -495,6 +495,7 @@
- 
- 			assigned-clocks = <&ccu CLK_GPU>;
- 			assigned-clock-rates = <384000000>;
-+			#cooling-cells = <2>;
- 		};
- 
- 		gic: interrupt-controller at 01c81000 {
 diff --git a/arch/arm/boot/dts/sun8i-a33.dtsi b/arch/arm/boot/dts/sun8i-a33.dtsi
-index 73552bb..a2c6077 100644
+index b1cdff66..f391f71 100644
 --- a/arch/arm/boot/dts/sun8i-a33.dtsi
 +++ b/arch/arm/boot/dts/sun8i-a33.dtsi
-@@ -188,6 +188,16 @@
- 					trip = <&cpu_alert1>;
- 					cooling-device = <&cpu0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
- 				};
+@@ -266,6 +266,13 @@
+ 			status = "disabled";
+ 		};
+ 
++		ths: ths at 01c25000 {
++			compatible = "allwinner,sun8i-a33-ths";
++			reg = <0x01c25000 0x100>;
++			#thermal-sensor-cells = <0>;
++			#io-channel-cells = <0>;
++		};
 +
-+				map2 {
-+					trip = <&gpu_alert0>;
-+					cooling-device = <&mali 1 THERMAL_NO_LIMIT>;
-+				};
-+
-+				map3 {
-+					trip = <&gpu_alert1>;
-+					cooling-device = <&mali 2 THERMAL_NO_LIMIT>;
-+				};
+ 		fe0: display-frontend at 01e00000 {
+ 			compatible = "allwinner,sun8i-a33-display-frontend";
+ 			reg = <0x01e00000 0x20000>;
+@@ -376,6 +383,11 @@
  			};
- 
- 			trips {
-@@ -198,6 +208,13 @@
- 					type = "passive";
- 				};
- 
-+				gpu_alert0: gpu_alert0 {
-+					/* milliCelsius */
-+					temperature = <85000>;
-+					hysteresis = <2000>;
-+					type = "passive";
-+				};
+ 		};
+ 	};
 +
- 				cpu_alert1: cpu_alert1 {
- 					/* milliCelsius */
- 					temperature = <90000>;
-@@ -205,6 +222,13 @@
- 					type = "hot";
- 				};
++	iio-hwmon {
++		compatible = "iio-hwmon";
++		io-channels = <&ths>;
++	};
+ };
  
-+				gpu_alert1: gpu_alert1 {
-+					/* milliCelsius */
-+					temperature = <95000>;
-+					hysteresis = <2000>;
-+					type = "hot";
-+				};
-+
- 				cpu_crit: cpu_crit {
- 					/* milliCelsius */
- 					temperature = <110000>;
+ &ccu {
 -- 
 2.9.3
