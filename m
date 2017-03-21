@@ -1,54 +1,77 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 21 Mar 2017 11:36:59 +0000
-Subject: [RFC PATCH v0.001] PCI: Add support for tango PCIe controller
-In-Reply-To: <f13c385d-dcc9-dacd-2b2c-ca098228f4f4@free.fr>
-References: <ab110ce2-8678-9b34-6bd1-6cfaaa7fea04@free.fr>
- <f13c385d-dcc9-dacd-2b2c-ca098228f4f4@free.fr>
-Message-ID: <9d23357c-fa59-d638-11ba-f1ab24dbeb43@arm.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 21 Mar 2017 11:36:29 +0000
+Subject: [PATCH v5 00/39] i.MX Media Driver
+In-Reply-To: <7fe51907-311d-e1cd-3e4c-dd3dc4af7d78@xs4all.nl>
+References: <aef6c412-5464-726b-42f6-a24b7323aa9c@mentor.com>
+ <20170319103801.GQ21222@n2100.armlinux.org.uk>
+ <9b3311a8-34a7-2b5b-9bc7-836371e1e0a4@gmail.com>
+ <179aca0a-deb5-7937-f955-26cc6d93afba@xs4all.nl>
+ <20170320132930.GJ21222@n2100.armlinux.org.uk>
+ <d0e2a9c2-5e94-d810-7ef4-ae089a6b25f5@xs4all.nl>
+ <20170320141158.GK21222@n2100.armlinux.org.uk>
+ <40e08d05-58cd-a295-3174-123147ee2ac5@xs4all.nl>
+ <20170321104212.GC3784@bigcity.dyn.berto.se>
+ <7fe51907-311d-e1cd-3e4c-dd3dc4af7d78@xs4all.nl>
+Message-ID: <20170321113629.GW21222@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/03/17 10:15, Mason wrote:
-> [ Adding iommu ML ]
-> 
-> On 17/03/2017 17:11, Mason wrote:
-> 
->> + * QUIRK #5
->> + * Only transfers within the BAR are forwarded to the host.
->> + * By default, the DMA framework expects that
->> + * PCI address 0x8000_0000 -> CPU address 0x8000_0000
->> + * which is where DRAM0 is mapped.
-> 
-> I have an additional question on this topic.
-> 
-> In a typical system, PCI bus masters are able to access all of RAM,
-> unless there is some kind of IOMMU, right?
+On Tue, Mar 21, 2017 at 11:59:02AM +0100, Hans Verkuil wrote:
+> Ah, good to hear that -s works with MC. I was not sure about that.
+> Thanks for the feedback!
 
-Typically, yes (as always, exceptions exist, but it happens that we
-still need some work to actually support those cases properly).
+Not soo good on iMX6:
 
-> I suppose one may consider the above limitation ("Only transfers
-> within the BAR are forwarded to the host") as some form of weird
-> IOMMU? (There is, in fact, some remapping logic in the controller
-> setup which I haven't discussed so far.)
+$ v4l2-compliance -d /dev/video10 -s --expbuf-device=/dev/video0
+...
+Input ioctls:
+        test VIDIOC_G/S_TUNER/ENUM_FREQ_BANDS: OK (Not Supported)
+        test VIDIOC_G/S_FREQUENCY: OK (Not Supported)
+        test VIDIOC_S_HW_FREQ_SEEK: OK (Not Supported)
+        test VIDIOC_ENUMAUDIO: OK (Not Supported)
+                fail: v4l2-test-input-output.cpp(420): G_INPUT not supported for a capture device
+        test VIDIOC_G/S/ENUMINPUT: FAIL
+        test VIDIOC_G/S_AUDIO: OK (Not Supported)
+        Inputs: 0 Audio Inputs: 0 Tuners: 0
+...
+        Control ioctls:
+                test VIDIOC_QUERY_EXT_CTRL/QUERYMENU: OK
+                test VIDIOC_QUERYCTRL: OK
+                test VIDIOC_G/S_CTRL: OK
+                test VIDIOC_G/S/TRY_EXT_CTRLS: OK
+                fail: v4l2-test-controls.cpp(782): subscribe event for control 'User Controls' failed
+                test VIDIOC_(UN)SUBSCRIBE_EVENT/DQEVENT: FAIL
+...
+Streaming ioctls:
+        test read/write: OK (Not Supported)
+                fail: v4l2-test-buffers.cpp(297): g_field() == V4L2_FIELD_ANY
+                fail: v4l2-test-buffers.cpp(703): buf.check(q, last_seq)
+                fail: v4l2-test-buffers.cpp(973): captureBufs(node, q, m2m_q, frame_count, false)
+        test MMAP: FAIL
+        test USERPTR: OK (Not Supported)
+                fail: v4l2-test-buffers.cpp(1188): can_stream && ret != EINVAL
+        test DMABUF: FAIL
 
-Not really. If it's the 8x128MB region thing mentioned elsewhere, that's
-far too coarse a granularity to be much use with the existing IOMMU API
-(this vaguely reminds me of a similar discussion about programmable
-interconnects ages ago). Unless it's actually got some sort of GART-type
-thing or better capable of page-granularity mappings within a
-significantly-sized region, I'd put that idea to bed.
+(/dev/video0 being CODA).  CODA itself seems to have failures:
 
-> Since this SoC is used for TV, the media cartels mandate some way
-> to limit where PCI bus masters can peek/poke in RAM.
+        Format ioctls:
+                test VIDIOC_ENUM_FMT/FRAMESIZES/FRAMEINTERVALS: OK
+                warn: v4l2-test-formats.cpp(1187): S_PARM is supported for buftype 2, but not ENUM_FRAMEINTERVALS
+                warn: v4l2-test-formats.cpp(1194): S_PARM is supported but doesn't report V4L2_CAP_TIMEPERFRAME
+                test VIDIOC_G/S_PARM: OK
+                test VIDIOC_G_FBUF: OK (Not Supported)
+                test VIDIOC_G_FMT: OK
+                test VIDIOC_TRY_FMT: OK
+                fail: v4l2-test-formats.cpp(774): fmt_out.g_colorspace() != col
+...
+Streaming ioctls:
+        test read/write: OK (Not Supported)
+                fail: v4l2-test-buffers.cpp(956): q.create_bufs(node, 1, &fmt) != EINVAL
+        test MMAP: FAIL
+        test USERPTR: OK (Not Supported)
+        test DMABUF: Cannot test, specify --expbuf-device
 
-FWIW, since that sounds like more of a box-ticking exercise than a real
-practical concern, I'd point out that content protection is more or less
-the poster child for TrustZone, and your TZASC should help tick that box
-regardless.
-
-Robin.
-
-> 
-> Regards.
-> 
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
