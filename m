@@ -1,48 +1,46 @@
 From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Tue, 21 Mar 2017 18:04:14 +0000
-Subject: [PATCH 0/7] arm64: hugetlb cleanup + break-before-make fixes
-Message-ID: <20170321180421.18332-1-punit.agrawal@arm.com>
+Date: Tue, 21 Mar 2017 18:04:15 +0000
+Subject: [PATCH 1/7] arm64: hugetlb: set_huge_pte_at Add WARN_ON on
+ !pte_present
+In-Reply-To: <20170321180421.18332-1-punit.agrawal@arm.com>
+References: <20170321180421.18332-1-punit.agrawal@arm.com>
+Message-ID: <20170321180421.18332-2-punit.agrawal@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[ Posting this series on behalf of Steve ]
+From: Steve Capper <steve.capper@arm.com>
 
-It has become apparent that one has to take special care when
-modifying attributes of memory mappings that employ the contiguous
-bit.
+This patch adds a WARN_ON to set_huge_pte_at as the accessor assumes
+that entries to be written down are all present. (There are separate
+accessors to clear huge ptes).
 
-Both the requirement and the architecturally correct
-"Break-Before-Make" technique of updating contiguous entries can be
-found described in: ARM DDI 0487A.k_iss10775, "Misprogramming of the
-Contiguous bit", page D4-1762.
+We will need to handle the !pte_present case where memory offlining
+is used on hugetlb pages. swap and migration entries will be supplied
+to set_huge_pte_at in this case.
 
-The huge pte accessors currently replace the attributes of contiguous
-pte entries in place thus can, on certain platforms, lead to TLB
-conflict aborts or even erroneous results returned from TLB lookups.
+Cc: David Woods <dwoods@mellanox.com>
+Signed-off-by: Steve Capper <steve.capper@arm.com>
+Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+---
+ arch/arm64/mm/hugetlbpage.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-This patch series adds the required break-before-make logic to the
-contiguous bit hugetlb accessors.
-
-In order to simplify the break-before-make logic (and the patch
-review), we first simplify the existing code.
-
-During the course of this simplification I have found a bug whereby
-spurious calls were being made to huge_ptep_offset by other accessors.
-Also, a pre-emptive, WARN_ON is added to set_huge_pte_at in case it is
-supplied with swp/migration entries unexpectedly (from
-MEMORY_FAILURE).
-
-Steve Capper (7):
-  arm64: hugetlb: set_huge_pte_at Add WARN_ON on !pte_present
-  arm64: hugetlb: Cleanup setup_hugepagesz
-  arm64: hugetlb: Refactor find_num_contig
-  arm64: hugetlb: Introduce pte_pgprot helper
-  arm64: hugetlb: Remove spurious calls to huge_ptep_offset
-  arm64: hugetlb: Spring clean huge pte accessors
-  arm64: hugetlb: Add break-before-make logic for contiguous entries
-
- arch/arm64/mm/hugetlbpage.c | 228 +++++++++++++++++++++++++-------------------
- 1 file changed, 130 insertions(+), 98 deletions(-)
-
+diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
+index e25584d72396..a686f8705ef3 100644
+--- a/arch/arm64/mm/hugetlbpage.c
++++ b/arch/arm64/mm/hugetlbpage.c
+@@ -69,6 +69,12 @@ void set_huge_pte_at(struct mm_struct *mm, unsigned long addr,
+ 	unsigned long pfn;
+ 	pgprot_t hugeprot;
+ 
++	/*
++	 * Code needs to be expanded to handle huge swap and migration
++	 * entries. Needed for HUGETLB and MEMORY_FAILURE.
++	 */
++	WARN_ON(!pte_present(pte));
++
+ 	if (ncontig == 1) {
+ 		set_pte_at(mm, addr, ptep, pte);
+ 		return;
 -- 
 2.11.0
