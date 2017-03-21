@@ -1,54 +1,53 @@
 From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Tue, 21 Mar 2017 16:36:08 +0100
-Subject: [PATCH v3 08/11] ARM: dtsi: sun8i: a33: add thermal sensor
+Date: Tue, 21 Mar 2017 16:36:11 +0100
+Subject: [PATCH v3 11/11] ARM: sun8i: sina33: add highest OPP of CPUs
 In-Reply-To: <20170321153611.16228-1-quentin.schulz@free-electrons.com>
 References: <20170321153611.16228-1-quentin.schulz@free-electrons.com>
-Message-ID: <20170321153611.16228-9-quentin.schulz@free-electrons.com>
+Message-ID: <20170321153611.16228-12-quentin.schulz@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the DT node for the thermal sensor present in the Allwinner
-A33 GPADC.
+The A33 supports 1.1GHz and 1.2GHz frequencies at 1.32V and the Sinlinx
+SinA33 has its cpu-supply property set in the cpu DT node.
+
+Therefore, CPUfreq knows how to handle the regulator in charge of the
+CPU and can adjust its voltage to match the OPP.
+
+Add these two CPU frequencies to the CPU OPP table of the Sinlinx
+SinA33.
 
 Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
 ---
 
-v3:
-  - switched compatible to allwinner,sun8i-a33-ths,
-  - renamed DT node name and label to ths to better match datasheet's name,
+added in v3
 
- arch/arm/boot/dts/sun8i-a33.dtsi | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun8i-a33.dtsi b/arch/arm/boot/dts/sun8i-a33.dtsi
-index b1cdff66..f391f71 100644
---- a/arch/arm/boot/dts/sun8i-a33.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a33.dtsi
-@@ -266,6 +266,13 @@
- 			status = "disabled";
- 		};
- 
-+		ths: ths at 01c25000 {
-+			compatible = "allwinner,sun8i-a33-ths";
-+			reg = <0x01c25000 0x100>;
-+			#thermal-sensor-cells = <0>;
-+			#io-channel-cells = <0>;
-+		};
-+
- 		fe0: display-frontend at 01e00000 {
- 			compatible = "allwinner,sun8i-a33-display-frontend";
- 			reg = <0x01e00000 0x20000>;
-@@ -376,6 +383,11 @@
- 			};
- 		};
- 	};
-+
-+	iio-hwmon {
-+		compatible = "iio-hwmon";
-+		io-channels = <&ths>;
-+	};
+diff --git a/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts b/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts
+index d84f1bd..a92dee1 100644
+--- a/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts
++++ b/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts
+@@ -87,6 +87,20 @@
+ 	cpu-supply = <&reg_dcdc3>;
  };
  
- &ccu {
++&cpu0_opp_table {
++	opp at 1104000000 {
++		opp-hz = /bits/ 64 <1104000000>;
++		opp-microvolt = <1320000>;
++		clock-latency-ns = <244144>; /* 8 32k periods */
++	};
++
++	opp at 1200000000 {
++		opp-hz = /bits/ 64 <1200000000>;
++		opp-microvolt = <1320000>;
++		clock-latency-ns = <244144>; /* 8 32k periods */
++	};
++};
++
+ &de {
+ 	status = "okay";
+ };
 -- 
 2.9.3
