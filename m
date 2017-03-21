@@ -1,68 +1,68 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Wed, 22 Mar 2017 08:46:51 +0900
-Subject: [GIT PULL] ARM: dts: uniphier: UniPhier DT updates for v4.12
-Message-ID: <CAK7LNAScRBfD_2kDZYtr0S83kvLhSHAs0C4HjprNr5dKCSPRcw@mail.gmail.com>
+From: mturquette@baylibre.com (Michael Turquette)
+Date: Tue, 21 Mar 2017 16:49:56 -0700
+Subject: [PATCH 3/5] clk: meson-gxbb: Add GXL/GXM GP0 Variant
+In-Reply-To: <1489411604-18700-4-git-send-email-narmstrong@baylibre.com>
+References: <1489411604-18700-1-git-send-email-narmstrong@baylibre.com>
+ <1489411604-18700-4-git-send-email-narmstrong@baylibre.com>
+Message-ID: <149014019624.54062.687648107621865354@resonance>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+Hi Neil,
 
-Here are UniPhier DT (32bit) updates for the v4.12 merge window.
-Please pull!
+Quoting Neil Armstrong (2017-03-13 06:26:42)
+> @@ -821,6 +893,7 @@ struct pll_params_table gxbb_gp0_params_table[] = {
+>         &gxbb_hdmi_pll,
+>         &gxbb_sys_pll,
+>         &gxbb_gp0_pll,
+> +       &gxl_gp0_pll,
 
+Is there a reason for adding the pointer to this array here? It seems to
+me that the gxbb_gp0_pll and gxl_gp0_pll are mutually exclusive, so
+perhaps two different tables should be used?
 
-The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
+>  };
+>  
+>  static struct meson_clk_mpll *const gxbb_clk_mplls[] = {
+> @@ -923,6 +996,10 @@ static int gxbb_clkc_probe(struct platform_device *pdev)
+>         struct clk *parent_clk;
+>         struct device *dev = &pdev->dev;
+>  
+> +       /* Override GP0 clock for GXL/GXM */
+> +       if (of_device_is_compatible(dev->of_node, "amlogic,gxl-clkc"))
+> +               gxbb_hw_onecell_data.hws[CLKID_GP0_PLL] = &gxl_gp0_pll.hw;
 
-  Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
+Similarly, this above is a little ugly compared to dedicated tables for
+each variant.
 
-are available in the git repository at:
+Regards,
+Mike
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/masahiroy/linux-uniphier.git
-tags/uniphier-dt-v4.12
-
-for you to fetch changes up to facc7a551cda4c7091b0413438b280e654659890:
-
-  ARM: dts: uniphier: add pagesize property to EEPROM of proto boards
-(2017-03-14 05:02:13 +0900)
-
-----------------------------------------------------------------
-UniPhier ARM SoC DT updates for v4.12
-
-- Remove skeleton.dtsi inclusion
-- Fix W=* build warnings
-- Fix eMMC pin-mux node
-- Add pagesize properties to EEPROM nodes
-
-----------------------------------------------------------------
-Masahiro Yamada (6):
-      ARM: dts: uniphier: remove skeleton.dtsi inclusion
-      ARM: dts: uniphier: fix no unit name warnings
-      ARM: dts: uniphier: move memory node below aliases node
-      ARM: dts: uniphier: fix pin groups of eMMC pin-mux node
-      ARM: dts: uniphier: add pagesize property to EEPROM of Support Card
-      ARM: dts: uniphier: add pagesize property to EEPROM of proto boards
-
- arch/arm/boot/dts/uniphier-ld4-ref.dts       | 10 +++++-----
- arch/arm/boot/dts/uniphier-ld4.dtsi          |  4 ++--
- arch/arm/boot/dts/uniphier-ld6b-ref.dts      | 10 +++++-----
- arch/arm/boot/dts/uniphier-pinctrl.dtsi      |  2 +-
- arch/arm/boot/dts/uniphier-pro4-ace.dts      | 11 ++++++-----
- arch/arm/boot/dts/uniphier-pro4-ref.dts      | 10 +++++-----
- arch/arm/boot/dts/uniphier-pro4-sanji.dts    | 11 ++++++-----
- arch/arm/boot/dts/uniphier-pro4.dtsi         |  4 ++--
- arch/arm/boot/dts/uniphier-pro5.dtsi         |  4 ++--
- arch/arm/boot/dts/uniphier-pxs2-gentil.dts   | 11 ++++++-----
- arch/arm/boot/dts/uniphier-pxs2-vodka.dts    | 10 +++++-----
- arch/arm/boot/dts/uniphier-pxs2.dtsi         |  4 ++--
- arch/arm/boot/dts/uniphier-ref-daughter.dtsi |  4 +++-
- arch/arm/boot/dts/uniphier-sld3-ref.dts      | 12 ++++++------
- arch/arm/boot/dts/uniphier-sld3.dtsi         |  4 ++--
- arch/arm/boot/dts/uniphier-sld8-ref.dts      | 10 +++++-----
- arch/arm/boot/dts/uniphier-sld8.dtsi         |  4 ++--
- arch/arm/boot/dts/uniphier-support-card.dtsi |  5 +++--
- 18 files changed, 68 insertions(+), 62 deletions(-)
-
-
--- 
-Best Regards
-Masahiro Yamada
+> +
+>         /*  Generic clocks and PLLs */
+>         clk_base = of_iomap(dev->of_node, 0);
+>         if (!clk_base) {
+> @@ -996,6 +1073,7 @@ static int gxbb_clkc_probe(struct platform_device *pdev)
+>  
+>  static const struct of_device_id gxbb_clkc_match_table[] = {
+>         { .compatible = "amlogic,gxbb-clkc" },
+> +       { .compatible = "amlogic,gxl-clkc" },
+>         { }
+>  };
+>  
+> diff --git a/drivers/clk/meson/gxbb.h b/drivers/clk/meson/gxbb.h
+> index 8ee2022..7f99bf6 100644
+> --- a/drivers/clk/meson/gxbb.h
+> +++ b/drivers/clk/meson/gxbb.h
+> @@ -71,6 +71,8 @@
+>  #define HHI_GP0_PLL_CNTL2              0x44 /* 0x11 offset in data sheet */
+>  #define HHI_GP0_PLL_CNTL3              0x48 /* 0x12 offset in data sheet */
+>  #define HHI_GP0_PLL_CNTL4              0x4c /* 0x13 offset in data sheet */
+> +#define        HHI_GP0_PLL_CNTL5               0x50 /* 0x14 offset in data sheet */
+> +#define        HHI_GP0_PLL_CNTL1               0x58 /* 0x16 offset in data sheet */
+>  
+>  #define HHI_XTAL_DIVN_CNTL             0xbc /* 0x2f offset in data sheet */
+>  #define HHI_TIMER90K                   0xec /* 0x3b offset in data sheet */
+> -- 
+> 1.9.1
+> 
