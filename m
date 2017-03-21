@@ -1,292 +1,88 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Tue, 21 Mar 2017 12:16:07 +0100
-Subject: [PATCH 1/9] KVM: arm/arm64: vgic: Defer touching GICH_VMCR to
- vcpu_load/put
-In-Reply-To: <a4683f7c-498d-85f3-8987-f6e002f1ebb3@arm.com>
-References: <20170320105818.20481-1-cdall@linaro.org>
- <20170320105818.20481-2-cdall@linaro.org>
- <a4683f7c-498d-85f3-8987-f6e002f1ebb3@arm.com>
-Message-ID: <20170321111607.GA15920@cbox>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 21 Mar 2017 11:16:34 +0000
+Subject: [PATCH v33 05/14] arm64: mm: allow for unmapping part of kernel
+ mapping
+In-Reply-To: <20170315095941.25119-3-takahiro.akashi@linaro.org>
+References: <20170315095656.24992-1-takahiro.akashi@linaro.org>
+ <20170315095941.25119-3-takahiro.akashi@linaro.org>
+Message-ID: <CAKv+Gu9mJxOci7sW5iJFWaSmQz4N3SJkh+qwcFZ3ZmUpVywZQg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 21, 2017 at 10:29:08AM +0000, Marc Zyngier wrote:
-> On 20/03/17 10:58, Christoffer Dall wrote:
-> > From: Christoffer Dall <cdall@cs.columbia.edu>
-> > 
-> > We don't have to save/restore the VMCR on every entry to/from the guest,
-> > since on GICv2 we can access the control interface from EL1 and on VHE
-> > systems with GICv3 we can access the control interface from KVM running
-> > in EL2.
-> > 
-> > GICv3 systems without VHE becomes the rare case, which has to
-> > save/restore the register on each round trip.
-> > 
-> > For in-context accesses to the VMCR, meaning emulation code needs access
-> > to the value of the VCPU that is currently running within vcpu_load
-> > and vcpu_put will detect that the it should load the VMCR from the
-> > physical GIC instead of using the cached memory value.  While this extra
-> > checking adds some code complexity we end up moving code out of the
-> > critical path.
-> > 
-> > Note that userspace accesses may see out-of-date values if the VCPU is
-> > running while accessing the VGIC state via the KVM device API, but this
-> > is already the case.
-> > 
-> > Signed-off-by: Christoffer Dall <cdall@cs.columbia.edu>
-> > Signed-off-by: Christoffer Dall <cdall@linaro.org>
-> > ---
-> >  arch/arm/include/asm/kvm_asm.h   |  3 +++
-> >  arch/arm/kvm/arm.c               | 11 +++++-----
-> >  arch/arm64/include/asm/kvm_asm.h |  2 ++
-> >  include/kvm/arm_vgic.h           |  3 +++
-> >  virt/kvm/arm/hyp/vgic-v2-sr.c    |  3 ---
-> >  virt/kvm/arm/hyp/vgic-v3-sr.c    | 14 ++++++++----
-> >  virt/kvm/arm/vgic/vgic-init.c    | 12 +++++++++++
-> >  virt/kvm/arm/vgic/vgic-v2.c      | 46 ++++++++++++++++++++++++++++++++++++++--
-> >  virt/kvm/arm/vgic/vgic-v3.c      | 42 ++++++++++++++++++++++++++++++++++--
-> >  virt/kvm/arm/vgic/vgic.c         | 22 +++++++++++++++++++
-> >  virt/kvm/arm/vgic/vgic.h         |  6 ++++++
-> >  11 files changed, 148 insertions(+), 16 deletions(-)
-> > 
-> > diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
-> > index 8ef0538..dd16044 100644
-> > --- a/arch/arm/include/asm/kvm_asm.h
-> > +++ b/arch/arm/include/asm/kvm_asm.h
-> > @@ -75,7 +75,10 @@ extern void __init_stage2_translation(void);
-> >  extern void __kvm_hyp_reset(unsigned long);
-> >  
-> >  extern u64 __vgic_v3_get_ich_vtr_el2(void);
-> > +extern u64 __vgic_v3_read_vmcr(void);
-> > +extern void __vgic_v3_write_vmcr(u32 vmcr);
-> >  extern void __vgic_v3_init_lrs(void);
-> > +
-> >  #endif
-> >  
-> >  #endif /* __ARM_KVM_ASM_H__ */
-> > diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-> > index d775aac..cfdf2f5 100644
-> > --- a/arch/arm/kvm/arm.c
-> > +++ b/arch/arm/kvm/arm.c
-> > @@ -348,15 +348,14 @@ void kvm_arch_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
-> >  	vcpu->arch.host_cpu_context = this_cpu_ptr(kvm_host_cpu_state);
-> >  
-> >  	kvm_arm_set_running_vcpu(vcpu);
-> > +
-> > +	kvm_vgic_load(vcpu);
-> >  }
-> >  
-> >  void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
-> >  {
-> > -	/*
-> > -	 * The arch-generic KVM code expects the cpu field of a vcpu to be -1
-> > -	 * if the vcpu is no longer assigned to a cpu.  This is used for the
-> > -	 * optimized make_all_cpus_request path.
-> > -	 */
-> > +	kvm_vgic_put(vcpu);
-> > +
-> >  	vcpu->cpu = -1;
-> >  
-> >  	kvm_arm_set_running_vcpu(NULL);
-> > @@ -630,7 +629,9 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
-> >  		 * non-preemptible context.
-> >  		 */
-> >  		preempt_disable();
-> > +
-> >  		kvm_pmu_flush_hwstate(vcpu);
-> > +
-> >  		kvm_timer_flush_hwstate(vcpu);
-> >  		kvm_vgic_flush_hwstate(vcpu);
-> >  
-> > diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
-> > index ec3553eb..49f99cd 100644
-> > --- a/arch/arm64/include/asm/kvm_asm.h
-> > +++ b/arch/arm64/include/asm/kvm_asm.h
-> > @@ -59,6 +59,8 @@ extern void __kvm_tlb_flush_local_vmid(struct kvm_vcpu *vcpu);
-> >  extern int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
-> >  
-> >  extern u64 __vgic_v3_get_ich_vtr_el2(void);
-> > +extern u64 __vgic_v3_read_vmcr(void);
-> > +extern void __vgic_v3_write_vmcr(u32 vmcr);
-> >  extern void __vgic_v3_init_lrs(void);
-> >  
-> >  extern u32 __kvm_get_mdcr_el2(void);
-> > diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-> > index c0b3d99..8d7c3a7 100644
-> > --- a/include/kvm/arm_vgic.h
-> > +++ b/include/kvm/arm_vgic.h
-> > @@ -307,6 +307,9 @@ bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, unsigned int virt_irq);
-> >  
-> >  int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu);
-> >  
-> > +void kvm_vgic_load(struct kvm_vcpu *vcpu);
-> > +void kvm_vgic_put(struct kvm_vcpu *vcpu);
-> > +
-> >  #define irqchip_in_kernel(k)	(!!((k)->arch.vgic.in_kernel))
-> >  #define vgic_initialized(k)	((k)->arch.vgic.initialized)
-> >  #define vgic_ready(k)		((k)->arch.vgic.ready)
-> > diff --git a/virt/kvm/arm/hyp/vgic-v2-sr.c b/virt/kvm/arm/hyp/vgic-v2-sr.c
-> > index c8aeb7b..d3d3b9b 100644
-> > --- a/virt/kvm/arm/hyp/vgic-v2-sr.c
-> > +++ b/virt/kvm/arm/hyp/vgic-v2-sr.c
-> > @@ -114,8 +114,6 @@ void __hyp_text __vgic_v2_save_state(struct kvm_vcpu *vcpu)
-> >  	if (!base)
-> >  		return;
-> >  
-> > -	cpu_if->vgic_vmcr = readl_relaxed(base + GICH_VMCR);
-> > -
-> >  	if (vcpu->arch.vgic_cpu.live_lrs) {
-> >  		cpu_if->vgic_apr = readl_relaxed(base + GICH_APR);
-> >  
-> > @@ -165,7 +163,6 @@ void __hyp_text __vgic_v2_restore_state(struct kvm_vcpu *vcpu)
-> >  		}
-> >  	}
-> >  
-> > -	writel_relaxed(cpu_if->vgic_vmcr, base + GICH_VMCR);
-> >  	vcpu->arch.vgic_cpu.live_lrs = live_lrs;
-> >  }
-> >  
-> > diff --git a/virt/kvm/arm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
-> > index 3947095..e51ee7e 100644
-> > --- a/virt/kvm/arm/hyp/vgic-v3-sr.c
-> > +++ b/virt/kvm/arm/hyp/vgic-v3-sr.c
-> > @@ -159,8 +159,6 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
-> >  	if (!cpu_if->vgic_sre)
-> >  		dsb(st);
-> >  
-> > -	cpu_if->vgic_vmcr  = read_gicreg(ICH_VMCR_EL2);
-> > -
-> >  	if (vcpu->arch.vgic_cpu.live_lrs) {
-> >  		int i;
-> >  		u32 max_lr_idx, nr_pri_bits;
-> > @@ -261,8 +259,6 @@ void __hyp_text __vgic_v3_restore_state(struct kvm_vcpu *vcpu)
-> >  			live_lrs |= (1 << i);
-> >  	}
-> >  
-> > -	write_gicreg(cpu_if->vgic_vmcr, ICH_VMCR_EL2);
-> > -
-> >  	if (live_lrs) {
-> >  		write_gicreg(cpu_if->vgic_hcr, ICH_HCR_EL2);
-> >  
-> > @@ -326,3 +322,13 @@ u64 __hyp_text __vgic_v3_get_ich_vtr_el2(void)
-> >  {
-> >  	return read_gicreg(ICH_VTR_EL2);
-> >  }
-> > +
-> > +u64 __hyp_text __vgic_v3_read_vmcr(void)
-> > +{
-> > +	return read_gicreg(ICH_VMCR_EL2);
-> > +}
-> > +
-> > +void __hyp_text __vgic_v3_write_vmcr(u32 vmcr)
-> > +{
-> > +	write_gicreg(vmcr, ICH_VMCR_EL2);
-> > +}
-> > diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
-> > index 702f810..3762fd1 100644
-> > --- a/virt/kvm/arm/vgic/vgic-init.c
-> > +++ b/virt/kvm/arm/vgic/vgic-init.c
-> > @@ -262,6 +262,18 @@ int vgic_init(struct kvm *kvm)
-> >  	vgic_debug_init(kvm);
-> >  
-> >  	dist->initialized = true;
-> > +
-> > +	/*
-> > +	 * If we're initializing GICv2 on-demand when first running the VCPU
-> > +	 * then we need to load the VGIC state onto the CPU.  We can detect
-> > +	 * this easily by checking if we are in between vcpu_load and vcpu_put
-> > +	 * when we just initialized the VGIC.
-> > +	 */
-> > +	preempt_disable();
-> > +	vcpu = kvm_arm_get_running_vcpu();
-> > +	if (vcpu)
-> > +		kvm_vgic_load(vcpu);
-> > +	preempt_enable();
-> >  out:
-> >  	return ret;
-> >  }
-> > diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
-> > index 94cf4b9..dfe6e5e 100644
-> > --- a/virt/kvm/arm/vgic/vgic-v2.c
-> > +++ b/virt/kvm/arm/vgic/vgic-v2.c
-> > @@ -199,6 +199,9 @@ void vgic_v2_clear_lr(struct kvm_vcpu *vcpu, int lr)
-> >  
-> >  void vgic_v2_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
-> >  {
-> > +	struct vgic_dist *vgic = &vcpu->kvm->arch.vgic;
-> > +	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
-> > +	int cpu;
-> >  	u32 vmcr;
-> >  
-> >  	vmcr  = (vmcrp->ctlr << GICH_VMCR_CTRL_SHIFT) & GICH_VMCR_CTRL_MASK;
-> > @@ -209,12 +212,35 @@ void vgic_v2_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
-> >  	vmcr |= (vmcrp->pmr << GICH_VMCR_PRIMASK_SHIFT) &
-> >  		GICH_VMCR_PRIMASK_MASK;
-> >  
-> > -	vcpu->arch.vgic_cpu.vgic_v2.vgic_vmcr = vmcr;
-> > +	cpu_if->vgic_vmcr = vmcr;
-> > +
-> > +	cpu = get_cpu();
-> > +	if (vcpu->cpu == cpu)
-> > +		/*
-> > +		 * We have run vcpu_load and we're on VHE which means the VMCR
-> > +		 * has already been flushed to the CPU; flush it again.
-> > +		 */
-> 
-> I don't understand this comment. What has VHE to do with this?
-> 
+On 15 March 2017 at 09:59, AKASHI Takahiro <takahiro.akashi@linaro.org> wrote:
+> create_pgd_mapping() is enhanced here so that it will accept
+> PAGE_KERNEL_INVALID protection attribute and unmap a given range of memory.
+>
+> The feature will be used in a later kdump patch to implement the protection
+> against possible corruption of crash dump kernel memory which is to be set
+> aside from ther other memory on primary kernel.
+>
+> Note that, in this implementation, it assumes that all the range of memory
+> to be processed is mapped in page-level since the only current user is
+> kdump where page mappings are also required.
+>
+> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
 
-Bah, I used to only do this on VHE systems and do the save/restore on
-GICv3-non-vhe systems, but then I changed it to use kvm_call_hyp in
-load/put, so the comment is out of date.  Thanks for spotting it.
+Couldn't we use unmap_kernel_range() for this?
 
-> > +		writel_relaxed(vmcr, vgic->vctrl_base + GICH_VMCR);
-> > +	put_cpu();
-> 
-> There is one thing I don't quite get: I thought we could only get there
-> with a userspace access. I understand that we've run vcpu_load()
-> already, 
-
-Actually, I think I was completely misguided here; I don't think you can
-ever end up here between vcpu_load and vcpu_put...
-
-> and that we end-up with a stale configuration in the HW. But
-> why do we need to immediately propagate it? Surely we can rely on the
-> vcpu thread doing a vcpu_load itself to load the new value, right? I
-> must be missing something...
-
-... and you're right, there's no actual change in functionality in that
-userspace should stop the VCPU to ensure an updated value when reading
-back the VMCR-based register values.  So I can just get rid of this
-nonsense.
-
-> 
-> >  }
-> >  
-> >  void vgic_v2_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
-> >  {
-> > -	u32 vmcr = vcpu->arch.vgic_cpu.vgic_v2.vgic_vmcr;
-> > +	struct vgic_dist *vgic = &vcpu->kvm->arch.vgic;
-> > +	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
-> > +	int cpu;
-> > +	u32 vmcr;
-> > +
-> > +	cpu = get_cpu();
-> > +	if (vcpu->cpu == cpu)
-> > +		/*
-> > +		 * We have run vcpu_load and which means the VMCR
-> > +		 * has already been flushed to the CPU; sync it back.
-> > +		 */
-> > +		cpu_if->vgic_vmcr = readl_relaxed(vgic->vctrl_base + GICH_VMCR);
-> > +	put_cpu();
-> > +
-> > +	vmcr = cpu_if->vgic_vmcr;
-> 
-> Same comment as above.
-> 
-Same answer.
-
-I'll rework this.
-
-Thanks,
--Christoffer
+> ---
+>  arch/arm64/include/asm/pgtable-prot.h |  1 +
+>  arch/arm64/mm/mmu.c                   | 17 +++++++++++------
+>  2 files changed, 12 insertions(+), 6 deletions(-)
+>
+> diff --git a/arch/arm64/include/asm/pgtable-prot.h b/arch/arm64/include/asm/pgtable-prot.h
+> index 2142c7726e76..945d84cd5df7 100644
+> --- a/arch/arm64/include/asm/pgtable-prot.h
+> +++ b/arch/arm64/include/asm/pgtable-prot.h
+> @@ -54,6 +54,7 @@
+>  #define PAGE_KERNEL_ROX                __pgprot(_PAGE_DEFAULT | PTE_UXN | PTE_DIRTY | PTE_RDONLY)
+>  #define PAGE_KERNEL_EXEC       __pgprot(_PAGE_DEFAULT | PTE_UXN | PTE_DIRTY | PTE_WRITE)
+>  #define PAGE_KERNEL_EXEC_CONT  __pgprot(_PAGE_DEFAULT | PTE_UXN | PTE_DIRTY | PTE_WRITE | PTE_CONT)
+> +#define PAGE_KERNEL_INVALID    __pgprot(0)
+>
+>  #define PAGE_HYP               __pgprot(_PAGE_DEFAULT | PTE_HYP | PTE_HYP_XN)
+>  #define PAGE_HYP_EXEC          __pgprot(_PAGE_DEFAULT | PTE_HYP | PTE_RDONLY)
+> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+> index d28dbcf596b6..cb359a3927ef 100644
+> --- a/arch/arm64/mm/mmu.c
+> +++ b/arch/arm64/mm/mmu.c
+> @@ -128,7 +128,10 @@ static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
+>         do {
+>                 pte_t old_pte = *pte;
+>
+> -               set_pte(pte, pfn_pte(pfn, prot));
+> +               if (pgprot_val(prot))
+> +                       set_pte(pte, pfn_pte(pfn, prot));
+> +               else
+> +                       pte_clear(null, null, pte);
+>                 pfn++;
+>
+>                 /*
+> @@ -309,12 +312,14 @@ static void __init create_mapping_noalloc(phys_addr_t phys, unsigned long virt,
+>         __create_pgd_mapping(init_mm.pgd, phys, virt, size, prot, NULL, false);
+>  }
+>
+> -void __init create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
+> -                              unsigned long virt, phys_addr_t size,
+> -                              pgprot_t prot, bool page_mappings_only)
+> +/*
+> + * Note that PAGE_KERNEL_INVALID should be used with page_mappings_only
+> + * true for now.
+> + */
+> +void create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
+> +                       unsigned long virt, phys_addr_t size,
+> +                       pgprot_t prot, bool page_mappings_only)
+>  {
+> -       BUG_ON(mm == &init_mm);
+> -
+>         __create_pgd_mapping(mm->pgd, phys, virt, size, prot,
+>                              pgd_pgtable_alloc, page_mappings_only);
+>  }
+> --
+> 2.11.1
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
