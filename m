@@ -1,37 +1,52 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Tue, 21 Mar 2017 16:25:45 +0100
-Subject: [PATCH v2 08/13] ARM64: dts: meson-gx: Add shared CMA dma memory pool
-In-Reply-To: <1490109950-21421-1-git-send-email-narmstrong@baylibre.com>
-References: <1490109950-21421-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1490109950-21421-9-git-send-email-narmstrong@baylibre.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 21 Mar 2017 15:26:36 +0000
+Subject: [PATCH 05/20] ARM: implement pci_remap_cfgspace() interface
+In-Reply-To: <20170320164354.GQ21222@n2100.armlinux.org.uk>
+References: <20170227151436.18698-1-lorenzo.pieralisi@arm.com>
+ <20170227151436.18698-6-lorenzo.pieralisi@arm.com>
+ <20170320164354.GQ21222@n2100.armlinux.org.uk>
+Message-ID: <20170321152636.GA4799@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The HDMI modes needs more CMA memory to be reserved at boot-time.
+Hi Russell,
 
-Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
----
- arch/arm64/boot/dts/amlogic/meson-gx.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+On Mon, Mar 20, 2017 at 04:43:55PM +0000, Russell King - ARM Linux wrote:
+> On Mon, Feb 27, 2017 at 03:14:16PM +0000, Lorenzo Pieralisi wrote:
+> > The PCI bus specifications (rev 3.0, 3.2.5 "Transaction Ordering
+> > and Posting") define rules for PCI configuration space transactions
+> > ordering and posting, that state that configuration writes have to
+> > be non-posted transactions.
+> > 
+> > Current ioremap interface on ARM provides mapping functions that
+> > provide "bufferable" writes transactions (ie ioremap uses MT_DEVICE
+> > memory type) aka posted writes, so PCI host controller drivers have
+> > no arch interface to remap PCI configuration space with memory
+> > attributes that comply with the PCI specifications for configuration
+> > space.
+> > 
+> > Implement an ARM specific pci_remap_cfgspace() interface that allows to
+> > map PCI config memory regions with MT_UNCACHED memory type (ie strongly
+> > ordered - non-posted writes), providing a remap function that complies
+> > with PCI specifications for config space transactions.
+> 
+> Doesn't this have the side effect that configuration writes can bypass
+> writes to device memory if there isn't an intervening dsb?  (They
+> probably can do on some CPUs today anyway.)
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
-index 5d995f7..94c6f95 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
-@@ -71,6 +71,14 @@
- 			reg = <0x0 0x10000000 0x0 0x200000>;
- 			no-map;
- 		};
-+
-+		linux,cma {
-+			compatible = "shared-dma-pool";
-+			reusable;
-+			size = <0x0 0xbc00000>;
-+			alignment = <0x0 0x400000>;
-+			linux,cma-default;
-+		};
- 	};
- 
- 	cpus {
--- 
-1.9.1
+I assumed that in plain terms, the difference between MT_DEVICE and
+MT_UNCACHED is write posting (aka bufferable) behaviour (across CPU
+architecture versions) and that does not affect write ordering rules.
+
+You and Catalin have more insights into ARM 32-bit memory types so
+I definitely need your input here to be comprehensive and avoid
+pitfalls, let me know if you have some specific CPUs in mind on
+which this may trigger a regression.
+
+> So, in any case, this looks like an improvement:
+> 
+> Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
+
+Thank you !
+
+Lorenzo
