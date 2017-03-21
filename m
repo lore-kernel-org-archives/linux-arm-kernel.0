@@ -1,149 +1,45 @@
-From: james.morse@arm.com (James Morse)
-Date: Tue, 21 Mar 2017 18:25:46 +0000
-Subject: [PATCH v33 07/14] arm64: hibernate: preserve kdump image around
- hibernation
-In-Reply-To: <20170315095941.25119-5-takahiro.akashi@linaro.org>
-References: <20170315095656.24992-1-takahiro.akashi@linaro.org>
- <20170315095941.25119-5-takahiro.akashi@linaro.org>
-Message-ID: <58D1702A.2010702@arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 21 Mar 2017 19:28:29 +0100
+Subject: [PATCH v2 0/7] Hi,
+Message-ID: <cover.26288667a039bc9f8e62dec2fd6342ded4014d12.1490120798.git-series.gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Akashi,
+this series add support for the pin and gpio controllers present on
+the Armada 37xx SoCs.
 
-On 15/03/17 09:59, AKASHI Takahiro wrote:
-> Since arch_kexec_protect_crashkres() removes a mapping for crash dump
-> kernel image, the loaded data won't be preserved around hibernation.
-> 
-> In this patch, helper functions, kexec_prepare_suspend()/
-> kexec_post_resume(), are additionally called before/after hibernation so
-> that the relevant memory segments will be mapped again and preserved just
-> as the others are.
-> 
-> In addition, to minimize the size of hibernation image,
-> kexec_is_chraskres_nosave() is added to pfn_is_nosave() in order to
+Each Armada 37xx SoC comes with 2 pin controllers: one on the south
+bridge (managing 28 pins) and one on the north bridge (managing 36 pins).
 
-(crashkres)
+At the hardware level the controller configure the pins by group and not
+pin by pin.
 
-> recoginize only the pages that hold loaded crash dump kernel image as
+The gpio controller is also capable to handle interrupt from gpio.
 
-(recognize)
+Gregory
 
-> saveable. Hibernation excludes any pages that are marked as Reserved and
-> yet "nosave."
+Gregory CLEMENT (7):
+  pinctrl: dt-bindings: Add documentation for Armada 37xx pin controllers
+  arm64: marvell: enable the Armada 37xx pinctrl driver
+  pinctrl: armada-37xx: Add pin controller support for Armada 37xx
+  pinctrl: armada-37xx: Add gpio support
+  pinctrl: aramda-37xx: Add irqchip support
+  ARM64: dts: marvell: Add pinctrl nodes for Armada 3700
+  ARM64: dts: marvell: armada37xx: add pinctrl definition
 
+ Documentation/devicetree/bindings/clock/armada3700-xtal-clock.txt         |   7 +-
+ Documentation/devicetree/bindings/pinctrl/marvell,armada-37xx-pinctrl.txt | 143 +++++++++++-
+ arch/arm64/Kconfig.platforms                                              |   2 +-
+ arch/arm64/boot/dts/marvell/armada-3720-db.dts                            |   8 +-
+ arch/arm64/boot/dts/marvell/armada-37xx.dtsi                              |  71 +++++-
+ drivers/pinctrl/Makefile                                                  |   2 +-
+ drivers/pinctrl/mvebu/Kconfig                                             |   7 +-
+ drivers/pinctrl/mvebu/Makefile                                            |   3 +-
+ drivers/pinctrl/mvebu/pinctrl-armada-37xx.c                               | 918 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-
+ 9 files changed, 1153 insertions(+), 8 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/marvell,armada-37xx-pinctrl.txt
+ create mode 100644 drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
 
-Neat! I didn't think this would be possible without hacking kernel/power/snapshot.c.
-
-I've given this a spin on Juno and Seattle, I even added debug_pagealloc, but
-that doesn't trick it because your kexec_prepare_suspend() puts the mapping back.
-
-Reviewed-by: James Morse <james.morse@arm.com>
-
-
-Thanks,
-
-James
-
-
-Some nits about comments:
-
-> diff --git a/arch/arm64/kernel/hibernate.c b/arch/arm64/kernel/hibernate.c
-> index 97a7384100f3..1e10fafa59bd 100644
-> --- a/arch/arm64/kernel/hibernate.c
-> +++ b/arch/arm64/kernel/hibernate.c
-> @@ -286,6 +288,9 @@ int swsusp_arch_suspend(void)
->  	local_dbg_save(flags);
->  
->  	if (__cpu_suspend_enter(&state)) {
-> +		/* make the crash dump kernel image visible/saveable */
-> +		kexec_prepare_suspend();
-
-Strictly this is kdump not kexec, but the comment makes that clear.
-
-> +
->  		sleep_cpu = smp_processor_id();
->  		ret = swsusp_save();
->  	} else {
-
-> diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
-> index 02e4f929db3b..82f48db589cf 100644
-> --- a/arch/arm64/kernel/machine_kexec.c
-> +++ b/arch/arm64/kernel/machine_kexec.c
-
-> @@ -220,7 +221,6 @@ void arch_kexec_protect_crashkres(void)
->  			kexec_crash_image->segment[i].memsz,
->  			PAGE_KERNEL_INVALID, true);
->  
-> -
-
-Stray whitespace change from a previous patch?
-
->  	flush_tlb_all();
->  }
->  
-> @@ -233,3 +233,74 @@ void arch_kexec_unprotect_crashkres(void)
-
-> +/*
-> + * kexec_is_crashres_nosave
-> + *
-> + * Return true only if a page is part of reserved memory for crash dump kernel,
-> + * but does not hold any data of loaded kernel image.
-> + *
-> + * Note that all the pages in crash dump kernel memory have been initially
-> + * marked as Reserved in kexec_reserve_crashkres_pages().
-> + *
-> + * In hibernation, the pages which are Reserved and yet "nosave"
-> + * are excluded from the hibernation iamge. kexec_is_crashkres_nosave()
-> + * does this check for crash dump kernel and will reduce the total size
-> + * of hibernation image.
-> + */
-> +
-> +bool kexec_is_crashkres_nosave(unsigned long pfn)
-> +{
-> +	int i;
-> +	phys_addr_t addr;
-> +
-> +	/* in reserved memory? */
-
-Comment in the wrong place?
-
-
-> +	if (!crashk_res.end)
-> +		return false;
-> +
-> +	addr = __pfn_to_phys(pfn);
-
-(makes more sense here)
-
-
-> +	if ((addr < crashk_res.start) || (crashk_res.end < addr))
-> +		return false;
-> +
-
-> +	/* not part of loaded kernel image? */
-
-Comment in the wrong place?
-
-
-> +	if (!kexec_crash_image)
-> +		return true;
-> +
-
-(makes more sense here)
-
-
-> +	for (i = 0; i < kexec_crash_image->nr_segments; i++)
-> +		if (addr >= kexec_crash_image->segment[i].mem &&
-> +				addr < (kexec_crash_image->segment[i].mem +
-> +					kexec_crash_image->segment[i].memsz))
-> +			return false;
-> +
-> +	return true;
-> +}
-> +
-
-
-Thanks,
-
-James
+base-commit: c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201
+-- 
+git-series 0.9.1
