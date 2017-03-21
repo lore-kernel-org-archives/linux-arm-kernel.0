@@ -1,348 +1,130 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 21 Mar 2017 19:28:34 +0100
-Subject: [PATCH v2 5/7] pinctrl: aramda-37xx: Add irqchip support
-In-Reply-To: <cover.26288667a039bc9f8e62dec2fd6342ded4014d12.1490120798.git-series.gregory.clement@free-electrons.com>
-References: <cover.26288667a039bc9f8e62dec2fd6342ded4014d12.1490120798.git-series.gregory.clement@free-electrons.com>
-Message-ID: <0e60fccd7913b83ee53d2921ce8f297927e8b6f3.1490120798.git-series.gregory.clement@free-electrons.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 21 Mar 2017 18:36:51 +0000
+Subject: [PATCH v3 01/25] arm64: hyp-stub: Implement HVC_RESET_VECTORS
+ stub hypercall
+In-Reply-To: <58D165E2.7050501@arm.com>
+References: <20170306142458.8875-1-marc.zyngier@arm.com>
+ <20170306142458.8875-2-marc.zyngier@arm.com>
+ <20170321170407.GD21829@e104818-lin.cambridge.arm.com>
+ <58D1620E.30001@arm.com> <0cce34c1-cb6f-0ba3-ac98-c0a0e986dc86@arm.com>
+ <58D165E2.7050501@arm.com>
+Message-ID: <8b0b5948-368f-530c-cd64-7b97dbe2312a@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Armada 37xx SoCs can handle interrupt through GPIO. However it can
-only manage the edge ones.
+On 21/03/17 17:41, James Morse wrote:
+> On 21/03/17 17:37, Marc Zyngier wrote:
+>> On 21/03/17 17:25, James Morse wrote:
+>>> On 21/03/17 17:04, Catalin Marinas wrote:
+>>>> On Mon, Mar 06, 2017 at 02:24:34PM +0000, Marc Zyngier wrote:
+>>>>> Let's define a new stub hypercall that resets the HYP configuration
+>>>>> to its default: hyp-stub vectors, and MMU disabled.
+>>>>>
+>>>>> Of course, for the hyp-stub itself, this is a trivial no-op.
+>>>>> Hypervisors will have a bit more work to do.
+>>>>>
+>>>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>>>>> ---
+>>>>>  arch/arm64/include/asm/virt.h |  9 +++++++++
+>>>>>  arch/arm64/kernel/hyp-stub.S  | 13 ++++++++++++-
+>>>>>  2 files changed, 21 insertions(+), 1 deletion(-)
+>>>> [...]
+>>>>> +ENTRY(__hyp_reset_vectors)
+>>>>> +	str	lr, [sp, #-16]!
+>>>>> +	mov	x0, #HVC_RESET_VECTORS
+>>>>> +	hvc	#0
+>>>>> +	ldr	lr, [sp], #16
+>>>>> +	ret
+>>>>> +ENDPROC(__hyp_reset_vectors)
+>>>>
+>>>> Why do we need to specifically preserve lr across the hvc call? Is it
+>>>> corrupted by the EL2 code (if yes, are other caller-saved registers that
+>>>> need preserving)? I don't see something similar in the arch/arm code.
+>>>
+>>> Kexec on arm64 needed a register to clobber in the hyp-stub's el1_sync code. We
+>>> wanted to preserve all the registers so soft_restart() could look more like a
+>>> function call.
+>>
+>> I don't think we need this anymore. Once we enter __cpu_soft_restart(),
+>> there is no turning back. Or am I missing something else?
+> 
+> My recollection of the history may be wrong: but we needed to mess with esr_el2
+> before we know its a soft_restart() call, at which point we didn't want to
+> clobber the registers. This was the strange use of x18 in kexec.
 
-The way the interrupt are managed are classical so we can use the generic
-interrupt chip model.
+After a bit of digging together with James, we found the guilty one.
+The hyp-stub entry code uses lr (aka x30) as a scratch register to 
+find out if we've made it here via a HVC instruction. This is an 
+absolutely pointless test, because by definition HVC is the only way to 
+get there.
 
-The only unusual "feature" is that many interrupts are connected to the
-parent interrupt controller. But we do not take advantage of this and use
-the chained irq with all of them.
+I've ended up with the following patch:
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- drivers/pinctrl/mvebu/pinctrl-armada-37xx.c | 223 ++++++++++++++++++++-
- 1 file changed, 216 insertions(+), 7 deletions(-)
+diff --git a/arch/arm64/kernel/hyp-stub.S b/arch/arm64/kernel/hyp-stub.S
+index 8ccdd549f7c7..210bd6b3849d 100644
+--- a/arch/arm64/kernel/hyp-stub.S
++++ b/arch/arm64/kernel/hyp-stub.S
+@@ -55,12 +55,6 @@ ENDPROC(__hyp_stub_vectors)
+ 	.align 11
+ 
+ el1_sync:
+-	mrs	x30, esr_el2
+-	lsr	x30, x30, #ESR_ELx_EC_SHIFT
+-
+-	cmp	x30, #ESR_ELx_EC_HVC64
+-	b.ne	9f				// Not an HVC trap
+-
+ 	cmp	x0, #HVC_SET_VECTORS
+ 	b.ne	2f
+ 	msr	vbar_el2, x1
+@@ -120,18 +114,14 @@ ENDPROC(\label)
+  */
+ 
+ ENTRY(__hyp_set_vectors)
+-	str	lr, [sp, #-16]!
+ 	mov	x1, x0
+ 	mov	x0, #HVC_SET_VECTORS
+ 	hvc	#0
+-	ldr	lr, [sp], #16
+ 	ret
+ ENDPROC(__hyp_set_vectors)
+ 
+ ENTRY(__hyp_reset_vectors)
+-	str	lr, [sp, #-16]!
+ 	mov	x0, #HVC_RESET_VECTORS
+ 	hvc	#0
+-	ldr	lr, [sp], #16
+ 	ret
+ ENDPROC(__hyp_reset_vectors)
+diff --git a/arch/arm64/kvm/hyp/hyp-entry.S b/arch/arm64/kvm/hyp/hyp-entry.S
+index 1277f81b63b7..5170ce1021da 100644
+--- a/arch/arm64/kvm/hyp/hyp-entry.S
++++ b/arch/arm64/kvm/hyp/hyp-entry.S
+@@ -32,17 +32,17 @@
+ 	 * Shuffle the parameters before calling the function
+ 	 * pointed to in x0. Assumes parameters in x[1,2,3].
+ 	 */
++	str	lr, [sp, #-16]!
+ 	mov	lr, x0
+ 	mov	x0, x1
+ 	mov	x1, x2
+ 	mov	x2, x3
+ 	blr	lr
++	ldr	lr, [sp], #16
+ .endm
+ 
+ ENTRY(__vhe_hyp_call)
+-	str	lr, [sp, #-16]!
+ 	do_el2_call
+-	ldr	lr, [sp], #16
+ 	/*
+ 	 * We used to rely on having an exception return to get
+ 	 * an implicit isb. In the E2H case, we don't have it anymore.
 
-diff --git a/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c b/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
-index e41e2d02aca7..5d3af27f1ba9 100644
---- a/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
-+++ b/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
-@@ -13,7 +13,9 @@
- #include <linux/gpio/driver.h>
- #include <linux/mfd/syscon.h>
- #include <linux/of.h>
-+#include <linux/of_address.h>
- #include <linux/of_device.h>
-+#include <linux/of_irq.h>
- #include <linux/pinctrl/pinconf-generic.h>
- #include <linux/pinctrl/pinconf.h>
- #include <linux/pinctrl/pinctrl.h>
-@@ -30,6 +32,11 @@
- #define OUTPUT_CTL	0x20
- #define SELECTION	0x30
- 
-+#define IRQ_EN		0x0
-+#define IRQ_POL		0x08
-+#define IRQ_STATUS	0x10
-+#define IRQ_WKUP	0x18
-+
- static int global_pin;
- 
- #define NB_FUNCS 2
-@@ -76,9 +83,12 @@ struct armada_37xx_pmx_func {
- 
- struct armada_37xx_pinctrl {
- 	struct regmap			*regmap;
-+	void __iomem			*base;
- 	struct armada_37xx_pin_data	*data;
- 	struct device			*dev;
- 	struct gpio_chip		gpio_chip;
-+	struct irq_chip			irq_chip;
-+	spinlock_t			irq_lock;
- 	struct pinctrl_desc		pctl;
- 	struct pinctrl_dev		*pctl_dev;
- 	struct armada_37xx_pin_group	*groups;
-@@ -316,7 +326,7 @@ static int armada_37xx_pmx_set(struct pinctrl_dev *pctldev,
- 	return armada_37xx_pmx_set_by_name(pctldev, name, grp);
- }
- 
--static inline void aramda_37xx_update_reg(unsigned int *reg,
-+static inline void armada_37xx_update_reg(unsigned int *reg,
- 					  unsigned int offset)
- {
- 	/* We never have more than 2 registers */
-@@ -326,6 +336,14 @@ static inline void aramda_37xx_update_reg(unsigned int *reg,
- 	}
- }
- 
-+static inline void armada_37xx_irq_update_reg(unsigned int *reg,
-+					  struct irq_data *d)
-+{
-+	int offset = irqd_to_hwirq(d);
-+
-+	armada_37xx_update_reg(reg, offset);
-+}
-+
- static int armada_37xx_gpio_direction_input(struct gpio_chip *chip,
- 					    unsigned int offset)
- {
-@@ -333,7 +351,7 @@ static int armada_37xx_gpio_direction_input(struct gpio_chip *chip,
- 	unsigned int reg = OUTPUT_EN;
- 	unsigned int mask;
- 
--	aramda_37xx_update_reg(&reg, offset);
-+	armada_37xx_update_reg(&reg, offset);
- 	mask = BIT(offset);
- 
- 	return regmap_update_bits(info->regmap, reg, mask, 0);
-@@ -346,7 +364,7 @@ static int armada_37xx_gpio_get_direction(struct gpio_chip *chip,
- 	unsigned int reg = OUTPUT_EN;
- 	unsigned int val, mask;
- 
--	aramda_37xx_update_reg(&reg, offset);
-+	armada_37xx_update_reg(&reg, offset);
- 	mask = BIT(offset);
- 
- 	regmap_read(info->regmap, reg, &val);
-@@ -361,7 +379,7 @@ static int armada_37xx_gpio_direction_output(struct gpio_chip *chip,
- 	unsigned int reg = OUTPUT_EN;
- 	unsigned int mask;
- 
--	aramda_37xx_update_reg(&reg, offset);
-+	armada_37xx_update_reg(&reg, offset);
- 	mask = BIT(offset);
- 
- 	return regmap_update_bits(info->regmap, reg, mask, mask);
-@@ -373,7 +391,7 @@ static int armada_37xx_gpio_get(struct gpio_chip *chip, unsigned int offset)
- 	unsigned int reg = INPUT_VAL;
- 	unsigned int val, mask;
- 
--	aramda_37xx_update_reg(&reg, offset);
-+	armada_37xx_update_reg(&reg, offset);
- 	mask = BIT(offset);
- 
- 	regmap_read(info->regmap, reg, &val);
-@@ -388,7 +406,7 @@ static void armada_37xx_gpio_set(struct gpio_chip *chip, unsigned int offset,
- 	unsigned int reg = OUTPUT_VAL;
- 	unsigned int mask, val;
- 
--	aramda_37xx_update_reg(&reg, offset);
-+	armada_37xx_update_reg(&reg, offset);
- 	mask = BIT(offset);
- 	val = value ? mask : 0;
- 
-@@ -449,6 +467,194 @@ static const struct gpio_chip armada_37xx_gpiolib_chip = {
- 	.owner = THIS_MODULE,
- };
- 
-+void armada_37xx_irq_ack(struct irq_data *d)
-+{
-+	struct gpio_chip *chip = irq_data_get_irq_chip_data(d);
-+	struct armada_37xx_pinctrl *info = gpiochip_get_data(chip);
-+	u32 reg = IRQ_STATUS, mask = d->mask;
-+	unsigned long flags;
-+
-+	armada_37xx_irq_update_reg(&reg, d);
-+	spin_lock_irqsave(&info->irq_lock, flags);
-+	writel(mask, info->base + reg);
-+	spin_unlock_irqrestore(&info->irq_lock, flags);
-+}
-+
-+void armada_37xx_irq_mask(struct irq_data *d)
-+{
-+	struct gpio_chip *chip = irq_data_get_irq_chip_data(d);
-+	struct armada_37xx_pinctrl *info = gpiochip_get_data(chip);
-+	u32 val, reg = IRQ_EN, mask = d->mask;
-+	unsigned long flags;
-+
-+	armada_37xx_irq_update_reg(&reg, d);
-+	spin_lock_irqsave(&info->irq_lock, flags);
-+	val = readl(info->base + reg);
-+	writel(val & ~mask, info->base + reg);
-+	spin_unlock_irqrestore(&info->irq_lock, flags);
-+}
-+
-+void armada_37xx_irq_unmask(struct irq_data *d)
-+{
-+	struct gpio_chip *chip = irq_data_get_irq_chip_data(d);
-+	struct armada_37xx_pinctrl *info = gpiochip_get_data(chip);
-+	u32 val, reg = IRQ_EN, mask = d->mask;
-+	unsigned long flags;
-+
-+	armada_37xx_irq_update_reg(&reg, d);
-+	spin_lock_irqsave(&info->irq_lock, flags);
-+	val = readl(info->base + reg);
-+	writel(val | mask, info->base + reg);
-+	spin_unlock_irqrestore(&info->irq_lock, flags);
-+}
-+
-+static int armada_37xx_irq_set_wake(struct irq_data *d, unsigned int on)
-+{
-+	struct gpio_chip *chip = irq_data_get_irq_chip_data(d);
-+	struct armada_37xx_pinctrl *info = gpiochip_get_data(chip);
-+	u32 val, reg = IRQ_WKUP, mask = d->mask;
-+	unsigned long flags;
-+
-+	armada_37xx_irq_update_reg(&reg, d);
-+	spin_lock_irqsave(&info->irq_lock, flags);
-+	val = readl(info->base + reg);
-+	if (on)
-+		val |= mask;
-+	else
-+		val &= ~mask;
-+	writel(val, info->base + reg);
-+	spin_unlock_irqrestore(&info->irq_lock, flags);
-+
-+	return 0;
-+}
-+
-+static int armada_37xx_irq_set_type(struct irq_data *d, unsigned int type)
-+{
-+	struct gpio_chip *chip = irq_data_get_irq_chip_data(d);
-+	struct armada_37xx_pinctrl *info = gpiochip_get_data(chip);
-+	u32 val, reg = IRQ_POL, mask = d->mask;
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&info->irq_lock, flags);
-+	armada_37xx_irq_update_reg(&reg, d);
-+	val = readl(info->base + reg);
-+	switch (type) {
-+	case IRQ_TYPE_EDGE_RISING:
-+		val &= ~mask;
-+		break;
-+	case IRQ_TYPE_EDGE_FALLING:
-+		val |= mask;
-+		break;
-+	default:
-+		spin_unlock_irqrestore(&info->irq_lock, flags);
-+		return -EINVAL;
-+	}
-+	writel(val, info->base + reg);
-+	spin_unlock_irqrestore(&info->irq_lock, flags);
-+
-+	return 0;
-+}
-+
-+
-+static void armada_37xx_irq_handler(struct irq_desc *desc)
-+{
-+	struct gpio_chip *gc = irq_desc_get_handler_data(desc);
-+	struct irq_chip *chip = irq_desc_get_chip(desc);
-+	struct armada_37xx_pinctrl *info = gpiochip_get_data(gc);
-+	struct irq_domain *d = gc->irqdomain;
-+	int i;
-+
-+	chained_irq_enter(chip, desc);
-+	for (i = 0; i <= d->revmap_size / GPIO_PER_REG; i++) {
-+		u32 status;
-+		unsigned long flags;
-+
-+		spin_lock_irqsave(&info->irq_lock, flags);
-+		status = readl_relaxed(info->base + IRQ_STATUS + 4 * i);
-+		/* Manage only the interrupt that was enabled */
-+		status &= readl_relaxed(info->base + IRQ_EN + 4 * i);
-+		spin_unlock_irqrestore(&info->irq_lock, flags);
-+		while (status) {
-+			u32 hwirq = ffs(status) - 1;
-+			u32 virq = irq_linear_revmap(d, hwirq +
-+						     i * GPIO_PER_REG);
-+
-+			generic_handle_irq(virq);
-+			status &= ~(1 << hwirq);
-+		}
-+	}
-+	chained_irq_exit(chip, desc);
-+}
-+
-+static int armada_37xx_irqchip_register(struct platform_device *pdev,
-+					struct armada_37xx_pinctrl *info)
-+{
-+	struct device_node *np = info->dev->of_node;
-+	int nrirqs = info->data->nr_pins;
-+	struct gpio_chip *gc = &info->gpio_chip;
-+	struct irq_chip *irqchip = &info->irq_chip;
-+	struct resource res;
-+	int ret, i, nr_irq_parent;
-+
-+	for_each_child_of_node(info->dev->of_node, np) {
-+		if (of_find_property(np, "gpio-controller", NULL)) {
-+			ret = 0;
-+			break;
-+		}
-+	};
-+	if (ret)
-+		return ret;
-+
-+	nr_irq_parent = of_irq_count(np);
-+	spin_lock_init(&info->irq_lock);
-+
-+	if (!nr_irq_parent) {
-+		dev_err(&pdev->dev, "Invalid or no IRQ\n");
-+		return 0;
-+	}
-+
-+	if (of_address_to_resource(info->dev->of_node, 1, &res)) {
-+		dev_err(info->dev, "cannot find IO resource\n");
-+		return -ENOENT;
-+	}
-+
-+	info->base = devm_ioremap_resource(info->dev, &res);
-+	if (IS_ERR(info->base))
-+		return PTR_ERR(info->base);
-+
-+	irqchip->irq_ack = armada_37xx_irq_ack;
-+	irqchip->irq_mask = armada_37xx_irq_mask;
-+	irqchip->irq_unmask = armada_37xx_irq_unmask;
-+	irqchip->irq_set_wake = armada_37xx_irq_set_wake;
-+	irqchip->irq_set_type = armada_37xx_irq_set_type;
-+	irqchip->name = info->data->name;
-+
-+	ret = gpiochip_irqchip_add(gc, irqchip, 0,
-+				   handle_level_irq, IRQ_TYPE_NONE);
-+	if (ret) {
-+		dev_info(&pdev->dev, "could not add irqchip\n");
-+		return ret;
-+	}
-+
-+	for (i = 0; i < nrirqs; i++) {
-+		struct irq_data *d = irq_get_irq_data(gc->irq_base + i);
-+
-+		d->mask = 1 << (i % GPIO_PER_REG);
-+	}
-+
-+	for (i = 0; i < nr_irq_parent; i++) {
-+		int irq = irq_of_parse_and_map(np, i);
-+
-+		if (irq < 0)
-+			continue;
-+
-+		gpiochip_set_chained_irqchip(gc, irqchip, irq,
-+					     armada_37xx_irq_handler);
-+	}
-+
-+	return 0;
-+}
-+
- static int armada_37xx_gpiochip_register(struct platform_device *pdev,
- 					struct armada_37xx_pinctrl *info)
- {
-@@ -477,6 +683,9 @@ static int armada_37xx_gpiochip_register(struct platform_device *pdev,
- 	ret = gpiochip_add_data(gc, info);
- 	if (ret)
- 		return ret;
-+	ret = armada_37xx_irqchip_register(pdev, info);
-+	if (ret)
-+		return ret;
- 
- 	return 0;
- }
-@@ -518,7 +727,7 @@ static int armada_37xx_fill_group(struct armada_37xx_pinctrl *info, int base)
- 
- 		grp->pins = devm_kzalloc(info->dev,
- 					 (grp->npins + grp->extra_npins) *
--					 sizeof(*grp->pins), GFP_KERNEL);
-+				 sizeof(*grp->pins), GFP_KERNEL);
- 		if (!grp->pins)
- 			return -ENOMEM;
- 
+I'll split that in convenient patches and repost the series.
+
+Thanks,
+
+	M.
 -- 
-git-series 0.9.1
+Jazz is not dead. It just smells funny...
