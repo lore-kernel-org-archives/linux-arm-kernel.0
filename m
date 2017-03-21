@@ -1,78 +1,73 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Tue, 21 Mar 2017 13:14:52 -0700
-Subject: [PATCH] netfilter: nfnetlink_cthelper: Fix memory leak
-In-Reply-To: <1490079425-6172-1-git-send-email-jeffy.chen@rock-chips.com>
-References: <1490079425-6172-1-git-send-email-jeffy.chen@rock-chips.com>
-Message-ID: <CAKdAkRSyMyGDFP_VotukxZWpfTr1GUfKpD_+1mP=djz1sG+WRw@mail.gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 21 Mar 2017 21:15:42 +0100
+Subject: [PATCH 2/2] spi: imx: fix use of native chip-selects with
+ devicetree
+In-Reply-To: <20170321192342.4fxlb2zjcas53uow@pengutronix.de>
+References: <1489726983-17706-1-git-send-email-gerg@linux-m68k.org>
+ <1489726983-17706-3-git-send-email-gerg@linux-m68k.org>
+ <f1cf2001-28b4-6a74-b98a-13336d74ff9d@mentor.com>
+ <4a8449d9-cc38-d642-0853-246f46ee7059@linux-m68k.org>
+ <20170321080551.ie4xm5hr3fki365s@pengutronix.de>
+ <942cfc4b-445b-ca51-1823-2391cea62abf@linux-m68k.org>
+ <20170321121133.jcmhhbszj2d42h3w@pengutronix.de>
+ <20678cef-f667-9915-aa00-8877ad152a8c@linux-m68k.org>
+ <20170321192342.4fxlb2zjcas53uow@pengutronix.de>
+Message-ID: <CAMuHMdW+KcPCAweneu4pTg1Pb-uAvYGz1+Z=oEDYoOt4gWrjhA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 20, 2017 at 11:57 PM, Jeffy Chen <jeffy.chen@rock-chips.com> wrote:
-> We have memory leaks of nf_conntrack_helper & expect_policy.
+Hi Uwe,
+
+On Tue, Mar 21, 2017 at 8:23 PM, Uwe Kleine-K?nig
+<u.kleine-koenig@pengutronix.de> wrote:
+> On Tue, Mar 21, 2017 at 11:22:27PM +1000, Greg Ungerer wrote:
+>> On 21/03/17 22:11, Uwe Kleine-K?nig wrote:
+>> > On Tue, Mar 21, 2017 at 09:53:52PM +1000, Greg Ungerer wrote:
+>> > > On 21/03/17 18:05, Uwe Kleine-K?nig wrote:
+>> > > > On Tue, Mar 21, 2017 at 12:05:20PM +1000, Greg Ungerer wrote:
+>> > > > > On 20/03/17 23:22, Vladimir Zapolskiy wrote:
+>> > > > > > For that type of bindings locally I have a hackish spi-imx driver change,
+>> > > > > > which supports this option, but I'm unsure if it is universal enough.
+>> > > > >
+>> > > > > Do you mean supporting no cs-gpios tag?
+>> > > > > That would be nice, but it would seem not many users of this are
+>> > > > > using native chip selects.
+>> > > >
+>> > > > The reason for this is that the native chip selects are less flexible
+>> > > > than gpios because you cannot control when they deassert. IIRC they do
+>> > > > it too much for some chips. So the only reason to stick to them is that
+>> > > > on some SoCs not all pins have a GPIO function. Not sure if transfer
+>> > > > speed is another reason, but I would expect that the gain isn't that
+>> > > > big.
+>> > >
+>> > > For the particular SPI device I am using, a Silicon Labs 32260,
+>> > > it actually wants the assertion and de-assertion of the chip-select
+>> > > between each byte. So it is the only way it can work for me.
+>> >
+>> > That should be doable with gpio-cs, too. You just need the right flags
+>> > in your spi transfer IIRC.
+>>
+>> Do you know which flag(s)  do that?
 >
-> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+> Looking at the source it's not about flags, but you have to split your
+> transfer into several messages.
 
-This looks reasonable to me:
+... and set spi_transfer.cs_change.
 
-Reviewed-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+> AFAICT that's how the spi stuff is
+> supposed to work. That is, at the start of a message CS is asserted and
+> (only) at it's end CS is deasserted. So the imx core with native chip
+> select actually misbehaves by toggling CS between each word.
 
-But you need to send it to correct lists, and linux-arm-kernel is not it:
+Indeed.
 
-./scripts/get_maintainer.pl -f net/netfilter/nfnetlink_cthelper.c
-Pablo Neira Ayuso <pablo@netfilter.org> (supporter:NETFILTER)
-Jozsef Kadlecsik <kadlec@blackhole.kfki.hu> (supporter:NETFILTER)
-"David S. Miller" <davem@davemloft.net> (maintainer:NETWORKING [GENERAL])
-netfilter-devel at vger.kernel.org (open list:NETFILTER)
-coreteam at netfilter.org (open list:NETFILTER)
-netdev at vger.kernel.org (open list:NETWORKING [GENERAL])
-linux-kernel at vger.kernel.org (open list)
+Gr{oetje,eeting}s,
 
-> ---
->
->  net/netfilter/nfnetlink_cthelper.c | 7 +++++++
->  1 file changed, 7 insertions(+)
->
-> diff --git a/net/netfilter/nfnetlink_cthelper.c b/net/netfilter/nfnetlink_cthelper.c
-> index de87823..99d4bd7 100644
-> --- a/net/netfilter/nfnetlink_cthelper.c
-> +++ b/net/netfilter/nfnetlink_cthelper.c
-> @@ -191,6 +191,8 @@ nfnl_cthelper_parse_expect_policy(struct nf_conntrack_helper *helper,
->                 if (ret < 0)
->                         goto err;
->         }
-> +
-> +       kfree(helper->expect_policy);
->         helper->expect_policy = expect_policy;
->         return 0;
->  err:
-> @@ -249,6 +251,7 @@ nfnl_cthelper_create(const struct nlattr * const tb[],
->
->         return 0;
->  err:
-> +       kfree(helper->expect_policy);
->         kfree(helper);
->         return ret;
->  }
-> @@ -612,6 +615,8 @@ static int nfnl_cthelper_del(struct net *net, struct sock *nfnl,
->
->                         found = true;
->                         nf_conntrack_helper_unregister(cur);
-> +                       kfree(cur->expect_policy);
-> +                       kfree(cur);
->                 }
->         }
->         /* Make sure we return success if we flush and there is no helpers */
-> @@ -675,6 +680,8 @@ static void __exit nfnl_cthelper_exit(void)
->                                 continue;
->
->                         nf_conntrack_helper_unregister(cur);
-> +                       kfree(cur->expect_policy);
-> +                       kfree(cur);
->                 }
->         }
->  }
+                        Geert
 
-Thanks.
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
--- 
-Dmitry
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
