@@ -1,44 +1,84 @@
-From: dwmw2@infradead.org (David Woodhouse)
-Date: Tue, 21 Mar 2017 09:42:23 +0000
-Subject: [PATCH v33 00/14] add kdump support
-In-Reply-To: <20170321073452.GA17298@linaro.org>
-References: <20170315095656.24992-1-takahiro.akashi@linaro.org>
- <1489750991.17202.40.camel@infradead.org>
- <1489759373.17202.44.camel@infradead.org>
- <20170317153358.GI5940@leverpostej>
- <1489765628.17202.59.camel@infradead.org>
- <20170317162421.GK5940@leverpostej> <20170321073452.GA17298@linaro.org>
-Message-ID: <1490089343.5036.92.camel@infradead.org>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 21 Mar 2017 11:07:38 +0100
+Subject: [PATCH] arm: spear6xx: add labels to various nodes in spear600.dtsi
+Message-ID: <1490090858-8866-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2017-03-21 at 16:34 +0900, AKASHI Takahiro wrote:
-> Yes, it is intentional. I removed 'offline' code in my v14 (2016/3/4).
-> As you assumed, I'd expect 'online' status of all CPUs to be kept
-> unchanged in the core dump.
+Having labels allows to more easily reference nodes in .dts files
+including spear600.dtsi.
 
-I wonder if it would be better to take a *copy* of it and put it back
-after we're done taking the CPUs down? As things stand, we now have
-*three* different methods of taking down all the CPUs... and *none* of
-them allow a platform to override it with an NMI-based or STONITH-based 
-method, which seems like something of an oversight.
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ arch/arm/boot/dts/spear600.dtsi | 14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
 
-> If you can agree, I would like to modify this disputed warning code to:
->?
-> +	BUG_ON(!in_kexec_crash && (stuck_cpus || (num_online_cpus() > 1)));
-> +	WARN(in_kexec_crash && (stuck_cpus || smp_crash_stop_failed()),
-> +		"Some CPUs may be stale, kdump will be unreliable.\n");
-
-That works; thanks.
-
-FWIW I'm currently blaming my platform's firmware for my sporadic
-crash-on-CPU#1 failures. If your testing includes crashes on non-boot
-CPUs (perhaps using the sysrq hack I posted) and it reliably passes for
-you, then let's ignore that for now.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: smime.p7s
-Type: application/x-pkcs7-signature
-Size: 4938 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170321/3266da88/attachment-0001.bin>
+diff --git a/arch/arm/boot/dts/spear600.dtsi b/arch/arm/boot/dts/spear600.dtsi
+index 9f60a7b..55b23f5 100644
+--- a/arch/arm/boot/dts/spear600.dtsi
++++ b/arch/arm/boot/dts/spear600.dtsi
+@@ -57,7 +57,7 @@
+ 			status = "disabled";
+ 		};
+ 
+-		dma at fc400000 {
++		dmac: dma at fc400000 {
+ 			compatible = "arm,pl080", "arm,primecell";
+ 			reg = <0xfc400000 0x1000>;
+ 			interrupt-parent = <&vic1>;
+@@ -97,7 +97,7 @@
+ 			status = "disabled";
+ 		};
+ 
+-		ehci at e1800000 {
++		ehci_usb0: ehci at e1800000 {
+ 			compatible = "st,spear600-ehci", "usb-ehci";
+ 			reg = <0xe1800000 0x1000>;
+ 			interrupt-parent = <&vic1>;
+@@ -105,7 +105,7 @@
+ 			status = "disabled";
+ 		};
+ 
+-		ehci at e2000000 {
++		ehci_usb1: ehci at e2000000 {
+ 			compatible = "st,spear600-ehci", "usb-ehci";
+ 			reg = <0xe2000000 0x1000>;
+ 			interrupt-parent = <&vic1>;
+@@ -113,7 +113,7 @@
+ 			status = "disabled";
+ 		};
+ 
+-		ohci at e1900000 {
++		ohci_usb0: ohci at e1900000 {
+ 			compatible = "st,spear600-ohci", "usb-ohci";
+ 			reg = <0xe1900000 0x1000>;
+ 			interrupt-parent = <&vic1>;
+@@ -121,7 +121,7 @@
+ 			status = "disabled";
+ 		};
+ 
+-		ohci at e2100000 {
++		ohci_usb1: ohci at e2100000 {
+ 			compatible = "st,spear600-ohci", "usb-ohci";
+ 			reg = <0xe2100000 0x1000>;
+ 			interrupt-parent = <&vic1>;
+@@ -135,7 +135,7 @@
+ 			compatible = "simple-bus";
+ 			ranges = <0xd0000000 0xd0000000 0x30000000>;
+ 
+-			serial at d0000000 {
++			uart0: serial at d0000000 {
+ 				compatible = "arm,pl011", "arm,primecell";
+ 				reg = <0xd0000000 0x1000>;
+ 				interrupt-parent = <&vic0>;
+@@ -143,7 +143,7 @@
+ 				status = "disabled";
+ 			};
+ 
+-			serial at d0080000 {
++			uart1: serial at d0080000 {
+ 				compatible = "arm,pl011", "arm,primecell";
+ 				reg = <0xd0080000 0x1000>;
+ 				interrupt-parent = <&vic0>;
+-- 
+2.7.4
