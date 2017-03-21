@@ -1,109 +1,178 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 21 Mar 2017 11:59:16 +0000
-Subject: [PATCH] efifb: avoid reconfiguration of BAR that covers the
- framebuffer
-In-Reply-To: <20170321115447.GA3667@red-moon>
-References: <1490048037-1850-1-git-send-email-ard.biesheuvel@linaro.org>
- <20170321115447.GA3667@red-moon>
-Message-ID: <CAKv+Gu9oLVWY4QOf=eONT6a8v1+m8BKUUR79LUamysKZhbb2CQ@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 21 Mar 2017 12:05:30 +0000
+Subject: [PATCH 7/9] KVM: arm/arm64: vgic: Implement early VGIC init
+ functionality
+In-Reply-To: <20170320105818.20481-8-cdall@linaro.org>
+References: <20170320105818.20481-1-cdall@linaro.org>
+ <20170320105818.20481-8-cdall@linaro.org>
+Message-ID: <3aba3207-24e4-c832-2b84-1c0a7790eb46@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 March 2017 at 11:54, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
-> [+Bjorn]
->
-> On Mon, Mar 20, 2017 at 10:13:57PM +0000, Ard Biesheuvel wrote:
->> On UEFI systems, the PCI subsystem is enumerated by the firmware,
->> and if a graphical framebuffer is exposed by a PCI device, its base
->> address and size are exposed to the OS via the Graphics Output
->> Protocol (GOP).
->>
->> On arm64 PCI systems, the entire PCI hierarchy is reconfigured from
->> scratch at boot. This may result in the GOP framebuffer address to
->> become stale, if the BAR covering the framebuffer is modified. This
->> will cause the framebuffer to become unresponsive, and may in some
->> cases result in unpredictable behavior if the range is reassigned to
->> another device.
->
-> How does it currently work on eg x86 ? I suspect it just works because
-> on x86 resources are claimed at boot and if the FB memory BAR contains
-> reasonable values it is left alone by the kernel code reassigning
-> resources on x86.
->
+On 20/03/17 10:58, Christoffer Dall wrote:
+> Implement early initialization for both the distributor and the CPU
+> interfaces.  The basic idea is that even though the VGIC is not
+> functional or not requested from user space, the critical path of the
+> run loop can still call VGIC functions that just won't do anything,
+> without them having to check additional initialization flags to ensure
+> they don't look at uninitialized data structures.
+> 
+> Signed-off-by: Christoffer Dall <cdall@linaro.org>
+> ---
+>  virt/kvm/arm/vgic/vgic-init.c | 96 +++++++++++++++++++++++++------------------
+>  1 file changed, 56 insertions(+), 40 deletions(-)
+> 
+> diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
+> index 3762fd1..25fd1b9 100644
+> --- a/virt/kvm/arm/vgic/vgic-init.c
+> +++ b/virt/kvm/arm/vgic/vgic-init.c
+> @@ -24,7 +24,12 @@
+>  
+>  /*
+>   * Initialization rules: there are multiple stages to the vgic
+> - * initialization, both for the distributor and the CPU interfaces.
+> + * initialization, both for the distributor and the CPU interfaces.  The basic
+> + * idea is that even though the VGIC is not functional or not requested from
+> + * user space, the critical path of the run loop can still call VGIC functions
+> + * that just won't do anything, without them having to check additional
+> + * initialization flags to ensure they don't look at uninitialized data
+> + * structures.
+>   *
+>   * Distributor:
+>   *
+> @@ -39,23 +44,67 @@
+>   *
+>   * CPU Interface:
+>   *
+> - * - kvm_vgic_cpu_early_init(): initialization of static data that
+> + * - kvm_vgic_vcpu_early_init(): initialization of static data that
+>   *   doesn't depend on any sizing information or emulation type. No
+>   *   allocation is allowed there.
+>   */
+>  
+>  /* EARLY INIT */
+>  
+> -/*
+> - * Those 2 functions should not be needed anymore but they
+> - * still are called from arm.c
+> +/**
+> + * kvm_vgic_early_init() - Initialize static VGIC VCPU data structures
+> + * @kvm: The VM whose VGIC districutor should be initialized
+> + *
+> + * Only do initialization of static structures that don't require any
+> + * allocation or sizing information from userspace.  vgic_init() called
+> + * kvm_vgic_dist_init() which takes care of the rest.
+>   */
+>  void kvm_vgic_early_init(struct kvm *kvm)
+>  {
+> +	struct vgic_dist *dist = &kvm->arch.vgic;
+> +
+> +	INIT_LIST_HEAD(&dist->lpi_list_head);
+> +	spin_lock_init(&dist->lpi_list_lock);
+>  }
+>  
+> +/**
+> + * kvm_vgic_vcpu_early_init() - Initialize static VGIC VCPU data structures
+> + * @vcpu: The VCPU whose VGIC data structures whould be initialized
+> + *
+> + * Only do initialization, but do not actually enable the VGIC CPU interface
+> + * yet.
+> + */
+>  void kvm_vgic_vcpu_early_init(struct kvm_vcpu *vcpu)
+>  {
+> +	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+> +	int i;
+> +
+> +	INIT_LIST_HEAD(&vgic_cpu->ap_list_head);
+> +	spin_lock_init(&vgic_cpu->ap_list_lock);
+> +
+> +	/*
+> +	 * Enable and configure all SGIs to be edge-triggered and
+> +	 * configure all PPIs as level-triggered.
+> +	 */
+> +	for (i = 0; i < VGIC_NR_PRIVATE_IRQS; i++) {
+> +		struct vgic_irq *irq = &vgic_cpu->private_irqs[i];
+> +
+> +		INIT_LIST_HEAD(&irq->ap_list);
+> +		spin_lock_init(&irq->irq_lock);
+> +		irq->intid = i;
+> +		irq->vcpu = NULL;
+> +		irq->target_vcpu = vcpu;
+> +		irq->targets = 1U << vcpu->vcpu_id;
+> +		kref_init(&irq->refcount);
+> +		if (vgic_irq_is_sgi(i)) {
+> +			/* SGIs */
+> +			irq->enabled = 1;
+> +			irq->config = VGIC_CONFIG_EDGE;
+> +		} else {
+> +			/* PPIs */
+> +			irq->config = VGIC_CONFIG_LEVEL;
+> +		}
+> +	}
+>  }
+>  
+>  /* CREATION */
+> @@ -148,9 +197,6 @@ static int kvm_vgic_dist_init(struct kvm *kvm, unsigned int nr_spis)
+>  	struct kvm_vcpu *vcpu0 = kvm_get_vcpu(kvm, 0);
+>  	int i;
+>  
+> -	INIT_LIST_HEAD(&dist->lpi_list_head);
+> -	spin_lock_init(&dist->lpi_list_lock);
+> -
+>  	dist->spis = kcalloc(nr_spis, sizeof(struct vgic_irq), GFP_KERNEL);
+>  	if (!dist->spis)
+>  		return  -ENOMEM;
+> @@ -181,41 +227,11 @@ static int kvm_vgic_dist_init(struct kvm *kvm, unsigned int nr_spis)
+>  }
+>  
+>  /**
+> - * kvm_vgic_vcpu_init: initialize the vcpu data structures and
+> - * enable the VCPU interface
+> - * @vcpu: the VCPU which's VGIC should be initialized
+> + * kvm_vgic_vcpu_init() - Enable the VCPU interface
+> + * @vcpu: the VCPU which's VGIC should be enabled
+>   */
+>  static void kvm_vgic_vcpu_init(struct kvm_vcpu *vcpu)
+>  {
+> -	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+> -	int i;
+> -
+> -	INIT_LIST_HEAD(&vgic_cpu->ap_list_head);
+> -	spin_lock_init(&vgic_cpu->ap_list_lock);
+> -
+> -	/*
+> -	 * Enable and configure all SGIs to be edge-triggered and
+> -	 * configure all PPIs as level-triggered.
+> -	 */
+> -	for (i = 0; i < VGIC_NR_PRIVATE_IRQS; i++) {
+> -		struct vgic_irq *irq = &vgic_cpu->private_irqs[i];
+> -
+> -		INIT_LIST_HEAD(&irq->ap_list);
+> -		spin_lock_init(&irq->irq_lock);
+> -		irq->intid = i;
+> -		irq->vcpu = NULL;
+> -		irq->target_vcpu = vcpu;
+> -		irq->targets = 1U << vcpu->vcpu_id;
+> -		kref_init(&irq->refcount);
+> -		if (vgic_irq_is_sgi(i)) {
+> -			/* SGIs */
+> -			irq->enabled = 1;
+> -			irq->config = VGIC_CONFIG_EDGE;
+> -		} else {
+> -			/* PPIs */
+> -			irq->config = VGIC_CONFIG_LEVEL;
+> -		}
+> -	}
+>  	if (kvm_vgic_global_state.type == VGIC_V2)
+>  		vgic_v2_enable(vcpu);
+>  	else
+> 
 
-This is my understanding, yes.
+Since this function is now about enabling the vgic on a given vcpu,
+shouldn't the name reflect this? Other than that:
 
->> So add a quirk to the EFI fb driver to find the BAR associated with
->> the GOP base address, and set the IORESOURCE_PCI_FIXED attribute so
->> that the PCI core will leave it alone.
->>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->>  drivers/video/fbdev/efifb.c | 33 ++++++++++++++++++++
->>  1 file changed, 33 insertions(+)
->>
->> diff --git a/drivers/video/fbdev/efifb.c b/drivers/video/fbdev/efifb.c
->> index 8c4dc1e1f94f..97a3b15b6f04 100644
->> --- a/drivers/video/fbdev/efifb.c
->> +++ b/drivers/video/fbdev/efifb.c
->> @@ -10,6 +10,7 @@
->>  #include <linux/efi.h>
->>  #include <linux/errno.h>
->>  #include <linux/fb.h>
->> +#include <linux/pci.h>
->>  #include <linux/platform_device.h>
->>  #include <linux/screen_info.h>
->>  #include <video/vga.h>
->> @@ -360,3 +361,35 @@ static struct platform_driver efifb_driver = {
->>  };
->>
->>  builtin_platform_driver(efifb_driver);
->> +
->> +static bool resource_found;
->> +
->> +static void efifb_fixup_resources(struct pci_dev *dev)
->> +{
->> +     u64 fb_base = screen_info.lfb_base;
->> +     u64 fb_size = screen_info.lfb_size;
->> +     int i;
->> +
->> +     if (resource_found || screen_info.orig_video_isVGA != VIDEO_TYPE_EFI)
->> +             return;
->> +
->> +     if (screen_info.capabilities & VIDEO_CAPABILITY_64BIT_BASE)
->> +             fb_base |= (u64)screen_info.ext_lfb_base << 32;
->> +
->> +     if (!fb_base)
->> +             return;
->> +
->> +     for (i = 0; i < PCI_STD_RESOURCE_END; i++) {
->> +             struct resource *res = &dev->resource[i];
->> +
->> +             if (!(res->flags & IORESOURCE_MEM))
->> +                     continue;
->> +
->> +             if (res->start <= fb_base && res->end >= fb_base + fb_size) {
->
-> You are checking for a live resource here right (ie PCI device should be
-> enabled) ? I am not sure that just checking the resource range is safe
-> (I mean it would be most certainly a FW bug to have a PCI disabled
-> device with memory BAR programmed with the FB addresses but thought it
-> was worth mentioning).
->
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
-It is implied that the device is enabled. The GOP protocol exposes a
-live framebuffer base/size with some metadata regarding the pixel
-format/color depth etc. It contains no annotations as to whether the
-device is PCI or simply a framebuffer mapped in system memory, and so
-we can only assume that the device is enabled.
-
->> +                     res->flags |= IORESOURCE_PCI_FIXED;
->> +                     resource_found = true;
->> +                     break;
->> +             }
->> +     }
->> +}
->> +DECLARE_PCI_FIXUP_HEADER(PCI_ANY_ID, PCI_ANY_ID, efifb_fixup_resources);
->> --
->> 2.7.4
->>
+	M.
+-- 
+Jazz is not dead. It just smells funny...
