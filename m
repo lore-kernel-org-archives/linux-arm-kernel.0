@@ -1,92 +1,87 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Tue, 21 Mar 2017 10:59:24 +0800
-Subject: [v3 3/5] coresight: add support for debug module
-In-Reply-To: <CANLsYkyiAnSGW4Ujs6L-yBKK3no3zigbyBgOCWbm06ZdV-f2Hw@mail.gmail.com>
-References: <20170309175915.GA964@leoy-linaro>
- <3f27efee-3b63-81fd-eb96-73fd7e6f5e92@arm.com>
- <20170313165600.GB32431@linaro.org>
- <516f8989-4dde-2686-d549-0761feb14d1b@arm.com>
- <CANLsYkzJsGvr4ZzNbTwcPu1Qki6=Szvu+bMjHZ_rza==DqFChw@mail.gmail.com>
- <20170317101328.GA19877@leoy-linaro>
- <20170317155007.GA20435@linaro.org>
- <20170317162836.GD2020@leoy-linaro>
- <5995f6a7-08b1-c868-fc88-a145d1748a33@arm.com>
- <CANLsYkyiAnSGW4Ujs6L-yBKK3no3zigbyBgOCWbm06ZdV-f2Hw@mail.gmail.com>
-Message-ID: <20170321025924.GA7429@leoy-linaro>
+From: fu.wei@linaro.org (Fu Wei)
+Date: Tue, 21 Mar 2017 11:48:02 +0800
+Subject: [Linaro-acpi] [PATCH v21 13/13] acpi/arm64: Add SBSA Generic
+ Watchdog support in GTDT driver
+In-Reply-To: <20170320185002.GT31496@slurndal-lnx1.caveonetworks.com>
+References: <20170206185015.12296-1-fu.wei@linaro.org>
+ <20170206185015.12296-14-fu.wei@linaro.org>
+ <20170317200153.GF15909@leverpostej>
+ <CADyBb7uZV2Qe0ga4TTS_iis5MtwJ=u6PKYSV6ED103Cmh5_O3g@mail.gmail.com>
+ <20170320180949.GM31213@leverpostej>
+ <20170320185002.GT31496@slurndal-lnx1.caveonetworks.com>
+Message-ID: <CADyBb7vgzLCoFO6p=mu=D93VSHwuFh6cLEwVD9PvvuOUGxEgcw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 20, 2017 at 10:40:00AM -0600, Mathieu Poirier wrote:
+Hi Mark, Lurndal,
 
-[...]
 
-> >>> If we don't check for "nohlt" some platform may freeze, others may work.
-> >>> If we
-> >>> mandate that "nohlt" be present on the kernel cmd line it works in all
-> >>> cases.
-> >>> As such mandating that "nohlt" be present is a better way to go.
-> >>
-> >>
-> >> Sure, so I will add below checking code in the probe function, please
-> >> let me know if you have alter better way to implement this:
-> >>
-> >> +       if (IS_ENABLED(CONFIG_CPU_IDLE) &&
-> >> +                       !strstr(boot_command_line, "nohlt")) {
-> >> +               dev_err(dev, "May not be accessible in CPU power
-> >> domain.\n");
-> >> +               return -EPERM;
-> >> +       }
-> >>
-> >
-> > There is an API which kind of achieves what "nohlt" does at runtime :
-> >
-> >   cpu_idle_poll_ctrl(true)
-> >
-> > So may be we could use that instead of depending on "nohlt". The other side
-> > of the issues is "when do we decide to use the API". May be we could add
-> > something
-> > like : enable_debug, which could then trigger the panic notifier
-> > registrations
-> > and the above. That would still leave us with a case where the system
-> > crashes
-> > even before the user gets a terminal. May be the following is the best
-> > option :
-> >
-> > 1) Dedicated kernel command line parameter for enabling the CPU debug at
-> > boot/probe.
-> >
-> > and
-> >
-> > 2) Runtime enable method via sysfs.
-> >
-> > What do you think ?
-> 
-> In my opinion booting with "nohlt" on the cmd line is sufficient to
-> determine if we should use the driver or not.  That way we also avoid
-> declaring yet another sysfs flag, something I really want to avoid.
+On 21 March 2017 at 02:50, Lurndal, Scott <Scott.Lurndal@cavium.com> wrote:
+> On Mon, Mar 20, 2017 at 06:09:50PM +0000, Mark Rutland wrote:
+>> On Tue, Mar 21, 2017 at 01:57:58AM +0800, Fu Wei wrote:
+>> > On 18 March 2017 at 04:01, Mark Rutland <mark.rutland@arm.com> wrote:
+>> > > On Tue, Feb 07, 2017 at 02:50:15AM +0800, fu.wei at linaro.org wrote:
+>>
+>> > > I've not been able to find where the ACPI spec says that zero is not a
+>> > > valid GSIV. This may simply be an oversight/ambiguity in the spec.
+>> > >
+>> > > Is there any statement to that effect?
+>> >
+>> > you are right, zero is a  valid GSIV, I will delete this check. Thanks
+>>
+>> That being the case, how does one describe a watchdog that does not have
+>> an interrupt?
+>>
+>> As I mentioned, I think this is an oversight/ambiguity in the spec tat
+>> we should address.
+>>
+>> > > My reading of SBSA is that there is one watchdog in the system.
+>> > >
+>> > > Is that not the case?
+>> >
+>> > do you mean:
+>> > ---------------
+>> > 4.2.4 Watchdogs
+>> > The base server system implements a Generic Watchdog as specified in
+>> > APPENDIX A: Generic Watchdog.
+>> > ---------------
+>> >
+>> > I am not sure about that if this is saying "we only have one SBSA
+>> > watchdog in a system"
+>> >
+>> > would you let me know where mention it? Do I miss something?
+>>
+>> My reading was that the 'a' above meant a single element. i.e.
+>>
+>>       The base server system implements _a_ Generic Watchdog as
+>>       specified in APPENDIX A: Generic Watchdog.
+>
+>   It is a requirement of a conforming implementation that there
+> be a generic watchdog (impl as per the appendix).   That doesn't preclude
+> an implmentation from providing additional watchdogs (for example, if
+> the processor implements EL3, it is likely that an implementation
+> will include a secure watchdog as well as a non-secure watchdog).
+>
+>   The SBSA describes the minimal hardware requirements for a
+> compliant server.
 
-Agree.
+So I think, for the SBSA watchdog:
 
-I did spend some time to implement coresight core framework to support
-debug module, you could see it on:http://termbin.com/k2fj; this also
-gives me more sense which is better choice. If declaring another sysfs
-flag to support debug module in coresight framework, this lets the
-codes and interfaces more complex. E.g. for best fit into coresight
-framework, finally we can get 8 sysfs nodes for 8 CPUs in system; so
-that means we need enable every CPU one by one.
+(1) there maybe more then one non-secure watchdog in GTDT
 
-root at linaro-developer:~# ls /sys/bus/coresight/devices/
-f6590000.debug  f6594000.debug  f65d0000.debug  f65d4000.debug
-f6592000.debug  f6596000.debug  f65d2000.debug  f65d6000.debug
+(2) we may also need to skip  secure watchdogs in GTDT,
+and only register non-secure watchdogs into platform resources.
 
-This is not quite reasonable to introduce complexity for either code
-or using it. If we review coresight topology, some components need to
-interact with each other and coresight framework should handle them
-properly to enable/disable path, etc. But as Mathieu meantioned, from
-the point of the hardware topology, the CPU debug module is quite
-standalone under the coresight umbrella, and it has no any dependency
-with other tracing or bus modules. So it's good to keep it simple,
-this also matches with hardware implementation.
+Please correct me, if I misunderstand something.
 
-Thanks,
-Leo Yan
+>
+> scott
+
+
+
+-- 
+Best regards,
+
+Fu Wei
+Software Engineer
+Red Hat
