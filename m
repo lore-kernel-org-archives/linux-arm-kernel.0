@@ -1,183 +1,62 @@
-From: isubramanian@apm.com (Iyappan Subramanian)
-Date: Tue, 21 Mar 2017 12:24:41 -0700
-Subject: [PATCH net-next 2/4] drivers: net: xgene-v2: Add ethtool support
-In-Reply-To: <1490124283-10371-1-git-send-email-isubramanian@apm.com>
-References: <1490124283-10371-1-git-send-email-isubramanian@apm.com>
-Message-ID: <1490124283-10371-3-git-send-email-isubramanian@apm.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 21 Mar 2017 20:23:42 +0100
+Subject: [PATCH 2/2] spi: imx: fix use of native chip-selects with
+ devicetree
+In-Reply-To: <20678cef-f667-9915-aa00-8877ad152a8c@linux-m68k.org>
+References: <1489726983-17706-1-git-send-email-gerg@linux-m68k.org>
+ <1489726983-17706-3-git-send-email-gerg@linux-m68k.org>
+ <f1cf2001-28b4-6a74-b98a-13336d74ff9d@mentor.com>
+ <4a8449d9-cc38-d642-0853-246f46ee7059@linux-m68k.org>
+ <20170321080551.ie4xm5hr3fki365s@pengutronix.de>
+ <942cfc4b-445b-ca51-1823-2391cea62abf@linux-m68k.org>
+ <20170321121133.jcmhhbszj2d42h3w@pengutronix.de>
+ <20678cef-f667-9915-aa00-8877ad152a8c@linux-m68k.org>
+Message-ID: <20170321192342.4fxlb2zjcas53uow@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Added basic ethtool support.
+On Tue, Mar 21, 2017 at 11:22:27PM +1000, Greg Ungerer wrote:
+> Hi Uwe,
+> 
+> On 21/03/17 22:11, Uwe Kleine-K?nig wrote:
+> > On Tue, Mar 21, 2017 at 09:53:52PM +1000, Greg Ungerer wrote:
+> > > On 21/03/17 18:05, Uwe Kleine-K?nig wrote:
+> > > > On Tue, Mar 21, 2017 at 12:05:20PM +1000, Greg Ungerer wrote:
+> > > > > On 20/03/17 23:22, Vladimir Zapolskiy wrote:
+> > > > > > For that type of bindings locally I have a hackish spi-imx driver change,
+> > > > > > which supports this option, but I'm unsure if it is universal enough.
+> > > > > 
+> > > > > Do you mean supporting no cs-gpios tag?
+> > > > > That would be nice, but it would seem not many users of this are
+> > > > > using native chip selects.
+> > > > 
+> > > > The reason for this is that the native chip selects are less flexible
+> > > > than gpios because you cannot control when they deassert. IIRC they do
+> > > > it too much for some chips. So the only reason to stick to them is that
+> > > > on some SoCs not all pins have a GPIO function. Not sure if transfer
+> > > > speed is another reason, but I would expect that the gain isn't that
+> > > > big.
+> > > 
+> > > For the particular SPI device I am using, a Silicon Labs 32260,
+> > > it actually wants the assertion and de-assertion of the chip-select
+> > > between each byte. So it is the only way it can work for me.
+> > 
+> > That should be doable with gpio-cs, too. You just need the right flags
+> > in your spi transfer IIRC.
+> 
+> Do you know which flag(s)  do that?
 
-Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
----
- drivers/net/ethernet/apm/xgene-v2/Makefile  |   2 +-
- drivers/net/ethernet/apm/xgene-v2/ethtool.c | 121 ++++++++++++++++++++++++++++
- drivers/net/ethernet/apm/xgene-v2/main.c    |   1 +
- drivers/net/ethernet/apm/xgene-v2/main.h    |   1 +
- 4 files changed, 124 insertions(+), 1 deletion(-)
- create mode 100644 drivers/net/ethernet/apm/xgene-v2/ethtool.c
+Looking at the source it's not about flags, but you have to split your
+transfer into several messages. AFAICT that's how the spi stuff is
+supposed to work. That is, at the start of a message CS is asserted and
+(only) at it's end CS is deasserted. So the imx core with native chip
+select actually misbehaves by toggling CS between each word.
 
-diff --git a/drivers/net/ethernet/apm/xgene-v2/Makefile b/drivers/net/ethernet/apm/xgene-v2/Makefile
-index 0fa5975..f16a2b3 100644
---- a/drivers/net/ethernet/apm/xgene-v2/Makefile
-+++ b/drivers/net/ethernet/apm/xgene-v2/Makefile
-@@ -2,5 +2,5 @@
- # Makefile for APM X-Gene Ethernet v2 driver
- #
- 
--xgene-enet-v2-objs := main.o mac.o enet.o ring.o mdio.o
-+xgene-enet-v2-objs := main.o mac.o enet.o ring.o mdio.o ethtool.o
- obj-$(CONFIG_NET_XGENE_V2) += xgene-enet-v2.o
-diff --git a/drivers/net/ethernet/apm/xgene-v2/ethtool.c b/drivers/net/ethernet/apm/xgene-v2/ethtool.c
-new file mode 100644
-index 0000000..0c426f5
---- /dev/null
-+++ b/drivers/net/ethernet/apm/xgene-v2/ethtool.c
-@@ -0,0 +1,121 @@
-+/*
-+ * Applied Micro X-Gene SoC Ethernet v2 Driver
-+ *
-+ * Copyright (c) 2017, Applied Micro Circuits Corporation
-+ * Author(s): Iyappan Subramanian <isubramanian@apm.com>
-+ *	      Keyur Chudgar <kchudgar@apm.com>
-+ *
-+ * This program is free software; you can redistribute  it and/or modify it
-+ * under  the terms of  the GNU General  Public License as published by the
-+ * Free Software Foundation;  either version 2 of the  License, or (at your
-+ * option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#include "main.h"
-+
-+struct xge_gstrings_stats {
-+	char name[ETH_GSTRING_LEN];
-+	int offset;
-+};
-+
-+#define XGE_STAT(m)		{ #m, offsetof(struct xge_pdata, stats.m) }
-+
-+static const struct xge_gstrings_stats gstrings_stats[] = {
-+	XGE_STAT(rx_packets),
-+	XGE_STAT(tx_packets),
-+	XGE_STAT(rx_bytes),
-+	XGE_STAT(tx_bytes),
-+	XGE_STAT(rx_errors)
-+};
-+
-+#define XGE_STATS_LEN		ARRAY_SIZE(gstrings_stats)
-+
-+static void xge_get_drvinfo(struct net_device *ndev,
-+			    struct ethtool_drvinfo *info)
-+{
-+	struct xge_pdata *pdata = netdev_priv(ndev);
-+	struct platform_device *pdev = pdata->pdev;
-+
-+	strcpy(info->driver, "xgene-enet-v2");
-+	strcpy(info->version, XGENE_ENET_V2_VERSION);
-+	snprintf(info->fw_version, ETHTOOL_FWVERS_LEN, "N/A");
-+	sprintf(info->bus_info, "%s", pdev->name);
-+}
-+
-+static void xge_get_strings(struct net_device *ndev, u32 stringset, u8 *data)
-+{
-+	u8 *p = data;
-+	int i;
-+
-+	if (stringset != ETH_SS_STATS)
-+		return;
-+
-+	for (i = 0; i < XGE_STATS_LEN; i++) {
-+		memcpy(p, gstrings_stats[i].name, ETH_GSTRING_LEN);
-+		p += ETH_GSTRING_LEN;
-+	}
-+}
-+
-+static int xge_get_sset_count(struct net_device *ndev, int sset)
-+{
-+	if (sset != ETH_SS_STATS)
-+		return -EINVAL;
-+
-+	return XGE_STATS_LEN;
-+}
-+
-+static void xge_get_ethtool_stats(struct net_device *ndev,
-+				  struct ethtool_stats *dummy,
-+				  u64 *data)
-+{
-+	void *pdata = netdev_priv(ndev);
-+	int i;
-+
-+	for (i = 0; i < XGE_STATS_LEN; i++)
-+		*data++ = *(u64 *)(pdata + gstrings_stats[i].offset);
-+}
-+
-+static int xge_get_link_ksettings(struct net_device *ndev,
-+				  struct ethtool_link_ksettings *cmd)
-+{
-+	struct phy_device *phydev = ndev->phydev;
-+
-+	if (!phydev)
-+		return -ENODEV;
-+
-+	return phy_ethtool_ksettings_get(phydev, cmd);
-+}
-+
-+static int xge_set_link_ksettings(struct net_device *ndev,
-+				  const struct ethtool_link_ksettings *cmd)
-+{
-+	struct phy_device *phydev = ndev->phydev;
-+
-+	if (!phydev)
-+		return -ENODEV;
-+
-+	return phy_ethtool_ksettings_set(phydev, cmd);
-+}
-+
-+static const struct ethtool_ops xge_ethtool_ops = {
-+	.get_drvinfo = xge_get_drvinfo,
-+	.get_link = ethtool_op_get_link,
-+	.get_strings = xge_get_strings,
-+	.get_sset_count = xge_get_sset_count,
-+	.get_ethtool_stats = xge_get_ethtool_stats,
-+	.get_link_ksettings = xge_get_link_ksettings,
-+	.set_link_ksettings = xge_set_link_ksettings,
-+};
-+
-+void xge_set_ethtool_ops(struct net_device *ndev)
-+{
-+	ndev->ethtool_ops = &xge_ethtool_ops;
-+}
-diff --git a/drivers/net/ethernet/apm/xgene-v2/main.c b/drivers/net/ethernet/apm/xgene-v2/main.c
-index 10d4aff..9a5a5ec 100644
---- a/drivers/net/ethernet/apm/xgene-v2/main.c
-+++ b/drivers/net/ethernet/apm/xgene-v2/main.c
-@@ -673,6 +673,7 @@ static int xge_probe(struct platform_device *pdev)
- 		goto err;
- 
- 	ndev->hw_features = ndev->features;
-+	xge_set_ethtool_ops(ndev);
- 
- 	ret = dma_coerce_mask_and_coherent(dev, DMA_BIT_MASK(64));
- 	if (ret) {
-diff --git a/drivers/net/ethernet/apm/xgene-v2/main.h b/drivers/net/ethernet/apm/xgene-v2/main.h
-index 3e98bb4..00b8751 100644
---- a/drivers/net/ethernet/apm/xgene-v2/main.h
-+++ b/drivers/net/ethernet/apm/xgene-v2/main.h
-@@ -76,5 +76,6 @@ struct xge_pdata {
- 
- int xge_mdio_config(struct net_device *ndev);
- void xge_mdio_remove(struct net_device *ndev);
-+void xge_set_ethtool_ops(struct net_device *ndev);
- 
- #endif /* __XGENE_ENET_V2_MAIN_H__ */
+@broonie: Can you confirm or contradict please?
+
+Best regards
+Uwe
+
 -- 
-1.9.1
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
