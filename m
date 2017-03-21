@@ -1,53 +1,70 @@
 From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Tue, 21 Mar 2017 16:36:11 +0100
-Subject: [PATCH v3 11/11] ARM: sun8i: sina33: add highest OPP of CPUs
+Date: Tue, 21 Mar 2017 16:36:05 +0100
+Subject: [PATCH v3 05/11] Documentation: DT: bindings: input: touschcreen:
+ remove sun4i documentation
 In-Reply-To: <20170321153611.16228-1-quentin.schulz@free-electrons.com>
 References: <20170321153611.16228-1-quentin.schulz@free-electrons.com>
-Message-ID: <20170321153611.16228-12-quentin.schulz@free-electrons.com>
+Message-ID: <20170321153611.16228-6-quentin.schulz@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A33 supports 1.1GHz and 1.2GHz frequencies at 1.32V and the Sinlinx
-SinA33 has its cpu-supply property set in the cpu DT node.
-
-Therefore, CPUfreq knows how to handle the regulator in charge of the
-CPU and can adjust its voltage to match the OPP.
-
-Add these two CPU frequencies to the CPU OPP table of the Sinlinx
-SinA33.
+This patch removes the sun4i touchscreen controller binding
+documentation since it has been merged with the sun4i GPADC binding
+documentation.
 
 Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+Acked-by: Rob Herring <robh@kernel.org>
 ---
 
-added in v3
+added in v2
 
- arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+ .../bindings/input/touchscreen/sun4i.txt           | 38 ----------------------
+ 1 file changed, 38 deletions(-)
+ delete mode 100644 Documentation/devicetree/bindings/input/touchscreen/sun4i.txt
 
-diff --git a/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts b/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts
-index d84f1bd..a92dee1 100644
---- a/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts
-+++ b/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts
-@@ -87,6 +87,20 @@
- 	cpu-supply = <&reg_dcdc3>;
- };
- 
-+&cpu0_opp_table {
-+	opp at 1104000000 {
-+		opp-hz = /bits/ 64 <1104000000>;
-+		opp-microvolt = <1320000>;
-+		clock-latency-ns = <244144>; /* 8 32k periods */
-+	};
-+
-+	opp at 1200000000 {
-+		opp-hz = /bits/ 64 <1200000000>;
-+		opp-microvolt = <1320000>;
-+		clock-latency-ns = <244144>; /* 8 32k periods */
-+	};
-+};
-+
- &de {
- 	status = "okay";
- };
+diff --git a/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt b/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt
+deleted file mode 100644
+index 89abecd..0000000
+--- a/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt
++++ /dev/null
+@@ -1,38 +0,0 @@
+-sun4i resistive touchscreen controller
+---------------------------------------
+-
+-Required properties:
+- - compatible: "allwinner,sun4i-a10-ts", "allwinner,sun5i-a13-ts" or
+-   "allwinner,sun6i-a31-ts"
+- - reg: mmio address range of the chip
+- - interrupts: interrupt to which the chip is connected
+- - #thermal-sensor-cells: shall be 0
+-
+-Optional properties:
+- - allwinner,ts-attached	 : boolean indicating that an actual touchscreen
+-				   is attached to the controller
+- - allwinner,tp-sensitive-adjust : integer (4 bits)
+-				   adjust sensitivity of pen down detection
+-				   between 0 (least sensitive) and 15
+-				   (defaults to 15)
+- - allwinner,filter-type	 : integer (2 bits)
+-				   select median and averaging filter
+-				   samples used for median / averaging filter
+-				   0: 4/2
+-				   1: 5/3
+-				   2: 8/4
+-				   3: 16/8
+-				   (defaults to 1)
+-
+-Example:
+-
+-	rtp: rtp at 01c25000 {
+-		compatible = "allwinner,sun4i-a10-ts";
+-		reg = <0x01c25000 0x100>;
+-		interrupts = <29>;
+-		allwinner,ts-attached;
+-		#thermal-sensor-cells = <0>;
+-		/* sensitive/noisy touch panel */
+-		allwinner,tp-sensitive-adjust = <0>;
+-		allwinner,filter-type = <3>;
+-	};
 -- 
 2.9.3
