@@ -1,138 +1,195 @@
-From: hias@horus.com (Matthias Reichl)
-Date: Tue, 21 Mar 2017 23:11:45 +0100
-Subject: [alsa-devel] [PATCH 0/3] ASoC: Enable a new IC master mode:
- bcm2835<=>IC<=>cs42xx8
-In-Reply-To: <e0adcc6c-8bf4-adae-874b-c291e71e5712@laposte.net>
-References: <170950f7-354f-e6a9-cefb-834a00fadd1b@flatmax.org>
- <20170227103024.GF2718@delle.lan>
- <7b78c782-28e1-4849-5d00-8caf30847d5c@flatmax.org>
- <20170227115108.GA6732@delle.lan>
- <20170228095929.GH2742@localhost.localdomain>
- <20170315190108.y6ybxm3nfgnutajv@sirena.org.uk>
- <7d8d38f7-53aa-cc3d-4bbd-141649528a8a@flatmax.org>
- <8c62f014-d246-e0c1-2b02-a28a2c2786b7@metafoo.de>
- <000fbaa4-4c7c-5b13-0806-7e42672a4a55@flatmax.org>
- <e0adcc6c-8bf4-adae-874b-c291e71e5712@laposte.net>
-Message-ID: <20170321221145.GA7258@camel2.lan>
+From: tbaicar@codeaurora.org (Tyler Baicar)
+Date: Tue, 21 Mar 2017 16:46:56 -0600
+Subject: [PATCH V13 01/10] acpi: apei: read ack upon ghes record consumption
+In-Reply-To: <1490136425-4324-1-git-send-email-tbaicar@codeaurora.org>
+References: <1490136425-4324-1-git-send-email-tbaicar@codeaurora.org>
+Message-ID: <1490136425-4324-2-git-send-email-tbaicar@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 21, 2017 at 10:21:04PM +0100, Emmanuel Fust? wrote:
-> Le 16/03/2017 ? 23:14, Matt Flax a ?crit :
-> >
-> >
-> >On 17/03/17 08:27, Lars-Peter Clausen wrote:
-> >>On 03/16/2017 09:51 PM, Matt Flax wrote:
-> >>>
-> >>>On 16/03/17 06:01, Mark Brown wrote:
-> >>>>On Tue, Feb 28, 2017 at 09:59:29AM +0000, Charles Keepax wrote:
-> >>>>>On Mon, Feb 27, 2017 at 12:51:08PM +0100, Matthias Reichl wrote:
-> >>>>>>>I have a bcm2835 (Pi 2 and 3) SoC here. It is producing
-> >>>>>>>multichannel (8
-> >>>>>>>out,
-> >>>>>>>6 in) audio. In ALSA we call that DSP mode - right ?!
-> >>>>>>No. DSP modes are protocol/timing specifications as I2S, PDP,
-> >>>>>>S/PDIF, ...
-> >>>>>>You can look these up in datasheets and if a chip implements such a
-> >>>>>>protocol you can be sure that it adheres to that standard - i.e. it
-> >>>>>>will sync the frames to the pulses on LRclk.
-> >>>>>I agree with the thoughts in this thread really if the AP doesn't
-> >>>>>actually support DSP A mode we shouldn't add DSP A mode.
-> >>>>The trouble here is that this isn't 100% clear, the specifications of
-> >>>>the DSP modes are such that only one edge in the LRCLK matters and so
-> >>>>providing you're doing mono or have exact clocking they interoperate
-> >>>>perfectly well.  We already frequently do similar things the other
-> >>>>way,
-> >>>>most of the programmable serial ports can't actually do I2S modes
-> >>>>properly and rely on exact clocking to get things right when operating
-> >>>>as I2S since they only sync on one edge (though they can generally
-> >>>>generate the clocks correctly when operating as master, they just
-> >>>>don't
-> >>>>pay attention to the left/right switch edge).
-> >>>>
-> >>>>That said unless we're doing something with the data layout or similar
-> >>>>configuration there's a fairly strong case for putting the mangling
-> >>>>for
-> >>>>this in the core, something like just falling back to I2S mode if we
-> >>>>set
-> >>>>DSP A and so on.  Which would be a lot nicer if we actually got
-> >>>>round to
-> >>>>putting mode capability information in the drivers.
-> >>>I agree, the data layout is already configurable in the bcm2835_i2s.c
-> >>>platform driver. We can already use the "snd_soc_dai_set_bclk_ratio"
-> >>>function to manage word offsets in our machine drivers.
-> >>>
-> >>>There is nothing which says that the bcm2835 SoC is I2S restricted in
-> >>>any
-> >>>way. In fact, the reference document says quite the opposite.
-> >>>
-> >>>In the reference "BCM2835 ARM Peripherals" pdf, they call the audio
-> >>>system
-> >>>an "APB peripheral". They are saying that it is reconfigurable and
-> >>>part of
-> >>>the AMBA family of interconnect schemes.
-> >>>
-> >>>As far as the bcm2835_i2s platform driver goes, it has implemented an
-> >>>AMBA
-> >>>protocol, where audio words are counted from the LR clock onset - for
-> >>>some
-> >>>reason people are insisting this is an I2S bus. Really our
-> >>>implementation is
-> >>>not I2S at all, because word onsets are programmable and flexible in
-> >>>the
-> >>>bcm2835_i2s.c driver.
-> >>AMBA/APB is the interface which connects the peripheral to the system
-> >>memory
-> >>bus. It is the interface over which the CPU does configuration register
-> >>writes. This has nothing and absolutely nothing to do with the I2S
-> >>interface
-> >>that is also implemented by the peripheral that is used to stream audio
-> >>to
-> >>and from external components.
-> >>
-> >
-> >Their (BCM reference) document [1] specifically states "It supports many
-> >classic PCM formats including I2S".
-> >
-> >Do agree with Mark's statement "the specifications of the DSP modes are
-> >such that only one edge in the LRCLK matters" ?
-> >
-> >If we look at the bcm2835 platform driver setup, it is concerned with bit
-> >clock counting to specify the audio data for both of the AMBA/APB channels
-> >from serial bitstream into memory. It has two channels into memory,
-> >however "it supports many classic PCM formats" ... my vote for one classic
-> >format is DSP mode !
-> >
-> >Do you see a problem with that ?
-> >
-> >thanks
-> >Matt
-> >[1] https://www.raspberrypi.org/wp-content/uploads/2012/02/BCM2835-ARM-Peripherals.pdf
-> >_______________________________________________
-> >
-> Re-reading this document, the bcm2835 PCM IP block SHOULD support real DSP
-> mode, with one BCLK pulsed LRCLK, zero BCLK delay etc...
-> It just need to be properly setup.
+A RAS (Reliability, Availability, Serviceability) controller
+may be a separate processor running in parallel with OS
+execution, and may generate error records for consumption by
+the OS. If the RAS controller produces multiple error records,
+then they may be overwritten before the OS has consumed them.
 
-I've re-read the document, too, last week and noticed the framesync
-registers - sorry, I had completely forgotten about these. I guess it
-should be possible to configure the bcm2835 to DSP mode but it'd still be
-limited to 2 channel setups - the hardware only has 2 channel position
-registers for each direction.
+The Generic Hardware Error Source (GHES) v2 structure
+introduces the capability for the OS to acknowledge the
+consumption of the error record generated by the RAS
+controller. A RAS controller supporting GHESv2 shall wait for
+the acknowledgment before writing a new error record, thus
+eliminating the race condition.
 
-> According to the same document, you could program the bmc up to 16 32bits
-> channels when in master mode, so I suspect that you could go up to this
-> limit in slave mode.
-> But as it is designed, it could only use up to two of any channels among the
-> 16.
+Add support for parsing of GHESv2 sub-tables as well.
 
-I'm not quite sure if I can follow you on this - how would you
-configure 16 channels when there are only 2 channel position registers?
+Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
+CC: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
+Reviewed-by: James Morse <james.morse@arm.com>
+---
+ drivers/acpi/apei/ghes.c | 49 +++++++++++++++++++++++++++++++++++++++++++++---
+ drivers/acpi/apei/hest.c |  7 +++++--
+ include/acpi/ghes.h      |  5 ++++-
+ 3 files changed, 55 insertions(+), 6 deletions(-)
 
-With bclk ratio eg set to 16*32=512 BCM2835 will only transmit 2*32
-bits of data (at configurable bit positions), the remaining 448
-bits will be zero.
-
-so long,
-
-Hias
+diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
+index b192b42..0241e36 100644
+--- a/drivers/acpi/apei/ghes.c
++++ b/drivers/acpi/apei/ghes.c
+@@ -46,6 +46,7 @@
+ #include <linux/nmi.h>
+ #include <linux/sched/clock.h>
+ 
++#include <acpi/actbl1.h>
+ #include <acpi/ghes.h>
+ #include <acpi/apei.h>
+ #include <asm/tlbflush.h>
+@@ -80,6 +81,10 @@
+ 	((struct acpi_hest_generic_status *)				\
+ 	 ((struct ghes_estatus_node *)(estatus_node) + 1))
+ 
++#define IS_HEST_TYPE_GENERIC_V2(ghes)				\
++	((struct acpi_hest_header *)ghes->generic)->type ==	\
++	 ACPI_HEST_TYPE_GENERIC_ERROR_V2
++
+ /*
+  * This driver isn't really modular, however for the time being,
+  * continuing to use module_param is the easiest way to remain
+@@ -249,10 +254,18 @@ static struct ghes *ghes_new(struct acpi_hest_generic *generic)
+ 	ghes = kzalloc(sizeof(*ghes), GFP_KERNEL);
+ 	if (!ghes)
+ 		return ERR_PTR(-ENOMEM);
++
+ 	ghes->generic = generic;
++	if (IS_HEST_TYPE_GENERIC_V2(ghes)) {
++		rc = apei_map_generic_address(
++			&ghes->generic_v2->read_ack_register);
++		if (rc)
++			goto err_free;
++	}
++
+ 	rc = apei_map_generic_address(&generic->error_status_address);
+ 	if (rc)
+-		goto err_free;
++		goto err_unmap_read_ack_addr;
+ 	error_block_length = generic->error_block_length;
+ 	if (error_block_length > GHES_ESTATUS_MAX_SIZE) {
+ 		pr_warning(FW_WARN GHES_PFX
+@@ -264,13 +277,17 @@ static struct ghes *ghes_new(struct acpi_hest_generic *generic)
+ 	ghes->estatus = kmalloc(error_block_length, GFP_KERNEL);
+ 	if (!ghes->estatus) {
+ 		rc = -ENOMEM;
+-		goto err_unmap;
++		goto err_unmap_status_addr;
+ 	}
+ 
+ 	return ghes;
+ 
+-err_unmap:
++err_unmap_status_addr:
+ 	apei_unmap_generic_address(&generic->error_status_address);
++err_unmap_read_ack_addr:
++	if (IS_HEST_TYPE_GENERIC_V2(ghes))
++		apei_unmap_generic_address(
++			&ghes->generic_v2->read_ack_register);
+ err_free:
+ 	kfree(ghes);
+ 	return ERR_PTR(rc);
+@@ -280,6 +297,9 @@ static void ghes_fini(struct ghes *ghes)
+ {
+ 	kfree(ghes->estatus);
+ 	apei_unmap_generic_address(&ghes->generic->error_status_address);
++	if (IS_HEST_TYPE_GENERIC_V2(ghes))
++		apei_unmap_generic_address(
++			&ghes->generic_v2->read_ack_register);
+ }
+ 
+ static inline int ghes_severity(int severity)
+@@ -649,6 +669,23 @@ static void ghes_estatus_cache_add(
+ 	rcu_read_unlock();
+ }
+ 
++static int ghes_ack_error(struct acpi_hest_generic_v2 *generic_v2)
++{
++	int rc;
++	u64 val = 0;
++
++	rc = apei_read(&val, &generic_v2->read_ack_register);
++	if (rc)
++		return rc;
++	val &= generic_v2->read_ack_preserve <<
++		generic_v2->read_ack_register.bit_offset;
++	val |= generic_v2->read_ack_write <<
++		generic_v2->read_ack_register.bit_offset;
++	rc = apei_write(val, &generic_v2->read_ack_register);
++
++	return rc;
++}
++
+ static int ghes_proc(struct ghes *ghes)
+ {
+ 	int rc;
+@@ -661,6 +698,12 @@ static int ghes_proc(struct ghes *ghes)
+ 			ghes_estatus_cache_add(ghes->generic, ghes->estatus);
+ 	}
+ 	ghes_do_proc(ghes, ghes->estatus);
++
++	if (IS_HEST_TYPE_GENERIC_V2(ghes)) {
++		rc = ghes_ack_error(ghes->generic_v2);
++		if (rc)
++			return rc;
++	}
+ out:
+ 	ghes_clear_estatus(ghes);
+ 	return rc;
+diff --git a/drivers/acpi/apei/hest.c b/drivers/acpi/apei/hest.c
+index 8f2a98e..456b488 100644
+--- a/drivers/acpi/apei/hest.c
++++ b/drivers/acpi/apei/hest.c
+@@ -52,6 +52,7 @@
+ 	[ACPI_HEST_TYPE_AER_ENDPOINT] = sizeof(struct acpi_hest_aer),
+ 	[ACPI_HEST_TYPE_AER_BRIDGE] = sizeof(struct acpi_hest_aer_bridge),
+ 	[ACPI_HEST_TYPE_GENERIC_ERROR] = sizeof(struct acpi_hest_generic),
++	[ACPI_HEST_TYPE_GENERIC_ERROR_V2] = sizeof(struct acpi_hest_generic_v2),
+ };
+ 
+ static int hest_esrc_len(struct acpi_hest_header *hest_hdr)
+@@ -141,7 +142,8 @@ static int __init hest_parse_ghes_count(struct acpi_hest_header *hest_hdr, void
+ {
+ 	int *count = data;
+ 
+-	if (hest_hdr->type == ACPI_HEST_TYPE_GENERIC_ERROR)
++	if (hest_hdr->type == ACPI_HEST_TYPE_GENERIC_ERROR ||
++	    hest_hdr->type == ACPI_HEST_TYPE_GENERIC_ERROR_V2)
+ 		(*count)++;
+ 	return 0;
+ }
+@@ -152,7 +154,8 @@ static int __init hest_parse_ghes(struct acpi_hest_header *hest_hdr, void *data)
+ 	struct ghes_arr *ghes_arr = data;
+ 	int rc, i;
+ 
+-	if (hest_hdr->type != ACPI_HEST_TYPE_GENERIC_ERROR)
++	if (hest_hdr->type != ACPI_HEST_TYPE_GENERIC_ERROR &&
++	    hest_hdr->type != ACPI_HEST_TYPE_GENERIC_ERROR_V2)
+ 		return 0;
+ 
+ 	if (!((struct acpi_hest_generic *)hest_hdr)->enabled)
+diff --git a/include/acpi/ghes.h b/include/acpi/ghes.h
+index 720446c..68f088a 100644
+--- a/include/acpi/ghes.h
++++ b/include/acpi/ghes.h
+@@ -13,7 +13,10 @@
+ #define GHES_EXITING		0x0002
+ 
+ struct ghes {
+-	struct acpi_hest_generic *generic;
++	union {
++		struct acpi_hest_generic *generic;
++		struct acpi_hest_generic_v2 *generic_v2;
++	};
+ 	struct acpi_hest_generic_status *estatus;
+ 	u64 buffer_paddr;
+ 	unsigned long flags;
+-- 
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
