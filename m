@@ -1,118 +1,75 @@
 From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Tue, 21 Mar 2017 16:36:02 +0100
-Subject: [PATCH v3 02/11] ARM: sun8i: a33: add all operating points
-In-Reply-To: <20170321153611.16228-1-quentin.schulz@free-electrons.com>
-References: <20170321153611.16228-1-quentin.schulz@free-electrons.com>
-Message-ID: <20170321153611.16228-3-quentin.schulz@free-electrons.com>
+Date: Tue, 21 Mar 2017 16:36:00 +0100
+Subject: [PATCH v3 00/11] add thermal throttling to Allwinner A33 SoC
+Message-ID: <20170321153611.16228-1-quentin.schulz@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds almost all operating points allowed for the A33 as defined by
-fex files available at:
-https://github.com/linux-sunxi/sunxi-boards/tree/master/sys_config/a33
+The Allwinner SoCs all have an ADC that can also act as a touchscreen
+controller and a thermal sensor. The first four channels can be used
+either for the ADC or the touchscreen and the fifth channel is used for
+the thermal sensor. We currently have a driver for the two latter
+functions in drivers/input/touchscreen/sun4i-ts.c but we don't have
+access to the ADC feature at all. It is meant to replace the current
+driver by using MFD and subdrivers for existing bindings.
 
-There are more possible frequencies in this patch than there are in the
-fex files because the fex files only give an interval of possible
-frequencies for a given voltage. All supported frequencies are defined
-in the original driver code in Allwinner vendor tree.
+The Allwinner A33 only has a thermal sensor present in the GPADC. In
+addition, there is not an existing DT binding for the GPADC. Thus, we do
+not need the sun4i-gpadc MFD driver which was made to keep DT compatibility
+and probe subdrivers without the need to add DT subnodes.
 
-There are two missing frequencies though: 1104MHz and 1200MHz which
-require the CPU to have 1.32V supplied, which is higher than the default
-voltage.
+This series of patch adds the thermal sensor for the A33 and GPU/CPU
+thermal throttling. It also adds the cpu-supply property to the CPU node
+needed by the Sinlinx SinA33 and Olinuxino A33 to adapt their CPU regulator
+voltage depending on the currently used OPP. The other A33 boards all have
+their cpu-supply property set.
 
-Without all A33 boards defining the CPU regulator, we cannot have these
-two frequencies as it would cause the CPU to try to run a higher
-frequency without "overvolting" which is very likely to crash the CPU.
+This series also fixes the missing operating-points-v2 property in cpu DT
+nodes. Finally, it also adds all remaining OPPs which can be found in
+Allwinner 3.4 linux and fex files of all A33 boards.
 
-Therefore, these two frequencies must be enabled on a per-board basis.
+This series of patch is based on this[1] series of patch.
 
-Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
----
+v3:
+  - fixed compatible name in DT and in documentation,
+  - fixed DT node name and label,
+  - added explanations in commit logs,
+  - moved frequencies that need overvolting to board DTS instead of A33 DTSI,
+  - fixed a typo in if is_enabled condition,
+  - removed all patches concerning Olimex Olinuxino (no HW to test on),
 
-v2:
-  - updated commit log,
-  - removed 1.1GHz as it requires overvolting the CPU which need the CPU
-  regulator to be set which is set on a per-board basis,
+[1] https://lkml.org/lkml/2016/12/13/298 : "[PATCH v9] add support for Allwinner
+SoCs ADC"
 
- arch/arm/boot/dts/sun8i-a33.dtsi | 54 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 54 insertions(+)
+Thanks,
+Quentin
 
-diff --git a/arch/arm/boot/dts/sun8i-a33.dtsi b/arch/arm/boot/dts/sun8i-a33.dtsi
-index 39b2d78..b1cdff66 100644
---- a/arch/arm/boot/dts/sun8i-a33.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a33.dtsi
-@@ -49,18 +49,72 @@
- 		compatible = "operating-points-v2";
- 		opp-shared;
- 
-+		opp at 120000000 {
-+			opp-hz = /bits/ 64 <120000000>;
-+			opp-microvolt = <1040000>;
-+			clock-latency-ns = <244144>; /* 8 32k periods */
-+		};
-+
-+		opp at 240000000 {
-+			opp-hz = /bits/ 64 <240000000>;
-+			opp-microvolt = <1040000>;
-+			clock-latency-ns = <244144>; /* 8 32k periods */
-+		};
-+
-+		opp at 312000000 {
-+			opp-hz = /bits/ 64 <312000000>;
-+			opp-microvolt = <1040000>;
-+			clock-latency-ns = <244144>; /* 8 32k periods */
-+		};
-+
-+		opp at 408000000 {
-+			opp-hz = /bits/ 64 <408000000>;
-+			opp-microvolt = <1040000>;
-+			clock-latency-ns = <244144>; /* 8 32k periods */
-+		};
-+
-+		opp at 480000000 {
-+			opp-hz = /bits/ 64 <480000000>;
-+			opp-microvolt = <1040000>;
-+			clock-latency-ns = <244144>; /* 8 32k periods */
-+		};
-+
-+		opp at 504000000 {
-+			opp-hz = /bits/ 64 <504000000>;
-+			opp-microvolt = <1040000>;
-+			clock-latency-ns = <244144>; /* 8 32k periods */
-+		};
-+
-+		opp at 600000000 {
-+			opp-hz = /bits/ 64 <600000000>;
-+			opp-microvolt = <1040000>;
-+			clock-latency-ns = <244144>; /* 8 32k periods */
-+		};
-+
- 		opp at 648000000 {
- 			opp-hz = /bits/ 64 <648000000>;
- 			opp-microvolt = <1040000>;
- 			clock-latency-ns = <244144>; /* 8 32k periods */
- 		};
- 
-+		opp at 720000000 {
-+			opp-hz = /bits/ 64 <720000000>;
-+			opp-microvolt = <1100000>;
-+			clock-latency-ns = <244144>; /* 8 32k periods */
-+		};
-+
- 		opp at 816000000 {
- 			opp-hz = /bits/ 64 <816000000>;
- 			opp-microvolt = <1100000>;
- 			clock-latency-ns = <244144>; /* 8 32k periods */
- 		};
- 
-+		opp at 912000000 {
-+			opp-hz = /bits/ 64 <912000000>;
-+			opp-microvolt = <1200000>;
-+			clock-latency-ns = <244144>; /* 8 32k periods */
-+		};
-+
- 		opp at 1008000000 {
- 			opp-hz = /bits/ 64 <1008000000>;
- 			opp-microvolt = <1200000>;
+Maxime Ripard (1):
+  ARM: sun8i: a33: Add devfreq-based GPU cooling
+
+Quentin Schulz (10):
+  ARM: sun8i: a33: add operating-points-v2 property to all nodes
+  ARM: sun8i: a33: add all operating points
+  ARM: dts: sun8i: sina33: add cpu-supply
+  Documentation: DT: bindings: mfd: add A33 GPADC binding
+  Documentation: DT: bindings: input: touschcreen: remove sun4i
+    documentation
+  iio: adc: sun4i-gpadc-iio: move code used in MFD probing to new
+    function
+  iio: adc: sun4i-gpadc-iio: add support for A33 thermal sensor
+  ARM: dtsi: sun8i: a33: add thermal sensor
+  ARM: dtsi: sun8i: a33: add CPU thermal throttling
+  ARM: sun8i: sina33: add highest OPP of CPUs
+
+ .../touchscreen/sun4i.txt => mfd/sun4i-gpadc.txt}  |  21 +++
+ arch/arm/boot/dts/sun8i-a23-a33.dtsi               |   1 +
+ arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts     |  18 +++
+ arch/arm/boot/dts/sun8i-a33.dtsi                   | 141 +++++++++++++++++
+ drivers/iio/adc/Kconfig                            |   2 +-
+ drivers/iio/adc/sun4i-gpadc-iio.c                  | 170 +++++++++++++++++----
+ include/linux/mfd/sun4i-gpadc.h                    |   4 +
+ 7 files changed, 324 insertions(+), 33 deletions(-)
+ rename Documentation/devicetree/bindings/{input/touchscreen/sun4i.txt => mfd/sun4i-gpadc.txt} (64%)
+
 -- 
 2.9.3
