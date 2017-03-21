@@ -1,111 +1,92 @@
-From: gerg@linux-m68k.org (Greg Ungerer)
-Date: Tue, 21 Mar 2017 12:05:20 +1000
-Subject: [PATCH 2/2] spi: imx: fix use of native chip-selects with
- devicetree
-In-Reply-To: <f1cf2001-28b4-6a74-b98a-13336d74ff9d@mentor.com>
-References: <1489726983-17706-1-git-send-email-gerg@linux-m68k.org>
- <1489726983-17706-3-git-send-email-gerg@linux-m68k.org>
- <f1cf2001-28b4-6a74-b98a-13336d74ff9d@mentor.com>
-Message-ID: <4a8449d9-cc38-d642-0853-246f46ee7059@linux-m68k.org>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Tue, 21 Mar 2017 10:59:24 +0800
+Subject: [v3 3/5] coresight: add support for debug module
+In-Reply-To: <CANLsYkyiAnSGW4Ujs6L-yBKK3no3zigbyBgOCWbm06ZdV-f2Hw@mail.gmail.com>
+References: <20170309175915.GA964@leoy-linaro>
+ <3f27efee-3b63-81fd-eb96-73fd7e6f5e92@arm.com>
+ <20170313165600.GB32431@linaro.org>
+ <516f8989-4dde-2686-d549-0761feb14d1b@arm.com>
+ <CANLsYkzJsGvr4ZzNbTwcPu1Qki6=Szvu+bMjHZ_rza==DqFChw@mail.gmail.com>
+ <20170317101328.GA19877@leoy-linaro>
+ <20170317155007.GA20435@linaro.org>
+ <20170317162836.GD2020@leoy-linaro>
+ <5995f6a7-08b1-c868-fc88-a145d1748a33@arm.com>
+ <CANLsYkyiAnSGW4Ujs6L-yBKK3no3zigbyBgOCWbm06ZdV-f2Hw@mail.gmail.com>
+Message-ID: <20170321025924.GA7429@leoy-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vladimir,
+On Mon, Mar 20, 2017 at 10:40:00AM -0600, Mathieu Poirier wrote:
 
-On 20/03/17 23:22, Vladimir Zapolskiy wrote:
-> On 03/17/2017 07:03 AM, Greg Ungerer wrote:
->> The commonly used mechanism of specifying the hardware or native
->> chip-select on an SPI device in devicetree (that is "cs-gpios = <0>")
->> does not result in the native chip-select being configured for use.
->> So external SPI devices that require use of the native chip-select
->> will not work.
->>
->> You can successfully specify native chip-selects if using a platform
->> setup by specifying the cs-gpio as negative offset by 32. And that
->> works correctly. You cannot use the same method in devicetree.
->>
->> The logic in the spi-imx.c driver during probe uses core spi function
->> of_spi_register_master() in spi.c to parse the "cs-gpios" devicetree tag.
->> For valid GPIO values that will be recorded for use, all other entries in
->> the cs_gpios list will be set to -ENOENT. So entries like "<0>" will be
->> set to -ENOENT in the cs_gpios list.
->>
->> When the SPI device registers are setup the code will use the GPIO
->> listed in the cs_gpios list for the desired chip-select. If the cs_gpio
->> is less then 0 then it is intended to be for a native chip-select, and
->> its cs_gpio value is added to 32 to get the chipselect number to use.
->> Problem is that with devicetree this can only ever be -ENOENT (which
->> is -2), and that alone results in an invalid chip-select number. But also
->> doesn't allow selection of the native chip-select at all.
->>
->> To fix, if the cs_gpio specified for this spi device is not a
->> valid GPIO then use the "chip_select" (that is the native chip-select
->> number) for hardware setup.
->>
+[...]
+
+> >>> If we don't check for "nohlt" some platform may freeze, others may work.
+> >>> If we
+> >>> mandate that "nohlt" be present on the kernel cmd line it works in all
+> >>> cases.
+> >>> As such mandating that "nohlt" be present is a better way to go.
+> >>
+> >>
+> >> Sure, so I will add below checking code in the probe function, please
+> >> let me know if you have alter better way to implement this:
+> >>
+> >> +       if (IS_ENABLED(CONFIG_CPU_IDLE) &&
+> >> +                       !strstr(boot_command_line, "nohlt")) {
+> >> +               dev_err(dev, "May not be accessible in CPU power
+> >> domain.\n");
+> >> +               return -EPERM;
+> >> +       }
+> >>
+> >
+> > There is an API which kind of achieves what "nohlt" does at runtime :
+> >
+> >   cpu_idle_poll_ctrl(true)
+> >
+> > So may be we could use that instead of depending on "nohlt". The other side
+> > of the issues is "when do we decide to use the API". May be we could add
+> > something
+> > like : enable_debug, which could then trigger the panic notifier
+> > registrations
+> > and the above. That would still leave us with a case where the system
+> > crashes
+> > even before the user gets a terminal. May be the following is the best
+> > option :
+> >
+> > 1) Dedicated kernel command line parameter for enabling the CPU debug at
+> > boot/probe.
+> >
+> > and
+> >
+> > 2) Runtime enable method via sysfs.
+> >
+> > What do you think ?
 > 
-> Can you please share an example of "cs-gpios" property for a particular
-> case, which I'm able to test? It is an Atmel AT93C66A EEPROM connected
-> to CSPI1 and sitting on chip select 2 (= selected by CSPI1_SS2), there
-> is no other SPI devices on CSPI1.
+> In my opinion booting with "nohlt" on the cmd line is sufficient to
+> determine if we should use the driver or not.  That way we also avoid
+> declaring yet another sysfs flag, something I really want to avoid.
 
-Is the AT93C66A going to work if you use native chip selects?
+Agree.
 
-I have an iMX25 based board with a NOR flash on SPI1 using
-a GPIO chip select, and on SPI2 a Silicon Labs 32260 SLIC
-using the native chip select 1. It requires the chip select line
-to be asserted and de-asserted between each byte, as done when
-using the native chip select setup of the iMX SPI module.
+I did spend some time to implement coresight core framework to support
+debug module, you could see it on:http://termbin.com/k2fj; this also
+gives me more sense which is better choice. If declaring another sysfs
+flag to support debug module in coresight framework, this lets the
+codes and interfaces more complex. E.g. for best fit into coresight
+framework, finally we can get 8 sysfs nodes for 8 CPUs in system; so
+that means we need enable every CPU one by one.
 
-Anyway, the cs-gpio I use is:
+root at linaro-developer:~# ls /sys/bus/coresight/devices/
+f6590000.debug  f6594000.debug  f65d0000.debug  f65d4000.debug
+f6592000.debug  f6596000.debug  f65d2000.debug  f65d6000.debug
 
-  cs-gpios = <0>, <0>, <0>, <0>;
+This is not quite reasonable to introduce complexity for either code
+or using it. If we review coresight topology, some components need to
+interact with each other and coresight framework should handle them
+properly to enable/disable path, etc. But as Mathieu meantioned, from
+the point of the hardware topology, the CPU debug module is quite
+standalone under the coresight umbrella, and it has no any dependency
+with other tracing or bus modules. So it's good to keep it simple,
+this also matches with hardware implementation.
 
-
-> Since I raise the question, please add the correspondent updates and
-> and an example to Documentation/devicetree/bindings/spi/fsl-imx-cspi.txt
-
-Ok.
-
-There is a few other devicetrees in arc/arm/boot/dts that use the "<0>"
-notation for cs-gpios. Documentation/devicetree/bindings/spi/spi-davinci.txt
-does describe its meaning.
-
-
-> In fact my expectation would be to have a device description like one
-> below:
-> 
-> &spi1 {
-> 	status = "okay";
-> 	pinctrl-names = "default";
-> 	pinctrl-0 = <&pinctrl_cspi1>;
-> 
-> 	eeprom at 2 {
-> 		compatible = "atmel,at93c66a";
-> 		reg = <2>;
-> 		spi-cs-high;
-> 		spi-max-frequency = <1000000>;
-> 	};
-> };
-> 
-> Note, that there is no cs-gpios property at all, which is mandatory
-> at the moment, and unit address / reg property defines chip select
-> number.
-
-Ideally it would be allowed to have no cs-gpios at all. But currently
-the spi-imx driver explicitly fails on this:
-
-  spi.1: No CS GPIOs available
-
-As an example my devicetree entry is similar to your above, but
-it has "cs-gpios = <0>, <0>, <0>, <0>;" as well. Thats all.
-
-
-> For that type of bindings locally I have a hackish spi-imx driver change,
-> which supports this option, but I'm unsure if it is universal enough.
-
-Do you mean supporting no cs-gpios tag?
-That would be nice, but it would seem not many users of this are
-using native chip selects. 
-
-Regards
-Greg
+Thanks,
+Leo Yan
