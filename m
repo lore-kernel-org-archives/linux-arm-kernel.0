@@ -1,50 +1,83 @@
-From: vigneshr@ti.com (Vignesh R)
-Date: Tue, 21 Mar 2017 19:06:35 +0530
-Subject: [PATCH 1/2] tty: serial_core: Add name field to uart_port struct
-In-Reply-To: <20170321133636.8814-1-vigneshr@ti.com>
-References: <20170321133636.8814-1-vigneshr@ti.com>
-Message-ID: <20170321133636.8814-2-vigneshr@ti.com>
+From: andrew.smirnov@gmail.com (Andrey Smirnov)
+Date: Tue, 21 Mar 2017 06:41:59 -0700
+Subject: [PATCH v7 0/4] i.MX7 PCI support
+Message-ID: <20170321134203.26325-1-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce a field to store name of uart_port that can be used to easily
-identify uart port instances on a system that has more than one uart
-instance. The name is of the form ttyXN(eg. ttyS0, ttyAMA0,..) where N
-is number that particular uart instance.
-This field will be useful when printing debug info for a particular port
-or in register irqs with unique irq name. Port name is populated during
-uart_add_one_port().
+Hello, everyone:
 
-Signed-off-by: Vignesh R <vigneshr@ti.com>
----
- drivers/tty/serial/serial_core.c | 2 ++
- include/linux/serial_core.h      | 1 +
- 2 files changed, 3 insertions(+)
+This is a seventh iteration of the code that adds PCI-subsystem bits
+necessary for enabling PCI support on i.MX7.
 
-diff --git a/drivers/tty/serial/serial_core.c b/drivers/tty/serial/serial_core.c
-index 0fb3f7cce62a..8b0fff74b190 100644
---- a/drivers/tty/serial/serial_core.c
-+++ b/drivers/tty/serial/serial_core.c
-@@ -2744,6 +2744,8 @@ int uart_add_one_port(struct uart_driver *drv, struct uart_port *uport)
- 	state->pm_state = UART_PM_STATE_UNDEFINED;
- 	uport->cons = drv->cons;
- 	uport->minor = drv->tty_driver->minor_start + uport->line;
-+	snprintf(uport->name, sizeof(uport->name), "%s%d", drv->dev_name,
-+		 drv->tty_driver->name_base + uport->line);
- 
- 	/*
- 	 * If this port is a console, then the spinlock is already
-diff --git a/include/linux/serial_core.h b/include/linux/serial_core.h
-index 58484fb35cc8..821f97ce3ae2 100644
---- a/include/linux/serial_core.h
-+++ b/include/linux/serial_core.h
-@@ -247,6 +247,7 @@ struct uart_port {
- 	unsigned char		suspended;
- 	unsigned char		irq_wake;
- 	unsigned char		unused[2];
-+	char			name[20];		/* port name */
- 	struct attribute_group	*attr_group;		/* port specific attributes */
- 	const struct attribute_group **tty_groups;	/* all attributes (serial core use only) */
- 	struct serial_rs485     rs485;
+NOTE: To test this patchset with real i.MX7 hardware, additional
+patches, that are being upstreamed via different trees, are needed. Full
+working tree is availible at:
+
+	https://github.com/ndreys/linux/tree/imx7d/pcie-support-v7
+
+Changes since v6 (can be found at [version6]):
+
+	- Rebased against latest changes in 'next' of PCI subsystem
+          git tree
+
+Chagnes since v5 (can be found at [version5]):
+
+	- Collected ACKs from Lee and Rob
+
+Changes since v4 (can be found at [version4]):
+
+	- Dropped typo-fix patch (originally patch #1 of the
+          series).
+
+	- Added patch with workaround to address speed change false
+          failures (I kept it as a separate patch to better document
+          exchange with NXP/Freescale that lead to that patch)
+
+	- Added patch to avoid speed change on links configured Gen1
+          only (Let me know if that is a terrible idea)
+
+	- Addressed section mismatch problem by moving call to
+          hook_fault_code to happend before driver registration.
+
+Changes since v3 (can be found at [version3]):
+	- Move all of the reset_control_assert's into imx6_pcie_assert_core_reset
+	- Documented required reset and power domain DT bindings
+
+Changes since v2 (can be found at [version2]):
+
+	- Collected Reviewed-by for patch #2 from Lucas
+	- Reset logic implementation moved out into a reset controller
+          driver (see [reset1])
+	- Removed unused leftover code
+
+Changes since v1 (can be found at [version1]):
+
+	- All GPC related code moved into a separate driver (see [gpc1])
+	- Removed GPIO probe deferral logging
+	- Fixed section mismatch warning
+	- Minor reformatting of fsl,imx6q-pcie.txt(as per Rob
+          Herring's request)
+
+[version6] https://lkml.org/lkml/2017/3/14/584
+[version5] https://lkml.org/lkml/2017/2/20/376
+[version4] https://lkml.org/lkml/2017/2/7/478
+[version3] https://lkml.org/lkml/2017/2/6/565
+[version2] https://lkml.org/lkml/2017/2/1/510
+[version1] https://lkml.org/lkml/2017/1/19/488
+[gpc1] https://lkml.org/lkml/2017/2/6/551
+[reset1] https://lkml.org/lkml/2017/2/6/554
+
+Andrey Smirnov (4):
+  PCI: imx6: Add code to support i.MX7D
+  PCI: imx6: Allow probe deferal by reset GPIO
+  PCI: imx6: Do not wait for speed change on i.MX7
+  PCI: imx6: Do not switch speed if Gen2 is disabled
+
+ .../devicetree/bindings/pci/fsl,imx6q-pcie.txt     |  13 +-
+ drivers/pci/dwc/pci-imx6.c                         | 198 +++++++++++++++------
+ include/linux/mfd/syscon/imx7-iomuxc-gpr.h         |   4 +
+ 3 files changed, 160 insertions(+), 55 deletions(-)
+
 -- 
-2.11.0
+2.9.3
