@@ -1,72 +1,130 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 22 Mar 2017 10:57:51 -0700
-Subject: [PATCH] ARM: omap2+: Revert omap-smp.c changes resetting CPU1
- during boot
-In-Reply-To: <0f81ef51-29a7-3a38-1d99-2f68d6ec9410@ti.com>
-References: <20170314151725.GC20572@atomide.com>
- <d0fe191f-66f8-b72d-0a2a-00815e663a8d@ti.com>
- <20170314164106.GE20572@atomide.com>
- <ea09d676-29f6-7100-4c68-88920deaeb7c@ti.com>
- <20170314181425.GF20572@atomide.com>
- <20170315172200.GM20572@atomide.com>
- <20170316152925.GO20572@atomide.com>
- <20170317092458.GJ23750@n2100.armlinux.org.uk>
- <20170317135710.GQ20572@atomide.com>
- <0f81ef51-29a7-3a38-1d99-2f68d6ec9410@ti.com>
-Message-ID: <20170322175750.GF10760@atomide.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Wed, 22 Mar 2017 18:59:10 +0100
+Subject: [PATCH v2 1/3] ata: add Palmchip BK3710 PATA controller driver
+In-Reply-To: <bc9a2d9b-1f16-4b59-0033-235686c76dcb@cogentembedded.com>
+References: <1489509414-11491-1-git-send-email-b.zolnierkie@samsung.com>
+ <1489509414-11491-2-git-send-email-b.zolnierkie@samsung.com>
+ <bc9a2d9b-1f16-4b59-0033-235686c76dcb@cogentembedded.com>
+ <CGME20170322175912epcas5p2dc82f4879de4c440523e7d31c9bf385b@epcas5p2.samsung.com>
+Message-ID: <4365895.k4zyj0CytI@amdc3058>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Andrew F. Davis <afd@ti.com> [170317 09:28]:
-> On 03/17/2017 08:57 AM, Tony Lindgren wrote:
-> > * Russell King - ARM Linux <linux@armlinux.org.uk> [170317 02:27]:
-> >> Why can't you reset the CPU when it's died, possibly releasing the
-> >> reset again to get it into the boot rom (which is where it'll be at
-> >> boot time.)
-> > 
-> > Yes that would make most sense to me. Andrew, does that break your use
-> > case again for CPU1 for suspend/restore?
-> > 
+
+Hi,
+
+On Saturday, March 18, 2017 04:52:18 PM Sergei Shtylyov wrote:
+> Hello!
 > 
-> We cannot reset the CPU, that is the only constraint I have. If you let
-> a core go awol then it is lost for good, you should try to avoid that.
-> The secure side on that core may still be running just fine, and may be
-> performing very important tasks, resetting the whole core because the
-> non-secure side lost control of its side is not okay.
+> On 3/14/2017 7:36 PM, Bartlomiej Zolnierkiewicz wrote:
+> 
+> > Add Palmchip BK3710 PATA controller driver.
+> >
+> > Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> [...]
+> > diff --git a/drivers/ata/pata_bk3710.c b/drivers/ata/pata_bk3710.c
+> > new file mode 100644
+> > index 0000000..6d77217
+> > --- /dev/null
+> > +++ b/drivers/ata/pata_bk3710.c
+> > @@ -0,0 +1,386 @@
+> [...]
+> > +static void pata_bk3710_chipinit(void __iomem *base)
+> > +{
+> [...]
+> > +	/*
+> > +	 * IORDYTMP IORDY Timer for Primary Register
+> > +	 * (ATA_IORDYTMP_IORDYTMP     , 0xffff  )
+> > +	 */
+> > +	iowrite32(0xFFFF, base + BK3710_IORDYTMP);
+> 
+>     As I've already said, this is useless as we don't handle the IORDY timeout 
+> interrupt anyway; writing 0 would be fine.
 
-For suspend/resume, I think the right solution is to put dra7
-CPU1 into retention instead trying to put it into off which will
-fail. This should fix the "smp_ops.cpu_die() returned, trying to
-resuscitate" issue. And then there is no need to repark CPU1
-anywhere for suspend/resume as it's not spinning. And it's context
-won't get lost and no reset is needed. And some power is saved.
+Will fix in v3, in the incremental patch (so it is easier to revert
+if it turns out to cause problems later or port to palm_bk3710).
 
-For kexec, things are trickier. If CPU1 is in some deeper power
-state, it will wake to the configured address and there's no way
-to reconfigure that AFAIK. So reset CPU1 reset is needed from that
-state. Note that HS omap4 implementations do seem to survive CPU1
-off mode just fine.
+> > +
+> > +	/*
+> > +	 * Configure BMISP Register
+> > +	 * (ATA_BMISP_DMAEN1	, DISABLE )	|
+> > +	 * (ATA_BMISP_DMAEN0	, DISABLE )	|
+> > +	 * (ATA_BMISP_IORDYINT	, CLEAR)	|
+> > +	 * (ATA_BMISP_INTRSTAT	, CLEAR)	|
+> > +	 * (ATA_BMISP_DMAERROR	, CLEAR)
+> > +	 */
+> > +	iowrite16(0, base + BK3710_BMISP);
+> 
+>     Bits 0-3 cane only be cleared by writing 1, so this write can't clear 
 
-Andrew, does your use case really need kexec supported? If not,
-I think the sane thing for is to just disable kexec in the HS
-kernel for dra7 during runtime.
+The documentation does say this about bits 1-3, bit 0 is handled in
+a different way.
 
-And then if it turns out we really need to repark CPU1 for kexec
-into boot ROM, at least the following changes are needed:
+> them, contrary to what the comment says. Might be a material for a follow-up 
+> patch tho...
 
-1. We need to differentiate between suspend/resume and kexec for
-   CPU1 hot-unplug so we can put CPU1 into retention for
-   suspend/resume and park CPU1 for kexec
+Will fix in the incremental patch in v3.
 
-2. When parking CPU1 for kexec, it can be done in two stages.
-   We can first park it to a loop waiting for flat memory mapping,
-   then jump to boot ROM loop. But flat memory mapping is not
-   enough we also need to remap boot ROM and L4.. Probably waiting
-   for MMU off won't work here
+> [...]
+> > +static int __init pata_bk3710_probe(struct platform_device *pdev)
+> > +{
+> > +	struct clk *clk;
+> > +	struct resource *mem;
+> > +	struct ata_host *host;
+> > +	struct ata_port *ap;
+> > +	void __iomem *base;
+> > +	unsigned long rate;
+> > +	int irq;
+> > +
+> > +	clk = devm_clk_get(&pdev->dev, NULL);
+> > +	if (IS_ERR(clk))
+> > +		return -ENODEV;
+> > +
+> > +	clk_enable(clk);
+> > +	rate = clk_get_rate(clk);
+> > +	if (!rate)
+> > +		return -EINVAL;
+> > +
+> > +	/* NOTE:  round *down* to meet minimum timings; we count in clocks */
+> > +	ideclk_period = 1000000000UL / rate;
+> > +
+> > +	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> > +	if (mem == NULL) {
+> > +		pr_err(DRV_NAME ": failed to get memory region resource\n");
+> > +		return -ENODEV;
+> > +	}
+> 
+>     NULL check not needed here, devm_ioremap_resource() checks this anyway.
 
-So depending on the use cases, I don't know if implementing these
-two are really needed or make sense.
+Will be fixed in v3.
 
-Regards,
+> > +
+> > +	irq = platform_get_irq(pdev, 0);
+> > +	if (irq < 0) {
+> > +		pr_err(DRV_NAME ": failed to get IRQ resource\n");
+> > +		return irq;
+> > +	}
+> > +
+> > +	base = devm_ioremap_resource(&pdev->dev, mem);
+> > +	if (IS_ERR(base))
+> > +		return PTR_ERR(base);
+> > +
+> [...]
+> > +/* work with hotplug and coldplug */
+> > +MODULE_ALIAS("platform:palm_bk3710");
+> > +
+> > +static struct platform_driver pata_bk3710_driver = {
+> > +	.driver = {
+> > +		.name = "palm_bk3710",
+> 
+>     Not DRV_NAME?
 
-Tony
+DRV_NAME is "pata_bk3710" and the platform driver name needs to
+match the old driver name for compatibility reasons (supporting
+both drivers by the arch specific code).
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
