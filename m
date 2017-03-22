@@ -1,97 +1,197 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 22 Mar 2017 16:19:44 +0800
-Subject: [PATCH 05/15] ARM: dts: imx: fix PCI bus dtc warnings
-In-Reply-To: <20170322020313.24338-5-robh@kernel.org>
-References: <20170322020313.24338-1-robh@kernel.org>
- <20170322020313.24338-5-robh@kernel.org>
-Message-ID: <20170322081942.GM3443@dragon>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 22 Mar 2017 09:22:23 +0100
+Subject: [PATCH v8 2/3] dmaengine: pl330: remove pdata based initialization
+In-Reply-To: <1486650171-20598-3-git-send-email-m.szyprowski@samsung.com>
+References: <1486650171-20598-1-git-send-email-m.szyprowski@samsung.com>
+ <CGME20170209142308eucas1p24d52db3d52e19228e8f423c3dc8b085b@eucas1p2.samsung.com>
+ <1486650171-20598-3-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <f0d36362-ce75-02a0-0bfa-e265cba03b8b@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 21, 2017 at 09:03:03PM -0500, Rob Herring wrote:
-> dtc recently added PCI bus checks. Fix these warnings.
-> 
-> Signed-off-by: Rob Herring <robh@kernel.org>
-> Cc: Shawn Guo <shawnguo@kernel.org>
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: Fabio Estevam <fabio.estevam@nxp.com>
+Hi Vinod
 
-Applied with a couple of changes below.
+
+On 2017-02-09 15:22, Marek Szyprowski wrote:
+> This driver is now used only on platforms which support device tree, so
+> it is safe to remove legacy platform data based initialization code.
+>
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> For plat-samsung:
+> Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
+
+Vinod: This patch is completely independent from the rest of the changes
+from that patchset. Could you apply it, or do you want me to resend it
+separately? Runtime pm related changes will wait until a new DMA engine API
+is ready.
 
 > ---
-> Sub-arch maintainers, please apply to your trees unless arm-soc wants 
-> to take the whole lot.
-> 
->  arch/arm/boot/dts/imx6qdl.dtsi | 3 ++-
->  arch/arm/boot/dts/imx6qp.dtsi  | 2 +-
->  arch/arm/boot/dts/imx6sx.dtsi  | 3 ++-
->  3 files changed, 5 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-> index 6d7bf6496117..f95e24e73252 100644
-> --- a/arch/arm/boot/dts/imx6qdl.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl.dtsi
-> @@ -197,7 +197,7 @@
->  			arm,shared-override;
->  		};
->  
-> -		pcie: pcie at 0x01000000 {
-> +		pcie: pcie at 1ffc000 {
->  			compatible = "fsl,imx6q-pcie", "snps,dw-pcie";
->  			reg = <0x01ffc000 0x04000>,
->  			      <0x01f00000 0x80000>;
-> @@ -205,6 +205,7 @@
->  			#address-cells = <3>;
->  			#size-cells = <2>;
->  			device_type = "pci";
-> +			bus-range = <0 0xff>;
+>   arch/arm/plat-samsung/devs.c |  1 -
+>   drivers/dma/pl330.c          | 42 ++++++++----------------------------------
+>   include/linux/amba/pl330.h   | 35 -----------------------------------
+>   3 files changed, 8 insertions(+), 70 deletions(-)
+>   delete mode 100644 include/linux/amba/pl330.h
+>
+> diff --git a/arch/arm/plat-samsung/devs.c b/arch/arm/plat-samsung/devs.c
+> index 03fac123676d..dc269d9143bc 100644
+> --- a/arch/arm/plat-samsung/devs.c
+> +++ b/arch/arm/plat-samsung/devs.c
+> @@ -10,7 +10,6 @@
+>    * published by the Free Software Foundation.
+>   */
+>   
+> -#include <linux/amba/pl330.h>
+>   #include <linux/kernel.h>
+>   #include <linux/types.h>
+>   #include <linux/interrupt.h>
+> diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
+> index f37f4978dabb..8b0da7fa520d 100644
+> --- a/drivers/dma/pl330.c
+> +++ b/drivers/dma/pl330.c
+> @@ -22,7 +22,6 @@
+>   #include <linux/dma-mapping.h>
+>   #include <linux/dmaengine.h>
+>   #include <linux/amba/bus.h>
+> -#include <linux/amba/pl330.h>
+>   #include <linux/scatterlist.h>
+>   #include <linux/of.h>
+>   #include <linux/of_dma.h>
+> @@ -2077,18 +2076,6 @@ static void pl330_tasklet(unsigned long data)
+>   	}
+>   }
+>   
+> -bool pl330_filter(struct dma_chan *chan, void *param)
+> -{
+> -	u8 *peri_id;
+> -
+> -	if (chan->device->dev->driver != &pl330_driver.drv)
+> -		return false;
+> -
+> -	peri_id = chan->private;
+> -	return *peri_id == (unsigned long)param;
+> -}
+> -EXPORT_SYMBOL(pl330_filter);
+> -
+>   static struct dma_chan *of_dma_pl330_xlate(struct of_phandle_args *dma_spec,
+>   						struct of_dma *ofdma)
+>   {
+> @@ -2833,7 +2820,6 @@ static int __maybe_unused pl330_resume(struct device *dev)
+>   static int
+>   pl330_probe(struct amba_device *adev, const struct amba_id *id)
+>   {
+> -	struct dma_pl330_platdata *pdat;
+>   	struct pl330_config *pcfg;
+>   	struct pl330_dmac *pl330;
+>   	struct dma_pl330_chan *pch, *_p;
+> @@ -2843,8 +2829,6 @@ static int __maybe_unused pl330_resume(struct device *dev)
+>   	int num_chan;
+>   	struct device_node *np = adev->dev.of_node;
+>   
+> -	pdat = dev_get_platdata(&adev->dev);
+> -
+>   	ret = dma_set_mask_and_coherent(&adev->dev, DMA_BIT_MASK(32));
+>   	if (ret)
+>   		return ret;
+> @@ -2857,7 +2841,7 @@ static int __maybe_unused pl330_resume(struct device *dev)
+>   	pd = &pl330->ddma;
+>   	pd->dev = &adev->dev;
+>   
+> -	pl330->mcbufsz = pdat ? pdat->mcbuf_sz : 0;
+> +	pl330->mcbufsz = 0;
+>   
+>   	/* get quirk */
+>   	for (i = 0; i < ARRAY_SIZE(of_quirks); i++)
+> @@ -2901,10 +2885,7 @@ static int __maybe_unused pl330_resume(struct device *dev)
+>   	INIT_LIST_HEAD(&pd->channels);
+>   
+>   	/* Initialize channel parameters */
+> -	if (pdat)
+> -		num_chan = max_t(int, pdat->nr_valid_peri, pcfg->num_chan);
+> -	else
+> -		num_chan = max_t(int, pcfg->num_peri, pcfg->num_chan);
+> +	num_chan = max_t(int, pcfg->num_peri, pcfg->num_chan);
+>   
+>   	pl330->num_peripherals = num_chan;
+>   
+> @@ -2916,11 +2897,8 @@ static int __maybe_unused pl330_resume(struct device *dev)
+>   
+>   	for (i = 0; i < num_chan; i++) {
+>   		pch = &pl330->peripherals[i];
+> -		if (!adev->dev.of_node)
+> -			pch->chan.private = pdat ? &pdat->peri_id[i] : NULL;
+> -		else
+> -			pch->chan.private = adev->dev.of_node;
+>   
+> +		pch->chan.private = adev->dev.of_node;
+>   		INIT_LIST_HEAD(&pch->submitted_list);
+>   		INIT_LIST_HEAD(&pch->work_list);
+>   		INIT_LIST_HEAD(&pch->completed_list);
+> @@ -2933,15 +2911,11 @@ static int __maybe_unused pl330_resume(struct device *dev)
+>   		list_add_tail(&pch->chan.device_node, &pd->channels);
+>   	}
+>   
+> -	if (pdat) {
+> -		pd->cap_mask = pdat->cap_mask;
+> -	} else {
+> -		dma_cap_set(DMA_MEMCPY, pd->cap_mask);
+> -		if (pcfg->num_peri) {
+> -			dma_cap_set(DMA_SLAVE, pd->cap_mask);
+> -			dma_cap_set(DMA_CYCLIC, pd->cap_mask);
+> -			dma_cap_set(DMA_PRIVATE, pd->cap_mask);
+> -		}
+> +	dma_cap_set(DMA_MEMCPY, pd->cap_mask);
+> +	if (pcfg->num_peri) {
+> +		dma_cap_set(DMA_SLAVE, pd->cap_mask);
+> +		dma_cap_set(DMA_CYCLIC, pd->cap_mask);
+> +		dma_cap_set(DMA_PRIVATE, pd->cap_mask);
+>   	}
+>   
+>   	pd->device_alloc_chan_resources = pl330_alloc_chan_resources;
+> diff --git a/include/linux/amba/pl330.h b/include/linux/amba/pl330.h
+> deleted file mode 100644
+> index fe93758e8403..000000000000
+> --- a/include/linux/amba/pl330.h
+> +++ /dev/null
+> @@ -1,35 +0,0 @@
+> -/* linux/include/linux/amba/pl330.h
+> - *
+> - * Copyright (C) 2010 Samsung Electronics Co. Ltd.
+> - *	Jaswinder Singh <jassi.brar@samsung.com>
+> - *
+> - * This program is free software; you can redistribute it and/or modify
+> - * it under the terms of the GNU General Public License as published by
+> - * the Free Software Foundation; either version 2 of the License, or
+> - * (at your option) any later version.
+> - */
+> -
+> -#ifndef	__AMBA_PL330_H_
+> -#define	__AMBA_PL330_H_
+> -
+> -#include <linux/dmaengine.h>
+> -
+> -struct dma_pl330_platdata {
+> -	/*
+> -	 * Number of valid peripherals connected to DMAC.
+> -	 * This may be different from the value read from
+> -	 * CR0, as the PL330 implementation might have 'holes'
+> -	 * in the peri list or the peri could also be reached
+> -	 * from another DMAC which the platform prefers.
+> -	 */
+> -	u8 nr_valid_peri;
+> -	/* Array of valid peripherals */
+> -	u8 *peri_id;
+> -	/* Operational capabilities */
+> -	dma_cap_mask_t cap_mask;
+> -	/* Bytes to allocate for MC buffer */
+> -	unsigned mcbuf_sz;
+> -};
+> -
+> -extern bool pl330_filter(struct dma_chan *chan, void *param);
+> -#endif	/* __AMBA_PL330_H_ */
 
-For sake of consistency, I changed it to <0x00 0xff> like you did for
-imx6sx.dtsi.
-
->  			ranges = <0x81000000 0 0          0x01f80000 0 0x00010000 /* downstream I/O */
->  				  0x82000000 0 0x01000000 0x01000000 0 0x00f00000>; /* non-prefetchable memory */
->  			num-lanes = <1>;
-> diff --git a/arch/arm/boot/dts/imx6qp.dtsi b/arch/arm/boot/dts/imx6qp.dtsi
-> index 24d071f5d9cd..b7688f1e3c86 100644
-> --- a/arch/arm/boot/dts/imx6qp.dtsi
-> +++ b/arch/arm/boot/dts/imx6qp.dtsi
-> @@ -82,7 +82,7 @@
->  				      "ldb_di0", "ldb_di1", "prg";
->  		};
->  
-> -		pcie: pcie at 0x01000000 {
-> +		pcie: pcie at 1ffc000 {
-
-We had a patch on IMX tree changing this to use label for referencing
-the node, and hence this imx6qp.dtsi bit change can be saved.
-
-Shawn
-
->  			compatible = "fsl,imx6qp-pcie", "snps,dw-pcie";
->  		};
->  
-> diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
-> index dd4ec85ecbaa..c7f76de57c7b 100644
-> --- a/arch/arm/boot/dts/imx6sx.dtsi
-> +++ b/arch/arm/boot/dts/imx6sx.dtsi
-> @@ -1281,7 +1281,7 @@
->  			};
->  		};
->  
-> -		pcie: pcie at 0x08000000 {
-> +		pcie: pcie at 8ffc000 {
->  			compatible = "fsl,imx6sx-pcie", "snps,dw-pcie";
->  			reg = <0x08ffc000 0x4000>; /* DBI */
->  			#address-cells = <3>;
-> @@ -1293,6 +1293,7 @@
->  				  0x81000000 0 0          0x08f80000 0 0x00010000
->  				  /* non-prefetchable memory */
->  				  0x82000000 0 0x08000000 0x08000000 0 0x00f00000>;
-> +			bus-range = <0x00 0xff>;
->  			num-lanes = <1>;
->  			interrupts = <GIC_SPI 123 IRQ_TYPE_LEVEL_HIGH>;
->  			clocks = <&clks IMX6SX_CLK_PCIE_REF_125M>,
-> -- 
-> 2.10.1
-> 
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
