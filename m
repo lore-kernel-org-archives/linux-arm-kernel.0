@@ -1,45 +1,73 @@
-From: yannick.fertre@st.com (Yannick Fertre)
-Date: Wed, 22 Mar 2017 15:12:52 +0100
-Subject: [PATCH v2 3/5] ARM: dts: stm32: Add watchdog support for STM32F429 SoC
-In-Reply-To: <1490191974-29722-1-git-send-email-yannick.fertre@st.com>
-References: <1490191974-29722-1-git-send-email-yannick.fertre@st.com>
-Message-ID: <1490191974-29722-4-git-send-email-yannick.fertre@st.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 22 Mar 2017 14:16:24 +0000
+Subject: [PATCH 4/7] arm64: hugetlb: Introduce pte_pgprot helper
+In-Reply-To: <20170321180421.18332-5-punit.agrawal@arm.com>
+References: <20170321180421.18332-1-punit.agrawal@arm.com>
+ <20170321180421.18332-5-punit.agrawal@arm.com>
+Message-ID: <20170322141623.GE2977@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add watchdog into DT for stm32f429 family.
+On Tue, Mar 21, 2017 at 06:04:18PM +0000, Punit Agrawal wrote:
+> From: Steve Capper <steve.capper@arm.com>
+> 
+> Rather than xor pte bits in various places, use this helper function.
+> 
+> Cc: David Woods <dwoods@mellanox.com>
+> Signed-off-by: Steve Capper <steve.capper@arm.com>
+> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
 
-Signed-off-by: Yannick FERTRE <yannick.fertre@st.com>
----
- arch/arm/boot/dts/stm32f429.dtsi | 9 ++++++++-
- 1 file changed, 8 insertions(+), 1 deletion(-)
+Much nicer!
 
-diff --git a/arch/arm/boot/dts/stm32f429.dtsi b/arch/arm/boot/dts/stm32f429.dtsi
-index ee0da97..148273b 100644
---- a/arch/arm/boot/dts/stm32f429.dtsi
-+++ b/arch/arm/boot/dts/stm32f429.dtsi
-@@ -65,7 +65,7 @@
- 			clock-frequency = <32768>;
- 		};
- 
--		clk-lsi {
-+		clk_lsi: clk-lsi {
- 			#clock-cells = <0>;
- 			compatible = "fixed-clock";
- 			clock-frequency = <32000>;
-@@ -812,6 +812,13 @@
- 			clocks = <&rcc 0 STM32F4_AHB2_CLOCK(RNG)>;
- 
- 		};
-+
-+		iwdg: iwdg at 40003000 {
-+			compatible = "st,stm32-iwdg";
-+			reg = <0x40003000 0x400>;
-+			clocks = <&clk_lsi>;
-+			status = "disabled";
-+		};
- 	};
- };
- 
--- 
-1.9.1
+Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+
+Mark.
+
+> ---
+>  arch/arm64/mm/hugetlbpage.c | 16 ++++++++++++----
+>  1 file changed, 12 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
+> index 81bc6e4cf714..44d637eb32a7 100644
+> --- a/arch/arm64/mm/hugetlbpage.c
+> +++ b/arch/arm64/mm/hugetlbpage.c
+> @@ -41,6 +41,16 @@ int pud_huge(pud_t pud)
+>  #endif
+>  }
+>  
+> +/*
+> + * Select all bits except the pfn
+> + */
+> +static inline pgprot_t pte_pgprot(pte_t pte)
+> +{
+> +	unsigned long pfn = pte_pfn(pte);
+> +
+> +	return __pgprot(pte_val(pfn_pte(pfn, __pgprot(0))) ^ pte_val(pte));
+> +}
+> +
+>  static int find_num_contig(struct mm_struct *mm, unsigned long addr,
+>  			   pte_t *ptep, size_t *pgsize)
+>  {
+> @@ -80,7 +90,7 @@ void set_huge_pte_at(struct mm_struct *mm, unsigned long addr,
+>  
+>  	ncontig = find_num_contig(mm, addr, ptep, &pgsize);
+>  	pfn = pte_pfn(pte);
+> -	hugeprot = __pgprot(pte_val(pfn_pte(pfn, __pgprot(0))) ^ pte_val(pte));
+> +	hugeprot = pte_pgprot(pte);
+>  	for (i = 0; i < ncontig; i++) {
+>  		pr_debug("%s: set pte %p to 0x%llx\n", __func__, ptep,
+>  			 pte_val(pfn_pte(pfn, hugeprot)));
+> @@ -235,9 +245,7 @@ int huge_ptep_set_access_flags(struct vm_area_struct *vma,
+>  		size_t pgsize = 0;
+>  		unsigned long pfn = pte_pfn(pte);
+>  		/* Select all bits except the pfn */
+> -		pgprot_t hugeprot =
+> -			__pgprot(pte_val(pfn_pte(pfn, __pgprot(0))) ^
+> -				 pte_val(pte));
+> +		pgprot_t hugeprot = pte_pgprot(pte);
+>  
+>  		cpte = huge_pte_offset(vma->vm_mm, addr);
+>  		pfn = pte_pfn(*cpte);
+> -- 
+> 2.11.0
+> 
