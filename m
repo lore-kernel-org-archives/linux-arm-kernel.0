@@ -1,21 +1,26 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 21 Mar 2017 17:33:14 -0700
-Subject: [GIT PULL] ARM: at91: fixes for 4.11
-In-Reply-To: <20170314105208.gamqtnumihav7tbf@piout.net>
-References: <20170314105208.gamqtnumihav7tbf@piout.net>
-Message-ID: <20170322003314.GE5129@localhost>
+Date: Tue, 21 Mar 2017 17:31:08 -0700
+Subject: [GIT PULL] Reset controller fixes for v4.11
+In-Reply-To: <1490117743.6403.8.camel@pengutronix.de>
+References: <1490117743.6403.8.camel@pengutronix.de>
+Message-ID: <20170322003108.GD5129@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 14, 2017 at 11:52:08AM +0100, Alexandre Belloni wrote:
-> Arnd, Olof,
+On Tue, Mar 21, 2017 at 06:35:43PM +0100, Philipp Zabel wrote:
+> Dear arm-soc maintainers,
 > 
-> Here are two fixes for 4.11. The revert is reverting a DT patch that
-> went through the USB tree but should have never been applied.
+> please consider merging this tag, which completes an already merged
+> commit in case the RESET_CONTROLLER config option is disabled.
 > 
-> The second patch fixes an issue were the SoC hangs when using
-> at91_cpuidle.
+> I have already sent a few patches that make use of the new behaviour
+> introduced by commit bb475230b8e5 ("reset: make optional functions
+> really optional"). It would be nice if those could be merged for v4.11,
+> as without this fix they could cause drivers to fail probing if
+> RESET_CONTROLLER is disabled.
 > 
+> regards
+> Philipp
 > 
 > The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
 > 
@@ -23,19 +28,22 @@ On Tue, Mar 14, 2017 at 11:52:08AM +0100, Alexandre Belloni wrote:
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git tags/at91-ab-4.11-fixes
+>   git://git.pengutronix.de/git/pza/linux.git tags/reset-fixes-for-4.11
 > 
-> for you to fetch changes up to 60b89f1928af80b546b5c3fd8714a62f6f4b8844:
+> for you to fetch changes up to 0ca10b60ceeb5372da01798ca68c116ae45a6eb6:
 > 
->   ARM: at91: pm: cpu_idle: switch DDR to power-down mode (2017-03-14 11:09:50 +0100)
+>   reset: fix optional reset_control_get stubs to return NULL (2017-03-21 18:19:43 +0100)
 > 
 > ----------------------------------------------------------------
-> Fixes for 4.11:
+> Reset controller fixes for v4.11
 > 
->  - Fix USB host for sama5d2
->  - Fix cpuidle on sama5
+> Fix optional reset_control_get_stubs to return NULL and remove warnings
+> from reset_control_* stubs.
+> This fixes commit bb475230b8e5 ("reset: make optional  functions really
+> optional"), which was merged in reset-for-4.11, and would cause consumer
+> drivers depending on the new behaviour of optional resets to fail probing
+> if RESET_CONTROLLER Kconfig option is disabled.
 
-Merged, thanks.
-
+Merged, thanks!
 
 -Olof
