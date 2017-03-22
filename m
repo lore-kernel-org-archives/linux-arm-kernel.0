@@ -1,9 +1,9 @@
 From: sean.wang@mediatek.com (Sean Wang)
-Date: Wed, 22 Mar 2017 16:16:01 +0800
+Date: Wed, 22 Mar 2017 16:04:25 +0800
 Subject: [PATCH 01/16] arm: dts: add clock controller device nodes
 In-Reply-To: <1485170975-51813-2-git-send-email-john@phrozen.org>
 References: <1485170975-51813-2-git-send-email-john@phrozen.org>
-Message-ID: <1490170561-13358-1-git-send-email-sean.wang@mediatek.com>
+Message-ID: <1490169865-12993-1-git-send-email-sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
