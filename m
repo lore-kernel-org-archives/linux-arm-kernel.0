@@ -1,55 +1,36 @@
-From: jagan@openedev.com (Jagan Teki)
-Date: Wed, 22 Mar 2017 16:36:48 +0530
-Subject: [PATCH v7 3/3] ARM: dts: imx6q-icore: Add touchscreen node
-In-Reply-To: <1490180808-2856-1-git-send-email-jagan@openedev.com>
-References: <1490180808-2856-1-git-send-email-jagan@openedev.com>
-Message-ID: <1490180808-2856-3-git-send-email-jagan@openedev.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 22 Mar 2017 11:10:20 +0000
+Subject: [PATCH] ARM: dma-mapping: Fix dma_get_sgtable() for regions
+ without struct page
+In-Reply-To: <1487682998-2564-1-git-send-email-m.szyprowski@samsung.com>
+References: <CGME20170221131655eucas1p2f2ca6e3c819aeae227c5e5c5f2bc7d3f@eucas1p2.samsung.com>
+ <1487682998-2564-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <20170322111020.GD21222@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jagan Teki <jagan@amarulasolutions.com>
+On Tue, Feb 21, 2017 at 02:16:38PM +0100, Marek Szyprowski wrote:
+> Some DMA regions, for example those created by dma_declare_coherent_memory,
+> might not be possible to be represented by struct page pointers. Getting
+> scatterlist for the buffer allocated from such region is not possible.
+> This patch adds a simple check in arm_dma_get_sgtable() function if the
+> exported struct page pointer is valid.
 
-max11801 touchscreen on Engicam iCoreM6 Quad module is
-connected via i2c1, so add max11801: touchscreen at 48 on i2c1.
+I really don't like this - the "validation" here looks like total crap,
+especially when you analyse what these macros expand to.
 
-Cc: Domenico Acri <domenico.acri@engicam.com>
-Cc: Matteo Lisi <matteo.lisi@engicam.com>
-Cc: Michael Trimarchi <michael@amarulasolutions.com>
-Cc: Shawn Guo <shawnguo@kernel.org>
-Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
----
-Changes for v7:
-- add vendor prefix as maxim on compatible
-Changes for v6:
-- Replace the lable and name of the node
-   ts: max11801 => max11801: touchscreen at 48
-Changes for v5:
-- %s/arm/ARM/g with subject prefix
-Changes for v4:
-- Newly added patch
+I also don't like the way dma_get_sgtable() appeared without any
+documentation about (a) what it's for (b) what the expectations for its
+arguments are and (c) what it's supposed to be doing.  There are no
+comments in include/linux/dma-mapping.h describing the interface, nor
+are there any comments about it in Documentation/DMA*.
 
- arch/arm/boot/dts/imx6q-icore.dts | 9 +++++++++
- 1 file changed, 9 insertions(+)
+So, I'm really not applying this patch until the purpose of this
+function gets documented.
 
-diff --git a/arch/arm/boot/dts/imx6q-icore.dts b/arch/arm/boot/dts/imx6q-icore.dts
-index 73f34d1..70cc8b2 100644
---- a/arch/arm/boot/dts/imx6q-icore.dts
-+++ b/arch/arm/boot/dts/imx6q-icore.dts
-@@ -58,6 +58,15 @@
- 	status = "okay";
- };
- 
-+&i2c1 {
-+	max11801: touchscreen at 48 {
-+		compatible = "maxim,max11801";
-+		reg = <0x48>;
-+		interrupt-parent = <&gpio3>;
-+		interrupts = <31 2>;
-+	};
-+};
-+
- &ldb {
- 	status = "okay";
- 
+Thanks.
+
 -- 
-1.9.1
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
