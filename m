@@ -1,95 +1,80 @@
 From: l.stach@pengutronix.de (Lucas Stach)
-Date: Wed, 22 Mar 2017 09:43:34 +0100
-Subject: [PATCH 2/8] soc: imx: gpc: fix the wrong using of regmap cache
-In-Reply-To: <20170322185322.GB16264@b29396-OptiPlex-7040>
+Date: Wed, 22 Mar 2017 09:46:10 +0100
+Subject: [PATCH 4/8] soc: imx: gpc: fix imx6sl gpc power domain regression
+In-Reply-To: <20170322192356.GC16264@b29396-OptiPlex-7040>
 References: <1489990547-1510-1-git-send-email-aisheng.dong@nxp.com>
- <1489990547-1510-3-git-send-email-aisheng.dong@nxp.com>
- <1490002701.2895.13.camel@pengutronix.de>
- <20170322185322.GB16264@b29396-OptiPlex-7040>
-Message-ID: <1490172214.2895.32.camel@pengutronix.de>
+ <1489990547-1510-5-git-send-email-aisheng.dong@nxp.com>
+ <1490001974.2895.11.camel@pengutronix.de>
+ <20170322192356.GC16264@b29396-OptiPlex-7040>
+Message-ID: <1490172370.2895.34.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, den 23.03.2017, 02:53 +0800 schrieb Dong Aisheng:
-> Hi Lucas,
-> 
-> Thanks for the review.
-> 
-> On Mon, Mar 20, 2017 at 10:38:21AM +0100, Lucas Stach wrote:
+Am Donnerstag, den 23.03.2017, 03:23 +0800 schrieb Dong Aisheng:
+> On Mon, Mar 20, 2017 at 10:26:14AM +0100, Lucas Stach wrote:
 > > Am Montag, den 20.03.2017, 14:15 +0800 schrieb Dong Aisheng:
-> > > Without providing the proper reg_defaults, the regmap registers first
-> > > read out may be always 0 if enabling cache, which results in the
-> > > following issue we met.
-> > > e.g. During driver probe in imx6_pm_domain_power_on():
-> > > regmap_read(pd->regmap, pd->reg_offs + GPC_PGC_PUPSCR_OFFS, &val);
-> > > The PGC_PUPSCR register val is always 0 but it's actually 0xf01 in HW.
-> > > 
-> > > Since GPC registers are tightly related to CPU bring up and may be
-> > > changed in bootloader, we don't want to provide defaults.
-> > > And the cache really does not save too much for GPC module.
-> > > 
-> > > Therefore, simply disable cache to fix the issue and make life easy.
+> > > Commit 721cabf6c660 ("soc: imx: move PGC handling to a new GPC driver")
+> > > broke the MX6SL GPC power domain support.
+> > > It always got the following error:
+> > > [    1.248364] imx-gpc 20dc000.gpc: could not find pgc DT node
+> > > This patch adds back the legecy support.
 > > 
-> > While I agree that not using the cache may be the right thing to do
-> > here, bypassing the cache by not providing the volatile function is only
-> > half the fix.
+> > This patch removes a safeguard against abusing the old binding for new
+> > SoCs. Please leave this check in place and instead loosen the check to
+> > also allow the old i.MX6SL binding.
 > > 
 > 
-> Removing volatile function actually is only due to it becomes meaningless
-> after disable cache, not used to bypass or fix the cache issue.
+> Thanks for the reminder.
+> I found beside the checking, we probably also need some extra fix that
+> the current imx_gpc_old_dt_init() only supports two domains while the
+> driver formerly supports three for MX6SL.
 > 
-> > Please also set the cache type to REGCACHE_NONE, to make it clear that
-> > the cache isn't used.
-> > 
+> And because the num_domains is defined by driver itself, no need check
+> in imx_gpc_old_dt_init() anymore.
 > 
-> I believe all guys normally may know the regmap cache is disabled by default
-> if without specifying cache_type, this way is also commonly used in kernel.
-> So i just simply remove it.
-> Another bonus is it fully hides the cache bits from drive user.
-> No one needs to know it if not use.
+> The patch would be as follows:
+> diff --git a/drivers/soc/imx/gpc.c b/drivers/soc/imx/gpc.c
+> index 4885ec2..6a806a1 100644
+> --- a/drivers/soc/imx/gpc.c
+> +++ b/drivers/soc/imx/gpc.c
+> @@ -303,10 +303,13 @@ static struct genpd_onecell_data imx_gpc_onecell_data = {
+>  
+>  static int imx_gpc_old_dt_init(struct device *dev, struct regmap *regmap)
+>  {
+> +       const struct of_device_id *of_id =
+> +                       of_match_device(imx_gpc_dt_ids, dev);
+> +       const struct imx_gpc_dt_data *of_id_data = of_id->data;
+>         struct imx_pm_domain *domain;
+>         int i, ret;
+>  
+> -       for (i = 0; i < 2; i++) {
+> +       for (i = 0; i < of_id_data->num_domains; i++) {
+>                 domain = &imx_gpc_domains[i];
+>                 domain->regmap = regmap;
+>                 domain->ipg_rate_mhz = 66;
+> @@ -324,7 +327,7 @@ static int imx_gpc_old_dt_init(struct device *dev, struct regmap *regmap)
+>                 }
+>         }
+>  
+> -       for (i = 0; i < 2; i++)
+> +       for (i = 0; i < of_id_data->num_domains; i++)
+>                 pm_genpd_init(&imx_gpc_domains[i].base, NULL, false);
+>  
+>         if (IS_ENABLED(CONFIG_PM_GENERIC_DOMAINS)) {
+> @@ -337,7 +340,7 @@ static int imx_gpc_old_dt_init(struct device *dev, struct regmap *regmap)
+>         return 0;
+>  
+>  genpd_err:
+> -       for (i = 0; i < 2; i++)
+> +       for (i = 0; i < of_id_data->num_domains; i++)
+>                 pm_genpd_remove(&imx_gpc_domains[i].base);
+>         imx_pgc_put_clocks(&imx_gpc_domains[1]);
+>  clk_err:
 > 
-> Anyway, if you insist on it, i could explicitly claim the cache type to
-> REGCACHE_NONE in V2.
+> Do you think it's ok?
+> 
+I don't like the redundant of_match_id. Please just pass num_domains as
+a parameter to imx_gpc_old_dt_init(). Otherwise this looks good.
 
-Um, no thanks. I claim lack of coffee for my first review. This patch is
-
-Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
-
-> > 
-> > > Cc: Lucas Stach <l.stach@pengutronix.de>
-> > > Cc: Shawn Guo <shawnguo@kernel.org>
-> > > Fixes: 721cabf6c660 ("soc: imx: move PGC handling to a new GPC driver")
-> > > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
-> > > ---
-> > >  drivers/soc/imx/gpc.c | 10 ----------
-> > >  1 file changed, 10 deletions(-)
-> > > 
-> > > diff --git a/drivers/soc/imx/gpc.c b/drivers/soc/imx/gpc.c
-> > > index c9bfdfd..7e6a672 100644
-> > > --- a/drivers/soc/imx/gpc.c
-> > > +++ b/drivers/soc/imx/gpc.c
-> > > @@ -289,22 +289,12 @@ static bool imx_gpc_readable_reg(struct device *dev, unsigned int reg)
-> > >  	return (reg % 4 == 0) && (reg <= 0x2ac);
-> > >  }
-> > >  
-> > > -static bool imx_gpc_volatile_reg(struct device *dev, unsigned int reg)
-> > > -{
-> > > -	if (reg == GPC_CNTR)
-> > > -		return true;
-> > > -
-> > > -	return false;
-> > > -}
-> > > -
-> > >  static const struct regmap_config imx_gpc_regmap_config = {
-> > > -	.cache_type = REGCACHE_FLAT,
-> > >  	.reg_bits = 32,
-> > >  	.val_bits = 32,
-> > >  	.reg_stride = 4,
-> > >  
-> > >  	.readable_reg = imx_gpc_readable_reg,
-> > > -	.volatile_reg = imx_gpc_volatile_reg,
-> > >  
-> > >  	.max_register = 0x2ac,
-> > >  };
-> > 
-> > 
+Regards,
+Lucas
