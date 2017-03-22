@@ -1,168 +1,48 @@
-From: leonard.crestez@nxp.com (Leonard Crestez)
-Date: Wed, 22 Mar 2017 18:53:10 +0200
-Subject: [RFC 8/8] ARM: dts: imx6qdl-sabresd: Enable fsl,ldo-bypass
-In-Reply-To: <cover.1490199005.git.leonard.crestez@nxp.com>
-References: <cover.1490199005.git.leonard.crestez@nxp.com>
-Message-ID: <8f4dca5609781f0362009dfa7f6d5c0990b5ea6d.1490199005.git.leonard.crestez@nxp.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 22 Mar 2017 16:55:27 +0000
+Subject: [RFC PATCH v2 23/41] arm64/sve: Move ZEN handling to the common
+ task_fpsimd_load() path
+In-Reply-To: <1490194274-30569-24-git-send-email-Dave.Martin@arm.com>
+References: <1490194274-30569-1-git-send-email-Dave.Martin@arm.com>
+ <1490194274-30569-24-git-send-email-Dave.Martin@arm.com>
+Message-ID: <20170322165527.GD19950@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This enables LDO bypass by default on the imx6qdl-sabresd boards. New
-dts files with -ldo suffix are added for users who want to run with LDOs
-enabled on these boards anyway.
+Hi,
 
-Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
----
- arch/arm/boot/dts/imx6dl-sabresd-ldo.dts | 13 +++++++++++++
- arch/arm/boot/dts/imx6q-sabresd-ldo.dts  | 13 +++++++++++++
- arch/arm/boot/dts/imx6qdl-sabresd.dtsi   | 19 +++++++++++++++++++
- arch/arm/boot/dts/imx6qdl.dtsi           |  6 +++---
- arch/arm/boot/dts/imx6qp-sabresd-ldo.dts | 13 +++++++++++++
- arch/arm/boot/dts/imx6qp-sabresd.dts     |  4 ++--
- 6 files changed, 63 insertions(+), 5 deletions(-)
- create mode 100644 arch/arm/boot/dts/imx6dl-sabresd-ldo.dts
- create mode 100644 arch/arm/boot/dts/imx6q-sabresd-ldo.dts
- create mode 100644 arch/arm/boot/dts/imx6qp-sabresd-ldo.dts
+On Wed, Mar 22, 2017 at 02:50:53PM +0000, Dave Martin wrote:
+>  void do_sve_acc(unsigned int esr, struct pt_regs *regs)
+>  {
+> -	unsigned long tmp;
+> +	if (test_and_set_thread_flag(TIF_SVE)) {
+> +		unsigned long tmp;
+>  
+> -	if (test_and_set_thread_flag(TIF_SVE))
+> +		asm ("mrs %0, cpacr_el1" : "=r" (tmp));
 
-diff --git a/arch/arm/boot/dts/imx6dl-sabresd-ldo.dts b/arch/arm/boot/dts/imx6dl-sabresd-ldo.dts
-new file mode 100644
-index 0000000..1b224d6
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6dl-sabresd-ldo.dts
-@@ -0,0 +1,13 @@
-+/*
-+ * Copyright 2017 NXP
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include "imx6dl-sabresd.dts"
-+
-+&gpc {
-+	fsl,ldo-bypass = <0>;
-+};
-diff --git a/arch/arm/boot/dts/imx6q-sabresd-ldo.dts b/arch/arm/boot/dts/imx6q-sabresd-ldo.dts
-new file mode 100644
-index 0000000..4d2e8cc
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6q-sabresd-ldo.dts
-@@ -0,0 +1,13 @@
-+/*
-+ * Copyright 2017 NXP
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include "imx6q-sabresd.dts"
-+
-+&gpc {
-+	fsl,ldo-bypass = <0>;
-+};
-diff --git a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-index 63bf95e..5a73d9d 100644
---- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-@@ -182,6 +182,10 @@
- 	status = "okay";
- };
- 
-+&gpc {
-+	fsl,ldo-bypass = <1>;
-+};
-+
- &hdmi {
- 	ddc-i2c-bus = <&i2c2>;
- 	status = "okay";
-@@ -548,6 +552,21 @@
- 	status = "okay";
- };
- 
-+&reg_arm {
-+       vin-supply = <&sw1a_reg>;
-+       regulator-allow-bypass;
-+};
-+
-+&reg_pu {
-+       vin-supply = <&sw1c_reg>;
-+       regulator-allow-bypass;
-+};
-+
-+&reg_soc {
-+       vin-supply = <&sw1c_reg>;
-+       regulator-allow-bypass;
-+};
-+
- &snvs_poweroff {
- 	status = "okay";
- };
-diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-index 6d7bf64..54fe769 100644
---- a/arch/arm/boot/dts/imx6qdl.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl.dtsi
-@@ -677,7 +677,7 @@
- 					compatible = "fsl,anatop-regulator";
- 					regulator-name = "vddarm";
- 					regulator-min-microvolt = <725000>;
--					regulator-max-microvolt = <1450000>;
-+					regulator-max-microvolt = <1300000>;
- 					regulator-always-on;
- 					anatop-reg-offset = <0x140>;
- 					anatop-vol-bit-shift = <0>;
-@@ -694,7 +694,7 @@
- 					compatible = "fsl,anatop-regulator";
- 					regulator-name = "vddpu";
- 					regulator-min-microvolt = <725000>;
--					regulator-max-microvolt = <1450000>;
-+					regulator-max-microvolt = <1300000>;
- 					regulator-enable-ramp-delay = <150>;
- 					anatop-reg-offset = <0x140>;
- 					anatop-vol-bit-shift = <9>;
-@@ -711,7 +711,7 @@
- 					compatible = "fsl,anatop-regulator";
- 					regulator-name = "vddsoc";
- 					regulator-min-microvolt = <725000>;
--					regulator-max-microvolt = <1450000>;
-+					regulator-max-microvolt = <1300000>;
- 					regulator-always-on;
- 					anatop-reg-offset = <0x140>;
- 					anatop-vol-bit-shift = <18>;
-diff --git a/arch/arm/boot/dts/imx6qp-sabresd-ldo.dts b/arch/arm/boot/dts/imx6qp-sabresd-ldo.dts
-new file mode 100644
-index 0000000..c659533
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6qp-sabresd-ldo.dts
-@@ -0,0 +1,13 @@
-+/*
-+ * Copyright 2017 NXP
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include "imx6qp-sabresd.dts"
-+
-+&gpc {
-+	fsl,ldo-bypass = <0>;
-+};
-diff --git a/arch/arm/boot/dts/imx6qp-sabresd.dts b/arch/arm/boot/dts/imx6qp-sabresd.dts
-index b234580..a8a5004 100644
---- a/arch/arm/boot/dts/imx6qp-sabresd.dts
-+++ b/arch/arm/boot/dts/imx6qp-sabresd.dts
-@@ -50,8 +50,8 @@
- 	compatible = "fsl,imx6qp-sabresd", "fsl,imx6qp";
- };
- 
--&cpu0 {
--	arm-supply = <&sw2_reg>;
-+&reg_arm {
-+	vin-supply = <&sw2_reg>;
- };
- 
- &iomuxc {
--- 
-2.7.4
+Please use read_sysreg().
+
+> +
+> +		printk(KERN_INFO "%s: Strange, ZEN=%u\n",
+> +		       __func__, (unsigned int)((tmp >> 16) & 3));
+>  		BUG();
+
+Given we're about to BUG(), I guess it would make more sense to use
+pr_err() here, and be a bit more informative. e.g.
+
+	pr_crit("SVE trap taken unexpectedly. CPACR_EL1.ZEN is %u\n",
+		(unsigned int)((tmp >> 16) & 3));
+	BUG();
+
+... my usual comments w.r.t. magic numbers apply.
+
+[...]
+
+> +		BUILD_BUG_ON(_TIF_SVE != CPACR_EL1_ZEN_EL0EN);
+
+As previously, I do not think this is a good idea. Treating these as
+separate values is not difficult, and IMO far easier to reason about.
+
+Thanks,
+Mark.
