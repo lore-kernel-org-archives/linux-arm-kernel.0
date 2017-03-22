@@ -1,110 +1,115 @@
-From: xiexiuqi@huawei.com (Xie XiuQi)
-Date: Wed, 22 Mar 2017 20:08:48 +0800
-Subject: [PATCH V11 10/10] arm/arm64: KVM: add guest SEA support
-In-Reply-To: <58D25C8D.3070507@arm.com>
-References: <1487712121-16688-1-git-send-email-tbaicar@codeaurora.org>
- <1487712121-16688-11-git-send-email-tbaicar@codeaurora.org>
- <df6ba5dc-d93f-925a-46bf-1e1e209d17f3@huawei.com> <58B43092.6040401@arm.com>
- <6eee7a67-808e-8712-2ec2-593eac52d921@huawei.com> <58D25C8D.3070507@arm.com>
-Message-ID: <b57e2cb1-129b-7369-96e0-33e5c87dbb74@huawei.com>
+From: sza@esh.hu (=?utf-8?B?U3plbXrFkSBBbmRyw6Fz?=)
+Date: Wed, 22 Mar 2017 13:23:26 +0100
+Subject: [PATCH v3 0/7] ARM: Fix dma_alloc_coherent() and friends for NOMMU
+In-Reply-To: <90e219f3-7139-c11c-a635-509173d4148a@arm.com>
+References: <1489137839-549-1-git-send-email-vladimir.murzin@arm.com>
+ <90e219f3-7139-c11c-a635-509173d4148a@arm.com>
+Message-ID: <33321273-E3E7-459B-A615-5ADA52445AA1@esh.hu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi James,
+I?ve tested this v3 version on my Atmel armv7m board with several drivers with DMA and enabled caches,
+and I?ve not seen any issues.
 
-On 2017/3/22 19:14, James Morse wrote:
-> Hi Wang Xiongfeng,
-> 
-> On 22/03/17 02:46, Xiongfeng Wang wrote:
->>> Guests are a special case as QEMU may never access the faulty memory itself, so
->>> it won't receive the 'late' signal. It looks like ARM/arm64 KVM lacks support
->>> for KVM_PFN_ERR_HWPOISON which sends SIGBUS from KVM's fault-handling code. I
->>> have patches to add support for this which I intend to send at rc1.
->>>
->>> [0] suggests 'KVM qemu' sets these MCE flags to take the 'early' path, but given
->>> x86s KVM_PFN_ERR_HWPOISON, this may be out of date.
->>>
->>>
->>> Either way, once QEMU gets a signal indicating the virtual address, it can
->>> generate its own APEI CPER records and use the KVM APIs to mock up an
->>> Synchronous External Abort, (or inject an IRQ or run the vcpu waiting for the
->>> guest's polling thread to come round, whichever was described to the guest via
->>> the HEST/GHES tables).
->>>
->>
->> I have another confusion about the SIGBUS signal. Can QEMU always get a SIGBUS when needed.
->> I know one circumstance which will send SIGBUS. The ghes_handle_memory_failure() in
->> ghes_do_proc() will send SIGBUS to QEMU, but this only happens when there exists memory section
->> in ghes, that is the section type is CPER_SEC_PLATFORM_MEM.
->> Suppose this case, an load  error in guest application causes an SEA, and the firmware take it.
->> The firmware begin to scan the error record and fill the ghes. But the error record in memory node
->> has been read by other handler.
-> 
-> (this looks like a race)
-> 
->> The firmware won't add memory section in ghes, so ghes_handle_memory_failure() won't be called.
-> 
-> I think this would be a firmware bug. Firmware can reserve as much memory as it
-> needs for writing CPER records, there should not be a case where 'the memory' is
-> currently being processed by another handler.
+You can add my Tested-by.
 
-I have a question here:
-Consider this case, the memory controller first detected a memory error,
-but it has not been consumed. So it will not generate the SEA. Memory error
-may be reported to the OS by IRQ with MEM section in CPER record; and
-after for a while, the error data was loaded into the cache and consumed,
-when the SEA is generated. Is it possible only processor section, and no
-MEM section in CPER record?
+Thanks for the patches!
 
-Obviously there are two different GHES above, one for SEA and another for IRQ/GSIV.
-Could we assume that there is mem section in the SEA ghes table?
+Andras 
 
+> On 2017. Mar 16., at 10:03, Vladimir Murzin <vladimir.murzin@arm.com> wrote:
 > 
-> The memory firmware uses to write CPER records too shouldn't be published to the
-> OS until it has finished. Once firmware has finished writing the CPER records it
-> can update the memory pointed to by GHES->ErrorStatusAddress with the location
-> of the CPER records and invoke the Notification method for this GHES. (SEI, SEA,
-> IRQ etc). We should always get a complete set of CPER records to describe the error.
+> Gentle ping!
 > 
-
-Does it mean that the BIOS has the responsibility to ensure that the GHES table has a
-complete error info, including memory, bus, tlb, cache and other related error info?
-
--- 
-Thanks,
-Xie XiuQi
-
-> It firmware uses GHESv2 it can get an 'ack' write from APEI once it has finished
-> processing the records. Once it gets this firmware knows it can re-use the memory.
-> 
-> (Obviously each GHES entry can only process one error at a time. Firmware should
-> either handle this, or have one entry for each Error Source that can happen
-> independently)
-> 
-> 
->> I mean that we may not rely on ghes_handle_memory_failure() to send SIGBUS to QEMU. Whether we should
->> add some other code to send SIGBUS in handle_guest_abort(). I don't know whether the ARM/arm64
->>  KVM_PFN_ERR_HWPOISON you mentioned above will cover all the cases.
-> 
-> The SIGBUS routine is part of the kernel's recovery method for memory errors. It
-> should cover all the errors reported with this CPER_SEC_PLATFORM_MEM.
-> 
-> Back to the race you describe. It shouldn't matter if one CPU processes an error
-> for guest memory while a vcpu is running on another. This may happen if the
-> error was detected by DRAM's background scrub.
-> If we don't treat KVM/Qemu as anything special the memory_failure()->SIGBUS path
-> will happen regardless of whether the fault interrupted the guest or not.
-> 
-> 
-> There are other types of error such as PCIe, CPU, BUS error etc. If it's
-> possible to recover from these we may need additional code in the kernel. This
-> shouldn't necessarily treat KVM as a special case.
-> 
-> 
-> Thanks,
-> 
-> James
-> 
-> 
-> .
+> On 10/03/17 09:23, Vladimir Murzin wrote:
+>> It seem that addition of cache support for M-class CPUs uncovered
+>> latent bug in DMA usage. NOMMU memory model has been treated as being
+>> always consistent; however, for R/M CPU classes memory can be covered
+>> by MPU which in turn might configure RAM as Normal i.e. bufferable and
+>> cacheable. It breaks dma_alloc_coherent() and friends, since data can
+>> stuck in caches now or be buffered.
+>> 
+>> This patch set is trying to address the issue by providing region of
+>> memory suitable for consistent DMA operations. It is supposed that
+>> such region is marked by MPU as non-cacheable. Robin suggested to
+>> advertise such memory as reserved shared-dma-pool, rather then using
+>> homebrew command line option, and extend dma-coherent to provide
+>> default DMA area in the similar way as it is done for CMA (PATCH
+>> 4/7). It allows us to offload all bookkeeping on generic coherent DMA
+>> framework, and it seems that it might be reused by other architectures
+>> like c6x and blackfin.
+>> 
+>> While reviewing/testing previous vesrions of the patch set it turned
+>> out that dma-coherent does not take into account "dma-ranges" device
+>> tree property, so it is addressed in PATCH 3/7.
+>> 
+>> For ARM, dedicated DMA region is required for cases other than:
+>> - MMU/MPU is off
+>> - cpu is v7m w/o cache support
+>> - device is coherent
+>> 
+>> In case one of the above conditions is true dma operations are forced
+>> to be coherent and wired with dma_noop_ops.
+>> 
+>> To make life easier NOMMU dma operations are kept in separate
+>> compilation unit.
+>> 
+>> Since the issue was reported in the same time as Benjamin sent his
+>> patch [1] to allow mmap for NOMMU, his case is also addressed in this
+>> series (PATCH 1/7 and PATCH 2/7).
+>> 
+>> Thanks!
+>> 
+>> [1] http://www.armlinux.org.uk/developer/patches/viewpatch.php?id=8633/1
+>> 
+>> Cc: Joerg Roedel <jroedel@suse.de>
+>> Cc: Christian Borntraeger <borntraeger@de.ibm.com>
+>> Cc: Michal Nazarewicz <mina86@mina86.com>
+>> Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+>> Cc: Alan Stern <stern@rowland.harvard.edu>
+>> Cc: Yoshinori Sato <ysato@users.sourceforge.jp>
+>> Cc: Rich Felker <dalias@libc.org>
+>> Cc: Roger Quadros <rogerq@ti.com>
+>> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+>> Cc: Rob Herring <robh+dt@kernel.org>
+>> Cc: Mark Rutland <mark.rutland@arm.com>
+>> Cc: Doug Ledford <dledford@redhat.com>
+>> 
+>> Changelog:
+>> 	    v2 -> v3
+>> 	       - fixed warnings reported by Alexandre and kbuild robot
+>> 
+>> 	    v1 -> v2
+>> 	       - rebased on v4.11-rc1
+>> 	       - added Robin's Reviewed-by
+>> 	       - dedicated flag is introduced to use dev->dma_pfn_offset
+>> 	         rather than mem->device_base in case memory region is
+>> 		 configured via device tree (so Tested-by discarded there)
+>> 
+>> 	RFC v6 -> v1
+>> 	       - dropped RFC tag
+>> 	       - added Alexandre's Tested-by
+>> 
+>> Vladimir Murzin (7):
+>>  dma: Take into account dma_pfn_offset
+>>  dma: Add simple dma_noop_mmap
+>>  drivers: dma-coherent: Account dma_pfn_offset when used with device
+>>    tree
+>>  drivers: dma-coherent: Introduce default DMA pool
+>>  ARM: NOMMU: Introduce dma operations for noMMU
+>>  ARM: NOMMU: Set ARM_DMA_MEM_BUFFERABLE for M-class cpus
+>>  ARM: dma-mapping: Remove traces of NOMMU code
+>> 
+>> .../bindings/reserved-memory/reserved-memory.txt   |   3 +
+>> arch/arm/Kconfig                                   |   1 +
+>> arch/arm/include/asm/dma-mapping.h                 |   2 +-
+>> arch/arm/mm/Kconfig                                |   2 +-
+>> arch/arm/mm/Makefile                               |   5 +-
+>> arch/arm/mm/dma-mapping-nommu.c                    | 253 +++++++++++++++++++++
+>> arch/arm/mm/dma-mapping.c                          |  29 +--
+>> drivers/base/dma-coherent.c                        |  74 +++++-
+>> lib/dma-noop.c                                     |  29 ++-
+>> 9 files changed, 354 insertions(+), 44 deletions(-)
+>> create mode 100644 arch/arm/mm/dma-mapping-nommu.c
+>> 
 > 
