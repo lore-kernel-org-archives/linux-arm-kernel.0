@@ -1,28 +1,58 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 22 Mar 2017 14:09:26 -0700
-Subject: [PATCH] ARM: imx_v6_v7_defconfig: Select SMSC_PHY
-In-Reply-To: <82d0aeeaed87ae5c9390b889cef4c54d715cde61.1490191972.git.leonard.crestez@nxp.com>
-References: <82d0aeeaed87ae5c9390b889cef4c54d715cde61.1490191972.git.leonard.crestez@nxp.com>
-Message-ID: <5b1b4048-0499-313b-eaeb-167c6e6d50ae@gmail.com>
+Date: Wed, 22 Mar 2017 14:12:49 -0700
+Subject: [PATCH] ARM: dts: sun7i: lamobo-r1: Fix CPU port RGMII settings
+In-Reply-To: <CAGb2v65KvoC9MUoErkGeHvmbm8Ocq-vhFBhxXvZu--=xT4zAeg@mail.gmail.com>
+References: <20170319045039.6163-1-f.fainelli@gmail.com>
+ <CAGb2v65KvoC9MUoErkGeHvmbm8Ocq-vhFBhxXvZu--=xT4zAeg@mail.gmail.com>
+Message-ID: <3d32f497-e875-2a55-5908-78de880640bc@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/22/2017 07:27 AM, Leonard Crestez wrote:
-> The imx6sl-evk board has a LAN8720A ethernet phy supported by SMSC_PHY.
-> Add this driver to the default imx config since the device is present on
-> one of the evaluation boards.
-> 
-> This used to work mostly fine with the generic phy driver but since
-> commit 0878fff1f42c18e448ab5b8b4f6a3eb32365b5b6 that driver no longer
-> performs a soft reset on startup. This causes netboot to sometimes
-> timeout on DHCP because RX doesn't work right. DHCP is eventually retried and
-> it works the second time but it takes 90+ seconds to get a login prompt.
-> 
-> This was generated with "make savedefconfig" and it includes a few
-> additional minor cleanups.
-> 
-> Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
+Hello Chen-Yu,
 
-Acked-by: Florian Fainelli <f.fainelli@gmail.com>
+On 03/21/2017 09:06 PM, Chen-Yu Tsai wrote:
+> Hi Florian,
+> 
+> On Sun, Mar 19, 2017 at 12:50 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
+>> The CPU port of the BCM53125 is configured with RGMII (no delays) but
+>> this should actually be RGMII with transmit delay (rgmii-txid) because
+>> STMMAC takes care of inserting the transmitter delay. This fixes
+>> occasional packet loss encountered.
+>>
+>> Fixes: d7b9eaff5f0c ("ARM: dts: sun7i: Add BCM53125 switch nodes to the lamobo-r1 board")
+>> Reported-by: Hartmut Knaack <knaack.h@gmx.de>
+>> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+>> ---
+>>  arch/arm/boot/dts/sun7i-a20-lamobo-r1.dts | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/boot/dts/sun7i-a20-lamobo-r1.dts b/arch/arm/boot/dts/sun7i-a20-lamobo-r1.dts
+>> index 72ec0d5ae052..bbf1c8cbaac6 100644
+>> --- a/arch/arm/boot/dts/sun7i-a20-lamobo-r1.dts
+>> +++ b/arch/arm/boot/dts/sun7i-a20-lamobo-r1.dts
+>> @@ -167,7 +167,7 @@
+>>                                         reg = <8>;
+>>                                         label = "cpu";
+>>                                         ethernet = <&gmac>;
+>> -                                       phy-mode = "rgmii";
+>> +                                       phy-mode = "rgmii-txid";
+> 
+> Just to clarify, the DT binding says:
+> 
+>   * "rgmii-txid" (RGMII with internal TX delay provided by the PHY, the MAC
+>      should not add an TX delay in this case)
+> 
+> I'm assuming this applies from the device node's point of view?
+> In this case the "PHY" is STMMAC, and the "MAC" is the switch chip?
+> Is that right?
+
+It's actually a MAC to MAC type of set up here, so the definition of the
+property kind of still applies, with the caveat that we need to make
+sure that if one side uses "rgmii", the other one uses "rgmii-txid"
+which is what is being done here. I think I typoed in the commit message
+in that it should read "STMMAC does not take care of inserting the
+transmitter delay here" which is why the switch must do it.
+
+Thanks!
 -- 
 Florian
