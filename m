@@ -1,85 +1,61 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 22 Mar 2017 14:50:49 +0000
-Subject: [RFC PATCH v2 19/41] arm64/sve: Avoid corruption when replacing the
- SVE state
+Date: Wed, 22 Mar 2017 14:50:58 +0000
+Subject: [RFC PATCH v2 28/41] arm64: KVM: Treat SVE use by guests as undefined
+ instruction execution
 In-Reply-To: <1490194274-30569-1-git-send-email-Dave.Martin@arm.com>
 References: <1490194274-30569-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1490194274-30569-20-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1490194274-30569-29-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If preemption occurs during replacement of the whole SVE state,
-as occurs during execve() or rt_sigreturn(), then some or all of
-the new state for the thread can be lost, due to erroneous saving
-of the pre-existing state over the new data.
+We don't currently support context-switching of Scalable Vector
+Extension context between vcpus, and the SVE access exception is
+thus left masked by default at EL2 when running a vcpu.
 
-This patch disables preemption around the affected operations to
-avoid this failure mode.
+However, there's nothing to stop a guest trying to use SVE.  If it
+does, we'll get an SVE access exception to EL2 which will cause KVM
+to panic since this exception isn't yet recognised.
 
-This should be reexamined later if the impact on preemption latency
-proves to be excessive.
+This patch adds knowledge to KVM about the SVE access exception,
+translating it into an undefined instruction exception injected to
+the vcpu.
+
+This prevents a malicious guest from panicking the host by
+attempted SVE use.
+
+SVE-enabled guests will still not work properly for now, but they
+won't take the host down.
 
 Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 ---
- arch/arm64/kernel/fpsimd.c | 4 ++++
- arch/arm64/kernel/signal.c | 9 ++++++++-
- 2 files changed, 12 insertions(+), 1 deletion(-)
+ arch/arm64/kvm/handle_exit.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-index 952dd20..f3006a6 100644
---- a/arch/arm64/kernel/fpsimd.c
-+++ b/arch/arm64/kernel/fpsimd.c
-@@ -254,6 +254,8 @@ void fpsimd_flush_thread(void)
- 	if (!system_supports_fpsimd())
- 		return;
- 
-+	preempt_disable();
-+
- 	fpsimd_flush_task_state(current);
- 
- 	memset(&current->thread.fpsimd_state, 0, sizeof(struct fpsimd_state));
-@@ -269,6 +271,8 @@ void fpsimd_flush_thread(void)
- 	}
- 
- 	set_thread_flag(TIF_FOREIGN_FPSTATE);
-+
-+	preempt_enable();
+diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
+index fa1b18e..e43b147 100644
+--- a/arch/arm64/kvm/handle_exit.c
++++ b/arch/arm64/kvm/handle_exit.c
+@@ -146,6 +146,13 @@ static int kvm_handle_unknown_ec(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 	return 1;
  }
  
- /*
-diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
-index 9d4f7c8..c3e15e2 100644
---- a/arch/arm64/kernel/signal.c
-+++ b/arch/arm64/kernel/signal.c
-@@ -256,6 +256,10 @@ static int __restore_sve_fpsimd_context(struct user_ctxs *user,
- 	if (vl != sve_get_vl())
- 		return -EINVAL;
- 
-+	preempt_disable();
++static int handle_sve(struct kvm_vcpu *vcpu, struct kvm_run *run)
++{
++	/* Until SVE is supported for guests: */
++	kvm_inject_undefined(vcpu);
++	return 1;
++}
 +
-+	set_thread_flag(TIF_FOREIGN_FPSTATE);
-+
- 	BUG_ON(SVE_SIG_REGS_SIZE(vq) > sizeof(*task_sve_regs));
- 	BUG_ON(round_up(SVE_SIG_REGS_SIZE(vq), 16) < sizeof(*task_sve_regs));
- 	BUG_ON(SVE_SIG_FFR_OFFSET(vq) - SVE_SIG_REGS_OFFSET !=
-@@ -265,7 +269,7 @@ static int __restore_sve_fpsimd_context(struct user_ctxs *user,
- 					SVE_SIG_REGS_OFFSET,
- 			       SVE_SIG_REGS_SIZE(vq));
- 	if (err)
--		return err;
-+		goto out_preempt;
- 
- 	/* copy the FP and status/control registers */
- 	/* restore_sigframe() already checked that user->fpsimd != NULL. */
-@@ -278,6 +282,9 @@ static int __restore_sve_fpsimd_context(struct user_ctxs *user,
- 	if (!err)
- 		fpsimd_update_current_state(&fpsimd);
- 
-+out_preempt:
-+	preempt_enable();
-+
- 	return err;
- }
- 
+ static exit_handle_fn arm_exit_handlers[] = {
+ 	[0 ... ESR_ELx_EC_MAX]	= kvm_handle_unknown_ec,
+ 	[ESR_ELx_EC_WFx]	= kvm_handle_wfx,
+@@ -159,6 +166,7 @@ static exit_handle_fn arm_exit_handlers[] = {
+ 	[ESR_ELx_EC_HVC64]	= handle_hvc,
+ 	[ESR_ELx_EC_SMC64]	= handle_smc,
+ 	[ESR_ELx_EC_SYS64]	= kvm_handle_sys_reg,
++	[ESR_ELx_EC_SVE]	= handle_sve,
+ 	[ESR_ELx_EC_IABT_LOW]	= kvm_handle_guest_abort,
+ 	[ESR_ELx_EC_DABT_LOW]	= kvm_handle_guest_abort,
+ 	[ESR_ELx_EC_SOFTSTP_LOW]= kvm_handle_guest_debug,
 -- 
 2.1.4
