@@ -1,78 +1,139 @@
 From: al.kochet@gmail.com (Alexander Kochetkov)
-Date: Wed, 22 Mar 2017 18:48:31 +0300
-Subject: [PATCH v7 4/7] ARM: dts: rockchip: add clockevent attribute to
- rockchip timers
+Date: Wed, 22 Mar 2017 18:48:28 +0300
+Subject: [PATCH v7 1/7] clocksource/drivers/clksrc-evt-probe: Describe with
+ the DT both the clocksource and the clockevent
 In-Reply-To: <1490197714-25415-1-git-send-email-al.kochet@gmail.com>
 References: <1490197714-25415-1-git-send-email-al.kochet@gmail.com>
-Message-ID: <1490197714-25415-5-git-send-email-al.kochet@gmail.com>
+Message-ID: <1490197714-25415-2-git-send-email-al.kochet@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All rockchip timers present in the DT act as clockevent.
-It is possible to specify timer role using DT attribute.
-Mark them accordingly.
+From: Daniel Lezcano <daniel.lezcano@linaro.org>
 
-Also this patch specify that for timer should be called init
-function specified with CLOCKEVENT_OF_DECLARE().
+The CLOCKSOURCE_OF_DECLARE() was introduced before the
+CLOCKEVENT_OF_DECLARE() and that resulted in some abuse where the
+clockevent and the clocksource are both initialized in the same init
+routine.
 
-Without the commit boot warnings will appear because clock
-framework will try initialize them as clocksource.
+With the introduction of the CLOCKEVENT_OF_DECLARE(), the driver can
+now split the clocksource and the clockevent init code. However, the
+device tree may specify a single node, so the same node will be passed
+to the clockevent/clocksource's init function, with the same base
+address.
 
+with this patch it is possible to specify an attribute to the timer's node to
+specify if it is a clocksource or a clockevent and define two timers node.
+
+For example:
+
+        timer: timer at 98400000 {
+                compatible = "moxa,moxart-timer";
+                reg = <0x98400000 0x42>;
+                interrupts = <19 1>;
+                clocks = <&coreclk>;
+                clockevent;
+        };
+
+        timer: timer at 98400010 {
+                compatible = "moxa,moxart-timer";
+                reg = <0x98400010 0x42>;
+                clocks = <&coreclk>;
+                clocksource;
+        };
+
+With this approach, we allow a mechanism to clearly define a clocksource or a
+clockevent without aerobatics we can find around in some drivers:
+	timer-sp804.c, arc-timer.c, dw_apb_timer_of.c, mps2-timer.c,
+	renesas-ostm.c, time-efm32.c, time-lpc32xx.c.
+
+Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 Signed-off-by: Alexander Kochetkov <al.kochet@gmail.com>
 ---
- arch/arm/boot/dts/rk3036.dtsi            |    1 +
- arch/arm/boot/dts/rk322x.dtsi            |    1 +
- arch/arm/boot/dts/rk3288.dtsi            |    1 +
- arch/arm64/boot/dts/rockchip/rk3368.dtsi |    1 +
- 4 files changed, 4 insertions(+)
+ Documentation/devicetree/bindings/timer/timer.txt |   38 +++++++++++++++++++++
+ drivers/clocksource/clkevt-probe.c                |    7 ++++
+ drivers/clocksource/clksrc-probe.c                |    7 ++++
+ 3 files changed, 52 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/timer/timer.txt
 
-diff --git a/arch/arm/boot/dts/rk3036.dtsi b/arch/arm/boot/dts/rk3036.dtsi
-index 843d2be..a04bb5a 100644
---- a/arch/arm/boot/dts/rk3036.dtsi
-+++ b/arch/arm/boot/dts/rk3036.dtsi
-@@ -353,6 +353,7 @@
- 		interrupts = <GIC_SPI 28 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&xin24m>, <&cru PCLK_TIMER>;
- 		clock-names = "timer", "pclk";
+diff --git a/Documentation/devicetree/bindings/timer/timer.txt b/Documentation/devicetree/bindings/timer/timer.txt
+new file mode 100644
+index 0000000..f1ee0cf
+--- /dev/null
++++ b/Documentation/devicetree/bindings/timer/timer.txt
+@@ -0,0 +1,38 @@
++
++Specifying timer information for devices
++========================================
++
++The timer can be declared via the macro:
++
++CLOCKSOURCE_OF_DECLARE(name, init) if it is a clocksource
++CLOCKEVENT_OF_DECLARE(name, init) if it is a clockevent
++
++The CLOCKSOURCE_OF_DECLARE() was introduced before the
++CLOCKEVENT_OF_DECLARE() and that resulted in some abuse where the
++clockevent and the clocksource are both initialized in the same init
++routine.
++
++With the introduction of the CLOCKEVENT_OF_DECLARE(), the driver can
++now split the clocksource and the clockevent init code. However, the
++device tree may specify a single node, so the same node will be passed
++to the clockevent/clocksource's init function, with the same base
++address. It is possible to specify an attribute to the timer's node to
++specify if it is a clocksource or a clockevent and define two timers
++node.
++
++Example:
++
++	timer: timer at 98400000 {
++		compatible = "moxa,moxart-timer";
++		reg = <0x98400000 0x42>;
++		interrupts = <19 1>;
++		clocks = <&coreclk>;
 +		clockevent;
- 	};
++	};
++
++	timer: timer at 98400010 {
++		compatible = "moxa,moxart-timer";
++		reg = <0x98400010 0x42>;
++		clocks = <&coreclk>;
++		clocksource;
++	};
+diff --git a/drivers/clocksource/clkevt-probe.c b/drivers/clocksource/clkevt-probe.c
+index eb89b50..fa02ac1 100644
+--- a/drivers/clocksource/clkevt-probe.c
++++ b/drivers/clocksource/clkevt-probe.c
+@@ -37,6 +37,13 @@ int __init clockevent_probe(void)
  
- 	pwm0: pwm at 20050000 {
-diff --git a/arch/arm/boot/dts/rk322x.dtsi b/arch/arm/boot/dts/rk322x.dtsi
-index 2a4eee2..2250640 100644
---- a/arch/arm/boot/dts/rk322x.dtsi
-+++ b/arch/arm/boot/dts/rk322x.dtsi
-@@ -328,6 +328,7 @@
- 		interrupts = <GIC_SPI 43 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&xin24m>, <&cru PCLK_TIMER>;
- 		clock-names = "timer", "pclk";
-+		clockevent;
- 	};
+ 		init_func = match->data;
  
- 	cru: clock-controller at 110e0000 {
-diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-index 91c4b3c..f45b7ad 100644
---- a/arch/arm/boot/dts/rk3288.dtsi
-+++ b/arch/arm/boot/dts/rk3288.dtsi
-@@ -217,6 +217,7 @@
- 		interrupts = <GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&xin24m>, <&cru PCLK_TIMER>;
- 		clock-names = "timer", "pclk";
-+		clockevent;
- 	};
++		/*
++		 * The device node describes a clocksource, ignore it
++		 * as we are in the clockevent init routine.
++		 */
++		if (of_property_read_bool(np, "clocksource"))
++			continue;
++
+ 		ret = init_func(np);
+ 		if (ret) {
+ 			pr_warn("Failed to initialize '%s' (%d)\n",
+diff --git a/drivers/clocksource/clksrc-probe.c b/drivers/clocksource/clksrc-probe.c
+index bc62be9..ce50f33 100644
+--- a/drivers/clocksource/clksrc-probe.c
++++ b/drivers/clocksource/clksrc-probe.c
+@@ -38,6 +38,13 @@ void __init clocksource_probe(void)
  
- 	display-subsystem {
-diff --git a/arch/arm64/boot/dts/rockchip/rk3368.dtsi b/arch/arm64/boot/dts/rockchip/rk3368.dtsi
-index 4f44d11..054dadd 100644
---- a/arch/arm64/boot/dts/rockchip/rk3368.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3368.dtsi
-@@ -673,6 +673,7 @@
- 		compatible = "rockchip,rk3368-timer", "rockchip,rk3288-timer";
- 		reg = <0x0 0xff810000 0x0 0x20>;
- 		interrupts = <GIC_SPI 66 IRQ_TYPE_LEVEL_HIGH>;
-+		clockevent;
- 	};
+ 		init_func_ret = match->data;
  
- 	gic: interrupt-controller at ffb71000 {
++		/*
++		 * The device node describes a clockevent, ignore it
++		 * as we are in the clocksource init routine.
++		 */
++		if (of_property_read_bool(np, "clockevent"))
++			continue;
++
+ 		ret = init_func_ret(np);
+ 		if (ret) {
+ 			pr_err("Failed to initialize '%s': %d",
 -- 
 1.7.9.5
