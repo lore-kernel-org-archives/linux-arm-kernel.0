@@ -1,34 +1,83 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Wed, 22 Mar 2017 17:47:41 +0100
-Subject: [PATCH] ARM: dts: rockchip: increase SD clock frequency on Radxa
- Rock
-In-Reply-To: <1490110822-3310-1-git-send-email-al.kochet@gmail.com>
-References: <1490110822-3310-1-git-send-email-al.kochet@gmail.com>
-Message-ID: <1978752.xjtBqdMt97@phil>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 22 Mar 2017 16:48:10 +0000
+Subject: [RFC PATCH v2 21/41] arm64/sve: Enable SVE on demand for userspace
+In-Reply-To: <1490194274-30569-22-git-send-email-Dave.Martin@arm.com>
+References: <1490194274-30569-1-git-send-email-Dave.Martin@arm.com>
+ <1490194274-30569-22-git-send-email-Dave.Martin@arm.com>
+Message-ID: <20170322164809.GC19950@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-Am Dienstag, 21. M?rz 2017, 18:40:22 CET schrieb Alexander Kochetkov:
-> The patch set SD clock frequency to maximum possible to SD-card
-> (50MHz). This change actual clock frequency from 32MHz to 48MHz
-> (speedup 1.5X).
-> 
-> Banner line before patch: 'mmc_host mmc0: Bus speed (slot 0) = 32000000Hz
-> (slot req 50000000Hz, actual 32000000HZ div = 0)'.
-> Banner line after patch: 'mmc_host mmc0: Bus speed (slot 0) = 96000000Hz
-> (slot req 50000000Hz, actual 48000000HZ div = 1)'
-> 
-> Signed-off-by: Alexander Kochetkov <al.kochet@gmail.com>
+On Wed, Mar 22, 2017 at 02:50:51PM +0000, Dave Martin wrote:
+> This patch tracks whether a task has ever attempted to use the
+> Scalable Vector Extension.  If and only if SVE is in use by a task,
+> it will be enabled for userspace when scheduling the task in.  For
+> other tasks, SVE is disabled when scheduling in.
 
-sorry, but I will not apply this patch at this time.
+>  #define TIF_SYSCALL_AUDIT	9
+>  #define TIF_SYSCALL_TRACEPOINT	10
+>  #define TIF_SECCOMP		11
+> +#define TIF_SVE			17	/* Scalable Vector Extension in use */
 
-When testing on my radxarock with the card I always use upon entering the 
-rootfs everything explodes with -110 errors, while without that patch the card 
-runs stable as far as I can tell.
+Please don't skip ahead to bit 17. I see why you're doing that, but I
+don't think that's a good idea. More on that below.
 
-I also don't have the time to investigate further right now though.
+> +void do_sve_acc(unsigned int esr, struct pt_regs *regs)
+> +{
+> +	unsigned long tmp;
+> +
+> +	if (test_and_set_thread_flag(TIF_SVE))
+> +		BUG();
+> +
+> +	asm ("mrs %0, cpacr_el1" : "=r" (tmp));
+> +	asm volatile ("msr cpacr_el1, %0" :: "r" (tmp | (1 << 17)));
 
+Please de-magic the number, e.g. with something like:
 
-Heiko
+#define CPACR_SVE_EN	(1 << 17)
+
+... in <asm/sysreg.h>.
+
+Please also use {read,write}_sysreg(), e.g.
+
+	val = read_sysreg(cpacr_el1);
+	tmp |= CPACR_SVE_EN;
+	write_sysreg(tmp, cpacr_el1);
+
+[...]
+
+> +		if (IS_ENABLED(CONFIG_ARM64_SVE)) {
+> +			/*
+> +			 * Flip SVE enable for userspace if it doesn't
+> +			 * match the current_task.
+> +			 */
+> +			asm ("mrs %0, cpacr_el1" : "=r" (tmp));
+> +			flags = current_thread_info()->flags;
+> +			if ((tmp ^ (unsigned long)flags) & (1 << 17)) {
+> +				tmp ^= 1 << 17;
+> +				asm volatile ("msr cpacr_el1, %0" :: "r" (tmp));
+> +			}
+
+I think it's a bad idea to rely on the TIF flag and CPACR bit to have
+the same index. It makes this painful to read, and it leaves us fragile
+if the TIF bits are reorganised.
+
+How about:
+
+	unsigned long cpacr = read_sysreg(cpacr_el1);
+	bool hw_enabled = !!(cpacr & CPACR_SVE_EN);
+	bool sw_enabled = test_thread_flag(TIF_SVE);
+
+	/*
+	 * Flip SVE enable for userspace if it doesn't
+	 * match the current_task.
+	 */
+	if (hw_enabled != sw_enabled) {
+		cpacr ^= CPACR_SVE_EN;
+		write_sysreg(cpacr, cpacr_el1);
+	}
+
+Thanks,
+Mark.
