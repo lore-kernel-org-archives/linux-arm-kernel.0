@@ -1,31 +1,35 @@
-From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Thu, 23 Mar 2017 00:05:17 +0530
-Subject: [PATCH v7 1/3] Input: max11801_ts: Add missing of_match_table
-In-Reply-To: <20170322183039.GA2899@dtor-ws>
-References: <1490180808-2856-1-git-send-email-jagan@openedev.com>
- <20170322183039.GA2899@dtor-ws>
-Message-ID: <CAMty3ZApz+GVkeoT4-75tiJcn6-CxkzdOrMcH7hjK1k2Ht=ZUQ@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 22 Mar 2017 18:35:13 +0000
+Subject: [PATCH 00/15] arm64/kvm: use common sysreg definitions
+In-Reply-To: <20170310183555.GB6271@arm.com>
+References: <1489079247-31092-1-git-send-email-mark.rutland@arm.com>
+ <87a88tv94d.fsf@on-the-bus.cambridge.arm.com>
+ <20170310183555.GB6271@arm.com>
+Message-ID: <20170322183512.GB27921@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 23, 2017 at 12:00 AM, Dmitry Torokhov
-<dmitry.torokhov@gmail.com> wrote:
-> On Wed, Mar 22, 2017 at 04:36:46PM +0530, Jagan Teki wrote:
->> From: Jagan Teki <jagan@amarulasolutions.com>
->>
->> Added missing of_match_table for max11801_ts driver with
->> compatible as "maxim,max11801_ts"
->>
->
-> Why not "maxim,max11801"? Also, I think we'd need a binding document.
+Hi,
 
-Compatibility purpose to make this is for touchscreen and few of other
-*_ts.c files follow the same, and added binding documentation in 2/3
-patch.
+On Fri, Mar 10, 2017 at 06:35:55PM +0000, Will Deacon wrote:
+> On Fri, Mar 10, 2017 at 08:17:22AM +0000, Marc Zyngier wrote:
 
-thanks!
--- 
-Jagan Teki
-Senior Linux Kernel Engineer | Amarula Solutions
-U-Boot, Linux | Upstream Maintainer
-Hyderabad, India.
+> > The next question is how do we merge this. Obviously, we can't split it
+> > between trees, and this is very likely to clash with anything that we
+> > will merge on the KVM side (the sysreg table is a popular place).
+> > 
+> > Will, Catalin: Would it make sense to create a stable branch with these
+> > patches, and merge it into both the arm64 and KVM trees? That'd make
+> > things easier...
+> 
+> I think the scope for conflict on our side is pretty high too, so a shared
+> branch might be the best way to go. I don't want to branch just yet though,
+> so I'll probably wait a week or so before setting something in stone.
+
+Any further thoughts on this?
+
+Christoffer has Acked the KVM bits, so if you're happy to do so for the
+arm64 bits I can make a stable branch.
+
+Thanks,
+Mark.
