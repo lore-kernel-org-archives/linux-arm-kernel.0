@@ -1,54 +1,38 @@
 From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Wed, 22 Mar 2017 14:50:20 +0100
-Subject: [PATCH v1 3/5] ARM: dts: stm32ap: Add watchdog support for
- STM32F429 SoC
-In-Reply-To: <1490189786-19232-4-git-send-email-yannick.fertre@st.com>
+Date: Wed, 22 Mar 2017 14:51:12 +0100
+Subject: [PATCH v1 4/5] ARM: dts: stm32ap: Add watchdog support for
+ STM32F429 eval board
+In-Reply-To: <1490189786-19232-5-git-send-email-yannick.fertre@st.com>
 References: <1490189786-19232-1-git-send-email-yannick.fertre@st.com>
- <1490189786-19232-4-git-send-email-yannick.fertre@st.com>
-Message-ID: <70b47d08-9628-f0c6-094f-c3712527bda8@st.com>
+ <1490189786-19232-5-git-send-email-yannick.fertre@st.com>
+Message-ID: <877e3dbb-780c-1ece-04e1-594e8f783a5e@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi
 
 On 03/22/2017 02:36 PM, Yannick Fertre wrote:
-> Signed-off-by: Yannick FERTRE <yannick.fertre@st.com>
+> Signed-off-by: Yannick Fertre <yannick.fertre@st.com>
 > ---
 
-Please add a commit message, and change commit header as following:
+Please add a commit message and change commit header as following:
 
-ARM: dts: stm32: ...
+ARM: dts: stm32: .....
 
->  arch/arm/boot/dts/stm32f429.dtsi | 9 ++++++++-
->  1 file changed, 8 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm/boot/dts/stm32f429.dtsi b/arch/arm/boot/dts/stm32f429.dtsi
-> index ee0da97..148273b 100644
-> --- a/arch/arm/boot/dts/stm32f429.dtsi
-> +++ b/arch/arm/boot/dts/stm32f429.dtsi
-> @@ -65,7 +65,7 @@
->  			clock-frequency = <32768>;
->  		};
->
-> -		clk-lsi {
-> +		clk_lsi: clk-lsi {
->  			#clock-cells = <0>;
->  			compatible = "fixed-clock";
->  			clock-frequency = <32000>;
-> @@ -812,6 +812,13 @@
->  			clocks = <&rcc 0 STM32F4_AHB2_CLOCK(RNG)>;
->
->  		};
-> +
-> +		iwdg: iwdg at 40003000 {
-Please try to keep nodes ordered.
 
-> +			compatible = "st,stm32-iwdg";
-> +			reg = <0x40003000 0x400>;
-> +			clocks = <&clk_lsi>;
-> +			status = "disabled";
-> +		};
->  	};
+>  arch/arm/boot/dts/stm32429i-eval.dts | 4 ++++
+>  1 file changed, 4 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/stm32429i-eval.dts b/arch/arm/boot/dts/stm32429i-eval.dts
+> index 3c99466..aab81ed 100644
+> --- a/arch/arm/boot/dts/stm32429i-eval.dts
+> +++ b/arch/arm/boot/dts/stm32429i-eval.dts
+> @@ -181,3 +181,7 @@
+>  	pinctrl-names = "default";
+>  	status = "okay";
 >  };
->
+> +
+> +&iwdg {
+> +	status = "okay";
+> +};
 >
