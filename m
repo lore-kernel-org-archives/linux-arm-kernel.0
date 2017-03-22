@@ -1,66 +1,44 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 22 Mar 2017 14:32:32 +0100
-Subject: [PATCH v6 4/4] clk: samsung: exynos-audss: Use runtime PM
-In-Reply-To: <CAPDyKFrL9pvGQw+09rP52p72FqKuh6rLNt0NEUZ-TFxU838Nzw@mail.gmail.com>
-References: <CGME20170322113556eucas1p1b3434935701aba1db7868415a9c3b4f9@eucas1p1.samsung.com>
- <1490182543-28550-1-git-send-email-m.szyprowski@samsung.com>
- <1490182543-28550-5-git-send-email-m.szyprowski@samsung.com>
- <CAPDyKFrL9pvGQw+09rP52p72FqKuh6rLNt0NEUZ-TFxU838Nzw@mail.gmail.com>
-Message-ID: <42b06c10-4a80-ed62-a120-e6b86b2af0b2@samsung.com>
+From: yannick.fertre@st.com (Yannick Fertre)
+Date: Wed, 22 Mar 2017 14:36:24 +0100
+Subject: [PATCH v1 3/5] ARM: dts: stm32ap: Add watchdog support for STM32F429
+ SoC
+In-Reply-To: <1490189786-19232-1-git-send-email-yannick.fertre@st.com>
+References: <1490189786-19232-1-git-send-email-yannick.fertre@st.com>
+Message-ID: <1490189786-19232-4-git-send-email-yannick.fertre@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ulf,
+Signed-off-by: Yannick FERTRE <yannick.fertre@st.com>
+---
+ arch/arm/boot/dts/stm32f429.dtsi | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
 
-On 2017-03-22 13:00, Ulf Hansson wrote:
-> On 22 March 2017 at 12:35, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
->> This patch adds support for runtime PM to Exynos Audio SubSystem driver to
->> enable full support for audio power domain on Exynos5 SoCs. The main change
->> is moving register saving and restoring code from system sleep PM ops to
->> runtime PM ops and implementing system sleep PM ops with generic
->> pm_runtime_force_suspend/resume helpers. Runtime PM of the Exynos AudSS
->> device is managed from clock core depending on the preparation status
->> of the provided clocks.
->>
->> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
->
-> Minor nitpick below.
->
-> [...]
->
->> -#ifdef CONFIG_PM_SLEEP
->>   static unsigned long reg_save[][2] = {
->>          { ASS_CLK_SRC,  0 },
->>          { ASS_CLK_DIV,  0 },
->>          { ASS_CLK_GATE, 0 },
->>   };
->>
->> -static int exynos_audss_clk_suspend(struct device *dev)
->> +static int __maybe_unused exynos_audss_clk_suspend(struct device *dev)
-> Instead of using "__maybe_unused", I would rather change from
-> "CONFIG_PM_SLEEP" to "CONFIG_PM". However, no strong opinion.
->
-> Perhaps you need something like this for patch 3/4 as well?
-
-Frankly, this matters only for compile-time tests. All Exynos platforms
-require CONFIG_PM, so that code will be always used in runtime.
-
-For compile-time tests probably it is better to use __maybe_unused approach
-to have higher coverage.
-
->>   {
->>          int i;
->>
->> @@ -54,7 +54,7 @@ static int exynos_audss_clk_suspend(struct device *dev)
->>          return 0;
->>   }
-> [...]
->
-> Kind regards
-> Uffe
-
-Best regards
+diff --git a/arch/arm/boot/dts/stm32f429.dtsi b/arch/arm/boot/dts/stm32f429.dtsi
+index ee0da97..148273b 100644
+--- a/arch/arm/boot/dts/stm32f429.dtsi
++++ b/arch/arm/boot/dts/stm32f429.dtsi
+@@ -65,7 +65,7 @@
+ 			clock-frequency = <32768>;
+ 		};
+ 
+-		clk-lsi {
++		clk_lsi: clk-lsi {
+ 			#clock-cells = <0>;
+ 			compatible = "fixed-clock";
+ 			clock-frequency = <32000>;
+@@ -812,6 +812,13 @@
+ 			clocks = <&rcc 0 STM32F4_AHB2_CLOCK(RNG)>;
+ 
+ 		};
++
++		iwdg: iwdg at 40003000 {
++			compatible = "st,stm32-iwdg";
++			reg = <0x40003000 0x400>;
++			clocks = <&clk_lsi>;
++			status = "disabled";
++		};
+ 	};
+ };
+ 
 -- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+1.9.1
