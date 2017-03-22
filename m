@@ -1,91 +1,64 @@
-From: dongas86@gmail.com (Dong Aisheng)
-Date: Thu, 23 Mar 2017 08:47:39 +0800
-Subject: [PATCH 4/8] soc: imx: gpc: fix imx6sl gpc power domain regression
-In-Reply-To: <1490172370.2895.34.camel@pengutronix.de>
-References: <1489990547-1510-1-git-send-email-aisheng.dong@nxp.com>
- <1489990547-1510-5-git-send-email-aisheng.dong@nxp.com>
- <1490001974.2895.11.camel@pengutronix.de>
- <20170322192356.GC16264@b29396-OptiPlex-7040>
- <1490172370.2895.34.camel@pengutronix.de>
-Message-ID: <20170323004739.GE16264@b29396-OptiPlex-7040>
+From: jnair@caviumnetworks.com (Jayachandran C)
+Date: Wed, 22 Mar 2017 08:51:09 +0000
+Subject: [PATCH v3 0/2] Handle Cavium ThunderX2 PCI topology quirk
+Message-ID: <1490172671-2648-1-git-send-email-jnair@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 22, 2017 at 09:46:10AM +0100, Lucas Stach wrote:
-> Am Donnerstag, den 23.03.2017, 03:23 +0800 schrieb Dong Aisheng:
-> > On Mon, Mar 20, 2017 at 10:26:14AM +0100, Lucas Stach wrote:
-> > > Am Montag, den 20.03.2017, 14:15 +0800 schrieb Dong Aisheng:
-> > > > Commit 721cabf6c660 ("soc: imx: move PGC handling to a new GPC driver")
-> > > > broke the MX6SL GPC power domain support.
-> > > > It always got the following error:
-> > > > [    1.248364] imx-gpc 20dc000.gpc: could not find pgc DT node
-> > > > This patch adds back the legecy support.
-> > > 
-> > > This patch removes a safeguard against abusing the old binding for new
-> > > SoCs. Please leave this check in place and instead loosen the check to
-> > > also allow the old i.MX6SL binding.
-> > > 
-> > 
-> > Thanks for the reminder.
-> > I found beside the checking, we probably also need some extra fix that
-> > the current imx_gpc_old_dt_init() only supports two domains while the
-> > driver formerly supports three for MX6SL.
-> > 
-> > And because the num_domains is defined by driver itself, no need check
-> > in imx_gpc_old_dt_init() anymore.
-> > 
-> > The patch would be as follows:
-> > diff --git a/drivers/soc/imx/gpc.c b/drivers/soc/imx/gpc.c
-> > index 4885ec2..6a806a1 100644
-> > --- a/drivers/soc/imx/gpc.c
-> > +++ b/drivers/soc/imx/gpc.c
-> > @@ -303,10 +303,13 @@ static struct genpd_onecell_data imx_gpc_onecell_data = {
-> >  
-> >  static int imx_gpc_old_dt_init(struct device *dev, struct regmap *regmap)
-> >  {
-> > +       const struct of_device_id *of_id =
-> > +                       of_match_device(imx_gpc_dt_ids, dev);
-> > +       const struct imx_gpc_dt_data *of_id_data = of_id->data;
-> >         struct imx_pm_domain *domain;
-> >         int i, ret;
-> >  
-> > -       for (i = 0; i < 2; i++) {
-> > +       for (i = 0; i < of_id_data->num_domains; i++) {
-> >                 domain = &imx_gpc_domains[i];
-> >                 domain->regmap = regmap;
-> >                 domain->ipg_rate_mhz = 66;
-> > @@ -324,7 +327,7 @@ static int imx_gpc_old_dt_init(struct device *dev, struct regmap *regmap)
-> >                 }
-> >         }
-> >  
-> > -       for (i = 0; i < 2; i++)
-> > +       for (i = 0; i < of_id_data->num_domains; i++)
-> >                 pm_genpd_init(&imx_gpc_domains[i].base, NULL, false);
-> >  
-> >         if (IS_ENABLED(CONFIG_PM_GENERIC_DOMAINS)) {
-> > @@ -337,7 +340,7 @@ static int imx_gpc_old_dt_init(struct device *dev, struct regmap *regmap)
-> >         return 0;
-> >  
-> >  genpd_err:
-> > -       for (i = 0; i < 2; i++)
-> > +       for (i = 0; i < of_id_data->num_domains; i++)
-> >                 pm_genpd_remove(&imx_gpc_domains[i].base);
-> >         imx_pgc_put_clocks(&imx_gpc_domains[1]);
-> >  clk_err:
-> > 
-> > Do you think it's ok?
-> > 
-> I don't like the redundant of_match_id. Please just pass num_domains as
-> a parameter to imx_gpc_old_dt_init(). Otherwise this looks good.
-> 
+Hi Bjorn, Alex,
 
-Yes, of course, will update it.
+Here is v3 of the patchset to handle the PCIe topology quirk of
+Cavium ThunderX2 (previously called Broadcom Vulcan).
 
-Thanks for the suggestion.
+The earlier discussions on this can be seen at:
+http://www.spinics.net/lists/linux-pci/msg51001.html
+https://patchwork.ozlabs.org/patch/582633/ and
+https://lists.linuxfoundation.org/pipermail/iommu/2016-June/017681.html
 
-Regards
-Dong Aisheng
+The earlier discussion on this patchset had stalled with a suggestion
+that it may be possible to fix up this quirk by handling the issue in
+the function argument of pci_for_each_dma_alias(). But at that point
+all the ACPI and OF code for SMMU and GIC was to merged, and we did not
+have reasonable codebase to make the changes.
 
-> Regards,
-> Lucas
-> 
+For 4.11, I tried to fix it in both the SMMU and the GIC ITS code based
+on this suggestion, but after going thru the effort, that does not look
+like the right approach. I have the code changes at:
+https://github.com/jchandra-cavm/linux/commits/rid-xlate-fixup
+if anyone want to look over the code.
+
+The problems with that approach is:
+ - of the 14 uses of pci_for_each_dma_alias in the function in the kernel
+   tree, I have to fixup 6 callers (which is all but one ofthe callers
+   outside x86)
+ - 4 of these can be reasonably handled (please see the github repo above),
+   but the calls in drivers/irqchip/irq-gic-v3-its-pci-msi.c and
+   drivers/iommu/iommu.c cannot be reasonably fixed up.
+ - Even without the 2 above two changes I can get it to work for now.
+   But pci_for_each_dma_alias does not work as expected on this platform
+   and we have to be aware of that for all future uses of the function.
+  
+For now, I have ruled out that approach, and I have rebased the earlier
+patch on to 4.11-rc and submitting again for review. The changes are:
+
+v2>v3:
+ - changed device flag name from PCI_DEV_FLAGS_DMA_ALIAS_ROOT to
+   PCI_DEV_FLAGS_BRIDGE_XLATE_ROOT
+ - updated commit message to make the quirk clearer.
+
+Let me know your comments and suggestions.
+
+Thanks,
+JC.
+
+Jayachandran C (2):
+  PCI: Add device flag PCI_DEV_FLAGS_BRIDGE_XLATE_ROOT
+  PCI: quirks: Fix ThunderX2 dma alias handling
+
+ drivers/pci/quirks.c | 14 ++++++++++++++
+ drivers/pci/search.c |  4 ++++
+ include/linux/pci.h  |  2 ++
+ 3 files changed, 20 insertions(+)
+
+-- 
+2.7.4
