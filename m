@@ -1,35 +1,46 @@
 From: al.kochet@gmail.com (Alexander Kochetkov)
-Date: Wed, 22 Mar 2017 18:48:30 +0300
-Subject: [PATCH v7 3/7] ARM: dts: rockchip: update compatible property for
- rk322x timer
+Date: Wed, 22 Mar 2017 18:48:29 +0300
+Subject: [PATCH v7 2/7] dt-bindings: clarify compatible property for rockchip
+ timers
 In-Reply-To: <1490197714-25415-1-git-send-email-al.kochet@gmail.com>
 References: <1490197714-25415-1-git-send-email-al.kochet@gmail.com>
-Message-ID: <1490197714-25415-4-git-send-email-al.kochet@gmail.com>
+Message-ID: <1490197714-25415-3-git-send-email-al.kochet@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Property set to '"rockchip,rk3228-timer", "rockchip,rk3288-timer"'
-to match devicetree bindings.
+Make all properties description in form '"rockchip,<chip>-timer",
+"rockchip,rk3288-timer"' for all chips found in linux kernel.
 
-Signed-off-by: Alexander Kochetkov <al.kochet@gmail.com>
 Suggested-by: Heiko St?bner <heiko@sntech.de>
+Signed-off-by: Alexander Kochetkov <al.kochet@gmail.com>
+Acked-by: Rob Herring <robh@kernel.org>
 Reviewed-by: Heiko Stuebner <heiko@sntech.de>
 ---
- arch/arm/boot/dts/rk322x.dtsi |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ .../bindings/timer/rockchip,rk-timer.txt           |   12 +++++++++---
+ 1 file changed, 9 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/rk322x.dtsi b/arch/arm/boot/dts/rk322x.dtsi
-index 9e6bf0e..2a4eee2 100644
---- a/arch/arm/boot/dts/rk322x.dtsi
-+++ b/arch/arm/boot/dts/rk322x.dtsi
-@@ -323,7 +323,7 @@
- 	};
+diff --git a/Documentation/devicetree/bindings/timer/rockchip,rk-timer.txt b/Documentation/devicetree/bindings/timer/rockchip,rk-timer.txt
+index a41b184..16a5f45 100644
+--- a/Documentation/devicetree/bindings/timer/rockchip,rk-timer.txt
++++ b/Documentation/devicetree/bindings/timer/rockchip,rk-timer.txt
+@@ -1,9 +1,15 @@
+ Rockchip rk timer
  
- 	timer: timer at 110c0000 {
--		compatible = "rockchip,rk3288-timer";
-+		compatible = "rockchip,rk3228-timer", "rockchip,rk3288-timer";
- 		reg = <0x110c0000 0x20>;
- 		interrupts = <GIC_SPI 43 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&xin24m>, <&cru PCLK_TIMER>;
+ Required properties:
+-- compatible: shall be one of:
+-  "rockchip,rk3288-timer" - for rk3066, rk3036, rk3188, rk322x, rk3288, rk3368
+-  "rockchip,rk3399-timer" - for rk3399
++- compatible: should be:
++  "rockchip,rk3036-timer", "rockchip,rk3288-timer": for Rockchip RK3036
++  "rockchip,rk3066-timer", "rockchip,rk3288-timer": for Rockchip RK3066
++  "rockchip,rk3188-timer", "rockchip,rk3288-timer": for Rockchip RK3188
++  "rockchip,rk3228-timer", "rockchip,rk3288-timer": for Rockchip RK3228
++  "rockchip,rk3229-timer", "rockchip,rk3288-timer": for Rockchip RK3229
++  "rockchip,rk3288-timer": for Rockchip RK3288
++  "rockchip,rk3368-timer", "rockchip,rk3288-timer": for Rockchip RK3368
++  "rockchip,rk3399-timer": for Rockchip RK3399
+ - reg: base address of the timer register starting with TIMERS CONTROL register
+ - interrupts: should contain the interrupts for Timer0
+ - clocks : must contain an entry for each entry in clock-names
 -- 
 1.7.9.5
