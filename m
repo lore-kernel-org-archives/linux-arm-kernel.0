@@ -1,53 +1,47 @@
-From: claudiu.beznea@microchip.com (Claudiu Beznea)
-Date: Wed, 22 Mar 2017 15:29:35 +0200
-Subject: [PATCH v3 2/2] drivers: pwm: pwm-atmel: enable PWM on sama5d2
-In-Reply-To: <1490189375-20384-1-git-send-email-claudiu.beznea@microchip.com>
-References: <1490189375-20384-1-git-send-email-claudiu.beznea@microchip.com>
-Message-ID: <1490189375-20384-3-git-send-email-claudiu.beznea@microchip.com>
+From: fisaksen@baylibre.com (Frode Isaksen)
+Date: Wed, 22 Mar 2017 14:30:01 +0100
+Subject: [PATCH 3/8] spi: davinci: limit the transfer size if DMA enabled
+In-Reply-To: <c85c9e88-c40b-88b3-f47d-6d5f5cc1fa00@ti.com>
+References: <1486740584-17875-1-git-send-email-fisaksen@baylibre.com>
+ <1486740584-17875-4-git-send-email-fisaksen@baylibre.com>
+ <a17cca3a-d029-a2cd-583c-2672287d191c@ti.com>
+ <b4d8bd90-cd33-560f-5102-20c2375dac70@ti.com>
+ <44a615b6-97ab-0ab8-c2ba-013fdd40ffd7@baylibre.com>
+ <95c7bc96-2de9-043d-880e-4de9f0b2308a@ti.com>
+ <c85c9e88-c40b-88b3-f47d-6d5f5cc1fa00@ti.com>
+Message-ID: <e6930698-b843-1ed0-d621-879e0b8bacb7@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-sama5d2 can use the same atmel_pwm_data as sama5d3.
 
-Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
-Acked-by: Rob Herring <robh@kernel.org>
 
----
-Changes since v2:
-- the variable name used to initialize the .data member of
-the of_device_id was renamed to atmel_pwm_regs_v2 to be
-consistent with the approach from the first patch from
-this series
+On 22/03/2017 13:20, Peter Ujfalusi wrote:
+> On 03/22/2017 01:35 PM, Sekhar Nori wrote:
+>> On Wednesday 22 March 2017 04:41 PM, Frode Isaksen wrote:
+>> I guess this means that most IPs continue to get more missed sync events
+>> even after the first sync event is generated at end of MAX_NR_SG PaRAMs.
+>> And may be even that first sync event miss is a problem because the IP
+>> does not pause and ends up shifting data in the shift register anyway.
+>>
+>> If this is so broken, should edma driver not refuse to handle more than
+>> MAX_NR_SG for all transfers but mem-to-mem transfers?
+>
+> DM355, OMAP-L138, etc have only 128 paRAM slots. If we lift the restriction on
+> the number of paRAM slots a channel can take, then DMA will most likely going
+> to stop working: If any peripherals request 128 long SG transfer (and MMC
+> easily does that alone) then we will have no available paRAM slot for other
+> clients.
+>
+> It might be possible to start the paRAM slot update for the next batch already
+> when we have 1 or 2 slots to be processed, but that is going to be tricky and
+> not even reliable.
+Note that with SPI, a workaround for this issue has been found by using the rx
+buffer as the dummy tx buffer when doing read-only transfers (this is the case
+that fails). With this, the rx and tx paRAM slots are reconfigured at the same time.
 
- Documentation/devicetree/bindings/pwm/atmel-pwm.txt | 1 +
- drivers/pwm/pwm-atmel.c                             | 3 +++
- 2 files changed, 4 insertions(+)
-
-diff --git a/Documentation/devicetree/bindings/pwm/atmel-pwm.txt b/Documentation/devicetree/bindings/pwm/atmel-pwm.txt
-index 02331b9..c8c831d 100644
---- a/Documentation/devicetree/bindings/pwm/atmel-pwm.txt
-+++ b/Documentation/devicetree/bindings/pwm/atmel-pwm.txt
-@@ -4,6 +4,7 @@ Required properties:
-   - compatible: should be one of:
-     - "atmel,at91sam9rl-pwm"
-     - "atmel,sama5d3-pwm"
-+    - "atmel,sama5d2-pwm"
-   - reg: physical base address and length of the controller's registers
-   - #pwm-cells: Should be 3. See pwm.txt in this directory for a
-     description of the cells format.
-diff --git a/drivers/pwm/pwm-atmel.c b/drivers/pwm/pwm-atmel.c
-index f147154..530d7dc 100644
---- a/drivers/pwm/pwm-atmel.c
-+++ b/drivers/pwm/pwm-atmel.c
-@@ -312,6 +312,9 @@ static const struct of_device_id atmel_pwm_dt_ids[] = {
- 		.compatible = "atmel,sama5d3-pwm",
- 		.data = &atmel_pwm_regs_v2,
- 	}, {
-+		.compatible = "atmel,sama5d2-pwm",
-+		.data = &atmel_pwm_regs_v2,
-+	}, {
- 		/* sentinel */
- 	},
- };
--- 
-2.7.4
+Thanks,
+Frode
+>
+> Note: audio also sets limit on the number of periods to avoid this
+> reconfiguration of paRAM slots.
+>
