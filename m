@@ -1,83 +1,41 @@
-From: james.morse@arm.com (James Morse)
-Date: Wed, 22 Mar 2017 11:14:21 +0000
-Subject: [PATCH V11 10/10] arm/arm64: KVM: add guest SEA support
-In-Reply-To: <6eee7a67-808e-8712-2ec2-593eac52d921@huawei.com>
-References: <1487712121-16688-1-git-send-email-tbaicar@codeaurora.org>
- <1487712121-16688-11-git-send-email-tbaicar@codeaurora.org>
- <df6ba5dc-d93f-925a-46bf-1e1e209d17f3@huawei.com> <58B43092.6040401@arm.com>
- <6eee7a67-808e-8712-2ec2-593eac52d921@huawei.com>
-Message-ID: <58D25C8D.3070507@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 22 Mar 2017 11:15:15 +0000
+Subject: [PATCH] kvm: pass the virtual SEI syndrome to guest OS
+In-Reply-To: <CAFEAcA_NBvRQpuXJ2iZs_8n3b6920Z6E5ueuiAeF-4JCcqPRxQ@mail.gmail.com>
+References: <1489996534-8270-1-git-send-email-gengdongjiu@huawei.com>
+ <7055772d-2a20-6e0c-2bf8-204bc9ef52a5@arm.com>
+ <b912c293-4314-7c90-30a4-2f986feb1670@huawei.com>
+ <22fb583f-a33e-15f8-a059-fb112b27dd4f@arm.com> <58CFF058.8020205@arm.com>
+ <76795e20-2f20-1e54-cfa5-7444f28b18ee@huawei.com>
+ <20170321113428.GC15920@cbox> <58D17AF0.2010802@arm.com>
+ <20170321193933.GB31111@cbox>
+ <CAFEAcA_NBvRQpuXJ2iZs_8n3b6920Z6E5ueuiAeF-4JCcqPRxQ@mail.gmail.com>
+Message-ID: <f56cf420-affc-35f0-2355-801a924b8a35@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wang Xiongfeng,
-
-On 22/03/17 02:46, Xiongfeng Wang wrote:
->> Guests are a special case as QEMU may never access the faulty memory itself, so
->> it won't receive the 'late' signal. It looks like ARM/arm64 KVM lacks support
->> for KVM_PFN_ERR_HWPOISON which sends SIGBUS from KVM's fault-handling code. I
->> have patches to add support for this which I intend to send at rc1.
->>
->> [0] suggests 'KVM qemu' sets these MCE flags to take the 'early' path, but given
->> x86s KVM_PFN_ERR_HWPOISON, this may be out of date.
->>
->>
->> Either way, once QEMU gets a signal indicating the virtual address, it can
->> generate its own APEI CPER records and use the KVM APIs to mock up an
->> Synchronous External Abort, (or inject an IRQ or run the vcpu waiting for the
->> guest's polling thread to come round, whichever was described to the guest via
->> the HEST/GHES tables).
->>
+On 21/03/17 22:10, Peter Maydell wrote:
+> On 21 March 2017 at 19:39, Christoffer Dall <cdall@linaro.org> wrote:
+>> My confusion here comes from not thinking about QEMU or KVM as firmware,
+>> but as the machine, so it would be sort of like the functionality is
+>> baked into hardware rather than firmware.
 > 
-> I have another confusion about the SIGBUS signal. Can QEMU always get a SIGBUS when needed.
-> I know one circumstance which will send SIGBUS. The ghes_handle_memory_failure() in
-> ghes_do_proc() will send SIGBUS to QEMU, but this only happens when there exists memory section
-> in ghes, that is the section type is CPER_SEC_PLATFORM_MEM.
-> Suppose this case, an load  error in guest application causes an SEA, and the firmware take it.
-> The firmware begin to scan the error record and fill the ghes. But the error record in memory node
-> has been read by other handler.
+> There is precedent for that kind of thing -- we implement PSCI
+> in KVM/QEMU for the guest, though in real hardware it would be
+> provided by firmware at EL3.
 
-(this looks like a race)
+[probably vastly off topic]
 
-> The firmware won't add memory section in ghes, so ghes_handle_memory_failure() won't be called.
+In retrospect, I now believe this was a rather big mistake to implement
+PSCI in KVM.
 
-I think this would be a firmware bug. Firmware can reserve as much memory as it
-needs for writing CPER records, there should not be a case where 'the memory' is
-currently being processed by another handler.
-
-The memory firmware uses to write CPER records too shouldn't be published to the
-OS until it has finished. Once firmware has finished writing the CPER records it
-can update the memory pointed to by GHES->ErrorStatusAddress with the location
-of the CPER records and invoke the Notification method for this GHES. (SEI, SEA,
-IRQ etc). We should always get a complete set of CPER records to describe the error.
-
-It firmware uses GHESv2 it can get an 'ack' write from APEI once it has finished
-processing the records. Once it gets this firmware knows it can re-use the memory.
-
-(Obviously each GHES entry can only process one error at a time. Firmware should
-either handle this, or have one entry for each Error Source that can happen
-independently)
-
-
-> I mean that we may not rely on ghes_handle_memory_failure() to send SIGBUS to QEMU. Whether we should
-> add some other code to send SIGBUS in handle_guest_abort(). I don't know whether the ARM/arm64
->  KVM_PFN_ERR_HWPOISON you mentioned above will cover all the cases.
-
-The SIGBUS routine is part of the kernel's recovery method for memory errors. It
-should cover all the errors reported with this CPER_SEC_PLATFORM_MEM.
-
-Back to the race you describe. It shouldn't matter if one CPU processes an error
-for guest memory while a vcpu is running on another. This may happen if the
-error was detected by DRAM's background scrub.
-If we don't treat KVM/Qemu as anything special the memory_failure()->SIGBUS path
-will happen regardless of whether the fault interrupted the guest or not.
-
-
-There are other types of error such as PCIe, CPU, BUS error etc. If it's
-possible to recover from these we may need additional code in the kernel. This
-shouldn't necessarily treat KVM as a special case.
-
+Eventually, we want to be able to handle the full spectrum of the SMCCC
+and forward things to an actual TEE if available. There is no real
+reason why PSCI shouldn't be handled in userspace the same way (and we
+already offload reset and halt to QEMU).
 
 Thanks,
 
-James
+	M.
+-- 
+Jazz is not dead. It just smells funny...
