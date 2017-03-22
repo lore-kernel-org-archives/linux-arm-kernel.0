@@ -1,60 +1,26 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Wed, 22 Mar 2017 09:01:37 +0100
-Subject: [PATCH 01/15] ARM: dts: alpine: fix PCIe node name
-In-Reply-To: <20170322020313.24338-1-robh@kernel.org>
-References: <20170322020313.24338-1-robh@kernel.org>
-Message-ID: <20170322080137.st3osq5ckfis6uwz@kwain>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Wed, 22 Mar 2017 17:03:30 +0900
+Subject: [PATCH 0/2] pinctrl: samsung: Fix PINCFG_TYPE_DRV bitfields for
+ Exynos5433
+References: <CGME20170322080334epcas1p2531fbfdd3c3e033b0f67c5a5cf63b6a1@epcas1p2.samsung.com>
+Message-ID: <1490169812-25225-1-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+This patches add the missing part about PINCFG_TYPE_DRV bitfields
+for Exynos5433 when merged the multiple patches for pinctrl-exynos.c
+and this patch removes the unused EXYNOS_PIN_BANK_EINTW_EXT macro.
 
-On Tue, Mar 21, 2017 at 09:02:59PM -0500, Rob Herring wrote:
-> PCIe bridges should have a node name of 'pcie'.
-> 
-> Signed-off-by: Rob Herring <robh@kernel.org>
+Also, patch1 and patch2 will be possible squashed if the separate patch
+is not necesasry.
 
-Acked-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+Chanwoo Choi (2):
+  pinctrl: samsung: Add missing part for PINCFG_TYPE_DRV of Exynos5433
+  pinctrl: samsung: Remove unused pin-bank macro
 
-This can go through arm-soc directly. If not I'll take it.
-Thanks!
-
-Antoine
-
-> Cc: Tsahee Zidenberg <tsahee@annapurnalabs.com>
-> Cc: Antoine Tenart <antoine.tenart@free-electrons.com>
-> ---
-> Sub-arch maintainers, please apply to your trees unless arm-soc wants 
-> to take the whole lot.
-> 
->  arch/arm/boot/dts/alpine.dtsi | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/alpine.dtsi b/arch/arm/boot/dts/alpine.dtsi
-> index d0eefc3b886c..f09f9c8e178a 100644
-> --- a/arch/arm/boot/dts/alpine.dtsi
-> +++ b/arch/arm/boot/dts/alpine.dtsi
-> @@ -139,7 +139,7 @@
->  		};
->  
->  		/* Internal PCIe Controller */
-> -		pcie-internal at 0xfbc00000 {
-> +		pcie at fbc00000 {
->  			compatible = "pci-host-ecam-generic";
->  			device_type = "pci";
->  			#size-cells = <2>;
-> -- 
-> 2.10.1
-> 
+ drivers/pinctrl/samsung/pinctrl-exynos.c | 80 ++++++++++++++++----------------
+ drivers/pinctrl/samsung/pinctrl-exynos.h | 11 -----
+ 2 files changed, 40 insertions(+), 51 deletions(-)
 
 -- 
-Antoine T?nart, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170322/01ad26da/attachment.sig>
+1.9.1
