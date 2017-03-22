@@ -1,83 +1,45 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 22 Mar 2017 15:59:21 +0000
-Subject: [PATCH v2 06/18] arm64: arch_timer: Add infrastructure for
- multiple erratum detection methods
-In-Reply-To: <20170322154114.GE30499@mai>
-References: <20170320174829.28182-1-marc.zyngier@arm.com>
- <20170320174829.28182-7-marc.zyngier@arm.com> <20170322154114.GE30499@mai>
-Message-ID: <a922484a-1bb0-cfd0-1996-fab026a4feae@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 22 Mar 2017 15:59:29 +0000
+Subject: [PATCH 00/14] arm_pmu: ACPI support
+In-Reply-To: <CAFpQJXXqU6pvjckrQ86jXPhKd9XZQ+hDHt8X19Wy31JmLJvrjw@mail.gmail.com>
+References: <1489143891-11596-1-git-send-email-mark.rutland@arm.com>
+ <58CA8C8A.8080405@huawei.com>
+ <CAFpQJXVe_=42R+0Ch-tLwCcvhX3xJa20mhgYCWWNty-sn1Gp+g@mail.gmail.com>
+ <CAFpQJXXqU6pvjckrQ86jXPhKd9XZQ+hDHt8X19Wy31JmLJvrjw@mail.gmail.com>
+Message-ID: <20170322155929.GA19950@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Sorry, sent too quickly]
-
-On 22/03/17 15:41, Daniel Lezcano wrote:
-> On Mon, Mar 20, 2017 at 05:48:17PM +0000, Marc Zyngier wrote:
->> We're currently stuck with DT when it comes to handling errata, which
->> is pretty restrictive. In order to make things more flexible, let's
->> introduce an infrastructure that could support alternative discovery
->> methods. No change in functionality.
->>
->> Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  arch/arm64/include/asm/arch_timer.h  |  7 +++-
->>  drivers/clocksource/arm_arch_timer.c | 80 +++++++++++++++++++++++++++++++-----
->>  2 files changed, 75 insertions(+), 12 deletions(-)
->>
->> diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
->> index b4b34004a21e..5cd964e90d11 100644
->> --- a/arch/arm64/include/asm/arch_timer.h
->> +++ b/arch/arm64/include/asm/arch_timer.h
->> @@ -37,9 +37,14 @@ extern struct static_key_false arch_timer_read_ool_enabled;
->>  #define needs_unstable_timer_counter_workaround()  false
->>  #endif
->>  
->> +enum arch_timer_erratum_match_type {
->> +	ate_match_dt,
->> +};
->>  
->>  struct arch_timer_erratum_workaround {
->> -	const char *id;		/* Indicate the Erratum ID */
->> +	enum arch_timer_erratum_match_type match_type;
+On Wed, Mar 22, 2017 at 02:46:50PM +0530, Ganapatrao Kulkarni wrote:
+> i am not able to run with latest perf tool, i see issue with memory
+> corruption in malloc
+> is this seen from anyone else too?
+> i am not sure, is this issue with my setup?
 > 
-> Putting the match_fn instead will be much more simpler and the code won't
-> have to deal with ate_match_type, no ?
-
-I'm not sure about the "much simpler" aspect. Each function is not
-necessarily standalone (see patches 8 and 13 for example, dealing with
-CPU-local defects).
-
-Also, given that we have two architectures to cater for, as well as two
-firmware interfaces, it makes more sense (at least to me) to have
-something that doesn't require to define a bunch of empty stubs (we
-already have too many of them) depending on arm vs arm64, DT vs ACPI,
-errata handling enabled vs disabled.
-
-We're sidestepping this at the moment because it all lives under one
-single config option that cannot be enabled from 32bit, but I hope to
-change that.
-
+> root at VAL1-13>perf>> perf stat -e armv8_pmuv3_0/br_mis_pred/ sleep 1
 > 
-> [ ... ]
+>  Performance counter stats for 'sleep 1':
 > 
->> +static void arch_timer_check_ool_workaround(enum arch_timer_erratum_match_type type,
->> +					    void *arg)
->> +{
->> +	const struct arch_timer_erratum_workaround *wa;
->> +	ate_match_fn_t match_fn = NULL;
->> +
->> +	if (static_branch_unlikely(&arch_timer_read_ool_enabled))
->> +		return;
->> +
+>             10,815      armv8_pmuv3_0/br_mis_pred/
 > 
-> Why is this check necessary ?
+>        1.001232167 seconds time elapsed
+> 
+> root at VAL1-13>perf>> ./perf stat -e armv8_pmuv3_0/br_mis_pred/ sleep 1
+> *** Error in `./perf': free(): invalid next size (fast): 0x00000000086a7a00 ***
+> Aborted (core dumped)
+> root at VAL1-13>perf>> ./perf -v
+> perf version 4.11.rc3.g093b99
+> root at VAL1-13>perf>> perf -v
+> perf version 4.8.rc6.g21c488
+> root at VAL1-13>perf>> uname -a
+> Linux VAL1-13 4.11.0-rc2-12139-g3804e12 #1 SMP PREEMPT Wed Mar 22
+> 06:26:28 UTC 2017 aarch64 aarch64 aarch64 GNU/Linux
+> root at VAL1-13>perf>>
 
-We don't allow cumulative workarounds at this stage. This restriction
-gets lifted (to some extent) later in the series.
+I've managed to reproduce this on a Seatle system using DT, with the
+perf tool from v4.11-rc3.
+
+I'm digging into this now.
 
 Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Mark.
