@@ -1,130 +1,70 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Wed, 22 Mar 2017 18:59:10 +0100
-Subject: [PATCH v2 1/3] ata: add Palmchip BK3710 PATA controller driver
-In-Reply-To: <bc9a2d9b-1f16-4b59-0033-235686c76dcb@cogentembedded.com>
-References: <1489509414-11491-1-git-send-email-b.zolnierkie@samsung.com>
- <1489509414-11491-2-git-send-email-b.zolnierkie@samsung.com>
- <bc9a2d9b-1f16-4b59-0033-235686c76dcb@cogentembedded.com>
- <CGME20170322175912epcas5p2dc82f4879de4c440523e7d31c9bf385b@epcas5p2.samsung.com>
-Message-ID: <4365895.k4zyj0CytI@amdc3058>
+From: jagan@openedev.com (Jagan Teki)
+Date: Wed, 22 Mar 2017 23:18:09 +0530
+Subject: [PATCH 04/12] ARM: dts: imx6ul-isiot: Add i2c nodes
+In-Reply-To: <1490204897-14525-1-git-send-email-jagan@openedev.com>
+References: <1490204897-14525-1-git-send-email-jagan@openedev.com>
+Message-ID: <1490204897-14525-5-git-send-email-jagan@openedev.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Jagan Teki <jagan@amarulasolutions.com>
 
-Hi,
+Add support for i2c nodes i2c1 and i2c2 on Is.IoT MX6UL
+eMMC variant boards.
 
-On Saturday, March 18, 2017 04:52:18 PM Sergei Shtylyov wrote:
-> Hello!
-> 
-> On 3/14/2017 7:36 PM, Bartlomiej Zolnierkiewicz wrote:
-> 
-> > Add Palmchip BK3710 PATA controller driver.
-> >
-> > Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> [...]
-> > diff --git a/drivers/ata/pata_bk3710.c b/drivers/ata/pata_bk3710.c
-> > new file mode 100644
-> > index 0000000..6d77217
-> > --- /dev/null
-> > +++ b/drivers/ata/pata_bk3710.c
-> > @@ -0,0 +1,386 @@
-> [...]
-> > +static void pata_bk3710_chipinit(void __iomem *base)
-> > +{
-> [...]
-> > +	/*
-> > +	 * IORDYTMP IORDY Timer for Primary Register
-> > +	 * (ATA_IORDYTMP_IORDYTMP     , 0xffff  )
-> > +	 */
-> > +	iowrite32(0xFFFF, base + BK3710_IORDYTMP);
-> 
->     As I've already said, this is useless as we don't handle the IORDY timeout 
-> interrupt anyway; writing 0 would be fine.
+Cc: Shawn Guo <shawnguo@kernel.org>
+Cc: Matteo Lisi <matteo.lisi@engicam.com>
+Cc: Michael Trimarchi <michael@amarulasolutions.com>
+Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+---
+ arch/arm/boot/dts/imx6ul-isiot.dtsi | 28 ++++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
 
-Will fix in v3, in the incremental patch (so it is easier to revert
-if it turns out to cause problems later or port to palm_bk3710).
-
-> > +
-> > +	/*
-> > +	 * Configure BMISP Register
-> > +	 * (ATA_BMISP_DMAEN1	, DISABLE )	|
-> > +	 * (ATA_BMISP_DMAEN0	, DISABLE )	|
-> > +	 * (ATA_BMISP_IORDYINT	, CLEAR)	|
-> > +	 * (ATA_BMISP_INTRSTAT	, CLEAR)	|
-> > +	 * (ATA_BMISP_DMAERROR	, CLEAR)
-> > +	 */
-> > +	iowrite16(0, base + BK3710_BMISP);
-> 
->     Bits 0-3 cane only be cleared by writing 1, so this write can't clear 
-
-The documentation does say this about bits 1-3, bit 0 is handled in
-a different way.
-
-> them, contrary to what the comment says. Might be a material for a follow-up 
-> patch tho...
-
-Will fix in the incremental patch in v3.
-
-> [...]
-> > +static int __init pata_bk3710_probe(struct platform_device *pdev)
-> > +{
-> > +	struct clk *clk;
-> > +	struct resource *mem;
-> > +	struct ata_host *host;
-> > +	struct ata_port *ap;
-> > +	void __iomem *base;
-> > +	unsigned long rate;
-> > +	int irq;
-> > +
-> > +	clk = devm_clk_get(&pdev->dev, NULL);
-> > +	if (IS_ERR(clk))
-> > +		return -ENODEV;
-> > +
-> > +	clk_enable(clk);
-> > +	rate = clk_get_rate(clk);
-> > +	if (!rate)
-> > +		return -EINVAL;
-> > +
-> > +	/* NOTE:  round *down* to meet minimum timings; we count in clocks */
-> > +	ideclk_period = 1000000000UL / rate;
-> > +
-> > +	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> > +	if (mem == NULL) {
-> > +		pr_err(DRV_NAME ": failed to get memory region resource\n");
-> > +		return -ENODEV;
-> > +	}
-> 
->     NULL check not needed here, devm_ioremap_resource() checks this anyway.
-
-Will be fixed in v3.
-
-> > +
-> > +	irq = platform_get_irq(pdev, 0);
-> > +	if (irq < 0) {
-> > +		pr_err(DRV_NAME ": failed to get IRQ resource\n");
-> > +		return irq;
-> > +	}
-> > +
-> > +	base = devm_ioremap_resource(&pdev->dev, mem);
-> > +	if (IS_ERR(base))
-> > +		return PTR_ERR(base);
-> > +
-> [...]
-> > +/* work with hotplug and coldplug */
-> > +MODULE_ALIAS("platform:palm_bk3710");
-> > +
-> > +static struct platform_driver pata_bk3710_driver = {
-> > +	.driver = {
-> > +		.name = "palm_bk3710",
-> 
->     Not DRV_NAME?
-
-DRV_NAME is "pata_bk3710" and the platform driver name needs to
-match the old driver name for compatibility reasons (supporting
-both drivers by the arch specific code).
-
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+diff --git a/arch/arm/boot/dts/imx6ul-isiot.dtsi b/arch/arm/boot/dts/imx6ul-isiot.dtsi
+index 5ccc3df..4697a04 100644
+--- a/arch/arm/boot/dts/imx6ul-isiot.dtsi
++++ b/arch/arm/boot/dts/imx6ul-isiot.dtsi
+@@ -71,6 +71,20 @@
+ 	};
+ };
+ 
++&i2c1 {
++	clock-frequency = <100000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c1>;
++	status = "okay";
++};
++
++&i2c2 {
++	clock_frequency = <100000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c2>;
++	status = "okay";
++};
++
+ &pwm8 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_pwm8>;
+@@ -95,6 +109,20 @@
+ };
+ 
+ &iomuxc {
++	pinctrl_i2c1: i2c1grp {
++		fsl,pins = <
++			MX6UL_PAD_UART4_TX_DATA__I2C1_SCL 0x4001b8b0
++			MX6UL_PAD_UART4_RX_DATA__I2C1_SDA 0x4001b8b0
++		>;
++	};
++
++	pinctrl_i2c2: i2c2grp {
++		fsl,pins = <
++			MX6UL_PAD_GPIO1_IO00__I2C2_SCL 0x4001b8b0
++			MX6UL_PAD_GPIO1_IO01__I2C2_SDA 0x4001b8b0
++		>;
++	};
++
+ 	pinctrl_pwm8: pwm8grp {
+ 		fsl,pins = <
+ 			MX6UL_PAD_ENET1_RX_ER__PWM8_OUT   0x110b0
+-- 
+1.9.1
