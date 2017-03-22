@@ -1,124 +1,211 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 22 Mar 2017 14:50:51 +0000
-Subject: [RFC PATCH v2 21/41] arm64/sve: Enable SVE on demand for userspace
-In-Reply-To: <1490194274-30569-1-git-send-email-Dave.Martin@arm.com>
-References: <1490194274-30569-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1490194274-30569-22-git-send-email-Dave.Martin@arm.com>
+From: adrian.hunter@intel.com (Adrian Hunter)
+Date: Wed, 22 Mar 2017 16:47:23 +0200
+Subject: [PATCH v6 10/14] mmc: sdhci-xenon: Add SoC PHY PAD voltage control
+In-Reply-To: <3c21f3f9930373d6e6c28526c2e5b0aa2072daef.1487091464.git-series.gregory.clement@free-electrons.com>
+References: <cover.ff78bebe0384f650a51e5e6f0f1dca6e7894b53b.1487091464.git-series.gregory.clement@free-electrons.com>
+ <3c21f3f9930373d6e6c28526c2e5b0aa2072daef.1487091464.git-series.gregory.clement@free-electrons.com>
+Message-ID: <e5aeca29-1e91-8bc7-9d0e-686179f154cc@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch tracks whether a task has ever attempted to use the
-Scalable Vector Extension.  If and only if SVE is in use by a task,
-it will be enabled for userspace when scheduling the task in.  For
-other tasks, SVE is disabled when scheduling in.
+On 14/02/17 19:01, Gregory CLEMENT wrote:
+> From: Hu Ziji <huziji@marvell.com>
+> 
+> Some SoCs have PHY PAD outside Xenon IP.
+> PHY PAD voltage should match signalling voltage in use.
+> 
+> Add generic SoC PHY PAD voltage control interface.
+> Implement Aramda-3700 SoC PHY PAD voltage control.
+> 
+> Signed-off-by: Hu Ziji <huziji@marvell.com>
+> Tested-by: Russell King <rmk+kernel@armlinux.org.uk>
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> ---
+>  drivers/mmc/host/sdhci-xenon-phy.c | 116 +++++++++++++++++++++++++++++-
+>  drivers/mmc/host/sdhci-xenon.c     |   2 +-
+>  drivers/mmc/host/sdhci-xenon.h     |   2 +-
+>  3 files changed, 119 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/mmc/host/sdhci-xenon-phy.c b/drivers/mmc/host/sdhci-xenon-phy.c
+> index c26ba3a180a0..c3b7e9a21f6b 100644
+> --- a/drivers/mmc/host/sdhci-xenon-phy.c
+> +++ b/drivers/mmc/host/sdhci-xenon-phy.c
+> @@ -143,6 +143,27 @@ enum phy_type_enum {
+>  	NR_PHY_TYPES
+>  };
+>  
+> +enum soc_pad_ctrl_type {
+> +	SOC_PAD_SD,
+> +	SOC_PAD_FIXED_1_8V,
+> +};
+> +
+> +struct soc_pad_ctrl_table {
+> +	const char *soc;
+> +	void (*set_soc_pad)(struct sdhci_host *host,
+> +			    unsigned char signal_voltage);
+> +};
 
-Signed-off-by: Dave Martin <Dave.Martin@arm.com>
----
- arch/arm64/include/asm/thread_info.h |  1 +
- arch/arm64/kernel/entry.S            | 18 +++++++++++++++++-
- arch/arm64/kernel/fpsimd.c           | 28 ++++++++++++++++++++++++++++
- 3 files changed, 46 insertions(+), 1 deletion(-)
+Is soc_pad_ctrl_table used?
 
-diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
-index 46c3b93..272c32d 100644
---- a/arch/arm64/include/asm/thread_info.h
-+++ b/arch/arm64/include/asm/thread_info.h
-@@ -91,6 +91,7 @@ struct thread_info {
- #define TIF_SYSCALL_AUDIT	9
- #define TIF_SYSCALL_TRACEPOINT	10
- #define TIF_SECCOMP		11
-+#define TIF_SVE			17	/* Scalable Vector Extension in use */
- #define TIF_MEMDIE		18	/* is terminating due to OOM killer */
- #define TIF_FREEZE		19
- #define TIF_RESTORE_SIGMASK	20
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index 43512d4..a9ae051 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -524,6 +524,10 @@ el0_sync:
- 	b.eq	el0_ia
- 	cmp	x24, #ESR_ELx_EC_FP_ASIMD	// FP/ASIMD access
- 	b.eq	el0_fpsimd_acc
-+#ifdef CONFIG_ARM64_SVE
-+	cmp	x24, #ESR_ELx_EC_SVE		// SVE access
-+	b.eq	el0_sve_acc
-+#endif
- 	cmp	x24, #ESR_ELx_EC_FP_EXC64	// FP/ASIMD exception
- 	b.eq	el0_fpsimd_exc
- 	cmp	x24, #ESR_ELx_EC_SYS64		// configurable trap
-@@ -622,9 +626,21 @@ el0_fpsimd_acc:
- 	mov	x1, sp
- 	bl	do_fpsimd_acc
- 	b	ret_to_user
-+#ifdef CONFIG_ARM64_SVE
-+	/*
-+	 * Scalable Vector Extension access
-+	 */
-+el0_sve_acc:
-+	enable_dbg
-+	ct_user_exit
-+	mov	x0, x25
-+	mov	x1, sp
-+	bl	do_sve_acc
-+	b	ret_to_user
-+#endif
- el0_fpsimd_exc:
- 	/*
--	 * Floating Point or Advanced SIMD exception
-+	 * Floating Point, Advanced SIMD or SVE exception
- 	 */
- 	enable_dbg
- 	ct_user_exit
-diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-index f3006a6..749f4f0 100644
---- a/arch/arm64/kernel/fpsimd.c
-+++ b/arch/arm64/kernel/fpsimd.c
-@@ -149,6 +149,18 @@ static void sve_to_fpsimd(struct task_struct *task)
- 	__sve_to_fpsimd(task, sve_vq_from_vl(vl));
- }
- 
-+void do_sve_acc(unsigned int esr, struct pt_regs *regs)
-+{
-+	unsigned long tmp;
-+
-+	if (test_and_set_thread_flag(TIF_SVE))
-+		BUG();
-+
-+	asm ("mrs %0, cpacr_el1" : "=r" (tmp));
-+	asm volatile ("msr cpacr_el1, %0" :: "r" (tmp | (1 << 17)));
-+	/* Serialised by exception return to user */
-+}
-+
- #else /* ! CONFIG_ARM64_SVE */
- 
- /* Dummy declarations for usage protected with IS_ENABLED(CONFIG_ARM64_SVE): */
-@@ -306,11 +318,27 @@ void fpsimd_restore_current_state(void)
- 		return;
- 	preempt_disable();
- 	if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE)) {
-+		unsigned long tmp;
-+		unsigned long flags;
-+
- 		struct fpsimd_state *st = &current->thread.fpsimd_state;
- 
- 		task_fpsimd_load(current);
- 		this_cpu_write(fpsimd_last_state, st);
- 		st->cpu = smp_processor_id();
-+
-+		if (IS_ENABLED(CONFIG_ARM64_SVE)) {
-+			/*
-+			 * Flip SVE enable for userspace if it doesn't
-+			 * match the current_task.
-+			 */
-+			asm ("mrs %0, cpacr_el1" : "=r" (tmp));
-+			flags = current_thread_info()->flags;
-+			if ((tmp ^ (unsigned long)flags) & (1 << 17)) {
-+				tmp ^= 1 << 17;
-+				asm volatile ("msr cpacr_el1, %0" :: "r" (tmp));
-+			}
-+		}
- 	}
- 	preempt_enable();
- }
--- 
-2.1.4
+> +
+> +struct soc_pad_ctrl {
+> +	/* Register address of SoC PHY PAD ctrl */
+> +	void __iomem	*reg;
+> +	/* SoC PHY PAD ctrl type */
+> +	enum soc_pad_ctrl_type pad_type;
+> +	/* SoC specific operation to set SoC PHY PAD */
+> +	void (*set_soc_pad)(struct sdhci_host *host,
+> +			    unsigned char signal_voltage);
+> +};
+> +
+>  static struct xenon_emmc_phy_regs xenon_emmc_5_0_phy_regs = {
+>  	.timing_adj	= XENON_EMMC_5_0_PHY_TIMING_ADJUST,
+>  	.func_ctrl	= XENON_EMMC_5_0_PHY_FUNC_CONTROL,
+> @@ -176,6 +197,8 @@ struct emmc_phy_params {
+>  	u8	nr_tun_times;
+>  	/* Divider for calculating Tuning Step */
+>  	u8	tun_step_divider;
+> +
+> +	struct soc_pad_ctrl pad_ctrl;
+>  };
+>  
+>  static int alloc_emmc_phy(struct sdhci_xenon_priv *priv)
+> @@ -252,6 +275,45 @@ static int emmc_phy_init(struct sdhci_host *host)
+>  	return 0;
+>  }
+>  
+> +#define ARMADA_3700_SOC_PAD_1_8V	0x1
+> +#define ARMADA_3700_SOC_PAD_3_3V	0x0
+> +
+> +static void armada_3700_soc_pad_voltage_set(struct sdhci_host *host,
+> +					    unsigned char signal_voltage)
+> +{
+> +	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> +	struct sdhci_xenon_priv *priv = sdhci_pltfm_priv(pltfm_host);
+> +	struct emmc_phy_params *params = priv->phy_params;
+> +
+> +	if (params->pad_ctrl.pad_type == SOC_PAD_FIXED_1_8V) {
+> +		writel(ARMADA_3700_SOC_PAD_1_8V, params->pad_ctrl.reg);
+> +	} else if (params->pad_ctrl.pad_type == SOC_PAD_SD) {
+> +		if (signal_voltage == MMC_SIGNAL_VOLTAGE_180)
+> +			writel(ARMADA_3700_SOC_PAD_1_8V, params->pad_ctrl.reg);
+> +		else if (signal_voltage == MMC_SIGNAL_VOLTAGE_330)
+> +			writel(ARMADA_3700_SOC_PAD_3_3V, params->pad_ctrl.reg);
+> +	}
+> +}
+> +
+> +/*
+> + * Set SoC PHY voltage PAD control register,
+> + * according to the operation voltage on PAD.
+> + * The detailed operation depends on SoC implementation.
+> + */
+> +static void emmc_phy_set_soc_pad(struct sdhci_host *host,
+> +				 unsigned char signal_voltage)
+> +{
+> +	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> +	struct sdhci_xenon_priv *priv = sdhci_pltfm_priv(pltfm_host);
+> +	struct emmc_phy_params *params = priv->phy_params;
+> +
+> +	if (!params->pad_ctrl.reg)
+> +		return;
+> +
+> +	if (params->pad_ctrl.set_soc_pad)
+> +		params->pad_ctrl.set_soc_pad(host, signal_voltage);
+> +}
+> +
+>  /*
+>   * Enable eMMC PHY HW DLL
+>   * DLL should be enabled and stable before HS200/SDR104 tuning,
+> @@ -584,6 +646,51 @@ static void emmc_phy_set(struct sdhci_host *host,
+>  	dev_dbg(mmc_dev(host->mmc), "eMMC PHY setting completes\n");
+>  }
+>  
+> +static int get_dt_pad_ctrl_data(struct sdhci_host *host,
+> +				struct device_node *np,
+> +				struct emmc_phy_params *params)
+> +{
+> +	int ret = 0;
+> +	const char *name;
+> +	struct resource iomem;
+> +
+> +	if (of_device_is_compatible(np, "marvell,armada-3700-sdhci"))
+> +		params->pad_ctrl.set_soc_pad = armada_3700_soc_pad_voltage_set;
+> +	else
+> +		return 0;
+> +
+> +	if (of_address_to_resource(np, 1, &iomem)) {
+> +		dev_err(mmc_dev(host->mmc), "Unable to find SoC PAD ctrl register address for %s\n",
+> +			np->name);
+> +		return -EINVAL;
+> +	}
+> +
+> +	params->pad_ctrl.reg = devm_ioremap_resource(mmc_dev(host->mmc),
+> +						     &iomem);
+> +	if (IS_ERR(params->pad_ctrl.reg)) {
+> +		dev_err(mmc_dev(host->mmc), "Unable to get SoC PHY PAD ctrl register for %s\n",
+> +			np->name);
+> +		return PTR_ERR(params->pad_ctrl.reg);
+> +	}
+> +
+> +	ret = of_property_read_string(np, "marvell,pad-type", &name);
+> +	if (ret) {
+> +		dev_err(mmc_dev(host->mmc), "Unable to determine SoC PHY PAD ctrl type\n");
+> +		return ret;
+> +	}
+> +	if (!strcmp(name, "sd")) {
+> +		params->pad_ctrl.pad_type = SOC_PAD_SD;
+> +	} else if (!strcmp(name, "fixed-1-8v")) {
+> +		params->pad_ctrl.pad_type = SOC_PAD_FIXED_1_8V;
+> +	} else {
+> +		dev_err(mmc_dev(host->mmc), "Unsupported SoC PHY PAD ctrl type %s\n",
+> +			name);
+> +		return -EINVAL;
+> +	}
+> +
+> +	return ret;
+> +}
+> +
+>  static int emmc_phy_parse_param_dt(struct sdhci_host *host,
+>  				   struct device_node *np,
+>  				   struct emmc_phy_params *params)
+> @@ -617,7 +724,14 @@ static int emmc_phy_parse_param_dt(struct sdhci_host *host,
+>  	else
+>  		params->tun_step_divider = XENON_TUNING_STEP_DIVIDER;
+>  
+> -	return 0;
+> +	return get_dt_pad_ctrl_data(host, np, params);
+> +}
+> +
+> +/* Set SoC PHY Voltage PAD */
+> +void xenon_soc_pad_ctrl(struct sdhci_host *host,
+> +			unsigned char signal_voltage)
+> +{
+> +	emmc_phy_set_soc_pad(host, signal_voltage);
+>  }
+>  
+>  /*
+> diff --git a/drivers/mmc/host/sdhci-xenon.c b/drivers/mmc/host/sdhci-xenon.c
+> index 99c18cad6460..f344d9fb0a1b 100644
+> --- a/drivers/mmc/host/sdhci-xenon.c
+> +++ b/drivers/mmc/host/sdhci-xenon.c
+> @@ -338,6 +338,8 @@ static int xenon_start_signal_voltage_switch(struct mmc_host *mmc,
+>  	 */
+>  	enable_xenon_internal_clk(host);
+>  
+> +	xenon_soc_pad_ctrl(host, ios->signal_voltage);
+> +
+>  	if (priv->init_card_type == MMC_TYPE_MMC)
+>  		return xenon_emmc_signal_voltage_switch(mmc, ios);
+>  
+> diff --git a/drivers/mmc/host/sdhci-xenon.h b/drivers/mmc/host/sdhci-xenon.h
+> index e87639774bca..57e7cb463413 100644
+> --- a/drivers/mmc/host/sdhci-xenon.h
+> +++ b/drivers/mmc/host/sdhci-xenon.h
+> @@ -104,4 +104,6 @@ struct sdhci_xenon_priv {
+>  int xenon_phy_adj(struct sdhci_host *host, struct mmc_ios *ios);
+>  int xenon_phy_parse_dt(struct device_node *np,
+>  		       struct sdhci_host *host);
+> +void xenon_soc_pad_ctrl(struct sdhci_host *host,
+> +			unsigned char signal_voltage);
+>  #endif
+> 
