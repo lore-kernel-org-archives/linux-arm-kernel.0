@@ -1,104 +1,45 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Wed, 22 Mar 2017 16:28:20 +0000
-Subject: [PATCH 1/2] firmware: meson-sm: Check for buffer output size
-In-Reply-To: <20170303151759.8330-2-carlo@caione.org>
-References: <20170303151759.8330-1-carlo@caione.org>
- <20170303151759.8330-2-carlo@caione.org>
-Message-ID: <7b026b39-1d37-fbfc-192a-d21a4f43aa48@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 22 Mar 2017 17:29:19 +0100
+Subject: [PATCH] [v2] arm64: define BUG() instruction without CONFIG_BUG
+In-Reply-To: <20170322153208.GC25645@e104818-lin.cambridge.arm.com>
+References: <20170314213939.3874497-1-arnd@arndb.de>
+ <20170322143729.GB25645@e104818-lin.cambridge.arm.com>
+ <CAK8P3a0A0-gnBnBBuWdPjgoDMo=2P9yXcLjZYm9Yz+xpQnCyCw@mail.gmail.com>
+ <20170322153208.GC25645@e104818-lin.cambridge.arm.com>
+Message-ID: <CAK8P3a1V37QGtB6EeXptaOgKFz1QE=VObN91r1Ld-0ZOKAPXaQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Mar 22, 2017 at 4:32 PM, Catalin Marinas
+<catalin.marinas@arm.com> wrote:
+> On Wed, Mar 22, 2017 at 03:51:54PM +0100, Arnd Bergmann wrote:
+>> On Wed, Mar 22, 2017 at 3:37 PM, Catalin Marinas
+>> <catalin.marinas@arm.com> wrote:
 
+>> Taht was certainly not intended, and I don't see yet what exactly is going on.
+>> What is your setting for CONFIG_BUG and CONFIG_BUGVERBOSE?
+>
+> CONFIG_BUG=y
+> CONFIG_DEBUG_BUGVERBOSE=y
 
-On 03/03/17 15:17, Carlo Caione wrote:
-> From: Carlo Caione <carlo@endlessm.com>
->
-> After the data is read by the secure monitor driver it is being copied
-> in the output buffer checking only the size of the bounce buffer but not
-> the size of the output buffer.
->
-> Fix this in the secure monitor driver slightly changing the API. Fix
-> also the efuse driver that it is the only driver using this API to not
-> break bisectability.
->
-> Signed-off-by: Carlo Caione <carlo@endlessm.com>
+Ok, I found the typo, can you just fold this in, or should I send an
+updated patch?
 
-Sorry for the delay!!
+ Arnd
 
-For nvmem part,
+diff --git a/arch/arm64/include/asm/bug.h b/arch/arm64/include/asm/bug.h
+index bfc6021760e5..ff030254f791 100644
+--- a/arch/arm64/include/asm/bug.h
++++ b/arch/arm64/include/asm/bug.h
+@@ -49,10 +49,10 @@ _BUGVERBOSE_LOCATION(__FILE__, __LINE__) \
 
-Acked-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+ #define __BUG_FLAGS(flags) \
+  asm volatile ( \
+- __BUG_ENTRY(0) \
++ __BUG_ENTRY(flags) \
+  "brk %[imm]" :: [imm] "i" (BUG_BRK_IMM) \
+  );
 
-
-> ---
->  drivers/firmware/meson/meson_sm.c       | 10 +++++++---
->  drivers/nvmem/meson-efuse.c             |  2 +-
->  include/linux/firmware/meson/meson_sm.h |  4 ++--
->  3 files changed, 10 insertions(+), 6 deletions(-)
->
-> diff --git a/drivers/firmware/meson/meson_sm.c b/drivers/firmware/meson/meson_sm.c
-> index b0d254930ed3..5f30a5774e57 100644
-> --- a/drivers/firmware/meson/meson_sm.c
-> +++ b/drivers/firmware/meson/meson_sm.c
-> @@ -127,6 +127,7 @@ EXPORT_SYMBOL(meson_sm_call);
->   * meson_sm_call_read - retrieve data from secure-monitor
->   *
->   * @buffer:	Buffer to store the retrieved data
-> + * @bsize:	Size of the buffer
->   * @cmd_index:	Index of the SMC32 function ID
->   * @arg0:	SMC32 Argument 0
->   * @arg1:	SMC32 Argument 1
-> @@ -136,8 +137,8 @@ EXPORT_SYMBOL(meson_sm_call);
->   *
->   * Return:	size of read data on success, a negative value on error
->   */
-> -int meson_sm_call_read(void *buffer, unsigned int cmd_index, u32 arg0,
-> -		       u32 arg1, u32 arg2, u32 arg3, u32 arg4)
-> +int meson_sm_call_read(void *buffer, unsigned int bsize, unsigned int cmd_index,
-> +		       u32 arg0, u32 arg1, u32 arg2, u32 arg3, u32 arg4)
->  {
->  	u32 size;
->
-> @@ -147,10 +148,13 @@ int meson_sm_call_read(void *buffer, unsigned int cmd_index, u32 arg0,
->  	if (!fw.chip->cmd_shmem_out_base)
->  		return -EINVAL;
->
-> +	if (bsize > fw.chip->shmem_size)
-> +		return -EINVAL;
-> +
->  	if (meson_sm_call(cmd_index, &size, arg0, arg1, arg2, arg3, arg4) < 0)
->  		return -EINVAL;
->
-> -	if (!size || size > fw.chip->shmem_size)
-> +	if (!size || size > bsize)
->  		return -EINVAL;
->
->  	if (buffer)
-> diff --git a/drivers/nvmem/meson-efuse.c b/drivers/nvmem/meson-efuse.c
-> index f207c3b10482..70bfc9839bb2 100644
-> --- a/drivers/nvmem/meson-efuse.c
-> +++ b/drivers/nvmem/meson-efuse.c
-> @@ -27,7 +27,7 @@ static int meson_efuse_read(void *context, unsigned int offset,
->  	u8 *buf = val;
->  	int ret;
->
-> -	ret = meson_sm_call_read(buf, SM_EFUSE_READ, offset,
-> +	ret = meson_sm_call_read(buf, bytes, SM_EFUSE_READ, offset,
->  				 bytes, 0, 0, 0);
->  	if (ret < 0)
->  		return ret;
-> diff --git a/include/linux/firmware/meson/meson_sm.h b/include/linux/firmware/meson/meson_sm.h
-> index 8e953c6f394a..37a5eaea69dd 100644
-> --- a/include/linux/firmware/meson/meson_sm.h
-> +++ b/include/linux/firmware/meson/meson_sm.h
-> @@ -25,7 +25,7 @@ int meson_sm_call(unsigned int cmd_index, u32 *ret, u32 arg0, u32 arg1,
->  		  u32 arg2, u32 arg3, u32 arg4);
->  int meson_sm_call_write(void *buffer, unsigned int b_size, unsigned int cmd_index,
->  			u32 arg0, u32 arg1, u32 arg2, u32 arg3, u32 arg4);
-> -int meson_sm_call_read(void *buffer, unsigned int cmd_index, u32 arg0, u32 arg1,
-> -		       u32 arg2, u32 arg3, u32 arg4);
-> +int meson_sm_call_read(void *buffer, unsigned int bsize, unsigned int cmd_index,
-> +		       u32 arg0, u32 arg1, u32 arg2, u32 arg3, u32 arg4);
->
->  #endif /* _MESON_SM_FW_H_ */
->
+ #define BUG() do { \
+  __BUG_FLAGS(0); \
+  unreachable(); \
