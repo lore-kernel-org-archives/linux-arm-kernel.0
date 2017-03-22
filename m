@@ -1,124 +1,41 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 22 Mar 2017 15:30:29 +0000
-Subject: [PATCH v3] efifb: avoid reconfiguration of BAR that covers the
- framebuffer
-Message-ID: <1490196629-28088-1-git-send-email-ard.biesheuvel@linaro.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 22 Mar 2017 15:32:09 +0000
+Subject: [PATCH] [v2] arm64: define BUG() instruction without CONFIG_BUG
+In-Reply-To: <CAK8P3a0A0-gnBnBBuWdPjgoDMo=2P9yXcLjZYm9Yz+xpQnCyCw@mail.gmail.com>
+References: <20170314213939.3874497-1-arnd@arndb.de>
+ <20170322143729.GB25645@e104818-lin.cambridge.arm.com>
+ <CAK8P3a0A0-gnBnBBuWdPjgoDMo=2P9yXcLjZYm9Yz+xpQnCyCw@mail.gmail.com>
+Message-ID: <20170322153208.GC25645@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On UEFI systems, the PCI subsystem is enumerated by the firmware,
-and if a graphical framebuffer is exposed by a PCI device, its base
-address and size are exposed to the OS via the Graphics Output
-Protocol (GOP).
+On Wed, Mar 22, 2017 at 03:51:54PM +0100, Arnd Bergmann wrote:
+> On Wed, Mar 22, 2017 at 3:37 PM, Catalin Marinas
+> <catalin.marinas@arm.com> wrote:
+> > Hi Arnd,
+> >
+> > On Tue, Mar 14, 2017 at 10:39:21PM +0100, Arnd Bergmann wrote:
+> >> This mirrors commit e9c38ceba8d9 ("ARM: 8455/1: define __BUG as
+> >> asm(BUG_INSTR) without CONFIG_BUG") to make the behavior of
+> >> arm64 consistent with arm and x86, and avoids lots of warnings in
+> >> randconfig builds, such as:
+> >>
+> >> kernel/seccomp.c: In function '__seccomp_filter':
+> >> kernel/seccomp.c:666:1: error: no return statement in function returning non-void [-Werror=return-type]
+> >>
+> >> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> >
+> > A side-effect of this patch is that it turns WARN into BUG. I hit the
+> > WARN_ONCE in arch/arm64/kernel/efi.c:34 (on Juno with 64K pages) and
+> > with your patch applied, the kernel panics.
+> 
+> Taht was certainly not intended, and I don't see yet what exactly is going on.
+> What is your setting for CONFIG_BUG and CONFIG_BUGVERBOSE?
 
-On arm64 PCI systems, the entire PCI hierarchy is reconfigured from
-scratch at boot. This may result in the GOP framebuffer address to
-become stale, if the BAR covering the framebuffer is modified. This
-will cause the framebuffer to become unresponsive, and may in some
-cases result in unpredictable behavior if the range is reassigned to
-another device.
+CONFIG_BUG=y
+CONFIG_DEBUG_BUGVERBOSE=y
 
-So add a quirk to the EFI fb driver to find the BAR associated with
-the GOP base address, and set the IORESOURCE_PCI_FIXED attribute so
-that the PCI core will leave it alone.
+(just defconfig + 64K pages)
 
-Cc: Matt Fleming <matt@codeblueprint.co.uk>
-Cc: Peter Jones <pjones@redhat.com>
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
-v3: check device is enabled before attempting to claim the resource
-
- drivers/video/fbdev/efifb.c | 60 +++++++++++++++++++-
- 1 file changed, 59 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/video/fbdev/efifb.c b/drivers/video/fbdev/efifb.c
-index 8c4dc1e1f94f..88f653864a01 100644
---- a/drivers/video/fbdev/efifb.c
-+++ b/drivers/video/fbdev/efifb.c
-@@ -10,6 +10,7 @@
- #include <linux/efi.h>
- #include <linux/errno.h>
- #include <linux/fb.h>
-+#include <linux/pci.h>
- #include <linux/platform_device.h>
- #include <linux/screen_info.h>
- #include <video/vga.h>
-@@ -143,6 +144,9 @@ static struct attribute *efifb_attrs[] = {
- };
- ATTRIBUTE_GROUPS(efifb);
- 
-+static bool pci_bar_found;	/* did we find a BAR matching the efifb base? */
-+static bool pci_dev_disabled;	/* was the device disabled? */
-+
- static int efifb_probe(struct platform_device *dev)
- {
- 	struct fb_info *info;
-@@ -152,7 +156,7 @@ static int efifb_probe(struct platform_device *dev)
- 	unsigned int size_total;
- 	char *option = NULL;
- 
--	if (screen_info.orig_video_isVGA != VIDEO_TYPE_EFI)
-+	if (screen_info.orig_video_isVGA != VIDEO_TYPE_EFI || pci_dev_disabled)
- 		return -ENODEV;
- 
- 	if (fb_get_options("efifb", &option))
-@@ -360,3 +364,57 @@ static struct platform_driver efifb_driver = {
- };
- 
- builtin_platform_driver(efifb_driver);
-+
-+static void claim_efifb_bar(struct pci_dev *dev, int idx)
-+{
-+	u16 word;
-+
-+	pci_bar_found = true;
-+
-+	pci_read_config_word(dev, PCI_COMMAND, &word);
-+	if (!(word & PCI_COMMAND_MEMORY)) {
-+		pci_dev_disabled = true;
-+		dev_err(&dev->dev,
-+			"BAR %d: assigned to efifb but device is disabled!\n",
-+			idx);
-+		return;
-+	}
-+
-+	if (pci_claim_resource(dev, idx)) {
-+		pci_dev_disabled = true;
-+		dev_err(&dev->dev,
-+			"BAR %d: failed to claim resource for efifb!\n", idx);
-+		return;
-+	}
-+
-+	dev_info(&dev->dev, "BAR %d: assigned to efifb\n", idx);
-+}
-+
-+static void efifb_fixup_resources(struct pci_dev *dev)
-+{
-+	u64 base = screen_info.lfb_base;
-+	u64 size = screen_info.lfb_size;
-+	int i;
-+
-+	if (pci_bar_found || screen_info.orig_video_isVGA != VIDEO_TYPE_EFI)
-+		return;
-+
-+	if (screen_info.capabilities & VIDEO_CAPABILITY_64BIT_BASE)
-+		base |= (u64)screen_info.ext_lfb_base << 32;
-+
-+	if (!base)
-+		return;
-+
-+	for (i = 0; i < PCI_STD_RESOURCE_END; i++) {
-+		struct resource *res = &dev->resource[i];
-+
-+		if (!(res->flags & IORESOURCE_MEM))
-+			continue;
-+
-+		if (res->start <= base && res->end >= base + size - 1) {
-+			claim_efifb_bar(dev, i);
-+			break;
-+		}
-+	}
-+}
-+DECLARE_PCI_FIXUP_HEADER(PCI_ANY_ID, PCI_ANY_ID, efifb_fixup_resources);
 -- 
-2.7.4
+Catalin
