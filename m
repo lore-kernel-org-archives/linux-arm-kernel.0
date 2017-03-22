@@ -1,59 +1,50 @@
-From: liviu.dudau@arm.com (Liviu Dudau)
-Date: Wed, 22 Mar 2017 11:56:18 +0000
-Subject: [PATCH 13/15] arm64: dts: juno: fix PCI bus dtc warnings
-In-Reply-To: <20170322020313.24338-13-robh@kernel.org>
-References: <20170322020313.24338-1-robh@kernel.org>
- <20170322020313.24338-13-robh@kernel.org>
-Message-ID: <20170322115618.GD6816@e110455-lin.cambridge.arm.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Wed, 22 Mar 2017 12:59:37 +0100
+Subject: [PATCH v3 2/4] arm64: dts: rockchip: add Gru/Kevin DTS
+In-Reply-To: <20170320235344.126298-3-briannorris@chromium.org>
+References: <20170320235344.126298-1-briannorris@chromium.org>
+ <20170320235344.126298-3-briannorris@chromium.org>
+Message-ID: <2390473.XAgkTqANPY@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
-
-On Tue, Mar 21, 2017 at 09:03:11PM -0500, Rob Herring wrote:
-> dtc recently added PCI bus checks. Fix these warnings.
-
-Was not aware of the warnings and the commit message doesn't quote
-them, but the change looks trivial. So:
-
-Acked-by: Liviu Dudau <liviu.dudau@arm.com>
-
-Thanks for fixing this!
-Liviu
-
+Am Montag, 20. M?rz 2017, 16:53:42 CET schrieb Brian Norris:
+> Kevin is part of a family of boards called Gru. As best as possible, the
+> properties shared by the Gru family are placed in rk3399-gru.dtsi, while
+> Kevin-specific bits are in rk3399-gru-kevin.dts. This does not add full
+> support for the base Gru board.
 > 
-> Signed-off-by: Rob Herring <robh@kernel.org>
-> Cc: Liviu Dudau <liviu.dudau@arm.com>
-> Cc: Sudeep Holla <sudeep.holla@arm.com>
-> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> ---
+> Working and tested (to some extent):
+>  * EC support -- including keyboard, battery, PWM, and probably more
+>  * UART / console
+>  * Thermal
+>  * Touchscreen
+>  * Touchpad
+>  * Digitizer (regulator still WIP)
+>  * PCIe / Wifi
+>  * Bluetooth / Webcam
+>  * SD card
+>  * eMMC
+>  * USB2 on TypeC
+>    - This works much of the time, but USB3 devices may or may not detect
+>      properly. Waiting on proper extcon support for USB3 over TypeC.
+>    - Depends on XHCI/DWC3 fixes for ARM64 that still haven't landed
+>  * Backlight
 > 
->  arch/arm64/boot/dts/arm/juno-base.dtsi | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> Not working:
+>  * CPUFreq -- relies on special OVP support for our PWM regulator
+>    circuits
+>  * EC / extcon support -- and with it, USB3/TypeC/DP
+>  * DRM -- won't even build on ARM64, so all display, eDP, etc. is not
+>    enabled
 > 
-> diff --git a/arch/arm64/boot/dts/arm/juno-base.dtsi b/arch/arm64/boot/dts/arm/juno-base.dtsi
-> index df539e865b90..8ffaff2043d0 100644
-> --- a/arch/arm64/boot/dts/arm/juno-base.dtsi
-> +++ b/arch/arm64/boot/dts/arm/juno-base.dtsi
-> @@ -428,7 +428,7 @@
->  		};
->  	};
->  
-> -	pcie_ctlr: pcie-controller at 40000000 {
-> +	pcie_ctlr: pcie at 40000000 {
->  		compatible = "arm,juno-r1-pcie", "plda,xpressrich3-axi", "pci-host-ecam-generic";
->  		device_type = "pci";
->  		reg = <0 0x40000000 0 0x10000000>;	/* ECAM config space */
-> -- 
-> 2.10.1
+> Not tested:
+>  * Audio
 > 
+> Signed-off-by: Brian Norris <briannorris@chromium.org>
 
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+applied for 4.12 with Enric's Tested-tag after some reordering of nodes/
+properties.
+
+
+Heiko
