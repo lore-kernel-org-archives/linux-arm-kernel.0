@@ -1,118 +1,502 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 22 Mar 2017 14:51:06 +0000
-Subject: [RFC PATCH v2 36/41] arm64/sve: ptrace: Wire up vector length control
- and reporting
+Date: Wed, 22 Mar 2017 14:51:11 +0000
+Subject: [RFC PATCH v2 41/41] arm64/sve: Documentation: Add overview of the
+ SVE userspace ABI
 In-Reply-To: <1490194274-30569-1-git-send-email-Dave.Martin@arm.com>
 References: <1490194274-30569-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1490194274-30569-37-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1490194274-30569-42-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for manipulating a task's vector length at
-runtime via ptrace.
-
-As a simplification, we turn the task back into an FPSIMD-only task
-when changing the vector length.  If the register data is written
-too, we then turn the task back into an SVE task, with changed
-task_struct layout for the SVE data, before the actual data writing
-is done.
-
-Because the vector length is now variable, sve_get() now needs to
-return the real maximum for user_sve_header.max_vl, since .vl may
-be less than this (that's the whole point).
+This patch adds initial documentation of the ABI provided by the
+kernel to enable userspace software to make use of SVE.
 
 Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 ---
- arch/arm64/include/asm/fpsimd.h      |  2 ++
- arch/arm64/include/uapi/asm/ptrace.h |  6 ++++++
- arch/arm64/kernel/ptrace.c           | 25 +++++++++++++++----------
- 3 files changed, 23 insertions(+), 10 deletions(-)
+ Documentation/arm64/sve.txt | 475 ++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 475 insertions(+)
+ create mode 100644 Documentation/arm64/sve.txt
 
-diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
-index 764da0f..385ef226 100644
---- a/arch/arm64/include/asm/fpsimd.h
-+++ b/arch/arm64/include/asm/fpsimd.h
-@@ -105,6 +105,8 @@ extern void *__sve_state(struct task_struct *task);
- 
- #ifdef CONFIG_ARM64_SVE
- 
-+extern int sve_max_vl;
+diff --git a/Documentation/arm64/sve.txt b/Documentation/arm64/sve.txt
+new file mode 100644
+index 0000000..f82fbf8
+--- /dev/null
++++ b/Documentation/arm64/sve.txt
+@@ -0,0 +1,475 @@
++            Scalable Vector Extension support for AArch64 Linux
++            ===================================================
 +
- extern void fpsimd_sync_to_sve(struct task_struct *task);
- extern void sve_sync_to_fpsimd(struct task_struct *task);
- extern void sve_sync_from_fpsimd_zeropad(struct task_struct *task);
-diff --git a/arch/arm64/include/uapi/asm/ptrace.h b/arch/arm64/include/uapi/asm/ptrace.h
-index f26b68e..69a2700 100644
---- a/arch/arm64/include/uapi/asm/ptrace.h
-+++ b/arch/arm64/include/uapi/asm/ptrace.h
-@@ -64,6 +64,8 @@
- 
- #ifndef __ASSEMBLY__
- 
-+#include <linux/prctl.h>
++Author: Dave Martin <Dave.Martin@arm.com>
++Date:   20 March 2017
 +
- /*
-  * User structures for general purpose, floating point and debug registers.
-  */
-@@ -108,6 +110,10 @@ struct user_sve_header {
- #define SVE_PT_REGS_FPSIMD		0
- #define SVE_PT_REGS_SVE			SVE_PT_REGS_MASK
- 
-+#define SVE_PT_VL_THREAD		PR_SVE_SET_VL_THREAD
-+#define SVE_PT_VL_INHERIT		PR_SVE_SET_VL_INHERIT
-+#define SVE_PT_VL_ONEXEC		PR_SVE_SET_VL_ONEXEC
++This document outlines briefly the interface provided to userspace by Linux in
++order to support use of the ARM Scalable Vector Extension (SVE).
 +
- 
- /*
-  * The remainder of the SVE state follows struct user_sve_header.  The
-diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
-index 72b922a..02d3265 100644
---- a/arch/arm64/kernel/ptrace.c
-+++ b/arch/arm64/kernel/ptrace.c
-@@ -751,14 +751,15 @@ static int sve_get(struct task_struct *target,
- 	BUG_ON(!sve_vl_valid(header.vl));
- 	vq = sve_vq_from_vl(header.vl);
- 
--	/* Until runtime or per-task vector length changing is supported: */
--	header.max_vl = header.vl;
-+	BUG_ON(!sve_vl_valid(sve_max_vl));
-+	header.max_vl = sve_max_vl;
- 
- 	header.flags = test_tsk_thread_flag(target, TIF_SVE) ?
- 		SVE_PT_REGS_SVE : SVE_PT_REGS_FPSIMD;
- 
- 	header.size = SVE_PT_SIZE(vq, header.flags);
--	header.max_size = SVE_PT_SIZE(vq, SVE_PT_REGS_SVE);
-+	header.max_size = SVE_PT_SIZE(sve_vq_from_vl(header.max_vl),
-+				      SVE_PT_REGS_SVE);
- 
- 	ret = user_regset_copyout(&pos, &count, &kbuf, &ubuf, &header,
- 				  0, sizeof(header));
-@@ -845,14 +846,18 @@ static int sve_set(struct task_struct *target,
- 	if (ret)
- 		goto out;
- 
--	if (header.vl != target->thread.sve_vl)
--		return -EINVAL;
--
--	BUG_ON(!sve_vl_valid(header.vl));
--	vq = sve_vq_from_vl(header.vl);
-+	/*
-+	 * Apart from PT_SVE_REGS_MASK, all PT_SVE_* flags are consumed by
-+	 * sve_set_vector_length(), which will also validate them for us:
-+	 */
-+	ret = sve_set_vector_length(target, header.vl,
-+				    header.flags & ~SVE_PT_REGS_MASK);
-+	if (ret)
-+		goto out;
- 
--	if (header.flags & ~SVE_PT_REGS_MASK)
--		return -EINVAL;
-+	/* Actual VL set may be less than the user asked for: */
-+	BUG_ON(!sve_vl_valid(target->thread.sve_vl));
-+	vq = sve_vq_from_vl(target->thread.sve_vl);
- 
- 	/* Registers: FPSIMD-only case */
- 
++This is an outline of the most important features and issues only and not
++intended to be exhaustive.
++
++This document does not aim to describe the SVE architecture or programmer's
++model.  To aid understanding, a minimal description of relevant programmer's
++model features for SVE is included in Appendix A.
++
++
++1.  General
++-----------
++
++* SVE registers Z0..Z31, P0..P15 and FFR and the current vector length VL, are
++  tracked per-thread.
++
++* The presence of SVE is reported to userspace via HWCAP_SVE in the aux vector
++  AT_HWCAP entry.  SVE is reported in /proc/cpuinfo as "sve".
++
++
++2.  Vector length terminology
++-----------------------------
++
++The size of an SVE vector (Z) register is referred to as the "vector length".
++
++To avoid confusion about the units used to express vector length, the kernel
++adopts the following conventions:
++
++* Vector length (VL) = size of a Z-register in bytes
++
++* Vector quadwords (VQ) = size of a Z-register in units of 128 bits
++
++(So, VL = 16 * VQ.)
++
++The VQ convention is used where the underlying granularity is important, such
++as in data structure definitions.  In most other situations, the VL convention
++is used.  This is consistent with the meaning of the "VL" pseudo-register in
++the SVE instruction set architecture.
++
++
++3.  System call behaviour
++-------------------------
++
++* On syscall, V0..V31 are preserved (as without SVE).  Thus, bits [127:0] of
++  Z0..Z31 are preserved.  All other bits of Z0..Z31, and all of P0..P15 and FFR
++  become unspecified on return from a syscall.
++
++* The SVE registers are not used to pass arguments to or receive results from
++  any syscall.
++
++* In practice the affected registers/bits will be preserved or will be replaced
++  with zeros on return from a syscall, but userspace should not make
++  assumptions about this.  The kernel behaviour may vary on a case-by-case
++  basis.
++
++
++4.  Signal handling
++-------------------
++
++* A new signal frame record sve_context encodes the SVE registers on signal
++  delivery. [1]
++
++* This record is supplementary to fpsimd_context.  The FPSR and FPCR registers
++  are only present in fpsimd_context.  For convenience, the content of V0..V31
++  is duplicated between sve_context and fpsimd_context.
++
++* The sve_context record is included if and only if the SVE registers are live
++  at the time of signal delivery.
++
++If the sve_context record is present in the signal frame:
++
++* sve_context.vl encodes the current vector length of the thread.
++
++* The remainder of the data has a vl-dependent size and layout.  Macros
++  SIG_SVE_* are defined [1] to facilitate access to the members.
++
++* If the SVE context is too big to fit in sigcontext.__reserved[], then extra
++  space is allocated on the stack, an extra_context record is written in
++  __reserved[] referencing this space.  sve_context is then written in the
++  extra space.  Refer to [1] for further details about this mechanism.
++
++
++5.  Signal return
++-----------------
++
++When returning from a signal handler:
++
++* If there is no sve_context record in the signal frame, the SVE registers/bits
++  become non-live and unspecified.  (In practice, this is likely to mean that
++  these bits become zero, but software should not make assumptions about this.)
++
++* If sve_context is present in the signal frame, the SVE registers become live
++  and are populated appropriately.  However, for backward compatibility
++  reasons, bits [127:0] of Z0..Z31 are always restored from the corresponding
++  members of fpsimd_context.vregs[] and not from sve_context.  The remaining
++  bits are restored from sve_context.
++
++* Inclusion of fpsimd_context in the signal frame remains mandatory,
++  irrespective of whether sve_context is present or not.
++
++* The vector length cannot be changed via signal return.  If sve_context.vl in
++  the signal frame does not match the current vector length, the signal return
++  attempt is treated as illegal, resulting in a forced SIGSEGV.
++
++
++6.  prctl extensions
++--------------------
++
++Some new prctl() calls are added to allow programs to manage the SVE vector
++length:
++
++prctl(PR_SVE_SET_VL, unsigned long vl, unsigned long flags)
++
++    Sets the vector length of the calling thread.
++
++    flags:
++
++	PR_SVE_SET_VL_THREAD
++
++	    Permit setting even if the calling process has multiple threads.
++	    This is otherwise forbidden in order to prevent accidents.
++
++	    Worker threads with different vector lengths can be created in this
++	    way, within a single process.
++
++	    General-purpose userspace code may not work correctly unless all
++	    threads have the same vector length.
++
++	PR_SVE_SET_VL_INHERIT
++
++	    Inherit the current vector length across execve().  Otherwise, the
++	    vector length is reset to the system default at execve().  (See
++	    Section 9.)
++
++	PR_SVE_SET_VL_ONEXEC
++
++	    Defer the requested vector length change until the next execve().
++	    This allows launching of a new program with a different vector
++	    length, while avoiding runtime side effects in the caller.
++
++	    This also overrides the effect of PR_SVE_SET_VL_INHERIT for the
++	    first execve().
++
++	    Without PR_SVE_SET_VL_ONEXEC, any outstanding deferred vector
++	    length change is cancelled.
++
++    Return value: a nonnegative on success, or a negative value on error:
++	EINVAL: SVE not supported, invalid vector length requested, or
++	    invalid flags.
++
++    The returned value describes the resulting configuration, encoded as for
++    PR_SVE_GET_VL.
++
++    Changing the vector length causes all of P0..P15, FFR and all bits of
++    Z0..V31 except for Z0 bits [127:0] .. Z31 bits [127:0] to become
++    unspecified.  Calling PR_SVE_SET_VL with vl equal to the thread's current
++    vector length does not constitute a change to the vector length for this
++    purpose.
++
++    If vl is greater than the maximum vector length supported by the system,
++    the vector length is set to the maximum supported vector length.
++
++
++prctl(PR_SVE_GET_VL)
++
++    Gets the vector length of the calling thread.
++
++    The following flag may be OR-ed into the result:
++
++	PR_SVE_SET_VL_INHERIT
++
++	    Vector length will be inherited across execve().
++
++    There is no way to determine whether there is an outstanding deferred
++    vector length change (which would only normally be the case between a
++    fork() or vfork() and the corresponding execve() in typical use).
++
++    To extract the vector length from the result, use PR_SVE_GET_VL_LEN().
++
++    Return value: a nonnegative value on success, or a negative value on error:
++	EINVAL: SVE not supported.
++
++
++prctl(PR_GET_MINSIGSTKSZ)
++
++    Returns the minimum amount of stack space in bytes required for guaranteed
++    signal delivery.
++
++    The returned value is analogous to the POSIX macro MINSIGSTKSZ, except that
++    expansion of the signal frame is taken into account.  This allows correct
++    allocation of stacks even for large vector lengths.
++
++    Return value: a nonnegative value on success, or a negative value on error:
++	EINVAL: Function not implemented.
++
++    If this call fails, the value provided for MINSIGSTKSZ by [1] can be
++    assumed.
++
++
++7.  ptrace extensions
++---------------------
++
++* A new regset NT_ARM_SVE is defined for use with PTRACE_GETREGSET and
++  PTRACE_SETREGSET.
++
++  Refer to [2] for definitions.
++
++The regset data starts with struct user_sve_header, containing:
++
++    size
++
++	Size of the complete regset, in bytes.
++	This depends on vl and possibly on other things in the future.
++
++	If a call to PTRACE_GETREGSET requests less data than the value of
++	size, the caller can allocate a larger buffer and retry in order to
++	read the complete regset.
++
++    max_size
++
++	Maximum size in bytes that the regset can grow to for the target
++	thread.  The regset won't grow bigger than this even if the target
++	thread changes its vector length etc.
++
++    vl
++
++	Target thread's current vector length, in bytes.
++
++    max_vl
++
++	Maximum possible vector length for the target thread.
++
++    flags
++
++	either
++
++	    SVE_PT_REGS_FPSIMD
++
++		SVE registers are not live (GETREGSET) or are to be made
++		non-live (SETREGSET).
++
++		The payload is of type struct user_fpsimd_state, with the same
++		meaning as for NT_PRFPREG, starting at offset
++		SVE_PT_FPSIMD_OFFSET from the start of user_sve_header.
++
++		Extra data might be appended in the future: the size of the
++		payload should be obtained using SVE_PT_FPSIMD_SIZE(vq, flags).
++
++		vq should be obtained using sve_vq_from_vl(vl).
++
++		or
++
++	    SVE_PT_REGS_SVE
++
++		SVE registers are live (GETREGSET) or are to be made live
++		(SETREGSET).
++
++		The payload contains the SVE register data, starting at offset
++		SVE_PT_SVE_OFFSET from the start of user_sve_header, and with
++		size SVE_PT_SVE_SIZE(vq, flags);
++
++	... OR-ed with zero or more of the following flags, which have the same
++	meaning and behaviour as the corresponding PR_SET_VL_* flags:
++
++	    SVE_PT_VL_THREAD (SETREGSET only)
++
++	    SVE_PT_VL_INHERIT
++
++	    SVE_PT_VL_ONEXEC (SETREGSET only).
++
++* The effects of changing the vector length and/or flags are equivalent to
++  those documented for PR_SVE_SET_VL.
++
++* In the SVE_PT_REGS_SVE case, the size and layout of the payload depends on
++  the header fields.  The SVE_PT_SVE_*() macros are provided to facilitate
++  access to the members.
++
++* In either case, for SETREGSET it is permissible to omit the payload, in which
++  case only the vector length and flags are changed (along with any
++  consequences of those changes).
++
++  The effect of writing a partial, incomplete payload is unspecified.
++
++
++8.  ELF coredump extensions
++---------------------------
++
++* A NT_ARM_SVE note will be added to each coredump for each thread of the
++  dumped process.  The contents will be equivalent to the data that would have
++  been read if a PTRACE_GETREGSET of NT_ARM_SVE were executed for each thread
++  when the coredump was generated.
++
++  Each of these notes may be padded up to a larger size: if so, the surplus
++  data should be ignored when parsing the coredump.
++
++
++9.  System runtime configuration
++--------------------------------
++
++* To mitigate the ABI impact of expansion of the signal frame, a policy
++  mechanism is provided for administrators, distro maintainers and developers
++  to set the default vector length for userspace processes:
++
++/proc/cpu/sve_default_vector_length
++
++    Writing the text representation of an integer to this file sets the system
++    default vector length to the specified value, unless the value is greater
++    than the maximum vector length supported by the system in which case the
++    default vector length is set to that maximum.
++
++    The result can be determined by reopening the file and reading its
++    contents.
++
++    At boot, the default vector length is initially set to 64 or the maximum
++    supported vector length, whichever is smaller.  This determines the initial
++    vector length of the init process (PID 1).
++
++    Reading this file returns the current system default vector length.
++
++* At every execve() call, the new vector length of the new process is set to
++  the system default vector length, unless
++
++    * PR_SVE_SET_VL_INHERIT (or equivalently SVE_PT_VL_INHERIT) is set for the
++      calling thread, or
++
++    * a deferred vector length change is pending, established via the
++      PR_SVE_SET_VL_ONEXEC flag (or SVE_PT_VL_ONEXEC).
++
++* Modifying the system default vector length does not affect the vector length
++  of any existing process or thread that does not make an execve() call.
++
++
++Appendix A.  SVE programmer's model (informative)
++=================================================
++
++This section provides a minimal description of the additions made by SVE to the
++ARMv8-A programmer's model that are relevant to this document.
++
++Note: This section is for information only and not intended to be complete or
++to replace any architectural specification.
++
++A.1.  Registers
++---------------
++
++In A64 state, SVE adds the following:
++
++* 32 8VL-bit vector registers Z0..Z31
++  For each Zn, Zn bits [127:0] alias the ARMv8-A vector register Vn.
++
++  A register write using a Vn register name zeros all bits of the corresponding
++  Zn except for bits [127:0].
++
++* 16 VL-bit predicate registers P0..P15
++
++* 1 VL-bit special-purpose predicate register FFR (the "first-fault register")
++
++* a VL "pseudo-register" that determines the size of each vector register
++
++  The SVE instruction set architecture provides no way to write VL directly.
++  Instead, it can be modified only by EL1 and above, by writing appropriate
++  system registers.
++
++* The value of VL can be configured at runtime by EL1 and above:
++  16 <= VL <= VLmax, where VL must be a multiple of 16.
++
++* The maximum vector length is determined by the hardware:
++  16 <= VLmax <= 256.
++
++  (The SVE architecture specifies 256, but permits future architecture
++  revisions to raise this limit.)
++
++* FPSR and FPCR are retained from ARMv8-A, and interact with SVE floating-point
++  operations in a similar way to the way in which they interact with ARMv8
++  floating-point operations.
++
++         8VL-1                       128               0  bit index
++        +----          ////            -----------------+
++     Z0 |                               :       V0      |
++      :                                          :
++     Z7 |                               :       V7      |
++     Z8 |                               :     * V8      |
++      :                                       :  :
++    Z15 |                               :     *V15      |
++    Z16 |                               :      V16      |
++      :                                          :
++    Z31 |                               :      V31      |
++        +----          ////            -----------------+
++                                                 31    0
++         VL-1                  0                +-------+
++        +----       ////      --+          FPSR |       |
++     P0 |                       |               +-------+
++      : |                       |         *FPCR |       |
++    P15 |                       |               +-------+
++        +----       ////      --+
++    FFR |                       |               +-----+
++        +----       ////      --+            VL |     |
++                                                +-----+
++
++(*) callee-save:
++    This only applies to bits [63:0] of Z-/V-registers.
++    FPCR contains callee-save and caller-save bits.  See [3] for details.
++
++
++A.2.  Procedure call standard
++-----------------------------
++
++The ARMv8-A base procedure call standard is extended as follows with respect to
++the additional SVE register state:
++
++* All SVE register bits that are not shared with FP/SIMD are caller-save.
++
++* Z8 bits [63:0] .. Z15 bits [63:0] are callee-save.
++
++  This follows from the way these bits are mapped to V8..V15, which are caller-
++  save in the base procedure call standard.
++
++
++Appendix B.  ARMv8-A FP/SIMD programmer's model
++===============================================
++
++Note: This section is for information only and not intended to be complete or
++to replace any architectural specification.
++
++Refer to [3] for for more information.
++
++ARMv8-A defines the following floating-point / SIMD register state:
++
++* 32 128-bit vector registers V0..V31
++* 2 32-bit status/control registers FPSR, FPCR
++
++         127           0  bit index
++        +---------------+
++     V0 |               |
++      : :               :
++     V7 |               |
++   * V8 |               |
++   :  : :               :
++   *V15 |               |
++    V16 |               |
++      : :               :
++    V31 |               |
++        +---------------+
++
++                 31    0
++                +-------+
++           FPSR |       |
++                +-------+
++          *FPCR |       |
++                +-------+
++
++(*) callee-save:
++    This only applies to bits [63:0] of V-registers.
++    FPCR contains a mixture of callee-save and caller-save bits.
++
++
++References
++==========
++
++[1] arch/arm64/include/uapi/asm/sigcontext.h
++    AArch64 Linux signal ABI definitions
++
++[2] arch/arm64/include/uapi/asm/ptrace.h
++    AArch64 Linux ptrace ABI definitions
++
++[3] ARM IHI0055C
++    http://infocenter.arm.com/help/topic/com.arm.doc.ihi0055c/IHI0055C_beta_aapcs64.pdf
++    http://infocenter.arm.com/help/topic/com.arm.doc.subset.swdev.abi/index.html
++    Procedure Call Standard for the ARM 64-bit Architecture (AArch64)
 -- 
 2.1.4
