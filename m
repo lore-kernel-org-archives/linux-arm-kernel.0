@@ -1,49 +1,96 @@
-From: sven.eckelmann@openmesh.com (Sven Eckelmann)
-Date: Wed, 22 Mar 2017 15:10:49 +0100
-Subject: [15/17] qcom: ipq4019: add cpu operating points for cpufreq
- support
-In-Reply-To: <1458770712-10880-16-git-send-email-mmcclint@codeaurora.org>
-References: <1458770712-10880-16-git-send-email-mmcclint@codeaurora.org>
-Message-ID: <40277521.UIyJVnYny8@bentobox>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Wed, 22 Mar 2017 15:22:48 +0100
+Subject: [PATCH v3 16/19] KVM: arm64: ITS: vgic_its_check_id returns the
+ entry's GPA
+In-Reply-To: <be79d92f-2522-a754-f006-66901d26e94c@arm.com>
+References: <1488800074-21991-1-git-send-email-eric.auger@redhat.com>
+ <1488800074-21991-17-git-send-email-eric.auger@redhat.com>
+ <be79d92f-2522-a754-f006-66901d26e94c@arm.com>
+Message-ID: <393b3bef-07b6-146c-823e-fcf2541c921f@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mittwoch, 23. M?rz 2016 17:05:10 CET Matthew McClintock wrote:
-> This adds some operating points for cpu frequeny scaling
+Hi Andre,
+On 21/03/2017 19:12, Andre Przywara wrote:
+> Hi,
 > 
-> Signed-off-by: Matthew McClintock <mmcclint@codeaurora.org>
-[...]
+> On 06/03/17 11:34, Eric Auger wrote:
+>> As vgic_its_check_id() computes the device/collection entry's
+>> GPA, let's return it so that new callers can retrieve it easily.
+>>
+>> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+>>
+>> ---
+>>
+>> v2: new
+>> ---
+>>  virt/kvm/arm/vgic/vgic-its.c | 11 ++++++++---
+>>  1 file changed, 8 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+>> index ad67759..1060125 100644
+>> --- a/virt/kvm/arm/vgic/vgic-its.c
+>> +++ b/virt/kvm/arm/vgic/vgic-its.c
+>> @@ -637,7 +637,8 @@ static int vgic_its_cmd_handle_movi(struct kvm *kvm, struct vgic_its *its,
+>>   * is actually valid (covered by a memslot and guest accessible).
+>>   * For this we have to read the respective first level entry.
+>>   */
+>> -static bool vgic_its_check_id(struct vgic_its *its, u64 baser, int id)
+>> +static bool vgic_its_check_id(struct vgic_its *its, u64 baser, int id,
+>> +			      gpa_t *eaddr)
+>>  {
+>>  	int l1_tbl_size = GITS_BASER_NR_PAGES(baser) * SZ_64K;
+>>  	int index;
+>> @@ -657,6 +658,7 @@ static bool vgic_its_check_id(struct vgic_its *its, u64 baser, int id)
+>>  		addr = BASER_ADDRESS(baser) + id * esz;
+>>  		gfn = addr >> PAGE_SHIFT;
+>>  
+>> +		*eaddr = addr;
+> 
+> If you check that eaddr is not NULL before writing to it, you can save
+> the dummy variable in the two callers below (which doesn't hurt, but
+> does not help readability either).
 
-I saw that you've created a new version of the patch and it was added to
-different staging/testing [1] trees.
+Done
 
-But I find it rather odd that Codeaurora uses different settings [3]. Here for 
-easier comparison:
+Thanks
 
-setting     | QSDK 1.1.3     | proposed patch
----------------------------------------------
-clk-latency |         100000 |    256000
-opp0        |     48000(000) |  48000000
-opp1        |    200000(000) | 200000000
-opp2        |    500000(000) | 500000000
-opp3        |    710000(000) | 666000000
-
-It looks to me like clk-latency and the opp3 (maximum frequency) are 
-different. Is the reason for this difference known?
-
-I've just noticed it because I got an DTB from an ODM which had even
-716000(000) set for opp3.
-
-Kind regards,
-	Sven
-
-[1] https://git.lede-project.org/?p=lede/blogic/staging.git;a=blob;f=target/linux/ipq806x/patches-4.9/0017-qcom-ipq4019-add-cpu-operating-points-for-cpufreq-su.patch;h=7cbd6a4551bfd968d013164f76897c603f4ae2ff;hb=627e9c2c36839634d987535658a287843a8a9fd6
-[2] https://github.com/chunkeey/LEDE-IPQ40XX/blob/a04cf208fe317074502f7ea81dafa828c89b74bb/target/linux/ipq40xx/patches-4.9/120-qcom-ipq4019-add-cpu-operating-points-for-cpufreq-su.patch
-[3] https://source.codeaurora.org/quic/qsdk/oss/kernel/linux-msm/tree/arch/arm/boot/dts/qcom-ipq40xx.dtsi?h=release/date_r1&id=461894f071b168c963795ebfa15d3458b102730a#n768
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170322/9327cde0/attachment.sig>
+Eric
+> 
+> Cheers,
+> Andre.
+> 
+>>  		return kvm_is_visible_gfn(its->dev->kvm, gfn);
+>>  	}
+>>  
+>> @@ -689,6 +691,7 @@ static bool vgic_its_check_id(struct vgic_its *its, u64 baser, int id)
+>>  	indirect_ptr += index * esz;
+>>  	gfn = indirect_ptr >> PAGE_SHIFT;
+>>  
+>> +	*eaddr = indirect_ptr;
+>>  	return kvm_is_visible_gfn(its->dev->kvm, gfn);
+>>  }
+>>  
+>> @@ -697,8 +700,9 @@ static int vgic_its_alloc_collection(struct vgic_its *its,
+>>  				     u32 coll_id)
+>>  {
+>>  	struct its_collection *collection;
+>> +	gpa_t eaddr;
+>>  
+>> -	if (!vgic_its_check_id(its, its->baser_coll_table, coll_id))
+>> +	if (!vgic_its_check_id(its, its->baser_coll_table, coll_id, &eaddr))
+>>  		return E_ITS_MAPC_COLLECTION_OOR;
+>>  
+>>  	collection = kzalloc(sizeof(*collection), GFP_KERNEL);
+>> @@ -910,8 +914,9 @@ static int vgic_its_cmd_handle_mapd(struct kvm *kvm, struct vgic_its *its,
+>>  	size_t size = its_cmd_get_size(its_cmd);
+>>  	gpa_t itt_addr = its_cmd_get_ittaddr(its_cmd);
+>>  	struct its_device *device;
+>> +	gpa_t eaddr;
+>>  
+>> -	if (!vgic_its_check_id(its, its->baser_device_table, device_id))
+>> +	if (!vgic_its_check_id(its, its->baser_device_table, device_id, &eaddr))
+>>  		return E_ITS_MAPD_DEVICE_OOR;
+>>  
+>>  	if (valid && size > VITS_TYPER_IDBITS)
+>>
