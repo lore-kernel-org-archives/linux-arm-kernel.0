@@ -1,77 +1,48 @@
 From: zyw@rock-chips.com (Chris Zhong)
-Date: Wed, 22 Mar 2017 09:54:48 +0800
-Subject: [PATCH v4 1/4] drm/rockchip/dsi: check phy_cfg_clk only for RK3399
+Date: Wed, 22 Mar 2017 09:54:51 +0800
+Subject: [PATCH v4 4/4] drm/rockchip/dsi: correct the grf_switch_reg name
 In-Reply-To: <1490147691-4489-1-git-send-email-zyw@rock-chips.com>
 References: <1490147691-4489-1-git-send-email-zyw@rock-chips.com>
-Message-ID: <1490147691-4489-2-git-send-email-zyw@rock-chips.com>
+Message-ID: <1490147691-4489-5-git-send-email-zyw@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For RK3399, the phy_cfg_clk is a required clock, if phy_cfg_clk is
-disabled, MIPI phy can not work. Let's return a error if there is no
-phy_cfg_clk in dts property, when the pdata match RK3399.
+For the RK3399, the grf_switch_reg name should be RK3399_GRF_SOC_CON20,
+not RK3399_GRF_SOC_CON19.
 
 Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+Reviewed-by: Brian Norris <briannorris@chromium.org>
 Reviewed-by: Sean Paul <seanpaul@chromium.org>
 ---
 
 Changes in v4: None
-Changes in v3:
-- add a DW_MIPI_NEEDS_PHY_CFG_CLK for RK3399
-
+Changes in v3: None
 Changes in v2: None
 
- drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 14 ++++++++------
- 1 file changed, 8 insertions(+), 6 deletions(-)
+ drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-index f84f9ae..68f48b0 100644
+index dc8fd22..3aedcba 100644
 --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
 +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-@@ -251,6 +251,8 @@
- #define THS_PRE_PROGRAM_EN	BIT(7)
- #define THS_ZERO_PROGRAM_EN	BIT(6)
+@@ -34,7 +34,7 @@
+ #define RK3288_DSI0_SEL_VOP_LIT		BIT(6)
+ #define RK3288_DSI1_SEL_VOP_LIT		BIT(9)
  
-+#define DW_MIPI_NEEDS_PHY_CFG_CLK	BIT(0)
-+
- enum {
- 	BANDGAP_97_07,
- 	BANDGAP_98_05,
-@@ -279,6 +281,7 @@ struct dw_mipi_dsi_plat_data {
- 	u32 grf_switch_reg;
- 	u32 grf_dsi0_mode;
- 	u32 grf_dsi0_mode_reg;
-+	unsigned int flags;
- 	unsigned int max_data_lanes;
- };
+-#define RK3399_GRF_SOC_CON19		0x6250
++#define RK3399_GRF_SOC_CON20		0x6250
+ #define RK3399_DSI0_SEL_VOP_LIT		BIT(0)
+ #define RK3399_DSI1_SEL_VOP_LIT		BIT(4)
  
-@@ -1136,6 +1139,7 @@ static struct dw_mipi_dsi_plat_data rk3399_mipi_dsi_drv_data = {
- 	.grf_switch_reg = RK3399_GRF_SOC_CON19,
+@@ -1151,7 +1151,7 @@ static struct dw_mipi_dsi_plat_data rk3288_mipi_dsi_drv_data = {
+ static struct dw_mipi_dsi_plat_data rk3399_mipi_dsi_drv_data = {
+ 	.dsi0_en_bit = RK3399_DSI0_SEL_VOP_LIT,
+ 	.dsi1_en_bit = RK3399_DSI1_SEL_VOP_LIT,
+-	.grf_switch_reg = RK3399_GRF_SOC_CON19,
++	.grf_switch_reg = RK3399_GRF_SOC_CON20,
  	.grf_dsi0_mode = RK3399_GRF_DSI_MODE,
  	.grf_dsi0_mode_reg = RK3399_GRF_SOC_CON22,
-+	.flags = DW_MIPI_NEEDS_PHY_CFG_CLK,
- 	.max_data_lanes = 4,
- };
- 
-@@ -1227,15 +1231,13 @@ static int dw_mipi_dsi_bind(struct device *dev, struct device *master,
- 		clk_disable_unprepare(dsi->pclk);
- 	}
- 
--	dsi->phy_cfg_clk = devm_clk_get(dev, "phy_cfg");
--	if (IS_ERR(dsi->phy_cfg_clk)) {
--		ret = PTR_ERR(dsi->phy_cfg_clk);
--		if (ret != -ENOENT) {
-+	if (pdata->flags & DW_MIPI_NEEDS_PHY_CFG_CLK) {
-+		dsi->phy_cfg_clk = devm_clk_get(dev, "phy_cfg");
-+		if (IS_ERR(dsi->phy_cfg_clk)) {
-+			ret = PTR_ERR(dsi->phy_cfg_clk);
- 			dev_err(dev, "Unable to get phy_cfg_clk: %d\n", ret);
- 			return ret;
- 		}
--		dsi->phy_cfg_clk = NULL;
--		dev_dbg(dev, "have not phy_cfg_clk\n");
- 	}
- 
- 	ret = clk_prepare_enable(dsi->pllref_clk);
+ 	.flags = DW_MIPI_NEEDS_PHY_CFG_CLK | DW_MIPI_NEEDS_GRF_CLK,
 -- 
 2.6.3
