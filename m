@@ -1,50 +1,61 @@
 From: jagan@openedev.com (Jagan Teki)
-Date: Thu, 23 Mar 2017 00:35:16 +0530
-Subject: [PATCH v8 1/3] Input: max11801_ts: Add missing of_match_table
-Message-ID: <1490209518-20790-1-git-send-email-jagan@openedev.com>
+Date: Thu, 23 Mar 2017 00:35:17 +0530
+Subject: [PATCH v8 2/3] dt-bindings: input: touchscreen: Add max11801-ts
+ binding
+In-Reply-To: <1490209518-20790-1-git-send-email-jagan@openedev.com>
+References: <1490209518-20790-1-git-send-email-jagan@openedev.com>
+Message-ID: <1490209518-20790-2-git-send-email-jagan@openedev.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jagan Teki <jagan@amarulasolutions.com>
 
-Added missing of_match_table for max11801_ts driver with
-compatible as "maxim,max11801_ts"
+Add missing documentation of max11801-ts dt-binding details.
 
 Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Rob Herring <robh+dt@kernel.org>
 Cc: Shawn Guo <shawnguo@kernel.org>
-Cc: Matteo Lisi <matteo.lisi@engicam.com>
 Cc: Michael Trimarchi <michael@amarulasolutions.com>
 Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 ---
 Changes for v8:
-- use the compatible as maxim,max11801 with remove suffix _ts since
-  i2c node follow the same.
+- Use IRQ_TYPE_EDGE_FALLING for interrupt trigger type. 
 Changes for v7:
-- newly added patch
+- add vendor prefix as maxim
+Changes for v6:
+- Replace the lable and name of the node
+   ts: max11801 => max11801: touchscreen at 48
+Changes for v5:
+- Newly added patch
 
- drivers/input/touchscreen/max11801_ts.c | 7 +++++++
- 1 file changed, 7 insertions(+)
+ .../bindings/input/touchscreen/max11801-ts.txt         | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/input/touchscreen/max11801-ts.txt
 
-diff --git a/drivers/input/touchscreen/max11801_ts.c b/drivers/input/touchscreen/max11801_ts.c
-index a595ae5..d3c7fc0 100644
---- a/drivers/input/touchscreen/max11801_ts.c
-+++ b/drivers/input/touchscreen/max11801_ts.c
-@@ -224,9 +224,16 @@ static int max11801_ts_probe(struct i2c_client *client,
- };
- MODULE_DEVICE_TABLE(i2c, max11801_ts_id);
- 
-+static const struct of_device_id max11801_ts_dt_ids[] = {
-+	{ .compatible = "maxim,max11801" },
-+	{ /* sentinel */ }
-+};
-+MODULE_DEVICE_TABLE(of, max11801_ts_dt_ids);
+diff --git a/Documentation/devicetree/bindings/input/touchscreen/max11801-ts.txt b/Documentation/devicetree/bindings/input/touchscreen/max11801-ts.txt
+new file mode 100644
+index 0000000..40ac0fe
+--- /dev/null
++++ b/Documentation/devicetree/bindings/input/touchscreen/max11801-ts.txt
+@@ -0,0 +1,18 @@
++* MAXI MAX11801 Resistive touch screen controller with i2c interface
 +
- static struct i2c_driver max11801_ts_driver = {
- 	.driver = {
- 		.name	= "max11801_ts",
-+		.of_match_table	= max11801_ts_dt_ids,
- 	},
- 	.id_table	= max11801_ts_id,
- 	.probe		= max11801_ts_probe,
++Required properties:
++- compatible: must be "maxim,max11801"
++- reg: i2c slave address
++- interrupt-parent: the phandle for the interrupt controller
++- interrupts: touch controller interrupt
++
++Example:
++
++&i2c1 {
++	max11801: touchscreen at 48 {
++		compatible = "maxim,max11801";
++		reg = <0x48>;
++		interrupt-parent = <&gpio3>;
++		interrupts = <31 IRQ_TYPE_EDGE_FALLING>;
++	};
++};
 -- 
 1.9.1
