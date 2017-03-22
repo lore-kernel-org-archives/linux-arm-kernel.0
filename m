@@ -1,43 +1,25 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Wed, 22 Mar 2017 15:25:01 +0100
-Subject: [PATCH/RFC v2 0/4] iommu/ipmmu-vmsa: IPMMU slave device
- whitelist V2
-In-Reply-To: <148549764733.22203.16459470412085471955.sendpatchset@little-apple>
-References: <148549764733.22203.16459470412085471955.sendpatchset@little-apple>
-Message-ID: <20170322142501.GM29659@8bytes.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 22 Mar 2017 14:24:39 +0000
+Subject: [PATCH 6/7] arm64: hugetlb: Spring clean huge pte accessors
+In-Reply-To: <20170321180421.18332-7-punit.agrawal@arm.com>
+References: <20170321180421.18332-1-punit.agrawal@arm.com>
+ <20170321180421.18332-7-punit.agrawal@arm.com>
+Message-ID: <20170322142439.GG2977@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 27, 2017 at 03:14:07PM +0900, Magnus Damm wrote:
-> iommu/ipmmu-vmsa: IPMMU slave device whitelist V2
-> 
-> [PATCH/RFC v2 1/4] iommu/of: Skip IOMMU devices disabled in DT
-> [PATCH/RFC v2 2/4] iommu/ipmmu-vmsa: Get rid of disabled device check
-> [PATCH/RFC v2 3/4] iommu/ipmmu-vmsa: Check devices in xlate()
-> [PATCH/RFC v2 3/4] iommu/ipmmu-vmsa: Opt-in slave devices based on ES version
-> 
-> Here's an updated prototype that shows how DT integration of IPMMU details
-> may be integrated and merged upstream based on SoC data sheet ahead of
-> time followed by enablement in the IPMMU driver code once the appropriate
-> SoC ES version has been released and the hardware has been tested.
-> 
-> Changes since V1:
->  - Broke out patch 1 from the IPMMU driver
->  - Moved slave device check from ->add_device() to ->xlate() (Thanks Robin!)
->  - Updated white list patch to hook into ->xlate()
-> 
-> Patch 1 may be suitable for upstream merge, however other patches should
-> in the future if agreed on be rolled into the IPMMU driver series.
-> 
-> Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
-> ---
-> 
->  Developed on top of renesas-drivers-2017-01-24-v4.10-rc5
-> 
->  drivers/iommu/ipmmu-vmsa.c |   59 +++++++++++++++++++++++---------------------
->  drivers/iommu/of_iommu.c   |    2 -
->  2 files changed, 33 insertions(+), 28 deletions(-)
+On Tue, Mar 21, 2017 at 06:04:20PM +0000, Punit Agrawal wrote:
+> +		/*
+> +		 * If HW_AFDBM is enabled, then the HW could
+> +		 * turn on the dirty bit for any of the page
+> +		 * in the set, so check them all.
+> +		 */
 
-For the series:
+Nit: we've carried over a grammar bug from the existing comment, which
+would be nive to fix up. Can we either s/page/pages/ or s/of the // ?
 
-Reviewed-by: Joerg Roedel <jroedel@suse.de>
+Either way, the logic looks good.
+
+Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+
+Mark.
