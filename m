@@ -1,178 +1,131 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 22 Mar 2017 11:35:00 +0000
-Subject: [PATCH v2] efifb: avoid reconfiguration of BAR that covers the
- framebuffer
-In-Reply-To: <35F65528-FC1F-4813-A0C6-641CF864212A@linaro.org>
-References: <1490123810-12383-1-git-send-email-ard.biesheuvel@linaro.org>
- <20170322102939.GB3519@red-moon>
- <35F65528-FC1F-4813-A0C6-641CF864212A@linaro.org>
-Message-ID: <20170322113500.GA3940@red-moon>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 22 Mar 2017 12:35:39 +0100
+Subject: [PATCH v6 0/4] Add runtime PM support for clocks (on Exynos SoC
+ example)
+References: <CGME20170322113553eucas1p20875eb2da524fd090c6a7cc725c9d944@eucas1p2.samsung.com>
+Message-ID: <1490182543-28550-1-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[+Yinghai]
+Dear All,
 
-On Wed, Mar 22, 2017 at 11:08:48AM +0000, Ard Biesheuvel wrote:
-> 
-> > On 22 Mar 2017, at 10:29, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
-> > 
-> >> On Tue, Mar 21, 2017 at 07:16:50PM +0000, Ard Biesheuvel wrote:
-> >> On UEFI systems, the PCI subsystem is enumerated by the firmware,
-> >> and if a graphical framebuffer is exposed by a PCI device, its base
-> >> address and size are exposed to the OS via the Graphics Output
-> >> Protocol (GOP).
-> >> 
-> >> On arm64 PCI systems, the entire PCI hierarchy is reconfigured from
-> >> scratch at boot. This may result in the GOP framebuffer address to
-> >> become stale, if the BAR covering the framebuffer is modified. This
-> >> will cause the framebuffer to become unresponsive, and may in some
-> >> cases result in unpredictable behavior if the range is reassigned to
-> >> another device.
-> >> 
-> >> So add a quirk to the EFI fb driver to find the BAR associated with
-> >> the GOP base address, and set the IORESOURCE_PCI_FIXED attribute so
-> >> that the PCI core will leave it alone.
-> >> 
-> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> >> ---
-> >> As it turns out, setting the IORESOURCE_PCI_FIXED flag is not sufficient
-> >> to make the PCI core leave the BARs alone, so instead, the BAR resource
-> >> is claimed in the quirk handler.
-> >> 
-> >> As suggested by Lorenzo, a check is added that the device has memory
-> >> decoding enabled, and if it doesn't, no attempt is made to use the
-> >> EFI framebuffer.
-> >> 
-> >> drivers/video/fbdev/efifb.c | 58 +++++++++++++++++++-
-> >> 1 file changed, 57 insertions(+), 1 deletion(-)
-> >> 
-> >> diff --git a/drivers/video/fbdev/efifb.c b/drivers/video/fbdev/efifb.c
-> >> index 8c4dc1e1f94f..eeeaf78c4a5b 100644
-> >> --- a/drivers/video/fbdev/efifb.c
-> >> +++ b/drivers/video/fbdev/efifb.c
-> >> @@ -10,6 +10,7 @@
-> >> #include <linux/efi.h>
-> >> #include <linux/errno.h>
-> >> #include <linux/fb.h>
-> >> +#include <linux/pci.h>
-> >> #include <linux/platform_device.h>
-> >> #include <linux/screen_info.h>
-> >> #include <video/vga.h>
-> >> @@ -143,6 +144,9 @@ static struct attribute *efifb_attrs[] = {
-> >> };
-> >> ATTRIBUTE_GROUPS(efifb);
-> >> 
-> >> +static bool pci_bar_found;    /* did we find a BAR matching the efifb base? */
-> >> +static bool pci_bar_disabled;    /* was it disabled? */
-> >> +
-> >> static int efifb_probe(struct platform_device *dev)
-> >> {
-> >>    struct fb_info *info;
-> >> @@ -152,7 +156,7 @@ static int efifb_probe(struct platform_device *dev)
-> >>    unsigned int size_total;
-> >>    char *option = NULL;
-> >> 
-> >> -    if (screen_info.orig_video_isVGA != VIDEO_TYPE_EFI)
-> >> +    if (screen_info.orig_video_isVGA != VIDEO_TYPE_EFI || pci_bar_disabled)
-> >>        return -ENODEV;
-> >> 
-> >>    if (fb_get_options("efifb", &option))
-> >> @@ -360,3 +364,55 @@ static struct platform_driver efifb_driver = {
-> >> };
-> >> 
-> >> builtin_platform_driver(efifb_driver);
-> >> +
-> >> +static void claim_efifb_bar(struct pci_dev *dev, int idx)
-> >> +{
-> >> +    u16 word;
-> >> +
-> >> +    pci_bar_found = true;
-> >> +
-> >> +    if (pci_claim_resource(dev, idx)) {
-> > 
-> > I would not do that. If claiming the resource succeeds, it will become
-> > immutable (ie it becomes part of the resource tree), if it is your FB
-> > fine if it isn't this will mess things up since a) you won't be able to
-> > claim the PCI resources for the real FB and b) you won't be able to
-> > reallocate the PCI resources for the device we *think* is the FB but it
-> > actually isn't (unless we force a realloc).
-> > 
-> > So, I would carry out the check below first, if the device is enabled
-> > we should flag its resource IORESOURCE_PCI_FIXED otherwise just do
-> > nothing and let PCI core (through arch specific realloc policy) handle
-> > it.
-> > 
-> 
-> Well, it turned out that this does not actually work: the BAR is not
-> reassigned, but the same range ends up being given to another device
-> in some cases.
+This patchset adds runtime PM support to common clock framework. This is an
+attempt to implement support for clock controllers, which belongs to a power
+domain. This approach works surprisingly well on Exynos 5433 SoC, what allowed
+us to solve various freeze/crash issues related to power management.
 
-Ok, that's because the PCI core just prevent assigning that resource
-but it does not request it (ie insert it in the resource tree) which
-is what you do when claiming it.
+The main idea behind this patchset is to keep clock's controller power domain
+enabled every time when at least one of its clock is enabled or access to its
+registers is being made. Clock controller driver (clock provider) can
+supply a struct device pointer, which is the used by clock core for tracking and
+managing clock's controller runtime pm state. Each clk_prepare() operation will
+first call pm_runtime_get_sync() on the supplied device, while clk_unprepare()
+will do pm_runtime_put() at the end.
 
-I wonder how IORESOURCE_PCI_FIXED works on eg x86, I think it is time
-to have a proper look into resources allocation code because there
-are bits and pieces that are quite obscure to me.
+This runtime PM feature has been tested with Exynos4412 (not included in this
+patchset) and Exynos5433 clocks drivers. Both have some clocks, which belongs to
+respective power domains and need special handling during power on/off
+procedures. Till now it wasn't handled at all, what caused various problems.
 
-I think I would reverse the order in which you carry out the BAR
-reservation anyway (first check if the device is enabled second request
-the resource ie claim it).
+Patches for clocks drivers change the way the clock provider is initialized.
+Instead of CLK_OF_DECLARE based initialization, a complete platform device driver
+infrastructure is being used. This is needed to let driver to use runtime PM
+feature and integrate with generic power domains. The side-effect of this change
+is a delay in clock provider registeration during system boot, so early
+initialized drivers might get EPROBEDEFER error when requesting their clocks.
+This is an issue for IOMMU drivers, so this patchset will be fully functional
+once the deferred probe for IOMMU will be merged. v9 of the IOMMU deferred probe
+support has been posted a few days ago:
+https://www.spinics.net/lists/arm-kernel/msg567558.html
 
-Lorenzo
+Patches are based on v4.11-rc3.
 
-> 
-> 
-> > Side note: I *think* it should be fine to claim a resource twice
-> > (ie in x86 the FB would have been claimed already by core x86 code),
-> > just thought it is worth checking.
-> > 
-> > Lorenzo
-> > 
-> >> +        pci_bar_disabled = true;
-> >> +        dev_err(&dev->dev, "BAR %d: failed to claim efifb BAR\n", idx);
-> >> +        return;
-> >> +    }
-> >> +
-> >> +    pci_read_config_word(dev, PCI_COMMAND, &word);
-> >> +    if (!(word & PCI_COMMAND_MEMORY)) {
-> >> +        pci_bar_disabled = true;
-> >> +        dev_err(&dev->dev,
-> >> +            "BAR %d: efifb BAR has memory decoding disabled!\n", idx);
-> >> +        return;
-> >> +    }
-> >> +
-> >> +    dev_info(&dev->dev, "BAR %d: claimed for efifb\n", idx);
-> >> +}
-> >> +
-> >> +static void efifb_fixup_resources(struct pci_dev *dev)
-> >> +{
-> >> +    u64 base = screen_info.lfb_base;
-> >> +    u64 size = screen_info.lfb_size;
-> >> +    int i;
-> >> +
-> >> +    if (pci_bar_found || screen_info.orig_video_isVGA != VIDEO_TYPE_EFI)
-> >> +        return;
-> >> +
-> >> +    if (screen_info.capabilities & VIDEO_CAPABILITY_64BIT_BASE)
-> >> +        base |= (u64)screen_info.ext_lfb_base << 32;
-> >> +
-> >> +    if (!base)
-> >> +        return;
-> >> +
-> >> +    for (i = 0; i < PCI_STD_RESOURCE_END; i++) {
-> >> +        struct resource *res = &dev->resource[i];
-> >> +
-> >> +        if (!(res->flags & IORESOURCE_MEM))
-> >> +            continue;
-> >> +
-> >> +        if (res->start <= base && res->end >= base + size - 1) {
-> >> +            claim_efifb_bar(dev, i);
-> >> +            break;
-> >> +        }
-> >> +    }
-> >> +}
-> >> +DECLARE_PCI_FIXUP_HEADER(PCI_ANY_ID, PCI_ANY_ID, efifb_fixup_resources);
-> >> -- 
-> >> 2.7.4
-> >> 
+Stephen: this patchset finally got a review from Ulf (from PM point of
+view). Is also touches only the Exynos5433 and Exynos Audio Subsystem
+drivers, which both have separate DT nodes for each clock controllers and
+each clock controller is entirely only in the one power domain, so everything is
+clean from the current DT bindings perspective. Would it be okay to merge it?
+
+Best regards
+Marek Szyprowski
+Samsung R&D Institute Poland
+
+
+Changelog:
+
+v6:
+- addressed comments from Ulf Hanson and added his 'Reviewed-by' tags
+- simplified exynos 5433 clock driver code a bit
+- fixes issues pointed by kbuild test robot
+
+v5:
+- rebased onto next-20170125 kernel release
+- added two more calls to runtime PM in clock's core:
+	1. clk_recalc() should ensure active runtime pm state, because it might
+	   read registers (in case of dividers) to calculate the rate
+	2. clk_register() also needs to ensure active runtime pm state to read
+	   initial rate and status of the clocks
+- more fixes in Exynos5433 clocks drivers:
+	1. PLL in DISP CMU must be enabled for suspend
+	2. guard clocks registration with pm_runtime_get_sync/pm_runtime_put to
+	   avoid turning the power domain on and off many times for no good
+	   reason (registering each clock will call pm_runtime_get_sync(), then
+	   pm_runtime_put, what in turn might disable power domain)
+- still waiting for a review...
+
+v4: http://www.spinics.net/lists/arm-kernel/msg550747.html
+- Removed patch for Exynos4412 clocks from the patchset. DT bindings for power
+  domain for ISP sub-controller needs more discussion. It will be handled
+  separately when the runtime PM for clocks feature gets merged.
+- Added patch with runtime PM support for Exynos AudioSS clock controller driver
+  (needed to enable audio power domain on Exynos5 series).
+- Fixes in Exynos5433 driver:
+	1. added missing clock for Audio CMU
+	2. added support for FSYS CMU
+	3. improved support for DISP CMU (thanks to Andrzej Hajda for
+	   investigating that).
+- Rebased onto v4.10-rc1
+- Waiting for a review...
+
+v3: http://www.spinics.net/lists/arm-kernel/msg538122.html
+- Removed CLK_RUNTIME_PM flag, core now simply checks if runtime pm is enabled
+  for the provided device during clock registration as suggested by Ulf
+- Simplified code for exynos4412 isp clock driver registration
+- Resolved some other minor issues pointed by Ulf clk core code
+- Rebased onto v4.9-rc1 and new version of IOMMU deferred probe patchset
+
+v2: https://www.spinics.net/lists/arm-kernel/msg532798.html
+- Simplified clk_pm_runtime_get/put functions, removed workaround for devices
+  with disabled runtime pm. Such workaround is no longer needed since commit
+  4d23a5e84806b202d9231929c9507ef7cf7a0185 ("PM / Domains: Allow runtime PM
+  during system PM phases").
+- Added CLK_RUNTIME_PM flag to indicate clocks, for which clock core should
+  call runtime pm functions. This solves problem with clocks, for which struct
+  device is already registered, but no runtime pm is enabled.
+- Extended commit messages according to Ulf suggestions.
+- Fixed some style issues pointed by Barlomiej.
+
+v1: http://www.spinics.net/lists/arm-kernel/msg528128.html
+- initial version
+
+
+Patch summary:
+
+Marek Szyprowski (4):
+  clk: Add support for runtime PM
+  clk: samsung: Add support for runtime PM
+  clk: samsung: exynos5433: Add runtime PM support
+  clk: samsung: exynos-audss: Use runtime PM
+
+ .../devicetree/bindings/clock/clk-exynos-audss.txt |   6 +
+ .../devicetree/bindings/clock/exynos5433-clock.txt |  16 +
+ drivers/clk/clk.c                                  | 129 ++++++-
+ drivers/clk/samsung/clk-exynos-audss.c             |  68 ++--
+ drivers/clk/samsung/clk-exynos5433.c               | 413 ++++++++++++++++-----
+ drivers/clk/samsung/clk-pll.c                      |   2 +-
+ drivers/clk/samsung/clk.c                          |  12 +-
+ drivers/clk/samsung/clk.h                          |   7 +
+ 8 files changed, 517 insertions(+), 136 deletions(-)
+
+-- 
+1.9.1
