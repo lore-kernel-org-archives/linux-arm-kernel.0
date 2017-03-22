@@ -1,16 +1,142 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 22 Mar 2017 14:45:30 +0800
-Subject: [PATCH 1/2] ARM: dts: imx25-pinfunc: remove duplicate definition
-In-Reply-To: <20170320082111.3249-1-uwe@kleine-koenig.org>
-References: <20170320082111.3249-1-uwe@kleine-koenig.org>
-Message-ID: <20170322064528.GK3443@dragon>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 22 Mar 2017 14:50:31 +0800
+Subject: [PATCH 4/5] clk: sunxi-ng: Add driver for A83T CCU
+In-Reply-To: <20170215094954.h3wyaxlqkeb342yu@lukather>
+References: <20170214033526.16977-1-wens@csie.org>
+ <20170214033526.16977-5-wens@csie.org>
+ <20170214095819.utsftcvti5zdmlmi@lukather>
+ <CAGb2v66PxbhUdqSwFc5iFN2wDVQbOsibDkckXpFsxXW1WJNe3w@mail.gmail.com>
+ <20170215094954.h3wyaxlqkeb342yu@lukather>
+Message-ID: <CAGb2v67ey1Ppc3wf1154QKoCX-xsOjWDEsXi5gxPbL4MY37zHw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 20, 2017 at 09:21:10AM +0100, Uwe Kleine-K?nig wrote:
-> This was introduced in commit 18e2b50407fb ("ARM: dts: imx25-pinfunc:
-> more defines").
-> 
-> Signed-off-by: Uwe Kleine-K?nig <uwe@kleine-koenig.org>
+On Wed, Feb 15, 2017 at 5:49 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Tue, Feb 14, 2017 at 06:26:39PM +0800, Chen-Yu Tsai wrote:
+>> On Tue, Feb 14, 2017 at 5:58 PM, Maxime Ripard
+>> <maxime.ripard@free-electrons.com> wrote:
+>> > On Tue, Feb 14, 2017 at 11:35:25AM +0800, Chen-Yu Tsai wrote:
+>> >> +/* Some PLLs are input * N / div1 / P. Model them as NKMP with no K */
+>> >
+>> > Is that even working?
+>>
+>> Looking at the nkmp clock code, only .recalc_rate will work properly though.
+>> Maybe I could fix up the code so it handles zero width factors.
+>>
+>> > I'm not quite sure we want to do that. We might model it as a NP clock
+>> > with a variable prediv?
+>>
+>> There's no NP clock type yet. And a problem with a variable prediv is that
+>> it doesn't participate in factor calculation. It's effectively fixed.
+>>
+>> I did this for the A80 as well though. Fixing up the NKMP clock might be
+>> easier.
+>
+> Then maybe we just need a NMP clock type then. What I'm really afraid
+> of is that we'll just end up in a clk-factors situation that was
+> simply impossible to maintain without breaking anything, hence why we
+> had different clock types then.
 
-Applied both, thanks.
+Upon further review, I think it will work. I did notice a discrepancy
+between .set_rate and .round_rate though. Will send fixes later.
+
+About the old clk-factors situation, I'm not exactly sure what part
+you're referring to. To me it seems the "factors" bits are mostly the
+same. Differences are mostly with parent-specific pre-dividers,
+clock post-dividers, and non-standard factors. The first is nicely
+handled by the new mux wrapper, the second is currently only used
+with NK types, and the last is currently only supported by single
+factor divider or multiplier clocks with tables.
+
+Non-standard factors are probably the trickiest one, but given we will
+support full factor tables for some of the tricky CPU PLLs, this is
+probably solved, even if not implemented yet.
+
+I'll start with the NP style clocks, which only use P when the output
+is under a certain frequency.
+
+Regards
+ChenYu
+
+>> >
+>> >> +/* Use a separate clock for the pre-divider on the AHB1 PLL-PERIPH input */
+>> >> +static SUNXI_CCU_M(pll_periph_ahb1_clk, "pll-periph-ahb1", "pll-periph",
+>> >> +                0x054, 6, 2, 0);
+>> >> +
+>> >> +static const char * const ahb1_parents[] = { "osc16M-d512", "osc24M",
+>> >> +                                          "pll-periph-ahb1",
+>> >> +                                          "pll-periph-ahb1" };
+>> >> +static struct ccu_div ahb1_clk = {
+>> >> +     .div            = _SUNXI_CCU_DIV_FLAGS(4, 2, CLK_DIVIDER_POWER_OF_TWO),
+>> >> +     .mux            = _SUNXI_CCU_MUX(12, 2),
+>> >> +     .common         = {
+>> >> +             .reg            = 0x054,
+>> >> +             .hw.init        = CLK_HW_INIT_PARENTS("ahb1",
+>> >> +                                                   ahb1_parents,
+>> >> +                                                   &ccu_div_ops,
+>> >> +                                                   0),
+>> >> +     },
+>> >> +};
+>> >
+>> > What's different from a pre divider only for a given index here?
+>>
+>> The variable pre-divider is shared for both pll-periph mux inputs.
+>> This is one way to handle it. The other would be to extend ccu_mux
+>> to handle multiple variable pre-dividers. I don't really want to do
+>> that if this is the only instance that needs it though.
+>
+> Every addition we made was only needed by one instance at first :)
+>
+> We are working that way for fixed pre-dividers already, I don't see
+> why we can't have it for variable ones too.
+>
+>> >> +/*
+>> >> + * MMC2 supports what's called the "new timing mode". The CCU and the MMC
+>> >> + * controller must be in sync about which mode is used. The new mode moves
+>> >> + * the clock delay controls (and possibly the delay lines) into the MMC
+>> >> + * block. Also, the output of the clock is divided by 2. The output and
+>> >> + * sample phase clocks are unused under this mode.
+>> >> + *
+>> >> + * This new mode seems to be preferred. Hence we force this clock to the
+>> >> + * new mode. And we don't add the phase clocks.
+>> >> + */
+>> >
+>> > I'm sorry, but I said this several times, this isn't working. We
+>> > should model it properly, and not hack this around in the clock
+>> > driver.
+>> >
+>> > As you say in your comment, the MMC driver needs to be aware about
+>> > which mode is used, in order to also set a bit in one of its registers
+>> > accordingly, and modify its sampling behaviour.
+>> >
+>> > The new timing is preferred, but our previous clock implementations
+>> > didn't hardcode it, so we can't even rely on that behaviour to always
+>> > write it in our driver.
+>>
+>> Correct. With the A83T there has never been a merged clock driver though.
+>> I realize this is a one off thing.
+>>
+>> > This is not something specific to the A83T, but is found in all the
+>> > SoCs since the A23, so we need to come up with a good solution to
+>> > address that.
+>> >
+>> > I'm not sure what a good solution would be though. One would be to
+>> > just have a private function of our own to switch in the new mode (if
+>> > relevant, because only the MMC2 controllers have it), but that would
+>> > lead to troubles with !sunxi-ng. Not something we can't deal with, but
+>> > some extra precautions should be taken (make sure to protect the call
+>> > through an ifdef / IS_DEFINED, check that the sunxi-ng driver has been
+>> > probed, etc.)
+>>
+>> If the custom function route is acceptable, I'll come up with something.
+>
+> I think it would be a great start yes. I'll try to discuss it with
+> Mike and Stephen at ELC and see what they think about that.
+>
+> Maxime
+>
+> --
+> Maxime Ripard, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
