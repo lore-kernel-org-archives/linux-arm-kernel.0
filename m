@@ -1,214 +1,64 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Wed, 22 Mar 2017 18:24:04 +0100
-Subject: [PATCH v1 2/4] clk: rockchip: rk3228: add CLK_IGNORE_UNUSED flag
- for some clks
-In-Reply-To: <1489653894-2440-3-git-send-email-zhangqing@rock-chips.com>
-References: <1489653894-2440-1-git-send-email-zhangqing@rock-chips.com>
- <1489653894-2440-3-git-send-email-zhangqing@rock-chips.com>
-Message-ID: <1613388.aipGbOUUHC@phil>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Wed, 22 Mar 2017 17:25:50 +0000
+Subject: [PATCH v3 3/5] coresight: add support for debug module
+In-Reply-To: <1e6d6a91-3bdc-7cfb-a96f-780c959e0316@arm.com>
+References: <1488520809-31670-1-git-send-email-leo.yan@linaro.org>
+ <1488520809-31670-4-git-send-email-leo.yan@linaro.org>
+ <671a0b39-b635-6e0e-d3fa-967651f2e29c@arm.com>
+ <CAJ9a7VgCjXNGC4C49PxL-nBxzhMCmA8Mb-0C_epahizA5EL2HA@mail.gmail.com>
+ <e7a97c52-f61a-e503-f626-09563fa100b8@arm.com>
+ <CAJ9a7VhvCS3xXAHBt0AUVB2Zp2P1HP_LQm4KiptiBT9VJ1fC0Q@mail.gmail.com>
+ <4961636d-d77c-0f9a-7076-4db1ef456073@arm.com>
+ <1e6d6a91-3bdc-7cfb-a96f-780c959e0316@arm.com>
+Message-ID: <7a028460-d598-e337-5e09-234beddca88b@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Elaine,
 
 
-in general, I expect some sort of explanation in the commit message on
-why clocks need to be always on and cannot be handled from a driver.
+On 22/03/17 17:09, Suzuki K Poulose wrote:
+> On 22/03/17 16:17, Sudeep Holla wrote:
 
-Also you can save flags, if you just make leave-clocks critical, which also
-is way safer than using clk_ignore_unused - see rk3399.
+[...]
 
-Some highlights down below
-
-
-Am Donnerstag, 16. M?rz 2017, 16:44:52 CET schrieb Elaine Zhang:
-> set pclk_cpu and hclk_cpu as critical_clocks
+>> 
+>> Point taken. So we could just specify that all necessary power
+>> domains need to be on for proper functionality for this feature and
+>> that it's highly platform specific instead of mixing cpu/cluster
+>> idle details here.
+>> 
+>>> The key point is that the caveat in using this driver is that
+>>> the power management has to be considered on a platform specific
+>>> basis before it is configured; and appropriate actions may be
+>>> needed for it to work correctly. Without this then the driver
+>>> could cause more issues than it debugs. A user selecting this
+>>> _must_ be told about these issues
+>>> 
 > 
-> Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
-> ---
->  drivers/clk/rockchip/clk-rk3228.c | 66 ++++++++++++++++++++-------------------
->  1 file changed, 34 insertions(+), 32 deletions(-)
+> So given all the possible caveats, I think we :
 > 
-> diff --git a/drivers/clk/rockchip/clk-rk3228.c b/drivers/clk/rockchip/clk-rk3228.c
-> index db6e5a9e6de6..9f82d089084e 100644
-> --- a/drivers/clk/rockchip/clk-rk3228.c
-> +++ b/drivers/clk/rockchip/clk-rk3228.c
-> @@ -262,9 +262,9 @@ enum rk3228_plls {
->  			RK2928_CLKGATE_CON(6), 2, GFLAGS),
->  	GATE(0, "pclk_cpu", "pclk_bus_src", 0,
->  			RK2928_CLKGATE_CON(6), 3, GFLAGS),
-> -	GATE(0, "pclk_phy_pre", "pclk_bus_src", 0,
-> +	GATE(0, "pclk_phy_pre", "pclk_bus_src", CLK_IGNORE_UNUSED,
->  			RK2928_CLKGATE_CON(6), 4, GFLAGS),
-> -	GATE(0, "pclk_ddr_pre", "pclk_bus_src", 0,
-> +	GATE(0, "pclk_ddr_pre", "pclk_bus_src", CLK_IGNORE_UNUSED,
->  			RK2928_CLKGATE_CON(6), 13, GFLAGS),
-
-both not needed if you make pclk_ddrupctl and friends critical
-
-
->  	/* PD_VIDEO */
-> @@ -445,7 +445,7 @@ enum rk3228_plls {
->  			RK2928_CLKGATE_CON(2), 12, GFLAGS,
->  			&rk3228_spdif_fracmux),
->  
-> -	GATE(0, "jtag", "ext_jtag", 0,
-> +	GATE(0, "jtag", "ext_jtag", CLK_IGNORE_UNUSED,
->  			RK2928_CLKGATE_CON(1), 3, GFLAGS),
->  
->  	GATE(0, "sclk_otgphy0", "xin24m", 0,
-> @@ -527,24 +527,24 @@ enum rk3228_plls {
->  
->  	/* PD_VOP */
->  	GATE(0, "aclk_rga", "aclk_rga_pre", 0, RK2928_CLKGATE_CON(13), 0, GFLAGS),
-> -	GATE(0, "aclk_rga_noc", "aclk_rga_pre", 0, RK2928_CLKGATE_CON(13), 11, GFLAGS),
-> +	GATE(0, "aclk_rga_noc", "aclk_rga_pre", CLK_IGNORE_UNUSED, RK2928_CLKGATE_CON(13), 11, GFLAGS),
->  	GATE(0, "aclk_iep", "aclk_iep_pre", 0, RK2928_CLKGATE_CON(13), 2, GFLAGS),
-> -	GATE(0, "aclk_iep_noc", "aclk_iep_pre", 0, RK2928_CLKGATE_CON(13), 9, GFLAGS),
-> +	GATE(0, "aclk_iep_noc", "aclk_iep_pre", CLK_IGNORE_UNUSED, RK2928_CLKGATE_CON(13), 9, GFLAGS),
-
-please make noc-clocks critical, see rk3399
-
->  
->  	GATE(ACLK_VOP, "aclk_vop", "aclk_vop_pre", 0, RK2928_CLKGATE_CON(13), 5, GFLAGS),
-> -	GATE(0, "aclk_vop_noc", "aclk_vop_pre", 0, RK2928_CLKGATE_CON(13), 12, GFLAGS),
-> +	GATE(0, "aclk_vop_noc", "aclk_vop_pre", CLK_IGNORE_UNUSED, RK2928_CLKGATE_CON(13), 12, GFLAGS),
->  
->  	GATE(0, "aclk_hdcp", "aclk_hdcp_pre", 0, RK2928_CLKGATE_CON(14), 10, GFLAGS),
-> -	GATE(0, "aclk_hdcp_noc", "aclk_hdcp_pre", 0, RK2928_CLKGATE_CON(13), 10, GFLAGS),
-> +	GATE(0, "aclk_hdcp_noc", "aclk_hdcp_pre", CLK_IGNORE_UNUSED, RK2928_CLKGATE_CON(13), 10, GFLAGS),
->  
->  	GATE(0, "hclk_rga", "hclk_vio_pre", 0, RK2928_CLKGATE_CON(13), 1, GFLAGS),
->  	GATE(0, "hclk_iep", "hclk_vio_pre", 0, RK2928_CLKGATE_CON(13), 3, GFLAGS),
->  	GATE(HCLK_VOP, "hclk_vop", "hclk_vio_pre", 0, RK2928_CLKGATE_CON(13), 6, GFLAGS),
-> -	GATE(0, "hclk_vio_ahb_arbi", "hclk_vio_pre", 0, RK2928_CLKGATE_CON(13), 7, GFLAGS),
-> -	GATE(0, "hclk_vio_noc", "hclk_vio_pre", 0, RK2928_CLKGATE_CON(13), 8, GFLAGS),
-> -	GATE(0, "hclk_vop_noc", "hclk_vio_pre", 0, RK2928_CLKGATE_CON(13), 13, GFLAGS),
-> +	GATE(0, "hclk_vio_ahb_arbi", "hclk_vio_pre", CLK_IGNORE_UNUSED, RK2928_CLKGATE_CON(13), 7, GFLAGS),
-> +	GATE(0, "hclk_vio_noc", "hclk_vio_pre", CLK_IGNORE_UNUSED, RK2928_CLKGATE_CON(13), 8, GFLAGS),
-> +	GATE(0, "hclk_vop_noc", "hclk_vio_pre", CLK_IGNORE_UNUSED, RK2928_CLKGATE_CON(13), 13, GFLAGS),
->  	GATE(0, "hclk_vio_h2p", "hclk_vio_pre", 0, RK2928_CLKGATE_CON(14), 7, GFLAGS),
-> -	GATE(0, "hclk_hdcp_mmu", "hclk_vio_pre", 0, RK2928_CLKGATE_CON(14), 12, GFLAGS),
-> +	GATE(0, "hclk_hdcp_mmu", "hclk_vio_pre", CLK_IGNORE_UNUSED, RK2928_CLKGATE_CON(14), 12, GFLAGS),
-
-I would assume the hdcp-iommu should handle this clock, why does it need
-to be always on?
-
-
->  	GATE(PCLK_HDMI_CTRL, "pclk_hdmi_ctrl", "hclk_vio_pre", 0, RK2928_CLKGATE_CON(14), 6, GFLAGS),
->  	GATE(0, "pclk_vio_h2p", "hclk_vio_pre", 0, RK2928_CLKGATE_CON(14), 8, GFLAGS),
->  	GATE(0, "pclk_hdcp", "hclk_vio_pre", 0, RK2928_CLKGATE_CON(14), 11, GFLAGS),
-> @@ -558,13 +558,13 @@ enum rk3228_plls {
->  	GATE(HCLK_EMMC, "hclk_emmc", "hclk_peri", 0, RK2928_CLKGATE_CON(11), 2, GFLAGS),
->  	GATE(HCLK_NANDC, "hclk_nandc", "hclk_peri", 0, RK2928_CLKGATE_CON(11), 3, GFLAGS),
->  	GATE(0, "hclk_host0", "hclk_peri", 0, RK2928_CLKGATE_CON(11), 6, GFLAGS),
-> -	GATE(0, "hclk_host0_arb", "hclk_peri", 0, RK2928_CLKGATE_CON(11), 7, GFLAGS),
-> +	GATE(0, "hclk_host0_arb", "hclk_peri", CLK_IGNORE_UNUSED, RK2928_CLKGATE_CON(11), 7, GFLAGS),
->  	GATE(0, "hclk_host1", "hclk_peri", 0, RK2928_CLKGATE_CON(11), 8, GFLAGS),
-> -	GATE(0, "hclk_host1_arb", "hclk_peri", 0, RK2928_CLKGATE_CON(11), 9, GFLAGS),
-> +	GATE(0, "hclk_host1_arb", "hclk_peri", CLK_IGNORE_UNUSED, RK2928_CLKGATE_CON(11), 9, GFLAGS),
->  	GATE(0, "hclk_host2", "hclk_peri", 0, RK2928_CLKGATE_CON(11), 10, GFLAGS),
->  	GATE(0, "hclk_otg", "hclk_peri", 0, RK2928_CLKGATE_CON(11), 12, GFLAGS),
-> -	GATE(0, "hclk_otg_pmu", "hclk_peri", 0, RK2928_CLKGATE_CON(11), 13, GFLAGS),
-> -	GATE(0, "hclk_host2_arb", "hclk_peri", 0, RK2928_CLKGATE_CON(11), 14, GFLAGS),
-> +	GATE(0, "hclk_otg_pmu", "hclk_peri", CLK_IGNORE_UNUSED, RK2928_CLKGATE_CON(11), 13, GFLAGS),
-> +	GATE(0, "hclk_host2_arb", "hclk_peri", CLK_IGNORE_UNUSED, RK2928_CLKGATE_CON(11), 14, GFLAGS),
-
-same as noc clocks, make arbiter clocks critical instead
-
->  	GATE(0, "hclk_peri_noc", "hclk_peri", CLK_IGNORE_UNUSED, RK2928_CLKGATE_CON(12), 1, GFLAGS),
->  
->  	GATE(PCLK_GMAC, "pclk_gmac", "pclk_peri", 0, RK2928_CLKGATE_CON(11), 5, GFLAGS),
-> @@ -572,15 +572,15 @@ enum rk3228_plls {
->  
->  	/* PD_GPU */
->  	GATE(0, "aclk_gpu", "aclk_gpu_pre", 0, RK2928_CLKGATE_CON(13), 14, GFLAGS),
-> -	GATE(0, "aclk_gpu_noc", "aclk_gpu_pre", 0, RK2928_CLKGATE_CON(13), 15, GFLAGS),
-> +	GATE(0, "aclk_gpu_noc", "aclk_gpu_pre", CLK_IGNORE_UNUSED, RK2928_CLKGATE_CON(13), 15, GFLAGS),
->  
->  	/* PD_BUS */
-> -	GATE(0, "sclk_initmem_mbist", "aclk_cpu", 0, RK2928_CLKGATE_CON(8), 1, GFLAGS),
-> -	GATE(0, "aclk_initmem", "aclk_cpu", 0, RK2928_CLKGATE_CON(8), 0, GFLAGS),
-> +	GATE(0, "sclk_initmem_mbist", "aclk_cpu", CLK_IGNORE_UNUSED, RK2928_CLKGATE_CON(8), 1, GFLAGS),
-> +	GATE(0, "aclk_initmem", "aclk_cpu", CLK_IGNORE_UNUSED, RK2928_CLKGATE_CON(8), 0, GFLAGS),
->  	GATE(ACLK_DMAC, "aclk_dmac_bus", "aclk_cpu", 0, RK2928_CLKGATE_CON(8), 2, GFLAGS),
->  	GATE(0, "aclk_bus_noc", "aclk_cpu", CLK_IGNORE_UNUSED, RK2928_CLKGATE_CON(10), 1, GFLAGS),
->  
-> -	GATE(0, "hclk_rom", "hclk_cpu", 0, RK2928_CLKGATE_CON(8), 3, GFLAGS),
-> +	GATE(0, "hclk_rom", "hclk_cpu", CLK_IGNORE_UNUSED, RK2928_CLKGATE_CON(8), 3, GFLAGS),
->  	GATE(HCLK_I2S0_8CH, "hclk_i2s0_8ch", "hclk_cpu", 0, RK2928_CLKGATE_CON(8), 7, GFLAGS),
->  	GATE(HCLK_I2S1_8CH, "hclk_i2s1_8ch", "hclk_cpu", 0, RK2928_CLKGATE_CON(8), 8, GFLAGS),
->  	GATE(HCLK_I2S2_2CH, "hclk_i2s2_2ch", "hclk_cpu", 0, RK2928_CLKGATE_CON(8), 9, GFLAGS),
-> @@ -589,18 +589,18 @@ enum rk3228_plls {
->  	GATE(0, "hclk_crypto_mst", "hclk_cpu", 0, RK2928_CLKGATE_CON(8), 11, GFLAGS),
->  	GATE(0, "hclk_crypto_slv", "hclk_cpu", 0, RK2928_CLKGATE_CON(8), 12, GFLAGS),
->  
-> -	GATE(0, "pclk_ddrupctl", "pclk_ddr_pre", 0, RK2928_CLKGATE_CON(8), 4, GFLAGS),
-> -	GATE(0, "pclk_ddrmon", "pclk_ddr_pre", 0, RK2928_CLKGATE_CON(8), 6, GFLAGS),
-> -	GATE(0, "pclk_msch_noc", "pclk_ddr_pre", 0, RK2928_CLKGATE_CON(10), 2, GFLAGS),
-> +	GATE(0, "pclk_ddrupctl", "pclk_ddr_pre", CLK_IGNORE_UNUSED, RK2928_CLKGATE_CON(8), 4, GFLAGS),
-> +	GATE(0, "pclk_ddrmon", "pclk_ddr_pre", CLK_IGNORE_UNUSED, RK2928_CLKGATE_CON(8), 6, GFLAGS),
-> +	GATE(0, "pclk_msch_noc", "pclk_ddr_pre", CLK_IGNORE_UNUSED, RK2928_CLKGATE_CON(10), 2, GFLAGS),
-
-again critical
-
-
-> -	GATE(0, "pclk_efuse_1024", "pclk_cpu", 0, RK2928_CLKGATE_CON(8), 13, GFLAGS),
-> -	GATE(0, "pclk_efuse_256", "pclk_cpu", 0, RK2928_CLKGATE_CON(8), 14, GFLAGS),
-> +	GATE(0, "pclk_efuse_1024", "pclk_cpu", CLK_IGNORE_UNUSED, RK2928_CLKGATE_CON(8), 13, GFLAGS),
-> +	GATE(0, "pclk_efuse_256", "pclk_cpu", CLK_IGNORE_UNUSED, RK2928_CLKGATE_CON(8), 14, GFLAGS),
-
-we do have a general efuse driver, why do these clocks need to be on?
-
-
->  	GATE(PCLK_I2C0, "pclk_i2c0", "pclk_cpu", 0, RK2928_CLKGATE_CON(8), 15, GFLAGS),
->  	GATE(PCLK_I2C1, "pclk_i2c1", "pclk_cpu", 0, RK2928_CLKGATE_CON(9), 0, GFLAGS),
->  	GATE(PCLK_I2C2, "pclk_i2c2", "pclk_cpu", 0, RK2928_CLKGATE_CON(9), 1, GFLAGS),
->  	GATE(PCLK_I2C3, "pclk_i2c3", "pclk_cpu", 0, RK2928_CLKGATE_CON(9), 2, GFLAGS),
->  	GATE(PCLK_TIMER, "pclk_timer0", "pclk_cpu", 0, RK2928_CLKGATE_CON(9), 4, GFLAGS),
-> -	GATE(0, "pclk_stimer", "pclk_cpu", 0, RK2928_CLKGATE_CON(9), 5, GFLAGS),
-> +	GATE(0, "pclk_stimer", "pclk_cpu", CLK_IGNORE_UNUSED, RK2928_CLKGATE_CON(9), 5, GFLAGS),
->  	GATE(PCLK_SPI0, "pclk_spi0", "pclk_cpu", 0, RK2928_CLKGATE_CON(9), 6, GFLAGS),
->  	GATE(PCLK_PWM, "pclk_rk_pwm", "pclk_cpu", 0, RK2928_CLKGATE_CON(9), 7, GFLAGS),
->  	GATE(PCLK_GPIO0, "pclk_gpio0", "pclk_cpu", 0, RK2928_CLKGATE_CON(9), 8, GFLAGS),
-> @@ -616,20 +616,20 @@ enum rk3228_plls {
->  	GATE(0, "pclk_sgrf", "pclk_cpu", CLK_IGNORE_UNUSED, RK2928_CLKGATE_CON(10), 2, GFLAGS),
->  	GATE(0, "pclk_sim", "pclk_cpu", 0, RK2928_CLKGATE_CON(10), 3, GFLAGS),
->  
-> -	GATE(0, "pclk_ddrphy", "pclk_phy_pre", 0, RK2928_CLKGATE_CON(10), 3, GFLAGS),
-> -	GATE(0, "pclk_acodecphy", "pclk_phy_pre", 0, RK2928_CLKGATE_CON(10), 5, GFLAGS),
-> +	GATE(0, "pclk_ddrphy", "pclk_phy_pre", CLK_IGNORE_UNUSED, RK2928_CLKGATE_CON(10), 3, GFLAGS),
-> +	GATE(0, "pclk_acodecphy", "pclk_phy_pre", CLK_IGNORE_UNUSED, RK2928_CLKGATE_CON(10), 5, GFLAGS),
->  	GATE(PCLK_HDMI_PHY, "pclk_hdmiphy", "pclk_phy_pre", 0, RK2928_CLKGATE_CON(10), 7, GFLAGS),
->  	GATE(0, "pclk_vdacphy", "pclk_phy_pre", 0, RK2928_CLKGATE_CON(10), 8, GFLAGS),
-> -	GATE(0, "pclk_phy_noc", "pclk_phy_pre", 0, RK2928_CLKGATE_CON(10), 9, GFLAGS),
-> +	GATE(0, "pclk_phy_noc", "pclk_phy_pre", CLK_IGNORE_UNUSED, RK2928_CLKGATE_CON(10), 9, GFLAGS),
->  
->  	GATE(0, "aclk_vpu", "aclk_vpu_pre", 0, RK2928_CLKGATE_CON(15), 0, GFLAGS),
-> -	GATE(0, "aclk_vpu_noc", "aclk_vpu_pre", 0, RK2928_CLKGATE_CON(15), 4, GFLAGS),
-> +	GATE(0, "aclk_vpu_noc", "aclk_vpu_pre", CLK_IGNORE_UNUSED, RK2928_CLKGATE_CON(15), 4, GFLAGS),
->  	GATE(0, "aclk_rkvdec", "aclk_rkvdec_pre", 0, RK2928_CLKGATE_CON(15), 2, GFLAGS),
-> -	GATE(0, "aclk_rkvdec_noc", "aclk_rkvdec_pre", 0, RK2928_CLKGATE_CON(15), 6, GFLAGS),
-> +	GATE(0, "aclk_rkvdec_noc", "aclk_rkvdec_pre", CLK_IGNORE_UNUSED, RK2928_CLKGATE_CON(15), 6, GFLAGS),
->  	GATE(0, "hclk_vpu", "hclk_vpu_pre", 0, RK2928_CLKGATE_CON(15), 1, GFLAGS),
-> -	GATE(0, "hclk_vpu_noc", "hclk_vpu_pre", 0, RK2928_CLKGATE_CON(15), 5, GFLAGS),
-> +	GATE(0, "hclk_vpu_noc", "hclk_vpu_pre", CLK_IGNORE_UNUSED, RK2928_CLKGATE_CON(15), 5, GFLAGS),
->  	GATE(0, "hclk_rkvdec", "hclk_rkvdec_pre", 0, RK2928_CLKGATE_CON(15), 3, GFLAGS),
-> -	GATE(0, "hclk_rkvdec_noc", "hclk_rkvdec_pre", 0, RK2928_CLKGATE_CON(15), 7, GFLAGS),
-> +	GATE(0, "hclk_rkvdec_noc", "hclk_rkvdec_pre", CLK_IGNORE_UNUSED, RK2928_CLKGATE_CON(15), 7, GFLAGS),
->  
->  	/* PD_MMC */
->  	MMC(SCLK_SDMMC_DRV,    "sdmmc_drv",    "sclk_sdmmc", RK3228_SDMMC_CON0, 1),
-> @@ -644,6 +644,8 @@ enum rk3228_plls {
->  
->  static const char *const rk3228_critical_clocks[] __initconst = {
->  	"aclk_cpu",
-> +	"pclk_cpu",
-> +	"hclk_cpu",
->  	"aclk_peri",
->  	"hclk_peri",
->  	"pclk_peri",
+> 1) Shouldn't enable the driver by default at runtime even if it is 
+> built-in. 
+> 2) Should provide mechanisms to turn it on at boot (via
+> kernel commandline) or anytime later (via sysfs), which kind of puts
+> the responsibility back on the user : "You know what you are doing". 
+> 3) Shouldn't turn the driver on based on "nohlt" which the user
+> could use it for some other purposes, without explicit intention of
+> turning this driver on).
+> 4) Should document the fact that, on some
+> platforms, the user may have to disable CPUidle explicitly to get the
+> driver working. But let us not make it the default. The user with a
+> not so ideal platform could add "nohlt" and get it working.
 > 
 
+Agreed on all points and well summarized.
+I would like to highlight (3) and (4) as it needs to be well understood.
 
-Heiko
+"nohlt" has a *different* meaning already, so using that in this
+driver for something else is simple wrong as it affects the system in
+unintended ways. And yes if user (mis)uses it to get things working,
+it's fine but shouldn't be recommended way.
+
+-- 
+Regards,
+Sudeep
