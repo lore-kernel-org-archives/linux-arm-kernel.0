@@ -1,51 +1,158 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Wed, 22 Mar 2017 09:26:41 +0100
-Subject: [PATCH v3 4/4] arm64: dts: rockchip: add regulator info for Kevin
- digitizer
-In-Reply-To: <20170320235344.126298-5-briannorris@chromium.org>
-References: <20170320235344.126298-1-briannorris@chromium.org>
- <20170320235344.126298-5-briannorris@chromium.org>
-Message-ID: <20415662.PctC9IM4SC@phil>
+From: a.hajda@samsung.com (Andrzej Hajda)
+Date: Wed, 22 Mar 2017 09:36:34 +0100
+Subject: [PATCH 10/41] drm/bridge: analogix_dp: Don't change psr while
+ bridge is disabled
+In-Reply-To: <20170321195818.GE19389@art_vandelay>
+References: <20170310043305.17216-1-seanpaul@chromium.org>
+ <CGME20170310044738epcas5p254ae086c7ed81ec88e4ba3211f86c014@epcas5p2.samsung.com>
+ <20170310043305.17216-11-seanpaul@chromium.org>
+ <e7b7ef5b-7935-a74c-c046-27c56ae16774@samsung.com>
+ <20170321195818.GE19389@art_vandelay>
+Message-ID: <5279d215-4a19-73c0-0a77-9c8580fa36c0@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, 20. M?rz 2017, 16:53:44 CET schrieb Brian Norris:
-> We need to enable this regulator before the digitizer can be used. Wacom
-> recommended waiting for 100 ms before talking to the HID.
-> 
-> Signed-off-by: Brian Norris <briannorris@chromium.org>
-> ---
-> v3:
->  * reintroduced into patch set; bindings are in linux-next
-> ---
->  arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts | 3 +++
->  1 file changed, 3 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
-> b/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts index
-> 2f720cf2fd07..f4714c4606f3 100644
-> --- a/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
-> +++ b/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
-> @@ -232,6 +232,9 @@ ap_i2c_dig: &i2c2 {
+On 21.03.2017 20:58, Sean Paul wrote:
+> On Thu, Mar 16, 2017 at 02:40:21PM +0100, Andrzej Hajda wrote:
+>> On 10.03.2017 05:32, Sean Paul wrote:
+>>> From: zain wang <wzz@rock-chips.com>
+>>>
+>>> There is a race between AUX CH bring-up and enabling bridge which will
+>>> cause link training to fail. To avoid hitting it, don't change psr state
+>>> while enabling the bridge.
+>>>
+>>> Cc: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+>>> Cc: Sean Paul <seanpaul@chromium.org>
+>>> Signed-off-by: zain wang <wzz@rock-chips.com>
+>>> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+>>> [seanpaul fixed up the commit message a bit and renamed *_supported to *_enabled]
+>>> Signed-off-by: Sean Paul <seanpaul@chromium.org>
+>> Hmm, beside resetting psr_enable in analogix_dp_bridge_disable I do not
+>> see functional change, or am I blind?
+> The patch also adds a check of psr_enable in analogix_dp_commit. This will avoid
+> trying to enable psr when the bridge is disabled (that's why psr_enable is
+> reset).
 
-according to the hid-over-i2c binding, this should use a special compatible 
-like
+Copy/paste from analogix_dp_commit chunk below:
 
-	compatible = "wacom,w9013", "hid-over-i2c"
+-	dp->psr_support = analogix_dp_detect_sink_psr(dp);
+-	if (dp->psr_support)
++	dp->psr_enable = analogix_dp_detect_sink_psr(dp);
++	if (dp->psr_enable)
+ 		analogix_dp_enable_sink_psr(dp);
 
-As the binding patch is from Caesar, I assume that is the Kevin component and
-I can add that myself, just need confirmation that this is actually the correct 
-component :-) .
 
+What is added here?
 
-Thanks
-Heiko
+Regards
+Andrzej
 
->  		pinctrl-names = "default";
->  		pinctrl-0 = <&cpu1_dig_irq_l &cpu1_dig_pdct_l>;
-> 
-> +		vdd-supply = <&p3_3v_dig>;
-> +		post-power-on-delay-ms = <100>;
-> +
->  		interrupt-parent = <&gpio2>;
->  		interrupts = <4 IRQ_TYPE_LEVEL_LOW>;
+>
+> Sean
+>
+>> Regards
+>> Andrzej
+>>
+>>> ---
+>>>  drivers/gpu/drm/bridge/analogix/analogix_dp_core.c | 15 ++++++++-------
+>>>  drivers/gpu/drm/bridge/analogix/analogix_dp_core.h |  2 +-
+>>>  drivers/gpu/drm/rockchip/analogix_dp-rockchip.c    |  2 +-
+>>>  include/drm/bridge/analogix_dp.h                   |  2 +-
+>>>  4 files changed, 11 insertions(+), 10 deletions(-)
+>>>
+>>> diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
+>>> index 8a8f05fe9da3..64d94a34874d 100644
+>>> --- a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
+>>> +++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
+>>> @@ -98,20 +98,20 @@ static int analogix_dp_detect_hpd(struct analogix_dp_device *dp)
+>>>  	return 0;
+>>>  }
+>>>  
+>>> -int analogix_dp_psr_supported(struct device *dev)
+>>> +int analogix_dp_psr_enabled(struct device *dev)
+>>>  {
+>>>  	struct analogix_dp_device *dp = dev_get_drvdata(dev);
+>>>  
+>>> -	return dp->psr_support;
+>>> +	return dp->psr_enable;
+>>>  }
+>>> -EXPORT_SYMBOL_GPL(analogix_dp_psr_supported);
+>>> +EXPORT_SYMBOL_GPL(analogix_dp_psr_enabled);
+>>>  
+>>>  int analogix_dp_enable_psr(struct device *dev)
+>>>  {
+>>>  	struct analogix_dp_device *dp = dev_get_drvdata(dev);
+>>>  	struct edp_vsc_psr psr_vsc;
+>>>  
+>>> -	if (!dp->psr_support)
+>>> +	if (!dp->psr_enable)
+>>>  		return 0;
+>>>  
+>>>  	/* Prepare VSC packet as per EDP 1.4 spec, Table 6.9 */
+>>> @@ -134,7 +134,7 @@ int analogix_dp_disable_psr(struct device *dev)
+>>>  	struct edp_vsc_psr psr_vsc;
+>>>  	int ret;
+>>>  
+>>> -	if (!dp->psr_support)
+>>> +	if (!dp->psr_enable)
+>>>  		return 0;
+>>>  
+>>>  	/* Prepare VSC packet as per EDP 1.4 spec, Table 6.9 */
+>>> @@ -878,8 +878,8 @@ static void analogix_dp_commit(struct analogix_dp_device *dp)
+>>>  	/* Enable video */
+>>>  	analogix_dp_start_video(dp);
+>>>  
+>>> -	dp->psr_support = analogix_dp_detect_sink_psr(dp);
+>>> -	if (dp->psr_support)
+>>> +	dp->psr_enable = analogix_dp_detect_sink_psr(dp);
+>>> +	if (dp->psr_enable)
+>>>  		analogix_dp_enable_sink_psr(dp);
+>>>  }
+>>>  
+>>> @@ -1120,6 +1120,7 @@ static void analogix_dp_bridge_disable(struct drm_bridge *bridge)
+>>>  	if (ret)
+>>>  		DRM_ERROR("failed to setup the panel ret = %d\n", ret);
+>>>  
+>>> +	dp->psr_enable = false;
+>>>  	dp->dpms_mode = DRM_MODE_DPMS_OFF;
+>>>  }
+>>>  
+>>> diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h
+>>> index b039b28d8fcc..e135a42cb19e 100644
+>>> --- a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h
+>>> +++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h
+>>> @@ -170,7 +170,7 @@ struct analogix_dp_device {
+>>>  	int			dpms_mode;
+>>>  	int			hpd_gpio;
+>>>  	bool                    force_hpd;
+>>> -	bool			psr_support;
+>>> +	bool			psr_enable;
+>>>  
+>>>  	struct mutex		panel_lock;
+>>>  	bool			panel_is_modeset;
+>>> diff --git a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
+>>> index 64e7e2c0bc58..f44756029478 100644
+>>> --- a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
+>>> +++ b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
+>>> @@ -83,7 +83,7 @@ static void analogix_dp_psr_set(struct drm_encoder *encoder, bool enabled)
+>>>  	int vact_end;
+>>>  	int ret;
+>>>  
+>>> -	if (!analogix_dp_psr_supported(dp->dev))
+>>> +	if (!analogix_dp_psr_enabled(dp->dev))
+>>>  		return;
+>>>  
+>>>  	dev_dbg(dp->dev, "%s PSR...\n", enabled ? "enable" : "disable");
+>>> diff --git a/include/drm/bridge/analogix_dp.h b/include/drm/bridge/analogix_dp.h
+>>> index c99d6eaef1ac..4fc0165ed3f5 100644
+>>> --- a/include/drm/bridge/analogix_dp.h
+>>> +++ b/include/drm/bridge/analogix_dp.h
+>>> @@ -38,7 +38,7 @@ struct analogix_dp_plat_data {
+>>>  			 struct drm_connector *);
+>>>  };
+>>>  
+>>> -int analogix_dp_psr_supported(struct device *dev);
+>>> +int analogix_dp_psr_enabled(struct device *dev);
+>>>  int analogix_dp_enable_psr(struct device *dev);
+>>>  int analogix_dp_disable_psr(struct device *dev);
+>>>  
