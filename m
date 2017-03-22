@@ -1,168 +1,49 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Wed, 22 Mar 2017 15:17:38 +0100
-Subject: [PATCH v3 17/19] KVM: arm64: ITS: ITT flush and restore
-In-Reply-To: <41f6b5b7-275e-8752-cdd7-96bb1e53ab04@arm.com>
-References: <1488800074-21991-1-git-send-email-eric.auger@redhat.com>
- <1488800074-21991-18-git-send-email-eric.auger@redhat.com>
- <41f6b5b7-275e-8752-cdd7-96bb1e53ab04@arm.com>
-Message-ID: <3e332896-bf38-7ebc-f50d-0598f6c3058a@redhat.com>
+From: sven.eckelmann@openmesh.com (Sven Eckelmann)
+Date: Wed, 22 Mar 2017 15:10:49 +0100
+Subject: [15/17] qcom: ipq4019: add cpu operating points for cpufreq
+ support
+In-Reply-To: <1458770712-10880-16-git-send-email-mmcclint@codeaurora.org>
+References: <1458770712-10880-16-git-send-email-mmcclint@codeaurora.org>
+Message-ID: <40277521.UIyJVnYny8@bentobox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andre,
+On Mittwoch, 23. M?rz 2016 17:05:10 CET Matthew McClintock wrote:
+> This adds some operating points for cpu frequeny scaling
+> 
+> Signed-off-by: Matthew McClintock <mmcclint@codeaurora.org>
+[...]
 
-On 21/03/2017 19:13, Andre Przywara wrote:
-> Hi,
-> 
-> On 06/03/17 11:34, Eric Auger wrote:
->> Introduce routines to flush and restore device ITT and their
->> interrupt table entries (ITE).
->>
->> The routines will be called on device table flush and
->> restore.
->>
->> Signed-off-by: Eric Auger <eric.auger@redhat.com>
->>
->> ---
->> v2 -> v3:
->> - add return 0 in vgic_its_restore_ite (was in subsequent patch)
->>
->> v2: creation
->> ---
->>  virt/kvm/arm/vgic/vgic-its.c | 100 +++++++++++++++++++++++++++++++++++++++++++
->>  1 file changed, 100 insertions(+)
->>
->> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
->> index 1060125..a216849 100644
->> --- a/virt/kvm/arm/vgic/vgic-its.c
->> +++ b/virt/kvm/arm/vgic/vgic-its.c
->> @@ -1748,6 +1748,106 @@ static int vgic_its_restore_pending_tables(struct vgic_its *its)
->>  	return -ENXIO;
->>  }
->>  
->> +static int vgic_its_flush_ite(struct vgic_its *its, struct its_device *dev,
->> +			      struct its_ite *ite, gpa_t gpa)
->> +{
->> +	struct kvm *kvm = its->dev->kvm;
->> +	u32 next_offset;
->> +	u64 val;
->> +
->> +	next_offset = compute_next_eventid_offset(&dev->itt_head, ite);
->> +	val = ((u64)next_offset << 48) | ((u64)ite->lpi << 16) |
->> +		ite->collection->collection_id;
->> +	val = cpu_to_le64(val);
->> +	return kvm_write_guest(kvm, gpa, &val, VITS_ESZ);
->> +}
->> +
->> +/**
->> + * vgic_its_restore_ite - restore an interrupt translation entry
->> + * @event_id: id used for indexing
->> + * @ptr: kernel VA where the 8 byte ITE is located
->> + * @opaque: pointer to the its_device
->> + * @next: id offset to the next entry
->> + */
->> +static int vgic_its_restore_ite(struct vgic_its *its, u32 event_id,
->> +				void *ptr, void *opaque, u32 *next)
->> +{
->> +	struct its_device *dev = (struct its_device *)opaque;
->> +	struct its_collection *collection;
->> +	struct kvm *kvm = its->dev->kvm;
->> +	u64 val, *p = (u64 *)ptr;
->> +	struct vgic_irq *irq;
->> +	u32 coll_id, lpi_id;
->> +	struct its_ite *ite;
->> +	int ret;
->> +
->> +	val = *p;
->> +	*next = 1;
->> +
->> +	val = le64_to_cpu(val);
->> +
->> +	coll_id = val & GENMASK_ULL(15, 0);
->> +	lpi_id = (val & GENMASK_ULL(47, 16)) >> 16;
->> +
->> +	if (!lpi_id)
->> +		return 0;
->> +
->> +	*next = (val & GENMASK_ULL(63, 48)) >> 48;
-> 
-> No need for the mask here, just ">> 48" would be enough.
-sure
-> 
->> +
->> +	collection = find_collection(its, coll_id);
->> +	if (!collection)
->> +		return -EINVAL;
->> +
->> +	ret = vgic_its_alloc_ite(dev, &ite, collection,
->> +				  lpi_id, event_id);
->> +	if (ret)
->> +		return ret;
->> +
->> +	irq = vgic_add_lpi(kvm, lpi_id);
->> +	if (IS_ERR(irq))
->> +		return PTR_ERR(irq);
->> +	ite->irq = irq;
->> +
->> +	/* restore the configuration of the LPI */
->> +	ret = update_lpi_config(kvm, irq, NULL);
->> +	if (ret)
->> +		return ret;
->> +
->> +	update_affinity_ite(kvm, ite);
->> +	return 0;
->> +}
->> +
->> +static int vgic_its_flush_itt(struct vgic_its *its, struct its_device *device)
->> +{
->> +	gpa_t base = device->itt_addr;
->> +	struct its_ite *ite;
->> +	int ret;
->> +
->> +	list_for_each_entry(ite, &device->itt_head, ite_list) {
->> +		gpa_t gpa = base + ite->event_id * VITS_ESZ;
->> +
->> +		ret = vgic_its_flush_ite(its, device, ite, gpa);
->> +		if (ret)
->> +			return ret;
->> +	}
->> +	return 0;
->> +}
->> +
->> +static int vgic_its_restore_itt(struct vgic_its *its,
->> +				struct its_device *dev)
->> +{
->> +	size_t max_size = (2 << dev->nb_eventid_bits) * VITS_ESZ;
-> 
-> I think that depends on your usage of nb_eventid_bits, but this "2 <<"
-> is really confusing here. So I really think you should just hold the
-> actual number of bits in this variable and handle the +/- 1 encoding
-> just once when sourcing the information.
-fixed now as dev->nb_eventid_bits actually matches the number of bits.
-Sorry for the confusion. I must have been in orbit when I wrote that 2
-<< stuff.
+I saw that you've created a new version of the patch and it was added to
+different staging/testing [1] trees.
 
-Thanks
+But I find it rather odd that Codeaurora uses different settings [3]. Here for 
+easier comparison:
 
-Eric
-> 
-> The rest looks fine.
-> 
-> Cheers,
-> Andre.
-> 
->> +	gpa_t base = dev->itt_addr;
->> +	int ret;
->> +
->> +	ret =  lookup_table(its, base, max_size, VITS_ESZ, 0,
->> +			    vgic_its_restore_ite, dev);
->> +
->> +	if (ret < 0)
->> +		return ret;
->> +	return 0;
->> +}
->> +
->>  /**
->>   * vgic_its_flush_device_tables - flush the device table and all ITT
->>   * into guest RAM
->>
+setting     | QSDK 1.1.3     | proposed patch
+---------------------------------------------
+clk-latency |         100000 |    256000
+opp0        |     48000(000) |  48000000
+opp1        |    200000(000) | 200000000
+opp2        |    500000(000) | 500000000
+opp3        |    710000(000) | 666000000
+
+It looks to me like clk-latency and the opp3 (maximum frequency) are 
+different. Is the reason for this difference known?
+
+I've just noticed it because I got an DTB from an ODM which had even
+716000(000) set for opp3.
+
+Kind regards,
+	Sven
+
+[1] https://git.lede-project.org/?p=lede/blogic/staging.git;a=blob;f=target/linux/ipq806x/patches-4.9/0017-qcom-ipq4019-add-cpu-operating-points-for-cpufreq-su.patch;h=7cbd6a4551bfd968d013164f76897c603f4ae2ff;hb=627e9c2c36839634d987535658a287843a8a9fd6
+[2] https://github.com/chunkeey/LEDE-IPQ40XX/blob/a04cf208fe317074502f7ea81dafa828c89b74bb/target/linux/ipq40xx/patches-4.9/120-qcom-ipq4019-add-cpu-operating-points-for-cpufreq-su.patch
+[3] https://source.codeaurora.org/quic/qsdk/oss/kernel/linux-msm/tree/arch/arm/boot/dts/qcom-ipq40xx.dtsi?h=release/date_r1&id=461894f071b168c963795ebfa15d3458b102730a#n768
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170322/9327cde0/attachment.sig>
