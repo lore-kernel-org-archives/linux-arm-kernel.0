@@ -1,83 +1,28 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 22 Mar 2017 16:48:10 +0000
-Subject: [RFC PATCH v2 21/41] arm64/sve: Enable SVE on demand for userspace
-In-Reply-To: <1490194274-30569-22-git-send-email-Dave.Martin@arm.com>
-References: <1490194274-30569-1-git-send-email-Dave.Martin@arm.com>
- <1490194274-30569-22-git-send-email-Dave.Martin@arm.com>
-Message-ID: <20170322164809.GC19950@leverpostej>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Wed, 22 Mar 2017 09:49:24 -0700
+Subject: [PATCH V2 1/2] ARM: dts: BCM5301X: Specify serial console params
+ in dtsi files
+In-Reply-To: <20170315170328.13879-1-zajec5@gmail.com>
+References: <20170314075830.2247-1-zajec5@gmail.com>
+ <20170315170328.13879-1-zajec5@gmail.com>
+Message-ID: <c900cc9c-3650-f6f0-3650-01f05f680fcd@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 03/15/2017 10:03 AM, Rafa? Mi?ecki wrote:
+> From: Rafa? Mi?ecki <rafal@milecki.pl>
+> 
+> So far every Northstar device we have seen was using the same serial
+> console params (115200n8). It probably make the most sense to put it in
+> some proper dtsi files instead of repeating over and over for every
+> single device. As different boards may use different bootloaders it
+> seems the safest idea is to use board specific dtsi files.
+> 
+> Just in case some vendor decides to use different UART (parameters) this
+> can be always easily overwritten.
+> 
+> Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
 
-On Wed, Mar 22, 2017 at 02:50:51PM +0000, Dave Martin wrote:
-> This patch tracks whether a task has ever attempted to use the
-> Scalable Vector Extension.  If and only if SVE is in use by a task,
-> it will be enabled for userspace when scheduling the task in.  For
-> other tasks, SVE is disabled when scheduling in.
-
->  #define TIF_SYSCALL_AUDIT	9
->  #define TIF_SYSCALL_TRACEPOINT	10
->  #define TIF_SECCOMP		11
-> +#define TIF_SVE			17	/* Scalable Vector Extension in use */
-
-Please don't skip ahead to bit 17. I see why you're doing that, but I
-don't think that's a good idea. More on that below.
-
-> +void do_sve_acc(unsigned int esr, struct pt_regs *regs)
-> +{
-> +	unsigned long tmp;
-> +
-> +	if (test_and_set_thread_flag(TIF_SVE))
-> +		BUG();
-> +
-> +	asm ("mrs %0, cpacr_el1" : "=r" (tmp));
-> +	asm volatile ("msr cpacr_el1, %0" :: "r" (tmp | (1 << 17)));
-
-Please de-magic the number, e.g. with something like:
-
-#define CPACR_SVE_EN	(1 << 17)
-
-... in <asm/sysreg.h>.
-
-Please also use {read,write}_sysreg(), e.g.
-
-	val = read_sysreg(cpacr_el1);
-	tmp |= CPACR_SVE_EN;
-	write_sysreg(tmp, cpacr_el1);
-
-[...]
-
-> +		if (IS_ENABLED(CONFIG_ARM64_SVE)) {
-> +			/*
-> +			 * Flip SVE enable for userspace if it doesn't
-> +			 * match the current_task.
-> +			 */
-> +			asm ("mrs %0, cpacr_el1" : "=r" (tmp));
-> +			flags = current_thread_info()->flags;
-> +			if ((tmp ^ (unsigned long)flags) & (1 << 17)) {
-> +				tmp ^= 1 << 17;
-> +				asm volatile ("msr cpacr_el1, %0" :: "r" (tmp));
-> +			}
-
-I think it's a bad idea to rely on the TIF flag and CPACR bit to have
-the same index. It makes this painful to read, and it leaves us fragile
-if the TIF bits are reorganised.
-
-How about:
-
-	unsigned long cpacr = read_sysreg(cpacr_el1);
-	bool hw_enabled = !!(cpacr & CPACR_SVE_EN);
-	bool sw_enabled = test_thread_flag(TIF_SVE);
-
-	/*
-	 * Flip SVE enable for userspace if it doesn't
-	 * match the current_task.
-	 */
-	if (hw_enabled != sw_enabled) {
-		cpacr ^= CPACR_SVE_EN;
-		write_sysreg(cpacr, cpacr_el1);
-	}
-
-Thanks,
-Mark.
+Applied, thanks!
+-- 
+Florian
