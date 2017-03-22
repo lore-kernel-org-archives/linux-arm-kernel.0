@@ -1,51 +1,22 @@
-From: ckeepax@opensource.wolfsonmicro.com (Charles Keepax)
-Date: Wed, 22 Mar 2017 17:15:35 +0000
-Subject: [PATCH v3 2/2] pinctrl: samsung: Use devres version of
- gpiochip_add_data
-In-Reply-To: <1490202935-4708-1-git-send-email-ckeepax@opensource.wolfsonmicro.com>
-References: <1490202935-4708-1-git-send-email-ckeepax@opensource.wolfsonmicro.com>
-Message-ID: <1490202935-4708-2-git-send-email-ckeepax@opensource.wolfsonmicro.com>
+From: al.kochet@gmail.com (Alexander Kochetkov)
+Date: Wed, 22 Mar 2017 20:14:36 +0300
+Subject: [PATCH] ARM: dts: rockchip: increase SD clock frequency on Radxa
+ Rock
+In-Reply-To: <FCE5C7E0-7BED-4600-952A-E1EBC900F814@gmail.com>
+References: <1490110822-3310-1-git-send-email-al.kochet@gmail.com>
+ <1978752.xjtBqdMt97@phil> <FCE5C7E0-7BED-4600-952A-E1EBC900F814@gmail.com>
+Message-ID: <BDFC28D2-5C1F-4406-9F0E-BF089048F7DB@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use devm_gpiochip_add_data to simplify the error path in
-samsung_gpiolib_register.
 
-Signed-off-by: Charles Keepax <ckeepax@opensource.wolfsonmicro.com>
-Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
----
+> 22 ????? 2017 ?., ? 20:04, Alexander Kochetkov <al.kochet@gmail.com> ???????(?):
+> 
+> Ok. Let leave as is for now.
+> 
+> My radxa worked stable for a year with this settings.
 
-No changes since v2.
+Ok, I not sure what my radxa worked stable with this settings.
+Hieko, thanks for catching that.
 
- drivers/pinctrl/samsung/pinctrl-samsung.c | 9 ++-------
- 1 file changed, 2 insertions(+), 7 deletions(-)
-
-diff --git a/drivers/pinctrl/samsung/pinctrl-samsung.c b/drivers/pinctrl/samsung/pinctrl-samsung.c
-index 5d53370..934fc3b 100644
---- a/drivers/pinctrl/samsung/pinctrl-samsung.c
-+++ b/drivers/pinctrl/samsung/pinctrl-samsung.c
-@@ -936,20 +936,15 @@ static int samsung_gpiolib_register(struct platform_device *pdev,
- 		gc->of_node = bank->of_node;
- 		gc->label = bank->name;
- 
--		ret = gpiochip_add_data(gc, bank);
-+		ret = devm_gpiochip_add_data(&pdev->dev, gc, bank);
- 		if (ret) {
- 			dev_err(&pdev->dev, "failed to register gpio_chip %s, error code: %d\n",
- 							gc->label, ret);
--			goto fail;
-+			return ret;
- 		}
- 	}
- 
- 	return 0;
--
--fail:
--	for (--i, --bank; i >= 0; --i, --bank)
--		gpiochip_remove(&bank->gpio_chip);
--	return ret;
- }
- 
- /* retrieve the soc specific data */
--- 
-2.1.4
+Sorry for your time.
