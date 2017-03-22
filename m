@@ -1,353 +1,141 @@
-From: yannick.fertre@st.com (Yannick Fertre)
-Date: Wed, 22 Mar 2017 14:36:23 +0100
-Subject: [PATCH v1 2/5] drivers: watchdog: Add STM32 IWDG driver
-In-Reply-To: <1490189786-19232-1-git-send-email-yannick.fertre@st.com>
-References: <1490189786-19232-1-git-send-email-yannick.fertre@st.com>
-Message-ID: <1490189786-19232-3-git-send-email-yannick.fertre@st.com>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Wed, 22 Mar 2017 14:37:24 +0100
+Subject: [PATCH v4 00/28] arm/arm64: KVM: Rework the hyp-stub API
+In-Reply-To: <20170321192058.9300-1-marc.zyngier@arm.com>
+References: <20170321192058.9300-1-marc.zyngier@arm.com>
+Message-ID: <20170322133724.GA10969@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds IWDG (Independent WatchDoG) support for STM32 platform.
+Hi Marc,
 
-Change-Id: Iab218745fc25566f12558fae7f52e2f8c21db74e
-Signed-off-by: Yannick FERTRE <yannick.fertre@st.com>
-Tested-by: Yannick FERTRE <yannick.fertre@st.com>
-Reviewed-by: Ludovic BARRE <ludovic.barre@st.com>
----
- drivers/watchdog/Kconfig      |  11 ++
- drivers/watchdog/Makefile     |   1 +
- drivers/watchdog/stm32_iwdg.c | 289 ++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 301 insertions(+)
- create mode 100644 drivers/watchdog/stm32_iwdg.c
 
-diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
-index 52a70ee..d9745a5 100644
---- a/drivers/watchdog/Kconfig
-+++ b/drivers/watchdog/Kconfig
-@@ -744,6 +744,17 @@ config ZX2967_WATCHDOG
- 	  To compile this driver as a module, choose M here: the
- 	  module will be called zx2967_wdt.
- 
-+config STM32_WATCHDOG
-+	tristate "STM32 Independent WatchDoG (IWDG) support"
-+	depends on ARCH_STM32
-+	select WATCHDOG_CORE
-+	default y
-+	help
-+	  Say Y here to include Watchdog timer support.
-+
-+	  To compile this driver as a module, choose M here: the
-+	  module will be called stm32_iwdg.
-+
- # AVR32 Architecture
- 
- config AT32AP700X_WDT
-diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
-index a2126e2..a35e423 100644
---- a/drivers/watchdog/Makefile
-+++ b/drivers/watchdog/Makefile
-@@ -84,6 +84,7 @@ obj-$(CONFIG_ATLAS7_WATCHDOG) += atlas7_wdt.o
- obj-$(CONFIG_RENESAS_WDT) += renesas_wdt.o
- obj-$(CONFIG_ASPEED_WATCHDOG) += aspeed_wdt.o
- obj-$(CONFIG_ZX2967_WATCHDOG) += zx2967_wdt.o
-+obj-$(CONFIG_STM32_WATCHDOG) += stm32_iwdg.o
- 
- # AVR32 Architecture
- obj-$(CONFIG_AT32AP700X_WDT) += at32ap700x_wdt.o
-diff --git a/drivers/watchdog/stm32_iwdg.c b/drivers/watchdog/stm32_iwdg.c
-new file mode 100644
-index 0000000..507dfc4
---- /dev/null
-+++ b/drivers/watchdog/stm32_iwdg.c
-@@ -0,0 +1,289 @@
-+/*
-+ * Driver for STM32 Independent Watchdog
-+ *
-+ * Copyright (C) Yannick Fertre 2017
-+ * Author: Yannick Fertre <yannick.fertre@st.com>
-+ *
-+ * This driver is based on tegra_wdt.c
-+ *
-+ * License terms:  GNU General Public License (GPL), version 2
-+ */
-+
-+#include <linux/clk.h>
-+#include <linux/delay.h>
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/interrupt.h>
-+#include <linux/io.h>
-+#include <linux/iopoll.h>
-+#include <linux/of.h>
-+#include <linux/platform_device.h>
-+#include <linux/watchdog.h>
-+
-+/* minimum watchdog trigger timeout, in seconds */
-+#define MIN_WDT_TIMEOUT	1
-+
-+/* IWDG registers */
-+#define IWDG_KR		0x00 /* Key register */
-+#define IWDG_PR		0x04 /* Prescaler Register */
-+#define IWDG_RLR	0x08 /* ReLoad Register */
-+#define IWDG_SR		0x0C /* Status Register */
-+#define IWDG_WINR	0x10 /* Windows Register */
-+
-+/* IWDG_KR register bit mask */
-+#define KR_KEY_RELOAD	0xAAAA /* reload counter enable */
-+#define KR_KEY_ENABLE	0xCCCC /* peripheral enable */
-+#define KR_KEY_EWA	0x5555 /* write access enable */
-+#define KR_KEY_DWA	0x0000 /* write access disable */
-+
-+/* IWDG_PR register bit values */
-+#define PR_4    0x00 /* prescaler set to 4 */
-+#define PR_8    0x01 /* prescaler set to 8 */
-+#define PR_16   0x02 /* prescaler set to 16 */
-+#define PR_32   0x03 /* prescaler set to 32 */
-+#define PR_64   0x04 /* prescaler set to 64 */
-+#define PR_128  0x05 /* prescaler set to 128 */
-+#define PR_256	0x06 /* prescaler set to 256 */
-+
-+/* IWDG_RLR register values */
-+#define RLR_MAX		0xFFF /* max value supported by reload register */
-+
-+/* IWDG_SR register bit mask */
-+#define FLAG_PVU	BIT(0) /* Watchdog prescaler value update */
-+#define FLAG_RVU	BIT(1) /* Watchdog counter reload value update */
-+
-+/* set timeout to 100000 us */
-+#define TIMEOUT_US	100000
-+#define SLEEP_US	1000
-+
-+struct stm32_iwdg {
-+	struct watchdog_device	wdd;
-+	struct device		*dev;
-+	void __iomem		*regs;
-+	struct clk		*clk;
-+	unsigned int		rate;
-+};
-+
-+static int heartbeat = MIN_WDT_TIMEOUT;
-+module_param(heartbeat, int, 0x0);
-+MODULE_PARM_DESC(heartbeat,
-+		 "Watchdog heartbeats in seconds. (default = "
-+		 __MODULE_STRING(WDT_HEARTBEAT) ")");
-+
-+static inline u32 reg_read(void __iomem *base, u32 reg)
-+{
-+	return readl_relaxed(base + reg);
-+}
-+
-+static inline void reg_write(void __iomem *base, u32 reg, u32 val)
-+{
-+	writel_relaxed(val, base + reg);
-+}
-+
-+static int stm32_iwdg_start(struct watchdog_device *wdd)
-+{
-+	struct stm32_iwdg *wdt = watchdog_get_drvdata(wdd);
-+	u32 val = FLAG_PVU | FLAG_RVU;
-+	u32 reload;
-+	int ret;
-+
-+	dev_dbg(wdt->dev, "%s\n", __func__);
-+
-+	/* prescaler fixed to 256 */
-+	reload = (wdd->timeout * wdt->rate) / 256;
-+	if (reload > RLR_MAX + 1) {
-+		dev_err(wdt->dev,
-+			"Watchdog doesn't support reload value: %d\n", reload);
-+		return -EINVAL;
-+	}
-+
-+	/* enable watchdog */
-+	reg_write(wdt->regs, IWDG_KR, KR_KEY_ENABLE);
-+
-+	/* set prescaler & reload registers */
-+	reg_write(wdt->regs, IWDG_KR, KR_KEY_EWA);
-+	reg_write(wdt->regs, IWDG_PR, PR_256); /* prescaler fix to 256 */
-+	reg_write(wdt->regs, IWDG_RLR, reload - 1);
-+
-+	/* wait for the registers to be updated (max 100ms) */
-+	ret = readl_relaxed_poll_timeout(wdt->regs + IWDG_SR, val,
-+					 !(val & (FLAG_PVU | FLAG_RVU)),
-+					 SLEEP_US, TIMEOUT_US);
-+	if (ret) {
-+		dev_err(wdt->dev,
-+			"Fail to set prescaler or reload registers\n");
-+		return -EINVAL;
-+	}
-+
-+	/* reload watchdog */
-+	reg_write(wdt->regs, IWDG_KR, KR_KEY_RELOAD);
-+
-+	return 0;
-+}
-+
-+static int stm32_iwdg_stop(struct watchdog_device *wdd)
-+{
-+	struct stm32_iwdg *wdt = watchdog_get_drvdata(wdd);
-+
-+	if (watchdog_active(wdd)) {
-+		dev_err(wdt->dev,
-+			"Watchdog can't be stopped once started(no way out)\n");
-+		return -EPERM;
-+	}
-+
-+	return 0;
-+}
-+
-+static int stm32_iwdg_ping(struct watchdog_device *wdd)
-+{
-+	struct stm32_iwdg *wdt = watchdog_get_drvdata(wdd);
-+
-+	dev_dbg(wdt->dev, "%s\n", __func__);
-+
-+	reg_write(wdt->regs, IWDG_KR, KR_KEY_RELOAD);
-+
-+	return 0;
-+}
-+
-+static int stm32_iwdg_set_timeout(struct watchdog_device *wdd,
-+				  unsigned int timeout)
-+{
-+	struct stm32_iwdg *wdt = watchdog_get_drvdata(wdd);
-+
-+	dev_dbg(wdt->dev, "%s timeout: %d sec\n", __func__, timeout);
-+
-+	wdd->timeout = timeout;
-+
-+	if (watchdog_active(wdd))
-+		return stm32_iwdg_start(wdd);
-+
-+	return 0;
-+}
-+
-+static const struct watchdog_info stm32_iwdg_info = {
-+	.options	= WDIOF_SETTIMEOUT |
-+			  WDIOF_MAGICCLOSE |
-+			  WDIOF_KEEPALIVEPING,
-+	.identity	= "STM32 Independent Watchdog",
-+};
-+
-+static struct watchdog_ops stm32_iwdg_ops = {
-+	.owner		= THIS_MODULE,
-+	.start		= stm32_iwdg_start,
-+	.stop		= stm32_iwdg_stop,
-+	.ping		= stm32_iwdg_ping,
-+	.set_timeout	= stm32_iwdg_set_timeout,
-+};
-+
-+static int stm32_iwdg_probe(struct platform_device *pdev)
-+{
-+	struct watchdog_device *wdd;
-+	struct stm32_iwdg *wdt;
-+	struct resource *res;
-+	void __iomem *regs;
-+	struct clk *clk;
-+	int max_wdt_timeout;
-+	int ret;
-+
-+	/* This is the timer base. */
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	regs = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(regs)) {
-+		dev_err(&pdev->dev, "Could not get resource\n");
-+		return PTR_ERR(regs);
-+	}
-+
-+	clk = devm_clk_get(&pdev->dev, NULL);
-+	if (IS_ERR(clk)) {
-+		dev_err(&pdev->dev, "Unable to get clock\n");
-+		return PTR_ERR(clk);
-+	}
-+
-+	ret = clk_prepare_enable(clk);
-+	if (ret) {
-+		dev_err(&pdev->dev, "Unable to prepare clock %p\n", clk);
-+		return ret;
-+	}
-+
-+	/*
-+	 * Allocate our watchdog driver data, which has the
-+	 * struct watchdog_device nested within it.
-+	 */
-+	wdt = devm_kzalloc(&pdev->dev, sizeof(*wdt), GFP_KERNEL);
-+	if (!wdt) {
-+		ret = -ENOMEM;
-+		goto err;
-+	}
-+
-+	/* Initialize struct stm32_iwdg. */
-+	wdt->regs = regs;
-+	wdt->dev = &pdev->dev;
-+	wdt->clk = clk;
-+	/*
-+	 * iwdg is clocked by its own dedicated low-speed clock (LSI)
-+	 * at 32khz.
-+	 */
-+	wdt->rate = 32 * 1024;
-+
-+	/* get max timeout & set heartbeat */
-+	max_wdt_timeout = ((RLR_MAX + 1) * 256) / wdt->rate;
-+	heartbeat = max_wdt_timeout;
-+
-+	/* Initialize struct watchdog_device. */
-+	wdd = &wdt->wdd;
-+	wdd->timeout = heartbeat;
-+	wdd->info = &stm32_iwdg_info;
-+	wdd->ops = &stm32_iwdg_ops;
-+	wdd->min_timeout = MIN_WDT_TIMEOUT;
-+	wdd->max_timeout = max_wdt_timeout;
-+	watchdog_set_drvdata(wdd, wdt);
-+	watchdog_set_nowayout(wdd, true);
-+
-+	ret = watchdog_register_device(wdd);
-+	if (ret) {
-+		dev_err(&pdev->dev,
-+			"failed to register watchdog device\n");
-+		goto err;
-+	}
-+
-+	platform_set_drvdata(pdev, wdt);
-+
-+	dev_info(&pdev->dev,
-+		 "initialized (heartbeat = %d sec)\n", heartbeat);
-+	return 0;
-+
-+err:
-+	clk_disable_unprepare(clk);
-+	return ret;
-+}
-+
-+static int stm32_iwdg_remove(struct platform_device *pdev)
-+{
-+	struct stm32_iwdg *wdt = platform_get_drvdata(pdev);
-+
-+	watchdog_unregister_device(&wdt->wdd);
-+	clk_disable_unprepare(wdt->clk);
-+
-+	dev_info(&pdev->dev, "removed watchdog device\n");
-+	return 0;
-+}
-+
-+static const struct of_device_id stm32_iwdg_of_match[] = {
-+	{ .compatible = "st,stm32-iwdg" },
-+	{ /* end node */ }
-+};
-+MODULE_DEVICE_TABLE(of, stm32_iwdg_of_match);
-+
-+static struct platform_driver stm32_iwdg_driver = {
-+	.probe		= stm32_iwdg_probe,
-+	.remove		= stm32_iwdg_remove,
-+	.driver = {
-+		.name	= "iwdg",
-+		.of_match_table = stm32_iwdg_of_match,
-+	},
-+};
-+module_platform_driver(stm32_iwdg_driver);
-+
-+MODULE_AUTHOR("Yannick Fertre <yannick.fertre@st.com>");
-+MODULE_DESCRIPTION("STMicroelectronics STM32 Independent Watchdog Driver");
-+MODULE_LICENSE("GPL v2");
--- 
-1.9.1
+On Tue, Mar 21, 2017 at 07:20:30PM +0000, Marc Zyngier wrote:
+> As noticed by RMK in this thread[1], the hyp-stub API on 32bit ARM
+> could do with some TLC (it cannot perform a soft-restart at HYP, and
+> has holes in the hyp-stub support in a number of places). In general,
+> it would be desirable for the 32bit behaviour to align on 64bit, if
+> only to ease maintenance.
+> 
+> This series implements the following:
+> - Add HVC_[GS]ET_VECTORS and HVC_SOFT_RESTART to the 32bit code
+> - Add HVC_RESET_VECTORS to both arm and arm64, removing the need for
+>   __hyp_reset_vectors
+> - Implement add the stub entry points in the KVM init code, which
+>   didn't implement any so far
+> - Convert the HYP code to use the init code stubs directly
+> - Some general cleanup as a result of these changes (which includes
+>   killing HVC_GET_VECTORS)
+> - Add some API documentation that covers the above
+> 
+> Patches 12 to 14 would be better squashed into 10 and 11, but I've
+> kept them separate so that I can take the blame for everything I've
+> broken.
+
+This series looks great overall.  I'm still going through the details of
+the patches, but one high level questions:
+
+What if we formalized the way to call a function in Hyp mode, whatever
+its current configuration may be, via a specific HVC number.  That would
+mean that the documentation say nothing of a hypervisor specific
+implementaiton.
+
+Could we then use that to initialize hyp mode for a hypervisor, i.e.
+KVM, without having to actually change the vectors?  Couldn't we simply
+use the the hvc stub to call a function in the physical address space,
+and be rid of the concept of hyp-init alltogether?
+
+I'm probably missing something, but let me know your thoughts.
+
+Thanks,
+-Christoffer
+
+> 
+> I've tested this on arm (Cubietruck, Jetson TK1) and arm64 (Seattle),
+> both as host and guest. Keerthy has been kind enough to test the 32bit
+> code on DRA7-EVM, AM57XX-EVM and KEYSTONE-K2E-EVM.
+> 
+> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-December/473472.html
+> 
+> * From v3:
+>   - Reworked the way we save/restore lr on arm64, making it EL2's job
+>   in a consistent way (these are the three initial patches)
+>   - Collected RBs, TBs and Acks from James, Keerthy and Russell
+>   - Rebased on 4.11-rc3
+> 
+> * From v2:
+>   - Kill HVC_GET_VECTORS and the corresponding __hyp_get_vectors
+> 
+> * From v1:
+>   - Fixed some glaring bugs (reported by Ard and James)
+>   - Tidy up stub vector export on 32bit (Ard)
+>   - Nicer VA/PA conversion on 32bit (Ard)
+>   - Updated cpu_v7_reset documentation
+>   - Cleaned up HYP reset on PM events
+>   - Minor stub documentation update
+> 
+> Marc Zyngier (26):
+>   arm64: hyp-stub: Stop pointlessly clobbering lr
+>   arm64: KVM: Move lr save/restore to do_el2_call
+>   arm64: hyp-stub: Don't save lr in the EL1 code
+>   arm64: hyp-stub: Implement HVC_RESET_VECTORS stub hypercall
+>   arm64: KVM: Implement HVC_RESET_VECTORS stub hypercall in the init
+>     code
+>   arm64: KVM: Implement HVC_GET_VECTORS in the init code
+>   arm64: KVM: Allow the main HYP code to use the init hyp stub
+>     implementation
+>   arm64: KVM: Convert __cpu_reset_hyp_mode to using __hyp_reset_vectors
+>   arm64: KVM: Implement HVC_SOFT_RESTART in the init code
+>   ARM: KVM: Convert KVM to use HVC_GET_VECTORS
+>   ARM: Update cpu_v7_reset documentation
+>   ARM: hyp-stub: Use r1 for the soft-restart address
+>   ARM: Expose the VA/IDMAP offset
+>   ARM: hyp-stub: Implement HVC_RESET_VECTORS stub hypercall
+>   ARM: KVM: Implement HVC_RESET_VECTORS stub hypercall in the init code
+>   ARM: KVM: Implement HVC_GET_VECTORS in the init code
+>   ARM: KVM: Allow the main HYP code to use the init hyp stub
+>     implementation
+>   ARM: KVM: Convert __cpu_reset_hyp_mode to using __hyp_reset_vectors
+>   ARM: KVM: Implement HVC_SOFT_RESTART in the init code
+>   arm/arm64: KVM: Use __hyp_reset_vectors() directly
+>   arm/arm64: KVM: Remove kvm_get_idmap_start
+>   arm/arm64: KVM: Use HVC_RESET_VECTORS to reinit HYP mode
+>   ARM: decompressor: Remove __hyp_get_vectors usage
+>   ARM: hyp-stub/KVM: Kill __hyp_get_vectors
+>   arm64: hyp-stub/KVM: Kill __hyp_get_vectors
+>   arm/arm64: Add hyp-stub API documentation
+> 
+> Russell King (2):
+>   ARM: hyp-stub: improve ABI
+>   ARM: soft-reboot into same mode that we entered the kernel
+> 
+>  Documentation/virtual/kvm/arm/hyp-abi.txt | 45 ++++++++++++++++++++++++++++
+>  arch/arm/boot/compressed/head.S           |  5 +++-
+>  arch/arm/include/asm/kvm_asm.h            |  2 --
+>  arch/arm/include/asm/kvm_host.h           |  6 ----
+>  arch/arm/include/asm/kvm_mmu.h            |  1 -
+>  arch/arm/include/asm/proc-fns.h           |  4 +--
+>  arch/arm/include/asm/virt.h               | 12 +++++++-
+>  arch/arm/kernel/hyp-stub.S                | 39 +++++++++++++++++++-----
+>  arch/arm/kernel/reboot.c                  |  7 +++--
+>  arch/arm/kvm/arm.c                        | 25 ++++++----------
+>  arch/arm/kvm/hyp/hyp-entry.S              | 29 ++++++++++++++----
+>  arch/arm/kvm/init.S                       | 49 ++++++++++++++++++++++++++-----
+>  arch/arm/kvm/interrupts.S                 |  4 ---
+>  arch/arm/kvm/mmu.c                        |  5 ----
+>  arch/arm/mm/mmu.c                         |  5 ++++
+>  arch/arm/mm/proc-v7.S                     | 15 ++++++----
+>  arch/arm64/include/asm/kvm_asm.h          |  1 -
+>  arch/arm64/include/asm/kvm_host.h         |  7 -----
+>  arch/arm64/include/asm/kvm_mmu.h          |  1 -
+>  arch/arm64/include/asm/virt.h             | 17 +++++++----
+>  arch/arm64/kernel/hyp-stub.S              | 34 +++++++--------------
+>  arch/arm64/kvm/hyp-init.S                 | 45 +++++++++++++++++++++-------
+>  arch/arm64/kvm/hyp.S                      |  2 +-
+>  arch/arm64/kvm/hyp/hyp-entry.S            | 43 +++++++++++++--------------
+>  24 files changed, 266 insertions(+), 137 deletions(-)
+>  create mode 100644 Documentation/virtual/kvm/arm/hyp-abi.txt
+> 
+> -- 
+> 2.11.0
+> 
