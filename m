@@ -1,197 +1,149 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Wed, 22 Mar 2017 11:18:54 +0100
-Subject: [PATCH v4 2/3] clk: meson-gxbb: Add MALI clocks
+Date: Wed, 22 Mar 2017 11:18:55 +0100
+Subject: [PATCH v4 3/3] ARM64: dts: meson-gx: Add MALI nodes for GXBB and GXL
 In-Reply-To: <1490177935-9646-1-git-send-email-narmstrong@baylibre.com>
 References: <1490177935-9646-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1490177935-9646-3-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1490177935-9646-4-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Mali is clocked by two identical clock paths behind a glitch free mux
-to safely change frequency while running.
+The same MALI-450 MP3 GPU is present in the GXBB and GXL SoCs.
 
-The two "mali_0" and "mali_1" clocks are composed of a mux, divider and gate.
-Expose these two clocks trees using generic clocks.
-Finally the glitch free mux is added as "mali" clock.
+The node is simply added in the meson-gxbb.dtsi file.
+
+For GXL, since a lot is shared with the GXM that has a MALI-T820 IP, this
+patch adds a new meson-gxl-mali.dtsi and is included in the SoC specific
+dtsi files.
 
 Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 ---
- drivers/clk/meson/gxbb.c | 139 +++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 139 insertions(+)
+ arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi      | 37 ++++++++++++++++++++
+ arch/arm64/boot/dts/amlogic/meson-gxl-mali.dtsi  | 43 ++++++++++++++++++++++++
+ arch/arm64/boot/dts/amlogic/meson-gxl-s905d.dtsi |  1 +
+ arch/arm64/boot/dts/amlogic/meson-gxl-s905x.dtsi |  1 +
+ 4 files changed, 82 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxl-mali.dtsi
 
-diff --git a/drivers/clk/meson/gxbb.c b/drivers/clk/meson/gxbb.c
-index 5059c7b..d07dc22 100644
---- a/drivers/clk/meson/gxbb.c
-+++ b/drivers/clk/meson/gxbb.c
-@@ -634,6 +634,131 @@
- 	},
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+index 04b3324..0617a3d 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+@@ -478,6 +478,43 @@
+ 	};
  };
  
++&apb {
++	mali: gpu at c0000 {
++		compatible = "amlogic,meson-gxbb-mali", "arm,mali-450";
++		reg = <0x0 0xc0000 0x0 0x40000>;
++		interrupts = <GIC_SPI 160 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 161 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 162 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 163 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 164 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 165 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 166 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 167 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 168 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 169 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-names = "gp", "gpmmu", "pp", "pmu",
++			"pp0", "ppmmu0", "pp1", "ppmmu1",
++			"pp2", "ppmmu2";
++		clocks = <&clkc CLKID_CLK81>, <&clkc CLKID_MALI>;
++		clock-names = "bus", "core";
++
++		/*
++		 * Mali clocking is provided by two identical clock paths
++		 * MALI_0 and MALI_1 muxed to a single clock by a glitch
++		 * free mux to safely change frequency while running.
++		 */
++		assigned-clocks = <&clkc CLKID_MALI_0_SEL>,
++				  <&clkc CLKID_MALI_0>,
++				  <&clkc CLKID_MALI>; /* Glitch free mux */
++		assigned-clock-parents = <&clkc CLKID_FCLK_DIV3>,
++					 <0>, /* Do Nothing */
++					 <&clkc CLKID_MALI_0>;
++		assigned-clock-rates = <0>, /* Do Nothing */
++				       <666666666>,
++				       <0>; /* Do Nothing */
++	};
++};
++
+ &i2c_A {
+ 	clocks = <&clkc CLKID_I2C>;
+ };
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-mali.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxl-mali.dtsi
+new file mode 100644
+index 0000000..f06cc234
+--- /dev/null
++++ b/arch/arm64/boot/dts/amlogic/meson-gxl-mali.dtsi
+@@ -0,0 +1,43 @@
 +/*
-+ * The MALI IP is clocked by two identical clocks (mali_0 and mali_1)
-+ * muxed by a glitch-free switch.
++ * Copyright (c) 2017 BayLibre SAS
++ * Author: Neil Armstrong <narmstrong@baylibre.com>
++ *
++ * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 + */
 +
-+static u32 mux_table_mali_0_1[] = {0, 1, 2, 3, 4, 5, 6, 7};
-+static const char *gxbb_mali_0_1_parent_names[] = {
-+	"xtal", "gp0_pll", "mpll2", "mpll1", "fclk_div7",
-+	"fclk_div4", "fclk_div3", "fclk_div5"
-+};
++&apb {
++	mali: gpu at c0000 {
++		compatible = "amlogic,meson-gxbb-mali", "arm,mali-450";
++		reg = <0x0 0xc0000 0x0 0x40000>;
++		interrupts = <GIC_SPI 160 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 161 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 162 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 163 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 164 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 165 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 166 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 167 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 168 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 169 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-names = "gp", "gpmmu", "pp", "pmu",
++			"pp0", "ppmmu0", "pp1", "ppmmu1",
++			"pp2", "ppmmu2";
++		clocks = <&clkc CLKID_CLK81>, <&clkc CLKID_MALI>;
++		clock-names = "bus", "core";
 +
-+static struct clk_mux gxbb_mali_0_sel = {
-+	.reg = (void *)HHI_MALI_CLK_CNTL,
-+	.mask = 0x7,
-+	.shift = 9,
-+	.table = mux_table_mali_0_1,
-+	.lock = &clk_lock,
-+	.hw.init = &(struct clk_init_data){
-+		.name = "mali_0_sel",
-+		.ops = &clk_mux_ops,
 +		/*
-+		 * bits 10:9 selects from 8 possible parents:
-+		 * xtal, gp0_pll, mpll2, mpll1, fclk_div7,
-+		 * fclk_div4, fclk_div3, fclk_div5
++		 * Mali clocking is provided by two identical clock paths
++		 * MALI_0 and MALI_1 muxed to a single clock by a glitch
++		 * free mux to safely change frequency while running.
 +		 */
-+		.parent_names = gxbb_mali_0_1_parent_names,
-+		.num_parents = 8,
-+		.flags = CLK_SET_RATE_NO_REPARENT,
-+	},
++		assigned-clocks = <&clkc CLKID_MALI_0_SEL>,
++				  <&clkc CLKID_MALI_0>,
++				  <&clkc CLKID_MALI>; /* Glitch free mux */
++		assigned-clock-parents = <&clkc CLKID_FCLK_DIV3>,
++					 <0>, /* Do Nothing */
++					 <&clkc CLKID_MALI_0>;
++		assigned-clock-rates = <0>, /* Do Nothing */
++				       <666666666>,
++				       <0>; /* Do Nothing */
++	};
 +};
-+
-+static struct clk_divider gxbb_mali_0_div = {
-+	.reg = (void *)HHI_MALI_CLK_CNTL,
-+	.shift = 0,
-+	.width = 7,
-+	.lock = &clk_lock,
-+	.hw.init = &(struct clk_init_data){
-+		.name = "mali_0_div",
-+		.ops = &clk_divider_ops,
-+		.parent_names = (const char *[]){ "mali_0_sel" },
-+		.num_parents = 1,
-+		.flags = CLK_SET_RATE_NO_REPARENT,
-+	},
-+};
-+
-+static struct clk_gate gxbb_mali_0 = {
-+	.reg = (void *)HHI_MALI_CLK_CNTL,
-+	.bit_idx = 8,
-+	.lock = &clk_lock,
-+	.hw.init = &(struct clk_init_data){
-+		.name = "mali_0",
-+		.ops = &clk_gate_ops,
-+		.parent_names = (const char *[]){ "mali_0_div" },
-+		.num_parents = 1,
-+		.flags = CLK_SET_RATE_PARENT,
-+	},
-+};
-+
-+static struct clk_mux gxbb_mali_1_sel = {
-+	.reg = (void *)HHI_MALI_CLK_CNTL,
-+	.mask = 0x7,
-+	.shift = 25,
-+	.table = mux_table_mali_0_1,
-+	.lock = &clk_lock,
-+	.hw.init = &(struct clk_init_data){
-+		.name = "mali_1_sel",
-+		.ops = &clk_mux_ops,
-+		/*
-+		 * bits 10:9 selects from 8 possible parents:
-+		 * xtal, gp0_pll, mpll2, mpll1, fclk_div7,
-+		 * fclk_div4, fclk_div3, fclk_div5
-+		 */
-+		.parent_names = gxbb_mali_0_1_parent_names,
-+		.num_parents = 8,
-+		.flags = CLK_SET_RATE_NO_REPARENT,
-+	},
-+};
-+
-+static struct clk_divider gxbb_mali_1_div = {
-+	.reg = (void *)HHI_MALI_CLK_CNTL,
-+	.shift = 16,
-+	.width = 7,
-+	.lock = &clk_lock,
-+	.hw.init = &(struct clk_init_data){
-+		.name = "mali_1_div",
-+		.ops = &clk_divider_ops,
-+		.parent_names = (const char *[]){ "mali_1_sel" },
-+		.num_parents = 1,
-+		.flags = CLK_SET_RATE_NO_REPARENT,
-+	},
-+};
-+
-+static struct clk_gate gxbb_mali_1 = {
-+	.reg = (void *)HHI_MALI_CLK_CNTL,
-+	.bit_idx = 24,
-+	.lock = &clk_lock,
-+	.hw.init = &(struct clk_init_data){
-+		.name = "mali_1",
-+		.ops = &clk_gate_ops,
-+		.parent_names = (const char *[]){ "mali_1_div" },
-+		.num_parents = 1,
-+		.flags = CLK_SET_RATE_PARENT,
-+	},
-+};
-+
-+static u32 mux_table_mali[] = {0, 1};
-+static const char *gxbb_mali_parent_names[] = {
-+	"mali_0", "mali_1"
-+};
-+
-+static struct clk_mux gxbb_mali = {
-+	.reg = (void *)HHI_MALI_CLK_CNTL,
-+	.mask = 1,
-+	.shift = 31,
-+	.table = mux_table_mali,
-+	.lock = &clk_lock,
-+	.hw.init = &(struct clk_init_data){
-+		.name = "mali",
-+		.ops = &clk_mux_ops,
-+		.parent_names = gxbb_mali_parent_names,
-+		.num_parents = 2,
-+		.flags = CLK_SET_RATE_NO_REPARENT,
-+	},
-+};
-+
- /* Everything Else (EE) domain gates */
- static MESON_GATE(gxbb_ddr, HHI_GCLK_MPEG0, 0);
- static MESON_GATE(gxbb_dos, HHI_GCLK_MPEG0, 1);
-@@ -827,6 +952,13 @@
- 		[CLKID_SAR_ADC_CLK]	    = &gxbb_sar_adc_clk.hw,
- 		[CLKID_SAR_ADC_SEL]	    = &gxbb_sar_adc_clk_sel.hw,
- 		[CLKID_SAR_ADC_DIV]	    = &gxbb_sar_adc_clk_div.hw,
-+		[CLKID_MALI_0_SEL]	    = &gxbb_mali_0_sel.hw,
-+		[CLKID_MALI_0_DIV]	    = &gxbb_mali_0_div.hw,
-+		[CLKID_MALI_0]		    = &gxbb_mali_0.hw,
-+		[CLKID_MALI_1_SEL]	    = &gxbb_mali_1_sel.hw,
-+		[CLKID_MALI_1_DIV]	    = &gxbb_mali_1_div.hw,
-+		[CLKID_MALI_1]		    = &gxbb_mali_1.hw,
-+		[CLKID_MALI]		    = &gxbb_mali.hw,
- 	},
- 	.num = NR_CLKS,
- };
-@@ -930,16 +1062,23 @@
- 	&gxbb_emmc_b,
- 	&gxbb_emmc_c,
- 	&gxbb_sar_adc_clk,
-+	&gxbb_mali_0,
-+	&gxbb_mali_1,
- };
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905d.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxl-s905d.dtsi
+index 615308e..5a90e30 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxl-s905d.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905d.dtsi
+@@ -42,6 +42,7 @@
+  */
  
- static struct clk_mux *const gxbb_clk_muxes[] = {
- 	&gxbb_mpeg_clk_sel,
- 	&gxbb_sar_adc_clk_sel,
-+	&gxbb_mali_0_sel,
-+	&gxbb_mali_1_sel,
-+	&gxbb_mali,
- };
+ #include "meson-gxl.dtsi"
++#include "meson-gxl-mali.dtsi"
  
- static struct clk_divider *const gxbb_clk_dividers[] = {
- 	&gxbb_mpeg_clk_div,
- 	&gxbb_sar_adc_clk_div,
-+	&gxbb_mali_0_div,
-+	&gxbb_mali_1_div,
- };
+ / {
+ 	compatible = "amlogic,s905d", "amlogic,meson-gxl";
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x.dtsi
+index 08237ee..0f78d83 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x.dtsi
+@@ -42,6 +42,7 @@
+  */
  
- static int gxbb_clkc_probe(struct platform_device *pdev)
+ #include "meson-gxl.dtsi"
++#include "meson-gxl-mali.dtsi"
+ 
+ / {
+ 	compatible = "amlogic,s905x", "amlogic,meson-gxl";
 -- 
 1.9.1
