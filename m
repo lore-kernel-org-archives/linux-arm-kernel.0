@@ -1,185 +1,142 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 22 Mar 2017 14:50:48 +0000
-Subject: [RFC PATCH v2 18/41] arm64/sve: signal: Restore FPSIMD/SVE state in
- rt_sigreturn
-In-Reply-To: <1490194274-30569-1-git-send-email-Dave.Martin@arm.com>
-References: <1490194274-30569-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1490194274-30569-19-git-send-email-Dave.Martin@arm.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Wed, 22 Mar 2017 20:40:55 +0530
+Subject: [PATCH v5 4/7] PCI: dwc: all: Modify dbi accessors to take dbi_base
+ as argument
+In-Reply-To: <20170313134328.1588-5-kishon@ti.com>
+References: <20170313134328.1588-5-kishon@ti.com>
+Message-ID: <20170322151055.15947-1-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the missing logic to restore the SVE state in
-rt_sigreturn.
+dwc has 2 dbi address space labeled dbics and dbics2. The existing
+helper to access dbi address space can access only dbics. However
+dbics2 has to be accessed for programming the BAR registers in the
+case of EP mode. This is in preparation for adding EP mode support
+to dwc driver.
 
-Because the FPSIMD and SVE state alias, this code replaces the
-existing fpsimd restore code when there is SVE state to restore.
-
-For Zn[127:0], the saved FPSIMD state in Vn takes precedence.
-
-Since __task_fpsimd_to_sve() is used to merge the FPSIMD and SVE
-state back together, and only for this purpose, we don't want it to
-zero out the SVE state -- hence delete the memset() from there.
-
-Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+Cc: Jingoo Han <jingoohan1@gmail.com>
+Cc: Joao Pinto <Joao.Pinto@synopsys.com>
+Acked-by: Niklas Cassel <niklas.cassel@axis.com>
+Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- arch/arm64/kernel/fpsimd.c |  4 ---
- arch/arm64/kernel/signal.c | 87 ++++++++++++++++++++++++++++++++++++++++------
- 2 files changed, 76 insertions(+), 15 deletions(-)
+Changes from v4:
+Add void as return type in dw_pcie_writel_dbi spotted by Niklas.
 
-diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-index 1bdf7f2..952dd20 100644
---- a/arch/arm64/kernel/fpsimd.c
-+++ b/arch/arm64/kernel/fpsimd.c
-@@ -113,7 +113,6 @@ static void __fpsimd_to_sve(struct task_struct *task, unsigned int vq)
- 	struct fpsimd_state *fst = &task->thread.fpsimd_state;
- 	unsigned int i;
- 
--	memset(sst, 0, sizeof(*sst));
- 	for (i = 0; i < 32; ++i)
- 		sst->zregs[i][0] = fst->vregs[i];
+ drivers/pci/dwc/pci-exynos.c      | 10 ++++++----
+ drivers/pci/dwc/pcie-designware.c | 13 +++++++------
+ drivers/pci/dwc/pcie-designware.h | 20 ++++++++++++++++----
+ 3 files changed, 29 insertions(+), 14 deletions(-)
+
+diff --git a/drivers/pci/dwc/pci-exynos.c b/drivers/pci/dwc/pci-exynos.c
+index 993b650ef275..a0d40f74b88d 100644
+--- a/drivers/pci/dwc/pci-exynos.c
++++ b/drivers/pci/dwc/pci-exynos.c
+@@ -521,23 +521,25 @@ static void exynos_pcie_enable_interrupts(struct exynos_pcie *ep)
+ 		exynos_pcie_msi_init(ep);
  }
-@@ -288,9 +287,6 @@ void fpsimd_preserve_current_state(void)
  
- void fpsimd_signal_preserve_current_state(void)
+-static u32 exynos_pcie_readl_dbi(struct dw_pcie *pci, u32 reg)
++static u32 exynos_pcie_readl_dbi(struct dw_pcie *pci, void __iomem *base,
++				 u32 reg)
  {
--	WARN_ONCE(elf_hwcap & HWCAP_SVE,
--		  "SVE state save/restore around signals doesn't work properly, expect userspace corruption!\n");
--
- 	fpsimd_preserve_current_state();
- 	sve_to_fpsimd(current);
- }
-diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
-index 6b83917..9d4f7c8 100644
---- a/arch/arm64/kernel/signal.c
-+++ b/arch/arm64/kernel/signal.c
-@@ -211,6 +211,11 @@ static int restore_fpsimd_context(struct fpsimd_context __user *ctx)
+ 	struct exynos_pcie *ep = to_exynos_pcie(pci);
+ 	u32 val;
+ 
+ 	exynos_pcie_sideband_dbi_r_mode(ep, true);
+-	val = readl(pci->dbi_base + reg);
++	val = readl(base + reg);
+ 	exynos_pcie_sideband_dbi_r_mode(ep, false);
+ 	return val;
  }
  
+-static void exynos_pcie_writel_dbi(struct dw_pcie *pci, u32 reg, u32 val)
++static void exynos_pcie_writel_dbi(struct dw_pcie *pci, void __iomem *base,
++				   u32 reg, u32 val)
+ {
+ 	struct exynos_pcie *ep = to_exynos_pcie(pci);
  
-+struct user_ctxs {
-+	struct fpsimd_context __user *fpsimd;
-+	struct sve_context __user *sve;
-+};
-+
- #ifdef CONFIG_ARM64_SVE
- 
- static int preserve_sve_context(struct sve_context __user *ctx)
-@@ -240,19 +245,68 @@ static int preserve_sve_context(struct sve_context __user *ctx)
- 	return err ? -EFAULT : 0;
+ 	exynos_pcie_sideband_dbi_w_mode(ep, true);
+-	writel(val, pci->dbi_base + reg);
++	writel(val, base + reg);
+ 	exynos_pcie_sideband_dbi_w_mode(ep, false);
  }
  
-+static int __restore_sve_fpsimd_context(struct user_ctxs *user,
-+					unsigned int vl, unsigned int vq)
+diff --git a/drivers/pci/dwc/pcie-designware.c b/drivers/pci/dwc/pcie-designware.c
+index 3eaf3ccdc118..ea403e2240cf 100644
+--- a/drivers/pci/dwc/pcie-designware.c
++++ b/drivers/pci/dwc/pcie-designware.c
+@@ -61,20 +61,21 @@ int dw_pcie_write(void __iomem *addr, int size, u32 val)
+ 	return PCIBIOS_SUCCESSFUL;
+ }
+ 
+-u32 dw_pcie_readl_dbi(struct dw_pcie *pci, u32 reg)
++u32 __dw_pcie_readl_dbi(struct dw_pcie *pci, void __iomem *base, u32 reg)
+ {
+ 	if (pci->ops->readl_dbi)
+-		return pci->ops->readl_dbi(pci, reg);
++		return pci->ops->readl_dbi(pci, base, reg);
+ 
+-	return readl(pci->dbi_base + reg);
++	return readl(base + reg);
+ }
+ 
+-void dw_pcie_writel_dbi(struct dw_pcie *pci, u32 reg, u32 val)
++void __dw_pcie_writel_dbi(struct dw_pcie *pci, void __iomem *base, u32 reg,
++			  u32 val)
+ {
+ 	if (pci->ops->writel_dbi)
+-		pci->ops->writel_dbi(pci, reg, val);
++		pci->ops->writel_dbi(pci, base, reg, val);
+ 	else
+-		writel(val, pci->dbi_base + reg);
++		writel(val, base + reg);
+ }
+ 
+ static u32 dw_pcie_readl_unroll(struct dw_pcie *pci, u32 index, u32 reg)
+diff --git a/drivers/pci/dwc/pcie-designware.h b/drivers/pci/dwc/pcie-designware.h
+index 8f3dcb2b099b..09b334a12892 100644
+--- a/drivers/pci/dwc/pcie-designware.h
++++ b/drivers/pci/dwc/pcie-designware.h
+@@ -144,8 +144,9 @@ struct pcie_port {
+ 
+ struct dw_pcie_ops {
+ 	u64	(*cpu_addr_fixup)(u64 cpu_addr);
+-	u32	(*readl_dbi)(struct dw_pcie *pcie, u32 reg);
+-	void	(*writel_dbi)(struct dw_pcie *pcie, u32 reg, u32 val);
++	u32	(*readl_dbi)(struct dw_pcie *pcie, void __iomem *base, u32 reg);
++	void	(*writel_dbi)(struct dw_pcie *pcie, void __iomem *base, u32 reg,
++			      u32 val);
+ 	int	(*link_up)(struct dw_pcie *pcie);
+ };
+ 
+@@ -163,8 +164,9 @@ struct dw_pcie {
+ int dw_pcie_read(void __iomem *addr, int size, u32 *val);
+ int dw_pcie_write(void __iomem *addr, int size, u32 val);
+ 
+-u32 dw_pcie_readl_dbi(struct dw_pcie *pci, u32 reg);
+-void dw_pcie_writel_dbi(struct dw_pcie *pci, u32 reg, u32 val);
++u32 __dw_pcie_readl_dbi(struct dw_pcie *pci, void __iomem *base, u32 reg);
++void __dw_pcie_writel_dbi(struct dw_pcie *pci, void __iomem *base, u32 reg,
++			  u32 val);
+ int dw_pcie_link_up(struct dw_pcie *pci);
+ int dw_pcie_wait_for_link(struct dw_pcie *pci);
+ void dw_pcie_prog_outbound_atu(struct dw_pcie *pci, int index,
+@@ -172,6 +174,16 @@ void dw_pcie_prog_outbound_atu(struct dw_pcie *pci, int index,
+ 			       u32 size);
+ void dw_pcie_setup(struct dw_pcie *pci);
+ 
++static inline void dw_pcie_writel_dbi(struct dw_pcie *pci, u32 reg, u32 val)
 +{
-+	int err;
-+	struct fpsimd_sve_state(vq) *task_sve_regs =
-+		__sve_state(current);
-+	struct fpsimd_state fpsimd;
-+
-+	if (vl != sve_get_vl())
-+		return -EINVAL;
-+
-+	BUG_ON(SVE_SIG_REGS_SIZE(vq) > sizeof(*task_sve_regs));
-+	BUG_ON(round_up(SVE_SIG_REGS_SIZE(vq), 16) < sizeof(*task_sve_regs));
-+	BUG_ON(SVE_SIG_FFR_OFFSET(vq) - SVE_SIG_REGS_OFFSET !=
-+	       (char *)&task_sve_regs->ffr - (char *)task_sve_regs);
-+	err = __copy_from_user(task_sve_regs,
-+			       (char __user const *)user->sve +
-+					SVE_SIG_REGS_OFFSET,
-+			       SVE_SIG_REGS_SIZE(vq));
-+	if (err)
-+		return err;
-+
-+	/* copy the FP and status/control registers */
-+	/* restore_sigframe() already checked that user->fpsimd != NULL. */
-+	err = __copy_from_user(fpsimd.vregs, user->fpsimd->vregs,
-+			       sizeof(fpsimd.vregs));
-+	__get_user_error(fpsimd.fpsr, &user->fpsimd->fpsr, err);
-+	__get_user_error(fpsimd.fpcr, &user->fpsimd->fpcr, err);
-+
-+	/* load the hardware registers from the fpsimd_state structure */
-+	if (!err)
-+		fpsimd_update_current_state(&fpsimd);
-+
-+	return err;
++	__dw_pcie_writel_dbi(pci, pci->dbi_base, reg, val);
 +}
 +
-+static int restore_sve_fpsimd_context(struct user_ctxs *user)
++static inline u32 dw_pcie_readl_dbi(struct dw_pcie *pci, u32 reg)
 +{
-+	int err;
-+	u16 vl, vq;
-+
-+	err = __get_user(vl, &user->sve->vl);
-+	if (err)
-+		return err;
-+
-+	if (!sve_vl_valid(vl))
-+		return -EINVAL;
-+
-+	vq = sve_vq_from_vl(vl);
-+
-+	return __restore_sve_fpsimd_context(user, vl, vq);
++	return  __dw_pcie_readl_dbi(pci, pci->dbi_base, reg);
 +}
 +
- #else /* ! CONFIG_ARM64_SVE */
- 
--/* Turn any non-optimised out attempt to use this into a link error: */
-+/* Turn any non-optimised out attempts to use these into a link error: */
- extern int preserve_sve_context(void __user *ctx);
-+extern int restore_sve_fpsimd_context(struct user_ctxs *user);
- 
- #endif /* ! CONFIG_ARM64_SVE */
- 
- 
--struct user_ctxs {
--	struct fpsimd_context __user *fpsimd;
--	struct sve_context __user *sve;
--};
--
- static int parse_user_sigframe(struct user_ctxs *user,
- 			       struct rt_sigframe __user *sf)
- {
-@@ -316,6 +370,9 @@ static int parse_user_sigframe(struct user_ctxs *user,
- 			if (!IS_ENABLED(CONFIG_ARM64_SVE))
- 				goto invalid;
- 
-+			if (!(elf_hwcap & HWCAP_SVE))
-+				goto invalid;
-+
- 			if (user->sve)
- 				goto invalid;
- 
-@@ -375,9 +432,6 @@ static int parse_user_sigframe(struct user_ctxs *user,
- 	}
- 
- done:
--	if (!user->fpsimd)
--		goto invalid;
--
- 	return 0;
- 
- invalid:
-@@ -411,8 +465,19 @@ static int restore_sigframe(struct pt_regs *regs,
- 	if (err == 0)
- 		err = parse_user_sigframe(&user, sf);
- 
--	if (err == 0)
--		err = restore_fpsimd_context(user.fpsimd);
-+	if (err == 0) {
-+		if (!user.fpsimd)
-+			return -EINVAL;
-+
-+		if (user.sve) {
-+			if (!IS_ENABLED(CONFIG_ARM64_SVE) ||
-+			    !(elf_hwcap & HWCAP_SVE))
-+				return -EINVAL;
-+
-+			err = restore_sve_fpsimd_context(&user);
-+		} else
-+			err = restore_fpsimd_context(user.fpsimd);
-+	}
- 
- 	return err;
- }
+ #ifdef CONFIG_PCIE_DW_HOST
+ irqreturn_t dw_handle_msi_irq(struct pcie_port *pp);
+ void dw_pcie_msi_init(struct pcie_port *pp);
 -- 
-2.1.4
+2.11.0
