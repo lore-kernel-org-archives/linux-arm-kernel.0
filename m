@@ -1,42 +1,57 @@
-From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Wed, 22 Mar 2017 18:30:56 +0000
-Subject: [RFC PATCH 22/30] iommu: Bind/unbind tasks to/from devices
-In-Reply-To: <20170322153610.GC7266@8bytes.org>
-References: <20170227195441.5170-1-jean-philippe.brucker@arm.com>
- <20170227195441.5170-23-jean-philippe.brucker@arm.com>
- <1488534044.6234.14.camel@infradead.org>
- <20170303183958.GA15146@e106794-lin.localdomain>
- <20170322153610.GC7266@8bytes.org>
-Message-ID: <426ce726-e4e3-ea7c-81ac-154ee40a2d79@arm.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Wed, 22 Mar 2017 11:30:39 -0700
+Subject: [PATCH v7 1/3] Input: max11801_ts: Add missing of_match_table
+In-Reply-To: <1490180808-2856-1-git-send-email-jagan@openedev.com>
+References: <1490180808-2856-1-git-send-email-jagan@openedev.com>
+Message-ID: <20170322183039.GA2899@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joerg,
-
-On 22/03/17 15:36, Joerg Roedel wrote:
-> On Fri, Mar 03, 2017 at 06:39:58PM +0000, Jean-Philippe Brucker wrote:
->> Yes, it would be nice to have a common PASID allocator. But I don't
->> think that a system-wide PASID space is workable for us. At the moment
->> systems might have a few identical devices all supporting 20 bits of
->> PASID. But consider the case where one odd device can only handle four
->> address spaces, and supports a maximum of two PASID bits. We'd quickly
->> run out of PASIDs to hand to such devices, even though we could easily
->> have one PASID space per endpoint (from a quick glance at the specs, I
->> assume that both Intel and AMD IOMMUs offer one PASID table per RID.)
+On Wed, Mar 22, 2017 at 04:36:46PM +0530, Jagan Teki wrote:
+> From: Jagan Teki <jagan@amarulasolutions.com>
 > 
-> But that shouldn't be a problem if we allocate PASIDs top-down (meaning
-> starting from the biggest value supported by a given device), right?
+> Added missing of_match_table for max11801_ts driver with
+> compatible as "maxim,max11801_ts"
 > 
-> Then we can satisfy the devices with 16 or 20 bit PASIDs and still have
-> the 2-bit PASIDs free for the devices that need it.
 
-But if there is more than 4 devices that only support 2 bit PASIDs, you
-still get a starvation that you wouldn't get with per-domain/device PASID
-allocator. Arguably I have no real-world example to back this up, we can
-probably expect vendors to always implement a sane amount of PASID bits.
-Unifying the API is certainly more important than imagining all the
-twisted configurations possible, and a PASID allocator with per-task
-top-down allocation seems to me like an acceptable compromise.
+Why not "maxim,max11801"? Also, I think we'd need a binding document.
 
-Thanks,
-Jean-Philippe
+> Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+> Cc: Shawn Guo <shawnguo@kernel.org>
+> Cc: Matteo Lisi <matteo.lisi@engicam.com>
+> Cc: Michael Trimarchi <michael@amarulasolutions.com>
+> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+> ---
+> Changes for v7:
+> - newly added patch
+> 
+>  drivers/input/touchscreen/max11801_ts.c | 7 +++++++
+>  1 file changed, 7 insertions(+)
+> 
+> diff --git a/drivers/input/touchscreen/max11801_ts.c b/drivers/input/touchscreen/max11801_ts.c
+> index a595ae5..5085d4f 100644
+> --- a/drivers/input/touchscreen/max11801_ts.c
+> +++ b/drivers/input/touchscreen/max11801_ts.c
+> @@ -224,9 +224,16 @@ static int max11801_ts_probe(struct i2c_client *client,
+>  };
+>  MODULE_DEVICE_TABLE(i2c, max11801_ts_id);
+>  
+> +static const struct of_device_id max11801_ts_dt_ids[] = {
+> +	{ .compatible = "maxim,max11801_ts" },
+> +	{ /* sentinel */ }
+> +};
+> +MODULE_DEVICE_TABLE(of, max11801_ts_dt_ids);
+> +
+>  static struct i2c_driver max11801_ts_driver = {
+>  	.driver = {
+>  		.name	= "max11801_ts",
+> +		.of_match_table	= max11801_ts_dt_ids,
+>  	},
+>  	.id_table	= max11801_ts_id,
+>  	.probe		= max11801_ts_probe,
+> -- 
+> 1.9.1
+> 
+
+-- 
+Dmitry
