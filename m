@@ -1,46 +1,53 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 22 Mar 2017 20:07:18 +0530
-Subject: [PATCH v4 15/23] dt-bindings: PCI: dra7xx: Add dt bindings to
- enable unaligned access
-In-Reply-To: <20170320214316.yah5cvfdabiceywf@rob-hp-laptop>
-References: <20170313142259.25397-1-kishon@ti.com>
- <20170313142259.25397-16-kishon@ti.com>
- <20170320214316.yah5cvfdabiceywf@rob-hp-laptop>
-Message-ID: <a3b44129-38b5-fb19-c931-108079b0c382@ti.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 22 Mar 2017 14:38:10 +0000
+Subject: [PATCH 7/7] arm64: hugetlb: Add break-before-make logic for
+ contiguous entries
+In-Reply-To: <20170321180421.18332-8-punit.agrawal@arm.com>
+References: <20170321180421.18332-1-punit.agrawal@arm.com>
+ <20170321180421.18332-8-punit.agrawal@arm.com>
+Message-ID: <20170322143810.GH2977@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
-
-On Tuesday 21 March 2017 03:13 AM, Rob Herring wrote:
-> On Mon, Mar 13, 2017 at 07:52:51PM +0530, Kishon Vijay Abraham I wrote:
->> Update device tree binding documentation of TI's dra7xx PCI
->> controller to include property for enabling unaligned mem access.
->>
->> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
->> ---
->>  Documentation/devicetree/bindings/pci/ti-pci.txt | 5 +++++
->>  1 file changed, 5 insertions(+)
->>
->> diff --git a/Documentation/devicetree/bindings/pci/ti-pci.txt b/Documentation/devicetree/bindings/pci/ti-pci.txt
->> index 190828a5f32a..b69dd7dbd29e 100644
->> --- a/Documentation/devicetree/bindings/pci/ti-pci.txt
->> +++ b/Documentation/devicetree/bindings/pci/ti-pci.txt
->> @@ -39,6 +39,11 @@ DEVICE MODE
->>   - interrupts : one interrupt entries must be specified for main interrupt.
->>   - num-ib-windows : number of inbound address translation windows
->>   - num-ob-windows : number of outbound address translation windows
->> + - ti,syscon-unaligned-access: phandle to the syscon dt node. The 1st argument
->> +			       should contain the register offset within syscon
->> +			       and the 2nd argument should contain the bit field
->> +			       for setting the bit to enable unaligned
->> +			       access.
+On Tue, Mar 21, 2017 at 06:04:21PM +0000, Punit Agrawal wrote:
+> From: Steve Capper <steve.capper@arm.com>
 > 
-> This should be setup by the firmware/bootloader or some platform code. 
-> Why does the PCI host need to configure this?
+> It has become apparent that one has to take special care when modifying
+> attributes of memory mappings that employ the contiguous bit.
+> 
+> Both the requirement and the architecturally correct "Break-Before-Make"
+> technique of updating contiguous entries can be found described in:
+> ARM DDI 0487A.k_iss10775, "Misprogramming of the Contiguous bit",
+> page D4-1762.
+> 
+> The huge pte accessors currently replace the attributes of contiguous
+> pte entries in place thus can, on certain platforms, lead to TLB
+> conflict aborts or even erroneous results returned from TLB lookups.
+> 
+> This patch adds a helper function get_clear_flush(.) that clears a
+> contiguous entry and returns the head pte (whilst taking care to
+> retain dirty bit information that could have been modified by DBM).
+> A tlb invalidate is performed to then ensure that there is no
+> possibility of multiple tlb entries being present for the same
+> region.
 
-That would create a dependency between the bootloader and kernel which is
-usually avoided in platforms like dra7xx.
+Since its evidently easy to miss, can we please add a comment above
+get_clear_flush() regarding the BBM requirement, e.g.
 
-Thanks
-Kishon
+/*
+ * Changing some bits of contiguous entries requires us to follow a
+ * Break-Before-Make approach, breaking the whole contiguous set before
+ * we can change any entries. See ARM DDI 0487A.k_iss10775,
+ * "Misprogramming of the Contiguous bit", page D4-1762.
+ *
+ * This helper performs the break step.
+ */
+
+Otherwise, this looks good to me, and to the best of my knowledge avoids
+the issue described above.
+
+FWIW:
+
+Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+
+Mark.
