@@ -1,99 +1,166 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Wed, 22 Mar 2017 17:00:54 +0000
-Subject: [PATCH V2 3/5] soc/tegra: flowctrl: Add basic platform driver
-In-Reply-To: <1490202056-13040-1-git-send-email-jonathanh@nvidia.com>
-References: <1490202056-13040-1-git-send-email-jonathanh@nvidia.com>
-Message-ID: <1490202056-13040-4-git-send-email-jonathanh@nvidia.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 22 Mar 2017 18:11:14 +0100
+Subject: [PATCH v6 03/14] mmc: core: Add mmc-card dt sub-node parse in
+ core layer
+In-Reply-To: <CAPDyKFoqxMCSe-2bt2dz1AM_2X7dtVe4w6e7+oAQ==HO_=XKQw@mail.gmail.com>
+ (Ulf Hansson's message of "Wed, 15 Mar 2017 13:43:44 +0100")
+References: <cover.ff78bebe0384f650a51e5e6f0f1dca6e7894b53b.1487091464.git-series.gregory.clement@free-electrons.com>
+ <34e51d32c82b57571e061e80df3bbaed731db554.1487091464.git-series.gregory.clement@free-electrons.com>
+ <CAPDyKFoqxMCSe-2bt2dz1AM_2X7dtVe4w6e7+oAQ==HO_=XKQw@mail.gmail.com>
+Message-ID: <87r31pdyod.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a simple platform driver for the flowctrl module so that it gets
-registered as a proper device.
+Hi Ulf,
+ 
+ On mer., mars 15 2017, Ulf Hansson <ulf.hansson@linaro.org> wrote:
 
-Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
----
- drivers/soc/tegra/flowctrl.c | 34 ++++++++++++++++++++++++++++++----
- 1 file changed, 30 insertions(+), 4 deletions(-)
+> On 14 February 2017 at 18:01, Gregory CLEMENT
+> <gregory.clement@free-electrons.com> wrote:
+>> From: Hu Ziji <huziji@marvell.com>
+>>
+>> Some vendor host, like Xenon, can support multiple types.
+>> In dts, use mmc-card dt sub-node to indicate eMMC is in use.
+>>
+>> Add a generic mmc-card parse function in mmc core layer.
+>> If mmc-card sub-node is detected, set eMMC common caps, such as
+>> MMC_CAP_NONREMOVABLE, MMC_CAP2_NO_SD and MMC_CAP2_NO_SDIO.
+>>
+>> Since it is likely that struct mmc_card is not allocated yet when
+>> this mmc-card parse function is called, it will return true if
+>> mmc-card sub-node is detected. Otherwise, return false.
+>> It can help vendor host determine if the card type is eMMC.
+>>
+>> Signed-off-by: Hu Ziji <huziji@marvell.com>
+>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>> ---
+>>  drivers/mmc/core/mmc.c   | 24 ++++++++++++++++++++++++
+>>  include/linux/mmc/core.h |  2 ++
+>>  2 files changed, 26 insertions(+)
+>>
+>> diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
+>> index b61b52f9da3d..dc480006a303 100644
+>> --- a/drivers/mmc/core/mmc.c
+>> +++ b/drivers/mmc/core/mmc.c
+>> @@ -2111,6 +2111,30 @@ static const struct mmc_bus_ops mmc_ops = {
+>>  };
+>>
+>>  /*
+>> + * Parse mmc-card dt sub-node and set eMMC common caps
+>> + * if mmc-card exists.
+>> + * If mmc-card is detected, return true.
+>> + * Otherwise, return false.
+>> + */
+>> +bool mmc_of_parse_mmc_card(struct mmc_host *host)
+>> +{
+>> +       struct device_node *np;
+>> +       bool ret = false;
+>> +
+>> +       np = mmc_of_find_child_device(host, 0);
+>
+> There are already some places in the mmc core where child nodes are
+> being parsed. You may have a look for mmc_of_find_child_device() and
+> find the callers of it.
 
-diff --git a/drivers/soc/tegra/flowctrl.c b/drivers/soc/tegra/flowctrl.c
-index 3a5a1cb9ae90..25eddfc8475d 100644
---- a/drivers/soc/tegra/flowctrl.c
-+++ b/drivers/soc/tegra/flowctrl.c
-@@ -24,6 +24,7 @@
- #include <linux/kernel.h>
- #include <linux/of.h>
- #include <linux/of_address.h>
-+#include <linux/platform_device.h>
- 
- #include <soc/tegra/common.h>
- #include <soc/tegra/flowctrl.h>
-@@ -47,7 +48,7 @@ static void __iomem *tegra_flowctrl_base;
- 
- static void flowctrl_update(u8 offset, u32 value)
- {
--	if (WARN_ONCE(!tegra_flowctrl_base,
-+	if (WARN_ONCE(IS_ERR_OR_NULL(tegra_flowctrl_base),
- 		      "Tegra flowctrl not initialised!\n"))
- 		return;
- 
-@@ -62,7 +63,7 @@ u32 flowctrl_read_cpu_csr(unsigned int cpuid)
- {
- 	u8 offset = flowctrl_offset_cpu_csr[cpuid];
- 
--	if (WARN_ONCE(!tegra_flowctrl_base,
-+	if (WARN_ONCE(IS_ERR_OR_NULL(tegra_flowctrl_base),
- 		      "Tegra flowctrl not initialised!\n"))
- 		return 0;
- 
-@@ -148,7 +149,22 @@ void flowctrl_cpu_suspend_exit(unsigned int cpuid)
- 	flowctrl_write_cpu_csr(cpuid, reg);
- }
- 
--static const struct of_device_id matches[] __initconst = {
-+static int tegra_flowctrl_probe(struct platform_device *pdev)
-+{
-+	void __iomem *base = tegra_flowctrl_base;
-+	struct resource *res;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	tegra_flowctrl_base = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(tegra_flowctrl_base))
-+		return PTR_ERR(base);
-+
-+	iounmap(base);
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id tegra_flowctrl_match[] = {
- 	{ .compatible = "nvidia,tegra124-flowctrl" },
- 	{ .compatible = "nvidia,tegra114-flowctrl" },
- 	{ .compatible = "nvidia,tegra30-flowctrl" },
-@@ -156,6 +172,16 @@ static const struct of_device_id matches[] __initconst = {
- 	{ }
- };
- 
-+static struct platform_driver tegra_flowctrl_driver = {
-+	.driver = {
-+		.name = "tegra-flowctrl",
-+		.suppress_bind_attrs = true,
-+		.of_match_table = tegra_flowctrl_match,
-+	},
-+	.probe = tegra_flowctrl_probe,
-+};
-+builtin_platform_driver(tegra_flowctrl_driver);
-+
- static int __init tegra_flowctrl_init(void)
- {
- 	/* hardcoded fallback if device tree node is missing */
-@@ -166,7 +192,7 @@ static int __init tegra_flowctrl_init(void)
- 	if (!soc_is_tegra())
- 		return 0;
- 
--	np = of_find_matching_node(NULL, matches);
-+	np = of_find_matching_node(NULL, tegra_flowctrl_match);
- 	if (np) {
- 		struct resource res;
- 
+mmc_of_find_child_device is called in 3 places:
+
+ - in mmc_add_card() from drivers/mmc/core/bus.c to populate the of_node
+   field of card->dev. Here we don't care of the mmc-card property
+
+ - in mmc_decode_ext_csd() from drivers/mmc/core/mmc.c, here the purpose
+   is exactly to check if the mmc-card property is present so we could
+   replace it by mmc_of_parse_mmc_card().
+
+ - in sdio_set_of_node from drivers/mmc/core/sdio_bus.c to populate the
+   of_node field of func->dev. Here again, we don't care of the mmc-card
+   property
+
+So in one case we could use the same function but for the 2 other cases
+continue to use mmc_of_find_child_device() alone make sens.
+
+>
+> Additionally, we need a generic method of how to describe in DT, when
+> an mmc host controller has more than one mmc slot. This will also be
+> done using child nodes.
+>
+> So, before starting hacking on this, it seems like we need some
+> consolidation of the code. In principle, I would like to move the APIs
+> for parsing of the child nodes into host.c, along with existing
+> mmc_of_parse() function.
+
+I understand that you want consolidate this subsystem but it seems
+beyond the this series. I would not want that the merge of this driver
+will be delayed more because of it. We submitted the first version 5
+month ago now, made several changes and we will reach the 7th
+version. Along these version we also already contribute to improve the
+mmc subsystem. I agree to work on the change you want, but I would like
+not depending of it to merge this series.
+
+We will address all the other comment on v6 from you and Andrian for a
+v7. And for this patch we can:
+
+ - keep it as is and only modify the mmc_decode_ext_csd() to use
+   mmc_of_find_child_device().
+
+ - Moving it back inside our driver waiting for a better API in the mmc
+   subsystem.
+
+What would be your preference?
+
+>
+>> +       if (np && of_device_is_compatible(np, "mmc-card")) {
+>> +               /* mmc-card sub-node indicates eMMC card is in use. */
+>> +               host->caps |= MMC_CAP_NONREMOVABLE;
+>> +               host->caps2 |= MMC_CAP2_NO_SDIO | MMC_CAP2_NO_SD;
+>> +               ret = true;
+>> +       }
+>> +
+>
+> So instead of providing a new mmc OF parse API, let's make
+> mmc_of_parse() call another internal function which deals with child
+> node parsing.
+
+As the driver need to know if the card is an emmc then we need to alos
+expose this information in one of the mmc structure, waht about "struct
+mmc_host"?
+
+Thanks,
+
+Gregory
+
+
+>
+>> +       of_node_put(np);
+>> +       return ret;
+>> +}
+>> +EXPORT_SYMBOL_GPL(mmc_of_parse_mmc_card);
+>> +
+>> +/*
+>>   * Starting point for MMC card init.
+>>   */
+>>  int mmc_attach_mmc(struct mmc_host *host)
+>> diff --git a/include/linux/mmc/core.h b/include/linux/mmc/core.h
+>> index e33cc748dcfe..1b27323f3b6e 100644
+>> --- a/include/linux/mmc/core.h
+>> +++ b/include/linux/mmc/core.h
+>> @@ -234,4 +234,6 @@ struct device_node;
+>>  extern u32 mmc_vddrange_to_ocrmask(int vdd_min, int vdd_max);
+>>  extern int mmc_of_parse_voltage(struct device_node *np, u32 *mask);
+>>
+>> +extern bool mmc_of_parse_mmc_card(struct mmc_host *host);
+>> +
+>>  #endif /* LINUX_MMC_CORE_H */
+>> --
+>> git-series 0.9.1
+>
+> If you didn't quite understand my comments, then please tell me. Then
+> I can help out cooking some patches for you.
+>
+> Kind regards
+> Uffe
+
 -- 
-2.7.4
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
