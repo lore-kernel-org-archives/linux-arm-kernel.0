@@ -1,86 +1,93 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 22 Mar 2017 16:53:32 +0000
-Subject: [PATCH v3 3/5] coresight: add support for debug module
-In-Reply-To: <20170322160102.GB15179@leoy-linaro>
-References: <1488520809-31670-1-git-send-email-leo.yan@linaro.org>
- <1488520809-31670-4-git-send-email-leo.yan@linaro.org>
- <671a0b39-b635-6e0e-d3fa-967651f2e29c@arm.com>
- <CAJ9a7VgCjXNGC4C49PxL-nBxzhMCmA8Mb-0C_epahizA5EL2HA@mail.gmail.com>
- <e7a97c52-f61a-e503-f626-09563fa100b8@arm.com>
- <20170322160102.GB15179@leoy-linaro>
-Message-ID: <d976bae5-0b81-e47c-4f41-eb240bea7827@arm.com>
+From: leonard.crestez@nxp.com (Leonard Crestez)
+Date: Wed, 22 Mar 2017 18:53:02 +0200
+Subject: [RFC 0/8] ARM: imx: Upstream fsl,ldo-bypass
+Message-ID: <cover.1490199005.git.leonard.crestez@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Freescale imx socs have three built-in regulators LDO_ARM LDO_SOC and LDO_PU
+used to control internal chip voltages. "ldo-bypass" mode refers to placing
+these regulators in bypass mode and controlling voltages from an external power
+management chip instead. The intention is to save power (at the expense of an
+extra PMIC on the board).
 
+Looking through commit messages and emails it seems that there are other users
+of unusual power configurations for imx but there doesn't appear to be any
+board dts file using this mode. This is an attempt to upstream this feature
+based on how the freescale BSP does it. This series only enables it for the
+imx6qdl-sabresd boards for simplicity.
 
-On 22/03/17 16:01, Leo Yan wrote:
-> On Wed, Mar 22, 2017 at 02:07:47PM +0000, Sudeep Holla wrote:
+Versions of u-boot shipped by freescale for imx partially handle this in the
+bootloader. His patch series tries to detect if the bootloader did this and
+takes advantage of it but it is not required. This series works fine with
+upstream u-boot. The binding is odd because it's shared with those versions of
+uboot.
 
-[...]
+The LDO regulators have a minimum dropout of 125mv and this is removed when
+bypass mode is entered. This results in a brief increase in voltage. The bypass
+code sets the minimum frequency before enabling LDO bypass to avoid
+overvolting. Some new checks are added in the regulator core to check for this
+(patch 4) and the checks would trigger without lowering the frequency.
 
->>
->> We can always do that unconditionally. If implementations don't honor
->> those bits, it's different. If they hang on accessing something which is
->> on debug power domain and not on core power domain, then you have much
->> bigger issue to solve. How can you even trust and make any other
->> register accesses that are in debug power domain then ?
-> 
-> So we can add below code before really access another other registers
-> are possible in CPU power domain:
-> 
->         /*
->          * Force to power on CPU power domain and assert
->          * DBGPWRUPREQ signal
->          */
->         val = readl(drvdata->base + EDPRCR);
->         val |= BIT(3);
->         writel(val, drvdata->base + EDPRCR);
-> 
+Issues that need to be discussed:
 
-Yes worth trying it out.
+* I'm not happy with the regulator_allow_bypass API. It claims to "allow the
+regulator to go into bypass mode if all other consumers for the regulator also
+enable bypass mode" but it doesn't seem to properly handle the case when
+additional consumers show up after bypass mode is enabled. It's not even clear
+how it should be done, should regulator_get on a bypassed regulator disable
+bypass mode?
 
-[...]
+There are only 2 other users of this and they don't seem to use multiple
+consumers. For imx the gpc driver is a secondary consumer for vddpu so this
+needs to be handled somehow. There is a hack in patch 7 which forces gpc to
+always probe after cpufreq and rely on it to perform the bypass procedure.
 
-> 
-> I tried to digest these info and below are my understanding from your
-> suggestion:
-> 
-> ### For boot time: add two command line flags
-> 
+Having both gpc and cpufreq call regulator_allow_bypass would sort of work but
+it would be ugly. If gpc probes first it would attempt bypass and get an error
+(because of the supply voltage check), bypass would later be performed
+successfully by cpufreq.
 
-I am not really sure about boot flags as there are dependency on power
-domains and expecting them to be powered on quite earlier is too much to
-ask. I am not sure if we need special case for boot time. But that's
-just my opinion. If someone has found it *really* useful and no other
-alternative exists, then go for it.
+I think it would be better to have an imperative regulator_set_bypass API. I
+think it might even be reasonable for it to completely replace the current
+regulator_allow_bypass API.
 
-[...]
+It would also make the code a lot simpler, there would no longer be a need to
+check regulator_is_bypass after regulator_allow_bypass.
 
-> ### For runtime: use one sysfs node
-> 
-> - Create sysfs node:
->   /sys/kernel/debug/coresight_cpu_debug/enable_debug
-> 
->   echo 1 > /sys/kernel/debug/coresight_cpu_debug/enable_debug: same
->   functionality with boot time's 'coresight.cpu_debug';
-> 
+* There is an anatop patch which dynamically modifies regulator_desc to
+zero-out "min_dropout_uV" in bypass mode, despite the fact that documentation
+claims that regulator_desc should be read-only. Perhaps the core should handle
+this or this should be replaced with a function in regulator_ops?
 
-My argument was this to be default without any need for flags.
-We can skip it as and when we find broken implementation if required.
+Irina Tirdea (2):
+  cpufreq: imx6q: Fix handling EPROBE_DEFER from regulator
+  regulator: anatop: fix min dropout for bypass mode
 
->   echo 2 > /sys/kernel/debug/coresight_cpu_debug/enable_debug: same
->   functionality with boot time's 'coresight.cpu_debug_pwrup';
-> 
->   echo 0 > /sys/kernel/debug/coresight_cpu_debug/enable_debug: disable
->   debug functionality.
->
+Leonard Crestez (6):
+  ARM: imx: gpc: Do not print error message for EPROBE_DEFER
+  cpufreq: imx6q: Set max suspend_freq to avoid changes during suspend
+  regulator: core: Check enabling bypass respects constraints
+  regulator: core: Add regulator_is_bypass function
+  cpufreq: imx6q: Initialize LDO bypass
+  ARM: dts: imx6qdl-sabresd: Enable fsl,ldo-bypass
 
-So it can be simple boolean to force setup the power domain requirements
-for it to work whenever you need to activate it. I may be missing some
-use-case, but IIUC simple boolean flag should be fine as suggested
-initially.
+ .../devicetree/bindings/power/fsl,imx-gpc.txt      |   4 +
+ arch/arm/boot/dts/imx6dl-sabresd-ldo.dts           |  13 ++
+ arch/arm/boot/dts/imx6q-sabresd-ldo.dts            |  13 ++
+ arch/arm/boot/dts/imx6qdl-sabresd.dtsi             |  19 +++
+ arch/arm/boot/dts/imx6qdl.dtsi                     |   6 +-
+ arch/arm/boot/dts/imx6qp-sabresd-ldo.dts           |  13 ++
+ arch/arm/boot/dts/imx6qp-sabresd.dts               |   4 +-
+ arch/arm/mach-imx/gpc.c                            |  13 +-
+ drivers/cpufreq/imx6q-cpufreq.c                    | 180 +++++++++++++++++++++
+ drivers/regulator/anatop-regulator.c               |   9 +-
+ drivers/regulator/core.c                           |  78 ++++++++-
+ include/linux/regulator/consumer.h                 |   1 +
+ 12 files changed, 344 insertions(+), 9 deletions(-)
+ create mode 100644 arch/arm/boot/dts/imx6dl-sabresd-ldo.dts
+ create mode 100644 arch/arm/boot/dts/imx6q-sabresd-ldo.dts
+ create mode 100644 arch/arm/boot/dts/imx6qp-sabresd-ldo.dts
 
 -- 
-Regards,
-Sudeep
+2.7.4
