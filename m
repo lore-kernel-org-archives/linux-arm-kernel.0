@@ -1,26 +1,38 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Wed, 22 Mar 2017 11:02:49 -0700
-Subject: [PATCH 3/3] ARM64: dts: meson-gxl: Add missing pinctrl pins groups
-In-Reply-To: <1488893462-7016-4-git-send-email-narmstrong@baylibre.com> (Neil
- Armstrong's message of "Tue, 7 Mar 2017 14:31:02 +0100")
-References: <1488893462-7016-1-git-send-email-narmstrong@baylibre.com>
- <1488893462-7016-4-git-send-email-narmstrong@baylibre.com>
-Message-ID: <m2inn1mbp2.fsf@baylibre.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Wed, 22 Mar 2017 11:02:59 -0700
+Subject: [GIT PULL 1/2] Broadcom arm Device Tree fixes for 4.11 (part 2)
+Message-ID: <20170322180300.27599-1-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Neil
+The following changes since commit 0c2bf9f95983fe30aa2f6463cb761cd42c2d521a:
 
-Neil Armstrong <narmstrong@baylibre.com> writes:
+  ARM: dts: BCM5301X: Correct GIC_PPI interrupt flags (2017-03-05 17:10:55 -0800)
 
-> Add pinctrl pins nodes following the additions of missing pins in the pinctrl
-> driver.
->
-> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+are available in the git repository at:
 
-I'll assume you will re-spin patches 2-3 of this series on Martin's
-updated PWM series.
+  http://github.com/Broadcom/stblinux tags/arm-soc/for-4.11/devicetree-fixes-2
 
-Thanks,
+for you to fetch changes up to acfa28b3649ec07775efaac0c00de2db39d71634:
 
-Kevin
+  ARM: dts: NSP: GPIO reboot open-source (2017-03-16 14:04:25 -0700)
+
+----------------------------------------------------------------
+This pull request contains Broadcom ARM-based SoCs Device Tree fixes for 4.11,
+please pull the following:
+
+- Jon fixes a reboot issue on most Northstar Plus platforms by adding the
+  "open-source" property to the "gpio-restart" Device Tree nodes
+
+----------------------------------------------------------------
+Jon Mason (1):
+      ARM: dts: NSP: GPIO reboot open-source
+
+ arch/arm/boot/dts/bcm958522er.dts  | 1 +
+ arch/arm/boot/dts/bcm958525er.dts  | 1 +
+ arch/arm/boot/dts/bcm958525xmc.dts | 1 +
+ arch/arm/boot/dts/bcm958622hr.dts  | 1 +
+ arch/arm/boot/dts/bcm958623hr.dts  | 1 +
+ arch/arm/boot/dts/bcm958625hr.dts  | 1 +
+ arch/arm/boot/dts/bcm988312hr.dts  | 1 +
+ 7 files changed, 7 insertions(+)
