@@ -1,19 +1,59 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 22 Mar 2017 11:33:15 +0800
-Subject: [PATCH v3 03/11] ARM: dts: sun8i: sina33: add cpu-supply
-In-Reply-To: <20170321153611.16228-4-quentin.schulz@free-electrons.com>
-References: <20170321153611.16228-1-quentin.schulz@free-electrons.com>
- <20170321153611.16228-4-quentin.schulz@free-electrons.com>
-Message-ID: <CAGb2v67mihMMMqEpWSiuXXn6evXcquStGqQHRK2KdQzQ+EubNA@mail.gmail.com>
+From: j-keerthy@ti.com (Keerthy)
+Date: Wed, 22 Mar 2017 09:12:47 +0530
+Subject: [PATCH v2 0/8] thermal: ti-soc-thermal: Migrate slope/offset data
+ to device tree
+In-Reply-To: <1489046762-11288-1-git-send-email-j-keerthy@ti.com>
+References: <1489046762-11288-1-git-send-email-j-keerthy@ti.com>
+Message-ID: <64ab8413-6cf1-864f-0550-9c8db59523f7@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 21, 2017 at 11:36 PM, Quentin Schulz
-<quentin.schulz@free-electrons.com> wrote:
-> This adds the cpu-supply DT property to the cpu0 DT node needed by
-> the board to adapt the regulator voltage depending on the currently used
-> OPP.
->
-> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
 
-Acked-by: Chen-Yu Tsai <wens@csie.org>
+
+On Thursday 09 March 2017 01:35 PM, Keerthy wrote:
+> Currently the slope and offset values for calculating the
+> hot spot temperature of a particular thermal zone is part
+> of driver data. Pass them here instead and obtain the values
+> while of node parsing.
+> 
+> Tested for the slope and constant values on DRA7-EVM, OMAP3-BEAGLE. 
+
+Hi Eduardo,
+
+If the series looks okay could you please pull this?
+
+Regards,
+Keerthy
+
+> 
+> Changes in v2:
+> 
+>   * Added OMAP3 changes along with DRA7/OMAP4/OMAP5.
+> 
+> Keerthy (8):
+>   arm: dts: omap3: Add cpu_thermal zone
+>   ARM: DRA7: Thermal: Add slope and offset values
+>   ARM: OMAP5: Thermal: Add slope and offset values
+>   ARM: OMAP443x: Thermal: Add slope and offset values
+>   ARM: OMAP4460: Thermal: Add slope and offset values
+>   thermal: ti-soc-thermal: Fetch slope and offset from DT
+>   thermal: ti-soc-thermal: Remove redundant constants
+>   thermal: ti-soc-thermal: Remove redundant code
+> 
+>  arch/arm/boot/dts/dra7.dtsi                        |  17 +++
+>  arch/arm/boot/dts/omap3-cpu-thermal.dtsi           |  20 +++
+>  arch/arm/boot/dts/omap34xx.dtsi                    |   8 +-
+>  arch/arm/boot/dts/omap36xx.dtsi                    |   8 +-
+>  arch/arm/boot/dts/omap443x.dtsi                    |   4 +
+>  arch/arm/boot/dts/omap4460.dtsi                    |   4 +
+>  arch/arm/boot/dts/omap5.dtsi                       |   9 ++
+>  .../thermal/ti-soc-thermal/dra752-thermal-data.c   |  10 --
+>  .../thermal/ti-soc-thermal/omap3-thermal-data.c    |   4 -
+>  .../thermal/ti-soc-thermal/omap4-thermal-data.c    |   6 -
+>  .../thermal/ti-soc-thermal/omap5-thermal-data.c    |   4 -
+>  drivers/thermal/ti-soc-thermal/ti-bandgap.h        |   4 -
+>  drivers/thermal/ti-soc-thermal/ti-thermal-common.c | 158 +--------------------
+>  drivers/thermal/ti-soc-thermal/ti-thermal.h        |  16 ---
+>  14 files changed, 71 insertions(+), 201 deletions(-)
+>  create mode 100644 arch/arm/boot/dts/omap3-cpu-thermal.dtsi
+> 
