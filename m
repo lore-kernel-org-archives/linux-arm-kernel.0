@@ -1,22 +1,124 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 22 Mar 2017 12:28:11 -0300
-Subject: [PATCH] ARM: imx_v6_v7_defconfig: Select SMSC_PHY
-In-Reply-To: <82d0aeeaed87ae5c9390b889cef4c54d715cde61.1490191972.git.leonard.crestez@nxp.com>
-References: <82d0aeeaed87ae5c9390b889cef4c54d715cde61.1490191972.git.leonard.crestez@nxp.com>
-Message-ID: <CAOMZO5CLH8pgdC7faTMSESW28Uu=soydN2m_yd26YuCE6u_yCg@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 22 Mar 2017 15:30:29 +0000
+Subject: [PATCH v3] efifb: avoid reconfiguration of BAR that covers the
+ framebuffer
+Message-ID: <1490196629-28088-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 22, 2017 at 11:27 AM, Leonard Crestez
-<leonard.crestez@nxp.com> wrote:
-> The imx6sl-evk board has a LAN8720A ethernet phy supported by SMSC_PHY.
-> Add this driver to the default imx config since the device is present on
-> one of the evaluation boards.
->
-> This used to work mostly fine with the generic phy driver but since
-> commit 0878fff1f42c18e448ab5b8b4f6a3eb32365b5b6 that driver no longer
+On UEFI systems, the PCI subsystem is enumerated by the firmware,
+and if a graphical framebuffer is exposed by a PCI device, its base
+address and size are exposed to the OS via the Graphics Output
+Protocol (GOP).
 
-The prefer format when referring to a commit is:
-0878fff1f42c  ("net: phy: Do not perform software reset for Generic PHY")
+On arm64 PCI systems, the entire PCI hierarchy is reconfigured from
+scratch at boot. This may result in the GOP framebuffer address to
+become stale, if the BAR covering the framebuffer is modified. This
+will cause the framebuffer to become unresponsive, and may in some
+cases result in unpredictable behavior if the range is reassigned to
+another device.
 
-Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+So add a quirk to the EFI fb driver to find the BAR associated with
+the GOP base address, and set the IORESOURCE_PCI_FIXED attribute so
+that the PCI core will leave it alone.
+
+Cc: Matt Fleming <matt@codeblueprint.co.uk>
+Cc: Peter Jones <pjones@redhat.com>
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+v3: check device is enabled before attempting to claim the resource
+
+ drivers/video/fbdev/efifb.c | 60 +++++++++++++++++++-
+ 1 file changed, 59 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/video/fbdev/efifb.c b/drivers/video/fbdev/efifb.c
+index 8c4dc1e1f94f..88f653864a01 100644
+--- a/drivers/video/fbdev/efifb.c
++++ b/drivers/video/fbdev/efifb.c
+@@ -10,6 +10,7 @@
+ #include <linux/efi.h>
+ #include <linux/errno.h>
+ #include <linux/fb.h>
++#include <linux/pci.h>
+ #include <linux/platform_device.h>
+ #include <linux/screen_info.h>
+ #include <video/vga.h>
+@@ -143,6 +144,9 @@ static struct attribute *efifb_attrs[] = {
+ };
+ ATTRIBUTE_GROUPS(efifb);
+ 
++static bool pci_bar_found;	/* did we find a BAR matching the efifb base? */
++static bool pci_dev_disabled;	/* was the device disabled? */
++
+ static int efifb_probe(struct platform_device *dev)
+ {
+ 	struct fb_info *info;
+@@ -152,7 +156,7 @@ static int efifb_probe(struct platform_device *dev)
+ 	unsigned int size_total;
+ 	char *option = NULL;
+ 
+-	if (screen_info.orig_video_isVGA != VIDEO_TYPE_EFI)
++	if (screen_info.orig_video_isVGA != VIDEO_TYPE_EFI || pci_dev_disabled)
+ 		return -ENODEV;
+ 
+ 	if (fb_get_options("efifb", &option))
+@@ -360,3 +364,57 @@ static struct platform_driver efifb_driver = {
+ };
+ 
+ builtin_platform_driver(efifb_driver);
++
++static void claim_efifb_bar(struct pci_dev *dev, int idx)
++{
++	u16 word;
++
++	pci_bar_found = true;
++
++	pci_read_config_word(dev, PCI_COMMAND, &word);
++	if (!(word & PCI_COMMAND_MEMORY)) {
++		pci_dev_disabled = true;
++		dev_err(&dev->dev,
++			"BAR %d: assigned to efifb but device is disabled!\n",
++			idx);
++		return;
++	}
++
++	if (pci_claim_resource(dev, idx)) {
++		pci_dev_disabled = true;
++		dev_err(&dev->dev,
++			"BAR %d: failed to claim resource for efifb!\n", idx);
++		return;
++	}
++
++	dev_info(&dev->dev, "BAR %d: assigned to efifb\n", idx);
++}
++
++static void efifb_fixup_resources(struct pci_dev *dev)
++{
++	u64 base = screen_info.lfb_base;
++	u64 size = screen_info.lfb_size;
++	int i;
++
++	if (pci_bar_found || screen_info.orig_video_isVGA != VIDEO_TYPE_EFI)
++		return;
++
++	if (screen_info.capabilities & VIDEO_CAPABILITY_64BIT_BASE)
++		base |= (u64)screen_info.ext_lfb_base << 32;
++
++	if (!base)
++		return;
++
++	for (i = 0; i < PCI_STD_RESOURCE_END; i++) {
++		struct resource *res = &dev->resource[i];
++
++		if (!(res->flags & IORESOURCE_MEM))
++			continue;
++
++		if (res->start <= base && res->end >= base + size - 1) {
++			claim_efifb_bar(dev, i);
++			break;
++		}
++	}
++}
++DECLARE_PCI_FIXUP_HEADER(PCI_ANY_ID, PCI_ANY_ID, efifb_fixup_resources);
+-- 
+2.7.4
