@@ -1,35 +1,125 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 22 Mar 2017 11:03:00 -0700
-Subject: [GIT PULL 2/2] Broadcom arm64 Device Tree fixes for 4.11
-In-Reply-To: <20170322180300.27599-1-f.fainelli@gmail.com>
-References: <20170322180300.27599-1-f.fainelli@gmail.com>
-Message-ID: <20170322180300.27599-2-f.fainelli@gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 22 Mar 2017 18:04:30 +0000
+Subject: [PATCH] arm64: dts: NS2: Add dma-coherent to relevant DT entries
+In-Reply-To: <1490129479-19459-1-git-send-email-jon.mason@broadcom.com>
+References: <1490129479-19459-1-git-send-email-jon.mason@broadcom.com>
+Message-ID: <779b8bb1-3053-d329-8c53-e428b5ce60be@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
+Hi Jon,
 
-  Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
+On 21/03/17 20:51, Jon Mason wrote:
+> Cache related issues with DMA rings and performance issues related to
+> caching are being caused by not properly setting the "dma-coherent" flag
+> in the device tree entries.  Adding it here to correct the issue.
 
-are available in the git repository at:
+I'd expect the SMMU to be wired up coherently as well - is it not? (it
+won't actually be going wrong if it is, just that you'd be doing
+unnecessary cache cleaning on page table updates)
 
-  http://github.com/Broadcom/stblinux tags/arm-soc/for-4.11/devicetree-arm64-fixes
+Robin.
 
-for you to fetch changes up to f0c0cb99f74c03e2407ea553f6d46eb611e262b5:
-
-  arm64: dts: NS2: Add dma-coherent to relevant DT entries (2017-03-22 10:14:14 -0700)
-
-----------------------------------------------------------------
-This pull request contains Broadcom ARM64-based SoCs Device Tree fixes for 4.11,
-please pull the following:
-
-- Jon adds missing "dma-coherent" property to the Northstar 2 DTS include file
-  in order to fix both performance and cache problems for: PCIe, Ethernet,
-  PDC/mailbox, SATA3 and SDHCI
-
-----------------------------------------------------------------
-Jon Mason (1):
-      arm64: dts: NS2: Add dma-coherent to relevant DT entries
-
- arch/arm64/boot/dts/broadcom/ns2.dtsi | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+> Signed-off-by: Jon Mason <jon.mason@broadcom.com>
+> Fixes: fd5e5dd56 ("arm64: dts: Add PCIe0 and PCIe4 DT nodes for NS2")
+> Fixes: dddc3c9d7 ("arm64: dts: NS2: add AMAC ethernet support")
+> Fixes: e79249143 ("arm64: dts: Add Broadcom Northstar2 device tree entries for PDC driver")
+> Fixes: ac9aae00f ("arm64: dts: Add SATA3 AHCI and SATA3 PHY DT nodes for NS2")
+> Fixes: efc877676 ("arm64: dts: Add SDHCI DT node for NS2")
+> ---
+>  arch/arm64/boot/dts/broadcom/ns2.dtsi | 11 +++++++++++
+>  1 file changed, 11 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/broadcom/ns2.dtsi b/arch/arm64/boot/dts/broadcom/ns2.dtsi
+> index b8503fc..35a309a 100644
+> --- a/arch/arm64/boot/dts/broadcom/ns2.dtsi
+> +++ b/arch/arm64/boot/dts/broadcom/ns2.dtsi
+> @@ -114,6 +114,7 @@
+>  	pcie0: pcie at 20020000 {
+>  		compatible = "brcm,iproc-pcie";
+>  		reg = <0 0x20020000 0 0x1000>;
+> +		dma-coherent;
+>  
+>  		#interrupt-cells = <1>;
+>  		interrupt-map-mask = <0 0 0 0>;
+> @@ -144,6 +145,7 @@
+>  	pcie4: pcie at 50020000 {
+>  		compatible = "brcm,iproc-pcie";
+>  		reg = <0 0x50020000 0 0x1000>;
+> +		dma-coherent;
+>  
+>  		#interrupt-cells = <1>;
+>  		interrupt-map-mask = <0 0 0 0>;
+> @@ -174,6 +176,7 @@
+>  	pcie8: pcie at 60c00000 {
+>  		compatible = "brcm,iproc-pcie-paxc";
+>  		reg = <0 0x60c00000 0 0x1000>;
+> +		dma-coherent;
+>  		linux,pci-domain = <8>;
+>  
+>  		bus-range = <0x0 0x1>;
+> @@ -203,6 +206,7 @@
+>  			      <0x61030000 0x100>;
+>  			reg-names = "amac_base", "idm_base", "nicpm_base";
+>  			interrupts = <GIC_SPI 341 IRQ_TYPE_LEVEL_HIGH>;
+> +			dma-coherent;
+>  			phy-handle = <&gphy0>;
+>  			phy-mode = "rgmii";
+>  			status = "disabled";
+> @@ -213,6 +217,7 @@
+>  			reg = <0x612c0000 0x445>;  /* PDC FS0 regs */
+>  			interrupts = <GIC_SPI 187 IRQ_TYPE_LEVEL_HIGH>;
+>  			#mbox-cells = <1>;
+> +			dma-coherent;
+>  			brcm,rx-status-len = <32>;
+>  			brcm,use-bcm-hdr;
+>  		};
+> @@ -228,6 +233,7 @@
+>  			reg = <0x612e0000 0x445>;  /* PDC FS1 regs */
+>  			interrupts = <GIC_SPI 189 IRQ_TYPE_LEVEL_HIGH>;
+>  			#mbox-cells = <1>;
+> +			dma-coherent;
+>  			brcm,rx-status-len = <32>;
+>  			brcm,use-bcm-hdr;
+>  		};
+> @@ -243,6 +249,7 @@
+>  			reg = <0x61300000 0x445>;  /* PDC FS2 regs */
+>  			interrupts = <GIC_SPI 191 IRQ_TYPE_LEVEL_HIGH>;
+>  			#mbox-cells = <1>;
+> +			dma-coherent;
+>  			brcm,rx-status-len = <32>;
+>  			brcm,use-bcm-hdr;
+>  		};
+> @@ -258,6 +265,7 @@
+>  			reg = <0x61320000 0x445>;  /* PDC FS3 regs */
+>  			interrupts = <GIC_SPI 193 IRQ_TYPE_LEVEL_HIGH>;
+>  			#mbox-cells = <1>;
+> +			dma-coherent;
+>  			brcm,rx-status-len = <32>;
+>  			brcm,use-bcm-hdr;
+>  		};
+> @@ -668,6 +676,7 @@
+>  		sata: ahci at 663f2000 {
+>  			compatible = "brcm,iproc-ahci", "generic-ahci";
+>  			reg = <0x663f2000 0x1000>;
+> +			dma-coherent;
+>  			reg-names = "ahci";
+>  			interrupts = <GIC_SPI 438 IRQ_TYPE_LEVEL_HIGH>;
+>  			#address-cells = <1>;
+> @@ -691,6 +700,7 @@
+>  			compatible = "brcm,sdhci-iproc-cygnus";
+>  			reg = <0x66420000 0x100>;
+>  			interrupts = <GIC_SPI 421 IRQ_TYPE_LEVEL_HIGH>;
+> +			dma-coherent;
+>  			bus-width = <8>;
+>  			clocks = <&genpll_sw BCM_NS2_GENPLL_SW_SDIO_CLK>;
+>  			status = "disabled";
+> @@ -700,6 +710,7 @@
+>  			compatible = "brcm,sdhci-iproc-cygnus";
+>  			reg = <0x66430000 0x100>;
+>  			interrupts = <GIC_SPI 422 IRQ_TYPE_LEVEL_HIGH>;
+> +			dma-coherent;
+>  			bus-width = <8>;
+>  			clocks = <&genpll_sw BCM_NS2_GENPLL_SW_SDIO_CLK>;
+>  			status = "disabled";
+> 
