@@ -1,68 +1,63 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Wed, 22 Mar 2017 18:14:44 +0000
-Subject: [PATCH 7/7] arm64: hugetlb: Add break-before-make logic for
- contiguous entries
-In-Reply-To: <20170322143810.GH2977@leverpostej>
-References: <20170321180421.18332-1-punit.agrawal@arm.com>
- <20170321180421.18332-8-punit.agrawal@arm.com>
- <20170322143810.GH2977@leverpostej>
-Message-ID: <48e7853e-1636-0746-21d5-3a0a3e4c177e@arm.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Wed, 22 Mar 2017 19:20:57 +0100
+Subject: [PATCH v3 0/5] ATA/ARM: convert ARM/DaVinci to use libata PATA drivers
+References: <CGME20170322182127epcas1p267b13e8c92205223458863783bdea476@epcas1p2.samsung.com>
+Message-ID: <1490206862-26065-1-git-send-email-b.zolnierkie@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
+
+This patchset adds Palmchip BK3710 IDE controller driver to
+libata and switches ARM/DaVinci to use it (instead of the old
+IDE driver).
+
+Sekhar, please check that it still works after changes, thanks.
+
+Changes since v2
+(https://www.spinics.net/lists/arm-kernel/msg568597.html):
+- fixed 'checkpatch.pl --strict' issues reported by Sekhar
+- added chipset initialization fixups in the new patches #2-3
+  (based on the review comments from Sergei)
+
+Changes since v1
+(https://www.spinics.net/lists/arm-kernel/msg567442.html):
+- addressed review comments from Sergei Shtylyov
+- fixed cycle_time unitialized variable issue
+
+Changes since v0.1 draft patch version
+(https://www.spinics.net/lists/arm-kernel/msg566932.html):
+- fixed cycle_time build warning
+- added platform support fixes from Sekhar
+- added defconfig changes from Sekhar
+- preserved platform support for the old IDE driver
+- split it on 3 patches
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
 
 
-On 22/03/17 14:38, Mark Rutland wrote:
-> On Tue, Mar 21, 2017 at 06:04:21PM +0000, Punit Agrawal wrote:
->> From: Steve Capper <steve.capper@arm.com>
->>
->> It has become apparent that one has to take special care when modifying
->> attributes of memory mappings that employ the contiguous bit.
->>
->> Both the requirement and the architecturally correct "Break-Before-Make"
->> technique of updating contiguous entries can be found described in:
->> ARM DDI 0487A.k_iss10775, "Misprogramming of the Contiguous bit",
->> page D4-1762.
->>
->> The huge pte accessors currently replace the attributes of contiguous
->> pte entries in place thus can, on certain platforms, lead to TLB
->> conflict aborts or even erroneous results returned from TLB lookups.
->>
->> This patch adds a helper function get_clear_flush(.) that clears a
->> contiguous entry and returns the head pte (whilst taking care to
->> retain dirty bit information that could have been modified by DBM).
->> A tlb invalidate is performed to then ensure that there is no
->> possibility of multiple tlb entries being present for the same
->> region.
->
-> Since its evidently easy to miss, can we please add a comment above
-> get_clear_flush() regarding the BBM requirement, e.g.
->
-> /*
->  * Changing some bits of contiguous entries requires us to follow a
->  * Break-Before-Make approach, breaking the whole contiguous set before
->  * we can change any entries. See ARM DDI 0487A.k_iss10775,
->  * "Misprogramming of the Contiguous bit", page D4-1762.
->  *
->  * This helper performs the break step.
->  */
->
-> Otherwise, this looks good to me, and to the best of my knowledge avoids
-> the issue described above.
->
-> FWIW:
->
-> Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+Bartlomiej Zolnierkiewicz (3):
+  ata: add Palmchip BK3710 PATA controller driver
+  pata_bk3710: disable IORDY Timer on chipset initialization
+  pata_bk3710: clear status bits of BMISP on chipset initialization
 
-Hi Mark,
+Sekhar Nori (2):
+  ARM: davinci: add pata_bk3710 libata driver support
+  ARM: davinci_all_defconfig: convert to use libata PATA
 
-Thanks for reviewing the patches. I'll address your comments and post a
-new version in a day or two.
+ arch/arm/configs/davinci_all_defconfig    |   4 +-
+ arch/arm/mach-davinci/board-dm644x-evm.c  |   3 +-
+ arch/arm/mach-davinci/board-dm646x-evm.c  |   3 +-
+ arch/arm/mach-davinci/board-neuros-osd2.c |   3 +-
+ drivers/ata/Kconfig                       |   9 +
+ drivers/ata/Makefile                      |   1 +
+ drivers/ata/pata_bk3710.c                 | 382 ++++++++++++++++++++++++++++++
+ 7 files changed, 399 insertions(+), 6 deletions(-)
+ create mode 100644 drivers/ata/pata_bk3710.c
 
-Thanks,
-Punit
-
->
-> Mark.
->
-IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
+-- 
+1.9.1
