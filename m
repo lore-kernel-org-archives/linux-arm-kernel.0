@@ -1,38 +1,83 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 22 Mar 2017 12:12:09 +0100
-Subject: [PATCH] ARM: dts: augment Moxa ART GPIO node
-Message-ID: <20170322111209.14571-1-linus.walleij@linaro.org>
+From: james.morse@arm.com (James Morse)
+Date: Wed, 22 Mar 2017 11:14:21 +0000
+Subject: [PATCH V11 10/10] arm/arm64: KVM: add guest SEA support
+In-Reply-To: <6eee7a67-808e-8712-2ec2-593eac52d921@huawei.com>
+References: <1487712121-16688-1-git-send-email-tbaicar@codeaurora.org>
+ <1487712121-16688-11-git-send-email-tbaicar@codeaurora.org>
+ <df6ba5dc-d93f-925a-46bf-1e1e209d17f3@huawei.com> <58B43092.6040401@arm.com>
+ <6eee7a67-808e-8712-2ec2-593eac52d921@huawei.com>
+Message-ID: <58D25C8D.3070507@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Moxa ART GPIO is a Faraday FTGPIO010. Augment the DTS node
-to indicate both compatible values for the SoC and the IP part.
-Also increase the register range to 0x100, it has at least 0x48
-bytes of registers, and a few extra will not hurt.
+Hi Wang Xiongfeng,
 
-Tested-by: Jonas Jensen <jonas.jensen@gmail.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-ARM SoC folks: please just apply this to DT for-next like the
-other Moxa Faraday cleanup patch.
----
- arch/arm/boot/dts/moxart.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+On 22/03/17 02:46, Xiongfeng Wang wrote:
+>> Guests are a special case as QEMU may never access the faulty memory itself, so
+>> it won't receive the 'late' signal. It looks like ARM/arm64 KVM lacks support
+>> for KVM_PFN_ERR_HWPOISON which sends SIGBUS from KVM's fault-handling code. I
+>> have patches to add support for this which I intend to send at rc1.
+>>
+>> [0] suggests 'KVM qemu' sets these MCE flags to take the 'early' path, but given
+>> x86s KVM_PFN_ERR_HWPOISON, this may be out of date.
+>>
+>>
+>> Either way, once QEMU gets a signal indicating the virtual address, it can
+>> generate its own APEI CPER records and use the KVM APIs to mock up an
+>> Synchronous External Abort, (or inject an IRQ or run the vcpu waiting for the
+>> guest's polling thread to come round, whichever was described to the guest via
+>> the HEST/GHES tables).
+>>
+> 
+> I have another confusion about the SIGBUS signal. Can QEMU always get a SIGBUS when needed.
+> I know one circumstance which will send SIGBUS. The ghes_handle_memory_failure() in
+> ghes_do_proc() will send SIGBUS to QEMU, but this only happens when there exists memory section
+> in ghes, that is the section type is CPER_SEC_PLATFORM_MEM.
+> Suppose this case, an load  error in guest application causes an SEA, and the firmware take it.
+> The firmware begin to scan the error record and fill the ghes. But the error record in memory node
+> has been read by other handler.
 
-diff --git a/arch/arm/boot/dts/moxart.dtsi b/arch/arm/boot/dts/moxart.dtsi
-index 64f2f44235d0..e86f8c905ac5 100644
---- a/arch/arm/boot/dts/moxart.dtsi
-+++ b/arch/arm/boot/dts/moxart.dtsi
-@@ -67,8 +67,8 @@
- 		gpio: gpio at 98700000 {
- 			gpio-controller;
- 			#gpio-cells = <2>;
--			compatible = "moxa,moxart-gpio";
--			reg = <0x98700000 0xC>;
-+			compatible = "moxa,moxart-gpio", "faraday,ftgpio010";
-+			reg = <0x98700000 0x100>;
- 		};
- 
- 		rtc: rtc {
--- 
-2.9.3
+(this looks like a race)
+
+> The firmware won't add memory section in ghes, so ghes_handle_memory_failure() won't be called.
+
+I think this would be a firmware bug. Firmware can reserve as much memory as it
+needs for writing CPER records, there should not be a case where 'the memory' is
+currently being processed by another handler.
+
+The memory firmware uses to write CPER records too shouldn't be published to the
+OS until it has finished. Once firmware has finished writing the CPER records it
+can update the memory pointed to by GHES->ErrorStatusAddress with the location
+of the CPER records and invoke the Notification method for this GHES. (SEI, SEA,
+IRQ etc). We should always get a complete set of CPER records to describe the error.
+
+It firmware uses GHESv2 it can get an 'ack' write from APEI once it has finished
+processing the records. Once it gets this firmware knows it can re-use the memory.
+
+(Obviously each GHES entry can only process one error at a time. Firmware should
+either handle this, or have one entry for each Error Source that can happen
+independently)
+
+
+> I mean that we may not rely on ghes_handle_memory_failure() to send SIGBUS to QEMU. Whether we should
+> add some other code to send SIGBUS in handle_guest_abort(). I don't know whether the ARM/arm64
+>  KVM_PFN_ERR_HWPOISON you mentioned above will cover all the cases.
+
+The SIGBUS routine is part of the kernel's recovery method for memory errors. It
+should cover all the errors reported with this CPER_SEC_PLATFORM_MEM.
+
+Back to the race you describe. It shouldn't matter if one CPU processes an error
+for guest memory while a vcpu is running on another. This may happen if the
+error was detected by DRAM's background scrub.
+If we don't treat KVM/Qemu as anything special the memory_failure()->SIGBUS path
+will happen regardless of whether the fault interrupted the guest or not.
+
+
+There are other types of error such as PCIe, CPU, BUS error etc. If it's
+possible to recover from these we may need additional code in the kernel. This
+shouldn't necessarily treat KVM as a special case.
+
+
+Thanks,
+
+James
