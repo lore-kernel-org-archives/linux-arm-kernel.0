@@ -1,48 +1,74 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 22 Mar 2017 14:50:50 +0000
-Subject: [RFC PATCH v2 20/41] arm64/sve: traps: Add descriptive string for SVE
- exceptions
+Date: Wed, 22 Mar 2017 14:50:47 +0000
+Subject: [RFC PATCH v2 17/41] arm64/sve: signal: Dump Scalable Vector
+ Extension registers to user stack
 In-Reply-To: <1490194274-30569-1-git-send-email-Dave.Martin@arm.com>
 References: <1490194274-30569-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1490194274-30569-21-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1490194274-30569-18-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In preparation for SVE trapping in userspace, let's print something
-relevant instead of "UNREGOCNIZED EC" when an unhandled SVE
-exception occurs.
+This patch populates the sve_regs() area reserved on the user stack
+with the actual register context.
 
 Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 ---
- arch/arm64/include/asm/esr.h | 3 ++-
- arch/arm64/kernel/traps.c    | 1 +
- 2 files changed, 3 insertions(+), 1 deletion(-)
+ arch/arm64/include/asm/fpsimd.h | 1 +
+ arch/arm64/kernel/fpsimd.c      | 3 +--
+ arch/arm64/kernel/signal.c      | 8 ++++++++
+ 3 files changed, 10 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/include/asm/esr.h b/arch/arm64/include/asm/esr.h
-index d14c478..87729f3 100644
---- a/arch/arm64/include/asm/esr.h
-+++ b/arch/arm64/include/asm/esr.h
-@@ -42,7 +42,8 @@
- #define ESR_ELx_EC_HVC64	(0x16)
- #define ESR_ELx_EC_SMC64	(0x17)
- #define ESR_ELx_EC_SYS64	(0x18)
--/* Unallocated EC: 0x19 - 0x1E */
-+#define ESR_ELx_EC_SVE		(0x19)
-+/* Unallocated EC: 0x1A - 0x1E */
- #define ESR_ELx_EC_IMP_DEF	(0x1f)
- #define ESR_ELx_EC_IABT_LOW	(0x20)
- #define ESR_ELx_EC_IABT_CUR	(0x21)
-diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-index e52be6a..e2e7c3c 100644
---- a/arch/arm64/kernel/traps.c
-+++ b/arch/arm64/kernel/traps.c
-@@ -587,6 +587,7 @@ static const char *esr_class_str[] = {
- 	[ESR_ELx_EC_HVC64]		= "HVC (AArch64)",
- 	[ESR_ELx_EC_SMC64]		= "SMC (AArch64)",
- 	[ESR_ELx_EC_SYS64]		= "MSR/MRS (AArch64)",
-+	[ESR_ELx_EC_SVE]		= "SVE",
- 	[ESR_ELx_EC_IMP_DEF]		= "EL3 IMP DEF",
- 	[ESR_ELx_EC_IABT_LOW]		= "IABT (lower EL)",
- 	[ESR_ELx_EC_IABT_CUR]		= "IABT (current EL)",
+diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
+index 93ae8a7..be292c5 100644
+--- a/arch/arm64/include/asm/fpsimd.h
++++ b/arch/arm64/include/asm/fpsimd.h
+@@ -95,6 +95,7 @@ extern void sve_save_state(void *state, u32 *pfpsr);
+ extern void sve_load_state(void const *state, u32 const *pfpsr);
+ extern unsigned int sve_get_vl(void);
+ extern void __init fpsimd_init_task_struct_size(void);
++extern void *__sve_state(struct task_struct *task);
+ 
+ #endif
+ 
+diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+index 801f4d3..1bdf7f2 100644
+--- a/arch/arm64/kernel/fpsimd.c
++++ b/arch/arm64/kernel/fpsimd.c
+@@ -93,7 +93,7 @@ static DEFINE_PER_CPU(struct fpsimd_state *, fpsimd_last_state);
+ 
+ #ifdef CONFIG_ARM64_SVE
+ 
+-static void *__sve_state(struct task_struct *task)
++void *__sve_state(struct task_struct *task)
+ {
+ 	return (char *)task + ALIGN(sizeof(*task), 16);
+ }
+@@ -153,7 +153,6 @@ static void sve_to_fpsimd(struct task_struct *task)
+ #else /* ! CONFIG_ARM64_SVE */
+ 
+ /* Dummy declarations for usage protected with IS_ENABLED(CONFIG_ARM64_SVE): */
+-extern void *__sve_state(struct task_struct *task);
+ extern void *sve_pffr(struct task_struct *task);
+ extern void fpsimd_to_sve(struct task_struct *task);
+ 
+diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
+index 113502e..6b83917 100644
+--- a/arch/arm64/kernel/signal.c
++++ b/arch/arm64/kernel/signal.c
+@@ -229,6 +229,14 @@ static int preserve_sve_context(struct sve_context __user *ctx)
+ 	BUILD_BUG_ON(sizeof(ctx->__reserved) != sizeof(reserved));
+ 	err |= copy_to_user(&ctx->__reserved, reserved, sizeof(reserved));
+ 
++	/*
++	 * This assumes that the SVE state has already been saved to
++	 * the task struct by calling preserve_fpsimd_context().
++	 */
++	err |= copy_to_user((char __user *)ctx + SVE_SIG_REGS_OFFSET,
++			    __sve_state(current),
++			    SVE_SIG_REGS_SIZE(vq));
++
+ 	return err ? -EFAULT : 0;
+ }
+ 
 -- 
 2.1.4
