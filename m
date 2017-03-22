@@ -1,19 +1,109 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Thu, 23 Mar 2017 00:00:51 +0100
-Subject: [GIT PULL] iommu/arm-smmu: Fixes for 4.11
-In-Reply-To: <20170322183849.GG13077@arm.com>
-References: <20170322183849.GG13077@arm.com>
-Message-ID: <20170322230051.GG7266@8bytes.org>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Thu, 23 Mar 2017 07:17:03 +0800
+Subject: [PATCH v2 1/5] dt-bindings: update device tree binding for
+ Allwinner PRCM CCUs
+In-Reply-To: <20170322200923.tcr7yqnfqj2zk2v7@lukather>
+References: <20170315172808.64011-1-icenowy@aosc.xyz>
+ <20170315172808.64011-2-icenowy@aosc.xyz>
+ <20170321074117.vdfjynauuuv6fivp@lukather>
+ <115431490120542@web34g.yandex.ru> <20170322200923.tcr7yqnfqj2zk2v7@lukather>
+Message-ID: <997781490224623@web30o.yandex.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 22, 2017 at 06:38:50PM +0000, Will Deacon wrote:
-> The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
-> 
->   Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git for-joerg/arm-smmu/fixes
 
-Pulled, thanks Will.
+
+23.03.2017, 04:09, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
+> On Wed, Mar 22, 2017 at 02:22:22AM +0800, Icenowy Zheng wrote:
+>> ?21.03.2017, 15:41, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
+>> ?> On Thu, Mar 16, 2017 at 01:28:04AM +0800, Icenowy Zheng wrote:
+>> ?>> ?Many Allwinner SoCs after A31 have a CCU in PRCM block.
+>> ?>>
+>> ?>> ?Give the ones on H3 and A64 compatible strings.
+>> ?>>
+>> ?>> ?Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+>> ?>> ?---
+>> ?>> ?Changes in v2:
+>> ?>> ?- Add iosc for R_CCU's on H3/A64. (A31, A23 and A33 seem to have different
+>> ?>> ???clock for mux 3 of ar100 clk. Investgations are needed for them.)
+>> ?>>
+>> ?>> ??Documentation/devicetree/bindings/clock/sunxi-ccu.txt | 18 +++++++++++++++++-
+>> ?>> ??1 file changed, 17 insertions(+), 1 deletion(-)
+>> ?>>
+>> ?>> ?diff --git a/Documentation/devicetree/bindings/clock/sunxi-ccu.txt b/Documentation/devicetree/bindings/clock/sunxi-ccu.txt
+>> ?>> ?index 68512aa398a9..4a4addff595d 100644
+>> ?>> ?--- a/Documentation/devicetree/bindings/clock/sunxi-ccu.txt
+>> ?>> ?+++ b/Documentation/devicetree/bindings/clock/sunxi-ccu.txt
+>> ?>> ?@@ -7,9 +7,11 @@ Required properties :
+>> ?>> ??????????????????- "allwinner,sun8i-a23-ccu"
+>> ?>> ??????????????????- "allwinner,sun8i-a33-ccu"
+>> ?>> ??????????????????- "allwinner,sun8i-h3-ccu"
+>> ?>> ?+ - "allwinner,sun8i-h3-r-ccu"
+>> ?>> ??????????????????- "allwinner,sun8i-v3s-ccu"
+>> ?>> ??????????????????- "allwinner,sun9i-a80-ccu"
+>> ?>> ??????????????????- "allwinner,sun50i-a64-ccu"
+>> ?>> ?+ - "allwinner,sun50i-a64-r-ccu"
+>> ?>> ??????????????????- "allwinner,sun50i-h5-ccu"
+>> ?>>
+>> ?>> ??- reg: Must contain the registers base address and length
+>> ?>> ?@@ -20,7 +22,11 @@ Required properties :
+>> ?>> ??- #clock-cells : must contain 1
+>> ?>> ??- #reset-cells : must contain 1
+>> ?>>
+>> ?>> ?-Example:
+>> ?>> ?+For the PRCM CCUs on H3/A64, one more clock is needed:
+>> ?>> ?+- "iosc": another frequency oscillator used for CPUS (usually at 32000Hz,
+>> ?>> ?+ not the same with losc)
+>> ?>
+>> ?> This is called the internal oscillator in the datasheet, it would
+>> ?> probably make more sense to call it that way in the documentation too.
+>> ?>
+>> ?> This oscillator seems to be clocked at 16MHz, so we should represent
+>> ?> it as such.
+>> ?>
+>> ?> And I'm wondering, are you *sure* that it's fed directly from the
+>> ?> internal oscillator, or goes through the registers in the RTC, with
+>> ?> the 32 divider and 16 prescaler by default that makes it at roughly
+>> ?> the same rate (31.25kHz).
+>>
+>> ?In fact I know nothing about it -- I only represented the code in BSP
+>> ?clock driver.
+>>
+>> ?The mux value 3 varies from SoC to SoC. For A64/H5 it's 32000,
+>> ?for A33 it's 667000 (seems to be directly the internal OSC, as the
+>> ?user manual says the internal OSC is 600~700kHz; but it's named
+>> ?cpuosc rather than iosc in A33 BSP clock driver); for A80 it's even
+>> ?PLL_AUDIO.
+>
+> Where are you getting those info from?
+>
+> As far as I know, the A33 PRCM takes the hosc, losc, pll6 and CPU
+> (internal) oscillator:
+> https://github.com/allwinner-zh/linux-3.4-sunxi/blob/master/drivers/clk/sunxi/clk-sun8iw5.c#L508
+>
+> The H3 takes the hosc and losc:
+> https://github.com/allwinner-zh/linux-3.4-sunxi/blob/master/drivers/clk/sunxi/clk-sun8iw7.c#L379
+>
+> The A80 takes the hosc and losc:
+> https://github.com/allwinner-zh/linux-3.4-sunxi/blob/master/drivers/clk/sunxi/clk-sun9iw1.c#L281
+>
+> The A64 takes the hosc, losc, pll-periph0 and the iosc, which indeed
+> seems to be fed from the internal oscillator with the divider in the
+> RTC:
+> https://github.com/longsleep/linux-pine64/blob/lichee-dev-v3.10.65-bsp2.0/arch/arm64/boot/dts/sun50iw1p1-clk.dtsi#L19
+> https://github.com/longsleep/linux-pine64/blob/lichee-dev-v3.10.65-bsp2.0/drivers/clk/sunxi/clk-sun50iw1.c#L603
+
+But then in sunxi_init_clocks function, the iosc clock is initialized
+as a fixed clock with 32000Hz.
+
+The clock node in BSP device tree have a compatible of
+allwinner,fixed-clock, but not fixed-clock, which makes it not able
+to be really probed.
+
+>
+> Maxime
+>
+> --
+> Maxime Ripard, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
