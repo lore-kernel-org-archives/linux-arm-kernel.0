@@ -1,78 +1,75 @@
 From: jagan@openedev.com (Jagan Teki)
-Date: Wed, 22 Mar 2017 23:18:06 +0530
-Subject: [PATCH 01/12] ARM: dts: imx6ul-geam: Add backlight support for lcdif
+Date: Wed, 22 Mar 2017 23:18:10 +0530
+Subject: [PATCH 05/12] ARM: dts: imx6ul-isiot-common: Add touchscreen node
 In-Reply-To: <1490204897-14525-1-git-send-email-jagan@openedev.com>
 References: <1490204897-14525-1-git-send-email-jagan@openedev.com>
-Message-ID: <1490204897-14525-2-git-send-email-jagan@openedev.com>
+Message-ID: <1490204897-14525-6-git-send-email-jagan@openedev.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jagan Teki <jagan@amarulasolutions.com>
 
-This patch add support for lcdif backlight on GEAM6UL
-variant boards.
+Add touchscreen node as i2c1 slave device on Engicam Is.IoT MX6UL
+modules, the touchscreen controlled 'st,stmpe-ts' connected via
+i2c with st,stmpe811 mfb interface.
 
 Cc: Shawn Guo <shawnguo@kernel.org>
 Cc: Matteo Lisi <matteo.lisi@engicam.com>
 Cc: Michael Trimarchi <michael@amarulasolutions.com>
 Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 ---
- arch/arm/boot/dts/imx6ul-geam.dtsi | 29 +++++++++++++++++++++++++++++
- 1 file changed, 29 insertions(+)
+ arch/arm/boot/dts/imx6ul-isiot-common.dtsi | 34 ++++++++++++++++++++++++++++++
+ 1 file changed, 34 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx6ul-geam.dtsi b/arch/arm/boot/dts/imx6ul-geam.dtsi
-index 940aef6..ee5220c 100644
---- a/arch/arm/boot/dts/imx6ul-geam.dtsi
-+++ b/arch/arm/boot/dts/imx6ul-geam.dtsi
-@@ -49,6 +49,23 @@
- 		reg = <0x80000000 0x08000000>;
- 	};
+diff --git a/arch/arm/boot/dts/imx6ul-isiot-common.dtsi b/arch/arm/boot/dts/imx6ul-isiot-common.dtsi
+index 9660e20..b149b5e 100644
+--- a/arch/arm/boot/dts/imx6ul-isiot-common.dtsi
++++ b/arch/arm/boot/dts/imx6ul-isiot-common.dtsi
+@@ -40,6 +40,34 @@
+  *     OTHER DEALINGS IN THE SOFTWARE.
+  */
  
-+	backlight {
-+		compatible = "pwm-backlight";
-+		pwms = <&pwm8 0 100000>;
-+		brightness-levels = < 0  1  2  3  4  5  6  7  8  9
-+				     10 11 12 13 14 15 16 17 18 19
-+				     20 21 22 23 24 25 26 27 28 29
-+				     30 31 32 33 34 35 36 37 38 39
-+				     40 41 42 43 44 45 46 47 48 49
-+				     50 51 52 53 54 55 56 57 58 59
-+				     60 61 62 63 64 65 66 67 68 69
-+				     70 71 72 73 74 75 76 77 78 79
-+				     80 81 82 83 84 85 86 87 88 89
-+				     90 91 92 93 94 95 96 97 98 99
-+				    100>;
-+		default-brightness-level = <100>;
-+	};
++&i2c1 {
++	touch: stmpe811 at 44 {
++		compatible = "st,stmpe811";
++		reg = <0x44>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_stmpe_ts>;
++		interrupt-parent = <&gpio1>;
++		interrupts = <18 IRQ_TYPE_EDGE_FALLING>;
++		interrupt-controller;
++		#interrupt-cells = <2>;
 +
- 	chosen {
- 		stdout-path = &uart1;
- 	};
-@@ -143,6 +160,12 @@
- 	display = <&display0>;
- };
- 
-+&pwm8 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_pwm8>;
-+	status = "okay";
++		stmpe_touchscreen {
++			compatible = "st,stmpe-ts";
++			st,sample-time = <4>;
++			st,mod-12b = <1>;
++			st,ref-sel = <0>;
++			st,adc-freq = <1>;
++			st,ave-ctrl = <1>;
++			st,touch-det-delay = <2>;
++			st,settling = <2>;
++			st,fraction-z = <7>;
++			st,i-drive = <1>;
++		};
++	};
 +};
 +
- &tsc {
+ &lcdif {
  	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_tsc>;
-@@ -290,6 +313,12 @@
+ 	pinctrl-0 = <&pinctrl_lcdif_dat
+@@ -104,4 +132,10 @@
+ 			MX6UL_PAD_LCD_DATA17__LCDIF_DATA17  0x79
  		>;
  	};
- 
-+	pinctrl_pwm8: pwm8grp {
++
++	pinctrl_stmpe_ts:  stmpe-tsgrp  {
 +		fsl,pins = <
-+			MX6UL_PAD_ENET1_RX_ER__PWM8_OUT   0x110b0
++			MX6UL_PAD_UART1_CTS_B__GPIO1_IO18 0x1b0b0
 +		>;
 +	};
-+
- 	pinctrl_tsc: tscgrp {
- 		fsl,pin = <
- 			MX6UL_PAD_GPIO1_IO01__GPIO1_IO01	0xb0
+ };
 -- 
 1.9.1
