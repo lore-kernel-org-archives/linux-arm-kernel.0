@@ -1,53 +1,34 @@
-From: aisheng.dong@nxp.com (Dong Aisheng)
-Date: Thu, 23 Mar 2017 12:53:23 +0800
-Subject: [PATCH v2 6/8] soc: imx: gpc: keep PGC_X_CTRL name align with
- reference manual
-In-Reply-To: <1490244805-3921-1-git-send-email-aisheng.dong@nxp.com>
-References: <1490244805-3921-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1490244805-3921-7-git-send-email-aisheng.dong@nxp.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 22 Mar 2017 14:25:49 +0100
+Subject: [PATCH v2 1/4] pinctrl: sh-pfc: Update info pointer after
+ SoC-specific init
+In-Reply-To: <1489425167-22711-2-git-send-email-geert+renesas@glider.be>
+References: <1489425167-22711-1-git-send-email-geert+renesas@glider.be>
+ <1489425167-22711-2-git-send-email-geert+renesas@glider.be>
+Message-ID: <CAMuHMdUYr8BTLdSLV=_JUJVvtDL0dc0PGq0M98Gf=6NtwdiL_w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of GPC_PGC_PDN_OFFS, naming it as GPC_PGC_CTRL_OFFS which is
-defined in reference manual for better reading.
+On Mon, Mar 13, 2017 at 6:12 PM, Geert Uytterhoeven
+<geert+renesas@glider.be> wrote:
+> Update the sh_pfc_soc_info pointer after calling the SoC-specific
+> initialization function, as it may have been updated to e.g. handle
+> different SoC revisions.  This makes sure the correct subdriver name is
+> printed later.
+>
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Cc: Shawn Guo <shawnguo@kernel.org>
-Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
-Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
----
- drivers/soc/imx/gpc.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+Queued in sh-pfc-for-v4.12 with
+Fixes: 0c151062f32c9db8 ("sh-pfc: Add support for SoC-specific initialization")
+as this has been reported independently afterwards.
 
-diff --git a/drivers/soc/imx/gpc.c b/drivers/soc/imx/gpc.c
-index afb02f9..3c61248 100644
---- a/drivers/soc/imx/gpc.c
-+++ b/drivers/soc/imx/gpc.c
-@@ -21,7 +21,7 @@
- 
- #define GPC_CNTR		0x000
- 
--#define GPC_PGC_PDN_OFFS	0x0
-+#define GPC_PGC_CTRL_OFFS	0x0
- #define GPC_PGC_PUPSCR_OFFS	0x4
- #define GPC_PGC_PDNSCR_OFFS	0x8
- #define GPC_PGC_SW2ISO_SHIFT	0x8
-@@ -65,7 +65,7 @@ static int imx6_pm_domain_power_off(struct generic_pm_domain *genpd)
- 	iso2sw = (val >> 8) & 0x3f;
- 
- 	/* Gate off domain when powered down */
--	regmap_update_bits(pd->regmap, pd->reg_offs + GPC_PGC_PDN_OFFS,
-+	regmap_update_bits(pd->regmap, pd->reg_offs + GPC_PGC_CTRL_OFFS,
- 			   0x1, 0x1);
- 
- 	/* Request GPC to power down domain */
-@@ -101,7 +101,7 @@ static int imx6_pm_domain_power_on(struct generic_pm_domain *genpd)
- 		clk_prepare_enable(pd->clk[i]);
- 
- 	/* Gate off domain when powered down */
--	regmap_update_bits(pd->regmap, pd->reg_offs + GPC_PGC_PDN_OFFS,
-+	regmap_update_bits(pd->regmap, pd->reg_offs + GPC_PGC_CTRL_OFFS,
- 			   0x1, 0x1);
- 
- 	/* Read ISO and ISO2SW power up delays */
--- 
-2.7.4
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
