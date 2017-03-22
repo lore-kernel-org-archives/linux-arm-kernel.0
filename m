@@ -1,28 +1,43 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Wed, 22 Mar 2017 20:11:27 +0200
-Subject: [PATCH 2/2] pinctrl: samsung: Remove unused pin-bank macro
-In-Reply-To: <1490169812-25225-3-git-send-email-cw00.choi@samsung.com>
-References: <1490169812-25225-1-git-send-email-cw00.choi@samsung.com>
- <CGME20170322080335epcas5p2f514974da14bd739d712cf1ab1a4cc0c@epcas5p2.samsung.com>
- <1490169812-25225-3-git-send-email-cw00.choi@samsung.com>
-Message-ID: <20170322181127.aolaevubauaolb3g@kozik-lap>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Wed, 22 Mar 2017 18:13:27 +0000
+Subject: [PATCH V2 4/5] dt-bindings: tegra: Update compatible strings for
+ Tegra flowctrl
+In-Reply-To: <b85e7f4e-ba63-8374-b10d-3f9f04252a69@wwwdotorg.org>
+References: <1490202056-13040-1-git-send-email-jonathanh@nvidia.com>
+ <1490202056-13040-5-git-send-email-jonathanh@nvidia.com>
+ <b85e7f4e-ba63-8374-b10d-3f9f04252a69@wwwdotorg.org>
+Message-ID: <58983614-8f75-b498-e544-5121a16d5d19@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 22, 2017 at 05:03:32PM +0900, Chanwoo Choi wrote:
-> After merged commit 1259feddd0f8 ("pinctrl: samsung: Fix the width
-> of PINCFG_TYPE_DRV bitfields for Exynos5433"), EXYNOS_PIN_BANK_EINTW
-> was replaced by EXYNOS5433_PIN_BANK_EINTW_EXT. This patch removes
-> the unused pin-bank macro (EXYNOS_PIN_BANK_EINTW).
-> 
-> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-> ---
->  drivers/pinctrl/samsung/pinctrl-exynos.h | 11 -----------
->  1 file changed, 11 deletions(-)
-> 
 
-Thanks, applied and squashed with previous one (it is logically the same
-change).
+On 22/03/17 17:26, Stephen Warren wrote:
+> On 03/22/2017 11:00 AM, Jon Hunter wrote:
+>> Update the compatible strings for Tegra Flow Control driver to match
+>> the device-tree source files for Tegra.
+> 
+>> +++
+>> b/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-flowctrl.txt
+> 
+>> +  - "nvidia,tegra124-flowctrl": for Tegra124 and Tegra132
+> 
+> I think that should be:
+> 
+> +  - "nvidia,tegra124-flowctrl": for Tegra124
+> +  - "nvidia,tegra132-flowctrl", "nvidia,tegra124-flowctrl": for \
+> Tegra132
 
-Best regards,
-Krzysztof
+This is based upon the current tegra132.dtsi file which just has ...
+
+	flow-controller at 60007000 {
+		compatible = "nvidia,tegra124-flowctrl";
+		...
+
+So I can fix-it up if that is what we want/should have. I have a feeling
+there are a few other cases like this.
+
+Cheers
+Jon
+
+-- 
+nvpublic
