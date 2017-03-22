@@ -1,73 +1,217 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 22 Mar 2017 14:16:24 +0000
-Subject: [PATCH 4/7] arm64: hugetlb: Introduce pte_pgprot helper
-In-Reply-To: <20170321180421.18332-5-punit.agrawal@arm.com>
-References: <20170321180421.18332-1-punit.agrawal@arm.com>
- <20170321180421.18332-5-punit.agrawal@arm.com>
-Message-ID: <20170322141623.GE2977@leverpostej>
+From: john.garry@huawei.com (John Garry)
+Date: Wed, 22 Mar 2017 14:12:48 +0000
+Subject: [PATCH v9 15/15] irqchip: mbigen: Add ACPI support
+In-Reply-To: <20170321144521.GA4392@red-moon>
+References: <1488890410-15503-1-git-send-email-guohanjun@huawei.com>
+ <1488890410-15503-16-git-send-email-guohanjun@huawei.com>
+ <20170321144521.GA4392@red-moon>
+Message-ID: <12635f14-8cbd-61ba-74fa-495a81f94038@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 21, 2017 at 06:04:18PM +0000, Punit Agrawal wrote:
-> From: Steve Capper <steve.capper@arm.com>
-> 
-> Rather than xor pte bits in various places, use this helper function.
-> 
-> Cc: David Woods <dwoods@mellanox.com>
-> Signed-off-by: Steve Capper <steve.capper@arm.com>
-> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+On 21/03/2017 14:45, Lorenzo Pieralisi wrote:
+> On Tue, Mar 07, 2017 at 08:40:10PM +0800, Hanjun Guo wrote:
+>> From: Hanjun Guo <hanjun.guo@linaro.org>
+>>
+>> With the preparation of platform msi support and interrupt producer
+>> in DSDT, we can add mbigen ACPI support now.
+>>
+>> We are using Interrupt resource type in _CRS methd to indicate number
+>> of irq pins instead of num_pins in DT to avoid _DSD usage in this case.
+>>
+>> For mbigen,
+>>     Device(MBI0) {
+>>           Name(_HID, "HISI0152")
+>>           Name(_UID, Zero)
+>>           Name(_CRS, ResourceTemplate() {
+>>                   Memory32Fixed(ReadWrite, 0xa0080000, 0x10000)
+>> 		  Interrupt(ResourceProducer,...) {12,14,....}
+>
+> What do these interrupt numbers represent ? This looks wrong to me.
+> An interrupt descriptor is there to describe the interrupts a device
+> can generate; you are using it just to add a "standard" (that is
+> not standard at all) way of counting the number of vectors allocated
+> to this specific chip and that's just wrong.
+>
 
-Much nicer!
+As I understand, the count of interrupts we are declaring for the mbigen 
+is the same as the sum of interrupts for that mbigen's children.
 
-Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+So at the point we probe the mbigen, can we just deference the children 
+to count their interrupts, and use this as the #msis?
 
-Mark.
+> Can't you use something like Agustin did in the QCOM combiner:
+>
+> drivers/irqchip/qcom-irq-combiner.c
+>
+> to detect the MSI vector length (ie by describing the MBIgen through
+> generic registers and use the bit width to compute the vector
+> lenght) ? I am not sure how feasible it is given that my knowledge
+> of MBIgen is pretty poor.
+>
+> I understand we want to avoid _DSD properties but we should not
+> work around standard bindings to achieve that goal.
+>
 
-> ---
->  arch/arm64/mm/hugetlbpage.c | 16 ++++++++++++----
->  1 file changed, 12 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
-> index 81bc6e4cf714..44d637eb32a7 100644
-> --- a/arch/arm64/mm/hugetlbpage.c
-> +++ b/arch/arm64/mm/hugetlbpage.c
-> @@ -41,6 +41,16 @@ int pud_huge(pud_t pud)
->  #endif
->  }
->  
-> +/*
-> + * Select all bits except the pfn
-> + */
-> +static inline pgprot_t pte_pgprot(pte_t pte)
-> +{
-> +	unsigned long pfn = pte_pfn(pte);
-> +
-> +	return __pgprot(pte_val(pfn_pte(pfn, __pgprot(0))) ^ pte_val(pte));
-> +}
-> +
->  static int find_num_contig(struct mm_struct *mm, unsigned long addr,
->  			   pte_t *ptep, size_t *pgsize)
->  {
-> @@ -80,7 +90,7 @@ void set_huge_pte_at(struct mm_struct *mm, unsigned long addr,
->  
->  	ncontig = find_num_contig(mm, addr, ptep, &pgsize);
->  	pfn = pte_pfn(pte);
-> -	hugeprot = __pgprot(pte_val(pfn_pte(pfn, __pgprot(0))) ^ pte_val(pte));
-> +	hugeprot = pte_pgprot(pte);
->  	for (i = 0; i < ncontig; i++) {
->  		pr_debug("%s: set pte %p to 0x%llx\n", __func__, ptep,
->  			 pte_val(pfn_pte(pfn, hugeprot)));
-> @@ -235,9 +245,7 @@ int huge_ptep_set_access_flags(struct vm_area_struct *vma,
->  		size_t pgsize = 0;
->  		unsigned long pfn = pte_pfn(pte);
->  		/* Select all bits except the pfn */
-> -		pgprot_t hugeprot =
-> -			__pgprot(pte_val(pfn_pte(pfn, __pgprot(0))) ^
-> -				 pte_val(pte));
-> +		pgprot_t hugeprot = pte_pgprot(pte);
->  
->  		cpte = huge_pte_offset(vma->vm_mm, addr);
->  		pfn = pte_pfn(*cpte);
-> -- 
-> 2.11.0
-> 
+We use "num-pins" for dt solution, but it is not so welcome here.
+
+> Side effect: IIUC the kernel will allocate an array of resources for
+> your MBIgen interrupts whose size equal the Interrupt descriptor,
+> which is as bad as it can get given that those resources are to
+> the best of my knowledge unused.
+>
+
+Much appreciated,
+John
+
+> Lorenzo
+>
+>>           })
+>>     }
+>>
+>> For devices,
+>>    Device(COM0) {
+>>           Name(_HID, "ACPIIDxx")
+>>           Name(_UID, Zero)
+>>           Name(_CRS, ResourceTemplate() {
+>>                  Memory32Fixed(ReadWrite, 0xb0030000, 0x10000)
+>> 		 Interrupt(ResourceConsumer,..., "\_SB.MBI0") {12}
+>>           })
+>>     }
+>>
+>> With the help of platform msi and interrupt producer, then devices
+>> will get the virq from mbigen's irqdomain.
+>>
+>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+>> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>> Cc: Ma Jun <majun258@huawei.com>
+>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+>> Cc: Thomas Gleixner <tglx@linutronix.de>
+>> ---
+>>  drivers/irqchip/irq-mbigen.c | 70 ++++++++++++++++++++++++++++++++++++++++++--
+>>  1 file changed, 67 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/drivers/irqchip/irq-mbigen.c b/drivers/irqchip/irq-mbigen.c
+>> index 3756408..e6bb503 100644
+>> --- a/drivers/irqchip/irq-mbigen.c
+>> +++ b/drivers/irqchip/irq-mbigen.c
+>> @@ -16,6 +16,7 @@
+>>   * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+>>   */
+>>
+>> +#include <linux/acpi.h>
+>>  #include <linux/interrupt.h>
+>>  #include <linux/irqchip.h>
+>>  #include <linux/module.h>
+>> @@ -180,7 +181,7 @@ static int mbigen_domain_translate(struct irq_domain *d,
+>>  				    unsigned long *hwirq,
+>>  				    unsigned int *type)
+>>  {
+>> -	if (is_of_node(fwspec->fwnode)) {
+>> +	if (is_of_node(fwspec->fwnode) || is_acpi_device_node(fwspec->fwnode)) {
+>>  		if (fwspec->param_count != 2)
+>>  			return -EINVAL;
+>>
+>> @@ -271,6 +272,54 @@ static int mbigen_of_create_domain(struct platform_device *pdev,
+>>  	return 0;
+>>  }
+>>
+>> +#ifdef CONFIG_ACPI
+>> +static acpi_status mbigen_acpi_process_resource(struct acpi_resource *ares,
+>> +					     void *context)
+>> +{
+>> +	struct acpi_resource_extended_irq *ext_irq;
+>> +	u32 *num_irqs = context;
+>> +
+>> +	switch (ares->type) {
+>> +	case ACPI_RESOURCE_TYPE_EXTENDED_IRQ:
+>> +		ext_irq = &ares->data.extended_irq;
+>> +		*num_irqs += ext_irq->interrupt_count;
+>> +		break;
+>> +	default:
+>> +		break;
+>> +	}
+>> +
+>> +	return AE_OK;
+>> +}
+>> +
+>> +static int mbigen_acpi_create_domain(struct platform_device *pdev,
+>> +				     struct mbigen_device *mgn_chip)
+>> +{
+>> +	struct irq_domain *domain;
+>> +	u32 num_msis = 0;
+>> +	acpi_status status;
+>> +
+>> +	status = acpi_walk_resources(ACPI_HANDLE(&pdev->dev), METHOD_NAME__CRS,
+>> +				     mbigen_acpi_process_resource, &num_msis);
+>> +	if (ACPI_FAILURE(status) || num_msis == 0)
+>> +		return -EINVAL;
+>> +
+>> +	domain = platform_msi_create_device_domain(&pdev->dev, num_msis,
+>> +						   mbigen_write_msg,
+>> +						   &mbigen_domain_ops,
+>> +						   mgn_chip);
+>> +	if (!domain)
+>> +		return -ENOMEM;
+>> +
+>> +	return 0;
+>> +}
+>> +#else
+>> +static inline int mbigen_acpi_create_domain(struct platform_device *pdev,
+>> +					    struct mbigen_device *mgn_chip)
+>> +{
+>> +	return -ENODEV;
+>> +}
+>> +#endif
+>> +
+>>  static int mbigen_device_probe(struct platform_device *pdev)
+>>  {
+>>  	struct mbigen_device *mgn_chip;
+>> @@ -289,9 +338,17 @@ static int mbigen_device_probe(struct platform_device *pdev)
+>>  	if (IS_ERR(mgn_chip->base))
+>>  		return PTR_ERR(mgn_chip->base);
+>>
+>> -	err = mbigen_of_create_domain(pdev, mgn_chip);
+>> -	if (err)
+>> +	if (IS_ENABLED(CONFIG_OF) && pdev->dev.of_node)
+>> +		err = mbigen_of_create_domain(pdev, mgn_chip);
+>> +	else if (ACPI_COMPANION(&pdev->dev))
+>> +		err = mbigen_acpi_create_domain(pdev, mgn_chip);
+>> +	else
+>> +		err = -EINVAL;
+>> +
+>> +	if (err) {
+>> +		dev_err(&pdev->dev, "Failed to create mbi-gen@%p irqdomain", mgn_chip->base);
+>>  		return err;
+>> +	}
+>>
+>>  	platform_set_drvdata(pdev, mgn_chip);
+>>  	return 0;
+>> @@ -303,10 +360,17 @@ static int mbigen_device_probe(struct platform_device *pdev)
+>>  };
+>>  MODULE_DEVICE_TABLE(of, mbigen_of_match);
+>>
+>> +static const struct acpi_device_id mbigen_acpi_match[] = {
+>> +	{ "HISI0152", 0 },
+>> +	{}
+>> +};
+>> +MODULE_DEVICE_TABLE(acpi, mbigen_acpi_match);
+>> +
+>>  static struct platform_driver mbigen_platform_driver = {
+>>  	.driver = {
+>>  		.name		= "Hisilicon MBIGEN-V2",
+>>  		.of_match_table	= mbigen_of_match,
+>> +		.acpi_match_table = ACPI_PTR(mbigen_acpi_match),
+>>  	},
+>>  	.probe			= mbigen_device_probe,
+>>  };
+>> --
+>> 1.7.12.4
+>>
+> _______________________________________________
+> linuxarm mailing list
+> linuxarm at huawei.com
+> http://rnd-openeuler.huawei.com/mailman/listinfo/linuxarm
+>
+> .
+>
