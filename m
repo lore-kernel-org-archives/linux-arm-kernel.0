@@ -1,223 +1,160 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Wed, 22 Mar 2017 10:14:40 +0100
-Subject: [PATCH v3 2/3] clk: meson-gxbb: Add MALI clocks
-In-Reply-To: <149013907135.54062.15157425339137707641@resonance>
-References: <1489064027-18004-1-git-send-email-narmstrong@baylibre.com>
- <1489064027-18004-3-git-send-email-narmstrong@baylibre.com>
- <149013907135.54062.15157425339137707641@resonance>
-Message-ID: <4eeb2043-68f8-b7d7-e40d-18cd5c7659cb@baylibre.com>
+From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
+Date: Wed, 22 Mar 2017 14:46:50 +0530
+Subject: [PATCH 00/14] arm_pmu: ACPI support
+In-Reply-To: <CAFpQJXVe_=42R+0Ch-tLwCcvhX3xJa20mhgYCWWNty-sn1Gp+g@mail.gmail.com>
+References: <1489143891-11596-1-git-send-email-mark.rutland@arm.com>
+ <58CA8C8A.8080405@huawei.com>
+ <CAFpQJXVe_=42R+0Ch-tLwCcvhX3xJa20mhgYCWWNty-sn1Gp+g@mail.gmail.com>
+Message-ID: <CAFpQJXXqU6pvjckrQ86jXPhKd9XZQ+hDHt8X19Wy31JmLJvrjw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/22/2017 12:31 AM, Michael Turquette wrote:
-> Hi Neil,
-> 
-> Quoting Neil Armstrong (2017-03-09 04:53:46)
->> The Mali is clocked by two identical clock paths behind a glitch free mux
->> to safely change frequency while running.
+i am not able to run with latest perf tool, i see issue with memory
+corruption in malloc
+is this seen from anyone else too?
+i am not sure, is this issue with my setup?
+
+root at VAL1-13>perf>> perf stat -e armv8_pmuv3_0/br_mis_pred/ sleep 1
+
+ Performance counter stats for 'sleep 1':
+
+            10,815      armv8_pmuv3_0/br_mis_pred/
+
+       1.001232167 seconds time elapsed
+
+root at VAL1-13>perf>> ./perf stat -e armv8_pmuv3_0/br_mis_pred/ sleep 1
+*** Error in `./perf': free(): invalid next size (fast): 0x00000000086a7a00 ***
+Aborted (core dumped)
+root at VAL1-13>perf>> ./perf -v
+perf version 4.11.rc3.g093b99
+root at VAL1-13>perf>> perf -v
+perf version 4.8.rc6.g21c488
+root at VAL1-13>perf>> uname -a
+Linux VAL1-13 4.11.0-rc2-12139-g3804e12 #1 SMP PREEMPT Wed Mar 22
+06:26:28 UTC 2017 aarch64 aarch64 aarch64 GNU/Linux
+root at VAL1-13>perf>>
+
+
+On Mon, Mar 20, 2017 at 11:41 PM, Ganapatrao Kulkarni
+<gpkulkarni@gmail.com> wrote:
+> Hi Hanjun,
+>
+> On Thu, Mar 16, 2017 at 6:30 PM, Hanjun Guo <guohanjun@huawei.com> wrote:
+>> On 2017/3/10 19:04, Mark Rutland wrote:
+>>> Hi,
+>>>
+>>> This series implements ACPI support in the ARM PMU code. It borrows some code
+>>> from Jeremy's series [1], but takes a different approach to probing and
+>>> association, using the usual hotplug state machine, minimising external changes
+>>> required, and simplifying the relationship with the common arm_pmu code.
+>>>
+>>> The first few patches are preparatory cleanup/refactoring, with the latter half
+>>> of the series being specific to ACPI support.
+>>>
+>>> The series is based on my IRQ rework patches [2]. I've pushed the whole series
+>>> out to the arm/perf/acpi branch [3] of my kernel.org repo.
+>>>
+>>> Due to the innards of the hotplug callback framework, it's not entirely
+>>> safe to register a PMU in a hotplug callback. Due to this, we can only
+>>> associated hotplugged CPUs with a PMU if a matching CPU was around at
+>>> probe time. A similar restriction already applies to DT systems. We may
+>>> be able to relax this with some future work.
+>>>
+>>> I've given this some testing on a Juno platform (using SPIs). To see that IRQs
+>>> are correctly associated, I've tested with the following:
+>>>
+>>>   $ taskset -c ${SOME_CPU_HERE} perf record \
+>>>     -e armv8_pmuv3_0/cpu_cycles/ \
+>>>     -e armv8_pmuv3_1/cpu_cycles/ \
+>>>     cat /proc/interrupts
+>>>
+>>> I've also booted with nr_cpus temporarily capped (passing maxcpus=) to test the
+>>> association logic. This has also been tested in a VM using PPIs; I do not have
+>>> access to a host machine which itself uses PPIs.
 >>
->> The two "mali_0" and "mali_1" clocks are composed of a mux, divider and gate.
->> Expose these two clocks trees using generic clocks.
->> Finally the glitch free mux is added as "mali" clock.
+>> Booted OK and 'perf list' got on Hisilicon D03:
 >>
->> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
->> ---
->>  drivers/clk/meson/gxbb.c | 139 +++++++++++++++++++++++++++++++++++++++++++++++
->>  1 file changed, 139 insertions(+)
+>> d03-09:~ # perf list
 >>
->> diff --git a/drivers/clk/meson/gxbb.c b/drivers/clk/meson/gxbb.c
->> index 5059c7b..d9f7fef 100644
->> --- a/drivers/clk/meson/gxbb.c
->> +++ b/drivers/clk/meson/gxbb.c
->> @@ -634,6 +634,131 @@
->>         },
->>  };
->>  
->> +/*
->> + * The MALI IP is clocked by two identical clocks (mali_0 and mali_1)
->> + * muxed by a glitch-free switch.
->> + */
->> +
->> +static u32 mux_table_mali_0_1[] = {0, 1, 2, 3, 4, 5, 6, 7};
->> +static const char *gxbb_mali_0_1_parent_names[] = {
->> +       "xtal", "gp0_pll", "mpll2", "mpll1", "fclk_div7",
->> +       "fclk_div4", "fclk_div3", "fclk_div5"
->> +};
->> +
->> +static struct clk_mux gxbb_mali_0_sel = {
->> +       .reg = (void *)HHI_MALI_CLK_CNTL,
->> +       .mask = 0x7,
->> +       .shift = 9,
->> +       .table = mux_table_mali_0_1,
->> +       .lock = &clk_lock,
->> +       .hw.init = &(struct clk_init_data){
->> +               .name = "mali_0_sel",
->> +               .ops = &clk_mux_ops,
->> +               /*
->> +                * bits 10:9 selects from 8 possible parents:
->> +                * xtal, gp0_pll, mpll2, mpll1, fclk_div7,
->> +                * fclk_div4, fclk_div3, fclk_div5
->> +                */
->> +               .parent_names = gxbb_mali_0_1_parent_names,
->> +               .num_parents = 8,
->> +               .flags = (CLK_SET_RATE_NO_REPARENT | CLK_IGNORE_UNUSED),
-> 
-> Are all of these CLK_IGNORE_UNUSED flags necessary? If so, why? I'm just
-> wondering if this is yet another display-related use case where a
-> hand-off mechanism would work better?
-
-Hi,
-
-I'm just precocious about how these clocks will be handled, since the Mali driver
-is out of tree, I'm not sure about how they will be handled at all.
-
-But I can test and remove these if we consider my out-of-tree driver platform
-code as reference.
-
-Neil
-
-> 
-> Thanks,
-> Mike
-> 
->> +       },
->> +};
->> +
->> +static struct clk_divider gxbb_mali_0_div = {
->> +       .reg = (void *)HHI_MALI_CLK_CNTL,
->> +       .shift = 0,
->> +       .width = 7,
->> +       .lock = &clk_lock,
->> +       .hw.init = &(struct clk_init_data){
->> +               .name = "mali_0_div",
->> +               .ops = &clk_divider_ops,
->> +               .parent_names = (const char *[]){ "mali_0_sel" },
->> +               .num_parents = 1,
->> +               .flags = (CLK_SET_RATE_NO_REPARENT | CLK_IGNORE_UNUSED),
->> +       },
->> +};
->> +
->> +static struct clk_gate gxbb_mali_0 = {
->> +       .reg = (void *)HHI_MALI_CLK_CNTL,
->> +       .bit_idx = 8,
->> +       .lock = &clk_lock,
->> +       .hw.init = &(struct clk_init_data){
->> +               .name = "mali_0",
->> +               .ops = &clk_gate_ops,
->> +               .parent_names = (const char *[]){ "mali_0_div" },
->> +               .num_parents = 1,
->> +               .flags = (CLK_SET_RATE_PARENT | CLK_IGNORE_UNUSED),
->> +       },
->> +};
->> +
->> +static struct clk_mux gxbb_mali_1_sel = {
->> +       .reg = (void *)HHI_MALI_CLK_CNTL,
->> +       .mask = 0x7,
->> +       .shift = 25,
->> +       .table = mux_table_mali_0_1,
->> +       .lock = &clk_lock,
->> +       .hw.init = &(struct clk_init_data){
->> +               .name = "mali_1_sel",
->> +               .ops = &clk_mux_ops,
->> +               /*
->> +                * bits 10:9 selects from 8 possible parents:
->> +                * xtal, gp0_pll, mpll2, mpll1, fclk_div7,
->> +                * fclk_div4, fclk_div3, fclk_div5
->> +                */
->> +               .parent_names = gxbb_mali_0_1_parent_names,
->> +               .num_parents = 8,
->> +               .flags = (CLK_SET_RATE_NO_REPARENT | CLK_IGNORE_UNUSED),
->> +       },
->> +};
->> +
->> +static struct clk_divider gxbb_mali_1_div = {
->> +       .reg = (void *)HHI_MALI_CLK_CNTL,
->> +       .shift = 16,
->> +       .width = 7,
->> +       .lock = &clk_lock,
->> +       .hw.init = &(struct clk_init_data){
->> +               .name = "mali_1_div",
->> +               .ops = &clk_divider_ops,
->> +               .parent_names = (const char *[]){ "mali_1_sel" },
->> +               .num_parents = 1,
->> +               .flags = (CLK_SET_RATE_NO_REPARENT | CLK_IGNORE_UNUSED),
->> +       },
->> +};
->> +
->> +static struct clk_gate gxbb_mali_1 = {
->> +       .reg = (void *)HHI_MALI_CLK_CNTL,
->> +       .bit_idx = 24,
->> +       .lock = &clk_lock,
->> +       .hw.init = &(struct clk_init_data){
->> +               .name = "mali_1",
->> +               .ops = &clk_gate_ops,
->> +               .parent_names = (const char *[]){ "mali_1_div" },
->> +               .num_parents = 1,
->> +               .flags = (CLK_SET_RATE_PARENT | CLK_IGNORE_UNUSED),
->> +       },
->> +};
->> +
->> +static u32 mux_table_mali[] = {0, 1};
->> +static const char *gxbb_mali_parent_names[] = {
->> +       "mali_0", "mali_1"
->> +};
->> +
->> +static struct clk_mux gxbb_mali = {
->> +       .reg = (void *)HHI_MALI_CLK_CNTL,
->> +       .mask = 1,
->> +       .shift = 31,
->> +       .table = mux_table_mali,
->> +       .lock = &clk_lock,
->> +       .hw.init = &(struct clk_init_data){
->> +               .name = "mali",
->> +               .ops = &clk_mux_ops,
->> +               .parent_names = gxbb_mali_parent_names,
->> +               .num_parents = 2,
->> +               .flags = (CLK_SET_RATE_NO_REPARENT | CLK_IGNORE_UNUSED),
->> +       },
->> +};
->> +
->>  /* Everything Else (EE) domain gates */
->>  static MESON_GATE(gxbb_ddr, HHI_GCLK_MPEG0, 0);
->>  static MESON_GATE(gxbb_dos, HHI_GCLK_MPEG0, 1);
->> @@ -827,6 +952,13 @@
->>                 [CLKID_SAR_ADC_CLK]         = &gxbb_sar_adc_clk.hw,
->>                 [CLKID_SAR_ADC_SEL]         = &gxbb_sar_adc_clk_sel.hw,
->>                 [CLKID_SAR_ADC_DIV]         = &gxbb_sar_adc_clk_div.hw,
->> +               [CLKID_MALI_0_SEL]          = &gxbb_mali_0_sel.hw,
->> +               [CLKID_MALI_0_DIV]          = &gxbb_mali_0_div.hw,
->> +               [CLKID_MALI_0]              = &gxbb_mali_0.hw,
->> +               [CLKID_MALI_1_SEL]          = &gxbb_mali_1_sel.hw,
->> +               [CLKID_MALI_1_DIV]          = &gxbb_mali_1_div.hw,
->> +               [CLKID_MALI_1]              = &gxbb_mali_1.hw,
->> +               [CLKID_MALI]                = &gxbb_mali.hw,
->>         },
->>         .num = NR_CLKS,
->>  };
->> @@ -930,16 +1062,23 @@
->>         &gxbb_emmc_b,
->>         &gxbb_emmc_c,
->>         &gxbb_sar_adc_clk,
->> +       &gxbb_mali_0,
->> +       &gxbb_mali_1,
->>  };
->>  
->>  static struct clk_mux *const gxbb_clk_muxes[] = {
->>         &gxbb_mpeg_clk_sel,
->>         &gxbb_sar_adc_clk_sel,
->> +       &gxbb_mali_0_sel,
->> +       &gxbb_mali_1_sel,
->> +       &gxbb_mali,
->>  };
->>  
->>  static struct clk_divider *const gxbb_clk_dividers[] = {
->>         &gxbb_mpeg_clk_div,
->>         &gxbb_sar_adc_clk_div,
->> +       &gxbb_mali_0_div,
->> +       &gxbb_mali_1_div,
->>  };
->>  
->>  static int gxbb_clkc_probe(struct platform_device *pdev)
->> -- 
->> 1.9.1
+>> List of pre-defined events (to be used in -e):
 >>
+>>   branch-misses                                      [Hardware event]
+>>   bus-cycles                                         [Hardware event]
+>>   cache-misses                                       [Hardware event]
+>>   cache-references                                   [Hardware event]
+>>   cpu-cycles OR cycles                               [Hardware event]
+>>   instructions                                       [Hardware event]
+>>
+>>   alignment-faults                                   [Software event]
+>>   context-switches OR cs                             [Software event]
+>>   cpu-clock                                          [Software event]
+>>   cpu-migrations OR migrations                       [Software event]
+>>   dummy                                              [Software event]
+>>   emulation-faults                                   [Software event]
+>>   major-faults                                       [Software event]
+>>   minor-faults                                       [Software event]
+>>   page-faults OR faults                              [Software event]
+>>   task-clock                                         [Software event]
+>>
+>>   L1-dcache-load-misses                              [Hardware cache event]
+>>   L1-dcache-loads                                    [Hardware cache event]
+>>   L1-dcache-store-misses                             [Hardware cache event]
+>>   L1-dcache-stores                                   [Hardware cache event]
+>>   L1-icache-load-misses                              [Hardware cache event]
+>>   L1-icache-loads                                    [Hardware cache event]
+>>   branch-load-misses                                 [Hardware cache event]
+>>   branch-loads                                       [Hardware cache event]
+>>   dTLB-load-misses                                   [Hardware cache event]
+>>   iTLB-load-misses                                   [Hardware cache event]
+>>
+>>   armv8_pmuv3_0/br_mis_pred/                         [Kernel PMU event]
+>>   armv8_pmuv3_0/br_pred/                             [Kernel PMU event]
+>>   armv8_pmuv3_0/bus_access/                          [Kernel PMU event]
+>>   armv8_pmuv3_0/bus_cycles/                          [Kernel PMU event]
+>>   armv8_pmuv3_0/cid_write_retired/                   [Kernel PMU event]
+>>   armv8_pmuv3_0/cpu_cycles/                          [Kernel PMU event]
+>>   armv8_pmuv3_0/exc_return/                          [Kernel PMU event]
+>>   armv8_pmuv3_0/exc_taken/                           [Kernel PMU event]
+>>   armv8_pmuv3_0/inst_retired/                        [Kernel PMU event]
+>>   armv8_pmuv3_0/inst_spec/                           [Kernel PMU event]
+>>   armv8_pmuv3_0/l1d_cache/                           [Kernel PMU event]
+>>   armv8_pmuv3_0/l1d_cache_refill/                    [Kernel PMU event]
+>>   armv8_pmuv3_0/l1d_cache_wb/                        [Kernel PMU event]
+>>   armv8_pmuv3_0/l1d_tlb_refill/                      [Kernel PMU event]
+>>   armv8_pmuv3_0/l1i_cache/                           [Kernel PMU event]
+>>   armv8_pmuv3_0/l1i_cache_refill/                    [Kernel PMU event]
+>>   armv8_pmuv3_0/l1i_tlb_refill/                      [Kernel PMU event]
+>>   armv8_pmuv3_0/l2d_cache/                           [Kernel PMU event]
+>>   armv8_pmuv3_0/l2d_cache_refill/                    [Kernel PMU event]
+>>   armv8_pmuv3_0/l2d_cache_wb/                        [Kernel PMU event]
+>>   armv8_pmuv3_0/mem_access/                          [Kernel PMU event]
+>>   armv8_pmuv3_0/memory_error/                        [Kernel PMU event]
+>>   armv8_pmuv3_0/sw_incr/                             [Kernel PMU event]
+>>   armv8_pmuv3_0/ttbr_write_retired/                  [Kernel PMU event]
+>>
+>>   rNNN                                               [Raw hardware event descriptor]
+>>   cpu/t1=v1[,t2=v2,t3 ...]/modifier                  [Raw hardware event descriptor]
+>>    (see 'man perf-list' on how to encode it)
+>>
+>>   mem:<addr>[/len][:access]                          [Hardware breakpoint]
+>>
+>>
+>> Try some basic perf event and it works, anything else I can try in specific?
+>
+> you can try perf fuzzer
+>
+> thanks
+> Ganapat
+>
+>>
+>> Thanks
+>> Hanjun
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+thanks
+Ganapat
