@@ -1,55 +1,56 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 22 Mar 2017 13:00:56 +0100
-Subject: [PATCH v6 4/4] clk: samsung: exynos-audss: Use runtime PM
-In-Reply-To: <1490182543-28550-5-git-send-email-m.szyprowski@samsung.com>
-References: <CGME20170322113556eucas1p1b3434935701aba1db7868415a9c3b4f9@eucas1p1.samsung.com>
- <1490182543-28550-1-git-send-email-m.szyprowski@samsung.com>
- <1490182543-28550-5-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <CAPDyKFrL9pvGQw+09rP52p72FqKuh6rLNt0NEUZ-TFxU838Nzw@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 22 Mar 2017 13:02:10 +0100
+Subject: [PATCH 4/6] pinctrl: aramda-37xx: Add irqchip support
+In-Reply-To: <CACRpkdbR-WRT0rJp2CuN6CkZF=J35JUgGHjW7beyaimipz0ehw@mail.gmail.com>
+ (Linus Walleij's message of "Fri, 30 Dec 2016 09:58:06 +0100")
+References: <20161222172501.16121-1-gregory.clement@free-electrons.com>
+ <20161222172501.16121-5-gregory.clement@free-electrons.com>
+ <CACRpkdbR-WRT0rJp2CuN6CkZF=J35JUgGHjW7beyaimipz0ehw@mail.gmail.com>
+Message-ID: <87zigdeczh.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 March 2017 at 12:35, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
-> This patch adds support for runtime PM to Exynos Audio SubSystem driver to
-> enable full support for audio power domain on Exynos5 SoCs. The main change
-> is moving register saving and restoring code from system sleep PM ops to
-> runtime PM ops and implementing system sleep PM ops with generic
-> pm_runtime_force_suspend/resume helpers. Runtime PM of the Exynos AudSS
-> device is managed from clock core depending on the preparation status
-> of the provided clocks.
+Hi Linus,
+ 
+ On ven., d?c. 30 2016, Linus Walleij <linus.walleij@linaro.org> wrote:
+
+> On Thu, Dec 22, 2016 at 6:24 PM, Gregory CLEMENT
+> <gregory.clement@free-electrons.com> wrote:
 >
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-
-Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
-
-Minor nitpick below.
-
-[...]
-
+>> The Armada 37xx SoCs can handle interrupt through GPIO. However it can
+>> only manage the edge ones.
+>>
+>> The way the interrupt are managed are classical so we can use the generic
+>> interrupt chip model.
+>>
+>> The only unusual "feature" is that many interrupts are connected to the
+>> parent interrupt controller. But we do not take advantage of this and use
+>> the chained irq with all of them.
+>>
+>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 >
-> -#ifdef CONFIG_PM_SLEEP
->  static unsigned long reg_save[][2] = {
->         { ASS_CLK_SRC,  0 },
->         { ASS_CLK_DIV,  0 },
->         { ASS_CLK_GATE, 0 },
->  };
+> So this is very simple and should use GPIOLIB_IRQCHIP.
 >
-> -static int exynos_audss_clk_suspend(struct device *dev)
-> +static int __maybe_unused exynos_audss_clk_suspend(struct device *dev)
+> Begin with select GPIOLIB_IRQCHIP in your Kconfig and then look
+> at conversions such as commit 85ae9e512f437cd09bf61564bdba29ab88bab3e3
+> ("pinctrl: bcm2835: switch to GPIOLIB_IRQCHIP")
+> for inspiration.
 
-Instead of using "__maybe_unused", I would rather change from
-"CONFIG_PM_SLEEP" to "CONFIG_PM". However, no strong opinion.
+I switched to the use of GPIOLIB_IRQCHIP however it didn't really simplify
+my code, during the development on the v2 I did a commit only for this
+change and here it is the diffstat:
+110     72      drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
 
-Perhaps you need something like this for patch 3/4 as well?
+In my first version I used the generic irqchip so I was able to benefit
+of this framework, by switching to GPIOLIB_IRQCHIP I had to implement
+again some of the functions such as .mask, .unmask an ack.
 
->  {
->         int i;
->
-> @@ -54,7 +54,7 @@ static int exynos_audss_clk_suspend(struct device *dev)
->         return 0;
->  }
+Thanks,
 
-[...]
+Gregory
 
-Kind regards
-Uffe
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
