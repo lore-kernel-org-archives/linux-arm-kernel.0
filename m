@@ -1,52 +1,35 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 21 Mar 2017 17:20:27 -0700
-Subject: [PATCH 2/2] arm64: dts: add arm/arm64 include symlinks
-In-Reply-To: <20170320230337.GB78325@google.com>
-References: <20170226060058.5841-1-heiko@sntech.de>
- <20170226060058.5841-2-heiko@sntech.de>
- <20170320230337.GB78325@google.com>
-Message-ID: <20170322002027.GA2984@localhost>
+Date: Tue, 21 Mar 2017 17:29:40 -0700
+Subject: [PATCH] ARM: dts: Adjust moxart IRQ controller and flags
+In-Reply-To: <20170318164001.4967-1-linus.walleij@linaro.org>
+References: <20170318164001.4967-1-linus.walleij@linaro.org>
+Message-ID: <20170322002940.GA5129@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 20, 2017 at 04:03:37PM -0700, Brian Norris wrote:
-> Hi,
+On Sat, Mar 18, 2017 at 05:40:01PM +0100, Linus Walleij wrote:
+> The moxart interrupt line flags were not respected in previous
+> driver: instead of assigning them per-consumer, a fixes mask
+> was set in the controller.
 > 
-> On Sun, Feb 26, 2017 at 07:00:58AM +0100, Heiko Stuebner wrote:
-> > Allow including of dtsi files in an architecture-independent manner.
-> > Some dtsi files may be shared between architectures and one suggestion
-> > was to have symlinks and let these includes get accessed via a
-> >     #include <arm64/foo.dtsi>
-> > So add the necessary symlinks for arm32.
-> > 
-> > Suggested-by: Olof Johansson <olof@lixom.net>
-> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> > ---
-> > Suggested by Olof in response to the patch adding direct symlinks
-> > for cros-ec includes.
-> > 
-> > Tested with adapted rk3399-Gru dtsi files and while we only need this arm64
-> > version right now, it might make sense to already have both the arm32 and
-> > arm64 versions ready.
+> With the migration to a standard Faraday driver we need to
+> set up and handle the consumer flags correctly. Also remove
+> the Moxart-specific flags when switching to using real consumer
+> flags.
 > 
-> FWIW, tested fine here too (for the same platform).
+> Extend the register window to 0x100 bytes as we may have a few
+> more registers in there and it doesn't hurt.
 > 
-> I guess this works fine, if it makes people happy. It also allows some
-> weird #include paths. e.g.:
-> 
-> #include <arm64/include/arm/include/arm64/rockchip/rk3399.dtsi>
-> 
-> I guess we can call that an entertaining feature, and not a bug?
-> 
-> Reviewed-by: Brian Norris <briannorris@chromium.org>
-> Tested-by: Brian Norris <briannorris@chromium.org>
-> 
-> Where should this go? I'd like not to wait another few months before
-> sending my Gru/Kevin DTS again.
+> Tested-by: Jonas Jensen <jonas.jensen@gmail.com>
+> Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> ARM SoC folks: can you please apply this directly to whatever
+> DTS branch is applicable for Moxart? We are switching to a
+> generic Faraday Technology interrupt controller driver that
+> actually make use of the trigger flags so this needs to be
+> rectified.
 
-Checked into shared/dt-symlinks on the arm-soc repo now (and merged into
-next/dt and next/dt64). Please use that branch as a base for DT material that
-will use this.
-
+Applied to next/dt, thanks.
 
 -Olof
