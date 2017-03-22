@@ -1,115 +1,188 @@
-From: sza@esh.hu (=?utf-8?B?U3plbXrFkSBBbmRyw6Fz?=)
-Date: Wed, 22 Mar 2017 13:23:26 +0100
-Subject: [PATCH v3 0/7] ARM: Fix dma_alloc_coherent() and friends for NOMMU
-In-Reply-To: <90e219f3-7139-c11c-a635-509173d4148a@arm.com>
-References: <1489137839-549-1-git-send-email-vladimir.murzin@arm.com>
- <90e219f3-7139-c11c-a635-509173d4148a@arm.com>
-Message-ID: <33321273-E3E7-459B-A615-5ADA52445AA1@esh.hu>
+From: horia.geanta@nxp.com (=?UTF-8?q?Horia=20Geant=C4=83?=)
+Date: Wed, 22 Mar 2017 14:29:39 +0200
+Subject: [PATCH] arm64: dts: ls1012a: add crypto node
+Message-ID: <20170322122939.22117-1-horia.geanta@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I?ve tested this v3 version on my Atmel armv7m board with several drivers with DMA and enabled caches,
-and I?ve not seen any issues.
+LS1012A has a SEC v5.4 security engine.
 
-You can add my Tested-by.
+Signed-off-by: Horia Geant? <horia.geanta@nxp.com>
+---
+ arch/arm64/boot/dts/freescale/fsl-ls1012a-frdm.dts |  9 +++
+ arch/arm64/boot/dts/freescale/fsl-ls1012a-qds.dts  |  9 +++
+ arch/arm64/boot/dts/freescale/fsl-ls1012a-rdb.dts  |  9 +++
+ arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi     | 91 +++++++++++++++++++++-
+ 4 files changed, 117 insertions(+), 1 deletion(-)
 
-Thanks for the patches!
-
-Andras 
-
-> On 2017. Mar 16., at 10:03, Vladimir Murzin <vladimir.murzin@arm.com> wrote:
-> 
-> Gentle ping!
-> 
-> On 10/03/17 09:23, Vladimir Murzin wrote:
->> It seem that addition of cache support for M-class CPUs uncovered
->> latent bug in DMA usage. NOMMU memory model has been treated as being
->> always consistent; however, for R/M CPU classes memory can be covered
->> by MPU which in turn might configure RAM as Normal i.e. bufferable and
->> cacheable. It breaks dma_alloc_coherent() and friends, since data can
->> stuck in caches now or be buffered.
->> 
->> This patch set is trying to address the issue by providing region of
->> memory suitable for consistent DMA operations. It is supposed that
->> such region is marked by MPU as non-cacheable. Robin suggested to
->> advertise such memory as reserved shared-dma-pool, rather then using
->> homebrew command line option, and extend dma-coherent to provide
->> default DMA area in the similar way as it is done for CMA (PATCH
->> 4/7). It allows us to offload all bookkeeping on generic coherent DMA
->> framework, and it seems that it might be reused by other architectures
->> like c6x and blackfin.
->> 
->> While reviewing/testing previous vesrions of the patch set it turned
->> out that dma-coherent does not take into account "dma-ranges" device
->> tree property, so it is addressed in PATCH 3/7.
->> 
->> For ARM, dedicated DMA region is required for cases other than:
->> - MMU/MPU is off
->> - cpu is v7m w/o cache support
->> - device is coherent
->> 
->> In case one of the above conditions is true dma operations are forced
->> to be coherent and wired with dma_noop_ops.
->> 
->> To make life easier NOMMU dma operations are kept in separate
->> compilation unit.
->> 
->> Since the issue was reported in the same time as Benjamin sent his
->> patch [1] to allow mmap for NOMMU, his case is also addressed in this
->> series (PATCH 1/7 and PATCH 2/7).
->> 
->> Thanks!
->> 
->> [1] http://www.armlinux.org.uk/developer/patches/viewpatch.php?id=8633/1
->> 
->> Cc: Joerg Roedel <jroedel@suse.de>
->> Cc: Christian Borntraeger <borntraeger@de.ibm.com>
->> Cc: Michal Nazarewicz <mina86@mina86.com>
->> Cc: Marek Szyprowski <m.szyprowski@samsung.com>
->> Cc: Alan Stern <stern@rowland.harvard.edu>
->> Cc: Yoshinori Sato <ysato@users.sourceforge.jp>
->> Cc: Rich Felker <dalias@libc.org>
->> Cc: Roger Quadros <rogerq@ti.com>
->> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
->> Cc: Rob Herring <robh+dt@kernel.org>
->> Cc: Mark Rutland <mark.rutland@arm.com>
->> Cc: Doug Ledford <dledford@redhat.com>
->> 
->> Changelog:
->> 	    v2 -> v3
->> 	       - fixed warnings reported by Alexandre and kbuild robot
->> 
->> 	    v1 -> v2
->> 	       - rebased on v4.11-rc1
->> 	       - added Robin's Reviewed-by
->> 	       - dedicated flag is introduced to use dev->dma_pfn_offset
->> 	         rather than mem->device_base in case memory region is
->> 		 configured via device tree (so Tested-by discarded there)
->> 
->> 	RFC v6 -> v1
->> 	       - dropped RFC tag
->> 	       - added Alexandre's Tested-by
->> 
->> Vladimir Murzin (7):
->>  dma: Take into account dma_pfn_offset
->>  dma: Add simple dma_noop_mmap
->>  drivers: dma-coherent: Account dma_pfn_offset when used with device
->>    tree
->>  drivers: dma-coherent: Introduce default DMA pool
->>  ARM: NOMMU: Introduce dma operations for noMMU
->>  ARM: NOMMU: Set ARM_DMA_MEM_BUFFERABLE for M-class cpus
->>  ARM: dma-mapping: Remove traces of NOMMU code
->> 
->> .../bindings/reserved-memory/reserved-memory.txt   |   3 +
->> arch/arm/Kconfig                                   |   1 +
->> arch/arm/include/asm/dma-mapping.h                 |   2 +-
->> arch/arm/mm/Kconfig                                |   2 +-
->> arch/arm/mm/Makefile                               |   5 +-
->> arch/arm/mm/dma-mapping-nommu.c                    | 253 +++++++++++++++++++++
->> arch/arm/mm/dma-mapping.c                          |  29 +--
->> drivers/base/dma-coherent.c                        |  74 +++++-
->> lib/dma-noop.c                                     |  29 ++-
->> 9 files changed, 354 insertions(+), 44 deletions(-)
->> create mode 100644 arch/arm/mm/dma-mapping-nommu.c
->> 
-> 
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1012a-frdm.dts b/arch/arm64/boot/dts/freescale/fsl-ls1012a-frdm.dts
+index a619f6496a4c..bab9e68947e4 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1012a-frdm.dts
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1012a-frdm.dts
+@@ -49,6 +49,15 @@
+ 	model = "LS1012A Freedom Board";
+ 	compatible = "fsl,ls1012a-frdm", "fsl,ls1012a";
+ 
++	aliases {
++		crypto = &crypto;
++		rtic_a = &rtic_a;
++		rtic_b = &rtic_b;
++		rtic_c = &rtic_c;
++		rtic_d = &rtic_d;
++		sec_mon = &sec_mon;
++	};
++
+ 	sys_mclk: clock-mclk {
+ 		compatible = "fixed-clock";
+ 		#clock-cells = <0>;
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1012a-qds.dts b/arch/arm64/boot/dts/freescale/fsl-ls1012a-qds.dts
+index 14a67f1709e7..5c4e84c7f20d 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1012a-qds.dts
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1012a-qds.dts
+@@ -49,6 +49,15 @@
+ 	model = "LS1012A QDS Board";
+ 	compatible = "fsl,ls1012a-qds", "fsl,ls1012a";
+ 
++	aliases {
++		crypto = &crypto;
++		rtic_a = &rtic_a;
++		rtic_b = &rtic_b;
++		rtic_c = &rtic_c;
++		rtic_d = &rtic_d;
++		sec_mon = &sec_mon;
++	};
++
+ 	sys_mclk: clock-mclk {
+ 		compatible = "fixed-clock";
+ 		#clock-cells = <0>;
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1012a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-ls1012a-rdb.dts
+index 62c5c7123a15..ff9dd16aa65a 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1012a-rdb.dts
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1012a-rdb.dts
+@@ -48,6 +48,15 @@
+ / {
+ 	model = "LS1012A RDB Board";
+ 	compatible = "fsl,ls1012a-rdb", "fsl,ls1012a";
++
++	aliases {
++		crypto = &crypto;
++		rtic_a = &rtic_a;
++		rtic_b = &rtic_b;
++		rtic_c = &rtic_c;
++		rtic_d = &rtic_d;
++		sec_mon = &sec_mon;
++	};
+ };
+ 
+ &duart0 {
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
+index cffebb4b3df1..68f3012ae07e 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
+@@ -42,7 +42,7 @@
+  *     OTHER DEALINGS IN THE SOFTWARE.
+  */
+ 
+-#include <dt-bindings/interrupt-controller/irq.h>
++#include <dt-bindings/interrupt-controller/arm-gic.h>
+ 
+ / {
+ 	compatible = "fsl,ls1012a";
+@@ -113,6 +113,95 @@
+ 			big-endian;
+ 		};
+ 
++		crypto: crypto at 1700000 {
++			compatible = "fsl,sec-v5.4", "fsl,sec-v5.0",
++				     "fsl,sec-v4.0";
++			fsl,sec-era = <8>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges = <0x0 0x00 0x1700000 0x100000>;
++			reg = <0x00 0x1700000 0x0 0x100000>;
++			interrupts = <GIC_SPI 75 IRQ_TYPE_LEVEL_HIGH>;
++
++			sec_jr0: jr at 10000 {
++				compatible = "fsl,sec-v5.4-job-ring",
++					     "fsl,sec-v5.0-job-ring",
++					     "fsl,sec-v4.0-job-ring";
++				reg	   = <0x10000 0x10000>;
++				interrupts = <GIC_SPI 71 IRQ_TYPE_LEVEL_HIGH>;
++			};
++
++			sec_jr1: jr at 20000 {
++				compatible = "fsl,sec-v5.4-job-ring",
++					     "fsl,sec-v5.0-job-ring",
++					     "fsl,sec-v4.0-job-ring";
++				reg	   = <0x20000 0x10000>;
++				interrupts = <GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>;
++			};
++
++			sec_jr2: jr at 30000 {
++				compatible = "fsl,sec-v5.4-job-ring",
++					     "fsl,sec-v5.0-job-ring",
++					     "fsl,sec-v4.0-job-ring";
++				reg	   = <0x30000 0x10000>;
++				interrupts = <GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>;
++			};
++
++			sec_jr3: jr at 40000 {
++				compatible = "fsl,sec-v5.4-job-ring",
++					     "fsl,sec-v5.0-job-ring",
++					     "fsl,sec-v4.0-job-ring";
++				reg	   = <0x40000 0x10000>;
++				interrupts = <GIC_SPI 74 IRQ_TYPE_LEVEL_HIGH>;
++			};
++
++			rtic at 60000 {
++				compatible = "fsl,sec-v5.4-rtic",
++					     "fsl,sec-v5.0-rtic",
++					     "fsl,sec-v4.0-rtic";
++				#address-cells = <1>;
++				#size-cells = <1>;
++				reg = <0x60000 0x100 0x60e00 0x18>;
++				ranges = <0x0 0x60100 0x500>;
++
++				rtic_a: rtic-a at 0 {
++					compatible = "fsl,sec-v5.4-rtic-memory",
++						     "fsl,sec-v5.0-rtic-memory",
++						     "fsl,sec-v4.0-rtic-memory";
++					reg = <0x00 0x20 0x100 0x100>;
++				};
++
++				rtic_b: rtic-b at 20 {
++					compatible = "fsl,sec-v5.4-rtic-memory",
++						     "fsl,sec-v5.0-rtic-memory",
++						     "fsl,sec-v4.0-rtic-memory";
++					reg = <0x20 0x20 0x200 0x100>;
++				};
++
++				rtic_c: rtic-c at 40 {
++					compatible = "fsl,sec-v5.4-rtic-memory",
++						     "fsl,sec-v5.0-rtic-memory",
++						     "fsl,sec-v4.0-rtic-memory";
++					reg = <0x40 0x20 0x300 0x100>;
++				};
++
++				rtic_d: rtic-d at 60 {
++					compatible = "fsl,sec-v5.4-rtic-memory",
++						     "fsl,sec-v5.0-rtic-memory",
++						     "fsl,sec-v4.0-rtic-memory";
++					reg = <0x60 0x20 0x400 0x100>;
++				};
++			};
++		};
++
++		sec_mon: sec_mon at 1e90000 {
++			compatible = "fsl,sec-v5.4-mon", "fsl,sec-v5.0-mon",
++				     "fsl,sec-v4.0-mon";
++			reg = <0x0 0x1e90000 0x0 0x10000>;
++			interrupts = <GIC_SPI 78 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 79 IRQ_TYPE_LEVEL_HIGH>;
++		};
++
+ 		dcfg: dcfg at 1ee0000 {
+ 			compatible = "fsl,ls1012a-dcfg",
+ 				     "syscon";
+-- 
+2.12.0.264.gd6db3f216544
