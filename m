@@ -1,126 +1,97 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Wed, 22 Mar 2017 11:29:58 -0500
-Subject: [PATCH 03/20] asm-generic/io.h: add PCI config space remap
- interface
-In-Reply-To: <20170322150403.GA4951@red-moon>
-References: <20170227151436.18698-1-lorenzo.pieralisi@arm.com>
- <20170227151436.18698-4-lorenzo.pieralisi@arm.com>
- <20170316211243.GE9739@bhelgaas-glaptop.roam.corp.google.com>
- <20170322150403.GA4951@red-moon>
-Message-ID: <20170322162958.GA24935@bhelgaas-glaptop.roam.corp.google.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 22 Mar 2017 16:46:19 +0000
+Subject: [PATCH] of: Fix DMA mask assignment
+In-Reply-To: <CAL_JsqKAuyePWUC-K21uZEjBU29EZA3WUQOYQdwAZUMOz+mEFg@mail.gmail.com>
+References: <94ede94e98502a7948085fba5a16994d3805010c.1488910224.git.robin.murphy@arm.com>
+ <CAL_JsqKAuyePWUC-K21uZEjBU29EZA3WUQOYQdwAZUMOz+mEFg@mail.gmail.com>
+Message-ID: <20170322164619.GG21222@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 22, 2017 at 03:04:03PM +0000, Lorenzo Pieralisi wrote:
-> Hi Bjorn, Arnd,
+On Wed, Mar 22, 2017 at 10:19:58AM -0500, Rob Herring wrote:
+> On Tue, Mar 7, 2017 at 12:12 PM, Robin Murphy <robin.murphy@arm.com> wrote:
+> > As we start moving towards mandating that device DMA addressing
+> > capabilities are correctly described in DT for platforms like arm64,
 > 
-> On Thu, Mar 16, 2017 at 04:12:43PM -0500, Bjorn Helgaas wrote:
-> > [+cc Luis]
-> > 
-> > On Mon, Feb 27, 2017 at 03:14:14PM +0000, Lorenzo Pieralisi wrote:
-> > > The PCI specifications (Rev 3.0, 3.2.5 "Transaction Ordering and
-> > > Posting") mandate non-posted configuration transactions. As further
-> > > highlighted in the PCIe specifications (4.0 - Rev0.3, "Ordering
-> > > Considerations for the Enhanced Configuration Access Mechanism"),
-> > > through ECAM and ECAM-derivative configuration mechanism, the memory
-> > > mapped transactions from the host CPU into Configuration Requests on the
-> > > PCI express fabric may create ordering problems for software because
-> > > writes to memory address are typically posted transactions (unless the
-> > > architecture can enforce through virtual address mapping non-posted
-> > > write transactions behaviour) but writes to Configuration Space are not
-> > > posted on the PCI express fabric.
-> > > 
-> > > Current DT and ACPI host bridge controllers map PCI configuration space
-> > > (ECAM and ECAM-derivative) into the virtual address space through
-> > > ioremap() calls, that are non-cacheable device accesses on most
-> > > architectures, but may provide "bufferable" or "posted" write semantics
-> > > in architecture like eg ARM/ARM64 that allow ioremap'ed regions writes
-> > > to be buffered in the bus connecting the host CPU to the PCI fabric;
-> > > this behaviour, as underlined in the PCIe specifications, may trigger
-> > > transactions ordering rules and must be prevented.
-> > > 
-> > > Introduce a new generic and explicit API to create a memory
-> > > mapping for ECAM and ECAM-derivative config space area that
-> > > defaults to ioremap_nocache() (which should provide a sane default
-> > > behaviour) but still allowing architectures on which ioremap_nocache()
-> > > results in posted write transactions to override the function
-> > > call with an arch specific implementation that complies with
-> > > the PCI specifications for configuration transactions.
-> > > 
-> > > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > > Cc: Arnd Bergmann <arnd@arndb.de>
-> > > Cc: Will Deacon <will.deacon@arm.com>
-> > > Cc: Bjorn Helgaas <bhelgaas@google.com>
-> > > Cc: Russell King <linux@armlinux.org.uk>
-> > > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> > > ---
-> > >  include/asm-generic/io.h | 9 +++++++++
-> > >  1 file changed, 9 insertions(+)
-> > > 
-> > > diff --git a/include/asm-generic/io.h b/include/asm-generic/io.h
-> > > index 7ef015e..52dda81 100644
-> > > --- a/include/asm-generic/io.h
-> > > +++ b/include/asm-generic/io.h
-> > > @@ -915,6 +915,15 @@ extern void ioport_unmap(void __iomem *p);
-> > >  #endif /* CONFIG_GENERIC_IOMAP */
-> > >  #endif /* CONFIG_HAS_IOPORT_MAP */
-> > >  
-> > > +#ifndef pci_remap_cfgspace
-> > > +#define pci_remap_cfgspace pci_remap_cfgspace
-> > > +static inline void __iomem *pci_remap_cfgspace(phys_addr_t offset,
-> > > +					       size_t size)
-> > > +{
-> > > +	return ioremap_nocache(offset, size);
-> > > +}
-> > 
-> > I'm fine with this conceptually, but I think it would make more sense
-> > if the name weren't specific to PCI or config space, e.g.,
-> > ioremap_nopost() or something.
+> Why? There's no point to dma-ranges if the bus is not restricting the
+> device. dma-ranges is supposed to apply to a bus, not a device. For
+> example, using dma-ranges for a 32-bit device on a 64-bit platform is
+> wrong. To put it another way, devices know their addressing
+> capability, so we don't need to describe that in DT, only external
+> restrictions outside of the device.
 > 
-> I would like to respin shortly so I have to make a decision on the
-> interface, either:
+> > it
+> > turns out that actually assigning DMA masks wider than 32 bits from
+> > "dma-ranges" is made largely impossible by the current code. New PCI
+> > devices are passed in with 32-bit masks, while new platform devices are
+> > passed in with their masks unset, so we install default 32-bit masks for
+> > them. As a result, subsequently taking the minimum between any existing
+> > mask and the size given by "dma-ranges" means that we can never exceed
+> > 32 bits for the vast majority of devices.
+> >
+> > Since the DT can be assumed to describe the hardware appropriately, and
+> > the device's driver is expected by the DMA API to explicitly set a mask
+> > later when it probes, we can safely let "dma-ranges" unconditionally
+> > override any initial mask from device creation (and as a small bonus
+> > deduplicate the calculation in the process).
+> >
+> > CC: Arnd Bergmann <arnd@arndb.de>
+> > CC: Murali Karicheri <m-karicheri2@ti.com>
+> > Fixes: 9a6d7298b083 ("of: Calculate device DMA masks based on DT dma-range size")
 > 
-> (1) I keep it a PCI only interface (which means I can even move it to
->     include/linux/pci.h and arch*/include/asm/pci.h to override it)
+> Changing behavior since 4.1 doesn't really seem like a fix. A fix
+> should generally be tagged for stable and I'd be nervous on this one.
 > 
-> or
-> 
-> (2) We add it as a generic ioremap_* interface (I am not sure though
->     that's really useful other than to map PCI config space, actually
->     the reasoning behind the naming was to limit its usage to PCI
->     config space mappings)
-> 
-> I take it as Bjorn is keener on (2), just running a final check before
-> putting v2 together to make progress.
+> Are we sure all the things a driver may do still work the same? A
+> driver changing the default 32-bit mask to a 64-bit mask for example.
 
-The point of this seems to be to use non-posted mappings for both I/O
-port space and ECAM (config) space.  So I think the most readable way
-would be to have generic definitions like this:
+I'll re-iterate about the DMA API requirements.  All drivers that perform
+DMA are expected to perform DMA mask negotiation with the architecture
+code.  That means all drivers should use:
 
-  #ifndef ioremap_nopost
-  #define ioremap_nopost ioremap_nocache
-  #endif
+	dma_set_mask()
 
-  #ifndef pgprot_nonposted
-  #define pgprot_nonposted(prot) pgprot_noncached(prot)
-  #endif
+if they intend to use the streaming DMA APIs,
 
-and let ARM/ARM64 implement their own versions of those.  Then the
-devm code might fit naturally in lib/devres.c, e.g.,
+	dma_set_coherent_mask()
 
-  void __iomem *devm_ioremap_nopost(...) { ... }
+if they intend to use the coherent DMA API, or
 
-and we probably wouldn't need the pci_remap_cfgspace() wrapper, e.g.,
-we could do:
+	dma_set_mask_and_coherent()
 
-  return ioremap_page_range(..., pgprot_nonposted(PAGE_KERNEL));
+if they intend to use both APIs.  Drivers that omit these calls are
+buggy.
 
-  cfg->win = ioremap_nopost(...);
+It is also required that drivers check the return value from these
+calls, since failure means that (eg) they are not allowed to perform
+64-bit DMA.
 
-But I might be oversimplifying things.
+The mask that the driver passes in to these functions is determined
+by two things:
 
-BTW, I tried to apply the v1 series on my "master" branch (v4.11-rc1)
-and patch 19 didn't apply cleanly.  It's trivial and I can fix it up
-by hand, so not really a problem, just FYI.
+(a) how many address lines the device supports
+(b) the addressing mode that the driver wishes to enable for the device
 
-Bjorn
+For example, on PCI, to use 64-bit DMA, DAC addressing is necessary.
+A PCI driver must have successfully negotiated a >32-bit DMA mask in
+order to use DAC addressing, as this indicates whether the upstream
+supports DAC addressing cycles.
+
+There may be other restrictions that the device driver is unaware of.
+
+So, these three functions are part of a negotiation that drivers are
+expected to perform, and moving this information into DT does not
+negate the need for drivers to perform this negotiation.
+
+Drivers that use the DMA mask coerce() functions are fundamentally
+buggy drivers that either (a) didn't set a DMA mask before there was
+code in DT/elsewhere to provide the default mask, or (b) are overriding
+the negotiation mechanism.  No new drivers should ever use the DMA mask
+coerce functions.
+
+Hope this helps.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
