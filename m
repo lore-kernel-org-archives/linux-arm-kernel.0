@@ -1,47 +1,90 @@
-From: fisaksen@baylibre.com (Frode Isaksen)
-Date: Wed, 22 Mar 2017 14:30:01 +0100
-Subject: [PATCH 3/8] spi: davinci: limit the transfer size if DMA enabled
-In-Reply-To: <c85c9e88-c40b-88b3-f47d-6d5f5cc1fa00@ti.com>
-References: <1486740584-17875-1-git-send-email-fisaksen@baylibre.com>
- <1486740584-17875-4-git-send-email-fisaksen@baylibre.com>
- <a17cca3a-d029-a2cd-583c-2672287d191c@ti.com>
- <b4d8bd90-cd33-560f-5102-20c2375dac70@ti.com>
- <44a615b6-97ab-0ab8-c2ba-013fdd40ffd7@baylibre.com>
- <95c7bc96-2de9-043d-880e-4de9f0b2308a@ti.com>
- <c85c9e88-c40b-88b3-f47d-6d5f5cc1fa00@ti.com>
-Message-ID: <e6930698-b843-1ed0-d621-879e0b8bacb7@baylibre.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Wed, 22 Mar 2017 14:31:36 +0100
+Subject: [PATCH v2 4/8] soc: imx: gpc: fix imx6sl gpc power domain
+ regression
+In-Reply-To: <1490244805-3921-5-git-send-email-aisheng.dong@nxp.com>
+References: <1490244805-3921-1-git-send-email-aisheng.dong@nxp.com>
+ <1490244805-3921-5-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <1490189496.29056.1.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Am Donnerstag, den 23.03.2017, 12:53 +0800 schrieb Dong Aisheng:
+> Commit 721cabf6c660 ("soc: imx: move PGC handling to a new GPC driver")
+> broke the MX6SL GPC power domain support.
+> It always got the following error:
+> [    1.248364] imx-gpc 20dc000.gpc: could not find pgc DT node
+> This patch adds back the legecy support.
+> 
+> Cc: Lucas Stach <l.stach@pengutronix.de>
+> Cc: Shawn Guo <shawnguo@kernel.org>
+> Fixes: 721cabf6c660 ("soc: imx: move PGC handling to a new GPC driver")
+> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 
+I would have hoped to keep the sanity check, but it makes things more
+complicated for no real gain, as probably nobody is going to try adding
+SoC support with the old bindings:
 
-On 22/03/2017 13:20, Peter Ujfalusi wrote:
-> On 03/22/2017 01:35 PM, Sekhar Nori wrote:
->> On Wednesday 22 March 2017 04:41 PM, Frode Isaksen wrote:
->> I guess this means that most IPs continue to get more missed sync events
->> even after the first sync event is generated at end of MAX_NR_SG PaRAMs.
->> And may be even that first sync event miss is a problem because the IP
->> does not pause and ends up shifting data in the shift register anyway.
->>
->> If this is so broken, should edma driver not refuse to handle more than
->> MAX_NR_SG for all transfers but mem-to-mem transfers?
->
-> DM355, OMAP-L138, etc have only 128 paRAM slots. If we lift the restriction on
-> the number of paRAM slots a channel can take, then DMA will most likely going
-> to stop working: If any peripherals request 128 long SG transfer (and MMC
-> easily does that alone) then we will have no available paRAM slot for other
-> clients.
->
-> It might be possible to start the paRAM slot update for the next batch already
-> when we have 1 or 2 slots to be processed, but that is going to be tricky and
-> not even reliable.
-Note that with SPI, a workaround for this issue has been found by using the rx
-buffer as the dummy tx buffer when doing read-only transfers (this is the case
-that fails). With this, the rx and tx paRAM slots are reconfigured at the same time.
+Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
 
-Thanks,
-Frode
->
-> Note: audio also sets limit on the number of periods to avoid this
-> reconfiguration of paRAM slots.
->
+> ---
+> Change Log:
+> v1->v2: add back the three domain support for MX6SL
+> ---
+>  drivers/soc/imx/gpc.c | 18 +++++++-----------
+>  1 file changed, 7 insertions(+), 11 deletions(-)
+> 
+> diff --git a/drivers/soc/imx/gpc.c b/drivers/soc/imx/gpc.c
+> index ba6e7ab..9a2354e 100644
+> --- a/drivers/soc/imx/gpc.c
+> +++ b/drivers/soc/imx/gpc.c
+> @@ -309,12 +309,13 @@ static struct genpd_onecell_data imx_gpc_onecell_data = {
+>  	.num_domains = 2,
+>  };
+>  
+> -static int imx_gpc_old_dt_init(struct device *dev, struct regmap *regmap)
+> +static int imx_gpc_old_dt_init(struct device *dev, struct regmap *regmap,
+> +			       unsigned int num_domains)
+>  {
+>  	struct imx_pm_domain *domain;
+>  	int i, ret;
+>  
+> -	for (i = 0; i < 2; i++) {
+> +	for (i = 0; i < num_domains; i++) {
+>  		domain = &imx_gpc_domains[i];
+>  		domain->regmap = regmap;
+>  		domain->ipg_rate_mhz = 66;
+> @@ -332,7 +333,7 @@ static int imx_gpc_old_dt_init(struct device *dev, struct regmap *regmap)
+>  		}
+>  	}
+>  
+> -	for (i = 0; i < 2; i++)
+> +	for (i = 0; i < num_domains; i++)
+>  		pm_genpd_init(&imx_gpc_domains[i].base, NULL, false);
+>  
+>  	if (IS_ENABLED(CONFIG_PM_GENERIC_DOMAINS)) {
+> @@ -345,7 +346,7 @@ static int imx_gpc_old_dt_init(struct device *dev, struct regmap *regmap)
+>  	return 0;
+>  
+>  genpd_err:
+> -	for (i = 0; i < 2; i++)
+> +	for (i = 0; i < num_domains; i++)
+>  		pm_genpd_remove(&imx_gpc_domains[i].base);
+>  	imx_pgc_put_clocks(&imx_gpc_domains[1]);
+>  clk_err:
+> @@ -385,13 +386,8 @@ static int imx_gpc_probe(struct platform_device *pdev)
+>  	}
+>  
+>  	if (!pgc_node) {
+> -		/* old DT layout is only supported for mx6q aka 2 domains */
+> -		if (of_id_data->num_domains != 2) {
+> -			dev_err(&pdev->dev, "could not find pgc DT node\n");
+> -			return -ENODEV;
+> -		}
+> -
+> -		ret = imx_gpc_old_dt_init(&pdev->dev, regmap);
+> +		ret = imx_gpc_old_dt_init(&pdev->dev, regmap,
+> +					  of_id_data->num_domains);
+>  		if (ret)
+>  			return ret;
+>  	} else {
