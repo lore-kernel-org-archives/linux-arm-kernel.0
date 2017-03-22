@@ -1,82 +1,108 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 22 Mar 2017 17:06:58 +0000
-Subject: [RFC PATCH v2 28/41] arm64: KVM: Treat SVE use by guests as
- undefined instruction execution
-In-Reply-To: <1490194274-30569-29-git-send-email-Dave.Martin@arm.com>
-References: <1490194274-30569-1-git-send-email-Dave.Martin@arm.com>
- <1490194274-30569-29-git-send-email-Dave.Martin@arm.com>
-Message-ID: <20170322170658.GF19950@leverpostej>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Wed, 22 Mar 2017 17:00:56 +0000
+Subject: [PATCH V2 5/5] soc/tegra: Add initial flowctrl support for
+ Tegra132/210
+In-Reply-To: <1490202056-13040-1-git-send-email-jonathanh@nvidia.com>
+References: <1490202056-13040-1-git-send-email-jonathanh@nvidia.com>
+Message-ID: <1490202056-13040-6-git-send-email-jonathanh@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Tegra132 and Tegra210 support the flowctrl module and so add initial
+support for these devices.
 
-On Wed, Mar 22, 2017 at 02:50:58PM +0000, Dave Martin wrote:
-> We don't currently support context-switching of Scalable Vector
-> Extension context between vcpus, and the SVE access exception is
-> thus left masked by default at EL2 when running a vcpu.
-> 
-> However, there's nothing to stop a guest trying to use SVE.  If it
-> does, we'll get an SVE access exception to EL2 which will cause KVM
-> to panic since this exception isn't yet recognised.
-> 
-> This patch adds knowledge to KVM about the SVE access exception,
-> translating it into an undefined instruction exception injected to
-> the vcpu.
-> 
-> This prevents a malicious guest from panicking the host by
-> attempted SVE use.
-> 
-> SVE-enabled guests will still not work properly for now, but they
-> won't take the host down.
-> 
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> ---
->  arch/arm64/kvm/handle_exit.c | 8 ++++++++
->  1 file changed, 8 insertions(+)
+Please note that Tegra186 does not support the flowctrl module, so
+update the initialisation function such that we do not fall back and
+attempt to map the 'hardcoded' address range for Tegra186. Furthermore
+64-bit Tegra devices have always had the flowctrl node defined in their
+device-tree and so only use the 'hardcoded' addresses for 32-bit Tegra
+devices.
 
-As a heads-up, this is handled implicitly by kvm_handle_unknown_ec()
-since commit ba4dd156eabdca93 ("arm64: KVM: Survive unknown traps from
-guests"). That also logs a (ratelimited) warning regarding the
-unimplemented trap handling.
+Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
+---
+ drivers/soc/tegra/Kconfig    |  2 ++
+ drivers/soc/tegra/flowctrl.c | 31 +++++++++++++++++++++----------
+ 2 files changed, 23 insertions(+), 10 deletions(-)
 
-Given that, I think we can drop this patch until actual support lands.
-
-Thanks,
-Mark.
-
-> 
-> diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
-> index fa1b18e..e43b147 100644
-> --- a/arch/arm64/kvm/handle_exit.c
-> +++ b/arch/arm64/kvm/handle_exit.c
-> @@ -146,6 +146,13 @@ static int kvm_handle_unknown_ec(struct kvm_vcpu *vcpu, struct kvm_run *run)
->  	return 1;
->  }
->  
-> +static int handle_sve(struct kvm_vcpu *vcpu, struct kvm_run *run)
-> +{
-> +	/* Until SVE is supported for guests: */
-> +	kvm_inject_undefined(vcpu);
-> +	return 1;
-> +}
-> +
->  static exit_handle_fn arm_exit_handlers[] = {
->  	[0 ... ESR_ELx_EC_MAX]	= kvm_handle_unknown_ec,
->  	[ESR_ELx_EC_WFx]	= kvm_handle_wfx,
-> @@ -159,6 +166,7 @@ static exit_handle_fn arm_exit_handlers[] = {
->  	[ESR_ELx_EC_HVC64]	= handle_hvc,
->  	[ESR_ELx_EC_SMC64]	= handle_smc,
->  	[ESR_ELx_EC_SYS64]	= kvm_handle_sys_reg,
-> +	[ESR_ELx_EC_SVE]	= handle_sve,
->  	[ESR_ELx_EC_IABT_LOW]	= kvm_handle_guest_abort,
->  	[ESR_ELx_EC_DABT_LOW]	= kvm_handle_guest_abort,
->  	[ESR_ELx_EC_SOFTSTP_LOW]= kvm_handle_guest_debug,
-> -- 
-> 2.1.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/drivers/soc/tegra/Kconfig b/drivers/soc/tegra/Kconfig
+index c7e8ddfb574e..dcf088db40b6 100644
+--- a/drivers/soc/tegra/Kconfig
++++ b/drivers/soc/tegra/Kconfig
+@@ -63,6 +63,7 @@ if ARM64
+ config ARCH_TEGRA_132_SOC
+ 	bool "NVIDIA Tegra132 SoC"
+ 	select PINCTRL_TEGRA124
++	select SOC_TEGRA_FLOWCTRL
+ 	select SOC_TEGRA_PMC
+ 	help
+ 	  Enable support for NVIDIA Tegra132 SoC, based on the Denver
+@@ -73,6 +74,7 @@ config ARCH_TEGRA_132_SOC
+ config ARCH_TEGRA_210_SOC
+ 	bool "NVIDIA Tegra210 SoC"
+ 	select PINCTRL_TEGRA210
++	select SOC_TEGRA_FLOWCTRL
+ 	select SOC_TEGRA_PMC
+ 	help
+ 	  Enable support for the NVIDIA Tegra210 SoC. Also known as Tegra X1,
+diff --git a/drivers/soc/tegra/flowctrl.c b/drivers/soc/tegra/flowctrl.c
+index 25eddfc8475d..0e345c05fc65 100644
+--- a/drivers/soc/tegra/flowctrl.c
++++ b/drivers/soc/tegra/flowctrl.c
+@@ -165,6 +165,7 @@ static int tegra_flowctrl_probe(struct platform_device *pdev)
+ }
+ 
+ static const struct of_device_id tegra_flowctrl_match[] = {
++	{ .compatible = "nvidia,tegra210-flowctrl" },
+ 	{ .compatible = "nvidia,tegra124-flowctrl" },
+ 	{ .compatible = "nvidia,tegra114-flowctrl" },
+ 	{ .compatible = "nvidia,tegra30-flowctrl" },
+@@ -184,9 +185,7 @@ builtin_platform_driver(tegra_flowctrl_driver);
+ 
+ static int __init tegra_flowctrl_init(void)
+ {
+-	/* hardcoded fallback if device tree node is missing */
+-	unsigned long base = 0x60007000;
+-	unsigned long size = SZ_4K;
++	struct resource res;
+ 	struct device_node *np;
+ 
+ 	if (!soc_is_tegra())
+@@ -194,17 +193,29 @@ static int __init tegra_flowctrl_init(void)
+ 
+ 	np = of_find_matching_node(NULL, tegra_flowctrl_match);
+ 	if (np) {
+-		struct resource res;
+-
+-		if (of_address_to_resource(np, 0, &res) == 0) {
+-			size = resource_size(&res);
+-			base = res.start;
++		if (of_address_to_resource(np, 0, &res) < 0) {
++			pr_err("failed to get flowctrl register\n");
++			return -ENXIO;
+ 		}
+-
+ 		of_node_put(np);
++	} else if (IS_ENABLED(CONFIG_ARM)) {
++		/*
++		 * Hardcoded fallback for 32-bit Tegra
++		 * devices if device tree node is missing.
++		 */
++		res.start = 0x60007000;
++		res.end = 0x60007fff;
++		res.flags = IORESOURCE_MEM;
++	} else {
++		/*
++		 * At this point we're running on a Tegra,
++		 * that doesn't support the flow controller
++		 * (eg. Tegra186), so just return.
++		 */
++		return 0;
+ 	}
+ 
+-	tegra_flowctrl_base = ioremap_nocache(base, size);
++	tegra_flowctrl_base = ioremap_nocache(res.start, resource_size(&res));
+ 	if (!tegra_flowctrl_base)
+ 		return -ENXIO;
+ 
+-- 
+2.7.4
