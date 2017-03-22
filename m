@@ -1,24 +1,39 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 22 Mar 2017 08:11:34 +0100
-Subject: [RESEND PATCH v4 0/9] add support for AXP20X and AXP22X power
- supply drivers
-In-Reply-To: <20170320081653.8884-1-quentin.schulz@free-electrons.com>
-References: <20170320081653.8884-1-quentin.schulz@free-electrons.com>
-Message-ID: <20170322071134.mbd3x3ncllje2ovs@lukather>
+Date: Wed, 22 Mar 2017 08:16:46 +0100
+Subject: [PATCH v3 01/11] ARM: sun8i: a33: add operating-points-v2
+ property to all nodes
+In-Reply-To: <CAGb2v65qMod+k5Uo-Z4qG=7kMx_FiHhR_01XS+Bn+m3T=JH6bg@mail.gmail.com>
+References: <20170321153611.16228-1-quentin.schulz@free-electrons.com>
+ <20170321153611.16228-2-quentin.schulz@free-electrons.com>
+ <CAGb2v65qMod+k5Uo-Z4qG=7kMx_FiHhR_01XS+Bn+m3T=JH6bg@mail.gmail.com>
+Message-ID: <20170322071646.stljnmlnfrhpchm2@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 20, 2017 at 09:16:44AM +0100, Quentin Schulz wrote:
-> These patches haven't changed since v4. The goal is to split the series in
-> two series, one (this one) with patches ready to be merged and the other
-> one (everything impacting the battery power supply) which depends on an
-> ongoing series by Liam Breck to be merged once the ongoing series has a
-> consensus.
+On Wed, Mar 22, 2017 at 11:32:28AM +0800, Chen-Yu Tsai wrote:
+> On Tue, Mar 21, 2017 at 11:36 PM, Quentin Schulz
+> <quentin.schulz@free-electrons.com> wrote:
+> > The OPP are declared as shared but no operating points are declared for
+> > cpu1, 2 and 3. Thus, the following error happens during the boot:
+> >
+> > cpu cpu1: dev_pm_opp_of_get_sharing_cpus: Couldn't find tcpu_dev node.
+> >
+> > This patch applies the operating points to each cpu of the A33.
+> >
 > 
-> Therefore, this series of patch is ready to be merged. I don't see any
-> dependency between subsystems.
+> This should have
+> 
+> Fixes: 03749eb88e63 ("ARM: dts: sun8i: add opp-v2 table for A33")
+> 
+> and be merged as fixes for 4.11.
+> 
+> > Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+> 
+> Acked-by: Chen-Yu Tsai <wens@csie.org>
 
-Merged the patches 5-8, thanks!
+I just queued it as a fix for 4.11, with the fixes tag.
+
+Thanks!
 Maxime
 
 -- 
@@ -31,4 +46,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170322/b60dc893/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170322/0097ed4f/attachment-0001.sig>
