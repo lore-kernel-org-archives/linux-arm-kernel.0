@@ -1,44 +1,95 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 22 Mar 2017 09:42:48 +0100
-Subject: [PATCH 4/6] gpio: gemini: rename to match Faraday IP
-In-Reply-To: <CACmBeS2OC6X_Rb5qaVEGMY4mPyHwnib-=pm-g=+73J6ZSRDgLw@mail.gmail.com>
-References: <20170312232818.26304-1-linus.walleij@linaro.org>
- <20170312232818.26304-4-linus.walleij@linaro.org>
- <CACmBeS2OC6X_Rb5qaVEGMY4mPyHwnib-=pm-g=+73J6ZSRDgLw@mail.gmail.com>
-Message-ID: <CACRpkda0TpcUsEW6wiHzhueSckz_WTfbDgpixdgCNvodHDmpyw@mail.gmail.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Wed, 22 Mar 2017 09:43:34 +0100
+Subject: [PATCH 2/8] soc: imx: gpc: fix the wrong using of regmap cache
+In-Reply-To: <20170322185322.GB16264@b29396-OptiPlex-7040>
+References: <1489990547-1510-1-git-send-email-aisheng.dong@nxp.com>
+ <1489990547-1510-3-git-send-email-aisheng.dong@nxp.com>
+ <1490002701.2895.13.camel@pengutronix.de>
+ <20170322185322.GB16264@b29396-OptiPlex-7040>
+Message-ID: <1490172214.2895.32.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 21, 2017 at 11:59 AM, Jonas Jensen <jonas.jensen@gmail.com> wrote:
+Am Donnerstag, den 23.03.2017, 02:53 +0800 schrieb Dong Aisheng:
+> Hi Lucas,
+> 
+> Thanks for the review.
+> 
+> On Mon, Mar 20, 2017 at 10:38:21AM +0100, Lucas Stach wrote:
+> > Am Montag, den 20.03.2017, 14:15 +0800 schrieb Dong Aisheng:
+> > > Without providing the proper reg_defaults, the regmap registers first
+> > > read out may be always 0 if enabling cache, which results in the
+> > > following issue we met.
+> > > e.g. During driver probe in imx6_pm_domain_power_on():
+> > > regmap_read(pd->regmap, pd->reg_offs + GPC_PGC_PUPSCR_OFFS, &val);
+> > > The PGC_PUPSCR register val is always 0 but it's actually 0xf01 in HW.
+> > > 
+> > > Since GPC registers are tightly related to CPU bring up and may be
+> > > changed in bootloader, we don't want to provide defaults.
+> > > And the cache really does not save too much for GPC module.
+> > > 
+> > > Therefore, simply disable cache to fix the issue and make life easy.
+> > 
+> > While I agree that not using the cache may be the right thing to do
+> > here, bypassing the cache by not providing the volatile function is only
+> > half the fix.
+> > 
+> 
+> Removing volatile function actually is only due to it becomes meaningless
+> after disable cache, not used to bypass or fix the cache issue.
+> 
+> > Please also set the cache type to REGCACHE_NONE, to make it clear that
+> > the cache isn't used.
+> > 
+> 
+> I believe all guys normally may know the regmap cache is disabled by default
+> if without specifying cache_type, this way is also commonly used in kernel.
+> So i just simply remove it.
+> Another bonus is it fully hides the cache bits from drive user.
+> No one needs to know it if not use.
+> 
+> Anyway, if you insist on it, i could explicitly claim the cache type to
+> REGCACHE_NONE in V2.
 
-> Verified on UC-7112-LX by buzzing the buzzer and writing the RTC (see
-> log [1] for next-20170310):
->
-> [1] https://bitbucket.org/Kasreyn/linux-next/commits/c63f3c2215f6fd106ff0ec6f9864b85b7be565ac
->
-> [    0.000000] Linux version 4.11.0-rc1-next-20170310-00004-gc63f3c2
-> (i at ildjarn) (gcc version 4.9.1 (crosstool-NG 1.20.0) ) #4461 PREEMP
-> T Tue Mar 21 11:43:29 CET 2017
-> ..
-> echo 24 > /sys/class/gpio/export
-> echo out > /sys/class/gpio/gpio24/direction
-> echo 1 > /sys/class/gpio/gpio24/value
-> echo 0 > /sys/class/gpio/gpio24/value
-> ..
-> date +%Y%m%d%h%m -s "201001202323"
-> hwclock -w
-> reboot
-> ..
-> [    4.520000] moxart-rtc 90000000.soc:rtc: setting system clock to
-> 2010-01-20 23:23:20 UTC (1264029800)
+Um, no thanks. I claim lack of coffee for my first review. This patch is
 
-Nice! Have you tested my new GPIO character device tools from
-tools/gpio/* in the kernel tree?
+Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
 
-> Tested-by: Jonas Jensen <jonas.jensen@gmail.com>
-
-Thanks man. I have only a few more or these, I might save some
-for the next kernel cycle. ;)
-
-Yours,
-Linus Walleij
+> > 
+> > > Cc: Lucas Stach <l.stach@pengutronix.de>
+> > > Cc: Shawn Guo <shawnguo@kernel.org>
+> > > Fixes: 721cabf6c660 ("soc: imx: move PGC handling to a new GPC driver")
+> > > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> > > ---
+> > >  drivers/soc/imx/gpc.c | 10 ----------
+> > >  1 file changed, 10 deletions(-)
+> > > 
+> > > diff --git a/drivers/soc/imx/gpc.c b/drivers/soc/imx/gpc.c
+> > > index c9bfdfd..7e6a672 100644
+> > > --- a/drivers/soc/imx/gpc.c
+> > > +++ b/drivers/soc/imx/gpc.c
+> > > @@ -289,22 +289,12 @@ static bool imx_gpc_readable_reg(struct device *dev, unsigned int reg)
+> > >  	return (reg % 4 == 0) && (reg <= 0x2ac);
+> > >  }
+> > >  
+> > > -static bool imx_gpc_volatile_reg(struct device *dev, unsigned int reg)
+> > > -{
+> > > -	if (reg == GPC_CNTR)
+> > > -		return true;
+> > > -
+> > > -	return false;
+> > > -}
+> > > -
+> > >  static const struct regmap_config imx_gpc_regmap_config = {
+> > > -	.cache_type = REGCACHE_FLAT,
+> > >  	.reg_bits = 32,
+> > >  	.val_bits = 32,
+> > >  	.reg_stride = 4,
+> > >  
+> > >  	.readable_reg = imx_gpc_readable_reg,
+> > > -	.volatile_reg = imx_gpc_volatile_reg,
+> > >  
+> > >  	.max_register = 0x2ac,
+> > >  };
+> > 
+> > 
