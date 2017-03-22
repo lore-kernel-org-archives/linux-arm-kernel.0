@@ -1,81 +1,118 @@
-From: sramana@codeaurora.org (Srinivas Ramana)
-Date: Wed, 22 Mar 2017 19:15:32 +0530
-Subject: [PATCH v2] arm64: kaslr: Fix up the kernel image alignment
-In-Reply-To: <20170322124008.GH8026@arm.com>
-References: <904FACBF-3DFE-4DDE-ACB5-7109A137D477@linaro.org>
- <1490182705-14243-1-git-send-email-sramana@codeaurora.org>
- <CAKv+Gu-XUY0XBSK_oe4DbveZOhk8_ZQLMEdPmLiaRv9rCh7ifw@mail.gmail.com>
- <20170322124008.GH8026@arm.com>
-Message-ID: <58D27FFC.8030205@codeaurora.org>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 22 Mar 2017 08:47:27 -0500
+Subject: [PATCH 06/15] ARM: dts: r8a779x: fix PCI bus dtc warnings
+In-Reply-To: <CAMuHMdVMyjVv471KB6+SCbNBs6EAaFUm1-2xwj2y-qgriFht0Q@mail.gmail.com>
+References: <20170322020313.24338-1-robh@kernel.org>
+ <20170322020313.24338-6-robh@kernel.org>
+ <CAMuHMdVMyjVv471KB6+SCbNBs6EAaFUm1-2xwj2y-qgriFht0Q@mail.gmail.com>
+Message-ID: <CAL_JsqLd3o0MEgU93axvEg3kddMp4fvP2ZpnBWRdNBR8AHFV+Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/22/2017 06:10 PM, Will Deacon wrote:
-> On Wed, Mar 22, 2017 at 12:16:24PM +0000, Ard Biesheuvel wrote:
->> On 22 March 2017 at 11:38, Srinivas Ramana <sramana@codeaurora.org> wrote:
->>> From: Neeraj Upadhyay <neeraju@codeaurora.org>
->>>
->>> If kernel image extends across alignment boundary, existing
->>> code increases the KASLR offset by size of kernel image. The
->>> offset is masked after resizing. There are cases, where after
->>> masking, we may still have kernel image extending across
->>> boundary. This eventually results in only 2MB block getting
->>> mapped while creating the page tables. This results in data aborts
->>> while accessing unmapped regions during second relocation (with
->>> kaslr offset) in __primary_switch. To fix this problem, round up the
->>> kernel image size, by swapper block size, before adding it for
->>> correction.
->>>
->>> For example consider below case, where kernel image still crosses
->>> 1GB alignment boundary, after masking the offset, which is fixed
->>> by rounding up kernel image size.
->>>
->>> SWAPPER_TABLE_SHIFT = 30
->>> Swapper using section maps with section size 2MB.
->>> CONFIG_PGTABLE_LEVELS = 3
->>> VA_BITS = 39
->>>
->>> _text  : 0xffffff8008080000
->>> _end   : 0xffffff800aa1b000
->>> offset : 0x1f35600000
->>> mask = ((1UL << (VA_BITS - 2)) - 1) & ~(SZ_2M - 1)
->>>
->>> (_text + offset) >> SWAPPER_TABLE_SHIFT = 0x3fffffe7c
->>> (_end + offset) >> SWAPPER_TABLE_SHIFT  = 0x3fffffe7d
->>>
->>> offset after existing correction (before mask) = 0x1f37f9b000
->>> (_text + offset) >> SWAPPER_TABLE_SHIFT = 0x3fffffe7d
->>> (_end + offset) >> SWAPPER_TABLE_SHIFT  = 0x3fffffe7d
->>>
->>> offset (after mask) = 0x1f37e00000
->>> (_text + offset) >> SWAPPER_TABLE_SHIFT = 0x3fffffe7c
->>> (_end + offset) >> SWAPPER_TABLE_SHIFT  = 0x3fffffe7d
->>>
->>> new offset w/ rounding up = 0x1f38000000
->>> (_text + offset) >> SWAPPER_TABLE_SHIFT = 0x3fffffe7d
->>> (_end + offset) >> SWAPPER_TABLE_SHIFT  = 0x3fffffe7d
->>>
->>> Fixes: f80fb3a3d508 ("arm64: add support for kernel ASLR")
->>> Signed-off-by: Neeraj Upadhyay <neeraju@codeaurora.org>
->>> Signed-off-by: Srinivas Ramana <sramana@codeaurora.org>
+On Wed, Mar 22, 2017 at 3:58 AM, Geert Uytterhoeven
+<geert@linux-m68k.org> wrote:
+> Hi Rob,
+>
+> On Wed, Mar 22, 2017 at 3:03 AM, Rob Herring <robh@kernel.org> wrote:
+>> dtc recently added PCI bus checks. Fix these warnings.
+>
+> It's always a good idea to put the warnings in the commit message:
+
+Well, the warnings are a bit noisy in that they get repeated, can be
+misleading, change as I fix problems (device nodes are not checked if
+the bridge node fails), and most importantly I'm lazy having fixed
+these treewide. Sub-arch maintainers are welcome to make better
+patches. :)
+
+> arch/arm/boot/dts/r8a7790-lager.dtb: Warning (pci_bridge): Node
+> /pci at ee090000/usb at 0,1 node name is not "pci" or "pcie"
+> arch/arm/boot/dts/r8a7790-lager.dtb: Warning (pci_bridge): Node
+> /pci at ee090000/usb at 0,1 missing ranges for PCI bridge (or not a bridge)
+> arch/arm/boot/dts/r8a7790-lager.dtb: Warning (pci_bridge): Node
+> /pci at ee090000/usb at 0,1 incorrect #address-cells for PCI bridge
+> arch/arm/boot/dts/r8a7790-lager.dtb: Warning (pci_bridge): Node
+> /pci at ee090000/usb at 0,1 incorrect #size-cells for PCI bridge
+> arch/arm/boot/dts/r8a7790-lager.dtb: Warning (pci_bridge): Node
+> /pci at ee090000/usb at 0,1 missing bus-range for PCI bridge
+> arch/arm/boot/dts/r8a7790-lager.dtb: Warning (pci_bridge): Node
+> /pci at ee090000/usb at 0,2 node name is not "pci" or "pcie"
+> arch/arm/boot/dts/r8a7790-lager.dtb: Warning (pci_bridge): Node
+> /pci at ee090000/usb at 0,2 missing ranges for PCI bridge (or not a bridge)
+> arch/arm/boot/dts/r8a7790-lager.dtb: Warning (pci_bridge): Node
+> /pci at ee090000/usb at 0,2 incorrect #address-cells for PCI bridge
+> arch/arm/boot/dts/r8a7790-lager.dtb: Warning (pci_bridge): Node
+> /pci at ee090000/usb at 0,2 incorrect #size-cells for PCI bridge
+> arch/arm/boot/dts/r8a7790-lager.dtb: Warning (pci_bridge): Node
+> /pci at ee090000/usb at 0,2 missing bus-range for PCI bridge
+> arch/arm/boot/dts/r8a7790-lager.dtb: Warning (pci_bridge): Node
+> /pci at ee0d0000/usb at 0,1 node name is not "pci" or "pcie"
+> arch/arm/boot/dts/r8a7790-lager.dtb: Warning (pci_bridge): Node
+> /pci at ee0d0000/usb at 0,1 missing ranges for PCI bridge (or not a bridge)
+> arch/arm/boot/dts/r8a7790-lager.dtb: Warning (pci_bridge): Node
+> /pci at ee0d0000/usb at 0,1 incorrect #address-cells for PCI bridge
+> arch/arm/boot/dts/r8a7790-lager.dtb: Warning (pci_bridge): Node
+> /pci at ee0d0000/usb at 0,1 incorrect #size-cells for PCI bridge
+> arch/arm/boot/dts/r8a7790-lager.dtb: Warning (pci_bridge): Node
+> /pci at ee0d0000/usb at 0,1 missing bus-range for PCI bridge
+> arch/arm/boot/dts/r8a7790-lager.dtb: Warning (pci_bridge): Node
+> /pci at ee0d0000/usb at 0,2 node name is not "pci" or "pcie"
+> arch/arm/boot/dts/r8a7790-lager.dtb: Warning (pci_bridge): Node
+> /pci at ee0d0000/usb at 0,2 missing ranges for PCI bridge (or not a bridge)
+> arch/arm/boot/dts/r8a7790-lager.dtb: Warning (pci_bridge): Node
+> /pci at ee0d0000/usb at 0,2 incorrect #address-cells for PCI bridge
+> arch/arm/boot/dts/r8a7790-lager.dtb: Warning (pci_bridge): Node
+> /pci at ee0d0000/usb at 0,2 incorrect #size-cells for PCI bridge
+> arch/arm/boot/dts/r8a7790-lager.dtb: Warning (pci_bridge): Node
+> /pci at ee0d0000/usb at 0,2 missing bus-range for PCI bridge
+> arch/arm/boot/dts/r8a7790-lager.dtb: Warning (unit_address_format):
+> Failed prerequisite 'pci_bridge'
+> arch/arm/boot/dts/r8a7790-lager.dtb: Warning (pci_device_reg): Failed
+> prerequisite 'pci_bridge'
+> arch/arm/boot/dts/r8a7790-lager.dtb: Warning (pci_device_bus_num):
+> Failed prerequisite 'pci_bridge'
+>
+> The above indeed go away with your patch, but I don't know why ;-)
+
+Most of these are because 'device_type = "pci";' should only be on PCI
+bridges, not PCI devices.
+
+>
+>> Signed-off-by: Rob Herring <robh@kernel.org>
+>> Cc: Simon Horman <horms@verge.net.au>
+>> Cc: Magnus Damm <magnus.damm@gmail.com>
+>> Cc: linux-renesas-soc at vger.kernel.org
+>> ---
+>> Sub-arch maintainers, please apply to your trees unless arm-soc wants
+>> to take the whole lot.
 >>
->> Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>>  arch/arm/boot/dts/r8a7790.dtsi | 16 ++++++----------
+>>  arch/arm/boot/dts/r8a7791.dtsi | 16 ++++++----------
+>>  arch/arm/boot/dts/r8a7794.dtsi | 16 ++++++----------
+>>  3 files changed, 18 insertions(+), 30 deletions(-)
 >>
->> ... and thanks for the excellent commit log message!
+>> diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
+>> index 6d10450de6d7..c16a37e9fb5d 100644
+>> --- a/arch/arm/boot/dts/r8a7790.dtsi
+>> +++ b/arch/arm/boot/dts/r8a7790.dtsi
+>> @@ -1598,16 +1598,14 @@
+>>                                  0x0800 0 0 1 &gic GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH
+>>                                  0x1000 0 0 2 &gic GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH>;
+>>
+>> -               usb at 0,1 {
+>> +               usb at 1,0 {
+>>                         reg = <0x800 0 0 0 0>;
+>> -                       device_type = "pci";
+>>                         phys = <&usb0 0>;
+>>                         phy-names = "usb";
+>>                 };
 >
-> Thanks both. I've picked this up as a fix.
->
-> Will
->
+> Both Documentation/devicetree/bindings/pci/pci.txt and ePAPR refer to
+> http://www.firmware.org/1275/bindings/pci/pci2_1.pdf
+> http://www.firmware.org/1275/practice/imap/imap0_9d.pdf
+> which no longer exist.
 
-Thanks Ard and Will for the review and picking this patch.
-can we also CC: <stable@vger.kernel.org> ?
+Yeah, they are still out there. Just need to google "PCI supplement 1275". :)
 
-Thanks,
--- Srinivas R
+I have the full archive saved off. I need to get them added to devicetree.org.
 
-
--- 
-Qualcomm India Private Limited, on behalf of Qualcomm Innovation Center, 
-Inc.,
-is a member of Code Aurora Forum, a Linux Foundation Collaborative Project.
+Rob
