@@ -1,155 +1,130 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 22 Mar 2017 14:50:59 +0000
-Subject: [RFC PATCH v2 29/41] prctl: Add skeleton for PR_SVE_{SET,
- GET}_VL controls
+Date: Wed, 22 Mar 2017 14:50:53 +0000
+Subject: [RFC PATCH v2 23/41] arm64/sve: Move ZEN handling to the common
+ task_fpsimd_load() path
 In-Reply-To: <1490194274-30569-1-git-send-email-Dave.Martin@arm.com>
 References: <1490194274-30569-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1490194274-30569-30-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1490194274-30569-24-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a do-nothing skeleton for the arm64 Scalable Vector
-Extension control prctls.
+Currently, ZEN is handled only in fpsimd_restore_current_state(),
+which is not sufficient since it applies only in certain
+situations.
 
-These prctls are only avilable with
-
-    CONFIG_ARM64=y
-    CONFIG_ARM64_SVE=y
-
-Otherwise they will compile out and return -EINVAL if attempted
-from userspace.
-
-The backend functions sve_{set,get}_task_vl() will be fleshed out
-with actual functionality in subsequent patches.
+Since all the relevant paths call task_fpsimd_load(), this patch
+moves the ZEN handling there.
 
 Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 ---
- arch/arm64/include/asm/fpsimd.h    | 16 ++++++++++++++++
- arch/arm64/include/asm/processor.h |  4 ++++
- arch/arm64/kernel/fpsimd.c         | 13 +++++++++++++
- include/uapi/linux/prctl.h         |  4 ++++
- kernel/sys.c                       | 12 ++++++++++++
- 5 files changed, 49 insertions(+)
+ arch/arm64/include/asm/thread_info.h |  1 +
+ arch/arm64/kernel/fpsimd.c           | 50 ++++++++++++++++++++----------------
+ 2 files changed, 29 insertions(+), 22 deletions(-)
 
-diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
-index 71b94ee..7dba890 100644
---- a/arch/arm64/include/asm/fpsimd.h
-+++ b/arch/arm64/include/asm/fpsimd.h
-@@ -17,6 +17,7 @@
- #define __ASM_FP_H
+diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
+index 272c32d..a0f5498 100644
+--- a/arch/arm64/include/asm/thread_info.h
++++ b/arch/arm64/include/asm/thread_info.h
+@@ -107,6 +107,7 @@ struct thread_info {
+ #define _TIF_SYSCALL_AUDIT	(1 << TIF_SYSCALL_AUDIT)
+ #define _TIF_SYSCALL_TRACEPOINT	(1 << TIF_SYSCALL_TRACEPOINT)
+ #define _TIF_SECCOMP		(1 << TIF_SECCOMP)
++#define _TIF_SVE		(1 << TIF_SVE)
+ #define _TIF_UPROBE		(1 << TIF_UPROBE)
+ #define _TIF_32BIT		(1 << TIF_32BIT)
  
- #include <asm/ptrace.h>
-+#include <asm/errno.h>
- 
- #ifndef __ASSEMBLY__
- 
-@@ -107,12 +108,27 @@ extern void fpsimd_sync_to_sve(struct task_struct *task);
- extern void sve_sync_to_fpsimd(struct task_struct *task);
- extern void sve_sync_from_fpsimd_zeropad(struct task_struct *task);
- 
-+extern int sve_set_task_vl(struct task_struct *task,
-+			   unsigned long vector_length, unsigned long flags);
-+extern int sve_get_task_vl(struct task_struct *task);
-+
- #else /* ! CONFIG_ARM64_SVE */
- 
- static void __maybe_unused sve_sync_to_fpsimd(struct task_struct *task) { }
- static void __maybe_unused sve_sync_from_fpsimd_zeropad(
- 	struct task_struct *task) { }
- 
-+static int __maybe_unused sve_set_task_vl(struct task_struct *task,
-+	unsigned long vector_length, unsigned long flags)
-+{
-+	return -EINVAL;
-+}
-+
-+static int __maybe_unused sve_get_task_vl(struct task_struct *task)
-+{
-+	return -EINVAL;
-+}
-+
- #endif /* ! CONFIG_ARM64_SVE */
- 
- #endif
-diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
-index c97b8bd..865c279 100644
---- a/arch/arm64/include/asm/processor.h
-+++ b/arch/arm64/include/asm/processor.h
-@@ -189,4 +189,8 @@ static inline void spin_lock_prefetch(const void *ptr)
- int cpu_enable_pan(void *__unused);
- int cpu_enable_cache_maint_trap(void *__unused);
- 
-+#define SVE_SET_VL(task, vector_length, flags) \
-+	sve_set_task_vl(task, vector_length, flags)
-+#define SVE_GET_VL(task) sve_get_task_vl(task)
-+
- #endif /* __ASM_PROCESSOR_H */
 diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-index ee59325..4102d13 100644
+index 260438d..5fb5585 100644
 --- a/arch/arm64/kernel/fpsimd.c
 +++ b/arch/arm64/kernel/fpsimd.c
-@@ -204,6 +204,19 @@ void do_sve_acc(unsigned int esr, struct pt_regs *regs)
- 	task_fpsimd_load(current);
+@@ -37,6 +37,9 @@
+ #define FPEXC_IXF	(1 << 4)
+ #define FPEXC_IDF	(1 << 7)
+ 
++/* Forward declarations for local functions used by both SVE and FPSIMD */
++static void task_fpsimd_load(struct task_struct *task);
++
+ /*
+  * In order to reduce the number of times the FPSIMD state is needlessly saved
+  * and restored, we need to keep track of two things:
+@@ -151,18 +154,20 @@ static void sve_to_fpsimd(struct task_struct *task)
+ 
+ void do_sve_acc(unsigned int esr, struct pt_regs *regs)
+ {
+-	unsigned long tmp;
++	if (test_and_set_thread_flag(TIF_SVE)) {
++		unsigned long tmp;
+ 
+-	if (test_and_set_thread_flag(TIF_SVE))
++		asm ("mrs %0, cpacr_el1" : "=r" (tmp));
++
++		printk(KERN_INFO "%s: Strange, ZEN=%u\n",
++		       __func__, (unsigned int)((tmp >> 16) & 3));
+ 		BUG();
++	}
+ 
+ 	BUG_ON(is_compat_task());
+ 
+ 	fpsimd_to_sve(current);
+-
+-	asm ("mrs %0, cpacr_el1" : "=r" (tmp));
+-	asm volatile ("msr cpacr_el1, %0" :: "r" (tmp | (1 << 17)));
+-	/* Serialised by exception return to user */
++	task_fpsimd_load(current);
  }
  
-+/* PR_SVE_SET_VL */
-+int sve_set_task_vl(struct task_struct *task,
-+		    unsigned long vector_length, unsigned long flags)
-+{
-+	return -EINVAL;
-+}
-+
-+/* PR_SVE_GET_VL */
-+int sve_get_task_vl(struct task_struct *task)
-+{
-+	return -EINVAL;
-+}
-+
  #else /* ! CONFIG_ARM64_SVE */
- 
- /* Dummy declarations for usage protected with IS_ENABLED(CONFIG_ARM64_SVE): */
-diff --git a/include/uapi/linux/prctl.h b/include/uapi/linux/prctl.h
-index a8d0759..e32e2da 100644
---- a/include/uapi/linux/prctl.h
-+++ b/include/uapi/linux/prctl.h
-@@ -197,4 +197,8 @@ struct prctl_mm_map {
- # define PR_CAP_AMBIENT_LOWER		3
- # define PR_CAP_AMBIENT_CLEAR_ALL	4
- 
-+/* arm64 Scalable Vector Extension controls */
-+#define PR_SVE_SET_VL			48	/* set task vector length */
-+#define PR_SVE_GET_VL			49	/* get task vector length */
+@@ -220,6 +225,23 @@ static void task_fpsimd_load(struct task_struct *task)
+ 			       &task->thread.fpsimd_state.fpsr);
+ 	else
+ 		fpsimd_load_state(&task->thread.fpsimd_state);
 +
- #endif /* _LINUX_PRCTL_H */
-diff --git a/kernel/sys.c b/kernel/sys.c
-index 7ff6d1b..ea5d37e 100644
---- a/kernel/sys.c
-+++ b/kernel/sys.c
-@@ -110,6 +110,12 @@
- #ifndef SET_FP_MODE
- # define SET_FP_MODE(a,b)	(-EINVAL)
- #endif
-+#ifndef SVE_SET_VL
-+# define SVE_SET_VL(a,b,c)	(-EINVAL)
-+#endif
-+#ifndef SVE_GET_VL
-+# define SVE_GET_VL(a)		(-EINVAL)
-+#endif
++	/*
++	 * Flip SVE enable for userspace if it doesn't match the
++	 * current_task.
++	 */
++	if (IS_ENABLED(CONFIG_ARM64_SVE) && (elf_hwcap & HWCAP_SVE)) {
++		unsigned int tmp, flags;
++
++		asm ("mrs %0, cpacr_el1" : "=r" (tmp));
++		flags = task_thread_info(task)->flags;
++		BUILD_BUG_ON(_TIF_SVE != CPACR_EL1_ZEN_EL0EN);
++		if ((tmp ^ (unsigned long)flags) & _TIF_SVE) {
++			tmp ^= _TIF_SVE;
++			asm volatile ("msr cpacr_el1, %0" :: "r" (tmp));
++			/* Serialised by exception return to user */
++		}
++	}
+ }
  
- /*
-  * this is where the system-wide overflow UID and GID are defined, for
-@@ -2290,6 +2296,12 @@ SYSCALL_DEFINE5(prctl, int, option, unsigned long, arg2, unsigned long, arg3,
- 	case PR_GET_FP_MODE:
- 		error = GET_FP_MODE(me);
- 		break;
-+	case PR_SVE_SET_VL:
-+		error = SVE_SET_VL(me, arg2, arg3);
-+		break;
-+	case PR_SVE_GET_VL:
-+		error = SVE_GET_VL(me);
-+		break;
- 	default:
- 		error = -EINVAL;
- 		break;
+ static void task_fpsimd_save(struct task_struct *task)
+@@ -323,27 +345,11 @@ void fpsimd_restore_current_state(void)
+ 		return;
+ 	preempt_disable();
+ 	if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE)) {
+-		unsigned long tmp;
+-		unsigned long flags;
+-
+ 		struct fpsimd_state *st = &current->thread.fpsimd_state;
+ 
+ 		task_fpsimd_load(current);
+ 		this_cpu_write(fpsimd_last_state, st);
+ 		st->cpu = smp_processor_id();
+-
+-		if (IS_ENABLED(CONFIG_ARM64_SVE)) {
+-			/*
+-			 * Flip SVE enable for userspace if it doesn't
+-			 * match the current_task.
+-			 */
+-			asm ("mrs %0, cpacr_el1" : "=r" (tmp));
+-			flags = current_thread_info()->flags;
+-			if ((tmp ^ (unsigned long)flags) & (1 << 17)) {
+-				tmp ^= 1 << 17;
+-				asm volatile ("msr cpacr_el1, %0" :: "r" (tmp));
+-			}
+-		}
+ 	}
+ 	preempt_enable();
+ }
 -- 
 2.1.4
