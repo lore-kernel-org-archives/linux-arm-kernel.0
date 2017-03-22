@@ -1,53 +1,55 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Wed, 22 Mar 2017 11:18:52 +0100
-Subject: [PATCH v4 0/3] meson-gx: Add mali-450 support
-Message-ID: <1490177935-9646-1-git-send-email-narmstrong@baylibre.com>
+Date: Wed, 22 Mar 2017 11:18:53 +0100
+Subject: [PATCH v4 1/3] clk: meson-gxbb: Add MALI clock IDS
+In-Reply-To: <1490177935-9646-1-git-send-email-narmstrong@baylibre.com>
+References: <1490177935-9646-1-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1490177935-9646-2-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since the merge of the Mali dt bindings at [1], add support for Mali clocks
-and DT node.
+Add missing MALI clock IDs and expose the muxes and gates in the dt-bindings.
 
-The Mali is clocked by two identical clock paths behind a glitch free mux
-to safely change frequency while running.
-So these clocks must be added to the meson-gxbb clock controller.
+Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+---
+ drivers/clk/meson/gxbb.h              | 9 ++++++++-
+ include/dt-bindings/clock/gxbb-clkc.h | 5 +++++
+ 2 files changed, 13 insertions(+), 1 deletion(-)
 
-Changes since v3 at [7] :
- - Removed CLK_IGNORE_UNUSED on mali clocks
-
-Changes since v2 at [5] :
- - Rebased on v2 Audio Clocks patchset from Jerome Brunet at [6]
- - Marked parents names list as static
- - Reworded patch 3 commit message
-
-Changes since v1 at [2] :
- - Remove GP0 fixes, this will pushed later, for base frequency it can depend on fclk_div3
- - Add GXL support
- - rebase on clk-next and jbrunet's patchset at [3] and [4]
- - get rid of composite clocks, this adds more clocks IDs and exposes 2 more clocks
-
-[7] http://lkml.kernel.org/r/1489064027-18004-1-git-send-email-narmstrong at baylibre.com
-[6] http://lkml.kernel.org/r/20170309104154.28295-1-jbrunet at baylibre.com
-[5] http://lkml.kernel.org/r/1488365164-22861-1-git-send-email-narmstrong at baylibre.com
-[4] http://lkml.kernel.org/r/20170228093016.5624-1-jbrunet at baylibre.com
-[3] http://lkml.kernel.org/r/20170228133002.17894-1-jbrunet at baylibre.com
-[2] http://lkml.kernel.org/r/1486721084-1383-1-git-send-email-narmstrong at baylibre.com
-[1] http://lkml.kernel.org/r/b098c4fa9fce88361cca20417978734d0e1b5cca.1485939041.git-series.maxime.ripard at free-electrons.com
-
-Neil Armstrong (3):
-  clk: meson-gxbb: Add MALI clock IDS
-  clk: meson-gxbb: Add MALI clocks
-  ARM64: dts: meson-gx: Add MALI nodes for GXBB and GXL
-
- arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi      |  37 ++++++
- arch/arm64/boot/dts/amlogic/meson-gxl-mali.dtsi  |  43 +++++++
- arch/arm64/boot/dts/amlogic/meson-gxl-s905d.dtsi |   1 +
- arch/arm64/boot/dts/amlogic/meson-gxl-s905x.dtsi |   1 +
- drivers/clk/meson/gxbb.c                         | 139 +++++++++++++++++++++++
- drivers/clk/meson/gxbb.h                         |   9 +-
- include/dt-bindings/clock/gxbb-clkc.h            |   5 +
- 7 files changed, 234 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxl-mali.dtsi
-
+diff --git a/drivers/clk/meson/gxbb.h b/drivers/clk/meson/gxbb.h
+index 274f587..73efdc3 100644
+--- a/drivers/clk/meson/gxbb.h
++++ b/drivers/clk/meson/gxbb.h
+@@ -268,8 +268,15 @@
+ /* CLKID_SAR_ADC_CLK */
+ /* CLKID_SAR_ADC_SEL */
+ #define CLKID_SAR_ADC_DIV	  99
++/* CLKID_MALI_0_SEL */
++#define CLKID_MALI_0_DIV	 101
++/* CLKID_MALI_0	*/
++/* CLKID_MALI_1_SEL */
++#define CLKID_MALI_1_DIV	 104
++/* CLKID_MALI_1	*/
++/* CLKID_MALI	*/
+ 
+-#define NR_CLKS			  100
++#define NR_CLKS			  107
+ 
+ /* include the CLKIDs that have been made part of the stable DT binding */
+ #include <dt-bindings/clock/gxbb-clkc.h>
+diff --git a/include/dt-bindings/clock/gxbb-clkc.h b/include/dt-bindings/clock/gxbb-clkc.h
+index f08f06d..ef7d6b7 100644
+--- a/include/dt-bindings/clock/gxbb-clkc.h
++++ b/include/dt-bindings/clock/gxbb-clkc.h
+@@ -35,5 +35,10 @@
+ #define CLKID_SD_EMMC_C		96
+ #define CLKID_SAR_ADC_CLK	97
+ #define CLKID_SAR_ADC_SEL	98
++#define CLKID_MALI_0_SEL	100
++#define CLKID_MALI_0		102
++#define CLKID_MALI_1_SEL	103
++#define CLKID_MALI_1		105
++#define CLKID_MALI		106
+ 
+ #endif /* __GXBB_CLKC_H */
 -- 
 1.9.1
