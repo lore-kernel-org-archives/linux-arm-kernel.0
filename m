@@ -1,114 +1,59 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 22 Mar 2017 12:54:50 +0100
-Subject: [PATCH 3/6] pinctrl: armada-37xx: Add gpio support
-In-Reply-To: <CACRpkdY_68=5oBN3TLs_ohc0gc2=yiG3qizg7MGh4F7Z+-ZzSg@mail.gmail.com>
- (Linus Walleij's message of "Fri, 30 Dec 2016 09:51:51 +0100")
-References: <20161222172501.16121-1-gregory.clement@free-electrons.com>
- <20161222172501.16121-4-gregory.clement@free-electrons.com>
- <CACRpkdY_68=5oBN3TLs_ohc0gc2=yiG3qizg7MGh4F7Z+-ZzSg@mail.gmail.com>
-Message-ID: <874lylfrw5.fsf@free-electrons.com>
+From: liviu.dudau@arm.com (Liviu Dudau)
+Date: Wed, 22 Mar 2017 11:56:18 +0000
+Subject: [PATCH 13/15] arm64: dts: juno: fix PCI bus dtc warnings
+In-Reply-To: <20170322020313.24338-13-robh@kernel.org>
+References: <20170322020313.24338-1-robh@kernel.org>
+ <20170322020313.24338-13-robh@kernel.org>
+Message-ID: <20170322115618.GD6816@e110455-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
- 
- On ven., d?c. 30 2016, Linus Walleij <linus.walleij@linaro.org> wrote:
+Hi Rob,
 
-> On Thu, Dec 22, 2016 at 6:24 PM, Gregory CLEMENT
-> <gregory.clement@free-electrons.com> wrote:
->
->> GPIO management is pretty simple and is part of the same IP than the pin
->> controller for the Armada 37xx SoCs.  This patch adds the GPIO support to
->> the pinctrl-armada-37xx.c file, it also allows sharing common functions
->> between the gpiolib and the pinctrl drivers.
->>
->> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
->
-> Some remarks:
->
->> +static int armada_37xx_gpio_get_direction(struct gpio_chip *chip,
->> +                                         unsigned int offset)
->> +{
->> +       struct armada_37xx_pinctrl *info = gpiochip_get_data(chip);
->> +       unsigned int reg = OUTPUT_EN;
->> +       unsigned int val, mask;
->> +
->> +       if (offset >= GPIO_PER_REG) {
->> +               offset -= GPIO_PER_REG;
->> +               reg += sizeof(u32);
->> +       }
->
-> Add a comment saying we never have more than two registers?
-> If there would be three registers this would fail, right?
+On Tue, Mar 21, 2017 at 09:03:11PM -0500, Rob Herring wrote:
+> dtc recently added PCI bus checks. Fix these warnings.
 
-I added the comment
+Was not aware of the warnings and the commit message doesn't quote
+them, but the change looks trivial. So:
 
->
->> +       mask = BIT(offset);
->> +
->> +       regmap_read(info->regmap, reg, &val);
->>
->> +       return (val & mask) == 0;
->
-> Use this:
->
-> return !(val & mask);
+Acked-by: Liviu Dudau <liviu.dudau@arm.com>
 
-done but I could tou explain the advantage of doing it?
+Thanks for fixing this!
+Liviu
 
->
->> +static int armada_37xx_gpio_get(struct gpio_chip *chip, unsigned int offset)
->> +{
->> +       struct armada_37xx_pinctrl *info = gpiochip_get_data(chip);
->> +       unsigned int reg = INPUT_VAL;
->> +       unsigned int val, mask;
->> +
->> +       if (offset >= GPIO_PER_REG) {
->> +               offset -= GPIO_PER_REG;
->> +               reg += sizeof(u32);
->> +       }
->> +       mask = BIT(offset);
->
-> This code is repeating. Break out a static (inline?) helper to do
-> this.
-
-done
-
->
->> +static int armada_37xx_gpiolib_register(struct platform_device *pdev,
->> +                                       struct armada_37xx_pinctrl *info)
->
-> Nit: gpiochip_register or so is more to the point.
->
->> +       ret = gpiochip_add_pin_range(&info->gpio_chip, dev_name(dev), 0,
->> +                                    pinbase, info->data->nr_pins);
->> +       if (ret)
->> +               return ret;
->
-> Why do you do this?
->
-> Why not just put the ranges into the device tree? We already support
-> this in the gpiolib core and it is helpful.
->
-> See Documentation/devicetree/bindings/gpio/gpio.txt
-> and other DTS files for gpio-ranges.
-
-Following your review, I tried to use it but it didn't work for
-me. When the second pin controller was probed then there was collision
-for the gpio number. I tried several combination without any luck.
-
-So for now I left it aside.
-
-I can show you the errors message I get and the binding I used if you
-are interested.
-
-
-Thanks,
-
-Gregory
+> 
+> Signed-off-by: Rob Herring <robh@kernel.org>
+> Cc: Liviu Dudau <liviu.dudau@arm.com>
+> Cc: Sudeep Holla <sudeep.holla@arm.com>
+> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> ---
+> 
+>  arch/arm64/boot/dts/arm/juno-base.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/boot/dts/arm/juno-base.dtsi b/arch/arm64/boot/dts/arm/juno-base.dtsi
+> index df539e865b90..8ffaff2043d0 100644
+> --- a/arch/arm64/boot/dts/arm/juno-base.dtsi
+> +++ b/arch/arm64/boot/dts/arm/juno-base.dtsi
+> @@ -428,7 +428,7 @@
+>  		};
+>  	};
+>  
+> -	pcie_ctlr: pcie-controller at 40000000 {
+> +	pcie_ctlr: pcie at 40000000 {
+>  		compatible = "arm,juno-r1-pcie", "plda,xpressrich3-axi", "pci-host-ecam-generic";
+>  		device_type = "pci";
+>  		reg = <0 0x40000000 0 0x10000000>;	/* ECAM config space */
+> -- 
+> 2.10.1
+> 
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
