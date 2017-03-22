@@ -1,48 +1,40 @@
 From: zyw@rock-chips.com (Chris Zhong)
-Date: Wed, 22 Mar 2017 09:54:51 +0800
-Subject: [PATCH v4 4/4] drm/rockchip/dsi: correct the grf_switch_reg name
+Date: Wed, 22 Mar 2017 09:54:49 +0800
+Subject: [PATCH v4 2/4] dt-bindings: add the grf clock for dw-mipi-dsi
 In-Reply-To: <1490147691-4489-1-git-send-email-zyw@rock-chips.com>
 References: <1490147691-4489-1-git-send-email-zyw@rock-chips.com>
-Message-ID: <1490147691-4489-5-git-send-email-zyw@rock-chips.com>
+Message-ID: <1490147691-4489-3-git-send-email-zyw@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For the RK3399, the grf_switch_reg name should be RK3399_GRF_SOC_CON20,
-not RK3399_GRF_SOC_CON19.
+For RK3399, the grf clock should be controlled by dw-mipi-dsi driver,
+add the description for this clock.
 
 Signed-off-by: Chris Zhong <zyw@rock-chips.com>
-Reviewed-by: Brian Norris <briannorris@chromium.org>
 Reviewed-by: Sean Paul <seanpaul@chromium.org>
 ---
 
-Changes in v4: None
+Changes in v4:
+- remove "additional"
+
 Changes in v3: None
 Changes in v2: None
 
- drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ .../devicetree/bindings/display/rockchip/dw_mipi_dsi_rockchip.txt       | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-index dc8fd22..3aedcba 100644
---- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-+++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-@@ -34,7 +34,7 @@
- #define RK3288_DSI0_SEL_VOP_LIT		BIT(6)
- #define RK3288_DSI1_SEL_VOP_LIT		BIT(9)
- 
--#define RK3399_GRF_SOC_CON19		0x6250
-+#define RK3399_GRF_SOC_CON20		0x6250
- #define RK3399_DSI0_SEL_VOP_LIT		BIT(0)
- #define RK3399_DSI1_SEL_VOP_LIT		BIT(4)
- 
-@@ -1151,7 +1151,7 @@ static struct dw_mipi_dsi_plat_data rk3288_mipi_dsi_drv_data = {
- static struct dw_mipi_dsi_plat_data rk3399_mipi_dsi_drv_data = {
- 	.dsi0_en_bit = RK3399_DSI0_SEL_VOP_LIT,
- 	.dsi1_en_bit = RK3399_DSI1_SEL_VOP_LIT,
--	.grf_switch_reg = RK3399_GRF_SOC_CON19,
-+	.grf_switch_reg = RK3399_GRF_SOC_CON20,
- 	.grf_dsi0_mode = RK3399_GRF_DSI_MODE,
- 	.grf_dsi0_mode_reg = RK3399_GRF_SOC_CON22,
- 	.flags = DW_MIPI_NEEDS_PHY_CFG_CLK | DW_MIPI_NEEDS_GRF_CLK,
+diff --git a/Documentation/devicetree/bindings/display/rockchip/dw_mipi_dsi_rockchip.txt b/Documentation/devicetree/bindings/display/rockchip/dw_mipi_dsi_rockchip.txt
+index 188f6f7..1d722f5 100644
+--- a/Documentation/devicetree/bindings/display/rockchip/dw_mipi_dsi_rockchip.txt
++++ b/Documentation/devicetree/bindings/display/rockchip/dw_mipi_dsi_rockchip.txt
+@@ -10,7 +10,7 @@ Required properties:
+ - interrupts: Represent the controller's interrupt to the CPU(s).
+ - clocks, clock-names: Phandles to the controller's pll reference
+   clock(ref) and APB clock(pclk). For RK3399, a phy config clock
+-  (phy_cfg) is additional required. As described in [1].
++  (phy_cfg) and a grf clock(grf) are required. As described in [1].
+ - rockchip,grf: this soc should set GRF regs to mux vopl/vopb.
+ - ports: contain a port node with endpoint definitions as defined in [2].
+   For vopb,set the reg = <0> and set the reg = <1> for vopl.
 -- 
 2.6.3
