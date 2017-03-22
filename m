@@ -1,92 +1,77 @@
-From: dingtianhong@huawei.com (Ding Tianhong)
-Date: Wed, 22 Mar 2017 21:56:04 +0800
-Subject: [PATCH v2 00/18] clocksource/arch_timer: Errata workaround
- infrastructure rework
-In-Reply-To: <20170320174829.28182-1-marc.zyngier@arm.com>
-References: <20170320174829.28182-1-marc.zyngier@arm.com>
-Message-ID: <ae4efcb5-bd0a-5ee2-3fa1-41874b7dc85e@huawei.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 22 Mar 2017 14:01:32 +0000
+Subject: [PATCH 2/7] arm64: hugetlb: Cleanup setup_hugepagesz
+In-Reply-To: <20170321180421.18332-3-punit.agrawal@arm.com>
+References: <20170321180421.18332-1-punit.agrawal@arm.com>
+ <20170321180421.18332-3-punit.agrawal@arm.com>
+Message-ID: <20170322140132.GC2977@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tested-by: Ding Tianhong <dingtianhong@huawei.com>
+On Tue, Mar 21, 2017 at 06:04:16PM +0000, Punit Agrawal wrote:
+> From: Steve Capper <steve.capper@arm.com>
+> 
+> Replace a lot of if statements with switch and case labels to make it
+> much clearer which huge page sizes are supported.
+> 
+> Also, we prevent PUD_SIZE from being used on systems not running with
+> 4KB PAGE_SIZE. Before if one supplied PUD_SIZE in these circumstances,
+> then unusuable huge page sizes would be in use.
+> 
+> Fixes: 084bd29810a5 ("ARM64: mm: HugeTLB support.")
+> Cc: David Woods <dwoods@mellanox.com>
+> Signed-off-by: Steve Capper <steve.capper@arm.com>
+> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
 
-On 2017/3/21 1:48, Marc Zyngier wrote:
-> It has recently become obvious that a number of arm64 systems have
-> been blessed with a set of timers that are slightly less than perfect,
-> and require a bit of hand-holding. We already have a bunch of
-> errata-specific code to deal with this, but as we're adding more
-> potential detection methods (DT, ACPI, capability), things are getting
-> a bit out of hands.
+Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+
+I assume this'll get a cc stable to ensure backport.
+
+Thanks,
+Mark.
+
+> ---
+>  arch/arm64/mm/hugetlbpage.c | 26 +++++++++++++-------------
+>  1 file changed, 13 insertions(+), 13 deletions(-)
 > 
-> Instead of adding more ad-hoc fixes to an already difficult code base,
-> let's give ourselves a bit of an infrastructure that can deal with
-> this and hide most of the uggliness behind frendly accessors.
-> 
-> The series is structured as such:
-> 
-> - A bunch of arm64 specific patches that allow the rest of the
->   workaround infrastructure to be built upon (such as being able to
->   trap userspace access to the virtual counter). These are now
->   separate in order to allow the creation of a shared branch between
->   the arm64 and clocksource trees.
-> 
-> - The following patches rework the existing workarounds, allowing
->   errata to be matched using a given detection method
-> 
-> - Another patch allows a workaround to affect a subset of the CPUs,
->   and not the whole system
-> 
-> - We then work around a Cortex-A73 erratum, whose counter can return a
->   wrong value if read while crossing a 32bit boundary
-> 
-> - Finally, we add some ACPI-specific workarounds for HiSilicon
->   platforms that have the HISILICON_ERRATUM_161010101 defect.
-> 
-> Note that so far, we only deal with arm64. Once the infrastructure is
-> agreed upon, we can look at generalizing it (to some extent) to 32bit
-> ARM (typical use case would be a 32bit guest running on an affected
-> host).
-> 
-> * From v1:
->   - Addressed Hanjun and Mark review comments
->   - Moved arm64 specific patches to the beginning of the series,
->     leaving the clocksource patches at the end, resulting in an extra
->     patch.
->   - Added RBs, TBs, and Acks.
-> 
-> Marc Zyngier (18):
->   arm64: Allow checking of a CPU-local erratum
->   arm64: Add CNTVCT_EL0 trap handler
->   arm64: Define Cortex-A73 MIDR
->   arm64: cpu_errata: Allow an erratum to be match for all revisions of a
->     core
->   arm64: cpu_errata: Add capability to advertise Cortex-A73 erratum
->     858921
->   arm64: arch_timer: Add infrastructure for multiple erratum detection
->     methods
->   arm64: arch_timer: Add erratum handler for globally defined capability
->   arm64: arch_timer: Add erratum handler for CPU-specific capability
->   arm64: arch_timer: Move arch_timer_reg_read/write around
->   arm64: arch_timer: Get rid of erratum_workaround_set_sne
->   arm64: arch_timer: Rework the set_next_event workarounds
->   arm64: arch_timer: Make workaround methods optional
->   arm64: arch_timer: Allows a CPU-specific erratum to only affect a
->     subset of CPUs
->   arm64: arch_timer: Move clocksource_counter and co around
->   arm64: arch_timer: Enable CNTVCT_EL0 trap if workaround is enabled
->   arm64: arch_timer: Workaround for Cortex-A73 erratum 858921
->   arm64: arch_timer: Allow erratum matching with ACPI OEM information
->   arm64: arch_timer: Add HISILICON_ERRATUM_161010101 ACPI matching data
-> 
->  Documentation/arm64/silicon-errata.txt |   1 +
->  arch/arm64/include/asm/arch_timer.h    |  44 ++-
->  arch/arm64/include/asm/cpucaps.h       |   3 +-
->  arch/arm64/include/asm/cputype.h       |   2 +
->  arch/arm64/include/asm/esr.h           |   2 +
->  arch/arm64/kernel/cpu_errata.c         |  15 +
->  arch/arm64/kernel/cpufeature.c         |  13 +-
->  arch/arm64/kernel/traps.c              |  14 +
->  drivers/clocksource/Kconfig            |  11 +
->  drivers/clocksource/arm_arch_timer.c   | 535 +++++++++++++++++++++++----------
->  10 files changed, 471 insertions(+), 169 deletions(-)
+> diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
+> index a686f8705ef3..aacbe18e6640 100644
+> --- a/arch/arm64/mm/hugetlbpage.c
+> +++ b/arch/arm64/mm/hugetlbpage.c
+> @@ -296,20 +296,20 @@ static __init int setup_hugepagesz(char *opt)
+>  {
+>  	unsigned long ps = memparse(opt, &opt);
+>  
+> -	if (ps == PMD_SIZE) {
+> -		hugetlb_add_hstate(PMD_SHIFT - PAGE_SHIFT);
+> -	} else if (ps == PUD_SIZE) {
+> -		hugetlb_add_hstate(PUD_SHIFT - PAGE_SHIFT);
+> -	} else if (ps == (PAGE_SIZE * CONT_PTES)) {
+> -		hugetlb_add_hstate(CONT_PTE_SHIFT);
+> -	} else if (ps == (PMD_SIZE * CONT_PMDS)) {
+> -		hugetlb_add_hstate((PMD_SHIFT + CONT_PMD_SHIFT) - PAGE_SHIFT);
+> -	} else {
+> -		hugetlb_bad_size();
+> -		pr_err("hugepagesz: Unsupported page size %lu K\n", ps >> 10);
+> -		return 0;
+> +	switch (ps) {
+> +#ifdef CONFIG_ARM64_4K_PAGES
+> +	case PUD_SIZE:
+> +#endif
+> +	case PMD_SIZE * CONT_PMDS:
+> +	case PMD_SIZE:
+> +	case PAGE_SIZE * CONT_PTES:
+> +		hugetlb_add_hstate(ilog2(ps) - PAGE_SHIFT);
+> +		return 1;
+>  	}
+> -	return 1;
+> +
+> +	hugetlb_bad_size();
+> +	pr_err("hugepagesz: Unsupported page size %lu K\n", ps >> 10);
+> +	return 0;
+>  }
+>  __setup("hugepagesz=", setup_hugepagesz);
+>  
+> -- 
+> 2.11.0
 > 
