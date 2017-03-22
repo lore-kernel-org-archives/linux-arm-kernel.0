@@ -1,67 +1,73 @@
-From: jnair@caviumnetworks.com (Jayachandran C)
-Date: Wed, 22 Mar 2017 08:51:11 +0000
-Subject: [PATCH v3 2/2] PCI: quirks: Fix ThunderX2 dma alias handling
-In-Reply-To: <1490172671-2648-1-git-send-email-jnair@caviumnetworks.com>
-References: <1490172671-2648-1-git-send-email-jnair@caviumnetworks.com>
-Message-ID: <1490172671-2648-3-git-send-email-jnair@caviumnetworks.com>
+From: sramana@codeaurora.org (Srinivas Ramana)
+Date: Wed, 22 Mar 2017 14:25:43 +0530
+Subject: [PATCH] arm64: kaslr: Add 2MB correction for aligning kernel image
+Message-ID: <1490172943-826-1-git-send-email-sramana@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jayachandran C <jchandra@broadcom.com>
+From: Neeraj Upadhyay <neeraju@codeaurora.org>
 
-The Cavium ThunderX2 arm64 SoCs (called Broadcom Vulcan earlier), the PCI
-topology is slightly unusual. For a multi-node system, it looks like:
+If kernel image extends across alignment boundary, existing
+code increases the KASLR offset by size of kernel image. The
+offset is masked after resizing. There are cases, where after
+masking, we may still have kernel image extending across
+boundary. This eventually results in only 2MB block getting
+mapped while creating the page tables. This results in data aborts
+while accessing unmapped regions during second relocation (with
+kaslr offset) in __primary_switch. To fix this problem, add a
+2MB correction to offset along with the correction of kernel
+image size, before applying mask.
 
-[node level PCI bridges - one per node]
-    [SoC PCI devices with MSI-X but no IOMMU]
-    [PCI-PCIe "glue" bridges - upto 14, one per real bridge below]
-        [PCIe real root ports associated with IOMMU and GICv3 ITS]
-            [External PCI devices connected to PCIe links]
+For example consider below case, where kernel image still crosses
+1GB alignment boundary, after masking the offset, which is fixed
+by adding 2MB correction.
 
-The top two levels of bridges should have introduced aliases since they
-are PCI and PCI/PCIe bridges, but in the case of ThunderX2 they do not.
-In the case of external PCIe devices, the "real" root ports are connected
-to the SMMU and the GIC ITS, so there is no aliases. The SoC PCI devices
-are directly connected to the GIC ITS and the bridges do not introduce
-an alias either.
+SWAPPER_TABLE_SHIFT = 30
+Swapper using section maps with section size 2MB.
+CONFIG_PGTABLE_LEVELS = 3
+VA_BITS = 39
 
-To handle this quirk, we mark the real PCIe root ports and node level
-PCIe bridges with the flag PCI_DEV_FLAGS_BRIDGE_XLATE_ROOT.  With this,
-pci_for_each_dma_alias() works correctly for external PCIe devices and
-SoC PCI devices.
+_text  : 0xffffff8008080000
+_end   : 0xffffff800aa1b000
+offset : 0x1f35600000
+mask = ((1UL << (VA_BITS - 2)) - 1) & ~(SZ_2M - 1)
 
-For the current revision of Cavium ThunderX2, the VendorID and Device ID
-are from Broadcom Vulcan (14e4:90XX).
+(_text + offset) >> SWAPPER_TABLE_SHIFT = 0x3fffffe7c
+(_end + offset) >> SWAPPER_TABLE_SHIFT  = 0x3fffffe7d
 
-Signed-off-by: Jayachandran C <jnair@caviumnetworks.com>
+offset after existing correction (before mask) = 0x1f37f9b000
+(_text + offset) >> SWAPPER_TABLE_SHIFT = 0x3fffffe7d
+(_end + offset) >> SWAPPER_TABLE_SHIFT  = 0x3fffffe7d
+
+offset (after mask) = 0x1f37e00000
+(_text + offset) >> SWAPPER_TABLE_SHIFT = 0x3fffffe7c
+(_end + offset) >> SWAPPER_TABLE_SHIFT  = 0x3fffffe7d
+
+new offset w/ 2MB correction (before mask) = 0x1f37819b00
+new offset w/ 2MB correction (after mask) = 0x1f38000000
+(_text + offset) >> SWAPPER_TABLE_SHIFT = 0x3fffffe7d
+(_end + offset) >> SWAPPER_TABLE_SHIFT  = 0x3fffffe7d
+
+Fixes: f80fb3a3d508 ("arm64: add support for kernel ASLR")
+Signed-off-by: Neeraj Upadhyay <neeraju@codeaurora.org>
+Signed-off-by: Srinivas Ramana <sramana@codeaurora.org>
 ---
- drivers/pci/quirks.c | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+ arch/arm64/kernel/kaslr.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/pci/quirks.c b/drivers/pci/quirks.c
-index 6736836..564a84a 100644
---- a/drivers/pci/quirks.c
-+++ b/drivers/pci/quirks.c
-@@ -3958,6 +3958,20 @@ DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL, 0x2260, quirk_mic_x200_dma_alias);
- DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL, 0x2264, quirk_mic_x200_dma_alias);
+diff --git a/arch/arm64/kernel/kaslr.c b/arch/arm64/kernel/kaslr.c
+index 769f24ef628c..7b8af985e497 100644
+--- a/arch/arm64/kernel/kaslr.c
++++ b/arch/arm64/kernel/kaslr.c
+@@ -135,7 +135,7 @@ u64 __init kaslr_early_init(u64 dt_phys, u64 modulo_offset)
+ 	 */
+ 	if ((((u64)_text + offset + modulo_offset) >> SWAPPER_TABLE_SHIFT) !=
+ 	    (((u64)_end + offset + modulo_offset) >> SWAPPER_TABLE_SHIFT))
+-		offset = (offset + (u64)(_end - _text)) & mask;
++		offset = (offset + (u64)(_end - _text) + SZ_2M) & mask;
  
- /*
-+ * The IOMMU and interrupt controller on Broadcom Vulcan/Cavium ThunderX2 are
-+ * associated not at the root bus, but at a bridge below. This quirk flag
-+ * will ensure that the aliases are identified correctly.
-+ */
-+static void quirk_bridge_cavm_thrx2_pcie_root(struct pci_dev *pdev)
-+{
-+	pdev->dev_flags |= PCI_DEV_FLAGS_BRIDGE_XLATE_ROOT;
-+}
-+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_BROADCOM, 0x9000,
-+				quirk_bridge_cavm_thrx2_pcie_root);
-+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_BROADCOM, 0x9084,
-+				quirk_bridge_cavm_thrx2_pcie_root);
-+
-+/*
-  * Intersil/Techwell TW686[4589]-based video capture cards have an empty (zero)
-  * class code.  Fix it.
-  */
+ 	if (IS_ENABLED(CONFIG_KASAN))
+ 		/*
 -- 
-2.7.4
+Qualcomm India Private Limited, on behalf of Qualcomm Innovation Center, Inc., 
+is a member of Code Aurora Forum, a Linux Foundation Collaborative Project.
