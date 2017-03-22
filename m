@@ -1,211 +1,314 @@
-From: adrian.hunter@intel.com (Adrian Hunter)
-Date: Wed, 22 Mar 2017 16:47:23 +0200
-Subject: [PATCH v6 10/14] mmc: sdhci-xenon: Add SoC PHY PAD voltage control
-In-Reply-To: <3c21f3f9930373d6e6c28526c2e5b0aa2072daef.1487091464.git-series.gregory.clement@free-electrons.com>
-References: <cover.ff78bebe0384f650a51e5e6f0f1dca6e7894b53b.1487091464.git-series.gregory.clement@free-electrons.com>
- <3c21f3f9930373d6e6c28526c2e5b0aa2072daef.1487091464.git-series.gregory.clement@free-electrons.com>
-Message-ID: <e5aeca29-1e91-8bc7-9d0e-686179f154cc@intel.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 22 Mar 2017 14:50:46 +0000
+Subject: [RFC PATCH v2 16/41] arm64/sve: signal: Add SVE state record to
+ sigcontext
+In-Reply-To: <1490194274-30569-1-git-send-email-Dave.Martin@arm.com>
+References: <1490194274-30569-1-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1490194274-30569-17-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/02/17 19:01, Gregory CLEMENT wrote:
-> From: Hu Ziji <huziji@marvell.com>
-> 
-> Some SoCs have PHY PAD outside Xenon IP.
-> PHY PAD voltage should match signalling voltage in use.
-> 
-> Add generic SoC PHY PAD voltage control interface.
-> Implement Aramda-3700 SoC PHY PAD voltage control.
-> 
-> Signed-off-by: Hu Ziji <huziji@marvell.com>
-> Tested-by: Russell King <rmk+kernel@armlinux.org.uk>
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> ---
->  drivers/mmc/host/sdhci-xenon-phy.c | 116 +++++++++++++++++++++++++++++-
->  drivers/mmc/host/sdhci-xenon.c     |   2 +-
->  drivers/mmc/host/sdhci-xenon.h     |   2 +-
->  3 files changed, 119 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/mmc/host/sdhci-xenon-phy.c b/drivers/mmc/host/sdhci-xenon-phy.c
-> index c26ba3a180a0..c3b7e9a21f6b 100644
-> --- a/drivers/mmc/host/sdhci-xenon-phy.c
-> +++ b/drivers/mmc/host/sdhci-xenon-phy.c
-> @@ -143,6 +143,27 @@ enum phy_type_enum {
->  	NR_PHY_TYPES
->  };
->  
-> +enum soc_pad_ctrl_type {
-> +	SOC_PAD_SD,
-> +	SOC_PAD_FIXED_1_8V,
-> +};
-> +
-> +struct soc_pad_ctrl_table {
-> +	const char *soc;
-> +	void (*set_soc_pad)(struct sdhci_host *host,
-> +			    unsigned char signal_voltage);
-> +};
+This patch adds a record to sigcontext that will contain the SVE
+state.
 
-Is soc_pad_ctrl_table used?
+The sigcontext SVE layout is intentionally the same as the layout
+used internally by the kernel to store the SVE state in
+task_struct, so this patch also uses the new macros to replace
+magic numbers currently used to describe the layout.
 
-> +
-> +struct soc_pad_ctrl {
-> +	/* Register address of SoC PHY PAD ctrl */
-> +	void __iomem	*reg;
-> +	/* SoC PHY PAD ctrl type */
-> +	enum soc_pad_ctrl_type pad_type;
-> +	/* SoC specific operation to set SoC PHY PAD */
-> +	void (*set_soc_pad)(struct sdhci_host *host,
-> +			    unsigned char signal_voltage);
-> +};
-> +
->  static struct xenon_emmc_phy_regs xenon_emmc_5_0_phy_regs = {
->  	.timing_adj	= XENON_EMMC_5_0_PHY_TIMING_ADJUST,
->  	.func_ctrl	= XENON_EMMC_5_0_PHY_FUNC_CONTROL,
-> @@ -176,6 +197,8 @@ struct emmc_phy_params {
->  	u8	nr_tun_times;
->  	/* Divider for calculating Tuning Step */
->  	u8	tun_step_divider;
-> +
-> +	struct soc_pad_ctrl pad_ctrl;
->  };
->  
->  static int alloc_emmc_phy(struct sdhci_xenon_priv *priv)
-> @@ -252,6 +275,45 @@ static int emmc_phy_init(struct sdhci_host *host)
->  	return 0;
->  }
->  
-> +#define ARMADA_3700_SOC_PAD_1_8V	0x1
-> +#define ARMADA_3700_SOC_PAD_3_3V	0x0
-> +
-> +static void armada_3700_soc_pad_voltage_set(struct sdhci_host *host,
-> +					    unsigned char signal_voltage)
-> +{
-> +	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-> +	struct sdhci_xenon_priv *priv = sdhci_pltfm_priv(pltfm_host);
-> +	struct emmc_phy_params *params = priv->phy_params;
-> +
-> +	if (params->pad_ctrl.pad_type == SOC_PAD_FIXED_1_8V) {
-> +		writel(ARMADA_3700_SOC_PAD_1_8V, params->pad_ctrl.reg);
-> +	} else if (params->pad_ctrl.pad_type == SOC_PAD_SD) {
-> +		if (signal_voltage == MMC_SIGNAL_VOLTAGE_180)
-> +			writel(ARMADA_3700_SOC_PAD_1_8V, params->pad_ctrl.reg);
-> +		else if (signal_voltage == MMC_SIGNAL_VOLTAGE_330)
-> +			writel(ARMADA_3700_SOC_PAD_3_3V, params->pad_ctrl.reg);
-> +	}
-> +}
-> +
-> +/*
-> + * Set SoC PHY voltage PAD control register,
-> + * according to the operation voltage on PAD.
-> + * The detailed operation depends on SoC implementation.
-> + */
-> +static void emmc_phy_set_soc_pad(struct sdhci_host *host,
-> +				 unsigned char signal_voltage)
-> +{
-> +	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-> +	struct sdhci_xenon_priv *priv = sdhci_pltfm_priv(pltfm_host);
-> +	struct emmc_phy_params *params = priv->phy_params;
-> +
-> +	if (!params->pad_ctrl.reg)
-> +		return;
-> +
-> +	if (params->pad_ctrl.set_soc_pad)
-> +		params->pad_ctrl.set_soc_pad(host, signal_voltage);
-> +}
-> +
->  /*
->   * Enable eMMC PHY HW DLL
->   * DLL should be enabled and stable before HS200/SDR104 tuning,
-> @@ -584,6 +646,51 @@ static void emmc_phy_set(struct sdhci_host *host,
->  	dev_dbg(mmc_dev(host->mmc), "eMMC PHY setting completes\n");
->  }
->  
-> +static int get_dt_pad_ctrl_data(struct sdhci_host *host,
-> +				struct device_node *np,
-> +				struct emmc_phy_params *params)
-> +{
-> +	int ret = 0;
-> +	const char *name;
-> +	struct resource iomem;
-> +
-> +	if (of_device_is_compatible(np, "marvell,armada-3700-sdhci"))
-> +		params->pad_ctrl.set_soc_pad = armada_3700_soc_pad_voltage_set;
-> +	else
-> +		return 0;
-> +
-> +	if (of_address_to_resource(np, 1, &iomem)) {
-> +		dev_err(mmc_dev(host->mmc), "Unable to find SoC PAD ctrl register address for %s\n",
-> +			np->name);
-> +		return -EINVAL;
-> +	}
-> +
-> +	params->pad_ctrl.reg = devm_ioremap_resource(mmc_dev(host->mmc),
-> +						     &iomem);
-> +	if (IS_ERR(params->pad_ctrl.reg)) {
-> +		dev_err(mmc_dev(host->mmc), "Unable to get SoC PHY PAD ctrl register for %s\n",
-> +			np->name);
-> +		return PTR_ERR(params->pad_ctrl.reg);
-> +	}
-> +
-> +	ret = of_property_read_string(np, "marvell,pad-type", &name);
-> +	if (ret) {
-> +		dev_err(mmc_dev(host->mmc), "Unable to determine SoC PHY PAD ctrl type\n");
-> +		return ret;
-> +	}
-> +	if (!strcmp(name, "sd")) {
-> +		params->pad_ctrl.pad_type = SOC_PAD_SD;
-> +	} else if (!strcmp(name, "fixed-1-8v")) {
-> +		params->pad_ctrl.pad_type = SOC_PAD_FIXED_1_8V;
-> +	} else {
-> +		dev_err(mmc_dev(host->mmc), "Unsupported SoC PHY PAD ctrl type %s\n",
-> +			name);
-> +		return -EINVAL;
-> +	}
-> +
-> +	return ret;
-> +}
-> +
->  static int emmc_phy_parse_param_dt(struct sdhci_host *host,
->  				   struct device_node *np,
->  				   struct emmc_phy_params *params)
-> @@ -617,7 +724,14 @@ static int emmc_phy_parse_param_dt(struct sdhci_host *host,
->  	else
->  		params->tun_step_divider = XENON_TUNING_STEP_DIVIDER;
->  
-> -	return 0;
-> +	return get_dt_pad_ctrl_data(host, np, params);
-> +}
-> +
-> +/* Set SoC PHY Voltage PAD */
-> +void xenon_soc_pad_ctrl(struct sdhci_host *host,
-> +			unsigned char signal_voltage)
-> +{
-> +	emmc_phy_set_soc_pad(host, signal_voltage);
->  }
->  
->  /*
-> diff --git a/drivers/mmc/host/sdhci-xenon.c b/drivers/mmc/host/sdhci-xenon.c
-> index 99c18cad6460..f344d9fb0a1b 100644
-> --- a/drivers/mmc/host/sdhci-xenon.c
-> +++ b/drivers/mmc/host/sdhci-xenon.c
-> @@ -338,6 +338,8 @@ static int xenon_start_signal_voltage_switch(struct mmc_host *mmc,
->  	 */
->  	enable_xenon_internal_clk(host);
->  
-> +	xenon_soc_pad_ctrl(host, ios->signal_voltage);
-> +
->  	if (priv->init_card_type == MMC_TYPE_MMC)
->  		return xenon_emmc_signal_voltage_switch(mmc, ios);
->  
-> diff --git a/drivers/mmc/host/sdhci-xenon.h b/drivers/mmc/host/sdhci-xenon.h
-> index e87639774bca..57e7cb463413 100644
-> --- a/drivers/mmc/host/sdhci-xenon.h
-> +++ b/drivers/mmc/host/sdhci-xenon.h
-> @@ -104,4 +104,6 @@ struct sdhci_xenon_priv {
->  int xenon_phy_adj(struct sdhci_host *host, struct mmc_ios *ios);
->  int xenon_phy_parse_dt(struct device_node *np,
->  		       struct sdhci_host *host);
-> +void xenon_soc_pad_ctrl(struct sdhci_host *host,
-> +			unsigned char signal_voltage);
->  #endif
-> 
+Subsequent patches will implement the actual register dumping.
+
+Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+---
+ arch/arm64/include/uapi/asm/sigcontext.h | 86 ++++++++++++++++++++++++++++++++
+ arch/arm64/kernel/fpsimd.c               | 31 ++++++------
+ arch/arm64/kernel/signal.c               | 62 +++++++++++++++++++++++
+ 3 files changed, 162 insertions(+), 17 deletions(-)
+
+diff --git a/arch/arm64/include/uapi/asm/sigcontext.h b/arch/arm64/include/uapi/asm/sigcontext.h
+index 1af8437..11c915d 100644
+--- a/arch/arm64/include/uapi/asm/sigcontext.h
++++ b/arch/arm64/include/uapi/asm/sigcontext.h
+@@ -88,4 +88,90 @@ struct extra_context {
+ 	__u32 size;	/* size in bytes of the extra space */
+ };
+ 
++#define SVE_MAGIC	0x53564501
++
++struct sve_context {
++	struct _aarch64_ctx head;
++	__u16 vl;
++	__u16 __reserved[3];
++};
++
++/*
++ * The SVE architecture leaves space for future expansion of the
++ * vector length beyond its initial architectural limit of 2048 bits
++ * (16 quadwords).
++ */
++#define SVE_VQ_MIN		1
++#define SVE_VQ_MAX		0x200
++
++#define SVE_VL_MIN		(SVE_VQ_MIN * 0x10)
++#define SVE_VL_MAX		(SVE_VQ_MAX * 0x10)
++
++#define SVE_NUM_ZREGS		32
++#define SVE_NUM_PREGS		16
++
++#define sve_vl_valid(vl) \
++	((vl) % 0x10 == 0 && (vl) >= SVE_VL_MIN && (vl) <= SVE_VL_MAX)
++#define sve_vq_from_vl(vl)	((vl) / 0x10)
++
++/*
++ * The total size of meaningful data in the SVE context in bytes,
++ * including the header, is given by SVE_SIG_CONTEXT_SIZE(vq).
++ *
++ * Note: for all these macros, the "vq" argument denotes the SVE
++ * vector length in quadwords (i.e., units of 128 bits).
++ *
++ * The correct way to obtain vq is to use sve_vq_from_vl(vl).  The
++ * result is valid if and only if sve_vl_valid(vl) is true.  This is
++ * guaranteed for a struct sve_context written by the kernel.
++ *
++ *
++ * Additional macros describe the contents and layout of the payload.
++ * For each, SVE_SIG_x_OFFSET(args) is the start offset relative to
++ * the start of struct sve_context, and SVE_SIG_x_SIZE(args) is the
++ * size in bytes:
++ *
++ *	x	type				description
++ *	-	----				-----------
++ *	REGS					the entire SVE context
++ *
++ *	ZREGS	__uint128_t[SVE_NUM_ZREGS][vq]	all Z-registers
++ *	ZREG	__uint128_t[vq]			individual Z-register Zn
++ *
++ *	PREGS	uint16_t[SVE_NUM_PREGS][vq]	all P-registers
++ *	PREG	uint16_t[vq]			individual P-register Pn
++ *
++ *	FFR	uint16_t[vq]			first-fault status register
++ *
++ * Additional data might be appended in the future.
++ */
++
++#define SVE_SIG_ZREG_SIZE(vq)	((__u32)(vq) * 16)
++#define SVE_SIG_PREG_SIZE(vq)	((__u32)(vq) * 2)
++#define SVE_SIG_FFR_SIZE(vq)	SVE_SIG_PREG_SIZE(vq)
++
++#define SVE_SIG_REGS_OFFSET	((sizeof(struct sve_context) + 15) / 16 * 16)
++
++#define SVE_SIG_ZREGS_OFFSET	SVE_SIG_REGS_OFFSET
++#define SVE_SIG_ZREG_OFFSET(vq, n) \
++	(SVE_SIG_ZREGS_OFFSET + SVE_SIG_ZREG_SIZE(vq) * (n))
++#define SVE_SIG_ZREGS_SIZE(vq) \
++	(SVE_SIG_ZREG_OFFSET(vq, SVE_NUM_ZREGS) - SVE_SIG_ZREGS_OFFSET)
++
++#define SVE_SIG_PREGS_OFFSET(vq) \
++	(SVE_SIG_ZREGS_OFFSET + SVE_SIG_ZREGS_SIZE(vq))
++#define SVE_SIG_PREG_OFFSET(vq, n) \
++	(SVE_SIG_PREGS_OFFSET(vq) + SVE_SIG_PREG_SIZE(vq) * (n))
++#define SVE_SIG_PREGS_SIZE(vq) \
++	(SVE_SIG_PREG_OFFSET(vq, SVE_NUM_PREGS) - SVE_SIG_PREGS_OFFSET(vq))
++
++#define SVE_SIG_FFR_OFFSET(vq) \
++	(SVE_SIG_PREGS_OFFSET(vq) + SVE_SIG_PREGS_SIZE(vq))
++
++#define SVE_SIG_REGS_SIZE(vq) \
++	(SVE_SIG_FFR_OFFSET(vq) + SVE_SIG_FFR_SIZE(vq) - SVE_SIG_REGS_OFFSET)
++
++#define SVE_SIG_CONTEXT_SIZE(vq) (SVE_SIG_REGS_OFFSET + SVE_SIG_REGS_SIZE(vq))
++
++
+ #endif /* _UAPI__ASM_SIGCONTEXT_H */
+diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+index 0024931..801f4d3 100644
+--- a/arch/arm64/kernel/fpsimd.c
++++ b/arch/arm64/kernel/fpsimd.c
+@@ -28,6 +28,7 @@
+ #include <asm/fpsimd.h>
+ #include <asm/cputype.h>
+ #include <asm/hwcap.h>
++#include <asm/sigcontext.h>
+ 
+ #define FPEXC_IOF	(1 << 0)
+ #define FPEXC_DZF	(1 << 1)
+@@ -101,8 +102,9 @@ static void *sve_pffr(struct task_struct *task)
+ {
+ 	unsigned int vl = sve_get_vl();
+ 
+-	BUG_ON(vl % 16);
+-	return (char *)__sve_state(task) + 34 * vl;
++	BUG_ON(!sve_vl_valid(vl));
++	return (char *)__sve_state(task) +
++		(SVE_SIG_FFR_OFFSET(sve_vq_from_vl(vl)) - SVE_SIG_REGS_OFFSET);
+ }
+ 
+ static void __fpsimd_to_sve(struct task_struct *task, unsigned int vq)
+@@ -119,16 +121,12 @@ static void __fpsimd_to_sve(struct task_struct *task, unsigned int vq)
+ static void fpsimd_to_sve(struct task_struct *task)
+ {
+ 	unsigned int vl = sve_get_vl();
+-	unsigned int vq;
+ 
+ 	if (!(elf_hwcap & HWCAP_SVE))
+ 		return;
+ 
+-	BUG_ON(vl % 16);
+-	vq = vl / 16;
+-	BUG_ON(vq < 1 || vq > 16);
+-
+-	__fpsimd_to_sve(task, vq);
++	BUG_ON(!sve_vl_valid(vl));
++	__fpsimd_to_sve(task, sve_vq_from_vl(vl));
+ }
+ 
+ static void __sve_to_fpsimd(struct task_struct *task, unsigned int vq)
+@@ -144,16 +142,12 @@ static void __sve_to_fpsimd(struct task_struct *task, unsigned int vq)
+ static void sve_to_fpsimd(struct task_struct *task)
+ {
+ 	unsigned int vl = sve_get_vl();
+-	unsigned int vq;
+ 
+ 	if (!(elf_hwcap & HWCAP_SVE))
+ 		return;
+ 
+-	BUG_ON(vl % 16);
+-	vq = vl / 16;
+-	BUG_ON(vq < 1 || vq > 16);
+-
+-	__sve_to_fpsimd(task, vq);
++	BUG_ON(!sve_vl_valid(vl));
++	__sve_to_fpsimd(task, sve_vq_from_vl(vl));
+ }
+ 
+ #else /* ! CONFIG_ARM64_SVE */
+@@ -480,11 +474,14 @@ void __init fpsimd_init_task_struct_size(void)
+ 	if (IS_ENABLED(CONFIG_ARM64_SVE) &&
+ 	    ((read_cpuid(ID_AA64PFR0_EL1) >> ID_AA64PFR0_SVE_SHIFT)
+ 	     & 0xf) == 1) {
+-		arch_task_struct_size = sizeof(struct task_struct) +
+-			35 * sve_get_vl();
++		unsigned int vl = sve_get_vl();
++
++		BUG_ON(!sve_vl_valid(vl));
++		arch_task_struct_size = ALIGN(sizeof(struct task_struct), 16) +
++			ALIGN(SVE_SIG_REGS_SIZE(sve_vq_from_vl(vl)), 16);
+ 
+ 		pr_info("SVE: enabled with maximum %u bits per vector\n",
+-			sve_get_vl() * 8);
++			vl * 8);
+ 	}
+ }
+ 
+diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
+index 15c7edf..113502e 100644
+--- a/arch/arm64/kernel/signal.c
++++ b/arch/arm64/kernel/signal.c
+@@ -57,6 +57,7 @@ struct rt_sigframe_user_layout {
+ 
+ 	unsigned long fpsimd_offset;
+ 	unsigned long esr_offset;
++	unsigned long sve_offset;
+ 	unsigned long extra_offset;
+ 	unsigned long end_offset;
+ };
+@@ -209,8 +210,39 @@ static int restore_fpsimd_context(struct fpsimd_context __user *ctx)
+ 	return err ? -EFAULT : 0;
+ }
+ 
++
++#ifdef CONFIG_ARM64_SVE
++
++static int preserve_sve_context(struct sve_context __user *ctx)
++{
++	int err = 0;
++	u16 reserved[ARRAY_SIZE(ctx->__reserved)];
++	unsigned int vl = sve_get_vl();
++	unsigned int vq = sve_vq_from_vl(vl);
++
++	memset(reserved, 0, sizeof(reserved));
++
++	__put_user_error(SVE_MAGIC, &ctx->head.magic, err);
++	__put_user_error(round_up(SVE_SIG_CONTEXT_SIZE(vq), 16),
++			 &ctx->head.size, err);
++	__put_user_error(vl, &ctx->vl, err);
++	BUILD_BUG_ON(sizeof(ctx->__reserved) != sizeof(reserved));
++	err |= copy_to_user(&ctx->__reserved, reserved, sizeof(reserved));
++
++	return err ? -EFAULT : 0;
++}
++
++#else /* ! CONFIG_ARM64_SVE */
++
++/* Turn any non-optimised out attempt to use this into a link error: */
++extern int preserve_sve_context(void __user *ctx);
++
++#endif /* ! CONFIG_ARM64_SVE */
++
++
+ struct user_ctxs {
+ 	struct fpsimd_context __user *fpsimd;
++	struct sve_context __user *sve;
+ };
+ 
+ static int parse_user_sigframe(struct user_ctxs *user,
+@@ -224,6 +256,7 @@ static int parse_user_sigframe(struct user_ctxs *user,
+ 	bool have_extra_context = false;
+ 
+ 	user->fpsimd = NULL;
++	user->sve = NULL;
+ 
+ 	if (!IS_ALIGNED((unsigned long)base, 16))
+ 		goto invalid;
+@@ -271,6 +304,19 @@ static int parse_user_sigframe(struct user_ctxs *user,
+ 			/* ignore */
+ 			break;
+ 
++		case SVE_MAGIC:
++			if (!IS_ENABLED(CONFIG_ARM64_SVE))
++				goto invalid;
++
++			if (user->sve)
++				goto invalid;
++
++			if (size < sizeof(*user->sve))
++				goto invalid;
++
++			user->sve = (struct sve_context __user *)head;
++			break;
++
+ 		case EXTRA_MAGIC:
+ 			if (have_extra_context)
+ 				goto invalid;
+@@ -417,6 +463,15 @@ static int setup_sigframe_layout(struct rt_sigframe_user_layout *user)
+ 			return err;
+ 	}
+ 
++	if (IS_ENABLED(CONFIG_ARM64_SVE) && (elf_hwcap & HWCAP_SVE)) {
++		unsigned int vq = sve_vq_from_vl(sve_get_vl());
++
++		err = sigframe_alloc(user, &user->sve_offset,
++				     SVE_SIG_CONTEXT_SIZE(vq));
++		if (err)
++			return err;
++	}
++
+ 	return sigframe_alloc_end(user);
+ }
+ 
+@@ -458,6 +513,13 @@ static int setup_sigframe(struct rt_sigframe_user_layout *user,
+ 		__put_user_error(current->thread.fault_code, &esr_ctx->esr, err);
+ 	}
+ 
++	/* Scalable Vector Extension state, if present */
++	if (IS_ENABLED(CONFIG_ARM64_SVE) && err == 0 && user->sve_offset) {
++		struct sve_context __user *sve_ctx =
++			apply_user_offset(user, user->sve_offset);
++		err |= preserve_sve_context(sve_ctx);
++	}
++
+ 	if (err == 0 && user->extra_offset) {
+ 		struct extra_context __user *extra =
+ 			apply_user_offset(user, user->extra_offset);
+-- 
+2.1.4
