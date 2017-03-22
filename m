@@ -1,70 +1,65 @@
-From: jcm@redhat.com (Jon Masters)
-Date: Wed, 22 Mar 2017 11:13:05 -0400
-Subject: [PATCH v3 0/2] Handle Cavium ThunderX2 PCI topology quirk
-In-Reply-To: <1490172671-2648-1-git-send-email-jnair@caviumnetworks.com>
-References: <1490172671-2648-1-git-send-email-jnair@caviumnetworks.com>
-Message-ID: <122d7df5-8fde-c6fb-a608-9091dd59e79b@redhat.com>
+From: adrian.hunter@intel.com (Adrian Hunter)
+Date: Wed, 22 Mar 2017 16:49:10 +0200
+Subject: [PATCH v6 05/14] mmc: sdhci: Export
+ sdhci_start_signal_voltage_switch() in sdhci.c
+In-Reply-To: <ebab2ad6a83a91683c9589b976a6975141167296.1487091464.git-series.gregory.clement@free-electrons.com>
+References: <cover.ff78bebe0384f650a51e5e6f0f1dca6e7894b53b.1487091464.git-series.gregory.clement@free-electrons.com>
+ <ebab2ad6a83a91683c9589b976a6975141167296.1487091464.git-series.gregory.clement@free-electrons.com>
+Message-ID: <0648f4c1-6acf-00c3-bc5c-c7f029d1eec5@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/22/2017 04:51 AM, Jayachandran C wrote:
-> Hi Bjorn, Alex,
+On 14/02/17 19:01, Gregory CLEMENT wrote:
+> From: Hu Ziji <huziji@marvell.com>
 > 
-> Here is v3 of the patchset to handle the PCIe topology quirk of
-> Cavium ThunderX2 (previously called Broadcom Vulcan).
+> Export sdhci_start_signal_voltage_switch() from sdhci.c.
+> Thus vendor sdhci driver can implement its own signal voltage
+> switch routine.
 > 
-> The earlier discussions on this can be seen at:
-> http://www.spinics.net/lists/linux-pci/msg51001.html
-> https://patchwork.ozlabs.org/patch/582633/ and
-> https://lists.linuxfoundation.org/pipermail/iommu/2016-June/017681.html
-> 
-> The earlier discussion on this patchset had stalled with a suggestion
-> that it may be possible to fix up this quirk by handling the issue in
-> the function argument of pci_for_each_dma_alias(). But at that point
-> all the ACPI and OF code for SMMU and GIC was to merged, and we did not
-> have reasonable codebase to make the changes.
-> 
-> For 4.11, I tried to fix it in both the SMMU and the GIC ITS code based
-> on this suggestion, but after going thru the effort, that does not look
-> like the right approach. I have the code changes at:
-> https://github.com/jchandra-cavm/linux/commits/rid-xlate-fixup
-> if anyone want to look over the code.
-> 
-> The problems with that approach is:
->  - of the 14 uses of pci_for_each_dma_alias in the function in the kernel
->    tree, I have to fixup 6 callers (which is all but one ofthe callers
->    outside x86)
->  - 4 of these can be reasonably handled (please see the github repo above),
->    but the calls in drivers/irqchip/irq-gic-v3-its-pci-msi.c and
->    drivers/iommu/iommu.c cannot be reasonably fixed up.
->  - Even without the 2 above two changes I can get it to work for now.
->    But pci_for_each_dma_alias does not work as expected on this platform
->    and we have to be aware of that for all future uses of the function.
->   
-> For now, I have ruled out that approach, and I have rebased the earlier
-> patch on to 4.11-rc and submitting again for review. The changes are:
-> 
-> v2>v3:
->  - changed device flag name from PCI_DEV_FLAGS_DMA_ALIAS_ROOT to
->    PCI_DEV_FLAGS_BRIDGE_XLATE_ROOT
->  - updated commit message to make the quirk clearer.
-> 
-> Let me know your comments and suggestions.
+> Signed-off-by: Hu Ziji <huziji@marvell.com>
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-My opinion FWIW is that the quirk you have is one of the least intrusive
-ways of handling this. Generally in the case of ARM servers, we have a
-difference vs. x86 in that the latter usually have a magic RC at the
-top level that everything sits beneath (and then, presumably, Intel
-do some magic for multi-socket to fudge things over Q/UPI so that
-things look nice and boring to software). On ARM, we're typically
-dealing with third party RC IP that's disjoint from other parts of
-the SoC. We're certainly in the process of bolstering the specs to
-set some expectations and greater guidance around topologies that
-we would like to avoid, so I don't see this getting out of hand.
+Acked-by: Adrian Hunter <adrian.hunter@intel.com>
 
-That's my $0.02.
-
-Jon.
-
--- 
-Computer Architect | Sent from my Fedora powered laptop
+> ---
+>  drivers/mmc/host/sdhci.c | 5 +++--
+>  drivers/mmc/host/sdhci.h | 2 ++
+>  2 files changed, 5 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+> index 0e9ed0fadff9..d2338dc362f4 100644
+> --- a/drivers/mmc/host/sdhci.c
+> +++ b/drivers/mmc/host/sdhci.c
+> @@ -1839,8 +1839,8 @@ static void sdhci_enable_sdio_irq(struct mmc_host *mmc, int enable)
+>  	spin_unlock_irqrestore(&host->lock, flags);
+>  }
+>  
+> -static int sdhci_start_signal_voltage_switch(struct mmc_host *mmc,
+> -					     struct mmc_ios *ios)
+> +int sdhci_start_signal_voltage_switch(struct mmc_host *mmc,
+> +				      struct mmc_ios *ios)
+>  {
+>  	struct sdhci_host *host = mmc_priv(mmc);
+>  	u16 ctrl;
+> @@ -1932,6 +1932,7 @@ static int sdhci_start_signal_voltage_switch(struct mmc_host *mmc,
+>  		return 0;
+>  	}
+>  }
+> +EXPORT_SYMBOL_GPL(sdhci_start_signal_voltage_switch);
+>  
+>  static int sdhci_card_busy(struct mmc_host *mmc)
+>  {
+> diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h
+> index 3563c0c384ca..e4a07543a12b 100644
+> --- a/drivers/mmc/host/sdhci.h
+> +++ b/drivers/mmc/host/sdhci.h
+> @@ -692,6 +692,8 @@ void sdhci_reset(struct sdhci_host *host, u8 mask);
+>  void sdhci_set_uhs_signaling(struct sdhci_host *host, unsigned timing);
+>  int sdhci_execute_tuning(struct mmc_host *mmc, u32 opcode);
+>  void sdhci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios);
+> +int sdhci_start_signal_voltage_switch(struct mmc_host *mmc,
+> +				      struct mmc_ios *ios);
+>  
+>  #ifdef CONFIG_PM
+>  extern int sdhci_suspend_host(struct sdhci_host *host);
+> 
