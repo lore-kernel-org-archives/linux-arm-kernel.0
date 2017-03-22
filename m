@@ -1,65 +1,34 @@
-From: adrian.hunter@intel.com (Adrian Hunter)
-Date: Wed, 22 Mar 2017 16:49:10 +0200
-Subject: [PATCH v6 05/14] mmc: sdhci: Export
- sdhci_start_signal_voltage_switch() in sdhci.c
-In-Reply-To: <ebab2ad6a83a91683c9589b976a6975141167296.1487091464.git-series.gregory.clement@free-electrons.com>
-References: <cover.ff78bebe0384f650a51e5e6f0f1dca6e7894b53b.1487091464.git-series.gregory.clement@free-electrons.com>
- <ebab2ad6a83a91683c9589b976a6975141167296.1487091464.git-series.gregory.clement@free-electrons.com>
-Message-ID: <0648f4c1-6acf-00c3-bc5c-c7f029d1eec5@intel.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 22 Mar 2017 15:57:34 +0100
+Subject: [PATCH v2 04/18] arm64: cpu_errata: Allow an erratum to be match
+ for all revisions of a core
+In-Reply-To: <20170320174829.28182-5-marc.zyngier@arm.com>
+References: <20170320174829.28182-1-marc.zyngier@arm.com>
+ <20170320174829.28182-5-marc.zyngier@arm.com>
+Message-ID: <20170322145734.GC30499@mai>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/02/17 19:01, Gregory CLEMENT wrote:
-> From: Hu Ziji <huziji@marvell.com>
+On Mon, Mar 20, 2017 at 05:48:15PM +0000, Marc Zyngier wrote:
+> Some minor erratum may not be fixed in further revisions of a core,
+> leading to a situation where the workaround needs to be updated each
+> time an updated core is released.
 > 
-> Export sdhci_start_signal_voltage_switch() from sdhci.c.
-> Thus vendor sdhci driver can implement its own signal voltage
-> switch routine.
+> Introduce a MIDR_ALL_VERSIONS match helper that will work for all
+> versions of that MIDR, once and for all.
 > 
-> Signed-off-by: Hu Ziji <huziji@marvell.com>
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-
-Acked-by: Adrian Hunter <adrian.hunter@intel.com>
-
+> Acked-by: Mark Rutland <mark.rutland@arm.com>
+> Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > ---
->  drivers/mmc/host/sdhci.c | 5 +++--
->  drivers/mmc/host/sdhci.h | 2 ++
->  2 files changed, 5 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
-> index 0e9ed0fadff9..d2338dc362f4 100644
-> --- a/drivers/mmc/host/sdhci.c
-> +++ b/drivers/mmc/host/sdhci.c
-> @@ -1839,8 +1839,8 @@ static void sdhci_enable_sdio_irq(struct mmc_host *mmc, int enable)
->  	spin_unlock_irqrestore(&host->lock, flags);
->  }
->  
-> -static int sdhci_start_signal_voltage_switch(struct mmc_host *mmc,
-> -					     struct mmc_ios *ios)
-> +int sdhci_start_signal_voltage_switch(struct mmc_host *mmc,
-> +				      struct mmc_ios *ios)
->  {
->  	struct sdhci_host *host = mmc_priv(mmc);
->  	u16 ctrl;
-> @@ -1932,6 +1932,7 @@ static int sdhci_start_signal_voltage_switch(struct mmc_host *mmc,
->  		return 0;
->  	}
->  }
-> +EXPORT_SYMBOL_GPL(sdhci_start_signal_voltage_switch);
->  
->  static int sdhci_card_busy(struct mmc_host *mmc)
->  {
-> diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h
-> index 3563c0c384ca..e4a07543a12b 100644
-> --- a/drivers/mmc/host/sdhci.h
-> +++ b/drivers/mmc/host/sdhci.h
-> @@ -692,6 +692,8 @@ void sdhci_reset(struct sdhci_host *host, u8 mask);
->  void sdhci_set_uhs_signaling(struct sdhci_host *host, unsigned timing);
->  int sdhci_execute_tuning(struct mmc_host *mmc, u32 opcode);
->  void sdhci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios);
-> +int sdhci_start_signal_voltage_switch(struct mmc_host *mmc,
-> +				      struct mmc_ios *ios);
->  
->  #ifdef CONFIG_PM
->  extern int sdhci_suspend_host(struct sdhci_host *host);
-> 
+
+Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+
+
+-- 
+
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
