@@ -1,30 +1,57 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 22 Mar 2017 16:47:51 +0100
-Subject: [PATCH v2 09/18] arm64: arch_timer: Move
- arch_timer_reg_read/write around
-In-Reply-To: <20170320174829.28182-10-marc.zyngier@arm.com>
-References: <20170320174829.28182-1-marc.zyngier@arm.com>
- <20170320174829.28182-10-marc.zyngier@arm.com>
-Message-ID: <20170322154751.GF30499@mai>
+From: al.kochet@gmail.com (Alexander Kochetkov)
+Date: Wed, 22 Mar 2017 18:48:27 +0300
+Subject: [PATCH v7 0/7] Implement clocksource for rockchip SoC using rockchip
+ timer
+Message-ID: <1490197714-25415-1-git-send-email-al.kochet@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 20, 2017 at 05:48:20PM +0000, Marc Zyngier wrote:
-> As we're about to move things around, let's start with the low
-> level read/write functions. This allows us to use these functions
-> in the errata handling code without having to use forward declaration
-> of static functions.
-> 
-> Acked-by: Mark Rutland <mark.rutland@arm.com>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
+Hello, Daniel, Heiko.
 
-Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+Here is try 7 :) Could you please take a look into it?
+
+rockchip_timer init code implemented using CLOCKEVENT_OF_DECLARE()
+introduced in commit 0c8893c9095d ("clockevents: Add a clkevt-of
+mechanism like clksrc-of")
+
+There is change in the arch/arm/mach-rockchip/rockchip.c.
+
+This series should be applied after the commit:
+https://lkml.org/lkml/2017/3/22/426
+
+As without the commit, you will get linker error ("clkevt-probe.c:63:
+undefined reference to `__clkevt_of_table?")
+
+Regards,
+Alexander.
+
+
+Alexander Kochetkov (6):
+  dt-bindings: clarify compatible property for rockchip timers
+  ARM: dts: rockchip: update compatible property for rk322x timer
+  ARM: dts: rockchip: add clockevent attribute to rockchip timers
+  clocksource/drivers/rockchip_timer: implement clocksource timer
+  ARM: dts: rockchip: add timer entries to rk3188 SoC
+  ARM: dts: rockchip: disable arm-global-timer for rk3188
+
+Daniel Lezcano (1):
+  clocksource/drivers/clksrc-evt-probe: Describe with the DT both the
+    clocksource and the clockevent
+
+ .../bindings/timer/rockchip,rk-timer.txt           |   12 +-
+ Documentation/devicetree/bindings/timer/timer.txt  |   38 ++++
+ arch/arm/boot/dts/rk3036.dtsi                      |    1 +
+ arch/arm/boot/dts/rk3188.dtsi                      |   19 ++
+ arch/arm/boot/dts/rk322x.dtsi                      |    3 +-
+ arch/arm/boot/dts/rk3288.dtsi                      |    1 +
+ arch/arm/mach-rockchip/rockchip.c                  |    2 +
+ arch/arm64/boot/dts/rockchip/rk3368.dtsi           |    1 +
+ drivers/clocksource/Kconfig                        |    2 +
+ drivers/clocksource/clkevt-probe.c                 |    7 +
+ drivers/clocksource/clksrc-probe.c                 |    7 +
+ drivers/clocksource/rockchip_timer.c               |  215 ++++++++++++++------
+ 12 files changed, 241 insertions(+), 67 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/timer/timer.txt
 
 -- 
-
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+1.7.9.5
