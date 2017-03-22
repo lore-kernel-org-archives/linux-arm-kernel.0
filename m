@@ -1,314 +1,177 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 22 Mar 2017 14:50:46 +0000
-Subject: [RFC PATCH v2 16/41] arm64/sve: signal: Add SVE state record to
- sigcontext
+Date: Wed, 22 Mar 2017 14:50:45 +0000
+Subject: [RFC PATCH v2 15/41] arm64/sve: Restore working FPSIMD save/restore
+ around signals
 In-Reply-To: <1490194274-30569-1-git-send-email-Dave.Martin@arm.com>
 References: <1490194274-30569-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1490194274-30569-17-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1490194274-30569-16-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a record to sigcontext that will contain the SVE
-state.
+Because fpsimd_state and the SVE state are not magically
+synchronised in the task_struct, stale FPSIMD data may be saved on
+signal handler entry, and restored data my be lost on sigreturn.
 
-The sigcontext SVE layout is intentionally the same as the layout
-used internally by the kernel to store the SVE state in
-task_struct, so this patch also uses the new macros to replace
-magic numbers currently used to describe the layout.
+This patch converts between SVE and FPSIMD views around the signal,
+restoring working FPSIMD save/restore.
 
-Subsequent patches will implement the actual register dumping.
+This will not save/restore the SVE state properly, but it should
+restore a working FPSIMD ABI.
 
 Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 ---
- arch/arm64/include/uapi/asm/sigcontext.h | 86 ++++++++++++++++++++++++++++++++
- arch/arm64/kernel/fpsimd.c               | 31 ++++++------
- arch/arm64/kernel/signal.c               | 62 +++++++++++++++++++++++
- 3 files changed, 162 insertions(+), 17 deletions(-)
+ arch/arm64/include/asm/fpsimd.h |  1 +
+ arch/arm64/kernel/fpsimd.c      | 73 ++++++++++++++++++++++++++++++++++++++++-
+ arch/arm64/kernel/signal.c      |  2 +-
+ arch/arm64/kernel/signal32.c    |  2 +-
+ 4 files changed, 75 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/include/uapi/asm/sigcontext.h b/arch/arm64/include/uapi/asm/sigcontext.h
-index 1af8437..11c915d 100644
---- a/arch/arm64/include/uapi/asm/sigcontext.h
-+++ b/arch/arm64/include/uapi/asm/sigcontext.h
-@@ -88,4 +88,90 @@ struct extra_context {
- 	__u32 size;	/* size in bytes of the extra space */
- };
+diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
+index 757d304..93ae8a7 100644
+--- a/arch/arm64/include/asm/fpsimd.h
++++ b/arch/arm64/include/asm/fpsimd.h
+@@ -80,6 +80,7 @@ extern void fpsimd_load_state(struct fpsimd_state *state);
+ extern void fpsimd_thread_switch(struct task_struct *next);
+ extern void fpsimd_flush_thread(void);
  
-+#define SVE_MAGIC	0x53564501
-+
-+struct sve_context {
-+	struct _aarch64_ctx head;
-+	__u16 vl;
-+	__u16 __reserved[3];
-+};
-+
-+/*
-+ * The SVE architecture leaves space for future expansion of the
-+ * vector length beyond its initial architectural limit of 2048 bits
-+ * (16 quadwords).
-+ */
-+#define SVE_VQ_MIN		1
-+#define SVE_VQ_MAX		0x200
-+
-+#define SVE_VL_MIN		(SVE_VQ_MIN * 0x10)
-+#define SVE_VL_MAX		(SVE_VQ_MAX * 0x10)
-+
-+#define SVE_NUM_ZREGS		32
-+#define SVE_NUM_PREGS		16
-+
-+#define sve_vl_valid(vl) \
-+	((vl) % 0x10 == 0 && (vl) >= SVE_VL_MIN && (vl) <= SVE_VL_MAX)
-+#define sve_vq_from_vl(vl)	((vl) / 0x10)
-+
-+/*
-+ * The total size of meaningful data in the SVE context in bytes,
-+ * including the header, is given by SVE_SIG_CONTEXT_SIZE(vq).
-+ *
-+ * Note: for all these macros, the "vq" argument denotes the SVE
-+ * vector length in quadwords (i.e., units of 128 bits).
-+ *
-+ * The correct way to obtain vq is to use sve_vq_from_vl(vl).  The
-+ * result is valid if and only if sve_vl_valid(vl) is true.  This is
-+ * guaranteed for a struct sve_context written by the kernel.
-+ *
-+ *
-+ * Additional macros describe the contents and layout of the payload.
-+ * For each, SVE_SIG_x_OFFSET(args) is the start offset relative to
-+ * the start of struct sve_context, and SVE_SIG_x_SIZE(args) is the
-+ * size in bytes:
-+ *
-+ *	x	type				description
-+ *	-	----				-----------
-+ *	REGS					the entire SVE context
-+ *
-+ *	ZREGS	__uint128_t[SVE_NUM_ZREGS][vq]	all Z-registers
-+ *	ZREG	__uint128_t[vq]			individual Z-register Zn
-+ *
-+ *	PREGS	uint16_t[SVE_NUM_PREGS][vq]	all P-registers
-+ *	PREG	uint16_t[vq]			individual P-register Pn
-+ *
-+ *	FFR	uint16_t[vq]			first-fault status register
-+ *
-+ * Additional data might be appended in the future.
-+ */
-+
-+#define SVE_SIG_ZREG_SIZE(vq)	((__u32)(vq) * 16)
-+#define SVE_SIG_PREG_SIZE(vq)	((__u32)(vq) * 2)
-+#define SVE_SIG_FFR_SIZE(vq)	SVE_SIG_PREG_SIZE(vq)
-+
-+#define SVE_SIG_REGS_OFFSET	((sizeof(struct sve_context) + 15) / 16 * 16)
-+
-+#define SVE_SIG_ZREGS_OFFSET	SVE_SIG_REGS_OFFSET
-+#define SVE_SIG_ZREG_OFFSET(vq, n) \
-+	(SVE_SIG_ZREGS_OFFSET + SVE_SIG_ZREG_SIZE(vq) * (n))
-+#define SVE_SIG_ZREGS_SIZE(vq) \
-+	(SVE_SIG_ZREG_OFFSET(vq, SVE_NUM_ZREGS) - SVE_SIG_ZREGS_OFFSET)
-+
-+#define SVE_SIG_PREGS_OFFSET(vq) \
-+	(SVE_SIG_ZREGS_OFFSET + SVE_SIG_ZREGS_SIZE(vq))
-+#define SVE_SIG_PREG_OFFSET(vq, n) \
-+	(SVE_SIG_PREGS_OFFSET(vq) + SVE_SIG_PREG_SIZE(vq) * (n))
-+#define SVE_SIG_PREGS_SIZE(vq) \
-+	(SVE_SIG_PREG_OFFSET(vq, SVE_NUM_PREGS) - SVE_SIG_PREGS_OFFSET(vq))
-+
-+#define SVE_SIG_FFR_OFFSET(vq) \
-+	(SVE_SIG_PREGS_OFFSET(vq) + SVE_SIG_PREGS_SIZE(vq))
-+
-+#define SVE_SIG_REGS_SIZE(vq) \
-+	(SVE_SIG_FFR_OFFSET(vq) + SVE_SIG_FFR_SIZE(vq) - SVE_SIG_REGS_OFFSET)
-+
-+#define SVE_SIG_CONTEXT_SIZE(vq) (SVE_SIG_REGS_OFFSET + SVE_SIG_REGS_SIZE(vq))
-+
-+
- #endif /* _UAPI__ASM_SIGCONTEXT_H */
++extern void fpsimd_signal_preserve_current_state(void);
+ extern void fpsimd_preserve_current_state(void);
+ extern void fpsimd_restore_current_state(void);
+ extern void fpsimd_update_current_state(struct fpsimd_state *state);
 diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-index 0024931..801f4d3 100644
+index 7c6417a..0024931 100644
 --- a/arch/arm64/kernel/fpsimd.c
 +++ b/arch/arm64/kernel/fpsimd.c
-@@ -28,6 +28,7 @@
- #include <asm/fpsimd.h>
- #include <asm/cputype.h>
- #include <asm/hwcap.h>
-+#include <asm/sigcontext.h>
- 
- #define FPEXC_IOF	(1 << 0)
- #define FPEXC_DZF	(1 << 1)
-@@ -101,8 +102,9 @@ static void *sve_pffr(struct task_struct *task)
- {
- 	unsigned int vl = sve_get_vl();
- 
--	BUG_ON(vl % 16);
--	return (char *)__sve_state(task) + 34 * vl;
-+	BUG_ON(!sve_vl_valid(vl));
-+	return (char *)__sve_state(task) +
-+		(SVE_SIG_FFR_OFFSET(sve_vq_from_vl(vl)) - SVE_SIG_REGS_OFFSET);
+@@ -105,11 +105,66 @@ static void *sve_pffr(struct task_struct *task)
+ 	return (char *)__sve_state(task) + 34 * vl;
  }
  
- static void __fpsimd_to_sve(struct task_struct *task, unsigned int vq)
-@@ -119,16 +121,12 @@ static void __fpsimd_to_sve(struct task_struct *task, unsigned int vq)
- static void fpsimd_to_sve(struct task_struct *task)
- {
- 	unsigned int vl = sve_get_vl();
--	unsigned int vq;
- 
- 	if (!(elf_hwcap & HWCAP_SVE))
- 		return;
- 
--	BUG_ON(vl % 16);
--	vq = vl / 16;
--	BUG_ON(vq < 1 || vq > 16);
--
--	__fpsimd_to_sve(task, vq);
-+	BUG_ON(!sve_vl_valid(vl));
-+	__fpsimd_to_sve(task, sve_vq_from_vl(vl));
- }
- 
- static void __sve_to_fpsimd(struct task_struct *task, unsigned int vq)
-@@ -144,16 +142,12 @@ static void __sve_to_fpsimd(struct task_struct *task, unsigned int vq)
- static void sve_to_fpsimd(struct task_struct *task)
- {
- 	unsigned int vl = sve_get_vl();
--	unsigned int vq;
- 
- 	if (!(elf_hwcap & HWCAP_SVE))
- 		return;
- 
--	BUG_ON(vl % 16);
--	vq = vl / 16;
--	BUG_ON(vq < 1 || vq > 16);
--
--	__sve_to_fpsimd(task, vq);
-+	BUG_ON(!sve_vl_valid(vl));
-+	__sve_to_fpsimd(task, sve_vq_from_vl(vl));
- }
- 
- #else /* ! CONFIG_ARM64_SVE */
-@@ -480,11 +474,14 @@ void __init fpsimd_init_task_struct_size(void)
- 	if (IS_ENABLED(CONFIG_ARM64_SVE) &&
- 	    ((read_cpuid(ID_AA64PFR0_EL1) >> ID_AA64PFR0_SVE_SHIFT)
- 	     & 0xf) == 1) {
--		arch_task_struct_size = sizeof(struct task_struct) +
--			35 * sve_get_vl();
-+		unsigned int vl = sve_get_vl();
++static void __fpsimd_to_sve(struct task_struct *task, unsigned int vq)
++{
++	struct sve_struct fpsimd_sve_state(vq) *sst = __sve_state(task);
++	struct fpsimd_state *fst = &task->thread.fpsimd_state;
++	unsigned int i;
 +
-+		BUG_ON(!sve_vl_valid(vl));
-+		arch_task_struct_size = ALIGN(sizeof(struct task_struct), 16) +
-+			ALIGN(SVE_SIG_REGS_SIZE(sve_vq_from_vl(vl)), 16);
++	memset(sst, 0, sizeof(*sst));
++	for (i = 0; i < 32; ++i)
++		sst->zregs[i][0] = fst->vregs[i];
++}
++
++static void fpsimd_to_sve(struct task_struct *task)
++{
++	unsigned int vl = sve_get_vl();
++	unsigned int vq;
++
++	if (!(elf_hwcap & HWCAP_SVE))
++		return;
++
++	BUG_ON(vl % 16);
++	vq = vl / 16;
++	BUG_ON(vq < 1 || vq > 16);
++
++	__fpsimd_to_sve(task, vq);
++}
++
++static void __sve_to_fpsimd(struct task_struct *task, unsigned int vq)
++{
++	struct sve_struct fpsimd_sve_state(vq) *sst = __sve_state(task);
++	struct fpsimd_state *fst = &task->thread.fpsimd_state;
++	unsigned int i;
++
++	for (i = 0; i < 32; ++i)
++		fst->vregs[i] = sst->zregs[i][0];
++}
++
++static void sve_to_fpsimd(struct task_struct *task)
++{
++	unsigned int vl = sve_get_vl();
++	unsigned int vq;
++
++	if (!(elf_hwcap & HWCAP_SVE))
++		return;
++
++	BUG_ON(vl % 16);
++	vq = vl / 16;
++	BUG_ON(vq < 1 || vq > 16);
++
++	__sve_to_fpsimd(task, vq);
++}
++
+ #else /* ! CONFIG_ARM64_SVE */
  
- 		pr_info("SVE: enabled with maximum %u bits per vector\n",
--			sve_get_vl() * 8);
-+			vl * 8);
+ /* Dummy declarations for usage protected with IS_ENABLED(CONFIG_ARM64_SVE): */
+ extern void *__sve_state(struct task_struct *task);
+ extern void *sve_pffr(struct task_struct *task);
++extern void fpsimd_to_sve(struct task_struct *task);
++
++/* Functions that map to no-ops without SVE: */
++static void sve_to_fpsimd(struct task_struct *task __always_unused) { }
+ 
+ #endif /* ! CONFIG_ARM64_SVE */
+ 
+@@ -238,6 +293,15 @@ void fpsimd_preserve_current_state(void)
+ 	preempt_enable();
+ }
+ 
++void fpsimd_signal_preserve_current_state(void)
++{
++	WARN_ONCE(elf_hwcap & HWCAP_SVE,
++		  "SVE state save/restore around signals doesn't work properly, expect userspace corruption!\n");
++
++	fpsimd_preserve_current_state();
++	sve_to_fpsimd(current);
++}
++
+ /*
+  * Load the userland FPSIMD state of 'current' from memory, but only if the
+  * FPSIMD state already held in the registers is /not/ the most recent FPSIMD
+@@ -268,13 +332,20 @@ void fpsimd_update_current_state(struct fpsimd_state *state)
+ 	if (!system_supports_fpsimd())
+ 		return;
+ 	preempt_disable();
+-	fpsimd_load_state(state);
++
++	if (IS_ENABLED(CONFIG_ARM64_SVE)) {
++		current->thread.fpsimd_state = *state;
++		fpsimd_to_sve(current);
++	}
++	task_fpsimd_load(current);
++
+ 	if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE)) {
+ 		struct fpsimd_state *st = &current->thread.fpsimd_state;
+ 
+ 		this_cpu_write(fpsimd_last_state, st);
+ 		st->cpu = smp_processor_id();
  	}
++
+ 	preempt_enable();
  }
  
 diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
-index 15c7edf..113502e 100644
+index 49c30df..15c7edf 100644
 --- a/arch/arm64/kernel/signal.c
 +++ b/arch/arm64/kernel/signal.c
-@@ -57,6 +57,7 @@ struct rt_sigframe_user_layout {
+@@ -168,7 +168,7 @@ static int preserve_fpsimd_context(struct fpsimd_context __user *ctx)
+ 	int err;
  
- 	unsigned long fpsimd_offset;
- 	unsigned long esr_offset;
-+	unsigned long sve_offset;
- 	unsigned long extra_offset;
- 	unsigned long end_offset;
- };
-@@ -209,8 +210,39 @@ static int restore_fpsimd_context(struct fpsimd_context __user *ctx)
- 	return err ? -EFAULT : 0;
- }
+ 	/* dump the hardware registers to the fpsimd_state structure */
+-	fpsimd_preserve_current_state();
++	fpsimd_signal_preserve_current_state();
  
-+
-+#ifdef CONFIG_ARM64_SVE
-+
-+static int preserve_sve_context(struct sve_context __user *ctx)
-+{
-+	int err = 0;
-+	u16 reserved[ARRAY_SIZE(ctx->__reserved)];
-+	unsigned int vl = sve_get_vl();
-+	unsigned int vq = sve_vq_from_vl(vl);
-+
-+	memset(reserved, 0, sizeof(reserved));
-+
-+	__put_user_error(SVE_MAGIC, &ctx->head.magic, err);
-+	__put_user_error(round_up(SVE_SIG_CONTEXT_SIZE(vq), 16),
-+			 &ctx->head.size, err);
-+	__put_user_error(vl, &ctx->vl, err);
-+	BUILD_BUG_ON(sizeof(ctx->__reserved) != sizeof(reserved));
-+	err |= copy_to_user(&ctx->__reserved, reserved, sizeof(reserved));
-+
-+	return err ? -EFAULT : 0;
-+}
-+
-+#else /* ! CONFIG_ARM64_SVE */
-+
-+/* Turn any non-optimised out attempt to use this into a link error: */
-+extern int preserve_sve_context(void __user *ctx);
-+
-+#endif /* ! CONFIG_ARM64_SVE */
-+
-+
- struct user_ctxs {
- 	struct fpsimd_context __user *fpsimd;
-+	struct sve_context __user *sve;
- };
+ 	/* copy the FP and status/control registers */
+ 	err = __copy_to_user(ctx->vregs, fpsimd->vregs, sizeof(fpsimd->vregs));
+diff --git a/arch/arm64/kernel/signal32.c b/arch/arm64/kernel/signal32.c
+index c747a0f..2df31a38 100644
+--- a/arch/arm64/kernel/signal32.c
++++ b/arch/arm64/kernel/signal32.c
+@@ -244,7 +244,7 @@ static int compat_preserve_vfp_context(struct compat_vfp_sigframe __user *frame)
+ 	 * Note that this also saves V16-31, which aren't visible
+ 	 * in AArch32.
+ 	 */
+-	fpsimd_preserve_current_state();
++	fpsimd_signal_preserve_current_state();
  
- static int parse_user_sigframe(struct user_ctxs *user,
-@@ -224,6 +256,7 @@ static int parse_user_sigframe(struct user_ctxs *user,
- 	bool have_extra_context = false;
- 
- 	user->fpsimd = NULL;
-+	user->sve = NULL;
- 
- 	if (!IS_ALIGNED((unsigned long)base, 16))
- 		goto invalid;
-@@ -271,6 +304,19 @@ static int parse_user_sigframe(struct user_ctxs *user,
- 			/* ignore */
- 			break;
- 
-+		case SVE_MAGIC:
-+			if (!IS_ENABLED(CONFIG_ARM64_SVE))
-+				goto invalid;
-+
-+			if (user->sve)
-+				goto invalid;
-+
-+			if (size < sizeof(*user->sve))
-+				goto invalid;
-+
-+			user->sve = (struct sve_context __user *)head;
-+			break;
-+
- 		case EXTRA_MAGIC:
- 			if (have_extra_context)
- 				goto invalid;
-@@ -417,6 +463,15 @@ static int setup_sigframe_layout(struct rt_sigframe_user_layout *user)
- 			return err;
- 	}
- 
-+	if (IS_ENABLED(CONFIG_ARM64_SVE) && (elf_hwcap & HWCAP_SVE)) {
-+		unsigned int vq = sve_vq_from_vl(sve_get_vl());
-+
-+		err = sigframe_alloc(user, &user->sve_offset,
-+				     SVE_SIG_CONTEXT_SIZE(vq));
-+		if (err)
-+			return err;
-+	}
-+
- 	return sigframe_alloc_end(user);
- }
- 
-@@ -458,6 +513,13 @@ static int setup_sigframe(struct rt_sigframe_user_layout *user,
- 		__put_user_error(current->thread.fault_code, &esr_ctx->esr, err);
- 	}
- 
-+	/* Scalable Vector Extension state, if present */
-+	if (IS_ENABLED(CONFIG_ARM64_SVE) && err == 0 && user->sve_offset) {
-+		struct sve_context __user *sve_ctx =
-+			apply_user_offset(user, user->sve_offset);
-+		err |= preserve_sve_context(sve_ctx);
-+	}
-+
- 	if (err == 0 && user->extra_offset) {
- 		struct extra_context __user *extra =
- 			apply_user_offset(user, user->extra_offset);
+ 	/* Place structure header on the stack */
+ 	__put_user_error(magic, &frame->magic, err);
 -- 
 2.1.4
