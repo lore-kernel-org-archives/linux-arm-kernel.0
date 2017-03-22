@@ -1,281 +1,36 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Wed, 22 Mar 2017 15:29:52 +0100
-Subject: [PATCH v3 11/19] KVM: arm64: ITS: KVM_DEV_ARM_VGIC_GRP_ITS_TABLES
- group
-In-Reply-To: <799d0724-6352-4ff9-4d88-5f379435db4b@arm.com>
-References: <1488800074-21991-1-git-send-email-eric.auger@redhat.com>
- <1488800074-21991-12-git-send-email-eric.auger@redhat.com>
- <799d0724-6352-4ff9-4d88-5f379435db4b@arm.com>
-Message-ID: <dfe7d412-ec46-8e98-cbab-e6b9a6ecc71c@redhat.com>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Wed, 22 Mar 2017 15:19:04 +0100
+Subject: [PATCH 0/2] ThunderX external PCI fixes for legacy&new ACPI
+ firmware
+In-Reply-To: <20170321174325.GB13150@bhelgaas-glaptop.roam.corp.google.com>
+References: <1489564155-3881-1-git-send-email-tn@semihalf.com>
+ <20170321174325.GB13150@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <9a200f93-32e3-f225-649d-670af5e84b10@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andre,
+On 21.03.2017 18:43, Bjorn Helgaas wrote:
+> On Wed, Mar 15, 2017 at 08:49:13AM +0100, Tomasz Nowicki wrote:
+>> This patch series update ThunderX PEM driver to be able to boot with legacy
+>> and new ACPI firmware:
+>> 1. New firmware uses registered Cavium harware ID "CAV", but kernel instead
+>>    uses "THRX". Fix kernel to use "CAV".
+>> 2. Legacy firmware misses PEM quirks information so for this case kernel
+>>    should not assume anything from FW and figure out PEM resources on its own.
+>>
+>> Fix this all together in the following branch:
+>> git at github.com:semihalf-nowicki-tomasz/linux.git (thunderx-pci-legacy-fw-v1)
+>>
+>> Tomasz Nowicki (2):
+>>   PCI: Use Cavium assigned hardware ID for ThunderX host controller
+>>   PCI: Add legacy firmware support for Cavium ThunderX host controller
+>>
+>>  drivers/pci/host/pci-thunder-pem.c | 58 ++++++++++++++++++++++++++++++++++++--
+>>  1 file changed, 55 insertions(+), 3 deletions(-)
+>
+> Applied with Robert's acks to pci/host-thunder for v4.12, thanks!
+>
 
-On 20/03/2017 19:14, Andre Przywara wrote:
-> Hi Eric,
-> 
-> On 06/03/17 11:34, Eric Auger wrote:
->> Introduce a new group aiming at saving/restoring the ITS
->> tables to/from the guest memory.
->>
->> We hold the its lock during the save and restore to prevent
->> any command from being executed. This also garantees the LPI
->> list is not going to change and no MSI injection can happen
->> during the operation.
->>
->> At this stage the functionality is not yet implemented. Only
->> the skeleton is put in place.
->>
->> Signed-off-by: Eric Auger <eric.auger@redhat.com>
->>
->> ---
->>
->> v1 -> v2:
->> - remove useless kvm parameter
->>
->> At the end of the restore I trigger a map_resources. This aims
->> at accomodating the virtio-net-pci guest use case. On restore I
->> can see the virtio-net-pci device sends MSI before the first
->> VCPU run. The fact we are not able to handle MSIs at that stage
->> stalls the virtio-net-pci device. We may fix this issue at QEMU
->> level instead.
->> ---
->>  arch/arm/include/uapi/asm/kvm.h   |   1 +
->>  arch/arm64/include/uapi/asm/kvm.h |   1 +
->>  virt/kvm/arm/vgic/vgic-its.c      | 115 +++++++++++++++++++++++++++++++++++++-
->>  3 files changed, 116 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
->> index 4beb83b..7b165e9 100644
->> --- a/arch/arm/include/uapi/asm/kvm.h
->> +++ b/arch/arm/include/uapi/asm/kvm.h
->> @@ -193,6 +193,7 @@ struct kvm_arch_memory_slot {
->>  #define KVM_DEV_ARM_VGIC_GRP_CPU_SYSREGS 6
->>  #define KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO  7
->>  #define KVM_DEV_ARM_VGIC_GRP_ITS_REGS	8
->> +#define KVM_DEV_ARM_VGIC_GRP_ITS_TABLES	9
->>  #define KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_SHIFT	10
->>  #define KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_MASK \
->>  			(0x3fffffULL << KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_SHIFT)
->> diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
->> index 7e8dd69..166df68 100644
->> --- a/arch/arm64/include/uapi/asm/kvm.h
->> +++ b/arch/arm64/include/uapi/asm/kvm.h
->> @@ -213,6 +213,7 @@ struct kvm_arch_memory_slot {
->>  #define KVM_DEV_ARM_VGIC_GRP_CPU_SYSREGS 6
->>  #define KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO  7
->>  #define KVM_DEV_ARM_VGIC_GRP_ITS_REGS 8
->> +#define KVM_DEV_ARM_VGIC_GRP_ITS_TABLES 9
->>  #define KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_SHIFT	10
->>  #define KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_MASK \
->>  			(0x3fffffULL << KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_SHIFT)
->> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
->> index 322e370..dd7545a 100644
->> --- a/virt/kvm/arm/vgic/vgic-its.c
->> +++ b/virt/kvm/arm/vgic/vgic-its.c
->> @@ -1551,6 +1551,112 @@ int vgic_its_attr_regs_access(struct kvm_device *dev,
->>  	return 0;
->>  }
->>  
->> +/**
->> + * vgic_its_flush_pending_tables - Flush the pending tables into guest RAM
->> + */
->> +static int vgic_its_flush_pending_tables(struct vgic_its *its)
-> 
-> Mmh, it sounds a bit odd to flush/restore pending tables, which are a
-> redistributor property, really, in an ITS context. But I think it's fine
-> for them to stay here for now.
-> I will check again when I arrive at the actual implementation ...
-The main benefit of doing the flush/restore of the pending tables at the
-same place as where we handle the other tables is:
+Thanks Bjorn!
 
-when doing the pending table restore, we have finished the restoration
-of the collection & device tables; as such we know exactly which LPI
-pending state needed to be restored.
-
-Assuming we do that independently on ITS tables I guess we would need to
-"blindly" restore the whole pending tables. The 1st kB can be used for
-coarse mapping but well this is more complex and less efficient I think.
-Does that make sense?
-> 
->> +{
->> +	return -ENXIO;
->> +}
->> +
->> +/**
->> + * vgic_its_restore_pending_tables - Restore the pending tables from guest
->> + * RAM to internal data structs
->> + */
->> +static int vgic_its_restore_pending_tables(struct vgic_its *its)
->> +{
->> +	return -ENXIO;
->> +}
->> +
->> +/**
->> + * vgic_its_flush_device_tables - flush the device table and all ITT
->> + * into guest RAM
->> + */
->> +static int vgic_its_flush_device_tables(struct vgic_its *its)
->> +{
->> +	return -ENXIO;
->> +}
->> +
->> +/**
->> + * vgic_its_restore_device_tables - restore the device table and all ITT
->> + * from guest RAM to internal data structs
->> + */
->> +static int vgic_its_restore_device_tables(struct vgic_its *its)
->> +{
->> +	return -ENXIO;
->> +}
->> +
->> +/**
->> + * vgic_its_flush_collection_table - flush the collection table into
->> + * guest RAM
->> + */
->> +static int vgic_its_flush_collection_table(struct vgic_its *its)
->> +{
->> +	return -ENXIO;
->> +}
->> +
->> +/**
->> + * vgic_its_restore_collection_table - reads the collection table
->> + * in guest memory and restores the ITS internal state. Requires the
->> + * BASER registers to be restored before.
->> + */
->> +static int vgic_its_restore_collection_table(struct vgic_its *its)
->> +{
->> +	return -ENXIO;
->> +}
->> +
->> +/**
->> + * vgic_its_table_flush - Flush all the tables into guest RAM
->> + */
->> +static int vgic_its_table_flush(struct vgic_its *its)
->> +{
->> +	int ret;
->> +
->> +	mutex_lock(&its->its_lock);
->> +
->> +	ret = vgic_its_flush_pending_tables(its);
->> +	if (ret)
->> +		goto out;
->> +	ret = vgic_its_flush_device_tables(its);
->> +	if (ret)
->> +		goto out;
->> +
->> +	ret = vgic_its_flush_collection_table(its);
->> +out:
->> +	mutex_unlock(&its->its_lock);
->> +	return ret;
->> +}
->> +
->> +/**
->> + * vgic_its_table_restore - Restore all tables from guest RAM to internal
->> + * data structs
->> + */
->> +static int vgic_its_table_restore(struct vgic_its *its)
->> +{
->> +	int ret;
->> +
->> +	mutex_lock(&its->its_lock);
->> +	ret = vgic_its_restore_collection_table(its);
->> +	if (ret)
->> +		goto out;
->> +
->> +	ret = vgic_its_restore_device_tables(its);
->> +	if (ret)
->> +		goto out;
->> +
->> +	ret = vgic_its_restore_pending_tables(its);
->> +out:
->> +	mutex_unlock(&its->its_lock);
->> +
->> +	/**
->> +	 *  In real use case we observe MSI injection before
->> +	 *  the first CPU run. This is likely to stall virtio-net-pci
->> +	 *  for instance
->> +	 */
->> +	ret = kvm_vgic_map_resources(its->dev->kvm);
->> +	return ret;
->> +}
->> +
->>  static int vgic_its_has_attr(struct kvm_device *dev,
->>  			     struct kvm_device_attr *attr)
->>  {
->> @@ -1569,6 +1675,8 @@ static int vgic_its_has_attr(struct kvm_device *dev,
->>  		break;
->>  	case KVM_DEV_ARM_VGIC_GRP_ITS_REGS:
->>  		return vgic_its_has_attr_regs(dev, attr);
->> +	case KVM_DEV_ARM_VGIC_GRP_ITS_TABLES:
->> +		return 0;
-> 
-> So maybe this has been discussed before and I missed it,
-no we haven't discussed that yet
- but wouldn't it
-> be more natural to trigger flush/restore via the
-> KVM_DEV_ARM_VGIC_GRP_CTRL group, next to the (currently only one)
-> KVM_DEV_ARM_VGIC_CTRL_INIT command? To me that sounds more like a fit,
-> since this group is explicitly about control commands. Encoding flush as
-> a dummy read and restore as a dummy write sounds a bit of a stretch to me.
-
-> So I'd suggest to just implement two more commands in that group:
-> KVM_DEV_ARM_VGIC_CTRL_FLUSH_TABLES	and KVM_DEV_ARM_VGIC_CTRL_RESTORE_TABLES
-> 
-> Does that make sense or do I miss something?
-
-Well it is implemented as a Set/Get attribute and as a group in itself
-to be homogeneous with regs. In userspace functions sometimes also are
-called set/get for save/restore so I did not find it too much
-far-fetched. Also Peter reviewed it and did not point it out. I would be
-tempted to leave it as is, waiting for somebody else to complain but
-well I don't have a strong opinion.
-
-Thanks
-
-Eric
-> 
-> Cheers,
-> Andre.
-> 
->>  	}
->>  	return -ENXIO;
->>  }
->> @@ -1617,6 +1725,8 @@ static int vgic_its_set_attr(struct kvm_device *dev,
->>  
->>  		return vgic_its_attr_regs_access(dev, attr, &reg, true);
->>  	}
->> +	case KVM_DEV_ARM_VGIC_GRP_ITS_TABLES:
->> +		return vgic_its_table_restore(its);
->>  	}
->>  	return -ENXIO;
->>  }
->> @@ -1624,9 +1734,10 @@ static int vgic_its_set_attr(struct kvm_device *dev,
->>  static int vgic_its_get_attr(struct kvm_device *dev,
->>  			     struct kvm_device_attr *attr)
->>  {
->> +	struct vgic_its *its = dev->private;
->> +
->>  	switch (attr->group) {
->>  	case KVM_DEV_ARM_VGIC_GRP_ADDR: {
->> -		struct vgic_its *its = dev->private;
->>  		u64 addr = its->vgic_its_base;
->>  		u64 __user *uaddr = (u64 __user *)(long)attr->addr;
->>  		unsigned long type = (unsigned long)attr->attr;
->> @@ -1647,6 +1758,8 @@ static int vgic_its_get_attr(struct kvm_device *dev,
->>  		if (ret)
->>  			return ret;
->>  		return put_user(reg, uaddr);
->> +	case KVM_DEV_ARM_VGIC_GRP_ITS_TABLES:
->> +		return vgic_its_table_flush(its);
->>  	}
->>  	default:
->>  		return -ENXIO;
->>
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Tomasz
