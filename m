@@ -1,79 +1,34 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 22 Mar 2017 14:10:05 +0000
-Subject: [PATCH v2] efifb: avoid reconfiguration of BAR that covers the
- framebuffer
-In-Reply-To: <CAKv+Gu-XJK8bJvPrjfHbFHsOmuJ96RRgdsg2E7vgC0HZDemyFg@mail.gmail.com>
-References: <1490123810-12383-1-git-send-email-ard.biesheuvel@linaro.org>
- <20170322102939.GB3519@red-moon>
- <35F65528-FC1F-4813-A0C6-641CF864212A@linaro.org>
- <20170322113500.GA3940@red-moon>
- <CAKv+Gu-XJK8bJvPrjfHbFHsOmuJ96RRgdsg2E7vgC0HZDemyFg@mail.gmail.com>
-Message-ID: <20170322141005.GA4221@red-moon>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Wed, 22 Mar 2017 09:48:20 -0500
+Subject: [PATCH] PCI: ACPI: Fix ThunderX PEM initialization
+In-Reply-To: <de830a73-6f01-62af-b454-dc1588a209eb@jonmasters.org>
+References: <20170201151807.GA15793@bhelgaas-glaptop.roam.corp.google.com>
+ <376ae1df-da85-e576-75d6-3ae2ab0f1b41@jonmasters.org>
+ <20170315113323.GA28027@localhost.localdomain>
+ <251db823-591b-483b-9c55-13c911020fd1@jonmasters.org>
+ <48b93116-cc0f-e59d-8aa3-704052ad6759@gmail.com>
+ <c3392131-9243-24d3-30b4-4d7e84019d6f@jonmasters.org>
+ <20170321134744.GA13150@bhelgaas-glaptop.roam.corp.google.com>
+ <b50b6a7f-30be-4206-4f38-2539ea936228@semihalf.com>
+ <aad5796a-1af8-53e0-c5f3-cb7755519cd5@caviumnetworks.com>
+ <de830a73-6f01-62af-b454-dc1588a209eb@jonmasters.org>
+Message-ID: <20170322144820.GA16556@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 22, 2017 at 12:39:57PM +0000, Ard Biesheuvel wrote:
+On Wed, Mar 22, 2017 at 10:28:27AM -0400, Jon Masters wrote:
+> On 03/21/2017 10:56 AM, David Daney wrote:
 
-[...]
+> > Yes.  After all this back and forth, Cavium has decided to deploy
+> > firmware with "CAVxxx" as _HID.
+> 
+> Great. How about a stable backport for Greg K-H? I want to make sure
+> that everyone running "upstream" has a chance of booting.
 
-> >> Well, it turned out that this does not actually work: the BAR is not
-> >> reassigned, but the same range ends up being given to another device
-> >> in some cases.
-> >
-> > Ok, that's because the PCI core just prevent assigning that resource
-> > but it does not request it (ie insert it in the resource tree) which
-> > is what you do when claiming it.
-> >
-> 
-> Yes, that seems to be what is happening.
-> 
-> > I wonder how IORESOURCE_PCI_FIXED works on eg x86, I think it is time
-> > to have a proper look into resources allocation code because there
-> > are bits and pieces that are quite obscure to me.
-> >
-> 
-> I did a quick test with calling request_mem_region(), in which case we
-> end up with something like
-> 
-> 10000000-3efeffff : PCI Bus 0000:00
->   10000000-101d4bff : efifb:pci
->   101d5000-101d5fff : 0000:00:01.0
->   101d6000-101d6fff : 0000:00:02.0
->   101d7000-101d7fff : 0000:00:04.0
->     101d7000-101d7fff : ehci_hcd
->   101d8000-101d8fff : 0000:00:05.0
->   101e0000-101effff : 0000:00:05.0
->   10200000-1023ffff : 0000:00:02.0
-> 
-> which works, because the region is no longer assigned to another BAR.
-> 
-> But I think claiming the resource via the PCI subsystem is probably
-> more appropriate, because then we get
+The first patch, fee4d813850c ("PCI: Use Cavium assigned hardware ID for
+ThunderX host controller"), has a stable tag already.
 
-Yes it is.
+The second, 1dc94a38af89 ("PCI: Add legacy firmware support for Cavium
+ThunderX host controller"), does not, but I can easily add it if needed.
 
-> 10000000-3efeffff : PCI Bus 0000:00
->   10000000-10ffffff : 0000:00:05.0
->     10000000-101d4fff : efifb
->   11000000-1103ffff : 0000:00:02.0
->   11040000-1104ffff : 0000:00:05.0
->   11050000-11050fff : 0000:00:01.0
->   11051000-11051fff : 0000:00:02.0
->   11052000-11052fff : 0000:00:04.0
->     11052000-11052fff : ehci_hcd
->   11053000-11053fff : 0000:00:05.0
-> 
-> (Note that efifb does not use the entire BAR resource)
-> 
-> > I think I would reverse the order in which you carry out the BAR
-> > reservation anyway (first check if the device is enabled second request
-> > the resource ie claim it).
-> >
-> 
-> I will spin a v3 with the check and the claim in reverse order. But I
-> think we should keep the pci_claim() call.
-
-Agreed.
-
-Thanks,
-Lorenzo
+Bjorn
