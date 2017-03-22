@@ -1,36 +1,34 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Wed, 22 Mar 2017 11:44:21 -0700
-Subject: [PATCH v7 1/3] Input: max11801_ts: Add missing of_match_table
-In-Reply-To: <CAMty3ZApz+GVkeoT4-75tiJcn6-CxkzdOrMcH7hjK1k2Ht=ZUQ@mail.gmail.com>
-References: <1490180808-2856-1-git-send-email-jagan@openedev.com>
- <20170322183039.GA2899@dtor-ws>
- <CAMty3ZApz+GVkeoT4-75tiJcn6-CxkzdOrMcH7hjK1k2Ht=ZUQ@mail.gmail.com>
-Message-ID: <20170322184421.GB2899@dtor-ws>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Wed, 22 Mar 2017 20:45:51 +0200
+Subject: [PATCH 1/2] tty: serial_core: Add name field to uart_port struct
+In-Reply-To: <20170321133636.8814-2-vigneshr@ti.com>
+References: <20170321133636.8814-1-vigneshr@ti.com>
+ <20170321133636.8814-2-vigneshr@ti.com>
+Message-ID: <CAHp75VfHtTV6L0GE61kMiHMCQrUSwGJPRxsiNuOCD9mY7MPpZQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 23, 2017 at 12:05:17AM +0530, Jagan Teki wrote:
-> On Thu, Mar 23, 2017 at 12:00 AM, Dmitry Torokhov
-> <dmitry.torokhov@gmail.com> wrote:
-> > On Wed, Mar 22, 2017 at 04:36:46PM +0530, Jagan Teki wrote:
-> >> From: Jagan Teki <jagan@amarulasolutions.com>
-> >>
-> >> Added missing of_match_table for max11801_ts driver with
-> >> compatible as "maxim,max11801_ts"
-> >>
-> >
-> > Why not "maxim,max11801"? Also, I think we'd need a binding document.
-> 
-> Compatibility purpose to make this is for touchscreen and few of other
+On Tue, Mar 21, 2017 at 3:36 PM, Vignesh R <vigneshr@ti.com> wrote:
+> Introduce a field to store name of uart_port that can be used to easily
+> identify uart port instances on a system that has more than one uart
 
-Compatibility with what? The i2c id is "max11801" (without the "-ts").
+uart -> UART
 
-> *_ts.c files follow the same, and added binding documentation in 2/3
-> patch.
+> instance. The name is of the form ttyXN(eg. ttyS0, ttyAMA0,..) where N
+> is number that particular uart instance.
+> This field will be useful when printing debug info for a particular port
+> or in register irqs with unique irq name. Port name is populated during
 
-Sorry, it seems I am only copied on 1/3 patch.
+irq(s) -> IRQ(s)
 
-Thanks.
+> uart_add_one_port().
+
+> +       snprintf(uport->name, sizeof(uport->name), "%s%d", drv->dev_name,
+> +                drv->tty_driver->name_base + uport->line);
+
+This is fragile. dev_name is defined as pointer, so, it would be any length.
+So, better to use [devm_]kasprintf().
 
 -- 
-Dmitry
+With Best Regards,
+Andy Shevchenko
