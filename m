@@ -1,34 +1,248 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Wed, 22 Mar 2017 09:48:20 -0500
-Subject: [PATCH] PCI: ACPI: Fix ThunderX PEM initialization
-In-Reply-To: <de830a73-6f01-62af-b454-dc1588a209eb@jonmasters.org>
-References: <20170201151807.GA15793@bhelgaas-glaptop.roam.corp.google.com>
- <376ae1df-da85-e576-75d6-3ae2ab0f1b41@jonmasters.org>
- <20170315113323.GA28027@localhost.localdomain>
- <251db823-591b-483b-9c55-13c911020fd1@jonmasters.org>
- <48b93116-cc0f-e59d-8aa3-704052ad6759@gmail.com>
- <c3392131-9243-24d3-30b4-4d7e84019d6f@jonmasters.org>
- <20170321134744.GA13150@bhelgaas-glaptop.roam.corp.google.com>
- <b50b6a7f-30be-4206-4f38-2539ea936228@semihalf.com>
- <aad5796a-1af8-53e0-c5f3-cb7755519cd5@caviumnetworks.com>
- <de830a73-6f01-62af-b454-dc1588a209eb@jonmasters.org>
-Message-ID: <20170322144820.GA16556@bhelgaas-glaptop.roam.corp.google.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 22 Mar 2017 14:50:31 +0000
+Subject: [RFC PATCH v2 01/41] arm64: signal: Refactor sigcontext parsing in
+ rt_sigreturn
+In-Reply-To: <1490194274-30569-1-git-send-email-Dave.Martin@arm.com>
+References: <1490194274-30569-1-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1490194274-30569-2-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 22, 2017 at 10:28:27AM -0400, Jon Masters wrote:
-> On 03/21/2017 10:56 AM, David Daney wrote:
+Currently, rt_sigreturn does very limited checking on the
+sigcontext coming from userspace.
 
-> > Yes.  After all this back and forth, Cavium has decided to deploy
-> > firmware with "CAVxxx" as _HID.
-> 
-> Great. How about a stable backport for Greg K-H? I want to make sure
-> that everyone running "upstream" has a chance of booting.
+Future additions of extra dynamic sigcontext data will increase the
+potential for surprises.  Also, it is not clear whether the
+sigcontext extension records are supposed to occur in a particular
+order.
 
-The first patch, fee4d813850c ("PCI: Use Cavium assigned hardware ID for
-ThunderX host controller"), has a stable tag already.
+This patch factors out the sigcontext parsing into a separate
+function, and adds extra checks to validate the well-formedness of
+the sigcontext structure.
 
-The second, 1dc94a38af89 ("PCI: Add legacy firmware support for Cavium
-ThunderX host controller"), does not, but I can easily add it if needed.
+To help with this, an abstraction for the signal frame layout is
+also added, using offsets to track the location of different
+records in the frame.  Although trivial, this provides a base to
+extend upon in order to track more complex layouts.
 
-Bjorn
+Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+---
+ arch/arm64/kernel/signal.c | 121 +++++++++++++++++++++++++++++++++++++--------
+ 1 file changed, 101 insertions(+), 20 deletions(-)
+
+diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
+index c7b6de6..f582d1d 100644
+--- a/arch/arm64/kernel/signal.c
++++ b/arch/arm64/kernel/signal.c
+@@ -19,9 +19,11 @@
+ 
+ #include <linux/compat.h>
+ #include <linux/errno.h>
++#include <linux/kernel.h>
+ #include <linux/signal.h>
+ #include <linux/personality.h>
+ #include <linux/freezer.h>
++#include <linux/stddef.h>
+ #include <linux/uaccess.h>
+ #include <linux/tracehook.h>
+ #include <linux/ratelimit.h>
+@@ -45,6 +47,10 @@ struct rt_sigframe {
+ 	u64 lr;
+ };
+ 
++struct rt_sigframe_user_layout {
++	struct rt_sigframe __user *sigframe;
++};
++
+ static int preserve_fpsimd_context(struct fpsimd_context __user *ctx)
+ {
+ 	struct fpsimd_state *fpsimd = &current->thread.fpsimd_state;
+@@ -92,12 +98,86 @@ static int restore_fpsimd_context(struct fpsimd_context __user *ctx)
+ 	return err ? -EFAULT : 0;
+ }
+ 
++struct user_ctxs {
++	struct fpsimd_context __user *fpsimd;
++};
++
++static int parse_user_sigframe(struct user_ctxs *user,
++			       struct rt_sigframe __user *sf)
++{
++	struct sigcontext __user *sc = &sf->uc.uc_mcontext;
++	struct _aarch64_ctx __user *head =
++		(struct _aarch64_ctx __user *)&sc->__reserved;
++	size_t offset = 0;
++
++	user->fpsimd = NULL;
++
++	while (1) {
++		int err;
++		u32 magic, size;
++
++		head = (struct _aarch64_ctx __user *)&sc->__reserved[offset];
++		if (!IS_ALIGNED((unsigned long)head, 16))
++			goto invalid;
++
++		err = 0;
++		__get_user_error(magic, &head->magic, err);
++		__get_user_error(size, &head->size, err);
++		if (err)
++			return err;
++
++		switch (magic) {
++		case 0:
++			if (size)
++				goto invalid;
++
++			goto done;
++
++		case FPSIMD_MAGIC:
++			if (user->fpsimd)
++				goto invalid;
++
++			if (offset > sizeof(sc->__reserved) -
++					sizeof(*user->fpsimd) ||
++			    size < sizeof(*user->fpsimd))
++				goto invalid;
++
++			user->fpsimd = (struct fpsimd_context __user *)head;
++			break;
++
++		case ESR_MAGIC:
++			/* ignore */
++			break;
++
++		default:
++			goto invalid;
++		}
++
++		if (size < sizeof(*head))
++			goto invalid;
++
++		if (size > sizeof(sc->__reserved) - (sizeof(*head) + offset))
++			goto invalid;
++
++		offset += size;
++	}
++
++done:
++	if (!user->fpsimd)
++		goto invalid;
++
++	return 0;
++
++invalid:
++	return -EINVAL;
++}
++
+ static int restore_sigframe(struct pt_regs *regs,
+ 			    struct rt_sigframe __user *sf)
+ {
+ 	sigset_t set;
+ 	int i, err;
+-	void *aux = sf->uc.uc_mcontext.__reserved;
++	struct user_ctxs user;
+ 
+ 	err = __copy_from_user(&set, &sf->uc.uc_sigmask, sizeof(set));
+ 	if (err == 0)
+@@ -116,12 +196,11 @@ static int restore_sigframe(struct pt_regs *regs,
+ 	regs->syscallno = ~0UL;
+ 
+ 	err |= !valid_user_regs(&regs->user_regs, current);
++	if (err == 0)
++		err = parse_user_sigframe(&user, sf);
+ 
+-	if (err == 0) {
+-		struct fpsimd_context *fpsimd_ctx =
+-			container_of(aux, struct fpsimd_context, head);
+-		err |= restore_fpsimd_context(fpsimd_ctx);
+-	}
++	if (err == 0)
++		err = restore_fpsimd_context(user.fpsimd);
+ 
+ 	return err;
+ }
+@@ -162,10 +241,11 @@ asmlinkage long sys_rt_sigreturn(struct pt_regs *regs)
+ 	return 0;
+ }
+ 
+-static int setup_sigframe(struct rt_sigframe __user *sf,
++static int setup_sigframe(struct rt_sigframe_user_layout *user,
+ 			  struct pt_regs *regs, sigset_t *set)
+ {
+ 	int i, err = 0;
++	struct rt_sigframe __user *sf = user->sigframe;
+ 	void *aux = sf->uc.uc_mcontext.__reserved;
+ 	struct _aarch64_ctx *end;
+ 
+@@ -209,33 +289,32 @@ static int setup_sigframe(struct rt_sigframe __user *sf,
+ 	return err;
+ }
+ 
+-static struct rt_sigframe __user *get_sigframe(struct ksignal *ksig,
+-					       struct pt_regs *regs)
++static int get_sigframe(struct rt_sigframe_user_layout *user,
++			 struct ksignal *ksig, struct pt_regs *regs)
+ {
+ 	unsigned long sp, sp_top;
+-	struct rt_sigframe __user *frame;
+ 
+ 	sp = sp_top = sigsp(regs->sp, ksig);
+ 
+ 	sp = (sp - sizeof(struct rt_sigframe)) & ~15;
+-	frame = (struct rt_sigframe __user *)sp;
++	user->sigframe = (struct rt_sigframe __user *)sp;
+ 
+ 	/*
+ 	 * Check that we can actually write to the signal frame.
+ 	 */
+-	if (!access_ok(VERIFY_WRITE, frame, sp_top - sp))
+-		frame = NULL;
++	if (!access_ok(VERIFY_WRITE, user->sigframe, sp_top - sp))
++		return -EFAULT;
+ 
+-	return frame;
++	return 0;
+ }
+ 
+ static void setup_return(struct pt_regs *regs, struct k_sigaction *ka,
+-			 void __user *frame, int usig)
++			 struct rt_sigframe_user_layout *user, int usig)
+ {
+ 	__sigrestore_t sigtramp;
+ 
+ 	regs->regs[0] = usig;
+-	regs->sp = (unsigned long)frame;
++	regs->sp = (unsigned long)user->sigframe;
+ 	regs->regs[29] = regs->sp + offsetof(struct rt_sigframe, fp);
+ 	regs->pc = (unsigned long)ka->sa.sa_handler;
+ 
+@@ -250,20 +329,22 @@ static void setup_return(struct pt_regs *regs, struct k_sigaction *ka,
+ static int setup_rt_frame(int usig, struct ksignal *ksig, sigset_t *set,
+ 			  struct pt_regs *regs)
+ {
++	struct rt_sigframe_user_layout user;
+ 	struct rt_sigframe __user *frame;
+ 	int err = 0;
+ 
+-	frame = get_sigframe(ksig, regs);
+-	if (!frame)
++	if (get_sigframe(&user, ksig, regs))
+ 		return 1;
+ 
++	frame = user.sigframe;
++
+ 	__put_user_error(0, &frame->uc.uc_flags, err);
+ 	__put_user_error(NULL, &frame->uc.uc_link, err);
+ 
+ 	err |= __save_altstack(&frame->uc.uc_stack, regs->sp);
+-	err |= setup_sigframe(frame, regs, set);
++	err |= setup_sigframe(&user, regs, set);
+ 	if (err == 0) {
+-		setup_return(regs, &ksig->ka, frame, usig);
++		setup_return(regs, &ksig->ka, &user, usig);
+ 		if (ksig->ka.sa.sa_flags & SA_SIGINFO) {
+ 			err |= copy_siginfo_to_user(&frame->info, &ksig->info);
+ 			regs->regs[1] = (unsigned long)&frame->info;
+-- 
+2.1.4
