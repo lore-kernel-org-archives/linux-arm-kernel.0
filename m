@@ -1,230 +1,96 @@
 From: eric.auger@redhat.com (Auger Eric)
-Date: Wed, 22 Mar 2017 15:15:05 +0100
-Subject: [PATCH v3 05/19] KVM: arm64: ITS: Implement
- vgic_its_has_attr_regs and attr_regs_access
-In-Reply-To: <3002064c-edd7-93a4-afdd-52ccb95f854e@arm.com>
+Date: Wed, 22 Mar 2017 15:11:05 +0100
+Subject: [PATCH v3 16/19] KVM: arm64: ITS: vgic_its_check_id returns the
+ entry's GPA
+In-Reply-To: <be79d92f-2522-a754-f006-66901d26e94c@arm.com>
 References: <1488800074-21991-1-git-send-email-eric.auger@redhat.com>
- <1488800074-21991-6-git-send-email-eric.auger@redhat.com>
- <3002064c-edd7-93a4-afdd-52ccb95f854e@arm.com>
-Message-ID: <c539367c-8b20-12d7-ff59-a3450556c16c@redhat.com>
+ <1488800074-21991-17-git-send-email-eric.auger@redhat.com>
+ <be79d92f-2522-a754-f006-66901d26e94c@arm.com>
+Message-ID: <5e14fa1c-2eb6-6746-968b-4ecc18dd7cdd@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Andre,
-On 20/03/2017 19:13, Andre Przywara wrote:
-> Hi Eric,
+Hi,
+
+On 21/03/2017 19:12, Andre Przywara wrote:
+> Hi,
 > 
 > On 06/03/17 11:34, Eric Auger wrote:
->> This patch implements vgic_its_has_attr_regs and vgic_its_attr_regs_access
->> upon the MMIO framework. VGIC ITS KVM device KVM_DEV_ARM_VGIC_GRP_ITS_REGS
->> group becomes functional.
->>
->> At least GITS_CREADR requires to differentiate a guest write action from a
->> user access. As such let's introduce a new uaccess_its_write
->> vgic_register_region callback.
+>> As vgic_its_check_id() computes the device/collection entry's
+>> GPA, let's return it so that new callers can retrieve it easily.
 >>
 >> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+>>
 >> ---
->>  virt/kvm/arm/vgic/vgic-its.c  | 74 ++++++++++++++++++++++++++++++++++++-------
->>  virt/kvm/arm/vgic/vgic-mmio.h |  9 ++++--
->>  2 files changed, 69 insertions(+), 14 deletions(-)
+>>
+>> v2: new
+>> ---
+>>  virt/kvm/arm/vgic/vgic-its.c | 11 ++++++++---
+>>  1 file changed, 8 insertions(+), 3 deletions(-)
 >>
 >> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
->> index 43bb17e..e9c8f9f 100644
+>> index ad67759..1060125 100644
 >> --- a/virt/kvm/arm/vgic/vgic-its.c
 >> +++ b/virt/kvm/arm/vgic/vgic-its.c
->> @@ -1287,13 +1287,14 @@ static void vgic_mmio_write_its_baser(struct kvm *kvm,
->>  	*regptr = reg;
->>  }
->>  
->> -#define REGISTER_ITS_DESC(off, rd, wr, length, acc)		\
->> +#define REGISTER_ITS_DESC(off, rd, wr, uwr, length, acc)		\
->>  {								\
->>  	.reg_offset = off,					\
->>  	.len = length,						\
->>  	.access_flags = acc,					\
->>  	.its_read = rd,						\
->>  	.its_write = wr,					\
->> +	.uaccess_its_write = uwr,					\
-> 
-> I was wondering if it would create less churn to keep this definition
-> here (with .uaccess_its_write automatically becoming NULL), and then
-> either open-code the one special case below or provide a second wrapper
-> macro. But I guess either way is not really nice, so we could go with
-> this approach here as well.
-
-Agreed. I plan to introduce REGISTER_ITS_DESC_UACCESS in next patch instead.
-
-> 
->>  }
->>  
->>  static void its_mmio_write_wi(struct kvm *kvm, struct vgic_its *its,
->> @@ -1304,28 +1305,28 @@ static void its_mmio_write_wi(struct kvm *kvm, struct vgic_its *its,
->>  
->>  static struct vgic_register_region its_registers[] = {
->>  	REGISTER_ITS_DESC(GITS_CTLR,
->> -		vgic_mmio_read_its_ctlr, vgic_mmio_write_its_ctlr, 4,
->> +		vgic_mmio_read_its_ctlr, vgic_mmio_write_its_ctlr, NULL, 4,
->>  		VGIC_ACCESS_32bit),
->>  	REGISTER_ITS_DESC(GITS_IIDR,
->> -		vgic_mmio_read_its_iidr, its_mmio_write_wi, 4,
->> +		vgic_mmio_read_its_iidr, its_mmio_write_wi, NULL, 4,
->>  		VGIC_ACCESS_32bit),
->>  	REGISTER_ITS_DESC(GITS_TYPER,
->> -		vgic_mmio_read_its_typer, its_mmio_write_wi, 8,
->> +		vgic_mmio_read_its_typer, its_mmio_write_wi, NULL, 8,
->>  		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
->>  	REGISTER_ITS_DESC(GITS_CBASER,
->> -		vgic_mmio_read_its_cbaser, vgic_mmio_write_its_cbaser, 8,
->> +		vgic_mmio_read_its_cbaser, vgic_mmio_write_its_cbaser, NULL, 8,
->>  		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
->>  	REGISTER_ITS_DESC(GITS_CWRITER,
->> -		vgic_mmio_read_its_cwriter, vgic_mmio_write_its_cwriter, 8,
->> -		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
->> +		vgic_mmio_read_its_cwriter, vgic_mmio_write_its_cwriter, NULL,
->> +		8, VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
->>  	REGISTER_ITS_DESC(GITS_CREADR,
->> -		vgic_mmio_read_its_creadr, its_mmio_write_wi, 8,
->> +		vgic_mmio_read_its_creadr, its_mmio_write_wi, NULL, 8,
->>  		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
->>  	REGISTER_ITS_DESC(GITS_BASER,
->> -		vgic_mmio_read_its_baser, vgic_mmio_write_its_baser, 0x40,
->> +		vgic_mmio_read_its_baser, vgic_mmio_write_its_baser, NULL, 0x40,
->>  		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
->>  	REGISTER_ITS_DESC(GITS_IDREGS_BASE,
->> -		vgic_mmio_read_its_idregs, its_mmio_write_wi, 0x30,
->> +		vgic_mmio_read_its_idregs, its_mmio_write_wi, NULL, 0x30,
->>  		VGIC_ACCESS_32bit),
->>  };
->>  
->> @@ -1448,14 +1449,63 @@ static void vgic_its_destroy(struct kvm_device *kvm_dev)
->>  int vgic_its_has_attr_regs(struct kvm_device *dev,
->>  			   struct kvm_device_attr *attr)
+>> @@ -637,7 +637,8 @@ static int vgic_its_cmd_handle_movi(struct kvm *kvm, struct vgic_its *its,
+>>   * is actually valid (covered by a memslot and guest accessible).
+>>   * For this we have to read the respective first level entry.
+>>   */
+>> -static bool vgic_its_check_id(struct vgic_its *its, u64 baser, int id)
+>> +static bool vgic_its_check_id(struct vgic_its *its, u64 baser, int id,
+>> +			      gpa_t *eaddr)
 >>  {
->> -	return -ENXIO;
->> +	const struct vgic_register_region *region;
->> +	struct vgic_io_device iodev = {
->> +		.regions = its_registers,
->> +		.nr_regions = ARRAY_SIZE(its_registers),
->> +	};
->> +	gpa_t offset;
->> +
->> +	offset = attr->attr;
-> 
-> Those two can be on one line.
-> But actually why not just put attr->attr below and save that variable at
-> all?
-done
-> 
->> +
->> +	region = vgic_find_mmio_region(iodev.regions,
->> +				       iodev.nr_regions,
->> +				       offset);
->> +	if (!region)
->> +		return -ENXIO;
-> 
-> Nit: empty line here?
-done
-> 
->> +	return 0;
->>  }
+>>  	int l1_tbl_size = GITS_BASER_NR_PAGES(baser) * SZ_64K;
+>>  	int index;
+>> @@ -657,6 +658,7 @@ static bool vgic_its_check_id(struct vgic_its *its, u64 baser, int id)
+>>  		addr = BASER_ADDRESS(baser) + id * esz;
+>>  		gfn = addr >> PAGE_SHIFT;
 >>  
->>  int vgic_its_attr_regs_access(struct kvm_device *dev,
->>  			      struct kvm_device_attr *attr,
->>  			      u64 *reg, bool is_write)
->>  {
->> -	return -ENXIO;
->> +	const struct vgic_register_region *region;
->> +	struct vgic_io_device iodev = {
->> +		.regions = its_registers,
->> +		.nr_regions = ARRAY_SIZE(its_registers),
->> +	};
->> +	struct vgic_its *its = dev->private;
->> +	gpa_t addr, offset;
->> +	unsigned int len;
->> +
->> +	if (IS_VGIC_ADDR_UNDEF(its->vgic_its_base))
->> +		return -ENXIO;
->> +
->> +	offset = attr->attr;
->> +	if (offset & 0x7)
->> +		return -EINVAL;
+>> +		*eaddr = addr;
 > 
-> Isn't this still breaking IIDR reads (a 32-bit register at offset 0x4)?
-Hum yes it does. I will fix & test that. At the moment I was not
-saving/restoring the IIDR but this is the plan now. Thanks for spotting
-this.
-> 
->> +
->> +	addr = its->vgic_its_base + offset;
->> +
->> +	region = vgic_find_mmio_region(iodev.regions,
->> +				       iodev.nr_regions,
->> +				       offset);
->> +	if (!region)
->> +		return -ENXIO;
->> +
->> +	len = region->access_flags & VGIC_ACCESS_64bit ? 8 : 4;
-> 
-> Can you add a comment that states that we only support full register
-> accesses via this interface (deviating from the spec which allows split
-> accesses to 64-bit registers)? I think that's mentioned somewhere else
-> (Documentation/...), but it avoids confusion for the casual reader here.
-Added that comment.
-> 
-> Also I am wondering if that way of using the pointer here for both 32-
-> and 64-bit registers breaks on big endian? Or is it specified somewhere
-> that this interface uses LE only?
-
-Agreed, I used add vgic_data_mmio_bus_to_host and
-vgic_data_host_to_mmio_bus handling.
+> If you check that eaddr is not NULL before writing to it, you can save
+> the dummy variable in the two callers below (which doesn't hurt, but
+> does not help readability either).
+done
 
 Thanks
 
 Eric
 > 
-> The rest looks fine, thanks!
-> 
 > Cheers,
 > Andre.
 > 
->> +	if (is_write) {
->> +		if (region->uaccess_its_write)
->> +			region->uaccess_its_write(dev->kvm, its, addr,
->> +						  len, *reg);
->> +		else
->> +			region->its_write(dev->kvm, its, addr, len, *reg);
->> +	} else {
->> +		*reg = region->its_read(dev->kvm, its, addr, len);
->> +	}
->> +	return 0;
+>>  		return kvm_is_visible_gfn(its->dev->kvm, gfn);
+>>  	}
+>>  
+>> @@ -689,6 +691,7 @@ static bool vgic_its_check_id(struct vgic_its *its, u64 baser, int id)
+>>  	indirect_ptr += index * esz;
+>>  	gfn = indirect_ptr >> PAGE_SHIFT;
+>>  
+>> +	*eaddr = indirect_ptr;
+>>  	return kvm_is_visible_gfn(its->dev->kvm, gfn);
 >>  }
 >>  
->>  static int vgic_its_has_attr(struct kvm_device *dev,
->> diff --git a/virt/kvm/arm/vgic/vgic-mmio.h b/virt/kvm/arm/vgic/vgic-mmio.h
->> index 055ad42..ad8a585 100644
->> --- a/virt/kvm/arm/vgic/vgic-mmio.h
->> +++ b/virt/kvm/arm/vgic/vgic-mmio.h
->> @@ -36,8 +36,13 @@ struct vgic_register_region {
->>  	};
->>  	unsigned long (*uaccess_read)(struct kvm_vcpu *vcpu, gpa_t addr,
->>  				      unsigned int len);
->> -	void (*uaccess_write)(struct kvm_vcpu *vcpu, gpa_t addr,
->> -			      unsigned int len, unsigned long val);
->> +	union {
->> +		void (*uaccess_write)(struct kvm_vcpu *vcpu, gpa_t addr,
->> +				      unsigned int len, unsigned long val);
->> +		void (*uaccess_its_write)(struct kvm *kvm, struct vgic_its *its,
->> +					  gpa_t addr, unsigned int len,
->> +					  unsigned long val);
->> +	};
->>  };
+>> @@ -697,8 +700,9 @@ static int vgic_its_alloc_collection(struct vgic_its *its,
+>>  				     u32 coll_id)
+>>  {
+>>  	struct its_collection *collection;
+>> +	gpa_t eaddr;
 >>  
->>  extern struct kvm_io_device_ops kvm_io_gic_ops;
+>> -	if (!vgic_its_check_id(its, its->baser_coll_table, coll_id))
+>> +	if (!vgic_its_check_id(its, its->baser_coll_table, coll_id, &eaddr))
+>>  		return E_ITS_MAPC_COLLECTION_OOR;
+>>  
+>>  	collection = kzalloc(sizeof(*collection), GFP_KERNEL);
+>> @@ -910,8 +914,9 @@ static int vgic_its_cmd_handle_mapd(struct kvm *kvm, struct vgic_its *its,
+>>  	size_t size = its_cmd_get_size(its_cmd);
+>>  	gpa_t itt_addr = its_cmd_get_ittaddr(its_cmd);
+>>  	struct its_device *device;
+>> +	gpa_t eaddr;
+>>  
+>> -	if (!vgic_its_check_id(its, its->baser_device_table, device_id))
+>> +	if (!vgic_its_check_id(its, its->baser_device_table, device_id, &eaddr))
+>>  		return E_ITS_MAPD_DEVICE_OOR;
+>>  
+>>  	if (valid && size > VITS_TYPER_IDBITS)
 >>
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
