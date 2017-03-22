@@ -1,67 +1,77 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 22 Mar 2017 14:50:56 +0000
-Subject: [RFC PATCH v2 26/41] arm64/sve: Avoid stale user register state after
- SVE access exception
+Date: Wed, 22 Mar 2017 14:50:55 +0000
+Subject: [RFC PATCH v2 25/41] arm64/sve: Avoid preempt_disable() during
+ sigreturn
 In-Reply-To: <1490194274-30569-1-git-send-email-Dave.Martin@arm.com>
 References: <1490194274-30569-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1490194274-30569-27-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1490194274-30569-26-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, when an SVE access exception is taken from userspace,
-the FPSIMD state in the task_struct is converted to SVE state and
-reloaded as SVE state.
+Currently the sigreturn implementation for SVE relies on
+preempt_disable() to avoid an intervening context switch from
+corrupting the SVE state in the task_struct.
 
-Unfortunately, since we've been executing in userspace there's no
-guarantee that the FPSIMD state saved will actually be up to date
-with respect to the registers, so updates may be lost.
+Unforunately, __get_user() and friends are not safe under
+preempt_disable().
 
-This patch saves the FPSIMD state back to the task_struct first, to
-ensure that the task_struct copy of the data is up to date.
+As an alternative, this patch removes preempt_disable() and sets
+TIF_FOREIGN_FPSTATE instead: this will inform the context switch
+code that the current CPU registers don't contain the SVE/FPSIMD
+state of the current task, preventing writeback to the task_struct
+during context switch.
 
-Also, the CPACR handling logic is removed since task_fpsimd_load()
-handles it anyway.
+To avoid an intervening context switch from spontaneously clearing
+TIF_FOREIGN_FPSTATE again while doing this,
+fpsimd_flush_task_state() is also called beforehand.
 
 Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 ---
- arch/arm64/kernel/fpsimd.c | 16 ++++++----------
- 1 file changed, 6 insertions(+), 10 deletions(-)
+ arch/arm64/kernel/signal.c | 14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-index 8c18384..4e2d796 100644
---- a/arch/arm64/kernel/fpsimd.c
-+++ b/arch/arm64/kernel/fpsimd.c
-@@ -39,6 +39,7 @@
+diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
+index 619dca5..20bc312 100644
+--- a/arch/arm64/kernel/signal.c
++++ b/arch/arm64/kernel/signal.c
+@@ -256,10 +256,10 @@ static int __restore_sve_fpsimd_context(struct user_ctxs *user,
+ 	if (vl != sve_get_vl())
+ 		return -EINVAL;
  
- /* Forward declarations for local functions used by both SVE and FPSIMD */
- static void task_fpsimd_load(struct task_struct *task);
-+static void task_fpsimd_save(struct task_struct *task);
- 
- /*
-  * In order to reduce the number of times the FPSIMD state is needlessly saved
-@@ -154,19 +155,14 @@ static void sve_to_fpsimd(struct task_struct *task)
- 
- void do_sve_acc(unsigned int esr, struct pt_regs *regs)
- {
--	if (test_and_set_thread_flag(TIF_SVE)) {
--		unsigned long tmp;
+-	preempt_disable();
 -
--		asm ("mrs %0, cpacr_el1" : "=r" (tmp));
--
--		printk(KERN_INFO "%s: Strange, ZEN=%u\n",
--		       __func__, (unsigned int)((tmp >> 16) & 3));
--		BUG();
--	}
--
- 	BUG_ON(is_compat_task());
++	fpsimd_flush_task_state(current);
++	barrier();
+ 	set_thread_flag(TIF_FOREIGN_FPSTATE);
+-	set_thread_flag(TIF_SVE);
++	barrier();
  
-+	task_fpsimd_save(current);
+ 	BUG_ON(SVE_SIG_REGS_SIZE(vq) > sizeof(*task_sve_regs));
+ 	BUG_ON(round_up(SVE_SIG_REGS_SIZE(vq), 16) < sizeof(*task_sve_regs));
+@@ -270,7 +270,7 @@ static int __restore_sve_fpsimd_context(struct user_ctxs *user,
+ 					SVE_SIG_REGS_OFFSET,
+ 			       SVE_SIG_REGS_SIZE(vq));
+ 	if (err)
+-		goto out_preempt;
++		return err;
+ 
+ 	/* copy the FP and status/control registers */
+ 	/* restore_sigframe() already checked that user->fpsimd != NULL. */
+@@ -279,13 +279,13 @@ static int __restore_sve_fpsimd_context(struct user_ctxs *user,
+ 	__get_user_error(fpsimd.fpsr, &user->fpsimd->fpsr, err);
+ 	__get_user_error(fpsimd.fpcr, &user->fpsimd->fpcr, err);
+ 
++	barrier();
++	set_thread_flag(TIF_SVE);
 +
- 	fpsimd_to_sve(current);
-+	if (test_and_set_thread_flag(TIF_SVE))
-+		BUG(); /* We shouldn't trap if SVE was already enabled! */
-+
- 	task_fpsimd_load(current);
+ 	/* load the hardware registers from the fpsimd_state structure */
+ 	if (!err)
+ 		fpsimd_update_current_state(&fpsimd);
+ 
+-out_preempt:
+-	preempt_enable();
+-
+ 	return err;
  }
  
 -- 
