@@ -1,64 +1,105 @@
-From: leonard.crestez@nxp.com (Leonard Crestez)
-Date: Wed, 22 Mar 2017 16:27:37 +0200
-Subject: [PATCH] ARM: imx_v6_v7_defconfig: Select SMSC_PHY
-Message-ID: <82d0aeeaed87ae5c9390b889cef4c54d715cde61.1490191972.git.leonard.crestez@nxp.com>
+From: jcm@jonmasters.org (Jon Masters)
+Date: Wed, 22 Mar 2017 10:28:27 -0400
+Subject: [PATCH] PCI: ACPI: Fix ThunderX PEM initialization
+In-Reply-To: <aad5796a-1af8-53e0-c5f3-cb7755519cd5@caviumnetworks.com>
+References: <20170131142525.GA9942@bhelgaas-glaptop.roam.corp.google.com>
+ <20170131145720.GA14231@localhost.localdomain>
+ <20170131203109.GA14127@bhelgaas-glaptop.roam.corp.google.com>
+ <20170201125325.GA15805@localhost.localdomain>
+ <20170201151807.GA15793@bhelgaas-glaptop.roam.corp.google.com>
+ <376ae1df-da85-e576-75d6-3ae2ab0f1b41@jonmasters.org>
+ <20170315113323.GA28027@localhost.localdomain>
+ <251db823-591b-483b-9c55-13c911020fd1@jonmasters.org>
+ <48b93116-cc0f-e59d-8aa3-704052ad6759@gmail.com>
+ <c3392131-9243-24d3-30b4-4d7e84019d6f@jonmasters.org>
+ <20170321134744.GA13150@bhelgaas-glaptop.roam.corp.google.com>
+ <b50b6a7f-30be-4206-4f38-2539ea936228@semihalf.com>
+ <aad5796a-1af8-53e0-c5f3-cb7755519cd5@caviumnetworks.com>
+Message-ID: <de830a73-6f01-62af-b454-dc1588a209eb@jonmasters.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The imx6sl-evk board has a LAN8720A ethernet phy supported by SMSC_PHY.
-Add this driver to the default imx config since the device is present on
-one of the evaluation boards.
+On 03/21/2017 10:56 AM, David Daney wrote:
+> On 03/21/2017 07:17 AM, Tomasz Nowicki wrote:
 
-This used to work mostly fine with the generic phy driver but since
-commit 0878fff1f42c18e448ab5b8b4f6a3eb32365b5b6 that driver no longer
-performs a soft reset on startup. This causes netboot to sometimes
-timeout on DHCP because RX doesn't work right. DHCP is eventually retried and
-it works the second time but it takes 90+ seconds to get a login prompt.
+>> On 21.03.2017 14:47, Bjorn Helgaas wrote:
 
-This was generated with "make savedefconfig" and it includes a few
-additional minor cleanups.
+>>>> And for other folks following along with this thread: I'm not just
+>>>> picking on Cavium here. I'll be doing the same with *every* ARM server
+>>>> SoC company as necessary over the coming months.
 
-Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
----
+>>> Thanks for keeping on top of this, Jon.
 
-I also tried to do some debugging in the fec driver and it apparently receives
-corrupted packets when this happens. If I hack it to go into promiscuous mode
-unconditionally it gets a whole bunch of rx errors (crc errors, length errors
-and so on). So the phy config is probably wrong and is confusing the mac?
+You're welcome. I'm pleased (in some sense) that we're starting to see
+enough systems shipping that unifying quirks and IDs such that ODMs
+can bend metal easily is a problem that we want to solve. I am saddened
+that there isn't an ARM swat team with black helicopters swooping in to
+ensure zoo avoidance (and I do actually request this every year in my
+own budget cycle), but I am very "happy" to serve that role for now.
 
-In theory it might be possible to make that driver "just work" with phy
-settings from uboot but it's not clear it's worthwhile.
+As I said, this isn't Cavium's fault. They're a victim of their market
+success. I'm super excited to see them shipping systems on which we
+want to run general purpose Operating Systems. At the same time, as
+with *every* other ARM vendor, I will keep my eye out for compliance
+concerns and I will act to ensure that these things are flagged.
 
- arch/arm/configs/imx_v6_v7_defconfig | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+>>> I agree, we should not be
+>>> using unregistered vendor prefixes, e.g., the "THRX" added by
+>>> 44f22bd91e88 ("PCI: Add MCFG quirks for Cavium ThunderX pass2.x host
+>>> controller").  I'm sorry I merged that without doing the due
+>>> diligence.
 
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index eaba3b1..e605389 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -143,6 +143,7 @@ CONFIG_SMSC911X=y
- # CONFIG_NET_VENDOR_STMICRO is not set
- CONFIG_AT803X_PHY=y
- CONFIG_MICREL_PHY=y
-+CONFIG_SMSC_PHY=y
- CONFIG_USB_PEGASUS=m
- CONFIG_USB_RTL8150=m
- CONFIG_USB_RTL8152=m
-@@ -152,7 +153,6 @@ CONFIG_BRCMFMAC=m
- CONFIG_WL12XX=m
- CONFIG_WLCORE_SDIO=m
- # CONFIG_WILINK_PLATFORM_DATA is not set
--# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
- CONFIG_INPUT_EVDEV=y
- CONFIG_INPUT_EVBUG=m
- CONFIG_KEYBOARD_GPIO=y
-@@ -376,7 +376,6 @@ CONFIG_NLS_ISO8859_1=y
- CONFIG_NLS_ISO8859_15=m
- CONFIG_NLS_UTF8=y
- CONFIG_PRINTK_TIME=y
--CONFIG_DEBUG_FS=y
- CONFIG_MAGIC_SYSRQ=y
- # CONFIG_SCHED_DEBUG is not set
- CONFIG_PROVE_LOCKING=y
--- 
-2.7.4
+Oh, it's difficult for you to police everything without having every
+possible platform in front of you, with every firmware, and a lot of
+time that none of us have :)
+
+>> Honestly, it is me who is responsible for this since I submitted
+>> the patch.
+
+You're great Tomasz. You've done awesome stuff over the past few months.
+I want to be /very/ clear that none of my pushback is directed at you,
+David, or any specific individual. You're doing great. I'm going to
+make sure that alignment happens in this industry because I need to
+ship a "common core" single binary build OS that supports "ARM
+servers". That means every server, from every vendor. Not all are
+going to be "certified" to run RHEL, but all servers must be capable
+of booting and working with upstream kernels, and running *ANY*
+Linux distro, so that customers and users who try an "ARM server"
+from a random ODM don't get upset. There will be no zoo. There will
+only be "upstream first" driven development and the distros will
+learn to consume only from upstream. They won't produce hacked up
+nonsense with patches to support platforms that aren't upstream.
+
+> Yes.  After all this back and forth, Cavium has decided to deploy
+> firmware with "CAVxxx" as _HID.
+
+Great. How about a stable backport for Greg K-H? I want to make sure
+that everyone running "upstream" has a chance of booting.
+
+> The deciding factor was that the prefix is already registered and there
+> are probably fewer than 10 systems deployed with the experimental and
+> erroneous  "THRXxxx" value.  Neither option (switching the kernel to "CAVxxx",
+> or changing the firmware to use "THRXxxx") was without its drawbacks. 
+
+Agree. Let's pick a solution and learn for the future. I know you know
+this, but for everyone else (especially ARM vendors who follow):
+
+The dirty secret to server is that we have software we ship, and hardware
+that ships separately. The software lives for years. It's easier to change
+the hardware than software that has already shipped. This is where very
+rich and featurefull firmware comes in. The platform is defined by the
+firmware, which should provide a fully standard interface that is SET
+IN STONE. It's so utterly bulletproof that it's both forward and
+backward compatible. Going forward, all of the ARM vendors are going
+to have utterly bulletproof server platforms with an amazing level of
+joined up cohesion in terms of tracking changes on the software and
+hardware side in terms of the platform firmware gluing it together.
+
+It's a dirty secret that x86 teaches us, and we're going to play
+exactly the same model out again (this has been the evil plan for
+many many years). But to do it right requires that we are very
+very careful in connecting dots between the platform pieces.
+
+Thanks,
+
+Jon.
