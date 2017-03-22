@@ -1,40 +1,27 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 22 Mar 2017 19:32:43 +0000
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Wed, 22 Mar 2017 15:36:49 -0400
 Subject: [PATCH v3] efifb: avoid reconfiguration of BAR that covers the
  framebuffer
 In-Reply-To: <20170322193111.GA8190@wunner.de>
 References: <1490196629-28088-1-git-send-email-ard.biesheuvel@linaro.org>
  <20170322193111.GA8190@wunner.de>
-Message-ID: <CAKv+Gu_X-SEnz7h9J8boqqjOQGHQawwdSAq4haH-OGu8zdfNfA@mail.gmail.com>
+Message-ID: <31da6db5-be22-9e84-5e76-67c519bc0b34@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 March 2017 at 19:31, Lukas Wunner <lukas@wunner.de> wrote:
-> On Wed, Mar 22, 2017 at 03:30:29PM +0000, Ard Biesheuvel wrote:
->> On UEFI systems, the PCI subsystem is enumerated by the firmware,
->> and if a graphical framebuffer is exposed by a PCI device, its base
->> address and size are exposed to the OS via the Graphics Output
->> Protocol (GOP).
->>
->> On arm64 PCI systems, the entire PCI hierarchy is reconfigured from
->> scratch at boot. This may result in the GOP framebuffer address to
->> become stale, if the BAR covering the framebuffer is modified. This
->> will cause the framebuffer to become unresponsive, and may in some
->> cases result in unpredictable behavior if the range is reassigned to
->> another device.
->
-> Hm, commit message seems to indicate the issue is restricted to arm64,
-> yet there's no IS_ENABLED(ARM64) to constrain the added code to that arch?
->
+On 3/22/2017 3:31 PM, Lukas Wunner wrote:
+> On arm64 PCI systems, the entire PCI hierarchy is reconfigured from
+> scratch at boot. This may result in the GOP framebuffer address to
+> become stale, if the BAR covering the framebuffer is modified.
 
-True. I am eager to get some x86 coverage for this, since I would
-expect this not to do any harm. But I'm fine with making it ARM/arm64
-specific in the final version.
+Does this code still work with the case where resources are not reassigned on ARM64?
 
->
->> +DECLARE_PCI_FIXUP_HEADER(PCI_ANY_ID, PCI_ANY_ID, efifb_fixup_resources);
->
-> Maybe this can be constrained to PCI_BASE_CLASS_DISPLAY?
->
+As far as I know, kernel honors resource assignments done by the UEFI BIOS if
+they are correct. Kernel will reassign the resources only if something is wrong.
 
-How does one do that with DECLARE_PCI_FIXUP_HEADER?
+Will this code break other platforms/architectures?
+
+-- 
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
