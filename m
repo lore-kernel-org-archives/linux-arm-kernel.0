@@ -1,38 +1,46 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 22 Mar 2017 12:34:45 +0800
-Subject: [RESEND PATCH v4 2/9] iio: adc: add support for X-Powers AXP20X
- and AXP22X PMICs ADCs
-In-Reply-To: <20170320081653.8884-3-quentin.schulz@free-electrons.com>
-References: <20170320081653.8884-1-quentin.schulz@free-electrons.com>
- <20170320081653.8884-3-quentin.schulz@free-electrons.com>
-Message-ID: <CAGb2v66JC65=9WiMy-Nu+9tTFRLsJL2Eyb0wfJV_K=65ABc6Zg@mail.gmail.com>
+From: c.jayachandran@gmail.com (Jayachandran C.)
+Date: Wed, 22 Mar 2017 11:06:36 +0530
+Subject: [PATCH 14/15] arm64: dts: broadcom: fix PCI bus dtc warnings
+In-Reply-To: <20170322020313.24338-14-robh@kernel.org>
+References: <20170322020313.24338-1-robh@kernel.org>
+ <20170322020313.24338-14-robh@kernel.org>
+Message-ID: <CA+7sy7DKf8DXVVHS22_E1wStoxMPHpufaHi83OaKg4LKS+JbUg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Rob,
 
-On Mon, Mar 20, 2017 at 4:16 PM, Quentin Schulz
-<quentin.schulz@free-electrons.com> wrote:
-> The X-Powers AXP20X and AXP22X PMICs have multiple ADCs. They expose the
-> battery voltage, battery charge and discharge currents, AC-in and VBUS
-> voltages and currents, 2 GPIOs muxable in ADC mode and PMIC temperature.
+On Wed, Mar 22, 2017 at 7:33 AM, Rob Herring <robh@kernel.org> wrote:
+> dtc recently added PCI bus checks. Fix these warnings.
 >
-> This adds support for most of AXP20X and AXP22X ADCs.
+> Signed-off-by: Rob Herring <robh@kernel.org>
+> Cc: "Jayachandran C." <c.jayachandran@gmail.com>
+> Cc: bcm-kernel-feedback-list at broadcom.com
+> ---
+> Sub-arch maintainers, please apply to your trees unless arm-soc wants
+> to take the whole lot.
 >
-> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
-> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Acked-by: Chen-Yu Tsai <wens@csie.org>
-> Reviewed-by: Jonathan Cameron <jic23@kernel.org>
+>  arch/arm64/boot/dts/broadcom/vulcan.dtsi | 1 +
+>  1 file changed, 1 insertion(+)
+>
+> diff --git a/arch/arm64/boot/dts/broadcom/vulcan.dtsi b/arch/arm64/boot/dts/broadcom/vulcan.dtsi
+> index 34e11a9db2a0..71fea7fdc68d 100644
+> --- a/arch/arm64/boot/dts/broadcom/vulcan.dtsi
+> +++ b/arch/arm64/boot/dts/broadcom/vulcan.dtsi
+> @@ -117,6 +117,7 @@
+>                 ranges =
+>                   <0x02000000    0 0x40000000    0 0x40000000    0 0x20000000
+>                    0x43000000 0x40 0x00000000 0x40 0x00000000 0x20 0x00000000>;
+> +               bus-range = <0x00 0xff>;
+>                 interrupt-map-mask = <0 0 0 7>;
+>                 interrupt-map =
+>                       /* addr  pin  ic   icaddr  icintr */
 
-This patch seems to depend on commit 4707274714ef ("mfd: axp20x: Correct name
-of temperature data ADC registers") currently in the mfd tree.
 
-Jonathan, would it be ok for Lee to take this patch through the mfd tree
-as well?
+There is a patch posted to move this from broadcom/vulcan.dtsi to
+cavium/thunder2-99xx.dtsi
+https://www.spinics.net/lists/arm-kernel/msg568464.html
 
+That might go in thru the arm-soc tree, and there might be a conflict here.
 
-Thanks
-ChenYu
-
-P.S. I'm thinking about having MFD_AXP20X imply its various sub-drivers.
-Not sure if that was the intended usage of the new imply syntax though.
+JC.
