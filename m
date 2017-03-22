@@ -1,93 +1,72 @@
 From: jagan@openedev.com (Jagan Teki)
-Date: Wed, 22 Mar 2017 23:18:11 +0530
-Subject: [PATCH 06/12] ARM: dts: imx6ul-[geam|isiot]: Add sai2 node
+Date: Wed, 22 Mar 2017 23:18:13 +0530
+Subject: [PATCH 08/12] ARM: dts: imx6ul-geam: Add Sound card with codec node
 In-Reply-To: <1490204897-14525-1-git-send-email-jagan@openedev.com>
 References: <1490204897-14525-1-git-send-email-jagan@openedev.com>
-Message-ID: <1490204897-14525-7-git-send-email-jagan@openedev.com>
+Message-ID: <1490204897-14525-9-git-send-email-jagan@openedev.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jagan Teki <jagan@amarulasolutions.com>
 
-Add Synchronous Audio Interface(SAI) node for Engicam GEAM6UL
-and Is.IoT MX6UL variant module boards.
+Add support for Sound card and related codec(via i2c1) nodes
+on Engicam GEAM6UL variant module boards.
 
 Cc: Shawn Guo <shawnguo@kernel.org>
 Cc: Matteo Lisi <matteo.lisi@engicam.com>
 Cc: Michael Trimarchi <michael@amarulasolutions.com>
 Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 ---
- arch/arm/boot/dts/imx6ul-geam.dtsi  | 16 ++++++++++++++++
- arch/arm/boot/dts/imx6ul-isiot.dtsi | 16 ++++++++++++++++
- 2 files changed, 32 insertions(+)
+ arch/arm/boot/dts/imx6ul-geam-kit.dts | 13 +++++++++++++
+ arch/arm/boot/dts/imx6ul-geam.dtsi    | 12 ++++++++++++
+ 2 files changed, 25 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx6ul-geam.dtsi b/arch/arm/boot/dts/imx6ul-geam.dtsi
-index ee5220c..eb94d95 100644
---- a/arch/arm/boot/dts/imx6ul-geam.dtsi
-+++ b/arch/arm/boot/dts/imx6ul-geam.dtsi
-@@ -172,6 +172,12 @@
- 	xnur-gpio = <&gpio1 3 GPIO_ACTIVE_LOW>;
- };
- 
-+&sai2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_sai2>;
-+	status = "okay";
-+};
-+
- &uart1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_uart1>;
-@@ -328,6 +334,16 @@
- 		>;
- 	};
- 
-+	pinctrl_sai2: sai2grp {
-+		fsl,pins = <
-+			MX6UL_PAD_JTAG_TCK__SAI2_RX_DATA	0x130b0
-+			MX6UL_PAD_JTAG_TMS__CCM_CLKO1		0x4001b031
-+			MX6UL_PAD_JTAG_TDI__SAI2_TX_BCLK	0x17088
-+			MX6UL_PAD_JTAG_TDO__SAI2_TX_SYNC	0x17088
-+			MX6UL_PAD_JTAG_TRST_B__SAI2_TX_DATA	0x120b0
-+		>;
-+	};
-+
- 	pinctrl_uart1: uart1grp {
- 		fsl,pins = <
- 			MX6UL_PAD_UART1_TX_DATA__UART1_DCE_TX 0x1b0b1
-diff --git a/arch/arm/boot/dts/imx6ul-isiot.dtsi b/arch/arm/boot/dts/imx6ul-isiot.dtsi
-index 4697a04..ea30380 100644
---- a/arch/arm/boot/dts/imx6ul-isiot.dtsi
-+++ b/arch/arm/boot/dts/imx6ul-isiot.dtsi
-@@ -91,6 +91,12 @@
+diff --git a/arch/arm/boot/dts/imx6ul-geam-kit.dts b/arch/arm/boot/dts/imx6ul-geam-kit.dts
+index 142e60c..93c9586 100644
+--- a/arch/arm/boot/dts/imx6ul-geam-kit.dts
++++ b/arch/arm/boot/dts/imx6ul-geam-kit.dts
+@@ -58,6 +58,19 @@
  	status = "okay";
  };
  
-+&sai2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_sai2>;
-+	status = "okay";
++&i2c1 {
++	codec: sgtl5000 at 0a {
++		compatible = "fsl,sgtl5000";
++		reg = <0x0a>;
++		clocks = <&clks IMX6UL_CLK_OSC>;
++		clock-names = "mclk";
++		wlf,shared-lrclk;
++		VDDA-supply = <&reg_3p3v>;
++		VDDIO-supply = <&reg_3p3v>;
++		VDDD-supply = <&reg_1p8v>;
++	};
 +};
 +
- &uart1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_uart1>;
-@@ -129,6 +135,16 @@
- 		>;
+ &lcdif {
+ 	display = <&display0>;
+ 	status = "okay";
+diff --git a/arch/arm/boot/dts/imx6ul-geam.dtsi b/arch/arm/boot/dts/imx6ul-geam.dtsi
+index eb94d95..c405e55 100644
+--- a/arch/arm/boot/dts/imx6ul-geam.dtsi
++++ b/arch/arm/boot/dts/imx6ul-geam.dtsi
+@@ -87,6 +87,18 @@
+ 		regulator-always-on;
+ 		regulator-boot-on;
  	};
- 
-+	pinctrl_sai2: sai2grp {
-+		fsl,pins = <
-+			MX6UL_PAD_JTAG_TCK__SAI2_RX_DATA	0x130b0
-+			MX6UL_PAD_JTAG_TMS__CCM_CLKO1		0x4001b031
-+			MX6UL_PAD_JTAG_TDI__SAI2_TX_BCLK	0x17088
-+			MX6UL_PAD_JTAG_TDO__SAI2_TX_SYNC	0x17088
-+			MX6UL_PAD_JTAG_TRST_B__SAI2_TX_DATA	0x120b0
-+		>;
-+	};
 +
- 	pinctrl_uart1: uart1grp {
- 		fsl,pins = <
- 			MX6UL_PAD_UART1_TX_DATA__UART1_DCE_TX 0x1b0b1
++	sound {
++		compatible = "fsl,imx-audio-sgtl5000";
++		model = "imx6q-geam-sgtl5000";
++		cpu-dai = <&sai2>;
++		audio-codec = <&codec>;
++		gpr = <&gpr>;
++		audio-routing =
++			"MIC_IN", "Mic Jack",
++			"Mic Jack", "Mic Bias",
++			"Headphone Jack", "HP_OUT";
++	};
+ };
+ 
+ &can1 {
 -- 
 1.9.1
