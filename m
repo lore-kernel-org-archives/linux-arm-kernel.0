@@ -1,42 +1,192 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Wed, 22 Mar 2017 16:16:42 +0100
-Subject: [PATCH v2 1/4] iommu: Disambiguate MSI region types
-In-Reply-To: <a56c76f7276a12120ecd0675be4c69de58aec8ff.1489683129.git.robin.murphy@arm.com>
-References: <cover.1489683129.git.robin.murphy@arm.com>
- <a56c76f7276a12120ecd0675be4c69de58aec8ff.1489683129.git.robin.murphy@arm.com>
-Message-ID: <20170322151642.GD7315@8bytes.org>
+From: seanpaul@chromium.org (Sean Paul)
+Date: Wed, 22 Mar 2017 11:19:30 -0400
+Subject: [PATCH 10/41] drm/bridge: analogix_dp: Don't change psr while
+ bridge is disabled
+In-Reply-To: <5279d215-4a19-73c0-0a77-9c8580fa36c0@samsung.com>
+References: <20170310043305.17216-1-seanpaul@chromium.org>
+ <CGME20170310044738epcas5p254ae086c7ed81ec88e4ba3211f86c014@epcas5p2.samsung.com>
+ <20170310043305.17216-11-seanpaul@chromium.org>
+ <e7b7ef5b-7935-a74c-c046-27c56ae16774@samsung.com>
+ <20170321195818.GE19389@art_vandelay>
+ <5279d215-4a19-73c0-0a77-9c8580fa36c0@samsung.com>
+Message-ID: <20170322151930.GQ19389@art_vandelay>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 16, 2017 at 05:00:16PM +0000, Robin Murphy wrote:
-> The introduction of reserved regions has left a couple of rough edges
-> which we could do with sorting out sooner rather than later. Since we
-> are not yet addressing the potential dynamic aspect of software-managed
-> reservations and presenting them at arbitrary fixed addresses, it is
-> incongruous that we end up displaying hardware vs. software-managed MSI
-> regions to userspace differently, especially since ARM-based systems may
-> actually require one or the other, or even potentially both at once,
-> (which iommu-dma currently has no hope of dealing with at all). Let's
-> resolve the former user-visible inconsistency ASAP before the ABI has
-> been baked into a kernel release, in a way that also lays the groundwork
-> for the latter shortcoming to be addressed by follow-up patches.
+On Wed, Mar 22, 2017 at 09:36:34AM +0100, Andrzej Hajda wrote:
+> On 21.03.2017 20:58, Sean Paul wrote:
+> > On Thu, Mar 16, 2017 at 02:40:21PM +0100, Andrzej Hajda wrote:
+> >> On 10.03.2017 05:32, Sean Paul wrote:
+> >>> From: zain wang <wzz@rock-chips.com>
+> >>>
+> >>> There is a race between AUX CH bring-up and enabling bridge which will
+> >>> cause link training to fail. To avoid hitting it, don't change psr state
+> >>> while enabling the bridge.
+> >>>
+> >>> Cc: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+> >>> Cc: Sean Paul <seanpaul@chromium.org>
+> >>> Signed-off-by: zain wang <wzz@rock-chips.com>
+> >>> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+> >>> [seanpaul fixed up the commit message a bit and renamed *_supported to *_enabled]
+> >>> Signed-off-by: Sean Paul <seanpaul@chromium.org>
+> >> Hmm, beside resetting psr_enable in analogix_dp_bridge_disable I do not
+> >> see functional change, or am I blind?
+> > The patch also adds a check of psr_enable in analogix_dp_commit. This will avoid
+> > trying to enable psr when the bridge is disabled (that's why psr_enable is
+> > reset).
 > 
-> For clarity, rename the software-managed type to IOMMU_RESV_SW_MSI, use
-> IOMMU_RESV_MSI to describe the hardware type, and document everything a
-> little bit. Since the x86 MSI remapping hardware falls squarely under
-> this meaning of IOMMU_RESV_MSI, apply that type to their regions as well,
-> so that we tell the same story to userspace across all platforms.
+> Copy/paste from analogix_dp_commit chunk below:
 > 
-> Secondly, as the various region types require quite different handling,
-> and it really makes little sense to ever try combining them, convert the
-> bitfield-esque #defines to a plain enum in the process before anyone
-> gets the wrong impression.
+> -	dp->psr_support = analogix_dp_detect_sink_psr(dp);
+> -	if (dp->psr_support)
+> +	dp->psr_enable = analogix_dp_detect_sink_psr(dp);
+> +	if (dp->psr_enable)
+>  		analogix_dp_enable_sink_psr(dp);
 > 
-> Fixes: d30ddcaa7b02 ("iommu: Add a new type field in iommu_resv_region")
-> Reviewed-by: Eric Auger <eric.auger@redhat.com>
-> CC: Alex Williamson <alex.williamson@redhat.com>
-> CC: David Woodhouse <dwmw2@infradead.org>
-> CC: kvm at vger.kernel.org
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> 
+> What is added here?
 
-Applied this one to iommu/fixes.
+I guess this is what I get for skimming, apologies. I'll hopefully do a better
+job explaining below.
+
+
+> 
+> Regards
+> Andrzej
+> 
+> >
+> > Sean
+> >
+> >> Regards
+> >> Andrzej
+> >>
+> >>> ---
+> >>>  drivers/gpu/drm/bridge/analogix/analogix_dp_core.c | 15 ++++++++-------
+> >>>  drivers/gpu/drm/bridge/analogix/analogix_dp_core.h |  2 +-
+> >>>  drivers/gpu/drm/rockchip/analogix_dp-rockchip.c    |  2 +-
+> >>>  include/drm/bridge/analogix_dp.h                   |  2 +-
+> >>>  4 files changed, 11 insertions(+), 10 deletions(-)
+> >>>
+> >>> diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
+> >>> index 8a8f05fe9da3..64d94a34874d 100644
+> >>> --- a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
+> >>> +++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
+> >>> @@ -98,20 +98,20 @@ static int analogix_dp_detect_hpd(struct analogix_dp_device *dp)
+> >>>  	return 0;
+> >>>  }
+> >>>  
+> >>> -int analogix_dp_psr_supported(struct device *dev)
+> >>> +int analogix_dp_psr_enabled(struct device *dev)
+> >>>  {
+> >>>  	struct analogix_dp_device *dp = dev_get_drvdata(dev);
+> >>>  
+> >>> -	return dp->psr_support;
+> >>> +	return dp->psr_enable;
+> >>>  }
+> >>> -EXPORT_SYMBOL_GPL(analogix_dp_psr_supported);
+> >>> +EXPORT_SYMBOL_GPL(analogix_dp_psr_enabled);
+> >>>  
+> >>>  int analogix_dp_enable_psr(struct device *dev)
+> >>>  {
+> >>>  	struct analogix_dp_device *dp = dev_get_drvdata(dev);
+> >>>  	struct edp_vsc_psr psr_vsc;
+> >>>  
+> >>> -	if (!dp->psr_support)
+> >>> +	if (!dp->psr_enable)
+
+This gates enabling psr on the panel. Previously it was put in place to avoid
+trying to enable psr on devices which did not support it.
+
+> >>>  		return 0;
+> >>>  
+> >>>  	/* Prepare VSC packet as per EDP 1.4 spec, Table 6.9 */
+> >>> @@ -134,7 +134,7 @@ int analogix_dp_disable_psr(struct device *dev)
+> >>>  	struct edp_vsc_psr psr_vsc;
+> >>>  	int ret;
+> >>>  
+> >>> -	if (!dp->psr_support)
+> >>> +	if (!dp->psr_enable)
+> >>>  		return 0;
+> >>>  
+> >>>  	/* Prepare VSC packet as per EDP 1.4 spec, Table 6.9 */
+> >>> @@ -878,8 +878,8 @@ static void analogix_dp_commit(struct analogix_dp_device *dp)
+> >>>  	/* Enable video */
+> >>>  	analogix_dp_start_video(dp);
+> >>>  
+> >>> -	dp->psr_support = analogix_dp_detect_sink_psr(dp);
+> >>> -	if (dp->psr_support)
+> >>> +	dp->psr_enable = analogix_dp_detect_sink_psr(dp);
+> >>> +	if (dp->psr_enable)
+
+This probes the hardware to see if psr is supported. If it is, psr_enable will
+transition to true. Before this patch, psr_support/psr_enable would be flipped
+true on the first modeset and stay that way forever, even when the panel was
+turned off.
+
+> >>>  		analogix_dp_enable_sink_psr(dp);
+> >>>  }
+> >>>  
+> >>> @@ -1120,6 +1120,7 @@ static void analogix_dp_bridge_disable(struct drm_bridge *bridge)
+> >>>  	if (ret)
+> >>>  		DRM_ERROR("failed to setup the panel ret = %d\n", ret);
+> >>>  
+> >>> +	dp->psr_enable = false;
+
+By setting psr_enable to false here, the driver ensures that any subsequent calls
+to analogix_dp_enable_psr() will return early and will not attempt to change
+hardware (that would fail). Once the panel is re-enabled, psr_enable will return
+to true if the hardware supports it.
+
+This is why the variable was renamed from psr_support to psr_enable. It no
+longer just tracks whether psr is supported, but rather that it is supported and
+eligible to be enabled.
+
+Sean
+
+
+> >>>  	dp->dpms_mode = DRM_MODE_DPMS_OFF;
+> >>>  }
+> >>>  
+> >>> diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h
+> >>> index b039b28d8fcc..e135a42cb19e 100644
+> >>> --- a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h
+> >>> +++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h
+> >>> @@ -170,7 +170,7 @@ struct analogix_dp_device {
+> >>>  	int			dpms_mode;
+> >>>  	int			hpd_gpio;
+> >>>  	bool                    force_hpd;
+> >>> -	bool			psr_support;
+> >>> +	bool			psr_enable;
+> >>>  
+> >>>  	struct mutex		panel_lock;
+> >>>  	bool			panel_is_modeset;
+> >>> diff --git a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
+> >>> index 64e7e2c0bc58..f44756029478 100644
+> >>> --- a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
+> >>> +++ b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
+> >>> @@ -83,7 +83,7 @@ static void analogix_dp_psr_set(struct drm_encoder *encoder, bool enabled)
+> >>>  	int vact_end;
+> >>>  	int ret;
+> >>>  
+> >>> -	if (!analogix_dp_psr_supported(dp->dev))
+> >>> +	if (!analogix_dp_psr_enabled(dp->dev))
+> >>>  		return;
+> >>>  
+> >>>  	dev_dbg(dp->dev, "%s PSR...\n", enabled ? "enable" : "disable");
+> >>> diff --git a/include/drm/bridge/analogix_dp.h b/include/drm/bridge/analogix_dp.h
+> >>> index c99d6eaef1ac..4fc0165ed3f5 100644
+> >>> --- a/include/drm/bridge/analogix_dp.h
+> >>> +++ b/include/drm/bridge/analogix_dp.h
+> >>> @@ -38,7 +38,7 @@ struct analogix_dp_plat_data {
+> >>>  			 struct drm_connector *);
+> >>>  };
+> >>>  
+> >>> -int analogix_dp_psr_supported(struct device *dev);
+> >>> +int analogix_dp_psr_enabled(struct device *dev);
+> >>>  int analogix_dp_enable_psr(struct device *dev);
+> >>>  int analogix_dp_disable_psr(struct device *dev);
+> >>>  
+> 
+
+-- 
+Sean Paul, Software Engineer, Google / Chromium OS
