@@ -1,35 +1,38 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 21 Mar 2017 17:29:40 -0700
-Subject: [PATCH] ARM: dts: Adjust moxart IRQ controller and flags
-In-Reply-To: <20170318164001.4967-1-linus.walleij@linaro.org>
-References: <20170318164001.4967-1-linus.walleij@linaro.org>
-Message-ID: <20170322002940.GA5129@localhost>
+Date: Tue, 21 Mar 2017 17:30:05 -0700
+Subject: [GIT PULL] i.MX fixes for 4.11
+In-Reply-To: <20170320084229.GH3443@dragon>
+References: <20170320084229.GH3443@dragon>
+Message-ID: <20170322003005.GB5129@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 18, 2017 at 05:40:01PM +0100, Linus Walleij wrote:
-> The moxart interrupt line flags were not respected in previous
-> driver: instead of assigning them per-consumer, a fixes mask
-> was set in the controller.
+On Mon, Mar 20, 2017 at 04:42:31PM +0800, Shawn Guo wrote:
+> The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
 > 
-> With the migration to a standard Faraday driver we need to
-> set up and handle the consumer flags correctly. Also remove
-> the Moxart-specific flags when switching to using real consumer
-> flags.
+>   Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
 > 
-> Extend the register window to 0x100 bytes as we may have a few
-> more registers in there and it doesn't hurt.
+> are available in the git repository at:
 > 
-> Tested-by: Jonas Jensen <jonas.jensen@gmail.com>
-> Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> ARM SoC folks: can you please apply this directly to whatever
-> DTS branch is applicable for Moxart? We are switching to a
-> generic Faraday Technology interrupt controller driver that
-> actually make use of the trigger flags so this needs to be
-> rectified.
+>   git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-fixes-4.11
+> 
+> for you to fetch changes up to 12aff99723901bcc0e2a6a34343a4f62c371fdd9:
+> 
+>   ARM: dts: imx6sx-udoo-neo: Fix reboot hang (2017-03-08 12:44:46 +0100)
+> 
+> ----------------------------------------------------------------
+> i.MX fixes for 4.11:
+>  - A fix to reboot hang seen on imx6sx-udoo-neo board, by removing
+>    arm-supply and soc-supply and using LDO enabled mode.
+> 
+> ----------------------------------------------------------------
+> Fabio Estevam (1):
+>       ARM: dts: imx6sx-udoo-neo: Fix reboot hang
+> 
+>  arch/arm/boot/dts/imx6sx-udoo-neo.dtsi | 5 -----
+>  1 file changed, 5 deletions(-)
 
-Applied to next/dt, thanks.
+Merged, thanks.
+
 
 -Olof
