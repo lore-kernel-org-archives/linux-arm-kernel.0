@@ -1,53 +1,38 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 22 Mar 2017 16:20:35 +0000
-Subject: [RFC PATCH v2 11/41] arm64/sve: Expand task_struct for Scalable
- Vector Extension state
-In-Reply-To: <1490194274-30569-12-git-send-email-Dave.Martin@arm.com>
-References: <1490194274-30569-1-git-send-email-Dave.Martin@arm.com>
- <1490194274-30569-12-git-send-email-Dave.Martin@arm.com>
-Message-ID: <20170322162035.GB19950@leverpostej>
+From: al.kochet@gmail.com (Alexander Kochetkov)
+Date: Wed, 22 Mar 2017 19:20:56 +0300
+Subject: [PATCH] ARM: dts: rockchip: setup DMA-channels for mmc0 and emmc
+ for rk3188
+In-Reply-To: <11123239.Wc863F7R2R@phil>
+References: <1490109227-4006-1-git-send-email-al.kochet@gmail.com>
+ <11123239.Wc863F7R2R@phil>
+Message-ID: <C2BC0A84-EF69-42E3-84FA-A873B8A7187A@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 22, 2017 at 02:50:41PM +0000, Dave Martin wrote:
-> This patch expands task_struct to accommodate the Scalable Vector
-> Extension state.
+Hello, Heiko!
+
+> 22 ????? 2017 ?., ? 18:54, Heiko Stuebner <heiko@sntech.de> ???????(?):
 > 
-> The extra space is not used for anything yet.
+> I've applied a slightly different variant in [0] with your commit message and
+> moved the dma properties to the mmc/emmc nodes in rk3xxx.dtsi - as the dma
+> channels are the same on both rk3188 and rk3066.
 
-[...]
+Thank you! I had changes in the rk3xxx.dtsi initially, but them moved them
+into rk3188. Don?t know why I did that. May be because I don?t have rk3066
+based board to test on.
 
-> +#ifdef CONFIG_ARM64_SVE
-> +
-> +static void *__sve_state(struct task_struct *task)
-> +{
-> +	return (char *)task + ALIGN(sizeof(*task), 16);
-> +}
-> +
-> +static void *sve_pffr(struct task_struct *task)
-> +{
-> +	unsigned int vl = sve_get_vl();
-> +
-> +	BUG_ON(vl % 16);
-> +	return (char *)__sve_state(task) + 34 * vl;
-> +}
+> While at it, I've also added the sdio dma as there is no need to leave it out.
 
-Can we mnemonicise the magic numbers for these?
+I?ve tested mmc0 and emm and they work great. I haven?t tested sdio.
 
-That, and some comment regarding how the task_struct and sve state are
-organised in memory, as that's painful to reverse-engineer.
+> 
+> Also when changing the devicetree, please do not append stuff at the bottom
+> but instead sort new nodes (the &mmc &emmc in this case) and properties
+> alphabetically.
 
-> +
-> +#else /* ! CONFIG_ARM64_SVE */
-> +
-> +/* Dummy declarations for usage protected with IS_ENABLED(CONFIG_ARM64_SVE): */
-> +extern void *__sve_state(struct task_struct *task);
-> +extern void *sve_pffr(struct task_struct *task);
-> +
-> +#endif /* ! CONFIG_ARM64_SVE */
+Ok. Thank you.
 
-The usual pattern is to make these static inlines, with a BUILD_BUG() if
-calls are expected/required to be optimised away entirely.
+I have working settings for eMMC for radxa rock. What do you think, is it good idea to add them
+to the kernel DT? As Radxa Rock doesn?t come with eMMC, but eMMC can be soldered manually.
 
-Thanks,
-Mark.
+Alexander.
