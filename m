@@ -1,35 +1,40 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 22 Mar 2017 18:35:13 +0000
-Subject: [PATCH 00/15] arm64/kvm: use common sysreg definitions
-In-Reply-To: <20170310183555.GB6271@arm.com>
-References: <1489079247-31092-1-git-send-email-mark.rutland@arm.com>
- <87a88tv94d.fsf@on-the-bus.cambridge.arm.com>
- <20170310183555.GB6271@arm.com>
-Message-ID: <20170322183512.GB27921@leverpostej>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 22 Mar 2017 18:38:50 +0000
+Subject: [GIT PULL] iommu/arm-smmu: Fixes for 4.11
+Message-ID: <20170322183849.GG13077@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Joerg,
 
-On Fri, Mar 10, 2017 at 06:35:55PM +0000, Will Deacon wrote:
-> On Fri, Mar 10, 2017 at 08:17:22AM +0000, Marc Zyngier wrote:
-
-> > The next question is how do we merge this. Obviously, we can't split it
-> > between trees, and this is very likely to clash with anything that we
-> > will merge on the KVM side (the sysreg table is a popular place).
-> > 
-> > Will, Catalin: Would it make sense to create a stable branch with these
-> > patches, and merge it into both the arm64 and KVM trees? That'd make
-> > things easier...
-> 
-> I think the scope for conflict on our side is pretty high too, so a shared
-> branch might be the best way to go. I don't want to branch just yet though,
-> so I'll probably wait a week or so before setting something in stone.
-
-Any further thoughts on this?
-
-Christoffer has Acked the KVM bits, so if you're happy to do so for the
-arm64 bits I can make a stable branch.
+Please pull these two ARM io-pgtable fixes from Oleksandr for 4.11. They're
+not critical, but they mean that we detect misuses in the iommu_{map,unmap}
+API instead of deferencing junk pointers in the kernel. I've had them queued
+locally for a while, so Robin and I have given them a fair workout.
 
 Thanks,
-Mark.
+
+Will
+
+--->8
+
+The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
+
+  Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git for-joerg/arm-smmu/fixes
+
+for you to fetch changes up to a03849e7210277fa212779b7cd9c30e1ab6194b2:
+
+  iommu/io-pgtable-arm-v7s: Check for leaf entry before dereferencing it (2017-03-10 18:23:34 +0000)
+
+----------------------------------------------------------------
+Oleksandr Tyshchenko (2):
+      iommu/io-pgtable-arm: Check for leaf entry before dereferencing it
+      iommu/io-pgtable-arm-v7s: Check for leaf entry before dereferencing it
+
+ drivers/iommu/io-pgtable-arm-v7s.c | 6 +++++-
+ drivers/iommu/io-pgtable-arm.c     | 6 +++++-
+ 2 files changed, 10 insertions(+), 2 deletions(-)
