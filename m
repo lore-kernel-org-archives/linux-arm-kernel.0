@@ -1,96 +1,79 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Wed, 22 Mar 2017 15:11:05 +0100
-Subject: [PATCH v3 16/19] KVM: arm64: ITS: vgic_its_check_id returns the
- entry's GPA
-In-Reply-To: <be79d92f-2522-a754-f006-66901d26e94c@arm.com>
-References: <1488800074-21991-1-git-send-email-eric.auger@redhat.com>
- <1488800074-21991-17-git-send-email-eric.auger@redhat.com>
- <be79d92f-2522-a754-f006-66901d26e94c@arm.com>
-Message-ID: <5e14fa1c-2eb6-6746-968b-4ecc18dd7cdd@redhat.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 22 Mar 2017 14:10:05 +0000
+Subject: [PATCH v2] efifb: avoid reconfiguration of BAR that covers the
+ framebuffer
+In-Reply-To: <CAKv+Gu-XJK8bJvPrjfHbFHsOmuJ96RRgdsg2E7vgC0HZDemyFg@mail.gmail.com>
+References: <1490123810-12383-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20170322102939.GB3519@red-moon>
+ <35F65528-FC1F-4813-A0C6-641CF864212A@linaro.org>
+ <20170322113500.GA3940@red-moon>
+ <CAKv+Gu-XJK8bJvPrjfHbFHsOmuJ96RRgdsg2E7vgC0HZDemyFg@mail.gmail.com>
+Message-ID: <20170322141005.GA4221@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Mar 22, 2017 at 12:39:57PM +0000, Ard Biesheuvel wrote:
 
-On 21/03/2017 19:12, Andre Przywara wrote:
-> Hi,
-> 
-> On 06/03/17 11:34, Eric Auger wrote:
->> As vgic_its_check_id() computes the device/collection entry's
->> GPA, let's return it so that new callers can retrieve it easily.
->>
->> Signed-off-by: Eric Auger <eric.auger@redhat.com>
->>
->> ---
->>
->> v2: new
->> ---
->>  virt/kvm/arm/vgic/vgic-its.c | 11 ++++++++---
->>  1 file changed, 8 insertions(+), 3 deletions(-)
->>
->> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
->> index ad67759..1060125 100644
->> --- a/virt/kvm/arm/vgic/vgic-its.c
->> +++ b/virt/kvm/arm/vgic/vgic-its.c
->> @@ -637,7 +637,8 @@ static int vgic_its_cmd_handle_movi(struct kvm *kvm, struct vgic_its *its,
->>   * is actually valid (covered by a memslot and guest accessible).
->>   * For this we have to read the respective first level entry.
->>   */
->> -static bool vgic_its_check_id(struct vgic_its *its, u64 baser, int id)
->> +static bool vgic_its_check_id(struct vgic_its *its, u64 baser, int id,
->> +			      gpa_t *eaddr)
->>  {
->>  	int l1_tbl_size = GITS_BASER_NR_PAGES(baser) * SZ_64K;
->>  	int index;
->> @@ -657,6 +658,7 @@ static bool vgic_its_check_id(struct vgic_its *its, u64 baser, int id)
->>  		addr = BASER_ADDRESS(baser) + id * esz;
->>  		gfn = addr >> PAGE_SHIFT;
->>  
->> +		*eaddr = addr;
-> 
-> If you check that eaddr is not NULL before writing to it, you can save
-> the dummy variable in the two callers below (which doesn't hurt, but
-> does not help readability either).
-done
+[...]
 
-Thanks
+> >> Well, it turned out that this does not actually work: the BAR is not
+> >> reassigned, but the same range ends up being given to another device
+> >> in some cases.
+> >
+> > Ok, that's because the PCI core just prevent assigning that resource
+> > but it does not request it (ie insert it in the resource tree) which
+> > is what you do when claiming it.
+> >
+> 
+> Yes, that seems to be what is happening.
+> 
+> > I wonder how IORESOURCE_PCI_FIXED works on eg x86, I think it is time
+> > to have a proper look into resources allocation code because there
+> > are bits and pieces that are quite obscure to me.
+> >
+> 
+> I did a quick test with calling request_mem_region(), in which case we
+> end up with something like
+> 
+> 10000000-3efeffff : PCI Bus 0000:00
+>   10000000-101d4bff : efifb:pci
+>   101d5000-101d5fff : 0000:00:01.0
+>   101d6000-101d6fff : 0000:00:02.0
+>   101d7000-101d7fff : 0000:00:04.0
+>     101d7000-101d7fff : ehci_hcd
+>   101d8000-101d8fff : 0000:00:05.0
+>   101e0000-101effff : 0000:00:05.0
+>   10200000-1023ffff : 0000:00:02.0
+> 
+> which works, because the region is no longer assigned to another BAR.
+> 
+> But I think claiming the resource via the PCI subsystem is probably
+> more appropriate, because then we get
 
-Eric
+Yes it is.
+
+> 10000000-3efeffff : PCI Bus 0000:00
+>   10000000-10ffffff : 0000:00:05.0
+>     10000000-101d4fff : efifb
+>   11000000-1103ffff : 0000:00:02.0
+>   11040000-1104ffff : 0000:00:05.0
+>   11050000-11050fff : 0000:00:01.0
+>   11051000-11051fff : 0000:00:02.0
+>   11052000-11052fff : 0000:00:04.0
+>     11052000-11052fff : ehci_hcd
+>   11053000-11053fff : 0000:00:05.0
 > 
-> Cheers,
-> Andre.
+> (Note that efifb does not use the entire BAR resource)
 > 
->>  		return kvm_is_visible_gfn(its->dev->kvm, gfn);
->>  	}
->>  
->> @@ -689,6 +691,7 @@ static bool vgic_its_check_id(struct vgic_its *its, u64 baser, int id)
->>  	indirect_ptr += index * esz;
->>  	gfn = indirect_ptr >> PAGE_SHIFT;
->>  
->> +	*eaddr = indirect_ptr;
->>  	return kvm_is_visible_gfn(its->dev->kvm, gfn);
->>  }
->>  
->> @@ -697,8 +700,9 @@ static int vgic_its_alloc_collection(struct vgic_its *its,
->>  				     u32 coll_id)
->>  {
->>  	struct its_collection *collection;
->> +	gpa_t eaddr;
->>  
->> -	if (!vgic_its_check_id(its, its->baser_coll_table, coll_id))
->> +	if (!vgic_its_check_id(its, its->baser_coll_table, coll_id, &eaddr))
->>  		return E_ITS_MAPC_COLLECTION_OOR;
->>  
->>  	collection = kzalloc(sizeof(*collection), GFP_KERNEL);
->> @@ -910,8 +914,9 @@ static int vgic_its_cmd_handle_mapd(struct kvm *kvm, struct vgic_its *its,
->>  	size_t size = its_cmd_get_size(its_cmd);
->>  	gpa_t itt_addr = its_cmd_get_ittaddr(its_cmd);
->>  	struct its_device *device;
->> +	gpa_t eaddr;
->>  
->> -	if (!vgic_its_check_id(its, its->baser_device_table, device_id))
->> +	if (!vgic_its_check_id(its, its->baser_device_table, device_id, &eaddr))
->>  		return E_ITS_MAPD_DEVICE_OOR;
->>  
->>  	if (valid && size > VITS_TYPER_IDBITS)
->>
+> > I think I would reverse the order in which you carry out the BAR
+> > reservation anyway (first check if the device is enabled second request
+> > the resource ie claim it).
+> >
+> 
+> I will spin a v3 with the check and the claim in reverse order. But I
+> think we should keep the pci_claim() call.
+
+Agreed.
+
+Thanks,
+Lorenzo
