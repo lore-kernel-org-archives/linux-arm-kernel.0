@@ -1,48 +1,25 @@
-From: lionel.debieve@st.com (Lionel Debieve)
-Date: Wed, 22 Mar 2017 18:12:31 +0100
-Subject: [PATCH 1/1] tty: serial: st-asc: Make the locking RT aware
-Message-ID: <1490202751-16581-1-git-send-email-lionel.debieve@st.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Wed, 22 Mar 2017 10:14:14 -0700
+Subject: [PATCH] arm64: dts: NS2: Add dma-coherent to relevant DT
+In-Reply-To: <1490129479-19459-1-git-send-email-jon.mason@broadcom.com>
+References: <1490129479-19459-1-git-send-email-jon.mason@broadcom.com>
+Message-ID: <20170322171414.26039-1-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The lock is a sleeping lock and local_irq_save() is not the
-standard implementation now. Working for both -RT and non
-RT.
+On Tue, 21 Mar 2017 16:51:19 -0400, Jon Mason <jon.mason@broadcom.com> wrote:
+> Cache related issues with DMA rings and performance issues related to
+> caching are being caused by not properly setting the "dma-coherent" flag
+> in the device tree entries. Adding it here to correct the issue.
+>
+> Signed-off-by: Jon Mason <jon.mason@broadcom.com>
+> Fixes: fd5e5dd56 ("arm64: dts: Add PCIe0 and PCIe4 DT nodes for NS2")
+> Fixes: dddc3c9d7 ("arm64: dts: NS2: add AMAC ethernet support")
+> Fixes: e79249143 ("arm64: dts: Add Broadcom Northstar2 device tree entries for PDC driver")
+> Fixes: ac9aae00f ("arm64: dts: Add SATA3 AHCI and SATA3 PHY DT nodes for NS2")
+> Fixes: efc877676 ("arm64: dts: Add SDHCI DT node for NS2")
+> ---
 
-Signed-off-by: Lionel Debieve <lionel.debieve@st.com>
----
- drivers/tty/serial/st-asc.c | 8 +++-----
- 1 file changed, 3 insertions(+), 5 deletions(-)
-
-diff --git a/drivers/tty/serial/st-asc.c b/drivers/tty/serial/st-asc.c
-index c334bcc..4889396 100644
---- a/drivers/tty/serial/st-asc.c
-+++ b/drivers/tty/serial/st-asc.c
-@@ -887,13 +887,12 @@ static void asc_console_write(struct console *co, const char *s, unsigned count)
- 	int locked = 1;
- 	u32 intenable;
- 
--	local_irq_save(flags);
- 	if (port->sysrq)
- 		locked = 0; /* asc_interrupt has already claimed the lock */
- 	else if (oops_in_progress)
--		locked = spin_trylock(&port->lock);
-+		locked = spin_trylock_irqsave(&port->lock, flags);
- 	else
--		spin_lock(&port->lock);
-+		spin_lock_irqsave(&port->lock, flags);
- 
- 	/*
- 	 * Disable interrupts so we don't get the IRQ line bouncing
-@@ -911,8 +910,7 @@ static void asc_console_write(struct console *co, const char *s, unsigned count)
- 	asc_out(port, ASC_INTEN, intenable);
- 
- 	if (locked)
--		spin_unlock(&port->lock);
--	local_irq_restore(flags);
-+		spin_unlock_irqrestore(&port->lock, flags);
- }
- 
- static int asc_console_setup(struct console *co, char *options)
--- 
-2.7.4
+Applied, thanks!
+--
+Florian
