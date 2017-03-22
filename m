@@ -1,48 +1,25 @@
-From: clg@kaod.org (=?UTF-8?q?C=C3=A9dric=20Le=20Goater?=)
-Date: Wed, 22 Mar 2017 17:04:43 +0100
-Subject: [PATCH] ARM: dts: aspeed: add SPI controller bindings to Romulus
-Message-ID: <1490198683-5796-1-git-send-email-clg@kaod.org>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Wed, 22 Mar 2017 08:55:29 -0700
+Subject: [PATCH 0/2] meson-sm: Fix issues when reading data from sm
+In-Reply-To: <20170303151759.8330-1-carlo@caione.org> (Carlo Caione's message
+ of "Fri, 3 Mar 2017 16:17:57 +0100")
+References: <20170303151759.8330-1-carlo@caione.org>
+Message-ID: <m24lylnw5q.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Romulus systems have one MX25L25635 (32768 Kbytes) flash module for
-the BMC firmware and other MT25QL512A (65536 Kbytes) for the host.
+Carlo Caione <carlo@caione.org> writes:
 
-Signed-off-by: C?dric Le Goater <clg@kaod.org>
----
- arch/arm/boot/dts/aspeed-bmc-opp-romulus.dts | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+> From: Carlo Caione <carlo@endlessm.com>
+>
+> While working on a related driver I noticed a couple of problems in the
+> meson-sm driver. The problems are unrelated but since the fixes touch the same
+> codebase I decided to submit these in the same patchset.
 
-diff --git a/arch/arm/boot/dts/aspeed-bmc-opp-romulus.dts b/arch/arm/boot/dts/aspeed-bmc-opp-romulus.dts
-index 7a3b2b50c884..e3c6358bc7d9 100644
---- a/arch/arm/boot/dts/aspeed-bmc-opp-romulus.dts
-+++ b/arch/arm/boot/dts/aspeed-bmc-opp-romulus.dts
-@@ -31,6 +31,26 @@
- 	};
- };
- 
-+&fmc {
-+	status = "okay";
-+	flash at 0 {
-+		status = "okay";
-+		label = "bmc";
-+	};
-+};
-+
-+&spi1 {
-+	status = "okay";
-+	flash at 0 {
-+		status = "okay";
-+		label = "pnor";
-+	};
-+};
-+
-+&spi2 {
-+	status = "okay";
-+};
-+
- &uart5 {
- 	status = "okay";
- };
--- 
-2.7.4
+Applied to amlogic tree, branch: v4.12/drivers
+
+I'd prefer to have acks from Mark and Srini, but since this has been on
+the list for awhile, I'm guessing that isn't going to happen, so
+consider this a request.
+
+Kevin
