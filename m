@@ -1,142 +1,97 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 22 Mar 2017 14:50:31 +0800
-Subject: [PATCH 4/5] clk: sunxi-ng: Add driver for A83T CCU
-In-Reply-To: <20170215094954.h3wyaxlqkeb342yu@lukather>
-References: <20170214033526.16977-1-wens@csie.org>
- <20170214033526.16977-5-wens@csie.org>
- <20170214095819.utsftcvti5zdmlmi@lukather>
- <CAGb2v66PxbhUdqSwFc5iFN2wDVQbOsibDkckXpFsxXW1WJNe3w@mail.gmail.com>
- <20170215094954.h3wyaxlqkeb342yu@lukather>
-Message-ID: <CAGb2v67ey1Ppc3wf1154QKoCX-xsOjWDEsXi5gxPbL4MY37zHw@mail.gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 22 Mar 2017 08:09:35 +0100
+Subject: [PATCH 2/2] spi: imx: fix use of native chip-selects with
+ devicetree
+In-Reply-To: <51a48190-9edb-093e-a6fc-a7cb8c1e0ce0@linux-m68k.org>
+References: <1489726983-17706-1-git-send-email-gerg@linux-m68k.org>
+ <1489726983-17706-3-git-send-email-gerg@linux-m68k.org>
+ <f1cf2001-28b4-6a74-b98a-13336d74ff9d@mentor.com>
+ <4a8449d9-cc38-d642-0853-246f46ee7059@linux-m68k.org>
+ <20170321080551.ie4xm5hr3fki365s@pengutronix.de>
+ <942cfc4b-445b-ca51-1823-2391cea62abf@linux-m68k.org>
+ <20170321121133.jcmhhbszj2d42h3w@pengutronix.de>
+ <20678cef-f667-9915-aa00-8877ad152a8c@linux-m68k.org>
+ <20170321192342.4fxlb2zjcas53uow@pengutronix.de>
+ <CAMuHMdW+KcPCAweneu4pTg1Pb-uAvYGz1+Z=oEDYoOt4gWrjhA@mail.gmail.com>
+ <51a48190-9edb-093e-a6fc-a7cb8c1e0ce0@linux-m68k.org>
+Message-ID: <CAMuHMdW+sqSyoQUE7sGPKoXy7n9Bh2QGg5BNA1EP5=eW4GKTVA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 15, 2017 at 5:49 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Tue, Feb 14, 2017 at 06:26:39PM +0800, Chen-Yu Tsai wrote:
->> On Tue, Feb 14, 2017 at 5:58 PM, Maxime Ripard
->> <maxime.ripard@free-electrons.com> wrote:
->> > On Tue, Feb 14, 2017 at 11:35:25AM +0800, Chen-Yu Tsai wrote:
->> >> +/* Some PLLs are input * N / div1 / P. Model them as NKMP with no K */
->> >
->> > Is that even working?
->>
->> Looking at the nkmp clock code, only .recalc_rate will work properly though.
->> Maybe I could fix up the code so it handles zero width factors.
->>
->> > I'm not quite sure we want to do that. We might model it as a NP clock
->> > with a variable prediv?
->>
->> There's no NP clock type yet. And a problem with a variable prediv is that
->> it doesn't participate in factor calculation. It's effectively fixed.
->>
->> I did this for the A80 as well though. Fixing up the NKMP clock might be
->> easier.
->
-> Then maybe we just need a NMP clock type then. What I'm really afraid
-> of is that we'll just end up in a clk-factors situation that was
-> simply impossible to maintain without breaking anything, hence why we
-> had different clock types then.
+Hi Greg,
 
-Upon further review, I think it will work. I did notice a discrepancy
-between .set_rate and .round_rate though. Will send fixes later.
-
-About the old clk-factors situation, I'm not exactly sure what part
-you're referring to. To me it seems the "factors" bits are mostly the
-same. Differences are mostly with parent-specific pre-dividers,
-clock post-dividers, and non-standard factors. The first is nicely
-handled by the new mux wrapper, the second is currently only used
-with NK types, and the last is currently only supported by single
-factor divider or multiplier clocks with tables.
-
-Non-standard factors are probably the trickiest one, but given we will
-support full factor tables for some of the tricky CPU PLLs, this is
-probably solved, even if not implemented yet.
-
-I'll start with the NP style clocks, which only use P when the output
-is under a certain frequency.
-
-Regards
-ChenYu
-
->> >
->> >> +/* Use a separate clock for the pre-divider on the AHB1 PLL-PERIPH input */
->> >> +static SUNXI_CCU_M(pll_periph_ahb1_clk, "pll-periph-ahb1", "pll-periph",
->> >> +                0x054, 6, 2, 0);
->> >> +
->> >> +static const char * const ahb1_parents[] = { "osc16M-d512", "osc24M",
->> >> +                                          "pll-periph-ahb1",
->> >> +                                          "pll-periph-ahb1" };
->> >> +static struct ccu_div ahb1_clk = {
->> >> +     .div            = _SUNXI_CCU_DIV_FLAGS(4, 2, CLK_DIVIDER_POWER_OF_TWO),
->> >> +     .mux            = _SUNXI_CCU_MUX(12, 2),
->> >> +     .common         = {
->> >> +             .reg            = 0x054,
->> >> +             .hw.init        = CLK_HW_INIT_PARENTS("ahb1",
->> >> +                                                   ahb1_parents,
->> >> +                                                   &ccu_div_ops,
->> >> +                                                   0),
->> >> +     },
->> >> +};
->> >
->> > What's different from a pre divider only for a given index here?
+On Wed, Mar 22, 2017 at 1:50 AM, Greg Ungerer <gerg@linux-m68k.org> wrote:
+> On 22/03/17 06:15, Geert Uytterhoeven wrote:
+>> On Tue, Mar 21, 2017 at 8:23 PM, Uwe Kleine-K?nig
+>> <u.kleine-koenig@pengutronix.de> wrote:
+>>> On Tue, Mar 21, 2017 at 11:22:27PM +1000, Greg Ungerer wrote:
+>>>> On 21/03/17 22:11, Uwe Kleine-K?nig wrote:
+>>>>> On Tue, Mar 21, 2017 at 09:53:52PM +1000, Greg Ungerer wrote:
+>>>>>> On 21/03/17 18:05, Uwe Kleine-K?nig wrote:
+>>>>>>> On Tue, Mar 21, 2017 at 12:05:20PM +1000, Greg Ungerer wrote:
+>>>>>>>> On 20/03/17 23:22, Vladimir Zapolskiy wrote:
+>>>>>>>>> For that type of bindings locally I have a hackish spi-imx driver change,
+>>>>>>>>> which supports this option, but I'm unsure if it is universal enough.
+>>>>>>>>
+>>>>>>>> Do you mean supporting no cs-gpios tag?
+>>>>>>>> That would be nice, but it would seem not many users of this are
+>>>>>>>> using native chip selects.
+>>>>>>>
+>>>>>>> The reason for this is that the native chip selects are less flexible
+>>>>>>> than gpios because you cannot control when they deassert. IIRC they do
+>>>>>>> it too much for some chips. So the only reason to stick to them is that
+>>>>>>> on some SoCs not all pins have a GPIO function. Not sure if transfer
+>>>>>>> speed is another reason, but I would expect that the gain isn't that
+>>>>>>> big.
+>>>>>>
+>>>>>> For the particular SPI device I am using, a Silicon Labs 32260,
+>>>>>> it actually wants the assertion and de-assertion of the chip-select
+>>>>>> between each byte. So it is the only way it can work for me.
+>>>>>
+>>>>> That should be doable with gpio-cs, too. You just need the right flags
+>>>>> in your spi transfer IIRC.
+>>>>
+>>>> Do you know which flag(s)  do that?
+>>>
+>>> Looking at the source it's not about flags, but you have to split your
+>>> transfer into several messages.
 >>
->> The variable pre-divider is shared for both pll-periph mux inputs.
->> This is one way to handle it. The other would be to extend ccu_mux
->> to handle multiple variable pre-dividers. I don't really want to do
->> that if this is the only instance that needs it though.
+>> ... and set spi_transfer.cs_change.
 >
-> Every addition we made was only needed by one instance at first :)
->
-> We are working that way for fixed pre-dividers already, I don't see
-> why we can't have it for variable ones too.
->
->> >> +/*
->> >> + * MMC2 supports what's called the "new timing mode". The CCU and the MMC
->> >> + * controller must be in sync about which mode is used. The new mode moves
->> >> + * the clock delay controls (and possibly the delay lines) into the MMC
->> >> + * block. Also, the output of the clock is divided by 2. The output and
->> >> + * sample phase clocks are unused under this mode.
->> >> + *
->> >> + * This new mode seems to be preferred. Hence we force this clock to the
->> >> + * new mode. And we don't add the phase clocks.
->> >> + */
->> >
->> > I'm sorry, but I said this several times, this isn't working. We
->> > should model it properly, and not hack this around in the clock
->> > driver.
->> >
->> > As you say in your comment, the MMC driver needs to be aware about
->> > which mode is used, in order to also set a bit in one of its registers
->> > accordingly, and modify its sampling behaviour.
->> >
->> > The new timing is preferred, but our previous clock implementations
->> > didn't hardcode it, so we can't even rely on that behaviour to always
->> > write it in our driver.
+> Yep, that looks like the one. Though it would appear not all
+> spi drivers support it. The spi-imx driver for one doesn't look
+> at it at all.
+
+Correct. With many drivers, you must use cs-gpios to support that feature.
+Remember, SPI is a mixed bag of features, and not all of them are supported
+on all controllers.
+
+>>> AFAICT that's how the spi stuff is
+>>> supposed to work. That is, at the start of a message CS is asserted and
+>>> (only) at it's end CS is deasserted. So the imx core with native chip
+>>> select actually misbehaves by toggling CS between each word.
 >>
->> Correct. With the A83T there has never been a merged clock driver though.
->> I realize this is a one off thing.
->>
->> > This is not something specific to the A83T, but is found in all the
->> > SoCs since the A23, so we need to come up with a good solution to
->> > address that.
->> >
->> > I'm not sure what a good solution would be though. One would be to
->> > just have a private function of our own to switch in the new mode (if
->> > relevant, because only the MMC2 controllers have it), but that would
->> > lead to troubles with !sunxi-ng. Not something we can't deal with, but
->> > some extra precautions should be taken (make sure to protect the call
->> > through an ifdef / IS_DEFINED, check that the sunxi-ng driver has been
->> > probed, etc.)
->>
->> If the custom function route is acceptable, I'll come up with something.
+>> Indeed.
 >
-> I think it would be a great start yes. I'll try to discuss it with
-> Mike and Stephen at ELC and see what they think about that.
+> If you look around the kernel source for cs_change there is
+> a number of devices that use it. A bunch od ADC/DACs in
+> particular (including in backlight support).
 >
-> Maxime
->
-> --
-> Maxime Ripard, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
+> So I don't know that I would characterize the iMX one as
+> misbehaving so much as only natively supporting the model
+> where chip select is asserted/deasserted per burst. It is
+> strait forward to implement the GPIO method instead of the
+> native chip select with the iMX pin multiplexing.
+
+It's up to the system integrator to specify cs-gpios when needed.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
