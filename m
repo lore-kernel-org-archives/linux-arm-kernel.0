@@ -1,92 +1,213 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 22 Mar 2017 20:09:24 +0530
-Subject: [PATCH v4 14/23] PCI: dwc: dra7xx: Workaround for errata id i870
-In-Reply-To: <20170320214819.5azzdbgncfemhujo@rob-hp-laptop>
-References: <20170313142259.25397-1-kishon@ti.com>
- <20170313142259.25397-15-kishon@ti.com>
- <20170320214819.5azzdbgncfemhujo@rob-hp-laptop>
-Message-ID: <387a82a1-a534-efe1-e9eb-aa78809566a4@ti.com>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Wed, 22 Mar 2017 15:40:01 +0100
+Subject: [PATCH v3 14/19] KVM: arm64: ITS: Add infrastructure for table
+ lookup
+In-Reply-To: <841f3278-b101-b920-c4a9-0d97b34c9a8a@arm.com>
+References: <1488800074-21991-1-git-send-email-eric.auger@redhat.com>
+ <1488800074-21991-15-git-send-email-eric.auger@redhat.com>
+ <841f3278-b101-b920-c4a9-0d97b34c9a8a@arm.com>
+Message-ID: <e4f8c5fe-55ff-d291-cd0a-859d48bd05da@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-
-On Tuesday 21 March 2017 03:18 AM, Rob Herring wrote:
-> On Mon, Mar 13, 2017 at 07:52:50PM +0530, Kishon Vijay Abraham I wrote:
->> According to errata i870, access to the PCIe slave port
->> that are not 32-bit aligned will result in incorrect mapping
->> to TLP Address and Byte enable fields.
->>
->> Accessing non 32-bit aligned data causes incorrect data in the target
->> buffer if memcpy is used. Implement the workaround for this
->> errata here.
->>
->> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
->> ---
->>  drivers/pci/dwc/pci-dra7xx.c | 53 ++++++++++++++++++++++++++++++++++++++++++++
->>  1 file changed, 53 insertions(+)
->>
->> diff --git a/drivers/pci/dwc/pci-dra7xx.c b/drivers/pci/dwc/pci-dra7xx.c
->> index 35c18534469c..147d37a7fe58 100644
->> --- a/drivers/pci/dwc/pci-dra7xx.c
->> +++ b/drivers/pci/dwc/pci-dra7xx.c
->> @@ -26,6 +26,8 @@
->>  #include <linux/pm_runtime.h>
->>  #include <linux/resource.h>
->>  #include <linux/types.h>
->> +#include <linux/mfd/syscon.h>
->> +#include <linux/regmap.h>
->>  
->>  #include "pcie-designware.h"
->>  
->> @@ -528,6 +530,51 @@ static const struct of_device_id of_dra7xx_pcie_match[] = {
->>  	{},
->>  };
->>  
->> +/*
->> + * dra7xx_pcie_ep_unaligned_memaccess: workaround for AM572x/AM571x Errata i870
->> + * @dra7xx: the dra7xx device where the workaround should be applied
->> + *
->> + * Access to the PCIe slave port that are not 32-bit aligned will result
->> + * in incorrect mapping to TLP Address and Byte enable fields. Therefore,
->> + * byte and half-word accesses are not possible to byte offset 0x1, 0x2, or
->> + * 0x3.
->> + *
->> + * To avoid this issue set PCIE_SS1_AXI2OCP_LEGACY_MODE_ENABLE to 1.
->> + */
->> +static int dra7xx_pcie_ep_unaligned_memaccess(struct device *dev)
->> +{
->> +	int ret;
->> +	struct device_node *np = dev->of_node;
->> +	struct regmap *regmap;
->> +	unsigned int reg;
->> +	unsigned int field;
->> +
->> +	regmap = syscon_regmap_lookup_by_phandle(np,
->> +						 "ti,syscon-unaligned-access");
->> +	if (IS_ERR(regmap)) {
->> +		dev_dbg(dev, "can't get ti,syscon-unaligned-access\n");
->> +		return -EINVAL;
->> +	}
->> +
->> +	if (of_property_read_u32_index(np, "ti,syscon-unaligned-access", 1,
->> +				       &reg)) {
->> +		dev_err(dev, "couldn't get legacy mode register offset\n");
->> +		return -EINVAL;
->> +	}
->> +
->> +	if (of_property_read_u32_index(np, "ti,syscon-unaligned-access", 2,
->> +				       &field)) {
->> +		dev_err(dev, "can't get bit field for setting legacy mode\n");
->> +		return -EINVAL;
->> +	}
+On 21/03/2017 19:12, Andre Przywara wrote:
+> Hi,
 > 
-> If this remains, it's screaming for a helper function. 
-> of_parse_phandle_with_args already exists, but maybe a syscon specific 
-> function is in order.
+> On 06/03/17 11:34, Eric Auger wrote:
+>> Add a generic lookup_table() helper whose role consists in
+>> scanning a contiguous table located in guest RAM and applying
+>> a callback on each entry. Entries can be handled as linked lists
+>> since the callback may return an offset to the next entry and
+>> also tell that an entry is the last one.
+>>
+>> Helper functions also are added to compute the device/event ID
+>> offset to the next DTE/ITE.
+>>
+>> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+>> ---
+>>  virt/kvm/arm/vgic/vgic-its.c | 119 +++++++++++++++++++++++++++++++++++++++++++
+>>  1 file changed, 119 insertions(+)
+>>
+>> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+>> index 1cd6ae6..cf04776 100644
+>> --- a/virt/kvm/arm/vgic/vgic-its.c
+>> +++ b/virt/kvm/arm/vgic/vgic-its.c
+>> @@ -181,6 +181,8 @@ static struct its_ite *find_ite(struct vgic_its *its, u32 device_id,
+>>  #define VITS_ESZ 8
+>>  #define VITS_TYPER_IDBITS 0xF
+>>  #define VITS_TYPER_DEVBITS 0xF
+>> +#define VITS_DTE_MAX_DEVID_OFFSET GENMASK(19, 0)
+>> +#define VITS_ITE_MAX_EVENTID_OFFSET GENMASK(16, 0)
+> 
+> GENMASK here is a bit misleading, I think (BIT(20) - 1) would be
+> clearer, wouldn't it?
 
-hmm, I guess for now I can use of_parse_phandle_with_args. The number of args
-might vary for different platforms/scenarios?
+done
+> 
+>>  
+>>  /*
+>>   * Finds and returns a collection in the ITS collection table.
+>> @@ -1607,6 +1609,123 @@ int vgic_its_attr_regs_access(struct kvm_device *dev,
+>>  	return 0;
+>>  }
+>>  
+>> +static u32 compute_next_devid_offset(struct list_head *h,
+>> +				     struct its_device *dev)
+>> +{
+>> +	struct list_head *e = &dev->dev_list;
+>> +	struct its_device *next;
+>> +	u32 next_offset;
+>> +
+>> +	if (e->next == h)
+>> +		return 0;
+>> +	next = list_entry(e->next, struct its_device, dev_list);
+>> +	next_offset = next->device_id - dev->device_id;
+>> +
+>> +	return next_offset < VITS_DTE_MAX_DEVID_OFFSET ?
+>> +			next_offset : VITS_DTE_MAX_DEVID_OFFSET;
+> 
+> 	return min(next_offset, VITS_DTE_MAX_DEVID_OFFSET);
+> 
+>> +}
+>> +
+>> +static u32 compute_next_eventid_offset(struct list_head *h,
+>> +				       struct its_ite *ite)
+>> +{
+>> +	struct list_head *e = &ite->ite_list;
+>> +	struct its_ite *next;
+>> +	u32 next_offset;
+>> +
+>> +	if (e->next == h)
+>> +		return 0;
+>> +	next = list_entry(e->next, struct its_ite, ite_list);
+>> +	next_offset = next->event_id - ite->event_id;
+>> +
+>> +	return next_offset < VITS_ITE_MAX_EVENTID_OFFSET ?
+>> +			next_offset : VITS_ITE_MAX_EVENTID_OFFSET;
+> 
+> 	return min(next_offset, VITS_ITE_MAX_EVENTID_OFFSET);
+> 
+>> +}
+>> +
+>> +static int next_segment(unsigned long len, int offset)
+> 
+> Isn't "segment" a page, really? And thus should be named like this?
+
+I lazily reused kvm_main.c homonymous function, hence the name. I may
+expose the function kvm_host.h
+> 
+>> +{
+>> +	if (len > PAGE_SIZE - offset)
+>> +		return PAGE_SIZE - offset;
+>> +	else
+>> +		return len;
+>> +}
+> 
+> Can be: return min(len, PAGE_SIZE - offset); which means it could be a
+> macro even.
+> 
+>> +
+>> +/**
+>> + * entry_fn_t - Callback called on a table entry restore path
+>> + * @its: its handle
+>> + * @id: id of the entry
+>> + * @addr: kernel VA of the entry
+>> + * @opaque: pointer to an opaque data
+>> + * @next_offset: minimal ID offset to the next entry. 0 if this
+>> + * entry is the last one, 1 if the entry is invalid, >= 1 if an
+>> + * entry's next_offset field was truly decoded
+>> + *
+>> + * Return: < 0 on error, 0 otherwise
+>> + */
+>> +typedef int (*entry_fn_t)(struct vgic_its *its, u32 id, void *addr,
+>> +			  void *opaque, u32 *next_offset);
+>> +
+>> +/**
+>> + * lookup_table - scans a contiguous table in guest RAM and applies a function
+>> + * to each entry
+>> + *
+>> + * @its: its handle
+>> + * @base: base gpa of the table
+>> + * @size: size of the table in bytes
+>> + * @esz: entry size in bytes
+>> + * @start_id: first entry's ID
+>> + * @fn: function to apply on each entry
+>> + *
+>> + * Return: < 0 on error, 1 if last element identified, 0 otherwise
+>> + */
+>> +static int lookup_table(struct vgic_its *its, gpa_t base, int size, int esz,
+> 
+>    ^^^^^^
+> Won't this trigger a build warning when building at this patch only?
+yes I corrected that
 
 Thanks
-Kishon
+
+Eric
+> 
+> The rest looks fine.
+> 
+> Cheers,
+> Andre
+> 
+> 
+>> +			int start_id, entry_fn_t fn, void *opaque)
+>> +{
+>> +	gpa_t gpa = base, top = base + size - 1;
+>> +	unsigned long len = top - gpa;
+>> +	int ret, seg, offset = offset_in_page(gpa);
+>> +	gfn_t gfn = gpa >> PAGE_SHIFT;
+>> +	u32 id = start_id + (gpa - base)/esz;
+>> +	struct kvm *kvm = its->dev->kvm;
+>> +	kvm_pfn_t pfn;
+>> +
+>> +	while ((seg = next_segment(len, offset)) != 0) {
+>> +		u32 next_offset;
+>> +		bool writeable;
+>> +		void *addr;
+>> +
+>> +		pfn = gfn_to_pfn_prot(kvm, gfn, true, &writeable);
+>> +		if (is_error_noslot_pfn(pfn))
+>> +			return -EINVAL;
+>> +		addr = phys_to_virt((u64)pfn << PAGE_SHIFT);
+>> +		addr += offset;
+>> +
+>> +		while (seg > 0) {
+>> +			size_t byte_offset;
+>> +
+>> +			ret = fn(its, id, addr, opaque, &next_offset);
+>> +			if (ret < 0 || (!ret && !next_offset))
+>> +				goto out;
+>> +
+>> +			byte_offset = next_offset * esz;
+>> +
+>> +			id += next_offset;
+>> +			gpa += byte_offset;
+>> +			addr += byte_offset;
+>> +			seg -= byte_offset;
+>> +		}
+>> +		kvm_release_pfn_clean(pfn);
+>> +
+>> +		len = top - gpa;
+>> +		offset = offset_in_page(gpa);
+>> +		gfn = gpa >> PAGE_SHIFT;
+>> +		id = start_id + (gpa - base)/esz;
+>> +	}
+>> +	return 0;
+>> +out:
+>> +	kvm_release_pfn_clean(pfn);
+>> +	return (ret < 0 ? ret : 1);
+>> +}
+>> +
+>>  /**
+>>   * vgic_its_flush_pending_tables - Flush the pending tables into guest RAM
+>>   */
+>>
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
