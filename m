@@ -1,109 +1,101 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Thu, 23 Mar 2017 07:17:03 +0800
-Subject: [PATCH v2 1/5] dt-bindings: update device tree binding for
- Allwinner PRCM CCUs
-In-Reply-To: <20170322200923.tcr7yqnfqj2zk2v7@lukather>
-References: <20170315172808.64011-1-icenowy@aosc.xyz>
- <20170315172808.64011-2-icenowy@aosc.xyz>
- <20170321074117.vdfjynauuuv6fivp@lukather>
- <115431490120542@web34g.yandex.ru> <20170322200923.tcr7yqnfqj2zk2v7@lukather>
-Message-ID: <997781490224623@web30o.yandex.ru>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Thu, 23 Mar 2017 07:23:06 +0800
+Subject: [PATCH 00/14] arm_pmu: ACPI support
+In-Reply-To: <20170322121944.GB3940@red-moon>
+References: <1489143891-11596-1-git-send-email-mark.rutland@arm.com>
+ <5b5dca5f-0ea3-d7e7-63c9-dba57969d4be@arm.com>
+ <20170314114508.GA15740@leverpostej> <20170314184733.GC15740@leverpostej>
+ <20170322121944.GB3940@red-moon>
+Message-ID: <58D3075A.3020605@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-23.03.2017, 04:09, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
-> On Wed, Mar 22, 2017 at 02:22:22AM +0800, Icenowy Zheng wrote:
->> ?21.03.2017, 15:41, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
->> ?> On Thu, Mar 16, 2017 at 01:28:04AM +0800, Icenowy Zheng wrote:
->> ?>> ?Many Allwinner SoCs after A31 have a CCU in PRCM block.
->> ?>>
->> ?>> ?Give the ones on H3 and A64 compatible strings.
->> ?>>
->> ?>> ?Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
->> ?>> ?---
->> ?>> ?Changes in v2:
->> ?>> ?- Add iosc for R_CCU's on H3/A64. (A31, A23 and A33 seem to have different
->> ?>> ???clock for mux 3 of ar100 clk. Investgations are needed for them.)
->> ?>>
->> ?>> ??Documentation/devicetree/bindings/clock/sunxi-ccu.txt | 18 +++++++++++++++++-
->> ?>> ??1 file changed, 17 insertions(+), 1 deletion(-)
->> ?>>
->> ?>> ?diff --git a/Documentation/devicetree/bindings/clock/sunxi-ccu.txt b/Documentation/devicetree/bindings/clock/sunxi-ccu.txt
->> ?>> ?index 68512aa398a9..4a4addff595d 100644
->> ?>> ?--- a/Documentation/devicetree/bindings/clock/sunxi-ccu.txt
->> ?>> ?+++ b/Documentation/devicetree/bindings/clock/sunxi-ccu.txt
->> ?>> ?@@ -7,9 +7,11 @@ Required properties :
->> ?>> ??????????????????- "allwinner,sun8i-a23-ccu"
->> ?>> ??????????????????- "allwinner,sun8i-a33-ccu"
->> ?>> ??????????????????- "allwinner,sun8i-h3-ccu"
->> ?>> ?+ - "allwinner,sun8i-h3-r-ccu"
->> ?>> ??????????????????- "allwinner,sun8i-v3s-ccu"
->> ?>> ??????????????????- "allwinner,sun9i-a80-ccu"
->> ?>> ??????????????????- "allwinner,sun50i-a64-ccu"
->> ?>> ?+ - "allwinner,sun50i-a64-r-ccu"
->> ?>> ??????????????????- "allwinner,sun50i-h5-ccu"
->> ?>>
->> ?>> ??- reg: Must contain the registers base address and length
->> ?>> ?@@ -20,7 +22,11 @@ Required properties :
->> ?>> ??- #clock-cells : must contain 1
->> ?>> ??- #reset-cells : must contain 1
->> ?>>
->> ?>> ?-Example:
->> ?>> ?+For the PRCM CCUs on H3/A64, one more clock is needed:
->> ?>> ?+- "iosc": another frequency oscillator used for CPUS (usually at 32000Hz,
->> ?>> ?+ not the same with losc)
->> ?>
->> ?> This is called the internal oscillator in the datasheet, it would
->> ?> probably make more sense to call it that way in the documentation too.
->> ?>
->> ?> This oscillator seems to be clocked at 16MHz, so we should represent
->> ?> it as such.
->> ?>
->> ?> And I'm wondering, are you *sure* that it's fed directly from the
->> ?> internal oscillator, or goes through the registers in the RTC, with
->> ?> the 32 divider and 16 prescaler by default that makes it at roughly
->> ?> the same rate (31.25kHz).
+On 03/22/2017 08:19 PM, Lorenzo Pieralisi wrote:
+> On Tue, Mar 14, 2017 at 06:47:34PM +0000, Mark Rutland wrote:
+>> On Tue, Mar 14, 2017 at 11:49:19AM +0000, Mark Rutland wrote:
+>>> On Fri, Mar 10, 2017 at 04:14:57PM -0600, Jeremy Linton wrote:
+>>>> I tried these patches on a m400 (which uses PPIs), and the kernel
+>>>> fails to come up enough to login via the network (which works with
+>>>> 4.11rc1 without these patches). So, I suspect there is something
+>>>> wrong with them.
+>>>
+>>> Indeed; sorry about this. I'll see if I can get access to a board to try
+>>> local debugging.
 >>
->> ?In fact I know nothing about it -- I only represented the code in BSP
->> ?clock driver.
+>>>> About the only thing it says with any meaning when earlycon is passed is:
+>>>> [   10.965147] Serial: 8250/16550 driver, 32 ports, IRQ sharing enabled
+>>>> [   11.064193] dw-apb-uart APMC0D08:00: cannot get irq
+>>>>
+>>>> and promptly hangs up.
 >>
->> ?The mux value 3 varies from SoC to SoC. For A64/H5 it's 32000,
->> ?for A33 it's 667000 (seems to be directly the internal OSC, as the
->> ?user manual says the internal OSC is 600~700kHz; but it's named
->> ?cpuosc rather than iosc in A33 BSP clock driver); for A80 it's even
->> ?PLL_AUDIO.
+>> I believe that this is a latent FW bug, in a beta FW, exposed by recent
+>> changes.
+>>
+>> I managed to get access to two APM Mustang boards. I can reproduce the
+>> issue with a vanilla v4.11-rc1 defconfig on one, which has a beta FW.
+>> The same kernel boots fine on the other, which has a later released FW.
+>>
+>> I bisected the issue down to commit:
+>>
+>>    d44fa3d46079dc09 ("ACPI: Add support for ResourceSource/IRQ domain mapping")
+>>
+>> It seems the beta FW describes the UART interrupt with an Extended
+>> Interrupt Descriptor with the Consumer/Producer bit clear. Per the spec,
+>> this means "This device produces and consumes this resource", which
+>> doesn't make sense here given the UART is not an interrupt controller.
+>>
+>> The (working) released FW doesn't use an Extended Interrupt Descriptor
+>> for this interrupt, sidestepping the issue.
+>>
+>> Given that (AFAICT) this only affects a known-broken, beta FW, I don't
+>> think that we care that much.
+>>
+>> However, I think there is a larger potential issue here.
+>>
+>> In acpi_irq_parse_one_cb(), we skip interrupts with an Extended
+>> Interrupt Descriptor with the Consumer/Producer bit clear. It sounds
+>> like devices which behave as interrupt controllers could legitimately
+>> have this bit set for interrupts they generate and deliver to
+>> themselves, and we'd erroneously skip these when parsing interrupts.
+>>
+>> It's not entirely clear to me why this bit exists at all, given that
+>> it's not used as part of mapping the interrupt, and if you really want
+>> to know you can map the interrupt and look at the result.
 >
-> Where are you getting those info from?
->
-> As far as I know, the A33 PRCM takes the hosc, losc, pll6 and CPU
-> (internal) oscillator:
-> https://github.com/allwinner-zh/linux-3.4-sunxi/blob/master/drivers/clk/sunxi/clk-sun8iw5.c#L508
->
-> The H3 takes the hosc and losc:
-> https://github.com/allwinner-zh/linux-3.4-sunxi/blob/master/drivers/clk/sunxi/clk-sun8iw7.c#L379
->
-> The A80 takes the hosc and losc:
-> https://github.com/allwinner-zh/linux-3.4-sunxi/blob/master/drivers/clk/sunxi/clk-sun9iw1.c#L281
->
-> The A64 takes the hosc, losc, pll-periph0 and the iosc, which indeed
-> seems to be fed from the internal oscillator with the divider in the
-> RTC:
-> https://github.com/longsleep/linux-pine64/blob/lichee-dev-v3.10.65-bsp2.0/arch/arm64/boot/dts/sun50iw1p1-clk.dtsi#L19
-> https://github.com/longsleep/linux-pine64/blob/lichee-dev-v3.10.65-bsp2.0/drivers/clk/sunxi/clk-sun50iw1.c#L603
+> It is not entirely clear to anyone (and it has been a source of major
+> trouble for other descriptors - ie memory - to the point that it has been
+> deprecated for *some* descriptors). IIRC (Hanjun ?) the only reason why
+> Agustin added the check for that bit in drivers/acpi/resource.c
+> (is_gsi()) is to prevent ACPI core code allocating IRQs for the MBIgen
+> device that, _erroneously_, was using an extended interrupt descriptor
+> to list IRQ lines (that I have no idea what they represent) in order to
+> count how many MSI vectors it would have to allocate.
 
-But then in sunxi_init_clocks function, the iosc clock is initialized
-as a fixed clock with 32000Hz.
-
-The clock node in BSP device tree have a compatible of
-allwinner,fixed-clock, but not fixed-clock, which makes it not able
-to be really probed.
+I'm not sure it's error for a interrupt producer device (such as MBIgen)
+to represent its interrupt resources using Interrupt under _CRS, from
+the spec, we didn't violate anything, but in the OS side we expect a
+better way to count MSI vectors.
 
 >
-> Maxime
+> The gist is: removing the check for the extended interrupt descriptor
+> producer/consumer bit in ACPI code therefore ignoring that bit should
+> be harmless (given that the MBIgen bindings should be changed anyway).
 >
-> --
-> Maxime Ripard, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
+> The meaning of that bit (and how we can flag up a FW bug) it is still
+> a bit fuzzy IMO.
+>
+> Agustin, Hanjun, comments ?
+
+I think it's firmware bug in the first place, PRODUCER bit can't be
+clear if the device itself is not an interrupt controller, as we
+can see that it's UART interrupt and UART can't be a interrupt
+controller right? and the default value for the Consumer/Producer bit
+is 1, not 0, the spec clearly say that.
+
+So I think we need to fix the firmware (then the code is still not
+violate any platforms), and also we need to fix the spec to clarify
+things (As Agustin proposed), I reported this issue to ASWG but seems
+my email was blocked, I will raise an ECR for discussion.
+
+Thanks
+Hanjun
