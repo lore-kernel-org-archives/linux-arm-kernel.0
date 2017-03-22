@@ -1,93 +1,53 @@
-From: leonard.crestez@nxp.com (Leonard Crestez)
-Date: Wed, 22 Mar 2017 18:53:02 +0200
-Subject: [RFC 0/8] ARM: imx: Upstream fsl,ldo-bypass
-Message-ID: <cover.1490199005.git.leonard.crestez@nxp.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Wed, 22 Mar 2017 17:00:51 +0000
+Subject: [PATCH V2 0/5] soc/tegra: Enable flowctrl support for Tegra132/210
+Message-ID: <1490202056-13040-1-git-send-email-jonathanh@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Freescale imx socs have three built-in regulators LDO_ARM LDO_SOC and LDO_PU
-used to control internal chip voltages. "ldo-bypass" mode refers to placing
-these regulators in bypass mode and controlling voltages from an external power
-management chip instead. The intention is to save power (at the expense of an
-extra PMIC on the board).
+The flowctrl modules is supported by both Tegra132 and Tegra210 devices.
+These devices already have the flowctrl node defined in their respective
+*.dtsi device-tree files. The flowctrl driver is currently located in
+the arch/arm/mach-tegra directory and so can only be used for 32-bit
+Tegra devices. Move this driver into drivers/soc/tegra so that it can
+be used for all Tegra devices that support flowctrl.
 
-Looking through commit messages and emails it seems that there are other users
-of unusual power configurations for imx but there doesn't appear to be any
-board dts file using this mode. This is an attempt to upstream this feature
-based on how the freescale BSP does it. This series only enables it for the
-imx6qdl-sabresd boards for simplicity.
+I have also added a couple clean-up patches.
 
-Versions of u-boot shipped by freescale for imx partially handle this in the
-bootloader. His patch series tries to detect if the bootloader did this and
-takes advantage of it but it is not required. This series works fine with
-upstream u-boot. The binding is odd because it's shared with those versions of
-uboot.
+Changes since V1:
+- Updated warning message per Thierry's feedback
+- Added stub functions for public flowctrl APIs
+- Added patch to register flowctrl driver as a platform driver
+- Updated formatting of DT compatible strings per Thierry's feedback.
 
-The LDO regulators have a minimum dropout of 125mv and this is removed when
-bypass mode is entered. This results in a brief increase in voltage. The bypass
-code sets the minimum frequency before enabling LDO bypass to avoid
-overvolting. Some new checks are added in the regulator core to check for this
-(patch 4) and the checks would trigger without lowering the frequency.
+Jon Hunter (5):
+  ARM: tegra: Remove unnecessary inclusion of flowctrl header
+  soc/tegra: Move Tegra flowctrl driver
+  soc/tegra: flowctrl: Add basic platform driver
+  dt-bindings: tegra: Update compatible strings for Tegra flowctrl
+  soc/tegra: Add initial flowctrl support for Tegra132/210
 
-Issues that need to be discussed:
-
-* I'm not happy with the regulator_allow_bypass API. It claims to "allow the
-regulator to go into bypass mode if all other consumers for the regulator also
-enable bypass mode" but it doesn't seem to properly handle the case when
-additional consumers show up after bypass mode is enabled. It's not even clear
-how it should be done, should regulator_get on a bypassed regulator disable
-bypass mode?
-
-There are only 2 other users of this and they don't seem to use multiple
-consumers. For imx the gpc driver is a secondary consumer for vddpu so this
-needs to be handled somehow. There is a hack in patch 7 which forces gpc to
-always probe after cpufreq and rely on it to perform the bypass procedure.
-
-Having both gpc and cpufreq call regulator_allow_bypass would sort of work but
-it would be ugly. If gpc probes first it would attempt bypass and get an error
-(because of the supply voltage check), bypass would later be performed
-successfully by cpufreq.
-
-I think it would be better to have an imperative regulator_set_bypass API. I
-think it might even be reasonable for it to completely replace the current
-regulator_allow_bypass API.
-
-It would also make the code a lot simpler, there would no longer be a need to
-check regulator_is_bypass after regulator_allow_bypass.
-
-* There is an anatop patch which dynamically modifies regulator_desc to
-zero-out "min_dropout_uV" in bypass mode, despite the fact that documentation
-claims that regulator_desc should be read-only. Perhaps the core should handle
-this or this should be replaced with a function in regulator_ops?
-
-Irina Tirdea (2):
-  cpufreq: imx6q: Fix handling EPROBE_DEFER from regulator
-  regulator: anatop: fix min dropout for bypass mode
-
-Leonard Crestez (6):
-  ARM: imx: gpc: Do not print error message for EPROBE_DEFER
-  cpufreq: imx6q: Set max suspend_freq to avoid changes during suspend
-  regulator: core: Check enabling bypass respects constraints
-  regulator: core: Add regulator_is_bypass function
-  cpufreq: imx6q: Initialize LDO bypass
-  ARM: dts: imx6qdl-sabresd: Enable fsl,ldo-bypass
-
- .../devicetree/bindings/power/fsl,imx-gpc.txt      |   4 +
- arch/arm/boot/dts/imx6dl-sabresd-ldo.dts           |  13 ++
- arch/arm/boot/dts/imx6q-sabresd-ldo.dts            |  13 ++
- arch/arm/boot/dts/imx6qdl-sabresd.dtsi             |  19 +++
- arch/arm/boot/dts/imx6qdl.dtsi                     |   6 +-
- arch/arm/boot/dts/imx6qp-sabresd-ldo.dts           |  13 ++
- arch/arm/boot/dts/imx6qp-sabresd.dts               |   4 +-
- arch/arm/mach-imx/gpc.c                            |  13 +-
- drivers/cpufreq/imx6q-cpufreq.c                    | 180 +++++++++++++++++++++
- drivers/regulator/anatop-regulator.c               |   9 +-
- drivers/regulator/core.c                           |  78 ++++++++-
- include/linux/regulator/consumer.h                 |   1 +
- 12 files changed, 344 insertions(+), 9 deletions(-)
- create mode 100644 arch/arm/boot/dts/imx6dl-sabresd-ldo.dts
- create mode 100644 arch/arm/boot/dts/imx6q-sabresd-ldo.dts
- create mode 100644 arch/arm/boot/dts/imx6qp-sabresd-ldo.dts
+ .../bindings/arm/tegra/nvidia,tegra20-flowctrl.txt |   7 +-
+ arch/arm/mach-tegra/Makefile                       |   1 -
+ arch/arm/mach-tegra/cpuidle-tegra20.c              |   3 +-
+ arch/arm/mach-tegra/flowctrl.c                     | 179 ----------------
+ arch/arm/mach-tegra/flowctrl.h                     |  66 ------
+ arch/arm/mach-tegra/platsmp.c                      |   2 +-
+ arch/arm/mach-tegra/pm.c                           |   2 +-
+ arch/arm/mach-tegra/reset-handler.S                |   2 +-
+ arch/arm/mach-tegra/sleep-tegra20.S                |   3 +-
+ arch/arm/mach-tegra/sleep-tegra30.S                |   2 +-
+ arch/arm/mach-tegra/sleep.S                        |   2 -
+ arch/arm/mach-tegra/tegra.c                        |   2 -
+ drivers/soc/tegra/Kconfig                          |   9 +
+ drivers/soc/tegra/Makefile                         |   1 +
+ drivers/soc/tegra/flowctrl.c                       | 224 +++++++++++++++++++++
+ include/soc/tegra/flowctrl.h                       |  82 ++++++++
+ 16 files changed, 330 insertions(+), 257 deletions(-)
+ delete mode 100644 arch/arm/mach-tegra/flowctrl.c
+ delete mode 100644 arch/arm/mach-tegra/flowctrl.h
+ create mode 100644 drivers/soc/tegra/flowctrl.c
+ create mode 100644 include/soc/tegra/flowctrl.h
 
 -- 
 2.7.4
