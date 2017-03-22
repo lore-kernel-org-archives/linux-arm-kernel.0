@@ -1,72 +1,107 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Wed, 22 Mar 2017 19:00:24 +0100
-Subject: [RFC 7/8] cpufreq: imx6q: Initialize LDO bypass
-In-Reply-To: <1490204881.17057.16.camel@nxp.com>
-References: <cover.1490199005.git.leonard.crestez@nxp.com>
- <75ec3ea8fe812b4cf689e0c130358e81aa7fbd13.1490199005.git.leonard.crestez@nxp.com>
- <1490202585.29056.5.camel@pengutronix.de>
- <1490204881.17057.16.camel@nxp.com>
-Message-ID: <1490205624.29056.13.camel@pengutronix.de>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 22 Mar 2017 21:09:23 +0100
+Subject: [PATCH v2 1/5] dt-bindings: update device tree binding for
+ Allwinner PRCM CCUs
+In-Reply-To: <115431490120542@web34g.yandex.ru>
+References: <20170315172808.64011-1-icenowy@aosc.xyz>
+ <20170315172808.64011-2-icenowy@aosc.xyz>
+ <20170321074117.vdfjynauuuv6fivp@lukather>
+ <115431490120542@web34g.yandex.ru>
+Message-ID: <20170322200923.tcr7yqnfqj2zk2v7@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, den 22.03.2017, 19:48 +0200 schrieb Leonard Crestez:
-> On Wed, 2017-03-22 at 18:09 +0100, Lucas Stach wrote:
-> > Am Mittwoch, den 22.03.2017, 18:53 +0200 schrieb Leonard Crestez:
-> > > 
-> > > Several imx6* socs have three built-in regulators LDO_ARM LDO_SOC and
-> > > LDO_PU used to control internal chip voltages. "ldo-bypass" mode refers
-> > > to placing these regulators in bypass mode and controlling voltages from
-> > > an external power management chip instead. This is intended to save
-> > > power at the expense of an extra PMIC on the board.
-> > > 
-> > > The voltages for these regulators are controlled from the imxq6 cpufreq
-> > > driver so it makes sense to also control LDO bypass from here. The gpc
-> > > driver also fetches a reference to LDO_PU and uses it to gate power to
-> > > graphics blocks.
-> > > 
-> > > The LDO regulator has a minimum dropout voltage of 125mv so enabling
-> > > bypass mode will raise the effective voltage by that amount. We need set
-> > > the minimum frequency first to avoid overvolting when enabling LDO
-> > > bypass.
-> > > 
-> > > The binding is an u32 fsl,ldo-bypass in the gpc node because that's how
-> > > it was defined in the freescale vendor tree for a long time and
-> > > compatibility is desirable. Otherwise it would be a bool.
-> > > 
-> > > Some versions of u-boot shipped by freescale check this same property
-> > > and set regulators in bypass mode before linux actually starts so we
-> > > check for that scenario as well and finish early.
-> > I've not looked at the patch at all, but this feels like the wrong
-> > location to implement this. Using bypass mode or not should really be a
-> > internal decision of the regulator driver, influenced by a DT property
-> > to allow bypass mode.
-> > 
-> > The regulator driver can also implement the correct sequencing of first
-> > lowering external voltage to min + dropout, then going into bypass mode,
-> > then lower the external voltage by the amount of the dropout. I don't
-> > see why we need a frequency switch for this at all.
+On Wed, Mar 22, 2017 at 02:22:22AM +0800, Icenowy Zheng wrote:
 > 
-> Because minimum voltages are dictated by core frequency. At high frequency
-> the (minimum voltage for frequency + dropout) is too high and would go beyond
-> the maximum of 1300 mv when bypass is enabled. It doesn't actually instantly
-> break, this is based on the "operating ranges" from this document:
 > 
-> http://www.nxp.com/assets/documents/data/en/data-sheets/IMX6DQCEC.pdf
-
-Urgh, yes, this is unfortunate.
-
-> > Implementing this in the consumers seems like the wrong spot.
+> 21.03.2017, 15:41, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
+> > On Thu, Mar 16, 2017 at 01:28:04AM +0800, Icenowy Zheng wrote:
+> >> ?Many Allwinner SoCs after A31 have a CCU in PRCM block.
+> >>
+> >> ?Give the ones on H3 and A64 compatible strings.
+> >>
+> >> ?Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+> >> ?---
+> >> ?Changes in v2:
+> >> ?- Add iosc for R_CCU's on H3/A64. (A31, A23 and A33 seem to have different
+> >> ???clock for mux 3 of ar100 clk. Investgations are needed for them.)
+> >>
+> >> ??Documentation/devicetree/bindings/clock/sunxi-ccu.txt | 18 +++++++++++++++++-
+> >> ??1 file changed, 17 insertions(+), 1 deletion(-)
+> >>
+> >> ?diff --git a/Documentation/devicetree/bindings/clock/sunxi-ccu.txt b/Documentation/devicetree/bindings/clock/sunxi-ccu.txt
+> >> ?index 68512aa398a9..4a4addff595d 100644
+> >> ?--- a/Documentation/devicetree/bindings/clock/sunxi-ccu.txt
+> >> ?+++ b/Documentation/devicetree/bindings/clock/sunxi-ccu.txt
+> >> ?@@ -7,9 +7,11 @@ Required properties :
+> >> ??????????????????- "allwinner,sun8i-a23-ccu"
+> >> ??????????????????- "allwinner,sun8i-a33-ccu"
+> >> ??????????????????- "allwinner,sun8i-h3-ccu"
+> >> ?+ - "allwinner,sun8i-h3-r-ccu"
+> >> ??????????????????- "allwinner,sun8i-v3s-ccu"
+> >> ??????????????????- "allwinner,sun9i-a80-ccu"
+> >> ??????????????????- "allwinner,sun50i-a64-ccu"
+> >> ?+ - "allwinner,sun50i-a64-r-ccu"
+> >> ??????????????????- "allwinner,sun50i-h5-ccu"
+> >>
+> >> ??- reg: Must contain the registers base address and length
+> >> ?@@ -20,7 +22,11 @@ Required properties :
+> >> ??- #clock-cells : must contain 1
+> >> ??- #reset-cells : must contain 1
+> >>
+> >> ?-Example:
+> >> ?+For the PRCM CCUs on H3/A64, one more clock is needed:
+> >> ?+- "iosc": another frequency oscillator used for CPUS (usually at 32000Hz,
+> >> ?+ not the same with losc)
+> >
+> > This is called the internal oscillator in the datasheet, it would
+> > probably make more sense to call it that way in the documentation too.
+> >
+> > This oscillator seems to be clocked at 16MHz, so we should represent
+> > it as such.
+> >
+> > And I'm wondering, are you *sure* that it's fed directly from the
+> > internal oscillator, or goes through the registers in the RTC, with
+> > the 32 divider and 16 prescaler by default that makes it at roughly
+> > the same rate (31.25kHz).
 > 
-> It doesn't belong in drivers for individual regulators either, it's a piece
-> of board-level global configuration.
+> In fact I know nothing about it -- I only represented the code in BSP
+> clock driver.
+> 
+> The mux value 3 varies from SoC to SoC. For A64/H5 it's 32000,
+> for A33 it's 667000 (seems to be directly the internal OSC, as the
+> user manual says the internal OSC is 600~700kHz; but it's named
+> cpuosc rather than iosc in A33 BSP clock driver); for A80 it's even
+> PLL_AUDIO.
 
-The configuration weather to use the bypass or not is board level, I
-agree. But the decision to bypass the regulator should be done either at
-the regulator driver level or even in the regulator framework. That is
-the point where you are able to match up the constraints of the
-consumers with the ability to get the correct voltage from the supplying
-regulator.
+Where are you getting those info from?
 
-Regards,
-Lucas
+As far as I know, the A33 PRCM takes the hosc, losc, pll6 and CPU
+(internal) oscillator:
+https://github.com/allwinner-zh/linux-3.4-sunxi/blob/master/drivers/clk/sunxi/clk-sun8iw5.c#L508
+
+The H3 takes the hosc and losc:
+https://github.com/allwinner-zh/linux-3.4-sunxi/blob/master/drivers/clk/sunxi/clk-sun8iw7.c#L379
+
+The A80 takes the hosc and losc:
+https://github.com/allwinner-zh/linux-3.4-sunxi/blob/master/drivers/clk/sunxi/clk-sun9iw1.c#L281
+
+The A64 takes the hosc, losc, pll-periph0 and the iosc, which indeed
+seems to be fed from the internal oscillator with the divider in the
+RTC:
+https://github.com/longsleep/linux-pine64/blob/lichee-dev-v3.10.65-bsp2.0/arch/arm64/boot/dts/sun50iw1p1-clk.dtsi#L19
+https://github.com/longsleep/linux-pine64/blob/lichee-dev-v3.10.65-bsp2.0/drivers/clk/sunxi/clk-sun50iw1.c#L603
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170322/d59ff81c/attachment.sig>
