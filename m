@@ -1,45 +1,51 @@
-From: davem@davemloft.net (David Miller)
-Date: Wed, 22 Mar 2017 12:43:16 -0700 (PDT)
-Subject: [PATCH net-next 0/7] Clean up PHY MMD accessors
-In-Reply-To: <20170321163555.GA21222@n2100.armlinux.org.uk>
-References: <20170321163555.GA21222@n2100.armlinux.org.uk>
-Message-ID: <20170322.124316.224419523899966124.davem@davemloft.net>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Wed, 22 Mar 2017 15:49:21 -0400
+Subject: [PATCH v3] efifb: avoid reconfiguration of BAR that covers the
+ framebuffer
+In-Reply-To: <CAKv+Gu8Uw-X3AR6aQYevPdRfcgPNnqL4O3sRoKxsZAiW29sbqg@mail.gmail.com>
+References: <1490196629-28088-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20170322193111.GA8190@wunner.de>
+ <31da6db5-be22-9e84-5e76-67c519bc0b34@codeaurora.org>
+ <CAKv+Gu8Uw-X3AR6aQYevPdRfcgPNnqL4O3sRoKxsZAiW29sbqg@mail.gmail.com>
+Message-ID: <704b8b8c-e607-29b3-e101-bbecd90073bb@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Russell King - ARM Linux <linux@armlinux.org.uk>
-Date: Tue, 21 Mar 2017 16:35:55 +0000
+On 3/22/2017 3:41 PM, Ard Biesheuvel wrote:
+>> As far as I know, kernel honors resource assignments done by the UEFI BIOS if
+>> they are correct. Kernel will reassign the resources only if something is wrong.
+>>
+> No, the kernel always reassigns all BARs on arm64.
 
-> This series cleans up phylib's MMD accessors, so that we have a common
-> way of accessing the Clause 45 register set.
-> 
-> The current situation is far from ideal - we have phy_(read|write)_mmd()
-> which accesses Clause 45 registers over Clause 45 accesses, and we have
-> phy_(read|write)_mmd_indirect(), which accesses Clause 45 registers via
-> Clause 22 register 13/14.
-> 
-> Generic code uses the indirect methods to access standard Clause 45
-> features, and when we come to add Clause 45 PHY support to phylib, we
-> would need to make these conditional upon the PHY type, or duplicate
-> these functions.
-> 
-> An alternative solution is to merge these accessors together, and select
-> the appropriate access method depending upon the 802.3 clause that the
-> PHY conforms with.  The result is that we have a single set of
-> phy_(read|write)_mmd() accessors.
-> 
-> For cases which require special handling, we still allow PHY drivers to
-> override all MMD accesses - except rather than just overriding the
-> indirect accesses.  This keeps existing overrides working.
-> 
-> Combining the two also has another beneficial side effect - we get rid
-> of similar functions that take arguments in different orders.  The
-> old direct accessors took the phy structure, devad and register number,
-> whereas the indirect accessors took the phy structure, register number
-> and devad in that order.  Care must be taken when updating future
-> drivers that the argument order is correct, and the function name is
-> not merely replaced.
-> 
-> This patch set is against net-next.
+I think this is where the problem is.
 
-Series applied, thanks Russell.
+I'm not seeing this happen on QDF2400 which supports ACPI + UEFI BIOS
+combination only. 
+
+I see that kernel honored the resources assigned by UEFI BIOS if I compare
+the BAR addresses.
+
+I see reassignment only when something is horribly broken. Then, there would
+be a bridge configuration invalid message in the boot log to confirm this.
+
+> 
+>> Will this code break other platforms/architectures?
+>>
+> Which platforms/architectures are you referring to? EFIFB on a PCI
+> device is currently broken on arm64. 
+
+In general or on your particular platform?
+
+> On x86, it works, given that BARs
+> are usually not reassigned, and so the patch should be a no-op in that
+> case (although I'd argue it is still an improvement to check whether
+> the device that owns the BAR actually has memory decoding enabled
+> before we attach the framebuffer driver to it)
+> 
+
+I'm fine as long as it doesn't break anything. That's why, I'm asking.
+
+-- 
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
