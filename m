@@ -1,44 +1,66 @@
-From: ckeepax@opensource.wolfsonmicro.com (Charles Keepax)
-Date: Wed, 22 Mar 2017 12:34:40 +0000
-Subject: [alsa-devel] [PATCH 0/3] ASoC: Enable a new IC master mode:
- bcm2835<=>IC<=>cs42xx8
-In-Reply-To: <64802e9b-ffe9-65e3-502a-4253674fb4c7@flatmax.org>
-References: <20170228095929.GH2742@localhost.localdomain>
- <20170315190108.y6ybxm3nfgnutajv@sirena.org.uk>
- <7d8d38f7-53aa-cc3d-4bbd-141649528a8a@flatmax.org>
- <8c62f014-d246-e0c1-2b02-a28a2c2786b7@metafoo.de>
- <000fbaa4-4c7c-5b13-0806-7e42672a4a55@flatmax.org>
- <e0adcc6c-8bf4-adae-874b-c291e71e5712@laposte.net>
- <20170321221145.GA7258@camel2.lan>
- <579f0763-a5bd-f820-b36f-b6437e331b4b@flatmax.org>
- <20170322094301.GE6986@localhost.localdomain>
- <64802e9b-ffe9-65e3-502a-4253674fb4c7@flatmax.org>
-Message-ID: <20170322123440.GH6986@localhost.localdomain>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 22 Mar 2017 12:40:08 +0000
+Subject: [PATCH v2] arm64: kaslr: Fix up the kernel image alignment
+In-Reply-To: <CAKv+Gu-XUY0XBSK_oe4DbveZOhk8_ZQLMEdPmLiaRv9rCh7ifw@mail.gmail.com>
+References: <904FACBF-3DFE-4DDE-ACB5-7109A137D477@linaro.org>
+ <1490182705-14243-1-git-send-email-sramana@codeaurora.org>
+ <CAKv+Gu-XUY0XBSK_oe4DbveZOhk8_ZQLMEdPmLiaRv9rCh7ifw@mail.gmail.com>
+Message-ID: <20170322124008.GH8026@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 22, 2017 at 11:04:34PM +1100, Matt Flax wrote:
-> >Are we saying that what gets transmitted on the bus is neither valid
-> >I2S or DSP mode data? But as you have your custom hardware block in
-> >the middle it interprets this data correctly and converts it to a
-> >regular bus format on the other side that goes to the CODEC?
+On Wed, Mar 22, 2017 at 12:16:24PM +0000, Ard Biesheuvel wrote:
+> On 22 March 2017 at 11:38, Srinivas Ramana <sramana@codeaurora.org> wrote:
+> > From: Neeraj Upadhyay <neeraju@codeaurora.org>
 > >
+> > If kernel image extends across alignment boundary, existing
+> > code increases the KASLR offset by size of kernel image. The
+> > offset is masked after resizing. There are cases, where after
+> > masking, we may still have kernel image extending across
+> > boundary. This eventually results in only 2MB block getting
+> > mapped while creating the page tables. This results in data aborts
+> > while accessing unmapped regions during second relocation (with
+> > kaslr offset) in __primary_switch. To fix this problem, round up the
+> > kernel image size, by swapper block size, before adding it for
+> > correction.
 > >
-> Yes, essentially there is translation between the two data word edge
-> triggered ABP (the bcm2835's PCM block) and a Cirrus Logic TDM codec.
+> > For example consider below case, where kernel image still crosses
+> > 1GB alignment boundary, after masking the offset, which is fixed
+> > by rounding up kernel image size.
+> >
+> > SWAPPER_TABLE_SHIFT = 30
+> > Swapper using section maps with section size 2MB.
+> > CONFIG_PGTABLE_LEVELS = 3
+> > VA_BITS = 39
+> >
+> > _text  : 0xffffff8008080000
+> > _end   : 0xffffff800aa1b000
+> > offset : 0x1f35600000
+> > mask = ((1UL << (VA_BITS - 2)) - 1) & ~(SZ_2M - 1)
+> >
+> > (_text + offset) >> SWAPPER_TABLE_SHIFT = 0x3fffffe7c
+> > (_end + offset) >> SWAPPER_TABLE_SHIFT  = 0x3fffffe7d
+> >
+> > offset after existing correction (before mask) = 0x1f37f9b000
+> > (_text + offset) >> SWAPPER_TABLE_SHIFT = 0x3fffffe7d
+> > (_end + offset) >> SWAPPER_TABLE_SHIFT  = 0x3fffffe7d
+> >
+> > offset (after mask) = 0x1f37e00000
+> > (_text + offset) >> SWAPPER_TABLE_SHIFT = 0x3fffffe7c
+> > (_end + offset) >> SWAPPER_TABLE_SHIFT  = 0x3fffffe7d
+> >
+> > new offset w/ rounding up = 0x1f38000000
+> > (_text + offset) >> SWAPPER_TABLE_SHIFT = 0x3fffffe7d
+> > (_end + offset) >> SWAPPER_TABLE_SHIFT  = 0x3fffffe7d
+> >
+> > Fixes: f80fb3a3d508 ("arm64: add support for kernel ASLR")
+> > Signed-off-by: Neeraj Upadhyay <neeraju@codeaurora.org>
+> > Signed-off-by: Srinivas Ramana <sramana@codeaurora.org>
+> 
+> Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> 
+> ... and thanks for the excellent commit log message!
 
-Hmm... I guess that is the root difficulty here. As we probably
-don't want to call it DSP mode in the driver if connecting it
-to something that was expecting data in that format wouldn't
-work. Especially if the device actually could support DSP mode as
-well, since we would then be blocking someone for implementing
-legimate DSP mode in the future.
+Thanks both. I've picked this up as a fix.
 
-I guess really the correct thing to do would be to add some
-define for the new format, but I can see that might be a tricky
-road. Would perhaps some sort of BESPOKE define or something be
-possible to indicate odd formats that don't fall into regular
-classifications?
-
-Thanks,
-Charles
+Will
