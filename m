@@ -1,43 +1,53 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Wed, 22 Mar 2017 18:13:27 +0000
-Subject: [PATCH V2 4/5] dt-bindings: tegra: Update compatible strings for
- Tegra flowctrl
-In-Reply-To: <b85e7f4e-ba63-8374-b10d-3f9f04252a69@wwwdotorg.org>
-References: <1490202056-13040-1-git-send-email-jonathanh@nvidia.com>
- <1490202056-13040-5-git-send-email-jonathanh@nvidia.com>
- <b85e7f4e-ba63-8374-b10d-3f9f04252a69@wwwdotorg.org>
-Message-ID: <58983614-8f75-b498-e544-5121a16d5d19@nvidia.com>
+From: briannorris@chromium.org (Brian Norris)
+Date: Wed, 22 Mar 2017 11:14:42 -0700
+Subject: [PATCH v3 4/4] arm64: dts: rockchip: add regulator info for
+ Kevin digitizer
+In-Reply-To: <20415662.PctC9IM4SC@phil>
+References: <20170320235344.126298-1-briannorris@chromium.org>
+ <20170320235344.126298-5-briannorris@chromium.org>
+ <20415662.PctC9IM4SC@phil>
+Message-ID: <20170322181441.GC98450@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 22/03/17 17:26, Stephen Warren wrote:
-> On 03/22/2017 11:00 AM, Jon Hunter wrote:
->> Update the compatible strings for Tegra Flow Control driver to match
->> the device-tree source files for Tegra.
+On Wed, Mar 22, 2017 at 09:26:41AM +0100, Heiko Stuebner wrote:
+> Am Montag, 20. M?rz 2017, 16:53:44 CET schrieb Brian Norris:
+> > We need to enable this regulator before the digitizer can be used. Wacom
+> > recommended waiting for 100 ms before talking to the HID.
+> > 
+> > Signed-off-by: Brian Norris <briannorris@chromium.org>
+> > ---
+> > v3:
+> >  * reintroduced into patch set; bindings are in linux-next
+> > ---
+> >  arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts | 3 +++
+> >  1 file changed, 3 insertions(+)
+> > 
+> > diff --git a/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
+> > b/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts index
+> > 2f720cf2fd07..f4714c4606f3 100644
+> > --- a/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
+> > +++ b/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
+> > @@ -232,6 +232,9 @@ ap_i2c_dig: &i2c2 {
 > 
->> +++
->> b/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-flowctrl.txt
+> according to the hid-over-i2c binding, this should use a special compatible 
+> like
 > 
->> +  - "nvidia,tegra124-flowctrl": for Tegra124 and Tegra132
+> 	compatible = "wacom,w9013", "hid-over-i2c"
 > 
-> I think that should be:
-> 
-> +  - "nvidia,tegra124-flowctrl": for Tegra124
-> +  - "nvidia,tegra132-flowctrl", "nvidia,tegra124-flowctrl": for \
-> Tegra132
+> As the binding patch is from Caesar, I assume that is the Kevin component and
+> I can add that myself, just need confirmation that this is actually the correct 
+> component :-) .
 
-This is based upon the current tegra132.dtsi file which just has ...
+*Sigh.* The I2C (and SPI) framework is still broken w.r.t. multiple
+compatible strings and drivers built as modules [1]. So I'd really
+rather not do this...
 
-	flow-controller at 60007000 {
-		compatible = "nvidia,tegra124-flowctrl";
-		...
+...but yes, that's a fair component description.
 
-So I can fix-it up if that is what we want/should have. I have a feeling
-there are a few other cases like this.
+Brian
 
-Cheers
-Jon
-
--- 
-nvpublic
+[1] Some discussion about SPI:
+    https://patchwork.kernel.org/patch/7630571/
+    And the discussion about I2C (25% through that thread):
+    https://patchwork.kernel.org/patch/9455245/
