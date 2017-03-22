@@ -1,37 +1,48 @@
 From: yannick.fertre@st.com (Yannick Fertre)
-Date: Wed, 22 Mar 2017 15:12:49 +0100
-Subject: [PATCH v2 0/5] STM32 Independant watchdog
-Message-ID: <1490191974-29722-1-git-send-email-yannick.fertre@st.com>
+Date: Wed, 22 Mar 2017 15:12:50 +0100
+Subject: [PATCH v2 1/5] dt-bindings: Document STM32 IWDG bindings
+In-Reply-To: <1490191974-29722-1-git-send-email-yannick.fertre@st.com>
+References: <1490191974-29722-1-git-send-email-yannick.fertre@st.com>
+Message-ID: <1490191974-29722-2-git-send-email-yannick.fertre@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Version 2:
-- Add commit messages
+From: Yannick Fertre <yfertre.stm32@gmail.com>
 
-Version 1:
-- Initial commit
+This adds documentation of device tree bindings for the STM32 IWDG
+(Independent WatchDoG).
 
-The purpose of this set of patches is to add a new watchdog driver for
-stm32f429.
-This driver was developed and tested on evaluation board stm32429i.
-
-Yannick Fertre (5):
-  dt-bindings: Document STM32 IWDG bindings
-  drivers: watchdog: Add STM32 IWDG driver
-  ARM: dts: stm32: Add watchdog support for STM32F429 SoC
-  ARM: dts: stm32: Add watchdog support for STM32F429 eval board
-  ARM: configs: Add watchdog support in STM32 defconfig
-
- .../devicetree/bindings/watchdog/st,stm32-iwdg.txt |  15 ++
- arch/arm/boot/dts/stm32429i-eval.dts               |   4 +
- arch/arm/boot/dts/stm32f429.dtsi                   |   9 +-
- arch/arm/configs/stm32_defconfig                   |   1 +
- drivers/watchdog/Kconfig                           |  11 +
- drivers/watchdog/Makefile                          |   1 +
- drivers/watchdog/stm32_iwdg.c                      | 289 +++++++++++++++++++++
- 7 files changed, 329 insertions(+), 1 deletion(-)
+Change-Id: Idadacc806d00205fe9af2e8606af229b4b760558
+Signed-off-by: Yannick Fertre <yfertre.stm32@gmail.com>
+Reviewed-on: https://gerrit.st.com/45217
+Reviewed-by: Yannick FERTRE <yannick.fertre@st.com>
+Tested-by: Yannick FERTRE <yannick.fertre@st.com>
+Reviewed-by: Ludovic BARRE <ludovic.barre@st.com>
+---
+ .../devicetree/bindings/watchdog/st,stm32-iwdg.txt        | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/watchdog/st,stm32-iwdg.txt
- create mode 100644 drivers/watchdog/stm32_iwdg.c
 
+diff --git a/Documentation/devicetree/bindings/watchdog/st,stm32-iwdg.txt b/Documentation/devicetree/bindings/watchdog/st,stm32-iwdg.txt
+new file mode 100644
+index 0000000..9c6936b
+--- /dev/null
++++ b/Documentation/devicetree/bindings/watchdog/st,stm32-iwdg.txt
+@@ -0,0 +1,15 @@
++STM32 Independent WatchDoG (IWDG)
++---------------------------------
++
++Required properties:
++- compatible: "st,stm32-iwdg".
++- reg: physical base address and length of the registers set for the device;
++- clocks: Must contain a single entry describing the clock input
++
++Example:
++
++iwdg at 40003000 {
++	compatible = "st,stm32-iwdg";
++	reg = <0x40003000 0x400>;
++	clocks = <&clk_lsi>;
++};
 -- 
 1.9.1
