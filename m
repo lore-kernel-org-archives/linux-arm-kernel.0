@@ -1,80 +1,87 @@
 From: robh@kernel.org (Rob Herring)
-Date: Tue, 21 Mar 2017 21:03:08 -0500
-Subject: [PATCH 10/15] ARM: dts: bcm: fix msi-controller name and unit address
+Date: Tue, 21 Mar 2017 21:03:10 -0500
+Subject: [PATCH 12/15] arm64: dts: apm: fix PCI bus dtc warnings
 In-Reply-To: <20170322020313.24338-1-robh@kernel.org>
 References: <20170322020313.24338-1-robh@kernel.org>
-Message-ID: <20170322020313.24338-10-robh@kernel.org>
+Message-ID: <20170322020313.24338-12-robh@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The unit address for the msi controller is not valid as there is no reg
-property, so remove it. Also, msi-controller is the preferred node name.
+dtc recently added PCI bus checks. Fix these warnings.
 
 Signed-off-by: Rob Herring <robh@kernel.org>
-Cc: Ray Jui <rjui@broadcom.com>
-Cc: Scott Branden <sbranden@broadcom.com>
-Cc: Jon Mason <jonmason@broadcom.com>
-Cc: bcm-kernel-feedback-list at broadcom.com
+Cc: Duc Dang <dhdang@apm.com>
 ---
 Sub-arch maintainers, please apply to your trees unless arm-soc wants 
 to take the whole lot.
 
- arch/arm/boot/dts/bcm-cygnus.dtsi | 4 ++--
- arch/arm/boot/dts/bcm-nsp.dtsi    | 6 +++---
- 2 files changed, 5 insertions(+), 5 deletions(-)
+ arch/arm64/boot/dts/apm/apm-shadowcat.dtsi | 2 ++
+ arch/arm64/boot/dts/apm/apm-storm.dtsi     | 5 +++++
+ 2 files changed, 7 insertions(+)
 
-diff --git a/arch/arm/boot/dts/bcm-cygnus.dtsi b/arch/arm/boot/dts/bcm-cygnus.dtsi
-index 8833a4c3cd96..9644fddb5e3c 100644
---- a/arch/arm/boot/dts/bcm-cygnus.dtsi
-+++ b/arch/arm/boot/dts/bcm-cygnus.dtsi
-@@ -205,7 +205,7 @@
- 			status = "disabled";
- 
- 			msi-parent = <&msi0>;
--			msi0: msi at 18012000 {
-+			msi0: msi-controller {
- 				compatible = "brcm,iproc-msi";
- 				msi-controller;
- 				interrupt-parent = <&gic>;
-@@ -240,7 +240,7 @@
- 			status = "disabled";
- 
- 			msi-parent = <&msi1>;
--			msi1: msi at 18013000 {
-+			msi1: msi-controller {
- 				compatible = "brcm,iproc-msi";
- 				msi-controller;
- 				interrupt-parent = <&gic>;
-diff --git a/arch/arm/boot/dts/bcm-nsp.dtsi b/arch/arm/boot/dts/bcm-nsp.dtsi
-index 832795b0fd0f..42c017df490f 100644
---- a/arch/arm/boot/dts/bcm-nsp.dtsi
-+++ b/arch/arm/boot/dts/bcm-nsp.dtsi
-@@ -450,7 +450,7 @@
- 		status = "disabled";
- 
- 		msi-parent = <&msi0>;
--		msi0: msi at 18012000 {
-+		msi0: msi-controller {
- 			compatible = "brcm,iproc-msi";
- 			msi-controller;
- 			interrupt-parent = <&gic>;
-@@ -486,7 +486,7 @@
- 		status = "disabled";
- 
- 		msi-parent = <&msi1>;
--		msi1: msi at 18013000 {
-+		msi1: msi-controller {
- 			compatible = "brcm,iproc-msi";
- 			msi-controller;
- 			interrupt-parent = <&gic>;
-@@ -522,7 +522,7 @@
- 		status = "disabled";
- 
- 		msi-parent = <&msi2>;
--		msi2: msi at 18014000 {
-+		msi2: msi-controller {
- 			compatible = "brcm,iproc-msi";
- 			msi-controller;
- 			interrupt-parent = <&gic>;
+diff --git a/arch/arm64/boot/dts/apm/apm-shadowcat.dtsi b/arch/arm64/boot/dts/apm/apm-shadowcat.dtsi
+index 72720e9132a1..c9ffffb96e43 100644
+--- a/arch/arm64/boot/dts/apm/apm-shadowcat.dtsi
++++ b/arch/arm64/boot/dts/apm/apm-shadowcat.dtsi
+@@ -626,6 +626,7 @@
+ 				  0x43000000 0xe0 0x00000000 0xe0 0x00000000 0x20 0x00000000>; /* mem */
+ 			dma-ranges = <0x42000000 0x80 0x00000000 0x80 0x00000000 0x00 0x80000000
+ 				      0x42000000 0x00 0x00000000 0x00 0x00000000 0x80 0x00000000>;
++			bus-range = <0x00 0xff>;
+ 			interrupt-map-mask = <0x0 0x0 0x0 0x7>;
+ 			interrupt-map = <0x0 0x0 0x0 0x1 &gic 0x0 0x0 0x0 0x10 0x4
+ 					 0x0 0x0 0x0 0x2 &gic 0x0 0x0 0x0 0x11 0x4
+@@ -651,6 +652,7 @@
+ 				  0x43000000 0xb0 0x00000000 0xb0 0x00000000 0x10 0x00000000>; /* mem */
+ 			dma-ranges = <0x42000000 0x80 0x00000000 0x80 0x00000000 0x00 0x80000000
+ 				      0x42000000 0x00 0x00000000 0x00 0x00000000 0x80 0x00000000>;
++			bus-range = <0x00 0xff>;
+ 			interrupt-map-mask = <0x0 0x0 0x0 0x7>;
+ 			interrupt-map = <0x0 0x0 0x0 0x1 &gic 0x0 0x0 0x0 0x16 0x4
+ 					 0x0 0x0 0x0 0x2 &gic 0x0 0x0 0x0 0x17 0x4
+diff --git a/arch/arm64/boot/dts/apm/apm-storm.dtsi b/arch/arm64/boot/dts/apm/apm-storm.dtsi
+index 63be8e51eaa8..c09a36fed917 100644
+--- a/arch/arm64/boot/dts/apm/apm-storm.dtsi
++++ b/arch/arm64/boot/dts/apm/apm-storm.dtsi
+@@ -626,6 +626,7 @@
+ 				  0x43000000 0xf0 0x00000000 0xf0 0x00000000 0x10 0x00000000>; /* mem */
+ 			dma-ranges = <0x42000000 0x80 0x00000000 0x80 0x00000000 0x00 0x80000000
+ 				      0x42000000 0x00 0x00000000 0x00 0x00000000 0x80 0x00000000>;
++			bus-range = <0x00 0xff>;
+ 			interrupt-map-mask = <0x0 0x0 0x0 0x7>;
+ 			interrupt-map = <0x0 0x0 0x0 0x1 &gic 0x0 0xc2 0x4
+ 					 0x0 0x0 0x0 0x2 &gic 0x0 0xc3 0x4
+@@ -651,6 +652,7 @@
+ 				  0x43000000 0xd8 0x00000000 0xd8 0x00000000 0x08 0x00000000>; /* mem */
+ 			dma-ranges = <0x42000000 0x80 0x00000000 0x80 0x00000000 0x00 0x80000000
+ 				      0x42000000 0x00 0x00000000 0x00 0x00000000 0x80 0x00000000>;
++			bus-range = <0x00 0xff>;
+ 			interrupt-map-mask = <0x0 0x0 0x0 0x7>;
+ 			interrupt-map = <0x0 0x0 0x0 0x1 &gic 0x0 0xc8 0x4
+ 					 0x0 0x0 0x0 0x2 &gic 0x0 0xc9 0x4
+@@ -676,6 +678,7 @@
+ 				  0x43000000 0x94 0x00000000 0x94 0x00000000 0x04 0x00000000>; /* mem */
+ 			dma-ranges = <0x42000000 0x80 0x00000000 0x80 0x00000000 0x00 0x80000000
+ 				      0x42000000 0x00 0x00000000 0x00 0x00000000 0x80 0x00000000>;
++			bus-range = <0x00 0xff>;
+ 			interrupt-map-mask = <0x0 0x0 0x0 0x7>;
+ 			interrupt-map = <0x0 0x0 0x0 0x1 &gic 0x0 0xce 0x4
+ 					 0x0 0x0 0x0 0x2 &gic 0x0 0xcf 0x4
+@@ -701,6 +704,7 @@
+ 				  0x43000000 0xb0 0x00000000 0xb0 0x00000000 0x10 0x00000000>; /* mem */
+ 			dma-ranges = <0x42000000 0x80 0x00000000 0x80 0x00000000 0x00 0x80000000
+ 				      0x42000000 0x00 0x00000000 0x00 0x00000000 0x80 0x00000000>;
++			bus-range = <0x00 0xff>;
+ 			interrupt-map-mask = <0x0 0x0 0x0 0x7>;
+ 			interrupt-map = <0x0 0x0 0x0 0x1 &gic 0x0 0xd4 0x4
+ 					 0x0 0x0 0x0 0x2 &gic 0x0 0xd5 0x4
+@@ -726,6 +730,7 @@
+ 				  0x43000000 0xc8 0x00000000 0xc8 0x00000000 0x08 0x00000000>; /* mem */
+ 			dma-ranges = <0x42000000 0x80 0x00000000 0x80 0x00000000 0x00 0x80000000
+ 				      0x42000000 0x00 0x00000000 0x00 0x00000000 0x80 0x00000000>;
++			bus-range = <0x00 0xff>;
+ 			interrupt-map-mask = <0x0 0x0 0x0 0x7>;
+ 			interrupt-map = <0x0 0x0 0x0 0x1 &gic 0x0 0xda 0x4
+ 					 0x0 0x0 0x0 0x2 &gic 0x0 0xdb 0x4
 -- 
 2.10.1
