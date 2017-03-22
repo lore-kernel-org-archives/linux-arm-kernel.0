@@ -1,39 +1,110 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Wed, 22 Mar 2017 14:20:08 +0200
-Subject: [PATCH 3/8] spi: davinci: limit the transfer size if DMA enabled
-In-Reply-To: <95c7bc96-2de9-043d-880e-4de9f0b2308a@ti.com>
-References: <1486740584-17875-1-git-send-email-fisaksen@baylibre.com>
- <1486740584-17875-4-git-send-email-fisaksen@baylibre.com>
- <a17cca3a-d029-a2cd-583c-2672287d191c@ti.com>
- <b4d8bd90-cd33-560f-5102-20c2375dac70@ti.com>
- <44a615b6-97ab-0ab8-c2ba-013fdd40ffd7@baylibre.com>
- <95c7bc96-2de9-043d-880e-4de9f0b2308a@ti.com>
-Message-ID: <c85c9e88-c40b-88b3-f47d-6d5f5cc1fa00@ti.com>
+From: xiexiuqi@huawei.com (Xie XiuQi)
+Date: Wed, 22 Mar 2017 20:08:48 +0800
+Subject: [PATCH V11 10/10] arm/arm64: KVM: add guest SEA support
+In-Reply-To: <58D25C8D.3070507@arm.com>
+References: <1487712121-16688-1-git-send-email-tbaicar@codeaurora.org>
+ <1487712121-16688-11-git-send-email-tbaicar@codeaurora.org>
+ <df6ba5dc-d93f-925a-46bf-1e1e209d17f3@huawei.com> <58B43092.6040401@arm.com>
+ <6eee7a67-808e-8712-2ec2-593eac52d921@huawei.com> <58D25C8D.3070507@arm.com>
+Message-ID: <b57e2cb1-129b-7369-96e0-33e5c87dbb74@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/22/2017 01:35 PM, Sekhar Nori wrote:
-> On Wednesday 22 March 2017 04:41 PM, Frode Isaksen wrote:
-> I guess this means that most IPs continue to get more missed sync events
-> even after the first sync event is generated at end of MAX_NR_SG PaRAMs.
-> And may be even that first sync event miss is a problem because the IP
-> does not pause and ends up shifting data in the shift register anyway.
->
-> If this is so broken, should edma driver not refuse to handle more than
-> MAX_NR_SG for all transfers but mem-to-mem transfers?
+Hi James,
 
-DM355, OMAP-L138, etc have only 128 paRAM slots. If we lift the restriction on 
-the number of paRAM slots a channel can take, then DMA will most likely going 
-to stop working: If any peripherals request 128 long SG transfer (and MMC 
-easily does that alone) then we will have no available paRAM slot for other 
-clients.
+On 2017/3/22 19:14, James Morse wrote:
+> Hi Wang Xiongfeng,
+> 
+> On 22/03/17 02:46, Xiongfeng Wang wrote:
+>>> Guests are a special case as QEMU may never access the faulty memory itself, so
+>>> it won't receive the 'late' signal. It looks like ARM/arm64 KVM lacks support
+>>> for KVM_PFN_ERR_HWPOISON which sends SIGBUS from KVM's fault-handling code. I
+>>> have patches to add support for this which I intend to send at rc1.
+>>>
+>>> [0] suggests 'KVM qemu' sets these MCE flags to take the 'early' path, but given
+>>> x86s KVM_PFN_ERR_HWPOISON, this may be out of date.
+>>>
+>>>
+>>> Either way, once QEMU gets a signal indicating the virtual address, it can
+>>> generate its own APEI CPER records and use the KVM APIs to mock up an
+>>> Synchronous External Abort, (or inject an IRQ or run the vcpu waiting for the
+>>> guest's polling thread to come round, whichever was described to the guest via
+>>> the HEST/GHES tables).
+>>>
+>>
+>> I have another confusion about the SIGBUS signal. Can QEMU always get a SIGBUS when needed.
+>> I know one circumstance which will send SIGBUS. The ghes_handle_memory_failure() in
+>> ghes_do_proc() will send SIGBUS to QEMU, but this only happens when there exists memory section
+>> in ghes, that is the section type is CPER_SEC_PLATFORM_MEM.
+>> Suppose this case, an load  error in guest application causes an SEA, and the firmware take it.
+>> The firmware begin to scan the error record and fill the ghes. But the error record in memory node
+>> has been read by other handler.
+> 
+> (this looks like a race)
+> 
+>> The firmware won't add memory section in ghes, so ghes_handle_memory_failure() won't be called.
+> 
+> I think this would be a firmware bug. Firmware can reserve as much memory as it
+> needs for writing CPER records, there should not be a case where 'the memory' is
+> currently being processed by another handler.
 
-It might be possible to start the paRAM slot update for the next batch already 
-when we have 1 or 2 slots to be processed, but that is going to be tricky and 
-not even reliable.
+I have a question here:
+Consider this case, the memory controller first detected a memory error,
+but it has not been consumed. So it will not generate the SEA. Memory error
+may be reported to the OS by IRQ with MEM section in CPER record; and
+after for a while, the error data was loaded into the cache and consumed,
+when the SEA is generated. Is it possible only processor section, and no
+MEM section in CPER record?
 
-Note: audio also sets limit on the number of periods to avoid this 
-reconfiguration of paRAM slots.
+Obviously there are two different GHES above, one for SEA and another for IRQ/GSIV.
+Could we assume that there is mem section in the SEA ghes table?
+
+> 
+> The memory firmware uses to write CPER records too shouldn't be published to the
+> OS until it has finished. Once firmware has finished writing the CPER records it
+> can update the memory pointed to by GHES->ErrorStatusAddress with the location
+> of the CPER records and invoke the Notification method for this GHES. (SEI, SEA,
+> IRQ etc). We should always get a complete set of CPER records to describe the error.
+> 
+
+Does it mean that the BIOS has the responsibility to ensure that the GHES table has a
+complete error info, including memory, bus, tlb, cache and other related error info?
 
 -- 
-P?ter
+Thanks,
+Xie XiuQi
+
+> It firmware uses GHESv2 it can get an 'ack' write from APEI once it has finished
+> processing the records. Once it gets this firmware knows it can re-use the memory.
+> 
+> (Obviously each GHES entry can only process one error at a time. Firmware should
+> either handle this, or have one entry for each Error Source that can happen
+> independently)
+> 
+> 
+>> I mean that we may not rely on ghes_handle_memory_failure() to send SIGBUS to QEMU. Whether we should
+>> add some other code to send SIGBUS in handle_guest_abort(). I don't know whether the ARM/arm64
+>>  KVM_PFN_ERR_HWPOISON you mentioned above will cover all the cases.
+> 
+> The SIGBUS routine is part of the kernel's recovery method for memory errors. It
+> should cover all the errors reported with this CPER_SEC_PLATFORM_MEM.
+> 
+> Back to the race you describe. It shouldn't matter if one CPU processes an error
+> for guest memory while a vcpu is running on another. This may happen if the
+> error was detected by DRAM's background scrub.
+> If we don't treat KVM/Qemu as anything special the memory_failure()->SIGBUS path
+> will happen regardless of whether the fault interrupted the guest or not.
+> 
+> 
+> There are other types of error such as PCIe, CPU, BUS error etc. If it's
+> possible to recover from these we may need additional code in the kernel. This
+> shouldn't necessarily treat KVM as a special case.
+> 
+> 
+> Thanks,
+> 
+> James
+> 
+> 
+> .
+> 
