@@ -1,217 +1,111 @@
-From: john.garry@huawei.com (John Garry)
-Date: Wed, 22 Mar 2017 14:12:48 +0000
-Subject: [PATCH v9 15/15] irqchip: mbigen: Add ACPI support
-In-Reply-To: <20170321144521.GA4392@red-moon>
-References: <1488890410-15503-1-git-send-email-guohanjun@huawei.com>
- <1488890410-15503-16-git-send-email-guohanjun@huawei.com>
- <20170321144521.GA4392@red-moon>
-Message-ID: <12635f14-8cbd-61ba-74fa-495a81f94038@huawei.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 22 Mar 2017 14:14:50 +0000
+Subject: [PATCH 3/7] arm64: hugetlb: Refactor find_num_contig
+In-Reply-To: <20170321180421.18332-4-punit.agrawal@arm.com>
+References: <20170321180421.18332-1-punit.agrawal@arm.com>
+ <20170321180421.18332-4-punit.agrawal@arm.com>
+Message-ID: <20170322141450.GD2977@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/03/2017 14:45, Lorenzo Pieralisi wrote:
-> On Tue, Mar 07, 2017 at 08:40:10PM +0800, Hanjun Guo wrote:
->> From: Hanjun Guo <hanjun.guo@linaro.org>
->>
->> With the preparation of platform msi support and interrupt producer
->> in DSDT, we can add mbigen ACPI support now.
->>
->> We are using Interrupt resource type in _CRS methd to indicate number
->> of irq pins instead of num_pins in DT to avoid _DSD usage in this case.
->>
->> For mbigen,
->>     Device(MBI0) {
->>           Name(_HID, "HISI0152")
->>           Name(_UID, Zero)
->>           Name(_CRS, ResourceTemplate() {
->>                   Memory32Fixed(ReadWrite, 0xa0080000, 0x10000)
->> 		  Interrupt(ResourceProducer,...) {12,14,....}
->
-> What do these interrupt numbers represent ? This looks wrong to me.
-> An interrupt descriptor is there to describe the interrupts a device
-> can generate; you are using it just to add a "standard" (that is
-> not standard at all) way of counting the number of vectors allocated
-> to this specific chip and that's just wrong.
->
+On Tue, Mar 21, 2017 at 06:04:17PM +0000, Punit Agrawal wrote:
+> From: Steve Capper <steve.capper@arm.com>
+> 
+> As we regularly check for contiguous pte's in the huge accessors, remove
+> this extra check from find_num_contig.
+> 
+> Cc: David Woods <dwoods@mellanox.com>
+> Signed-off-by: Steve Capper <steve.capper@arm.com>
+> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
 
-As I understand, the count of interrupts we are declaring for the mbigen 
-is the same as the sum of interrupts for that mbigen's children.
+Reviewed-by: Mark Rutland <mark.rutland@arm.com>
 
-So at the point we probe the mbigen, can we just deference the children 
-to count their interrupts, and use this as the #msis?
+Mark.
 
-> Can't you use something like Agustin did in the QCOM combiner:
->
-> drivers/irqchip/qcom-irq-combiner.c
->
-> to detect the MSI vector length (ie by describing the MBIgen through
-> generic registers and use the bit width to compute the vector
-> lenght) ? I am not sure how feasible it is given that my knowledge
-> of MBIgen is pretty poor.
->
-> I understand we want to avoid _DSD properties but we should not
-> work around standard bindings to achieve that goal.
->
-
-We use "num-pins" for dt solution, but it is not so welcome here.
-
-> Side effect: IIUC the kernel will allocate an array of resources for
-> your MBIgen interrupts whose size equal the Interrupt descriptor,
-> which is as bad as it can get given that those resources are to
-> the best of my knowledge unused.
->
-
-Much appreciated,
-John
-
-> Lorenzo
->
->>           })
->>     }
->>
->> For devices,
->>    Device(COM0) {
->>           Name(_HID, "ACPIIDxx")
->>           Name(_UID, Zero)
->>           Name(_CRS, ResourceTemplate() {
->>                  Memory32Fixed(ReadWrite, 0xb0030000, 0x10000)
->> 		 Interrupt(ResourceConsumer,..., "\_SB.MBI0") {12}
->>           })
->>     }
->>
->> With the help of platform msi and interrupt producer, then devices
->> will get the virq from mbigen's irqdomain.
->>
->> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
->> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->> Cc: Ma Jun <majun258@huawei.com>
->> Cc: Marc Zyngier <marc.zyngier@arm.com>
->> Cc: Thomas Gleixner <tglx@linutronix.de>
->> ---
->>  drivers/irqchip/irq-mbigen.c | 70 ++++++++++++++++++++++++++++++++++++++++++--
->>  1 file changed, 67 insertions(+), 3 deletions(-)
->>
->> diff --git a/drivers/irqchip/irq-mbigen.c b/drivers/irqchip/irq-mbigen.c
->> index 3756408..e6bb503 100644
->> --- a/drivers/irqchip/irq-mbigen.c
->> +++ b/drivers/irqchip/irq-mbigen.c
->> @@ -16,6 +16,7 @@
->>   * along with this program.  If not, see <http://www.gnu.org/licenses/>.
->>   */
->>
->> +#include <linux/acpi.h>
->>  #include <linux/interrupt.h>
->>  #include <linux/irqchip.h>
->>  #include <linux/module.h>
->> @@ -180,7 +181,7 @@ static int mbigen_domain_translate(struct irq_domain *d,
->>  				    unsigned long *hwirq,
->>  				    unsigned int *type)
->>  {
->> -	if (is_of_node(fwspec->fwnode)) {
->> +	if (is_of_node(fwspec->fwnode) || is_acpi_device_node(fwspec->fwnode)) {
->>  		if (fwspec->param_count != 2)
->>  			return -EINVAL;
->>
->> @@ -271,6 +272,54 @@ static int mbigen_of_create_domain(struct platform_device *pdev,
->>  	return 0;
->>  }
->>
->> +#ifdef CONFIG_ACPI
->> +static acpi_status mbigen_acpi_process_resource(struct acpi_resource *ares,
->> +					     void *context)
->> +{
->> +	struct acpi_resource_extended_irq *ext_irq;
->> +	u32 *num_irqs = context;
->> +
->> +	switch (ares->type) {
->> +	case ACPI_RESOURCE_TYPE_EXTENDED_IRQ:
->> +		ext_irq = &ares->data.extended_irq;
->> +		*num_irqs += ext_irq->interrupt_count;
->> +		break;
->> +	default:
->> +		break;
->> +	}
->> +
->> +	return AE_OK;
->> +}
->> +
->> +static int mbigen_acpi_create_domain(struct platform_device *pdev,
->> +				     struct mbigen_device *mgn_chip)
->> +{
->> +	struct irq_domain *domain;
->> +	u32 num_msis = 0;
->> +	acpi_status status;
->> +
->> +	status = acpi_walk_resources(ACPI_HANDLE(&pdev->dev), METHOD_NAME__CRS,
->> +				     mbigen_acpi_process_resource, &num_msis);
->> +	if (ACPI_FAILURE(status) || num_msis == 0)
->> +		return -EINVAL;
->> +
->> +	domain = platform_msi_create_device_domain(&pdev->dev, num_msis,
->> +						   mbigen_write_msg,
->> +						   &mbigen_domain_ops,
->> +						   mgn_chip);
->> +	if (!domain)
->> +		return -ENOMEM;
->> +
->> +	return 0;
->> +}
->> +#else
->> +static inline int mbigen_acpi_create_domain(struct platform_device *pdev,
->> +					    struct mbigen_device *mgn_chip)
->> +{
->> +	return -ENODEV;
->> +}
->> +#endif
->> +
->>  static int mbigen_device_probe(struct platform_device *pdev)
->>  {
->>  	struct mbigen_device *mgn_chip;
->> @@ -289,9 +338,17 @@ static int mbigen_device_probe(struct platform_device *pdev)
->>  	if (IS_ERR(mgn_chip->base))
->>  		return PTR_ERR(mgn_chip->base);
->>
->> -	err = mbigen_of_create_domain(pdev, mgn_chip);
->> -	if (err)
->> +	if (IS_ENABLED(CONFIG_OF) && pdev->dev.of_node)
->> +		err = mbigen_of_create_domain(pdev, mgn_chip);
->> +	else if (ACPI_COMPANION(&pdev->dev))
->> +		err = mbigen_acpi_create_domain(pdev, mgn_chip);
->> +	else
->> +		err = -EINVAL;
->> +
->> +	if (err) {
->> +		dev_err(&pdev->dev, "Failed to create mbi-gen@%p irqdomain", mgn_chip->base);
->>  		return err;
->> +	}
->>
->>  	platform_set_drvdata(pdev, mgn_chip);
->>  	return 0;
->> @@ -303,10 +360,17 @@ static int mbigen_device_probe(struct platform_device *pdev)
->>  };
->>  MODULE_DEVICE_TABLE(of, mbigen_of_match);
->>
->> +static const struct acpi_device_id mbigen_acpi_match[] = {
->> +	{ "HISI0152", 0 },
->> +	{}
->> +};
->> +MODULE_DEVICE_TABLE(acpi, mbigen_acpi_match);
->> +
->>  static struct platform_driver mbigen_platform_driver = {
->>  	.driver = {
->>  		.name		= "Hisilicon MBIGEN-V2",
->>  		.of_match_table	= mbigen_of_match,
->> +		.acpi_match_table = ACPI_PTR(mbigen_acpi_match),
->>  	},
->>  	.probe			= mbigen_device_probe,
->>  };
->> --
->> 1.7.12.4
->>
-> _______________________________________________
-> linuxarm mailing list
-> linuxarm at huawei.com
-> http://rnd-openeuler.huawei.com/mailman/listinfo/linuxarm
->
-> .
->
+> ---
+>  arch/arm64/mm/hugetlbpage.c | 17 ++++++++---------
+>  1 file changed, 8 insertions(+), 9 deletions(-)
+> 
+> diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
+> index aacbe18e6640..81bc6e4cf714 100644
+> --- a/arch/arm64/mm/hugetlbpage.c
+> +++ b/arch/arm64/mm/hugetlbpage.c
+> @@ -42,15 +42,13 @@ int pud_huge(pud_t pud)
+>  }
+>  
+>  static int find_num_contig(struct mm_struct *mm, unsigned long addr,
+> -			   pte_t *ptep, pte_t pte, size_t *pgsize)
+> +			   pte_t *ptep, size_t *pgsize)
+>  {
+>  	pgd_t *pgd = pgd_offset(mm, addr);
+>  	pud_t *pud;
+>  	pmd_t *pmd;
+>  
+>  	*pgsize = PAGE_SIZE;
+> -	if (!pte_cont(pte))
+> -		return 1;
+>  	pud = pud_offset(pgd, addr);
+>  	pmd = pmd_offset(pud, addr);
+>  	if ((pte_t *)pmd == ptep) {
+> @@ -65,7 +63,7 @@ void set_huge_pte_at(struct mm_struct *mm, unsigned long addr,
+>  {
+>  	size_t pgsize;
+>  	int i;
+> -	int ncontig = find_num_contig(mm, addr, ptep, pte, &pgsize);
+> +	int ncontig;
+>  	unsigned long pfn;
+>  	pgprot_t hugeprot;
+>  
+> @@ -75,11 +73,12 @@ void set_huge_pte_at(struct mm_struct *mm, unsigned long addr,
+>  	 */
+>  	WARN_ON(!pte_present(pte));
+>  
+> -	if (ncontig == 1) {
+> +	if (!pte_cont(pte)) {
+>  		set_pte_at(mm, addr, ptep, pte);
+>  		return;
+>  	}
+>  
+> +	ncontig = find_num_contig(mm, addr, ptep, &pgsize);
+>  	pfn = pte_pfn(pte);
+>  	hugeprot = __pgprot(pte_val(pfn_pte(pfn, __pgprot(0))) ^ pte_val(pte));
+>  	for (i = 0; i < ncontig; i++) {
+> @@ -203,7 +202,7 @@ pte_t huge_ptep_get_and_clear(struct mm_struct *mm,
+>  		bool is_dirty = false;
+>  
+>  		cpte = huge_pte_offset(mm, addr);
+> -		ncontig = find_num_contig(mm, addr, cpte, *cpte, &pgsize);
+> +		ncontig = find_num_contig(mm, addr, cpte, &pgsize);
+>  		/* save the 1st pte to return */
+>  		pte = ptep_get_and_clear(mm, addr, cpte);
+>  		for (i = 1, addr += pgsize; i < ncontig; ++i, addr += pgsize) {
+> @@ -243,7 +242,7 @@ int huge_ptep_set_access_flags(struct vm_area_struct *vma,
+>  		cpte = huge_pte_offset(vma->vm_mm, addr);
+>  		pfn = pte_pfn(*cpte);
+>  		ncontig = find_num_contig(vma->vm_mm, addr, cpte,
+> -					  *cpte, &pgsize);
+> +					  &pgsize);
+>  		for (i = 0; i < ncontig; ++i, ++cpte, addr += pgsize) {
+>  			changed |= ptep_set_access_flags(vma, addr, cpte,
+>  							pfn_pte(pfn,
+> @@ -266,7 +265,7 @@ void huge_ptep_set_wrprotect(struct mm_struct *mm,
+>  		size_t pgsize = 0;
+>  
+>  		cpte = huge_pte_offset(mm, addr);
+> -		ncontig = find_num_contig(mm, addr, cpte, *cpte, &pgsize);
+> +		ncontig = find_num_contig(mm, addr, cpte, &pgsize);
+>  		for (i = 0; i < ncontig; ++i, ++cpte, addr += pgsize)
+>  			ptep_set_wrprotect(mm, addr, cpte);
+>  	} else {
+> @@ -284,7 +283,7 @@ void huge_ptep_clear_flush(struct vm_area_struct *vma,
+>  
+>  		cpte = huge_pte_offset(vma->vm_mm, addr);
+>  		ncontig = find_num_contig(vma->vm_mm, addr, cpte,
+> -					  *cpte, &pgsize);
+> +					  &pgsize);
+>  		for (i = 0; i < ncontig; ++i, ++cpte, addr += pgsize)
+>  			ptep_clear_flush(vma, addr, cpte);
+>  	} else {
+> -- 
+> 2.11.0
+> 
