@@ -1,27 +1,20 @@
-From: al.kochet@gmail.com (Alexander Kochetkov)
-Date: Wed, 22 Mar 2017 20:04:26 +0300
-Subject: [PATCH] ARM: dts: rockchip: increase SD clock frequency on Radxa
- Rock
-In-Reply-To: <1978752.xjtBqdMt97@phil>
-References: <1490110822-3310-1-git-send-email-al.kochet@gmail.com>
- <1978752.xjtBqdMt97@phil>
-Message-ID: <FCE5C7E0-7BED-4600-952A-E1EBC900F814@gmail.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Wed, 22 Mar 2017 18:05:50 +0100
+Subject: [PATCH v2 3/6] dt-bindings: rk1108-cru: rename RK1108 to RV1108
+In-Reply-To: <20170317171840.4683-4-heiko@sntech.de>
+References: <20170317171840.4683-1-heiko@sntech.de>
+ <20170317171840.4683-4-heiko@sntech.de>
+Message-ID: <45160004.yQbCIfXNgo@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-> 22 ????? 2017 ?., ? 19:47, Heiko Stuebner <heiko@sntech.de> ???????(?):
+Am Freitag, 17. M?rz 2017, 18:18:37 CET schrieb Heiko Stuebner:
+> From: Andy Yan <andy.yan@rock-chips.com>
 > 
-> sorry, but I will not apply this patch at this time.
+> Rockchip finally named the SOC as RV1108, so change it.
+> 
+> Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
+> Acked-by: Rob Herring <robh@kernel.org>
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 
-> When testing on my radxarock with the card I always use upon entering the 
-> rootfs everything explodes with -110 errors, while without that patch the card 
-> runs stable as far as I can tell.
-
-> I also don't have the time to investigate further right now though.
-
-Ok. Let leave as is for now.
-
-My radxa worked stable for a year with this settings.
-And my custom rk3188 based board also has this setting. Kernel 4.8.
-And I saw -110 errors only then I disconnect SD-card from board.
+applied to my clk-branch for 4.12
