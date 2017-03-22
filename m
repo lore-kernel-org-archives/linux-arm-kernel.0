@@ -1,123 +1,230 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 22 Mar 2017 14:18:24 +0000
-Subject: [PATCH 5/7] arm64: hugetlb: Remove spurious calls to
- huge_ptep_offset
-In-Reply-To: <20170321180421.18332-6-punit.agrawal@arm.com>
-References: <20170321180421.18332-1-punit.agrawal@arm.com>
- <20170321180421.18332-6-punit.agrawal@arm.com>
-Message-ID: <20170322141823.GF2977@leverpostej>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Wed, 22 Mar 2017 15:15:05 +0100
+Subject: [PATCH v3 05/19] KVM: arm64: ITS: Implement
+ vgic_its_has_attr_regs and attr_regs_access
+In-Reply-To: <3002064c-edd7-93a4-afdd-52ccb95f854e@arm.com>
+References: <1488800074-21991-1-git-send-email-eric.auger@redhat.com>
+ <1488800074-21991-6-git-send-email-eric.auger@redhat.com>
+ <3002064c-edd7-93a4-afdd-52ccb95f854e@arm.com>
+Message-ID: <c539367c-8b20-12d7-ff59-a3450556c16c@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 21, 2017 at 06:04:19PM +0000, Punit Agrawal wrote:
-> From: Steve Capper <steve.capper@arm.com>
+Andre,
+On 20/03/2017 19:13, Andre Przywara wrote:
+> Hi Eric,
 > 
-> We don't need to call huge_ptep_offset as our accessors are already
-> supplied with the pte_t *. This patch removes those spurious calls.
+> On 06/03/17 11:34, Eric Auger wrote:
+>> This patch implements vgic_its_has_attr_regs and vgic_its_attr_regs_access
+>> upon the MMIO framework. VGIC ITS KVM device KVM_DEV_ARM_VGIC_GRP_ITS_REGS
+>> group becomes functional.
+>>
+>> At least GITS_CREADR requires to differentiate a guest write action from a
+>> user access. As such let's introduce a new uaccess_its_write
+>> vgic_register_region callback.
+>>
+>> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+>> ---
+>>  virt/kvm/arm/vgic/vgic-its.c  | 74 ++++++++++++++++++++++++++++++++++++-------
+>>  virt/kvm/arm/vgic/vgic-mmio.h |  9 ++++--
+>>  2 files changed, 69 insertions(+), 14 deletions(-)
+>>
+>> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+>> index 43bb17e..e9c8f9f 100644
+>> --- a/virt/kvm/arm/vgic/vgic-its.c
+>> +++ b/virt/kvm/arm/vgic/vgic-its.c
+>> @@ -1287,13 +1287,14 @@ static void vgic_mmio_write_its_baser(struct kvm *kvm,
+>>  	*regptr = reg;
+>>  }
+>>  
+>> -#define REGISTER_ITS_DESC(off, rd, wr, length, acc)		\
+>> +#define REGISTER_ITS_DESC(off, rd, wr, uwr, length, acc)		\
+>>  {								\
+>>  	.reg_offset = off,					\
+>>  	.len = length,						\
+>>  	.access_flags = acc,					\
+>>  	.its_read = rd,						\
+>>  	.its_write = wr,					\
+>> +	.uaccess_its_write = uwr,					\
 > 
-> Cc: David Woods <dwoods@mellanox.com>
-> Signed-off-by: Steve Capper <steve.capper@arm.com>
-> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+> I was wondering if it would create less churn to keep this definition
+> here (with .uaccess_its_write automatically becoming NULL), and then
+> either open-code the one special case below or provide a second wrapper
+> macro. But I guess either way is not really nice, so we could go with
+> this approach here as well.
 
-Reviwewed-by: Mark Rutland <mark.rutland@arm.com>
+Agreed. I plan to introduce REGISTER_ITS_DESC_UACCESS in next patch instead.
 
-Mark.
-
-> ---
->  arch/arm64/mm/hugetlbpage.c | 37 ++++++++++++++-----------------------
->  1 file changed, 14 insertions(+), 23 deletions(-)
 > 
-> diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
-> index 44d637eb32a7..c868c80a9d6b 100644
-> --- a/arch/arm64/mm/hugetlbpage.c
-> +++ b/arch/arm64/mm/hugetlbpage.c
-> @@ -208,21 +208,19 @@ pte_t huge_ptep_get_and_clear(struct mm_struct *mm,
->  	if (pte_cont(*ptep)) {
->  		int ncontig, i;
->  		size_t pgsize;
-> -		pte_t *cpte;
->  		bool is_dirty = false;
->  
-> -		cpte = huge_pte_offset(mm, addr);
-> -		ncontig = find_num_contig(mm, addr, cpte, &pgsize);
-> +		ncontig = find_num_contig(mm, addr, ptep, &pgsize);
->  		/* save the 1st pte to return */
-> -		pte = ptep_get_and_clear(mm, addr, cpte);
-> +		pte = ptep_get_and_clear(mm, addr, ptep);
->  		for (i = 1, addr += pgsize; i < ncontig; ++i, addr += pgsize) {
->  			/*
->  			 * If HW_AFDBM is enabled, then the HW could
->  			 * turn on the dirty bit for any of the page
->  			 * in the set, so check them all.
->  			 */
-> -			++cpte;
-> -			if (pte_dirty(ptep_get_and_clear(mm, addr, cpte)))
-> +			++ptep;
-> +			if (pte_dirty(ptep_get_and_clear(mm, addr, ptep)))
->  				is_dirty = true;
->  		}
->  		if (is_dirty)
-> @@ -238,8 +236,6 @@ int huge_ptep_set_access_flags(struct vm_area_struct *vma,
->  			       unsigned long addr, pte_t *ptep,
->  			       pte_t pte, int dirty)
->  {
-> -	pte_t *cpte;
-> -
->  	if (pte_cont(pte)) {
->  		int ncontig, i, changed = 0;
->  		size_t pgsize = 0;
-> @@ -247,12 +243,11 @@ int huge_ptep_set_access_flags(struct vm_area_struct *vma,
->  		/* Select all bits except the pfn */
->  		pgprot_t hugeprot = pte_pgprot(pte);
->  
-> -		cpte = huge_pte_offset(vma->vm_mm, addr);
-> -		pfn = pte_pfn(*cpte);
-> -		ncontig = find_num_contig(vma->vm_mm, addr, cpte,
-> +		pfn = pte_pfn(pte);
-> +		ncontig = find_num_contig(vma->vm_mm, addr, ptep,
->  					  &pgsize);
-> -		for (i = 0; i < ncontig; ++i, ++cpte, addr += pgsize) {
-> -			changed |= ptep_set_access_flags(vma, addr, cpte,
-> +		for (i = 0; i < ncontig; ++i, ++ptep, addr += pgsize) {
-> +			changed |= ptep_set_access_flags(vma, addr, ptep,
->  							pfn_pte(pfn,
->  								hugeprot),
->  							dirty);
-> @@ -269,13 +264,11 @@ void huge_ptep_set_wrprotect(struct mm_struct *mm,
->  {
->  	if (pte_cont(*ptep)) {
->  		int ncontig, i;
-> -		pte_t *cpte;
->  		size_t pgsize = 0;
->  
-> -		cpte = huge_pte_offset(mm, addr);
-> -		ncontig = find_num_contig(mm, addr, cpte, &pgsize);
-> -		for (i = 0; i < ncontig; ++i, ++cpte, addr += pgsize)
-> -			ptep_set_wrprotect(mm, addr, cpte);
-> +		ncontig = find_num_contig(mm, addr, ptep, &pgsize);
-> +		for (i = 0; i < ncontig; ++i, ++ptep, addr += pgsize)
-> +			ptep_set_wrprotect(mm, addr, ptep);
->  	} else {
->  		ptep_set_wrprotect(mm, addr, ptep);
->  	}
-> @@ -286,14 +279,12 @@ void huge_ptep_clear_flush(struct vm_area_struct *vma,
->  {
->  	if (pte_cont(*ptep)) {
->  		int ncontig, i;
-> -		pte_t *cpte;
->  		size_t pgsize = 0;
->  
-> -		cpte = huge_pte_offset(vma->vm_mm, addr);
-> -		ncontig = find_num_contig(vma->vm_mm, addr, cpte,
-> +		ncontig = find_num_contig(vma->vm_mm, addr, ptep,
->  					  &pgsize);
-> -		for (i = 0; i < ncontig; ++i, ++cpte, addr += pgsize)
-> -			ptep_clear_flush(vma, addr, cpte);
-> +		for (i = 0; i < ncontig; ++i, ++ptep, addr += pgsize)
-> +			ptep_clear_flush(vma, addr, ptep);
->  	} else {
->  		ptep_clear_flush(vma, addr, ptep);
->  	}
-> -- 
-> 2.11.0
+>>  }
+>>  
+>>  static void its_mmio_write_wi(struct kvm *kvm, struct vgic_its *its,
+>> @@ -1304,28 +1305,28 @@ static void its_mmio_write_wi(struct kvm *kvm, struct vgic_its *its,
+>>  
+>>  static struct vgic_register_region its_registers[] = {
+>>  	REGISTER_ITS_DESC(GITS_CTLR,
+>> -		vgic_mmio_read_its_ctlr, vgic_mmio_write_its_ctlr, 4,
+>> +		vgic_mmio_read_its_ctlr, vgic_mmio_write_its_ctlr, NULL, 4,
+>>  		VGIC_ACCESS_32bit),
+>>  	REGISTER_ITS_DESC(GITS_IIDR,
+>> -		vgic_mmio_read_its_iidr, its_mmio_write_wi, 4,
+>> +		vgic_mmio_read_its_iidr, its_mmio_write_wi, NULL, 4,
+>>  		VGIC_ACCESS_32bit),
+>>  	REGISTER_ITS_DESC(GITS_TYPER,
+>> -		vgic_mmio_read_its_typer, its_mmio_write_wi, 8,
+>> +		vgic_mmio_read_its_typer, its_mmio_write_wi, NULL, 8,
+>>  		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
+>>  	REGISTER_ITS_DESC(GITS_CBASER,
+>> -		vgic_mmio_read_its_cbaser, vgic_mmio_write_its_cbaser, 8,
+>> +		vgic_mmio_read_its_cbaser, vgic_mmio_write_its_cbaser, NULL, 8,
+>>  		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
+>>  	REGISTER_ITS_DESC(GITS_CWRITER,
+>> -		vgic_mmio_read_its_cwriter, vgic_mmio_write_its_cwriter, 8,
+>> -		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
+>> +		vgic_mmio_read_its_cwriter, vgic_mmio_write_its_cwriter, NULL,
+>> +		8, VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
+>>  	REGISTER_ITS_DESC(GITS_CREADR,
+>> -		vgic_mmio_read_its_creadr, its_mmio_write_wi, 8,
+>> +		vgic_mmio_read_its_creadr, its_mmio_write_wi, NULL, 8,
+>>  		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
+>>  	REGISTER_ITS_DESC(GITS_BASER,
+>> -		vgic_mmio_read_its_baser, vgic_mmio_write_its_baser, 0x40,
+>> +		vgic_mmio_read_its_baser, vgic_mmio_write_its_baser, NULL, 0x40,
+>>  		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
+>>  	REGISTER_ITS_DESC(GITS_IDREGS_BASE,
+>> -		vgic_mmio_read_its_idregs, its_mmio_write_wi, 0x30,
+>> +		vgic_mmio_read_its_idregs, its_mmio_write_wi, NULL, 0x30,
+>>  		VGIC_ACCESS_32bit),
+>>  };
+>>  
+>> @@ -1448,14 +1449,63 @@ static void vgic_its_destroy(struct kvm_device *kvm_dev)
+>>  int vgic_its_has_attr_regs(struct kvm_device *dev,
+>>  			   struct kvm_device_attr *attr)
+>>  {
+>> -	return -ENXIO;
+>> +	const struct vgic_register_region *region;
+>> +	struct vgic_io_device iodev = {
+>> +		.regions = its_registers,
+>> +		.nr_regions = ARRAY_SIZE(its_registers),
+>> +	};
+>> +	gpa_t offset;
+>> +
+>> +	offset = attr->attr;
+> 
+> Those two can be on one line.
+> But actually why not just put attr->attr below and save that variable at
+> all?
+done
+> 
+>> +
+>> +	region = vgic_find_mmio_region(iodev.regions,
+>> +				       iodev.nr_regions,
+>> +				       offset);
+>> +	if (!region)
+>> +		return -ENXIO;
+> 
+> Nit: empty line here?
+done
+> 
+>> +	return 0;
+>>  }
+>>  
+>>  int vgic_its_attr_regs_access(struct kvm_device *dev,
+>>  			      struct kvm_device_attr *attr,
+>>  			      u64 *reg, bool is_write)
+>>  {
+>> -	return -ENXIO;
+>> +	const struct vgic_register_region *region;
+>> +	struct vgic_io_device iodev = {
+>> +		.regions = its_registers,
+>> +		.nr_regions = ARRAY_SIZE(its_registers),
+>> +	};
+>> +	struct vgic_its *its = dev->private;
+>> +	gpa_t addr, offset;
+>> +	unsigned int len;
+>> +
+>> +	if (IS_VGIC_ADDR_UNDEF(its->vgic_its_base))
+>> +		return -ENXIO;
+>> +
+>> +	offset = attr->attr;
+>> +	if (offset & 0x7)
+>> +		return -EINVAL;
+> 
+> Isn't this still breaking IIDR reads (a 32-bit register at offset 0x4)?
+Hum yes it does. I will fix & test that. At the moment I was not
+saving/restoring the IIDR but this is the plan now. Thanks for spotting
+this.
+> 
+>> +
+>> +	addr = its->vgic_its_base + offset;
+>> +
+>> +	region = vgic_find_mmio_region(iodev.regions,
+>> +				       iodev.nr_regions,
+>> +				       offset);
+>> +	if (!region)
+>> +		return -ENXIO;
+>> +
+>> +	len = region->access_flags & VGIC_ACCESS_64bit ? 8 : 4;
+> 
+> Can you add a comment that states that we only support full register
+> accesses via this interface (deviating from the spec which allows split
+> accesses to 64-bit registers)? I think that's mentioned somewhere else
+> (Documentation/...), but it avoids confusion for the casual reader here.
+Added that comment.
+> 
+> Also I am wondering if that way of using the pointer here for both 32-
+> and 64-bit registers breaks on big endian? Or is it specified somewhere
+> that this interface uses LE only?
+
+Agreed, I used add vgic_data_mmio_bus_to_host and
+vgic_data_host_to_mmio_bus handling.
+
+Thanks
+
+Eric
+> 
+> The rest looks fine, thanks!
+> 
+> Cheers,
+> Andre.
+> 
+>> +	if (is_write) {
+>> +		if (region->uaccess_its_write)
+>> +			region->uaccess_its_write(dev->kvm, its, addr,
+>> +						  len, *reg);
+>> +		else
+>> +			region->its_write(dev->kvm, its, addr, len, *reg);
+>> +	} else {
+>> +		*reg = region->its_read(dev->kvm, its, addr, len);
+>> +	}
+>> +	return 0;
+>>  }
+>>  
+>>  static int vgic_its_has_attr(struct kvm_device *dev,
+>> diff --git a/virt/kvm/arm/vgic/vgic-mmio.h b/virt/kvm/arm/vgic/vgic-mmio.h
+>> index 055ad42..ad8a585 100644
+>> --- a/virt/kvm/arm/vgic/vgic-mmio.h
+>> +++ b/virt/kvm/arm/vgic/vgic-mmio.h
+>> @@ -36,8 +36,13 @@ struct vgic_register_region {
+>>  	};
+>>  	unsigned long (*uaccess_read)(struct kvm_vcpu *vcpu, gpa_t addr,
+>>  				      unsigned int len);
+>> -	void (*uaccess_write)(struct kvm_vcpu *vcpu, gpa_t addr,
+>> -			      unsigned int len, unsigned long val);
+>> +	union {
+>> +		void (*uaccess_write)(struct kvm_vcpu *vcpu, gpa_t addr,
+>> +				      unsigned int len, unsigned long val);
+>> +		void (*uaccess_its_write)(struct kvm *kvm, struct vgic_its *its,
+>> +					  gpa_t addr, unsigned int len,
+>> +					  unsigned long val);
+>> +	};
+>>  };
+>>  
+>>  extern struct kvm_io_device_ops kvm_io_gic_ops;
+>>
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 > 
