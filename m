@@ -1,64 +1,80 @@
 From: robh@kernel.org (Rob Herring)
-Date: Tue, 21 Mar 2017 21:03:05 -0500
-Subject: [PATCH 07/15] ARM: dts: spear13xx: fix PCI bus dtc warnings
+Date: Tue, 21 Mar 2017 21:03:08 -0500
+Subject: [PATCH 10/15] ARM: dts: bcm: fix msi-controller name and unit address
 In-Reply-To: <20170322020313.24338-1-robh@kernel.org>
 References: <20170322020313.24338-1-robh@kernel.org>
-Message-ID: <20170322020313.24338-7-robh@kernel.org>
+Message-ID: <20170322020313.24338-10-robh@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-dtc recently added PCI bus checks. Fix these warnings.
+The unit address for the msi controller is not valid as there is no reg
+property, so remove it. Also, msi-controller is the preferred node name.
 
 Signed-off-by: Rob Herring <robh@kernel.org>
-Cc: Viresh Kumar <vireshk@kernel.org>
-Cc: Shiraz Hashim <shiraz.linux.kernel@gmail.com>
+Cc: Ray Jui <rjui@broadcom.com>
+Cc: Scott Branden <sbranden@broadcom.com>
+Cc: Jon Mason <jonmason@broadcom.com>
+Cc: bcm-kernel-feedback-list at broadcom.com
 ---
 Sub-arch maintainers, please apply to your trees unless arm-soc wants 
 to take the whole lot.
 
- arch/arm/boot/dts/spear1310.dtsi | 3 +++
- arch/arm/boot/dts/spear1340.dtsi | 1 +
- 2 files changed, 4 insertions(+)
+ arch/arm/boot/dts/bcm-cygnus.dtsi | 4 ++--
+ arch/arm/boot/dts/bcm-nsp.dtsi    | 6 +++---
+ 2 files changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/spear1310.dtsi b/arch/arm/boot/dts/spear1310.dtsi
-index 54bc6d3cf290..40f4ad3c34c6 100644
---- a/arch/arm/boot/dts/spear1310.dtsi
-+++ b/arch/arm/boot/dts/spear1310.dtsi
-@@ -98,6 +98,7 @@
- 			device_type = "pci";
- 			ranges = <0x81000000 0 0	 0x80020000 0 0x00010000   /* downstream I/O */
- 				0x82000000 0 0x80030000 0xc0030000 0 0x0ffd0000>; /* non-prefetchable memory */
-+			bus-range = <0x00 0xff>;
+diff --git a/arch/arm/boot/dts/bcm-cygnus.dtsi b/arch/arm/boot/dts/bcm-cygnus.dtsi
+index 8833a4c3cd96..9644fddb5e3c 100644
+--- a/arch/arm/boot/dts/bcm-cygnus.dtsi
++++ b/arch/arm/boot/dts/bcm-cygnus.dtsi
+@@ -205,7 +205,7 @@
  			status = "disabled";
- 		};
  
-@@ -116,6 +117,7 @@
- 			device_type = "pci";
- 			ranges = <0x81000000 0 0  0x90020000 0 0x00010000   /* downstream I/O */
- 				0x82000000 0 0x90030000 0x90030000 0 0x0ffd0000>; /* non-prefetchable memory */
-+			bus-range = <0x00 0xff>;
+ 			msi-parent = <&msi0>;
+-			msi0: msi at 18012000 {
++			msi0: msi-controller {
+ 				compatible = "brcm,iproc-msi";
+ 				msi-controller;
+ 				interrupt-parent = <&gic>;
+@@ -240,7 +240,7 @@
  			status = "disabled";
- 		};
  
-@@ -134,6 +136,7 @@
- 			device_type = "pci";
- 			ranges = <0x81000000 0 0	 0xc0020000 0 0x00010000   /* downstream I/O */
- 				0x82000000 0 0xc0030000 0xc0030000 0 0x0ffd0000>; /* non-prefetchable memory */
-+			bus-range = <0x00 0xff>;
- 			status = "disabled";
- 		};
+ 			msi-parent = <&msi1>;
+-			msi1: msi at 18013000 {
++			msi1: msi-controller {
+ 				compatible = "brcm,iproc-msi";
+ 				msi-controller;
+ 				interrupt-parent = <&gic>;
+diff --git a/arch/arm/boot/dts/bcm-nsp.dtsi b/arch/arm/boot/dts/bcm-nsp.dtsi
+index 832795b0fd0f..42c017df490f 100644
+--- a/arch/arm/boot/dts/bcm-nsp.dtsi
++++ b/arch/arm/boot/dts/bcm-nsp.dtsi
+@@ -450,7 +450,7 @@
+ 		status = "disabled";
  
-diff --git a/arch/arm/boot/dts/spear1340.dtsi b/arch/arm/boot/dts/spear1340.dtsi
-index df2232d767ed..5f347054527d 100644
---- a/arch/arm/boot/dts/spear1340.dtsi
-+++ b/arch/arm/boot/dts/spear1340.dtsi
-@@ -63,6 +63,7 @@
- 			device_type = "pci";
- 			ranges = <0x81000000 0 0	 0x80020000 0 0x00010000   /* downstream I/O */
- 				0x82000000 0 0x80030000 0xc0030000 0 0x0ffd0000>; /* non-prefetchable memory */
-+			bus-range = <0x00 0xff>;
- 			status = "disabled";
- 		};
+ 		msi-parent = <&msi0>;
+-		msi0: msi at 18012000 {
++		msi0: msi-controller {
+ 			compatible = "brcm,iproc-msi";
+ 			msi-controller;
+ 			interrupt-parent = <&gic>;
+@@ -486,7 +486,7 @@
+ 		status = "disabled";
  
+ 		msi-parent = <&msi1>;
+-		msi1: msi at 18013000 {
++		msi1: msi-controller {
+ 			compatible = "brcm,iproc-msi";
+ 			msi-controller;
+ 			interrupt-parent = <&gic>;
+@@ -522,7 +522,7 @@
+ 		status = "disabled";
+ 
+ 		msi-parent = <&msi2>;
+-		msi2: msi at 18014000 {
++		msi2: msi-controller {
+ 			compatible = "brcm,iproc-msi";
+ 			msi-controller;
+ 			interrupt-parent = <&gic>;
 -- 
 2.10.1
