@@ -1,78 +1,65 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 22 Mar 2017 14:50:55 +0000
-Subject: [RFC PATCH v2 25/41] arm64/sve: Avoid preempt_disable() during
- sigreturn
+Date: Wed, 22 Mar 2017 14:50:54 +0000
+Subject: [RFC PATCH v2 24/41] arm64/sve: Discard SVE state on system call
 In-Reply-To: <1490194274-30569-1-git-send-email-Dave.Martin@arm.com>
 References: <1490194274-30569-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1490194274-30569-26-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1490194274-30569-25-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently the sigreturn implementation for SVE relies on
-preempt_disable() to avoid an intervening context switch from
-corrupting the SVE state in the task_struct.
+The base procedure call standard for the Scalable Vector Extension
+defines all of the SVE programmer's model state (Z0-31, P0-15, FFR)
+as caller-save, except for that subset of the state that aliases
+FPSIMD state.
 
-Unforunately, __get_user() and friends are not safe under
-preempt_disable().
+System calls from userspace will almost always be made through C
+library wrappers -- as a consequence of the PCS there will thus
+rarely if ever be any live SVE state at syscall entry in practice.
 
-As an alternative, this patch removes preempt_disable() and sets
-TIF_FOREIGN_FPSTATE instead: this will inform the context switch
-code that the current CPU registers don't contain the SVE/FPSIMD
-state of the current task, preventing writeback to the task_struct
-during context switch.
+This gives us an opportinity to make SVE explicitly caller-save
+around SVC and so stop carrying around the SVE state for tasks that
+use SVE only occasionally (say, by calling a library).
 
-To avoid an intervening context switch from spontaneously clearing
-TIF_FOREIGN_FPSTATE again while doing this,
-fpsimd_flush_task_state() is also called beforehand.
+Note that FPSIMD state will still be preserved around SVC.
+
+As a crude heuristic to avoid pathological cases where a thread
+that uses SVE frequently has to fault back into the kernel again to
+re-enable SVE after a syscall, we switch the thread back to
+FPSIMD-only context tracking only if the context is actually
+switched out before returning to userspace.
 
 Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 ---
- arch/arm64/kernel/signal.c | 14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
+ arch/arm64/kernel/fpsimd.c | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
 
-diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
-index 619dca5..20bc312 100644
---- a/arch/arm64/kernel/signal.c
-+++ b/arch/arm64/kernel/signal.c
-@@ -256,10 +256,10 @@ static int __restore_sve_fpsimd_context(struct user_ctxs *user,
- 	if (vl != sve_get_vl())
- 		return -EINVAL;
+diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+index 5fb5585..8c18384 100644
+--- a/arch/arm64/kernel/fpsimd.c
++++ b/arch/arm64/kernel/fpsimd.c
+@@ -250,6 +250,23 @@ static void task_fpsimd_save(struct task_struct *task)
+ 	BUG_ON(task != current);
  
--	preempt_disable();
--
-+	fpsimd_flush_task_state(current);
-+	barrier();
- 	set_thread_flag(TIF_FOREIGN_FPSTATE);
--	set_thread_flag(TIF_SVE);
-+	barrier();
- 
- 	BUG_ON(SVE_SIG_REGS_SIZE(vq) > sizeof(*task_sve_regs));
- 	BUG_ON(round_up(SVE_SIG_REGS_SIZE(vq), 16) < sizeof(*task_sve_regs));
-@@ -270,7 +270,7 @@ static int __restore_sve_fpsimd_context(struct user_ctxs *user,
- 					SVE_SIG_REGS_OFFSET,
- 			       SVE_SIG_REGS_SIZE(vq));
- 	if (err)
--		goto out_preempt;
-+		return err;
- 
- 	/* copy the FP and status/control registers */
- 	/* restore_sigframe() already checked that user->fpsimd != NULL. */
-@@ -279,13 +279,13 @@ static int __restore_sve_fpsimd_context(struct user_ctxs *user,
- 	__get_user_error(fpsimd.fpsr, &user->fpsimd->fpsr, err);
- 	__get_user_error(fpsimd.fpcr, &user->fpsimd->fpcr, err);
- 
-+	barrier();
-+	set_thread_flag(TIF_SVE);
+ 	if (IS_ENABLED(CONFIG_ARM64_SVE) &&
++	    task_pt_regs(task)->syscallno != ~0UL &&
++	    test_tsk_thread_flag(task, TIF_SVE)) {
++		unsigned long tmp;
 +
- 	/* load the hardware registers from the fpsimd_state structure */
- 	if (!err)
- 		fpsimd_update_current_state(&fpsimd);
- 
--out_preempt:
--	preempt_enable();
--
- 	return err;
- }
- 
++		clear_tsk_thread_flag(task, TIF_SVE);
++
++		/* Trap if the task tries to use SVE again: */
++		asm volatile (
++			"mrs	%[tmp], cpacr_el1\n\t"
++			"bic	%[tmp], %[tmp], %[mask]\n\t"
++			"msr	cpacr_el1, %[tmp]"
++			: [tmp] "=r" (tmp)
++			: [mask] "i" (CPACR_EL1_ZEN_EL0EN)
++		);
++	}
++
++	if (IS_ENABLED(CONFIG_ARM64_SVE) &&
+ 	    test_tsk_thread_flag(task, TIF_SVE))
+ 		sve_save_state(sve_pffr(task),
+ 			       &task->thread.fpsimd_state.fpsr);
 -- 
 2.1.4
