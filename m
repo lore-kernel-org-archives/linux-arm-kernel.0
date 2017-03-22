@@ -1,57 +1,78 @@
 From: al.kochet@gmail.com (Alexander Kochetkov)
-Date: Wed, 22 Mar 2017 18:48:27 +0300
-Subject: [PATCH v7 0/7] Implement clocksource for rockchip SoC using rockchip
- timer
-Message-ID: <1490197714-25415-1-git-send-email-al.kochet@gmail.com>
+Date: Wed, 22 Mar 2017 18:48:31 +0300
+Subject: [PATCH v7 4/7] ARM: dts: rockchip: add clockevent attribute to
+ rockchip timers
+In-Reply-To: <1490197714-25415-1-git-send-email-al.kochet@gmail.com>
+References: <1490197714-25415-1-git-send-email-al.kochet@gmail.com>
+Message-ID: <1490197714-25415-5-git-send-email-al.kochet@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello, Daniel, Heiko.
+All rockchip timers present in the DT act as clockevent.
+It is possible to specify timer role using DT attribute.
+Mark them accordingly.
 
-Here is try 7 :) Could you please take a look into it?
+Also this patch specify that for timer should be called init
+function specified with CLOCKEVENT_OF_DECLARE().
 
-rockchip_timer init code implemented using CLOCKEVENT_OF_DECLARE()
-introduced in commit 0c8893c9095d ("clockevents: Add a clkevt-of
-mechanism like clksrc-of")
+Without the commit boot warnings will appear because clock
+framework will try initialize them as clocksource.
 
-There is change in the arch/arm/mach-rockchip/rockchip.c.
+Signed-off-by: Alexander Kochetkov <al.kochet@gmail.com>
+---
+ arch/arm/boot/dts/rk3036.dtsi            |    1 +
+ arch/arm/boot/dts/rk322x.dtsi            |    1 +
+ arch/arm/boot/dts/rk3288.dtsi            |    1 +
+ arch/arm64/boot/dts/rockchip/rk3368.dtsi |    1 +
+ 4 files changed, 4 insertions(+)
 
-This series should be applied after the commit:
-https://lkml.org/lkml/2017/3/22/426
-
-As without the commit, you will get linker error ("clkevt-probe.c:63:
-undefined reference to `__clkevt_of_table?")
-
-Regards,
-Alexander.
-
-
-Alexander Kochetkov (6):
-  dt-bindings: clarify compatible property for rockchip timers
-  ARM: dts: rockchip: update compatible property for rk322x timer
-  ARM: dts: rockchip: add clockevent attribute to rockchip timers
-  clocksource/drivers/rockchip_timer: implement clocksource timer
-  ARM: dts: rockchip: add timer entries to rk3188 SoC
-  ARM: dts: rockchip: disable arm-global-timer for rk3188
-
-Daniel Lezcano (1):
-  clocksource/drivers/clksrc-evt-probe: Describe with the DT both the
-    clocksource and the clockevent
-
- .../bindings/timer/rockchip,rk-timer.txt           |   12 +-
- Documentation/devicetree/bindings/timer/timer.txt  |   38 ++++
- arch/arm/boot/dts/rk3036.dtsi                      |    1 +
- arch/arm/boot/dts/rk3188.dtsi                      |   19 ++
- arch/arm/boot/dts/rk322x.dtsi                      |    3 +-
- arch/arm/boot/dts/rk3288.dtsi                      |    1 +
- arch/arm/mach-rockchip/rockchip.c                  |    2 +
- arch/arm64/boot/dts/rockchip/rk3368.dtsi           |    1 +
- drivers/clocksource/Kconfig                        |    2 +
- drivers/clocksource/clkevt-probe.c                 |    7 +
- drivers/clocksource/clksrc-probe.c                 |    7 +
- drivers/clocksource/rockchip_timer.c               |  215 ++++++++++++++------
- 12 files changed, 241 insertions(+), 67 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/timer/timer.txt
-
+diff --git a/arch/arm/boot/dts/rk3036.dtsi b/arch/arm/boot/dts/rk3036.dtsi
+index 843d2be..a04bb5a 100644
+--- a/arch/arm/boot/dts/rk3036.dtsi
++++ b/arch/arm/boot/dts/rk3036.dtsi
+@@ -353,6 +353,7 @@
+ 		interrupts = <GIC_SPI 28 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&xin24m>, <&cru PCLK_TIMER>;
+ 		clock-names = "timer", "pclk";
++		clockevent;
+ 	};
+ 
+ 	pwm0: pwm at 20050000 {
+diff --git a/arch/arm/boot/dts/rk322x.dtsi b/arch/arm/boot/dts/rk322x.dtsi
+index 2a4eee2..2250640 100644
+--- a/arch/arm/boot/dts/rk322x.dtsi
++++ b/arch/arm/boot/dts/rk322x.dtsi
+@@ -328,6 +328,7 @@
+ 		interrupts = <GIC_SPI 43 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&xin24m>, <&cru PCLK_TIMER>;
+ 		clock-names = "timer", "pclk";
++		clockevent;
+ 	};
+ 
+ 	cru: clock-controller at 110e0000 {
+diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+index 91c4b3c..f45b7ad 100644
+--- a/arch/arm/boot/dts/rk3288.dtsi
++++ b/arch/arm/boot/dts/rk3288.dtsi
+@@ -217,6 +217,7 @@
+ 		interrupts = <GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&xin24m>, <&cru PCLK_TIMER>;
+ 		clock-names = "timer", "pclk";
++		clockevent;
+ 	};
+ 
+ 	display-subsystem {
+diff --git a/arch/arm64/boot/dts/rockchip/rk3368.dtsi b/arch/arm64/boot/dts/rockchip/rk3368.dtsi
+index 4f44d11..054dadd 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3368.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3368.dtsi
+@@ -673,6 +673,7 @@
+ 		compatible = "rockchip,rk3368-timer", "rockchip,rk3288-timer";
+ 		reg = <0x0 0xff810000 0x0 0x20>;
+ 		interrupts = <GIC_SPI 66 IRQ_TYPE_LEVEL_HIGH>;
++		clockevent;
+ 	};
+ 
+ 	gic: interrupt-controller at ffb71000 {
 -- 
 1.7.9.5
