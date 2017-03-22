@@ -1,35 +1,35 @@
 From: robh@kernel.org (Rob Herring)
-Date: Tue, 21 Mar 2017 21:03:13 -0500
-Subject: [PATCH 15/15] arm64: dts: xilinx: fix PCI bus dtc warnings
+Date: Tue, 21 Mar 2017 21:03:11 -0500
+Subject: [PATCH 13/15] arm64: dts: juno: fix PCI bus dtc warnings
 In-Reply-To: <20170322020313.24338-1-robh@kernel.org>
 References: <20170322020313.24338-1-robh@kernel.org>
-Message-ID: <20170322020313.24338-15-robh@kernel.org>
+Message-ID: <20170322020313.24338-13-robh@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 dtc recently added PCI bus checks. Fix these warnings.
 
 Signed-off-by: Rob Herring <robh@kernel.org>
-Cc: Michal Simek <michal.simek@xilinx.com>
-Cc: "S?ren Brinkmann" <soren.brinkmann@xilinx.com>
+Cc: Liviu Dudau <liviu.dudau@arm.com>
+Cc: Sudeep Holla <sudeep.holla@arm.com>
+Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 ---
-Sub-arch maintainers, please apply to your trees unless arm-soc wants 
-to take the whole lot.
 
- arch/arm64/boot/dts/xilinx/zynqmp.dtsi | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm64/boot/dts/arm/juno-base.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm64/boot/dts/xilinx/zynqmp.dtsi b/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
-index 54dc28351c8c..1a3f5e928bb9 100644
---- a/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
-+++ b/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
-@@ -221,6 +221,7 @@
- 				  0x43000000 0x00000006 0x00000000 0x00000006
- 				  0x00000000 0x00000002 0x00000000>;
- 				  /* prefetchable memory */
-+			bus-range = <0x00 0xff>;
- 			interrupt-map-mask = <0x0 0x0 0x0 0x7>;
- 			interrupt-map = <0x0 0x0 0x0 0x1 &pcie_intc 0x1>,
- 					<0x0 0x0 0x0 0x2 &pcie_intc 0x2>,
+diff --git a/arch/arm64/boot/dts/arm/juno-base.dtsi b/arch/arm64/boot/dts/arm/juno-base.dtsi
+index df539e865b90..8ffaff2043d0 100644
+--- a/arch/arm64/boot/dts/arm/juno-base.dtsi
++++ b/arch/arm64/boot/dts/arm/juno-base.dtsi
+@@ -428,7 +428,7 @@
+ 		};
+ 	};
+ 
+-	pcie_ctlr: pcie-controller at 40000000 {
++	pcie_ctlr: pcie at 40000000 {
+ 		compatible = "arm,juno-r1-pcie", "plda,xpressrich3-axi", "pci-host-ecam-generic";
+ 		device_type = "pci";
+ 		reg = <0 0x40000000 0 0x10000000>;	/* ECAM config space */
 -- 
 2.10.1
