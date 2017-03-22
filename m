@@ -1,38 +1,38 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 21 Mar 2017 17:30:05 -0700
-Subject: [GIT PULL] i.MX fixes for 4.11
-In-Reply-To: <20170320084229.GH3443@dragon>
-References: <20170320084229.GH3443@dragon>
-Message-ID: <20170322003005.GB5129@localhost>
+Date: Tue, 21 Mar 2017 17:30:33 -0700
+Subject: [GIT PULL] Allwinner fixes for 4.11
+In-Reply-To: <20170320100955.qiq4nhfgkdqsce7j@lukather>
+References: <20170320100955.qiq4nhfgkdqsce7j@lukather>
+Message-ID: <20170322003033.GC5129@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 20, 2017 at 04:42:31PM +0800, Shawn Guo wrote:
+On Mon, Mar 20, 2017 at 11:09:55AM +0100, Maxime Ripard wrote:
+> Hi,
+> 
+> Please pull the following patches for one of the 4.11 rc's.
+> 
+> Thanks!
+> Maxime
+> 
 > The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
 > 
 >   Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-fixes-4.11
+>   https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-fixes-for-4.11
 > 
-> for you to fetch changes up to 12aff99723901bcc0e2a6a34343a4f62c371fdd9:
+> for you to fetch changes up to 9693219aa61dc7a75ac015e5c011e889cb821eec:
 > 
->   ARM: dts: imx6sx-udoo-neo: Fix reboot hang (2017-03-08 12:44:46 +0100)
-> 
-> ----------------------------------------------------------------
-> i.MX fixes for 4.11:
->  - A fix to reboot hang seen on imx6sx-udoo-neo board, by removing
->    arm-supply and soc-supply and using LDO enabled mode.
+>   ARM: sun8i: a23/a33: drop bl_en_pin GPIO pinmux in reference design DTSI (2017-03-20 09:31:42 +0100)
 > 
 > ----------------------------------------------------------------
-> Fabio Estevam (1):
->       ARM: dts: imx6sx-udoo-neo: Fix reboot hang
+> Allwinner fixes for 4.11
 > 
->  arch/arm/boot/dts/imx6sx-udoo-neo.dtsi | 5 -----
->  1 file changed, 5 deletions(-)
+> A bunch of device tree fixes for various boards / SoCs.
 
-Merged, thanks.
+Merged, thanks. Small bunch though. :)
 
 
 -Olof
