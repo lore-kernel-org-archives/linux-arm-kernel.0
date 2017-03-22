@@ -1,30 +1,72 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 22 Mar 2017 20:00:36 +0000
-Subject: [PATCH v3] efifb: avoid reconfiguration of BAR that covers the
- framebuffer
-In-Reply-To: <4ccb4d92-3830-3980-38c3-7085a3d97734@codeaurora.org>
-References: <1490196629-28088-1-git-send-email-ard.biesheuvel@linaro.org>
- <20170322193111.GA8190@wunner.de>
- <31da6db5-be22-9e84-5e76-67c519bc0b34@codeaurora.org>
- <CAKv+Gu8Uw-X3AR6aQYevPdRfcgPNnqL4O3sRoKxsZAiW29sbqg@mail.gmail.com>
- <704b8b8c-e607-29b3-e101-bbecd90073bb@codeaurora.org>
- <CAKv+Gu-3wAXLyogLxg3N=6vf6Ryz2cLXw01tZUR_E48ddVU22A@mail.gmail.com>
- <4ccb4d92-3830-3980-38c3-7085a3d97734@codeaurora.org>
-Message-ID: <CAKv+Gu9wORrhcYGLFdSubMrJiKwKzFBJkzS79Odc8sJRf6bJhA@mail.gmail.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Wed, 22 Mar 2017 19:00:24 +0100
+Subject: [RFC 7/8] cpufreq: imx6q: Initialize LDO bypass
+In-Reply-To: <1490204881.17057.16.camel@nxp.com>
+References: <cover.1490199005.git.leonard.crestez@nxp.com>
+ <75ec3ea8fe812b4cf689e0c130358e81aa7fbd13.1490199005.git.leonard.crestez@nxp.com>
+ <1490202585.29056.5.camel@pengutronix.de>
+ <1490204881.17057.16.camel@nxp.com>
+Message-ID: <1490205624.29056.13.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 March 2017 at 19:57, Sinan Kaya <okaya@codeaurora.org> wrote:
-> On 3/22/2017 3:52 PM, Ard Biesheuvel wrote:
-[..]
->> If you have working EFIFB on your platform, it works by accident. This
->> patch is needed to ensure that the BAR associated with the EFI
->> framebuffer is left untouched.
->>
->
-> I never claimed that. I was just double checking your assumptions.
-> I really don't like ARM64 specific PCI code in general. PCI doesn't care
-> about CPU type. I hope to see this patch become part of common code.
->
+Am Mittwoch, den 22.03.2017, 19:48 +0200 schrieb Leonard Crestez:
+> On Wed, 2017-03-22 at 18:09 +0100, Lucas Stach wrote:
+> > Am Mittwoch, den 22.03.2017, 18:53 +0200 schrieb Leonard Crestez:
+> > > 
+> > > Several imx6* socs have three built-in regulators LDO_ARM LDO_SOC and
+> > > LDO_PU used to control internal chip voltages. "ldo-bypass" mode refers
+> > > to placing these regulators in bypass mode and controlling voltages from
+> > > an external power management chip instead. This is intended to save
+> > > power at the expense of an extra PMIC on the board.
+> > > 
+> > > The voltages for these regulators are controlled from the imxq6 cpufreq
+> > > driver so it makes sense to also control LDO bypass from here. The gpc
+> > > driver also fetches a reference to LDO_PU and uses it to gate power to
+> > > graphics blocks.
+> > > 
+> > > The LDO regulator has a minimum dropout voltage of 125mv so enabling
+> > > bypass mode will raise the effective voltage by that amount. We need set
+> > > the minimum frequency first to avoid overvolting when enabling LDO
+> > > bypass.
+> > > 
+> > > The binding is an u32 fsl,ldo-bypass in the gpc node because that's how
+> > > it was defined in the freescale vendor tree for a long time and
+> > > compatibility is desirable. Otherwise it would be a bool.
+> > > 
+> > > Some versions of u-boot shipped by freescale check this same property
+> > > and set regulators in bypass mode before linux actually starts so we
+> > > check for that scenario as well and finish early.
+> > I've not looked at the patch at all, but this feels like the wrong
+> > location to implement this. Using bypass mode or not should really be a
+> > internal decision of the regulator driver, influenced by a DT property
+> > to allow bypass mode.
+> > 
+> > The regulator driver can also implement the correct sequencing of first
+> > lowering external voltage to min + dropout, then going into bypass mode,
+> > then lower the external voltage by the amount of the dropout. I don't
+> > see why we need a frequency switch for this at all.
+> 
+> Because minimum voltages are dictated by core frequency. At high frequency
+> the (minimum voltage for frequency + dropout) is too high and would go beyond
+> the maximum of 1300 mv when bypass is enabled. It doesn't actually instantly
+> break, this is based on the "operating ranges" from this document:
+> 
+> http://www.nxp.com/assets/documents/data/en/data-sheets/IMX6DQCEC.pdf
 
-Good! Thanks
+Urgh, yes, this is unfortunate.
+
+> > Implementing this in the consumers seems like the wrong spot.
+> 
+> It doesn't belong in drivers for individual regulators either, it's a piece
+> of board-level global configuration.
+
+The configuration weather to use the bypass or not is board level, I
+agree. But the decision to bypass the regulator should be done either at
+the regulator driver level or even in the regulator framework. That is
+the point where you are able to match up the constraints of the
+consumers with the ability to get the correct voltage from the supplying
+regulator.
+
+Regards,
+Lucas
