@@ -1,104 +1,60 @@
 From: dongas86@gmail.com (Dong Aisheng)
-Date: Thu, 23 Mar 2017 03:23:56 +0800
-Subject: [PATCH 4/8] soc: imx: gpc: fix imx6sl gpc power domain regression
-In-Reply-To: <1490001974.2895.11.camel@pengutronix.de>
+Date: Thu, 23 Mar 2017 03:25:15 +0800
+Subject: [PATCH 8/8] soc: imx: gpc: remove unnecessary readable_reg
+ callback
+In-Reply-To: <1490003027.2895.19.camel@pengutronix.de>
 References: <1489990547-1510-1-git-send-email-aisheng.dong@nxp.com>
- <1489990547-1510-5-git-send-email-aisheng.dong@nxp.com>
- <1490001974.2895.11.camel@pengutronix.de>
-Message-ID: <20170322192356.GC16264@b29396-OptiPlex-7040>
+ <1489990547-1510-9-git-send-email-aisheng.dong@nxp.com>
+ <1490003027.2895.19.camel@pengutronix.de>
+Message-ID: <20170322192515.GD16264@b29396-OptiPlex-7040>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 20, 2017 at 10:26:14AM +0100, Lucas Stach wrote:
+On Mon, Mar 20, 2017 at 10:43:47AM +0100, Lucas Stach wrote:
 > Am Montag, den 20.03.2017, 14:15 +0800 schrieb Dong Aisheng:
-> > Commit 721cabf6c660 ("soc: imx: move PGC handling to a new GPC driver")
-> > broke the MX6SL GPC power domain support.
-> > It always got the following error:
-> > [    1.248364] imx-gpc 20dc000.gpc: could not find pgc DT node
-> > This patch adds back the legecy support.
+> > It is not really necessary to provide the current .readable_reg
+> > implementation as we know what we're doing in our driver
+> > and the regmap core has already done the partial check for
+> > available maximum regs.
+> > 
+> > Cc: Lucas Stach <l.stach@pengutronix.de>
+> > Cc: Shawn Guo <shawnguo@kernel.org>
+> > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 > 
-> This patch removes a safeguard against abusing the old binding for new
-> SoCs. Please leave this check in place and instead loosen the check to
-> also allow the old i.MX6SL binding.
+> Acked-by: Lucas Stach <l.stach@pengutronix.de>
 > 
 
-Thanks for the reminder.
-I found beside the checking, we probably also need some extra fix that
-the current imx_gpc_old_dt_init() only supports two domains while the
-driver formerly supports three for MX6SL.
-
-And because the num_domains is defined by driver itself, no need check
-in imx_gpc_old_dt_init() anymore.
-
-The patch would be as follows:
-diff --git a/drivers/soc/imx/gpc.c b/drivers/soc/imx/gpc.c
-index 4885ec2..6a806a1 100644
---- a/drivers/soc/imx/gpc.c
-+++ b/drivers/soc/imx/gpc.c
-@@ -303,10 +303,13 @@ static struct genpd_onecell_data imx_gpc_onecell_data = {
- 
- static int imx_gpc_old_dt_init(struct device *dev, struct regmap *regmap)
- {
-+       const struct of_device_id *of_id =
-+                       of_match_device(imx_gpc_dt_ids, dev);
-+       const struct imx_gpc_dt_data *of_id_data = of_id->data;
-        struct imx_pm_domain *domain;
-        int i, ret;
- 
--       for (i = 0; i < 2; i++) {
-+       for (i = 0; i < of_id_data->num_domains; i++) {
-                domain = &imx_gpc_domains[i];
-                domain->regmap = regmap;
-                domain->ipg_rate_mhz = 66;
-@@ -324,7 +327,7 @@ static int imx_gpc_old_dt_init(struct device *dev, struct regmap *regmap)
-                }
-        }
- 
--       for (i = 0; i < 2; i++)
-+       for (i = 0; i < of_id_data->num_domains; i++)
-                pm_genpd_init(&imx_gpc_domains[i].base, NULL, false);
- 
-        if (IS_ENABLED(CONFIG_PM_GENERIC_DOMAINS)) {
-@@ -337,7 +340,7 @@ static int imx_gpc_old_dt_init(struct device *dev, struct regmap *regmap)
-        return 0;
- 
- genpd_err:
--       for (i = 0; i < 2; i++)
-+       for (i = 0; i < of_id_data->num_domains; i++)
-                pm_genpd_remove(&imx_gpc_domains[i].base);
-        imx_pgc_put_clocks(&imx_gpc_domains[1]);
- clk_err:
-
-Do you think it's ok?
+Thanks for the review and Acks.
 
 Regards
 Dong Aisheng
 
-> > 
-> > Cc: Lucas Stach <l.stach@pengutronix.de>
-> > Cc: Shawn Guo <shawnguo@kernel.org>
-> > Fixes: 721cabf6c660 ("soc: imx: move PGC handling to a new GPC driver")
-> > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 > > ---
-> >  drivers/soc/imx/gpc.c | 6 ------
-> >  1 file changed, 6 deletions(-)
+> >  drivers/soc/imx/gpc.c | 8 --------
+> >  1 file changed, 8 deletions(-)
 > > 
 > > diff --git a/drivers/soc/imx/gpc.c b/drivers/soc/imx/gpc.c
-> > index ba6e7ab..c1d0e67 100644
+> > index a744f7e..4885ec2 100644
 > > --- a/drivers/soc/imx/gpc.c
 > > +++ b/drivers/soc/imx/gpc.c
-> > @@ -385,12 +385,6 @@ static int imx_gpc_probe(struct platform_device *pdev)
-> >  	}
+> > @@ -284,18 +284,10 @@ static const struct of_device_id imx_gpc_dt_ids[] = {
+> >  	{ }
+> >  };
 > >  
-> >  	if (!pgc_node) {
-> > -		/* old DT layout is only supported for mx6q aka 2 domains */
-> > -		if (of_id_data->num_domains != 2) {
-> > -			dev_err(&pdev->dev, "could not find pgc DT node\n");
-> > -			return -ENODEV;
-> > -		}
+> > -static bool imx_gpc_readable_reg(struct device *dev, unsigned int reg)
+> > -{
+> > -	return (reg % 4 == 0) && (reg <= 0x2ac);
+> > -}
 > > -
-> >  		ret = imx_gpc_old_dt_init(&pdev->dev, regmap);
-> >  		if (ret)
-> >  			return ret;
+> >  static const struct regmap_config imx_gpc_regmap_config = {
+> >  	.reg_bits = 32,
+> >  	.val_bits = 32,
+> >  	.reg_stride = 4,
+> > -
+> > -	.readable_reg = imx_gpc_readable_reg,
+> > -
+> >  	.max_register = 0x2ac,
+> >  };
+> >  
 > 
 > 
