@@ -1,149 +1,68 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Wed, 22 Mar 2017 11:18:55 +0100
-Subject: [PATCH v4 3/3] ARM64: dts: meson-gx: Add MALI nodes for GXBB and GXL
-In-Reply-To: <1490177935-9646-1-git-send-email-narmstrong@baylibre.com>
-References: <1490177935-9646-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1490177935-9646-4-git-send-email-narmstrong@baylibre.com>
+From: jonas.jensen@gmail.com (Jonas Jensen)
+Date: Wed, 22 Mar 2017 11:21:01 +0100
+Subject: [PATCH 4/6] gpio: gemini: rename to match Faraday IP
+In-Reply-To: <CACRpkda0TpcUsEW6wiHzhueSckz_WTfbDgpixdgCNvodHDmpyw@mail.gmail.com>
+References: <20170312232818.26304-1-linus.walleij@linaro.org>
+ <20170312232818.26304-4-linus.walleij@linaro.org>
+ <CACmBeS2OC6X_Rb5qaVEGMY4mPyHwnib-=pm-g=+73J6ZSRDgLw@mail.gmail.com>
+ <CACRpkda0TpcUsEW6wiHzhueSckz_WTfbDgpixdgCNvodHDmpyw@mail.gmail.com>
+Message-ID: <CACmBeS23APp1=+0Cypyx9OujhekUTF7w5QbwE_9zt_go3GdUPw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The same MALI-450 MP3 GPU is present in the GXBB and GXL SoCs.
+On 22 March 2017 at 09:42, Linus Walleij <linus.walleij@linaro.org> wrote:
+> Nice! Have you tested my new GPIO character device tools from
+> tools/gpio/* in the kernel tree?
 
-The node is simply added in the meson-gxbb.dtsi file.
+I had not and thanks for pointing that out, lsgpio lists all available
+gpios (though most of them are unnamed), and gpio-hammer successfully
+toggled buzzer on/off.
 
-For GXL, since a lot is shared with the GXM that has a MALI-T820 IP, this
-patch adds a new meson-gxl-mali.dtsi and is included in the SoC specific
-dtsi files.
+uname -a
+Linux zurkon 4.11.0-rc1-next-20170310-00004-gc63f3c2 #4466 PREEMPT Wed
+Mar 22 11:05:28 CET 2017 armv4l GNU/Linux
 
-Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
----
- arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi      | 37 ++++++++++++++++++++
- arch/arm64/boot/dts/amlogic/meson-gxl-mali.dtsi  | 43 ++++++++++++++++++++++++
- arch/arm64/boot/dts/amlogic/meson-gxl-s905d.dtsi |  1 +
- arch/arm64/boot/dts/amlogic/meson-gxl-s905x.dtsi |  1 +
- 4 files changed, 82 insertions(+)
- create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxl-mali.dtsi
+./lsgpio
+GPIO chip: gpiochip0, "FTGPIO010", 32 GPIO lines
+        line  0: unnamed unused [output]
+        line  1: unnamed unused [output]
+        line  2: unnamed unused [output]
+        line  3: unnamed unused [output]
+        line  4: unnamed unused
+        line  5: unnamed "rtc_sclk" [kernel output]
+        line  6: unnamed "rtc_data" [kernel]
+        line  7: unnamed "rtc_reset" [kernel output]
+        line  8: unnamed unused
+        line  9: unnamed unused
+        line 10: unnamed unused
+        line 11: unnamed unused [output]
+        line 12: unnamed unused
+        line 13: unnamed unused [output]
+        line 14: unnamed unused
+        line 15: unnamed unused [output]
+        line 16: unnamed unused
+        line 17: unnamed unused [output]
+        line 18: unnamed unused
+        line 19: unnamed unused
+        line 20: unnamed unused
+        line 21: unnamed unused
+        line 22: unnamed unused
+        line 23: unnamed unused
+        line 24: unnamed unused [output]
+        line 25: unnamed unused
+        line 26: unnamed unused
+        line 27: unnamed "ready-led" [kernel output active-low]
+        line 28: unnamed unused
+        line 29: unnamed unused
+        line 30: unnamed unused
+        line 31: unnamed unused [output]
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-index 04b3324..0617a3d 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-@@ -478,6 +478,43 @@
- 	};
- };
- 
-+&apb {
-+	mali: gpu at c0000 {
-+		compatible = "amlogic,meson-gxbb-mali", "arm,mali-450";
-+		reg = <0x0 0xc0000 0x0 0x40000>;
-+		interrupts = <GIC_SPI 160 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 161 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 162 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 163 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 164 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 165 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 166 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 167 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 168 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 169 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupt-names = "gp", "gpmmu", "pp", "pmu",
-+			"pp0", "ppmmu0", "pp1", "ppmmu1",
-+			"pp2", "ppmmu2";
-+		clocks = <&clkc CLKID_CLK81>, <&clkc CLKID_MALI>;
-+		clock-names = "bus", "core";
-+
-+		/*
-+		 * Mali clocking is provided by two identical clock paths
-+		 * MALI_0 and MALI_1 muxed to a single clock by a glitch
-+		 * free mux to safely change frequency while running.
-+		 */
-+		assigned-clocks = <&clkc CLKID_MALI_0_SEL>,
-+				  <&clkc CLKID_MALI_0>,
-+				  <&clkc CLKID_MALI>; /* Glitch free mux */
-+		assigned-clock-parents = <&clkc CLKID_FCLK_DIV3>,
-+					 <0>, /* Do Nothing */
-+					 <&clkc CLKID_MALI_0>;
-+		assigned-clock-rates = <0>, /* Do Nothing */
-+				       <666666666>,
-+				       <0>; /* Do Nothing */
-+	};
-+};
-+
- &i2c_A {
- 	clocks = <&clkc CLKID_I2C>;
- };
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-mali.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxl-mali.dtsi
-new file mode 100644
-index 0000000..f06cc234
---- /dev/null
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxl-mali.dtsi
-@@ -0,0 +1,43 @@
-+/*
-+ * Copyright (c) 2017 BayLibre SAS
-+ * Author: Neil Armstrong <narmstrong@baylibre.com>
-+ *
-+ * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-+ */
-+
-+&apb {
-+	mali: gpu at c0000 {
-+		compatible = "amlogic,meson-gxbb-mali", "arm,mali-450";
-+		reg = <0x0 0xc0000 0x0 0x40000>;
-+		interrupts = <GIC_SPI 160 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 161 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 162 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 163 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 164 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 165 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 166 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 167 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 168 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 169 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupt-names = "gp", "gpmmu", "pp", "pmu",
-+			"pp0", "ppmmu0", "pp1", "ppmmu1",
-+			"pp2", "ppmmu2";
-+		clocks = <&clkc CLKID_CLK81>, <&clkc CLKID_MALI>;
-+		clock-names = "bus", "core";
-+
-+		/*
-+		 * Mali clocking is provided by two identical clock paths
-+		 * MALI_0 and MALI_1 muxed to a single clock by a glitch
-+		 * free mux to safely change frequency while running.
-+		 */
-+		assigned-clocks = <&clkc CLKID_MALI_0_SEL>,
-+				  <&clkc CLKID_MALI_0>,
-+				  <&clkc CLKID_MALI>; /* Glitch free mux */
-+		assigned-clock-parents = <&clkc CLKID_FCLK_DIV3>,
-+					 <0>, /* Do Nothing */
-+					 <&clkc CLKID_MALI_0>;
-+		assigned-clock-rates = <0>, /* Do Nothing */
-+				       <666666666>,
-+				       <0>; /* Do Nothing */
-+	};
-+};
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905d.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxl-s905d.dtsi
-index 615308e..5a90e30 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxl-s905d.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905d.dtsi
-@@ -42,6 +42,7 @@
-  */
- 
- #include "meson-gxl.dtsi"
-+#include "meson-gxl-mali.dtsi"
- 
- / {
- 	compatible = "amlogic,s905d", "amlogic,meson-gxl";
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x.dtsi
-index 08237ee..0f78d83 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x.dtsi
-@@ -42,6 +42,7 @@
-  */
- 
- #include "meson-gxl.dtsi"
-+#include "meson-gxl-mali.dtsi"
- 
- / {
- 	compatible = "amlogic,s905x", "amlogic,meson-gxl";
--- 
-1.9.1
+./gpio-hammer -n gpiochip0 -o 24
+Hammer lines [24] on gpiochip0, initial states: [0]
+[|] [24: 1]
+
+./gpio-hammer -n gpiochip0 -o 27
+Failed to issue GET LINEHANDLE IOCTL (-16)
+
+
+   Jonas
