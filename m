@@ -1,188 +1,44 @@
-From: horia.geanta@nxp.com (=?UTF-8?q?Horia=20Geant=C4=83?=)
-Date: Wed, 22 Mar 2017 14:29:39 +0200
-Subject: [PATCH] arm64: dts: ls1012a: add crypto node
-Message-ID: <20170322122939.22117-1-horia.geanta@nxp.com>
+From: ckeepax@opensource.wolfsonmicro.com (Charles Keepax)
+Date: Wed, 22 Mar 2017 12:34:40 +0000
+Subject: [alsa-devel] [PATCH 0/3] ASoC: Enable a new IC master mode:
+ bcm2835<=>IC<=>cs42xx8
+In-Reply-To: <64802e9b-ffe9-65e3-502a-4253674fb4c7@flatmax.org>
+References: <20170228095929.GH2742@localhost.localdomain>
+ <20170315190108.y6ybxm3nfgnutajv@sirena.org.uk>
+ <7d8d38f7-53aa-cc3d-4bbd-141649528a8a@flatmax.org>
+ <8c62f014-d246-e0c1-2b02-a28a2c2786b7@metafoo.de>
+ <000fbaa4-4c7c-5b13-0806-7e42672a4a55@flatmax.org>
+ <e0adcc6c-8bf4-adae-874b-c291e71e5712@laposte.net>
+ <20170321221145.GA7258@camel2.lan>
+ <579f0763-a5bd-f820-b36f-b6437e331b4b@flatmax.org>
+ <20170322094301.GE6986@localhost.localdomain>
+ <64802e9b-ffe9-65e3-502a-4253674fb4c7@flatmax.org>
+Message-ID: <20170322123440.GH6986@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-LS1012A has a SEC v5.4 security engine.
+On Wed, Mar 22, 2017 at 11:04:34PM +1100, Matt Flax wrote:
+> >Are we saying that what gets transmitted on the bus is neither valid
+> >I2S or DSP mode data? But as you have your custom hardware block in
+> >the middle it interprets this data correctly and converts it to a
+> >regular bus format on the other side that goes to the CODEC?
+> >
+> >
+> Yes, essentially there is translation between the two data word edge
+> triggered ABP (the bcm2835's PCM block) and a Cirrus Logic TDM codec.
 
-Signed-off-by: Horia Geant? <horia.geanta@nxp.com>
----
- arch/arm64/boot/dts/freescale/fsl-ls1012a-frdm.dts |  9 +++
- arch/arm64/boot/dts/freescale/fsl-ls1012a-qds.dts  |  9 +++
- arch/arm64/boot/dts/freescale/fsl-ls1012a-rdb.dts  |  9 +++
- arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi     | 91 +++++++++++++++++++++-
- 4 files changed, 117 insertions(+), 1 deletion(-)
+Hmm... I guess that is the root difficulty here. As we probably
+don't want to call it DSP mode in the driver if connecting it
+to something that was expecting data in that format wouldn't
+work. Especially if the device actually could support DSP mode as
+well, since we would then be blocking someone for implementing
+legimate DSP mode in the future.
 
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1012a-frdm.dts b/arch/arm64/boot/dts/freescale/fsl-ls1012a-frdm.dts
-index a619f6496a4c..bab9e68947e4 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1012a-frdm.dts
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1012a-frdm.dts
-@@ -49,6 +49,15 @@
- 	model = "LS1012A Freedom Board";
- 	compatible = "fsl,ls1012a-frdm", "fsl,ls1012a";
- 
-+	aliases {
-+		crypto = &crypto;
-+		rtic_a = &rtic_a;
-+		rtic_b = &rtic_b;
-+		rtic_c = &rtic_c;
-+		rtic_d = &rtic_d;
-+		sec_mon = &sec_mon;
-+	};
-+
- 	sys_mclk: clock-mclk {
- 		compatible = "fixed-clock";
- 		#clock-cells = <0>;
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1012a-qds.dts b/arch/arm64/boot/dts/freescale/fsl-ls1012a-qds.dts
-index 14a67f1709e7..5c4e84c7f20d 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1012a-qds.dts
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1012a-qds.dts
-@@ -49,6 +49,15 @@
- 	model = "LS1012A QDS Board";
- 	compatible = "fsl,ls1012a-qds", "fsl,ls1012a";
- 
-+	aliases {
-+		crypto = &crypto;
-+		rtic_a = &rtic_a;
-+		rtic_b = &rtic_b;
-+		rtic_c = &rtic_c;
-+		rtic_d = &rtic_d;
-+		sec_mon = &sec_mon;
-+	};
-+
- 	sys_mclk: clock-mclk {
- 		compatible = "fixed-clock";
- 		#clock-cells = <0>;
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1012a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-ls1012a-rdb.dts
-index 62c5c7123a15..ff9dd16aa65a 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1012a-rdb.dts
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1012a-rdb.dts
-@@ -48,6 +48,15 @@
- / {
- 	model = "LS1012A RDB Board";
- 	compatible = "fsl,ls1012a-rdb", "fsl,ls1012a";
-+
-+	aliases {
-+		crypto = &crypto;
-+		rtic_a = &rtic_a;
-+		rtic_b = &rtic_b;
-+		rtic_c = &rtic_c;
-+		rtic_d = &rtic_d;
-+		sec_mon = &sec_mon;
-+	};
- };
- 
- &duart0 {
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
-index cffebb4b3df1..68f3012ae07e 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
-@@ -42,7 +42,7 @@
-  *     OTHER DEALINGS IN THE SOFTWARE.
-  */
- 
--#include <dt-bindings/interrupt-controller/irq.h>
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
- 
- / {
- 	compatible = "fsl,ls1012a";
-@@ -113,6 +113,95 @@
- 			big-endian;
- 		};
- 
-+		crypto: crypto at 1700000 {
-+			compatible = "fsl,sec-v5.4", "fsl,sec-v5.0",
-+				     "fsl,sec-v4.0";
-+			fsl,sec-era = <8>;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges = <0x0 0x00 0x1700000 0x100000>;
-+			reg = <0x00 0x1700000 0x0 0x100000>;
-+			interrupts = <GIC_SPI 75 IRQ_TYPE_LEVEL_HIGH>;
-+
-+			sec_jr0: jr at 10000 {
-+				compatible = "fsl,sec-v5.4-job-ring",
-+					     "fsl,sec-v5.0-job-ring",
-+					     "fsl,sec-v4.0-job-ring";
-+				reg	   = <0x10000 0x10000>;
-+				interrupts = <GIC_SPI 71 IRQ_TYPE_LEVEL_HIGH>;
-+			};
-+
-+			sec_jr1: jr at 20000 {
-+				compatible = "fsl,sec-v5.4-job-ring",
-+					     "fsl,sec-v5.0-job-ring",
-+					     "fsl,sec-v4.0-job-ring";
-+				reg	   = <0x20000 0x10000>;
-+				interrupts = <GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>;
-+			};
-+
-+			sec_jr2: jr at 30000 {
-+				compatible = "fsl,sec-v5.4-job-ring",
-+					     "fsl,sec-v5.0-job-ring",
-+					     "fsl,sec-v4.0-job-ring";
-+				reg	   = <0x30000 0x10000>;
-+				interrupts = <GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>;
-+			};
-+
-+			sec_jr3: jr at 40000 {
-+				compatible = "fsl,sec-v5.4-job-ring",
-+					     "fsl,sec-v5.0-job-ring",
-+					     "fsl,sec-v4.0-job-ring";
-+				reg	   = <0x40000 0x10000>;
-+				interrupts = <GIC_SPI 74 IRQ_TYPE_LEVEL_HIGH>;
-+			};
-+
-+			rtic at 60000 {
-+				compatible = "fsl,sec-v5.4-rtic",
-+					     "fsl,sec-v5.0-rtic",
-+					     "fsl,sec-v4.0-rtic";
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+				reg = <0x60000 0x100 0x60e00 0x18>;
-+				ranges = <0x0 0x60100 0x500>;
-+
-+				rtic_a: rtic-a at 0 {
-+					compatible = "fsl,sec-v5.4-rtic-memory",
-+						     "fsl,sec-v5.0-rtic-memory",
-+						     "fsl,sec-v4.0-rtic-memory";
-+					reg = <0x00 0x20 0x100 0x100>;
-+				};
-+
-+				rtic_b: rtic-b at 20 {
-+					compatible = "fsl,sec-v5.4-rtic-memory",
-+						     "fsl,sec-v5.0-rtic-memory",
-+						     "fsl,sec-v4.0-rtic-memory";
-+					reg = <0x20 0x20 0x200 0x100>;
-+				};
-+
-+				rtic_c: rtic-c at 40 {
-+					compatible = "fsl,sec-v5.4-rtic-memory",
-+						     "fsl,sec-v5.0-rtic-memory",
-+						     "fsl,sec-v4.0-rtic-memory";
-+					reg = <0x40 0x20 0x300 0x100>;
-+				};
-+
-+				rtic_d: rtic-d at 60 {
-+					compatible = "fsl,sec-v5.4-rtic-memory",
-+						     "fsl,sec-v5.0-rtic-memory",
-+						     "fsl,sec-v4.0-rtic-memory";
-+					reg = <0x60 0x20 0x400 0x100>;
-+				};
-+			};
-+		};
-+
-+		sec_mon: sec_mon at 1e90000 {
-+			compatible = "fsl,sec-v5.4-mon", "fsl,sec-v5.0-mon",
-+				     "fsl,sec-v4.0-mon";
-+			reg = <0x0 0x1e90000 0x0 0x10000>;
-+			interrupts = <GIC_SPI 78 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 79 IRQ_TYPE_LEVEL_HIGH>;
-+		};
-+
- 		dcfg: dcfg at 1ee0000 {
- 			compatible = "fsl,ls1012a-dcfg",
- 				     "syscon";
--- 
-2.12.0.264.gd6db3f216544
+I guess really the correct thing to do would be to add some
+define for the new format, but I can see that might be a tricky
+road. Would perhaps some sort of BESPOKE define or something be
+possible to indicate odd formats that don't fall into regular
+classifications?
+
+Thanks,
+Charles
