@@ -1,34 +1,35 @@
-From: lukas@wunner.de (Lukas Wunner)
-Date: Wed, 22 Mar 2017 20:31:11 +0100
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 22 Mar 2017 19:41:45 +0000
 Subject: [PATCH v3] efifb: avoid reconfiguration of BAR that covers the
  framebuffer
-In-Reply-To: <1490196629-28088-1-git-send-email-ard.biesheuvel@linaro.org>
+In-Reply-To: <31da6db5-be22-9e84-5e76-67c519bc0b34@codeaurora.org>
 References: <1490196629-28088-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20170322193111.GA8190@wunner.de>
+ <20170322193111.GA8190@wunner.de>
+ <31da6db5-be22-9e84-5e76-67c519bc0b34@codeaurora.org>
+Message-ID: <CAKv+Gu8Uw-X3AR6aQYevPdRfcgPNnqL4O3sRoKxsZAiW29sbqg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 22, 2017 at 03:30:29PM +0000, Ard Biesheuvel wrote:
-> On UEFI systems, the PCI subsystem is enumerated by the firmware,
-> and if a graphical framebuffer is exposed by a PCI device, its base
-> address and size are exposed to the OS via the Graphics Output
-> Protocol (GOP).
-> 
-> On arm64 PCI systems, the entire PCI hierarchy is reconfigured from
-> scratch at boot. This may result in the GOP framebuffer address to
-> become stale, if the BAR covering the framebuffer is modified. This
-> will cause the framebuffer to become unresponsive, and may in some
-> cases result in unpredictable behavior if the range is reassigned to
-> another device.
+On 22 March 2017 at 19:36, Sinan Kaya <okaya@codeaurora.org> wrote:
+> On 3/22/2017 3:31 PM, Lukas Wunner wrote:
+>> On arm64 PCI systems, the entire PCI hierarchy is reconfigured from
+>> scratch at boot. This may result in the GOP framebuffer address to
+>> become stale, if the BAR covering the framebuffer is modified.
+>
+> Does this code still work with the case where resources are not reassigned on ARM64?
+>
+> As far as I know, kernel honors resource assignments done by the UEFI BIOS if
+> they are correct. Kernel will reassign the resources only if something is wrong.
+>
 
-Hm, commit message seems to indicate the issue is restricted to arm64,
-yet there's no IS_ENABLED(ARM64) to constrain the added code to that arch?
+No, the kernel always reassigns all BARs on arm64.
 
+> Will this code break other platforms/architectures?
+>
 
-> +DECLARE_PCI_FIXUP_HEADER(PCI_ANY_ID, PCI_ANY_ID, efifb_fixup_resources);
-
-Maybe this can be constrained to PCI_BASE_CLASS_DISPLAY?
-
-Thanks,
-
-Lukas
+Which platforms/architectures are you referring to? EFIFB on a PCI
+device is currently broken on arm64. On x86, it works, given that BARs
+are usually not reassigned, and so the patch should be a no-op in that
+case (although I'd argue it is still an improvement to check whether
+the device that owns the BAR actually has memory decoding enabled
+before we attach the framebuffer driver to it)
