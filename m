@@ -1,49 +1,33 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 22 Mar 2017 14:50:37 +0000
-Subject: [RFC PATCH v2 07/41] arm64/sve: Allow kernel-mode NEON to be disabled
- in Kconfig
-In-Reply-To: <1490194274-30569-1-git-send-email-Dave.Martin@arm.com>
-References: <1490194274-30569-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1490194274-30569-8-git-send-email-Dave.Martin@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 22 Mar 2017 15:51:54 +0100
+Subject: [PATCH] [v2] arm64: define BUG() instruction without CONFIG_BUG
+In-Reply-To: <20170322143729.GB25645@e104818-lin.cambridge.arm.com>
+References: <20170314213939.3874497-1-arnd@arndb.de>
+ <20170322143729.GB25645@e104818-lin.cambridge.arm.com>
+Message-ID: <CAK8P3a0A0-gnBnBBuWdPjgoDMo=2P9yXcLjZYm9Yz+xpQnCyCw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, support for kernel-mode NEON alongside the Scalable
-Vector Extension doesn't work, so allow KERNEL_MODE_NEON to be
-disabled.
+On Wed, Mar 22, 2017 at 3:37 PM, Catalin Marinas
+<catalin.marinas@arm.com> wrote:
+> Hi Arnd,
+>
+> On Tue, Mar 14, 2017 at 10:39:21PM +0100, Arnd Bergmann wrote:
+>> This mirrors commit e9c38ceba8d9 ("ARM: 8455/1: define __BUG as
+>> asm(BUG_INSTR) without CONFIG_BUG") to make the behavior of
+>> arm64 consistent with arm and x86, and avoids lots of warnings in
+>> randconfig builds, such as:
+>>
+>> kernel/seccomp.c: In function '__seccomp_filter':
+>> kernel/seccomp.c:666:1: error: no return statement in function returning non-void [-Werror=return-type]
+>>
+>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+>
+> A side-effect of this patch is that it turns WARN into BUG. I hit the
+> WARN_ONCE in arch/arm64/kernel/efi.c:34 (on Juno with 64K pages) and
+> with your patch applied, the kernel panics.
 
-This is only needed for bisectability of the SVE patches and will
-be removed later.
+Taht was certainly not intended, and I don't see yet what exactly is going on.
+What is your setting for CONFIG_BUG and CONFIG_BUGVERBOSE?
 
-Signed-off-by: Dave Martin <Dave.Martin@arm.com>
----
- arch/arm64/Kconfig | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 6f270a8..cf82776 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -226,9 +226,6 @@ config SWIOTLB
- config IOMMU_HELPER
- 	def_bool SWIOTLB
- 
--config KERNEL_MODE_NEON
--	def_bool y
--
- config FIX_EARLYCON_MEM
- 	def_bool y
- 
-@@ -274,6 +271,10 @@ endmenu
- 
- menu "Kernel Features"
- 
-+config KERNEL_MODE_NEON
-+	bool "Support NEON/FPSIMD code in the kernel"
-+	default y
-+
- menu "ARM errata workarounds via the alternatives framework"
- 
- config ARM64_ERRATUM_826319
--- 
-2.1.4
+     Arnd
