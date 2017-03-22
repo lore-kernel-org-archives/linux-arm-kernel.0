@@ -1,142 +1,156 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 22 Mar 2017 20:40:55 +0530
-Subject: [PATCH v5 4/7] PCI: dwc: all: Modify dbi accessors to take dbi_base
- as argument
-In-Reply-To: <20170313134328.1588-5-kishon@ti.com>
-References: <20170313134328.1588-5-kishon@ti.com>
-Message-ID: <20170322151055.15947-1-kishon@ti.com>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Wed, 22 Mar 2017 16:12:52 +0100
+Subject: [PATCH v3 19/19] KVM: arm64: ITS: Pending table save/restore
+In-Reply-To: <6e2f94c2-8afe-9b5f-d097-a43e168b95df@arm.com>
+References: <1488800074-21991-1-git-send-email-eric.auger@redhat.com>
+ <1488800074-21991-20-git-send-email-eric.auger@redhat.com>
+ <6e2f94c2-8afe-9b5f-d097-a43e168b95df@arm.com>
+Message-ID: <52a9896e-f8ec-05aa-7b0e-e7b9aa97df15@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-dwc has 2 dbi address space labeled dbics and dbics2. The existing
-helper to access dbi address space can access only dbics. However
-dbics2 has to be accessed for programming the BAR registers in the
-case of EP mode. This is in preparation for adding EP mode support
-to dwc driver.
+Hi Andre,
 
-Cc: Jingoo Han <jingoohan1@gmail.com>
-Cc: Joao Pinto <Joao.Pinto@synopsys.com>
-Acked-by: Niklas Cassel <niklas.cassel@axis.com>
-Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
----
-Changes from v4:
-Add void as return type in dw_pcie_writel_dbi spotted by Niklas.
+On 20/03/2017 19:21, Andre Przywara wrote:
+> Hi Eric,
+> 
+> just fast-forwarded to the end and noticed this one:
+> 
+> 
+> On 06/03/17 11:34, Eric Auger wrote:
+>> Save and restore the pending tables.
+>>
+>> Pending table restore obviously requires the pendbaser to be
+>> already set.
+>>
+>> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+>>
+>> ---
+>>
+>> v1 -> v2:
+>> - do not care about the 1st KB which should be zeroed according to
+>>   the spec.
+>> ---
+>>  virt/kvm/arm/vgic/vgic-its.c | 71 ++++++++++++++++++++++++++++++++++++++++++--
+>>  1 file changed, 69 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+>> index 27ebabd..24824be 100644
+>> --- a/virt/kvm/arm/vgic/vgic-its.c
+>> +++ b/virt/kvm/arm/vgic/vgic-its.c
+>> @@ -1736,7 +1736,48 @@ static int lookup_table(struct vgic_its *its, gpa_t base, int size, int esz,
+>>   */
+>>  static int vgic_its_flush_pending_tables(struct vgic_its *its)
+>>  {
+>> -	return -ENXIO;
+>> +	struct kvm *kvm = its->dev->kvm;
+>> +	struct vgic_dist *dist = &kvm->arch.vgic;
+>> +	struct vgic_irq *irq;
+>> +	int ret;
+>> +
+>> +	/**
+>> +	 * we do not take the dist->lpi_list_lock since we have a garantee
+>> +	 * the LPI list is not touched while the its lock is held
+> 
+> Can you elaborate on what gives us this guarantee? I see that we have a
+> locking *order*, but that doesn't mean we can avoid taking the lock. So
+> to me it looks like we need to take the lpi_list_lock spinlock here,
+> which unfortunately breaks the kvm_read_guest() calls below.
+> 
+> If you agree on this, you can take a look at the INVALL implementation,
+> where I faced the same issue. The solution we came up with is
+> vgic_copy_lpi_list(), which you can call under the lock to create a
+> (private) copy of the LPI list, which you can later iterate without
+> holding the lock - and thus are free to call sleeping functions.
 
- drivers/pci/dwc/pci-exynos.c      | 10 ++++++----
- drivers/pci/dwc/pcie-designware.c | 13 +++++++------
- drivers/pci/dwc/pcie-designware.h | 20 ++++++++++++++++----
- 3 files changed, 29 insertions(+), 14 deletions(-)
+Yes the comment is wrong and at least I need to fix it. The its_lock
+prevents new commands to be absorbed but does not protect from a change
+of the pending status which is our interest here.
 
-diff --git a/drivers/pci/dwc/pci-exynos.c b/drivers/pci/dwc/pci-exynos.c
-index 993b650ef275..a0d40f74b88d 100644
---- a/drivers/pci/dwc/pci-exynos.c
-+++ b/drivers/pci/dwc/pci-exynos.c
-@@ -521,23 +521,25 @@ static void exynos_pcie_enable_interrupts(struct exynos_pcie *ep)
- 		exynos_pcie_msi_init(ep);
- }
- 
--static u32 exynos_pcie_readl_dbi(struct dw_pcie *pci, u32 reg)
-+static u32 exynos_pcie_readl_dbi(struct dw_pcie *pci, void __iomem *base,
-+				 u32 reg)
- {
- 	struct exynos_pcie *ep = to_exynos_pcie(pci);
- 	u32 val;
- 
- 	exynos_pcie_sideband_dbi_r_mode(ep, true);
--	val = readl(pci->dbi_base + reg);
-+	val = readl(base + reg);
- 	exynos_pcie_sideband_dbi_r_mode(ep, false);
- 	return val;
- }
- 
--static void exynos_pcie_writel_dbi(struct dw_pcie *pci, u32 reg, u32 val)
-+static void exynos_pcie_writel_dbi(struct dw_pcie *pci, void __iomem *base,
-+				   u32 reg, u32 val)
- {
- 	struct exynos_pcie *ep = to_exynos_pcie(pci);
- 
- 	exynos_pcie_sideband_dbi_w_mode(ep, true);
--	writel(val, pci->dbi_base + reg);
-+	writel(val, base + reg);
- 	exynos_pcie_sideband_dbi_w_mode(ep, false);
- }
- 
-diff --git a/drivers/pci/dwc/pcie-designware.c b/drivers/pci/dwc/pcie-designware.c
-index 3eaf3ccdc118..ea403e2240cf 100644
---- a/drivers/pci/dwc/pcie-designware.c
-+++ b/drivers/pci/dwc/pcie-designware.c
-@@ -61,20 +61,21 @@ int dw_pcie_write(void __iomem *addr, int size, u32 val)
- 	return PCIBIOS_SUCCESSFUL;
- }
- 
--u32 dw_pcie_readl_dbi(struct dw_pcie *pci, u32 reg)
-+u32 __dw_pcie_readl_dbi(struct dw_pcie *pci, void __iomem *base, u32 reg)
- {
- 	if (pci->ops->readl_dbi)
--		return pci->ops->readl_dbi(pci, reg);
-+		return pci->ops->readl_dbi(pci, base, reg);
- 
--	return readl(pci->dbi_base + reg);
-+	return readl(base + reg);
- }
- 
--void dw_pcie_writel_dbi(struct dw_pcie *pci, u32 reg, u32 val)
-+void __dw_pcie_writel_dbi(struct dw_pcie *pci, void __iomem *base, u32 reg,
-+			  u32 val)
- {
- 	if (pci->ops->writel_dbi)
--		pci->ops->writel_dbi(pci, reg, val);
-+		pci->ops->writel_dbi(pci, base, reg, val);
- 	else
--		writel(val, pci->dbi_base + reg);
-+		writel(val, base + reg);
- }
- 
- static u32 dw_pcie_readl_unroll(struct dw_pcie *pci, u32 index, u32 reg)
-diff --git a/drivers/pci/dwc/pcie-designware.h b/drivers/pci/dwc/pcie-designware.h
-index 8f3dcb2b099b..09b334a12892 100644
---- a/drivers/pci/dwc/pcie-designware.h
-+++ b/drivers/pci/dwc/pcie-designware.h
-@@ -144,8 +144,9 @@ struct pcie_port {
- 
- struct dw_pcie_ops {
- 	u64	(*cpu_addr_fixup)(u64 cpu_addr);
--	u32	(*readl_dbi)(struct dw_pcie *pcie, u32 reg);
--	void	(*writel_dbi)(struct dw_pcie *pcie, u32 reg, u32 val);
-+	u32	(*readl_dbi)(struct dw_pcie *pcie, void __iomem *base, u32 reg);
-+	void	(*writel_dbi)(struct dw_pcie *pcie, void __iomem *base, u32 reg,
-+			      u32 val);
- 	int	(*link_up)(struct dw_pcie *pcie);
- };
- 
-@@ -163,8 +164,9 @@ struct dw_pcie {
- int dw_pcie_read(void __iomem *addr, int size, u32 *val);
- int dw_pcie_write(void __iomem *addr, int size, u32 val);
- 
--u32 dw_pcie_readl_dbi(struct dw_pcie *pci, u32 reg);
--void dw_pcie_writel_dbi(struct dw_pcie *pci, u32 reg, u32 val);
-+u32 __dw_pcie_readl_dbi(struct dw_pcie *pci, void __iomem *base, u32 reg);
-+void __dw_pcie_writel_dbi(struct dw_pcie *pci, void __iomem *base, u32 reg,
-+			  u32 val);
- int dw_pcie_link_up(struct dw_pcie *pci);
- int dw_pcie_wait_for_link(struct dw_pcie *pci);
- void dw_pcie_prog_outbound_atu(struct dw_pcie *pci, int index,
-@@ -172,6 +174,16 @@ void dw_pcie_prog_outbound_atu(struct dw_pcie *pci, int index,
- 			       u32 size);
- void dw_pcie_setup(struct dw_pcie *pci);
- 
-+static inline void dw_pcie_writel_dbi(struct dw_pcie *pci, u32 reg, u32 val)
-+{
-+	__dw_pcie_writel_dbi(pci, pci->dbi_base, reg, val);
-+}
-+
-+static inline u32 dw_pcie_readl_dbi(struct dw_pcie *pci, u32 reg)
-+{
-+	return  __dw_pcie_readl_dbi(pci, pci->dbi_base, reg);
-+}
-+
- #ifdef CONFIG_PCIE_DW_HOST
- irqreturn_t dw_handle_msi_irq(struct pcie_port *pp);
- void dw_pcie_msi_init(struct pcie_port *pp);
--- 
-2.11.0
+On the other hand, can't we simply consider the flush (and restore)
+cannot happen if the VM is in running state. In the current QEMU
+integration we wait for the VM to be paused before flushing the tables
+in guest RAM. Otherwise you will get some stall data anyway. So can't we
+simply document this requirement. I think the requirement is different
+from the INVALL's one. Does it make sense?
+
+Thanks
+
+Eric
+> 
+> Cheers,
+> Andre.
+> 
+>> +	 */
+>> +	list_for_each_entry(irq, &dist->lpi_list_head, lpi_list) {
+>> +		struct kvm_vcpu *vcpu;
+>> +		gpa_t pendbase, ptr;
+>> +		bool stored;
+>> +		u8 val;
+>> +
+>> +		vcpu = irq->target_vcpu;
+>> +		if (!vcpu)
+>> +			return -EINVAL;
+>> +
+>> +		pendbase = PENDBASER_ADDRESS(vcpu->arch.vgic_cpu.pendbaser);
+>> +
+>> +		ptr = pendbase + (irq->intid / BITS_PER_BYTE);
+>> +
+>> +		ret = kvm_read_guest(kvm, (gpa_t)ptr, &val, 1);
+>> +		if (ret)
+>> +			return ret;
+>> +
+>> +		stored = val & (irq->intid % BITS_PER_BYTE);
+>> +		if (stored == irq->pending_latch)
+>> +			continue;
+>> +
+>> +		if (irq->pending_latch)
+>> +			val |= 1 << (irq->intid % BITS_PER_BYTE);
+>> +		else
+>> +			val &= ~(1 << (irq->intid % BITS_PER_BYTE));
+>> +
+>> +		ret = kvm_write_guest(kvm, (gpa_t)ptr, &val, 1);
+>> +		if (ret)
+>> +			return ret;
+>> +	}
+>> +
+>> +	return 0;
+>>  }
+>>  
+>>  /**
+>> @@ -1745,7 +1786,33 @@ static int vgic_its_flush_pending_tables(struct vgic_its *its)
+>>   */
+>>  static int vgic_its_restore_pending_tables(struct vgic_its *its)
+>>  {
+>> -	return -ENXIO;
+>> +	struct vgic_irq *irq;
+>> +	struct kvm *kvm = its->dev->kvm;
+>> +	struct vgic_dist *dist = &kvm->arch.vgic;
+>> +	int ret;
+>> +
+>> +	list_for_each_entry(irq, &dist->lpi_list_head, lpi_list) {
+>> +		struct kvm_vcpu *vcpu;
+>> +		gpa_t pendbase, ptr;
+>> +		u8 val;
+>> +
+>> +		vcpu = irq->target_vcpu;
+>> +		if (!vcpu)
+>> +			return -EINVAL;
+>> +
+>> +		if (!(vcpu->arch.vgic_cpu.pendbaser & GICR_PENDBASER_PTZ))
+>> +			return 0;
+>> +
+>> +		pendbase = PENDBASER_ADDRESS(vcpu->arch.vgic_cpu.pendbaser);
+>> +
+>> +		ptr = pendbase + (irq->intid / BITS_PER_BYTE);
+>> +
+>> +		ret = kvm_read_guest(kvm, (gpa_t)ptr, &val, 1);
+>> +		if (ret)
+>> +			return ret;
+>> +		irq->pending_latch = val & (1 << (irq->intid % BITS_PER_BYTE));
+>> +	}
+>> +	return 0;
+>>  }
+>>  
+>>  static int vgic_its_flush_ite(struct vgic_its *its, struct its_device *dev,
+>>
