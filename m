@@ -1,74 +1,62 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 22 Mar 2017 14:50:47 +0000
-Subject: [RFC PATCH v2 17/41] arm64/sve: signal: Dump Scalable Vector
- Extension registers to user stack
-In-Reply-To: <1490194274-30569-1-git-send-email-Dave.Martin@arm.com>
-References: <1490194274-30569-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1490194274-30569-18-git-send-email-Dave.Martin@arm.com>
+From: adrian.hunter@intel.com (Adrian Hunter)
+Date: Wed, 22 Mar 2017 16:49:38 +0200
+Subject: [PATCH v6 06/14] mmc: sdhci: Export sdhci_enable_sdio_irq() from
+ sdhci.c
+In-Reply-To: <43d7894cb56bd69d7980cea12b12d56f509f4797.1487091464.git-series.gregory.clement@free-electrons.com>
+References: <cover.ff78bebe0384f650a51e5e6f0f1dca6e7894b53b.1487091464.git-series.gregory.clement@free-electrons.com>
+ <43d7894cb56bd69d7980cea12b12d56f509f4797.1487091464.git-series.gregory.clement@free-electrons.com>
+Message-ID: <ff0c74a4-00c3-6eea-9427-bdd5412a2c07@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch populates the sve_regs() area reserved on the user stack
-with the actual register context.
+On 14/02/17 19:01, Gregory CLEMENT wrote:
+> From: Hu Ziji <huziji@marvell.com>
+> 
+> Export sdhci_enable_sdio_irq() from sdhci.c.
+> Thus vendor SDHC driver can implement its specific SDIO irq
+> control.
+> 
+> Signed-off-by: Hu Ziji <huziji@marvell.com>
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-Signed-off-by: Dave Martin <Dave.Martin@arm.com>
----
- arch/arm64/include/asm/fpsimd.h | 1 +
- arch/arm64/kernel/fpsimd.c      | 3 +--
- arch/arm64/kernel/signal.c      | 8 ++++++++
- 3 files changed, 10 insertions(+), 2 deletions(-)
+Acked-by: Adrian Hunter <adrian.hunter@intel.com>
 
-diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
-index 93ae8a7..be292c5 100644
---- a/arch/arm64/include/asm/fpsimd.h
-+++ b/arch/arm64/include/asm/fpsimd.h
-@@ -95,6 +95,7 @@ extern void sve_save_state(void *state, u32 *pfpsr);
- extern void sve_load_state(void const *state, u32 const *pfpsr);
- extern unsigned int sve_get_vl(void);
- extern void __init fpsimd_init_task_struct_size(void);
-+extern void *__sve_state(struct task_struct *task);
- 
- #endif
- 
-diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-index 801f4d3..1bdf7f2 100644
---- a/arch/arm64/kernel/fpsimd.c
-+++ b/arch/arm64/kernel/fpsimd.c
-@@ -93,7 +93,7 @@ static DEFINE_PER_CPU(struct fpsimd_state *, fpsimd_last_state);
- 
- #ifdef CONFIG_ARM64_SVE
- 
--static void *__sve_state(struct task_struct *task)
-+void *__sve_state(struct task_struct *task)
- {
- 	return (char *)task + ALIGN(sizeof(*task), 16);
- }
-@@ -153,7 +153,6 @@ static void sve_to_fpsimd(struct task_struct *task)
- #else /* ! CONFIG_ARM64_SVE */
- 
- /* Dummy declarations for usage protected with IS_ENABLED(CONFIG_ARM64_SVE): */
--extern void *__sve_state(struct task_struct *task);
- extern void *sve_pffr(struct task_struct *task);
- extern void fpsimd_to_sve(struct task_struct *task);
- 
-diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
-index 113502e..6b83917 100644
---- a/arch/arm64/kernel/signal.c
-+++ b/arch/arm64/kernel/signal.c
-@@ -229,6 +229,14 @@ static int preserve_sve_context(struct sve_context __user *ctx)
- 	BUILD_BUG_ON(sizeof(ctx->__reserved) != sizeof(reserved));
- 	err |= copy_to_user(&ctx->__reserved, reserved, sizeof(reserved));
- 
-+	/*
-+	 * This assumes that the SVE state has already been saved to
-+	 * the task struct by calling preserve_fpsimd_context().
-+	 */
-+	err |= copy_to_user((char __user *)ctx + SVE_SIG_REGS_OFFSET,
-+			    __sve_state(current),
-+			    SVE_SIG_REGS_SIZE(vq));
-+
- 	return err ? -EFAULT : 0;
- }
- 
--- 
-2.1.4
+> ---
+>  drivers/mmc/host/sdhci.c | 3 ++-
+>  drivers/mmc/host/sdhci.h | 1 +
+>  2 files changed, 3 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+> index d2338dc362f4..9a4fda81ff81 100644
+> --- a/drivers/mmc/host/sdhci.c
+> +++ b/drivers/mmc/host/sdhci.c
+> @@ -1824,7 +1824,7 @@ static void sdhci_enable_sdio_irq_nolock(struct sdhci_host *host, int enable)
+>  	}
+>  }
+>  
+> -static void sdhci_enable_sdio_irq(struct mmc_host *mmc, int enable)
+> +void sdhci_enable_sdio_irq(struct mmc_host *mmc, int enable)
+>  {
+>  	struct sdhci_host *host = mmc_priv(mmc);
+>  	unsigned long flags;
+> @@ -1838,6 +1838,7 @@ static void sdhci_enable_sdio_irq(struct mmc_host *mmc, int enable)
+>  	sdhci_enable_sdio_irq_nolock(host, enable);
+>  	spin_unlock_irqrestore(&host->lock, flags);
+>  }
+> +EXPORT_SYMBOL_GPL(sdhci_enable_sdio_irq);
+>  
+>  int sdhci_start_signal_voltage_switch(struct mmc_host *mmc,
+>  				      struct mmc_ios *ios)
+> diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h
+> index e4a07543a12b..609783364941 100644
+> --- a/drivers/mmc/host/sdhci.h
+> +++ b/drivers/mmc/host/sdhci.h
+> @@ -694,6 +694,7 @@ int sdhci_execute_tuning(struct mmc_host *mmc, u32 opcode);
+>  void sdhci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios);
+>  int sdhci_start_signal_voltage_switch(struct mmc_host *mmc,
+>  				      struct mmc_ios *ios);
+> +void sdhci_enable_sdio_irq(struct mmc_host *mmc, int enable);
+>  
+>  #ifdef CONFIG_PM
+>  extern int sdhci_suspend_host(struct sdhci_host *host);
+> 
