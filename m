@@ -1,92 +1,29 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 22 Mar 2017 12:16:24 +0000
-Subject: [PATCH v2] arm64: kaslr: Fix up the kernel image alignment
-In-Reply-To: <1490182705-14243-1-git-send-email-sramana@codeaurora.org>
-References: <904FACBF-3DFE-4DDE-ACB5-7109A137D477@linaro.org>
- <1490182705-14243-1-git-send-email-sramana@codeaurora.org>
-Message-ID: <CAKv+Gu-XUY0XBSK_oe4DbveZOhk8_ZQLMEdPmLiaRv9rCh7ifw@mail.gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 22 Mar 2017 12:18:48 +0000
+Subject: [PATCH v2] arm: Fix memory attribute inconsistencies when using
+ fixmap
+In-Reply-To: <CAKv+Gu8VoSLOUiNSXsrtQUr8TQdGBqiOmhsKS+N2dhToMusOUg@mail.gmail.com>
+References: <20170321173030.7751-1-tixy@linaro.org>
+ <1490117781.3136.9.camel@linaro.org>
+ <CAKv+Gu82PsyyC=fQHxUn5mrCdmQvhwK+DK342-vv8y53mLcpng@mail.gmail.com>
+ <1490175988.2890.1.camel@linaro.org>
+ <CAKv+Gu8VoSLOUiNSXsrtQUr8TQdGBqiOmhsKS+N2dhToMusOUg@mail.gmail.com>
+Message-ID: <20170322121847.GE21222@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 March 2017 at 11:38, Srinivas Ramana <sramana@codeaurora.org> wrote:
-> From: Neeraj Upadhyay <neeraju@codeaurora.org>
->
-> If kernel image extends across alignment boundary, existing
-> code increases the KASLR offset by size of kernel image. The
-> offset is masked after resizing. There are cases, where after
-> masking, we may still have kernel image extending across
-> boundary. This eventually results in only 2MB block getting
-> mapped while creating the page tables. This results in data aborts
-> while accessing unmapped regions during second relocation (with
-> kaslr offset) in __primary_switch. To fix this problem, round up the
-> kernel image size, by swapper block size, before adding it for
-> correction.
->
-> For example consider below case, where kernel image still crosses
-> 1GB alignment boundary, after masking the offset, which is fixed
-> by rounding up kernel image size.
->
-> SWAPPER_TABLE_SHIFT = 30
-> Swapper using section maps with section size 2MB.
-> CONFIG_PGTABLE_LEVELS = 3
-> VA_BITS = 39
->
-> _text  : 0xffffff8008080000
-> _end   : 0xffffff800aa1b000
-> offset : 0x1f35600000
-> mask = ((1UL << (VA_BITS - 2)) - 1) & ~(SZ_2M - 1)
->
-> (_text + offset) >> SWAPPER_TABLE_SHIFT = 0x3fffffe7c
-> (_end + offset) >> SWAPPER_TABLE_SHIFT  = 0x3fffffe7d
->
-> offset after existing correction (before mask) = 0x1f37f9b000
-> (_text + offset) >> SWAPPER_TABLE_SHIFT = 0x3fffffe7d
-> (_end + offset) >> SWAPPER_TABLE_SHIFT  = 0x3fffffe7d
->
-> offset (after mask) = 0x1f37e00000
-> (_text + offset) >> SWAPPER_TABLE_SHIFT = 0x3fffffe7c
-> (_end + offset) >> SWAPPER_TABLE_SHIFT  = 0x3fffffe7d
->
-> new offset w/ rounding up = 0x1f38000000
-> (_text + offset) >> SWAPPER_TABLE_SHIFT = 0x3fffffe7d
-> (_end + offset) >> SWAPPER_TABLE_SHIFT  = 0x3fffffe7d
->
-> Fixes: f80fb3a3d508 ("arm64: add support for kernel ASLR")
-> Signed-off-by: Neeraj Upadhyay <neeraju@codeaurora.org>
-> Signed-off-by: Srinivas Ramana <sramana@codeaurora.org>
+On Wed, Mar 22, 2017 at 12:13:40PM +0000, Ard Biesheuvel wrote:
+> I think build testing is reasonable: the routines we call are all
+> stubbed out for nommu anyway, and most changes are local to mmu.c, so
+> I don't see how this would change behavior on nommu (famous last
+> words)
 
-Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+I'm hoping to finally get some regular testing of nommu in place
+during the next few weeks, so hopefully the stability of nommu from
+the arch code point of view should get better.  Individual platforms
+are a different matter.
 
-... and thanks for the excellent commit log message!
-
-> ---
->  arch/arm64/kernel/kaslr.c | 10 +++++++---
->  1 file changed, 7 insertions(+), 3 deletions(-)
->
-> diff --git a/arch/arm64/kernel/kaslr.c b/arch/arm64/kernel/kaslr.c
-> index 769f24ef628c..d7e90d97f5c4 100644
-> --- a/arch/arm64/kernel/kaslr.c
-> +++ b/arch/arm64/kernel/kaslr.c
-> @@ -131,11 +131,15 @@ u64 __init kaslr_early_init(u64 dt_phys, u64 modulo_offset)
->         /*
->          * The kernel Image should not extend across a 1GB/32MB/512MB alignment
->          * boundary (for 4KB/16KB/64KB granule kernels, respectively). If this
-> -        * happens, increase the KASLR offset by the size of the kernel image.
-> +        * happens, increase the KASLR offset by the size of the kernel image
-> +        * rounded up by SWAPPER_BLOCK_SIZE.
->          */
->         if ((((u64)_text + offset + modulo_offset) >> SWAPPER_TABLE_SHIFT) !=
-> -           (((u64)_end + offset + modulo_offset) >> SWAPPER_TABLE_SHIFT))
-> -               offset = (offset + (u64)(_end - _text)) & mask;
-> +           (((u64)_end + offset + modulo_offset) >> SWAPPER_TABLE_SHIFT)) {
-> +               u64 kimg_sz = _end - _text;
-> +               offset = (offset + round_up(kimg_sz, SWAPPER_BLOCK_SIZE))
-> +                               & mask;
-> +       }
->
->         if (IS_ENABLED(CONFIG_KASAN))
->                 /*
-> --
-> Qualcomm India Private Limited, on behalf of Qualcomm Innovation Center, Inc.,
-> is a member of Code Aurora Forum, a Linux Foundation Collaborative Project.
->
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
