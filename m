@@ -1,41 +1,31 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 22 Mar 2017 15:32:09 +0000
-Subject: [PATCH] [v2] arm64: define BUG() instruction without CONFIG_BUG
-In-Reply-To: <CAK8P3a0A0-gnBnBBuWdPjgoDMo=2P9yXcLjZYm9Yz+xpQnCyCw@mail.gmail.com>
-References: <20170314213939.3874497-1-arnd@arndb.de>
- <20170322143729.GB25645@e104818-lin.cambridge.arm.com>
- <CAK8P3a0A0-gnBnBBuWdPjgoDMo=2P9yXcLjZYm9Yz+xpQnCyCw@mail.gmail.com>
-Message-ID: <20170322153208.GC25645@e104818-lin.cambridge.arm.com>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Wed, 22 Mar 2017 16:36:10 +0100
+Subject: [RFC PATCH 22/30] iommu: Bind/unbind tasks to/from devices
+In-Reply-To: <20170303183958.GA15146@e106794-lin.localdomain>
+References: <20170227195441.5170-1-jean-philippe.brucker@arm.com>
+ <20170227195441.5170-23-jean-philippe.brucker@arm.com>
+ <1488534044.6234.14.camel@infradead.org>
+ <20170303183958.GA15146@e106794-lin.localdomain>
+Message-ID: <20170322153610.GC7266@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 22, 2017 at 03:51:54PM +0100, Arnd Bergmann wrote:
-> On Wed, Mar 22, 2017 at 3:37 PM, Catalin Marinas
-> <catalin.marinas@arm.com> wrote:
-> > Hi Arnd,
-> >
-> > On Tue, Mar 14, 2017 at 10:39:21PM +0100, Arnd Bergmann wrote:
-> >> This mirrors commit e9c38ceba8d9 ("ARM: 8455/1: define __BUG as
-> >> asm(BUG_INSTR) without CONFIG_BUG") to make the behavior of
-> >> arm64 consistent with arm and x86, and avoids lots of warnings in
-> >> randconfig builds, such as:
-> >>
-> >> kernel/seccomp.c: In function '__seccomp_filter':
-> >> kernel/seccomp.c:666:1: error: no return statement in function returning non-void [-Werror=return-type]
-> >>
-> >> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> >
-> > A side-effect of this patch is that it turns WARN into BUG. I hit the
-> > WARN_ONCE in arch/arm64/kernel/efi.c:34 (on Juno with 64K pages) and
-> > with your patch applied, the kernel panics.
-> 
-> Taht was certainly not intended, and I don't see yet what exactly is going on.
-> What is your setting for CONFIG_BUG and CONFIG_BUGVERBOSE?
+On Fri, Mar 03, 2017 at 06:39:58PM +0000, Jean-Philippe Brucker wrote:
+> Yes, it would be nice to have a common PASID allocator. But I don't
+> think that a system-wide PASID space is workable for us. At the moment
+> systems might have a few identical devices all supporting 20 bits of
+> PASID. But consider the case where one odd device can only handle four
+> address spaces, and supports a maximum of two PASID bits. We'd quickly
+> run out of PASIDs to hand to such devices, even though we could easily
+> have one PASID space per endpoint (from a quick glance at the specs, I
+> assume that both Intel and AMD IOMMUs offer one PASID table per RID.)
 
-CONFIG_BUG=y
-CONFIG_DEBUG_BUGVERBOSE=y
+But that shouldn't be a problem if we allocate PASIDs top-down (meaning
+starting from the biggest value supported by a given device), right?
 
-(just defconfig + 64K pages)
+Then we can satisfy the devices with 16 or 20 bit PASIDs and still have
+the 2-bit PASIDs free for the devices that need it.
 
--- 
-Catalin
+
+
+	Joerg
