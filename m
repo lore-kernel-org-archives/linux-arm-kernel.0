@@ -1,52 +1,39 @@
-From: jic23@jic23.retrosnub.co.uk (Jonathan Cameron)
-Date: Wed, 22 Mar 2017 06:31:24 +0000
-Subject: [RESEND PATCH v4 2/9] iio: adc: add support for X-Powers AXP20X
- and AXP22X PMICs ADCs
-In-Reply-To: <CAGb2v66JC65=9WiMy-Nu+9tTFRLsJL2Eyb0wfJV_K=65ABc6Zg@mail.gmail.com>
-References: <20170320081653.8884-1-quentin.schulz@free-electrons.com>
- <20170320081653.8884-3-quentin.schulz@free-electrons.com>
- <CAGb2v66JC65=9WiMy-Nu+9tTFRLsJL2Eyb0wfJV_K=65ABc6Zg@mail.gmail.com>
-Message-ID: <B745132F-4A85-496A-93FC-515DF126895A@jic23.retrosnub.co.uk>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Wed, 22 Mar 2017 14:38:25 +0800
+Subject: [PATCH 1/8] soc: imx: gpc: fix gpc clk get error handling
+In-Reply-To: <20170322183306.GA16264@b29396-OptiPlex-7040>
+References: <1489990547-1510-1-git-send-email-aisheng.dong@nxp.com>
+ <1489990547-1510-2-git-send-email-aisheng.dong@nxp.com>
+ <20170320080523.GG3443@dragon>
+ <20170322183306.GA16264@b29396-OptiPlex-7040>
+Message-ID: <20170322063823.GJ3443@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Mar 23, 2017 at 02:33:06AM +0800, Dong Aisheng wrote:
+> On Mon, Mar 20, 2017 at 04:05:24PM +0800, Shawn Guo wrote:
+> > On Mon, Mar 20, 2017 at 02:15:40PM +0800, Dong Aisheng wrote:
+> > > diff --git a/drivers/soc/imx/gpc.c b/drivers/soc/imx/gpc.c
+> > > index 1e9b3b8..c9bfdfd 100644
+> > > --- a/drivers/soc/imx/gpc.c
+> > > +++ b/drivers/soc/imx/gpc.c
+> > > @@ -143,7 +143,7 @@ static int imx_pgc_get_clocks(struct device *dev, struct imx_pm_domain *domain)
+> > >  	return 0;
+> > >  
+> > >  clk_err:
+> > > -	for (; i >= 0; i--)
+> > > +	while (i--)
+> > >  		clk_put(domain->clk[i]);
+> > 
+> > Will clk[0] be put then?
+> > 
+> 
+> Yes, it is a bit tricky:
+> See as follows:
+> while (i--)	<== (i = 1)
+> 	clk_put(domain->clk[i]);	<=== (i = 0)
 
+Hah, I was still thinking it in the way how for-loop works.  Sorry for
+the noise.
 
-On 22 March 2017 04:34:45 GMT+00:00, Chen-Yu Tsai <wens@csie.org> wrote:
->Hi,
->
->On Mon, Mar 20, 2017 at 4:16 PM, Quentin Schulz
-><quentin.schulz@free-electrons.com> wrote:
->> The X-Powers AXP20X and AXP22X PMICs have multiple ADCs. They expose
->the
->> battery voltage, battery charge and discharge currents, AC-in and
->VBUS
->> voltages and currents, 2 GPIOs muxable in ADC mode and PMIC
->temperature.
->>
->> This adds support for most of AXP20X and AXP22X ADCs.
->>
->> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
->> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
->> Acked-by: Chen-Yu Tsai <wens@csie.org>
->> Reviewed-by: Jonathan Cameron <jic23@kernel.org>
->
->This patch seems to depend on commit 4707274714ef ("mfd: axp20x:
->Correct name
->of temperature data ADC registers") currently in the mfd tree.
->
->Jonathan, would it be ok for Lee to take this patch through the mfd
->tree
->as well?
-Sure.
->
->
->Thanks
->ChenYu
->
->P.S. I'm thinking about having MFD_AXP20X imply its various
->sub-drivers.
->Not sure if that was the intended usage of the new imply syntax though.
-
--- 
-Sent from my Android device with K-9 Mail. Please excuse my brevity.
+Shawn
