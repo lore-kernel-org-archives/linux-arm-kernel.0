@@ -1,96 +1,41 @@
-From: dongas86@gmail.com (Dong Aisheng)
-Date: Thu, 23 Mar 2017 02:53:22 +0800
-Subject: [PATCH 2/8] soc: imx: gpc: fix the wrong using of regmap cache
-In-Reply-To: <1490002701.2895.13.camel@pengutronix.de>
-References: <1489990547-1510-1-git-send-email-aisheng.dong@nxp.com>
- <1489990547-1510-3-git-send-email-aisheng.dong@nxp.com>
- <1490002701.2895.13.camel@pengutronix.de>
-Message-ID: <20170322185322.GB16264@b29396-OptiPlex-7040>
+From: tbaicar@codeaurora.org (Baicar, Tyler)
+Date: Tue, 21 Mar 2017 21:05:24 -0600
+Subject: [PATCH V13 09/10] trace, ras: add ARM processor error trace event
+In-Reply-To: <e1e63cbb-a75e-af11-4fa0-446b40999ee8@huawei.com>
+References: <1490136425-4324-1-git-send-email-tbaicar@codeaurora.org>
+ <1490136425-4324-10-git-send-email-tbaicar@codeaurora.org>
+ <e1e63cbb-a75e-af11-4fa0-446b40999ee8@huawei.com>
+Message-ID: <060cefca-0020-411a-a27d-ede7102cac09@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lucas,
+Hello Xie XiuQi,
 
-Thanks for the review.
+On 3/21/2017 8:48 PM, Xie XiuQi wrote:
+> Reviewed-by: Xie XiuQi <xiexiuqi@huawei.com>
+Thank you!
+Tyler
+>
+> On 2017/3/22 6:47, Tyler Baicar wrote:
+>> Currently there are trace events for the various RAS
+>> errors with the exception of ARM processor type errors.
+>> Add a new trace event for such errors so that the user
+>> will know when they occur. These trace events are
+>> consistent with the ARM processor error section type
+>> defined in UEFI 2.6 spec section N.2.4.4.
+>>
+>> Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
+>> Acked-by: Steven Rostedt <rostedt@goodmis.org>
+>> ---
+>>   drivers/acpi/apei/ghes.c    |  8 +++++++-
+>>   drivers/firmware/efi/cper.c |  1 +
+>>   drivers/ras/ras.c           |  1 +
+>>   include/ras/ras_event.h     | 45 +++++++++++++++++++++++++++++++++++++++++++++
+>>   4 files changed, 54 insertions(+), 1 deletion(-)
+>>
+>>
 
-On Mon, Mar 20, 2017 at 10:38:21AM +0100, Lucas Stach wrote:
-> Am Montag, den 20.03.2017, 14:15 +0800 schrieb Dong Aisheng:
-> > Without providing the proper reg_defaults, the regmap registers first
-> > read out may be always 0 if enabling cache, which results in the
-> > following issue we met.
-> > e.g. During driver probe in imx6_pm_domain_power_on():
-> > regmap_read(pd->regmap, pd->reg_offs + GPC_PGC_PUPSCR_OFFS, &val);
-> > The PGC_PUPSCR register val is always 0 but it's actually 0xf01 in HW.
-> > 
-> > Since GPC registers are tightly related to CPU bring up and may be
-> > changed in bootloader, we don't want to provide defaults.
-> > And the cache really does not save too much for GPC module.
-> > 
-> > Therefore, simply disable cache to fix the issue and make life easy.
-> 
-> While I agree that not using the cache may be the right thing to do
-> here, bypassing the cache by not providing the volatile function is only
-> half the fix.
-> 
-
-Removing volatile function actually is only due to it becomes meaningless
-after disable cache, not used to bypass or fix the cache issue.
-
-> Please also set the cache type to REGCACHE_NONE, to make it clear that
-> the cache isn't used.
-> 
-
-I believe all guys normally may know the regmap cache is disabled by default
-if without specifying cache_type, this way is also commonly used in kernel.
-So i just simply remove it.
-Another bonus is it fully hides the cache bits from drive user.
-No one needs to know it if not use.
-
-Anyway, if you insist on it, i could explicitly claim the cache type to
-REGCACHE_NONE in V2.
-
-Thanks
-
-Regards
-Dong Aisheng
-
-> Regards,
-> Lucas
-> 
-> > Cc: Lucas Stach <l.stach@pengutronix.de>
-> > Cc: Shawn Guo <shawnguo@kernel.org>
-> > Fixes: 721cabf6c660 ("soc: imx: move PGC handling to a new GPC driver")
-> > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
-> > ---
-> >  drivers/soc/imx/gpc.c | 10 ----------
-> >  1 file changed, 10 deletions(-)
-> > 
-> > diff --git a/drivers/soc/imx/gpc.c b/drivers/soc/imx/gpc.c
-> > index c9bfdfd..7e6a672 100644
-> > --- a/drivers/soc/imx/gpc.c
-> > +++ b/drivers/soc/imx/gpc.c
-> > @@ -289,22 +289,12 @@ static bool imx_gpc_readable_reg(struct device *dev, unsigned int reg)
-> >  	return (reg % 4 == 0) && (reg <= 0x2ac);
-> >  }
-> >  
-> > -static bool imx_gpc_volatile_reg(struct device *dev, unsigned int reg)
-> > -{
-> > -	if (reg == GPC_CNTR)
-> > -		return true;
-> > -
-> > -	return false;
-> > -}
-> > -
-> >  static const struct regmap_config imx_gpc_regmap_config = {
-> > -	.cache_type = REGCACHE_FLAT,
-> >  	.reg_bits = 32,
-> >  	.val_bits = 32,
-> >  	.reg_stride = 4,
-> >  
-> >  	.readable_reg = imx_gpc_readable_reg,
-> > -	.volatile_reg = imx_gpc_volatile_reg,
-> >  
-> >  	.max_register = 0x2ac,
-> >  };
-> 
-> 
+-- 
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
