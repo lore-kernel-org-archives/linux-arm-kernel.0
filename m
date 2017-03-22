@@ -1,53 +1,44 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Wed, 22 Mar 2017 11:32:24 +0100
-Subject: [PATCH v2 2/5] clk: meson-gxbb: Add GP0 PLL init parameters
+Date: Wed, 22 Mar 2017 11:32:26 +0100
+Subject: [PATCH v2 4/5] clk: meson-gxbb: Expose GP0 dt-bindings clock id
 In-Reply-To: <1490178747-14837-1-git-send-email-narmstrong@baylibre.com>
 References: <1490178747-14837-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1490178747-14837-3-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1490178747-14837-5-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tha Amlogic GXBB SoC GP0 PLL needs some vendor provided parameters to be
-initializated in the the GP0 control registers before configuring the rate
-with the rate table provided parameters.
-
-GXBB GP0 PLL tweaks are also selected to respect the vendor init procedure.
+This patch exposes the GP0 PLL clock id in the dt bindings.
 
 Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 ---
- drivers/clk/meson/gxbb.c | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+ drivers/clk/meson/gxbb.h              | 2 +-
+ include/dt-bindings/clock/gxbb-clkc.h | 1 +
+ 2 files changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/clk/meson/gxbb.c b/drivers/clk/meson/gxbb.c
-index d07dc22..db95038 100644
---- a/drivers/clk/meson/gxbb.c
-+++ b/drivers/clk/meson/gxbb.c
-@@ -352,6 +352,13 @@
- 	},
- };
- 
-+struct pll_params_table gxbb_gp0_params_table[] = {
-+	PLL_PARAM(HHI_GP0_PLL_CNTL, 0x6a000228),
-+	PLL_PARAM(HHI_GP0_PLL_CNTL2, 0x69c80000),
-+	PLL_PARAM(HHI_GP0_PLL_CNTL3, 0x0a5590c4),
-+	PLL_PARAM(HHI_GP0_PLL_CNTL4, 0x0000500d),
-+};
-+
- static struct meson_clk_pll gxbb_gp0_pll = {
- 	.m = {
- 		.reg_off = HHI_GP0_PLL_CNTL,
-@@ -368,6 +375,12 @@
- 		.shift   = 16,
- 		.width   = 2,
- 	},
-+	.params = {
-+		.params_table = gxbb_gp0_params_table,
-+		.params_count =	ARRAY_SIZE(gxbb_gp0_params_table),
-+		.no_init_reset = true,
-+		.clear_reset_for_lock = true,
-+	},
- 	.rate_table = gp0_pll_rate_table,
- 	.rate_count = ARRAY_SIZE(gp0_pll_rate_table),
- 	.lock = &clk_lock,
+diff --git a/drivers/clk/meson/gxbb.h b/drivers/clk/meson/gxbb.h
+index b710e06..9d94924 100644
+--- a/drivers/clk/meson/gxbb.h
++++ b/drivers/clk/meson/gxbb.h
+@@ -179,7 +179,7 @@
+ /* CLKID_FCLK_DIV4 */
+ #define CLKID_FCLK_DIV5		  7
+ #define CLKID_FCLK_DIV7		  8
+-#define CLKID_GP0_PLL		  9
++/* CLKID_GP0_PLL */
+ #define CLKID_MPEG_SEL		  10
+ #define CLKID_MPEG_DIV		  11
+ /* CLKID_CLK81 */
+diff --git a/include/dt-bindings/clock/gxbb-clkc.h b/include/dt-bindings/clock/gxbb-clkc.h
+index ef7d6b7..cce6cb5 100644
+--- a/include/dt-bindings/clock/gxbb-clkc.h
++++ b/include/dt-bindings/clock/gxbb-clkc.h
+@@ -10,6 +10,7 @@
+ #define CLKID_FCLK_DIV2		4
+ #define CLKID_FCLK_DIV3		5
+ #define CLKID_FCLK_DIV4		6
++#define CLKID_GP0_PLL		9
+ #define CLKID_CLK81		12
+ #define CLKID_MPLL2		15
+ #define CLKID_SPI		34
 -- 
 1.9.1
