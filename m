@@ -1,30 +1,28 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 22 Mar 2017 09:58:36 +0000
-Subject: [PATCH] KVM: arm/arm64: vgic: Fix GICC_PMR uaccess on GICv3 and
- clarify ABI
-In-Reply-To: <20170321210522.8362-1-cdall@linaro.org>
-References: <20170321210522.8362-1-cdall@linaro.org>
-Message-ID: <15b51bbf-aeb9-fe7c-1c64-66a4c40faa91@arm.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Wed, 22 Mar 2017 11:09:30 +0100
+Subject: [PATCH] MAINTAINERS: pinctrl: Add git tree to Samsung pinctrl
+ entry
+In-Reply-To: <20170320164851.5999-1-krzk@kernel.org>
+References: <CGME20170320164914epcas1p316c1dee152cb3a9c5a65014aa59006af@epcas1p3.samsung.com>
+ <20170320164851.5999-1-krzk@kernel.org>
+Message-ID: <10fb6332-402a-924e-8976-85c3b651d6d9@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/03/17 21:05, Christoffer Dall wrote:
-> As an oversight, for GICv2, we accidentally export the GICC_PMR register
-> in the format of the GICH_VMCR.VMPriMask field in the lower 5 bits of a
-> word, meaning that userspace must always use the lower 5 bits to
-> communicate with the KVM device and must shift the value left by 3
-> places to obtain the actual priority mask level.
-> 
-> Since GICv3 supports the full 8 bits of priority masking in the ICH_VMCR,
-> we have to fix the value we export when emulating a GICv2 on top of a
-> hardware GICv3 and exporting the emulated GICv2 state to userspace.
-> 
-> Take the chance to clarify this aspect of the ABI.
-> 
-> Signed-off-by: Christoffer Dall <cdall@linaro.org>
+On 03/20/2017 05:48 PM, Krzysztof Kozlowski wrote:
+> Add a Git tree on @kernel.org for maintaining the Samsung pinctrl
+> drivers.  The tree will be maintained in a shared model between current
+> Samsung pinctrl maintainers.  Pull requests will be going to Linus
+> Walleij.
+>
+> Also add the patchwork for linux-samsung-soc mailing list which will be
+> used for handling the patches.
+>
+> Cc: Tomasz Figa <tomasz.figa@gmail.com>
+> Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+Thanks for your effort Krzysztof,
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Acked-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
