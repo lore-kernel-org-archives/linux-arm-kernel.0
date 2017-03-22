@@ -1,59 +1,54 @@
-From: j-keerthy@ti.com (Keerthy)
-Date: Wed, 22 Mar 2017 09:12:47 +0530
-Subject: [PATCH v2 0/8] thermal: ti-soc-thermal: Migrate slope/offset data
- to device tree
-In-Reply-To: <1489046762-11288-1-git-send-email-j-keerthy@ti.com>
-References: <1489046762-11288-1-git-send-email-j-keerthy@ti.com>
-Message-ID: <64ab8413-6cf1-864f-0550-9c8db59523f7@ti.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 22 Mar 2017 12:06:49 +0800
+Subject: [PATCH] ARM: dts: sun7i: lamobo-r1: Fix CPU port RGMII settings
+In-Reply-To: <20170319045039.6163-1-f.fainelli@gmail.com>
+References: <20170319045039.6163-1-f.fainelli@gmail.com>
+Message-ID: <CAGb2v65KvoC9MUoErkGeHvmbm8Ocq-vhFBhxXvZu--=xT4zAeg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Florian,
+
+On Sun, Mar 19, 2017 at 12:50 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
+> The CPU port of the BCM53125 is configured with RGMII (no delays) but
+> this should actually be RGMII with transmit delay (rgmii-txid) because
+> STMMAC takes care of inserting the transmitter delay. This fixes
+> occasional packet loss encountered.
+>
+> Fixes: d7b9eaff5f0c ("ARM: dts: sun7i: Add BCM53125 switch nodes to the lamobo-r1 board")
+> Reported-by: Hartmut Knaack <knaack.h@gmx.de>
+> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+> ---
+>  arch/arm/boot/dts/sun7i-a20-lamobo-r1.dts | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/boot/dts/sun7i-a20-lamobo-r1.dts b/arch/arm/boot/dts/sun7i-a20-lamobo-r1.dts
+> index 72ec0d5ae052..bbf1c8cbaac6 100644
+> --- a/arch/arm/boot/dts/sun7i-a20-lamobo-r1.dts
+> +++ b/arch/arm/boot/dts/sun7i-a20-lamobo-r1.dts
+> @@ -167,7 +167,7 @@
+>                                         reg = <8>;
+>                                         label = "cpu";
+>                                         ethernet = <&gmac>;
+> -                                       phy-mode = "rgmii";
+> +                                       phy-mode = "rgmii-txid";
+
+Just to clarify, the DT binding says:
+
+  * "rgmii-txid" (RGMII with internal TX delay provided by the PHY, the MAC
+     should not add an TX delay in this case)
+
+I'm assuming this applies from the device node's point of view?
+In this case the "PHY" is STMMAC, and the "MAC" is the switch chip?
+Is that right?
 
 
-On Thursday 09 March 2017 01:35 PM, Keerthy wrote:
-> Currently the slope and offset values for calculating the
-> hot spot temperature of a particular thermal zone is part
-> of driver data. Pass them here instead and obtain the values
-> while of node parsing.
-> 
-> Tested for the slope and constant values on DRA7-EVM, OMAP3-BEAGLE. 
+Thanks
+ChenYu
 
-Hi Eduardo,
-
-If the series looks okay could you please pull this?
-
-Regards,
-Keerthy
-
-> 
-> Changes in v2:
-> 
->   * Added OMAP3 changes along with DRA7/OMAP4/OMAP5.
-> 
-> Keerthy (8):
->   arm: dts: omap3: Add cpu_thermal zone
->   ARM: DRA7: Thermal: Add slope and offset values
->   ARM: OMAP5: Thermal: Add slope and offset values
->   ARM: OMAP443x: Thermal: Add slope and offset values
->   ARM: OMAP4460: Thermal: Add slope and offset values
->   thermal: ti-soc-thermal: Fetch slope and offset from DT
->   thermal: ti-soc-thermal: Remove redundant constants
->   thermal: ti-soc-thermal: Remove redundant code
-> 
->  arch/arm/boot/dts/dra7.dtsi                        |  17 +++
->  arch/arm/boot/dts/omap3-cpu-thermal.dtsi           |  20 +++
->  arch/arm/boot/dts/omap34xx.dtsi                    |   8 +-
->  arch/arm/boot/dts/omap36xx.dtsi                    |   8 +-
->  arch/arm/boot/dts/omap443x.dtsi                    |   4 +
->  arch/arm/boot/dts/omap4460.dtsi                    |   4 +
->  arch/arm/boot/dts/omap5.dtsi                       |   9 ++
->  .../thermal/ti-soc-thermal/dra752-thermal-data.c   |  10 --
->  .../thermal/ti-soc-thermal/omap3-thermal-data.c    |   4 -
->  .../thermal/ti-soc-thermal/omap4-thermal-data.c    |   6 -
->  .../thermal/ti-soc-thermal/omap5-thermal-data.c    |   4 -
->  drivers/thermal/ti-soc-thermal/ti-bandgap.h        |   4 -
->  drivers/thermal/ti-soc-thermal/ti-thermal-common.c | 158 +--------------------
->  drivers/thermal/ti-soc-thermal/ti-thermal.h        |  16 ---
->  14 files changed, 71 insertions(+), 201 deletions(-)
->  create mode 100644 arch/arm/boot/dts/omap3-cpu-thermal.dtsi
-> 
+>                                         fixed-link {
+>                                                 speed = <1000>;
+>                                                 full-duplex;
+> --
+> 2.9.3
+>
