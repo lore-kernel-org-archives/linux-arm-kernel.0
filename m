@@ -1,86 +1,27 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 22 Mar 2017 17:03:30 +0000
-Subject: [RFC PATCH v2 24/41] arm64/sve: Discard SVE state on system call
-In-Reply-To: <1490194274-30569-25-git-send-email-Dave.Martin@arm.com>
-References: <1490194274-30569-1-git-send-email-Dave.Martin@arm.com>
- <1490194274-30569-25-git-send-email-Dave.Martin@arm.com>
-Message-ID: <20170322170330.GE19950@leverpostej>
+From: al.kochet@gmail.com (Alexander Kochetkov)
+Date: Wed, 22 Mar 2017 20:04:26 +0300
+Subject: [PATCH] ARM: dts: rockchip: increase SD clock frequency on Radxa
+ Rock
+In-Reply-To: <1978752.xjtBqdMt97@phil>
+References: <1490110822-3310-1-git-send-email-al.kochet@gmail.com>
+ <1978752.xjtBqdMt97@phil>
+Message-ID: <FCE5C7E0-7BED-4600-952A-E1EBC900F814@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 22, 2017 at 02:50:54PM +0000, Dave Martin wrote:
-> The base procedure call standard for the Scalable Vector Extension
-> defines all of the SVE programmer's model state (Z0-31, P0-15, FFR)
-> as caller-save, except for that subset of the state that aliases
-> FPSIMD state.
-> 
-> System calls from userspace will almost always be made through C
-> library wrappers -- as a consequence of the PCS there will thus
-> rarely if ever be any live SVE state at syscall entry in practice.
-> 
-> This gives us an opportinity to make SVE explicitly caller-save
-> around SVC and so stop carrying around the SVE state for tasks that
-> use SVE only occasionally (say, by calling a library).
-> 
-> Note that FPSIMD state will still be preserved around SVC.
-> 
-> As a crude heuristic to avoid pathological cases where a thread
-> that uses SVE frequently has to fault back into the kernel again to
-> re-enable SVE after a syscall, we switch the thread back to
-> FPSIMD-only context tracking only if the context is actually
-> switched out before returning to userspace.
-> 
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> ---
->  arch/arm64/kernel/fpsimd.c | 17 +++++++++++++++++
->  1 file changed, 17 insertions(+)
-> 
-> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-> index 5fb5585..8c18384 100644
-> --- a/arch/arm64/kernel/fpsimd.c
-> +++ b/arch/arm64/kernel/fpsimd.c
-> @@ -250,6 +250,23 @@ static void task_fpsimd_save(struct task_struct *task)
->  	BUG_ON(task != current);
->  
->  	if (IS_ENABLED(CONFIG_ARM64_SVE) &&
-> +	    task_pt_regs(task)->syscallno != ~0UL &&
-> +	    test_tsk_thread_flag(task, TIF_SVE)) {
-> +		unsigned long tmp;
-> +
-> +		clear_tsk_thread_flag(task, TIF_SVE);
-> +
-> +		/* Trap if the task tries to use SVE again: */
-> +		asm volatile (
-> +			"mrs	%[tmp], cpacr_el1\n\t"
-> +			"bic	%[tmp], %[tmp], %[mask]\n\t"
-> +			"msr	cpacr_el1, %[tmp]"
-> +			: [tmp] "=r" (tmp)
-> +			: [mask] "i" (CPACR_EL1_ZEN_EL0EN)
-> +		);
 
-Given we're poking this bit in a few places, I think it would make more
-sense to add enable/disable helpers. Those can also subsume the lazy
-writeback used for the context switch, e.g.
+> 22 ????? 2017 ?., ? 19:47, Heiko Stuebner <heiko@sntech.de> ???????(?):
+> 
+> sorry, but I will not apply this patch at this time.
 
-static inline void sve_el0_enable(void)
-}
-	unsigned long cpacr = read_sysreg(cpacr_el1);
-	if ((cpacr & CPACR_EL1_ZEN_EL0EN)
-		return;
+> When testing on my radxarock with the card I always use upon entering the 
+> rootfs everything explodes with -110 errors, while without that patch the card 
+> runs stable as far as I can tell.
 
-	cpacr |= CPACR_EL1_ZEN_EL0EN;
-	write_sysreg(cpacr, cpacr_el1);
-}
+> I also don't have the time to investigate further right now though.
 
-static inline void sve_el0_disable(void)
-{
-	unsigned long cpacr = read_sysreg(cpacr_el1);
-	if (!(cpacr & CPACR_EL1_ZEN_EL0EN)
-		return;
+Ok. Let leave as is for now.
 
-	cpacr &= ~CPACR_EL1_ZEN_EL0EN;
-	write_sysreg(cpacr, cpacr_el1);
-}
-
-Thanks,
-Mark.
+My radxa worked stable for a year with this settings.
+And my custom rk3188 based board also has this setting. Kernel 4.8.
+And I saw -110 errors only then I disconnect SD-card from board.
