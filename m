@@ -1,54 +1,72 @@
-From: briannorris@chromium.org (Brian Norris)
-Date: Wed, 22 Mar 2017 10:57:40 -0700
-Subject: [PATCH v3 2/4] arm64: dts: rockchip: add Gru/Kevin DTS
-In-Reply-To: <2390473.XAgkTqANPY@phil>
-References: <20170320235344.126298-1-briannorris@chromium.org>
- <20170320235344.126298-3-briannorris@chromium.org>
- <2390473.XAgkTqANPY@phil>
-Message-ID: <20170322175739.GB98450@google.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 22 Mar 2017 10:57:51 -0700
+Subject: [PATCH] ARM: omap2+: Revert omap-smp.c changes resetting CPU1
+ during boot
+In-Reply-To: <0f81ef51-29a7-3a38-1d99-2f68d6ec9410@ti.com>
+References: <20170314151725.GC20572@atomide.com>
+ <d0fe191f-66f8-b72d-0a2a-00815e663a8d@ti.com>
+ <20170314164106.GE20572@atomide.com>
+ <ea09d676-29f6-7100-4c68-88920deaeb7c@ti.com>
+ <20170314181425.GF20572@atomide.com>
+ <20170315172200.GM20572@atomide.com>
+ <20170316152925.GO20572@atomide.com>
+ <20170317092458.GJ23750@n2100.armlinux.org.uk>
+ <20170317135710.GQ20572@atomide.com>
+ <0f81ef51-29a7-3a38-1d99-2f68d6ec9410@ti.com>
+Message-ID: <20170322175750.GF10760@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 22, 2017 at 12:59:37PM +0100, Heiko Stuebner wrote:
-> Am Montag, 20. M?rz 2017, 16:53:42 CET schrieb Brian Norris:
-> > Kevin is part of a family of boards called Gru. As best as possible, the
-> > properties shared by the Gru family are placed in rk3399-gru.dtsi, while
-> > Kevin-specific bits are in rk3399-gru-kevin.dts. This does not add full
-> > support for the base Gru board.
+* Andrew F. Davis <afd@ti.com> [170317 09:28]:
+> On 03/17/2017 08:57 AM, Tony Lindgren wrote:
+> > * Russell King - ARM Linux <linux@armlinux.org.uk> [170317 02:27]:
+> >> Why can't you reset the CPU when it's died, possibly releasing the
+> >> reset again to get it into the boot rom (which is where it'll be at
+> >> boot time.)
 > > 
-> > Working and tested (to some extent):
-> >  * EC support -- including keyboard, battery, PWM, and probably more
-> >  * UART / console
-> >  * Thermal
-> >  * Touchscreen
-> >  * Touchpad
-> >  * Digitizer (regulator still WIP)
-> >  * PCIe / Wifi
-> >  * Bluetooth / Webcam
-> >  * SD card
-> >  * eMMC
-> >  * USB2 on TypeC
-> >    - This works much of the time, but USB3 devices may or may not detect
-> >      properly. Waiting on proper extcon support for USB3 over TypeC.
-> >    - Depends on XHCI/DWC3 fixes for ARM64 that still haven't landed
-> >  * Backlight
+> > Yes that would make most sense to me. Andrew, does that break your use
+> > case again for CPU1 for suspend/restore?
 > > 
-> > Not working:
-> >  * CPUFreq -- relies on special OVP support for our PWM regulator
-> >    circuits
-> >  * EC / extcon support -- and with it, USB3/TypeC/DP
-> >  * DRM -- won't even build on ARM64, so all display, eDP, etc. is not
-> >    enabled
-> > 
-> > Not tested:
-> >  * Audio
-> > 
-> > Signed-off-by: Brian Norris <briannorris@chromium.org>
 > 
-> applied for 4.12 with Enric's Tested-tag after some reordering of nodes/
-> properties.
+> We cannot reset the CPU, that is the only constraint I have. If you let
+> a core go awol then it is lost for good, you should try to avoid that.
+> The secure side on that core may still be running just fine, and may be
+> performing very important tasks, resetting the whole core because the
+> non-secure side lost control of its side is not okay.
 
-I realize I didn't catch 100% of the comments you wanted dropped. Thanks
-for cleaning it.
+For suspend/resume, I think the right solution is to put dra7
+CPU1 into retention instead trying to put it into off which will
+fail. This should fix the "smp_ops.cpu_die() returned, trying to
+resuscitate" issue. And then there is no need to repark CPU1
+anywhere for suspend/resume as it's not spinning. And it's context
+won't get lost and no reset is needed. And some power is saved.
 
-Brian
+For kexec, things are trickier. If CPU1 is in some deeper power
+state, it will wake to the configured address and there's no way
+to reconfigure that AFAIK. So reset CPU1 reset is needed from that
+state. Note that HS omap4 implementations do seem to survive CPU1
+off mode just fine.
+
+Andrew, does your use case really need kexec supported? If not,
+I think the sane thing for is to just disable kexec in the HS
+kernel for dra7 during runtime.
+
+And then if it turns out we really need to repark CPU1 for kexec
+into boot ROM, at least the following changes are needed:
+
+1. We need to differentiate between suspend/resume and kexec for
+   CPU1 hot-unplug so we can put CPU1 into retention for
+   suspend/resume and park CPU1 for kexec
+
+2. When parking CPU1 for kexec, it can be done in two stages.
+   We can first park it to a loop waiting for flat memory mapping,
+   then jump to boot ROM loop. But flat memory mapping is not
+   enough we also need to remap boot ROM and L4.. Probably waiting
+   for MMU off won't work here
+
+So depending on the use cases, I don't know if implementing these
+two are really needed or make sense.
+
+Regards,
+
+Tony
