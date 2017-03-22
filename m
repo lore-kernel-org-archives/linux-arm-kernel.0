@@ -1,88 +1,37 @@
-From: hoegeun.kwon@samsung.com (Hoegeun Kwon)
-Date: Wed, 22 Mar 2017 10:36:44 +0900
-Subject: [PATCH v5 3/5] drm/exynos: dsi: Fix the parse_dt function
-In-Reply-To: <1488948852-5380-4-git-send-email-hoegeun.kwon@samsung.com>
-References: <1488948852-5380-1-git-send-email-hoegeun.kwon@samsung.com>
- <CGME20170308045502epcas1p2d2f7a0f768082b7a54b2ebe260e78436@epcas1p2.samsung.com>
- <1488948852-5380-4-git-send-email-hoegeun.kwon@samsung.com>
-Message-ID: <93e79e92-a102-e931-8d63-843031848888@samsung.com>
+From: zyw@rock-chips.com (Chris Zhong)
+Date: Wed, 22 Mar 2017 09:54:47 +0800
+Subject: [PATCH v4 0/4] RK3399 dw-mipi-dsi patches
+Message-ID: <1490147691-4489-1-git-send-email-zyw@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi inki,
+Hi all
 
-Could you check the this patch?
-For reference, patch 1/5 and 2/5 have already been applied to Krzysztof 
-tree.
-
-Best regards,
-Hoegeun
+This series set the phy_cfg_clk to be a required clock for RK3399, and
+add a grf clock control in dw-mipi-dsi driver. And then correct a
+register name.
 
 
-On 03/08/2017 01:54 PM, Hoegeun Kwon wrote:
-> The dsi + panel is a parental relationship, so OF grpah is not needed.
-> Therefore, the current dsi_parse_dt function will throw an error,
-> because there is no linked OF graph for the case fimd + dsi + panel.
->
-> Parse the Pll burst and esc clock frequency properties in dsi_parse_dt()
-> and create a bridge_node only if there is an OF graph associated with dsi.
->
-> Signed-off-by: Hoegeun Kwon <hoegeun.kwon@samsung.com>
-> Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
-> Reviewed-by: Andi Shyti <andi.shyti@samsung.com>
-> ---
->   drivers/gpu/drm/exynos/exynos_drm_dsi.c | 32 ++++++++------------------------
->   1 file changed, 8 insertions(+), 24 deletions(-)
->
-> diff --git a/drivers/gpu/drm/exynos/exynos_drm_dsi.c b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
-> index f5c04d0..2d4e118 100644
-> --- a/drivers/gpu/drm/exynos/exynos_drm_dsi.c
-> +++ b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
-> @@ -1652,39 +1652,23 @@ static int exynos_dsi_parse_dt(struct exynos_dsi *dsi)
->   	if (ret < 0)
->   		return ret;
->   
-> -	ep = of_graph_get_endpoint_by_regs(node, DSI_PORT_OUT, 0);
-> -	if (!ep) {
-> -		dev_err(dev, "no output port with endpoint specified\n");
-> -		return -EINVAL;
-> -	}
-> -
-> -	ret = exynos_dsi_of_read_u32(ep, "samsung,burst-clock-frequency",
-> +	ret = exynos_dsi_of_read_u32(node, "samsung,burst-clock-frequency",
->   				     &dsi->burst_clk_rate);
->   	if (ret < 0)
-> -		goto end;
-> +		return ret;
->   
-> -	ret = exynos_dsi_of_read_u32(ep, "samsung,esc-clock-frequency",
-> +	ret = exynos_dsi_of_read_u32(node, "samsung,esc-clock-frequency",
->   				     &dsi->esc_clk_rate);
->   	if (ret < 0)
-> -		goto end;
-> -
-> -	of_node_put(ep);
-> +		return ret;
->   
->   	ep = of_graph_get_next_endpoint(node, NULL);
-> -	if (!ep) {
-> -		ret = -EINVAL;
-> -		goto end;
-> -	}
-> -
-> -	dsi->bridge_node = of_graph_get_remote_port_parent(ep);
-> -	if (!dsi->bridge_node) {
-> -		ret = -EINVAL;
-> -		goto end;
-> +	if (ep) {
-> +		dsi->bridge_node = of_graph_get_remote_port_parent(ep);
-> +		of_node_put(ep);
->   	}
-> -end:
-> -	of_node_put(ep);
->   
-> -	return ret;
-> +	return 0;
->   }
->   
->   static int exynos_dsi_bind(struct device *dev, struct device *master,
+Changes in v4:
+- remove "additional"
+- print the err after clk_prepare_enable(dsi->grf_clk)
+
+Changes in v3:
+- add a DW_MIPI_NEEDS_PHY_CFG_CLK for RK3399
+- add a DW_MIPI_NEEDS_GRF_CLK for RK3399
+
+Changes in v2:
+- check the grf_clk only for RK3399
+
+Chris Zhong (4):
+  drm/rockchip/dsi: check phy_cfg_clk only for RK3399
+  dt-bindings: add the grf clock for dw-mipi-dsi
+  drm/rockchip/dsi: enable the grf clk before writing grf registers
+  drm/rockchip/dsi: correct the grf_switch_reg name
+
+ .../display/rockchip/dw_mipi_dsi_rockchip.txt      |  2 +-
+ drivers/gpu/drm/rockchip/dw-mipi-dsi.c             | 42 +++++++++++++++++-----
+ 2 files changed, 35 insertions(+), 9 deletions(-)
+
+-- 
+2.6.3
