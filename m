@@ -1,48 +1,33 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 22 Mar 2017 16:55:27 +0000
-Subject: [RFC PATCH v2 23/41] arm64/sve: Move ZEN handling to the common
- task_fpsimd_load() path
-In-Reply-To: <1490194274-30569-24-git-send-email-Dave.Martin@arm.com>
-References: <1490194274-30569-1-git-send-email-Dave.Martin@arm.com>
- <1490194274-30569-24-git-send-email-Dave.Martin@arm.com>
-Message-ID: <20170322165527.GD19950@leverpostej>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 22 Mar 2017 16:57:07 +0000
+Subject: [PATCH] [v2] arm64: define BUG() instruction without CONFIG_BUG
+In-Reply-To: <CAK8P3a1V37QGtB6EeXptaOgKFz1QE=VObN91r1Ld-0ZOKAPXaQ@mail.gmail.com>
+References: <20170314213939.3874497-1-arnd@arndb.de>
+ <20170322143729.GB25645@e104818-lin.cambridge.arm.com>
+ <CAK8P3a0A0-gnBnBBuWdPjgoDMo=2P9yXcLjZYm9Yz+xpQnCyCw@mail.gmail.com>
+ <20170322153208.GC25645@e104818-lin.cambridge.arm.com>
+ <CAK8P3a1V37QGtB6EeXptaOgKFz1QE=VObN91r1Ld-0ZOKAPXaQ@mail.gmail.com>
+Message-ID: <20170322165706.GE25645@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Mar 22, 2017 at 05:29:19PM +0100, Arnd Bergmann wrote:
+> On Wed, Mar 22, 2017 at 4:32 PM, Catalin Marinas
+> <catalin.marinas@arm.com> wrote:
+> > On Wed, Mar 22, 2017 at 03:51:54PM +0100, Arnd Bergmann wrote:
+> >> On Wed, Mar 22, 2017 at 3:37 PM, Catalin Marinas
+> >> <catalin.marinas@arm.com> wrote:
+> 
+> >> Taht was certainly not intended, and I don't see yet what exactly is going on.
+> >> What is your setting for CONFIG_BUG and CONFIG_BUGVERBOSE?
+> >
+> > CONFIG_BUG=y
+> > CONFIG_DEBUG_BUGVERBOSE=y
+> 
+> Ok, I found the typo, can you just fold this in, or should I send an
+> updated patch?
 
-On Wed, Mar 22, 2017 at 02:50:53PM +0000, Dave Martin wrote:
->  void do_sve_acc(unsigned int esr, struct pt_regs *regs)
->  {
-> -	unsigned long tmp;
-> +	if (test_and_set_thread_flag(TIF_SVE)) {
-> +		unsigned long tmp;
->  
-> -	if (test_and_set_thread_flag(TIF_SVE))
-> +		asm ("mrs %0, cpacr_el1" : "=r" (tmp));
+I'll fold it in. Thanks.
 
-Please use read_sysreg().
-
-> +
-> +		printk(KERN_INFO "%s: Strange, ZEN=%u\n",
-> +		       __func__, (unsigned int)((tmp >> 16) & 3));
->  		BUG();
-
-Given we're about to BUG(), I guess it would make more sense to use
-pr_err() here, and be a bit more informative. e.g.
-
-	pr_crit("SVE trap taken unexpectedly. CPACR_EL1.ZEN is %u\n",
-		(unsigned int)((tmp >> 16) & 3));
-	BUG();
-
-... my usual comments w.r.t. magic numbers apply.
-
-[...]
-
-> +		BUILD_BUG_ON(_TIF_SVE != CPACR_EL1_ZEN_EL0EN);
-
-As previously, I do not think this is a good idea. Treating these as
-separate values is not difficult, and IMO far easier to reason about.
-
-Thanks,
-Mark.
+-- 
+Catalin
