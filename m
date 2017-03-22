@@ -1,54 +1,84 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 22 Mar 2017 17:05:18 +0530
-Subject: [PATCH 3/8] spi: davinci: limit the transfer size if DMA enabled
-In-Reply-To: <44a615b6-97ab-0ab8-c2ba-013fdd40ffd7@baylibre.com>
-References: <1486740584-17875-1-git-send-email-fisaksen@baylibre.com>
- <1486740584-17875-4-git-send-email-fisaksen@baylibre.com>
- <a17cca3a-d029-a2cd-583c-2672287d191c@ti.com>
- <b4d8bd90-cd33-560f-5102-20c2375dac70@ti.com>
- <44a615b6-97ab-0ab8-c2ba-013fdd40ffd7@baylibre.com>
-Message-ID: <95c7bc96-2de9-043d-880e-4de9f0b2308a@ti.com>
+From: sramana@codeaurora.org (Srinivas Ramana)
+Date: Wed, 22 Mar 2017 17:08:25 +0530
+Subject: [PATCH v2] arm64: kaslr: Fix up the kernel image alignment
+In-Reply-To: <904FACBF-3DFE-4DDE-ACB5-7109A137D477@linaro.org>
+References: <904FACBF-3DFE-4DDE-ACB5-7109A137D477@linaro.org>
+Message-ID: <1490182705-14243-1-git-send-email-sramana@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 22 March 2017 04:41 PM, Frode Isaksen wrote:
-> 
-> 
-> On 21/03/2017 23:02, Peter Ujfalusi wrote:
->>
->>
->> On 02/13/2017 07:59 AM, Sekhar Nori wrote:
->>> + Peter
->>>
->>> On Friday 10 February 2017 08:59 PM, Frode Isaksen wrote:
->>>> Limit the transfer size to 20 scatter/gather pages if
->>>> DMA is enabled.
->>>> The eDMA DMA engine is limited to 20 SG entries in one DMA
->>>> transaction. If this number is exceeded, DMA receive fails.
->>>> This error occurs with large vmalloc'ed buffers.
->>>
->>> This needs more explanation because there is support available in edma
->>> driver for long SG lists by breaking them down into transfers using 20
->>> PaRAM entries at a time. If thats not working for you, that needs
->>> further debug.
->>
->> While breaking down long SG list works in the eDMA driver, it is not w/o it's
->> limitation. It might take (to) long to re-configure the paRAM slots for the
->> next batch. We see missed events with MMC/SD in case of long SG list, so I
->> would not be surprised if this is not causing issues in other places...
->>
-> I checked the time to re-configure the paRAM slots with an oscillo and it takes
-> about 160uS. Since the slave is still transmitting, the number of bytes lost is
-> about 160/8=20. With the spi-loopback-test I saw about 30bytes lost when
-> re-configuring.
+From: Neeraj Upadhyay <neeraju@codeaurora.org>
 
-I guess this means that most IPs continue to get more missed sync events
-even after the first sync event is generated at end of MAX_NR_SG PaRAMs.
-And may be even that first sync event miss is a problem because the IP
-does not pause and ends up shifting data in the shift register anyway.
+If kernel image extends across alignment boundary, existing
+code increases the KASLR offset by size of kernel image. The
+offset is masked after resizing. There are cases, where after
+masking, we may still have kernel image extending across
+boundary. This eventually results in only 2MB block getting
+mapped while creating the page tables. This results in data aborts
+while accessing unmapped regions during second relocation (with
+kaslr offset) in __primary_switch. To fix this problem, round up the
+kernel image size, by swapper block size, before adding it for
+correction.
 
-If this is so broken, should edma driver not refuse to handle more than
-MAX_NR_SG for all transfers but mem-to-mem transfers?
+For example consider below case, where kernel image still crosses
+1GB alignment boundary, after masking the offset, which is fixed
+by rounding up kernel image size.
 
-Thanks,
-Sekhar
+SWAPPER_TABLE_SHIFT = 30
+Swapper using section maps with section size 2MB.
+CONFIG_PGTABLE_LEVELS = 3
+VA_BITS = 39
+
+_text  : 0xffffff8008080000
+_end   : 0xffffff800aa1b000
+offset : 0x1f35600000
+mask = ((1UL << (VA_BITS - 2)) - 1) & ~(SZ_2M - 1)
+
+(_text + offset) >> SWAPPER_TABLE_SHIFT = 0x3fffffe7c
+(_end + offset) >> SWAPPER_TABLE_SHIFT  = 0x3fffffe7d
+
+offset after existing correction (before mask) = 0x1f37f9b000
+(_text + offset) >> SWAPPER_TABLE_SHIFT = 0x3fffffe7d
+(_end + offset) >> SWAPPER_TABLE_SHIFT  = 0x3fffffe7d
+
+offset (after mask) = 0x1f37e00000
+(_text + offset) >> SWAPPER_TABLE_SHIFT = 0x3fffffe7c
+(_end + offset) >> SWAPPER_TABLE_SHIFT  = 0x3fffffe7d
+
+new offset w/ rounding up = 0x1f38000000
+(_text + offset) >> SWAPPER_TABLE_SHIFT = 0x3fffffe7d
+(_end + offset) >> SWAPPER_TABLE_SHIFT  = 0x3fffffe7d
+
+Fixes: f80fb3a3d508 ("arm64: add support for kernel ASLR")
+Signed-off-by: Neeraj Upadhyay <neeraju@codeaurora.org>
+Signed-off-by: Srinivas Ramana <sramana@codeaurora.org>
+---
+ arch/arm64/kernel/kaslr.c | 10 +++++++---
+ 1 file changed, 7 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm64/kernel/kaslr.c b/arch/arm64/kernel/kaslr.c
+index 769f24ef628c..d7e90d97f5c4 100644
+--- a/arch/arm64/kernel/kaslr.c
++++ b/arch/arm64/kernel/kaslr.c
+@@ -131,11 +131,15 @@ u64 __init kaslr_early_init(u64 dt_phys, u64 modulo_offset)
+ 	/*
+ 	 * The kernel Image should not extend across a 1GB/32MB/512MB alignment
+ 	 * boundary (for 4KB/16KB/64KB granule kernels, respectively). If this
+-	 * happens, increase the KASLR offset by the size of the kernel image.
++	 * happens, increase the KASLR offset by the size of the kernel image
++	 * rounded up by SWAPPER_BLOCK_SIZE.
+ 	 */
+ 	if ((((u64)_text + offset + modulo_offset) >> SWAPPER_TABLE_SHIFT) !=
+-	    (((u64)_end + offset + modulo_offset) >> SWAPPER_TABLE_SHIFT))
+-		offset = (offset + (u64)(_end - _text)) & mask;
++	    (((u64)_end + offset + modulo_offset) >> SWAPPER_TABLE_SHIFT)) {
++		u64 kimg_sz = _end - _text;
++		offset = (offset + round_up(kimg_sz, SWAPPER_BLOCK_SIZE))
++				& mask;
++	}
+ 
+ 	if (IS_ENABLED(CONFIG_KASAN))
+ 		/*
+-- 
+Qualcomm India Private Limited, on behalf of Qualcomm Innovation Center, Inc., 
+is a member of Code Aurora Forum, a Linux Foundation Collaborative Project.
