@@ -1,111 +1,168 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 22 Mar 2017 14:14:50 +0000
-Subject: [PATCH 3/7] arm64: hugetlb: Refactor find_num_contig
-In-Reply-To: <20170321180421.18332-4-punit.agrawal@arm.com>
-References: <20170321180421.18332-1-punit.agrawal@arm.com>
- <20170321180421.18332-4-punit.agrawal@arm.com>
-Message-ID: <20170322141450.GD2977@leverpostej>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Wed, 22 Mar 2017 15:17:38 +0100
+Subject: [PATCH v3 17/19] KVM: arm64: ITS: ITT flush and restore
+In-Reply-To: <41f6b5b7-275e-8752-cdd7-96bb1e53ab04@arm.com>
+References: <1488800074-21991-1-git-send-email-eric.auger@redhat.com>
+ <1488800074-21991-18-git-send-email-eric.auger@redhat.com>
+ <41f6b5b7-275e-8752-cdd7-96bb1e53ab04@arm.com>
+Message-ID: <3e332896-bf38-7ebc-f50d-0598f6c3058a@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 21, 2017 at 06:04:17PM +0000, Punit Agrawal wrote:
-> From: Steve Capper <steve.capper@arm.com>
-> 
-> As we regularly check for contiguous pte's in the huge accessors, remove
-> this extra check from find_num_contig.
-> 
-> Cc: David Woods <dwoods@mellanox.com>
-> Signed-off-by: Steve Capper <steve.capper@arm.com>
-> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+Hi Andre,
 
-Reviewed-by: Mark Rutland <mark.rutland@arm.com>
-
-Mark.
-
-> ---
->  arch/arm64/mm/hugetlbpage.c | 17 ++++++++---------
->  1 file changed, 8 insertions(+), 9 deletions(-)
+On 21/03/2017 19:13, Andre Przywara wrote:
+> Hi,
 > 
-> diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
-> index aacbe18e6640..81bc6e4cf714 100644
-> --- a/arch/arm64/mm/hugetlbpage.c
-> +++ b/arch/arm64/mm/hugetlbpage.c
-> @@ -42,15 +42,13 @@ int pud_huge(pud_t pud)
->  }
->  
->  static int find_num_contig(struct mm_struct *mm, unsigned long addr,
-> -			   pte_t *ptep, pte_t pte, size_t *pgsize)
-> +			   pte_t *ptep, size_t *pgsize)
->  {
->  	pgd_t *pgd = pgd_offset(mm, addr);
->  	pud_t *pud;
->  	pmd_t *pmd;
->  
->  	*pgsize = PAGE_SIZE;
-> -	if (!pte_cont(pte))
-> -		return 1;
->  	pud = pud_offset(pgd, addr);
->  	pmd = pmd_offset(pud, addr);
->  	if ((pte_t *)pmd == ptep) {
-> @@ -65,7 +63,7 @@ void set_huge_pte_at(struct mm_struct *mm, unsigned long addr,
->  {
->  	size_t pgsize;
->  	int i;
-> -	int ncontig = find_num_contig(mm, addr, ptep, pte, &pgsize);
-> +	int ncontig;
->  	unsigned long pfn;
->  	pgprot_t hugeprot;
->  
-> @@ -75,11 +73,12 @@ void set_huge_pte_at(struct mm_struct *mm, unsigned long addr,
->  	 */
->  	WARN_ON(!pte_present(pte));
->  
-> -	if (ncontig == 1) {
-> +	if (!pte_cont(pte)) {
->  		set_pte_at(mm, addr, ptep, pte);
->  		return;
->  	}
->  
-> +	ncontig = find_num_contig(mm, addr, ptep, &pgsize);
->  	pfn = pte_pfn(pte);
->  	hugeprot = __pgprot(pte_val(pfn_pte(pfn, __pgprot(0))) ^ pte_val(pte));
->  	for (i = 0; i < ncontig; i++) {
-> @@ -203,7 +202,7 @@ pte_t huge_ptep_get_and_clear(struct mm_struct *mm,
->  		bool is_dirty = false;
->  
->  		cpte = huge_pte_offset(mm, addr);
-> -		ncontig = find_num_contig(mm, addr, cpte, *cpte, &pgsize);
-> +		ncontig = find_num_contig(mm, addr, cpte, &pgsize);
->  		/* save the 1st pte to return */
->  		pte = ptep_get_and_clear(mm, addr, cpte);
->  		for (i = 1, addr += pgsize; i < ncontig; ++i, addr += pgsize) {
-> @@ -243,7 +242,7 @@ int huge_ptep_set_access_flags(struct vm_area_struct *vma,
->  		cpte = huge_pte_offset(vma->vm_mm, addr);
->  		pfn = pte_pfn(*cpte);
->  		ncontig = find_num_contig(vma->vm_mm, addr, cpte,
-> -					  *cpte, &pgsize);
-> +					  &pgsize);
->  		for (i = 0; i < ncontig; ++i, ++cpte, addr += pgsize) {
->  			changed |= ptep_set_access_flags(vma, addr, cpte,
->  							pfn_pte(pfn,
-> @@ -266,7 +265,7 @@ void huge_ptep_set_wrprotect(struct mm_struct *mm,
->  		size_t pgsize = 0;
->  
->  		cpte = huge_pte_offset(mm, addr);
-> -		ncontig = find_num_contig(mm, addr, cpte, *cpte, &pgsize);
-> +		ncontig = find_num_contig(mm, addr, cpte, &pgsize);
->  		for (i = 0; i < ncontig; ++i, ++cpte, addr += pgsize)
->  			ptep_set_wrprotect(mm, addr, cpte);
->  	} else {
-> @@ -284,7 +283,7 @@ void huge_ptep_clear_flush(struct vm_area_struct *vma,
->  
->  		cpte = huge_pte_offset(vma->vm_mm, addr);
->  		ncontig = find_num_contig(vma->vm_mm, addr, cpte,
-> -					  *cpte, &pgsize);
-> +					  &pgsize);
->  		for (i = 0; i < ncontig; ++i, ++cpte, addr += pgsize)
->  			ptep_clear_flush(vma, addr, cpte);
->  	} else {
-> -- 
-> 2.11.0
+> On 06/03/17 11:34, Eric Auger wrote:
+>> Introduce routines to flush and restore device ITT and their
+>> interrupt table entries (ITE).
+>>
+>> The routines will be called on device table flush and
+>> restore.
+>>
+>> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+>>
+>> ---
+>> v2 -> v3:
+>> - add return 0 in vgic_its_restore_ite (was in subsequent patch)
+>>
+>> v2: creation
+>> ---
+>>  virt/kvm/arm/vgic/vgic-its.c | 100 +++++++++++++++++++++++++++++++++++++++++++
+>>  1 file changed, 100 insertions(+)
+>>
+>> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+>> index 1060125..a216849 100644
+>> --- a/virt/kvm/arm/vgic/vgic-its.c
+>> +++ b/virt/kvm/arm/vgic/vgic-its.c
+>> @@ -1748,6 +1748,106 @@ static int vgic_its_restore_pending_tables(struct vgic_its *its)
+>>  	return -ENXIO;
+>>  }
+>>  
+>> +static int vgic_its_flush_ite(struct vgic_its *its, struct its_device *dev,
+>> +			      struct its_ite *ite, gpa_t gpa)
+>> +{
+>> +	struct kvm *kvm = its->dev->kvm;
+>> +	u32 next_offset;
+>> +	u64 val;
+>> +
+>> +	next_offset = compute_next_eventid_offset(&dev->itt_head, ite);
+>> +	val = ((u64)next_offset << 48) | ((u64)ite->lpi << 16) |
+>> +		ite->collection->collection_id;
+>> +	val = cpu_to_le64(val);
+>> +	return kvm_write_guest(kvm, gpa, &val, VITS_ESZ);
+>> +}
+>> +
+>> +/**
+>> + * vgic_its_restore_ite - restore an interrupt translation entry
+>> + * @event_id: id used for indexing
+>> + * @ptr: kernel VA where the 8 byte ITE is located
+>> + * @opaque: pointer to the its_device
+>> + * @next: id offset to the next entry
+>> + */
+>> +static int vgic_its_restore_ite(struct vgic_its *its, u32 event_id,
+>> +				void *ptr, void *opaque, u32 *next)
+>> +{
+>> +	struct its_device *dev = (struct its_device *)opaque;
+>> +	struct its_collection *collection;
+>> +	struct kvm *kvm = its->dev->kvm;
+>> +	u64 val, *p = (u64 *)ptr;
+>> +	struct vgic_irq *irq;
+>> +	u32 coll_id, lpi_id;
+>> +	struct its_ite *ite;
+>> +	int ret;
+>> +
+>> +	val = *p;
+>> +	*next = 1;
+>> +
+>> +	val = le64_to_cpu(val);
+>> +
+>> +	coll_id = val & GENMASK_ULL(15, 0);
+>> +	lpi_id = (val & GENMASK_ULL(47, 16)) >> 16;
+>> +
+>> +	if (!lpi_id)
+>> +		return 0;
+>> +
+>> +	*next = (val & GENMASK_ULL(63, 48)) >> 48;
 > 
+> No need for the mask here, just ">> 48" would be enough.
+sure
+> 
+>> +
+>> +	collection = find_collection(its, coll_id);
+>> +	if (!collection)
+>> +		return -EINVAL;
+>> +
+>> +	ret = vgic_its_alloc_ite(dev, &ite, collection,
+>> +				  lpi_id, event_id);
+>> +	if (ret)
+>> +		return ret;
+>> +
+>> +	irq = vgic_add_lpi(kvm, lpi_id);
+>> +	if (IS_ERR(irq))
+>> +		return PTR_ERR(irq);
+>> +	ite->irq = irq;
+>> +
+>> +	/* restore the configuration of the LPI */
+>> +	ret = update_lpi_config(kvm, irq, NULL);
+>> +	if (ret)
+>> +		return ret;
+>> +
+>> +	update_affinity_ite(kvm, ite);
+>> +	return 0;
+>> +}
+>> +
+>> +static int vgic_its_flush_itt(struct vgic_its *its, struct its_device *device)
+>> +{
+>> +	gpa_t base = device->itt_addr;
+>> +	struct its_ite *ite;
+>> +	int ret;
+>> +
+>> +	list_for_each_entry(ite, &device->itt_head, ite_list) {
+>> +		gpa_t gpa = base + ite->event_id * VITS_ESZ;
+>> +
+>> +		ret = vgic_its_flush_ite(its, device, ite, gpa);
+>> +		if (ret)
+>> +			return ret;
+>> +	}
+>> +	return 0;
+>> +}
+>> +
+>> +static int vgic_its_restore_itt(struct vgic_its *its,
+>> +				struct its_device *dev)
+>> +{
+>> +	size_t max_size = (2 << dev->nb_eventid_bits) * VITS_ESZ;
+> 
+> I think that depends on your usage of nb_eventid_bits, but this "2 <<"
+> is really confusing here. So I really think you should just hold the
+> actual number of bits in this variable and handle the +/- 1 encoding
+> just once when sourcing the information.
+fixed now as dev->nb_eventid_bits actually matches the number of bits.
+Sorry for the confusion. I must have been in orbit when I wrote that 2
+<< stuff.
+
+Thanks
+
+Eric
+> 
+> The rest looks fine.
+> 
+> Cheers,
+> Andre.
+> 
+>> +	gpa_t base = dev->itt_addr;
+>> +	int ret;
+>> +
+>> +	ret =  lookup_table(its, base, max_size, VITS_ESZ, 0,
+>> +			    vgic_its_restore_ite, dev);
+>> +
+>> +	if (ret < 0)
+>> +		return ret;
+>> +	return 0;
+>> +}
+>> +
+>>  /**
+>>   * vgic_its_flush_device_tables - flush the device table and all ITT
+>>   * into guest RAM
+>>
