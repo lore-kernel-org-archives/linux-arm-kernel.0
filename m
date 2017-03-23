@@ -1,108 +1,36 @@
-From: thgarnie@google.com (Thomas Garnier)
-Date: Thu, 23 Mar 2017 10:25:14 -0700
-Subject: [PATCH v5 3/4] arm/syscalls: Specific usage of
- verify_pre_usermode_state
-In-Reply-To: <20170323172515.27950-1-thgarnie@google.com>
-References: <20170323172515.27950-1-thgarnie@google.com>
-Message-ID: <20170323172515.27950-3-thgarnie@google.com>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Thu, 23 Mar 2017 18:26:04 +0100
+Subject: [PATCH v4 7/8] ARM: configs: Add STM32 LTDC support in STM32
+ defconfig
+In-Reply-To: <1489597334-16896-8-git-send-email-yannick.fertre@st.com>
+References: <1489597334-16896-1-git-send-email-yannick.fertre@st.com>
+ <1489597334-16896-8-git-send-email-yannick.fertre@st.com>
+Message-ID: <583a98e7-bff5-1875-385f-a53569393035@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implement specific usage of verify_pre_usermode_state for user-mode
-returns for arm.
----
-Based on next-20170322
----
- arch/arm/Kconfig               |  1 +
- arch/arm/kernel/entry-common.S | 16 +++++++++++++++-
- 2 files changed, 16 insertions(+), 1 deletion(-)
+Hi
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index fcbc5ef1ec69..10c6dc3dfff9 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -12,6 +12,7 @@ config ARM
- 	select ARCH_HAVE_CUSTOM_GPIO_H
- 	select ARCH_HAS_GCOV_PROFILE_ALL
- 	select ARCH_MIGHT_HAVE_PC_PARPORT
-+	select ARCH_NO_SYSCALL_VERIFY_PRE_USERMODE_STATE
- 	select ARCH_OPTIONAL_KERNEL_RWX if ARCH_HAS_STRICT_KERNEL_RWX
- 	select ARCH_OPTIONAL_KERNEL_RWX_DEFAULT if CPU_V7
- 	select ARCH_SUPPORTS_ATOMIC_RMW
-diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
-index eb5cd77bf1d8..88c72c4e44ad 100644
---- a/arch/arm/kernel/entry-common.S
-+++ b/arch/arm/kernel/entry-common.S
-@@ -12,6 +12,7 @@
- #include <asm/unistd.h>
- #include <asm/ftrace.h>
- #include <asm/unwind.h>
-+#include <asm/memory.h>
- #ifdef CONFIG_AEABI
- #include <asm/unistd-oabi.h>
- #endif
-@@ -27,7 +28,6 @@
- 
- #include "entry-header.S"
- 
--
- 	.align	5
- #if !(IS_ENABLED(CONFIG_TRACE_IRQFLAGS) || IS_ENABLED(CONFIG_CONTEXT_TRACKING))
- /*
-@@ -40,9 +40,12 @@ ret_fast_syscall:
-  UNWIND(.fnstart	)
-  UNWIND(.cantunwind	)
- 	disable_irq_notrace			@ disable interrupts
-+	ldr	r2, [tsk, #TI_ADDR_LIMIT]
- 	ldr	r1, [tsk, #TI_FLAGS]		@ re-check for syscall tracing
- 	tst	r1, #_TIF_SYSCALL_WORK | _TIF_WORK_MASK
- 	bne	fast_work_pending
-+	cmp	r2, #TASK_SIZE
-+	blne	addr_limit_fail
- 
- 	/* perform architecture specific actions before user return */
- 	arch_ret_to_user r1, lr
-@@ -66,6 +69,7 @@ ret_fast_syscall:
-  UNWIND(.cantunwind	)
- 	str	r0, [sp, #S_R0 + S_OFF]!	@ save returned r0
- 	disable_irq_notrace			@ disable interrupts
-+	ldr	r2, [tsk, #TI_ADDR_LIMIT]
- 	ldr	r1, [tsk, #TI_FLAGS]		@ re-check for syscall tracing
- 	tst	r1, #_TIF_SYSCALL_WORK | _TIF_WORK_MASK
- 	beq	no_work_pending
-@@ -82,6 +86,7 @@ slow_work_pending:
- 	mov	r2, why				@ 'syscall'
- 	bl	do_work_pending
- 	cmp	r0, #0
-+	ldreq   r2, [tsk, #TI_ADDR_LIMIT]
- 	beq	no_work_pending
- 	movlt	scno, #(__NR_restart_syscall - __NR_SYSCALL_BASE)
- 	ldmia	sp, {r0 - r6}			@ have to reload r0 - r6
-@@ -99,9 +104,12 @@ ret_slow_syscall:
- 	disable_irq_notrace			@ disable interrupts
- ENTRY(ret_to_user_from_irq)
- 	ldr	r1, [tsk, #TI_FLAGS]
-+	ldr	r2, [tsk, #TI_ADDR_LIMIT]
- 	tst	r1, #_TIF_WORK_MASK
- 	bne	slow_work_pending
- no_work_pending:
-+	cmp	r2, #TASK_SIZE
-+	blne	addr_limit_fail
- 	asm_trace_hardirqs_on save = 0
- 
- 	/* perform architecture specific actions before user return */
-@@ -125,6 +133,12 @@ ENTRY(ret_from_fork)
- 	b	ret_slow_syscall
- ENDPROC(ret_from_fork)
- 
-+addr_limit_fail:
-+	stmfd	sp!, {r0, lr}
-+	bl	asm_verify_pre_usermode_state
-+	ldmfd	sp!, {r0, lr}
-+	ret     lr
-+
- /*=============================================================================
-  * SWI handler
-  *-----------------------------------------------------------------------------
--- 
-2.12.1.500.gab5fba24ee-goog
+On 03/15/2017 06:02 PM, Yannick Fertre wrote:
+> Signed-off-by: Yannick Fertre <yannick.fertre@st.com>
+> ---
+
+Can you change commit header by:" ARM: config: stm32: Add LTDC support"
+and can you fill a commit message please ?
+
+>  arch/arm/configs/stm32_defconfig | 1 +
+>  1 file changed, 1 insertion(+)
+>
+> diff --git a/arch/arm/configs/stm32_defconfig b/arch/arm/configs/stm32_defconfig
+> index 436240d..9c6ba54e 100644
+> --- a/arch/arm/configs/stm32_defconfig
+> +++ b/arch/arm/configs/stm32_defconfig
+> @@ -49,6 +49,7 @@ CONFIG_SERIAL_STM32=y
+>  CONFIG_SERIAL_STM32_CONSOLE=y
+>  # CONFIG_HW_RANDOM is not set
+>  # CONFIG_HWMON is not set
+> +CONFIG_DRM=y
+>  CONFIG_MFD_SYSCON=y
+>  # CONFIG_USB_SUPPORT is not set
+>  CONFIG_NEW_LEDS=y
+>
