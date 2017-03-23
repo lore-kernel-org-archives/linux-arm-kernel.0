@@ -1,54 +1,40 @@
-From: peppe.cavallaro@st.com (Giuseppe CAVALLARO)
-Date: Thu, 23 Mar 2017 11:51:00 +0100
-Subject: stmmac: Performance regression after commit aff3d9eff843 "net:
- stmmac: enable multiple buffers"
-In-Reply-To: <465dc72e-8a1f-b41f-105f-add2164df6d5@st.com>
-References: <20170323100828.GC16625@Red>
- <68200e05-04fd-1cc1-f6d6-f77e9e6f1d9d@synopsys.com>
- <20170323102037.GD16625@Red>
- <a7c928ec-e4e5-b618-d0d4-2a833be10d53@synopsys.com>
- <465dc72e-8a1f-b41f-105f-add2164df6d5@st.com>
-Message-ID: <5c305629-0b61-88e5-5c48-4616cd687d9f@st.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 23 Mar 2017 10:51:10 +0000
+Subject: [GIT PULL] Immutable branch between MFD and PHY due for the v4.12
+ merge window
+In-Reply-To: <20170314164653.15771-5-krzk@kernel.org>
+References: <20170314164653.15771-1-krzk@kernel.org>
+ <20170314164653.15771-5-krzk@kernel.org>
+Message-ID: <20170323105110.26w3g6jxrlgdtka7@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/23/2017 11:48 AM, Giuseppe CAVALLARO wrote:
-> Hello
->
-> On 3/23/2017 11:20 AM, Corentin Labbe wrote:
->>> I have a 4.21 QoS Core with 4 RX + 4 TX and detected no regression.
->>> >Could you please share the iperf cmds you are using in order for me 
->>> to reproduce
->>> >in my side?
->
-> Joao, you have a really powerful HW integration with multiple channels 
-> for both RX and TX.
-> Often this is not the same for other setup where, usually just a DMA0 
-> is present or, sometime, there
-> is just one RX extra channel.
->
-> My question is, what happens on this kind of configurations? Are we 
-> still guarantying the best performances?
->
-> Also we have to guarantee, that the TSO and SG are always working. 
-> Another point is the buffer sizes that
-> can be different among platforms.
->
-> The problem  below reported by Corentin push me to think that there is 
-> a bug, so we should
-> understand when this has been introduced and if likely fixed by some 
-> configuration we are
-> not take care right now.
->
-> ndesc_get_rx_status: Oversized frame spanned multiple buffers"
+Enjoy!
 
-I wonder if this could be easily triggered by getting a big file via 
-FTP. So not properly related on performance benchs
+The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
 
-peppe
+  Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
 
->
->
-> Best Regards
-> Peppe
->
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/lee/mfd.git ib-mfd-phy-v4.12
+
+for you to fetch changes up to f7f6c060547c51691f9b943e6c33f63675c1a0a9:
+
+  mfd: exynos-lpass: Use common soc/exynos-regs-pmu.h header (2017-03-23 10:47:27 +0000)
+
+----------------------------------------------------------------
+Immutable branch between MFD and PHY due for the v4.12 merge window
+
+----------------------------------------------------------------
+Krzysztof Kozlowski (1):
+      mfd: exynos-lpass: Use common soc/exynos-regs-pmu.h header
+
+ drivers/mfd/exynos-lpass.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
