@@ -1,239 +1,225 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 23 Mar 2017 16:19:01 +0100
-Subject: [PATCH v3 1/7] pinctrl: dt-bindings: Add documentation for Armada
- 37xx pin controllers
+Date: Thu, 23 Mar 2017 16:19:04 +0100
+Subject: [PATCH v3 4/7] pinctrl: armada-37xx: Add gpio support
 In-Reply-To: <cover.72ded2a212a37139db2a4193482b04a84a545a48.1490282185.git-series.gregory.clement@free-electrons.com>
 References: <cover.72ded2a212a37139db2a4193482b04a84a545a48.1490282185.git-series.gregory.clement@free-electrons.com>
-Message-ID: <941d03c9a3bdfd5e789aada29b35184ec9fed9fe.1490282185.git-series.gregory.clement@free-electrons.com>
+Message-ID: <33b78632f0f461f353dffbc75a80a2a9673fb0a6.1490282185.git-series.gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document the device tree binding for the pin controllers found on the
-Armada 37xx SoCs.
-
-Update the binding documention of the xtal clk which is a subnode of this
-syscon node.
+GPIO management is pretty simple and is part of the same IP than the pin
+controller for the Armada 37xx SoCs.  This patch adds the GPIO support to
+the pinctrl-armada-37xx.c file, it also allows sharing common functions
+between the gpiolib and the pinctrl drivers.
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- Documentation/devicetree/bindings/clock/armada3700-xtal-clock.txt         |   7 +--
- Documentation/devicetree/bindings/pinctrl/marvell,armada-37xx-pinctrl.txt | 183 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-
- 2 files changed, 187 insertions(+), 3 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/pinctrl/marvell,armada-37xx-pinctrl.txt
+ drivers/pinctrl/mvebu/pinctrl-armada-37xx.c | 127 ++++++++++++++++++---
+ 1 file changed, 113 insertions(+), 14 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/clock/armada3700-xtal-clock.txt b/Documentation/devicetree/bindings/clock/armada3700-xtal-clock.txt
-index a88f1f05fbd6..4c0807f28cfa 100644
---- a/Documentation/devicetree/bindings/clock/armada3700-xtal-clock.txt
-+++ b/Documentation/devicetree/bindings/clock/armada3700-xtal-clock.txt
-@@ -5,6 +5,7 @@ reading the gpio latch register.
+diff --git a/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c b/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
+index f2ff9801d0f4..31e921aa2f86 100644
+--- a/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
++++ b/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
+@@ -10,6 +10,7 @@
+  * without any warranty of any kind, whether express or implied.
+  */
  
- This node must be a subnode of the node exposing the register address
- of the GPIO block where the gpio latch is located.
-+See Documentation/devicetree/bindings/pinctrl/marvell,armada-37xx-pinctrl.txt
++#include <linux/gpio/driver.h>
+ #include <linux/mfd/syscon.h>
+ #include <linux/of.h>
+ #include <linux/of_device.h>
+@@ -24,6 +25,8 @@
+ #include "../pinctrl-utils.h"
  
- Required properties:
- - compatible : shall be one of the following:
-@@ -16,9 +17,9 @@ Optional properties:
- 	output names ("xtal")
+ #define OUTPUT_EN	0x0
++#define INPUT_VAL	0x10
++#define OUTPUT_VAL	0x18
+ #define OUTPUT_CTL	0x20
+ #define SELECTION	0x30
  
- Example:
--gpio1: gpio at 13800 {
--	compatible = "marvell,armada-3700-gpio", "syscon", "simple-mfd";
--	reg = <0x13800 0x1000>;
-+pinctrl_nb: pinctrl-nb at 13800 {
-+	compatible = "armada3710-nb-pinctrl", "syscon", "simple-mfd";
-+	reg = <0x13800 0x100>, <0x13C00 0x20>;
+@@ -73,6 +76,7 @@ struct armada_37xx_pinctrl {
+ 	struct regmap			*regmap;
+ 	struct armada_37xx_pin_data	*data;
+ 	struct device			*dev;
++	struct gpio_chip		gpio_chip;
+ 	struct pinctrl_desc		pctl;
+ 	struct pinctrl_dev		*pctl_dev;
+ 	struct armada_37xx_pin_group	*groups;
+@@ -310,51 +314,99 @@ static int armada_37xx_pmx_set(struct pinctrl_dev *pctldev,
+ 	return armada_37xx_pmx_set_by_name(pctldev, name, grp);
+ }
  
- 	xtalclk: xtal-clk {
- 		compatible = "marvell,armada-3700-xtal-clock";
-diff --git a/Documentation/devicetree/bindings/pinctrl/marvell,armada-37xx-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/marvell,armada-37xx-pinctrl.txt
-new file mode 100644
-index 000000000000..2eda81e0bca1
---- /dev/null
-+++ b/Documentation/devicetree/bindings/pinctrl/marvell,armada-37xx-pinctrl.txt
-@@ -0,0 +1,183 @@
-+* Marvell Armada 37xx SoC pin and gpio controller
+-static int armada_37xx_pmx_direction_input(struct armada_37xx_pinctrl *info,
+-					   unsigned int offset)
++static inline void aramda_37xx_update_reg(unsigned int *reg,
++					  unsigned int offset)
+ {
+-	unsigned int reg = OUTPUT_EN;
+-	unsigned int mask;
+-
++	/* We never have more than 2 registers */
+ 	if (offset >= GPIO_PER_REG) {
+ 		offset -= GPIO_PER_REG;
+-		reg += sizeof(u32);
++		*reg += sizeof(u32);
+ 	}
++}
 +
-+Each Armada 37xx SoC come with two pin and gpio controller one for the
-+south bridge and the other for the north bridge.
++static int armada_37xx_gpio_direction_input(struct gpio_chip *chip,
++					    unsigned int offset)
++{
++	struct armada_37xx_pinctrl *info = gpiochip_get_data(chip);
++	unsigned int reg = OUTPUT_EN;
++	unsigned int mask;
 +
-+Inside this set of register the gpio latch allows exposing some
-+configuration of the SoC and especially the clock frequency of the
-+xtal. Hence, this node is a represent as syscon allowing sharing the
-+register between multiple hardware block.
++	aramda_37xx_update_reg(&reg, offset);
+ 	mask = BIT(offset);
+ 
+ 	return regmap_update_bits(info->regmap, reg, mask, 0);
+ }
+ 
++static int armada_37xx_gpio_get_direction(struct gpio_chip *chip,
++					  unsigned int offset)
++{
++	struct armada_37xx_pinctrl *info = gpiochip_get_data(chip);
++	unsigned int reg = OUTPUT_EN;
++	unsigned int val, mask;
 +
-+GPIO and pin controller:
-+------------------------
++	aramda_37xx_update_reg(&reg, offset);
++	mask = BIT(offset);
 +
-+Main node:
++	regmap_read(info->regmap, reg, &val);
+ 
++	return !(val & mask);
++}
+ 
+-static int armada_37xx_pmx_direction_output(struct armada_37xx_pinctrl *info,
+-					    unsigned int offset, int value)
++static int armada_37xx_gpio_direction_output(struct gpio_chip *chip,
++					     unsigned int offset, int value)
+ {
++	struct armada_37xx_pinctrl *info = gpiochip_get_data(chip);
+ 	unsigned int reg = OUTPUT_EN;
+ 	unsigned int mask;
+ 
+-	if (offset >= GPIO_PER_REG) {
+-		offset -= GPIO_PER_REG;
+-		reg += sizeof(u32);
+-	}
++	aramda_37xx_update_reg(&reg, offset);
+ 	mask = BIT(offset);
+ 
+ 	return regmap_update_bits(info->regmap, reg, mask, mask);
+ }
+ 
++static int armada_37xx_gpio_get(struct gpio_chip *chip, unsigned int offset)
++{
++	struct armada_37xx_pinctrl *info = gpiochip_get_data(chip);
++	unsigned int reg = INPUT_VAL;
++	unsigned int val, mask;
 +
-+Refer to pinctrl-bindings.txt in this directory for details of the
-+common pinctrl bindings used by client devices, including the meaning
-+of the phrase "pin configuration node".
++	aramda_37xx_update_reg(&reg, offset);
++	mask = BIT(offset);
 +
-+Required properties for pinctrl driver:
++	regmap_read(info->regmap, reg, &val);
 +
-+- compatible:	"marvell,armada3710-sb-pinctrl", "syscon, "simple-mfd"
-+		for the south bridge
-+		"marvell,armada3710-nb-pinctrl", "syscon, "simple-mfd"
-+		for the north bridge
-+- reg: The first set of register are for pinctrl/gpio and the second
-+  set for the interrupt controller
-+- interrupts: list of the interrupt use by the gpio
++	return (val & mask) != 0;
++}
 +
-+Available groups and functions for the North bridge:
++static void armada_37xx_gpio_set(struct gpio_chip *chip, unsigned int offset,
++				 int value)
++{
++	struct armada_37xx_pinctrl *info = gpiochip_get_data(chip);
++	unsigned int reg = OUTPUT_VAL;
++	unsigned int mask, val;
 +
-+group: jtag
-+ - pins 20-24
-+ - functions jtag, gpio
++	aramda_37xx_update_reg(&reg, offset);
++	mask = BIT(offset);
++	val = value ? mask : 0;
 +
-+group sdio0
-+ - pins 8-10
-+ - functions sdio, gpio
++	regmap_update_bits(info->regmap, reg, mask, val);
++}
 +
-+group emmc_nb
-+ - pins 27-35
-+ - functions emmc, gpio
-+
-+group pwm0
-+ - pin 11 (GPIO1-11)
-+ - functions pwm, gpio
-+
-+group pwm1
-+ - pin 12
-+ - functions pwm, gpio
-+
-+group pwm2
-+ - pin 13
-+ - functions pwm, gpio
-+
-+group pwm3
-+ - pin 14
-+ - functions pwm, gpio
-+
-+group pmic1
-+ - pin 17
-+ - functions pmic, gpio
-+
-+group pmic0
-+ - pin 16
-+ - functions pmic, gpio
-+
-+group i2c2
-+ - pins 2-3
-+ - functions i2c, gpio
-+
-+group i2c1
-+ - pins 0-1
-+ - functions i2c, gpio
-+
-+group spi_cs1
-+ - pin 17
-+ - functions spi, gpio
-+
-+group spi_cs2
-+ - pin 18
-+ - functions spi, gpio
-+
-+group spi_cs3
-+ - pin 19
-+ - functions spi, gpio
-+
-+group onewire
-+ - pin 4
-+ - functions onewire, gpio
-+
-+group uart1
-+ - pins 25-26
-+ - functions uart, gpio
-+
-+group spi_quad
-+ - pins 15-16
-+ - functions spi, gpio
-+
-+group uart_2
-+ - pins 9-10
-+ - functions uart, gpio
-+
-+Available groups and functions for the South bridge:
-+
-+group usb32_drvvbus0
-+ - pin 36
-+ - functions drvbus, gpio
-+
-+group usb2_drvvbus1
-+ - pin 37
-+ - functions drvbus, gpio
-+
-+group sdio_sb
-+ - pins 60-64
-+ - functions sdio, gpio
-+
-+group rgmii
-+ - pins 42-55
-+ - functions mii, gpio
-+
-+group pcie1
-+ - pins 39-40
-+ - functions pcie, gpio
-+
-+group ptp
-+ - pins 56-58
-+ - functions ptp, gpio
-+
-+group ptp_clk
-+ - pin 57
-+ - functions ptp, mii
-+
-+group ptp_trig
-+ - pin 58
-+ - functions ptp, mii
-+
-+group mii_col
-+ - pin 59
-+ - functions mii, mii_err
-+
-+GPIO subnode:
-+
-+Please refer to gpio.txt in this directory for details of gpio-ranges property
-+and the common GPIO bindings used by client devices.
-+
-+Required properties for gpio driver under the gpio subnode:
-+- interrupts: List of interrupt specifier for the controllers interrupt.
-+- gpio-controller: Marks the device node as a gpio controller.
-+- #gpio-cells: Should be 2. The first cell is the GPIO number and the
-+   second cell specifies GPIO flags, as defined in
-+   <dt-bindings/gpio/gpio.h>. Only the GPIO_ACTIVE_HIGH and
-+   GPIO_ACTIVE_LOW flags are supported.
-+- gpio-ranges: Range of pins managed by the GPIO controller.
-+
-+Xtal Clock bindings for Marvell Armada 37xx SoCs
-+------------------------------------------------
-+
-+see Documentation/devicetree/bindings/clock/armada3700-xtal-clock.txt
-+
-+
-+Example:
-+pinctrl_sb: pinctrl-sb at 18800 {
-+	compatible = "marvell,armada3710-sb-pinctrl", "syscon", "simple-mfd";
-+	reg = <0x18800 0x100>, <0x18C00 0x20>;
-+	gpiosb: gpiosb {
-+		#gpio-cells = <2>;
-+		gpio-ranges = <&pinctrl_sb 0 0 29>;
-+		gpio-controller;
-+		interrupts =
-+		<GIC_SPI 160 IRQ_TYPE_LEVEL_HIGH>,
-+		<GIC_SPI 159 IRQ_TYPE_LEVEL_HIGH>,
-+		<GIC_SPI 158 IRQ_TYPE_LEVEL_HIGH>,
-+		<GIC_SPI 157 IRQ_TYPE_LEVEL_HIGH>,
-+		<GIC_SPI 156 IRQ_TYPE_LEVEL_HIGH>;
-+	};
-+
-+	rgmii_pins: mii-pins {
-+		groups = "rgmii";
-+		function = "mii";
-+	};
-+
+ static int armada_37xx_pmx_gpio_set_direction(struct pinctrl_dev *pctldev,
+ 					      struct pinctrl_gpio_range *range,
+ 					      unsigned int offset, bool input)
+ {
+ 	struct armada_37xx_pinctrl *info = pinctrl_dev_get_drvdata(pctldev);
++	struct gpio_chip *chip = range->gc;
+ 
+ 	dev_dbg(info->dev, "gpio_direction for pin %u as %s-%d to %s\n",
+ 		offset, range->name, offset, input ? "input" : "output");
+ 
+ 	if (input)
+-		armada_37xx_pmx_direction_input(info, offset);
++		armada_37xx_gpio_direction_input(chip, offset);
+ 	else
+-		armada_37xx_pmx_direction_output(info, offset, 0);
++		armada_37xx_gpio_direction_output(chip, offset, 0);
+ 
+ 	return 0;
+ }
+@@ -384,6 +436,49 @@ static const struct pinmux_ops armada_37xx_pmx_ops = {
+ 	.gpio_set_direction	= armada_37xx_pmx_gpio_set_direction,
+ };
+ 
++static const struct gpio_chip armada_37xx_gpiolib_chip = {
++	.request = gpiochip_generic_request,
++	.free = gpiochip_generic_free,
++	.set = armada_37xx_gpio_set,
++	.get = armada_37xx_gpio_get,
++	.get_direction	= armada_37xx_gpio_get_direction,
++	.direction_input = armada_37xx_gpio_direction_input,
++	.direction_output = armada_37xx_gpio_direction_output,
++	.owner = THIS_MODULE,
 +};
++
++static int armada_37xx_gpiochip_register(struct platform_device *pdev,
++					struct armada_37xx_pinctrl *info)
++{
++	struct device_node *np;
++	struct gpio_chip *gc;
++	int ret = -ENODEV;
++
++	for_each_child_of_node(info->dev->of_node, np) {
++		if (of_find_property(np, "gpio-controller", NULL)) {
++			ret = 0;
++			break;
++		}
++	};
++	if (ret)
++		return ret;
++
++	info->gpio_chip = armada_37xx_gpiolib_chip;
++
++	gc = &info->gpio_chip;
++	gc->ngpio = info->data->nr_pins;
++	gc->parent = &pdev->dev;
++	gc->base = -1;
++	gc->of_node = np;
++	gc->label = info->data->name;
++
++	ret = gpiochip_add_data(gc, info);
++	if (ret)
++		return ret;
++
++	return 0;
++}
++
+ static int armada_37xx_add_function(struct armada_37xx_pmx_func *funcs,
+ 				    int *funcsize, const char *name)
+ {
+@@ -586,6 +681,10 @@ static int armada_37xx_pinctrl_probe(struct platform_device *pdev)
+ 	if (ret)
+ 		return ret;
+ 
++	ret = armada_37xx_gpiochip_register(pdev, info);
++	if (ret)
++		return ret;
++
+ 	platform_set_drvdata(pdev, info);
+ 
+ 	return 0;
 -- 
 git-series 0.9.1
