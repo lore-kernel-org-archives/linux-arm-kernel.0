@@ -1,108 +1,82 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 23 Mar 2017 11:20:39 +0100
-Subject: [PATCH 4/4] tty/serial: sh-sci: remove uneeded IS_ERR_OR_NULL
- calls
-In-Reply-To: <20170323101045.u3uigdu5xfwjmjc7@pengutronix.de>
-References: <20170306093043.ay4dz3ehp3aakwxh@pengutronix.de>
- <CAMuHMdWQuvANNU14A7NQuzv6AFp04bq4DG_oc7w9h4wUrG+4aQ@mail.gmail.com>
- <20170306100220.droey65uq2ew3mzu@pengutronix.de>
- <CACRpkdYeFyr4yjQjDAUpPJwuD_NW2y=wXnzt1xSNoOX0SFCLmw@mail.gmail.com>
- <CAMuHMdWv-xs12UqutEtXJGR8qqgx6DeDhkKvvYhhyW+XTVsUNQ@mail.gmail.com>
- <CAMuHMdXGn35bEsJKnUi5o3AytL4AJN2fBfoB79v5W-jOVFQx6g@mail.gmail.com>
- <20170320103113.tpveoq2onzrwmkdt@pengutronix.de>
- <CAMuHMdWbwA+3UGVnHYJOs26vTj13Yn+s4B8tE9kyy25JcjyZGg@mail.gmail.com>
- <20170320110718.e44s2gip36m75bqj@pengutronix.de>
- <CACRpkdZy_uguiKfSH-0gdanjr-xkwxoANTx6Fb2VwsvzRwcPRA@mail.gmail.com>
- <20170323101045.u3uigdu5xfwjmjc7@pengutronix.de>
-Message-ID: <CAMuHMdWDUzwUqrchbhh-TkE3J9Xg4TrwTF6HreikUcNNTf_ozQ@mail.gmail.com>
+From: sricharan@codeaurora.org (Sricharan R)
+Date: Thu, 23 Mar 2017 15:52:06 +0530
+Subject: [PATCH v2 5/5] iommu: Allow default domain type to be set on the
+ kernel command line
+In-Reply-To: <20170321181729.GG30948@arm.com>
+References: <1489178976-15353-1-git-send-email-will.deacon@arm.com>
+ <1489178976-15353-6-git-send-email-will.deacon@arm.com>
+ <20170321154527.GB29659@8bytes.org> <20170321172137.GF30948@arm.com>
+ <807ecbb0-c9d7-fc0a-25d2-93b5c4374107@arm.com>
+ <20170321181729.GG30948@arm.com>
+Message-ID: <2fce5c37-cde1-e5d3-0490-835867789169@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+Hi,
 
-On Thu, Mar 23, 2017 at 11:10 AM, Uwe Kleine-K?nig
-<u.kleine-koenig@pengutronix.de> wrote:
-> On Thu, Mar 23, 2017 at 10:32:01AM +0100, Linus Walleij wrote:
->> On Mon, Mar 20, 2017 at 12:07 PM, Uwe Kleine-K?nig
->> <u.kleine-koenig@pengutronix.de> wrote:
->> > On Mon, Mar 20, 2017 at 11:38:52AM +0100, Geert Uytterhoeven wrote:
->> >> On Mon, Mar 20, 2017 at 11:31 AM, Uwe Kleine-K?nig
->> >> <u.kleine-koenig@pengutronix.de> wrote:
->> >> > On Mon, Mar 20, 2017 at 10:56:14AM +0100, Geert Uytterhoeven wrote:
->> >> >> Documentation/gpio/consumer.txt rightfully sates:
->> >> >> | Note that gpio_get*_optional() functions (and their managed variants), unlike
->> >> >> | the rest of gpiolib API, also return NULL when gpiolib support is disabled.
->> >> >> | This is helpful to driver authors, since they do not need to special case
->> >> >> | -ENOSYS return codes.  System integrators should however be careful to enable
->> >> >> | gpiolib on systems that need it.
->> >> >
->> >> > I cannot find this paragraph in Documentation/gpio/consumer.txt:
->> >> >
->> >> >         $ git grep -e 'ENOSYS' v4.11-rc3 -- Documentation/gpio/
->> >> >         <void>
->> >>
->> >> It was added by commit 22c403676dbbb7c6 ("gpio: return NULL from
->> >> gpiod_get_optional when GPIOLIB is disabled")
->> >
->> > Ah, that's in next.
->> >
->> > I still think this is wrong and I'm a bit disappointed that Linus merged
->> > this patch (without saying so in the thread even) as I thought Linus and
->> > I agreed on this being a bad idea.
+On 3/21/2017 11:47 PM, Will Deacon wrote:
+> On Tue, Mar 21, 2017 at 05:46:29PM +0000, Robin Murphy wrote:
+>> On 21/03/17 17:21, Will Deacon wrote:
+>>> On Tue, Mar 21, 2017 at 04:45:27PM +0100, Joerg Roedel wrote:
+>>>> On Fri, Mar 10, 2017 at 08:49:36PM +0000, Will Deacon wrote:
+>>>>> @@ -1014,8 +1027,8 @@ struct iommu_group *iommu_group_get_for_dev(struct device *dev)
+>>>>>  	 * IOMMU driver.
+>>>>>  	 */
+>>>>>  	if (!group->default_domain) {
+>>>>> -		group->default_domain = __iommu_domain_alloc(dev->bus,
+>>>>> -							     IOMMU_DOMAIN_DMA);
+>>>>> +		group->default_domain =
+>>>>> +			__iommu_domain_alloc(dev->bus, iommu_def_domain_type);
+>>>>
+>>>> It would be good to have a fall-back here if we are talking to an IOMMU
+>>>> driver that uses default domains, but does not support identity-mapped
+>>>> domains (yet). Exynos and Rockchip IOMMU drivers seem to fall into this
+>>>> category. A dev_warn() also makes sense in case allocating a identity
+>>>> domain fails.
+>>>
+>>> Sure, something like the diff below?
+>>>
+>>> Will
+>>>
+>>> --->8
+>>>
+>>>
+>>> diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
+>>> index 42a842e3f95f..f787626a745d 100644
+>>> --- a/drivers/iommu/iommu.c
+>>> +++ b/drivers/iommu/iommu.c
+>>> @@ -1027,10 +1027,19 @@ struct iommu_group *iommu_group_get_for_dev(struct device *dev)
+>>>  	 * IOMMU driver.
+>>>  	 */
+>>>  	if (!group->default_domain) {
+>>> -		group->default_domain =
+>>> -			__iommu_domain_alloc(dev->bus, iommu_def_domain_type);
+>>> +		struct iommu_domain *dom;
+>>> +
+>>> +		dom = __iommu_domain_alloc(dev->bus, iommu_def_domain_type);
+>>> +		if (!dom) {
+>>> +			dev_warn(dev,
+>>> +				 "failed to allocate default IOMMU domain of type %u; falling back to IOMMU_DOMAIN_DMA",
+>>> +				 iommu_def_domain_type);
 >>
->> I think it is not good, but what we have before this patch is worse.
->>
->> I.e. it is the lesser evil.
->>
->> Before this patch the API is inconsistent: it gives NULL if GPIOLIB
->> is defined and -ENOSYS if GPIOLIB is not defined.
+>> Conversely, that's going to be noisy if iommu_def_domain_type was
+>> IOMMU_DOMAIN_DMA to begin with. I think it makes sense to warn if the
+>> user asked for a specific default domain type on the command line and
+>> that didn't work, but maybe not to bother otherwise. Plus, if they asked
+>> for passthrough, then not allocating a default domain at all is probably
+>> closer to the desired result than installing a DMA ops domain would be.
 >
-> So old is: it worked as intended with GPIOLIB and produced an error
-> without GPIOLIB even if no GPIO is there and NULL would be right.
->
->> After this patch it gives NULL in both cases, and that is at least
->> consistent.
->
-> And new is: with GPIOLIB it still works as intended and gives you NULL
-> even if a GPIO is there and so -ENOSYS would be right.
+> You're right -- I'll hack this about to check if the default type isn't
+> DOMAIN_DMA before warning about the allocation failure.
 
-If I forget to enable a driver, the corresponding class device is also not
-there.
+if some master devices want 'IDENTITY_DOMAIN' as default (because  those 
+devices do not want any iommu resources to be used/dma_ops to be set) 
+and some 'DMA_DOMAIN' as default, then should the default be 
+'DMA_DOMAIN' and then masters needing IDENTITY_DOMAIN explicitly do an
+detach_dev later. This [1] was adding the support for detach_dev
+of the default DMA_DOMAINs.
 
-> I admit that most of the time with GPIOLIB NULL is the right answer
-> because probably there is no GPIO to handle. But if there is a GPIO you
-> run in hard to debug problems instead of being able to see the error
-> code and act accordingly.
+[1] https://patchwork.codeaurora.org/patch/164933/
 
-But having the error breaks setups where the GPIO is optional and does
-not exist.
-
-Make sure to enable all drivers and subsystems you need when building
-your kernel. That's always true. And may indeed be hard to debug (e.g. what
-kernel options do I need to make systemd work?).
-
-> write(2) and close(2) succeed most of the time, too. Still it's not a
-> good idea to not check the return value. Or let the kernel return
-> success unconditionally.
-
-Writing all bytes passed in the buffer is "optional" in another sense than
-an "optional" GPIO: you must retry the write, while you can continue if
-an optional GPIO is not present.
-
-> So you exchanged many obvious and easy to fix problems with a few hard
-> ones. I don't agree that's a good idea, but you seem to be willing to
-> try it. Good luck.
-
-Yeah, before drivers had to explicitly ignore -ENOSYS if they want to
-support platforms with and without GPIOLIB. Bad...
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Regards,
+  Sricharan
