@@ -1,40 +1,33 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 23 Mar 2017 16:12:37 +0100
-Subject: [PATCH] ARM: dts: at91: add envelope detector mux to the Axentia
- TSE-850
-In-Reply-To: <1489789486-30985-1-git-send-email-peda@axentia.se>
-References: <1489789486-30985-1-git-send-email-peda@axentia.se>
-Message-ID: <20170323151237.u7vu63kxygxopq4b@piout.net>
+From: thgarnie@google.com (Thomas Garnier)
+Date: Thu, 23 Mar 2017 08:14:44 -0700
+Subject: [PATCH v4 1/4] syscalls: Restore address limit after a syscall
+In-Reply-To: <f0cf8766-4ee9-5386-5454-2301f429464c@zytor.com>
+References: <20170322203834.67556-1-thgarnie@google.com>
+ <CALCETrV6K8iSfAwojMFyLrbb3CG2aF4k5hPWc7EDV4ErPDq64w@mail.gmail.com>
+ <CAJcbSZGLAXmE_mFZMAZgioWExzm3A4vXBKLGJ7DZNAbJOcH8Zw@mail.gmail.com>
+ <f0cf8766-4ee9-5386-5454-2301f429464c@zytor.com>
+Message-ID: <CAJcbSZEqeKVKbtUABzuhavxoH9KWCaVUBG3j5owAwyRhiw8Z7g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/03/2017 at 23:24:46 +0100, Peter Rosin wrote:
-> The envelope detector can analyze 6 different signals, selectable with a
-> mux controlled by three gpio pins.
-> 
-> Signed-off-by: Peter Rosin <peda@axentia.se>
-> ---
-> 
-> Hi!
-> 
-> This patch makes use of the mux subsystem and a couple of drivers
-> available in linux-next since a week or two. The stuff this depends
-> on has relevant acks, specifically on the DT bindings, so the bindings
-> should be stable and not cause trouble for this patch. Which is why I
-> thought I'd try to get this in for v4.12-rc1 along with that mux
-> subsystem series.
-> 
-> Please consider applying.
-> 
-> Cheers,
-> peda
-> 
-> arch/arm/boot/dts/at91-tse850-3.dts | 29 ++++++++++++++++++++++++++++-
->  1 file changed, 28 insertions(+), 1 deletion(-)
-> 
-Applied, thanks.
+Okay well then people are fine with a BUG_ON approach. I will do a
+next iteration tailored to that. I will also try to add the static
+inline suggestion from Peter.
+
+On Wed, Mar 22, 2017 at 1:54 PM, H. Peter Anvin <hpa@zytor.com> wrote:
+> On 03/22/17 13:49, Thomas Garnier wrote:
+>>
+>> We can default to BUGging. I think my approach was avoiding doing a
+>> BUG_ON just to avoid breaking people.
+>>
+>
+> Breaking on a potentially-exploitable bug is a feature.
+>
+>         -hpa
+>
+>
+
+
 
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Thomas
