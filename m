@@ -1,87 +1,64 @@
-From: julia@ni.com (Julia Cartwright)
-Date: Thu, 23 Mar 2017 15:43:22 -0500
-Subject: [PATCH v4 1/4] pinctrl: rockchip: remove unnecessary locking
-In-Reply-To: <3695399.LE2KsF2WZK@diego>
-References: <20170323105931.10455-1-john@metanate.com>
- <9002373.ugSBBElCUj@diego>
- <20170323182910.GN10423@jcartwri.amer.corp.natinst.com>
- <3695399.LE2KsF2WZK@diego>
-Message-ID: <20170323204322.GO10423@jcartwri.amer.corp.natinst.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 23 Mar 2017 13:52:57 -0700
+Subject: [PATCH v2 0/8] thermal: ti-soc-thermal: Migrate slope/offset
+ data to device tree
+In-Reply-To: <64ab8413-6cf1-864f-0550-9c8db59523f7@ti.com>
+References: <1489046762-11288-1-git-send-email-j-keerthy@ti.com>
+ <64ab8413-6cf1-864f-0550-9c8db59523f7@ti.com>
+Message-ID: <20170323205256.GO10760@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 23, 2017 at 09:01:43PM +0100, Heiko St?bner wrote:
-> Am Donnerstag, 23. M?rz 2017, 13:29:10 CET schrieb Julia Cartwright:
-> > On Thu, Mar 23, 2017 at 06:55:50PM +0100, Heiko St?bner wrote:
-> > > Am Donnerstag, 23. M?rz 2017, 17:51:53 CET schrieb John Keeping:
-> > > > On Thu, 23 Mar 2017 11:10:20 -0500, Julia Cartwright wrote:
-[..]
-> > > > > > @@ -1185,17 +1177,14 @@ static int rockchip_set_drive_perpin(struct
-> > > > > > rockchip_pin_bank *bank,> >
-> > > > > > 
-> > > > > >  			rmask = BIT(15) | BIT(31);
-> > > > > >  			data |= BIT(31);
-> > > > > >  			ret = regmap_update_bits(regmap, reg, rmask, data);
-> > > > > > 
-> > > > > > -			if (ret) {
-> > > > > > -				spin_unlock_irqrestore(&bank->slock, flags);
-> > > > > > +			if (ret)
-> > > > > > 
-> > > > > >  				return ret;
-> > > > > > 
-> > > > > > -			}
-> > > > > > 
-> > > > > >  			rmask = 0x3 | (0x3 << 16);
-> > > > > >  			temp |= (0x3 << 16);
-> > > > > >  			reg += 0x4;
-> > > > > >  			ret = regmap_update_bits(regmap, reg, rmask, temp);
-> > > > > 
-> > > > > Killing the lock here means the writes to to this pair of registers
-> > > > > (reg
-> > > > > and reg + 4) can be observed non-atomically.  Have you convinced
-> > > > > yourself that this isn't a problem?
-> > > > 
-> > > > I called it out in v1 [1] since this bit is new since v4.4 where I
-> > > > originally wrote this patch, and didn't get any comments about it.
-> > > > 
-> > > > I've convinced myself that removing the lock doesn't cause any problems
-> > > > for writing to the hardware: if the lock would prevent writes
-> > > > interleaving then it means that two callers are trying to write
-> > > > different drive strengths to the same pin, and even with a lock here one
-> > > > of them will end up with the wrong drive strength.
-> > > > 
-> > > > But it does mean that a read via rockchip_get_drive_perpin() may see an
-> > > > inconsistent state.  I think adding a new lock specifically for this
-> > > > particular drive strength bit is overkill and I can't find a scenario
-> > > > where this will actually matter; any driver setting a pinctrl config
-> > > > must already be doing something to avoid racing two configurations
-> > > > against each other, mustn't it?
-> > > 
-> > > also, pins can normally only be requested once - see drivers complaining
-> > > if
-> > > one of their pins is already held by a different driver. So if you really
-> > > end up with two things writing to the same drive strength bits, the
-> > > driver holding the pins must be really messed up anyway :-)
-> > 
-> > My concern would be if two independent pins' drive strength
-> > configuration would walk on each other, because they happen to be
-> > configured via the same registers.
-> > 
-> > If that's not possible, then great!
+* Keerthy <j-keerthy@ti.com> [170321 20:45]:
 > 
-> ah sorry that we didn't make that clearer in the beginning, but no that also 
-> isn't possible. The registers use a "hiword-mask" scheme, so on each write to 
-> bit (x) the corresponding write-mask in bit (x+16) also needs to be set, so 
-> the each write will always only affect bits enabled in that way.
+> 
+> On Thursday 09 March 2017 01:35 PM, Keerthy wrote:
+> > Currently the slope and offset values for calculating the
+> > hot spot temperature of a particular thermal zone is part
+> > of driver data. Pass them here instead and obtain the values
+> > while of node parsing.
+> > 
+> > Tested for the slope and constant values on DRA7-EVM, OMAP3-BEAGLE. 
+> 
+> Hi Eduardo,
+> 
+> If the series looks okay could you please pull this?
 
-Awesome, thanks for clearing things up.
+Also.. Are the dts changes safe for me to pick separately?
 
-Thanks!
-   Julia
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170323/1559c8e6/attachment.sig>
+Regards,
+
+Tony
+
+
+> > Changes in v2:
+> > 
+> >   * Added OMAP3 changes along with DRA7/OMAP4/OMAP5.
+> > 
+> > Keerthy (8):
+> >   arm: dts: omap3: Add cpu_thermal zone
+> >   ARM: DRA7: Thermal: Add slope and offset values
+> >   ARM: OMAP5: Thermal: Add slope and offset values
+> >   ARM: OMAP443x: Thermal: Add slope and offset values
+> >   ARM: OMAP4460: Thermal: Add slope and offset values
+> >   thermal: ti-soc-thermal: Fetch slope and offset from DT
+> >   thermal: ti-soc-thermal: Remove redundant constants
+> >   thermal: ti-soc-thermal: Remove redundant code
+> > 
+> >  arch/arm/boot/dts/dra7.dtsi                        |  17 +++
+> >  arch/arm/boot/dts/omap3-cpu-thermal.dtsi           |  20 +++
+> >  arch/arm/boot/dts/omap34xx.dtsi                    |   8 +-
+> >  arch/arm/boot/dts/omap36xx.dtsi                    |   8 +-
+> >  arch/arm/boot/dts/omap443x.dtsi                    |   4 +
+> >  arch/arm/boot/dts/omap4460.dtsi                    |   4 +
+> >  arch/arm/boot/dts/omap5.dtsi                       |   9 ++
+> >  .../thermal/ti-soc-thermal/dra752-thermal-data.c   |  10 --
+> >  .../thermal/ti-soc-thermal/omap3-thermal-data.c    |   4 -
+> >  .../thermal/ti-soc-thermal/omap4-thermal-data.c    |   6 -
+> >  .../thermal/ti-soc-thermal/omap5-thermal-data.c    |   4 -
+> >  drivers/thermal/ti-soc-thermal/ti-bandgap.h        |   4 -
+> >  drivers/thermal/ti-soc-thermal/ti-thermal-common.c | 158 +--------------------
+> >  drivers/thermal/ti-soc-thermal/ti-thermal.h        |  16 ---
+> >  14 files changed, 71 insertions(+), 201 deletions(-)
+> >  create mode 100644 arch/arm/boot/dts/omap3-cpu-thermal.dtsi
+> > 
