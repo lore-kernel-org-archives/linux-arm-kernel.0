@@ -1,102 +1,64 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 23 Mar 2017 10:57:27 +0000
-Subject: [PATCH v3] efifb: avoid reconfiguration of BAR that covers the
- framebuffer
-In-Reply-To: <CAKv+Gu93eJ-js3g7M6Jdm6XGMaWMswFmzBG2qNT4rn+3=1+EyA@mail.gmail.com>
-References: <1490196629-28088-1-git-send-email-ard.biesheuvel@linaro.org>
- <20170322193111.GA8190@wunner.de>
- <CAKv+Gu_X-SEnz7h9J8boqqjOQGHQawwdSAq4haH-OGu8zdfNfA@mail.gmail.com>
- <20170323084819.GA23281@h08.hostsharing.net>
- <CAKv+Gu93eJ-js3g7M6Jdm6XGMaWMswFmzBG2qNT4rn+3=1+EyA@mail.gmail.com>
-Message-ID: <20170323105727.GA2441@red-moon>
+From: Joao.Pinto@synopsys.com (Joao Pinto)
+Date: Thu, 23 Mar 2017 10:56:55 +0000
+Subject: stmmac: Performance regression after commit aff3d9eff843 "net:
+ stmmac: enable multiple buffers"
+In-Reply-To: <5c305629-0b61-88e5-5c48-4616cd687d9f@st.com>
+References: <20170323100828.GC16625@Red>
+ <68200e05-04fd-1cc1-f6d6-f77e9e6f1d9d@synopsys.com>
+ <20170323102037.GD16625@Red>
+ <a7c928ec-e4e5-b618-d0d4-2a833be10d53@synopsys.com>
+ <465dc72e-8a1f-b41f-105f-add2164df6d5@st.com>
+ <5c305629-0b61-88e5-5c48-4616cd687d9f@st.com>
+Message-ID: <89948183-5dba-af4e-8fd1-2a6add6750c8@synopsys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 23, 2017 at 09:04:03AM +0000, Ard Biesheuvel wrote:
-> On 23 March 2017 at 08:48, Lukas Wunner <lukas@wunner.de> wrote:
-> > On Wed, Mar 22, 2017 at 07:32:43PM +0000, Ard Biesheuvel wrote:
-> >> On 22 March 2017 at 19:31, Lukas Wunner <lukas@wunner.de> wrote:
-> >> > On Wed, Mar 22, 2017 at 03:30:29PM +0000, Ard Biesheuvel wrote:
-> >> >> On UEFI systems, the PCI subsystem is enumerated by the firmware,
-> >> >> and if a graphical framebuffer is exposed by a PCI device, its base
-> >> >> address and size are exposed to the OS via the Graphics Output
-> >> >> Protocol (GOP).
-> >> >>
-> >> >> On arm64 PCI systems, the entire PCI hierarchy is reconfigured from
-> >> >> scratch at boot. This may result in the GOP framebuffer address to
-> >> >> become stale, if the BAR covering the framebuffer is modified. This
-> >> >> will cause the framebuffer to become unresponsive, and may in some
-> >> >> cases result in unpredictable behavior if the range is reassigned to
-> >> >> another device.
-> >> >
-> >> > Hm, commit message seems to indicate the issue is restricted to arm64,
-> >> > yet there's no IS_ENABLED(ARM64) to constrain the added code to that arch?
-> >>
-> >> True. I am eager to get some x86 coverage for this, since I would
-> >> expect this not to do any harm. But I'm fine with making it ARM/arm64
-> >> specific in the final version.
-> >
-> > I see.  IIUC, this is only a problem because pci_bus_assign_resources()
-> > is called from arch/arm64/kernel/pci.c:pci_acpi_scan_root() (as well as
-> > the host drivers) and x86 isn't affected because it doesn't do that.
-> >
+?s 10:51 AM de 3/23/2017, Giuseppe CAVALLARO escreveu:
+> On 3/23/2017 11:48 AM, Giuseppe CAVALLARO wrote:
+>> Hello
+>>
+>> On 3/23/2017 11:20 AM, Corentin Labbe wrote:
+>>>> I have a 4.21 QoS Core with 4 RX + 4 TX and detected no regression.
+>>>> >Could you please share the iperf cmds you are using in order for me to
+>>>> reproduce
+>>>> >in my side?
+>>
+>> Joao, you have a really powerful HW integration with multiple channels for
+>> both RX and TX.
+>> Often this is not the same for other setup where, usually just a DMA0 is
+>> present or, sometime, there
+>> is just one RX extra channel.
+>>
+>> My question is, what happens on this kind of configurations? Are we still
+>> guarantying the best performances?
+>>
+>> Also we have to guarantee, that the TSO and SG are always working. Another
+>> point is the buffer sizes that
+>> can be different among platforms.
+>>
+>> The problem  below reported by Corentin push me to think that there is a bug,
+>> so we should
+>> understand when this has been introduced and if likely fixed by some
+>> configuration we are
+>> not take care right now.
+>>
+>> ndesc_get_rx_status: Oversized frame spanned multiple buffers"
 > 
-> Correct. But on x86 (or rather, on a PC), you can be sure that UEFI
-> (or the legacy PCI bios) performed the resource assignment already.
-> One could argue that this is equally the case when running arm64 in
-> ACPI mode, but in general, you cannot assume the presence of firmware
-> on ARM/arm64 that has already taken care of this, and so the state of
-> the BARs has to be presumed invalid.
+> I wonder if this could be easily triggered by getting a big file via FTP. So not
+> properly related on performance benchs
 
-The story is a bit more convoluted than that owing to x86 (and other
-arches) legacy.
+I am going to do that test and check it out and also run iperf a couple of
+times. I am counting on doing this today and send you later the results. If
+anyone gets results sooner please share.
 
-x86 tries to claim all PCI resources (in two passes - first enabled
-devices, second disabled devices) and that predates ACPI/UEFI.
-
-Mind, x86 reassign resources that can't be claimed too, the only
-difference with ARM64 is that, for the better or the worse, we
-have decided not to claim the FW PCI set-up on ARM64 even if it
-is sane, we do not even try, it was a deliberate choice.
-
-This patch should be harmless on x86 since if the FB PCI BAR is set
-up sanely, claiming it again should be a nop (to be checked).
-
-For all the talk about PCI being arch agnostic as I said manifold
-times before, that's just theory. In practice different arches
-treat PCI FW set-up differently, it would be ideal to make them
-uniform but legacy is huge and there is a massive risk of triggering
-regressions, it is no mean feat (if achievable at all).
-
-Lorenzo
-
-> > I have no opinion on executing the quirk on x86 as well, I was just
-> > confused by the discrepancy between commit message and patch, but that
-> > can easily be remedied with a copy+paste of what you replied to Sinan:
-> >
-> >        "On x86, it works, given that BARs are usually not reassigned,
-> >         and so the patch should be a no-op in that case, although it
-> >         should still be an improvement to check whether the device that
-> >         owns the BAR actually has memory decoding enabled before we
-> >         attach the framebuffer driver to it."
-> >
-> >
 > 
-> OK, I will include that.
+> peppe
 > 
-> >> >> +DECLARE_PCI_FIXUP_HEADER(PCI_ANY_ID, PCI_ANY_ID, efifb_fixup_resources);
-> >> >
-> >> > Maybe this can be constrained to PCI_BASE_CLASS_DISPLAY?
-> >>
-> >> How does one do that with DECLARE_PCI_FIXUP_HEADER?
-> >
-> > With DECLARE_PCI_FIXUP_CLASS_HEADER().
-> >
+>>
+>>
+>> Best Regards
+>> Peppe
+>>
 > 
-> Ah ok, thanks for pointing that out.
-> 
-> I do wonder whether it makes sense to keep the code as is, so that we
-> spot unexpected configurations, i.e., where the GOP points into a BAR
-> that is unrelated to graphics. In this case, I think we should disable
-> efifb rather than proceed without claiming any PCI resources (as we
-> did without this patch)
+
+Thanks.
