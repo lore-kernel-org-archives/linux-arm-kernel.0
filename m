@@ -1,59 +1,58 @@
-From: peppe.cavallaro@st.com (Giuseppe CAVALLARO)
-Date: Thu, 23 Mar 2017 11:33:23 +0100
-Subject: stmmac still supporting spear600 ?
-In-Reply-To: <20170321155054.2f4cb921@free-electrons.com>
-References: <20170309093412.33c0277d@free-electrons.com>
- <373e2760-94c5-4349-33aa-158bc8f4b19e@st.com>
- <20170309103236.3e16304f@free-electrons.com>
- <79049eda-5d37-6b70-8945-2d3ab55e56b8@st.com>
- <20170321155054.2f4cb921@free-electrons.com>
-Message-ID: <63405ec5-099c-b935-2724-6c85012fc9f7@st.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 23 Mar 2017 11:36:52 +0100
+Subject: [PATCH 4/6] pinctrl: aramda-37xx: Add irqchip support
+In-Reply-To: <87zigdeczh.fsf@free-electrons.com>
+References: <20161222172501.16121-1-gregory.clement@free-electrons.com>
+ <20161222172501.16121-5-gregory.clement@free-electrons.com>
+ <CACRpkdbR-WRT0rJp2CuN6CkZF=J35JUgGHjW7beyaimipz0ehw@mail.gmail.com>
+ <87zigdeczh.fsf@free-electrons.com>
+Message-ID: <CACRpkdaVDQMoPXmT++vJ4v9mUejYSy28Ybwb0v2519OeCSPvXg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Thomas
-
-On 3/21/2017 3:50 PM, Thomas Petazzoni wrote:
-> Hello,
+On Wed, Mar 22, 2017 at 1:02 PM, Gregory CLEMENT
+<gregory.clement@free-electrons.com> wrote:
+>  On ven., d?c. 30 2016, Linus Walleij <linus.walleij@linaro.org> wrote:
 >
-> On Thu, 9 Mar 2017 15:56:31 +0100, Giuseppe CAVALLARO wrote:
->
->> On 3/9/2017 10:32 AM, Thomas Petazzoni wrote:
+>> On Thu, Dec 22, 2016 at 6:24 PM, Gregory CLEMENT
+>> <gregory.clement@free-electrons.com> wrote:
 >>
->>> OK, I'll have a look. However, I'm still confused by this DMA_RESET bit
->>> that never clears, contrary to what the datasheet says. Are there some
->>> erratas?
->> I suggest you to take a look at the tx/rx clocks from PHY.
->> You have to provide these otherwise you cannot reset the engine.
-> Thanks for the hint.
-
-you are welcome
-
-> Further research has revealed that everything is working fine on a
-> platform with a Gigabit PHY connected via GMII.
+>>> The Armada 37xx SoCs can handle interrupt through GPIO. However it can
+>>> only manage the edge ones.
+>>>
+>>> The way the interrupt are managed are classical so we can use the generic
+>>> interrupt chip model.
+>>>
+>>> The only unusual "feature" is that many interrupts are connected to the
+>>> parent interrupt controller. But we do not take advantage of this and use
+>>> the chained irq with all of them.
+>>>
+>>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>>
+>> So this is very simple and should use GPIOLIB_IRQCHIP.
+>>
+>> Begin with select GPIOLIB_IRQCHIP in your Kconfig and then look
+>> at conversions such as commit 85ae9e512f437cd09bf61564bdba29ab88bab3e3
+>> ("pinctrl: bcm2835: switch to GPIOLIB_IRQCHIP")
+>> for inspiration.
 >
-> However, on a different platform (which I'm using) with a 10/100 PHY
-> connected via MII, DMA_RESET never clears, and networking doesn't work.
-> The SMSC PHY LAN8700 is also supposed to be providing the clock through
-> its TX_CLK pin. I double checked, and both the MAC and PHY are in MII
-> mode, but still no luck so far.
+> I switched to the use of GPIOLIB_IRQCHIP however it didn't really simplify
+> my code, during the development on the v2 I did a commit only for this
+> change and here it is the diffstat:
+> 110     72      drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
 >
-> Of course, if you have any suggestion or hint, I'm all ears :)
+> In my first version I used the generic irqchip so I was able to benefit
+> of this framework, by switching to GPIOLIB_IRQCHIP I had to implement
+> again some of the functions such as .mask, .unmask an ack.
 
-I can just you to keep the focus on clock configuration. I tested the 
-SMSC PHY LAN8700
-w/o any issues on several platform.  In MII both rx/tx_clk are provided 
-by PHY and if you
-have an external oscillator this should be safe enough, indeed.
-Another check you can do is about the reset time! Maybe you need to 
-change something
-when reset the SMSC transceiver, try to increase the delay (if you use 
-GPIO to reset it).
+I still think this is better, so thanks.
 
-Regards
-Peppe
+If you have ideas of how we could combine generic irqchip with
+GPIOLIB_IRQCHIP in an efficient manner, I'd be happy to hear
+about it? I want gpiolib core to be involved setting things like
+the .irq_request/release_resources() for example, so if you
+would proceed with this solution, I would have had you add those
+duplicating the gpiolib helpers instead.
 
->
-> Thanks,
->
-> Thomas
+Yours,
+Linus Walleij
