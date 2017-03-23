@@ -1,99 +1,86 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 23 Mar 2017 15:16:49 +0000
-Subject: [PATCH v4 00/28] arm/arm64: KVM: Rework the hyp-stub API
-In-Reply-To: <20170323143916.GA27715@cbox>
-References: <20170321192058.9300-1-marc.zyngier@arm.com>
- <20170322133724.GA10969@cbox> <3dab2f39-88c2-e10b-942c-58a1d8053b71@arm.com>
- <20170322172708.GA17329@cbox> <10524c84-1e1e-05f8-97b9-436c8649ffa8@arm.com>
- <20170323143916.GA27715@cbox>
-Message-ID: <e424e00c-e649-8e6a-7f73-ffbd37046779@arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 23 Mar 2017 16:19:00 +0100
+Subject: [PATCH v3 0/7] Add support for pinctrl/gpio on Armada 37xx
+Message-ID: <cover.72ded2a212a37139db2a4193482b04a84a545a48.1490282185.git-series.gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/03/17 14:39, Christoffer Dall wrote:
-> On Thu, Mar 23, 2017 at 10:53:04AM +0000, Marc Zyngier wrote:
->> On 22/03/17 17:27, Christoffer Dall wrote:
->>>
->>> I don't think there is a great use case beyond what we already do, it
->>> would just be to have one set of hyp vectors fewer, so that either the
->>> hyp stub is in place, or a hypervisor is in place, not kvm-init vectors.
->>>
->>> So instead of doing:
->>>   __hyp_set_vectors(kvm_get_idmap_vector());
->>>   hvc(); /* via the misused kvm_call_hyp thing */
->>>
->>> you would do:
->>>
->>>   __hyp_call_function(__kvm_hyp_init, arg1, arg2);
->>>
->>> which would change the vector and initialize anything.
->>>
->>> Not sure if that can work though, or if there are any downsides that I
->>> haven't thought about?
->>
->> I've given it a go, and that seems to work, at least on arm64. We may 
->> have to set the vectors in a slightly different way on 32bit because 
->> we're going to run out of registers (we only have two left once we 
->> reach the function being called).
-> 
-> Right, that's a challenge I clearly didn't foresee.
-> 
->>
->> Another thing is that the function called is not really a function. It 
->> is an exception handler, as it has to end with an eret (or we may need 
->> to save LR in funky ways).
-> 
-> Shouldn't it have the same semantics as the KVM calling function thing
-> where it pushes the LR on the stack?  But of course, that requires
-> having a stack for each runtime that owns hyp mode at any given time.
-> Potentially not great.
+Hi,
 
-Indeed, and that's the point where I'm starting to think that we may be
-trying to beautify something that may not be worth it.
+In this third version I finally managed to use gpio-ranges from the
+device tree. For the record, this series adds support for the pin and
+gpio controllers present on the Armada 37xx SoCs.
 
-> If possible, the idea would be that you'd call functions, just like you
-> normally do, but the functions you call can choose to never return -
-> again just like a C function can do if it messes with your machine
-> configuration.
-> 
-> But maybe the idea is fundamentally flawed, if the only function
-> you'd ever call from the hyp stub is one that takes over the hyp world,
-> and then the original design was just based on using set_vectors.  Hmmm.
+Each Armada 37xx SoC comes with 2 pin controllers: one on the south
+bridge (managing 28 pins) and one on the north bridge (managing 36 pins).
 
-That's my point above. The only use case we have so far for this method
-is to take over EL2. On the other have, I've noticed that the more I
-rework this area, the more old stuff surfaces, ready to be nuked. Maybe
-I should keep digging.
+At the hardware level the controller configure the pins by group and not
+pin by pin.
 
-> 
->>  The potential blocker for this is that the
->> 32bit decompressor does use set_vectors in funky ways to deal with
->> relocation. If we get rid of set_vectors like I just did on 64bit,
->> we'll need to mess with that as well.
-> 
-> Interesting.  I didn't think that we'd necessarily get rid of
-> set_vectors, but I agree with you that if we wanted to do this, it
-> should probably go.
-> 
->>
->> Anyway, here's the hack, 64bit only, quickly tested on Mustang. I'm not
->> completely sure this is any prettier, but it is certainly manageable.
-> 
-> There are two things I like about it.  First, it gets rid of the
-> 'additional runtime' in hyp and second the changes to
-> cpu_init_hyp_mode() are quite nice, imho.
-> 
-> Thanks being said, this series is pretty nice as it is, so I don't want
-> to impose more work on you at the moment, so maybe we save your patch
-> snipped below for later if we want to consider looking at it some other
-> time?
+The gpio controller is also capable to handle interrupt from gpio.
 
-What I can do is prepare an extra series that would include the
-corresponding 32bit changes, and we then evaluate that separately. I
-don't mind spending a bit of time on it.
+Changelog
+
+v2 -> v3
+ - use gpio-ranges (patch 4)
+
+ - Document gpio-ranges usage (patch 1)
+
+ - do not use anymore a global pin index (patch 3)
+
+v1 -> v2:
+- Update binding documentation making clear that mfd and syscon must
+  be used (patch 1).
+
+- Split the fist patch adding pin controller support for Armada 37xx
+  in arm64 part (for kconfig) and pinctrl part (patch 2 and 3)
+
+- Add MFD_SYSCON dependency (patch 3)
+
+- Add kerneldoc for the armada_37xx_pin_group struct (patch 3)
+
+- Rename _add_function() to armada_37xx_add_function() (patch 3)
+
+- Use an inline function to update the reg offset (patch 4)
+
+- Rename gpiolib_register to gpiochip_register (patch 4)
+
+- Add a comment about the two registers limit (patch 4)
+
+- Add explicit gpio node in the device tree (patch 4)
+
+- Convert the driver to use GPIOLIB_IRQCHIP (patch 5)
+
+- Add a critical section when accessing the hardware registers (patch 5)
+
+- Use the gpio subnode (patch 5)
 
 Thanks,
 
-	M.
+Gregory
+
+Gregory CLEMENT (7):
+  pinctrl: dt-bindings: Add documentation for Armada 37xx pin controllers
+  arm64: marvell: enable the Armada 37xx pinctrl driver
+  pinctrl: armada-37xx: Add pin controller support for Armada 37xx
+  pinctrl: armada-37xx: Add gpio support
+  pinctrl: aramda-37xx: Add irqchip support
+  ARM64: dts: marvell: Add pinctrl nodes for Armada 3700
+  ARM64: dts: marvell: armada37xx: add pinctrl definition
+
+ Documentation/devicetree/bindings/clock/armada3700-xtal-clock.txt         |   7 +-
+ Documentation/devicetree/bindings/pinctrl/marvell,armada-37xx-pinctrl.txt | 183 ++++++++++++++-
+ arch/arm64/Kconfig.platforms                                              |   2 +-
+ arch/arm64/boot/dts/marvell/armada-3720-db.dts                            |   8 +-
+ arch/arm64/boot/dts/marvell/armada-37xx.dtsi                              |  73 +++++-
+ drivers/pinctrl/Makefile                                                  |   2 +-
+ drivers/pinctrl/mvebu/Kconfig                                             |   7 +-
+ drivers/pinctrl/mvebu/Makefile                                            |   3 +-
+ drivers/pinctrl/mvebu/pinctrl-armada-37xx.c                               | 910 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-
+ 9 files changed, 1187 insertions(+), 8 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/marvell,armada-37xx-pinctrl.txt
+ create mode 100644 drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
+
+base-commit: c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201
 -- 
-Jazz is not dead. It just smells funny...
+git-series 0.9.1
