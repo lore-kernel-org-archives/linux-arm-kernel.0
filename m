@@ -1,30 +1,59 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 23 Mar 2017 10:31:54 +0000
-Subject: [PATCH 0/2] meson-sm: Fix issues when reading data from sm
-In-Reply-To: <m24lylnw5q.fsf@baylibre.com>
-References: <20170303151759.8330-1-carlo@caione.org>
- <m24lylnw5q.fsf@baylibre.com>
-Message-ID: <20170323103153.GA9287@leverpostej>
+From: peppe.cavallaro@st.com (Giuseppe CAVALLARO)
+Date: Thu, 23 Mar 2017 11:33:23 +0100
+Subject: stmmac still supporting spear600 ?
+In-Reply-To: <20170321155054.2f4cb921@free-electrons.com>
+References: <20170309093412.33c0277d@free-electrons.com>
+ <373e2760-94c5-4349-33aa-158bc8f4b19e@st.com>
+ <20170309103236.3e16304f@free-electrons.com>
+ <79049eda-5d37-6b70-8945-2d3ab55e56b8@st.com>
+ <20170321155054.2f4cb921@free-electrons.com>
+Message-ID: <63405ec5-099c-b935-2724-6c85012fc9f7@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 22, 2017 at 08:55:29AM -0700, Kevin Hilman wrote:
-> Carlo Caione <carlo@caione.org> writes:
-> 
-> > From: Carlo Caione <carlo@endlessm.com>
-> >
-> > While working on a related driver I noticed a couple of problems in the
-> > meson-sm driver. The problems are unrelated but since the fixes touch the same
-> > codebase I decided to submit these in the same patchset.
-> 
-> Applied to amlogic tree, branch: v4.12/drivers
-> 
-> I'd prefer to have acks from Mark and Srini, but since this has been on
-> the list for awhile, I'm guessing that isn't going to happen, so
-> consider this a request.
+Hello Thomas
 
->From a quick scan, this looks fine to me. FWIW:
+On 3/21/2017 3:50 PM, Thomas Petazzoni wrote:
+> Hello,
+>
+> On Thu, 9 Mar 2017 15:56:31 +0100, Giuseppe CAVALLARO wrote:
+>
+>> On 3/9/2017 10:32 AM, Thomas Petazzoni wrote:
+>>
+>>> OK, I'll have a look. However, I'm still confused by this DMA_RESET bit
+>>> that never clears, contrary to what the datasheet says. Are there some
+>>> erratas?
+>> I suggest you to take a look at the tx/rx clocks from PHY.
+>> You have to provide these otherwise you cannot reset the engine.
+> Thanks for the hint.
 
-Acked-by: Mark Rutland <mark.rutland@arm.com>
+you are welcome
 
-Mark.
+> Further research has revealed that everything is working fine on a
+> platform with a Gigabit PHY connected via GMII.
+>
+> However, on a different platform (which I'm using) with a 10/100 PHY
+> connected via MII, DMA_RESET never clears, and networking doesn't work.
+> The SMSC PHY LAN8700 is also supposed to be providing the clock through
+> its TX_CLK pin. I double checked, and both the MAC and PHY are in MII
+> mode, but still no luck so far.
+>
+> Of course, if you have any suggestion or hint, I'm all ears :)
+
+I can just you to keep the focus on clock configuration. I tested the 
+SMSC PHY LAN8700
+w/o any issues on several platform.  In MII both rx/tx_clk are provided 
+by PHY and if you
+have an external oscillator this should be safe enough, indeed.
+Another check you can do is about the reset time! Maybe you need to 
+change something
+when reset the SMSC transceiver, try to increase the delay (if you use 
+GPIO to reset it).
+
+Regards
+Peppe
+
+>
+> Thanks,
+>
+> Thomas
