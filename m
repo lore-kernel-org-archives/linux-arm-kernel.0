@@ -1,63 +1,77 @@
-From: sr@denx.de (Stefan Roese)
-Date: Thu, 23 Mar 2017 13:34:29 +0100
-Subject: [PATCH] irqchip/armada-370-xp: Correctly align bits in 'msi_used'
- bitmap (multi-MSI)
-Message-ID: <20170323123429.11145-1-sr@denx.de>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 23 Mar 2017 13:34:37 +0100
+Subject: [PATCH 4/4] tty/serial: sh-sci: remove uneeded IS_ERR_OR_NULL
+ calls
+In-Reply-To: <CAMuHMdUWybAZXc2RbGMGyp4DYQZU9BS8MxXKE5Kfd+aH8+w9sA@mail.gmail.com>
+References: <CAMuHMdWv-xs12UqutEtXJGR8qqgx6DeDhkKvvYhhyW+XTVsUNQ@mail.gmail.com>
+ <CAMuHMdXGn35bEsJKnUi5o3AytL4AJN2fBfoB79v5W-jOVFQx6g@mail.gmail.com>
+ <20170320103113.tpveoq2onzrwmkdt@pengutronix.de>
+ <CAMuHMdWbwA+3UGVnHYJOs26vTj13Yn+s4B8tE9kyy25JcjyZGg@mail.gmail.com>
+ <20170320110718.e44s2gip36m75bqj@pengutronix.de>
+ <CACRpkdZy_uguiKfSH-0gdanjr-xkwxoANTx6Fb2VwsvzRwcPRA@mail.gmail.com>
+ <20170323101045.u3uigdu5xfwjmjc7@pengutronix.de>
+ <CAMuHMdWDUzwUqrchbhh-TkE3J9Xg4TrwTF6HreikUcNNTf_ozQ@mail.gmail.com>
+ <20170323111106.7ogh6g2oa3m4cqc6@pengutronix.de>
+ <CAMuHMdUWybAZXc2RbGMGyp4DYQZU9BS8MxXKE5Kfd+aH8+w9sA@mail.gmail.com>
+Message-ID: <20170323123437.uqdwhfmmsjke3f7s@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Testing on an Armada XP platform has shown, that requesting 4 MSI vectors
-may lead to a MSI message data value of 0x0f15 on a PCIe device
-supporting 4 MSI vectors. This MSI message data register needs to be
-aligned to power-of-2 of the supported vector count [1]. The result from
-this setup was, that 0x0f14 has been written into this data register
-and therefore not all interrupt vectors were available, or even worse,
-an incorrect (off by one) IRQ was trigger by the PCIe device.
+On Thu, Mar 23, 2017 at 01:03:56PM +0100, Geert Uytterhoeven wrote:
+> Hi Uwe,
+> 
+> On Thu, Mar 23, 2017 at 12:11 PM, Uwe Kleine-K?nig
+> <u.kleine-koenig@pengutronix.de> wrote:
+> >> Make sure to enable all drivers and subsystems you need when building
+> >> your kernel. That's always true. And may indeed be hard to debug (e.g. what
+> >> kernel options do I need to make systemd work?).
+> >
+> > It's worse here. If you forget to enable a driver the device isn't bound
+> > and that's obvious to diagnose. When ignoring an optional GPIO there
+> > might be a device that claims to work but fails to do so. (e.g. you
+> > write to memory, write() returns 0, but the data never landed there.)
+> >
+> >> > write(2) and close(2) succeed most of the time, too. Still it's not a
+> >> > good idea to not check the return value. Or let the kernel return
+> >> > success unconditionally.
+> >>
+> >> Writing all bytes passed in the buffer is "optional" in another sense than
+> >> an "optional" GPIO: you must retry the write, while you can continue if
+> >> an optional GPIO is not present.
+> >
+> > And that is the point. You can continue *iff* the optional GPIO is not
+> > present. The patch in question removes the ability to determine if that
+> > GPIO is present and claims it is not present.
+> 
+> If you forget to enable a driver/subsystem, you sometimes cannot determine
+> if the device is present or not neither.
+> 
+> Hence it boils down to "knowing" if there is a GPIO or not.
+> So, when can there be a GPIO?
+>   1. The GPIO is described in DT.
+>      => Not an issue, as DT GPIO implies GPIOLIB,
+>   2. The GPIO is described in legacy platform data.
+>      => The platform code should make sure GPIOLIB is selected when needed.
+> 
+> Issue solved?
 
-This patch now fixes this issue by making sure, that the bits are
-correctly aligned in the 'msi_used' bitmap. Resulting in the example
-from above in a MSI message data value of 0x0f18.
+I like it better to not rely on platform code to do the right thing.
 
-[1] PCI Local Bus Spec: 6.8.1.6
+Maybe we can make gpiod_get_optional look like this:
 
-Signed-off-by: Stefan Roese <sr@denx.de>
-Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Thomas Gleixner <tglx@linutronix.de>
----
- drivers/irqchip/irq-armada-370-xp.c | 15 ++++++++++++++-
- 1 file changed, 14 insertions(+), 1 deletion(-)
+	if (!dev->of_node && isnt_a_acpi_device(dev) && !IS_ENABLED(GPIOLIB))
+		return NULL;
+	else
+		return -ENOSYS;
 
-diff --git a/drivers/irqchip/irq-armada-370-xp.c b/drivers/irqchip/irq-armada-370-xp.c
-index eb0d4d41b156..793862978f19 100644
---- a/drivers/irqchip/irq-armada-370-xp.c
-+++ b/drivers/irqchip/irq-armada-370-xp.c
-@@ -151,11 +151,24 @@ static int armada_370_xp_msi_alloc(struct irq_domain *domain, unsigned int virq,
- 				   unsigned int nr_irqs, void *args)
- {
- 	int hwirq, i;
-+	int nr_irqs_pow2;
-+
-+	/*
-+	 * Round number of requested irqs up to next power of 2. This is
-+	 * needed since the MSI message data register in the configuration
-+	 * space is only allowed to have the low order bits changed for
-+	 * multi MSI vectors. This result will be used to allocated the
-+	 * bits in the "msi_used" bitmap for the hwirq vectors, this time
-+	 * aligned to "nr_irqs_pow2".
-+	 *
-+	 * Please look at PCI Local Bus Spec: 6.8.1.6 for further details.
-+	 */
-+	nr_irqs_pow2 = 1 << fls(nr_irqs - 1);
- 
- 	mutex_lock(&msi_used_lock);
- 
- 	hwirq = bitmap_find_next_zero_area(msi_used, PCI_MSI_DOORBELL_NR,
--					   0, nr_irqs, 0);
-+					   0, nr_irqs, nr_irqs_pow2 - 1);
- 	if (hwirq >= PCI_MSI_DOORBELL_NR) {
- 		mutex_unlock(&msi_used_lock);
- 		return -ENOSPC;
+I don't know how isnt_a_acpi_device looks like, probably it involves
+CONFIG_ACPI and/or dev->acpi_node.
+
+This should be safe and still comfortable for legacy platforms, isn't it?
+
+Best regards
+Uwe
+
 -- 
-2.12.1
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
