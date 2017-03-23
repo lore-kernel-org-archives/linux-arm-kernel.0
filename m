@@ -1,33 +1,44 @@
 From: aisheng.dong@nxp.com (Dong Aisheng)
-Date: Thu, 23 Mar 2017 12:53:22 +0800
-Subject: [PATCH v2 5/8] soc: imx: gpc: fix comment when power up domain
+Date: Thu, 23 Mar 2017 12:53:24 +0800
+Subject: [PATCH v2 7/8] dt-bindings: imx-gpc: correct the DOMAIN_INDEX using
 In-Reply-To: <1490244805-3921-1-git-send-email-aisheng.dong@nxp.com>
 References: <1490244805-3921-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1490244805-3921-6-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <1490244805-3921-8-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The correct comment should be power up domain.
+Actually DOMAIN_INDEX is not used by the client devices to refer to
+the power domain, it uses phandle. Corrent the binding doc a bit
+to avoid confusing.
 
 Cc: Shawn Guo <shawnguo@kernel.org>
 Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
 Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 ---
- drivers/soc/imx/gpc.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ Documentation/devicetree/bindings/power/fsl,imx-gpc.txt | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/soc/imx/gpc.c b/drivers/soc/imx/gpc.c
-index 9a2354e..afb02f9 100644
---- a/drivers/soc/imx/gpc.c
-+++ b/drivers/soc/imx/gpc.c
-@@ -104,7 +104,7 @@ static int imx6_pm_domain_power_on(struct generic_pm_domain *genpd)
- 	regmap_update_bits(pd->regmap, pd->reg_offs + GPC_PGC_PDN_OFFS,
- 			   0x1, 0x1);
+diff --git a/Documentation/devicetree/bindings/power/fsl,imx-gpc.txt b/Documentation/devicetree/bindings/power/fsl,imx-gpc.txt
+index 06040a4..58d323c 100644
+--- a/Documentation/devicetree/bindings/power/fsl,imx-gpc.txt
++++ b/Documentation/devicetree/bindings/power/fsl,imx-gpc.txt
+@@ -20,8 +20,7 @@ subnodes of the power gating controller 'pgc' node of the GPC and should
+ contain the following:
  
--	/* Read ISO and ISO2SW power down delays */
-+	/* Read ISO and ISO2SW power up delays */
- 	regmap_read(pd->regmap, pd->reg_offs + GPC_PGC_PUPSCR_OFFS, &val);
- 	sw = val & 0x3f;
- 	sw2iso = (val >> 8) & 0x3f;
+ Required properties:
+-- reg: the DOMAIN_INDEX as used by the client devices to refer to this
+-  power domain
++- reg: Must contain the DOMAIN_INDEX of this power domain
+   The following DOMAIN_INDEX values are valid for i.MX6Q:
+   ARM_DOMAIN     0
+   PU_DOMAIN      1
+@@ -54,6 +53,7 @@ Example:
+ 				reg = <0>;
+ 				#power-domain-cells = <0>;
+ 			};
++
+ 			pd_pu: power-domain at 1 {
+ 				reg = <1>;
+ 				#power-domain-cells = <0>;
 -- 
 2.7.4
