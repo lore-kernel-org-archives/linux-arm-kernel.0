@@ -1,57 +1,62 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 23 Mar 2017 15:41:11 +0100
-Subject: [PATCH 4/6] pinctrl: aramda-37xx: Add irqchip support
-In-Reply-To: <CACRpkdaVDQMoPXmT++vJ4v9mUejYSy28Ybwb0v2519OeCSPvXg@mail.gmail.com>
- (Linus Walleij's message of "Thu, 23 Mar 2017 11:36:52 +0100")
-References: <20161222172501.16121-1-gregory.clement@free-electrons.com>
- <20161222172501.16121-5-gregory.clement@free-electrons.com>
- <CACRpkdbR-WRT0rJp2CuN6CkZF=J35JUgGHjW7beyaimipz0ehw@mail.gmail.com>
- <87zigdeczh.fsf@free-electrons.com>
- <CACRpkdaVDQMoPXmT++vJ4v9mUejYSy28Ybwb0v2519OeCSPvXg@mail.gmail.com>
-Message-ID: <87inn0dpiw.fsf@free-electrons.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Thu, 23 Mar 2017 07:43:25 -0700
+Subject: [PATCH 4/4] tty/serial: sh-sci: remove uneeded IS_ERR_OR_NULL
+ calls
+In-Reply-To: <CACRpkdZRfLh9RXRycW_cAxuTYE6tPd7LR32EkAW8y2fh=AxhXA@mail.gmail.com>
+References: <20170320103113.tpveoq2onzrwmkdt@pengutronix.de>
+ <CAMuHMdWbwA+3UGVnHYJOs26vTj13Yn+s4B8tE9kyy25JcjyZGg@mail.gmail.com>
+ <20170320110718.e44s2gip36m75bqj@pengutronix.de>
+ <CACRpkdZy_uguiKfSH-0gdanjr-xkwxoANTx6Fb2VwsvzRwcPRA@mail.gmail.com>
+ <20170323101045.u3uigdu5xfwjmjc7@pengutronix.de>
+ <CAMuHMdWDUzwUqrchbhh-TkE3J9Xg4TrwTF6HreikUcNNTf_ozQ@mail.gmail.com>
+ <20170323111106.7ogh6g2oa3m4cqc6@pengutronix.de>
+ <CAMuHMdUWybAZXc2RbGMGyp4DYQZU9BS8MxXKE5Kfd+aH8+w9sA@mail.gmail.com>
+ <20170323123437.uqdwhfmmsjke3f7s@pengutronix.de>
+ <CACRpkdZRfLh9RXRycW_cAxuTYE6tPd7LR32EkAW8y2fh=AxhXA@mail.gmail.com>
+Message-ID: <20170323144325.GA952@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
- 
- On jeu., mars 23 2017, Linus Walleij <linus.walleij@linaro.org> wrote:
+On Thu, Mar 23, 2017 at 02:41:53PM +0100, Linus Walleij wrote:
+> On Thu, Mar 23, 2017 at 1:34 PM, Uwe Kleine-K?nig
+> <u.kleine-koenig@pengutronix.de> wrote:
+> 
+> > Maybe we can make gpiod_get_optional look like this:
+> >
+> >         if (!dev->of_node && isnt_a_acpi_device(dev) && !IS_ENABLED(GPIOLIB))
+> >                 return NULL;
+> >         else
+> >                 return -ENOSYS;
+> >
+> > I don't know how isnt_a_acpi_device looks like, probably it involves
+> > CONFIG_ACPI and/or dev->acpi_node.
+> >
+> > This should be safe and still comfortable for legacy platforms, isn't it?
+> 
+> I like the looks of this.
+> 
+> Can we revert Dmitry's patch and apply something like this instead?
+> 
+> Dmitry, how do you feel about this?
 
->> I switched to the use of GPIOLIB_IRQCHIP however it didn't really simplify
->> my code, during the development on the v2 I did a commit only for this
->> change and here it is the diffstat:
->> 110     72      drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
->>
->> In my first version I used the generic irqchip so I was able to benefit
->> of this framework, by switching to GPIOLIB_IRQCHIP I had to implement
->> again some of the functions such as .mask, .unmask an ack.
->
-> I still think this is better, so thanks.
+I frankly do not see the point. It still makes driver code more complex
+for no good reason. I also think that not having optional GPIO is not an
+error, so returning value from error space is not correct. NULL is value
+from another space altogether.
 
-Yes, I understand that from the point of view of the gpio subsystem it
-is better to share as code as possible between the driver.
+Uwe seems to be concerned about case that I find extremely unlikely. We
+are talking about a system that does not have GPIO support and behaves
+just fine, with the exception that it actually has (physically) a
+*single* GPIO, and that GPIO happens to be optional in a single driver,
+but in this particular system is actually needed (but that need
+manifests in a non-obvious way). And we have system integrator that has
+no idea what they are doing (no schematic, etc).
 
->
-> If you have ideas of how we could combine generic irqchip with
-> GPIOLIB_IRQCHIP in an efficient manner, I'd be happy to hear
-> about it? I want gpiolib core to be involved setting things like
-> the .irq_request/release_resources() for example, so if you
-> would proceed with this solution, I would have had you add those
-> duplicating the gpiolib helpers instead.
+I think that if there is one optional GPIO there will be mandatiry GPIOs
+in such system as well and selection of GPIOLIB will be forced early on
+in board bringup.
 
-Indeed it could be interesting to be able to combine both, however it
-does not seem an easy task: at first sight both subsystem would need to
-be modified. It is obviously beyond the scope of this driver, but I will
-try to have a look on it to see what I could propose in a separate
-series.
-
-Gregory
-
->
-> Yours,
-> Linus Walleij
+Thanks.
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Dmitry
