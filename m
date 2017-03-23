@@ -1,88 +1,69 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 23 Mar 2017 10:52:11 +0000
-Subject: [PATCH 23/35] drivers/mfd: Convert remaining uses of pr_warning
- to pr_warn
-In-Reply-To: <a6c827c14d0b9f4be42e549ec4c629245516e979.1487314667.git.joe@perches.com>
-References: <cover.1487314666.git.joe@perches.com>
- <a6c827c14d0b9f4be42e549ec4c629245516e979.1487314667.git.joe@perches.com>
-Message-ID: <20170323105211.kf7slyiv4rdqhqfw@dell>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 23 Mar 2017 12:11:06 +0100
+Subject: [PATCH 4/4] tty/serial: sh-sci: remove uneeded IS_ERR_OR_NULL
+ calls
+In-Reply-To: <CAMuHMdWDUzwUqrchbhh-TkE3J9Xg4TrwTF6HreikUcNNTf_ozQ@mail.gmail.com>
+References: <20170306100220.droey65uq2ew3mzu@pengutronix.de>
+ <CACRpkdYeFyr4yjQjDAUpPJwuD_NW2y=wXnzt1xSNoOX0SFCLmw@mail.gmail.com>
+ <CAMuHMdWv-xs12UqutEtXJGR8qqgx6DeDhkKvvYhhyW+XTVsUNQ@mail.gmail.com>
+ <CAMuHMdXGn35bEsJKnUi5o3AytL4AJN2fBfoB79v5W-jOVFQx6g@mail.gmail.com>
+ <20170320103113.tpveoq2onzrwmkdt@pengutronix.de>
+ <CAMuHMdWbwA+3UGVnHYJOs26vTj13Yn+s4B8tE9kyy25JcjyZGg@mail.gmail.com>
+ <20170320110718.e44s2gip36m75bqj@pengutronix.de>
+ <CACRpkdZy_uguiKfSH-0gdanjr-xkwxoANTx6Fb2VwsvzRwcPRA@mail.gmail.com>
+ <20170323101045.u3uigdu5xfwjmjc7@pengutronix.de>
+ <CAMuHMdWDUzwUqrchbhh-TkE3J9Xg4TrwTF6HreikUcNNTf_ozQ@mail.gmail.com>
+Message-ID: <20170323111106.7ogh6g2oa3m4cqc6@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> To enable eventual removal of pr_warning
-> 
-> This makes pr_warn use consistent for drivers/mfd
-> 
-> Prior to this patch, there were 4 uses of pr_warning and
-> 9 uses of pr_warn in drivers/mfd
-> 
-> Signed-off-by: Joe Perches <joe@perches.com>
-> ---
->  drivers/mfd/db8500-prcmu.c  | 2 +-
->  drivers/mfd/sta2x11-mfd.c   | 4 ++--
->  drivers/mfd/twl4030-power.c | 7 ++-----
->  3 files changed, 5 insertions(+), 8 deletions(-)
+Hello,
 
-Applied.
+On Thu, Mar 23, 2017 at 11:20:39AM +0100, Geert Uytterhoeven wrote:
+> But having the error breaks setups where the GPIO is optional and does
+> not exist.
 
-(... and I corrected the $SUBJECT line on your behalf)
+so the right way forward is to check harder in the situation where
+-ENOSYS was returned before to determine if there is really no GPIO to
+be used. "Oh, there are hints that there is no GPIO (GPIOLIB=n), so lets
+assume there isn't." is wrong.
 
-> diff --git a/drivers/mfd/db8500-prcmu.c b/drivers/mfd/db8500-prcmu.c
-> index ca38a6a14110..5c739ac752e8 100644
-> --- a/drivers/mfd/db8500-prcmu.c
-> +++ b/drivers/mfd/db8500-prcmu.c
-> @@ -2377,7 +2377,7 @@ static void ack_dbb_wakeup(void)
->  
->  static inline void print_unknown_header_warning(u8 n, u8 header)
->  {
-> -	pr_warning("prcmu: Unknown message header (%d) in mailbox %d.\n",
-> +	pr_warn("prcmu: Unknown message header (%d) in mailbox %d\n",
->  		header, n);
->  }
->  
-> diff --git a/drivers/mfd/sta2x11-mfd.c b/drivers/mfd/sta2x11-mfd.c
-> index 9292202039ee..3aeafa228baf 100644
-> --- a/drivers/mfd/sta2x11-mfd.c
-> +++ b/drivers/mfd/sta2x11-mfd.c
-> @@ -60,8 +60,8 @@ static struct sta2x11_mfd *sta2x11_mfd_find(struct pci_dev *pdev)
->  	struct sta2x11_mfd *mfd;
->  
->  	if (!pdev && !list_empty(&sta2x11_mfd_list)) {
-> -		pr_warning("%s: Unspecified device, "
-> -			    "using first instance\n", __func__);
-> +		pr_warn("%s: Unspecified device, using first instance\n",
-> +			__func__);
->  		return list_entry(sta2x11_mfd_list.next,
->  				  struct sta2x11_mfd, list);
->  	}
-> diff --git a/drivers/mfd/twl4030-power.c b/drivers/mfd/twl4030-power.c
-> index 1beb722f6080..8be023ba8e3e 100644
-> --- a/drivers/mfd/twl4030-power.c
-> +++ b/drivers/mfd/twl4030-power.c
-> @@ -502,9 +502,7 @@ static int load_twl4030_script(const struct twl4030_power_data *pdata,
->  	}
->  	if (tscript->flags & TWL4030_SLEEP_SCRIPT) {
->  		if (!order)
-> -			pr_warning("TWL4030: Bad order of scripts (sleep "\
-> -					"script before wakeup) Leads to boot"\
-> -					"failure on some boards\n");
-> +			pr_warn("TWL4030: Bad order of scripts (sleep script before wakeup) Leads to boot failure on some boards\n");
->  		err = twl4030_config_sleep_sequence(address);
->  	}
->  out:
-> @@ -929,8 +927,7 @@ static int twl4030_power_probe(struct platform_device *pdev)
->  		err = twl_i2c_read_u8(TWL_MODULE_PM_MASTER, &val,
->  				      TWL4030_PM_MASTER_CFG_P123_TRANSITION);
->  		if (err) {
-> -			pr_warning("TWL4030 Unable to read registers\n");
-> -
-> +			pr_warn("TWL4030 Unable to read registers\n");
->  		} else if (!(val & SEQ_OFFSYNC)) {
->  			val |= SEQ_OFFSYNC;
->  			err = twl_i2c_write_u8(TWL_MODULE_PM_MASTER, val,
+Can we please properly fix the problem instead of papering over it?
+
+> Make sure to enable all drivers and subsystems you need when building
+> your kernel. That's always true. And may indeed be hard to debug (e.g. what
+> kernel options do I need to make systemd work?).
+
+It's worse here. If you forget to enable a driver the device isn't bound
+and that's obvious to diagnose. When ignoring an optional GPIO there
+might be a device that claims to work but fails to do so. (e.g. you
+write to memory, write() returns 0, but the data never landed there.)
+
+> > write(2) and close(2) succeed most of the time, too. Still it's not a
+> > good idea to not check the return value. Or let the kernel return
+> > success unconditionally.
+> 
+> Writing all bytes passed in the buffer is "optional" in another sense than
+> an "optional" GPIO: you must retry the write, while you can continue if
+> an optional GPIO is not present.
+
+And that is the point. You can continue *iff* the optional GPIO is not
+present. The patch in question removes the ability to determine if that
+GPIO is present and claims it is not present.
+
+> > So you exchanged many obvious and easy to fix problems with a few hard
+> > ones. I don't agree that's a good idea, but you seem to be willing to
+> > try it. Good luck.
+> 
+> Yeah, before drivers had to explicitly ignore -ENOSYS if they want to
+> support platforms with and without GPIOLIB. Bad...
+
+Doing things right is sometimes not maximally easy. But that is no
+excuse to do it wrong.
+
+Best regards
+Uwe
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
