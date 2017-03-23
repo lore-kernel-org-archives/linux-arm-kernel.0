@@ -1,53 +1,30 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 23 Mar 2017 11:28:55 +0100
-Subject: [PATCH 3/6] pinctrl: armada-37xx: Add gpio support
-In-Reply-To: <874lylfrw5.fsf@free-electrons.com>
-References: <20161222172501.16121-1-gregory.clement@free-electrons.com>
- <20161222172501.16121-4-gregory.clement@free-electrons.com>
- <CACRpkdY_68=5oBN3TLs_ohc0gc2=yiG3qizg7MGh4F7Z+-ZzSg@mail.gmail.com>
- <874lylfrw5.fsf@free-electrons.com>
-Message-ID: <CACRpkdZm9rBN==TrLFw=dMvwnu5URis4eQAG5j8OiSm=1c3EZQ@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 23 Mar 2017 10:31:54 +0000
+Subject: [PATCH 0/2] meson-sm: Fix issues when reading data from sm
+In-Reply-To: <m24lylnw5q.fsf@baylibre.com>
+References: <20170303151759.8330-1-carlo@caione.org>
+ <m24lylnw5q.fsf@baylibre.com>
+Message-ID: <20170323103153.GA9287@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 22, 2017 at 12:54 PM, Gregory CLEMENT
-<gregory.clement@free-electrons.com> wrote:
->  On ven., d?c. 30 2016, Linus Walleij <linus.walleij@linaro.org> wrote:
+On Wed, Mar 22, 2017 at 08:55:29AM -0700, Kevin Hilman wrote:
+> Carlo Caione <carlo@caione.org> writes:
+> 
+> > From: Carlo Caione <carlo@endlessm.com>
+> >
+> > While working on a related driver I noticed a couple of problems in the
+> > meson-sm driver. The problems are unrelated but since the fixes touch the same
+> > codebase I decided to submit these in the same patchset.
+> 
+> Applied to amlogic tree, branch: v4.12/drivers
+> 
+> I'd prefer to have acks from Mark and Srini, but since this has been on
+> the list for awhile, I'm guessing that isn't going to happen, so
+> consider this a request.
 
->>> +       mask = BIT(offset);
->>> +
->>> +       regmap_read(info->regmap, reg, &val);
->>>
->>> +       return (val & mask) == 0;
->>
->> Use this:
->>
->> return !(val & mask);
->
-> done but I could tou explain the advantage of doing it?
+>From a quick scan, this looks fine to me. FWIW:
 
-The other controllers do it so makes the code easier to
-perceptualize.
+Acked-by: Mark Rutland <mark.rutland@arm.com>
 
->>> +       ret = gpiochip_add_pin_range(&info->gpio_chip, dev_name(dev), 0,
->>> +                                    pinbase, info->data->nr_pins);
->>> +       if (ret)
->>> +               return ret;
->>
->> Why do you do this?
->>
->> Why not just put the ranges into the device tree? We already support
->> this in the gpiolib core and it is helpful.
->>
->> See Documentation/devicetree/bindings/gpio/gpio.txt
->> and other DTS files for gpio-ranges.
->
-> Following your review, I tried to use it but it didn't work for
-> me. When the second pin controller was probed then there was collision
-> for the gpio number. I tried several combination without any luck.
-
-That sounds like a bug. Are you using dynamic GPIO number
-assignments?
-
-Yours,
-Linus Walleij
+Mark.
