@@ -1,58 +1,58 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 23 Mar 2017 11:36:52 +0100
-Subject: [PATCH 4/6] pinctrl: aramda-37xx: Add irqchip support
-In-Reply-To: <87zigdeczh.fsf@free-electrons.com>
-References: <20161222172501.16121-1-gregory.clement@free-electrons.com>
- <20161222172501.16121-5-gregory.clement@free-electrons.com>
- <CACRpkdbR-WRT0rJp2CuN6CkZF=J35JUgGHjW7beyaimipz0ehw@mail.gmail.com>
- <87zigdeczh.fsf@free-electrons.com>
-Message-ID: <CACRpkdaVDQMoPXmT++vJ4v9mUejYSy28Ybwb0v2519OeCSPvXg@mail.gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 23 Mar 2017 13:37:44 +0300
+Subject: [PATCH v3 1/5] ata: add Palmchip BK3710 PATA controller driver
+In-Reply-To: <1490206862-26065-2-git-send-email-b.zolnierkie@samsung.com>
+References: <1490206862-26065-1-git-send-email-b.zolnierkie@samsung.com>
+ <CGME20170322182131epcas1p26b2402ec94ca08d2a6a332579a65e269@epcas1p2.samsung.com>
+ <1490206862-26065-2-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <103c435e-206c-aaaa-59ba-1eb2a4f77780@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 22, 2017 at 1:02 PM, Gregory CLEMENT
-<gregory.clement@free-electrons.com> wrote:
->  On ven., d?c. 30 2016, Linus Walleij <linus.walleij@linaro.org> wrote:
->
->> On Thu, Dec 22, 2016 at 6:24 PM, Gregory CLEMENT
->> <gregory.clement@free-electrons.com> wrote:
->>
->>> The Armada 37xx SoCs can handle interrupt through GPIO. However it can
->>> only manage the edge ones.
->>>
->>> The way the interrupt are managed are classical so we can use the generic
->>> interrupt chip model.
->>>
->>> The only unusual "feature" is that many interrupts are connected to the
->>> parent interrupt controller. But we do not take advantage of this and use
->>> the chained irq with all of them.
->>>
->>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
->>
->> So this is very simple and should use GPIOLIB_IRQCHIP.
->>
->> Begin with select GPIOLIB_IRQCHIP in your Kconfig and then look
->> at conversions such as commit 85ae9e512f437cd09bf61564bdba29ab88bab3e3
->> ("pinctrl: bcm2835: switch to GPIOLIB_IRQCHIP")
->> for inspiration.
->
-> I switched to the use of GPIOLIB_IRQCHIP however it didn't really simplify
-> my code, during the development on the v2 I did a commit only for this
-> change and here it is the diffstat:
-> 110     72      drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
->
-> In my first version I used the generic irqchip so I was able to benefit
-> of this framework, by switching to GPIOLIB_IRQCHIP I had to implement
-> again some of the functions such as .mask, .unmask an ack.
+Hello!
 
-I still think this is better, so thanks.
+On 3/22/2017 9:20 PM, Bartlomiej Zolnierkiewicz wrote:
 
-If you have ideas of how we could combine generic irqchip with
-GPIOLIB_IRQCHIP in an efficient manner, I'd be happy to hear
-about it? I want gpiolib core to be involved setting things like
-the .irq_request/release_resources() for example, so if you
-would proceed with this solution, I would have had you add those
-duplicating the gpiolib helpers instead.
+> Add Palmchip BK3710 PATA controller driver.
+>
+> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+[...]
+> diff --git a/drivers/ata/pata_bk3710.c b/drivers/ata/pata_bk3710.c
+> new file mode 100644
+> index 0000000..1a1223f
+> --- /dev/null
+> +++ b/drivers/ata/pata_bk3710.c
+> @@ -0,0 +1,382 @@
+[...]
+> +static int __init pata_bk3710_probe(struct platform_device *pdev)
+> +{
+> +	struct clk *clk;
+> +	struct resource *mem;
+> +	struct ata_host *host;
+> +	struct ata_port *ap;
+> +	void __iomem *base;
+> +	unsigned long rate;
+> +	int irq;
+> +
+> +	clk = devm_clk_get(&pdev->dev, NULL);
+> +	if (IS_ERR(clk))
+> +		return -ENODEV;
+> +
+> +	clk_enable(clk);
+> +	rate = clk_get_rate(clk);
+> +	if (!rate)
+> +		return -EINVAL;
+> +
+> +	/* NOTE:  round *down* to meet minimum timings; we count in clocks */
+> +	ideclk_period = 1000000000UL / rate;
+> +
+> +	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 
-Yours,
-Linus Walleij
+    I'd put this close to devm_iorempe_resource() and would probably even get 
+rid of 'mem' altogether...
+
+[...]
+
+Acked-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+
+MBR, Sergei
