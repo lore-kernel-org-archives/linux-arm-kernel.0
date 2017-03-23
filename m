@@ -1,33 +1,109 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Thu, 23 Mar 2017 21:15:01 +0200
-Subject: [PATCH v4 2/6] pinctrl: samsung: Add support for pad retention
- control for Exynos5433 SoCs
-In-Reply-To: <1490256207-10061-3-git-send-email-m.szyprowski@samsung.com>
-References: <1490256207-10061-1-git-send-email-m.szyprowski@samsung.com>
- <CGME20170323080348eucas1p188a598869b71a1302160df46839b3ca8@eucas1p1.samsung.com>
- <1490256207-10061-3-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <20170323191501.3xufnbb5nqhm4szm@kozik-lap>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 23 Mar 2017 20:19:53 +0100
+Subject: [PATCH V8 1/3] irq: Add flags to request_percpu_irq function
+In-Reply-To: <20170323185449.GA21359@leverpostej>
+References: <1490290924-12958-1-git-send-email-daniel.lezcano@linaro.org>
+ <20170323185449.GA21359@leverpostej>
+Message-ID: <20170323191953.GC24630@mai>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 23, 2017 at 09:03:23AM +0100, Marek Szyprowski wrote:
-> This patch adds support for retention control for Exynos5433 SoCs. Three
-> groups of pins has been defined for retention control: common shared group
-> for ALIVE, CPIF, eSE, FINGER, IMEM, NFC, PERIC, TOUCH pin banks and
-> separate control for FSYS and AUD pin banks, for which PMU retention
-> registers match whole banks.
+Hi Mark,
+
+On Thu, Mar 23, 2017 at 06:54:52PM +0000, Mark Rutland wrote:
+> Hi Daniel,
 > 
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
-> ---
->  drivers/pinctrl/samsung/pinctrl-exynos.c | 58 ++++++++++++++++++++++++++++++++
->  1 file changed, 58 insertions(+)
+> On Thu, Mar 23, 2017 at 06:42:01PM +0100, Daniel Lezcano wrote:
+> > In the next changes, we track the interrupts but we discard the timers as
+> > that does not make sense. The next interrupt on a timer is predictable.
+> 
+> Sorry, but I could not parse this. 
+
+I meant we are measuring when are happening the interrupts by getting the local
+clock in the interrupt handler. But if the interrupts are coming from a timer, it
+is not necessary to do that because we already know when they will occur.
+
+So, in order to sort out which interrupt we measure, we use the IRQF_TIMER flag.
+
+Unfortunately, this flag is missing when we do a request_percpu_irq. The
+purpose of this patch is to fix that.
+
+> > diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
+> > index 9612b84..0f5ab4a 100644
+> > --- a/drivers/perf/arm_pmu.c
+> > +++ b/drivers/perf/arm_pmu.c
+> > @@ -661,7 +661,7 @@ static int cpu_pmu_request_irq(struct arm_pmu *cpu_pmu, irq_handler_t handler)
+> >  
+> >  	irq = platform_get_irq(pmu_device, 0);
+> >  	if (irq > 0 && irq_is_percpu(irq)) {
+> > -		err = request_percpu_irq(irq, handler, "arm-pmu",
+> > +		err = request_percpu_irq(irq, 0, handler, "arm-pmu",
+> >  					 &hw_events->percpu_pmu);
+> >  		if (err) {
+> >  			pr_err("unable to request IRQ%d for ARM PMU counters\n",
+> 
+> Please Cc myself and Will Deacon when modifying the arm_pmu driver, as
+> per MAINTAINERS. I only spotted this patch by chance.
+
+Ah, ok, sorry for that. Thanks for spotting this, you should have been Cc'ed by
+my cccmd script. I will check that.
+
+> This conflicts with arm_pmu changes I have queued for v4.12 [1].
+> 
+> So, can we leave the prototype of request_percpu_irq() as-is?
+> 
+> Why not add a new request_percpu_irq_flags() function, and leave
+> request_percpu_irq() as a wrapper for that? e.g.
+
+[ ... ]
+
+> static inline int
+> request_percpu_irq(unsigned int irq, irq_handler_t handler,
+> 		   const char *devname, void __percpu *percpu_dev_id)
+> {
+> 	return request_percpu_irq_flags(irq, handler, devname,
+> 					percpu_dev_id, 0);
+> }
+> 
+> ... that would avoid having to touch any non-timer driver for now.
+
+Mmh, yes. That's a good suggestion.
+
+> [...]
+> 
+> > -request_percpu_irq(unsigned int irq, irq_handler_t handler,
+> > -		   const char *devname, void __percpu *percpu_dev_id);
+> > +request_percpu_irq(unsigned int irq, unsigned long flags,
+> > +		   irq_handler_t handler,  const char *devname,
+> > +		   void __percpu *percpu_dev_id);
+> >  
+> 
+> Looking at request_irq, the prototype is:
+> 
+> int __must_check
+> request_irq(unsigned int irq, irq_handler_t handler,
+> 	    unsigned long flags, const char *name,
+> 	    void *dev);
+> 
+> ... surely it would be better to share the same argument order? i.e.
+> 
+> int __must_check
+> request_percpu_irq(unsigned int irq, irq_handler_t handler,
+> 		   unsigned long flags, const char *devname,
+> 		   void __percpu *percpu_dev_id);
 > 
 
-Thanks, applied.
+Agree.
 
-Let it settle for one day so auto-builders will catch up and then I will
-provide a stable tag for Lee (MFD).
+Thanks for the review.
 
-Best regards,
-Krzysztof
+  -- Daniel
+
+
+-- 
+
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
