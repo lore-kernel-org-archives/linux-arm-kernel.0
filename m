@@ -1,32 +1,33 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Thu, 23 Mar 2017 16:32:04 +0100
-Subject: [PATCH v4 1/4] syscalls: Restore address limit after a syscall
-In-Reply-To: <CAJcbSZEqeKVKbtUABzuhavxoH9KWCaVUBG3j5owAwyRhiw8Z7g@mail.gmail.com>
-References: <20170322203834.67556-1-thgarnie@google.com>
- <CALCETrV6K8iSfAwojMFyLrbb3CG2aF4k5hPWc7EDV4ErPDq64w@mail.gmail.com>
- <CAJcbSZGLAXmE_mFZMAZgioWExzm3A4vXBKLGJ7DZNAbJOcH8Zw@mail.gmail.com>
- <f0cf8766-4ee9-5386-5454-2301f429464c@zytor.com>
- <CAJcbSZEqeKVKbtUABzuhavxoH9KWCaVUBG3j5owAwyRhiw8Z7g@mail.gmail.com>
-Message-ID: <20170323153204.4lxglq6jlvvxp6ev@pd.tnic>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Thu, 23 Mar 2017 11:32:29 -0400
+Subject: [PATCH] ACPI / IPMI: change warning to debug on timeout
+Message-ID: <1490283150-24000-1-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 23, 2017 at 08:14:44AM -0700, Thomas Garnier wrote:
-> Okay well then people are fine with a BUG_ON approach. I will do a
-> next iteration tailored to that. I will also try to add the static
-> inline suggestion from Peter.
+Getting timeout message from BMC when trying to read from a non-existent
+FRU. This is expected but warning is not.
 
-Would it be possible, please, to refrain from top-posting when replying
-on the ML?
+Let's reduce the warning to debug.
 
-You sometimes reply inline and after the text and sometimes at the top.
-This subthread has both variants and it is really annoying to people
-like me who try to follow the discussion.
+Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+---
+ drivers/acpi/acpi_ipmi.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-Thanks.
-
+diff --git a/drivers/acpi/acpi_ipmi.c b/drivers/acpi/acpi_ipmi.c
+index 747c2ba..1b64419 100644
+--- a/drivers/acpi/acpi_ipmi.c
++++ b/drivers/acpi/acpi_ipmi.c
+@@ -429,8 +429,7 @@ static void ipmi_msg_handler(struct ipmi_recv_msg *msg, void *user_msg_data)
+ 	if (msg->recv_type == IPMI_RESPONSE_RECV_TYPE &&
+ 	    msg->msg.data_len == 1) {
+ 		if (msg->msg.data[0] == IPMI_TIMEOUT_COMPLETION_CODE) {
+-			dev_WARN_ONCE(dev, true,
+-				      "Unexpected response (timeout).\n");
++			dev_dbg_once(dev, "Unexpected response (timeout).\n");
+ 			tx_msg->msg_done = ACPI_IPMI_TIMEOUT;
+ 		}
+ 		goto out_comp;
 -- 
-Regards/Gruss,
-    Boris.
-
-Good mailing practices for 400: avoid top-posting and trim the reply.
+1.9.1
