@@ -1,38 +1,94 @@
 From: aisheng.dong@nxp.com (Dong Aisheng)
-Date: Thu, 23 Mar 2017 12:53:17 +0800
-Subject: [PATCH v2 0/8] soc: imx: gpc: fixes and clean up
-Message-ID: <1490244805-3921-1-git-send-email-aisheng.dong@nxp.com>
+Date: Thu, 23 Mar 2017 12:53:18 +0800
+Subject: [PATCH v2 1/8] soc: imx: gpc: fix gpc clk get error handling
+In-Reply-To: <1490244805-3921-1-git-send-email-aisheng.dong@nxp.com>
+References: <1490244805-3921-1-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <1490244805-3921-2-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series mostly fixes a few exist issues and clean up.
-1) fix clk error handling to avoid kernel crash
-2) fix wrong use of regmap cache
-3) fix domain_index sanity check
-4) fix mx6sl regression
-5) a few clean up
+We got a following kernel crash once supplying one more IPG
+clock in GPC node in devicetree. The original error handling of
+clocks get is a bit wrong that when reaching the maximum clock
+get error, the index 'i' is already GPC_CLK_MAX which can't be used
+as the array index for clk_put operations.
 
-Patch based on shawn/for-next tree.
+[    3.000110] imx-gpc 20dc000.gpc: more than 6 clocks
+[    3.005141] Unable to handle kernel NULL pointer dereference at virtual address 00000000
+[    3.013487] pgd = c0004000
+[    3.016300] [00000000] *pgd=00000000
+[    3.020060] Internal error: Oops: 805 [#1] SMP ARM
+[    3.024957] Modules linked in:
+[    3.028122] CPU: 0 PID: 1 Comm: swapper/0 Tainted: G        W       4.11.0-rc1-00056-g813791b-dirty #1140
+[    3.037801] Hardware name: Freescale i.MX6 Quad/DualLite (Device Tree)
+[    3.044435] task: ef298000 task.stack: ef294000
+[    3.049080] PC is at __clk_put+0x38/0xec
+[    3.053103] LR is at 0x7f54ce9a
+[    3.056345] pc : [<c0537984>]    lr : [<7f54ce9a>]    psr: 60000013
+[    3.056345] sp : ef295d48  ip : c8a582b2  fp : ef295d64
+[    3.068026] r10: ee9fc400  r9 : 00000000  r8 : ef398c10
+[    3.073354] r7 : ef398c10  r6 : c1071264  r5 : c10710f0  r4 : eea5be80
+[    3.079986] r3 : 00000000  r2 : 00000000  r1 : 00000100  r0 : 00000001
+[    3.086621] Flags: nZCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment none
+[    3.093863] Control: 10c5387d  Table: 1000404a  DAC: 00000051
+[    3.099712] Process swapper/0 (pid: 1, stack limit = 0xef294210)
+[    3.105823] Stack: (0xef295d48 to 0xef296000)
+...
+[    3.292660] Backtrace:
+[    3.295222] [<c053794c>] (__clk_put) from [<c0531028>] (clk_put+0x18/0x1c)
+[    3.302206]  r6:c1071264 r5:c10710f0 r4:c107124c r3:00000001
+[    3.307977] [<c0531010>] (clk_put) from [<c0546ba0>] (imx_pgc_get_clocks+0x64/0x78)
+[    3.315747] [<c0546b3c>] (imx_pgc_get_clocks) from [<c0547124>] (imx_gpc_probe+0x204/0x31c)
+[    3.324209]  r7:00000000 r6:c1070eb0 r5:00000001 r4:ef398c00
+[    3.329980] [<c0546f20>] (imx_gpc_probe) from [<c05e65f0>] (platform_drv_probe+0x5c/0xc0)
+[    3.338270]  r10:c0f00608 r9:00000000 r8:00000000 r7:fffffdfb r6:c1070f20 r5:ef398c10
+[    3.346207]  r4:ef398c10
+[    3.348849] [<c05e6594>] (platform_drv_probe) from [<c05e4250>] (driver_probe_device+0x214/0x2ec)
+[    3.357835]  r7:c1070f20 r6:00000000 r5:c18cea74 r4:ef398c10
+[    3.363607] [<c05e403c>] (driver_probe_device) from [<c05e43ec>] (__driver_attach+0xc4/0xc8)
+[    3.372159]  r9:c0f8b858 r8:c0f8b850 r7:00000000 r6:ef398c44 r5:c1070f20 r4:ef398c10
+[    3.380017] [<c05e4328>] (__driver_attach) from [<c05e21fc>] (bus_for_each_dev+0x7c/0xb0)
+[    3.388304]  r6:c05e4328 r5:c1070f20 r4:00000000 r3:00000000
+[    3.394074] [<c05e2180>] (bus_for_each_dev) from [<c05e3bc4>] (driver_attach+0x28/0x30)
+[    3.402188]  r6:c107f3e8 r5:eea5be00 r4:c1070f20
+[    3.406913] [<c05e3b9c>] (driver_attach) from [<c05e3740>] (bus_add_driver+0x19c/0x224)
+[    3.415034] [<c05e35a4>] (bus_add_driver) from [<c05e52fc>] (driver_register+0x88/0x108)
+[    3.423235]  r7:c10e1000 r6:00000000 r5:c0f57d2c r4:c1070f20
+[    3.429004] [<c05e5274>] (driver_register) from [<c05e6534>] (__platform_driver_register+0x40/0x54)
+[    3.438160]  r5:c0f57d2c r4:00000006
+[    3.441846] [<c05e64f4>] (__platform_driver_register) from [<c0f57d44>] (imx_gpc_driver_init+0x18/0x20)
+[    3.451360] [<c0f57d2c>] (imx_gpc_driver_init) from [<c010200c>] (do_one_initcall+0x4c/0x180)
+[    3.460008] [<c0101fc0>] (do_one_initcall) from [<c0f00e40>] (kernel_init_freeable+0x130/0x1f8)
+[    3.468820]  r9:c0f8b858 r8:c0f8b850 r6:c0fc2414 r5:c10e1000 r4:00000006
+[    3.475637] [<c0f00d10>] (kernel_init_freeable) from [<c0ae6aec>] (kernel_init+0x18/0x124)
+[    3.484014]  r10:00000000 r9:00000000 r8:00000000 r7:00000000 r6:00000000 r5:c0ae6ad4
+[    3.491951]  r4:00000000
+[    3.494590] [<c0ae6ad4>] (kernel_init) from [<c01088d0>] (ret_from_fork+0x14/0x24)
+[    3.502267]  r4:00000000 r3:ef294000
+[    3.505947] Code: e5943014 e5942018 e3530000 e3a01c01 (e5823000)
+[    3.512215] ---[ end trace 375f9f2a5ddeff3c ]---
+[    3.517036] Kernel panic - not syncing: Attempted to kill init! exitcode=0x0000000b
 
-Change Log:
-v1->v2:
- * Only patch 4 changed for adding back the
-   three domains support for MX6SL.
- * Added Lucas' Tags
+Cc: Lucas Stach <l.stach@pengutronix.de>
+Cc: Shawn Guo <shawnguo@kernel.org>
+Fixes: 721cabf6c660 ("soc: imx: move PGC handling to a new GPC driver")
+Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+---
+ drivers/soc/imx/gpc.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Dong Aisheng (8):
-  soc: imx: gpc: fix gpc clk get error handling
-  soc: imx: gpc: fix the wrong using of regmap cache
-  soc: imx: gpc: fix domain_index sanity check issue
-  soc: imx: gpc: fix imx6sl gpc power domain regression
-  soc: imx: gpc: fix comment when power up domain
-  soc: imx: gpc: keep PGC_X_CTRL name align with reference manual
-  dt-bindings: imx-gpc: correct the DOMAIN_INDEX using
-  soc: imx: gpc: remove unnecessary readable_reg callback
-
- .../devicetree/bindings/power/fsl,imx-gpc.txt      |  4 +-
- drivers/soc/imx/gpc.c                              | 48 ++++++----------------
- 2 files changed, 15 insertions(+), 37 deletions(-)
-
+diff --git a/drivers/soc/imx/gpc.c b/drivers/soc/imx/gpc.c
+index 1e9b3b8..c9bfdfd 100644
+--- a/drivers/soc/imx/gpc.c
++++ b/drivers/soc/imx/gpc.c
+@@ -143,7 +143,7 @@ static int imx_pgc_get_clocks(struct device *dev, struct imx_pm_domain *domain)
+ 	return 0;
+ 
+ clk_err:
+-	for (; i >= 0; i--)
++	while (i--)
+ 		clk_put(domain->clk[i]);
+ 
+ 	return ret;
 -- 
 2.7.4
