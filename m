@@ -1,38 +1,48 @@
-From: smueller@chronox.de (Stephan =?ISO-8859-1?Q?M=FCller?=)
-Date: Thu, 23 Mar 2017 12:35:56 +0100
-Subject: Question - seeding the hw pseudo random number generator
-In-Reply-To: <602a68ef-c57a-0092-ebe0-161ec602fad6@linux.vnet.ibm.com>
-References: <20170318092554.lggkhfg5eko23o3k@kozik-lap>
- <1509135.hmo2UhaKWe@tauon.atsec.com>
- <602a68ef-c57a-0092-ebe0-161ec602fad6@linux.vnet.ibm.com>
-Message-ID: <32410262.FWdrND2fdY@positron.chronox.de>
+From: gerg@uclinux.org (Greg Ungerer)
+Date: Thu, 23 Mar 2017 21:37:48 +1000
+Subject: [PATCH] ARM: nommu: access ID_PFR1 only if CPUID scheme
+In-Reply-To: <20170323104310.GA6941@afzalpc>
+References: <20170317164034.4036-1-afzal.mohd.ma@gmail.com>
+ <20170323104310.GA6941@afzalpc>
+Message-ID: <7f5317f9-f173-2503-e125-99c6f3cd81b1@uclinux.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 23. M?rz 2017, 09:03:23 CET schrieb Harald Freudenberger:
+Hi Afzal,
 
-Hi Harald,
+On 23/03/17 20:43, afzal mohammed wrote:
+> On Fri, Mar 17, 2017 at 10:10:34PM +0530, afzal mohammed wrote:
+>> Greg upon trying to boot no-MMU Kernel on ARM926EJ reported boot
+>> failure. He root caused it to ID_PFR1 access introduced by the
+>> commit mentioned in the fixes tag below.
+>>
+>> All CP15 processors need not have processor feature registers, only
+>> for architectures defined by CPUID scheme would have it. Hence check
+>> for it before accessing processor feature register, ID_PFR1.
+>>
+>> Fixes: f8300a0b5de0 ("ARM: 8647/2: nommu: dynamic exception base address setting")
+>> Reported-by: Greg Ungerer <gerg@uclinux.org>
+>> Signed-off-by: afzal mohammed <afzal.mohd.ma@gmail.com>
+>
+> Greg, can i add your Tested-by ?
 
-> I'll have a look on it. Currently the s390/crypto/prng seeds itself with
-> an algorithm based on the jitter of the very fine granular hardware
-> clock of a s390 machine. There were some thoughts and measurements
-> by an mathematician which let to this algorithm.
+Absolutely:
 
-It takes a page and simply writes 512 times the high-res time stamp using 
-get_tod_clock_fast into it. Effectively it uses the same fundamental noise 
-source as the jitterentropy. (A couple of months ago I had to perform an 
-SP800-90B assessment on exactly that code path. :-) )
+Tested-by: Greg Ungerer <gerg@uclinux.org>
 
-> However, long-term
-> the s390 platform will provide some kind of true hardware random number
-> generator and the idea is to use this for seeding the prng.
+Thanks for taking care of this.
 
-The question is just that it provides a device file nobody else provides. And 
-the question is whether to consolidate it. If it is a DRNG, the discussion is 
-about consolidating it behind AF_ALG. If it is an RNG with its own noise 
-source (i.e. it provides entropic data by itself), it should rather be placed 
-into drivers/char/hw_random and use the hw-random framework. This framework 
-will also ensure that it may seed the /dev/random device kernel-internally.
+Regards
+Greg
 
-Ciao
-Stephan
+
+>> ---
+>>
+>> Hi Russell,
+>>
+>> It would be good to have the fix go in during -rc, as,
+>>
+>> 1. Culprit commit went in during the last merge window
+>> 2. Though nothing supported in mainline is known to be broken, the
+>>     original change needs to be modified to be reliable
+>
