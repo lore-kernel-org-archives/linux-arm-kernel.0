@@ -1,112 +1,177 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 23 Mar 2017 15:15:17 +0000
-Subject: [PATCH v3] efifb: avoid reconfiguration of BAR that covers the
- framebuffer
-In-Reply-To: <20170323143151.GA21544@red-moon>
-References: <1490196629-28088-1-git-send-email-ard.biesheuvel@linaro.org>
- <20170322193111.GA8190@wunner.de>
- <CAKv+Gu_X-SEnz7h9J8boqqjOQGHQawwdSAq4haH-OGu8zdfNfA@mail.gmail.com>
- <20170323084819.GA23281@h08.hostsharing.net>
- <CAKv+Gu93eJ-js3g7M6Jdm6XGMaWMswFmzBG2qNT4rn+3=1+EyA@mail.gmail.com>
- <20170323105727.GA2441@red-moon>
- <CAKv+Gu-J664KXaZR19nViq4o1n_x=P-trsZ0oNDiONuBpAcd7A@mail.gmail.com>
- <20170323143151.GA21544@red-moon>
-Message-ID: <CAKv+Gu_iUir5d3evOvS3tUK6vY1H7KBktDf253MA8vyZDwOKPA@mail.gmail.com>
+From: slash.tmp@free.fr (Mason)
+Date: Thu, 23 Mar 2017 16:15:57 +0100
+Subject: AER notifications
+In-Reply-To: <f22570b0-aaf5-0c30-0ee7-4e69762552b3@free.fr>
+References: <f22570b0-aaf5-0c30-0ee7-4e69762552b3@free.fr>
+Message-ID: <92032302-8139-601b-690b-0299360bc462@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 March 2017 at 14:31, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
-> On Thu, Mar 23, 2017 at 12:25:48PM +0000, Ard Biesheuvel wrote:
->> On 23 March 2017 at 10:57, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
->> > On Thu, Mar 23, 2017 at 09:04:03AM +0000, Ard Biesheuvel wrote:
->> >> On 23 March 2017 at 08:48, Lukas Wunner <lukas@wunner.de> wrote:
->> >> > On Wed, Mar 22, 2017 at 07:32:43PM +0000, Ard Biesheuvel wrote:
->> >> >> On 22 March 2017 at 19:31, Lukas Wunner <lukas@wunner.de> wrote:
->> >> >> > On Wed, Mar 22, 2017 at 03:30:29PM +0000, Ard Biesheuvel wrote:
->> >> >> >> On UEFI systems, the PCI subsystem is enumerated by the firmware,
->> >> >> >> and if a graphical framebuffer is exposed by a PCI device, its base
->> >> >> >> address and size are exposed to the OS via the Graphics Output
->> >> >> >> Protocol (GOP).
->> >> >> >>
->> >> >> >> On arm64 PCI systems, the entire PCI hierarchy is reconfigured from
->> >> >> >> scratch at boot. This may result in the GOP framebuffer address to
->> >> >> >> become stale, if the BAR covering the framebuffer is modified. This
->> >> >> >> will cause the framebuffer to become unresponsive, and may in some
->> >> >> >> cases result in unpredictable behavior if the range is reassigned to
->> >> >> >> another device.
->> >> >> >
->> >> >> > Hm, commit message seems to indicate the issue is restricted to arm64,
->> >> >> > yet there's no IS_ENABLED(ARM64) to constrain the added code to that arch?
->> >> >>
->> >> >> True. I am eager to get some x86 coverage for this, since I would
->> >> >> expect this not to do any harm. But I'm fine with making it ARM/arm64
->> >> >> specific in the final version.
->> >> >
->> >> > I see.  IIUC, this is only a problem because pci_bus_assign_resources()
->> >> > is called from arch/arm64/kernel/pci.c:pci_acpi_scan_root() (as well as
->> >> > the host drivers) and x86 isn't affected because it doesn't do that.
->> >> >
->> >>
->> >> Correct. But on x86 (or rather, on a PC), you can be sure that UEFI
->> >> (or the legacy PCI bios) performed the resource assignment already.
->> >> One could argue that this is equally the case when running arm64 in
->> >> ACPI mode, but in general, you cannot assume the presence of firmware
->> >> on ARM/arm64 that has already taken care of this, and so the state of
->> >> the BARs has to be presumed invalid.
->> >
->> > The story is a bit more convoluted than that owing to x86 (and other
->> > arches) legacy.
->> >
->> > x86 tries to claim all PCI resources (in two passes - first enabled
->> > devices, second disabled devices) and that predates ACPI/UEFI.
->> >
->> > Mind, x86 reassign resources that can't be claimed too, the only
->> > difference with ARM64 is that, for the better or the worse, we
->> > have decided not to claim the FW PCI set-up on ARM64 even if it
->> > is sane, we do not even try, it was a deliberate choice.
->> >
->> > This patch should be harmless on x86 since if the FB PCI BAR is set
->> > up sanely, claiming it again should be a nop (to be checked).
->> >
->>
->> I have checked this with OVMF under QEMU. Claiming the resource early
->> like we do this in this patch does not result in any diagnostic output
->> or other symptoms that would suggest that anything unexpected occurs.
->
-> There is something that I do not understand on how the resource
-> claiming works on x86. IIUC on x86, resource claiming is done in:
->
-> arch/x86/pci/legacy.c
->
-> pci_subsys_init()
->  -> pcibios_init()
->   -> pcibios_resource_survey()
->
-> pci_subsys_init() is run in a subsys_initcall.
->
+On 23/03/2017 15:14, Mason wrote:
 
-Yes, the call trace I get for the resource claim for the efifb BAR
-without this patch is
-
-pci_subsys_init+0x3f/0x43
-- pcibios_init+0x2c/0x3d
--- pcibios_resource_survey+0x38/0x6a
---- pci_legacy_init+0x2e/0x2e
----- pcibios_allocate_resources+0x8a/0x240
------ pci_claim_resource+0xdc/0x140
+> My PCIe host bridge is supposed to support AER, so I enabled
+> kernel support, out of curiosity. For these tests, I plugged
+> a USB3 card into the PCIe slot.
+> 
+> I see two classes of reports.
+> 
+> 1) When the system is idling, with no USB device plugged into
+> the PCIe card, I occasionally see these:
+> 
+> [ 5003.638675] pcieport 0000:00:00.0: AER: Multiple Corrected error received: id=0000
+> [ 5003.646365] pcieport 0000:00:00.0: PCIe Bus Error: severity=Corrected, type=Physical Layer, id=0000(Receiver ID)
+> [ 5003.656991] pcieport 0000:00:00.0:   device [1105:0028] error status/mask=00000001/00002000
+> [ 5003.665566] pcieport 0000:00:00.0:    [ 0] Receiver Error         (First)
+> 
+> [ 6104.766906] pcieport 0000:00:00.0: AER: Multiple Corrected error received: id=0000
+> [ 6104.774579] pcieport 0000:00:00.0: PCIe Bus Error: severity=Corrected, type=Physical Layer, id=0000(Receiver ID)
+> [ 6104.785140] pcieport 0000:00:00.0:   device [1105:0028] error status/mask=00000001/00002000
+> [ 6104.793701] pcieport 0000:00:00.0:    [ 0] Receiver Error         (First)
+> 
+> [ 8388.051130] pcieport 0000:00:00.0: AER: Multiple Corrected error received: id=0000
+> [ 8388.058818] pcieport 0000:00:00.0: PCIe Bus Error: severity=Corrected, type=Physical Layer, id=0000(Receiver ID)
+> [ 8388.069429] pcieport 0000:00:00.0:   device [1105:0028] error status/mask=00000001/00002000
+> [ 8388.078041] pcieport 0000:00:00.0:    [ 0] Receiver Error         (First)
+> 
+> [11022.907894] pcieport 0000:00:00.0: AER: Multiple Corrected error received: id=0000
+> [11022.915570] pcieport 0000:00:00.0: PCIe Bus Error: severity=Corrected, type=Physical Layer, id=0000(Receiver ID)
+> [11022.926102] pcieport 0000:00:00.0:   device [1105:0028] error status/mask=00000001/00002000
+> [11022.934666] pcieport 0000:00:00.0:    [ 0] Receiver Error         (First)
+> 
+> 1105:0024 is the rev1 host bridge.
+> 1105:0028 is the rev2 host bridge.
+> 
+> I'll let a rev1 host bridge idle for a long time, but I don't
+> remember seeing these reports on rev1.
+> 
+> 
+> 2) When I unplug my USB3 Flash drive, I always get some kind of
+> error from the USB framework, and sometimes they are coupled with
+> AER messages.
+> 
+> [   40.158166] pcieport 0000:00:00.0: AER: Uncorrected (Non-Fatal) error received: id=0000
+> [   40.166291] pcieport 0000:00:00.0: PCIe Bus Error: severity=Uncorrected (Non-Fatal), type=Transaction Layer, id=0000(Requester ID)
+> [   40.178519] pcieport 0000:00:00.0:   device [1105:0024] error status/mask=00004000/00000000
+> [   40.187033] pcieport 0000:00:00.0:    [14] Completion Timeout     (First)
+> [   40.193957] pcieport 0000:00:00.0: broadcast error_detected message
+> [   40.200345] pcieport 0000:00:00.0: AER: Device recovery failed
+> [   40.485352] xhci_hcd 0000:01:00.0: Cannot set link state.
+> [   40.490887] usb usb2-port2: cannot disable (err = -32)
+> [   40.496070] usb 2-2: USB disconnect, device number 2
+> [   40.508478] pcieport 0000:00:00.0: AER: Uncorrected (Non-Fatal) error received: id=0000
+> [   40.517291] pcieport 0000:00:00.0: PCIe Bus Error: severity=Uncorrected (Non-Fatal), type=Transaction Layer, id=0000(Requester ID)
+> [   40.529266] pcieport 0000:00:00.0:   device [1105:0024] error status/mask=00004000/00000000
+> [   40.538284] pcieport 0000:00:00.0:    [14] Completion Timeout     (First)
+> [   40.545233] pcieport 0000:00:00.0: broadcast error_detected message
+> [   40.551883] pcieport 0000:00:00.0: AER: Device recovery failed
+> [   40.557859] pcieport 0000:00:00.0: AER: Uncorrected (Non-Fatal) error received: id=0000
+> [   40.566367] pcieport 0000:00:00.0: PCIe Bus Error: severity=Uncorrected (Non-Fatal), type=Transaction Layer, id=0000(Requester ID)
+> [   40.578667] pcieport 0000:00:00.0:   device [1105:0024] error status/mask=00004000/00000000
+> [   40.587098] pcieport 0000:00:00.0:    [14] Completion Timeout     (First)
+> [   40.593950] pcieport 0000:00:00.0: broadcast error_detected message
+> [   40.600268] pcieport 0000:00:00.0: AER: Device recovery failed
+> [   40.606148] pcieport 0000:00:00.0: AER: Uncorrected (Non-Fatal) error received: id=0000
+> [   40.614223] pcieport 0000:00:00.0: PCIe Bus Error: severity=Uncorrected (Non-Fatal), type=Transaction Layer, id=0000(Requester ID)
+> [   40.626046] pcieport 0000:00:00.0:   device [1105:0024] error status/mask=00004000/00000000
+> [   40.634455] pcieport 0000:00:00.0:    [14] Completion Timeout     (First)
+> [   40.641295] pcieport 0000:00:00.0: broadcast error_detected message
+> [   40.647605] pcieport 0000:00:00.0: AER: Device recovery failed
 
 
-> Now, how do we ensure that resource claiming is carried out _after_
-> the PCI root busses have been actually scanned ?
->
-> The ACPI scan handler interface (so the interface to actually scan
-> a PCI root bridge in ACPI) is initialized in acpi_init() (which
-> is a subsys_initcall), how do we guarantee that is run before
-> pci_subsys_init() ?
->
+Apparently, the above error trace occurs *every time* I unplug the
+USB3 Flash drive. I'm sure it didn't use to happen systematically...
 
-$ nm vmlinux |grep -E '__initcall_(acpi_init|pci_subsys_init)'
-ffffffff81d540b8 t __initcall_acpi_init4
-ffffffff81d54158 t __initcall_pci_subsys_init4
+[   59.058798] usb 2-2: new SuperSpeed USB device number 2 using xhci_hcd
+[   59.092272] usb 2-2: New USB device found, idVendor=0951, idProduct=1666
+[   59.099029] usb 2-2: New USB device strings: Mfr=1, Product=2, SerialNumber=3
+[   59.106377] usb 2-2: Product: DataTraveler 3.0
+[   59.110929] usb 2-2: Manufacturer: Kingston
+[   59.115209] usb 2-2: SerialNumber: 002618887865F0C0F8646BFA
+[   59.124163] usb-storage 2-2:1.0: USB Mass Storage device detected
+[   59.130727] scsi host0: usb-storage 2-2:1.0
+[   60.158296] scsi 0:0:0:0: Direct-Access     Kingston DataTraveler 3.0      PQ: 0 ANSI: 6
+[   60.168252] sd 0:0:0:0: [sda] 15109516 512-byte logical blocks: (7.74 GB/7.20 GiB)
+[   60.178876] sd 0:0:0:0: [sda] Write Protect is off
+[   60.184356] sd 0:0:0:0: [sda] Mode Sense: 4f 00 00 00
+[   60.189738] sd 0:0:0:0: [sda] Write cache: disabled, read cache: enabled, doesn't support DPO or FUA
+[   60.202228]  sda: sda1
+[   60.206629] sd 0:0:0:0: [sda] Attached SCSI removable disk
 
-so it appears to depend on link order currently.
+[   65.963480] pcieport 0000:00:00.0: AER: Uncorrected (Non-Fatal) error received: id=0000
+[   65.971582] pcieport 0000:00:00.0: PCIe Bus Error: severity=Uncorrected (Non-Fatal), type=Transaction Layer, id=0000(Requester ID)
+[   65.983816] pcieport 0000:00:00.0:   device [1105:0024] error status/mask=00004000/00000000
+[   65.992331] pcieport 0000:00:00.0:    [14] Completion Timeout     (First)
+[   65.999274] pcieport 0000:00:00.0: broadcast error_detected message
+[   66.005664] pcieport 0000:00:00.0: AER: Device recovery failed
+[   66.280717] xhci_hcd 0000:01:00.0: Cannot set link state.
+[   66.286295] usb usb2-port2: cannot disable (err = -32)
+[   66.291486] usb 2-2: USB disconnect, device number 2
+[   66.297725] pcieport 0000:00:00.0: AER: Uncorrected (Non-Fatal) error received: id=0000
+[   66.306012] pcieport 0000:00:00.0: PCIe Bus Error: severity=Uncorrected (Non-Fatal), type=Transaction Layer, id=0000(Requester ID)
+[   66.318142] pcieport 0000:00:00.0:   device [1105:0024] error status/mask=00004000/00000000
+[   66.326704] pcieport 0000:00:00.0:    [14] Completion Timeout     (First)
+[   66.333641] pcieport 0000:00:00.0: broadcast error_detected message
+[   66.340043] pcieport 0000:00:00.0: AER: Device recovery failed
+[   66.345996] pcieport 0000:00:00.0: AER: Uncorrected (Non-Fatal) error received: id=0000
+[   66.354141] pcieport 0000:00:00.0: PCIe Bus Error: severity=Uncorrected (Non-Fatal), type=Transaction Layer, id=0000(Requester ID)
+[   66.366026] pcieport 0000:00:00.0:   device [1105:0024] error status/mask=00004000/00000000
+[   66.374444] pcieport 0000:00:00.0:    [14] Completion Timeout     (First)
+[   66.381321] pcieport 0000:00:00.0: broadcast error_detected message
+[   66.387635] pcieport 0000:00:00.0: AER: Device recovery failed
+
+[   72.715540] usb 2-2: new SuperSpeed USB device number 3 using xhci_hcd
+[   72.748836] usb 2-2: New USB device found, idVendor=0951, idProduct=1666
+[   72.755594] usb 2-2: New USB device strings: Mfr=1, Product=2, SerialNumber=3
+[   72.762778] usb 2-2: Product: DataTraveler 3.0
+[   72.767329] usb 2-2: Manufacturer: Kingston
+[   72.771547] usb 2-2: SerialNumber: 002618887865F0C0F8646BFA
+[   72.780539] usb-storage 2-2:1.0: USB Mass Storage device detected
+[   72.786987] scsi host0: usb-storage 2-2:1.0
+[   73.811611] scsi 0:0:0:0: Direct-Access     Kingston DataTraveler 3.0      PQ: 0 ANSI: 6
+[   73.821656] sd 0:0:0:0: [sda] 15109516 512-byte logical blocks: (7.74 GB/7.20 GiB)
+[   73.832641] sd 0:0:0:0: [sda] Write Protect is off
+[   73.837909] sd 0:0:0:0: [sda] Mode Sense: 4f 00 00 00
+[   73.843538] sd 0:0:0:0: [sda] Write cache: disabled, read cache: enabled, doesn't support DPO or FUA
+[   73.856237]  sda: sda1
+[   73.864146] sd 0:0:0:0: [sda] Attached SCSI removable disk
+
+[   78.138502] pcieport 0000:00:00.0: AER: Uncorrected (Non-Fatal) error received: id=0000
+[   78.146629] pcieport 0000:00:00.0: PCIe Bus Error: severity=Uncorrected (Non-Fatal), type=Transaction Layer, id=0000(Requester ID)
+[   78.158469] pcieport 0000:00:00.0:   device [1105:0024] error status/mask=00004000/00000000
+[   78.166904] pcieport 0000:00:00.0:    [14] Completion Timeout     (First)
+[   78.173768] pcieport 0000:00:00.0: broadcast error_detected message
+[   78.180081] pcieport 0000:00:00.0: AER: Device recovery failed
+[   78.464045] xhci_hcd 0000:01:00.0: Cannot set link state.
+[   78.469507] usb usb2-port2: cannot disable (err = -32)
+[   78.474689] usb 2-2: USB disconnect, device number 3
+[   78.480947] pcieport 0000:00:00.0: AER: Uncorrected (Non-Fatal) error received: id=0000
+[   78.489209] pcieport 0000:00:00.0: PCIe Bus Error: severity=Uncorrected (Non-Fatal), type=Transaction Layer, id=0000(Requester ID)
+[   78.501131] pcieport 0000:00:00.0:   device [1105:0024] error status/mask=00004000/00000000
+[   78.509573] pcieport 0000:00:00.0:    [14] Completion Timeout     (First)
+[   78.516495] pcieport 0000:00:00.0: broadcast error_detected message
+[   78.522833] pcieport 0000:00:00.0: AER: Device recovery failed
+[   78.528715] pcieport 0000:00:00.0: AER: Uncorrected (Non-Fatal) error received: id=0000
+[   78.536799] pcieport 0000:00:00.0: PCIe Bus Error: severity=Uncorrected (Non-Fatal), type=Transaction Layer, id=0000(Requester ID)
+[   78.548644] pcieport 0000:00:00.0:   device [1105:0024] error status/mask=00004000/00000000
+[   78.557053] pcieport 0000:00:00.0:    [14] Completion Timeout     (First)
+[   78.563905] pcieport 0000:00:00.0: broadcast error_detected message
+[   78.570214] pcieport 0000:00:00.0: AER: Device recovery failed
+
+
+And I also see a third kind of report:
+
+[   17.826017] pcieport 0000:00:00.0: AER: Corrected error received: id=0000
+[   17.833917] pcieport 0000:00:00.0: PCIe Bus Error: severity=Corrected, type=Data Link Layer, id=0000(Transmitter ID)
+[   17.844583] pcieport 0000:00:00.0:   device [1105:0024] error status/mask=00001000/00002000
+[   17.853217] pcieport 0000:00:00.0:    [12] Replay Timer Timeout  
+
+[ 7100.130522] pcieport 0000:00:00.0: AER: Corrected error received: id=0000
+[ 7100.137405] pcieport 0000:00:00.0: PCIe Bus Error: severity=Corrected, type=Data Link Layer, id=0000(Transmitter ID)
+[ 7100.148351] pcieport 0000:00:00.0:   device [1105:0024] error status/mask=00001000/00002000
+[ 7100.156888] pcieport 0000:00:00.0:    [12] Replay Timer Timeout  
+
+
+I'll try enabling AER on the legacy kernel (3.4) to see if I get
+the same behavior.
+
+Regards.
