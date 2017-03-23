@@ -1,35 +1,70 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 23 Mar 2017 17:58:05 +0000
-Subject: [PATCH V13 10/10] arm/arm64: KVM: add guest SEA support
-In-Reply-To: <1490136425-4324-11-git-send-email-tbaicar@codeaurora.org>
-References: <1490136425-4324-1-git-send-email-tbaicar@codeaurora.org>
- <1490136425-4324-11-git-send-email-tbaicar@codeaurora.org>
-Message-ID: <20170323175805.GC32309@e104818-lin.cambridge.arm.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 23 Mar 2017 17:59:40 +0000
+Subject: [PATCH 5/4] iommu/arm-smmu: Poll for TLB sync completion more
+ effectively
+In-Reply-To: <cover.1488907474.git.robin.murphy@arm.com>
+References: <cover.1488907474.git.robin.murphy@arm.com>
+Message-ID: <67da197b56bb8763623fc215176b86ab04b1799e.1490291854.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 21, 2017 at 04:47:05PM -0600, Tyler Baicar wrote:
-> Currently external aborts are unsupported by the guest abort
-> handling. Add handling for SEAs so that the host kernel reports
-> SEAs which occur in the guest kernel.
-> 
-> Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
-> ---
->  arch/arm/include/asm/kvm_arm.h       | 10 +++++++++
->  arch/arm/include/asm/system_misc.h   |  5 +++++
->  arch/arm/kvm/mmu.c                   | 41 ++++++++++++++++++++++++++++++------
->  arch/arm64/include/asm/kvm_arm.h     | 10 +++++++++
->  arch/arm64/include/asm/system_misc.h |  2 ++
->  arch/arm64/mm/fault.c                | 19 +++++++++++++++--
->  drivers/acpi/apei/ghes.c             | 13 ++++++------
->  include/acpi/ghes.h                  |  2 +-
->  8 files changed, 86 insertions(+), 16 deletions(-)
+On relatively slow development platforms and software models, the
+inefficiency of our TLB sync loop tends not to show up - for instance on
+a Juno r1 board I typically see the TLBI has completed of its own accord
+by the time we get to the sync, such that the latter finishes instantly.
 
-For arm64:
+However, on larger systems doing real I/O, it's less realistic for the
+TLBs to go idle immediately, and at that point falling into the 1MHz
+polling loop turns out to throw away performance drastically. Let's
+strike a balance by polling more than once between pauses, such that we
+have much more chance of catching normal operations completing before
+committing to the fixed delay, but also backing off exponentially, since
+if a sync really hasn't completed within one or two "reasonable time"
+periods, it becomes increasingly unlikely that it ever will.
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+---
+ drivers/iommu/arm-smmu.c | 18 +++++++++---------
+ 1 file changed, 9 insertions(+), 9 deletions(-)
 
-Marc, Christoffer, could you please check the kvm bits in here? Thanks.
-
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index f7411109670f..aa17f3d937a0 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -162,6 +162,7 @@
+ #define ARM_SMMU_GR0_sTLBGSTATUS	0x74
+ #define sTLBGSTATUS_GSACTIVE		(1 << 0)
+ #define TLB_LOOP_TIMEOUT		1000000	/* 1s! */
++#define TLB_SPIN_COUNT			10
+ 
+ /* Stream mapping registers */
+ #define ARM_SMMU_GR0_SMR(n)		(0x800 + ((n) << 2))
+@@ -574,18 +575,17 @@ static void __arm_smmu_free_bitmap(unsigned long *map, int idx)
+ static void __arm_smmu_tlb_sync(struct arm_smmu_device *smmu,
+ 				void __iomem *sync, void __iomem *status)
+ {
+-	int count = 0;
++	unsigned int spin_count, delay;
+ 
+ 	writel_relaxed(0, sync);
+-	while (readl_relaxed(status) & sTLBGSTATUS_GSACTIVE) {
+-		cpu_relax();
+-		if (++count == TLB_LOOP_TIMEOUT) {
+-			dev_err_ratelimited(smmu->dev,
+-			"TLB sync timed out -- SMMU may be deadlocked\n");
+-			return;
+-		}
+-		udelay(1);
++	for (delay = 1; delay < TLB_LOOP_TIMEOUT; delay *= 2) {
++		for (spin_count = TLB_SPIN_COUNT; spin_count > 0; spin_count--)
++			if (!(readl_relaxed(status) & sTLBGSTATUS_GSACTIVE))
++				return;
++		udelay(delay);
+ 	}
++	dev_err_ratelimited(smmu->dev,
++			    "TLB sync timed out -- SMMU may be deadlocked\n");
+ }
+ 
+ static void arm_smmu_tlb_sync_global(struct arm_smmu_device *smmu)
 -- 
-Catalin
+2.11.0.dirty
