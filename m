@@ -1,42 +1,65 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 23 Mar 2017 11:52:27 +0000
-Subject: [RFC PATCH v2 21/41] arm64/sve: Enable SVE on demand for userspace
-In-Reply-To: <98bf1730-7579-d9f9-37c0-75ccfc29087b@arm.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Thu, 23 Mar 2017 11:52:53 +0000
+Subject: [RFC PATCH v2 23/41] arm64/sve: Move ZEN handling to the common
+ task_fpsimd_load() path
+In-Reply-To: <20170322165527.GD19950@leverpostej>
 References: <1490194274-30569-1-git-send-email-Dave.Martin@arm.com>
- <1490194274-30569-22-git-send-email-Dave.Martin@arm.com>
- <20170322164809.GC19950@leverpostej>
- <20170323112404.GC3750@e103592.cambridge.arm.com>
- <98bf1730-7579-d9f9-37c0-75ccfc29087b@arm.com>
-Message-ID: <20170323115227.GD9287@leverpostej>
+ <1490194274-30569-24-git-send-email-Dave.Martin@arm.com>
+ <20170322165527.GD19950@leverpostej>
+Message-ID: <20170323115252.GD3750@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 23, 2017 at 11:30:16AM +0000, Suzuki K Poulose wrote:
-> On 23/03/17 11:24, Dave Martin wrote:
-> >On Wed, Mar 22, 2017 at 04:48:10PM +0000, Mark Rutland wrote:
-
-> >>>+	asm ("mrs %0, cpacr_el1" : "=r" (tmp));
-> >>>+	asm volatile ("msr cpacr_el1, %0" :: "r" (tmp | (1 << 17)));
-
-> >>Please also use {read,write}_sysreg(), e.g.
-> >
-> >TBH, I was confused about the status of these macros at the time I
-> >wrote this code.
-> >
-> >The naming clash with the cpufeature functions is unfortunate.  In my
-> >head these names all became associated with "do something behind the
-> >scenes that may or may not really read the underlying system reg".
-> >
-> >Would it be reasonable to rename read_system_reg() to something more
-> >different, like read_kernel_sysreg(), read_system_id(),
-> >read_sanitised_id_reg(), etc.?
+On Wed, Mar 22, 2017 at 04:55:27PM +0000, Mark Rutland wrote:
+> Hi,
 > 
-> I agree. read_system_reg() is not quite obvious name given all the other
-> similar names. We could go with either read_sanitised_id_reg() or read_system_safe_reg() ?
+> On Wed, Mar 22, 2017 at 02:50:53PM +0000, Dave Martin wrote:
+> >  void do_sve_acc(unsigned int esr, struct pt_regs *regs)
+> >  {
+> > -	unsigned long tmp;
+> > +	if (test_and_set_thread_flag(TIF_SVE)) {
+> > +		unsigned long tmp;
+> >  
+> > -	if (test_and_set_thread_flag(TIF_SVE))
+> > +		asm ("mrs %0, cpacr_el1" : "=r" (tmp));
+> 
+> Please use read_sysreg().
+> 
+> > +
+> > +		printk(KERN_INFO "%s: Strange, ZEN=%u\n",
+> > +		       __func__, (unsigned int)((tmp >> 16) & 3));
+> >  		BUG();
+> 
+> Given we're about to BUG(), I guess it would make more sense to use
+> pr_err() here, and be a bit more informative. e.g.
+> 
+> 	pr_crit("SVE trap taken unexpectedly. CPACR_EL1.ZEN is %u\n",
+> 		(unsigned int)((tmp >> 16) & 3));
+> 	BUG();
 
-I think read_sanitised_id_reg() sounds best, since "safe" cound mean a
-few things, and having "id" in the name makes it clear that it's not a
-general purpose sysreg accessor.
+This also goes away later -- it made sense for debugging, but since
+do_sve_acc() is called on the back of a trap this BUG is really a check
+for broken hardware.
 
-Thanks,
-Mark.
+Later, this is reduced to
+
+	if (test_and_set_thread_flag(TIF_SVE))
+		BUG();
+
+with the CPACR manipulation moved to ret_to_user
+(via task_fpsimd_load()).
+
+> 
+> ... my usual comments w.r.t. magic numbers apply.
+> 
+> [...]
+> 
+> > +		BUILD_BUG_ON(_TIF_SVE != CPACR_EL1_ZEN_EL0EN);
+> 
+> As previously, I do not think this is a good idea. Treating these as
+> separate values is not difficult, and IMO far easier to reason about.
+
+Agreed.
+
+Cheers
+---Dave
