@@ -1,48 +1,56 @@
-From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Thu, 23 Mar 2017 17:03:46 +0000
-Subject: [RFC PATCH 24/30] iommu: Specify PASID state when unbinding a task
-In-Reply-To: <20170323165218.GL7266@8bytes.org>
-References: <20170227195441.5170-1-jean-philippe.brucker@arm.com>
- <20170227195441.5170-25-jean-philippe.brucker@arm.com>
- <20170322154429.GE7266@8bytes.org>
- <e2bb4c67-9b61-01cf-cc17-68088cdc5e5b@arm.com>
- <20170322225320.GF7266@8bytes.org>
- <a093bc07-a345-a689-9d97-f15a306f922d@arm.com>
- <20170323143014.GK7266@8bytes.org>
- <20170323145311.GA22972@e106794-lin.localdomain>
- <20170323165218.GL7266@8bytes.org>
-Message-ID: <9d318e88-11af-6dab-b30e-d6b5c02443fe@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 23 Mar 2017 10:02:10 -0700
+Subject: [PATCHv2 0/9] clk: ti: add support for clkctrl clocks
+In-Reply-To: <20170323010057.GI10760@atomide.com>
+References: <1489741781-12816-1-git-send-email-t-kristo@ti.com>
+ <20170317152536.GT20572@atomide.com>
+ <94d20a17-5072-ffab-3529-4bbb14327a10@ti.com>
+ <20170323010057.GI10760@atomide.com>
+Message-ID: <20170323170210.GL10760@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/03/17 16:52, Joerg Roedel wrote:
-> On Thu, Mar 23, 2017 at 03:52:14PM +0000, Jean-Philippe Brucker wrote:
->> On 23/03/17 14:30, Joerg Roedel wrote:
->>> Are you sure about the meaning of the stop-marker? Can you point me to
->>> where it is specified?
->>
->> The concept is introduced in the PCI ECN that adds PASIDs to the ATS
->> specification. I have the following link, which is probably behind a
->> wall:
->>
->> https://pcisig.com/sites/default/files/specification_documents/ECN-PASID-ATS-2011-03-31.pdf
->>
->> A Stop Marker is a PPR with flags Read=Write=0, Last=1, targeting the
->> PASID that is being decommissioned. In section 4.1.2, the specifications
->> details the two device-specific ways of stopping use of a PASID, with or
->> without a Stop Marker. When done with a Stop Marker, the function doesn't
->> have to wait for any outstanding PPR to return, the Stop Marker serves as
->> a PASID barrier.
+* Tony Lindgren <tony@atomide.com> [170322 18:03]:
+> * Tero Kristo <t-kristo@ti.com> [170317 14:39]:
+> > On 17/03/17 17:25, Tony Lindgren wrote:
+> > > * Tero Kristo <t-kristo@ti.com> [170317 02:12]:
+> > > > Any additional testing on omap4 welcome as this series basically
+> > > > tweaks every possible peripheral clock on the SoC.
+> > > 
+> > > Without the last patch in this series, booting fails for me:
+> > > 
+> > > [    5.074890] l4_per_cm:clk:0120:0: failed to disable
+> > > [    5.085113] l4_per_cm:clk:0128:0: failed to disable
+> > > 
+> > > Care to check that booting keeps working for each patch in the
+> > > series to avoid breaking git bisect for booting?
+> > 
+> > Hmm, I think patch 8+9 need to be squashed then. I can double check this
+> > next week though.
 > 
-> Thanks for that, I have a closer look. Is that stopper packet visible to
-> software (e.g. is an entry created in the queue)?
+> Also looks like with this set merged HDMI stops working on
+> omap4 with:
+> 
+> HDMIWP: omapdss HDMIWP error: Failed to set PHY power mode to 1
 
-As far as I understand, it should be added to the queue like a normal PPR,
-and software should check the R/W/L flags combination. For SMMU at least,
-it is the same. The only difference is that when the PRI queue overflows,
-the SMMU would discard a Stop Marker instead of sending an automated
-response to the device (as it would do with others PPR that have the L
-flag.) Software shouldn't send a response to a Stop Marker either.
+Forgot to mention that's with omapdrm with encoder-tpd12s015 and
+encoder-tfp410 modules loaded to get HDMI working. Here's more verbose
+dmesg output in case that provides more clues:
 
-Thanks,
-Jean-Philippe
+[   91.042877] omapdss HDMICORE error: operation stopped when reading edid
+[   91.078308] [drm] Enabling DMM ywrap scrolling
+[   91.099243] omapdss HDMIWP error: Failed to set PHY power mode to 1
+[   91.107879] omapdss HDMI error: failed to power on device
+[   91.107879] omapdrm omapdrm.0: Failed to enable display 'hdmi': -5
+[   91.359619] omapdrm omapdrm.0: atomic complete timeout (pipe 0)!
+[   91.619964] omapdrm omapdrm.0: atomic complete timeout (pipe 0)!
+[   91.620300] Console: switching to colour frame buffer device 128x48
+[   91.682434] omapdrm omapdrm.0: fb0: omapdrm frame buffer device
+[   91.770812] [drm] Initialized omapdrm 1.0.0 20110917 for omapdrm.0 on minor 0
+[   92.818054] omapdss HDMICORE error: operation stopped when reading edid
+[   93.090087] omapdrm omapdrm.0: atomic complete timeout (pipe 0)!
+[   93.349853] omapdrm omapdrm.0: atomic complete timeout (pipe 0)!
+
+Regards,
+
+Tony
