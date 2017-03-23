@@ -1,90 +1,73 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 23 Mar 2017 13:44:19 +0100
-Subject: [PATCH 4/4] tty/serial: sh-sci: remove uneeded IS_ERR_OR_NULL
- calls
-In-Reply-To: <20170323123437.uqdwhfmmsjke3f7s@pengutronix.de>
-References: <CAMuHMdWv-xs12UqutEtXJGR8qqgx6DeDhkKvvYhhyW+XTVsUNQ@mail.gmail.com>
- <CAMuHMdXGn35bEsJKnUi5o3AytL4AJN2fBfoB79v5W-jOVFQx6g@mail.gmail.com>
- <20170320103113.tpveoq2onzrwmkdt@pengutronix.de>
- <CAMuHMdWbwA+3UGVnHYJOs26vTj13Yn+s4B8tE9kyy25JcjyZGg@mail.gmail.com>
- <20170320110718.e44s2gip36m75bqj@pengutronix.de>
- <CACRpkdZy_uguiKfSH-0gdanjr-xkwxoANTx6Fb2VwsvzRwcPRA@mail.gmail.com>
- <20170323101045.u3uigdu5xfwjmjc7@pengutronix.de>
- <CAMuHMdWDUzwUqrchbhh-TkE3J9Xg4TrwTF6HreikUcNNTf_ozQ@mail.gmail.com>
- <20170323111106.7ogh6g2oa3m4cqc6@pengutronix.de>
- <CAMuHMdUWybAZXc2RbGMGyp4DYQZU9BS8MxXKE5Kfd+aH8+w9sA@mail.gmail.com>
- <20170323123437.uqdwhfmmsjke3f7s@pengutronix.de>
-Message-ID: <CAMuHMdVcALm_iLiTgs7GL5S77ur+iGVhyD0yB9FxCfKFpw7uug@mail.gmail.com>
+From: gengdongjiu@huawei.com (Dongjiu Geng)
+Date: Thu, 23 Mar 2017 21:01:01 +0800
+Subject: [PATCH] arm/arm64: KVM: send SIGBUS error to qemu
+Message-ID: <1490274061-487-1-git-send-email-gengdongjiu@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+when the pfn is KVM_PFN_ERR_HWPOISON, it indicates to send
+SIGBUS signal from KVM's fault-handling code to qemu, qemu
+can handle this signal according to the fault address.
 
-On Thu, Mar 23, 2017 at 1:34 PM, Uwe Kleine-K?nig
-<u.kleine-koenig@pengutronix.de> wrote:
-> On Thu, Mar 23, 2017 at 01:03:56PM +0100, Geert Uytterhoeven wrote:
->> On Thu, Mar 23, 2017 at 12:11 PM, Uwe Kleine-K?nig
->> <u.kleine-koenig@pengutronix.de> wrote:
->> >> Make sure to enable all drivers and subsystems you need when building
->> >> your kernel. That's always true. And may indeed be hard to debug (e.g. what
->> >> kernel options do I need to make systemd work?).
->> >
->> > It's worse here. If you forget to enable a driver the device isn't bound
->> > and that's obvious to diagnose. When ignoring an optional GPIO there
->> > might be a device that claims to work but fails to do so. (e.g. you
->> > write to memory, write() returns 0, but the data never landed there.)
->> >
->> >> > write(2) and close(2) succeed most of the time, too. Still it's not a
->> >> > good idea to not check the return value. Or let the kernel return
->> >> > success unconditionally.
->> >>
->> >> Writing all bytes passed in the buffer is "optional" in another sense than
->> >> an "optional" GPIO: you must retry the write, while you can continue if
->> >> an optional GPIO is not present.
->> >
->> > And that is the point. You can continue *iff* the optional GPIO is not
->> > present. The patch in question removes the ability to determine if that
->> > GPIO is present and claims it is not present.
->>
->> If you forget to enable a driver/subsystem, you sometimes cannot determine
->> if the device is present or not neither.
->>
->> Hence it boils down to "knowing" if there is a GPIO or not.
->> So, when can there be a GPIO?
->>   1. The GPIO is described in DT.
->>      => Not an issue, as DT GPIO implies GPIOLIB,
->>   2. The GPIO is described in legacy platform data.
->>      => The platform code should make sure GPIOLIB is selected when needed.
->>
->> Issue solved?
->
-> I like it better to not rely on platform code to do the right thing.
+Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
+---
+ arch/arm/kvm/mmu.c       | 20 ++++++++++++++++++++
+ include/linux/kvm_host.h |  5 +++++
+ 2 files changed, 25 insertions(+)
 
-;-)
-
-> Maybe we can make gpiod_get_optional look like this:
->
->         if (!dev->of_node && isnt_a_acpi_device(dev) && !IS_ENABLED(GPIOLIB))
->                 return NULL;
->         else
->                 return -ENOSYS;
->
-> I don't know how isnt_a_acpi_device looks like, probably it involves
-> CONFIG_ACPI and/or dev->acpi_node.
->
-> This should be safe and still comfortable for legacy platforms, isn't it?
-
-Yes, that should do the trick.
-
-No feedback from me about ACPI.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+index 962616fd4ddd..1307ec400de3 100644
+--- a/arch/arm/kvm/mmu.c
++++ b/arch/arm/kvm/mmu.c
+@@ -1237,6 +1237,20 @@ static void coherent_cache_guest_page(struct kvm_vcpu *vcpu, kvm_pfn_t pfn,
+ 	__coherent_cache_guest_page(vcpu, pfn, size);
+ }
+ 
++static void kvm_send_hwpoison_signal(unsigned long address,
++					struct task_struct *tsk)
++{
++	siginfo_t info;
++
++	info.si_signo	= SIGBUS;
++	info.si_errno	= 0;
++	info.si_code	= BUS_MCEERR_AR;
++	info.si_addr	= (void __user *)address;
++	info.si_addr_lsb = PAGE_SHIFT;
++
++	send_sig_info(SIGBUS, &info, tsk);
++}
++
+ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 			  struct kvm_memory_slot *memslot, unsigned long hva,
+ 			  unsigned long fault_status)
+@@ -1309,6 +1323,12 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 	if (is_error_noslot_pfn(pfn))
+ 		return -EFAULT;
+ 
++	if (is_error_hwpoison_pfn(pfn)) {
++		kvm_send_hwpoison_signal(kvm_vcpu_gfn_to_hva(vcpu, gfn),
++								current);
++		return -EFAULT;
++	}
++
+ 	if (kvm_is_device_pfn(pfn)) {
+ 		mem_type = PAGE_S2_DEVICE;
+ 		flags |= KVM_S2PTE_FLAG_IS_IOMAP;
+diff --git a/include/linux/kvm_host.h b/include/linux/kvm_host.h
+index 2c14ad9809da..610ded9ebe9b 100644
+--- a/include/linux/kvm_host.h
++++ b/include/linux/kvm_host.h
+@@ -91,6 +91,11 @@ static inline bool is_noslot_pfn(kvm_pfn_t pfn)
+ {
+ 	return pfn == KVM_PFN_NOSLOT;
+ }
++/* hwpoison pfn indicates that it needs to send SIGBUS */
++static inline bool is_error_hwpoison_pfn(kvm_pfn_t pfn)
++{
++	return pfn == KVM_PFN_ERR_HWPOISON;
++}
+ 
+ /*
+  * architectures with KVM_HVA_ERR_BAD other than PAGE_OFFSET (e.g. s390)
+-- 
+2.11.0
