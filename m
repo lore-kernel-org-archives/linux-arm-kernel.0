@@ -1,75 +1,95 @@
-From: julia@ni.com (Julia Cartwright)
-Date: Thu, 23 Mar 2017 13:29:10 -0500
-Subject: [PATCH v4 1/4] pinctrl: rockchip: remove unnecessary locking
-In-Reply-To: <9002373.ugSBBElCUj@diego>
-References: <20170323105931.10455-1-john@metanate.com>
- <20170323161020.GM10423@jcartwri.amer.corp.natinst.com>
- <20170323175153.1a576d3c.john@metanate.com> <9002373.ugSBBElCUj@diego>
-Message-ID: <20170323182910.GN10423@jcartwri.amer.corp.natinst.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 23 Mar 2017 18:33:06 +0000
+Subject: [PATCH 11/14] arm64: add function to get a cpu's MADT GICC table
+In-Reply-To: <1489143891-11596-12-git-send-email-mark.rutland@arm.com>
+References: <1489143891-11596-1-git-send-email-mark.rutland@arm.com>
+ <1489143891-11596-12-git-send-email-mark.rutland@arm.com>
+Message-ID: <20170323183306.GA28797@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 23, 2017 at 06:55:50PM +0100, Heiko St?bner wrote:
-> Am Donnerstag, 23. M?rz 2017, 17:51:53 CET schrieb John Keeping:
-> > On Thu, 23 Mar 2017 11:10:20 -0500, Julia Cartwright wrote:
-[..]
-> > > [..]
-> > > 
-> > > > @@ -1185,17 +1177,14 @@ static int rockchip_set_drive_perpin(struct
-> > > > rockchip_pin_bank *bank,> > 
-> > > >  			rmask = BIT(15) | BIT(31);
-> > > >  			data |= BIT(31);
-> > > >  			ret = regmap_update_bits(regmap, reg, rmask, data);
-> > > > 
-> > > > -			if (ret) {
-> > > > -				spin_unlock_irqrestore(&bank->slock, flags);
-> > > > +			if (ret)
-> > > > 
-> > > >  				return ret;
-> > > > 
-> > > > -			}
-> > > > 
-> > > >  			rmask = 0x3 | (0x3 << 16);
-> > > >  			temp |= (0x3 << 16);
-> > > >  			reg += 0x4;
-> > > >  			ret = regmap_update_bits(regmap, reg, rmask, temp);
-> > > 
-> > > Killing the lock here means the writes to to this pair of registers (reg
-> > > and reg + 4) can be observed non-atomically.  Have you convinced
-> > > yourself that this isn't a problem?
-> > 
-> > I called it out in v1 [1] since this bit is new since v4.4 where I
-> > originally wrote this patch, and didn't get any comments about it.
-> > 
-> > I've convinced myself that removing the lock doesn't cause any problems
-> > for writing to the hardware: if the lock would prevent writes
-> > interleaving then it means that two callers are trying to write
-> > different drive strengths to the same pin, and even with a lock here one
-> > of them will end up with the wrong drive strength.
-> > 
-> > But it does mean that a read via rockchip_get_drive_perpin() may see an
-> > inconsistent state.  I think adding a new lock specifically for this
-> > particular drive strength bit is overkill and I can't find a scenario
-> > where this will actually matter; any driver setting a pinctrl config
-> > must already be doing something to avoid racing two configurations
-> > against each other, mustn't it?
+On Fri, Mar 10, 2017 at 11:04:48AM +0000, Mark Rutland wrote:
+> Currently the ACPI parking protocol code needs to parse each CPU's MADT
+> GICC table to extract the mailbox address and so on. Each time we parse
+> a GICC table, we call back to the parking protocol code to parse it.
 > 
-> also, pins can normally only be requested once - see drivers complaining if 
-> one of their pins is already held by a different driver. So if you really end 
-> up with two things writing to the same drive strength bits, the driver holding 
-> the pins must be really messed up anyway :-)
+> This has been fine so far, but we're about to have more code that needs
+> to extract data from the GICC tables, and adding a callback for each
+> user is going to get unwieldy.
+> 
+> Instead, this patch ensures that we stash a copy of each CPU's GICC
+> table at boot time, such that anything needing to parse it can later
+> request it. This will allow for other parsers of GICC, and for
+> simplification to the ACPI parking protocol code. Note that we must
+> store a copy, rather than a pointer, since the core ACPI code
+> temporarily maps/unmaps tables while iterating over them.
+> 
+> Since we parse the MADT before we know how many CPUs we have (and hence
+> before we setup the percpu areas), we must use an NR_CPUS sized array.
+> 
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm64/include/asm/acpi.h |  2 ++
+>  arch/arm64/kernel/smp.c       | 10 ++++++++++
+>  2 files changed, 12 insertions(+)
 
-My concern would be if two independent pins' drive strength
-configuration would walk on each other, because they happen to be
-configured via the same registers.
+Most of the static array storage is a waste of memory but it makes
+things much simpler and if it does become a problem we know how to
+fix it so:
 
-If that's not possible, then great!
+Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 
-   Julia
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170323/7d358238/attachment-0001.sig>
+> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
+> index c1976c0..0e99978 100644
+> --- a/arch/arm64/include/asm/acpi.h
+> +++ b/arch/arm64/include/asm/acpi.h
+> @@ -85,6 +85,8 @@ static inline bool acpi_has_cpu_in_madt(void)
+>  	return true;
+>  }
+>  
+> +struct acpi_madt_generic_interrupt *acpi_cpu_get_madt_gicc(int cpu);
+> +
+>  static inline void arch_fix_phys_package_id(int num, u32 slot) { }
+>  void __init acpi_init_cpus(void);
+>  
+> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+> index ef1caae..390c277 100644
+> --- a/arch/arm64/kernel/smp.c
+> +++ b/arch/arm64/kernel/smp.c
+> @@ -518,6 +518,13 @@ static int __init smp_cpu_setup(int cpu)
+>  static unsigned int cpu_count = 1;
+>  
+>  #ifdef CONFIG_ACPI
+> +static struct acpi_madt_generic_interrupt cpu_madt_gicc[NR_CPUS];
+> +
+> +struct acpi_madt_generic_interrupt *acpi_cpu_get_madt_gicc(int cpu)
+> +{
+> +	return &cpu_madt_gicc[cpu];
+> +}
+> +
+>  /*
+>   * acpi_map_gic_cpu_interface - parse processor MADT entry
+>   *
+> @@ -552,6 +559,7 @@ static int __init smp_cpu_setup(int cpu)
+>  			return;
+>  		}
+>  		bootcpu_valid = true;
+> +		cpu_madt_gicc[0] = *processor;
+>  		early_map_cpu_to_node(0, acpi_numa_get_nid(0, hwid));
+>  		return;
+>  	}
+> @@ -562,6 +570,8 @@ static int __init smp_cpu_setup(int cpu)
+>  	/* map the logical cpu id to cpu MPIDR */
+>  	cpu_logical_map(cpu_count) = hwid;
+>  
+> +	cpu_madt_gicc[cpu_count] = *processor;
+> +
+>  	/*
+>  	 * Set-up the ACPI parking protocol cpu entries
+>  	 * while initializing the cpu_logical_map to
+> -- 
+> 1.9.1
+> 
