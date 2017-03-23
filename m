@@ -1,10 +1,10 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 23 Mar 2017 17:43:45 +0100
-Subject: [PATCH 0/3] Fix and improve USB3 support on Armada 37xx
-In-Reply-To: <20170308173315.28512-1-gregory.clement@free-electrons.com>
- (Gregory CLEMENT's message of "Wed, 8 Mar 2017 18:33:12 +0100")
-References: <20170308173315.28512-1-gregory.clement@free-electrons.com>
-Message-ID: <87wpbgc5a6.fsf@free-electrons.com>
+Date: Thu, 23 Mar 2017 17:44:11 +0100
+Subject: [PATCH] ARM64: dts: marvell: armada-3720 add RTC support
+In-Reply-To: <20170308173519.28685-1-gregory.clement@free-electrons.com>
+ (Gregory CLEMENT's message of "Wed, 8 Mar 2017 18:35:19 +0100")
+References: <20170308173519.28685-1-gregory.clement@free-electrons.com>
+Message-ID: <87shm4c59g.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,36 +12,44 @@ Hi,
  
  On mer., mars 08 2017, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
 
-> Hi,
+> The Armada 3720 DB board has an RTC on the I2C bus. It's a PT7C4337A from
+> Pericom but which claims to be fully compatible with the ds1337.
 >
-> The first patch fixes a wrong IRQ number present since the
-> introduction of the device tree for this SoC.
->
-> The second and the third ones improve the USB3 representation
-> following the add of the clock support on Armada 37xx and the gpio
-> expander on Armada 3720 DB.
->
-> Thanks,
->
-> Gregory
->
-> Gregory CLEMENT (3):
->   ARM64: dts: marvell: armada-37xx: Fix interrupt mapping for USB3
->   ARM64: dts: marvell: armada-37xx: Add clock resource for USB3
->   ARM64: dts: marvell: armada-3720-db: Add phy for USB3
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-All 3 patches applied on mvebu/dt64
+Applied on mvebu/dt64
 
 Gregory
 
+> ---
+>  arch/arm64/boot/dts/marvell/armada-3720-db.dts | 6 ++++++
+>  1 file changed, 6 insertions(+)
 >
->  arch/arm64/boot/dts/marvell/armada-3720-db.dts | 17 +++++++++++++++++
->  arch/arm64/boot/dts/marvell/armada-37xx.dtsi   |  3 ++-
->  2 files changed, 19 insertions(+), 1 deletion(-)
->
+> diff --git a/arch/arm64/boot/dts/marvell/armada-3720-db.dts b/arch/arm64/boot/dts/marvell/armada-3720-db.dts
+> index 10207f96f090..38fa7a85c28a 100644
+> --- a/arch/arm64/boot/dts/marvell/armada-3720-db.dts
+> +++ b/arch/arm64/boot/dts/marvell/armada-3720-db.dts
+> @@ -98,6 +98,12 @@
+>  		 * IO0_7: PWR_EN_SGMII	IO1_7: PWR_MCI_PS
+>  		 */
+>  	};
+> +
+> +	rtc at 68  {
+> +		/* PT7C4337A from pericom fully compatible with the ds1337 */
+> +		compatible = "dallas,ds1337";
+> +		reg = <0x68>;
+> +	};
+>  };
+>  
+>  /* CON3 */
 > -- 
 > 2.11.0
 >
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
 -- 
 Gregory Clement, Free Electrons
