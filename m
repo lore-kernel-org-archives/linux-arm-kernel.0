@@ -1,283 +1,1101 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 23 Mar 2017 14:22:30 +0000
-Subject: [RFC PATCH v0.2] PCI: Add support for tango PCIe host bridge
-In-Reply-To: <91db1f47-3024-9712-309a-fb4b21e42028@free.fr>
-References: <91db1f47-3024-9712-309a-fb4b21e42028@free.fr>
-Message-ID: <e5c0bace-fcbe-de3f-b76f-0fb672562e84@arm.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Thu, 23 Mar 2017 15:24:29 +0100
+Subject: [PATCH v3] ARM: dts: imx6: add ZII RDU2 boards
+Message-ID: <20170323142429.8835-1-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/03/17 13:05, Mason wrote:
-> I think this version is ready for review.
-> It has all the required bits and pieces.
-> I still have a few questions, embedded as comments in the code.
-> (Missing are ancillary changes to Kconfig, Makefile)
+This adds support for the Zodiac Inflight Innovations RDU2 board,
+which has both a Quad and a QuadPlus variant.
 
-May I suggest that if you think that a patch is ready for review, it
-should really contain all the bits that make it an actual patch? That
-would include an actual commit log and all what is required to actually
-compile it. Not to mention a SoB.
+The board supports different panels, with the bootloader patching
+in the correct compatible, depending on the hardware configuration.
 
-We rely (at least I certainly do) on things like the kbuild robot
-picking up stuff from the list and giving it a go. Also, it makes it a
-much more efficient use of the reviewer time not to review the same
-thing twice...
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+Tested-by: Nikita Yushchenko <nikita.yoush@cogentembedded.com>
+Tested-by: Chris Healy <cphealy@gmail.com>
+---
+v2: correct touchscreen IRQ to level low.
+v3: changes to incorporate Shawns review
+---
+ arch/arm/boot/dts/Makefile              |   4 +-
+ arch/arm/boot/dts/imx6q-zii-rdu2.dts    |  50 ++
+ arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi | 934 ++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/imx6qp-zii-rdu2.dts   |  50 ++
+ 4 files changed, 1037 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/imx6q-zii-rdu2.dts
+ create mode 100644 arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi
+ create mode 100644 arch/arm/boot/dts/imx6qp-zii-rdu2.dts
 
-That being said:
-
-> ---
->  drivers/pci/host/pcie-tango.c | 350 ++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 350 insertions(+)
->  create mode 100644 drivers/pci/host/pcie-tango.c
-> 
-> diff --git a/drivers/pci/host/pcie-tango.c b/drivers/pci/host/pcie-tango.c
-> new file mode 100644
-> index 000000000000..b2e6448aed2d
-> --- /dev/null
-> +++ b/drivers/pci/host/pcie-tango.c
-> @@ -0,0 +1,350 @@
-> +#include <linux/irqchip/chained_irq.h>
-> +#include <linux/irqdomain.h>
-> +#include <linux/pci-ecam.h>
-> +#include <linux/msi.h>
-> +
-> +#define MSI_COUNT 32
-
-Is this something that is hardcoded? Unlikely to ever change?
-
-> +
-> +struct tango_pcie {
-> +	void __iomem *mux;
-> +	void __iomem *msi_status;
-> +	void __iomem *msi_mask;
-> +	phys_addr_t msi_doorbell;
-> +	struct mutex lock; /* lock for updating msi_mask */
-> +	struct irq_domain *irq_domain;
-> +	struct irq_domain *msi_domain;
-> +	int irq;
-> +};
-> +
-> +/*** MSI CONTROLLER SUPPORT ***/
-> +
-> +static void tango_msi_isr(struct irq_desc *desc)
-> +{
-> +	struct irq_chip *chip = irq_desc_get_chip(desc);
-> +	struct tango_pcie *pcie;
-> +	unsigned long status, virq;
-> +	int pos;
-> +
-> +	chained_irq_enter(chip, desc);
-> +	pcie = irq_desc_get_handler_data(desc);
-> +
-> +	status = readl_relaxed(pcie->msi_status);
-
-Please use types that unambiguously match that of the MMIO accessor (u32
-in this case). On a 64bit system, unsigned long is likely to be 64bit.
-You can assign it to an unsigned long before calling the
-for_each_set_bit operator.
-
-> +	writel_relaxed(status, pcie->msi_status); /* clear IRQs */
-
-Why isn't this your irq_ack method instead of open-coding it?
-
-> +
-> +	for_each_set_bit(pos, &status, MSI_COUNT) {
-> +		virq = irq_find_mapping(pcie->irq_domain, pos);
-> +		if (virq)
-> +			generic_handle_irq(virq);
-> +		else
-> +			pr_err("Unhandled MSI: %d\n", pos);
-
-Please rate-limit this.
-
-> +	}
-> +
-> +	chained_irq_exit(chip, desc);
-> +}
-> +
-> +static struct irq_chip tango_msi_irq_chip = {
-> +	.name = "MSI",
-> +	.irq_mask = pci_msi_mask_irq,
-> +	.irq_unmask = pci_msi_unmask_irq,
-> +};
-> +
-> +static struct msi_domain_info msi_domain_info = {
-> +	.flags	= MSI_FLAG_USE_DEF_DOM_OPS | MSI_FLAG_USE_DEF_CHIP_OPS,
-
-No support for MSI-X? Why?
-
-> +	.chip	= &tango_msi_irq_chip,
-> +};
-> +
-> +static void tango_compose_msi_msg(struct irq_data *data, struct msi_msg *msg)
-> +{
-> +	struct tango_pcie *pcie = irq_data_get_irq_chip_data(data);
-> +
-> +	msg->address_lo = lower_32_bits(pcie->msi_doorbell);
-> +	msg->address_hi = upper_32_bits(pcie->msi_doorbell);
-> +	msg->data = data->hwirq;
-> +}
-> +
-> +static int tango_set_affinity(struct irq_data *irq_data,
-> +		const struct cpumask *mask, bool force)
-> +{
-> +	 return -EINVAL;
-> +}
-> +
-> +static struct irq_chip tango_msi_chip = {
-> +	.name			= "MSI",
-> +	.irq_compose_msi_msg	= tango_compose_msi_msg,
-> +	.irq_set_affinity	= tango_set_affinity,
-> +};
-> +
-> +static int tango_irq_domain_alloc(struct irq_domain *domain, unsigned int virq,
-> +		unsigned int nr_irqs, void *args)
-> +{
-> +	struct tango_pcie *pcie = domain->host_data;
-> +	int pos, err = 0;
-> +	u32 mask;
-> +
-> +	if (nr_irqs != 1) /* When does that happen? */
-> +		return -EINVAL;
-
-Only if the end-point wants to use Multi-MSI. You don't advertise
-support for it, so it should never happen.
-
-> +
-> +	mutex_lock(&pcie->lock);
-> +
-> +	mask = readl_relaxed(pcie->msi_mask);
-
-Do you really need to read this from the HW each time you allocate an
-interrupt? That feels pretty crazy. You're much better off having an
-in-memory bitmap that will make things more efficient, and avoid the
-following bug...
-
-> +	pos = find_first_zero_bit(&mask, MSI_COUNT);
-
-... where using a u32 as a bitmap is a very bad idea (because not the
-whole world is a 32bit, little endian platform).
-
-> +	if (pos < MSI_COUNT)
-> +		writel(mask | BIT(pos), pcie->msi_mask);
-
-And it would make a lot more sense to move this write (which should be
-relaxed) to irq_unmask. Also, calling msi_mask for something that is an
-enable register is a bit counter intuitive.
-
-> +	else
-> +		err = -ENOSPC;
-> +
-> +	mutex_unlock(&pcie->lock);
-> +
-> +	irq_domain_set_info(domain, virq, pos, &tango_msi_chip,
-> +			domain->host_data, handle_simple_irq, NULL, NULL);
-
-And here, you're polluting the domain even if you failed to allocate the
-interrupt.
-
-> +
-> +	return err;
-> +}
-> +
-> +static void tango_irq_domain_free(struct irq_domain *domain,
-> +				   unsigned int virq, unsigned int nr_irqs)
-> +{
-> +	struct irq_data *d = irq_domain_get_irq_data(domain, virq);
-> +	struct tango_pcie *pcie = irq_data_get_irq_chip_data(d);
-> +	int pos = d->hwirq;
-> +	u32 mask;
-> +
-> +	mutex_lock(&pcie->lock);
-> +
-> +	mask = readl(pcie->msi_mask);
-> +	writel(mask & ~BIT(pos), pcie->msi_mask);
-
-Same as above, please move this to the irq_unmask method.
-
-> +
-> +	mutex_unlock(&pcie->lock);
-> +}
-> +
-> +static const struct irq_domain_ops msi_domain_ops = {
-> +	.alloc	= tango_irq_domain_alloc,
-> +	.free	= tango_irq_domain_free,
-> +};
-> +
-> +static int tango_msi_remove(struct platform_device *pdev)
-> +{
-> +	struct tango_pcie *msi = platform_get_drvdata(pdev);
-> +
-> +	irq_set_chained_handler(msi->irq, NULL);
-> +	irq_set_handler_data(msi->irq, NULL);
-> +	/* irq_set_chained_handler_and_data(msi->irq, NULL, NULL); instead? */
-> +
-> +	irq_domain_remove(msi->msi_domain);
-> +	irq_domain_remove(msi->irq_domain);
-> +
-> +	return 0;
-> +}
-> +
-> +static int tango_msi_probe(struct platform_device *pdev, struct tango_pcie *pcie)
-> +{
-> +	int virq;
-> +	struct fwnode_handle *fwnode = of_node_to_fwnode(pdev->dev.of_node);
-> +	struct irq_domain *msi_dom, *irq_dom;
-> +
-> +	mutex_init(&pcie->lock);
-> +	writel(0, pcie->msi_mask);
-> +
-> +	/* Why is fwnode for this call? */
-> +	irq_dom = irq_domain_add_linear(NULL, MSI_COUNT, &msi_domain_ops, pcie);
-
-Use irq_domain_create_linear, pass the same fwnode.
-
-> +	if (!irq_dom) {
-> +		pr_err("Failed to create IRQ domain\n");
-> +		return -ENOMEM;
-> +	}
-> +
-> +	msi_dom = pci_msi_create_irq_domain(fwnode, &msi_domain_info, irq_dom);
-> +	if (!msi_dom) {
-> +		pr_err("Failed to create MSI domain\n");
-> +		irq_domain_remove(irq_dom);
-> +		return -ENOMEM;
-> +	}
-> +
-> +	virq = platform_get_irq(pdev, 1);
-
-In the absence of a documented binding, it is hard to know if you're
-doing the right thing.
-
-> +	if (virq <= 0) {
-> +		irq_domain_remove(msi_dom);
-> +		irq_domain_remove(irq_dom);
-> +		return -ENXIO;
-
-Maybe add a message indicating what failed?
-
-> +	}
-> +
-> +	pcie->irq_domain = irq_dom;
-> +	pcie->msi_domain = msi_dom;
-> +	pcie->irq = virq;
-> +	irq_set_chained_handler_and_data(virq, tango_msi_isr, pcie);
-> +
-> +	return 0;
-> +}
-> +
-> +/*** HOST BRIDGE SUPPORT ***/
-
-[...]
-
-I don't know much about PCIe itself, hence stopping here.
-
-I'd like to see the MSI code as a separate patch, because it is pretty
-much standalone. And please write a DT binding document for the whole
-thing, because I end-up second guessing what you're trying to do...
-
-Thanks,
-
-	M.
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 011808490fed..67588114f3d7 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -425,9 +425,11 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
+ 	imx6q-utilite-pro.dtb \
+ 	imx6q-wandboard.dtb \
+ 	imx6q-wandboard-revb1.dtb \
++	imx6q-zii-rdu2.dtb \
+ 	imx6qp-nitrogen6_max.dtb \
+ 	imx6qp-sabreauto.dtb \
+-	imx6qp-sabresd.dtb
++	imx6qp-sabresd.dtb \
++	imx6qp-zii-rdu2.dtb
+ dtb-$(CONFIG_SOC_IMX6SL) += \
+ 	imx6sl-evk.dtb \
+ 	imx6sl-warp.dtb
+diff --git a/arch/arm/boot/dts/imx6q-zii-rdu2.dts b/arch/arm/boot/dts/imx6q-zii-rdu2.dts
+new file mode 100644
+index 000000000000..b2d346640fd7
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6q-zii-rdu2.dts
+@@ -0,0 +1,50 @@
++/*
++ * Copyright (C) 2016-2017 Zodiac Inflight Innovations
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License
++ *     version 2 as published by the Free Software Foundation.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/dts-v1/;
++
++#include <imx6q.dtsi>
++#include <imx6qdl-zii-rdu2.dtsi>
++
++/ {
++	model = "ZII RDU2 Board";
++	compatible = "zii,imx6q-zii-rdu2", "fsl,imx6q";
++};
+diff --git a/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi b/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi
+new file mode 100644
+index 000000000000..15dfa0cf3acb
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi
+@@ -0,0 +1,934 @@
++/*
++ * Copyright (C) 2016-2017 Zodiac Inflight Innovations
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License
++ *     version 2 as published by the Free Software Foundation.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/sound/fsl-imx-audmux.h>
++
++/ {
++	chosen {
++		stdout-path = &uart1;
++	};
++
++	aliases {
++		mdio-gpio0 = &mdio1;
++	};
++
++	mdio1: mdio {
++		compatible = "virtual,mdio-gpio";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_mdio1>;
++		gpios = <&gpio6 5 GPIO_ACTIVE_HIGH
++		         &gpio6 4 GPIO_ACTIVE_HIGH>;
++	};
++
++	reg_28p0v: regulator-28p0v {
++		compatible = "regulator-fixed";
++		regulator-name = "28V_IN";
++		regulator-min-microvolt = <28000000>;
++		regulator-max-microvolt = <28000000>;
++		regulator-always-on;
++	};
++
++	reg_12p0v: regulator-12p0v {
++		compatible = "regulator-fixed";
++		vin-supply = <&reg_28p0v>;
++		regulator-name = "12V_MAIN";
++		regulator-min-microvolt = <12000000>;
++		regulator-max-microvolt = <12000000>;
++		regulator-always-on;
++	};
++
++	reg_5p0v_main: regulator-5p0v-main {
++		compatible = "regulator-fixed";
++		vin-supply = <&reg_12p0v>;
++		regulator-name = "5V_MAIN";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		regulator-always-on;
++	};
++
++	reg_5p0v_user_usb: regulator-5p0v-user-usb {
++		compatible = "regulator-fixed";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_reg_user_usb>;
++		vin-supply = <&reg_5p0v_main>;
++		regulator-name = "5V_USER_USB";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		gpio = <&gpio3 22 GPIO_ACTIVE_LOW>;
++		startup-delay-us = <1000>;
++	};
++
++	reg_3p3v_pmic: regulator-3p3v-pmic {
++		compatible = "regulator-fixed";
++		vin-supply = <&reg_12p0v>;
++		regulator-name = "PMIC_3V3";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		regulator-always-on;
++	};
++
++	reg_3p3v: regulator-3p3v {
++		compatible = "regulator-fixed";
++		vin-supply = <&reg_3p3v_pmic>;
++		regulator-name = "GEN_3V3";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		regulator-always-on;
++	};
++
++	reg_3p3v_sd: regulator-3p3v-sd {
++		compatible = "regulator-fixed";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_reg_3p3v_sd>;
++		vin-supply = <&reg_3p3v>;
++		regulator-name = "3V3_SD";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		gpio = <&gpio7 8 GPIO_ACTIVE_HIGH>;
++		startup-delay-us = <1000>;
++		enable-active-high;
++		regulator-always-on;
++	};
++
++	reg_3p3v_display: regulator-3p3v-display {
++		compatible = "regulator-fixed";
++		vin-supply = <&reg_12p0v>;
++		regulator-name = "3V3_DISPLAY";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		regulator-always-on;
++	};
++
++	reg_3p3v_ssd: regulator-3p3v-ssd {
++		compatible = "regulator-fixed";
++		vin-supply = <&reg_12p0v>;
++		regulator-name = "3V3_SSD";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		regulator-always-on;
++	};
++
++	sound1 {
++		compatible = "simple-audio-card";
++		simple-audio-card,name = "Front";
++		simple-audio-card,format = "i2s";
++		simple-audio-card,bitclock-master = <&sound1_codec>;
++		simple-audio-card,frame-master = <&sound1_codec>;
++		simple-audio-card,widgets =
++			"Headphone", "Headphone Jack";
++		simple-audio-card,routing =
++			"Headphone Jack", "HPLEFT",
++			"Headphone Jack", "HPRIGHT",
++			"LEFTIN", "HPL",
++			"RIGHTIN", "HPR";
++		simple-audio-card,aux-devs = <&hpa1>;
++
++		sound1_cpu: simple-audio-card,cpu {
++			sound-dai = <&ssi2>;
++		};
++
++		sound1_codec: simple-audio-card,codec {
++			sound-dai = <&codec1>;
++			clocks = <&cs2000>;
++		};
++	};
++
++	sound2 {
++		compatible = "simple-audio-card";
++		simple-audio-card,name = "Back";
++		simple-audio-card,format = "i2s";
++		simple-audio-card,bitclock-master = <&sound2_codec>;
++		simple-audio-card,frame-master = <&sound2_codec>;
++		simple-audio-card,widgets =
++			"Headphone", "Headphone Jack";
++		simple-audio-card,routing =
++			"Headphone Jack", "HPLEFT",
++			"Headphone Jack", "HPRIGHT",
++			"LEFTIN", "HPL",
++			"RIGHTIN", "HPR";
++		simple-audio-card,aux-devs = <&hpa2>;
++
++		sound2_cpu: simple-audio-card,cpu {
++			sound-dai = <&ssi1>;
++		};
++
++		sound2_codec: simple-audio-card,codec {
++			sound-dai = <&codec2>;
++			clocks = <&cs2000>;
++		};
++	};
++
++	panel {
++		power-supply = <&reg_3p3v_display>;
++		status = "disabled";
++
++		port {
++			panel_in: endpoint {
++				remote-endpoint = <&lvds0_out>;
++			};
++		};
++	};
++
++	disp0: disp0 {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		compatible = "fsl,imx-parallel-display";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_disp0>;
++		status = "disabled";
++
++		port at 0 {
++			reg = <0>;
++
++			disp0_in_0: endpoint {
++				remote-endpoint = <&ipu1_di0_disp0>;
++			};
++		};
++
++		port at 1 {
++			reg = <1>;
++
++			disp0_out: endpoint {
++				remote-endpoint = <&tc358767_in>;
++			};
++		};
++	};
++
++	cs2000_ref: cs2000-ref {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <24576000>;
++	};
++
++	cs2000_in_dummy: cs2000-in-dummy {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <0>;
++	};
++
++	edp_refclk: edp-refclk {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <19200000>;
++	};
++};
++
++&reg_arm {
++	vin-supply = <&sw1a_reg>;
++};
++
++&reg_pu {
++	vin-supply = <&sw1c_reg>;
++};
++
++&reg_soc {
++	vin-supply = <&sw1c_reg>;
++};
++
++&ldb {
++	lvds-channel at 0 {
++		port at 4 {
++			reg = <4>;
++
++			lvds0_out: endpoint {
++				remote-endpoint = <&panel_in>;
++			};
++		};
++	};
++};
++
++&uart1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart1>;
++	status = "okay";
++};
++
++&uart3 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart3>;
++	uart-has-rtscts;
++	linux,rs485-enabled-at-boot-time;
++	status = "okay";
++};
++
++&uart4 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart4>;
++	status = "okay";
++};
++
++&ecspi1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_ecspi1>;
++	cs-gpios = <&gpio2 30 GPIO_ACTIVE_HIGH>;
++	status = "okay";
++
++	flash at 0 {
++		compatible = "st,m25p128", "jedec,spi-nor";
++		spi-max-frequency = <20000000>;
++		reg = <0>;
++	};
++};
++
++&i2c1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c1>;
++	clock-frequency = <100000>;
++	status = "okay";
++
++	codec2: codec at 18 {
++		compatible = "ti,tlv320dac3100";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_codec2>;
++		reg = <0x18>;
++		#sound-dai-cells = <0>;
++		HPVDD-supply = <&reg_3p3v>;
++		SPRVDD-supply = <&reg_3p3v>;
++		SPLVDD-supply = <&reg_3p3v>;
++		AVDD-supply = <&reg_3p3v>;
++		IOVDD-supply = <&reg_3p3v>;
++		DVDD-supply = <&vgen4_reg>;
++		gpio-reset = <&gpio1 2 GPIO_ACTIVE_HIGH>;
++	};
++
++	accel at 1c {
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_accel>;
++		compatible = "fsl,mma8451";
++		reg = <0x1c>;
++		interrupt-parent = <&gpio1>;
++		interrupt-names = "int1", "int2";
++		interrupts = <18 IRQ_TYPE_LEVEL_LOW>, <20 IRQ_TYPE_LEVEL_LOW>;
++	};
++
++	hpa2: amp at 60 {
++		compatible = "ti,tpa6130a2";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_tpa2>;
++		reg = <0x60>;
++		power-gpio = <&gpio1 5 GPIO_ACTIVE_HIGH>;
++		Vdd-supply = <&reg_5p0v_main>;
++	};
++
++	edp-bridge at 68 {
++		compatible = "toshiba,tc358767";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_tc358767>;
++		reg = <0x68>;
++		shutdown-gpios = <&gpio1 9 GPIO_ACTIVE_HIGH>;
++		clock-names = "ref";
++		clocks = <&edp_refclk>;
++		status = "disabled";
++
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			port at 1 {
++				reg = <1>;
++
++				tc358767_in: endpoint {
++					remote-endpoint = <&disp0_out>;
++				};
++			};
++		};
++	};
++};
++
++&i2c2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c2>;
++	clock-frequency = <100000>;
++	status = "okay";
++
++	pmic at 08 {
++		compatible = "fsl,pfuze100";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_pfuze100_irq>;
++		reg = <0x08>;
++		interrupt-parent = <&gpio7>;
++		interrupts = <13 IRQ_TYPE_LEVEL_LOW>;
++
++		regulators {
++			sw1a_reg: sw1ab {
++				regulator-min-microvolt = <300000>;
++				regulator-max-microvolt = <1875000>;
++				regulator-boot-on;
++				regulator-always-on;
++				regulator-ramp-delay = <6250>;
++			};
++
++			sw1c_reg: sw1c {
++				regulator-min-microvolt = <300000>;
++				regulator-max-microvolt = <1875000>;
++				regulator-boot-on;
++				regulator-always-on;
++				regulator-ramp-delay = <6250>;
++			};
++
++			sw2_reg: sw2 {
++				regulator-min-microvolt = <800000>;
++				regulator-max-microvolt = <3000000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			sw3a_reg: sw3a {
++				regulator-min-microvolt = <400000>;
++				regulator-max-microvolt = <1500000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			sw3b_reg: sw3b {
++				regulator-min-microvolt = <400000>;
++				regulator-max-microvolt = <1500000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			sw4_reg: sw4 {
++				regulator-min-microvolt = <800000>;
++				regulator-max-microvolt = <1800000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			snvs_reg: vsnvs {
++				regulator-min-microvolt = <1000000>;
++				regulator-max-microvolt = <3000000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			vref_reg: vrefddr {
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			vgen2_reg: vgen2 {
++				regulator-min-microvolt = <1000000>;
++				regulator-max-microvolt = <1500000>;
++				regulator-always-on;
++			};
++
++			vgen4_reg: vgen4 {
++				regulator-min-microvolt = <1200000>;
++				regulator-max-microvolt = <1800000>;
++				regulator-always-on;
++			};
++
++			vgen5_reg: vgen5 {
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <2500000>;
++				regulator-always-on;
++			};
++
++			vgen6_reg: vgen6 {
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <2800000>;
++				regulator-always-on;
++			};
++		};
++	};
++
++	temp-sense at 48 {
++		compatible = "national,lm75";
++		reg = <0x48>;
++	};
++
++	cs2000: clkgen at 4e {
++		compatible = "cirrus,cs2000-cp";
++		reg = <0x4e>;
++		#clock-cells = <0>;
++		clock-names = "clk_in", "ref_clk";
++		clocks = <&cs2000_in_dummy>, <&cs2000_ref>;
++		assigned-clocks = <&cs2000>;
++		assigned-clock-rates = <24000000>;
++	};
++
++	eeprom at 54 {
++		compatible = "at,24c128";
++		reg = <0x54>;
++	};
++
++	rtc at 68 {
++		compatible = "dallas,ds1341";
++		reg = <0x68>;
++	};
++};
++
++&i2c3 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c3>;
++	clock-frequency = <400000>;
++	status = "okay";
++
++	codec1: codec at 18 {
++		compatible = "ti,tlv320dac3100";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_codec1>;
++		reg = <0x18>;
++		#sound-dai-cells = <0>;
++		HPVDD-supply = <&reg_3p3v>;
++		SPRVDD-supply = <&reg_3p3v>;
++		SPLVDD-supply = <&reg_3p3v>;
++		AVDD-supply = <&reg_3p3v>;
++		IOVDD-supply = <&reg_3p3v>;
++		DVDD-supply = <&vgen4_reg>;
++		gpio-reset = <&gpio1 0 GPIO_ACTIVE_HIGH>;
++	};
++
++	touchscreen at 20 {
++		compatible = "syna,rmi4-i2c";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_ts>;
++		reg = <0x20>;
++		interrupt-parent = <&gpio1>;
++		interrupts = <8 IRQ_TYPE_LEVEL_LOW>;
++		vdd-supply = <&reg_5p0v_main>;
++		vio-supply = <&reg_3p3v>;
++
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		rmi4-f01 at 1 {
++			reg = <0x1>;
++			syna,nosleep-mode = <1>;
++		};
++
++		rmi4-f11 at 11 {
++			reg = <0x11>;
++			touchscreen-inverted-y;
++			touchscreen-swapped-x-y;
++			syna,sensor-type = <1>;
++		};
++
++		rmi4-f12 at 12 {
++			reg = <0x12>;
++			touchscreen-inverted-y;
++			touchscreen-swapped-x-y;
++			syna,sensor-type = <1>;
++		};
++	};
++
++	hpa1: amp at 60 {
++		compatible = "ti,tpa6130a2";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_tpa1>;
++		reg = <0x60>;
++		power-gpio = <&gpio1 4 GPIO_ACTIVE_HIGH>;
++		Vdd-supply = <&reg_5p0v_main>;
++	};
++};
++
++&ipu1_di0_disp0 {
++	remote-endpoint = <&disp0_in_0>;
++};
++
++&pcie {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_pcie>;
++	reset-gpio = <&gpio7 12 GPIO_ACTIVE_LOW>;
++	status = "okay";
++};
++
++&usdhc2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usdhc2>;
++	bus-width = <4>;
++	cd-gpios = <&gpio2 2 GPIO_ACTIVE_LOW>;
++	wp-gpios = <&gpio2 3 GPIO_ACTIVE_HIGH>;
++	vmmc-supply = <&reg_3p3v_sd>;
++	vqmmc-supply = <&reg_3p3v>;
++	status = "okay";
++};
++
++&usdhc3 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usdhc3>;
++	bus-width = <4>;
++	cd-gpios = <&gpio2 0 GPIO_ACTIVE_LOW>;
++	wp-gpios = <&gpio2 1 GPIO_ACTIVE_HIGH>;
++	vmmc-supply = <&reg_3p3v_sd>;
++	vqmmc-supply = <&reg_3p3v>;
++	status = "okay";
++};
++
++&usdhc4 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usdhc4>;
++	bus-width = <8>;
++	vmmc-supply = <&reg_3p3v>;
++	vqmmc-supply = <&reg_3p3v>;
++	non-removable;
++	status = "okay";
++};
++
++&sata {
++	status = "okay";
++	target-supply = <&reg_3p3v_ssd>;
++};
++
++&fec {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_enet>;
++	phy-mode = "rmii";
++	phy-reset-gpios = <&gpio1 23 0 GPIO_ACTIVE_LOW>;
++	phy-reset-duration = "100";
++	phy-supply = <&reg_3p3v>;
++	status = "okay";
++
++	fixed-link {
++		speed = <100>;
++		full-duplex;
++	};
++};
++
++&usbh1 {
++	vbus-supply = <&reg_5p0v_main>;
++	status = "okay";
++};
++
++&usbotg {
++	vbus-supply = <&reg_5p0v_user_usb>;
++	disable-over-current;
++	dr_mode = "host";
++	status = "okay";
++};
++
++&ssi1 {
++	status = "okay";
++};
++
++&ssi2 {
++	status = "okay";
++};
++
++&audmux {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_audmux>;
++	status = "okay";
++
++	ssi1 {
++		fsl,audmux-port = <0>;
++		fsl,port-config = <
++			(IMX_AUDMUX_V2_PTCR_SYN |
++			 IMX_AUDMUX_V2_PTCR_TFSEL(2) |
++			 IMX_AUDMUX_V2_PTCR_TCSEL(2) |
++			 IMX_AUDMUX_V2_PTCR_TFSDIR |
++			 IMX_AUDMUX_V2_PTCR_TCLKDIR)
++			IMX_AUDMUX_V2_PDCR_RXDSEL(2)
++		>;
++	};
++
++	aud3 {
++		fsl,audmux-port = <2>;
++		fsl,port-config = <
++			IMX_AUDMUX_V2_PTCR_SYN
++			IMX_AUDMUX_V2_PDCR_RXDSEL(0)
++		>;
++	};
++
++	ssi2 {
++		fsl,audmux-port = <1>;
++		fsl,port-config = <
++			(IMX_AUDMUX_V2_PTCR_SYN |
++			 IMX_AUDMUX_V2_PTCR_TFSEL(4) |
++			 IMX_AUDMUX_V2_PTCR_TCSEL(4) |
++			 IMX_AUDMUX_V2_PTCR_TFSDIR |
++			 IMX_AUDMUX_V2_PTCR_TCLKDIR)
++			IMX_AUDMUX_V2_PDCR_RXDSEL(4)
++		>;
++	};
++
++	aud5 {
++		fsl,audmux-port = <4>;
++		fsl,port-config = <
++			IMX_AUDMUX_V2_PTCR_SYN
++			IMX_AUDMUX_V2_PDCR_RXDSEL(1)
++		>;
++	};
++};
++
++&iomuxc {
++	pinctrl-names = "default";
++
++	pinctrl_accel: accelgrp {
++		fsl,pins = <
++			MX6QDL_PAD_SD1_CMD__GPIO1_IO18		0x4001b000
++			MX6QDL_PAD_SD1_CLK__GPIO1_IO20		0x4001b000
++		>;
++	};
++
++	pinctrl_audmux: audmuxgrp {
++		fsl,pins = <
++			MX6QDL_PAD_KEY_COL0__AUD5_TXC		0x130b0
++			MX6QDL_PAD_KEY_ROW0__AUD5_TXD		0x130b0
++			MX6QDL_PAD_KEY_COL1__AUD5_TXFS		0x130b0
++			MX6QDL_PAD_CSI0_DAT4__AUD3_TXC		0x130b0
++			MX6QDL_PAD_CSI0_DAT5__AUD3_TXD		0x130b0
++			MX6QDL_PAD_CSI0_DAT6__AUD3_TXFS		0x130b0
++		>;
++	};
++
++	pinctrl_codec1: dac1grp {
++		fsl,pins = <
++			MX6QDL_PAD_GPIO_0__GPIO1_IO00		0x40000038
++		>;
++	};
++
++	pinctrl_codec2: dac2grp {
++		fsl,pins = <
++			MX6QDL_PAD_GPIO_2__GPIO1_IO02		0x40000038
++		>;
++	};
++
++	pinctrl_disp0: disp0grp {
++		fsl,pins = <
++			MX6QDL_PAD_DI0_DISP_CLK__IPU1_DI0_DISP_CLK 0x100f9
++			MX6QDL_PAD_DI0_PIN15__IPU1_DI0_PIN15       0x100f9
++			MX6QDL_PAD_DI0_PIN2__IPU1_DI0_PIN02        0x100f9
++			MX6QDL_PAD_DI0_PIN3__IPU1_DI0_PIN03        0x100f9
++			MX6QDL_PAD_DISP0_DAT0__IPU1_DISP0_DATA00   0x100f9
++			MX6QDL_PAD_DISP0_DAT1__IPU1_DISP0_DATA01   0x100f9
++			MX6QDL_PAD_DISP0_DAT2__IPU1_DISP0_DATA02   0x100f9
++			MX6QDL_PAD_DISP0_DAT3__IPU1_DISP0_DATA03   0x100f9
++			MX6QDL_PAD_DISP0_DAT4__IPU1_DISP0_DATA04   0x100f9
++			MX6QDL_PAD_DISP0_DAT5__IPU1_DISP0_DATA05   0x100f9
++			MX6QDL_PAD_DISP0_DAT6__IPU1_DISP0_DATA06   0x100f9
++			MX6QDL_PAD_DISP0_DAT7__IPU1_DISP0_DATA07   0x100f9
++			MX6QDL_PAD_DISP0_DAT8__IPU1_DISP0_DATA08   0x100f9
++			MX6QDL_PAD_DISP0_DAT9__IPU1_DISP0_DATA09   0x100f9
++			MX6QDL_PAD_DISP0_DAT10__IPU1_DISP0_DATA10  0x100f9
++			MX6QDL_PAD_DISP0_DAT11__IPU1_DISP0_DATA11  0x100f9
++			MX6QDL_PAD_DISP0_DAT12__IPU1_DISP0_DATA12  0x100f9
++			MX6QDL_PAD_DISP0_DAT13__IPU1_DISP0_DATA13  0x100f9
++			MX6QDL_PAD_DISP0_DAT14__IPU1_DISP0_DATA14  0x100f9
++			MX6QDL_PAD_DISP0_DAT15__IPU1_DISP0_DATA15  0x100f9
++			MX6QDL_PAD_DISP0_DAT16__IPU1_DISP0_DATA16  0x100f9
++			MX6QDL_PAD_DISP0_DAT17__IPU1_DISP0_DATA17  0x100f9
++			MX6QDL_PAD_DISP0_DAT18__IPU1_DISP0_DATA18  0x100f9
++			MX6QDL_PAD_DISP0_DAT19__IPU1_DISP0_DATA19  0x100f9
++			MX6QDL_PAD_DISP0_DAT20__IPU1_DISP0_DATA20  0x100f9
++			MX6QDL_PAD_DISP0_DAT21__IPU1_DISP0_DATA21  0x100f9
++			MX6QDL_PAD_DISP0_DAT22__IPU1_DISP0_DATA22  0x100f9
++			MX6QDL_PAD_DISP0_DAT23__IPU1_DISP0_DATA23  0x100f9
++		>;
++	};
++
++	pinctrl_ecspi1: ecspi1grp {
++		fsl,pins = <
++			MX6QDL_PAD_EIM_D17__ECSPI1_MISO		0x100b1
++			MX6QDL_PAD_EIM_D18__ECSPI1_MOSI		0x100b1
++			MX6QDL_PAD_EIM_D16__ECSPI1_SCLK		0x100b1
++			MX6QDL_PAD_EIM_EB2__GPIO2_IO30		0x1b0b1
++		>;
++	};
++
++	pinctrl_enet: enetgrp {
++		fsl,pins = <
++			MX6QDL_PAD_ENET_MDC__ENET_MDC		0x000b1
++			MX6QDL_PAD_ENET_MDIO__ENET_MDIO		0x100b1
++			MX6QDL_PAD_ENET_CRS_DV__ENET_RX_EN	0x100f5
++			MX6QDL_PAD_ENET_TX_EN__ENET_TX_EN	0x100f5
++			MX6QDL_PAD_ENET_RXD0__ENET_RX_DATA0	0x100c0
++			MX6QDL_PAD_ENET_RXD1__ENET_RX_DATA1	0x100c0
++			MX6QDL_PAD_ENET_TXD0__ENET_TX_DATA0	0x100f5
++			MX6QDL_PAD_ENET_TXD1__ENET_TX_DATA1	0x100f5
++			MX6QDL_PAD_GPIO_16__ENET_REF_CLK	0x40010040
++			MX6QDL_PAD_ENET_RX_ER__ENET_RX_ER	0x100b0
++			MX6QDL_PAD_ENET_REF_CLK__GPIO1_IO23	0x1b0b0
++		>;
++	};
++
++	pinctrl_i2c1: i2c1grp {
++		fsl,pins = <
++			MX6QDL_PAD_CSI0_DAT8__I2C1_SDA		0x4001b8b1
++			MX6QDL_PAD_CSI0_DAT9__I2C1_SCL		0x4001b8b1
++		>;
++	};
++
++	pinctrl_i2c2: i2c2grp {
++		fsl,pins = <
++			MX6QDL_PAD_KEY_COL3__I2C2_SCL		0x4001b8b1
++			MX6QDL_PAD_KEY_ROW3__I2C2_SDA		0x4001b8b1
++		>;
++	};
++
++	pinctrl_i2c3: i2c3grp {
++		fsl,pins = <
++			MX6QDL_PAD_GPIO_3__I2C3_SCL		0x4001b8b1
++			MX6QDL_PAD_GPIO_6__I2C3_SDA		0x4001b8b1
++		>;
++	};
++
++	pinctrl_mdio1: bitbangmdiogrp {
++		fsl,pins = <
++			/* Bitbang MDIO for DEB Switch */
++			MX6QDL_PAD_CSI0_DAT19__GPIO6_IO05	0x4001b030
++			MX6QDL_PAD_CSI0_DAT18__GPIO6_IO04	0x40018830
++		>;
++	};
++
++	pinctrl_pcie: pciegrp {
++		fsl,pins = <
++			MX6QDL_PAD_GPIO_17__GPIO7_IO12		0x10038
++		>;
++	};
++
++	pinctrl_pfuze100_irq: pfuze100grp {
++		fsl,pins = <
++			MX6QDL_PAD_GPIO_18__GPIO7_IO13		0x40010000
++		>;
++	};
++
++	pinctrl_reg_3p3v_sd: mmcsupply1grp {
++		fsl,pins = <
++			MX6QDL_PAD_SD3_RST__GPIO7_IO08		0x858
++		>;
++	};
++
++	pinctrl_reg_user_usb: usbotggrp {
++		fsl,pins = <
++			MX6QDL_PAD_EIM_D22__GPIO3_IO22		0x40000038
++		>;
++	};
++
++	pinctrl_rmii_phy_irq: phygrp {
++		fsl,pins = <
++			MX6QDL_PAD_EIM_D30__GPIO3_IO30		0x40010000
++		>;
++	};
++
++	pinctrl_tc358767: tc358767grp {
++		fsl,pins = <
++			MX6QDL_PAD_GPIO_9__GPIO1_IO09		0x10
++		>;
++	};
++
++	pinctrl_tpa1: tpa6130-1grp {
++		fsl,pins = <
++			MX6QDL_PAD_GPIO_4__GPIO1_IO04		0x40000038
++		>;
++	};
++
++	pinctrl_tpa2: tpa6130-2grp {
++		fsl,pins = <
++			MX6QDL_PAD_GPIO_5__GPIO1_IO05		0x40000038
++		>;
++	};
++
++	pinctrl_ts: tsgrp {
++		fsl,pins = <
++			MX6QDL_PAD_GPIO_8__GPIO1_IO08		0x1b0b0
++			MX6QDL_PAD_GPIO_7__GPIO1_IO07		0x1b0b0
++		>;
++	};
++
++	pinctrl_uart1: uart1grp {
++		fsl,pins = <
++			MX6QDL_PAD_CSI0_DAT10__UART1_TX_DATA	0x1b0b1
++			MX6QDL_PAD_CSI0_DAT11__UART1_RX_DATA	0x1b0b1
++		>;
++	};
++
++	pinctrl_uart3: uart3grp {
++		fsl,pins = <
++			MX6QDL_PAD_EIM_D24__UART3_TX_DATA	0x1b0b1
++			MX6QDL_PAD_EIM_D25__UART3_RX_DATA	0x1b0b1
++			MX6QDL_PAD_EIM_D31__UART3_RTS_B		0x1b0b1
++		>;
++	};
++
++	pinctrl_uart4: uart4grp {
++		fsl,pins = <
++			MX6QDL_PAD_CSI0_DAT12__UART4_TX_DATA	0x1b0b1
++			MX6QDL_PAD_CSI0_DAT13__UART4_RX_DATA	0x1b0b1
++		>;
++	};
++
++	pinctrl_usdhc2: usdhc2grp {
++		fsl,pins = <
++			MX6QDL_PAD_SD2_CMD__SD2_CMD		0x10059
++			MX6QDL_PAD_SD2_CLK__SD2_CLK		0x10069
++			MX6QDL_PAD_SD2_DAT0__SD2_DATA0		0x17059
++			MX6QDL_PAD_SD2_DAT1__SD2_DATA1		0x17059
++			MX6QDL_PAD_SD2_DAT2__SD2_DATA2		0x17059
++			MX6QDL_PAD_SD2_DAT3__SD2_DATA3		0x17059
++			MX6QDL_PAD_NANDF_D3__GPIO2_IO03		0x40010040
++			MX6QDL_PAD_NANDF_D2__GPIO2_IO02		0x40010040
++		>;
++	};
++
++	pinctrl_usdhc3: usdhc3grp {
++		fsl,pins = <
++			MX6QDL_PAD_SD3_CMD__SD3_CMD		0x10059
++			MX6QDL_PAD_SD3_CLK__SD3_CLK		0x10069
++			MX6QDL_PAD_SD3_DAT0__SD3_DATA0		0x17059
++			MX6QDL_PAD_SD3_DAT1__SD3_DATA1		0x17059
++			MX6QDL_PAD_SD3_DAT2__SD3_DATA2		0x17059
++			MX6QDL_PAD_SD3_DAT3__SD3_DATA3		0x17059
++			MX6QDL_PAD_NANDF_D1__GPIO2_IO01		0x40010040
++			MX6QDL_PAD_NANDF_D0__GPIO2_IO00		0x40010040
++
++		>;
++	};
++
++	pinctrl_usdhc4: usdhc4grp {
++		fsl,pins = <
++			MX6QDL_PAD_SD4_CMD__SD4_CMD		0x17059
++			MX6QDL_PAD_SD4_CLK__SD4_CLK		0x10059
++			MX6QDL_PAD_SD4_DAT0__SD4_DATA0		0x17059
++			MX6QDL_PAD_SD4_DAT1__SD4_DATA1		0x17059
++			MX6QDL_PAD_SD4_DAT2__SD4_DATA2		0x17059
++			MX6QDL_PAD_SD4_DAT3__SD4_DATA3		0x17059
++			MX6QDL_PAD_SD4_DAT4__SD4_DATA4		0x17059
++			MX6QDL_PAD_SD4_DAT5__SD4_DATA5		0x17059
++			MX6QDL_PAD_SD4_DAT6__SD4_DATA6		0x17059
++			MX6QDL_PAD_SD4_DAT7__SD4_DATA7		0x17059
++			MX6QDL_PAD_NANDF_ALE__SD4_RESET		0x1b0b1
++		>;
++	};
++};
+diff --git a/arch/arm/boot/dts/imx6qp-zii-rdu2.dts b/arch/arm/boot/dts/imx6qp-zii-rdu2.dts
+new file mode 100644
+index 000000000000..882b3bd97e07
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6qp-zii-rdu2.dts
+@@ -0,0 +1,50 @@
++/*
++ * Copyright (C) 2016-2017 Zodiac Inflight Innovations
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License
++ *     version 2 as published by the Free Software Foundation.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/dts-v1/;
++
++#include <imx6qp.dtsi>
++#include <imx6qdl-zii-rdu2.dtsi>
++
++/ {
++	model = "ZII RDU2+ Board";
++	compatible = "zii,imx6qp-zii-rdu2", "fsl,imx6qp";
++};
 -- 
-Jazz is not dead. It just smells funny...
+2.11.0
