@@ -1,73 +1,53 @@
-From: gengdongjiu@huawei.com (Dongjiu Geng)
-Date: Thu, 23 Mar 2017 21:01:01 +0800
-Subject: [PATCH] arm/arm64: KVM: send SIGBUS error to qemu
-Message-ID: <1490274061-487-1-git-send-email-gengdongjiu@huawei.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 23 Mar 2017 13:47:20 +0100
+Subject: [PATCH 4/6] gpio: gemini: rename to match Faraday IP
+In-Reply-To: <CACmBeS23APp1=+0Cypyx9OujhekUTF7w5QbwE_9zt_go3GdUPw@mail.gmail.com>
+References: <20170312232818.26304-1-linus.walleij@linaro.org>
+ <20170312232818.26304-4-linus.walleij@linaro.org>
+ <CACmBeS2OC6X_Rb5qaVEGMY4mPyHwnib-=pm-g=+73J6ZSRDgLw@mail.gmail.com>
+ <CACRpkda0TpcUsEW6wiHzhueSckz_WTfbDgpixdgCNvodHDmpyw@mail.gmail.com>
+ <CACmBeS23APp1=+0Cypyx9OujhekUTF7w5QbwE_9zt_go3GdUPw@mail.gmail.com>
+Message-ID: <CACRpkdY0Nj19KgYXfs5GZQrbxSJ-6zZkdo+bYo7Ss_Qo7EgP_Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-when the pfn is KVM_PFN_ERR_HWPOISON, it indicates to send
-SIGBUS signal from KVM's fault-handling code to qemu, qemu
-can handle this signal according to the fault address.
+On Wed, Mar 22, 2017 at 11:21 AM, Jonas Jensen <jonas.jensen@gmail.com> wrote:
+> On 22 March 2017 at 09:42, Linus Walleij <linus.walleij@linaro.org> wrote:
 
-Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
----
- arch/arm/kvm/mmu.c       | 20 ++++++++++++++++++++
- include/linux/kvm_host.h |  5 +++++
- 2 files changed, 25 insertions(+)
+>> Nice! Have you tested my new GPIO character device tools from
+>> tools/gpio/* in the kernel tree?
+>
+> I had not and thanks for pointing that out, lsgpio lists all available
+> gpios (though most of them are unnamed), and gpio-hammer successfully
+> toggled buzzer on/off.
 
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index 962616fd4ddd..1307ec400de3 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -1237,6 +1237,20 @@ static void coherent_cache_guest_page(struct kvm_vcpu *vcpu, kvm_pfn_t pfn,
- 	__coherent_cache_guest_page(vcpu, pfn, size);
- }
- 
-+static void kvm_send_hwpoison_signal(unsigned long address,
-+					struct task_struct *tsk)
-+{
-+	siginfo_t info;
-+
-+	info.si_signo	= SIGBUS;
-+	info.si_errno	= 0;
-+	info.si_code	= BUS_MCEERR_AR;
-+	info.si_addr	= (void __user *)address;
-+	info.si_addr_lsb = PAGE_SHIFT;
-+
-+	send_sig_info(SIGBUS, &info, tsk);
-+}
-+
- static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 			  struct kvm_memory_slot *memslot, unsigned long hva,
- 			  unsigned long fault_status)
-@@ -1309,6 +1323,12 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 	if (is_error_noslot_pfn(pfn))
- 		return -EFAULT;
- 
-+	if (is_error_hwpoison_pfn(pfn)) {
-+		kvm_send_hwpoison_signal(kvm_vcpu_gfn_to_hva(vcpu, gfn),
-+								current);
-+		return -EFAULT;
-+	}
-+
- 	if (kvm_is_device_pfn(pfn)) {
- 		mem_type = PAGE_S2_DEVICE;
- 		flags |= KVM_S2PTE_FLAG_IS_IOMAP;
-diff --git a/include/linux/kvm_host.h b/include/linux/kvm_host.h
-index 2c14ad9809da..610ded9ebe9b 100644
---- a/include/linux/kvm_host.h
-+++ b/include/linux/kvm_host.h
-@@ -91,6 +91,11 @@ static inline bool is_noslot_pfn(kvm_pfn_t pfn)
- {
- 	return pfn == KVM_PFN_NOSLOT;
- }
-+/* hwpoison pfn indicates that it needs to send SIGBUS */
-+static inline bool is_error_hwpoison_pfn(kvm_pfn_t pfn)
-+{
-+	return pfn == KVM_PFN_ERR_HWPOISON;
-+}
- 
- /*
-  * architectures with KVM_HVA_ERR_BAD other than PAGE_OFFSET (e.g. s390)
--- 
-2.11.0
+Nice.
+
+> GPIO chip: gpiochip0, "FTGPIO010", 32 GPIO lines
+>         line  0: unnamed unused [output]
+>         line  1: unnamed unused [output]
+>         line  2: unnamed unused [output]
+>         line  3: unnamed unused [output]
+
+BTW you can name all the "unnamed" lines by using
+gpio-line-names in the gpio node of the device tree, c.f.
+commit 3a1689ea752436917c5ce4487527ed6c444630ee
+
+>         line 24: unnamed unused [output]
+>         line 25: unnamed unused
+>         line 26: unnamed unused
+>         line 27: unnamed "ready-led" [kernel output active-low]
+(...)
+>
+> ./gpio-hammer -n gpiochip0 -o 24
+> Hammer lines [24] on gpiochip0, initial states: [0]
+> [|] [24: 1]
+>
+> ./gpio-hammer -n gpiochip0 -o 27
+> Failed to issue GET LINEHANDLE IOCTL (-16)
+
+So finally when the kernel is using a GPIO line you can't use it
+from userspace at the same time. -16 is -EBUSY.
+
+Yours,
+Linus Walleij
