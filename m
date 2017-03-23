@@ -1,41 +1,32 @@
 From: vigneshr@ti.com (Vignesh R)
-Date: Thu, 23 Mar 2017 17:43:36 +0530
-Subject: [PATCH 1/2] tty: serial_core: Add name field to uart_port struct
-In-Reply-To: <CAHp75VfHtTV6L0GE61kMiHMCQrUSwGJPRxsiNuOCD9mY7MPpZQ@mail.gmail.com>
+Date: Thu, 23 Mar 2017 17:52:46 +0530
+Subject: [PATCH 0/2] serial: Add name field to uart_port
+In-Reply-To: <CAHp75VdhHj-7Utganxo1YnSABmnM5KC+bVJe2KgXx65hNHNGng@mail.gmail.com>
 References: <20170321133636.8814-1-vigneshr@ti.com>
- <20170321133636.8814-2-vigneshr@ti.com>
- <CAHp75VfHtTV6L0GE61kMiHMCQrUSwGJPRxsiNuOCD9mY7MPpZQ@mail.gmail.com>
-Message-ID: <61fd3976-1160-f0cb-15ce-91c46f3d749e@ti.com>
+ <CAHp75VdhHj-7Utganxo1YnSABmnM5KC+bVJe2KgXx65hNHNGng@mail.gmail.com>
+Message-ID: <21173bda-55e5-b9d0-5eb1-335091fbca6a@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On Thursday 23 March 2017 12:15 AM, Andy Shevchenko wrote:
+On Thursday 23 March 2017 12:16 AM, Andy Shevchenko wrote:
 > On Tue, Mar 21, 2017 at 3:36 PM, Vignesh R <vigneshr@ti.com> wrote:
->> Introduce a field to store name of uart_port that can be used to easily
->> identify uart port instances on a system that has more than one uart
+>> This series adds name attribute to uart_port struct inorder to store
+>> name of the tty port that will help in identify different uart
+>> instances.
+>> This patch series is based on discussion here[1].
 > 
-> uart -> UART
-> 
->> instance. The name is of the form ttyXN(eg. ttyS0, ttyAMA0,..) where N
->> is number that particular uart instance.
->> This field will be useful when printing debug info for a particular port
->> or in register irqs with unique irq name. Port name is populated during
-> 
-> irq(s) -> IRQ(s)
-> 
->> uart_add_one_port().
-> 
->> +       snprintf(uport->name, sizeof(uport->name), "%s%d", drv->dev_name,
->> +                drv->tty_driver->name_base + uport->line);
-> 
-> This is fragile. dev_name is defined as pointer, so, it would be any length.
-> So, better to use [devm_]kasprintf().
-> 
+> Please, use versioning for the series. This AFAIU should be v3, and
+> next (which is expecting based on comments) would be v4.
 
-Ok, will you use kasprintf() (and corresponding kfree()) as device is
-not yet allocated at this stage to use devm_*.
+The very first patch I submitted was accepted. So I did not make the
+previous patch as v2 as it was an incremental fix. Since, this series is
+very different from previous patch, I chose not to label this as v3.
+Anyways, will make the next version as v4.
+
+Thanks for the review!
+
 
 -- 
 Regards
