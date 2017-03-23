@@ -1,177 +1,99 @@
-From: slash.tmp@free.fr (Mason)
-Date: Thu, 23 Mar 2017 16:15:57 +0100
-Subject: AER notifications
-In-Reply-To: <f22570b0-aaf5-0c30-0ee7-4e69762552b3@free.fr>
-References: <f22570b0-aaf5-0c30-0ee7-4e69762552b3@free.fr>
-Message-ID: <92032302-8139-601b-690b-0299360bc462@free.fr>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 23 Mar 2017 15:16:49 +0000
+Subject: [PATCH v4 00/28] arm/arm64: KVM: Rework the hyp-stub API
+In-Reply-To: <20170323143916.GA27715@cbox>
+References: <20170321192058.9300-1-marc.zyngier@arm.com>
+ <20170322133724.GA10969@cbox> <3dab2f39-88c2-e10b-942c-58a1d8053b71@arm.com>
+ <20170322172708.GA17329@cbox> <10524c84-1e1e-05f8-97b9-436c8649ffa8@arm.com>
+ <20170323143916.GA27715@cbox>
+Message-ID: <e424e00c-e649-8e6a-7f73-ffbd37046779@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/03/2017 15:14, Mason wrote:
-
-> My PCIe host bridge is supposed to support AER, so I enabled
-> kernel support, out of curiosity. For these tests, I plugged
-> a USB3 card into the PCIe slot.
+On 23/03/17 14:39, Christoffer Dall wrote:
+> On Thu, Mar 23, 2017 at 10:53:04AM +0000, Marc Zyngier wrote:
+>> On 22/03/17 17:27, Christoffer Dall wrote:
+>>>
+>>> I don't think there is a great use case beyond what we already do, it
+>>> would just be to have one set of hyp vectors fewer, so that either the
+>>> hyp stub is in place, or a hypervisor is in place, not kvm-init vectors.
+>>>
+>>> So instead of doing:
+>>>   __hyp_set_vectors(kvm_get_idmap_vector());
+>>>   hvc(); /* via the misused kvm_call_hyp thing */
+>>>
+>>> you would do:
+>>>
+>>>   __hyp_call_function(__kvm_hyp_init, arg1, arg2);
+>>>
+>>> which would change the vector and initialize anything.
+>>>
+>>> Not sure if that can work though, or if there are any downsides that I
+>>> haven't thought about?
+>>
+>> I've given it a go, and that seems to work, at least on arm64. We may 
+>> have to set the vectors in a slightly different way on 32bit because 
+>> we're going to run out of registers (we only have two left once we 
+>> reach the function being called).
 > 
-> I see two classes of reports.
+> Right, that's a challenge I clearly didn't foresee.
 > 
-> 1) When the system is idling, with no USB device plugged into
-> the PCIe card, I occasionally see these:
+>>
+>> Another thing is that the function called is not really a function. It 
+>> is an exception handler, as it has to end with an eret (or we may need 
+>> to save LR in funky ways).
 > 
-> [ 5003.638675] pcieport 0000:00:00.0: AER: Multiple Corrected error received: id=0000
-> [ 5003.646365] pcieport 0000:00:00.0: PCIe Bus Error: severity=Corrected, type=Physical Layer, id=0000(Receiver ID)
-> [ 5003.656991] pcieport 0000:00:00.0:   device [1105:0028] error status/mask=00000001/00002000
-> [ 5003.665566] pcieport 0000:00:00.0:    [ 0] Receiver Error         (First)
+> Shouldn't it have the same semantics as the KVM calling function thing
+> where it pushes the LR on the stack?  But of course, that requires
+> having a stack for each runtime that owns hyp mode at any given time.
+> Potentially not great.
+
+Indeed, and that's the point where I'm starting to think that we may be
+trying to beautify something that may not be worth it.
+
+> If possible, the idea would be that you'd call functions, just like you
+> normally do, but the functions you call can choose to never return -
+> again just like a C function can do if it messes with your machine
+> configuration.
 > 
-> [ 6104.766906] pcieport 0000:00:00.0: AER: Multiple Corrected error received: id=0000
-> [ 6104.774579] pcieport 0000:00:00.0: PCIe Bus Error: severity=Corrected, type=Physical Layer, id=0000(Receiver ID)
-> [ 6104.785140] pcieport 0000:00:00.0:   device [1105:0028] error status/mask=00000001/00002000
-> [ 6104.793701] pcieport 0000:00:00.0:    [ 0] Receiver Error         (First)
+> But maybe the idea is fundamentally flawed, if the only function
+> you'd ever call from the hyp stub is one that takes over the hyp world,
+> and then the original design was just based on using set_vectors.  Hmmm.
+
+That's my point above. The only use case we have so far for this method
+is to take over EL2. On the other have, I've noticed that the more I
+rework this area, the more old stuff surfaces, ready to be nuked. Maybe
+I should keep digging.
+
 > 
-> [ 8388.051130] pcieport 0000:00:00.0: AER: Multiple Corrected error received: id=0000
-> [ 8388.058818] pcieport 0000:00:00.0: PCIe Bus Error: severity=Corrected, type=Physical Layer, id=0000(Receiver ID)
-> [ 8388.069429] pcieport 0000:00:00.0:   device [1105:0028] error status/mask=00000001/00002000
-> [ 8388.078041] pcieport 0000:00:00.0:    [ 0] Receiver Error         (First)
+>>  The potential blocker for this is that the
+>> 32bit decompressor does use set_vectors in funky ways to deal with
+>> relocation. If we get rid of set_vectors like I just did on 64bit,
+>> we'll need to mess with that as well.
 > 
-> [11022.907894] pcieport 0000:00:00.0: AER: Multiple Corrected error received: id=0000
-> [11022.915570] pcieport 0000:00:00.0: PCIe Bus Error: severity=Corrected, type=Physical Layer, id=0000(Receiver ID)
-> [11022.926102] pcieport 0000:00:00.0:   device [1105:0028] error status/mask=00000001/00002000
-> [11022.934666] pcieport 0000:00:00.0:    [ 0] Receiver Error         (First)
+> Interesting.  I didn't think that we'd necessarily get rid of
+> set_vectors, but I agree with you that if we wanted to do this, it
+> should probably go.
 > 
-> 1105:0024 is the rev1 host bridge.
-> 1105:0028 is the rev2 host bridge.
+>>
+>> Anyway, here's the hack, 64bit only, quickly tested on Mustang. I'm not
+>> completely sure this is any prettier, but it is certainly manageable.
 > 
-> I'll let a rev1 host bridge idle for a long time, but I don't
-> remember seeing these reports on rev1.
+> There are two things I like about it.  First, it gets rid of the
+> 'additional runtime' in hyp and second the changes to
+> cpu_init_hyp_mode() are quite nice, imho.
 > 
-> 
-> 2) When I unplug my USB3 Flash drive, I always get some kind of
-> error from the USB framework, and sometimes they are coupled with
-> AER messages.
-> 
-> [   40.158166] pcieport 0000:00:00.0: AER: Uncorrected (Non-Fatal) error received: id=0000
-> [   40.166291] pcieport 0000:00:00.0: PCIe Bus Error: severity=Uncorrected (Non-Fatal), type=Transaction Layer, id=0000(Requester ID)
-> [   40.178519] pcieport 0000:00:00.0:   device [1105:0024] error status/mask=00004000/00000000
-> [   40.187033] pcieport 0000:00:00.0:    [14] Completion Timeout     (First)
-> [   40.193957] pcieport 0000:00:00.0: broadcast error_detected message
-> [   40.200345] pcieport 0000:00:00.0: AER: Device recovery failed
-> [   40.485352] xhci_hcd 0000:01:00.0: Cannot set link state.
-> [   40.490887] usb usb2-port2: cannot disable (err = -32)
-> [   40.496070] usb 2-2: USB disconnect, device number 2
-> [   40.508478] pcieport 0000:00:00.0: AER: Uncorrected (Non-Fatal) error received: id=0000
-> [   40.517291] pcieport 0000:00:00.0: PCIe Bus Error: severity=Uncorrected (Non-Fatal), type=Transaction Layer, id=0000(Requester ID)
-> [   40.529266] pcieport 0000:00:00.0:   device [1105:0024] error status/mask=00004000/00000000
-> [   40.538284] pcieport 0000:00:00.0:    [14] Completion Timeout     (First)
-> [   40.545233] pcieport 0000:00:00.0: broadcast error_detected message
-> [   40.551883] pcieport 0000:00:00.0: AER: Device recovery failed
-> [   40.557859] pcieport 0000:00:00.0: AER: Uncorrected (Non-Fatal) error received: id=0000
-> [   40.566367] pcieport 0000:00:00.0: PCIe Bus Error: severity=Uncorrected (Non-Fatal), type=Transaction Layer, id=0000(Requester ID)
-> [   40.578667] pcieport 0000:00:00.0:   device [1105:0024] error status/mask=00004000/00000000
-> [   40.587098] pcieport 0000:00:00.0:    [14] Completion Timeout     (First)
-> [   40.593950] pcieport 0000:00:00.0: broadcast error_detected message
-> [   40.600268] pcieport 0000:00:00.0: AER: Device recovery failed
-> [   40.606148] pcieport 0000:00:00.0: AER: Uncorrected (Non-Fatal) error received: id=0000
-> [   40.614223] pcieport 0000:00:00.0: PCIe Bus Error: severity=Uncorrected (Non-Fatal), type=Transaction Layer, id=0000(Requester ID)
-> [   40.626046] pcieport 0000:00:00.0:   device [1105:0024] error status/mask=00004000/00000000
-> [   40.634455] pcieport 0000:00:00.0:    [14] Completion Timeout     (First)
-> [   40.641295] pcieport 0000:00:00.0: broadcast error_detected message
-> [   40.647605] pcieport 0000:00:00.0: AER: Device recovery failed
+> Thanks being said, this series is pretty nice as it is, so I don't want
+> to impose more work on you at the moment, so maybe we save your patch
+> snipped below for later if we want to consider looking at it some other
+> time?
 
+What I can do is prepare an extra series that would include the
+corresponding 32bit changes, and we then evaluate that separately. I
+don't mind spending a bit of time on it.
 
-Apparently, the above error trace occurs *every time* I unplug the
-USB3 Flash drive. I'm sure it didn't use to happen systematically...
+Thanks,
 
-[   59.058798] usb 2-2: new SuperSpeed USB device number 2 using xhci_hcd
-[   59.092272] usb 2-2: New USB device found, idVendor=0951, idProduct=1666
-[   59.099029] usb 2-2: New USB device strings: Mfr=1, Product=2, SerialNumber=3
-[   59.106377] usb 2-2: Product: DataTraveler 3.0
-[   59.110929] usb 2-2: Manufacturer: Kingston
-[   59.115209] usb 2-2: SerialNumber: 002618887865F0C0F8646BFA
-[   59.124163] usb-storage 2-2:1.0: USB Mass Storage device detected
-[   59.130727] scsi host0: usb-storage 2-2:1.0
-[   60.158296] scsi 0:0:0:0: Direct-Access     Kingston DataTraveler 3.0      PQ: 0 ANSI: 6
-[   60.168252] sd 0:0:0:0: [sda] 15109516 512-byte logical blocks: (7.74 GB/7.20 GiB)
-[   60.178876] sd 0:0:0:0: [sda] Write Protect is off
-[   60.184356] sd 0:0:0:0: [sda] Mode Sense: 4f 00 00 00
-[   60.189738] sd 0:0:0:0: [sda] Write cache: disabled, read cache: enabled, doesn't support DPO or FUA
-[   60.202228]  sda: sda1
-[   60.206629] sd 0:0:0:0: [sda] Attached SCSI removable disk
-
-[   65.963480] pcieport 0000:00:00.0: AER: Uncorrected (Non-Fatal) error received: id=0000
-[   65.971582] pcieport 0000:00:00.0: PCIe Bus Error: severity=Uncorrected (Non-Fatal), type=Transaction Layer, id=0000(Requester ID)
-[   65.983816] pcieport 0000:00:00.0:   device [1105:0024] error status/mask=00004000/00000000
-[   65.992331] pcieport 0000:00:00.0:    [14] Completion Timeout     (First)
-[   65.999274] pcieport 0000:00:00.0: broadcast error_detected message
-[   66.005664] pcieport 0000:00:00.0: AER: Device recovery failed
-[   66.280717] xhci_hcd 0000:01:00.0: Cannot set link state.
-[   66.286295] usb usb2-port2: cannot disable (err = -32)
-[   66.291486] usb 2-2: USB disconnect, device number 2
-[   66.297725] pcieport 0000:00:00.0: AER: Uncorrected (Non-Fatal) error received: id=0000
-[   66.306012] pcieport 0000:00:00.0: PCIe Bus Error: severity=Uncorrected (Non-Fatal), type=Transaction Layer, id=0000(Requester ID)
-[   66.318142] pcieport 0000:00:00.0:   device [1105:0024] error status/mask=00004000/00000000
-[   66.326704] pcieport 0000:00:00.0:    [14] Completion Timeout     (First)
-[   66.333641] pcieport 0000:00:00.0: broadcast error_detected message
-[   66.340043] pcieport 0000:00:00.0: AER: Device recovery failed
-[   66.345996] pcieport 0000:00:00.0: AER: Uncorrected (Non-Fatal) error received: id=0000
-[   66.354141] pcieport 0000:00:00.0: PCIe Bus Error: severity=Uncorrected (Non-Fatal), type=Transaction Layer, id=0000(Requester ID)
-[   66.366026] pcieport 0000:00:00.0:   device [1105:0024] error status/mask=00004000/00000000
-[   66.374444] pcieport 0000:00:00.0:    [14] Completion Timeout     (First)
-[   66.381321] pcieport 0000:00:00.0: broadcast error_detected message
-[   66.387635] pcieport 0000:00:00.0: AER: Device recovery failed
-
-[   72.715540] usb 2-2: new SuperSpeed USB device number 3 using xhci_hcd
-[   72.748836] usb 2-2: New USB device found, idVendor=0951, idProduct=1666
-[   72.755594] usb 2-2: New USB device strings: Mfr=1, Product=2, SerialNumber=3
-[   72.762778] usb 2-2: Product: DataTraveler 3.0
-[   72.767329] usb 2-2: Manufacturer: Kingston
-[   72.771547] usb 2-2: SerialNumber: 002618887865F0C0F8646BFA
-[   72.780539] usb-storage 2-2:1.0: USB Mass Storage device detected
-[   72.786987] scsi host0: usb-storage 2-2:1.0
-[   73.811611] scsi 0:0:0:0: Direct-Access     Kingston DataTraveler 3.0      PQ: 0 ANSI: 6
-[   73.821656] sd 0:0:0:0: [sda] 15109516 512-byte logical blocks: (7.74 GB/7.20 GiB)
-[   73.832641] sd 0:0:0:0: [sda] Write Protect is off
-[   73.837909] sd 0:0:0:0: [sda] Mode Sense: 4f 00 00 00
-[   73.843538] sd 0:0:0:0: [sda] Write cache: disabled, read cache: enabled, doesn't support DPO or FUA
-[   73.856237]  sda: sda1
-[   73.864146] sd 0:0:0:0: [sda] Attached SCSI removable disk
-
-[   78.138502] pcieport 0000:00:00.0: AER: Uncorrected (Non-Fatal) error received: id=0000
-[   78.146629] pcieport 0000:00:00.0: PCIe Bus Error: severity=Uncorrected (Non-Fatal), type=Transaction Layer, id=0000(Requester ID)
-[   78.158469] pcieport 0000:00:00.0:   device [1105:0024] error status/mask=00004000/00000000
-[   78.166904] pcieport 0000:00:00.0:    [14] Completion Timeout     (First)
-[   78.173768] pcieport 0000:00:00.0: broadcast error_detected message
-[   78.180081] pcieport 0000:00:00.0: AER: Device recovery failed
-[   78.464045] xhci_hcd 0000:01:00.0: Cannot set link state.
-[   78.469507] usb usb2-port2: cannot disable (err = -32)
-[   78.474689] usb 2-2: USB disconnect, device number 3
-[   78.480947] pcieport 0000:00:00.0: AER: Uncorrected (Non-Fatal) error received: id=0000
-[   78.489209] pcieport 0000:00:00.0: PCIe Bus Error: severity=Uncorrected (Non-Fatal), type=Transaction Layer, id=0000(Requester ID)
-[   78.501131] pcieport 0000:00:00.0:   device [1105:0024] error status/mask=00004000/00000000
-[   78.509573] pcieport 0000:00:00.0:    [14] Completion Timeout     (First)
-[   78.516495] pcieport 0000:00:00.0: broadcast error_detected message
-[   78.522833] pcieport 0000:00:00.0: AER: Device recovery failed
-[   78.528715] pcieport 0000:00:00.0: AER: Uncorrected (Non-Fatal) error received: id=0000
-[   78.536799] pcieport 0000:00:00.0: PCIe Bus Error: severity=Uncorrected (Non-Fatal), type=Transaction Layer, id=0000(Requester ID)
-[   78.548644] pcieport 0000:00:00.0:   device [1105:0024] error status/mask=00004000/00000000
-[   78.557053] pcieport 0000:00:00.0:    [14] Completion Timeout     (First)
-[   78.563905] pcieport 0000:00:00.0: broadcast error_detected message
-[   78.570214] pcieport 0000:00:00.0: AER: Device recovery failed
-
-
-And I also see a third kind of report:
-
-[   17.826017] pcieport 0000:00:00.0: AER: Corrected error received: id=0000
-[   17.833917] pcieport 0000:00:00.0: PCIe Bus Error: severity=Corrected, type=Data Link Layer, id=0000(Transmitter ID)
-[   17.844583] pcieport 0000:00:00.0:   device [1105:0024] error status/mask=00001000/00002000
-[   17.853217] pcieport 0000:00:00.0:    [12] Replay Timer Timeout  
-
-[ 7100.130522] pcieport 0000:00:00.0: AER: Corrected error received: id=0000
-[ 7100.137405] pcieport 0000:00:00.0: PCIe Bus Error: severity=Corrected, type=Data Link Layer, id=0000(Transmitter ID)
-[ 7100.148351] pcieport 0000:00:00.0:   device [1105:0024] error status/mask=00001000/00002000
-[ 7100.156888] pcieport 0000:00:00.0:    [12] Replay Timer Timeout  
-
-
-I'll try enabling AER on the legacy kernel (3.4) to see if I get
-the same behavior.
-
-Regards.
+	M.
+-- 
+Jazz is not dead. It just smells funny...
