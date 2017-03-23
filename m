@@ -1,191 +1,44 @@
-From: shiju.jose@huawei.com (Shiju Jose)
-Date: Thu, 23 Mar 2017 18:44:30 +0000
-Subject: [PATCH V13 08/10] ras: acpi / apei: generate trace event for
- unrecognized CPER section
-In-Reply-To: <1490136425-4324-9-git-send-email-tbaicar@codeaurora.org>
-References: <1490136425-4324-1-git-send-email-tbaicar@codeaurora.org>
- <1490136425-4324-9-git-send-email-tbaicar@codeaurora.org>
-Message-ID: <86258A5CC0A3704780874CF6004BA8A62DCE0485@lhreml502-mbs>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Thu, 23 Mar 2017 20:51:43 +0200
+Subject: [PATCH v3 1/2] pinctrl: samsung: Register pinctrl before GPIO
+In-Reply-To: <1490202935-4708-1-git-send-email-ckeepax@opensource.wolfsonmicro.com>
+References: <1490202935-4708-1-git-send-email-ckeepax@opensource.wolfsonmicro.com>
+Message-ID: <20170323185143.7nfgddujuie6ccws@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tested-by: Shiju Jose <shiju.jose@huawei.com>
-
-> -----Original Message-----
-> From: Tyler Baicar [mailto:tbaicar at codeaurora.org]
-> Sent: 21 March 2017 22:47
-> To: christoffer.dall at linaro.org; marc.zyngier at arm.com;
-> pbonzini at redhat.com; rkrcmar at redhat.com; linux at armlinux.org.uk;
-> catalin.marinas at arm.com; will.deacon at arm.com; rjw at rjwysocki.net;
-> lenb at kernel.org; matt at codeblueprint.co.uk; robert.moore at intel.com;
-> lv.zheng at intel.com; nkaje at codeaurora.org; zjzhang at codeaurora.org;
-> mark.rutland at arm.com; james.morse at arm.com; akpm at linux-foundation.org;
-> eun.taik.lee at samsung.com; sandeepa.s.prabhu at gmail.com;
-> labbott at redhat.com; shijie.huang at arm.com; rruigrok at codeaurora.org;
-> paul.gortmaker at windriver.com; tn at semihalf.com; fu.wei at linaro.org;
-> rostedt at goodmis.org; bristot at redhat.com; linux-arm-
-> kernel at lists.infradead.org; kvmarm at lists.cs.columbia.edu;
-> kvm at vger.kernel.org; linux-kernel at vger.kernel.org; linux-
-> acpi at vger.kernel.org; linux-efi at vger.kernel.org; devel at acpica.org;
-> Suzuki.Poulose at arm.com; punit.agrawal at arm.com; astone at redhat.com;
-> harba at codeaurora.org; hanjun.guo at linaro.org; John Garry; Shiju Jose;
-> joe at perches.com
-> Cc: Tyler Baicar
-> Subject: [PATCH V13 08/10] ras: acpi / apei: generate trace event for
-> unrecognized CPER section
+On Wed, Mar 22, 2017 at 05:15:34PM +0000, Charles Keepax wrote:
+> If we request a GPIO hog, then gpiochip_add_data will attempt
+> to request some of its own GPIOs. The driver also uses
+> gpiochip_generic_request which means that for any GPIO request to
+> succeed the pinctrl needs to be registered. Currently however the
+> driver registers the GPIO and then the pinctrl meaning all GPIO hog
+> requests will fail, which then in turn causes the whole driver to fail
+> probe.
 > 
-> UEFI spec allows for non-standard section in Common Platform Error
-> Record. This is defined in section N.2.3 of UEFI version 2.5.
+> Fix this up by ensuring we register the pinctrl first. This
+> does require us to manually set the GPIO base for the
+> pinctrl. Fortunately the driver already assigns a fixed GPIO base, in
+> samsung_gpiolib_register, and uses the same calculation it does for
+> the pin_base. Meaning the two will always be the same and allowing us
+> to reuse the pinbase and avoid the issue.
 > 
-> Currently if the CPER section's type (UUID) does not match with any
-> section type that the kernel knows how to parse, trace event is not
-> generated for such section. And thus user is not able to know happening
-> of such hardware error, including error record of non-standard section.
+> Although currently there are no users of GPIO hogs in mainline
+> there are plenty of Samsung based boards that are widely used for
+> development purposes of other hardware. Indeed we hit this issue
+> whilst attaching some additional hardware to an Arndale system.
 > 
-> This commit generates a trace event which contains raw error data for
-> unrecognized CPER section.
-> 
-> Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
-> CC: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
+> Signed-off-by: Charles Keepax <ckeepax@opensource.wolfsonmicro.com>
 > ---
->  drivers/acpi/apei/ghes.c | 24 ++++++++++++++++++++++--
->  drivers/ras/ras.c        |  1 +
->  include/ras/ras_event.h  | 45
-> +++++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 68 insertions(+), 2 deletions(-)
 > 
-> diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c index
-> 7e3e5e0..3ecbacc 100644
-> --- a/drivers/acpi/apei/ghes.c
-> +++ b/drivers/acpi/apei/ghes.c
-> @@ -45,11 +45,13 @@
->  #include <linux/aer.h>
->  #include <linux/nmi.h>
->  #include <linux/sched/clock.h>
-> +#include <linux/uuid.h>
+> Changes since v2:
+>  - Squash in fix to set the GPIO base on the pin_bank.
 > 
->  #include <acpi/actbl1.h>
->  #include <acpi/ghes.h>
->  #include <acpi/apei.h>
->  #include <asm/tlbflush.h>
-> +#include <ras/ras_event.h>
+>  drivers/pinctrl/samsung/pinctrl-samsung.c | 36 +++++++++++++++----------------
+>  1 file changed, 18 insertions(+), 18 deletions(-)
 > 
->  #include "apei-internal.h"
-> 
-> @@ -454,11 +456,21 @@ static void ghes_do_proc(struct ghes *ghes,  {
->  	int sev, sec_sev;
->  	struct acpi_hest_generic_data *gdata;
-> +	uuid_le sec_type;
-> +	uuid_le *fru_id = &NULL_UUID_LE;
-> +	char *fru_text = "";
-> 
->  	sev = ghes_severity(estatus->error_severity);
->  	apei_estatus_for_each_section(estatus, gdata) {
->  		sec_sev = ghes_severity(gdata->error_severity);
-> -		if (!uuid_le_cmp(*(uuid_le *)gdata->section_type,
-> +		sec_type = *(uuid_le *)gdata->section_type;
-> +
-> +		if (gdata->validation_bits & CPER_SEC_VALID_FRU_ID)
-> +			fru_id = (uuid_le *)gdata->fru_id;
-> +		if (gdata->validation_bits & CPER_SEC_VALID_FRU_TEXT)
-> +			fru_text = gdata->fru_text;
-> +
-> +		if (!uuid_le_cmp(sec_type,
->  				 CPER_SEC_PLATFORM_MEM)) {
->  			struct cper_sec_mem_err *mem_err;
-> 
-> @@ -469,7 +481,7 @@ static void ghes_do_proc(struct ghes *ghes,
->  			ghes_handle_memory_failure(gdata, sev);
->  		}
->  #ifdef CONFIG_ACPI_APEI_PCIEAER
-> -		else if (!uuid_le_cmp(*(uuid_le *)gdata->section_type,
-> +		else if (!uuid_le_cmp(sec_type,
->  				      CPER_SEC_PCIE)) {
->  			struct cper_sec_pcie *pcie_err;
-> 
-> @@ -502,6 +514,14 @@ static void ghes_do_proc(struct ghes *ghes,
-> 
->  		}
->  #endif
-> +#ifdef CONFIG_RAS
-> +		else if (trace_unknown_sec_event_enabled()) {
-> +			void *unknown_err =
-> acpi_hest_generic_data_payload(gdata);
-> +			trace_unknown_sec_event(&sec_type,
-> +					fru_id, fru_text, sec_sev,
-> +					unknown_err, gdata->error_data_length);
-> +		}
-> +#endif
->  	}
->  }
-> 
-> diff --git a/drivers/ras/ras.c b/drivers/ras/ras.c index
-> b67dd36..fb2500b 100644
-> --- a/drivers/ras/ras.c
-> +++ b/drivers/ras/ras.c
-> @@ -27,3 +27,4 @@ static int __init ras_init(void)
-> EXPORT_TRACEPOINT_SYMBOL_GPL(extlog_mem_event);
->  #endif
->  EXPORT_TRACEPOINT_SYMBOL_GPL(mc_event);
-> +EXPORT_TRACEPOINT_SYMBOL_GPL(unknown_sec_event);
-> diff --git a/include/ras/ras_event.h b/include/ras/ras_event.h index
-> 1791a12..5861b6f 100644
-> --- a/include/ras/ras_event.h
-> +++ b/include/ras/ras_event.h
-> @@ -162,6 +162,51 @@
->  );
-> 
->  /*
-> + * Unknown Section Report
-> + *
-> + * This event is generated when hardware detected a hardware
-> + * error event, which may be of non-standard section as defined
-> + * in UEFI spec appendix "Common Platform Error Record", or may
-> + * be of sections for which TRACE_EVENT is not defined.
-> + *
-> + */
-> +TRACE_EVENT(unknown_sec_event,
-> +
-> +	TP_PROTO(const uuid_le *sec_type,
-> +		 const uuid_le *fru_id,
-> +		 const char *fru_text,
-> +		 const u8 sev,
-> +		 const u8 *err,
-> +		 const u32 len),
-> +
-> +	TP_ARGS(sec_type, fru_id, fru_text, sev, err, len),
-> +
-> +	TP_STRUCT__entry(
-> +		__array(char, sec_type, 16)
-> +		__array(char, fru_id, 16)
-> +		__string(fru_text, fru_text)
-> +		__field(u8, sev)
-> +		__field(u32, len)
-> +		__dynamic_array(u8, buf, len)
-> +	),
-> +
-> +	TP_fast_assign(
-> +		memcpy(__entry->sec_type, sec_type, sizeof(uuid_le));
-> +		memcpy(__entry->fru_id, fru_id, sizeof(uuid_le));
-> +		__assign_str(fru_text, fru_text);
-> +		__entry->sev = sev;
-> +		__entry->len = len;
-> +		memcpy(__get_dynamic_array(buf), err, len);
-> +	),
-> +
-> +	TP_printk("severity: %d; sec type:%pU; FRU: %pU %s; data len:%d;
-> raw data:%s",
-> +		  __entry->sev, __entry->sec_type,
-> +		  __entry->fru_id, __get_str(fru_text),
-> +		  __entry->len,
-> +		  __print_hex(__get_dynamic_array(buf), __entry->len)) );
-> +
-> +/*
->   * PCIe AER Trace event
->   *
->   * These events are generated when hardware detects a corrected or
-> --
-> Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
-> Technologies, Inc.
-> Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a
-> Linux Foundation Collaborative Project.
+
+Thanks, applied.
+
+Best regards,
+Krzysztof
