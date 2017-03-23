@@ -1,146 +1,119 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 23 Mar 2017 12:25:48 +0000
-Subject: [PATCH v3] efifb: avoid reconfiguration of BAR that covers the
- framebuffer
-In-Reply-To: <20170323105727.GA2441@red-moon>
-References: <1490196629-28088-1-git-send-email-ard.biesheuvel@linaro.org>
- <20170322193111.GA8190@wunner.de>
- <CAKv+Gu_X-SEnz7h9J8boqqjOQGHQawwdSAq4haH-OGu8zdfNfA@mail.gmail.com>
- <20170323084819.GA23281@h08.hostsharing.net>
- <CAKv+Gu93eJ-js3g7M6Jdm6XGMaWMswFmzBG2qNT4rn+3=1+EyA@mail.gmail.com>
- <20170323105727.GA2441@red-moon>
-Message-ID: <CAKv+Gu-J664KXaZR19nViq4o1n_x=P-trsZ0oNDiONuBpAcd7A@mail.gmail.com>
+From: mike.leach@linaro.org (Mike Leach)
+Date: Thu, 23 Mar 2017 12:27:09 +0000
+Subject: [PATCH v3 3/5] coresight: add support for debug module
+In-Reply-To: <20170323054319.GA7716@leoy-linaro>
+References: <1488520809-31670-1-git-send-email-leo.yan@linaro.org>
+ <1488520809-31670-4-git-send-email-leo.yan@linaro.org>
+ <671a0b39-b635-6e0e-d3fa-967651f2e29c@arm.com>
+ <CAJ9a7VgCjXNGC4C49PxL-nBxzhMCmA8Mb-0C_epahizA5EL2HA@mail.gmail.com>
+ <e7a97c52-f61a-e503-f626-09563fa100b8@arm.com>
+ <CAJ9a7VhvCS3xXAHBt0AUVB2Zp2P1HP_LQm4KiptiBT9VJ1fC0Q@mail.gmail.com>
+ <4961636d-d77c-0f9a-7076-4db1ef456073@arm.com>
+ <1e6d6a91-3bdc-7cfb-a96f-780c959e0316@arm.com>
+ <7a028460-d598-e337-5e09-234beddca88b@arm.com>
+ <20170323054319.GA7716@leoy-linaro>
+Message-ID: <CAJ9a7Vj8Rt7+Pq+pYg-K+xHNYnSyR+oN4RHM6XTb_Ju+akgbug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 March 2017 at 10:57, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
-> On Thu, Mar 23, 2017 at 09:04:03AM +0000, Ard Biesheuvel wrote:
->> On 23 March 2017 at 08:48, Lukas Wunner <lukas@wunner.de> wrote:
->> > On Wed, Mar 22, 2017 at 07:32:43PM +0000, Ard Biesheuvel wrote:
->> >> On 22 March 2017 at 19:31, Lukas Wunner <lukas@wunner.de> wrote:
->> >> > On Wed, Mar 22, 2017 at 03:30:29PM +0000, Ard Biesheuvel wrote:
->> >> >> On UEFI systems, the PCI subsystem is enumerated by the firmware,
->> >> >> and if a graphical framebuffer is exposed by a PCI device, its base
->> >> >> address and size are exposed to the OS via the Graphics Output
->> >> >> Protocol (GOP).
->> >> >>
->> >> >> On arm64 PCI systems, the entire PCI hierarchy is reconfigured from
->> >> >> scratch at boot. This may result in the GOP framebuffer address to
->> >> >> become stale, if the BAR covering the framebuffer is modified. This
->> >> >> will cause the framebuffer to become unresponsive, and may in some
->> >> >> cases result in unpredictable behavior if the range is reassigned to
->> >> >> another device.
->> >> >
->> >> > Hm, commit message seems to indicate the issue is restricted to arm64,
->> >> > yet there's no IS_ENABLED(ARM64) to constrain the added code to that arch?
+Also agree with Suzuki's excellent summary.
+
+A couple of notes on using EDPRCR....
+
+The logic for this assuming a correctly implemented system should be
+something like.....
+
+if (prsr() == powered_down) { // if we are powered down request power up.
+    sw_unlock()   // ensure that the sw lock register on the device is unlocked
+    write(prcr(bit3=1))
+    wait_with_timeout(prsr()==powered_up)   // must wait to see if the
+system does power up - otherwise bad things happen!
+    if(timed_out)
+       fail("power up request for CPU N failed.")  // nothing to do
+after this point though if a CPU can't be powered is should not be
+included in the list to be checked on crash.
+}
+ensure_os_lock_unlocked()  // os lock has to be unlocked for bit 0 of
+prcr to be writeable.
+sw_unlock()   // ensure that the sw lock register on the device is unlocked
+write(prcr(bit3=1 | bit0=1)) // the core is powered, set the
+nopowerdown request bit so we don't lose it & emulate power down
+
+
+I think that some of the above logic is already in the driver, so
+needs to be adapted for the PRCR handling.
+
+
+On the "bad" systems, the initial prsr check is likely to fail (crash
+/ buslock) if the debug logic is not correctly powered. The user will
+then have to use one or more of the PM mitigations previously
+discussed that are appropriate for that specific platform and retry
+
+Regards
+
+Mike
+
+
+On 23 March 2017 at 05:43, Leo Yan <leo.yan@linaro.org> wrote:
+> On Wed, Mar 22, 2017 at 05:25:50PM +0000, Sudeep Holla wrote:
+>>
+>>
+>> On 22/03/17 17:09, Suzuki K Poulose wrote:
+>> > On 22/03/17 16:17, Sudeep Holla wrote:
+>>
+>> [...]
+>>
 >> >>
->> >> True. I am eager to get some x86 coverage for this, since I would
->> >> expect this not to do any harm. But I'm fine with making it ARM/arm64
->> >> specific in the final version.
+>> >> Point taken. So we could just specify that all necessary power
+>> >> domains need to be on for proper functionality for this feature and
+>> >> that it's highly platform specific instead of mixing cpu/cluster
+>> >> idle details here.
+>> >>
+>> >>> The key point is that the caveat in using this driver is that
+>> >>> the power management has to be considered on a platform specific
+>> >>> basis before it is configured; and appropriate actions may be
+>> >>> needed for it to work correctly. Without this then the driver
+>> >>> could cause more issues than it debugs. A user selecting this
+>> >>> _must_ be told about these issues
+>> >>>
 >> >
->> > I see.  IIUC, this is only a problem because pci_bus_assign_resources()
->> > is called from arch/arm64/kernel/pci.c:pci_acpi_scan_root() (as well as
->> > the host drivers) and x86 isn't affected because it doesn't do that.
+>> > So given all the possible caveats, I think we :
+>> >
+>> > 1) Shouldn't enable the driver by default at runtime even if it is
+>> > built-in.
+>> > 2) Should provide mechanisms to turn it on at boot (via
+>> > kernel commandline) or anytime later (via sysfs), which kind of puts
+>> > the responsibility back on the user : "You know what you are doing".
+>> > 3) Shouldn't turn the driver on based on "nohlt" which the user
+>> > could use it for some other purposes, without explicit intention of
+>> > turning this driver on).
+>> > 4) Should document the fact that, on some
+>> > platforms, the user may have to disable CPUidle explicitly to get the
+>> > driver working. But let us not make it the default. The user with a
+>> > not so ideal platform could add "nohlt" and get it working.
 >> >
 >>
->> Correct. But on x86 (or rather, on a PC), you can be sure that UEFI
->> (or the legacy PCI bios) performed the resource assignment already.
->> One could argue that this is equally the case when running arm64 in
->> ACPI mode, but in general, you cannot assume the presence of firmware
->> on ARM/arm64 that has already taken care of this, and so the state of
->> the BARs has to be presumed invalid.
+>> Agreed on all points and well summarized.
+>> I would like to highlight (3) and (4) as it needs to be well understood.
+>>
+>> "nohlt" has a *different* meaning already, so using that in this
+>> driver for something else is simple wrong as it affects the system in
+>> unintended ways. And yes if user (mis)uses it to get things working,
+>> it's fine but shouldn't be recommended way.
 >
-> The story is a bit more convoluted than that owing to x86 (and other
-> arches) legacy.
+> Understand this point.
 >
-> x86 tries to claim all PCI resources (in two passes - first enabled
-> devices, second disabled devices) and that predates ACPI/UEFI.
+> I will try to use general way to constraint CPUIdle like other
+> drivers.
 >
-> Mind, x86 reassign resources that can't be claimed too, the only
-> difference with ARM64 is that, for the better or the worse, we
-> have decided not to claim the FW PCI set-up on ARM64 even if it
-> is sane, we do not even try, it was a deliberate choice.
+> Thanks all for these good suggestions :)
 >
-> This patch should be harmless on x86 since if the FB PCI BAR is set
-> up sanely, claiming it again should be a nop (to be checked).
->
-
-I have checked this with OVMF under QEMU. Claiming the resource early
-like we do this in this patch does not result in any diagnostic output
-or other symptoms that would suggest that anything unexpected occurs.
-
-For the record: I applied the following hunk on top of the current
-version of this patch
-
-diff --git a/drivers/video/fbdev/efifb.c b/drivers/video/fbdev/efifb.c
-index 88f653864a01..98b7c437a448 100644
---- a/drivers/video/fbdev/efifb.c
-+++ b/drivers/video/fbdev/efifb.c
-@@ -380,7 +380,10 @@ static void claim_efifb_bar(struct pci_dev *dev, int idx)
-                return;
-        }
-
--       if (pci_claim_resource(dev, idx)) {
-+       if (dev->resource[idx].parent != NULL) {
-+               dev_info(&dev->dev, "BAR %d: resource already claimed\n", idx);
-+               while (1) { asm ("hlt"); }
-+       } else if (pci_claim_resource(dev, idx)) {
-                pci_dev_disabled = true;
-                dev_err(&dev->dev,
-                        "BAR %d: failed to claim resource for efifb!\n", idx);
-
-and got the following output in the kernel log related to BDF 0/2/0 and efifb
-
-pci 0000:00:02.0: [1234:1111] type 00 class 0x030000
-pci 0000:00:02.0: reg 0x10: [mem 0x80000000-0x80ffffff pref]
-pci 0000:00:02.0: reg 0x18: [mem 0x81020000-0x81020fff]
-pci 0000:00:02.0: reg 0x30: [mem 0xffff0000-0xffffffff pref]
-pci 0000:00:02.0: BAR 0: assigned to efifb
-pci 0000:00:02.0: can't claim BAR 6 [mem 0xffff0000-0xffffffff pref]:
-no compatible bridge window
-pci 0000:00:02.0: BAR 6: assigned [mem 0x08040000-0x0804ffff pref]
-pci 0000:00:02.0: Video device with shadowed ROM at [mem 0x000c0000-0x000dffff]
-efifb: probing for efifb
-efifb: framebuffer at 0x80000000, using 1876k, total 1875k
-efifb: mode is 800x600x32, linelength=3200, pages=1
-efifb: scrolling: redraw
-efifb: Truecolor: size=8:8:8:8, shift=24:16:8:0
-
-whereas a kernel without this patch gives me
-
-pci 0000:00:02.0: [1234:1111] type 00 class 0x030000
-pci 0000:00:02.0: reg 0x10: [mem 0x80000000-0x80ffffff pref]
-pci 0000:00:02.0: reg 0x18: [mem 0x81020000-0x81020fff]
-pci 0000:00:02.0: reg 0x30: [mem 0xffff0000-0xffffffff pref]
-pci 0000:00:02.0: can't claim BAR 6 [mem 0xffff0000-0xffffffff pref]:
-no compatible bridge window
-pci 0000:00:02.0: BAR 6: assigned [mem 0x08040000-0x0804ffff pref]
-pci 0000:00:02.0: Video device with shadowed ROM at [mem 0x000c0000-0x000dffff]
-efifb: probing for efifb
-efifb: framebuffer at 0x80000000, using 1876k, total 1875k
-efifb: mode is 800x600x32, linelength=3200, pages=1
-efifb: scrolling: redraw
-efifb: Truecolor: size=8:8:8:8, shift=24:16:8:0
-
-/proc/iomem looks exactly the same.
-
-So in summary, x86 does not seem to care.
-
-Furthermore, I tested with this change, as suggested by Lukas
-
-diff --git a/drivers/video/fbdev/efifb.c b/drivers/video/fbdev/efifb.c
-index 88f653864a01..c72d84590343 100644
---- a/drivers/video/fbdev/efifb.c
-+++ b/drivers/video/fbdev/efifb.c
-@@ -417,4 +417,5 @@ static void efifb_fixup_resources(struct pci_dev *dev)
-                }
-        }
- }
--DECLARE_PCI_FIXUP_HEADER(PCI_ANY_ID, PCI_ANY_ID, efifb_fixup_resources);
-+DECLARE_PCI_FIXUP_CLASS_HEADER(PCI_ANY_ID, PCI_ANY_ID, PCI_BASE_CLASS_DISPLAY,
-+                              16, efifb_fixup_resources);
+> Thanks,
+> Leo Yan
 
 
-which does appear to work fine, and thinking about it, I feel there is
-only so much we can do to sanity check the efifb against the PCI setup
-performed by the firmware, so I am inclined to fold this in.
+
+-- 
+Mike Leach
+Principal Engineer, ARM Ltd.
+Blackburn Design Centre. UK
