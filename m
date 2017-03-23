@@ -1,29 +1,26 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Thu, 23 Mar 2017 10:35:27 +0100
-Subject: [RESEND PATCH v4 2/9] iio: adc: add support for X-Powers AXP20X
- and AXP22X PMICs ADCs
-In-Reply-To: <CAGb2v66JC65=9WiMy-Nu+9tTFRLsJL2Eyb0wfJV_K=65ABc6Zg@mail.gmail.com>
-References: <20170320081653.8884-1-quentin.schulz@free-electrons.com>
- <20170320081653.8884-3-quentin.schulz@free-electrons.com>
- <CAGb2v66JC65=9WiMy-Nu+9tTFRLsJL2Eyb0wfJV_K=65ABc6Zg@mail.gmail.com>
-Message-ID: <20170323093527.ojcdpvruzqnhvysq@earth>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Thu, 23 Mar 2017 17:44:06 +0800
+Subject: Question - seeding the hw pseudo random number generator
+In-Reply-To: <20170323082307.GB16625@Red>
+References: <20170318092554.lggkhfg5eko23o3k@kozik-lap>
+ <CANc+2y5gv2ygSM4HF69XCW7Bb8UUHN+qJKq0os-mOvYknH+SeQ@mail.gmail.com>
+ <20170320132858.GA27044@gondor.apana.org.au>
+ <20170323082307.GB16625@Red>
+Message-ID: <20170323094406.GA6848@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Mar 23, 2017 at 09:23:07AM +0100, Corentin Labbe wrote:
+> 
+> Problem with this conversion, a huge regression for user space.
+> Using hwrng is simple as cat /dev/hwrng.
+> Using algif_rng via AF_ALG is ... unusable for the moment.
+> Perhaps creating an user space tool (prng-tool which provide a cat /dev/hwrng replacement) is mandatory before any convertion.
 
-On Wed, Mar 22, 2017 at 12:34:45PM +0800, Chen-Yu Tsai wrote:
-> P.S. I'm thinking about having MFD_AXP20X imply its various sub-drivers.
-> Not sure if that was the intended usage of the new imply syntax though.
+Stephan may have a tool to do this.  Stephan?
 
-I think adding "default MFD_AXP20X" to the sub-drivers is cleaner,
-as you will not end up with a long list.
-
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170323/ca312157/attachment.sig>
+Thanks,
+-- 
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
