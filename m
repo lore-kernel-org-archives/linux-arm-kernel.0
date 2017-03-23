@@ -1,27 +1,31 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 23 Mar 2017 10:05:39 +0100
-Subject: [PATCH] pinctrl: rockchip: add irq_enable & irq_disable ops
-In-Reply-To: <1488434212-6567-1-git-send-email-jeffy.chen@rock-chips.com>
-References: <1488434212-6567-1-git-send-email-jeffy.chen@rock-chips.com>
-Message-ID: <CACRpkdam_qAi3CB5ZZubc3CdJkBH2pOGja2m166Gtj5ikF+CzA@mail.gmail.com>
+Date: Thu, 23 Mar 2017 10:11:15 +0100
+Subject: [PATCH v2] pinctrl: st: add irq_request/release_resources
+ callbacks
+In-Reply-To: <1489685162-3003-1-git-send-email-patrice.chotard@st.com>
+References: <1489685162-3003-1-git-send-email-patrice.chotard@st.com>
+Message-ID: <CACRpkdYABEc+Mxmki9p7bJQ9KUg7ZrhygQRuAs7yXV=cUD9ujg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 2, 2017 at 6:56 AM, Jeffy Chen <jeffy.chen@rock-chips.com> wrote:
+On Thu, Mar 16, 2017 at 6:26 PM,  <patrice.chotard@st.com> wrote:
 
-> Currently we are trying to enable/disable the clk of irq's gpio bank when
-> unmask/mask irq. But the kernel's "lazy disable approach" will skip masking
-> irq when the irq chip doesn't support irq_disable ops.
+> From: Patrice Chotard <patrice.chotard@st.com>
 >
-> So we may hit this case:
->         irq_enable-> enable clk
->         irq_disable-> noop
->         irq_enable-> enable clk again
->         irq_disable-> noop
+> When using GPIO as IRQ source, the GPIO must be configured
+> in INPUT. Callbacks dedicated for this was missing in
+> pinctrl-st driver.
 >
-> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+> This fix the following kernel error when trying to lock a gpio
+> as IRQ:
+>
+> [    7.521095] gpio gpiochip7: (PIO11): gpiochip_lock_as_irq: tried to flag a GPIO set as output for IRQ
+> [    7.526018] gpio gpiochip7: (PIO11): unable to lock HW IRQ 6 for IRQ
+> [    7.529405] genirq: Failed to request resources for 0-0053 (irq 81) on irqchip GPIO
+>
+> Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
 
-Patch applied with Heiko's review tag.
+Patch applied for fixes.
 
 Yours,
 Linus Walleij
