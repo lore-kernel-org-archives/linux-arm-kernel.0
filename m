@@ -1,680 +1,109 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 23 Mar 2017 16:19:03 +0100
-Subject: [PATCH v3 3/7] pinctrl: armada-37xx: Add pin controller support for
- Armada 37xx
+Date: Thu, 23 Mar 2017 16:19:07 +0100
+Subject: [PATCH v3 7/7] ARM64: dts: marvell: armada37xx: add pinctrl definition
 In-Reply-To: <cover.72ded2a212a37139db2a4193482b04a84a545a48.1490282185.git-series.gregory.clement@free-electrons.com>
 References: <cover.72ded2a212a37139db2a4193482b04a84a545a48.1490282185.git-series.gregory.clement@free-electrons.com>
-Message-ID: <368b82895e47fb34b027c3c5f6827b1c763e7f64.1490282185.git-series.gregory.clement@free-electrons.com>
+Message-ID: <c9139217acd3bdf90b8928d56f1de87e5153c237.1490282185.git-series.gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Armada 37xx SoC come with 2 pin controllers: one on the south
-bridge (managing 28 pins) and one on the north bridge (managing 36 pins).
-
-At the hardware level the controller configure the pins by group and not
-pin by pin. This constraint is reflected in the design of the driver:
-only the group related functions are implemented.
+Start to populate the device tree of the Armada 37xx with the pincontrol
+configuration used on the board providing a dts.
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- drivers/pinctrl/Makefile                    |   2 +-
- drivers/pinctrl/mvebu/Kconfig               |   7 +-
- drivers/pinctrl/mvebu/Makefile              |   3 +-
- drivers/pinctrl/mvebu/pinctrl-armada-37xx.c | 602 +++++++++++++++++++++-
- 4 files changed, 612 insertions(+), 2 deletions(-)
- create mode 100644 drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
+ arch/arm64/boot/dts/marvell/armada-3720-db.dts |  8 +++++-
+ arch/arm64/boot/dts/marvell/armada-37xx.dtsi   | 31 +++++++++++++++++++-
+ 2 files changed, 39 insertions(+)
 
-diff --git a/drivers/pinctrl/Makefile b/drivers/pinctrl/Makefile
-index a251f439626f..95080811f36f 100644
---- a/drivers/pinctrl/Makefile
-+++ b/drivers/pinctrl/Makefile
-@@ -44,7 +44,7 @@ obj-y				+= bcm/
- obj-$(CONFIG_PINCTRL_BERLIN)	+= berlin/
- obj-y				+= freescale/
- obj-$(CONFIG_X86)		+= intel/
--obj-$(CONFIG_PINCTRL_MVEBU)	+= mvebu/
-+obj-y				+= mvebu/
- obj-y				+= nomadik/
- obj-$(CONFIG_PINCTRL_PXA)	+= pxa/
- obj-$(CONFIG_ARCH_QCOM)		+= qcom/
-diff --git a/drivers/pinctrl/mvebu/Kconfig b/drivers/pinctrl/mvebu/Kconfig
-index 170602407c0d..5bade32d3089 100644
---- a/drivers/pinctrl/mvebu/Kconfig
-+++ b/drivers/pinctrl/mvebu/Kconfig
-@@ -39,3 +39,10 @@ config PINCTRL_ORION
- 	select PINCTRL_MVEBU
+diff --git a/arch/arm64/boot/dts/marvell/armada-3720-db.dts b/arch/arm64/boot/dts/marvell/armada-3720-db.dts
+index 86602c907a61..e749c5727490 100644
+--- a/arch/arm64/boot/dts/marvell/armada-3720-db.dts
++++ b/arch/arm64/boot/dts/marvell/armada-3720-db.dts
+@@ -63,6 +63,8 @@
+ };
  
- endif
-+
-+config PINCTRL_ARMADA_37XX
-+       bool
-+       select GENERIC_PINCONF
-+       select MFD_SYSCON
-+       select PINCONF
-+       select PINMUX
-diff --git a/drivers/pinctrl/mvebu/Makefile b/drivers/pinctrl/mvebu/Makefile
-index 18270cd5ea43..60c245a60f39 100644
---- a/drivers/pinctrl/mvebu/Makefile
-+++ b/drivers/pinctrl/mvebu/Makefile
-@@ -1,4 +1,4 @@
--obj-y				+= pinctrl-mvebu.o
-+obj-$(CONFIG_PINCTRL_MVEBU)	+= pinctrl-mvebu.o
- obj-$(CONFIG_PINCTRL_DOVE)	+= pinctrl-dove.o
- obj-$(CONFIG_PINCTRL_KIRKWOOD)	+= pinctrl-kirkwood.o
- obj-$(CONFIG_PINCTRL_ARMADA_370) += pinctrl-armada-370.o
-@@ -6,4 +6,5 @@ obj-$(CONFIG_PINCTRL_ARMADA_375) += pinctrl-armada-375.o
- obj-$(CONFIG_PINCTRL_ARMADA_38X) += pinctrl-armada-38x.o
- obj-$(CONFIG_PINCTRL_ARMADA_39X) += pinctrl-armada-39x.o
- obj-$(CONFIG_PINCTRL_ARMADA_XP)  += pinctrl-armada-xp.o
-+obj-$(CONFIG_PINCTRL_ARMADA_37XX)  += pinctrl-armada-37xx.o
- obj-$(CONFIG_PINCTRL_ORION)  += pinctrl-orion.o
-diff --git a/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c b/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
-new file mode 100644
-index 000000000000..f2ff9801d0f4
---- /dev/null
-+++ b/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
-@@ -0,0 +1,602 @@
-+/*
-+ * Marvell 37xx SoC pinctrl driver
-+ *
-+ * Copyright (C) 2017 Marvell
-+ *
-+ * Gregory CLEMENT <gregory.clement@free-electrons.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2 or later. This program is licensed "as is"
-+ * without any warranty of any kind, whether express or implied.
-+ */
-+
-+#include <linux/mfd/syscon.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
-+#include <linux/pinctrl/pinconf-generic.h>
-+#include <linux/pinctrl/pinconf.h>
-+#include <linux/pinctrl/pinctrl.h>
-+#include <linux/pinctrl/pinmux.h>
-+#include <linux/platform_device.h>
-+#include <linux/regmap.h>
-+#include <linux/slab.h>
-+
-+#include "../pinctrl-utils.h"
-+
-+#define OUTPUT_EN	0x0
-+#define OUTPUT_CTL	0x20
-+#define SELECTION	0x30
-+
-+#define NB_FUNCS 2
-+#define GPIO_PER_REG	32
-+
-+/**
-+ * struct armada_37xx_pin_group: represents group of pins of a pinmux function.
-+ * The pins of a pinmux groups are composed of one or two groups of contiguous
-+ * pins.
-+ * @name:	Name of the pin group, used to lookup the group.
-+ * @start_pins:	Index of the first pin of the main range of pins belonging to
-+ *		the group
-+ * @npins:	Number of pins included in the first range
-+ * @reg_mask:	Bit mask matching the group in the selection register
-+ * @extra_pins:	Index of the first pin of the optional second range of pins
-+ *		belonging to the group
-+ * @npins:	Number of pins included in the second optional range
-+ * @funcs:	A list of pinmux functions that can be selected for this group.
-+ * @pins:	Total number pins included in the group
-+ */
-+struct armada_37xx_pin_group {
-+	const char	*name;
-+	unsigned int	start_pin;
-+	unsigned int	npins;
-+	u32		reg_mask;
-+	unsigned int	extra_pin;
-+	unsigned int	extra_npins;
-+	const char	*funcs[NB_FUNCS];
-+	unsigned int	*pins;
-+};
-+
-+struct armada_37xx_pin_data {
-+	u8				nr_pins;
-+	char				*name;
-+	struct armada_37xx_pin_group	*groups;
-+	int				ngroups;
-+};
-+
-+struct armada_37xx_pmx_func {
-+	const char		*name;
-+	const char		**groups;
-+	unsigned int		ngroups;
-+};
-+
-+struct armada_37xx_pinctrl {
-+	struct regmap			*regmap;
-+	struct armada_37xx_pin_data	*data;
-+	struct device			*dev;
-+	struct pinctrl_desc		pctl;
-+	struct pinctrl_dev		*pctl_dev;
-+	struct armada_37xx_pin_group	*groups;
-+	unsigned int			ngroups;
-+	struct armada_37xx_pmx_func	*funcs;
-+	unsigned int			nfuncs;
-+};
-+
-+#define PIN_GRP(_name, _start, _nr, _mask, _func1, _func2)	\
-+	{					\
-+		.name = _name,			\
-+		.start_pin = _start,		\
-+		.npins = _nr,			\
-+		.reg_mask = _mask,		\
-+		.funcs = {_func1, _func2}	\
-+	}
-+
-+#define PIN_GRP_GPIO(_name, _start, _nr, _mask, _func1)	\
-+	{					\
-+		.name = _name,			\
-+		.start_pin = _start,		\
-+		.npins = _nr,			\
-+		.reg_mask = _mask,		\
-+		.funcs = {_func1, "gpio"}	\
-+	}
-+
-+#define PIN_GRP_EXTRA(_name, _start, _nr, _mask, _start2, _nr2, _f1, _f2) \
-+	{						\
-+		.name = _name,				\
-+		.start_pin = _start,			\
-+		.npins = _nr,				\
-+		.reg_mask = _mask,			\
-+		.extra_pin = _start2,			\
-+		.extra_npins = _nr2,			\
-+		.funcs = {_f1, _f2}			\
-+	}
-+
-+static struct armada_37xx_pin_group armada_37xx_nb_groups[] = {
-+	PIN_GRP_GPIO("jtag", 20, 5, BIT(0), "jtag"),
-+	PIN_GRP_GPIO("sdio0", 8, 3, BIT(1), "sdio"),
-+	PIN_GRP_GPIO("emmc_nb", 27, 9, BIT(2), "emmc"),
-+	PIN_GRP_GPIO("pwm0", 11, 1, BIT(3), "pwm"),
-+	PIN_GRP_GPIO("pwm1", 12, 1, BIT(4), "pwm"),
-+	PIN_GRP_GPIO("pwm2", 13, 1, BIT(5), "pwm"),
-+	PIN_GRP_GPIO("pwm3", 14, 1, BIT(6), "pwm"),
-+	PIN_GRP_GPIO("pmic1", 17, 1, BIT(7), "pmic"),
-+	PIN_GRP_GPIO("pmic0", 16, 1, BIT(8), "pmic"),
-+	PIN_GRP_GPIO("i2c2", 2, 2, BIT(9), "i2c"),
-+	PIN_GRP_GPIO("i2c1", 0, 2, BIT(10), "i2c"),
-+	PIN_GRP_GPIO("spi_cs1", 17, 1, BIT(12), "spi"),
-+	PIN_GRP_GPIO("spi_cs2", 18, 1, BIT(13), "spi"),
-+	PIN_GRP_GPIO("spi_cs3", 19, 1, BIT(14), "spi"),
-+	PIN_GRP_GPIO("onewire", 4, 1, BIT(16), "onewire"),
-+	PIN_GRP_GPIO("uart1", 25, 2, BIT(17), "uart"),
-+	PIN_GRP_GPIO("spi_quad", 15, 2, BIT(18), "spi"),
-+	PIN_GRP_EXTRA("uart_2", 9, 2, BIT(19), 18, 2, "gpio", "uart"),
-+};
-+
-+static struct armada_37xx_pin_group armada_37xx_sb_groups[] = {
-+	PIN_GRP_GPIO("usb32_drvvbus0", 0, 1, BIT(0), "drvbus"),
-+	PIN_GRP_GPIO("usb2_drvvbus1", 1, 1, BIT(1), "drvbus"),
-+	PIN_GRP_GPIO("sdio_sb", 24, 5, BIT(2), "sdio"),
-+	PIN_GRP_EXTRA("rgmii", 6, 14, BIT(3), 23, 1, "mii", "gpio"),
-+	PIN_GRP_GPIO("pcie1", 3, 2, BIT(4), "pcie"),
-+	PIN_GRP_GPIO("ptp", 20, 3, BIT(5), "ptp"),
-+	PIN_GRP("ptp_clk", 21, 1, BIT(6), "ptp", "mii"),
-+	PIN_GRP("ptp_trig", 22, 1, BIT(7), "ptp", "mii"),
-+	PIN_GRP("mii_col", 23, 1, BIT(8), "mii", "mii_err"),
-+};
-+
-+struct armada_37xx_pin_data armada_37xx_pin_nb = {
-+	.nr_pins = 36,
-+	.name = "GPIO1",
-+	.groups = armada_37xx_nb_groups,
-+	.ngroups = ARRAY_SIZE(armada_37xx_nb_groups),
-+};
-+
-+struct armada_37xx_pin_data armada_37xx_pin_sb = {
-+	.nr_pins = 29,
-+	.name = "GPIO2",
-+	.groups = armada_37xx_sb_groups,
-+	.ngroups = ARRAY_SIZE(armada_37xx_sb_groups),
-+};
-+
-+static int armada_37xx_get_func_reg(struct armada_37xx_pin_group *grp,
-+				    const char *func)
-+{
-+	int f;
-+
-+	for (f = 0; f < NB_FUNCS; f++)
-+		if (!strcmp(grp->funcs[f], func))
-+			return f;
-+
-+	return -ENOTSUPP;
-+}
-+
-+static struct armada_37xx_pin_group *armada_37xx_find_next_grp_by_pin(
-+	struct armada_37xx_pinctrl *info, int pin, int *grp)
-+{
-+	while (*grp < info->ngroups) {
-+		struct armada_37xx_pin_group *group = &info->groups[*grp];
-+		int j;
-+
-+		*grp = *grp + 1;
-+		for (j = 0; j < (group->npins + group->extra_npins); j++)
-+			if (group->pins[j] == pin)
-+				return group;
-+	}
-+	return NULL;
-+}
-+
-+static int armada_37xx_pin_config_group_get(struct pinctrl_dev *pctldev,
-+			    unsigned int selector, unsigned long *config)
-+{
-+	return -ENOTSUPP;
-+}
-+
-+static int armada_37xx_pin_config_group_set(struct pinctrl_dev *pctldev,
-+			    unsigned int selector, unsigned long *configs,
-+			    unsigned int num_configs)
-+{
-+	return -ENOTSUPP;
-+}
-+
-+static struct pinconf_ops armada_37xx_pinconf_ops = {
-+	.is_generic = true,
-+	.pin_config_group_get = armada_37xx_pin_config_group_get,
-+	.pin_config_group_set = armada_37xx_pin_config_group_set,
-+};
-+
-+static int armada_37xx_get_groups_count(struct pinctrl_dev *pctldev)
-+{
-+	struct armada_37xx_pinctrl *info = pinctrl_dev_get_drvdata(pctldev);
-+
-+	return info->ngroups;
-+}
-+
-+static const char *armada_37xx_get_group_name(struct pinctrl_dev *pctldev,
-+					      unsigned int group)
-+{
-+	struct armada_37xx_pinctrl *info = pinctrl_dev_get_drvdata(pctldev);
-+
-+	return info->groups[group].name;
-+}
-+
-+static int armada_37xx_get_group_pins(struct pinctrl_dev *pctldev,
-+				      unsigned int selector,
-+				      const unsigned int **pins,
-+				      unsigned int *npins)
-+{
-+	struct armada_37xx_pinctrl *info = pinctrl_dev_get_drvdata(pctldev);
-+
-+	if (selector >= info->ngroups)
-+		return -EINVAL;
-+
-+	*pins = info->groups[selector].pins;
-+	*npins = info->groups[selector].npins;
-+
-+	return 0;
-+}
-+
-+static const struct pinctrl_ops armada_37xx_pctrl_ops = {
-+	.get_groups_count	= armada_37xx_get_groups_count,
-+	.get_group_name		= armada_37xx_get_group_name,
-+	.get_group_pins		= armada_37xx_get_group_pins,
-+	.dt_node_to_map		= pinconf_generic_dt_node_to_map_group,
-+	.dt_free_map		= pinctrl_utils_free_map,
-+};
-+
-+/*
-+ * Pinmux_ops handling
-+ */
-+
-+static int armada_37xx_pmx_get_funcs_count(struct pinctrl_dev *pctldev)
-+{
-+	struct armada_37xx_pinctrl *info = pinctrl_dev_get_drvdata(pctldev);
-+
-+	return info->nfuncs;
-+}
-+
-+static const char *armada_37xx_pmx_get_func_name(struct pinctrl_dev *pctldev,
-+						 unsigned int selector)
-+{
-+	struct armada_37xx_pinctrl *info = pinctrl_dev_get_drvdata(pctldev);
-+
-+	return info->funcs[selector].name;
-+}
-+
-+static int armada_37xx_pmx_get_groups(struct pinctrl_dev *pctldev,
-+				      unsigned int selector,
-+				      const char * const **groups,
-+				      unsigned int * const num_groups)
-+{
-+	struct armada_37xx_pinctrl *info = pinctrl_dev_get_drvdata(pctldev);
-+
-+	*groups = info->funcs[selector].groups;
-+	*num_groups = info->funcs[selector].ngroups;
-+
-+	return 0;
-+}
-+
-+static int armada_37xx_pmx_set_by_name(struct pinctrl_dev *pctldev,
-+				       const char *name,
-+				       struct armada_37xx_pin_group *grp)
-+{
-+	struct armada_37xx_pinctrl *info = pinctrl_dev_get_drvdata(pctldev);
-+	unsigned int reg = SELECTION;
-+	unsigned int mask = grp->reg_mask;
-+	int ret, val;
-+
-+	dev_dbg(info->dev, "enable function %s group %s\n",
-+		name, grp->name);
-+
-+	ret = armada_37xx_get_func_reg(grp, name);
-+
-+	if (ret < 0)
-+		return ret;
-+
-+	val = ret ? mask : 0;
-+
-+	regmap_update_bits(info->regmap, reg, mask, val);
-+
-+	return 0;
-+}
-+
-+static int armada_37xx_pmx_set(struct pinctrl_dev *pctldev,
-+			       unsigned int selector,
-+			       unsigned int group)
-+{
-+
-+	struct armada_37xx_pinctrl *info = pinctrl_dev_get_drvdata(pctldev);
-+	struct armada_37xx_pin_group *grp = &info->groups[group];
-+	const char *name = info->funcs[selector].name;
-+
-+	return armada_37xx_pmx_set_by_name(pctldev, name, grp);
-+}
-+
-+static int armada_37xx_pmx_direction_input(struct armada_37xx_pinctrl *info,
-+					   unsigned int offset)
-+{
-+	unsigned int reg = OUTPUT_EN;
-+	unsigned int mask;
-+
-+	if (offset >= GPIO_PER_REG) {
-+		offset -= GPIO_PER_REG;
-+		reg += sizeof(u32);
-+	}
-+	mask = BIT(offset);
-+
-+	return regmap_update_bits(info->regmap, reg, mask, 0);
-+}
-+
-+
-+
-+static int armada_37xx_pmx_direction_output(struct armada_37xx_pinctrl *info,
-+					    unsigned int offset, int value)
-+{
-+	unsigned int reg = OUTPUT_EN;
-+	unsigned int mask;
-+
-+	if (offset >= GPIO_PER_REG) {
-+		offset -= GPIO_PER_REG;
-+		reg += sizeof(u32);
-+	}
-+	mask = BIT(offset);
-+
-+	return regmap_update_bits(info->regmap, reg, mask, mask);
-+}
-+
-+static int armada_37xx_pmx_gpio_set_direction(struct pinctrl_dev *pctldev,
-+					      struct pinctrl_gpio_range *range,
-+					      unsigned int offset, bool input)
-+{
-+	struct armada_37xx_pinctrl *info = pinctrl_dev_get_drvdata(pctldev);
-+
-+	dev_dbg(info->dev, "gpio_direction for pin %u as %s-%d to %s\n",
-+		offset, range->name, offset, input ? "input" : "output");
-+
-+	if (input)
-+		armada_37xx_pmx_direction_input(info, offset);
-+	else
-+		armada_37xx_pmx_direction_output(info, offset, 0);
-+
-+	return 0;
-+}
-+
-+static int armada_37xx_gpio_request_enable(struct pinctrl_dev *pctldev,
-+					   struct pinctrl_gpio_range *range,
-+					   unsigned int offset)
-+{
-+	struct armada_37xx_pinctrl *info = pinctrl_dev_get_drvdata(pctldev);
-+	struct armada_37xx_pin_group *group;
-+	int grp = 0;
-+
-+	dev_dbg(info->dev, "requesting gpio %d\n", offset);
-+
-+	while ((group = armada_37xx_find_next_grp_by_pin(info, offset, &grp)))
-+		armada_37xx_pmx_set_by_name(pctldev, "gpio", group);
-+
-+	return 0;
-+}
-+
-+static const struct pinmux_ops armada_37xx_pmx_ops = {
-+	.get_functions_count	= armada_37xx_pmx_get_funcs_count,
-+	.get_function_name	= armada_37xx_pmx_get_func_name,
-+	.get_function_groups	= armada_37xx_pmx_get_groups,
-+	.set_mux		= armada_37xx_pmx_set,
-+	.gpio_request_enable	= armada_37xx_gpio_request_enable,
-+	.gpio_set_direction	= armada_37xx_pmx_gpio_set_direction,
-+};
-+
-+static int armada_37xx_add_function(struct armada_37xx_pmx_func *funcs,
-+				    int *funcsize, const char *name)
-+{
-+	int i = 0;
-+
-+	if (*funcsize <= 0)
-+		return -EOVERFLOW;
-+
-+	while (funcs->ngroups) {
-+		/* function already there */
-+		if (strcmp(funcs->name, name) == 0) {
-+			funcs->ngroups++;
-+
-+			return -EEXIST;
-+		}
-+		funcs++;
-+		i++;
-+	}
-+
-+	/* append new unique function */
-+	funcs->name = name;
-+	funcs->ngroups = 1;
-+	(*funcsize)--;
-+
-+	return 0;
-+}
-+
-+static int armada_37xx_fill_group(struct armada_37xx_pinctrl *info)
-+{
-+	int n, num = 0, funcsize = info->data->nr_pins;
-+
-+	for (n = 0; n < info->ngroups; n++) {
-+		struct armada_37xx_pin_group *grp = &info->groups[n];
-+		int i, j, f;
-+
-+		grp->pins = devm_kzalloc(info->dev,
-+					 (grp->npins + grp->extra_npins) *
-+					 sizeof(*grp->pins), GFP_KERNEL);
-+		if (!grp->pins)
-+			return -ENOMEM;
-+
-+		for (i = 0; i < grp->npins; i++)
-+			grp->pins[i] = grp->start_pin + i;
-+
-+		for (j = 0; j < grp->extra_npins; j++)
-+			grp->pins[i+j] = grp->extra_pin + j;
-+
-+		for (f = 0; f < NB_FUNCS; f++) {
-+			int ret;
-+			/* check for unique functions and count groups */
-+			ret = armada_37xx_add_function(info->funcs, &funcsize,
-+					    grp->funcs[f]);
-+			if (ret == -EOVERFLOW)
-+				dev_err(info->dev,
-+					"More functions than pins(%d)\n",
-+					info->data->nr_pins);
-+			if (ret < 0)
-+				continue;
-+			num++;
-+		}
-+	}
-+
-+	info->nfuncs = num;
-+
-+	return 0;
-+}
-+
-+static int armada_37xx_fill_func(struct armada_37xx_pinctrl *info)
-+{
-+	struct armada_37xx_pmx_func *funcs = info->funcs;
-+	int n;
-+
-+	for (n = 0; n < info->nfuncs; n++) {
-+		const char *name = funcs[n].name;
-+		const char **groups;
-+		int g;
-+
-+		funcs[n].groups = devm_kzalloc(info->dev, funcs[n].ngroups *
-+					       sizeof(*(funcs[n].groups)),
-+					       GFP_KERNEL);
-+		if (!funcs[n].groups)
-+			return -ENOMEM;
-+
-+		groups = funcs[n].groups;
-+
-+		for (g = 0; g < info->ngroups; g++) {
-+			struct armada_37xx_pin_group *gp = &info->groups[g];
-+			int f;
-+
-+			for (f = 0; f < NB_FUNCS; f++) {
-+				if (strcmp(gp->funcs[f], name) == 0) {
-+					*groups = gp->name;
-+					groups++;
-+				}
-+			}
-+		}
-+	}
-+	return 0;
-+}
-+
-+static int armada_37xx_pinctrl_register(struct platform_device *pdev,
-+					struct armada_37xx_pinctrl *info)
-+{
-+	struct armada_37xx_pin_data *pin_data = info->data;
-+	struct pinctrl_desc *ctrldesc = &info->pctl;
-+	struct pinctrl_pin_desc *pindesc, *pdesc;
-+	int pin, ret;
-+
-+	info->groups = pin_data->groups;
-+	info->ngroups = pin_data->ngroups;
-+
-+	ctrldesc->name = "armada_37xx-pinctrl";
-+	ctrldesc->owner = THIS_MODULE;
-+	ctrldesc->pctlops = &armada_37xx_pctrl_ops;
-+	ctrldesc->pmxops = &armada_37xx_pmx_ops;
-+	ctrldesc->confops = &armada_37xx_pinconf_ops;
-+
-+	pindesc = devm_kzalloc(&pdev->dev, sizeof(*pindesc) *
-+			       pin_data->nr_pins, GFP_KERNEL);
-+	if (!pindesc)
-+		return -ENOMEM;
-+
-+	ctrldesc->pins = pindesc;
-+	ctrldesc->npins = pin_data->nr_pins;
-+
-+	pdesc = pindesc;
-+	for (pin = 0; pin < pin_data->nr_pins; pin++) {
-+		pdesc->number = pin;
-+		pdesc->name = kasprintf(GFP_KERNEL, "%s-%d",
-+					pin_data->name, pin);
-+		pdesc++;
-+	}
-+
-+	/*
-+	 * we allocate functions for number of pins and hope there are
-+	 * fewer unique functions than pins available
-+	 */
-+	info->funcs = devm_kzalloc(&pdev->dev, pin_data->nr_pins *
-+			   sizeof(struct armada_37xx_pmx_func), GFP_KERNEL);
-+	if (!info->funcs)
-+		return -ENOMEM;
-+
-+
-+	ret = armada_37xx_fill_group(info);
-+	if (ret)
-+		return ret;
-+
-+	ret = armada_37xx_fill_func(info);
-+	if (ret)
-+		return ret;
-+
-+	info->pctl_dev = devm_pinctrl_register(&pdev->dev, ctrldesc, info);
-+	if (IS_ERR(info->pctl_dev)) {
-+		dev_err(&pdev->dev, "could not register pinctrl driver\n");
-+		return PTR_ERR(info->pctl_dev);
-+	}
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id armada_37xx_pinctrl_of_match[] = {
-+	{
-+		.compatible = "marvell,armada3710-sb-pinctrl",
-+		.data = (void *)&armada_37xx_pin_sb,
-+	},
-+	{
-+		.compatible = "marvell,armada3710-nb-pinctrl",
-+		.data = (void *)&armada_37xx_pin_nb,
-+	},
-+	{ },
-+};
-+
-+static int armada_37xx_pinctrl_probe(struct platform_device *pdev)
-+{
-+	const struct of_device_id *match;
-+	struct armada_37xx_pinctrl *info;
-+	struct device *dev = &pdev->dev;
-+	struct device_node *np = dev->of_node;
-+	struct regmap *regmap;
-+	int ret;
-+
-+	info = devm_kzalloc(dev, sizeof(struct armada_37xx_pinctrl),
-+			    GFP_KERNEL);
-+	if (!info)
-+		return -ENOMEM;
-+
-+	info->dev = dev;
-+
-+	regmap = syscon_node_to_regmap(np);
-+	if (IS_ERR(regmap)) {
-+		dev_err(&pdev->dev, "cannot get regmap\n");
-+		return PTR_ERR(regmap);
-+	}
-+	info->regmap = regmap;
-+
-+	match = of_match_node(armada_37xx_pinctrl_of_match, np);
-+	info->data = (struct armada_37xx_pin_data *)match->data;
-+
-+	ret = armada_37xx_pinctrl_register(pdev, info);
-+	if (ret)
-+		return ret;
-+
-+	platform_set_drvdata(pdev, info);
-+
-+	return 0;
-+}
-+
-+static struct platform_driver armada_37xx_pinctrl_driver = {
-+	.driver = {
-+		.name = "armada-37xx-pinctrl",
-+		.of_match_table = armada_37xx_pinctrl_of_match,
-+	},
-+	.probe = armada_37xx_pinctrl_probe,
-+};
-+
-+builtin_platform_driver(armada_37xx_pinctrl_driver);
+ &i2c0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c1_pins>;
+ 	status = "okay";
+ };
+ 
+@@ -73,6 +75,8 @@
+ 
+ &spi0 {
+ 	status = "okay";
++	pinctrl-names = "default";
++	pinctrl-0 = <&spi_quad_pins>;
+ 
+ 	m25p80 at 0 {
+ 		compatible = "jedec,spi-nor";
+@@ -103,6 +107,8 @@
+ 
+ /* Exported on the micro USB connector CON32 through an FTDI */
+ &uart0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart1_pins>;
+ 	status = "okay";
+ };
+ 
+@@ -128,6 +134,8 @@
+ };
+ 
+ &eth0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&rgmii_pins>;
+ 	phy-mode = "rgmii-id";
+ 	phy = <&phy0>;
+ 	status = "okay";
+diff --git a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+index c02b13479458..2ac25f54d01d 100644
+--- a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+@@ -186,6 +186,31 @@
+ 					clock-output-names = "xtal";
+ 					#clock-cells = <0>;
+ 				};
++
++				spi_quad_pins: spi-quad-pins {
++					groups = "spi_quad";
++					function = "spi";
++				};
++
++				i2c1_pins: i2c1-pins {
++					groups = "i2c1";
++					function = "i2c";
++				};
++
++				i2c2_pins: i2c2-pins {
++					groups = "i2c2";
++					function = "i2c";
++				};
++
++				uart1_pins: uart1-pins {
++					groups = "uart1";
++					function = "uart";
++				};
++
++				uart2_pins: uart2-pins {
++					groups = "uart2";
++					function = "uart";
++				};
+ 			};
+ 
+ 			pinctrl_sb: pinctrl-sb at 18800 {
+@@ -203,6 +228,12 @@
+ 					<GIC_SPI 157 IRQ_TYPE_LEVEL_HIGH>,
+ 					<GIC_SPI 156 IRQ_TYPE_LEVEL_HIGH>;
+ 				};
++
++				rgmii_pins: mii-pins {
++					groups = "rgmii";
++					function = "mii";
++				};
++
+ 			};
+ 
+ 			eth0: ethernet at 30000 {
 -- 
 git-series 0.9.1
