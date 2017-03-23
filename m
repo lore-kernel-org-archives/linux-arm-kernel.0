@@ -1,171 +1,66 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Thu, 23 Mar 2017 20:29:30 +0900
-Subject: [PATCH v33 07/14] arm64: hibernate: preserve kdump image around
- hibernation
-In-Reply-To: <58D1702A.2010702@arm.com>
-References: <20170315095656.24992-1-takahiro.akashi@linaro.org>
- <20170315095941.25119-5-takahiro.akashi@linaro.org>
- <58D1702A.2010702@arm.com>
-Message-ID: <20170323112929.GD17298@linaro.org>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Thu, 23 Mar 2017 11:30:16 +0000
+Subject: [RFC PATCH v2 21/41] arm64/sve: Enable SVE on demand for userspace
+In-Reply-To: <20170323112404.GC3750@e103592.cambridge.arm.com>
+References: <1490194274-30569-1-git-send-email-Dave.Martin@arm.com>
+ <1490194274-30569-22-git-send-email-Dave.Martin@arm.com>
+ <20170322164809.GC19950@leverpostej>
+ <20170323112404.GC3750@e103592.cambridge.arm.com>
+Message-ID: <98bf1730-7579-d9f9-37c0-75ccfc29087b@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 21, 2017 at 06:25:46PM +0000, James Morse wrote:
-> Hi Akashi,
-> 
-> On 15/03/17 09:59, AKASHI Takahiro wrote:
-> > Since arch_kexec_protect_crashkres() removes a mapping for crash dump
-> > kernel image, the loaded data won't be preserved around hibernation.
-> > 
-> > In this patch, helper functions, kexec_prepare_suspend()/
-> > kexec_post_resume(), are additionally called before/after hibernation so
-> > that the relevant memory segments will be mapped again and preserved just
-> > as the others are.
-> > 
-> > In addition, to minimize the size of hibernation image,
-> > kexec_is_chraskres_nosave() is added to pfn_is_nosave() in order to
-> 
-> (crashkres)
+On 23/03/17 11:24, Dave Martin wrote:
+> On Wed, Mar 22, 2017 at 04:48:10PM +0000, Mark Rutland wrote:
+>> Hi,
+>>
+>> On Wed, Mar 22, 2017 at 02:50:51PM +0000, Dave Martin wrote:
+>>> This patch tracks whether a task has ever attempted to use the
+>>> Scalable Vector Extension.  If and only if SVE is in use by a task,
+>>> it will be enabled for userspace when scheduling the task in.  For
+>>> other tasks, SVE is disabled when scheduling in.
+>>
+>>>  #define TIF_SYSCALL_AUDIT	9
+>>>  #define TIF_SYSCALL_TRACEPOINT	10
+>>>  #define TIF_SECCOMP		11
+>>> +#define TIF_SVE			17	/* Scalable Vector Extension in use */
+>>
+>> Please don't skip ahead to bit 17. I see why you're doing that, but I
+>> don't think that's a good idea. More on that below.
+>
+> Well, a comment here to explain the dependency would have been a good
+> idea, but I agree it's better to drop this trickery...
+>
+>>> +void do_sve_acc(unsigned int esr, struct pt_regs *regs)
+>>> +{
+>>> +	unsigned long tmp;
+>>> +
+>>> +	if (test_and_set_thread_flag(TIF_SVE))
+>>> +		BUG();
+>>> +
+>>> +	asm ("mrs %0, cpacr_el1" : "=r" (tmp));
+>>> +	asm volatile ("msr cpacr_el1, %0" :: "r" (tmp | (1 << 17)));
+>>
+>> Please de-magic the number, e.g. with something like:
+>>
+>> #define CPACR_SVE_EN	(1 << 17)
+>>
+>> ... in <asm/sysreg.h>.
+>>
+>> Please also use {read,write}_sysreg(), e.g.
+>
+> TBH, I was confused about the status of these macros at the time I
+> wrote this code.
+>
+> The naming clash with the cpufeature functions is unfortunate.  In my
+> head these names all became associated with "do something behind the
+> scenes that may or may not really read the underlying system reg".
+>
+> Would it be reasonable to rename read_system_reg() to something more
+> different, like read_kernel_sysreg(), read_system_id(),
+> read_sanitised_id_reg(), etc.?
 
-Yes.
+I agree. read_system_reg() is not quite obvious name given all the other
+similar names. We could go with either read_sanitised_id_reg() or read_system_safe_reg() ?
 
-> > recoginize only the pages that hold loaded crash dump kernel image as
-> 
-> (recognize)
-
-Ah, yes ...
-
-> > saveable. Hibernation excludes any pages that are marked as Reserved and
-> > yet "nosave."
-> 
-> 
-> Neat! I didn't think this would be possible without hacking kernel/power/snapshot.c.
-> 
-> I've given this a spin on Juno and Seattle, I even added debug_pagealloc, but
-> that doesn't trick it because your kexec_prepare_suspend() puts the mapping back.
-> 
-> Reviewed-by: James Morse <james.morse@arm.com>
-> 
-> 
-> Thanks,
-> 
-> James
-> 
-> 
-> Some nits about comments:
-> 
-> > diff --git a/arch/arm64/kernel/hibernate.c b/arch/arm64/kernel/hibernate.c
-> > index 97a7384100f3..1e10fafa59bd 100644
-> > --- a/arch/arm64/kernel/hibernate.c
-> > +++ b/arch/arm64/kernel/hibernate.c
-> > @@ -286,6 +288,9 @@ int swsusp_arch_suspend(void)
-> >  	local_dbg_save(flags);
-> >  
-> >  	if (__cpu_suspend_enter(&state)) {
-> > +		/* make the crash dump kernel image visible/saveable */
-> > +		kexec_prepare_suspend();
-> 
-> Strictly this is kdump not kexec, but the comment makes that clear.
-
-I hesitated to use "kdump_" here as there are no functions with
-such a prefix (say, even arch_kexec_protect_crashkres()).
-So probably "crash_" or "crash_kexec_" would sound much better.
-
-> > +
-> >  		sleep_cpu = smp_processor_id();
-> >  		ret = swsusp_save();
-> >  	} else {
-> 
-> > diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
-> > index 02e4f929db3b..82f48db589cf 100644
-> > --- a/arch/arm64/kernel/machine_kexec.c
-> > +++ b/arch/arm64/kernel/machine_kexec.c
-> 
-> > @@ -220,7 +221,6 @@ void arch_kexec_protect_crashkres(void)
-> >  			kexec_crash_image->segment[i].memsz,
-> >  			PAGE_KERNEL_INVALID, true);
-> >  
-> > -
-> 
-> Stray whitespace change from a previous patch?
-
-Oops, fix it.
-
-> >  	flush_tlb_all();
-> >  }
-> >  
-> > @@ -233,3 +233,74 @@ void arch_kexec_unprotect_crashkres(void)
-> 
-> > +/*
-> > + * kexec_is_crashres_nosave
-> > + *
-> > + * Return true only if a page is part of reserved memory for crash dump kernel,
-> > + * but does not hold any data of loaded kernel image.
-> > + *
-> > + * Note that all the pages in crash dump kernel memory have been initially
-> > + * marked as Reserved in kexec_reserve_crashkres_pages().
-> > + *
-> > + * In hibernation, the pages which are Reserved and yet "nosave"
-> > + * are excluded from the hibernation iamge. kexec_is_crashkres_nosave()
-> > + * does this check for crash dump kernel and will reduce the total size
-> > + * of hibernation image.
-> > + */
-> > +
-> > +bool kexec_is_crashkres_nosave(unsigned long pfn)
-> > +{
-> > +	int i;
-> > +	phys_addr_t addr;
-> > +
-> > +	/* in reserved memory? */
-> 
-> Comment in the wrong place?
-
-This is after my deep thinking :) but
-
-> 
-> > +	if (!crashk_res.end)
-> > +		return false;
-> > +
-> > +	addr = __pfn_to_phys(pfn);
-> 
-> (makes more sense here)
-
-if you think so, I will follow you.
-
-> 
-> > +	if ((addr < crashk_res.start) || (crashk_res.end < addr))
-> > +		return false;
-> > +
-> 
-> > +	/* not part of loaded kernel image? */
-> 
-> Comment in the wrong place?
-> 
-> 
-> > +	if (!kexec_crash_image)
-> > +		return true;
-> > +
-> 
-> (makes more sense here)
-
-ditto
-
-> 
-> > +	for (i = 0; i < kexec_crash_image->nr_segments; i++)
-> > +		if (addr >= kexec_crash_image->segment[i].mem &&
-> > +				addr < (kexec_crash_image->segment[i].mem +
-> > +					kexec_crash_image->segment[i].memsz))
-> > +			return false;
-> > +
-> > +	return true;
-> > +}
-> > +
-> 
-> 
-> Thanks,
-> 
-> James
-
-
-Thank you for your review!
--Takahiro AKASHI
+Suzuki
