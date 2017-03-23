@@ -1,84 +1,36 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Thu, 23 Mar 2017 20:43:10 +0900
-Subject: [PATCH v33 05/14] arm64: mm: allow for unmapping part of kernel
- mapping
-In-Reply-To: <58D10209.1090406@arm.com>
-References: <20170315095656.24992-1-takahiro.akashi@linaro.org>
- <20170315095941.25119-3-takahiro.akashi@linaro.org>
- <58D10209.1090406@arm.com>
-Message-ID: <20170323114309.GE17298@linaro.org>
+From: smueller@chronox.de (Stephan =?ISO-8859-1?Q?M=FCller?=)
+Date: Thu, 23 Mar 2017 12:44:57 +0100
+Subject: Question - seeding the hw pseudo random number generator
+In-Reply-To: <20170323094406.GA6848@gondor.apana.org.au>
+References: <20170318092554.lggkhfg5eko23o3k@kozik-lap>
+ <20170323082307.GB16625@Red> <20170323094406.GA6848@gondor.apana.org.au>
+Message-ID: <6726036.ieol9yEJdI@positron.chronox.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 21, 2017 at 10:35:53AM +0000, James Morse wrote:
-> Hi Akashi,
-> 
-> On 15/03/17 09:59, AKASHI Takahiro wrote:
-> > create_pgd_mapping() is enhanced here so that it will accept
-> > PAGE_KERNEL_INVALID protection attribute and unmap a given range of memory.
-> > 
-> > The feature will be used in a later kdump patch to implement the protection
-> > against possible corruption of crash dump kernel memory which is to be set
-> > aside from ther other memory on primary kernel.
-> 
-> Nit: ther- > the
+Am Donnerstag, 23. M?rz 2017, 10:44:06 CET schrieb Herbert Xu:
 
-Fix it.
+Hi Herbert,
 
-> > Note that, in this implementation, it assumes that all the range of memory
-> > to be processed is mapped in page-level since the only current user is
-> > kdump where page mappings are also required.
-> 
-> Using create_pgd_mapping() like this means the mappings will be updated via the
-> fixmap which is unnecessary as the page tables will be part of mapped memory. In
+> On Thu, Mar 23, 2017 at 09:23:07AM +0100, Corentin Labbe wrote:
+> > Problem with this conversion, a huge regression for user space.
+> > Using hwrng is simple as cat /dev/hwrng.
+> > Using algif_rng via AF_ALG is ... unusable for the moment.
+> > Perhaps creating an user space tool (prng-tool which provide a cat
+> > /dev/hwrng replacement) is mandatory before any convertion.
+> Stephan may have a tool to do this.  Stephan?
 
-This might be a reason that we would go for (un)map_kernel_range()
-over create_pgd_mapping() (? not sure)
+Creating such tool is more or less trivial. It simply requires the invocation 
+of kcapi_rng_init, kcapi_rng_seed, kcapi_rng_generate and eventually 
+kcapi_rng_destroy from [1]. I can write such a tool if requested.
 
-> the worst case this adds an extra tlbi for every 2MB of crash image when we map
-> or unmap it. I don't think this matters.
-> 
-> This code used to be __init and it is the only user of FIX_PTE, so there won't
-> be any existing runtime users. The two arch_kexec_unprotect_crashkres() calls in
-> kexec are both protected by the kexec_mutex, and the call in hibernate happens
-> after disable_nonboot_cpus(), so these callers can't race with each other.
-> 
-> This looks safe to me.
-> 
-> 
-> > diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-> > index d28dbcf596b6..cb359a3927ef 100644
-> > --- a/arch/arm64/mm/mmu.c
-> > +++ b/arch/arm64/mm/mmu.c
-> > @@ -128,7 +128,10 @@ static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
-> >  	do {
-> >  		pte_t old_pte = *pte;
-> >  
-> > -		set_pte(pte, pfn_pte(pfn, prot));
-> > +		if (pgprot_val(prot))
-> > +			set_pte(pte, pfn_pte(pfn, prot));
-> > +		else
-> > +			pte_clear(null, null, pte);
-> 
-> Lowercase NULLs? This relies on these values never being used... __set_fixmap()
-> in the same file passes &init_mm and the address, can we do the same to be
-> consistent?
+I see one change we need to add to algif_rng.c: currently the caller must 
+provide the specific name of the DRNG to be used. With such a tool, the caller 
+does not care about the type of DRNG. Thus, rng_bind should be changed such 
+that if name is NULL, it should use crypto_get_default_rng(). This would 
+alleviate the caller from selecting "the right" DRNG.
 
-OK.
+[1] http://www.chronox.de/libkcapi.html
 
-Thanks,
--Takahiro AKASHI
-
-> 
-> >  		pfn++;
-> >  
-> >  		/*
-> 
-> Reviewed-by: James Morse <james.morse@arm.com>
-> 
-> 
-> Thanks,
-> 
-> James
-> 
-> 
+Ciao
+Stephan
