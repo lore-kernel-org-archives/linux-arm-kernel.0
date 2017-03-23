@@ -1,56 +1,32 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 23 Mar 2017 17:50:37 +0100
-Subject: [PATCH 2/2] arm64: defconfig: enable MVPP2
-In-Reply-To: <1489677388-19320-3-git-send-email-thomas.petazzoni@free-electrons.com>
- (Thomas Petazzoni's message of "Thu, 16 Mar 2017 16:16:28 +0100")
-References: <1489677388-19320-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1489677388-19320-3-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <87k27gc4yq.fsf@free-electrons.com>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Thu, 23 Mar 2017 17:50:53 +0100
+Subject: [PATCH 0/8] pinctrl: meson: add audio output pins
+Message-ID: <20170323165101.29262-1-jbrunet@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
- 
- On jeu., mars 16 2017, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
+This patchset adds the pinctrl definition and the related device-tree
+bindings of the i2s output and spdif output pins on the meson gxbb and
+gxl SoCs.
 
-> The MVPP2 network driver is used for the ARM64 Marvell Armada 7K and 8K
-> platforms, so enable it in the arm64 defconfig.
->
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+This is part of the ongoing work to bring audio output suppot on the
+meson family. It was tested on the gxbb p200 and gxl p230.
 
-Applied on mvebu/defconfig64
+Jerome Brunet (8):
+  pinctrl: meson: gxbb: add i2s output pins
+  pinctrl: meson: gxbb: add spdif output pins
+  pinctrl: meson: gxl: add i2s output pins
+  pinctrl: meson: gxl: add spdif output pins
+  ARM64: dts: meson-gxbb: add i2s output pins
+  ARM64: dts: meson-gxbb: add spdif output pins
+  ARM64: dts: meson-gxl: add i2s output pins
+  ARM64: dts: meson-gxl: add spdif output pins
 
-Thanks,
-
-Gregory
-
-> ---
->  arch/arm64/configs/defconfig | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-> index 7c48028..fece4d3 100644
-> --- a/arch/arm64/configs/defconfig
-> +++ b/arch/arm64/configs/defconfig
-> @@ -185,6 +185,7 @@ CONFIG_HNS_ENET=y
->  CONFIG_E1000E=y
->  CONFIG_IGB=y
->  CONFIG_IGBVF=y
-> +CONFIG_MVPP2=y
->  CONFIG_SKY2=y
->  CONFIG_RAVB=y
->  CONFIG_SMC91X=y
-> -- 
-> 2.7.4
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+ arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 84 +++++++++++++++++++++++++++++
+ arch/arm64/boot/dts/amlogic/meson-gxl.dtsi  | 83 ++++++++++++++++++++++++++++
+ drivers/pinctrl/meson/pinctrl-meson-gxbb.c  | 49 +++++++++++++++++
+ drivers/pinctrl/meson/pinctrl-meson-gxl.c   | 49 +++++++++++++++++
+ 4 files changed, 265 insertions(+)
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+2.9.3
