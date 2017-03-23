@@ -1,67 +1,62 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 23 Mar 2017 13:03:56 +0100
-Subject: [PATCH 4/4] tty/serial: sh-sci: remove uneeded IS_ERR_OR_NULL
- calls
-In-Reply-To: <20170323111106.7ogh6g2oa3m4cqc6@pengutronix.de>
-References: <20170306100220.droey65uq2ew3mzu@pengutronix.de>
- <CACRpkdYeFyr4yjQjDAUpPJwuD_NW2y=wXnzt1xSNoOX0SFCLmw@mail.gmail.com>
- <CAMuHMdWv-xs12UqutEtXJGR8qqgx6DeDhkKvvYhhyW+XTVsUNQ@mail.gmail.com>
- <CAMuHMdXGn35bEsJKnUi5o3AytL4AJN2fBfoB79v5W-jOVFQx6g@mail.gmail.com>
- <20170320103113.tpveoq2onzrwmkdt@pengutronix.de>
- <CAMuHMdWbwA+3UGVnHYJOs26vTj13Yn+s4B8tE9kyy25JcjyZGg@mail.gmail.com>
- <20170320110718.e44s2gip36m75bqj@pengutronix.de>
- <CACRpkdZy_uguiKfSH-0gdanjr-xkwxoANTx6Fb2VwsvzRwcPRA@mail.gmail.com>
- <20170323101045.u3uigdu5xfwjmjc7@pengutronix.de>
- <CAMuHMdWDUzwUqrchbhh-TkE3J9Xg4TrwTF6HreikUcNNTf_ozQ@mail.gmail.com>
- <20170323111106.7ogh6g2oa3m4cqc6@pengutronix.de>
-Message-ID: <CAMuHMdUWybAZXc2RbGMGyp4DYQZU9BS8MxXKE5Kfd+aH8+w9sA@mail.gmail.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Thu, 23 Mar 2017 12:07:26 +0000
+Subject: [RFC PATCH v2 21/41] arm64/sve: Enable SVE on demand for userspace
+In-Reply-To: <20170323115227.GD9287@leverpostej>
+References: <1490194274-30569-1-git-send-email-Dave.Martin@arm.com>
+ <1490194274-30569-22-git-send-email-Dave.Martin@arm.com>
+ <20170322164809.GC19950@leverpostej>
+ <20170323112404.GC3750@e103592.cambridge.arm.com>
+ <98bf1730-7579-d9f9-37c0-75ccfc29087b@arm.com>
+ <20170323115227.GD9287@leverpostej>
+Message-ID: <20170323120726.GF3750@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+On Thu, Mar 23, 2017 at 11:52:27AM +0000, Mark Rutland wrote:
+> On Thu, Mar 23, 2017 at 11:30:16AM +0000, Suzuki K Poulose wrote:
+> > On 23/03/17 11:24, Dave Martin wrote:
+> > >On Wed, Mar 22, 2017 at 04:48:10PM +0000, Mark Rutland wrote:
+> 
+> > >>>+	asm ("mrs %0, cpacr_el1" : "=r" (tmp));
+> > >>>+	asm volatile ("msr cpacr_el1, %0" :: "r" (tmp | (1 << 17)));
+> 
+> > >>Please also use {read,write}_sysreg(), e.g.
+> > >
+> > >TBH, I was confused about the status of these macros at the time I
+> > >wrote this code.
+> > >
+> > >The naming clash with the cpufeature functions is unfortunate.  In my
+> > >head these names all became associated with "do something behind the
+> > >scenes that may or may not really read the underlying system reg".
+> > >
+> > >Would it be reasonable to rename read_system_reg() to something more
+> > >different, like read_kernel_sysreg(), read_system_id(),
+> > >read_sanitised_id_reg(), etc.?
+> > 
+> > I agree. read_system_reg() is not quite obvious name given all the other
+> > similar names. We could go with either read_sanitised_id_reg() or read_system_safe_reg() ?
+> 
+> I think read_sanitised_id_reg() sounds best, since "safe" cound mean a
+> few things, and having "id" in the name makes it clear that it's not a
+> general purpose sysreg accessor.
 
-On Thu, Mar 23, 2017 at 12:11 PM, Uwe Kleine-K?nig
-<u.kleine-koenig@pengutronix.de> wrote:
->> Make sure to enable all drivers and subsystems you need when building
->> your kernel. That's always true. And may indeed be hard to debug (e.g. what
->> kernel options do I need to make systemd work?).
->
-> It's worse here. If you forget to enable a driver the device isn't bound
-> and that's obvious to diagnose. When ignoring an optional GPIO there
-> might be a device that claims to work but fails to do so. (e.g. you
-> write to memory, write() returns 0, but the data never landed there.)
->
->> > write(2) and close(2) succeed most of the time, too. Still it's not a
->> > good idea to not check the return value. Or let the kernel return
->> > success unconditionally.
->>
->> Writing all bytes passed in the buffer is "optional" in another sense than
->> an "optional" GPIO: you must retry the write, while you can continue if
->> an optional GPIO is not present.
->
-> And that is the point. You can continue *iff* the optional GPIO is not
-> present. The patch in question removes the ability to determine if that
-> GPIO is present and claims it is not present.
+OK, I'll write a separate patch proposing that.
 
-If you forget to enable a driver/subsystem, you sometimes cannot determine
-if the device is present or not neither.
+Are we comfortable with _id_ in the name here?
 
-Hence it boils down to "knowing" if there is a GPIO or not.
-So, when can there be a GPIO?
-  1. The GPIO is described in DT.
-     => Not an issue, as DT GPIO implies GPIOLIB,
-  2. The GPIO is described in legacy platform data.
-     => The platform code should make sure GPIOLIB is selected when needed.
+My logic was that sanitisation makes no sense for anything except
+read-only ID registers, and _system_ sounds too universal.
 
-Issue solved?
 
-Gr{oetje,eeting}s,
+There is a sting in the tail here -- I add ZCR as an "id" reg so that we
+can treat the maximum configurable length in the LEN field as if it were
+an ID field.  See patch 38 (apologies Suzuki, missed your CC).
 
-                        Geert
+In fact, ZCR is neither read-only nor an ID register -- but the view of
+it through cpufeatures does have those properties.
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+It might be better to rename it, but I considered it an OK compromise.
+Let me know if you have concerns.
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Cheers
+---Dave
