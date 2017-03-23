@@ -1,42 +1,47 @@
-From: freude@linux.vnet.ibm.com (Harald Freudenberger)
-Date: Thu, 23 Mar 2017 09:03:23 +0100
-Subject: Question - seeding the hw pseudo random number generator
-In-Reply-To: <1509135.hmo2UhaKWe@tauon.atsec.com>
-References: <20170318092554.lggkhfg5eko23o3k@kozik-lap>
- <CANc+2y5gv2ygSM4HF69XCW7Bb8UUHN+qJKq0os-mOvYknH+SeQ@mail.gmail.com>
- <20170320132858.GA27044@gondor.apana.org.au>
- <1509135.hmo2UhaKWe@tauon.atsec.com>
-Message-ID: <602a68ef-c57a-0092-ebe0-161ec602fad6@linux.vnet.ibm.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Thu, 23 Mar 2017 09:03:22 +0100
+Subject: [PATCH v4 1/6] pinctrl: samsung: Ensure that pad retention is disabled
+ on driver init
+In-Reply-To: <1490256207-10061-1-git-send-email-m.szyprowski@samsung.com>
+References: <1490256207-10061-1-git-send-email-m.szyprowski@samsung.com>
+ <CGME20170323080347eucas1p2d0340709543b3ce128281e5a490216d4@eucas1p2.samsung.com>
+Message-ID: <1490256207-10061-2-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/20/2017 02:39 PM, Stephan M?ller wrote:
-> Am Montag, 20. M?rz 2017, 14:28:58 CET schrieb Herbert Xu:
->
-> Hi Herbert,
->
->> On Mon, Mar 20, 2017 at 12:19:32PM +0530, PrasannaKumar Muralidharan wrote:
->>> AF_ALG interface for rng does have seeding support. I think hw_random
->>> does not provide seeding support intentionally as I understand that
->>> True RNG need not require seeding (please correct me if I am wrong).
->> Yes.  We should be converting PRNGs in hwrng over to algif_rng.
-> IMHO this not only applies to the PRNGs in drivers/crypto (which should simply 
-> register with crypto_register_rngs) but also to ~/hacking/sources/linux/arch/
-> s390/crypto/prng.c which exports a /dev/prandom file.
->
-> For the seeding, it may make sense to follow the example given with crypto/
-> drbg.c using the add_random_ready_callback function.
->
-> Ciao
-> Stephan
->
+When pin controller device is a part of power domain, there is no guarantee
+that the power domain was not turned off and then on during boot process
+before probing of the pin control driver. If it happened, then pin control
+driver should ensure that pad retention is turned off during its probe call.
 
-I'll have a look on it. Currently the s390/crypto/prng seeds itself with
-an algorithm based on the jitter of the very fine granular hardware
-clock of a s390 machine. There were some thoughts and measurements
-by an mathematician which let to this algorithm. However, long-term
-the s390 platform will provide some kind of true hardware random number
-generator and the idea is to use this for seeding the prng.
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
+---
+ drivers/pinctrl/samsung/pinctrl-exynos.c | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-regards
-Harald Freudenberger
+diff --git a/drivers/pinctrl/samsung/pinctrl-exynos.c b/drivers/pinctrl/samsung/pinctrl-exynos.c
+index f9b49967f512..fa8bdd9ae198 100644
+--- a/drivers/pinctrl/samsung/pinctrl-exynos.c
++++ b/drivers/pinctrl/samsung/pinctrl-exynos.c
+@@ -777,6 +777,7 @@ static void exynos_retention_disable(struct samsung_pinctrl_drv_data *drvdata)
+ {
+ 	struct samsung_retention_ctrl *ctrl;
+ 	struct regmap *pmu_regs;
++	int i;
+ 
+ 	ctrl = devm_kzalloc(drvdata->dev, sizeof(*ctrl), GFP_KERNEL);
+ 	if (!ctrl)
+@@ -794,6 +795,10 @@ static void exynos_retention_disable(struct samsung_pinctrl_drv_data *drvdata)
+ 	ctrl->enable = exynos_retention_enable;
+ 	ctrl->disable = exynos_retention_disable;
+ 
++	/* Ensure that retention is disabled on driver init */
++	for (i = 0; i < ctrl->nr_regs; i++)
++		regmap_write(pmu_regs, ctrl->regs[i], ctrl->value);
++
+ 	return ctrl;
+ }
+ 
+-- 
+1.9.1
