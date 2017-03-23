@@ -1,36 +1,42 @@
-From: smueller@chronox.de (Stephan =?ISO-8859-1?Q?M=FCller?=)
-Date: Thu, 23 Mar 2017 12:44:57 +0100
-Subject: Question - seeding the hw pseudo random number generator
-In-Reply-To: <20170323094406.GA6848@gondor.apana.org.au>
-References: <20170318092554.lggkhfg5eko23o3k@kozik-lap>
- <20170323082307.GB16625@Red> <20170323094406.GA6848@gondor.apana.org.au>
-Message-ID: <6726036.ieol9yEJdI@positron.chronox.de>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 23 Mar 2017 11:52:27 +0000
+Subject: [RFC PATCH v2 21/41] arm64/sve: Enable SVE on demand for userspace
+In-Reply-To: <98bf1730-7579-d9f9-37c0-75ccfc29087b@arm.com>
+References: <1490194274-30569-1-git-send-email-Dave.Martin@arm.com>
+ <1490194274-30569-22-git-send-email-Dave.Martin@arm.com>
+ <20170322164809.GC19950@leverpostej>
+ <20170323112404.GC3750@e103592.cambridge.arm.com>
+ <98bf1730-7579-d9f9-37c0-75ccfc29087b@arm.com>
+Message-ID: <20170323115227.GD9287@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 23. M?rz 2017, 10:44:06 CET schrieb Herbert Xu:
+On Thu, Mar 23, 2017 at 11:30:16AM +0000, Suzuki K Poulose wrote:
+> On 23/03/17 11:24, Dave Martin wrote:
+> >On Wed, Mar 22, 2017 at 04:48:10PM +0000, Mark Rutland wrote:
 
-Hi Herbert,
+> >>>+	asm ("mrs %0, cpacr_el1" : "=r" (tmp));
+> >>>+	asm volatile ("msr cpacr_el1, %0" :: "r" (tmp | (1 << 17)));
 
-> On Thu, Mar 23, 2017 at 09:23:07AM +0100, Corentin Labbe wrote:
-> > Problem with this conversion, a huge regression for user space.
-> > Using hwrng is simple as cat /dev/hwrng.
-> > Using algif_rng via AF_ALG is ... unusable for the moment.
-> > Perhaps creating an user space tool (prng-tool which provide a cat
-> > /dev/hwrng replacement) is mandatory before any convertion.
-> Stephan may have a tool to do this.  Stephan?
+> >>Please also use {read,write}_sysreg(), e.g.
+> >
+> >TBH, I was confused about the status of these macros at the time I
+> >wrote this code.
+> >
+> >The naming clash with the cpufeature functions is unfortunate.  In my
+> >head these names all became associated with "do something behind the
+> >scenes that may or may not really read the underlying system reg".
+> >
+> >Would it be reasonable to rename read_system_reg() to something more
+> >different, like read_kernel_sysreg(), read_system_id(),
+> >read_sanitised_id_reg(), etc.?
+> 
+> I agree. read_system_reg() is not quite obvious name given all the other
+> similar names. We could go with either read_sanitised_id_reg() or read_system_safe_reg() ?
 
-Creating such tool is more or less trivial. It simply requires the invocation 
-of kcapi_rng_init, kcapi_rng_seed, kcapi_rng_generate and eventually 
-kcapi_rng_destroy from [1]. I can write such a tool if requested.
+I think read_sanitised_id_reg() sounds best, since "safe" cound mean a
+few things, and having "id" in the name makes it clear that it's not a
+general purpose sysreg accessor.
 
-I see one change we need to add to algif_rng.c: currently the caller must 
-provide the specific name of the DRNG to be used. With such a tool, the caller 
-does not care about the type of DRNG. Thus, rng_bind should be changed such 
-that if name is NULL, it should use crypto_get_default_rng(). This would 
-alleviate the caller from selecting "the right" DRNG.
-
-[1] http://www.chronox.de/libkcapi.html
-
-Ciao
-Stephan
+Thanks,
+Mark.
