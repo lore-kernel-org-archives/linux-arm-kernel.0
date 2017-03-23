@@ -1,25 +1,29 @@
-From: john@metanate.com (John Keeping)
-Date: Thu, 23 Mar 2017 10:59:27 +0000
-Subject: [PATCH v4 0/4] pinctrl: rockchip: PREEMPT_RT_FULL fixes
-Message-ID: <20170323105931.10455-1-john@metanate.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 23 Mar 2017 11:02:49 +0000
+Subject: next-20170323 build: 2 failures 4 warnings (next-20170323)
+In-Reply-To: <E1cqxc1-0004Cs-Lx@optimist>
+References: <E1cqxc1-0004Cs-Lx@optimist>
+Message-ID: <20170323110249.3tf3tjo6c2y5qbkh@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The aim of the series is to make the Rockchip pinctrl irq_chip
-implementation safe for use with RT_FULL which requires that raw
-spinlocks are used to avoid sleeping in hardirq context.
+On Thu, Mar 23, 2017 at 07:56:49AM +0000, Build bot for Mark Brown wrote:
 
-v4 is v3 rebased onto pinctrl/devel as of b9c6dcab265e ("pinctrl: rockchip:
-rename RK1108 to RV1108").
+Today's -next fails to build an arm64 allmodconfig and defconfig due to:
 
-John Keeping (4):
-  pinctrl: rockchip: remove unnecessary locking
-  pinctrl: rockchip: convert to raw spinlock
-  pinctrl: rockchip: split out verification of mux settings
-  pinctrl: rockchip: avoid hardirq-unsafe functions in irq_chip
+> 	arm64-allmodconfig
+> 	arm64-defconfig
+> ERROR (phandle_references): Reference to non-existent node or label "pwm_f_clk_pins"
+> ERROR (phandle_references): Reference to non-existent node or label "pwm_ao_a_3_pins"
+> ERROR: Input tree has errors, aborting (use -f to force output)
 
- drivers/pinctrl/pinctrl-rockchip.c | 149 +++++++++++++++++++++----------------
- 1 file changed, 85 insertions(+), 64 deletions(-)
-
--- 
-2.12.0.377.gf910686b23.dirty
+The offending references are in 3224eaca966088b4cf4f1ca3 (ARM64: dts:
+meson-gxl: add support for the Khadas VIM board), there doesn't seem to
+be anything providing those phandles in either mainline or -next.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170323/087a89ae/attachment.sig>
