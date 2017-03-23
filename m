@@ -1,58 +1,84 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 23 Mar 2017 13:37:44 +0300
-Subject: [PATCH v3 1/5] ata: add Palmchip BK3710 PATA controller driver
-In-Reply-To: <1490206862-26065-2-git-send-email-b.zolnierkie@samsung.com>
-References: <1490206862-26065-1-git-send-email-b.zolnierkie@samsung.com>
- <CGME20170322182131epcas1p26b2402ec94ca08d2a6a332579a65e269@epcas1p2.samsung.com>
- <1490206862-26065-2-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <103c435e-206c-aaaa-59ba-1eb2a4f77780@cogentembedded.com>
+From: sricharan@codeaurora.org (Sricharan R)
+Date: Thu, 23 Mar 2017 16:08:02 +0530
+Subject: [PATCH v2 5/5] iommu: Allow default domain type to be set on the
+ kernel command line
+In-Reply-To: <20170321181729.GG30948@arm.com>
+References: <1489178976-15353-1-git-send-email-will.deacon@arm.com>
+ <1489178976-15353-6-git-send-email-will.deacon@arm.com>
+ <20170321154527.GB29659@8bytes.org> <20170321172137.GF30948@arm.com>
+ <807ecbb0-c9d7-fc0a-25d2-93b5c4374107@arm.com>
+ <20170321181729.GG30948@arm.com>
+Message-ID: <8125f87a-6dc9-170c-27c6-2a28b7660519@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello!
+Hi,
 
-On 3/22/2017 9:20 PM, Bartlomiej Zolnierkiewicz wrote:
+Replying again, as there was some issue with mailer last time.
 
-> Add Palmchip BK3710 PATA controller driver.
+On 3/21/2017 11:47 PM, Will Deacon wrote:
+> On Tue, Mar 21, 2017 at 05:46:29PM +0000, Robin Murphy wrote:
+>> On 21/03/17 17:21, Will Deacon wrote:
+>>> On Tue, Mar 21, 2017 at 04:45:27PM +0100, Joerg Roedel wrote:
+>>>> On Fri, Mar 10, 2017 at 08:49:36PM +0000, Will Deacon wrote:
+>>>>> @@ -1014,8 +1027,8 @@ struct iommu_group *iommu_group_get_for_dev(struct device *dev)
+>>>>>  	 * IOMMU driver.
+>>>>>  	 */
+>>>>>  	if (!group->default_domain) {
+>>>>> -		group->default_domain = __iommu_domain_alloc(dev->bus,
+>>>>> -							     IOMMU_DOMAIN_DMA);
+>>>>> +		group->default_domain =
+>>>>> +			__iommu_domain_alloc(dev->bus, iommu_def_domain_type);
+>>>>
+>>>> It would be good to have a fall-back here if we are talking to an IOMMU
+>>>> driver that uses default domains, but does not support identity-mapped
+>>>> domains (yet). Exynos and Rockchip IOMMU drivers seem to fall into this
+>>>> category. A dev_warn() also makes sense in case allocating a identity
+>>>> domain fails.
+>>>
+>>> Sure, something like the diff below?
+>>>
+>>> Will
+>>>
+>>> --->8
+>>>
+>>>
+>>> diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
+>>> index 42a842e3f95f..f787626a745d 100644
+>>> --- a/drivers/iommu/iommu.c
+>>> +++ b/drivers/iommu/iommu.c
+>>> @@ -1027,10 +1027,19 @@ struct iommu_group *iommu_group_get_for_dev(struct device *dev)
+>>>  	 * IOMMU driver.
+>>>  	 */
+>>>  	if (!group->default_domain) {
+>>> -		group->default_domain =
+>>> -			__iommu_domain_alloc(dev->bus, iommu_def_domain_type);
+>>> +		struct iommu_domain *dom;
+>>> +
+>>> +		dom = __iommu_domain_alloc(dev->bus, iommu_def_domain_type);
+>>> +		if (!dom) {
+>>> +			dev_warn(dev,
+>>> +				 "failed to allocate default IOMMU domain of type %u; falling back to IOMMU_DOMAIN_DMA",
+>>> +				 iommu_def_domain_type);
+>>
+>> Conversely, that's going to be noisy if iommu_def_domain_type was
+>> IOMMU_DOMAIN_DMA to begin with. I think it makes sense to warn if the
+>> user asked for a specific default domain type on the command line and
+>> that didn't work, but maybe not to bother otherwise. Plus, if they asked
+>> for passthrough, then not allocating a default domain at all is probably
+>> closer to the desired result than installing a DMA ops domain would be.
 >
-> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-[...]
-> diff --git a/drivers/ata/pata_bk3710.c b/drivers/ata/pata_bk3710.c
-> new file mode 100644
-> index 0000000..1a1223f
-> --- /dev/null
-> +++ b/drivers/ata/pata_bk3710.c
-> @@ -0,0 +1,382 @@
-[...]
-> +static int __init pata_bk3710_probe(struct platform_device *pdev)
-> +{
-> +	struct clk *clk;
-> +	struct resource *mem;
-> +	struct ata_host *host;
-> +	struct ata_port *ap;
-> +	void __iomem *base;
-> +	unsigned long rate;
-> +	int irq;
-> +
-> +	clk = devm_clk_get(&pdev->dev, NULL);
-> +	if (IS_ERR(clk))
-> +		return -ENODEV;
-> +
-> +	clk_enable(clk);
-> +	rate = clk_get_rate(clk);
-> +	if (!rate)
-> +		return -EINVAL;
-> +
-> +	/* NOTE:  round *down* to meet minimum timings; we count in clocks */
-> +	ideclk_period = 1000000000UL / rate;
-> +
-> +	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> You're right -- I'll hack this about to check if the default type isn't
+> DOMAIN_DMA before warning about the allocation failure.
 
-    I'd put this close to devm_iorempe_resource() and would probably even get 
-rid of 'mem' altogether...
+if some master devices want 'IDENTITY_DOMAIN' as default (because
+those devices do not want any iommu resources to be used/dma_ops to be
+set) and some 'DMA_DOMAIN' as default, then should the default be
+'DMA_DOMAIN' and then masters needing IDENTITY_DOMAIN explicitly do an
+detach_dev later. This [1] was adding the support for detach_dev
+of the default DMA_DOMAINs.
 
-[...]
+[1] https://patchwork.codeaurora.org/patch/164933/
 
-Acked-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-
-MBR, Sergei
+Regards,
+  Sricharan
