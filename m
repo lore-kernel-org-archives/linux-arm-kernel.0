@@ -1,29 +1,119 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 23 Mar 2017 17:02:06 +0000
-Subject: [PATCH V13 04/10] arm64: exception: handle Synchronous External
- Abort
-In-Reply-To: <1490136425-4324-5-git-send-email-tbaicar@codeaurora.org>
-References: <1490136425-4324-1-git-send-email-tbaicar@codeaurora.org>
- <1490136425-4324-5-git-send-email-tbaicar@codeaurora.org>
-Message-ID: <20170323170206.GA32309@e104818-lin.cambridge.arm.com>
+From: thgarnie@google.com (Thomas Garnier)
+Date: Thu, 23 Mar 2017 10:25:12 -0700
+Subject: [PATCH v5 1/4] syscalls: Restore address limit after a syscall
+Message-ID: <20170323172515.27950-1-thgarnie@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 21, 2017 at 04:46:59PM -0600, Tyler Baicar wrote:
-> SEA exceptions are often caused by an uncorrected hardware
-> error, and are handled when data abort and instruction abort
-> exception classes have specific values for their Fault Status
-> Code.
-> When SEA occurs, before killing the process, report the error
-> in the kernel logs.
-> Update fault_info[] with specific SEA faults so that the
-> new SEA handler is used.
-> 
-> Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
-> CC: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
-> Reviewed-by: James Morse <james.morse@arm.com>
-> ---
->  arch/arm64/include/asm/esr.h |  1 +
->  arch/arm64/mm/fault.c        | 43 +++++++++++++++++++++++++++++++++----------
+This patch ensures a syscall does not return to user-mode with a kernel
+address limit. If that happened, a process can corrupt kernel-mode
+memory and elevate privileges.
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+For example, it would mitigation this bug:
+
+- https://bugs.chromium.org/p/project-zero/issues/detail?id=990
+
+The CONFIG_ARCH_NO_SYSCALL_VERIFY_PRE_USERMODE_STATE option is also
+added so each architecture can optimize this change.
+
+Signed-off-by: Thomas Garnier <thgarnie@google.com>
+---
+Based on next-20170322
+---
+ arch/s390/Kconfig        |  1 +
+ include/linux/syscalls.h | 26 +++++++++++++++++++++++++-
+ init/Kconfig             |  7 +++++++
+ kernel/sys.c             |  7 +++++++
+ 4 files changed, 40 insertions(+), 1 deletion(-)
+
+diff --git a/arch/s390/Kconfig b/arch/s390/Kconfig
+index a2dcef0aacc7..b73f5b87bc99 100644
+--- a/arch/s390/Kconfig
++++ b/arch/s390/Kconfig
+@@ -103,6 +103,7 @@ config S390
+ 	select ARCH_INLINE_WRITE_UNLOCK_BH
+ 	select ARCH_INLINE_WRITE_UNLOCK_IRQ
+ 	select ARCH_INLINE_WRITE_UNLOCK_IRQRESTORE
++	select ARCH_NO_SYSCALL_VERIFY_PRE_USERMODE_STATE
+ 	select ARCH_SAVE_PAGE_KEYS if HIBERNATION
+ 	select ARCH_SUPPORTS_ATOMIC_RMW
+ 	select ARCH_SUPPORTS_NUMA_BALANCING
+diff --git a/include/linux/syscalls.h b/include/linux/syscalls.h
+index 980c3c9b06f8..f9ff80fa92ff 100644
+--- a/include/linux/syscalls.h
++++ b/include/linux/syscalls.h
+@@ -191,6 +191,27 @@ extern struct trace_event_functions exit_syscall_print_funcs;
+ 	SYSCALL_METADATA(sname, x, __VA_ARGS__)			\
+ 	__SYSCALL_DEFINEx(x, sname, __VA_ARGS__)
+ 
++
++/*
++ * Called before coming back to user-mode. Returning to user-mode with an
++ * address limit different than USER_DS can allow to overwrite kernel memory.
++ */
++static inline void verify_pre_usermode_state(void) {
++	BUG_ON(!segment_eq(get_fs(), USER_DS));
++}
++
++#ifndef CONFIG_ARCH_NO_SYSCALL_VERIFY_PRE_USERMODE_STATE
++#define __CHECK_USER_CALLER() \
++	bool user_caller = segment_eq(get_fs(), USER_DS)
++#define __VERIFY_PRE_USERMODE_STATE() \
++	if (user_caller) verify_pre_usermode_state()
++#else
++#define __CHECK_USER_CALLER()
++#define __VERIFY_PRE_USERMODE_STATE()
++asmlinkage void asm_verify_pre_usermode_state(void);
++#endif
++
++
+ #define __PROTECT(...) asmlinkage_protect(__VA_ARGS__)
+ #define __SYSCALL_DEFINEx(x, name, ...)					\
+ 	asmlinkage long sys##name(__MAP(x,__SC_DECL,__VA_ARGS__))	\
+@@ -199,7 +220,10 @@ extern struct trace_event_functions exit_syscall_print_funcs;
+ 	asmlinkage long SyS##name(__MAP(x,__SC_LONG,__VA_ARGS__));	\
+ 	asmlinkage long SyS##name(__MAP(x,__SC_LONG,__VA_ARGS__))	\
+ 	{								\
+-		long ret = SYSC##name(__MAP(x,__SC_CAST,__VA_ARGS__));	\
++		long ret;						\
++		__CHECK_USER_CALLER();					\
++		ret = SYSC##name(__MAP(x,__SC_CAST,__VA_ARGS__));	\
++		__VERIFY_PRE_USERMODE_STATE();				\
+ 		__MAP(x,__SC_TEST,__VA_ARGS__);				\
+ 		__PROTECT(x, ret,__MAP(x,__SC_ARGS,__VA_ARGS__));	\
+ 		return ret;						\
+diff --git a/init/Kconfig b/init/Kconfig
+index c859c993c26f..c4efc3a95e4a 100644
+--- a/init/Kconfig
++++ b/init/Kconfig
+@@ -1929,6 +1929,13 @@ config PROFILING
+ config TRACEPOINTS
+ 	bool
+ 
++#
++# Set by each architecture that want to optimize how verify_pre_usermode_state
++# is called.
++#
++config ARCH_NO_SYSCALL_VERIFY_PRE_USERMODE_STATE
++	bool
++
+ source "arch/Kconfig"
+ 
+ endmenu		# General setup
+diff --git a/kernel/sys.c b/kernel/sys.c
+index 196c7134bee6..4ae278fcc290 100644
+--- a/kernel/sys.c
++++ b/kernel/sys.c
+@@ -2459,3 +2459,10 @@ COMPAT_SYSCALL_DEFINE1(sysinfo, struct compat_sysinfo __user *, info)
+ 	return 0;
+ }
+ #endif /* CONFIG_COMPAT */
++
++#ifdef CONFIG_ARCH_NO_SYSCALL_VERIFY_PRE_USERMODE_STATE
++asmlinkage void asm_verify_pre_usermode_state(void)
++{
++	verify_pre_usermode_state();
++}
++#endif
+-- 
+2.12.1.500.gab5fba24ee-goog
