@@ -1,108 +1,75 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Thu, 23 Mar 2017 16:45:07 +0100
-Subject: [PATCH v4 00/28] arm/arm64: KVM: Rework the hyp-stub API
-In-Reply-To: <e424e00c-e649-8e6a-7f73-ffbd37046779@arm.com>
-References: <20170321192058.9300-1-marc.zyngier@arm.com>
- <20170322133724.GA10969@cbox>
- <3dab2f39-88c2-e10b-942c-58a1d8053b71@arm.com>
- <20170322172708.GA17329@cbox>
- <10524c84-1e1e-05f8-97b9-436c8649ffa8@arm.com>
- <20170323143916.GA27715@cbox>
- <e424e00c-e649-8e6a-7f73-ffbd37046779@arm.com>
-Message-ID: <20170323154507.GB27715@cbox>
+From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
+Date: Thu, 23 Mar 2017 15:52:14 +0000
+Subject: [RFC PATCH 24/30] iommu: Specify PASID state when unbinding a task
+In-Reply-To: <20170323143014.GK7266@8bytes.org>
+References: <20170227195441.5170-1-jean-philippe.brucker@arm.com>
+ <20170227195441.5170-25-jean-philippe.brucker@arm.com>
+ <20170322154429.GE7266@8bytes.org>
+ <e2bb4c67-9b61-01cf-cc17-68088cdc5e5b@arm.com>
+ <20170322225320.GF7266@8bytes.org>
+ <a093bc07-a345-a689-9d97-f15a306f922d@arm.com>
+ <20170323143014.GK7266@8bytes.org>
+Message-ID: <20170323145311.GA22972@e106794-lin.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 23, 2017 at 03:16:49PM +0000, Marc Zyngier wrote:
-> On 23/03/17 14:39, Christoffer Dall wrote:
-> > On Thu, Mar 23, 2017 at 10:53:04AM +0000, Marc Zyngier wrote:
-> >> On 22/03/17 17:27, Christoffer Dall wrote:
-> >>>
-> >>> I don't think there is a great use case beyond what we already do, it
-> >>> would just be to have one set of hyp vectors fewer, so that either the
-> >>> hyp stub is in place, or a hypervisor is in place, not kvm-init vectors.
-> >>>
-> >>> So instead of doing:
-> >>>   __hyp_set_vectors(kvm_get_idmap_vector());
-> >>>   hvc(); /* via the misused kvm_call_hyp thing */
-> >>>
-> >>> you would do:
-> >>>
-> >>>   __hyp_call_function(__kvm_hyp_init, arg1, arg2);
-> >>>
-> >>> which would change the vector and initialize anything.
-> >>>
-> >>> Not sure if that can work though, or if there are any downsides that I
-> >>> haven't thought about?
-> >>
-> >> I've given it a go, and that seems to work, at least on arm64. We may 
-> >> have to set the vectors in a slightly different way on 32bit because 
-> >> we're going to run out of registers (we only have two left once we 
-> >> reach the function being called).
-> > 
-> > Right, that's a challenge I clearly didn't foresee.
-> > 
-> >>
-> >> Another thing is that the function called is not really a function. It 
-> >> is an exception handler, as it has to end with an eret (or we may need 
-> >> to save LR in funky ways).
-> > 
-> > Shouldn't it have the same semantics as the KVM calling function thing
-> > where it pushes the LR on the stack?  But of course, that requires
-> > having a stack for each runtime that owns hyp mode at any given time.
-> > Potentially not great.
+On 23/03/17 14:30, Joerg Roedel wrote:
+> On Thu, Mar 23, 2017 at 01:37:41PM +0000, Jean-Philippe Brucker wrote:
+>> On 22/03/17 22:53, Joerg Roedel wrote:
+>>> That can't happen, when the device driver does its job right. It has to
+>>> shut down the context which causes the PPR requests for the PASID on the
+>>> device. This includes stopping the context and waiting until all PPR
+>>> requests it sent are processed.
+>>
+>> By "processed", do you mean that they are committed to the IOMMU, or that
+>> they came back with a PRG response?
 > 
-> Indeed, and that's the point where I'm starting to think that we may be
-> trying to beautify something that may not be worth it.
+> By processed I mean the device received a response to the request, or is
+> at least no longer waiting for responses.
 > 
-> > If possible, the idea would be that you'd call functions, just like you
-> > normally do, but the functions you call can choose to never return -
-> > again just like a C function can do if it messes with your machine
-> > configuration.
-> > 
-> > But maybe the idea is fundamentally flawed, if the only function
-> > you'd ever call from the hyp stub is one that takes over the hyp world,
-> > and then the original design was just based on using set_vectors.  Hmmm.
+>> The driver might not be able to do the latter, since PCI defines two ways
+>> of shutting down a context:
+>>
+>> * Either wait for all PPR requests to come back with a PRG response,
+>> * Or send a Stop Marker PPR request and forget about it.
 > 
-> That's my point above. The only use case we have so far for this method
-> is to take over EL2. On the other have, I've noticed that the more I
-> rework this area, the more old stuff surfaces, ready to be nuked. Maybe
-> I should keep digging.
-> 
-> > 
-> >>  The potential blocker for this is that the
-> >> 32bit decompressor does use set_vectors in funky ways to deal with
-> >> relocation. If we get rid of set_vectors like I just did on 64bit,
-> >> we'll need to mess with that as well.
-> > 
-> > Interesting.  I didn't think that we'd necessarily get rid of
-> > set_vectors, but I agree with you that if we wanted to do this, it
-> > should probably go.
-> > 
-> >>
-> >> Anyway, here's the hack, 64bit only, quickly tested on Mustang. I'm not
-> >> completely sure this is any prettier, but it is certainly manageable.
-> > 
-> > There are two things I like about it.  First, it gets rid of the
-> > 'additional runtime' in hyp and second the changes to
-> > cpu_init_hyp_mode() are quite nice, imho.
-> > 
-> > Thanks being said, this series is pretty nice as it is, so I don't want
-> > to impose more work on you at the moment, so maybe we save your patch
-> > snipped below for later if we want to consider looking at it some other
-> > time?
-> 
-> What I can do is prepare an extra series that would include the
-> corresponding 32bit changes, and we then evaluate that separately. I
-> don't mind spending a bit of time on it.
-> 
+> Are you sure about the meaning of the stop-marker? Can you point me to
+> where it is specified?
 
-At this point I definitely think we should separate those efforts, and
-get this series merged.  If you feel like looking at the other aspect,
-that's great, and we can also have a look together at some point (I
-could at least write the documentation), but let's do it in two stages.
+The concept is introduced in the PCI ECN that adds PASIDs to the ATS
+specification. I have the following link, which is probably behind a
+wall:
 
-/me stops making noise and goes back to reviewing the series at hand.
+https://pcisig.com/sites/default/files/specification_documents/ECN-PASID-ATS-2011-03-31.pdf
+
+A Stop Marker is a PPR with flags Read=Write=0, Last=1, targeting the
+PASID that is being decommissioned. In section 4.1.2, the specifications
+details the two device-specific ways of stopping use of a PASID, with or
+without a Stop Marker. When done with a Stop Marker, the function doesn't
+have to wait for any outstanding PPR to return, the Stop Marker serves as
+a PASID barrier.
 
 Thanks,
--Christoffer
+Jean-Philippe
+
+> I know about a different marker, which allows a device to issue several
+> PPR requests and only get one response for all of them. The last request
+> then has that marker set.
+> 
+> But I am not aware (yet) of a marker with which the device says it no
+> longer sends requests with this PASID.
+
+>> My intent with passing flags to unbind() was to handle the case where VFIO
+>> is unable to tell us whether PPRs are still being issued by the device.
+>> But the issue seems moot to me now that I have a better understanding, as
+>> there will be a detach_dev/attach_dev sequence before we start rebinding
+>> PASIDs, and we can simply reset the PRI interface there (I'm currently
+>> doing that in add_device, but I should move it.)
+> 
+> VFIO should completly reset the device before it is re-used, so I don't
+> think we run into problems there.
+> 
+> 
+> 
+> 	Joerg
+> 
