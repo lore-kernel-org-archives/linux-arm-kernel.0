@@ -1,72 +1,72 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Thu, 23 Mar 2017 13:43:20 +0800
-Subject: [PATCH v3 3/5] coresight: add support for debug module
-In-Reply-To: <7a028460-d598-e337-5e09-234beddca88b@arm.com>
-References: <1488520809-31670-1-git-send-email-leo.yan@linaro.org>
- <1488520809-31670-4-git-send-email-leo.yan@linaro.org>
- <671a0b39-b635-6e0e-d3fa-967651f2e29c@arm.com>
- <CAJ9a7VgCjXNGC4C49PxL-nBxzhMCmA8Mb-0C_epahizA5EL2HA@mail.gmail.com>
- <e7a97c52-f61a-e503-f626-09563fa100b8@arm.com>
- <CAJ9a7VhvCS3xXAHBt0AUVB2Zp2P1HP_LQm4KiptiBT9VJ1fC0Q@mail.gmail.com>
- <4961636d-d77c-0f9a-7076-4db1ef456073@arm.com>
- <1e6d6a91-3bdc-7cfb-a96f-780c959e0316@arm.com>
- <7a028460-d598-e337-5e09-234beddca88b@arm.com>
-Message-ID: <20170323054319.GA7716@leoy-linaro>
+From: lkp@intel.com (kbuild test robot)
+Date: Thu, 23 Mar 2017 14:18:34 +0800
+Subject: [PATCH] genirq: Notify clients whenever there is change in
+ affinity
+In-Reply-To: <1490027777-29130-2-git-send-email-psodagud@codeaurora.org>
+Message-ID: <201703231444.06qWwK1u%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 22, 2017 at 05:25:50PM +0000, Sudeep Holla wrote:
-> 
-> 
-> On 22/03/17 17:09, Suzuki K Poulose wrote:
-> > On 22/03/17 16:17, Sudeep Holla wrote:
-> 
-> [...]
-> 
-> >> 
-> >> Point taken. So we could just specify that all necessary power
-> >> domains need to be on for proper functionality for this feature and
-> >> that it's highly platform specific instead of mixing cpu/cluster
-> >> idle details here.
-> >> 
-> >>> The key point is that the caveat in using this driver is that
-> >>> the power management has to be considered on a platform specific
-> >>> basis before it is configured; and appropriate actions may be
-> >>> needed for it to work correctly. Without this then the driver
-> >>> could cause more issues than it debugs. A user selecting this
-> >>> _must_ be told about these issues
-> >>> 
-> > 
-> > So given all the possible caveats, I think we :
-> > 
-> > 1) Shouldn't enable the driver by default at runtime even if it is 
-> > built-in. 
-> > 2) Should provide mechanisms to turn it on at boot (via
-> > kernel commandline) or anytime later (via sysfs), which kind of puts
-> > the responsibility back on the user : "You know what you are doing". 
-> > 3) Shouldn't turn the driver on based on "nohlt" which the user
-> > could use it for some other purposes, without explicit intention of
-> > turning this driver on).
-> > 4) Should document the fact that, on some
-> > platforms, the user may have to disable CPUidle explicitly to get the
-> > driver working. But let us not make it the default. The user with a
-> > not so ideal platform could add "nohlt" and get it working.
-> > 
-> 
-> Agreed on all points and well summarized.
-> I would like to highlight (3) and (4) as it needs to be well understood.
-> 
-> "nohlt" has a *different* meaning already, so using that in this
-> driver for something else is simple wrong as it affects the system in
-> unintended ways. And yes if user (mis)uses it to get things working,
-> it's fine but shouldn't be recommended way.
+Hi Prasad,
 
-Understand this point.
+[auto build test WARNING on tip/irq/core]
+[also build test WARNING on v4.11-rc3 next-20170322]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-I will try to use general way to constraint CPUIdle like other
-drivers.
+url:    https://github.com/0day-ci/linux/commits/Prasad-Sodagudi/genirq-Notify-clients-whenever-there-is-change-in-affinity/20170323-094431
+reproduce:
+        # apt-get install sparse
+        make ARCH=x86_64 allmodconfig
+        make C=1 CF=-D__CHECK_ENDIAN__
 
-Thanks all for these good suggestions :)
 
-Thanks,
-Leo Yan
+sparse warnings: (new ones prefixed by >>)
+
+   include/linux/compiler.h:264:8: sparse: attribute 'no_sanitize_address': unknown attribute
+>> kernel/irq/migration.c:46:36: sparse: not enough arguments for function irq_do_set_affinity
+   kernel/irq/migration.c: In function 'irq_move_masked_irq':
+   kernel/irq/migration.c:46:3: error: too few arguments to function 'irq_do_set_affinity'
+      irq_do_set_affinity(&desc->irq_data, desc->pending_mask, false);
+      ^~~~~~~~~~~~~~~~~~~
+   In file included from kernel/irq/migration.c:5:0:
+   kernel/irq/internals.h:116:12: note: declared here
+    extern int irq_do_set_affinity(struct irq_data *data,
+               ^~~~~~~~~~~~~~~~~~~
+
+vim +46 kernel/irq/migration.c
+
+c777ac55 Andrew Morton     2006-03-25  30  
+239007b8 Thomas Gleixner   2009-11-17  31  	assert_raw_spin_locked(&desc->lock);
+501f2499 Bryan Holty       2006-03-25  32  
+c777ac55 Andrew Morton     2006-03-25  33  	/*
+c777ac55 Andrew Morton     2006-03-25  34  	 * If there was a valid mask to work with, please
+c777ac55 Andrew Morton     2006-03-25  35  	 * do the disable, re-program, enable sequence.
+c777ac55 Andrew Morton     2006-03-25  36  	 * This is *not* particularly important for level triggered
+c777ac55 Andrew Morton     2006-03-25  37  	 * but in a edge trigger case, we might be setting rte
+25985edc Lucas De Marchi   2011-03-30  38  	 * when an active trigger is coming in. This could
+c777ac55 Andrew Morton     2006-03-25  39  	 * cause some ioapics to mal-function.
+c777ac55 Andrew Morton     2006-03-25  40  	 * Being paranoid i guess!
+e7b946e9 Eric W. Biederman 2006-10-04  41  	 *
+e7b946e9 Eric W. Biederman 2006-10-04  42  	 * For correct operation this depends on the caller
+e7b946e9 Eric W. Biederman 2006-10-04  43  	 * masking the irqs.
+c777ac55 Andrew Morton     2006-03-25  44  	 */
+818b0f3b Jiang Liu         2012-03-30  45  	if (cpumask_any_and(desc->pending_mask, cpu_online_mask) < nr_cpu_ids)
+818b0f3b Jiang Liu         2012-03-30 @46  		irq_do_set_affinity(&desc->irq_data, desc->pending_mask, false);
+57b150cc Yinghai Lu        2009-04-27  47  
+7f7ace0c Mike Travis       2009-01-10  48  	cpumask_clear(desc->pending_mask);
+e7b946e9 Eric W. Biederman 2006-10-04  49  }
+e7b946e9 Eric W. Biederman 2006-10-04  50  
+a439520f Thomas Gleixner   2011-02-04  51  void irq_move_irq(struct irq_data *idata)
+e7b946e9 Eric W. Biederman 2006-10-04  52  {
+f1a06390 Thomas Gleixner   2011-01-28  53  	bool masked;
+e7b946e9 Eric W. Biederman 2006-10-04  54  
+
+:::::: The code at line 46 was first introduced by commit
+:::::: 818b0f3bfb236ae66cac3ff38e86b9e47f24b7aa genirq: Introduce irq_do_set_affinity() to reduce duplicated code
+
+:::::: TO: Jiang Liu <liuj97@gmail.com>
+:::::: CC: Thomas Gleixner <tglx@linutronix.de>
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
