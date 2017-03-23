@@ -1,78 +1,108 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Thu, 23 Mar 2017 08:44:41 -0700
-Subject: [PATCH 4/4] tty/serial: sh-sci: remove uneeded IS_ERR_OR_NULL
- calls
-In-Reply-To: <20170323144325.GA952@dtor-ws>
-References: <CAMuHMdWbwA+3UGVnHYJOs26vTj13Yn+s4B8tE9kyy25JcjyZGg@mail.gmail.com>
- <20170320110718.e44s2gip36m75bqj@pengutronix.de>
- <CACRpkdZy_uguiKfSH-0gdanjr-xkwxoANTx6Fb2VwsvzRwcPRA@mail.gmail.com>
- <20170323101045.u3uigdu5xfwjmjc7@pengutronix.de>
- <CAMuHMdWDUzwUqrchbhh-TkE3J9Xg4TrwTF6HreikUcNNTf_ozQ@mail.gmail.com>
- <20170323111106.7ogh6g2oa3m4cqc6@pengutronix.de>
- <CAMuHMdUWybAZXc2RbGMGyp4DYQZU9BS8MxXKE5Kfd+aH8+w9sA@mail.gmail.com>
- <20170323123437.uqdwhfmmsjke3f7s@pengutronix.de>
- <CACRpkdZRfLh9RXRycW_cAxuTYE6tPd7LR32EkAW8y2fh=AxhXA@mail.gmail.com>
- <20170323144325.GA952@dtor-ws>
-Message-ID: <20170323154441.GA9460@dtor-ws>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Thu, 23 Mar 2017 16:45:07 +0100
+Subject: [PATCH v4 00/28] arm/arm64: KVM: Rework the hyp-stub API
+In-Reply-To: <e424e00c-e649-8e6a-7f73-ffbd37046779@arm.com>
+References: <20170321192058.9300-1-marc.zyngier@arm.com>
+ <20170322133724.GA10969@cbox>
+ <3dab2f39-88c2-e10b-942c-58a1d8053b71@arm.com>
+ <20170322172708.GA17329@cbox>
+ <10524c84-1e1e-05f8-97b9-436c8649ffa8@arm.com>
+ <20170323143916.GA27715@cbox>
+ <e424e00c-e649-8e6a-7f73-ffbd37046779@arm.com>
+Message-ID: <20170323154507.GB27715@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 23, 2017 at 07:43:25AM -0700, Dmitry Torokhov wrote:
-> On Thu, Mar 23, 2017 at 02:41:53PM +0100, Linus Walleij wrote:
-> > On Thu, Mar 23, 2017 at 1:34 PM, Uwe Kleine-K?nig
-> > <u.kleine-koenig@pengutronix.de> wrote:
+On Thu, Mar 23, 2017 at 03:16:49PM +0000, Marc Zyngier wrote:
+> On 23/03/17 14:39, Christoffer Dall wrote:
+> > On Thu, Mar 23, 2017 at 10:53:04AM +0000, Marc Zyngier wrote:
+> >> On 22/03/17 17:27, Christoffer Dall wrote:
+> >>>
+> >>> I don't think there is a great use case beyond what we already do, it
+> >>> would just be to have one set of hyp vectors fewer, so that either the
+> >>> hyp stub is in place, or a hypervisor is in place, not kvm-init vectors.
+> >>>
+> >>> So instead of doing:
+> >>>   __hyp_set_vectors(kvm_get_idmap_vector());
+> >>>   hvc(); /* via the misused kvm_call_hyp thing */
+> >>>
+> >>> you would do:
+> >>>
+> >>>   __hyp_call_function(__kvm_hyp_init, arg1, arg2);
+> >>>
+> >>> which would change the vector and initialize anything.
+> >>>
+> >>> Not sure if that can work though, or if there are any downsides that I
+> >>> haven't thought about?
+> >>
+> >> I've given it a go, and that seems to work, at least on arm64. We may 
+> >> have to set the vectors in a slightly different way on 32bit because 
+> >> we're going to run out of registers (we only have two left once we 
+> >> reach the function being called).
 > > 
-> > > Maybe we can make gpiod_get_optional look like this:
-> > >
-> > >         if (!dev->of_node && isnt_a_acpi_device(dev) && !IS_ENABLED(GPIOLIB))
-> > >                 return NULL;
-> > >         else
-> > >                 return -ENOSYS;
-> > >
-> > > I don't know how isnt_a_acpi_device looks like, probably it involves
-> > > CONFIG_ACPI and/or dev->acpi_node.
-> > >
-> > > This should be safe and still comfortable for legacy platforms, isn't it?
+> > Right, that's a challenge I clearly didn't foresee.
 > > 
-> > I like the looks of this.
+> >>
+> >> Another thing is that the function called is not really a function. It 
+> >> is an exception handler, as it has to end with an eret (or we may need 
+> >> to save LR in funky ways).
 > > 
-> > Can we revert Dmitry's patch and apply something like this instead?
-> > 
-> > Dmitry, how do you feel about this?
+> > Shouldn't it have the same semantics as the KVM calling function thing
+> > where it pushes the LR on the stack?  But of course, that requires
+> > having a stack for each runtime that owns hyp mode at any given time.
+> > Potentially not great.
 > 
-> I frankly do not see the point. It still makes driver code more complex
-> for no good reason. I also think that not having optional GPIO is not an
-> error, so returning value from error space is not correct. NULL is value
-> from another space altogether.
+> Indeed, and that's the point where I'm starting to think that we may be
+> trying to beautify something that may not be worth it.
 > 
-> Uwe seems to be concerned about case that I find extremely unlikely. We
-> are talking about a system that does not have GPIO support and behaves
-> just fine, with the exception that it actually has (physically) a
-> *single* GPIO, and that GPIO happens to be optional in a single driver,
-> but in this particular system is actually needed (but that need
-> manifests in a non-obvious way). And we have system integrator that has
-> no idea what they are doing (no schematic, etc).
+> > If possible, the idea would be that you'd call functions, just like you
+> > normally do, but the functions you call can choose to never return -
+> > again just like a C function can do if it messes with your machine
+> > configuration.
+> > 
+> > But maybe the idea is fundamentally flawed, if the only function
+> > you'd ever call from the hyp stub is one that takes over the hyp world,
+> > and then the original design was just based on using set_vectors.  Hmmm.
 > 
-> I think that if there is one optional GPIO there will be mandatiry GPIOs
-> in such system as well and selection of GPIOLIB will be forced early on
-> in board bringup.
+> That's my point above. The only use case we have so far for this method
+> is to take over EL2. On the other have, I've noticed that the more I
+> rework this area, the more old stuff surfaces, ready to be nuked. Maybe
+> I should keep digging.
+> 
+> > 
+> >>  The potential blocker for this is that the
+> >> 32bit decompressor does use set_vectors in funky ways to deal with
+> >> relocation. If we get rid of set_vectors like I just did on 64bit,
+> >> we'll need to mess with that as well.
+> > 
+> > Interesting.  I didn't think that we'd necessarily get rid of
+> > set_vectors, but I agree with you that if we wanted to do this, it
+> > should probably go.
+> > 
+> >>
+> >> Anyway, here's the hack, 64bit only, quickly tested on Mustang. I'm not
+> >> completely sure this is any prettier, but it is certainly manageable.
+> > 
+> > There are two things I like about it.  First, it gets rid of the
+> > 'additional runtime' in hyp and second the changes to
+> > cpu_init_hyp_mode() are quite nice, imho.
+> > 
+> > Thanks being said, this series is pretty nice as it is, so I don't want
+> > to impose more work on you at the moment, so maybe we save your patch
+> > snipped below for later if we want to consider looking at it some other
+> > time?
+> 
+> What I can do is prepare an extra series that would include the
+> corresponding 32bit changes, and we then evaluate that separately. I
+> don't mind spending a bit of time on it.
+> 
 
-One more thing: if we keep reporting -ENOSYS in case of !CONFIG_GPIOLIB,
-then most of the non platform-sepcific drivers will eventually gain code
-silently coping with this -ENOSYS:
+At this point I definitely think we should separate those efforts, and
+get this series merged.  If you feel like looking at the other aspect,
+that's great, and we can also have a look together at some point (I
+could at least write the documentation), but let's do it in two stages.
 
-	data->gpiod = gpiod_getptional(...);
-	if (IS_ERR(data->gpiod)) {
-		error = PTR_ERR(data->gpiod);
-		if (error != -ENOSYS)
-			return error;
+/me stops making noise and goes back to reviewing the series at hand.
 
-		data->gpiod = NULL; /* This GPIO _is_ optional */
-	}
-
-which will negate Uwe's claim that it will help debugging issues.
-
-Thanks.
-
--- 
-Dmitry
+Thanks,
+-Christoffer
