@@ -1,46 +1,56 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 23 Mar 2017 19:00:45 +0000
-Subject: [PATCH v3 2/8] include: pe.h: add some missing definitions
+Date: Thu, 23 Mar 2017 19:00:47 +0000
+Subject: [PATCH v3 4/8] arm64: efi: clean up Image header after PE header has
+ been split off
 In-Reply-To: <20170323190051.14882-1-ard.biesheuvel@linaro.org>
 References: <20170323190051.14882-1-ard.biesheuvel@linaro.org>
-Message-ID: <20170323190051.14882-3-ard.biesheuvel@linaro.org>
+Message-ID: <20170323190051.14882-5-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mark Rutland <mark.rutland@arm.com>
+After having split off the PE header, clean up the bits that remain:
+use .long consistently, merge two adjacent #ifdef CONFIG_EFI blocks,
+fix the offset of the PE header pointer and remove the redundant .align
+that follows it.
 
-Add the missing IMAGE_FILE_MACHINE_ARM64 and IMAGE_DEBUG_TYPE_CODEVIEW
-definitions.
+Also, since we will be eliminating all open coded constants from the
+EFI header in subsequent patches, let's replace the open coded "ARM\x64"
+magic number with its .ascii equivalent.
 
-We'll need them for the arm64 EFI stub...
+No changes to the resulting binary image are intended.
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-[ardb: add IMAGE_DEBUG_TYPE_CODEVIEW as well]
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- include/linux/pe.h | 3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm64/kernel/head.S | 12 +++---------
+ 1 file changed, 3 insertions(+), 9 deletions(-)
 
-diff --git a/include/linux/pe.h b/include/linux/pe.h
-index a8a594117df3..143ce75be5f0 100644
---- a/include/linux/pe.h
-+++ b/include/linux/pe.h
-@@ -34,6 +34,7 @@
- #define	IMAGE_FILE_MACHINE_AMD64	0x8664
- #define	IMAGE_FILE_MACHINE_ARM		0x01c0
- #define	IMAGE_FILE_MACHINE_ARMV7	0x01c4
-+#define	IMAGE_FILE_MACHINE_ARM64	0xaa64
- #define	IMAGE_FILE_MACHINE_EBC		0x0ebc
- #define	IMAGE_FILE_MACHINE_I386		0x014c
- #define	IMAGE_FILE_MACHINE_IA64		0x0200
-@@ -141,6 +142,8 @@
- #define IMAGE_SCN_MEM_READ	0x40000000 /* readable */
- #define IMAGE_SCN_MEM_WRITE	0x80000000 /* writeable */
+diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+index c1977bed01db..6d49e716bf40 100644
+--- a/arch/arm64/kernel/head.S
++++ b/arch/arm64/kernel/head.S
+@@ -91,20 +91,14 @@ _head:
+ 	.quad	0				// reserved
+ 	.quad	0				// reserved
+ 	.quad	0				// reserved
+-	.byte	0x41				// Magic number, "ARM\x64"
+-	.byte	0x52
+-	.byte	0x4d
+-	.byte	0x64
++	.ascii	"ARM\x64"			// Magic number
+ #ifdef CONFIG_EFI
+ 	.long	pe_header - _head		// Offset to the PE header.
+-#else
+-	.word	0				// reserved
+-#endif
  
-+#define IMAGE_DEBUG_TYPE_CODEVIEW	2
-+
- #ifndef __ASSEMBLY__
+-#ifdef CONFIG_EFI
+-	.align 3
+ pe_header:
+ 	__EFI_PE_HEADER
++#else
++	.long	0				// reserved
+ #endif
  
- struct mz_hdr {
+ 	__INIT
 -- 
 2.9.3
