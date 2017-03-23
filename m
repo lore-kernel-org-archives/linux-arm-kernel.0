@@ -1,93 +1,29 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 23 Mar 2017 09:34:54 +0000
-Subject: [PATCH v2] arm64: kaslr: Fix up the kernel image alignment
-In-Reply-To: <58D39641.2060009@codeaurora.org>
-References: <904FACBF-3DFE-4DDE-ACB5-7109A137D477@linaro.org>
- <1490182705-14243-1-git-send-email-sramana@codeaurora.org>
- <CAKv+Gu-XUY0XBSK_oe4DbveZOhk8_ZQLMEdPmLiaRv9rCh7ifw@mail.gmail.com>
- <20170322124008.GH8026@arm.com> <58D27FFC.8030205@codeaurora.org>
- <58D39641.2060009@codeaurora.org>
-Message-ID: <CAKv+Gu-XXYaJmoZKQANmcaSn5Z1Nu2zTJ66yTOKFs=cVuzd6tQ@mail.gmail.com>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Thu, 23 Mar 2017 10:35:27 +0100
+Subject: [RESEND PATCH v4 2/9] iio: adc: add support for X-Powers AXP20X
+ and AXP22X PMICs ADCs
+In-Reply-To: <CAGb2v66JC65=9WiMy-Nu+9tTFRLsJL2Eyb0wfJV_K=65ABc6Zg@mail.gmail.com>
+References: <20170320081653.8884-1-quentin.schulz@free-electrons.com>
+ <20170320081653.8884-3-quentin.schulz@free-electrons.com>
+ <CAGb2v66JC65=9WiMy-Nu+9tTFRLsJL2Eyb0wfJV_K=65ABc6Zg@mail.gmail.com>
+Message-ID: <20170323093527.ojcdpvruzqnhvysq@earth>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 March 2017 at 09:32, Srinivas Ramana <sramana@codeaurora.org> wrote:
-> On 03/22/2017 07:15 PM, Srinivas Ramana wrote:
->>
->> On 03/22/2017 06:10 PM, Will Deacon wrote:
->>>
->>> On Wed, Mar 22, 2017 at 12:16:24PM +0000, Ard Biesheuvel wrote:
->>>>
->>>> On 22 March 2017 at 11:38, Srinivas Ramana <sramana@codeaurora.org>
->>>> wrote:
->>>>>
->>>>> From: Neeraj Upadhyay <neeraju@codeaurora.org>
->>>>>
->>>>> If kernel image extends across alignment boundary, existing
->>>>> code increases the KASLR offset by size of kernel image. The
->>>>> offset is masked after resizing. There are cases, where after
->>>>> masking, we may still have kernel image extending across
->>>>> boundary. This eventually results in only 2MB block getting
->>>>> mapped while creating the page tables. This results in data aborts
->>>>> while accessing unmapped regions during second relocation (with
->>>>> kaslr offset) in __primary_switch. To fix this problem, round up the
->>>>> kernel image size, by swapper block size, before adding it for
->>>>> correction.
->>>>>
->>>>> For example consider below case, where kernel image still crosses
->>>>> 1GB alignment boundary, after masking the offset, which is fixed
->>>>> by rounding up kernel image size.
->>>>>
->>>>> SWAPPER_TABLE_SHIFT = 30
->>>>> Swapper using section maps with section size 2MB.
->>>>> CONFIG_PGTABLE_LEVELS = 3
->>>>> VA_BITS = 39
->>>>>
->>>>> _text  : 0xffffff8008080000
->>>>> _end   : 0xffffff800aa1b000
->>>>> offset : 0x1f35600000
->>>>> mask = ((1UL << (VA_BITS - 2)) - 1) & ~(SZ_2M - 1)
->>>>>
->>>>> (_text + offset) >> SWAPPER_TABLE_SHIFT = 0x3fffffe7c
->>>>> (_end + offset) >> SWAPPER_TABLE_SHIFT  = 0x3fffffe7d
->>>>>
->>>>> offset after existing correction (before mask) = 0x1f37f9b000
->>>>> (_text + offset) >> SWAPPER_TABLE_SHIFT = 0x3fffffe7d
->>>>> (_end + offset) >> SWAPPER_TABLE_SHIFT  = 0x3fffffe7d
->>>>>
->>>>> offset (after mask) = 0x1f37e00000
->>>>> (_text + offset) >> SWAPPER_TABLE_SHIFT = 0x3fffffe7c
->>>>> (_end + offset) >> SWAPPER_TABLE_SHIFT  = 0x3fffffe7d
->>>>>
->>>>> new offset w/ rounding up = 0x1f38000000
->>>>> (_text + offset) >> SWAPPER_TABLE_SHIFT = 0x3fffffe7d
->>>>> (_end + offset) >> SWAPPER_TABLE_SHIFT  = 0x3fffffe7d
->>>>>
->>>>> Fixes: f80fb3a3d508 ("arm64: add support for kernel ASLR")
->>>>> Signed-off-by: Neeraj Upadhyay <neeraju@codeaurora.org>
->>>>> Signed-off-by: Srinivas Ramana <sramana@codeaurora.org>
->>>>
->>>>
->>>> Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->>>>
->>>> ... and thanks for the excellent commit log message!
->>>
->>>
->>> Thanks both. I've picked this up as a fix.
->>>
->>> Will
->>>
->>
->> Thanks Ard and Will for the review and picking this patch.
->> can we also CC: <stable@vger.kernel.org> ?
->>
->> Thanks,
->> -- Srinivas R
->>
->>
->
-> Sorry, there is a checkpatch error in the last patch. I will submit v3
-> after fixing the checkpatch error.
->
+Hi,
 
-I wouldn't worry about that. Will has already queued the patch.
+On Wed, Mar 22, 2017 at 12:34:45PM +0800, Chen-Yu Tsai wrote:
+> P.S. I'm thinking about having MFD_AXP20X imply its various sub-drivers.
+> Not sure if that was the intended usage of the new imply syntax though.
+
+I think adding "default MFD_AXP20X" to the sub-drivers is cleaner,
+as you will not end up with a long list.
+
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170323/ca312157/attachment.sig>
