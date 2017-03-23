@@ -1,29 +1,88 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 23 Mar 2017 11:02:49 +0000
-Subject: next-20170323 build: 2 failures 4 warnings (next-20170323)
-In-Reply-To: <E1cqxc1-0004Cs-Lx@optimist>
-References: <E1cqxc1-0004Cs-Lx@optimist>
-Message-ID: <20170323110249.3tf3tjo6c2y5qbkh@sirena.org.uk>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 23 Mar 2017 10:52:11 +0000
+Subject: [PATCH 23/35] drivers/mfd: Convert remaining uses of pr_warning
+ to pr_warn
+In-Reply-To: <a6c827c14d0b9f4be42e549ec4c629245516e979.1487314667.git.joe@perches.com>
+References: <cover.1487314666.git.joe@perches.com>
+ <a6c827c14d0b9f4be42e549ec4c629245516e979.1487314667.git.joe@perches.com>
+Message-ID: <20170323105211.kf7slyiv4rdqhqfw@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 23, 2017 at 07:56:49AM +0000, Build bot for Mark Brown wrote:
+> To enable eventual removal of pr_warning
+> 
+> This makes pr_warn use consistent for drivers/mfd
+> 
+> Prior to this patch, there were 4 uses of pr_warning and
+> 9 uses of pr_warn in drivers/mfd
+> 
+> Signed-off-by: Joe Perches <joe@perches.com>
+> ---
+>  drivers/mfd/db8500-prcmu.c  | 2 +-
+>  drivers/mfd/sta2x11-mfd.c   | 4 ++--
+>  drivers/mfd/twl4030-power.c | 7 ++-----
+>  3 files changed, 5 insertions(+), 8 deletions(-)
 
-Today's -next fails to build an arm64 allmodconfig and defconfig due to:
+Applied.
 
-> 	arm64-allmodconfig
-> 	arm64-defconfig
-> ERROR (phandle_references): Reference to non-existent node or label "pwm_f_clk_pins"
-> ERROR (phandle_references): Reference to non-existent node or label "pwm_ao_a_3_pins"
-> ERROR: Input tree has errors, aborting (use -f to force output)
+(... and I corrected the $SUBJECT line on your behalf)
 
-The offending references are in 3224eaca966088b4cf4f1ca3 (ARM64: dts:
-meson-gxl: add support for the Khadas VIM board), there doesn't seem to
-be anything providing those phandles in either mainline or -next.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170323/087a89ae/attachment.sig>
+> diff --git a/drivers/mfd/db8500-prcmu.c b/drivers/mfd/db8500-prcmu.c
+> index ca38a6a14110..5c739ac752e8 100644
+> --- a/drivers/mfd/db8500-prcmu.c
+> +++ b/drivers/mfd/db8500-prcmu.c
+> @@ -2377,7 +2377,7 @@ static void ack_dbb_wakeup(void)
+>  
+>  static inline void print_unknown_header_warning(u8 n, u8 header)
+>  {
+> -	pr_warning("prcmu: Unknown message header (%d) in mailbox %d.\n",
+> +	pr_warn("prcmu: Unknown message header (%d) in mailbox %d\n",
+>  		header, n);
+>  }
+>  
+> diff --git a/drivers/mfd/sta2x11-mfd.c b/drivers/mfd/sta2x11-mfd.c
+> index 9292202039ee..3aeafa228baf 100644
+> --- a/drivers/mfd/sta2x11-mfd.c
+> +++ b/drivers/mfd/sta2x11-mfd.c
+> @@ -60,8 +60,8 @@ static struct sta2x11_mfd *sta2x11_mfd_find(struct pci_dev *pdev)
+>  	struct sta2x11_mfd *mfd;
+>  
+>  	if (!pdev && !list_empty(&sta2x11_mfd_list)) {
+> -		pr_warning("%s: Unspecified device, "
+> -			    "using first instance\n", __func__);
+> +		pr_warn("%s: Unspecified device, using first instance\n",
+> +			__func__);
+>  		return list_entry(sta2x11_mfd_list.next,
+>  				  struct sta2x11_mfd, list);
+>  	}
+> diff --git a/drivers/mfd/twl4030-power.c b/drivers/mfd/twl4030-power.c
+> index 1beb722f6080..8be023ba8e3e 100644
+> --- a/drivers/mfd/twl4030-power.c
+> +++ b/drivers/mfd/twl4030-power.c
+> @@ -502,9 +502,7 @@ static int load_twl4030_script(const struct twl4030_power_data *pdata,
+>  	}
+>  	if (tscript->flags & TWL4030_SLEEP_SCRIPT) {
+>  		if (!order)
+> -			pr_warning("TWL4030: Bad order of scripts (sleep "\
+> -					"script before wakeup) Leads to boot"\
+> -					"failure on some boards\n");
+> +			pr_warn("TWL4030: Bad order of scripts (sleep script before wakeup) Leads to boot failure on some boards\n");
+>  		err = twl4030_config_sleep_sequence(address);
+>  	}
+>  out:
+> @@ -929,8 +927,7 @@ static int twl4030_power_probe(struct platform_device *pdev)
+>  		err = twl_i2c_read_u8(TWL_MODULE_PM_MASTER, &val,
+>  				      TWL4030_PM_MASTER_CFG_P123_TRANSITION);
+>  		if (err) {
+> -			pr_warning("TWL4030 Unable to read registers\n");
+> -
+> +			pr_warn("TWL4030 Unable to read registers\n");
+>  		} else if (!(val & SEQ_OFFSYNC)) {
+>  			val |= SEQ_OFFSYNC;
+>  			err = twl_i2c_write_u8(TWL_MODULE_PM_MASTER, val,
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
