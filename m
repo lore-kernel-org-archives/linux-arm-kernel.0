@@ -1,64 +1,73 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 23 Mar 2017 13:52:57 -0700
-Subject: [PATCH v2 0/8] thermal: ti-soc-thermal: Migrate slope/offset
- data to device tree
-In-Reply-To: <64ab8413-6cf1-864f-0550-9c8db59523f7@ti.com>
-References: <1489046762-11288-1-git-send-email-j-keerthy@ti.com>
- <64ab8413-6cf1-864f-0550-9c8db59523f7@ti.com>
-Message-ID: <20170323205256.GO10760@atomide.com>
+From: mike.kravetz@oracle.com (Mike Kravetz)
+Date: Thu, 23 Mar 2017 13:55:27 -0700
+Subject: [RFC PATCH 0/2] Add hstate parameter to huge_pte_offset()
+In-Reply-To: <20170323125823.429-1-punit.agrawal@arm.com>
+References: <20170323125823.429-1-punit.agrawal@arm.com>
+Message-ID: <bde0d8a5-f361-ef4e-5cb3-1615bc2a98b0@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Keerthy <j-keerthy@ti.com> [170321 20:45]:
+On 03/23/2017 05:58 AM, Punit Agrawal wrote:
+> On architectures that support hugepages composed of contiguous pte as
+> well as block entries at the same level in the page table,
+> huge_pte_offset() is not able to determine the right offset to return
+> when it encounters a swap entry (which is used to mark poisoned as
+> well as migrated pages in the page table).
+> 
+> huge_pte_offset() needs to know the size of the hugepage at the
+> requested address to determine the offset to return - the current
+> entry or the first entry of a set of contiguous hugepages. This came
+> up while enabling support for memory failure handling on arm64[0].
+> 
+> Patch 1 adds a hstate parameter to huge_pte_offset() to provide
+> additional information about the target address. It also updates the
+> signatures (and usage) of huge_pte_offset() for architectures that
+> override the generic implementation. This patch has been compile
+> tested on ia64 and x86.
+
+I haven't looked at the performance implications of making huge_pte_offset
+just a little slower.  But, I think you can get hstate from the parameters
+passed today.
+
+vma = find_vma(mm, addr);
+h = hstate_vma(vma);
+
+-- 
+Mike Kravetz
+
+> Patch 2 uses the size determined by the parameter added in Patch 1, to
+> return the correct page table offset.
+> 
+> The patchset is based on top of v4.11-rc3 and the arm64 huge page
+> cleanup for break-before-make[1].
+> 
+> Thanks,
+> Punit
 > 
 > 
-> On Thursday 09 March 2017 01:35 PM, Keerthy wrote:
-> > Currently the slope and offset values for calculating the
-> > hot spot temperature of a particular thermal zone is part
-> > of driver data. Pass them here instead and obtain the values
-> > while of node parsing.
-> > 
-> > Tested for the slope and constant values on DRA7-EVM, OMAP3-BEAGLE. 
+> [0] http://marc.info/?l=linux-arm-kernel&m=148772028907925&w=2
+> [1] https://www.spinics.net/lists/arm-kernel/msg570422.html
 > 
-> Hi Eduardo,
+> Punit Agrawal (2):
+>   mm/hugetlb.c: add hstate parameter to huge_pte_offset()
+>   arm64: hugetlbpages: Correctly handle swap entries in
+>     huge_pte_offset()
 > 
-> If the series looks okay could you please pull this?
-
-Also.. Are the dts changes safe for me to pick separately?
-
-Regards,
-
-Tony
-
-
-> > Changes in v2:
-> > 
-> >   * Added OMAP3 changes along with DRA7/OMAP4/OMAP5.
-> > 
-> > Keerthy (8):
-> >   arm: dts: omap3: Add cpu_thermal zone
-> >   ARM: DRA7: Thermal: Add slope and offset values
-> >   ARM: OMAP5: Thermal: Add slope and offset values
-> >   ARM: OMAP443x: Thermal: Add slope and offset values
-> >   ARM: OMAP4460: Thermal: Add slope and offset values
-> >   thermal: ti-soc-thermal: Fetch slope and offset from DT
-> >   thermal: ti-soc-thermal: Remove redundant constants
-> >   thermal: ti-soc-thermal: Remove redundant code
-> > 
-> >  arch/arm/boot/dts/dra7.dtsi                        |  17 +++
-> >  arch/arm/boot/dts/omap3-cpu-thermal.dtsi           |  20 +++
-> >  arch/arm/boot/dts/omap34xx.dtsi                    |   8 +-
-> >  arch/arm/boot/dts/omap36xx.dtsi                    |   8 +-
-> >  arch/arm/boot/dts/omap443x.dtsi                    |   4 +
-> >  arch/arm/boot/dts/omap4460.dtsi                    |   4 +
-> >  arch/arm/boot/dts/omap5.dtsi                       |   9 ++
-> >  .../thermal/ti-soc-thermal/dra752-thermal-data.c   |  10 --
-> >  .../thermal/ti-soc-thermal/omap3-thermal-data.c    |   4 -
-> >  .../thermal/ti-soc-thermal/omap4-thermal-data.c    |   6 -
-> >  .../thermal/ti-soc-thermal/omap5-thermal-data.c    |   4 -
-> >  drivers/thermal/ti-soc-thermal/ti-bandgap.h        |   4 -
-> >  drivers/thermal/ti-soc-thermal/ti-thermal-common.c | 158 +--------------------
-> >  drivers/thermal/ti-soc-thermal/ti-thermal.h        |  16 ---
-> >  14 files changed, 71 insertions(+), 201 deletions(-)
-> >  create mode 100644 arch/arm/boot/dts/omap3-cpu-thermal.dtsi
-> > 
+>  arch/arm64/mm/hugetlbpage.c   | 33 +++++++++++++++++----------------
+>  arch/ia64/mm/hugetlbpage.c    |  4 ++--
+>  arch/metag/mm/hugetlbpage.c   |  2 +-
+>  arch/mips/mm/hugetlbpage.c    |  2 +-
+>  arch/parisc/mm/hugetlbpage.c  |  2 +-
+>  arch/powerpc/mm/hugetlbpage.c |  2 +-
+>  arch/s390/mm/hugetlbpage.c    |  2 +-
+>  arch/sh/mm/hugetlbpage.c      |  2 +-
+>  arch/sparc/mm/hugetlbpage.c   |  2 +-
+>  arch/tile/mm/hugetlbpage.c    |  2 +-
+>  arch/x86/mm/hugetlbpage.c     |  2 +-
+>  fs/userfaultfd.c              |  7 +++++--
+>  include/linux/hugetlb.h       |  2 +-
+>  mm/hugetlb.c                  | 18 +++++++++---------
+>  mm/page_vma_mapped.c          |  2 +-
+>  mm/pagewalk.c                 |  2 +-
+>  16 files changed, 45 insertions(+), 41 deletions(-)
+> 
