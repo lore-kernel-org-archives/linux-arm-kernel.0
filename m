@@ -1,72 +1,43 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 23 Mar 2017 13:40:24 +0000
-Subject: [RFC PATCH v2 21/41] arm64/sve: Enable SVE on demand for userspace
-In-Reply-To: <20170323120726.GF3750@e103592.cambridge.arm.com>
-References: <1490194274-30569-1-git-send-email-Dave.Martin@arm.com>
- <1490194274-30569-22-git-send-email-Dave.Martin@arm.com>
- <20170322164809.GC19950@leverpostej>
- <20170323112404.GC3750@e103592.cambridge.arm.com>
- <98bf1730-7579-d9f9-37c0-75ccfc29087b@arm.com>
- <20170323115227.GD9287@leverpostej>
- <20170323120726.GF3750@e103592.cambridge.arm.com>
-Message-ID: <20170323134023.GG9287@leverpostej>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 23 Mar 2017 14:41:53 +0100
+Subject: [PATCH 4/4] tty/serial: sh-sci: remove uneeded IS_ERR_OR_NULL
+ calls
+In-Reply-To: <20170323123437.uqdwhfmmsjke3f7s@pengutronix.de>
+References: <CAMuHMdWv-xs12UqutEtXJGR8qqgx6DeDhkKvvYhhyW+XTVsUNQ@mail.gmail.com>
+ <CAMuHMdXGn35bEsJKnUi5o3AytL4AJN2fBfoB79v5W-jOVFQx6g@mail.gmail.com>
+ <20170320103113.tpveoq2onzrwmkdt@pengutronix.de>
+ <CAMuHMdWbwA+3UGVnHYJOs26vTj13Yn+s4B8tE9kyy25JcjyZGg@mail.gmail.com>
+ <20170320110718.e44s2gip36m75bqj@pengutronix.de>
+ <CACRpkdZy_uguiKfSH-0gdanjr-xkwxoANTx6Fb2VwsvzRwcPRA@mail.gmail.com>
+ <20170323101045.u3uigdu5xfwjmjc7@pengutronix.de>
+ <CAMuHMdWDUzwUqrchbhh-TkE3J9Xg4TrwTF6HreikUcNNTf_ozQ@mail.gmail.com>
+ <20170323111106.7ogh6g2oa3m4cqc6@pengutronix.de>
+ <CAMuHMdUWybAZXc2RbGMGyp4DYQZU9BS8MxXKE5Kfd+aH8+w9sA@mail.gmail.com>
+ <20170323123437.uqdwhfmmsjke3f7s@pengutronix.de>
+Message-ID: <CACRpkdZRfLh9RXRycW_cAxuTYE6tPd7LR32EkAW8y2fh=AxhXA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 23, 2017 at 12:07:26PM +0000, Dave Martin wrote:
-> On Thu, Mar 23, 2017 at 11:52:27AM +0000, Mark Rutland wrote:
-> > On Thu, Mar 23, 2017 at 11:30:16AM +0000, Suzuki K Poulose wrote:
-> > > On 23/03/17 11:24, Dave Martin wrote:
-> > > >On Wed, Mar 22, 2017 at 04:48:10PM +0000, Mark Rutland wrote:
-> > 
-> > > >>>+	asm ("mrs %0, cpacr_el1" : "=r" (tmp));
-> > > >>>+	asm volatile ("msr cpacr_el1, %0" :: "r" (tmp | (1 << 17)));
-> > 
-> > > >>Please also use {read,write}_sysreg(), e.g.
-> > > >
-> > > >TBH, I was confused about the status of these macros at the time I
-> > > >wrote this code.
-> > > >
-> > > >The naming clash with the cpufeature functions is unfortunate.  In my
-> > > >head these names all became associated with "do something behind the
-> > > >scenes that may or may not really read the underlying system reg".
-> > > >
-> > > >Would it be reasonable to rename read_system_reg() to something more
-> > > >different, like read_kernel_sysreg(), read_system_id(),
-> > > >read_sanitised_id_reg(), etc.?
-> > > 
-> > > I agree. read_system_reg() is not quite obvious name given all the other
-> > > similar names. We could go with either read_sanitised_id_reg() or read_system_safe_reg() ?
-> > 
-> > I think read_sanitised_id_reg() sounds best, since "safe" cound mean a
-> > few things, and having "id" in the name makes it clear that it's not a
-> > general purpose sysreg accessor.
-> 
-> OK, I'll write a separate patch proposing that.
-> 
-> Are we comfortable with _id_ in the name here?
-> 
-> My logic was that sanitisation makes no sense for anything except
-> read-only ID registers, and _system_ sounds too universal.
-> 
-> There is a sting in the tail here -- I add ZCR as an "id" reg so that we
-> can treat the maximum configurable length in the LEN field as if it were
-> an ID field.  See patch 38 (apologies Suzuki, missed your CC).
-> 
-> In fact, ZCR is neither read-only nor an ID register -- but the view of
-> it through cpufeatures does have those properties.
-> 
-> It might be better to rename it, but I considered it an OK compromise.
-> Let me know if you have concerns.
+On Thu, Mar 23, 2017 at 1:34 PM, Uwe Kleine-K?nig
+<u.kleine-koenig@pengutronix.de> wrote:
 
-FWIW, I'm fine with read_sanitised_id_reg(), even considering the ZCR
-case, given we're using it for feature identification information.
+> Maybe we can make gpiod_get_optional look like this:
+>
+>         if (!dev->of_node && isnt_a_acpi_device(dev) && !IS_ENABLED(GPIOLIB))
+>                 return NULL;
+>         else
+>                 return -ENOSYS;
+>
+> I don't know how isnt_a_acpi_device looks like, probably it involves
+> CONFIG_ACPI and/or dev->acpi_node.
+>
+> This should be safe and still comfortable for legacy platforms, isn't it?
 
-At best, we only need a comment over the ZCR field definitions in
-arch/arm64/kernel/cpufeature.c, explaining what's going on.
+I like the looks of this.
 
-Perhaps read_sanitised_ftr_reg() covers that better? That might align
-better with the existing *_ftr_reg() naming.
+Can we revert Dmitry's patch and apply something like this instead?
 
-Thanks,
-Mark.
+Dmitry, how do you feel about this?
+
+Yours,
+Linus Walleij
