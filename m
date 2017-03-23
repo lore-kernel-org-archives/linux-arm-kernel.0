@@ -1,83 +1,53 @@
 From: aisheng.dong@nxp.com (Dong Aisheng)
-Date: Thu, 23 Mar 2017 12:53:21 +0800
-Subject: [PATCH v2 4/8] soc: imx: gpc: fix imx6sl gpc power domain regression
+Date: Thu, 23 Mar 2017 12:53:23 +0800
+Subject: [PATCH v2 6/8] soc: imx: gpc: keep PGC_X_CTRL name align with
+ reference manual
 In-Reply-To: <1490244805-3921-1-git-send-email-aisheng.dong@nxp.com>
 References: <1490244805-3921-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1490244805-3921-5-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <1490244805-3921-7-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 721cabf6c660 ("soc: imx: move PGC handling to a new GPC driver")
-broke the MX6SL GPC power domain support.
-It always got the following error:
-[    1.248364] imx-gpc 20dc000.gpc: could not find pgc DT node
-This patch adds back the legecy support.
+Instead of GPC_PGC_PDN_OFFS, naming it as GPC_PGC_CTRL_OFFS which is
+defined in reference manual for better reading.
 
-Cc: Lucas Stach <l.stach@pengutronix.de>
 Cc: Shawn Guo <shawnguo@kernel.org>
-Fixes: 721cabf6c660 ("soc: imx: move PGC handling to a new GPC driver")
+Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
 Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
-
 ---
-Change Log:
-v1->v2: add back the three domain support for MX6SL
----
- drivers/soc/imx/gpc.c | 18 +++++++-----------
- 1 file changed, 7 insertions(+), 11 deletions(-)
+ drivers/soc/imx/gpc.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/soc/imx/gpc.c b/drivers/soc/imx/gpc.c
-index ba6e7ab..9a2354e 100644
+index afb02f9..3c61248 100644
 --- a/drivers/soc/imx/gpc.c
 +++ b/drivers/soc/imx/gpc.c
-@@ -309,12 +309,13 @@ static struct genpd_onecell_data imx_gpc_onecell_data = {
- 	.num_domains = 2,
- };
+@@ -21,7 +21,7 @@
  
--static int imx_gpc_old_dt_init(struct device *dev, struct regmap *regmap)
-+static int imx_gpc_old_dt_init(struct device *dev, struct regmap *regmap,
-+			       unsigned int num_domains)
- {
- 	struct imx_pm_domain *domain;
- 	int i, ret;
+ #define GPC_CNTR		0x000
  
--	for (i = 0; i < 2; i++) {
-+	for (i = 0; i < num_domains; i++) {
- 		domain = &imx_gpc_domains[i];
- 		domain->regmap = regmap;
- 		domain->ipg_rate_mhz = 66;
-@@ -332,7 +333,7 @@ static int imx_gpc_old_dt_init(struct device *dev, struct regmap *regmap)
- 		}
- 	}
+-#define GPC_PGC_PDN_OFFS	0x0
++#define GPC_PGC_CTRL_OFFS	0x0
+ #define GPC_PGC_PUPSCR_OFFS	0x4
+ #define GPC_PGC_PDNSCR_OFFS	0x8
+ #define GPC_PGC_SW2ISO_SHIFT	0x8
+@@ -65,7 +65,7 @@ static int imx6_pm_domain_power_off(struct generic_pm_domain *genpd)
+ 	iso2sw = (val >> 8) & 0x3f;
  
--	for (i = 0; i < 2; i++)
-+	for (i = 0; i < num_domains; i++)
- 		pm_genpd_init(&imx_gpc_domains[i].base, NULL, false);
+ 	/* Gate off domain when powered down */
+-	regmap_update_bits(pd->regmap, pd->reg_offs + GPC_PGC_PDN_OFFS,
++	regmap_update_bits(pd->regmap, pd->reg_offs + GPC_PGC_CTRL_OFFS,
+ 			   0x1, 0x1);
  
- 	if (IS_ENABLED(CONFIG_PM_GENERIC_DOMAINS)) {
-@@ -345,7 +346,7 @@ static int imx_gpc_old_dt_init(struct device *dev, struct regmap *regmap)
- 	return 0;
+ 	/* Request GPC to power down domain */
+@@ -101,7 +101,7 @@ static int imx6_pm_domain_power_on(struct generic_pm_domain *genpd)
+ 		clk_prepare_enable(pd->clk[i]);
  
- genpd_err:
--	for (i = 0; i < 2; i++)
-+	for (i = 0; i < num_domains; i++)
- 		pm_genpd_remove(&imx_gpc_domains[i].base);
- 	imx_pgc_put_clocks(&imx_gpc_domains[1]);
- clk_err:
-@@ -385,13 +386,8 @@ static int imx_gpc_probe(struct platform_device *pdev)
- 	}
+ 	/* Gate off domain when powered down */
+-	regmap_update_bits(pd->regmap, pd->reg_offs + GPC_PGC_PDN_OFFS,
++	regmap_update_bits(pd->regmap, pd->reg_offs + GPC_PGC_CTRL_OFFS,
+ 			   0x1, 0x1);
  
- 	if (!pgc_node) {
--		/* old DT layout is only supported for mx6q aka 2 domains */
--		if (of_id_data->num_domains != 2) {
--			dev_err(&pdev->dev, "could not find pgc DT node\n");
--			return -ENODEV;
--		}
--
--		ret = imx_gpc_old_dt_init(&pdev->dev, regmap);
-+		ret = imx_gpc_old_dt_init(&pdev->dev, regmap,
-+					  of_id_data->num_domains);
- 		if (ret)
- 			return ret;
- 	} else {
+ 	/* Read ISO and ISO2SW power up delays */
 -- 
 2.7.4
