@@ -1,30 +1,84 @@
-From: alexandre.torgue@st.com (Alexandre TORGUE)
-Date: Thu, 23 Mar 2017 11:09:06 +0100
-Subject: [PATCH] ARM: configs: stm32: Set CPU_V7M_NUM_IRQ to max value
-Message-ID: <1490263746-10512-1-git-send-email-alexandre.torgue@st.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 23 Mar 2017 11:10:45 +0100
+Subject: [PATCH 4/4] tty/serial: sh-sci: remove uneeded IS_ERR_OR_NULL
+ calls
+In-Reply-To: <CACRpkdZy_uguiKfSH-0gdanjr-xkwxoANTx6Fb2VwsvzRwcPRA@mail.gmail.com>
+References: <20170306093043.ay4dz3ehp3aakwxh@pengutronix.de>
+ <CAMuHMdWQuvANNU14A7NQuzv6AFp04bq4DG_oc7w9h4wUrG+4aQ@mail.gmail.com>
+ <20170306100220.droey65uq2ew3mzu@pengutronix.de>
+ <CACRpkdYeFyr4yjQjDAUpPJwuD_NW2y=wXnzt1xSNoOX0SFCLmw@mail.gmail.com>
+ <CAMuHMdWv-xs12UqutEtXJGR8qqgx6DeDhkKvvYhhyW+XTVsUNQ@mail.gmail.com>
+ <CAMuHMdXGn35bEsJKnUi5o3AytL4AJN2fBfoB79v5W-jOVFQx6g@mail.gmail.com>
+ <20170320103113.tpveoq2onzrwmkdt@pengutronix.de>
+ <CAMuHMdWbwA+3UGVnHYJOs26vTj13Yn+s4B8tE9kyy25JcjyZGg@mail.gmail.com>
+ <20170320110718.e44s2gip36m75bqj@pengutronix.de>
+ <CACRpkdZy_uguiKfSH-0gdanjr-xkwxoANTx6Fb2VwsvzRwcPRA@mail.gmail.com>
+Message-ID: <20170323101045.u3uigdu5xfwjmjc7@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-stm32_defconfig is used for several STM32 MCU: STM32F429, STM32F469,
-STM32F746 and now STM32H743. Each of MCU listed have different interrupts
-number mapped on NVIC. STM32F429: 81, STM32F469: 92, STM32F746: 97 and
-STM32H743: 149. I could set CPU_V7M_NUM_IRQ to 149 but in order to avoid
-forgetting to update this value for next STM32 MCU I prefer to set it to
-max value: 240.
+On Thu, Mar 23, 2017 at 10:32:01AM +0100, Linus Walleij wrote:
+> On Mon, Mar 20, 2017 at 12:07 PM, Uwe Kleine-K?nig
+> <u.kleine-koenig@pengutronix.de> wrote:
+> > Hello Geert,
+> >
+> > On Mon, Mar 20, 2017 at 11:38:52AM +0100, Geert Uytterhoeven wrote:
+> >> On Mon, Mar 20, 2017 at 11:31 AM, Uwe Kleine-K?nig
+> >> <u.kleine-koenig@pengutronix.de> wrote:
+> >> > On Mon, Mar 20, 2017 at 10:56:14AM +0100, Geert Uytterhoeven wrote:
+> >> >> Documentation/gpio/consumer.txt rightfully sates:
+> >> >> | Note that gpio_get*_optional() functions (and their managed variants), unlike
+> >> >> | the rest of gpiolib API, also return NULL when gpiolib support is disabled.
+> >> >> | This is helpful to driver authors, since they do not need to special case
+> >> >> | -ENOSYS return codes.  System integrators should however be careful to enable
+> >> >> | gpiolib on systems that need it.
+> >> >
+> >> > I cannot find this paragraph in Documentation/gpio/consumer.txt:
+> >> >
+> >> >         $ git grep -e 'ENOSYS' v4.11-rc3 -- Documentation/gpio/
+> >> >         <void>
+> >>
+> >> It was added by commit 22c403676dbbb7c6 ("gpio: return NULL from
+> >> gpiod_get_optional when GPIOLIB is disabled")
+> >
+> > Ah, that's in next.
+> >
+> > I still think this is wrong and I'm a bit disappointed that Linus merged
+> > this patch (without saying so in the thread even) as I thought Linus and
+> > I agreed on this being a bad idea.
+> 
+> I think it is not good, but what we have before this patch is worse.
+> 
+> I.e. it is the lesser evil.
+> 
+> Before this patch the API is inconsistent: it gives NULL if GPIOLIB
+> is defined and -ENOSYS if GPIOLIB is not defined.
 
-Signed-off-by: Alexandre TORGUE <alexandre.torgue@st.com>
+So old is: it worked as intended with GPIOLIB and produced an error
+without GPIOLIB even if no GPIO is there and NULL would be right.
+ 
+> After this patch it gives NULL in both cases, and that is at least
+> consistent.
 
-diff --git a/arch/arm/configs/stm32_defconfig b/arch/arm/configs/stm32_defconfig
-index a9d8e3c..7c9c157 100644
---- a/arch/arm/configs/stm32_defconfig
-+++ b/arch/arm/configs/stm32_defconfig
-@@ -20,6 +20,7 @@ CONFIG_EMBEDDED=y
- # CONFIG_MMU is not set
- CONFIG_ARM_SINGLE_ARMV7M=y
- CONFIG_ARCH_STM32=y
-+CONFIG_CPU_V7M_NUM_IRQ=240
- CONFIG_SET_MEM_PARAM=y
- CONFIG_DRAM_BASE=0x90000000
- CONFIG_FLASH_MEM_BASE=0x08000000
+And new is: with GPIOLIB it still works as intended and gives you NULL
+even if a GPIO is there and so -ENOSYS would be right.
+
+I admit that most of the time with GPIOLIB NULL is the right answer
+because probably there is no GPIO to handle. But if there is a GPIO you
+run in hard to debug problems instead of being able to see the error
+code and act accordingly.
+
+write(2) and close(2) succeed most of the time, too. Still it's not a
+good idea to not check the return value. Or let the kernel return
+success unconditionally.
+
+So you exchanged many obvious and easy to fix problems with a few hard
+ones. I don't agree that's a good idea, but you seem to be willing to
+try it. Good luck.
+
+Best regards
+Uwe
+
 -- 
-1.9.1
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
