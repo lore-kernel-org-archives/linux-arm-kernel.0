@@ -1,8 +1,8 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 23 Mar 2017 13:34:37 +0100
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 23 Mar 2017 13:44:19 +0100
 Subject: [PATCH 4/4] tty/serial: sh-sci: remove uneeded IS_ERR_OR_NULL
  calls
-In-Reply-To: <CAMuHMdUWybAZXc2RbGMGyp4DYQZU9BS8MxXKE5Kfd+aH8+w9sA@mail.gmail.com>
+In-Reply-To: <20170323123437.uqdwhfmmsjke3f7s@pengutronix.de>
 References: <CAMuHMdWv-xs12UqutEtXJGR8qqgx6DeDhkKvvYhhyW+XTVsUNQ@mail.gmail.com>
  <CAMuHMdXGn35bEsJKnUi5o3AytL4AJN2fBfoB79v5W-jOVFQx6g@mail.gmail.com>
  <20170320103113.tpveoq2onzrwmkdt@pengutronix.de>
@@ -13,65 +13,78 @@ References: <CAMuHMdWv-xs12UqutEtXJGR8qqgx6DeDhkKvvYhhyW+XTVsUNQ@mail.gmail.com>
  <CAMuHMdWDUzwUqrchbhh-TkE3J9Xg4TrwTF6HreikUcNNTf_ozQ@mail.gmail.com>
  <20170323111106.7ogh6g2oa3m4cqc6@pengutronix.de>
  <CAMuHMdUWybAZXc2RbGMGyp4DYQZU9BS8MxXKE5Kfd+aH8+w9sA@mail.gmail.com>
-Message-ID: <20170323123437.uqdwhfmmsjke3f7s@pengutronix.de>
+ <20170323123437.uqdwhfmmsjke3f7s@pengutronix.de>
+Message-ID: <CAMuHMdVcALm_iLiTgs7GL5S77ur+iGVhyD0yB9FxCfKFpw7uug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 23, 2017 at 01:03:56PM +0100, Geert Uytterhoeven wrote:
-> Hi Uwe,
-> 
-> On Thu, Mar 23, 2017 at 12:11 PM, Uwe Kleine-K?nig
-> <u.kleine-koenig@pengutronix.de> wrote:
-> >> Make sure to enable all drivers and subsystems you need when building
-> >> your kernel. That's always true. And may indeed be hard to debug (e.g. what
-> >> kernel options do I need to make systemd work?).
-> >
-> > It's worse here. If you forget to enable a driver the device isn't bound
-> > and that's obvious to diagnose. When ignoring an optional GPIO there
-> > might be a device that claims to work but fails to do so. (e.g. you
-> > write to memory, write() returns 0, but the data never landed there.)
-> >
-> >> > write(2) and close(2) succeed most of the time, too. Still it's not a
-> >> > good idea to not check the return value. Or let the kernel return
-> >> > success unconditionally.
-> >>
-> >> Writing all bytes passed in the buffer is "optional" in another sense than
-> >> an "optional" GPIO: you must retry the write, while you can continue if
-> >> an optional GPIO is not present.
-> >
-> > And that is the point. You can continue *iff* the optional GPIO is not
-> > present. The patch in question removes the ability to determine if that
-> > GPIO is present and claims it is not present.
-> 
-> If you forget to enable a driver/subsystem, you sometimes cannot determine
-> if the device is present or not neither.
-> 
-> Hence it boils down to "knowing" if there is a GPIO or not.
-> So, when can there be a GPIO?
->   1. The GPIO is described in DT.
->      => Not an issue, as DT GPIO implies GPIOLIB,
->   2. The GPIO is described in legacy platform data.
->      => The platform code should make sure GPIOLIB is selected when needed.
-> 
-> Issue solved?
+Hi Uwe,
 
-I like it better to not rely on platform code to do the right thing.
+On Thu, Mar 23, 2017 at 1:34 PM, Uwe Kleine-K?nig
+<u.kleine-koenig@pengutronix.de> wrote:
+> On Thu, Mar 23, 2017 at 01:03:56PM +0100, Geert Uytterhoeven wrote:
+>> On Thu, Mar 23, 2017 at 12:11 PM, Uwe Kleine-K?nig
+>> <u.kleine-koenig@pengutronix.de> wrote:
+>> >> Make sure to enable all drivers and subsystems you need when building
+>> >> your kernel. That's always true. And may indeed be hard to debug (e.g. what
+>> >> kernel options do I need to make systemd work?).
+>> >
+>> > It's worse here. If you forget to enable a driver the device isn't bound
+>> > and that's obvious to diagnose. When ignoring an optional GPIO there
+>> > might be a device that claims to work but fails to do so. (e.g. you
+>> > write to memory, write() returns 0, but the data never landed there.)
+>> >
+>> >> > write(2) and close(2) succeed most of the time, too. Still it's not a
+>> >> > good idea to not check the return value. Or let the kernel return
+>> >> > success unconditionally.
+>> >>
+>> >> Writing all bytes passed in the buffer is "optional" in another sense than
+>> >> an "optional" GPIO: you must retry the write, while you can continue if
+>> >> an optional GPIO is not present.
+>> >
+>> > And that is the point. You can continue *iff* the optional GPIO is not
+>> > present. The patch in question removes the ability to determine if that
+>> > GPIO is present and claims it is not present.
+>>
+>> If you forget to enable a driver/subsystem, you sometimes cannot determine
+>> if the device is present or not neither.
+>>
+>> Hence it boils down to "knowing" if there is a GPIO or not.
+>> So, when can there be a GPIO?
+>>   1. The GPIO is described in DT.
+>>      => Not an issue, as DT GPIO implies GPIOLIB,
+>>   2. The GPIO is described in legacy platform data.
+>>      => The platform code should make sure GPIOLIB is selected when needed.
+>>
+>> Issue solved?
+>
+> I like it better to not rely on platform code to do the right thing.
 
-Maybe we can make gpiod_get_optional look like this:
+;-)
 
-	if (!dev->of_node && isnt_a_acpi_device(dev) && !IS_ENABLED(GPIOLIB))
-		return NULL;
-	else
-		return -ENOSYS;
+> Maybe we can make gpiod_get_optional look like this:
+>
+>         if (!dev->of_node && isnt_a_acpi_device(dev) && !IS_ENABLED(GPIOLIB))
+>                 return NULL;
+>         else
+>                 return -ENOSYS;
+>
+> I don't know how isnt_a_acpi_device looks like, probably it involves
+> CONFIG_ACPI and/or dev->acpi_node.
+>
+> This should be safe and still comfortable for legacy platforms, isn't it?
 
-I don't know how isnt_a_acpi_device looks like, probably it involves
-CONFIG_ACPI and/or dev->acpi_node.
+Yes, that should do the trick.
 
-This should be safe and still comfortable for legacy platforms, isn't it?
+No feedback from me about ACPI.
 
-Best regards
-Uwe
+Gr{oetje,eeting}s,
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
