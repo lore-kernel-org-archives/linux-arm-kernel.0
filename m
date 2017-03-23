@@ -1,64 +1,73 @@
-From: julia@ni.com (Julia Cartwright)
-Date: Thu, 23 Mar 2017 11:10:20 -0500
-Subject: [PATCH v4 1/4] pinctrl: rockchip: remove unnecessary locking
-In-Reply-To: <20170323105931.10455-2-john@metanate.com>
-References: <20170323105931.10455-1-john@metanate.com>
- <20170323105931.10455-2-john@metanate.com>
-Message-ID: <20170323161020.GM10423@jcartwri.amer.corp.natinst.com>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Thu, 23 Mar 2017 16:12:55 +0000
+Subject: [PATCH] arm64: kconfig: allow support for memory failure handling
+In-Reply-To: <58D3DCA1.5090006@arm.com>
+References: <1485985115-27274-1-git-send-email-tbaicar@codeaurora.org>
+ <58D3DCA1.5090006@arm.com>
+Message-ID: <1dc99ff7-65ac-4858-6008-8ee8d0f6f336@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello John-
 
-One quick question below.  Apologies if this has been covered, but just
-want to be sure.
 
-On Thu, Mar 23, 2017 at 10:59:28AM +0000, John Keeping wrote:
-> regmap_update_bits does its own locking and everything else accessed
-> here is a local variable so there is no need to lock around it.
-> 
-> Signed-off-by: John Keeping <john@metanate.com>
-> Reviewed-by: Heiko Stuebner <heiko@sntech.de>
-> Tested-by: Heiko Stuebner <heiko@sntech.de>
-> ---
-> v3: unchanged
-> v2.1:
-> - Remove RK2928 locking in rockchip_set_pull()
-> v2:
-> - Also remove locking in rockchip_set_schmitt()
-> ---
->  drivers/pinctrl/pinctrl-rockchip.c | 33 ++-------------------------------
->  1 file changed, 2 insertions(+), 31 deletions(-)
-> 
-> diff --git a/drivers/pinctrl/pinctrl-rockchip.c b/drivers/pinctrl/pinctrl-rockchip.c
-> index bd4b63f66220..6568c867bdcd 100644
-> --- a/drivers/pinctrl/pinctrl-rockchip.c
-> +++ b/drivers/pinctrl/pinctrl-rockchip.c
-[..]
-> @@ -1185,17 +1177,14 @@ static int rockchip_set_drive_perpin(struct rockchip_pin_bank *bank,
->  			rmask = BIT(15) | BIT(31);
->  			data |= BIT(31);
->  			ret = regmap_update_bits(regmap, reg, rmask, data);
-> -			if (ret) {
-> -				spin_unlock_irqrestore(&bank->slock, flags);
-> +			if (ret)
->  				return ret;
-> -			}
->  
->  			rmask = 0x3 | (0x3 << 16);
->  			temp |= (0x3 << 16);
->  			reg += 0x4;
->  			ret = regmap_update_bits(regmap, reg, rmask, temp);
+On 23/03/17 14:33, James Morse wrote:
+> Hi Punit,
+>
+> On 01/02/17 21:38, Tyler Baicar wrote:
+>> From: "Jonathan (Zhixiong) Zhang" <zjzhang@codeaurora.org>
+>>
+>> If ACPI_APEI and MEMORY_FAILURE is configured, select
+>> ACPI_APEI_MEMORY_FAILURE. This enables memory failure recovery
+>> when such memory failure is reported through ACPI APEI. APEI
+>> (ACPI Platform Error Interfaces) provides a means for the
+>> platform to convey error information to the kernel.
+>>
+>> Declare ARCH_SUPPORTS_MEMORY_FAILURE, as arm64 does support
+>> memory failure recovery attempt.
+>
+> Am I right in thinking we should wait for the hugepage issue you found with
+> hwpoison [0] to be fixed before arm64 can have ARCH_SUPPORTS_MEMORY_FAILURE?
 
-Killing the lock here means the writes to to this pair of registers (reg
-and reg + 4) can be observed non-atomically.  Have you convinced
-yourself that this isn't a problem?
+We should at the least fix the huge_pte_offset() issue discovered in [0]
+before we enable memory failure handling. Earlier today I posted a
+RFC[1] fix for it based on Catalin's suggestion.
 
-   Julia
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170323/fa72076b/attachment-0001.sig>
+>
+> (If so, can this patch become part of that series to they are obviously related!)
+
+Good point - I can include the patches enabling memory failure handling
+on ARM64 if Tyler's fine with it.
+
+Thanks,
+Punit
+
+[1] https://lkml.org/lkml/2017/3/23/293
+
+>
+> Thanks,
+>
+> James
+>
+> [0] https://www.spinics.net/lists/arm-kernel/msg568995.html
+>
+>
+>
+>
+>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+>> index f92778d..4cd12a0 100644
+>> --- a/arch/arm64/Kconfig
+>> +++ b/arch/arm64/Kconfig
+>> @@ -15,6 +15,8 @@ config ARM64
+>>      select ARCH_HAS_SG_CHAIN
+>>      select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
+>>      select ARCH_USE_CMPXCHG_LOCKREF
+>> +    select ACPI_APEI_MEMORY_FAILURE if ACPI_APEI && MEMORY_FAILURE
+>> +    select ARCH_SUPPORTS_MEMORY_FAILURE
+>>      select ARCH_SUPPORTS_ATOMIC_RMW
+>>      select ARCH_SUPPORTS_NUMA_BALANCING
+>>      select ARCH_WANT_COMPAT_IPC_PARSE_VERSION
+>>
+>
+>
+>
+IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
