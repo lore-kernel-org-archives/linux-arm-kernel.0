@@ -1,30 +1,25 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 23 Mar 2017 14:12:03 +0000
-Subject: [PATCH v6 00/11] arm64: mmu: avoid W+X mappings and re-enable
- PTE_CONT for kernel
-In-Reply-To: <1489092729-16871-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1489092729-16871-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20170323141203.GD14290@e104818-lin.cambridge.arm.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Thu, 23 Mar 2017 15:13:11 +0100
+Subject: [PATCH 0/2] IPU PRE/PRG devicetree nodes
+Message-ID: <20170323141313.11241-1-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 09, 2017 at 09:51:58PM +0100, Ard Biesheuvel wrote:
-> Ard Biesheuvel (11):
->   arm: kvm: move kvm_vgic_global_state out of .text section
->   arm64: mmu: move TLB maintenance from callers to create_mapping_late()
->   arm64: alternatives: apply boot time fixups via the linear mapping
->   arm64: mmu: map .text as read-only from the outset
->   arm64: mmu: apply strict permissions to .init.text and .init.data
->   arm64/mmu: align alloc_init_pte prototype with pmd/pud versions
->   arm64/mmu: ignore debug_pagealloc for kernel segments
->   arm64/mmu: add contiguous bit to sanity bug check
->   arm64/mmu: replace 'page_mappings_only' parameter with flags argument
->   arm64/mm: remove pointless map/unmap sequences when creating page
->     tables
->   arm64: mm: set the contiguous bit for kernel mappings where
->     appropriate
+Hi Shawn,
 
-Queued for 4.12. Thanks.
+the following 2 patches add the DT nodes for the PRE/PRG units found
+on i.MX6QP. The bindings and driver code to make use of those are
+already in Dave Airlies drm-next branch, so can be considered stable.
+
+Regards,
+Lucas
+
+Lucas Stach (2):
+  ARM: dts: imx6qp: add PRE nodes
+  ARM: dts: imx6qp: add PRG nodes and hook up to IPUs
+
+ arch/arm/boot/dts/imx6qp.dtsi | 58 +++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 58 insertions(+)
 
 -- 
-Catalin
+2.11.0
