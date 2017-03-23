@@ -1,66 +1,93 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 23 Mar 2017 10:32:01 +0100
-Subject: [PATCH 4/4] tty/serial: sh-sci: remove uneeded IS_ERR_OR_NULL
- calls
-In-Reply-To: <20170320110718.e44s2gip36m75bqj@pengutronix.de>
-References: <20170306085842.yijkfpqi3adcedmm@pengutronix.de>
- <CAMuHMdV2_vbocY4wCzvYtPAaF+QEX_Y4g6qVu5EqEBf5AnFdaw@mail.gmail.com>
- <20170306093043.ay4dz3ehp3aakwxh@pengutronix.de>
- <CAMuHMdWQuvANNU14A7NQuzv6AFp04bq4DG_oc7w9h4wUrG+4aQ@mail.gmail.com>
- <20170306100220.droey65uq2ew3mzu@pengutronix.de>
- <CACRpkdYeFyr4yjQjDAUpPJwuD_NW2y=wXnzt1xSNoOX0SFCLmw@mail.gmail.com>
- <CAMuHMdWv-xs12UqutEtXJGR8qqgx6DeDhkKvvYhhyW+XTVsUNQ@mail.gmail.com>
- <CAMuHMdXGn35bEsJKnUi5o3AytL4AJN2fBfoB79v5W-jOVFQx6g@mail.gmail.com>
- <20170320103113.tpveoq2onzrwmkdt@pengutronix.de>
- <CAMuHMdWbwA+3UGVnHYJOs26vTj13Yn+s4B8tE9kyy25JcjyZGg@mail.gmail.com>
- <20170320110718.e44s2gip36m75bqj@pengutronix.de>
-Message-ID: <CACRpkdZy_uguiKfSH-0gdanjr-xkwxoANTx6Fb2VwsvzRwcPRA@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 23 Mar 2017 09:34:54 +0000
+Subject: [PATCH v2] arm64: kaslr: Fix up the kernel image alignment
+In-Reply-To: <58D39641.2060009@codeaurora.org>
+References: <904FACBF-3DFE-4DDE-ACB5-7109A137D477@linaro.org>
+ <1490182705-14243-1-git-send-email-sramana@codeaurora.org>
+ <CAKv+Gu-XUY0XBSK_oe4DbveZOhk8_ZQLMEdPmLiaRv9rCh7ifw@mail.gmail.com>
+ <20170322124008.GH8026@arm.com> <58D27FFC.8030205@codeaurora.org>
+ <58D39641.2060009@codeaurora.org>
+Message-ID: <CAKv+Gu-XXYaJmoZKQANmcaSn5Z1Nu2zTJ66yTOKFs=cVuzd6tQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 20, 2017 at 12:07 PM, Uwe Kleine-K?nig
-<u.kleine-koenig@pengutronix.de> wrote:
-> Hello Geert,
->
-> On Mon, Mar 20, 2017 at 11:38:52AM +0100, Geert Uytterhoeven wrote:
->> On Mon, Mar 20, 2017 at 11:31 AM, Uwe Kleine-K?nig
->> <u.kleine-koenig@pengutronix.de> wrote:
->> > On Mon, Mar 20, 2017 at 10:56:14AM +0100, Geert Uytterhoeven wrote:
->> >> Documentation/gpio/consumer.txt rightfully sates:
->> >> | Note that gpio_get*_optional() functions (and their managed variants), unlike
->> >> | the rest of gpiolib API, also return NULL when gpiolib support is disabled.
->> >> | This is helpful to driver authors, since they do not need to special case
->> >> | -ENOSYS return codes.  System integrators should however be careful to enable
->> >> | gpiolib on systems that need it.
->> >
->> > I cannot find this paragraph in Documentation/gpio/consumer.txt:
->> >
->> >         $ git grep -e 'ENOSYS' v4.11-rc3 -- Documentation/gpio/
->> >         <void>
+On 23 March 2017 at 09:32, Srinivas Ramana <sramana@codeaurora.org> wrote:
+> On 03/22/2017 07:15 PM, Srinivas Ramana wrote:
 >>
->> It was added by commit 22c403676dbbb7c6 ("gpio: return NULL from
->> gpiod_get_optional when GPIOLIB is disabled")
+>> On 03/22/2017 06:10 PM, Will Deacon wrote:
+>>>
+>>> On Wed, Mar 22, 2017 at 12:16:24PM +0000, Ard Biesheuvel wrote:
+>>>>
+>>>> On 22 March 2017 at 11:38, Srinivas Ramana <sramana@codeaurora.org>
+>>>> wrote:
+>>>>>
+>>>>> From: Neeraj Upadhyay <neeraju@codeaurora.org>
+>>>>>
+>>>>> If kernel image extends across alignment boundary, existing
+>>>>> code increases the KASLR offset by size of kernel image. The
+>>>>> offset is masked after resizing. There are cases, where after
+>>>>> masking, we may still have kernel image extending across
+>>>>> boundary. This eventually results in only 2MB block getting
+>>>>> mapped while creating the page tables. This results in data aborts
+>>>>> while accessing unmapped regions during second relocation (with
+>>>>> kaslr offset) in __primary_switch. To fix this problem, round up the
+>>>>> kernel image size, by swapper block size, before adding it for
+>>>>> correction.
+>>>>>
+>>>>> For example consider below case, where kernel image still crosses
+>>>>> 1GB alignment boundary, after masking the offset, which is fixed
+>>>>> by rounding up kernel image size.
+>>>>>
+>>>>> SWAPPER_TABLE_SHIFT = 30
+>>>>> Swapper using section maps with section size 2MB.
+>>>>> CONFIG_PGTABLE_LEVELS = 3
+>>>>> VA_BITS = 39
+>>>>>
+>>>>> _text  : 0xffffff8008080000
+>>>>> _end   : 0xffffff800aa1b000
+>>>>> offset : 0x1f35600000
+>>>>> mask = ((1UL << (VA_BITS - 2)) - 1) & ~(SZ_2M - 1)
+>>>>>
+>>>>> (_text + offset) >> SWAPPER_TABLE_SHIFT = 0x3fffffe7c
+>>>>> (_end + offset) >> SWAPPER_TABLE_SHIFT  = 0x3fffffe7d
+>>>>>
+>>>>> offset after existing correction (before mask) = 0x1f37f9b000
+>>>>> (_text + offset) >> SWAPPER_TABLE_SHIFT = 0x3fffffe7d
+>>>>> (_end + offset) >> SWAPPER_TABLE_SHIFT  = 0x3fffffe7d
+>>>>>
+>>>>> offset (after mask) = 0x1f37e00000
+>>>>> (_text + offset) >> SWAPPER_TABLE_SHIFT = 0x3fffffe7c
+>>>>> (_end + offset) >> SWAPPER_TABLE_SHIFT  = 0x3fffffe7d
+>>>>>
+>>>>> new offset w/ rounding up = 0x1f38000000
+>>>>> (_text + offset) >> SWAPPER_TABLE_SHIFT = 0x3fffffe7d
+>>>>> (_end + offset) >> SWAPPER_TABLE_SHIFT  = 0x3fffffe7d
+>>>>>
+>>>>> Fixes: f80fb3a3d508 ("arm64: add support for kernel ASLR")
+>>>>> Signed-off-by: Neeraj Upadhyay <neeraju@codeaurora.org>
+>>>>> Signed-off-by: Srinivas Ramana <sramana@codeaurora.org>
+>>>>
+>>>>
+>>>> Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>>>>
+>>>> ... and thanks for the excellent commit log message!
+>>>
+>>>
+>>> Thanks both. I've picked this up as a fix.
+>>>
+>>> Will
+>>>
+>>
+>> Thanks Ard and Will for the review and picking this patch.
+>> can we also CC: <stable@vger.kernel.org> ?
+>>
+>> Thanks,
+>> -- Srinivas R
+>>
+>>
 >
-> Ah, that's in next.
+> Sorry, there is a checkpatch error in the last patch. I will submit v3
+> after fixing the checkpatch error.
 >
-> I still think this is wrong and I'm a bit disappointed that Linus merged
-> this patch (without saying so in the thread even) as I thought Linus and
-> I agreed on this being a bad idea.
 
-I think it is not good, but what we have before this patch is worse.
-
-I.e. it is the lesser evil.
-
-Before this patch the API is inconsistent: it gives NULL if GPIOLIB
-is defined and -ENOSYS if GPIOLIB is not defined.
-
-After this patch it gives NULL in both cases, and that is at least
-consistent.
-
-It would be great if someone steps in and fix it so as to return
-relevant errors (or error pointers rather) in both cases. However
-I guess it will lead a bunch of fallouts in the consumers, albeit
-they are not super-many.
-
-Yours,
-Linus Walleij
+I wouldn't worry about that. Will has already queued the patch.
