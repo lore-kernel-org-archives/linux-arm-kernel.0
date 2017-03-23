@@ -1,73 +1,162 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 23 Mar 2017 17:28:00 +0100
-Subject: [PATCH v2 05/23] MAINTAINERS: Add file patterns for dove device
- tree bindings
-In-Reply-To: <1489324627-19126-6-git-send-email-geert@linux-m68k.org> (Geert
- Uytterhoeven's message of "Sun, 12 Mar 2017 14:16:49 +0100")
-References: <1489324627-19126-1-git-send-email-geert@linux-m68k.org>
- <1489324627-19126-6-git-send-email-geert@linux-m68k.org>
-Message-ID: <87a88cdkkv.fsf@free-electrons.com>
+Date: Thu, 23 Mar 2017 17:29:52 +0100
+Subject: [PATCH v2] ARM: dts: mvebu: linksys: enable buffer manager support
+In-Reply-To: <20170316055320.7929-1-ralph.sennhauser@gmail.com> (Ralph
+ Sennhauser's message of "Thu, 16 Mar 2017 06:53:19 +0100")
+References: <20170316055320.7929-1-ralph.sennhauser@gmail.com>
+Message-ID: <8760j0dkhr.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert,
+Hi Ralph,
  
- On dim., mars 12 2017, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
+ On jeu., mars 16 2017, Ralph Sennhauser <ralph.sennhauser@gmail.com> wrote:
 
-> Submitters of device tree binding documentation may forget to CC
-> the subsystem maintainer if this is missing.
+> Add appropriate properties to devices in the Linksys WRT AC Series for the
+> mvneta driver to use hardware buffer management.
 >
-> Signed-off-by: Geert Uytterhoeven <geert@linux-m68k.org>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> Cc: Gregory Clement <gregory.clement@free-electrons.com>
-> Cc: linux-arm-kernel at lists.infradead.org
+> Also update "soc" ranges property and set the status of bm and bm-bppi
+> to "okay" (SRAM).
+>
+> Signed-off-by: Ralph Sennhauser <ralph.sennhauser@gmail.com>
 
 
-Applied on mvebu/soc
+Applied on mvebu/dt
 
 Thanks,
 
 Gregory
 
 > ---
-> Please apply this patch directly if you want to be involved in device
-> tree binding documentation for your subsystem.
 >
-> v2:
->   - No changes.
+> v1 -> v2:
+> 	Use independent pools for short (suggested by Gregory Clement)
 >
-> Impact on next-20170310:
 >
-> +Jason Cooper <jason@lakedaemon.net> (maintainer:ARM/Marvell Dove/MV78xx0/Orion SOC support)
-> +Andrew Lunn <andrew@lunn.ch> (maintainer:ARM/Marvell Dove/MV78xx0/Orion SOC support)
-> +Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> (maintainer:ARM/Marvell Dove/MV78xx0/Orion SOC support)
-> +Gregory Clement <gregory.clement@free-electrons.com> (maintainer:ARM/Marvell Dove/MV78xx0/Orion SOC support)
->  Rob Herring <robh+dt@kernel.org> (maintainer:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS)
->  Mark Rutland <mark.rutland@arm.com> (maintainer:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS)
-> +linux-arm-kernel at lists.infradead.org (moderated list:ARM/Marvell Dove/MV78xx0/Orion SOC support)
->  devicetree at vger.kernel.org (open list:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS)
->  linux-kernel at vger.kernel.org (open list)
-> ---
->  MAINTAINERS | 1 +
->  1 file changed, 1 insertion(+)
+>  arch/arm/boot/dts/armada-385-linksys.dtsi     | 17 ++++++++++++++++-
+>  arch/arm/boot/dts/armada-xp-linksys-mamba.dts | 17 ++++++++++++++++-
+>  2 files changed, 32 insertions(+), 2 deletions(-)
 >
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 6428d3c82fce9670..ce461fefec6c9463 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -1486,6 +1486,7 @@ M:	Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
->  M:	Gregory Clement <gregory.clement@free-electrons.com>
->  L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
->  S:	Maintained
-> +F:	Documentation/devicetree/bindings/soc/dove/
->  F:	arch/arm/mach-dove/
->  F:	arch/arm/mach-mv78xx0/
->  F:	arch/arm/mach-orion5x/
+> diff --git a/arch/arm/boot/dts/armada-385-linksys.dtsi b/arch/arm/boot/dts/armada-385-linksys.dtsi
+> index df47bf1..aa0d225 100644
+> --- a/arch/arm/boot/dts/armada-385-linksys.dtsi
+> +++ b/arch/arm/boot/dts/armada-385-linksys.dtsi
+> @@ -59,7 +59,8 @@
+>  		ranges = <MBUS_ID(0xf0, 0x01) 0 0xf1000000 0x100000
+>  			  MBUS_ID(0x01, 0x1d) 0 0xfff00000 0x100000
+>  			  MBUS_ID(0x09, 0x19) 0 0xf1100000 0x10000
+> -			  MBUS_ID(0x09, 0x15) 0 0xf1110000 0x10000>;
+> +			  MBUS_ID(0x09, 0x15) 0 0xf1110000 0x10000
+> +			  MBUS_ID(0x0c, 0x04) 0 0xf1200000 0x100000>;
+>  
+>  		internal-regs {
+>  			i2c at 11000 {
+> @@ -88,6 +89,9 @@
+>  			ethernet at 70000 {
+>  				status = "okay";
+>  				phy-mode = "rgmii-id";
+> +				buffer-manager = <&bm>;
+> +				bm,pool-long = <2>;
+> +				bm,pool-short = <3>;
+>  				fixed-link {
+>  					speed = <1000>;
+>  					full-duplex;
+> @@ -97,6 +101,9 @@
+>  			ethernet at 34000 {
+>  				status = "okay";
+>  				phy-mode = "sgmii";
+> +				buffer-manager = <&bm>;
+> +				bm,pool-long = <0>;
+> +				bm,pool-short = <1>;
+>  				fixed-link {
+>  					speed = <1000>;
+>  					full-duplex;
+> @@ -159,6 +166,10 @@
+>  				status = "okay";
+>  			};
+>  
+> +			bm at c8000 {
+> +				status = "okay";
+> +			};
+> +
+>  			/* USB part of the eSATA/USB 2.0 port */
+>  			usb at 58000 {
+>  				status = "okay";
+> @@ -241,6 +252,10 @@
+>  			};
+>  		};
+>  
+> +		bm-bppi {
+> +			status = "okay";
+> +		};
+> +
+>  		pcie-controller {
+>  			status = "okay";
+>  
+> diff --git a/arch/arm/boot/dts/armada-xp-linksys-mamba.dts b/arch/arm/boot/dts/armada-xp-linksys-mamba.dts
+> index 3744ba3..9efcf59 100644
+> --- a/arch/arm/boot/dts/armada-xp-linksys-mamba.dts
+> +++ b/arch/arm/boot/dts/armada-xp-linksys-mamba.dts
+> @@ -71,7 +71,8 @@
+>  		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xf1000000 0x100000
+>  			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000
+>  			  MBUS_ID(0x09, 0x09) 0 0 0xf1100000 0x10000
+> -			  MBUS_ID(0x09, 0x05) 0 0 0xf1110000 0x10000>;
+> +			  MBUS_ID(0x09, 0x05) 0 0 0xf1110000 0x10000
+> +			  MBUS_ID(0x0c, 0x04) 0 0 0xf1200000 0x100000>;
+>  
+>  		internal-regs {
+>  
+> @@ -95,6 +96,9 @@
+>  				pinctrl-names = "default";
+>  				status = "okay";
+>  				phy-mode = "rgmii-id";
+> +				buffer-manager = <&bm>;
+> +				bm,pool-long = <0>;
+> +				bm,pool-short = <1>;
+>  				fixed-link {
+>  					speed = <1000>;
+>  					full-duplex;
+> @@ -106,6 +110,9 @@
+>  				pinctrl-names = "default";
+>  				status = "okay";
+>  				phy-mode = "rgmii-id";
+> +				buffer-manager = <&bm>;
+> +				bm,pool-long = <2>;
+> +				bm,pool-short = <3>;
+>  				fixed-link {
+>  					speed = <1000>;
+>  					full-duplex;
+> @@ -186,6 +193,10 @@
+>  				};
+>  			};
+>  
+> +			bm at c8000 {
+> +				status = "okay";
+> +			};
+> +
+>  			nand at d0000 {
+>  				status = "okay";
+>  				num-cs = <1>;
+> @@ -259,6 +270,10 @@
+>  				};
+>  			};
+>  		};
+> +
+> +		bm-bppi {
+> +			status = "okay";
+> +		};
+>  	};
+>  
+>  	gpio_keys {
 > -- 
-> 2.7.4
+> 2.10.2
 >
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
 -- 
 Gregory Clement, Free Electrons
