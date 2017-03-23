@@ -1,30 +1,44 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 23 Mar 2017 13:59:51 -0700
-Subject: [PATCH 0/5] ARM: OMAP2+: Add and enable operating-points-v2
-In-Reply-To: <1488813822-26042-1-git-send-email-d-gerlach@ti.com>
-References: <1488813822-26042-1-git-send-email-d-gerlach@ti.com>
-Message-ID: <20170323205950.GQ10760@atomide.com>
+Date: Thu, 23 Mar 2017 14:00:05 -0700
+Subject: [PATCH v2 0/4] ARM: dm8168-evm: add SATA support
+In-Reply-To: <1489490055-2318-1-git-send-email-bgolaszewski@baylibre.com>
+References: <1489490055-2318-1-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <20170323210003.GR10760@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Dave Gerlach <d-gerlach@ti.com> [170306 07:26]:
-> Hi,
-> This series adds the necessary changes to get proper operating-points-v2 tables
-> for AM335x/AM437x/DRA7xx/AM57xx TI SoCs. Doing this enables the ti-cpufreq
-> driver and allows the platform to detect which CPU OPPs are valid for the
-> configuration in use and enable them.
+* Bartosz Golaszewski <bgolaszewski@baylibre.com> [170314 04:16]:
+> This series implements support for the on-board SATA controller
+> on the dm8168-evm board.
 > 
-> This series adds complete tables for am335x and adds 1GHz support for all
-> beaglebone black boards and updates the already merged but unused am437x table
-> to match the finalized DT bindings. It also moves the existing dra7xx/am57xx
-> OPPs to OPPv2 but does not enable 1.5GHz yet as this requires multiregulator
-> support which will come at a later date.
+> The first patch adds the clock domain and hwmod entries for the
+> SATA module.
 > 
-> Also, now that so many TI platforms will depend on the ti-cpufreq driver let's
-> add CONFIG_ARM_TI_CPUFREQ to omap2plus_defconfig to enable it as part of the
-> default configuration.
+> The second patch models the external reference clock used by SATA.
+> 
+> The third adds the SATA node to the SoC's device tree.
+> 
+> The fourth enables the SATA driver by default in omap2plus_defconfig.
+> 
+> Tested together with the series implementing the driver for
+> ahci-dm816 on a DM8168-EVM board.
+> 
+> v1 -> v2:
+>   PATCH 1/4:
+>     - removed the unused define from cm81xx.h
+>   PATCH 3/4:
+>     - fixed the size of the mapped register region
+> 
+> Bartosz Golaszewski (3):
+>   ARM: dts: dm8168-evm: add the external reference clock for SATA
+>   ARM: dts: dm8168-evm: add SATA node
+>   ARM: omap2plus_defconfig: enable ahci-dm816 module
+> 
+> Kevin Hilman (1):
+>   ARM: OMAP2+: dm81xx: Add clkdm and hwmod for SATA
 
-Applying all for v4.12 into dt-v2 and defconfig branches.
+Applying all for for v4.12 into soc, dts-v2 and defconfig
+branches.
 
 Thanks,
 
