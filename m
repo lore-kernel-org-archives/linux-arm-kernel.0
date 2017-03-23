@@ -1,34 +1,29 @@
-From: smueller@chronox.de (Stephan =?ISO-8859-1?Q?M=FCller?=)
-Date: Thu, 23 Mar 2017 14:06:22 +0100
-Subject: Question - seeding the hw pseudo random number generator
-In-Reply-To: <20170323094406.GA6848@gondor.apana.org.au>
-References: <20170318092554.lggkhfg5eko23o3k@kozik-lap>
- <20170323082307.GB16625@Red> <20170323094406.GA6848@gondor.apana.org.au>
-Message-ID: <25271998.F6jFv7Sebt@positron.chronox.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 23 Mar 2017 13:15:44 +0000
+Subject: [PATCH] arm64: Revert "arm64: kaslr: fix breakage with
+ CONFIG_MODVERSIONS=y"
+In-Reply-To: <20170206190337.GD20777@arm.com>
+References: <1486393362-10875-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20170206190337.GD20777@arm.com>
+Message-ID: <20170323131544.GC14290@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 23. M?rz 2017, 10:44:06 CET schrieb Herbert Xu:
+On Mon, Feb 06, 2017 at 07:03:38PM +0000, Will Deacon wrote:
+> On Mon, Feb 06, 2017 at 03:02:42PM +0000, Ard Biesheuvel wrote:
+> > This reverts commit 9c0e83c371cf4696926c95f9c8c77cd6ea803426, which
+> > is no longer needed now that the modversions code plays nice with
+> > relocatable PIE kernels.
+> > 
+> > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> > ---
+> > This simply removes some dead code, so this patch can wait for v4.12 if
+> > preferred. (The modversions fixes were only queued for -rc7)
+> 
+> Yeah, probably best to leave this one until 4.12 given that for-next/core
+> is based on -rc3.
 
-Hi Herbert,
+I queued it for 4.12. Thanks.
 
-> On Thu, Mar 23, 2017 at 09:23:07AM +0100, Corentin Labbe wrote:
-> > Problem with this conversion, a huge regression for user space.
-> > Using hwrng is simple as cat /dev/hwrng.
-> > Using algif_rng via AF_ALG is ... unusable for the moment.
-> > Perhaps creating an user space tool (prng-tool which provide a cat
-> > /dev/hwrng replacement) is mandatory before any convertion.
-> Stephan may have a tool to do this.  Stephan?
-
-Here is a suggestion for such a tool that I could add to libkcapi. Naturally, 
-this code is only a demonstrator which lacks some features.
-
-Ciao
-Stephan
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: kcapi-rng.c
-Type: text/x-csrc
-Size: 3542 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170323/c0d8f632/attachment.bin>
+-- 
+Catalin
