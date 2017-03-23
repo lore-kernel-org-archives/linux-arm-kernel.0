@@ -1,24 +1,38 @@
-From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Thu, 23 Mar 2017 21:09:52 +0100
-Subject: [RFT PATCH 5/6] pinctrl: meson: use gpio-ranges from DT
-In-Reply-To: <1490286449-19448-6-git-send-email-narmstrong@baylibre.com>
-References: <1490286449-19448-1-git-send-email-narmstrong@baylibre.com>
- <1490286449-19448-6-git-send-email-narmstrong@baylibre.com>
-Message-ID: <CAFBinCBa3QuUANF1z3LGk3T9GF-rV5F4WfLGuNCMB2q5juQyOw@mail.gmail.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Thu, 23 Mar 2017 13:15:08 -0700
+Subject: [PATCH v5 1/4] syscalls: Restore address limit after a syscall
+In-Reply-To: <20170323172515.27950-1-thgarnie@google.com>
+References: <20170323172515.27950-1-thgarnie@google.com>
+Message-ID: <CAGXu5jKbqOvb2TtfpXhjPQFxEShaBu=RbBQORtqhcF1bD3As6w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Neil,
-
-On Thu, Mar 23, 2017 at 5:27 PM, Neil Armstrong <narmstrong@baylibre.com> wrote:
-> When trying to add a gpio-hog, we enter a weird loop where the gpio-ranges
-> is needed when gpiochip_add_data() is called but in the current implementation
-> the ranges are added from the driver afterwards.
+On Thu, Mar 23, 2017 at 10:25 AM, Thomas Garnier <thgarnie@google.com> wrote:
+> This patch ensures a syscall does not return to user-mode with a kernel
+> address limit. If that happened, a process can corrupt kernel-mode
+> memory and elevate privileges.
 >
-> A simple solution is to rely on the DR gpio-ranges attribute and remove the
-> call to gpiochip_add_pin_range().
-did you mean devicetree or DT instead of "DR"?
+> For example, it would mitigation this bug:
+>
+> - https://bugs.chromium.org/p/project-zero/issues/detail?id=990
+>
+> The CONFIG_ARCH_NO_SYSCALL_VERIFY_PRE_USERMODE_STATE option is also
+> added so each architecture can optimize this change.
+>
+> Signed-off-by: Thomas Garnier <thgarnie@google.com>
 
+Awesome. :) I've tested this on x86 and arm with the LKDTM patch I'll
+post in a moment.
 
-Regards,
-Martin
+[   46.977823] lkdtm: Performing direct entry CORRUPT_USER_DS
+[   46.978966] lkdtm: setting bad task size limit
+[   46.980302] ------------[ cut here ]------------
+[   46.981219] kernel BUG at ./include/linux/syscalls.h:200!
+
+Tested-by: Kees Cook <keescook@chromium.org>
+
+(Also note, your Signed-off-by lines are missing in patches 2-4)
+
+-- 
+Kees Cook
+Pixel Security
