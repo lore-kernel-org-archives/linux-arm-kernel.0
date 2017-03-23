@@ -1,69 +1,75 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 23 Mar 2017 12:11:06 +0100
-Subject: [PATCH 4/4] tty/serial: sh-sci: remove uneeded IS_ERR_OR_NULL
- calls
-In-Reply-To: <CAMuHMdWDUzwUqrchbhh-TkE3J9Xg4TrwTF6HreikUcNNTf_ozQ@mail.gmail.com>
-References: <20170306100220.droey65uq2ew3mzu@pengutronix.de>
- <CACRpkdYeFyr4yjQjDAUpPJwuD_NW2y=wXnzt1xSNoOX0SFCLmw@mail.gmail.com>
- <CAMuHMdWv-xs12UqutEtXJGR8qqgx6DeDhkKvvYhhyW+XTVsUNQ@mail.gmail.com>
- <CAMuHMdXGn35bEsJKnUi5o3AytL4AJN2fBfoB79v5W-jOVFQx6g@mail.gmail.com>
- <20170320103113.tpveoq2onzrwmkdt@pengutronix.de>
- <CAMuHMdWbwA+3UGVnHYJOs26vTj13Yn+s4B8tE9kyy25JcjyZGg@mail.gmail.com>
- <20170320110718.e44s2gip36m75bqj@pengutronix.de>
- <CACRpkdZy_uguiKfSH-0gdanjr-xkwxoANTx6Fb2VwsvzRwcPRA@mail.gmail.com>
- <20170323101045.u3uigdu5xfwjmjc7@pengutronix.de>
- <CAMuHMdWDUzwUqrchbhh-TkE3J9Xg4TrwTF6HreikUcNNTf_ozQ@mail.gmail.com>
-Message-ID: <20170323111106.7ogh6g2oa3m4cqc6@pengutronix.de>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Thu, 23 Mar 2017 19:13:18 +0800
+Subject: [PATCH] ARM: dts: imx: add Gateworks Ventana GW5903 support
+In-Reply-To: <CAL_JsqKVxpdS0cuXnwkux7zESXdjRA7RO0Pu0gGLdqKUTaMDpg@mail.gmail.com>
+References: <1490125452-5712-1-git-send-email-tharvey@gateworks.com>
+ <CAL_JsqKVxpdS0cuXnwkux7zESXdjRA7RO0Pu0gGLdqKUTaMDpg@mail.gmail.com>
+Message-ID: <20170323111317.GA30608@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Thu, Mar 23, 2017 at 11:20:39AM +0100, Geert Uytterhoeven wrote:
-> But having the error breaks setups where the GPIO is optional and does
-> not exist.
-
-so the right way forward is to check harder in the situation where
--ENOSYS was returned before to determine if there is really no GPIO to
-be used. "Oh, there are hints that there is no GPIO (GPIOLIB=n), so lets
-assume there isn't." is wrong.
-
-Can we please properly fix the problem instead of papering over it?
-
-> Make sure to enable all drivers and subsystems you need when building
-> your kernel. That's always true. And may indeed be hard to debug (e.g. what
-> kernel options do I need to make systemd work?).
-
-It's worse here. If you forget to enable a driver the device isn't bound
-and that's obvious to diagnose. When ignoring an optional GPIO there
-might be a device that claims to work but fails to do so. (e.g. you
-write to memory, write() returns 0, but the data never landed there.)
-
-> > write(2) and close(2) succeed most of the time, too. Still it's not a
-> > good idea to not check the return value. Or let the kernel return
-> > success unconditionally.
+On Wed, Mar 22, 2017 at 09:04:59AM -0500, Rob Herring wrote:
+> > diff --git a/arch/arm/boot/dts/imx6dl-gw5903.dts b/arch/arm/boot/dts/imx6dl-gw5903.dts
+> > new file mode 100644
+> > index 0000000..103261e
+> > --- /dev/null
+> > +++ b/arch/arm/boot/dts/imx6dl-gw5903.dts
+> > @@ -0,0 +1,55 @@
+> > +/*
+> > + * Copyright 2017 Gateworks Corporation
+> > + *
+> > + * This file is dual-licensed: you can use it either under the terms
+> > + * of the GPL or the X11 license, at your option. Note that this dual
+> > + * licensing only applies to this file, and not this project as a
+> > + * whole.
+> > + *
+> > + *  a) This file is free software; you can redistribute it and/or
+> > + *     modify it under the terms of the GNU General Public License as
+> > + *     published by the Free Software Foundation; either version 2 of
+> > + *     the License, or (at your option) any later version.
+> > + *
+> > + *     This file is distributed in the hope that it will be useful,
+> > + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> > + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> > + *     GNU General Public License for more details.
+> > + *
+> > + *     You should have received a copy of the GNU General Public
+> > + *     License along with this file; if not, write to the Free
+> > + *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
+> > + *     MA 02110-1301 USA
+> > + *
+> > + * Or, alternatively,
+> > + *
+> > + *  b) Permission is hereby granted, free of charge, to any person
+> > + *     obtaining a copy of this software and associated documentation
+> > + *     files (the "Software"), to deal in the Software without
+> > + *     restriction, including without limitation the rights to use,
+> > + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> > + *     sell copies of the Software, and to permit persons to whom the
+> > + *     Software is furnished to do so, subject to the following
+> > + *     conditions:
+> > + *
+> > + *     The above copyright notice and this permission notice shall be
+> > + *     included in all copies or substantial portions of the Software.
+> > + *
+> > + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> > + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> > + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> > + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> > + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> > + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> > + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> > + *     OTHER DEALINGS IN THE SOFTWARE.
+> > + */
 > 
-> Writing all bytes passed in the buffer is "optional" in another sense than
-> an "optional" GPIO: you must retry the write, while you can continue if
-> an optional GPIO is not present.
-
-And that is the point. You can continue *iff* the optional GPIO is not
-present. The patch in question removes the ability to determine if that
-GPIO is present and claims it is not present.
-
-> > So you exchanged many obvious and easy to fix problems with a few hard
-> > ones. I don't agree that's a good idea, but you seem to be willing to
-> > try it. Good luck.
+> You can use SPDX tag here:
 > 
-> Yeah, before drivers had to explicitly ignore -ENOSYS if they want to
-> support platforms with and without GPIOLIB. Bad...
+> SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+> 
+> While it says X11, this is really MIT license text as defined by SPDX.
 
-Doing things right is sometimes not maximally easy. But that is no
-excuse to do it wrong.
+Isn't it still controversial whether we should use SPDX tag or not?
 
-Best regards
-Uwe
+https://lkml.org/lkml/2017/2/28/750
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Shawn
