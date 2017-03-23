@@ -1,25 +1,23 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 23 Mar 2017 10:17:33 +0100
-Subject: [PATCH v2 2/6] pinctrl: rockchip: rename RK1108 to RV1108
-In-Reply-To: <20170317171840.4683-3-heiko@sntech.de>
-References: <20170317171840.4683-1-heiko@sntech.de>
- <20170317171840.4683-3-heiko@sntech.de>
-Message-ID: <CACRpkdbhOP8wW-xTMhTOVr_P0KrxHxitOkOAcYOdcVd89bcqJA@mail.gmail.com>
+Date: Thu, 23 Mar 2017 10:20:06 +0100
+Subject: [PATCH v3 0/4] pinctrl: rockchip: PREEMPT_RT_FULL fixes
+In-Reply-To: <20170317182430.27400-1-john@metanate.com>
+References: <20170317182430.27400-1-john@metanate.com>
+Message-ID: <CACRpkdbcnuPGQGuNG-0ZdARbKdJRMrXGZsoeG4NPVFTMg5p6sw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 17, 2017 at 6:18 PM, Heiko Stuebner <heiko@sntech.de> wrote:
+On Fri, Mar 17, 2017 at 7:24 PM, John Keeping <john@metanate.com> wrote:
 
-> From: Andy Yan <andy.yan@rock-chips.com>
+> The aim of the series is to make the Rockchip pinctrl irq_chip
+> implementation safe for use with RT_FULL which requires that raw
+> spinlocks are used to avoid sleeping in hardirq context.
 >
-> Rockchip finally named the SOC as RV1108, so change it.
->
-> Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
->
-> [adapted rk1108 dtsi to keep bisectability]
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> This is the same as version 2 [1] with the 2.1 version of patch 1
+> included, but I'm rolling it up as a new version so it's simpler to
+> apply.
 
-Patch applied.
+This v3 does not apply either so please rebase and resend.
 
 Yours,
 Linus Walleij
