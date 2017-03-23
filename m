@@ -1,56 +1,261 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 23 Mar 2017 10:02:10 -0700
-Subject: [PATCHv2 0/9] clk: ti: add support for clkctrl clocks
-In-Reply-To: <20170323010057.GI10760@atomide.com>
-References: <1489741781-12816-1-git-send-email-t-kristo@ti.com>
- <20170317152536.GT20572@atomide.com>
- <94d20a17-5072-ffab-3529-4bbb14327a10@ti.com>
- <20170323010057.GI10760@atomide.com>
-Message-ID: <20170323170210.GL10760@atomide.com>
+From: slash.tmp@free.fr (Mason)
+Date: Thu, 23 Mar 2017 18:03:57 +0100
+Subject: [RFC PATCH v0.2] PCI: Add support for tango PCIe host bridge
+In-Reply-To: <e5c0bace-fcbe-de3f-b76f-0fb672562e84@arm.com>
+References: <91db1f47-3024-9712-309a-fb4b21e42028@free.fr>
+ <e5c0bace-fcbe-de3f-b76f-0fb672562e84@arm.com>
+Message-ID: <310db9dd-7db6-2106-2e53-f0083b2d3758@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [170322 18:03]:
-> * Tero Kristo <t-kristo@ti.com> [170317 14:39]:
-> > On 17/03/17 17:25, Tony Lindgren wrote:
-> > > * Tero Kristo <t-kristo@ti.com> [170317 02:12]:
-> > > > Any additional testing on omap4 welcome as this series basically
-> > > > tweaks every possible peripheral clock on the SoC.
-> > > 
-> > > Without the last patch in this series, booting fails for me:
-> > > 
-> > > [    5.074890] l4_per_cm:clk:0120:0: failed to disable
-> > > [    5.085113] l4_per_cm:clk:0128:0: failed to disable
-> > > 
-> > > Care to check that booting keeps working for each patch in the
-> > > series to avoid breaking git bisect for booting?
-> > 
-> > Hmm, I think patch 8+9 need to be squashed then. I can double check this
-> > next week though.
+On 23/03/2017 15:22, Marc Zyngier wrote:
+
+> On 23/03/17 13:05, Mason wrote:
 > 
-> Also looks like with this set merged HDMI stops working on
-> omap4 with:
+>> +#define MSI_COUNT 32
 > 
-> HDMIWP: omapdss HDMIWP error: Failed to set PHY power mode to 1
+> Is this something that is hardcoded? Unlikely to ever change?
 
-Forgot to mention that's with omapdrm with encoder-tpd12s015 and
-encoder-tfp410 modules loaded to get HDMI working. Here's more verbose
-dmesg output in case that provides more clues:
+The host bridge actually supports 256 MSIs.
 
-[   91.042877] omapdss HDMICORE error: operation stopped when reading edid
-[   91.078308] [drm] Enabling DMM ywrap scrolling
-[   91.099243] omapdss HDMIWP error: Failed to set PHY power mode to 1
-[   91.107879] omapdss HDMI error: failed to power on device
-[   91.107879] omapdrm omapdrm.0: Failed to enable display 'hdmi': -5
-[   91.359619] omapdrm omapdrm.0: atomic complete timeout (pipe 0)!
-[   91.619964] omapdrm omapdrm.0: atomic complete timeout (pipe 0)!
-[   91.620300] Console: switching to colour frame buffer device 128x48
-[   91.682434] omapdrm omapdrm.0: fb0: omapdrm frame buffer device
-[   91.770812] [drm] Initialized omapdrm 1.0.0 20110917 for omapdrm.0 on minor 0
-[   92.818054] omapdss HDMICORE error: operation stopped when reading edid
-[   93.090087] omapdrm omapdrm.0: atomic complete timeout (pipe 0)!
-[   93.349853] omapdrm omapdrm.0: atomic complete timeout (pipe 0)!
+IIUC, what you suggested on IRC is that I support 256 in the driver,
+and only read the status for *enabled* MSIs.
 
-Regards,
+Pseudo-code:
 
-Tony
+for every 32-bit blob in the enabled bitmap
+  if the value is non-zero
+    lookup the corresponding status reg
+
+Problem is that a BITMAP is unsigned long (as you point out below).
+So I'm not sure how to iterate 32-bits at a time over the BITMAP.
+
+
+
+
+>> +static void tango_msi_isr(struct irq_desc *desc)
+>> +{
+>> +	struct irq_chip *chip = irq_desc_get_chip(desc);
+>> +	struct tango_pcie *pcie;
+>> +	unsigned long status, virq;
+>> +	int pos;
+>> +
+>> +	chained_irq_enter(chip, desc);
+>> +	pcie = irq_desc_get_handler_data(desc);
+>> +
+>> +	status = readl_relaxed(pcie->msi_status);
+> 
+> Please use types that unambiguously match that of the MMIO accessor (u32
+> in this case). On a 64bit system, unsigned long is likely to be 64bit.
+> You can assign it to an unsigned long before calling the
+> for_each_set_bit operator.
+
+OK. I'm aware that unsigned long is 64 bits on sane 64b platforms,
+but since extending u32 to u64 would pad with zeros, I didn't expect
+this to be an issue. I will change the code. Note: I copied the
+code from the Altera driver.
+
+>> +	writel_relaxed(status, pcie->msi_status); /* clear IRQs */
+> 
+> Why isn't this your irq_ack method instead of open-coding it?
+
+I based my driver on the Altera driver, and I did it like
+I thought they did. I will try fixing my code.
+
+
+>> +	for_each_set_bit(pos, &status, MSI_COUNT) {
+>> +		virq = irq_find_mapping(pcie->irq_domain, pos);
+>> +		if (virq)
+>> +			generic_handle_irq(virq);
+>> +		else
+>> +			pr_err("Unhandled MSI: %d\n", pos);
+> 
+> Please rate-limit this.
+
+I'll use pr_err_ratelimited
+
+
+>> +static struct msi_domain_info msi_domain_info = {
+>> +	.flags	= MSI_FLAG_USE_DEF_DOM_OPS | MSI_FLAG_USE_DEF_CHIP_OPS,
+> 
+> No support for MSI-X? Why?
+
+Good question.
+https://en.wikipedia.org/wiki/Message_Signaled_Interrupts#MSI-X
+My controller supports a single doorbell, and only 256 MSIs.
+I thought that meant it didn't support MSI-X.
+
+
+>> +static int tango_irq_domain_alloc(struct irq_domain *domain, unsigned int virq,
+>> +		unsigned int nr_irqs, void *args)
+>> +{
+>> +	struct tango_pcie *pcie = domain->host_data;
+>> +	int pos, err = 0;
+>> +	u32 mask;
+>> +
+>> +	if (nr_irqs != 1) /* When does that happen? */
+>> +		return -EINVAL;
+> 
+> Only if the end-point wants to use Multi-MSI. You don't advertise
+> support for it, so it should never happen.
+
+Should I keep the test or remove it?
+
+
+>> +	mutex_lock(&pcie->lock);
+>> +
+>> +	mask = readl_relaxed(pcie->msi_mask);
+> 
+> Do you really need to read this from the HW each time you allocate an
+> interrupt? That feels pretty crazy. You're much better off having an
+> in-memory bitmap that will make things more efficient, and avoid the
+> following bug...
+> 
+>> +	pos = find_first_zero_bit(&mask, MSI_COUNT);
+> 
+> ... where using a u32 as a bitmap is a very bad idea (because not the
+> whole world is a 32bit, little endian platform).
+
+I understand your point. This ties in to the ISR discussion.
+
+
+>> +	if (pos < MSI_COUNT)
+>> +		writel(mask | BIT(pos), pcie->msi_mask);
+> 
+> And it would make a lot more sense to move this write (which should be
+> relaxed) to irq_unmask. Also, calling msi_mask for something that is an
+> enable register is a bit counter intuitive.
+
+I don't have as much experience as you.
+I just used the names in the HW documentation.
+I think it is the "mask" (as in bitmap) of enabled MSIs.
+I will change "mask" to "enable".
+
+Are you saying I should not use pci_msi_mask_irq and pci_msi_unmask_irq,
+but register custom implementations? I should still call these in my
+custom functions, right?
+
+
+>> +	else
+>> +		err = -ENOSPC;
+>> +
+>> +	mutex_unlock(&pcie->lock);
+>> +
+>> +	irq_domain_set_info(domain, virq, pos, &tango_msi_chip,
+>> +			domain->host_data, handle_simple_irq, NULL, NULL);
+> 
+> And here, you're polluting the domain even if you failed to allocate the
+> interrupt.
+
+This bug is 100% mine. Will fix.
+
+>> +
+>> +	return err;
+>> +}
+>> +
+>> +static void tango_irq_domain_free(struct irq_domain *domain,
+>> +				   unsigned int virq, unsigned int nr_irqs)
+>> +{
+>> +	struct irq_data *d = irq_domain_get_irq_data(domain, virq);
+>> +	struct tango_pcie *pcie = irq_data_get_irq_chip_data(d);
+>> +	int pos = d->hwirq;
+>> +	u32 mask;
+>> +
+>> +	mutex_lock(&pcie->lock);
+>> +
+>> +	mask = readl(pcie->msi_mask);
+>> +	writel(mask & ~BIT(pos), pcie->msi_mask);
+> 
+> Same as above, please move this to the irq_unmask method.
+
+This one should be irq_mask, no?
+
+Even If I move the MMIO write, it should be done under lock,
+I think. But I don't know in what context irq_unmask will
+be called.
+You said: not mutex, spinlock.
+
+
+>> +static int tango_msi_remove(struct platform_device *pdev)
+>> +{
+>> +	struct tango_pcie *msi = platform_get_drvdata(pdev);
+>> +
+>> +	irq_set_chained_handler(msi->irq, NULL);
+>> +	irq_set_handler_data(msi->irq, NULL);
+>> +	/* irq_set_chained_handler_and_data(msi->irq, NULL, NULL); instead? */
+
+Can I call irq_set_chained_handler_and_data(msi->irq, NULL, NULL);
+instead of the two calls?
+
+
+>> +	mutex_init(&pcie->lock);
+>> +	writel(0, pcie->msi_mask);
+>> +
+>> +	/* Why is fwnode for this call? */
+>> +	irq_dom = irq_domain_add_linear(NULL, MSI_COUNT, &msi_domain_ops, pcie);
+> 
+> Use irq_domain_create_linear, pass the same fwnode.
+
+Will change that.
+
+
+>> +	if (!irq_dom) {
+>> +		pr_err("Failed to create IRQ domain\n");
+>> +		return -ENOMEM;
+>> +	}
+>> +
+>> +	msi_dom = pci_msi_create_irq_domain(fwnode, &msi_domain_info, irq_dom);
+>> +	if (!msi_dom) {
+>> +		pr_err("Failed to create MSI domain\n");
+>> +		irq_domain_remove(irq_dom);
+>> +		return -ENOMEM;
+>> +	}
+>> +
+>> +	virq = platform_get_irq(pdev, 1);
+> 
+> In the absence of a documented binding, it is hard to know if you're
+> doing the right thing.
+
+		pcie at 50000000 {
+			compatible = "sigma,smp8759-pcie";
+			reg = <0x50000000 SZ_64M>, <0x2e000 0x100>;
+			device_type = "pci";
+			bus-range = <0 63>;
+			#size-cells = <2>;
+			#address-cells = <3>;
+			#interrupt-cells = <1>;
+			ranges = <0x02000000 0x0 0x04000000  0x54000000  0x0 SZ_192M>;
+			msi-controller;
+			/* 54 for misc interrupts, 55 for MSI */
+			interrupts = <54 IRQ_TYPE_LEVEL_HIGH>, <55 IRQ_TYPE_LEVEL_HIGH>;
+		};
+
+Note: I don't have an "interrupt-map" prop because rev1 doesn't support
+legacy PCI interrupts (INTx). But I see the PCI framework wrongly mapping
+intA to my system's interrupt #1, presumably because I am lacking an
+interrupt-map?
+
+Also I find the MSI interrupt number to be high:
+
+# cat /proc/interrupts 
+           CPU0       CPU1       
+ 19:      21171       1074     GIC-0  29 Edge      twd
+ 20:        116          0      irq0   1 Level     serial
+ 26:          7          0       MSI   0 Edge      aerdrv
+ 28:       3263          0       MSI 524288 Edge      xhci_hcd
+
+524288 is 0x80000. Was this offset chosen by the intc core?
+Or by my (lack of) DT?
+
+>> +	if (virq <= 0) {
+>> +		irq_domain_remove(msi_dom);
+>> +		irq_domain_remove(irq_dom);
+>> +		return -ENXIO;
+> 
+> Maybe add a message indicating what failed?
+
+Will do.
+
+Thanks again for the thorough review.
+
+Regards.
