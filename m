@@ -1,25 +1,33 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Thu, 23 Mar 2017 12:28:58 -0700
-Subject: [RESEND PATCH 0/3] ARM64: dts: meson-gx: Cleanup for common nodes
-In-Reply-To: <1489396252-28696-1-git-send-email-narmstrong@baylibre.com> (Neil
- Armstrong's message of "Mon, 13 Mar 2017 10:10:49 +0100")
-References: <1489396252-28696-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <m2h92jlrlx.fsf@baylibre.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Thu, 23 Mar 2017 21:37:11 +0200
+Subject: [PATCH 04/15] ARM: dts: exynos: fix PCI bus dtc warnings
+In-Reply-To: <20170322020313.24338-4-robh@kernel.org>
+References: <20170322020313.24338-1-robh@kernel.org>
+ <20170322020313.24338-4-robh@kernel.org>
+Message-ID: <20170323193711.yu6nyjppformf3tb@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Neil Armstrong <narmstrong@baylibre.com> writes:
-
-> Since we know the GXBB and GXL/GXM share more hardware, we can safely move
-> the remaining peripheral nodes present in the GXBB dtsi to the common GX dtsi.
-> The following patches are small cleanups and helps to uniform the GX common
-> dtsi compatible scheme.
+On Tue, Mar 21, 2017 at 09:03:02PM -0500, Rob Herring wrote:
+> dtc recently added PCI bus checks. Fix these warnings.
+> 
+> Signed-off-by: Rob Herring <robh@kernel.org>
+> Cc: Kukjin Kim <kgene@kernel.org>
+> Cc: Krzysztof Kozlowski <krzk@kernel.org>
+> Cc: Javier Martinez Canillas <javier@osg.samsung.com>
+> Cc: linux-samsung-soc at vger.kernel.org
+> ---
+> Sub-arch maintainers, please apply to your trees unless arm-soc wants 
+> to take the whole lot.
+> 
+>  arch/arm/boot/dts/exynos5440.dtsi | 2 ++
+>  1 file changed, 2 insertions(+)
 >
-> Changes since original v1 at [1]:
->  - Add back missing changelog on patches 1 and 3
 
-Applied to v4.12/dt64,
+Hi,
 
-Thanks,
+Unfortunately patch does not apply. There were some changes around PCIe
+this release so I think the best way would be to rebase on top of linux-next.
 
-Kevin
+Best regards,
+Krzysztof
