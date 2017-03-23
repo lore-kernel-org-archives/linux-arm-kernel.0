@@ -1,130 +1,72 @@
-From: huziji@marvell.com (Ziji Hu)
-Date: Thu, 23 Mar 2017 13:32:23 +0800
-Subject: [EXT] Re: [PATCH v6 07/14] dt: bindings: Add bindings for Marvell
- Xenon SD Host Controller
-In-Reply-To: <CAPDyKFrmb51cTR7B5S0JkmACH0=bw9+28RmWnjwWkuiT7N4wVw@mail.gmail.com>
-References: <cover.ff78bebe0384f650a51e5e6f0f1dca6e7894b53b.1487091464.git-series.gregory.clement@free-electrons.com>
- <3a4ce2fd25ed812482b0fc96f50dd305c8f40fe9.1487091464.git-series.gregory.clement@free-electrons.com>
- <CAPDyKFrmb51cTR7B5S0JkmACH0=bw9+28RmWnjwWkuiT7N4wVw@mail.gmail.com>
-Message-ID: <c3c97ce1-4aaa-4e85-d2c3-275f5247c0cc@marvell.com>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Thu, 23 Mar 2017 13:43:20 +0800
+Subject: [PATCH v3 3/5] coresight: add support for debug module
+In-Reply-To: <7a028460-d598-e337-5e09-234beddca88b@arm.com>
+References: <1488520809-31670-1-git-send-email-leo.yan@linaro.org>
+ <1488520809-31670-4-git-send-email-leo.yan@linaro.org>
+ <671a0b39-b635-6e0e-d3fa-967651f2e29c@arm.com>
+ <CAJ9a7VgCjXNGC4C49PxL-nBxzhMCmA8Mb-0C_epahizA5EL2HA@mail.gmail.com>
+ <e7a97c52-f61a-e503-f626-09563fa100b8@arm.com>
+ <CAJ9a7VhvCS3xXAHBt0AUVB2Zp2P1HP_LQm4KiptiBT9VJ1fC0Q@mail.gmail.com>
+ <4961636d-d77c-0f9a-7076-4db1ef456073@arm.com>
+ <1e6d6a91-3bdc-7cfb-a96f-780c959e0316@arm.com>
+ <7a028460-d598-e337-5e09-234beddca88b@arm.com>
+Message-ID: <20170323054319.GA7716@leoy-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ulf,
-
-On 2017/3/15 20:48, Ulf Hansson wrote:
+On Wed, Mar 22, 2017 at 05:25:50PM +0000, Sudeep Holla wrote:
+> 
+> 
+> On 22/03/17 17:09, Suzuki K Poulose wrote:
+> > On 22/03/17 16:17, Sudeep Holla wrote:
+> 
 > [...]
 > 
->> +
->> +Example:
->> +- For eMMC:
->> +
->> +       sdhci at aa0000 {
->> +               compatible = "marvell,armada-ap806-sdhci";
->> +               reg = <0xaa0000 0x1000>;
->> +               interrupts = <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>
->> +               clocks = <&emmc_clk>;
->> +               clock-names = "core";
->> +               bus-width = <4>;
->> +               marvell,xenon-phy-slow-mode;
->> +               marvell,xenon-tun-count = <11>;
+> >> 
+> >> Point taken. So we could just specify that all necessary power
+> >> domains need to be on for proper functionality for this feature and
+> >> that it's highly platform specific instead of mixing cpu/cluster
+> >> idle details here.
+> >> 
+> >>> The key point is that the caveat in using this driver is that
+> >>> the power management has to be considered on a platform specific
+> >>> basis before it is configured; and appropriate actions may be
+> >>> needed for it to work correctly. Without this then the driver
+> >>> could cause more issues than it debugs. A user selecting this
+> >>> _must_ be told about these issues
+> >>> 
+> > 
+> > So given all the possible caveats, I think we :
+> > 
+> > 1) Shouldn't enable the driver by default at runtime even if it is 
+> > built-in. 
+> > 2) Should provide mechanisms to turn it on at boot (via
+> > kernel commandline) or anytime later (via sysfs), which kind of puts
+> > the responsibility back on the user : "You know what you are doing". 
+> > 3) Shouldn't turn the driver on based on "nohlt" which the user
+> > could use it for some other purposes, without explicit intention of
+> > turning this driver on).
+> > 4) Should document the fact that, on some
+> > platforms, the user may have to disable CPUidle explicitly to get the
+> > driver working. But let us not make it the default. The user with a
+> > not so ideal platform could add "nohlt" and get it working.
+> > 
 > 
-> There's no vmmc-supply here.
+> Agreed on all points and well summarized.
+> I would like to highlight (3) and (4) as it needs to be well understood.
 > 
-> How do you control power to the eMMC card?
-> 
+> "nohlt" has a *different* meaning already, so using that in this
+> driver for something else is simple wrong as it affects the system in
+> unintended ways. And yes if user (mis)uses it to get things working,
+> it's fine but shouldn't be recommended way.
 
-	Sorry for the delayed reply.
-	Just confirmed with the engineers.
+Understand this point.
 
-	It seems that there is a regulator.
-	I will ask for a complete node example.
+I will try to use general way to constraint CPUIdle like other
+drivers.
 
->> +
->> +               #address-cells = <1>;
->> +               #size-cells = <0>;
->> +               apm_mmccard: mmccard at 0 {
->> +                       compatible = "mmc-card";
->> +                       reg = <0>;
->> +               };
->> +       };
->> +
->> +- For SD/SDIO:
->> +
->> +       sdhci at ab0000 {
->> +               compatible = "marvell,armada-cp110-sdhci";
->> +               reg = <0xab0000 0x1000>;
->> +               interrupts = <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>
->> +               vqmmc-supply = <&sd_regulator>;
-> 
-> I guess you know vqmmc is for the I/O voltage.
-> 
-> Again, how do you power the SD/SDIO card? No vmmc?
+Thanks all for these good suggestions :)
 
-	The vmmc-supply regulator does exist according to the engineer.
-	I will ask them to provide a complete one.
-
-> 
->> +               clocks = <&sdclk>;
->> +               clock-names = "core";
->> +               bus-width = <4>;
->> +               marvell,xenon-tun-count = <9>;
->> +       };
->> +
->> +- For eMMC with compatible "marvell,armada-3700-sdhci":
->> +
->> +       sdhci at aa0000 {
->> +               compatible = "marvell,armada-3700-sdhci";
->> +               reg = <0xaa0000 0x1000>,
->> +                     <phy_addr 0x4>;
->> +               interrupts = <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>
->> +               clocks = <&emmcclk>;
->> +               clock-names = "core";
->> +               bus-width = <8>;
->> +               mmc-ddr-1_8v;
->> +               mmc-hs400-1_8v;
-> 
-> Again, no vmmc?
-> 
-
-	The engineer told me the power to eMMC card is fixed on this platform.
-	They don't implement a specific regulator for eMMC core power.
-
->> +
->> +               marvell,pad-type = "fixed-1-8v";
->> +
->> +               #address-cells = <1>;
->> +               #size-cells = <0>;
->> +               mmccard: mmccard at 0 {
->> +                       compatible = "mmc-card";
->> +                       reg = <0>;
->> +               };
->> +       };
->> +
->> +- For SD/SDIO with compatible "marvell,armada-3700-sdhci":
->> +
->> +       sdhci at ab0000 {
->> +               compatible = "marvell,armada-3700-sdhci";
->> +               reg = <0xab0000 0x1000>,
->> +                     <phy_addr 0x4>;
->> +               interrupts = <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>
->> +               vqmmc-supply = <&sd_regulator>;
-> 
-> Again, no vmmc?
-> 
-	
-	It seems that the core power to SD is also fixed.
-
->> +               clocks = <&sdclk>;
->> +               clock-names = "core";
->> +               bus-width = <4>;
->> +
->> +               marvell,pad-type = "sd";
->> +       };
->> --
->> git-series 0.9.1
-> 
-> 
-> Kind regards
-> Uffe
-> 
+Thanks,
+Leo Yan
