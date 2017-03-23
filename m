@@ -1,42 +1,60 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 23 Mar 2017 09:53:21 +0100
-Subject: [PATCH 2/3] pinctrl: meson-gxl: Fix inverted registers and add
- missing pins
-In-Reply-To: <5e975901-b5d4-fdc8-9866-ad6bc9e3b599@baylibre.com>
-References: <1488893462-7016-1-git-send-email-narmstrong@baylibre.com>
- <1488893462-7016-3-git-send-email-narmstrong@baylibre.com>
- <CACRpkdZ+x6vZQKfCoKD3dn-XzAxBBwMy=HF1Zi7SqXFWv28rZA@mail.gmail.com>
- <5e975901-b5d4-fdc8-9866-ad6bc9e3b599@baylibre.com>
-Message-ID: <CACRpkdbuYOf1XHsAR0mstRGv+2n2S2Lmn6KAsbKNV=aOseukLA@mail.gmail.com>
+From: lukas@wunner.de (Lukas Wunner)
+Date: Thu, 23 Mar 2017 09:48:19 +0100
+Subject: [PATCH v3] efifb: avoid reconfiguration of BAR that covers the
+ framebuffer
+In-Reply-To: <CAKv+Gu_X-SEnz7h9J8boqqjOQGHQawwdSAq4haH-OGu8zdfNfA@mail.gmail.com>
+References: <1490196629-28088-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20170322193111.GA8190@wunner.de>
+ <CAKv+Gu_X-SEnz7h9J8boqqjOQGHQawwdSAq4haH-OGu8zdfNfA@mail.gmail.com>
+Message-ID: <20170323084819.GA23281@h08.hostsharing.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 15, 2017 at 10:49 AM, Neil Armstrong
-<narmstrong@baylibre.com> wrote:
-> On 03/15/2017 10:43 AM, Linus Walleij wrote:
->> On Tue, Mar 7, 2017 at 2:31 PM, Neil Armstrong <narmstrong@baylibre.com> wrote:
->>
->>> Fix some inverted bit numbers in some pinctrl groups and add missing pins
->>> and groups to be in pair with the GXBB pinctrl pins definition.
->>>
->>> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
->>
->> This does not apply on my fixes branch and possibly no other
->> v4.11-rc1-based branch. Can you please rebase it and resend?
->>
->> I guess this also needs queueing for fixes?
->>
->> Yours,
->> Linus Walleij
->>
->
-> Hi Linus,
->
-> Indeed, it depends on Martin's "pinctrl: meson: gxl: add the missing PWM pin definitions" posted earlier.
+On Wed, Mar 22, 2017 at 07:32:43PM +0000, Ard Biesheuvel wrote:
+> On 22 March 2017 at 19:31, Lukas Wunner <lukas@wunner.de> wrote:
+> > On Wed, Mar 22, 2017 at 03:30:29PM +0000, Ard Biesheuvel wrote:
+> >> On UEFI systems, the PCI subsystem is enumerated by the firmware,
+> >> and if a graphical framebuffer is exposed by a PCI device, its base
+> >> address and size are exposed to the OS via the Graphics Output
+> >> Protocol (GOP).
+> >>
+> >> On arm64 PCI systems, the entire PCI hierarchy is reconfigured from
+> >> scratch at boot. This may result in the GOP framebuffer address to
+> >> become stale, if the BAR covering the framebuffer is modified. This
+> >> will cause the framebuffer to become unresponsive, and may in some
+> >> cases result in unpredictable behavior if the range is reassigned to
+> >> another device.
+> >
+> > Hm, commit message seems to indicate the issue is restricted to arm64,
+> > yet there's no IS_ENABLED(ARM64) to constrain the added code to that arch?
+> 
+> True. I am eager to get some x86 coverage for this, since I would
+> expect this not to do any harm. But I'm fine with making it ARM/arm64
+> specific in the final version.
 
-I merged the latest version of Martin's patch and it still does not
-apply so could you rebase on the pinctrl "devel" branch and
-resend?
+I see.  IIUC, this is only a problem because pci_bus_assign_resources()
+is called from arch/arm64/kernel/pci.c:pci_acpi_scan_root() (as well as
+the host drivers) and x86 isn't affected because it doesn't do that.
 
-Yours,
-Linus Walleij
+I have no opinion on executing the quirk on x86 as well, I was just
+confused by the discrepancy between commit message and patch, but that
+can easily be remedied with a copy+paste of what you replied to Sinan:
+
+       "On x86, it works, given that BARs are usually not reassigned,
+	and so the patch should be a no-op in that case, although it
+	should still be an improvement to check whether the device that
+	owns the BAR actually has memory decoding enabled before we
+	attach the framebuffer driver to it."
+
+
+> >> +DECLARE_PCI_FIXUP_HEADER(PCI_ANY_ID, PCI_ANY_ID, efifb_fixup_resources);
+> >
+> > Maybe this can be constrained to PCI_BASE_CLASS_DISPLAY?
+> 
+> How does one do that with DECLARE_PCI_FIXUP_HEADER?
+
+With DECLARE_PCI_FIXUP_CLASS_HEADER().
+
+Thanks,
+
+Lukas
