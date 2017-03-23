@@ -1,24 +1,31 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 23 Mar 2017 13:39:28 +0300
-Subject: [PATCH v3 3/5] pata_bk3710: clear status bits of BMISP on chipset
- initialization
-In-Reply-To: <1490206862-26065-4-git-send-email-b.zolnierkie@samsung.com>
-References: <1490206862-26065-1-git-send-email-b.zolnierkie@samsung.com>
- <CGME20170322182139epcas5p32d912444c0be8747565a4979f8744572@epcas5p3.samsung.com>
- <1490206862-26065-4-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <bf129198-f778-61d6-07e5-a96c261b08fb@cogentembedded.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 23 Mar 2017 11:38:23 +0100
+Subject: [PATCH] MAINTAINERS: pinctrl: Add git tree to Samsung pinctrl
+ entry
+In-Reply-To: <20170320164851.5999-1-krzk@kernel.org>
+References: <20170320164851.5999-1-krzk@kernel.org>
+Message-ID: <CACRpkdZK=5hnNFZ=M6jf-YeGj_nZx4Xw3+UQfj_5kOQ5_Hhj5Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/22/2017 9:21 PM, Bartlomiej Zolnierkiewicz wrote:
+On Mon, Mar 20, 2017 at 5:48 PM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
 
-> Clear IORDYINT, INTRSTAT and DMAERROR bits of BMISP register
-> (value '1' needs to be written to the bit to clear it).
+> Add a Git tree on @kernel.org for maintaining the Samsung pinctrl
+> drivers.  The tree will be maintained in a shared model between current
+> Samsung pinctrl maintainers.  Pull requests will be going to Linus
+> Walleij.
 >
-> Suggested-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-[...]
+> Also add the patchwork for linux-samsung-soc mailing list which will be
+> used for handling the patches.
+>
+> Cc: Tomasz Figa <tomasz.figa@gmail.com>
+> Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 
-Acked-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-MBR, Sergei
+Should I apply this patch by the way?
+
+Yours,
+Linus Walleij
