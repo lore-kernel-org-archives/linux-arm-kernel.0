@@ -1,31 +1,26 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 23 Mar 2017 10:11:15 +0100
-Subject: [PATCH v2] pinctrl: st: add irq_request/release_resources
- callbacks
-In-Reply-To: <1489685162-3003-1-git-send-email-patrice.chotard@st.com>
-References: <1489685162-3003-1-git-send-email-patrice.chotard@st.com>
-Message-ID: <CACRpkdYABEc+Mxmki9p7bJQ9KUg7ZrhygQRuAs7yXV=cUD9ujg@mail.gmail.com>
+Date: Thu, 23 Mar 2017 10:16:38 +0100
+Subject: [PATCH v2 1/6] dt-bindings: rockchip,
+ pinctrl: rename RK1108 to RV1108
+In-Reply-To: <20170317171840.4683-2-heiko@sntech.de>
+References: <20170317171840.4683-1-heiko@sntech.de>
+ <20170317171840.4683-2-heiko@sntech.de>
+Message-ID: <CACRpkdbK4O3F_+qOdzepR1ercr-xuHPAT7pnSTyb0y1mUGv-qQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 16, 2017 at 6:26 PM,  <patrice.chotard@st.com> wrote:
+On Fri, Mar 17, 2017 at 6:18 PM, Heiko Stuebner <heiko@sntech.de> wrote:
 
-> From: Patrice Chotard <patrice.chotard@st.com>
+> From: Andy Yan <andy.yan@rock-chips.com>
 >
-> When using GPIO as IRQ source, the GPIO must be configured
-> in INPUT. Callbacks dedicated for this was missing in
-> pinctrl-st driver.
+> Rockchip finally named the SOC as RV1108, so change it.
+> Also move the compatible list to one compatible per line.
 >
-> This fix the following kernel error when trying to lock a gpio
-> as IRQ:
->
-> [    7.521095] gpio gpiochip7: (PIO11): gpiochip_lock_as_irq: tried to flag a GPIO set as output for IRQ
-> [    7.526018] gpio gpiochip7: (PIO11): unable to lock HW IRQ 6 for IRQ
-> [    7.529405] genirq: Failed to request resources for 0-0053 (irq 81) on irqchip GPIO
->
-> Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
+> Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
+> Acked-by: Rob Herring <robh@kernel.org>
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 
-Patch applied for fixes.
+Patch applied.
 
 Yours,
 Linus Walleij
