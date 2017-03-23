@@ -1,73 +1,357 @@
-From: fugang.duan@nxp.com (Andy Duan)
-Date: Thu, 23 Mar 2017 01:17:19 +0000
-Subject: [PATCH] ARM: imx_v6_v7_defconfig: Select SMSC_PHY
-In-Reply-To: <82d0aeeaed87ae5c9390b889cef4c54d715cde61.1490191972.git.leonard.crestez@nxp.com>
-References: <82d0aeeaed87ae5c9390b889cef4c54d715cde61.1490191972.git.leonard.crestez@nxp.com>
-Message-ID: <AM4PR0401MB22603DE8193DCACB469438F9FF3F0@AM4PR0401MB2260.eurprd04.prod.outlook.com>
+From: mturquette@baylibre.com (Michael Turquette)
+Date: Wed, 22 Mar 2017 18:21:50 -0700
+Subject: [RFC v0 1/2] interconnect: Add generic interconnect controller API
+In-Reply-To: <20170301182235.19154-2-georgi.djakov@linaro.org>
+References: <20170301182235.19154-1-georgi.djakov@linaro.org>
+ <20170301182235.19154-2-georgi.djakov@linaro.org>
+Message-ID: <149023211030.54062.1219073679182388814@resonance>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Leonard Crestez <leonard.crestez@nxp.com> Sent: Wednesday, March 22, 2017 10:28 PM
->To: Shawn Guo <shawnguo@kernel.org>; Sascha Hauer
-><kernel@pengutronix.de>
->Cc: Leonard Crestez <leonard.crestez@nxp.com>; linux-arm-
->kernel at lists.infradead.org; Fabio Estevam <fabio.estevam@nxp.com>; Andy
->Duan <fugang.duan@nxp.com>; Octavian Purdila
-><octavian.purdila@nxp.com>; Florian Fainelli <f.fainelli@gmail.com>; linux-
->kernel at vger.kernel.org
->Subject: [PATCH] ARM: imx_v6_v7_defconfig: Select SMSC_PHY
->
->The imx6sl-evk board has a LAN8720A ethernet phy supported by SMSC_PHY.
->Add this driver to the default imx config since the device is present on one of
->the evaluation boards.
->
->This used to work mostly fine with the generic phy driver but since commit
->0878fff1f42c18e448ab5b8b4f6a3eb32365b5b6 that driver no longer performs a
->soft reset on startup. This causes netboot to sometimes timeout on DHCP
->because RX doesn't work right. DHCP is eventually retried and it works the
->second time but it takes 90+ seconds to get a login prompt.
->
->This was generated with "make savedefconfig" and it includes a few additional
->minor cleanups.
->
->Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
->---
->
->I also tried to do some debugging in the fec driver and it apparently receives
->corrupted packets when this happens. If I hack it to go into promiscuous mode
->unconditionally it gets a whole bunch of rx errors (crc errors, length errors and
->so on). So the phy config is probably wrong and is confusing the mac?
->
->In theory it might be possible to make that driver "just work" with phy settings
->from uboot but it's not clear it's worthwhile.
->
-> arch/arm/configs/imx_v6_v7_defconfig | 3 +--
-> 1 file changed, 1 insertion(+), 2 deletions(-)
->
->diff --git a/arch/arm/configs/imx_v6_v7_defconfig
->b/arch/arm/configs/imx_v6_v7_defconfig
->index eaba3b1..e605389 100644
->--- a/arch/arm/configs/imx_v6_v7_defconfig
->+++ b/arch/arm/configs/imx_v6_v7_defconfig
->@@ -143,6 +143,7 @@ CONFIG_SMSC911X=y
-> # CONFIG_NET_VENDOR_STMICRO is not set
-> CONFIG_AT803X_PHY=y
-> CONFIG_MICREL_PHY=y
->+CONFIG_SMSC_PHY=y
-> CONFIG_USB_PEGASUS=m
-> CONFIG_USB_RTL8150=m
-> CONFIG_USB_RTL8152=m
->@@ -152,7 +153,6 @@ CONFIG_BRCMFMAC=m
-> CONFIG_WL12XX=m
-> CONFIG_WLCORE_SDIO=m
-> # CONFIG_WILINK_PLATFORM_DATA is not set -#
->CONFIG_INPUT_MOUSEDEV_PSAUX is not set  CONFIG_INPUT_EVDEV=y
->CONFIG_INPUT_EVBUG=m  CONFIG_KEYBOARD_GPIO=y @@ -376,7 +376,6
->@@ CONFIG_NLS_ISO8859_1=y  CONFIG_NLS_ISO8859_15=m
->CONFIG_NLS_UTF8=y  CONFIG_PRINTK_TIME=y -CONFIG_DEBUG_FS=y
->CONFIG_MAGIC_SYSRQ=y  # CONFIG_SCHED_DEBUG is not set
->CONFIG_PROVE_LOCKING=y
->--
->2.7.4
+Hi Georgi,
 
-Acked-by: Fugang Duan <fugang.duan@nxp.com>
+Quoting Georgi Djakov (2017-03-01 10:22:34)
+> diff --git a/Documentation/devicetree/bindings/interconnect/interconnect.txt b/Documentation/devicetree/bindings/interconnect/interconnect.txt
+> new file mode 100644
+> index 000000000000..c62d86e4c52d
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/interconnect/interconnect.txt
+> @@ -0,0 +1,91 @@
+> +Interconnect Provider Device Tree Bindings
+> +=========================================
+
+I agree with Rob to skip the DT bindings for now. However I did review
+this privately in February and I'll re-post my review comments here for
+when the bindings do get discussed at a later date:
+
+> +Optional properties:
+> +interconnect-port : A phandle and interconnect provider specifier as defined by
+> +               bindings of the interconnect provider specified by phandle.
+> +               This denotes the port to which the interconnect consumer is
+> +               wired. It is used when there are multiple interconnect providers
+> +               that have one or multiple links between them.
+
+Go ahead and remove the interconnect-port property description from the
+provider part of the binding. It should be sufficient to say,
+"interconnect providers can also be interconnect consumers, such as in
+the case where two network-on-chip fabrics interface directly".
+
+> +
+> +Example:
+> +
+> +               snoc: snoc at 0580000 {
+> +                       compatible = "qcom,msm-bus-snoc";
+> +                       reg = <0x580000 0x14000>;
+> +                       #interconnect-cells = <1>;
+> +                       clock-names = "bus_clk", "bus_a_clk";
+> +                       clocks = <&rpmcc RPM_SMD_SNOC_CLK>, <&rpmcc RPM_SMD_SNOC_A_CLK>;
+> +                       status = "okay";
+> +                       interconnect-port = <&bimc MAS_SNOC_CFG>,
+> +                                       <&bimc SNOC_BIMC_0_MAS>,
+> +                                       <&bimc SNOC_BIMC_1_MAS>,
+> +                                       <&pnoc SNOC_PNOC_SLV>;
+> +               };
+> +               bimc: bimc at 0400000 {
+> +                       compatible = "qcom,msm-bus-bimc";
+> +                       reg = <0x400000 0x62000>;
+> +                       #interconnect-cells = <1>;
+> +                       clock-names = "bus_clk", "bus_a_clk";
+> +                       clocks = <&rpmcc RPM_SMD_BIMC_CLK>, <&rpmcc RPM_SMD_BIMC_A_CLK>;
+> +                       status = "okay";
+> +                       interconnect-port = <&snoc BIMC_SNOC_MAS>;
+> +               };
+> +               pnoc: pnoc at 500000 {
+> +                       compatible = "qcom,msm-bus-pnoc";
+> +                       reg = <0x500000 0x11000>;
+> +                       #interconnect-cells = <1>;
+> +                       clock-names = "bus_clk", "bus_a_clk";
+> +                       clocks = <&rpmcc RPM_SMD_PCNOC_CLK>, <&rpmcc RPM_SMD_PCNOC_A_CLK>;
+> +                       status = "okay";
+> +                       interconnect-port = <&snoc PNOC_SNOC_SLV>;
+> +               };
+> +
+> += interconnect consumers =
+> +
+> +The interconnect consumers are device nodes which consume the interconnect
+> +path(s) provided by the interconnect provider. There can be multiple
+> +interconnect providers on a SoC and the consumer may consume multiple paths
+> +from different providers depending on usecase and the components it has to
+> +interact with.
+> +
+> +Required-properties:
+> +interconnect-port : A phandle and interconnect provider specifier as defined by
+> +               bindings of the interconnect provider specified by phandle.
+> +               This denotes the port to which the interconnect consumer is
+> +               wired.
+> +interconnect-path : List of phandles to the data path endpoints.
+
+More copy/paste from February review:
+
+"Path" means everything between the endpoints (e.g. the details of the
+graph traversal), whereas this DT property is really only meant to
+defint the target endpoint. Let's rename it to interconnect-target.
+
+When referring to endpoints I think we should some pairing terminology
+like: src,dst or local,remote or initiator,target.
+
+So how about:
+s/interconnect-port/interconnect-sources/
+s/interconnect-path/interconnect-targets/
+
+This keeps things symmetrical and the (source,target) pair just makes
+sense. I used plural as well since there can be multiple ports.
+
+It might even make sense to shorten it with: source-ports, target-ports
+
+> +interconnect-path-names : List of interconnect path name strings sorted in the
+> +               same order as the interconnect-path property.  Consumers drivers
+> +               will use interconnect-path-names to match the link names with
+> +               interconnect specifiers.
+
+Let's not use string names. No reason to copy the clkdev-style of
+resource lookups when an integer id will do just fine.
+
+> +
+> +Example:
+> +
+> +       sdhci at 07864000 {
+> +               ...
+> +               interconnect-port = <&pnoc MAS_PNOC_SDCC_2>;
+> +               interconnect-path = <&blsp1_uart2>;
+
+interconnect-path (err, port-target?) should not point to a consumer
+device node, it should point to the local port of the consumer device.
+
+How about:
+
+	sdhci at 07864000 {
+		...
+		interconnect-sources = <&pnoc 123>;
+		interconnect-targets = <&pnoc 456>, <&snoc 789>;
+	};
+
+And the magic numbers above (123, 456, 789) can be replaced by
+human-readable macros via the DT include chroot. E.g:
+
+	interconnect-source = <&pnoc USB_OTG>;
+	interconnect-target = <&pnoc OMG_WTF>, <&pnoc BBQ>;
+
+> +               interconnect-path-names = "spi";
+> +       };
+> diff --git a/Documentation/interconnect/interconnect.txt b/Documentation/interconnect/interconnect.txt
+> new file mode 100644
+> index 000000000000..051d3955f28b
+> --- /dev/null
+> +++ b/Documentation/interconnect/interconnect.txt
+> @@ -0,0 +1,68 @@
+...
+> +The interconnect framework provide the following APIs to consumers:
+> +
+> +struct interconnect_path *interconnect_get(struct device *dev, const char *id);
+
+Replace strings with an integer offset for the port.
+
+> diff --git a/drivers/interconnect/interconnect.c b/drivers/interconnect/interconnect.c
+> new file mode 100644
+> index 000000000000..dadd1ffdbc50
+> --- /dev/null
+> +++ b/drivers/interconnect/interconnect.c
+> @@ -0,0 +1,285 @@
+...
+> +struct interconnect_path *interconnect_get(struct device *dev, const char *id)
+
+If the consumer device has more than one local port (e.g. source), it
+must be specified along the target port, right?
+
+> +{
+> +       struct device_node *np;
+> +       struct platform_device *dst_pdev;
+> +       struct interconnect_node *src, *dst, *node;
+> +       struct interconnect_path *path;
+> +       int ret, index;
+> +
+> +       if (WARN_ON(!dev || !id))
+> +               return ERR_PTR(-EINVAL);
+> +
+> +       src = find_node(dev->of_node);
+> +       if (IS_ERR(src))
+> +               return ERR_CAST(src);
+
+Does this assume that dev only has a single local port?
+
+> +
+> +       index = of_property_match_string(dev->of_node,
+> +                                        "interconnect-path-names", id);
+> +       if (index < 0) {
+> +               dev_err(dev, "missing interconnect-path-names DT property on %s\n",
+> +                       dev->of_node->full_name);
+> +               return ERR_PTR(index);
+> +       }
+> +
+> +       /* get the destination endpoint device_node */
+> +       np = of_parse_phandle(dev->of_node, "interconnect-path", index);
+> +
+> +       dst_pdev = of_find_device_by_node(np);
+> +       if (!dst_pdev) {
+> +               dev_err(dev, "error finding device by node %s\n", np->name);
+> +               return ERR_PTR(-ENODEV);
+> +       }
+> +
+> +       dst = find_node(np);
+> +       if (IS_ERR(dst))
+> +               return ERR_CAST(dst);
+
+Some of the above can be simplified by using a symbolic constant integer
+instead of a string name for the index.
+
+> diff --git a/include/linux/interconnect-consumer.h b/include/linux/interconnect-consumer.h
+> new file mode 100644
+> index 000000000000..8bd5bb3e4196
+> --- /dev/null
+> +++ b/include/linux/interconnect-consumer.h
+> @@ -0,0 +1,70 @@
+> +/*
+> + * Copyright (c) 2017, Linaro Ltd.
+> + *
+> + * This software is licensed under the terms of the GNU General Public
+> + * License version 2, as published by the Free Software Foundation, and
+> + * may be copied, distributed, and modified under those terms.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#ifndef _LINUX_INTERCONNECT_CONSUMER_H
+> +#define _LINUX_INTERCONNECT_CONSUMER_H
+> +
+> +struct interconnect_node;
+> +
+> +/**
+> + * struct interconnect_path - interconnect path structure
+> + *
+> + * @node_list: list of the interconnect nodes
+> + * @src_dev: source endpoint
+> + * @dst_dev: destination endpoint
+> + */
+> +struct interconnect_path {
+> +       struct list_head node_list;
+> +       struct device *src_dev;
+> +       struct device *dst_dev;
+> +};
+
+Don't expose the definition of interconnect_path to users. They should
+only have an opaque handle to the interconnect_path object.
+
+> diff --git a/include/linux/interconnect-provider.h b/include/linux/interconnect-provider.h
+> new file mode 100644
+> index 000000000000..af1ca739ce52
+> --- /dev/null
+> +++ b/include/linux/interconnect-provider.h
+> @@ -0,0 +1,92 @@
+> +/*
+> + * Copyright (c) 2017, Linaro Ltd.
+> + *
+> + * This software is licensed under the terms of the GNU General Public
+> + * License version 2, as published by the Free Software Foundation, and
+> + * may be copied, distributed, and modified under those terms.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#ifndef _LINUX_INTERCONNECT_PROVIDER_H
+> +#define _LINUX_INTERCONNECT_PROVIDER_H
+> +
+> +#include <linux/interconnect-consumer.h>
+> +
+> +/**
+> + * struct icp_ops - platform specific callback operations for interconnect
+> + * providers that will be called from drivers
+> + *
+> + * @set: set constraints on interconnect
+> + * @xlate: provider-specific callback for mapping nodes from phandle arguments
+> + */
+> +struct icp_ops {
+> +       int (*set)(struct interconnect_node *node, u32 bandwidth);
+> +       struct interconnect_node *(*xlate)(struct of_phandle_args *spec, void *data);
+> +};
+> +
+> +/**
+> + * struct icp - interconnect provider (controller) entity that might
+> + * provide multiple interconnect controls
+> + *
+> + * @icp_list: list of the registered interconnect providers
+> + * @nodes: internal list of the interconnect provider nodes
+> + * @ops: pointer to device specific struct icp_ops
+> + * @dev: the device this interconnect provider belongs to
+> + * @of_node: the corresponding device tree node as phandle target
+> + * @data: pointer to private data
+> + */
+> +struct icp {
+> +       struct list_head        icp_list;
+> +       struct list_head        nodes;
+> +       const struct icp_ops    *ops;
+> +       struct device           *dev;
+> +       const char              *name;
+> +       struct device_node      *of_node;
+> +       void                    *data;
+> +};
+
+Does this need to be defined for provider drivers?
+
+> +
+> +/**
+> + * struct interconnect_node - entity that is part of the interconnect topology
+> + *
+> + * @links: links to other interconnect nodes
+> + * @num_links: number of interconnect nodes
+> + * @icp: points to the interconnect provider struct this node belongs to
+> + * @icn_list: list of interconnect nodes
+> + * @search_list: list used when walking the nodes graph
+> + * @reverse: pointer to previous node when walking the nodes graph
+> + * @is_traversed: flag that is used when walking the nodes graph
+> + * @qos_list: a list of QoS constraints
+> + */
+> +struct interconnect_node {
+> +       struct interconnect_node **links;
+> +       size_t                  num_links;
+> +
+> +       struct icp              *icp;
+> +       struct list_head        icn_list;
+> +       struct list_head        search_list;
+> +       struct interconnect_node *reverse;
+> +       bool                    is_traversed;
+> +       struct hlist_head       qos_list;
+> +};
+
+Don't define this publicly. Should just be declared as an opaque handle.
+
+> +
+> +/**
+> + * struct icn_qos - constraints that are attached to each node
+> + *
+> + * @node: linked list node
+> + * @path: the interconnect path which is using this constraint
+> + * @bandwidth: an integer describing the bandwidth in kbps
+> + */
+> +struct icn_qos {
+> +       struct hlist_node node;
+> +       struct interconnect_path *path;
+> +       u32 bandwidth;
+> +};
+
+
+Don't define this publicly. Should just be declared as an opaque handle.
+
+Regards,
+Mike
+
+> +
+> +int interconnect_add_provider(struct icp *icp);
+> +int interconnect_del_provider(struct icp *icp);
+> +
+> +#endif /* _LINUX_INTERCONNECT_PROVIDER_H */
