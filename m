@@ -1,31 +1,78 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 23 Mar 2017 10:03:44 +0100
-Subject: [PATCH v2 1/4] pinctrl: rockchip: remove unnecessary locking
-In-Reply-To: <20170315174654.15128-2-john@metanate.com>
-References: <20170315174654.15128-1-john@metanate.com>
- <20170315174654.15128-2-john@metanate.com>
-Message-ID: <CACRpkda7oaXXdXkToE+5V0XhbFx3gV4p5Jp-mJm-ZvG5WN2fWw@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 23 Mar 2017 09:04:03 +0000
+Subject: [PATCH v3] efifb: avoid reconfiguration of BAR that covers the
+ framebuffer
+In-Reply-To: <20170323084819.GA23281@h08.hostsharing.net>
+References: <1490196629-28088-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20170322193111.GA8190@wunner.de>
+ <CAKv+Gu_X-SEnz7h9J8boqqjOQGHQawwdSAq4haH-OGu8zdfNfA@mail.gmail.com>
+ <20170323084819.GA23281@h08.hostsharing.net>
+Message-ID: <CAKv+Gu93eJ-js3g7M6Jdm6XGMaWMswFmzBG2qNT4rn+3=1+EyA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 15, 2017 at 6:46 PM, John Keeping <john@metanate.com> wrote:
-
-> regmap_update_bits does its own locking and everything else accessed
-> here is a local variable so there is no need to lock around it.
+On 23 March 2017 at 08:48, Lukas Wunner <lukas@wunner.de> wrote:
+> On Wed, Mar 22, 2017 at 07:32:43PM +0000, Ard Biesheuvel wrote:
+>> On 22 March 2017 at 19:31, Lukas Wunner <lukas@wunner.de> wrote:
+>> > On Wed, Mar 22, 2017 at 03:30:29PM +0000, Ard Biesheuvel wrote:
+>> >> On UEFI systems, the PCI subsystem is enumerated by the firmware,
+>> >> and if a graphical framebuffer is exposed by a PCI device, its base
+>> >> address and size are exposed to the OS via the Graphics Output
+>> >> Protocol (GOP).
+>> >>
+>> >> On arm64 PCI systems, the entire PCI hierarchy is reconfigured from
+>> >> scratch at boot. This may result in the GOP framebuffer address to
+>> >> become stale, if the BAR covering the framebuffer is modified. This
+>> >> will cause the framebuffer to become unresponsive, and may in some
+>> >> cases result in unpredictable behavior if the range is reassigned to
+>> >> another device.
+>> >
+>> > Hm, commit message seems to indicate the issue is restricted to arm64,
+>> > yet there's no IS_ENABLED(ARM64) to constrain the added code to that arch?
+>>
+>> True. I am eager to get some x86 coverage for this, since I would
+>> expect this not to do any harm. But I'm fine with making it ARM/arm64
+>> specific in the final version.
 >
-> Signed-off-by: John Keeping <john@metanate.com>
-> Reviewed-by: Heiko Stuebner <heiko@sntech.de>
-> Tested-by: Heiko Stuebner <heiko@sntech.de>
-> ---
-> v2:
-> - Also remove locking in rockchip_set_schmitt()
+> I see.  IIUC, this is only a problem because pci_bus_assign_resources()
+> is called from arch/arm64/kernel/pci.c:pci_acpi_scan_root() (as well as
+> the host drivers) and x86 isn't affected because it doesn't do that.
+>
 
-This does not apply on my "devel" branch in the pinctrl tree.
+Correct. But on x86 (or rather, on a PC), you can be sure that UEFI
+(or the legacy PCI bios) performed the resource assignment already.
+One could argue that this is equally the case when running arm64 in
+ACPI mode, but in general, you cannot assume the presence of firmware
+on ARM/arm64 that has already taken care of this, and so the state of
+the BARs has to be presumed invalid.
 
-Please rebase on that and resend.
+> I have no opinion on executing the quirk on x86 as well, I was just
+> confused by the discrepancy between commit message and patch, but that
+> can easily be remedied with a copy+paste of what you replied to Sinan:
+>
+>        "On x86, it works, given that BARs are usually not reassigned,
+>         and so the patch should be a no-op in that case, although it
+>         should still be an improvement to check whether the device that
+>         owns the BAR actually has memory decoding enabled before we
+>         attach the framebuffer driver to it."
+>
+>
 
-Since I have no patches for rockchip so far I suspect this
-is not even based on v4.11-rc1 so pls forward-port.
+OK, I will include that.
 
-Yours,
-Linus Walleij
+>> >> +DECLARE_PCI_FIXUP_HEADER(PCI_ANY_ID, PCI_ANY_ID, efifb_fixup_resources);
+>> >
+>> > Maybe this can be constrained to PCI_BASE_CLASS_DISPLAY?
+>>
+>> How does one do that with DECLARE_PCI_FIXUP_HEADER?
+>
+> With DECLARE_PCI_FIXUP_CLASS_HEADER().
+>
+
+Ah ok, thanks for pointing that out.
+
+I do wonder whether it makes sense to keep the code as is, so that we
+spot unexpected configurations, i.e., where the GOP points into a BAR
+that is unrelated to graphics. In this case, I think we should disable
+efifb rather than proceed without claiming any PCI resources (as we
+did without this patch)
