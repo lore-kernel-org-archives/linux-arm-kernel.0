@@ -1,103 +1,205 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 23 Mar 2017 16:45:57 +0000
-Subject: [PATCH v3 04/11] Documentation: DT: bindings: mfd: add A33 GPADC
- binding
-In-Reply-To: <20170321153611.16228-5-quentin.schulz@free-electrons.com>
-References: <20170321153611.16228-1-quentin.schulz@free-electrons.com>
- <20170321153611.16228-5-quentin.schulz@free-electrons.com>
-Message-ID: <20170323164557.a7h2eolmxeqfwg6b@dell>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 23 Mar 2017 17:46:48 +0100
+Subject: [PATCH 1/2] arm64: marvell: dts: add PPv2.2 description to Armada
+ 7K/8K
+In-Reply-To: <1489677388-19320-2-git-send-email-thomas.petazzoni@free-electrons.com>
+ (Thomas Petazzoni's message of "Thu, 16 Mar 2017 16:16:27 +0100")
+References: <1489677388-19320-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1489677388-19320-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <87o9wsc553.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 21 Mar 2017, Quentin Schulz wrote:
+Hi Thomas,
+ 
+ On jeu., mars 16 2017, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
 
-> This patch adds documentation for the A33 GPADC binding.
-> 
-> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+> This commit adds the description of the PPv2.2 hardware block for the
+> Marvell Armada 7K and Armada 8K processors, and their corresponding Armada
+> 7040 and 8040 Development boards.
+
+Applied on mvebu/dt64
+
+Thanks,
+
+Gregory
+
+>
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 > ---
-> 
-> v3:
->   - fixed missing allwinner in front of compatible,
->   - updated compatible to allwinner,sun8i-a33-ths to better reflect the
->   datasheet's name,
->   - updated example's DT node name and label to ths,
-> 
-> added in v2
-> 
->  .../devicetree/bindings/mfd/sun4i-gpadc.txt        | 59 ++++++++++++++++++++++
->  1 file changed, 59 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt
-
-This is going to need a DT Ack.
-
-> diff --git a/Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt b/Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt
-> new file mode 100644
-> index 0000000..badff36
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mfd/sun4i-gpadc.txt
-> @@ -0,0 +1,59 @@
-> +Allwinner SoCs' GPADC Device Tree bindings
-> +------------------------------------------
-> +The Allwinner SoCs all have an ADC that can also act as a thermal sensor
-> +and sometimes as a touchscreen controller.
+>  arch/arm64/boot/dts/marvell/armada-7040-db.dts     | 25 +++++++++++++++
+>  arch/arm64/boot/dts/marvell/armada-8040-db.dts     | 16 ++++++++++
+>  .../boot/dts/marvell/armada-cp110-master.dtsi      | 37 ++++++++++++++++++++++
+>  .../arm64/boot/dts/marvell/armada-cp110-slave.dtsi | 37 ++++++++++++++++++++++
+>  4 files changed, 115 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/marvell/armada-7040-db.dts b/arch/arm64/boot/dts/marvell/armada-7040-db.dts
+> index 070b589..bb0e1e8 100644
+> --- a/arch/arm64/boot/dts/marvell/armada-7040-db.dts
+> +++ b/arch/arm64/boot/dts/marvell/armada-7040-db.dts
+> @@ -146,3 +146,28 @@
+>  &cpm_usb3_1 {
+>  	status = "okay";
+>  };
 > +
-> +Required properties:
-> +  - compatible: "allwinner,sun8i-a33-ths",
-> +  - reg: mmio address range of the chip,
-> +  - #thermal-sensor-cells: shall be 0,
-> +  - #io-channel-cells: shall be 0,
-> +
-> +Example:
-> +	ths: ths at 01c25000 {
-> +		compatible = "allwinner,sun8i-a33-ths";
-> +		reg = <0x01c25000 0x100>;
-> +		#thermal-sensor-cells = <0>;
-> +		#io-channel-cells = <0>;
+> +&cpm_mdio {
+> +	phy0: ethernet-phy at 0 {
+> +		reg = <0>;
 > +	};
-> +
-> +sun4i, sun5i and sun6i SoCs are also supported via the older binding:
-> +
-> +sun4i resistive touchscreen controller
-> +--------------------------------------
-> +
-> +Required properties:
-> + - compatible: "allwinner,sun4i-a10-ts", "allwinner,sun5i-a13-ts" or
-> +   "allwinner,sun6i-a31-ts"
-> + - reg: mmio address range of the chip
-> + - interrupts: interrupt to which the chip is connected
-> + - #thermal-sensor-cells: shall be 0
-> +
-> +Optional properties:
-> + - allwinner,ts-attached	 : boolean indicating that an actual touchscreen
-> +				   is attached to the controller
-> + - allwinner,tp-sensitive-adjust : integer (4 bits)
-> +				   adjust sensitivity of pen down detection
-> +				   between 0 (least sensitive) and 15
-> +				   (defaults to 15)
-> + - allwinner,filter-type	 : integer (2 bits)
-> +				   select median and averaging filter
-> +				   samples used for median / averaging filter
-> +				   0: 4/2
-> +				   1: 5/3
-> +				   2: 8/4
-> +				   3: 16/8
-> +				   (defaults to 1)
-> +
-> +Example:
-> +
-> +	rtp: rtp at 01c25000 {
-> +		compatible = "allwinner,sun4i-a10-ts";
-> +		reg = <0x01c25000 0x100>;
-> +		interrupts = <29>;
-> +		allwinner,ts-attached;
-> +		#thermal-sensor-cells = <0>;
-> +		/* sensitive/noisy touch panel */
-> +		allwinner,tp-sensitive-adjust = <0>;
-> +		allwinner,filter-type = <3>;
+> +	phy1: ethernet-phy at 1 {
+> +		reg = <1>;
 > +	};
+> +};
+> +
+> +&cpm_ethernet {
+> +	status = "okay";
+> +};
+> +
+> +&cpm_eth1 {
+> +	status = "okay";
+> +	phy = <&phy0>;
+> +	phy-mode = "sgmii";
+> +};
+> +
+> +&cpm_eth2 {
+> +	status = "okay";
+> +	phy = <&phy1>;
+> +	phy-mode = "rgmii-id";
+> +};
+> diff --git a/arch/arm64/boot/dts/marvell/armada-8040-db.dts b/arch/arm64/boot/dts/marvell/armada-8040-db.dts
+> index 6e6f182..80e685e 100644
+> --- a/arch/arm64/boot/dts/marvell/armada-8040-db.dts
+> +++ b/arch/arm64/boot/dts/marvell/armada-8040-db.dts
+> @@ -124,6 +124,22 @@
+>  	status = "okay";
+>  };
+>  
+> +&cpm_mdio {
+> +	phy1: ethernet-phy at 1 {
+> +		reg = <1>;
+> +	};
+> +};
+> +
+> +&cpm_ethernet {
+> +	status = "okay";
+> +};
+> +
+> +&cpm_eth2 {
+> +	status = "okay";
+> +	phy = <&phy1>;
+> +	phy-mode = "rgmii-id";
+> +};
+> +
+>  /* CON5 on CP1 expansion */
+>  &cps_pcie2 {
+>  	status = "okay";
+> diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+> index 3a99c36..9a2ce2a 100644
+> --- a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+> +++ b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+> @@ -59,6 +59,43 @@
+>  			interrupt-parent = <&gic>;
+>  			ranges = <0x0 0x0 0xf2000000 0x2000000>;
+>  
+> +			cpm_ethernet: ethernet at 0 {
+> +				compatible = "marvell,armada-7k-pp22";
+> +				reg = <0x0 0x100000>, <0x129000 0xb000>;
+> +				clocks = <&cpm_syscon0 1 3>, <&cpm_syscon0 1 9>, <&cpm_syscon0 1 5>;
+> +				clock-names = "pp_clk", "gop_clk", "mg_clk";
+> +				status = "disabled";
+> +				dma-coherent;
+> +
+> +				cpm_eth0: eth0 {
+> +					interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
+> +					port-id = <0>;
+> +					gop-port-id = <0>;
+> +					status = "disabled";
+> +				};
+> +
+> +				cpm_eth1: eth1 {
+> +					interrupts = <GIC_SPI 38 IRQ_TYPE_LEVEL_HIGH>;
+> +					port-id = <1>;
+> +					gop-port-id = <2>;
+> +					status = "disabled";
+> +				};
+> +
+> +				cpm_eth2: eth2 {
+> +					interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>;
+> +					port-id = <2>;
+> +					gop-port-id = <3>;
+> +					status = "disabled";
+> +				};
+> +			};
+> +
+> +			cpm_mdio: mdio at 12a200 {
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +				compatible = "marvell,orion-mdio";
+> +				reg = <0x12a200 0x10>;
+> +			};
+> +
+>  			cpm_syscon0: system-controller at 440000 {
+>  				compatible = "marvell,cp110-system-controller0",
+>  					     "syscon";
+> diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+> index 9e09c4d..c9dfa24 100644
+> --- a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+> +++ b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+> @@ -59,6 +59,43 @@
+>  			interrupt-parent = <&gic>;
+>  			ranges = <0x0 0x0 0xf4000000 0x2000000>;
+>  
+> +			cps_ethernet: ethernet at 0 {
+> +				compatible = "marvell,armada-7k-pp22";
+> +				reg = <0x0 0x100000>, <0x129000 0xb000>;
+> +				clocks = <&cps_syscon0 1 3>, <&cps_syscon0 1 9>, <&cps_syscon0 1 5>;
+> +				clock-names = "pp_clk", "gop_clk", "mg_clk";
+> +				status = "disabled";
+> +				dma-coherent;
+> +
+> +				cps_eth0: eth0 {
+> +					interrupts = <GIC_SPI 261 IRQ_TYPE_LEVEL_HIGH>;
+> +					port-id = <0>;
+> +					gop-port-id = <0>;
+> +					status = "disabled";
+> +				};
+> +
+> +				cps_eth1: eth1 {
+> +					interrupts = <GIC_SPI 262 IRQ_TYPE_LEVEL_HIGH>;
+> +					port-id = <1>;
+> +					gop-port-id = <2>;
+> +					status = "disabled";
+> +				};
+> +
+> +				cps_eth2: eth2 {
+> +					interrupts = <GIC_SPI 263 IRQ_TYPE_LEVEL_HIGH>;
+> +					port-id = <2>;
+> +					gop-port-id = <3>;
+> +					status = "disabled";
+> +				};
+> +			};
+> +
+> +			cps_mdio: mdio at 12a200 {
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +				compatible = "marvell,orion-mdio";
+> +				reg = <0x12a200 0x10>;
+> +			};
+> +
+>  			cps_syscon0: system-controller at 440000 {
+>  				compatible = "marvell,cp110-system-controller0",
+>  					     "syscon";
+> -- 
+> 2.7.4
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
