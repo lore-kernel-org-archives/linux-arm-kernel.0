@@ -1,72 +1,91 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Thu, 23 Mar 2017 14:18:34 +0800
-Subject: [PATCH] genirq: Notify clients whenever there is change in
- affinity
-In-Reply-To: <1490027777-29130-2-git-send-email-psodagud@codeaurora.org>
-Message-ID: <201703231444.06qWwK1u%fengguang.wu@intel.com>
+From: adrian.hunter@intel.com (Adrian Hunter)
+Date: Thu, 23 Mar 2017 09:03:43 +0200
+Subject: [v2, 4/7] mmc: sdhci: add a quirk to restore delay in tuning
+In-Reply-To: <1488529129-23560-5-git-send-email-yangbo.lu@nxp.com>
+References: <1488529129-23560-1-git-send-email-yangbo.lu@nxp.com>
+ <1488529129-23560-5-git-send-email-yangbo.lu@nxp.com>
+Message-ID: <878da006-5b83-a9d9-6136-07d8f07ea65f@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Prasad,
+On 03/03/17 10:18, Yangbo Lu wrote:
+> There was a mdelay between tuning cycles which is removed since
+> eMMC spec didn't require that. However it's observed that eSDHC
+> needed this delay for HS200 successful tuning. Maybe it's also
+> needed for some other controllers. This patch is to add a quirk
+> to fix it.
+> 
+> Fixes: 197160d52e85 ("mmc: sdhci: remove mdelay in eMMC tuning")
+> Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
+> ---
 
-[auto build test WARNING on tip/irq/core]
-[also build test WARNING on v4.11-rc3 next-20170322]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
-
-url:    https://github.com/0day-ci/linux/commits/Prasad-Sodagudi/genirq-Notify-clients-whenever-there-is-change-in-affinity/20170323-094431
-reproduce:
-        # apt-get install sparse
-        make ARCH=x86_64 allmodconfig
-        make C=1 CF=-D__CHECK_ENDIAN__
-
-
-sparse warnings: (new ones prefixed by >>)
-
-   include/linux/compiler.h:264:8: sparse: attribute 'no_sanitize_address': unknown attribute
->> kernel/irq/migration.c:46:36: sparse: not enough arguments for function irq_do_set_affinity
-   kernel/irq/migration.c: In function 'irq_move_masked_irq':
-   kernel/irq/migration.c:46:3: error: too few arguments to function 'irq_do_set_affinity'
-      irq_do_set_affinity(&desc->irq_data, desc->pending_mask, false);
-      ^~~~~~~~~~~~~~~~~~~
-   In file included from kernel/irq/migration.c:5:0:
-   kernel/irq/internals.h:116:12: note: declared here
-    extern int irq_do_set_affinity(struct irq_data *data,
-               ^~~~~~~~~~~~~~~~~~~
-
-vim +46 kernel/irq/migration.c
-
-c777ac55 Andrew Morton     2006-03-25  30  
-239007b8 Thomas Gleixner   2009-11-17  31  	assert_raw_spin_locked(&desc->lock);
-501f2499 Bryan Holty       2006-03-25  32  
-c777ac55 Andrew Morton     2006-03-25  33  	/*
-c777ac55 Andrew Morton     2006-03-25  34  	 * If there was a valid mask to work with, please
-c777ac55 Andrew Morton     2006-03-25  35  	 * do the disable, re-program, enable sequence.
-c777ac55 Andrew Morton     2006-03-25  36  	 * This is *not* particularly important for level triggered
-c777ac55 Andrew Morton     2006-03-25  37  	 * but in a edge trigger case, we might be setting rte
-25985edc Lucas De Marchi   2011-03-30  38  	 * when an active trigger is coming in. This could
-c777ac55 Andrew Morton     2006-03-25  39  	 * cause some ioapics to mal-function.
-c777ac55 Andrew Morton     2006-03-25  40  	 * Being paranoid i guess!
-e7b946e9 Eric W. Biederman 2006-10-04  41  	 *
-e7b946e9 Eric W. Biederman 2006-10-04  42  	 * For correct operation this depends on the caller
-e7b946e9 Eric W. Biederman 2006-10-04  43  	 * masking the irqs.
-c777ac55 Andrew Morton     2006-03-25  44  	 */
-818b0f3b Jiang Liu         2012-03-30  45  	if (cpumask_any_and(desc->pending_mask, cpu_online_mask) < nr_cpu_ids)
-818b0f3b Jiang Liu         2012-03-30 @46  		irq_do_set_affinity(&desc->irq_data, desc->pending_mask, false);
-57b150cc Yinghai Lu        2009-04-27  47  
-7f7ace0c Mike Travis       2009-01-10  48  	cpumask_clear(desc->pending_mask);
-e7b946e9 Eric W. Biederman 2006-10-04  49  }
-e7b946e9 Eric W. Biederman 2006-10-04  50  
-a439520f Thomas Gleixner   2011-02-04  51  void irq_move_irq(struct irq_data *idata)
-e7b946e9 Eric W. Biederman 2006-10-04  52  {
-f1a06390 Thomas Gleixner   2011-01-28  53  	bool masked;
-e7b946e9 Eric W. Biederman 2006-10-04  54  
-
-:::::: The code at line 46 was first introduced by commit
-:::::: 818b0f3bfb236ae66cac3ff38e86b9e47f24b7aa genirq: Introduce irq_do_set_affinity() to reduce duplicated code
-
-:::::: TO: Jiang Liu <liuj97@gmail.com>
-:::::: CC: Thomas Gleixner <tglx@linutronix.de>
+I would prefer to do something like this:
 
 ---
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+From: Adrian Hunter <adrian.hunter@intel.com>
+Date: Thu, 23 Mar 2017 08:54:06 +0200
+Subject: [PATCH] mmc: sdhci: Control the delay between tuning commands
+
+The delay between tuning commands for SD cards is not part of the
+specification. A driver that needs it probably needs it for eMMC too,
+whereas most drivers would probably like to set it to 0. Make it a
+host member (host->tuning_delay) that defaults to the existing behaviour.
+Drivers can set it to zero to eliminate the delay, or set it to a positive
+value to always have a delay.
+
+Signed-off-by: Adrian Hunter <adrian.hunter@intel.com>
+---
+ drivers/mmc/host/sdhci.c | 11 ++++++++---
+ drivers/mmc/host/sdhci.h |  1 +
+ 2 files changed, 9 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+index a33102fc800b..2fc33485df1d 100644
+--- a/drivers/mmc/host/sdhci.c
++++ b/drivers/mmc/host/sdhci.c
+@@ -2100,9 +2100,9 @@ static void __sdhci_execute_tuning(struct sdhci_host *host, u32 opcode)
+ 			break;
+ 		}
+ 
+-		/* eMMC spec does not require a delay between tuning cycles */
+-		if (opcode == MMC_SEND_TUNING_BLOCK)
+-			mdelay(1);
++		/* Spec does not require a delay between tuning cycles */
++		if (host->tuning_delay > 0)
++			mdelay(host->tuning_delay);
+ 	}
+ 
+ 	pr_info("%s: Tuning failed, falling back to fixed sampling clock\n",
+@@ -2164,6 +2164,9 @@ int sdhci_execute_tuning(struct mmc_host *mmc, u32 opcode)
+ 
+ 	host->mmc->retune_period = tuning_count;
+ 
++	if (host->tuning_delay < 0)
++		host->tuning_delay = opcode == MMC_SEND_TUNING_BLOCK;
++
+ 	sdhci_start_tuning(host);
+ 
+ 	__sdhci_execute_tuning(host, opcode);
+@@ -3108,6 +3111,8 @@ struct sdhci_host *sdhci_alloc_host(struct device *dev,
+ 	host->cqe_ier     = SDHCI_CQE_INT_MASK;
+ 	host->cqe_err_ier = SDHCI_CQE_INT_ERR_MASK;
+ 
++	host->tuning_delay = -1;
++
+ 	return host;
+ }
+ 
+diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h
+index 35b41da0a636..b0f416fc9548 100644
+--- a/drivers/mmc/host/sdhci.h
++++ b/drivers/mmc/host/sdhci.h
+@@ -538,6 +538,7 @@ struct sdhci_host {
+ #define SDHCI_TUNING_MODE_1	0
+ #define SDHCI_TUNING_MODE_2	1
+ #define SDHCI_TUNING_MODE_3	2
++	int			tuning_delay;	/* Delay (ms) between tuning commands */
+ 
+ 	unsigned long private[0] ____cacheline_aligned;
+ };
+-- 
+1.9.1
