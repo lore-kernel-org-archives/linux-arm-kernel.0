@@ -1,113 +1,76 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Thu, 23 Mar 2017 12:58:04 -0700
-Subject: [PATCH 4/4] tty/serial: sh-sci: remove uneeded IS_ERR_OR_NULL
- calls
-In-Reply-To: <20170323191020.nrstp2cfh7cuqvf3@pengutronix.de>
-References: <CACRpkdZy_uguiKfSH-0gdanjr-xkwxoANTx6Fb2VwsvzRwcPRA@mail.gmail.com>
- <20170323101045.u3uigdu5xfwjmjc7@pengutronix.de>
- <CAMuHMdWDUzwUqrchbhh-TkE3J9Xg4TrwTF6HreikUcNNTf_ozQ@mail.gmail.com>
- <20170323111106.7ogh6g2oa3m4cqc6@pengutronix.de>
- <CAMuHMdUWybAZXc2RbGMGyp4DYQZU9BS8MxXKE5Kfd+aH8+w9sA@mail.gmail.com>
- <20170323123437.uqdwhfmmsjke3f7s@pengutronix.de>
- <CACRpkdZRfLh9RXRycW_cAxuTYE6tPd7LR32EkAW8y2fh=AxhXA@mail.gmail.com>
- <20170323144325.GA952@dtor-ws> <20170323154441.GA9460@dtor-ws>
- <20170323191020.nrstp2cfh7cuqvf3@pengutronix.de>
-Message-ID: <20170323195804.GA2502@dtor-ws>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Thu, 23 Mar 2017 21:01:43 +0100
+Subject: [PATCH v4 1/4] pinctrl: rockchip: remove unnecessary locking
+In-Reply-To: <20170323182910.GN10423@jcartwri.amer.corp.natinst.com>
+References: <20170323105931.10455-1-john@metanate.com>
+ <9002373.ugSBBElCUj@diego>
+ <20170323182910.GN10423@jcartwri.amer.corp.natinst.com>
+Message-ID: <3695399.LE2KsF2WZK@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 23, 2017 at 08:10:20PM +0100, Uwe Kleine-K?nig wrote:
-> On Thu, Mar 23, 2017 at 08:44:41AM -0700, Dmitry Torokhov wrote:
-> > On Thu, Mar 23, 2017 at 07:43:25AM -0700, Dmitry Torokhov wrote:
-> > > On Thu, Mar 23, 2017 at 02:41:53PM +0100, Linus Walleij wrote:
-> > > > On Thu, Mar 23, 2017 at 1:34 PM, Uwe Kleine-K?nig
-> > > > <u.kleine-koenig@pengutronix.de> wrote:
+Am Donnerstag, 23. M?rz 2017, 13:29:10 CET schrieb Julia Cartwright:
+> On Thu, Mar 23, 2017 at 06:55:50PM +0100, Heiko St?bner wrote:
+> > Am Donnerstag, 23. M?rz 2017, 17:51:53 CET schrieb John Keeping:
+> > > On Thu, 23 Mar 2017 11:10:20 -0500, Julia Cartwright wrote:
+> [..]
+> 
+> > > > [..]
 > > > > 
-> > > > > Maybe we can make gpiod_get_optional look like this:
-> > > > >
-> > > > >         if (!dev->of_node && isnt_a_acpi_device(dev) && !IS_ENABLED(GPIOLIB))
-> > > > >                 return NULL;
-> > > > >         else
-> > > > >                 return -ENOSYS;
-> > > > >
-> > > > > I don't know how isnt_a_acpi_device looks like, probably it involves
-> > > > > CONFIG_ACPI and/or dev->acpi_node.
-> > > > >
-> > > > > This should be safe and still comfortable for legacy platforms, isn't it?
+> > > > > @@ -1185,17 +1177,14 @@ static int rockchip_set_drive_perpin(struct
+> > > > > rockchip_pin_bank *bank,> >
+> > > > > 
+> > > > >  			rmask = BIT(15) | BIT(31);
+> > > > >  			data |= BIT(31);
+> > > > >  			ret = regmap_update_bits(regmap, reg, rmask, data);
+> > > > > 
+> > > > > -			if (ret) {
+> > > > > -				spin_unlock_irqrestore(&bank->slock, flags);
+> > > > > +			if (ret)
+> > > > > 
+> > > > >  				return ret;
+> > > > > 
+> > > > > -			}
+> > > > > 
+> > > > >  			rmask = 0x3 | (0x3 << 16);
+> > > > >  			temp |= (0x3 << 16);
+> > > > >  			reg += 0x4;
+> > > > >  			ret = regmap_update_bits(regmap, reg, rmask, temp);
 > > > > 
-> > > > I like the looks of this.
-> > > > 
-> > > > Can we revert Dmitry's patch and apply something like this instead?
-> > > > 
-> > > > Dmitry, how do you feel about this?
+> > > > Killing the lock here means the writes to to this pair of registers
+> > > > (reg
+> > > > and reg + 4) can be observed non-atomically.  Have you convinced
+> > > > yourself that this isn't a problem?
 > > > 
-> > > I frankly do not see the point. It still makes driver code more complex
-> 
-> Note that this code is in the gpio header, and not in driver code. So
-> the driver just does
-> 
-> 	gpiod = gpiod_get_optional(...)
-> 	if (IS_ERR(gpiod))
-> 		return PTR_ERR(gpiod);
-> 
-> (as it is supposed to do now). I think that's nice.
-
-Except that it breaks if !CONFIG_GPIOLIB which is legitimate config in
-many cases. Can I have a DT platform or ACPI platform that does not
-expose any GPIOs for kernel to control and thus want to disable GPIOLIB?
-I can't see why not.
-
-> 
-> > > for no good reason. I also think that not having optional GPIO is not an
-> > > error, so returning value from error space is not correct. NULL is value
-> > > from another space altogether.
-> 
-> It seems you didn't understand my concern.
-
-Likewise.
-
-> 
-> > > Uwe seems to be concerned about case that I find extremely unlikely. We
-> > > are talking about a system that does not have GPIO support and behaves
-> > > just fine, with the exception that it actually has (physically) a
-> > > *single* GPIO, and that GPIO happens to be optional in a single driver,
-> > > but in this particular system is actually needed (but that need
-> > > manifests in a non-obvious way). And we have system integrator that has
-> > > no idea what they are doing (no schematic, etc).
-> 
-> IMHO this is not an excuse to have lax error checking.
-
-IMO it is not an error altogether, so there is no lax checking.
-
-> 
-> > > I think that if there is one optional GPIO there will be mandatiry GPIOs
-> > > in such system as well and selection of GPIOLIB will be forced early on
-> > > in board bringup.
+> > > I called it out in v1 [1] since this bit is new since v4.4 where I
+> > > originally wrote this patch, and didn't get any comments about it.
+> > > 
+> > > I've convinced myself that removing the lock doesn't cause any problems
+> > > for writing to the hardware: if the lock would prevent writes
+> > > interleaving then it means that two callers are trying to write
+> > > different drive strengths to the same pin, and even with a lock here one
+> > > of them will end up with the wrong drive strength.
+> > > 
+> > > But it does mean that a read via rockchip_get_drive_perpin() may see an
+> > > inconsistent state.  I think adding a new lock specifically for this
+> > > particular drive strength bit is overkill and I can't find a scenario
+> > > where this will actually matter; any driver setting a pinctrl config
+> > > must already be doing something to avoid racing two configurations
+> > > against each other, mustn't it?
 > > 
-> > One more thing: if we keep reporting -ENOSYS in case of !CONFIG_GPIOLIB,
-> > then most of the non platform-sepcific drivers will eventually gain code
-> > silently coping with this -ENOSYS:
-> > 
-> > 	data->gpiod = gpiod_getptional(...);
-> > 	if (IS_ERR(data->gpiod)) {
-> > 		error = PTR_ERR(data->gpiod);
-> > 		if (error != -ENOSYS)
-> > 			return error;
-> > 
-> > 		data->gpiod = NULL; /* This GPIO _is_ optional */
+> > also, pins can normally only be requested once - see drivers complaining
+> > if
+> > one of their pins is already held by a different driver. So if you really
+> > end up with two things writing to the same drive strength bits, the
+> > driver holding the pins must be really messed up anyway :-)
 > 
-> Do you agree that this is wrong? Yes, it behaves right for most cases.
-> But there are cases where it behaves wrong and so it needs fixing.
+> My concern would be if two independent pins' drive strength
+> configuration would walk on each other, because they happen to be
+> configured via the same registers.
+> 
+> If that's not possible, then great!
 
-I think by now it should be obvious that I do not find it wrong. In fact
-that is what I, as a maintainer of drivers that supposed to work on
-multitude of platforms, will be forced to do, if the change to stop
-reporting -ENOSYS gets reverted. A generic driver has no way to know
-that kernel configuration or firmware configuration is wrong and should
-not be trusted (except for piling up horrendous DMI hacks in some
-cases on X86).
-
-Thanks.
-
--- 
-Dmitry
+ah sorry that we didn't make that clearer in the beginning, but no that also 
+isn't possible. The registers use a "hiword-mask" scheme, so on each write to 
+bit (x) the corresponding write-mask in bit (x+16) also needs to be set, so 
+the each write will always only affect bits enabled in that way.
