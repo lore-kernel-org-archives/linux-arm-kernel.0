@@ -1,38 +1,44 @@
-From: afzal.mohd.ma@gmail.com (afzal mohammed)
-Date: Thu, 23 Mar 2017 16:13:10 +0530
-Subject: [PATCH] ARM: nommu: access ID_PFR1 only if CPUID scheme
-In-Reply-To: <20170317164034.4036-1-afzal.mohd.ma@gmail.com>
-References: <20170317164034.4036-1-afzal.mohd.ma@gmail.com>
-Message-ID: <20170323104310.GA6941@afzalpc>
+From: peppe.cavallaro@st.com (Giuseppe CAVALLARO)
+Date: Thu, 23 Mar 2017 11:48:38 +0100
+Subject: stmmac: Performance regression after commit aff3d9eff843 "net:
+ stmmac: enable multiple buffers"
+In-Reply-To: <a7c928ec-e4e5-b618-d0d4-2a833be10d53@synopsys.com>
+References: <20170323100828.GC16625@Red>
+ <68200e05-04fd-1cc1-f6d6-f77e9e6f1d9d@synopsys.com>
+ <20170323102037.GD16625@Red>
+ <a7c928ec-e4e5-b618-d0d4-2a833be10d53@synopsys.com>
+Message-ID: <465dc72e-8a1f-b41f-105f-add2164df6d5@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello
 
-On Fri, Mar 17, 2017 at 10:10:34PM +0530, afzal mohammed wrote:
-> Greg upon trying to boot no-MMU Kernel on ARM926EJ reported boot
-> failure. He root caused it to ID_PFR1 access introduced by the
-> commit mentioned in the fixes tag below.
-> 
-> All CP15 processors need not have processor feature registers, only
-> for architectures defined by CPUID scheme would have it. Hence check
-> for it before accessing processor feature register, ID_PFR1.
-> 
-> Fixes: f8300a0b5de0 ("ARM: 8647/2: nommu: dynamic exception base address setting")
-> Reported-by: Greg Ungerer <gerg@uclinux.org>
-> Signed-off-by: afzal mohammed <afzal.mohd.ma@gmail.com>
+On 3/23/2017 11:20 AM, Corentin Labbe wrote:
+>> I have a 4.21 QoS Core with 4 RX + 4 TX and detected no regression.
+>> >Could you please share the iperf cmds you are using in order for me to reproduce
+>> >in my side?
 
-Greg, can i add your Tested-by ?
+Joao, you have a really powerful HW integration with multiple channels 
+for both RX and TX.
+Often this is not the same for other setup where, usually just a DMA0 is 
+present or, sometime, there
+is just one RX extra channel.
 
-Regards
-afzal
+My question is, what happens on this kind of configurations? Are we 
+still guarantying the best performances?
 
-> ---
-> 
-> Hi Russell,
-> 
-> It would be good to have the fix go in during -rc, as,
-> 
-> 1. Culprit commit went in during the last merge window
-> 2. Though nothing supported in mainline is known to be broken, the
->     original change needs to be modified to be reliable
+Also we have to guarantee, that the TSO and SG are always working. 
+Another point is the buffer sizes that
+can be different among platforms.
+
+The problem  below reported by Corentin push me to think that there is a 
+bug, so we should
+understand when this has been introduced and if likely fixed by some 
+configuration we are
+not take care right now.
+
+ndesc_get_rx_status: Oversized frame spanned multiple buffers"
+
+
+Best Regards
+Peppe
