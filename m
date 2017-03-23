@@ -1,103 +1,67 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Thu, 23 Mar 2017 19:56:19 +0900
-Subject: [PATCH v33 05/14] arm64: mm: allow for unmapping part of kernel
- mapping
-In-Reply-To: <CAKv+Gu9mJxOci7sW5iJFWaSmQz4N3SJkh+qwcFZ3ZmUpVywZQg@mail.gmail.com>
-References: <20170315095656.24992-1-takahiro.akashi@linaro.org>
- <20170315095941.25119-3-takahiro.akashi@linaro.org>
- <CAKv+Gu9mJxOci7sW5iJFWaSmQz4N3SJkh+qwcFZ3ZmUpVywZQg@mail.gmail.com>
-Message-ID: <20170323105618.GC17298@linaro.org>
+From: Joao.Pinto@synopsys.com (Joao Pinto)
+Date: Thu, 23 Mar 2017 10:54:48 +0000
+Subject: stmmac: Performance regression after commit aff3d9eff843 "net:
+ stmmac: enable multiple buffers"
+In-Reply-To: <465dc72e-8a1f-b41f-105f-add2164df6d5@st.com>
+References: <20170323100828.GC16625@Red>
+ <68200e05-04fd-1cc1-f6d6-f77e9e6f1d9d@synopsys.com>
+ <20170323102037.GD16625@Red>
+ <a7c928ec-e4e5-b618-d0d4-2a833be10d53@synopsys.com>
+ <465dc72e-8a1f-b41f-105f-add2164df6d5@st.com>
+Message-ID: <3df02ae0-f38a-9184-5ad7-d7afc9b51a97@synopsys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ard,
 
-On Tue, Mar 21, 2017 at 11:16:34AM +0000, Ard Biesheuvel wrote:
-> On 15 March 2017 at 09:59, AKASHI Takahiro <takahiro.akashi@linaro.org> wrote:
-> > create_pgd_mapping() is enhanced here so that it will accept
-> > PAGE_KERNEL_INVALID protection attribute and unmap a given range of memory.
-> >
-> > The feature will be used in a later kdump patch to implement the protection
-> > against possible corruption of crash dump kernel memory which is to be set
-> > aside from ther other memory on primary kernel.
-> >
-> > Note that, in this implementation, it assumes that all the range of memory
-> > to be processed is mapped in page-level since the only current user is
-> > kdump where page mappings are also required.
-> >
-> > Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+Hi Peppe,
+
+?s 10:48 AM de 3/23/2017, Giuseppe CAVALLARO escreveu:
+> Hello
 > 
-> Couldn't we use unmap_kernel_range() for this?
+> On 3/23/2017 11:20 AM, Corentin Labbe wrote:
+>>> I have a 4.21 QoS Core with 4 RX + 4 TX and detected no regression.
+>>> >Could you please share the iperf cmds you are using in order for me to
+>>> reproduce
+>>> >in my side?
+> 
+> Joao, you have a really powerful HW integration with multiple channels for both
+> RX and TX.
+> Often this is not the same for other setup where, usually just a DMA0 is present
+> or, sometime, there
+> is just one RX extra channel.
 
-I've almost forgotten this function, but my understanding is that
-this function (and map counterpart) is mainly for "VM area" (< PAGE_OFFSET).
-While it seems to (actually does) work instead of create_pgd_mapping() for now,
-I'm not sure whether it is an expected usage (now and future).
+My opinion is that we should not have problems, since the majority of features
+introduced are used if you configure rx queues > 1 or tx queues > 1, so if you
+use the default (=1) those confiogurations will not take place.
 
-So I think that it would be safe to keep using create_pgd_mapping().
+> 
+> My question is, what happens on this kind of configurations? Are we still
+> guarantying the best performances?
+> 
+> Also we have to guarantee, that the TSO and SG are always working. Another point
+> is the buffer sizes that
+> can be different among platforms.
+
+We have to pay attention to the RX buffer size, since I had problems with DHCP
+messages not being received because of little buffer size.
+Currently TX buffer size is not configurable and in the future it should be
+useful to include it too.
+
+> 
+> The problem  below reported by Corentin push me to think that there is a bug, so
+> we should
+> understand when this has been introduced and if likely fixed by some
+> configuration we are
+> not take care right now.
+
+Of course.
+
+> 
+> ndesc_get_rx_status: Oversized frame spanned multiple buffers"
+> 
+> 
+> Best Regards
+> Peppe
 
 Thanks,
--Takahiro AKASHI
-
-
-> > ---
-> >  arch/arm64/include/asm/pgtable-prot.h |  1 +
-> >  arch/arm64/mm/mmu.c                   | 17 +++++++++++------
-> >  2 files changed, 12 insertions(+), 6 deletions(-)
-> >
-> > diff --git a/arch/arm64/include/asm/pgtable-prot.h b/arch/arm64/include/asm/pgtable-prot.h
-> > index 2142c7726e76..945d84cd5df7 100644
-> > --- a/arch/arm64/include/asm/pgtable-prot.h
-> > +++ b/arch/arm64/include/asm/pgtable-prot.h
-> > @@ -54,6 +54,7 @@
-> >  #define PAGE_KERNEL_ROX                __pgprot(_PAGE_DEFAULT | PTE_UXN | PTE_DIRTY | PTE_RDONLY)
-> >  #define PAGE_KERNEL_EXEC       __pgprot(_PAGE_DEFAULT | PTE_UXN | PTE_DIRTY | PTE_WRITE)
-> >  #define PAGE_KERNEL_EXEC_CONT  __pgprot(_PAGE_DEFAULT | PTE_UXN | PTE_DIRTY | PTE_WRITE | PTE_CONT)
-> > +#define PAGE_KERNEL_INVALID    __pgprot(0)
-> >
-> >  #define PAGE_HYP               __pgprot(_PAGE_DEFAULT | PTE_HYP | PTE_HYP_XN)
-> >  #define PAGE_HYP_EXEC          __pgprot(_PAGE_DEFAULT | PTE_HYP | PTE_RDONLY)
-> > diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-> > index d28dbcf596b6..cb359a3927ef 100644
-> > --- a/arch/arm64/mm/mmu.c
-> > +++ b/arch/arm64/mm/mmu.c
-> > @@ -128,7 +128,10 @@ static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
-> >         do {
-> >                 pte_t old_pte = *pte;
-> >
-> > -               set_pte(pte, pfn_pte(pfn, prot));
-> > +               if (pgprot_val(prot))
-> > +                       set_pte(pte, pfn_pte(pfn, prot));
-> > +               else
-> > +                       pte_clear(null, null, pte);
-> >                 pfn++;
-> >
-> >                 /*
-> > @@ -309,12 +312,14 @@ static void __init create_mapping_noalloc(phys_addr_t phys, unsigned long virt,
-> >         __create_pgd_mapping(init_mm.pgd, phys, virt, size, prot, NULL, false);
-> >  }
-> >
-> > -void __init create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
-> > -                              unsigned long virt, phys_addr_t size,
-> > -                              pgprot_t prot, bool page_mappings_only)
-> > +/*
-> > + * Note that PAGE_KERNEL_INVALID should be used with page_mappings_only
-> > + * true for now.
-> > + */
-> > +void create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
-> > +                       unsigned long virt, phys_addr_t size,
-> > +                       pgprot_t prot, bool page_mappings_only)
-> >  {
-> > -       BUG_ON(mm == &init_mm);
-> > -
-> >         __create_pgd_mapping(mm->pgd, phys, virt, size, prot,
-> >                              pgd_pgtable_alloc, page_mappings_only);
-> >  }
-> > --
-> > 2.11.1
-> >
-> >
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Joao
