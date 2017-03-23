@@ -1,91 +1,56 @@
-From: adrian.hunter@intel.com (Adrian Hunter)
-Date: Thu, 23 Mar 2017 09:03:43 +0200
-Subject: [v2, 4/7] mmc: sdhci: add a quirk to restore delay in tuning
-In-Reply-To: <1488529129-23560-5-git-send-email-yangbo.lu@nxp.com>
-References: <1488529129-23560-1-git-send-email-yangbo.lu@nxp.com>
- <1488529129-23560-5-git-send-email-yangbo.lu@nxp.com>
-Message-ID: <878da006-5b83-a9d9-6136-07d8f07ea65f@intel.com>
+From: patrice.chotard@st.com (Patrice CHOTARD)
+Date: Thu, 23 Mar 2017 07:56:27 +0000
+Subject: [PATCH 1/1] tty: serial: st-asc: Make the locking RT aware
+In-Reply-To: <1490202751-16581-1-git-send-email-lionel.debieve@st.com>
+References: <1490202751-16581-1-git-send-email-lionel.debieve@st.com>
+Message-ID: <d592cad0-1509-4eec-1012-7af17f9e577c@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/03/17 10:18, Yangbo Lu wrote:
-> There was a mdelay between tuning cycles which is removed since
-> eMMC spec didn't require that. However it's observed that eSDHC
-> needed this delay for HS200 successful tuning. Maybe it's also
-> needed for some other controllers. This patch is to add a quirk
-> to fix it.
-> 
-> Fixes: 197160d52e85 ("mmc: sdhci: remove mdelay in eMMC tuning")
-> Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
+Hi Lionel
+
+On 03/22/2017 06:12 PM, Lionel Debieve wrote:
+> The lock is a sleeping lock and local_irq_save() is not the
+> standard implementation now. Working for both -RT and non
+> RT.
+>
+> Signed-off-by: Lionel Debieve <lionel.debieve@st.com>
+
+Acked-by: Patrice Chotard <patrice.chotard@st.com>
+
+
 > ---
-
-I would prefer to do something like this:
-
----
-From: Adrian Hunter <adrian.hunter@intel.com>
-Date: Thu, 23 Mar 2017 08:54:06 +0200
-Subject: [PATCH] mmc: sdhci: Control the delay between tuning commands
-
-The delay between tuning commands for SD cards is not part of the
-specification. A driver that needs it probably needs it for eMMC too,
-whereas most drivers would probably like to set it to 0. Make it a
-host member (host->tuning_delay) that defaults to the existing behaviour.
-Drivers can set it to zero to eliminate the delay, or set it to a positive
-value to always have a delay.
-
-Signed-off-by: Adrian Hunter <adrian.hunter@intel.com>
----
- drivers/mmc/host/sdhci.c | 11 ++++++++---
- drivers/mmc/host/sdhci.h |  1 +
- 2 files changed, 9 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
-index a33102fc800b..2fc33485df1d 100644
---- a/drivers/mmc/host/sdhci.c
-+++ b/drivers/mmc/host/sdhci.c
-@@ -2100,9 +2100,9 @@ static void __sdhci_execute_tuning(struct sdhci_host *host, u32 opcode)
- 			break;
- 		}
- 
--		/* eMMC spec does not require a delay between tuning cycles */
--		if (opcode == MMC_SEND_TUNING_BLOCK)
--			mdelay(1);
-+		/* Spec does not require a delay between tuning cycles */
-+		if (host->tuning_delay > 0)
-+			mdelay(host->tuning_delay);
- 	}
- 
- 	pr_info("%s: Tuning failed, falling back to fixed sampling clock\n",
-@@ -2164,6 +2164,9 @@ int sdhci_execute_tuning(struct mmc_host *mmc, u32 opcode)
- 
- 	host->mmc->retune_period = tuning_count;
- 
-+	if (host->tuning_delay < 0)
-+		host->tuning_delay = opcode == MMC_SEND_TUNING_BLOCK;
-+
- 	sdhci_start_tuning(host);
- 
- 	__sdhci_execute_tuning(host, opcode);
-@@ -3108,6 +3111,8 @@ struct sdhci_host *sdhci_alloc_host(struct device *dev,
- 	host->cqe_ier     = SDHCI_CQE_INT_MASK;
- 	host->cqe_err_ier = SDHCI_CQE_INT_ERR_MASK;
- 
-+	host->tuning_delay = -1;
-+
- 	return host;
- }
- 
-diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h
-index 35b41da0a636..b0f416fc9548 100644
---- a/drivers/mmc/host/sdhci.h
-+++ b/drivers/mmc/host/sdhci.h
-@@ -538,6 +538,7 @@ struct sdhci_host {
- #define SDHCI_TUNING_MODE_1	0
- #define SDHCI_TUNING_MODE_2	1
- #define SDHCI_TUNING_MODE_3	2
-+	int			tuning_delay;	/* Delay (ms) between tuning commands */
- 
- 	unsigned long private[0] ____cacheline_aligned;
- };
--- 
-1.9.1
+>  drivers/tty/serial/st-asc.c | 8 +++-----
+>  1 file changed, 3 insertions(+), 5 deletions(-)
+>
+> diff --git a/drivers/tty/serial/st-asc.c b/drivers/tty/serial/st-asc.c
+> index c334bcc..4889396 100644
+> --- a/drivers/tty/serial/st-asc.c
+> +++ b/drivers/tty/serial/st-asc.c
+> @@ -887,13 +887,12 @@ static void asc_console_write(struct console *co, const char *s, unsigned count)
+>  	int locked = 1;
+>  	u32 intenable;
+>
+> -	local_irq_save(flags);
+>  	if (port->sysrq)
+>  		locked = 0; /* asc_interrupt has already claimed the lock */
+>  	else if (oops_in_progress)
+> -		locked = spin_trylock(&port->lock);
+> +		locked = spin_trylock_irqsave(&port->lock, flags);
+>  	else
+> -		spin_lock(&port->lock);
+> +		spin_lock_irqsave(&port->lock, flags);
+>
+>  	/*
+>  	 * Disable interrupts so we don't get the IRQ line bouncing
+> @@ -911,8 +910,7 @@ static void asc_console_write(struct console *co, const char *s, unsigned count)
+>  	asc_out(port, ASC_INTEN, intenable);
+>
+>  	if (locked)
+> -		spin_unlock(&port->lock);
+> -	local_irq_restore(flags);
+> +		spin_unlock_irqrestore(&port->lock, flags);
+>  }
+>
+>  static int asc_console_setup(struct console *co, char *options)
+>
