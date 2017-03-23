@@ -1,62 +1,99 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 23 Mar 2017 12:07:26 +0000
-Subject: [RFC PATCH v2 21/41] arm64/sve: Enable SVE on demand for userspace
-In-Reply-To: <20170323115227.GD9287@leverpostej>
+Date: Thu, 23 Mar 2017 12:10:17 +0000
+Subject: [RFC PATCH v2 28/41] arm64: KVM: Treat SVE use by guests as
+ undefined instruction execution
+In-Reply-To: <20170322170658.GF19950@leverpostej>
 References: <1490194274-30569-1-git-send-email-Dave.Martin@arm.com>
- <1490194274-30569-22-git-send-email-Dave.Martin@arm.com>
- <20170322164809.GC19950@leverpostej>
- <20170323112404.GC3750@e103592.cambridge.arm.com>
- <98bf1730-7579-d9f9-37c0-75ccfc29087b@arm.com>
- <20170323115227.GD9287@leverpostej>
-Message-ID: <20170323120726.GF3750@e103592.cambridge.arm.com>
+ <1490194274-30569-29-git-send-email-Dave.Martin@arm.com>
+ <20170322170658.GF19950@leverpostej>
+Message-ID: <20170323121016.GG3750@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 23, 2017 at 11:52:27AM +0000, Mark Rutland wrote:
-> On Thu, Mar 23, 2017 at 11:30:16AM +0000, Suzuki K Poulose wrote:
-> > On 23/03/17 11:24, Dave Martin wrote:
-> > >On Wed, Mar 22, 2017 at 04:48:10PM +0000, Mark Rutland wrote:
+On Wed, Mar 22, 2017 at 05:06:58PM +0000, Mark Rutland wrote:
+> Hi,
 > 
-> > >>>+	asm ("mrs %0, cpacr_el1" : "=r" (tmp));
-> > >>>+	asm volatile ("msr cpacr_el1, %0" :: "r" (tmp | (1 << 17)));
-> 
-> > >>Please also use {read,write}_sysreg(), e.g.
-> > >
-> > >TBH, I was confused about the status of these macros at the time I
-> > >wrote this code.
-> > >
-> > >The naming clash with the cpufeature functions is unfortunate.  In my
-> > >head these names all became associated with "do something behind the
-> > >scenes that may or may not really read the underlying system reg".
-> > >
-> > >Would it be reasonable to rename read_system_reg() to something more
-> > >different, like read_kernel_sysreg(), read_system_id(),
-> > >read_sanitised_id_reg(), etc.?
+> On Wed, Mar 22, 2017 at 02:50:58PM +0000, Dave Martin wrote:
+> > We don't currently support context-switching of Scalable Vector
+> > Extension context between vcpus, and the SVE access exception is
+> > thus left masked by default at EL2 when running a vcpu.
 > > 
-> > I agree. read_system_reg() is not quite obvious name given all the other
-> > similar names. We could go with either read_sanitised_id_reg() or read_system_safe_reg() ?
+> > However, there's nothing to stop a guest trying to use SVE.  If it
+> > does, we'll get an SVE access exception to EL2 which will cause KVM
+> > to panic since this exception isn't yet recognised.
+> > 
+> > This patch adds knowledge to KVM about the SVE access exception,
+> > translating it into an undefined instruction exception injected to
+> > the vcpu.
+> > 
+> > This prevents a malicious guest from panicking the host by
+> > attempted SVE use.
+> > 
+> > SVE-enabled guests will still not work properly for now, but they
+> > won't take the host down.
+> > 
+> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> > ---
+> >  arch/arm64/kvm/handle_exit.c | 8 ++++++++
+> >  1 file changed, 8 insertions(+)
 > 
-> I think read_sanitised_id_reg() sounds best, since "safe" cound mean a
-> few things, and having "id" in the name makes it clear that it's not a
-> general purpose sysreg accessor.
+> As a heads-up, this is handled implicitly by kvm_handle_unknown_ec()
+> since commit ba4dd156eabdca93 ("arm64: KVM: Survive unknown traps from
+> guests"). That also logs a (ratelimited) warning regarding the
+> unimplemented trap handling.
+> 
+> Given that, I think we can drop this patch until actual support lands.
 
-OK, I'll write a separate patch proposing that.
+Agreed.
 
-Are we comfortable with _id_ in the name here?
+I wasn't sure that we wanted the verbose printks for this case, but since guests using SVE are currently broken it's better to have it.
 
-My logic was that sanitisation makes no sense for anything except
-read-only ID registers, and _system_ sounds too universal.
-
-
-There is a sting in the tail here -- I add ZCR as an "id" reg so that we
-can treat the maximum configurable length in the LEN field as if it were
-an ID field.  See patch 38 (apologies Suzuki, missed your CC).
-
-In fact, ZCR is neither read-only nor an ID register -- but the view of
-it through cpufeatures does have those properties.
-
-It might be better to rename it, but I considered it an OK compromise.
-Let me know if you have concerns.
+I'll drop this pending proper KVM support.
 
 Cheers
 ---Dave
+
+> 
+> Thanks,
+> Mark.
+> 
+> > 
+> > diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
+> > index fa1b18e..e43b147 100644
+> > --- a/arch/arm64/kvm/handle_exit.c
+> > +++ b/arch/arm64/kvm/handle_exit.c
+> > @@ -146,6 +146,13 @@ static int kvm_handle_unknown_ec(struct kvm_vcpu *vcpu, struct kvm_run *run)
+> >  	return 1;
+> >  }
+> >  
+> > +static int handle_sve(struct kvm_vcpu *vcpu, struct kvm_run *run)
+> > +{
+> > +	/* Until SVE is supported for guests: */
+> > +	kvm_inject_undefined(vcpu);
+> > +	return 1;
+> > +}
+> > +
+> >  static exit_handle_fn arm_exit_handlers[] = {
+> >  	[0 ... ESR_ELx_EC_MAX]	= kvm_handle_unknown_ec,
+> >  	[ESR_ELx_EC_WFx]	= kvm_handle_wfx,
+> > @@ -159,6 +166,7 @@ static exit_handle_fn arm_exit_handlers[] = {
+> >  	[ESR_ELx_EC_HVC64]	= handle_hvc,
+> >  	[ESR_ELx_EC_SMC64]	= handle_smc,
+> >  	[ESR_ELx_EC_SYS64]	= kvm_handle_sys_reg,
+> > +	[ESR_ELx_EC_SVE]	= handle_sve,
+> >  	[ESR_ELx_EC_IABT_LOW]	= kvm_handle_guest_abort,
+> >  	[ESR_ELx_EC_DABT_LOW]	= kvm_handle_guest_abort,
+> >  	[ESR_ELx_EC_SOFTSTP_LOW]= kvm_handle_guest_debug,
+> > -- 
+> > 2.1.4
+> > 
+> > 
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
