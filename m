@@ -1,2222 +1,938 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 23 Mar 2017 17:03:04 -0400
-Subject: [PATCH 3/3] minitty: minimal TTY support replacement for serial ports
-In-Reply-To: <20170323210304.2181-1-nicolas.pitre@linaro.org>
-References: <20170323210304.2181-1-nicolas.pitre@linaro.org>
-Message-ID: <20170323210304.2181-4-nicolas.pitre@linaro.org>
+From: agustinv@codeaurora.org (Agustin Vega-Frias)
+Date: Thu, 23 Mar 2017 17:03:17 -0400
+Subject: [PATCH V5] perf: qcom: Add L3 cache PMU driver
+Message-ID: <1490302997-28640-1-git-send-email-agustinv@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a minimal TTY layer replacement for embedded systems with limited
-capabilities. This supports only serial ports, supports only a subset of
-the default line discipline, and dispense with anything that is of no use
-for a small embedded system.
+This adds a new dynamic PMU to the Perf Events framework to program
+and control the L3 cache PMUs in some Qualcomm Technologies SOCs.
 
-Signed-off-by: Nicolas Pitre <nico@linaro.org>
+The driver supports a distributed cache architecture where the overall
+cache for a socket is comprised of multiple slices each with its own PMU.
+Access to each individual PMU is provided even though all CPUs share all
+the slices. User space needs to aggregate to individual counts to provide
+a global picture.
+
+The driver exports formatting and event information to sysfs so it can
+be used by the perf user space tools with the syntaxes:
+   perf stat -a -e l3cache_0_0/read-miss/
+   perf stat -a -e l3cache_0_0/event=0x21/
+
+Signed-off-by: Agustin Vega-Frias <agustinv@codeaurora.org>
 ---
- drivers/tty/Kconfig                                |   10 +-
- drivers/tty/Makefile                               |    1 +
- drivers/tty/serial/Kconfig                         |   12 +-
- drivers/tty/serial/Makefile                        |    3 +
- .../tty/serial/{serial_core.c => fulltty_serial.c} |    0
- drivers/tty/serial/minitty_serial.c                | 2091 ++++++++++++++++++++
- include/linux/tty_flip.h                           |    4 +
- 7 files changed, 2116 insertions(+), 5 deletions(-)
- rename drivers/tty/serial/{serial_core.c => fulltty_serial.c} (100%)
- create mode 100644 drivers/tty/serial/minitty_serial.c
+ Documentation/perf/qcom_l3_pmu.txt |  25 ++
+ drivers/perf/Kconfig               |  10 +
+ drivers/perf/Makefile              |   1 +
+ drivers/perf/qcom_l3_pmu.c         | 824 +++++++++++++++++++++++++++++++++++++
+ include/linux/cpuhotplug.h         |   1 +
+ 5 files changed, 861 insertions(+)
+ create mode 100644 Documentation/perf/qcom_l3_pmu.txt
+ create mode 100644 drivers/perf/qcom_l3_pmu.c
 
-diff --git a/drivers/tty/Kconfig b/drivers/tty/Kconfig
-index 95103054c0..8517c353d8 100644
---- a/drivers/tty/Kconfig
-+++ b/drivers/tty/Kconfig
-@@ -2,10 +2,12 @@ config TTY
- 	bool "Enable TTY" if EXPERT
- 	default y
- 	---help---
--	  Allows you to remove TTY support which can save space, and
--	  blocks features that require TTY from inclusion in the kernel.
--	  TTY is required for any text terminals or serial port
--	  communication. Most users should leave this enabled.
-+	  Allows you to remove the full-featured TTY support which can save
-+	  space, and blocks features that require it from inclusion in the
-+	  kernel. TTY support is required for any text terminals or serial
-+	  port communication. If turned off, a much smaller TTY implementation
-+	  that only supports serial ports in a limited capacity may be
-+	  selected instead. Most users should leave this enabled.
- 
- if TTY
- 
-diff --git a/drivers/tty/Makefile b/drivers/tty/Makefile
-index 1461be6b90..9b7b3418cd 100644
---- a/drivers/tty/Makefile
-+++ b/drivers/tty/Makefile
-@@ -1,5 +1,6 @@
- obj-$(CONFIG_TTY)		+= tty_io.o n_tty.o tty_ioctl.o tty_ldisc.o \
- 				   tty_buffer.o tty_port.o tty_mutex.o tty_ldsem.o tty_baudrate.o
-+obj-$(CONFIG_MINITTY_SERIAL)	+= tty_baudrate.o
- obj-$(CONFIG_LEGACY_PTYS)	+= pty.o
- obj-$(CONFIG_UNIX98_PTYS)	+= pty.o
- obj-$(CONFIG_AUDIT)		+= tty_audit.o
-diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
-index 6117ac8da4..a552387a39 100644
---- a/drivers/tty/serial/Kconfig
-+++ b/drivers/tty/serial/Kconfig
-@@ -2,7 +2,17 @@
- # Serial device configuration
- #
- 
--if TTY
-+config MINITTY_SERIAL
-+	bool "Enable mini TTY for serial ports"
-+	depends on !TTY
-+	default y
-+	help
-+	  This enables a much smaller TTY implementation that only supports
-+	  serial ports in a limited capacity. This is however sufficient for
-+	  many embedded use cases that use serial ports mainly as a debug
-+	  console where the saving in kernel code size is welcome.
-+
-+if TTY || MINITTY_SERIAL
- 
- menu "Serial drivers"
- 	depends on HAS_IOMEM
-diff --git a/drivers/tty/serial/Makefile b/drivers/tty/serial/Makefile
-index 2d6288bc45..970af02c86 100644
---- a/drivers/tty/serial/Makefile
-+++ b/drivers/tty/serial/Makefile
-@@ -2,7 +2,10 @@
- # Makefile for the kernel serial device drivers.
- #
- 
-+serial_core-$(CONFIG_TTY) := fulltty_serial.o
-+serial_core-$(CONFIG_MINITTY_SERIAL) := minitty_serial.o
- obj-$(CONFIG_SERIAL_CORE) += serial_core.o
-+
- obj-$(CONFIG_SERIAL_21285) += 21285.o
- 
- obj-$(CONFIG_SERIAL_EARLYCON) += earlycon.o
-diff --git a/drivers/tty/serial/serial_core.c b/drivers/tty/serial/fulltty_serial.c
-similarity index 100%
-rename from drivers/tty/serial/serial_core.c
-rename to drivers/tty/serial/fulltty_serial.c
-diff --git a/drivers/tty/serial/minitty_serial.c b/drivers/tty/serial/minitty_serial.c
+diff --git a/Documentation/perf/qcom_l3_pmu.txt b/Documentation/perf/qcom_l3_pmu.txt
 new file mode 100644
-index 0000000000..c8e91b2c54
+index 0000000..96b3a94
 --- /dev/null
-+++ b/drivers/tty/serial/minitty_serial.c
-@@ -0,0 +1,2091 @@
++++ b/Documentation/perf/qcom_l3_pmu.txt
+@@ -0,0 +1,25 @@
++Qualcomm Datacenter Technologies L3 Cache Performance Monitoring Unit (PMU)
++===========================================================================
++
++This driver supports the L3 cache PMUs found in Qualcomm Datacenter Technologies
++Centriq SoCs. The L3 cache on these SOCs is composed of multiple slices, shared
++by all cores within a socket. Each slice is exposed as a separate uncore perf
++PMU with device name l3cache_<socket>_<instance>. User space is responsible
++for aggregating across slices.
++
++The driver provides a description of its available events and configuration
++options in sysfs, see /sys/devices/l3cache*. Given that these are uncore PMUs
++the driver also exposes a "cpumask" sysfs attribute which contains a mask
++consisting of one CPU per socket which will be used to handle all the PMU
++events on that socket.
++
++The hardware implements 32bit event counters and has a flat 8bit event space
++exposed via the "event" format attribute. In addition to the 32bit physical
++counters the driver supports virtual 64bit hardware counters by using hardware
++counter chaining. This feature is exposed via the "lc" (long counter) format
++flag. E.g.:
++
++  perf stat -e l3cache_0_0/read-miss,lc/
++
++Given that these are uncore PMUs the driver does not support sampling, therefore
++"perf record" will not work. Per-task perf sessions are not supported.
+diff --git a/drivers/perf/Kconfig b/drivers/perf/Kconfig
+index 9365190..c436e0d 100644
+--- a/drivers/perf/Kconfig
++++ b/drivers/perf/Kconfig
+@@ -21,6 +21,16 @@ config QCOM_L2_PMU
+ 	  Adds the L2 cache PMU into the perf events subsystem for
+ 	  monitoring L2 cache events.
+ 
++config QCOM_L3_PMU
++	bool "Qualcomm Technologies L3-cache PMU"
++	depends on ARCH_QCOM && ARM64 && PERF_EVENTS && ACPI
++	select QCOM_IRQ_COMBINER
++	help
++	   Provides support for the L3 cache performance monitor unit (PMU)
++	   in Qualcomm Technologies processors.
++	   Adds the L3 cache PMU into the perf events subsystem for
++	   monitoring L3 cache events.
++
+ config XGENE_PMU
+         depends on PERF_EVENTS && ARCH_XGENE
+         bool "APM X-Gene SoC PMU"
+diff --git a/drivers/perf/Makefile b/drivers/perf/Makefile
+index ef24833..ef0c6b2 100644
+--- a/drivers/perf/Makefile
++++ b/drivers/perf/Makefile
+@@ -1,3 +1,4 @@
+ obj-$(CONFIG_ARM_PMU) += arm_pmu.o
+ obj-$(CONFIG_QCOM_L2_PMU)	+= qcom_l2_pmu.o
++obj-$(CONFIG_QCOM_L3_PMU) += qcom_l3_pmu.o
+ obj-$(CONFIG_XGENE_PMU) += xgene_pmu.o
+diff --git a/drivers/perf/qcom_l3_pmu.c b/drivers/perf/qcom_l3_pmu.c
+new file mode 100644
+index 0000000..176dc30
+--- /dev/null
++++ b/drivers/perf/qcom_l3_pmu.c
+@@ -0,0 +1,824 @@
 +/*
-+ * Smallest shortcut replacement for tty and serial core layers.
++ * Driver for the L3 cache PMUs in Qualcomm Technologies chips.
 + *
-+ * Based mainly on tty_io.c, n_tty.c and serial_core.c from many smart people.
++ * The driver supports a distributed cache architecture where the overall
++ * cache for a socket is comprised of multiple slices each with its own PMU.
++ * Access to each individual PMU is provided even though all CPUs share all
++ * the slices. User space needs to aggregate to individual counts to provide
++ * a global picture.
 + *
-+ * Created by:  Nicolas Pitre, January 2017
-+ * Copyright:   (C) 2017  Linaro Limited
++ * See Documentation/perf/qcom_l3_pmu.txt for more details.
++ *
++ * Copyright (c) 2015-2017, The Linux Foundation. All rights reserved.
 + *
 + * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
++ * it under the terms of the GNU General Public License version 2 and
++ * only version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
 + */
 +
-+#include <linux/init.h>
++#include <linux/acpi.h>
++#include <linux/bitops.h>
++#include <linux/interrupt.h>
++#include <linux/io.h>
++#include <linux/list.h>
 +#include <linux/module.h>
-+#include <linux/tty.h>
-+#include <linux/tty_flip.h>
-+#include <linux/ctype.h>
-+#include <linux/console.h>
-+#include <linux/of.h>
-+#include <linux/delay.h>
-+#include <linux/device.h>
-+#include <linux/errno.h>
-+#include <linux/mutex.h>
-+#include <linux/poll.h>
-+#include <linux/sched.h>
-+#include <linux/sched/signal.h>
-+#include <linux/serial_core.h>
-+#include <linux/signal.h>
-+#include <linux/slab.h>
-+#include <linux/uaccess.h>
++#include <linux/perf_event.h>
++#include <linux/platform_device.h>
 +
-+struct minitty_data {
-+	struct uart_state state;
-+	struct ktermios termios;
-+	struct mutex mutex;
-+	unsigned char *rx_buf;
-+	int rx_head, rx_vetted, rx_tail;
-+	int rx_lines, column, canon_start_pos;
-+	bool rx_raw;
-+	bool rx_overflow;
-+	wait_queue_head_t write_wait;
-+	wait_queue_head_t read_wait;
-+	struct work_struct rx_work;
-+	struct cdev cdev;
-+	struct device *dev;
-+	int usecount;
++/*
++ * General constants
++ */
++
++/* Number of counters on each PMU */
++#define L3_NUM_COUNTERS  8
++/* Mask for the event type field within perf_event_attr.config and EVTYPE reg */
++#define L3_EVTYPE_MASK   0xFF
++/*
++ * Bit position of the 'long counter' flag within perf_event_attr.config.
++ * Reserve some space between the event type and this flag to allow expansion
++ * in the event type field.
++ */
++#define L3_EVENT_LC_BIT  32
++
++/*
++ * Register offsets
++ */
++
++/* Perfmon registers */
++#define L3_HML3_PM_CR       0x000
++#define L3_HML3_PM_EVCNTR(__cntr) (0x420 + ((__cntr) & 0x7) * 8)
++#define L3_HML3_PM_CNTCTL(__cntr) (0x120 + ((__cntr) & 0x7) * 8)
++#define L3_HML3_PM_EVTYPE(__cntr) (0x220 + ((__cntr) & 0x7) * 8)
++#define L3_HML3_PM_FILTRA   0x300
++#define L3_HML3_PM_FILTRB   0x308
++#define L3_HML3_PM_FILTRC   0x310
++#define L3_HML3_PM_FILTRAM  0x304
++#define L3_HML3_PM_FILTRBM  0x30C
++#define L3_HML3_PM_FILTRCM  0x314
++
++/* Basic counter registers */
++#define L3_M_BC_CR         0x500
++#define L3_M_BC_SATROLL_CR 0x504
++#define L3_M_BC_CNTENSET   0x508
++#define L3_M_BC_CNTENCLR   0x50C
++#define L3_M_BC_INTENSET   0x510
++#define L3_M_BC_INTENCLR   0x514
++#define L3_M_BC_GANG       0x718
++#define L3_M_BC_OVSR       0x740
++#define L3_M_BC_IRQCTL     0x96C
++
++/*
++ * Bit field definitions
++ */
++
++/* L3_HML3_PM_CR */
++#define PM_CR_RESET           (0)
++
++/* L3_HML3_PM_XCNTCTL/L3_HML3_PM_CNTCTLx */
++#define PMCNT_RESET           (0)
++
++/* L3_HML3_PM_EVTYPEx */
++#define EVSEL(__val)          ((__val) & L3_EVTYPE_MASK)
++
++/* Reset value for all the filter registers */
++#define PM_FLTR_RESET         (0)
++
++/* L3_M_BC_CR */
++#define BC_RESET              (1UL << 1)
++#define BC_ENABLE             (1UL << 0)
++
++/* L3_M_BC_SATROLL_CR */
++#define BC_SATROLL_CR_RESET   (0)
++
++/* L3_M_BC_CNTENSET */
++#define PMCNTENSET(__cntr)    (1UL << ((__cntr) & 0x7))
++
++/* L3_M_BC_CNTENCLR */
++#define PMCNTENCLR(__cntr)    (1UL << ((__cntr) & 0x7))
++#define BC_CNTENCLR_RESET     (0xFF)
++
++/* L3_M_BC_INTENSET */
++#define PMINTENSET(__cntr)    (1UL << ((__cntr) & 0x7))
++
++/* L3_M_BC_INTENCLR */
++#define PMINTENCLR(__cntr)    (1UL << ((__cntr) & 0x7))
++#define BC_INTENCLR_RESET     (0xFF)
++
++/* L3_M_BC_GANG */
++#define GANG_EN(__cntr)       (1UL << ((__cntr) & 0x7))
++#define BC_GANG_RESET         (0)
++
++/* L3_M_BC_OVSR */
++#define PMOVSRCLR(__cntr)     (1UL << ((__cntr) & 0x7))
++#define PMOVSRCLR_RESET       (0xFF)
++
++/* L3_M_BC_IRQCTL */
++#define PMIRQONMSBEN(__cntr)  (1UL << ((__cntr) & 0x7))
++#define BC_IRQCTL_RESET       (0x0)
++
++/*
++ * Events
++ */
++
++#define L3_EVENT_CYCLES		0x01
++#define L3_EVENT_READ_HIT		0x20
++#define L3_EVENT_READ_MISS		0x21
++#define L3_EVENT_READ_HIT_D		0x22
++#define L3_EVENT_READ_MISS_D		0x23
++#define L3_EVENT_WRITE_HIT		0x24
++#define L3_EVENT_WRITE_MISS		0x25
++
++/*
++ * Decoding of settings from perf_event_attr
++ *
++ * The config format for perf events is:
++ * - config: bits 0-7: event type
++ *           bit  32:  HW counter size requested, 0: 32 bits, 1: 64 bits
++ */
++static inline u32 get_event_type(struct perf_event *event)
++{
++	return (event->attr.config) & L3_EVTYPE_MASK;
++}
++
++static inline bool event_uses_long_counter(struct perf_event *event)
++{
++	return !!(event->attr.config & BIT_ULL(L3_EVENT_LC_BIT));
++}
++
++/*
++ * Main PMU, inherits from the core perf PMU type
++ */
++struct l3cache_pmu {
++	struct pmu		pmu;
++	struct hlist_node	node;
++	void __iomem		*regs;
++	struct perf_event	*events[L3_NUM_COUNTERS];
++	unsigned long		used_mask[BITS_TO_LONGS(L3_NUM_COUNTERS)];
++	cpumask_t		cpumask;
 +};
 +
-+#define RX_BUF_SIZE PAGE_SIZE
-+#define RX_BUF_WRAP(x) ((x) & (RX_BUF_SIZE - 1))
++#define to_l3cache_pmu(p) (container_of(p, struct l3cache_pmu, pmu))
 +
 +/*
-+ * Functions called back by low level UART drivers when
-+ * the TX buffer is getting near empty.
++ * Type used to group hardware counter operations
++ *
++ * Used to implement two types of hardware counters, standard (32bits) and
++ * long (64bits). The hardware supports counter chaining which we use to
++ * implement long counters. This support is exposed via the 'lc' flag field
++ * in perf_event_attr.config.
 + */
-+void uart_write_wakeup(struct uart_port *port)
-+{
-+	struct uart_state *state = port->state;
-+	struct minitty_data *mtty = container_of(state, typeof(*mtty), state);
-+
-+	wake_up_interruptible_poll(&mtty->write_wait, POLLOUT);
-+}
-+EXPORT_SYMBOL(uart_write_wakeup);
-+
-+static void
-+uart_update_mctrl(struct uart_port *port, unsigned int set, unsigned int clear)
-+{
-+	unsigned long flags;
-+	unsigned int old;
-+
-+	spin_lock_irqsave(&port->lock, flags);
-+	old = port->mctrl;
-+	port->mctrl = (old & ~clear) | set;
-+	if (old != port->mctrl)
-+		port->ops->set_mctrl(port, port->mctrl);
-+	spin_unlock_irqrestore(&port->lock, flags);
-+}
-+
-+#define uart_set_mctrl(port, set)	uart_update_mctrl(port, set, 0)
-+#define uart_clear_mctrl(port, clear)	uart_update_mctrl(port, 0, clear)
-+
-+static void uart_change_pm(struct uart_state *state,
-+			   enum uart_pm_state pm_state)
-+{
-+	struct uart_port *port =state->uart_port; 
-+
-+	if (state->pm_state != pm_state) {
-+		if (port && port->ops->pm)
-+			port->ops->pm(port, pm_state, state->pm_state);
-+		state->pm_state = pm_state;
-+	}
-+}
-+
-+int uart_suspend_port(struct uart_driver *drv, struct uart_port *port)
-+{
-+	return -EPROTONOSUPPORT;
-+}
-+EXPORT_SYMBOL(uart_suspend_port);
-+
-+int uart_resume_port(struct uart_driver *drv, struct uart_port *port)
-+{
-+	return -EPROTONOSUPPORT;
-+}
-+EXPORT_SYMBOL(uart_resume_port);
++struct l3cache_event_ops {
++	/* Called to start event monitoring */
++	void (*start)(struct perf_event *event);
++	/* Called to stop event monitoring */
++	void (*stop)(struct perf_event *event, int flags);
++	/* Called to update the perf_event */
++	void (*update)(struct perf_event *event);
++};
 +
 +/*
-+ *	Are the two ports equivalent?
++ * Implementation of long counter operations
++ *
++ * 64bit counters are implemented by chaining two of the 32bit physical
++ * counters. The PMU only supports chaining of adjacent even/odd pairs
++ * and for simplicity the driver always configures the odd counter to
++ * count the overflows of the lower-numbered even counter. Note that since
++ * the resulting hardware counter is 64bits no IRQs are required to maintain
++ * the software counter which is also 64bits.
 + */
-+int uart_match_port(struct uart_port *port1, struct uart_port *port2)
-+{
-+	if (port1->iotype != port2->iotype)
-+		return 0;
 +
-+	switch (port1->iotype) {
-+	case UPIO_PORT:
-+		return (port1->iobase == port2->iobase);
-+	case UPIO_HUB6:
-+		return (port1->iobase == port2->iobase) &&
-+		       (port1->hub6   == port2->hub6);
-+	case UPIO_MEM:
-+	case UPIO_MEM16:
-+	case UPIO_MEM32:
-+	case UPIO_MEM32BE:
-+	case UPIO_AU:
-+	case UPIO_TSI:
-+		return (port1->mapbase == port2->mapbase);
++static void qcom_l3_cache__64bit_counter_start(struct perf_event *event)
++{
++	struct l3cache_pmu *l3pmu = to_l3cache_pmu(event->pmu);
++	int idx = event->hw.idx;
++	u32 evsel = get_event_type(event);
++	u32 gang;
++
++	/* Set the odd counter to count the overflows of the even counter */
++	gang = readl_relaxed(l3pmu->regs + L3_M_BC_GANG);
++	gang |= GANG_EN(idx + 1);
++	writel_relaxed(gang, l3pmu->regs + L3_M_BC_GANG);
++
++	/* Initialize the hardware counters and reset prev_count*/
++	local64_set(&event->hw.prev_count, 0);
++	writel_relaxed(0, l3pmu->regs + L3_HML3_PM_EVCNTR(idx + 1));
++	writel_relaxed(0, l3pmu->regs + L3_HML3_PM_EVCNTR(idx));
++
++	/*
++	 * Set the event types, the upper half must use zero and the lower
++	 * half the actual event type
++	 */
++	writel_relaxed(EVSEL(0), l3pmu->regs + L3_HML3_PM_EVTYPE(idx + 1));
++	writel_relaxed(EVSEL(evsel), l3pmu->regs + L3_HML3_PM_EVTYPE(idx));
++
++	/* Finally, enable the counters */
++	writel_relaxed(PMCNT_RESET, l3pmu->regs + L3_HML3_PM_CNTCTL(idx + 1));
++	writel_relaxed(PMCNTENSET(idx + 1), l3pmu->regs + L3_M_BC_CNTENSET);
++	writel_relaxed(PMCNT_RESET, l3pmu->regs + L3_HML3_PM_CNTCTL(idx));
++	writel_relaxed(PMCNTENSET(idx), l3pmu->regs + L3_M_BC_CNTENSET);
++}
++
++static void qcom_l3_cache__64bit_counter_stop(struct perf_event *event,
++					      int flags)
++{
++	struct l3cache_pmu *l3pmu = to_l3cache_pmu(event->pmu);
++	int idx = event->hw.idx;
++	u32 gang = readl_relaxed(l3pmu->regs + L3_M_BC_GANG);
++
++	/* Disable the counters */
++	writel_relaxed(PMCNTENCLR(idx), l3pmu->regs + L3_M_BC_CNTENCLR);
++	writel_relaxed(PMCNTENCLR(idx + 1), l3pmu->regs + L3_M_BC_CNTENCLR);
++
++	/* Disable chaining */
++	writel_relaxed(gang & ~GANG_EN(idx + 1), l3pmu->regs + L3_M_BC_GANG);
++}
++
++static void qcom_l3_cache__64bit_counter_update(struct perf_event *event)
++{
++	struct l3cache_pmu *l3pmu = to_l3cache_pmu(event->pmu);
++	int idx = event->hw.idx;
++	u32 hi, lo;
++	u64 prev, new;
++
++	do {
++		prev = local64_read(&event->hw.prev_count);
++		do {
++			hi = readl_relaxed(l3pmu->regs + L3_HML3_PM_EVCNTR(idx + 1));
++			lo = readl_relaxed(l3pmu->regs + L3_HML3_PM_EVCNTR(idx));
++		} while (hi != readl_relaxed(l3pmu->regs + L3_HML3_PM_EVCNTR(idx + 1)));
++		new = ((u64)hi << 32) | lo;
++	} while (local64_cmpxchg(&event->hw.prev_count, prev, new) != prev);
++
++	local64_add(new - prev, &event->count);
++}
++
++static const struct l3cache_event_ops event_ops_long = {
++	.start = qcom_l3_cache__64bit_counter_start,
++	.stop = qcom_l3_cache__64bit_counter_stop,
++	.update = qcom_l3_cache__64bit_counter_update,
++};
++
++/*
++ * Implementation of standard counter operations
++ *
++ * 32bit counters use a single physical counter and a hardware feature that
++ * asserts the overflow IRQ on the toggling of the most significant bit in
++ * the counter. This feature allows the counters to be left free-running
++ * without needing the usual reprogramming required to properly handle races
++ * during concurrent calls to update.
++ */
++
++static void qcom_l3_cache__32bit_counter_start(struct perf_event *event)
++{
++	struct l3cache_pmu *l3pmu = to_l3cache_pmu(event->pmu);
++	int idx = event->hw.idx;
++	u32 evsel = get_event_type(event);
++	u32 irqctl = readl_relaxed(l3pmu->regs + L3_M_BC_IRQCTL);
++
++	/* Set the counter to assert the overflow IRQ on MSB toggling */
++	writel_relaxed(irqctl | PMIRQONMSBEN(idx), l3pmu->regs + L3_M_BC_IRQCTL);
++
++	/* Initialize the hardware counter and reset prev_count*/
++	local64_set(&event->hw.prev_count, 0);
++	writel_relaxed(0, l3pmu->regs + L3_HML3_PM_EVCNTR(idx));
++
++	/* Set the event type */
++	writel_relaxed(EVSEL(evsel), l3pmu->regs + L3_HML3_PM_EVTYPE(idx));
++
++	/* Enable interrupt generation by this counter */
++	writel_relaxed(PMINTENSET(idx), l3pmu->regs + L3_M_BC_INTENSET);
++
++	/* Finally, enable the counter */
++	writel_relaxed(PMCNT_RESET, l3pmu->regs + L3_HML3_PM_CNTCTL(idx));
++	writel_relaxed(PMCNTENSET(idx), l3pmu->regs + L3_M_BC_CNTENSET);
++}
++
++static void qcom_l3_cache__32bit_counter_stop(struct perf_event *event,
++					      int flags)
++{
++	struct l3cache_pmu *l3pmu = to_l3cache_pmu(event->pmu);
++	int idx = event->hw.idx;
++	u32 irqctl = readl_relaxed(l3pmu->regs + L3_M_BC_IRQCTL);
++
++	/* Disable the counter */
++	writel_relaxed(PMCNTENCLR(idx), l3pmu->regs + L3_M_BC_CNTENCLR);
++
++	/* Disable interrupt generation by this counter */
++	writel_relaxed(PMINTENCLR(idx), l3pmu->regs + L3_M_BC_INTENCLR);
++
++	/* Set the counter to not assert the overflow IRQ on MSB toggling */
++	writel_relaxed(irqctl & ~PMIRQONMSBEN(idx), l3pmu->regs + L3_M_BC_IRQCTL);
++}
++
++static void qcom_l3_cache__32bit_counter_update(struct perf_event *event)
++{
++	struct l3cache_pmu *l3pmu = to_l3cache_pmu(event->pmu);
++	int idx = event->hw.idx;
++	u32 prev, new;
++
++	do {
++		prev = local64_read(&event->hw.prev_count);
++		new = readl_relaxed(l3pmu->regs + L3_HML3_PM_EVCNTR(idx));
++	} while (local64_cmpxchg(&event->hw.prev_count, prev, new) != prev);
++
++	local64_add(new - prev, &event->count);
++}
++
++static const struct l3cache_event_ops event_ops_std = {
++	.start = qcom_l3_cache__32bit_counter_start,
++	.stop = qcom_l3_cache__32bit_counter_stop,
++	.update = qcom_l3_cache__32bit_counter_update,
++};
++
++/* Retrieve the appropriate operations for the given event */
++static
++const struct l3cache_event_ops *l3cache_event_get_ops(struct perf_event *event)
++{
++	if (event_uses_long_counter(event))
++		return &event_ops_long;
++	else
++		return &event_ops_std;
++}
++
++/*
++ * Top level PMU functions.
++ */
++
++static inline void qcom_l3_cache__init(struct l3cache_pmu *l3pmu)
++{
++	int i;
++
++	writel_relaxed(BC_RESET, l3pmu->regs + L3_M_BC_CR);
++
++	/*
++	 * Use writel for the first programming command to ensure the basic
++	 * counter unit is stopped before proceeding
++	 */
++	writel(BC_SATROLL_CR_RESET, l3pmu->regs + L3_M_BC_SATROLL_CR);
++
++	writel_relaxed(BC_CNTENCLR_RESET, l3pmu->regs + L3_M_BC_CNTENCLR);
++	writel_relaxed(BC_INTENCLR_RESET, l3pmu->regs + L3_M_BC_INTENCLR);
++	writel_relaxed(PMOVSRCLR_RESET, l3pmu->regs + L3_M_BC_OVSR);
++	writel_relaxed(BC_GANG_RESET, l3pmu->regs + L3_M_BC_GANG);
++	writel_relaxed(BC_IRQCTL_RESET, l3pmu->regs + L3_M_BC_IRQCTL);
++	writel_relaxed(PM_CR_RESET, l3pmu->regs + L3_HML3_PM_CR);
++
++	for (i = 0; i < L3_NUM_COUNTERS; ++i) {
++		writel_relaxed(PMCNT_RESET, l3pmu->regs + L3_HML3_PM_CNTCTL(i));
++		writel_relaxed(EVSEL(0), l3pmu->regs + L3_HML3_PM_EVTYPE(i));
 +	}
++
++	writel_relaxed(PM_FLTR_RESET, l3pmu->regs + L3_HML3_PM_FILTRA);
++	writel_relaxed(PM_FLTR_RESET, l3pmu->regs + L3_HML3_PM_FILTRAM);
++	writel_relaxed(PM_FLTR_RESET, l3pmu->regs + L3_HML3_PM_FILTRB);
++	writel_relaxed(PM_FLTR_RESET, l3pmu->regs + L3_HML3_PM_FILTRBM);
++	writel_relaxed(PM_FLTR_RESET, l3pmu->regs + L3_HML3_PM_FILTRC);
++	writel_relaxed(PM_FLTR_RESET, l3pmu->regs + L3_HML3_PM_FILTRCM);
++
++	/*
++	 * Use writel here to ensure all programming commands are done
++	 *  before proceeding
++	 */
++	writel(BC_ENABLE, l3pmu->regs + L3_M_BC_CR);
++}
++
++static irqreturn_t qcom_l3_cache__handle_irq(int irq_num, void *data)
++{
++	struct l3cache_pmu *l3pmu = data;
++	/* Read the overflow status register */
++	long status = readl_relaxed(l3pmu->regs + L3_M_BC_OVSR);
++	int idx;
++
++	if (status == 0)
++		return IRQ_NONE;
++
++	/* Clear the bits we read on the overflow status register */
++	writel_relaxed(status, l3pmu->regs + L3_M_BC_OVSR);
++
++	for_each_set_bit(idx, &status, L3_NUM_COUNTERS) {
++		struct perf_event *event;
++		const struct l3cache_event_ops *ops;
++
++		event = l3pmu->events[idx];
++		if (!event)
++			continue;
++
++		/*
++		 * Since the IRQ is not enabled for events using long counters
++		 * we should never see one of those here, however, be consistent
++		 * and use the ops indirections like in the other operations.
++		 */
++
++		ops = l3cache_event_get_ops(event);
++		ops->update(event);
++	}
++
++	return IRQ_HANDLED;
++}
++
++/*
++ * Implementation of abstract pmu functionality required by
++ * the core perf events code.
++ */
++
++static void qcom_l3_cache__pmu_enable(struct pmu *pmu)
++{
++	struct l3cache_pmu *l3pmu = to_l3cache_pmu(pmu);
++
++	/* Ensure the other programming commands are observed before enabling */
++	wmb();
++
++	writel(BC_ENABLE, l3pmu->regs + L3_M_BC_CR);
++}
++
++static void qcom_l3_cache__pmu_disable(struct pmu *pmu)
++{
++	struct l3cache_pmu *l3pmu = to_l3cache_pmu(pmu);
++
++	writel_relaxed(0, l3pmu->regs + L3_M_BC_CR);
++
++	/* Ensure the basic counter unit is stopped before proceeding */
++	wmb();
++}
++
++static int qcom_l3_cache__event_init(struct perf_event *event)
++{
++	struct l3cache_pmu *l3pmu = to_l3cache_pmu(event->pmu);
++	struct hw_perf_event *hwc = &event->hw;
++	struct perf_event *sibling;
++
++	/*
++	 * Is the event for this PMU?
++	 */
++	if (event->attr.type != event->pmu->type)
++		return -ENOENT;
++
++	/*
++	 * There are no per-counter mode filters in the PMU.
++	 */
++	if (event->attr.exclude_user || event->attr.exclude_kernel ||
++	    event->attr.exclude_hv || event->attr.exclude_idle)
++		return -EINVAL;
++
++	/*
++	 * Sampling not supported since these events are not core-attributable.
++	 */
++	if (hwc->sample_period)
++		return -EINVAL;
++
++	/*
++	 * Task mode not available, we run the counters as socket counters,
++	 * not attributable to any CPU and therefore cannot attribute per-task.
++	 */
++	if (event->cpu < 0)
++		return -EINVAL;
++
++	/*
++	 * We must NOT create groups containing mixed PMUs, although software
++	 * events are acceptable
++	 */
++	if (event->group_leader->pmu != event->pmu &&
++			!is_software_event(event->group_leader))
++		return -EINVAL;
++
++	list_for_each_entry(sibling, &event->group_leader->sibling_list,
++			group_entry)
++		if (sibling->pmu != event->pmu &&
++				!is_software_event(sibling))
++			return -EINVAL;
++
++	hwc->idx = -1;
++
++	/*
++	 * Many perf core operations (eg. events rotation) operate on a
++	 * single CPU context. This is obvious for CPU PMUs, where one
++	 * expects the same sets of events being observed on all CPUs,
++	 * but can lead to issues for off-core PMUs, like this one, where
++	 * each event could be theoretically assigned to a different CPU.
++	 * To mitigate this, we enforce CPU assignment to one designated
++	 * processor (the one described in the "cpumask" attribute exported
++	 * by the PMU device). perf user space tools honor this and avoid
++	 * opening more than one copy of the events.
++	 */
++	event->cpu = cpumask_first(&l3pmu->cpumask);
++
 +	return 0;
 +}
-+EXPORT_SYMBOL(uart_match_port);
 +
-+/**
-+ *	uart_handle_dcd_change - handle a change of carrier detect state
-+ *	@port: uart_port structure for the open port
-+ *	@status: new carrier detect status, nonzero if active
-+ *
-+ *	Caller must hold port->lock
-+ */
-+void uart_handle_dcd_change(struct uart_port *port, unsigned int status)
++static void qcom_l3_cache__event_start(struct perf_event *event, int flags)
 +{
-+	port->icount.dcd++;
++	struct hw_perf_event *hwc = &event->hw;
++	const struct l3cache_event_ops *ops = l3cache_event_get_ops(event);
++
++	hwc->state = 0;
++	ops->start(event);
 +}
-+EXPORT_SYMBOL_GPL(uart_handle_dcd_change);
 +
-+/**
-+ *	uart_handle_cts_change - handle a change of clear-to-send state
-+ *	@port: uart_port structure for the open port
-+ *	@status: new clear to send status, nonzero if active
-+ *
-+ *	Caller must hold port->lock
-+ */
-+void uart_handle_cts_change(struct uart_port *port, unsigned int status)
++static void qcom_l3_cache__event_stop(struct perf_event *event, int flags)
 +{
-+	port->icount.cts++;
++	struct hw_perf_event *hwc = &event->hw;
++	const struct l3cache_event_ops *ops = l3cache_event_get_ops(event);
 +
-+	if (uart_softcts_mode(port)) {
-+		if (port->hw_stopped) {
-+			if (status) {
-+				port->hw_stopped = 0;
-+				port->ops->start_tx(port);
-+				uart_write_wakeup(port);
-+			}
-+		} else {
-+			if (!status) {
-+				port->hw_stopped = 1;
-+				port->ops->stop_tx(port);
-+			}
-+		}
-+	}
++	if (hwc->state & PERF_HES_STOPPED)
++		return;
++
++	ops->stop(event, flags);
++	if (flags & PERF_EF_UPDATE)
++		ops->update(event);
++	hwc->state |= PERF_HES_STOPPED | PERF_HES_UPTODATE;
 +}
-+EXPORT_SYMBOL_GPL(uart_handle_cts_change);
 +
-+/**
-+ *	uart_update_timeout - update per-port FIFO timeout.
-+ *	@port:  uart_port structure describing the port
-+ *	@cflag: termios cflag value
-+ *	@baud:  speed of the port
-+ *
-+ *	Set the port FIFO timeout value.  The @cflag value should
-+ *	reflect the actual hardware settings.
-+ */
-+void
-+uart_update_timeout(struct uart_port *port, unsigned int cflag,
-+		    unsigned int baud)
++static int qcom_l3_cache__event_add(struct perf_event *event, int flags)
 +{
-+	unsigned int bits;
-+
-+	/* byte size and parity */
-+	switch (cflag & CSIZE) {
-+	case CS5:
-+		bits = 7;
-+		break;
-+	case CS6:
-+		bits = 8;
-+		break;
-+	case CS7:
-+		bits = 9;
-+		break;
-+	default:
-+		bits = 10;
-+		break; /* CS8 */
-+	}
-+
-+	if (cflag & CSTOPB)
-+		bits++;
-+	if (cflag & PARENB)
-+		bits++;
++	struct l3cache_pmu *l3pmu = to_l3cache_pmu(event->pmu);
++	struct hw_perf_event *hwc = &event->hw;
++	int order = event_uses_long_counter(event) ? 1 : 0;
++	int idx;
 +
 +	/*
-+	 * The total number of bits to be transmitted in the fifo.
++	 * Try to allocate a counter.
 +	 */
-+	bits = bits * port->fifosize;
++	idx = bitmap_find_free_region(l3pmu->used_mask, L3_NUM_COUNTERS, order);
++	if (idx < 0)
++		/* The counters are all in use. */
++		return -EAGAIN;
 +
-+	/*
-+	 * Figure the timeout to send the above number of bits.
-+	 * Add .02 seconds of slop
-+	 */
-+	port->timeout = (HZ * bits) / baud + HZ/50;
++	hwc->idx = idx;
++	hwc->state = PERF_HES_STOPPED | PERF_HES_UPTODATE;
++	l3pmu->events[idx] = event;
++
++	if (flags & PERF_EF_START)
++		qcom_l3_cache__event_start(event, 0);
++
++	/* Propagate changes to the userspace mapping. */
++	perf_event_update_userpage(event);
++
++	return 0;
 +}
-+EXPORT_SYMBOL(uart_update_timeout);
 +
-+/**
-+ *	uart_get_baud_rate - return baud rate for a particular port
-+ *	@port: uart_port structure describing the port in question.
-+ *	@termios: desired termios settings.
-+ *	@old: old termios (or NULL)
-+ *	@min: minimum acceptable baud rate
-+ *	@max: maximum acceptable baud rate
-+ *
-+ *	Decode the termios structure into a numeric baud rate,
-+ *	mapping the %B0 rate to 9600 baud.
-+ *
-+ *	If the new baud rate is invalid, try the old termios setting.
-+ *	If it's still invalid, go with the closest acceptable.
-+ *
-+ *	Update the @termios structure to reflect the baud rate
-+ *	we're actually going to be using. Don't do this for the case
-+ *	where B0 is requested ("hang up").
-+ */
-+unsigned int
-+uart_get_baud_rate(struct uart_port *port, struct ktermios *termios,
-+		   struct ktermios *old, unsigned int min, unsigned int max)
++static void qcom_l3_cache__event_del(struct perf_event *event, int flags)
 +{
-+	unsigned int baud;
-+	bool hung_up = false;
++	struct l3cache_pmu *l3pmu = to_l3cache_pmu(event->pmu);
++	struct hw_perf_event *hwc = &event->hw;
++	int order = event_uses_long_counter(event) ? 1 : 0;
 +
-+	baud = termios->c_ospeed;
++	/* Stop and clean up */
++	qcom_l3_cache__event_stop(event,  flags | PERF_EF_UPDATE);
++	l3pmu->events[hwc->idx] = NULL;
++	bitmap_release_region(l3pmu->used_mask, hwc->idx, order);
 +
-+	/* Special case: B0 rate. */
-+	if (baud == 0) {
-+		hung_up = true;
-+		baud = 9600;
++	/* Propagate changes to the userspace mapping. */
++	perf_event_update_userpage(event);
++}
++
++static void qcom_l3_cache__event_read(struct perf_event *event)
++{
++	const struct l3cache_event_ops *ops = l3cache_event_get_ops(event);
++
++	ops->update(event);
++}
++
++/*
++ * Add sysfs attributes
++ *
++ * We export:
++ * - formats, used by perf user space and other tools to configure events
++ * - events, used by perf user space and other tools to create events
++ *   symbolically, e.g.:
++ *     perf stat -a -e l3cache_0_0/event=read-miss/ ls
++ *     perf stat -a -e l3cache_0_0/event=0x21/ ls
++ * - cpumask, used by perf user space and other tools to know on which CPUs
++ *   to open the events
++ */
++
++/* formats */
++
++static ssize_t l3cache_pmu_format_show(struct device *dev,
++				       struct device_attribute *attr, char *buf)
++{
++	struct dev_ext_attribute *eattr;
++
++	eattr = container_of(attr, struct dev_ext_attribute, attr);
++	return sprintf(buf, "%s\n", (char *) eattr->var);
++}
++
++#define L3CACHE_PMU_FORMAT_ATTR(_name, _config)				      \
++	(&((struct dev_ext_attribute[]) {				      \
++		{ .attr = __ATTR(_name, 0444, l3cache_pmu_format_show, NULL), \
++		  .var = (void *) _config, }				      \
++	})[0].attr.attr)
++
++static struct attribute *qcom_l3_cache_pmu_formats[] = {
++	L3CACHE_PMU_FORMAT_ATTR(event, "config:0-7"),
++	L3CACHE_PMU_FORMAT_ATTR(lc, "config:" __stringify(L3_EVENT_LC_BIT)),
++	NULL,
++};
++
++static struct attribute_group qcom_l3_cache_pmu_format_group = {
++	.name = "format",
++	.attrs = qcom_l3_cache_pmu_formats,
++};
++
++/* events */
++
++ssize_t l3cache_pmu_event_show(struct device *dev,
++				     struct device_attribute *attr, char *page)
++{
++	struct perf_pmu_events_attr *pmu_attr;
++
++	pmu_attr = container_of(attr, struct perf_pmu_events_attr, attr);
++	return sprintf(page, "event=0x%02llx\n", pmu_attr->id);
++}
++
++#define L3CACHE_EVENT_ATTR(_name, _id)					     \
++	(&((struct perf_pmu_events_attr[]) {				     \
++		{ .attr = __ATTR(_name, 0444, l3cache_pmu_event_show, NULL), \
++		  .id = _id, }						     \
++	})[0].attr.attr)
++
++static struct attribute *qcom_l3_cache_pmu_events[] = {
++	L3CACHE_EVENT_ATTR(cycles, L3_EVENT_CYCLES),
++	L3CACHE_EVENT_ATTR(read-hit, L3_EVENT_READ_HIT),
++	L3CACHE_EVENT_ATTR(read-miss, L3_EVENT_READ_MISS),
++	L3CACHE_EVENT_ATTR(read-hit-d-side, L3_EVENT_READ_HIT_D),
++	L3CACHE_EVENT_ATTR(read-miss-d-side, L3_EVENT_READ_MISS_D),
++	L3CACHE_EVENT_ATTR(write-hit, L3_EVENT_WRITE_HIT),
++	L3CACHE_EVENT_ATTR(write-miss, L3_EVENT_WRITE_MISS),
++	NULL
++};
++
++static struct attribute_group qcom_l3_cache_pmu_events_group = {
++	.name = "events",
++	.attrs = qcom_l3_cache_pmu_events,
++};
++
++/* cpumask */
++
++static ssize_t qcom_l3_cache_pmu_cpumask_show(struct device *dev,
++				     struct device_attribute *attr, char *buf)
++{
++	struct l3cache_pmu *l3pmu = to_l3cache_pmu(dev_get_drvdata(dev));
++
++	return cpumap_print_to_pagebuf(true, buf, &l3pmu->cpumask);
++}
++
++static DEVICE_ATTR(cpumask, 0444, qcom_l3_cache_pmu_cpumask_show, NULL);
++
++static struct attribute *qcom_l3_cache_pmu_cpumask_attrs[] = {
++	&dev_attr_cpumask.attr,
++	NULL,
++};
++
++static struct attribute_group qcom_l3_cache_pmu_cpumask_attr_group = {
++	.attrs = qcom_l3_cache_pmu_cpumask_attrs,
++};
++
++/*
++ * Per PMU device attribute groups
++ */
++static const struct attribute_group *qcom_l3_cache_pmu_attr_grps[] = {
++	&qcom_l3_cache_pmu_format_group,
++	&qcom_l3_cache_pmu_events_group,
++	&qcom_l3_cache_pmu_cpumask_attr_group,
++	NULL,
++};
++
++/*
++ * Probing functions and data.
++ */
++
++static int qcom_l3_cache_pmu_online_cpu(unsigned int cpu, struct hlist_node *node)
++{
++	struct l3cache_pmu *l3pmu = hlist_entry_safe(node, struct l3cache_pmu, node);
++
++	/* If there is not a CPU/PMU association pick this CPU */
++	if (cpumask_empty(&l3pmu->cpumask))
++		cpumask_set_cpu(cpu, &l3pmu->cpumask);
++
++	return 0;
++}
++
++static int qcom_l3_cache_pmu_offline_cpu(unsigned int cpu, struct hlist_node *node)
++{
++	struct l3cache_pmu *l3pmu = hlist_entry_safe(node, struct l3cache_pmu, node);
++	unsigned int target;
++
++	if (!cpumask_test_and_clear_cpu(cpu, &l3pmu->cpumask))
++		return 0;
++	target = cpumask_any_but(cpu_online_mask, cpu);
++	if (target >= nr_cpu_ids)
++		return 0;
++	perf_pmu_migrate_context(&l3pmu->pmu, cpu, target);
++	cpumask_set_cpu(target, &l3pmu->cpumask);
++	return 0;
++}
++
++static int qcom_l3_cache_pmu_probe(struct platform_device *pdev)
++{
++	struct l3cache_pmu *l3pmu;
++	struct acpi_device *acpi_dev;
++	struct resource *memrc;
++	int ret;
++	char *name;
++
++	/* Initialize the PMU data structures */
++
++	acpi_dev = ACPI_COMPANION(&pdev->dev);
++	if (!acpi_dev)
++		return -ENODEV;
++
++	l3pmu = devm_kzalloc(&pdev->dev, sizeof(*l3pmu), GFP_KERNEL);
++	name = devm_kasprintf(&pdev->dev, GFP_KERNEL, "l3cache_%s_%s",
++		      acpi_dev->parent->pnp.unique_id, acpi_dev->pnp.unique_id);
++	if (!l3pmu || !name)
++		return -ENOMEM;
++
++	l3pmu->pmu = (struct pmu) {
++		.task_ctx_nr	= perf_invalid_context,
++
++		.pmu_enable	= qcom_l3_cache__pmu_enable,
++		.pmu_disable	= qcom_l3_cache__pmu_disable,
++		.event_init	= qcom_l3_cache__event_init,
++		.add		= qcom_l3_cache__event_add,
++		.del		= qcom_l3_cache__event_del,
++		.start		= qcom_l3_cache__event_start,
++		.stop		= qcom_l3_cache__event_stop,
++		.read		= qcom_l3_cache__event_read,
++
++		.attr_groups	= qcom_l3_cache_pmu_attr_grps,
++	};
++
++	memrc = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	l3pmu->regs = devm_ioremap_resource(&pdev->dev, memrc);
++	if (IS_ERR(l3pmu->regs)) {
++		dev_err(&pdev->dev, "Can't map PMU @%pa\n", &memrc->start);
++		return PTR_ERR(l3pmu->regs);
 +	}
 +
-+	if (old && (baud < min || baud > max))
-+		baud = old->c_ospeed;
-+	if (baud < min)
-+		baud = min;
-+	else if (baud > max)
-+		baud = max;
++	qcom_l3_cache__init(l3pmu);
 +
-+	if (!hung_up)
-+		termios->c_ispeed = termios->c_ospeed = baud;
-+	
-+	return baud;
-+}
-+EXPORT_SYMBOL(uart_get_baud_rate);
++	ret = platform_get_irq(pdev, 0);
++	if (ret <= 0)
++		return ret;
 +
-+/**
-+ *	uart_get_divisor - return uart clock divisor
-+ *	@port: uart_port structure describing the port.
-+ *	@baud: desired baud rate
-+ *
-+ *	Calculate the uart clock divisor for the port.
-+ */
-+unsigned int
-+uart_get_divisor(struct uart_port *port, unsigned int baud)
-+{
-+	return DIV_ROUND_CLOSEST(port->uartclk, 16 * baud);
-+}
-+EXPORT_SYMBOL(uart_get_divisor);
++	ret = devm_request_irq(&pdev->dev, ret, qcom_l3_cache__handle_irq, 0,
++			       name, l3pmu);
++	if (ret) {
++		dev_err(&pdev->dev, "Request for IRQ failed for slice @%pa\n",
++			&memrc->start);
++		return ret;
++	}
 +
-+static void uart_start_tx(struct minitty_data *mtty)
-+{
-+	struct uart_port *port = mtty->state.uart_port;
-+	spin_lock_irq(&port->lock);
-+	if (!port->hw_stopped)
-+		port->ops->start_tx(port);
-+	spin_unlock_irq(&port->lock);
++	/* Add this instance to the list used by the offline callback */
++	ret = cpuhp_state_add_instance(CPUHP_AP_PERF_ARM_QCOM_L3_ONLINE, &l3pmu->node);
++	if (ret) {
++		dev_err(&pdev->dev, "Error %d registering hotplug", ret);
++		return ret;
++	}
++
++	ret = perf_pmu_register(&l3pmu->pmu, name, -1);
++	if (ret < 0) {
++		dev_err(&pdev->dev, "Failed to register L3 cache PMU (%d)\n", ret);
++		return ret;
++	}
++
++	dev_info(&pdev->dev, "Registered %s, type: %d\n", name, l3pmu->pmu.type);
++
++	return 0;
 +}
 +
-+static int uart_chars_in_buffer(struct minitty_data *mtty)
++static const struct acpi_device_id qcom_l3_cache_pmu_acpi_match[] = {
++	{ "QCOM8081", },
++	{ }
++};
++MODULE_DEVICE_TABLE(acpi, qcom_l3_cache_pmu_acpi_match);
++
++static struct platform_driver qcom_l3_cache_pmu_driver = {
++	.driver = {
++		.name = "qcom-l3cache-pmu",
++		.owner = THIS_MODULE,
++		.acpi_match_table = ACPI_PTR(qcom_l3_cache_pmu_acpi_match),
++	},
++	.probe = qcom_l3_cache_pmu_probe,
++};
++
++static int __init register_qcom_l3_cache_pmu_driver(void)
 +{
-+	struct uart_state *state = &mtty->state;
-+	struct uart_port *port = mtty->state.uart_port;
 +	int ret;
 +
-+	spin_lock_irq(&port->lock);
-+	ret = uart_circ_chars_pending(&state->xmit);
-+	spin_unlock_irq(&port->lock);
-+	return ret;
-+}
-+
-+static void uart_flush_tx_buffer(struct minitty_data *mtty)
-+{
-+	struct uart_state *state = &mtty->state;
-+	struct uart_port *port = mtty->state.uart_port;
-+
-+	spin_lock_irq(&port->lock);
-+	uart_circ_clear(&state->xmit);
-+	if (port->ops->flush_buffer)
-+		port->ops->flush_buffer(port);
-+	spin_unlock_irq(&port->lock);
-+	uart_write_wakeup(port);
-+}
-+
-+static int uart_get_lsr_info(struct minitty_data *mtty, unsigned int __user *p)
-+{
-+	struct uart_state *state = &mtty->state;
-+	struct uart_port *port = mtty->state.uart_port;
-+	unsigned int result;
-+
-+	mutex_lock(&mtty->mutex);
-+	result = port->ops->tx_empty(port);
-+
-+	/*
-+	 * If we're about to load something into the transmit
-+	 * register, we'll pretend the transmitter isn't empty to
-+	 * avoid a race condition (depending on when the transmit
-+	 * interrupt happens).
-+	 */
-+	if (port->x_char ||
-+	    ((uart_circ_chars_pending(&state->xmit) > 0) &&
-+	     !uart_tx_stopped(port)))
-+		result &= ~TIOCSER_TEMT;
-+	mutex_unlock(&mtty->mutex);
-+	return put_user(result, p);
-+}
-+
-+static int uart_tiocmget(struct minitty_data *mtty, int __user *p)
-+{
-+	struct uart_port *port = mtty->state.uart_port;
-+	int ret = -EIO;
-+
-+	mutex_lock(&mtty->mutex);
-+	ret = port->mctrl;
-+	spin_lock_irq(&port->lock);
-+	ret |= port->ops->get_mctrl(port);
-+	spin_unlock_irq(&port->lock);
-+	mutex_unlock(&mtty->mutex);
-+	if (ret >= 0)
-+		ret = put_user(ret, p);
-+	return ret;
-+}
-+
-+static int
-+uart_tiocmset(struct minitty_data *mtty, unsigned int cmd, unsigned __user *p)
-+{
-+	struct uart_port *port = mtty->state.uart_port;
-+	unsigned int set, clear, val;
-+	int ret;
-+
-+	ret = get_user(val, p);
++	/* Install a hook to update the reader CPU in case it goes offline */
++	ret = cpuhp_setup_state_multi(CPUHP_AP_PERF_ARM_QCOM_L3_ONLINE,
++				      "perf/qcom/l3cache:online",
++				      qcom_l3_cache_pmu_online_cpu,
++				      qcom_l3_cache_pmu_offline_cpu);
 +	if (ret)
 +		return ret;
-+	set = clear = 0;
-+	switch (cmd) {
-+	case TIOCMBIS:
-+		set = val;
-+		break;
-+	case TIOCMBIC:
-+		clear = val;
-+		break;
-+	case TIOCMSET:
-+		set = val;
-+		clear = ~val;
-+		break;
-+	}
-+	set &= TIOCM_DTR|TIOCM_RTS|TIOCM_OUT1|TIOCM_OUT2|TIOCM_LOOP;
-+	clear &= TIOCM_DTR|TIOCM_RTS|TIOCM_OUT1|TIOCM_OUT2|TIOCM_LOOP;
 +
-+	mutex_lock(&mtty->mutex);
-+	uart_update_mctrl(port, set, clear);
-+	mutex_unlock(&mtty->mutex);
-+	return 0;
++	return platform_driver_register(&qcom_l3_cache_pmu_driver);
 +}
-+
-+static int uart_break_ctl(struct minitty_data *mtty, int break_state)
-+{
-+	struct uart_port *port = mtty->state.uart_port;
-+	int ret = -EIO;
-+
-+	mutex_lock(&mtty->mutex);
-+	port->ops->break_ctl(port, break_state);
-+	mutex_unlock(&mtty->mutex);
-+	return ret;
-+}
-+
-+/*
-+ * Wait for any of the 4 modem inputs (DCD,RI,DSR,CTS) to change
-+ * - mask passed in arg for lines of interest
-+ *   (use |'ed TIOCM_RNG/DSR/CD/CTS for masking)
-+ * Caller should use TIOCGICOUNT to see which one it was
-+ */
-+static int uart_wait_modem_status(struct minitty_data *mtty, unsigned long arg)
-+{
-+	struct uart_port *uport = mtty->state.uart_port;
-+	struct tty_port *port = &mtty->state.port;
-+	DECLARE_WAITQUEUE(wait, current);
-+	struct uart_icount cprev, cnow;
-+	int ret;
-+
-+	/*
-+	 * note the counters on entry
-+	 */
-+	spin_lock_irq(&uport->lock);
-+	memcpy(&cprev, &uport->icount, sizeof(struct uart_icount));
-+	if (uport->ops->enable_ms)
-+		uport->ops->enable_ms(uport);
-+	spin_unlock_irq(&uport->lock);
-+
-+	add_wait_queue(&port->delta_msr_wait, &wait);
-+	for (;;) {
-+		spin_lock_irq(&uport->lock);
-+		memcpy(&cnow, &uport->icount, sizeof(struct uart_icount));
-+		spin_unlock_irq(&uport->lock);
-+
-+		set_current_state(TASK_INTERRUPTIBLE);
-+
-+		if (((arg & TIOCM_RNG) && (cnow.rng != cprev.rng)) ||
-+		    ((arg & TIOCM_DSR) && (cnow.dsr != cprev.dsr)) ||
-+		    ((arg & TIOCM_CD)  && (cnow.dcd != cprev.dcd)) ||
-+		    ((arg & TIOCM_CTS) && (cnow.cts != cprev.cts))) {
-+			ret = 0;
-+			break;
-+		}
-+
-+		schedule();
-+
-+		/* see if a signal did it */
-+		if (signal_pending(current)) {
-+			ret = -ERESTARTSYS;
-+			break;
-+		}
-+
-+		cprev = cnow;
-+	}
-+	__set_current_state(TASK_RUNNING);
-+	remove_wait_queue(&port->delta_msr_wait, &wait);
-+
-+	return ret;
-+}
-+
-+/*
-+ * Get counter of input serial line interrupts (DCD,RI,DSR,CTS)
-+ * NB: both 1->0 and 0->1 transitions are counted except for
-+ *     RI where only 0->1 is counted.
-+ */
-+static int uart_tiocgicount(struct minitty_data *mtty, void __user *p)
-+{
-+	struct uart_port *port = mtty->state.uart_port;
-+	struct serial_icounter_struct icount;
-+	struct uart_icount cnow;
-+
-+	spin_lock_irq(&port->lock);
-+	memcpy(&cnow, &port->icount, sizeof(struct uart_icount));
-+	spin_unlock_irq(&port->lock);
-+
-+	memset(&icount, 0, sizeof(icount));
-+	icount.cts         = cnow.cts;
-+	icount.dsr         = cnow.dsr;
-+	icount.rng         = cnow.rng;
-+	icount.dcd         = cnow.dcd;
-+	icount.rx          = cnow.rx;
-+	icount.tx          = cnow.tx;
-+	icount.frame       = cnow.frame;
-+	icount.overrun     = cnow.overrun;
-+	icount.parity      = cnow.parity;
-+	icount.brk         = cnow.brk;
-+	icount.buf_overrun = cnow.buf_overrun;
-+	if (copy_to_user(p, &icount, sizeof(icount)))
-+		return -EFAULT;
-+	return 0;
-+}
-+
-+static void uart_change_speed(struct minitty_data *mtty,
-+			      struct ktermios *old_termios)
-+{
-+	struct uart_port *port = mtty->state.uart_port;
-+	struct ktermios *termios = &mtty->termios;
-+	int hw_stopped;
-+
-+	port->ops->set_termios(port, termios, old_termios);
-+
-+	/*
-+	 * Set modem status enables based on termios cflag
-+	 */
-+	spin_lock_irq(&port->lock);
-+	if (termios->c_cflag & CRTSCTS)
-+		port->status |= UPSTAT_CTS_ENABLE;
-+	else
-+		port->status &= ~UPSTAT_CTS_ENABLE;
-+
-+	if (termios->c_cflag & CLOCAL)
-+		port->status &= ~UPSTAT_DCD_ENABLE;
-+	else
-+		port->status |= UPSTAT_DCD_ENABLE;
-+
-+	/* reset sw-assisted CTS flow control based on (possibly) new mode */
-+	hw_stopped = port->hw_stopped;
-+	port->hw_stopped = uart_softcts_mode(port) &&
-+				!(port->ops->get_mctrl(port) & TIOCM_CTS);
-+	if (port->hw_stopped) {
-+		if (!hw_stopped)
-+			port->ops->stop_tx(port);
-+	} else {
-+		if (hw_stopped)
-+			port->ops->start_tx(port);
-+	}
-+	spin_unlock_irq(&port->lock);
-+}
-+
-+static void uart_set_termios(struct minitty_data *mtty,
-+			     struct ktermios *old_termios)
-+{
-+	struct uart_port *port = mtty->state.uart_port;
-+	unsigned int cflag = mtty->termios.c_cflag;
-+	unsigned int iflag_mask = IGNBRK|BRKINT|IGNPAR|PARMRK|INPCK;
-+	bool sw_changed = false;
-+
-+	/*
-+	 * Drivers doing software flow control also need to know
-+	 * about changes to these input settings.
-+	 */
-+	if (port->flags & UPF_SOFT_FLOW) {
-+		iflag_mask |= IXANY|IXON|IXOFF;
-+		sw_changed =
-+		   mtty->termios.c_cc[VSTART] != old_termios->c_cc[VSTART] ||
-+		   mtty->termios.c_cc[VSTOP] != old_termios->c_cc[VSTOP];
-+	}
-+
-+	/*
-+	 * These are the bits that are used to setup various
-+	 * flags in the low level driver. We can ignore the Bfoo
-+	 * bits in c_cflag; c_[io]speed will always be set
-+	 * appropriately by set_termios(). 
-+	 */
-+	if ((cflag ^ old_termios->c_cflag) == 0 &&
-+	    mtty->termios.c_ospeed == old_termios->c_ospeed &&
-+	    mtty->termios.c_ispeed == old_termios->c_ispeed &&
-+	    ((mtty->termios.c_iflag ^ old_termios->c_iflag) & iflag_mask) == 0 &&
-+	    !sw_changed)
-+		return;
-+
-+	uart_change_speed(mtty, old_termios);
-+	/* reload cflag from termios; port driver may have overriden flags */
-+	cflag = mtty->termios.c_cflag;
-+
-+	/* Handle transition to B0 status */
-+	if ((old_termios->c_cflag & CBAUD) && !(cflag & CBAUD))
-+		uart_clear_mctrl(port, TIOCM_RTS | TIOCM_DTR);
-+	/* Handle transition away from B0 status */
-+	else if (!(old_termios->c_cflag & CBAUD) && (cflag & CBAUD)) {
-+		unsigned int mask = TIOCM_DTR;
-+		if (!(cflag & CRTSCTS))
-+			mask |= TIOCM_RTS;
-+		uart_set_mctrl(port, mask);
-+	}
-+}
-+
-+static void uart_wait_until_sent(struct minitty_data *mtty)
-+{
-+	struct uart_port *port = mtty->state.uart_port;
-+	unsigned long char_time, expire, timeout;
-+
-+	/*
-+	 * Set the check interval to be 1/5 of the estimated time to
-+	 * send a single character, and make it at least 1.
-+	 *
-+	 * Note: we have to use pretty tight timings here to satisfy
-+	 * the NIST-PCTS.
-+	 */
-+	char_time = (port->timeout - HZ/50) / port->fifosize;
-+	char_time = char_time / 5;
-+	if (char_time == 0)
-+		char_time = 1;
-+
-+	/*
-+	 * If the transmitter hasn't cleared in twice the approximate
-+	 * amount of time to send the entire FIFO, it probably won't
-+	 * ever clear.  This assumes the UART isn't doing flow
-+	 * control, which is currently the case.  Hence, if it ever
-+	 * takes longer than port->timeout, this is probably due to a
-+	 * UART bug of some kind.  So, we clamp the timeout parameter at
-+	 * 2*port->timeout.
-+	 */
-+	timeout = 2 * port->timeout;
-+
-+	expire = jiffies + timeout;
-+	while (!port->ops->tx_empty(port)) {
-+		        msleep_interruptible(jiffies_to_msecs(char_time));
-+			        if (signal_pending(current))
-+					                break;
-+				        if (time_after(jiffies, expire))
-+						                break;
-+	}
-+}
-+
-+static void mtty_wait_until_sent(struct minitty_data *mtty)
-+{
-+	long timeout = MAX_SCHEDULE_TIMEOUT;
-+
-+	timeout = wait_event_interruptible_timeout(mtty->write_wait,
-+			                !uart_chars_in_buffer(mtty), timeout);
-+	if (timeout > 0)
-+		uart_wait_until_sent(mtty);
-+}
-+
-+static void mtty_set_termios(struct minitty_data *mtty,
-+			     struct ktermios *old_termios)
-+{
-+	bool was_raw = mtty->rx_raw;
-+
-+	mtty->rx_raw = !I_IGNCR(mtty) && !I_ICRNL(mtty) && !I_INLCR(mtty) &&
-+		       !L_ICANON(mtty) && !L_ISIG(mtty) && !L_ECHO(mtty);
-+	if (!mtty->rx_raw && was_raw)
-+		mtty->rx_lines = mtty->column = mtty->canon_start_pos = 0;
-+
-+	/* mark things we don't support. */
-+	mtty->termios.c_iflag |= IGNBRK | IGNPAR;
-+	mtty->termios.c_iflag &= ~(ISTRIP | IUCLC | IXON | IXOFF);
-+	mtty->termios.c_lflag &= ~IEXTEN;
-+
-+	/* The termios change make the tty ready for I/O */
-+	wake_up_interruptible(&mtty->write_wait);
-+	wake_up_interruptible(&mtty->read_wait);
-+}
-+
-+static int set_termios(struct minitty_data *mtty, unsigned int cmd,
-+		       void __user *arg)
-+{
-+	struct ktermios new_termios, old_termios;
-+	int ret;
-+
-+	mutex_lock(&mtty->mutex);
-+	new_termios = mtty->termios;
-+	mutex_unlock(&mtty->mutex);
-+
-+	switch (cmd) {
-+	case TCSETAF:
-+	case TCSETAW:
-+	case TCSETA:
-+		ret = user_termio_to_kernel_termios(&new_termios,
-+						    (struct termio __user *)arg);
-+		break;
-+#ifdef TCGETS2
-+	case TCSETSF2:
-+	case TCSETSW2:
-+	case TCSETS2:
-+		ret = user_termios_to_kernel_termios(&new_termios,
-+						     (struct termios2 __user *)arg);
-+		break;
-+	default:
-+		ret = user_termios_to_kernel_termios_1(&new_termios,
-+						       (struct termios __user *)arg);
-+		break;
-+#else
-+	default:
-+		ret = user_termios_to_kernel_termios(&new_termios,
-+						     (struct termios __user *)arg);
-+		break;
-+#endif
-+	}
-+	if (ret)
-+		return -EFAULT;
-+
-+	switch (cmd) {
-+	case TCSETSF:
-+#ifdef TCGETS2
-+	case TCSETSF2:
-+#endif
-+	case TCSETAF:
-+		uart_flush_tx_buffer(mtty);
-+	}
-+
-+	switch (cmd) {
-+	case TCSETSF:
-+	case TCSETSW:
-+#ifdef TCGETS2
-+	case TCSETSF2:
-+	case TCSETSW2:
-+#endif
-+	case TCSETAF:
-+	case TCSETAW:
-+		mtty_wait_until_sent(mtty);
-+		if (signal_pending(current))
-+			return -ERESTARTSYS;
-+	}
-+
-+	/*
-+	 * If old style Bfoo values are used then load c_ispeed/c_ospeed
-+	 * with the real speed so its unconditionally usable.
-+	 */
-+	new_termios.c_ispeed = tty_termios_input_baud_rate(&new_termios);
-+	new_termios.c_ospeed = tty_termios_baud_rate(&new_termios);
-+
-+	mutex_lock(&mtty->mutex);
-+	old_termios = mtty->termios;
-+	mtty->termios = new_termios;
-+	mtty_set_termios(mtty, &old_termios);
-+	uart_set_termios(mtty, &old_termios);
-+	mutex_unlock(&mtty->mutex);
-+	return 0;
-+}
-+
-+static int tiocsetd(int __user *p)
-+{
-+	int ldisc;
-+
-+	if (get_user(ldisc, p))
-+		return -EFAULT;
-+	if (ldisc != N_TTY)
-+		return -EINVAL;
-+	return 0;
-+}
-+
-+static int tiocgetd(int __user *p)
-+{
-+	return put_user(N_TTY, p);
-+}
-+
-+static void copy_termios(struct minitty_data *mtty, struct ktermios *kterm)
-+{
-+	mutex_lock(&mtty->mutex);
-+	*kterm = mtty->termios;
-+	mutex_unlock(&mtty->mutex);
-+}
-+
-+static long minitty_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
-+{
-+	struct minitty_data *mtty = file->private_data;
-+	struct uart_port *port = mtty->state.uart_port;
-+	void __user *p = (void __user *)arg;
-+	struct ktermios kterm;
-+	int ret = -ENOIOCTLCMD;
-+
-+	switch (cmd) {
-+	case TIOCSETD:
-+		return tiocsetd(p);
-+	case TIOCGETD:
-+		return tiocgetd(p);
-+	case TIOCSBRK:
-+		return uart_break_ctl(mtty, -1);
-+	case TIOCCBRK:
-+		return uart_break_ctl(mtty, 0);
-+	case TIOCMGET:
-+		return uart_tiocmget(mtty, p);
-+	case TIOCMSET:
-+	case TIOCMBIC:
-+	case TIOCMBIS:
-+		return uart_tiocmset(mtty, cmd, p);
-+	case TIOCGICOUNT:
-+		return uart_tiocgicount(mtty, p);
-+	case TIOCMIWAIT:
-+		return uart_wait_modem_status(mtty, arg);
-+	case TIOCSERGETLSR:
-+		return uart_get_lsr_info(mtty, p);
-+
-+#ifndef TCGETS2
-+	case TCGETS:
-+		copy_termios(mtty, &kterm);
-+		if (kernel_termios_to_user_termios((struct termios __user *)arg, &kterm))
-+			return -EFAULT;
-+		return 0;
-+#else
-+	case TCGETS:
-+		copy_termios(mtty, &kterm);
-+		if (kernel_termios_to_user_termios_1((struct termios __user *)arg, &kterm))
-+			return -EFAULT;
-+		return 0;
-+	case TCGETS2:
-+		copy_termios(mtty, &kterm);
-+		if (kernel_termios_to_user_termios((struct termios2 __user *)arg, &kterm))
-+			return -EFAULT;
-+		return 0;
-+	case TCSETSF2:
-+	case TCSETSW2:
-+	case TCSETS2:
-+#endif
-+	case TCSETSF:
-+	case TCSETSW:
-+	case TCSETS:
-+	case TCSETAF:
-+	case TCSETAW:
-+	case TCSETA:
-+		return set_termios(mtty, cmd, p);
-+	case TCGETA:
-+		copy_termios(mtty, &kterm);
-+		if (kernel_termios_to_user_termio((struct termio __user *)arg, &kterm))
-+			return -EFAULT;
-+		return 0;
-+
-+	default:
-+		mutex_lock(&mtty->mutex);
-+		if (port->ops->ioctl)
-+			ret = port->ops->ioctl(port, cmd, arg);
-+		mutex_unlock(&mtty->mutex);
-+		break;
-+	}
-+
-+	if (ret == -ENOIOCTLCMD)
-+		ret = -EINVAL;
-+	return ret;
-+}
-+
-+/*
-+ * Functions called back by low level UART drivers to provide
-+ * an RX character. We simply ignore characters with errors here.
-+ */
-+
-+int tty_insert_flip_char(struct tty_port *port, unsigned char ch, char flag)
-+{
-+	struct uart_state *state = container_of(port, struct uart_state, port);
-+	struct minitty_data *mtty = container_of(state, typeof(*mtty), state);
-+
-+	if (flag == TTY_NORMAL) {
-+		int tail = smp_load_acquire(&mtty->rx_tail);
-+		int head = mtty->rx_head;
-+		int next = RX_BUF_WRAP(head + 1);
-+		/*
-+		 * Advance head only if buffer is not full.
-+		 * Keep on overwriting last char otherwise.
-+		 */
-+		mtty->rx_buf[head] = ch;
-+		if (next != tail) {
-+			smp_store_release(&mtty->rx_head, next);
-+			return 1;
-+		} else {
-+			smp_store_release(&mtty->rx_overflow, true);
-+		}
-+	}		
-+	return 0;
-+}
-+EXPORT_SYMBOL(tty_insert_flip_char);
-+
-+void uart_insert_char(struct uart_port *port, unsigned int status,
-+		      unsigned int overrun, unsigned int ch, unsigned int flag)
-+{
-+	struct uart_state *state = port->state;
-+	struct minitty_data *mtty = container_of(state, typeof(*mtty), state);
-+
-+	if (flag == TTY_NORMAL) {
-+		int tail = smp_load_acquire(&mtty->rx_tail);
-+		int head = mtty->rx_head;
-+		int next = RX_BUF_WRAP(head + 1);
-+		/*
-+		 * Advance head only if buffer is not full.
-+		 * Keep on overwriting last char otherwise.
-+		 */
-+		mtty->rx_buf[head] = ch;
-+		if (next != tail) {
-+			smp_store_release(&mtty->rx_head, next);
-+		} else {
-+			smp_store_release(&mtty->rx_overflow, true);
-+			port->icount.buf_overrun++;
-+		}
-+	}
-+}
-+EXPORT_SYMBOL_GPL(uart_insert_char);
-+
-+void tty_schedule_flip(struct tty_port *port)
-+{
-+	struct uart_state *state = container_of(port, struct uart_state, port);
-+	struct minitty_data *mtty = container_of(state, typeof(*mtty), state);
-+
-+	queue_work(system_unbound_wq, &mtty->rx_work);
-+}
-+EXPORT_SYMBOL(tty_schedule_flip);
-+
-+void tty_flip_buffer_push(struct tty_port *port)
-+{
-+	tty_schedule_flip(port);
-+}
-+EXPORT_SYMBOL(tty_flip_buffer_push);
-+
-+/*
-+ * Line Discipline Stuff
-+ */
-+
-+static bool is_utf8_continuation(struct minitty_data *mtty, unsigned char c)
-+{
-+	return (I_IUTF8(mtty) && (c & 0xc0) == 0x80);
-+}
-+
-+static bool is_line_termination(struct minitty_data *mtty, unsigned char c)
-+{
-+	return (c == '\n' || c == EOF_CHAR(mtty) || c == EOL_CHAR(mtty));
-+}
-+
-+/*
-+ * Queue the provided character string in its entirety or nothing.
-+ * Return true if queued, false otherwise.
-+ */
-+static bool queue_tx_chars(struct minitty_data *mtty, unsigned char *s, int len)
-+{
-+	struct circ_buf *circ = &mtty->state.xmit;
-+	int head, tail, space;
-+
-+	tail = smp_load_acquire(&circ->tail);
-+	head = circ->head;
-+	space = CIRC_SPACE(head, tail, UART_XMIT_SIZE);
-+	if (space < len)
-+		return false;
-+	while (len--) {
-+		circ->buf[head] = *s++;
-+		head = (head + 1) & (UART_XMIT_SIZE - 1);
-+	}
-+	smp_store_release(&circ->head, head);
-+	return true;
-+}
-+
-+/*
-+ * Queue characters in their cooked sequence.
-+ * Return true if queued, or false otherwise.
-+ */
-+static bool tx_cooked_char(struct minitty_data *mtty, unsigned char c)
-+{
-+	int spaces, next_col = mtty->column;
-+
-+	switch (c) {
-+	case '\n':
-+		if (O_ONLRET(mtty))
-+			next_col = 0;
-+		if (O_ONLCR(mtty)) {
-+			if (!queue_tx_chars(mtty, "\r\n", 2))
-+				return false;
-+			mtty->column = mtty->canon_start_pos = 0;
-+			return true;
-+		}
-+		break;
-+	case '\r':
-+		if (O_ONOCR(mtty) && mtty->column == 0)
-+			return true;
-+		if (O_OCRNL(mtty)) {
-+			c = '\n';
-+			if (O_ONLRET(mtty))
-+				next_col = 0;
-+		} else
-+			next_col = 0;
-+		break;
-+	case '\t':
-+		spaces = 8 - (mtty->column & 7);
-+		if (O_TABDLY(mtty) == XTABS) {
-+			if (!queue_tx_chars(mtty, "        ", spaces))
-+				return false;
-+			mtty->column += spaces;
-+			return true;
-+		}
-+		next_col += spaces;
-+		break;
-+	case '\b':
-+		if (next_col > 0)
-+			next_col--;
-+		break;
-+	default:
-+		if (iscntrl(c))
-+			break;
-+		if (is_utf8_continuation(mtty, c))
-+			break;
-+		next_col++;
-+		break;
-+	}
-+	if (!queue_tx_chars(mtty, &c, 1))
-+		return false;
-+	mtty->column = next_col;
-+	if (next_col == 0)
-+		mtty->canon_start_pos = 0;
-+	return true;
-+}
-+
-+/*
-+ * Queue echoed characters, converting CTRL sequences into "^X" if need be.
-+ * Return true if queued, or false otherwise.
-+ */
-+static bool echo_rx_char(struct minitty_data *mtty, unsigned char c)
-+{
-+	if (L_ECHOCTL(mtty) && iscntrl(c) && c != '\t' && c != '\n') {
-+		unsigned char buf[2];
-+		buf[0] = '^';
-+		buf[1] = c ^ 0100;
-+		return queue_tx_chars(mtty, buf, 2);
-+	}
-+	if (O_OPOST(mtty))
-+		return tx_cooked_char(mtty, c);
-+	else
-+		return queue_tx_chars(mtty, &c, 1);
-+}
-+
-+/*
-+ * Remove character from RX buffer at given position by shifting
-+ * all preceding characters ahead.
-+ */
-+static void eat_rx_char(struct minitty_data *mtty, int pos)
-+{
-+	unsigned char *buf = mtty->rx_buf;
-+	int tail = mtty->rx_tail;
-+	int bottom = (tail <= pos) ? tail : 0;
-+
-+	memmove(&buf[bottom+1], &buf[bottom], pos - bottom);
-+	if (tail > pos) {
-+		buf[0] = buf[RX_BUF_SIZE-1];
-+		memmove(&buf[tail+1], &buf[tail], RX_BUF_SIZE - 1 - tail);
-+	}
-+	smp_store_release(&mtty->rx_tail, RX_BUF_WRAP(tail + 1));
-+}
-+
-+/*
-+ * Create needed erase sequence according to the erase character c at
-+ * position pos in the RX buffer. The erase sequence is sent for each
-+ * erased characters and only if that succeeds then the character is
-+ * actually removed from the buffer. The erase character itself is removed
-+ * last so if the whole erase sequence cannot be completed then this can
-+ * be resumed later.
-+ */
-+static bool erase_rx_char(struct minitty_data *mtty, unsigned char c, int pos)
-+{
-+	int prev_pos = RX_BUF_WRAP(pos - 1);
-+	bool seen_alnum = false;
-+
-+	while (pos != mtty->rx_tail) {
-+		unsigned char prev_c = mtty->rx_buf[prev_pos];
-+
-+		if (is_line_termination(mtty, prev_c)) {
-+			/* End of previous line: we don't erase further. */
-+			break;
-+		}
-+
-+		if (is_utf8_continuation(mtty, prev_c)) {
-+			/* UTF8 continuation char: we just drop it */
-+			eat_rx_char(mtty, prev_pos);
-+			continue;
-+		}
-+
-+		if (c == WERASE_CHAR(mtty) && seen_alnum && !isalnum(prev_c)) {
-+			/* Beginning of previous word: we don't erase further */
-+			break;
-+		}
-+
-+		if (prev_c == '\t') {
-+			/* depends on characters before the tab */
-+			int spaces = 0;
-+			int i = prev_pos;
-+			while (i != mtty->rx_tail) {
-+				unsigned char before;
-+				i = RX_BUF_WRAP(i - 1);
-+				before = mtty->rx_buf[i];
-+				if (before == '\t')
-+					break;
-+				if (is_line_termination(mtty, before))
-+					break;
-+				if (L_ECHOCTL(mtty) && iscntrl(before))
-+					spaces += 2;
-+				else if (is_utf8_continuation(mtty, before))
-+					continue;
-+				else if (!iscntrl(before))
-+					spaces++;
-+			}
-+			if (i == mtty->rx_tail)
-+				spaces += mtty->canon_start_pos;
-+			spaces = 8 - (spaces & 7);
-+			if (!queue_tx_chars(mtty, "\b\b\b\b\b\b\b\b", spaces))
-+				return false;
-+			mtty->column -= spaces;
-+		} else if (L_ECHOCTL(mtty) && iscntrl(prev_c)) {
-+			/* control chars were printed as "^X" */
-+			if (!queue_tx_chars(mtty, "\b\b  \b\b", 6))
-+				return false;
-+			mtty->column -= 2;
-+		} else if (!iscntrl(prev_c)) {
-+			if (!queue_tx_chars(mtty, "\b \b", 3))
-+				return false;
-+			mtty->column -= 1;
-+		}
-+
-+		/* erase sequence sent, now remove the char from the buffer */
-+		eat_rx_char(mtty, prev_pos);
-+
-+		if (c == ERASE_CHAR(mtty))
-+			break;
-+	}
-+
-+	/* Finally remove the erase character itself. */
-+	eat_rx_char(mtty, pos);
-+	return true;
-+}
-+
-+/*
-+ * Process RX bytes: canonical mode, echo, signals, etc.
-+ * This might not process all RX characters if e.g. there is not enough
-+ * room in the TX buffer to contain corresponding echo sequences.
-+ */
-+static void minitty_process_rx(struct minitty_data *mtty)
-+{
-+	bool xmit = false;
-+	int i, head;
-+       
-+	head = smp_load_acquire(&mtty->rx_head);
-+
-+	if (mtty->rx_raw) {
-+		smp_store_release(&mtty->rx_vetted, head);
-+		return;
-+	}
-+
-+	/*
-+	 * RX overflow mitigation: evaluate the last received character
-+	 * stored at the very head of the buffer in case it might be a
-+	 * signal or newline character that could kick the reader into
-+	 * action. We potentially overwrite the last vetted character but
-+	 * we're past any concern for lost characters at this point.
-+	 */
-+	if (unlikely(mtty->rx_overflow)) {
-+		WRITE_ONCE(mtty->rx_overflow, false);
-+		if (RX_BUF_WRAP(head + 1) == mtty->rx_tail) {
-+			i = RX_BUF_WRAP(head - 1);
-+			mtty->rx_buf[i] = mtty->rx_buf[head];
-+			if (mtty->rx_vetted == head)
-+				mtty->rx_vetted = i;
-+		}
-+	}
-+
-+	for (i = mtty->rx_vetted; i != head; i = RX_BUF_WRAP(i + 1)) {
-+		unsigned char c = mtty->rx_buf[i];
-+
-+		if (c == '\r') {
-+			if (I_IGNCR(mtty)) {
-+				eat_rx_char(mtty, i);
-+				continue;
-+			}
-+			if (I_ICRNL(mtty))
-+				mtty->rx_buf[i] = c = '\n';
-+		} else if (c == '\n' && I_INLCR(mtty))
-+			mtty->rx_buf[i] = c = '\r';
-+
-+		if (L_ICANON(mtty)) {
-+			if ((L_ECHOE(mtty) && c == ERASE_CHAR(mtty)) ||
-+			    (L_ECHOE(mtty) && c == WERASE_CHAR(mtty)) ||
-+			    (L_ECHOK(mtty) && c == KILL_CHAR(mtty))) {
-+				xmit = true;
-+				if (!erase_rx_char(mtty, c, i))
-+						break;
-+				continue;
-+			}
-+			if (is_line_termination(mtty, c)) {
-+				mtty->rx_lines++;
-+				if (c != '\n')
-+					continue;
-+			}
-+		}
-+
-+		if (L_ECHO(mtty) || (c == '\n' && L_ECHONL(mtty))) {
-+			xmit = true;
-+			if (!echo_rx_char(mtty, c))
-+				break;
-+		}
-+	}
-+
-+	smp_store_release(&mtty->rx_vetted, i);
-+
-+	if (xmit)
-+		uart_start_tx(mtty);
-+}
-+
-+static bool rx_data_available(struct minitty_data *mtty, bool poll)
-+{
-+	bool data_avail = (mtty->rx_tail != mtty->rx_vetted);
-+	if (data_avail && !L_ICANON(mtty)) {
-+		int amt = poll && !TIME_CHAR(mtty) && MIN_CHAR(mtty) ?
-+				MIN_CHAR(mtty) : 1;
-+		data_avail = RX_BUF_WRAP(mtty->rx_vetted - mtty->rx_tail) >= amt;
-+	} else if (data_avail && !mtty->rx_lines) {
-+		/* wait for a full line */
-+		data_avail = false;
-+	} else if (!data_avail && mtty->rx_lines) {
-+		/*
-+		 * This may happen if the RX buffer was flushed by a signal
-+		 * or during RX overflow. Let's just reset it to zero.
-+		 */
-+		mtty->rx_lines = 0;
-+	}
-+	return data_avail;
-+}
-+
-+static void uart_rx_work(struct work_struct *work)
-+{
-+	struct minitty_data *mtty = container_of(work, typeof(*mtty), rx_work);
-+
-+	mutex_lock(&mtty->mutex);
-+	minitty_process_rx(mtty);
-+	if (rx_data_available(mtty, true))
-+		wake_up_interruptible_poll(&mtty->read_wait, POLLIN);
-+	mutex_unlock(&mtty->mutex);
-+}
-+
-+static ssize_t minitty_raw_read(struct minitty_data *mtty, char __user *buf,
-+				size_t count)
-+{
-+	int head, tail, len, ret = 0;
-+
-+	head = smp_load_acquire(&mtty->rx_vetted); 
-+	tail = mtty->rx_tail;
-+	do {
-+		len = CIRC_CNT(head, tail, RX_BUF_SIZE);
-+		if (len > count)
-+			len = count;
-+		if (copy_to_user(buf, mtty->rx_buf+tail, len) != 0)
-+			return -EFAULT;
-+		tail = RX_BUF_WRAP(tail + len);
-+		buf += len;
-+		count -= len;
-+		ret += len;
-+	} while (count && len && tail == 0);
-+	smp_store_release(&mtty->rx_tail, tail);
-+	return ret;
-+}
-+
-+static ssize_t minitty_cooked_read(struct minitty_data *mtty, char __user *buf,
-+				   size_t count)
-+{
-+	int head, tail, i, ret;
-+	bool eol = false;
-+
-+	head = smp_load_acquire(&mtty->rx_vetted);
-+	tail = mtty->rx_tail;
-+
-+	/* First, locate the end-of-line marker if any. */
-+	for (i = tail; i != head && count; i = RX_BUF_WRAP(i + 1), count--) {
-+		unsigned char c = mtty->rx_buf[i];
-+		if (is_line_termination(mtty, c)) {
-+			eol = true;
-+			break;
-+		}
-+	}
-+
-+	count = CIRC_CNT(i, tail, RX_BUF_SIZE);
-+
-+	if (eol) {
-+		/* Include the line delimiter except for EOF */
-+		if (mtty->rx_buf[i] != EOF_CHAR(mtty))
-+			count++;
-+		i = RX_BUF_WRAP(i + 1);
-+	}
-+
-+	ret = minitty_raw_read(mtty, buf, count);
-+	if (ret >= 0 && eol) {
-+		/* we consumed a whole line */
-+		mtty->rx_lines--;
-+		/* adjust tail in case EOF was skipped */
-+		smp_store_release(&mtty->rx_tail, i);
-+	}
-+	return ret;
-+}
-+
-+static ssize_t minitty_read(struct file *file, char __user *buf,
-+			    size_t count, loff_t *ppos)
-+{
-+	struct minitty_data *mtty = file->private_data;
-+	char __user *buf0 = buf;
-+	DEFINE_WAIT_FUNC(wait, woken_wake_function);
-+	int minimum, time;
-+	long timeout;
-+	int ret = 0;
-+
-+	mutex_lock(&mtty->mutex);
-+
-+	minimum = time = 0;
-+	timeout = MAX_SCHEDULE_TIMEOUT;
-+	if (!L_ICANON(mtty)) {
-+		minimum = MIN_CHAR(mtty);
-+		if (minimum) {
-+			time = (HZ / 10) * TIME_CHAR(mtty);
-+		} else {
-+			timeout = (HZ / 10) * TIME_CHAR(mtty);
-+			minimum = 1;
-+		}
-+	}
-+
-+	add_wait_queue(&mtty->read_wait, &wait);
-+
-+	while (count) {
-+		minitty_process_rx(mtty);
-+
-+		if (!rx_data_available(mtty, false)) {
-+			if (!timeout)
-+				break;
-+			if (file->f_flags & O_NONBLOCK) {
-+				ret = -EAGAIN;
-+				break;
-+			}
-+			if (signal_pending(current)) {
-+				ret = -ERESTARTSYS;
-+				break;
-+			}
-+			mutex_unlock(&mtty->mutex);
-+			timeout = wait_woken(&wait, TASK_INTERRUPTIBLE,
-+					     timeout);
-+			mutex_lock(&mtty->mutex);
-+			continue;
-+		}
-+
-+		if (L_ICANON(mtty)) {
-+			ret = minitty_cooked_read(mtty, buf, count);
-+			if (ret > 0)
-+				buf += ret;
-+			break;
-+		}
-+
-+		ret = minitty_raw_read(mtty, buf, count);
-+		if (ret < 0)
-+			break;
-+		buf += ret;
-+		count -= ret;
-+		if (buf - buf0 >= minimum)
-+			break;
-+		if (time)
-+			timeout = time;
-+	}
-+
-+	remove_wait_queue(&mtty->read_wait, &wait);
-+	mutex_unlock(&mtty->mutex);
-+	if (buf - buf0)
-+		ret = buf - buf0;
-+	return ret;
-+}
-+
-+static ssize_t minitty_raw_write(struct minitty_data *mtty, const char __user *buf,
-+				 size_t count)
-+{
-+	struct circ_buf *circ = &mtty->state.xmit;
-+	int head, tail, len, ret = 0;
-+
-+	tail = smp_load_acquire(&circ->tail);
-+	head = circ->head;
-+	do {
-+		len = CIRC_SPACE_TO_END(head, tail, UART_XMIT_SIZE);
-+		if (len > count)
-+			len = count;
-+		if (copy_from_user(circ->buf + head, buf, len) != 0)
-+			return -EFAULT;
-+		head = (head + len) & (UART_XMIT_SIZE - 1);
-+		buf += len;
-+		count -= len;
-+		ret += len;
-+	} while (count && len && head == 0);
-+	smp_store_release(&circ->head, head);
-+
-+	uart_start_tx(mtty);
-+	return ret;
-+}
-+
-+static ssize_t minitty_cooked_write(struct minitty_data *mtty, const char __user *buf,
-+				    size_t count)
-+{
-+	const char __user *buf0 = buf;
-+
-+	while (count--) {
-+		unsigned char c;
-+		if (get_user(c, buf) != 0)
-+			return -EFAULT;
-+		if (!tx_cooked_char(mtty, c))
-+			break;
-+		buf++;
-+	}
-+	mtty->canon_start_pos = mtty->column;
-+
-+	uart_start_tx(mtty);
-+	return buf - buf0;
-+}
-+
-+static ssize_t minitty_write(struct file *file, const char __user *buf,
-+			     size_t count, loff_t *ppos)
-+{
-+	struct minitty_data *mtty = file->private_data;
-+	const char __user *buf0 = buf;
-+	DEFINE_WAIT_FUNC(wait, woken_wake_function);
-+	int ret;
-+
-+	mutex_lock(&mtty->mutex);
-+	add_wait_queue(&mtty->write_wait, &wait);
-+
-+	while (1) {
-+		/* give priority to RX echo and signals */
-+		minitty_process_rx(mtty);
-+
-+		if (signal_pending(current)) {
-+			ret = -ERESTARTSYS;
-+			break;
-+		}
-+
-+		if (O_OPOST(mtty))
-+			ret = minitty_cooked_write(mtty, buf, count);
-+		else
-+			ret = minitty_raw_write(mtty, buf, count);
-+		if (ret < 0)
-+			break;
-+		buf += ret;
-+		count -= ret;
-+		if (!count)
-+			break;
-+		if (file->f_flags & O_NONBLOCK) {
-+			ret = -EAGAIN;
-+			break;
-+		}
-+		mutex_unlock(&mtty->mutex);
-+		wait_woken(&wait, TASK_INTERRUPTIBLE, MAX_SCHEDULE_TIMEOUT);
-+		mutex_lock(&mtty->mutex);
-+	}
-+
-+	remove_wait_queue(&mtty->write_wait, &wait);
-+	mutex_unlock(&mtty->mutex);
-+	return (buf - buf0) ? buf - buf0 : ret;
-+}
-+
-+static unsigned int minitty_poll(struct file *file, poll_table *wait)
-+{
-+	struct minitty_data *mtty = file->private_data;
-+	struct uart_port *port = mtty->state.uart_port;
-+	unsigned int mask = 0;
-+
-+	mutex_lock(&mtty->mutex);
-+
-+	poll_wait(file, &mtty->read_wait, wait);
-+	poll_wait(file, &mtty->write_wait, wait);
-+
-+	if (rx_data_available(mtty, true)) {
-+		mask |= POLLIN | POLLRDNORM;
-+	} else {
-+		minitty_process_rx(mtty);
-+		if (rx_data_available(mtty, true))
-+			mask |= POLLIN | POLLRDNORM;
-+	}
-+
-+	if (!port->hw_stopped) {
-+		struct circ_buf *circ = &mtty->state.xmit;
-+		int tail = smp_load_acquire(&circ->tail);
-+		int head = circ->head;
-+		int count = CIRC_CNT(head, tail, UART_XMIT_SIZE);
-+		if (count < WAKEUP_CHARS)
-+			mask |= POLLOUT | POLLWRNORM;
-+	}
-+
-+	mutex_unlock(&mtty->mutex);
-+
-+	return mask;
-+}
-+
-+static int uart_port_startup(struct minitty_data *mtty)
-+{
-+	struct uart_state *state = &mtty->state;
-+	struct uart_port *port = state->uart_port;
-+	unsigned long page;
-+	int ret;
-+
-+	/* Make sure the device is in D0 state. */
-+	uart_change_pm(state, UART_PM_STATE_ON);
-+
-+	/* Initialise and allocate the transmit buffer. */
-+	page = get_zeroed_page(GFP_KERNEL);
-+	if (!page)
-+		return -ENOMEM;
-+	state->xmit.buf = (unsigned char *) page;
-+	uart_circ_clear(&state->xmit);
-+
-+	/* Initialise and allocate the receive buffer. */
-+	page = get_zeroed_page(GFP_KERNEL);
-+	if (!page) {
-+		ret = -ENOMEM;
-+		goto err_free_tx;
-+	}
-+	mtty->rx_buf = (unsigned char *) page;
-+	mtty->rx_head = mtty->rx_tail = mtty->rx_vetted = mtty->rx_lines = 0;
-+	mtty->rx_overflow = false;
-+
-+	ret = port->ops->startup(port);
-+	if (ret)
-+		goto err_free_rx;
-+
-+	if (uart_console(port) && port->cons->cflag) {
-+		mtty->termios.c_cflag = port->cons->cflag;
-+		port->cons->cflag = 0;
-+	}
-+
-+	/* Initialise the hardware port settings. */
-+	uart_change_speed(mtty, NULL);
-+
-+	/*
-+	 * Setup the RTS and DTR signals once the
-+	 * port is open and ready to respond.
-+	 */
-+	uart_set_mctrl(port, TIOCM_RTS | TIOCM_DTR);
-+
-+	return 0;
-+
-+err_free_rx:
-+	free_page((unsigned long)mtty->rx_buf);
-+	mtty->rx_buf = NULL;
-+err_free_tx:
-+	free_page((unsigned long)state->xmit.buf);
-+	state->xmit.buf = NULL;
-+	return ret;
-+}
-+
-+/*
-+ * This routine will shutdown a serial port; interrupts are disabled, and
-+ * DTR is dropped if the hangup on close termio flag is on.
-+ */
-+static void uart_port_shutdown(struct minitty_data *mtty)
-+{
-+	struct uart_state *state = &mtty->state;
-+	struct uart_port *port = state->uart_port;
-+
-+	spin_lock_irq(&port->lock);
-+	port->ops->stop_rx(port);
-+	spin_unlock_irq(&port->lock);
-+
-+	if (uart_console(port))
-+		port->cons->cflag = mtty->termios.c_cflag;
-+
-+	/* Turn off DTR and RTS early. */
-+	if (C_HUPCL(mtty))
-+		uart_clear_mctrl(port, TIOCM_DTR | TIOCM_RTS);
-+
-+	/* Free the IRQ and disable the port. */
-+	port->ops->shutdown(port);
-+	synchronize_irq(port->irq);
-+
-+	/* Free the transmit buffer page. */
-+	free_page((unsigned long)state->xmit.buf);
-+	state->xmit.buf = NULL;
-+
-+	/* Free the receive buffer page. */
-+	free_page((unsigned long)mtty->rx_buf);
-+	mtty->rx_buf = NULL;
-+}
-+
-+static int minitty_open(struct inode *inode, struct file *file)
-+{
-+	struct minitty_data *mtty = NULL;
-+	dev_t devt = inode->i_rdev;
-+	int ret = 0;
-+
-+	if (devt == MKDEV(TTYAUX_MAJOR, 1)) {
-+		struct console *co;
-+		struct uart_driver *drv;
-+		console_lock();
-+		for_each_console(co) {
-+			if (co->device  != uart_console_device)
-+				continue;
-+			drv = co->data;
-+			mtty = container_of(drv->state, typeof(*mtty), state);
-+			mtty +=	co->index;
-+			break;
-+		}
-+		console_unlock();
-+		if (!mtty)
-+			return -ENODEV;
-+	} else {
-+		mtty = container_of(inode->i_cdev, typeof(*mtty), cdev);
-+	}
-+
-+	nonseekable_open(inode, file);
-+
-+	file->private_data = mtty;
-+
-+	mutex_lock(&mtty->mutex);
-+	if (!mtty->usecount++) {
-+		ret = uart_port_startup(mtty);
-+		if (ret)
-+			mtty->usecount--;
-+	}
-+	mutex_unlock(&mtty->mutex);
-+	return ret;
-+}
-+
-+static int minitty_release(struct inode *inode, struct file *file)
-+{
-+	struct minitty_data *mtty = file->private_data;
-+	struct uart_state *state = &mtty->state;
-+	struct uart_port *port = state->uart_port;
-+
-+	mutex_lock(&mtty->mutex);
-+	mtty->usecount--;
-+	if (!mtty->usecount) {
-+		uart_flush_tx_buffer(mtty);
-+		uart_port_shutdown(mtty);
-+		if (!uart_console(port))
-+			uart_change_pm(state, UART_PM_STATE_OFF);
-+	}
-+	mutex_unlock(&mtty->mutex);
-+	return 0;
-+}
-+
-+static const struct file_operations minitty_fops = {
-+	.llseek		= no_llseek,
-+	.read		= minitty_read,
-+	.write		= minitty_write,
-+	.poll		= minitty_poll,
-+	.unlocked_ioctl	= minitty_ioctl,
-+	.open		= minitty_open,
-+	.release	= minitty_release,
-+};
-+
-+struct class *minitty_class;
-+
-+#if defined(CONFIG_SERIAL_CORE_CONSOLE) || defined(CONFIG_CONSOLE_POLL)
-+/**
-+ *	uart_console_write - write a console message to a serial port
-+ *	@port: the port to write the message
-+ *	@s: array of characters
-+ *	@count: number of characters in string to write
-+ *	@putchar: function to write character to port
-+ */
-+void uart_console_write(struct uart_port *port, const char *s,
-+			unsigned int count,
-+			void (*putchar)(struct uart_port *, int))
-+{
-+	unsigned int i;
-+
-+	for (i = 0; i < count; i++, s++) {
-+		if (*s == '\n')
-+			putchar(port, '\r');
-+		putchar(port, *s);
-+	}
-+}
-+EXPORT_SYMBOL_GPL(uart_console_write);
-+
-+/*
-+ *	Check whether an invalid uart number has been specified, and
-+ *	if so, search for the first available port that does have
-+ *	console support.
-+ */
-+struct uart_port * __init
-+uart_get_console(struct uart_port *ports, int nr, struct console *co)
-+{
-+	int idx = co->index;
-+
-+	if (idx < 0 || idx >= nr || (ports[idx].iobase == 0 &&
-+				     ports[idx].membase == NULL))
-+		for (idx = 0; idx < nr; idx++)
-+			if (ports[idx].iobase != 0 ||
-+			    ports[idx].membase != NULL)
-+				break;
-+
-+	co->index = idx;
-+
-+	return ports + idx;
-+}
-+
-+/**
-+ *	uart_parse_earlycon - Parse earlycon options
-+ *	@p:	  ptr to 2nd field (ie., just beyond '<name>,')
-+ *	@iotype:  ptr for decoded iotype (out)
-+ *	@addr:    ptr for decoded mapbase/iobase (out)
-+ *	@options: ptr for <options> field; NULL if not present (out)
-+ *
-+ *	Decodes earlycon kernel command line parameters of the form
-+ *	   earlycon=<name>,io|mmio|mmio16|mmio32|mmio32be|mmio32native,<addr>,<options>
-+ *	   console=<name>,io|mmio|mmio16|mmio32|mmio32be|mmio32native,<addr>,<options>
-+ *
-+ *	The optional form
-+ *	   earlycon=<name>,0x<addr>,<options>
-+ *	   console=<name>,0x<addr>,<options>
-+ *	is also accepted; the returned @iotype will be UPIO_MEM.
-+ *
-+ *	Returns 0 on success or -EINVAL on failure
-+ */
-+int uart_parse_earlycon(char *p, unsigned char *iotype, resource_size_t *addr,
-+			char **options)
-+{
-+	if (strncmp(p, "mmio,", 5) == 0) {
-+		*iotype = UPIO_MEM;
-+		p += 5;
-+	} else if (strncmp(p, "mmio16,", 7) == 0) {
-+		*iotype = UPIO_MEM16;
-+		p += 7;
-+	} else if (strncmp(p, "mmio32,", 7) == 0) {
-+		*iotype = UPIO_MEM32;
-+		p += 7;
-+	} else if (strncmp(p, "mmio32be,", 9) == 0) {
-+		*iotype = UPIO_MEM32BE;
-+		p += 9;
-+	} else if (strncmp(p, "mmio32native,", 13) == 0) {
-+		*iotype = IS_ENABLED(CONFIG_CPU_BIG_ENDIAN) ?
-+			UPIO_MEM32BE : UPIO_MEM32;
-+		p += 13;
-+	} else if (strncmp(p, "io,", 3) == 0) {
-+		*iotype = UPIO_PORT;
-+		p += 3;
-+	} else if (strncmp(p, "0x", 2) == 0) {
-+		*iotype = UPIO_MEM;
-+	} else {
-+		return -EINVAL;
-+	}
-+
-+	/*
-+	 * Before you replace it with kstrtoull(), think about options separator
-+	 * (',') it will not tolerate
-+	 */
-+	*addr = simple_strtoull(p, NULL, 0);
-+	p = strchr(p, ',');
-+	if (p)
-+		p++;
-+
-+	*options = p;
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(uart_parse_earlycon);
-+
-+/**
-+ *	uart_parse_options - Parse serial port baud/parity/bits/flow control.
-+ *	@options: pointer to option string
-+ *	@baud: pointer to an 'int' variable for the baud rate.
-+ *	@parity: pointer to an 'int' variable for the parity.
-+ *	@bits: pointer to an 'int' variable for the number of data bits.
-+ *	@flow: pointer to an 'int' variable for the flow control character.
-+ *
-+ *	uart_parse_options decodes a string containing the serial console
-+ *	options.  The format of the string is <baud><parity><bits><flow>,
-+ *	eg: 115200n8r
-+ */
-+void
-+uart_parse_options(char *options, int *baud, int *parity, int *bits, int *flow)
-+{
-+	char *s = options;
-+
-+	*baud = simple_strtoul(s, NULL, 10);
-+	while (*s >= '0' && *s <= '9')
-+		s++;
-+	if (*s)
-+		*parity = *s++;
-+	if (*s)
-+		*bits = *s++ - '0';
-+	if (*s)
-+		*flow = *s;
-+}
-+EXPORT_SYMBOL_GPL(uart_parse_options);
-+
-+/**
-+ *	uart_set_options - setup the serial console parameters
-+ *	@port: pointer to the serial ports uart_port structure
-+ *	@co: console pointer
-+ *	@baud: baud rate
-+ *	@parity: parity character - 'n' (none), 'o' (odd), 'e' (even)
-+ *	@bits: number of data bits
-+ *	@flow: flow control character - 'r' (rts)
-+ */
-+int
-+uart_set_options(struct uart_port *port, struct console *co,
-+		 int baud, int parity, int bits, int flow)
-+{
-+	struct ktermios termios;
-+	static struct ktermios dummy;
-+
-+	/*
-+	 * Ensure that the serial console lock is initialised
-+	 * early.
-+	 * If this port is a console, then the spinlock is already
-+	 * initialised.
-+	 */
-+	if (!(uart_console(port) && (port->cons->flags & CON_ENABLED)))
-+		spin_lock_init(&port->lock);
-+
-+	memset(&termios, 0, sizeof(struct ktermios));
-+
-+	termios.c_cflag |= CREAD | HUPCL | CLOCAL;
-+	tty_termios_encode_baud_rate(&termios, baud, baud);
-+
-+	if (bits == 7)
-+		termios.c_cflag |= CS7;
-+	else
-+		termios.c_cflag |= CS8;
-+
-+	switch (parity) {
-+	case 'o': case 'O':
-+		termios.c_cflag |= PARODD;
-+		/*fall through*/
-+	case 'e': case 'E':
-+		termios.c_cflag |= PARENB;
-+		break;
-+	}
-+
-+	if (flow == 'r')
-+		termios.c_cflag |= CRTSCTS;
-+
-+	/*
-+	 * some uarts on other side don't support no flow control.
-+	 * So we set * DTR in host uart to make them happy
-+	 */
-+	port->mctrl |= TIOCM_DTR;
-+
-+	port->ops->set_termios(port, &termios, &dummy);
-+	/*
-+	 * Allow the setting of the UART parameters with a NULL console
-+	 * too:
-+	 */
-+	if (co)
-+		co->cflag = termios.c_cflag;
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(uart_set_options);
-+#endif /* CONFIG_SERIAL_CORE_CONSOLE */
-+
-+static int
-+uart_configure_port(struct uart_driver *drv, struct uart_state *state,
-+		    struct uart_port *port)
-+{
-+	unsigned int flags;
-+
-+	/*
-+	 * If there isn't a port here, don't do anything further.
-+	 */
-+	if (!port->iobase && !port->mapbase && !port->membase)
-+		return -ENXIO;
-+
-+	/*
-+	 * Now do the auto configuration stuff.  Note that config_port
-+	 * is expected to claim the resources and map the port for us.
-+	 */
-+	flags = 0;
-+	if (port->flags & UPF_BOOT_AUTOCONF) {
-+		if (!(port->flags & UPF_FIXED_TYPE)) {
-+			port->type = PORT_UNKNOWN;
-+			flags |= UART_CONFIG_TYPE;
-+		}
-+		port->ops->config_port(port, flags);
-+	}
-+
-+	if (port->type != PORT_UNKNOWN) {
-+		unsigned long flags;
-+
-+		pr_info("%s%d %s\n", drv->dev_name, port->line,
-+			port->ops->type ? port->ops->type(port) : "");
-+
-+		/* Power up port for set_mctrl() */
-+		uart_change_pm(state, UART_PM_STATE_ON);
-+
-+		/*
-+		 * Ensure that the modem control lines are de-activated.
-+		 * keep the DTR setting that is set in uart_set_options()
-+		 * We probably don't need a spinlock around this, but
-+		 */
-+		spin_lock_irqsave(&port->lock, flags);
-+		port->ops->set_mctrl(port, port->mctrl & TIOCM_DTR);
-+		spin_unlock_irqrestore(&port->lock, flags);
-+
-+		/*
-+		 * If this driver supports console, and it hasn't been
-+		 * successfully registered yet, try to re-register it.
-+		 * It may be that the port was not available.
-+		 */
-+		if (port->cons && !(port->cons->flags & CON_ENABLED))
-+			register_console(port->cons);
-+
-+		/*
-+		 * Power down all ports by default, except the
-+		 * console if we have one.
-+		 */
-+		if (!uart_console(port))
-+			uart_change_pm(state, UART_PM_STATE_OFF);
-+
-+		return 0;
-+	}
-+
-+	return -EINVAL;
-+}
-+
-+/**
-+ *	uart_add_one_port - attach a driver-defined port structure
-+ *	@drv: pointer to the uart low level driver structure for this port
-+ *	@port: uart port structure to use for this port.
-+ */
-+int uart_add_one_port(struct uart_driver *drv, struct uart_port *port)
-+{
-+	unsigned int index = port->line;
-+	dev_t devt = MKDEV(drv->major, drv->minor) + index;
-+	struct minitty_data *mtty;
-+	struct uart_state *state;
-+	int ret;
-+
-+	mtty = container_of(drv->state, typeof(*mtty), state) + index;
-+	state = &mtty->state;
-+
-+	state->uart_port = port;
-+	state->pm_state = UART_PM_STATE_UNDEFINED;
-+	port->state = state;
-+	port->cons = drv->cons;
-+	port->minor = drv->minor + index;
-+
-+	/* our default termios */
-+	mtty->termios.c_iflag = ICRNL;
-+	mtty->termios.c_oflag = OPOST | ONLCR;
-+	mtty->termios.c_cflag = B9600 | CS8 | CREAD | HUPCL | CLOCAL;
-+	mtty->termios.c_lflag = ICANON | ECHO | ECHOE | ECHOK | ECHOKE | ECHOCTL;
-+	mtty->termios.c_ispeed = 9600;
-+	mtty->termios.c_ospeed = 9600;
-+	memcpy(mtty->termios.c_cc, INIT_C_CC, sizeof(cc_t)*NCCS);
-+
-+	mutex_init(&mtty->mutex);
-+	init_waitqueue_head(&mtty->write_wait);
-+	init_waitqueue_head(&mtty->read_wait);
-+	INIT_WORK(&mtty->rx_work, uart_rx_work);
-+
-+	/*
-+	 * If this port is a console, then the spinlock is already
-+	 * initialised.
-+	 */
-+	if (!(uart_console(port) && (port->cons->flags & CON_ENABLED)))
-+		spin_lock_init(&port->lock);
-+	if (port->cons && port->dev)
-+		of_console_check(port->dev->of_node, port->cons->name, index);
-+
-+	ret = uart_configure_port(drv, state, port);
-+	/*
-+	 * We don't support setserial so no point registering a nonexistent
-+	 * device . Silently ignore this port if not present.
-+	 */
-+	if (ret) {
-+		ret = 0;
-+		goto out;
-+	}
-+
-+	state->port.console = uart_console(port);
-+
-+	cdev_init(&mtty->cdev, &minitty_fops);
-+	mtty->cdev.owner = drv->owner;
-+	ret = cdev_add(&mtty->cdev, devt, 1);
-+	if (ret)
-+		goto out;
-+	mtty->dev = device_create(minitty_class, port->dev, devt, mtty,
-+				  "%s%d", drv->dev_name, index);
-+	if (IS_ERR(mtty->dev)) {
-+		ret = PTR_ERR(mtty->dev);
-+		goto err_cdev_del;
-+	}
-+
-+	return 0;
-+
-+err_cdev_del:
-+	cdev_del(&mtty->cdev);
-+out:
-+	return ret;
-+}
-+EXPORT_SYMBOL(uart_add_one_port);
-+
-+/**
-+ *	uart_remove_one_port - detach a driver defined port structure
-+ *	@drv: pointer to the uart low level driver structure for this port
-+ *	@port: uart port structure for this port
-+ *
-+ *	This unhooks the specified port structure from the core driver.
-+ *	No further calls will be made to the low-level code for this port.
-+ */
-+int uart_remove_one_port(struct uart_driver *drv, struct uart_port *port)
-+{
-+	unsigned int index = port->line;
-+	dev_t devt = MKDEV(drv->major, drv->minor) + index;
-+	struct minitty_data *mtty;
-+	struct uart_state *state;
-+
-+	mtty = container_of(drv->state, typeof(*mtty), state) + index;
-+	state = &mtty->state;
-+	BUG_ON(state != port->state);
-+
-+	device_destroy(minitty_class, devt);
-+	cdev_del(&mtty->cdev);
-+
-+	if (uart_console(port))
-+		unregister_console(port->cons);
-+
-+	if (port->type != PORT_UNKNOWN && port->ops->release_port)
-+		port->ops->release_port(port);
-+	port->type = PORT_UNKNOWN;
-+	state->uart_port = NULL;
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL(uart_remove_one_port);
-+
-+/**
-+ *	uart_register_driver - register a driver with the uart core layer
-+ *	@drv: low level driver structure
-+ *
-+ *	Register a uart driver. The per-port structures should be
-+ *	registered using uart_add_one_port after this call has succeeded.
-+ */
-+int uart_register_driver(struct uart_driver *drv)
-+{
-+	struct minitty_data *mtty;
-+	int ret;
-+
-+	BUG_ON(drv->state);
-+
-+	mtty = kzalloc(sizeof(*mtty) * drv->nr, GFP_KERNEL);
-+	if (!mtty)
-+		return -ENOMEM;
-+
-+	if (!drv->major) {
-+		dev_t devt;
-+		ret = alloc_chrdev_region(&devt, drv->minor, drv->nr, drv->driver_name);
-+		drv->major = MAJOR(devt);
-+		drv->minor = MINOR(devt);
-+	} else {
-+		dev_t devt = MKDEV(drv->major, drv->minor);
-+		ret = register_chrdev_region(devt, drv->nr, drv->driver_name);
-+	}
-+	if (ret < 0)
-+		goto err;
-+
-+	drv->state = &mtty->state;
-+	return 0;
-+
-+err:
-+	kfree(mtty);
-+	return ret;
-+}
-+EXPORT_SYMBOL(uart_register_driver);
-+
-+/**
-+ *	uart_unregister_driver - remove a driver from the uart core layer
-+ *	@drv: low level driver structure
-+ *
-+ *	Remove all references to a driver from the core driver.  The low
-+ *	level driver must have removed all its ports via the
-+ *	uart_remove_one_port() if it registered them with uart_add_one_port().
-+ */
-+void uart_unregister_driver(struct uart_driver *drv)
-+{
-+	dev_t devt = MKDEV(drv->major, drv->minor);
-+	struct minitty_data *mtty;
-+
-+	unregister_chrdev_region(devt, drv->nr);
-+	mtty = container_of(drv->state, typeof(*mtty), state);
-+	drv->state = NULL;
-+	kfree(mtty);
-+}
-+EXPORT_SYMBOL(uart_unregister_driver);
-+
-+void do_SAK(struct tty_struct *tty)
-+{
-+}
-+EXPORT_SYMBOL(do_SAK);
-+
-+struct tty_driver *uart_console_device(struct console *co, int *index)
-+{
-+	return NULL;
-+}
-+
-+static struct cdev console_cdev;
-+
-+static char *minitty_devnode(struct device *dev, umode_t *mode)
-+{
-+	if (!mode)
-+		return NULL;
-+	if (dev->devt == MKDEV(TTYAUX_MAJOR, 0) ||
-+			dev->devt == MKDEV(TTYAUX_MAJOR, 2))
-+		*mode = 0666;
-+	return NULL;
-+}
-+
-+static int __init minitty_class_init(void)
-+{
-+	minitty_class = class_create(THIS_MODULE, "tty");
-+	if (IS_ERR(minitty_class))
-+		return PTR_ERR(minitty_class);
-+	minitty_class->devnode = minitty_devnode;
-+	return 0;
-+}
-+postcore_initcall(minitty_class_init);
-+
-+int __init minitty_init(void)
-+{
-+	dev_t devt = MKDEV(TTYAUX_MAJOR, 1);
-+	cdev_init(&console_cdev, &minitty_fops);
-+	if (cdev_add(&console_cdev, devt, 1) ||
-+	    register_chrdev_region(devt, 1, "/dev/console") < 0)
-+		panic("Couldn't register /dev/console driver\n");
-+	device_create(minitty_class, NULL, devt, NULL, "console");
-+	return 0;
-+}
-+device_initcall(minitty_init);
-diff --git a/include/linux/tty_flip.h b/include/linux/tty_flip.h
-index c28dd523f9..5393513298 100644
---- a/include/linux/tty_flip.h
-+++ b/include/linux/tty_flip.h
-@@ -13,6 +13,7 @@ extern int tty_prepare_flip_string(struct tty_port *port,
- extern void tty_flip_buffer_push(struct tty_port *port);
- void tty_schedule_flip(struct tty_port *port);
- 
-+#ifndef CONFIG_MINITTY_SERIAL
- static inline int tty_insert_flip_char(struct tty_port *port,
- 					unsigned char ch, char flag)
- {
-@@ -28,6 +29,9 @@ static inline int tty_insert_flip_char(struct tty_port *port,
- 	}
- 	return tty_insert_flip_string_flags(port, &ch, &flag, 1);
- }
-+#else
-+int tty_insert_flip_char(struct tty_port *port, unsigned char ch, char flag);
-+#endif
- 
- static inline int tty_insert_flip_string(struct tty_port *port,
- 		const unsigned char *chars, size_t size)
++device_initcall(register_qcom_l3_cache_pmu_driver);
+diff --git a/include/linux/cpuhotplug.h b/include/linux/cpuhotplug.h
+index 62d240e..cfcfab3 100644
+--- a/include/linux/cpuhotplug.h
++++ b/include/linux/cpuhotplug.h
+@@ -137,6 +137,7 @@ enum cpuhp_state {
+ 	CPUHP_AP_PERF_ARM_CCN_ONLINE,
+ 	CPUHP_AP_PERF_ARM_L2X0_ONLINE,
+ 	CPUHP_AP_PERF_ARM_QCOM_L2_ONLINE,
++	CPUHP_AP_PERF_ARM_QCOM_L3_ONLINE,
+ 	CPUHP_AP_WORKQUEUE_ONLINE,
+ 	CPUHP_AP_RCUTREE_ONLINE,
+ 	CPUHP_AP_ONLINE_DYN,
 -- 
-2.9.3
+Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
