@@ -1,31 +1,33 @@
-From: thgarnie@google.com (Thomas Garnier)
-Date: Thu, 23 Mar 2017 08:40:03 -0700
-Subject: [PATCH v4 1/4] syscalls: Restore address limit after a syscall
-In-Reply-To: <20170323153204.4lxglq6jlvvxp6ev@pd.tnic>
-References: <20170322203834.67556-1-thgarnie@google.com>
- <CALCETrV6K8iSfAwojMFyLrbb3CG2aF4k5hPWc7EDV4ErPDq64w@mail.gmail.com>
- <CAJcbSZGLAXmE_mFZMAZgioWExzm3A4vXBKLGJ7DZNAbJOcH8Zw@mail.gmail.com>
- <f0cf8766-4ee9-5386-5454-2301f429464c@zytor.com>
- <CAJcbSZEqeKVKbtUABzuhavxoH9KWCaVUBG3j5owAwyRhiw8Z7g@mail.gmail.com>
- <20170323153204.4lxglq6jlvvxp6ev@pd.tnic>
-Message-ID: <CAJcbSZGGRG_-MVSj+RpVDWQNbERUGxXgkUvMJLJJ03HS=3AO-g@mail.gmail.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Thu, 23 Mar 2017 08:44:07 -0700
+Subject: next-20170323 build: 2 failures 4 warnings (next-20170323)
+In-Reply-To: <20170323110249.3tf3tjo6c2y5qbkh@sirena.org.uk> (Mark Brown's
+ message of "Thu, 23 Mar 2017 11:02:49 +0000")
+References: <E1cqxc1-0004Cs-Lx@optimist>
+ <20170323110249.3tf3tjo6c2y5qbkh@sirena.org.uk>
+Message-ID: <m2a88cm20o.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 23, 2017 at 8:32 AM, Borislav Petkov <bp@alien8.de> wrote:
-> On Thu, Mar 23, 2017 at 08:14:44AM -0700, Thomas Garnier wrote:
->> Okay well then people are fine with a BUG_ON approach. I will do a
->> next iteration tailored to that. I will also try to add the static
->> inline suggestion from Peter.
->
-> Would it be possible, please, to refrain from top-posting when replying
-> on the ML?
->
-> You sometimes reply inline and after the text and sometimes at the top.
-> This subthread has both variants and it is really annoying to people
-> like me who try to follow the discussion.
+Mark Brown <broonie@kernel.org> writes:
 
-Sure, I will try to always reply inline. Sorry bad habits.
+> On Thu, Mar 23, 2017 at 07:56:49AM +0000, Build bot for Mark Brown wrote:
+>
+> Today's -next fails to build an arm64 allmodconfig and defconfig due to:
+>
+>> 	arm64-allmodconfig
+>> 	arm64-defconfig
+>> ERROR (phandle_references): Reference to non-existent node or label "pwm_f_clk_pins"
+>> ERROR (phandle_references): Reference to non-existent node or label "pwm_ao_a_3_pins"
+>> ERROR: Input tree has errors, aborting (use -f to force output)
+>
+> The offending references are in 3224eaca966088b4cf4f1ca3 (ARM64: dts:
+> meson-gxl: add support for the Khadas VIM board), there doesn't seem to
+> be anything providing those phandles in either mainline or -next.
 
--- 
-Thomas
+This was my fault, I backed it out soon after I committed, but it was
+picked up by -next before I removed it.
+
+Sorry for the noise,
+
+Kevin
