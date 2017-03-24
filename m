@@ -1,103 +1,67 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Fri, 24 Mar 2017 13:23:28 +0800
-Subject: [PATCH 07/12] ARM: dts: imx6ul-isiot: Add Sound card with codec
- node
-In-Reply-To: <1490204897-14525-8-git-send-email-jagan@openedev.com>
-References: <1490204897-14525-1-git-send-email-jagan@openedev.com>
- <1490204897-14525-8-git-send-email-jagan@openedev.com>
-Message-ID: <20170324052324.GF30608@dragon>
+From: vigneshr@ti.com (Vignesh R)
+Date: Fri, 24 Mar 2017 10:57:59 +0530
+Subject: [PATCH v2 1/2] tty: serial_core: Add name field to uart_port struct
+In-Reply-To: <20170324052800.11526-1-vigneshr@ti.com>
+References: <20170324052800.11526-1-vigneshr@ti.com>
+Message-ID: <20170324052800.11526-2-vigneshr@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 22, 2017 at 11:18:12PM +0530, Jagan Teki wrote:
-> From: Jagan Teki <jagan@amarulasolutions.com>
-> 
-> Add support for Sound card and related codec(via i2c1) nodes
-> on Engicam Is.IoT MX6UL variant module boards.
-> 
-> Cc: Shawn Guo <shawnguo@kernel.org>
-> Cc: Matteo Lisi <matteo.lisi@engicam.com>
-> Cc: Michael Trimarchi <michael@amarulasolutions.com>
-> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-> ---
->  arch/arm/boot/dts/imx6ul-isiot-common.dtsi | 11 +++++++++++
->  arch/arm/boot/dts/imx6ul-isiot.dtsi        | 30 ++++++++++++++++++++++++++++++
->  2 files changed, 41 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/imx6ul-isiot-common.dtsi b/arch/arm/boot/dts/imx6ul-isiot-common.dtsi
-> index b149b5e..c79fa42 100644
-> --- a/arch/arm/boot/dts/imx6ul-isiot-common.dtsi
-> +++ b/arch/arm/boot/dts/imx6ul-isiot-common.dtsi
-> @@ -41,6 +41,17 @@
->   */
->  
->  &i2c1 {
-> +	codec: sgtl5000 at 0a {
+Introduce a field to store name of uart_port that can be used to easily
+identify UART port instances on a system that has more than one UART
+instance. The name is of the form ttyXN(eg. ttyS0, ttyAMA0,..) where N
+is number that particular UART instance.
+This field will be useful when printing debug info for a particular port
+or in register IRQs with unique IRQ name. Port name is populated during
+uart_add_one_port().
 
-	sgtl5000: codec at a {
+Signed-off-by: Vignesh R <vigneshr@ti.com>
+---
 
-> +		compatible = "fsl,sgtl5000";
-> +		reg = <0x0a>;
-> +		clocks = <&clks IMX6UL_CLK_OSC>;
-> +		clock-names = "mclk";
-> +		wlf,shared-lrclk;
+v2: 
+use kasprintf() instead of snprintf()
+Fix up commit message.
 
-This is a property for wm8960 not sgtl5000.
+ drivers/tty/serial/serial_core.c | 7 +++++++
+ include/linux/serial_core.h      | 1 +
+ 2 files changed, 8 insertions(+)
 
-> +		VDDA-supply = <&reg_3p3v>;
-> +		VDDIO-supply = <&reg_3p3v>;
-> +		VDDD-supply = <&reg_1p8v>;
-> +	};
-> +
->  	touch: stmpe811 at 44 {
->  		compatible = "st,stmpe811";
->  		reg = <0x44>;
-> diff --git a/arch/arm/boot/dts/imx6ul-isiot.dtsi b/arch/arm/boot/dts/imx6ul-isiot.dtsi
-> index ea30380..7cbcaea 100644
-> --- a/arch/arm/boot/dts/imx6ul-isiot.dtsi
-> +++ b/arch/arm/boot/dts/imx6ul-isiot.dtsi
-> @@ -69,6 +69,36 @@
->  				    100>;
->  		default-brightness-level = <100>;
->  	};
-> +
-> +	reg_1p8v: regulator-1p8v {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "1P8V";
-> +		regulator-min-microvolt = <1800000>;
-> +		regulator-max-microvolt = <1800000>;
-> +		regulator-always-on;
-> +		regulator-boot-on;
-> +	};
-> +
-> +	reg_3p3v: regulator-3p3v {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "3P3V";
-> +		regulator-min-microvolt = <3300000>;
-> +		regulator-max-microvolt = <3300000>;
-> +		regulator-always-on;
-> +		regulator-boot-on;
-> +	};
-> +
-> +	sound {
-> +		compatible = "fsl,imx-audio-sgtl5000";
-> +		model = "imx6ul-isiot-sgtl5000";
-> +		cpu-dai = <&sai2>;
-> +		audio-codec = <&codec>;
-> +		gpr = <&gpr>;
-
-I do not see this 'gpr' thing in bindings/sound/imx-audio-sgtl5000.txt.
-
-Shawn
-
-> +		audio-routing =
-> +			"MIC_IN", "Mic Jack",
-> +			"Mic Jack", "Mic Bias",
-> +			"Headphone Jack", "HP_OUT";
-> +	};
->  };
->  
->  &i2c1 {
-> -- 
-> 1.9.1
-> 
+diff --git a/drivers/tty/serial/serial_core.c b/drivers/tty/serial/serial_core.c
+index 0fb3f7cce62a..f5572e28d16a 100644
+--- a/drivers/tty/serial/serial_core.c
++++ b/drivers/tty/serial/serial_core.c
+@@ -2744,6 +2744,12 @@ int uart_add_one_port(struct uart_driver *drv, struct uart_port *uport)
+ 	state->pm_state = UART_PM_STATE_UNDEFINED;
+ 	uport->cons = drv->cons;
+ 	uport->minor = drv->tty_driver->minor_start + uport->line;
++	uport->name = kasprintf(GFP_KERNEL, "%s%d", drv->dev_name,
++				drv->tty_driver->name_base + uport->line);
++	if (!uport->name) {
++		ret = -ENOMEM;
++		goto out;
++	}
+ 
+ 	/*
+ 	 * If this port is a console, then the spinlock is already
+@@ -2861,6 +2867,7 @@ int uart_remove_one_port(struct uart_driver *drv, struct uart_port *uport)
+ 	if (uport->type != PORT_UNKNOWN && uport->ops->release_port)
+ 		uport->ops->release_port(uport);
+ 	kfree(uport->tty_groups);
++	kfree(uport->name);
+ 
+ 	/*
+ 	 * Indicate that there isn't a port here anymore.
+diff --git a/include/linux/serial_core.h b/include/linux/serial_core.h
+index 58484fb35cc8..60530678c633 100644
+--- a/include/linux/serial_core.h
++++ b/include/linux/serial_core.h
+@@ -247,6 +247,7 @@ struct uart_port {
+ 	unsigned char		suspended;
+ 	unsigned char		irq_wake;
+ 	unsigned char		unused[2];
++	char			*name;			/* port name */
+ 	struct attribute_group	*attr_group;		/* port specific attributes */
+ 	const struct attribute_group **tty_groups;	/* all attributes (serial core use only) */
+ 	struct serial_rs485     rs485;
+-- 
+2.11.0
