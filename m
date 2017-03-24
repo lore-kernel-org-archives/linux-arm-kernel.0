@@ -1,164 +1,64 @@
 From: willy@infradead.org (Matthew Wilcox)
-Date: Fri, 24 Mar 2017 09:13:18 -0700
-Subject: [PATCH v3 7/7] vga: Optimise console scrolling
+Date: Fri, 24 Mar 2017 09:13:16 -0700
+Subject: [PATCH v3 5/7] zram: Convert to using memset_l
 In-Reply-To: <20170324161318.18718-1-willy@infradead.org>
 References: <20170324161318.18718-1-willy@infradead.org>
-Message-ID: <20170324161318.18718-8-willy@infradead.org>
+Message-ID: <20170324161318.18718-6-willy@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Matthew Wilcox <mawilcox@microsoft.com>
 
-Where possible, call memset16(), memmove() or memcpy() instead of using
-open-coded loops.  If an architecture doesn't define VT_BUF_HAVE_RW,
-we can do that from the generic code.  For the architectures which do
-have special RW routines, usually we can do the special thing (pointer
-test or byteswap) once (and then use a mem* call) instead of each time
-around a loop.  Alpha is the only architecture missing a scr_memmovew()
-definition (because it's non-trivial to write).
+zram was the motivation for creating memset_l().  Minchan Kim sees a 7%
+performance improvement on x86 with 100MB of non-zero deduplicatable
+data:
 
-I don't like the calling convention that uses a byte count instead of
-a count of u16s, but it's a little late to change that.  Reduces code
-size of fbcon.o by almost 400 bytes on my laptop build.
+        perf stat -r 10 dd if=/dev/zram0 of=/dev/null
+
+vanilla:        0.232050465 seconds time elapsed ( +-  0.51% )
+memset_l:	0.217219387 seconds time elapsed ( +-  0.07% )
 
 Signed-off-by: Matthew Wilcox <mawilcox@microsoft.com>
+Tested-by: Minchan Kim <minchan@kernel.org>
 ---
- arch/mips/include/asm/vga.h    |  6 ++++++
- arch/powerpc/include/asm/vga.h |  8 ++++++++
- arch/sparc/include/asm/vga.h   | 24 ++++++++++++++++++++++++
- include/linux/vt_buffer.h      | 12 ++++++++++++
- 4 files changed, 50 insertions(+)
+ drivers/block/zram/zram_drv.c | 15 +++------------
+ 1 file changed, 3 insertions(+), 12 deletions(-)
 
-diff --git a/arch/mips/include/asm/vga.h b/arch/mips/include/asm/vga.h
-index f82c83749a08..7510f406e1e1 100644
---- a/arch/mips/include/asm/vga.h
-+++ b/arch/mips/include/asm/vga.h
-@@ -40,9 +40,15 @@ static inline u16 scr_readw(volatile const u16 *addr)
- 	return le16_to_cpu(*addr);
+diff --git a/drivers/block/zram/zram_drv.c b/drivers/block/zram/zram_drv.c
+index e27d89a36c34..25dcad309695 100644
+--- a/drivers/block/zram/zram_drv.c
++++ b/drivers/block/zram/zram_drv.c
+@@ -157,20 +157,11 @@ static inline void update_used_max(struct zram *zram,
+ 	} while (old_max != cur_max);
  }
  
-+static inline void scr_memsetw(u16 *s, u16 v, unsigned int count)
-+{
-+	memset16(s, cpu_to_le16(v), count / 2);
-+}
-+
- #define scr_memcpyw(d, s, c) memcpy(d, s, c)
- #define scr_memmovew(d, s, c) memmove(d, s, c)
- #define VT_BUF_HAVE_MEMCPYW
- #define VT_BUF_HAVE_MEMMOVEW
-+#define VT_BUF_HAVE_MEMSETW
- 
- #endif /* _ASM_VGA_H */
-diff --git a/arch/powerpc/include/asm/vga.h b/arch/powerpc/include/asm/vga.h
-index ab3acd2f2786..7a7b541b7493 100644
---- a/arch/powerpc/include/asm/vga.h
-+++ b/arch/powerpc/include/asm/vga.h
-@@ -33,8 +33,16 @@ static inline u16 scr_readw(volatile const u16 *addr)
- 	return le16_to_cpu(*addr);
- }
- 
-+#define VT_BUF_HAVE_MEMSETW
-+static inline void scr_memsetw(u16 *s, u16 v, unsigned int n)
-+{
-+	memset16(s, cpu_to_le16(v), n / 2);
-+}
-+
- #define VT_BUF_HAVE_MEMCPYW
-+#define VT_BUF_HAVE_MEMMOVEW
- #define scr_memcpyw	memcpy
-+#define scr_memmovew	memmove
- 
- #endif /* !CONFIG_VGA_CONSOLE && !CONFIG_MDA_CONSOLE */
- 
-diff --git a/arch/sparc/include/asm/vga.h b/arch/sparc/include/asm/vga.h
-index ec0e9967d93d..1fab92b110d9 100644
---- a/arch/sparc/include/asm/vga.h
-+++ b/arch/sparc/include/asm/vga.h
-@@ -11,6 +11,9 @@
- #include <asm/types.h>
- 
- #define VT_BUF_HAVE_RW
-+#define VT_BUF_HAVE_MEMSETW
-+#define VT_BUF_HAVE_MEMCPYW
-+#define VT_BUF_HAVE_MEMMOVEW
- 
- #undef scr_writew
- #undef scr_readw
-@@ -29,6 +32,27 @@ static inline u16 scr_readw(const u16 *addr)
- 	return *addr;
- }
- 
-+static inline void scr_memsetw(u16 *p, u16 v, unsigned int n)
-+{
-+	BUG_ON((long) p >= 0);
-+
-+	memset16(s, cpu_to_le16(v), n / 2);
-+}
-+
-+static inline void scr_memcpyw(u16 *d, u16 *s, unsigned int n)
-+{
-+	BUG_ON((long) d >= 0);
-+
-+	memcpy(d, s, n);
-+}
-+
-+static inline void scr_memmovew(u16 *d, u16 *s, unsigned int n)
-+{
-+	BUG_ON((long) d >= 0);
-+
-+	memmove(d, s, n);
-+}
-+
- #define VGA_MAP_MEM(x,s) (x)
- 
- #endif
-diff --git a/include/linux/vt_buffer.h b/include/linux/vt_buffer.h
-index f38c10ba3ff5..31b92fcd8f03 100644
---- a/include/linux/vt_buffer.h
-+++ b/include/linux/vt_buffer.h
-@@ -26,24 +26,33 @@
- #ifndef VT_BUF_HAVE_MEMSETW
- static inline void scr_memsetw(u16 *s, u16 c, unsigned int count)
+-static inline void zram_fill_page(char *ptr, unsigned long len,
++static inline void zram_fill_page(void *ptr, unsigned long len,
+ 					unsigned long value)
  {
-+#ifdef VT_BUF_HAVE_RW
- 	count /= 2;
- 	while (count--)
- 		scr_writew(c, s++);
-+#else
-+	memset16(s, c, count / 2);
-+#endif
+-	int i;
+-	unsigned long *page = (unsigned long *)ptr;
+-
+ 	WARN_ON_ONCE(!IS_ALIGNED(len, sizeof(unsigned long)));
+-
+-	if (likely(value == 0)) {
+-		memset(ptr, 0, len);
+-	} else {
+-		for (i = 0; i < len / sizeof(*page); i++)
+-			page[i] = value;
+-	}
++	memset_l(ptr, value, len / sizeof(unsigned long));
  }
- #endif
  
- #ifndef VT_BUF_HAVE_MEMCPYW
- static inline void scr_memcpyw(u16 *d, const u16 *s, unsigned int count)
+ static bool page_same_filled(void *ptr, unsigned long *element)
+@@ -193,7 +184,7 @@ static bool page_same_filled(void *ptr, unsigned long *element)
+ static void handle_same_page(struct bio_vec *bvec, unsigned long element)
  {
-+#ifdef VT_BUF_HAVE_RW
- 	count /= 2;
- 	while (count--)
- 		scr_writew(scr_readw(s++), d++);
-+#else
-+	memcpy(d, s, count);
-+#endif
- }
- #endif
+ 	struct page *page = bvec->bv_page;
+-	void *user_mem;
++	char *user_mem;
  
- #ifndef VT_BUF_HAVE_MEMMOVEW
- static inline void scr_memmovew(u16 *d, const u16 *s, unsigned int count)
- {
-+#ifdef VT_BUF_HAVE_RW
- 	if (d < s)
- 		scr_memcpyw(d, s, count);
- 	else {
-@@ -53,6 +62,9 @@ static inline void scr_memmovew(u16 *d, const u16 *s, unsigned int count)
- 		while (count--)
- 			scr_writew(scr_readw(--s), --d);
- 	}
-+#else
-+	memmove(d, s, count);
-+#endif
- }
- #endif
- 
+ 	user_mem = kmap_atomic(page);
+ 	zram_fill_page(user_mem + bvec->bv_offset, bvec->bv_len, element);
 -- 
 2.11.0
