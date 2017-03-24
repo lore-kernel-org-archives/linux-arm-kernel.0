@@ -1,17 +1,16 @@
 From: jagan@openedev.com (Jagan Teki)
-Date: Fri, 24 Mar 2017 21:48:40 +0530
-Subject: [PATCH v2 05/15] ARM: dts: imx6ul-isiot-common: Add touchscreen node
+Date: Fri, 24 Mar 2017 21:48:41 +0530
+Subject: [PATCH v2 06/15] ARM: dts: imx6ul-[geam|isiot]: Add sai2 node
 In-Reply-To: <1490372330-5611-1-git-send-email-jagan@openedev.com>
 References: <1490372330-5611-1-git-send-email-jagan@openedev.com>
-Message-ID: <1490372330-5611-6-git-send-email-jagan@openedev.com>
+Message-ID: <1490372330-5611-7-git-send-email-jagan@openedev.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jagan Teki <jagan@amarulasolutions.com>
 
-Add touchscreen node as i2c1 slave device on Engicam Is.IoT MX6UL
-modules, the touchscreen controlled 'st,stmpe-ts' connected via
-i2c with st,stmpe811 mfd interface.
+Add Synchronous Audio Interface(SAI) node for Engicam GEAM6UL
+and Is.IoT MX6UL variant module boards.
 
 Cc: Shawn Guo <shawnguo@kernel.org>
 Cc: Matteo Lisi <matteo.lisi@engicam.com>
@@ -19,63 +18,79 @@ Cc: Michael Trimarchi <michael@amarulasolutions.com>
 Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 ---
 Changes for v2:
-- Fix commit message s/mfb/mfd
-- Use proper [label:] node-name[@unit-address] for mfd device 
-- Use pinctrl-names as pinctrl_stmpe instead of pinctrl_stmpe_ts
-- Use proper [label:] node-name[@unit-address] for stmpe_touchscreen
+- none
 
- arch/arm/boot/dts/imx6ul-isiot-common.dtsi | 34 ++++++++++++++++++++++++++++++
- 1 file changed, 34 insertions(+)
+ arch/arm/boot/dts/imx6ul-geam.dtsi  | 16 ++++++++++++++++
+ arch/arm/boot/dts/imx6ul-isiot.dtsi | 16 ++++++++++++++++
+ 2 files changed, 32 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx6ul-isiot-common.dtsi b/arch/arm/boot/dts/imx6ul-isiot-common.dtsi
-index 9660e20..827f0dc 100644
---- a/arch/arm/boot/dts/imx6ul-isiot-common.dtsi
-+++ b/arch/arm/boot/dts/imx6ul-isiot-common.dtsi
-@@ -40,6 +40,34 @@
-  *     OTHER DEALINGS IN THE SOFTWARE.
-  */
+diff --git a/arch/arm/boot/dts/imx6ul-geam.dtsi b/arch/arm/boot/dts/imx6ul-geam.dtsi
+index ee5220c..eb94d95 100644
+--- a/arch/arm/boot/dts/imx6ul-geam.dtsi
++++ b/arch/arm/boot/dts/imx6ul-geam.dtsi
+@@ -172,6 +172,12 @@
+ 	xnur-gpio = <&gpio1 3 GPIO_ACTIVE_LOW>;
+ };
  
-+&i2c1 {
-+	stmpe811: gpio-expander at 44 {
-+		compatible = "st,stmpe811";
-+		reg = <0x44>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_stmpe>;
-+		interrupt-parent = <&gpio1>;
-+		interrupts = <18 IRQ_TYPE_EDGE_FALLING>;
-+		interrupt-controller;
-+		#interrupt-cells = <2>;
-+
-+		stmpe: touchscreen {
-+			compatible = "st,stmpe-ts";
-+			st,sample-time = <4>;
-+			st,mod-12b = <1>;
-+			st,ref-sel = <0>;
-+			st,adc-freq = <1>;
-+			st,ave-ctrl = <1>;
-+			st,touch-det-delay = <2>;
-+			st,settling = <2>;
-+			st,fraction-z = <7>;
-+			st,i-drive = <1>;
-+		};
-+	};
++&sai2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_sai2>;
++	status = "okay";
 +};
 +
- &lcdif {
+ &uart1 {
  	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_lcdif_dat
-@@ -104,4 +132,10 @@
- 			MX6UL_PAD_LCD_DATA17__LCDIF_DATA17  0x79
+ 	pinctrl-0 = <&pinctrl_uart1>;
+@@ -328,6 +334,16 @@
  		>;
  	};
-+
-+	pinctrl_stmpe: stmpegrp  {
+ 
++	pinctrl_sai2: sai2grp {
 +		fsl,pins = <
-+			MX6UL_PAD_UART1_CTS_B__GPIO1_IO18 0x1b0b0
++			MX6UL_PAD_JTAG_TCK__SAI2_RX_DATA	0x130b0
++			MX6UL_PAD_JTAG_TMS__CCM_CLKO1		0x4001b031
++			MX6UL_PAD_JTAG_TDI__SAI2_TX_BCLK	0x17088
++			MX6UL_PAD_JTAG_TDO__SAI2_TX_SYNC	0x17088
++			MX6UL_PAD_JTAG_TRST_B__SAI2_TX_DATA	0x120b0
 +		>;
 +	};
++
+ 	pinctrl_uart1: uart1grp {
+ 		fsl,pins = <
+ 			MX6UL_PAD_UART1_TX_DATA__UART1_DCE_TX 0x1b0b1
+diff --git a/arch/arm/boot/dts/imx6ul-isiot.dtsi b/arch/arm/boot/dts/imx6ul-isiot.dtsi
+index 4697a04..ea30380 100644
+--- a/arch/arm/boot/dts/imx6ul-isiot.dtsi
++++ b/arch/arm/boot/dts/imx6ul-isiot.dtsi
+@@ -91,6 +91,12 @@
+ 	status = "okay";
  };
+ 
++&sai2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_sai2>;
++	status = "okay";
++};
++
+ &uart1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_uart1>;
+@@ -129,6 +135,16 @@
+ 		>;
+ 	};
+ 
++	pinctrl_sai2: sai2grp {
++		fsl,pins = <
++			MX6UL_PAD_JTAG_TCK__SAI2_RX_DATA	0x130b0
++			MX6UL_PAD_JTAG_TMS__CCM_CLKO1		0x4001b031
++			MX6UL_PAD_JTAG_TDI__SAI2_TX_BCLK	0x17088
++			MX6UL_PAD_JTAG_TDO__SAI2_TX_SYNC	0x17088
++			MX6UL_PAD_JTAG_TRST_B__SAI2_TX_DATA	0x120b0
++		>;
++	};
++
+ 	pinctrl_uart1: uart1grp {
+ 		fsl,pins = <
+ 			MX6UL_PAD_UART1_TX_DATA__UART1_DCE_TX 0x1b0b1
 -- 
 1.9.1
