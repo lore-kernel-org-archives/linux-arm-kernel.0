@@ -1,29 +1,41 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri, 24 Mar 2017 10:15:41 -0700
-Subject: [GIT PULL 4/4] bcm2835 MAINTAINERS updates for 4.12
-In-Reply-To: <20170321193952.10270-4-eric@anholt.net>
-References: <20170321193952.10270-1-eric@anholt.net>
- <20170321193952.10270-4-eric@anholt.net>
-Message-ID: <2e0b486c-06da-e81d-4966-d6e838e5709a@gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 24 Mar 2017 18:23:16 +0100
+Subject: [GIT PULL] ARM: mvebu: defconfig64 for v4.12 (#1)
+Message-ID: <87lgrubncr.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/21/2017 12:39 PM, Eric Anholt wrote:
->   Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://github.com/anholt/linux tags/bcm2835-maintainers-next-2017-03-21
-> 
-> for you to fetch changes up to 346ab44e65ac0e9aa1cd70b910fe06f8feb151c4:
-> 
->   MAINTAINERS: Add Stefan Wahren to bcm2835. (2017-03-06 09:03:28 -0800)
-> 
-> ----------------------------------------------------------------
-> This pull request updates the MAINTAINERS file for BCM283x for 4.12.
-> 
-> ----------------------------------------------------------------
+Hi,
 
-And... merged as well, thanks!
--- 
-Florian
+Here is the first pull request for defconfig64 for mvebu for v4.12.
+
+Gregory
+
+The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
+
+  Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
+
+are available in the git repository at:
+
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-defconfig64-4.12-1
+
+for you to fetch changes up to 66e56302842e9971426bd7e504c4db4f88cbb037:
+
+  arm64: defconfig: enable MVPP2 (2017-03-23 17:50:13 +0100)
+
+----------------------------------------------------------------
+mvebu defconfig64 for 4.12 (part 1)
+
+Update arm64 defconfig by adding MVPP2 for Marvell Armada 7K/8K and
+MVNETA and I2C_PXA for Armada 37xx.
+
+----------------------------------------------------------------
+Gregory CLEMENT (2):
+      arm64: defconfig: enable MVNETA
+      arm64: defconfig: enable I2C_PXA
+
+Thomas Petazzoni (1):
+      arm64: defconfig: enable MVPP2
+
+ arch/arm64/configs/defconfig | 3 +++
+ 1 file changed, 3 insertions(+)
