@@ -1,107 +1,105 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 24 Mar 2017 11:49:55 +0100
-Subject: [PATCH] mmc: core: Do not hold re-tuning during CMD6 commands
-In-Reply-To: <1490348427.22814.19.camel@mhfsdcap03>
-References: <1490336341-22292-1-git-send-email-chaotian.jing@mediatek.com>
- <1490336341-22292-2-git-send-email-chaotian.jing@mediatek.com>
- <13a83728-0031-5683-c371-4b517df32299@intel.com>
- <1490344369.22814.10.camel@mhfsdcap03>
- <03d54000-9ced-1b31-df80-d254f02433db@intel.com>
- <1490348427.22814.19.camel@mhfsdcap03>
-Message-ID: <CAPDyKFoo5sJ2XtjyiW1DLjhFdJySbDK7+N05vrKpeiZsp25qrA@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 24 Mar 2017 10:57:02 +0000
+Subject: [PATCH v33 05/14] arm64: mm: allow for unmapping part of kernel
+ mapping
+In-Reply-To: <20170323114309.GE17298@linaro.org>
+References: <20170315095656.24992-1-takahiro.akashi@linaro.org>
+ <20170315095941.25119-3-takahiro.akashi@linaro.org> <58D10209.1090406@arm.com>
+ <20170323114309.GE17298@linaro.org>
+Message-ID: <CAKv+Gu-YCGfymnaWzNfxNyoyPwYGCAkPViC_Lwf0WAgnRPD2WQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 March 2017 at 10:40, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
-> On Fri, 2017-03-24 at 11:19 +0200, Adrian Hunter wrote:
->> On 24/03/17 10:32, Chaotian Jing wrote:
->> > On Fri, 2017-03-24 at 09:52 +0200, Adrian Hunter wrote:
->> >> On 24/03/17 08:19, Chaotian Jing wrote:
->> >>> this patch is refine for 'commit c6dbab9cb58f ("mmc: core: Hold re-tuning
->> >>> during switch commands")'
->> >>> Since it has 3 retries at max for CMD6, if the first CMD6 got CRC error,
->> >>> then should do re-tune before the next CMD6 was sent.
->> >>>
->> >>> Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
->> >>> ---
->> >>>  drivers/mmc/core/mmc_ops.c |    3 +--
->> >>>  1 file changed, 1 insertion(+), 2 deletions(-)
->> >>>
->> >>> diff --git a/drivers/mmc/core/mmc_ops.c b/drivers/mmc/core/mmc_ops.c
->> >>> index fe80f26..6931927 100644
->> >>> --- a/drivers/mmc/core/mmc_ops.c
->> >>> +++ b/drivers/mmc/core/mmc_ops.c
->> >>> @@ -534,8 +534,6 @@ int __mmc_switch(struct mmc_card *card, u8 set, u8 index, u8 value,
->> >>>   bool use_r1b_resp = use_busy_signal;
->> >>>   unsigned char old_timing = host->ios.timing;
->> >>>
->> >>> - mmc_retune_hold(host);
->> >>> -
->> >>>   /*
->> >>>    * If the cmd timeout and the max_busy_timeout of the host are both
->> >>>    * specified, let's validate them. A failure means we need to prevent
->> >>> @@ -567,6 +565,7 @@ int __mmc_switch(struct mmc_card *card, u8 set, u8 index, u8 value,
->> >>>           cmd.sanitize_busy = true;
->> >>>
->> >>>   err = mmc_wait_for_cmd(host, &cmd, MMC_CMD_RETRIES);
->> >>> + mmc_retune_hold(host);
->> >>
->> >> That is not how mmc_retune_hold() works, you need mmc_retune_hold_now() as
->> >> it is here:
->> >>
->> >>    https://marc.info/?l=linux-mmc&m=148940903816582
->> >>
->> >> But using "retries" with commands that have busy-waiting on the data line
->> >> doesn't make much sense anyway.  Particularly with CRC errors, I would
->> >> expect the card is actually busily doing the switch and we need only to wait
->> >> for it.  The same can be true for timeout errors.  For some CMD6 we might
->> >> need to send CMD12 if the card is busy after an error.  I would prefer an
->> >> explicit attempt at recovery from CMD6 errors.
->> >>
+On 23 March 2017 at 11:43, AKASHI Takahiro <takahiro.akashi@linaro.org> wrote:
+> On Tue, Mar 21, 2017 at 10:35:53AM +0000, James Morse wrote:
+>> Hi Akashi,
+>>
+>> On 15/03/17 09:59, AKASHI Takahiro wrote:
+>> > create_pgd_mapping() is enhanced here so that it will accept
+>> > PAGE_KERNEL_INVALID protection attribute and unmap a given range of memory.
 >> >
->> > It's the host driver's responsibility to ensure card is not in busy
->> > state before issue the next R1B command, or the MMC core layer needs do
->> > extra check/waiting before issue a R1B command.
+>> > The feature will be used in a later kdump patch to implement the protection
+>> > against possible corruption of crash dump kernel memory which is to be set
+>> > aside from ther other memory on primary kernel.
 >>
->> Better to deal with cards stuck in busy from the places where busy-waiting
->> is expected.
+>> Nit: ther- > the
+>
+> Fix it.
+>
+>> > Note that, in this implementation, it assumes that all the range of memory
+>> > to be processed is mapped in page-level since the only current user is
+>> > kdump where page mappings are also required.
 >>
-> Yes, if a R1B command got response CRC error, we can do busy-waiting in
-> the error hander funtion(mmc_wait_for_req_done())
+>> Using create_pgd_mapping() like this means the mappings will be updated via the
+>> fixmap which is unnecessary as the page tables will be part of mapped memory. In
+>
+> This might be a reason that we would go for (un)map_kernel_range()
+> over create_pgd_mapping() (? not sure)
+>
 
-That would introduce too big changes and I am sure it will cause/hide
-other problems.
+Yes, that is why I suggested it. We already use it to unmap the init
+segment at the end of boot, but I do take your point about it being
+documented as operating on kernel VMAs only.
 
-If there is a problem in __mmc_switch(), let's try to fix it there first.
+Looking at the code, it shouldn't matter (it does not touch or reason
+about VMAs at all, it only walks the page tables and unmaps them), but
+I agree it is better not to rely on that.
 
->> > I think the purpose of "re-tune" is trying to cover particular case(eg.
->> > voltage fluctuate or EMI or some glitch of host/device which caused CRC
->> > error)
+But instead of clearing all permissions, which apparently requires
+changes to alloc_init_pte(), and introduces the restriction that the
+region should be mapped down to pages, could we not simply clear
+PTE_VALID on the region, like we do for debug_pagealloc()?
+
+
+>> the worst case this adds an extra tlbi for every 2MB of crash image when we map
+>> or unmap it. I don't think this matters.
 >>
->> No, re-tuning is to compensate for drift caused primarily by temperature change.
+>> This code used to be __init and it is the only user of FIX_PTE, so there won't
+>> be any existing runtime users. The two arch_kexec_unprotect_crashkres() calls in
+>> kexec are both protected by the kexec_mutex, and the call in hibernate happens
+>> after disable_nonboot_cpus(), so these callers can't race with each other.
 >>
-> Yes, by JEDEC spec, temperature change cause timing drift of EMMC
-> device, but, as you mentioned, maybe I have a hardware problem of host,
-> but needs Software to cover it. so that we are doing our best to do
-> re-tune if got CRC error. if could recover it, then  it's better than
-> system hung.
-
-Exactly in what cases do you get CRC errors for CMD6. We need a full
-cmd log to understand and to help.
-
->> > error) , but in such cases, too many cases are disable re-tune function
->> > by mmc_retune_hold(), for example, in this case, if a response CRC error
->> > got then we never have chance to recover it. then cause system cannot
->> > access emmc or suspend/resume fail.
+>> This looks safe to me.
 >>
->> Maybe you have a hardware problem.
-
-There is no way I am going to accept patches touching this part of the
-mmc core, without providing real evidence for how it solves a problem.
-To me, it seems like you are applying a workaround for another issue.
-
-Again, try to provide us with some more data and logs, then perhaps we
-can help narrow down the issues.
-
-Kind regards
-Uffe
+>>
+>> > diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+>> > index d28dbcf596b6..cb359a3927ef 100644
+>> > --- a/arch/arm64/mm/mmu.c
+>> > +++ b/arch/arm64/mm/mmu.c
+>> > @@ -128,7 +128,10 @@ static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
+>> >     do {
+>> >             pte_t old_pte = *pte;
+>> >
+>> > -           set_pte(pte, pfn_pte(pfn, prot));
+>> > +           if (pgprot_val(prot))
+>> > +                   set_pte(pte, pfn_pte(pfn, prot));
+>> > +           else
+>> > +                   pte_clear(null, null, pte);
+>>
+>> Lowercase NULLs? This relies on these values never being used... __set_fixmap()
+>> in the same file passes &init_mm and the address, can we do the same to be
+>> consistent?
+>
+> OK.
+>
+> Thanks,
+> -Takahiro AKASHI
+>
+>>
+>> >             pfn++;
+>> >
+>> >             /*
+>>
+>> Reviewed-by: James Morse <james.morse@arm.com>
+>>
+>>
+>> Thanks,
+>>
+>> James
+>>
+>>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
