@@ -1,25 +1,61 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 24 Mar 2017 09:37:32 -0500
-Subject: [PATCH v3 04/11] IIO: add DT bindings for stm32 DFSDM filter
-In-Reply-To: <1489759704-30217-5-git-send-email-arnaud.pouliquen@st.com>
-References: <1489759704-30217-1-git-send-email-arnaud.pouliquen@st.com>
- <1489759704-30217-5-git-send-email-arnaud.pouliquen@st.com>
-Message-ID: <20170324143732.nvq2wfra6q3hcrhs@rob-hp-laptop>
+From: smueller@chronox.de (Stephan =?ISO-8859-1?Q?M=FCller?=)
+Date: Fri, 24 Mar 2017 15:37:59 +0100
+Subject: [PATCH 1/3] crypto: hw_random - Add new Exynos RNG driver
+In-Reply-To: <20170324142446.31129-2-krzk@kernel.org>
+References: <20170324142446.31129-1-krzk@kernel.org>
+ <20170324142446.31129-2-krzk@kernel.org>
+Message-ID: <2503592.nlbQnVP8UR@positron.chronox.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 17, 2017 at 03:08:17PM +0100, Arnaud Pouliquen wrote:
-> Add bindings that describes Digital Filter for Sigma Delta
-> Modulators. DFSDM allows to connect sigma delta
-> modulators.
-> 
-> Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
-> ---
-> V2->V3:
->    Fixes based on V2 comments
-> 
->  .../bindings/iio/adc/st,stm32-dfsdm-adc.txt        | 120 +++++++++++++++++++++
->  1 file changed, 120 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/iio/adc/st,stm32-dfsdm-adc.txt
+Am Freitag, 24. M?rz 2017, 15:24:44 CET schrieb Krzysztof Kozlowski:
 
-Acked-by: Rob Herring <robh@kernel.org>
+Hi Krzysztof,
+
+> +
+> +static int exynos_rng_set_seed(struct exynos_rng_dev *rng,
+> +			       const u8 *seed, unsigned int slen)
+> +{
+> +	int ret, i;
+> +	u32 val;
+> +
+> +	dev_dbg(rng->dev, "Seeding with %u bytes\n", slen);
+> +
+> +	ret = clk_prepare_enable(rng->clk);
+> +	if (ret)
+> +		return ret;
+> +
+> +	if (slen < EXYNOS_RNG_SEED_SIZE) {
+> +		dev_warn(rng->dev, "Seed too short (only %u bytes)\n", slen);
+> +		ret = -EINVAL;
+> +		goto out;
+> +	}
+> +
+> +	for (i = 0 ; i < EXYNOS_RNG_SEED_REGS ; i++) {
+> +		val = seed[i * 4] << 24;
+> +		val |= seed[i * 4 + 1] << 16;
+> +		val |= seed[i * 4 + 2] << 8;
+> +		val |= seed[i * 4 + 3] << 0;
+> +
+> +		exynos_rng_writel(rng, val, EXYNOS_RNG_SEED(i));
+> +	}
+> +
+> +	val = exynos_rng_readl(rng, EXYNOS_RNG_STATUS);
+> +	if (!(val & EXYNOS_RNG_STATUS_SEED_SETTING_DONE)) {
+> +		dev_warn(rng->dev, "Seed setting not finished\n");
+> +		ret = -EIO;
+> +		goto out;
+> +	}
+> +
+> +	ret = 0;
+> +	/* Save seed for suspend */
+> +	memcpy(rng->seed_save, seed, slen);
+
+Is this really necessary? If you need to save some seed, shouldn't that be an 
+output of the DRNG and not the real seed?
+
+Besides, how do you know that slen is not larger than EXYNOS_RNG_SEED_SIZE?
+
+
+Ciao
+Stephan
