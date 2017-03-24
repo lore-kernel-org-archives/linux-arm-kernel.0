@@ -1,37 +1,54 @@
-From: ralph.sennhauser@gmail.com (Ralph Sennhauser)
-Date: Fri, 24 Mar 2017 15:18:13 +0100
-Subject: [PATCH v3 3/4] ARM: mvebu: Enable SENSORS_PWM_FAN in defconfig
-In-Reply-To: <20170324141815.7252-1-ralph.sennhauser@gmail.com>
-References: <20170324141815.7252-1-ralph.sennhauser@gmail.com>
-Message-ID: <20170324141815.7252-4-ralph.sennhauser@gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 24 Mar 2017 09:21:32 -0500
+Subject: [PATCH v3 02/11] IIO: Add DT bindings for sigma delta adc
+ modulator
+In-Reply-To: <1489759704-30217-3-git-send-email-arnaud.pouliquen@st.com>
+References: <1489759704-30217-1-git-send-email-arnaud.pouliquen@st.com>
+ <1489759704-30217-3-git-send-email-arnaud.pouliquen@st.com>
+Message-ID: <20170324142131.cm72er2cc2kggxco@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andrew Lunn <andrew@lunn.ch>
+On Fri, Mar 17, 2017 at 03:08:15PM +0100, Arnaud Pouliquen wrote:
+> Add documentation of device tree bindings to support
+> sigma delta modulator in IIO framework.
+> 
+> Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
+> ---
+> V2 -> V3 :
+> 	-Rename to suppress "simple"
+>         - add "ads1201" compatibility
+>  
+>  .../devicetree/bindings/iio/adc/sigma-delta-modulator.txt   | 13 +++++++++++++
+>  1 file changed, 13 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/iio/adc/sigma-delta-modulator.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/iio/adc/sigma-delta-modulator.txt b/Documentation/devicetree/bindings/iio/adc/sigma-delta-modulator.txt
+> new file mode 100644
+> index 0000000..27f04a3
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/iio/adc/sigma-delta-modulator.txt
+> @@ -0,0 +1,13 @@
+> +Device-Tree bindings for sigma delta modulator
+> +
+> +Required properties:
+> +- compatible: should be "ads1201", "sd-modulator". "sd-modulator" can be use
+> +	as a generic SD modulator if modulator not specified in compatible list.
+> +- #io-channel-cells = <1>: See the IIO bindings section "IIO consumers".
+> +
+> +Example node:
+> +
+> +	ads1202: simple_sd_adc at 0 {
 
-Now that the GPIO driver also supports PWM operation, enable the PWM
-framework and fan driver in mvebu_v7_defconfig.
+adc at ...
 
-Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-URL: https://patchwork.ozlabs.org/patch/427297/
-[Ralph Sennhauser: add fan driver to defconfig]
-Signed-off-by: Ralph Sennhauser <ralph.sennhauser@gmail.com>
----
- arch/arm/configs/mvebu_v7_defconfig | 2 ++
- 1 file changed, 2 insertions(+)
+With that,
 
-diff --git a/arch/arm/configs/mvebu_v7_defconfig b/arch/arm/configs/mvebu_v7_defconfig
-index f1a0e25..6955370 100644
---- a/arch/arm/configs/mvebu_v7_defconfig
-+++ b/arch/arm/configs/mvebu_v7_defconfig
-@@ -135,6 +135,8 @@ CONFIG_DMADEVICES=y
- CONFIG_MV_XOR=y
- # CONFIG_IOMMU_SUPPORT is not set
- CONFIG_MEMORY=y
-+CONFIG_PWM=y
-+CONFIG_SENSORS_PWM_FAN=y
- CONFIG_EXT4_FS=y
- CONFIG_ISO9660_FS=y
- CONFIG_JOLIET=y
--- 
-2.10.2
+Acked-by: Rob Herring <robh@kernel.org>
+
+> +		compatible = "sd-modulator";
+> +		#io-channel-cells = <1>;
+> +	};
+> -- 
+> 1.9.1
+> 
