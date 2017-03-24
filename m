@@ -1,75 +1,34 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Fri, 24 Mar 2017 13:11:32 -0700
-Subject: [RFT PATCH 0/6] pinctrl: meson: Fix gpio-ranged for GPIO Hog
-In-Reply-To: <1490286449-19448-1-git-send-email-narmstrong@baylibre.com> (Neil
- Armstrong's message of "Thu, 23 Mar 2017 17:27:23 +0100")
-References: <1490286449-19448-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <m2poh6h1u3.fsf@baylibre.com>
+From: afzal.mohd.ma@gmail.com (afzal mohammed)
+Date: Sat, 25 Mar 2017 01:47:36 +0530
+Subject: [PATCH v2] arm: Fix memory attribute inconsistencies when using
+ fixmap
+In-Reply-To: <1490196388.2890.8.camel@linaro.org>
+References: <20170321173030.7751-1-tixy@linaro.org>
+ <1490117781.3136.9.camel@linaro.org>
+ <CAKv+Gu82PsyyC=fQHxUn5mrCdmQvhwK+DK342-vv8y53mLcpng@mail.gmail.com>
+ <1490175988.2890.1.camel@linaro.org>
+ <CAKv+Gu8VoSLOUiNSXsrtQUr8TQdGBqiOmhsKS+N2dhToMusOUg@mail.gmail.com>
+ <1490196388.2890.8.camel@linaro.org>
+Message-ID: <20170324201736.GA3317@afzalpc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Neil Armstrong <narmstrong@baylibre.com> writes:
+Hi,
 
-> Whem trying to add a gpio hog to enable the USB Hub on the Odroid-C2, I
-> encountered a strange bug where when calling gpiochip_add_data() the gpiolib
-> code was trying to add the Hog but failed because the gpio ranges were missing.
->
-> In the meson-pinctrl driver, the gpio ranges are added manually /after/ the
-> call to gpiochip_add_data().
-> The arch/arm meson8 and meson8b patches has not been tested, this is why this
-> patchset is an RFT.
->
-> So this patchset uses the DT gpio-ranges attribute instead and solves the issue.
->
-> The final patch is the actual GPIO Hog for the Odroid-C2 board, which is an ugly
-> hack but is necessary to have USB Ports working on the board until the generic
-> power sequence framework is merged.
->
-> Neil Armstrong (6):
->   ARM64: dts: meson-gxbb: Add gpio-ranges properties
->   ARM64: dts: meson-gxl: Add gpio-ranges properties
->   ARM: dts: meson8: Add gpio-ranges properties
->   ARM: dts: meson8b: Add gpio-ranges properties
->   pinctrl: meson: use gpio-ranges from DT
->   ARM64: dts: meson-gxbb: Add USB Hub GPIO hog
+On Wed, Mar 22, 2017 at 03:26:28PM +0000, Jon Medhurst (Tixy) wrote:
+> > > On Tue, 2017-03-21 at 19:00 +0000, Ard Biesheuvel wrote:
 
-Not sure what kind of extra testing is needed on meson8*, but I tested
-on meson8b-odroidc1 by replacing the heartbeat LED GPIO with a GPIO
-hog[1] and see the LED turn on and stay on, so it seems good to me.
+> > > > It looks like nommu should be unaffected, but it is worth giving it a
+> > > > spin as well
+> 
+> After much faffing around I got MPS2 booting a Linux kernel, and
+> somewhat to my surprise?it seems to boot fine, all the way up to
+> panicking because it didn't find an init. This was with $subject patch.
 
-Tested-by: Kevin Hilman <khilman@baylibre.com>
+Vybrid VF610 Cortex M4 boots to prompt w/ this patch on current mainline.
 
-Kevin
+Vybrid VF610 Cortex A5 using !MMU Kernel w/ this patch too boots to
+prompt (climbing onto the shoulder's of Vladimir, not Torvalds HEAD)
 
-[1]
-diff --git a/arch/arm/boot/dts/meson8b-odroidc1.dts b/arch/arm/boot/dts/meson8b-odroidc1.dts
-index e50f1a1fdbc7..d750d6b4c9f1 100644
---- a/arch/arm/boot/dts/meson8b-odroidc1.dts
-+++ b/arch/arm/boot/dts/meson8b-odroidc1.dts
-@@ -60,6 +60,7 @@
- 		reg = <0x40000000 0x40000000>;
- 	};
- 
-+/*
- 	leds {
- 		compatible = "gpio-leds";
- 		blue {
-@@ -69,10 +70,18 @@
- 			default-state = "off";
- 		};
- 	};
-+*/
- };
- 
- &uart_AO {
- 	status = "okay";
- 	pinctrl-0 = <&uart_ao_a_pins>;
- 	pinctrl-names = "default";
-+
-+       usb-hub {
-+               gpio-hog;
-+               gpios = <GPIOAO_13 GPIO_ACTIVE_HIGH>;
-+               output-high;
-+               line-name = "usb-hub-reset";
-+       };
- };
+Regards
+afzal
