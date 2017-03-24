@@ -1,168 +1,139 @@
-From: dann.frazier@canonical.com (dann frazier)
-Date: Fri, 24 Mar 2017 11:48:16 -0600
-Subject: [PATCH v2 06/18] arm64: arch_timer: Add infrastructure for
- multiple erratum detection methods
-In-Reply-To: <20170320174829.28182-7-marc.zyngier@arm.com>
-References: <20170320174829.28182-1-marc.zyngier@arm.com>
- <20170320174829.28182-7-marc.zyngier@arm.com>
-Message-ID: <CALdTtnvyT1qjKp5C5AfvSSW7GqN3m2Y_CkTMEX+5OxyvH=+G2Q@mail.gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Fri, 24 Mar 2017 13:49:47 -0400 (EDT)
+Subject: [PATCH 0/3] minitty: a minimal TTY layer alternative for embedded
+ systems
+In-Reply-To: <20170324135317.GA26769@kroah.com>
+References: <20170323210304.2181-1-nicolas.pitre@linaro.org>
+ <20170324065015.GA17226@kroah.com>
+ <alpine.LFD.2.20.1703240819370.2304@knanqh.ubzr>
+ <20170324135317.GA26769@kroah.com>
+Message-ID: <alpine.LFD.2.20.1703241215540.2304@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 20, 2017 at 11:48 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> We're currently stuck with DT when it comes to handling errata, which
-> is pretty restrictive. In order to make things more flexible, let's
-> introduce an infrastructure that could support alternative discovery
-> methods. No change in functionality.
->
-> Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm64/include/asm/arch_timer.h  |  7 +++-
->  drivers/clocksource/arm_arch_timer.c | 80 +++++++++++++++++++++++++++++++-----
->  2 files changed, 75 insertions(+), 12 deletions(-)
->
-> diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
-> index b4b34004a21e..5cd964e90d11 100644
-> --- a/arch/arm64/include/asm/arch_timer.h
-> +++ b/arch/arm64/include/asm/arch_timer.h
-> @@ -37,9 +37,14 @@ extern struct static_key_false arch_timer_read_ool_enabled;
->  #define needs_unstable_timer_counter_workaround()  false
->  #endif
->
-> +enum arch_timer_erratum_match_type {
-> +       ate_match_dt,
-> +};
->
->  struct arch_timer_erratum_workaround {
-> -       const char *id;         /* Indicate the Erratum ID */
-> +       enum arch_timer_erratum_match_type match_type;
-> +       const void *id;
-> +       const char *desc;
->         u32 (*read_cntp_tval_el0)(void);
->         u32 (*read_cntv_tval_el0)(void);
->         u64 (*read_cntvct_el0)(void);
-> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-> index 7a8a4117f123..6a0f0e161a0f 100644
-> --- a/drivers/clocksource/arm_arch_timer.c
-> +++ b/drivers/clocksource/arm_arch_timer.c
-> @@ -182,7 +182,9 @@ EXPORT_SYMBOL_GPL(arch_timer_read_ool_enabled);
->  static const struct arch_timer_erratum_workaround ool_workarounds[] = {
->  #ifdef CONFIG_FSL_ERRATUM_A008585
->         {
-> +               .match_type = ate_match_dt,
->                 .id = "fsl,erratum-a008585",
-> +               .desc = "Freescale erratum a005858",
->                 .read_cntp_tval_el0 = fsl_a008585_read_cntp_tval_el0,
->                 .read_cntv_tval_el0 = fsl_a008585_read_cntv_tval_el0,
->                 .read_cntvct_el0 = fsl_a008585_read_cntvct_el0,
-> @@ -190,13 +192,78 @@ static const struct arch_timer_erratum_workaround ool_workarounds[] = {
->  #endif
->  #ifdef CONFIG_HISILICON_ERRATUM_161010101
->         {
-> +               .match_type = ate_match_dt,
->                 .id = "hisilicon,erratum-161010101",
-> +               .desc = "HiSilicon erratum 161010101",
->                 .read_cntp_tval_el0 = hisi_161010101_read_cntp_tval_el0,
->                 .read_cntv_tval_el0 = hisi_161010101_read_cntv_tval_el0,
->                 .read_cntvct_el0 = hisi_161010101_read_cntvct_el0,
->         },
->  #endif
->  };
-> +
-> +typedef bool (*ate_match_fn_t)(const struct arch_timer_erratum_workaround *,
-> +                              const void *);
-> +
-> +static
-> +bool arch_timer_check_dt_erratum(const struct arch_timer_erratum_workaround *wa,
-> +                                const void *arg)
-> +{
-> +       const struct device_node *np = arg;
-> +
-> +       return of_property_read_bool(np, wa->id);
-> +}
-> +
-> +static const struct arch_timer_erratum_workaround *
-> +arch_timer_iterate_errata(enum arch_timer_erratum_match_type type,
-> +                         ate_match_fn_t match_fn,
-> +                         void *arg)
-> +{
-> +       int i;
-> +
-> +       for (i = 0; i < ARRAY_SIZE(ool_workarounds); i++) {
-> +               if (ool_workarounds[i].match_type != type)
-> +                       continue;
-> +
-> +               if (match_fn(&ool_workarounds[i], arg))
-> +                       return &ool_workarounds[i];
-> +       }
-> +
-> +       return NULL;
-> +}
-> +
-> +static
-> +void arch_timer_enable_workaround(const struct arch_timer_erratum_workaround *wa)
-> +{
-> +       timer_unstable_counter_workaround = wa;
-> +       static_branch_enable(&arch_timer_read_ool_enabled);
-> +}
-> +
-> +static void arch_timer_check_ool_workaround(enum arch_timer_erratum_match_type type,
-> +                                           void *arg)
-> +{
-> +       const struct arch_timer_erratum_workaround *wa;
-> +       ate_match_fn_t match_fn = NULL;
-> +
-> +       if (static_branch_unlikely(&arch_timer_read_ool_enabled))
-> +               return;
-> +
-> +       switch (type) {
-> +       case ate_match_dt:
-> +               match_fn = arch_timer_check_dt_erratum;
-> +               break;
+On Fri, 24 Mar 2017, Greg Kroah-Hartman wrote:
 
-hey Marc,
-   Would it make sense to have a default case here that warns &
-returns? That wouldn't get hit by this series as-is, but might avoid a
-NULL callback in the future.
+> On Fri, Mar 24, 2017 at 08:31:45AM -0400, Nicolas Pitre wrote:
+> > That's the crux of the argument: touching the current TTY layer is NOT 
+> > going to help keeping it stable. Here, not only I did remove features, 
+> > but the ones I kept were reimplemented to be much smaller and 
+> > potentially less scalable and performant too.  The ultimate goal here is 
+> > to have the smallest code possible with very simple locking and not 
+> > necessarily the most scalable code. That in itself is contradictory with 
+> > the regular TTY code and warrants a separate implementation. And because 
+> > it is so small, it is much easier to understand and much easier to 
+> > maintain.
+> 
+> So, what you are really saying here is "the current tty layer is too
+> messy, too complex, too big, and not understandable, so I'm going to
+> route around it by rewriting the whole thing just for my single-use-case
+> because I don't want to touch it."
 
-  -dann
+That's not exactly what I'm saying.
 
-> +       }
-> +
-> +       wa = arch_timer_iterate_errata(type, match_fn, arg);
-> +       if (!wa)
-> +               return;
-> +
-> +       arch_timer_enable_workaround(wa);
-> +       pr_info("Enabling global workaround for %s\n", wa->desc);
-> +}
-> +
-> +#else
-> +#define arch_timer_check_ool_workaround(t,a)           do { } while(0)
->  #endif /* CONFIG_ARM_ARCH_TIMER_OOL_WORKAROUND */
->
->  static __always_inline
-> @@ -960,17 +1027,8 @@ static int __init arch_timer_of_init(struct device_node *np)
->
->         arch_timer_c3stop = !of_property_read_bool(np, "always-on");
->
-> -#ifdef CONFIG_ARM_ARCH_TIMER_OOL_WORKAROUND
-> -       for (i = 0; i < ARRAY_SIZE(ool_workarounds); i++) {
-> -               if (of_property_read_bool(np, ool_workarounds[i].id)) {
-> -                       timer_unstable_counter_workaround = &ool_workarounds[i];
-> -                       static_branch_enable(&arch_timer_read_ool_enabled);
-> -                       pr_info("arch_timer: Enabling workaround for %s\n",
-> -                               timer_unstable_counter_workaround->id);
-> -                       break;
-> -               }
-> -       }
-> -#endif
-> +       /* Check for globally applicable workarounds */
-> +       arch_timer_check_ool_workaround(ate_match_dt, np);
->
->         /*
->          * If we cannot rely on firmware initializing the timer registers then
-> --
-> 2.11.0
->
+Yes, the current TTY code is big. It has to, given that it is extremely 
+flexible, it can scale up and still be robust, and it covers a large 
+amount of use cases. Because of those characteristics, it fundamentally 
+cannot be made small. You just can't have it all.
+
+I'm not saying that the current code is not understandable. I spent 
+considerable amount of my time understanding it, first and foremost to 
+get to know what I'm talking about, and find ways to shrink its memory 
+footprint initially. It is certainly complex because of the flexibility 
+and robustness it provides. My code most likely wouldn't perform as well 
+in the presence of multiple high-throughput channels for example.  But 
+that's not my concern.
+
+I'm concerned about small embedded systems where 85% of that code is 
+useless. In some cases the ability to change baudrate is also unneeded 
+so I intend to make that part configurable too.
+
+But in the end there is simply no way I could achieve the same footprint 
+reduction with the existing code.  This is clearly impossible.
+
+For example, my code perform line discipline handling in the very same 
+buffer where the RX interrupt is storing new data. The existing TTY code 
+has up to 3 buffering layers because of the needed modularisation to 
+support swappable line discipline modules, etc.  It is simply 
+unreasonable to expect that the later can be turned into the former 
+without either breaking things or severely restricting its scope.
+
+Let's be honest here: the existing code _could_ possibly be reduced of 
+course. That would require a lot of efforts to gain 50% reduction maybe?  
+What I'm looking at with my proposal here is a 6x reduction factor and 
+I'm still not done with it. There is no way I could do that with the 
+existing code.
+
+Let me give you some background as to what my fundamental motivation is, 
+and then maybe you'll understand why I'm doing this.
+
+What is the biggest buzzword in the IT industry right now? It is IOT.
+
+Most IOT targets are so small that people are rewriting new operating 
+systems from scratch for them. Lots of fragmentation already exists. 
+We're talking about systems with less than one megabyte of RAM, 
+sometimes much less.  Still, those things are being connected to the 
+internet. And this is going to be a total security nightmare.
+
+I wish to be able to leverage the Linux ecosystem for as much of the IOT 
+space as possible to avoid the worst of those nightmares.  The Linux 
+ecosystem has a *lot* of knowledgeable people around it, a lot of 
+testing infrastructure and tooling available already, etc.  If a 
+security issue turns up on Linux, it has a greater chance of being 
+caught early, or fixed quickly otherwise, and finding people with the 
+right knowledge is easier on Linux than it could be on any RTOS out 
+there. Still with me so far?
+
+Yes we have tools that can automatically reduce the kernel size. We can 
+use LTO with the compiler, etc.  LTO is pretty good already. It can 
+typically reduce the kernel size by 20%.  If all system calls are 
+disabled except for a few ones, then LTO can get rid of another 20%.  
+The minimal kernel I get is still 400-500 KB in size.  That's still too 
+big. Part of the size is this 60 KB of TTY + serial driver code just to 
+send some debugging messages out or do simple shell interactions!  Now 
+with this mini TTY and one of the existing UART driver I'm down to 20 
+KB and there is still room for more reduction.
+
+There is also this 120 KB of VFS code that is always there even though 
+there is no real filesystem at all configured in the kernel. There is 
+that other 100 KB of core driver support code despite the fact that the 
+set of drivers I'm using are very simple and basic. Etc.
+
+For Linux to be suitable, it has to be small, damn small. My target is 
+256 KB of RAM.  And if you look at the kind of application those 256 KB 
+systems are doing, it's basically one main task typically acquiring 
+sensor data and sending it in some crypted protocol over a wireless 
+network on the internet, and possibly accepting commands back.  So what 
+do you need from the OS to achieve that?  A few system calls, a minimal 
+scheduler, minimal memory management, minimal filesystem structure and 
+minimal network stack. And your user app.
+
+So, why not having each of those blocks be created using the existing 
+Linux syscall interface and internal API?  At that point, it should be 
+possible to take your standard full-featured Linux workstation and 
+develop your user app on it, run it there using all the existing native 
+debugging tools, etc. Also, it should be possible to swap some of those 
+kernel blocks for the tiny alternative in your kernel config and still 
+be able to boot such a kernel on your PC workstation and validate them 
+there, test them with the existing fuzers, etc.  That's what I have here 
+with this mini TTY implementation. In the end you just take the mini 
+version of everything for the final target and you're done.  And you 
+don't have to learn a whole new development environment and program 
+model, etc.
+
+I hope you'd agree with me that for such a goal, I cannot just try to 
+shrink the existing code. There has to be a parallel implementation of 
+some blocks alongside the main one that preserves the existing API but 
+that provides much less scalability and fewer features. Next on my list 
+would be a cache-less, completely serialized VFS alternative that has 
+only what's needed to make the link between the read/write syscalls, a 
+filesystem driver and a block driver. And by being really small, the 
+maintenance cost of a parallel implementation isn't very high, certainly 
+much less than trying to maintain a single version that can scale to 
+both extremes.
+
+Hence this series, which I hope could be the beginning of a trend for
+allowing Linux into the largest computing device deployment to come.
+
+
+Nicolas
