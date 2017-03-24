@@ -1,108 +1,53 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Fri, 24 Mar 2017 16:23:40 +0100
-Subject: [PATCH v4 28/28] arm/arm64: Add hyp-stub API documentation
-In-Reply-To: <ff4fe929-98f0-de0e-2f1a-d06c7969d5e0@arm.com>
-References: <20170321192058.9300-1-marc.zyngier@arm.com>
- <20170321192058.9300-29-marc.zyngier@arm.com>
- <20170324143316.GA25903@cbox>
- <ff4fe929-98f0-de0e-2f1a-d06c7969d5e0@arm.com>
-Message-ID: <20170324152340.GG25903@cbox>
+From: borntraeger@de.ibm.com (Christian Borntraeger)
+Date: Fri, 24 Mar 2017 16:24:28 +0100
+Subject: [PATCH] lkdtm: add bad USER_DS test
+In-Reply-To: <CAJcbSZHJ1WFcE7QY6qLM9RMUJbGXxTpp3WsCNJBX4h1U-4HEjA@mail.gmail.com>
+References: <20170323203419.GA62859@beast> <20170324081450.GA5891@osiris>
+ <CAJcbSZHJ1WFcE7QY6qLM9RMUJbGXxTpp3WsCNJBX4h1U-4HEjA@mail.gmail.com>
+Message-ID: <a1ab8afa-5462-dc24-2106-0a6b43773c5b@de.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 24, 2017 at 02:42:13PM +0000, Marc Zyngier wrote:
-> On 24/03/17 14:33, Christoffer Dall wrote:
-> > On Tue, Mar 21, 2017 at 07:20:58PM +0000, Marc Zyngier wrote:
-> >> In order to help people understanding the hyp-stub API that exists
-> >> between the host kernel and the hypervisor mode (whether a hypervisor
-> >> has been installed or not), let's document said API.
-> >>
-> >> As with any form of documentation, I expect it to become obsolete
-> >> and completely misleading within 20 minutes after having being merged.
-> > 
-> > I don't think this last sentence belongs in the commit message.
-> > 
-> >>
-> >> Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
-> >> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> >> ---
-> >>  Documentation/virtual/kvm/arm/hyp-abi.txt | 45 +++++++++++++++++++++++++++++++
-> >>  1 file changed, 45 insertions(+)
-> >>  create mode 100644 Documentation/virtual/kvm/arm/hyp-abi.txt
-> >>
-> >> diff --git a/Documentation/virtual/kvm/arm/hyp-abi.txt b/Documentation/virtual/kvm/arm/hyp-abi.txt
-> >> new file mode 100644
-> >> index 000000000000..a1e0314d2249
-> >> --- /dev/null
-> >> +++ b/Documentation/virtual/kvm/arm/hyp-abi.txt
-> >> @@ -0,0 +1,45 @@
-> >> +* Internal ABI between the kernel and HYP
-> >> +
-> >> +This file documents the interaction between the Linux kernel and the
-> >> +hypervisor layer when running Linux as a hypervisor (for example
-> >> +KVM). It doesn't cover the interaction of the kernel with the
-> >> +hypervisor when running as a guest (under Xen, KVM or any other
-> >> +hypervisor), or any hypervisor-specific interaction when the kernel is
-> >> +used as a host.
-> >> +
-> >> +On arm and arm64 (without VHE), the kernel doesn't run in hypervisor
-> >> +mode, but still needs to interact with it, allowing a built-in
-> >> +hypervisor to be either installed or torn down.
-> >> +
-> >> +In order to achieve this, the kernel must be booted at HYP (arm) or
-> >> +EL2 (arm64), allowing it to install a set of stubs before dropping to
-> >> +SVC/EL1. These stubs are accessible by using a 'hvc #0' instruction,
-> >> +and only act on individual CPUs.
-> >> +
-> >> +Unless specified otherwise, any built-in hypervisor must implement
-> >> +these functions (see arch/arm{,64}/include/asm/virt.h):
-> >> +
-> >> +* r0/x0 = HVC_SET_VECTORS
-> >> +  r1/x1 = vectors
-> >> +
-> >> +  Set HVBAR/VBAR_EL2 to 'vectors' to enable a hypervisor. 'vectors'
-> >> +  must be a physical address, and respect the alignment requirements
-> >> +  of the architecture. Only implemented by the initial stubs.
-> > 
-> > Does this last sentence mean that KVM doesn't implement this function?
+On 03/24/2017 04:17 PM, Thomas Garnier wrote:
+> On Fri, Mar 24, 2017 at 1:14 AM, Heiko Carstens
+> <heiko.carstens@de.ibm.com> wrote:
+>> On Thu, Mar 23, 2017 at 01:34:19PM -0700, Kees Cook wrote:
+>>> This adds CORRUPT_USER_DS to check that the get_fs() test on syscall return
+>>> still sees USER_DS during the new VERIFY_PRE_USERMODE_STATE checks.
+>>>
+>>> Signed-off-by: Kees Cook <keescook@chromium.org>
+>>
+>> ...
+>>
+>>> +void lkdtm_CORRUPT_USER_DS(void)
+>>> +{
+>>> +     /*
+>>> +      * Test that USER_DS has been set correctly on exiting a syscall.
+>>> +      * Since setting this higher than USER_DS (TASK_SIZE) would introduce
+>>> +      * an exploitable condition, we lower it instead, since that should
+>>> +      * not create as large a problem on an unprotected system.
+>>> +      */
+>>> +     mm_segment_t lowfs;
+>>> +#ifdef MAKE_MM_SEG
+>>> +     lowfs = MAKE_MM_SEG(TASK_SIZE - PAGE_SIZE);
+>>> +#else
+>>> +     lowfs = TASK_SIZE - PAGE_SIZE;
+>>> +#endif
+>>> +
+>>> +     pr_info("setting bad task size limit\n");
+>>> +     set_fs(lowfs);
+>>> +}
+>>
+>> This won't work on architectures where the set_fs() argument does not
+>> contain an address but an address space identifier. This is true e.g. for
+>> s390 and as far as I know also for sparc.
+>> On s390 we have complete distinct address spaces for kernel and user space
+>> that each start at address zero.
+>>
 > 
-> Indeed. 
+> The patch that enforce USER_DS is disabled on s390 anyway. I guess, we
+> can just do a set_fs(KERNEL_DS) for the others.
 
-I think the wording could be improved to "Only implemented by the
-initial stubs, not by Linux hypervisors."
-
-> Directly setting the vectors is inherently unsafe (MMU could
-> still be ON, for example), hence the HVC_SET_VECTORS operation that
-> allow this to be done safely (RESET followed by SET).
-> 
-
-Hmm, is it any less safe than setting the vectors using the hyp stubs?
-In the initial case, we're relying on the caller knowing that the MMU is
-off, and that the stubs are in place, otherwise it doesn't make sense.
-
-But I think the point is just that we don't have a need to change the
-vector from within KVM; we only have a need to set the vector when going
-from stub->kvm, and we have a need to reset the whole thing (including
-turning off the MMU) when going from kvm->stub.
-
-Anyhow, my comment was just about the wording, as I had some nagging
-doubt when I read the patch.
-
-> > 
-> >> +
-> >> +* r0/x0 = HVC_RESET_VECTORS
-> >> +
-> >> +  Turn HYP/EL2 MMU off, and reset HVBAR/VBAR_EL2 to the default
-> >> +  value. This effectively disables an existing hypervisor.
-> > 
-> > What's the 'default value' ?  Could we say to the physical address of
-> > the hypervisor stub's exception vector?
-> 
-> Shouldn't that be the kernel stub's exception vector?
-> 
-
-Yeah, the "initials stubs' exception vector" is probably the most
-coherent thing we can use here.
-
-Thanks,
--Christoffer
+that would enable the test, but it would also mean that lkdtm can be used by
+a program to escalate its rights. I think that is the reason why Kees did this
+lowfs things.
