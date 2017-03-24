@@ -1,33 +1,47 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri, 24 Mar 2017 10:53:48 -0700
-Subject: [PATCH 3/9] arm64: mm: install SError abort handler
-In-Reply-To: <20170324173515.GB10746@leverpostej>
-References: <20170324144632.5896-1-opendmb@gmail.com>
- <20170324144632.5896-4-opendmb@gmail.com>
- <20170324151654.GD29588@leverpostej> <58D54DE8.9020707@gmail.com>
- <20170324173515.GB10746@leverpostej>
-Message-ID: <710c4142-ae20-9715-3e51-910a2073a64e@gmail.com>
+Date: Fri, 24 Mar 2017 10:58:01 -0700
+Subject: [GIT PULL 1/7] Broadcom soc changes for 4.12
+Message-ID: <20170324175807.27272-1-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/24/2017 10:35 AM, Mark Rutland wrote:
-> On Fri, Mar 24, 2017 at 09:48:40AM -0700, Doug Berger wrote:
->> On 03/24/2017 08:16 AM, Mark Rutland wrote:
->>> On Fri, Mar 24, 2017 at 07:46:26AM -0700, Doug Berger wrote:
-> 
->> If you would consider an alternative implementation where we scrap
->> the SError handler (i.e. maintain the ugliness in our downstream
->> kernel) in favor of a more gentle user mode crash on SError that
->> allows the kernel the opportunity to service the interrupt for
->> diagnostic purposes I could try to repackage that.
-> 
-> If this is just for diagnostic purposes, I believe you can register a
-> panic notifier, which can then read from the bus. The panic will occur,
-> but you'll have the opportunity to log some information to dmesg.
+The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
 
-And crash the kernel? That sounds awful, FWIW the ARM/Linux kernel is
-able to recover just fine from user-space accessing e.g: invalid
-physical addresses in the GISB register space, bringing the same level
-of functionality to ARM64/Linux sounds reasonable to me.
--- 
-Florian
+  Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
+
+are available in the git repository at:
+
+  http://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.12/soc
+
+for you to fetch changes up to d47b51ad31e21ab8129da64d42e2fc48e7a215eb:
+
+  ARM: brcmstb: Add entry for 7260 (2017-03-15 14:57:50 -0700)
+
+----------------------------------------------------------------
+This pull request contains Broadcom ARM-based SoC Kconfig/platform changes for
+4.12, please pull the following:
+
+- Al enables ZONE_DMA for BRCMSTB platforms since a bunch of on-chip
+  peripherals such as USB (OHCI and EHCI) and SDHCI cannot support physical
+  addresses > 32-bit. This is only required when ARM_LPAE is enabled
+
+- Danesh enables ARCH_HAS_HOLES_MEMORYMODEL in order for the kernel to provide
+  a pfn_valid() implementation despite BRCMSTB enabling the SPARSEMEM model by
+  default.
+
+- Florian adds support for a new 28nm generation chip: 7260 by updating the
+  runtime detection UART debuggin stub used for DEBUG_LL.
+
+----------------------------------------------------------------
+Al Cooper (1):
+      ARM: brcmstb: Enable ZONE_DMA for non 64-bit capable peripherals
+
+Danesh Petigara (1):
+      ARM: brcmstb: Enable ARCH_HAS_HOLES_MEMORYMODEL
+
+Florian Fainelli (1):
+      ARM: brcmstb: Add entry for 7260
+
+ arch/arm/include/debug/brcmstb.S | 18 ++++++++++--------
+ arch/arm/mach-bcm/Kconfig        |  2 ++
+ 2 files changed, 12 insertions(+), 8 deletions(-)
