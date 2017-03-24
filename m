@@ -1,45 +1,100 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 24 Mar 2017 07:52:45 +0100
-Subject: [GIT PULL] Renesas ARM Based SoC Drivers Updates for v4.12
-In-Reply-To: <20170322003750.GI5129@localhost>
-References: <cover.1490000158.git.horms+renesas@verge.net.au>
- <20170322003750.GI5129@localhost>
-Message-ID: <20170324065245.GG1319@verge.net.au>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 24 Mar 2017 14:55:44 +0800
+Subject: [linux-sunxi] [PATCH v4 3/8] phy: sun4i-usb: add PHYCTL offset
+ for H3 SoC
+In-Reply-To: <1157651490336844@web12m.yandex.ru>
+References: <20170319161951.55834-1-icenowy@aosc.xyz>
+ <20170319161951.55834-4-icenowy@aosc.xyz>
+ <CAGb2v65NHgDDPGChR4rg28NS1tuj2RZ9ERrQz2cSa_haZLypXA@mail.gmail.com>
+ <1157651490336844@web12m.yandex.ru>
+Message-ID: <CAGb2v64DgFdmHiJ1r4NJR6Ck5ny1Mik_XhTEd_7=XMyptrD2uA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 21, 2017 at 05:37:50PM -0700, Olof Johansson wrote:
-> On Mon, Mar 20, 2017 at 09:58:23AM +0100, Simon Horman wrote:
-> > Hi Olof, Hi Kevin, Hi Arnd,
-> > 
-> > Please consider these Renesas ARM based SoC drivers updates for v4.12.
-> > 
-> > 
-> > The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
-> > 
-> >   Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
-> > 
-> > are available in the git repository at:
-> > 
-> >   https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-drivers-for-v4.12
-> > 
-> > for you to fetch changes up to cd59de80dd34dd2d1a3ca97d7a6e712c048b135a:
-> > 
-> >   soc: renesas: Identify RZ/G1N (2017-03-13 10:26:08 +0100)
-> > 
-> > ----------------------------------------------------------------
-> > Renesas ARM Based SoC Drivers Updates for v4.12
-> > 
-> > * Identify RZ/G1N and RZ/G1H
-> > 
-> > ----------------------------------------------------------------
-> > Geert Uytterhoeven (2):
-> >       soc: renesas: Identify RZ/G1H
-> >       soc: renesas: Identify RZ/G1N
-> 
-> At first I was wondering why you'd applied the same patch twice. Renesas likes
-> to make names similar *and* hard to remember sometimes. :-)
+On Fri, Mar 24, 2017 at 2:27 PM, Icenowy Zheng <icenowy@aosc.xyz> wrote:
+>
+>
+> 24.03.2017, 11:05, "Chen-Yu Tsai" <wens@csie.org>:
+>> On Mon, Mar 20, 2017 at 12:19 AM, Icenowy Zheng <icenowy@aosc.xyz> wrote:
+>>>  The config structure of H3 in phy-sun4i-usb driver have the PHYCTL
+>>>  register offset missing.
+>>>
+>>>  Add it. Because it's a SoC after A33, its PHYCTL offset should be 0x10.
+>>
+>> You are implying that all SoCs after A33 have PHYCTL at 0x10.
+>>
+>> This is not true. As the A83T, which was released after the A33, has
+>> PHYCTL at the old offset.
+>
+> No, in Allwinner's BSP A83T is using also PHYCTL at 0x10.
+>
+> The code in linux-3.4/drivers/usb/sunxi_usb/include/sunxi_usb_bsp.c is
+> ```
+> #if defined (CONFIG_ARCH_SUN8IW5) || defined (CONFIG_ARCH_SUN8IW6) || defined (CONFIG_ARCH_SUN8IW9) || defined (CONFIG_ARCH_SUN8IW8) || defined (CONFIG_ARCH_SUN8IW7)
+> #define  USBPHYC_REG_o_PHYCTL               0x0410
+> #else
+> #define  USBPHYC_REG_o_PHYCTL               0x0404
+> #endif
+> ```
+>
+> In linux-3.10/drivers/usb/sunxi_usb/include/sunxi_usb_bsp.c is
+> ```
+> #if defined (CONFIG_ARCH_SUN50I) || defined (CONFIG_ARCH_SUN8IW10) || defined (CONFIG_ARCH_SUN8IW11)
+> #define  USBPHYC_REG_o_PHYCTL               0x0410
+> #else
+> #define  USBPHYC_REG_o_PHYCTL               0x0404
+> #endif
+> ```
+>
+> So sun50i* and sun50iw5~w11 all use PHYCTL at 0x10.
+>
 
-:-)
+Seems you are right. However I think it's best to not assume or infer
+anything. Who knows, Allwinner might re-release some old SoC under a
+different under a different name again.
 
-Thanks for queueing up this and the other pull-requests I sent.
+Just state the facts: H3 has its PHYCTL at 0x10.
+
+ChenYu
+
+>>
+>> Just state that H3 has PHYCTL at 0x10.
+>>
+>> ChenYu
+>>
+>>>  Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+>>>  ---
+>>>  New patch in v4.
+>>>
+>>>   drivers/phy/phy-sun4i-usb.c | 1 +
+>>>   1 file changed, 1 insertion(+)
+>>>
+>>>  diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
+>>>  index 62b4d25448c6..a650f283f6ff 100644
+>>>  --- a/drivers/phy/phy-sun4i-usb.c
+>>>  +++ b/drivers/phy/phy-sun4i-usb.c
+>>>  @@ -821,6 +821,7 @@ static const struct sun4i_usb_phy_cfg sun8i_h3_cfg = {
+>>>          .num_phys = 4,
+>>>          .type = sun8i_h3_phy,
+>>>          .disc_thresh = 3,
+>>>  + .phyctl_offset = REG_PHYCTL_A33,
+>>>          .dedicated_clocks = true,
+>>>          .enable_pmu_unk1 = true,
+>>>   };
+>>>  --
+>>>  2.12.0
+>>>
+>>>  --
+>>>  You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
+>>>  To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
+>>>  For more options, visit https://groups.google.com/d/optout.
+>>
+>> --
+>> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
+>> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
+>> For more options, visit https://groups.google.com/d/optout.
+>
+> --
+> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
+> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
+> For more options, visit https://groups.google.com/d/optout.
