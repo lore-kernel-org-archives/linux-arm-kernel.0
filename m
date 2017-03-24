@@ -1,86 +1,133 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 24 Mar 2017 09:59:08 -0500
-Subject: [PATCH v3 1/2] doc: Add bindings document for Xilinx LogiCore PR
- Decoupler
-In-Reply-To: <1489781473-30772-1-git-send-email-mdf@kernel.org>
-References: <1489781473-30772-1-git-send-email-mdf@kernel.org>
-Message-ID: <20170324145908.aiijqixf5xcnkksa@rob-hp-laptop>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Fri, 24 Mar 2017 10:07:53 -0500
+Subject: [PATCH 2/4 v5] PCI: add driver for Faraday Technology Host Bridge
+In-Reply-To: <20170312222403.2473-1-linus.walleij@linaro.org>
+References: <20170312222403.2473-1-linus.walleij@linaro.org>
+Message-ID: <20170324150753.GC25380@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 17, 2017 at 01:11:12PM -0700, Moritz Fischer wrote:
-> This adds the binding documentation for the Xilinx LogiCORE PR
-> Decoupler soft core.
+On Sun, Mar 12, 2017 at 11:24:03PM +0100, Linus Walleij wrote:
+> This adds a host bridge driver for the Faraday Technology
+> FPPCI100 host bridge, used for Cortina Systems Gemini SoC
+> (SL3516) PCI Host Bridge.
 > 
-> Signed-off-by: Moritz Fischer <mdf@kernel.org>
-> Cc: Michal Simek <michal.simek@xilinx.com>
-> Cc: S?ren Brinkmann <soren.brinkmann@xilinx.com>
-> Cc: linux-kernel at vger.kernel.org
-> Cc: devicetree at vger.kernel.org
-> ---
+> This code is inspired by the out-of-tree OpenWRT patch and
+> then extensively rewritten for device tree and using the modern
+> helpers to cut down and modernize the code to all new PCI
+> frameworks. A driver exists in U-Boot as well.
 > 
-> Changes from v2:
-> - Added refence to generic fpga-region bindings
-> - Fixed up reg property in example
-> - Added fallback to "xlnx,pr-decoupler" without version
+> Tested on the ITian Square One SQ201 NAS with the following
+> result in the boot log (trimmed to relevant parts):
 > 
-> Changes from v1:
-> - Added clock names & clock to example
-> - Merged some of the description from Michal's version
+> OF: PCI: host bridge /soc/pci at 50000000 ranges:
+> OF: PCI:    IO 0x50000000..0x500fffff -> 0x00000000
+> OF: PCI:   MEM 0x58000000..0x5fffffff -> 0x58000000
+> ftpci100 50000000.pci: PCI host bridge to bus 0000:00
+> pci_bus 0000:00: root bus resource [bus 00-ff]
+> pci_bus 0000:00: root bus resource [io  0x0000-0xfffff]
+> pci_bus 0000:00: root bus resource [mem 0x58000000-0x5fffffff]
+> ftpci100 50000000.pci:
+>   DMA MEM1 BASE: 0x0000000000000000 -> 0x0000000007ffffff config 00070000
+> ftpci100 50000000.pci:
+>   DMA MEM2 BASE: 0x0000000000000000 -> 0x0000000003ffffff config 00060000
+> ftpci100 50000000.pci:
+>   DMA MEM3 BASE: 0x0000000000000000 -> 0x0000000003ffffff config 00060000
+> PCI: bus0: Fast back to back transfers disabled
+> pci 0000:00:00.0: of_irq_parse_pci() failed with rc=-22
+> pci 0000:00:0c.0: BAR 0: assigned [mem 0x58000000-0x58007fff]
+> pci 0000:00:09.2: BAR 0: assigned [mem 0x58008000-0x580080ff]
+> pci 0000:00:09.0: BAR 4: assigned [io  0x1000-0x101f]
+> pci 0000:00:09.1: BAR 4: assigned [io  0x1020-0x103f]
+> pci 0000:00:09.0: enabling device (0140 -> 0141)
+> pci 0000:00:09.0: HCRESET not completed yet!
+> pci 0000:00:09.1: enabling device (0140 -> 0141)
+> pci 0000:00:09.1: HCRESET not completed yet!
+> pci 0000:00:09.2: enabling device (0140 -> 0142)
+> rt61pci 0000:00:0c.0: enabling device (0140 -> 0142)
+> ieee80211 phy0: rt2x00_set_chip: Info - Chipset detected -
+>    rt: 2561, rf: 0003, rev: 000c
+> ehci_hcd: USB 2.0 'Enhanced' Host Controller (EHCI) Driver
+> ehci-pci: EHCI PCI platform driver
+> ehci-pci 0000:00:09.2: EHCI Host Controller
+> ehci-pci 0000:00:09.2: new USB bus registered, assigned bus number 1
+> ehci-pci 0000:00:09.2: irq 125, io mem 0x58008000
+> ehci-pci 0000:00:09.2: USB 2.0 started, EHCI 1.00
+> hub 1-0:1.0: USB hub found
+> hub 1-0:1.0: 4 ports detected
+> uhci_hcd: USB Universal Host Controller Interface driver
+> uhci_hcd 0000:00:09.0: UHCI Host Controller
+> uhci_hcd 0000:00:09.0: new USB bus registered, assigned bus number 2
+> uhci_hcd 0000:00:09.0: HCRESET not completed yet!
+> uhci_hcd 0000:00:09.0: irq 123, io base 0x00001000
+> hub 2-0:1.0: USB hub found
+> hub 2-0:1.0: config failed, hub doesn't have any ports! (err -19)
+> uhci_hcd 0000:00:09.1: UHCI Host Controller
+> uhci_hcd 0000:00:09.1: new USB bus registered, assigned bus number 3
+> uhci_hcd 0000:00:09.1: HCRESET not completed yet!
+> uhci_hcd 0000:00:09.1: irq 124, io base 0x00001020
+> hub 3-0:1.0: USB hub found
+> hub 3-0:1.0: config failed, hub doesn't have any ports! (err -19)
+> scsi 0:0:0:0: Direct-Access     USB      Flash Disk       1.00 PQ: 0 ANSI: 2
+> sd 0:0:0:0: [sda] 7900336 512-byte logical blocks: (4.04 GB/3.77 GiB)
+> sd 0:0:0:0: [sda] Write Protect is off
+> sd 0:0:0:0: [sda] No Caching mode page found
+> sd 0:0:0:0: [sda] Assuming drive cache: write through
+>  sda: sda1 sda2 sda3
+> sd 0:0:0:0: [sda] Attached SCSI removable disk
+> ieee80211 phy0: rt2x00lib_request_firmware: Info -
+>    Loading firmware file 'rt2561s.bin'
+> ieee80211 phy0: rt2x00lib_request_firmware: Info -
+>    Firmware detected - version: 0.8
+> IPv6: ADDRCONF(NETDEV_UP): wlan0: link is not ready
 > 
-> ---
->  .../bindings/fpga/xilinx-pr-decoupler.txt          | 35 ++++++++++++++++++++++
->  1 file changed, 35 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/fpga/xilinx-pr-decoupler.txt
+> $ lspci
+> 00:00.0 Class 0600: 159b:4321
+> 00:09.2 Class 0c03: 1106:3104
+> 00:09.0 Class 0c03: 1106:3038
+> 00:09.1 Class 0c03: 1106:3038
+> 00:0c.0 Class 0280: 1814:0301
 > 
-> diff --git a/Documentation/devicetree/bindings/fpga/xilinx-pr-decoupler.txt b/Documentation/devicetree/bindings/fpga/xilinx-pr-decoupler.txt
-> new file mode 100644
-> index 0000000..16141bd
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/fpga/xilinx-pr-decoupler.txt
-> @@ -0,0 +1,35 @@
-> +Xilinx LogiCORE Partial Reconfig Decoupler Softcore
-> +
-> +The Xilinx LogiCORE Partial Reconfig Decoupler manages one or more
-> +decouplers / fpga bridges.
-> +The controller can decouple/disable the bridges which prevents signal
-> +changes from passing through the bridge.  The controller can also
-> +couple / enable the bridges which allows traffic to pass through the
-> +bridge normally.
-> +
-> +The Driver supports only MMIO handling. A PR region can have multiple
-> +PR Decouples which can bhe handled independently or chaines via decouple/
+> cat /proc/interrupts
+>            CPU0
+> 123:          0       PCI   0 Edge      uhci_hcd:usb2
+> 124:          0       PCI   1 Edge      uhci_hcd:usb3
+> 125:        159       PCI   2 Edge      ehci_hcd:usb1
+> 126:       1082       PCI   3 Edge      rt61pci
+> 
+> cat /proc/iomem
+> 50000000-500000ff : /soc/pci at 50000000
+> 58000000-5fffffff : Gemini PCI MEM
+>   58000000-58007fff : 0000:00:0c.0
+>     58000000-58007fff : 0000:00:0c.0
+>   58008000-580080ff : 0000:00:09.2
+>     58008000-580080ff : ehci_hcd
+> 
+> The EHCI USB hub works fine, I can mount and manage
+> files and the IRQs just keep ticking up. I can issue
+> iwlist wlan0 scanning and see all the WLANs here, I don't have
+> wpa_supplicant so have not tried connecting to them.
+> 
+> Cc: Janos Laube <janos.dev@gmail.com>
+> Cc: Paulius Zaleckas <paulius.zaleckas@gmail.com>
+> Cc: Hans Ulli Kroll <ulli.kroll@googlemail.com>
+> Cc: Florian Fainelli <f.fainelli@gmail.com>
+> Cc: Feng-Hsin Chiang <john453@faraday-tech.com>
+> Cc: Greentime Hu <green.hu@gmail.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 
-s/chaines/chains/
+Acked-by: Bjorn Helgaas <bhelgaas@google.com>
 
-> +decouple_status signals.
-> +
-> +Required properties:
-> +- compatible		: Should contain "xlnx,pr-decoupler-1.00"
-> +- regs			: base address and size for decoupler module
-> +- clocks		: input clock to IP
-> +- clock-names		: should contain "aclk"
-> +
-> +Optional properties:
-> +- bridge-enable		: 0 if driver should disable bridge at startup
-> +			  1 if driver should enable bridge at startup
-> +			  Default is to leave bridge in current state.
+I don't know enough to review the DT patch, but you have Rob's ack
+already.
 
-This is common and should move into a common doc. Maybe fpga-region.txt 
-works?
+Not sure how you want to merge these; if you want to feed the whole
+thing via ARM SoC, that's fine with me.  Otherwise, let me know if
+you'd like me to take anything.
 
-> +
-> +See Documentation/devicetree/bindings/fpga/fpga-region.txt for generic bindings.
-> +
-> +Example:
-> +	fpga-bridge at 100000450 {
-> +		compatible = "xlnx,pr-decoupler-1.00",
-> +			     "xlnx-pr-decoupler";
-> +		regs = <0x10000045 0x10>;
-> +		clocks = <&clkc 15>;
-> +		clock-names = "aclk";
-> +		bridge-enable = <0>;
-> +	};
-> -- 
-> 2.7.4
-> 
+Noticed one trivial typo below.
+
+> + * Special configuration registers directly in the first few words
+> + * in he I/O space.
+
+s/he//
