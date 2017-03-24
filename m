@@ -1,51 +1,54 @@
-From: adrian.hunter@intel.com (Adrian Hunter)
-Date: Fri, 24 Mar 2017 09:52:18 +0200
-Subject: [PATCH] mmc: core: Do not hold re-tuning during CMD6 commands
-In-Reply-To: <1490336341-22292-2-git-send-email-chaotian.jing@mediatek.com>
-References: <1490336341-22292-1-git-send-email-chaotian.jing@mediatek.com>
- <1490336341-22292-2-git-send-email-chaotian.jing@mediatek.com>
-Message-ID: <13a83728-0031-5683-c371-4b517df32299@intel.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 24 Mar 2017 08:59:56 +0100
+Subject: [PATCH 06/15] ARM: dts: r8a779x: fix PCI bus dtc warnings
+In-Reply-To: <20170324070614.GJ1319@verge.net.au>
+References: <20170322020313.24338-1-robh@kernel.org>
+ <20170322020313.24338-6-robh@kernel.org>
+ <20170324070614.GJ1319@verge.net.au>
+Message-ID: <CAMuHMdXLqsLMdjZrHnWhho50JOqQHuOMD3HUr2Skiujq8OPG-A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/03/17 08:19, Chaotian Jing wrote:
-> this patch is refine for 'commit c6dbab9cb58f ("mmc: core: Hold re-tuning
-> during switch commands")'
-> Since it has 3 retries at max for CMD6, if the first CMD6 got CRC error,
-> then should do re-tune before the next CMD6 was sent.
-> 
-> Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
-> ---
->  drivers/mmc/core/mmc_ops.c |    3 +--
->  1 file changed, 1 insertion(+), 2 deletions(-)
-> 
-> diff --git a/drivers/mmc/core/mmc_ops.c b/drivers/mmc/core/mmc_ops.c
-> index fe80f26..6931927 100644
-> --- a/drivers/mmc/core/mmc_ops.c
-> +++ b/drivers/mmc/core/mmc_ops.c
-> @@ -534,8 +534,6 @@ int __mmc_switch(struct mmc_card *card, u8 set, u8 index, u8 value,
->  	bool use_r1b_resp = use_busy_signal;
->  	unsigned char old_timing = host->ios.timing;
->  
-> -	mmc_retune_hold(host);
-> -
->  	/*
->  	 * If the cmd timeout and the max_busy_timeout of the host are both
->  	 * specified, let's validate them. A failure means we need to prevent
-> @@ -567,6 +565,7 @@ int __mmc_switch(struct mmc_card *card, u8 set, u8 index, u8 value,
->  		cmd.sanitize_busy = true;
->  
->  	err = mmc_wait_for_cmd(host, &cmd, MMC_CMD_RETRIES);
-> +	mmc_retune_hold(host);
+Hi Simon,
 
-That is not how mmc_retune_hold() works, you need mmc_retune_hold_now() as
-it is here:
+On Fri, Mar 24, 2017 at 8:06 AM, Simon Horman <horms@verge.net.au> wrote:
+> On Tue, Mar 21, 2017 at 09:03:04PM -0500, Rob Herring wrote:
+>> dtc recently added PCI bus checks. Fix these warnings.
+>>
+>> Signed-off-by: Rob Herring <robh@kernel.org>
+>> Cc: Simon Horman <horms@verge.net.au>
+>> Cc: Magnus Damm <magnus.damm@gmail.com>
+>> Cc: linux-renesas-soc at vger.kernel.org
+>> ---
+>> Sub-arch maintainers, please apply to your trees unless arm-soc wants
+>> to take the whole lot.
+>
+> I would prefer to take these through my tree to reduce the chances of
+> conflicts emerging later.
+>
+> Geert, are you happy with this patch and its changelog as-is?
 
-	https://marc.info/?l=linux-mmc&m=148940903816582
+I'd use something like:
 
-But using "retries" with commands that have busy-waiting on the data line
-doesn't make much sense anyway.  Particularly with CRC errors, I would
-expect the card is actually busily doing the switch and we need only to wait
-for it.  The same can be true for timeout errors.  For some CMD6 we might
-need to send CMD12 if the card is busy after an error.  I would prefer an
-explicit attempt at recovery from CMD6 errors.
+---8<----------
+The bogus 'device_type = "pci"' confuses dtc, causing lots of totally
+unrelated warnings.  After fixing that, real warnings like
+
+    arch/arm/boot/dts/r8a7790-lager.dtb: Warning (pci_device_reg):
+Node /pci at ee090000/usb@0,1 PCI unit address format error, expected
+"1,0"
+
+are left.  Correct the unit-adresses and reg properties of the subnodes
+to fix these.
+---------->8---
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
