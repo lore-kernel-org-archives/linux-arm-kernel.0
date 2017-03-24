@@ -1,114 +1,62 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 24 Mar 2017 11:14:21 -0700
-Subject: [PATCH v4 3/7] coresight: refactor with function
- of_coresight_get_cpu
-In-Reply-To: <1489762943-25849-4-git-send-email-leo.yan@linaro.org>
-References: <1489762943-25849-1-git-send-email-leo.yan@linaro.org>
- <1489762943-25849-4-git-send-email-leo.yan@linaro.org>
-Message-ID: <20170324181421.GB25840@codeaurora.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 24 Mar 2017 18:16:53 +0000
+Subject: Query: ARM64: A random failure with hugetlbfs linked mmap() of a
+ stack area
+In-Reply-To: <2b8bf63f-3e20-aa26-2d75-83aa2ab35cde@redhat.com>
+References: <4e776e1f-dd11-2fa2-5109-6c2b5184b70d@redhat.com>
+ <20170324161558.GA10491@leverpostej>
+ <d6ee1a17-4518-5a37-f8b7-b62030c24cc7@redhat.com>
+ <20170324172533.GA10746@leverpostej>
+ <2b8bf63f-3e20-aa26-2d75-83aa2ab35cde@redhat.com>
+Message-ID: <20170324181652.GC10746@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/17, Leo Yan wrote:
-> diff --git a/drivers/hwtracing/coresight/of_coresight.c b/drivers/hwtracing/coresight/of_coresight.c
-> index 917ca39..7a60f2b 100644
-> --- a/drivers/hwtracing/coresight/of_coresight.c
-> +++ b/drivers/hwtracing/coresight/of_coresight.c
-> @@ -101,15 +101,38 @@ static int of_coresight_alloc_memory(struct device *dev,
->  	return 0;
->  }
->  
-> +int of_coresight_get_cpu(struct device_node *node)
-
-const node?
-
-> +{
-> +	int cpu;
-> +	bool found;
-> +	struct device_node *dn, *np;
-> +
-> +	dn = of_parse_phandle(node, "cpu", 0);
-> +
-> +	/* Affinity defaults to CPU0 */
-> +	if (!dn)
-> +		return 0;
-> +
-> +	for_each_possible_cpu(cpu) {
-> +		np = of_get_cpu_node(cpu, NULL);
-
-of_cpu_device_node_get()?
-
-> +		found = (dn == np);
-> +		of_node_put(np);
-> +		if (found)
-> +			break;
-> +	}
-> +	of_node_put(dn);
-> +
-> +	/* Affinity to CPU0 if no cpu nodes are found */
-> +	return found ? cpu : 0;
-> +}
-> +
->  struct coresight_platform_data *of_get_coresight_platform_data(
->  				struct device *dev, struct device_node *node)
->  {
-> -	int i = 0, ret = 0, cpu;
-> +	int i = 0, ret = 0;
->  	struct coresight_platform_data *pdata;
->  	struct of_endpoint endpoint, rendpoint;
->  	struct device *rdev;
-> -	bool found;
-> -	struct device_node *dn, *np;
->  	struct device_node *ep = NULL;
->  	struct device_node *rparent = NULL;
->  	struct device_node *rport = NULL;
-> @@ -176,18 +199,7 @@ struct coresight_platform_data *of_get_coresight_platform_data(
->  		} while (ep);
->  	}
->  
-> -	dn = of_parse_phandle(node, "cpu", 0);
-> -	for_each_possible_cpu(cpu) {
-> -		np = of_get_cpu_node(cpu, NULL);
-> -		found = (dn == np);
-> -		of_node_put(np);
-> -		if (found)
-> -			break;
-> -	}
-> -	of_node_put(dn);
-> -
-
-Ok yeah the code is moving, so perhaps another patch to make the
-changes suggested above.
-
-> -	/* Affinity to CPU0 if no cpu nodes are found */
-> -	pdata->cpu = found ? cpu : 0;
-> +	pdata->cpu = of_coresight_get_cpu(node);
->  
->  	return pdata;
->  }
-> diff --git a/include/linux/coresight.h b/include/linux/coresight.h
-> index 2a5982c..7b29743 100644
-> --- a/include/linux/coresight.h
-> +++ b/include/linux/coresight.h
-> @@ -263,9 +263,11 @@ static inline int coresight_timeout(void __iomem *addr, u32 offset,
->  #endif
->  
->  #ifdef CONFIG_OF
-> +extern int of_coresight_get_cpu(struct device_node *node);
->  extern struct coresight_platform_data *of_get_coresight_platform_data(
->  				struct device *dev, struct device_node *node);
->  #else
-> +static int of_coresight_get_cpu(struct device_node *node) { return 0; }
-
-inline?
-
->  static inline struct coresight_platform_data *of_get_coresight_platform_data(
->  	struct device *dev, struct device_node *node) { return NULL; }
->  #endif
-> -- 
-> 2.7.4
+On Fri, Mar 24, 2017 at 11:32:58PM +0530, Pratyush Anand wrote:
 > 
+> 
+> On Friday 24 March 2017 10:55 PM, Mark Rutland wrote:
+> >>Moreover, even if mmap() in test routine crosses over many other
+> >>text/rd/rw area mappings, should it fail? We are not writing
+> >>anything to mmaped area. So, why should just a creation of another
+> >>map result in segmentation fault?
+> >The new mapping replaces the old mappings that it clobbers, so all the
+> >old data/code is gone. Loads or instruction fetches will see data from
+> >the new mapping.
+> 
+> Humm..I see..But in that case mmap() should have failed and return
+> MAP_FAILED instead of remapping and which could cause a segfault.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+That does nto appear to be the case. As per the mmap man page:
+
+  MAP_FIXED
+      Don't  interpret addr as a hint: place the mapping at exactly that
+      address.  addr must be a multiple of the page size.  If the memory
+      region specified by addr and len overlaps pages of any existing
+      mapping(s), then the overlapped part of the existing mapping(s)
+      will  be discarded.  If the specified address cannot be used,
+      mmap() will fail.  Because requiring a fixed address for a mapping
+      is less portable, the use of this option is discouraged.
+
+[...]
+
+> >For your report, it's not clear to me what's going on. Did you take the
+> >/proc/pid/maps data from teh exact same process that the segfault
+> >occurred in? and/or did you disable ASLR?
+> 
+> Yes, it is from the same process.
+
+That is troubling; I cannot explain that.
+
+> Since, I was not able to reproduce with gdb so, I had inserted a
+> scanf() just before mmap() and then had read /proc/pid/maps.
+
+That might be because GDB disables ASLR by default. Did you re-enable
+ASLR within GDB with:
+
+	set disable-randomization off
+
+If not, could you give that a go?
+
+Thanks,
+Mark.
