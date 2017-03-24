@@ -1,52 +1,97 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 24 Mar 2017 09:46:03 -0500
-Subject: [PATCH v3 08/11] ASoC: Add bindings for DMIC codec driver
-In-Reply-To: <1489759704-30217-9-git-send-email-arnaud.pouliquen@st.com>
-References: <1489759704-30217-1-git-send-email-arnaud.pouliquen@st.com>
- <1489759704-30217-9-git-send-email-arnaud.pouliquen@st.com>
-Message-ID: <20170324144603.zos7n4oqelaag433@rob-hp-laptop>
+From: smueller@chronox.de (Stephan =?ISO-8859-1?Q?M=FCller?=)
+Date: Fri, 24 Mar 2017 15:46:44 +0100
+Subject: [PATCH 1/3] crypto: hw_random - Add new Exynos RNG driver
+In-Reply-To: <20170324144348.v4hegak7dffh5awh@kozik-lap>
+References: <20170324142446.31129-1-krzk@kernel.org>
+ <2503592.nlbQnVP8UR@positron.chronox.de>
+ <20170324144348.v4hegak7dffh5awh@kozik-lap>
+Message-ID: <3628768.ze2UxnIp5I@tauon.atsec.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 17, 2017 at 03:08:21PM +0100, Arnaud Pouliquen wrote:
-> This patch adds documentation of device tree bindings for audio DMIC codec.
+Am Freitag, 24. M?rz 2017, 15:43:48 CET schrieb Krzysztof Kozlowski:
+
+Hi Krzysztof,
+
+> On Fri, Mar 24, 2017 at 03:37:59PM +0100, Stephan M?ller wrote:
+> > Am Freitag, 24. M?rz 2017, 15:24:44 CET schrieb Krzysztof Kozlowski:
+> > 
+> > Hi Krzysztof,
+> > 
+> > > +
+> > > +static int exynos_rng_set_seed(struct exynos_rng_dev *rng,
+> > > +			       const u8 *seed, unsigned int slen)
+> > > +{
+> > > +	int ret, i;
+> > > +	u32 val;
+> > > +
+> > > +	dev_dbg(rng->dev, "Seeding with %u bytes\n", slen);
+> > > +
+> > > +	ret = clk_prepare_enable(rng->clk);
+> > > +	if (ret)
+> > > +		return ret;
+> > > +
+> > > +	if (slen < EXYNOS_RNG_SEED_SIZE) {
+> > > +		dev_warn(rng->dev, "Seed too short (only %u bytes)\n", slen);
+> > > +		ret = -EINVAL;
+> > > +		goto out;
+> > > +	}
+> > > +
+> > > +	for (i = 0 ; i < EXYNOS_RNG_SEED_REGS ; i++) {
+> > > +		val = seed[i * 4] << 24;
+> > > +		val |= seed[i * 4 + 1] << 16;
+> > > +		val |= seed[i * 4 + 2] << 8;
+> > > +		val |= seed[i * 4 + 3] << 0;
+> > > +
+> > > +		exynos_rng_writel(rng, val, EXYNOS_RNG_SEED(i));
+> > > +	}
+> > > +
+> > > +	val = exynos_rng_readl(rng, EXYNOS_RNG_STATUS);
+> > > +	if (!(val & EXYNOS_RNG_STATUS_SEED_SETTING_DONE)) {
+> > > +		dev_warn(rng->dev, "Seed setting not finished\n");
+> > > +		ret = -EIO;
+> > > +		goto out;
+> > > +	}
+> > > +
+> > > +	ret = 0;
+> > > +	/* Save seed for suspend */
+> > > +	memcpy(rng->seed_save, seed, slen);
+> > 
+> > Is this really necessary? If you need to save some seed, shouldn't that be
+> > an output of the DRNG and not the real seed?
 > 
-> Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
-> ---
->  Documentation/devicetree/bindings/sound/dmic.txt | 11 +++++++++++
->  1 file changed, 11 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/sound/dmic.txt
+> When suspended to RAM device will loose the contents of registers
+> (including SEED registers) so it has to be initialized with something on
+> resume.
 > 
-> diff --git a/Documentation/devicetree/bindings/sound/dmic.txt b/Documentation/devicetree/bindings/sound/dmic.txt
-> new file mode 100644
-> index 0000000..eb2a9d4
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/sound/dmic.txt
-> @@ -0,0 +1,11 @@
-> +Device-Tree bindings for dmic codec
-
-Please define what is and isn't a DMIC here. What's the interface?
-
-> +
-> +Required properties:
-> +	- compatible: should be "dmic-codec".
-
-DMICs don't have part numbers?
-
-> +
-> +Example node:
-> +
-> +	dmic_audio: dmic_audio at 0 {
-
-Don't use '_' and there's no reg property, so there should be no unit 
-address.
-
-> +		compatible = "dmic-codec";
-> +		status = "okay";
-
-Don't show status in examples.
-
-> +	};
-> -- 
-> 1.9.1
+> The seed registers are write-only so I cannot read them and store
+> contents just before suspend.
 > 
+> I understand that real seed should not be stored... but then if I am not
+> able to re-seed it with same values, I will loose the continuous and
+> reproducible pseudo-random generation after suspend. Aren't this
+> expected out of PRNG?
+
+An RNG has to be stateless from the perspective of the caller -- this is the 
+core implication of entropy.
+
+Then, if you add the initial seed after the RNG lost its state implies that 
+the same sequence of random numbers starts again. I.e. where is the 
+randomness?
+> 
+> > Besides, how do you know that slen is not larger than
+> > EXYNOS_RNG_SEED_SIZE?
+> 
+> Right, there is a overflow here. It should be sizeof(rng->seed_save);
+
+shouldn't it be min(rng->seed_save, slen)?
+> 
+> Thanks for review!
+> 
+> Best regards,
+> Krzysztof
+
+
+
+Ciao
+Stephan
