@@ -1,207 +1,198 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Fri, 24 Mar 2017 09:56:08 +0800
-Subject: [PATCH] arm64: dts: ls1012a: add crypto node
-In-Reply-To: <20170322122939.22117-1-horia.geanta@nxp.com>
-References: <20170322122939.22117-1-horia.geanta@nxp.com>
-Message-ID: <20170324015606.GC30608@dragon>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 23 Mar 2017 21:06:30 -0500
+Subject: [PATCH] clk: stm32h7: Add stm32h743 clock driver
+In-Reply-To: <1489569810-24350-1-git-send-email-gabriel.fernandez@st.com>
+References: <1489569810-24350-1-git-send-email-gabriel.fernandez@st.com>
+Message-ID: <20170324020630.vhffmeeb6wto53zx@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 22, 2017 at 02:29:39PM +0200, Horia Geant? wrote:
-> LS1012A has a SEC v5.4 security engine.
+On Wed, Mar 15, 2017 at 10:23:30AM +0100, gabriel.fernandez at st.com wrote:
+> From: Gabriel Fernandez <gabriel.fernandez@st.com>
 > 
-> Signed-off-by: Horia Geant? <horia.geanta@nxp.com>
+> This patch enables clocks for STM32H743 boards.
+> 
+> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
 > ---
->  arch/arm64/boot/dts/freescale/fsl-ls1012a-frdm.dts |  9 +++
->  arch/arm64/boot/dts/freescale/fsl-ls1012a-qds.dts  |  9 +++
->  arch/arm64/boot/dts/freescale/fsl-ls1012a-rdb.dts  |  9 +++
->  arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi     | 91 +++++++++++++++++++++-
->  4 files changed, 117 insertions(+), 1 deletion(-)
+>  .../devicetree/bindings/clock/st,stm32h7-rcc.txt   |  152 ++
+>  drivers/clk/Makefile                               |    1 +
+>  drivers/clk/clk-stm32h7.c                          | 1586 ++++++++++++++++++++
+>  include/dt-bindings/clock/stm32h7-clks.h           |  165 ++
+>  include/dt-bindings/mfd/stm32h7-rcc.h              |  138 ++
+>  5 files changed, 2042 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/clock/st,stm32h7-rcc.txt
+>  create mode 100644 drivers/clk/clk-stm32h7.c
+>  create mode 100644 include/dt-bindings/clock/stm32h7-clks.h
+>  create mode 100644 include/dt-bindings/mfd/stm32h7-rcc.h
 > 
-> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1012a-frdm.dts b/arch/arm64/boot/dts/freescale/fsl-ls1012a-frdm.dts
-> index a619f6496a4c..bab9e68947e4 100644
-> --- a/arch/arm64/boot/dts/freescale/fsl-ls1012a-frdm.dts
-> +++ b/arch/arm64/boot/dts/freescale/fsl-ls1012a-frdm.dts
-> @@ -49,6 +49,15 @@
->  	model = "LS1012A Freedom Board";
->  	compatible = "fsl,ls1012a-frdm", "fsl,ls1012a";
->  
-> +	aliases {
-> +		crypto = &crypto;
-> +		rtic_a = &rtic_a;
-> +		rtic_b = &rtic_b;
-> +		rtic_c = &rtic_c;
-> +		rtic_d = &rtic_d;
-> +		sec_mon = &sec_mon;
-> +	};
+> diff --git a/Documentation/devicetree/bindings/clock/st,stm32h7-rcc.txt b/Documentation/devicetree/bindings/clock/st,stm32h7-rcc.txt
+> new file mode 100644
+> index 0000000..9d4b587
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/clock/st,stm32h7-rcc.txt
+> @@ -0,0 +1,152 @@
+> +STMicroelectronics STM32H7 Reset and Clock Controller
+> +=====================================================
 > +
->  	sys_mclk: clock-mclk {
->  		compatible = "fixed-clock";
->  		#clock-cells = <0>;
-> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1012a-qds.dts b/arch/arm64/boot/dts/freescale/fsl-ls1012a-qds.dts
-> index 14a67f1709e7..5c4e84c7f20d 100644
-> --- a/arch/arm64/boot/dts/freescale/fsl-ls1012a-qds.dts
-> +++ b/arch/arm64/boot/dts/freescale/fsl-ls1012a-qds.dts
-> @@ -49,6 +49,15 @@
->  	model = "LS1012A QDS Board";
->  	compatible = "fsl,ls1012a-qds", "fsl,ls1012a";
->  
-> +	aliases {
-> +		crypto = &crypto;
-> +		rtic_a = &rtic_a;
-> +		rtic_b = &rtic_b;
-> +		rtic_c = &rtic_c;
-> +		rtic_d = &rtic_d;
-> +		sec_mon = &sec_mon;
-> +	};
+> +The RCC IP is both a reset and a clock controller.
 > +
->  	sys_mclk: clock-mclk {
->  		compatible = "fixed-clock";
->  		#clock-cells = <0>;
-> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1012a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-ls1012a-rdb.dts
-> index 62c5c7123a15..ff9dd16aa65a 100644
-> --- a/arch/arm64/boot/dts/freescale/fsl-ls1012a-rdb.dts
-> +++ b/arch/arm64/boot/dts/freescale/fsl-ls1012a-rdb.dts
-> @@ -48,6 +48,15 @@
->  / {
->  	model = "LS1012A RDB Board";
->  	compatible = "fsl,ls1012a-rdb", "fsl,ls1012a";
+> +Please refer to clock-bindings.txt for common clock controller binding usage.
+> +Please also refer to reset.txt for common reset controller binding usage.
 > +
-> +	aliases {
-> +		crypto = &crypto;
-> +		rtic_a = &rtic_a;
-> +		rtic_b = &rtic_b;
-> +		rtic_c = &rtic_c;
-> +		rtic_d = &rtic_d;
-> +		sec_mon = &sec_mon;
-> +	};
+> +Required properties:
+> +- compatible: Should be:
+> +  "st,stm32h743-rcc"
+> +
+> +- reg: should be register base and length as documented in the
+> +  datasheet
+> +
+> +- #reset-cells: 1, see below
+> +
+> +- #clock-cells : from common clock binding; shall be set to 1
+> +
+> +- clocks: External oscillator clock phandle
+> +  - high speed external clock signal (HSE)
+> +  - low speed external clock signal (LSE)
+> +  - external I2S clock (I2S_CKIN)
+> +
+> +- st,syscfg: phandle for pwrcfg, mandatory to disable/enable backup domain
+> +  write protection (RTC clock).
+> +
+> +- pll x node: Allow to register a pll with specific parameters.
+> +  Please see PLL section below.
+> +
+> +Example:
+> +
+> +	rcc: rcc at 58024400 {
+> +		#reset-cells = <1>;
+> +		#clock-cells = <2>
+> +		compatible = "st,stm32h743-rcc", "st,stm32-rcc";
+> +		reg = <0x58024400 0x400>;
+> +		clocks = <&clk_hse>, <&clk_lse>, <&clk_i2s_ckin>;
+> +
+> +		st,syscfg = <&pwrcfg>;
+> +
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		vco1 at 58024430 {
+> +			#clock-cells = <0>;
+> +			compatible = "stm32,pll";
+> +			reg = <0>;
 
-What are these aliases used for?  Are they board specific?  If not, we
-should probably have them in fsl-ls1012a.dtsi, since you are adding
-them for all three fsl-ls1012a based boards.
+The reg addr value and unit address don't match.
 
->  };
->  
->  &duart0 {
-> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
-> index cffebb4b3df1..68f3012ae07e 100644
-> --- a/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
-> +++ b/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
-> @@ -42,7 +42,7 @@
->   *     OTHER DEALINGS IN THE SOFTWARE.
->   */
->  
-> -#include <dt-bindings/interrupt-controller/irq.h>
-> +#include <dt-bindings/interrupt-controller/arm-gic.h>
->  
->  / {
->  	compatible = "fsl,ls1012a";
-> @@ -113,6 +113,95 @@
->  			big-endian;
->  		};
->  
-> +		crypto: crypto at 1700000 {
-> +			compatible = "fsl,sec-v5.4", "fsl,sec-v5.0",
-> +				     "fsl,sec-v4.0";
-> +			fsl,sec-era = <8>;
-> +			#address-cells = <1>;
-> +			#size-cells = <1>;
-> +			ranges = <0x0 0x00 0x1700000 0x100000>;
-> +			reg = <0x00 0x1700000 0x0 0x100000>;
-> +			interrupts = <GIC_SPI 75 IRQ_TYPE_LEVEL_HIGH>;
-> +
-> +			sec_jr0: jr at 10000 {
-> +				compatible = "fsl,sec-v5.4-job-ring",
-> +					     "fsl,sec-v5.0-job-ring",
-> +					     "fsl,sec-v4.0-job-ring";
-> +				reg	   = <0x10000 0x10000>;
-> +				interrupts = <GIC_SPI 71 IRQ_TYPE_LEVEL_HIGH>;
-> +			};
-> +
-> +			sec_jr1: jr at 20000 {
-> +				compatible = "fsl,sec-v5.4-job-ring",
-> +					     "fsl,sec-v5.0-job-ring",
-> +					     "fsl,sec-v4.0-job-ring";
-> +				reg	   = <0x20000 0x10000>;
-> +				interrupts = <GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>;
-> +			};
-> +
-> +			sec_jr2: jr at 30000 {
-> +				compatible = "fsl,sec-v5.4-job-ring",
-> +					     "fsl,sec-v5.0-job-ring",
-> +					     "fsl,sec-v4.0-job-ring";
-> +				reg	   = <0x30000 0x10000>;
-> +				interrupts = <GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>;
-> +			};
-> +
-> +			sec_jr3: jr at 40000 {
-> +				compatible = "fsl,sec-v5.4-job-ring",
-> +					     "fsl,sec-v5.0-job-ring",
-> +					     "fsl,sec-v4.0-job-ring";
-> +				reg	   = <0x40000 0x10000>;
-> +				interrupts = <GIC_SPI 74 IRQ_TYPE_LEVEL_HIGH>;
-> +			};
-> +
-> +			rtic at 60000 {
-> +				compatible = "fsl,sec-v5.4-rtic",
-> +					     "fsl,sec-v5.0-rtic",
-> +					     "fsl,sec-v4.0-rtic";
-> +				#address-cells = <1>;
-> +				#size-cells = <1>;
-> +				reg = <0x60000 0x100 0x60e00 0x18>;
-> +				ranges = <0x0 0x60100 0x500>;
-> +
-> +				rtic_a: rtic-a at 0 {
-> +					compatible = "fsl,sec-v5.4-rtic-memory",
-> +						     "fsl,sec-v5.0-rtic-memory",
-> +						     "fsl,sec-v4.0-rtic-memory";
-> +					reg = <0x00 0x20 0x100 0x100>;
-> +				};
-> +
-> +				rtic_b: rtic-b at 20 {
-> +					compatible = "fsl,sec-v5.4-rtic-memory",
-> +						     "fsl,sec-v5.0-rtic-memory",
-> +						     "fsl,sec-v4.0-rtic-memory";
-> +					reg = <0x20 0x20 0x200 0x100>;
-> +				};
-> +
-> +				rtic_c: rtic-c at 40 {
-> +					compatible = "fsl,sec-v5.4-rtic-memory",
-> +						     "fsl,sec-v5.0-rtic-memory",
-> +						     "fsl,sec-v4.0-rtic-memory";
-> +					reg = <0x40 0x20 0x300 0x100>;
-> +				};
-> +
-> +				rtic_d: rtic-d at 60 {
-> +					compatible = "fsl,sec-v5.4-rtic-memory",
-> +						     "fsl,sec-v5.0-rtic-memory",
-> +						     "fsl,sec-v4.0-rtic-memory";
-> +					reg = <0x60 0x20 0x400 0x100>;
-> +				};
-> +			};
 > +		};
 > +
-> +		sec_mon: sec_mon at 1e90000 {
+> +		vco2 at 58024438 {
+> +			#clock-cells = <0>;
+> +			compatible = "stm32,pll";
+> +			reg = <1>;
+> +			st,clock-div = <2>;
+> +			st,clock-mult = <40>;
+> +			st,frac-status = <0>;
+> +			st,frac = <0>;
+> +			st,vcosel = <1>;
+> +			st,pllrge = <2>;
+> +		};
+> +	};
+> +
+> +
+> +STM32H7 PLL
+> +-----------
+> +
+> +The VCO of STM32 PLL could be reprensented like this:
+> +
+> +  Vref    ---------       --------
+> +    ---->| / DIVM  |---->| x DIVN | ------> VCO
+> +          ---------       --------
+> +		             ^
+> +			     |
+> +	                  -------
+> +		         | FRACN |
+> +		          -------
+> +
+> +When the PLL is configured in integer mode:
+> +- VCO = ( Vref / DIVM ) * DIVN
+> +
+> +When the PLL is configured in fractional mode:
+> +- VCO = ( Vref / DIVM ) * ( DIVN + FRACN / 2^13)
+> +
+> +
+> +Required properties for pll node:
+> +- compatible: Should be:
+> +  "stm32,pll"
 
-Hyphen is more preferred to be used in node name than underscore.
+Only 1 single PLL design for all STM32 chips ever?
 
-Shawn
+> +
+> +- #clock-cells: from common clock binding; shall be set to 0
+> +- reg: Should be the pll number.
+> +
+> +Optional properties:
+> +- st,clock-div:  DIVM division factor       : <1..63>
+> +- st,clock-mult: DIVN multiplication factor : <4..512>
+> +
+> +- st,frac-status:
+> +   - 0 Pll is configured in integer mode
+> +   - 1 Pll is configure in fractional mode
 
-> +			compatible = "fsl,sec-v5.4-mon", "fsl,sec-v5.0-mon",
-> +				     "fsl,sec-v4.0-mon";
-> +			reg = <0x0 0x1e90000 0x0 0x10000>;
-> +			interrupts = <GIC_SPI 78 IRQ_TYPE_LEVEL_HIGH>,
-> +				     <GIC_SPI 79 IRQ_TYPE_LEVEL_HIGH>;
+Isn't this implied by the presence of the next property?
+
+> +
+> +- st,frac: Fractional part of the multiplication factor : <0..8191>
+> +
+> +- st,vcosel: VCO selection
+> +  - 0: Wide VCO range:192 to 836 MHz
+> +  - 1: Medium VCO range:150 to 420 MHz
+> +
+> +- st,pllrge: PLL input frequency range
+> +  - 0: The PLL input (Vref / DIVM) clock range frequency is between 1 and 2 MHz
+> +  - 1: The PLL input (Vref / DIVM) clock range frequency is between 2 and 4 MHz
+> +  - 2: The PLL input (Vref / DIVM) clock range frequency is between 4 and 8 MHz
+> +  - 3: The PLL input (Vref / DIVM) clock range frequency is between 8 and 16 MHz
+
+Seems like you could figure this out based on the input freq and other 
+properties.
+
+> +
+> +
+> +The peripheral clock consumer should specify the desired clock by
+> +having the clock ID in its "clocks" phandle cell.
+> +
+> +All available clocks are defined as preprocessor macros in
+> +dt-bindings/clock/stm32h7-clks.h header and can be used in device
+> +tree sources.
+> +
+> +Example:
+> +
+> +		timer5: timer at 40000c00 {
+> +			compatible = "st,stm32-timer";
+> +			reg = <0x40000c00 0x400>;
+> +			interrupts = <50>;
+> +			clocks = <&rcc TIM5_CK>;
+> +
 > +		};
 > +
->  		dcfg: dcfg at 1ee0000 {
->  			compatible = "fsl,ls1012a-dcfg",
->  				     "syscon";
-> -- 
-> 2.12.0.264.gd6db3f216544
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> +Specifying softreset control of devices
+> +=======================================
+> +
+> +Device nodes should specify the reset channel required in their "resets"
+> +property, containing a phandle to the reset device node and an index specifying
+> +which channel to use.
+> +The index is the bit number within the RCC registers bank, starting from RCC
+> +base address.
+> +It is calculated as: index = register_offset / 4 * 32 + bit_offset.
+> +Where bit_offset is the bit offset within the register.
+> +
+> +For example, for CRC reset:
+> +  crc = AHB4RSTR_offset / 4 * 32 + CRCRST_bit_offset = 0x88 / 4 * 32 + 19 = 1107
+> +
+> +All available preprocessor macros for reset are defined dt-bindings//mfd/stm32h7-rcc.h
+> +header and can be used in device tree sources.
+> +
+> +example:
+> +
+> +	timer2 {
+> +		resets	= <&rcc STM32H7_APB1L_RESET(TIM2)>;
+> +	};
