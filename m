@@ -1,33 +1,181 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 24 Mar 2017 12:15:27 +0000
-Subject: [PATCH 2/4] arm64: perf: Abstract system register accesses away
+Date: Fri, 24 Mar 2017 12:15:26 +0000
+Subject: [PATCH 1/4] arm64: perf: Move PMUv3 driver to drivers/perf
 In-Reply-To: <20170324121529.22603-1-marc.zyngier@arm.com>
 References: <20170324121529.22603-1-marc.zyngier@arm.com>
-Message-ID: <20170324121529.22603-3-marc.zyngier@arm.com>
+Message-ID: <20170324121529.22603-2-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As we want to enable 32bit support, we need to distanciate the
-PMUv3 driver from the AArch64 system register names.
+Having the ARM PMUv3 driver sitting in arch/arm64/kernel is getting
+in the way of being able to use perf on ARMv8 cores running a 32bit
+kernel, such as 32bit KVM guests.
 
-This patch moves all system register accesses to an architecture
-specific include file, allowing the 32bit counterpart to be
-slotted in at a later time.
+This patch moves it into drivers/perf/arm_pmuv3.c, with an include
+file in include/linux/perf/arm_pmuv3.h. The only thing left in
+arch/arm64 is some mundane perf stuff.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/arm_pmuv3.h | 102 +++++++++++++++++++++++++++++++++++++
- drivers/perf/arm_pmuv3.c           |  35 +++++++------
- include/linux/perf/arm_pmuv3.h     |   2 +
- 3 files changed, 121 insertions(+), 18 deletions(-)
- create mode 100644 arch/arm64/include/asm/arm_pmuv3.h
+ arch/arm64/include/asm/perf_event.h                | 55 ----------------
+ arch/arm64/kernel/Makefile                         |  1 -
+ drivers/perf/Kconfig                               |  9 +++
+ drivers/perf/Makefile                              |  1 +
+ .../perf_event.c => drivers/perf/arm_pmuv3.c       |  1 +
+ include/kvm/arm_pmu.h                              |  2 +-
+ include/linux/perf/arm_pmuv3.h                     | 75 ++++++++++++++++++++++
+ 7 files changed, 87 insertions(+), 57 deletions(-)
+ rename arch/arm64/kernel/perf_event.c => drivers/perf/arm_pmuv3.c (99%)
+ create mode 100644 include/linux/perf/arm_pmuv3.h
 
-diff --git a/arch/arm64/include/asm/arm_pmuv3.h b/arch/arm64/include/asm/arm_pmuv3.h
+diff --git a/arch/arm64/include/asm/perf_event.h b/arch/arm64/include/asm/perf_event.h
+index 8d5cbec17d80..91b6be092ce2 100644
+--- a/arch/arm64/include/asm/perf_event.h
++++ b/arch/arm64/include/asm/perf_event.h
+@@ -19,61 +19,6 @@
+ 
+ #include <asm/stack_pointer.h>
+ 
+-#define	ARMV8_PMU_MAX_COUNTERS	32
+-#define	ARMV8_PMU_COUNTER_MASK	(ARMV8_PMU_MAX_COUNTERS - 1)
+-
+-/*
+- * Per-CPU PMCR: config reg
+- */
+-#define ARMV8_PMU_PMCR_E	(1 << 0) /* Enable all counters */
+-#define ARMV8_PMU_PMCR_P	(1 << 1) /* Reset all counters */
+-#define ARMV8_PMU_PMCR_C	(1 << 2) /* Cycle counter reset */
+-#define ARMV8_PMU_PMCR_D	(1 << 3) /* CCNT counts every 64th cpu cycle */
+-#define ARMV8_PMU_PMCR_X	(1 << 4) /* Export to ETM */
+-#define ARMV8_PMU_PMCR_DP	(1 << 5) /* Disable CCNT if non-invasive debug*/
+-#define ARMV8_PMU_PMCR_LC	(1 << 6) /* Overflow on 64 bit cycle counter */
+-#define	ARMV8_PMU_PMCR_N_SHIFT	11	 /* Number of counters supported */
+-#define	ARMV8_PMU_PMCR_N_MASK	0x1f
+-#define	ARMV8_PMU_PMCR_MASK	0x7f	 /* Mask for writable bits */
+-
+-/*
+- * PMOVSR: counters overflow flag status reg
+- */
+-#define	ARMV8_PMU_OVSR_MASK		0xffffffff	/* Mask for writable bits */
+-#define	ARMV8_PMU_OVERFLOWED_MASK	ARMV8_PMU_OVSR_MASK
+-
+-/*
+- * PMXEVTYPER: Event selection reg
+- */
+-#define	ARMV8_PMU_EVTYPE_MASK	0xc800ffff	/* Mask for writable bits */
+-#define	ARMV8_PMU_EVTYPE_EVENT	0xffff		/* Mask for EVENT bits */
+-
+-/*
+- * PMUv3 event types: required events
+- */
+-#define ARMV8_PMUV3_PERFCTR_SW_INCR				0x00
+-#define ARMV8_PMUV3_PERFCTR_L1D_CACHE_REFILL			0x03
+-#define ARMV8_PMUV3_PERFCTR_L1D_CACHE				0x04
+-#define ARMV8_PMUV3_PERFCTR_BR_MIS_PRED				0x10
+-#define ARMV8_PMUV3_PERFCTR_CPU_CYCLES				0x11
+-#define ARMV8_PMUV3_PERFCTR_BR_PRED				0x12
+-
+-/*
+- * Event filters for PMUv3
+- */
+-#define	ARMV8_PMU_EXCLUDE_EL1	(1 << 31)
+-#define	ARMV8_PMU_EXCLUDE_EL0	(1 << 30)
+-#define	ARMV8_PMU_INCLUDE_EL2	(1 << 27)
+-
+-/*
+- * PMUSERENR: user enable reg
+- */
+-#define ARMV8_PMU_USERENR_MASK	0xf		/* Mask for writable bits */
+-#define ARMV8_PMU_USERENR_EN	(1 << 0) /* PMU regs can be accessed at EL0 */
+-#define ARMV8_PMU_USERENR_SW	(1 << 1) /* PMSWINC can be written at EL0 */
+-#define ARMV8_PMU_USERENR_CR	(1 << 2) /* Cycle counter can be read at EL0 */
+-#define ARMV8_PMU_USERENR_ER	(1 << 3) /* Event counter can be read@EL0 */
+-
+ #ifdef CONFIG_PERF_EVENTS
+ struct pt_regs;
+ extern unsigned long perf_instruction_pointer(struct pt_regs *regs);
+diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+index 1606c6b2a280..b50696a5875a 100644
+--- a/arch/arm64/kernel/Makefile
++++ b/arch/arm64/kernel/Makefile
+@@ -33,7 +33,6 @@ arm64-obj-$(CONFIG_FUNCTION_TRACER)	+= ftrace.o entry-ftrace.o
+ arm64-obj-$(CONFIG_MODULES)		+= arm64ksyms.o module.o
+ arm64-obj-$(CONFIG_ARM64_MODULE_PLTS)	+= module-plts.o
+ arm64-obj-$(CONFIG_PERF_EVENTS)		+= perf_regs.o perf_callchain.o
+-arm64-obj-$(CONFIG_HW_PERF_EVENTS)	+= perf_event.o
+ arm64-obj-$(CONFIG_HAVE_HW_BREAKPOINT)	+= hw_breakpoint.o
+ arm64-obj-$(CONFIG_CPU_PM)		+= sleep.o suspend.o
+ arm64-obj-$(CONFIG_CPU_IDLE)		+= cpuidle.o
+diff --git a/drivers/perf/Kconfig b/drivers/perf/Kconfig
+index 93651907874f..bd2b1b1cb1b6 100644
+--- a/drivers/perf/Kconfig
++++ b/drivers/perf/Kconfig
+@@ -12,6 +12,7 @@ config ARM_PMU
+ 	  Say y if you want to use CPU performance monitors on ARM-based
+ 	  systems.
+ 
++
+ config QCOM_L2_PMU
+ 	bool "Qualcomm Technologies L2-cache PMU"
+ 	depends on ARCH_QCOM && ARM64 && PERF_EVENTS && ACPI
+@@ -21,6 +22,14 @@ config QCOM_L2_PMU
+ 	  Adds the L2 cache PMU into the perf events subsystem for
+ 	  monitoring L2 cache events.
+ 
++config ARM_PMUV3
++	depends on HW_PERF_EVENTS && ARM64
++	bool "ARM PMUv3 support"
++	default y
++	help
++	  Say y if you want to use CPU performance monitors on ARMv8
++	  systems that implement the PMUv3 architecture.
++
+ config XGENE_PMU
+         depends on PERF_EVENTS && ARCH_XGENE
+         bool "APM X-Gene SoC PMU"
+diff --git a/drivers/perf/Makefile b/drivers/perf/Makefile
+index ef24833c94a8..645a59c2d6ee 100644
+--- a/drivers/perf/Makefile
++++ b/drivers/perf/Makefile
+@@ -1,3 +1,4 @@
+ obj-$(CONFIG_ARM_PMU) += arm_pmu.o
++obj-$(CONFIG_ARM_PMUV3) += arm_pmuv3.o
+ obj-$(CONFIG_QCOM_L2_PMU)	+= qcom_l2_pmu.o
+ obj-$(CONFIG_XGENE_PMU) += xgene_pmu.o
+diff --git a/arch/arm64/kernel/perf_event.c b/drivers/perf/arm_pmuv3.c
+similarity index 99%
+rename from arch/arm64/kernel/perf_event.c
+rename to drivers/perf/arm_pmuv3.c
+index 57ae9d9ed9bb..ac4e6dfc9486 100644
+--- a/arch/arm64/kernel/perf_event.c
++++ b/drivers/perf/arm_pmuv3.c
+@@ -27,6 +27,7 @@
+ #include <linux/acpi.h>
+ #include <linux/of.h>
+ #include <linux/perf/arm_pmu.h>
++#include <linux/perf/arm_pmuv3.h>
+ #include <linux/platform_device.h>
+ 
+ /*
+diff --git a/include/kvm/arm_pmu.h b/include/kvm/arm_pmu.h
+index 92e7e97ca8ff..8e9927524c81 100644
+--- a/include/kvm/arm_pmu.h
++++ b/include/kvm/arm_pmu.h
+@@ -19,7 +19,7 @@
+ #define __ASM_ARM_KVM_PMU_H
+ 
+ #include <linux/perf_event.h>
+-#include <asm/perf_event.h>
++#include <linux/perf/arm_pmuv3.h>
+ 
+ #define ARMV8_PMU_CYCLE_IDX		(ARMV8_PMU_MAX_COUNTERS - 1)
+ 
+diff --git a/include/linux/perf/arm_pmuv3.h b/include/linux/perf/arm_pmuv3.h
 new file mode 100644
-index 000000000000..7b01787fb8fd
+index 000000000000..119b0decc392
 --- /dev/null
-+++ b/arch/arm64/include/asm/arm_pmuv3.h
-@@ -0,0 +1,102 @@
++++ b/include/linux/perf/arm_pmuv3.h
+@@ -0,0 +1,75 @@
 +/*
 + * Copyright (C) 2012 ARM Ltd.
 + *
@@ -44,235 +192,64 @@ index 000000000000..7b01787fb8fd
 + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
 +
-+#ifndef __ASM_PMUV3_H
-+#define __ASM_PMUV3_H
++#ifndef __PERF_ARM_PMUV3_H
++#define __PERF_ARM_PMUV3_H
 +
-+#include <asm/sysreg.h>
++#define	ARMV8_PMU_MAX_COUNTERS	32
++#define	ARMV8_PMU_COUNTER_MASK	(ARMV8_PMU_MAX_COUNTERS - 1)
 +
-+static inline void write_pmcr(u32 val)
-+{
-+	write_sysreg(val, pmcr_el0);
-+}
++/*
++ * Per-CPU PMCR: config reg
++ */
++#define ARMV8_PMU_PMCR_E	(1 << 0) /* Enable all counters */
++#define ARMV8_PMU_PMCR_P	(1 << 1) /* Reset all counters */
++#define ARMV8_PMU_PMCR_C	(1 << 2) /* Cycle counter reset */
++#define ARMV8_PMU_PMCR_D	(1 << 3) /* CCNT counts every 64th cpu cycle */
++#define ARMV8_PMU_PMCR_X	(1 << 4) /* Export to ETM */
++#define ARMV8_PMU_PMCR_DP	(1 << 5) /* Disable CCNT if non-invasive debug*/
++#define ARMV8_PMU_PMCR_LC	(1 << 6) /* Overflow on 64 bit cycle counter */
++#define	ARMV8_PMU_PMCR_N_SHIFT	11	 /* Number of counters supported */
++#define	ARMV8_PMU_PMCR_N_MASK	0x1f
++#define	ARMV8_PMU_PMCR_MASK	0x7f	 /* Mask for writable bits */
 +
-+static inline u32 read_pmcr(void)
-+{
-+	return read_sysreg(pmcr_el0);
-+}
++/*
++ * PMOVSR: counters overflow flag status reg
++ */
++#define	ARMV8_PMU_OVSR_MASK		0xffffffff	/* Mask for writable bits */
++#define	ARMV8_PMU_OVERFLOWED_MASK	ARMV8_PMU_OVSR_MASK
 +
-+static inline void write_pmselr(u32 val)
-+{
-+	write_sysreg(val, pmselr_el0);
-+}
++/*
++ * PMXEVTYPER: Event selection reg
++ */
++#define	ARMV8_PMU_EVTYPE_MASK	0xc800ffff	/* Mask for writable bits */
++#define	ARMV8_PMU_EVTYPE_EVENT	0xffff		/* Mask for EVENT bits */
 +
-+static inline void write_pmccntr(u64 val)
-+{
-+	write_sysreg(val, pmccntr_el0);
-+}
++/*
++ * PMUv3 event types: required events
++ */
++#define ARMV8_PMUV3_PERFCTR_SW_INCR				0x00
++#define ARMV8_PMUV3_PERFCTR_L1D_CACHE_REFILL			0x03
++#define ARMV8_PMUV3_PERFCTR_L1D_CACHE				0x04
++#define ARMV8_PMUV3_PERFCTR_BR_MIS_PRED				0x10
++#define ARMV8_PMUV3_PERFCTR_CPU_CYCLES				0x11
++#define ARMV8_PMUV3_PERFCTR_BR_PRED				0x12
 +
-+static inline u64 read_pmccntr(void)
-+{
-+	return read_sysreg(pmccntr_el0);
-+}
++/*
++ * Event filters for PMUv3
++ */
++#define	ARMV8_PMU_EXCLUDE_EL1	(1 << 31)
++#define	ARMV8_PMU_EXCLUDE_EL0	(1 << 30)
++#define	ARMV8_PMU_INCLUDE_EL2	(1 << 27)
 +
-+static inline void write_pmxevcntr(u32 val)
-+{
-+	write_sysreg(val, pmxevcntr_el0);
-+}
-+
-+static inline u32 read_pmxevcntr(void)
-+{
-+	return read_sysreg(pmxevcntr_el0);
-+}
-+
-+static inline void write_pmxevtyper(u32 val)
-+{
-+	write_sysreg(val, pmxevtyper_el0);
-+}
-+
-+static inline void write_pmcntenset(u32 val)
-+{
-+	write_sysreg(val, pmcntenset_el0);
-+}
-+
-+static inline void write_pmcntenclr(u32 val)
-+{
-+	write_sysreg(val, pmcntenclr_el0);
-+}
-+
-+static inline void write_pmintenset(u32 val)
-+{
-+	write_sysreg(val, pmintenset_el1);
-+}
-+
-+static inline void write_pmintenclr(u32 val)
-+{
-+	write_sysreg(val, pmintenclr_el1);
-+}
-+
-+static inline void write_pmovsclr(u32 val)
-+{
-+	write_sysreg(val, pmovsclr_el0);
-+}
-+
-+static inline u32 read_pmovsclr(void)
-+{
-+	return read_sysreg(pmovsclr_el0);
-+}
-+
-+static inline u32 read_pmceid0(void)
-+{
-+	return read_sysreg(pmceid0_el0);
-+}
-+
-+static inline u32 read_pmceid1(void)
-+{
-+	return read_sysreg(pmceid1_el0);
-+}
++/*
++ * PMUSERENR: user enable reg
++ */
++#define ARMV8_PMU_USERENR_MASK	0xf		/* Mask for writable bits */
++#define ARMV8_PMU_USERENR_EN	(1 << 0) /* PMU regs can be accessed at EL0 */
++#define ARMV8_PMU_USERENR_SW	(1 << 1) /* PMSWINC can be written at EL0 */
++#define ARMV8_PMU_USERENR_CR	(1 << 2) /* Cycle counter can be read at EL0 */
++#define ARMV8_PMU_USERENR_ER	(1 << 3) /* Event counter can be read@EL0 */
 +
 +#endif
-diff --git a/drivers/perf/arm_pmuv3.c b/drivers/perf/arm_pmuv3.c
-index ac4e6dfc9486..55486dcd2d5b 100644
---- a/drivers/perf/arm_pmuv3.c
-+++ b/drivers/perf/arm_pmuv3.c
-@@ -21,7 +21,6 @@
- 
- #include <asm/irq_regs.h>
- #include <asm/perf_event.h>
--#include <asm/sysreg.h>
- #include <asm/virt.h>
- 
- #include <linux/acpi.h>
-@@ -556,14 +555,14 @@ static struct attribute_group armv8_pmuv3_format_attr_group = {
- 
- static inline u32 armv8pmu_pmcr_read(void)
- {
--	return read_sysreg(pmcr_el0);
-+	return read_pmcr();
- }
- 
- static inline void armv8pmu_pmcr_write(u32 val)
- {
- 	val &= ARMV8_PMU_PMCR_MASK;
- 	isb();
--	write_sysreg(val, pmcr_el0);
-+	write_pmcr(val);
- }
- 
- static inline int armv8pmu_has_overflowed(u32 pmovsr)
-@@ -585,7 +584,7 @@ static inline int armv8pmu_counter_has_overflowed(u32 pmnc, int idx)
- static inline int armv8pmu_select_counter(int idx)
- {
- 	u32 counter = ARMV8_IDX_TO_COUNTER(idx);
--	write_sysreg(counter, pmselr_el0);
-+	write_pmselr(counter);
- 	isb();
- 
- 	return idx;
-@@ -602,9 +601,9 @@ static inline u32 armv8pmu_read_counter(struct perf_event *event)
- 		pr_err("CPU%u reading wrong counter %d\n",
- 			smp_processor_id(), idx);
- 	else if (idx == ARMV8_IDX_CYCLE_COUNTER)
--		value = read_sysreg(pmccntr_el0);
-+		value = read_pmccntr();
- 	else if (armv8pmu_select_counter(idx) == idx)
--		value = read_sysreg(pmxevcntr_el0);
-+		value = read_pmxevcntr();
- 
- 	return value;
- }
-@@ -626,47 +625,47 @@ static inline void armv8pmu_write_counter(struct perf_event *event, u32 value)
- 		 */
- 		u64 value64 = 0xffffffff00000000ULL | value;
- 
--		write_sysreg(value64, pmccntr_el0);
-+		write_pmccntr(value64);
- 	} else if (armv8pmu_select_counter(idx) == idx)
--		write_sysreg(value, pmxevcntr_el0);
-+		write_pmxevcntr(value);
- }
- 
- static inline void armv8pmu_write_evtype(int idx, u32 val)
- {
- 	if (armv8pmu_select_counter(idx) == idx) {
- 		val &= ARMV8_PMU_EVTYPE_MASK;
--		write_sysreg(val, pmxevtyper_el0);
-+		write_pmxevtyper(val);
- 	}
- }
- 
- static inline int armv8pmu_enable_counter(int idx)
- {
- 	u32 counter = ARMV8_IDX_TO_COUNTER(idx);
--	write_sysreg(BIT(counter), pmcntenset_el0);
-+	write_pmcntenset(BIT(counter));
- 	return idx;
- }
- 
- static inline int armv8pmu_disable_counter(int idx)
- {
- 	u32 counter = ARMV8_IDX_TO_COUNTER(idx);
--	write_sysreg(BIT(counter), pmcntenclr_el0);
-+	write_pmcntenclr(BIT(counter));
- 	return idx;
- }
- 
- static inline int armv8pmu_enable_intens(int idx)
- {
- 	u32 counter = ARMV8_IDX_TO_COUNTER(idx);
--	write_sysreg(BIT(counter), pmintenset_el1);
-+	write_pmintenset(BIT(counter));
- 	return idx;
- }
- 
- static inline int armv8pmu_disable_intens(int idx)
- {
- 	u32 counter = ARMV8_IDX_TO_COUNTER(idx);
--	write_sysreg(BIT(counter), pmintenclr_el1);
-+	write_pmintenclr(BIT(counter));
- 	isb();
- 	/* Clear the overflow flag in case an interrupt is pending. */
--	write_sysreg(BIT(counter), pmovsclr_el0);
-+	write_pmovsclr(BIT(counter));
- 	isb();
- 
- 	return idx;
-@@ -677,11 +676,11 @@ static inline u32 armv8pmu_getreset_flags(void)
- 	u32 value;
- 
- 	/* Read */
--	value = read_sysreg(pmovsclr_el0);
-+	value = read_pmovsclr();
- 
- 	/* Write to clear flags */
- 	value &= ARMV8_PMU_OVSR_MASK;
--	write_sysreg(value, pmovsclr_el0);
-+	write_pmovsclr(value);
- 
- 	return value;
- }
-@@ -970,8 +969,8 @@ static void __armv8pmu_probe_pmu(void *info)
- 	/* Add the CPU cycles counter */
- 	cpu_pmu->num_events += 1;
- 
--	pmceid[0] = read_sysreg(pmceid0_el0);
--	pmceid[1] = read_sysreg(pmceid1_el0);
-+	pmceid[0] = read_pmceid0();
-+	pmceid[1] = read_pmceid1();
- 
- 	bitmap_from_u32array(cpu_pmu->pmceid_bitmap,
- 			     ARMV8_PMUV3_MAX_COMMON_EVENTS, pmceid,
-diff --git a/include/linux/perf/arm_pmuv3.h b/include/linux/perf/arm_pmuv3.h
-index 119b0decc392..e0b1ae016fa5 100644
---- a/include/linux/perf/arm_pmuv3.h
-+++ b/include/linux/perf/arm_pmuv3.h
-@@ -17,6 +17,8 @@
- #ifndef __PERF_ARM_PMUV3_H
- #define __PERF_ARM_PMUV3_H
- 
-+#include <asm/arm_pmuv3.h>
-+
- #define	ARMV8_PMU_MAX_COUNTERS	32
- #define	ARMV8_PMU_COUNTER_MASK	(ARMV8_PMU_MAX_COUNTERS - 1)
- 
 -- 
 2.11.0
