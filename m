@@ -1,26 +1,95 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 24 Mar 2017 15:35:05 +0100
-Subject: [PATCH v3 4/4] mvebu: wrt1900ac: Use pwm-fan rather than gpio-fan
-In-Reply-To: <20170324141815.7252-5-ralph.sennhauser@gmail.com>
-References: <20170324141815.7252-1-ralph.sennhauser@gmail.com>
- <20170324141815.7252-5-ralph.sennhauser@gmail.com>
-Message-ID: <20170324143505.GK28518@lunn.ch>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 24 Mar 2017 09:52:08 -0500
+Subject: [PATCH v3 10/11] ASoC: add bindings for stm32 DFSDM filter
+In-Reply-To: <1489759704-30217-11-git-send-email-arnaud.pouliquen@st.com>
+References: <1489759704-30217-1-git-send-email-arnaud.pouliquen@st.com>
+ <1489759704-30217-11-git-send-email-arnaud.pouliquen@st.com>
+Message-ID: <20170324145208.6tj5swol5du5lkyc@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> +	pwm_fan {
->  		/* SUNON HA4010V4-0000-C99 */
-> -		compatible = "gpio-fan";
-> -		gpios = <&gpio0 24 0>;
->  
-> -		gpio-fan,speed-map = <0    0
-> -				      4500 1>;
-> +		compatible = "pwm-fan";
-> +		pwms = <&gpio0 24 4000 0>;
+On Fri, Mar 17, 2017 at 03:08:23PM +0100, Arnaud Pouliquen wrote:
+> Add bindings that describes audio settings to support
+> Digital Filter for pulse density modulation(PDM) microphone.
+> 
+> Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
+> ---
+> V2->V3:
+>    Fixes based on V2 comments
+> 
+>  .../devicetree/bindings/sound/st,stm32-adfsdm.txt  | 41 ++++++++++++++++++++++
+>  1 file changed, 41 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/sound/st,stm32-adfsdm.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/sound/st,stm32-adfsdm.txt b/Documentation/devicetree/bindings/sound/st,stm32-adfsdm.txt
+> new file mode 100644
+> index 0000000..ab610bc
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/sound/st,stm32-adfsdm.txt
+> @@ -0,0 +1,40 @@
+> +STMicroelectronics audio DFSDM DT bindings
+> +
+> +This driver supports audio PDM microphone capture through Digital Filter format
+> +Sigma Delta modulators (DFSDM).
+> +
+> +Required properties:
+> +  - compatible: "st,stm32h7-adfsdm".
+> +
+> +  - #sound-dai-cells : Must be equal to 0
+> +
+> +  - io-channels : phandle to iio dfsdm instance node.
+> +
+> +
+> +Example of a simple sound card using audio DFSDM node.
+> +
+> +	dmic0: dmic_ at 0 {
 
-Hi Ralph
+Drop the '_' and unit address.
 
-I believe this last 0 is the flags parameter. Now that we have
-#pwm-cells = 1, i think this last 0 should be dropped.
+> +		compatible = "dmic-codec";
+> +		#sound-dai-cells = <0>;
+> +	};
+> +
+> +	asoc-pdm at 0 {
 
-	  Andrew
+asoc is a Linux term. Drop the unit address.
+
+> +		compatible = "st,stm32h7-adfsdm";
+
+Is this a separate block from the ADC? A drawing of the h/w blocks and 
+connections would help.
+
+> +		#sound-dai-cells = <0>;
+> +		io-channels = <&dfsdm_adc0 0>;
+> +	};
+> +
+> +	sound_dfsdm_pdm {
+
+sound-card {
+
+> + 		compatible = "simple-audio-card";
+> + 		simple-audio-card,name = "dfsdm_pdm";
+> +
+> + 		dfsdm0_mic0: simple-audio-card,dai-link at 0 {
+
+I'd suggest moving to the graph card.
+
+> + 			format = "pdm";
+> + 			cpu {
+> + 				sound-dai = <&asoc_pdm1>;
+
+This phandle doesn't point to anything.
+
+> + 			};
+> + 			dmic0_codec: codec {
+> + 				sound-dai = <&dmic0>;
+> + 			};
+> + 		};
+> +	};
+> \ No newline at end of file
+
+^^^
+
+> -- 
+> 1.9.1
+> 
