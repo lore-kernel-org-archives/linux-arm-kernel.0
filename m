@@ -1,38 +1,41 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Fri, 24 Mar 2017 17:24:46 +0300
-Subject: [PATCH 3/3] ARM: multi_v7_defconfig: Enable Exynos RNG and user-space
- crypto API
-In-Reply-To: <20170324142446.31129-1-krzk@kernel.org>
-References: <20170324142446.31129-1-krzk@kernel.org>
-Message-ID: <20170324142446.31129-4-krzk@kernel.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 24 Mar 2017 07:26:10 -0700
+Subject: [PATCH v2 0/8] thermal: ti-soc-thermal: Migrate slope/offset
+ data to device tree
+In-Reply-To: <a410d37f-92e5-39b4-ac6c-158673163cb0@ti.com>
+References: <1489046762-11288-1-git-send-email-j-keerthy@ti.com>
+ <64ab8413-6cf1-864f-0550-9c8db59523f7@ti.com>
+ <20170323205256.GO10760@atomide.com>
+ <a410d37f-92e5-39b4-ac6c-158673163cb0@ti.com>
+Message-ID: <20170324142610.GX10760@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the new Exynos pseudo random number generator driver and
-user-space API to access crypto algorithms and devices (not only RNG).
+* Keerthy <j-keerthy@ti.com> [170323 20:29]:
+> 
+> 
+> On Friday 24 March 2017 02:22 AM, Tony Lindgren wrote:
+> > * Keerthy <j-keerthy@ti.com> [170321 20:45]:
+> >>
+> >>
+> >> On Thursday 09 March 2017 01:35 PM, Keerthy wrote:
+> >>> Currently the slope and offset values for calculating the
+> >>> hot spot temperature of a particular thermal zone is part
+> >>> of driver data. Pass them here instead and obtain the values
+> >>> while of node parsing.
+> >>>
+> >>> Tested for the slope and constant values on DRA7-EVM, OMAP3-BEAGLE. 
+> >>
+> >> Hi Eduardo,
+> >>
+> >> If the series looks okay could you please pull this?
+> > 
+> > Also.. Are the dts changes safe for me to pick separately?
+> 
+> Yes Tony they are safe to pulled separately.
 
-Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
----
- arch/arm/configs/multi_v7_defconfig | 6 ++++++
- 1 file changed, 6 insertions(+)
+OK applying patches 1 - 5 of this series into omap-for-v4.12/dt-v2.
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 36c1b39cfb54..9bc1bd7f2afa 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -935,7 +935,13 @@ CONFIG_CPUFREQ_DT=y
- CONFIG_KEYSTONE_IRQ=y
- CONFIG_HW_RANDOM=y
- CONFIG_HW_RANDOM_ST=y
-+CONFIG_CRYPTO_USER=m
-+CONFIG_CRYPTO_USER_API_HASH=m
-+CONFIG_CRYPTO_USER_API_SKCIPHER=m
-+CONFIG_CRYPTO_USER_API_RNG=m
-+CONFIG_CRYPTO_USER_API_AEAD=m
- CONFIG_CRYPTO_DEV_MARVELL_CESA=m
-+CONFIG_CRYPTO_DEV_EXYNOS_RNG=m
- CONFIG_CRYPTO_DEV_S5P=m
- CONFIG_CRYPTO_DEV_SUN4I_SS=m
- CONFIG_CRYPTO_DEV_ROCKCHIP=m
--- 
-2.9.3
+Thanks,
+
+Tony
