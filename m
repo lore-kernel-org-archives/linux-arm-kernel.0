@@ -1,80 +1,167 @@
-From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Fri, 24 Mar 2017 12:29:49 +0530
-Subject: [PATCH 05/12] ARM: dts: imx6ul-isiot-common: Add touchscreen node
-In-Reply-To: <20170324051632.GD30608@dragon>
-References: <1490204897-14525-1-git-send-email-jagan@openedev.com>
- <1490204897-14525-6-git-send-email-jagan@openedev.com>
- <20170324051632.GD30608@dragon>
-Message-ID: <CAMty3ZBfdjrbvL7F9CbhfD_Wdowr4zM_Rdot=TGKMxq0JPyHjg@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 24 Mar 2017 08:06:14 +0100
+Subject: [PATCH 06/15] ARM: dts: r8a779x: fix PCI bus dtc warnings
+In-Reply-To: <20170322020313.24338-6-robh@kernel.org>
+References: <20170322020313.24338-1-robh@kernel.org>
+ <20170322020313.24338-6-robh@kernel.org>
+Message-ID: <20170324070614.GJ1319@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 24, 2017 at 10:46 AM, Shawn Guo <shawnguo@kernel.org> wrote:
-> On Wed, Mar 22, 2017 at 11:18:10PM +0530, Jagan Teki wrote:
->> From: Jagan Teki <jagan@amarulasolutions.com>
->>
->> Add touchscreen node as i2c1 slave device on Engicam Is.IoT MX6UL
->> modules, the touchscreen controlled 'st,stmpe-ts' connected via
->> i2c with st,stmpe811 mfb interface.
->
-> s/mfb/mfd?
->
->>
->> Cc: Shawn Guo <shawnguo@kernel.org>
->> Cc: Matteo Lisi <matteo.lisi@engicam.com>
->> Cc: Michael Trimarchi <michael@amarulasolutions.com>
->> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
->> ---
->>  arch/arm/boot/dts/imx6ul-isiot-common.dtsi | 34 ++++++++++++++++++++++++++++++
->>  1 file changed, 34 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/imx6ul-isiot-common.dtsi b/arch/arm/boot/dts/imx6ul-isiot-common.dtsi
->> index 9660e20..b149b5e 100644
->> --- a/arch/arm/boot/dts/imx6ul-isiot-common.dtsi
->> +++ b/arch/arm/boot/dts/imx6ul-isiot-common.dtsi
->> @@ -40,6 +40,34 @@
->>   *     OTHER DEALINGS IN THE SOFTWARE.
->>   */
->>
->> +&i2c1 {
->> +     touch: stmpe811 at 44 {
->
-> Label a MFD device 'touch'?  Also, the node name should be generic.  Not
-> sure what should be used for MFD device though.
+On Tue, Mar 21, 2017 at 09:03:04PM -0500, Rob Herring wrote:
+> dtc recently added PCI bus checks. Fix these warnings.
+> 
+> Signed-off-by: Rob Herring <robh@kernel.org>
+> Cc: Simon Horman <horms@verge.net.au>
+> Cc: Magnus Damm <magnus.damm@gmail.com>
+> Cc: linux-renesas-soc at vger.kernel.org
+> ---
+> Sub-arch maintainers, please apply to your trees unless arm-soc wants 
+> to take the whole lot.
 
-May be I can use stmpe811 at 41 the existing imx6qdl-apalis.dtsi using
-the similar notation.
+I would prefer to take these through my tree to reduce the chances of
+conflicts emerging later.
 
->
->> +             compatible = "st,stmpe811";
->> +             reg = <0x44>;
->> +             #address-cells = <1>;
->> +             #size-cells = <0>;
->> +             pinctrl-names = "default";
->> +             pinctrl-0 = <&pinctrl_stmpe_ts>;
->
-> If this is for stmpe-ts, shouldn't be put into touchscreen child node?
+Geert, are you happy with this patch and its changelog as-is?
 
-Actually this is interrupt pad, for the touch controller via stmpe so
-I can rename pinctrl_touch_int.
-
->
->> +             interrupt-parent = <&gpio1>;
->> +             interrupts = <18 IRQ_TYPE_EDGE_FALLING>;
->> +             interrupt-controller;
->> +             #interrupt-cells = <2>;
->> +
->> +             stmpe_touchscreen {
->
-> 'stmpe: touchscreen {' might be better.
-
-stmpe_touchscreen {
-
-This is also compatible with existing dtsi files
-
-thanks!
--- 
-Jagan Teki
-Senior Linux Kernel Engineer | Amarula Solutions
-U-Boot, Linux | Upstream Maintainer
-Hyderabad, India.
+> 
+>  arch/arm/boot/dts/r8a7790.dtsi | 16 ++++++----------
+>  arch/arm/boot/dts/r8a7791.dtsi | 16 ++++++----------
+>  arch/arm/boot/dts/r8a7794.dtsi | 16 ++++++----------
+>  3 files changed, 18 insertions(+), 30 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
+> index 6d10450de6d7..c16a37e9fb5d 100644
+> --- a/arch/arm/boot/dts/r8a7790.dtsi
+> +++ b/arch/arm/boot/dts/r8a7790.dtsi
+> @@ -1598,16 +1598,14 @@
+>  				 0x0800 0 0 1 &gic GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH
+>  				 0x1000 0 0 2 &gic GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH>;
+>  
+> -		usb at 0,1 {
+> +		usb at 1,0 {
+>  			reg = <0x800 0 0 0 0>;
+> -			device_type = "pci";
+>  			phys = <&usb0 0>;
+>  			phy-names = "usb";
+>  		};
+>  
+> -		usb at 0,2 {
+> +		usb at 2,0 {
+>  			reg = <0x1000 0 0 0 0>;
+> -			device_type = "pci";
+>  			phys = <&usb0 0>;
+>  			phy-names = "usb";
+>  		};
+> @@ -1654,16 +1652,14 @@
+>  				 0x0800 0 0 1 &gic GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH
+>  				 0x1000 0 0 2 &gic GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH>;
+>  
+> -		usb at 0,1 {
+> -			reg = <0x800 0 0 0 0>;
+> -			device_type = "pci";
+> +		usb at 1,0 {
+> +			reg = <0x20800 0 0 0 0>;
+>  			phys = <&usb2 0>;
+>  			phy-names = "usb";
+>  		};
+>  
+> -		usb at 0,2 {
+> -			reg = <0x1000 0 0 0 0>;
+> -			device_type = "pci";
+> +		usb at 2,0 {
+> +			reg = <0x21000 0 0 0 0>;
+>  			phys = <&usb2 0>;
+>  			phy-names = "usb";
+>  		};
+> diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
+> index 9f9e48511836..a1d8686eaea5 100644
+> --- a/arch/arm/boot/dts/r8a7791.dtsi
+> +++ b/arch/arm/boot/dts/r8a7791.dtsi
+> @@ -1596,16 +1596,14 @@
+>  				 0x0800 0 0 1 &gic GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH
+>  				 0x1000 0 0 2 &gic GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH>;
+>  
+> -		usb at 0,1 {
+> +		usb at 1,0 {
+>  			reg = <0x800 0 0 0 0>;
+> -			device_type = "pci";
+>  			phys = <&usb0 0>;
+>  			phy-names = "usb";
+>  		};
+>  
+> -		usb at 0,2 {
+> +		usb at 2,0 {
+>  			reg = <0x1000 0 0 0 0>;
+> -			device_type = "pci";
+>  			phys = <&usb0 0>;
+>  			phy-names = "usb";
+>  		};
+> @@ -1631,16 +1629,14 @@
+>  				 0x0800 0 0 1 &gic GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH
+>  				 0x1000 0 0 2 &gic GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH>;
+>  
+> -		usb at 0,1 {
+> -			reg = <0x800 0 0 0 0>;
+> -			device_type = "pci";
+> +		usb at 1,0 {
+> +			reg = <0x10800 0 0 0 0>;
+>  			phys = <&usb2 0>;
+>  			phy-names = "usb";
+>  		};
+>  
+> -		usb at 0,2 {
+> -			reg = <0x1000 0 0 0 0>;
+> -			device_type = "pci";
+> +		usb at 2,0 {
+> +			reg = <0x11000 0 0 0 0>;
+>  			phys = <&usb2 0>;
+>  			phy-names = "usb";
+>  		};
+> diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
+> index 319c1069b7ee..c07495185cc4 100644
+> --- a/arch/arm/boot/dts/r8a7794.dtsi
+> +++ b/arch/arm/boot/dts/r8a7794.dtsi
+> @@ -817,16 +817,14 @@
+>  				 0x0800 0 0 1 &gic GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH
+>  				 0x1000 0 0 2 &gic GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH>;
+>  
+> -		usb at 0,1 {
+> +		usb at 1,0 {
+>  			reg = <0x800 0 0 0 0>;
+> -			device_type = "pci";
+>  			phys = <&usb0 0>;
+>  			phy-names = "usb";
+>  		};
+>  
+> -		usb at 0,2 {
+> +		usb at 2,0 {
+>  			reg = <0x1000 0 0 0 0>;
+> -			device_type = "pci";
+>  			phys = <&usb0 0>;
+>  			phy-names = "usb";
+>  		};
+> @@ -852,16 +850,14 @@
+>  				 0x0800 0 0 1 &gic GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH
+>  				 0x1000 0 0 2 &gic GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH>;
+>  
+> -		usb at 0,1 {
+> -			reg = <0x800 0 0 0 0>;
+> -			device_type = "pci";
+> +		usb at 1,0 {
+> +			reg = <0x10800 0 0 0 0>;
+>  			phys = <&usb2 0>;
+>  			phy-names = "usb";
+>  		};
+>  
+> -		usb at 0,2 {
+> -			reg = <0x1000 0 0 0 0>;
+> -			device_type = "pci";
+> +		usb at 2,0 {
+> +			reg = <0x11000 0 0 0 0>;
+>  			phys = <&usb2 0>;
+>  			phy-names = "usb";
+>  		};
+> -- 
+> 2.10.1
+> 
