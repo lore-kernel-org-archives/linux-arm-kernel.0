@@ -1,26 +1,21 @@
-From: vigneshr@ti.com (Vignesh R)
-Date: Fri, 24 Mar 2017 10:57:58 +0530
-Subject: [PATCH v2 0/2] serial: Add name field to uart_port
-Message-ID: <20170324052800.11526-1-vigneshr@ti.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Fri, 24 Mar 2017 13:49:27 +0800
+Subject: [PATCH v2 0/8] soc: imx: gpc: fixes and clean up
+In-Reply-To: <1490244805-3921-1-git-send-email-aisheng.dong@nxp.com>
+References: <1490244805-3921-1-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <20170324054925.GG30608@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds name attribute to uart_port struct inorder to store
-name of the tty port that will help in identify different uart
-instances.
-This patch series is based on discussion here[1].
+On Thu, Mar 23, 2017 at 12:53:17PM +0800, Dong Aisheng wrote:
+> Dong Aisheng (8):
+>   soc: imx: gpc: fix gpc clk get error handling
+>   soc: imx: gpc: fix the wrong using of regmap cache
+>   soc: imx: gpc: fix domain_index sanity check issue
+>   soc: imx: gpc: fix imx6sl gpc power domain regression
+>   soc: imx: gpc: fix comment when power up domain
+>   soc: imx: gpc: keep PGC_X_CTRL name align with reference manual
+>   dt-bindings: imx-gpc: correct the DOMAIN_INDEX using
+>   soc: imx: gpc: remove unnecessary readable_reg callback
 
-[1] https://www.spinics.net/lists/arm-kernel/msg569188.html
-Previous version:  https://lkml.org/lkml/2017/3/21/328
-
-Vignesh R (2):
-  tty: serial_core: Add name field to uart_port struct
-  serial: 8250: 8250_core: Fix irq name for 8250 serial IRQ
-
- drivers/tty/serial/8250/8250_core.c | 2 +-
- drivers/tty/serial/serial_core.c    | 7 +++++++
- include/linux/serial_core.h         | 1 +
- 3 files changed, 9 insertions(+), 1 deletion(-)
-
--- 
-2.11.0
+Applied all, thanks.
