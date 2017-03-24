@@ -1,80 +1,33 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Fri, 24 Mar 2017 10:51:25 -0700
-Subject: [PATCH v2] lkdtm: add bad USER_DS test
-Message-ID: <20170324175125.GA108985@beast>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Fri, 24 Mar 2017 10:53:48 -0700
+Subject: [PATCH 3/9] arm64: mm: install SError abort handler
+In-Reply-To: <20170324173515.GB10746@leverpostej>
+References: <20170324144632.5896-1-opendmb@gmail.com>
+ <20170324144632.5896-4-opendmb@gmail.com>
+ <20170324151654.GD29588@leverpostej> <58D54DE8.9020707@gmail.com>
+ <20170324173515.GB10746@leverpostej>
+Message-ID: <710c4142-ae20-9715-3e51-910a2073a64e@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds CORRUPT_USER_DS to check that the get_fs() test on syscall
-return (via __VERIFY_PRE_USERMODE_STATE) still sees USER_DS. Since
-trying to deal with values other than USER_DS and KERNEL_DS across all
-architectures in a safe way is not sensible, this sets KERNEL_DS, but
-since that could be extremely dangerous if the protection is not present,
-it also raises SIGKILL for current, so that no matter what, the process
-will die. A successful test will be visible with a BUG(), like all the
-other LKDTM tests.
+On 03/24/2017 10:35 AM, Mark Rutland wrote:
+> On Fri, Mar 24, 2017 at 09:48:40AM -0700, Doug Berger wrote:
+>> On 03/24/2017 08:16 AM, Mark Rutland wrote:
+>>> On Fri, Mar 24, 2017 at 07:46:26AM -0700, Doug Berger wrote:
+> 
+>> If you would consider an alternative implementation where we scrap
+>> the SError handler (i.e. maintain the ugliness in our downstream
+>> kernel) in favor of a more gentle user mode crash on SError that
+>> allows the kernel the opportunity to service the interrupt for
+>> diagnostic purposes I could try to repackage that.
+> 
+> If this is just for diagnostic purposes, I believe you can register a
+> panic notifier, which can then read from the bus. The panic will occur,
+> but you'll have the opportunity to log some information to dmesg.
 
-Signed-off-by: Kees Cook <keescook@chromium.org>
----
- drivers/misc/lkdtm.h      |  1 +
- drivers/misc/lkdtm_bugs.c | 11 +++++++++++
- drivers/misc/lkdtm_core.c |  1 +
- 3 files changed, 13 insertions(+)
-
-diff --git a/drivers/misc/lkdtm.h b/drivers/misc/lkdtm.h
-index 67d27be60405..3b4976396ec4 100644
---- a/drivers/misc/lkdtm.h
-+++ b/drivers/misc/lkdtm.h
-@@ -27,6 +27,7 @@ void lkdtm_REFCOUNT_ZERO_SUB(void);
- void lkdtm_REFCOUNT_ZERO_ADD(void);
- void lkdtm_CORRUPT_LIST_ADD(void);
- void lkdtm_CORRUPT_LIST_DEL(void);
-+void lkdtm_CORRUPT_USER_DS(void);
- 
- /* lkdtm_heap.c */
- void lkdtm_OVERWRITE_ALLOCATION(void);
-diff --git a/drivers/misc/lkdtm_bugs.c b/drivers/misc/lkdtm_bugs.c
-index e3f4cd8876b5..ed4f4c56c796 100644
---- a/drivers/misc/lkdtm_bugs.c
-+++ b/drivers/misc/lkdtm_bugs.c
-@@ -8,6 +8,8 @@
- #include <linux/list.h>
- #include <linux/refcount.h>
- #include <linux/sched.h>
-+#include <linux/sched/signal.h>
-+#include <linux/uaccess.h>
- 
- struct lkdtm_list {
- 	struct list_head node;
-@@ -279,3 +281,12 @@ void lkdtm_CORRUPT_LIST_DEL(void)
- 	else
- 		pr_err("list_del() corruption not detected!\n");
- }
-+
-+void lkdtm_CORRUPT_USER_DS(void)
-+{
-+	pr_info("setting bad task size limit\n");
-+	set_fs(KERNEL_DS);
-+
-+	/* Make sure we do not keep running with a KERNEL_DS! */
-+	force_sig(SIGKILL, current);
-+}
-diff --git a/drivers/misc/lkdtm_core.c b/drivers/misc/lkdtm_core.c
-index b9a4cd4a9b68..42d2b8e31e6b 100644
---- a/drivers/misc/lkdtm_core.c
-+++ b/drivers/misc/lkdtm_core.c
-@@ -199,6 +199,7 @@ struct crashtype crashtypes[] = {
- 	CRASHTYPE(OVERFLOW),
- 	CRASHTYPE(CORRUPT_LIST_ADD),
- 	CRASHTYPE(CORRUPT_LIST_DEL),
-+	CRASHTYPE(CORRUPT_USER_DS),
- 	CRASHTYPE(CORRUPT_STACK),
- 	CRASHTYPE(UNALIGNED_LOAD_STORE_WRITE),
- 	CRASHTYPE(OVERWRITE_ALLOCATION),
+And crash the kernel? That sounds awful, FWIW the ARM/Linux kernel is
+able to recover just fine from user-space accessing e.g: invalid
+physical addresses in the GISB register space, bringing the same level
+of functionality to ARM64/Linux sounds reasonable to me.
 -- 
-2.7.4
-
-
--- 
-Kees Cook
-Pixel Security
+Florian
