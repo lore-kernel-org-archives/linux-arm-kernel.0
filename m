@@ -1,45 +1,126 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 24 Mar 2017 16:46:14 +0100
-Subject: [PATCH v2 1/1] ARM: dts: sun8i: NanoPi NEO Air add WiFi / eMMC
-In-Reply-To: <20170323212444.20685-2-jelle@vdwaa.nl>
-References: <20170323212444.20685-1-jelle@vdwaa.nl>
- <20170323212444.20685-2-jelle@vdwaa.nl>
-Message-ID: <20170324154614.mjfl6dnvwddp364b@lukather>
+Date: Fri, 24 Mar 2017 16:55:18 +0100
+Subject: [PATCH 3/3] ARM: dts: sun8i: add device tree for Lichee Pi Zero
+ with Dock
+In-Reply-To: <20170322223427.YNp8w8sn@smtp3m.mail.yandex.net>
+References: <20170322223427.YNp8w8sn@smtp3m.mail.yandex.net>
+Message-ID: <20170324155518.xcbmluz4ehltfxwt@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thu, Mar 23, 2017 at 10:24:44PM +0100, Jelle van der Waa wrote:
-> Enable the WiFi (AP6212) chip and eMMC support for the NanoPi NEO Air.
+On Thu, Mar 23, 2017 at 03:34:18AM +0800, Icenowy Zheng wrote:
 > 
-> Signed-off-by: Jelle van der Waa <jelle@vdwaa.nl>
-> ---
->  arch/arm/boot/dts/sun8i-h3-nanopi-neo-air.dts | 45 +++++++++++++++++++++++++++
->  1 file changed, 45 insertions(+)
+> 2017?3?23? 03:24? Maxime Ripard <maxime.ripard@free-electrons.com>???
+> >
+> > On Fri, Mar 17, 2017 at 11:43:43PM +0800, Icenowy Zheng wrote: 
+> > > Lichee Pi Zero features a dock, which adds some functions, and should be 
+> > > soldered with the core board of Lichee Pi Zero. 
+> > > 
+> > > Add support for the dock as a new dts, as soldering is needed to make 
+> > > the dock usable and there's functions enabled on the dock that is 
+> > > unavailable at the 2.54mm pins of the core board. 
+> > > 
+> > > Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz> 
+> > > --- 
+> > >? arch/arm/boot/dts/Makefile???????????????????????? |? 3 +- 
+> > >? arch/arm/boot/dts/sun8i-v3s-licheepi-zero-dock.dts | 98 ++++++++++++++++++++++ 
+> > >? 2 files changed, 100 insertions(+), 1 deletion(-) 
+> > >? create mode 100644 arch/arm/boot/dts/sun8i-v3s-licheepi-zero-dock.dts 
+> > > 
+> > > diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile 
+> > > index 43c27b624f94..de52d403f818 100644 
+> > > --- a/arch/arm/boot/dts/Makefile 
+> > > +++ b/arch/arm/boot/dts/Makefile 
+> > > @@ -878,7 +878,8 @@ dtb-$(CONFIG_MACH_SUN8I) += \ 
+> > >? sun8i-h3-orangepi-plus.dtb \ 
+> > >? sun8i-h3-orangepi-plus2e.dtb \ 
+> > >? sun8i-r16-parrot.dtb \ 
+> > > - sun8i-v3s-licheepi-zero.dtb 
+> > > + sun8i-v3s-licheepi-zero.dtb \ 
+> > > + sun8i-v3s-licheepi-zero-dock.dtb 
+> > >? dtb-$(CONFIG_MACH_SUN9I) += \ 
+> > >? sun9i-a80-optimus.dtb \ 
+> > >? sun9i-a80-cubieboard4.dtb 
+> > > diff --git a/arch/arm/boot/dts/sun8i-v3s-licheepi-zero-dock.dts b/arch/arm/boot/dts/sun8i-v3s-licheepi-zero-dock.dts 
+> > > new file mode 100644 
+> > > index 000000000000..956fa47fde53 
+> > > --- /dev/null 
+> > > +++ b/arch/arm/boot/dts/sun8i-v3s-licheepi-zero-dock.dts 
+> > > @@ -0,0 +1,98 @@ 
+> > > +/* 
+> > > + * Copyright (C) 2016 Icenowy Zheng <icenowy@aosc.xyz> 
+> > > + * 
+> > > + * This file is dual-licensed: you can use it either under the terms 
+> > > + * of the GPL or the X11 license, at your option. Note that this dual 
+> > > + * licensing only applies to this file, and not this project as a 
+> > > + * whole. 
+> > > + * 
+> > > + *? a) This file is free software; you can redistribute it and/or 
+> > > + *???? modify it under the terms of the GNU General Public License as 
+> > > + *???? published by the Free Software Foundation; either version 2 of the 
+> > > + *???? License, or (at your option) any later version. 
+> > > + * 
+> > > + *???? This file is distributed in the hope that it will be useful, 
+> > > + *???? but WITHOUT ANY WARRANTY; without even the implied warranty of 
+> > > + *???? MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.? See the 
+> > > + *???? GNU General Public License for more details. 
+> > > + * 
+> > > + * Or, alternatively, 
+> > > + * 
+> > > + *? b) Permission is hereby granted, free of charge, to any person 
+> > > + *???? obtaining a copy of this software and associated documentation 
+> > > + *???? files (the "Software"), to deal in the Software without 
+> > > + *???? restriction, including without limitation the rights to use, 
+> > > + *???? copy, modify, merge, publish, distribute, sublicense, and/or 
+> > > + *???? sell copies of the Software, and to permit persons to whom the 
+> > > + *???? Software is furnished to do so, subject to the following 
+> > > + *???? conditions: 
+> > > + * 
+> > > + *???? The above copyright notice and this permission notice shall be 
+> > > + *???? included in all copies or substantial portions of the Software. 
+> > > + * 
+> > > + *???? THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, 
+> > > + *???? EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES 
+> > > + *???? OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND 
+> > > + *???? NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT 
+> > > + *???? HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, 
+> > > + *???? WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING 
+> > > + *???? FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR 
+> > > + *???? OTHER DEALINGS IN THE SOFTWARE. 
+> > > + */ 
+> > > + 
+> > > +#include "sun8i-v3s-licheepi-zero.dts" 
+> > > + 
+> > > +#include <dt-bindings/input/input.h> 
+> > > + 
+> > > +/ { 
+> > > + model = "Lichee Pi Zero with Dock"; 
+> > > + compatible = "licheepi,licheepi-zero-dock", "licheepi,licheepi-zero", 
+> > > + ???? "allwinner,sun8i-v3s"; 
+> > > +}; 
+> > > + 
+> > > +&leds { 
+> > > + /* The LEDs conflict with MMC1 slot */ 
+> >
+> > How does it conflicts? 
 > 
-> diff --git a/arch/arm/boot/dts/sun8i-h3-nanopi-neo-air.dts b/arch/arm/boot/dts/sun8i-h3-nanopi-neo-air.dts
-> index 3ba081c1f555..457a28e56514 100644
-> --- a/arch/arm/boot/dts/sun8i-h3-nanopi-neo-air.dts
-> +++ b/arch/arm/boot/dts/sun8i-h3-nanopi-neo-air.dts
-> @@ -73,6 +73,13 @@
->  			gpios = <&pio 0 10 GPIO_ACTIVE_HIGH>; /* PA10 */
->  		};
->  	};
-> +
-> +	wifi-pwrseq: wifi-pwrseq {
-> +		compatible = "mmc-pwrseq-simple";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&wifi-en-nanopi-neo-air>;
+> They both use PGx.
 
-Could you please drop that pinctrl group for that GPIO? It will help
-us prevent a bug in the future in the pinctrl driver that allows two
-GPIO users to claim the same pin.
+So they use the same bank? How is that a conflict?
 
-Unfortunately, that will require removing all those pinctrl properties
-for the GPIOs, so we'd better not introduce them in the first place :)
+> > > +&mmc1 { 
+> > > + pinctrl-0 = <&mmc1_pins>; 
+> > > + pinctrl-names = "default"; 
+> > > + broken-cd; 
+> >
+> > There's no card-detect on a GPIO? 
+> 
+> Yes.
+> 
+> All SD slots on Lichee Pi series have no card-detect.
 
-Thanks!
+Weird... Ok.
+
 Maxime
 
 -- 
@@ -52,4 +133,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170324/ebfdb4ff/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170324/50613656/attachment.sig>
