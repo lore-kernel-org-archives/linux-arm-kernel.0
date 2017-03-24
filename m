@@ -1,64 +1,248 @@
-From: chaotian.jing@mediatek.com (Chaotian Jing)
-Date: Fri, 24 Mar 2017 16:32:49 +0800
-Subject: [PATCH] mmc: core: Do not hold re-tuning during CMD6 commands
-In-Reply-To: <13a83728-0031-5683-c371-4b517df32299@intel.com>
-References: <1490336341-22292-1-git-send-email-chaotian.jing@mediatek.com>
- <1490336341-22292-2-git-send-email-chaotian.jing@mediatek.com>
- <13a83728-0031-5683-c371-4b517df32299@intel.com>
-Message-ID: <1490344369.22814.10.camel@mhfsdcap03>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 24 Mar 2017 09:37:11 +0100
+Subject: [PATCH v2 2/4] mvebu: xp: Add pwm properties to .dtsi files
+In-Reply-To: <20170324091128.329364eb@gmail.com> (Ralph Sennhauser's message
+ of "Fri, 24 Mar 2017 09:11:28 +0100")
+References: <20170318154305.28348-1-ralph.sennhauser@gmail.com>
+ <20170318154305.28348-3-ralph.sennhauser@gmail.com>
+ <871stodjze.fsf@free-electrons.com>
+ <20170324091128.329364eb@gmail.com>
+Message-ID: <87fui3cbpk.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2017-03-24 at 09:52 +0200, Adrian Hunter wrote:
-> On 24/03/17 08:19, Chaotian Jing wrote:
-> > this patch is refine for 'commit c6dbab9cb58f ("mmc: core: Hold re-tuning
-> > during switch commands")'
-> > Since it has 3 retries at max for CMD6, if the first CMD6 got CRC error,
-> > then should do re-tune before the next CMD6 was sent.
-> > 
-> > Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
-> > ---
-> >  drivers/mmc/core/mmc_ops.c |    3 +--
-> >  1 file changed, 1 insertion(+), 2 deletions(-)
-> > 
-> > diff --git a/drivers/mmc/core/mmc_ops.c b/drivers/mmc/core/mmc_ops.c
-> > index fe80f26..6931927 100644
-> > --- a/drivers/mmc/core/mmc_ops.c
-> > +++ b/drivers/mmc/core/mmc_ops.c
-> > @@ -534,8 +534,6 @@ int __mmc_switch(struct mmc_card *card, u8 set, u8 index, u8 value,
-> >  	bool use_r1b_resp = use_busy_signal;
-> >  	unsigned char old_timing = host->ios.timing;
-> >  
-> > -	mmc_retune_hold(host);
-> > -
-> >  	/*
-> >  	 * If the cmd timeout and the max_busy_timeout of the host are both
-> >  	 * specified, let's validate them. A failure means we need to prevent
-> > @@ -567,6 +565,7 @@ int __mmc_switch(struct mmc_card *card, u8 set, u8 index, u8 value,
-> >  		cmd.sanitize_busy = true;
-> >  
-> >  	err = mmc_wait_for_cmd(host, &cmd, MMC_CMD_RETRIES);
-> > +	mmc_retune_hold(host);
-> 
-> That is not how mmc_retune_hold() works, you need mmc_retune_hold_now() as
-> it is here:
-> 
-> 	https://marc.info/?l=linux-mmc&m=148940903816582
-> 
-> But using "retries" with commands that have busy-waiting on the data line
-> doesn't make much sense anyway.  Particularly with CRC errors, I would
-> expect the card is actually busily doing the switch and we need only to wait
-> for it.  The same can be true for timeout errors.  For some CMD6 we might
-> need to send CMD12 if the card is busy after an error.  I would prefer an
-> explicit attempt at recovery from CMD6 errors.
-> 
+Hi Ralph,
+ 
+ On ven., mars 24 2017, Ralph Sennhauser <ralph.sennhauser@gmail.com> wrote:
 
-It's the host driver's responsibility to ensure card is not in busy
-state before issue the next R1B command, or the MMC core layer needs do
-extra check/waiting before issue a R1B command.
-I think the purpose of "re-tune" is trying to cover particular case(eg.
-voltage fluctuate or EMI or some glitch of host/device which caused CRC
-error) , but in such cases, too many cases are disable re-tune function
-by mmc_retune_hold(), for example, in this case, if a response CRC error
-got then we never have chance to recover it. then cause system cannot
-access emmc or suspend/resume fail.
+> On Thu, 23 Mar 2017 17:40:53 +0100
+> Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
+>
+>> Hi Ralph,
+>>  
+>>  On sam., mars 18 2017, Ralph Sennhauser <ralph.sennhauser@gmail.com>
+>> wrote:
+>> 
+>> It seems that I don't receive the 1st patch of the series.
+>
+> Hi Gregory,
+>
+> it makes no sense to only send part of a series to a recipient. Will
+
+To be frank it depends. Some maintainers don't want to receive a patch
+which is not related to their subsystem. But it is not my case, I prefer
+to have the full picture.
+
+> have to improve my use of --cc-cmd it seems. Will pay attention to this
+> for v3.
+
+Also don't forget to add te cover letter too if you have written one.
+
+Thanks!
+
+Gregory
+
+>
+> Sorry
+> Ralph
+>
+>> 
+>> Also could you refresh my mind to expose why these patchse were not
+>> apply the first time and why we should apply them now?
+>> 
+>> Thanks,
+>> 
+>> Gregory
+>> 
+>> 
+>> > From: Andrew Lunn <andrew@lunn.ch>
+>> >
+>> > Add properties to the gpio nodes to allow them to be also used as
+>> > pwm lines.
+>> >
+>> > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+>> > URL: https://patchwork.ozlabs.org/patch/427294/
+>> > Signed-off-by: Ralph Sennhauser <ralph.sennhauser@gmail.com>
+>> > ---
+>> >  arch/arm/boot/dts/armada-370.dtsi        | 10 ++++++++--
+>> >  arch/arm/boot/dts/armada-xp-mv78230.dtsi | 10 ++++++++--
+>> >  arch/arm/boot/dts/armada-xp-mv78260.dtsi |  8 ++++++--
+>> >  arch/arm/boot/dts/armada-xp-mv78460.dtsi | 10 ++++++++--
+>> >  4 files changed, 30 insertions(+), 8 deletions(-)
+>> >
+>> > diff --git a/arch/arm/boot/dts/armada-370.dtsi
+>> > b/arch/arm/boot/dts/armada-370.dtsi index cc011c8..aa9fe72 100644
+>> > --- a/arch/arm/boot/dts/armada-370.dtsi
+>> > +++ b/arch/arm/boot/dts/armada-370.dtsi
+>> > @@ -138,24 +138,30 @@
+>> >  
+>> >  			gpio0: gpio at 18100 {
+>> >  				compatible = "marvell,orion-gpio";
+>> > -				reg = <0x18100 0x40>;
+>> > +				reg = <0x18100 0x40>, <0x181c0
+>> > 0x08>;
+>> > +				reg-names = "gpio", "pwm";
+>> >  				ngpios = <32>;
+>> >  				gpio-controller;
+>> >  				#gpio-cells = <2>;
+>> > +				#pwm-cells = <2>;
+>> >  				interrupt-controller;
+>> >  				#interrupt-cells = <2>;
+>> >  				interrupts = <82>, <83>, <84>,
+>> > <85>;
+>> > +				clocks = <&coreclk 0>;
+>> >  			};
+>> >  
+>> >  			gpio1: gpio at 18140 {
+>> >  				compatible = "marvell,orion-gpio";
+>> > -				reg = <0x18140 0x40>;
+>> > +				reg = <0x18140 0x40>, <0x181c8
+>> > 0x08>;
+>> > +				reg-names = "gpio", "pwm";
+>> >  				ngpios = <32>;
+>> >  				gpio-controller;
+>> >  				#gpio-cells = <2>;
+>> > +				#pwm-cells = <2>;
+>> >  				interrupt-controller;
+>> >  				#interrupt-cells = <2>;
+>> >  				interrupts = <87>, <88>, <89>,
+>> > <90>;
+>> > +				clocks = <&coreclk 0>;
+>> >  			};
+>> >  
+>> >  			gpio2: gpio at 18180 {
+>> > diff --git a/arch/arm/boot/dts/armada-xp-mv78230.dtsi
+>> > b/arch/arm/boot/dts/armada-xp-mv78230.dtsi index 07c5090..fc3934f
+>> > 100644 --- a/arch/arm/boot/dts/armada-xp-mv78230.dtsi
+>> > +++ b/arch/arm/boot/dts/armada-xp-mv78230.dtsi
+>> > @@ -203,24 +203,30 @@
+>> >  		internal-regs {
+>> >  			gpio0: gpio at 18100 {
+>> >  				compatible = "marvell,orion-gpio";
+>> > -				reg = <0x18100 0x40>;
+>> > +				reg = <0x18100 0x40>, <0x181c0
+>> > 0x08>;
+>> > +				reg-names = "gpio", "pwm";
+>> >  				ngpios = <32>;
+>> >  				gpio-controller;
+>> >  				#gpio-cells = <2>;
+>> > +				#pwm-cells = <2>;
+>> >  				interrupt-controller;
+>> >  				#interrupt-cells = <2>;
+>> >  				interrupts = <82>, <83>, <84>,
+>> > <85>;
+>> > +				clocks = <&coreclk 0>;
+>> >  			};
+>> >  
+>> >  			gpio1: gpio at 18140 {
+>> >  				compatible = "marvell,orion-gpio";
+>> > -				reg = <0x18140 0x40>;
+>> > +				reg = <0x18140 0x40>, <0x181c8
+>> > 0x08>;
+>> > +				reg-names = "gpio", "pwm";
+>> >  				ngpios = <17>;
+>> >  				gpio-controller;
+>> >  				#gpio-cells = <2>;
+>> > +				#pwm-cells = <2>;
+>> >  				interrupt-controller;
+>> >  				#interrupt-cells = <2>;
+>> >  				interrupts = <87>, <88>, <89>;
+>> > +				clocks = <&coreclk 0>;
+>> >  			};
+>> >  		};
+>> >  	};
+>> > diff --git a/arch/arm/boot/dts/armada-xp-mv78260.dtsi
+>> > b/arch/arm/boot/dts/armada-xp-mv78260.dtsi index 64e936a..04dda6a
+>> > 100644 --- a/arch/arm/boot/dts/armada-xp-mv78260.dtsi
+>> > +++ b/arch/arm/boot/dts/armada-xp-mv78260.dtsi
+>> > @@ -286,24 +286,28 @@
+>> >  		internal-regs {
+>> >  			gpio0: gpio at 18100 {
+>> >  				compatible = "marvell,orion-gpio";
+>> > -				reg = <0x18100 0x40>;
+>> > +				reg = <0x18100 0x40>, <0x181c0
+>> > 0x08>;
+>> > +				reg-names = "gpio", "pwm";
+>> >  				ngpios = <32>;
+>> >  				gpio-controller;
+>> >  				#gpio-cells = <2>;
+>> > +				#pwm-cells = <2>;
+>> >  				interrupt-controller;
+>> >  				#interrupt-cells = <2>;
+>> >  				interrupts = <82>, <83>, <84>,
+>> > <85>;
+>> > +				clocks = <&coreclk 0>;
+>> >  			};
+>> >  
+>> >  			gpio1: gpio at 18140 {
+>> >  				compatible = "marvell,orion-gpio";
+>> > -				reg = <0x18140 0x40>;
+>> > +				reg = <0x18140 0x40>, <0x181c8
+>> > 0x08>; ngpios = <32>;
+>> >  				gpio-controller;
+>> >  				#gpio-cells = <2>;
+>> >  				interrupt-controller;
+>> >  				#interrupt-cells = <2>;
+>> >  				interrupts = <87>, <88>, <89>,
+>> > <90>;
+>> > +				clocks = <&coreclk 0>;
+>> >  			};
+>> >  
+>> >  			gpio2: gpio at 18180 {
+>> > diff --git a/arch/arm/boot/dts/armada-xp-mv78460.dtsi
+>> > b/arch/arm/boot/dts/armada-xp-mv78460.dtsi index d1383dd..fb6d28a
+>> > 100644 --- a/arch/arm/boot/dts/armada-xp-mv78460.dtsi
+>> > +++ b/arch/arm/boot/dts/armada-xp-mv78460.dtsi
+>> > @@ -324,24 +324,30 @@
+>> >  		internal-regs {
+>> >  			gpio0: gpio at 18100 {
+>> >  				compatible = "marvell,orion-gpio";
+>> > -				reg = <0x18100 0x40>;
+>> > +				reg = <0x18100 0x40>, <0x181c0
+>> > 0x08>;
+>> > +				reg-names = "gpio", "pwm";
+>> >  				ngpios = <32>;
+>> >  				gpio-controller;
+>> >  				#gpio-cells = <2>;
+>> > +				#pwm-cells = <2>;
+>> >  				interrupt-controller;
+>> >  				#interrupt-cells = <2>;
+>> >  				interrupts = <82>, <83>, <84>,
+>> > <85>;
+>> > +				clocks = <&coreclk 0>;
+>> >  			};
+>> >  
+>> >  			gpio1: gpio at 18140 {
+>> >  				compatible = "marvell,orion-gpio";
+>> > -				reg = <0x18140 0x40>;
+>> > +				reg = <0x18140 0x40>, <0x181c8
+>> > 0x08>;
+>> > +				reg-names = "gpio", "pwm";
+>> >  				ngpios = <32>;
+>> >  				gpio-controller;
+>> >  				#gpio-cells = <2>;
+>> > +				#pwm-cells = <2>;
+>> >  				interrupt-controller;
+>> >  				#interrupt-cells = <2>;
+>> >  				interrupts = <87>, <88>, <89>,
+>> > <90>;
+>> > +				clocks = <&coreclk 0>;
+>> >  			};
+>> >  
+>> >  			gpio2: gpio at 18180 {
+>> > -- 
+>> > 2.10.2
+>> >  
+>> 
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
