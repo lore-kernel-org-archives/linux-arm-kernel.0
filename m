@@ -1,68 +1,168 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Fri, 24 Mar 2017 10:46:41 -0700
-Subject: [PATCH] lkdtm: add bad USER_DS test
-In-Reply-To: <a1ab8afa-5462-dc24-2106-0a6b43773c5b@de.ibm.com>
-References: <20170323203419.GA62859@beast> <20170324081450.GA5891@osiris>
- <CAJcbSZHJ1WFcE7QY6qLM9RMUJbGXxTpp3WsCNJBX4h1U-4HEjA@mail.gmail.com>
- <a1ab8afa-5462-dc24-2106-0a6b43773c5b@de.ibm.com>
-Message-ID: <CAGXu5jJxNjdz3x1M3t9nhy590Bk67xwGxidYqJWytETb_PFgKQ@mail.gmail.com>
+From: dann.frazier@canonical.com (dann frazier)
+Date: Fri, 24 Mar 2017 11:48:16 -0600
+Subject: [PATCH v2 06/18] arm64: arch_timer: Add infrastructure for
+ multiple erratum detection methods
+In-Reply-To: <20170320174829.28182-7-marc.zyngier@arm.com>
+References: <20170320174829.28182-1-marc.zyngier@arm.com>
+ <20170320174829.28182-7-marc.zyngier@arm.com>
+Message-ID: <CALdTtnvyT1qjKp5C5AfvSSW7GqN3m2Y_CkTMEX+5OxyvH=+G2Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 24, 2017 at 8:24 AM, Christian Borntraeger
-<borntraeger@de.ibm.com> wrote:
-> On 03/24/2017 04:17 PM, Thomas Garnier wrote:
->> On Fri, Mar 24, 2017 at 1:14 AM, Heiko Carstens
->> <heiko.carstens@de.ibm.com> wrote:
->>> On Thu, Mar 23, 2017 at 01:34:19PM -0700, Kees Cook wrote:
->>>> This adds CORRUPT_USER_DS to check that the get_fs() test on syscall return
->>>> still sees USER_DS during the new VERIFY_PRE_USERMODE_STATE checks.
->>>>
->>>> Signed-off-by: Kees Cook <keescook@chromium.org>
->>>
->>> ...
->>>
->>>> +void lkdtm_CORRUPT_USER_DS(void)
->>>> +{
->>>> +     /*
->>>> +      * Test that USER_DS has been set correctly on exiting a syscall.
->>>> +      * Since setting this higher than USER_DS (TASK_SIZE) would introduce
->>>> +      * an exploitable condition, we lower it instead, since that should
->>>> +      * not create as large a problem on an unprotected system.
->>>> +      */
->>>> +     mm_segment_t lowfs;
->>>> +#ifdef MAKE_MM_SEG
->>>> +     lowfs = MAKE_MM_SEG(TASK_SIZE - PAGE_SIZE);
->>>> +#else
->>>> +     lowfs = TASK_SIZE - PAGE_SIZE;
->>>> +#endif
->>>> +
->>>> +     pr_info("setting bad task size limit\n");
->>>> +     set_fs(lowfs);
->>>> +}
->>>
->>> This won't work on architectures where the set_fs() argument does not
->>> contain an address but an address space identifier. This is true e.g. for
->>> s390 and as far as I know also for sparc.
->>> On s390 we have complete distinct address spaces for kernel and user space
->>> that each start at address zero.
->>>
->>
->> The patch that enforce USER_DS is disabled on s390 anyway. I guess, we
->> can just do a set_fs(KERNEL_DS) for the others.
+On Mon, Mar 20, 2017 at 11:48 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> We're currently stuck with DT when it comes to handling errata, which
+> is pretty restrictive. In order to make things more flexible, let's
+> introduce an infrastructure that could support alternative discovery
+> methods. No change in functionality.
 >
-> that would enable the test, but it would also mean that lkdtm can be used by
-> a program to escalate its rights. I think that is the reason why Kees did this
-> lowfs things.
+> Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm64/include/asm/arch_timer.h  |  7 +++-
+>  drivers/clocksource/arm_arch_timer.c | 80 +++++++++++++++++++++++++++++++-----
+>  2 files changed, 75 insertions(+), 12 deletions(-)
+>
+> diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
+> index b4b34004a21e..5cd964e90d11 100644
+> --- a/arch/arm64/include/asm/arch_timer.h
+> +++ b/arch/arm64/include/asm/arch_timer.h
+> @@ -37,9 +37,14 @@ extern struct static_key_false arch_timer_read_ool_enabled;
+>  #define needs_unstable_timer_counter_workaround()  false
+>  #endif
+>
+> +enum arch_timer_erratum_match_type {
+> +       ate_match_dt,
+> +};
+>
+>  struct arch_timer_erratum_workaround {
+> -       const char *id;         /* Indicate the Erratum ID */
+> +       enum arch_timer_erratum_match_type match_type;
+> +       const void *id;
+> +       const char *desc;
+>         u32 (*read_cntp_tval_el0)(void);
+>         u32 (*read_cntv_tval_el0)(void);
+>         u64 (*read_cntvct_el0)(void);
+> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+> index 7a8a4117f123..6a0f0e161a0f 100644
+> --- a/drivers/clocksource/arm_arch_timer.c
+> +++ b/drivers/clocksource/arm_arch_timer.c
+> @@ -182,7 +182,9 @@ EXPORT_SYMBOL_GPL(arch_timer_read_ool_enabled);
+>  static const struct arch_timer_erratum_workaround ool_workarounds[] = {
+>  #ifdef CONFIG_FSL_ERRATUM_A008585
+>         {
+> +               .match_type = ate_match_dt,
+>                 .id = "fsl,erratum-a008585",
+> +               .desc = "Freescale erratum a005858",
+>                 .read_cntp_tval_el0 = fsl_a008585_read_cntp_tval_el0,
+>                 .read_cntv_tval_el0 = fsl_a008585_read_cntv_tval_el0,
+>                 .read_cntvct_el0 = fsl_a008585_read_cntvct_el0,
+> @@ -190,13 +192,78 @@ static const struct arch_timer_erratum_workaround ool_workarounds[] = {
+>  #endif
+>  #ifdef CONFIG_HISILICON_ERRATUM_161010101
+>         {
+> +               .match_type = ate_match_dt,
+>                 .id = "hisilicon,erratum-161010101",
+> +               .desc = "HiSilicon erratum 161010101",
+>                 .read_cntp_tval_el0 = hisi_161010101_read_cntp_tval_el0,
+>                 .read_cntv_tval_el0 = hisi_161010101_read_cntv_tval_el0,
+>                 .read_cntvct_el0 = hisi_161010101_read_cntvct_el0,
+>         },
+>  #endif
+>  };
+> +
+> +typedef bool (*ate_match_fn_t)(const struct arch_timer_erratum_workaround *,
+> +                              const void *);
+> +
+> +static
+> +bool arch_timer_check_dt_erratum(const struct arch_timer_erratum_workaround *wa,
+> +                                const void *arg)
+> +{
+> +       const struct device_node *np = arg;
+> +
+> +       return of_property_read_bool(np, wa->id);
+> +}
+> +
+> +static const struct arch_timer_erratum_workaround *
+> +arch_timer_iterate_errata(enum arch_timer_erratum_match_type type,
+> +                         ate_match_fn_t match_fn,
+> +                         void *arg)
+> +{
+> +       int i;
+> +
+> +       for (i = 0; i < ARRAY_SIZE(ool_workarounds); i++) {
+> +               if (ool_workarounds[i].match_type != type)
+> +                       continue;
+> +
+> +               if (match_fn(&ool_workarounds[i], arg))
+> +                       return &ool_workarounds[i];
+> +       }
+> +
+> +       return NULL;
+> +}
+> +
+> +static
+> +void arch_timer_enable_workaround(const struct arch_timer_erratum_workaround *wa)
+> +{
+> +       timer_unstable_counter_workaround = wa;
+> +       static_branch_enable(&arch_timer_read_ool_enabled);
+> +}
+> +
+> +static void arch_timer_check_ool_workaround(enum arch_timer_erratum_match_type type,
+> +                                           void *arg)
+> +{
+> +       const struct arch_timer_erratum_workaround *wa;
+> +       ate_match_fn_t match_fn = NULL;
+> +
+> +       if (static_branch_unlikely(&arch_timer_read_ool_enabled))
+> +               return;
+> +
+> +       switch (type) {
+> +       case ate_match_dt:
+> +               match_fn = arch_timer_check_dt_erratum;
+> +               break;
 
-Yeah, but it seems like getting this right for all architectures isn't
-sane. I'm going to change it to use KERNEL_DS but also post a SIGKILL
-to the process. That way it'll still trigger the syscall return
-checking, but will be unable to continue running with a potentially
-uncaught KERNEL_DS.
+hey Marc,
+   Would it make sense to have a default case here that warns &
+returns? That wouldn't get hit by this series as-is, but might avoid a
+NULL callback in the future.
 
--Kees
+  -dann
 
--- 
-Kees Cook
-Pixel Security
+> +       }
+> +
+> +       wa = arch_timer_iterate_errata(type, match_fn, arg);
+> +       if (!wa)
+> +               return;
+> +
+> +       arch_timer_enable_workaround(wa);
+> +       pr_info("Enabling global workaround for %s\n", wa->desc);
+> +}
+> +
+> +#else
+> +#define arch_timer_check_ool_workaround(t,a)           do { } while(0)
+>  #endif /* CONFIG_ARM_ARCH_TIMER_OOL_WORKAROUND */
+>
+>  static __always_inline
+> @@ -960,17 +1027,8 @@ static int __init arch_timer_of_init(struct device_node *np)
+>
+>         arch_timer_c3stop = !of_property_read_bool(np, "always-on");
+>
+> -#ifdef CONFIG_ARM_ARCH_TIMER_OOL_WORKAROUND
+> -       for (i = 0; i < ARRAY_SIZE(ool_workarounds); i++) {
+> -               if (of_property_read_bool(np, ool_workarounds[i].id)) {
+> -                       timer_unstable_counter_workaround = &ool_workarounds[i];
+> -                       static_branch_enable(&arch_timer_read_ool_enabled);
+> -                       pr_info("arch_timer: Enabling workaround for %s\n",
+> -                               timer_unstable_counter_workaround->id);
+> -                       break;
+> -               }
+> -       }
+> -#endif
+> +       /* Check for globally applicable workarounds */
+> +       arch_timer_check_ool_workaround(ate_match_dt, np);
+>
+>         /*
+>          * If we cannot rely on firmware initializing the timer registers then
+> --
+> 2.11.0
+>
