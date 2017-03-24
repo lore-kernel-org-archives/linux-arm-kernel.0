@@ -1,86 +1,60 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 24 Mar 2017 14:42:13 +0000
-Subject: [PATCH v4 28/28] arm/arm64: Add hyp-stub API documentation
-In-Reply-To: <20170324143316.GA25903@cbox>
-References: <20170321192058.9300-1-marc.zyngier@arm.com>
- <20170321192058.9300-29-marc.zyngier@arm.com> <20170324143316.GA25903@cbox>
-Message-ID: <ff4fe929-98f0-de0e-2f1a-d06c7969d5e0@arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 24 Mar 2017 14:43:40 +0000
+Subject: [PATCH V9 00/11] IOMMU probe deferral support
+In-Reply-To: <5FC3163CFD30C246ABAA99954A238FA81750B7CB@lhreml504-mbs>
+References: <1489086061-9356-1-git-send-email-sricharan@codeaurora.org>
+ <58D49845.9060407@hisilicon.com>
+ <0ea8022b-a19b-335d-6cc6-81510196f891@codeaurora.org>
+ <5FC3163CFD30C246ABAA99954A238FA81750B7CB@lhreml504-mbs>
+Message-ID: <20170324144340.GA17560@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/03/17 14:33, Christoffer Dall wrote:
-> On Tue, Mar 21, 2017 at 07:20:58PM +0000, Marc Zyngier wrote:
->> In order to help people understanding the hyp-stub API that exists
->> between the host kernel and the hypervisor mode (whether a hypervisor
->> has been installed or not), let's document said API.
->>
->> As with any form of documentation, I expect it to become obsolete
->> and completely misleading within 20 minutes after having being merged.
-> 
-> I don't think this last sentence belongs in the commit message.
-> 
->>
->> Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  Documentation/virtual/kvm/arm/hyp-abi.txt | 45 +++++++++++++++++++++++++++++++
->>  1 file changed, 45 insertions(+)
->>  create mode 100644 Documentation/virtual/kvm/arm/hyp-abi.txt
->>
->> diff --git a/Documentation/virtual/kvm/arm/hyp-abi.txt b/Documentation/virtual/kvm/arm/hyp-abi.txt
->> new file mode 100644
->> index 000000000000..a1e0314d2249
->> --- /dev/null
->> +++ b/Documentation/virtual/kvm/arm/hyp-abi.txt
->> @@ -0,0 +1,45 @@
->> +* Internal ABI between the kernel and HYP
->> +
->> +This file documents the interaction between the Linux kernel and the
->> +hypervisor layer when running Linux as a hypervisor (for example
->> +KVM). It doesn't cover the interaction of the kernel with the
->> +hypervisor when running as a guest (under Xen, KVM or any other
->> +hypervisor), or any hypervisor-specific interaction when the kernel is
->> +used as a host.
->> +
->> +On arm and arm64 (without VHE), the kernel doesn't run in hypervisor
->> +mode, but still needs to interact with it, allowing a built-in
->> +hypervisor to be either installed or torn down.
->> +
->> +In order to achieve this, the kernel must be booted at HYP (arm) or
->> +EL2 (arm64), allowing it to install a set of stubs before dropping to
->> +SVC/EL1. These stubs are accessible by using a 'hvc #0' instruction,
->> +and only act on individual CPUs.
->> +
->> +Unless specified otherwise, any built-in hypervisor must implement
->> +these functions (see arch/arm{,64}/include/asm/virt.h):
->> +
->> +* r0/x0 = HVC_SET_VECTORS
->> +  r1/x1 = vectors
->> +
->> +  Set HVBAR/VBAR_EL2 to 'vectors' to enable a hypervisor. 'vectors'
->> +  must be a physical address, and respect the alignment requirements
->> +  of the architecture. Only implemented by the initial stubs.
-> 
-> Does this last sentence mean that KVM doesn't implement this function?
+On Fri, Mar 24, 2017 at 09:27:51AM +0000, Shameerali Kolothum Thodi wrote:
 
-Indeed. Directly setting the vectors is inherently unsafe (MMU could
-still be ON, for example), hence the HVC_SET_VECTORS operation that
-allow this to be done safely (RESET followed by SET).
+[...]
 
+> @@ -107,7 +107,7 @@ int of_dma_configure(struct device *dev, struct device_node *np)
+>   	ret = of_dma_get_range(np, &dma_addr, &paddr, &size);
+>   	if (ret < 0) {
+>   		dma_addr = offset = 0;
+>  -		size = dev->coherent_dma_mask + 1;
+>  +		size = max(dev->coherent_dma_mask, dev->coherent_dma_mask + 1);
 > 
->> +
->> +* r0/x0 = HVC_RESET_VECTORS
->> +
->> +  Turn HYP/EL2 MMU off, and reset HVBAR/VBAR_EL2 to the default
->> +  value. This effectively disables an existing hypervisor.
-> 
-> What's the 'default value' ?  Could we say to the physical address of
-> the hypervisor stub's exception vector?
+> @@ -1386,7 +1387,8 @@ int acpi_dma_configure(struct device *dev, enum dev_dma_attr attr)
+>   	 * Assume dma valid range starts at 0 and covers the whole
+>   	 * coherent_dma_mask.
+>   	 */
+>  -	arch_setup_dma_ops(dev, 0, dev->coherent_dma_mask + 1, iommu,
+>  +	size = max(dev->coherent_dma_mask, dev->coherent_dma_mask + 1);
 
-Shouldn't that be the kernel stub's exception vector?
+size is not defined in acpi_dma_configure(), so there is
+something missing in the diff above, just to make sure we are
+testing the same thing.
+
+Mind posting kernel logs with and without patch above (fixed) for
+DT boot and ACPI boot please.
 
 Thanks,
+Lorenzo
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+>  +	arch_setup_dma_ops(dev, 0, size, iommu,
+>   			   attr == DEV_DMA_COHERENT);
+> 
+> With the above fixes, DT boot works fine. But we still get the below crash on ACPI
+> 
+> > > [  402.581445] kernel BUG at drivers/iommu/arm-smmu-v3.c:1064!
+> > > [  402.587007] Internal error: Oops - BUG: 0 [#1] PREEMPT SMP
+> > > [  402.592479] Modules linked in: vfio_iommu_type1 vfio_pci irqbypass
+> > vfio_virqfd vfio ixgbevf ixgb
+> 
+> > The change that this series does is trying to add the dma/iommu ops to the
+> > device after the iommu is actually probed.
+> > So in your working case, does the device initially gets hooked to iommu_ops
+> > and the above same check passes in working case ?
+> 
+> I believe so. Because didn't notice the "specified DMA range outside IOMMU capability"
+> in the working case.
+>  
+> Thanks,
+> Shameer
