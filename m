@@ -1,172 +1,114 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Fri, 24 Mar 2017 16:55:20 +0100
-Subject: [PATCH 2/2] PCI: Add legacy firmware support for Cavium ThunderX
- host controller
-In-Reply-To: <1489564155-3881-3-git-send-email-tn@semihalf.com>
-References: <1489564155-3881-1-git-send-email-tn@semihalf.com>
- <1489564155-3881-3-git-send-email-tn@semihalf.com>
-Message-ID: <bc7b66de-9070-1561-440e-ac12124fc268@semihalf.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri, 24 Mar 2017 15:55:33 +0000
+Subject: [PATCH] arm64: ptrace: Crystallise the pt_regs->syscallno = ~0UL idiom
+Message-ID: <1490370933-24057-1-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15.03.2017 08:49, Tomasz Nowicki wrote:
-> During early days of PCI quirks support ThunderX firmware did not provide
-> PNP0c02 node with PCI configuration space and PEM-specific register ranges.
-> This means that for legacy FW we are not reserving these resources and
-> cannot gather PEM-specific resources for further PEM initialization.
->
-> In order to support already deployed legacy FW calculate PEM-specific ranges
-> and provide resources reservation as fallback scenario into PEM driver when
-> we could not gather PEM reg base from ACPI tables.
->
-> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-> Signed-off-by: Vadim Lomovtsev <Vadim.Lomovtsev@caviumnetworks.com>
-> ---
->  drivers/pci/host/pci-thunder-pem.c | 56 ++++++++++++++++++++++++++++++++++++--
->  1 file changed, 54 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/pci/host/pci-thunder-pem.c b/drivers/pci/host/pci-thunder-pem.c
-> index e354010..e0aa194 100644
-> --- a/drivers/pci/host/pci-thunder-pem.c
-> +++ b/drivers/pci/host/pci-thunder-pem.c
-> @@ -14,6 +14,7 @@
->   * Copyright (C) 2015 - 2016 Cavium, Inc.
->   */
->
-> +#include <linux/bitfield.h>
->  #include <linux/kernel.h>
->  #include <linux/init.h>
->  #include <linux/of_address.h>
-> @@ -319,6 +320,50 @@ static int thunder_pem_init(struct device *dev, struct pci_config_window *cfg,
->
->  #if defined(CONFIG_ACPI) && defined(CONFIG_PCI_QUIRKS)
->
-> +#define PEM_RES_BASE		0x87e0c0000000UL
-> +#define PEM_NODE_MASK		GENMASK(45, 44)
-> +#define PEM_INDX_MASK		GENMASK(26, 24)
-> +#define PEM_MIN_DOM_IN_NODE	4
-> +#define PEM_MAX_DOM_IN_NODE	10
-> +
-> +static void thunder_pem_reserve_range(struct device *dev, int seg,
-> +				      struct resource *r)
-> +{
-> +	resource_size_t start = r->start, end = r->end;
-> +	struct resource *res;
-> +	const char *regionid;
-> +
-> +	regionid = kasprintf(GFP_KERNEL, "PEM RC:%d", seg);
-> +	if (!regionid)
-> +		return;
-> +
-> +	res = request_mem_region(start, end - start + 1, regionid);
-> +	if (res)
-> +		res->flags &= ~IORESOURCE_BUSY;
-> +	else
-> +		kfree(regionid);
-> +
-> +	dev_info(dev, "%pR %s reserved\n", r,
-> +		 res ? "has been" : "could not be");
-> +}
-> +
-> +static void thunder_pem_legacy_fw(struct acpi_pci_root *root,
-> +				 struct resource *res_pem)
-> +{
-> +	int node = acpi_get_node(root->device->handle);
-> +	int index;
-> +
-> +	if (node == NUMA_NO_NODE)
-> +		node = 0;
-> +
-> +	index = root->segment - PEM_MIN_DOM_IN_NODE;
-> +	index -= node * PEM_MAX_DOM_IN_NODE;
-> +	res_pem->start = PEM_RES_BASE | FIELD_PREP(PEM_NODE_MASK, node) |
-> +					FIELD_PREP(PEM_INDX_MASK, index);
-> +	res_pem->end = res_pem->start + SZ_16M - 1;
-> +	res_pem->flags = IORESOURCE_MEM;
-> +}
-> +
->  static int thunder_pem_acpi_init(struct pci_config_window *cfg)
->  {
->  	struct device *dev = cfg->parent;
-> @@ -332,9 +377,16 @@ static int thunder_pem_acpi_init(struct pci_config_window *cfg)
->  		return -ENOMEM;
->
->  	ret = acpi_get_rc_resources(dev, "CAVA02B", root->segment, res_pem);
-> +
-> +	/*
-> +	 * If we fail to gather resources it means that we run with old
-> +	 * FW where we need to calculate PEM-specific resources manually.
-> +	 */
->  	if (ret) {
-> -		dev_err(dev, "can't get rc base address\n");
-> -		return ret;
-> +		thunder_pem_legacy_fw(root, res_pem);
-> +		/* Reserve PEM specific resources and PCI configuration space */
-> +		thunder_pem_reserve_range(dev, root->segment, res_pem);
+Assigning ~0UL to pt_regs->syscallno to indicate that a task is not
+executing a syscall is a little obscure.
 
+This patch defines a helper zap_syscall() to make users of this
+idiom and its intent a bit more readable.  This concept allows
+relaxations to the system call ABI whereby not all userspace state
+need be preserved by the kernel around an explicit syscall.  The
+Scalable Vector Extension ABI will make use of this with regard
+to the extra register state added by SVE.
 
-Looks like I screwed up PEM resource size for reservation. We cannot 
-reserve full 16M here since devices will not able to request their 
-resources later on:
-pcieport 0004:1f:00.0: can't enable device: BAR 0 [mem 
-0x87e0c0f00000-0x87e0c0ffffff 64bit] not claimed
+No relaxation of the _existing_ system call ABI is implied here.
 
-SZ_64K is what we need to reserve.
+Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+---
+ arch/arm64/include/asm/processor.h | 7 ++++++-
+ arch/arm64/kernel/ptrace.c         | 3 ++-
+ arch/arm64/kernel/signal.c         | 4 ++--
+ arch/arm64/kernel/signal32.c       | 3 ++-
+ 4 files changed, 12 insertions(+), 5 deletions(-)
 
-Bjorn can you please apply below fix:
-
-@@ -327,21 +327,20 @@ static void thunder_pem_legacy_fw(struct 
-acpi_pci_root *root,
-  	int node = acpi_get_node(root->device->handle);
-  	int index;
-
-  	if (node == NUMA_NO_NODE)
-  		node = 0;
-
-  	index = root->segment - PEM_MIN_DOM_IN_NODE;
-  	index -= node * PEM_MAX_DOM_IN_NODE;
-  	res_pem->start = PEM_RES_BASE | FIELD_PREP(PEM_NODE_MASK, node) |
-  					FIELD_PREP(PEM_INDX_MASK, index);
--	res_pem->end = res_pem->start + SZ_16M - 1;
-  	res_pem->flags = IORESOURCE_MEM;
-  }
-
-  static int thunder_pem_acpi_init(struct pci_config_window *cfg)
-  {
-  	struct device *dev = cfg->parent;
-  	struct acpi_device *adev = to_acpi_device(dev);
-  	struct acpi_pci_root *root = acpi_driver_data(adev);
-  	struct resource *res_pem;
-  	int ret;
-@@ -351,22 +350,29 @@ static int thunder_pem_acpi_init(struct 
-pci_config_window *cfg)
-  		return -ENOMEM;
-
-  	ret = acpi_get_rc_resources(dev, "CAVA02B", root->segment, res_pem);
-
-  	/*
-  	 * If we fail to gather resources it means that we run with old
-  	 * FW where we need to calculate PEM-specific resources manually.
-  	 */
-  	if (ret) {
-  		thunder_pem_legacy_fw(root, res_pem);
--		/* Reserve PEM specific resources and PCI configuration space */
-+		/*
-+		 * Reserve 64K size PEM specific resources. The full 16M range
-+		 * size is required for thunder_pem_init() call.
-+		 */
-+		res_pem->end = res_pem->start + SZ_64K - 1;
-  		thunder_pem_reserve_range(dev, root->segment, res_pem);
-+		res_pem->end = res_pem->start + SZ_16M - 1;
+diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
+index c97b8bd..0502007 100644
+--- a/arch/arm64/include/asm/processor.h
++++ b/arch/arm64/include/asm/processor.h
+@@ -104,10 +104,15 @@ struct thread_struct {
+ 
+ #define INIT_THREAD  {	}
+ 
++static inline void zap_syscall(struct pt_regs *regs)
++{
++	regs->syscallno = ~0UL;
++}
 +
-+		/* and PCI configuration space */
-  		thunder_pem_reserve_range(dev, root->segment, &cfg->res);
-  	}
-
-  	return thunder_pem_init(dev, cfg, res_pem);
-  }
-
-My apology for not paying attention.
-
-Thanks,
-Tomasz
+ static inline void start_thread_common(struct pt_regs *regs, unsigned long pc)
+ {
+ 	memset(regs, 0, sizeof(*regs));
+-	regs->syscallno = ~0UL;
++	zap_syscall(regs);
+ 	regs->pc = pc;
+ }
+ 
+diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
+index c142459..d92b422 100644
+--- a/arch/arm64/kernel/ptrace.c
++++ b/arch/arm64/kernel/ptrace.c
+@@ -42,6 +42,7 @@
+ #include <asm/compat.h>
+ #include <asm/debug-monitors.h>
+ #include <asm/pgtable.h>
++#include <asm/processor.h>
+ #include <asm/syscall.h>
+ #include <asm/traps.h>
+ #include <asm/system_misc.h>
+@@ -1348,7 +1349,7 @@ static void tracehook_report_syscall(struct pt_regs *regs,
+ 	if (dir == PTRACE_SYSCALL_EXIT)
+ 		tracehook_report_syscall_exit(regs, 0);
+ 	else if (tracehook_report_syscall_entry(regs))
+-		regs->syscallno = ~0UL;
++		zap_syscall(regs);
+ 
+ 	regs->regs[regno] = saved_reg;
+ }
+diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
+index 49c30df..1aef3d7 100644
+--- a/arch/arm64/kernel/signal.c
++++ b/arch/arm64/kernel/signal.c
+@@ -351,7 +351,7 @@ static int restore_sigframe(struct pt_regs *regs,
+ 	/*
+ 	 * Avoid sys_rt_sigreturn() restarting.
+ 	 */
+-	regs->syscallno = ~0UL;
++	zap_syscall(regs);
+ 
+ 	err |= !valid_user_regs(&regs->user_regs, current);
+ 	if (err == 0)
+@@ -634,7 +634,7 @@ static void do_signal(struct pt_regs *regs)
+ 		/*
+ 		 * Avoid additional syscall restarting via ret_to_user.
+ 		 */
+-		regs->syscallno = ~0UL;
++		zap_syscall(regs);
+ 
+ 		/*
+ 		 * Prepare for system call restart. We do this here so that a
+diff --git a/arch/arm64/kernel/signal32.c b/arch/arm64/kernel/signal32.c
+index c747a0f..53f1cc0 100644
+--- a/arch/arm64/kernel/signal32.c
++++ b/arch/arm64/kernel/signal32.c
+@@ -27,6 +27,7 @@
+ #include <asm/fpsimd.h>
+ #include <asm/signal32.h>
+ #include <linux/uaccess.h>
++#include <asm/processor.h>
+ #include <asm/unistd.h>
+ 
+ struct compat_sigcontext {
+@@ -354,7 +355,7 @@ static int compat_restore_sigframe(struct pt_regs *regs,
+ 	/*
+ 	 * Avoid compat_sys_sigreturn() restarting.
+ 	 */
+-	regs->syscallno = ~0UL;
++	zap_syscall(regs);
+ 
+ 	err |= !valid_user_regs(&regs->user_regs, current);
+ 
+-- 
+2.1.4
