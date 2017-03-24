@@ -1,34 +1,48 @@
-From: afzal.mohd.ma@gmail.com (afzal mohammed)
-Date: Sat, 25 Mar 2017 01:47:36 +0530
-Subject: [PATCH v2] arm: Fix memory attribute inconsistencies when using
- fixmap
-In-Reply-To: <1490196388.2890.8.camel@linaro.org>
-References: <20170321173030.7751-1-tixy@linaro.org>
- <1490117781.3136.9.camel@linaro.org>
- <CAKv+Gu82PsyyC=fQHxUn5mrCdmQvhwK+DK342-vv8y53mLcpng@mail.gmail.com>
- <1490175988.2890.1.camel@linaro.org>
- <CAKv+Gu8VoSLOUiNSXsrtQUr8TQdGBqiOmhsKS+N2dhToMusOUg@mail.gmail.com>
- <1490196388.2890.8.camel@linaro.org>
-Message-ID: <20170324201736.GA3317@afzalpc>
+From: smueller@chronox.de (Stephan =?ISO-8859-1?Q?M=FCller?=)
+Date: Fri, 24 Mar 2017 21:41:59 +0100
+Subject: [PATCH v2 1/3] crypto: hw_random - Add new Exynos RNG driver
+In-Reply-To: <20170324182606.23339-2-krzk@kernel.org>
+References: <20170324182606.23339-1-krzk@kernel.org>
+ <20170324182606.23339-2-krzk@kernel.org>
+Message-ID: <4248691.8fGIDmasva@tauon.atsec.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Am Freitag, 24. M?rz 2017, 19:26:04 CET schrieb Krzysztof Kozlowski:
 
-On Wed, Mar 22, 2017 at 03:26:28PM +0000, Jon Medhurst (Tixy) wrote:
-> > > On Tue, 2017-03-21 at 19:00 +0000, Ard Biesheuvel wrote:
+Hi Krzysztof,
 
-> > > > It looks like nommu should be unaffected, but it is worth giving it a
-> > > > spin as well
-> 
-> After much faffing around I got MPS2 booting a Linux kernel, and
-> somewhat to my surprise?it seems to boot fine, all the way up to
-> panicking because it didn't find an init. This was with $subject patch.
+> +static unsigned int exynos_rng_copy_random(struct exynos_rng_dev *rng,
+> +					   u8 *dst, unsigned int dlen)
+> +{
+> +	unsigned int cnt = 0;
+> +	int i, j;
+> +	u32 val;
+> +
+> +	for (j = 0; j < EXYNOS_RNG_SEED_REGS; j++) {
+> +		val = exynos_rng_readl(rng, EXYNOS_RNG_OUT(j));
+> +
+> +		for (i = 0; i < 4; i++) {
+> +			dst[cnt] = val & 0xff;
+> +			val >>= 8;
+> +			if (++cnt >= dlen)
+> +				return cnt;
+> +		}
+> +		rng->seed_save[j] = val;
 
-Vybrid VF610 Cortex M4 boots to prompt w/ this patch on current mainline.
+Just to clarify: is this call right? Shouldn't that be removed? Any RNG that 
+is given to a caller is tainted and should not serve as seed.
+> +	}
+> +
+> +	/*
+> +	 * Engine filled all output registers, so read the remaining registers
+> +	 * for storing data as future seed.
+> +	 */
+> +	for (; j < EXYNOS_RNG_SEED_REGS; j++)
+> +		rng->seed_save[j] = exynos_rng_readl(rng, EXYNOS_RNG_OUT(j));
 
-Vybrid VF610 Cortex A5 using !MMU Kernel w/ this patch too boots to
-prompt (climbing onto the shoulder's of Vladimir, not Torvalds HEAD)
+With this call, I guess the questioned line above could go away, right?
 
-Regards
-afzal
+
+Ciao
+Stephan
