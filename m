@@ -1,136 +1,106 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 24 Mar 2017 10:44:50 +0100
-Subject: [PATCH 4/4] tty/serial: sh-sci: remove uneeded IS_ERR_OR_NULL
- calls
-In-Reply-To: <20170324091558.l2gmqqyced3d345o@pengutronix.de>
-References: <20170323123437.uqdwhfmmsjke3f7s@pengutronix.de>
- <CACRpkdZRfLh9RXRycW_cAxuTYE6tPd7LR32EkAW8y2fh=AxhXA@mail.gmail.com>
- <20170323144325.GA952@dtor-ws> <20170323154441.GA9460@dtor-ws>
- <20170323191020.nrstp2cfh7cuqvf3@pengutronix.de>
- <20170323195804.GA2502@dtor-ws>
- <20170324080006.tbhyqlgk35xybsna@pengutronix.de>
- <CAMuHMdXnUzjb5wzMtmzY2ojpGbhr_3KFGDYd2QKEawVipBhdbw@mail.gmail.com>
- <20170324083905.h5uhdgiycchcjcgs@pengutronix.de>
- <CAMuHMdVoYyDUvQuoPoY347b8tbcuOJK5o7GXoSngiX3LQYekAQ@mail.gmail.com>
- <20170324091558.l2gmqqyced3d345o@pengutronix.de>
-Message-ID: <CAMuHMdWp+e4gmRYYV=kzpUjdkbJUX3UfXGp0zC_LBK0-7+thLQ@mail.gmail.com>
+From: gengdongjiu@huawei.com (gengdongjiu)
+Date: Fri, 24 Mar 2017 17:44:20 +0800
+Subject: [PATCH] arm/arm64: KVM: send SIGBUS error to qemu
+In-Reply-To: <58D3E469.8090408@arm.com>
+References: <1490274061-487-1-git-send-email-gengdongjiu@huawei.com>
+ <58D3E469.8090408@arm.com>
+Message-ID: <5b2bbc21-98a9-e6c5-b643-6fea009c3e26@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+Hi James,
+   thanks for your review.
 
-On Fri, Mar 24, 2017 at 10:15 AM, Uwe Kleine-K?nig
-<u.kleine-koenig@pengutronix.de> wrote:
-> On Fri, Mar 24, 2017 at 09:59:04AM +0100, Geert Uytterhoeven wrote:
->> On Fri, Mar 24, 2017 at 9:39 AM, Uwe Kleine-K?nig
->> <u.kleine-koenig@pengutronix.de> wrote:
->> > On Fri, Mar 24, 2017 at 09:29:02AM +0100, Geert Uytterhoeven wrote:
->> >> On Fri, Mar 24, 2017 at 9:00 AM, Uwe Kleine-K?nig
->> >> <u.kleine-koenig@pengutronix.de> wrote:
->> >> > From: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
->> >> > Subject: [PATCH] gpiod: let get_optional return NULL in some cases with GPIOLIB disabled
->> >> >
->> >> > People disagree if gpiod_get_optional should return NULL or
->> >> > ERR_PTR(-ENOSYS) if GPIOLIB is disabled. The argument for NULL is that
->> >> > the person who decided to disable GPIOLIB is assumed to know that there
->> >> > is no GPIO. The reason to stick to ERR_PTR(-ENOSYS) is that it might
->> >> > introduce hard to debug problems if that decision is wrong.
->> >> >
->> >> > So this patch introduces a compromise and let gpiod_get_optional (and
->> >> > its variants) return NULL if the device in question cannot have an
->> >> > associated GPIO because it is neither instantiated by a device tree nor
->> >> > by ACPI.
->> >> >
->> >> > This should handle most cases that are argued about.
->> >> >
->> >> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
->> >> > ---
->> >> >  include/linux/gpio/consumer.h | 55 ++++++++++++++++++++++++++++++++++++-------
->> >> >  1 file changed, 46 insertions(+), 9 deletions(-)
->> >> >
->> >> > diff --git a/include/linux/gpio/consumer.h b/include/linux/gpio/consumer.h
->> >> > index fb0fde686cb1..0ca29889290d 100644
->> >> > --- a/include/linux/gpio/consumer.h
->> >> > +++ b/include/linux/gpio/consumer.h
->> >> > @@ -161,20 +161,48 @@ gpiod_get_index(struct device *dev,
->> >> >         return ERR_PTR(-ENOSYS);
->> >> >  }
->> >> >
->> >> > -static inline struct gpio_desc *__must_check
->> >> > -gpiod_get_optional(struct device *dev, const char *con_id,
->> >> > -                  enum gpiod_flags flags)
->> >> > +static inline bool __gpiod_no_optional_possible(struct device *dev)
->> >> >  {
->> >> > -       return ERR_PTR(-ENOSYS);
->> >> > +       /*
->> >> > +        * gpiod_get_optional et al can only provide a GPIO if at least one of
->> >> > +        * the backends for specifing a GPIO is available. These are device
->> >> > +        * tree, ACPI and gpiolib's lookup tables. The latter isn't available if
->> >> > +        * GPIOLIB is disabled (which is the case here).
->> >> > +        * So if the provided device is unrelated to device tree and ACPI, we
->> >> > +        * can be sure that there is no optional GPIO and let gpiod_get_optional
->> >> > +        * safely return NULL.
->> >> > +        * Otherwise there is still a chance that there is no GPIO but we cannot
->> >> > +        * be sure without having to enable a part of GPIOLIB (i.e. the lookup
->> >> > +        * part). So lets play safe and return an error. (Though there are also
->> >> > +        * arguments that returning NULL then would be beneficial.)
->> >> > +        */
->> >> > +
->> >> > +       if (IS_ENABLED(CONFIG_OF) && dev && dev->of_node)
->> >> > +               return false;
->> >>
->> >> At first sight, I though this was OK:
->> >>
->> >>   1. On ARM with DT, we can assume CONFIG_GPIOLOB=y.
->> >>
->> >>   2. I managed to configure an SH kernel with CONFIG_GPIOLOB=n, CONFIG_OF=y,
->> >>      and CONFIG_SERIAL_SH_SCI=y, but since SH boards with SH-SCI UARTs do
->> >>      not use DT (yet), the check for dev->of_node (false) should handle
->> >>      that.
->> >>
->> >>   3. However, I managed to do the same for h8300, which does use DT. Hence
->> >>      if mctrl_gpio would start relying on gpiod_get_optional(), this would
->> >>      break the sh-sci driver on h8300 :-(
->> >>      Note that h8300 doesn't have any GPIO drivers (yet?), so
->> >>      CONFIG_GPIPOLIB=n makes perfect sense!
->> >
->> > Thanks for your efforts.
->>
->> You're welcome.
->>
->> >> So I'm afraid the only option is to always return NULL, and put the
->> >> responsability on the shoulders of the system integrator...
->> >
->> > The gpio lines could be provided by an i2c gpio adapter, right? So IMHO
->> > you don't need platform gpios to justify -ENODEV. So I guess that's a
->> > case where we don't come to an agreement.
->>
->> While you can enable I2C without further dependencies, no I2C GPIO expander
->> will be offered... unless you have enabled CONFIG_GPIOLIB first.
->
-> And that is expected, still the device tree could reference such a GPIO
-> and thus create a situation where Dmitry's and my judgement disagree.
+On 2017/3/23 23:06, James Morse wrote:
+> Hi Dongjiu Geng,
+> 
+> On 23/03/17 13:01, Dongjiu Geng wrote:
+>> when the pfn is KVM_PFN_ERR_HWPOISON, it indicates to send
+>> SIGBUS signal from KVM's fault-handling code to qemu, qemu
+>> can handle this signal according to the fault address.
+> 
+> I'm afraid I beat you to it on this one:
+> https://www.spinics.net/lists/arm-kernel/msg568919.html
+> 
+> (Are you the same gengdj who ask me to post that patch?:
+>  https://lkml.org/lkml/2017/3/5/187 )
 
-If the device tree references such a GPIO, and CONFIG_GPIOLIB is not set,
-the I2C GPIO expander device will not be bound.
-Frank Rowand's DT scripts (http://elinux.org/Device_Tree_frowand) will come
-to the rescue, and inform the user which driver(s) to enable.
+Oh, yes, it is me. recently I do not check my gmail and think you are not reply mail.
+it is great that you upstream this patch.
 
-> So I think my suggestion is the best we could do now. It minimizes the
-> number of cases where we disagree. The next best thing would be to
-> implement that half gpiolib stuff (i.e. do the full lookup to be sure
-> there is no gpio) but this comes at a price: We need some time to
-> implement it and it adds a bit to the kernel size.
-
-So I still have to handle -ENOSYS in sh-sci.c, to avoid regressions...
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+> 
+> We don't need upstream KVM to do this until either arm or arm64 has
+> ARCH_SUPPORTS_MEMORY_FAILURE. Punit and Tyler have discovered problems with the
+> way arm64's hugepage and hwpoison interact:
+> https://www.spinics.net/lists/arm-kernel/msg568995.html
+  ok, thanks James. do you know when the arm or arm64 will have ARCH_SUPPORTS_MEMORY_FAILURE?
+> 
+> 
+> Some comments on the differences:
+> 
+>> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+>> index 962616fd4ddd..1307ec400de3 100644
+>> --- a/arch/arm/kvm/mmu.c
+>> +++ b/arch/arm/kvm/mmu.c
+>> @@ -1237,6 +1237,20 @@ static void coherent_cache_guest_page(struct kvm_vcpu *vcpu, kvm_pfn_t pfn,
+>>  	__coherent_cache_guest_page(vcpu, pfn, size);
+>>  }
+>>  
+>> +static void kvm_send_hwpoison_signal(unsigned long address,
+>> +					struct task_struct *tsk)
+>> +{
+>> +	siginfo_t info;
+>> +
+>> +	info.si_signo	= SIGBUS;
+>> +	info.si_errno	= 0;
+>> +	info.si_code	= BUS_MCEERR_AR;
+>> +	info.si_addr	= (void __user *)address;
+>> +	info.si_addr_lsb = PAGE_SHIFT;
+> 
+> Any version of this patch should handle hugepage for the sizes KVM uses in its
+> stage2 mappings. By just passing PAGE_SHIFT you let the guest fault for each
+> page that makes up the hugepage.
+> 
+> 
+>> +
+>> +	send_sig_info(SIGBUS, &info, tsk);
+>> +}
+>> +
+>>  static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>>  			  struct kvm_memory_slot *memslot, unsigned long hva,
+>>  			  unsigned long fault_status)
+>> @@ -1309,6 +1323,12 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>>  	if (is_error_noslot_pfn(pfn))
+>>  		return -EFAULT;
+>>  
+>> +	if (is_error_hwpoison_pfn(pfn)) {
+>> +		kvm_send_hwpoison_signal(kvm_vcpu_gfn_to_hva(vcpu, gfn),
+>> +								current);
+>> +		return -EFAULT;
+> 
+> This will return -EFAULT from the KVM_RUN ioctl(). Is Qemu expected to know it
+> should try again? This is indistinguishable from the is_error_noslot_pfn() error
+> above.
+> 
+> x86 returns 0 from this path, kvm_handle_bad_page() in arch/x86/kvm/mmu.c as the
+> SIGBUS should arrive first. If the SIGBUS is handled the error has been resolved
+> and Qemu can call KVM_RUN again. Returning an error and sending SIGBUS suggests
+> there are two problems.
+  thanks for that. I think your Statement is reasonable.
+> 
+> 
+>> +	}
+>> +
+>>  	if (kvm_is_device_pfn(pfn)) {
+>>  		mem_type = PAGE_S2_DEVICE;
+>>  		flags |= KVM_S2PTE_FLAG_IS_IOMAP;
+> 
+> 
+> 
+> Thanks,
+> 
+> James
+> 
+> 
+> .
+> 
