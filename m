@@ -1,38 +1,51 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 24 Mar 2017 16:14:43 +0100
-Subject: [PATCH 2/4 v5] PCI: add driver for Faraday Technology Host Bridge
-In-Reply-To: <20170324150753.GC25380@bhelgaas-glaptop.roam.corp.google.com>
-References: <20170312222403.2473-1-linus.walleij@linaro.org>
- <20170324150753.GC25380@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <CACRpkdbkhui0iwJbOeD8uwurdWvOYdPKtRPQhSkg0atpAB174Q@mail.gmail.com>
+From: thgarnie@google.com (Thomas Garnier)
+Date: Fri, 24 Mar 2017 08:17:11 -0700
+Subject: [PATCH] lkdtm: add bad USER_DS test
+In-Reply-To: <20170324081450.GA5891@osiris>
+References: <20170323203419.GA62859@beast> <20170324081450.GA5891@osiris>
+Message-ID: <CAJcbSZHJ1WFcE7QY6qLM9RMUJbGXxTpp3WsCNJBX4h1U-4HEjA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 24, 2017 at 4:07 PM, Bjorn Helgaas <helgaas@kernel.org> wrote:
-
-> Acked-by: Bjorn Helgaas <bhelgaas@google.com>
-
-Thanks!
-
-> I don't know enough to review the DT patch, but you have Rob's ack
-> already.
+On Fri, Mar 24, 2017 at 1:14 AM, Heiko Carstens
+<heiko.carstens@de.ibm.com> wrote:
+> On Thu, Mar 23, 2017 at 01:34:19PM -0700, Kees Cook wrote:
+>> This adds CORRUPT_USER_DS to check that the get_fs() test on syscall return
+>> still sees USER_DS during the new VERIFY_PRE_USERMODE_STATE checks.
+>>
+>> Signed-off-by: Kees Cook <keescook@chromium.org>
 >
-> Not sure how you want to merge these; if you want to feed the whole
-> thing via ARM SoC, that's fine with me.  Otherwise, let me know if
-> you'd like me to take anything.
-
-It'd be perfect if you could merge patches 1+2 into the PCI tree,
-there are no dependencies to the ARM tree.
-
-> Noticed one trivial typo below.
+> ...
 >
->> + * Special configuration registers directly in the first few words
->> + * in he I/O space.
+>> +void lkdtm_CORRUPT_USER_DS(void)
+>> +{
+>> +     /*
+>> +      * Test that USER_DS has been set correctly on exiting a syscall.
+>> +      * Since setting this higher than USER_DS (TASK_SIZE) would introduce
+>> +      * an exploitable condition, we lower it instead, since that should
+>> +      * not create as large a problem on an unprotected system.
+>> +      */
+>> +     mm_segment_t lowfs;
+>> +#ifdef MAKE_MM_SEG
+>> +     lowfs = MAKE_MM_SEG(TASK_SIZE - PAGE_SIZE);
+>> +#else
+>> +     lowfs = TASK_SIZE - PAGE_SIZE;
+>> +#endif
+>> +
+>> +     pr_info("setting bad task size limit\n");
+>> +     set_fs(lowfs);
+>> +}
 >
-> s/he//
+> This won't work on architectures where the set_fs() argument does not
+> contain an address but an address space identifier. This is true e.g. for
+> s390 and as far as I know also for sparc.
+> On s390 we have complete distinct address spaces for kernel and user space
+> that each start at address zero.
+>
 
-Can you fix it when applying or do you want me to resend it with
-this fixed?
+The patch that enforce USER_DS is disabled on s390 anyway. I guess, we
+can just do a set_fs(KERNEL_DS) for the others.
 
-Yours,
-Linus Walleij
+
+-- 
+Thomas
