@@ -1,97 +1,55 @@
-From: smueller@chronox.de (Stephan =?ISO-8859-1?Q?M=FCller?=)
-Date: Fri, 24 Mar 2017 15:46:44 +0100
-Subject: [PATCH 1/3] crypto: hw_random - Add new Exynos RNG driver
-In-Reply-To: <20170324144348.v4hegak7dffh5awh@kozik-lap>
-References: <20170324142446.31129-1-krzk@kernel.org>
- <2503592.nlbQnVP8UR@positron.chronox.de>
- <20170324144348.v4hegak7dffh5awh@kozik-lap>
-Message-ID: <3628768.ze2UxnIp5I@tauon.atsec.com>
+From: msalter@redhat.com (Mark Salter)
+Date: Fri, 24 Mar 2017 10:47:28 -0400
+Subject: [PATCH] arm64: fix NULL dereference in have_cpu_die()
+In-Reply-To: <20170324140936.GA29588@leverpostej>
+References: <20170324135356.25881-1-msalter@redhat.com>
+ <20170324140936.GA29588@leverpostej>
+Message-ID: <1490366848.7651.10.camel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, 24. M?rz 2017, 15:43:48 CET schrieb Krzysztof Kozlowski:
-
-Hi Krzysztof,
-
-> On Fri, Mar 24, 2017 at 03:37:59PM +0100, Stephan M?ller wrote:
-> > Am Freitag, 24. M?rz 2017, 15:24:44 CET schrieb Krzysztof Kozlowski:
+On Fri, 2017-03-24 at 14:09 +0000, Mark Rutland wrote:
+> On Fri, Mar 24, 2017 at 09:53:56AM -0400, Mark Salter wrote:
+> > Commit 5c492c3f5255 ("arm64: smp: Add function to determine if cpus are
+> > stuck in the kernel") added a helper function to determine if die() is
+> > supported in cpu_ops. This function assumes a cpu will have a valid
+> > cpu_ops entry, but that may not be the case for cpu0 is spin-table or
+> > parking protocol is used to boot secondary cpus. In that case, there
+> > is a NULL dereference if have_cpu_die() is called by cpu0. So add a
+> > check for a valid cpu_ops before dereferencing it.
 > > 
-> > Hi Krzysztof,
+> > Fixes: 5c492c3f5255 ("arm64: smp: Add function to determine if cpus are stuck in the kernel")
+> > Signed-off-by: Mark Salter <msalter@redhat.com>
+> > ---
+> > ?arch/arm64/kernel/smp.c | 2 +-
+> > ?1 file changed, 1 insertion(+), 1 deletion(-)
 > > 
-> > > +
-> > > +static int exynos_rng_set_seed(struct exynos_rng_dev *rng,
-> > > +			       const u8 *seed, unsigned int slen)
-> > > +{
-> > > +	int ret, i;
-> > > +	u32 val;
-> > > +
-> > > +	dev_dbg(rng->dev, "Seeding with %u bytes\n", slen);
-> > > +
-> > > +	ret = clk_prepare_enable(rng->clk);
-> > > +	if (ret)
-> > > +		return ret;
-> > > +
-> > > +	if (slen < EXYNOS_RNG_SEED_SIZE) {
-> > > +		dev_warn(rng->dev, "Seed too short (only %u bytes)\n", slen);
-> > > +		ret = -EINVAL;
-> > > +		goto out;
-> > > +	}
-> > > +
-> > > +	for (i = 0 ; i < EXYNOS_RNG_SEED_REGS ; i++) {
-> > > +		val = seed[i * 4] << 24;
-> > > +		val |= seed[i * 4 + 1] << 16;
-> > > +		val |= seed[i * 4 + 2] << 8;
-> > > +		val |= seed[i * 4 + 3] << 0;
-> > > +
-> > > +		exynos_rng_writel(rng, val, EXYNOS_RNG_SEED(i));
-> > > +	}
-> > > +
-> > > +	val = exynos_rng_readl(rng, EXYNOS_RNG_STATUS);
-> > > +	if (!(val & EXYNOS_RNG_STATUS_SEED_SETTING_DONE)) {
-> > > +		dev_warn(rng->dev, "Seed setting not finished\n");
-> > > +		ret = -EIO;
-> > > +		goto out;
-> > > +	}
-> > > +
-> > > +	ret = 0;
-> > > +	/* Save seed for suspend */
-> > > +	memcpy(rng->seed_save, seed, slen);
-> > 
-> > Is this really necessary? If you need to save some seed, shouldn't that be
-> > an output of the DRNG and not the real seed?
+> > diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+> > index ef1caae..9b10365 100644
+> > --- a/arch/arm64/kernel/smp.c
+> > +++ b/arch/arm64/kernel/smp.c
+> > @@ -944,7 +944,7 @@ static bool have_cpu_die(void)
+> > ?#ifdef CONFIG_HOTPLUG_CPU
+> > ?	int any_cpu = raw_smp_processor_id();
+> > ?
+> > -	if (cpu_ops[any_cpu]->cpu_die)
+> > +	if (cpu_ops[any_cpu] && cpu_ops[any_cpu]->cpu_die)
+> > ?		return true;
 > 
-> When suspended to RAM device will loose the contents of registers
-> (including SEED registers) so it has to be initialized with something on
-> resume.
+> We take similar care in op_cpu_disable() and cpu_die_early(), so this is
+> certainly more in keeping with the rest of the arm64 code, and is an
+> improvement.
 > 
-> The seed registers are write-only so I cannot read them and store
-> contents just before suspend.
+> ... however, I think there is a larger problem. Given cpu_ops can differ
+> by CPU, we could encounter a case where some CPUs had PSCI ops, and some
+> had none. In that case, have_cpu_die() can return different values on
+> different CPUs.
 > 
-> I understand that real seed should not be stored... but then if I am not
-> able to re-seed it with same values, I will loose the continuous and
-> reproducible pseudo-random generation after suspend. Aren't this
-> expected out of PRNG?
+> ... which means that cpus_are_stuck_in_kernel() is on shaky ground, and
+> we may need a more comprehensive fix.
+> 
 
-An RNG has to be stateless from the perspective of the caller -- this is the 
-core implication of entropy.
-
-Then, if you add the initial seed after the RNG lost its state implies that 
-the same sequence of random numbers starts again. I.e. where is the 
-randomness?
-> 
-> > Besides, how do you know that slen is not larger than
-> > EXYNOS_RNG_SEED_SIZE?
-> 
-> Right, there is a overflow here. It should be sizeof(rng->seed_save);
-
-shouldn't it be min(rng->seed_save, slen)?
-> 
-> Thanks for review!
-> 
-> Best regards,
-> Krzysztof
-
-
-
-Ciao
-Stephan
+Hmm, cpus_are_stuck_in_kernel() is called from hibernate.c where there
+would be a problem if any cpu was stuck in kernel. It is also called
+from machine_kexec.c where there would be a problem if any but the
+calling cpu was stuck in kernel. So clearly something else is needed...
