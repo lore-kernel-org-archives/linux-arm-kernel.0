@@ -1,83 +1,53 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 24 Mar 2017 11:36:11 +0000
-Subject: [PATCH v6 06/11] drivers: perf: hisi: Add support for Hisilicon
- Djtag driver
-In-Reply-To: <58D4F901.5070503@gmail.com>
-References: <1489127302-112735-1-git-send-email-anurup.m@huawei.com>
- <20170321155119.GF22188@leverpostej> <58D4F901.5070503@gmail.com>
-Message-ID: <20170324113610.GB22771@leverpostej>
+Date: Fri, 24 Mar 2017 11:43:25 +0000
+Subject: [PATCH v6 08/11] drivers: perf: hisi: use poll method to avoid
+ L3C counter overflow
+In-Reply-To: <58D4C006.2010907@gmail.com>
+References: <1489127325-112821-1-git-send-email-anurup.m@huawei.com>
+ <20170321171605.GB29116@leverpostej> <58D4C006.2010907@gmail.com>
+Message-ID: <20170324114325.GC22771@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 24, 2017 at 04:16:25PM +0530, Anurup M wrote:
-> Thanks for the review.
+On Fri, Mar 24, 2017 at 12:13:18PM +0530, Anurup M wrote:
+> On Tuesday 21 March 2017 10:46 PM, Mark Rutland wrote:
+> >On Fri, Mar 10, 2017 at 01:28:45AM -0500, Anurup M wrote:
+
+> >>+/* The counter overflow IRQ is not supported for some PMUs
+> >>+ * use hrtimer to periodically poll and avoid overflow
+> >>+ */
+> >>+static enum hrtimer_restart hisi_hrtimer_callback(struct hrtimer *hrtimer)
+> >>+{
+> >>+	struct hisi_pmu *hisi_pmu = container_of(hrtimer,
+> >>+						 struct hisi_pmu, hrtimer);
+> >>+	struct perf_event *event;
+> >>+	struct hw_perf_event *hwc;
+> >>+	unsigned long flags;
+> >>+
+> >>+	/* Return if no active events */
+> >>+	if (!hisi_pmu->num_active)
+> >>+		return HRTIMER_NORESTART;
+> >>+
+> >>+	local_irq_save(flags);
+> >>+
+> >>+	/* Update event count for each active event */
+> >>+	list_for_each_entry(event, &hisi_pmu->active_list, active_entry) {
+> >>+		hwc = &event->hw;
+> >>+		/* Read hardware counter and update the Perf event counter */
+> >>+		hisi_pmu->ops->event_update(event, hwc, GET_CNTR_IDX(hwc));
+> >>+	}
+> >How do we ensure that we don't take the interrupt in the middle of a
+> >sequence of accesses to the HW?
 > 
-> On Tuesday 21 March 2017 09:21 PM, Mark Rutland wrote:
-> >On Fri, Mar 10, 2017 at 01:28:22AM -0500, Anurup M wrote:
+> The L3 cache and MN PMU does not use the overflow IRQ and it does
+> not occur here
+> as the interrupt Mask register is by default masked in hardware.
 
-> >>+#define SC_DJTAG_TIMEOUT_US    (100 * USEC_PER_MSEC) /* 100ms */
-> >How was this value chosen?
-> >
-> >How likely is a timeout?
-> 
-> As explained in PATCH 7,
-> 
-> The djtag -EBUSY in hardware is a very rare scenario, and by design
-> of hardware, does not occur unless there is a Chip hung situation.
-> The maximum timeout possible in djtag is 30us, and hardware logic
-> shall reset it, if djtag is unavailable for more than 30us.
-> The timeout used in driver is 100ms to ensure that it does not fail
-> in any case.
+I was referring to the timer interrupt which backs the hrtimer.
 
-I couldn't find such an explanation in patch 7.
-
-So that this doesn't get lost, please place a comment to this effect
-above the definition of SC_DJTAG_TIMEOUT_US.
-
-We can drop the existing "100ms" comment at the same time.
-
-What exactly does a "chip hung situation" imply? Does that just mean
-that only the djtag HW is hung, or that other parts of the chip are hung
-too, such taht other things are likely to go wrong?
-
-[...]
-
-> >static int djtag_do_operation_v1(void __iomem *regs_base)
-> >{
-> >	int ret;
-> >	u32 val;
-> >
-> >	/* start to write to djtag register */
-> >	writel(DJTAG_MSTR_START_EN, regs_base + SC_DJTAG_MSTR_START_EN);
-> >
-> >	/* wait for the operation to complete */
-> >	ret = readl_poll_timout(regs_base + SC_DJTAG_MSTR_START_EN,
-> >				val, !(val & DJTAG_MSTR_EN),
-> >				1, SC_DJTAG_TIMEOUT_US);
-> >	
-> >	if (ret)
-> >		pr_warn("djtag operation timed out.\n");
-> >
-> >	return ret;
-> >}
-> >
-> >Depending on how serious a timeout is, this might want to be some kind
-> >of WARN variant.
-
->From the above, I take that a hang indicates a very serious problem, so
-this whould be a WARN, with a comment:
-
-	/* 
-	 * A timeout should never occur on a working system. See the
-	 * definition of SC_DJTAG_TIMEOUT_US.
-	 */
-	WARN(ret, "djtag operation timed out.\n");
-
-... or, if this really should never happen, and other things are likely
-to go wrong were we to see this, we can BUG_ON(ret) instead, remove the
-error code, and simplify all the callers.
-
-Likewise for djtag_do_operation_v2().
+i.e. how do we guarantee that hisi_hrtimer_callback() is not called
+while we are in the middle of a RMW sequence? Are interrupts disabled
+for all of those seqeunces?
 
 Thanks,
 Mark.
