@@ -1,114 +1,55 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Fri, 24 Mar 2017 18:46:00 +0300
-Subject: [PATCH 1/3] crypto: hw_random - Add new Exynos RNG driver
-In-Reply-To: <3940941.n3qdgn1RbN@amdc3058>
-References: <20170324142446.31129-1-krzk@kernel.org>
- <20170324142446.31129-2-krzk@kernel.org>
- <CGME20170324152650epcas5p1fb48677d6b5ac7210d6df438a5e70ca3@epcas5p1.samsung.com>
- <3940941.n3qdgn1RbN@amdc3058>
-Message-ID: <20170324154600.lavc22dbw7rtioli@kozik-lap>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 24 Mar 2017 16:46:14 +0100
+Subject: [PATCH v2 1/1] ARM: dts: sun8i: NanoPi NEO Air add WiFi / eMMC
+In-Reply-To: <20170323212444.20685-2-jelle@vdwaa.nl>
+References: <20170323212444.20685-1-jelle@vdwaa.nl>
+ <20170323212444.20685-2-jelle@vdwaa.nl>
+Message-ID: <20170324154614.mjfl6dnvwddp364b@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 24, 2017 at 04:26:47PM +0100, Bartlomiej Zolnierkiewicz wrote:
+Hi,
+
+On Thu, Mar 23, 2017 at 10:24:44PM +0100, Jelle van der Waa wrote:
+> Enable the WiFi (AP6212) chip and eMMC support for the NanoPi NEO Air.
 > 
-> Hi,
+> Signed-off-by: Jelle van der Waa <jelle@vdwaa.nl>
+> ---
+>  arch/arm/boot/dts/sun8i-h3-nanopi-neo-air.dts | 45 +++++++++++++++++++++++++++
+>  1 file changed, 45 insertions(+)
 > 
-> Firstly, thanks for working on this.
-> 
-> The patch looks fine overall for me, some review comments below.
-> 
-> On Friday, March 24, 2017 05:24:44 PM Krzysztof Kozlowski wrote:
-> > Replace existing hw_ranndom/exynos-rng driver with a new, reworked one.
-> > This is a driver for pseudo random number generator block which on
-> > Exynos4 chipsets must be seeded with some value.  On newer Exynos5420
-> > chipsets it might seed itself from true random number generator block
-> > but this is not implemented yet.
-> > 
-> > New driver is a complete rework to use the crypto ALGAPI instead of
-> > hw_random API.  Rationale for the change:
-> > 1. hw_random interface is for true RNG devices.
-> > 2. The old driver was seeding itself with jiffies which is not a
-> >    reliable source for randomness.
-> > 3. Device generates five random numbers in each pass but old driver was
-> >    returning only one thus its performance was reduced.
-> > 
-> > Compatibility with DeviceTree bindings is preserved.
-> > 
-> > New driver does not use runtime power management but manually enables
-> > and disables the clock when needed.  This is preferred approach because
-> > using runtime PM just to toggle clock is huge overhead.  Another
-> 
-> I'm not entirely convinced that the new approach is better.
-> 
-> With the old approach exynos_rng_generate() can be called more
-> than once before PM autosuspend kicks in and thus clk_prepare_enable()/
-> clk_disable()_unprepare() operations will be done only once. This
-> would give better performance on the "burst" operations.
-> 
-> [ The above assumes that clock operations are more costly than
->   going through PM core to check the current device state. ]
+> diff --git a/arch/arm/boot/dts/sun8i-h3-nanopi-neo-air.dts b/arch/arm/boot/dts/sun8i-h3-nanopi-neo-air.dts
+> index 3ba081c1f555..457a28e56514 100644
+> --- a/arch/arm/boot/dts/sun8i-h3-nanopi-neo-air.dts
+> +++ b/arch/arm/boot/dts/sun8i-h3-nanopi-neo-air.dts
+> @@ -73,6 +73,13 @@
+>  			gpios = <&pio 0 10 GPIO_ACTIVE_HIGH>; /* PA10 */
+>  		};
+>  	};
+> +
+> +	wifi-pwrseq: wifi-pwrseq {
+> +		compatible = "mmc-pwrseq-simple";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&wifi-en-nanopi-neo-air>;
 
-I agree that we loose the "burst" mode but:
-1. At least on Exynso4 SSS is part of TOP power domain so it will not
-   help to reduce any more power consumption (on Exynos5422 it is
-   mentioned in G2D... which seems incorrect).
-2. I think the overhead of clk operations is much smaller. These are only
-   two locks (prepare mutex + enable spin), simple tree traversal and
-   play with few SFRs.
+Could you please drop that pinctrl group for that GPIO? It will help
+us prevent a bug in the future in the pinctrl driver that allows two
+GPIO users to claim the same pin.
 
-   The power domain code in comparison to that is huge and complicated
-   with inter-device links and dependencies. Also the actual runtime PM
-   suspend would anyway fall back at then end to clk prepare/enable
-   locks and paths.
+Unfortunately, that will require removing all those pinctrl properties
+for the GPIOs, so we'd better not introduce them in the first place :)
 
-   We've been talking about this a lot with Marek Szyprowski (cc'ed) and
-   he was always (AFAIR) against attempts of runtime power
-   management of a single clock...
+Thanks!
+Maxime
 
-
-> 
-> > +static int exynos_rng_get_random(struct exynos_rng_dev *rng,
-> > +				 u8 *dst, unsigned int dlen,
-> > +				 unsigned int *read)
-> > +{
-> > +	int retry = 100;
-> 
-> I know that this is copied verbatim from the old driver but please
-> use define for the maximum number of retries.
-
-No problem. Number is chosen arbitrarily so there will not be any
-additional information coming from the define.
-
-> > +static int exynos_rng_probe(struct platform_device *pdev)
-> > +{
-> > +	struct exynos_rng_dev *rng;
-> > +	struct resource *res;
-> > +	int ret;
-> > +
-> > +	if (exynos_rng_dev)
-> > +		return -EEXIST;
-> 
-> How this condition could ever happen? 
-> 
-> The probe function will never be called twice.
-
-I really do not like global or file-scope variables. I do not like
-drivers using them. Actually I hate them.
-
->From time to time I encounter a driver which was designed with that
-approach - static fields and hidden assumption that there will be only
-one instance. Usually that assumption is really hidden...
-
-... and then it happens that I want to use two instances which of course
-fails.
-
-This code serves as a clear documentation for this assumption - only one
-instance is allowed. You can look at it as a self-documenting
-requirement.
-
-And I think the probe might be called twice, for example in case of
-mistake in DTB.
-
-Best regards,
-Krzysztof
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170324/ebfdb4ff/attachment-0001.sig>
