@@ -1,65 +1,70 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Fri, 24 Mar 2017 14:37:45 +0100
-Subject: [PATCH/RFC v2 2/2] arm64: dts: r8a7795: salvator-x: Add support for
- R-Car H3 ES2.0
-In-Reply-To: <1490362665-4422-1-git-send-email-geert+renesas@glider.be>
-References: <1490362665-4422-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1490362665-4422-3-git-send-email-geert+renesas@glider.be>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 24 Mar 2017 08:46:15 -0500
+Subject: [PATCH 1/5] dt-bindings: i2c-stm32: Document the STM32F7 I2C
+ bindings
+In-Reply-To: <1489744738-21632-2-git-send-email-cedric.madianga@gmail.com>
+References: <1489744738-21632-1-git-send-email-cedric.madianga@gmail.com>
+ <1489744738-21632-2-git-send-email-cedric.madianga@gmail.com>
+Message-ID: <20170324134615.o3vpwgmisrpkwswj@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Split off support for Salvator-X boards with the ES1.x revision of the
-R-Car H3 SoC into a separate file.  The main r8a7795-salvator-x.dts file
-now corresponds to Salvator-X with R-Car H3 ES2.0 or later.
+On Fri, Mar 17, 2017 at 10:58:54AM +0100, M'boumba Cedric Madianga wrote:
+> This patch adds the documentation of device tree bindings for STM32F7 I2C
+> 
+> Signed-off-by: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
+> ---
+>  .../devicetree/bindings/i2c/i2c-stm32.txt          | 22 +++++++++++++++++++---
+>  1 file changed, 19 insertions(+), 3 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/i2c/i2c-stm32.txt b/Documentation/devicetree/bindings/i2c/i2c-stm32.txt
+> index 78eaf7b..8288724 100644
+> --- a/Documentation/devicetree/bindings/i2c/i2c-stm32.txt
+> +++ b/Documentation/devicetree/bindings/i2c/i2c-stm32.txt
+> @@ -1,7 +1,9 @@
+>  * I2C controller embedded in STMicroelectronics STM32 I2C platform
+>  
+>  Required properties :
+> -- compatible : Must be "st,stm32f4-i2c"
+> +- compatible : Must be one of the following
+> +  - "st,stm32f4-i2c"
+> +  - "st,stm32f7-i2c"
+>  - reg : Offset and length of the register set for the device
+>  - interrupts : Must contain the interrupt id for I2C event and then the
+>    interrupt id for I2C error.
+> @@ -14,8 +16,22 @@ Required properties :
+>  
+>  Optional properties :
+>  - clock-frequency : Desired I2C bus clock frequency in Hz. If not specified,
+> -  the default 100 kHz frequency will be used. As only Normal and Fast modes
+> -  are supported, possible values are 100000 and 400000.
+> +  the default 100 kHz frequency will be used.
+> +  For STM32F4 SoC Standard-mode and Fast-mode are supported, possible values are
+> +  100000 and 400000.
+> +  For STM32F7 SoC, Standard-mode, Fast-mode and Fast-mode Plus are supported,
+> +  possible values are 100000, 400000 and 1000000.
+> +- st,i2c-timing : A 32-bit I2C timing refister value.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
-v2:
-  - Use a separate file for ES1.x instead of for ES2.0, so
-    r8a7795-salvator-x.dts always corresponds to the board with the
-    latest SoC revision,
-  - Add a dash between SoC part number and revision, for compatibility
-    with the BSP,
-  - Enhance the hardware description from basic support to everything
-    already supported on ES1.x.
----
- arch/arm64/boot/dts/renesas/Makefile                                  | 1 +
- .../renesas/{r8a7795-salvator-x.dts => r8a7795-es1-salvator-x.dts}    | 0
- arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts                    | 4 ++--
- 3 files changed, 3 insertions(+), 2 deletions(-)
- copy arch/arm64/boot/dts/renesas/{r8a7795-salvator-x.dts => r8a7795-es1-salvator-x.dts} (100%)
+s/refister/register/
 
-diff --git a/arch/arm64/boot/dts/renesas/Makefile b/arch/arm64/boot/dts/renesas/Makefile
-index 1618e0a3c81d48bd..b6c723d8f6875f2d 100644
---- a/arch/arm64/boot/dts/renesas/Makefile
-+++ b/arch/arm64/boot/dts/renesas/Makefile
-@@ -1,4 +1,5 @@
- dtb-$(CONFIG_ARCH_R8A7795) += r8a7795-salvator-x.dtb r8a7795-h3ulcb.dtb
-+dtb-$(CONFIG_ARCH_R8A7795) += r8a7795-es1-salvator-x.dtb
- dtb-$(CONFIG_ARCH_R8A7796) += r8a7796-salvator-x.dtb r8a7796-m3ulcb.dtb
- 
- always		:= $(dtb-y)
-diff --git a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts b/arch/arm64/boot/dts/renesas/r8a7795-es1-salvator-x.dts
-similarity index 100%
-copy from arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
-copy to arch/arm64/boot/dts/renesas/r8a7795-es1-salvator-x.dts
-diff --git a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
-index 7758b479dd98d2e9..baf5d34653d27e28 100644
---- a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
-+++ b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
-@@ -32,11 +32,11 @@
-  */
- 
- /dts-v1/;
--#include "r8a7795-es1.dtsi"
-+#include "r8a7795.dtsi"
- #include <dt-bindings/gpio/gpio.h>
- 
- / {
--	model = "Renesas Salvator-X board based on r8a7795 ES1.x";
-+	model = "Renesas Salvator-X board based on r8a7795 ES2.0+";
- 	compatible = "renesas,salvator-x", "renesas,r8a7795";
- 
- 	aliases {
--- 
-2.7.4
+With that,
+
+Acked-by: Rob Herring <robh@kernel.org>
+
+
+> +  This value is only required for "st,stm32f7-i2c".
+> +  A specific external tool delivered by ST is used to compute the value to be
+> +  set here according to i2C speed frequency, i2c clock source frequency,
+> +  i2c rise time and i2c fall time inputs.
+> +  - bit 31:28: PRESC[3:0]: Timing prescaler
+> +  - bit 27:24: Reserved
+> +  - bit 23:20: SCLDEL[3:0]: Data setup time
+> +  - bit 19:16: SDADEL[3:0]: Data hold time
+> +  - bit 15:8:  SCLH[7:0]: SCL high period
+> +  - bit 7:0:   SCLL[7:0]: SCL low period
+>  
+>  Example :
+>  
+> -- 
+> 1.9.1
+> 
