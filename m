@@ -1,150 +1,163 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 24 Mar 2017 13:24:08 +0000
-Subject: [PATCH 2/4] efi/libstub: unify command line param parsing
+Date: Fri, 24 Mar 2017 13:24:09 +0000
+Subject: [PATCH 3/4] efi/libstub: arm/arm64: disable debug prints on 'quiet'
+ cmdline arg
 In-Reply-To: <20170324132410.16628-1-ard.biesheuvel@linaro.org>
 References: <20170324132410.16628-1-ard.biesheuvel@linaro.org>
-Message-ID: <20170324132410.16628-3-ard.biesheuvel@linaro.org>
+Message-ID: <20170324132410.16628-4-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Merge the parsing of the command line carried out in arm-stub.c with
-the handling in efi_parse_options. Note that this also fixes the
-missing handling of CONFIG_CMDLINE_FORCE=y, in which case the builtin
-command line should supersede the one passed by the firmware.
+The EFI stub currently prints a number of diagnostic messages that do
+not carry a lot of information. Since these prints are not controlled
+by 'loglevel' or other command line parameters, and since they appear on
+the EFI framebuffer as well (if enabled), it would be nice if we could
+turn them off.
+
+So let's add support for the 'quiet' command line parameter in the stub,
+and disable the non-error prints if it is passed.
 
 Cc: Matt Fleming <matt@codeblueprint.co.uk>
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- drivers/firmware/efi/libstub/arm-stub.c        | 14 ------------
- drivers/firmware/efi/libstub/arm64-stub.c      |  4 +---
- drivers/firmware/efi/libstub/efi-stub-helper.c | 23 +++++++++++++-------
- drivers/firmware/efi/libstub/efistub.h         |  2 ++
- include/linux/efi.h                            |  2 +-
- 5 files changed, 19 insertions(+), 26 deletions(-)
+This was previously sent out as a separate patch. The difference is that this
+version looks for 'quiet' rather than 'efi=debug', and preserves the noisy
+console as the default.
+
+ drivers/firmware/efi/libstub/arm-stub.c        | 12 ++++++------
+ drivers/firmware/efi/libstub/arm32-stub.c      |  2 ++
+ drivers/firmware/efi/libstub/efi-stub-helper.c |  9 +++++++++
+ drivers/firmware/efi/libstub/efistub.h         |  7 +++++++
+ drivers/firmware/efi/libstub/secureboot.c      |  2 ++
+ include/linux/efi.h                            |  3 ---
+ 6 files changed, 26 insertions(+), 9 deletions(-)
 
 diff --git a/drivers/firmware/efi/libstub/arm-stub.c b/drivers/firmware/efi/libstub/arm-stub.c
-index 02049ff25c6b..fcd34057dc1c 100644
+index fcd34057dc1c..6f522e3091af 100644
 --- a/drivers/firmware/efi/libstub/arm-stub.c
 +++ b/drivers/firmware/efi/libstub/arm-stub.c
-@@ -18,8 +18,6 @@
+@@ -116,8 +116,6 @@ unsigned long efi_entry(void *handle, efi_system_table_t *sys_table,
+ 	if (sys_table->hdr.signature != EFI_SYSTEM_TABLE_SIGNATURE)
+ 		goto fail;
  
- #include "efistub.h"
- 
--bool __nokaslr;
+-	pr_efi(sys_table, "Booting Linux Kernel...\n");
 -
- efi_status_t efi_open_volume(efi_system_table_t *sys_table_arg,
- 			     void *__image, void **__fh)
- {
-@@ -153,18 +151,6 @@ unsigned long efi_entry(void *handle, efi_system_table_t *sys_table,
+ 	status = check_platform_features(sys_table);
+ 	if (status != EFI_SUCCESS)
+ 		goto fail;
+@@ -151,6 +149,12 @@ unsigned long efi_entry(void *handle, efi_system_table_t *sys_table,
  		goto fail;
  	}
  
--	/* check whether 'nokaslr' was passed on the command line */
--	if (IS_ENABLED(CONFIG_RANDOMIZE_BASE)) {
--		static const u8 default_cmdline[] = CONFIG_CMDLINE;
--		const u8 *str, *cmdline = cmdline_ptr;
--
--		if (IS_ENABLED(CONFIG_CMDLINE_FORCE))
--			cmdline = default_cmdline;
--		str = strstr(cmdline, "nokaslr");
--		if (str == cmdline || (str > cmdline && *(str - 1) == ' '))
--			__nokaslr = true;
--	}
--
++	status = efi_parse_options(cmdline_ptr);
++	if (status != EFI_SUCCESS)
++		pr_efi_err(sys_table, "Failed to parse EFI cmdline options\n");
++
++	pr_efi(sys_table, "Booting Linux Kernel...\n");
++
  	si = setup_graphics(sys_table);
  
  	status = handle_kernel_image(sys_table, image_addr, &image_size,
-diff --git a/drivers/firmware/efi/libstub/arm64-stub.c b/drivers/firmware/efi/libstub/arm64-stub.c
-index eae693eb3e91..b4c2589d7c91 100644
---- a/drivers/firmware/efi/libstub/arm64-stub.c
-+++ b/drivers/firmware/efi/libstub/arm64-stub.c
-@@ -16,8 +16,6 @@
+@@ -162,10 +166,6 @@ unsigned long efi_entry(void *handle, efi_system_table_t *sys_table,
+ 		goto fail_free_cmdline;
+ 	}
  
- #include "efistub.h"
- 
--extern bool __nokaslr;
+-	status = efi_parse_options(cmdline_ptr);
+-	if (status != EFI_SUCCESS)
+-		pr_efi_err(sys_table, "Failed to parse EFI cmdline options\n");
 -
- efi_status_t check_platform_features(efi_system_table_t *sys_table_arg)
- {
- 	u64 tg;
-@@ -52,7 +50,7 @@ efi_status_t handle_kernel_image(efi_system_table_t *sys_table_arg,
- 	u64 phys_seed = 0;
- 
- 	if (IS_ENABLED(CONFIG_RANDOMIZE_BASE)) {
--		if (!__nokaslr) {
-+		if (!nokaslr()) {
- 			status = efi_get_random_bytes(sys_table_arg,
- 						      sizeof(phys_seed),
- 						      (u8 *)&phys_seed);
-diff --git a/drivers/firmware/efi/libstub/efi-stub-helper.c b/drivers/firmware/efi/libstub/efi-stub-helper.c
-index 3290fae0b38f..1575b566cd4a 100644
---- a/drivers/firmware/efi/libstub/efi-stub-helper.c
-+++ b/drivers/firmware/efi/libstub/efi-stub-helper.c
-@@ -32,6 +32,13 @@
- 
- static unsigned long __chunk_size = EFI_READ_CHUNK_SIZE;
- 
-+static int __section(.data) __nokaslr;
-+
-+int __pure nokaslr(void)
-+{
-+	return __nokaslr;
-+}
-+
- #define EFI_MMAP_NR_SLACK_SLOTS	8
- 
- struct file_info {
-@@ -409,17 +416,17 @@ static efi_status_t efi_file_close(void *handle)
-  * environments, first in the early boot environment of the EFI boot
-  * stub, and subsequently during the kernel boot.
-  */
--efi_status_t efi_parse_options(char *cmdline)
-+efi_status_t efi_parse_options(char const *cmdline)
- {
-+	static const char default_cmdline[] = CONFIG_CMDLINE;
- 	char *str;
- 
--	/*
--	 * Currently, the only efi= option we look for is 'nochunk', which
--	 * is intended to work around known issues on certain x86 UEFI
--	 * versions. So ignore for now on other architectures.
--	 */
--	if (!IS_ENABLED(CONFIG_X86))
--		return EFI_SUCCESS;
-+	if (IS_ENABLED(CONFIG_CMDLINE_FORCE))
-+		cmdline = default_cmdline;
-+
-+	str = strstr(cmdline, "nokaslr");
-+	if (str == cmdline || (str && str > cmdline && *(str - 1) == ' '))
-+		__nokaslr = 1;
+ 	secure_boot = efi_get_secureboot(sys_table);
  
  	/*
+diff --git a/drivers/firmware/efi/libstub/arm32-stub.c b/drivers/firmware/efi/libstub/arm32-stub.c
+index 18a8b5eb55e7..becbda445913 100644
+--- a/drivers/firmware/efi/libstub/arm32-stub.c
++++ b/drivers/firmware/efi/libstub/arm32-stub.c
+@@ -9,6 +9,8 @@
+ #include <linux/efi.h>
+ #include <asm/efi.h>
+ 
++#include "efistub.h"
++
+ efi_status_t check_platform_features(efi_system_table_t *sys_table_arg)
+ {
+ 	int block;
+diff --git a/drivers/firmware/efi/libstub/efi-stub-helper.c b/drivers/firmware/efi/libstub/efi-stub-helper.c
+index 1575b566cd4a..93685f79f9e8 100644
+--- a/drivers/firmware/efi/libstub/efi-stub-helper.c
++++ b/drivers/firmware/efi/libstub/efi-stub-helper.c
+@@ -33,11 +33,16 @@
+ static unsigned long __chunk_size = EFI_READ_CHUNK_SIZE;
+ 
+ static int __section(.data) __nokaslr;
++static int __section(.data) __quiet;
+ 
+ int __pure nokaslr(void)
+ {
+ 	return __nokaslr;
+ }
++int __pure is_quiet(void)
++{
++	return __quiet;
++}
+ 
+ #define EFI_MMAP_NR_SLACK_SLOTS	8
+ 
+@@ -428,6 +433,10 @@ efi_status_t efi_parse_options(char const *cmdline)
+ 	if (str == cmdline || (str && str > cmdline && *(str - 1) == ' '))
+ 		__nokaslr = 1;
+ 
++	str = strstr(cmdline, "quiet");
++	if (str == cmdline || (str && str > cmdline && *(str - 1) == ' '))
++		__quiet = 1;
++
+ 	/*
  	 * If no EFI parameters were specified on the cmdline we've got
+ 	 * nothing to do.
 diff --git a/drivers/firmware/efi/libstub/efistub.h b/drivers/firmware/efi/libstub/efistub.h
-index 71c4d0e3c4ed..a7a2a2c3f199 100644
+index a7a2a2c3f199..83f268c05007 100644
 --- a/drivers/firmware/efi/libstub/efistub.h
 +++ b/drivers/firmware/efi/libstub/efistub.h
-@@ -24,6 +24,8 @@
- #define EFI_ALLOC_ALIGN		EFI_PAGE_SIZE
+@@ -25,6 +25,13 @@
  #endif
  
-+extern int __pure nokaslr(void);
+ extern int __pure nokaslr(void);
++extern int __pure is_quiet(void);
 +
++#define pr_efi(sys_table, msg)		do {				\
++	if (!is_quiet()) efi_printk(sys_table, "EFI stub: "msg);	\
++} while (0)
++
++#define pr_efi_err(sys_table, msg) efi_printk(sys_table, "EFI stub: ERROR: "msg)
+ 
  void efi_char16_printk(efi_system_table_t *, efi_char16_t *);
  
- efi_status_t efi_open_volume(efi_system_table_t *sys_table_arg, void *__image,
+diff --git a/drivers/firmware/efi/libstub/secureboot.c b/drivers/firmware/efi/libstub/secureboot.c
+index 5da36e56b36a..8c34d50a4d80 100644
+--- a/drivers/firmware/efi/libstub/secureboot.c
++++ b/drivers/firmware/efi/libstub/secureboot.c
+@@ -12,6 +12,8 @@
+ #include <linux/efi.h>
+ #include <asm/efi.h>
+ 
++#include "efistub.h"
++
+ /* BIOS variables */
+ static const efi_guid_t efi_variable_guid = EFI_GLOBAL_VARIABLE_GUID;
+ static const efi_char16_t const efi_SecureBoot_name[] = {
 diff --git a/include/linux/efi.h b/include/linux/efi.h
-index 94d34e0be24f..e485e87615d1 100644
+index e485e87615d1..ec36f42a2add 100644
 --- a/include/linux/efi.h
 +++ b/include/linux/efi.h
-@@ -1471,7 +1471,7 @@ efi_status_t handle_cmdline_files(efi_system_table_t *sys_table_arg,
- 				  unsigned long *load_addr,
- 				  unsigned long *load_size);
+@@ -1435,9 +1435,6 @@ static inline int efi_runtime_map_copy(void *buf, size_t bufsz)
  
--efi_status_t efi_parse_options(char *cmdline);
-+efi_status_t efi_parse_options(char const *cmdline);
+ /* prototypes shared between arch specific and generic stub code */
  
- efi_status_t efi_setup_gop(efi_system_table_t *sys_table_arg,
- 			   struct screen_info *si, efi_guid_t *proto,
+-#define pr_efi(sys_table, msg)     efi_printk(sys_table, "EFI stub: "msg)
+-#define pr_efi_err(sys_table, msg) efi_printk(sys_table, "EFI stub: ERROR: "msg)
+-
+ void efi_printk(efi_system_table_t *sys_table_arg, char *str);
+ 
+ void efi_free(efi_system_table_t *sys_table_arg, unsigned long size,
 -- 
 2.9.3
