@@ -1,62 +1,40 @@
-From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Fri, 24 Mar 2017 19:08:47 +0000
-Subject: [RFC PATCH 24/30] iommu: Specify PASID state when unbinding a task
-In-Reply-To: <20170324110045.GM7266@8bytes.org>
-References: <20170227195441.5170-1-jean-philippe.brucker@arm.com>
- <20170227195441.5170-25-jean-philippe.brucker@arm.com>
- <20170322154429.GE7266@8bytes.org>
- <e2bb4c67-9b61-01cf-cc17-68088cdc5e5b@arm.com>
- <20170322225320.GF7266@8bytes.org>
- <a093bc07-a345-a689-9d97-f15a306f922d@arm.com>
- <20170323143014.GK7266@8bytes.org>
- <20170323145311.GA22972@e106794-lin.localdomain>
- <20170323165218.GL7266@8bytes.org>
- <9d318e88-11af-6dab-b30e-d6b5c02443fe@arm.com>
- <20170324110045.GM7266@8bytes.org>
-Message-ID: <7386120a-2848-059f-4de0-7888a2698923@arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 24 Mar 2017 19:09:55 +0000
+Subject: [alsa-devel] [PATCH 0/3] ASoC: Enable a new IC master mode:
+ bcm2835<=>IC<=>cs42xx8
+In-Reply-To: <64802e9b-ffe9-65e3-502a-4253674fb4c7@flatmax.org>
+References: <20170228095929.GH2742@localhost.localdomain>
+ <20170315190108.y6ybxm3nfgnutajv@sirena.org.uk>
+ <7d8d38f7-53aa-cc3d-4bbd-141649528a8a@flatmax.org>
+ <8c62f014-d246-e0c1-2b02-a28a2c2786b7@metafoo.de>
+ <000fbaa4-4c7c-5b13-0806-7e42672a4a55@flatmax.org>
+ <e0adcc6c-8bf4-adae-874b-c291e71e5712@laposte.net>
+ <20170321221145.GA7258@camel2.lan>
+ <579f0763-a5bd-f820-b36f-b6437e331b4b@flatmax.org>
+ <20170322094301.GE6986@localhost.localdomain>
+ <64802e9b-ffe9-65e3-502a-4253674fb4c7@flatmax.org>
+Message-ID: <20170324190955.nxw5az4mza2ia6wl@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/03/17 11:00, Joerg Roedel wrote:
-> On Thu, Mar 23, 2017 at 05:03:46PM +0000, Jean-Philippe Brucker wrote:
->> On 23/03/17 16:52, Joerg Roedel wrote:
->>> Thanks for that, I have a closer look. Is that stopper packet visible to
->>> software (e.g. is an entry created in the queue)?
->>
->> As far as I understand, it should be added to the queue like a normal PPR,
->> and software should check the R/W/L flags combination. For SMMU at least,
->> it is the same. The only difference is that when the PRI queue overflows,
->> the SMMU would discard a Stop Marker instead of sending an automated
->> response to the device (as it would do with others PPR that have the L
->> flag.) Software shouldn't send a response to a Stop Marker either.
-> 
-> The document you posted is an addition to the spec, so we can't rely on
-> a stop marker being sent by a device when it shuts down a context.
-> Current AMD GPUs don't send one, afaik.
+On Wed, Mar 22, 2017 at 11:04:34PM +1100, Matt Flax wrote:
+> On 22/03/17 20:43, Charles Keepax wrote:
 
-Fair enough, though on the SMMU side we still don't know which shutdown
-model hardware vendors are more likely to choose. Devices could use the
-stop marker and never wait for completion of PPRs. In that case context
-shutdown would only have to make sure that PPRs are outside the PCI
-network, return immediately and allow the device driver to call unbind().
+> > Are we saying that what gets transmitted on the bus is neither valid
+> > I2S or DSP mode data? But as you have your custom hardware block in
+> > the middle it interprets this data correctly and converts it to a
+> > regular bus format on the other side that goes to the CODEC?
 
-So to be on the safe side I think I will by default assume that PPRs are
-in flight during unbind, and drain both software and hardware queue to
-ensure we catch them all.
+> Yes, essentially there is translation between the two data word edge
+> triggered ABP (the bcm2835's PCM block) and a Cirrus Logic TDM codec.
 
-As an optimization, we can later add ways for device drivers or firmware
-to inform the IOMMU which PASID shutdown model is implemented (maybe a
-callback in svm_ops?), in which case we wouldn't have to flush the queue
-and if necessary, we can wait for a stop marker before throwing away a PASID.
-
-Thanks,
-Jean-Philippe
-
-> I think the best we can do is shutting down processing for this PASID
-> when and inform the device driver, when we receive a stop marker. An
-> additional, optional call-back would do the job.
-> 
-> 
-> 
-> 	Joerg
-> 
+Could you please be concrete about what the two formats you're talking
+about here are and how these differences are observable on the wire?  I
+don't know what "two data word edge triggered ABP" means.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170324/e11e4711/attachment.sig>
