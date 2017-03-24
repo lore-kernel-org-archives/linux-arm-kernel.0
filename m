@@ -1,60 +1,78 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 24 Mar 2017 14:43:40 +0000
-Subject: [PATCH V9 00/11] IOMMU probe deferral support
-In-Reply-To: <5FC3163CFD30C246ABAA99954A238FA81750B7CB@lhreml504-mbs>
-References: <1489086061-9356-1-git-send-email-sricharan@codeaurora.org>
- <58D49845.9060407@hisilicon.com>
- <0ea8022b-a19b-335d-6cc6-81510196f891@codeaurora.org>
- <5FC3163CFD30C246ABAA99954A238FA81750B7CB@lhreml504-mbs>
-Message-ID: <20170324144340.GA17560@red-moon>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Fri, 24 Mar 2017 17:43:48 +0300
+Subject: [PATCH 1/3] crypto: hw_random - Add new Exynos RNG driver
+In-Reply-To: <2503592.nlbQnVP8UR@positron.chronox.de>
+References: <20170324142446.31129-1-krzk@kernel.org>
+ <20170324142446.31129-2-krzk@kernel.org>
+ <2503592.nlbQnVP8UR@positron.chronox.de>
+Message-ID: <20170324144348.v4hegak7dffh5awh@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 24, 2017 at 09:27:51AM +0000, Shameerali Kolothum Thodi wrote:
-
-[...]
-
-> @@ -107,7 +107,7 @@ int of_dma_configure(struct device *dev, struct device_node *np)
->   	ret = of_dma_get_range(np, &dma_addr, &paddr, &size);
->   	if (ret < 0) {
->   		dma_addr = offset = 0;
->  -		size = dev->coherent_dma_mask + 1;
->  +		size = max(dev->coherent_dma_mask, dev->coherent_dma_mask + 1);
+On Fri, Mar 24, 2017 at 03:37:59PM +0100, Stephan M?ller wrote:
+> Am Freitag, 24. M?rz 2017, 15:24:44 CET schrieb Krzysztof Kozlowski:
 > 
-> @@ -1386,7 +1387,8 @@ int acpi_dma_configure(struct device *dev, enum dev_dma_attr attr)
->   	 * Assume dma valid range starts at 0 and covers the whole
->   	 * coherent_dma_mask.
->   	 */
->  -	arch_setup_dma_ops(dev, 0, dev->coherent_dma_mask + 1, iommu,
->  +	size = max(dev->coherent_dma_mask, dev->coherent_dma_mask + 1);
-
-size is not defined in acpi_dma_configure(), so there is
-something missing in the diff above, just to make sure we are
-testing the same thing.
-
-Mind posting kernel logs with and without patch above (fixed) for
-DT boot and ACPI boot please.
-
-Thanks,
-Lorenzo
-
->  +	arch_setup_dma_ops(dev, 0, size, iommu,
->   			   attr == DEV_DMA_COHERENT);
+> Hi Krzysztof,
 > 
-> With the above fixes, DT boot works fine. But we still get the below crash on ACPI
+> > +
+> > +static int exynos_rng_set_seed(struct exynos_rng_dev *rng,
+> > +			       const u8 *seed, unsigned int slen)
+> > +{
+> > +	int ret, i;
+> > +	u32 val;
+> > +
+> > +	dev_dbg(rng->dev, "Seeding with %u bytes\n", slen);
+> > +
+> > +	ret = clk_prepare_enable(rng->clk);
+> > +	if (ret)
+> > +		return ret;
+> > +
+> > +	if (slen < EXYNOS_RNG_SEED_SIZE) {
+> > +		dev_warn(rng->dev, "Seed too short (only %u bytes)\n", slen);
+> > +		ret = -EINVAL;
+> > +		goto out;
+> > +	}
+> > +
+> > +	for (i = 0 ; i < EXYNOS_RNG_SEED_REGS ; i++) {
+> > +		val = seed[i * 4] << 24;
+> > +		val |= seed[i * 4 + 1] << 16;
+> > +		val |= seed[i * 4 + 2] << 8;
+> > +		val |= seed[i * 4 + 3] << 0;
+> > +
+> > +		exynos_rng_writel(rng, val, EXYNOS_RNG_SEED(i));
+> > +	}
+> > +
+> > +	val = exynos_rng_readl(rng, EXYNOS_RNG_STATUS);
+> > +	if (!(val & EXYNOS_RNG_STATUS_SEED_SETTING_DONE)) {
+> > +		dev_warn(rng->dev, "Seed setting not finished\n");
+> > +		ret = -EIO;
+> > +		goto out;
+> > +	}
+> > +
+> > +	ret = 0;
+> > +	/* Save seed for suspend */
+> > +	memcpy(rng->seed_save, seed, slen);
 > 
-> > > [  402.581445] kernel BUG at drivers/iommu/arm-smmu-v3.c:1064!
-> > > [  402.587007] Internal error: Oops - BUG: 0 [#1] PREEMPT SMP
-> > > [  402.592479] Modules linked in: vfio_iommu_type1 vfio_pci irqbypass
-> > vfio_virqfd vfio ixgbevf ixgb
-> 
-> > The change that this series does is trying to add the dma/iommu ops to the
-> > device after the iommu is actually probed.
-> > So in your working case, does the device initially gets hooked to iommu_ops
-> > and the above same check passes in working case ?
-> 
-> I believe so. Because didn't notice the "specified DMA range outside IOMMU capability"
-> in the working case.
->  
-> Thanks,
-> Shameer
+> Is this really necessary? If you need to save some seed, shouldn't that be an 
+> output of the DRNG and not the real seed?
+
+When suspended to RAM device will loose the contents of registers
+(including SEED registers) so it has to be initialized with something on
+resume.
+
+The seed registers are write-only so I cannot read them and store
+contents just before suspend.
+
+I understand that real seed should not be stored... but then if I am not
+able to re-seed it with same values, I will loose the continuous and
+reproducible pseudo-random generation after suspend. Aren't this
+expected out of PRNG?
+
+> Besides, how do you know that slen is not larger than EXYNOS_RNG_SEED_SIZE?
+
+Right, there is a overflow here. It should be sizeof(rng->seed_save);
+
+Thanks for review!
+
+Best regards,
+Krzysztof
