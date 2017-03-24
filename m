@@ -1,69 +1,121 @@
-From: willy@infradead.org (Matthew Wilcox)
-Date: Fri, 24 Mar 2017 09:13:11 -0700
-Subject: [PATCH v3 0/7] Add memsetN functions
-Message-ID: <20170324161318.18718-1-willy@infradead.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 24 Mar 2017 16:15:58 +0000
+Subject: Query: ARM64: A random failure with hugetlbfs linked mmap() of a
+ stack area
+In-Reply-To: <4e776e1f-dd11-2fa2-5109-6c2b5184b70d@redhat.com>
+References: <4e776e1f-dd11-2fa2-5109-6c2b5184b70d@redhat.com>
+Message-ID: <20170324161558.GA10491@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Matthew Wilcox <mawilcox@microsoft.com>
+Hi,
 
-zram was recently enhanced to support compressing pages with a repeating
-pattern up to the size of an unsigned long.  As part of the discussion,
-we noted it would be nice if architectures had optimised routines
-to fill regions of memory with patterns larger than those contained
-in a single byte.  Our suspicions were right; the x86 version offers
-approximately a 7% performance improvement over the C implementation.
+On Fri, Mar 24, 2017 at 07:51:34PM +0530, Pratyush Anand wrote:
+> # cat hugetlb_test_stack.c
+> 
+> #include <errno.h>
+> #include <fcntl.h>
+> #include <stdio.h>
+> #include <stdlib.h>
+> #include <string.h>
+> #include <sys/mman.h>
+> #include <sys/resource.h>
+> #include <sys/stat.h>
+> #include <sys/time.h>
+> #include <sys/types.h>
+> 
+> #define ALIGN(x, a)     (((x) + (a) - 1) & ~((a) - 1))
+> #define PALIGN(p, a)    ((void *)ALIGN((unsigned long)(p), (a)))
+> 
+> int main(int argc, char *argv[])
+> {
+>         long hpage_size;;
+>         void *stack_address, *mmap_address, *mmap_ret_address;
+>         struct rlimit r;
+>         int fd;
+> 
+>         if (argc < 3) {
+>                 printf("Pass hugetlb page size as 1st argument and
+> path of a file in hugetlbfs as second argument\n");
+>                 exit(0);
+>         }
+>         hpage_size = atol(argv[1]);
+> 
+>         printf("hpage_size is %lx\n", hpage_size);
+>         printf("file path is %s\n", argv[2]);
+>         r.rlim_cur = RLIM_INFINITY;
+>         r.rlim_max = RLIM_INFINITY;
+>         setrlimit(RLIMIT_STACK, &r);
+> 
+>         fd = open(argv[2], O_RDWR);
+> 
+>         if (fd < 0) {
+>                 printf("open() failed: %s\n", strerror(errno));
+>                 return -1;
+>         }
+> 
+>         stack_address = alloca(0);
+>         mmap_address = PALIGN(stack_address - 2 * hpage_size, hpage_size);
+> 
+>         printf("Address to be mapped is %p\n", mmap_address);
+>         mmap_ret_address = mmap(mmap_address, hpage_size,
+> PROT_READ|PROT_WRITE,
+>                                 MAP_FIXED|MAP_SHARED, fd, 0);
+>         printf("mmap_ret_address is %p\n", mmap_ret_address);
+> }
+> 
+> # gcc -o hugetlb_test_stack hugetlb_test_stack.c
+> # ls /sys/kernel/mm/hugepages/
+> hugepages-2048kB  hugepages-524288kB
+> 
+> I used 524288KB page size file for test. It did not reproduces with
+> 2048K page size.
+> 
+> # echo 5 > /sys/kernel/mm/hugepages/hugepages-524288kB/nr_hugepages
+> #  mount -t hugetlbfs none /mnt/hugetlbfs -o pagesize=524288K
+> # touch /mnt/hugetlbfs/test
+> # ./hugetlb_test_stack 536870912  /mnt/hugetlbfs/test
 
-The generic memfill() function is part of Lars Wirzenius' publib,
-but it doesn't offer the most convenient interface.  I chose to add
-five more-specific functions as part of this patchset -- memset16(),
-memset32(), memset64(), memset_l() (long) and memset_p() (pointer).
+I modified the test to print out some additional information, and ran it under
+GDB, with a breakpoint on main, and ASLR enabled with:
 
-It would be nice to have some more architectures implement optimised
-memsetN calls.  It would also be nice to find more places in the kernel
-which could benefit from calling these functions.  Maybe a coccinelle
-script could be written to find such places?  We're looking for loops
-over an array where the value being stored into the array does not depend
-on the iteration variable.
+	set disable-randomization off
 
-Since v1 of the patchset, I stumbled on Alpha's memsetw() which
-caused me to add memset16() to complete the set.  I removed the
-'__HAVE_ARCH_MEMSET_PLUS' preprocessor symbol in favour of separate
-MEMSET16 MEMSET32 and MEMSET64 symbols.  I also reviewed the scr_mem*w()
-usages across the different architectures and implemented some obvious
-missing optimisations.  Alpha is still missing scr_memmovew() as it
-would be non-trivial to write.
+It's clear from the log that the test is simply blatting a number of
+important mappings including libc, so I think this is simply a broken
+test.
 
-Russell's review on patch 2 only applies to the memset32/memset64
-implementation.  The memset16 is unreviewed (and, indeed, untested)
-to date.
+(gdb) run               
+Starting program: /host/home/nanook/htfs 536870912 /mnt/hugetlbfs/test
 
-Matthew Wilcox (7):
-  Add multibyte memset functions
-  ARM: Implement memset16, memset32 & memset64
-  x86: Implement memset16, memset32 & memset64
-  alpha: Add support for memset16
-  zram: Convert to using memset_l
-  sym53c8xx_2: Convert to use memset32
-  vga: Optimise console scrolling
+Breakpoint 1, 0x0000000000400848 in main ()
+(gdb) info proc mappings
+process 1301
+Mapped address spaces:
 
- arch/alpha/include/asm/string.h     | 15 ++++----
- arch/alpha/include/asm/vga.h        |  2 +-
- arch/alpha/lib/memset.S             | 10 +++---
- arch/arm/include/asm/string.h       | 21 ++++++++++++
- arch/arm/kernel/armksyms.c          |  3 ++
- arch/arm/lib/memset.S               | 44 +++++++++++++++++++-----
- arch/mips/include/asm/vga.h         |  6 ++++
- arch/powerpc/include/asm/vga.h      |  8 +++++
- arch/sparc/include/asm/vga.h        | 24 +++++++++++++
- arch/x86/include/asm/string_32.h    | 24 +++++++++++++
- arch/x86/include/asm/string_64.h    | 36 ++++++++++++++++++++
- drivers/block/zram/zram_drv.c       | 15 ++------
- drivers/scsi/sym53c8xx_2/sym_hipd.c | 11 ++----
- include/linux/string.h              | 30 ++++++++++++++++
- include/linux/vt_buffer.h           | 12 +++++++
- lib/string.c                        | 68 +++++++++++++++++++++++++++++++++++++
- 16 files changed, 287 insertions(+), 42 deletions(-)
+          Start Addr           End Addr       Size     Offset objfile
+            0x400000           0x410000    0x10000        0x0 /host/home/nanook/htfs
+            0x410000           0x420000    0x10000        0x0 /host/home/nanook/htfs
+      0xffffa76f0000     0xffffa7700000    0x10000        0x0 
+      0xffffa7700000     0xffffa7830000   0x130000        0x0 /host/lib/aarch64-linux-gnu/libc-2.19.so
+      0xffffa7830000     0xffffa7840000    0x10000   0x130000 /host/lib/aarch64-linux-gnu/libc-2.19.so
+      0xffffa7840000     0xffffa7850000    0x10000        0x0 [vvar]
+      0xffffa7850000     0xffffa7860000    0x10000        0x0 [vdso]
+      0xffffa7860000     0xffffa7880000    0x20000        0x0 /host/lib/aarch64-linux-gnu/ld-2.19.so
+      0xffffa7880000     0xffffa7890000    0x10000    0x10000 /host/lib/aarch64-linux-gnu/ld-2.19.so
+      0xffffd90f0000     0xffffd9120000    0x30000        0x0 [stack]
+(gdb) continue          
+Continuing.
+hpage_size is 20000000
+file path is /mnt/hugetlbfs/test
+Range to be mapped is 0xffffa0000000-0xffffbfffffff
+Currently main at 0x400840
 
--- 
-2.11.0
+Program received signal SIGILL, Illegal instruction.
+0x0000ffffa77c4c04 in __mmap (addr=<optimized out>, len=536870912, prot=3, 
+    flags=17, fd=3, offset=0)
+    at ../ports/sysdeps/unix/sysv/linux/aarch64/mmap.c:29
+29      ../ports/sysdeps/unix/sysv/linux/aarch64/mmap.c: No such file or directory.
+
+Thanks,
+Mark.
