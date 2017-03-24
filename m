@@ -1,215 +1,136 @@
-From: gabriel.fernandez@st.com (Gabriel Fernandez)
-Date: Fri, 24 Mar 2017 10:41:28 +0100
-Subject: [PATCH] clk: stm32h7: Add stm32h743 clock driver
-In-Reply-To: <20170324020630.vhffmeeb6wto53zx@rob-hp-laptop>
-References: <1489569810-24350-1-git-send-email-gabriel.fernandez@st.com>
- <20170324020630.vhffmeeb6wto53zx@rob-hp-laptop>
-Message-ID: <dce20025-9f42-e747-e325-e1667504e615@st.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 24 Mar 2017 10:44:50 +0100
+Subject: [PATCH 4/4] tty/serial: sh-sci: remove uneeded IS_ERR_OR_NULL
+ calls
+In-Reply-To: <20170324091558.l2gmqqyced3d345o@pengutronix.de>
+References: <20170323123437.uqdwhfmmsjke3f7s@pengutronix.de>
+ <CACRpkdZRfLh9RXRycW_cAxuTYE6tPd7LR32EkAW8y2fh=AxhXA@mail.gmail.com>
+ <20170323144325.GA952@dtor-ws> <20170323154441.GA9460@dtor-ws>
+ <20170323191020.nrstp2cfh7cuqvf3@pengutronix.de>
+ <20170323195804.GA2502@dtor-ws>
+ <20170324080006.tbhyqlgk35xybsna@pengutronix.de>
+ <CAMuHMdXnUzjb5wzMtmzY2ojpGbhr_3KFGDYd2QKEawVipBhdbw@mail.gmail.com>
+ <20170324083905.h5uhdgiycchcjcgs@pengutronix.de>
+ <CAMuHMdVoYyDUvQuoPoY347b8tbcuOJK5o7GXoSngiX3LQYekAQ@mail.gmail.com>
+ <20170324091558.l2gmqqyced3d345o@pengutronix.de>
+Message-ID: <CAMuHMdWp+e4gmRYYV=kzpUjdkbJUX3UfXGp0zC_LBK0-7+thLQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+Hi Uwe,
 
-Thanks for reviewing
-
-
-On 03/24/2017 03:06 AM, Rob Herring wrote:
-> On Wed, Mar 15, 2017 at 10:23:30AM +0100, gabriel.fernandez at st.com wrote:
->> From: Gabriel Fernandez <gabriel.fernandez@st.com>
+On Fri, Mar 24, 2017 at 10:15 AM, Uwe Kleine-K?nig
+<u.kleine-koenig@pengutronix.de> wrote:
+> On Fri, Mar 24, 2017 at 09:59:04AM +0100, Geert Uytterhoeven wrote:
+>> On Fri, Mar 24, 2017 at 9:39 AM, Uwe Kleine-K?nig
+>> <u.kleine-koenig@pengutronix.de> wrote:
+>> > On Fri, Mar 24, 2017 at 09:29:02AM +0100, Geert Uytterhoeven wrote:
+>> >> On Fri, Mar 24, 2017 at 9:00 AM, Uwe Kleine-K?nig
+>> >> <u.kleine-koenig@pengutronix.de> wrote:
+>> >> > From: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+>> >> > Subject: [PATCH] gpiod: let get_optional return NULL in some cases with GPIOLIB disabled
+>> >> >
+>> >> > People disagree if gpiod_get_optional should return NULL or
+>> >> > ERR_PTR(-ENOSYS) if GPIOLIB is disabled. The argument for NULL is that
+>> >> > the person who decided to disable GPIOLIB is assumed to know that there
+>> >> > is no GPIO. The reason to stick to ERR_PTR(-ENOSYS) is that it might
+>> >> > introduce hard to debug problems if that decision is wrong.
+>> >> >
+>> >> > So this patch introduces a compromise and let gpiod_get_optional (and
+>> >> > its variants) return NULL if the device in question cannot have an
+>> >> > associated GPIO because it is neither instantiated by a device tree nor
+>> >> > by ACPI.
+>> >> >
+>> >> > This should handle most cases that are argued about.
+>> >> >
+>> >> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+>> >> > ---
+>> >> >  include/linux/gpio/consumer.h | 55 ++++++++++++++++++++++++++++++++++++-------
+>> >> >  1 file changed, 46 insertions(+), 9 deletions(-)
+>> >> >
+>> >> > diff --git a/include/linux/gpio/consumer.h b/include/linux/gpio/consumer.h
+>> >> > index fb0fde686cb1..0ca29889290d 100644
+>> >> > --- a/include/linux/gpio/consumer.h
+>> >> > +++ b/include/linux/gpio/consumer.h
+>> >> > @@ -161,20 +161,48 @@ gpiod_get_index(struct device *dev,
+>> >> >         return ERR_PTR(-ENOSYS);
+>> >> >  }
+>> >> >
+>> >> > -static inline struct gpio_desc *__must_check
+>> >> > -gpiod_get_optional(struct device *dev, const char *con_id,
+>> >> > -                  enum gpiod_flags flags)
+>> >> > +static inline bool __gpiod_no_optional_possible(struct device *dev)
+>> >> >  {
+>> >> > -       return ERR_PTR(-ENOSYS);
+>> >> > +       /*
+>> >> > +        * gpiod_get_optional et al can only provide a GPIO if at least one of
+>> >> > +        * the backends for specifing a GPIO is available. These are device
+>> >> > +        * tree, ACPI and gpiolib's lookup tables. The latter isn't available if
+>> >> > +        * GPIOLIB is disabled (which is the case here).
+>> >> > +        * So if the provided device is unrelated to device tree and ACPI, we
+>> >> > +        * can be sure that there is no optional GPIO and let gpiod_get_optional
+>> >> > +        * safely return NULL.
+>> >> > +        * Otherwise there is still a chance that there is no GPIO but we cannot
+>> >> > +        * be sure without having to enable a part of GPIOLIB (i.e. the lookup
+>> >> > +        * part). So lets play safe and return an error. (Though there are also
+>> >> > +        * arguments that returning NULL then would be beneficial.)
+>> >> > +        */
+>> >> > +
+>> >> > +       if (IS_ENABLED(CONFIG_OF) && dev && dev->of_node)
+>> >> > +               return false;
+>> >>
+>> >> At first sight, I though this was OK:
+>> >>
+>> >>   1. On ARM with DT, we can assume CONFIG_GPIOLOB=y.
+>> >>
+>> >>   2. I managed to configure an SH kernel with CONFIG_GPIOLOB=n, CONFIG_OF=y,
+>> >>      and CONFIG_SERIAL_SH_SCI=y, but since SH boards with SH-SCI UARTs do
+>> >>      not use DT (yet), the check for dev->of_node (false) should handle
+>> >>      that.
+>> >>
+>> >>   3. However, I managed to do the same for h8300, which does use DT. Hence
+>> >>      if mctrl_gpio would start relying on gpiod_get_optional(), this would
+>> >>      break the sh-sci driver on h8300 :-(
+>> >>      Note that h8300 doesn't have any GPIO drivers (yet?), so
+>> >>      CONFIG_GPIPOLIB=n makes perfect sense!
+>> >
+>> > Thanks for your efforts.
 >>
->> This patch enables clocks for STM32H743 boards.
+>> You're welcome.
 >>
->> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
->> ---
->>   .../devicetree/bindings/clock/st,stm32h7-rcc.txt   |  152 ++
->>   drivers/clk/Makefile                               |    1 +
->>   drivers/clk/clk-stm32h7.c                          | 1586 ++++++++++++++++++++
->>   include/dt-bindings/clock/stm32h7-clks.h           |  165 ++
->>   include/dt-bindings/mfd/stm32h7-rcc.h              |  138 ++
->>   5 files changed, 2042 insertions(+)
->>   create mode 100644 Documentation/devicetree/bindings/clock/st,stm32h7-rcc.txt
->>   create mode 100644 drivers/clk/clk-stm32h7.c
->>   create mode 100644 include/dt-bindings/clock/stm32h7-clks.h
->>   create mode 100644 include/dt-bindings/mfd/stm32h7-rcc.h
+>> >> So I'm afraid the only option is to always return NULL, and put the
+>> >> responsability on the shoulders of the system integrator...
+>> >
+>> > The gpio lines could be provided by an i2c gpio adapter, right? So IMHO
+>> > you don't need platform gpios to justify -ENODEV. So I guess that's a
+>> > case where we don't come to an agreement.
 >>
->> diff --git a/Documentation/devicetree/bindings/clock/st,stm32h7-rcc.txt b/Documentation/devicetree/bindings/clock/st,stm32h7-rcc.txt
->> new file mode 100644
->> index 0000000..9d4b587
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/clock/st,stm32h7-rcc.txt
->> @@ -0,0 +1,152 @@
->> +STMicroelectronics STM32H7 Reset and Clock Controller
->> +=====================================================
->> +
->> +The RCC IP is both a reset and a clock controller.
->> +
->> +Please refer to clock-bindings.txt for common clock controller binding usage.
->> +Please also refer to reset.txt for common reset controller binding usage.
->> +
->> +Required properties:
->> +- compatible: Should be:
->> +  "st,stm32h743-rcc"
->> +
->> +- reg: should be register base and length as documented in the
->> +  datasheet
->> +
->> +- #reset-cells: 1, see below
->> +
->> +- #clock-cells : from common clock binding; shall be set to 1
->> +
->> +- clocks: External oscillator clock phandle
->> +  - high speed external clock signal (HSE)
->> +  - low speed external clock signal (LSE)
->> +  - external I2S clock (I2S_CKIN)
->> +
->> +- st,syscfg: phandle for pwrcfg, mandatory to disable/enable backup domain
->> +  write protection (RTC clock).
->> +
->> +- pll x node: Allow to register a pll with specific parameters.
->> +  Please see PLL section below.
->> +
->> +Example:
->> +
->> +	rcc: rcc at 58024400 {
->> +		#reset-cells = <1>;
->> +		#clock-cells = <2>
->> +		compatible = "st,stm32h743-rcc", "st,stm32-rcc";
->> +		reg = <0x58024400 0x400>;
->> +		clocks = <&clk_hse>, <&clk_lse>, <&clk_i2s_ckin>;
->> +
->> +		st,syscfg = <&pwrcfg>;
->> +
->> +		#address-cells = <1>;
->> +		#size-cells = <0>;
->> +
->> +		vco1 at 58024430 {
->> +			#clock-cells = <0>;
->> +			compatible = "stm32,pll";
->> +			reg = <0>;
-> The reg addr value and unit address don't match.
-ok il will change into
-
-	vco1 at 0 {
-		reg = <0>;
-
+>> While you can enable I2C without further dependencies, no I2C GPIO expander
+>> will be offered... unless you have enabled CONFIG_GPIOLIB first.
 >
->> +		};
->> +
->> +		vco2 at 58024438 {
->> +			#clock-cells = <0>;
->> +			compatible = "stm32,pll";
->> +			reg = <1>;
->> +			st,clock-div = <2>;
->> +			st,clock-mult = <40>;
->> +			st,frac-status = <0>;
->> +			st,frac = <0>;
->> +			st,vcosel = <1>;
->> +			st,pllrge = <2>;
->> +		};
->> +	};
->> +
->> +
->> +STM32H7 PLL
->> +-----------
->> +
->> +The VCO of STM32 PLL could be reprensented like this:
->> +
->> +  Vref    ---------       --------
->> +    ---->| / DIVM  |---->| x DIVN | ------> VCO
->> +          ---------       --------
->> +		             ^
->> +			     |
->> +	                  -------
->> +		         | FRACN |
->> +		          -------
->> +
->> +When the PLL is configured in integer mode:
->> +- VCO = ( Vref / DIVM ) * DIVN
->> +
->> +When the PLL is configured in fractional mode:
->> +- VCO = ( Vref / DIVM ) * ( DIVN + FRACN / 2^13)
->> +
->> +
->> +Required properties for pll node:
->> +- compatible: Should be:
->> +  "stm32,pll"
-> Only 1 single PLL design for all STM32 chips ever?
-no, i can change into "stm32h7,pll"
+> And that is expected, still the device tree could reference such a GPIO
+> and thus create a situation where Dmitry's and my judgement disagree.
 
->> +
->> +- #clock-cells: from common clock binding; shall be set to 0
->> +- reg: Should be the pll number.
->> +
->> +Optional properties:
->> +- st,clock-div:  DIVM division factor       : <1..63>
->> +- st,clock-mult: DIVN multiplication factor : <4..512>
->> +
->> +- st,frac-status:
->> +   - 0 Pll is configured in integer mode
->> +   - 1 Pll is configure in fractional mode
-> Isn't this implied by the presence of the next property?
-do you prefer this ?
+If the device tree references such a GPIO, and CONFIG_GPIOLIB is not set,
+the I2C GPIO expander device will not be bound.
+Frank Rowand's DT scripts (http://elinux.org/Device_Tree_frowand) will come
+to the rescue, and inform the user which driver(s) to enable.
 
-- st,frac :
-0 : pll is configured in integer mode
-1..8191 : Fractional part of the multiplication factor and pll is 
-configured in fractional mode
+> So I think my suggestion is the best we could do now. It minimizes the
+> number of cases where we disagree. The next best thing would be to
+> implement that half gpiolib stuff (i.e. do the full lookup to be sure
+> there is no gpio) but this comes at a price: We need some time to
+> implement it and it adds a bit to the kernel size.
 
->> +
->> +- st,frac: Fractional part of the multiplication factor : <0..8191>
->> +
->> +- st,vcosel: VCO selection
->> +  - 0: Wide VCO range:192 to 836 MHz
->> +  - 1: Medium VCO range:150 to 420 MHz
->> +
->> +- st,pllrge: PLL input frequency range
->> +  - 0: The PLL input (Vref / DIVM) clock range frequency is between 1 and 2 MHz
->> +  - 1: The PLL input (Vref / DIVM) clock range frequency is between 2 and 4 MHz
->> +  - 2: The PLL input (Vref / DIVM) clock range frequency is between 4 and 8 MHz
->> +  - 3: The PLL input (Vref / DIVM) clock range frequency is between 8 and 16 MHz
-> Seems like you could figure this out based on the input freq and other
-> properties.
-ok i will try to integrate pllrge configuration in the code.
+So I still have to handle -ENOSYS in sh-sci.c, to avoid regressions...
 
->
->> +
->> +
->> +The peripheral clock consumer should specify the desired clock by
->> +having the clock ID in its "clocks" phandle cell.
->> +
->> +All available clocks are defined as preprocessor macros in
->> +dt-bindings/clock/stm32h7-clks.h header and can be used in device
->> +tree sources.
->> +
->> +Example:
->> +
->> +		timer5: timer at 40000c00 {
->> +			compatible = "st,stm32-timer";
->> +			reg = <0x40000c00 0x400>;
->> +			interrupts = <50>;
->> +			clocks = <&rcc TIM5_CK>;
->> +
->> +		};
->> +
->> +Specifying softreset control of devices
->> +=======================================
->> +
->> +Device nodes should specify the reset channel required in their "resets"
->> +property, containing a phandle to the reset device node and an index specifying
->> +which channel to use.
->> +The index is the bit number within the RCC registers bank, starting from RCC
->> +base address.
->> +It is calculated as: index = register_offset / 4 * 32 + bit_offset.
->> +Where bit_offset is the bit offset within the register.
->> +
->> +For example, for CRC reset:
->> +  crc = AHB4RSTR_offset / 4 * 32 + CRCRST_bit_offset = 0x88 / 4 * 32 + 19 = 1107
->> +
->> +All available preprocessor macros for reset are defined dt-bindings//mfd/stm32h7-rcc.h
->> +header and can be used in device tree sources.
->> +
->> +example:
->> +
->> +	timer2 {
->> +		resets	= <&rcc STM32H7_APB1L_RESET(TIM2)>;
->> +	};
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
