@@ -1,153 +1,86 @@
-From: shameerali.kolothum.thodi@huawei.com (Shameerali Kolothum Thodi)
-Date: Fri, 24 Mar 2017 09:27:51 +0000
-Subject: [PATCH V9 00/11] IOMMU probe deferral support
-In-Reply-To: <0ea8022b-a19b-335d-6cc6-81510196f891@codeaurora.org>
-References: <1489086061-9356-1-git-send-email-sricharan@codeaurora.org>
- <58D49845.9060407@hisilicon.com>
- <0ea8022b-a19b-335d-6cc6-81510196f891@codeaurora.org>
-Message-ID: <5FC3163CFD30C246ABAA99954A238FA81750B7CB@lhreml504-mbs>
+From: chaotian.jing@mediatek.com (Chaotian Jing)
+Date: Fri, 24 Mar 2017 17:40:27 +0800
+Subject: [PATCH] mmc: core: Do not hold re-tuning during CMD6 commands
+In-Reply-To: <03d54000-9ced-1b31-df80-d254f02433db@intel.com>
+References: <1490336341-22292-1-git-send-email-chaotian.jing@mediatek.com>
+ <1490336341-22292-2-git-send-email-chaotian.jing@mediatek.com>
+ <13a83728-0031-5683-c371-4b517df32299@intel.com>
+ <1490344369.22814.10.camel@mhfsdcap03>
+ <03d54000-9ced-1b31-df80-d254f02433db@intel.com>
+Message-ID: <1490348427.22814.19.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sricharan,
-
-> -----Original Message-----
-> From: Sricharan R [mailto:sricharan at codeaurora.org]
-> Sent: Friday, March 24, 2017 7:10 AM
-> To: Wangzhou (B); robin.murphy at arm.com; will.deacon at arm.com;
-> joro at 8bytes.org; lorenzo.pieralisi at arm.com; iommu at lists.linux-
-> foundation.org; linux-arm-kernel at lists.infradead.org; linux-arm-
-> msm at vger.kernel.org; m.szyprowski at samsung.com;
-> bhelgaas at google.com; linux-pci at vger.kernel.org; linux-
-> acpi at vger.kernel.org; tn at semihalf.com; hanjun.guo at linaro.org;
-> okaya at codeaurora.org
-> Cc: Shameerali Kolothum Thodi
-> Subject: Re: [PATCH V9 00/11] IOMMU probe deferral support
-> 
-> Hi Zhou,
-> 
-> On 3/24/2017 9:23 AM, Zhou Wang wrote:
-> > On 2017/3/10 3:00, Sricharan R wrote:
-> >> This series calls the dma ops configuration for the devices at a
-> >> generic place so that it works for all busses.
-> >> The dma_configure_ops for a device is now called during the
-> >> device_attach callback just before the probe of the bus/driver is
-> >> called. Similarly dma_deconfigure is called during
-> >> device/driver_detach path.
+On Fri, 2017-03-24 at 11:19 +0200, Adrian Hunter wrote:
+> On 24/03/17 10:32, Chaotian Jing wrote:
+> > On Fri, 2017-03-24 at 09:52 +0200, Adrian Hunter wrote:
+> >> On 24/03/17 08:19, Chaotian Jing wrote:
+> >>> this patch is refine for 'commit c6dbab9cb58f ("mmc: core: Hold re-tuning
+> >>> during switch commands")'
+> >>> Since it has 3 retries at max for CMD6, if the first CMD6 got CRC error,
+> >>> then should do re-tune before the next CMD6 was sent.
+> >>>
+> >>> Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+> >>> ---
+> >>>  drivers/mmc/core/mmc_ops.c |    3 +--
+> >>>  1 file changed, 1 insertion(+), 2 deletions(-)
+> >>>
+> >>> diff --git a/drivers/mmc/core/mmc_ops.c b/drivers/mmc/core/mmc_ops.c
+> >>> index fe80f26..6931927 100644
+> >>> --- a/drivers/mmc/core/mmc_ops.c
+> >>> +++ b/drivers/mmc/core/mmc_ops.c
+> >>> @@ -534,8 +534,6 @@ int __mmc_switch(struct mmc_card *card, u8 set, u8 index, u8 value,
+> >>>  	bool use_r1b_resp = use_busy_signal;
+> >>>  	unsigned char old_timing = host->ios.timing;
+> >>>  
+> >>> -	mmc_retune_hold(host);
+> >>> -
+> >>>  	/*
+> >>>  	 * If the cmd timeout and the max_busy_timeout of the host are both
+> >>>  	 * specified, let's validate them. A failure means we need to prevent
+> >>> @@ -567,6 +565,7 @@ int __mmc_switch(struct mmc_card *card, u8 set, u8 index, u8 value,
+> >>>  		cmd.sanitize_busy = true;
+> >>>  
+> >>>  	err = mmc_wait_for_cmd(host, &cmd, MMC_CMD_RETRIES);
+> >>> +	mmc_retune_hold(host);
 > >>
-> >> pci_bus_add_devices    (platform/amba)(_device_create/driver_register)
-> >>        |                         |
-> >> pci_bus_add_device     (device_add/driver_register)
-> >>        |                         |
-> >> device_attach           device_initial_probe
-> >>        |                         |
-> >> __device_attach_driver    __device_attach_driver
-> >>        |
-> >> driver_probe_device
-> >>        |
-> >> really_probe
-> >>        |
-> >> dma_configure
+> >> That is not how mmc_retune_hold() works, you need mmc_retune_hold_now() as
+> >> it is here:
 > >>
-> >> Similarly on the device/driver_unregister path
-> >> __device_release_driver is called which inturn calls dma_deconfigure.
+> >> 	https://marc.info/?l=linux-mmc&m=148940903816582
 > >>
-> >> Rebased the series against mainline 4.11-rc1. Applies and builds
-> >> cleanly against mainline and linux-next. There is a conflict with
-> >> patch#9 against iommu-next, but that should go away eventually as
-> >> iommu-next is rebased against 4.11-rc1.
+> >> But using "retries" with commands that have busy-waiting on the data line
+> >> doesn't make much sense anyway.  Particularly with CRC errors, I would
+> >> expect the card is actually busily doing the switch and we need only to wait
+> >> for it.  The same can be true for timeout errors.  For some CMD6 we might
+> >> need to send CMD12 if the card is busy after an error.  I would prefer an
+> >> explicit attempt at recovery from CMD6 errors.
 > >>
-> >> * Tested with platform and pci devices for probe deferral
-> >>   and reprobe on arm64 based platform.
-> >
-> > Hi Sricharan,
-> >
-> > I applied this series on v4.11-rc1 to test PCIe pass through in
-> > HiSilicon
-> > D05 board(with Intel 82599 networking card). It failed.
-> >
-> > After I used:
-> >
-> > echo vfio-pci > /sys/bus/pci/devices/0002:81:10.0/driver_override
-> > echo 0002:81:10.0 > /sys/bus/pci/drivers/ixgbevf/unbind
-> > echo 0002:81:10.0 > /sys/bus/pci/drivers_probe
-> >
-> > to bind vfio-pci driver to Intel 82599 networking card VF.
-> >
-> > I got log in host:
-> > [...]
-> > [  414.275818] ixgbevf: Intel(R) 10 Gigabit PCI Express Virtual
-> > Function Network Driver - version 3.2.2-k [  414.275824] ixgbevf: Copyright
-> (c) 2009 - 2015 Intel Corporation.
-> > [  414.276647] ixgbe 0002:81:00.0 eth12: SR-IOV enabled with 1 VFs [
-> > 414.342252] pcieport 0002:80:00.0: can't derive routing for PCI INT A
-> > [  414.342255] ixgbe 0002:81:00.0: PCI INT A: no GSI [  414.343348]
-> > ixgbe 0002:81:00.0: Multiqueue Enabled: Rx Queue count = 4, Tx Queue
-> > count = 4 [  414.448135] pci 0002:81:10.0: [8086:10ed] type 00 class
-> > 0x020000 [  414.448713] iommu: Adding device 0002:81:10.0 to group 4 [
-> > 414.449798] ixgbevf 0002:81:10.0: enabling device (0000 -> 0002) [
-> > 414.451101] ixgbevf 0002:81:10.0: PF still in reset state.  Is the PF interface
-> up?
-> > [  414.451103] ixgbevf 0002:81:10.0: Assigning random MAC address [
-> > 414.451414] ixgbevf 0002:81:10.0: be:30:8f:ed:f8:02 [  414.451417]
-> > ixgbevf 0002:81:10.0: MAC: 1 [  414.451418] ixgbevf 0002:81:10.0:
-> > Intel(R) 82599 Virtual Function [  414.464271] VFIO - User Level
-> > meta-driver version: 0.3 [  414.570074] ixgbe 0002:81:00.0: registered
-> > PHC device on eth12
-> > [  414.700493] specified DMA range outside IOMMU capability
-> <-- error here
-> > [  414.700496] Failed to set up IOMMU for device 0002:81:10.0; retaining
-> platform DMA ops        <-- error here
+> > 
+> > It's the host driver's responsibility to ensure card is not in busy
+> > state before issue the next R1B command, or the MMC core layer needs do
+> > extra check/waiting before issue a R1B command.
 > 
-> Looks like this triggers the start of the bug.
-> So the below check in iommu_dma_init_domain fails,
+> Better to deal with cards stuck in busy from the places where busy-waiting
+> is expected.
 > 
->          if (domain->geometry.force_aperture) {
->                  if (base > domain->geometry.aperture_end ||
->                      base + size <= domain->geometry.aperture_start) {
+Yes, if a R1B command got response CRC error, we can do busy-waiting in
+the error hander funtion(mmc_wait_for_req_done())
+> > I think the purpose of "re-tune" is trying to cover particular case(eg.
+> > voltage fluctuate or EMI or some glitch of host/device which caused CRC
+> > error)
 > 
-> and the rest goes out of sync after that. Can you print out the base,
-> aperture_start and end values to see why the check fails ?
-
-dev_info(dev, "0x%llx 0x%llx, 0x%llx 0x%llx, 0x%llx 0x%llx\n", base, size, domain->geometry.aperture_start, domain->geometry.aperture_end, *dev->dma_mask, dev->coherent_dma_mask);
-
-[  183.752100] ixgbevf 0000:81:10.0: 0x0 0x100000000, 0x0 0xffffffffffff, 0xffffffff 0xffffffff
-.....
-[  319.508037] vfio-pci 0000:81:10.0: 0x0 0x0, 0x0 0xffffffffffff, 0xffffffffffffffff 0xffffffffffffffff
-
-Yes, size seems to be the problem here. When the VF  device gets attached to vfio-pci,
-somehow the dev->coherent_dma_mask is set to 64 bits and size become zero.
-
-@@ -107,7 +107,7 @@ int of_dma_configure(struct device *dev, struct device_node *np)
-  	ret = of_dma_get_range(np, &dma_addr, &paddr, &size);
-  	if (ret < 0) {
-  		dma_addr = offset = 0;
- -		size = dev->coherent_dma_mask + 1;
- +		size = max(dev->coherent_dma_mask, dev->coherent_dma_mask + 1);
-
-@@ -1386,7 +1387,8 @@ int acpi_dma_configure(struct device *dev, enum dev_dma_attr attr)
-  	 * Assume dma valid range starts at 0 and covers the whole
-  	 * coherent_dma_mask.
-  	 */
- -	arch_setup_dma_ops(dev, 0, dev->coherent_dma_mask + 1, iommu,
- +	size = max(dev->coherent_dma_mask, dev->coherent_dma_mask + 1);
- +	arch_setup_dma_ops(dev, 0, size, iommu,
-  			   attr == DEV_DMA_COHERENT);
-
-With the above fixes, DT boot works fine. But we still get the below crash on ACPI
-
-> > [  402.581445] kernel BUG at drivers/iommu/arm-smmu-v3.c:1064!
-> > [  402.587007] Internal error: Oops - BUG: 0 [#1] PREEMPT SMP
-> > [  402.592479] Modules linked in: vfio_iommu_type1 vfio_pci irqbypass
-> vfio_virqfd vfio ixgbevf ixgb
-
-> The change that this series does is trying to add the dma/iommu ops to the
-> device after the iommu is actually probed.
-> So in your working case, does the device initially gets hooked to iommu_ops
-> and the above same check passes in working case ?
-
-I believe so. Because didn't notice the "specified DMA range outside IOMMU capability"
-in the working case.
- 
-Thanks,
-Shameer
+> No, re-tuning is to compensate for drift caused primarily by temperature change.
+> 
+Yes, by JEDEC spec, temperature change cause timing drift of EMMC
+device, but, as you mentioned, maybe I have a hardware problem of host,
+but needs Software to cover it. so that we are doing our best to do
+re-tune if got CRC error. if could recover it, then  it's better than
+system hung.
+> > error) , but in such cases, too many cases are disable re-tune function
+> > by mmc_retune_hold(), for example, in this case, if a response CRC error
+> > got then we never have chance to recover it. then cause system cannot
+> > access emmc or suspend/resume fail.
+> 
+> Maybe you have a hardware problem.
+> 
