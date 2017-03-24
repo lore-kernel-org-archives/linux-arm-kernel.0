@@ -1,90 +1,217 @@
-From: opendmb@gmail.com (Doug Berger)
-Date: Fri, 24 Mar 2017 07:46:30 -0700
-Subject: [PATCH 7/9] bus: brcmstb_gisb: Add ARM64 support
-In-Reply-To: <20170324144632.5896-1-opendmb@gmail.com>
-References: <20170324144632.5896-1-opendmb@gmail.com>
-Message-ID: <20170324144632.5896-8-opendmb@gmail.com>
+From: jon.mason@broadcom.com (Jon Mason)
+Date: Fri, 24 Mar 2017 10:35:36 -0400
+Subject: [PATCH V2 2/2] thermal: broadcom: add Northstar thermal driver
+In-Reply-To: <20170323223045.15786-2-zajec5@gmail.com>
+References: <20170318155632.18099-1-zajec5@gmail.com>
+ <20170323223045.15786-1-zajec5@gmail.com>
+ <20170323223045.15786-2-zajec5@gmail.com>
+Message-ID: <20170324143535.GA31953@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Florian Fainelli <f.fainelli@gmail.com>
+On Thu, Mar 23, 2017 at 11:30:45PM +0100, Rafa? Mi?ecki wrote:
+> From: Rafa? Mi?ecki <rafal@milecki.pl>
+> 
+> Northstar is a SoC family commonly used in home routers. This commit
+> adds a driver for checking CPU temperature. As Northstar Plus seems to
+> also have this IP block this new symbol gets ARCH_BCM_IPROC dependency.
+> 
+> Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
+> Signed-off-by: Jon Mason <jon.mason@broadcom.com>
+> ---
+> V2: Make it iProc specific as NSP can also use this driver
+>     Select proper symbols in config ARCH_BCM_IPROC
+>     Define PVTMON register bits
+>     Update code selecting temperature monitor mode
+>     Thank you Jon!
+> ---
+>  arch/arm/mach-bcm/Kconfig             |  2 +
+>  drivers/thermal/Kconfig               |  5 ++
+>  drivers/thermal/Makefile              |  1 +
+>  drivers/thermal/broadcom/Kconfig      |  7 +++
+>  drivers/thermal/broadcom/Makefile     |  1 +
+>  drivers/thermal/broadcom/ns-thermal.c | 98 +++++++++++++++++++++++++++++++++++
+>  6 files changed, 114 insertions(+)
+>  create mode 100644 drivers/thermal/broadcom/Kconfig
+>  create mode 100644 drivers/thermal/broadcom/Makefile
+>  create mode 100644 drivers/thermal/broadcom/ns-thermal.c
+> 
+> diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
+> index a0e66d8200c5..da2bfeb8e390 100644
+> --- a/arch/arm/mach-bcm/Kconfig
+> +++ b/arch/arm/mach-bcm/Kconfig
+> @@ -19,6 +19,8 @@ config ARCH_BCM_IPROC
+>  	select GPIOLIB
+>  	select ARM_AMBA
+>  	select PINCTRL
+> +	select THERMAL
+> +	select THERMAL_OF
+>  	help
+>  	  This enables support for systems based on Broadcom IPROC architected SoCs.
+>  	  The IPROC complex contains one or more ARM CPUs along with common
+> diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
+> index 776b34396144..008e173ec825 100644
+> --- a/drivers/thermal/Kconfig
+> +++ b/drivers/thermal/Kconfig
+> @@ -392,6 +392,11 @@ config MTK_THERMAL
+>  	  Enable this option if you want to have support for thermal management
+>  	  controller present in Mediatek SoCs
+>  
+> +menu "Broadcom thermal drivers"
+> +depends on ARCH_BCM || COMPILE_TEST
+> +source "drivers/thermal/broadcom/Kconfig"
+> +endmenu
+> +
+>  menu "Texas Instruments thermal drivers"
+>  depends on ARCH_HAS_BANDGAP || COMPILE_TEST
+>  depends on HAS_IOMEM
+> diff --git a/drivers/thermal/Makefile b/drivers/thermal/Makefile
+> index 7adae2029355..549d81b6363c 100644
+> --- a/drivers/thermal/Makefile
+> +++ b/drivers/thermal/Makefile
+> @@ -27,6 +27,7 @@ thermal_sys-$(CONFIG_CLOCK_THERMAL)	+= clock_cooling.o
+>  thermal_sys-$(CONFIG_DEVFREQ_THERMAL) += devfreq_cooling.o
+>  
+>  # platform thermal drivers
+> +obj-y				+= broadcom/
+>  obj-$(CONFIG_QCOM_SPMI_TEMP_ALARM)	+= qcom-spmi-temp-alarm.o
+>  obj-$(CONFIG_SPEAR_THERMAL)	+= spear_thermal.o
+>  obj-$(CONFIG_ROCKCHIP_THERMAL)	+= rockchip_thermal.o
+> diff --git a/drivers/thermal/broadcom/Kconfig b/drivers/thermal/broadcom/Kconfig
+> new file mode 100644
+> index 000000000000..39b92a1f3584
+> --- /dev/null
+> +++ b/drivers/thermal/broadcom/Kconfig
+> @@ -0,0 +1,7 @@
+> +config BCM_NS_THERMAL
+> +	tristate "Northstar thermal driver"
+> +	depends on ARCH_BCM_IPROC || COMPILE_TEST
+> +	help
+> +	  Northstar's DMU (Device Management Unit) block contains a thermal
+> +	  sensor that allows checking CPU temperature. This driver provides
+> +	  support for it.
+> diff --git a/drivers/thermal/broadcom/Makefile b/drivers/thermal/broadcom/Makefile
+> new file mode 100644
+> index 000000000000..059df9a0ed69
+> --- /dev/null
+> +++ b/drivers/thermal/broadcom/Makefile
+> @@ -0,0 +1 @@
+> +obj-$(CONFIG_BCM_NS_THERMAL)		+= ns-thermal.o
+> diff --git a/drivers/thermal/broadcom/ns-thermal.c b/drivers/thermal/broadcom/ns-thermal.c
+> new file mode 100644
+> index 000000000000..acf3a4de62a4
+> --- /dev/null
+> +++ b/drivers/thermal/broadcom/ns-thermal.c
+> @@ -0,0 +1,98 @@
+> +/*
+> + * Copyright (C) 2017 Rafa? Mi?ecki <rafal@milecki.pl>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#include <linux/module.h>
+> +#include <linux/of_address.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/thermal.h>
+> +
+> +#define PVTMON_CONTROL0					0x00
+> +#define PVTMON_CONTROL0_SEL_MASK			0x0000000e
+> +#define PVTMON_CONTROL0_SEL_TEMP_MONITOR		0x00000000
+> +#define PVTMON_CONTROL0_SEL_TEST_MODE			0x0000000e
+> +#define PVTMON_STATUS					0x08
+> +
+> +struct ns_thermal {
+> +	void __iomem *pvtmon;
+> +};
+> +
+> +static int ns_thermal_get_temp(void *data, int *temp)
+> +{
+> +	struct ns_thermal *ns_thermal = data;
+> +	u32 val;
+> +
+> +	val = readl(ns_thermal->pvtmon + PVTMON_CONTROL0);
+> +	if ((val & PVTMON_CONTROL0_SEL_MASK) != PVTMON_CONTROL0_SEL_TEMP_MONITOR) {
+> +		val &= ~PVTMON_CONTROL0_SEL_MASK;
+> +		val |= PVTMON_CONTROL0_SEL_TEMP_MONITOR;
 
-Hook to the ARM64 data abort exception #16: synchronous external
-abort, which is how the GISB errors will be funneled back to the
-ARM64 CPU in case of problems
+I think this is slightly confusing here.  If this was off, ORing in 0
+will not enable it.  I think we need to flip the #define to make it
+PVTMON_CONTROL0_SEL_TEMP_MONITOR_DISABLE (or a less crappy name).
+then use this line here to toggle it.  Something like
 
-Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
----
- drivers/bus/Kconfig        |  2 +-
- drivers/bus/brcmstb_gisb.c | 15 ++++++++++++---
- 2 files changed, 13 insertions(+), 4 deletions(-)
+                val &= ~PVTMON_CONTROL0_SEL_TEMP_MONITOR_DISABLE;
 
-diff --git a/drivers/bus/Kconfig b/drivers/bus/Kconfig
-index 0a52da439abf..d2a5f1184022 100644
---- a/drivers/bus/Kconfig
-+++ b/drivers/bus/Kconfig
-@@ -57,7 +57,7 @@ config ARM_CCN
- 
- config BRCMSTB_GISB_ARB
- 	bool "Broadcom STB GISB bus arbiter"
--	depends on ARM || MIPS
-+	depends on ARM || ARM64 || MIPS
- 	default ARCH_BRCMSTB || BMIPS_GENERIC
- 	help
- 	  Driver for the Broadcom Set Top Box System-on-a-chip internal bus
-diff --git a/drivers/bus/brcmstb_gisb.c b/drivers/bus/brcmstb_gisb.c
-index c8d2a61d21ed..bf26b4017a2c 100644
---- a/drivers/bus/brcmstb_gisb.c
-+++ b/drivers/bus/brcmstb_gisb.c
-@@ -30,6 +30,11 @@
- #include <asm/signal.h>
- #endif
- 
-+#ifdef CONFIG_ARM64
-+#include <asm/signal.h>
-+#include <asm/system_misc.h>
-+#endif
-+
- #ifdef CONFIG_MIPS
- #include <asm/traps.h>
- #endif
-@@ -225,7 +230,7 @@ static int brcmstb_gisb_arb_decode_addr(struct brcmstb_gisb_arb_device *gdev,
- 	return 0;
- }
- 
--#ifdef CONFIG_ARM
-+#if defined(CONFIG_ARM) || defined(CONFIG_ARM64)
- static int brcmstb_bus_error_handler(unsigned long addr, unsigned int fsr,
- 				     struct pt_regs *regs)
- {
-@@ -235,7 +240,7 @@ static int brcmstb_bus_error_handler(unsigned long addr, unsigned int fsr,
- 	list_for_each_entry(gdev, &brcmstb_gisb_arb_device_list, next)
- 		brcmstb_gisb_arb_decode_addr(gdev, "bus error");
- 
--#if !defined(CONFIG_ARM_LPAE)
-+#if defined(CONFIG_ARM) && !defined(CONFIG_ARM_LPAE)
- 	/*
- 	 * If it was an imprecise abort, then we need to correct the
- 	 * return address to be _after_ the instruction.
-@@ -247,7 +252,7 @@ static int brcmstb_bus_error_handler(unsigned long addr, unsigned int fsr,
- 	/* Always report unhandled exception */
- 	return 1;
- }
--#endif
-+#endif /* CONFIG_ARM || CONFIG_ARM64 */
- 
- #ifdef CONFIG_MIPS
- static int brcmstb_bus_error_handler(struct pt_regs *regs, int is_fixup)
-@@ -395,6 +400,10 @@ static int __init brcmstb_gisb_arb_probe(struct platform_device *pdev)
- 			"imprecise external abort");
- #endif
- #endif /* CONFIG_ARM */
-+#ifdef CONFIG_ARM64
-+	hook_fault_code(16, brcmstb_bus_error_handler, SIGBUS, 0,
-+			"synchronous external abort");
-+#endif
- #ifdef CONFIG_MIPS
- 	board_be_handler = brcmstb_bus_error_handler;
- #endif
--- 
-2.12.0
+Thanks,
+Jon
+
+> +		writel(val, ns_thermal->pvtmon + PVTMON_CONTROL0);
+> +	}
+> +
+> +	val = readl(ns_thermal->pvtmon + PVTMON_STATUS);
+> +	*temp = (418 - (val * 5556 / 10000)) * 1000;
+> +
+> +	return 0;
+> +}
+> +
+> +const struct thermal_zone_of_device_ops ns_thermal_ops = {
+> +	.get_temp = ns_thermal_get_temp,
+> +};
+> +
+> +static int ns_thermal_probe(struct platform_device *pdev)
+> +{
+> +	struct device *dev = &pdev->dev;
+> +	struct ns_thermal *ns_thermal;
+> +	struct thermal_zone_device *tzd;
+> +
+> +	ns_thermal = devm_kzalloc(dev, sizeof(*ns_thermal), GFP_KERNEL);
+> +	if (!ns_thermal)
+> +		return -ENOMEM;
+> +
+> +	ns_thermal->pvtmon = of_iomap(dev_of_node(dev), 0);
+> +	if (WARN_ON(!ns_thermal->pvtmon))
+> +		return -ENOENT;
+> +
+> +	tzd = devm_thermal_zone_of_sensor_register(dev, 0, ns_thermal,
+> +						   &ns_thermal_ops);
+> +	if (IS_ERR(tzd)) {
+> +		iounmap(ns_thermal->pvtmon);
+> +		return PTR_ERR(tzd);
+> +	}
+> +
+> +	platform_set_drvdata(pdev, ns_thermal);
+> +
+> +	return 0;
+> +}
+> +
+> +static int ns_thermal_remove(struct platform_device *pdev)
+> +{
+> +	struct ns_thermal *ns_thermal = platform_get_drvdata(pdev);
+> +
+> +	iounmap(ns_thermal->pvtmon);
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct of_device_id ns_thermal_of_match[] = {
+> +	{ .compatible = "brcm,ns-thermal", },
+> +	{},
+> +};
+> +MODULE_DEVICE_TABLE(of, ns_thermal_of_match);
+> +
+> +static struct platform_driver ns_thermal_driver = {
+> +	.probe		= ns_thermal_probe,
+> +	.remove		= ns_thermal_remove,
+> +	.driver = {
+> +		.name = "ns-thermal",
+> +		.of_match_table = ns_thermal_of_match,
+> +	},
+> +};
+> +module_platform_driver(ns_thermal_driver);
+> +
+> +MODULE_DESCRIPTION("Northstar thermal driver");
+> +MODULE_LICENSE("GPL v2");
+> -- 
+> 2.11.0
+> 
