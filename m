@@ -1,56 +1,95 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 24 Mar 2017 18:24:07 +0100
-Subject: [GIT PULL] ARM: mvebu: dt64 for v4.12 (#1)
-Message-ID: <87h92ibnbc.fsf@free-electrons.com>
+From: delicious.quinoa@gmail.com (Alan Tull)
+Date: Fri, 24 Mar 2017 12:25:25 -0500
+Subject: [PATCH v3 1/2] doc: Add bindings document for Xilinx LogiCore PR
+ Decoupler
+In-Reply-To: <20170324152318.GA13089@tyrael.amer.corp.natinst.com>
+References: <1489781473-30772-1-git-send-email-mdf@kernel.org>
+ <20170324145908.aiijqixf5xcnkksa@rob-hp-laptop>
+ <20170324152318.GA13089@tyrael.amer.corp.natinst.com>
+Message-ID: <CANk1AXSHimnjsMsCJwbtwrkRppFCRxY7KQemFikgu+hqCTiO5Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Mar 24, 2017 at 10:23 AM, Moritz Fischer
+<moritz.fischer.private@gmail.com> wrote:
+> On Fri, Mar 24, 2017 at 09:59:08AM -0500, Rob Herring wrote:
+>> On Fri, Mar 17, 2017 at 01:11:12PM -0700, Moritz Fischer wrote:
+>> > This adds the binding documentation for the Xilinx LogiCORE PR
+>> > Decoupler soft core.
+>> >
+>> > Signed-off-by: Moritz Fischer <mdf@kernel.org>
+>> > Cc: Michal Simek <michal.simek@xilinx.com>
+>> > Cc: S?ren Brinkmann <soren.brinkmann@xilinx.com>
+>> > Cc: linux-kernel at vger.kernel.org
+>> > Cc: devicetree at vger.kernel.org
+>> > ---
+>> >
+>> > Changes from v2:
+>> > - Added refence to generic fpga-region bindings
+>> > - Fixed up reg property in example
+>> > - Added fallback to "xlnx,pr-decoupler" without version
+>> >
+>> > Changes from v1:
+>> > - Added clock names & clock to example
+>> > - Merged some of the description from Michal's version
+>> >
+>> > ---
+>> >  .../bindings/fpga/xilinx-pr-decoupler.txt          | 35 ++++++++++++++++++++++
+>> >  1 file changed, 35 insertions(+)
+>> >  create mode 100644 Documentation/devicetree/bindings/fpga/xilinx-pr-decoupler.txt
+>> >
+>> > diff --git a/Documentation/devicetree/bindings/fpga/xilinx-pr-decoupler.txt b/Documentation/devicetree/bindings/fpga/xilinx-pr-decoupler.txt
+>> > new file mode 100644
+>> > index 0000000..16141bd
+>> > --- /dev/null
+>> > +++ b/Documentation/devicetree/bindings/fpga/xilinx-pr-decoupler.txt
+>> > @@ -0,0 +1,35 @@
+>> > +Xilinx LogiCORE Partial Reconfig Decoupler Softcore
+>> > +
+>> > +The Xilinx LogiCORE Partial Reconfig Decoupler manages one or more
+>> > +decouplers / fpga bridges.
+>> > +The controller can decouple/disable the bridges which prevents signal
+>> > +changes from passing through the bridge.  The controller can also
+>> > +couple / enable the bridges which allows traffic to pass through the
+>> > +bridge normally.
+>> > +
+>> > +The Driver supports only MMIO handling. A PR region can have multiple
+>> > +PR Decouples which can bhe handled independently or chaines via decouple/
+>>
+>> s/chaines/chains/
+>
+> Fixed in v4.
+>
+>> > +decouple_status signals.
+>> > +
+>> > +Required properties:
+>> > +- compatible               : Should contain "xlnx,pr-decoupler-1.00"
+>> > +- regs                     : base address and size for decoupler module
+>> > +- clocks           : input clock to IP
+>> > +- clock-names              : should contain "aclk"
+>> > +
+>> > +Optional properties:
+>> > +- bridge-enable            : 0 if driver should disable bridge at startup
+>> > +                     1 if driver should enable bridge at startup
+>> > +                     Default is to leave bridge in current state.
+>>
+>> This is common and should move into a common doc. Maybe fpga-region.txt
+>> works?
+>
+> Ok will add patch for that to v5 series.
 
-Here is the first pull request for dt64 for mvebu for v4.12.
+Arg, our emails criss-crossed.  I've already sent v4 to Greg.  I hope
+we don't need v5 for this one thing.  bridge-enable is common for the
+fpga bridges (altera-fpga2sdram-bridge.txt, altera-freeze-bridge.txt,
+altera-hps2fpga-bridge.txt, xilinx-pr-decoupler.txt).  Probably we
+need a new patch to move this common bridges binding from all the
+above to fpga-region.txt or create a new fpga-bridges.txt.  At first
+blush, I prefer the later.
 
-Gregory
+Alan
 
-The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
 
-  Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
-
-are available in the git repository at:
-
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-dt64-4.12-1
-
-for you to fetch changes up to 60894719241e2b3d6d202304de9ad33a8da3685c:
-
-  arm64: marvell: dts: add PPv2.2 description to Armada 7K/8K (2017-03-23 17:46:23 +0100)
-
-----------------------------------------------------------------
-mvebu dt64 for 4.12 (part 1)
-
-- Add RTC support on Armada 7k/8k
-- Improve i2c support on Armada 37xx
-- Add gpio expander and RTC on Armada 3720 board
-- Improve USB3 support on Armada 37xx
-- Add network support on Armada 7k/8k
-
-----------------------------------------------------------------
-Gregory CLEMENT (7):
-      arm64: dts: marvell: add RTC description for Armada 7K/8K
-      ARM64: dts: marvell: armada37xx: add address and size property for i2c cells
-      ARM64: dts: marvell: armada-3720-db: add gpio expander
-      ARM64: dts: marvell: armada-37xx: Fix interrupt mapping for USB3
-      ARM64: dts: marvell: armada-37xx: Add clock resource for USB3
-      ARM64: dts: marvell: armada-3720-db: Add phy for USB3
-      ARM64: dts: marvell: armada-3720 add RTC support
-
-Thomas Petazzoni (1):
-      arm64: marvell: dts: add PPv2.2 description to Armada 7K/8K
-
- arch/arm64/boot/dts/marvell/armada-3720-db.dts     | 41 ++++++++++++++++++++
- arch/arm64/boot/dts/marvell/armada-37xx.dtsi       |  7 +++-
- arch/arm64/boot/dts/marvell/armada-7040-db.dts     | 25 ++++++++++++
- arch/arm64/boot/dts/marvell/armada-8020.dtsi       | 10 +++++
- arch/arm64/boot/dts/marvell/armada-8040-db.dts     | 16 ++++++++
- arch/arm64/boot/dts/marvell/armada-8040.dtsi       |  9 +++++
- .../boot/dts/marvell/armada-cp110-master.dtsi      | 44 ++++++++++++++++++++++
- .../arm64/boot/dts/marvell/armada-cp110-slave.dtsi | 44 ++++++++++++++++++++++
- 8 files changed, 195 insertions(+), 1 deletion(-)
+>
+> Thanks for your feedback,
+>
+> Moritz
