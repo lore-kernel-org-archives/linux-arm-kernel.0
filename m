@@ -1,16 +1,16 @@
 From: jagan@openedev.com (Jagan Teki)
-Date: Fri, 24 Mar 2017 21:48:36 +0530
-Subject: [PATCH v2 01/15] ARM: dts: imx6ul-geam: Add backlight support for
+Date: Fri, 24 Mar 2017 21:48:37 +0530
+Subject: [PATCH v2 02/15] ARM: dts: imx6ul-isiot: Add backlight support for
  lcdif
 In-Reply-To: <1490372330-5611-1-git-send-email-jagan@openedev.com>
 References: <1490372330-5611-1-git-send-email-jagan@openedev.com>
-Message-ID: <1490372330-5611-2-git-send-email-jagan@openedev.com>
+Message-ID: <1490372330-5611-3-git-send-email-jagan@openedev.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jagan Teki <jagan@amarulasolutions.com>
 
-This patch add support for lcdif backlight on GEAM6UL
+This patch add support for lcdif backlight on Is.IoT MX6UL
 variant boards.
 
 Cc: Shawn Guo <shawnguo@kernel.org>
@@ -21,17 +21,18 @@ Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 Changes for v2:
 - none
 
- arch/arm/boot/dts/imx6ul-geam.dtsi | 29 +++++++++++++++++++++++++++++
+ arch/arm/boot/dts/imx6ul-isiot.dtsi | 29 +++++++++++++++++++++++++++++
  1 file changed, 29 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx6ul-geam.dtsi b/arch/arm/boot/dts/imx6ul-geam.dtsi
-index 940aef6..ee5220c 100644
---- a/arch/arm/boot/dts/imx6ul-geam.dtsi
-+++ b/arch/arm/boot/dts/imx6ul-geam.dtsi
-@@ -49,6 +49,23 @@
- 		reg = <0x80000000 0x08000000>;
+diff --git a/arch/arm/boot/dts/imx6ul-isiot.dtsi b/arch/arm/boot/dts/imx6ul-isiot.dtsi
+index 0b43699..5ccc3df 100644
+--- a/arch/arm/boot/dts/imx6ul-isiot.dtsi
++++ b/arch/arm/boot/dts/imx6ul-isiot.dtsi
+@@ -52,6 +52,29 @@
+ 	chosen {
+ 		stdout-path = &uart1;
  	};
- 
++
 +	backlight {
 +		compatible = "pwm-backlight";
 +		pwms = <&pwm8 0 100000>;
@@ -48,35 +49,27 @@ index 940aef6..ee5220c 100644
 +				    100>;
 +		default-brightness-level = <100>;
 +	};
++};
 +
- 	chosen {
- 		stdout-path = &uart1;
- 	};
-@@ -143,6 +160,12 @@
- 	display = <&display0>;
- };
- 
 +&pwm8 {
 +	pinctrl-names = "default";
 +	pinctrl-0 = <&pinctrl_pwm8>;
 +	status = "okay";
-+};
-+
- &tsc {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_tsc>;
-@@ -290,6 +313,12 @@
- 		>;
- 	};
+ };
  
+ &uart1 {
+@@ -72,6 +95,12 @@
+ };
+ 
+ &iomuxc {
 +	pinctrl_pwm8: pwm8grp {
 +		fsl,pins = <
 +			MX6UL_PAD_ENET1_RX_ER__PWM8_OUT   0x110b0
 +		>;
 +	};
 +
- 	pinctrl_tsc: tscgrp {
- 		fsl,pin = <
- 			MX6UL_PAD_GPIO1_IO01__GPIO1_IO01	0xb0
+ 	pinctrl_uart1: uart1grp {
+ 		fsl,pins = <
+ 			MX6UL_PAD_UART1_TX_DATA__UART1_DCE_TX 0x1b0b1
 -- 
 1.9.1
