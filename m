@@ -1,60 +1,105 @@
 From: willy@infradead.org (Matthew Wilcox)
-Date: Fri, 24 Mar 2017 09:13:17 -0700
-Subject: [PATCH v3 6/7] sym53c8xx_2: Convert to use memset32
+Date: Fri, 24 Mar 2017 09:13:14 -0700
+Subject: [PATCH v3 3/7] x86: Implement memset16, memset32 & memset64
 In-Reply-To: <20170324161318.18718-1-willy@infradead.org>
 References: <20170324161318.18718-1-willy@infradead.org>
-Message-ID: <20170324161318.18718-7-willy@infradead.org>
+Message-ID: <20170324161318.18718-4-willy@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Matthew Wilcox <mawilcox@microsoft.com>
 
-memset32() can be used to initialise these three arrays.  Minor code
-footprint reduction.
+These are single instructions on x86.  There's no 64-bit instruction
+for x86-32, but we don't yet have any user for memset64() on 32-bit
+architectures, so don't bother to implement it.
 
 Signed-off-by: Matthew Wilcox <mawilcox@microsoft.com>
 ---
- drivers/scsi/sym53c8xx_2/sym_hipd.c | 11 +++--------
- 1 file changed, 3 insertions(+), 8 deletions(-)
+ arch/x86/include/asm/string_32.h | 24 ++++++++++++++++++++++++
+ arch/x86/include/asm/string_64.h | 36 ++++++++++++++++++++++++++++++++++++
+ 2 files changed, 60 insertions(+)
 
-diff --git a/drivers/scsi/sym53c8xx_2/sym_hipd.c b/drivers/scsi/sym53c8xx_2/sym_hipd.c
-index 6b349e301869..b886b10e3499 100644
---- a/drivers/scsi/sym53c8xx_2/sym_hipd.c
-+++ b/drivers/scsi/sym53c8xx_2/sym_hipd.c
-@@ -4985,13 +4985,10 @@ struct sym_lcb *sym_alloc_lcb (struct sym_hcb *np, u_char tn, u_char ln)
- 	 *  Compute the bus address of this table.
- 	 */
- 	if (ln && !tp->luntbl) {
--		int i;
--
- 		tp->luntbl = sym_calloc_dma(256, "LUNTBL");
- 		if (!tp->luntbl)
- 			goto fail;
--		for (i = 0 ; i < 64 ; i++)
--			tp->luntbl[i] = cpu_to_scr(vtobus(&np->badlun_sa));
-+		memset32(tp->luntbl, cpu_to_scr(vtobus(&np->badlun_sa)), 64);
- 		tp->head.luntbl_sa = cpu_to_scr(vtobus(tp->luntbl));
- 	}
+diff --git a/arch/x86/include/asm/string_32.h b/arch/x86/include/asm/string_32.h
+index 3d3e8353ee5c..84da91fe13ac 100644
+--- a/arch/x86/include/asm/string_32.h
++++ b/arch/x86/include/asm/string_32.h
+@@ -331,6 +331,30 @@ void *__constant_c_and_count_memset(void *s, unsigned long pattern,
+ 	 : __memset((s), (c), (count)))
+ #endif
  
-@@ -5077,8 +5074,7 @@ static void sym_alloc_lcb_tags (struct sym_hcb *np, u_char tn, u_char ln)
- 	/*
- 	 *  Initialize the task table with invalid entries.
- 	 */
--	for (i = 0 ; i < SYM_CONF_MAX_TASK ; i++)
--		lp->itlq_tbl[i] = cpu_to_scr(np->notask_ba);
-+	memset32(lp->itlq_tbl, cpu_to_scr(np->notask_ba), SYM_CONF_MAX_TASK);
++#define __HAVE_ARCH_MEMSET16
++static inline void *memset16(uint16_t *s, uint16_t v, size_t n)
++{
++	int d0, d1;
++	asm volatile("rep\n\t"
++		     "stosw"
++		     : "=&c" (d0), "=&D" (d1)
++		     : "a" (v), "1" (s), "0" (n)
++		     : "memory");
++	return s;
++}
++
++#define __HAVE_ARCH_MEMSET_32
++static inline void *memset32(uint32_t *s, uint32_t v, size_t n)
++{
++	int d0, d1;
++	asm volatile("rep\n\t"
++		     "stosl"
++		     : "=&c" (d0), "=&D" (d1)
++		     : "a" (v), "1" (s), "0" (n)
++		     : "memory");
++	return s;
++}
++
+ /*
+  * find the first occurrence of byte 'c', or 1 past the area if none
+  */
+diff --git a/arch/x86/include/asm/string_64.h b/arch/x86/include/asm/string_64.h
+index a164862d77e3..71c5e860c7da 100644
+--- a/arch/x86/include/asm/string_64.h
++++ b/arch/x86/include/asm/string_64.h
+@@ -56,6 +56,42 @@ extern void *__memcpy(void *to, const void *from, size_t len);
+ void *memset(void *s, int c, size_t n);
+ void *__memset(void *s, int c, size_t n);
  
- 	/*
- 	 *  Fill up the tag buffer with tag numbers.
-@@ -5764,8 +5760,7 @@ int sym_hcb_attach(struct Scsi_Host *shost, struct sym_fw *fw, struct sym_nvram
- 		goto attach_failed;
- 
- 	np->badlun_sa = cpu_to_scr(SCRIPTB_BA(np, resel_bad_lun));
--	for (i = 0 ; i < 64 ; i++)	/* 64 luns/target, no less */
--		np->badluntbl[i] = cpu_to_scr(vtobus(&np->badlun_sa));
-+	memset32(np->badluntbl, cpu_to_scr(vtobus(&np->badlun_sa)), 64);
- 
- 	/*
- 	 *  Prepare the bus address array that contains the bus 
++#define __HAVE_ARCH_MEMSET16
++static inline void *memset16(uint16_t *s, uint16_t v, size_t n)
++{
++	long d0, d1;
++	asm volatile("rep\n\t"
++		     "stosw"
++		     : "=&c" (d0), "=&D" (d1)
++		     : "a" (v), "1" (s), "0" (n)
++		     : "memory");
++	return s;
++}
++
++#define __HAVE_ARCH_MEMSET32
++static inline void *memset32(uint32_t *s, uint32_t v, size_t n)
++{
++	long d0, d1;
++	asm volatile("rep\n\t"
++		     "stosl"
++		     : "=&c" (d0), "=&D" (d1)
++		     : "a" (v), "1" (s), "0" (n)
++		     : "memory");
++	return s;
++}
++
++#define __HAVE_ARCH_MEMSET64
++static inline void *memset64(uint64_t *s, uint64_t v, size_t n)
++{
++	long d0, d1;
++	asm volatile("rep\n\t"
++		     "stosq"
++		     : "=&c" (d0), "=&D" (d1)
++		     : "a" (v), "1" (s), "0" (n)
++		     : "memory");
++	return s;
++}
++
+ #define __HAVE_ARCH_MEMMOVE
+ void *memmove(void *dest, const void *src, size_t count);
+ void *__memmove(void *dest, const void *src, size_t count);
 -- 
 2.11.0
