@@ -1,132 +1,36 @@
-From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
-Date: Fri, 24 Mar 2017 00:23:55 +0000
-Subject: [PATCH V7 5/7] ACPI: Delay the enumeration on the devices whose
- dependency has not met
-In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E20492A4C@FRAEML521-MBX.china.huawei.com>
-References: <1489372963-9000-1-git-send-email-yuanzhichang@hisilicon.com>
- <1489372963-9000-6-git-send-email-yuanzhichang@hisilicon.com>
- <4600523.rWNiWKrYZC@aspire.rjw.lan> <58C9F6C6.4090700@hisilicon.com>
- <CAK8P3a2QZ_j9RQ0U=4MoAAcRcZyu0L5AiYM22QZkiRxh7Ca-iA@mail.gmail.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E20492A4C@FRAEML521-MBX.china.huawei.com>
-Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E204B678C@FRAEML521-MBX.china.huawei.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Fri, 24 Mar 2017 09:28:36 +0800
+Subject: [PATCH 05/15] ARM: dts: imx: fix PCI bus dtc warnings
+In-Reply-To: <CAL_JsqKmbLP07zKN1SJAoe0xHjzjn80HQDRvqASXvhnUOBgAyA@mail.gmail.com>
+References: <20170322020313.24338-1-robh@kernel.org>
+ <20170322020313.24338-5-robh@kernel.org>
+ <20170322081942.GM3443@dragon>
+ <CAL_JsqKmbLP07zKN1SJAoe0xHjzjn80HQDRvqASXvhnUOBgAyA@mail.gmail.com>
+Message-ID: <20170324012831.GB30608@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd
++Tim who is the owner of Gateworks Ventana boards.
 
-> -----Original Message-----
-> From: linuxarm-bounces at huawei.com [mailto:linuxarm-bounces at huawei.com]
-> On Behalf Of Gabriele Paoloni
-> Sent: 16 March 2017 16:14
-> To: Arnd Bergmann; Yuanzhichang
-> Cc: Mark Rutland; Benjamin Herrenschmidt; Rafael Wysocki; linux-pci;
-> Will Deacon; Linuxarm; Frank Rowand; Lorenzo Pieralisi; ACPI Devel
-> Maling List; linux-serial at vger.kernel.org; Catalin Marinas;
-> devicetree at vger.kernel.org; Corey Minyard; liviu.dudau at arm.com; Rob
-> Herring; Bjorn Helgaas; kantyzc at 163.com; zhichang.yuan02 at gmail.com;
-> Linux ARM; Rafael J. Wysocki; Linux Kernel Mailing List; Zou Rongrong
-> Subject: RE: [PATCH V7 5/7] ACPI: Delay the enumeration on the devices
-> whose dependency has not met
-> 
-> Hi Arnd
-> 
-> > -----Original Message-----
-> > From: arndbergmann at gmail.com [mailto:arndbergmann at gmail.com] On
-> Behalf
-> > Of Arnd Bergmann
-> > Sent: 16 March 2017 10:13
-> > To: Yuanzhichang
-> > Cc: Rafael J. Wysocki; Catalin Marinas; Will Deacon; Rob Herring;
-> Frank
-> > Rowand; Bjorn Helgaas; Rafael Wysocki; Mark Rutland; Linux ARM; ACPI
-> > Devel Maling List; Lorenzo Pieralisi; Benjamin Herrenschmidt; Linux
-> > Kernel Mailing List; Linuxarm; devicetree at vger.kernel.org; linux-pci;
-> > linux-serial at vger.kernel.org; Corey Minyard; liviu.dudau at arm.com; Zou
-> > Rongrong; John Garry; Gabriele Paoloni; zhichang.yuan02 at gmail.com;
-> > kantyzc at 163.com; xuwei (O)
-> > Subject: Re: [PATCH V7 5/7] ACPI: Delay the enumeration on the
-> devices
-> > whose dependency has not met
+On Wed, Mar 22, 2017 at 08:53:34AM -0500, Rob Herring wrote:
+> On Wed, Mar 22, 2017 at 3:19 AM, Shawn Guo <shawnguo@kernel.org> wrote:
+> > On Tue, Mar 21, 2017 at 09:03:03PM -0500, Rob Herring wrote:
+> >> dtc recently added PCI bus checks. Fix these warnings.
+> >>
+> >> Signed-off-by: Rob Herring <robh@kernel.org>
+> >> Cc: Shawn Guo <shawnguo@kernel.org>
+> >> Cc: Sascha Hauer <kernel@pengutronix.de>
+> >> Cc: Fabio Estevam <fabio.estevam@nxp.com>
 > >
-> > On Thu, Mar 16, 2017 at 3:21 AM, zhichang.yuan
-> > <yuanzhichang@hisilicon.com> wrote:
-> > > Hi, Rafael,
-> > >
-> > > Thanks for your review!
-> > >
-> > > On 2017/3/14 5:24, Rafael J. Wysocki wrote:
-> > >> On Monday, March 13, 2017 10:42:41 AM zhichang.yuan wrote:
-> > >>> In commit 40e7fcb1929(ACPI: Add _DEP support to fix battery issue
-> > on Asus
-> > >>> T100TA), the '_DEP' was supported to solve the dependency of Asus
-> > battery. But
-> > >>> this patch is specific to Asus battery device.
-> > >>> In the real world, there are other devices which need the
-> > dependency to play the
-> > >>> role on the enumeration order. For example, all the Hip06 LPC
-> > >>> periperals(IPMI-BT, uart, etc) must be scanned after the LPC host
-> > driver
-> > >>> finished the probing. So, it makes sense to add a checking
-> whether
-> > the ACPI
-> > >>> device meet all the dependencies during its enumeration slot, if
-> > not, the
-> > >>> enumeration will be delayed till all dependency master finish
-> their
-> > work.
-> > >>>
-> > >>> This patch adds the dependency checking in ACPI enumeration, also
-> > the
-> > >>> corresponding handling to retrigger the Hip06 LPC peripherals'
-> > scanning.
-> > >>
-> > >> AFAICS, _DEP is generally abused in the wild and cannot be made
-> > generic.  Sorry.
-> > >>
-> > >
-> > > From the ACPI specification, _DEP is for operation region accesses.
-> > > You are right...
-> > >
-> > > How about we add a ACPI handler for our LPC bus?? Just like amba.
-> > > In this way, we also can solve the issue about LPC enumeration
-> order.
-> >
-> > As far as I can tell, PCI and LPC have exactly the same requirement
-> > here,
-> > so whatever you end up doing for one should be used for the other as
-> > well.
+> > Applied with a couple of changes below.
 > 
-> Well as you know PCI has got his own handler, identified by his own
-> namespace id "PNP0A03".
-> Now when you say "you end up doing for one should be used for the
-> other"
-> are you saying that we should introduce a new class of devices?
-> i.e. should we have an ACPI namespace identifier for non-PCI IO Host
-> Controllers?
-> 
-> Otherwise, if my understanding is correct, having a specific new ACPI
-> handler for HiSilicon LPC would mean to adding another function_init()
-> in the list of acpi handlers inits in acpi_scan_init().
-> 
-> But then every vendor would declare his own one...is this really
-> correct?
+> Thanks. BTW, forget to mention there's still one i.MX warning I did
+> not fix. It's with the "sky2 at 8" PCI device node. The unit address is
+> completely wrong. The comment says bus #8 which doesn't seem right
+> either. The unit address should be "<device num>[,<function]". There
+> should be a reg property which also has the bus number.
 
-Do you have any feedback on this?
+@Tim, these DTC warnings come from Ventana boards.  Can you take care of
+them?
 
-Otherwise I think that maybe we could consider moving back to the
-arch_initcall approach as proposed in V6:
-https://lkml.org/lkml/2017/1/24/28
-
-Thanks
-Gab
-
-> 
-> Many Thanks
-> Gab
-> 
-> >
-> >       Arnd
-> _______________________________________________
-> linuxarm mailing list
-> linuxarm at huawei.com
-> http://rnd-openeuler.huawei.com/mailman/listinfo/linuxarm
+Shawn
