@@ -1,53 +1,62 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 24 Mar 2017 14:48:39 +0000
-Subject: [PATCH] arm/dma-mapping: use for_each_sg
-In-Reply-To: <e9923f7ea2c0fd866efb48be52ffe91d25dd0290.1490326970.git.geliangtang@gmail.com>
-References: <e9923f7ea2c0fd866efb48be52ffe91d25dd0290.1490326970.git.geliangtang@gmail.com>
-Message-ID: <20170324144838.GH7909@n2100.armlinux.org.uk>
+From: opendmb@gmail.com (Doug Berger)
+Date: Fri, 24 Mar 2017 07:46:31 -0700
+Subject: [PATCH 8/9] bus: brcmstb_gisb: add ARM64 SError support
+In-Reply-To: <20170324144632.5896-1-opendmb@gmail.com>
+References: <20170324144632.5896-1-opendmb@gmail.com>
+Message-ID: <20170324144632.5896-9-opendmb@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 24, 2017 at 10:12:23PM +0800, Geliang Tang wrote:
-> Use for_each_sg() instead of open-coding it.
-> 
-> Signed-off-by: Geliang Tang <geliangtang@gmail.com>
+Asynchronous external aborts (e.g. for buffered writes) trigger SError
+aborts on the arm64 architecture.  This commit hooks the SError abort
+handling to check for GISB arbitration errors.
 
-No.
+Signed-off-by: Doug Berger <opendmb@gmail.com>
+---
+ drivers/bus/brcmstb_gisb.c | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
-> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-> index 63eabb0..e551351 100644
-> --- a/arch/arm/mm/dma-mapping.c
-> +++ b/arch/arm/mm/dma-mapping.c
-> @@ -1720,7 +1720,7 @@ static int __map_sg_chunk(struct device *dev, struct scatterlist *sg,
->  	if (iova == DMA_ERROR_CODE)
->  		return -ENOMEM;
->  
-> -	for (count = 0, s = sg; count < (size >> PAGE_SHIFT); s = sg_next(s)) {
-> +	for_each_sg(sg, s, size >> PAGE_SHIFT, count) {
-
-This is _not_ equivalent.
-
-#define for_each_sg(sglist, sg, nr, __i)        \
-        for (__i = 0, sg = (sglist); __i < (nr); __i++, sg = sg_next(sg))
-
-Putting the arguments into that gives:
-
-        for (count = 0, s = sg; count < (size >> PAGE_SHIFT); count++, s = sg_next(s))
-
-whereas the old code is:
-
-	for (count = 0, s = sg; count < (size >> PAGE_SHIFT); s = sg_next(s))
-
-Spot the difference?  "count++".
-
-This is because "size >> PAGE_SHIFT" is not the number of scatterlist
-entries, it's the number of pages to map.
-
-Please be more careful in the future to ensure that, when cleaning up
-code, that the code is indeed equivalent.  Subtle errors like this are
-sometimes incredibly difficult to spot.
-
+diff --git a/drivers/bus/brcmstb_gisb.c b/drivers/bus/brcmstb_gisb.c
+index bf26b4017a2c..52b5d96081eb 100644
+--- a/drivers/bus/brcmstb_gisb.c
++++ b/drivers/bus/brcmstb_gisb.c
+@@ -252,6 +252,28 @@ static int brcmstb_bus_error_handler(unsigned long addr, unsigned int fsr,
+ 	/* Always report unhandled exception */
+ 	return 1;
+ }
++
++#ifdef CONFIG_ARM64
++static int (*serror_chain)(unsigned long addr, unsigned int esr,
++				struct pt_regs *regs);
++static int do_brahma_b53_serror(unsigned long addr, unsigned int esr,
++				struct pt_regs *regs)
++{
++	struct brcmstb_gisb_arb_device *gdev;
++
++	if (((esr & (3 << 22)) == 0) && ((esr & 3) == 2)) {
++		/* iterate over each GISB arb registered handlers */
++		list_for_each_entry(gdev, &brcmstb_gisb_arb_device_list, next)
++			brcmstb_gisb_arb_decode_addr(gdev, "bus error");
++	}
++
++	if (serror_chain)
++		return serror_chain(addr, esr, regs);
++
++	/* Always report unhandled exception */
++	return 1;
++}
++#endif
+ #endif /* CONFIG_ARM || CONFIG_ARM64 */
+ 
+ #ifdef CONFIG_MIPS
+@@ -403,6 +425,8 @@ static int __init brcmstb_gisb_arb_probe(struct platform_device *pdev)
+ #ifdef CONFIG_ARM64
+ 	hook_fault_code(16, brcmstb_bus_error_handler, SIGBUS, 0,
+ 			"synchronous external abort");
++	if (list_is_singular(&brcmstb_gisb_arb_device_list))
++		serror_chain = hook_serror_handler(do_brahma_b53_serror);
+ #endif
+ #ifdef CONFIG_MIPS
+ 	board_be_handler = brcmstb_bus_error_handler;
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+2.12.0
