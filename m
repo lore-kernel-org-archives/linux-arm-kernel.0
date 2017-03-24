@@ -1,51 +1,132 @@
-From: slash.tmp@free.fr (Mason)
-Date: Fri, 24 Mar 2017 00:40:16 +0100
-Subject: [RFC PATCH v0.2] PCI: Add support for tango PCIe host bridge
-In-Reply-To: <310db9dd-7db6-2106-2e53-f0083b2d3758@free.fr>
-References: <91db1f47-3024-9712-309a-fb4b21e42028@free.fr>
- <e5c0bace-fcbe-de3f-b76f-0fb672562e84@arm.com>
- <310db9dd-7db6-2106-2e53-f0083b2d3758@free.fr>
-Message-ID: <9fffedd4-6292-b662-a588-a68fe7380af6@free.fr>
+From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
+Date: Fri, 24 Mar 2017 00:23:55 +0000
+Subject: [PATCH V7 5/7] ACPI: Delay the enumeration on the devices whose
+ dependency has not met
+In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E20492A4C@FRAEML521-MBX.china.huawei.com>
+References: <1489372963-9000-1-git-send-email-yuanzhichang@hisilicon.com>
+ <1489372963-9000-6-git-send-email-yuanzhichang@hisilicon.com>
+ <4600523.rWNiWKrYZC@aspire.rjw.lan> <58C9F6C6.4090700@hisilicon.com>
+ <CAK8P3a2QZ_j9RQ0U=4MoAAcRcZyu0L5AiYM22QZkiRxh7Ca-iA@mail.gmail.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E20492A4C@FRAEML521-MBX.china.huawei.com>
+Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E204B678C@FRAEML521-MBX.china.huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/03/2017 18:03, Mason wrote:
+Hi Arnd
 
-> The host bridge actually supports 256 MSIs.
+> -----Original Message-----
+> From: linuxarm-bounces at huawei.com [mailto:linuxarm-bounces at huawei.com]
+> On Behalf Of Gabriele Paoloni
+> Sent: 16 March 2017 16:14
+> To: Arnd Bergmann; Yuanzhichang
+> Cc: Mark Rutland; Benjamin Herrenschmidt; Rafael Wysocki; linux-pci;
+> Will Deacon; Linuxarm; Frank Rowand; Lorenzo Pieralisi; ACPI Devel
+> Maling List; linux-serial at vger.kernel.org; Catalin Marinas;
+> devicetree at vger.kernel.org; Corey Minyard; liviu.dudau at arm.com; Rob
+> Herring; Bjorn Helgaas; kantyzc at 163.com; zhichang.yuan02 at gmail.com;
+> Linux ARM; Rafael J. Wysocki; Linux Kernel Mailing List; Zou Rongrong
+> Subject: RE: [PATCH V7 5/7] ACPI: Delay the enumeration on the devices
+> whose dependency has not met
 > 
-> IIUC, what you suggested on IRC is that I support 256 in the driver,
-> and only read the status for *enabled* MSIs.
+> Hi Arnd
 > 
-> Pseudo-code:
+> > -----Original Message-----
+> > From: arndbergmann at gmail.com [mailto:arndbergmann at gmail.com] On
+> Behalf
+> > Of Arnd Bergmann
+> > Sent: 16 March 2017 10:13
+> > To: Yuanzhichang
+> > Cc: Rafael J. Wysocki; Catalin Marinas; Will Deacon; Rob Herring;
+> Frank
+> > Rowand; Bjorn Helgaas; Rafael Wysocki; Mark Rutland; Linux ARM; ACPI
+> > Devel Maling List; Lorenzo Pieralisi; Benjamin Herrenschmidt; Linux
+> > Kernel Mailing List; Linuxarm; devicetree at vger.kernel.org; linux-pci;
+> > linux-serial at vger.kernel.org; Corey Minyard; liviu.dudau at arm.com; Zou
+> > Rongrong; John Garry; Gabriele Paoloni; zhichang.yuan02 at gmail.com;
+> > kantyzc at 163.com; xuwei (O)
+> > Subject: Re: [PATCH V7 5/7] ACPI: Delay the enumeration on the
+> devices
+> > whose dependency has not met
+> >
+> > On Thu, Mar 16, 2017 at 3:21 AM, zhichang.yuan
+> > <yuanzhichang@hisilicon.com> wrote:
+> > > Hi, Rafael,
+> > >
+> > > Thanks for your review!
+> > >
+> > > On 2017/3/14 5:24, Rafael J. Wysocki wrote:
+> > >> On Monday, March 13, 2017 10:42:41 AM zhichang.yuan wrote:
+> > >>> In commit 40e7fcb1929(ACPI: Add _DEP support to fix battery issue
+> > on Asus
+> > >>> T100TA), the '_DEP' was supported to solve the dependency of Asus
+> > battery. But
+> > >>> this patch is specific to Asus battery device.
+> > >>> In the real world, there are other devices which need the
+> > dependency to play the
+> > >>> role on the enumeration order. For example, all the Hip06 LPC
+> > >>> periperals(IPMI-BT, uart, etc) must be scanned after the LPC host
+> > driver
+> > >>> finished the probing. So, it makes sense to add a checking
+> whether
+> > the ACPI
+> > >>> device meet all the dependencies during its enumeration slot, if
+> > not, the
+> > >>> enumeration will be delayed till all dependency master finish
+> their
+> > work.
+> > >>>
+> > >>> This patch adds the dependency checking in ACPI enumeration, also
+> > the
+> > >>> corresponding handling to retrigger the Hip06 LPC peripherals'
+> > scanning.
+> > >>
+> > >> AFAICS, _DEP is generally abused in the wild and cannot be made
+> > generic.  Sorry.
+> > >>
+> > >
+> > > From the ACPI specification, _DEP is for operation region accesses.
+> > > You are right...
+> > >
+> > > How about we add a ACPI handler for our LPC bus?? Just like amba.
+> > > In this way, we also can solve the issue about LPC enumeration
+> order.
+> >
+> > As far as I can tell, PCI and LPC have exactly the same requirement
+> > here,
+> > so whatever you end up doing for one should be used for the other as
+> > well.
 > 
-> for every 32-bit blob in the enabled bitmap
->   if the value is non-zero
->     lookup the corresponding status reg
+> Well as you know PCI has got his own handler, identified by his own
+> namespace id "PNP0A03".
+> Now when you say "you end up doing for one should be used for the
+> other"
+> are you saying that we should introduce a new class of devices?
+> i.e. should we have an ACPI namespace identifier for non-PCI IO Host
+> Controllers?
 > 
-> Problem is that a BITMAP is unsigned long (as you point out below).
-> So I'm not sure how to iterate 32-bits at a time over the BITMAP.
+> Otherwise, if my understanding is correct, having a specific new ACPI
+> handler for HiSilicon LPC would mean to adding another function_init()
+> in the list of acpi handlers inits in acpi_scan_init().
+> 
+> But then every vendor would declare his own one...is this really
+> correct?
 
-Something along these lines:
+Do you have any feedback on this?
 
-	DECLARE_BITMAP(enabled, 256);
+Otherwise I think that maybe we could consider moving back to the
+arch_initcall approach as proposed in V6:
+https://lkml.org/lkml/2017/1/24/28
 
-	unsigned int pos = 0;
+Thanks
+Gab
 
-	while ((pos = find_next_bit(enabled, 256, pos)) < 256) {
-		int offset = (pos / 32) * 4;
-		u32 status = readl_relaxed(status + offset);
-		/* Handle each pos set in status */
-		pos = round_up(pos, 32);
-	}
-
-You mentioned a bug in my code (due to the platform endianness)
-when passing the result of readl_relaxed to the bitops routine...
-How is one supposed to iterate over status?
-
-I'm not yet seeing this endianness issue, since (status & BIT(i))
-provides the status of MSI_i, irrespective of endianness.
-
-Although I see that arch/arm/include/asm/bitops.h declares
-BE and LE variants... I'm confused.
-
-Regards.
+> 
+> Many Thanks
+> Gab
+> 
+> >
+> >       Arnd
+> _______________________________________________
+> linuxarm mailing list
+> linuxarm at huawei.com
+> http://rnd-openeuler.huawei.com/mailman/listinfo/linuxarm
