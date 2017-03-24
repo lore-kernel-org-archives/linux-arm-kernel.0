@@ -1,84 +1,112 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Fri, 24 Mar 2017 14:27:24 +0800
-Subject: [linux-sunxi] [PATCH v4 3/8] phy: sun4i-usb: add PHYCTL offset
- for H3 SoC
-In-Reply-To: <CAGb2v65NHgDDPGChR4rg28NS1tuj2RZ9ERrQz2cSa_haZLypXA@mail.gmail.com>
-References: <20170319161951.55834-1-icenowy@aosc.xyz>
- <20170319161951.55834-4-icenowy@aosc.xyz>
- <CAGb2v65NHgDDPGChR4rg28NS1tuj2RZ9ERrQz2cSa_haZLypXA@mail.gmail.com>
-Message-ID: <1157651490336844@web12m.yandex.ru>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Fri, 24 Mar 2017 14:28:21 +0800
+Subject: [PATCH 2/2] soc/imx: add workaround for i.MX6QP to the GPC PD
+ driver
+In-Reply-To: <20170323144418.30977-3-l.stach@pengutronix.de>
+References: <20170323144418.30977-1-l.stach@pengutronix.de>
+ <20170323144418.30977-3-l.stach@pengutronix.de>
+Message-ID: <20170324062819.GJ30608@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Mar 23, 2017 at 03:44:18PM +0100, Lucas Stach wrote:
+> On i.MX6QP, due to hardware erratum ERR009619, the PRE clocks may be
+> stalled during the power up sequencing of the PU power domain. As this
+> may lead to a complete loss of display output, the recommended
+> workaround is to keep the PU domain enabled during normal system
+> operation.
+> 
+> Implement this by rejecting the domain power down request on the
+> affected SoC.
+> 
+> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> ---
+>  drivers/soc/imx/gpc.c | 19 +++++++++++++++++++
+>  1 file changed, 19 insertions(+)
+> 
+> diff --git a/drivers/soc/imx/gpc.c b/drivers/soc/imx/gpc.c
+> index 4294287e5f6c..599e1e46f694 100644
+> --- a/drivers/soc/imx/gpc.c
+> +++ b/drivers/soc/imx/gpc.c
+> @@ -45,6 +45,7 @@ struct imx_pm_domain {
+>  	unsigned int reg_offs;
+>  	signed char cntr_pdn_bit;
+>  	unsigned int ipg_rate_mhz;
+> +	bool allow_dynamic_pd;
+>  };
+>  
+>  static inline struct imx_pm_domain *
+> @@ -59,6 +60,9 @@ static int imx6_pm_domain_power_off(struct generic_pm_domain *genpd)
+>  	int iso, iso2sw;
+>  	u32 val;
+>  
+> +	if (!pd->allow_dynamic_pd)
+> +		return -EBUSY;
+> +
+>  	/* Read ISO and ISO2SW power down delays */
+>  	regmap_read(pd->regmap, pd->reg_offs + GPC_PGC_PUPSCR_OFFS, &val);
+>  	iso = val & 0x3f;
+> @@ -255,6 +259,7 @@ static struct imx_pm_domain imx_gpc_domains[] = {
+>  		},
+>  		.reg_offs = 0x260,
+>  		.cntr_pdn_bit = 0,
+> +		.allow_dynamic_pd = true,
+>  	}, {
+>  		.base = {
+>  			.name = "DISPLAY",
+> @@ -263,23 +268,33 @@ static struct imx_pm_domain imx_gpc_domains[] = {
+>  		},
+>  		.reg_offs = 0x240,
+>  		.cntr_pdn_bit = 4,
+> +		.allow_dynamic_pd = true,
+>  	}
+>  };
+>  
+>  struct imx_gpc_dt_data {
+>  	int num_domains;
+> +	bool err009619_present;
+>  };
+>  
+>  static const struct imx_gpc_dt_data imx6q_dt_data = {
+>  	.num_domains = 2,
+> +	.err009619_present = false,
+> +};
+> +
+> +static const struct imx_gpc_dt_data imx6qp_dt_data = {
+> +	.num_domains = 2,
+> +	.err009619_present = true,
+>  };
+>  
+>  static const struct imx_gpc_dt_data imx6sl_dt_data = {
+>  	.num_domains = 3,
+> +	.err009619_present = false,
+>  };
+>  
+>  static const struct of_device_id imx_gpc_dt_ids[] = {
+>  	{ .compatible = "fsl,imx6q-gpc", .data = &imx6q_dt_data },
+> +	{ .compatible = "fsl,imx6qp-gpc", .data = &imx6qp_dt_data },
+>  	{ .compatible = "fsl,imx6sl-gpc", .data = &imx6sl_dt_data },
+>  	{ }
+>  };
+> @@ -377,6 +392,10 @@ static int imx_gpc_probe(struct platform_device *pdev)
+>  		return ret;
+>  	}
+>  
+> +	/* Disable PU power down in normal operation if ERR009619 is present */
+> +	if (of_id_data->err009619_present)
+> +		imx_gpc_domains[1].allow_dynamic_pd = false;
 
+I'm uncomfortable with using hard-coded value indexing the
+imx_gpc_domains array for a particular power domain.  We already have a
+couple of such uses in the code, and it becomes even more.  Can we have
+some defines or enumerations to help?
 
-24.03.2017, 11:05, "Chen-Yu Tsai" <wens@csie.org>:
-> On Mon, Mar 20, 2017 at 12:19 AM, Icenowy Zheng <icenowy@aosc.xyz> wrote:
->> ?The config structure of H3 in phy-sun4i-usb driver have the PHYCTL
->> ?register offset missing.
->>
->> ?Add it. Because it's a SoC after A33, its PHYCTL offset should be 0x10.
->
-> You are implying that all SoCs after A33 have PHYCTL at 0x10.
->
-> This is not true. As the A83T, which was released after the A33, has
-> PHYCTL at the old offset.
+Shawn
 
-No, in Allwinner's BSP A83T is using also PHYCTL at 0x10.
-
-The code in linux-3.4/drivers/usb/sunxi_usb/include/sunxi_usb_bsp.c is
-```
-#if defined (CONFIG_ARCH_SUN8IW5) || defined (CONFIG_ARCH_SUN8IW6) || defined (CONFIG_ARCH_SUN8IW9) || defined (CONFIG_ARCH_SUN8IW8) || defined (CONFIG_ARCH_SUN8IW7)
-#define  USBPHYC_REG_o_PHYCTL		    0x0410
-#else
-#define  USBPHYC_REG_o_PHYCTL		    0x0404
-#endif
-```
-
-In linux-3.10/drivers/usb/sunxi_usb/include/sunxi_usb_bsp.c is
-```
-#if defined (CONFIG_ARCH_SUN50I) || defined (CONFIG_ARCH_SUN8IW10) || defined (CONFIG_ARCH_SUN8IW11)
-#define  USBPHYC_REG_o_PHYCTL		    0x0410
-#else
-#define  USBPHYC_REG_o_PHYCTL		    0x0404
-#endif
-```
-
-So sun50i* and sun50iw5~w11 all use PHYCTL at 0x10.
-
->
-> Just state that H3 has PHYCTL at 0x10.
->
-> ChenYu
->
->> ?Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
->> ?---
->> ?New patch in v4.
->>
->> ??drivers/phy/phy-sun4i-usb.c | 1 +
->> ??1 file changed, 1 insertion(+)
->>
->> ?diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
->> ?index 62b4d25448c6..a650f283f6ff 100644
->> ?--- a/drivers/phy/phy-sun4i-usb.c
->> ?+++ b/drivers/phy/phy-sun4i-usb.c
->> ?@@ -821,6 +821,7 @@ static const struct sun4i_usb_phy_cfg sun8i_h3_cfg = {
->> ?????????.num_phys = 4,
->> ?????????.type = sun8i_h3_phy,
->> ?????????.disc_thresh = 3,
->> ?+ .phyctl_offset = REG_PHYCTL_A33,
->> ?????????.dedicated_clocks = true,
->> ?????????.enable_pmu_unk1 = true,
->> ??};
->> ?--
->> ?2.12.0
->>
->> ?--
->> ?You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
->> ?To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
->> ?For more options, visit https://groups.google.com/d/optout.
->
-> --
-> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
-> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
-> For more options, visit https://groups.google.com/d/optout.
+> +
+>  	if (!pgc_node) {
+>  		ret = imx_gpc_old_dt_init(&pdev->dev, regmap,
+>  					  of_id_data->num_domains);
+> -- 
+> 2.11.0
+> 
