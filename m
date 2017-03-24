@@ -1,41 +1,35 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Fri, 24 Mar 2017 10:38:05 -0500
-Subject: [PATCH 2/4 v5] PCI: add driver for Faraday Technology Host Bridge
-In-Reply-To: <CACRpkdbkhui0iwJbOeD8uwurdWvOYdPKtRPQhSkg0atpAB174Q@mail.gmail.com>
-References: <20170312222403.2473-1-linus.walleij@linaro.org>
- <20170324150753.GC25380@bhelgaas-glaptop.roam.corp.google.com>
- <CACRpkdbkhui0iwJbOeD8uwurdWvOYdPKtRPQhSkg0atpAB174Q@mail.gmail.com>
-Message-ID: <20170324153805.GA31729@bhelgaas-glaptop.roam.corp.google.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Fri, 24 Mar 2017 16:38:24 +0100
+Subject: [PATCH v3 0/5] ATA/ARM: convert ARM/DaVinci to use libata PATA
+ drivers
+In-Reply-To: <aaf669ba-4439-9af7-7943-c9163bd99020@ti.com>
+References: <CGME20170322182127epcas1p267b13e8c92205223458863783bdea476@epcas1p2.samsung.com>
+ <1490206862-26065-1-git-send-email-b.zolnierkie@samsung.com>
+ <aaf669ba-4439-9af7-7943-c9163bd99020@ti.com>
+Message-ID: <7423344.GzQhW9fIvG@amdc3058>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 24, 2017 at 04:14:43PM +0100, Linus Walleij wrote:
-> On Fri, Mar 24, 2017 at 4:07 PM, Bjorn Helgaas <helgaas@kernel.org> wrote:
+On Thursday, March 23, 2017 07:27:05 PM Sekhar Nori wrote:
+> On Wednesday 22 March 2017 11:50 PM, Bartlomiej Zolnierkiewicz wrote:
+> > Hi,
+> > 
+> > This patchset adds Palmchip BK3710 IDE controller driver to
+> > libata and switches ARM/DaVinci to use it (instead of the old
+> > IDE driver).
+> > 
+> > Sekhar, please check that it still works after changes, thanks.
 > 
-> > Acked-by: Bjorn Helgaas <bhelgaas@google.com>
-> 
-> Thanks!
-> 
-> > I don't know enough to review the DT patch, but you have Rob's ack
-> > already.
-> >
-> > Not sure how you want to merge these; if you want to feed the whole
-> > thing via ARM SoC, that's fine with me.  Otherwise, let me know if
-> > you'd like me to take anything.
-> 
-> It'd be perfect if you could merge patches 1+2 into the PCI tree,
-> there are no dependencies to the ARM tree.
-> 
-> > Noticed one trivial typo below.
-> >
-> >> + * Special configuration registers directly in the first few words
-> >> + * in he I/O space.
-> >
-> > s/he//
-> 
-> Can you fix it when applying or do you want me to resend it with
-> this fixed?
+> Did some basic mount/read/write tests, it passed.
 
-I fixed it.
+Thanks for checking.
 
-Applied 1 & 2 to pci/host-faraday for v4.12, thanks!
+I guess that you can merge the patchset now to your tree
+(with Tejun's ACK for the whole patches and Sergei's ACK
+for ATA changes).
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
