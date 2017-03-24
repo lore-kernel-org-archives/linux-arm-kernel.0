@@ -1,76 +1,35 @@
-From: adrian.hunter@intel.com (Adrian Hunter)
-Date: Fri, 24 Mar 2017 11:19:13 +0200
-Subject: [PATCH] mmc: core: Do not hold re-tuning during CMD6 commands
-In-Reply-To: <1490344369.22814.10.camel@mhfsdcap03>
-References: <1490336341-22292-1-git-send-email-chaotian.jing@mediatek.com>
- <1490336341-22292-2-git-send-email-chaotian.jing@mediatek.com>
- <13a83728-0031-5683-c371-4b517df32299@intel.com>
- <1490344369.22814.10.camel@mhfsdcap03>
-Message-ID: <03d54000-9ced-1b31-df80-d254f02433db@intel.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 24 Mar 2017 09:29:28 +0000
+Subject: [PATCH 1/4 v2] irqchip: augment Gemini bindings to reflect
+ Faraday origin
+In-Reply-To: <20170318165326.20450-1-linus.walleij@linaro.org>
+References: <20170318165326.20450-1-linus.walleij@linaro.org>
+Message-ID: <604b75cd-e7ec-925d-e745-7ee7d45c602f@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/03/17 10:32, Chaotian Jing wrote:
-> On Fri, 2017-03-24 at 09:52 +0200, Adrian Hunter wrote:
->> On 24/03/17 08:19, Chaotian Jing wrote:
->>> this patch is refine for 'commit c6dbab9cb58f ("mmc: core: Hold re-tuning
->>> during switch commands")'
->>> Since it has 3 retries at max for CMD6, if the first CMD6 got CRC error,
->>> then should do re-tune before the next CMD6 was sent.
->>>
->>> Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
->>> ---
->>>  drivers/mmc/core/mmc_ops.c |    3 +--
->>>  1 file changed, 1 insertion(+), 2 deletions(-)
->>>
->>> diff --git a/drivers/mmc/core/mmc_ops.c b/drivers/mmc/core/mmc_ops.c
->>> index fe80f26..6931927 100644
->>> --- a/drivers/mmc/core/mmc_ops.c
->>> +++ b/drivers/mmc/core/mmc_ops.c
->>> @@ -534,8 +534,6 @@ int __mmc_switch(struct mmc_card *card, u8 set, u8 index, u8 value,
->>>  	bool use_r1b_resp = use_busy_signal;
->>>  	unsigned char old_timing = host->ios.timing;
->>>  
->>> -	mmc_retune_hold(host);
->>> -
->>>  	/*
->>>  	 * If the cmd timeout and the max_busy_timeout of the host are both
->>>  	 * specified, let's validate them. A failure means we need to prevent
->>> @@ -567,6 +565,7 @@ int __mmc_switch(struct mmc_card *card, u8 set, u8 index, u8 value,
->>>  		cmd.sanitize_busy = true;
->>>  
->>>  	err = mmc_wait_for_cmd(host, &cmd, MMC_CMD_RETRIES);
->>> +	mmc_retune_hold(host);
->>
->> That is not how mmc_retune_hold() works, you need mmc_retune_hold_now() as
->> it is here:
->>
->> 	https://marc.info/?l=linux-mmc&m=148940903816582
->>
->> But using "retries" with commands that have busy-waiting on the data line
->> doesn't make much sense anyway.  Particularly with CRC errors, I would
->> expect the card is actually busily doing the switch and we need only to wait
->> for it.  The same can be true for timeout errors.  For some CMD6 we might
->> need to send CMD12 if the card is busy after an error.  I would prefer an
->> explicit attempt at recovery from CMD6 errors.
->>
+On 18/03/17 16:53, Linus Walleij wrote:
+> When we merged the Gemini interrupt controller it was not yet
+> discovered that this IP block is actually a standard Faraday
+> Technology interrupt controller.
 > 
-> It's the host driver's responsibility to ensure card is not in busy
-> state before issue the next R1B command, or the MMC core layer needs do
-> extra check/waiting before issue a R1B command.
+> As the IP block will probably appear in other designs as well,
+> let's augment the DT bindings to reflect that it is first and
+> foremost a standard Faraday part with a function name (FTINTC010)
+> so that people reusing the IP easily find the driver they need.
+> 
+> Sorry for the mistakes due to lack of information.
+> 
+> Cc: Greentime Hu <green.hu@gmail.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> ChangeLog v1->v2:
+> - No changes, just resending with the rest.
 
-Better to deal with cards stuck in busy from the places where busy-waiting
-is expected.
+I've queued the series for 4.12.
 
-> I think the purpose of "re-tune" is trying to cover particular case(eg.
-> voltage fluctuate or EMI or some glitch of host/device which caused CRC
-> error)
+Thanks,
 
-No, re-tuning is to compensate for drift caused primarily by temperature change.
-
-> error) , but in such cases, too many cases are disable re-tune function
-> by mmc_retune_hold(), for example, in this case, if a response CRC error
-> got then we never have chance to recover it. then cause system cannot
-> access emmc or suspend/resume fail.
-
-Maybe you have a hardware problem.
+	M.
+-- 
+Jazz is not dead. It just smells funny...
