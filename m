@@ -1,140 +1,141 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Fri, 24 Mar 2017 19:00:02 +0100
-Subject: [PATCH] kvm: arm/arm64: Rework gpa callback handlers
-In-Reply-To: <1490034402-28850-1-git-send-email-suzuki.poulose@arm.com>
-References: <1490034402-28850-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20170324180002.GJ25903@cbox>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 24 Mar 2017 18:00:35 +0000
+Subject: [PATCH v2 06/18] arm64: arch_timer: Add infrastructure for
+ multiple erratum detection methods
+In-Reply-To: <CALdTtnvyT1qjKp5C5AfvSSW7GqN3m2Y_CkTMEX+5OxyvH=+G2Q@mail.gmail.com>
+References: <20170320174829.28182-1-marc.zyngier@arm.com>
+ <20170320174829.28182-7-marc.zyngier@arm.com>
+ <CALdTtnvyT1qjKp5C5AfvSSW7GqN3m2Y_CkTMEX+5OxyvH=+G2Q@mail.gmail.com>
+Message-ID: <b40e0cc7-5580-a834-babe-0dfa8427629e@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 20, 2017 at 06:26:42PM +0000, Suzuki K Poulose wrote:
-> In order to perform an operation on a gpa range, the hyp iterates
+Hi Dann,
 
-the hyp ?
-
-> over each page in a user memory slot for the given range. This is
-> inefficient while dealing with a big range (e.g, a VMA), especially
-> while unmaping a range. At present, with stage2 unmap on a range with
-> a hugepage backed region, we clear the PMD when we unmap the first
-> page in the loop. The remaining iterations simply traverse the page table
-> down to the PMD level only to see that nothing is in there.
+On 24/03/17 17:48, dann frazier wrote:
+> On Mon, Mar 20, 2017 at 11:48 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>> We're currently stuck with DT when it comes to handling errata, which
+>> is pretty restrictive. In order to make things more flexible, let's
+>> introduce an infrastructure that could support alternative discovery
+>> methods. No change in functionality.
+>>
+>> Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  arch/arm64/include/asm/arch_timer.h  |  7 +++-
+>>  drivers/clocksource/arm_arch_timer.c | 80 +++++++++++++++++++++++++++++++-----
+>>  2 files changed, 75 insertions(+), 12 deletions(-)
+>>
+>> diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
+>> index b4b34004a21e..5cd964e90d11 100644
+>> --- a/arch/arm64/include/asm/arch_timer.h
+>> +++ b/arch/arm64/include/asm/arch_timer.h
+>> @@ -37,9 +37,14 @@ extern struct static_key_false arch_timer_read_ool_enabled;
+>>  #define needs_unstable_timer_counter_workaround()  false
+>>  #endif
+>>
+>> +enum arch_timer_erratum_match_type {
+>> +       ate_match_dt,
+>> +};
+>>
+>>  struct arch_timer_erratum_workaround {
+>> -       const char *id;         /* Indicate the Erratum ID */
+>> +       enum arch_timer_erratum_match_type match_type;
+>> +       const void *id;
+>> +       const char *desc;
+>>         u32 (*read_cntp_tval_el0)(void);
+>>         u32 (*read_cntv_tval_el0)(void);
+>>         u64 (*read_cntvct_el0)(void);
+>> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+>> index 7a8a4117f123..6a0f0e161a0f 100644
+>> --- a/drivers/clocksource/arm_arch_timer.c
+>> +++ b/drivers/clocksource/arm_arch_timer.c
+>> @@ -182,7 +182,9 @@ EXPORT_SYMBOL_GPL(arch_timer_read_ool_enabled);
+>>  static const struct arch_timer_erratum_workaround ool_workarounds[] = {
+>>  #ifdef CONFIG_FSL_ERRATUM_A008585
+>>         {
+>> +               .match_type = ate_match_dt,
+>>                 .id = "fsl,erratum-a008585",
+>> +               .desc = "Freescale erratum a005858",
+>>                 .read_cntp_tval_el0 = fsl_a008585_read_cntp_tval_el0,
+>>                 .read_cntv_tval_el0 = fsl_a008585_read_cntv_tval_el0,
+>>                 .read_cntvct_el0 = fsl_a008585_read_cntvct_el0,
+>> @@ -190,13 +192,78 @@ static const struct arch_timer_erratum_workaround ool_workarounds[] = {
+>>  #endif
+>>  #ifdef CONFIG_HISILICON_ERRATUM_161010101
+>>         {
+>> +               .match_type = ate_match_dt,
+>>                 .id = "hisilicon,erratum-161010101",
+>> +               .desc = "HiSilicon erratum 161010101",
+>>                 .read_cntp_tval_el0 = hisi_161010101_read_cntp_tval_el0,
+>>                 .read_cntv_tval_el0 = hisi_161010101_read_cntv_tval_el0,
+>>                 .read_cntvct_el0 = hisi_161010101_read_cntvct_el0,
+>>         },
+>>  #endif
+>>  };
+>> +
+>> +typedef bool (*ate_match_fn_t)(const struct arch_timer_erratum_workaround *,
+>> +                              const void *);
+>> +
+>> +static
+>> +bool arch_timer_check_dt_erratum(const struct arch_timer_erratum_workaround *wa,
+>> +                                const void *arg)
+>> +{
+>> +       const struct device_node *np = arg;
+>> +
+>> +       return of_property_read_bool(np, wa->id);
+>> +}
+>> +
+>> +static const struct arch_timer_erratum_workaround *
+>> +arch_timer_iterate_errata(enum arch_timer_erratum_match_type type,
+>> +                         ate_match_fn_t match_fn,
+>> +                         void *arg)
+>> +{
+>> +       int i;
+>> +
+>> +       for (i = 0; i < ARRAY_SIZE(ool_workarounds); i++) {
+>> +               if (ool_workarounds[i].match_type != type)
+>> +                       continue;
+>> +
+>> +               if (match_fn(&ool_workarounds[i], arg))
+>> +                       return &ool_workarounds[i];
+>> +       }
+>> +
+>> +       return NULL;
+>> +}
+>> +
+>> +static
+>> +void arch_timer_enable_workaround(const struct arch_timer_erratum_workaround *wa)
+>> +{
+>> +       timer_unstable_counter_workaround = wa;
+>> +       static_branch_enable(&arch_timer_read_ool_enabled);
+>> +}
+>> +
+>> +static void arch_timer_check_ool_workaround(enum arch_timer_erratum_match_type type,
+>> +                                           void *arg)
+>> +{
+>> +       const struct arch_timer_erratum_workaround *wa;
+>> +       ate_match_fn_t match_fn = NULL;
+>> +
+>> +       if (static_branch_unlikely(&arch_timer_read_ool_enabled))
+>> +               return;
+>> +
+>> +       switch (type) {
+>> +       case ate_match_dt:
+>> +               match_fn = arch_timer_check_dt_erratum;
+>> +               break;
 > 
-> This patch reworks the code to invoke the callback handlers on the
-> biggest range possible within the memory slot to avoid reduce the
-> number of iterations.
+> hey Marc,
+>    Would it make sense to have a default case here that warns &
+> returns? That wouldn't get hit by this series as-is, but might avoid a
+> NULL callback in the future.
 
-avoid reduce?
+Sure, I can add that in the next version of this series. I would have
+hoped that GCC would warn you if you don't handle all the values of an
+enum, but it doesn't hurt to be cautious.
 
-did you mean "to reduce the number of times the handler is called" ?
+Thanks,
 
-> 
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Christoffer Dall <christoffer.dall@linaro.org>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> ---
->  arch/arm/kvm/mmu.c | 31 +++++++++++++------------------
->  1 file changed, 13 insertions(+), 18 deletions(-)
-> 
-> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-> index 37e67f5..8357fed 100644
-> --- a/arch/arm/kvm/mmu.c
-> +++ b/arch/arm/kvm/mmu.c
-> @@ -1524,7 +1524,8 @@ static int handle_hva_to_gpa(struct kvm *kvm,
->  			     unsigned long start,
->  			     unsigned long end,
->  			     int (*handler)(struct kvm *kvm,
-> -					    gpa_t gpa, void *data),
-> +					    gpa_t gpa, u64 size,
-> +					    void *data),
->  			     void *data)
->  {
->  	struct kvm_memslots *slots;
-> @@ -1536,7 +1537,7 @@ static int handle_hva_to_gpa(struct kvm *kvm,
->  	/* we only care about the pages that the guest sees */
->  	kvm_for_each_memslot(memslot, slots) {
->  		unsigned long hva_start, hva_end;
-> -		gfn_t gfn, gfn_end;
-> +		gfn_t gpa;
->  
->  		hva_start = max(start, memslot->userspace_addr);
->  		hva_end = min(end, memslot->userspace_addr +
-> @@ -1544,25 +1545,16 @@ static int handle_hva_to_gpa(struct kvm *kvm,
->  		if (hva_start >= hva_end)
->  			continue;
->  
-> -		/*
-> -		 * {gfn(page) | page intersects with [hva_start, hva_end)} =
-> -		 * {gfn_start, gfn_start+1, ..., gfn_end-1}.
-> -		 */
-> -		gfn = hva_to_gfn_memslot(hva_start, memslot);
-> -		gfn_end = hva_to_gfn_memslot(hva_end + PAGE_SIZE - 1, memslot);
-> -
-> -		for (; gfn < gfn_end; ++gfn) {
-> -			gpa_t gpa = gfn << PAGE_SHIFT;
-> -			ret |= handler(kvm, gpa, data);
-> -		}
-> +		gpa = hva_to_gfn_memslot(hva_start, memslot) << PAGE_SHIFT;
-> +		ret |= handler(kvm, gpa, (u64)(hva_end - hva_start), data);
->  	}
->  
->  	return ret;
->  }
->  
-> -static int kvm_unmap_hva_handler(struct kvm *kvm, gpa_t gpa, void *data)
-> +static int kvm_unmap_hva_handler(struct kvm *kvm, gpa_t gpa, u64 size, void *data)
->  {
-> -	unmap_stage2_range(kvm, gpa, PAGE_SIZE);
-> +	unmap_stage2_range(kvm, gpa, size);
->  	return 0;
->  }
->  
-> @@ -1589,10 +1581,11 @@ int kvm_unmap_hva_range(struct kvm *kvm,
->  	return 0;
->  }
->  
-> -static int kvm_set_spte_handler(struct kvm *kvm, gpa_t gpa, void *data)
-> +static int kvm_set_spte_handler(struct kvm *kvm, gpa_t gpa, u64 size, void *data)
->  {
->  	pte_t *pte = (pte_t *)data;
->  
-> +	WARN_ON(size != PAGE_SIZE);
->  	/*
->  	 * We can always call stage2_set_pte with KVM_S2PTE_FLAG_LOGGING_ACTIVE
->  	 * flag clear because MMU notifiers will have unmapped a huge PMD before
-> @@ -1618,11 +1611,12 @@ void kvm_set_spte_hva(struct kvm *kvm, unsigned long hva, pte_t pte)
->  	handle_hva_to_gpa(kvm, hva, end, &kvm_set_spte_handler, &stage2_pte);
->  }
->  
-> -static int kvm_age_hva_handler(struct kvm *kvm, gpa_t gpa, void *data)
-> +static int kvm_age_hva_handler(struct kvm *kvm, gpa_t gpa, u64 size, void *data)
->  {
->  	pmd_t *pmd;
->  	pte_t *pte;
->  
-> +	WARN_ON(size != PAGE_SIZE && size != PMD_SIZE);
->  	pmd = stage2_get_pmd(kvm, NULL, gpa);
->  	if (!pmd || pmd_none(*pmd))	/* Nothing there */
->  		return 0;
-> @@ -1637,11 +1631,12 @@ static int kvm_age_hva_handler(struct kvm *kvm, gpa_t gpa, void *data)
->  	return stage2_ptep_test_and_clear_young(pte);
->  }
->  
-> -static int kvm_test_age_hva_handler(struct kvm *kvm, gpa_t gpa, void *data)
-> +static int kvm_test_age_hva_handler(struct kvm *kvm, gpa_t gpa, u64 size, void *data)
->  {
->  	pmd_t *pmd;
->  	pte_t *pte;
->  
-> +	WARN_ON(size != PAGE_SIZE && size != PMD_SIZE);
->  	pmd = stage2_get_pmd(kvm, NULL, gpa);
->  	if (!pmd || pmd_none(*pmd))	/* Nothing there */
->  		return 0;
-> -- 
-> 2.7.4
-> 
-
-Otherwise looks good:
-
-I can fix up the commit message when applying this.
-
-Reviewed-by: Christoffer Dall <cdall@linaro.org>
+	M.
+-- 
+Jazz is not dead. It just smells funny...
