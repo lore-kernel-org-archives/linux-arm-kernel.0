@@ -1,23 +1,49 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 24 Mar 2017 12:55:06 +0000
-Subject: [RFC 6/8] regulator: core: Add regulator_is_bypass function
-In-Reply-To: <e74c2f4d2b452cbe01aa2a48edde5c024212ffcb.1490199005.git.leonard.crestez@nxp.com>
-References: <cover.1490199005.git.leonard.crestez@nxp.com>
- <e74c2f4d2b452cbe01aa2a48edde5c024212ffcb.1490199005.git.leonard.crestez@nxp.com>
-Message-ID: <20170324125506.5cxiykpq2tzzkltb@sirena.org.uk>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Fri, 24 Mar 2017 21:09:36 +0800
+Subject: [PATCH 07/12] ARM: dts: imx6ul-isiot: Add Sound card with codec
+ node
+In-Reply-To: <CAMty3ZBSVgL==LsCzsODkL117WFL4Pv4kwhXhxc3wDWre3i-zA@mail.gmail.com>
+References: <1490204897-14525-1-git-send-email-jagan@openedev.com>
+ <1490204897-14525-8-git-send-email-jagan@openedev.com>
+ <20170324052324.GF30608@dragon>
+ <CAMty3ZBSVgL==LsCzsODkL117WFL4Pv4kwhXhxc3wDWre3i-zA@mail.gmail.com>
+Message-ID: <20170324130934.GO30608@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 22, 2017 at 06:53:08PM +0200, Leonard Crestez wrote:
+On Fri, Mar 24, 2017 at 02:02:38PM +0530, Jagan Teki wrote:
+> On Fri, Mar 24, 2017 at 10:53 AM, Shawn Guo <shawnguo@kernel.org> wrote:
+> > On Wed, Mar 22, 2017 at 11:18:12PM +0530, Jagan Teki wrote:
+> >> From: Jagan Teki <jagan@amarulasolutions.com>
+> >>
+> >> Add support for Sound card and related codec(via i2c1) nodes
+> >> on Engicam Is.IoT MX6UL variant module boards.
+> >>
+> >> Cc: Shawn Guo <shawnguo@kernel.org>
+> >> Cc: Matteo Lisi <matteo.lisi@engicam.com>
+> >> Cc: Michael Trimarchi <michael@amarulasolutions.com>
+> >> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+> >> ---
+> >>  arch/arm/boot/dts/imx6ul-isiot-common.dtsi | 11 +++++++++++
+> >>  arch/arm/boot/dts/imx6ul-isiot.dtsi        | 30 ++++++++++++++++++++++++++++++
+> >>  2 files changed, 41 insertions(+)
+> >>
+> >> diff --git a/arch/arm/boot/dts/imx6ul-isiot-common.dtsi b/arch/arm/boot/dts/imx6ul-isiot-common.dtsi
+> >> index b149b5e..c79fa42 100644
+> >> --- a/arch/arm/boot/dts/imx6ul-isiot-common.dtsi
+> >> +++ b/arch/arm/boot/dts/imx6ul-isiot-common.dtsi
+> >> @@ -41,6 +41,17 @@
+> >>   */
+> >>
+> >>  &i2c1 {
+> >> +     codec: sgtl5000 at 0a {
+> >
+> >         sgtl5000: codec at a {
+> 
+> Just to understand, why codec: sgtl5000 at 0a not a suitable notation?
+> couldn't see any Documentation.
 
->  /**
-> + * regulator_is_bypass - Determine if the regulator is in bypass mode
+The node name should be generic.  Please see ePAPR '2.2.2 Generic Names
+Recommendation'.  Also, the unit-address shouldn't have leading zeros.
 
-Bypass is a verb so this should be regulator_is_bypassed()
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170324/159ccc5b/attachment.sig>
+Shawn
