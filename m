@@ -1,68 +1,66 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Fri, 24 Mar 2017 12:28:08 +0100
-Subject: [PATCH v3 18/19] KVM: arm64: ITS: Device table save/restore
-In-Reply-To: <ddd8369a-364d-3c6c-679d-3ede9a857888@arm.com>
-References: <1488800074-21991-1-git-send-email-eric.auger@redhat.com>
- <1488800074-21991-19-git-send-email-eric.auger@redhat.com>
- <2c4841df-f7b3-ee03-16d3-7e32c9cbd936@arm.com>
- <728905ad-61a2-f510-b04f-5af178dfaade@redhat.com>
- <ddd8369a-364d-3c6c-679d-3ede9a857888@arm.com>
-Message-ID: <4dd0f346-b2ba-5832-66a1-abb0b7fd2340@redhat.com>
+From: al.kochet@gmail.com (Alexander Kochetkov)
+Date: Fri, 24 Mar 2017 14:31:10 +0300
+Subject: [PATCH] clk: rockchip: limit i2s0_pre max rate on rk3188
+Message-ID: <1490355070-21818-1-git-send-email-al.kochet@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Change i2s0_pre from 768MHz to 192MHz and limit it's rate to 192MHz in
+order to fix issues described below.
 
-On 24/03/2017 12:14, Andre Przywara wrote:
-> Hi,
-> 
-> thanks for addressing the comments and for the fixes!
-> 
-> On 24/03/17 10:38, Auger Eric wrote:
->> Hi Andre,
->>
->> On 22/03/2017 15:39, Andre Przywara wrote:
->>> Hi,
->>>
->>> On 06/03/17 11:34, Eric Auger wrote:
->>>> This patch flushes the device table entries into guest RAM.
->>>> Both flat table and 2 stage tables are supported.  DeviceId
->>>> indexing is used.
->>>>
->>>> For each device listed in the device table, we also flush
->>>> the translation table using the vgic_its_flush/restore_itt
->>>> routines.
->>>>
->>>> On restore, devices are re-allocated and their itte are
->>>> re-built.
->>>
->>> Some minor things below.
->>> In general I had quite some trouble to understand what's going on here,
->>> though I convinced myself that this is correct. So could you add a bit
->>> more comments here? For instance to explain that we have to explicitly
->>> handle the L1 table on restore, but not on flush.
->>
->> On flush vgic_its_check_id does the 2 stage handling and computes the
->> entry address from the devid:
->>
->> 		if (!vgic_its_check_id(its, baser,
->> 				       dev->device_id, &eaddr))
->>
->> Then you simply flush the entry at that address
->>
->> On restore, you need to scan the level1 and level2 tables for valid entries.
-> 
-> That is exactly what I read from it, eventually - but only after staring
-> at the code for quite a while. So can you put these explanations in some
-> comments? An occasional reader would probably be puzzled to find the L1
-> handling only in the restore, but not in the save path. It could be even
-> shorter like: "Indirect table handling is covered by vgic_its_check_id()".
-Yep sure I am going to comment that.
+If right after the boot change i2s0_clk to 16.384MHz, real rate on
+i2s0_clk pin may differ from 16.384MHz. The issue is random. Sometimes
+rate on i2s0_clk pin equal to 16.384MHz, sometimes not.
 
-Thanks
+There is another 100% reproducable issue. First we have to boot and see
+the correct frequency on i2s0_clk pin (16.384MHz). Then we change its rate
+to 8.192MHz (and it changes), then we change its rate again to 16.384MHz.
+Rate leaves unchanged and equal to 8.192MHz.
 
-Eric
-> 
-> Cheers,
-> Andre.
-> 
+'clk_summary' shows following clock connection in all the cases, where
+rate was set to 16.384MHz (even then real rate differs).
+
+    clock                       rate
+    -----                       ----
+    xin24m                      24000000
+      pll_gpll                  768000000
+         gpll                   768000000
+            i2s_src             768000000
+               i2s0_pre         768000000
+                  i2s0_frac     16384000
+                     sclk_i2s0  16384000
+
+Also I found, that if I change i2s0_pre to 192MHz all the issues described
+above gone. I supposed that the issues is due to high i2s0_pre rate.
+Probably rk3188 has some sort of frequency restrictions imposed. Haven't
+found anything in the RK3188 TRM, so this is my assumption.
+
+Anyway, with the patch, all the issues gone.
+
+Signed-off-by: Alexander Kochetkov <al.kochet@gmail.com>
+---
+ drivers/clk/rockchip/clk-rk3188.c |    9 +++++++++
+ 1 file changed, 9 insertions(+)
+
+diff --git a/drivers/clk/rockchip/clk-rk3188.c b/drivers/clk/rockchip/clk-rk3188.c
+index d0e722a..e883f48 100644
+--- a/drivers/clk/rockchip/clk-rk3188.c
++++ b/drivers/clk/rockchip/clk-rk3188.c
+@@ -849,6 +849,15 @@ static void __init rk3188a_clk_init(struct device_node *np)
+ 			__func__);
+ 	}
+ 
++	/* limit i2s0_pre max rate */
++	clk1 = __clk_lookup("aclk_cpu_pre");
++	clk2 = __clk_lookup("i2s0_pre");
++	if (clk1 && clk2) {
++		rate = clk_get_rate(clk1);
++		clk_set_max_rate(clk2, rate);
++		clk_set_rate(clk2, rate);
++	}
++
+ 	rockchip_clk_protect_critical(rk3188_critical_clocks,
+ 				      ARRAY_SIZE(rk3188_critical_clocks));
+ 	rockchip_clk_of_add_provider(np, ctx);
+-- 
+1.7.9.5
