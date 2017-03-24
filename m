@@ -1,31 +1,33 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 24 Mar 2017 18:00:30 +0100
-Subject: [PATCH 01/15] ARM: dts: alpine: fix PCIe node name
-In-Reply-To: <20170322080137.st3osq5ckfis6uwz@kwain>
-References: <20170322020313.24338-1-robh@kernel.org>
- <20170322080137.st3osq5ckfis6uwz@kwain>
-Message-ID: <CAK8P3a2WOeNrz3J8vO+n+rhwn3N_vdOswZ0NMmYrdNvmkD8obQ@mail.gmail.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Fri, 24 Mar 2017 20:01:48 +0300
+Subject: [PATCH 1/3] crypto: hw_random - Add new Exynos RNG driver
+In-Reply-To: <87677624.EBdhaJY1KM@amdc3058>
+References: <20170324142446.31129-1-krzk@kernel.org>
+ <9265537.P6AeF50kg8@amdc3058>
+ <20170324161934.kc6g36nazr3y32kp@kozik-lap>
+ <CGME20170324164544epcas1p353b2eba5ecb6d5f7a69049c5ba9d667e@epcas1p3.samsung.com>
+ <87677624.EBdhaJY1KM@amdc3058>
+Message-ID: <20170324170148.ew7ozpt5jfwdx5yn@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 22, 2017 at 9:01 AM, Antoine Tenart
-<antoine.tenart@free-electrons.com> wrote:
-> Hi Rob,
->
-> On Tue, Mar 21, 2017 at 09:02:59PM -0500, Rob Herring wrote:
->> PCIe bridges should have a node name of 'pcie'.
->>
->> Signed-off-by: Rob Herring <robh@kernel.org>
->
-> Acked-by: Antoine Tenart <antoine.tenart@free-electrons.com>
->
-> This can go through arm-soc directly. If not I'll take it.
-> Thanks!
+On Fri, Mar 24, 2017 at 05:45:41PM +0100, Bartlomiej Zolnierkiewicz wrote:
+> > > > And I think the probe might be called twice, for example in case of
+> > > > mistake in DTB.
+> > > 
+> > > Even if this is possible resource allocation code in the driver will
+> > > take take care of handling it just fine,
+> > 
+> > Indeed, the devm_ioremap_resource() solves the case. I can drop the
+> > check then.
+> 
+> Looking on this a bit more it seems that devm_ioremap_resource() will
+> not cover all mistakes (using compatible by mistake in some other DTB
+> node).
+> 
+> Leave the check, I take my objection back.
 
-I have a mild preference for this kind of patch to get picked up by
-platform maintainers.
+Great! Thanks for feedback.
 
-Rob, once replies stop coming in, please send a pull request for anything
-that did not get picked up by anyone else.
-
-     Arnd
+Best regards,
+Krzysztof
