@@ -1,145 +1,60 @@
 From: willy@infradead.org (Matthew Wilcox)
-Date: Fri, 24 Mar 2017 09:13:12 -0700
-Subject: [PATCH v3 1/7] Add multibyte memset functions
+Date: Fri, 24 Mar 2017 09:13:17 -0700
+Subject: [PATCH v3 6/7] sym53c8xx_2: Convert to use memset32
 In-Reply-To: <20170324161318.18718-1-willy@infradead.org>
 References: <20170324161318.18718-1-willy@infradead.org>
-Message-ID: <20170324161318.18718-2-willy@infradead.org>
+Message-ID: <20170324161318.18718-7-willy@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Matthew Wilcox <mawilcox@microsoft.com>
 
-memset16(), memset32() and memset64() are like memset(), but allow the
-caller to fill the destination with a multibyte pattern.  memset_l()
-and memset_p() allow the caller to use unsigned long and pointer
-values respectively.  memset64() is currently only available on 64-bit
-architectures.
+memset32() can be used to initialise these three arrays.  Minor code
+footprint reduction.
 
 Signed-off-by: Matthew Wilcox <mawilcox@microsoft.com>
 ---
- include/linux/string.h | 30 ++++++++++++++++++++++
- lib/string.c           | 68 ++++++++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 98 insertions(+)
+ drivers/scsi/sym53c8xx_2/sym_hipd.c | 11 +++--------
+ 1 file changed, 3 insertions(+), 8 deletions(-)
 
-diff --git a/include/linux/string.h b/include/linux/string.h
-index 26b6f6a66f83..b376875b650c 100644
---- a/include/linux/string.h
-+++ b/include/linux/string.h
-@@ -99,6 +99,36 @@ extern __kernel_size_t strcspn(const char *,const char *);
- #ifndef __HAVE_ARCH_MEMSET
- extern void * memset(void *,int,__kernel_size_t);
- #endif
-+
-+#ifndef __HAVE_ARCH_MEMSET16
-+extern void *memset16(uint16_t *, uint16_t, __kernel_size_t);
-+#endif
-+
-+#ifndef __HAVE_ARCH_MEMSET32
-+extern void *memset32(uint32_t *, uint32_t, __kernel_size_t);
-+#endif
-+
-+#ifndef __HAVE_ARCH_MEMSET64
-+extern void *memset64(uint64_t *, uint64_t, __kernel_size_t);
-+#endif
-+
-+static inline void *memset_l(unsigned long *p, unsigned long v,
-+		__kernel_size_t n)
-+{
-+	if (BITS_PER_LONG == 32)
-+		return memset32((uint32_t *)p, v, n);
-+	else
-+		return memset64((uint64_t *)p, v, n);
-+}
-+
-+static inline void *memset_p(void **p, void *v, __kernel_size_t n)
-+{
-+	if (BITS_PER_LONG == 32)
-+		return memset32((uint32_t *)p, (uintptr_t)v, n);
-+	else
-+		return memset64((uint64_t *)p, (uintptr_t)v, n);
-+}
-+
- #ifndef __HAVE_ARCH_MEMCPY
- extern void * memcpy(void *,const void *,__kernel_size_t);
- #endif
-diff --git a/lib/string.c b/lib/string.c
-index ed83562a53ae..f18ba402e503 100644
---- a/lib/string.c
-+++ b/lib/string.c
-@@ -697,6 +697,74 @@ void memzero_explicit(void *s, size_t count)
- }
- EXPORT_SYMBOL(memzero_explicit);
+diff --git a/drivers/scsi/sym53c8xx_2/sym_hipd.c b/drivers/scsi/sym53c8xx_2/sym_hipd.c
+index 6b349e301869..b886b10e3499 100644
+--- a/drivers/scsi/sym53c8xx_2/sym_hipd.c
++++ b/drivers/scsi/sym53c8xx_2/sym_hipd.c
+@@ -4985,13 +4985,10 @@ struct sym_lcb *sym_alloc_lcb (struct sym_hcb *np, u_char tn, u_char ln)
+ 	 *  Compute the bus address of this table.
+ 	 */
+ 	if (ln && !tp->luntbl) {
+-		int i;
+-
+ 		tp->luntbl = sym_calloc_dma(256, "LUNTBL");
+ 		if (!tp->luntbl)
+ 			goto fail;
+-		for (i = 0 ; i < 64 ; i++)
+-			tp->luntbl[i] = cpu_to_scr(vtobus(&np->badlun_sa));
++		memset32(tp->luntbl, cpu_to_scr(vtobus(&np->badlun_sa)), 64);
+ 		tp->head.luntbl_sa = cpu_to_scr(vtobus(tp->luntbl));
+ 	}
  
-+#ifndef __HAVE_ARCH_MEMSET16
-+/**
-+ * memset16() - Fill a memory area with a uint16_t
-+ * @s: Pointer to the start of the area.
-+ * @v: The value to fill the area with
-+ * @count: The number of values to store
-+ *
-+ * Differs from memset() in that it fills with a uint16_t instead
-+ * of a byte.  Remember that @count is the number of uint16_ts to
-+ * store, not the number of bytes.
-+ */
-+void *memset16(uint16_t *s, uint16_t v, size_t count)
-+{
-+	uint16_t *xs = s;
-+
-+	while (count--)
-+		*xs++ = v;
-+	return s;
-+}
-+EXPORT_SYMBOL(memset16);
-+#endif
-+
-+#ifndef __HAVE_ARCH_MEMSET32
-+/**
-+ * memset32() - Fill a memory area with a uint32_t
-+ * @s: Pointer to the start of the area.
-+ * @v: The value to fill the area with
-+ * @count: The number of values to store
-+ *
-+ * Differs from memset() in that it fills with a uint32_t instead
-+ * of a byte.  Remember that @count is the number of uint32_ts to
-+ * store, not the number of bytes.
-+ */
-+void *memset32(uint32_t *s, uint32_t v, size_t count)
-+{
-+	uint32_t *xs = s;
-+
-+	while (count--)
-+		*xs++ = v;
-+	return s;
-+}
-+EXPORT_SYMBOL(memset32);
-+#endif
-+
-+#ifndef __HAVE_ARCH_MEMSET64
-+#if BITS_PER_LONG > 32
-+/**
-+ * memset64() - Fill a memory area with a uint64_t
-+ * @s: Pointer to the start of the area.
-+ * @v: The value to fill the area with
-+ * @count: The number of values to store
-+ *
-+ * Differs from memset() in that it fills with a uint64_t instead
-+ * of a byte.  Remember that @count is the number of uint64_ts to
-+ * store, not the number of bytes.
-+ */
-+void *memset64(uint64_t *s, uint64_t v, size_t count)
-+{
-+	uint64_t *xs = s;
-+
-+	while (count--)
-+		*xs++ = v;
-+	return s;
-+}
-+EXPORT_SYMBOL(memset64);
-+#endif
-+#endif
-+
- #ifndef __HAVE_ARCH_MEMCPY
- /**
-  * memcpy - Copy one area of memory to another
+@@ -5077,8 +5074,7 @@ static void sym_alloc_lcb_tags (struct sym_hcb *np, u_char tn, u_char ln)
+ 	/*
+ 	 *  Initialize the task table with invalid entries.
+ 	 */
+-	for (i = 0 ; i < SYM_CONF_MAX_TASK ; i++)
+-		lp->itlq_tbl[i] = cpu_to_scr(np->notask_ba);
++	memset32(lp->itlq_tbl, cpu_to_scr(np->notask_ba), SYM_CONF_MAX_TASK);
+ 
+ 	/*
+ 	 *  Fill up the tag buffer with tag numbers.
+@@ -5764,8 +5760,7 @@ int sym_hcb_attach(struct Scsi_Host *shost, struct sym_fw *fw, struct sym_nvram
+ 		goto attach_failed;
+ 
+ 	np->badlun_sa = cpu_to_scr(SCRIPTB_BA(np, resel_bad_lun));
+-	for (i = 0 ; i < 64 ; i++)	/* 64 luns/target, no less */
+-		np->badluntbl[i] = cpu_to_scr(vtobus(&np->badlun_sa));
++	memset32(np->badluntbl, cpu_to_scr(vtobus(&np->badlun_sa)), 64);
+ 
+ 	/*
+ 	 *  Prepare the bus address array that contains the bus 
 -- 
 2.11.0
