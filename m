@@ -1,56 +1,35 @@
-From: menschel.p@posteo.de (Patrick Menschel)
-Date: Fri, 24 Mar 2017 22:52:19 +0100
-Subject: [PATCH v2 2/2] ARM: dts: sun7i: Add CAN node and can0_pins_a pinctrl
- settings
-In-Reply-To: <1490392339-23565-1-git-send-email-menschel.p@posteo.de>
-References: <1490392339-23565-1-git-send-email-menschel.p@posteo.de>
-Message-ID: <1490392339-23565-3-git-send-email-menschel.p@posteo.de>
+From: ralph.sennhauser@gmail.com (Ralph Sennhauser)
+Date: Fri, 24 Mar 2017 23:23:40 +0100
+Subject: [PATCH v3 4/4] mvebu: wrt1900ac: Use pwm-fan rather than gpio-fan
+In-Reply-To: <20170324143505.GK28518@lunn.ch>
+References: <20170324141815.7252-1-ralph.sennhauser@gmail.com>
+ <20170324141815.7252-5-ralph.sennhauser@gmail.com>
+ <20170324143505.GK28518@lunn.ch>
+Message-ID: <20170324232340.7487f638@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A20 SoC has an on-board CAN controller. This patch adds the device node
-and the corresponding pinctrl settings for pins PH20 and PH21.
+On Fri, 24 Mar 2017 15:35:05 +0100
+Andrew Lunn <andrew@lunn.ch> wrote:
 
-The CAN controller is inherited from the A10 SoC and uses the same driver.
+> > +	pwm_fan {
+> >  		/* SUNON HA4010V4-0000-C99 */
+> > -		compatible = "gpio-fan";
+> > -		gpios = <&gpio0 24 0>;
+> >  
+> > -		gpio-fan,speed-map = <0    0
+> > -				      4500 1>;
+> > +		compatible = "pwm-fan";
+> > +		pwms = <&gpio0 24 4000 0>;  
+> 
+> Hi Ralph
+> 
+> I believe this last 0 is the flags parameter. Now that we have
+> #pwm-cells = 1, i think this last 0 should be dropped.
+> 
+> 	  Andrew
 
-This patch is adapted from the description in
-Documentation/devicetree/bindings/net/can/sun4i_can.txt
+Missed it. Duly noted like the other comments.
 
-Signed-off-by: Patrick Menschel <menschel.p@posteo.de>
----
- arch/arm/boot/dts/sun7i-a20.dtsi | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
-
-diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-index 2db97fc..25af586 100644
---- a/arch/arm/boot/dts/sun7i-a20.dtsi
-+++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-@@ -1096,6 +1096,11 @@
- 			#interrupt-cells = <3>;
- 			#gpio-cells = <3>;
- 
-+			can0_pins_a: can0 at 0 {
-+				pins = "PH20","PH21";
-+				function = "can";
-+			};
-+
- 			clk_out_a_pins_a: clk_out_a at 0 {
- 				pins = "PI12";
- 				function = "clk_out_a";
-@@ -1582,6 +1587,14 @@
- 			#size-cells = <0>;
- 		};
- 
-+		can0: can at 01c2bc00 {
-+			compatible = "allwinner,sun4i-a10-can";
-+			reg = <0x01c2bc00 0x400>;
-+			interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&apb1_gates 4>;
-+			status = "disabled";
-+		};
-+
- 		i2c4: i2c at 01c2c000 {
- 			compatible = "allwinner,sun7i-a20-i2c",
- 				     "allwinner,sun4i-a10-i2c";
--- 
-1.9.1
+Thanks
+Ralph
