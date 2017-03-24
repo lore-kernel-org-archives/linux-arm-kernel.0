@@ -1,49 +1,64 @@
-From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Fri, 24 Mar 2017 14:02:38 +0530
-Subject: [PATCH 07/12] ARM: dts: imx6ul-isiot: Add Sound card with codec
- node
-In-Reply-To: <20170324052324.GF30608@dragon>
-References: <1490204897-14525-1-git-send-email-jagan@openedev.com>
- <1490204897-14525-8-git-send-email-jagan@openedev.com>
- <20170324052324.GF30608@dragon>
-Message-ID: <CAMty3ZBSVgL==LsCzsODkL117WFL4Pv4kwhXhxc3wDWre3i-zA@mail.gmail.com>
+From: chaotian.jing@mediatek.com (Chaotian Jing)
+Date: Fri, 24 Mar 2017 16:32:49 +0800
+Subject: [PATCH] mmc: core: Do not hold re-tuning during CMD6 commands
+In-Reply-To: <13a83728-0031-5683-c371-4b517df32299@intel.com>
+References: <1490336341-22292-1-git-send-email-chaotian.jing@mediatek.com>
+ <1490336341-22292-2-git-send-email-chaotian.jing@mediatek.com>
+ <13a83728-0031-5683-c371-4b517df32299@intel.com>
+Message-ID: <1490344369.22814.10.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 24, 2017 at 10:53 AM, Shawn Guo <shawnguo@kernel.org> wrote:
-> On Wed, Mar 22, 2017 at 11:18:12PM +0530, Jagan Teki wrote:
->> From: Jagan Teki <jagan@amarulasolutions.com>
->>
->> Add support for Sound card and related codec(via i2c1) nodes
->> on Engicam Is.IoT MX6UL variant module boards.
->>
->> Cc: Shawn Guo <shawnguo@kernel.org>
->> Cc: Matteo Lisi <matteo.lisi@engicam.com>
->> Cc: Michael Trimarchi <michael@amarulasolutions.com>
->> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
->> ---
->>  arch/arm/boot/dts/imx6ul-isiot-common.dtsi | 11 +++++++++++
->>  arch/arm/boot/dts/imx6ul-isiot.dtsi        | 30 ++++++++++++++++++++++++++++++
->>  2 files changed, 41 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/imx6ul-isiot-common.dtsi b/arch/arm/boot/dts/imx6ul-isiot-common.dtsi
->> index b149b5e..c79fa42 100644
->> --- a/arch/arm/boot/dts/imx6ul-isiot-common.dtsi
->> +++ b/arch/arm/boot/dts/imx6ul-isiot-common.dtsi
->> @@ -41,6 +41,17 @@
->>   */
->>
->>  &i2c1 {
->> +     codec: sgtl5000 at 0a {
->
->         sgtl5000: codec at a {
+On Fri, 2017-03-24 at 09:52 +0200, Adrian Hunter wrote:
+> On 24/03/17 08:19, Chaotian Jing wrote:
+> > this patch is refine for 'commit c6dbab9cb58f ("mmc: core: Hold re-tuning
+> > during switch commands")'
+> > Since it has 3 retries at max for CMD6, if the first CMD6 got CRC error,
+> > then should do re-tune before the next CMD6 was sent.
+> > 
+> > Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+> > ---
+> >  drivers/mmc/core/mmc_ops.c |    3 +--
+> >  1 file changed, 1 insertion(+), 2 deletions(-)
+> > 
+> > diff --git a/drivers/mmc/core/mmc_ops.c b/drivers/mmc/core/mmc_ops.c
+> > index fe80f26..6931927 100644
+> > --- a/drivers/mmc/core/mmc_ops.c
+> > +++ b/drivers/mmc/core/mmc_ops.c
+> > @@ -534,8 +534,6 @@ int __mmc_switch(struct mmc_card *card, u8 set, u8 index, u8 value,
+> >  	bool use_r1b_resp = use_busy_signal;
+> >  	unsigned char old_timing = host->ios.timing;
+> >  
+> > -	mmc_retune_hold(host);
+> > -
+> >  	/*
+> >  	 * If the cmd timeout and the max_busy_timeout of the host are both
+> >  	 * specified, let's validate them. A failure means we need to prevent
+> > @@ -567,6 +565,7 @@ int __mmc_switch(struct mmc_card *card, u8 set, u8 index, u8 value,
+> >  		cmd.sanitize_busy = true;
+> >  
+> >  	err = mmc_wait_for_cmd(host, &cmd, MMC_CMD_RETRIES);
+> > +	mmc_retune_hold(host);
+> 
+> That is not how mmc_retune_hold() works, you need mmc_retune_hold_now() as
+> it is here:
+> 
+> 	https://marc.info/?l=linux-mmc&m=148940903816582
+> 
+> But using "retries" with commands that have busy-waiting on the data line
+> doesn't make much sense anyway.  Particularly with CRC errors, I would
+> expect the card is actually busily doing the switch and we need only to wait
+> for it.  The same can be true for timeout errors.  For some CMD6 we might
+> need to send CMD12 if the card is busy after an error.  I would prefer an
+> explicit attempt at recovery from CMD6 errors.
+> 
 
-Just to understand, why codec: sgtl5000 at 0a not a suitable notation?
-couldn't see any Documentation.
-
-thanks!
--- 
-Jagan Teki
-Senior Linux Kernel Engineer | Amarula Solutions
-U-Boot, Linux | Upstream Maintainer
-Hyderabad, India.
+It's the host driver's responsibility to ensure card is not in busy
+state before issue the next R1B command, or the MMC core layer needs do
+extra check/waiting before issue a R1B command.
+I think the purpose of "re-tune" is trying to cover particular case(eg.
+voltage fluctuate or EMI or some glitch of host/device which caused CRC
+error) , but in such cases, too many cases are disable re-tune function
+by mmc_retune_hold(), for example, in this case, if a response CRC error
+got then we never have chance to recover it. then cause system cannot
+access emmc or suspend/resume fail.
