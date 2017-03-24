@@ -1,58 +1,44 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Fri, 24 Mar 2017 15:52:08 +0800
-Subject: [PATCH] mmc: sunxi: change controller error info to debug level
-In-Reply-To: <CAPDyKFppqPjjXtAAcSynxMw-1Oc7W6ZMf=oJLzWwsnLUWCq5Rw@mail.gmail.com>
-References: <20170316132903.61246-1-icenowy@aosc.xyz>
- <CAPDyKFppqPjjXtAAcSynxMw-1Oc7W6ZMf=oJLzWwsnLUWCq5Rw@mail.gmail.com>
-Message-ID: <1662971490341928@web27j.yandex.ru>
+From: quentin.schulz@free-electrons.com (Quentin Schulz)
+Date: Fri, 24 Mar 2017 08:55:19 +0100
+Subject: [RESEND PATCH v4 2/9] iio: adc: add support for X-Powers AXP20X
+ and AXP22X PMICs ADCs
+In-Reply-To: <CAGb2v655AfEavMqVV-XTyYzHWt5qFsMnoMsTVd8HRDkCgjiTeQ@mail.gmail.com>
+References: <20170320081653.8884-1-quentin.schulz@free-electrons.com>
+ <20170320081653.8884-3-quentin.schulz@free-electrons.com>
+ <CAGb2v66JC65=9WiMy-Nu+9tTFRLsJL2Eyb0wfJV_K=65ABc6Zg@mail.gmail.com>
+ <20170323093527.ojcdpvruzqnhvysq@earth>
+ <CAGb2v655AfEavMqVV-XTyYzHWt5qFsMnoMsTVd8HRDkCgjiTeQ@mail.gmail.com>
+Message-ID: <13f2f8ba-af9e-576e-24ee-60c3a1609f80@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-
-24.03.2017, 15:46, "Ulf Hansson" <ulf.hansson@linaro.org>:
-> On 16 March 2017 at 14:29, Icenowy Zheng <icenowy@aosc.xyz> wrote:
->> ?The controller's errors are usually normal (for example, for MMC or SDIO
->> ?cards, some errors are expected to happen; and for boards without a
->> ?dedicated card detect pin the error info will even flood console and
->> ?hide other normal messages) and hard to understand.
+On 23/03/2017 10:52, Chen-Yu Tsai wrote:
+> On Thu, Mar 23, 2017 at 5:35 PM, Sebastian Reichel <sre@kernel.org> wrote:
+>> Hi,
 >>
->> ?Change their print level to debug, thus it won't be shown to generic
->> ?users.
+>> On Wed, Mar 22, 2017 at 12:34:45PM +0800, Chen-Yu Tsai wrote:
+>>> P.S. I'm thinking about having MFD_AXP20X imply its various sub-drivers.
+>>> Not sure if that was the intended usage of the new imply syntax though.
 >>
->> ?Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
->
-> For some reason this change didn't enter the mmc patchtracker. However
-> I have picked it up for next anyway.
+>> I think adding "default MFD_AXP20X" to the sub-drivers is cleaner,
+>> as you will not end up with a long list.
+> 
+> I'd still need to add imply statements for the various subsystems though,
+> like regulators, power supplies, extcon, etc..
+> But I suppose that's cleaner, and fits the original intent of the syntax.
+> 
 
-Thanks!
+Hum. I don't really understand what you are saying.. Am I supposed to
+modify something or, is it okay and we're waiting for Lee to apply on
+his tree?
 
-Maybe it's because of the e-mail provider chosen by AOSC (Yandex.Mail).
+Thanks in advance for clearing it up,
 
-Sorry. I will try to ask for a migration to other e-mail provider.
+Quentin
 
->
-> Thanks!
->
-> Kind regards
-> Uffe
->
->> ?---
->> ??drivers/mmc/host/sunxi-mmc.c | 2 +-
->> ??1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> ?diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
->> ?index 6ffcd2838272..0391c62cc99f 100644
->> ?--- a/drivers/mmc/host/sunxi-mmc.c
->> ?+++ b/drivers/mmc/host/sunxi-mmc.c
->> ?@@ -489,7 +489,7 @@ static void sunxi_mmc_dump_errinfo(struct sunxi_mmc_host *host)
->> ???????????????????????????????????????cmd->opcode == SD_IO_RW_DIRECT))
->> ?????????????????return;
->>
->> ?- dev_err(mmc_dev(host->mmc),
->> ?+ dev_dbg(mmc_dev(host->mmc),
->> ?????????????????"smc %d err, cmd %d,%s%s%s%s%s%s%s%s%s%s !!\n",
->> ?????????????????host->mmc->index, cmd->opcode,
->> ?????????????????data ? (data->flags & MMC_DATA_WRITE ? " WR" : " RD") : "",
->> ?--
->> ?2.12.0
+-- 
+Quentin Schulz, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
