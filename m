@@ -1,76 +1,41 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Fri, 24 Mar 2017 16:26:47 +0100
-Subject: [PATCH 1/3] crypto: hw_random - Add new Exynos RNG driver
-In-Reply-To: <20170324142446.31129-2-krzk@kernel.org>
-References: <20170324142446.31129-1-krzk@kernel.org>
- <20170324142446.31129-2-krzk@kernel.org>
- <CGME20170324152650epcas5p1fb48677d6b5ac7210d6df438a5e70ca3@epcas5p1.samsung.com>
-Message-ID: <3940941.n3qdgn1RbN@amdc3058>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Fri, 24 Mar 2017 10:38:05 -0500
+Subject: [PATCH 2/4 v5] PCI: add driver for Faraday Technology Host Bridge
+In-Reply-To: <CACRpkdbkhui0iwJbOeD8uwurdWvOYdPKtRPQhSkg0atpAB174Q@mail.gmail.com>
+References: <20170312222403.2473-1-linus.walleij@linaro.org>
+ <20170324150753.GC25380@bhelgaas-glaptop.roam.corp.google.com>
+ <CACRpkdbkhui0iwJbOeD8uwurdWvOYdPKtRPQhSkg0atpAB174Q@mail.gmail.com>
+Message-ID: <20170324153805.GA31729@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Hi,
-
-Firstly, thanks for working on this.
-
-The patch looks fine overall for me, some review comments below.
-
-On Friday, March 24, 2017 05:24:44 PM Krzysztof Kozlowski wrote:
-> Replace existing hw_ranndom/exynos-rng driver with a new, reworked one.
-> This is a driver for pseudo random number generator block which on
-> Exynos4 chipsets must be seeded with some value.  On newer Exynos5420
-> chipsets it might seed itself from true random number generator block
-> but this is not implemented yet.
+On Fri, Mar 24, 2017 at 04:14:43PM +0100, Linus Walleij wrote:
+> On Fri, Mar 24, 2017 at 4:07 PM, Bjorn Helgaas <helgaas@kernel.org> wrote:
 > 
-> New driver is a complete rework to use the crypto ALGAPI instead of
-> hw_random API.  Rationale for the change:
-> 1. hw_random interface is for true RNG devices.
-> 2. The old driver was seeding itself with jiffies which is not a
->    reliable source for randomness.
-> 3. Device generates five random numbers in each pass but old driver was
->    returning only one thus its performance was reduced.
+> > Acked-by: Bjorn Helgaas <bhelgaas@google.com>
 > 
-> Compatibility with DeviceTree bindings is preserved.
+> Thanks!
 > 
-> New driver does not use runtime power management but manually enables
-> and disables the clock when needed.  This is preferred approach because
-> using runtime PM just to toggle clock is huge overhead.  Another
+> > I don't know enough to review the DT patch, but you have Rob's ack
+> > already.
+> >
+> > Not sure how you want to merge these; if you want to feed the whole
+> > thing via ARM SoC, that's fine with me.  Otherwise, let me know if
+> > you'd like me to take anything.
+> 
+> It'd be perfect if you could merge patches 1+2 into the PCI tree,
+> there are no dependencies to the ARM tree.
+> 
+> > Noticed one trivial typo below.
+> >
+> >> + * Special configuration registers directly in the first few words
+> >> + * in he I/O space.
+> >
+> > s/he//
+> 
+> Can you fix it when applying or do you want me to resend it with
+> this fixed?
 
-I'm not entirely convinced that the new approach is better.
+I fixed it.
 
-With the old approach exynos_rng_generate() can be called more
-than once before PM autosuspend kicks in and thus clk_prepare_enable()/
-clk_disable()_unprepare() operations will be done only once. This
-would give better performance on the "burst" operations.
-
-[ The above assumes that clock operations are more costly than
-  going through PM core to check the current device state. ]
-
-> +static int exynos_rng_get_random(struct exynos_rng_dev *rng,
-> +				 u8 *dst, unsigned int dlen,
-> +				 unsigned int *read)
-> +{
-> +	int retry = 100;
-
-I know that this is copied verbatim from the old driver but please
-use define for the maximum number of retries.
-
-> +static int exynos_rng_probe(struct platform_device *pdev)
-> +{
-> +	struct exynos_rng_dev *rng;
-> +	struct resource *res;
-> +	int ret;
-> +
-> +	if (exynos_rng_dev)
-> +		return -EEXIST;
-
-How this condition could ever happen? 
-
-The probe function will never be called twice.
-
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+Applied 1 & 2 to pci/host-faraday for v4.12, thanks!
