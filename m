@@ -1,136 +1,172 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 24 Mar 2017 16:55:18 +0100
-Subject: [PATCH 3/3] ARM: dts: sun8i: add device tree for Lichee Pi Zero
- with Dock
-In-Reply-To: <20170322223427.YNp8w8sn@smtp3m.mail.yandex.net>
-References: <20170322223427.YNp8w8sn@smtp3m.mail.yandex.net>
-Message-ID: <20170324155518.xcbmluz4ehltfxwt@lukather>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Fri, 24 Mar 2017 16:55:20 +0100
+Subject: [PATCH 2/2] PCI: Add legacy firmware support for Cavium ThunderX
+ host controller
+In-Reply-To: <1489564155-3881-3-git-send-email-tn@semihalf.com>
+References: <1489564155-3881-1-git-send-email-tn@semihalf.com>
+ <1489564155-3881-3-git-send-email-tn@semihalf.com>
+Message-ID: <bc7b66de-9070-1561-440e-ac12124fc268@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 23, 2017 at 03:34:18AM +0800, Icenowy Zheng wrote:
-> 
-> 2017?3?23? 03:24? Maxime Ripard <maxime.ripard@free-electrons.com>???
-> >
-> > On Fri, Mar 17, 2017 at 11:43:43PM +0800, Icenowy Zheng wrote: 
-> > > Lichee Pi Zero features a dock, which adds some functions, and should be 
-> > > soldered with the core board of Lichee Pi Zero. 
-> > > 
-> > > Add support for the dock as a new dts, as soldering is needed to make 
-> > > the dock usable and there's functions enabled on the dock that is 
-> > > unavailable at the 2.54mm pins of the core board. 
-> > > 
-> > > Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz> 
-> > > --- 
-> > >? arch/arm/boot/dts/Makefile???????????????????????? |? 3 +- 
-> > >? arch/arm/boot/dts/sun8i-v3s-licheepi-zero-dock.dts | 98 ++++++++++++++++++++++ 
-> > >? 2 files changed, 100 insertions(+), 1 deletion(-) 
-> > >? create mode 100644 arch/arm/boot/dts/sun8i-v3s-licheepi-zero-dock.dts 
-> > > 
-> > > diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile 
-> > > index 43c27b624f94..de52d403f818 100644 
-> > > --- a/arch/arm/boot/dts/Makefile 
-> > > +++ b/arch/arm/boot/dts/Makefile 
-> > > @@ -878,7 +878,8 @@ dtb-$(CONFIG_MACH_SUN8I) += \ 
-> > >? sun8i-h3-orangepi-plus.dtb \ 
-> > >? sun8i-h3-orangepi-plus2e.dtb \ 
-> > >? sun8i-r16-parrot.dtb \ 
-> > > - sun8i-v3s-licheepi-zero.dtb 
-> > > + sun8i-v3s-licheepi-zero.dtb \ 
-> > > + sun8i-v3s-licheepi-zero-dock.dtb 
-> > >? dtb-$(CONFIG_MACH_SUN9I) += \ 
-> > >? sun9i-a80-optimus.dtb \ 
-> > >? sun9i-a80-cubieboard4.dtb 
-> > > diff --git a/arch/arm/boot/dts/sun8i-v3s-licheepi-zero-dock.dts b/arch/arm/boot/dts/sun8i-v3s-licheepi-zero-dock.dts 
-> > > new file mode 100644 
-> > > index 000000000000..956fa47fde53 
-> > > --- /dev/null 
-> > > +++ b/arch/arm/boot/dts/sun8i-v3s-licheepi-zero-dock.dts 
-> > > @@ -0,0 +1,98 @@ 
-> > > +/* 
-> > > + * Copyright (C) 2016 Icenowy Zheng <icenowy@aosc.xyz> 
-> > > + * 
-> > > + * This file is dual-licensed: you can use it either under the terms 
-> > > + * of the GPL or the X11 license, at your option. Note that this dual 
-> > > + * licensing only applies to this file, and not this project as a 
-> > > + * whole. 
-> > > + * 
-> > > + *? a) This file is free software; you can redistribute it and/or 
-> > > + *???? modify it under the terms of the GNU General Public License as 
-> > > + *???? published by the Free Software Foundation; either version 2 of the 
-> > > + *???? License, or (at your option) any later version. 
-> > > + * 
-> > > + *???? This file is distributed in the hope that it will be useful, 
-> > > + *???? but WITHOUT ANY WARRANTY; without even the implied warranty of 
-> > > + *???? MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.? See the 
-> > > + *???? GNU General Public License for more details. 
-> > > + * 
-> > > + * Or, alternatively, 
-> > > + * 
-> > > + *? b) Permission is hereby granted, free of charge, to any person 
-> > > + *???? obtaining a copy of this software and associated documentation 
-> > > + *???? files (the "Software"), to deal in the Software without 
-> > > + *???? restriction, including without limitation the rights to use, 
-> > > + *???? copy, modify, merge, publish, distribute, sublicense, and/or 
-> > > + *???? sell copies of the Software, and to permit persons to whom the 
-> > > + *???? Software is furnished to do so, subject to the following 
-> > > + *???? conditions: 
-> > > + * 
-> > > + *???? The above copyright notice and this permission notice shall be 
-> > > + *???? included in all copies or substantial portions of the Software. 
-> > > + * 
-> > > + *???? THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, 
-> > > + *???? EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES 
-> > > + *???? OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND 
-> > > + *???? NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT 
-> > > + *???? HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, 
-> > > + *???? WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING 
-> > > + *???? FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR 
-> > > + *???? OTHER DEALINGS IN THE SOFTWARE. 
-> > > + */ 
-> > > + 
-> > > +#include "sun8i-v3s-licheepi-zero.dts" 
-> > > + 
-> > > +#include <dt-bindings/input/input.h> 
-> > > + 
-> > > +/ { 
-> > > + model = "Lichee Pi Zero with Dock"; 
-> > > + compatible = "licheepi,licheepi-zero-dock", "licheepi,licheepi-zero", 
-> > > + ???? "allwinner,sun8i-v3s"; 
-> > > +}; 
-> > > + 
-> > > +&leds { 
-> > > + /* The LEDs conflict with MMC1 slot */ 
-> >
-> > How does it conflicts? 
-> 
-> They both use PGx.
+On 15.03.2017 08:49, Tomasz Nowicki wrote:
+> During early days of PCI quirks support ThunderX firmware did not provide
+> PNP0c02 node with PCI configuration space and PEM-specific register ranges.
+> This means that for legacy FW we are not reserving these resources and
+> cannot gather PEM-specific resources for further PEM initialization.
+>
+> In order to support already deployed legacy FW calculate PEM-specific ranges
+> and provide resources reservation as fallback scenario into PEM driver when
+> we could not gather PEM reg base from ACPI tables.
+>
+> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+> Signed-off-by: Vadim Lomovtsev <Vadim.Lomovtsev@caviumnetworks.com>
+> ---
+>  drivers/pci/host/pci-thunder-pem.c | 56 ++++++++++++++++++++++++++++++++++++--
+>  1 file changed, 54 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/pci/host/pci-thunder-pem.c b/drivers/pci/host/pci-thunder-pem.c
+> index e354010..e0aa194 100644
+> --- a/drivers/pci/host/pci-thunder-pem.c
+> +++ b/drivers/pci/host/pci-thunder-pem.c
+> @@ -14,6 +14,7 @@
+>   * Copyright (C) 2015 - 2016 Cavium, Inc.
+>   */
+>
+> +#include <linux/bitfield.h>
+>  #include <linux/kernel.h>
+>  #include <linux/init.h>
+>  #include <linux/of_address.h>
+> @@ -319,6 +320,50 @@ static int thunder_pem_init(struct device *dev, struct pci_config_window *cfg,
+>
+>  #if defined(CONFIG_ACPI) && defined(CONFIG_PCI_QUIRKS)
+>
+> +#define PEM_RES_BASE		0x87e0c0000000UL
+> +#define PEM_NODE_MASK		GENMASK(45, 44)
+> +#define PEM_INDX_MASK		GENMASK(26, 24)
+> +#define PEM_MIN_DOM_IN_NODE	4
+> +#define PEM_MAX_DOM_IN_NODE	10
+> +
+> +static void thunder_pem_reserve_range(struct device *dev, int seg,
+> +				      struct resource *r)
+> +{
+> +	resource_size_t start = r->start, end = r->end;
+> +	struct resource *res;
+> +	const char *regionid;
+> +
+> +	regionid = kasprintf(GFP_KERNEL, "PEM RC:%d", seg);
+> +	if (!regionid)
+> +		return;
+> +
+> +	res = request_mem_region(start, end - start + 1, regionid);
+> +	if (res)
+> +		res->flags &= ~IORESOURCE_BUSY;
+> +	else
+> +		kfree(regionid);
+> +
+> +	dev_info(dev, "%pR %s reserved\n", r,
+> +		 res ? "has been" : "could not be");
+> +}
+> +
+> +static void thunder_pem_legacy_fw(struct acpi_pci_root *root,
+> +				 struct resource *res_pem)
+> +{
+> +	int node = acpi_get_node(root->device->handle);
+> +	int index;
+> +
+> +	if (node == NUMA_NO_NODE)
+> +		node = 0;
+> +
+> +	index = root->segment - PEM_MIN_DOM_IN_NODE;
+> +	index -= node * PEM_MAX_DOM_IN_NODE;
+> +	res_pem->start = PEM_RES_BASE | FIELD_PREP(PEM_NODE_MASK, node) |
+> +					FIELD_PREP(PEM_INDX_MASK, index);
+> +	res_pem->end = res_pem->start + SZ_16M - 1;
+> +	res_pem->flags = IORESOURCE_MEM;
+> +}
+> +
+>  static int thunder_pem_acpi_init(struct pci_config_window *cfg)
+>  {
+>  	struct device *dev = cfg->parent;
+> @@ -332,9 +377,16 @@ static int thunder_pem_acpi_init(struct pci_config_window *cfg)
+>  		return -ENOMEM;
+>
+>  	ret = acpi_get_rc_resources(dev, "CAVA02B", root->segment, res_pem);
+> +
+> +	/*
+> +	 * If we fail to gather resources it means that we run with old
+> +	 * FW where we need to calculate PEM-specific resources manually.
+> +	 */
+>  	if (ret) {
+> -		dev_err(dev, "can't get rc base address\n");
+> -		return ret;
+> +		thunder_pem_legacy_fw(root, res_pem);
+> +		/* Reserve PEM specific resources and PCI configuration space */
+> +		thunder_pem_reserve_range(dev, root->segment, res_pem);
 
-So they use the same bank? How is that a conflict?
 
-> > > +&mmc1 { 
-> > > + pinctrl-0 = <&mmc1_pins>; 
-> > > + pinctrl-names = "default"; 
-> > > + broken-cd; 
-> >
-> > There's no card-detect on a GPIO? 
-> 
-> Yes.
-> 
-> All SD slots on Lichee Pi series have no card-detect.
+Looks like I screwed up PEM resource size for reservation. We cannot 
+reserve full 16M here since devices will not able to request their 
+resources later on:
+pcieport 0004:1f:00.0: can't enable device: BAR 0 [mem 
+0x87e0c0f00000-0x87e0c0ffffff 64bit] not claimed
 
-Weird... Ok.
+SZ_64K is what we need to reserve.
 
-Maxime
+Bjorn can you please apply below fix:
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170324/50613656/attachment.sig>
+@@ -327,21 +327,20 @@ static void thunder_pem_legacy_fw(struct 
+acpi_pci_root *root,
+  	int node = acpi_get_node(root->device->handle);
+  	int index;
+
+  	if (node == NUMA_NO_NODE)
+  		node = 0;
+
+  	index = root->segment - PEM_MIN_DOM_IN_NODE;
+  	index -= node * PEM_MAX_DOM_IN_NODE;
+  	res_pem->start = PEM_RES_BASE | FIELD_PREP(PEM_NODE_MASK, node) |
+  					FIELD_PREP(PEM_INDX_MASK, index);
+-	res_pem->end = res_pem->start + SZ_16M - 1;
+  	res_pem->flags = IORESOURCE_MEM;
+  }
+
+  static int thunder_pem_acpi_init(struct pci_config_window *cfg)
+  {
+  	struct device *dev = cfg->parent;
+  	struct acpi_device *adev = to_acpi_device(dev);
+  	struct acpi_pci_root *root = acpi_driver_data(adev);
+  	struct resource *res_pem;
+  	int ret;
+@@ -351,22 +350,29 @@ static int thunder_pem_acpi_init(struct 
+pci_config_window *cfg)
+  		return -ENOMEM;
+
+  	ret = acpi_get_rc_resources(dev, "CAVA02B", root->segment, res_pem);
+
+  	/*
+  	 * If we fail to gather resources it means that we run with old
+  	 * FW where we need to calculate PEM-specific resources manually.
+  	 */
+  	if (ret) {
+  		thunder_pem_legacy_fw(root, res_pem);
+-		/* Reserve PEM specific resources and PCI configuration space */
++		/*
++		 * Reserve 64K size PEM specific resources. The full 16M range
++		 * size is required for thunder_pem_init() call.
++		 */
++		res_pem->end = res_pem->start + SZ_64K - 1;
+  		thunder_pem_reserve_range(dev, root->segment, res_pem);
++		res_pem->end = res_pem->start + SZ_16M - 1;
++
++		/* and PCI configuration space */
+  		thunder_pem_reserve_range(dev, root->segment, &cfg->res);
+  	}
+
+  	return thunder_pem_init(dev, cfg, res_pem);
+  }
+
+My apology for not paying attention.
+
+Thanks,
+Tomasz
