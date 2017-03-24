@@ -1,80 +1,108 @@
-From: moritz.fischer.private@gmail.com (Moritz Fischer)
-Date: Fri, 24 Mar 2017 08:23:18 -0700
-Subject: [PATCH v3 1/2] doc: Add bindings document for Xilinx LogiCore PR
- Decoupler
-In-Reply-To: <20170324145908.aiijqixf5xcnkksa@rob-hp-laptop>
-References: <1489781473-30772-1-git-send-email-mdf@kernel.org>
- <20170324145908.aiijqixf5xcnkksa@rob-hp-laptop>
-Message-ID: <20170324152318.GA13089@tyrael.amer.corp.natinst.com>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Fri, 24 Mar 2017 16:23:40 +0100
+Subject: [PATCH v4 28/28] arm/arm64: Add hyp-stub API documentation
+In-Reply-To: <ff4fe929-98f0-de0e-2f1a-d06c7969d5e0@arm.com>
+References: <20170321192058.9300-1-marc.zyngier@arm.com>
+ <20170321192058.9300-29-marc.zyngier@arm.com>
+ <20170324143316.GA25903@cbox>
+ <ff4fe929-98f0-de0e-2f1a-d06c7969d5e0@arm.com>
+Message-ID: <20170324152340.GG25903@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 24, 2017 at 09:59:08AM -0500, Rob Herring wrote:
-> On Fri, Mar 17, 2017 at 01:11:12PM -0700, Moritz Fischer wrote:
-> > This adds the binding documentation for the Xilinx LogiCORE PR
-> > Decoupler soft core.
+On Fri, Mar 24, 2017 at 02:42:13PM +0000, Marc Zyngier wrote:
+> On 24/03/17 14:33, Christoffer Dall wrote:
+> > On Tue, Mar 21, 2017 at 07:20:58PM +0000, Marc Zyngier wrote:
+> >> In order to help people understanding the hyp-stub API that exists
+> >> between the host kernel and the hypervisor mode (whether a hypervisor
+> >> has been installed or not), let's document said API.
+> >>
+> >> As with any form of documentation, I expect it to become obsolete
+> >> and completely misleading within 20 minutes after having being merged.
 > > 
-> > Signed-off-by: Moritz Fischer <mdf@kernel.org>
-> > Cc: Michal Simek <michal.simek@xilinx.com>
-> > Cc: S?ren Brinkmann <soren.brinkmann@xilinx.com>
-> > Cc: linux-kernel at vger.kernel.org
-> > Cc: devicetree at vger.kernel.org
-> > ---
+> > I don't think this last sentence belongs in the commit message.
 > > 
-> > Changes from v2:
-> > - Added refence to generic fpga-region bindings
-> > - Fixed up reg property in example
-> > - Added fallback to "xlnx,pr-decoupler" without version
+> >>
+> >> Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
+> >> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> >> ---
+> >>  Documentation/virtual/kvm/arm/hyp-abi.txt | 45 +++++++++++++++++++++++++++++++
+> >>  1 file changed, 45 insertions(+)
+> >>  create mode 100644 Documentation/virtual/kvm/arm/hyp-abi.txt
+> >>
+> >> diff --git a/Documentation/virtual/kvm/arm/hyp-abi.txt b/Documentation/virtual/kvm/arm/hyp-abi.txt
+> >> new file mode 100644
+> >> index 000000000000..a1e0314d2249
+> >> --- /dev/null
+> >> +++ b/Documentation/virtual/kvm/arm/hyp-abi.txt
+> >> @@ -0,0 +1,45 @@
+> >> +* Internal ABI between the kernel and HYP
+> >> +
+> >> +This file documents the interaction between the Linux kernel and the
+> >> +hypervisor layer when running Linux as a hypervisor (for example
+> >> +KVM). It doesn't cover the interaction of the kernel with the
+> >> +hypervisor when running as a guest (under Xen, KVM or any other
+> >> +hypervisor), or any hypervisor-specific interaction when the kernel is
+> >> +used as a host.
+> >> +
+> >> +On arm and arm64 (without VHE), the kernel doesn't run in hypervisor
+> >> +mode, but still needs to interact with it, allowing a built-in
+> >> +hypervisor to be either installed or torn down.
+> >> +
+> >> +In order to achieve this, the kernel must be booted at HYP (arm) or
+> >> +EL2 (arm64), allowing it to install a set of stubs before dropping to
+> >> +SVC/EL1. These stubs are accessible by using a 'hvc #0' instruction,
+> >> +and only act on individual CPUs.
+> >> +
+> >> +Unless specified otherwise, any built-in hypervisor must implement
+> >> +these functions (see arch/arm{,64}/include/asm/virt.h):
+> >> +
+> >> +* r0/x0 = HVC_SET_VECTORS
+> >> +  r1/x1 = vectors
+> >> +
+> >> +  Set HVBAR/VBAR_EL2 to 'vectors' to enable a hypervisor. 'vectors'
+> >> +  must be a physical address, and respect the alignment requirements
+> >> +  of the architecture. Only implemented by the initial stubs.
 > > 
-> > Changes from v1:
-> > - Added clock names & clock to example
-> > - Merged some of the description from Michal's version
-> > 
-> > ---
-> >  .../bindings/fpga/xilinx-pr-decoupler.txt          | 35 ++++++++++++++++++++++
-> >  1 file changed, 35 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/fpga/xilinx-pr-decoupler.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/fpga/xilinx-pr-decoupler.txt b/Documentation/devicetree/bindings/fpga/xilinx-pr-decoupler.txt
-> > new file mode 100644
-> > index 0000000..16141bd
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/fpga/xilinx-pr-decoupler.txt
-> > @@ -0,0 +1,35 @@
-> > +Xilinx LogiCORE Partial Reconfig Decoupler Softcore
-> > +
-> > +The Xilinx LogiCORE Partial Reconfig Decoupler manages one or more
-> > +decouplers / fpga bridges.
-> > +The controller can decouple/disable the bridges which prevents signal
-> > +changes from passing through the bridge.  The controller can also
-> > +couple / enable the bridges which allows traffic to pass through the
-> > +bridge normally.
-> > +
-> > +The Driver supports only MMIO handling. A PR region can have multiple
-> > +PR Decouples which can bhe handled independently or chaines via decouple/
+> > Does this last sentence mean that KVM doesn't implement this function?
 > 
-> s/chaines/chains/
+> Indeed. 
 
-Fixed in v4.
+I think the wording could be improved to "Only implemented by the
+initial stubs, not by Linux hypervisors."
 
-> > +decouple_status signals.
-> > +
-> > +Required properties:
-> > +- compatible		: Should contain "xlnx,pr-decoupler-1.00"
-> > +- regs			: base address and size for decoupler module
-> > +- clocks		: input clock to IP
-> > +- clock-names		: should contain "aclk"
-> > +
-> > +Optional properties:
-> > +- bridge-enable		: 0 if driver should disable bridge at startup
-> > +			  1 if driver should enable bridge at startup
-> > +			  Default is to leave bridge in current state.
+> Directly setting the vectors is inherently unsafe (MMU could
+> still be ON, for example), hence the HVC_SET_VECTORS operation that
+> allow this to be done safely (RESET followed by SET).
 > 
-> This is common and should move into a common doc. Maybe fpga-region.txt 
-> works?
 
-Ok will add patch for that to v5 series.
+Hmm, is it any less safe than setting the vectors using the hyp stubs?
+In the initial case, we're relying on the caller knowing that the MMU is
+off, and that the stubs are in place, otherwise it doesn't make sense.
 
-Thanks for your feedback,
+But I think the point is just that we don't have a need to change the
+vector from within KVM; we only have a need to set the vector when going
+from stub->kvm, and we have a need to reset the whole thing (including
+turning off the MMU) when going from kvm->stub.
 
-Moritz
+Anyhow, my comment was just about the wording, as I had some nagging
+doubt when I read the patch.
+
+> > 
+> >> +
+> >> +* r0/x0 = HVC_RESET_VECTORS
+> >> +
+> >> +  Turn HYP/EL2 MMU off, and reset HVBAR/VBAR_EL2 to the default
+> >> +  value. This effectively disables an existing hypervisor.
+> > 
+> > What's the 'default value' ?  Could we say to the physical address of
+> > the hypervisor stub's exception vector?
+> 
+> Shouldn't that be the kernel stub's exception vector?
+> 
+
+Yeah, the "initials stubs' exception vector" is probably the most
+coherent thing we can use here.
+
+Thanks,
+-Christoffer
