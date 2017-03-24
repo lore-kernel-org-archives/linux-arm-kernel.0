@@ -1,27 +1,33 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 24 Mar 2017 17:35:15 +0000
-Subject: [PATCH 3/9] arm64: mm: install SError abort handler
-In-Reply-To: <58D54DE8.9020707@gmail.com>
-References: <20170324144632.5896-1-opendmb@gmail.com>
- <20170324144632.5896-4-opendmb@gmail.com>
- <20170324151654.GD29588@leverpostej> <58D54DE8.9020707@gmail.com>
-Message-ID: <20170324173515.GB10746@leverpostej>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Fri, 24 Mar 2017 17:36:15 +0000
+Subject: [PATCH] arm64: cpufeature: Make ID reg accessor naming less
+ counterintuitive
+In-Reply-To: <1490282079-2724-1-git-send-email-Dave.Martin@arm.com>
+References: <1490282079-2724-1-git-send-email-Dave.Martin@arm.com>
+Message-ID: <c6d8e559-9f4c-363d-26fa-9e25d1a55307@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 24, 2017 at 09:48:40AM -0700, Doug Berger wrote:
-> On 03/24/2017 08:16 AM, Mark Rutland wrote:
-> >On Fri, Mar 24, 2017 at 07:46:26AM -0700, Doug Berger wrote:
+On 23/03/17 15:14, Dave Martin wrote:
+> read_system_reg() can readily be confused with read_sysreg(),
+> whereas these are really quite different in their meaning.
+>
+> This patches attempts to reduce the ambiguity be reserving "sysreg"
+> for the actual system register accessors.
+>
+> read_system_reg() is instead renamed to read_sanitised_ftr_reg(),
+> to make it more obvious that the Linux-defined sanitised feature
+> register cache is being accessed here, not the underlying
+> architectural system registers.
+>
+> cpufeature.c's internal __raw_read_system_reg() function is renamed
+> in line with its actual purpose: a form of read_sysreg() that
+> indexes on (non-compiletime-constant) encoding rather than symbolic
+> register name.
+>
+> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+>
 
-> If you would consider an alternative implementation where we scrap
-> the SError handler (i.e. maintain the ugliness in our downstream
-> kernel) in favor of a more gentle user mode crash on SError that
-> allows the kernel the opportunity to service the interrupt for
-> diagnostic purposes I could try to repackage that.
+Thanks for clean up !
 
-If this is just for diagnostic purposes, I believe you can register a
-panic notifier, which can then read from the bus. The panic will occur,
-but you'll have the opportunity to log some information to dmesg.
-
-Thanks,
-Mark.
+Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
