@@ -1,9 +1,9 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri, 24 Mar 2017 10:58:03 -0700
-Subject: [GIT PULL 3/7] Broadcom devicetree-arm64 changes for 4.12
+Date: Fri, 24 Mar 2017 10:58:04 -0700
+Subject: [GIT PULL 4/7] Broadcom maintainers changes for 4.12
 In-Reply-To: <20170324175807.27272-1-f.fainelli@gmail.com>
 References: <20170324175807.27272-1-f.fainelli@gmail.com>
-Message-ID: <20170324175807.27272-3-f.fainelli@gmail.com>
+Message-ID: <20170324175807.27272-4-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,30 +13,37 @@ The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
 
 are available in the git repository at:
 
-  http://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.12/devicetree-arm64
+  http://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.12/maintainers
 
-for you to fetch changes up to 231b362aec8c38a35bdbb2456c42b503ad6ce620:
+for you to fetch changes up to 38b06b9d00f7d4907fc18866ec766253aa34f1c6:
 
-  arm64: dts: NS2: convert "ok" to "okay" (2017-03-15 14:54:21 -0700)
+  Merge tag 'bcm2835-maintainers-next-2017-03-21' into maintainers/next (2017-03-24 10:14:50 -0700)
 
 ----------------------------------------------------------------
-This pull request contains Broadcom ARM64-based SoCs Device Tree updates for
+This pull request contains Broadcom ARM-based SoCs MAINTAINERS file updates for
 4.12, please pull the following:
 
-- Rob enables the cryptographic block on Northstar 2 (SPU) by adding the proper
-  Device Tree nodes
+- Jon adds himself as a maintainer for the BCM5301X SoCs (Northstar) since he has
+  been contributing changes to these platforms for a while now
 
-- Jon replaces all occurences of: status = "ok" with status = "okay" to better
-  conform to the Device Tree specification
+- Stephen Warren removes himself from the BCM2835 maintainers (Rasperrby Pi) since
+  in his own words he has not been active that much lately
+
+- Eric adds Stefan Wahren as a maintainer for the BCM2835 platform since he has
+  been very active on it for neary 2 years now
 
 ----------------------------------------------------------------
+Eric Anholt (1):
+      MAINTAINERS: Add Stefan Wahren to bcm2835.
+
+Florian Fainelli (1):
+      Merge tag 'bcm2835-maintainers-next-2017-03-21' into maintainers/next
+
 Jon Mason (1):
-      arm64: dts: NS2: convert "ok" to "okay"
+      MAINTAINERS: Add Jon Mason to BCM5301X maintainers
 
-Rob Rice (1):
-      arm64: dts: NS2: Add Broadcom SPU driver DT entry
+Stephen Warren (1):
+      MAINTAINERS: remove swarren from bcm2835
 
- arch/arm64/boot/dts/broadcom/ns2-svk.dts | 38 ++++++++++++++++----------------
- arch/arm64/boot/dts/broadcom/ns2-xmc.dts | 20 ++++++++---------
- arch/arm64/boot/dts/broadcom/ns2.dtsi    | 24 ++++++++++++++++++++
- 3 files changed, 53 insertions(+), 29 deletions(-)
+ MAINTAINERS | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
