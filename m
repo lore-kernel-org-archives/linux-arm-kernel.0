@@ -1,53 +1,84 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 24 Mar 2017 11:43:25 +0000
-Subject: [PATCH v6 08/11] drivers: perf: hisi: use poll method to avoid
- L3C counter overflow
-In-Reply-To: <58D4C006.2010907@gmail.com>
-References: <1489127325-112821-1-git-send-email-anurup.m@huawei.com>
- <20170321171605.GB29116@leverpostej> <58D4C006.2010907@gmail.com>
-Message-ID: <20170324114325.GC22771@leverpostej>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Fri, 24 Mar 2017 13:46:00 +0200
+Subject: [PATCH v2 1/2] tty: serial_core: Add name field to uart_port
+ struct
+In-Reply-To: <20170324052800.11526-2-vigneshr@ti.com>
+References: <20170324052800.11526-1-vigneshr@ti.com>
+ <20170324052800.11526-2-vigneshr@ti.com>
+Message-ID: <CAHp75VeRBq=VVgh7FaiuFF6GjTx98A2oEYyWaQVEPAmwPExMdg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 24, 2017 at 12:13:18PM +0530, Anurup M wrote:
-> On Tuesday 21 March 2017 10:46 PM, Mark Rutland wrote:
-> >On Fri, Mar 10, 2017 at 01:28:45AM -0500, Anurup M wrote:
+On Fri, Mar 24, 2017 at 7:27 AM, Vignesh R <vigneshr@ti.com> wrote:
+> Introduce a field to store name of uart_port that can be used to easily
+> identify UART port instances on a system that has more than one UART
+> instance. The name is of the form ttyXN(eg. ttyS0, ttyAMA0,..) where N
+> is number that particular UART instance.
+> This field will be useful when printing debug info for a particular port
+> or in register IRQs with unique IRQ name. Port name is populated during
+> uart_add_one_port().
+>
 
-> >>+/* The counter overflow IRQ is not supported for some PMUs
-> >>+ * use hrtimer to periodically poll and avoid overflow
-> >>+ */
-> >>+static enum hrtimer_restart hisi_hrtimer_callback(struct hrtimer *hrtimer)
-> >>+{
-> >>+	struct hisi_pmu *hisi_pmu = container_of(hrtimer,
-> >>+						 struct hisi_pmu, hrtimer);
-> >>+	struct perf_event *event;
-> >>+	struct hw_perf_event *hwc;
-> >>+	unsigned long flags;
-> >>+
-> >>+	/* Return if no active events */
-> >>+	if (!hisi_pmu->num_active)
-> >>+		return HRTIMER_NORESTART;
-> >>+
-> >>+	local_irq_save(flags);
-> >>+
-> >>+	/* Update event count for each active event */
-> >>+	list_for_each_entry(event, &hisi_pmu->active_list, active_entry) {
-> >>+		hwc = &event->hw;
-> >>+		/* Read hardware counter and update the Perf event counter */
-> >>+		hisi_pmu->ops->event_update(event, hwc, GET_CNTR_IDX(hwc));
-> >>+	}
-> >How do we ensure that we don't take the interrupt in the middle of a
-> >sequence of accesses to the HW?
-> 
-> The L3 cache and MN PMU does not use the overflow IRQ and it does
-> not occur here
-> as the interrupt Mask register is by default masked in hardware.
+Looks good to me:
+Reviewed-by: Andy Shevchenko <andy.shevchenko@gmail.com>
 
-I was referring to the timer interrupt which backs the hrtimer.
+Just in case, have you checked if there any possible scenarios where
+memory will be leaked?
 
-i.e. how do we guarantee that hisi_hrtimer_callback() is not called
-while we are in the middle of a RMW sequence? Are interrupts disabled
-for all of those seqeunces?
+> Signed-off-by: Vignesh R <vigneshr@ti.com>
+> ---
+>
+> v2:
+> use kasprintf() instead of snprintf()
+> Fix up commit message.
+>
+>  drivers/tty/serial/serial_core.c | 7 +++++++
+>  include/linux/serial_core.h      | 1 +
+>  2 files changed, 8 insertions(+)
+>
+> diff --git a/drivers/tty/serial/serial_core.c b/drivers/tty/serial/serial_core.c
+> index 0fb3f7cce62a..f5572e28d16a 100644
+> --- a/drivers/tty/serial/serial_core.c
+> +++ b/drivers/tty/serial/serial_core.c
+> @@ -2744,6 +2744,12 @@ int uart_add_one_port(struct uart_driver *drv, struct uart_port *uport)
+>         state->pm_state = UART_PM_STATE_UNDEFINED;
+>         uport->cons = drv->cons;
+>         uport->minor = drv->tty_driver->minor_start + uport->line;
+> +       uport->name = kasprintf(GFP_KERNEL, "%s%d", drv->dev_name,
+> +                               drv->tty_driver->name_base + uport->line);
+> +       if (!uport->name) {
+> +               ret = -ENOMEM;
+> +               goto out;
+> +       }
+>
+>         /*
+>          * If this port is a console, then the spinlock is already
+> @@ -2861,6 +2867,7 @@ int uart_remove_one_port(struct uart_driver *drv, struct uart_port *uport)
+>         if (uport->type != PORT_UNKNOWN && uport->ops->release_port)
+>                 uport->ops->release_port(uport);
+>         kfree(uport->tty_groups);
+> +       kfree(uport->name);
+>
+>         /*
+>          * Indicate that there isn't a port here anymore.
+> diff --git a/include/linux/serial_core.h b/include/linux/serial_core.h
+> index 58484fb35cc8..60530678c633 100644
+> --- a/include/linux/serial_core.h
+> +++ b/include/linux/serial_core.h
+> @@ -247,6 +247,7 @@ struct uart_port {
+>         unsigned char           suspended;
+>         unsigned char           irq_wake;
+>         unsigned char           unused[2];
+> +       char                    *name;                  /* port name */
+>         struct attribute_group  *attr_group;            /* port specific attributes */
+>         const struct attribute_group **tty_groups;      /* all attributes (serial core use only) */
+>         struct serial_rs485     rs485;
+> --
+> 2.11.0
+>
 
-Thanks,
-Mark.
+
+
+-- 
+With Best Regards,
+Andy Shevchenko
