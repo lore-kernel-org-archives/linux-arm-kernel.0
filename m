@@ -1,9 +1,9 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri, 24 Mar 2017 10:58:05 -0700
-Subject: [GIT PULL 5/7] Broadcom defconfig changes for 4.12
+Date: Fri, 24 Mar 2017 10:58:07 -0700
+Subject: [GIT PULL 7/7] Broadcom drivers changes for 4.12
 In-Reply-To: <20170324175807.27272-1-f.fainelli@gmail.com>
 References: <20170324175807.27272-1-f.fainelli@gmail.com>
-Message-ID: <20170324175807.27272-5-f.fainelli@gmail.com>
+Message-ID: <20170324175807.27272-7-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,29 +13,23 @@ The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
 
 are available in the git repository at:
 
-  http://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.12/defconfig
+  http://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.12/drivers
 
-for you to fetch changes up to f880c8fd8cfb3bcb77a219c00de45ad0a8386d23:
+for you to fetch changes up to bd0faf08dc7fcb3e555b35f556c9012b3c93de3b:
 
-  Merge tag 'bcm2835-defconfig-next-2017-03-21' into defconfig/next (2017-03-24 10:13:25 -0700)
+  soc: bcm: brcmstb: Match additional compatible strings (2017-03-05 17:00:57 -0800)
 
 ----------------------------------------------------------------
-This pull request contains Broadcom ARM-based SoCs defconfig updates for 4.12,
-please pull the following:
+This pull request contains Broadcom ARM-based SoC drivers updates for 4.12,
+please pull the following changes:
 
-- Gerd enables the BCM2835 MMC driver which yields better performance than the
-  default one (iProc)
+- Florian updates the Broadcom STB GISB arbiter driver with a bunch of
+  compatible strings for MIPS-based STBs found under arch/mips/boot/dts/brcm/ in
+  order for the SoC identification driver to recognize these chips
 
 ----------------------------------------------------------------
 Florian Fainelli (1):
-      Merge tag 'bcm2835-defconfig-next-2017-03-21' into defconfig/next
+      soc: bcm: brcmstb: Match additional compatible strings
 
-Gerd Hoffmann (1):
-      arm: set CONFIG_MMC_BCM2835=y in bcm2835_defconfig and multi_v7_defconfig
-
-Stefan Wahren (1):
-      ARM: bcm2835: Enable missing CMA settings for VC4 driver
-
- arch/arm/configs/bcm2835_defconfig  | 5 +++--
- arch/arm/configs/multi_v7_defconfig | 1 +
- 2 files changed, 4 insertions(+), 2 deletions(-)
+ drivers/soc/bcm/brcmstb/common.c | 9 +++++++++
+ 1 file changed, 9 insertions(+)
