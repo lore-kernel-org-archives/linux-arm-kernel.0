@@ -1,84 +1,146 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Fri, 24 Mar 2017 13:46:00 +0200
-Subject: [PATCH v2 1/2] tty: serial_core: Add name field to uart_port
- struct
-In-Reply-To: <20170324052800.11526-2-vigneshr@ti.com>
-References: <20170324052800.11526-1-vigneshr@ti.com>
- <20170324052800.11526-2-vigneshr@ti.com>
-Message-ID: <CAHp75VeRBq=VVgh7FaiuFF6GjTx98A2oEYyWaQVEPAmwPExMdg@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 24 Mar 2017 11:57:07 +0000
+Subject: [PATCH v6 07/11] drivers: perf: hisi: Add support for Hisilicon
+ SoC event counters
+In-Reply-To: <58D4F277.7080006@gmail.com>
+References: <1489127311-112778-1-git-send-email-anurup.m@huawei.com>
+ <20170321165252.GA29116@leverpostej> <58D4F277.7080006@gmail.com>
+Message-ID: <20170324115707.GD22771@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 24, 2017 at 7:27 AM, Vignesh R <vigneshr@ti.com> wrote:
-> Introduce a field to store name of uart_port that can be used to easily
-> identify UART port instances on a system that has more than one UART
-> instance. The name is of the form ttyXN(eg. ttyS0, ttyAMA0,..) where N
-> is number that particular UART instance.
-> This field will be useful when printing debug info for a particular port
-> or in register IRQs with unique IRQ name. Port name is populated during
-> uart_add_one_port().
->
+On Fri, Mar 24, 2017 at 03:48:31PM +0530, Anurup M wrote:
+> On Tuesday 21 March 2017 10:22 PM, Mark Rutland wrote:
+> >On Fri, Mar 10, 2017 at 01:28:31AM -0500, Anurup M wrote:
 
-Looks good to me:
-Reviewed-by: Andy Shevchenko <andy.shevchenko@gmail.com>
+> >Can you please elaborate on the relationship between the index, its
+> >bank, and its module?
+> >
+> >It's not clear to me what's going on above.
+> 
+> The module_id and bank_select values are both needed to identify the
+> L3 cache bank/instance.
+> The v1 and v2 chip differ in the way these values are mapped.
+> 
+> In v1 hw (hip05/06):
+> instance 0: module_id = 0x04, bank_select = 0x02
+> instance 1: module_id = 0x04, bank_select = 0x04
+> instance 2: module_id = 0x04, bank_select = 0x01
+> instance 3: module_id = 0x04, bank_select = 0x08
+> 
+> In v2 hw (hip07):
+> instance 0: module_id = 0x01, bank_select = 0x01
+> instance 1: module_id = 0x02, bank_select = 0x01
+> instance 2: module_id = 0x03, bank_select = 0x01
+> instance 3: module_id = 0x04, bank_select = 0x01
+> 
+> So here we can see that for v1 hw, module_id is same and bank_select
+> is different.
+> In v2 hw, every instance has different module_id to make djtag
+> access faster than v1.
+> so the module_id is different and bank_select is same.
+> 
+> So I create a map array to identify the L3 cache instance.
+> 
+> +/* hip05/06 chips L3C bank identifier */
+> +static u32 l3c_bankid_map_v1[MAX_BANKS] = {
+> +    0x02, 0x04, 0x01, 0x08,
+> +};
+> +
+> +/* hip07 chip L3C bank identifier */
+> +static u32 l3c_bankid_map_v2[MAX_BANKS] = {
+> +    0x01, 0x02, 0x03, 0x04,
+> +};
+> 
+> Is my approach OK? or can be improved?
 
-Just in case, have you checked if there any possible scenarios where
-memory will be leaked?
+I think it would make more sense for this to be described in the DT.
 
-> Signed-off-by: Vignesh R <vigneshr@ti.com>
-> ---
->
-> v2:
-> use kasprintf() instead of snprintf()
-> Fix up commit message.
->
->  drivers/tty/serial/serial_core.c | 7 +++++++
->  include/linux/serial_core.h      | 1 +
->  2 files changed, 8 insertions(+)
->
-> diff --git a/drivers/tty/serial/serial_core.c b/drivers/tty/serial/serial_core.c
-> index 0fb3f7cce62a..f5572e28d16a 100644
-> --- a/drivers/tty/serial/serial_core.c
-> +++ b/drivers/tty/serial/serial_core.c
-> @@ -2744,6 +2744,12 @@ int uart_add_one_port(struct uart_driver *drv, struct uart_port *uport)
->         state->pm_state = UART_PM_STATE_UNDEFINED;
->         uport->cons = drv->cons;
->         uport->minor = drv->tty_driver->minor_start + uport->line;
-> +       uport->name = kasprintf(GFP_KERNEL, "%s%d", drv->dev_name,
-> +                               drv->tty_driver->name_base + uport->line);
-> +       if (!uport->name) {
-> +               ret = -ENOMEM;
-> +               goto out;
-> +       }
->
->         /*
->          * If this port is a console, then the spinlock is already
-> @@ -2861,6 +2867,7 @@ int uart_remove_one_port(struct uart_driver *drv, struct uart_port *uport)
->         if (uport->type != PORT_UNKNOWN && uport->ops->release_port)
->                 uport->ops->release_port(uport);
->         kfree(uport->tty_groups);
-> +       kfree(uport->name);
->
->         /*
->          * Indicate that there isn't a port here anymore.
-> diff --git a/include/linux/serial_core.h b/include/linux/serial_core.h
-> index 58484fb35cc8..60530678c633 100644
-> --- a/include/linux/serial_core.h
-> +++ b/include/linux/serial_core.h
-> @@ -247,6 +247,7 @@ struct uart_port {
->         unsigned char           suspended;
->         unsigned char           irq_wake;
->         unsigned char           unused[2];
-> +       char                    *name;                  /* port name */
->         struct attribute_group  *attr_group;            /* port specific attributes */
->         const struct attribute_group **tty_groups;      /* all attributes (serial core use only) */
->         struct serial_rs485     rs485;
-> --
-> 2.11.0
->
+[...]
+
+> >>+	hisi_djtag_readreg(module_id, bank_sel, reg_off, client, &value);
+
+> >>+	hisi_djtag_writereg(module_id, bank_sel, reg_off, value, client);
+
+> >What happens when either of these fail?
+
+> >>+	hisi_djtag_readreg(module_id, bank_sel, reg_off, client, &value);
+
+> >>+	hisi_djtag_writereg(module_id, bank_sel, reg_off, value, client);
+
+> >>+	ret = hisi_djtag_writereg(module_id, bank_sel, reg_off, value, client);
+
+> >>+	hisi_djtag_readreg(module_id, bank_sel, L3C_EVCTRL_REG_OFF,
+> >>+			   client, &value);
+
+> >>+	hisi_djtag_writereg(module_id, bank_sel, L3C_EVCTRL_REG_OFF,
+> >>+			    value, client);
+
+> >What happens if these accesses time out?
+> >
+> >Why are we not proagating the error, or handling it somehow?
 
 
+> >>+	hisi_djtag_readreg(module_id, bank_sel, L3C_EVCTRL_REG_OFF,
+> >>+			   client, &value);
 
--- 
-With Best Regards,
-Andy Shevchenko
+> >>+	hisi_djtag_writereg(module_id, bank_sel, L3C_EVCTRL_REG_OFF,
+> >>+			    value, client);
+
+> >Likewise.
+ 
+> The djtag -EBUSY in hardware is a very rare scenario, and by design
+> of hardware, does not occur unless there is a Chip hung situation.
+> The maximum timeout possible in djtag is 30us, and hardware logic
+> shall reset it, if djtag is unavailable for more than 30us.
+> The timeout used in driver is 100ms to ensure that it does not fail
+> in any case.
+> so I had ignored the error with just a warning.
+> 
+> I shall handle the error internally and propagate it until a void
+> function (pmu->start, pmu->stop, pmu->del etc. are void).
+> e.g. in the scenario pmu->add ---> pmu->start. If start fail,
+> pmu->add cannot catch it and continues.
+> the counter index could be cleared when pmu->del is called later.
+> 
+> Is this fine? Any suggestion to handle it?
+
+Propagating it up to a void function, only to silently fail is not good.
+
+Given it seems this should only happen if there is a major HW problem,
+I'd be happier with a BUG_ON() in the djtag accessors.
+
+[...]
+
+> >>+void hisi_uncore_pmu_enable(struct pmu *pmu)
+> >>+{
+> >>+	struct hisi_pmu *hisi_pmu = to_hisi_pmu(pmu);
+> >>+
+> >>+	if (hisi_pmu->ops->start_counters)
+> >>+		hisi_pmu->ops->start_counters(hisi_pmu);
+> >>+}
+> >>+
+> >>+void hisi_uncore_pmu_disable(struct pmu *pmu)
+> >>+{
+> >>+	struct hisi_pmu *hisi_pmu = to_hisi_pmu(pmu);
+> >>+
+> >>+	if (hisi_pmu->ops->stop_counters)
+> >>+		hisi_pmu->ops->stop_counters(hisi_pmu);
+> >>+}
+> >When do you not have these?
+> >
+> >In the absence of pmu::{enable,disable}, you must disallow groups, since
+> >their events will be enabled for different periods of time.
+> 
+> For L3 cache and MN PMU, pmu::{enable,disable}is present. But in
+> case of Hisilicon DDRC PMU,
+> it is not available. It only support continuous counting. I shall
+> disallow groups when adding support
+> for DDRC PMU.
+
+Given this code does not currently support the DDRC, please simplify
+the coder to assume these callbacks always exist. We can alter it when
+DDRC support arrives.
+
+Thanks,
+Mark.
