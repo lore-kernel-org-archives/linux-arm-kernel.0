@@ -1,114 +1,84 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Fri, 24 Mar 2017 19:30:44 +0100
-Subject: [PATCH] KVM: arm/arm64: Signal SIGBUS when stage2 discovers
- hwpoison memory
-In-Reply-To: <20170315160727.16465-1-james.morse@arm.com>
-References: <20170315160727.16465-1-james.morse@arm.com>
-Message-ID: <20170324183044.GK25903@cbox>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 24 Mar 2017 18:31:48 +0000
+Subject: [PATCH 3/9] arm64: mm: install SError abort handler
+In-Reply-To: <710c4142-ae20-9715-3e51-910a2073a64e@gmail.com>
+References: <20170324144632.5896-1-opendmb@gmail.com>
+ <20170324144632.5896-4-opendmb@gmail.com>
+ <20170324151654.GD29588@leverpostej> <58D54DE8.9020707@gmail.com>
+ <20170324173515.GB10746@leverpostej>
+ <710c4142-ae20-9715-3e51-910a2073a64e@gmail.com>
+Message-ID: <20170324183051.GD10746@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 15, 2017 at 04:07:27PM +0000, James Morse wrote:
-> Once we enable ARCH_SUPPORTS_MEMORY_FAILURE on arm64[0], notifications for
-> broken memory can call memory_failure() in mm/memory-failure.c to deliver
-> SIGBUS to any user space process using the page, and notify all the
-> in-kernel users.
-> 
-> If the page corresponded with guest memory, KVM will unmap this page
-> from its stage2 page tables. The user space process that allocated
-> this memory may have never touched this page in which case it may not
-> be mapped meaning SIGBUS won't be delivered.
-> 
-> When this happens KVM discovers pfn == KVM_PFN_ERR_HWPOISON when it
-> comes to process the stage2 fault.
-> 
-> Do as x86 does, and deliver the SIGBUS when we discover
-> KVM_PFN_ERR_HWPOISON. Use the stage2 mapping size as the si_addr_lsb
-> as this matches the user space mapping size.
-> 
-> Signed-off-by: James Morse <james.morse@arm.com>
-> CC: gengdongjiu <gengdj.1984@gmail.com>
-> ---
->  Without this patch both kvmtool and Qemu exit as the KVM_RUN ioctl() returns
->  EFAULT.
->  QEMU: error: kvm run failed Bad address
->  LVKM: KVM_RUN failed: Bad address
-> 
->  With this patch both kvmtool and Qemu receive SIGBUS ... and then exit.
->  In the future Qemu can use this signal to notify the guest, for more details
->  see hwpoison[1].
-> 
->  [0] https://www.spinics.net/lists/arm-kernel/msg560009.html
->  [1] https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/Documentation/vm/hwpoison.txt
-> 
-> 
->  arch/arm/kvm/mmu.c | 23 +++++++++++++++++++++++
->  1 file changed, 23 insertions(+)
-> 
-> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-> index 962616fd4ddd..9d1aa294e88f 100644
-> --- a/arch/arm/kvm/mmu.c
-> +++ b/arch/arm/kvm/mmu.c
-> @@ -20,8 +20,10 @@
->  #include <linux/kvm_host.h>
->  #include <linux/io.h>
->  #include <linux/hugetlb.h>
-> +#include <linux/sched/signal.h>
->  #include <trace/events/kvm.h>
->  #include <asm/pgalloc.h>
-> +#include <asm/siginfo.h>
->  #include <asm/cacheflush.h>
->  #include <asm/kvm_arm.h>
->  #include <asm/kvm_mmu.h>
-> @@ -1237,6 +1239,23 @@ static void coherent_cache_guest_page(struct kvm_vcpu *vcpu, kvm_pfn_t pfn,
->  	__coherent_cache_guest_page(vcpu, pfn, size);
->  }
->  
-> +static void kvm_send_hwpoison_signal(unsigned long address, bool hugetlb)
-> +{
-> +	siginfo_t info;
-> +
-> +	info.si_signo   = SIGBUS;
-> +	info.si_errno   = 0;
-> +	info.si_code    = BUS_MCEERR_AR;
-> +	info.si_addr    = (void __user *)address;
-> +
-> +	if (hugetlb)
-> +		info.si_addr_lsb = PMD_SHIFT;
-> +	else
-> +		info.si_addr_lsb = PAGE_SHIFT;
-> +
-> +	send_sig_info(SIGBUS, &info, current);
-> +}
-> +
->  static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
->  			  struct kvm_memory_slot *memslot, unsigned long hva,
->  			  unsigned long fault_status)
-> @@ -1306,6 +1325,10 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
->  	smp_rmb();
->  
->  	pfn = gfn_to_pfn_prot(kvm, gfn, write_fault, &writable);
-> +	if (pfn == KVM_PFN_ERR_HWPOISON) {
-> +		kvm_send_hwpoison_signal(hva, hugetlb);
+Hi Florian,
 
-The way this is called means that we'll only notify userspace of a huge
-mapping if userspace is mapping hugetlbfs, and not because the stage2
-mapping may or may not have used transparent huge pages when the error
-was discovered.  Is this the desired semantics?
-
-Also notice that the hva is not necessarily aligned to the beginning of
-the huge page, so can we be giving userspace wrong information by
-pointing in the middle of a huge page and telling it there was an
-address error in the size of the PMD ?
-
-> +		return 0;
-> +	}
->  	if (is_error_noslot_pfn(pfn))
->  		return -EFAULT;
->  
-> -- 
-> 2.10.1
+On Fri, Mar 24, 2017 at 10:53:48AM -0700, Florian Fainelli wrote:
+> On 03/24/2017 10:35 AM, Mark Rutland wrote:
+> > On Fri, Mar 24, 2017 at 09:48:40AM -0700, Doug Berger wrote:
+> >> On 03/24/2017 08:16 AM, Mark Rutland wrote:
+> >>> On Fri, Mar 24, 2017 at 07:46:26AM -0700, Doug Berger wrote:
+> > 
+> >> If you would consider an alternative implementation where we scrap
+> >> the SError handler (i.e. maintain the ugliness in our downstream
+> >> kernel) in favor of a more gentle user mode crash on SError that
+> >> allows the kernel the opportunity to service the interrupt for
+> >> diagnostic purposes I could try to repackage that.
+> > 
+> > If this is just for diagnostic purposes, I believe you can register a
+> > panic notifier, which can then read from the bus. The panic will occur,
+> > but you'll have the opportunity to log some information to dmesg.
 > 
+> And crash the kernel? That sounds awful, FWIW the ARM/Linux kernel is
+> able to recover just fine from user-space accessing e.g: invalid
+> physical addresses in the GISB register space, bringing the same level
+> of functionality to ARM64/Linux sounds reasonable to me.
+
+I disagree, given that:
+
+(a) You cannot determine the (HW) origin of the SError in an
+    architecturally portable way. i.e. when you take an SError, you have
+    no way of determining what asynchronous event caused it.
+
+(b) SError is effectively an edge-triggered interrupt for fatal system
+    errors (e.g. it may be triggered in resonse to ECC errors,
+    corruption detected in caches, etc). Even if you can determine that
+    the GISB triggered *an* SError, this does not tell you that this was
+    the *only* SError.
+
+    If you take an SError, something bad has already happened. Your data
+    may already have been corrupted, and worse, you don't know when or
+    where specifically this occurred (nor how many times).
+    
+(c) You cannot determine the (SW) origin of an SError without relying
+    upon implementation details. This cannot be written in a way that
+    does not rely on microarchitecture, integration, etc, and would need
+    to be updated for every future system with this misfeature.
+
+(d) Even if you can determine the (SW) origin of an SError by relying on
+    IMPLEMENTATION DEFINED details, your handler needs to be intimately
+    familiar with the arch in question in order to attempt to recover.
+
+    For example, the existing code tries to skip an ARM instruction in
+    some cases. For arm64 there are three cases that would need to be
+    handled (AArch64 A64, AArch32 A32/ARM, AArch32 T32/Thumb).
+
+    Further, it appears to me that the existing code is broken given
+    that it doesn't handle Thumb, and given that it's skipping an
+    instruction in response to an asynchronous event -- i.e. some
+    arbitrary instruction after the one which triggered the abort.
+
+For better or worse, SError *must* be treated as fatal.
+
+As Doug stated:
+
+    The main benefit is to help debug user mode code that accidentally
+    maps a bad address since we would never make such an egregious error
+    in the kernel ;)
+
+This is just one of many ways a userspace application with direct HW
+access can bring down the system. I see no reason to treat it any
+differently, especially given the above points.
 
 Thanks,
--Christoffer
+Mark.
