@@ -1,60 +1,61 @@
-From: jagan@openedev.com (Jagan Teki)
-Date: Fri, 24 Mar 2017 21:48:47 +0530
-Subject: [PATCH v2 12/15] ARM: dts: imx6dl-icore: Add LVDS support
-In-Reply-To: <1490372330-5611-1-git-send-email-jagan@openedev.com>
-References: <1490372330-5611-1-git-send-email-jagan@openedev.com>
-Message-ID: <1490372330-5611-13-git-send-email-jagan@openedev.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Fri, 24 Mar 2017 17:45:41 +0100
+Subject: [PATCH 1/3] crypto: hw_random - Add new Exynos RNG driver
+In-Reply-To: <20170324161934.kc6g36nazr3y32kp@kozik-lap>
+References: <20170324142446.31129-1-krzk@kernel.org>
+ <9265537.P6AeF50kg8@amdc3058> <20170324161934.kc6g36nazr3y32kp@kozik-lap>
+ <CGME20170324164544epcas1p353b2eba5ecb6d5f7a69049c5ba9d667e@epcas1p3.samsung.com>
+Message-ID: <87677624.EBdhaJY1KM@amdc3058>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jagan Teki <jagan@amarulasolutions.com>
+On Friday, March 24, 2017 07:19:34 PM Krzysztof Kozlowski wrote:
+> On Fri, Mar 24, 2017 at 05:11:25PM +0100, Bartlomiej Zolnierkiewicz wrote:
+> > On Friday, March 24, 2017 06:46:00 PM Krzysztof Kozlowski wrote:
+> > > I really do not like global or file-scope variables. I do not like
+> > > drivers using them. Actually I hate them.
+> > > 
+> > > From time to time I encounter a driver which was designed with that
+> > > approach - static fields and hidden assumption that there will be only
+> > > one instance. Usually that assumption is really hidden...
+> > > 
+> > > ... and then it happens that I want to use two instances which of course
+> > > fails.
+> > > 
+> > > This code serves as a clear documentation for this assumption - only one
+> > > instance is allowed. You can look at it as a self-documenting
+> > > requirement.
+> > 
+> > For me it looks as needless case of defensive programming and when
+> > I see the code like this it always raises questions about the real
+> > intentions of the code. I find it puzzling and not helpful.
+> 
+> I do not understand what might be puzzling about check for static
+> file-scope value. It is of course subjective, but for me that looks
+> pretty self-explanatory.
 
-Add LVDS display support for OpenFrame Capacitive touch 7 inc
-display which is supported by Engicam i.CoreM6 DualLite/Solo Starter Kit.
+The check should never happen given that ->probe will not happen twice.
 
-Cc: Shawn Guo <shawnguo@kernel.org>
-Cc: Matteo Lisi <matteo.lisi@engicam.com>
-Cc: Michael Trimarchi <michael@amarulasolutions.com>
-Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
----
-Changes for v2:
-- none
+However it seems that this is possible now with DT platform devices and
+incorrect DTB.
 
- arch/arm/boot/dts/imx6dl-icore.dts | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
+> > > And I think the probe might be called twice, for example in case of
+> > > mistake in DTB.
+> > 
+> > Even if this is possible resource allocation code in the driver will
+> > take take care of handling it just fine,
+> 
+> Indeed, the devm_ioremap_resource() solves the case. I can drop the
+> check then.
 
-diff --git a/arch/arm/boot/dts/imx6dl-icore.dts b/arch/arm/boot/dts/imx6dl-icore.dts
-index 0562ce4..ea9ab05 100644
---- a/arch/arm/boot/dts/imx6dl-icore.dts
-+++ b/arch/arm/boot/dts/imx6dl-icore.dts
-@@ -68,3 +68,28 @@
- 		VDDD-supply = <&reg_1p8v>;
- 	};
- };
-+
-+&ldb {
-+	status = "okay";
-+
-+	lvds-channel at 0 {
-+		fsl,data-mapping = "spwg";
-+		fsl,data-width = <18>;
-+		status = "okay";
-+
-+		display-timings {
-+			native-mode = <&timing0>;
-+			timing0: timing0 {
-+				clock-frequency = <60000000>;
-+				hactive = <800>;
-+				vactive = <480>;
-+				hback-porch = <30>;
-+				hfront-porch = <30>;
-+				vback-porch = <5>;
-+				vfront-porch = <5>;
-+				hsync-len = <64>;
-+				vsync-len = <20>;
-+			};
-+		};
-+	};
-+};
--- 
-1.9.1
+Looking on this a bit more it seems that devm_ioremap_resource() will
+not cover all mistakes (using compatible by mistake in some other DTB
+node).
+
+Leave the check, I take my objection back.
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
