@@ -1,131 +1,77 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 24 Mar 2017 09:39:05 +0100
-Subject: [PATCH 4/4] tty/serial: sh-sci: remove uneeded IS_ERR_OR_NULL
- calls
-In-Reply-To: <CAMuHMdXnUzjb5wzMtmzY2ojpGbhr_3KFGDYd2QKEawVipBhdbw@mail.gmail.com>
-References: <20170323111106.7ogh6g2oa3m4cqc6@pengutronix.de>
- <CAMuHMdUWybAZXc2RbGMGyp4DYQZU9BS8MxXKE5Kfd+aH8+w9sA@mail.gmail.com>
- <20170323123437.uqdwhfmmsjke3f7s@pengutronix.de>
- <CACRpkdZRfLh9RXRycW_cAxuTYE6tPd7LR32EkAW8y2fh=AxhXA@mail.gmail.com>
- <20170323144325.GA952@dtor-ws> <20170323154441.GA9460@dtor-ws>
- <20170323191020.nrstp2cfh7cuqvf3@pengutronix.de>
- <20170323195804.GA2502@dtor-ws>
- <20170324080006.tbhyqlgk35xybsna@pengutronix.de>
- <CAMuHMdXnUzjb5wzMtmzY2ojpGbhr_3KFGDYd2QKEawVipBhdbw@mail.gmail.com>
-Message-ID: <20170324083905.h5uhdgiycchcjcgs@pengutronix.de>
+From: al.kochet@gmail.com (Alexander Kochetkov)
+Date: Fri, 24 Mar 2017 11:41:26 +0300
+Subject: [PATCH v7 5/7] clocksource/drivers/rockchip_timer: implement
+ clocksource timer
+In-Reply-To: <201703241631.5BKa33uG%fengguang.wu@intel.com>
+References: <201703241631.5BKa33uG%fengguang.wu@intel.com>
+Message-ID: <B771814D-541A-4D89-AC8A-5FFF84DE2E66@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Geert,
+The patch series should be applied after the patches [1] and [2] haven?t merged yet into the kernel.
+That mention in the cover letter.
 
-On Fri, Mar 24, 2017 at 09:29:02AM +0100, Geert Uytterhoeven wrote:
-> On Fri, Mar 24, 2017 at 9:00 AM, Uwe Kleine-K?nig
-> <u.kleine-koenig@pengutronix.de> wrote:
-> > From: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> > Subject: [PATCH] gpiod: let get_optional return NULL in some cases with GPIOLIB disabled
-> >
-> > People disagree if gpiod_get_optional should return NULL or
-> > ERR_PTR(-ENOSYS) if GPIOLIB is disabled. The argument for NULL is that
-> > the person who decided to disable GPIOLIB is assumed to know that there
-> > is no GPIO. The reason to stick to ERR_PTR(-ENOSYS) is that it might
-> > introduce hard to debug problems if that decision is wrong.
-> >
-> > So this patch introduces a compromise and let gpiod_get_optional (and
-> > its variants) return NULL if the device in question cannot have an
-> > associated GPIO because it is neither instantiated by a device tree nor
-> > by ACPI.
-> >
-> > This should handle most cases that are argued about.
-> >
-> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> > ---
-> >  include/linux/gpio/consumer.h | 55 ++++++++++++++++++++++++++++++++++++-------
-> >  1 file changed, 46 insertions(+), 9 deletions(-)
-> >
-> > diff --git a/include/linux/gpio/consumer.h b/include/linux/gpio/consumer.h
-> > index fb0fde686cb1..0ca29889290d 100644
-> > --- a/include/linux/gpio/consumer.h
-> > +++ b/include/linux/gpio/consumer.h
-> > @@ -161,20 +161,48 @@ gpiod_get_index(struct device *dev,
-> >         return ERR_PTR(-ENOSYS);
-> >  }
-> >
-> > -static inline struct gpio_desc *__must_check
-> > -gpiod_get_optional(struct device *dev, const char *con_id,
-> > -                  enum gpiod_flags flags)
-> > +static inline bool __gpiod_no_optional_possible(struct device *dev)
-> >  {
-> > -       return ERR_PTR(-ENOSYS);
-> > +       /*
-> > +        * gpiod_get_optional et al can only provide a GPIO if at least one of
-> > +        * the backends for specifing a GPIO is available. These are device
-> > +        * tree, ACPI and gpiolib's lookup tables. The latter isn't available if
-> > +        * GPIOLIB is disabled (which is the case here).
-> > +        * So if the provided device is unrelated to device tree and ACPI, we
-> > +        * can be sure that there is no optional GPIO and let gpiod_get_optional
-> > +        * safely return NULL.
-> > +        * Otherwise there is still a chance that there is no GPIO but we cannot
-> > +        * be sure without having to enable a part of GPIOLIB (i.e. the lookup
-> > +        * part). So lets play safe and return an error. (Though there are also
-> > +        * arguments that returning NULL then would be beneficial.)
-> > +        */
-> > +
-> > +       if (IS_ENABLED(CONFIG_OF) && dev && dev->of_node)
-> > +               return false;
+[1] https://lkml.org/lkml/2017/3/22/420
+[2] https://lkml.org/lkml/2017/3/22/426
+
+> 24 ????? 2017 ?., ? 11:29, kbuild test robot <lkp@intel.com> ???????(?):
 > 
-> At first sight, I though this was OK:
+> Hi Alexander,
 > 
->   1. On ARM with DT, we can assume CONFIG_GPIOLOB=y.
+> [auto build test ERROR on tip/timers/core]
+> [also build test ERROR on v4.11-rc3 next-20170323]
+> [cannot apply to rockchip/for-next]
+> [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 > 
->   2. I managed to configure an SH kernel with CONFIG_GPIOLOB=n, CONFIG_OF=y,
->      and CONFIG_SERIAL_SH_SCI=y, but since SH boards with SH-SCI UARTs do
->      not use DT (yet), the check for dev->of_node (false) should handle
->      that.
+> url:    https://github.com/0day-ci/linux/commits/Alexander-Kochetkov/Implement-clocksource-for-rockchip-SoC-using-rockchip-timer/20170324-113008
+> config: arm64-defconfig (attached as .config)
+> compiler: aarch64-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
+> reproduce:
+>        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+>        chmod +x ~/bin/make.cross
+>        # save the attached .config to linux build tree
+>        make.cross ARCH=arm64 
 > 
->   3. However, I managed to do the same for h8300, which does use DT. Hence
->      if mctrl_gpio would start relying on gpiod_get_optional(), this would
->      break the sh-sci driver on h8300 :-(
->      Note that h8300 doesn't have any GPIO drivers (yet?), so
->      CONFIG_GPIPOLIB=n makes perfect sense!
-
-Thanks for your efforts.
-
-> So I'm afraid the only option is to always return NULL, and put the
-> responsability on the shoulders of the system integrator...
-
-The gpio lines could be provided by an i2c gpio adapter, right? So IMHO
-you don't need platform gpios to justify -ENODEV. So I guess that's a
-case where we don't come to an agreement.
-
-> > +       if (IS_ENABLED(CONFIG_ACPI) && dev && ACPI_COMPANION(dev))
-> > +               return false;
+> All errors (new ones prefixed by >>):
 > 
-> No comments about the ACPI case.
+>   In file included from include/linux/tick.h:7:0,
+>                    from drivers//acpi/processor_idle.c:32:
+>>> include/linux/clockchips.h:232:2: error: invalid preprocessing directive #els
+>    #els
+>     ^~~
+>>> include/linux/clockchips.h:233:19: error: static declaration of 'clockevent_probe' follows non-static declaration
+>    static inline int clockevent_probe(void) { return 0; }
+>                      ^~~~~~~~~~~~~~~~
+>   include/linux/clockchips.h:231:12: note: previous declaration of 'clockevent_probe' was here
+>    extern int clockevent_probe(void);
+>               ^~~~~~~~~~~~~~~~
+> --
+>>> drivers//clocksource/clkevt-probe.c:20:29: fatal error: linux/clockchip.h: No such file or directory
+>    #include <linux/clockchip.h>
+>                                ^
+>   compilation terminated.
 > 
-> >  static inline struct gpio_desc *__must_check
-> >  gpiod_get_index_optional(struct device *dev, const char *con_id,
-> >                          unsigned int index, enum gpiod_flags flags)
-> >  {
-> > +       if (__gpiod_no_optional_possible(dev))
-> > +               return NULL;
-> > +
-> >         return ERR_PTR(-ENOSYS);
+> vim +232 include/linux/clockchips.h
 > 
-> Regardless of the above, given you use the exact same construct in four
-> locations, what about letting __gpiod_no_optional_possible() return the NULL
-> or ERR_PTR itself, and renaming it to e.g. __gpiod_no_optional_return_value()?
-
-I thought about that but didn't find a good name and so considered it
-more clear this way. Another optimisation would be to unconditionally
-define get_optional in terms of get_index_optional which would simplify
-my patch a bit.
-
-I'd consider __gpiod_optional_return_value a better name than
-__gpiod_no_optional_return_value but I'm still not convinced.
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> d316c57f Thomas Gleixner 2007-02-16  226  
+> 376bc271 Daniel Lezcano  2016-04-19  227  #define CLOCKEVENT_OF_DECLARE(name, compat, fn) \
+> 376bc271 Daniel Lezcano  2016-04-19  228  	OF_DECLARE_1_RET(clkevt, name, compat, fn)
+> 376bc271 Daniel Lezcano  2016-04-19  229  
+> 376bc271 Daniel Lezcano  2016-04-19  230  #ifdef CONFIG_CLKEVT_PROBE
+> 376bc271 Daniel Lezcano  2016-04-19  231  extern int clockevent_probe(void);
+> 376bc271 Daniel Lezcano  2016-04-19 @232  #els
+> 376bc271 Daniel Lezcano  2016-04-19 @233  static inline int clockevent_probe(void) { return 0; }
+> 376bc271 Daniel Lezcano  2016-04-19  234  #endif
+> 376bc271 Daniel Lezcano  2016-04-19  235  
+> 9eed56e8 Ingo Molnar     2015-04-02  236  #endif /* _LINUX_CLOCKCHIPS_H */
+> 
+> :::::: The code at line 232 was first introduced by commit
+> :::::: 376bc27150f180d9f5eddec6a14117780177589d clockevents: Add a clkevt-of mechanism like clksrc-of
+> 
+> :::::: TO: Daniel Lezcano <daniel.lezcano@linaro.org>
+> :::::: CC: Daniel Lezcano <daniel.lezcano@linaro.org>
+> 
+> ---
+> 0-DAY kernel test infrastructure                Open Source Technology Center
+> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+> <.config.gz>
