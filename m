@@ -1,71 +1,44 @@
-From: j-keerthy@ti.com (Keerthy)
-Date: Fri, 24 Mar 2017 08:56:55 +0530
-Subject: [PATCH v2 0/8] thermal: ti-soc-thermal: Migrate slope/offset data
- to device tree
-In-Reply-To: <20170323205256.GO10760@atomide.com>
-References: <1489046762-11288-1-git-send-email-j-keerthy@ti.com>
- <64ab8413-6cf1-864f-0550-9c8db59523f7@ti.com>
- <20170323205256.GO10760@atomide.com>
-Message-ID: <a410d37f-92e5-39b4-ac6c-158673163cb0@ti.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Fri, 24 Mar 2017 06:50:46 +0300
+Subject: [PATCH 0/3] minitty: a minimal TTY layer alternative for
+ embedded systems
+In-Reply-To: <20170323210304.2181-1-nicolas.pitre@linaro.org>
+References: <20170323210304.2181-1-nicolas.pitre@linaro.org>
+Message-ID: <20170324035046.2mupvte2yzbgmslb@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Nicolas,
 
+On Thu, Mar 23, 2017 at 05:03:01PM -0400, Nicolas Pitre wrote:
+> Here's some numbers using a minimal ARM config.
+> 
+> When CONFIG_TTY=y, the following files are linked into the kernel:
+> 
+>    text    data     bss     dec     hex filename
+>    8796     128       0    8924    22dc drivers/tty/n_tty.o
+>   12846     276      44   13166    336e drivers/tty/serial/serial_core.o
+>    4852     489      49    5390    150e drivers/tty/sysrq.o
+>    1376       0       0    1376     560 drivers/tty/tty_buffer.o
+>   13571     172     132   13875    3633 drivers/tty/tty_io.o
+>    3072       0       0    3072     c00 drivers/tty/tty_ioctl.o
+>    2457       2     120    2579     a13 drivers/tty/tty_ldisc.o
+>    1328       0       0    1328     530 drivers/tty/tty_ldsem.o
+>     316       0       0     316     13c drivers/tty/tty_mutex.o
+>    2516       0       0    2516     9d4 drivers/tty/tty_port.o
+>   51130    1067     345   52542    cd3e (TOTALS)
+> 
+> With CONFIG_TTY=n and CONFIG_MINITTY_SERIAL=y, the above is replaced by:
+> 
+>    text    data     bss     dec     hex filename
+>    8776       8     108    8892    22bc drivers/tty/serial/minitty_serial.o
 
-On Friday 24 March 2017 02:22 AM, Tony Lindgren wrote:
-> * Keerthy <j-keerthy@ti.com> [170321 20:45]:
->>
->>
->> On Thursday 09 March 2017 01:35 PM, Keerthy wrote:
->>> Currently the slope and offset values for calculating the
->>> hot spot temperature of a particular thermal zone is part
->>> of driver data. Pass them here instead and obtain the values
->>> while of node parsing.
->>>
->>> Tested for the slope and constant values on DRA7-EVM, OMAP3-BEAGLE. 
->>
->> Hi Eduardo,
->>
->> If the series looks okay could you please pull this?
-> 
-> Also.. Are the dts changes safe for me to pick separately?
+tty_baudrate.o is missing here. It is included in serial_core.o when 
+CONFIG_TTY=y.
 
-Yes Tony they are safe to pulled separately.
+baruch
 
-> 
-> Regards,
-> 
-> Tony
-> 
-> 
->>> Changes in v2:
->>>
->>>   * Added OMAP3 changes along with DRA7/OMAP4/OMAP5.
->>>
->>> Keerthy (8):
->>>   arm: dts: omap3: Add cpu_thermal zone
->>>   ARM: DRA7: Thermal: Add slope and offset values
->>>   ARM: OMAP5: Thermal: Add slope and offset values
->>>   ARM: OMAP443x: Thermal: Add slope and offset values
->>>   ARM: OMAP4460: Thermal: Add slope and offset values
->>>   thermal: ti-soc-thermal: Fetch slope and offset from DT
->>>   thermal: ti-soc-thermal: Remove redundant constants
->>>   thermal: ti-soc-thermal: Remove redundant code
->>>
->>>  arch/arm/boot/dts/dra7.dtsi                        |  17 +++
->>>  arch/arm/boot/dts/omap3-cpu-thermal.dtsi           |  20 +++
->>>  arch/arm/boot/dts/omap34xx.dtsi                    |   8 +-
->>>  arch/arm/boot/dts/omap36xx.dtsi                    |   8 +-
->>>  arch/arm/boot/dts/omap443x.dtsi                    |   4 +
->>>  arch/arm/boot/dts/omap4460.dtsi                    |   4 +
->>>  arch/arm/boot/dts/omap5.dtsi                       |   9 ++
->>>  .../thermal/ti-soc-thermal/dra752-thermal-data.c   |  10 --
->>>  .../thermal/ti-soc-thermal/omap3-thermal-data.c    |   4 -
->>>  .../thermal/ti-soc-thermal/omap4-thermal-data.c    |   6 -
->>>  .../thermal/ti-soc-thermal/omap5-thermal-data.c    |   4 -
->>>  drivers/thermal/ti-soc-thermal/ti-bandgap.h        |   4 -
->>>  drivers/thermal/ti-soc-thermal/ti-thermal-common.c | 158 +--------------------
->>>  drivers/thermal/ti-soc-thermal/ti-thermal.h        |  16 ---
->>>  14 files changed, 71 insertions(+), 201 deletions(-)
->>>  create mode 100644 arch/arm/boot/dts/omap3-cpu-thermal.dtsi
->>>
+-- 
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.52.368.4656, http://www.tkos.co.il -
