@@ -1,62 +1,53 @@
-From: opendmb@gmail.com (Doug Berger)
-Date: Fri, 24 Mar 2017 07:46:32 -0700
-Subject: [PATCH 9/9] bus: brcmstb_gisb: update to support new revision
-In-Reply-To: <20170324144632.5896-1-opendmb@gmail.com>
-References: <20170324144632.5896-1-opendmb@gmail.com>
-Message-ID: <20170324144632.5896-10-opendmb@gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 24 Mar 2017 14:48:39 +0000
+Subject: [PATCH] arm/dma-mapping: use for_each_sg
+In-Reply-To: <e9923f7ea2c0fd866efb48be52ffe91d25dd0290.1490326970.git.geliangtang@gmail.com>
+References: <e9923f7ea2c0fd866efb48be52ffe91d25dd0290.1490326970.git.geliangtang@gmail.com>
+Message-ID: <20170324144838.GH7909@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The 7278 introduces a new version of this core.  This
-commit adds support for that revision.
+On Fri, Mar 24, 2017 at 10:12:23PM +0800, Geliang Tang wrote:
+> Use for_each_sg() instead of open-coding it.
+> 
+> Signed-off-by: Geliang Tang <geliangtang@gmail.com>
 
-Signed-off-by: Doug Berger <opendmb@gmail.com>
----
- Documentation/devicetree/bindings/bus/brcm,gisb-arb.txt |  3 ++-
- drivers/bus/brcmstb_gisb.c                              | 10 ++++++++++
- 2 files changed, 12 insertions(+), 1 deletion(-)
+No.
 
-diff --git a/Documentation/devicetree/bindings/bus/brcm,gisb-arb.txt b/Documentation/devicetree/bindings/bus/brcm,gisb-arb.txt
-index 1eceefb20f01..8a6c3c2e58fe 100644
---- a/Documentation/devicetree/bindings/bus/brcm,gisb-arb.txt
-+++ b/Documentation/devicetree/bindings/bus/brcm,gisb-arb.txt
-@@ -3,7 +3,8 @@ Broadcom GISB bus Arbiter controller
- Required properties:
- 
- - compatible:
--    "brcm,gisb-arb" or "brcm,bcm7445-gisb-arb" for 28nm chips
-+    "brcm,bcm7278-gisb-arb" for V7 28nm chips
-+    "brcm,gisb-arb" or "brcm,bcm7445-gisb-arb" for other 28nm chips
-     "brcm,bcm7435-gisb-arb" for newer 40nm chips
-     "brcm,bcm7400-gisb-arb" for older 40nm chips and all 65nm chips
-     "brcm,bcm7038-gisb-arb" for 130nm chips
-diff --git a/drivers/bus/brcmstb_gisb.c b/drivers/bus/brcmstb_gisb.c
-index 52b5d96081eb..a91c4ae63e74 100644
---- a/drivers/bus/brcmstb_gisb.c
-+++ b/drivers/bus/brcmstb_gisb.c
-@@ -63,6 +63,15 @@ static const int gisb_offsets_bcm7038[] = {
- 	[ARB_ERR_CAP_MASTER]	= -1,
- };
- 
-+static const int gisb_offsets_bcm7278[] = {
-+	[ARB_TIMER]		= 0x008,
-+	[ARB_ERR_CAP_CLR]	= 0x7f8,
-+	[ARB_ERR_CAP_HI_ADDR]	= -1,
-+	[ARB_ERR_CAP_ADDR]	= 0x7e0,
-+	[ARB_ERR_CAP_STATUS]	= 0x7f0,
-+	[ARB_ERR_CAP_MASTER]	= 0x7f4,
-+};
-+
- static const int gisb_offsets_bcm7400[] = {
- 	[ARB_TIMER]		= 0x00c,
- 	[ARB_ERR_CAP_CLR]	= 0x0c8,
-@@ -329,6 +338,7 @@ static const struct of_device_id brcmstb_gisb_arb_of_match[] = {
- 	{ .compatible = "brcm,bcm7445-gisb-arb", .data = gisb_offsets_bcm7445 },
- 	{ .compatible = "brcm,bcm7435-gisb-arb", .data = gisb_offsets_bcm7435 },
- 	{ .compatible = "brcm,bcm7400-gisb-arb", .data = gisb_offsets_bcm7400 },
-+	{ .compatible = "brcm,bcm7278-gisb-arb", .data = gisb_offsets_bcm7278 },
- 	{ .compatible = "brcm,bcm7038-gisb-arb", .data = gisb_offsets_bcm7038 },
- 	{ },
- };
+> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+> index 63eabb0..e551351 100644
+> --- a/arch/arm/mm/dma-mapping.c
+> +++ b/arch/arm/mm/dma-mapping.c
+> @@ -1720,7 +1720,7 @@ static int __map_sg_chunk(struct device *dev, struct scatterlist *sg,
+>  	if (iova == DMA_ERROR_CODE)
+>  		return -ENOMEM;
+>  
+> -	for (count = 0, s = sg; count < (size >> PAGE_SHIFT); s = sg_next(s)) {
+> +	for_each_sg(sg, s, size >> PAGE_SHIFT, count) {
+
+This is _not_ equivalent.
+
+#define for_each_sg(sglist, sg, nr, __i)        \
+        for (__i = 0, sg = (sglist); __i < (nr); __i++, sg = sg_next(sg))
+
+Putting the arguments into that gives:
+
+        for (count = 0, s = sg; count < (size >> PAGE_SHIFT); count++, s = sg_next(s))
+
+whereas the old code is:
+
+	for (count = 0, s = sg; count < (size >> PAGE_SHIFT); s = sg_next(s))
+
+Spot the difference?  "count++".
+
+This is because "size >> PAGE_SHIFT" is not the number of scatterlist
+entries, it's the number of pages to map.
+
+Please be more careful in the future to ensure that, when cleaning up
+code, that the code is indeed equivalent.  Subtle errors like this are
+sometimes incredibly difficult to spot.
+
 -- 
-2.12.0
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
