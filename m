@@ -1,44 +1,51 @@
-From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Fri, 24 Mar 2017 08:55:19 +0100
-Subject: [RESEND PATCH v4 2/9] iio: adc: add support for X-Powers AXP20X
- and AXP22X PMICs ADCs
-In-Reply-To: <CAGb2v655AfEavMqVV-XTyYzHWt5qFsMnoMsTVd8HRDkCgjiTeQ@mail.gmail.com>
-References: <20170320081653.8884-1-quentin.schulz@free-electrons.com>
- <20170320081653.8884-3-quentin.schulz@free-electrons.com>
- <CAGb2v66JC65=9WiMy-Nu+9tTFRLsJL2Eyb0wfJV_K=65ABc6Zg@mail.gmail.com>
- <20170323093527.ojcdpvruzqnhvysq@earth>
- <CAGb2v655AfEavMqVV-XTyYzHWt5qFsMnoMsTVd8HRDkCgjiTeQ@mail.gmail.com>
-Message-ID: <13f2f8ba-af9e-576e-24ee-60c3a1609f80@free-electrons.com>
+From: adrian.hunter@intel.com (Adrian Hunter)
+Date: Fri, 24 Mar 2017 09:52:18 +0200
+Subject: [PATCH] mmc: core: Do not hold re-tuning during CMD6 commands
+In-Reply-To: <1490336341-22292-2-git-send-email-chaotian.jing@mediatek.com>
+References: <1490336341-22292-1-git-send-email-chaotian.jing@mediatek.com>
+ <1490336341-22292-2-git-send-email-chaotian.jing@mediatek.com>
+Message-ID: <13a83728-0031-5683-c371-4b517df32299@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 23/03/2017 10:52, Chen-Yu Tsai wrote:
-> On Thu, Mar 23, 2017 at 5:35 PM, Sebastian Reichel <sre@kernel.org> wrote:
->> Hi,
->>
->> On Wed, Mar 22, 2017 at 12:34:45PM +0800, Chen-Yu Tsai wrote:
->>> P.S. I'm thinking about having MFD_AXP20X imply its various sub-drivers.
->>> Not sure if that was the intended usage of the new imply syntax though.
->>
->> I think adding "default MFD_AXP20X" to the sub-drivers is cleaner,
->> as you will not end up with a long list.
+On 24/03/17 08:19, Chaotian Jing wrote:
+> this patch is refine for 'commit c6dbab9cb58f ("mmc: core: Hold re-tuning
+> during switch commands")'
+> Since it has 3 retries at max for CMD6, if the first CMD6 got CRC error,
+> then should do re-tune before the next CMD6 was sent.
 > 
-> I'd still need to add imply statements for the various subsystems though,
-> like regulators, power supplies, extcon, etc..
-> But I suppose that's cleaner, and fits the original intent of the syntax.
+> Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+> ---
+>  drivers/mmc/core/mmc_ops.c |    3 +--
+>  1 file changed, 1 insertion(+), 2 deletions(-)
 > 
+> diff --git a/drivers/mmc/core/mmc_ops.c b/drivers/mmc/core/mmc_ops.c
+> index fe80f26..6931927 100644
+> --- a/drivers/mmc/core/mmc_ops.c
+> +++ b/drivers/mmc/core/mmc_ops.c
+> @@ -534,8 +534,6 @@ int __mmc_switch(struct mmc_card *card, u8 set, u8 index, u8 value,
+>  	bool use_r1b_resp = use_busy_signal;
+>  	unsigned char old_timing = host->ios.timing;
+>  
+> -	mmc_retune_hold(host);
+> -
+>  	/*
+>  	 * If the cmd timeout and the max_busy_timeout of the host are both
+>  	 * specified, let's validate them. A failure means we need to prevent
+> @@ -567,6 +565,7 @@ int __mmc_switch(struct mmc_card *card, u8 set, u8 index, u8 value,
+>  		cmd.sanitize_busy = true;
+>  
+>  	err = mmc_wait_for_cmd(host, &cmd, MMC_CMD_RETRIES);
+> +	mmc_retune_hold(host);
 
-Hum. I don't really understand what you are saying.. Am I supposed to
-modify something or, is it okay and we're waiting for Lee to apply on
-his tree?
+That is not how mmc_retune_hold() works, you need mmc_retune_hold_now() as
+it is here:
 
-Thanks in advance for clearing it up,
+	https://marc.info/?l=linux-mmc&m=148940903816582
 
-Quentin
-
--- 
-Quentin Schulz, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+But using "retries" with commands that have busy-waiting on the data line
+doesn't make much sense anyway.  Particularly with CRC errors, I would
+expect the card is actually busily doing the switch and we need only to wait
+for it.  The same can be true for timeout errors.  For some CMD6 we might
+need to send CMD12 if the card is busy after an error.  I would prefer an
+explicit attempt at recovery from CMD6 errors.
