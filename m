@@ -1,35 +1,32 @@
-From: ralph.sennhauser@gmail.com (Ralph Sennhauser)
-Date: Fri, 24 Mar 2017 23:23:40 +0100
-Subject: [PATCH v3 4/4] mvebu: wrt1900ac: Use pwm-fan rather than gpio-fan
-In-Reply-To: <20170324143505.GK28518@lunn.ch>
-References: <20170324141815.7252-1-ralph.sennhauser@gmail.com>
- <20170324141815.7252-5-ralph.sennhauser@gmail.com>
- <20170324143505.GK28518@lunn.ch>
-Message-ID: <20170324232340.7487f638@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 24 Mar 2017 23:25:50 +0100
+Subject: [GIT PULL 1/4] bcm2835 arm DT updates for 4.12
+In-Reply-To: <20170321193952.10270-1-eric@anholt.net>
+References: <20170321193952.10270-1-eric@anholt.net>
+Message-ID: <CAK8P3a2X0LYeidiPw4xN07WdU86Ah3_nJeropNSieJWxsHoEmA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 24 Mar 2017 15:35:05 +0100
-Andrew Lunn <andrew@lunn.ch> wrote:
+On Tue, Mar 21, 2017 at 8:39 PM, Eric Anholt <eric@anholt.net> wrote:
+>   Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
+>
+> are available in the git repository at:
+>
+>   git://github.com/anholt/linux tags/bcm2835-dt-next-2017-03-21
+>
+> for you to fetch changes up to 7f31a955a0c34de0463f7ff50b2bd62a5cce4204:
+>
+>   ARM: dts: bcm2835: add sdhost controller to devicetree (2017-03-17 17:35:50 -0700)
+>
+> ----------------------------------------------------------------
+> This pull request brings in the DT nodes for enabling HDMI audio on
+> Raspberry Pi, and nodes to describe the DSI and SDHOST hardware
+> modules (which are still disabled by default).
 
-> > +	pwm_fan {
-> >  		/* SUNON HA4010V4-0000-C99 */
-> > -		compatible = "gpio-fan";
-> > -		gpios = <&gpio0 24 0>;
-> >  
-> > -		gpio-fan,speed-map = <0    0
-> > -				      4500 1>;
-> > +		compatible = "pwm-fan";
-> > +		pwms = <&gpio0 24 4000 0>;  
-> 
-> Hi Ralph
-> 
-> I believe this last 0 is the flags parameter. Now that we have
-> #pwm-cells = 1, i think this last 0 should be dropped.
-> 
-> 	  Andrew
+Just a quick question: how do you plan to switch between the SD host
+drivers? If I understand this right, there are two working hardware blocks
+that can connect to the same slot. Do you have to configure this in
+device tree using  hardwired pinctrl settings, or can the user pick
+one of the drivers at runtime?
 
-Missed it. Duly noted like the other comments.
-
-Thanks
-Ralph
+        Arnd
