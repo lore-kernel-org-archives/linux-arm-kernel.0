@@ -1,33 +1,30 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Fri, 24 Mar 2017 20:01:48 +0300
-Subject: [PATCH 1/3] crypto: hw_random - Add new Exynos RNG driver
-In-Reply-To: <87677624.EBdhaJY1KM@amdc3058>
-References: <20170324142446.31129-1-krzk@kernel.org>
- <9265537.P6AeF50kg8@amdc3058>
- <20170324161934.kc6g36nazr3y32kp@kozik-lap>
- <CGME20170324164544epcas1p353b2eba5ecb6d5f7a69049c5ba9d667e@epcas1p3.samsung.com>
- <87677624.EBdhaJY1KM@amdc3058>
-Message-ID: <20170324170148.ew7ozpt5jfwdx5yn@kozik-lap>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Fri, 24 Mar 2017 10:13:03 -0700
+Subject: [GIT PULL 1/4] bcm2835 arm DT updates for 4.12
+In-Reply-To: <20170321193952.10270-1-eric@anholt.net>
+References: <20170321193952.10270-1-eric@anholt.net>
+Message-ID: <b6ad938c-21d3-b6a4-6447-9d1fc93920b7@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 24, 2017 at 05:45:41PM +0100, Bartlomiej Zolnierkiewicz wrote:
-> > > > And I think the probe might be called twice, for example in case of
-> > > > mistake in DTB.
-> > > 
-> > > Even if this is possible resource allocation code in the driver will
-> > > take take care of handling it just fine,
-> > 
-> > Indeed, the devm_ioremap_resource() solves the case. I can drop the
-> > check then.
+On 03/21/2017 12:39 PM, Eric Anholt wrote:
+>   Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
 > 
-> Looking on this a bit more it seems that devm_ioremap_resource() will
-> not cover all mistakes (using compatible by mistake in some other DTB
-> node).
+> are available in the git repository at:
 > 
-> Leave the check, I take my objection back.
+>   git://github.com/anholt/linux tags/bcm2835-dt-next-2017-03-21
+> 
+> for you to fetch changes up to 7f31a955a0c34de0463f7ff50b2bd62a5cce4204:
+> 
+>   ARM: dts: bcm2835: add sdhost controller to devicetree (2017-03-17 17:35:50 -0700)
+> 
+> ----------------------------------------------------------------
+> This pull request brings in the DT nodes for enabling HDMI audio on
+> Raspberry Pi, and nodes to describe the DSI and SDHOST hardware
+> modules (which are still disabled by default).
+> 
+> ----------------------------------------------------------------
 
-Great! Thanks for feedback.
-
-Best regards,
-Krzysztof
+Merged, thanks Eric!
+-- 
+Florian
