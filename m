@@ -1,19 +1,70 @@
 From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 24 Mar 2017 08:18:39 -0400 (EDT)
+Date: Fri, 24 Mar 2017 08:31:45 -0400 (EDT)
 Subject: [PATCH 0/3] minitty: a minimal TTY layer alternative for embedded
  systems
-In-Reply-To: <20170324035046.2mupvte2yzbgmslb@tarshish>
+In-Reply-To: <20170324065015.GA17226@kroah.com>
 References: <20170323210304.2181-1-nicolas.pitre@linaro.org>
- <20170324035046.2mupvte2yzbgmslb@tarshish>
-Message-ID: <alpine.LFD.2.20.1703240816380.2304@knanqh.ubzr>
+ <20170324065015.GA17226@kroah.com>
+Message-ID: <alpine.LFD.2.20.1703240819370.2304@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 24 Mar 2017, Baruch Siach wrote:
+On Fri, 24 Mar 2017, Greg Kroah-Hartman wrote:
 
-> Hi Nicolas,
-> 
+> meta-comment, any reason you didn't cc: linux-serial at vger as well?
+
+I didn't realize such a list even existed. I looked up "TTY LAYER" in 
+the maintainer file.
+
 > On Thu, Mar 23, 2017 at 05:03:01PM -0400, Nicolas Pitre wrote:
+> > Many embedded systems don't need the full TTY layer support. Most of the
+> > time, the TTY layer is only a conduit for outputting debugging messages
+> > over a serial port. The TTY layer also implements many features that are
+> > very unlikely to ever be used in such a setup. There is great potential
+> > for both code and dynamic memory size reduction on small systems. This is
+> > what this patch series is achieving.
+> > 
+> > The existing TTY code is quite large and complex. Trying to shrink it is
+> > rather risky as the potential for breakage is non negligeable. Therefore,
+> > the approach used here consists in the creation of the minimal code that
+> > interface with the existing UART drivers and provide TTY-like character
+> > devices to user space. When the regular TTY layer is disabled, then the
+> > minitty layer replacement is proposed by Kconfig.
+> > 
+> > Of course, making it "mini" means there are limitations to what it does:
+> > 
+> > - This supports serial ports only. No VT's, no PTY's.
+> > 
+> > - The default n_tty line discipline is hardcoded and no other line
+> >   discipline are supported.
+> > 
+> > - The line discipline features are not all implemented. Notably, XON/XOFF
+> >   is currently not implemented (although this might not require a lot of
+> >   code to do it).
+> > 
+> > - Hung-up state is not implemented.
+> > 
+> > - No error handling on RX bytes other than counting them.
+> > 
+> > - Behavior in the presence of overflows is most likely different from the
+> >   full TTY code.
+> > 
+> > - Job control is currently not supported (this may change in the future and 
+> >   be configurable).
+> > 
+> > But again, most small embedded systems simply don't need those things.
+> 
+> This is true, and I like the overall idea, but I don't like all of the
+> code duplication.  Also, who is going to maintain this?  I'm not going
+> to be able to even build it, let alone test it, for the systems I
+> normally use, and now you have tagged me as maintaining it for forever
+> :(
+
+I'll maintain it.  Will put the needed entry in MAINTAINERS.
+
+Why do you say you won't be able to build it? I didn't try but it is 
+meant to build with any serial driver.
+
 > > Here's some numbers using a minimal ARM config.
 > > 
 > > When CONFIG_TTY=y, the following files are linked into the kernel:
@@ -35,12 +86,34 @@ On Fri, 24 Mar 2017, Baruch Siach wrote:
 > > 
 > >    text    data     bss     dec     hex filename
 > >    8776       8     108    8892    22bc drivers/tty/serial/minitty_serial.o
+> > 
+> > That's it!  And the runtime buffer usage is much less as well.
 > 
-> tty_baudrate.o is missing here. It is included in serial_core.o when 
-> CONFIG_TTY=y.
+> Is there some way to just reorginize the existing code to get you almost
+> this same size?  Make ptys and other line diciplines options to select,
+> and slim down the io path by removing features there.
+> 
+> And that serial core looks huge from what you are showing is really
+> needed, any way to slim that down by just making features in it
+> configurable?
+> 
+> Again, I like the idea, but worry that with this change, we would have
+> two different tty layers we have to maintain for the next 20+ years, and
+> we have a hard time keeping one stable and working today :)
 
-It is also included when CONFIG_MINITTY_SERIAL=y, so for comparison 
-purpose I didn't list common files here.
+That's the crux of the argument: touching the current TTY layer is NOT 
+going to help keeping it stable. Here, not only I did remove features, 
+but the ones I kept were reimplemented to be much smaller and 
+potentially less scalable and performant too.  The ultimate goal here is 
+to have the smallest code possible with very simple locking and not 
+necessarily the most scalable code. That in itself is contradictory with 
+the regular TTY code and warrants a separate implementation. And because 
+it is so small, it is much easier to understand and much easier to 
+maintain.
+
+Where code sharing made sense, I did factor out common parts already, 
+such as the baudrate handling. I intend to do the same to add job 
+control support.
 
 
 Nicolas
