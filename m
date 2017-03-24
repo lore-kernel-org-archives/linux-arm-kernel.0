@@ -1,65 +1,32 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 24 Mar 2017 12:15:25 +0000
-Subject: [PATCH 0/4] perf: Enabling PMUv3 on 32bit ARM systems
-Message-ID: <20170324121529.22603-1-marc.zyngier@arm.com>
+Date: Fri, 24 Mar 2017 12:15:29 +0000
+Subject: [PATCH 4/4] ARM: mach-virt: Select PMUv3 driver by default
+In-Reply-To: <20170324121529.22603-1-marc.zyngier@arm.com>
+References: <20170324121529.22603-1-marc.zyngier@arm.com>
+Message-ID: <20170324121529.22603-5-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PMUv3 has been introduced with ARMv8 and, while it has only been used
-on 64bit systems so far, it would definitely be useful for 32bit
-guests running under KVM, for example.
+Since 32bit guests are not unlikely to run on an ARMv8 host,
+let's select the PMUv3 driver, which allows the PMU to be used
+on such systems.
 
-This is done in three steps:
-(1) Move the driver from arch/arm64 to drivers/perf
-(2) Add a handful of system register accessors so that we can reuse
-    the driver on 32bit
-(3) Provide the same accessors on 32bit, enable compilation, and
-    make it the default selection for mach-virt.
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-The one thing that I find a bit dodgy is the use of CONFIG_CPU_V7 to
-allow the selection of the driver. I'm not sure if we should just
-remove it altogether (it should never probe on anything but an ARMv8
-CPU), or define a CONFIG_CPU_V8... Guidance appreciated.
-
-Tested on a 32bit VM running on a X-Gene system:
-
-root at zomby-woof:~# uname -a
-Linux zomby-woof 4.11.0-rc3+ #6979 SMP PREEMPT Fri Mar 24 10:01:42 GMT 2017 armv7l GNU/Linux
-root at zomby-woof:~# dmesg | grep -i pmu
-[    2.440279] hw perfevents: enabled with armv8_pmuv3 PMU driver, 5 counters available
-root at zomby-woof:~# perf stat -e cycles,L1-icache-loads,dTLB-load-misses ~maz/hackbench 100 process 1000
-Running with 100*40 (== 4000) tasks.
-Time: 59.370
-
- Performance counter stats for '/home/maz/hackbench 100 process 1000':
-
-      323663890100      cycles                                                      
-       46297944079      L1-icache-loads                                             
-           6570884      dTLB-load-misses                                            
-
-      60.777397600 seconds time elapsed
-
-Marc Zyngier (4):
-  arm64: perf: Move PMUv3 driver to drivers/perf
-  arm64: perf: Abstract system register accesses away
-  ARM: perf: Allow the use of the PMUv3 driver on 32bit ARM
-  ARM: mach-virt: Select PMUv3 driver by default
-
- arch/arm/Kconfig                                   |   1 +
- arch/arm/include/asm/arm_pmuv3.h                   | 115 +++++++++++++++++++++
- arch/arm64/include/asm/arm_pmuv3.h                 | 102 ++++++++++++++++++
- arch/arm64/include/asm/perf_event.h                |  55 ----------
- arch/arm64/kernel/Makefile                         |   1 -
- drivers/perf/Kconfig                               |   9 ++
- drivers/perf/Makefile                              |   1 +
- .../perf_event.c => drivers/perf/arm_pmuv3.c       |  36 +++----
- include/kvm/arm_pmu.h                              |   2 +-
- include/linux/perf/arm_pmuv3.h                     |  77 ++++++++++++++
- 10 files changed, 324 insertions(+), 75 deletions(-)
- create mode 100644 arch/arm/include/asm/arm_pmuv3.h
- create mode 100644 arch/arm64/include/asm/arm_pmuv3.h
- rename arch/arm64/kernel/perf_event.c => drivers/perf/arm_pmuv3.c (98%)
- create mode 100644 include/linux/perf/arm_pmuv3.h
-
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 0d4e71b42c77..60bb0e0a807d 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -711,6 +711,7 @@ config ARCH_VIRT
+ 	select ARM_GIC_V3
+ 	select ARM_GIC_V3_ITS if PCI
+ 	select ARM_PSCI
++	select ARM_PMUV3 if PERF_EVENTS
+ 	select HAVE_ARM_ARCH_TIMER
+ 
+ #
 -- 
 2.11.0
