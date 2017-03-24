@@ -1,52 +1,88 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 24 Mar 2017 08:18:49 +0100
-Subject: [PATCH v5 0/2] mmc: host: s3cmci: add device tree support
-In-Reply-To: <1489799633-29278-1-git-send-email-sergio.prado@e-labworks.com>
-References: <1489799633-29278-1-git-send-email-sergio.prado@e-labworks.com>
-Message-ID: <CAPDyKFqMJHfBSdcQe9DNk430c3yXz+zqoS8C+b7yiv4P=D5dJw@mail.gmail.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Fri, 24 Mar 2017 15:25:15 +0800
+Subject: [PATCH 05/12] ARM: dts: imx6ul-isiot-common: Add touchscreen node
+In-Reply-To: <CAMty3ZBfdjrbvL7F9CbhfD_Wdowr4zM_Rdot=TGKMxq0JPyHjg@mail.gmail.com>
+References: <1490204897-14525-1-git-send-email-jagan@openedev.com>
+ <1490204897-14525-6-git-send-email-jagan@openedev.com>
+ <20170324051632.GD30608@dragon>
+ <CAMty3ZBfdjrbvL7F9CbhfD_Wdowr4zM_Rdot=TGKMxq0JPyHjg@mail.gmail.com>
+Message-ID: <20170324072513.GL30608@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 March 2017 at 02:13, Sergio Prado <sergio.prado@e-labworks.com> wrote:
-> This series adds support for configuring Samsung's S3C24XX MMC/SD/SDIO
-> controller via device tree.
->
-> Tested on FriendlyARM mini2440, based on s3c2440 SoC.
->
-> Changes since v4 (as suggested by Jaehoon Chung):
-> - using just a flag as a data structure for the driver to check for
->   s3c2400 compatibility
->
-> Changes since v3 (as suggested by Rob Herring):
-> - describing properties that wasn't documented and removing unnecessary
->   comment in the device tree binding
->
-> Changes since v2:
-> - struct "s3cmci_drv_data" and flag "is2440" renamed
-> - copying the whole driver data struct instead of only its member so
->   it will be easier to extend the information in the future
-> - using mmc_of_parse() to read "cd-gpios" and "wp-gpios" properties
->   from device tree
->
-> Changes since v1:
-> - pinctrl description removed from DT binding
-> - unit and label on DT binding renamed to mmc
->
-> Sergio Prado (2):
->   dt-bindings: mmc: add DT binding for S3C24XX MMC/SD/SDIO controller
->   mmc: host: s3cmci: allow probing from device tree
->
->  .../devicetree/bindings/mmc/samsung,s3cmci.txt     |  42 ++++
->  drivers/mmc/host/s3cmci.c                          | 257 ++++++++++-----------
->  2 files changed, 168 insertions(+), 131 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/mmc/samsung,s3cmci.txt
->
-> --
-> 1.9.1
->
+On Fri, Mar 24, 2017 at 12:29:49PM +0530, Jagan Teki wrote:
+> On Fri, Mar 24, 2017 at 10:46 AM, Shawn Guo <shawnguo@kernel.org> wrote:
+> > On Wed, Mar 22, 2017 at 11:18:10PM +0530, Jagan Teki wrote:
+> >> From: Jagan Teki <jagan@amarulasolutions.com>
+> >>
+> >> Add touchscreen node as i2c1 slave device on Engicam Is.IoT MX6UL
+> >> modules, the touchscreen controlled 'st,stmpe-ts' connected via
+> >> i2c with st,stmpe811 mfb interface.
+> >
+> > s/mfb/mfd?
+> >
+> >>
+> >> Cc: Shawn Guo <shawnguo@kernel.org>
+> >> Cc: Matteo Lisi <matteo.lisi@engicam.com>
+> >> Cc: Michael Trimarchi <michael@amarulasolutions.com>
+> >> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+> >> ---
+> >>  arch/arm/boot/dts/imx6ul-isiot-common.dtsi | 34 ++++++++++++++++++++++++++++++
+> >>  1 file changed, 34 insertions(+)
+> >>
+> >> diff --git a/arch/arm/boot/dts/imx6ul-isiot-common.dtsi b/arch/arm/boot/dts/imx6ul-isiot-common.dtsi
+> >> index 9660e20..b149b5e 100644
+> >> --- a/arch/arm/boot/dts/imx6ul-isiot-common.dtsi
+> >> +++ b/arch/arm/boot/dts/imx6ul-isiot-common.dtsi
+> >> @@ -40,6 +40,34 @@
+> >>   *     OTHER DEALINGS IN THE SOFTWARE.
+> >>   */
+> >>
+> >> +&i2c1 {
+> >> +     touch: stmpe811 at 44 {
+> >
+> > Label a MFD device 'touch'?  Also, the node name should be generic.  Not
+> > sure what should be used for MFD device though.
+> 
+> May be I can use stmpe811 at 41 the existing imx6qdl-apalis.dtsi using
+> the similar notation.
 
+Per application notes of stmpe811 below, I would suggest you name it
+gpio-expander.
 
-Thanks, applied for next!
+www.st.com/resource/zh/datasheet/CD00186725.pdf
 
-Kind regards
-Uffe
+> 
+> >
+> >> +             compatible = "st,stmpe811";
+> >> +             reg = <0x44>;
+> >> +             #address-cells = <1>;
+> >> +             #size-cells = <0>;
+> >> +             pinctrl-names = "default";
+> >> +             pinctrl-0 = <&pinctrl_stmpe_ts>;
+> >
+> > If this is for stmpe-ts, shouldn't be put into touchscreen child node?
+> 
+> Actually this is interrupt pad, for the touch controller via stmpe so
+> I can rename pinctrl_touch_int.
+
+Or just pinctrl_stmpe.
+
+> 
+> >
+> >> +             interrupt-parent = <&gpio1>;
+> >> +             interrupts = <18 IRQ_TYPE_EDGE_FALLING>;
+> >> +             interrupt-controller;
+> >> +             #interrupt-cells = <2>;
+> >> +
+> >> +             stmpe_touchscreen {
+> >
+> > 'stmpe: touchscreen {' might be better.
+> 
+> stmpe_touchscreen {
+> 
+> This is also compatible with existing dtsi files
+
+We do not need to keep compatibility with something not good.
+
+Shawn
