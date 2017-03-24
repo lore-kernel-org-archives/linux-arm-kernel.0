@@ -1,108 +1,58 @@
 From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Fri, 24 Mar 2017 15:50:54 +0800
-Subject: [linux-sunxi] [PATCH v4 3/8] phy: sun4i-usb: add PHYCTL offset
- for H3 SoC
-In-Reply-To: <CAGb2v64DgFdmHiJ1r4NJR6Ck5ny1Mik_XhTEd_7=XMyptrD2uA@mail.gmail.com>
-References: <20170319161951.55834-1-icenowy@aosc.xyz>
- <20170319161951.55834-4-icenowy@aosc.xyz>
- <CAGb2v65NHgDDPGChR4rg28NS1tuj2RZ9ERrQz2cSa_haZLypXA@mail.gmail.com>
- <1157651490336844@web12m.yandex.ru>
- <CAGb2v64DgFdmHiJ1r4NJR6Ck5ny1Mik_XhTEd_7=XMyptrD2uA@mail.gmail.com>
-Message-ID: <1680651490341854@web16j.yandex.ru>
+Date: Fri, 24 Mar 2017 15:52:08 +0800
+Subject: [PATCH] mmc: sunxi: change controller error info to debug level
+In-Reply-To: <CAPDyKFppqPjjXtAAcSynxMw-1Oc7W6ZMf=oJLzWwsnLUWCq5Rw@mail.gmail.com>
+References: <20170316132903.61246-1-icenowy@aosc.xyz>
+ <CAPDyKFppqPjjXtAAcSynxMw-1Oc7W6ZMf=oJLzWwsnLUWCq5Rw@mail.gmail.com>
+Message-ID: <1662971490341928@web27j.yandex.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-24.03.2017, 14:56, "Chen-Yu Tsai" <wens@csie.org>:
-> On Fri, Mar 24, 2017 at 2:27 PM, Icenowy Zheng <icenowy@aosc.xyz> wrote:
->> ?24.03.2017, 11:05, "Chen-Yu Tsai" <wens@csie.org>:
->>> ?On Mon, Mar 20, 2017 at 12:19 AM, Icenowy Zheng <icenowy@aosc.xyz> wrote:
->>>> ??The config structure of H3 in phy-sun4i-usb driver have the PHYCTL
->>>> ??register offset missing.
->>>>
->>>> ??Add it. Because it's a SoC after A33, its PHYCTL offset should be 0x10.
->>>
->>> ?You are implying that all SoCs after A33 have PHYCTL at 0x10.
->>>
->>> ?This is not true. As the A83T, which was released after the A33, has
->>> ?PHYCTL at the old offset.
+24.03.2017, 15:46, "Ulf Hansson" <ulf.hansson@linaro.org>:
+> On 16 March 2017 at 14:29, Icenowy Zheng <icenowy@aosc.xyz> wrote:
+>> ?The controller's errors are usually normal (for example, for MMC or SDIO
+>> ?cards, some errors are expected to happen; and for boards without a
+>> ?dedicated card detect pin the error info will even flood console and
+>> ?hide other normal messages) and hard to understand.
 >>
->> ?No, in Allwinner's BSP A83T is using also PHYCTL at 0x10.
+>> ?Change their print level to debug, thus it won't be shown to generic
+>> ?users.
 >>
->> ?The code in linux-3.4/drivers/usb/sunxi_usb/include/sunxi_usb_bsp.c is
->> ?```
->> ?#if defined (CONFIG_ARCH_SUN8IW5) || defined (CONFIG_ARCH_SUN8IW6) || defined (CONFIG_ARCH_SUN8IW9) || defined (CONFIG_ARCH_SUN8IW8) || defined (CONFIG_ARCH_SUN8IW7)
->> ?#define USBPHYC_REG_o_PHYCTL 0x0410
->> ?#else
->> ?#define USBPHYC_REG_o_PHYCTL 0x0404
->> ?#endif
->> ?```
->>
->> ?In linux-3.10/drivers/usb/sunxi_usb/include/sunxi_usb_bsp.c is
->> ?```
->> ?#if defined (CONFIG_ARCH_SUN50I) || defined (CONFIG_ARCH_SUN8IW10) || defined (CONFIG_ARCH_SUN8IW11)
->> ?#define USBPHYC_REG_o_PHYCTL 0x0410
->> ?#else
->> ?#define USBPHYC_REG_o_PHYCTL 0x0404
->> ?#endif
->> ?```
->>
->> ?So sun50i* and sun50iw5~w11 all use PHYCTL at 0x10.
+>> ?Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
 >
-> Seems you are right. However I think it's best to not assume or infer
-> anything. Who knows, Allwinner might re-release some old SoC under a
-> different under a different name again.
->
-> Just state the facts: H3 has its PHYCTL at 0x10.
+> For some reason this change didn't enter the mmc patchtracker. However
+> I have picked it up for next anyway.
 
-OK. Thanks ;-)
+Thanks!
+
+Maybe it's because of the e-mail provider chosen by AOSC (Yandex.Mail).
+
+Sorry. I will try to ask for a migration to other e-mail provider.
 
 >
-> ChenYu
+> Thanks!
 >
->>> ?Just state that H3 has PHYCTL at 0x10.
->>>
->>> ?ChenYu
->>>
->>>> ??Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
->>>> ??---
->>>> ??New patch in v4.
->>>>
->>>> ???drivers/phy/phy-sun4i-usb.c | 1 +
->>>> ???1 file changed, 1 insertion(+)
->>>>
->>>> ??diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
->>>> ??index 62b4d25448c6..a650f283f6ff 100644
->>>> ??--- a/drivers/phy/phy-sun4i-usb.c
->>>> ??+++ b/drivers/phy/phy-sun4i-usb.c
->>>> ??@@ -821,6 +821,7 @@ static const struct sun4i_usb_phy_cfg sun8i_h3_cfg = {
->>>> ??????????.num_phys = 4,
->>>> ??????????.type = sun8i_h3_phy,
->>>> ??????????.disc_thresh = 3,
->>>> ??+ .phyctl_offset = REG_PHYCTL_A33,
->>>> ??????????.dedicated_clocks = true,
->>>> ??????????.enable_pmu_unk1 = true,
->>>> ???};
->>>> ??--
->>>> ??2.12.0
->>>>
->>>> ??--
->>>> ??You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
->>>> ??To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
->>>> ??For more options, visit https://groups.google.com/d/optout.
->>>
->>> ?--
->>> ?You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
->>> ?To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
->>> ?For more options, visit https://groups.google.com/d/optout.
+> Kind regards
+> Uffe
+>
+>> ?---
+>> ??drivers/mmc/host/sunxi-mmc.c | 2 +-
+>> ??1 file changed, 1 insertion(+), 1 deletion(-)
 >>
+>> ?diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
+>> ?index 6ffcd2838272..0391c62cc99f 100644
+>> ?--- a/drivers/mmc/host/sunxi-mmc.c
+>> ?+++ b/drivers/mmc/host/sunxi-mmc.c
+>> ?@@ -489,7 +489,7 @@ static void sunxi_mmc_dump_errinfo(struct sunxi_mmc_host *host)
+>> ???????????????????????????????????????cmd->opcode == SD_IO_RW_DIRECT))
+>> ?????????????????return;
+>>
+>> ?- dev_err(mmc_dev(host->mmc),
+>> ?+ dev_dbg(mmc_dev(host->mmc),
+>> ?????????????????"smc %d err, cmd %d,%s%s%s%s%s%s%s%s%s%s !!\n",
+>> ?????????????????host->mmc->index, cmd->opcode,
+>> ?????????????????data ? (data->flags & MMC_DATA_WRITE ? " WR" : " RD") : "",
 >> ?--
->> ?You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
->> ?To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
->> ?For more options, visit https://groups.google.com/d/optout.
->
-> --
-> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
-> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
-> For more options, visit https://groups.google.com/d/optout.
+>> ?2.12.0
