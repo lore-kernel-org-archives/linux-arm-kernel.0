@@ -1,174 +1,298 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 24 Mar 2017 18:38:39 +0000
-Subject: [PATCH V9 00/11] IOMMU probe deferral support
-In-Reply-To: <5FC3163CFD30C246ABAA99954A238FA81750B7CB@lhreml504-mbs>
-References: <1489086061-9356-1-git-send-email-sricharan@codeaurora.org>
- <58D49845.9060407@hisilicon.com>
- <0ea8022b-a19b-335d-6cc6-81510196f891@codeaurora.org>
- <5FC3163CFD30C246ABAA99954A238FA81750B7CB@lhreml504-mbs>
-Message-ID: <db3d68f8-713c-9ae2-7df9-324bc1b375b1@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 24 Mar 2017 18:47:37 +0000
+Subject: [RFC PATCH v0.2] PCI: Add support for tango PCIe host bridge
+In-Reply-To: <310db9dd-7db6-2106-2e53-f0083b2d3758@free.fr>
+References: <91db1f47-3024-9712-309a-fb4b21e42028@free.fr>
+ <e5c0bace-fcbe-de3f-b76f-0fb672562e84@arm.com>
+ <310db9dd-7db6-2106-2e53-f0083b2d3758@free.fr>
+Message-ID: <012f7fcb-eaeb-70dd-a1a9-06c213789d30@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/03/17 09:27, Shameerali Kolothum Thodi wrote:
-> Hi Sricharan,
+On 23/03/17 17:03, Mason wrote:
+> On 23/03/2017 15:22, Marc Zyngier wrote:
 > 
->> -----Original Message-----
->> From: Sricharan R [mailto:sricharan at codeaurora.org]
->> Sent: Friday, March 24, 2017 7:10 AM
->> To: Wangzhou (B); robin.murphy at arm.com; will.deacon at arm.com;
->> joro at 8bytes.org; lorenzo.pieralisi at arm.com; iommu at lists.linux-
->> foundation.org; linux-arm-kernel at lists.infradead.org; linux-arm-
->> msm at vger.kernel.org; m.szyprowski at samsung.com;
->> bhelgaas at google.com; linux-pci at vger.kernel.org; linux-
->> acpi at vger.kernel.org; tn at semihalf.com; hanjun.guo at linaro.org;
->> okaya at codeaurora.org
->> Cc: Shameerali Kolothum Thodi
->> Subject: Re: [PATCH V9 00/11] IOMMU probe deferral support
+>> On 23/03/17 13:05, Mason wrote:
 >>
->> Hi Zhou,
+>>> +#define MSI_COUNT 32
 >>
->> On 3/24/2017 9:23 AM, Zhou Wang wrote:
->>> On 2017/3/10 3:00, Sricharan R wrote:
->>>> This series calls the dma ops configuration for the devices at a
->>>> generic place so that it works for all busses.
->>>> The dma_configure_ops for a device is now called during the
->>>> device_attach callback just before the probe of the bus/driver is
->>>> called. Similarly dma_deconfigure is called during
->>>> device/driver_detach path.
->>>>
->>>> pci_bus_add_devices    (platform/amba)(_device_create/driver_register)
->>>>        |                         |
->>>> pci_bus_add_device     (device_add/driver_register)
->>>>        |                         |
->>>> device_attach           device_initial_probe
->>>>        |                         |
->>>> __device_attach_driver    __device_attach_driver
->>>>        |
->>>> driver_probe_device
->>>>        |
->>>> really_probe
->>>>        |
->>>> dma_configure
->>>>
->>>> Similarly on the device/driver_unregister path
->>>> __device_release_driver is called which inturn calls dma_deconfigure.
->>>>
->>>> Rebased the series against mainline 4.11-rc1. Applies and builds
->>>> cleanly against mainline and linux-next. There is a conflict with
->>>> patch#9 against iommu-next, but that should go away eventually as
->>>> iommu-next is rebased against 4.11-rc1.
->>>>
->>>> * Tested with platform and pci devices for probe deferral
->>>>   and reprobe on arm64 based platform.
->>>
->>> Hi Sricharan,
->>>
->>> I applied this series on v4.11-rc1 to test PCIe pass through in
->>> HiSilicon
->>> D05 board(with Intel 82599 networking card). It failed.
->>>
->>> After I used:
->>>
->>> echo vfio-pci > /sys/bus/pci/devices/0002:81:10.0/driver_override
->>> echo 0002:81:10.0 > /sys/bus/pci/drivers/ixgbevf/unbind
->>> echo 0002:81:10.0 > /sys/bus/pci/drivers_probe
->>>
->>> to bind vfio-pci driver to Intel 82599 networking card VF.
->>>
->>> I got log in host:
->>> [...]
->>> [  414.275818] ixgbevf: Intel(R) 10 Gigabit PCI Express Virtual
->>> Function Network Driver - version 3.2.2-k [  414.275824] ixgbevf: Copyright
->> (c) 2009 - 2015 Intel Corporation.
->>> [  414.276647] ixgbe 0002:81:00.0 eth12: SR-IOV enabled with 1 VFs [
->>> 414.342252] pcieport 0002:80:00.0: can't derive routing for PCI INT A
->>> [  414.342255] ixgbe 0002:81:00.0: PCI INT A: no GSI [  414.343348]
->>> ixgbe 0002:81:00.0: Multiqueue Enabled: Rx Queue count = 4, Tx Queue
->>> count = 4 [  414.448135] pci 0002:81:10.0: [8086:10ed] type 00 class
->>> 0x020000 [  414.448713] iommu: Adding device 0002:81:10.0 to group 4 [
->>> 414.449798] ixgbevf 0002:81:10.0: enabling device (0000 -> 0002) [
->>> 414.451101] ixgbevf 0002:81:10.0: PF still in reset state.  Is the PF interface
->> up?
->>> [  414.451103] ixgbevf 0002:81:10.0: Assigning random MAC address [
->>> 414.451414] ixgbevf 0002:81:10.0: be:30:8f:ed:f8:02 [  414.451417]
->>> ixgbevf 0002:81:10.0: MAC: 1 [  414.451418] ixgbevf 0002:81:10.0:
->>> Intel(R) 82599 Virtual Function [  414.464271] VFIO - User Level
->>> meta-driver version: 0.3 [  414.570074] ixgbe 0002:81:00.0: registered
->>> PHC device on eth12
->>> [  414.700493] specified DMA range outside IOMMU capability
->> <-- error here
->>> [  414.700496] Failed to set up IOMMU for device 0002:81:10.0; retaining
->> platform DMA ops        <-- error here
+>> Is this something that is hardcoded? Unlikely to ever change?
+> 
+> The host bridge actually supports 256 MSIs.
+> 
+> IIUC, what you suggested on IRC is that I support 256 in the driver,
+> and only read the status for *enabled* MSIs.
+> 
+> Pseudo-code:
+> 
+> for every 32-bit blob in the enabled bitmap
+>   if the value is non-zero
+>     lookup the corresponding status reg
+> 
+> Problem is that a BITMAP is unsigned long (as you point out below).
+> So I'm not sure how to iterate 32-bits at a time over the BITMAP.
+
+See my reply in a previous email.
+
+>>> +static void tango_msi_isr(struct irq_desc *desc)
+>>> +{
+>>> +	struct irq_chip *chip = irq_desc_get_chip(desc);
+>>> +	struct tango_pcie *pcie;
+>>> +	unsigned long status, virq;
+>>> +	int pos;
+>>> +
+>>> +	chained_irq_enter(chip, desc);
+>>> +	pcie = irq_desc_get_handler_data(desc);
+>>> +
+>>> +	status = readl_relaxed(pcie->msi_status);
 >>
->> Looks like this triggers the start of the bug.
->> So the below check in iommu_dma_init_domain fails,
+>> Please use types that unambiguously match that of the MMIO accessor (u32
+>> in this case). On a 64bit system, unsigned long is likely to be 64bit.
+>> You can assign it to an unsigned long before calling the
+>> for_each_set_bit operator.
+> 
+> OK. I'm aware that unsigned long is 64 bits on sane 64b platforms,
+> but since extending u32 to u64 would pad with zeros, I didn't expect
+> this to be an issue. I will change the code. Note: I copied the
+> code from the Altera driver.
+
+This is an issue when your system is 64bit BE, something that is not
+that uncommon.
+
+> 
+>>> +	writel_relaxed(status, pcie->msi_status); /* clear IRQs */
 >>
->>          if (domain->geometry.force_aperture) {
->>                  if (base > domain->geometry.aperture_end ||
->>                      base + size <= domain->geometry.aperture_start) {
+>> Why isn't this your irq_ack method instead of open-coding it?
+> 
+> I based my driver on the Altera driver, and I did it like
+> I thought they did. I will try fixing my code.
+
+Doesn't make it right, unfortunately. I wish you would try to understand
+the API first instead of copy-pasting things (including potential bugs).
+
+> 
+>>> +	for_each_set_bit(pos, &status, MSI_COUNT) {
+>>> +		virq = irq_find_mapping(pcie->irq_domain, pos);
+>>> +		if (virq)
+>>> +			generic_handle_irq(virq);
+>>> +		else
+>>> +			pr_err("Unhandled MSI: %d\n", pos);
 >>
->> and the rest goes out of sync after that. Can you print out the base,
->> aperture_start and end values to see why the check fails ?
+>> Please rate-limit this.
 > 
-> dev_info(dev, "0x%llx 0x%llx, 0x%llx 0x%llx, 0x%llx 0x%llx\n", base, size, domain->geometry.aperture_start, domain->geometry.aperture_end, *dev->dma_mask, dev->coherent_dma_mask);
+> I'll use pr_err_ratelimited
 > 
-> [  183.752100] ixgbevf 0000:81:10.0: 0x0 0x100000000, 0x0 0xffffffffffff, 0xffffffff 0xffffffff
-> .....
-> [  319.508037] vfio-pci 0000:81:10.0: 0x0 0x0, 0x0 0xffffffffffff, 0xffffffffffffffff 0xffffffffffffffff
 > 
-> Yes, size seems to be the problem here. When the VF  device gets attached to vfio-pci,
-> somehow the dev->coherent_dma_mask is set to 64 bits and size become zero.
+>>> +static struct msi_domain_info msi_domain_info = {
+>>> +	.flags	= MSI_FLAG_USE_DEF_DOM_OPS | MSI_FLAG_USE_DEF_CHIP_OPS,
+>>
+>> No support for MSI-X? Why?
+> 
+> Good question.
+> https://en.wikipedia.org/wiki/Message_Signaled_Interrupts#MSI-X
+> My controller supports a single doorbell, and only 256 MSIs.
+> I thought that meant it didn't support MSI-X.
 
-AFAICS, this is either down to patch 3 (which should apply on its own
-easily enough for testing), or patch 6, implying that somehow the
-vfio-pci device gets its DMA mask widened to 64 bits somewhere between
-very soon after after creation (where we originally called
-of_dma_configure()) and immediately before probe (where we now call it).
+The "single doorbell" requirement is on the end-point, not on the
+controller. Multi-MSI only has a single register for all possible
+interrupts, while MSI-X allows one doorbell address per interrupt. In
+your case, all interrupts will have the same doorbell address, which is
+perfectly fine.
 
-Either way I guess this is yet more motivation to write that "change the
-arch_setup_dma_ops() interface to take a mask instead of a size" patch...
+> 
+> 
+>>> +static int tango_irq_domain_alloc(struct irq_domain *domain, unsigned int virq,
+>>> +		unsigned int nr_irqs, void *args)
+>>> +{
+>>> +	struct tango_pcie *pcie = domain->host_data;
+>>> +	int pos, err = 0;
+>>> +	u32 mask;
+>>> +
+>>> +	if (nr_irqs != 1) /* When does that happen? */
+>>> +		return -EINVAL;
+>>
+>> Only if the end-point wants to use Multi-MSI. You don't advertise
+>> support for it, so it should never happen.
+> 
+> Should I keep the test or remove it?
 
-> @@ -107,7 +107,7 @@ int of_dma_configure(struct device *dev, struct device_node *np)
->   	ret = of_dma_get_range(np, &dma_addr, &paddr, &size);
->   	if (ret < 0) {
->   		dma_addr = offset = 0;
->  -		size = dev->coherent_dma_mask + 1;
->  +		size = max(dev->coherent_dma_mask, dev->coherent_dma_mask + 1);
-> 
-> @@ -1386,7 +1387,8 @@ int acpi_dma_configure(struct device *dev, enum dev_dma_attr attr)
->   	 * Assume dma valid range starts at 0 and covers the whole
->   	 * coherent_dma_mask.
->   	 */
->  -	arch_setup_dma_ops(dev, 0, dev->coherent_dma_mask + 1, iommu,
->  +	size = max(dev->coherent_dma_mask, dev->coherent_dma_mask + 1);
->  +	arch_setup_dma_ops(dev, 0, size, iommu,
->   			   attr == DEV_DMA_COHERENT);
-> 
-> With the above fixes, DT boot works fine. But we still get the below crash on ACPI
-> 
->>> [  402.581445] kernel BUG at drivers/iommu/arm-smmu-v3.c:1064!
->>> [  402.587007] Internal error: Oops - BUG: 0 [#1] PREEMPT SMP
->>> [  402.592479] Modules linked in: vfio_iommu_type1 vfio_pci irqbypass
->> vfio_virqfd vfio ixgbevf ixgb
+Up to you. Some people warn loudly, some other ignore it, you've chosen
+a middle ground.
 
-I can't see how ACPI vs. DT would make any difference to the domain
-attach/detach mechanics getting into an invalid state (if the DT case
-works then unbinding the ixgbevf driver clearly does release the Stream
-ID correctly in general), so I'm more inclined to believe that something
-goes wrong with the fwspec in the ACPI path such that we end up touching
-the wrong STE altogether.
-
-Robin.
-
->> The change that this series does is trying to add the dma/iommu ops to the
->> device after the iommu is actually probed.
->> So in your working case, does the device initially gets hooked to iommu_ops
->> and the above same check passes in working case ?
 > 
-> I believe so. Because didn't notice the "specified DMA range outside IOMMU capability"
-> in the working case.
->  
-> Thanks,
-> Shameer
 > 
+>>> +	mutex_lock(&pcie->lock);
+>>> +
+>>> +	mask = readl_relaxed(pcie->msi_mask);
+>>
+>> Do you really need to read this from the HW each time you allocate an
+>> interrupt? That feels pretty crazy. You're much better off having an
+>> in-memory bitmap that will make things more efficient, and avoid the
+>> following bug...
+>>
+>>> +	pos = find_first_zero_bit(&mask, MSI_COUNT);
+>>
+>> ... where using a u32 as a bitmap is a very bad idea (because not the
+>> whole world is a 32bit, little endian platform).
+> 
+> I understand your point. This ties in to the ISR discussion.
+> 
+> 
+>>> +	if (pos < MSI_COUNT)
+>>> +		writel(mask | BIT(pos), pcie->msi_mask);
+>>
+>> And it would make a lot more sense to move this write (which should be
+>> relaxed) to irq_unmask. Also, calling msi_mask for something that is an
+>> enable register is a bit counter intuitive.
+> 
+> I don't have as much experience as you.
+> I just used the names in the HW documentation.
+> I think it is the "mask" (as in bitmap) of enabled MSIs.
+> I will change "mask" to "enable".
+> 
+> Are you saying I should not use pci_msi_mask_irq and pci_msi_unmask_irq,
+> but register custom implementations? I should still call these in my
+> custom functions, right?
+
+You can call both in your own mask/unmask methods. They serve different
+purpose (one is at the endpoint level, the other is at the MSI
+controller level).
+
+> 
+> 
+>>> +	else
+>>> +		err = -ENOSPC;
+>>> +
+>>> +	mutex_unlock(&pcie->lock);
+>>> +
+>>> +	irq_domain_set_info(domain, virq, pos, &tango_msi_chip,
+>>> +			domain->host_data, handle_simple_irq, NULL, NULL);
+>>
+>> And here, you're polluting the domain even if you failed to allocate the
+>> interrupt.
+> 
+> This bug is 100% mine. Will fix.
+
+Erm. In this file, all bugs are yours! :-)
+
+> 
+>>> +
+>>> +	return err;
+>>> +}
+>>> +
+>>> +static void tango_irq_domain_free(struct irq_domain *domain,
+>>> +				   unsigned int virq, unsigned int nr_irqs)
+>>> +{
+>>> +	struct irq_data *d = irq_domain_get_irq_data(domain, virq);
+>>> +	struct tango_pcie *pcie = irq_data_get_irq_chip_data(d);
+>>> +	int pos = d->hwirq;
+>>> +	u32 mask;
+>>> +
+>>> +	mutex_lock(&pcie->lock);
+>>> +
+>>> +	mask = readl(pcie->msi_mask);
+>>> +	writel(mask & ~BIT(pos), pcie->msi_mask);
+>>
+>> Same as above, please move this to the irq_unmask method.
+> 
+> This one should be irq_mask, no?
+
+Yes.
+
+> 
+> Even If I move the MMIO write, it should be done under lock,
+> I think. But I don't know in what context irq_unmask will
+> be called.
+> You said: not mutex, spinlock.
+
+It can be called from interrupt context, so it cannot be a mutex.
+
+> 
+> 
+>>> +static int tango_msi_remove(struct platform_device *pdev)
+>>> +{
+>>> +	struct tango_pcie *msi = platform_get_drvdata(pdev);
+>>> +
+>>> +	irq_set_chained_handler(msi->irq, NULL);
+>>> +	irq_set_handler_data(msi->irq, NULL);
+>>> +	/* irq_set_chained_handler_and_data(msi->irq, NULL, NULL); instead? */
+> 
+> Can I call irq_set_chained_handler_and_data(msi->irq, NULL, NULL);
+> instead of the two calls?
+
+Probably. Reading the code should tell you.
+
+> 
+>>> +	mutex_init(&pcie->lock);
+>>> +	writel(0, pcie->msi_mask);
+>>> +
+>>> +	/* Why is fwnode for this call? */
+>>> +	irq_dom = irq_domain_add_linear(NULL, MSI_COUNT, &msi_domain_ops, pcie);
+>>
+>> Use irq_domain_create_linear, pass the same fwnode.
+> 
+> Will change that.
+> 
+> 
+>>> +	if (!irq_dom) {
+>>> +		pr_err("Failed to create IRQ domain\n");
+>>> +		return -ENOMEM;
+>>> +	}
+>>> +
+>>> +	msi_dom = pci_msi_create_irq_domain(fwnode, &msi_domain_info, irq_dom);
+>>> +	if (!msi_dom) {
+>>> +		pr_err("Failed to create MSI domain\n");
+>>> +		irq_domain_remove(irq_dom);
+>>> +		return -ENOMEM;
+>>> +	}
+>>> +
+>>> +	virq = platform_get_irq(pdev, 1);
+>>
+>> In the absence of a documented binding, it is hard to know if you're
+>> doing the right thing.
+> 
+> 		pcie at 50000000 {
+> 			compatible = "sigma,smp8759-pcie";
+> 			reg = <0x50000000 SZ_64M>, <0x2e000 0x100>;
+> 			device_type = "pci";
+> 			bus-range = <0 63>;
+> 			#size-cells = <2>;
+> 			#address-cells = <3>;
+> 			#interrupt-cells = <1>;
+> 			ranges = <0x02000000 0x0 0x04000000  0x54000000  0x0 SZ_192M>;
+> 			msi-controller;
+> 			/* 54 for misc interrupts, 55 for MSI */
+> 			interrupts = <54 IRQ_TYPE_LEVEL_HIGH>, <55 IRQ_TYPE_LEVEL_HIGH>;
+> 		};
+
+This is not a binding. This is an example from your DT. Look at
+Documentation/devicetree/bindings/pci/ for examples of the required
+documentation.
+
+> 
+> Note: I don't have an "interrupt-map" prop because rev1 doesn't support
+> legacy PCI interrupts (INTx). But I see the PCI framework wrongly mapping
+> intA to my system's interrupt #1, presumably because I am lacking an
+> interrupt-map?
+
+Probably. I don't think it is legal not to have an interrupt-map.
+
+> 
+> Also I find the MSI interrupt number to be high:
+> 
+> # cat /proc/interrupts 
+>            CPU0       CPU1       
+>  19:      21171       1074     GIC-0  29 Edge      twd
+>  20:        116          0      irq0   1 Level     serial
+>  26:          7          0       MSI   0 Edge      aerdrv
+>  28:       3263          0       MSI 524288 Edge      xhci_hcd
+> 
+> 524288 is 0x80000. Was this offset chosen by the intc core?
+
+By the PCI/MSI layer. See pci_msi_domain_calc_hwirq().
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
