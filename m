@@ -1,101 +1,90 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Fri, 24 Mar 2017 17:51:56 +0300
-Subject: [PATCH 1/3] crypto: hw_random - Add new Exynos RNG driver
-In-Reply-To: <3628768.ze2UxnIp5I@tauon.atsec.com>
-References: <20170324142446.31129-1-krzk@kernel.org>
- <2503592.nlbQnVP8UR@positron.chronox.de>
- <20170324144348.v4hegak7dffh5awh@kozik-lap>
- <3628768.ze2UxnIp5I@tauon.atsec.com>
-Message-ID: <20170324145156.miqmxgkhn2v7rbcu@kozik-lap>
+From: opendmb@gmail.com (Doug Berger)
+Date: Fri, 24 Mar 2017 07:46:30 -0700
+Subject: [PATCH 7/9] bus: brcmstb_gisb: Add ARM64 support
+In-Reply-To: <20170324144632.5896-1-opendmb@gmail.com>
+References: <20170324144632.5896-1-opendmb@gmail.com>
+Message-ID: <20170324144632.5896-8-opendmb@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 24, 2017 at 03:46:44PM +0100, Stephan M?ller wrote:
-> Am Freitag, 24. M?rz 2017, 15:43:48 CET schrieb Krzysztof Kozlowski:
-> 
-> Hi Krzysztof,
-> 
-> > On Fri, Mar 24, 2017 at 03:37:59PM +0100, Stephan M?ller wrote:
-> > > Am Freitag, 24. M?rz 2017, 15:24:44 CET schrieb Krzysztof Kozlowski:
-> > > 
-> > > Hi Krzysztof,
-> > > 
-> > > > +
-> > > > +static int exynos_rng_set_seed(struct exynos_rng_dev *rng,
-> > > > +			       const u8 *seed, unsigned int slen)
-> > > > +{
-> > > > +	int ret, i;
-> > > > +	u32 val;
-> > > > +
-> > > > +	dev_dbg(rng->dev, "Seeding with %u bytes\n", slen);
-> > > > +
-> > > > +	ret = clk_prepare_enable(rng->clk);
-> > > > +	if (ret)
-> > > > +		return ret;
-> > > > +
-> > > > +	if (slen < EXYNOS_RNG_SEED_SIZE) {
-> > > > +		dev_warn(rng->dev, "Seed too short (only %u bytes)\n", slen);
-> > > > +		ret = -EINVAL;
-> > > > +		goto out;
-> > > > +	}
-> > > > +
-> > > > +	for (i = 0 ; i < EXYNOS_RNG_SEED_REGS ; i++) {
-> > > > +		val = seed[i * 4] << 24;
-> > > > +		val |= seed[i * 4 + 1] << 16;
-> > > > +		val |= seed[i * 4 + 2] << 8;
-> > > > +		val |= seed[i * 4 + 3] << 0;
-> > > > +
-> > > > +		exynos_rng_writel(rng, val, EXYNOS_RNG_SEED(i));
-> > > > +	}
-> > > > +
-> > > > +	val = exynos_rng_readl(rng, EXYNOS_RNG_STATUS);
-> > > > +	if (!(val & EXYNOS_RNG_STATUS_SEED_SETTING_DONE)) {
-> > > > +		dev_warn(rng->dev, "Seed setting not finished\n");
-> > > > +		ret = -EIO;
-> > > > +		goto out;
-> > > > +	}
-> > > > +
-> > > > +	ret = 0;
-> > > > +	/* Save seed for suspend */
-> > > > +	memcpy(rng->seed_save, seed, slen);
-> > > 
-> > > Is this really necessary? If you need to save some seed, shouldn't that be
-> > > an output of the DRNG and not the real seed?
-> > 
-> > When suspended to RAM device will loose the contents of registers
-> > (including SEED registers) so it has to be initialized with something on
-> > resume.
-> > 
-> > The seed registers are write-only so I cannot read them and store
-> > contents just before suspend.
-> > 
-> > I understand that real seed should not be stored... but then if I am not
-> > able to re-seed it with same values, I will loose the continuous and
-> > reproducible pseudo-random generation after suspend. Aren't this
-> > expected out of PRNG?
-> 
-> An RNG has to be stateless from the perspective of the caller -- this is the 
-> core implication of entropy.
-> 
-> Then, if you add the initial seed after the RNG lost its state implies that 
-> the same sequence of random numbers starts again. I.e. where is the 
-> randomness?
+From: Florian Fainelli <f.fainelli@gmail.com>
 
-Ahhh, yes, you are right. The device would not continue on its random
-generation because all state is lost anyway.
+Hook to the ARM64 data abort exception #16: synchronous external
+abort, which is how the GISB errors will be funneled back to the
+ARM64 CPU in case of problems
 
-I'll use the generated random numbers.
+Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+---
+ drivers/bus/Kconfig        |  2 +-
+ drivers/bus/brcmstb_gisb.c | 15 ++++++++++++---
+ 2 files changed, 13 insertions(+), 4 deletions(-)
 
-> > > Besides, how do you know that slen is not larger than
-> > > EXYNOS_RNG_SEED_SIZE?
-> > 
-> > Right, there is a overflow here. It should be sizeof(rng->seed_save);
-> 
-> shouldn't it be min(rng->seed_save, slen)?
-
-Now it is irrelevant but anyway I am not allowing the seed to be less
-then EXYNOS_RNG_SEED_SIZE (== sizeof(rng->seed_save)). The device
-expects all five channels (registers) to be seeded.
-
-Best regards,
-Krzysztof
+diff --git a/drivers/bus/Kconfig b/drivers/bus/Kconfig
+index 0a52da439abf..d2a5f1184022 100644
+--- a/drivers/bus/Kconfig
++++ b/drivers/bus/Kconfig
+@@ -57,7 +57,7 @@ config ARM_CCN
+ 
+ config BRCMSTB_GISB_ARB
+ 	bool "Broadcom STB GISB bus arbiter"
+-	depends on ARM || MIPS
++	depends on ARM || ARM64 || MIPS
+ 	default ARCH_BRCMSTB || BMIPS_GENERIC
+ 	help
+ 	  Driver for the Broadcom Set Top Box System-on-a-chip internal bus
+diff --git a/drivers/bus/brcmstb_gisb.c b/drivers/bus/brcmstb_gisb.c
+index c8d2a61d21ed..bf26b4017a2c 100644
+--- a/drivers/bus/brcmstb_gisb.c
++++ b/drivers/bus/brcmstb_gisb.c
+@@ -30,6 +30,11 @@
+ #include <asm/signal.h>
+ #endif
+ 
++#ifdef CONFIG_ARM64
++#include <asm/signal.h>
++#include <asm/system_misc.h>
++#endif
++
+ #ifdef CONFIG_MIPS
+ #include <asm/traps.h>
+ #endif
+@@ -225,7 +230,7 @@ static int brcmstb_gisb_arb_decode_addr(struct brcmstb_gisb_arb_device *gdev,
+ 	return 0;
+ }
+ 
+-#ifdef CONFIG_ARM
++#if defined(CONFIG_ARM) || defined(CONFIG_ARM64)
+ static int brcmstb_bus_error_handler(unsigned long addr, unsigned int fsr,
+ 				     struct pt_regs *regs)
+ {
+@@ -235,7 +240,7 @@ static int brcmstb_bus_error_handler(unsigned long addr, unsigned int fsr,
+ 	list_for_each_entry(gdev, &brcmstb_gisb_arb_device_list, next)
+ 		brcmstb_gisb_arb_decode_addr(gdev, "bus error");
+ 
+-#if !defined(CONFIG_ARM_LPAE)
++#if defined(CONFIG_ARM) && !defined(CONFIG_ARM_LPAE)
+ 	/*
+ 	 * If it was an imprecise abort, then we need to correct the
+ 	 * return address to be _after_ the instruction.
+@@ -247,7 +252,7 @@ static int brcmstb_bus_error_handler(unsigned long addr, unsigned int fsr,
+ 	/* Always report unhandled exception */
+ 	return 1;
+ }
+-#endif
++#endif /* CONFIG_ARM || CONFIG_ARM64 */
+ 
+ #ifdef CONFIG_MIPS
+ static int brcmstb_bus_error_handler(struct pt_regs *regs, int is_fixup)
+@@ -395,6 +400,10 @@ static int __init brcmstb_gisb_arb_probe(struct platform_device *pdev)
+ 			"imprecise external abort");
+ #endif
+ #endif /* CONFIG_ARM */
++#ifdef CONFIG_ARM64
++	hook_fault_code(16, brcmstb_bus_error_handler, SIGBUS, 0,
++			"synchronous external abort");
++#endif
+ #ifdef CONFIG_MIPS
+ 	board_be_handler = brcmstb_bus_error_handler;
+ #endif
+-- 
+2.12.0
