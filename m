@@ -1,131 +1,112 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Fri, 24 Mar 2017 17:03:35 +0100
-Subject: [PATCH v4 28/28] arm/arm64: Add hyp-stub API documentation
-In-Reply-To: <ea653ce3-e85a-a42a-9b4f-a5d1daabf871@arm.com>
-References: <20170321192058.9300-1-marc.zyngier@arm.com>
- <20170321192058.9300-29-marc.zyngier@arm.com>
- <20170324143316.GA25903@cbox>
- <ff4fe929-98f0-de0e-2f1a-d06c7969d5e0@arm.com>
- <20170324152340.GG25903@cbox>
- <ea653ce3-e85a-a42a-9b4f-a5d1daabf871@arm.com>
-Message-ID: <20170324160335.GI25903@cbox>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Fri, 24 Mar 2017 17:11:25 +0100
+Subject: [PATCH 1/3] crypto: hw_random - Add new Exynos RNG driver
+In-Reply-To: <20170324154600.lavc22dbw7rtioli@kozik-lap>
+References: <20170324142446.31129-1-krzk@kernel.org>
+ <3940941.n3qdgn1RbN@amdc3058> <20170324154600.lavc22dbw7rtioli@kozik-lap>
+ <CGME20170324161128epcas1p4b9ef08e3d7e640957d30afa84aa66a16@epcas1p4.samsung.com>
+Message-ID: <9265537.P6AeF50kg8@amdc3058>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 24, 2017 at 03:57:41PM +0000, Marc Zyngier wrote:
-> On 24/03/17 15:23, Christoffer Dall wrote:
-> > On Fri, Mar 24, 2017 at 02:42:13PM +0000, Marc Zyngier wrote:
-> >> On 24/03/17 14:33, Christoffer Dall wrote:
-> >>> On Tue, Mar 21, 2017 at 07:20:58PM +0000, Marc Zyngier wrote:
-> >>>> In order to help people understanding the hyp-stub API that exists
-> >>>> between the host kernel and the hypervisor mode (whether a hypervisor
-> >>>> has been installed or not), let's document said API.
-> >>>>
-> >>>> As with any form of documentation, I expect it to become obsolete
-> >>>> and completely misleading within 20 minutes after having being merged.
-> >>>
-> >>> I don't think this last sentence belongs in the commit message.
-> >>>
-> >>>>
-> >>>> Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
-> >>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> >>>> ---
-> >>>>  Documentation/virtual/kvm/arm/hyp-abi.txt | 45 +++++++++++++++++++++++++++++++
-> >>>>  1 file changed, 45 insertions(+)
-> >>>>  create mode 100644 Documentation/virtual/kvm/arm/hyp-abi.txt
-> >>>>
-> >>>> diff --git a/Documentation/virtual/kvm/arm/hyp-abi.txt b/Documentation/virtual/kvm/arm/hyp-abi.txt
-> >>>> new file mode 100644
-> >>>> index 000000000000..a1e0314d2249
-> >>>> --- /dev/null
-> >>>> +++ b/Documentation/virtual/kvm/arm/hyp-abi.txt
-> >>>> @@ -0,0 +1,45 @@
-> >>>> +* Internal ABI between the kernel and HYP
-> >>>> +
-> >>>> +This file documents the interaction between the Linux kernel and the
-> >>>> +hypervisor layer when running Linux as a hypervisor (for example
-> >>>> +KVM). It doesn't cover the interaction of the kernel with the
-> >>>> +hypervisor when running as a guest (under Xen, KVM or any other
-> >>>> +hypervisor), or any hypervisor-specific interaction when the kernel is
-> >>>> +used as a host.
-> >>>> +
-> >>>> +On arm and arm64 (without VHE), the kernel doesn't run in hypervisor
-> >>>> +mode, but still needs to interact with it, allowing a built-in
-> >>>> +hypervisor to be either installed or torn down.
-> >>>> +
-> >>>> +In order to achieve this, the kernel must be booted at HYP (arm) or
-> >>>> +EL2 (arm64), allowing it to install a set of stubs before dropping to
-> >>>> +SVC/EL1. These stubs are accessible by using a 'hvc #0' instruction,
-> >>>> +and only act on individual CPUs.
-> >>>> +
-> >>>> +Unless specified otherwise, any built-in hypervisor must implement
-> >>>> +these functions (see arch/arm{,64}/include/asm/virt.h):
-> >>>> +
-> >>>> +* r0/x0 = HVC_SET_VECTORS
-> >>>> +  r1/x1 = vectors
-> >>>> +
-> >>>> +  Set HVBAR/VBAR_EL2 to 'vectors' to enable a hypervisor. 'vectors'
-> >>>> +  must be a physical address, and respect the alignment requirements
-> >>>> +  of the architecture. Only implemented by the initial stubs.
-> >>>
-> >>> Does this last sentence mean that KVM doesn't implement this function?
-> >>
-> >> Indeed. 
+On Friday, March 24, 2017 06:46:00 PM Krzysztof Kozlowski wrote:
+> On Fri, Mar 24, 2017 at 04:26:47PM +0100, Bartlomiej Zolnierkiewicz wrote:
 > > 
-> > I think the wording could be improved to "Only implemented by the
-> > initial stubs, not by Linux hypervisors."
-> 
-> Looks good to me, I'll use that.
-> 
-> >> Directly setting the vectors is inherently unsafe (MMU could
-> >> still be ON, for example), hence the HVC_SET_VECTORS operation that
-> >> allow this to be done safely (RESET followed by SET).
-> >>
+> > Hi,
 > > 
-> > Hmm, is it any less safe than setting the vectors using the hyp stubs?
-> > In the initial case, we're relying on the caller knowing that the MMU is
-> > off, and that the stubs are in place, otherwise it doesn't make sense.
-> 
-> That's why I was implying here that RESET+SET is the safe way of doing
-> it. Another solution may be to make SET imply RESET, and keep it
-> implemented always?
-> 
-
-Meh, I think these patches are as stable as is required for the use
-cases at hand, so let's not introduce more churn in these patches.
-
-> > But I think the point is just that we don't have a need to change the
-> > vector from within KVM; we only have a need to set the vector when going
-> > from stub->kvm, and we have a need to reset the whole thing (including
-> > turning off the MMU) when going from kvm->stub.
-> 
-> Exactly. The current API doesn't try to cater for all possible cases. It
-> just make sure that KVM can be installed and torn down safely.
-> 
-
-Fair enough.
-
-> > Anyhow, my comment was just about the wording, as I had some nagging
-> > doubt when I read the patch.
+> > Firstly, thanks for working on this.
 > > 
-> >>>
-> >>>> +
-> >>>> +* r0/x0 = HVC_RESET_VECTORS
-> >>>> +
-> >>>> +  Turn HYP/EL2 MMU off, and reset HVBAR/VBAR_EL2 to the default
-> >>>> +  value. This effectively disables an existing hypervisor.
-> >>>
-> >>> What's the 'default value' ?  Could we say to the physical address of
-> >>> the hypervisor stub's exception vector?
-> >>
-> >> Shouldn't that be the kernel stub's exception vector?
-> >>
+> > The patch looks fine overall for me, some review comments below.
 > > 
-> > Yeah, the "initials stubs' exception vector" is probably the most
-> > coherent thing we can use here.
+> > On Friday, March 24, 2017 05:24:44 PM Krzysztof Kozlowski wrote:
+> > > Replace existing hw_ranndom/exynos-rng driver with a new, reworked one.
+> > > This is a driver for pseudo random number generator block which on
+> > > Exynos4 chipsets must be seeded with some value.  On newer Exynos5420
+> > > chipsets it might seed itself from true random number generator block
+> > > but this is not implemented yet.
+> > > 
+> > > New driver is a complete rework to use the crypto ALGAPI instead of
+> > > hw_random API.  Rationale for the change:
+> > > 1. hw_random interface is for true RNG devices.
+> > > 2. The old driver was seeding itself with jiffies which is not a
+> > >    reliable source for randomness.
+> > > 3. Device generates five random numbers in each pass but old driver was
+> > >    returning only one thus its performance was reduced.
+> > > 
+> > > Compatibility with DeviceTree bindings is preserved.
+> > > 
+> > > New driver does not use runtime power management but manually enables
+> > > and disables the clock when needed.  This is preferred approach because
+> > > using runtime PM just to toggle clock is huge overhead.  Another
+> > 
+> > I'm not entirely convinced that the new approach is better.
+> > 
+> > With the old approach exynos_rng_generate() can be called more
+> > than once before PM autosuspend kicks in and thus clk_prepare_enable()/
+> > clk_disable()_unprepare() operations will be done only once. This
+> > would give better performance on the "burst" operations.
+> > 
+> > [ The above assumes that clock operations are more costly than
+> >   going through PM core to check the current device state. ]
 > 
-> I'll use that when respinning it.
+> I agree that we loose the "burst" mode but:
+> 1. At least on Exynso4 SSS is part of TOP power domain so it will not
+>    help to reduce any more power consumption (on Exynos5422 it is
+>    mentioned in G2D... which seems incorrect).
+> 2. I think the overhead of clk operations is much smaller. These are only
+>    two locks (prepare mutex + enable spin), simple tree traversal and
+>    play with few SFRs.
 > 
+>    The power domain code in comparison to that is huge and complicated
+>    with inter-device links and dependencies. Also the actual runtime PM
+>    suspend would anyway fall back at then end to clk prepare/enable
+>    locks and paths.
+> 
+>    We've been talking about this a lot with Marek Szyprowski (cc'ed) and
+>    he was always (AFAIR) against attempts of runtime power
+>    management of a single clock...
 
-Thanks,
--Christoffer
+OK, thanks for explanation.
+
+> > > +static int exynos_rng_probe(struct platform_device *pdev)
+> > > +{
+> > > +	struct exynos_rng_dev *rng;
+> > > +	struct resource *res;
+> > > +	int ret;
+> > > +
+> > > +	if (exynos_rng_dev)
+> > > +		return -EEXIST;
+> > 
+> > How this condition could ever happen? 
+> > 
+> > The probe function will never be called twice.
+> 
+> I really do not like global or file-scope variables. I do not like
+> drivers using them. Actually I hate them.
+> 
+> From time to time I encounter a driver which was designed with that
+> approach - static fields and hidden assumption that there will be only
+> one instance. Usually that assumption is really hidden...
+> 
+> ... and then it happens that I want to use two instances which of course
+> fails.
+> 
+> This code serves as a clear documentation for this assumption - only one
+> instance is allowed. You can look at it as a self-documenting
+> requirement.
+
+For me it looks as needless case of defensive programming and when
+I see the code like this it always raises questions about the real
+intentions of the code. I find it puzzling and not helpful.
+
+> And I think the probe might be called twice, for example in case of
+> mistake in DTB.
+
+Even if this is possible resource allocation code in the driver will
+take take care of handling it just fine,
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
