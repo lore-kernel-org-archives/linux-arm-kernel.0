@@ -1,63 +1,163 @@
-From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Fri, 24 Mar 2017 20:19:32 +0100
-Subject: [PATCH v2] phy: meson8b-usb2: fix offsets for some of the
- registers
-In-Reply-To: <20170304102011.14944-1-martin.blumenstingl@googlemail.com>
-References: <20170113185358.8362-1-martin.blumenstingl@googlemail.com>
- <20170304102011.14944-1-martin.blumenstingl@googlemail.com>
-Message-ID: <CAFBinCB_Om_XJ4ubTQbFcGzqYxGrVYhn1fJpB5Um1b-S7k3ohA@mail.gmail.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Fri, 24 Mar 2017 12:20:31 -0700
+Subject: [PATCH v4 3/3] ARM64: dts: meson-gx: Add MALI nodes for GXBB and
+ GXL
+In-Reply-To: <1490177935-9646-4-git-send-email-narmstrong@baylibre.com> (Neil
+ Armstrong's message of "Wed, 22 Mar 2017 11:18:55 +0100")
+References: <1490177935-9646-1-git-send-email-narmstrong@baylibre.com>
+ <1490177935-9646-4-git-send-email-narmstrong@baylibre.com>
+Message-ID: <m237e2iirk.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kishon,
+Neil Armstrong <narmstrong@baylibre.com> writes:
 
-On Sat, Mar 4, 2017 at 11:20 AM, Martin Blumenstingl
-<martin.blumenstingl@googlemail.com> wrote:
-> The register offsets for REG_DBG_UART (and all following) were off by
-> 0x4. This was not a problem yet because these registers are currently
-> not used by the driver.
+> The same MALI-450 MP3 GPU is present in the GXBB and GXL SoCs.
 >
-> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
-> Reviewed-by: Jerome Brunet <jbrunet@baylibre.com>
-gentle ping - please let me know if something is missing (for example
-some ACK orreview) before you are going to apply this
+> The node is simply added in the meson-gxbb.dtsi file.
+>
+> For GXL, since a lot is shared with the GXM that has a MALI-T820 IP, this
+> patch adds a new meson-gxl-mali.dtsi and is included in the SoC specific
+> dtsi files.
+>
+> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+
+LGTM, I can apply this when the clk driver changes are merged (feel free
+to let me know when that happens, in case I'm not paying attention.)
+
+<bikeshed>
+nit: This series (and previous ones) use MALI, but I believe the correct
+way is Mali. Could you standarize on that throughout the series?
+</bikeshed>
+
+Kevin
 
 > ---
-> changes since v1:
-> - added Jerome's Reviewed-By
+>  arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi      | 37 ++++++++++++++++++++
+>  arch/arm64/boot/dts/amlogic/meson-gxl-mali.dtsi  | 43 ++++++++++++++++++++++++
+>  arch/arm64/boot/dts/amlogic/meson-gxl-s905d.dtsi |  1 +
+>  arch/arm64/boot/dts/amlogic/meson-gxl-s905x.dtsi |  1 +
+>  4 files changed, 82 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxl-mali.dtsi
 >
->  drivers/phy/phy-meson8b-usb2.c | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
->
-> diff --git a/drivers/phy/phy-meson8b-usb2.c b/drivers/phy/phy-meson8b-usb2.c
-> index 33c9f4ba157d..30f56a6a411f 100644
-> --- a/drivers/phy/phy-meson8b-usb2.c
-> +++ b/drivers/phy/phy-meson8b-usb2.c
-> @@ -81,9 +81,9 @@
->         #define REG_ADP_BC_ACA_PIN_GND                  BIT(25)
->         #define REG_ADP_BC_ACA_PIN_FLOAT                BIT(26)
->
-> -#define REG_DBG_UART                                   0x14
-> +#define REG_DBG_UART                                   0x10
->
-> -#define REG_TEST                                       0x18
-> +#define REG_TEST                                       0x14
->         #define REG_TEST_DATA_IN_MASK                   GENMASK(3, 0)
->         #define REG_TEST_EN_MASK                        GENMASK(7, 4)
->         #define REG_TEST_ADDR_MASK                      GENMASK(11, 8)
-> @@ -93,7 +93,7 @@
->         #define REG_TEST_DATA_OUT_MASK                  GENMASK(19, 16)
->         #define REG_TEST_DISABLE_ID_PULLUP              BIT(20)
->
-> -#define REG_TUNE                                       0x1c
-> +#define REG_TUNE                                       0x18
->         #define REG_TUNE_TX_RES_TUNE_MASK               GENMASK(1, 0)
->         #define REG_TUNE_TX_HSXV_TUNE_MASK              GENMASK(3, 2)
->         #define REG_TUNE_TX_VREF_TUNE_MASK              GENMASK(7, 4)
-> --
-> 2.12.0
->
-
-
-Regards,
-Martin
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+> index 04b3324..0617a3d 100644
+> --- a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+> +++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+> @@ -478,6 +478,43 @@
+>  	};
+>  };
+>  
+> +&apb {
+> +	mali: gpu at c0000 {
+> +		compatible = "amlogic,meson-gxbb-mali", "arm,mali-450";
+> +		reg = <0x0 0xc0000 0x0 0x40000>;
+> +		interrupts = <GIC_SPI 160 IRQ_TYPE_LEVEL_HIGH>,
+> +			     <GIC_SPI 161 IRQ_TYPE_LEVEL_HIGH>,
+> +			     <GIC_SPI 162 IRQ_TYPE_LEVEL_HIGH>,
+> +			     <GIC_SPI 163 IRQ_TYPE_LEVEL_HIGH>,
+> +			     <GIC_SPI 164 IRQ_TYPE_LEVEL_HIGH>,
+> +			     <GIC_SPI 165 IRQ_TYPE_LEVEL_HIGH>,
+> +			     <GIC_SPI 166 IRQ_TYPE_LEVEL_HIGH>,
+> +			     <GIC_SPI 167 IRQ_TYPE_LEVEL_HIGH>,
+> +			     <GIC_SPI 168 IRQ_TYPE_LEVEL_HIGH>,
+> +			     <GIC_SPI 169 IRQ_TYPE_LEVEL_HIGH>;
+> +		interrupt-names = "gp", "gpmmu", "pp", "pmu",
+> +			"pp0", "ppmmu0", "pp1", "ppmmu1",
+> +			"pp2", "ppmmu2";
+> +		clocks = <&clkc CLKID_CLK81>, <&clkc CLKID_MALI>;
+> +		clock-names = "bus", "core";
+> +
+> +		/*
+> +		 * Mali clocking is provided by two identical clock paths
+> +		 * MALI_0 and MALI_1 muxed to a single clock by a glitch
+> +		 * free mux to safely change frequency while running.
+> +		 */
+> +		assigned-clocks = <&clkc CLKID_MALI_0_SEL>,
+> +				  <&clkc CLKID_MALI_0>,
+> +				  <&clkc CLKID_MALI>; /* Glitch free mux */
+> +		assigned-clock-parents = <&clkc CLKID_FCLK_DIV3>,
+> +					 <0>, /* Do Nothing */
+> +					 <&clkc CLKID_MALI_0>;
+> +		assigned-clock-rates = <0>, /* Do Nothing */
+> +				       <666666666>,
+> +				       <0>; /* Do Nothing */
+> +	};
+> +};
+> +
+>  &i2c_A {
+>  	clocks = <&clkc CLKID_I2C>;
+>  };
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-mali.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxl-mali.dtsi
+> new file mode 100644
+> index 0000000..f06cc234
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/amlogic/meson-gxl-mali.dtsi
+> @@ -0,0 +1,43 @@
+> +/*
+> + * Copyright (c) 2017 BayLibre SAS
+> + * Author: Neil Armstrong <narmstrong@baylibre.com>
+> + *
+> + * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+> + */
+> +
+> +&apb {
+> +	mali: gpu at c0000 {
+> +		compatible = "amlogic,meson-gxbb-mali", "arm,mali-450";
+> +		reg = <0x0 0xc0000 0x0 0x40000>;
+> +		interrupts = <GIC_SPI 160 IRQ_TYPE_LEVEL_HIGH>,
+> +			     <GIC_SPI 161 IRQ_TYPE_LEVEL_HIGH>,
+> +			     <GIC_SPI 162 IRQ_TYPE_LEVEL_HIGH>,
+> +			     <GIC_SPI 163 IRQ_TYPE_LEVEL_HIGH>,
+> +			     <GIC_SPI 164 IRQ_TYPE_LEVEL_HIGH>,
+> +			     <GIC_SPI 165 IRQ_TYPE_LEVEL_HIGH>,
+> +			     <GIC_SPI 166 IRQ_TYPE_LEVEL_HIGH>,
+> +			     <GIC_SPI 167 IRQ_TYPE_LEVEL_HIGH>,
+> +			     <GIC_SPI 168 IRQ_TYPE_LEVEL_HIGH>,
+> +			     <GIC_SPI 169 IRQ_TYPE_LEVEL_HIGH>;
+> +		interrupt-names = "gp", "gpmmu", "pp", "pmu",
+> +			"pp0", "ppmmu0", "pp1", "ppmmu1",
+> +			"pp2", "ppmmu2";
+> +		clocks = <&clkc CLKID_CLK81>, <&clkc CLKID_MALI>;
+> +		clock-names = "bus", "core";
+> +
+> +		/*
+> +		 * Mali clocking is provided by two identical clock paths
+> +		 * MALI_0 and MALI_1 muxed to a single clock by a glitch
+> +		 * free mux to safely change frequency while running.
+> +		 */
+> +		assigned-clocks = <&clkc CLKID_MALI_0_SEL>,
+> +				  <&clkc CLKID_MALI_0>,
+> +				  <&clkc CLKID_MALI>; /* Glitch free mux */
+> +		assigned-clock-parents = <&clkc CLKID_FCLK_DIV3>,
+> +					 <0>, /* Do Nothing */
+> +					 <&clkc CLKID_MALI_0>;
+> +		assigned-clock-rates = <0>, /* Do Nothing */
+> +				       <666666666>,
+> +				       <0>; /* Do Nothing */
+> +	};
+> +};
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905d.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxl-s905d.dtsi
+> index 615308e..5a90e30 100644
+> --- a/arch/arm64/boot/dts/amlogic/meson-gxl-s905d.dtsi
+> +++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905d.dtsi
+> @@ -42,6 +42,7 @@
+>   */
+>  
+>  #include "meson-gxl.dtsi"
+> +#include "meson-gxl-mali.dtsi"
+>  
+>  / {
+>  	compatible = "amlogic,s905d", "amlogic,meson-gxl";
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x.dtsi
+> index 08237ee..0f78d83 100644
+> --- a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x.dtsi
+> +++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x.dtsi
+> @@ -42,6 +42,7 @@
+>   */
+>  
+>  #include "meson-gxl.dtsi"
+> +#include "meson-gxl-mali.dtsi"
+>  
+>  / {
+>  	compatible = "amlogic,s905x", "amlogic,meson-gxl";
