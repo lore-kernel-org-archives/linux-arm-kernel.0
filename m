@@ -1,36 +1,23 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Fri, 24 Mar 2017 09:28:36 +0800
-Subject: [PATCH 05/15] ARM: dts: imx: fix PCI bus dtc warnings
-In-Reply-To: <CAL_JsqKmbLP07zKN1SJAoe0xHjzjn80HQDRvqASXvhnUOBgAyA@mail.gmail.com>
-References: <20170322020313.24338-1-robh@kernel.org>
- <20170322020313.24338-5-robh@kernel.org>
- <20170322081942.GM3443@dragon>
- <CAL_JsqKmbLP07zKN1SJAoe0xHjzjn80HQDRvqASXvhnUOBgAyA@mail.gmail.com>
-Message-ID: <20170324012831.GB30608@dragon>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 23 Mar 2017 20:56:39 -0500
+Subject: [PATCH v5 1/3] mmc: dt-bindings: update Mediatek MMC bindings
+In-Reply-To: <1489562800-27431-2-git-send-email-yong.mao@mediatek.com>
+References: <1489562800-27431-1-git-send-email-yong.mao@mediatek.com>
+ <1489562800-27431-2-git-send-email-yong.mao@mediatek.com>
+Message-ID: <20170324015639.2hleaavsaw6bcgu6@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+Tim who is the owner of Gateworks Ventana boards.
-
-On Wed, Mar 22, 2017 at 08:53:34AM -0500, Rob Herring wrote:
-> On Wed, Mar 22, 2017 at 3:19 AM, Shawn Guo <shawnguo@kernel.org> wrote:
-> > On Tue, Mar 21, 2017 at 09:03:03PM -0500, Rob Herring wrote:
-> >> dtc recently added PCI bus checks. Fix these warnings.
-> >>
-> >> Signed-off-by: Rob Herring <robh@kernel.org>
-> >> Cc: Shawn Guo <shawnguo@kernel.org>
-> >> Cc: Sascha Hauer <kernel@pengutronix.de>
-> >> Cc: Fabio Estevam <fabio.estevam@nxp.com>
-> >
-> > Applied with a couple of changes below.
+On Wed, Mar 15, 2017 at 03:26:38PM +0800, Yong Mao wrote:
+> From: yong mao <yong.mao@mediatek.com>
 > 
-> Thanks. BTW, forget to mention there's still one i.MX warning I did
-> not fix. It's with the "sky2 at 8" PCI device node. The unit address is
-> completely wrong. The comment says bus #8 which doesn't seem right
-> either. The unit address should be "<device num>[,<function]". There
-> should be a reg property which also has the bus number.
+> Add description for mediatek,hs200-cmd-int-delay
+> Add description for mediatek,hs400-cmd-int-delay
+> Add description for mediatek,hs400-cmd-resp-sel-rising
+> 
+> Signed-off-by: Yong Mao <yong.mao@mediatek.com>
+> ---
+>  Documentation/devicetree/bindings/mmc/mtk-sd.txt |   12 ++++++++++++
+>  1 file changed, 12 insertions(+)
 
-@Tim, these DTC warnings come from Ventana boards.  Can you take care of
-them?
-
-Shawn
+Acked-by: Rob Herring <robh@kernel.org>
