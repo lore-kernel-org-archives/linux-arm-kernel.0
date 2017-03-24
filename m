@@ -1,122 +1,76 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 24 Mar 2017 10:15:58 +0100
-Subject: [PATCH 4/4] tty/serial: sh-sci: remove uneeded IS_ERR_OR_NULL
- calls
-In-Reply-To: <CAMuHMdVoYyDUvQuoPoY347b8tbcuOJK5o7GXoSngiX3LQYekAQ@mail.gmail.com>
-References: <20170323123437.uqdwhfmmsjke3f7s@pengutronix.de>
- <CACRpkdZRfLh9RXRycW_cAxuTYE6tPd7LR32EkAW8y2fh=AxhXA@mail.gmail.com>
- <20170323144325.GA952@dtor-ws> <20170323154441.GA9460@dtor-ws>
- <20170323191020.nrstp2cfh7cuqvf3@pengutronix.de>
- <20170323195804.GA2502@dtor-ws>
- <20170324080006.tbhyqlgk35xybsna@pengutronix.de>
- <CAMuHMdXnUzjb5wzMtmzY2ojpGbhr_3KFGDYd2QKEawVipBhdbw@mail.gmail.com>
- <20170324083905.h5uhdgiycchcjcgs@pengutronix.de>
- <CAMuHMdVoYyDUvQuoPoY347b8tbcuOJK5o7GXoSngiX3LQYekAQ@mail.gmail.com>
-Message-ID: <20170324091558.l2gmqqyced3d345o@pengutronix.de>
+From: adrian.hunter@intel.com (Adrian Hunter)
+Date: Fri, 24 Mar 2017 11:19:13 +0200
+Subject: [PATCH] mmc: core: Do not hold re-tuning during CMD6 commands
+In-Reply-To: <1490344369.22814.10.camel@mhfsdcap03>
+References: <1490336341-22292-1-git-send-email-chaotian.jing@mediatek.com>
+ <1490336341-22292-2-git-send-email-chaotian.jing@mediatek.com>
+ <13a83728-0031-5683-c371-4b517df32299@intel.com>
+ <1490344369.22814.10.camel@mhfsdcap03>
+Message-ID: <03d54000-9ced-1b31-df80-d254f02433db@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 24, 2017 at 09:59:04AM +0100, Geert Uytterhoeven wrote:
-> Hi Uwe,
+On 24/03/17 10:32, Chaotian Jing wrote:
+> On Fri, 2017-03-24 at 09:52 +0200, Adrian Hunter wrote:
+>> On 24/03/17 08:19, Chaotian Jing wrote:
+>>> this patch is refine for 'commit c6dbab9cb58f ("mmc: core: Hold re-tuning
+>>> during switch commands")'
+>>> Since it has 3 retries at max for CMD6, if the first CMD6 got CRC error,
+>>> then should do re-tune before the next CMD6 was sent.
+>>>
+>>> Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+>>> ---
+>>>  drivers/mmc/core/mmc_ops.c |    3 +--
+>>>  1 file changed, 1 insertion(+), 2 deletions(-)
+>>>
+>>> diff --git a/drivers/mmc/core/mmc_ops.c b/drivers/mmc/core/mmc_ops.c
+>>> index fe80f26..6931927 100644
+>>> --- a/drivers/mmc/core/mmc_ops.c
+>>> +++ b/drivers/mmc/core/mmc_ops.c
+>>> @@ -534,8 +534,6 @@ int __mmc_switch(struct mmc_card *card, u8 set, u8 index, u8 value,
+>>>  	bool use_r1b_resp = use_busy_signal;
+>>>  	unsigned char old_timing = host->ios.timing;
+>>>  
+>>> -	mmc_retune_hold(host);
+>>> -
+>>>  	/*
+>>>  	 * If the cmd timeout and the max_busy_timeout of the host are both
+>>>  	 * specified, let's validate them. A failure means we need to prevent
+>>> @@ -567,6 +565,7 @@ int __mmc_switch(struct mmc_card *card, u8 set, u8 index, u8 value,
+>>>  		cmd.sanitize_busy = true;
+>>>  
+>>>  	err = mmc_wait_for_cmd(host, &cmd, MMC_CMD_RETRIES);
+>>> +	mmc_retune_hold(host);
+>>
+>> That is not how mmc_retune_hold() works, you need mmc_retune_hold_now() as
+>> it is here:
+>>
+>> 	https://marc.info/?l=linux-mmc&m=148940903816582
+>>
+>> But using "retries" with commands that have busy-waiting on the data line
+>> doesn't make much sense anyway.  Particularly with CRC errors, I would
+>> expect the card is actually busily doing the switch and we need only to wait
+>> for it.  The same can be true for timeout errors.  For some CMD6 we might
+>> need to send CMD12 if the card is busy after an error.  I would prefer an
+>> explicit attempt at recovery from CMD6 errors.
+>>
 > 
-> On Fri, Mar 24, 2017 at 9:39 AM, Uwe Kleine-K?nig
-> <u.kleine-koenig@pengutronix.de> wrote:
-> > On Fri, Mar 24, 2017 at 09:29:02AM +0100, Geert Uytterhoeven wrote:
-> >> On Fri, Mar 24, 2017 at 9:00 AM, Uwe Kleine-K?nig
-> >> <u.kleine-koenig@pengutronix.de> wrote:
-> >> > From: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> >> > Subject: [PATCH] gpiod: let get_optional return NULL in some cases with GPIOLIB disabled
-> >> >
-> >> > People disagree if gpiod_get_optional should return NULL or
-> >> > ERR_PTR(-ENOSYS) if GPIOLIB is disabled. The argument for NULL is that
-> >> > the person who decided to disable GPIOLIB is assumed to know that there
-> >> > is no GPIO. The reason to stick to ERR_PTR(-ENOSYS) is that it might
-> >> > introduce hard to debug problems if that decision is wrong.
-> >> >
-> >> > So this patch introduces a compromise and let gpiod_get_optional (and
-> >> > its variants) return NULL if the device in question cannot have an
-> >> > associated GPIO because it is neither instantiated by a device tree nor
-> >> > by ACPI.
-> >> >
-> >> > This should handle most cases that are argued about.
-> >> >
-> >> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> >> > ---
-> >> >  include/linux/gpio/consumer.h | 55 ++++++++++++++++++++++++++++++++++++-------
-> >> >  1 file changed, 46 insertions(+), 9 deletions(-)
-> >> >
-> >> > diff --git a/include/linux/gpio/consumer.h b/include/linux/gpio/consumer.h
-> >> > index fb0fde686cb1..0ca29889290d 100644
-> >> > --- a/include/linux/gpio/consumer.h
-> >> > +++ b/include/linux/gpio/consumer.h
-> >> > @@ -161,20 +161,48 @@ gpiod_get_index(struct device *dev,
-> >> >         return ERR_PTR(-ENOSYS);
-> >> >  }
-> >> >
-> >> > -static inline struct gpio_desc *__must_check
-> >> > -gpiod_get_optional(struct device *dev, const char *con_id,
-> >> > -                  enum gpiod_flags flags)
-> >> > +static inline bool __gpiod_no_optional_possible(struct device *dev)
-> >> >  {
-> >> > -       return ERR_PTR(-ENOSYS);
-> >> > +       /*
-> >> > +        * gpiod_get_optional et al can only provide a GPIO if at least one of
-> >> > +        * the backends for specifing a GPIO is available. These are device
-> >> > +        * tree, ACPI and gpiolib's lookup tables. The latter isn't available if
-> >> > +        * GPIOLIB is disabled (which is the case here).
-> >> > +        * So if the provided device is unrelated to device tree and ACPI, we
-> >> > +        * can be sure that there is no optional GPIO and let gpiod_get_optional
-> >> > +        * safely return NULL.
-> >> > +        * Otherwise there is still a chance that there is no GPIO but we cannot
-> >> > +        * be sure without having to enable a part of GPIOLIB (i.e. the lookup
-> >> > +        * part). So lets play safe and return an error. (Though there are also
-> >> > +        * arguments that returning NULL then would be beneficial.)
-> >> > +        */
-> >> > +
-> >> > +       if (IS_ENABLED(CONFIG_OF) && dev && dev->of_node)
-> >> > +               return false;
-> >>
-> >> At first sight, I though this was OK:
-> >>
-> >>   1. On ARM with DT, we can assume CONFIG_GPIOLOB=y.
-> >>
-> >>   2. I managed to configure an SH kernel with CONFIG_GPIOLOB=n, CONFIG_OF=y,
-> >>      and CONFIG_SERIAL_SH_SCI=y, but since SH boards with SH-SCI UARTs do
-> >>      not use DT (yet), the check for dev->of_node (false) should handle
-> >>      that.
-> >>
-> >>   3. However, I managed to do the same for h8300, which does use DT. Hence
-> >>      if mctrl_gpio would start relying on gpiod_get_optional(), this would
-> >>      break the sh-sci driver on h8300 :-(
-> >>      Note that h8300 doesn't have any GPIO drivers (yet?), so
-> >>      CONFIG_GPIPOLIB=n makes perfect sense!
-> >
-> > Thanks for your efforts.
-> 
-> You're welcome.
-> 
-> >> So I'm afraid the only option is to always return NULL, and put the
-> >> responsability on the shoulders of the system integrator...
-> >
-> > The gpio lines could be provided by an i2c gpio adapter, right? So IMHO
-> > you don't need platform gpios to justify -ENODEV. So I guess that's a
-> > case where we don't come to an agreement.
-> 
-> While you can enable I2C without further dependencies, no I2C GPIO expander
-> will be offered... unless you have enabled CONFIG_GPIOLIB first.
+> It's the host driver's responsibility to ensure card is not in busy
+> state before issue the next R1B command, or the MMC core layer needs do
+> extra check/waiting before issue a R1B command.
 
-And that is expected, still the device tree could reference such a GPIO
-and thus create a situation where Dmitry's and my judgement disagree.
+Better to deal with cards stuck in busy from the places where busy-waiting
+is expected.
 
-So I think my suggestion is the best we could do now. It minimizes the
-number of cases where we disagree. The next best thing would be to
-implement that half gpiolib stuff (i.e. do the full lookup to be sure
-there is no gpio) but this comes at a price: We need some time to
-implement it and it adds a bit to the kernel size.
+> I think the purpose of "re-tune" is trying to cover particular case(eg.
+> voltage fluctuate or EMI or some glitch of host/device which caused CRC
+> error)
 
-Best regards
-Uwe
- 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+No, re-tuning is to compensate for drift caused primarily by temperature change.
+
+> error) , but in such cases, too many cases are disable re-tune function
+> by mmc_retune_hold(), for example, in this case, if a response CRC error
+> got then we never have chance to recover it. then cause system cannot
+> access emmc or suspend/resume fail.
+
+Maybe you have a hardware problem.
