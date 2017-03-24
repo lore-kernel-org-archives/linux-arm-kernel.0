@@ -1,114 +1,122 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 24 Mar 2017 15:55:33 +0000
-Subject: [PATCH] arm64: ptrace: Crystallise the pt_regs->syscallno = ~0UL idiom
-Message-ID: <1490370933-24057-1-git-send-email-Dave.Martin@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 24 Mar 2017 15:57:41 +0000
+Subject: [PATCH v4 28/28] arm/arm64: Add hyp-stub API documentation
+In-Reply-To: <20170324152340.GG25903@cbox>
+References: <20170321192058.9300-1-marc.zyngier@arm.com>
+ <20170321192058.9300-29-marc.zyngier@arm.com> <20170324143316.GA25903@cbox>
+ <ff4fe929-98f0-de0e-2f1a-d06c7969d5e0@arm.com> <20170324152340.GG25903@cbox>
+Message-ID: <ea653ce3-e85a-a42a-9b4f-a5d1daabf871@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Assigning ~0UL to pt_regs->syscallno to indicate that a task is not
-executing a syscall is a little obscure.
+On 24/03/17 15:23, Christoffer Dall wrote:
+> On Fri, Mar 24, 2017 at 02:42:13PM +0000, Marc Zyngier wrote:
+>> On 24/03/17 14:33, Christoffer Dall wrote:
+>>> On Tue, Mar 21, 2017 at 07:20:58PM +0000, Marc Zyngier wrote:
+>>>> In order to help people understanding the hyp-stub API that exists
+>>>> between the host kernel and the hypervisor mode (whether a hypervisor
+>>>> has been installed or not), let's document said API.
+>>>>
+>>>> As with any form of documentation, I expect it to become obsolete
+>>>> and completely misleading within 20 minutes after having being merged.
+>>>
+>>> I don't think this last sentence belongs in the commit message.
+>>>
+>>>>
+>>>> Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
+>>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>>>> ---
+>>>>  Documentation/virtual/kvm/arm/hyp-abi.txt | 45 +++++++++++++++++++++++++++++++
+>>>>  1 file changed, 45 insertions(+)
+>>>>  create mode 100644 Documentation/virtual/kvm/arm/hyp-abi.txt
+>>>>
+>>>> diff --git a/Documentation/virtual/kvm/arm/hyp-abi.txt b/Documentation/virtual/kvm/arm/hyp-abi.txt
+>>>> new file mode 100644
+>>>> index 000000000000..a1e0314d2249
+>>>> --- /dev/null
+>>>> +++ b/Documentation/virtual/kvm/arm/hyp-abi.txt
+>>>> @@ -0,0 +1,45 @@
+>>>> +* Internal ABI between the kernel and HYP
+>>>> +
+>>>> +This file documents the interaction between the Linux kernel and the
+>>>> +hypervisor layer when running Linux as a hypervisor (for example
+>>>> +KVM). It doesn't cover the interaction of the kernel with the
+>>>> +hypervisor when running as a guest (under Xen, KVM or any other
+>>>> +hypervisor), or any hypervisor-specific interaction when the kernel is
+>>>> +used as a host.
+>>>> +
+>>>> +On arm and arm64 (without VHE), the kernel doesn't run in hypervisor
+>>>> +mode, but still needs to interact with it, allowing a built-in
+>>>> +hypervisor to be either installed or torn down.
+>>>> +
+>>>> +In order to achieve this, the kernel must be booted at HYP (arm) or
+>>>> +EL2 (arm64), allowing it to install a set of stubs before dropping to
+>>>> +SVC/EL1. These stubs are accessible by using a 'hvc #0' instruction,
+>>>> +and only act on individual CPUs.
+>>>> +
+>>>> +Unless specified otherwise, any built-in hypervisor must implement
+>>>> +these functions (see arch/arm{,64}/include/asm/virt.h):
+>>>> +
+>>>> +* r0/x0 = HVC_SET_VECTORS
+>>>> +  r1/x1 = vectors
+>>>> +
+>>>> +  Set HVBAR/VBAR_EL2 to 'vectors' to enable a hypervisor. 'vectors'
+>>>> +  must be a physical address, and respect the alignment requirements
+>>>> +  of the architecture. Only implemented by the initial stubs.
+>>>
+>>> Does this last sentence mean that KVM doesn't implement this function?
+>>
+>> Indeed. 
+> 
+> I think the wording could be improved to "Only implemented by the
+> initial stubs, not by Linux hypervisors."
 
-This patch defines a helper zap_syscall() to make users of this
-idiom and its intent a bit more readable.  This concept allows
-relaxations to the system call ABI whereby not all userspace state
-need be preserved by the kernel around an explicit syscall.  The
-Scalable Vector Extension ABI will make use of this with regard
-to the extra register state added by SVE.
+Looks good to me, I'll use that.
 
-No relaxation of the _existing_ system call ABI is implied here.
+>> Directly setting the vectors is inherently unsafe (MMU could
+>> still be ON, for example), hence the HVC_SET_VECTORS operation that
+>> allow this to be done safely (RESET followed by SET).
+>>
+> 
+> Hmm, is it any less safe than setting the vectors using the hyp stubs?
+> In the initial case, we're relying on the caller knowing that the MMU is
+> off, and that the stubs are in place, otherwise it doesn't make sense.
 
-Signed-off-by: Dave Martin <Dave.Martin@arm.com>
----
- arch/arm64/include/asm/processor.h | 7 ++++++-
- arch/arm64/kernel/ptrace.c         | 3 ++-
- arch/arm64/kernel/signal.c         | 4 ++--
- arch/arm64/kernel/signal32.c       | 3 ++-
- 4 files changed, 12 insertions(+), 5 deletions(-)
+That's why I was implying here that RESET+SET is the safe way of doing
+it. Another solution may be to make SET imply RESET, and keep it
+implemented always?
 
-diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
-index c97b8bd..0502007 100644
---- a/arch/arm64/include/asm/processor.h
-+++ b/arch/arm64/include/asm/processor.h
-@@ -104,10 +104,15 @@ struct thread_struct {
- 
- #define INIT_THREAD  {	}
- 
-+static inline void zap_syscall(struct pt_regs *regs)
-+{
-+	regs->syscallno = ~0UL;
-+}
-+
- static inline void start_thread_common(struct pt_regs *regs, unsigned long pc)
- {
- 	memset(regs, 0, sizeof(*regs));
--	regs->syscallno = ~0UL;
-+	zap_syscall(regs);
- 	regs->pc = pc;
- }
- 
-diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
-index c142459..d92b422 100644
---- a/arch/arm64/kernel/ptrace.c
-+++ b/arch/arm64/kernel/ptrace.c
-@@ -42,6 +42,7 @@
- #include <asm/compat.h>
- #include <asm/debug-monitors.h>
- #include <asm/pgtable.h>
-+#include <asm/processor.h>
- #include <asm/syscall.h>
- #include <asm/traps.h>
- #include <asm/system_misc.h>
-@@ -1348,7 +1349,7 @@ static void tracehook_report_syscall(struct pt_regs *regs,
- 	if (dir == PTRACE_SYSCALL_EXIT)
- 		tracehook_report_syscall_exit(regs, 0);
- 	else if (tracehook_report_syscall_entry(regs))
--		regs->syscallno = ~0UL;
-+		zap_syscall(regs);
- 
- 	regs->regs[regno] = saved_reg;
- }
-diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
-index 49c30df..1aef3d7 100644
---- a/arch/arm64/kernel/signal.c
-+++ b/arch/arm64/kernel/signal.c
-@@ -351,7 +351,7 @@ static int restore_sigframe(struct pt_regs *regs,
- 	/*
- 	 * Avoid sys_rt_sigreturn() restarting.
- 	 */
--	regs->syscallno = ~0UL;
-+	zap_syscall(regs);
- 
- 	err |= !valid_user_regs(&regs->user_regs, current);
- 	if (err == 0)
-@@ -634,7 +634,7 @@ static void do_signal(struct pt_regs *regs)
- 		/*
- 		 * Avoid additional syscall restarting via ret_to_user.
- 		 */
--		regs->syscallno = ~0UL;
-+		zap_syscall(regs);
- 
- 		/*
- 		 * Prepare for system call restart. We do this here so that a
-diff --git a/arch/arm64/kernel/signal32.c b/arch/arm64/kernel/signal32.c
-index c747a0f..53f1cc0 100644
---- a/arch/arm64/kernel/signal32.c
-+++ b/arch/arm64/kernel/signal32.c
-@@ -27,6 +27,7 @@
- #include <asm/fpsimd.h>
- #include <asm/signal32.h>
- #include <linux/uaccess.h>
-+#include <asm/processor.h>
- #include <asm/unistd.h>
- 
- struct compat_sigcontext {
-@@ -354,7 +355,7 @@ static int compat_restore_sigframe(struct pt_regs *regs,
- 	/*
- 	 * Avoid compat_sys_sigreturn() restarting.
- 	 */
--	regs->syscallno = ~0UL;
-+	zap_syscall(regs);
- 
- 	err |= !valid_user_regs(&regs->user_regs, current);
- 
+> But I think the point is just that we don't have a need to change the
+> vector from within KVM; we only have a need to set the vector when going
+> from stub->kvm, and we have a need to reset the whole thing (including
+> turning off the MMU) when going from kvm->stub.
+
+Exactly. The current API doesn't try to cater for all possible cases. It
+just make sure that KVM can be installed and torn down safely.
+
+> Anyhow, my comment was just about the wording, as I had some nagging
+> doubt when I read the patch.
+> 
+>>>
+>>>> +
+>>>> +* r0/x0 = HVC_RESET_VECTORS
+>>>> +
+>>>> +  Turn HYP/EL2 MMU off, and reset HVBAR/VBAR_EL2 to the default
+>>>> +  value. This effectively disables an existing hypervisor.
+>>>
+>>> What's the 'default value' ?  Could we say to the physical address of
+>>> the hypervisor stub's exception vector?
+>>
+>> Shouldn't that be the kernel stub's exception vector?
+>>
+> 
+> Yeah, the "initials stubs' exception vector" is probably the most
+> coherent thing we can use here.
+
+I'll use that when respinning it.
+
+Thanks,
+
+	M.
 -- 
-2.1.4
+Jazz is not dead. It just smells funny...
