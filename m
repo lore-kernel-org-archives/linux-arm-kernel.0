@@ -1,110 +1,75 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 24 Mar 2017 13:24:10 +0000
-Subject: [PATCH 4/4] ef/libstub: arm/arm64: randomize the base of the UEFI rt
- services region
-In-Reply-To: <20170324132410.16628-1-ard.biesheuvel@linaro.org>
-References: <20170324132410.16628-1-ard.biesheuvel@linaro.org>
-Message-ID: <20170324132410.16628-5-ard.biesheuvel@linaro.org>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Fri, 24 Mar 2017 14:37:43 +0100
+Subject: [PATCH/RFC v2 0/2] arm64: dts: r8a7795: Add support for R-Car H3 ES2.0
+Message-ID: <1490362665-4422-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update the allocation logic for the virtual mapping of the UEFI runtime
-services to start from a randomized base address if KASLR is in effect,
-and if the UEFI firmware exposes an implementation of EFI_RNG_PROTOCOL.
+	Hi all,
 
-This makes it more difficult to predict the location of exploitable
-data structures in the runtime UEFI firmware, which increases robustness
-against attacks. Note that these regions are only mapped during the
-time a runtime service call is in progress, and only on a single CPU
-at a time, bit give the lack of a downside, let's enable it nonetheless.
+This patch series adds preliminary support for Renesas Salvator-X
+development boards equipped with revision ES2.0 of the R-Car H3 Soc.
 
-Cc: Ingo Molnar <mingo@kernel.org>
-Cc: Borislav Petkov <bp@alien8.de>
-Cc: Matt Fleming <matt@codeblueprint.co.uk>
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- drivers/firmware/efi/libstub/arm-stub.c | 48 ++++++++++++++------
- 1 file changed, 35 insertions(+), 13 deletions(-)
+  - Patch 1 adds support for the R-Car H3 ES2.0 Soc,
+    While this patch is safe as-is, as it doesn't affect any existing
+    setups, it's probably a bit premature to apply it.
+  - Patch 2 adds support for Salvator-X boards with R-Car H3 ES2.0.
+    This patch does affect existing development setups, as it changes the
+    name of the DTB for Salvator-X boards equipped with ES1.x SoCs.
+    Given most developers have access to ES1.x only, this patch must not be
+    applied yet.
 
-diff --git a/drivers/firmware/efi/libstub/arm-stub.c b/drivers/firmware/efi/libstub/arm-stub.c
-index 6f522e3091af..eb5225884098 100644
---- a/drivers/firmware/efi/libstub/arm-stub.c
-+++ b/drivers/firmware/efi/libstub/arm-stub.c
-@@ -18,6 +18,22 @@
- 
- #include "efistub.h"
- 
-+/*
-+ * This is the base address at which to start allocating virtual memory ranges
-+ * for UEFI Runtime Services. This is in the low TTBR0 range so that we can use
-+ * any allocation we choose, and eliminate the risk of a conflict after kexec.
-+ * The value chosen is the largest non-zero power of 2 suitable for this purpose
-+ * both on 32-bit and 64-bit ARM CPUs, to maximize the likelihood that it can
-+ * be mapped efficiently.
-+ * Since 32-bit ARM could potentially execute with a 1G/3G user/kernel split,
-+ * map everything below 1 GB. (512 MB is a reasonable upper bound for the
-+ * entire footprint of the UEFI runtime services memory regions)
-+ */
-+#define EFI_RT_VIRTUAL_BASE	SZ_512M
-+#define EFI_RT_VIRTUAL_SIZE	SZ_512M
-+
-+static u64 efi_virt_base = EFI_RT_VIRTUAL_BASE;
-+
- efi_status_t efi_open_volume(efi_system_table_t *sys_table_arg,
- 			     void *__image, void **__fh)
- {
-@@ -209,6 +225,25 @@ unsigned long efi_entry(void *handle, efi_system_table_t *sys_table,
- 
- 	efi_random_get_seed(sys_table);
- 
-+	if (IS_ENABLED(CONFIG_RANDOMIZE_BASE) && !nokaslr()) {
-+		/*
-+		 * Randomize the base of the UEFI runtime services region.
-+		 * Preserve the 2 MB alignment of the region by taking a
-+		 * shift of 21 bit positions into account when scaling
-+		 * the headroom value using a 32-bit random value.
-+		 */
-+		u64 headroom = TASK_SIZE - EFI_RT_VIRTUAL_BASE -
-+			       EFI_RT_VIRTUAL_SIZE;
-+		u32 rnd;
-+
-+		status = efi_get_random_bytes(sys_table, sizeof(rnd),
-+					      (u8 *)&rnd);
-+		if (status == EFI_SUCCESS) {
-+			efi_virt_base = EFI_RT_VIRTUAL_BASE +
-+					(((headroom >> 21) * rnd) >> (32 - 21));
-+		}
-+	}
-+
- 	new_fdt_addr = fdt_addr;
- 	status = allocate_new_fdt_and_exit_boot(sys_table, handle,
- 				&new_fdt_addr, efi_get_max_fdt_addr(dram_base),
-@@ -238,18 +273,6 @@ unsigned long efi_entry(void *handle, efi_system_table_t *sys_table,
- 	return EFI_ERROR;
- }
- 
--/*
-- * This is the base address at which to start allocating virtual memory ranges
-- * for UEFI Runtime Services. This is in the low TTBR0 range so that we can use
-- * any allocation we choose, and eliminate the risk of a conflict after kexec.
-- * The value chosen is the largest non-zero power of 2 suitable for this purpose
-- * both on 32-bit and 64-bit ARM CPUs, to maximize the likelihood that it can
-- * be mapped efficiently.
-- * Since 32-bit ARM could potentially execute with a 1G/3G user/kernel split,
-- * map everything below 1 GB.
-- */
--#define EFI_RT_VIRTUAL_BASE	SZ_512M
--
- static int cmp_mem_desc(const void *l, const void *r)
- {
- 	const efi_memory_desc_t *left = l, *right = r;
-@@ -299,7 +322,6 @@ void efi_get_virtmap(efi_memory_desc_t *memory_map, unsigned long map_size,
- 		     unsigned long desc_size, efi_memory_desc_t *runtime_map,
- 		     int *count)
- {
--	u64 efi_virt_base = EFI_RT_VIRTUAL_BASE;
- 	efi_memory_desc_t *in, *prev = NULL, *out = runtime_map;
- 	int l;
- 
+Note that for now, it is assumed that all H3ULCB boards are equipped with
+R-Car H3 ES1.x.
+
+For changes compared to v1 (which was not posted), please refer to the
+individual patches.
+
+Dependencies:
+  - renesas-devel-20170324-v4.11-rc3,
+  - [PATCH v2 0/4] clk: renesas: Add support for R-Car H3 ES2.0,
+  - [PATCH v2 0/4] pinctrl: sh-pfc: Add support for R-Car H3 ES2.0,
+  - [PATCH 0/3] soc: renesas: rcar-sysc: Add support for R-Car H3 ES2.0.
+
+To do:
+  - Reduce duplication by sharing Salvator-X board description.
+
+For testers, this series is available in the topic/r8a7795es2-dt-v2 branch
+of my renesas-drivers git repository at
+git://git.kernel.org/pub/scm/linux/kernel/git/geert/renesas-drivers.git.
+
+An integration branch (incl. all dependencies) for testing is provided as
+topic/r8a7795es2-integration.  I plan to update this branch when any of the
+dependencies are updated.
+
+This has been tested on Salvator-X with R-Car H3 ES1.0 and ES2.0 SoCs.
+
+Thanks for your comments!
+
+Geert Uytterhoeven (2):
+  arm64: dts: r8a7795: Add support for R-Car H3 ES2.0
+  arm64: dts: r8a7795: salvator-x: Add support for R-Car H3 ES2.0
+
+ arch/arm64/boot/dts/renesas/Makefile               |  1 +
+ ...5-salvator-x.dts => r8a7795-es1-salvator-x.dts} |  4 +-
+ arch/arm64/boot/dts/renesas/r8a7795-es1.dtsi       | 83 ++++++++++++++++++++++
+ arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts     |  4 +-
+ arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts |  2 +-
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi           | 70 +-----------------
+ 6 files changed, 90 insertions(+), 74 deletions(-)
+ copy arch/arm64/boot/dts/renesas/{r8a7795-salvator-x.dts => r8a7795-es1-salvator-x.dts} (99%)
+ create mode 100644 arch/arm64/boot/dts/renesas/r8a7795-es1.dtsi
+
 -- 
-2.9.3
+2.7.4
+
+Gr{oetje,eeting}s,
+
+						Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+							    -- Linus Torvalds
