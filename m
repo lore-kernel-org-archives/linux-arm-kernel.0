@@ -1,26 +1,15 @@
 From: jagan@openedev.com (Jagan Teki)
-Date: Fri, 24 Mar 2017 21:48:46 +0530
-Subject: [PATCH v2 11/15] ARM: dts: imx6qdl-icore-rqs: Replace codec 'lable:
- node@addr'
+Date: Fri, 24 Mar 2017 21:48:50 +0530
+Subject: [PATCH v2 15/15] ARM: dts: imx6ul-isiot: Add FEC node support
 In-Reply-To: <1490372330-5611-1-git-send-email-jagan@openedev.com>
 References: <1490372330-5611-1-git-send-email-jagan@openedev.com>
-Message-ID: <1490372330-5611-12-git-send-email-jagan@openedev.com>
+Message-ID: <1490372330-5611-16-git-send-email-jagan@openedev.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jagan Teki <jagan@amarulasolutions.com>
 
-According to devicetree specification from ePAPER v1.1
-[label:] node-name[@unit-address] { };
-
-label: should be human readable string describing a device.
-node-name: The name of a node should be somewhat generic,
-reflecting the function of the device and not its
-unit-address: match the first address specified in the
-reg property of the node and shouldn't have leading zeros.
-
-So replaced
-codec: sgtl5000 at 0a => sgtl5000: codec at a
+Add support for fec1 node on Engicam Is.IoT variant boards.
 
 Cc: Shawn Guo <shawnguo@kernel.org>
 Cc: Matteo Lisi <matteo.lisi@engicam.com>
@@ -30,49 +19,59 @@ Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 Changes for v2:
 - Newly added patch
 
- arch/arm/boot/dts/imx6dl-icore-rqs.dts   | 2 +-
- arch/arm/boot/dts/imx6q-icore-rqs.dts    | 2 +-
- arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi | 2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/imx6ul-isiot.dtsi | 33 +++++++++++++++++++++++++++++++++
+ 1 file changed, 33 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx6dl-icore-rqs.dts b/arch/arm/boot/dts/imx6dl-icore-rqs.dts
-index 5b4c14c..053e7cb 100644
---- a/arch/arm/boot/dts/imx6dl-icore-rqs.dts
-+++ b/arch/arm/boot/dts/imx6dl-icore-rqs.dts
-@@ -51,7 +51,7 @@
+diff --git a/arch/arm/boot/dts/imx6ul-isiot.dtsi b/arch/arm/boot/dts/imx6ul-isiot.dtsi
+index 9648de9..34a39c7 100644
+--- a/arch/arm/boot/dts/imx6ul-isiot.dtsi
++++ b/arch/arm/boot/dts/imx6ul-isiot.dtsi
+@@ -114,6 +114,24 @@
+ 	status = "okay";
  };
  
- &i2c3 {
--	codec: sgtl5000 at 0a {
-+	sgtl5000: codec at a {
- 		compatible = "fsl,sgtl5000";
- 		reg = <0x0a>;
- 		clocks = <&clks IMX6QDL_CLK_CKO>;
-diff --git a/arch/arm/boot/dts/imx6q-icore-rqs.dts b/arch/arm/boot/dts/imx6q-icore-rqs.dts
-index 441a28e5..d45e4f5 100644
---- a/arch/arm/boot/dts/imx6q-icore-rqs.dts
-+++ b/arch/arm/boot/dts/imx6q-icore-rqs.dts
-@@ -50,7 +50,7 @@
++&fec1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_enet1>;
++	phy-mode = "rmii";
++	phy-handle = <&ethphy0>;
++	status = "okay";
++
++	mdio {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		ethphy0: ethernet-phy at 0 {
++			compatible = "ethernet-phy-ieee802.3-c22";
++			reg = <0>;
++		};
++	};
++};
++
+ &pwm8 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_pwm8>;
+@@ -144,6 +162,21 @@
  };
  
- &i2c3 {
--	codec: sgtl5000 at 0a {
-+	sgtl5000: codec at a {
- 		compatible = "fsl,sgtl5000";
- 		reg = <0x0a>;
- 		clocks = <&clks IMX6QDL_CLK_CKO>;
-diff --git a/arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi b/arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi
-index 4032d38..d24e531 100644
---- a/arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi
-@@ -123,7 +123,7 @@
- 		compatible = "fsl,imx-audio-sgtl5000";
- 		model = "imx-audio-sgtl5000";
- 		ssi-controller = <&ssi1>;
--		audio-codec = <&codec>;
-+		audio-codec = <&sgtl5000>;
- 		audio-routing =
- 			"MIC_IN", "Mic Jack",
- 			"Mic Jack", "Mic Bias",
+ &iomuxc {
++	pinctrl_enet1: enet1grp {
++		fsl,pins = <
++			MX6UL_PAD_ENET2_RX_DATA0__ENET1_MDIO	0x1b0b0
++			MX6UL_PAD_ENET2_RX_DATA1__ENET1_MDC	0x1b0b0
++			MX6UL_PAD_ENET1_RX_EN__ENET1_RX_EN	0x1b0b0
++			MX6UL_PAD_ENET1_RX_DATA0__ENET1_RDATA00	0x1b0b0
++			MX6UL_PAD_ENET1_RX_DATA1__ENET1_RDATA01	0x1b0b0
++			MX6UL_PAD_ENET1_TX_EN__ENET1_TX_EN	0x1b0b0
++			MX6UL_PAD_ENET1_TX_DATA0__ENET1_TDATA00	0x1b0b0
++			MX6UL_PAD_ENET1_TX_DATA1__ENET1_TDATA01	0x1b0b0
++			MX6UL_PAD_ENET1_TX_CLK__ENET1_REF_CLK1	0x4001b031
++			MX6UL_PAD_ENET2_RX_EN__GPIO2_IO10	0x1b0b0
++		>;
++	};
++
+ 	pinctrl_i2c1: i2c1grp {
+ 		fsl,pins = <
+ 			MX6UL_PAD_UART4_TX_DATA__I2C1_SCL 0x4001b8b0
 -- 
 1.9.1
