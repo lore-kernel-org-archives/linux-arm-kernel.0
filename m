@@ -1,49 +1,66 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Fri, 24 Mar 2017 21:09:36 +0800
-Subject: [PATCH 07/12] ARM: dts: imx6ul-isiot: Add Sound card with codec
- node
-In-Reply-To: <CAMty3ZBSVgL==LsCzsODkL117WFL4Pv4kwhXhxc3wDWre3i-zA@mail.gmail.com>
-References: <1490204897-14525-1-git-send-email-jagan@openedev.com>
- <1490204897-14525-8-git-send-email-jagan@openedev.com>
- <20170324052324.GF30608@dragon>
- <CAMty3ZBSVgL==LsCzsODkL117WFL4Pv4kwhXhxc3wDWre3i-zA@mail.gmail.com>
-Message-ID: <20170324130934.GO30608@dragon>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 24 Mar 2017 13:23:13 +0000
+Subject: [PATCH RFC 1/3] thermal: allow hwmon devices to be created for
+ of-thermal zones
+In-Reply-To: <20170320171552.o2ye73c2okcvhluq@rob-hp-laptop>
+References: <E1cn8qC-0002uz-PB@rmk-PC.armlinux.org.uk>
+ <20170320171552.o2ye73c2okcvhluq@rob-hp-laptop>
+Message-ID: <20170324132312.GF7909@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 24, 2017 at 02:02:38PM +0530, Jagan Teki wrote:
-> On Fri, Mar 24, 2017 at 10:53 AM, Shawn Guo <shawnguo@kernel.org> wrote:
-> > On Wed, Mar 22, 2017 at 11:18:12PM +0530, Jagan Teki wrote:
-> >> From: Jagan Teki <jagan@amarulasolutions.com>
-> >>
-> >> Add support for Sound card and related codec(via i2c1) nodes
-> >> on Engicam Is.IoT MX6UL variant module boards.
-> >>
-> >> Cc: Shawn Guo <shawnguo@kernel.org>
-> >> Cc: Matteo Lisi <matteo.lisi@engicam.com>
-> >> Cc: Michael Trimarchi <michael@amarulasolutions.com>
-> >> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-> >> ---
-> >>  arch/arm/boot/dts/imx6ul-isiot-common.dtsi | 11 +++++++++++
-> >>  arch/arm/boot/dts/imx6ul-isiot.dtsi        | 30 ++++++++++++++++++++++++++++++
-> >>  2 files changed, 41 insertions(+)
-> >>
-> >> diff --git a/arch/arm/boot/dts/imx6ul-isiot-common.dtsi b/arch/arm/boot/dts/imx6ul-isiot-common.dtsi
-> >> index b149b5e..c79fa42 100644
-> >> --- a/arch/arm/boot/dts/imx6ul-isiot-common.dtsi
-> >> +++ b/arch/arm/boot/dts/imx6ul-isiot-common.dtsi
-> >> @@ -41,6 +41,17 @@
-> >>   */
-> >>
-> >>  &i2c1 {
-> >> +     codec: sgtl5000 at 0a {
-> >
-> >         sgtl5000: codec at a {
+On Mon, Mar 20, 2017 at 12:15:52PM -0500, Rob Herring wrote:
+> On Sun, Mar 12, 2017 at 07:07:40PM +0000, Russell King wrote:
+> > Allow hwmon devices to be optionally created for of-thermal zones,
+> > rather than permanently denying them "in case" there is a hwmon
+> > driver duplicating the thermal driver.
+> > 
+> > Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+> > ---
+> > Without this, "sensors" is unable to report the temperature of the
+> > Dove SoC when it supports thermal zones.
+> > 
+> >  Documentation/devicetree/bindings/thermal/thermal.txt | 3 +++
+> >  arch/arm/boot/dts/dove.dtsi                           | 1 +
+> >  drivers/thermal/of-thermal.c                          | 3 ++-
+> >  3 files changed, 6 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/thermal/thermal.txt b/Documentation/devicetree/bindings/thermal/thermal.txt
+> > index 88b6ea1ad290..1478735fff85 100644
+> > --- a/Documentation/devicetree/bindings/thermal/thermal.txt
+> > +++ b/Documentation/devicetree/bindings/thermal/thermal.txt
+> > @@ -175,6 +175,9 @@ containing trip nodes and one sub-node containing all the zone cooling maps.
+> >  			2000mW, while on a 10'' tablet is around
+> >  			4500mW.
+> >  
+> > +- linux,hwmon:		Allow Linux to create hwmon devices for the thermal
+> > +  Type: bool		zone.
+> > +
+> >  Note: The delay properties are bound to the maximum dT/dt (temperature
+> >  derivative over time) in two situations for a thermal zone:
+> >  (i)  - when passive cooling is activated (polling-delay-passive); and
+> > diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
+> > index 40fb98687230..00f5971cd039 100644
+> > --- a/arch/arm/boot/dts/dove.dtsi
+> > +++ b/arch/arm/boot/dts/dove.dtsi
+> > @@ -804,6 +804,7 @@
+> >  
+> >  	thermal-zones {
+> >  		soc-thermal {
+> > +			linux,hwmon;
 > 
-> Just to understand, why codec: sgtl5000 at 0a not a suitable notation?
-> couldn't see any Documentation.
+> I'd prefer to see a black or white list of sensor compatibles here. Then 
+> the dtb doesn't need to change if things move between hwmon and thermal 
+> zones.
 
-The node name should be generic.  Please see ePAPR '2.2.2 Generic Names
-Recommendation'.  Also, the unit-address shouldn't have leading zeros.
+I'm not sure what you mean, and I can't see how that would be coded up.
+The thermal layer doesn't give the option of individually selecting
+which sensors have hwmon stuff created - it seems to be all or nothing.
+I suspect what you're asking would require something of a rewrite of
+the thermal code.  The sensors are registered completely independently
+of parsing the thermal zone data.
 
-Shawn
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
