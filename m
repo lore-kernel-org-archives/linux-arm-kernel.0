@@ -1,62 +1,70 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 24 Mar 2017 18:16:53 +0000
-Subject: Query: ARM64: A random failure with hugetlbfs linked mmap() of a
- stack area
-In-Reply-To: <2b8bf63f-3e20-aa26-2d75-83aa2ab35cde@redhat.com>
-References: <4e776e1f-dd11-2fa2-5109-6c2b5184b70d@redhat.com>
- <20170324161558.GA10491@leverpostej>
- <d6ee1a17-4518-5a37-f8b7-b62030c24cc7@redhat.com>
- <20170324172533.GA10746@leverpostej>
- <2b8bf63f-3e20-aa26-2d75-83aa2ab35cde@redhat.com>
-Message-ID: <20170324181652.GC10746@leverpostej>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 24 Mar 2017 18:22:17 +0000
+Subject: [RFC PATCH v0.2] PCI: Add support for tango PCIe host bridge
+In-Reply-To: <9fffedd4-6292-b662-a588-a68fe7380af6@free.fr>
+References: <91db1f47-3024-9712-309a-fb4b21e42028@free.fr>
+ <e5c0bace-fcbe-de3f-b76f-0fb672562e84@arm.com>
+ <310db9dd-7db6-2106-2e53-f0083b2d3758@free.fr>
+ <9fffedd4-6292-b662-a588-a68fe7380af6@free.fr>
+Message-ID: <6e847686-43c6-11e9-6782-dec0fe81a58e@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 24, 2017 at 11:32:58PM +0530, Pratyush Anand wrote:
+On 23/03/17 23:40, Mason wrote:
+> On 23/03/2017 18:03, Mason wrote:
 > 
+>> The host bridge actually supports 256 MSIs.
+>>
+>> IIUC, what you suggested on IRC is that I support 256 in the driver,
+>> and only read the status for *enabled* MSIs.
+>>
+>> Pseudo-code:
+>>
+>> for every 32-bit blob in the enabled bitmap
+>>   if the value is non-zero
+>>     lookup the corresponding status reg
+>>
+>> Problem is that a BITMAP is unsigned long (as you point out below).
+>> So I'm not sure how to iterate 32-bits at a time over the BITMAP.
 > 
-> On Friday 24 March 2017 10:55 PM, Mark Rutland wrote:
-> >>Moreover, even if mmap() in test routine crosses over many other
-> >>text/rd/rw area mappings, should it fail? We are not writing
-> >>anything to mmaped area. So, why should just a creation of another
-> >>map result in segmentation fault?
-> >The new mapping replaces the old mappings that it clobbers, so all the
-> >old data/code is gone. Loads or instruction fetches will see data from
-> >the new mapping.
+> Something along these lines:
 > 
-> Humm..I see..But in that case mmap() should have failed and return
-> MAP_FAILED instead of remapping and which could cause a segfault.
-
-That does nto appear to be the case. As per the mmap man page:
-
-  MAP_FIXED
-      Don't  interpret addr as a hint: place the mapping at exactly that
-      address.  addr must be a multiple of the page size.  If the memory
-      region specified by addr and len overlaps pages of any existing
-      mapping(s), then the overlapped part of the existing mapping(s)
-      will  be discarded.  If the specified address cannot be used,
-      mmap() will fail.  Because requiring a fixed address for a mapping
-      is less portable, the use of this option is discouraged.
-
-[...]
-
-> >For your report, it's not clear to me what's going on. Did you take the
-> >/proc/pid/maps data from teh exact same process that the segfault
-> >occurred in? and/or did you disable ASLR?
+> 	DECLARE_BITMAP(enabled, 256);
 > 
-> Yes, it is from the same process.
+> 	unsigned int pos = 0;
+> 
+> 	while ((pos = find_next_bit(enabled, 256, pos)) < 256) {
+> 		int offset = (pos / 32) * 4;
+> 		u32 status = readl_relaxed(status + offset);
+> 		/* Handle each pos set in status */
+> 		pos = round_up(pos, 32);
+> 	}
 
-That is troubling; I cannot explain that.
+Something along those lines, yes.
 
-> Since, I was not able to reproduce with gdb so, I had inserted a
-> scanf() just before mmap() and then had read /proc/pid/maps.
+> You mentioned a bug in my code (due to the platform endianness)
+> when passing the result of readl_relaxed to the bitops routine...
+> How is one supposed to iterate over status?
 
-That might be because GDB disables ASLR by default. Did you re-enable
-ASLR within GDB with:
+You cannot directly use a pointer to a u32 in any of the bitmap
+operations. You need to copy the value to an unsigned long, and apply
+the bitmap op on that.
 
-	set disable-randomization off
+> I'm not yet seeing this endianness issue, since (status & BIT(i))
+> provides the status of MSI_i, irrespective of endianness.
 
-If not, could you give that a go?
+We discussed this over IRC, but I was referring to the above case and
+64bit BE platforms, which would not do what you expect.
+
+> Although I see that arch/arm/include/asm/bitops.h declares
+> BE and LE variants... I'm confused.
+
+Nothing in this code should be ARM specific. The kernel gives you the
+tools to write (mostly) architecture, endianness and word size agnostic
+code.
 
 Thanks,
-Mark.
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
