@@ -1,161 +1,145 @@
 From: willy@infradead.org (Matthew Wilcox)
-Date: Fri, 24 Mar 2017 09:13:13 -0700
-Subject: [PATCH v3 2/7] ARM: Implement memset16, memset32 & memset64
+Date: Fri, 24 Mar 2017 09:13:12 -0700
+Subject: [PATCH v3 1/7] Add multibyte memset functions
 In-Reply-To: <20170324161318.18718-1-willy@infradead.org>
 References: <20170324161318.18718-1-willy@infradead.org>
-Message-ID: <20170324161318.18718-3-willy@infradead.org>
+Message-ID: <20170324161318.18718-2-willy@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Matthew Wilcox <mawilcox@microsoft.com>
 
-ARM is only 32-bit, so it doesn't really need a memset64, but it was
-essentially free to add it to the existing implementation.
+memset16(), memset32() and memset64() are like memset(), but allow the
+caller to fill the destination with a multibyte pattern.  memset_l()
+and memset_p() allow the caller to use unsigned long and pointer
+values respectively.  memset64() is currently only available on 64-bit
+architectures.
 
 Signed-off-by: Matthew Wilcox <mawilcox@microsoft.com>
-Reviewed-by: Russell King <rmk+kernel@armlinux.org.uk>
 ---
- arch/arm/include/asm/string.h | 21 +++++++++++++++++++++
- arch/arm/kernel/armksyms.c    |  3 +++
- arch/arm/lib/memset.S         | 44 ++++++++++++++++++++++++++++++++++---------
- 3 files changed, 59 insertions(+), 9 deletions(-)
+ include/linux/string.h | 30 ++++++++++++++++++++++
+ lib/string.c           | 68 ++++++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 98 insertions(+)
 
-diff --git a/arch/arm/include/asm/string.h b/arch/arm/include/asm/string.h
-index cf4f3aad0fc1..bc7a1be7a76a 100644
---- a/arch/arm/include/asm/string.h
-+++ b/arch/arm/include/asm/string.h
-@@ -24,6 +24,27 @@ extern void * memchr(const void *, int, __kernel_size_t);
- #define __HAVE_ARCH_MEMSET
- extern void * memset(void *, int, __kernel_size_t);
- 
-+#define __HAVE_ARCH_MEMSET16
-+extern void *__memset16(uint16_t *, uint16_t v, __kernel_size_t);
-+static inline void *memset16(uint16_t *p, uint16_t v, __kernel_size_t n)
+diff --git a/include/linux/string.h b/include/linux/string.h
+index 26b6f6a66f83..b376875b650c 100644
+--- a/include/linux/string.h
++++ b/include/linux/string.h
+@@ -99,6 +99,36 @@ extern __kernel_size_t strcspn(const char *,const char *);
+ #ifndef __HAVE_ARCH_MEMSET
+ extern void * memset(void *,int,__kernel_size_t);
+ #endif
++
++#ifndef __HAVE_ARCH_MEMSET16
++extern void *memset16(uint16_t *, uint16_t, __kernel_size_t);
++#endif
++
++#ifndef __HAVE_ARCH_MEMSET32
++extern void *memset32(uint32_t *, uint32_t, __kernel_size_t);
++#endif
++
++#ifndef __HAVE_ARCH_MEMSET64
++extern void *memset64(uint64_t *, uint64_t, __kernel_size_t);
++#endif
++
++static inline void *memset_l(unsigned long *p, unsigned long v,
++		__kernel_size_t n)
 +{
-+	return __memset16(p, v, n * 2);
++	if (BITS_PER_LONG == 32)
++		return memset32((uint32_t *)p, v, n);
++	else
++		return memset64((uint64_t *)p, v, n);
 +}
 +
-+#define __HAVE_ARCH_MEMSET32
-+extern void *__memset32(uint32_t *, uint32_t v, __kernel_size_t);
-+static inline void *memset32(uint32_t *p, uint32_t v, __kernel_size_t n)
++static inline void *memset_p(void **p, void *v, __kernel_size_t n)
 +{
-+	return __memset32(p, v, n * 4);
++	if (BITS_PER_LONG == 32)
++		return memset32((uint32_t *)p, (uintptr_t)v, n);
++	else
++		return memset64((uint64_t *)p, (uintptr_t)v, n);
 +}
 +
-+#define __HAVE_ARCH_MEMSET64
-+extern void *__memset64(uint64_t *, uint32_t low, __kernel_size_t, uint32_t hi);
-+static inline void *memset64(uint64_t *p, uint64_t v, __kernel_size_t n)
+ #ifndef __HAVE_ARCH_MEMCPY
+ extern void * memcpy(void *,const void *,__kernel_size_t);
+ #endif
+diff --git a/lib/string.c b/lib/string.c
+index ed83562a53ae..f18ba402e503 100644
+--- a/lib/string.c
++++ b/lib/string.c
+@@ -697,6 +697,74 @@ void memzero_explicit(void *s, size_t count)
+ }
+ EXPORT_SYMBOL(memzero_explicit);
+ 
++#ifndef __HAVE_ARCH_MEMSET16
++/**
++ * memset16() - Fill a memory area with a uint16_t
++ * @s: Pointer to the start of the area.
++ * @v: The value to fill the area with
++ * @count: The number of values to store
++ *
++ * Differs from memset() in that it fills with a uint16_t instead
++ * of a byte.  Remember that @count is the number of uint16_ts to
++ * store, not the number of bytes.
++ */
++void *memset16(uint16_t *s, uint16_t v, size_t count)
 +{
-+	return __memset64(p, v, n * 8, v >> 32);
++	uint16_t *xs = s;
++
++	while (count--)
++		*xs++ = v;
++	return s;
 +}
++EXPORT_SYMBOL(memset16);
++#endif
 +
- extern void __memzero(void *ptr, __kernel_size_t n);
- 
- #define memset(p,v,n)							\
-diff --git a/arch/arm/kernel/armksyms.c b/arch/arm/kernel/armksyms.c
-index 8e8d20cdbce7..633341ed0713 100644
---- a/arch/arm/kernel/armksyms.c
-+++ b/arch/arm/kernel/armksyms.c
-@@ -87,6 +87,9 @@ EXPORT_SYMBOL(__raw_writesl);
- EXPORT_SYMBOL(strchr);
- EXPORT_SYMBOL(strrchr);
- EXPORT_SYMBOL(memset);
-+EXPORT_SYMBOL(__memset16);
-+EXPORT_SYMBOL(__memset32);
-+EXPORT_SYMBOL(__memset64);
- EXPORT_SYMBOL(memcpy);
- EXPORT_SYMBOL(memmove);
- EXPORT_SYMBOL(memchr);
-diff --git a/arch/arm/lib/memset.S b/arch/arm/lib/memset.S
-index 3c65e3bd790f..9adc9bdf3ffb 100644
---- a/arch/arm/lib/memset.S
-+++ b/arch/arm/lib/memset.S
-@@ -21,14 +21,14 @@ ENTRY(memset)
- UNWIND( .fnstart         )
- 	ands	r3, r0, #3		@ 1 unaligned?
- 	mov	ip, r0			@ preserve r0 as return value
-+	orr	r1, r1, r1, lsl #8
- 	bne	6f			@ 1
- /*
-  * we know that the pointer in ip is aligned to a word boundary.
-  */
--1:	orr	r1, r1, r1, lsl #8
--	orr	r1, r1, r1, lsl #16
-+1:	orr	r1, r1, r1, lsl #16
- 	mov	r3, r1
--	cmp	r2, #16
-+7:	cmp	r2, #16
- 	blt	4f
- 
- #if ! CALGN(1)+0
-@@ -41,7 +41,7 @@ UNWIND( .fnend              )
- UNWIND( .fnstart            )
- UNWIND( .save {r8, lr}      )
- 	mov	r8, r1
--	mov	lr, r1
-+	mov	lr, r3
- 
- 2:	subs	r2, r2, #64
- 	stmgeia	ip!, {r1, r3, r8, lr}	@ 64 bytes at a time.
-@@ -73,11 +73,11 @@ UNWIND( .fnend                 )
- UNWIND( .fnstart               )
- UNWIND( .save {r4-r8, lr}      )
- 	mov	r4, r1
--	mov	r5, r1
-+	mov	r5, r3
- 	mov	r6, r1
--	mov	r7, r1
-+	mov	r7, r3
- 	mov	r8, r1
--	mov	lr, r1
-+	mov	lr, r3
- 
- 	cmp	r2, #96
- 	tstgt	ip, #31
-@@ -114,12 +114,13 @@ UNWIND( .fnstart            )
- 	tst	r2, #4
- 	strne	r1, [ip], #4
- /*
-- * When we get here, we've got less than 4 bytes to zero.  We
-+ * When we get here, we've got less than 4 bytes to set.  We
-  * may have an unaligned pointer as well.
-  */
- 5:	tst	r2, #2
-+	movne	r3, r1, lsr #8		@ the top half of a 16-bit pattern
- 	strneb	r1, [ip], #1
--	strneb	r1, [ip], #1
-+	strneb	r3, [ip], #1
- 	tst	r2, #1
- 	strneb	r1, [ip], #1
- 	ret	lr
-@@ -135,3 +136,28 @@ UNWIND( .fnstart            )
- UNWIND( .fnend   )
- ENDPROC(memset)
- ENDPROC(mmioset)
++#ifndef __HAVE_ARCH_MEMSET32
++/**
++ * memset32() - Fill a memory area with a uint32_t
++ * @s: Pointer to the start of the area.
++ * @v: The value to fill the area with
++ * @count: The number of values to store
++ *
++ * Differs from memset() in that it fills with a uint32_t instead
++ * of a byte.  Remember that @count is the number of uint32_ts to
++ * store, not the number of bytes.
++ */
++void *memset32(uint32_t *s, uint32_t v, size_t count)
++{
++	uint32_t *xs = s;
 +
-+ENTRY(__memset16)
-+UNWIND( .fnstart         )
-+	tst	r0, #2			@ pointer unaligned?
-+	mov	ip, r0			@ preserve r0 as return value
-+	beq	1b			@ jump into the middle of memset
-+	subs	r2, r2, #2		@ cope with n == 0
-+	movge	r3, r1, lsr #8		@ r3 = r1 >> 8
-+	strgeb	r1, [ip], #1		@ *ip = r1
-+	strgeb	r3, [ip], #1		@ *ip = r3
-+	bgt	1b			@ back into memset if n > 0
-+	ret	lr			@ otherwise return
-+UNWIND( .fnend   )
-+ENDPROC(__memset16)
-+ENTRY(__memset32)
-+UNWIND( .fnstart         )
-+	mov	r3, r1			@ copy r1 to r3 and fall into memset64
-+UNWIND( .fnend   )
-+ENDPROC(__memset32)
-+ENTRY(__memset64)
-+UNWIND( .fnstart         )
-+	mov	ip, r0			@ preserve r0 as return value
-+	b	7b			@ jump into the middle of memset
-+UNWIND( .fnend   )
-+ENDPROC(__memset64)
++	while (count--)
++		*xs++ = v;
++	return s;
++}
++EXPORT_SYMBOL(memset32);
++#endif
++
++#ifndef __HAVE_ARCH_MEMSET64
++#if BITS_PER_LONG > 32
++/**
++ * memset64() - Fill a memory area with a uint64_t
++ * @s: Pointer to the start of the area.
++ * @v: The value to fill the area with
++ * @count: The number of values to store
++ *
++ * Differs from memset() in that it fills with a uint64_t instead
++ * of a byte.  Remember that @count is the number of uint64_ts to
++ * store, not the number of bytes.
++ */
++void *memset64(uint64_t *s, uint64_t v, size_t count)
++{
++	uint64_t *xs = s;
++
++	while (count--)
++		*xs++ = v;
++	return s;
++}
++EXPORT_SYMBOL(memset64);
++#endif
++#endif
++
+ #ifndef __HAVE_ARCH_MEMCPY
+ /**
+  * memcpy - Copy one area of memory to another
 -- 
 2.11.0
