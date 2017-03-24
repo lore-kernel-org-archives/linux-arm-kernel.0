@@ -1,78 +1,52 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 24 Mar 2017 14:45:24 +0000
-Subject: [PATCH v4 05/28] arm64: KVM: Implement HVC_RESET_VECTORS stub
- hypercall in the init code
-In-Reply-To: <20170324143350.GB25903@cbox>
-References: <20170321192058.9300-1-marc.zyngier@arm.com>
- <20170321192058.9300-6-marc.zyngier@arm.com> <20170324143350.GB25903@cbox>
-Message-ID: <f2c1bc8a-4108-1540-29b4-535ea5ac428e@arm.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 24 Mar 2017 09:46:03 -0500
+Subject: [PATCH v3 08/11] ASoC: Add bindings for DMIC codec driver
+In-Reply-To: <1489759704-30217-9-git-send-email-arnaud.pouliquen@st.com>
+References: <1489759704-30217-1-git-send-email-arnaud.pouliquen@st.com>
+ <1489759704-30217-9-git-send-email-arnaud.pouliquen@st.com>
+Message-ID: <20170324144603.zos7n4oqelaag433@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/03/17 14:33, Christoffer Dall wrote:
-> On Tue, Mar 21, 2017 at 07:20:35PM +0000, Marc Zyngier wrote:
->> In order to restore HYP mode to its original condition, KVM currently
->> implements __kvm_hyp_reset(). As we're moving towards a hyp-stub
->> defined API, it becomes necessary to implement HVC_RESET_VECTORS.
->>
->> This patch adds the HVC_RESET_VECTORS hypercall to the KVM init
->> code, which so far lacked any form of hypercall support.
->>
->> Reviewed-by: James Morse <james.morse@arm.com>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  arch/arm64/kvm/hyp-init.S | 12 ++++++++++++
->>  1 file changed, 12 insertions(+)
->>
->> diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
->> index 6b29d3d9e1f2..6cf98ccd10f2 100644
->> --- a/arch/arm64/kvm/hyp-init.S
->> +++ b/arch/arm64/kvm/hyp-init.S
->> @@ -22,6 +22,7 @@
->>  #include <asm/kvm_mmu.h>
->>  #include <asm/pgtable-hwdef.h>
->>  #include <asm/sysreg.h>
->> +#include <asm/virt.h>
->>  
->>  	.text
->>  	.pushsection	.hyp.idmap.text, "ax"
->> @@ -58,6 +59,9 @@ __invalid:
->>  	 * x2: HYP vectors
->>  	 */
->>  __do_hyp_init:
->> +	/* Check for a stub HVC call */
->> +	cmp	x0, #HVC_STUB_HCALL_NR
->> +	b.lo	__kvm_handle_stub_hvc
->>  
->>  	msr	ttbr0_el2, x0
->>  
->> @@ -119,6 +123,9 @@ __do_hyp_init:
->>  	eret
->>  ENDPROC(__kvm_hyp_init)
->>  
->> +ENTRY(__kvm_handle_stub_hvc)
->> +	cmp	x0, #HVC_RESET_VECTORS
->> +	b.ne	1f
->>  	/*
->>  	 * Reset kvm back to the hyp stub.
->>  	 */
->> @@ -133,9 +140,14 @@ ENTRY(__kvm_hyp_reset)
->>  	/* Install stub vectors */
->>  	adr_l	x0, __hyp_stub_vectors
->>  	msr	vbar_el2, x0
->> +	b	exit
->>  
->> +1:	mov	x0, #-1
+On Fri, Mar 17, 2017 at 03:08:21PM +0100, Arnaud Pouliquen wrote:
+> This patch adds documentation of device tree bindings for audio DMIC codec.
 > 
-> nit: do we have the -1 return value documented somewhere and should we
-> define it as HVC_SUB_ERR_RETURN or something like that?
+> Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
+> ---
+>  Documentation/devicetree/bindings/sound/dmic.txt | 11 +++++++++++
+>  1 file changed, 11 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/sound/dmic.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/sound/dmic.txt b/Documentation/devicetree/bindings/sound/dmic.txt
+> new file mode 100644
+> index 0000000..eb2a9d4
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/sound/dmic.txt
+> @@ -0,0 +1,11 @@
+> +Device-Tree bindings for dmic codec
 
-Indeed, this is something that is a bit dodgy. arm64 returns
-ARM_EXCEPTION_HYP_GONE, which is really a KVM exception code (and isn't
--1 either). I'll try to tighten this up a bit.
+Please define what is and isn't a DMIC here. What's the interface?
 
-Thanks,
+> +
+> +Required properties:
+> +	- compatible: should be "dmic-codec".
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+DMICs don't have part numbers?
+
+> +
+> +Example node:
+> +
+> +	dmic_audio: dmic_audio at 0 {
+
+Don't use '_' and there's no reg property, so there should be no unit 
+address.
+
+> +		compatible = "dmic-codec";
+> +		status = "okay";
+
+Don't show status in examples.
+
+> +	};
+> -- 
+> 1.9.1
+> 
