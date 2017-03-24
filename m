@@ -1,119 +1,86 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 24 Mar 2017 08:31:45 -0400 (EDT)
-Subject: [PATCH 0/3] minitty: a minimal TTY layer alternative for embedded
- systems
-In-Reply-To: <20170324065015.GA17226@kroah.com>
-References: <20170323210304.2181-1-nicolas.pitre@linaro.org>
- <20170324065015.GA17226@kroah.com>
-Message-ID: <alpine.LFD.2.20.1703240819370.2304@knanqh.ubzr>
+From: jnair@caviumnetworks.com (Jayachandran C)
+Date: Fri, 24 Mar 2017 12:44:08 +0000
+Subject: [PATCH v3 0/2] Handle Cavium ThunderX2 PCI topology quirk
+In-Reply-To: <122d7df5-8fde-c6fb-a608-9091dd59e79b@redhat.com>
+References: <1490172671-2648-1-git-send-email-jnair@caviumnetworks.com>
+ <122d7df5-8fde-c6fb-a608-9091dd59e79b@redhat.com>
+Message-ID: <20170324124327.GA2525@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 24 Mar 2017, Greg Kroah-Hartman wrote:
-
-> meta-comment, any reason you didn't cc: linux-serial at vger as well?
-
-I didn't realize such a list even existed. I looked up "TTY LAYER" in 
-the maintainer file.
-
-> On Thu, Mar 23, 2017 at 05:03:01PM -0400, Nicolas Pitre wrote:
-> > Many embedded systems don't need the full TTY layer support. Most of the
-> > time, the TTY layer is only a conduit for outputting debugging messages
-> > over a serial port. The TTY layer also implements many features that are
-> > very unlikely to ever be used in such a setup. There is great potential
-> > for both code and dynamic memory size reduction on small systems. This is
-> > what this patch series is achieving.
+On Wed, Mar 22, 2017 at 11:13:05AM -0400, Jon Masters wrote:
+> On 03/22/2017 04:51 AM, Jayachandran C wrote:
+> > Hi Bjorn, Alex,
 > > 
-> > The existing TTY code is quite large and complex. Trying to shrink it is
-> > rather risky as the potential for breakage is non negligeable. Therefore,
-> > the approach used here consists in the creation of the minimal code that
-> > interface with the existing UART drivers and provide TTY-like character
-> > devices to user space. When the regular TTY layer is disabled, then the
-> > minitty layer replacement is proposed by Kconfig.
+> > Here is v3 of the patchset to handle the PCIe topology quirk of
+> > Cavium ThunderX2 (previously called Broadcom Vulcan).
 > > 
-> > Of course, making it "mini" means there are limitations to what it does:
+> > The earlier discussions on this can be seen at:
+> > http://www.spinics.net/lists/linux-pci/msg51001.html
+> > https://patchwork.ozlabs.org/patch/582633/ and
+> > https://lists.linuxfoundation.org/pipermail/iommu/2016-June/017681.html
 > > 
-> > - This supports serial ports only. No VT's, no PTY's.
+> > The earlier discussion on this patchset had stalled with a suggestion
+> > that it may be possible to fix up this quirk by handling the issue in
+> > the function argument of pci_for_each_dma_alias(). But at that point
+> > all the ACPI and OF code for SMMU and GIC was to merged, and we did not
+> > have reasonable codebase to make the changes.
 > > 
-> > - The default n_tty line discipline is hardcoded and no other line
-> >   discipline are supported.
+> > For 4.11, I tried to fix it in both the SMMU and the GIC ITS code based
+> > on this suggestion, but after going thru the effort, that does not look
+> > like the right approach. I have the code changes at:
+> > https://github.com/jchandra-cavm/linux/commits/rid-xlate-fixup
+> > if anyone want to look over the code.
 > > 
-> > - The line discipline features are not all implemented. Notably, XON/XOFF
-> >   is currently not implemented (although this might not require a lot of
-> >   code to do it).
+> > The problems with that approach is:
+> >  - of the 14 uses of pci_for_each_dma_alias in the function in the kernel
+> >    tree, I have to fixup 6 callers (which is all but one ofthe callers
+> >    outside x86)
+> >  - 4 of these can be reasonably handled (please see the github repo above),
+> >    but the calls in drivers/irqchip/irq-gic-v3-its-pci-msi.c and
+> >    drivers/iommu/iommu.c cannot be reasonably fixed up.
+> >  - Even without the 2 above two changes I can get it to work for now.
+> >    But pci_for_each_dma_alias does not work as expected on this platform
+> >    and we have to be aware of that for all future uses of the function.
+> >   
+> > For now, I have ruled out that approach, and I have rebased the earlier
+> > patch on to 4.11-rc and submitting again for review. The changes are:
 > > 
-> > - Hung-up state is not implemented.
+> > v2>v3:
+> >  - changed device flag name from PCI_DEV_FLAGS_DMA_ALIAS_ROOT to
+> >    PCI_DEV_FLAGS_BRIDGE_XLATE_ROOT
+> >  - updated commit message to make the quirk clearer.
 > > 
-> > - No error handling on RX bytes other than counting them.
-> > 
-> > - Behavior in the presence of overflows is most likely different from the
-> >   full TTY code.
-> > 
-> > - Job control is currently not supported (this may change in the future and 
-> >   be configurable).
-> > 
-> > But again, most small embedded systems simply don't need those things.
+> > Let me know your comments and suggestions.
 > 
-> This is true, and I like the overall idea, but I don't like all of the
-> code duplication.  Also, who is going to maintain this?  I'm not going
-> to be able to even build it, let alone test it, for the systems I
-> normally use, and now you have tagged me as maintaining it for forever
-> :(
-
-I'll maintain it.  Will put the needed entry in MAINTAINERS.
-
-Why do you say you won't be able to build it? I didn't try but it is 
-meant to build with any serial driver.
-
-> > Here's some numbers using a minimal ARM config.
-> > 
-> > When CONFIG_TTY=y, the following files are linked into the kernel:
-> > 
-> >    text    data     bss     dec     hex filename
-> >    8796     128       0    8924    22dc drivers/tty/n_tty.o
-> >   12846     276      44   13166    336e drivers/tty/serial/serial_core.o
-> >    4852     489      49    5390    150e drivers/tty/sysrq.o
-> >    1376       0       0    1376     560 drivers/tty/tty_buffer.o
-> >   13571     172     132   13875    3633 drivers/tty/tty_io.o
-> >    3072       0       0    3072     c00 drivers/tty/tty_ioctl.o
-> >    2457       2     120    2579     a13 drivers/tty/tty_ldisc.o
-> >    1328       0       0    1328     530 drivers/tty/tty_ldsem.o
-> >     316       0       0     316     13c drivers/tty/tty_mutex.o
-> >    2516       0       0    2516     9d4 drivers/tty/tty_port.o
-> >   51130    1067     345   52542    cd3e (TOTALS)
-> > 
-> > With CONFIG_TTY=n and CONFIG_MINITTY_SERIAL=y, the above is replaced by:
-> > 
-> >    text    data     bss     dec     hex filename
-> >    8776       8     108    8892    22bc drivers/tty/serial/minitty_serial.o
-> > 
-> > That's it!  And the runtime buffer usage is much less as well.
+> My opinion FWIW is that the quirk you have is one of the least intrusive
+> ways of handling this. Generally in the case of ARM servers, we have a
+> difference vs. x86 in that the latter usually have a magic RC at the
+> top level that everything sits beneath (and then, presumably, Intel
+> do some magic for multi-socket to fudge things over Q/UPI so that
+> things look nice and boring to software). On ARM, we're typically
+> dealing with third party RC IP that's disjoint from other parts of
+> the SoC. We're certainly in the process of bolstering the specs to
+> set some expectations and greater guidance around topologies that
+> we would like to avoid, so I don't see this getting out of hand.
 > 
-> Is there some way to just reorginize the existing code to get you almost
-> this same size?  Make ptys and other line diciplines options to select,
-> and slim down the io path by removing features there.
-> 
-> And that serial core looks huge from what you are showing is really
-> needed, any way to slim that down by just making features in it
-> configurable?
-> 
-> Again, I like the idea, but worry that with this change, we would have
-> two different tty layers we have to maintain for the next 20+ years, and
-> we have a hard time keeping one stable and working today :)
 
-That's the crux of the argument: touching the current TTY layer is NOT 
-going to help keeping it stable. Here, not only I did remove features, 
-but the ones I kept were reimplemented to be much smaller and 
-potentially less scalable and performant too.  The ultimate goal here is 
-to have the smallest code possible with very simple locking and not 
-necessarily the most scalable code. That in itself is contradictory with 
-the regular TTY code and warrants a separate implementation. And because 
-it is so small, it is much easier to understand and much easier to 
-maintain.
+The ACPI specification[1] and the device tree specification[2] have
+provisions for mapping RID ranges under an RC to different SMMUs with
+an offset to generate StreamIDs. This is also true for the mapping
+from RID to ITS and DeviceID. So having multiple SMMUs/ITSs for
+devices under the same RC is not really a quirk.
 
-Where code sharing made sense, I did factor out common parts already, 
-such as the baudrate handling. I intend to do the same to add job 
-control support.
+It is also reasonable to have the traversal looking for aliases to
+stop at the point where the SMMU or ITS is attached. The quirk flag
+is only needed because the information on where the SMMU or ITS is
+attached is not available to the pci_for_each_dma_alias implementation.
+Usually this is not an issue, but unfortunately on ThunderX2, there
+are PCI and PCI/PCIe bridges above this point which causes the
+current code to calculate RIDs incorrectly.
 
+Thanks,
+JC.
 
-Nicolas
+[1] http://infocenter.arm.com/help/topic/com.arm.doc.den0049b/DEN0049B_IO_Remapping_Table.pdf
+[2] https://www.kernel.org/doc/Documentation/devicetree/bindings/pci/pci-iommu.txt 
