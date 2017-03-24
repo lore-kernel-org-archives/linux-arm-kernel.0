@@ -1,137 +1,86 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 24 Mar 2017 14:40:29 +0000
-Subject: [PATCH RFC 1/3] thermal: allow hwmon devices to be created for
- of-thermal zones
-In-Reply-To: <20170324132312.GF7909@n2100.armlinux.org.uk>
-References: <E1cn8qC-0002uz-PB@rmk-PC.armlinux.org.uk>
- <20170320171552.o2ye73c2okcvhluq@rob-hp-laptop>
- <20170324132312.GF7909@n2100.armlinux.org.uk>
-Message-ID: <20170324144029.GG7909@n2100.armlinux.org.uk>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 24 Mar 2017 14:42:13 +0000
+Subject: [PATCH v4 28/28] arm/arm64: Add hyp-stub API documentation
+In-Reply-To: <20170324143316.GA25903@cbox>
+References: <20170321192058.9300-1-marc.zyngier@arm.com>
+ <20170321192058.9300-29-marc.zyngier@arm.com> <20170324143316.GA25903@cbox>
+Message-ID: <ff4fe929-98f0-de0e-2f1a-d06c7969d5e0@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 24, 2017 at 01:23:13PM +0000, Russell King - ARM Linux wrote:
-> On Mon, Mar 20, 2017 at 12:15:52PM -0500, Rob Herring wrote:
-> > On Sun, Mar 12, 2017 at 07:07:40PM +0000, Russell King wrote:
-> > > Allow hwmon devices to be optionally created for of-thermal zones,
-> > > rather than permanently denying them "in case" there is a hwmon
-> > > driver duplicating the thermal driver.
-> > > 
-> > > Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
-> > > ---
-> > > Without this, "sensors" is unable to report the temperature of the
-> > > Dove SoC when it supports thermal zones.
-> > > 
-> > >  Documentation/devicetree/bindings/thermal/thermal.txt | 3 +++
-> > >  arch/arm/boot/dts/dove.dtsi                           | 1 +
-> > >  drivers/thermal/of-thermal.c                          | 3 ++-
-> > >  3 files changed, 6 insertions(+), 1 deletion(-)
-> > > 
-> > > diff --git a/Documentation/devicetree/bindings/thermal/thermal.txt b/Documentation/devicetree/bindings/thermal/thermal.txt
-> > > index 88b6ea1ad290..1478735fff85 100644
-> > > --- a/Documentation/devicetree/bindings/thermal/thermal.txt
-> > > +++ b/Documentation/devicetree/bindings/thermal/thermal.txt
-> > > @@ -175,6 +175,9 @@ containing trip nodes and one sub-node containing all the zone cooling maps.
-> > >  			2000mW, while on a 10'' tablet is around
-> > >  			4500mW.
-> > >  
-> > > +- linux,hwmon:		Allow Linux to create hwmon devices for the thermal
-> > > +  Type: bool		zone.
-> > > +
-> > >  Note: The delay properties are bound to the maximum dT/dt (temperature
-> > >  derivative over time) in two situations for a thermal zone:
-> > >  (i)  - when passive cooling is activated (polling-delay-passive); and
-> > > diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
-> > > index 40fb98687230..00f5971cd039 100644
-> > > --- a/arch/arm/boot/dts/dove.dtsi
-> > > +++ b/arch/arm/boot/dts/dove.dtsi
-> > > @@ -804,6 +804,7 @@
-> > >  
-> > >  	thermal-zones {
-> > >  		soc-thermal {
-> > > +			linux,hwmon;
-> > 
-> > I'd prefer to see a black or white list of sensor compatibles here. Then 
-> > the dtb doesn't need to change if things move between hwmon and thermal 
-> > zones.
+On 24/03/17 14:33, Christoffer Dall wrote:
+> On Tue, Mar 21, 2017 at 07:20:58PM +0000, Marc Zyngier wrote:
+>> In order to help people understanding the hyp-stub API that exists
+>> between the host kernel and the hypervisor mode (whether a hypervisor
+>> has been installed or not), let's document said API.
+>>
+>> As with any form of documentation, I expect it to become obsolete
+>> and completely misleading within 20 minutes after having being merged.
 > 
-> I'm not sure what you mean, and I can't see how that would be coded up.
-> The thermal layer doesn't give the option of individually selecting
-> which sensors have hwmon stuff created - it seems to be all or nothing.
-> I suspect what you're asking would require something of a rewrite of
-> the thermal code.  The sensors are registered completely independently
-> of parsing the thermal zone data.
+> I don't think this last sentence belongs in the commit message.
+> 
+>>
+>> Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  Documentation/virtual/kvm/arm/hyp-abi.txt | 45 +++++++++++++++++++++++++++++++
+>>  1 file changed, 45 insertions(+)
+>>  create mode 100644 Documentation/virtual/kvm/arm/hyp-abi.txt
+>>
+>> diff --git a/Documentation/virtual/kvm/arm/hyp-abi.txt b/Documentation/virtual/kvm/arm/hyp-abi.txt
+>> new file mode 100644
+>> index 000000000000..a1e0314d2249
+>> --- /dev/null
+>> +++ b/Documentation/virtual/kvm/arm/hyp-abi.txt
+>> @@ -0,0 +1,45 @@
+>> +* Internal ABI between the kernel and HYP
+>> +
+>> +This file documents the interaction between the Linux kernel and the
+>> +hypervisor layer when running Linux as a hypervisor (for example
+>> +KVM). It doesn't cover the interaction of the kernel with the
+>> +hypervisor when running as a guest (under Xen, KVM or any other
+>> +hypervisor), or any hypervisor-specific interaction when the kernel is
+>> +used as a host.
+>> +
+>> +On arm and arm64 (without VHE), the kernel doesn't run in hypervisor
+>> +mode, but still needs to interact with it, allowing a built-in
+>> +hypervisor to be either installed or torn down.
+>> +
+>> +In order to achieve this, the kernel must be booted at HYP (arm) or
+>> +EL2 (arm64), allowing it to install a set of stubs before dropping to
+>> +SVC/EL1. These stubs are accessible by using a 'hvc #0' instruction,
+>> +and only act on individual CPUs.
+>> +
+>> +Unless specified otherwise, any built-in hypervisor must implement
+>> +these functions (see arch/arm{,64}/include/asm/virt.h):
+>> +
+>> +* r0/x0 = HVC_SET_VECTORS
+>> +  r1/x1 = vectors
+>> +
+>> +  Set HVBAR/VBAR_EL2 to 'vectors' to enable a hypervisor. 'vectors'
+>> +  must be a physical address, and respect the alignment requirements
+>> +  of the architecture. Only implemented by the initial stubs.
+> 
+> Does this last sentence mean that KVM doesn't implement this function?
 
-Okay, I'm convinced that what you're asking for (if I'm understanding
-correctly) is just not possible with how the thermal code is (horribly)
-architected at the moment.
+Indeed. Directly setting the vectors is inherently unsafe (MMU could
+still be ON, for example), hence the HVC_SET_VECTORS operation that
+allow this to be done safely (RESET followed by SET).
 
-While trying to understand how all the thermal zone stuff fits together,
-I found this comment:
+> 
+>> +
+>> +* r0/x0 = HVC_RESET_VECTORS
+>> +
+>> +  Turn HYP/EL2 MMU off, and reset HVBAR/VBAR_EL2 to the default
+>> +  value. This effectively disables an existing hypervisor.
+> 
+> What's the 'default value' ?  Could we say to the physical address of
+> the hypervisor stub's exception vector?
 
-                /* For now, thermal framework supports only 1 sensor per zone */
-                ret = of_parse_phandle_with_args(child, "thermal-sensors",
-                                                 "#thermal-sensor-cells",
-                                                 0, &sensor_specs);
+Shouldn't that be the kernel stub's exception vector?
 
-so it's really not setup to deal with multiple sensors in DT right now
-(and there's no checking by the code that this is even the case.)
+Thanks,
 
-The way the code is architected, the thermal zone devices and hwmon
-support is setup _completely_ independently from attaching the single
-sensor to the zone - the setup of the thermal zone devices and
-registering the sysfs entry happens before the sensors.
-
-The hwmon support is coded such that there is one hwmon device for all
-thermal zones.  Each thermal zone device exports exactly one hwmon
-temperature sensor value with one set of trip points.
-
-A thermal zone device can support multiple sensors, but from the code
-and the above comment, the code does not support this - the sensors
-are not individually exported through hwmon.
-
-So, I think what you're asking for is not possible and is based upon
-a mis-understanding - thermal does not export sensors, but exports the
-_zone_ itself as a hwmon sensor.  The zone temperature is exported,
-along with its thresholds.
-
-Obviously, the separation of thermal vs hwmon is purely a Linux
-phenomenon, and I've wondered why people have to rewrite hwmon drivers
-as thermal drivers just to make use of the thermal subsystem - it seems
-to me like NIH syndrome.  I can't see why hwmon isn't able to export
-individual temperature sensors to thermal and have thermal import the
-values from there.
-
-For example, you could have a hwmon device that has multiple temperature
-sensors (some do) which monitor different parts of the system, and a
-hwmon device should be able to be incorporated into a thermal zone for
-management.
-
-That doesn't seem possible, you have to implement a thermal driver to
-interface your sensor to the thermal stuff, and then have the _zone_
-statistics exported through hwmon.
-
-If you want individual sensors exported, you have to implement a driver
-which has a dual-personality, it has to register with hwmon and thermal.
-
-I'd say that, arguably, the whole "no_hwmon" thing in thermal is also
-wrong - it may _seem_ to be correct because thermal only supports one
-sensor, and we don't want such a dual-personality driver to have two
-entries in sysfs, but that's rather moot when you consider that one is
-exporting the zone (which has DT configured thresholds) and one is
-exporting the sensor itself.
-
-So, my conclusion is that this is all rather messed up, and certainly
-beyond my willingness to put in a lot of effort, creating lots of
-patches to try and bring the code to a point where what you're asking
-for is possible (iow, where we export individual sensors to hwmon,
-and make individual sensors exportable.)
-
-Therefore, I believe that my implementation is entirely reasonable -
-the linux,hwmon flag indicates whether the state of the thermal _zone_
-(not the _sensors_) should be exported via hwmon.
-
+	M.
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Jazz is not dead. It just smells funny...
