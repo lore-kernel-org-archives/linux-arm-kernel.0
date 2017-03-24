@@ -1,54 +1,39 @@
 From: menschel.p@posteo.de (Patrick Menschel)
-Date: Fri, 24 Mar 2017 22:52:18 +0100
-Subject: [PATCH v2 1/2] ARM: dts: sun4i: Add CAN node and can0_pins_a pinctrl
- settings
-In-Reply-To: <1490392339-23565-1-git-send-email-menschel.p@posteo.de>
-References: <1490392339-23565-1-git-send-email-menschel.p@posteo.de>
-Message-ID: <1490392339-23565-2-git-send-email-menschel.p@posteo.de>
+Date: Fri, 24 Mar 2017 22:52:17 +0100
+Subject: [PATCH v2 0/2] ARM: dts: sunxi: Add CAN node and can0_pins_a pinctrl
+ setting
+Message-ID: <1490392339-23565-1-git-send-email-menschel.p@posteo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A10 SoC has an on-board CAN controller. This patch adds the device node
-and the corresponding pinctrl settings for pins PH20 and PH21.
+The Allwinner A10/A20 SoCs have an on-board CAN (Controller Area Network)
+controller. This patch adds the CAN core to the SoC's include files,
+sun4i-a10.dtsi and sun7i-a20.dtsi.
 
-This patch is adapted from the description in
+On linux-can mailing list was a discussion about updating the device tree bindings
+https://lkml.org/lkml/2015/9/17/220
+but it did not progress past writing the documentation file.
 Documentation/devicetree/bindings/net/can/sun4i_can.txt
 
-Signed-off-by: Patrick Menschel <menschel.p@posteo.de>
----
- arch/arm/boot/dts/sun4i-a10.dtsi | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+The CAN controller can be enabled in a board specific dts file as
+described in the documentation file or by using a device tree overlay.
 
-diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
-index ba20b48..f7dced4 100644
---- a/arch/arm/boot/dts/sun4i-a10.dtsi
-+++ b/arch/arm/boot/dts/sun4i-a10.dtsi
-@@ -974,6 +974,11 @@
- 			#interrupt-cells = <3>;
- 			#gpio-cells = <3>;
- 
-+			can0_pins_a: can0 at 0 {
-+				pins = "PH20","PH21";
-+				function = "can";
-+			};
-+
- 			emac_pins_a: emac0 at 0 {
- 				pins = "PA0", "PA1", "PA2",
- 				       "PA3", "PA4", "PA5", "PA6",
-@@ -1313,6 +1318,14 @@
- 			#size-cells = <0>;
- 		};
- 
-+		can0: can at 01c2bc00 {
-+			compatible = "allwinner,sun4i-a10-can";
-+			reg = <0x01c2bc00 0x400>;
-+			interrupts = <26>;
-+			clocks = <&apb1_gates 4>;
-+			status = "disabled";
-+		};
-+
- 		ps20: ps2 at 01c2a000 {
- 			compatible = "allwinner,sun4i-a10-ps2";
- 			reg = <0x01c2a000 0x400>;
+I have tested the patch v2 on a Banana Pi (A20 SoC) with mainline kernel 4.10.5.
+
+History:
+    v2: changed can0_pins_a node contents to new generic binding method, 
+	changed can0_pins_a node position by alphabetical order,
+        changed can0 device node position by rising physical address order
+
+    v1: initial
+
+Patrick Menschel (2):
+  ARM: dts: sun4i: Add CAN node and can0_pins_a pinctrl settings
+  ARM: dts: sun7i: Add CAN node and can0_pins_a pinctrl settings
+
+ arch/arm/boot/dts/sun4i-a10.dtsi | 13 +++++++++++++
+ arch/arm/boot/dts/sun7i-a20.dtsi | 13 +++++++++++++
+ 2 files changed, 26 insertions(+)
+
 -- 
 1.9.1
