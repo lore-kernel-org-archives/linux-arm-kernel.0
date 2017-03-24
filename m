@@ -1,112 +1,62 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Fri, 24 Mar 2017 17:11:25 +0100
-Subject: [PATCH 1/3] crypto: hw_random - Add new Exynos RNG driver
-In-Reply-To: <20170324154600.lavc22dbw7rtioli@kozik-lap>
-References: <20170324142446.31129-1-krzk@kernel.org>
- <3940941.n3qdgn1RbN@amdc3058> <20170324154600.lavc22dbw7rtioli@kozik-lap>
- <CGME20170324161128epcas1p4b9ef08e3d7e640957d30afa84aa66a16@epcas1p4.samsung.com>
-Message-ID: <9265537.P6AeF50kg8@amdc3058>
+From: thgarnie@google.com (Thomas Garnier)
+Date: Fri, 24 Mar 2017 09:11:33 -0700
+Subject: [PATCH] lkdtm: add bad USER_DS test
+In-Reply-To: <a1ab8afa-5462-dc24-2106-0a6b43773c5b@de.ibm.com>
+References: <20170323203419.GA62859@beast> <20170324081450.GA5891@osiris>
+ <CAJcbSZHJ1WFcE7QY6qLM9RMUJbGXxTpp3WsCNJBX4h1U-4HEjA@mail.gmail.com>
+ <a1ab8afa-5462-dc24-2106-0a6b43773c5b@de.ibm.com>
+Message-ID: <CAJcbSZG90Ya7GafnNGsNYvPM1J-wfVARjM6MunjE6Q_wdX99-Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, March 24, 2017 06:46:00 PM Krzysztof Kozlowski wrote:
-> On Fri, Mar 24, 2017 at 04:26:47PM +0100, Bartlomiej Zolnierkiewicz wrote:
-> > 
-> > Hi,
-> > 
-> > Firstly, thanks for working on this.
-> > 
-> > The patch looks fine overall for me, some review comments below.
-> > 
-> > On Friday, March 24, 2017 05:24:44 PM Krzysztof Kozlowski wrote:
-> > > Replace existing hw_ranndom/exynos-rng driver with a new, reworked one.
-> > > This is a driver for pseudo random number generator block which on
-> > > Exynos4 chipsets must be seeded with some value.  On newer Exynos5420
-> > > chipsets it might seed itself from true random number generator block
-> > > but this is not implemented yet.
-> > > 
-> > > New driver is a complete rework to use the crypto ALGAPI instead of
-> > > hw_random API.  Rationale for the change:
-> > > 1. hw_random interface is for true RNG devices.
-> > > 2. The old driver was seeding itself with jiffies which is not a
-> > >    reliable source for randomness.
-> > > 3. Device generates five random numbers in each pass but old driver was
-> > >    returning only one thus its performance was reduced.
-> > > 
-> > > Compatibility with DeviceTree bindings is preserved.
-> > > 
-> > > New driver does not use runtime power management but manually enables
-> > > and disables the clock when needed.  This is preferred approach because
-> > > using runtime PM just to toggle clock is huge overhead.  Another
-> > 
-> > I'm not entirely convinced that the new approach is better.
-> > 
-> > With the old approach exynos_rng_generate() can be called more
-> > than once before PM autosuspend kicks in and thus clk_prepare_enable()/
-> > clk_disable()_unprepare() operations will be done only once. This
-> > would give better performance on the "burst" operations.
-> > 
-> > [ The above assumes that clock operations are more costly than
-> >   going through PM core to check the current device state. ]
-> 
-> I agree that we loose the "burst" mode but:
-> 1. At least on Exynso4 SSS is part of TOP power domain so it will not
->    help to reduce any more power consumption (on Exynos5422 it is
->    mentioned in G2D... which seems incorrect).
-> 2. I think the overhead of clk operations is much smaller. These are only
->    two locks (prepare mutex + enable spin), simple tree traversal and
->    play with few SFRs.
-> 
->    The power domain code in comparison to that is huge and complicated
->    with inter-device links and dependencies. Also the actual runtime PM
->    suspend would anyway fall back at then end to clk prepare/enable
->    locks and paths.
-> 
->    We've been talking about this a lot with Marek Szyprowski (cc'ed) and
->    he was always (AFAIR) against attempts of runtime power
->    management of a single clock...
+On Fri, Mar 24, 2017 at 8:24 AM, Christian Borntraeger
+<borntraeger@de.ibm.com> wrote:
+> On 03/24/2017 04:17 PM, Thomas Garnier wrote:
+>> On Fri, Mar 24, 2017 at 1:14 AM, Heiko Carstens
+>> <heiko.carstens@de.ibm.com> wrote:
+>>> On Thu, Mar 23, 2017 at 01:34:19PM -0700, Kees Cook wrote:
+>>>> This adds CORRUPT_USER_DS to check that the get_fs() test on syscall return
+>>>> still sees USER_DS during the new VERIFY_PRE_USERMODE_STATE checks.
+>>>>
+>>>> Signed-off-by: Kees Cook <keescook@chromium.org>
+>>>
+>>> ...
+>>>
+>>>> +void lkdtm_CORRUPT_USER_DS(void)
+>>>> +{
+>>>> +     /*
+>>>> +      * Test that USER_DS has been set correctly on exiting a syscall.
+>>>> +      * Since setting this higher than USER_DS (TASK_SIZE) would introduce
+>>>> +      * an exploitable condition, we lower it instead, since that should
+>>>> +      * not create as large a problem on an unprotected system.
+>>>> +      */
+>>>> +     mm_segment_t lowfs;
+>>>> +#ifdef MAKE_MM_SEG
+>>>> +     lowfs = MAKE_MM_SEG(TASK_SIZE - PAGE_SIZE);
+>>>> +#else
+>>>> +     lowfs = TASK_SIZE - PAGE_SIZE;
+>>>> +#endif
+>>>> +
+>>>> +     pr_info("setting bad task size limit\n");
+>>>> +     set_fs(lowfs);
+>>>> +}
+>>>
+>>> This won't work on architectures where the set_fs() argument does not
+>>> contain an address but an address space identifier. This is true e.g. for
+>>> s390 and as far as I know also for sparc.
+>>> On s390 we have complete distinct address spaces for kernel and user space
+>>> that each start at address zero.
+>>>
+>>
+>> The patch that enforce USER_DS is disabled on s390 anyway. I guess, we
+>> can just do a set_fs(KERNEL_DS) for the others.
+>
+> that would enable the test, but it would also mean that lkdtm can be used by
+> a program to escalate its rights. I think that is the reason why Kees did this
+> lowfs things.
+>
 
-OK, thanks for explanation.
+I see, I need to look at how lkdtm works exactly.
 
-> > > +static int exynos_rng_probe(struct platform_device *pdev)
-> > > +{
-> > > +	struct exynos_rng_dev *rng;
-> > > +	struct resource *res;
-> > > +	int ret;
-> > > +
-> > > +	if (exynos_rng_dev)
-> > > +		return -EEXIST;
-> > 
-> > How this condition could ever happen? 
-> > 
-> > The probe function will never be called twice.
-> 
-> I really do not like global or file-scope variables. I do not like
-> drivers using them. Actually I hate them.
-> 
-> From time to time I encounter a driver which was designed with that
-> approach - static fields and hidden assumption that there will be only
-> one instance. Usually that assumption is really hidden...
-> 
-> ... and then it happens that I want to use two instances which of course
-> fails.
-> 
-> This code serves as a clear documentation for this assumption - only one
-> instance is allowed. You can look at it as a self-documenting
-> requirement.
-
-For me it looks as needless case of defensive programming and when
-I see the code like this it always raises questions about the real
-intentions of the code. I find it puzzling and not helpful.
-
-> And I think the probe might be called twice, for example in case of
-> mistake in DTB.
-
-Even if this is possible resource allocation code in the driver will
-take take care of handling it just fine,
-
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+-- 
+Thomas
