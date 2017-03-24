@@ -1,78 +1,78 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Fri, 24 Mar 2017 17:43:48 +0300
-Subject: [PATCH 1/3] crypto: hw_random - Add new Exynos RNG driver
-In-Reply-To: <2503592.nlbQnVP8UR@positron.chronox.de>
-References: <20170324142446.31129-1-krzk@kernel.org>
- <20170324142446.31129-2-krzk@kernel.org>
- <2503592.nlbQnVP8UR@positron.chronox.de>
-Message-ID: <20170324144348.v4hegak7dffh5awh@kozik-lap>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 24 Mar 2017 14:45:24 +0000
+Subject: [PATCH v4 05/28] arm64: KVM: Implement HVC_RESET_VECTORS stub
+ hypercall in the init code
+In-Reply-To: <20170324143350.GB25903@cbox>
+References: <20170321192058.9300-1-marc.zyngier@arm.com>
+ <20170321192058.9300-6-marc.zyngier@arm.com> <20170324143350.GB25903@cbox>
+Message-ID: <f2c1bc8a-4108-1540-29b4-535ea5ac428e@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 24, 2017 at 03:37:59PM +0100, Stephan M?ller wrote:
-> Am Freitag, 24. M?rz 2017, 15:24:44 CET schrieb Krzysztof Kozlowski:
+On 24/03/17 14:33, Christoffer Dall wrote:
+> On Tue, Mar 21, 2017 at 07:20:35PM +0000, Marc Zyngier wrote:
+>> In order to restore HYP mode to its original condition, KVM currently
+>> implements __kvm_hyp_reset(). As we're moving towards a hyp-stub
+>> defined API, it becomes necessary to implement HVC_RESET_VECTORS.
+>>
+>> This patch adds the HVC_RESET_VECTORS hypercall to the KVM init
+>> code, which so far lacked any form of hypercall support.
+>>
+>> Reviewed-by: James Morse <james.morse@arm.com>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  arch/arm64/kvm/hyp-init.S | 12 ++++++++++++
+>>  1 file changed, 12 insertions(+)
+>>
+>> diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
+>> index 6b29d3d9e1f2..6cf98ccd10f2 100644
+>> --- a/arch/arm64/kvm/hyp-init.S
+>> +++ b/arch/arm64/kvm/hyp-init.S
+>> @@ -22,6 +22,7 @@
+>>  #include <asm/kvm_mmu.h>
+>>  #include <asm/pgtable-hwdef.h>
+>>  #include <asm/sysreg.h>
+>> +#include <asm/virt.h>
+>>  
+>>  	.text
+>>  	.pushsection	.hyp.idmap.text, "ax"
+>> @@ -58,6 +59,9 @@ __invalid:
+>>  	 * x2: HYP vectors
+>>  	 */
+>>  __do_hyp_init:
+>> +	/* Check for a stub HVC call */
+>> +	cmp	x0, #HVC_STUB_HCALL_NR
+>> +	b.lo	__kvm_handle_stub_hvc
+>>  
+>>  	msr	ttbr0_el2, x0
+>>  
+>> @@ -119,6 +123,9 @@ __do_hyp_init:
+>>  	eret
+>>  ENDPROC(__kvm_hyp_init)
+>>  
+>> +ENTRY(__kvm_handle_stub_hvc)
+>> +	cmp	x0, #HVC_RESET_VECTORS
+>> +	b.ne	1f
+>>  	/*
+>>  	 * Reset kvm back to the hyp stub.
+>>  	 */
+>> @@ -133,9 +140,14 @@ ENTRY(__kvm_hyp_reset)
+>>  	/* Install stub vectors */
+>>  	adr_l	x0, __hyp_stub_vectors
+>>  	msr	vbar_el2, x0
+>> +	b	exit
+>>  
+>> +1:	mov	x0, #-1
 > 
-> Hi Krzysztof,
-> 
-> > +
-> > +static int exynos_rng_set_seed(struct exynos_rng_dev *rng,
-> > +			       const u8 *seed, unsigned int slen)
-> > +{
-> > +	int ret, i;
-> > +	u32 val;
-> > +
-> > +	dev_dbg(rng->dev, "Seeding with %u bytes\n", slen);
-> > +
-> > +	ret = clk_prepare_enable(rng->clk);
-> > +	if (ret)
-> > +		return ret;
-> > +
-> > +	if (slen < EXYNOS_RNG_SEED_SIZE) {
-> > +		dev_warn(rng->dev, "Seed too short (only %u bytes)\n", slen);
-> > +		ret = -EINVAL;
-> > +		goto out;
-> > +	}
-> > +
-> > +	for (i = 0 ; i < EXYNOS_RNG_SEED_REGS ; i++) {
-> > +		val = seed[i * 4] << 24;
-> > +		val |= seed[i * 4 + 1] << 16;
-> > +		val |= seed[i * 4 + 2] << 8;
-> > +		val |= seed[i * 4 + 3] << 0;
-> > +
-> > +		exynos_rng_writel(rng, val, EXYNOS_RNG_SEED(i));
-> > +	}
-> > +
-> > +	val = exynos_rng_readl(rng, EXYNOS_RNG_STATUS);
-> > +	if (!(val & EXYNOS_RNG_STATUS_SEED_SETTING_DONE)) {
-> > +		dev_warn(rng->dev, "Seed setting not finished\n");
-> > +		ret = -EIO;
-> > +		goto out;
-> > +	}
-> > +
-> > +	ret = 0;
-> > +	/* Save seed for suspend */
-> > +	memcpy(rng->seed_save, seed, slen);
-> 
-> Is this really necessary? If you need to save some seed, shouldn't that be an 
-> output of the DRNG and not the real seed?
+> nit: do we have the -1 return value documented somewhere and should we
+> define it as HVC_SUB_ERR_RETURN or something like that?
 
-When suspended to RAM device will loose the contents of registers
-(including SEED registers) so it has to be initialized with something on
-resume.
+Indeed, this is something that is a bit dodgy. arm64 returns
+ARM_EXCEPTION_HYP_GONE, which is really a KVM exception code (and isn't
+-1 either). I'll try to tighten this up a bit.
 
-The seed registers are write-only so I cannot read them and store
-contents just before suspend.
+Thanks,
 
-I understand that real seed should not be stored... but then if I am not
-able to re-seed it with same values, I will loose the continuous and
-reproducible pseudo-random generation after suspend. Aren't this
-expected out of PRNG?
-
-> Besides, how do you know that slen is not larger than EXYNOS_RNG_SEED_SIZE?
-
-Right, there is a overflow here. It should be sizeof(rng->seed_save);
-
-Thanks for review!
-
-Best regards,
-Krzysztof
+	M.
+-- 
+Jazz is not dead. It just smells funny...
