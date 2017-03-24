@@ -1,45 +1,25 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Fri, 24 Mar 2017 15:36:08 +0100
-Subject: [PATCH v4 00/28] arm/arm64: KVM: Rework the hyp-stub API
-In-Reply-To: <20170321192058.9300-1-marc.zyngier@arm.com>
-References: <20170321192058.9300-1-marc.zyngier@arm.com>
-Message-ID: <20170324143608.GF25903@cbox>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 24 Mar 2017 09:37:32 -0500
+Subject: [PATCH v3 04/11] IIO: add DT bindings for stm32 DFSDM filter
+In-Reply-To: <1489759704-30217-5-git-send-email-arnaud.pouliquen@st.com>
+References: <1489759704-30217-1-git-send-email-arnaud.pouliquen@st.com>
+ <1489759704-30217-5-git-send-email-arnaud.pouliquen@st.com>
+Message-ID: <20170324143732.nvq2wfra6q3hcrhs@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
-
-On Tue, Mar 21, 2017 at 07:20:30PM +0000, Marc Zyngier wrote:
-> As noticed by RMK in this thread[1], the hyp-stub API on 32bit ARM
-> could do with some TLC (it cannot perform a soft-restart at HYP, and
-> has holes in the hyp-stub support in a number of places). In general,
-> it would be desirable for the 32bit behaviour to align on 64bit, if
-> only to ease maintenance.
+On Fri, Mar 17, 2017 at 03:08:17PM +0100, Arnaud Pouliquen wrote:
+> Add bindings that describes Digital Filter for Sigma Delta
+> Modulators. DFSDM allows to connect sigma delta
+> modulators.
 > 
-> This series implements the following:
-> - Add HVC_[GS]ET_VECTORS and HVC_SOFT_RESTART to the 32bit code
-> - Add HVC_RESET_VECTORS to both arm and arm64, removing the need for
->   __hyp_reset_vectors
-> - Implement add the stub entry points in the KVM init code, which
->   didn't implement any so far
-> - Convert the HYP code to use the init code stubs directly
-> - Some general cleanup as a result of these changes (which includes
->   killing HVC_GET_VECTORS)
-> - Add some API documentation that covers the above
+> Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
+> ---
+> V2->V3:
+>    Fixes based on V2 comments
 > 
-> Patches 12 to 14 would be better squashed into 10 and 11, but I've
-> kept them separate so that I can take the blame for everything I've
-> broken.
-> 
-> I've tested this on arm (Cubietruck, Jetson TK1) and arm64 (Seattle),
-> both as host and guest. Keerthy has been kind enough to test the 32bit
-> code on DRA7-EVM, AM57XX-EVM and KEYSTONE-K2E-EVM.
+>  .../bindings/iio/adc/st,stm32-dfsdm-adc.txt        | 120 +++++++++++++++++++++
+>  1 file changed, 120 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/iio/adc/st,stm32-dfsdm-adc.txt
 
-
-For the series, except where I had some minor questions:
-
-Acked-by: Christoffer Dall <cdall@linaro.org>
-
-
-Thanks,
--Christoffer
+Acked-by: Rob Herring <robh@kernel.org>
