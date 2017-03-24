@@ -1,81 +1,80 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 24 Mar 2017 15:16:54 +0000
-Subject: [PATCH 3/9] arm64: mm: install SError abort handler
-In-Reply-To: <20170324144632.5896-4-opendmb@gmail.com>
-References: <20170324144632.5896-1-opendmb@gmail.com>
- <20170324144632.5896-4-opendmb@gmail.com>
-Message-ID: <20170324151654.GD29588@leverpostej>
+From: moritz.fischer.private@gmail.com (Moritz Fischer)
+Date: Fri, 24 Mar 2017 08:23:18 -0700
+Subject: [PATCH v3 1/2] doc: Add bindings document for Xilinx LogiCore PR
+ Decoupler
+In-Reply-To: <20170324145908.aiijqixf5xcnkksa@rob-hp-laptop>
+References: <1489781473-30772-1-git-send-email-mdf@kernel.org>
+ <20170324145908.aiijqixf5xcnkksa@rob-hp-laptop>
+Message-ID: <20170324152318.GA13089@tyrael.amer.corp.natinst.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 24, 2017 at 07:46:26AM -0700, Doug Berger wrote:
-> This commit adds support for minimal handling of SError aborts and
-> allows them to be hooked by a driver or other part of the kernel to
-> install a custom SError abort handler.  The hook function returns
-> the previously registered handler so that handlers may be chained if
-> desired.
+On Fri, Mar 24, 2017 at 09:59:08AM -0500, Rob Herring wrote:
+> On Fri, Mar 17, 2017 at 01:11:12PM -0700, Moritz Fischer wrote:
+> > This adds the binding documentation for the Xilinx LogiCORE PR
+> > Decoupler soft core.
+> > 
+> > Signed-off-by: Moritz Fischer <mdf@kernel.org>
+> > Cc: Michal Simek <michal.simek@xilinx.com>
+> > Cc: S?ren Brinkmann <soren.brinkmann@xilinx.com>
+> > Cc: linux-kernel at vger.kernel.org
+> > Cc: devicetree at vger.kernel.org
+> > ---
+> > 
+> > Changes from v2:
+> > - Added refence to generic fpga-region bindings
+> > - Fixed up reg property in example
+> > - Added fallback to "xlnx,pr-decoupler" without version
+> > 
+> > Changes from v1:
+> > - Added clock names & clock to example
+> > - Merged some of the description from Michal's version
+> > 
+> > ---
+> >  .../bindings/fpga/xilinx-pr-decoupler.txt          | 35 ++++++++++++++++++++++
+> >  1 file changed, 35 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/fpga/xilinx-pr-decoupler.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/fpga/xilinx-pr-decoupler.txt b/Documentation/devicetree/bindings/fpga/xilinx-pr-decoupler.txt
+> > new file mode 100644
+> > index 0000000..16141bd
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/fpga/xilinx-pr-decoupler.txt
+> > @@ -0,0 +1,35 @@
+> > +Xilinx LogiCORE Partial Reconfig Decoupler Softcore
+> > +
+> > +The Xilinx LogiCORE Partial Reconfig Decoupler manages one or more
+> > +decouplers / fpga bridges.
+> > +The controller can decouple/disable the bridges which prevents signal
+> > +changes from passing through the bridge.  The controller can also
+> > +couple / enable the bridges which allows traffic to pass through the
+> > +bridge normally.
+> > +
+> > +The Driver supports only MMIO handling. A PR region can have multiple
+> > +PR Decouples which can bhe handled independently or chaines via decouple/
 > 
-> The handler should return the value 0 if the error has been handled,
-> otherwise the handler should either call the next handler in the
-> chain or return a non-zero value.
+> s/chaines/chains/
 
-... so the order these get calls is completely dependent on probe
-order...
+Fixed in v4.
 
-> Since the Instruction Specific Syndrome value for SError aborts is
-> implementation specific the registerred handlers must implement
-> their own parsing of the syndrome.
+> > +decouple_status signals.
+> > +
+> > +Required properties:
+> > +- compatible		: Should contain "xlnx,pr-decoupler-1.00"
+> > +- regs			: base address and size for decoupler module
+> > +- clocks		: input clock to IP
+> > +- clock-names		: should contain "aclk"
+> > +
+> > +Optional properties:
+> > +- bridge-enable		: 0 if driver should disable bridge at startup
+> > +			  1 if driver should enable bridge at startup
+> > +			  Default is to leave bridge in current state.
+> 
+> This is common and should move into a common doc. Maybe fpga-region.txt 
+> works?
 
-... and drivers have to be intimately familiar with the CPU, in order to
-be able to parse its IMPLEMENTATION DEFINED ESR_ELx.ISS value.
+Ok will add patch for that to v5 series.
 
-Even then, there's no guarantee there's anything useful there, since it
-is IMPLEMENTATION DEFINED and could simply be RES0 or UNKNOWN in all
-cases.
+Thanks for your feedback,
 
-I do not think it is a good idea to allow arbitrary drivers to hook
-this fault in this manner.
-
-> +	.align	6
-> +el0_error:
-> +	kernel_entry 0
-> +el0_error_naked:
-> +	mrs	x25, esr_el1			// read the syndrome register
-> +	lsr	x24, x25, #ESR_ELx_EC_SHIFT	// exception class
-> +	cmp	x24, #ESR_ELx_EC_SERROR		// SError exception in EL0
-> +	b.ne	el0_error_inv
-> +el0_serr:
-> +	mrs	x26, far_el1
-> +	// enable interrupts before calling the main handler
-> +	enable_dbg_and_irq
-
-... why?
-
-We don't do this for inv_entry today.
-
-> +	ct_user_exit
-> +	bic	x0, x26, #(0xff << 56)
-> +	mov	x1, x25
-> +	mov	x2, sp
-> +	bl	do_serr_abort
-> +	b	ret_to_user
-> +el0_error_inv:
-> +	enable_dbg
-> +	mov	x0, sp
-> +	mov	x1, #BAD_ERROR
-> +	mov	x2, x25
-> +	b	bad_mode
-> +ENDPROC(el0_error)
-
-Clearly you expect these to be delivered at arbitrary times during
-execution. What if a KVM guest is executing at the time the SError is
-delivered?
-
-To be quite frank, I don't believe that we can reliably and safely
-handle this misfeature in the kernel, and this infrastructure only
-provides the illusion that we can.
-
-I do not think it makes sense to do this.
-
-Thanks,
-Mark.
+Moritz
