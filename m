@@ -1,27 +1,71 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Fri, 24 Mar 2017 17:58:18 +0300
-Subject: [PATCH 1/3] crypto: hw_random - Add new Exynos RNG driver
-In-Reply-To: <2090327.CHzkLTTdtg@positron.chronox.de>
-References: <20170324142446.31129-1-krzk@kernel.org>
- <3628768.ze2UxnIp5I@tauon.atsec.com>
- <20170324145156.miqmxgkhn2v7rbcu@kozik-lap>
- <2090327.CHzkLTTdtg@positron.chronox.de>
-Message-ID: <20170324145818.3muyy4cq3gms5len@kozik-lap>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 24 Mar 2017 15:01:23 +0000
+Subject: [PATCH v4 19/28] ARM: KVM: Allow the main HYP code to use the
+ init hyp stub implementation
+In-Reply-To: <20170324143432.GD25903@cbox>
+References: <20170321192058.9300-1-marc.zyngier@arm.com>
+ <20170321192058.9300-20-marc.zyngier@arm.com> <20170324143432.GD25903@cbox>
+Message-ID: <00380529-bee2-ba10-548d-319bc4fa5c1b@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 24, 2017 at 03:55:22PM +0100, Stephan M?ller wrote:
-> Am Freitag, 24. M?rz 2017, 15:51:56 CET schrieb Krzysztof Kozlowski:
+On 24/03/17 14:34, Christoffer Dall wrote:
+> On Tue, Mar 21, 2017 at 07:20:49PM +0000, Marc Zyngier wrote:
+>> We now have a full hyp-stub implementation in the KVM init code,
+>> but the main KVM code only supports HVC_GET_VECTORS, which is not
+>> enough.
+>>
+>> Instead of reinventing the wheel, let's reuse the init implementation
+>> by branching to the idmap page when called with a hyp-stub hypercall.
+>>
+>> Tested-by: Keerthy <j-keerthy@ti.com>
+>> Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  arch/arm/kvm/hyp/hyp-entry.S | 29 ++++++++++++++++++++++++-----
+>>  1 file changed, 24 insertions(+), 5 deletions(-)
+>>
+>> diff --git a/arch/arm/kvm/hyp/hyp-entry.S b/arch/arm/kvm/hyp/hyp-entry.S
+>> index 1f8db7d21fc5..a35baa81fd23 100644
+>> --- a/arch/arm/kvm/hyp/hyp-entry.S
+>> +++ b/arch/arm/kvm/hyp/hyp-entry.S
+>> @@ -126,11 +126,30 @@ hyp_hvc:
+>>  	 */
+>>  	pop	{r0, r1, r2}
+>>  
+>> -	/* Check for __hyp_get_vectors */
+>> -	cmp	r0, #HVC_GET_VECTORS
+>> -	mrceq	p15, 4, r0, c12, c0, 0	@ get HVBAR
+>> -	beq	1f
+>> +	/*
+>> +	 * Check if we have a kernel function, which is guaranteed to be
+>> +	 * bigger than the maximum hyp stub hypercall
+>> +	 */
+>> +	cmp	r0, #HVC_STUB_HCALL_NR
+>> +	bhs	1f
+>>  
+>> +	/*
+>> +	 * Not a kernel function, treat it as a stub hypercall.
+>> +	 * Compute the physical address for __kvm_handle_stub_hvc
+>> +	 * (as the code lives in the idmaped page) and branch there.
+>> +	 * We hijack ip (r12) as a tmp register.
+>> +	 */
 > 
-> Hi Krzysztof,
-> > 
-> > I'll use the generated random numbers.
-> 
-> If you do that, may I propse that you update this seed field periodically? 
-> E.g. with every (or every other) user request for random data, you may update 
-> that field with new data.
+> How can we just clobber r12 and be sure we don't corrupt the caller?
 
-Sounds reasonable. Thanks for feedback, it is much appreciated.
+r12 (aka ip) is allowed to be clobbered by the linker (used by inserted
+code veneers, for example). Given that this is a standalone object, we
+can safely assume that r12 has been saved if it was used by the caller.
 
-Best regards,
-Krzysztof
+Here is what the PCS says:
+
+"Register r12 (IP) may be used by a linker as a scratch register between
+a routine and any subroutine it calls (for details, see
+?5.3.1.1, Use of IP by the linker). It can also be used within a routine
+to hold intermediate values between subroutine calls."
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
