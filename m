@@ -1,30 +1,69 @@
-From: smueller@chronox.de (Stephan =?ISO-8859-1?Q?M=FCller?=)
-Date: Sat, 25 Mar 2017 17:32:12 +0100
-Subject: [PATCH v3 0/3] crypto: hw_random - Add new Exynos RNG driver
-In-Reply-To: <20170325162654.3827-1-krzk@kernel.org>
-References: <20170325162654.3827-1-krzk@kernel.org>
-Message-ID: <11209034.TNQDREpKIz@tauon.atsec.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Sat, 25 Mar 2017 12:43:30 -0500
+Subject: [PATCH] pci: mvebu: avoid changing the SCC bit in the link
+ status register
+In-Reply-To: <20170325125859.GM7909@n2100.armlinux.org.uk>
+References: <E1cTbUq-0008Gj-9u@rmk-PC.armlinux.org.uk>
+ <20170325125859.GM7909@n2100.armlinux.org.uk>
+Message-ID: <20170325174330.GH25380@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Samstag, 25. M?rz 2017, 17:26:51 CET schrieb Krzysztof Kozlowski:
+On Sat, Mar 25, 2017 at 12:58:59PM +0000, Russell King - ARM Linux wrote:
+> Ping.  This _fix_ doesn't seem to have made it in.
 
-Hi Krzysztof,
+Thanks for the ping.  I work from patchwork, and I couldn't find any
+trace of this patch there, so there must have been a glitch.
 
-> Hi,
+I applied it to pci/host-mvebu for v4.12.
+
+> On Tue, Jan 17, 2017 at 09:40:52PM +0000, Russell King wrote:
+> > It seems on later Armada 38x, the slot clock configuration bit is not
+> > read-only, but can be written.  This means that our RW1C protection
+> > ends up clearing this bit when the link control register is written.
+> > 
+> > Adjust the mask so that we only avoid writing '1' bits to the RW1C
+> > bits of this register (bits 15 and 14 of the link status) rather than
+> > masking out all the status register bits.
+> > 
+> > Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+> > ---
+> >  drivers/pci/host/pci-mvebu.c | 5 +++--
+> >  1 file changed, 3 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
+> > index 58f75c098b42..3ed4cb7501bd 100644
+> > --- a/drivers/pci/host/pci-mvebu.c
+> > +++ b/drivers/pci/host/pci-mvebu.c
+> > @@ -827,10 +827,11 @@ static int mvebu_sw_pci_bridge_write(struct mvebu_pcie_port *port,
+> >  		 * If the mask is 0xffff0000, then we only want to write
+> >  		 * the link control register, rather than clearing the
+> >  		 * RW1C bits in the link status register.  Mask out the
+> > -		 * status register bits.
+> > +		 * RW1C bits.
+> >  		 */
+> >  		if (mask == 0xffff0000)
+> > -			value &= 0xffff;
+> > +			value &= ~((PCI_EXP_LNKSTA_LABS |
+> > +				    PCI_EXP_LNKSTA_LBMS) << 16);
+> >  
+> >  		mvebu_writel(port, value, PCIE_CAP_PCIEXP + PCI_EXP_LNKCTL);
+> >  		break;
+> > -- 
+> > 2.7.4
+> > 
+> > 
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 > 
+> -- 
+> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+> according to speedtest.net.
 > 
-> This is a follow up of my questions around exynos-rng [1].
-> 
-> Changes since v2:
-> =================
-> 1. Do not re-use random numbers for re-seed (neither for system resume
->    nor for periodic re-seed).  Instead the driver will just generate new
->    random numbers (suggested by Stephan M?ller).
-
-Thank you. Regarding the cryptographic aspects:
-
-Reviewed-by: Stephan M?ller <smueller@chronox.de>
-
-Ciao
-Stephan
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
