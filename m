@@ -1,64 +1,73 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Sat, 25 Mar 2017 10:08:59 -0400
-Subject: [PATCH] ACPI / IPMI: change warning to debug on timeout
-In-Reply-To: <537c0d7a-fd95-2e7f-be07-9e3ca79ca07a@acm.org>
-References: <1490283150-24000-1-git-send-email-okaya@codeaurora.org>
- <537c0d7a-fd95-2e7f-be07-9e3ca79ca07a@acm.org>
-Message-ID: <39c54677-1472-afff-ec70-45a790f56e50@codeaurora.org>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Sat, 25 Mar 2017 22:50:07 +0800
+Subject: [PATCH v5 0/8] Add dual-role OTG support for Allwinner H3
+Message-ID: <20170325145015.22076-1-icenowy@aosc.xyz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/24/2017 10:55 PM, Corey Minyard wrote:
-> Why would a timeout for a message be expected?  The BMC should
-> at least respond with an error for an incorrect message.
+Allwinner H3 have a its USB PHY0 routed to two USB controllers: one is
+a MUSB controller, which can work in peripheral mode, but works badly in
+host mode (several hardware will fail on the MUSB controller, even connect
+one MUSB controller in peripheral mode to another one in host mode cannot
+work); the other is a pair of EHCI/OHCI controller, which can work only
+in host mode, but have better compatibillity. The route is controlled in
+a register, which we have set it to HCI only when we do not know about
+it well.
 
-Let me add some more context...
+Add support to route to the best controller according to current USB mode
+(host/peripheral).
 
-In this particular case, the FRU ID that I was trying to access was
-correct. 
+Note: Currently even if hardware only support hostmode, we should still
+enable the MUSB controller, as it controls the USB mode. (Some this kind
+of hardware can also work in peripheral mode by settings in the sysfs
+node of MUSB, then connect it to another host via a USB Type-A to Type-A
+cable.)
 
-Platform supports PCIe hotplug. The FRU is embedded into the HW that
-is being removed. That's what I mean by non-existent.
+Patch 1 changes the device tree binding to include the "pmu0" for HCI pair.
 
-When the device is ejected and a FRU command is executed, BMC times out
-reaching to the FRU on the device. 
+Patch 2 and 3 are fixes for H3 PHY, in order to make MUSB really working
+on H3.
 
-When the device is inserted, everything works as expected.
+Patch 4 adds support for auto routing of PHY0. It's currently only enabled
+on H3, but it's easy to extend it to other SoCs which feature this
+route control.
 
-> 
-> -corey
-> 
-> On 03/23/2017 10:32 AM, Sinan Kaya wrote:
->> Getting timeout message from BMC when trying to read from a non-existent
->> FRU. This is expected but warning is not.
->>
->> Let's reduce the warning to debug.
->>
->> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
->> ---
->>   drivers/acpi/acpi_ipmi.c | 3 +--
->>   1 file changed, 1 insertion(+), 2 deletions(-)
->>
->> diff --git a/drivers/acpi/acpi_ipmi.c b/drivers/acpi/acpi_ipmi.c
->> index 747c2ba..1b64419 100644
->> --- a/drivers/acpi/acpi_ipmi.c
->> +++ b/drivers/acpi/acpi_ipmi.c
->> @@ -429,8 +429,7 @@ static void ipmi_msg_handler(struct ipmi_recv_msg *msg, void *user_msg_data)
->>       if (msg->recv_type == IPMI_RESPONSE_RECV_TYPE &&
->>           msg->msg.data_len == 1) {
->>           if (msg->msg.data[0] == IPMI_TIMEOUT_COMPLETION_CODE) {
->> -            dev_WARN_ONCE(dev, true,
->> -                      "Unexpected response (timeout).\n");
->> +            dev_dbg_once(dev, "Unexpected response (timeout).\n");
->>               tx_msg->msg_done = ACPI_IPMI_TIMEOUT;
->>           }
->>           goto out_comp;
-> 
-> 
-> 
+Patch 5 adds necessary device tree nodes to the H3/H5 DTSI file. Note: The
+phy is not bind for OHCI/EHCI0, as OHCI/EHCI drivers will keep the VBUS
+on. Only MUSB driver can properly handle a dual-role PHY.
 
+Patch 6 enables USB OTG functionality on Orange Pi One board, which is
+the only H3 board I have that have proper OTG function. It's easy to
+enable OTG on other boards with their schematics.
+
+Patch 7 enables USB OTG functionality on Orange Pi Zero board, as the
+board cannot output power on Vbus, I only enabled peripheral mode by
+default.
+
+Patch 8 enables USB OTG funcionality on Orange Pi PC2 board, which is
+the newly support H5 board, and have USB-related pins same as Orange
+Pi One.
+
+The USB PHY on V3s/A64 SoCs also feature this capability, and it will
+be soon enabled on these SoCs after this patchset is merged.
+
+Icenowy Zheng (8):
+  dt: bindings: add pmu0 regs for USB PHYs on Allwinner H3/V3s/A64
+  phy: sun4i-usb: change PHYCTL register clearing code
+  phy: sun4i-usb: add PHYCTL offset for H3 SoC
+  phy: sun4i-usb: support automatically switch PHY0 route to MUSB/HCI
+  ARM: sunxi: h3/h5: add usb_otg and OHCI/EHCI for usbc0 on H3/H5
+  ARM: sun8i: h3: enable USB OTG on Orange Pi One
+  ARM: sun8i: h2+: enable USB OTG for Orange Pi Zero board
+  arm64: allwinner: h5: enable USB OTG on Orange Pi PC 2 board
+
+ .../devicetree/bindings/phy/sun4i-usb-phy.txt      |  1 +
+ arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts  | 20 +++++++-
+ arch/arm/boot/dts/sun8i-h3-orangepi-one.dts        | 22 ++++++++-
+ arch/arm/boot/dts/sunxi-h3-h5.dtsi                 | 32 ++++++++++++
+ .../boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts  | 27 +++++++++-
+ drivers/phy/phy-sun4i-usb.c                        | 57 ++++++++++++++--------
+ 6 files changed, 135 insertions(+), 24 deletions(-)
 
 -- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+2.12.0
