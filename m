@@ -1,79 +1,84 @@
 From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Sat, 25 Mar 2017 22:50:12 +0800
-Subject: [PATCH v5 5/8] ARM: sunxi: h3/h5: add usb_otg and OHCI/EHCI for usbc0
- on H3/H5
+Date: Sat, 25 Mar 2017 22:50:13 +0800
+Subject: [PATCH v5 6/8] ARM: sun8i: h3: enable USB OTG on Orange Pi One
 In-Reply-To: <20170325145015.22076-1-icenowy@aosc.xyz>
 References: <20170325145015.22076-1-icenowy@aosc.xyz>
-Message-ID: <20170325145015.22076-6-icenowy@aosc.xyz>
+Message-ID: <20170325145015.22076-7-icenowy@aosc.xyz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allwinner H3/H5 have a dual-routed USB PHY0 -- routed to either OHCI/EHCI
-or MUSB controller.
+Orange Pi One features a MicroUSB port that can work in both host mode
+and peripheral mode.
 
-Add device nodes for these controllers.
+When in host mode, its VBUS is controlled via a GPIO; when in peripheral
+mode, its VBUS cannot be used to power up the board.
+
+Add support for this port.
 
 Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+Acked-by: Chen-Yu Tsai <wens@csie.org>
 ---
 Changes in v5:
-- Change the size of &usb_otg address space from 0x0400 to 0x400.
-Changes in v4:
-- Add h5 to commit message.
+- Add Chen-Yu's ACK.
 Changes in v3:
-- Add "h3:" to commit message.
+- Add "h3:" in commit message.
 
- arch/arm/boot/dts/sunxi-h3-h5.dtsi | 32 ++++++++++++++++++++++++++++++++
- 1 file changed, 32 insertions(+)
+ arch/arm/boot/dts/sun8i-h3-orangepi-one.dts | 22 +++++++++++++++++++++-
+ 1 file changed, 21 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/sunxi-h3-h5.dtsi b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
-index 2494ea063cd4..6640ebfa6419 100644
---- a/arch/arm/boot/dts/sunxi-h3-h5.dtsi
-+++ b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
-@@ -144,6 +144,19 @@
- 			#size-cells = <0>;
- 		};
+diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts
+index ea8fd1325356..5fea430e0eb1 100644
+--- a/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts
++++ b/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts
+@@ -89,6 +89,10 @@
+ 	};
+ };
  
-+		usb_otg: usb at 01c19000 {
-+			compatible = "allwinner,sun8i-h3-musb";
-+			reg = <0x01c19000 0x400>;
-+			clocks = <&ccu CLK_BUS_OTG>;
-+			resets = <&ccu RST_BUS_OTG>;
-+			interrupts = <GIC_SPI 71 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-names = "mc";
-+			phys = <&usbphy 0>;
-+			phy-names = "usb";
-+			extcon = <&usbphy 0>;
-+			status = "disabled";
-+		};
++&ehci0 {
++	status = "okay";
++};
 +
- 		usbphy: phy at 01c19400 {
- 			compatible = "allwinner,sun8i-h3-usb-phy";
- 			reg = <0x01c19400 0x2c>,
-@@ -176,6 +189,25 @@
- 			#phy-cells = <1>;
- 		};
+ &ehci1 {
+ 	status = "okay";
+ };
+@@ -103,6 +107,10 @@
+ 	status = "okay";
+ };
  
-+		ehci0: usb at 01c1a000 {
-+			compatible = "allwinner,sun8i-h3-ehci", "generic-ehci";
-+			reg = <0x01c1a000 0x100>;
-+			interrupts = <GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&ccu CLK_BUS_EHCI0>, <&ccu CLK_BUS_OHCI0>;
-+			resets = <&ccu RST_BUS_EHCI0>, <&ccu RST_BUS_OHCI0>;
-+			status = "disabled";
-+		};
++&ohci0 {
++	status = "okay";
++};
 +
-+		ohci0: usb at 01c1a400 {
-+			compatible = "allwinner,sun8i-h3-ohci", "generic-ohci";
-+			reg = <0x01c1a400 0x100>;
-+			interrupts = <GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&ccu CLK_BUS_EHCI0>, <&ccu CLK_BUS_OHCI0>,
-+				 <&ccu CLK_USB_OHCI0>;
-+			resets = <&ccu RST_BUS_EHCI0>, <&ccu RST_BUS_OHCI0>;
-+			status = "disabled";
-+		};
+ &ohci1 {
+ 	status = "okay";
+ };
+@@ -126,6 +134,11 @@
+ 	};
+ };
+ 
++&reg_usb0_vbus {
++	gpio = <&r_pio 0 2 GPIO_ACTIVE_HIGH>; /* PL2 */
++	status = "okay";
++};
 +
- 		ehci1: usb at 01c1b000 {
- 			compatible = "allwinner,sun8i-h3-ehci", "generic-ehci";
- 			reg = <0x01c1b000 0x100>;
+ &uart0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart0_pins_a>;
+@@ -150,7 +163,14 @@
+ 	status = "disabled";
+ };
+ 
++&usb_otg {
++	dr_mode = "otg";
++	status = "okay";
++};
++
+ &usbphy {
+-	/* USB VBUS is always on */
++	/* USB Type-A port's VBUS is always on */
++	usb0_id_det-gpios = <&pio 6 12 GPIO_ACTIVE_HIGH>; /* PG12 */
++	usb0_vbus-supply = <&reg_usb0_vbus>;
+ 	status = "okay";
+ };
 -- 
 2.12.0
