@@ -1,84 +1,54 @@
 From: leo.yan@linaro.org (Leo Yan)
-Date: Sun, 26 Mar 2017 02:23:09 +0800
-Subject: [PATCH v5 1/9] coresight: bindings for CPU debug module
+Date: Sun, 26 Mar 2017 02:23:10 +0800
+Subject: [PATCH v5 2/9] doc: Add documentation for Coresight CPU debug
 In-Reply-To: <1490466197-29163-1-git-send-email-leo.yan@linaro.org>
 References: <1490466197-29163-1-git-send-email-leo.yan@linaro.org>
-Message-ID: <1490466197-29163-2-git-send-email-leo.yan@linaro.org>
+Message-ID: <1490466197-29163-3-git-send-email-leo.yan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to ARMv8 architecture reference manual (ARM DDI 0487A.k)
-Chapter 'Part H: External debug', the CPU can integrate debug module
-and it can support self-hosted debug and external debug. Especially
-for supporting self-hosted debug, this means the program can access
-the debug module from mmio region; and usually the mmio region is
-integrated with coresight.
+Update kernel-parameters.txt to add two new parameters:
 
-So add document for binding debug component, includes binding to APB
-clock; and also need specify the CPU node which the debug module is
-dedicated to specific CPU.
+- coresight_cpu_debug.enable is a knob to enable debugging at boot time.
+- coresight_cpu_debug.idle_constraint is used to constrain idle states
+  to ensure Coresight CPU debug component can be accessible.
 
-Suggested-by: Mike Leach <mike.leach@linaro.org>
-Reviewed-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 Signed-off-by: Leo Yan <leo.yan@linaro.org>
 ---
- .../bindings/arm/coresight-cpu-debug.txt           | 48 ++++++++++++++++++++++
- 1 file changed, 48 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/coresight-cpu-debug.txt
+ Documentation/admin-guide/kernel-parameters.txt | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/coresight-cpu-debug.txt b/Documentation/devicetree/bindings/arm/coresight-cpu-debug.txt
-new file mode 100644
-index 0000000..7ef3824
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/coresight-cpu-debug.txt
-@@ -0,0 +1,48 @@
-+* CoreSight CPU Debug Component:
+diff --git a/Documentation/admin-guide/kernel-parameters.txt b/Documentation/admin-guide/kernel-parameters.txt
+index 2ba45ca..6ed57d9 100644
+--- a/Documentation/admin-guide/kernel-parameters.txt
++++ b/Documentation/admin-guide/kernel-parameters.txt
+@@ -650,6 +650,27 @@
+ 			/proc/<pid>/coredump_filter.
+ 			See also Documentation/filesystems/proc.txt.
+ 
++	coresight_cpu_debug.enable
++			[ARM,ARM64]
++			Format: <bool>
++			Enable/disable the CPU sampling based debugging.
++			0: default value, disable debugging
++			1: enable debugging at boot time
 +
-+CoreSight CPU debug component are compliant with the ARMv8 architecture
-+reference manual (ARM DDI 0487A.k) Chapter 'Part H: External debug'. The
-+external debug module is mainly used for two modes: self-hosted debug and
-+external debug, and it can be accessed from mmio region from Coresight
-+and eventually the debug module connects with CPU for debugging. And the
-+debug module provides sample-based profiling extension, which can be used
-+to sample CPU program counter, secure state and exception level, etc;
-+usually every CPU has one dedicated debug module to be connected.
++	coresight_cpu_debug.idle_constraint
++			[ARM,ARM64]
++			Format: <int>
++			Some platforms have designed the idle states to disable
++			CPU power domain and need manually set constraint so
++			can access coresight CPU debug component safely. Setting
++			this parameter for latency requirement in
++			microseconds, finally we can constraint all or partial
++			idle states to ensure the CPU power domain is enabled.
++			Default is -1, which means no limiation to CPU idle
++			states; if set to 0, this means disabling all idle
++			states; user can choose other platform dependent values
++			so can disable specific idle states for the platform.
 +
-+Required properties:
-+
-+- compatible : should be "arm,coresight-cpu-debug"; supplemented with
-+               "arm,primecell" since this driver is using the AMBA bus
-+	       interface.
-+
-+- reg : physical base address and length of the register set.
-+
-+- clocks : the clock associated to this component.
-+
-+- clock-names : the name of the clock referenced by the code. Since we are
-+                using the AMBA framework, the name of the clock providing
-+		the interconnect should be "apb_pclk" and the clock is
-+		mandatory. The interface between the debug logic and the
-+		processor core is clocked by the internal CPU clock, so it
-+		is enabled with CPU clock by default.
-+
-+- cpu : the CPU phandle the debug module is affined to. When omitted
-+	the module is considered to belong to CPU0.
-+
-+Optional properties:
-+
-+- power-domains: a phandle to the debug power domain. We use "power-domains"
-+                 binding to turn on the debug logic if it has own dedicated
-+		 power domain and if necessary to use "idle_constraint" in
-+		 kernel command line or debugfs node to constrain idle states
-+		 to ensure registers in the CPU power domain are accessible.
-+
-+Example:
-+
-+	debug at f6590000 {
-+		compatible = "arm,coresight-cpu-debug","arm,primecell";
-+		reg = <0 0xf6590000 0 0x1000>;
-+		clocks = <&sys_ctrl HI6220_DAPB_CLK>;
-+		clock-names = "apb_pclk";
-+		cpu = <&cpu0>;
-+	};
+ 	cpuidle.off=1	[CPU_IDLE]
+ 			disable the cpuidle sub-system
+ 
 -- 
 2.7.4
