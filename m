@@ -1,37 +1,25 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Sat, 25 Mar 2017 10:02:54 -0400
-Subject: [PATCH V3] ACPI / IPMI: allow ACPI_IPMI with IPMI_SSIF
-Message-ID: <1490450575-29450-1-git-send-email-okaya@codeaurora.org>
+Date: Sat, 25 Mar 2017 10:03:33 -0400
+Subject: [PATCH] ACPI / IPMI: allow ACPI_IPMI with IPMI_SSIF
+In-Reply-To: <78897278-9240-6794-e99b-f3ff3013304f@acm.org>
+References: <1490284420-26657-1-git-send-email-okaya@codeaurora.org>
+ <78897278-9240-6794-e99b-f3ff3013304f@acm.org>
+Message-ID: <2b8eeebf-9ea0-70f7-8f34-d6f2f88106ed@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ACPI_IPMI driver currently depends on IPMI System Interface (IPMI_SI)
-driver to be enabled. IPMI_SI driver only handles KCS, SMIC and BT BMC
-interfaces.
+On 3/24/2017 10:56 PM, Corey Minyard wrote:
+> Oops, yes, this is an issue.
+> 
+> However, it should probably depend on IPMI_HANDLER, not the individual interface types.
+> 
 
-IPMI_SSIF is an alternative BMC communication method. It allows BMC to
-be accessed over an I2C bus instead of a standard interface.
+Thanks for the review. I posted V3 with your recommendation.
 
-Change the dependency to IPMI_HANDLER so that ACPI_IPMI works with all
-IPMI providers.
+> -corey
 
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
----
- drivers/acpi/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
-index 83e5f7e..3e15bf8 100644
---- a/drivers/acpi/Kconfig
-+++ b/drivers/acpi/Kconfig
-@@ -256,7 +256,7 @@ config ACPI_PROCESSOR
- 
- config ACPI_IPMI
- 	tristate "IPMI"
--	depends on IPMI_SI
-+	depends on IPMI_HANDLER
- 	default n
- 	help
- 	  This driver enables the ACPI to access the BMC controller. And it
 -- 
-1.9.1
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
