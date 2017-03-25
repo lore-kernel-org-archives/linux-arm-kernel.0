@@ -1,48 +1,62 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 25 Mar 2017 18:31:17 +0000
-Subject: [PATCH 2/2] iio: adc: meson-saradc: add Meson8b SoC compatibility
-In-Reply-To: <CAFBinCDVLZdBEX=UnGKFCkRF02YYx4hoRw54+AcwAku9zGjvaQ@mail.gmail.com>
-References: <20170325162938.28659-1-martin.blumenstingl@googlemail.com>
- <20170325162938.28659-3-martin.blumenstingl@googlemail.com>
- <231f1fef-e947-3461-2e5b-99d80abfa73a@kernel.org>
- <CAFBinCDVLZdBEX=UnGKFCkRF02YYx4hoRw54+AcwAku9zGjvaQ@mail.gmail.com>
-Message-ID: <c0151b73-2939-179b-0dd3-1fc9e9877c2d@kernel.org>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Sun, 26 Mar 2017 02:23:17 +0800
+Subject: [PATCH v5 9/9] arm64: dts: qcom: msm8916: Add debug unit
+In-Reply-To: <1490466197-29163-1-git-send-email-leo.yan@linaro.org>
+References: <1490466197-29163-1-git-send-email-leo.yan@linaro.org>
+Message-ID: <1490466197-29163-10-git-send-email-leo.yan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/03/17 18:28, Martin Blumenstingl wrote:
-> On Sat, Mar 25, 2017 at 7:13 PM, Jonathan Cameron <jic23@kernel.org> wrote:
->> On 25/03/17 16:29, Martin Blumenstingl wrote:
->>> Meson GX SoCs however use some magic bits to prevent simultaneous (=
->>> conflicting, because only consumer should use the FIFO buffer with the
->>> ADC results) usage by the Linux kernel and the bootloader (the BL30
->>> bootloader uses the SAR ADC to read the CPU temperature).
->>> This patch changes guards all BL30 functionality so it is skipped on
->>> SoCs which don't have it. Since the hardware itself doesn't know whether
->>> BL30 is available the internal meson_sar_adc_data is extended so this
->>> information can be provided per of_device_id.data inside the driver.
->>>
->>> Additionally the clocks "adc_clk" and "adc_sel" are not provided by the
->>> clock-controller itself. "adc_sel" is not available at all. "adc_clk"
->>> is provided by the SAR ADC IP block itself on Meson8b (and earlier).
->>> This is already supported by the meson_saradc driver.
->>>
->>> Finally a new of_device_id for the Meson8b SoC is added so it can be
->>> wired up in the corresponding DT.
->>>
->>> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
->> Looks sensible to me. Just fix those bits from Peter and we'll let it sit
->> a few days on the list to see if anyone else wants to chip in.
-> OK, we'll have to wait for one of the DT-maintainers ACK (on the other
-> patch) anyways, so I'll re-spin this in a week or so and fix
-> everything that has come up until then
-There is some flexibility in 'trivial' dt bindings such as this so as
-not to waste their time.  But we should allow them the opportunity before
-applying it anyway ;)
+Add debug unit on Qualcomm msm8916 based platforms, including the
+DragonBoard 410c board.
 
-Jonathan
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+Signed-off-by: Leo Yan <leo.yan@linaro.org>
+---
+ arch/arm64/boot/dts/qcom/msm8916.dtsi | 32 ++++++++++++++++++++++++++++++++
+ 1 file changed, 32 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+index 68a8e67..3af814b 100644
+--- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
++++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+@@ -1104,6 +1104,38 @@
+ 			};
+ 		};
+ 
++		debug at 850000 {
++			compatible = "arm,coresight-cpu-debug","arm,primecell";
++			reg = <0x850000 0x1000>;
++			clocks = <&rpmcc RPM_QDSS_CLK>;
++			clock-names = "apb_pclk";
++			cpu = <&CPU0>;
++		};
++
++		debug at 852000 {
++			compatible = "arm,coresight-cpu-debug","arm,primecell";
++			reg = <0x852000 0x1000>;
++			clocks = <&rpmcc RPM_QDSS_CLK>;
++			clock-names = "apb_pclk";
++			cpu = <&CPU1>;
++		};
++
++		debug at 854000 {
++			compatible = "arm,coresight-cpu-debug","arm,primecell";
++			reg = <0x854000 0x1000>;
++			clocks = <&rpmcc RPM_QDSS_CLK>;
++			clock-names = "apb_pclk";
++			cpu = <&CPU2>;
++		};
++
++		debug at 856000 {
++			compatible = "arm,coresight-cpu-debug","arm,primecell";
++			reg = <0x856000 0x1000>;
++			clocks = <&rpmcc RPM_QDSS_CLK>;
++			clock-names = "apb_pclk";
++			cpu = <&CPU3>;
++		};
++
+ 		etm at 85c000 {
+ 			compatible = "arm,coresight-etm4x", "arm,primecell";
+ 			reg = <0x85c000 0x1000>;
+-- 
+2.7.4
