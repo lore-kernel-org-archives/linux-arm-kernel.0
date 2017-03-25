@@ -1,265 +1,166 @@
 From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 25 Mar 2017 17:48:34 +0000
-Subject: [PATCH v3 07/11] iio: adc: sun4i-gpadc-iio: add support for A33
- thermal sensor
-In-Reply-To: <20170321153611.16228-8-quentin.schulz@free-electrons.com>
-References: <20170321153611.16228-1-quentin.schulz@free-electrons.com>
- <20170321153611.16228-8-quentin.schulz@free-electrons.com>
-Message-ID: <d43b29c4-7e9c-1cce-6529-e7cd4688a6ac@kernel.org>
+Date: Sat, 25 Mar 2017 18:13:49 +0000
+Subject: [PATCH 2/2] iio: adc: meson-saradc: add Meson8b SoC compatibility
+In-Reply-To: <20170325162938.28659-3-martin.blumenstingl@googlemail.com>
+References: <20170325162938.28659-1-martin.blumenstingl@googlemail.com>
+ <20170325162938.28659-3-martin.blumenstingl@googlemail.com>
+Message-ID: <231f1fef-e947-3461-2e5b-99d80abfa73a@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/03/17 15:36, Quentin Schulz wrote:
-> This adds support for the Allwinner A33 thermal sensor.
+On 25/03/17 16:29, Martin Blumenstingl wrote:
+> Meson GX SoCs however use some magic bits to prevent simultaneous (=
+> conflicting, because only consumer should use the FIFO buffer with the
+> ADC results) usage by the Linux kernel and the bootloader (the BL30
+> bootloader uses the SAR ADC to read the CPU temperature).
+> This patch changes guards all BL30 functionality so it is skipped on
+> SoCs which don't have it. Since the hardware itself doesn't know whether
+> BL30 is available the internal meson_sar_adc_data is extended so this
+> information can be provided per of_device_id.data inside the driver.
 > 
-> Unlike the A10, A13 and A31, the Allwinner A33 only has one channel
-> which is dedicated to the thermal sensor. Moreover, its thermal sensor
-> does not generate interruptions, thus we only need to directly read the
-> register storing the temperature value.
+> Additionally the clocks "adc_clk" and "adc_sel" are not provided by the
+> clock-controller itself. "adc_sel" is not available at all. "adc_clk"
+> is provided by the SAR ADC IP block itself on Meson8b (and earlier).
+> This is already supported by the meson_saradc driver.
 > 
-> The MFD used by the A10, A13 and A31, was created to avoid breaking the
-> DT binding, but since the nodes for the ADC weren't there for the A33,
-> it is not needed.
+> Finally a new of_device_id for the Meson8b SoC is added so it can be
+> wired up in the corresponding DT.
 > 
-> Though the A33 does not have an internal ADC, it has a thermal sensor
-> which shares the same registers with GPADC of the already supported SoCs
-> and almost the same bits, for the same purpose (thermal sensor).
-> 
-> The thermal sensor behaves exactly the same (except the presence of
-> interrupts or not) on the different SoCs.
-> 
-> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
-> Acked-by: Lee Jones <lee.jones@linaro.org>
-Acked-by: Jonathan Cameron <jic23@kernel.org>
+> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+Looks sensible to me. Just fix those bits from Peter and we'll let it sit
+a few days on the list to see if anyone else wants to chip in.
 
-I'm assuming this is going through your tree Lee, let me know if you want
-to do it differently.
+Thanks,
 
 Jonathan
 > ---
+>  drivers/iio/adc/meson_saradc.c | 70 +++++++++++++++++++++++++++---------------
+>  1 file changed, 46 insertions(+), 24 deletions(-)
 > 
-> v3:
->   - switched compatible from allwinner,sun8i-a33-gpadc-iio to
->   allwinner,sun8i-a33-ths to better reflect the datasheet's name,
->   - fixed the non-working if (!IS_ENABLED(THERMAL_OF)) by prefixing it with
->   CONFIG,
-> 
-> v2:
->   - removed added comments in Kconfig,
->   - simplified Kconfig depends on condition,
->   - removed THERMAL_OF requirement for sun8i,
->   - renamed sun8i_gpadc_channels to sun8i_a33_gpadc_channels,
->   - renamed use_dt boolean in no_irq as it reflects better why we need it,
->   - removed spurious/unneeded modifications done in v1,
-> 
->  drivers/iio/adc/Kconfig           |   2 +-
->  drivers/iio/adc/sun4i-gpadc-iio.c | 100 ++++++++++++++++++++++++++++++++++++--
->  include/linux/mfd/sun4i-gpadc.h   |   4 ++
->  3 files changed, 102 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/iio/adc/Kconfig b/drivers/iio/adc/Kconfig
-> index 9f8b4b1..8c8ead6 100644
-> --- a/drivers/iio/adc/Kconfig
-> +++ b/drivers/iio/adc/Kconfig
-> @@ -562,7 +562,7 @@ config STX104
->  config SUN4I_GPADC
->  	tristate "Support for the Allwinner SoCs GPADC"
->  	depends on IIO
-> -	depends on MFD_SUN4I_GPADC
-> +	depends on MFD_SUN4I_GPADC || MACH_SUN8I
->  	help
->  	  Say yes here to build support for Allwinner (A10, A13 and A31) SoCs
->  	  GPADC. This ADC provides 4 channels which can be used as an ADC or as
-> diff --git a/drivers/iio/adc/sun4i-gpadc-iio.c b/drivers/iio/adc/sun4i-gpadc-iio.c
-> index 7cb997a..74705aa 100644
-> --- a/drivers/iio/adc/sun4i-gpadc-iio.c
-> +++ b/drivers/iio/adc/sun4i-gpadc-iio.c
-> @@ -85,6 +85,12 @@ static const struct gpadc_data sun6i_gpadc_data = {
->  	.adc_chan_mask = SUN6I_GPADC_CTRL1_ADC_CHAN_MASK,
+> diff --git a/drivers/iio/adc/meson_saradc.c b/drivers/iio/adc/meson_saradc.c
+> index dd4190b50df6..f78fe66e0ec8 100644
+> --- a/drivers/iio/adc/meson_saradc.c
+> +++ b/drivers/iio/adc/meson_saradc.c
+> @@ -220,6 +220,7 @@ enum meson_sar_adc_chan7_mux_sel {
 >  };
 >  
-> +static const struct gpadc_data sun8i_a33_gpadc_data = {
-> +	.temp_offset = -1662,
-> +	.temp_scale = 162,
-> +	.tp_mode_en = SUN8I_GPADC_CTRL1_CHOP_TEMP_EN,
-> +};
-> +
->  struct sun4i_gpadc_iio {
->  	struct iio_dev			*indio_dev;
->  	struct completion		completion;
-> @@ -96,6 +102,7 @@ struct sun4i_gpadc_iio {
->  	unsigned int			temp_data_irq;
->  	atomic_t			ignore_temp_data_irq;
->  	const struct gpadc_data		*data;
-> +	bool				no_irq;
->  	/* prevents concurrent reads of temperature and ADC */
->  	struct mutex			mutex;
+>  struct meson_sar_adc_data {
+> +	char					has_bl30_integration;
+>  	unsigned int				resolution;
+>  	const char				*name;
 >  };
-> @@ -138,6 +145,23 @@ static const struct iio_chan_spec sun4i_gpadc_channels_no_temp[] = {
->  	SUN4I_GPADC_ADC_CHANNEL(3, "adc_chan3"),
->  };
+> @@ -437,19 +438,24 @@ static int meson_sar_adc_lock(struct iio_dev *indio_dev)
 >  
-> +static const struct iio_chan_spec sun8i_a33_gpadc_channels[] = {
-> +	{
-> +		.type = IIO_TEMP,
-> +		.info_mask_separate = BIT(IIO_CHAN_INFO_RAW) |
-> +				      BIT(IIO_CHAN_INFO_SCALE) |
-> +				      BIT(IIO_CHAN_INFO_OFFSET),
-> +		.datasheet_name = "temp_adc",
-> +	},
-> +};
-> +
-> +static const struct regmap_config sun4i_gpadc_regmap_config = {
-> +	.reg_bits = 32,
-> +	.val_bits = 32,
-> +	.reg_stride = 4,
-> +	.fast_io = true,
-> +};
-> +
->  static int sun4i_prepare_for_irq(struct iio_dev *indio_dev, int channel,
->  				 unsigned int irq)
->  {
-> @@ -247,6 +271,17 @@ static int sun4i_gpadc_temp_read(struct iio_dev *indio_dev, int *val)
->  {
->  	struct sun4i_gpadc_iio *info = iio_priv(indio_dev);
+>  	mutex_lock(&indio_dev->mlock);
 >  
-> +	if (info->no_irq) {
-> +		pm_runtime_get_sync(indio_dev->dev.parent);
+> -	/* prevent BL30 from using the SAR ADC while we are using it */
+> -	regmap_update_bits(priv->regmap, MESON_SAR_ADC_DELAY,
+> -			   MESON_SAR_ADC_DELAY_KERNEL_BUSY,
+> -			   MESON_SAR_ADC_DELAY_KERNEL_BUSY);
+> -
+> -	/* wait until BL30 releases it's lock (so we can use the SAR ADC) */
+> -	do {
+> -		udelay(1);
+> -		regmap_read(priv->regmap, MESON_SAR_ADC_DELAY, &val);
+> -	} while (val & MESON_SAR_ADC_DELAY_BL30_BUSY && timeout--);
+> -
+> -	if (timeout < 0)
+> -		return -ETIMEDOUT;
+> +	if (priv->data->has_bl30_integration) {
+> +		/* prevent BL30 from using the SAR ADC while we are using it */
+> +		regmap_update_bits(priv->regmap, MESON_SAR_ADC_DELAY,
+> +				MESON_SAR_ADC_DELAY_KERNEL_BUSY,
+> +				MESON_SAR_ADC_DELAY_KERNEL_BUSY);
 > +
-> +		regmap_read(info->regmap, SUN4I_GPADC_TEMP_DATA, val);
+> +		/*
+> +		 * wait until BL30 releases it's lock (so we can use the SAR
+> +		 * ADC)
+> +		 */
+> +		do {
+> +			udelay(1);
+> +			regmap_read(priv->regmap, MESON_SAR_ADC_DELAY, &val);
+> +		} while (val & MESON_SAR_ADC_DELAY_BL30_BUSY && timeout--);
 > +
-> +		pm_runtime_mark_last_busy(indio_dev->dev.parent);
-> +		pm_runtime_put_autosuspend(indio_dev->dev.parent);
-> +
-> +		return 0;
+> +		if (timeout < 0)
+> +			return -ETIMEDOUT;
 > +	}
-> +
->  	return sun4i_gpadc_read(indio_dev, 0, val, info->temp_data_irq);
->  }
 >  
-> @@ -454,6 +489,58 @@ static int sun4i_irq_init(struct platform_device *pdev, const char *name,
 >  	return 0;
 >  }
+> @@ -458,9 +464,10 @@ static void meson_sar_adc_unlock(struct iio_dev *indio_dev)
+>  {
+>  	struct meson_sar_adc_priv *priv = iio_priv(indio_dev);
 >  
-> +static const struct of_device_id sun4i_gpadc_of_id[] = {
-> +	{
-> +		.compatible = "allwinner,sun8i-a33-ths",
-> +		.data = &sun8i_a33_gpadc_data,
-> +	},
-> +	{ /* sentinel */ }
+> -	/* allow BL30 to use the SAR ADC again */
+> -	regmap_update_bits(priv->regmap, MESON_SAR_ADC_DELAY,
+> -			   MESON_SAR_ADC_DELAY_KERNEL_BUSY, 0);
+> +	if (priv->data->has_bl30_integration)
+> +		/* allow BL30 to use the SAR ADC again */
+> +		regmap_update_bits(priv->regmap, MESON_SAR_ADC_DELAY,
+> +				MESON_SAR_ADC_DELAY_KERNEL_BUSY, 0);
+>  
+>  	mutex_unlock(&indio_dev->mlock);
+>  }
+> @@ -614,14 +621,16 @@ static int meson_sar_adc_init(struct iio_dev *indio_dev)
+>  	 */
+>  	meson_sar_adc_set_chan7_mux(indio_dev, CHAN7_MUX_CH7_INPUT);
+>  
+> -	/*
+> -	 * leave sampling delay and the input clocks as configured by BL30 to
+> -	 * make sure BL30 gets the values it expects when reading the
+> -	 * temperature sensor.
+> -	 */
+> -	regmap_read(priv->regmap, MESON_SAR_ADC_REG3, &regval);
+> -	if (regval & MESON_SAR_ADC_REG3_BL30_INITIALIZED)
+> -		return 0;
+> +	if (priv->data->has_bl30_integration) {
+> +		/*
+> +		 * leave sampling delay and the input clocks as configured by
+> +		 * BL30 to make sure BL30 gets the values it expects when
+> +		 * reading the temperature sensor.
+> +		 */
+> +		regmap_read(priv->regmap, MESON_SAR_ADC_REG3, &regval);
+> +		if (regval & MESON_SAR_ADC_REG3_BL30_INITIALIZED)
+> +			return 0;
+> +	}
+>  
+>  	meson_sar_adc_stop_sample_engine(indio_dev);
+>  
+> @@ -834,23 +843,36 @@ static const struct iio_info meson_sar_adc_iio_info = {
+>  	.driver_module = THIS_MODULE,
+>  };
+>  
+> +struct meson_sar_adc_data meson_sar_adc_meson8b_data = {
+> +	.has_bl30_integration = 0,
+> +	.resolution = 10,
+> +	.name = "meson-meson8b-saradc",
 > +};
 > +
-> +static int sun4i_gpadc_probe_dt(struct platform_device *pdev,
-> +				struct iio_dev *indio_dev)
-> +{
-> +	struct sun4i_gpadc_iio *info = iio_priv(indio_dev);
-> +	const struct of_device_id *of_dev;
-> +	struct thermal_zone_device *tzd;
-> +	struct resource *mem;
-> +	void __iomem *base;
-> +	int ret;
-> +
-> +	of_dev = of_match_device(sun4i_gpadc_of_id, &pdev->dev);
-> +	if (!of_dev)
-> +		return -ENODEV;
-> +
-> +	info->no_irq = true;
-> +	info->data = (struct gpadc_data *)of_dev->data;
-> +	indio_dev->num_channels = ARRAY_SIZE(sun8i_a33_gpadc_channels);
-> +	indio_dev->channels = sun8i_a33_gpadc_channels;
-> +
-> +	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	base = devm_ioremap_resource(&pdev->dev, mem);
-> +	if (IS_ERR(base))
-> +		return PTR_ERR(base);
-> +
-> +	info->regmap = devm_regmap_init_mmio(&pdev->dev, base,
-> +					     &sun4i_gpadc_regmap_config);
-> +	if (IS_ERR(info->regmap)) {
-> +		ret = PTR_ERR(info->regmap);
-> +		dev_err(&pdev->dev, "failed to init regmap: %d\n", ret);
-> +		return ret;
-> +	}
-> +
-> +	if (!IS_ENABLED(CONFIG_THERMAL_OF))
-> +		return 0;
-> +
-> +	tzd = devm_thermal_zone_of_sensor_register(&pdev->dev, 0, info,
-> +						   &sun4i_ts_tz_ops);
-> +	if (IS_ERR(tzd))
-> +		dev_err(&pdev->dev, "could not register thermal sensor: %ld\n",
-> +			PTR_ERR(tzd));
-> +
-> +	return PTR_ERR_OR_ZERO(tzd);
-> +}
-> +
->  static int sun4i_gpadc_probe_mfd(struct platform_device *pdev,
->  				 struct iio_dev *indio_dev)
->  {
-> @@ -462,6 +549,7 @@ static int sun4i_gpadc_probe_mfd(struct platform_device *pdev,
->  		dev_get_drvdata(pdev->dev.parent);
->  	int ret;
+>  struct meson_sar_adc_data meson_sar_adc_gxbb_data = {
+> +	.has_bl30_integration = 1,
+>  	.resolution = 10,
+>  	.name = "meson-gxbb-saradc",
+>  };
 >  
-> +	info->no_irq = false;
->  	info->regmap = sun4i_gpadc_dev->regmap;
+>  struct meson_sar_adc_data meson_sar_adc_gxl_data = {
+> +	.has_bl30_integration = 1,
+>  	.resolution = 12,
+>  	.name = "meson-gxl-saradc",
+>  };
 >  
->  	indio_dev->num_channels = ARRAY_SIZE(sun4i_gpadc_channels);
-> @@ -561,7 +649,11 @@ static int sun4i_gpadc_probe(struct platform_device *pdev)
->  	indio_dev->info = &sun4i_gpadc_iio_info;
->  	indio_dev->modes = INDIO_DIRECT_MODE;
+>  struct meson_sar_adc_data meson_sar_adc_gxm_data = {
+> +	.has_bl30_integration = 1,
+>  	.resolution = 12,
+>  	.name = "meson-gxm-saradc",
+>  };
 >  
-> -	ret = sun4i_gpadc_probe_mfd(pdev, indio_dev);
-> +	if (pdev->dev.of_node)
-> +		ret = sun4i_gpadc_probe_dt(pdev, indio_dev);
-> +	else
-> +		ret = sun4i_gpadc_probe_mfd(pdev, indio_dev);
-> +
->  	if (ret)
->  		return ret;
->  
-> @@ -580,7 +672,7 @@ static int sun4i_gpadc_probe(struct platform_device *pdev)
->  	return 0;
->  
->  err_map:
-> -	if (IS_ENABLED(CONFIG_THERMAL_OF))
-> +	if (!info->no_irq && IS_ENABLED(CONFIG_THERMAL_OF))
->  		iio_map_array_unregister(indio_dev);
->  
->  	pm_runtime_put(&pdev->dev);
-> @@ -592,10 +684,11 @@ static int sun4i_gpadc_probe(struct platform_device *pdev)
->  static int sun4i_gpadc_remove(struct platform_device *pdev)
->  {
->  	struct iio_dev *indio_dev = platform_get_drvdata(pdev);
-> +	struct sun4i_gpadc_iio *info = iio_priv(indio_dev);
->  
->  	pm_runtime_put(&pdev->dev);
->  	pm_runtime_disable(&pdev->dev);
-> -	if (IS_ENABLED(CONFIG_THERMAL_OF))
-> +	if (!info->no_irq && IS_ENABLED(CONFIG_THERMAL_OF))
->  		iio_map_array_unregister(indio_dev);
->  
->  	return 0;
-> @@ -611,6 +704,7 @@ static const struct platform_device_id sun4i_gpadc_id[] = {
->  static struct platform_driver sun4i_gpadc_driver = {
->  	.driver = {
->  		.name = "sun4i-gpadc-iio",
-> +		.of_match_table = sun4i_gpadc_of_id,
->  		.pm = &sun4i_gpadc_pm_ops,
->  	},
->  	.id_table = sun4i_gpadc_id,
-> diff --git a/include/linux/mfd/sun4i-gpadc.h b/include/linux/mfd/sun4i-gpadc.h
-> index 509e736..139872c 100644
-> --- a/include/linux/mfd/sun4i-gpadc.h
-> +++ b/include/linux/mfd/sun4i-gpadc.h
-> @@ -38,6 +38,10 @@
->  #define SUN6I_GPADC_CTRL1_ADC_CHAN_SELECT(x)		(GENMASK(3, 0) & BIT(x))
->  #define SUN6I_GPADC_CTRL1_ADC_CHAN_MASK			GENMASK(3, 0)
->  
-> +/* TP_CTRL1 bits for sun8i SoCs */
-> +#define SUN8I_GPADC_CTRL1_CHOP_TEMP_EN			BIT(8)
-> +#define SUN8I_GPADC_CTRL1_GPADC_CALI_EN			BIT(7)
-> +
->  #define SUN4I_GPADC_CTRL2				0x08
->  
->  #define SUN4I_GPADC_CTRL2_TP_SENSITIVE_ADJUST(x)	((GENMASK(3, 0) & (x)) << 28)
+>  static const struct of_device_id meson_sar_adc_of_match[] = {
+>  	{
+> +		.compatible = "amlogic,meson8b-saradc",
+> +		.data = &meson_sar_adc_meson8b_data,
+> +	},
+> +	{
+>  		.compatible = "amlogic,meson-gxbb-saradc",
+>  		.data = &meson_sar_adc_gxbb_data,
+>  	}, {
 > 
