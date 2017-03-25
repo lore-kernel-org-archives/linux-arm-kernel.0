@@ -1,42 +1,51 @@
 From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Sat, 25 Mar 2017 22:50:14 +0800
-Subject: [PATCH v5 7/8] ARM: sun8i: h2+: enable USB OTG for Orange Pi Zero
+Date: Sat, 25 Mar 2017 22:50:15 +0800
+Subject: [PATCH v5 8/8] arm64: allwinner: h5: enable USB OTG on Orange Pi PC 2
  board
 In-Reply-To: <20170325145015.22076-1-icenowy@aosc.xyz>
 References: <20170325145015.22076-1-icenowy@aosc.xyz>
-Message-ID: <20170325145015.22076-8-icenowy@aosc.xyz>
+Message-ID: <20170325145015.22076-9-icenowy@aosc.xyz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Orange Pi Zero board features a USB OTG port, which has a ID pin, and
-can be used to power up the board. However, even if the board is powered
-via +5V pin in GPIO/expansion headers, the VBUS in the OTG port cannot
-be powered up, thus it's impossible to use it in host mode with simple
-OTG cables.
+Orange Pi PC 2 board features a OTG port like the one on older H3 Orange
+Pi's, with PG12 pin being the id det pin and PL2 being the vbus driver
+pin.
 
-Add support for it in peripheral mode.
-
-If someone really want to use it in host mode, the mode of PHY can be
-switch via sysfs, then use a powered USB OTG cable or powered USB HUB to
-power up external USB devices.
+Add support for it.
 
 Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
 Acked-by: Chen-Yu Tsai <wens@csie.org>
 ---
 Changes in v5:
 - Add Chen-Yu's ACK.
-Changes in v3:
-- Add "h2+:" in commit message.
 
- arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts | 20 +++++++++++++++++++-
- 1 file changed, 19 insertions(+), 1 deletion(-)
+ .../boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts  | 27 +++++++++++++++++++++-
+ 1 file changed, 26 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts b/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts
-index 96c32293598a..9e8b082c134f 100644
---- a/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts
-+++ b/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts
-@@ -95,6 +95,10 @@
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts
+index 30639729920d..dfecc17dcc92 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts
+@@ -90,6 +90,16 @@
+ 			gpios = <&r_pio 0 3 GPIO_ACTIVE_LOW>;
+ 		};
  	};
++
++	reg_usb0_vbus: usb0-vbus {
++		compatible = "regulator-fixed";
++		regulator-name = "usb0-vbus";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		enable-active-high;
++		gpio = <&r_pio 0 2 GPIO_ACTIVE_HIGH>; /* PL2 */
++		status = "okay";
++	};
+ };
+ 
+ &codec {
+@@ -100,6 +110,10 @@
+ 	status = "okay";
  };
  
 +&ehci0 {
@@ -46,8 +55,8 @@ index 96c32293598a..9e8b082c134f 100644
  &ehci1 {
  	status = "okay";
  };
-@@ -131,6 +135,10 @@
- 	bias-pull-up;
+@@ -127,6 +141,10 @@
+ 	status = "okay";
  };
  
 +&ohci0 {
@@ -57,24 +66,21 @@ index 96c32293598a..9e8b082c134f 100644
  &ohci1 {
  	status = "okay";
  };
-@@ -153,7 +161,17 @@
+@@ -157,7 +175,14 @@
  	status = "disabled";
  };
  
 +&usb_otg {
-+	dr_mode = "peripheral";
++	dr_mode = "otg";
 +	status = "okay";
 +};
 +
  &usbphy {
 -	/* USB VBUS is always on */
-+	/*
-+	 * USB Type-A port VBUS is always on. However, MicroUSB VBUS can only
-+	 * power up the board; when it's used as OTG port, this VBUS is
-+	 * always off even if the board is powered via GPIO pins.
-+	 */
- 	status = "okay";
++	/* USB Type-A ports' VBUS is always on */
 +	usb0_id_det-gpios = <&pio 6 12 GPIO_ACTIVE_HIGH>; /* PG12 */
++	usb0_vbus-supply = <&reg_usb0_vbus>;
+ 	status = "okay";
  };
 -- 
 2.12.0
