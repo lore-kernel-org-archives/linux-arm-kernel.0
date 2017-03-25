@@ -1,166 +1,143 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 25 Mar 2017 18:13:49 +0000
-Subject: [PATCH 2/2] iio: adc: meson-saradc: add Meson8b SoC compatibility
-In-Reply-To: <20170325162938.28659-3-martin.blumenstingl@googlemail.com>
-References: <20170325162938.28659-1-martin.blumenstingl@googlemail.com>
- <20170325162938.28659-3-martin.blumenstingl@googlemail.com>
-Message-ID: <231f1fef-e947-3461-2e5b-99d80abfa73a@kernel.org>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Sun, 26 Mar 2017 02:23:08 +0800
+Subject: [PATCH v5 0/9] coresight: enable debug module
+Message-ID: <1490466197-29163-1-git-send-email-leo.yan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/03/17 16:29, Martin Blumenstingl wrote:
-> Meson GX SoCs however use some magic bits to prevent simultaneous (=
-> conflicting, because only consumer should use the FIFO buffer with the
-> ADC results) usage by the Linux kernel and the bootloader (the BL30
-> bootloader uses the SAR ADC to read the CPU temperature).
-> This patch changes guards all BL30 functionality so it is skipped on
-> SoCs which don't have it. Since the hardware itself doesn't know whether
-> BL30 is available the internal meson_sar_adc_data is extended so this
-> information can be provided per of_device_id.data inside the driver.
-> 
-> Additionally the clocks "adc_clk" and "adc_sel" are not provided by the
-> clock-controller itself. "adc_sel" is not available at all. "adc_clk"
-> is provided by the SAR ADC IP block itself on Meson8b (and earlier).
-> This is already supported by the meson_saradc driver.
-> 
-> Finally a new of_device_id for the Meson8b SoC is added so it can be
-> wired up in the corresponding DT.
-> 
-> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
-Looks sensible to me. Just fix those bits from Peter and we'll let it sit
-a few days on the list to see if anyone else wants to chip in.
+ARMv8 architecture reference manual (ARM DDI 0487A.k) Chapter H7 "The
+Sample-based Profiling Extension" has description for sampling
+registers, we can utilize these registers to check program counter
+value with combined CPU exception level, secure state, etc. So this is
+helpful for CPU lockup bugs, e.g. if one CPU has run into infinite loop
+with IRQ disabled; the 'hang' CPU cannot switch context and handle any
+interrupt, so it cannot handle SMP call for stack dump, etc.
 
-Thanks,
+This patch series is to enable coresight debug module with sample-based
+registers and register call back notifier for PCSR register dumping
+when panic happens, so we can see below dumping info for panic; and
+this patch series has considered the conditions for access permission
+for debug registers self, so this can avoid access debug registers when
+CPU power domain is off; the driver also try to figure out the CPU is
+in secure or non-secure state.
 
-Jonathan
-> ---
->  drivers/iio/adc/meson_saradc.c | 70 +++++++++++++++++++++++++++---------------
->  1 file changed, 46 insertions(+), 24 deletions(-)
-> 
-> diff --git a/drivers/iio/adc/meson_saradc.c b/drivers/iio/adc/meson_saradc.c
-> index dd4190b50df6..f78fe66e0ec8 100644
-> --- a/drivers/iio/adc/meson_saradc.c
-> +++ b/drivers/iio/adc/meson_saradc.c
-> @@ -220,6 +220,7 @@ enum meson_sar_adc_chan7_mux_sel {
->  };
->  
->  struct meson_sar_adc_data {
-> +	char					has_bl30_integration;
->  	unsigned int				resolution;
->  	const char				*name;
->  };
-> @@ -437,19 +438,24 @@ static int meson_sar_adc_lock(struct iio_dev *indio_dev)
->  
->  	mutex_lock(&indio_dev->mlock);
->  
-> -	/* prevent BL30 from using the SAR ADC while we are using it */
-> -	regmap_update_bits(priv->regmap, MESON_SAR_ADC_DELAY,
-> -			   MESON_SAR_ADC_DELAY_KERNEL_BUSY,
-> -			   MESON_SAR_ADC_DELAY_KERNEL_BUSY);
-> -
-> -	/* wait until BL30 releases it's lock (so we can use the SAR ADC) */
-> -	do {
-> -		udelay(1);
-> -		regmap_read(priv->regmap, MESON_SAR_ADC_DELAY, &val);
-> -	} while (val & MESON_SAR_ADC_DELAY_BL30_BUSY && timeout--);
-> -
-> -	if (timeout < 0)
-> -		return -ETIMEDOUT;
-> +	if (priv->data->has_bl30_integration) {
-> +		/* prevent BL30 from using the SAR ADC while we are using it */
-> +		regmap_update_bits(priv->regmap, MESON_SAR_ADC_DELAY,
-> +				MESON_SAR_ADC_DELAY_KERNEL_BUSY,
-> +				MESON_SAR_ADC_DELAY_KERNEL_BUSY);
-> +
-> +		/*
-> +		 * wait until BL30 releases it's lock (so we can use the SAR
-> +		 * ADC)
-> +		 */
-> +		do {
-> +			udelay(1);
-> +			regmap_read(priv->regmap, MESON_SAR_ADC_DELAY, &val);
-> +		} while (val & MESON_SAR_ADC_DELAY_BL30_BUSY && timeout--);
-> +
-> +		if (timeout < 0)
-> +			return -ETIMEDOUT;
-> +	}
->  
->  	return 0;
->  }
-> @@ -458,9 +464,10 @@ static void meson_sar_adc_unlock(struct iio_dev *indio_dev)
->  {
->  	struct meson_sar_adc_priv *priv = iio_priv(indio_dev);
->  
-> -	/* allow BL30 to use the SAR ADC again */
-> -	regmap_update_bits(priv->regmap, MESON_SAR_ADC_DELAY,
-> -			   MESON_SAR_ADC_DELAY_KERNEL_BUSY, 0);
-> +	if (priv->data->has_bl30_integration)
-> +		/* allow BL30 to use the SAR ADC again */
-> +		regmap_update_bits(priv->regmap, MESON_SAR_ADC_DELAY,
-> +				MESON_SAR_ADC_DELAY_KERNEL_BUSY, 0);
->  
->  	mutex_unlock(&indio_dev->mlock);
->  }
-> @@ -614,14 +621,16 @@ static int meson_sar_adc_init(struct iio_dev *indio_dev)
->  	 */
->  	meson_sar_adc_set_chan7_mux(indio_dev, CHAN7_MUX_CH7_INPUT);
->  
-> -	/*
-> -	 * leave sampling delay and the input clocks as configured by BL30 to
-> -	 * make sure BL30 gets the values it expects when reading the
-> -	 * temperature sensor.
-> -	 */
-> -	regmap_read(priv->regmap, MESON_SAR_ADC_REG3, &regval);
-> -	if (regval & MESON_SAR_ADC_REG3_BL30_INITIALIZED)
-> -		return 0;
-> +	if (priv->data->has_bl30_integration) {
-> +		/*
-> +		 * leave sampling delay and the input clocks as configured by
-> +		 * BL30 to make sure BL30 gets the values it expects when
-> +		 * reading the temperature sensor.
-> +		 */
-> +		regmap_read(priv->regmap, MESON_SAR_ADC_REG3, &regval);
-> +		if (regval & MESON_SAR_ADC_REG3_BL30_INITIALIZED)
-> +			return 0;
-> +	}
->  
->  	meson_sar_adc_stop_sample_engine(indio_dev);
->  
-> @@ -834,23 +843,36 @@ static const struct iio_info meson_sar_adc_iio_info = {
->  	.driver_module = THIS_MODULE,
->  };
->  
-> +struct meson_sar_adc_data meson_sar_adc_meson8b_data = {
-> +	.has_bl30_integration = 0,
-> +	.resolution = 10,
-> +	.name = "meson-meson8b-saradc",
-> +};
-> +
->  struct meson_sar_adc_data meson_sar_adc_gxbb_data = {
-> +	.has_bl30_integration = 1,
->  	.resolution = 10,
->  	.name = "meson-gxbb-saradc",
->  };
->  
->  struct meson_sar_adc_data meson_sar_adc_gxl_data = {
-> +	.has_bl30_integration = 1,
->  	.resolution = 12,
->  	.name = "meson-gxl-saradc",
->  };
->  
->  struct meson_sar_adc_data meson_sar_adc_gxm_data = {
-> +	.has_bl30_integration = 1,
->  	.resolution = 12,
->  	.name = "meson-gxm-saradc",
->  };
->  
->  static const struct of_device_id meson_sar_adc_of_match[] = {
->  	{
-> +		.compatible = "amlogic,meson8b-saradc",
-> +		.data = &meson_sar_adc_meson8b_data,
-> +	},
-> +	{
->  		.compatible = "amlogic,meson-gxbb-saradc",
->  		.data = &meson_sar_adc_gxbb_data,
->  	}, {
-> 
+Patch 0001 is to document the dt binding; patch 0002 is to document
+boot parameters used in kernel command line.
+
+Patch 0003 is used to fix the func of_get_coresight_platform_data()
+doesn't properly drop the reference to the CPU node pointer; and
+patch 0004 is refactor to add new function of_coresight_get_cpu().
+Patch 0005 is to add const quality to structure device_node.
+
+Patch 0006 is the driver for CPU debug module.
+
+Patches 0007/0008 in this series are to enable debug unit on 96boards
+Hikey, patch 0007 is to add apb clock for debug unit and patch 0006
+is to add DT nodes for debug unit. Patch 0009 is to enable debug on
+96boards DB410c. Have verified on both two boards.
+
+We can enable debugging with two method, adding parameters into kernel
+command line for build-in module:
+  coresight_cpu_debug.enable=1
+  coresight_cpu_debug.idle_constraint=0
+
+Or we can wait the system has booted up to use debugfs nodes to enable
+debugging and set idle constraints:
+  # echo 1 > /sys/kernel/debug/coresight_cpu_debug/enable
+  # echo 0 > /sys/kernel/debug/coresight_cpu_debug/idle_constraint
+
+As result we can get below log after input command:
+echo c > /proc/sysrq-trigger:
+
+ARM external debug module:
+CPU[0]:
+ EDPRSR:  0000000b (Power:On DLK:Unlock)
+ EDPCSR:  [<ffff00000808eb54>] handle_IPI+0xe4/0x150
+ EDCIDSR: 00000000
+ EDVIDSR: 90000000 (State:Non-secure Mode:EL1/0 Width:64bits VMID:0)
+CPU[1]:
+ EDPRSR:  0000000b (Power:On DLK:Unlock)
+ EDPCSR:  [<ffff0000087a64c0>] debug_notifier_call+0x108/0x288
+ EDCIDSR: 00000000
+ EDVIDSR: 90000000 (State:Non-secure Mode:EL1/0 Width:64bits VMID:0)
+
+[...]
+
+Changes from v4:
+* This version is mainly credit to ARM colleagues many contribution
+  ideas for better quality (Thanks a lot Suzuki, Mike and Sudeep!).
+* According to Suzuki suggestion, refined debug module driver to avoid
+  memory leak for drvdata struct, handle PCSAMPLE_MODE=1, use flag
+  drvdata.pc_has_offset to indicate if PCSR has offset, minor fixes.
+* According to Mathieu suggestion, refined dt binding description.
+* Changed driver to support module mode;
+* According to Mike suggestion and very appreciate the pseudo code,
+  added support to force CPU powered up with register EDPRCR;
+* According to discussions, added command line and debugfs nodes to
+  support enabling debugging for boot time, or later can dynamically
+  enable/disable debugging by debugfs.
+* According to Rob Herring suggestion, one minor fixes in DT binding.
+* According to Stephen Boyd suggestion, add const quality to structure
+  device_node. And used use of_cpu_device_node_get() to replace
+  of_get_cpu_node() in patch 0003.
+
+Changes from v3:
+* Added Suzuki K Poulose's patch to fix issue for the func
+  of_get_coresight_platform_data() doesn't properly drop the reference
+  to the CPU node pointer.
+* According to Suzuki suggestion, added code to handl the corner case
+  for ARMv8 CPU with aarch32 mode.
+* According to Suzuki suggestion, changed compatible string to
+  "arm,coresight-cpu-debug".
+* According to Mathieu suggestion, added "power-domains" as optional
+  properties.
+
+Changes from v2:
+* According to Mathieu Poirier suggestion, applied some minor fixes.
+* Added two extra patches for enabling debug module on Hikey.
+
+Changes from v1:
+* According to Mike Leach suggestion, removed the binding for debug
+  module clocks which have been directly provided by CPU clocks.
+* According to Mathieu Poirier suggestion, added function
+  of_coresight_get_cpu() and some minor refactors for debug module
+  driver.
+
+Changes from RFC:
+* According to Mike Leach suggestion, added check for EDPRSR to avoid
+  lockup; added supporting EDVIDSR and EDCIDSR registers.
+* According to Mark Rutland and Mathieu Poirier suggestion, rewrote
+  the documentation for DT binding.
+* According to Mark and Mathieu suggestion, refined debug driver.
+
+
+Leo Yan (8):
+  coresight: bindings for CPU debug module
+  doc: Add documentation for Coresight CPU debug
+  coresight: refactor with function of_coresight_get_cpu
+  coresight: use const for device_node structures
+  coresight: add support for CPU debug module
+  clk: hi6220: add debug APB clock
+  arm64: dts: hi6220: register debug module
+  arm64: dts: qcom: msm8916: Add debug unit
+
+Suzuki K Poulose (1):
+  coresight: of_get_coresight_platform_data: Add missing of_node_put
+
+ Documentation/admin-guide/kernel-parameters.txt    |  21 +
+ .../bindings/arm/coresight-cpu-debug.txt           |  48 ++
+ arch/arm64/boot/dts/hisilicon/hi6220.dtsi          |  64 ++
+ arch/arm64/boot/dts/qcom/msm8916.dtsi              |  32 +
+ drivers/clk/hisilicon/clk-hi6220.c                 |   1 +
+ drivers/hwtracing/coresight/Kconfig                |  11 +
+ drivers/hwtracing/coresight/Makefile               |   1 +
+ drivers/hwtracing/coresight/coresight-cpu-debug.c  | 704 +++++++++++++++++++++
+ drivers/hwtracing/coresight/of_coresight.c         |  44 +-
+ include/dt-bindings/clock/hi6220-clock.h           |   5 +-
+ include/linux/coresight.h                          |   6 +-
+ 11 files changed, 920 insertions(+), 17 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/coresight-cpu-debug.txt
+ create mode 100644 drivers/hwtracing/coresight/coresight-cpu-debug.c
+
+-- 
+2.7.4
