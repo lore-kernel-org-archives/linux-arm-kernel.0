@@ -1,26 +1,35 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 24 Mar 2017 22:56:25 +0000
-Subject: [PATCH v2] ARM: ptdump: Add domain to output
-In-Reply-To: <CAGXu5j+sHPZVhw-Jt2=RPFYF-ebN_SzOd+F76A9Mxz8RY9YTVA@mail.gmail.com>
-References: <20170303003033.GA92641@beast>
- <CAGXu5j+sHPZVhw-Jt2=RPFYF-ebN_SzOd+F76A9Mxz8RY9YTVA@mail.gmail.com>
-Message-ID: <20170324225625.GK7909@n2100.armlinux.org.uk>
+From: shuahkh@osg.samsung.com (Shuah Khan)
+Date: Fri, 24 Mar 2017 18:04:58 -0600
+Subject: [PATCH 0/7] dwc3 - bug fixes and use meaningful goto labels
+Message-ID: <cover.1490387086.git.shuahkh@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 24, 2017 at 03:54:48PM -0700, Kees Cook wrote:
-> > This actually works correctly now (tested by forcing different domains on
-> > portions of the Kernel Mapping. I really wanted to find a way to use the
-> > existing bit structs, but I couldn't make anything work... I'm open to ideas.
-> 
-> Any feedback on this? Should I submit this to the ARM patch tracker?
+This patch series consists of two fixes and changes to goto labels
+to use meaningful names.
 
-Yes please, but with one change - the "DOMAIN_" prefix seems a little
-redundant.
+While working on goto label changes, I noticed  put_sync calls without
+successful get_sync in error legs.  The first two patches are the fixes
+and the rest of the patches are goto label changes.
 
-Thanks.
+
+Shuah Khan (7):
+  usb: dwc3: core: fix dwc3_probe() to not do put_sync when get_sync
+    fails
+  usb: dwc3: dwc3-omap: fix dwc3_omap_probe() do put_sync when get_sync
+    works
+  usb: dwc3: core: change goto labels to meaningful names
+  usb: dwc3: exynos: change goto labels in this file to meaningful names
+  usb: dwc3: omap: change goto labels in this file to meaningful names
+  usb: dwc3: gadget: change goto labels in this file to meaningful names
+  usb: dwc3: host: change goto labels in this file to meaningful names
+
+ drivers/usb/dwc3/core.c        | 64 +++++++++++++++++++++---------------------
+ drivers/usb/dwc3/dwc3-exynos.c | 16 +++++------
+ drivers/usb/dwc3/dwc3-omap.c   | 11 ++++----
+ drivers/usb/dwc3/gadget.c      | 56 ++++++++++++++++++------------------
+ drivers/usb/dwc3/host.c        | 10 +++----
+ 5 files changed, 79 insertions(+), 78 deletions(-)
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+2.7.4
