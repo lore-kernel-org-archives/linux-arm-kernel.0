@@ -1,102 +1,79 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 25 Mar 2017 16:01:21 +0000
-Subject: [PATCH v3 07/11] IIO: consumer: allow to set buffer sizes
-In-Reply-To: <b2715233-63e7-4c9d-49fc-ad6ca8be0d75@st.com>
-References: <1489759704-30217-1-git-send-email-arnaud.pouliquen@st.com>
- <1489759704-30217-8-git-send-email-arnaud.pouliquen@st.com>
- <951c19fa-d3b8-f4cd-cac1-64e3b8d1cf01@kernel.org>
- <b2715233-63e7-4c9d-49fc-ad6ca8be0d75@st.com>
-Message-ID: <91627cf5-5fb5-c3aa-c0cb-760688ec3ed9@kernel.org>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Sat, 25 Mar 2017 19:26:51 +0300
+Subject: [PATCH v3 0/3] crypto: hw_random - Add new Exynos RNG driver
+Message-ID: <20170325162654.3827-1-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/03/17 11:30, Arnaud Pouliquen wrote:
-> 
-> 
-> On 03/19/2017 11:44 PM, Jonathan Cameron wrote:
->> On 17/03/17 14:08, Arnaud Pouliquen wrote:
->>> Add iio consumer API to set buffer size and watermark according
->>> to sysfs API.
->>>
->>> Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
->> Hmm. Not keen on the length one.  Setting a requested watermark
->> is fair enough.  There is no actually buffer in these cases though
->> so setting it's length is downright odd..
-> Length and watermark are configurable from user land through sysfs.
-> Seems to me logic to also propose it in inkern API...
-> But I can clean length , no problem.
-The concept of length for the consumer interface doesn't currently
-make sense as it refers to an actual buffer.   The consumer interface
-currently passes one entry at a time...
-> 
->>
->> Guess this is part of the hacks we need to clean up by doing
->> the dma buffer consumer stuff right...
-> Yes all is linked :-).
-> 
->>
->> Jonathan
->>> ---
->>>  drivers/iio/buffer/industrialio-buffer-cb.c | 12 ++++++++++++
->>>  include/linux/iio/consumer.h                | 13 +++++++++++++
->>>  2 files changed, 25 insertions(+)
->>>
->>> diff --git a/drivers/iio/buffer/industrialio-buffer-cb.c b/drivers/iio/buffer/industrialio-buffer-cb.c
->>> index b8f550e..43c066a 100644
->>> --- a/drivers/iio/buffer/industrialio-buffer-cb.c
->>> +++ b/drivers/iio/buffer/industrialio-buffer-cb.c
->>> @@ -103,6 +103,18 @@ struct iio_cb_buffer *iio_channel_get_all_cb(struct device *dev,
->>>  }
->>>  EXPORT_SYMBOL_GPL(iio_channel_get_all_cb);
->>>  
->>> +int iio_channel_cb_set_buffer_params(struct iio_cb_buffer *cb_buff,
->>> +				      size_t length, size_t watermark)
->>> +{
->>> +	if (!length || length < watermark)
->>> +		return -EINVAL;
->>> +	cb_buff->buffer.watermark = watermark;
->>> +	cb_buff->buffer.length = length;
->>> +
->>> +	return 0;
->>> +}
->>> +EXPORT_SYMBOL_GPL(iio_channel_start_all_cb);
->>> +
->>>  int iio_channel_start_all_cb(struct iio_cb_buffer *cb_buff)
->>>  {
->>>  	return iio_update_buffers(cb_buff->indio_dev, &cb_buff->buffer,
->>> diff --git a/include/linux/iio/consumer.h b/include/linux/iio/consumer.h
->>> index cb44771..0f6e94d 100644
->>> --- a/include/linux/iio/consumer.h
->>> +++ b/include/linux/iio/consumer.h
->>> @@ -134,6 +134,19 @@ struct iio_cb_buffer *iio_channel_get_all_cb(struct device *dev,
->>>  						       void *private),
->>>  					     void *private);
->>>  /**
->>> + * iio_channel_cb_set_buffer_size() - set the buffer length.
->>> + * @cb_buffer:		The callback buffer from whom we want the channel
->>> + *			information.
->>> + * @length: buffer length in bytes
->>> + * @watermark: buffer watermark in bytes
->>> + *
->>> + * This function allows to configure the buffer length. The watermark if
->>> + * forced to half of the buffer.
->>> + */
->>> +int iio_channel_cb_set_buffer_params(struct iio_cb_buffer *cb_buffer,
->>> +				     size_t length, size_t watermark);
->>> +
->>> +/**
->>>   * iio_channel_release_all_cb() - release and unregister the callback.
->>>   * @cb_buffer:		The callback buffer that was allocated.
->>>   */
->>>
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+Hi,
+
+
+This is a follow up of my questions around exynos-rng [1].
+
+Changes since v2:
+=================
+1. Do not re-use random numbers for re-seed (neither for system resume
+   nor for periodic re-seed).  Instead the driver will just generate new
+   random numbers (suggested by Stephan M?ller).
+
+   Suspend path tested with suspend-to-freeze, not real suspend. Testing
+   on Trats2 would be welcomed.
+
+Changes since v1:
+=================
+1. Re-work the code for seeding after system resume, following suggestions
+   and review by Stephan M?ller.
+
+2. Re-seed itself from time to time (every 100 ms), suggested by Stephan
+   M?ller.
+
+3. Use a define for retries (Bartlomiej Zolnierkiewicz).
+4. Add some docs.
+
+
+Description:
+============
+The existing exynos-rng has many issues.  The most important one is that
+it is a pseudo RNG device but uses hw_random interface which does not allow
+proper seeding.
+
+The RNG module on Exynos4 requires seeding.  On newer SoCs (like Exynos5420)
+it can seed itself from a true RNG.  Converting the existing driver
+to use TRNG would effectively drop support for Exynos4 and break
+compatibility with existing users.
+
+Instead I decided to convert it to crypto API.  In the future I hope
+to add support for seeding from TRNG module.
+
+Tested with app [2].
+
+Patches are independent. I will take the defconfig changes (2/3 and 3/3)
+through samsung-soc tree.
+
+Best regards,
+Krzysztof
+
+[1] https://www.spinics.net/lists/arm-kernel/msg569641.html
+[2] https://www.spinics.net/lists/arm-kernel/msg571184.html
+
+
+Krzysztof Kozlowski (3):
+  crypto: hw_random - Add new Exynos RNG driver
+  ARM: exynos_defconfig: Enable Exynos RNG and user-space crypto API
+  ARM: multi_v7_defconfig: Enable Exynos RNG and user-space crypto API
+
+ MAINTAINERS                         |   8 +
+ arch/arm/configs/exynos_defconfig   |   6 +
+ arch/arm/configs/multi_v7_defconfig |   6 +
+ drivers/char/hw_random/Kconfig      |  14 --
+ drivers/char/hw_random/Makefile     |   1 -
+ drivers/char/hw_random/exynos-rng.c | 231 ---------------------
+ drivers/crypto/Kconfig              |  15 ++
+ drivers/crypto/Makefile             |   1 +
+ drivers/crypto/exynos-rng.c         | 390 ++++++++++++++++++++++++++++++++++++
+ 9 files changed, 426 insertions(+), 246 deletions(-)
+ delete mode 100644 drivers/char/hw_random/exynos-rng.c
+ create mode 100644 drivers/crypto/exynos-rng.c
+
+-- 
+2.9.3
