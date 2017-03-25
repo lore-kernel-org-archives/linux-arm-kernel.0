@@ -1,77 +1,44 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Sat, 25 Mar 2017 17:38:13 -0400
-Subject: [PATCH V5 4/4] PCI/ASPM: move link_state cleanup to bridge remove
-In-Reply-To: <1490477893-9517-1-git-send-email-okaya@codeaurora.org>
-References: <1490477893-9517-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1490477893-9517-5-git-send-email-okaya@codeaurora.org>
+Date: Sat, 25 Mar 2017 19:04:02 -0400
+Subject: [PATCH 1/2] dmaengine: qcom_hidma: disable/enable IRQs on pause/resume
+Message-ID: <1490483043-4364-1-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For endpoints, change pcie_aspm_exit_link_state() so it cleans up
-the device's own state and disables ASPM if necessary, but doesn't
-remove the parent's link_state.
+Once the channels are stopped, disable interrupts to make sure no new
+HW interaction can happen.
 
-For bridges, change pcie_aspm_exit_link_state() so it frees the
-bridge's own link_state.
+Similarly, re-enable the interrupts only if we know that channel is
+operational again.
 
-Fixes: https://bugzilla.kernel.org/show_bug.cgi?id=194895
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- drivers/pci/pcie/aspm.c | 20 +++++++++++++++-----
- drivers/pci/remove.c    |  3 +--
- 2 files changed, 16 insertions(+), 7 deletions(-)
+ drivers/dma/qcom/hidma_ll.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/drivers/pci/pcie/aspm.c b/drivers/pci/pcie/aspm.c
-index f48bb29..db3fbd9 100644
---- a/drivers/pci/pcie/aspm.c
-+++ b/drivers/pci/pcie/aspm.c
-@@ -947,6 +947,21 @@ void pcie_aspm_exit_link_state(struct pci_dev *pdev)
- 	struct pci_dev *parent = pdev->bus->self;
- 	struct pcie_link_state *link, *root, *parent_link;
+diff --git a/drivers/dma/qcom/hidma_ll.c b/drivers/dma/qcom/hidma_ll.c
+index 6645bdf..1530a66 100644
+--- a/drivers/dma/qcom/hidma_ll.c
++++ b/drivers/dma/qcom/hidma_ll.c
+@@ -499,6 +499,9 @@ int hidma_ll_enable(struct hidma_lldev *lldev)
+ 	lldev->trch_state = HIDMA_CH_ENABLED;
+ 	lldev->evch_state = HIDMA_CH_ENABLED;
  
-+	if (pdev->has_secondary_link) {
-+		link = pdev->link_state;
-+		down_read(&pci_bus_sem);
-+		mutex_lock(&aspm_lock);
++	/* enable irqs */
++	writel(ENABLE_IRQS, lldev->evca + HIDMA_EVCA_IRQ_EN_REG);
 +
-+		list_del(&link->sibling);
-+		list_del(&link->link);
-+
-+		/* Clock PM is for endpoint device */
-+		free_link_state(link);
-+		mutex_unlock(&aspm_lock);
-+		up_read(&pci_bus_sem);
-+		return;
-+	}
-+
- 	if (!parent || !parent->link_state)
- 		return;
- 
-@@ -965,11 +980,6 @@ void pcie_aspm_exit_link_state(struct pci_dev *pdev)
- 
- 	/* All functions are removed, so just disable ASPM for the link */
- 	pcie_config_aspm_link(link, 0);
--	list_del(&link->sibling);
--	list_del(&link->link);
--	/* Clock PM is for endpoint device */
--	free_link_state(link);
--
- 	/* Recheck latencies and configure upstream links */
- 	if (parent_link) {
- 		pcie_update_aspm_capable(root);
-diff --git a/drivers/pci/remove.c b/drivers/pci/remove.c
-index 73a03d3..7e14ebd 100644
---- a/drivers/pci/remove.c
-+++ b/drivers/pci/remove.c
-@@ -25,8 +25,7 @@ static void pci_stop_dev(struct pci_dev *dev)
- 		dev->is_added = 0;
- 	}
- 
--	if (dev->bus->self)
--		pcie_aspm_exit_link_state(dev);
-+	pcie_aspm_exit_link_state(dev);
+ 	return 0;
  }
  
- static void pci_destroy_dev(struct pci_dev *dev)
+@@ -596,6 +599,9 @@ int hidma_ll_disable(struct hidma_lldev *lldev)
+ 
+ 	lldev->trch_state = HIDMA_CH_SUSPENDED;
+ 	lldev->evch_state = HIDMA_CH_SUSPENDED;
++
++	/* disable interrupts */
++	writel(0, lldev->evca + HIDMA_EVCA_IRQ_EN_REG);
+ 	return 0;
+ }
+ 
 -- 
 1.9.1
