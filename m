@@ -1,27 +1,21 @@
-From: valmikibow@gmail.com (valmiki)
-Date: Sat, 25 Mar 2017 10:46:34 +0530
-Subject: [RFC PATCH 21/30] iommu/arm-smmu-v3: Handle device faults from PRI
-In-Reply-To: <8520D5D51A55D047800579B0941471982640F43C@XAP-PVEXMBX02.xlnx.xilinx.com>
-References: <20170227195441.5170-1-jean-philippe.brucker@arm.com>
- <20170227195441.5170-22-jean-philippe.brucker@arm.com>
- <8520D5D51A55D047800579B0941471982640F43C@XAP-PVEXMBX02.xlnx.xilinx.com>
-Message-ID: <0b3e3ddd-acc3-5ba7-639f-5c9192da57c3@gmail.com>
+From: gregory.0xf0@gmail.com (Gregory Fong)
+Date: Fri, 24 Mar 2017 22:21:44 -0700
+Subject: [PATCH 4/9] bus: brcmstb_gisb: Use register offsets with writes
+ too
+In-Reply-To: <20170324144632.5896-5-opendmb@gmail.com>
+References: <20170324144632.5896-1-opendmb@gmail.com>
+ <20170324144632.5896-5-opendmb@gmail.com>
+Message-ID: <CADtm3G74w9rAB==APUqDTZL307E9mCtWZgw3BWLP08B1C+tCBQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> When we receive a PRI Page Request (PPR) from the SMMU, it contains a context identifier SID:SSID, an IOVA and the requested access flags.
+On Fri, Mar 24, 2017 at 7:46 AM, Doug Berger <opendmb@gmail.com> wrote:
+> This commit corrects the bug introduced in commit f80835875d3d
+> ("bus: brcmstb_gisb: Look up register offsets in a table") such
+> that gisb_write() translates the register enumeration into an
+> offset from the base address for writes as well as reads.
 >
-> Search the domain corresponding to SID:SSID, and call handle_mm_fault on its mm. If memory management is able to fix the fault, we ask the device to retry the access with a PRI_SUCCESS message. Otherwise send PRI_FAIL.
->
-Hi Jean,
+> Fixes: f80835875d3d ("bus: brcmstb_gisb: Look up register offsets in a table")
+> Signed-off-by: Doug Berger <opendmb@gmail.com>
 
-I need some clarification. Page fault handling is already part of MMU. 
-When PRI requested page results in page fault, smmu is going to invoke 
-handle_mm_fault which is part of memory management unit ?
-
-If so this functionality is yet to be added in SMMU driver ?
-
-Because i haven't seen this API being called in your patches.
-
-Regards,
-Valmiki
+Acked-by: Gregory Fong <gregory.0xf0@gmail.com>
