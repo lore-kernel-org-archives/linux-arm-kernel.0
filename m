@@ -1,42 +1,37 @@
 From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Sat, 25 Mar 2017 22:50:09 +0800
-Subject: [PATCH v5 2/8] phy: sun4i-usb: change PHYCTL register clearing code
+Date: Sat, 25 Mar 2017 22:50:10 +0800
+Subject: [PATCH v5 3/8] phy: sun4i-usb: add PHYCTL offset for H3 SoC
 In-Reply-To: <20170325145015.22076-1-icenowy@aosc.xyz>
 References: <20170325145015.22076-1-icenowy@aosc.xyz>
-Message-ID: <20170325145015.22076-3-icenowy@aosc.xyz>
+Message-ID: <20170325145015.22076-4-icenowy@aosc.xyz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It seems that all SoCs with the PHYCTL register offset as 0x10 need the
-PHYCTL register to be cleared before it's written.
+The config structure of H3 in phy-sun4i-usb driver have the PHYCTL
+register offset missing.
 
-Change PHYCTL register clearing code to judge whether clearing is needed
-based on the PHYCTL offset.
+Add it. From the BSP source code, we know that the offset should be
+0x10.
 
 Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
 ---
 Changes in v5:
-- Commit message fix.
+- Changed commit message.
 
- drivers/phy/phy-sun4i-usb.c | 6 ++----
- 1 file changed, 2 insertions(+), 4 deletions(-)
+ drivers/phy/phy-sun4i-usb.c | 1 +
+ 1 file changed, 1 insertion(+)
 
 diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
-index a21b5f24a340..62b4d25448c6 100644
+index 62b4d25448c6..a650f283f6ff 100644
 --- a/drivers/phy/phy-sun4i-usb.c
 +++ b/drivers/phy/phy-sun4i-usb.c
-@@ -188,10 +188,8 @@ static void sun4i_usb_phy_write(struct sun4i_usb_phy *phy, u32 addr, u32 data,
- 
- 	spin_lock_irqsave(&phy_data->reg_lock, flags);
- 
--	if (phy_data->cfg->type == sun8i_a33_phy ||
--	    phy_data->cfg->type == sun50i_a64_phy ||
--	    phy_data->cfg->type == sun8i_v3s_phy) {
--		/* A33 or A64 needs us to set phyctl to 0 explicitly */
-+	if (phy_data->cfg->phyctl_offset == REG_PHYCTL_A33) {
-+		/* SoCs newer than A33 need us to set phyctl to 0 explicitly */
- 		writel(0, phyctl);
- 	}
- 
+@@ -821,6 +821,7 @@ static const struct sun4i_usb_phy_cfg sun8i_h3_cfg = {
+ 	.num_phys = 4,
+ 	.type = sun8i_h3_phy,
+ 	.disc_thresh = 3,
++	.phyctl_offset = REG_PHYCTL_A33,
+ 	.dedicated_clocks = true,
+ 	.enable_pmu_unk1 = true,
+ };
 -- 
 2.12.0
