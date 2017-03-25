@@ -1,76 +1,77 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Sat, 25 Mar 2017 17:38:12 -0400
-Subject: [PATCH V5 3/4] PCI/ASPM: save power on values during bridge init
+Date: Sat, 25 Mar 2017 17:38:13 -0400
+Subject: [PATCH V5 4/4] PCI/ASPM: move link_state cleanup to bridge remove
 In-Reply-To: <1490477893-9517-1-git-send-email-okaya@codeaurora.org>
 References: <1490477893-9517-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1490477893-9517-4-git-send-email-okaya@codeaurora.org>
+Message-ID: <1490477893-9517-5-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we added a hook to be called from device_add, save the
-default values from the HW registers early in the boot for further
-reuse during hot device add/remove operations.
+For endpoints, change pcie_aspm_exit_link_state() so it cleans up
+the device's own state and disables ASPM if necessary, but doesn't
+remove the parent's link_state.
+
+For bridges, change pcie_aspm_exit_link_state() so it frees the
+bridge's own link_state.
 
 Fixes: https://bugzilla.kernel.org/show_bug.cgi?id=194895
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- drivers/pci/pcie/aspm.c | 22 ++++++++++++++++++----
- 1 file changed, 18 insertions(+), 4 deletions(-)
+ drivers/pci/pcie/aspm.c | 20 +++++++++++++++-----
+ drivers/pci/remove.c    |  3 +--
+ 2 files changed, 16 insertions(+), 7 deletions(-)
 
 diff --git a/drivers/pci/pcie/aspm.c b/drivers/pci/pcie/aspm.c
-index f5b1fa0..f48bb29 100644
+index f48bb29..db3fbd9 100644
 --- a/drivers/pci/pcie/aspm.c
 +++ b/drivers/pci/pcie/aspm.c
-@@ -521,8 +521,10 @@ static void pcie_aspm_cap_init(struct pcie_link_state *link, int blacklist)
- 	 */
- 	if (dwreg.support & upreg.support & PCIE_LINK_STATE_L0S)
- 		link->aspm_support |= ASPM_STATE_L0S;
--	if (dwreg.enabled & PCIE_LINK_STATE_L0S)
-+	if (dwreg.enabled & PCIE_LINK_STATE_L0S) {
- 		link->aspm_enabled |= ASPM_STATE_L0S_UP;
-+		link->aspm_default |= ASPM_STATE_L0S_UP;
-+	}
- 	if (upreg.enabled & PCIE_LINK_STATE_L0S)
- 		link->aspm_enabled |= ASPM_STATE_L0S_DW;
- 	link->latency_up.l0s = calc_l0s_latency(upreg.latency_encoding_l0s);
-@@ -558,9 +560,6 @@ static void pcie_aspm_cap_init(struct pcie_link_state *link, int blacklist)
- 	if (link->aspm_support & ASPM_STATE_L1SS)
- 		aspm_calc_l1ss_info(link, &upreg, &dwreg);
+@@ -947,6 +947,21 @@ void pcie_aspm_exit_link_state(struct pci_dev *pdev)
+ 	struct pci_dev *parent = pdev->bus->self;
+ 	struct pcie_link_state *link, *root, *parent_link;
  
--	/* Save default state */
--	link->aspm_default = link->aspm_enabled;
--
- 	/* Setup initial capable state. Will be updated later */
- 	link->aspm_capable = link->aspm_support;
- 	/*
-@@ -835,6 +834,7 @@ static struct pcie_link_state *alloc_pcie_link_state(struct pci_dev *pdev)
- int pci_aspm_init(struct pci_dev *pdev)
- {
- 	struct pcie_link_state *link;
-+	struct aspm_register_info upreg;
- 
- 	if (!aspm_support_enabled)
- 		return 0;
-@@ -851,6 +851,20 @@ int pci_aspm_init(struct pci_dev *pdev)
- 	if (!link)
- 		return -ENOMEM;
- 
-+	pcie_get_aspm_reg(pdev, &upreg);
-+	if (upreg.enabled & PCIE_LINK_STATE_L0S)
-+		link->aspm_default |= ASPM_STATE_L0S_DW;
-+	if (upreg.enabled & PCIE_LINK_STATE_L1)
-+		link->aspm_default |= ASPM_STATE_L1;
-+	if (upreg.l1ss_ctl1 & PCI_L1SS_CTL1_ASPM_L1_1)
-+		link->aspm_default |= ASPM_STATE_L1_1;
-+	if (upreg.l1ss_ctl1 & PCI_L1SS_CTL1_ASPM_L1_2)
-+		link->aspm_default |= ASPM_STATE_L1_2;
-+	if (upreg.l1ss_ctl1 & PCI_L1SS_CTL1_PCIPM_L1_1)
-+		link->aspm_default |= ASPM_STATE_L1_1_PCIPM;
-+	if (upreg.l1ss_ctl1 & PCI_L1SS_CTL1_PCIPM_L1_2)
-+		link->aspm_default |= ASPM_STATE_L1_2_PCIPM;
++	if (pdev->has_secondary_link) {
++		link = pdev->link_state;
++		down_read(&pci_bus_sem);
++		mutex_lock(&aspm_lock);
 +
- 	return 0;
++		list_del(&link->sibling);
++		list_del(&link->link);
++
++		/* Clock PM is for endpoint device */
++		free_link_state(link);
++		mutex_unlock(&aspm_lock);
++		up_read(&pci_bus_sem);
++		return;
++	}
++
+ 	if (!parent || !parent->link_state)
+ 		return;
+ 
+@@ -965,11 +980,6 @@ void pcie_aspm_exit_link_state(struct pci_dev *pdev)
+ 
+ 	/* All functions are removed, so just disable ASPM for the link */
+ 	pcie_config_aspm_link(link, 0);
+-	list_del(&link->sibling);
+-	list_del(&link->link);
+-	/* Clock PM is for endpoint device */
+-	free_link_state(link);
+-
+ 	/* Recheck latencies and configure upstream links */
+ 	if (parent_link) {
+ 		pcie_update_aspm_capable(root);
+diff --git a/drivers/pci/remove.c b/drivers/pci/remove.c
+index 73a03d3..7e14ebd 100644
+--- a/drivers/pci/remove.c
++++ b/drivers/pci/remove.c
+@@ -25,8 +25,7 @@ static void pci_stop_dev(struct pci_dev *dev)
+ 		dev->is_added = 0;
+ 	}
+ 
+-	if (dev->bus->self)
+-		pcie_aspm_exit_link_state(dev);
++	pcie_aspm_exit_link_state(dev);
  }
  
+ static void pci_destroy_dev(struct pci_dev *dev)
 -- 
 1.9.1
