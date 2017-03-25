@@ -1,63 +1,28 @@
 From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Sat, 25 Mar 2017 19:43:50 +0100
-Subject: [PATCH 1/1] pinctrl: meson: meson8b: fix the NAND DQS pins
-In-Reply-To: <20170325184350.7677-1-martin.blumenstingl@googlemail.com>
-References: <20170325184350.7677-1-martin.blumenstingl@googlemail.com>
-Message-ID: <20170325184350.7677-2-martin.blumenstingl@googlemail.com>
+Date: Sat, 25 Mar 2017 19:43:49 +0100
+Subject: [PATCH 0/1] pinctrl-meson8b: fix the NAND DQS pin definitions
+Message-ID: <20170325184350.7677-1-martin.blumenstingl@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The nand_groups table uses different names for the NAND DQS pins than
-the GROUP() definition in meson8b_cbus_groups (nand_dqs_0 vs nand_dqs0).
-This prevents using the NAND DQS pins in the devicetree.
+We currently do not have a NAND driver but once we have one this will
+become handy:
+The current nand_dqs_0 and nand_dqs_1 groups are not usable because the
+"nand" function only allows "nand_dqs0" and "nand_dqs1" (no underscore
+after "nand_dqs").
 
-I decided to rename both pins to nand_dqs_15 and nand_dqs_18 as both seem
-to serve the same function, just exposed on different pins (unlike the
-ethernet TX pins for example, where there's eth_txd0..3 - all of these
-can be active at the same time as they are different data lines).
+While here, also rename the groups to "nand_dqs_15" (uses pin 15) and
+"nand_dqs_18" (uses pin 18).
+Renaming is safe in this case as it was not possible to use these
+groups/pins before (so we can be sure that there are no "old DT
+consumers" out there).
 
-Fixes: 0fefcb6876d0 ("pinctrl: Add support for Meson8b")
-Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
----
+
+Martin Blumenstingl (1):
+  pinctrl: meson: meson8b: fix the NAND DQS pins
+
  drivers/pinctrl/meson/pinctrl-meson8b.c | 12 ++++++------
  1 file changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/pinctrl/meson/pinctrl-meson8b.c b/drivers/pinctrl/meson/pinctrl-meson8b.c
-index 76f077f18193..bf747eb1f3f4 100644
---- a/drivers/pinctrl/meson/pinctrl-meson8b.c
-+++ b/drivers/pinctrl/meson/pinctrl-meson8b.c
-@@ -267,8 +267,8 @@ static const unsigned int nand_ale_pins[]	= { PIN(BOOT_11, 0) };
- static const unsigned int nand_cle_pins[]	= { PIN(BOOT_12, 0) };
- static const unsigned int nand_wen_clk_pins[]	= { PIN(BOOT_13, 0) };
- static const unsigned int nand_ren_clk_pins[]	= { PIN(BOOT_14, 0) };
--static const unsigned int nand_dqs_0_pins[]	= { PIN(BOOT_15, 0) };
--static const unsigned int nand_dqs_1_pins[]	= { PIN(BOOT_18, 0) };
-+static const unsigned int nand_dqs_15_pins[]	= { PIN(BOOT_15, 0) };
-+static const unsigned int nand_dqs_18_pins[]	= { PIN(BOOT_18, 0) };
- 
- static const unsigned int sdxc_d0_c_pins[]	= { PIN(BOOT_0, 0)};
- static const unsigned int sdxc_d13_c_pins[]	= { PIN(BOOT_1, 0), PIN(BOOT_2, 0),
-@@ -527,8 +527,8 @@ static struct meson_pmx_group meson8b_cbus_groups[] = {
- 	GROUP(nand_cle,		2,	20),
- 	GROUP(nand_wen_clk,	2,	19),
- 	GROUP(nand_ren_clk,	2,	18),
--	GROUP(nand_dqs_0,	2,	27),
--	GROUP(nand_dqs_1,	2,	28),
-+	GROUP(nand_dqs_15,	2,	27),
-+	GROUP(nand_dqs_18,	2,	28),
- 	GROUP(sdxc_d0_c,	4,	30),
- 	GROUP(sdxc_d13_c,	4,	29),
- 	GROUP(sdxc_d47_c,	4,	28),
-@@ -739,8 +739,8 @@ static const char * const sdxc_c_groups[] = {
- static const char * const nand_groups[] = {
- 	"nand_io", "nand_io_ce0", "nand_io_ce1",
- 	"nand_io_rb0", "nand_ale", "nand_cle",
--	"nand_wen_clk", "nand_ren_clk", "nand_dqs0",
--	"nand_dqs1"
-+	"nand_wen_clk", "nand_ren_clk", "nand_dqs_15",
-+	"nand_dqs_18"
- };
- 
- static const char * const nor_groups[] = {
 -- 
 2.12.1
