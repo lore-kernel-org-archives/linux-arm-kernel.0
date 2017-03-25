@@ -1,69 +1,265 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Sat, 25 Mar 2017 12:43:30 -0500
-Subject: [PATCH] pci: mvebu: avoid changing the SCC bit in the link
- status register
-In-Reply-To: <20170325125859.GM7909@n2100.armlinux.org.uk>
-References: <E1cTbUq-0008Gj-9u@rmk-PC.armlinux.org.uk>
- <20170325125859.GM7909@n2100.armlinux.org.uk>
-Message-ID: <20170325174330.GH25380@bhelgaas-glaptop.roam.corp.google.com>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Sat, 25 Mar 2017 17:48:34 +0000
+Subject: [PATCH v3 07/11] iio: adc: sun4i-gpadc-iio: add support for A33
+ thermal sensor
+In-Reply-To: <20170321153611.16228-8-quentin.schulz@free-electrons.com>
+References: <20170321153611.16228-1-quentin.schulz@free-electrons.com>
+ <20170321153611.16228-8-quentin.schulz@free-electrons.com>
+Message-ID: <d43b29c4-7e9c-1cce-6529-e7cd4688a6ac@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 25, 2017 at 12:58:59PM +0000, Russell King - ARM Linux wrote:
-> Ping.  This _fix_ doesn't seem to have made it in.
-
-Thanks for the ping.  I work from patchwork, and I couldn't find any
-trace of this patch there, so there must have been a glitch.
-
-I applied it to pci/host-mvebu for v4.12.
-
-> On Tue, Jan 17, 2017 at 09:40:52PM +0000, Russell King wrote:
-> > It seems on later Armada 38x, the slot clock configuration bit is not
-> > read-only, but can be written.  This means that our RW1C protection
-> > ends up clearing this bit when the link control register is written.
-> > 
-> > Adjust the mask so that we only avoid writing '1' bits to the RW1C
-> > bits of this register (bits 15 and 14 of the link status) rather than
-> > masking out all the status register bits.
-> > 
-> > Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
-> > ---
-> >  drivers/pci/host/pci-mvebu.c | 5 +++--
-> >  1 file changed, 3 insertions(+), 2 deletions(-)
-> > 
-> > diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
-> > index 58f75c098b42..3ed4cb7501bd 100644
-> > --- a/drivers/pci/host/pci-mvebu.c
-> > +++ b/drivers/pci/host/pci-mvebu.c
-> > @@ -827,10 +827,11 @@ static int mvebu_sw_pci_bridge_write(struct mvebu_pcie_port *port,
-> >  		 * If the mask is 0xffff0000, then we only want to write
-> >  		 * the link control register, rather than clearing the
-> >  		 * RW1C bits in the link status register.  Mask out the
-> > -		 * status register bits.
-> > +		 * RW1C bits.
-> >  		 */
-> >  		if (mask == 0xffff0000)
-> > -			value &= 0xffff;
-> > +			value &= ~((PCI_EXP_LNKSTA_LABS |
-> > +				    PCI_EXP_LNKSTA_LBMS) << 16);
-> >  
-> >  		mvebu_writel(port, value, PCIE_CAP_PCIEXP + PCI_EXP_LNKCTL);
-> >  		break;
-> > -- 
-> > 2.7.4
-> > 
-> > 
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+On 21/03/17 15:36, Quentin Schulz wrote:
+> This adds support for the Allwinner A33 thermal sensor.
 > 
-> -- 
-> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-> according to speedtest.net.
+> Unlike the A10, A13 and A31, the Allwinner A33 only has one channel
+> which is dedicated to the thermal sensor. Moreover, its thermal sensor
+> does not generate interruptions, thus we only need to directly read the
+> register storing the temperature value.
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> The MFD used by the A10, A13 and A31, was created to avoid breaking the
+> DT binding, but since the nodes for the ADC weren't there for the A33,
+> it is not needed.
+> 
+> Though the A33 does not have an internal ADC, it has a thermal sensor
+> which shares the same registers with GPADC of the already supported SoCs
+> and almost the same bits, for the same purpose (thermal sensor).
+> 
+> The thermal sensor behaves exactly the same (except the presence of
+> interrupts or not) on the different SoCs.
+> 
+> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+> Acked-by: Lee Jones <lee.jones@linaro.org>
+Acked-by: Jonathan Cameron <jic23@kernel.org>
+
+I'm assuming this is going through your tree Lee, let me know if you want
+to do it differently.
+
+Jonathan
+> ---
+> 
+> v3:
+>   - switched compatible from allwinner,sun8i-a33-gpadc-iio to
+>   allwinner,sun8i-a33-ths to better reflect the datasheet's name,
+>   - fixed the non-working if (!IS_ENABLED(THERMAL_OF)) by prefixing it with
+>   CONFIG,
+> 
+> v2:
+>   - removed added comments in Kconfig,
+>   - simplified Kconfig depends on condition,
+>   - removed THERMAL_OF requirement for sun8i,
+>   - renamed sun8i_gpadc_channels to sun8i_a33_gpadc_channels,
+>   - renamed use_dt boolean in no_irq as it reflects better why we need it,
+>   - removed spurious/unneeded modifications done in v1,
+> 
+>  drivers/iio/adc/Kconfig           |   2 +-
+>  drivers/iio/adc/sun4i-gpadc-iio.c | 100 ++++++++++++++++++++++++++++++++++++--
+>  include/linux/mfd/sun4i-gpadc.h   |   4 ++
+>  3 files changed, 102 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/iio/adc/Kconfig b/drivers/iio/adc/Kconfig
+> index 9f8b4b1..8c8ead6 100644
+> --- a/drivers/iio/adc/Kconfig
+> +++ b/drivers/iio/adc/Kconfig
+> @@ -562,7 +562,7 @@ config STX104
+>  config SUN4I_GPADC
+>  	tristate "Support for the Allwinner SoCs GPADC"
+>  	depends on IIO
+> -	depends on MFD_SUN4I_GPADC
+> +	depends on MFD_SUN4I_GPADC || MACH_SUN8I
+>  	help
+>  	  Say yes here to build support for Allwinner (A10, A13 and A31) SoCs
+>  	  GPADC. This ADC provides 4 channels which can be used as an ADC or as
+> diff --git a/drivers/iio/adc/sun4i-gpadc-iio.c b/drivers/iio/adc/sun4i-gpadc-iio.c
+> index 7cb997a..74705aa 100644
+> --- a/drivers/iio/adc/sun4i-gpadc-iio.c
+> +++ b/drivers/iio/adc/sun4i-gpadc-iio.c
+> @@ -85,6 +85,12 @@ static const struct gpadc_data sun6i_gpadc_data = {
+>  	.adc_chan_mask = SUN6I_GPADC_CTRL1_ADC_CHAN_MASK,
+>  };
+>  
+> +static const struct gpadc_data sun8i_a33_gpadc_data = {
+> +	.temp_offset = -1662,
+> +	.temp_scale = 162,
+> +	.tp_mode_en = SUN8I_GPADC_CTRL1_CHOP_TEMP_EN,
+> +};
+> +
+>  struct sun4i_gpadc_iio {
+>  	struct iio_dev			*indio_dev;
+>  	struct completion		completion;
+> @@ -96,6 +102,7 @@ struct sun4i_gpadc_iio {
+>  	unsigned int			temp_data_irq;
+>  	atomic_t			ignore_temp_data_irq;
+>  	const struct gpadc_data		*data;
+> +	bool				no_irq;
+>  	/* prevents concurrent reads of temperature and ADC */
+>  	struct mutex			mutex;
+>  };
+> @@ -138,6 +145,23 @@ static const struct iio_chan_spec sun4i_gpadc_channels_no_temp[] = {
+>  	SUN4I_GPADC_ADC_CHANNEL(3, "adc_chan3"),
+>  };
+>  
+> +static const struct iio_chan_spec sun8i_a33_gpadc_channels[] = {
+> +	{
+> +		.type = IIO_TEMP,
+> +		.info_mask_separate = BIT(IIO_CHAN_INFO_RAW) |
+> +				      BIT(IIO_CHAN_INFO_SCALE) |
+> +				      BIT(IIO_CHAN_INFO_OFFSET),
+> +		.datasheet_name = "temp_adc",
+> +	},
+> +};
+> +
+> +static const struct regmap_config sun4i_gpadc_regmap_config = {
+> +	.reg_bits = 32,
+> +	.val_bits = 32,
+> +	.reg_stride = 4,
+> +	.fast_io = true,
+> +};
+> +
+>  static int sun4i_prepare_for_irq(struct iio_dev *indio_dev, int channel,
+>  				 unsigned int irq)
+>  {
+> @@ -247,6 +271,17 @@ static int sun4i_gpadc_temp_read(struct iio_dev *indio_dev, int *val)
+>  {
+>  	struct sun4i_gpadc_iio *info = iio_priv(indio_dev);
+>  
+> +	if (info->no_irq) {
+> +		pm_runtime_get_sync(indio_dev->dev.parent);
+> +
+> +		regmap_read(info->regmap, SUN4I_GPADC_TEMP_DATA, val);
+> +
+> +		pm_runtime_mark_last_busy(indio_dev->dev.parent);
+> +		pm_runtime_put_autosuspend(indio_dev->dev.parent);
+> +
+> +		return 0;
+> +	}
+> +
+>  	return sun4i_gpadc_read(indio_dev, 0, val, info->temp_data_irq);
+>  }
+>  
+> @@ -454,6 +489,58 @@ static int sun4i_irq_init(struct platform_device *pdev, const char *name,
+>  	return 0;
+>  }
+>  
+> +static const struct of_device_id sun4i_gpadc_of_id[] = {
+> +	{
+> +		.compatible = "allwinner,sun8i-a33-ths",
+> +		.data = &sun8i_a33_gpadc_data,
+> +	},
+> +	{ /* sentinel */ }
+> +};
+> +
+> +static int sun4i_gpadc_probe_dt(struct platform_device *pdev,
+> +				struct iio_dev *indio_dev)
+> +{
+> +	struct sun4i_gpadc_iio *info = iio_priv(indio_dev);
+> +	const struct of_device_id *of_dev;
+> +	struct thermal_zone_device *tzd;
+> +	struct resource *mem;
+> +	void __iomem *base;
+> +	int ret;
+> +
+> +	of_dev = of_match_device(sun4i_gpadc_of_id, &pdev->dev);
+> +	if (!of_dev)
+> +		return -ENODEV;
+> +
+> +	info->no_irq = true;
+> +	info->data = (struct gpadc_data *)of_dev->data;
+> +	indio_dev->num_channels = ARRAY_SIZE(sun8i_a33_gpadc_channels);
+> +	indio_dev->channels = sun8i_a33_gpadc_channels;
+> +
+> +	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	base = devm_ioremap_resource(&pdev->dev, mem);
+> +	if (IS_ERR(base))
+> +		return PTR_ERR(base);
+> +
+> +	info->regmap = devm_regmap_init_mmio(&pdev->dev, base,
+> +					     &sun4i_gpadc_regmap_config);
+> +	if (IS_ERR(info->regmap)) {
+> +		ret = PTR_ERR(info->regmap);
+> +		dev_err(&pdev->dev, "failed to init regmap: %d\n", ret);
+> +		return ret;
+> +	}
+> +
+> +	if (!IS_ENABLED(CONFIG_THERMAL_OF))
+> +		return 0;
+> +
+> +	tzd = devm_thermal_zone_of_sensor_register(&pdev->dev, 0, info,
+> +						   &sun4i_ts_tz_ops);
+> +	if (IS_ERR(tzd))
+> +		dev_err(&pdev->dev, "could not register thermal sensor: %ld\n",
+> +			PTR_ERR(tzd));
+> +
+> +	return PTR_ERR_OR_ZERO(tzd);
+> +}
+> +
+>  static int sun4i_gpadc_probe_mfd(struct platform_device *pdev,
+>  				 struct iio_dev *indio_dev)
+>  {
+> @@ -462,6 +549,7 @@ static int sun4i_gpadc_probe_mfd(struct platform_device *pdev,
+>  		dev_get_drvdata(pdev->dev.parent);
+>  	int ret;
+>  
+> +	info->no_irq = false;
+>  	info->regmap = sun4i_gpadc_dev->regmap;
+>  
+>  	indio_dev->num_channels = ARRAY_SIZE(sun4i_gpadc_channels);
+> @@ -561,7 +649,11 @@ static int sun4i_gpadc_probe(struct platform_device *pdev)
+>  	indio_dev->info = &sun4i_gpadc_iio_info;
+>  	indio_dev->modes = INDIO_DIRECT_MODE;
+>  
+> -	ret = sun4i_gpadc_probe_mfd(pdev, indio_dev);
+> +	if (pdev->dev.of_node)
+> +		ret = sun4i_gpadc_probe_dt(pdev, indio_dev);
+> +	else
+> +		ret = sun4i_gpadc_probe_mfd(pdev, indio_dev);
+> +
+>  	if (ret)
+>  		return ret;
+>  
+> @@ -580,7 +672,7 @@ static int sun4i_gpadc_probe(struct platform_device *pdev)
+>  	return 0;
+>  
+>  err_map:
+> -	if (IS_ENABLED(CONFIG_THERMAL_OF))
+> +	if (!info->no_irq && IS_ENABLED(CONFIG_THERMAL_OF))
+>  		iio_map_array_unregister(indio_dev);
+>  
+>  	pm_runtime_put(&pdev->dev);
+> @@ -592,10 +684,11 @@ static int sun4i_gpadc_probe(struct platform_device *pdev)
+>  static int sun4i_gpadc_remove(struct platform_device *pdev)
+>  {
+>  	struct iio_dev *indio_dev = platform_get_drvdata(pdev);
+> +	struct sun4i_gpadc_iio *info = iio_priv(indio_dev);
+>  
+>  	pm_runtime_put(&pdev->dev);
+>  	pm_runtime_disable(&pdev->dev);
+> -	if (IS_ENABLED(CONFIG_THERMAL_OF))
+> +	if (!info->no_irq && IS_ENABLED(CONFIG_THERMAL_OF))
+>  		iio_map_array_unregister(indio_dev);
+>  
+>  	return 0;
+> @@ -611,6 +704,7 @@ static const struct platform_device_id sun4i_gpadc_id[] = {
+>  static struct platform_driver sun4i_gpadc_driver = {
+>  	.driver = {
+>  		.name = "sun4i-gpadc-iio",
+> +		.of_match_table = sun4i_gpadc_of_id,
+>  		.pm = &sun4i_gpadc_pm_ops,
+>  	},
+>  	.id_table = sun4i_gpadc_id,
+> diff --git a/include/linux/mfd/sun4i-gpadc.h b/include/linux/mfd/sun4i-gpadc.h
+> index 509e736..139872c 100644
+> --- a/include/linux/mfd/sun4i-gpadc.h
+> +++ b/include/linux/mfd/sun4i-gpadc.h
+> @@ -38,6 +38,10 @@
+>  #define SUN6I_GPADC_CTRL1_ADC_CHAN_SELECT(x)		(GENMASK(3, 0) & BIT(x))
+>  #define SUN6I_GPADC_CTRL1_ADC_CHAN_MASK			GENMASK(3, 0)
+>  
+> +/* TP_CTRL1 bits for sun8i SoCs */
+> +#define SUN8I_GPADC_CTRL1_CHOP_TEMP_EN			BIT(8)
+> +#define SUN8I_GPADC_CTRL1_GPADC_CALI_EN			BIT(7)
+> +
+>  #define SUN4I_GPADC_CTRL2				0x08
+>  
+>  #define SUN4I_GPADC_CTRL2_TP_SENSITIVE_ADJUST(x)	((GENMASK(3, 0) & (x)) << 28)
+> 
