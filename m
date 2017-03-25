@@ -1,44 +1,55 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Sat, 25 Mar 2017 19:04:02 -0400
-Subject: [PATCH 1/2] dmaengine: qcom_hidma: disable/enable IRQs on pause/resume
-Message-ID: <1490483043-4364-1-git-send-email-okaya@codeaurora.org>
+Date: Sat, 25 Mar 2017 19:04:03 -0400
+Subject: [PATCH 2/2] dmaengine: qcom_hidma: pause the channel on shutdown
+In-Reply-To: <1490483043-4364-1-git-send-email-okaya@codeaurora.org>
+References: <1490483043-4364-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <1490483043-4364-2-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Once the channels are stopped, disable interrupts to make sure no new
-HW interaction can happen.
+We need to ensure that all DMAs and interrupts are cleared during
+shutdown operation in order for kexec to start the next kernel clearly.
 
-Similarly, re-enable the interrupts only if we know that channel is
-operational again.
+Otherwise, HW could be performing a DMA into random addresses in the
+middle of second kernel start.
 
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- drivers/dma/qcom/hidma_ll.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+ drivers/dma/qcom/hidma.c | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
-diff --git a/drivers/dma/qcom/hidma_ll.c b/drivers/dma/qcom/hidma_ll.c
-index 6645bdf..1530a66 100644
---- a/drivers/dma/qcom/hidma_ll.c
-+++ b/drivers/dma/qcom/hidma_ll.c
-@@ -499,6 +499,9 @@ int hidma_ll_enable(struct hidma_lldev *lldev)
- 	lldev->trch_state = HIDMA_CH_ENABLED;
- 	lldev->evch_state = HIDMA_CH_ENABLED;
- 
-+	/* enable irqs */
-+	writel(ENABLE_IRQS, lldev->evca + HIDMA_EVCA_IRQ_EN_REG);
-+
- 	return 0;
+diff --git a/drivers/dma/qcom/hidma.c b/drivers/dma/qcom/hidma.c
+index 3c982c9..5072a7d 100644
+--- a/drivers/dma/qcom/hidma.c
++++ b/drivers/dma/qcom/hidma.c
+@@ -865,6 +865,20 @@ static int hidma_probe(struct platform_device *pdev)
+ 	return rc;
  }
  
-@@ -596,6 +599,9 @@ int hidma_ll_disable(struct hidma_lldev *lldev)
- 
- 	lldev->trch_state = HIDMA_CH_SUSPENDED;
- 	lldev->evch_state = HIDMA_CH_SUSPENDED;
++static void hidma_shutdown(struct platform_device *pdev)
++{
++	struct hidma_dev *dmadev = platform_get_drvdata(pdev);
 +
-+	/* disable interrupts */
-+	writel(0, lldev->evca + HIDMA_EVCA_IRQ_EN_REG);
- 	return 0;
- }
- 
++	dev_info(dmadev->ddev.dev, "HI-DMA engine shutdown\n");
++
++	pm_runtime_get_sync(dmadev->ddev.dev);
++	if (hidma_ll_disable(dmadev->lldev))
++		dev_warn(dmadev->ddev.dev, "channel did not stop\n");
++	pm_runtime_mark_last_busy(dmadev->ddev.dev);
++	pm_runtime_put_autosuspend(dmadev->ddev.dev);
++
++}
++
+ static int hidma_remove(struct platform_device *pdev)
+ {
+ 	struct hidma_dev *dmadev = platform_get_drvdata(pdev);
+@@ -908,6 +922,7 @@ static int hidma_remove(struct platform_device *pdev)
+ static struct platform_driver hidma_driver = {
+ 	.probe = hidma_probe,
+ 	.remove = hidma_remove,
++	.shutdown = hidma_shutdown,
+ 	.driver = {
+ 		   .name = "hidma",
+ 		   .of_match_table = hidma_match,
 -- 
 1.9.1
