@@ -1,48 +1,92 @@
 From: leo.yan@linaro.org (Leo Yan)
-Date: Sun, 26 Mar 2017 02:23:15 +0800
-Subject: [PATCH v5 7/9] clk: hi6220: add debug APB clock
+Date: Sun, 26 Mar 2017 02:23:16 +0800
+Subject: [PATCH v5 8/9] arm64: dts: hi6220: register debug module
 In-Reply-To: <1490466197-29163-1-git-send-email-leo.yan@linaro.org>
 References: <1490466197-29163-1-git-send-email-leo.yan@linaro.org>
-Message-ID: <1490466197-29163-8-git-send-email-leo.yan@linaro.org>
+Message-ID: <1490466197-29163-9-git-send-email-leo.yan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The debug APB clock is absent in hi6220 driver, so this patch is to add
-support for it.
+Bind debug module driver for Hi6220.
 
 Signed-off-by: Leo Yan <leo.yan@linaro.org>
 ---
- drivers/clk/hisilicon/clk-hi6220.c       | 1 +
- include/dt-bindings/clock/hi6220-clock.h | 5 ++++-
- 2 files changed, 5 insertions(+), 1 deletion(-)
+ arch/arm64/boot/dts/hisilicon/hi6220.dtsi | 64 +++++++++++++++++++++++++++++++
+ 1 file changed, 64 insertions(+)
 
-diff --git a/drivers/clk/hisilicon/clk-hi6220.c b/drivers/clk/hisilicon/clk-hi6220.c
-index c0e8e1f..2ae151c 100644
---- a/drivers/clk/hisilicon/clk-hi6220.c
-+++ b/drivers/clk/hisilicon/clk-hi6220.c
-@@ -134,6 +134,7 @@ static struct hisi_gate_clock hi6220_separated_gate_clks_sys[] __initdata = {
- 	{ HI6220_UART4_PCLK,    "uart4_pclk",    "uart4_src",      CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x230, 8,  0, },
- 	{ HI6220_SPI_CLK,       "spi_clk",       "clk_150m",       CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x230, 9,  0, },
- 	{ HI6220_TSENSOR_CLK,   "tsensor_clk",   "clk_bus",        CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x230, 12, 0, },
-+	{ HI6220_DAPB_CLK,      "dapb_clk",      "cs_dapb",        CLK_SET_RATE_PARENT|CLK_IS_CRITICAL,   0x230, 18, 0, },
- 	{ HI6220_MMU_CLK,       "mmu_clk",       "ddrc_axi1",      CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x240, 11, 0, },
- 	{ HI6220_HIFI_SEL,      "hifi_sel",      "hifi_src",       CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x270, 0,  0, },
- 	{ HI6220_MMC0_SYSPLL,   "mmc0_syspll",   "syspll",         CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x270, 1,  0, },
-diff --git a/include/dt-bindings/clock/hi6220-clock.h b/include/dt-bindings/clock/hi6220-clock.h
-index 6b03c84..b8ba665 100644
---- a/include/dt-bindings/clock/hi6220-clock.h
-+++ b/include/dt-bindings/clock/hi6220-clock.h
-@@ -124,7 +124,10 @@
- #define HI6220_CS_DAPB		57
- #define HI6220_CS_ATB_DIV	58
- 
--#define HI6220_SYS_NR_CLKS	59
-+/* gate clock */
-+#define HI6220_DAPB_CLK		59
+diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+index 470461d..467aa15 100644
+--- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
++++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+@@ -913,5 +913,69 @@
+ 				};
+ 			};
+ 		};
 +
-+#define HI6220_SYS_NR_CLKS	60
- 
- /* clk in Hi6220 media controller */
- /* gate clocks */
++		debug at f6590000 {
++			compatible = "arm,coresight-cpu-debug","arm,primecell";
++			reg = <0 0xf6590000 0 0x1000>;
++			clocks = <&sys_ctrl HI6220_DAPB_CLK>;
++			clock-names = "apb_pclk";
++			cpu = <&cpu0>;
++		};
++
++		debug at f6592000 {
++			compatible = "arm,coresight-cpu-debug","arm,primecell";
++			reg = <0 0xf6592000 0 0x1000>;
++			clocks = <&sys_ctrl HI6220_DAPB_CLK>;
++			clock-names = "apb_pclk";
++			cpu = <&cpu1>;
++		};
++
++		debug at f6594000 {
++			compatible = "arm,coresight-cpu-debug","arm,primecell";
++			reg = <0 0xf6594000 0 0x1000>;
++			clocks = <&sys_ctrl HI6220_DAPB_CLK>;
++			clock-names = "apb_pclk";
++			cpu = <&cpu2>;
++		};
++
++		debug at f6596000 {
++			compatible = "arm,coresight-cpu-debug","arm,primecell";
++			reg = <0 0xf6596000 0 0x1000>;
++			clocks = <&sys_ctrl HI6220_DAPB_CLK>;
++			clock-names = "apb_pclk";
++			cpu = <&cpu3>;
++		};
++
++		debug at f65d0000 {
++			compatible = "arm,coresight-cpu-debug","arm,primecell";
++			reg = <0 0xf65d0000 0 0x1000>;
++			clocks = <&sys_ctrl HI6220_DAPB_CLK>;
++			clock-names = "apb_pclk";
++			cpu = <&cpu4>;
++		};
++
++		debug at f65d2000 {
++			compatible = "arm,coresight-cpu-debug","arm,primecell";
++			reg = <0 0xf65d2000 0 0x1000>;
++			clocks = <&sys_ctrl HI6220_DAPB_CLK>;
++			clock-names = "apb_pclk";
++			cpu = <&cpu5>;
++		};
++
++		debug at f65d4000 {
++			compatible = "arm,coresight-cpu-debug","arm,primecell";
++			reg = <0 0xf65d4000 0 0x1000>;
++			clocks = <&sys_ctrl HI6220_DAPB_CLK>;
++			clock-names = "apb_pclk";
++			cpu = <&cpu6>;
++		};
++
++		debug at f65d6000 {
++			compatible = "arm,coresight-cpu-debug","arm,primecell";
++			reg = <0 0xf65d6000 0 0x1000>;
++			clocks = <&sys_ctrl HI6220_DAPB_CLK>;
++			clock-names = "apb_pclk";
++			cpu = <&cpu7>;
++		};
+ 	};
+ };
 -- 
 2.7.4
