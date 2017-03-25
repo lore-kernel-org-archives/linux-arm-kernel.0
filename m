@@ -1,92 +1,36 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Sun, 26 Mar 2017 02:23:16 +0800
-Subject: [PATCH v5 8/9] arm64: dts: hi6220: register debug module
-In-Reply-To: <1490466197-29163-1-git-send-email-leo.yan@linaro.org>
-References: <1490466197-29163-1-git-send-email-leo.yan@linaro.org>
-Message-ID: <1490466197-29163-9-git-send-email-leo.yan@linaro.org>
+From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
+Date: Sat, 25 Mar 2017 19:28:03 +0100
+Subject: [PATCH 2/2] iio: adc: meson-saradc: add Meson8b SoC compatibility
+In-Reply-To: <231f1fef-e947-3461-2e5b-99d80abfa73a@kernel.org>
+References: <20170325162938.28659-1-martin.blumenstingl@googlemail.com>
+ <20170325162938.28659-3-martin.blumenstingl@googlemail.com>
+ <231f1fef-e947-3461-2e5b-99d80abfa73a@kernel.org>
+Message-ID: <CAFBinCDVLZdBEX=UnGKFCkRF02YYx4hoRw54+AcwAku9zGjvaQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Bind debug module driver for Hi6220.
-
-Signed-off-by: Leo Yan <leo.yan@linaro.org>
----
- arch/arm64/boot/dts/hisilicon/hi6220.dtsi | 64 +++++++++++++++++++++++++++++++
- 1 file changed, 64 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-index 470461d..467aa15 100644
---- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-+++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-@@ -913,5 +913,69 @@
- 				};
- 			};
- 		};
-+
-+		debug at f6590000 {
-+			compatible = "arm,coresight-cpu-debug","arm,primecell";
-+			reg = <0 0xf6590000 0 0x1000>;
-+			clocks = <&sys_ctrl HI6220_DAPB_CLK>;
-+			clock-names = "apb_pclk";
-+			cpu = <&cpu0>;
-+		};
-+
-+		debug at f6592000 {
-+			compatible = "arm,coresight-cpu-debug","arm,primecell";
-+			reg = <0 0xf6592000 0 0x1000>;
-+			clocks = <&sys_ctrl HI6220_DAPB_CLK>;
-+			clock-names = "apb_pclk";
-+			cpu = <&cpu1>;
-+		};
-+
-+		debug at f6594000 {
-+			compatible = "arm,coresight-cpu-debug","arm,primecell";
-+			reg = <0 0xf6594000 0 0x1000>;
-+			clocks = <&sys_ctrl HI6220_DAPB_CLK>;
-+			clock-names = "apb_pclk";
-+			cpu = <&cpu2>;
-+		};
-+
-+		debug at f6596000 {
-+			compatible = "arm,coresight-cpu-debug","arm,primecell";
-+			reg = <0 0xf6596000 0 0x1000>;
-+			clocks = <&sys_ctrl HI6220_DAPB_CLK>;
-+			clock-names = "apb_pclk";
-+			cpu = <&cpu3>;
-+		};
-+
-+		debug at f65d0000 {
-+			compatible = "arm,coresight-cpu-debug","arm,primecell";
-+			reg = <0 0xf65d0000 0 0x1000>;
-+			clocks = <&sys_ctrl HI6220_DAPB_CLK>;
-+			clock-names = "apb_pclk";
-+			cpu = <&cpu4>;
-+		};
-+
-+		debug at f65d2000 {
-+			compatible = "arm,coresight-cpu-debug","arm,primecell";
-+			reg = <0 0xf65d2000 0 0x1000>;
-+			clocks = <&sys_ctrl HI6220_DAPB_CLK>;
-+			clock-names = "apb_pclk";
-+			cpu = <&cpu5>;
-+		};
-+
-+		debug at f65d4000 {
-+			compatible = "arm,coresight-cpu-debug","arm,primecell";
-+			reg = <0 0xf65d4000 0 0x1000>;
-+			clocks = <&sys_ctrl HI6220_DAPB_CLK>;
-+			clock-names = "apb_pclk";
-+			cpu = <&cpu6>;
-+		};
-+
-+		debug at f65d6000 {
-+			compatible = "arm,coresight-cpu-debug","arm,primecell";
-+			reg = <0 0xf65d6000 0 0x1000>;
-+			clocks = <&sys_ctrl HI6220_DAPB_CLK>;
-+			clock-names = "apb_pclk";
-+			cpu = <&cpu7>;
-+		};
- 	};
- };
--- 
-2.7.4
+On Sat, Mar 25, 2017 at 7:13 PM, Jonathan Cameron <jic23@kernel.org> wrote:
+> On 25/03/17 16:29, Martin Blumenstingl wrote:
+>> Meson GX SoCs however use some magic bits to prevent simultaneous (=
+>> conflicting, because only consumer should use the FIFO buffer with the
+>> ADC results) usage by the Linux kernel and the bootloader (the BL30
+>> bootloader uses the SAR ADC to read the CPU temperature).
+>> This patch changes guards all BL30 functionality so it is skipped on
+>> SoCs which don't have it. Since the hardware itself doesn't know whether
+>> BL30 is available the internal meson_sar_adc_data is extended so this
+>> information can be provided per of_device_id.data inside the driver.
+>>
+>> Additionally the clocks "adc_clk" and "adc_sel" are not provided by the
+>> clock-controller itself. "adc_sel" is not available at all. "adc_clk"
+>> is provided by the SAR ADC IP block itself on Meson8b (and earlier).
+>> This is already supported by the meson_saradc driver.
+>>
+>> Finally a new of_device_id for the Meson8b SoC is added so it can be
+>> wired up in the corresponding DT.
+>>
+>> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+> Looks sensible to me. Just fix those bits from Peter and we'll let it sit
+> a few days on the list to see if anyone else wants to chip in.
+OK, we'll have to wait for one of the DT-maintainers ACK (on the other
+patch) anyways, so I'll re-spin this in a week or so and fix
+everything that has come up until then
