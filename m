@@ -1,50 +1,65 @@
-From: flatmax@flatmax.org (Matt Flax)
-Date: Sat, 25 Mar 2017 16:45:46 +1100
-Subject: [alsa-devel] [PATCH 0/3] ASoC: Enable a new IC master mode:
- bcm2835<=>IC<=>cs42xx8
-In-Reply-To: <20170324190955.nxw5az4mza2ia6wl@sirena.org.uk>
-References: <20170228095929.GH2742@localhost.localdomain>
- <20170315190108.y6ybxm3nfgnutajv@sirena.org.uk>
- <7d8d38f7-53aa-cc3d-4bbd-141649528a8a@flatmax.org>
- <8c62f014-d246-e0c1-2b02-a28a2c2786b7@metafoo.de>
- <000fbaa4-4c7c-5b13-0806-7e42672a4a55@flatmax.org>
- <e0adcc6c-8bf4-adae-874b-c291e71e5712@laposte.net>
- <20170321221145.GA7258@camel2.lan>
- <579f0763-a5bd-f820-b36f-b6437e331b4b@flatmax.org>
- <20170322094301.GE6986@localhost.localdomain>
- <64802e9b-ffe9-65e3-502a-4253674fb4c7@flatmax.org>
- <20170324190955.nxw5az4mza2ia6wl@sirena.org.uk>
-Message-ID: <3c818d92-498e-868c-696b-a9b709af5415@flatmax.org>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Sat, 25 Mar 2017 10:36:48 +0300
+Subject: [PATCH v2 1/3] crypto: hw_random - Add new Exynos RNG driver
+In-Reply-To: <4248691.8fGIDmasva@tauon.atsec.com>
+References: <20170324182606.23339-1-krzk@kernel.org>
+ <20170324182606.23339-2-krzk@kernel.org>
+ <4248691.8fGIDmasva@tauon.atsec.com>
+Message-ID: <20170325073648.cbphcouvi6trmhcj@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Mar 24, 2017 at 09:41:59PM +0100, Stephan M?ller wrote:
+> Am Freitag, 24. M?rz 2017, 19:26:04 CET schrieb Krzysztof Kozlowski:
+> 
+> Hi Krzysztof,
+> 
+> > +static unsigned int exynos_rng_copy_random(struct exynos_rng_dev *rng,
+> > +					   u8 *dst, unsigned int dlen)
+> > +{
+> > +	unsigned int cnt = 0;
+> > +	int i, j;
+> > +	u32 val;
+> > +
+> > +	for (j = 0; j < EXYNOS_RNG_SEED_REGS; j++) {
+> > +		val = exynos_rng_readl(rng, EXYNOS_RNG_OUT(j));
+> > +
+> > +		for (i = 0; i < 4; i++) {
+> > +			dst[cnt] = val & 0xff;
+> > +			val >>= 8;
+> > +			if (++cnt >= dlen)
+> > +				return cnt;
+> > +		}
+> > +		rng->seed_save[j] = val;
+> 
+> Just to clarify: is this call right? Shouldn't that be removed? Any RNG that 
+> is given to a caller is tainted and should not serve as seed.
 
+In that case I could either re-use RNGs not passed to the caller (like
+in the block quoted below) or generate another round of them just for
+purpose of next seeding.
 
-On 25/03/17 06:09, Mark Brown wrote:
-> On Wed, Mar 22, 2017 at 11:04:34PM +1100, Matt Flax wrote:
->> On 22/03/17 20:43, Charles Keepax wrote:
->>> Are we saying that what gets transmitted on the bus is neither valid
->>> I2S or DSP mode data? But as you have your custom hardware block in
->>> the middle it interprets this data correctly and converts it to a
->>> regular bus format on the other side that goes to the CODEC?
->> Yes, essentially there is translation between the two data word edge
->> triggered ABP (the bcm2835's PCM block) and a Cirrus Logic TDM codec.
-> Could you please be concrete about what the two formats you're talking
-> about here are and how these differences are observable on the wire?  I
-> don't know what "two data word edge triggered ABP" means.
-On the codec side it is a regular TDM stream.
-On the SoC side, two channels  are arbitrarily offset from a PCM frame 
-sync clock (PCM_FS) leading edge. I have chosen to have 64 bits per 
-frame with 1 bit offset for the first word (from the leading edge) and 
-33 bits offset (from the leading edge) for the second word. This 
-resembles I2S, but it doesn't have to for the bcm2835.
+With the first approach the problem is that I might wait for such unused
+numbers pretty long. If user is requesting large amount of data, then I
+will always give him all five output numbers. I will not have unused
+numbers.
 
-In more detail ...
-The bcm2835's flexible PCM hardware (serialiser+APB) is set up to handle 
-two words at a time in/out from a 64 word FIFO buffers. The serialiser 
-loads and unloads two registers according to offsets from the PCM_FS 
-clock's leading edge. The APB interface is responsible for (un)loading 
-the 64 word FIFO buffer to/from memory - with DMA I guess.
+The second approach seems safe, but requires additional engine run which
+will slow down some of the generate() calls.
 
-thanks
-Matt
+> > +	}
+> > +
+> > +	/*
+> > +	 * Engine filled all output registers, so read the remaining registers
+> > +	 * for storing data as future seed.
+> > +	 */
+> > +	for (; j < EXYNOS_RNG_SEED_REGS; j++)
+> > +		rng->seed_save[j] = exynos_rng_readl(rng, EXYNOS_RNG_OUT(j));
+> 
+> With this call, I guess the questioned line above could go away, right?
+
+This is used in combination with the previous line so I will get five
+seeds (for five registers).
+
+Best regards,
+Krzysztof
