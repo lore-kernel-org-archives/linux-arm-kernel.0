@@ -1,39 +1,60 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Sun, 26 Mar 2017 00:33:15 +0300
-Subject: [GIT PULL 2/7] Broadcom devicetree changes for 4.12
-In-Reply-To: <20170324175807.27272-2-f.fainelli@gmail.com>
-References: <20170324175807.27272-1-f.fainelli@gmail.com>
- <20170324175807.27272-2-f.fainelli@gmail.com>
-Message-ID: <20170325213315.7dw2nugvhumhypbn@tarshish>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Sat, 25 Mar 2017 17:38:09 -0400
+Subject: [PATCH V5 0/4] PCI/ASPM: reconfigure ASPM following hotplug for
+ POLICY_DEFAULT
+Message-ID: <1490477893-9517-1-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Florian,
+When the operating system is booted with the default ASPM policy
+(POLICY_DEFAULT), current code is querying the enable/disable
+states from ASPM registers to determine the policy.
 
-On Fri, Mar 24, 2017 at 10:58:02AM -0700, Florian Fainelli wrote:
-> The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
-> 
->   Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
-> 
-> are available in the git repository at:
-> 
->   http://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.12/devicetree
-> 
-> for you to fetch changes up to 414ce21ae20547e0eea72fe0c4e8ee3280d30888:
-> 
->   Merge tag 'bcm2835-dt-next-2017-03-21' into devicetree/next (2017-03-24 10:12:31 -0700)
-> 
-> ----------------------------------------------------------------
-> This pull request contains Broadcom ARM-based SoCs Device Tree updates for
-> 4.12, please pull the following:
+For example, a BIOS could set the power saving state to performance
+and clear all ASPM control registers. A balanced ASPM policy could
+enable L0s and disable L1. A power conscious BIOS could enable both
+L0s and L1 to trade off latency and performance vs. power.
 
-What about my dts fixes that were in the delayed 4.11 pull request[1]?
+After hotplug removal, pcie_aspm_exit_link_state() function clears
+the ASPM registers. An insertion following hotplug removal reads
+incorrect policy as ASPM disabled even though ASPM was enabled
+during boot.
 
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-March/491554.html
+This is caused by the fact that same function is used for reconfiguring
+ASPM regardless of the power on state.
 
-baruch
+------------------------
+Changes from v4 (http://www.spinics.net/lists/linux-pci/msg59245.html)
+------------------------
+- pci_aspm_init(): Fix function comment.  Called for every device we
+  enumerate.
+	Upstream link partner:  Shouldn't need to check pdev->link_state
+        (should always be NULL for a brand-new device).
+
+- pcie_aspm_init_link_state(): Called for bridges (upstream end of
+    link) after all children have been enumerated.  No longer needs to
+    check aspm_support_enabled or pdev->has_secondary_link or the VIA
+    quirk: pci_aspm_init() already checked that stuff, so we only need
+    to check pdev->link_state here.
+
+- split the last patch into two
+  PCI/ASPM: move link_state cleanup to bridge remove
+  PCI/ASPM: save power on values during bridge init
+
+- create bugzilla (https://bugzilla.kernel.org/show_bug.cgi?id=194895)
+- add fixes tags
+
+Sinan Kaya (4):
+  PCI/ASPM: introduce pci_aspm_init() and add to pci_init_capabilities()
+  PCI/ASPM: add init hook to device_add
+  PCI/ASPM: save power on values during bridge init
+  PCI/ASPM: move link_state cleanup to bridge remove
+
+ drivers/pci/pcie/aspm.c | 93 +++++++++++++++++++++++++++++++++----------------
+ drivers/pci/probe.c     |  3 ++
+ drivers/pci/remove.c    |  3 +-
+ include/linux/pci.h     |  2 ++
+ 4 files changed, 69 insertions(+), 32 deletions(-)
 
 -- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.52.368.4656, http://www.tkos.co.il -
+1.9.1
