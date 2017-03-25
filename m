@@ -1,90 +1,47 @@
-From: vigneshr@ti.com (Vignesh R)
-Date: Sat, 25 Mar 2017 16:03:31 +0530
-Subject: [PATCH v2 1/2] tty: serial_core: Add name field to uart_port
- struct
-In-Reply-To: <CAHp75VeRBq=VVgh7FaiuFF6GjTx98A2oEYyWaQVEPAmwPExMdg@mail.gmail.com>
-References: <20170324052800.11526-1-vigneshr@ti.com>
- <20170324052800.11526-2-vigneshr@ti.com>
- <CAHp75VeRBq=VVgh7FaiuFF6GjTx98A2oEYyWaQVEPAmwPExMdg@mail.gmail.com>
-Message-ID: <eddbba43-eeb5-ab93-c486-f50a16eb077c@ti.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Sat, 25 Mar 2017 12:03:44 +0100 (CET)
+Subject: [GIT PULL 1/4] bcm2835 arm DT updates for 4.12
+In-Reply-To: <CAK8P3a2X0LYeidiPw4xN07WdU86Ah3_nJeropNSieJWxsHoEmA@mail.gmail.com>
+References: <20170321193952.10270-1-eric@anholt.net>
+ <CAK8P3a2X0LYeidiPw4xN07WdU86Ah3_nJeropNSieJWxsHoEmA@mail.gmail.com>
+Message-ID: <1533334801.217079.1490439824805@email.1und1.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Arnd,
 
+i hope it's okay if i answer.
 
-On 3/24/2017 5:16 PM, Andy Shevchenko wrote:
-> On Fri, Mar 24, 2017 at 7:27 AM, Vignesh R <vigneshr@ti.com> wrote:
->> Introduce a field to store name of uart_port that can be used to easily
->> identify UART port instances on a system that has more than one UART
->> instance. The name is of the form ttyXN(eg. ttyS0, ttyAMA0,..) where N
->> is number that particular UART instance.
->> This field will be useful when printing debug info for a particular port
->> or in register IRQs with unique IRQ name. Port name is populated during
->> uart_add_one_port().
->>
+> Arnd Bergmann <arnd@arndb.de> hat am 24. M?rz 2017 um 23:25 geschrieben:
 > 
-> Looks good to me:
-> Reviewed-by: Andy Shevchenko <andy.shevchenko@gmail.com>
 > 
-> Just in case, have you checked if there any possible scenarios where
-> memory will be leaked?
+> On Tue, Mar 21, 2017 at 8:39 PM, Eric Anholt <eric@anholt.net> wrote:
+> >   Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
+> >
+> > are available in the git repository at:
+> >
+> >   git://github.com/anholt/linux tags/bcm2835-dt-next-2017-03-21
+> >
+> > for you to fetch changes up to 7f31a955a0c34de0463f7ff50b2bd62a5cce4204:
+> >
+> >   ARM: dts: bcm2835: add sdhost controller to devicetree (2017-03-17 17:35:50 -0700)
+> >
+> > ----------------------------------------------------------------
+> > This pull request brings in the DT nodes for enabling HDMI audio on
+> > Raspberry Pi, and nodes to describe the DSI and SDHOST hardware
+> > modules (which are still disabled by default).
+> 
+> Just a quick question: how do you plan to switch between the SD host
+> drivers? If I understand this right, there are two working hardware blocks
+> that can connect to the same slot. Do you have to configure this in
+> device tree using  hardwired pinctrl settings, or can the user pick
+> one of the drivers at runtime?
 
-I ran kmemleak scan after opening and closing a serial port and did not
-see any memleak report. Also uport->tty_groups is allocated and
-deallocated in the same functions uport->name.
+via device tree
+
+The relevant changes [1] hasn't been merged yet.
+
+[1] - http://marc.info/?l=linux-mmc&m=148896494931931&w=2
 
 > 
->> Signed-off-by: Vignesh R <vigneshr@ti.com>
->> ---
->>
->> v2:
->> use kasprintf() instead of snprintf()
->> Fix up commit message.
->>
->>  drivers/tty/serial/serial_core.c | 7 +++++++
->>  include/linux/serial_core.h      | 1 +
->>  2 files changed, 8 insertions(+)
->>
->> diff --git a/drivers/tty/serial/serial_core.c b/drivers/tty/serial/serial_core.c
->> index 0fb3f7cce62a..f5572e28d16a 100644
->> --- a/drivers/tty/serial/serial_core.c
->> +++ b/drivers/tty/serial/serial_core.c
->> @@ -2744,6 +2744,12 @@ int uart_add_one_port(struct uart_driver *drv, struct uart_port *uport)
->>         state->pm_state = UART_PM_STATE_UNDEFINED;
->>         uport->cons = drv->cons;
->>         uport->minor = drv->tty_driver->minor_start + uport->line;
->> +       uport->name = kasprintf(GFP_KERNEL, "%s%d", drv->dev_name,
->> +                               drv->tty_driver->name_base + uport->line);
->> +       if (!uport->name) {
->> +               ret = -ENOMEM;
->> +               goto out;
->> +       }
->>
->>         /*
->>          * If this port is a console, then the spinlock is already
->> @@ -2861,6 +2867,7 @@ int uart_remove_one_port(struct uart_driver *drv, struct uart_port *uport)
->>         if (uport->type != PORT_UNKNOWN && uport->ops->release_port)
->>                 uport->ops->release_port(uport);
->>         kfree(uport->tty_groups);
->> +       kfree(uport->name);
->>
->>         /*
->>          * Indicate that there isn't a port here anymore.
->> diff --git a/include/linux/serial_core.h b/include/linux/serial_core.h
->> index 58484fb35cc8..60530678c633 100644
->> --- a/include/linux/serial_core.h
->> +++ b/include/linux/serial_core.h
->> @@ -247,6 +247,7 @@ struct uart_port {
->>         unsigned char           suspended;
->>         unsigned char           irq_wake;
->>         unsigned char           unused[2];
->> +       char                    *name;                  /* port name */
->>         struct attribute_group  *attr_group;            /* port specific attributes */
->>         const struct attribute_group **tty_groups;      /* all attributes (serial core use only) */
->>         struct serial_rs485     rs485;
->> --
->> 2.11.0
->>
-> 
-> 
-> 
+>         Arnd
