@@ -1,37 +1,70 @@
 From: shuahkh@osg.samsung.com (Shuah Khan)
-Date: Fri, 24 Mar 2017 18:04:59 -0600
-Subject: [PATCH 1/7] usb: dwc3: core: fix dwc3_probe() to not do put_sync when
- get_sync fails
+Date: Fri, 24 Mar 2017 18:05:02 -0600
+Subject: [PATCH 4/7] usb: dwc3: exynos: change goto labels in this file to
+ meaningful names
 In-Reply-To: <cover.1490387086.git.shuahkh@osg.samsung.com>
 References: <cover.1490387086.git.shuahkh@osg.samsung.com>
-Message-ID: <2238ea52423a83118ab724a96e8f0691ec4ada0b.1490387086.git.shuahkh@osg.samsung.com>
+Message-ID: <a81ad4534b4b9d451d0a2310469aa64b3c236f6e.1490387086.git.shuahkh@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-dwc3_probe() does pm_runtime_put_sync() in its err1 handling when
-pm_runtime_get_sync() fails.  Move the pm_runtime_put_sync() under
-err2 instead as it is used in error paths after pm_runtime_get_sync()
-succeeds.
+Change goto labels in this file to meaningful names
 
 Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
 ---
- drivers/usb/dwc3/core.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/usb/dwc3/dwc3-exynos.c | 16 ++++++++--------
+ 1 file changed, 8 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/usb/dwc3/core.c b/drivers/usb/dwc3/core.c
-index 56f1367..0fc7bef 100644
---- a/drivers/usb/dwc3/core.c
-+++ b/drivers/usb/dwc3/core.c
-@@ -1162,9 +1162,9 @@ static int dwc3_probe(struct platform_device *pdev)
+diff --git a/drivers/usb/dwc3/dwc3-exynos.c b/drivers/usb/dwc3/dwc3-exynos.c
+index 98f74ff..11f31f4 100644
+--- a/drivers/usb/dwc3/dwc3-exynos.c
++++ b/drivers/usb/dwc3/dwc3-exynos.c
+@@ -58,12 +58,12 @@ static int dwc3_exynos_register_phys(struct dwc3_exynos *exynos)
  
- err2:
- 	pm_runtime_allow(&pdev->dev);
-+	pm_runtime_put_sync(&pdev->dev);
+ 	ret = platform_device_add_data(exynos->usb2_phy, &pdata, sizeof(pdata));
+ 	if (ret)
+-		goto err1;
++		goto usb2_phy_device_put;
  
- err1:
--	pm_runtime_put_sync(&pdev->dev);
- 	pm_runtime_disable(&pdev->dev);
+ 	pdev = platform_device_alloc("usb_phy_generic", PLATFORM_DEVID_AUTO);
+ 	if (!pdev) {
+ 		ret = -ENOMEM;
+-		goto err1;
++		goto usb2_phy_device_put;
+ 	}
  
- err0:
+ 	exynos->usb3_phy = pdev;
+@@ -71,25 +71,25 @@ static int dwc3_exynos_register_phys(struct dwc3_exynos *exynos)
+ 
+ 	ret = platform_device_add_data(exynos->usb3_phy, &pdata, sizeof(pdata));
+ 	if (ret)
+-		goto err2;
++		goto usb3_phy_device_put;
+ 
+ 	ret = platform_device_add(exynos->usb2_phy);
+ 	if (ret)
+-		goto err2;
++		goto usb3_phy_device_put;
+ 
+ 	ret = platform_device_add(exynos->usb3_phy);
+ 	if (ret)
+-		goto err3;
++		goto usb2_phy_device_del;
+ 
+ 	return 0;
+ 
+-err3:
++usb2_phy_device_del:
+ 	platform_device_del(exynos->usb2_phy);
+ 
+-err2:
++usb3_phy_device_put:
+ 	platform_device_put(exynos->usb3_phy);
+ 
+-err1:
++usb2_phy_device_put:
+ 	platform_device_put(exynos->usb2_phy);
+ 
+ 	return ret;
 -- 
 2.7.4
