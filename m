@@ -1,55 +1,46 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Sat, 25 Mar 2017 19:04:03 -0400
-Subject: [PATCH 2/2] dmaengine: qcom_hidma: pause the channel on shutdown
-In-Reply-To: <1490483043-4364-1-git-send-email-okaya@codeaurora.org>
-References: <1490483043-4364-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1490483043-4364-2-git-send-email-okaya@codeaurora.org>
+From: minyard@acm.org (Corey Minyard)
+Date: Sat, 25 Mar 2017 20:25:05 -0500
+Subject: [PATCH V3] ACPI / IPMI: allow ACPI_IPMI with IPMI_SSIF
+In-Reply-To: <1490450575-29450-1-git-send-email-okaya@codeaurora.org>
+References: <1490450575-29450-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <1b71a9cf-f7c7-7bc4-2934-a357b0b5016b@acm.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We need to ensure that all DMAs and interrupts are cleared during
-shutdown operation in order for kexec to start the next kernel clearly.
+On 03/25/2017 09:02 AM, Sinan Kaya wrote:
+> ACPI_IPMI driver currently depends on IPMI System Interface (IPMI_SI)
+> driver to be enabled. IPMI_SI driver only handles KCS, SMIC and BT BMC
+> interfaces.
+>
+> IPMI_SSIF is an alternative BMC communication method. It allows BMC to
+> be accessed over an I2C bus instead of a standard interface.
+>
+> Change the dependency to IPMI_HANDLER so that ACPI_IPMI works with all
+> IPMI providers.
 
-Otherwise, HW could be performing a DMA into random addresses in the
-middle of second kernel start.
+If the ACPI people ack this, I can queue it, or they can take it with:
 
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
----
- drivers/dma/qcom/hidma.c | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+Acked-by: Corey Minyard <cminyard@mvista.com>
 
-diff --git a/drivers/dma/qcom/hidma.c b/drivers/dma/qcom/hidma.c
-index 3c982c9..5072a7d 100644
---- a/drivers/dma/qcom/hidma.c
-+++ b/drivers/dma/qcom/hidma.c
-@@ -865,6 +865,20 @@ static int hidma_probe(struct platform_device *pdev)
- 	return rc;
- }
- 
-+static void hidma_shutdown(struct platform_device *pdev)
-+{
-+	struct hidma_dev *dmadev = platform_get_drvdata(pdev);
-+
-+	dev_info(dmadev->ddev.dev, "HI-DMA engine shutdown\n");
-+
-+	pm_runtime_get_sync(dmadev->ddev.dev);
-+	if (hidma_ll_disable(dmadev->lldev))
-+		dev_warn(dmadev->ddev.dev, "channel did not stop\n");
-+	pm_runtime_mark_last_busy(dmadev->ddev.dev);
-+	pm_runtime_put_autosuspend(dmadev->ddev.dev);
-+
-+}
-+
- static int hidma_remove(struct platform_device *pdev)
- {
- 	struct hidma_dev *dmadev = platform_get_drvdata(pdev);
-@@ -908,6 +922,7 @@ static int hidma_remove(struct platform_device *pdev)
- static struct platform_driver hidma_driver = {
- 	.probe = hidma_probe,
- 	.remove = hidma_remove,
-+	.shutdown = hidma_shutdown,
- 	.driver = {
- 		   .name = "hidma",
- 		   .of_match_table = hidma_match,
--- 
-1.9.1
+Thanks,
+
+-corey
+
+> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+> ---
+>   drivers/acpi/Kconfig | 2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
+> index 83e5f7e..3e15bf8 100644
+> --- a/drivers/acpi/Kconfig
+> +++ b/drivers/acpi/Kconfig
+> @@ -256,7 +256,7 @@ config ACPI_PROCESSOR
+>   
+>   config ACPI_IPMI
+>   	tristate "IPMI"
+> -	depends on IPMI_SI
+> +	depends on IPMI_HANDLER
+>   	default n
+>   	help
+>   	  This driver enables the ACPI to access the BMC controller. And it
