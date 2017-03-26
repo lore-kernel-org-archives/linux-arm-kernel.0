@@ -1,34 +1,33 @@
 From: plaes@plaes.org (Priit Laes)
-Date: Sun, 26 Mar 2017 20:20:21 +0300
-Subject: [PATCH v2 6/6] clk: sunxi-ng: Display index when clock registration
- fails
+Date: Sun, 26 Mar 2017 20:20:20 +0300
+Subject: [PATCH v2 5/6] dt-bindings: List devicetree binding for the CCU of
+ Allwinner A10
 In-Reply-To: <cover.a58841efb571d44013658505f3fa140536a89d1c.1490545262.git-series.plaes@plaes.org>
 References: <cover.a58841efb571d44013658505f3fa140536a89d1c.1490545262.git-series.plaes@plaes.org>
-Message-ID: <c2b949f92eff7ae8836af36d56a633e501e35caa.1490545262.git-series.plaes@plaes.org>
+Message-ID: <28a3c670575f368a2bd9a67b451f0f45c474dc7b.1490545262.git-series.plaes@plaes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add clock index to clock registration failure message.
+Allwinner A10 is now driven by sunxi-ng CCU driver.
+
+Add devicetree binding for it.
 
 Signed-off-by: Priit Laes <plaes@plaes.org>
 ---
- drivers/clk/sunxi-ng/ccu_common.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ Documentation/devicetree/bindings/clock/sunxi-ccu.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/clk/sunxi-ng/ccu_common.c b/drivers/clk/sunxi-ng/ccu_common.c
-index 8a47baf..188fa50 100644
---- a/drivers/clk/sunxi-ng/ccu_common.c
-+++ b/drivers/clk/sunxi-ng/ccu_common.c
-@@ -63,8 +63,8 @@ int sunxi_ccu_probe(struct device_node *node, void __iomem *reg,
+diff --git a/Documentation/devicetree/bindings/clock/sunxi-ccu.txt b/Documentation/devicetree/bindings/clock/sunxi-ccu.txt
+index de90988..db49cbc 100644
+--- a/Documentation/devicetree/bindings/clock/sunxi-ccu.txt
++++ b/Documentation/devicetree/bindings/clock/sunxi-ccu.txt
+@@ -3,6 +3,7 @@ Allwinner Clock Control Unit Binding
  
- 		ret = clk_hw_register(NULL, hw);
- 		if (ret) {
--			pr_err("Couldn't register clock %s\n",
--			       clk_hw_get_name(hw));
-+			pr_err("Couldn't register clock %d - %s\n",
-+			       i, clk_hw_get_name(hw));
- 			goto err_clk_unreg;
- 		}
- 	}
+ Required properties :
+ - compatible: must contain one of the following compatibles:
++		- "allwinner,sun4i-a10-ccu"
+ 		- "allwinner,sun6i-a31-ccu"
+ 		- "allwinner,sun7i-a20-ccu"
+ 		- "allwinner,sun8i-a23-ccu"
 -- 
 git-series 0.9.1
