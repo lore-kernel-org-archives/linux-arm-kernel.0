@@ -1,76 +1,121 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 27 Mar 2017 09:46:43 +0100
-Subject: [PATCH v9 15/15] irqchip: mbigen: Add ACPI support
-In-Reply-To: <12635f14-8cbd-61ba-74fa-495a81f94038@huawei.com>
-References: <1488890410-15503-1-git-send-email-guohanjun@huawei.com>
- <1488890410-15503-16-git-send-email-guohanjun@huawei.com>
- <20170321144521.GA4392@red-moon>
- <12635f14-8cbd-61ba-74fa-495a81f94038@huawei.com>
-Message-ID: <c07135ba-f14f-fa2f-bd1b-e00cc758b3e7@arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sun, 26 Mar 2017 15:10:37 +0200
+Subject: [PATCH v2 1/5] dt-bindings: update device tree binding for
+ Allwinner PRCM CCUs
+In-Reply-To: <997781490224623@web30o.yandex.ru>
+References: <20170315172808.64011-1-icenowy@aosc.xyz>
+ <20170315172808.64011-2-icenowy@aosc.xyz>
+ <20170321074117.vdfjynauuuv6fivp@lukather>
+ <115431490120542@web34g.yandex.ru>
+ <20170322200923.tcr7yqnfqj2zk2v7@lukather>
+ <997781490224623@web30o.yandex.ru>
+Message-ID: <20170326131037.qkimsobykxxqgxee@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hanjun, John,
-
-On 22/03/17 14:12, John Garry wrote:
-> On 21/03/2017 14:45, Lorenzo Pieralisi wrote:
->> On Tue, Mar 07, 2017 at 08:40:10PM +0800, Hanjun Guo wrote:
->>> From: Hanjun Guo <hanjun.guo@linaro.org>
->>>
->>> With the preparation of platform msi support and interrupt producer
->>> in DSDT, we can add mbigen ACPI support now.
->>>
->>> We are using Interrupt resource type in _CRS methd to indicate number
->>> of irq pins instead of num_pins in DT to avoid _DSD usage in this case.
->>>
->>> For mbigen,
->>>     Device(MBI0) {
->>>           Name(_HID, "HISI0152")
->>>           Name(_UID, Zero)
->>>           Name(_CRS, ResourceTemplate() {
->>>                   Memory32Fixed(ReadWrite, 0xa0080000, 0x10000)
->>> 		  Interrupt(ResourceProducer,...) {12,14,....}
->>
->> What do these interrupt numbers represent ? This looks wrong to me.
->> An interrupt descriptor is there to describe the interrupts a device
->> can generate; you are using it just to add a "standard" (that is
->> not standard at all) way of counting the number of vectors allocated
->> to this specific chip and that's just wrong.
->>
+On Thu, Mar 23, 2017 at 07:17:03AM +0800, Icenowy Zheng wrote:
 > 
-> As I understand, the count of interrupts we are declaring for the mbigen 
-> is the same as the sum of interrupts for that mbigen's children.
 > 
-> So at the point we probe the mbigen, can we just deference the children 
-> to count their interrupts, and use this as the #msis?
+> 23.03.2017, 04:09, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
+> > On Wed, Mar 22, 2017 at 02:22:22AM +0800, Icenowy Zheng wrote:
+> >> ?21.03.2017, 15:41, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
+> >> ?> On Thu, Mar 16, 2017 at 01:28:04AM +0800, Icenowy Zheng wrote:
+> >> ?>> ?Many Allwinner SoCs after A31 have a CCU in PRCM block.
+> >> ?>>
+> >> ?>> ?Give the ones on H3 and A64 compatible strings.
+> >> ?>>
+> >> ?>> ?Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+> >> ?>> ?---
+> >> ?>> ?Changes in v2:
+> >> ?>> ?- Add iosc for R_CCU's on H3/A64. (A31, A23 and A33 seem to have different
+> >> ?>> ???clock for mux 3 of ar100 clk. Investgations are needed for them.)
+> >> ?>>
+> >> ?>> ??Documentation/devicetree/bindings/clock/sunxi-ccu.txt | 18 +++++++++++++++++-
+> >> ?>> ??1 file changed, 17 insertions(+), 1 deletion(-)
+> >> ?>>
+> >> ?>> ?diff --git a/Documentation/devicetree/bindings/clock/sunxi-ccu.txt b/Documentation/devicetree/bindings/clock/sunxi-ccu.txt
+> >> ?>> ?index 68512aa398a9..4a4addff595d 100644
+> >> ?>> ?--- a/Documentation/devicetree/bindings/clock/sunxi-ccu.txt
+> >> ?>> ?+++ b/Documentation/devicetree/bindings/clock/sunxi-ccu.txt
+> >> ?>> ?@@ -7,9 +7,11 @@ Required properties :
+> >> ?>> ??????????????????- "allwinner,sun8i-a23-ccu"
+> >> ?>> ??????????????????- "allwinner,sun8i-a33-ccu"
+> >> ?>> ??????????????????- "allwinner,sun8i-h3-ccu"
+> >> ?>> ?+ - "allwinner,sun8i-h3-r-ccu"
+> >> ?>> ??????????????????- "allwinner,sun8i-v3s-ccu"
+> >> ?>> ??????????????????- "allwinner,sun9i-a80-ccu"
+> >> ?>> ??????????????????- "allwinner,sun50i-a64-ccu"
+> >> ?>> ?+ - "allwinner,sun50i-a64-r-ccu"
+> >> ?>> ??????????????????- "allwinner,sun50i-h5-ccu"
+> >> ?>>
+> >> ?>> ??- reg: Must contain the registers base address and length
+> >> ?>> ?@@ -20,7 +22,11 @@ Required properties :
+> >> ?>> ??- #clock-cells : must contain 1
+> >> ?>> ??- #reset-cells : must contain 1
+> >> ?>>
+> >> ?>> ?-Example:
+> >> ?>> ?+For the PRCM CCUs on H3/A64, one more clock is needed:
+> >> ?>> ?+- "iosc": another frequency oscillator used for CPUS (usually at 32000Hz,
+> >> ?>> ?+ not the same with losc)
+> >> ?>
+> >> ?> This is called the internal oscillator in the datasheet, it would
+> >> ?> probably make more sense to call it that way in the documentation too.
+> >> ?>
+> >> ?> This oscillator seems to be clocked at 16MHz, so we should represent
+> >> ?> it as such.
+> >> ?>
+> >> ?> And I'm wondering, are you *sure* that it's fed directly from the
+> >> ?> internal oscillator, or goes through the registers in the RTC, with
+> >> ?> the 32 divider and 16 prescaler by default that makes it at roughly
+> >> ?> the same rate (31.25kHz).
+> >>
+> >> ?In fact I know nothing about it -- I only represented the code in BSP
+> >> ?clock driver.
+> >>
+> >> ?The mux value 3 varies from SoC to SoC. For A64/H5 it's 32000,
+> >> ?for A33 it's 667000 (seems to be directly the internal OSC, as the
+> >> ?user manual says the internal OSC is 600~700kHz; but it's named
+> >> ?cpuosc rather than iosc in A33 BSP clock driver); for A80 it's even
+> >> ?PLL_AUDIO.
+> >
+> > Where are you getting those info from?
+> >
+> > As far as I know, the A33 PRCM takes the hosc, losc, pll6 and CPU
+> > (internal) oscillator:
+> > https://github.com/allwinner-zh/linux-3.4-sunxi/blob/master/drivers/clk/sunxi/clk-sun8iw5.c#L508
+> >
+> > The H3 takes the hosc and losc:
+> > https://github.com/allwinner-zh/linux-3.4-sunxi/blob/master/drivers/clk/sunxi/clk-sun8iw7.c#L379
+> >
+> > The A80 takes the hosc and losc:
+> > https://github.com/allwinner-zh/linux-3.4-sunxi/blob/master/drivers/clk/sunxi/clk-sun9iw1.c#L281
+> >
+> > The A64 takes the hosc, losc, pll-periph0 and the iosc, which indeed
+> > seems to be fed from the internal oscillator with the divider in the
+> > RTC:
+> > https://github.com/longsleep/linux-pine64/blob/lichee-dev-v3.10.65-bsp2.0/arch/arm64/boot/dts/sun50iw1p1-clk.dtsi#L19
+> > https://github.com/longsleep/linux-pine64/blob/lichee-dev-v3.10.65-bsp2.0/drivers/clk/sunxi/clk-sun50iw1.c#L603
 > 
->> Can't you use something like Agustin did in the QCOM combiner:
->>
->> drivers/irqchip/qcom-irq-combiner.c
->>
->> to detect the MSI vector length (ie by describing the MBIgen through
->> generic registers and use the bit width to compute the vector
->> lenght) ? I am not sure how feasible it is given that my knowledge
->> of MBIgen is pretty poor.
->>
->> I understand we want to avoid _DSD properties but we should not
->> work around standard bindings to achieve that goal.
->>
+> But then in sunxi_init_clocks function, the iosc clock is initialized
+> as a fixed clock with 32000Hz.
 > 
-> We use "num-pins" for dt solution, but it is not so welcome here.
+> The clock node in BSP device tree have a compatible of
+> allwinner,fixed-clock, but not fixed-clock, which makes it not able
+> to be really probed.
 
-Well, this device is already completely out of any standard description
-on the ACPI side. And given that it bloats both the ACPI tables and the
-kernel data structures, I can only suggest that you take advantage of
-_DSD here, as misusing the standard properties is not something that we
-should condone. It will also make the driver more manageable, as it will
-use similar properties on both firmware implementations.
+That clock is registered:
+https://github.com/longsleep/linux-pine64/blob/lichee-dev-v3.10.65-bsp2.0/drivers/clk/sunxi/clk-sun50iw1.c#L1193
 
-I feel like I need to stress the urgency here. We're at -rc4, and still
-with unsolved issues. None of us want to miss the next merge window.
+Maxime
 
-Thanks,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170326/c6f2e97f/attachment-0001.sig>
