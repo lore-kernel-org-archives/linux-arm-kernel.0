@@ -1,44 +1,66 @@
-From: smueller@chronox.de (Stephan =?ISO-8859-1?Q?M=FCller?=)
-Date: Sun, 26 Mar 2017 06:10:44 +0200
-Subject: Question - seeding the hw pseudo random number generator
-In-Reply-To: <20170323094406.GA6848@gondor.apana.org.au>
-References: <20170318092554.lggkhfg5eko23o3k@kozik-lap>
- <20170323082307.GB16625@Red> <20170323094406.GA6848@gondor.apana.org.au>
-Message-ID: <1882318.c2IBOhq8iD@positron.chronox.de>
+From: lkp@intel.com (kbuild test robot)
+Date: Sun, 26 Mar 2017 15:28:02 +0800
+Subject: [PATCH v3 4/7] alpha: Add support for memset16
+In-Reply-To: <20170324161318.18718-5-willy@infradead.org>
+Message-ID: <201703261542.3JwqrQIw%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 23. M?rz 2017, 10:44:06 CEST schrieb Herbert Xu:
+Hi Matthew,
 
-Hi Herbert,
+[auto build test ERROR on linus/master]
+[also build test ERROR on v4.11-rc3 next-20170324]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-> On Thu, Mar 23, 2017 at 09:23:07AM +0100, Corentin Labbe wrote:
-> > Problem with this conversion, a huge regression for user space.
-> > Using hwrng is simple as cat /dev/hwrng.
-> > Using algif_rng via AF_ALG is ... unusable for the moment.
-> > Perhaps creating an user space tool (prng-tool which provide a cat
-> > /dev/hwrng replacement) is mandatory before any convertion.
-> Stephan may have a tool to do this.  Stephan?
+url:    https://github.com/0day-ci/linux/commits/Matthew-Wilcox/Add-memsetN-functions/20170326-140108
+config: alpha-allyesconfig (attached as .config)
+compiler: alpha-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=alpha 
 
-I added the application kcapi-rng to HEAD of [1]. Create the application with 
-the --enable-kcapi-rngapp configure option.
+All errors (new ones prefixed by >>):
 
-$ kcapi-rng 
+   In file included from include/linux/string.h:18:0,
+                    from include/linux/bitmap.h:8,
+                    from include/linux/cpumask.h:11,
+                    from include/linux/rcupdate.h:40,
+                    from include/linux/rculist.h:10,
+                    from include/linux/pid.h:4,
+                    from include/linux/sched.h:13,
+                    from arch/alpha/kernel/asm-offsets.c:9:
+   arch/alpha/include/asm/string.h: In function 'memset16':
+>> arch/alpha/include/asm/string.h:74:2: error: expected ';' before 'return'
+     return __memset16(p, v, n * 2);
+     ^~~~~~
+   make[2]: *** [arch/alpha/kernel/asm-offsets.s] Error 1
+   make[2]: Target '__build' not remade because of errors.
+   make[1]: *** [prepare0] Error 2
+   make[1]: Target 'prepare' not remade because of errors.
+   make: *** [sub-make] Error 2
 
-Kernel Crypto API Random Number Gatherer
+vim +74 arch/alpha/include/asm/string.h
 
-Kernel Crypto API interface library version: libkcapi pre-release 0.13.1
-Reported numeric version number 130080
+    68	#define __HAVE_ARCH_MEMSET16
+    69	extern void * __memset16(void *dest, unsigned short, size_t count);
+    70	static inline void *memset16(uint16_t *p, uint16_t v, size_t n)
+    71	{
+    72		if (__builtin_constant_p(v))
+    73			return __constant_c_memset(p, 0x0001000100010001UL * v, n * 2)
+  > 74		return __memset16(p, v, n * 2);
+    75	}
+    76	
+    77	#endif /* __KERNEL__ */
 
-Usage:
-        -b --bytes <BYTES>      Number of bytes to generate (required option)
-        -h --help       This help information
-           --version    Print version
-        -v --verbose    Verbose logging, multiple options increase verbosity
-
-Data provided at stdin is used to seed the DRNG
-
-[1] https://github.com/smuellerDD/libkcapi/
-
-Ciao
-Stephan
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 49576 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170326/1a1fb4b2/attachment-0001.gz>
