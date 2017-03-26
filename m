@@ -1,37 +1,44 @@
-From: ralph.sennhauser@gmail.com (Ralph Sennhauser)
-Date: Sun, 26 Mar 2017 23:05:58 +0200
-Subject: [PATCH v3 4/4] mvebu: wrt1900ac: Use pwm-fan rather than gpio-fan
-In-Reply-To: <20170324143505.GK28518@lunn.ch>
-References: <20170324141815.7252-1-ralph.sennhauser@gmail.com>
- <20170324141815.7252-5-ralph.sennhauser@gmail.com>
- <20170324143505.GK28518@lunn.ch>
-Message-ID: <20170326230558.6b6c4ec6@gmail.com>
+From: smueller@chronox.de (Stephan =?ISO-8859-1?Q?M=FCller?=)
+Date: Sun, 26 Mar 2017 23:25:24 +0200
+Subject: [PATCH v3 1/3] crypto: hw_random - Add new Exynos RNG driver
+In-Reply-To: <20170326180012.3eic4bt2p6h6u3nh@kozik-lap>
+References: <20170325162654.3827-1-krzk@kernel.org>
+ <2736911.EcZSki4vB1@positron.chronox.de>
+ <20170326180012.3eic4bt2p6h6u3nh@kozik-lap>
+Message-ID: <4479175.Jfq03yCxQW@tauon.atsec.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 24 Mar 2017 15:35:05 +0100
-Andrew Lunn <andrew@lunn.ch> wrote:
+Am Sonntag, 26. M?rz 2017, 20:00:12 CEST schrieb Krzysztof Kozlowski:
 
-> > +	pwm_fan {
-> >  		/* SUNON HA4010V4-0000-C99 */
-> > -		compatible = "gpio-fan";
-> > -		gpios = <&gpio0 24 0>;
-> >  
-> > -		gpio-fan,speed-map = <0    0
-> > -				      4500 1>;
-> > +		compatible = "pwm-fan";
-> > +		pwms = <&gpio0 24 4000 0>;  
+Hi Krzysztof,
+
+> > Would it make sense to add another outer loop here to allow all of slen to
+> > be injected into the DRNG? Note, in some cases, a user wants to add more
+> > seed into the DRNG than the actual seed size. In this case, the DRNG acts
+> > as a compression operation of entropy. This is used when the
+> > entropy-to-data ratio is not 1:1. In a lot of cases, users have a seed
+> > which has less entropy in bits per data bit.
 > 
-> Hi Ralph
+> Hi,
 > 
-> I believe this last 0 is the flags parameter. Now that we have
-> #pwm-cells = 1, i think this last 0 should be dropped.
+> I do not know whether this would have any benefit on hardware. The
+> datasheet is not describing too much here. It is actually saying only:
+> 1. Write SEED to each register (five in total).
+> 2. Confirm that STATUS register says seeding done.
+> 3. Start RNG engine.
+> 4. Wait for engine finish (another bit in STATUS - clear it then).
+> 5. Read the randoms.
 > 
-> 	  Andrew
+> I would guess that the hardware will ignore all previously written seeds
+> and use the last one. Maybe the hardware will use all of the seeds
+> written as you imply. It is just a guessing.
 
-Hi Andrew,
+Oh my, if you are right with your first guess, this is a bad DRNG design.
 
-isn't the 4000 (period?) pwm-cell #2 and 0 (flags?) pwm-cell #3? I
-actually expect "pwms = <&gpio0 24>;" here or "#pwm-cells = <2>;"
+Just out of curiousity: what happens if a caller invokes the seed function 
+twice or more times (each time with the sufficient amount of bits)? What is 
+your guess here?
 
-Ralph
+Ciao
+Stephan
