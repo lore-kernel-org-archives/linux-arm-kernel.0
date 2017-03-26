@@ -1,41 +1,63 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Sun, 26 Mar 2017 23:38:55 +0800
-Subject: [PATCH 0/5] Convert to use devm_*() for amba attached modules
-In-Reply-To: <20170326152050.v47z36eud6xvrcpt@piout.net>
-References: <1490539314-9681-1-git-send-email-leo.yan@linaro.org>
- <20170326152050.v47z36eud6xvrcpt@piout.net>
-Message-ID: <20170326153855.GA14404@leoy-linaro>
+From: abelvesa@linux.com (Abel Vesa)
+Date: Sun, 26 Mar 2017 16:55:49 +0100
+Subject: [RESEND] arm: ftrace: fix dynamic ftrace with DEBUG_RODATA and
+ !FRAME_POINTER
+Message-ID: <1490543749-20376-1-git-send-email-abelvesa@linux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 26, 2017 at 05:20:50PM +0200, Alexandre Belloni wrote:
-> On 26/03/2017 at 22:41:49 +0800, Leo Yan wrote:
-> > When review device driver modules which attach to amba bus, found
-> > several modules are not using devm_*() apis to manage resource. As
-> > result, some drivers have memory leakage or missing iomem unmapping
-> > when rmmod module. And the code has many "goto" tags to handle
-> > different failures.
-> > 
-> > So this patch series is to convert to use devm_*() for moudules which
-> > are attached to amba bus to manage resource and get more robust and
-> > neat code.
-> > 
-> > Patch 0003 "drivers/rtc/rtc-pl031.c: Convert to use devm_*()" has been
-> > verified on 96boards Hikey. Other patches can pass building but have
-> > not really tested on hardware.
-> > 
-> 
-> If your plan is to actually remove usage of
-> amba_request_regions() and amba_release_regions(), you should do so in
-> its own patch sets instead of hiding that in a useless cleanup series.
+The support for dynamic ftrace with CONFIG_DEBUG_RODATA involves
+overriding the weak arch_ftrace_update_code() with a variant which makes
+the kernel text writable around the patching.
 
-Just curious, from Russell's replying for patch 0005, IIUC we cannot
-totally remove usage of amba_request_regions() and
-amba_release_regions(), there have some coner case should use
-amba_request_regions() + ioremap().
+This override was however added under the CONFIG_OLD_MCOUNT ifdef, and
+CONFIG_OLD_MCOUNT is only enabled if frame pointers are enabled.
 
-Does it make sense to remove most usage of amba_request_regions() and
-amba_release_regions() but we still keep these two functions in the kernel?
+This leads to non-functional dynamic ftrace (ftrace triggers a
+WARN_ON()) when CONFIG_DEBUG_RODATA is enabled and CONFIG_FRAME_POINTER
+is not.
 
-Thanks,
-Leo Yan
+Move the override out of that ifdef and into the CONFIG_DYNAMIC_FTRACE
+ifdef where it belongs.
+
+Fixes: 80d6b0c2eed2a ("ARM: mm: allow text and rodata sections to be read-only")
+
+Suggested-by: Nicolai Stange <nicstange@gmail.com>
+Suggested-by: Rabin Vincent <rabin@rab.in>
+Signed-off-by: Abel Vesa <abelvesa@linux.com>
+Acked-by: Rabin Vincent <rabin@rab.in>
+---
+ arch/arm/kernel/ftrace.c | 11 ++++++-----
+ 1 file changed, 6 insertions(+), 5 deletions(-)
+
+diff --git a/arch/arm/kernel/ftrace.c b/arch/arm/kernel/ftrace.c
+index 3f17594..414e60e 100644
+--- a/arch/arm/kernel/ftrace.c
++++ b/arch/arm/kernel/ftrace.c
+@@ -29,11 +29,6 @@
+ #endif
+ 
+ #ifdef CONFIG_DYNAMIC_FTRACE
+-#ifdef CONFIG_OLD_MCOUNT
+-#define OLD_MCOUNT_ADDR	((unsigned long) mcount)
+-#define OLD_FTRACE_ADDR ((unsigned long) ftrace_caller_old)
+-
+-#define	OLD_NOP		0xe1a00000	/* mov r0, r0 */
+ 
+ static int __ftrace_modify_code(void *data)
+ {
+@@ -51,6 +46,12 @@ void arch_ftrace_update_code(int command)
+ 	stop_machine(__ftrace_modify_code, &command, NULL);
+ }
+ 
++#ifdef CONFIG_OLD_MCOUNT
++#define OLD_MCOUNT_ADDR	((unsigned long) mcount)
++#define OLD_FTRACE_ADDR ((unsigned long) ftrace_caller_old)
++
++#define	OLD_NOP		0xe1a00000	/* mov r0, r0 */
++
+ static unsigned long ftrace_nop_replace(struct dyn_ftrace *rec)
+ {
+ 	return rec->arch.old_mcount ? OLD_NOP : NOP;
+-- 
+2.7.4
