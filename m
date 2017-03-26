@@ -1,165 +1,143 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Sun, 26 Mar 2017 17:53:55 +0800
-Subject: [PATCH v3 7/7] vga: Optimise console scrolling
-In-Reply-To: <20170324161318.18718-8-willy@infradead.org>
-Message-ID: <201703261730.9nRIHfGC%fengguang.wu@intel.com>
+From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
+Date: Sun, 26 Mar 2017 13:06:02 +0200
+Subject: [RFC PATCH] clk: meson: gxbb: remove the "cpu_clk"
+Message-ID: <20170326110602.23379-1-martin.blumenstingl@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Matthew,
+It seems that the "cpu_clk" was carried over from the meson8b clock
+controller driver. On Meson GX (GXBB/GXL/GXM) the registers which are
+used by the cpu_clk have a different purpose (in other words: they don't
+control the CPU clock anymore). HHI_SYS_CPU_CLK_CNTL1 bits 31:24 are
+reserved according to the public S905 datasheet, while bit 23 is the
+"A53_trace_clk_DIS" gate (which according to the datasheet should only
+be used in case a silicon bug is discovered) and bits 22:20 are a
+divider (A53_trace_clk). The meson clk-cpu code however expects that
+bits 28:20 are reserved for a divider (according to the public S805
+datasheet this "SCALE_DIV: This value represents an N+1 divider of the
+input clock.").
 
-[auto build test ERROR on linus/master]
-[also build test ERROR on v4.11-rc3 next-20170324]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+The CPU clock on Meson GX SoCs is provided by the SCPI DVFS clock
+driver instead. Two examples from a Meson GXL S905X SoC:
+- vcpu (SCPI DVFS clock 0) rate: 1000000000 / cpu_clk rate: 708000000
+- vcpu (SCPI DVFS clock 0) rate: 1512000000 / cpu_clk rate: 708000000
 
-url:    https://github.com/0day-ci/linux/commits/Matthew-Wilcox/Add-memsetN-functions/20170326-140108
-config: mips-defconfig (attached as .config)
-compiler: mips-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=mips 
+Unfortunately the CLKID_CPUCLK was already exported (but is currently
+not used) to DT.
 
-All errors (new ones prefixed by >>):
+This is an RFC because I would like to hear other people's opinion on
+how to clean up the CLKID_CPUCLK (as it leaves a "hole" in
+gxbb_hw_onecell_data and changes the DT API (by removing a currently
+unused #define).
 
-   In file included from include/linux/selection.h:11:0,
-                    from drivers/video/console/newport_con.c:16:
-   include/linux/vt_buffer.h: In function 'scr_memsetw':
->> include/linux/vt_buffer.h:34:2: error: implicit declaration of function 'memset16' [-Werror=implicit-function-declaration]
-     memset16(s, c, count / 2);
-     ^~~~~~~~
-   include/linux/vt_buffer.h: In function 'scr_memcpyw':
->> include/linux/vt_buffer.h:47:2: error: implicit declaration of function 'memcpy' [-Werror=implicit-function-declaration]
-     memcpy(d, s, count);
-     ^~~~~~
-   include/linux/vt_buffer.h: In function 'scr_memmovew':
->> include/linux/vt_buffer.h:66:2: error: implicit declaration of function 'memmove' [-Werror=implicit-function-declaration]
-     memmove(d, s, count);
-     ^~~~~~~
-   In file included from include/linux/string.h:18:0,
-                    from include/linux/bitmap.h:8,
-                    from include/linux/cpumask.h:11,
-                    from arch/mips/include/asm/processor.h:15,
-                    from arch/mips/include/asm/thread_info.h:15,
-                    from include/linux/thread_info.h:25,
-                    from include/asm-generic/preempt.h:4,
-                    from ./arch/mips/include/generated/asm/preempt.h:1,
-                    from include/linux/preempt.h:80,
-                    from include/linux/spinlock.h:50,
-                    from include/linux/wait.h:8,
-                    from include/linux/fs.h:5,
-                    from include/linux/tty.h:4,
-                    from include/linux/vt_kern.h:11,
-                    from drivers/video/console/newport_con.c:18:
-   arch/mips/include/asm/string.h: At top level:
->> arch/mips/include/asm/string.h:138:14: error: conflicting types for 'memcpy'
-    extern void *memcpy(void *__to, __const__ void *__from, size_t __n);
-                 ^~~~~~
-   In file included from include/linux/selection.h:11:0,
-                    from drivers/video/console/newport_con.c:16:
-   include/linux/vt_buffer.h:47:2: note: previous implicit declaration of 'memcpy' was here
-     memcpy(d, s, count);
-     ^~~~~~
-   In file included from include/linux/string.h:18:0,
-                    from include/linux/bitmap.h:8,
-                    from include/linux/cpumask.h:11,
-                    from arch/mips/include/asm/processor.h:15,
-                    from arch/mips/include/asm/thread_info.h:15,
-                    from include/linux/thread_info.h:25,
-                    from include/asm-generic/preempt.h:4,
-                    from ./arch/mips/include/generated/asm/preempt.h:1,
-                    from include/linux/preempt.h:80,
-                    from include/linux/spinlock.h:50,
-                    from include/linux/wait.h:8,
-                    from include/linux/fs.h:5,
-                    from include/linux/tty.h:4,
-                    from include/linux/vt_kern.h:11,
-                    from drivers/video/console/newport_con.c:18:
->> arch/mips/include/asm/string.h:141:14: error: conflicting types for 'memmove'
-    extern void *memmove(void *__dest, __const__ void *__src, size_t __n);
-                 ^~~~~~~
-   In file included from include/linux/selection.h:11:0,
-                    from drivers/video/console/newport_con.c:16:
-   include/linux/vt_buffer.h:66:2: note: previous implicit declaration of 'memmove' was here
-     memmove(d, s, count);
-     ^~~~~~~
-   In file included from include/linux/bitmap.h:8:0,
-                    from include/linux/cpumask.h:11,
-                    from arch/mips/include/asm/processor.h:15,
-                    from arch/mips/include/asm/thread_info.h:15,
-                    from include/linux/thread_info.h:25,
-                    from include/asm-generic/preempt.h:4,
-                    from ./arch/mips/include/generated/asm/preempt.h:1,
-                    from include/linux/preempt.h:80,
-                    from include/linux/spinlock.h:50,
-                    from include/linux/wait.h:8,
-                    from include/linux/fs.h:5,
-                    from include/linux/tty.h:4,
-                    from include/linux/vt_kern.h:11,
-                    from drivers/video/console/newport_con.c:18:
-   include/linux/string.h:104:14: error: conflicting types for 'memset16'
-    extern void *memset16(uint16_t *, uint16_t, __kernel_size_t);
-                 ^~~~~~~~
-   In file included from include/linux/selection.h:11:0,
-                    from drivers/video/console/newport_con.c:16:
-   include/linux/vt_buffer.h:34:2: note: previous implicit declaration of 'memset16' was here
-     memset16(s, c, count / 2);
-     ^~~~~~~~
-   cc1: some warnings being treated as errors
-
-vim +/memset16 +34 include/linux/vt_buffer.h
-
-    28	{
-    29	#ifdef VT_BUF_HAVE_RW
-    30		count /= 2;
-    31		while (count--)
-    32			scr_writew(c, s++);
-    33	#else
-  > 34		memset16(s, c, count / 2);
-    35	#endif
-    36	}
-    37	#endif
-    38	
-    39	#ifndef VT_BUF_HAVE_MEMCPYW
-    40	static inline void scr_memcpyw(u16 *d, const u16 *s, unsigned int count)
-    41	{
-    42	#ifdef VT_BUF_HAVE_RW
-    43		count /= 2;
-    44		while (count--)
-    45			scr_writew(scr_readw(s++), d++);
-    46	#else
-  > 47		memcpy(d, s, count);
-    48	#endif
-    49	}
-    50	#endif
-    51	
-    52	#ifndef VT_BUF_HAVE_MEMMOVEW
-    53	static inline void scr_memmovew(u16 *d, const u16 *s, unsigned int count)
-    54	{
-    55	#ifdef VT_BUF_HAVE_RW
-    56		if (d < s)
-    57			scr_memcpyw(d, s, count);
-    58		else {
-    59			count /= 2;
-    60			d += count;
-    61			s += count;
-    62			while (count--)
-    63				scr_writew(scr_readw(--s), --d);
-    64		}
-    65	#else
-  > 66		memmove(d, s, count);
-    67	#endif
-    68	}
-    69	#endif
-
+Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
 ---
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 13581 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170326/f2c361de/attachment-0001.gz>
+ drivers/clk/meson/gxbb.c              | 44 +++--------------------------------
+ drivers/clk/meson/gxbb.h              |  2 +-
+ include/dt-bindings/clock/gxbb-clkc.h |  1 -
+ 3 files changed, 4 insertions(+), 43 deletions(-)
+
+diff --git a/drivers/clk/meson/gxbb.c b/drivers/clk/meson/gxbb.c
+index 1c1ec137a3cc..06586fe16ce3 100644
+--- a/drivers/clk/meson/gxbb.c
++++ b/drivers/clk/meson/gxbb.c
+@@ -496,21 +496,10 @@ static struct meson_clk_mpll gxbb_mpll2 = {
+ };
+ 
+ /*
+- * FIXME cpu clocks and the legacy composite clocks (e.g. clk81) are both PLL
+- * post-dividers and should be modeled with their respective PLLs via the
+- * forthcoming coordinated clock rates feature
++ * FIXME The legacy composite clocks (e.g. clk81) are both PLL post-dividers
++ * and should be modeled with their respective PLLs via the forthcoming
++ * coordinated clock rates feature
+  */
+-static struct meson_clk_cpu gxbb_cpu_clk = {
+-	.reg_off = HHI_SYS_CPU_CLK_CNTL1,
+-	.div_table = cpu_div_table,
+-	.clk_nb.notifier_call = meson_clk_cpu_notifier_cb,
+-	.hw.init = &(struct clk_init_data){
+-		.name = "cpu_clk",
+-		.ops = &meson_clk_cpu_ops,
+-		.parent_names = (const char *[]){ "sys_pll" },
+-		.num_parents = 1,
+-	},
+-};
+ 
+ static u32 mux_table_clk81[]	= { 6, 5, 7 };
+ 
+@@ -698,7 +687,6 @@ static MESON_GATE(gxbb_ao_i2c, HHI_GCLK_AO, 4);
+ static struct clk_hw_onecell_data gxbb_hw_onecell_data = {
+ 	.hws = {
+ 		[CLKID_SYS_PLL]		    = &gxbb_sys_pll.hw,
+-		[CLKID_CPUCLK]		    = &gxbb_cpu_clk.hw,
+ 		[CLKID_HDMI_PLL]	    = &gxbb_hdmi_pll.hw,
+ 		[CLKID_FIXED_PLL]	    = &gxbb_fixed_pll.hw,
+ 		[CLKID_FCLK_DIV2]	    = &gxbb_fclk_div2.hw,
+@@ -925,9 +913,6 @@ static int gxbb_clkc_probe(struct platform_device *pdev)
+ 	for (i = 0; i < ARRAY_SIZE(gxbb_clk_mplls); i++)
+ 		gxbb_clk_mplls[i]->base = clk_base;
+ 
+-	/* Populate the base address for CPU clk */
+-	gxbb_cpu_clk.base = clk_base;
+-
+ 	/* Populate the base address for the MPEG clks */
+ 	gxbb_mpeg_clk_sel.reg = clk_base + (u64)gxbb_mpeg_clk_sel.reg;
+ 	gxbb_mpeg_clk_div.reg = clk_base + (u64)gxbb_mpeg_clk_div.reg;
+@@ -950,29 +935,6 @@ static int gxbb_clkc_probe(struct platform_device *pdev)
+ 			goto iounmap;
+ 	}
+ 
+-	/*
+-	 * Register CPU clk notifier
+-	 *
+-	 * FIXME this is wrong for a lot of reasons. First, the muxes should be
+-	 * struct clk_hw objects. Second, we shouldn't program the muxes in
+-	 * notifier handlers. The tricky programming sequence will be handled
+-	 * by the forthcoming coordinated clock rates mechanism once that
+-	 * feature is released.
+-	 *
+-	 * Furthermore, looking up the parent this way is terrible. At some
+-	 * point we will stop allocating a default struct clk when registering
+-	 * a new clk_hw, and this hack will no longer work. Releasing the ccr
+-	 * feature before that time solves the problem :-)
+-	 */
+-	parent_hw = clk_hw_get_parent(&gxbb_cpu_clk.hw);
+-	parent_clk = parent_hw->clk;
+-	ret = clk_notifier_register(parent_clk, &gxbb_cpu_clk.clk_nb);
+-	if (ret) {
+-		pr_err("%s: failed to register clock notifier for cpu_clk\n",
+-				__func__);
+-		goto iounmap;
+-	}
+-
+ 	return of_clk_add_hw_provider(dev->of_node, of_clk_hw_onecell_get,
+ 			&gxbb_hw_onecell_data);
+ 
+diff --git a/drivers/clk/meson/gxbb.h b/drivers/clk/meson/gxbb.h
+index cbd62e46bb5b..ca1285acb92d 100644
+--- a/drivers/clk/meson/gxbb.h
++++ b/drivers/clk/meson/gxbb.h
+@@ -169,7 +169,7 @@
+  * to be exposed to client nodes in DT: include/dt-bindings/clock/gxbb-clkc.h
+  */
+ #define CLKID_SYS_PLL		  0
+-/* CLKID_CPUCLK */
++/* CLKID_CPUCLK - not used in the driver anymore */
+ /* CLKID_HDMI_PLL */
+ #define CLKID_FIXED_PLL		  3
+ /* CLKID_FCLK_DIV2 */
+diff --git a/include/dt-bindings/clock/gxbb-clkc.h b/include/dt-bindings/clock/gxbb-clkc.h
+index 63f4c2c44a1f..07311dfdba83 100644
+--- a/include/dt-bindings/clock/gxbb-clkc.h
++++ b/include/dt-bindings/clock/gxbb-clkc.h
+@@ -5,7 +5,6 @@
+ #ifndef __GXBB_CLKC_H
+ #define __GXBB_CLKC_H
+ 
+-#define CLKID_CPUCLK		1
+ #define CLKID_HDMI_PLL		2
+ #define CLKID_FCLK_DIV2		4
+ #define CLKID_FCLK_DIV3		5
+-- 
+2.12.1
