@@ -1,67 +1,35 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Sun, 26 Mar 2017 22:41:54 +0800
-Subject: [PATCH 5/5] ALSA: AACI: Convert to use devm_ioremap_resource()
-In-Reply-To: <1490539314-9681-1-git-send-email-leo.yan@linaro.org>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Sun, 26 Mar 2017 15:50:24 +0100
+Subject: [PATCH 1/5] Input: ambakmi - Convert to use devm_*()
+In-Reply-To: <1490539314-9681-2-git-send-email-leo.yan@linaro.org>
 References: <1490539314-9681-1-git-send-email-leo.yan@linaro.org>
-Message-ID: <1490539314-9681-6-git-send-email-leo.yan@linaro.org>
+ <1490539314-9681-2-git-send-email-leo.yan@linaro.org>
+Message-ID: <20170326145023.GO7909@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert to use devm_ioremap_resource() in probe function, otherwise it's
-missed to unremap this region if probe failed or rmmod module.
+On Sun, Mar 26, 2017 at 10:41:50PM +0800, Leo Yan wrote:
+> Convert driver to use devm_*() APIs so rely on driver model core layer
+> to manage resources. This eliminates error path boilerplate and makes
+> code neat.
+> 
+> This patch also fixes the memory leakage for 'kmi->io' when remove
+> module.
 
-Signed-off-by: Leo Yan <leo.yan@linaro.org>
----
- sound/arm/aaci.c | 21 ++++++---------------
- 1 file changed, 6 insertions(+), 15 deletions(-)
+No, it is not leaked, in fact, your patch introduces a use-after-free
+bug.
 
-diff --git a/sound/arm/aaci.c b/sound/arm/aaci.c
-index 4140b1b..2078568 100644
---- a/sound/arm/aaci.c
-+++ b/sound/arm/aaci.c
-@@ -990,19 +990,13 @@ static int aaci_probe(struct amba_device *dev,
- 	struct aaci *aaci;
- 	int ret, i;
- 
--	ret = amba_request_regions(dev, NULL);
--	if (ret)
--		return ret;
--
- 	aaci = aaci_init_card(dev);
--	if (!aaci) {
--		ret = -ENOMEM;
--		goto out;
--	}
-+	if (!aaci)
-+		return -ENOMEM;
- 
--	aaci->base = ioremap(dev->res.start, resource_size(&dev->res));
--	if (!aaci->base) {
--		ret = -ENOMEM;
-+	aaci->base = devm_ioremap_resource(&dev->dev, &dev->res);
-+	if (IS_ERR(aaci->base)) {
-+		ret = PTR_ERR(aaci->base);
- 		goto out;
- 	}
- 
-@@ -1064,9 +1058,7 @@ static int aaci_probe(struct amba_device *dev,
- 	}
- 
-  out:
--	if (aaci)
--		snd_card_free(aaci->card);
--	amba_release_regions(dev);
-+	snd_card_free(aaci->card);
- 	return ret;
- }
- 
-@@ -1079,7 +1071,6 @@ static int aaci_remove(struct amba_device *dev)
- 		writel(0, aaci->base + AACI_MAINCR);
- 
- 		snd_card_free(card);
--		amba_release_regions(dev);
- 	}
- 
- 	return 0;
+kmi->io is of type "struct serio", and this structure has an embedded
+"struct device".  The lifetime of any structure containing a "struct
+device" is controlled by the lifetime of the struct device.
+
+Once serio_register_port() has been called on it, it is up to the
+serio layer to free this structure.
+
+Therefore, your patch creates a bug, and so it gets a NAK.  There is no
+resource leakage here.
+
 -- 
-2.7.4
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
