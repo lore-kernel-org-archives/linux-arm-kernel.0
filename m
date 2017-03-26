@@ -1,8 +1,8 @@
 From: lkp@intel.com (kbuild test robot)
-Date: Sun, 26 Mar 2017 15:28:02 +0800
-Subject: [PATCH v3 4/7] alpha: Add support for memset16
-In-Reply-To: <20170324161318.18718-5-willy@infradead.org>
-Message-ID: <201703261542.3JwqrQIw%fengguang.wu@intel.com>
+Date: Sun, 26 Mar 2017 15:44:42 +0800
+Subject: [PATCH v3 3/7] x86: Implement memset16, memset32 & memset64
+In-Reply-To: <20170324161318.18718-4-willy@infradead.org>
+Message-ID: <201703261513.GU5jiBgq%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,46 +13,57 @@ Hi Matthew,
 [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
 url:    https://github.com/0day-ci/linux/commits/Matthew-Wilcox/Add-memsetN-functions/20170326-140108
-config: alpha-allyesconfig (attached as .config)
-compiler: alpha-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
+config: i386-randconfig-x077-201713 (attached as .config)
+compiler: gcc-6 (Debian 6.2.0-3) 6.2.0 20160901
 reproduce:
-        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
         # save the attached .config to linux build tree
-        make.cross ARCH=alpha 
+        make ARCH=i386 
 
 All errors (new ones prefixed by >>):
 
-   In file included from include/linux/string.h:18:0,
-                    from include/linux/bitmap.h:8,
-                    from include/linux/cpumask.h:11,
-                    from include/linux/rcupdate.h:40,
-                    from include/linux/rculist.h:10,
-                    from include/linux/pid.h:4,
-                    from include/linux/sched.h:13,
-                    from arch/alpha/kernel/asm-offsets.c:9:
-   arch/alpha/include/asm/string.h: In function 'memset16':
->> arch/alpha/include/asm/string.h:74:2: error: expected ';' before 'return'
-     return __memset16(p, v, n * 2);
-     ^~~~~~
-   make[2]: *** [arch/alpha/kernel/asm-offsets.s] Error 1
-   make[2]: Target '__build' not remade because of errors.
-   make[1]: *** [prepare0] Error 2
-   make[1]: Target 'prepare' not remade because of errors.
-   make: *** [sub-make] Error 2
+>> lib/string.c:733:7: error: redefinition of 'memset32'
+    void *memset32(uint32_t *s, uint32_t v, size_t count)
+          ^~~~~~~~
+   In file included from arch/x86/include/asm/string.h:2:0,
+                    from include/linux/string.h:18,
+                    from lib/string.c:23:
+   arch/x86/include/asm/string_32.h:347:21: note: previous definition of 'memset32' was here
+    static inline void *memset32(uint32_t *s, uint32_t v, size_t n)
+                        ^~~~~~~~
 
-vim +74 arch/alpha/include/asm/string.h
+vim +/memset32 +733 lib/string.c
 
-    68	#define __HAVE_ARCH_MEMSET16
-    69	extern void * __memset16(void *dest, unsigned short, size_t count);
-    70	static inline void *memset16(uint16_t *p, uint16_t v, size_t n)
-    71	{
-    72		if (__builtin_constant_p(v))
-    73			return __constant_c_memset(p, 0x0001000100010001UL * v, n * 2)
-  > 74		return __memset16(p, v, n * 2);
-    75	}
-    76	
-    77	#endif /* __KERNEL__ */
+9114f9de Matthew Wilcox 2017-03-24  717  	return s;
+9114f9de Matthew Wilcox 2017-03-24  718  }
+9114f9de Matthew Wilcox 2017-03-24  719  EXPORT_SYMBOL(memset16);
+9114f9de Matthew Wilcox 2017-03-24  720  #endif
+9114f9de Matthew Wilcox 2017-03-24  721  
+9114f9de Matthew Wilcox 2017-03-24  722  #ifndef __HAVE_ARCH_MEMSET32
+9114f9de Matthew Wilcox 2017-03-24  723  /**
+9114f9de Matthew Wilcox 2017-03-24  724   * memset32() - Fill a memory area with a uint32_t
+9114f9de Matthew Wilcox 2017-03-24  725   * @s: Pointer to the start of the area.
+9114f9de Matthew Wilcox 2017-03-24  726   * @v: The value to fill the area with
+9114f9de Matthew Wilcox 2017-03-24  727   * @count: The number of values to store
+9114f9de Matthew Wilcox 2017-03-24  728   *
+9114f9de Matthew Wilcox 2017-03-24  729   * Differs from memset() in that it fills with a uint32_t instead
+9114f9de Matthew Wilcox 2017-03-24  730   * of a byte.  Remember that @count is the number of uint32_ts to
+9114f9de Matthew Wilcox 2017-03-24  731   * store, not the number of bytes.
+9114f9de Matthew Wilcox 2017-03-24  732   */
+9114f9de Matthew Wilcox 2017-03-24 @733  void *memset32(uint32_t *s, uint32_t v, size_t count)
+9114f9de Matthew Wilcox 2017-03-24  734  {
+9114f9de Matthew Wilcox 2017-03-24  735  	uint32_t *xs = s;
+9114f9de Matthew Wilcox 2017-03-24  736  
+9114f9de Matthew Wilcox 2017-03-24  737  	while (count--)
+9114f9de Matthew Wilcox 2017-03-24  738  		*xs++ = v;
+9114f9de Matthew Wilcox 2017-03-24  739  	return s;
+9114f9de Matthew Wilcox 2017-03-24  740  }
+9114f9de Matthew Wilcox 2017-03-24  741  EXPORT_SYMBOL(memset32);
+
+:::::: The code at line 733 was first introduced by commit
+:::::: 9114f9de5005f9468370ed1cb1b5b841b10d3bad Add multibyte memset functions
+
+:::::: TO: Matthew Wilcox <mawilcox@microsoft.com>
+:::::: CC: 0day robot <fengguang.wu@intel.com>
 
 ---
 0-DAY kernel test infrastructure                Open Source Technology Center
@@ -61,6 +72,6 @@ https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
 A non-text attachment was scrubbed...
 Name: .config.gz
 Type: application/gzip
-Size: 49576 bytes
+Size: 25827 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170326/1a1fb4b2/attachment-0001.gz>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170326/cd155bfd/attachment-0001.gz>
