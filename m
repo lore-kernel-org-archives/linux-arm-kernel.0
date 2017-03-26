@@ -1,33 +1,31 @@
 From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Sun, 26 Mar 2017 15:50:24 +0100
-Subject: [PATCH 1/5] Input: ambakmi - Convert to use devm_*()
-In-Reply-To: <1490539314-9681-2-git-send-email-leo.yan@linaro.org>
+Date: Sun, 26 Mar 2017 15:54:09 +0100
+Subject: [PATCH 5/5] ALSA: AACI: Convert to use devm_ioremap_resource()
+In-Reply-To: <1490539314-9681-6-git-send-email-leo.yan@linaro.org>
 References: <1490539314-9681-1-git-send-email-leo.yan@linaro.org>
- <1490539314-9681-2-git-send-email-leo.yan@linaro.org>
-Message-ID: <20170326145023.GO7909@n2100.armlinux.org.uk>
+ <1490539314-9681-6-git-send-email-leo.yan@linaro.org>
+Message-ID: <20170326145409.GP7909@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 26, 2017 at 10:41:50PM +0800, Leo Yan wrote:
-> Convert driver to use devm_*() APIs so rely on driver model core layer
-> to manage resources. This eliminates error path boilerplate and makes
-> code neat.
-> 
-> This patch also fixes the memory leakage for 'kmi->io' when remove
-> module.
+On Sun, Mar 26, 2017 at 10:41:54PM +0800, Leo Yan wrote:
+> Convert to use devm_ioremap_resource() in probe function, otherwise it's
+> missed to unremap this region if probe failed or rmmod module.
 
-No, it is not leaked, in fact, your patch introduces a use-after-free
-bug.
+Again, wrong - just because there's nothing in the cleanup paths does
+not mean it doesn't clean up.
 
-kmi->io is of type "struct serio", and this structure has an embedded
-"struct device".  The lifetime of any structure containing a "struct
-device" is controlled by the lifetime of the struct device.
+static void aaci_free_card(struct snd_card *card)
+{
+        struct aaci *aaci = card->private_data;
 
-Once serio_register_port() has been called on it, it is up to the
-serio layer to free this structure.
+        iounmap(aaci->base);
+}
 
-Therefore, your patch creates a bug, and so it gets a NAK.  There is no
-resource leakage here.
+This unmaps the mapping you claim it fails to do so.  So, your patch
+actually _creates_ bugs that were not there before.
+
+NAK.
 
 -- 
 RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
