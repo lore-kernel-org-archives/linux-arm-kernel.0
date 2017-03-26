@@ -1,33 +1,37 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Mon, 27 Mar 2017 04:36:42 +0800
-Subject: [nomadik:gemini 43/43] ERROR: "of_flash_probe_versatile"
- [drivers/mtd/maps/physmap_of.ko] undefined!
-Message-ID: <201703270440.a4OOn0b4%fengguang.wu@intel.com>
+From: ralph.sennhauser@gmail.com (Ralph Sennhauser)
+Date: Sun, 26 Mar 2017 23:05:58 +0200
+Subject: [PATCH v3 4/4] mvebu: wrt1900ac: Use pwm-fan rather than gpio-fan
+In-Reply-To: <20170324143505.GK28518@lunn.ch>
+References: <20170324141815.7252-1-ralph.sennhauser@gmail.com>
+ <20170324141815.7252-5-ralph.sennhauser@gmail.com>
+ <20170324143505.GK28518@lunn.ch>
+Message-ID: <20170326230558.6b6c4ec6@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-nomadik.git gemini
-head:   5d333034d4b679ccad1e29b6041238c4a3f10984
-commit: 5d333034d4b679ccad1e29b6041238c4a3f10984 [43/43] mtd: physmap_of: really fix the physmap add-ons
-config: i386-allmodconfig (attached as .config)
-compiler: gcc-6 (Debian 6.2.0-3) 6.2.0 20160901
-reproduce:
-        git checkout 5d333034d4b679ccad1e29b6041238c4a3f10984
-        # save the attached .config to linux build tree
-        make ARCH=i386 
+On Fri, 24 Mar 2017 15:35:05 +0100
+Andrew Lunn <andrew@lunn.ch> wrote:
 
-All errors (new ones prefixed by >>):
+> > +	pwm_fan {
+> >  		/* SUNON HA4010V4-0000-C99 */
+> > -		compatible = "gpio-fan";
+> > -		gpios = <&gpio0 24 0>;
+> >  
+> > -		gpio-fan,speed-map = <0    0
+> > -				      4500 1>;
+> > +		compatible = "pwm-fan";
+> > +		pwms = <&gpio0 24 4000 0>;  
+> 
+> Hi Ralph
+> 
+> I believe this last 0 is the flags parameter. Now that we have
+> #pwm-cells = 1, i think this last 0 should be dropped.
+> 
+> 	  Andrew
 
->> ERROR: "of_flash_probe_versatile" [drivers/mtd/maps/physmap_of.ko] undefined!
->> ERROR: "of_flash_probe_gemini" [drivers/mtd/maps/physmap_of.ko] undefined!
+Hi Andrew,
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 59014 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170327/4af74f98/attachment-0001.gz>
+isn't the 4000 (period?) pwm-cell #2 and 0 (flags?) pwm-cell #3? I
+actually expect "pwms = <&gpio0 24>;" here or "#pwm-cells = <2>;"
+
+Ralph
