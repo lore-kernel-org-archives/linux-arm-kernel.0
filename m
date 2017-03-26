@@ -1,73 +1,165 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Sun, 26 Mar 2017 11:12:57 +0200
-Subject: script to setup pipeline was Re: [PATCH v4 14/36] [media] v4l2-mc:
- add a function to inherit controls from a pipeline
-In-Reply-To: <20170312185845.5c18ffd0@vento.lan>
-References: <20170311101408.272a9187@vento.lan>
- <20170311153229.yrdjmggb3p2suhdw@ihha.localdomain>
- <acfb5eca-ff00-6d57-339a-3322034cbdb3@gmail.com>
- <20170311184551.GD21222@n2100.armlinux.org.uk>
- <1f1b350a-5523-34bc-07b7-f3cd2d1fd4c1@gmail.com>
- <20170311185959.GF21222@n2100.armlinux.org.uk>
- <4917d7fb-2f48-17cd-aa2f-d54b0f19ed6e@gmail.com>
- <20170312073745.GI21222@n2100.armlinux.org.uk>
- <fba73c10-4b95-f0d2-e681-0b14ef1fbc1c@gmail.com>
- <20170312185845.5c18ffd0@vento.lan>
-Message-ID: <20170326091257.GA17728@amd>
+From: lkp@intel.com (kbuild test robot)
+Date: Sun, 26 Mar 2017 17:53:55 +0800
+Subject: [PATCH v3 7/7] vga: Optimise console scrolling
+In-Reply-To: <20170324161318.18718-8-willy@infradead.org>
+Message-ID: <201703261730.9nRIHfGC%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Hi Matthew,
 
-> > I do agree with you that MC places a lot of burden on the user to
-> > attain a lot of knowledge of the system's architecture.
-> 
-> Setting up the pipeline is not the hard part. One could write a
-> script to do that. 
+[auto build test ERROR on linus/master]
+[also build test ERROR on v4.11-rc3 next-20170324]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-Can you try to write that script? I believe it would solve big part of
-the problem.
+url:    https://github.com/0day-ci/linux/commits/Matthew-Wilcox/Add-memsetN-functions/20170326-140108
+config: mips-defconfig (attached as .config)
+compiler: mips-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=mips 
 
-> > And my other point is, I think most people who have a need to work with
-> > the media framework on a particular platform will likely already be
-> > quite familiar with that platform.
-> 
-> I disagree. The most popular platform device currently is Raspberry PI.
-> 
-> I doubt that almost all owners of RPi + camera module know anything
-> about MC. They just use Raspberry's official driver with just provides
-> the V4L2 interface.
-> 
-> I have a strong opinion that, for hardware like RPi, just the V4L2
-> API is enough for more than 90% of the cases.
+All errors (new ones prefixed by >>):
 
-Maybe V4L2 API is enough for 90% of the users. But I don't believe
-that means that we should provide compatibility. V4L2 API is not good
-enough for complex devices, and if we can make RPi people fix
-userspace... that's a good thing.
+   In file included from include/linux/selection.h:11:0,
+                    from drivers/video/console/newport_con.c:16:
+   include/linux/vt_buffer.h: In function 'scr_memsetw':
+>> include/linux/vt_buffer.h:34:2: error: implicit declaration of function 'memset16' [-Werror=implicit-function-declaration]
+     memset16(s, c, count / 2);
+     ^~~~~~~~
+   include/linux/vt_buffer.h: In function 'scr_memcpyw':
+>> include/linux/vt_buffer.h:47:2: error: implicit declaration of function 'memcpy' [-Werror=implicit-function-declaration]
+     memcpy(d, s, count);
+     ^~~~~~
+   include/linux/vt_buffer.h: In function 'scr_memmovew':
+>> include/linux/vt_buffer.h:66:2: error: implicit declaration of function 'memmove' [-Werror=implicit-function-declaration]
+     memmove(d, s, count);
+     ^~~~~~~
+   In file included from include/linux/string.h:18:0,
+                    from include/linux/bitmap.h:8,
+                    from include/linux/cpumask.h:11,
+                    from arch/mips/include/asm/processor.h:15,
+                    from arch/mips/include/asm/thread_info.h:15,
+                    from include/linux/thread_info.h:25,
+                    from include/asm-generic/preempt.h:4,
+                    from ./arch/mips/include/generated/asm/preempt.h:1,
+                    from include/linux/preempt.h:80,
+                    from include/linux/spinlock.h:50,
+                    from include/linux/wait.h:8,
+                    from include/linux/fs.h:5,
+                    from include/linux/tty.h:4,
+                    from include/linux/vt_kern.h:11,
+                    from drivers/video/console/newport_con.c:18:
+   arch/mips/include/asm/string.h: At top level:
+>> arch/mips/include/asm/string.h:138:14: error: conflicting types for 'memcpy'
+    extern void *memcpy(void *__to, __const__ void *__from, size_t __n);
+                 ^~~~~~
+   In file included from include/linux/selection.h:11:0,
+                    from drivers/video/console/newport_con.c:16:
+   include/linux/vt_buffer.h:47:2: note: previous implicit declaration of 'memcpy' was here
+     memcpy(d, s, count);
+     ^~~~~~
+   In file included from include/linux/string.h:18:0,
+                    from include/linux/bitmap.h:8,
+                    from include/linux/cpumask.h:11,
+                    from arch/mips/include/asm/processor.h:15,
+                    from arch/mips/include/asm/thread_info.h:15,
+                    from include/linux/thread_info.h:25,
+                    from include/asm-generic/preempt.h:4,
+                    from ./arch/mips/include/generated/asm/preempt.h:1,
+                    from include/linux/preempt.h:80,
+                    from include/linux/spinlock.h:50,
+                    from include/linux/wait.h:8,
+                    from include/linux/fs.h:5,
+                    from include/linux/tty.h:4,
+                    from include/linux/vt_kern.h:11,
+                    from drivers/video/console/newport_con.c:18:
+>> arch/mips/include/asm/string.h:141:14: error: conflicting types for 'memmove'
+    extern void *memmove(void *__dest, __const__ void *__src, size_t __n);
+                 ^~~~~~~
+   In file included from include/linux/selection.h:11:0,
+                    from drivers/video/console/newport_con.c:16:
+   include/linux/vt_buffer.h:66:2: note: previous implicit declaration of 'memmove' was here
+     memmove(d, s, count);
+     ^~~~~~~
+   In file included from include/linux/bitmap.h:8:0,
+                    from include/linux/cpumask.h:11,
+                    from arch/mips/include/asm/processor.h:15,
+                    from arch/mips/include/asm/thread_info.h:15,
+                    from include/linux/thread_info.h:25,
+                    from include/asm-generic/preempt.h:4,
+                    from ./arch/mips/include/generated/asm/preempt.h:1,
+                    from include/linux/preempt.h:80,
+                    from include/linux/spinlock.h:50,
+                    from include/linux/wait.h:8,
+                    from include/linux/fs.h:5,
+                    from include/linux/tty.h:4,
+                    from include/linux/vt_kern.h:11,
+                    from drivers/video/console/newport_con.c:18:
+   include/linux/string.h:104:14: error: conflicting types for 'memset16'
+    extern void *memset16(uint16_t *, uint16_t, __kernel_size_t);
+                 ^~~~~~~~
+   In file included from include/linux/selection.h:11:0,
+                    from drivers/video/console/newport_con.c:16:
+   include/linux/vt_buffer.h:34:2: note: previous implicit declaration of 'memset16' was here
+     memset16(s, c, count / 2);
+     ^~~~~~~~
+   cc1: some warnings being treated as errors
 
-> > The media graph for imx6 is fairly self-explanatory in my opinion.
-> > Yes that graph has to be generated, but just with a simple 'media-ctl
-> > --print-dot', I don't see how that is difficult for the user.
-> 
-> Again, IMHO, the problem is not how to setup the pipeline, but, instead,
-> the need to forward controls to the subdevices.
-> 
-> To use a camera, the user needs to set up a set of controls for the
-> image to make sense (bright, contrast, focus, etc). If the driver
-> doesn't forward those controls to the subdevs, an application like
-> "camorama" won't actually work for real, as the user won't be able
-> to adjust those parameters via GUI.
+vim +/memset16 +34 include/linux/vt_buffer.h
 
-I believe this can be fixed in libv4l2.
-								Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+    28	{
+    29	#ifdef VT_BUF_HAVE_RW
+    30		count /= 2;
+    31		while (count--)
+    32			scr_writew(c, s++);
+    33	#else
+  > 34		memset16(s, c, count / 2);
+    35	#endif
+    36	}
+    37	#endif
+    38	
+    39	#ifndef VT_BUF_HAVE_MEMCPYW
+    40	static inline void scr_memcpyw(u16 *d, const u16 *s, unsigned int count)
+    41	{
+    42	#ifdef VT_BUF_HAVE_RW
+    43		count /= 2;
+    44		while (count--)
+    45			scr_writew(scr_readw(s++), d++);
+    46	#else
+  > 47		memcpy(d, s, count);
+    48	#endif
+    49	}
+    50	#endif
+    51	
+    52	#ifndef VT_BUF_HAVE_MEMMOVEW
+    53	static inline void scr_memmovew(u16 *d, const u16 *s, unsigned int count)
+    54	{
+    55	#ifdef VT_BUF_HAVE_RW
+    56		if (d < s)
+    57			scr_memcpyw(d, s, count);
+    58		else {
+    59			count /= 2;
+    60			d += count;
+    61			s += count;
+    62			while (count--)
+    63				scr_writew(scr_readw(--s), --d);
+    64		}
+    65	#else
+  > 66		memmove(d, s, count);
+    67	#endif
+    68	}
+    69	#endif
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170326/1149c675/attachment.sig>
+Name: .config.gz
+Type: application/gzip
+Size: 13581 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170326/f2c361de/attachment-0001.gz>
