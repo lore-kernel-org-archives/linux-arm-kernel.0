@@ -1,114 +1,73 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Sun, 26 Mar 2017 16:45:33 +0800
-Subject: [PATCH v3 7/7] vga: Optimise console scrolling
-In-Reply-To: <20170324161318.18718-8-willy@infradead.org>
-Message-ID: <201703261615.IpHMoe8K%fengguang.wu@intel.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sun, 26 Mar 2017 11:12:57 +0200
+Subject: script to setup pipeline was Re: [PATCH v4 14/36] [media] v4l2-mc:
+ add a function to inherit controls from a pipeline
+In-Reply-To: <20170312185845.5c18ffd0@vento.lan>
+References: <20170311101408.272a9187@vento.lan>
+ <20170311153229.yrdjmggb3p2suhdw@ihha.localdomain>
+ <acfb5eca-ff00-6d57-339a-3322034cbdb3@gmail.com>
+ <20170311184551.GD21222@n2100.armlinux.org.uk>
+ <1f1b350a-5523-34bc-07b7-f3cd2d1fd4c1@gmail.com>
+ <20170311185959.GF21222@n2100.armlinux.org.uk>
+ <4917d7fb-2f48-17cd-aa2f-d54b0f19ed6e@gmail.com>
+ <20170312073745.GI21222@n2100.armlinux.org.uk>
+ <fba73c10-4b95-f0d2-e681-0b14ef1fbc1c@gmail.com>
+ <20170312185845.5c18ffd0@vento.lan>
+Message-ID: <20170326091257.GA17728@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Matthew,
+Hi!
 
-[auto build test ERROR on linus/master]
-[also build test ERROR on v4.11-rc3 next-20170324]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+> > I do agree with you that MC places a lot of burden on the user to
+> > attain a lot of knowledge of the system's architecture.
+> 
+> Setting up the pipeline is not the hard part. One could write a
+> script to do that. 
 
-url:    https://github.com/0day-ci/linux/commits/Matthew-Wilcox/Add-memsetN-functions/20170326-140108
-config: sparc-allyesconfig (attached as .config)
-compiler: sparc64-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=sparc 
+Can you try to write that script? I believe it would solve big part of
+the problem.
 
-All error/warnings (new ones prefixed by >>):
+> > And my other point is, I think most people who have a need to work with
+> > the media framework on a particular platform will likely already be
+> > quite familiar with that platform.
+> 
+> I disagree. The most popular platform device currently is Raspberry PI.
+> 
+> I doubt that almost all owners of RPi + camera module know anything
+> about MC. They just use Raspberry's official driver with just provides
+> the V4L2 interface.
+> 
+> I have a strong opinion that, for hardware like RPi, just the V4L2
+> API is enough for more than 90% of the cases.
 
-   In file included from include/video/vga.h:22:0,
-                    from include/linux/vgaarb.h:34,
-                    from drivers/gpu//drm/amd/amdgpu/amdgpu_device.c:35:
-   arch/sparc/include/asm/vga.h: In function 'scr_memsetw':
->> arch/sparc/include/asm/vga.h:39:11: error: 's' undeclared (first use in this function)
-     memset16(s, cpu_to_le16(v), n / 2);
-              ^
-   arch/sparc/include/asm/vga.h:39:11: note: each undeclared identifier is reported only once for each function it appears in
---
-   In file included from include/video/vga.h:22:0,
-                    from include/linux/vgaarb.h:34,
-                    from drivers/gpu//drm/nouveau/nouveau_vga.c:1:
-   arch/sparc/include/asm/vga.h: In function 'scr_memsetw':
->> arch/sparc/include/asm/vga.h:39:2: error: implicit declaration of function 'memset16' [-Werror=implicit-function-declaration]
-     memset16(s, cpu_to_le16(v), n / 2);
-     ^~~~~~~~
->> arch/sparc/include/asm/vga.h:39:11: error: 's' undeclared (first use in this function)
-     memset16(s, cpu_to_le16(v), n / 2);
-              ^
-   arch/sparc/include/asm/vga.h:39:11: note: each undeclared identifier is reported only once for each function it appears in
-   arch/sparc/include/asm/vga.h: In function 'scr_memcpyw':
->> arch/sparc/include/asm/vga.h:46:2: error: implicit declaration of function 'memcpy' [-Werror=implicit-function-declaration]
-     memcpy(d, s, n);
-     ^~~~~~
->> arch/sparc/include/asm/vga.h:46:2: warning: incompatible implicit declaration of built-in function 'memcpy'
-   arch/sparc/include/asm/vga.h:46:2: note: include '<string.h>' or provide a declaration of 'memcpy'
-   arch/sparc/include/asm/vga.h: In function 'scr_memmovew':
->> arch/sparc/include/asm/vga.h:53:2: error: implicit declaration of function 'memmove' [-Werror=implicit-function-declaration]
-     memmove(d, s, n);
-     ^~~~~~~
->> arch/sparc/include/asm/vga.h:53:2: warning: incompatible implicit declaration of built-in function 'memmove'
-   arch/sparc/include/asm/vga.h:53:2: note: include '<string.h>' or provide a declaration of 'memmove'
-   In file included from include/uapi/linux/uuid.h:21:0,
-                    from include/linux/uuid.h:19,
-                    from include/linux/mod_devicetable.h:12,
-                    from include/linux/i2c.h:29,
-                    from include/uapi/linux/fb.h:5,
-                    from include/linux/fb.h:5,
-                    from include/linux/vga_switcheroo.h:34,
-                    from drivers/gpu//drm/nouveau/nouveau_vga.c:2:
-   include/linux/string.h: At top level:
->> include/linux/string.h:104:14: error: conflicting types for 'memset16'
-    extern void *memset16(uint16_t *, uint16_t, __kernel_size_t);
-                 ^~~~~~~~
-   In file included from include/video/vga.h:22:0,
-                    from include/linux/vgaarb.h:34,
-                    from drivers/gpu//drm/nouveau/nouveau_vga.c:1:
-   arch/sparc/include/asm/vga.h:39:2: note: previous implicit declaration of 'memset16' was here
-     memset16(s, cpu_to_le16(v), n / 2);
-     ^~~~~~~~
-   cc1: some warnings being treated as errors
+Maybe V4L2 API is enough for 90% of the users. But I don't believe
+that means that we should provide compatibility. V4L2 API is not good
+enough for complex devices, and if we can make RPi people fix
+userspace... that's a good thing.
 
-vim +/s +39 arch/sparc/include/asm/vga.h
+> > The media graph for imx6 is fairly self-explanatory in my opinion.
+> > Yes that graph has to be generated, but just with a simple 'media-ctl
+> > --print-dot', I don't see how that is difficult for the user.
+> 
+> Again, IMHO, the problem is not how to setup the pipeline, but, instead,
+> the need to forward controls to the subdevices.
+> 
+> To use a camera, the user needs to set up a set of controls for the
+> image to make sense (bright, contrast, focus, etc). If the driver
+> doesn't forward those controls to the subdevs, an application like
+> "camorama" won't actually work for real, as the user won't be able
+> to adjust those parameters via GUI.
 
-    33	}
-    34	
-    35	static inline void scr_memsetw(u16 *p, u16 v, unsigned int n)
-    36	{
-    37		BUG_ON((long) p >= 0);
-    38	
-  > 39		memset16(s, cpu_to_le16(v), n / 2);
-    40	}
-    41	
-    42	static inline void scr_memcpyw(u16 *d, u16 *s, unsigned int n)
-    43	{
-    44		BUG_ON((long) d >= 0);
-    45	
-  > 46		memcpy(d, s, n);
-    47	}
-    48	
-    49	static inline void scr_memmovew(u16 *d, u16 *s, unsigned int n)
-    50	{
-    51		BUG_ON((long) d >= 0);
-    52	
-  > 53		memmove(d, s, n);
-    54	}
-    55	
-    56	#define VGA_MAP_MEM(x,s) (x)
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+I believe this can be fixed in libv4l2.
+								Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 49779 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170326/b8e77df5/attachment-0001.gz>
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170326/1149c675/attachment.sig>
