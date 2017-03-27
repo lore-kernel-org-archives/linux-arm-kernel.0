@@ -1,10 +1,9 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 27 Mar 2017 10:49:38 +0100
-Subject: [PATCH v2 10/22] PCI: xilinx-nwl: update PCI config space remap
- function
+Date: Mon, 27 Mar 2017 10:49:37 +0100
+Subject: [PATCH v2 09/22] PCI: xilinx: update PCI config space remap function
 In-Reply-To: <20170327094954.7162-1-lorenzo.pieralisi@arm.com>
 References: <20170327094954.7162-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20170327094954.7162-11-lorenzo.pieralisi@arm.com>
+Message-ID: <20170327094954.7162-10-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -18,21 +17,21 @@ Cc: Bjorn Helgaas <bhelgaas@google.com>
 Cc: Bharat Kumar Gogada <bharat.kumar.gogada@xilinx.com>
 Cc: Michal Simek <michal.simek@xilinx.com>
 ---
- drivers/pci/host/pcie-xilinx-nwl.c | 2 +-
+ drivers/pci/host/pcie-xilinx.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/pci/host/pcie-xilinx-nwl.c b/drivers/pci/host/pcie-xilinx-nwl.c
-index 4c3e0ab..cc042b1 100644
---- a/drivers/pci/host/pcie-xilinx-nwl.c
-+++ b/drivers/pci/host/pcie-xilinx-nwl.c
-@@ -761,7 +761,7 @@ static int nwl_pcie_parse_dt(struct nwl_pcie *pcie,
- 	pcie->phys_pcie_reg_base = res->start;
+diff --git a/drivers/pci/host/pcie-xilinx.c b/drivers/pci/host/pcie-xilinx.c
+index 7f030f5..e96f4a7 100644
+--- a/drivers/pci/host/pcie-xilinx.c
++++ b/drivers/pci/host/pcie-xilinx.c
+@@ -606,7 +606,7 @@ static int xilinx_pcie_parse_dt(struct xilinx_pcie_port *port)
+ 		return err;
+ 	}
  
- 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "cfg");
--	pcie->ecam_base = devm_ioremap_resource(dev, res);
-+	pcie->ecam_base = devm_ioremap_nopost_resource(dev, res);
- 	if (IS_ERR(pcie->ecam_base))
- 		return PTR_ERR(pcie->ecam_base);
- 	pcie->phys_ecam_base = res->start;
+-	port->reg_base = devm_ioremap_resource(dev, &regs);
++	port->reg_base = devm_ioremap_nopost_resource(dev, &regs);
+ 	if (IS_ERR(port->reg_base))
+ 		return PTR_ERR(port->reg_base);
+ 
 -- 
 2.10.0
