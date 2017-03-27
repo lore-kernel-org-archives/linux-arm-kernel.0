@@ -1,30 +1,64 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 27 Mar 2017 11:18:48 +0200
-Subject: [PATCH v2 1/7] pinctrl: dt-bindings: Add documentation for Armada
- 37xx pin controllers
-In-Reply-To: <2dc869315a1b6bcc6d7eedd67b9ea8c0483b9789.1490120798.git-series.gregory.clement@free-electrons.com>
-References: <cover.26288667a039bc9f8e62dec2fd6342ded4014d12.1490120798.git-series.gregory.clement@free-electrons.com>
- <2dc869315a1b6bcc6d7eedd67b9ea8c0483b9789.1490120798.git-series.gregory.clement@free-electrons.com>
-Message-ID: <CACRpkdaP9Q=3ZeARTYizCKKtH6NdCrCnapxS7p=EdV1gvCZe8w@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 27 Mar 2017 11:25:00 +0200
+Subject: [PATCH 0/7] memory: atmel-ebi: Add PM ops
+In-Reply-To: <1489653034-17777-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1489653034-17777-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <e27d2dd0-ce23-d63d-04dc-7be745770a00@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 21, 2017 at 7:28 PM, Gregory CLEMENT
-<gregory.clement@free-electrons.com> wrote:
+Le 16/03/2017 ? 09:30, Boris Brezillon a ?crit :
+> Hello,
+> 
+> This patchset adds a ->resume() hook to the EBI driver, but a few more
+> changes were required in order to easily implement this PM hook.
+> 
+> Patches 1 to 5 are just cleanup patches to simplify the EBI driver.
+> Patch 6 is fixing a bug in the EBI driver. Note that this bug has no
+> consequences until we start implementing the ->resume() hook.
+> And finally, patch 7 is implementing ->resume() so that the SMC config
+> is correctly restored when resuming the system.
+> 
+> This patchset depends on [1] which is removing the unused pata_at91
+> driver, which in turn prevents us from patching it before dropping
+> the old SMC macro definitions in patch 4.
+> 
+> Regards,
+> 
+> Boris
+> 
+> [1]http://lkml.iu.edu/hypermail/linux/kernel/1702.2/00990.html
 
-> Document the device tree binding for the pin controllers found on the
-> Armada 37xx SoCs.
->
-> Update the binding documention of the xtal clk which is a subnode of this
-> syscon node.
->
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+For the whole v2 series:
+Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
 
-These look all right to me, but let's see what the DT people say.
+Lee, you can take this series through your MFD tree as suggested by Boris.
 
-This business with a subnode named "gpio-controller" that the code is
-checking for is not in the bindings or examples, is this part of the old
-Armada bindings?
+Thanks, best regards,
 
-Yours,
-Linus Walleij
+> Changes since v1:
+> - move helper functions in a C file
+> - check if tdf is at least ATMEL_SMC_MODE_TDF_MIN
+> 
+> Boris Brezillon (7):
+>   mfd: syscon: atmel-smc: Add new helpers to ease SMC regs manipulation
+>   memory: atmel-ebi: Simplify SMC config code
+>   memory: atmel-ebi: Stop using reg_field objects for simple things
+>   mfd: syscon: atmel-smc: Remove unused helpers/macros
+>   memory: atmel-ebi: Change naming scheme
+>   memory: atmel-ebi: Add missing ->numcs assignment
+>   memory: atmel-ebi: Add PM ops
+> 
+>  drivers/memory/Kconfig               |   1 +
+>  drivers/memory/atmel-ebi.c           | 584 ++++++++++++-----------------------
+>  drivers/mfd/Kconfig                  |   4 +
+>  drivers/mfd/Makefile                 |   1 +
+>  drivers/mfd/atmel-smc.c              | 314 +++++++++++++++++++
+>  include/linux/mfd/syscon/atmel-smc.h | 237 ++++++--------
+>  6 files changed, 606 insertions(+), 535 deletions(-)
+>  create mode 100644 drivers/mfd/atmel-smc.c
+> 
+
+
+-- 
+Nicolas Ferre
