@@ -1,45 +1,250 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 27 Mar 2017 10:49:47 +0100
-Subject: [PATCH v2 19/22] PCI: tegra: update PCI config space remap function
-In-Reply-To: <20170327094954.7162-1-lorenzo.pieralisi@arm.com>
-References: <20170327094954.7162-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20170327094954.7162-20-lorenzo.pieralisi@arm.com>
+From: eric.auger@redhat.com (Eric Auger)
+Date: Mon, 27 Mar 2017 11:31:03 +0200
+Subject: [PATCH v4 13/22] KVM: arm64: ITS: KVM_DEV_ARM_VGIC_GRP_ITS_TABLES
+ group
+In-Reply-To: <1490607072-21610-1-git-send-email-eric.auger@redhat.com>
+References: <1490607072-21610-1-git-send-email-eric.auger@redhat.com>
+Message-ID: <1490607072-21610-14-git-send-email-eric.auger@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PCI configuration space should be mapped with a memory region type that
-generates on the CPU host bus non-posted write transations. Update the
-driver to use correct memory mapping attributes to map config space
-regions to enforce configuration space non-posted writes behaviour.
+Introduce a new group aiming at saving/restoring the ITS
+tables to/from the guest memory.
 
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Bjorn Helgaas <bhelgaas@google.com>
-Cc: Thierry Reding <thierry.reding@gmail.com>
+We hold the vcpus lock during the save and restore to make
+sure no vcpu is running.
+
+At this stage the functionality is not yet implemented. Only
+the skeleton is put in place.
+
+The ABI revision supposed to have been set through IIDR user
+write is checked before the table restoration. This guarantees
+this vITS knows how to restore the saved tables.
+
+Signed-off-by: Eric Auger <eric.auger@redhat.com>
+
 ---
- drivers/pci/host/pci-tegra.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/pci/host/pci-tegra.c b/drivers/pci/host/pci-tegra.c
-index ed8a93f..ec72c3a 100644
---- a/drivers/pci/host/pci-tegra.c
-+++ b/drivers/pci/host/pci-tegra.c
-@@ -380,7 +380,7 @@ static struct tegra_pcie_bus *tegra_pcie_bus_alloc(struct tegra_pcie *pcie,
- 						   unsigned int busnr)
+v3 -> v4:
+- pass kvm struct handle to vgic_its_flush/restore_pending_tables
+- take the kvm lock and vcpu locks
+- ABI revision check
+- check attr->attr is null
+
+v1 -> v2:
+- remove useless kvm parameter
+---
+ arch/arm/include/uapi/asm/kvm.h   |   1 +
+ arch/arm64/include/uapi/asm/kvm.h |   1 +
+ virt/kvm/arm/vgic/vgic-its.c      | 142 +++++++++++++++++++++++++++++++++++++-
+ 3 files changed, 143 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
+index 4beb83b..7b165e9 100644
+--- a/arch/arm/include/uapi/asm/kvm.h
++++ b/arch/arm/include/uapi/asm/kvm.h
+@@ -193,6 +193,7 @@ struct kvm_arch_memory_slot {
+ #define KVM_DEV_ARM_VGIC_GRP_CPU_SYSREGS 6
+ #define KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO  7
+ #define KVM_DEV_ARM_VGIC_GRP_ITS_REGS	8
++#define KVM_DEV_ARM_VGIC_GRP_ITS_TABLES	9
+ #define KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_SHIFT	10
+ #define KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_MASK \
+ 			(0x3fffffULL << KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_SHIFT)
+diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+index 7e8dd69..166df68 100644
+--- a/arch/arm64/include/uapi/asm/kvm.h
++++ b/arch/arm64/include/uapi/asm/kvm.h
+@@ -213,6 +213,7 @@ struct kvm_arch_memory_slot {
+ #define KVM_DEV_ARM_VGIC_GRP_CPU_SYSREGS 6
+ #define KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO  7
+ #define KVM_DEV_ARM_VGIC_GRP_ITS_REGS 8
++#define KVM_DEV_ARM_VGIC_GRP_ITS_TABLES 9
+ #define KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_SHIFT	10
+ #define KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_MASK \
+ 			(0x3fffffULL << KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_SHIFT)
+diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+index b275aea..76dd562 100644
+--- a/virt/kvm/arm/vgic/vgic-its.c
++++ b/virt/kvm/arm/vgic/vgic-its.c
+@@ -1627,6 +1627,135 @@ int vgic_its_attr_regs_access(struct kvm_device *dev,
+ 	return ret;
+ }
+ 
++/**
++ * vgic_its_flush_pending_tables - Flush the pending tables into guest RAM
++ */
++static int vgic_its_flush_pending_tables(struct kvm *kvm)
++{
++	return -ENXIO;
++}
++
++/**
++ * vgic_its_restore_pending_tables - Restore the pending tables from guest
++ * RAM to internal data structs
++ */
++static int vgic_its_restore_pending_tables(struct kvm *kvm)
++{
++	return -ENXIO;
++}
++
++/**
++ * vgic_its_flush_device_tables - flush the device table and all ITT
++ * into guest RAM
++ */
++static int vgic_its_flush_device_tables(struct vgic_its *its)
++{
++	return -ENXIO;
++}
++
++/**
++ * vgic_its_restore_device_tables - restore the device table and all ITT
++ * from guest RAM to internal data structs
++ */
++static int vgic_its_restore_device_tables(struct vgic_its *its)
++{
++	return -ENXIO;
++}
++
++/**
++ * vgic_its_flush_collection_table - flush the collection table into
++ * guest RAM
++ */
++static int vgic_its_flush_collection_table(struct vgic_its *its)
++{
++	return -ENXIO;
++}
++
++/**
++ * vgic_its_restore_collection_table - reads the collection table
++ * in guest memory and restores the ITS internal state. Requires the
++ * BASER registers to be restored before.
++ */
++static int vgic_its_restore_collection_table(struct vgic_its *its)
++{
++	return -ENXIO;
++}
++
++/**
++ * vgic_its_table_flush - Flush all the tables into guest RAM
++ */
++static int vgic_its_table_flush(struct vgic_its *its)
++{
++	struct kvm *kvm = its->dev->kvm;
++	int ret;
++
++	mutex_lock(&kvm->lock);
++
++	if (!lock_all_vcpus(kvm)) {
++		mutex_unlock(&kvm->lock);
++		return -EBUSY;
++	}
++
++	ret = vgic_its_flush_pending_tables(kvm);
++	if (ret)
++		goto out;
++	ret = vgic_its_flush_device_tables(its);
++	if (ret)
++		goto out;
++
++	ret = vgic_its_flush_collection_table(its);
++
++out:
++	unlock_all_vcpus(kvm);
++	mutex_unlock(&kvm->lock);
++	return ret;
++}
++
++/**
++ * vgic_its_table_restore - Restore all tables from guest RAM to internal
++ * data structs
++ */
++static int vgic_its_table_restore(struct vgic_its *its)
++{
++	struct kvm *kvm = its->dev->kvm;
++	int ret;
++
++	mutex_lock(&kvm->lock);
++
++	if (its->user_revision < REV) {
++		mutex_unlock(&kvm->lock);
++		return -EINVAL;
++	}
++
++	if (!lock_all_vcpus(kvm)) {
++		mutex_unlock(&kvm->lock);
++		return -EBUSY;
++	}
++
++	ret = vgic_its_restore_collection_table(its);
++	if (ret)
++		goto out;
++
++	ret = vgic_its_restore_device_tables(its);
++	if (ret)
++		goto out;
++
++	ret = vgic_its_restore_pending_tables(kvm);
++
++out:
++	unlock_all_vcpus(kvm);
++	mutex_unlock(&kvm->lock);
++
++	if (ret)
++		return ret;
++
++	/*
++	 * On restore path, MSI injections can happen before the
++	 * first VCPU run so let's complete the GIC init here.
++	 */
++	return kvm_vgic_map_resources(its->dev->kvm);
++}
++
+ static int vgic_its_has_attr(struct kvm_device *dev,
+ 			     struct kvm_device_attr *attr)
  {
- 	struct device *dev = pcie->dev;
--	pgprot_t prot = pgprot_device(PAGE_KERNEL);
-+	pgprot_t prot = pgprot_nonposted(PAGE_KERNEL);
- 	phys_addr_t cs = pcie->cs->start;
- 	struct tegra_pcie_bus *bus;
- 	unsigned int i;
-@@ -1962,7 +1962,7 @@ static int tegra_pcie_parse_dt(struct tegra_pcie *pcie)
- 		rp->pcie = pcie;
- 		rp->np = port;
+@@ -1645,6 +1774,8 @@ static int vgic_its_has_attr(struct kvm_device *dev,
+ 		break;
+ 	case KVM_DEV_ARM_VGIC_GRP_ITS_REGS:
+ 		return vgic_its_has_attr_regs(dev, attr);
++	case KVM_DEV_ARM_VGIC_GRP_ITS_TABLES:
++		return 0;
+ 	}
+ 	return -ENXIO;
+ }
+@@ -1693,6 +1824,10 @@ static int vgic_its_set_attr(struct kvm_device *dev,
  
--		rp->base = devm_ioremap_resource(dev, &rp->regs);
-+		rp->base = devm_ioremap_nopost_resource(dev, &rp->regs);
- 		if (IS_ERR(rp->base))
- 			return PTR_ERR(rp->base);
- 
+ 		return vgic_its_attr_regs_access(dev, attr, &reg, true);
+ 	}
++	case KVM_DEV_ARM_VGIC_GRP_ITS_TABLES:
++		if (attr->attr)
++			return -EINVAL;
++		return vgic_its_table_restore(its);
+ 	}
+ 	return -ENXIO;
+ }
+@@ -1700,9 +1835,10 @@ static int vgic_its_set_attr(struct kvm_device *dev,
+ static int vgic_its_get_attr(struct kvm_device *dev,
+ 			     struct kvm_device_attr *attr)
+ {
++	struct vgic_its *its = dev->private;
++
+ 	switch (attr->group) {
+ 	case KVM_DEV_ARM_VGIC_GRP_ADDR: {
+-		struct vgic_its *its = dev->private;
+ 		u64 addr = its->vgic_its_base;
+ 		u64 __user *uaddr = (u64 __user *)(long)attr->addr;
+ 		unsigned long type = (unsigned long)attr->attr;
+@@ -1723,6 +1859,10 @@ static int vgic_its_get_attr(struct kvm_device *dev,
+ 		if (ret)
+ 			return ret;
+ 		return put_user(reg, uaddr);
++	case KVM_DEV_ARM_VGIC_GRP_ITS_TABLES:
++		if (attr->attr)
++			return -EINVAL;
++		return vgic_its_table_flush(its);
+ 	}
+ 	default:
+ 		return -ENXIO;
 -- 
-2.10.0
+2.5.5
