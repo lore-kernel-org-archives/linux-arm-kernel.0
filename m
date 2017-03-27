@@ -1,169 +1,151 @@
-From: eric.auger@redhat.com (Eric Auger)
-Date: Mon, 27 Mar 2017 11:31:10 +0200
-Subject: [PATCH v4 20/22] KVM: arm64: ITS: ITT flush and restore
-In-Reply-To: <1490607072-21610-1-git-send-email-eric.auger@redhat.com>
-References: <1490607072-21610-1-git-send-email-eric.auger@redhat.com>
-Message-ID: <1490607072-21610-21-git-send-email-eric.auger@redhat.com>
+From: cedric.madianga@gmail.com (M'boumba Cedric Madianga)
+Date: Mon, 27 Mar 2017 12:06:10 +0200
+Subject: [PATCH 1/2] dt-bindings: Document the STM32 MDMA bindings
+In-Reply-To: <20170320215250.wwhq6lzwe45jmwks@rob-hp-laptop>
+References: <1489417599-31308-1-git-send-email-cedric.madianga@gmail.com>
+ <1489417599-31308-2-git-send-email-cedric.madianga@gmail.com>
+ <20170320215250.wwhq6lzwe45jmwks@rob-hp-laptop>
+Message-ID: <CAOAejn10dPjYTj8vBTDj5bc_RPTmkYC7uuBMPnP-R0BsQiRwhw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce routines to flush and restore device ITT and their
-interrupt table entries (ITE).
+Hi Rob,
 
-The routines will be called on device table flush and
-restore. They will become static in subsequent patches.
+2017-03-20 22:52 GMT+01:00 Rob Herring <robh@kernel.org>:
+> On Mon, Mar 13, 2017 at 04:06:38PM +0100, M'boumba Cedric Madianga wrote:
+>> This patch adds documentation of device tree bindings for the STM32 MDMA
+>> controller.
+>>
+>> Signed-off-by: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
+>> Reviewed-by: Ludovic BARRE <ludovic.barre@st.com>
+>> ---
+>>  .../devicetree/bindings/dma/stm32-mdma.txt         | 94 ++++++++++++++++++++++
+>>  1 file changed, 94 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/dma/stm32-mdma.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/dma/stm32-mdma.txt b/Documentation/devicetree/bindings/dma/stm32-mdma.txt
+>> new file mode 100644
+>> index 0000000..26a930c
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/dma/stm32-mdma.txt
+>> @@ -0,0 +1,94 @@
+>> +* STMicroelectronics STM32 MDMA controller
+>> +
+>> +The STM32 MDMA is a general-purpose direct memory access controller capable of
+>> +supporting 64 independent DMA channels with 256 HW requests.
+>> +
+>> +Required properties:
+>> +- compatible: Should be "st,stm32-mdma"
+>
+> Should be more specific.
 
-Signed-off-by: Eric Auger <eric.auger@redhat.com>
+The compatible string is not specific enough ? I don't see how to specific more.
 
----
+>
+>> +- reg: Should contain MDMA registers location and length. This should include
+>> +  all of the per-channel registers.
+>> +- interrupts: Should contain the MDMA interrupt.
+>> +- clocks: Should contain the input clock of the DMA instance.
+>> +- resets: Reference to a reset controller asserting the DMA controller.
+>> +- #dma-cells : Must be <5>. See DMA client paragraph for more details.
+>> +
+>> +Optional properties:
+>> +- dma-channels: Number of DMA channels supported by the controller.
+>> +- dma-requests: Number of DMA request signals supported by the controller.
+>> +- st,ahb-addr-masks: Array of u32 mask to list memory devices addressed via
+>> +  AHB bus.
+>
+> I don't understand what this is.
 
-v3 -> v4:
-- lookup_table and compute_next_eventid_offset become static in this
-  patch
-- remove static along with vgic_its_flush/restore_itt to avoid
-  compilation warnings
-- next field only computed with a shift (mask removed)
-- handle the case where the last element has not been found
+The MDMA is able to address memories and devices from AHB bus or AXI bus.
+The MDMA has a little different way of working to address AHB
+device/memory and AXI device/memory.
+In STM32H7 platform, almost all devices are addressed by AXI bus.
+But we have some memories adress by AHB bus.
+So, we add these parameter to be able to handle this.
 
-v2 -> v3:
-- add return 0 in vgic_its_restore_ite (was in subsequent patch)
+>
+>> +
+>> +Example:
+>
+> Put the 2 examples together.
 
-v2: creation
----
- virt/kvm/arm/vgic/vgic-its.c | 107 +++++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 104 insertions(+), 3 deletions(-)
+OK
 
-diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index b907e3c..02c0694 100644
---- a/virt/kvm/arm/vgic/vgic-its.c
-+++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -1707,7 +1707,7 @@ u32 compute_next_devid_offset(struct list_head *h, struct its_device *dev)
- 	return min_t(u32, next_offset, VITS_DTE_MAX_DEVID_OFFSET);
- }
- 
--u32 compute_next_eventid_offset(struct list_head *h, struct its_ite *ite)
-+static u32 compute_next_eventid_offset(struct list_head *h, struct its_ite *ite)
- {
- 	struct list_head *e = &ite->ite_list;
- 	struct its_ite *next;
-@@ -1749,8 +1749,8 @@ typedef int (*entry_fn_t)(struct vgic_its *its, u32 id, void *addr,
-  *
-  * Return: < 0 on error, 1 if last element identified, 0 otherwise
-  */
--int lookup_table(struct vgic_its *its, gpa_t base, int size, int esz,
--		 int start_id, entry_fn_t fn, void *opaque)
-+static int lookup_table(struct vgic_its *its, gpa_t base, int size, int esz,
-+			int start_id, entry_fn_t fn, void *opaque)
- {
- 	gpa_t gpa = base, top = base + size - 1;
- 	unsigned long len = size;
-@@ -1815,6 +1815,107 @@ static int vgic_its_restore_pending_tables(struct kvm *kvm)
- 	return -ENXIO;
- }
- 
-+static int vgic_its_flush_ite(struct vgic_its *its, struct its_device *dev,
-+			      struct its_ite *ite, gpa_t gpa)
-+{
-+	struct kvm *kvm = its->dev->kvm;
-+	u32 next_offset;
-+	u64 val;
-+
-+	next_offset = compute_next_eventid_offset(&dev->itt_head, ite);
-+	val = ((u64)next_offset << 48) | ((u64)ite->lpi << 16) |
-+		ite->collection->collection_id;
-+	val = cpu_to_le64(val);
-+	return kvm_write_guest(kvm, gpa, &val, VITS_ESZ);
-+}
-+
-+/**
-+ * vgic_its_restore_ite - restore an interrupt translation entry
-+ * @event_id: id used for indexing
-+ * @ptr: kernel VA where the 8 byte ITE is located
-+ * @opaque: pointer to the its_device
-+ * @next: id offset to the next entry
-+ */
-+static int vgic_its_restore_ite(struct vgic_its *its, u32 event_id,
-+				void *ptr, void *opaque, u32 *next)
-+{
-+	struct its_device *dev = (struct its_device *)opaque;
-+	struct its_collection *collection;
-+	struct kvm *kvm = its->dev->kvm;
-+	u64 val, *p = (u64 *)ptr;
-+	struct vgic_irq *irq;
-+	u32 coll_id, lpi_id;
-+	struct its_ite *ite;
-+	int ret;
-+
-+	val = *p;
-+	*next = 1;
-+
-+	val = le64_to_cpu(val);
-+
-+	coll_id = val & GENMASK_ULL(15, 0);
-+	lpi_id = (val & GENMASK_ULL(47, 16)) >> 16;
-+
-+	if (!lpi_id)
-+		return 0;
-+
-+	*next = val >> 48;
-+
-+	collection = find_collection(its, coll_id);
-+	if (!collection)
-+		return -EINVAL;
-+
-+	ret = vgic_its_alloc_ite(dev, &ite, collection,
-+				  lpi_id, event_id);
-+	if (ret)
-+		return ret;
-+
-+	irq = vgic_add_lpi(kvm, lpi_id);
-+	if (IS_ERR(irq))
-+		return PTR_ERR(irq);
-+	ite->irq = irq;
-+
-+	/* restore the configuration of the LPI */
-+	ret = update_lpi_config(kvm, irq, NULL);
-+	if (ret)
-+		return ret;
-+
-+	update_affinity_ite(kvm, ite);
-+	return 0;
-+}
-+
-+int vgic_its_flush_itt(struct vgic_its *its, struct its_device *device)
-+{
-+	gpa_t base = device->itt_addr;
-+	struct its_ite *ite;
-+	int ret;
-+
-+	list_for_each_entry(ite, &device->itt_head, ite_list) {
-+		gpa_t gpa = base + ite->event_id * VITS_ESZ;
-+
-+		ret = vgic_its_flush_ite(its, device, ite, gpa);
-+		if (ret)
-+			return ret;
-+	}
-+	return 0;
-+}
-+
-+int vgic_its_restore_itt(struct vgic_its *its, struct its_device *dev)
-+{
-+	size_t max_size = BIT_ULL(dev->nb_eventid_bits) * VITS_ESZ;
-+	gpa_t base = dev->itt_addr;
-+	int ret;
-+
-+	ret =  lookup_table(its, base, max_size, VITS_ESZ, 0,
-+			    vgic_its_restore_ite, dev);
-+
-+	if (ret < 0)
-+		return ret;
-+
-+	/* if the last element has not been found we are in trouble */
-+	return ret ? 0 : -EINVAL;
-+}
-+
- /**
-  * vgic_its_flush_device_tables - flush the device table and all ITT
-  * into guest RAM
--- 
-2.5.5
+>
+>> +
+>> +     mdma1: dma at 52000000 {
+>> +             compatible = "st,stm32-mdma";
+>> +             reg = <0x52000000 0x1000>;
+>> +             interrupts = <122>;
+>> +             clocks = <&clk_dummy>;
+>> +             resets = <&rcc 992>;
+>> +             #dma-cells = <5>;
+>> +             dma-channels = <16>;
+>> +             dma-requests = <32>;
+>> +             st,ahb-addr-masks = <0x20000000>, <0x00000000>;
+>> +     };
+>> +
+>> +* DMA client
+>> +
+>> +DMA clients connected to the STM32 MDMA controller must use the format
+>> +described in the dma.txt file, using a six-cell specifier for each channel:
+>> +a phandle to the MDMA controller plus the following five integer cells:
+>> +
+>> +1. The request line number
+>> +2. The priority level
+>> +     0x00: Low
+>> +     0x01: Medium
+>> +     0x10: High
+>> +     0x11: Very high
+>> +3. A 32bit mask specifying the DMA channel configuration
+>> + -bit 0-1: Source increment mode
+>> +     0x00: Source address pointer is fixed
+>> +     0x10: Source address pointer is incremented after each data transfer
+>> +     0x11: Source address pointer is decremented after each data transfer
+>> + -bit 2-3: Destination increment mode
+>> +     0x00: Destination address pointer is fixed
+>> +     0x10: Destination address pointer is incremented after each data
+>> +     transfer
+>> +     0x11: Destination address pointer is decremented after each data
+>> +     transfer
+>> + -bit 8-9: Source increment offset size
+>> +     0x00: byte (8bit)
+>> +     0x01: half-word (16bit)
+>> +     0x10: word (32bit)
+>> +     0x11: double-word (64bit)
+>> + -bit 10-11: Destination increment offset size
+>> +     0x00: byte (8bit)
+>> +     0x01: half-word (16bit)
+>> +     0x10: word (32bit)
+>> +     0x11: double-word (64bit)
+>> +-bit 25-18: The number of bytes to be transferred in a single transfer
+>> +     (min = 1 byte, max = 128 bytes)
+>> +-bit 29:28: Trigger Mode
+>> +     0x00: Each MDMA request triggers a buffer transfer (max 128 bytes)
+>> +     0x01: Each MDMA request triggers a block transfer (max 64K bytes)
+>> +     0x10: Each MDMA request triggers a repeated block transfer
+>> +     0x11: Each MDMA request triggers a linked list transfer
+>> +4. A 32bit value specifying the register to be used to acknowledge the request
+>> +   if no HW ack signal is used by the MDMA client
+>> +5. A 32bit mask specifying the value to be written to acknowledge the request
+>> +   if no HW ack signal is used by the MDMA client
+>> +
+>> +Example:
+>> +
+>> +     i2c4: i2c at 5c002000 {
+>> +             compatible = "st,stm32f7-i2c";
+>> +             reg = <0x5c002000 0x400>;
+>> +             interrupts = <GIC_SPI 95 IRQ_TYPE_NONE>,
+>> +                          <GIC_SPI 96 IRQ_TYPE_NONE>;
+>> +             clocks = <&clk_hsi>;
+>> +             #address-cells = <1>;
+>> +             #size-cells = <0>;
+>> +             dmas = <&mdma1 36 0x0 0x40008 0x0 0x0>,
+>> +                    <&mdma1 37 0x0 0x40002 0x0 0x0>;
+>> +             dma-names = "rx", "tx";
+>> +             status = "disabled";
+>> +     };
+>> --
+>> 1.9.1
+>>
