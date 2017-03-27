@@ -1,30 +1,29 @@
-From: chunkeey@googlemail.com (Christian Lamparter)
-Date: Tue, 28 Mar 2017 01:11:40 +0200
-Subject: [PATCH] ARM: debug: qcom: add UART addresses to Kconfig help for
- IPQ4019
-Message-ID: <20170327231140.3132-1-chunkeey@googlemail.com>
+From: davem@davemloft.net (David Miller)
+Date: Mon, 27 Mar 2017 16:15:34 -0700 (PDT)
+Subject: [PATCH] net: mvneta: set rx mode during resume if interface is
+ running
+In-Reply-To: <20170327105905.1404-1-jszhang@marvell.com>
+References: <20170327105905.1404-1-jszhang@marvell.com>
+Message-ID: <20170327.161534.60442857212281980.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add information about the IPQ4019 debug UART physical and virtual
-addresses in the DEBUG_QCOM_UARTDM Kconfig help section.
+From: Jisheng Zhang <jszhang@marvell.com>
+Date: Mon, 27 Mar 2017 18:59:05 +0800
 
-Signed-off-by: Christian Lamparter <chunkeey@googlemail.com>
----
- arch/arm/Kconfig.debug | 1 +
- 1 file changed, 1 insertion(+)
+> I found a bug by:
+> 
+> 0. boot and start dhcp client
+> 1. echo mem > /sys/power/state
+> 2. resume back immediately
+> 3. don't touch dhcp client to renew the lease
+> 4. ping the gateway. No acks
+> 
+> Usually, after step2, the DHCP lease isn't expired, so in theory we
+> should resume all back. But in fact, it doesn't. It turns out
+> the rx mode isn't resumed correctly. This patch fixes it by adding
+> mvneta_set_rx_mode(dev) in the resume hook if interface is running.
+> 
+> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 426d2716f55d..0e5c1f9c546a 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -751,6 +751,7 @@ choice
- 		  ARCH      DEBUG_UART_PHYS   DEBUG_UART_VIRT
- 		  APQ8064   0x16640000        0xf0040000
- 		  APQ8084   0xf995e000        0xfa75e000
-+		  IPQ4019   0x078af000        0xf78af000
- 		  MSM8X60   0x19c40000        0xf0040000
- 		  MSM8960   0x16440000        0xf0040000
- 		  MSM8974   0xf991e000        0xfa71e000
--- 
-2.11.0
+This doesn't apply cleanly to the net tree, please respin.
