@@ -1,54 +1,75 @@
-From: architt@codeaurora.org (Archit Taneja)
-Date: Mon, 27 Mar 2017 11:28:42 +0530
-Subject: [PATCH 1/2] drm/bridge: ti-tfp410: support hpd via gpio
-In-Reply-To: <6dfb2b66ec2a408dabe80d703f411ce0@rwthex-s1-b.rwth-ad.de>
-References: <2e47786ab3d04078ae70d0c4064f7c4d@rwthex-s1-b.rwth-ad.de>
- <093b4e9c0ae6413499e5bf8ec309fa41@rwthex-s1-b.rwth-ad.de>
- <6dfb2b66ec2a408dabe80d703f411ce0@rwthex-s1-b.rwth-ad.de>
-Message-ID: <d6b2391f-3e4a-2761-b6a0-8997d2c78600@codeaurora.org>
+From: chunyan.zhang@spreadtrum.com (Chunyan Zhang)
+Date: Mon, 27 Mar 2017 14:06:38 +0800
+Subject: [PATCH V5 0/4] Add Spreadtrum SP9860G support
+Message-ID: <1490594802-27073-1-git-send-email-chunyan.zhang@spreadtrum.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+SC9860 is a Spreadtrum SoC with eight Cortex A53, which are divided
+into 4 Big cores and 4 little cores.
 
-On 03/07/2017 03:21 AM, Christopher Spinrath wrote:
-> Hi Fabio,
->
-> On 03/06/2017 10:46 PM, Fabio Estevam wrote:
->> Hi Christopher,
->>
->> On Mon, Mar 6, 2017 at 6:40 PM,  <christopher.spinrath@rwth-aachen.de> wrote:
->>> From: Christopher Spinrath <christopher.spinrath@rwth-aachen.de>
->>>
->>> On some boards the hpd pin of a hdmi connector is wired up to a gpio
->>> pin. Since in the DRM world the tfp410 driver is responsible for
->>> handling the connector, add support for hpd gpios in this very driver.
->>>
->>> Signed-off-by: Christopher Spinrath <christopher.spinrath@rwth-aachen.de>
->>> ---
->>>  drivers/gpu/drm/bridge/ti-tfp410.c | 72 ++++++++++++++++++++++++++++++++++++--
->>
->> It would be nice to add 'hpd-gpios' property in the binding doc as well:
->> Documentation/devicetree/bindings/display/bridge/ti,tfp410.txt
->
-> The hpd-gpios property does *not* belong to the ti,tfp410 binding but to the hdmi-connector one
-> where it is already documented:
-> Documentation/devicetree/bindings/display/connector/hdmi-connector.txt
->
-> Unfortunatly, there is no dedicated driver for the connector in Linux; the connector properties have
-> to be handled by the encoder (here  the tfp410) driver. Note that this already happens for the
-> ddc-i2c-bus property.
->
+This patch-set provides a basic configuration for SC9860 in device tree
+to make it run to console.  After this we will continue to submit other
+device drivers step by step, which are using on most of Spreadtrum's SoCs.
 
-The patch looks good to me.
+Changes from v4:
+* Addressed Rob's comments
+  use serial at 0 instead of serial at 000000;
+* Added Rob's Acked-by on patch 2/4 and 3/4.
 
-Jyri,
+Changes from v3:
+* Rebased v4.11-rc2;
+* Added Reviewed-by of Mathieu;
+* Addressed Rob's comments:
+  - Documented sprd serial competible according to Rob's suggestion
+  - Revised serial node name to match its offset;
+* Added STM device node in dt.
 
-Is it possible for you to verify this on Beaglebone platform?
+Changes from v2:
+* Addressed comments from Mathieu:
+  - Removed CoreSight devices' lables from DT;
+  - Added another level of imbrication for ETFs which have more than one port;
+* Addressed comments from Rob:
+  - Switched to use SPDX-License-Identifier tag instead;
+  - Moved the 26m fixed clock node to top level in DT;
+  - Splited the patch into two, since they were revising two dt-bindings;
+  - Removed redundant space from sprd-usrt.txt;
+  - Removed useless property from the sprd_uart example of DT configuration.
+
+Changes from v1:
+* Removed useless idle-state node 'deep_sleep' from DT
+* Removed useless property 'sc-id' from DT
+* Removed 'clock-frequency' property from the node 'timer'
+* Added another compatible string '"arm,cortex-a53-pmu"' and property
+  'interrupt-affinity' for pmu
+* Kept using the existed compatible string of sprd_serial driver, and added
+  a new one for sc9860 in DT.
 
 Thanks,
-Archit
+Chunyan
+
+
+Chunyan Zhang (2):
+  dt-bindings: arm: Add bindings for SP9860G
+  dt-bindings: serial: add a new compatible string for SC9860
+
+Orson Zhai (1):
+  arm64: dts: Add basic DT to support Spreadtrum's SP9860G
+
+Wei Qiao (1):
+  serial: sprd: adjust TIMEOUT to a big value
+
+ Documentation/devicetree/bindings/arm/sprd.txt     |  13 +-
+ .../devicetree/bindings/serial/sprd-uart.txt       |  14 +-
+ arch/arm64/boot/dts/sprd/Makefile                  |   3 +-
+ arch/arm64/boot/dts/sprd/sc9860.dtsi               | 569 +++++++++++++++++++++
+ arch/arm64/boot/dts/sprd/sp9860g-1h10.dts          |  56 ++
+ arch/arm64/boot/dts/sprd/whale2.dtsi               |  71 +++
+ drivers/tty/serial/sprd_serial.c                   |   2 +-
+ 7 files changed, 720 insertions(+), 8 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/sprd/sc9860.dtsi
+ create mode 100644 arch/arm64/boot/dts/sprd/sp9860g-1h10.dts
+ create mode 100644 arch/arm64/boot/dts/sprd/whale2.dtsi
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+2.7.4
