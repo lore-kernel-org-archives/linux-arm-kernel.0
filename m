@@ -1,104 +1,68 @@
 From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Mon, 27 Mar 2017 10:27:22 +0100
-Subject: [PATCH v2 3/7] arm64: hugetlb: Refactor find_num_contig
+Date: Mon, 27 Mar 2017 10:27:21 +0100
+Subject: [PATCH v2 2/7] arm64: hugetlb: Cleanup setup_hugepagesz
 In-Reply-To: <20170327092726.31730-1-punit.agrawal@arm.com>
 References: <20170327092726.31730-1-punit.agrawal@arm.com>
-Message-ID: <20170327092726.31730-4-punit.agrawal@arm.com>
+Message-ID: <20170327092726.31730-3-punit.agrawal@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Steve Capper <steve.capper@arm.com>
 
-As we regularly check for contiguous pte's in the huge accessors, remove
-this extra check from find_num_contig.
+Replace a lot of if statements with switch and case labels to make it
+much clearer which huge page sizes are supported.
 
+Also, we prevent PUD_SIZE from being used on systems not running with
+4KB PAGE_SIZE. Before if one supplied PUD_SIZE in these circumstances,
+then unusuable huge page sizes would be in use.
+
+Fixes: 084bd29810a5 ("ARM64: mm: HugeTLB support.")
 Cc: David Woods <dwoods@mellanox.com>
+Cc: <stable@vger.kernel.org>
 Signed-off-by: Steve Capper <steve.capper@arm.com>
 Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
 Reviewed-by: Mark Rutland <mark.rutland@arm.com>
 ---
- arch/arm64/mm/hugetlbpage.c | 17 ++++++++---------
- 1 file changed, 8 insertions(+), 9 deletions(-)
+ arch/arm64/mm/hugetlbpage.c | 26 +++++++++++++-------------
+ 1 file changed, 13 insertions(+), 13 deletions(-)
 
 diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
-index aacbe18e6640..81bc6e4cf714 100644
+index a686f8705ef3..aacbe18e6640 100644
 --- a/arch/arm64/mm/hugetlbpage.c
 +++ b/arch/arm64/mm/hugetlbpage.c
-@@ -42,15 +42,13 @@ int pud_huge(pud_t pud)
- }
- 
- static int find_num_contig(struct mm_struct *mm, unsigned long addr,
--			   pte_t *ptep, pte_t pte, size_t *pgsize)
-+			   pte_t *ptep, size_t *pgsize)
+@@ -296,20 +296,20 @@ static __init int setup_hugepagesz(char *opt)
  {
- 	pgd_t *pgd = pgd_offset(mm, addr);
- 	pud_t *pud;
- 	pmd_t *pmd;
+ 	unsigned long ps = memparse(opt, &opt);
  
- 	*pgsize = PAGE_SIZE;
--	if (!pte_cont(pte))
--		return 1;
- 	pud = pud_offset(pgd, addr);
- 	pmd = pmd_offset(pud, addr);
- 	if ((pte_t *)pmd == ptep) {
-@@ -65,7 +63,7 @@ void set_huge_pte_at(struct mm_struct *mm, unsigned long addr,
- {
- 	size_t pgsize;
- 	int i;
--	int ncontig = find_num_contig(mm, addr, ptep, pte, &pgsize);
-+	int ncontig;
- 	unsigned long pfn;
- 	pgprot_t hugeprot;
- 
-@@ -75,11 +73,12 @@ void set_huge_pte_at(struct mm_struct *mm, unsigned long addr,
- 	 */
- 	WARN_ON(!pte_present(pte));
- 
--	if (ncontig == 1) {
-+	if (!pte_cont(pte)) {
- 		set_pte_at(mm, addr, ptep, pte);
- 		return;
+-	if (ps == PMD_SIZE) {
+-		hugetlb_add_hstate(PMD_SHIFT - PAGE_SHIFT);
+-	} else if (ps == PUD_SIZE) {
+-		hugetlb_add_hstate(PUD_SHIFT - PAGE_SHIFT);
+-	} else if (ps == (PAGE_SIZE * CONT_PTES)) {
+-		hugetlb_add_hstate(CONT_PTE_SHIFT);
+-	} else if (ps == (PMD_SIZE * CONT_PMDS)) {
+-		hugetlb_add_hstate((PMD_SHIFT + CONT_PMD_SHIFT) - PAGE_SHIFT);
+-	} else {
+-		hugetlb_bad_size();
+-		pr_err("hugepagesz: Unsupported page size %lu K\n", ps >> 10);
+-		return 0;
++	switch (ps) {
++#ifdef CONFIG_ARM64_4K_PAGES
++	case PUD_SIZE:
++#endif
++	case PMD_SIZE * CONT_PMDS:
++	case PMD_SIZE:
++	case PAGE_SIZE * CONT_PTES:
++		hugetlb_add_hstate(ilog2(ps) - PAGE_SHIFT);
++		return 1;
  	}
+-	return 1;
++
++	hugetlb_bad_size();
++	pr_err("hugepagesz: Unsupported page size %lu K\n", ps >> 10);
++	return 0;
+ }
+ __setup("hugepagesz=", setup_hugepagesz);
  
-+	ncontig = find_num_contig(mm, addr, ptep, &pgsize);
- 	pfn = pte_pfn(pte);
- 	hugeprot = __pgprot(pte_val(pfn_pte(pfn, __pgprot(0))) ^ pte_val(pte));
- 	for (i = 0; i < ncontig; i++) {
-@@ -203,7 +202,7 @@ pte_t huge_ptep_get_and_clear(struct mm_struct *mm,
- 		bool is_dirty = false;
- 
- 		cpte = huge_pte_offset(mm, addr);
--		ncontig = find_num_contig(mm, addr, cpte, *cpte, &pgsize);
-+		ncontig = find_num_contig(mm, addr, cpte, &pgsize);
- 		/* save the 1st pte to return */
- 		pte = ptep_get_and_clear(mm, addr, cpte);
- 		for (i = 1, addr += pgsize; i < ncontig; ++i, addr += pgsize) {
-@@ -243,7 +242,7 @@ int huge_ptep_set_access_flags(struct vm_area_struct *vma,
- 		cpte = huge_pte_offset(vma->vm_mm, addr);
- 		pfn = pte_pfn(*cpte);
- 		ncontig = find_num_contig(vma->vm_mm, addr, cpte,
--					  *cpte, &pgsize);
-+					  &pgsize);
- 		for (i = 0; i < ncontig; ++i, ++cpte, addr += pgsize) {
- 			changed |= ptep_set_access_flags(vma, addr, cpte,
- 							pfn_pte(pfn,
-@@ -266,7 +265,7 @@ void huge_ptep_set_wrprotect(struct mm_struct *mm,
- 		size_t pgsize = 0;
- 
- 		cpte = huge_pte_offset(mm, addr);
--		ncontig = find_num_contig(mm, addr, cpte, *cpte, &pgsize);
-+		ncontig = find_num_contig(mm, addr, cpte, &pgsize);
- 		for (i = 0; i < ncontig; ++i, ++cpte, addr += pgsize)
- 			ptep_set_wrprotect(mm, addr, cpte);
- 	} else {
-@@ -284,7 +283,7 @@ void huge_ptep_clear_flush(struct vm_area_struct *vma,
- 
- 		cpte = huge_pte_offset(vma->vm_mm, addr);
- 		ncontig = find_num_contig(vma->vm_mm, addr, cpte,
--					  *cpte, &pgsize);
-+					  &pgsize);
- 		for (i = 0; i < ncontig; ++i, ++cpte, addr += pgsize)
- 			ptep_clear_flush(vma, addr, cpte);
- 	} else {
 -- 
 2.11.0
