@@ -1,114 +1,55 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 27 Mar 2017 18:33:14 +0100
-Subject: [PATCH V9 00/11] IOMMU probe deferral support
-In-Reply-To: <f67fb561-4238-6933-04f3-0f910f9232d1@arm.com>
-References: <1489086061-9356-1-git-send-email-sricharan@codeaurora.org>
- <58D49845.9060407@hisilicon.com>
- <0ea8022b-a19b-335d-6cc6-81510196f891@codeaurora.org>
- <5FC3163CFD30C246ABAA99954A238FA81750B7CB@lhreml504-mbs>
- <db3d68f8-713c-9ae2-7df9-324bc1b375b1@arm.com>
- <5FC3163CFD30C246ABAA99954A238FA81750CCC4@lhreml504-mbs>
- <f67fb561-4238-6933-04f3-0f910f9232d1@arm.com>
-Message-ID: <20170327173314.GA17035@red-moon>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 27 Mar 2017 18:45:10 +0100
+Subject: Query: ARM64: A random failure with hugetlbfs linked mmap() of a
+ stack area
+In-Reply-To: <dfddf8fa-6e61-9d94-46ef-34bad1c8c632@redhat.com>
+References: <4e776e1f-dd11-2fa2-5109-6c2b5184b70d@redhat.com>
+ <20170324161558.GA10491@leverpostej>
+ <d6ee1a17-4518-5a37-f8b7-b62030c24cc7@redhat.com>
+ <20170324172533.GA10746@leverpostej>
+ <2b8bf63f-3e20-aa26-2d75-83aa2ab35cde@redhat.com>
+ <20170324181652.GC10746@leverpostej>
+ <4796e7df-808c-b07b-209d-ea02ecf74888@redhat.com>
+ <20170327121806.GA12578@leverpostej>
+ <dfddf8fa-6e61-9d94-46ef-34bad1c8c632@redhat.com>
+Message-ID: <20170327174510.GC13752@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 27, 2017 at 05:18:15PM +0100, Robin Murphy wrote:
-
-[...]
-
-> >> [  145.212351] iommu: Adding device 0000:81:10.0 to group 5
-> >> [  145.212367] ixgbevf 0000:81:10.0: 0x0 0x100000000, 0x0 0xffffffffffff,
-> >> 0xffffffff 0xffffffff
-> >> [  145.213261] ixgbevf 0000:81:10.0: enabling device (0000 -> 0002)
-> >> [  145.213394] ixgbe 0000:81:00.0 eth0: VF Reset msg received from vf 0
-> >> [  145.214272] ixgbe 0000:81:00.0: VF 0 has no MAC address assigned, you
-> >> may have to assign one manually
-> >> [  145.224379] ixgbevf 0000:81:10.0: MAC address not assigned by
-> >> administrator.
-> >> [  145.224384] ixgbevf 0000:81:10.0: Assigning random MAC address
-> >> [  145.225941] ixgbevf 0000:81:10.0: 1a:85:06:48:a7:19
-> >> [  145.225944] ixgbevf 0000:81:10.0: MAC: 1
-> >> [  145.225946] ixgbevf 0000:81:10.0: Intel(R) 82599 Virtual Function
-> >> [  145.299961] ixgbe 0000:81:00.0 eth0: NIC Link is Up 1 Gbps, Flow Control:
-> >> None
-> >> [  154.947742] nfs: server 172.18.45.166 not responding, still trying
-> >> [  191.025780] nfs: server 172.18.45.166 not responding, still trying
-> >> [  191.026122] nfs: server 172.18.45.166 OK
-> >> [  191.026317] nfs: server 172.18.45.166 OK
-> >> [  263.706402] VFIO - User Level meta-driver version: 0.3
-> >> [  269.757613] vfio-pci 0000:81:10.0: 0x0 0x0, 0x0 0xffffffffffff, 0xffffffffffffffff
-> >> 0xffffffffffffffff
-> >> [  269.757617] specified DMA range outside IOMMU capability
-> >> [  269.757618] Failed to set up IOMMU for device 0000:81:10.0; retaining
-> >> platform DMA ops
-> >>
-> >>  From the logs its clear that  when ixgbevf driver originally probes and adds
-> >> the device
-> >>  to smmu  the dma mask is 32, but when it binds to vfio-pci, it becomes 64 bit.
-> > 
-> > Just to add to that, the mask is set to 64 bit in the ixgebvf driver probe[1]
+On Mon, Mar 27, 2017 at 06:50:53PM +0530, Pratyush Anand wrote:
+> Hi Mark,
 > 
-> Aha, but of course it's still the same struct device getting bound to
-> VFIO later, so whatever mask the first driver set is still in there when
-> we go through of_dma_configure() the second time (and the fact that we
-> go through more than once being the new behaviour). So yes, this is a
-> legitimate problem and we really do need to be robust against size
-> overflow. I reckon the below tweak of your fix is probably the way to
-> go; cleaning up the arch_setup_dma_ops() interface can happen later.
+> Thanks a lot for your explanations!!
+> 
+> On Monday 27 March 2017 05:48 PM, Mark Rutland wrote:
+> >So far, I have not managed to trigger a single SIGSEGV while running
+> >under GDB.
+> >
+> >However, I have a theory that could explain that. I suspect that my
+> >toolchain has built the binary with an executable stack, while yours has
+> >not. Linux automatically sets READ_IMPLIES_EXEC for binaries with
+> >executable stacks, which IIUC would implicitly make the mmap RWX rather
+> >than RW.
+> >
+> >So in my case, the huge page is executable, and I get a SIGILL when
+> >trying to execute from it. In your case, the huge page is not
+> >executable, so you get a SIGSEGV.
+> 
+> Yes, your theory seems  convincing.
+> I passed PROT_EXEC as well along with PROT_READ|PROT_WRITE to
+> mmap(),and then I received SIGILL.
 
-Yes. On ACPI the additional issue is, given that we now call
-*_dma_configure multiple times, we end up adding the _same_ stream
-id to an existing fwspec ids array which triggers the SMMUv3 driver bug,
-because we try to configure the same id twice (it does not happen
-in DT since you have a check similar to the one I added below).
+Ok, I think that explains it, then.
 
-ACPI fix(es) below please let me know if it actually fixes the issues:
+I was a little confused by the PMD being NULL in your initial splat, but
+from a look at the mmap() codepaths, we lazily fault in hugetlbfs
+mappings unless explicitly asked to populate them.
 
--- >8 --
-diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-index 36a9abf..e7b1940 100644
---- a/drivers/acpi/arm64/iort.c
-+++ b/drivers/acpi/arm64/iort.c
-@@ -543,6 +543,14 @@ static const struct iommu_ops *iort_iommu_xlate(struct device *dev,
- 	const struct iommu_ops *ops = NULL;
- 	int ret = -ENODEV;
- 	struct fwnode_handle *iort_fwnode;
-+	struct iommu_fwspec *fwspec = dev->iommu_fwspec;
-+
-+	/*
-+	 * If we already translated the fwspec there
-+	 * is nothing left to do, return the iommu_ops.
-+	 */
-+	if (fwspec && fwspec->ops)
-+		return fwspec->ops;
- 
- 	if (node) {
- 		iort_fwnode = iort_get_fwnode(node);
-diff --git a/drivers/acpi/scan.c b/drivers/acpi/scan.c
-index 823b005..2a513cc 100644
---- a/drivers/acpi/scan.c
-+++ b/drivers/acpi/scan.c
-@@ -1376,18 +1376,20 @@ enum dev_dma_attr acpi_get_dma_attr(struct acpi_device *adev)
- int acpi_dma_configure(struct device *dev, enum dev_dma_attr attr)
- {
- 	const struct iommu_ops *iommu;
-+	u64 size;
- 
- 	iort_set_dma_mask(dev);
- 
- 	iommu = iort_iommu_configure(dev);
- 	if (IS_ERR(iommu))
- 		return PTR_ERR(iommu);
-+
-+	size = max(dev->coherent_dma_mask, dev->coherent_dma_mask + 1);
- 	/*
- 	 * Assume dma valid range starts at 0 and covers the whole
- 	 * coherent_dma_mask.
- 	 */
--	arch_setup_dma_ops(dev, 0, dev->coherent_dma_mask + 1, iommu,
--			   attr == DEV_DMA_COHERENT);
-+	arch_setup_dma_ops(dev, 0, size, iommu, attr == DEV_DMA_COHERENT);
- 
- 	return 0;
- }
+So mmap would have cleared any existing mappings (leaving the PMD NULL), 
+set up the VMA as RW, then returned without setting up the new mapping
+inthe page tables. Since that clobbered libc, when we get back to
+userspace we immediately take an instruction abort, and since we're not
+supposed to have execute permission, we get a SEGV.
+
+Thanks,
+Mark.
