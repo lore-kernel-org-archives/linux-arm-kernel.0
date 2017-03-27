@@ -1,38 +1,39 @@
-From: nicolas.ferre@microchip.com (Nicolas Ferre)
-Date: Mon, 27 Mar 2017 17:22:00 +0200
-Subject: [PATCH] MAINTAINERS: Add memory drivers to AT91 entry
-In-Reply-To: <20170327152101.21977-1-alexandre.belloni@free-electrons.com>
-References: <20170327152101.21977-1-alexandre.belloni@free-electrons.com>
-Message-ID: <030be639-2114-7588-5671-b3ec4377dfa3@microchip.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Mon, 27 Mar 2017 17:24:49 +0200
+Subject: [PATCH v6 3/4] clk: samsung: exynos5433: Add runtime PM support
+In-Reply-To: <1490182543-28550-4-git-send-email-m.szyprowski@samsung.com>
+References: <1490182543-28550-1-git-send-email-m.szyprowski@samsung.com>
+ <CGME20170322113555eucas1p2e6d19d66de5dc48b9f34e4b639759f78@eucas1p2.samsung.com>
+ <1490182543-28550-4-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <583f5de0-ef54-2558-9673-a2b52f38e5e9@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 27/03/2017 ? 17:21, Alexandre Belloni a ?crit :
-> Both atmel-ebi and atmel-sdram are maintained as part of the Atmel ARM
-> SoCs.
-> 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+On 03/22/2017 12:35 PM, Marek Szyprowski wrote:
+> +static int __init exynos5433_cmu_probe(struct platform_device *pdev)
+> +{
 
-Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+> +	/*
+> +	 * Enable runtime pm here, so clock core with use runtime pm for all
+> +	 * registered clocks. Additionally we increase the runtime PM usage
+> +	 * count during the clock registration, to avoid the clock core from
+> +	 * runtime suspending the device.
+> +	 */
 
-> ---
->  MAINTAINERS | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index c45c02bc6082..6531d239db6b 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -1111,6 +1111,7 @@ F:	arch/arm/boot/dts/at91*.dtsi
->  F:	arch/arm/boot/dts/sama*.dts
->  F:	arch/arm/boot/dts/sama*.dtsi
->  F:	arch/arm/include/debug/at91.S
-> +F:	drivers/memory/atmel*
->  
->  ARM/ATMEL AT91 Clock Support
->  M:	Boris Brezillon <boris.brezillon@free-electrons.com>
-> 
+While applying I rephrased the above comment to:
+
+/*
+  * Enable runtime PM here to allow the clock core using runtime PM
+  * for the registered clocks. Additionally, we increase the runtime
+  * PM usage count before registering the clocks, to prevent the
+  * clock core from runtime suspending the device.
+  */
+
+> +	pm_runtime_get_noresume(dev);
+> +	pm_runtime_set_active(dev);
+> +	pm_runtime_enable(dev);
 
 
 -- 
-Nicolas Ferre
+Thanks,
+Sylwester
