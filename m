@@ -1,45 +1,126 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Mon, 27 Mar 2017 17:33:12 +0200
-Subject: [RFC PATCH 24/30] iommu: Specify PASID state when unbinding a task
-In-Reply-To: <7386120a-2848-059f-4de0-7888a2698923@arm.com>
-References: <20170322154429.GE7266@8bytes.org>
- <e2bb4c67-9b61-01cf-cc17-68088cdc5e5b@arm.com>
- <20170322225320.GF7266@8bytes.org>
- <a093bc07-a345-a689-9d97-f15a306f922d@arm.com>
- <20170323143014.GK7266@8bytes.org>
- <20170323145311.GA22972@e106794-lin.localdomain>
- <20170323165218.GL7266@8bytes.org>
- <9d318e88-11af-6dab-b30e-d6b5c02443fe@arm.com>
- <20170324110045.GM7266@8bytes.org>
- <7386120a-2848-059f-4de0-7888a2698923@arm.com>
-Message-ID: <20170327153312.GP7266@8bytes.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 27 Mar 2017 16:37:57 +0100
+Subject: [PATCH v3] efifb: avoid reconfiguration of BAR that covers the
+ framebuffer
+In-Reply-To: <CAKv+Gu_iUir5d3evOvS3tUK6vY1H7KBktDf253MA8vyZDwOKPA@mail.gmail.com>
+References: <1490196629-28088-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20170322193111.GA8190@wunner.de>
+ <CAKv+Gu_X-SEnz7h9J8boqqjOQGHQawwdSAq4haH-OGu8zdfNfA@mail.gmail.com>
+ <20170323084819.GA23281@h08.hostsharing.net>
+ <CAKv+Gu93eJ-js3g7M6Jdm6XGMaWMswFmzBG2qNT4rn+3=1+EyA@mail.gmail.com>
+ <20170323105727.GA2441@red-moon>
+ <CAKv+Gu-J664KXaZR19nViq4o1n_x=P-trsZ0oNDiONuBpAcd7A@mail.gmail.com>
+ <20170323143151.GA21544@red-moon>
+ <CAKv+Gu_iUir5d3evOvS3tUK6vY1H7KBktDf253MA8vyZDwOKPA@mail.gmail.com>
+Message-ID: <CAKv+Gu90Q77fOi73Ui++cOip4uHwPgXXo6aj8c2O3mjtnqQEgg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 24, 2017 at 07:08:47PM +0000, Jean-Philippe Brucker wrote:
-> On 24/03/17 11:00, Joerg Roedel wrote:
-> > The document you posted is an addition to the spec, so we can't rely on
-> > a stop marker being sent by a device when it shuts down a context.
-> > Current AMD GPUs don't send one, afaik.
-> 
-> Fair enough, though on the SMMU side we still don't know which shutdown
-> model hardware vendors are more likely to choose. Devices could use the
-> stop marker and never wait for completion of PPRs. In that case context
-> shutdown would only have to make sure that PPRs are outside the PCI
-> network, return immediately and allow the device driver to call unbind().
+On 23 March 2017 at 15:15, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> On 23 March 2017 at 14:31, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
+>> On Thu, Mar 23, 2017 at 12:25:48PM +0000, Ard Biesheuvel wrote:
+>>> On 23 March 2017 at 10:57, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
+>>> > On Thu, Mar 23, 2017 at 09:04:03AM +0000, Ard Biesheuvel wrote:
+>>> >> On 23 March 2017 at 08:48, Lukas Wunner <lukas@wunner.de> wrote:
+>>> >> > On Wed, Mar 22, 2017 at 07:32:43PM +0000, Ard Biesheuvel wrote:
+>>> >> >> On 22 March 2017 at 19:31, Lukas Wunner <lukas@wunner.de> wrote:
+>>> >> >> > On Wed, Mar 22, 2017 at 03:30:29PM +0000, Ard Biesheuvel wrote:
+>>> >> >> >> On UEFI systems, the PCI subsystem is enumerated by the firmware,
+>>> >> >> >> and if a graphical framebuffer is exposed by a PCI device, its base
+>>> >> >> >> address and size are exposed to the OS via the Graphics Output
+>>> >> >> >> Protocol (GOP).
+>>> >> >> >>
+>>> >> >> >> On arm64 PCI systems, the entire PCI hierarchy is reconfigured from
+>>> >> >> >> scratch at boot. This may result in the GOP framebuffer address to
+>>> >> >> >> become stale, if the BAR covering the framebuffer is modified. This
+>>> >> >> >> will cause the framebuffer to become unresponsive, and may in some
+>>> >> >> >> cases result in unpredictable behavior if the range is reassigned to
+>>> >> >> >> another device.
+>>> >> >> >
+>>> >> >> > Hm, commit message seems to indicate the issue is restricted to arm64,
+>>> >> >> > yet there's no IS_ENABLED(ARM64) to constrain the added code to that arch?
+>>> >> >>
+>>> >> >> True. I am eager to get some x86 coverage for this, since I would
+>>> >> >> expect this not to do any harm. But I'm fine with making it ARM/arm64
+>>> >> >> specific in the final version.
+>>> >> >
+>>> >> > I see.  IIUC, this is only a problem because pci_bus_assign_resources()
+>>> >> > is called from arch/arm64/kernel/pci.c:pci_acpi_scan_root() (as well as
+>>> >> > the host drivers) and x86 isn't affected because it doesn't do that.
+>>> >> >
+>>> >>
+>>> >> Correct. But on x86 (or rather, on a PC), you can be sure that UEFI
+>>> >> (or the legacy PCI bios) performed the resource assignment already.
+>>> >> One could argue that this is equally the case when running arm64 in
+>>> >> ACPI mode, but in general, you cannot assume the presence of firmware
+>>> >> on ARM/arm64 that has already taken care of this, and so the state of
+>>> >> the BARs has to be presumed invalid.
+>>> >
+>>> > The story is a bit more convoluted than that owing to x86 (and other
+>>> > arches) legacy.
+>>> >
+>>> > x86 tries to claim all PCI resources (in two passes - first enabled
+>>> > devices, second disabled devices) and that predates ACPI/UEFI.
+>>> >
+>>> > Mind, x86 reassign resources that can't be claimed too, the only
+>>> > difference with ARM64 is that, for the better or the worse, we
+>>> > have decided not to claim the FW PCI set-up on ARM64 even if it
+>>> > is sane, we do not even try, it was a deliberate choice.
+>>> >
+>>> > This patch should be harmless on x86 since if the FB PCI BAR is set
+>>> > up sanely, claiming it again should be a nop (to be checked).
+>>> >
+>>>
+>>> I have checked this with OVMF under QEMU. Claiming the resource early
+>>> like we do this in this patch does not result in any diagnostic output
+>>> or other symptoms that would suggest that anything unexpected occurs.
+>>
+>> There is something that I do not understand on how the resource
+>> claiming works on x86. IIUC on x86, resource claiming is done in:
+>>
+>> arch/x86/pci/legacy.c
+>>
+>> pci_subsys_init()
+>>  -> pcibios_init()
+>>   -> pcibios_resource_survey()
+>>
+>> pci_subsys_init() is run in a subsys_initcall.
+>>
+>
+> Yes, the call trace I get for the resource claim for the efifb BAR
+> without this patch is
+>
+> pci_subsys_init+0x3f/0x43
+> - pcibios_init+0x2c/0x3d
+> -- pcibios_resource_survey+0x38/0x6a
+> --- pci_legacy_init+0x2e/0x2e
+> ---- pcibios_allocate_resources+0x8a/0x240
+> ----- pci_claim_resource+0xdc/0x140
+>
+>
+>> Now, how do we ensure that resource claiming is carried out _after_
+>> the PCI root busses have been actually scanned ?
+>>
+>> The ACPI scan handler interface (so the interface to actually scan
+>> a PCI root bridge in ACPI) is initialized in acpi_init() (which
+>> is a subsys_initcall), how do we guarantee that is run before
+>> pci_subsys_init() ?
+>>
+>
+> $ nm vmlinux |grep -E '__initcall_(acpi_init|pci_subsys_init)'
+> ffffffff81d540b8 t __initcall_acpi_init4
+> ffffffff81d54158 t __initcall_pci_subsys_init4
+>
+> so it appears to depend on link order currently.
 
-Yes, on a stop-marker we should immediatly remove the PASID from the
-IOMMU and inform the driver. It might call unbind or do something with
-the device.
+Bjorn, what is your take on this?
 
-> So to be on the safe side I think I will by default assume that PPRs are
-> in flight during unbind, and drain both software and hardware queue to
-> ensure we catch them all.
+Claiming the BAR resources associated with the efifb region from a
+DECLARE_PCI_FIXUP_HEADER() handler does not seem to interfere with the
+way resources are claimed later on. For arm64, we need this to ensure
+that the BAR doesn't move, but for x86 this does not seem to be an
+issue. This means we could potentially make the quirk ARM-only, but I
+am a bit reluctant to do so and create even more divergence.
 
-The AMD driver first removes the internal mapping of the PASID to its
-managing data-structures, so that any follow-on faults will get
-rejected.
-
-
-
-	Joerg
+Thanks,
+Ard.
