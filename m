@@ -1,337 +1,736 @@
-From: afd@ti.com (Andrew F. Davis)
-Date: Mon, 27 Mar 2017 11:33:30 -0500
-Subject: [PATCHv3] ARM: omap2+: Revert omap-smp.c changes resetting CPU1
- during boot
-In-Reply-To: <20170314180555.23597-1-tony@atomide.com>
-References: <20170314180555.23597-1-tony@atomide.com>
-Message-ID: <aa5d7ee3-2e54-2c6c-df5d-b5efff4b365e@ti.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Mon, 27 Mar 2017 17:34:57 +0100
+Subject: [PATCH v5 6/9] coresight: add support for CPU debug module
+In-Reply-To: <1490466197-29163-7-git-send-email-leo.yan@linaro.org>
+References: <1490466197-29163-1-git-send-email-leo.yan@linaro.org>
+ <1490466197-29163-7-git-send-email-leo.yan@linaro.org>
+Message-ID: <31be033f-514e-e48a-3ba2-a5c5cd477548@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/14/2017 01:05 PM, Tony Lindgren wrote:
-> Commit 3251885285e1 ("ARM: OMAP4+: Reset CPU1 properly for kexec") started
-> unconditionally resetting CPU1 because of a kexec boot issue I was seeing
-> earlier on omap4 when doing kexec boot between two different kernel
-> versions.
-> 
-> This caused issues on some systems. We should only reset CPU1 as a last
-> resort option, and try to avoid it where possible. Doing an unconditional
-> CPU1 reset causes issues for example when booting a bootloader configured
-> secure OS running on CPU1 as reported by Andrew F. Davis <afd@ti.com>.
-> 
-> We can't completely remove the reset of CPU1 as it would break kexec
-> booting from older kernels. But we can limit the CPU1 reset to cases
-> where CPU1 is wrongly parked within the memory area used by the booting
-> kernel. Then later on we can add support for parking CPU1 for kexec out
-> of the SDRAM back to bootrom.
-> 
-> So let's first fix the regression reported by Andrew by making CPU1 reset
-> conditional. To do this, we need to:
-> 
-> 1. Save configured AUX_CORE_BOOT_1 for later
-> 
-> 2. Modify AUX_CORE_BOOT_0 reading code to for HS SoCs to return
->    the whole register instead of the CPU mask
-> 
-> 3. Check if CPU1 is wrongly parked into the booting kernel by the
->    previous kernel and reset if needed
-> 
+On 25/03/17 18:23, Leo Yan wrote:
+> Coresight includes debug module and usually the module connects with CPU
+> debug logic. ARMv8 architecture reference manual (ARM DDI 0487A.k) has
+> description for related info in "Part H: External Debug".
+>
+> Chapter H7 "The Sample-based Profiling Extension" introduces several
+> sampling registers, e.g. we can check program counter value with
+> combined CPU exception level, secure state, etc. So this is helpful for
+> analysis CPU lockup scenarios, e.g. if one CPU has run into infinite
+> loop with IRQ disabled. In this case the CPU cannot switch context and
+> handle any interrupt (including IPIs), as the result it cannot handle
+> SMP call for stack dump.
+>
+> This patch is to enable coresight debug module, so firstly this driver
+> is to bind apb clock for debug module and this is to ensure the debug
+> module can be accessed from program or external debugger. And the driver
+> uses sample-based registers for debug purpose, e.g. when system triggers
+> panic, the driver will dump program counter and combined context
+> registers (EDCIDSR, EDVIDSR); by parsing context registers so can
+> quickly get to know CPU secure state, exception level, etc.
+>
+> Some of the debug module registers are located in CPU power domain, so
+> this requires the CPU power domain stays on when access related debug
+> registers, but the power management for CPU power domain is quite
+> dependent on SoC integration for power management. For the platforms
+> which with sane power controller implementations, this driver follows
+> the method to set EDPRCR to try to pull the CPU out of low power state
+> and then set 'no power down request' bit so the CPU has no chance to
+> lose power.
+>
+> If the SoC has not followed up this design well for power management
+> controller, the driver introduces module parameter "idle_constraint".
+> Setting this parameter for latency requirement in microseconds, finally
+> we can constrain all or partial idle states to ensure the CPU power
+> domain is enabled, this is a backup method to access coresight CPU
+> debug component safely.
 
-I still don't like this style of workaround, if kexec cannot regain
-control of core1 without a hard core reset than kexec should BUG() and
-force the user to reboot to a sane state.
+Leo,
 
-Anyway, this patch does remove the unconditional reset and fixes my
-use-case is some situations (when not using kexec) so:
+Thanks a lot for the quick rework. I don't fully understand (yet!) why we need the
+idle_constraint. I will leave it for Sudeep to comment on it, as he is the expert
+in that area. Some minor comments below.
 
-Tested-by: Andrew F. Davis <afd@ti.com>
-
-> Fixes: 3251885285e1 ("ARM: OMAP4+: Reset CPU1 properly for kexec")
-> Reported-by: Andrew F. Davis <afd@ti.com>
-> Cc: Andrew F. Davis <afd@ti.com>
-> Cc: Keerthy <j-keerthy@ti.com>
-> Cc: Russell King <rmk+kernel@armlinux.org.uk>
-> Cc: Santosh Shilimkar <ssantosh@kernel.org>
-> Cc: Tero Kristo <t-kristo@ti.com>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-> 
+>
+> Signed-off-by: Leo Yan <leo.yan@linaro.org>
 > ---
-> 
-> Changes from v2:
-> 
-> - Add Santosh to Cc, sorry Santosh I forgot to add earlier
-> 
-> - Add check for CPU1 being parked in addition to checking
->   CPU1 start-up address being within booting kernel before
->   reset
-> 
-> - Left out extra cpu_is to soc_is changes, those can be done
->   later
-> 
-> - Updated description to leave out suspend/resume issues as
->   those can be dealt with separately if they still exist after
->   fixing kexec boot, they may have been happening only after
->   a kexec boot
-> 
-> Changes from v1:
-> 
-> - We can't remove the CPU1 reset completely because it breaks
->   kexec booting all the existing kernels as CPU1 might be
->   parked into the booting kernel
-> 
-> ---
->  arch/arm/mach-omap2/common.h              |  1 +
->  arch/arm/mach-omap2/omap-hotplug.c        |  2 +-
->  arch/arm/mach-omap2/omap-mpuss-lowpower.c | 22 ++++++--
->  arch/arm/mach-omap2/omap-smc.S            |  1 -
->  arch/arm/mach-omap2/omap-smp.c            | 90 ++++++++++++++++++++++++++-----
->  5 files changed, 96 insertions(+), 20 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
-> --- a/arch/arm/mach-omap2/common.h
-> +++ b/arch/arm/mach-omap2/common.h
-> @@ -270,6 +270,7 @@ extern const struct smp_operations omap4_smp_ops;
->  extern int omap4_mpuss_init(void);
->  extern int omap4_enter_lowpower(unsigned int cpu, unsigned int power_state);
->  extern int omap4_hotplug_cpu(unsigned int cpu, unsigned int power_state);
-> +extern u32 omap4_get_cpu1_ns_pa_addr(void);
->  #else
->  static inline int omap4_enter_lowpower(unsigned int cpu,
->  					unsigned int power_state)
-> diff --git a/arch/arm/mach-omap2/omap-hotplug.c b/arch/arm/mach-omap2/omap-hotplug.c
-> --- a/arch/arm/mach-omap2/omap-hotplug.c
-> +++ b/arch/arm/mach-omap2/omap-hotplug.c
-> @@ -50,7 +50,7 @@ void omap4_cpu_die(unsigned int cpu)
->  		omap4_hotplug_cpu(cpu, PWRDM_POWER_OFF);
->  
->  		if (omap_secure_apis_support())
-> -			boot_cpu = omap_read_auxcoreboot0();
-> +			boot_cpu = omap_read_auxcoreboot0() >> 9;
->  		else
->  			boot_cpu =
->  				readl_relaxed(base + OMAP_AUX_CORE_BOOT_0) >> 5;
-> diff --git a/arch/arm/mach-omap2/omap-mpuss-lowpower.c b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
-> --- a/arch/arm/mach-omap2/omap-mpuss-lowpower.c
-> +++ b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
-> @@ -64,6 +64,7 @@
->  #include "prm-regbits-44xx.h"
->  
->  static void __iomem *sar_base;
-> +static u32 old_cpu1_ns_pa_addr;
->  
->  #if defined(CONFIG_PM) && defined(CONFIG_SMP)
->  
-> @@ -212,6 +213,11 @@ static void __init save_l2x0_context(void)
->  {}
->  #endif
->  
-> +u32 omap4_get_cpu1_ns_pa_addr(void)
-> +{
-> +	return old_cpu1_ns_pa_addr;
-> +}
+>  drivers/hwtracing/coresight/Kconfig               |  11 +
+>  drivers/hwtracing/coresight/Makefile              |   1 +
+>  drivers/hwtracing/coresight/coresight-cpu-debug.c | 704 ++++++++++++++++++++++
+>  3 files changed, 716 insertions(+)
+>  create mode 100644 drivers/hwtracing/coresight/coresight-cpu-debug.c
+>
+> diff --git a/drivers/hwtracing/coresight/Kconfig b/drivers/hwtracing/coresight/Kconfig
+> index 130cb21..18d7931 100644
+> --- a/drivers/hwtracing/coresight/Kconfig
+> +++ b/drivers/hwtracing/coresight/Kconfig
+> @@ -89,4 +89,15 @@ config CORESIGHT_STM
+>  	  logging useful software events or data coming from various entities
+>  	  in the system, possibly running different OSs
+>
+> +config CORESIGHT_CPU_DEBUG
+> +	tristate "CoreSight CPU Debug driver"
+> +	depends on ARM || ARM64
+> +	depends on DEBUG_FS
+> +	help
+> +	  This driver provides support for coresight debugging module. This
+> +	  is primarily used to dump sample-based profiling registers when
+> +	  system triggers panic, the driver will parse context registers so
+> +	  can quickly get to know program counter (PC), secure state,
+> +	  exception level, etc.
+
+May be we should mention/warn the user about the possible caveats of using
+this feature to help him make a better decision ? And / Or we should add a documentation
+for it. We have collected some real good information over the discussions and
+it is a good idea to capture it somewhere.
+
 > +
->  /**
->   * omap4_enter_lowpower: OMAP4 MPUSS Low Power Entry Function
->   * The purpose of this function is to manage low power programming
-> @@ -460,22 +466,30 @@ int __init omap4_mpuss_init(void)
->  void __init omap4_mpuss_early_init(void)
->  {
->  	unsigned long startup_pa;
-> +	void __iomem *ns_pa_addr;
->  
-> -	if (!(cpu_is_omap44xx() || soc_is_omap54xx()))
-> +	if (!(soc_is_omap44xx() || soc_is_omap54xx()))
->  		return;
->  
->  	sar_base = omap4_get_sar_ram_base();
->  
-> -	if (cpu_is_omap443x())
-> +	/* Save old NS_PA_ADDR for validity checks later on */
-> +	if (soc_is_omap44xx())
-> +		ns_pa_addr = sar_base + CPU1_WAKEUP_NS_PA_ADDR_OFFSET;
-> +	else
-> +		ns_pa_addr = sar_base + OMAP5_CPU1_WAKEUP_NS_PA_ADDR_OFFSET;
-> +	old_cpu1_ns_pa_addr = readl_relaxed(ns_pa_addr);
+>  endif
+> diff --git a/drivers/hwtracing/coresight/Makefile b/drivers/hwtracing/coresight/Makefile
+> index af480d9..433d590 100644
+> --- a/drivers/hwtracing/coresight/Makefile
+> +++ b/drivers/hwtracing/coresight/Makefile
+> @@ -16,3 +16,4 @@ obj-$(CONFIG_CORESIGHT_SOURCE_ETM4X) += coresight-etm4x.o \
+>  					coresight-etm4x-sysfs.o
+>  obj-$(CONFIG_CORESIGHT_QCOM_REPLICATOR) += coresight-replicator-qcom.o
+>  obj-$(CONFIG_CORESIGHT_STM) += coresight-stm.o
+> +obj-$(CONFIG_CORESIGHT_CPU_DEBUG) += coresight-cpu-debug.o
+> diff --git a/drivers/hwtracing/coresight/coresight-cpu-debug.c b/drivers/hwtracing/coresight/coresight-cpu-debug.c
+> new file mode 100644
+> index 0000000..fbec1d1
+> --- /dev/null
+> +++ b/drivers/hwtracing/coresight/coresight-cpu-debug.c
+
+> +#define EDPCSR				0x0A0
+> +#define EDCIDSR				0x0A4
+> +#define EDVIDSR				0x0A8
+> +#define EDPCSR_HI			0x0AC
+> +#define EDOSLAR				0x300
+> +#define EDPRCR				0x310
+> +#define EDPRSR				0x314
+> +#define EDDEVID1			0xFC4
+> +#define EDDEVID				0xFC8
 > +
-> +	if (soc_is_omap443x())
->  		startup_pa = __pa_symbol(omap4_secondary_startup);
-> -	else if (cpu_is_omap446x())
-> +	else if (soc_is_omap446x())
->  		startup_pa = __pa_symbol(omap4460_secondary_startup);
->  	else if ((__boot_cpu_mode & MODE_MASK) == HYP_MODE)
->  		startup_pa = __pa_symbol(omap5_secondary_hyp_startup);
->  	else
->  		startup_pa = __pa_symbol(omap5_secondary_startup);
->  
-> -	if (cpu_is_omap44xx())
-> +	if (soc_is_omap44xx())
->  		writel_relaxed(startup_pa, sar_base +
->  			       CPU1_WAKEUP_NS_PA_ADDR_OFFSET);
->  	else
-> diff --git a/arch/arm/mach-omap2/omap-smc.S b/arch/arm/mach-omap2/omap-smc.S
-> --- a/arch/arm/mach-omap2/omap-smc.S
-> +++ b/arch/arm/mach-omap2/omap-smc.S
-> @@ -94,6 +94,5 @@ ENTRY(omap_read_auxcoreboot0)
->  	ldr	r12, =0x103
->  	dsb
->  	smc	#0
-> -	mov	r0, r0, lsr #9
->  	ldmfd   sp!, {r2-r12, pc}
->  ENDPROC(omap_read_auxcoreboot0)
-> diff --git a/arch/arm/mach-omap2/omap-smp.c b/arch/arm/mach-omap2/omap-smp.c
-> --- a/arch/arm/mach-omap2/omap-smp.c
-> +++ b/arch/arm/mach-omap2/omap-smp.c
-> @@ -21,6 +21,7 @@
->  #include <linux/io.h>
->  #include <linux/irqchip/arm-gic.h>
->  
-> +#include <asm/sections.h>
->  #include <asm/smp_scu.h>
->  #include <asm/virt.h>
->  
-> @@ -40,10 +41,14 @@
->  
->  #define OMAP5_CORE_COUNT	0x2
->  
-> +#define AUX_CORE_BOOT0_GP_RELEASE	0x020
-> +#define AUX_CORE_BOOT0_HS_RELEASE	0x200
+> +#define EDPCSR_PROHIBITED		0xFFFFFFFF
 > +
->  struct omap_smp_config {
->  	unsigned long cpu1_rstctrl_pa;
->  	void __iomem *cpu1_rstctrl_va;
->  	void __iomem *scu_base;
-> +	void __iomem *wakeupgen_base;
->  	void *startup_addr;
->  };
->  
-> @@ -140,7 +145,6 @@ static int omap4_boot_secondary(unsigned int cpu, struct task_struct *idle)
->  	static struct clockdomain *cpu1_clkdm;
->  	static bool booted;
->  	static struct powerdomain *cpu1_pwrdm;
-> -	void __iomem *base = omap_get_wakeupgen_base();
->  
->  	/*
->  	 * Set synchronisation state between this boot processor
-> @@ -155,9 +159,11 @@ static int omap4_boot_secondary(unsigned int cpu, struct task_struct *idle)
->  	 * A barrier is added to ensure that write buffer is drained
->  	 */
->  	if (omap_secure_apis_support())
-> -		omap_modify_auxcoreboot0(0x200, 0xfffffdff);
-> +		omap_modify_auxcoreboot0(AUX_CORE_BOOT0_HS_RELEASE,
-> +					 0xfffffdff);
->  	else
-> -		writel_relaxed(0x20, base + OMAP_AUX_CORE_BOOT_0);
-> +		writel_relaxed(AUX_CORE_BOOT0_GP_RELEASE,
-> +			       cfg.wakeupgen_base + OMAP_AUX_CORE_BOOT_0);
->  
->  	if (!cpu1_clkdm && !cpu1_pwrdm) {
->  		cpu1_clkdm = clkdm_lookup("mpu1_clkdm");
-> @@ -261,9 +267,72 @@ static void __init omap4_smp_init_cpus(void)
->  		set_cpu_possible(i, true);
->  }
->  
-> +/*
-> + * For now, just make sure the start-up address is not within the booting
-> + * kernel space as that means we just overwrote whatever secondary_startup()
-> + * code there was.
-> + */
-> +static bool __init omap4_smp_cpu1_startup_valid(unsigned long addr)
-> +{
-> +	if ((addr >= __pa(PAGE_OFFSET)) && (addr <= __pa(__bss_start)))
-> +		return false;
+> +/* bits definition for EDPCSR */
+> +#ifndef CONFIG_64BIT
+
+We don't need this to protect the defintions, see comments around adjust_pc method.
+
+> +#define EDPCSR_THUMB			BIT(0)
+> +#define EDPCSR_ARM_INST_MASK		GENMASK(31, 2)
+> +#define EDPCSR_THUMB_INST_MASK		GENMASK(31, 1)
+> +#endif
 > +
-> +	return true;
-> +}
+> +/* bits definition for EDPRCR */
+> +#define EDPRCR_COREPURQ			BIT(3)
+> +#define EDPRCR_CORENPDRQ		BIT(0)
+> +
+> +/* bits definition for EDPRSR */
+> +#define EDPRSR_DLK			BIT(6)
+> +#define EDPRSR_PU			BIT(0)
+> +
+> +/* bits definition for EDVIDSR */
+> +#define EDVIDSR_NS			BIT(31)
+> +#define EDVIDSR_E2			BIT(30)
+> +#define EDVIDSR_E3			BIT(29)
+> +#define EDVIDSR_HV			BIT(28)
+> +#define EDVIDSR_VMID			GENMASK(7, 0)
 > +
 > +/*
-> + * We may need to reset CPU1 before configuring, otherwise kexec boot can end
-> + * up trying to use old kernel startup address or suspend-resume will
-> + * occasionally fail to bring up CPU1 on 4430 if CPU1 fails to enter deeper
-> + * idle states.
+> + * bits definition for EDDEVID1:PSCROffset
+> + *
+> + * NOTE: armv8 and armv7 have different definition for the register,
+> + * so consolidate the bits definition as below:
+> + *
+> + * 0b0000 - Sample offset applies based on the instruction state, we
+> + *          rely on EDDEVID to check if EDPCSR is implemented or not
+> + * 0b0001 - No offset applies.
+> + * 0b0010 - No offset applies, but do not use in AArch32 mode
+> + *
 > + */
-> +static void __init omap4_smp_maybe_reset_cpu1(struct omap_smp_config *c)
+> +#define EDDEVID1_PCSR_OFFSET_MASK	GENMASK(3, 0)
+> +#define EDDEVID1_PCSR_OFFSET_INS_SET	(0x0)
+> +#define EDDEVID1_PCSR_NO_OFFSET_DIS_AARCH32	(0x2)
+> +
+> +/* bits definition for EDDEVID */
+> +#define EDDEVID_PCSAMPLE_MODE		GENMASK(3, 0)
+> +#define EDDEVID_IMPL_NONE		(0x0)
+> +#define EDDEVID_IMPL_EDPCSR		(0x1)
+> +#define EDDEVID_IMPL_EDPCSR_EDCIDSR	(0x2)
+> +#define EDDEVID_IMPL_FULL		(0x3)
+> +
+> +#define DEBUG_WAIT_TIMEOUT		32
+> +
+> +struct debug_drvdata {
+> +	void __iomem	*base;
+> +	struct device	*dev;
+> +	int		cpu;
+> +
+> +	bool		edpcsr_present;
+> +	bool		edcidsr_present;
+> +	bool		edvidsr_present;
+> +	bool		pc_has_offset;
+> +
+
+> +	u32		eddevid;
+> +	u32		eddevid1;
+
+We don't need those two registers once we initialise the bool flags above.
+So, we could as well drop them from here.
+
+> +
+> +	u32		edpcsr;
+> +	u32		edpcsr_hi;
+
+> +	u32		edprcr;
+
+Unused member ?
+
+> +	u32		edprsr;
+> +	u32		edvidsr;
+> +	u32		edcidsr;
+> +};
+> +
+> +static DEFINE_MUTEX(debug_lock);
+> +static DEFINE_PER_CPU(struct debug_drvdata *, debug_drvdata);
+> +static int debug_count;
+> +static struct dentry *debug_debugfs_dir;
+> +
+> +static struct pm_qos_request debug_qos_req;
+> +static int idle_constraint = PM_QOS_DEFAULT_VALUE;
+> +module_param(idle_constraint, int, 0600);
+> +MODULE_PARM_DESC(idle_constraint, "Latency requirement in microseconds for CPU "
+> +		 "idle states (default is -1, which means have no limiation "
+> +		 "to CPU idle states; 0 means disabling all idle states; user "
+> +		 "can choose other platform dependent values so can disable "
+> +		 "specific idle states for the platform)");
+
+Correct me if I am wrong,
+
+All we want to do is disable the CPUIdle explicitly if the user knows that this
+could be a problem to use CPU debug on his platform. So, in effect, we should
+only be using idle_constraint = 0 or -1.
+
+In which case, we could make it easier for the user to tell us, either
+
+  0 - Don't do anything with CPUIdle (default)
+  1 - Disable CPUIdle for me as I know the platform has issues with CPU debug and CPUidle.
+
+than explaining the miscrosecond latency etc and make the appropriate calls underneath.
+something like (not necessarily the same name) :
+
+module_param(broken_with_cpuidle, bool, 0600);
+MODULE_PARAM_DESC(broken_with_cpuidle, "Specifies whether the CPU debug has issues with CPUIdle on"
+				       " the platform. Non-zero value implies CPUIdle has to be"
+				       " explicitly disabled.",);
+
+> +
+> +static bool debug_enable;
+> +module_param_named(enable, debug_enable, bool, 0600);
+> +MODULE_PARM_DESC(enable, "Knob to enable debug functionality "
+> +		 "(default is 0, which means is disabled by default)");
+
+> +static void debug_force_cpu_powered_up(struct debug_drvdata *drvdata)
 > +{
-> +	unsigned long cpu1_startup_pa, cpu1_ns_pa_addr;
-> +	bool needs_reset = false;
-> +	u32 released;
+> +	int timeout = DEBUG_WAIT_TIMEOUT;
 > +
-> +	if (omap_secure_apis_support())
-> +		released = omap_read_auxcoreboot0() & AUX_CORE_BOOT0_HS_RELEASE;
+> +	drvdata->edprsr = readl_relaxed(drvdata->base + EDPRSR);
+> +
+> +	CS_UNLOCK(drvdata->base);
+> +
+> +	/* Bail out if CPU is powered up yet */
+> +	if (drvdata->edprsr & EDPRSR_PU)
+> +		goto out_powered_up;
+> +
+> +	/*
+> +	 * Send request to power management controller and assert
+> +	 * DBGPWRUPREQ signal; if power management controller has
+> +	 * sane implementation, it should enable CPU power domain
+> +	 * in case CPU is in low power state.
+> +	 */
+> +	drvdata->edprsr = readl(drvdata->base + EDPRCR);
+> +	drvdata->edprsr |= EDPRCR_COREPURQ;
+
+You seem to be overloading the edprsr member here with EDPRCR by mistake.
+Since we don't need a cached value of EDPRCR, you might as well use a local
+variable here.
+
+> +	writel(drvdata->edprsr, drvdata->base + EDPRCR);
+> +
+> +	/* Wait for CPU to be powered up (timeout~=32ms) */
+> +	while (timeout--) {
+> +		drvdata->edprsr = readl_relaxed(drvdata->base + EDPRSR);
+> +		if (drvdata->edprsr & EDPRSR_PU)
+> +			break;
+> +
+> +		usleep_range(1000, 2000);
+> +	}
+
+We have coresight_timeout() already, but not in a reusable shape (regarding
+the timeout). We could possibly reuse it in the future.
+
+> +
+> +	/*
+> +	 * Unfortunately the CPU cannot be powered up, so return
+> +	 * back and later has no permission to access other
+> +	 * registers. For this case, should set 'idle_constraint'
+> +	 * to ensure CPU power domain is enabled!
+> +	 */
+> +	if (!(drvdata->edprsr & EDPRSR_PU)) {
+> +		pr_err("%s: power up request for CPU%d failed\n",
+> +			__func__, drvdata->cpu);
+> +		goto out;
+> +	}
+> +
+> +out_powered_up:
+> +	debug_os_unlock(drvdata);
+
+Question: Do we need a matching debug_os_lock() once we are done ?
+
+> +
+> +	/*
+> +	 * At this point the CPU is powered up, so set the no powerdown
+> +	 * request bit so we don't lose power and emulate power down.
+> +	 */
+> +	drvdata->edprsr = readl(drvdata->base + EDPRCR);
+> +	drvdata->edprsr |= EDPRCR_COREPURQ | EDPRCR_CORENPDRQ;
+> +	writel(drvdata->edprsr, drvdata->base + EDPRCR);
+> +
+> +out:
+> +	CS_LOCK(drvdata->base);
+> +}
+> +
+> +static void debug_read_regs(struct debug_drvdata *drvdata)
+> +{
+> +	/*
+> +	 * Ensure CPU power domain is enabled to let registers
+> +	 * are accessiable.
+> +	 */
+> +	debug_force_cpu_powered_up(drvdata);
+> +
+> +	if (!debug_access_permitted(drvdata))
+> +		return;
+> +
+> +	CS_UNLOCK(drvdata->base);
+> +
+> +	debug_os_unlock(drvdata);
+> +
+> +	drvdata->edpcsr = readl_relaxed(drvdata->base + EDPCSR);
+> +
+> +	/*
+> +	 * As described in ARM DDI 0487A.k, if the processing
+> +	 * element (PE) is in debug state, or sample-based
+> +	 * profiling is prohibited, EDPCSR reads as 0xFFFFFFFF;
+> +	 * EDCIDSR, EDVIDSR and EDPCSR_HI registers also become
+> +	 * UNKNOWN state. So directly bail out for this case.
+> +	 */
+> +	if (drvdata->edpcsr == EDPCSR_PROHIBITED)
+> +		goto out;
+> +
+> +	/*
+> +	 * A read of the EDPCSR normally has the side-effect of
+> +	 * indirectly writing to EDCIDSR, EDVIDSR and EDPCSR_HI;
+> +	 * at this point it's safe to read value from them.
+> +	 */
+> +	if (IS_ENABLED(CONFIG_64BIT))
+> +		drvdata->edpcsr_hi = readl_relaxed(drvdata->base + EDPCSR_HI);
+> +
+> +	if (drvdata->edcidsr_present)
+> +		drvdata->edcidsr = readl_relaxed(drvdata->base + EDCIDSR);
+> +
+> +	if (drvdata->edvidsr_present)
+> +		drvdata->edvidsr = readl_relaxed(drvdata->base + EDVIDSR);
+> +
+> +out:
+> +	CS_LOCK(drvdata->base);
+> +}
+> +
+
+> +#ifndef CONFIG_64BIT
+
+Instead of using this #ifndef/ifdef check twice (here and in the caller), we could :
+
+> +static unsigned long debug_adjust_pc(struct debug_drvdata *drvdata,
+> +				     unsigned long pc)
+> +{
+> +	unsigned long arm_inst_offset = 0, thumb_inst_offset = 0;
+> +
+	if (IS_ENABLED(CONFIG_64BIT))
+		return drvdata->edpcsr_hi << 32 | drvdata->edpcsr;
+
+> +	if (drvdata->pc_has_offset) {
+> +		arm_inst_offset = 8;
+> +		thumb_inst_offset = 4;
+> +	}
+> +
+> +	/* Handle thumb instruction */
+> +	if (pc & EDPCSR_THUMB) {
+> +		pc = (pc & EDPCSR_THUMB_INST_MASK) - thumb_inst_offset;
+> +		return pc;
+> +	}
+> +
+> +	/*
+> +	 * Handle arm instruction offset, if the arm instruction
+> +	 * is not 4 byte alignment then it's possible the case
+> +	 * for implementation defined; keep original value for this
+> +	 * case and print info for notice.
+> +	 */
+> +	if (pc & BIT(1))
+> +		pr_emerg("Instruction offset is implementation defined\n");
 > +	else
-> +		released = readl_relaxed(cfg.wakeupgen_base +
-> +					 OMAP_AUX_CORE_BOOT_0) &
-> +						AUX_CORE_BOOT0_GP_RELEASE;
-> +	if (released) {
-> +		pr_warn("smp: CPU1 not parked?\n");
+> +		pc = (pc & EDPCSR_ARM_INST_MASK) - arm_inst_offset;
 > +
+> +	return pc;
+> +}
+
+> +#endif
+> +
+> +static void debug_dump_regs(struct debug_drvdata *drvdata)
+> +{
+> +	unsigned long pc;
+> +
+> +	pr_emerg("\tEDPRSR:  %08x (Power:%s DLK:%s)\n", drvdata->edprsr,
+> +		 drvdata->edprsr & EDPRSR_PU ? "On" : "Off",
+> +		 drvdata->edprsr & EDPRSR_DLK ? "Lock" : "Unlock");
+> +
+> +	if (!debug_access_permitted(drvdata)) {
+> +		pr_emerg("No permission to access debug registers!\n");
 > +		return;
 > +	}
 > +
-> +	cpu1_startup_pa = readl_relaxed(cfg.wakeupgen_base +
-> +					OMAP_AUX_CORE_BOOT_1);
-> +	cpu1_ns_pa_addr = omap4_get_cpu1_ns_pa_addr();
-> +
-> +	/* Did the configured secondary_startup() get overwritten? */
-> +	if (!omap4_smp_cpu1_startup_valid(cpu1_startup_pa))
-> +		needs_reset = true;
-> +
-> +	/*
-> +	 * If omap4 or 5 has NS_PA_ADDR configured, CPU1 may be in a
-> +	 * deeper idle state in WFI and will wake to an invalid address.
-> +	 */
-> +	if ((soc_is_omap44xx() || soc_is_omap54xx()) &&
-> +	    !omap4_smp_cpu1_startup_valid(cpu1_ns_pa_addr))
-> +		needs_reset = true;
-> +
-> +	if (!needs_reset || !c->cpu1_rstctrl_va)
+> +	if (drvdata->edpcsr == EDPCSR_PROHIBITED) {
+> +		pr_emerg("CPU is in Debug state or profiling is prohibited!\n");
 > +		return;
+> +	}
 > +
-> +	pr_info("smp: CPU1 parked within kernel, needs reset (0x%lx 0x%lx)\n",
-> +		cpu1_startup_pa, cpu1_ns_pa_addr);
+
+> +#ifdef CONFIG_64BIT
+> +	pc = (unsigned long)drvdata->edpcsr_hi << 32 |
+> +	     (unsigned long)drvdata->edpcsr;
+> +#else
+> +	pc = debug_adjust_pc(drvdata, (unsigned long)drvdata->edpcsr);
+> +#endif
+
+nit: see above, comment for debug_adjust_pc().
+
+
 > +
-> +	writel_relaxed(1, c->cpu1_rstctrl_va);
-> +	readl_relaxed(c->cpu1_rstctrl_va);
-> +	writel_relaxed(0, c->cpu1_rstctrl_va);
+> +	pr_emerg("\tEDPCSR:  [<%p>] %pS\n", (void *)pc, (void *)pc);
+> +
+> +	if (drvdata->edcidsr_present)
+> +		pr_emerg("\tEDCIDSR: %08x\n", drvdata->edcidsr);
+> +
+> +	if (drvdata->edvidsr_present)
+> +		pr_emerg("\tEDVIDSR: %08x (State:%s Mode:%s Width:%dbits VMID:%x)\n",
+> +			 drvdata->edvidsr,
+> +			 drvdata->edvidsr & EDVIDSR_NS ? "Non-secure" : "Secure",
+> +			 drvdata->edvidsr & EDVIDSR_E3 ? "EL3" :
+> +				(drvdata->edvidsr & EDVIDSR_E2 ? "EL2" : "EL1/0"),
+> +			 drvdata->edvidsr & EDVIDSR_HV ? 64 : 32,
+> +			 drvdata->edvidsr & (u32)EDVIDSR_VMID);
 > +}
 > +
->  static void __init omap4_smp_prepare_cpus(unsigned int max_cpus)
->  {
-> -	void __iomem *base = omap_get_wakeupgen_base();
->  	const struct omap_smp_config *c = NULL;
->  
->  	if (soc_is_omap443x())
-> @@ -281,6 +350,7 @@ static void __init omap4_smp_prepare_cpus(unsigned int max_cpus)
->  	/* Must preserve cfg.scu_base set earlier */
->  	cfg.cpu1_rstctrl_pa = c->cpu1_rstctrl_pa;
->  	cfg.startup_addr = c->startup_addr;
-> +	cfg.wakeupgen_base = omap_get_wakeupgen_base();
->  
->  	if (soc_is_dra74x() || soc_is_omap54xx()) {
->  		if ((__boot_cpu_mode & MODE_MASK) == HYP_MODE)
-> @@ -299,15 +369,7 @@ static void __init omap4_smp_prepare_cpus(unsigned int max_cpus)
->  	if (cfg.scu_base)
->  		scu_enable(cfg.scu_base);
->  
-> -	/*
-> -	 * Reset CPU1 before configuring, otherwise kexec will
-> -	 * end up trying to use old kernel startup address.
-> -	 */
-> -	if (cfg.cpu1_rstctrl_va) {
-> -		writel_relaxed(1, cfg.cpu1_rstctrl_va);
-> -		readl_relaxed(cfg.cpu1_rstctrl_va);
-> -		writel_relaxed(0, cfg.cpu1_rstctrl_va);
-> -	}
-> +	omap4_smp_maybe_reset_cpu1(&cfg);
->  
->  	/*
->  	 * Write the address of secondary startup routine into the
-> @@ -319,7 +381,7 @@ static void __init omap4_smp_prepare_cpus(unsigned int max_cpus)
->  		omap_auxcoreboot_addr(__pa_symbol(cfg.startup_addr));
->  	else
->  		writel_relaxed(__pa_symbol(cfg.startup_addr),
-> -			       base + OMAP_AUX_CORE_BOOT_1);
-> +			       cfg.wakeupgen_base + OMAP_AUX_CORE_BOOT_1);
->  }
->  
->  const struct smp_operations omap4_smp_ops __initconst = {
-> 
+> +static void debug_init_arch_data(void *info)
+> +{
+> +	struct debug_drvdata *drvdata = info;
+> +	u32 mode, pcsr_offset;
+> +
+> +	CS_UNLOCK(drvdata->base);
+> +
+> +	debug_os_unlock(drvdata);
+> +
+> +	/* Read device info */
+> +	drvdata->eddevid  = readl_relaxed(drvdata->base + EDDEVID);
+> +	drvdata->eddevid1 = readl_relaxed(drvdata->base + EDDEVID1);
+
+As mentioned above, both of these registers are only need at init time to
+figure out the flags we set here. So we could remove them.
+
+> +
+> +	CS_LOCK(drvdata->base);
+> +
+> +	/* Parse implementation feature */
+> +	mode = drvdata->eddevid & EDDEVID_PCSAMPLE_MODE;
+> +	pcsr_offset = drvdata->eddevid1 & EDDEVID1_PCSR_OFFSET_MASK;
+
+
+> +
+> +	if (mode == EDDEVID_IMPL_NONE) {
+> +		drvdata->edpcsr_present  = false;
+> +		drvdata->edcidsr_present = false;
+> +		drvdata->edvidsr_present = false;
+> +	} else if (mode == EDDEVID_IMPL_EDPCSR) {
+> +		drvdata->edpcsr_present  = true;
+> +		drvdata->edcidsr_present = false;
+> +		drvdata->edvidsr_present = false;
+> +	} else if (mode == EDDEVID_IMPL_EDPCSR_EDCIDSR) {
+> +		if (!IS_ENABLED(CONFIG_64BIT) &&
+> +			(pcsr_offset == EDDEVID1_PCSR_NO_OFFSET_DIS_AARCH32))
+> +			drvdata->edpcsr_present = false;
+> +		else
+> +			drvdata->edpcsr_present = true;
+
+Sorry, I forgot why we do this check only in this mode. Shouldn't this be
+common to all modes (of course which implies PCSR is present) ?
+
+> +
+> +		drvdata->edcidsr_present = true;
+> +		drvdata->edvidsr_present = false;
+> +	} else if (mode == EDDEVID_IMPL_FULL) {
+> +		drvdata->edpcsr_present  = true;
+> +		drvdata->edcidsr_present = true;
+> +		drvdata->edvidsr_present = true;
+> +	}
+> +
+> +	if (IS_ENABLED(CONFIG_64BIT))
+> +		drvdata->pc_has_offset = false;
+> +	else
+> +		drvdata->pc_has_offset =
+> +			(pcsr_offset == EDDEVID1_PCSR_OFFSET_INS_SET);
+> +
+
+nit: This if-else chain could be replaced by :
+
+	
+	drvdata->edpcsr_present = false;
+	drvdata->edcidsr_present = false;
+	drvdata->edvidsr_present = false;
+
+	switch(mode) {
+	case EDDEVID_IMPL_FULL:
+		drvdata->edvidsr_present = true;
+		/* Fall through */
+	case EDDEVID_IMPL_EDPCSR_EDCIDSR:
+		drvdata->edcidsr_present = true;
+		/* Fall through */
+	case EDDEVID_IMPL_EDPCSR:
+		/*
+		 * In ARM DDI 0487A.k, the EDDEVID1.PCSROffset is used to
+		 * define if has the offset for PC sampling value; if read
+		 * back EDDEVID1.PCSROffset == 0x2, then this means the debug
+		 * module does not sample the instruction set state when
+		 * armv8 CPU in AArch32 state.
+		 */
+		drvdata->edpcsr_present = (IS_ENABLED(CONFIG_64BIT) ||
+					   (pcsr_offset != EDDEVID1_PCSR_NO_OFFSET_DIS_AARCH32));
+		drvdata->pc_has_offset = (pcsr_offset == EDDEVID1_PCSR_OFFSET_INS_SET);
+	default:
+		break;
+	}
+
+> +	return;
+> +}
+> +
+> +/*
+> + * Dump out information on panic.
+> + */
+> +static int debug_notifier_call(struct notifier_block *self,
+> +			       unsigned long v, void *p)
+> +{
+> +	int cpu;
+> +	struct debug_drvdata *drvdata;
+> +
+> +	pr_emerg("ARM external debug module:\n");
+> +
+> +	for_each_possible_cpu(cpu) {
+
+Shouldn't this be for_each_online_cpu() ? If the user has turned off a CPU,
+we shouldn't try to dump its registers.
+
+> +		drvdata = per_cpu(debug_drvdata, cpu);
+> +		if (!drvdata)
+> +			continue;
+> +
+> +		pr_emerg("CPU[%d]:\n", drvdata->cpu);
+> +
+> +		debug_read_regs(drvdata);
+> +		debug_dump_regs(drvdata);
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static struct notifier_block debug_notifier = {
+> +	.notifier_call = debug_notifier_call,
+> +};
+> +
+> +static int debug_enable_func(void)
+> +{
+> +	int ret;
+> +
+
+I think we should request the power domain here, now that the user
+has explicitly requested the feature to be turned on and released
+in debug_disable_func().
+
+> +	pm_qos_add_request(&debug_qos_req,
+> +		PM_QOS_CPU_DMA_LATENCY, idle_constraint);
+> +
+> +	ret = atomic_notifier_chain_register(&panic_notifier_list,
+> +					     &debug_notifier);
+
+...
+
+> +	if (ret)
+> +		goto err;
+> +
+> +	return 0;
+> +
+> +err:
+> +	pm_qos_remove_request(&debug_qos_req);
+> +	return ret;
+
+nit : this could be :
+
+	if (ret)
+		pm_qos_remove_request(&debug_qos_req);
+	return ret;
+
+> +}
+> +
+> +static void debug_disable_func(void)
+> +{
+
+As noted above, we could drop the power domain here.
+
+> +	atomic_notifier_chain_unregister(&panic_notifier_list,
+> +					 &debug_notifier);
+> +	pm_qos_remove_request(&debug_qos_req);
+> +}
+> +
+> +static ssize_t debug_func_knob_write(struct file *f,
+> +		const char __user *buf, size_t count, loff_t *ppos)
+> +{
+
+> +	if (on) {
+> +		ret = debug_enable_func();
+> +		if (ret) {
+> +			pr_err("%s: unable to disable debug function: %d\n",
+> +			       __func__, ret);
+> +			goto err;
+> +		}
+> +	} else
+> +		debug_disable_func();
+
+As per Linux codingstyle rules, you should use {} for the else section.
+See Documentation/process/coding-style.rst: Section 3.
+
+
+> +static ssize_t debug_idle_constraint_write(struct file *f,
+> +		const char __user *buf, size_t count, loff_t *ppos)
+> +{
+> +	int val;
+> +	ssize_t ret;
+> +
+> +	ret = kstrtoint_from_user(buf, count, 10, &val);
+> +	if (ret)
+> +		return ret;
+> +
+> +	mutex_lock(&debug_lock);
+> +	idle_constraint = val;
+> +
+> +	if (debug_enable)
+> +		pm_qos_update_request(&debug_qos_req, idle_constraint);
+> +
+> +	mutex_unlock(&debug_lock);
+> +	return count;
+> +}
+> +
+> +static ssize_t debug_idle_constraint_read(struct file *f,
+> +		char __user *ubuf, size_t count, loff_t *ppos)
+> +{
+> +	char buf[32];
+> +	int len;
+> +
+> +	if (*ppos)
+> +		return 0;
+
+It would be better if we do :
+
+> +
+> +	len = sprintf(buf, "%d\n", idle_constraint);
+
+	if (*ppos > len)
+		return 0;
+
+> +	return simple_read_from_buffer(ubuf, count, ppos, buf, len);
+
+	return simple_read_from_buffer(ubuf, count, ppos, buf + *ppos, len - *ppos);
+
+> +
+> +static int debug_func_init(void)
+> +{
+> +	struct dentry *file;
+> +	int ret;
+
+...
+
+> +	/* Enable debug module at boot time */
+> +	ret = debug_enable_func();
+> +	if (ret) {
+> +		pr_err("%s: unable to disable debug function: %d\n",
+
+s/disable/enable ?
+
+> +		       __func__, ret);
+> +		goto err;
+> +	}
+> +
+> +	return 0;
+> +
+> +err:
+> +	debugfs_remove_recursive(debug_debugfs_dir);
+> +	return ret;
+> +}
+> +
+> +static void debug_func_exit(void)
+> +{
+> +	debugfs_remove_recursive(debug_debugfs_dir);
+> +
+> +	/* Disable functionality if has enabled */
+> +	if (debug_enable)
+> +		debug_disable_func();
+> +}
+> +
+> +static int debug_probe(struct amba_device *adev, const struct amba_id *id)
+> +{
+> +	void __iomem *base;
+> +	struct device *dev = &adev->dev;
+> +	struct debug_drvdata *drvdata;
+> +	struct resource *res = &adev->res;
+> +	struct device_node *np = adev->dev.of_node;
+> +	int ret;
+> +
+> +	drvdata = devm_kzalloc(dev, sizeof(*drvdata), GFP_KERNEL);
+> +	if (!drvdata)
+> +		return -ENOMEM;
+> +
+> +	drvdata->cpu = np ? of_coresight_get_cpu(np) : 0;
+> +	if (per_cpu(debug_drvdata, drvdata->cpu)) {
+> +		dev_err(dev, "CPU's drvdata has been initialized\n");
+> +		return -EBUSY;
+> +	}
+> +
+> +	drvdata->dev = &adev->dev;
+> +	amba_set_drvdata(adev, drvdata);
+> +
+> +	/* Validity for the resource is already checked by the AMBA core */
+> +	base = devm_ioremap_resource(dev, res);
+> +	if (IS_ERR(base))
+> +		return PTR_ERR(base);
+> +
+> +	drvdata->base = base;
+> +
+> +	get_online_cpus();
+> +	per_cpu(debug_drvdata, drvdata->cpu) = drvdata;
+> +	ret = smp_call_function_single(drvdata->cpu,
+> +				debug_init_arch_data, drvdata, 1);
+> +	put_online_cpus();
+
+Now that we have dynamic enable/disable of the feature, we should do a pm_runtime_put()
+as expected and try to get_ the power domain when we enable the debug.
+
+
+Suzuki
