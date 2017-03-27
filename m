@@ -1,46 +1,36 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 27 Mar 2017 15:45:05 +0100
-Subject: [RFC PATCH 3/3] of: fix node traversing in of_dma_get_range
-In-Reply-To: <CAL_Jsq+1f2pHEy7=2Q7xGYYJjuQk3rLHH4pPTKRVN4QTtSr4Kw@mail.gmail.com>
-References: <1490419893-5073-1-git-send-email-oza.oza@broadcom.com>
- <1490419893-5073-3-git-send-email-oza.oza@broadcom.com>
- <CAL_Jsq+1f2pHEy7=2Q7xGYYJjuQk3rLHH4pPTKRVN4QTtSr4Kw@mail.gmail.com>
-Message-ID: <3aec823d-d3c7-03d3-68f7-963d3649c184@arm.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Mon, 27 Mar 2017 16:46:06 +0200 (CEST)
+Subject: [RFC PATCH v0.2] PCI: Add support for tango PCIe host bridge
+In-Reply-To: <9c65e647-8395-4467-53ca-c20ed374131b@free.fr>
+References: <91db1f47-3024-9712-309a-fb4b21e42028@free.fr>
+ <e5c0bace-fcbe-de3f-b76f-0fb672562e84@arm.com>
+ <310db9dd-7db6-2106-2e53-f0083b2d3758@free.fr>
+ <9fffedd4-6292-b662-a588-a68fe7380af6@free.fr>
+ <6e847686-43c6-11e9-6782-dec0fe81a58e@arm.com>
+ <9c65e647-8395-4467-53ca-c20ed374131b@free.fr>
+Message-ID: <alpine.DEB.2.20.1703271644210.3616@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
-
-On 27/03/17 15:34, Rob Herring wrote:
-> On Sat, Mar 25, 2017 at 12:31 AM, Oza Pawandeep <oza.oza@broadcom.com> wrote:
->> it jumps to the parent node without examining the child node.
->> also with that, it throws "no dma-ranges found for node"
->> for pci dma-ranges.
->>
->> this patch fixes device node traversing for dma-ranges.
+On Mon, 27 Mar 2017, Mason wrote:
+> On 24/03/2017 19:22, Marc Zyngier wrote:
 > 
-> What's the DT look like that doesn't work?
-
-The problem is the bodge in pci_dma_configure() where we don't have an
-OF node for the actual device itself, so pass in the host bridge's OF
-node instead. This happens to work well enough for dma-coherent, but I
-don't think dma-ranges was even considered at the time.
-
-As it happens I'm currently halfway through writing an experiment
-wherein pci_dma_configure() creates a temporary child node for the
-of_dma_configure() call if no other suitable alternative (e.g. some
-intermediate bridge node) exists. How hard are you likely to NAK that
-approach? ;)
-
-> dma-ranges is supposed to be a bus property, not a device's property.
-> So looking at the parent is correct behavior generally.
-
-Indeed, this patch as-is will break currently correct DTs (because we
-won't find dma-ranges on the device, so will bail before even looking at
-the parent as we should).
-
-Robin.
-
+> > You cannot directly use a pointer to a u32 in any of the bitmap
+> > operations. You need to copy the value to an unsigned long, and
+> > apply the bitmap op on that.
 > 
-> Rob
+> On my platform, find_first_zero_bit() resolves to
 > 
+>   int _find_first_zero_bit_le(const void * p, unsigned size);
+> 
+> If the underlying implementation actually expects an unsigned long
+> pointer, should the function prototype be changed?
+
+Errm? Why are you worrying about the underlying implementations?
+
+find_first_zero_bit() is what you are supposed to use in your code. And
+that explicitely takes a unsigned long pointer.
+
+Thanks,
+
+	tglx
