@@ -1,68 +1,119 @@
-From: zhang.lyra@gmail.com (Chunyan Zhang)
-Date: Mon, 27 Mar 2017 14:23:59 +0800
-Subject: [PATCH V4 3/4] dt-bindings: serial: add a new compatible string
- for SC9860
-In-Reply-To: <20170324023657.2iyh22lr52rme5bu@rob-hp-laptop>
-References: <1489729898-774-1-git-send-email-chunyan.zhang@spreadtrum.com>
- <1489729898-774-4-git-send-email-chunyan.zhang@spreadtrum.com>
- <20170324023657.2iyh22lr52rme5bu@rob-hp-laptop>
-Message-ID: <CAAfSe-tF=tUV8r00aXz_69H4xhj=kyZDF_BbezhQS7L3LyTriQ@mail.gmail.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 27 Mar 2017 14:27:21 +0800
+Subject: [PATCH v2 1/2] dts: arm64: add LS1043A DPAA support
+In-Reply-To: <HE1PR04MB11297D944241012F44C0ADF8EC3C0@HE1PR04MB1129.eurprd04.prod.outlook.com>
+References: <1488382505-17554-1-git-send-email-madalin.bucur@nxp.com>
+ <1488382505-17554-2-git-send-email-madalin.bucur@nxp.com>
+ <20170314070732.GH3618@dragon>
+ <HE1PR04MB11297D944241012F44C0ADF8EC3C0@HE1PR04MB1129.eurprd04.prod.outlook.com>
+Message-ID: <20170327062719.GQ30608@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+On Wed, Mar 22, 2017 at 10:58:12AM +0000, Madalin-Cristian Bucur wrote:
+> > > +&soc {
+> > > +
+> > > +/include/ "qoriq-fman3-0.dtsi"
+> > > +/include/ "qoriq-fman3-0-1g-0.dtsi"
+> > > +/include/ "qoriq-fman3-0-1g-1.dtsi"
+> > > +/include/ "qoriq-fman3-0-1g-2.dtsi"
+> > > +/include/ "qoriq-fman3-0-1g-3.dtsi"
+> > > +/include/ "qoriq-fman3-0-1g-4.dtsi"
+> > > +/include/ "qoriq-fman3-0-1g-5.dtsi"
+> > > +/include/ "qoriq-fman3-0-10g-0.dtsi"
+> > 
+> > We usually put the includes at the beginning of the file, and #include
+> > is more recommended than /include/.
+> 
+> I'm not making use of the header file inclusion feature #include provides
+> (nor plan to) in these files thus I've selected /include/ here.
 
-On 24 March 2017 at 10:36, Rob Herring <robh@kernel.org> wrote:
-> On Fri, Mar 17, 2017 at 01:51:37PM +0800, Chunyan Zhang wrote:
->> SC9860 use the same serial device which SC9836 uses, so added a new
->> compatible string to support SC9860 as well, also added an example
->> of how to describe this serial device in DT.
->>
->> Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
->> ---
->>  Documentation/devicetree/bindings/serial/sprd-uart.txt | 14 +++++++++++++-
->>  1 file changed, 13 insertions(+), 1 deletion(-)
->>
->> diff --git a/Documentation/devicetree/bindings/serial/sprd-uart.txt b/Documentation/devicetree/bindings/serial/sprd-uart.txt
->> index 2aff0f2..1db5d6f 100644
->> --- a/Documentation/devicetree/bindings/serial/sprd-uart.txt
->> +++ b/Documentation/devicetree/bindings/serial/sprd-uart.txt
->> @@ -1,7 +1,19 @@
->>  * Spreadtrum serial UART
->>
->>  Required properties:
->> -- compatible: must be "sprd,sc9836-uart"
->> +- compatible: must be one of:
->> +  * "sprd,sc9836-uart"
->> +  * "sprd,sc9860-uart", "sprd,sc9836-uart"
->> +
->>  - reg: offset and length of the register set for the device
->>  - interrupts: exactly one interrupt specifier
->>  - clocks: phandles to input clocks.
->> +
->> +Example:
->> +     uart0: serial at 000000 {
->
-> serial at 0
->
+Let's be simple and consistent.  Use #include please.
 
-Addressed this.
+> > > +	fman at 1a00000 {
+> > > +		enet0: ethernet at e0000 {
+> > > +		};
+> > > +
+> > > +		enet1: ethernet at e2000 {
+> > > +		};
+> > > +
+> > > +		enet2: ethernet at e4000 {
+> > > +		};
+> > > +
+> > > +		enet3: ethernet at e6000 {
+> > > +		};
+> > > +
+> > > +		enet4: ethernet at e8000 {
+> > > +		};
+> > > +
+> > > +		enet5: ethernet at ea000 {
+> > > +		};
+> > > +
+> > > +		enet6: ethernet at f0000 {
+> > > +		};
+> > > +	};
+> > 
+> > I do not quite understand why these nodes are empty.
+> 
+> These nodes provide the aliases (and custom SoC mapping) for the
+> FMan ports that are used on this particular SoC. The particular
+> node details are found in the port dtsi file thus no information
+> is required here. Given the fact that the numbering and actual
+> ports that are in use can vary between SoCs, the aliases cannot
+> be included in the port dtsi nor in the FMan dtsi.
 
-> With that,
->
-> Acked-by: Rob Herring <robh@kernel.org>
+Do not completely follow.  What do you mean by 'port dtsi file'?  Maybe
+I should wait for you new patches with better commit log and comments to
+understand these odd empty nodes.
 
-Thanks for your review,
-Chunyan
+> 
+> > > +};
+> > > diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts
+> > b/arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts
+> > > index 0989d63..ee66bb2 100644
+> > > --- a/arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts
+> > > +++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts
+> > > @@ -181,3 +181,5 @@
+> > >  		reg = <0>;
+> > >  	};
+> > >  };
+> > > +
+> > > +/include/ "fsl-ls1043-post.dtsi"
+> > 
+> > Move it to header of the file.
+> 
+> This is to be included at the end, to make sure the references are
+> met and to allow overrides if needed.
 
->
->
->> +             compatible = "sprd,sc9860-uart",
->> +                          "sprd,sc9836-uart";
->> +             reg = <0x000000 0x100>;
->> +             interrupts = <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>;
->> +             clocks = <&ext_26m>;
->> +     };
->> --
->> 2.7.4
->>
+What is broken if you move the include to header?
+
+> 
+> > > diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts
+> > b/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts
+> > > index c37110b..d94f003 100644
+> > > --- a/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts
+> > > +++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts
+> > > @@ -139,3 +139,78 @@
+> > >  &duart1 {
+> > >  	status = "okay";
+> > >  };
+> > > +
+> > > +/include/ "fsl-ls1043-post.dtsi"
+> > > +
+> > 
+> > Ditto
+> > 
+> > > +&soc {
+> > > +	fman at 1a00000 {
+> > > +		ethernet at e0000 {
+> > 
+> > You defined enet0 label.  Why don't you use it?
+> >
+> 
+> The enet0 label is used by u-boot for fix-ups, providing the
+> actual offset here makes it easier to follow.
+
+You will not need to construct the node hierarchy with label.  And
+alias/label name is more easier to follow than offset.
+
+Shawn
