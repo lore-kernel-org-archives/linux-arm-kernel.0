@@ -1,145 +1,98 @@
 From: eric.auger@redhat.com (Eric Auger)
-Date: Mon, 27 Mar 2017 11:31:04 +0200
-Subject: [PATCH v4 14/22] KVM: arm64: ITS: vgic_its_alloc_ite/device
+Date: Mon, 27 Mar 2017 11:30:58 +0200
+Subject: [PATCH v4 08/22] KVM: arm64: ITS: Implement
+ vgic_mmio_uaccess_write_its_iidr
 In-Reply-To: <1490607072-21610-1-git-send-email-eric.auger@redhat.com>
 References: <1490607072-21610-1-git-send-email-eric.auger@redhat.com>
-Message-ID: <1490607072-21610-15-git-send-email-eric.auger@redhat.com>
+Message-ID: <1490607072-21610-9-git-send-email-eric.auger@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add two new helpers to allocate an its ite and an its device.
-This will avoid duplication on restore path.
+The GITS_IIDR revision field is used to encode the version of the
+table layout (ABI). So we need to restore it to check the table
+layout to be restored is compatible with the destination vITS.
+
+The user selected revision is stored in the user_revision field.
+It will be compared against the REV num at table restoration time.
 
 Signed-off-by: Eric Auger <eric.auger@redhat.com>
 
 ---
 
-v3 -> v4:
-- fix allocation
-- add comment about its_lock mutex hold
-
-v1 -> v2:
-- report itt_size fix and remove ITE_SIZE
-- s/itte/ite/g
+v4: creation
 ---
- virt/kvm/arm/vgic/vgic-its.c | 73 ++++++++++++++++++++++++++++++--------------
- 1 file changed, 50 insertions(+), 23 deletions(-)
+ include/kvm/arm_vgic.h       |  2 ++
+ virt/kvm/arm/vgic/vgic-its.c | 24 +++++++++++++++++++++---
+ 2 files changed, 23 insertions(+), 3 deletions(-)
 
+diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+index b72dd2a..41b71ca 100644
+--- a/include/kvm/arm_vgic.h
++++ b/include/kvm/arm_vgic.h
+@@ -162,6 +162,8 @@ struct vgic_its {
+ 	u32			creadr;
+ 	u32			cwriter;
+ 
++	u32			user_revision;
++
+ 	/* Protects the device and collection lists */
+ 	struct mutex		its_lock;
+ 	struct list_head	device_list;
 diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index 76dd562..2a1ccbf 100644
+index a5f3abe..169b486 100644
 --- a/virt/kvm/arm/vgic/vgic-its.c
 +++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -726,6 +726,27 @@ static void vgic_its_free_collection(struct vgic_its *its, u32 coll_id)
- 	kfree(collection);
- }
+@@ -33,6 +33,9 @@
+ #include "vgic.h"
+ #include "vgic-mmio.h"
  
-+/* Must be called with its_lock mutex held */
-+static int vgic_its_alloc_ite(struct its_device *device,
-+			       struct its_ite **itep,
-+			       struct its_collection *collection,
-+			       u32 lpi_id, u32 event_id)
-+{
-+	struct its_ite *ite;
++/* ITS Table Layout ABI Revision */
++#define REV 0x1
 +
-+	ite = kzalloc(sizeof(*ite), GFP_KERNEL);
-+	if (!ite)
-+		return -ENOMEM;
-+
-+	ite->event_id	= event_id;
-+	ite->collection = collection;
-+	ite->lpi = lpi_id;
-+
-+	list_add_tail(&ite->ite_list, &device->itt_head);
-+	*itep = ite;
-+	return 0;
+ /*
+  * Creates a new (reference to a) struct vgic_irq for a given LPI.
+  * If this LPI is already mapped on another ITS, we increase its refcount
+@@ -384,7 +387,19 @@ static unsigned long vgic_mmio_read_its_iidr(struct kvm *kvm,
+ 					     struct vgic_its *its,
+ 					     gpa_t addr, unsigned int len)
+ {
+-	return (PRODUCT_ID_KVM << 24) | (IMPLEMENTER_ARM << 0);
++	return (PRODUCT_ID_KVM << 24) | (REV << 12) | IMPLEMENTER_ARM;
 +}
 +
- /*
-  * The MAPTI and MAPI commands map LPIs to ITTEs.
-  * Must be called with its_lock mutex held.
-@@ -739,7 +760,7 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
- 	struct its_ite *ite;
- 	struct its_device *device;
- 	struct its_collection *collection, *new_coll = NULL;
--	int lpi_nr;
-+	int lpi_nr, ret;
- 	struct vgic_irq *irq;
- 
- 	device = find_its_device(its, device_id);
-@@ -769,19 +790,13 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
- 		new_coll = collection;
- 	}
- 
--	ite = kzalloc(sizeof(struct its_ite), GFP_KERNEL);
--	if (!ite) {
-+	ret = vgic_its_alloc_ite(device, &ite, collection, lpi_nr, event_id);
-+	if (ret) {
- 		if (new_coll)
- 			vgic_its_free_collection(its, coll_id);
--		return -ENOMEM;
-+		return ret;
- 	}
- 
--	ite->event_id	= event_id;
--	list_add_tail(&ite->ite_list, &device->itt_head);
--
--	ite->collection = collection;
--	ite->lpi = lpi_nr;
--
- 	irq = vgic_add_lpi(kvm, lpi_nr);
- 	if (IS_ERR(irq)) {
- 		if (new_coll)
-@@ -820,6 +835,29 @@ static void vgic_its_unmap_device(struct kvm *kvm, struct its_device *device)
- 	kfree(device);
- }
- 
-+/* Must be called with its_lock mutex held */
-+static int vgic_its_alloc_device(struct vgic_its *its,
-+				 struct its_device **devp,
-+				 u32 device_id, gpa_t itt_addr,
-+				 u8 nb_eventid_bits)
++static void vgic_mmio_uaccess_write_its_iidr(struct kvm *kvm,
++					     struct vgic_its *its,
++					     gpa_t addr, unsigned int len,
++					     unsigned long val)
 +{
-+	struct its_device *device;
++	u64 tmp = 0;
 +
-+	device = kzalloc(sizeof(*device), GFP_KERNEL);
-+	if (!device)
-+		return -ENOMEM;
-+
-+	device->device_id = device_id;
-+	device->itt_addr = itt_addr;
-+	device->nb_eventid_bits = nb_eventid_bits;
-+	INIT_LIST_HEAD(&device->itt_head);
-+
-+	list_add_tail(&device->dev_list, &its->device_list);
-+	*devp = device;
-+
-+	return 0;
-+}
-+
- /*
-  * MAPD maps or unmaps a device ID to Interrupt Translation Tables (ITTs).
-  * Must be called with the its_lock mutex held.
-@@ -856,19 +894,8 @@ static int vgic_its_cmd_handle_mapd(struct kvm *kvm, struct vgic_its *its,
- 	if (!valid)
- 		return 0;
- 
--	device = kzalloc(sizeof(struct its_device), GFP_KERNEL);
--	if (!device)
--		return -ENOMEM;
--
--	device->device_id = device_id;
--	device->nb_eventid_bits = nb_eventid_bits;
--	device->itt_addr = itt_addr;
--
--	INIT_LIST_HEAD(&device->itt_head);
--
--	list_add_tail(&device->dev_list, &its->device_list);
--
--	return 0;
-+	return vgic_its_alloc_device(its, &device, device_id,
-+				     itt_addr, nb_eventid_bits);
++	tmp = update_64bit_reg(tmp, addr & 3, len, val);
++	tmp = (tmp & GENMASK(15, 12)) >> 12;
++	its->user_revision = tmp;
  }
  
- /*
+ static unsigned long vgic_mmio_read_its_idregs(struct kvm *kvm,
+@@ -1359,8 +1374,9 @@ static struct vgic_register_region its_registers[] = {
+ 	REGISTER_ITS_DESC(GITS_CTLR,
+ 		vgic_mmio_read_its_ctlr, vgic_mmio_write_its_ctlr, 4,
+ 		VGIC_ACCESS_32bit),
+-	REGISTER_ITS_DESC(GITS_IIDR,
+-		vgic_mmio_read_its_iidr, its_mmio_write_wi, 4,
++	REGISTER_ITS_DESC_UACCESS(GITS_IIDR,
++		vgic_mmio_read_its_iidr, its_mmio_write_wi,
++		vgic_mmio_uaccess_write_its_iidr, 4,
+ 		VGIC_ACCESS_32bit),
+ 	REGISTER_ITS_DESC(GITS_TYPER,
+ 		vgic_mmio_read_its_typer, its_mmio_write_wi, 8,
+@@ -1458,6 +1474,8 @@ static int vgic_its_create(struct kvm_device *dev, u32 type)
+ 		((u64)GITS_BASER_TYPE_COLLECTION << GITS_BASER_TYPE_SHIFT);
+ 	dev->kvm->arch.vgic.propbaser = INITIAL_PROPBASER_VALUE;
+ 
++	its->user_revision = 0;
++
+ 	dev->private = its;
+ 
+ 	return 0;
 -- 
 2.5.5
