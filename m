@@ -1,55 +1,128 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 27 Mar 2017 18:45:10 +0100
-Subject: Query: ARM64: A random failure with hugetlbfs linked mmap() of a
- stack area
-In-Reply-To: <dfddf8fa-6e61-9d94-46ef-34bad1c8c632@redhat.com>
-References: <4e776e1f-dd11-2fa2-5109-6c2b5184b70d@redhat.com>
- <20170324161558.GA10491@leverpostej>
- <d6ee1a17-4518-5a37-f8b7-b62030c24cc7@redhat.com>
- <20170324172533.GA10746@leverpostej>
- <2b8bf63f-3e20-aa26-2d75-83aa2ab35cde@redhat.com>
- <20170324181652.GC10746@leverpostej>
- <4796e7df-808c-b07b-209d-ea02ecf74888@redhat.com>
- <20170327121806.GA12578@leverpostej>
- <dfddf8fa-6e61-9d94-46ef-34bad1c8c632@redhat.com>
-Message-ID: <20170327174510.GC13752@leverpostej>
+From: gmbnomis@gmail.com (Simon Baatz)
+Date: Mon, 27 Mar 2017 20:02:07 +0200
+Subject: [PATCH v2 1/2] mtd: nand: orion: fix clk handling
+Message-ID: <20170327180208.13414-1-gmbnomis@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 27, 2017 at 06:50:53PM +0530, Pratyush Anand wrote:
-> Hi Mark,
-> 
-> Thanks a lot for your explanations!!
-> 
-> On Monday 27 March 2017 05:48 PM, Mark Rutland wrote:
-> >So far, I have not managed to trigger a single SIGSEGV while running
-> >under GDB.
-> >
-> >However, I have a theory that could explain that. I suspect that my
-> >toolchain has built the binary with an executable stack, while yours has
-> >not. Linux automatically sets READ_IMPLIES_EXEC for binaries with
-> >executable stacks, which IIUC would implicitly make the mmap RWX rather
-> >than RW.
-> >
-> >So in my case, the huge page is executable, and I get a SIGILL when
-> >trying to execute from it. In your case, the huge page is not
-> >executable, so you get a SIGSEGV.
-> 
-> Yes, your theory seems  convincing.
-> I passed PROT_EXEC as well along with PROT_READ|PROT_WRITE to
-> mmap(),and then I received SIGILL.
+The clk handling in orion_nand.c had two problems:
 
-Ok, I think that explains it, then.
+- In the probe function, clk_put() was called for an enabled clock,
+  which violates the API (see documentation for clk_put() in
+  include/linux/clk.h)
 
-I was a little confused by the PMD being NULL in your initial splat, but
-from a look at the mmap() codepaths, we lazily fault in hugetlbfs
-mappings unless explicitly asked to populate them.
+- In the error path of the probe function, clk_put() could be called
+  twice for the same clock.
 
-So mmap would have cleared any existing mappings (leaving the PMD NULL), 
-set up the VMA as RW, then returned without setting up the new mapping
-inthe page tables. Since that clobbered libc, when we get back to
-userspace we immediately take an instruction abort, and since we're not
-supposed to have execute permission, we get a SEGV.
+In order to clean this up, use the managed function devm_clk_get() and
+store the pointer to the clk in the driver data.
 
-Thanks,
-Mark.
+Fixes: baffab28b13120694fa3ebab08d3e99667a851d2 ('ARM: Orion: fix driver probe error handling with respect to clk')
+Cc: <stable@vger.kernel.org> # v4.5+
+Signed-off-by: Simon Baatz <gmbnomis@gmail.com>
+---
+
+Changes in v2:
+* changed whitespace alignment in orion_nand_info struct definition
+
+ drivers/mtd/nand/orion_nand.c | 42 +++++++++++++++++++++---------------------
+ 1 file changed, 21 insertions(+), 21 deletions(-)
+
+diff --git a/drivers/mtd/nand/orion_nand.c b/drivers/mtd/nand/orion_nand.c
+index 4a91c5d000be..3acdc20485f1 100644
+--- a/drivers/mtd/nand/orion_nand.c
++++ b/drivers/mtd/nand/orion_nand.c
+@@ -23,6 +23,11 @@
+ #include <asm/sizes.h>
+ #include <linux/platform_data/mtd-orion_nand.h>
+ 
++struct orion_nand_info {
++	struct nand_chip chip;
++	struct clk *clk;
++};
++
+ static void orion_nand_cmd_ctrl(struct mtd_info *mtd, int cmd, unsigned int ctrl)
+ {
+ 	struct nand_chip *nc = mtd_to_nand(mtd);
+@@ -75,20 +80,21 @@ static void orion_nand_read_buf(struct mtd_info *mtd, uint8_t *buf, int len)
+ 
+ static int __init orion_nand_probe(struct platform_device *pdev)
+ {
++	struct orion_nand_info *info;
+ 	struct mtd_info *mtd;
+ 	struct nand_chip *nc;
+ 	struct orion_nand_data *board;
+ 	struct resource *res;
+-	struct clk *clk;
+ 	void __iomem *io_base;
+ 	int ret = 0;
+ 	u32 val = 0;
+ 
+-	nc = devm_kzalloc(&pdev->dev,
+-			sizeof(struct nand_chip),
++	info = devm_kzalloc(&pdev->dev,
++			sizeof(struct orion_nand_info),
+ 			GFP_KERNEL);
+-	if (!nc)
++	if (!info)
+ 		return -ENOMEM;
++	nc = &info->chip;
+ 	mtd = nand_to_mtd(nc);
+ 
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+@@ -145,15 +151,13 @@ static int __init orion_nand_probe(struct platform_device *pdev)
+ 	if (board->dev_ready)
+ 		nc->dev_ready = board->dev_ready;
+ 
+-	platform_set_drvdata(pdev, mtd);
++	platform_set_drvdata(pdev, info);
+ 
+ 	/* Not all platforms can gate the clock, so it is not
+ 	   an error if the clock does not exists. */
+-	clk = clk_get(&pdev->dev, NULL);
+-	if (!IS_ERR(clk)) {
+-		clk_prepare_enable(clk);
+-		clk_put(clk);
+-	}
++	info->clk = devm_clk_get(&pdev->dev, NULL);
++	if (!IS_ERR(info->clk))
++		clk_prepare_enable(info->clk);
+ 
+ 	ret = nand_scan(mtd, 1);
+ 	if (ret)
+@@ -169,26 +173,22 @@ static int __init orion_nand_probe(struct platform_device *pdev)
+ 	return 0;
+ 
+ no_dev:
+-	if (!IS_ERR(clk)) {
+-		clk_disable_unprepare(clk);
+-		clk_put(clk);
+-	}
++	if (!IS_ERR(info->clk))
++		clk_disable_unprepare(info->clk);
+ 
+ 	return ret;
+ }
+ 
+ static int orion_nand_remove(struct platform_device *pdev)
+ {
+-	struct mtd_info *mtd = platform_get_drvdata(pdev);
+-	struct clk *clk;
++	struct orion_nand_info *info = platform_get_drvdata(pdev);
++	struct nand_chip *chip = &info->chip;
++	struct mtd_info *mtd = nand_to_mtd(chip);
+ 
+ 	nand_release(mtd);
+ 
+-	clk = clk_get(&pdev->dev, NULL);
+-	if (!IS_ERR(clk)) {
+-		clk_disable_unprepare(clk);
+-		clk_put(clk);
+-	}
++	if (!IS_ERR(info->clk))
++		clk_disable_unprepare(info->clk);
+ 
+ 	return 0;
+ }
+-- 
+2.9.3
