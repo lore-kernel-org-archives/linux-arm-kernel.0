@@ -1,62 +1,77 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Mon, 27 Mar 2017 16:18:14 +0100
-Subject: [PATCH] kvm: arm/arm64: Rework gpa callback handlers
-In-Reply-To: <20170324180002.GJ25903@cbox>
-References: <1490034402-28850-1-git-send-email-suzuki.poulose@arm.com>
- <20170324180002.GJ25903@cbox>
-Message-ID: <d4f1c780-a8ee-fd87-304e-92f67049f92f@arm.com>
+From: slash.tmp@free.fr (Mason)
+Date: Mon, 27 Mar 2017 17:18:23 +0200
+Subject: [RFC PATCH v0.2] PCI: Add support for tango PCIe host bridge
+In-Reply-To: <alpine.DEB.2.20.1703271644210.3616@nanos>
+References: <91db1f47-3024-9712-309a-fb4b21e42028@free.fr>
+ <e5c0bace-fcbe-de3f-b76f-0fb672562e84@arm.com>
+ <310db9dd-7db6-2106-2e53-f0083b2d3758@free.fr>
+ <9fffedd4-6292-b662-a588-a68fe7380af6@free.fr>
+ <6e847686-43c6-11e9-6782-dec0fe81a58e@arm.com>
+ <9c65e647-8395-4467-53ca-c20ed374131b@free.fr>
+ <alpine.DEB.2.20.1703271644210.3616@nanos>
+Message-ID: <4f426de0-b24a-c8dc-76a0-d4ec607a86be@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/03/17 18:00, Christoffer Dall wrote:
-> On Mon, Mar 20, 2017 at 06:26:42PM +0000, Suzuki K Poulose wrote:
->> In order to perform an operation on a gpa range, the hyp iterates
->
-> the hyp ?
+On 27/03/2017 16:46, Thomas Gleixner wrote:
 
-To be precise "the host" ?
-
+> On Mon, 27 Mar 2017, Mason wrote:
 >
->> over each page in a user memory slot for the given range. This is
->> inefficient while dealing with a big range (e.g, a VMA), especially
->> while unmaping a range. At present, with stage2 unmap on a range with
->> a hugepage backed region, we clear the PMD when we unmap the first
->> page in the loop. The remaining iterations simply traverse the page table
->> down to the PMD level only to see that nothing is in there.
+>> On 24/03/2017 19:22, Marc Zyngier wrote:
 >>
->> This patch reworks the code to invoke the callback handlers on the
->> biggest range possible within the memory slot to avoid reduce the
->> number of iterations.
->
-> avoid reduce?
->
-> did you mean "to reduce the number of times the handler is called" ?
-
-Yep, thanks for spotting.
-
->
+>>> You cannot directly use a pointer to a u32 in any of the bitmap
+>>> operations. You need to copy the value to an unsigned long, and
+>>> apply the bitmap op on that.
 >>
->> Cc: Marc Zyngier <marc.zyngier@arm.com>
->> Cc: Christoffer Dall <christoffer.dall@linaro.org>
->> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
->> ---
->>  arch/arm/kvm/mmu.c | 31 +++++++++++++------------------
->>  1 file changed, 13 insertions(+), 18 deletions(-)
+>> On my platform, find_first_zero_bit() resolves to
 >>
->> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
->> index 37e67f5..8357fed 100644
->> --- a/arch/arm/kvm/mmu.c
->> +++ b/arch/arm/kvm/mmu.c
-...
-
+>>   int _find_first_zero_bit_le(const void * p, unsigned size);
 >>
->
-> Otherwise looks good:
->
-> I can fix up the commit message when applying this.
->
-> Reviewed-by: Christoffer Dall <cdall@linaro.org>
+>> If the underlying implementation actually expects an unsigned long
+>> pointer, should the function prototype be changed?
+> 
+> Errm? Why are you worrying about the underlying implementations?
+> 
+> find_first_zero_bit() is what you are supposed to use in your code. And
+> that explicitely takes a unsigned long pointer.
 
-Thanks
+I don't think so.
 
-Suzuki
+If the prototype for find_first_zero_bit() specified the first
+argument as an unsigned long pointer, then the compiler would
+have rejected my code like this:
+
+  CC      drivers/pci/host/pcie-tango.o
+In file included from ./include/linux/bitops.h:36:0,
+                 from ./include/linux/kernel.h:10,
+                 from ./include/linux/list.h:8,
+                 from ./include/linux/smp.h:11,
+                 from ./include/linux/irq.h:12,
+                 from ./include/linux/irqchip/chained_irq.h:21,
+                 from drivers/pci/host/pcie-tango.c:1:
+drivers/pci/host/pcie-tango.c: In function 'tango_irq_domain_alloc':
+drivers/pci/host/pcie-tango.c:122:28: error: passing argument 1 of '_find_first_zero_bit_le' from incompatible pointer type [-Werror=incompatible-pointer-types]
+  pos = find_first_zero_bit(&mask, 32);
+                            ^
+./arch/arm/include/asm/bitops.h:199:59: note: in definition of macro 'find_first_zero_bit'
+ #define find_first_zero_bit(p,sz) _find_first_zero_bit_le(p,sz)
+                                                           ^
+./arch/arm/include/asm/bitops.h:162:12: note: expected 'const long unsigned int *' but argument is of type 'u32 * {aka unsigned int *}'
+ extern int _find_first_zero_bit_le(const unsigned long * p, unsigned size);
+            ^
+cc1: some warnings being treated as errors
+make[1]: *** [drivers/pci/host/pcie-tango.o] Error 1
+make: *** [drivers/pci/host/pcie-tango.o] Error 2
+
+
+But, in fact, the compiler remained silent, specifically because
+the situation on my platform is:
+
+  #define find_first_zero_bit(p,sz)	_find_first_zero_bit_le(p,sz)
+  int _find_first_zero_bit_le(const void * p, unsigned size);
+
+
+So I asked if the prototype could/should be changed, to have the
+compiler catch the error as early as possible.
+
+Regards.
