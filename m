@@ -1,139 +1,62 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 27 Mar 2017 17:16:58 +0200
-Subject: [PATCH v2] mtd: physmap_of: really fix the physmap add-ons
-Message-ID: <20170327151658.6175-1-linus.walleij@linaro.org>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Mon, 27 Mar 2017 16:18:14 +0100
+Subject: [PATCH] kvm: arm/arm64: Rework gpa callback handlers
+In-Reply-To: <20170324180002.GJ25903@cbox>
+References: <1490034402-28850-1-git-send-email-suzuki.poulose@arm.com>
+ <20170324180002.GJ25903@cbox>
+Message-ID: <d4f1c780-a8ee-fd87-304e-92f67049f92f@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current way of building the of_physmap add-ons result in just
-the add-on being in the object code, and not the actual core
-implementation and regress the Gemini and Versatile.
+On 24/03/17 18:00, Christoffer Dall wrote:
+> On Mon, Mar 20, 2017 at 06:26:42PM +0000, Suzuki K Poulose wrote:
+>> In order to perform an operation on a gpa range, the hyp iterates
+>
+> the hyp ?
 
-There is no way around exporting these functions. If they are
-built as modules, they will become modules with exported functions,
-if they are builtins they will become builtins.
+To be precise "the host" ?
 
-Fixes: 4f04f68e1598 ("mtd: physmap_of: fixup gemini/versatile dependencies")
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-ChangeLog v1->v2:
-- Make the Kconfig entries tristate so they can follow the config
-  of the main code portions.
-- Use the IS_ENABLED() macro from <linux/kconfig.h> to determine
-  whether a certain function is available for builtin OR module.
-  This is finally the silver bullet: allyes and allmod builds
-  fine on x86_64.
----
- drivers/mtd/maps/Kconfig                | 4 ++--
- drivers/mtd/maps/Makefile               | 8 ++------
- drivers/mtd/maps/physmap_of_gemini.c    | 2 ++
- drivers/mtd/maps/physmap_of_gemini.h    | 3 ++-
- drivers/mtd/maps/physmap_of_versatile.c | 2 ++
- drivers/mtd/maps/physmap_of_versatile.h | 3 ++-
- 6 files changed, 12 insertions(+), 10 deletions(-)
+>
+>> over each page in a user memory slot for the given range. This is
+>> inefficient while dealing with a big range (e.g, a VMA), especially
+>> while unmaping a range. At present, with stage2 unmap on a range with
+>> a hugepage backed region, we clear the PMD when we unmap the first
+>> page in the loop. The remaining iterations simply traverse the page table
+>> down to the PMD level only to see that nothing is in there.
+>>
+>> This patch reworks the code to invoke the callback handlers on the
+>> biggest range possible within the memory slot to avoid reduce the
+>> number of iterations.
+>
+> avoid reduce?
+>
+> did you mean "to reduce the number of times the handler is called" ?
 
-diff --git a/drivers/mtd/maps/Kconfig b/drivers/mtd/maps/Kconfig
-index 542fdf8e81fa..a4fa2f725d33 100644
---- a/drivers/mtd/maps/Kconfig
-+++ b/drivers/mtd/maps/Kconfig
-@@ -75,7 +75,7 @@ config MTD_PHYSMAP_OF
- 	  taken from OF device tree.
- 
- config MTD_PHYSMAP_OF_VERSATILE
--	bool "ARM Versatile OF-based physical memory map handling"
-+	tristate "ARM Versatile OF-based physical memory map handling"
- 	depends on MTD_PHYSMAP_OF
- 	depends on MFD_SYSCON
- 	default y if (ARCH_INTEGRATOR || ARCH_VERSATILE || ARCH_REALVIEW)
-@@ -85,7 +85,7 @@ config MTD_PHYSMAP_OF_VERSATILE
- 	  the flash can be taken out of write protection.
- 
- config MTD_PHYSMAP_OF_GEMINI
--	bool "Cortina Gemini OF-based physical memory map handling"
-+	tristate "Cortina Gemini OF-based physical memory map handling"
- 	depends on MTD_PHYSMAP_OF
- 	depends on MFD_SYSCON
- 	default ARCH_GEMINI
-diff --git a/drivers/mtd/maps/Makefile b/drivers/mtd/maps/Makefile
-index aef1846b4de2..608bdd37ac99 100644
---- a/drivers/mtd/maps/Makefile
-+++ b/drivers/mtd/maps/Makefile
-@@ -17,12 +17,8 @@ obj-$(CONFIG_MTD_CK804XROM)	+= ck804xrom.o
- obj-$(CONFIG_MTD_TSUNAMI)	+= tsunami_flash.o
- obj-$(CONFIG_MTD_PXA2XX)	+= pxa2xx-flash.o
- obj-$(CONFIG_MTD_PHYSMAP)	+= physmap.o
--ifdef CONFIG_MTD_PHYSMAP_OF_VERSATILE
--physmap_of-objs += physmap_of_versatile.o
--endif
--ifdef CONFIG_MTD_PHYSMAP_OF_GEMINI
--physmap_of-objs += physmap_of_gemini.o
--endif
-+obj-$(CONFIG_MTD_PHYSMAP_OF_VERSATILE) += physmap_of_versatile.o
-+obj-$(CONFIG_MTD_PHYSMAP_OF_GEMINI) += physmap_of_gemini.o
- obj-$(CONFIG_MTD_PHYSMAP_OF)	+= physmap_of.o
- obj-$(CONFIG_MTD_PISMO)		+= pismo.o
- obj-$(CONFIG_MTD_PMC_MSP_EVM)   += pmcmsp-flash.o
-diff --git a/drivers/mtd/maps/physmap_of_gemini.c b/drivers/mtd/maps/physmap_of_gemini.c
-index 9d371cd728ea..616f162c4da1 100644
---- a/drivers/mtd/maps/physmap_of_gemini.c
-+++ b/drivers/mtd/maps/physmap_of_gemini.c
-@@ -6,6 +6,7 @@
-  * detect and set it up when booting on this platform.
-  */
- #include <linux/export.h>
-+#include <linux/module.h>
- #include <linux/of.h>
- #include <linux/of_device.h>
- #include <linux/mtd/map.h>
-@@ -115,3 +116,4 @@ int of_flash_probe_gemini(struct platform_device *pdev,
- 
- 	return 0;
- }
-+EXPORT_SYMBOL(of_flash_probe_gemini);
-diff --git a/drivers/mtd/maps/physmap_of_gemini.h b/drivers/mtd/maps/physmap_of_gemini.h
-index c675025288dd..99eaa8637f79 100644
---- a/drivers/mtd/maps/physmap_of_gemini.h
-+++ b/drivers/mtd/maps/physmap_of_gemini.h
-@@ -1,7 +1,8 @@
- #include <linux/of.h>
- #include <linux/mtd/map.h>
-+#include <linux/kconfig.h>
- 
--#ifdef CONFIG_MTD_PHYSMAP_OF_GEMINI
-+#if IS_ENABLED(CONFIG_MTD_PHYSMAP_OF_GEMINI)
- int of_flash_probe_gemini(struct platform_device *pdev,
- 			  struct device_node *np,
- 			  struct map_info *map);
-diff --git a/drivers/mtd/maps/physmap_of_versatile.c b/drivers/mtd/maps/physmap_of_versatile.c
-index 8c6ccded9be8..0583876bc053 100644
---- a/drivers/mtd/maps/physmap_of_versatile.c
-+++ b/drivers/mtd/maps/physmap_of_versatile.c
-@@ -21,6 +21,7 @@
-  */
- #include <linux/export.h>
- #include <linux/io.h>
-+#include <linux/module.h>
- #include <linux/of.h>
- #include <linux/of_address.h>
- #include <linux/of_device.h>
-@@ -252,3 +253,4 @@ int of_flash_probe_versatile(struct platform_device *pdev,
- 
- 	return 0;
- }
-+EXPORT_SYMBOL(of_flash_probe_versatile);
-diff --git a/drivers/mtd/maps/physmap_of_versatile.h b/drivers/mtd/maps/physmap_of_versatile.h
-index 5b86f6dc6b3d..f4b5fa7476ac 100644
---- a/drivers/mtd/maps/physmap_of_versatile.h
-+++ b/drivers/mtd/maps/physmap_of_versatile.h
-@@ -1,7 +1,8 @@
- #include <linux/of.h>
- #include <linux/mtd/map.h>
-+#include <linux/kconfig.h>
- 
--#ifdef CONFIG_MTD_PHYSMAP_OF_VERSATILE
-+#if IS_ENABLED(CONFIG_MTD_PHYSMAP_OF_VERSATILE)
- int of_flash_probe_versatile(struct platform_device *pdev,
- 			     struct device_node *np,
- 			     struct map_info *map);
--- 
-2.9.3
+Yep, thanks for spotting.
+
+>
+>>
+>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+>> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+>> ---
+>>  arch/arm/kvm/mmu.c | 31 +++++++++++++------------------
+>>  1 file changed, 13 insertions(+), 18 deletions(-)
+>>
+>> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+>> index 37e67f5..8357fed 100644
+>> --- a/arch/arm/kvm/mmu.c
+>> +++ b/arch/arm/kvm/mmu.c
+...
+
+>>
+>
+> Otherwise looks good:
+>
+> I can fix up the commit message when applying this.
+>
+> Reviewed-by: Christoffer Dall <cdall@linaro.org>
+
+Thanks
+
+Suzuki
