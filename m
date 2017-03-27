@@ -1,75 +1,139 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 27 Mar 2017 16:14:32 +0100
-Subject: [PATCH 0/7] memory: atmel-ebi: Add PM ops
-In-Reply-To: <e27d2dd0-ce23-d63d-04dc-7be745770a00@atmel.com>
-References: <1489653034-17777-1-git-send-email-boris.brezillon@free-electrons.com>
- <e27d2dd0-ce23-d63d-04dc-7be745770a00@atmel.com>
-Message-ID: <20170327151432.ybb3pfuxivdhb7ji@dell>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 27 Mar 2017 17:16:58 +0200
+Subject: [PATCH v2] mtd: physmap_of: really fix the physmap add-ons
+Message-ID: <20170327151658.6175-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 27 Mar 2017, Nicolas Ferre wrote:
+The current way of building the of_physmap add-ons result in just
+the add-on being in the object code, and not the actual core
+implementation and regress the Gemini and Versatile.
 
-> Le 16/03/2017 ? 09:30, Boris Brezillon a ?crit :
-> > Hello,
-> > 
-> > This patchset adds a ->resume() hook to the EBI driver, but a few more
-> > changes were required in order to easily implement this PM hook.
-> > 
-> > Patches 1 to 5 are just cleanup patches to simplify the EBI driver.
-> > Patch 6 is fixing a bug in the EBI driver. Note that this bug has no
-> > consequences until we start implementing the ->resume() hook.
-> > And finally, patch 7 is implementing ->resume() so that the SMC config
-> > is correctly restored when resuming the system.
-> > 
-> > This patchset depends on [1] which is removing the unused pata_at91
-> > driver, which in turn prevents us from patching it before dropping
-> > the old SMC macro definitions in patch 4.
-> > 
-> > Regards,
-> > 
-> > Boris
-> > 
-> > [1]http://lkml.iu.edu/hypermail/linux/kernel/1702.2/00990.html
-> 
-> For the whole v2 series:
-> Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
-> 
-> Lee, you can take this series through your MFD tree as suggested by Boris.
+There is no way around exporting these functions. If they are
+built as modules, they will become modules with exported functions,
+if they are builtins they will become builtins.
 
-There doesn't appear to be a Maintainer for the memory subsystem.
+Fixes: 4f04f68e1598 ("mtd: physmap_of: fixup gemini/versatile dependencies")
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ChangeLog v1->v2:
+- Make the Kconfig entries tristate so they can follow the config
+  of the main code portions.
+- Use the IS_ENABLED() macro from <linux/kconfig.h> to determine
+  whether a certain function is available for builtin OR module.
+  This is finally the silver bullet: allyes and allmod builds
+  fine on x86_64.
+---
+ drivers/mtd/maps/Kconfig                | 4 ++--
+ drivers/mtd/maps/Makefile               | 8 ++------
+ drivers/mtd/maps/physmap_of_gemini.c    | 2 ++
+ drivers/mtd/maps/physmap_of_gemini.h    | 3 ++-
+ drivers/mtd/maps/physmap_of_versatile.c | 2 ++
+ drivers/mtd/maps/physmap_of_versatile.h | 3 ++-
+ 6 files changed, 12 insertions(+), 10 deletions(-)
 
-Who is the Maintainer for drivers/memory/atmel-ebi.c?
-
-If it's you, would you care to add an entry to MAINTAINERS?
-
-> > Changes since v1:
-> > - move helper functions in a C file
-> > - check if tdf is at least ATMEL_SMC_MODE_TDF_MIN
-> > 
-> > Boris Brezillon (7):
-> >   mfd: syscon: atmel-smc: Add new helpers to ease SMC regs manipulation
-> >   memory: atmel-ebi: Simplify SMC config code
-> >   memory: atmel-ebi: Stop using reg_field objects for simple things
-> >   mfd: syscon: atmel-smc: Remove unused helpers/macros
-> >   memory: atmel-ebi: Change naming scheme
-> >   memory: atmel-ebi: Add missing ->numcs assignment
-> >   memory: atmel-ebi: Add PM ops
-> > 
-> >  drivers/memory/Kconfig               |   1 +
-> >  drivers/memory/atmel-ebi.c           | 584 ++++++++++++-----------------------
-> >  drivers/mfd/Kconfig                  |   4 +
-> >  drivers/mfd/Makefile                 |   1 +
-> >  drivers/mfd/atmel-smc.c              | 314 +++++++++++++++++++
-> >  include/linux/mfd/syscon/atmel-smc.h | 237 ++++++--------
-> >  6 files changed, 606 insertions(+), 535 deletions(-)
-> >  create mode 100644 drivers/mfd/atmel-smc.c
-> > 
-> 
-> 
-
+diff --git a/drivers/mtd/maps/Kconfig b/drivers/mtd/maps/Kconfig
+index 542fdf8e81fa..a4fa2f725d33 100644
+--- a/drivers/mtd/maps/Kconfig
++++ b/drivers/mtd/maps/Kconfig
+@@ -75,7 +75,7 @@ config MTD_PHYSMAP_OF
+ 	  taken from OF device tree.
+ 
+ config MTD_PHYSMAP_OF_VERSATILE
+-	bool "ARM Versatile OF-based physical memory map handling"
++	tristate "ARM Versatile OF-based physical memory map handling"
+ 	depends on MTD_PHYSMAP_OF
+ 	depends on MFD_SYSCON
+ 	default y if (ARCH_INTEGRATOR || ARCH_VERSATILE || ARCH_REALVIEW)
+@@ -85,7 +85,7 @@ config MTD_PHYSMAP_OF_VERSATILE
+ 	  the flash can be taken out of write protection.
+ 
+ config MTD_PHYSMAP_OF_GEMINI
+-	bool "Cortina Gemini OF-based physical memory map handling"
++	tristate "Cortina Gemini OF-based physical memory map handling"
+ 	depends on MTD_PHYSMAP_OF
+ 	depends on MFD_SYSCON
+ 	default ARCH_GEMINI
+diff --git a/drivers/mtd/maps/Makefile b/drivers/mtd/maps/Makefile
+index aef1846b4de2..608bdd37ac99 100644
+--- a/drivers/mtd/maps/Makefile
++++ b/drivers/mtd/maps/Makefile
+@@ -17,12 +17,8 @@ obj-$(CONFIG_MTD_CK804XROM)	+= ck804xrom.o
+ obj-$(CONFIG_MTD_TSUNAMI)	+= tsunami_flash.o
+ obj-$(CONFIG_MTD_PXA2XX)	+= pxa2xx-flash.o
+ obj-$(CONFIG_MTD_PHYSMAP)	+= physmap.o
+-ifdef CONFIG_MTD_PHYSMAP_OF_VERSATILE
+-physmap_of-objs += physmap_of_versatile.o
+-endif
+-ifdef CONFIG_MTD_PHYSMAP_OF_GEMINI
+-physmap_of-objs += physmap_of_gemini.o
+-endif
++obj-$(CONFIG_MTD_PHYSMAP_OF_VERSATILE) += physmap_of_versatile.o
++obj-$(CONFIG_MTD_PHYSMAP_OF_GEMINI) += physmap_of_gemini.o
+ obj-$(CONFIG_MTD_PHYSMAP_OF)	+= physmap_of.o
+ obj-$(CONFIG_MTD_PISMO)		+= pismo.o
+ obj-$(CONFIG_MTD_PMC_MSP_EVM)   += pmcmsp-flash.o
+diff --git a/drivers/mtd/maps/physmap_of_gemini.c b/drivers/mtd/maps/physmap_of_gemini.c
+index 9d371cd728ea..616f162c4da1 100644
+--- a/drivers/mtd/maps/physmap_of_gemini.c
++++ b/drivers/mtd/maps/physmap_of_gemini.c
+@@ -6,6 +6,7 @@
+  * detect and set it up when booting on this platform.
+  */
+ #include <linux/export.h>
++#include <linux/module.h>
+ #include <linux/of.h>
+ #include <linux/of_device.h>
+ #include <linux/mtd/map.h>
+@@ -115,3 +116,4 @@ int of_flash_probe_gemini(struct platform_device *pdev,
+ 
+ 	return 0;
+ }
++EXPORT_SYMBOL(of_flash_probe_gemini);
+diff --git a/drivers/mtd/maps/physmap_of_gemini.h b/drivers/mtd/maps/physmap_of_gemini.h
+index c675025288dd..99eaa8637f79 100644
+--- a/drivers/mtd/maps/physmap_of_gemini.h
++++ b/drivers/mtd/maps/physmap_of_gemini.h
+@@ -1,7 +1,8 @@
+ #include <linux/of.h>
+ #include <linux/mtd/map.h>
++#include <linux/kconfig.h>
+ 
+-#ifdef CONFIG_MTD_PHYSMAP_OF_GEMINI
++#if IS_ENABLED(CONFIG_MTD_PHYSMAP_OF_GEMINI)
+ int of_flash_probe_gemini(struct platform_device *pdev,
+ 			  struct device_node *np,
+ 			  struct map_info *map);
+diff --git a/drivers/mtd/maps/physmap_of_versatile.c b/drivers/mtd/maps/physmap_of_versatile.c
+index 8c6ccded9be8..0583876bc053 100644
+--- a/drivers/mtd/maps/physmap_of_versatile.c
++++ b/drivers/mtd/maps/physmap_of_versatile.c
+@@ -21,6 +21,7 @@
+  */
+ #include <linux/export.h>
+ #include <linux/io.h>
++#include <linux/module.h>
+ #include <linux/of.h>
+ #include <linux/of_address.h>
+ #include <linux/of_device.h>
+@@ -252,3 +253,4 @@ int of_flash_probe_versatile(struct platform_device *pdev,
+ 
+ 	return 0;
+ }
++EXPORT_SYMBOL(of_flash_probe_versatile);
+diff --git a/drivers/mtd/maps/physmap_of_versatile.h b/drivers/mtd/maps/physmap_of_versatile.h
+index 5b86f6dc6b3d..f4b5fa7476ac 100644
+--- a/drivers/mtd/maps/physmap_of_versatile.h
++++ b/drivers/mtd/maps/physmap_of_versatile.h
+@@ -1,7 +1,8 @@
+ #include <linux/of.h>
+ #include <linux/mtd/map.h>
++#include <linux/kconfig.h>
+ 
+-#ifdef CONFIG_MTD_PHYSMAP_OF_VERSATILE
++#if IS_ENABLED(CONFIG_MTD_PHYSMAP_OF_VERSATILE)
+ int of_flash_probe_versatile(struct platform_device *pdev,
+ 			     struct device_node *np,
+ 			     struct map_info *map);
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+2.9.3
