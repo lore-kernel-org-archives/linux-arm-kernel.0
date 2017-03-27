@@ -1,36 +1,117 @@
-From: yangbo.lu@nxp.com (Yangbo Lu)
-Date: Mon, 27 Mar 2017 15:49:40 +0800
-Subject: [v3, 5/7] mmc: sdhci-of-esdhc: add delay between tuning cycles
-In-Reply-To: <1490600982-5410-1-git-send-email-yangbo.lu@nxp.com>
-References: <1490600982-5410-1-git-send-email-yangbo.lu@nxp.com>
-Message-ID: <1490600982-5410-6-git-send-email-yangbo.lu@nxp.com>
+From: yangbo.lu@nxp.com (Y.B. Lu)
+Date: Mon, 27 Mar 2017 08:05:58 +0000
+Subject: [v2, 4/7] mmc: sdhci: add a quirk to restore delay in tuning
+In-Reply-To: <878da006-5b83-a9d9-6136-07d8f07ea65f@intel.com>
+References: <1488529129-23560-1-git-send-email-yangbo.lu@nxp.com>
+ <1488529129-23560-5-git-send-email-yangbo.lu@nxp.com>
+ <878da006-5b83-a9d9-6136-07d8f07ea65f@intel.com>
+Message-ID: <DB6PR0401MB25364664A5A3D9BE8A80C19FF8330@DB6PR0401MB2536.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It's observed that eSDHC needed delay between tuning cycles for
-HS200 successful tuning. This patch is to set 1ms delay for that.
+Hi Adrian,
 
-Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
----
-Changes for v2:
-	- None
-Changes for v3:
-	- Used a host member for tuning delay instead of a quirk.
----
- drivers/mmc/host/sdhci-of-esdhc.c | 1 +
- 1 file changed, 1 insertion(+)
+Thanks a lot for your suggestion.
+I have sent out the new version patch-set.
 
-diff --git a/drivers/mmc/host/sdhci-of-esdhc.c b/drivers/mmc/host/sdhci-of-esdhc.c
-index 8c8e147..0754ef4 100644
---- a/drivers/mmc/host/sdhci-of-esdhc.c
-+++ b/drivers/mmc/host/sdhci-of-esdhc.c
-@@ -807,6 +807,7 @@ static int sdhci_esdhc_probe(struct platform_device *pdev)
- 	host->mmc_host_ops.start_signal_voltage_switch =
- 		esdhc_signal_voltage_switch;
- 	host->mmc_host_ops.execute_tuning = esdhc_execute_tuning;
-+	host->tuning_delay = 1;
- 
- 	esdhc_init(pdev, host);
- 
--- 
-2.1.0.27.g96db324
+Please help to review :)
+
+
+Best regards,
+Yangbo Lu
+
+> -----Original Message-----
+> From: Adrian Hunter [mailto:adrian.hunter at intel.com]
+> Sent: Thursday, March 23, 2017 3:04 PM
+> To: Y.B. Lu; linux-mmc at vger.kernel.org; ulf.hansson at linaro.org; Rob
+> Herring; Mark Rutland; Catalin Marinas; Will Deacon
+> Cc: devicetree at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> Xiaobo Xie
+> Subject: Re: [v2, 4/7] mmc: sdhci: add a quirk to restore delay in tuning
+> 
+> On 03/03/17 10:18, Yangbo Lu wrote:
+> > There was a mdelay between tuning cycles which is removed since eMMC
+> > spec didn't require that. However it's observed that eSDHC needed this
+> > delay for HS200 successful tuning. Maybe it's also needed for some
+> > other controllers. This patch is to add a quirk to fix it.
+> >
+> > Fixes: 197160d52e85 ("mmc: sdhci: remove mdelay in eMMC tuning")
+> > Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
+> > ---
+> 
+> I would prefer to do something like this:
+> 
+> ---
+> From: Adrian Hunter <adrian.hunter@intel.com>
+> Date: Thu, 23 Mar 2017 08:54:06 +0200
+> Subject: [PATCH] mmc: sdhci: Control the delay between tuning commands
+> 
+> The delay between tuning commands for SD cards is not part of the
+> specification. A driver that needs it probably needs it for eMMC too,
+> whereas most drivers would probably like to set it to 0. Make it a host
+> member (host->tuning_delay) that defaults to the existing behaviour.
+> Drivers can set it to zero to eliminate the delay, or set it to a
+> positive value to always have a delay.
+> 
+> Signed-off-by: Adrian Hunter <adrian.hunter@intel.com>
+> ---
+>  drivers/mmc/host/sdhci.c | 11 ++++++++---  drivers/mmc/host/sdhci.h |  1
+> +
+>  2 files changed, 9 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c index
+> a33102fc800b..2fc33485df1d 100644
+> --- a/drivers/mmc/host/sdhci.c
+> +++ b/drivers/mmc/host/sdhci.c
+> @@ -2100,9 +2100,9 @@ static void __sdhci_execute_tuning(struct
+> sdhci_host *host, u32 opcode)
+>  			break;
+>  		}
+> 
+> -		/* eMMC spec does not require a delay between tuning cycles
+> */
+> -		if (opcode == MMC_SEND_TUNING_BLOCK)
+> -			mdelay(1);
+> +		/* Spec does not require a delay between tuning cycles */
+> +		if (host->tuning_delay > 0)
+> +			mdelay(host->tuning_delay);
+>  	}
+> 
+>  	pr_info("%s: Tuning failed, falling back to fixed sampling clock\n",
+> @@ -2164,6 +2164,9 @@ int sdhci_execute_tuning(struct mmc_host *mmc, u32
+> opcode)
+> 
+>  	host->mmc->retune_period = tuning_count;
+> 
+> +	if (host->tuning_delay < 0)
+> +		host->tuning_delay = opcode == MMC_SEND_TUNING_BLOCK;
+> +
+>  	sdhci_start_tuning(host);
+> 
+>  	__sdhci_execute_tuning(host, opcode);
+> @@ -3108,6 +3111,8 @@ struct sdhci_host *sdhci_alloc_host(struct device
+> *dev,
+>  	host->cqe_ier     = SDHCI_CQE_INT_MASK;
+>  	host->cqe_err_ier = SDHCI_CQE_INT_ERR_MASK;
+> 
+> +	host->tuning_delay = -1;
+> +
+>  	return host;
+>  }
+> 
+> diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h index
+> 35b41da0a636..b0f416fc9548 100644
+> --- a/drivers/mmc/host/sdhci.h
+> +++ b/drivers/mmc/host/sdhci.h
+> @@ -538,6 +538,7 @@ struct sdhci_host {
+>  #define SDHCI_TUNING_MODE_1	0
+>  #define SDHCI_TUNING_MODE_2	1
+>  #define SDHCI_TUNING_MODE_3	2
+> +	int			tuning_delay;	/* Delay (ms) between tuning
+> commands */
+> 
+>  	unsigned long private[0] ____cacheline_aligned;  };
+> --
+> 1.9.1
+> 
+> 
