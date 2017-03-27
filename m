@@ -1,52 +1,51 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 27 Mar 2017 21:51:45 +0200
-Subject: [GIT PULL] Gemini DTS updates for v4.12
-Message-ID: <CACRpkdYGaRwE557fLVx9nCDL1vDvsK18pRUOqHwf184kL=9Acg@mail.gmail.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Mon, 27 Mar 2017 12:52:22 -0700
+Subject: [GIT PULL 2/7] Broadcom devicetree changes for 4.12
+In-Reply-To: <87d1d2wsjo.fsf@eliezer.anholt.net>
+References: <20170324175807.27272-1-f.fainelli@gmail.com>
+ <20170324175807.27272-2-f.fainelli@gmail.com>
+ <20170325213315.7dw2nugvhumhypbn@tarshish>
+ <87d1d2wsjo.fsf@eliezer.anholt.net>
+Message-ID: <fb017487-6350-5223-32d2-c356b6f01b77@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC folks,
+On 03/27/2017 10:14 AM, Eric Anholt wrote:
+> Baruch Siach <baruch@tkos.co.il> writes:
+> 
+>> Hi Florian,
+>>
+>> On Fri, Mar 24, 2017 at 10:58:02AM -0700, Florian Fainelli wrote:
+>>> The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
+>>>
+>>>   Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
+>>>
+>>> are available in the git repository at:
+>>>
+>>>   http://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.12/devicetree
+>>>
+>>> for you to fetch changes up to 414ce21ae20547e0eea72fe0c4e8ee3280d30888:
+>>>
+>>>   Merge tag 'bcm2835-dt-next-2017-03-21' into devicetree/next (2017-03-24 10:12:31 -0700)
+>>>
+>>> ----------------------------------------------------------------
+>>> This pull request contains Broadcom ARM-based SoCs Device Tree updates for
+>>> 4.12, please pull the following:
+>>
+>> What about my dts fixes that were in the delayed 4.11 pull request[1]?
+>>
+>> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-March/491554.html
+> 
+> I'm verry sorry to have misplaced those.  I've put them back on dt-next,
+> pushed, and will get a PR out after kbuild comes back clean.
+> 
+> (I thought that the 4.11 PR had got backed off to before the clk merge,
+> not discarded)
 
-here are some device tree updates for the Gemini on top of
-the initial device tree submission.
+That should have been how I was supposed to handle it, but unfortunately
+I did not.
 
-These go into the branch "gemini/dts" in your tree.
-
-Details in the signed tag.
-
-Please pull them in!
-
-Yours,
-Linus Walleij
-
-
-The following changes since commit 6ae4d211ab066ad3b808a2b7f0851837c44f495d:
-
-  ARM: dts: add watchdog to the Gemini (2017-03-12 12:18:29 +0100)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-nomadik.git
-tags/gemini-dts-2
-
-for you to fetch changes up to e3aeca1d74366a43d28e8c826ac48064f7287022:
-
-  ARM: dts: add PCI to the Gemini device trees (2017-03-24 19:08:03 +0100)
-
-----------------------------------------------------------------
-DTS updates for the Gemini on top of the multiplatform base:
-
-- Add the power controller to the DTS.
-- Augment the GPIO nodes to also include the Faraday
-  compatible.
-- Add the PCI bus host and config to the Gemini device trees.
-
-----------------------------------------------------------------
-Linus Walleij (3):
-      ARM: dts: add power controller to the Gemini DTS
-      ARM: dts: augment Gemini GPIO nodes
-      ARM: dts: add PCI to the Gemini device trees
-
- arch/arm/boot/dts/gemini-sq201.dts | 22 ++++++++++++++++
- arch/arm/boot/dts/gemini.dtsi      | 54 +++++++++++++++++++++++++++++++++++---
- 2 files changed, 73 insertions(+), 3 deletions(-)
+Thanks to both of you for your patience, we'll definitively avoid doing
+that again in the future...
+-- 
+Florian
