@@ -1,176 +1,422 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Mon, 27 Mar 2017 14:44:59 +0200
-Subject: [PATCH] KVM: arm/arm64: Signal SIGBUS when stage2 discovers
- hwpoison memory
-In-Reply-To: <58D8FEF8.9000205@arm.com>
-References: <20170315160727.16465-1-james.morse@arm.com>
- <20170324183044.GK25903@cbox>
- <87y3vrezjb.fsf@e105922-lin.cambridge.arm.com>
- <58D8FEF8.9000205@arm.com>
-Message-ID: <20170327124459.GA21871@cbox>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 27 Mar 2017 14:57:05 +0200
+Subject: [PATCH v3 1/2] drivers: pwm: pwm-atmel: switch to atomic PWM
+In-Reply-To: <1490189375-20384-2-git-send-email-claudiu.beznea@microchip.com>
+References: <1490189375-20384-1-git-send-email-claudiu.beznea@microchip.com>
+ <1490189375-20384-2-git-send-email-claudiu.beznea@microchip.com>
+Message-ID: <20170327145705.3ac52ae3@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 27, 2017 at 01:00:56PM +0100, James Morse wrote:
-> Hi guys,
-> 
-> On 27/03/17 12:20, Punit Agrawal wrote:
-> > Christoffer Dall <cdall@linaro.org> writes:
-> >> On Wed, Mar 15, 2017 at 04:07:27PM +0000, James Morse wrote:
-> >>> Once we enable ARCH_SUPPORTS_MEMORY_FAILURE on arm64[0], notifications for
-> >>> broken memory can call memory_failure() in mm/memory-failure.c to deliver
-> >>> SIGBUS to any user space process using the page, and notify all the
-> >>> in-kernel users.
-> >>>
-> >>> If the page corresponded with guest memory, KVM will unmap this page
-> >>> from its stage2 page tables. The user space process that allocated
-> >>> this memory may have never touched this page in which case it may not
-> >>> be mapped meaning SIGBUS won't be delivered.
-> >>>
-> >>> When this happens KVM discovers pfn == KVM_PFN_ERR_HWPOISON when it
-> >>> comes to process the stage2 fault.
-> >>>
-> >>> Do as x86 does, and deliver the SIGBUS when we discover
-> >>> KVM_PFN_ERR_HWPOISON. Use the stage2 mapping size as the si_addr_lsb
-> >>> as this matches the user space mapping size.
-> 
-> >>> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-> >>> index 962616fd4ddd..9d1aa294e88f 100644
-> >>> --- a/arch/arm/kvm/mmu.c
-> >>> +++ b/arch/arm/kvm/mmu.c
-> >>> @@ -20,8 +20,10 @@
-> >>>  #include <linux/kvm_host.h>
-> >>>  #include <linux/io.h>
-> >>>  #include <linux/hugetlb.h>
-> >>> +#include <linux/sched/signal.h>
-> >>>  #include <trace/events/kvm.h>
-> >>>  #include <asm/pgalloc.h>
-> >>> +#include <asm/siginfo.h>
-> >>>  #include <asm/cacheflush.h>
-> >>>  #include <asm/kvm_arm.h>
-> >>>  #include <asm/kvm_mmu.h>
-> >>> @@ -1237,6 +1239,23 @@ static void coherent_cache_guest_page(struct kvm_vcpu *vcpu, kvm_pfn_t pfn,
-> >>>  	__coherent_cache_guest_page(vcpu, pfn, size);
-> >>>  }
-> >>>  
-> >>> +static void kvm_send_hwpoison_signal(unsigned long address, bool hugetlb)
-> >>> +{
-> >>> +	siginfo_t info;
-> >>> +
-> >>> +	info.si_signo   = SIGBUS;
-> >>> +	info.si_errno   = 0;
-> >>> +	info.si_code    = BUS_MCEERR_AR;
-> >>> +	info.si_addr    = (void __user *)address;
-> >>> +
-> >>> +	if (hugetlb)
-> >>> +		info.si_addr_lsb = PMD_SHIFT;
-> >>> +	else
-> >>> +		info.si_addr_lsb = PAGE_SHIFT;
-> >>> +
-> >>> +	send_sig_info(SIGBUS, &info, current);
-> >>> +}
-> >>> +
-> >>>  static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
-> >>>  			  struct kvm_memory_slot *memslot, unsigned long hva,
-> >>>  			  unsigned long fault_status)
-> >>> @@ -1306,6 +1325,10 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
-> >>>  	smp_rmb();
-> >>>  
-> >>>  	pfn = gfn_to_pfn_prot(kvm, gfn, write_fault, &writable);
-> >>> +	if (pfn == KVM_PFN_ERR_HWPOISON) {
-> >>> +		kvm_send_hwpoison_signal(hva, hugetlb);
-> >>
-> >> The way this is called means that we'll only notify userspace of a huge
-> >> mapping if userspace is mapping hugetlbfs, and not because the stage2
-> >> mapping may or may not have used transparent huge pages when the error
-> >> was discovered.  Is this the desired semantics?
-> 
-> No,
-> 
-> 
-> > I think so.
-> >
-> > AFAIUI, transparent hugepages are split before being poisoned while all
-> > the underlying pages of a hugepage are poisoned together, i.e., no
-> > splitting.
-> 
-> In which case I need to look into this some more!
-> 
-> My thinking was we should report the size that was knocked out of the stage2 to
-> avoid the guest repeatedly faulting until it has touched every guest-page-size
-> in the stage2 hole.
+On Wed, 22 Mar 2017 15:29:34 +0200
+Claudiu Beznea <claudiu.beznea@microchip.com> wrote:
 
-By signaling something at the fault path, I think it's going to be very
-hard to backtrack how the stage 2 page tables looked like when faults
-started happening, because I think these are completely decoupled events
-(the mmu notifier and the later fault).
+> The currently Atmel PWM controllers supported by this driver
+> could change period or duty factor without channel disable,
+> for regular channels (sama5d3 support this by using period
+> or duty factor update registers, sam9rl support this by
+> writing channel update register and select the corresponding
+> update: period or duty factor). The chip doesn't support run
+> time changings of signal polarity. To take advantage of
+> atomic PWM framework and let controller works without glitches,
+> in this patch only the duty factor could be changed without
+> disabling PWM channel. For period and signal polarity the
+> atomic PWM is simulated by disabling + enabling the right PWM channel.
+> 
+> Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
+
+Reviewed-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 
 > 
-> Reading the code in that kvm/mmu.c it looked like the mapping sizes would always
-> be the same as those used by userspace.
-
-I think the mapping sizes should be the same between userspace and KVM,
-but the mapping size of a particular page (and associated pages) may
-vary over time.
-
+> ---
+>  drivers/pwm/pwm-atmel.c | 273 +++++++++++++++++++++++-------------------------
+>  1 file changed, 129 insertions(+), 144 deletions(-)
 > 
-> If the page was split before KVM could have taken this fault I assumed it would
-> fault on the page-size mapping and hugetlb would be false.
-
-I think you could have a huge page, which gets unmapped as a result on
-it getting split (perhaps because there was a failure on one page) and
-later as you fault, you can discover a range which can be a hugetlbfs or
-transparent huge pages.
-
-The question that I don't know is how Linux behaves if a page is marked
-with hwpoison, in that case, if Linux never supports THP and always
-marks an entire huge page in a hugetlbfs with the poison, then I think
-we're mostly good here.  If not, we should make sure we align with
-whatever the rest of the kernel does.
-
-> (which is already
-> wrong for another reason, looks like I grabbed the variable before
-> transparent_hugepage_adjust() has had a go a it.).
-> 
-
-yes, which is why I asked if you only care about hugetlbfs.
-
-> 
-> >> Also notice that the hva is not necessarily aligned to the beginning of
-> >> the huge page, so can we be giving userspace wrong information by
-> >> pointing in the middle of a huge page and telling it there was an
-> >> address error in the size of the PMD ?
-> >>
-> > 
-> > I could be reading it wrong but I think we are fine here - the address
-> > (hva) is the location that faulted. And the lsb indicates the least
-> > significant bit of the faulting address (See man sigaction(2)). The
-> > receiver of the signal is expected to use the address and lsb to workout
-> > the extent of corruption.
-> 
-> kill_proc() in mm/memory-failure.c does this too, but the address is set by
-> page_address_in_vma() in add_to_kill() of the same file. (I'll chat with Punit
-> off list.)
-> 
-> 
-> > Though I missed a subtlety while reviewing the patch before. The
-> > reported lsb should be for the userspace hugepage mapping (i.e., hva)
-> > and not for the stage 2.
-> 
-> I thought these were always supposed to be the same, and using hugetlb was a bug
-> because I didn't look closely enough at what is_vm_hugetlb_page() does.
-> 
-> 
-> > In light of this, I'd like to retract my Reviewed-by tag for this
-> > version of the patch as I believe we'll need to change the lsb
-> > reporting.
-> 
-> Sure, lets work out what this should be doing. I'm beginning to suspect x86's
-> 'always page size' was correct to begin with!
-> 
-
-I had a sense of that too, but it would be good to understand how you
-mark and individual page within a hugetlbfs huge page with hwpoison...
-
-Thanks,
--Christoffer
+> diff --git a/drivers/pwm/pwm-atmel.c b/drivers/pwm/pwm-atmel.c
+> index 67a7023..f147154 100644
+> --- a/drivers/pwm/pwm-atmel.c
+> +++ b/drivers/pwm/pwm-atmel.c
+> @@ -58,17 +58,22 @@
+>  #define PWM_MAX_PRD		0xFFFF
+>  #define PRD_MAX_PRES		10
+>  
+> +struct atmel_pwm_registers {
+> +	u8 period;
+> +	u8 period_upd;
+> +	u8 duty;
+> +	u8 duty_upd;
+> +};
+> +
+>  struct atmel_pwm_chip {
+>  	struct pwm_chip chip;
+>  	struct clk *clk;
+>  	void __iomem *base;
+> +	const struct atmel_pwm_registers *regs;
+>  
+>  	unsigned int updated_pwms;
+>  	/* ISR is cleared when read, ensure only one thread does that */
+>  	struct mutex isr_lock;
+> -
+> -	void (*config)(struct pwm_chip *chip, struct pwm_device *pwm,
+> -		       unsigned long dty, unsigned long prd);
+>  };
+>  
+>  static inline struct atmel_pwm_chip *to_atmel_pwm_chip(struct pwm_chip *chip)
+> @@ -105,153 +110,71 @@ static inline void atmel_pwm_ch_writel(struct atmel_pwm_chip *chip,
+>  	writel_relaxed(val, chip->base + base + offset);
+>  }
+>  
+> -static int atmel_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
+> -			    int duty_ns, int period_ns)
+> +static int atmel_pwm_calculate_cprd_and_pres(struct pwm_chip *chip,
+> +					     const struct pwm_state *state,
+> +					     unsigned long *cprd, u32 *pres)
+>  {
+>  	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
+> -	unsigned long prd, dty;
+> -	unsigned long long div;
+> -	unsigned int pres = 0;
+> -	u32 val;
+> -	int ret;
+> -
+> -	if (pwm_is_enabled(pwm) && (period_ns != pwm_get_period(pwm))) {
+> -		dev_err(chip->dev, "cannot change PWM period while enabled\n");
+> -		return -EBUSY;
+> -	}
+> +	unsigned long long cycles = state->period;
+>  
+>  	/* Calculate the period cycles and prescale value */
+> -	div = (unsigned long long)clk_get_rate(atmel_pwm->clk) * period_ns;
+> -	do_div(div, NSEC_PER_SEC);
+> +	cycles *= clk_get_rate(atmel_pwm->clk);
+> +	do_div(cycles, NSEC_PER_SEC);
+>  
+> -	while (div > PWM_MAX_PRD) {
+> -		div >>= 1;
+> -		pres++;
+> -	}
+> +	for (*pres = 0; cycles > PWM_MAX_PRD; cycles >>= 1)
+> +		(*pres)++;
+>  
+> -	if (pres > PRD_MAX_PRES) {
+> +	if (*pres > PRD_MAX_PRES) {
+>  		dev_err(chip->dev, "pres exceeds the maximum value\n");
+>  		return -EINVAL;
+>  	}
+>  
+> -	/* Calculate the duty cycles */
+> -	prd = div;
+> -	div *= duty_ns;
+> -	do_div(div, period_ns);
+> -	dty = prd - div;
+> -
+> -	ret = clk_enable(atmel_pwm->clk);
+> -	if (ret) {
+> -		dev_err(chip->dev, "failed to enable PWM clock\n");
+> -		return ret;
+> -	}
+> -
+> -	/* It is necessary to preserve CPOL, inside CMR */
+> -	val = atmel_pwm_ch_readl(atmel_pwm, pwm->hwpwm, PWM_CMR);
+> -	val = (val & ~PWM_CMR_CPRE_MSK) | (pres & PWM_CMR_CPRE_MSK);
+> -	atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWM_CMR, val);
+> -	atmel_pwm->config(chip, pwm, dty, prd);
+> -	mutex_lock(&atmel_pwm->isr_lock);
+> -	atmel_pwm->updated_pwms |= atmel_pwm_readl(atmel_pwm, PWM_ISR);
+> -	atmel_pwm->updated_pwms &= ~(1 << pwm->hwpwm);
+> -	mutex_unlock(&atmel_pwm->isr_lock);
+> +	*cprd = cycles;
+>  
+> -	clk_disable(atmel_pwm->clk);
+> -	return ret;
+> +	return 0;
+>  }
+>  
+> -static void atmel_pwm_config_v1(struct pwm_chip *chip, struct pwm_device *pwm,
+> -				unsigned long dty, unsigned long prd)
+> +static void atmel_pwm_calculate_cdty(const struct pwm_state *state,
+> +				     unsigned long cprd, unsigned long *cdty)
+>  {
+> -	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
+> -	unsigned int val;
+> +	unsigned long long cycles = state->duty_cycle;
+>  
+> -
+> -	atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMV1_CUPD, dty);
+> -
+> -	val = atmel_pwm_ch_readl(atmel_pwm, pwm->hwpwm, PWM_CMR);
+> -	val &= ~PWM_CMR_UPD_CDTY;
+> -	atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWM_CMR, val);
+> -
+> -	/*
+> -	 * If the PWM channel is enabled, only update CDTY by using the update
+> -	 * register, it needs to set bit 10 of CMR to 0
+> -	 */
+> -	if (pwm_is_enabled(pwm))
+> -		return;
+> -	/*
+> -	 * If the PWM channel is disabled, write value to duty and period
+> -	 * registers directly.
+> -	 */
+> -	atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMV1_CDTY, dty);
+> -	atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMV1_CPRD, prd);
+> +	cycles *= cprd;
+> +	do_div(cycles, state->period);
+> +	*cdty = cprd - cycles;
+>  }
+>  
+> -static void atmel_pwm_config_v2(struct pwm_chip *chip, struct pwm_device *pwm,
+> -				unsigned long dty, unsigned long prd)
+> -{
+> -	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
+> -
+> -	if (pwm_is_enabled(pwm)) {
+> -		/*
+> -		 * If the PWM channel is enabled, using the duty update register
+> -		 * to update the value.
+> -		 */
+> -		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMV2_CDTYUPD, dty);
+> -	} else {
+> -		/*
+> -		 * If the PWM channel is disabled, write value to duty and
+> -		 * period registers directly.
+> -		 */
+> -		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMV2_CDTY, dty);
+> -		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMV2_CPRD, prd);
+> -	}
+> -}
+> -
+> -static int atmel_pwm_set_polarity(struct pwm_chip *chip, struct pwm_device *pwm,
+> -				  enum pwm_polarity polarity)
+> +static void atmel_pwm_update_cdty(struct pwm_chip *chip, struct pwm_device *pwm,
+> +				  unsigned long cdty)
+>  {
+>  	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
+>  	u32 val;
+> -	int ret;
+> -
+> -	val = atmel_pwm_ch_readl(atmel_pwm, pwm->hwpwm, PWM_CMR);
+>  
+> -	if (polarity == PWM_POLARITY_NORMAL)
+> -		val &= ~PWM_CMR_CPOL;
+> -	else
+> -		val |= PWM_CMR_CPOL;
+> -
+> -	ret = clk_enable(atmel_pwm->clk);
+> -	if (ret) {
+> -		dev_err(chip->dev, "failed to enable PWM clock\n");
+> -		return ret;
+> +	if (atmel_pwm->regs->duty_upd ==
+> +	    atmel_pwm->regs->period_upd) {
+> +		val = atmel_pwm_ch_readl(atmel_pwm, pwm->hwpwm, PWM_CMR);
+> +		val &= ~PWM_CMR_UPD_CDTY;
+> +		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWM_CMR, val);
+>  	}
+>  
+> -	atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWM_CMR, val);
+> -
+> -	clk_disable(atmel_pwm->clk);
+> -
+> -	return 0;
+> +	atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm,
+> +			    atmel_pwm->regs->duty_upd, cdty);
+>  }
+>  
+> -static int atmel_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
+> +static void atmel_pwm_set_cprd_cdty(struct pwm_chip *chip,
+> +				    struct pwm_device *pwm,
+> +				    unsigned long cprd, unsigned long cdty)
+>  {
+>  	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
+> -	int ret;
+> -
+> -	ret = clk_enable(atmel_pwm->clk);
+> -	if (ret) {
+> -		dev_err(chip->dev, "failed to enable PWM clock\n");
+> -		return ret;
+> -	}
+>  
+> -	atmel_pwm_writel(atmel_pwm, PWM_ENA, 1 << pwm->hwpwm);
+> -
+> -	return 0;
+> +	atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm,
+> +			    atmel_pwm->regs->duty, cdty);
+> +	atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm,
+> +			    atmel_pwm->regs->period, cprd);
+>  }
+>  
+> -static void atmel_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
+> +static void atmel_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm,
+> +			      bool disable_clk)
+>  {
+>  	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
+>  	unsigned long timeout = jiffies + 2 * HZ;
+> @@ -282,37 +205,99 @@ static void atmel_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
+>  	       time_before(jiffies, timeout))
+>  		usleep_range(10, 100);
+>  
+> -	clk_disable(atmel_pwm->clk);
+> +	if (disable_clk)
+> +		clk_disable(atmel_pwm->clk);
+> +}
+> +
+> +static int atmel_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
+> +			   struct pwm_state *state)
+> +{
+> +	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
+> +	struct pwm_state cstate;
+> +	unsigned long cprd, cdty;
+> +	u32 pres, val;
+> +	int ret;
+> +
+> +	pwm_get_state(pwm, &cstate);
+> +
+> +	if (state->enabled) {
+> +		if (cstate.enabled &&
+> +		    cstate.polarity == state->polarity &&
+> +		    cstate.period == state->period) {
+> +			cprd = atmel_pwm_ch_readl(atmel_pwm, pwm->hwpwm,
+> +						  atmel_pwm->regs->period);
+> +			atmel_pwm_calculate_cdty(state, cprd, &cdty);
+> +			atmel_pwm_update_cdty(chip, pwm, cdty);
+> +			return 0;
+> +		}
+> +
+> +		ret = atmel_pwm_calculate_cprd_and_pres(chip, state, &cprd,
+> +							&pres);
+> +		if (ret) {
+> +			dev_err(chip->dev,
+> +				"failed to calculate cprd and prescaler\n");
+> +			return ret;
+> +		}
+> +
+> +		atmel_pwm_calculate_cdty(state, cprd, &cdty);
+> +
+> +		if (cstate.enabled) {
+> +			atmel_pwm_disable(chip, pwm, false);
+> +		} else {
+> +			ret = clk_enable(atmel_pwm->clk);
+> +			if (ret) {
+> +				dev_err(chip->dev, "failed to enable clock\n");
+> +				return ret;
+> +			}
+> +		}
+> +
+> +		/* It is necessary to preserve CPOL, inside CMR */
+> +		val = atmel_pwm_ch_readl(atmel_pwm, pwm->hwpwm, PWM_CMR);
+> +		val = (val & ~PWM_CMR_CPRE_MSK) | (pres & PWM_CMR_CPRE_MSK);
+> +		if (state->polarity == PWM_POLARITY_NORMAL)
+> +			val &= ~PWM_CMR_CPOL;
+> +		else
+> +			val |= PWM_CMR_CPOL;
+> +		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWM_CMR, val);
+> +		atmel_pwm_set_cprd_cdty(chip, pwm, cprd, cdty);
+> +		mutex_lock(&atmel_pwm->isr_lock);
+> +		atmel_pwm->updated_pwms |= atmel_pwm_readl(atmel_pwm, PWM_ISR);
+> +		atmel_pwm->updated_pwms &= ~(1 << pwm->hwpwm);
+> +		mutex_unlock(&atmel_pwm->isr_lock);
+> +		atmel_pwm_writel(atmel_pwm, PWM_ENA, 1 << pwm->hwpwm);
+> +	} else if (cstate.enabled) {
+> +		atmel_pwm_disable(chip, pwm, true);
+> +	}
+> +
+> +	return 0;
+>  }
+>  
+>  static const struct pwm_ops atmel_pwm_ops = {
+> -	.config = atmel_pwm_config,
+> -	.set_polarity = atmel_pwm_set_polarity,
+> -	.enable = atmel_pwm_enable,
+> -	.disable = atmel_pwm_disable,
+> +	.apply = atmel_pwm_apply,
+>  	.owner = THIS_MODULE,
+>  };
+>  
+> -struct atmel_pwm_data {
+> -	void (*config)(struct pwm_chip *chip, struct pwm_device *pwm,
+> -		       unsigned long dty, unsigned long prd);
+> -};
+> -
+> -static const struct atmel_pwm_data atmel_pwm_data_v1 = {
+> -	.config = atmel_pwm_config_v1,
+> +static const struct atmel_pwm_registers atmel_pwm_regs_v1 = {
+> +	.period		= PWMV1_CPRD,
+> +	.period_upd	= PWMV1_CUPD,
+> +	.duty		= PWMV1_CDTY,
+> +	.duty_upd	= PWMV1_CUPD,
+>  };
+>  
+> -static const struct atmel_pwm_data atmel_pwm_data_v2 = {
+> -	.config = atmel_pwm_config_v2,
+> +static const struct atmel_pwm_registers atmel_pwm_regs_v2 = {
+> +	.period		= PWMV2_CPRD,
+> +	.period_upd	= PWMV2_CPRDUPD,
+> +	.duty		= PWMV2_CDTY,
+> +	.duty_upd	= PWMV2_CDTYUPD,
+>  };
+>  
+>  static const struct platform_device_id atmel_pwm_devtypes[] = {
+>  	{
+>  		.name = "at91sam9rl-pwm",
+> -		.driver_data = (kernel_ulong_t)&atmel_pwm_data_v1,
+> +		.driver_data = (kernel_ulong_t)&atmel_pwm_regs_v1,
+>  	}, {
+>  		.name = "sama5d3-pwm",
+> -		.driver_data = (kernel_ulong_t)&atmel_pwm_data_v2,
+> +		.driver_data = (kernel_ulong_t)&atmel_pwm_regs_v2,
+>  	}, {
+>  		/* sentinel */
+>  	},
+> @@ -322,17 +307,17 @@ MODULE_DEVICE_TABLE(platform, atmel_pwm_devtypes);
+>  static const struct of_device_id atmel_pwm_dt_ids[] = {
+>  	{
+>  		.compatible = "atmel,at91sam9rl-pwm",
+> -		.data = &atmel_pwm_data_v1,
+> +		.data = &atmel_pwm_regs_v1,
+>  	}, {
+>  		.compatible = "atmel,sama5d3-pwm",
+> -		.data = &atmel_pwm_data_v2,
+> +		.data = &atmel_pwm_regs_v2,
+>  	}, {
+>  		/* sentinel */
+>  	},
+>  };
+>  MODULE_DEVICE_TABLE(of, atmel_pwm_dt_ids);
+>  
+> -static inline const struct atmel_pwm_data *
+> +static inline const struct atmel_pwm_registers *
+>  atmel_pwm_get_driver_data(struct platform_device *pdev)
+>  {
+>  	const struct platform_device_id *id;
+> @@ -342,18 +327,18 @@ atmel_pwm_get_driver_data(struct platform_device *pdev)
+>  
+>  	id = platform_get_device_id(pdev);
+>  
+> -	return (struct atmel_pwm_data *)id->driver_data;
+> +	return (struct atmel_pwm_registers *)id->driver_data;
+>  }
+>  
+>  static int atmel_pwm_probe(struct platform_device *pdev)
+>  {
+> -	const struct atmel_pwm_data *data;
+> +	const struct atmel_pwm_registers *regs;
+>  	struct atmel_pwm_chip *atmel_pwm;
+>  	struct resource *res;
+>  	int ret;
+>  
+> -	data = atmel_pwm_get_driver_data(pdev);
+> -	if (!data)
+> +	regs = atmel_pwm_get_driver_data(pdev);
+> +	if (!regs)
+>  		return -ENODEV;
+>  
+>  	atmel_pwm = devm_kzalloc(&pdev->dev, sizeof(*atmel_pwm), GFP_KERNEL);
+> @@ -385,7 +370,7 @@ static int atmel_pwm_probe(struct platform_device *pdev)
+>  
+>  	atmel_pwm->chip.base = -1;
+>  	atmel_pwm->chip.npwm = 4;
+> -	atmel_pwm->config = data->config;
+> +	atmel_pwm->regs = regs;
+>  	atmel_pwm->updated_pwms = 0;
+>  	mutex_init(&atmel_pwm->isr_lock);
+>  
