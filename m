@@ -1,27 +1,21 @@
-From: minchan@kernel.org (Minchan Kim)
-Date: Mon, 27 Mar 2017 14:01:34 +0900
-Subject: [PATCH v3 5/7] zram: Convert to using memset_l
-In-Reply-To: <20170324161318.18718-6-willy@infradead.org>
-References: <20170324161318.18718-1-willy@infradead.org>
- <20170324161318.18718-6-willy@infradead.org>
-Message-ID: <20170327050134.GA19601@bbox>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Mon, 27 Mar 2017 10:44:19 +0530
+Subject: [PATCH 1/2] dmaengine: qcom_hidma: disable/enable IRQs on
+ pause/resume
+In-Reply-To: <1490483043-4364-1-git-send-email-okaya@codeaurora.org>
+References: <1490483043-4364-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <20170327051418.GE9308@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 24, 2017 at 09:13:16AM -0700, Matthew Wilcox wrote:
-> From: Matthew Wilcox <mawilcox@microsoft.com>
+On Sat, Mar 25, 2017 at 07:04:02PM -0400, Sinan Kaya wrote:
+> Once the channels are stopped, disable interrupts to make sure no new
+> HW interaction can happen.
 > 
-> zram was the motivation for creating memset_l().  Minchan Kim sees a 7%
-> performance improvement on x86 with 100MB of non-zero deduplicatable
-> data:
-> 
->         perf stat -r 10 dd if=/dev/zram0 of=/dev/null
-> 
-> vanilla:        0.232050465 seconds time elapsed ( +-  0.51% )
-> memset_l:	0.217219387 seconds time elapsed ( +-  0.07% )
-> 
-> Signed-off-by: Matthew Wilcox <mawilcox@microsoft.com>
-> Tested-by: Minchan Kim <minchan@kernel.org>
-Acked-by: Minchan Kim <minchan@kernel.org>
+> Similarly, re-enable the interrupts only if we know that channel is
+> operational again.
 
-Thanks!
+Applied both, thanks
+
+-- 
+~Vinod
