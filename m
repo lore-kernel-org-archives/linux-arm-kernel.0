@@ -1,37 +1,36 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 27 Mar 2017 22:38:45 +0800
-Subject: [PATCH 0/2] drm/sun4i: Add display backend interrupt to dt binding
-Message-ID: <20170327143847.16259-1-wens@csie.org>
+Date: Mon, 27 Mar 2017 22:38:47 +0800
+Subject: [PATCH 2/2] ARM: dts: sun5i: Add interrupt for display backend
+In-Reply-To: <20170327143847.16259-1-wens@csie.org>
+References: <20170327143847.16259-1-wens@csie.org>
+Message-ID: <20170327143847.16259-3-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+The display backend on sun5i shares the same interrupt line as the
+display frontend. Add it.
 
-As promised, here is the patch adding the interrupt line for the display
-backend to the sun5i shared dtsi, and another one adding it to the device
-tree bindings.
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
 
-The display backend has an undocumented (in the user manual) interrupt
-that, according to vendor code, is raised when the current scanout is
-completed. This might be a better fit for DRM/KMS vblank signalling,
-rather than the TCON's vblank interrupt. If true, it would allow us
-to cut out the TCON from the crtc in the driver, instead keeping it
-solely as an encoder, simplifying some of the inter-component code.
+This won't directly apply to old releases. We may want to backport
+them though?
 
-Regardless, the interrupt line exists and should be added to the
-device tree.
+---
+ arch/arm/boot/dts/sun5i.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
 
-
-Regards
-ChenYu
-
-Chen-Yu Tsai (2):
-  drm/sun4i: Add display backend interrupt to device tree binding
-  ARM: dts: sun5i: Add interrupt for display backend
-
- Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt | 2 ++
- arch/arm/boot/dts/sun5i.dtsi                                  | 1 +
- 2 files changed, 3 insertions(+)
-
+diff --git a/arch/arm/boot/dts/sun5i.dtsi b/arch/arm/boot/dts/sun5i.dtsi
+index fc338ce7af79..5175f9cc9bed 100644
+--- a/arch/arm/boot/dts/sun5i.dtsi
++++ b/arch/arm/boot/dts/sun5i.dtsi
+@@ -689,6 +689,7 @@
+ 		be0: display-backend at 01e60000 {
+ 			compatible = "allwinner,sun5i-a13-display-backend";
+ 			reg = <0x01e60000 0x10000>;
++			interrupts = <47>;
+ 			clocks = <&ccu CLK_AHB_DE_BE>, <&ccu CLK_DE_BE>,
+ 				 <&ccu CLK_DRAM_DE_BE>;
+ 			clock-names = "ahb", "mod",
 -- 
 2.11.0
