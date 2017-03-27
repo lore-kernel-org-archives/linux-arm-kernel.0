@@ -1,402 +1,163 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Mon, 27 Mar 2017 11:09:31 -0600
-Subject: [PATCH 1/3] coresight: Replace sprintf with scnprintf
-In-Reply-To: <1490634573-11068-1-git-send-email-mathieu.poirier@linaro.org>
-References: <1490634573-11068-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1490634573-11068-2-git-send-email-mathieu.poirier@linaro.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 27 Mar 2017 18:09:52 +0100
+Subject: [RFC PATCH v0.2] PCI: Add support for tango PCIe host bridge
+In-Reply-To: <0502e180-5517-12d6-e3a1-bcea0da7e201@free.fr>
+References: <91db1f47-3024-9712-309a-fb4b21e42028@free.fr>
+ <e5c0bace-fcbe-de3f-b76f-0fb672562e84@arm.com>
+ <310db9dd-7db6-2106-2e53-f0083b2d3758@free.fr>
+ <012f7fcb-eaeb-70dd-a1a9-06c213789d30@arm.com>
+ <0502e180-5517-12d6-e3a1-bcea0da7e201@free.fr>
+Message-ID: <4edd799a-650c-0189-cd5c-e9fc18c5f8bc@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Olav Haugan <ohaugan@codeaurora.org>
+On 27/03/17 16:53, Mason wrote:
+> On 24/03/2017 19:47, Marc Zyngier wrote:
+> 
+>> On 23/03/17 17:03, Mason wrote:
+>>
+>>> On 23/03/2017 15:22, Marc Zyngier wrote:
+>>>
+>>>> On 23/03/17 13:05, Mason wrote:
+>>>>
+>>>>> +	writel_relaxed(status, pcie->msi_status); /* clear IRQs */
+>>>>
+>>>> Why isn't this your irq_ack method instead of open-coding it?
+>>>
+>>> I based my driver on the Altera driver, and I did it like
+>>> I thought they did. I will try fixing my code.
+>>
+>> Doesn't make it right, unfortunately. I wish you would try to understand
+>> the API first instead of copy-pasting things (including potential bugs).
+> 
+> So far, I have not been able to get the irqchip framework to
+> call the irq_ack functions I registered.
+> 
+> Should I pass a different handler than handle_simple_irq
+> to irq_domain_set_info?
+> 
+> 	irq_domain_set_info(domain, virq, pos, &tango_msi_chip,
+> 		domain->host_data, handle_simple_irq, NULL, NULL);
 
-Replace all occurrences of sprintf with scnprintf in coresight driver for
-consistency. scnprintf is also a safer alternative to sprintf.
+Only you can answer that question. But looking at the documentation is 
+always a good start:
 
-Signed-off-by: Olav Haugan <ohaugan@codeaurora.org>
-Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
----
- drivers/hwtracing/coresight/coresight-etb10.c      |  2 +-
- drivers/hwtracing/coresight/coresight-etm-perf.c   |  2 +-
- .../hwtracing/coresight/coresight-etm3x-sysfs.c    | 66 +++++++++++-----------
- drivers/hwtracing/coresight/coresight-funnel.c     |  4 +-
- drivers/hwtracing/coresight/coresight-stm.c        |  2 +-
- drivers/hwtracing/coresight/coresight-tmc.c        |  2 +-
- 6 files changed, 39 insertions(+), 39 deletions(-)
+/**
+ *      handle_simple_irq - Simple and software-decoded IRQs.
+ *      @desc:  the interrupt description structure for this irq
+ *
+ *      Simple interrupts are either sent from a demultiplexing interrupt
+ *      handler or come from hardware, where no interrupt hardware control
+ *      is necessary.
+ *
+ *      Note: The caller is expected to handle the ack, clear, mask and
+ *      unmask issues if necessary.
+ */
 
-diff --git a/drivers/hwtracing/coresight/coresight-etb10.c b/drivers/hwtracing/coresight/coresight-etb10.c
-index d7325c6534ad..491f4da61c11 100644
---- a/drivers/hwtracing/coresight/coresight-etb10.c
-+++ b/drivers/hwtracing/coresight/coresight-etb10.c
-@@ -588,7 +588,7 @@ static ssize_t trigger_cntr_show(struct device *dev,
- 	struct etb_drvdata *drvdata = dev_get_drvdata(dev->parent);
- 	unsigned long val = drvdata->trigger_cntr;
- 
--	return sprintf(buf, "%#lx\n", val);
-+	return scnprintf(buf, PAGE_SIZE, "%#lx\n", val);
- }
- 
- static ssize_t trigger_cntr_store(struct device *dev,
-diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.c b/drivers/hwtracing/coresight/coresight-etm-perf.c
-index 26cfac3e6de7..6ddcd186c085 100644
---- a/drivers/hwtracing/coresight/coresight-etm-perf.c
-+++ b/drivers/hwtracing/coresight/coresight-etm-perf.c
-@@ -467,7 +467,7 @@ int etm_perf_symlink(struct coresight_device *csdev, bool link)
- 	struct device *pmu_dev = etm_pmu.dev;
- 	struct device *cs_dev = &csdev->dev;
- 
--	sprintf(entry, "cpu%d", cpu);
-+	scnprintf(entry, PAGE_SIZE, "cpu%d", cpu);
- 
- 	if (!etm_perf_up)
- 		return -EPROBE_DEFER;
-diff --git a/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c b/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
-index ca98ad13bb8c..4cbbd1313331 100644
---- a/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
-+++ b/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
-@@ -27,7 +27,7 @@ static ssize_t nr_addr_cmp_show(struct device *dev,
- 	struct etm_drvdata *drvdata = dev_get_drvdata(dev->parent);
- 
- 	val = drvdata->nr_addr_cmp;
--	return sprintf(buf, "%#lx\n", val);
-+	return scnprintf(buf, PAGE_SIZE, "%#lx\n", val);
- }
- static DEVICE_ATTR_RO(nr_addr_cmp);
- 
-@@ -37,7 +37,7 @@ static ssize_t nr_cntr_show(struct device *dev,
- 	struct etm_drvdata *drvdata = dev_get_drvdata(dev->parent);
- 
- 	val = drvdata->nr_cntr;
--	return sprintf(buf, "%#lx\n", val);
-+	return scnprintf(buf, PAGE_SIZE, "%#lx\n", val);
- }
- static DEVICE_ATTR_RO(nr_cntr);
- 
-@@ -48,7 +48,7 @@ static ssize_t nr_ctxid_cmp_show(struct device *dev,
- 	struct etm_drvdata *drvdata = dev_get_drvdata(dev->parent);
- 
- 	val = drvdata->nr_ctxid_cmp;
--	return sprintf(buf, "%#lx\n", val);
-+	return scnprintf(buf, PAGE_SIZE, "%#lx\n", val);
- }
- static DEVICE_ATTR_RO(nr_ctxid_cmp);
- 
-@@ -68,7 +68,7 @@ static ssize_t etmsr_show(struct device *dev,
- 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
- 	pm_runtime_put(drvdata->dev);
- 
--	return sprintf(buf, "%#lx\n", val);
-+	return scnprintf(buf, PAGE_SIZE, "%#lx\n", val);
- }
- static DEVICE_ATTR_RO(etmsr);
- 
-@@ -110,7 +110,7 @@ static ssize_t mode_show(struct device *dev,
- 	struct etm_config *config = &drvdata->config;
- 
- 	val = config->mode;
--	return sprintf(buf, "%#lx\n", val);
-+	return scnprintf(buf, PAGE_SIZE, "%#lx\n", val);
- }
- 
- static ssize_t mode_store(struct device *dev,
-@@ -195,7 +195,7 @@ static ssize_t trigger_event_show(struct device *dev,
- 	struct etm_config *config = &drvdata->config;
- 
- 	val = config->trigger_event;
--	return sprintf(buf, "%#lx\n", val);
-+	return scnprintf(buf, PAGE_SIZE, "%#lx\n", val);
- }
- 
- static ssize_t trigger_event_store(struct device *dev,
-@@ -225,7 +225,7 @@ static ssize_t enable_event_show(struct device *dev,
- 	struct etm_config *config = &drvdata->config;
- 
- 	val = config->enable_event;
--	return sprintf(buf, "%#lx\n", val);
-+	return scnprintf(buf, PAGE_SIZE, "%#lx\n", val);
- }
- 
- static ssize_t enable_event_store(struct device *dev,
-@@ -255,7 +255,7 @@ static ssize_t fifofull_level_show(struct device *dev,
- 	struct etm_config *config = &drvdata->config;
- 
- 	val = config->fifofull_level;
--	return sprintf(buf, "%#lx\n", val);
-+	return scnprintf(buf, PAGE_SIZE, "%#lx\n", val);
- }
- 
- static ssize_t fifofull_level_store(struct device *dev,
-@@ -285,7 +285,7 @@ static ssize_t addr_idx_show(struct device *dev,
- 	struct etm_config *config = &drvdata->config;
- 
- 	val = config->addr_idx;
--	return sprintf(buf, "%#lx\n", val);
-+	return scnprintf(buf, PAGE_SIZE, "%#lx\n", val);
- }
- 
- static ssize_t addr_idx_store(struct device *dev,
-@@ -335,7 +335,7 @@ static ssize_t addr_single_show(struct device *dev,
- 	val = config->addr_val[idx];
- 	spin_unlock(&drvdata->spinlock);
- 
--	return sprintf(buf, "%#lx\n", val);
-+	return scnprintf(buf, PAGE_SIZE, "%#lx\n", val);
- }
- 
- static ssize_t addr_single_store(struct device *dev,
-@@ -394,7 +394,7 @@ static ssize_t addr_range_show(struct device *dev,
- 	val2 = config->addr_val[idx + 1];
- 	spin_unlock(&drvdata->spinlock);
- 
--	return sprintf(buf, "%#lx %#lx\n", val1, val2);
-+	return scnprintf(buf, PAGE_SIZE, "%#lx %#lx\n", val1, val2);
- }
- 
- static ssize_t addr_range_store(struct device *dev,
-@@ -456,7 +456,7 @@ static ssize_t addr_start_show(struct device *dev,
- 	val = config->addr_val[idx];
- 	spin_unlock(&drvdata->spinlock);
- 
--	return sprintf(buf, "%#lx\n", val);
-+	return scnprintf(buf, PAGE_SIZE, "%#lx\n", val);
- }
- 
- static ssize_t addr_start_store(struct device *dev,
-@@ -510,7 +510,7 @@ static ssize_t addr_stop_show(struct device *dev,
- 	val = config->addr_val[idx];
- 	spin_unlock(&drvdata->spinlock);
- 
--	return sprintf(buf, "%#lx\n", val);
-+	return scnprintf(buf, PAGE_SIZE, "%#lx\n", val);
- }
- 
- static ssize_t addr_stop_store(struct device *dev,
-@@ -556,7 +556,7 @@ static ssize_t addr_acctype_show(struct device *dev,
- 	val = config->addr_acctype[config->addr_idx];
- 	spin_unlock(&drvdata->spinlock);
- 
--	return sprintf(buf, "%#lx\n", val);
-+	return scnprintf(buf, PAGE_SIZE, "%#lx\n", val);
- }
- 
- static ssize_t addr_acctype_store(struct device *dev,
-@@ -588,7 +588,7 @@ static ssize_t cntr_idx_show(struct device *dev,
- 	struct etm_config *config = &drvdata->config;
- 
- 	val = config->cntr_idx;
--	return sprintf(buf, "%#lx\n", val);
-+	return scnprintf(buf, PAGE_SIZE, "%#lx\n", val);
- }
- 
- static ssize_t cntr_idx_store(struct device *dev,
-@@ -629,7 +629,7 @@ static ssize_t cntr_rld_val_show(struct device *dev,
- 	val = config->cntr_rld_val[config->cntr_idx];
- 	spin_unlock(&drvdata->spinlock);
- 
--	return sprintf(buf, "%#lx\n", val);
-+	return scnprintf(buf, PAGE_SIZE, "%#lx\n", val);
- }
- 
- static ssize_t cntr_rld_val_store(struct device *dev,
-@@ -664,7 +664,7 @@ static ssize_t cntr_event_show(struct device *dev,
- 	val = config->cntr_event[config->cntr_idx];
- 	spin_unlock(&drvdata->spinlock);
- 
--	return sprintf(buf, "%#lx\n", val);
-+	return scnprintf(buf, PAGE_SIZE, "%#lx\n", val);
- }
- 
- static ssize_t cntr_event_store(struct device *dev,
-@@ -699,7 +699,7 @@ static ssize_t cntr_rld_event_show(struct device *dev,
- 	val = config->cntr_rld_event[config->cntr_idx];
- 	spin_unlock(&drvdata->spinlock);
- 
--	return sprintf(buf, "%#lx\n", val);
-+	return scnprintf(buf, PAGE_SIZE, "%#lx\n", val);
- }
- 
- static ssize_t cntr_rld_event_store(struct device *dev,
-@@ -734,7 +734,7 @@ static ssize_t cntr_val_show(struct device *dev,
- 	if (!local_read(&drvdata->mode)) {
- 		spin_lock(&drvdata->spinlock);
- 		for (i = 0; i < drvdata->nr_cntr; i++)
--			ret += sprintf(buf, "counter %d: %x\n",
-+			ret += scnprintf(buf, PAGE_SIZE, "counter %d: %x\n",
- 				       i, config->cntr_val[i]);
- 		spin_unlock(&drvdata->spinlock);
- 		return ret;
-@@ -742,7 +742,7 @@ static ssize_t cntr_val_show(struct device *dev,
- 
- 	for (i = 0; i < drvdata->nr_cntr; i++) {
- 		val = etm_readl(drvdata, ETMCNTVRn(i));
--		ret += sprintf(buf, "counter %d: %x\n", i, val);
-+		ret += scnprintf(buf, PAGE_SIZE, "counter %d: %x\n", i, val);
- 	}
- 
- 	return ret;
-@@ -777,7 +777,7 @@ static ssize_t seq_12_event_show(struct device *dev,
- 	struct etm_config *config = &drvdata->config;
- 
- 	val = config->seq_12_event;
--	return sprintf(buf, "%#lx\n", val);
-+	return scnprintf(buf, PAGE_SIZE, "%#lx\n", val);
- }
- 
- static ssize_t seq_12_event_store(struct device *dev,
-@@ -806,7 +806,7 @@ static ssize_t seq_21_event_show(struct device *dev,
- 	struct etm_config *config = &drvdata->config;
- 
- 	val = config->seq_21_event;
--	return sprintf(buf, "%#lx\n", val);
-+	return scnprintf(buf, PAGE_SIZE, "%#lx\n", val);
- }
- 
- static ssize_t seq_21_event_store(struct device *dev,
-@@ -835,7 +835,7 @@ static ssize_t seq_23_event_show(struct device *dev,
- 	struct etm_config *config = &drvdata->config;
- 
- 	val = config->seq_23_event;
--	return sprintf(buf, "%#lx\n", val);
-+	return scnprintf(buf, PAGE_SIZE, "%#lx\n", val);
- }
- 
- static ssize_t seq_23_event_store(struct device *dev,
-@@ -864,7 +864,7 @@ static ssize_t seq_31_event_show(struct device *dev,
- 	struct etm_config *config = &drvdata->config;
- 
- 	val = config->seq_31_event;
--	return sprintf(buf, "%#lx\n", val);
-+	return scnprintf(buf, PAGE_SIZE, "%#lx\n", val);
- }
- 
- static ssize_t seq_31_event_store(struct device *dev,
-@@ -893,7 +893,7 @@ static ssize_t seq_32_event_show(struct device *dev,
- 	struct etm_config *config = &drvdata->config;
- 
- 	val = config->seq_32_event;
--	return sprintf(buf, "%#lx\n", val);
-+	return scnprintf(buf, PAGE_SIZE, "%#lx\n", val);
- }
- 
- static ssize_t seq_32_event_store(struct device *dev,
-@@ -922,7 +922,7 @@ static ssize_t seq_13_event_show(struct device *dev,
- 	struct etm_config *config = &drvdata->config;
- 
- 	val = config->seq_13_event;
--	return sprintf(buf, "%#lx\n", val);
-+	return scnprintf(buf, PAGE_SIZE, "%#lx\n", val);
- }
- 
- static ssize_t seq_13_event_store(struct device *dev,
-@@ -965,7 +965,7 @@ static ssize_t seq_curr_state_show(struct device *dev,
- 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
- 	pm_runtime_put(drvdata->dev);
- out:
--	return sprintf(buf, "%#lx\n", val);
-+	return scnprintf(buf, PAGE_SIZE, "%#lx\n", val);
- }
- 
- static ssize_t seq_curr_state_store(struct device *dev,
-@@ -998,7 +998,7 @@ static ssize_t ctxid_idx_show(struct device *dev,
- 	struct etm_config *config = &drvdata->config;
- 
- 	val = config->ctxid_idx;
--	return sprintf(buf, "%#lx\n", val);
-+	return scnprintf(buf, PAGE_SIZE, "%#lx\n", val);
- }
- 
- static ssize_t ctxid_idx_store(struct device *dev,
-@@ -1040,7 +1040,7 @@ static ssize_t ctxid_pid_show(struct device *dev,
- 	val = config->ctxid_vpid[config->ctxid_idx];
- 	spin_unlock(&drvdata->spinlock);
- 
--	return sprintf(buf, "%#lx\n", val);
-+	return scnprintf(buf, PAGE_SIZE, "%#lx\n", val);
- }
- 
- static ssize_t ctxid_pid_store(struct device *dev,
-@@ -1075,7 +1075,7 @@ static ssize_t ctxid_mask_show(struct device *dev,
- 	struct etm_config *config = &drvdata->config;
- 
- 	val = config->ctxid_mask;
--	return sprintf(buf, "%#lx\n", val);
-+	return scnprintf(buf, PAGE_SIZE, "%#lx\n", val);
- }
- 
- static ssize_t ctxid_mask_store(struct device *dev,
-@@ -1104,7 +1104,7 @@ static ssize_t sync_freq_show(struct device *dev,
- 	struct etm_config *config = &drvdata->config;
- 
- 	val = config->sync_freq;
--	return sprintf(buf, "%#lx\n", val);
-+	return scnprintf(buf, PAGE_SIZE, "%#lx\n", val);
- }
- 
- static ssize_t sync_freq_store(struct device *dev,
-@@ -1133,7 +1133,7 @@ static ssize_t timestamp_event_show(struct device *dev,
- 	struct etm_config *config = &drvdata->config;
- 
- 	val = config->timestamp_event;
--	return sprintf(buf, "%#lx\n", val);
-+	return scnprintf(buf, PAGE_SIZE, "%#lx\n", val);
- }
- 
- static ssize_t timestamp_event_store(struct device *dev,
-@@ -1174,7 +1174,7 @@ static ssize_t traceid_show(struct device *dev,
- 
- 	val = etm_get_trace_id(drvdata);
- 
--	return sprintf(buf, "%#lx\n", val);
-+	return scnprintf(buf, PAGE_SIZE, "%#lx\n", val);
- }
- 
- static ssize_t traceid_store(struct device *dev,
-diff --git a/drivers/hwtracing/coresight/coresight-funnel.c b/drivers/hwtracing/coresight/coresight-funnel.c
-index 860fe6ef5632..30cfd5c12b71 100644
---- a/drivers/hwtracing/coresight/coresight-funnel.c
-+++ b/drivers/hwtracing/coresight/coresight-funnel.c
-@@ -114,7 +114,7 @@ static ssize_t priority_show(struct device *dev,
- 	struct funnel_drvdata *drvdata = dev_get_drvdata(dev->parent);
- 	unsigned long val = drvdata->priority;
- 
--	return sprintf(buf, "%#lx\n", val);
-+	return scnprintf(buf, PAGE_SIZE, "%#lx\n", val);
- }
- 
- static ssize_t priority_store(struct device *dev,
-@@ -157,7 +157,7 @@ static ssize_t funnel_ctrl_show(struct device *dev,
- 
- 	pm_runtime_put(drvdata->dev);
- 
--	return sprintf(buf, "%#x\n", val);
-+	return scnprintf(buf, PAGE_SIZE, "%#x\n", val);
- }
- static DEVICE_ATTR_RO(funnel_ctrl);
- 
-diff --git a/drivers/hwtracing/coresight/coresight-stm.c b/drivers/hwtracing/coresight/coresight-stm.c
-index 93fc26f01bab..70b3eee7f4dd 100644
---- a/drivers/hwtracing/coresight/coresight-stm.c
-+++ b/drivers/hwtracing/coresight/coresight-stm.c
-@@ -614,7 +614,7 @@ static ssize_t traceid_show(struct device *dev,
- 	struct stm_drvdata *drvdata = dev_get_drvdata(dev->parent);
- 
- 	val = drvdata->traceid;
--	return sprintf(buf, "%#lx\n", val);
-+	return scnprintf(buf, PAGE_SIZE, "%#lx\n", val);
- }
- 
- static ssize_t traceid_store(struct device *dev,
-diff --git a/drivers/hwtracing/coresight/coresight-tmc.c b/drivers/hwtracing/coresight/coresight-tmc.c
-index d8517d2a968c..1a660f014c6c 100644
---- a/drivers/hwtracing/coresight/coresight-tmc.c
-+++ b/drivers/hwtracing/coresight/coresight-tmc.c
-@@ -253,7 +253,7 @@ static ssize_t trigger_cntr_show(struct device *dev,
- 	struct tmc_drvdata *drvdata = dev_get_drvdata(dev->parent);
- 	unsigned long val = drvdata->trigger_cntr;
- 
--	return sprintf(buf, "%#lx\n", val);
-+	return scnprintf(buf, PAGE_SIZE, "%#lx\n", val);
- }
- 
- static ssize_t trigger_cntr_store(struct device *dev,
+I'd tend to infer that this is not what you want. On the other hand,
+something called handle_edge_irq sounds promising when you deal
+with edge interrupts. But again, you are writing the driver, I cannot
+guide your hand.
+
+> When an MSI packet arrives at the MSI doorbell address, the controller
+> reads the packet's data; this is the MSI number "num". It sets bit "num"
+> to 1 in the status regs, and raises IRQ line 55 on the system intc.
+> The IRQ signal remains high, until software clears it by writing 1
+> in bit "num" of the status regs.
+> 
+> Is this an edge interrupt or a level interrupt?
+> 
+> I was told if the interrupt request is triggered by an event, then
+> it is an edge interrupt. The reception of an MSI packet is an event.
+> But the IRQ remains high, so this feels like a level high.
+> I'm hopelessly confused :-(
+
+Here's what your system looks like:
+
+PCI-EP -------> MSI Controller ------> INTC
+         MSI                    IRQ
+
+A PCI MSI is always edge. No ifs, no buts. That's what it is, and nothing
+else. Now, your MSI controller signals its output using a level interrupt,
+since you need to whack it on the head so that it lowers its line.
+
+There is not a single trigger, because there is not a single interrupt.
+
+>>>>> +	mutex_lock(&pcie->lock);
+>>>>> +
+>>>>> +	mask = readl_relaxed(pcie->msi_mask);
+>>>>
+>>>> Do you really need to read this from the HW each time you allocate an
+>>>> interrupt? That feels pretty crazy. You're much better off having an
+>>>> in-memory bitmap that will make things more efficient [...]
+> 
+> I have one remaining issue with bitmaps.
+> 
+> My HW regs are 32b. How do I grab e.g. bits 96-127?
+> All I can think of is
+>   u32 val = ((u32 *)bitmap)[3];
+> 
+> Is this acceptable?
+
+No.
+
+> 
+> mrutland mentioned bitmap_to_u32array() but IIUC it is used to
+> copy an entire bitmap.
+
+The real question is "Why do you need such a thing?".
+
+> 
+> 
+>>>>> +	if (pos < MSI_COUNT)
+>>>>> +		writel(mask | BIT(pos), pcie->msi_mask);
+>>>>
+>>>> And it would make a lot more sense to move this write (which should be
+>>>> relaxed) to irq_unmask. Also, calling msi_mask for something that is an
+>>>> enable register is a bit counter intuitive.
+>>>
+>>> I don't have as much experience as you.
+>>> I just used the names in the HW documentation.
+>>> I think it is the "mask" (as in bitmap) of enabled MSIs.
+>>> I will change "mask" to "enable".
+>>>
+>>> Are you saying I should not use pci_msi_mask_irq and pci_msi_unmask_irq,
+>>> but register custom implementations? I should still call these in my
+>>> custom functions, right?
+>>
+>> You can call both in your own mask/unmask methods. They serve different
+>> purpose (one is at the endpoint level, the other is at the MSI
+>> controller level).
+> 
+> So, if I understand correctly, I should check for an available MSIs
+> using the in-memory bitmap in tango_irq_domain_alloc(), but I would
+> defer actually enabling the MSI until irq_unmask?
+
+Yes.
+
+> I think work on bitmap and on the underlying HW regs need to be
+> protected under the same spinlock, correct?
+
+Yes.
+
+> 
+> 
+>>> Note: I don't have an "interrupt-map" prop because rev1 doesn't support
+>>> legacy PCI interrupts (INTx). But I see the PCI framework wrongly mapping
+>>> intA to my system's interrupt #1, presumably because I am lacking an
+>>> interrupt-map?
+>>
+>> Probably. I don't think it is legal not to have an interrupt-map.
+> 
+> My understanding is that the interrupt-map actually specifies how to
+> map the legacy IRQs. My platform does not support legacy IRQs; maybe
+> there is some binding to say that? Maybe this is more a question for
+> the PCI folks.
+
+Probably. But it looks to me that a a PCIe RC that doesn't support legacy
+interrupts is not a correct implementation. We can probably work around it,
+but that feels pretty wrong.
+
+	M.
 -- 
-2.7.4
+Jazz is not dead. It just smells funny...
