@@ -1,54 +1,36 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 27 Mar 2017 10:49:32 +0100
-Subject: [PATCH v2 04/22] PCI: fix pci_remap_iospace() remap attribute
-In-Reply-To: <20170327094954.7162-1-lorenzo.pieralisi@arm.com>
-References: <20170327094954.7162-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20170327094954.7162-5-lorenzo.pieralisi@arm.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Mon, 27 Mar 2017 15:15:12 +0530
+Subject: [PATCH v5 16/24] dt-bindings: PCI: dra7xx: Add dt bindings to enable
+ unaligned access
+In-Reply-To: <20170327094520.3129-1-kishon@ti.com>
+References: <20170327094520.3129-1-kishon@ti.com>
+Message-ID: <20170327094520.3129-17-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to the PCI local bus specifications (Revision 3.0, 3.2.5),
-I/O Address space transactions are non-posted. On architectures where
-I/O space is implemented through a chunk of memory mapped space mapped
-to PCI address space (ie IA64/ARM/ARM64) the memory mapping for the
-region backing I/O Address Space transactions determines the I/O
-transactions attributes (before the transactions actually reaches the
-PCI bus where it is handled according to the PCI specifications).
+Update device tree binding documentation of TI's dra7xx PCI
+controller to include property for enabling unaligned mem access.
 
-Current pci_remap_iospace() interface, that is used to map the PCI I/O
-Address Space into virtual address space, use pgprot_device() as memory
-attribute for the virtual address mapping, that in some architectures
-(ie ARM64) provides non-cacheable but write bufferable mappings (ie
-posted writes), which clash with the non-posted write behaviour for I/O
-Address Space mandated by the PCI specifications.
-
-Update the prot ioremap_page_range() parameter in pci_remap_iospace()
-to pgprot_nonposted to ensure that the virtual mapping backing
-I/O Address Space guarantee non-posted write transactions issued
-when addressing I/O Address Space through the MMIO mapping.
-
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Bjorn Helgaas <bhelgaas@google.com>
-Cc: Russell King <linux@armlinux.org.uk>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- drivers/pci/pci.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ Documentation/devicetree/bindings/pci/ti-pci.txt | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-index bd98674..9e084c0 100644
---- a/drivers/pci/pci.c
-+++ b/drivers/pci/pci.c
-@@ -3375,7 +3375,7 @@ int pci_remap_iospace(const struct resource *res, phys_addr_t phys_addr)
- 		return -EINVAL;
+diff --git a/Documentation/devicetree/bindings/pci/ti-pci.txt b/Documentation/devicetree/bindings/pci/ti-pci.txt
+index 190828a5f32a..b69dd7dbd29e 100644
+--- a/Documentation/devicetree/bindings/pci/ti-pci.txt
++++ b/Documentation/devicetree/bindings/pci/ti-pci.txt
+@@ -39,6 +39,11 @@ DEVICE MODE
+  - interrupts : one interrupt entries must be specified for main interrupt.
+  - num-ib-windows : number of inbound address translation windows
+  - num-ob-windows : number of outbound address translation windows
++ - ti,syscon-unaligned-access: phandle to the syscon dt node. The 1st argument
++			       should contain the register offset within syscon
++			       and the 2nd argument should contain the bit field
++			       for setting the bit to enable unaligned
++			       access.
  
- 	return ioremap_page_range(vaddr, vaddr + resource_size(res), phys_addr,
--				  pgprot_device(PAGE_KERNEL));
-+				  pgprot_nonposted(PAGE_KERNEL));
- #else
- 	/* this architecture does not have memory mapped I/O space,
- 	   so this function should never be called */
+ Optional Property:
+  - gpios : Should be added if a gpio line is required to drive PERST# line
 -- 
-2.10.0
+2.11.0
