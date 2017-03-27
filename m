@@ -1,86 +1,154 @@
-From: anurupvasu@gmail.com (Anurup M)
-Date: Mon, 27 Mar 2017 12:06:30 +0530
-Subject: [PATCH v6 06/11] drivers: perf: hisi: Add support for Hisilicon
- Djtag driver
-In-Reply-To: <20170324113610.GB22771@leverpostej>
-References: <1489127302-112735-1-git-send-email-anurup.m@huawei.com>
- <20170321155119.GF22188@leverpostej> <58D4F901.5070503@gmail.com>
- <20170324113610.GB22771@leverpostej>
-Message-ID: <58D8B2EE.1030206@gmail.com>
+From: madalin.bucur@nxp.com (Madalin-Cristian Bucur)
+Date: Mon, 27 Mar 2017 07:03:40 +0000
+Subject: [PATCH v2 1/2] dts: arm64: add LS1043A DPAA support
+In-Reply-To: <20170327062719.GQ30608@dragon>
+References: <1488382505-17554-1-git-send-email-madalin.bucur@nxp.com>
+ <1488382505-17554-2-git-send-email-madalin.bucur@nxp.com>
+ <20170314070732.GH3618@dragon>
+ <HE1PR04MB11297D944241012F44C0ADF8EC3C0@HE1PR04MB1129.eurprd04.prod.outlook.com>
+ <20170327062719.GQ30608@dragon>
+Message-ID: <HE1PR04MB1129A2CA69EB29CD45DBCD17EC330@HE1PR04MB1129.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+> -----Original Message-----
+> From: Shawn Guo [mailto:shawnguo at kernel.org]
+> Sent: Monday, March 27, 2017 9:27 AM
+> Subject: Re: [PATCH v2 1/2] dts: arm64: add LS1043A DPAA support
+> 
+> On Wed, Mar 22, 2017 at 10:58:12AM +0000, Madalin-Cristian Bucur wrote:
+> > > > +&soc {
+> > > > +
+> > > > +/include/ "qoriq-fman3-0.dtsi"
+> > > > +/include/ "qoriq-fman3-0-1g-0.dtsi"
+> > > > +/include/ "qoriq-fman3-0-1g-1.dtsi"
+> > > > +/include/ "qoriq-fman3-0-1g-2.dtsi"
+> > > > +/include/ "qoriq-fman3-0-1g-3.dtsi"
+> > > > +/include/ "qoriq-fman3-0-1g-4.dtsi"
+> > > > +/include/ "qoriq-fman3-0-1g-5.dtsi"
+> > > > +/include/ "qoriq-fman3-0-10g-0.dtsi"
+> > >
+> > > We usually put the includes at the beginning of the file, and #include
+> > > is more recommended than /include/.
+> >
+> > I'm not making use of the header file inclusion feature #include
+> provides
+> > (nor plan to) in these files thus I've selected /include/ here.
+> 
+> Let's be simple and consistent.  Use #include please.
 
+I can do that, running the preprocessor on these files without being required
+does not add that much time in the end. I'm not a fan of this feature, I never
+liked the fact one loses the liberty of easily using dtc directly to debug
+using dtc -O dts when adding #includes.
 
-On Friday 24 March 2017 05:06 PM, Mark Rutland wrote:
->>>> +#define SC_DJTAG_TIMEOUT_US    (100 * USEC_PER_MSEC) /* 100ms */
->>> > >How was this value chosen?
->>> > >
->>> > >How likely is a timeout?
->> >
->> >As explained in PATCH 7,
->> >
->> >The djtag -EBUSY in hardware is a very rare scenario, and by design
->> >of hardware, does not occur unless there is a Chip hung situation.
->> >The maximum timeout possible in djtag is 30us, and hardware logic
->> >shall reset it, if djtag is unavailable for more than 30us.
->> >The timeout used in driver is 100ms to ensure that it does not fail
->> >in any case.
-> I couldn't find such an explanation in patch 7.
+> > > > +	fman at 1a00000 {
+> > > > +		enet0: ethernet at e0000 {
+> > > > +		};
+> > > > +
+> > > > +		enet1: ethernet at e2000 {
+> > > > +		};
+> > > > +
+> > > > +		enet2: ethernet at e4000 {
+> > > > +		};
+> > > > +
+> > > > +		enet3: ethernet at e6000 {
+> > > > +		};
+> > > > +
+> > > > +		enet4: ethernet at e8000 {
+> > > > +		};
+> > > > +
+> > > > +		enet5: ethernet at ea000 {
+> > > > +		};
+> > > > +
+> > > > +		enet6: ethernet at f0000 {
+> > > > +		};
+> > > > +	};
+> > >
+> > > I do not quite understand why these nodes are empty.
+> >
+> > These nodes provide the aliases (and custom SoC mapping) for the
+> > FMan ports that are used on this particular SoC. The particular
+> > node details are found in the port dtsi file thus no information
+> > is required here. Given the fact that the numbering and actual
+> > ports that are in use can vary between SoCs, the aliases cannot
+> > be included in the port dtsi nor in the FMan dtsi.
+> 
+> Do not completely follow.  What do you mean by 'port dtsi file'?  Maybe
+> I should wait for you new patches with better commit log and comments to
+> understand these odd empty nodes.
 
-Sorry, I intent to mean that it was explained in the reply to PATCH 7 
-comments.
+The DPAA IP can have a certain number of ports. Out of those, a certain
+SoC can use all or only a subset, with diverse decisions on actual numbering
+of the used ports. Next, when using the SoC on a particular board, some
+ports will be used, some will not. The file hierarchy relates to this
+hierarchy - you have individual port files that are included by the
+SoC dtsi which in turn is included by the board dts. These nodes do not
+need any new content as all the node details are provided by the port
+dtsi files. The information they provide is the alias used for each port.
 
-> So that this doesn't get lost, please place a comment to this effect
-> above the definition of SC_DJTAG_TIMEOUT_US.
->
-> We can drop the existing "100ms" comment at the same time.
->
-> What exactly does a "chip hung situation" imply? Does that just mean
-> that only the djtag HW is hung, or that other parts of the chip are hung
-> too, such taht other things are likely to go wrong?
+> >
+> > > > +};
+> > > > diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts
+> > > b/arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts
+> > > > index 0989d63..ee66bb2 100644
+> > > > --- a/arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts
+> > > > +++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts
+> > > > @@ -181,3 +181,5 @@
+> > > >  		reg = <0>;
+> > > >  	};
+> > > >  };
+> > > > +
+> > > > +/include/ "fsl-ls1043-post.dtsi"
+> > >
+> > > Move it to header of the file.
+> >
+> > This is to be included at the end, to make sure the references are
+> > met and to allow overrides if needed.
+> 
+> What is broken if you move the include to header?
 
-Yes it is not that only djtag HW is hung, but it means there is some 
-serious irrecoverable
-condition in chip, where other things are also likely to go wrong.
-Shall add comments above definition of SC_DJTAG_TIMEOUT_US.
+Not much besides the structure we've always used for our SoCs device
+trees. The file is called "-post.dtsi" because here is the place any
+required overrides can be made, if needed. Moving to the top renders
+having this separate file useless.
 
-> [...]
->
->>> 	/* wait for the operation to complete */
->>> > >	ret = readl_poll_timout(regs_base + SC_DJTAG_MSTR_START_EN,
->>> > >				val, !(val & DJTAG_MSTR_EN),
->>> > >				1, SC_DJTAG_TIMEOUT_US);
->>> > >	
->>> > >	if (ret)
->>> > >		pr_warn("djtag operation timed out.\n");
->>> > >
->>> > >	return ret;
->>> > >}
->>> > >
->>> > >Depending on how serious a timeout is, this might want to be some kind
->>> > >of WARN variant.
->  From the above, I take that a hang indicates a very serious problem, so
-> this whould be a WARN, with a comment:
->
-> 	/*
-> 	 * A timeout should never occur on a working system. See the
-> 	 * definition of SC_DJTAG_TIMEOUT_US.
-> 	 */
-> 	WARN(ret, "djtag operation timed out.\n");
->
-> ... or, if this really should never happen, and other things are likely
-> to go wrong were we to see this, we can BUG_ON(ret) instead, remove the
-> error code, and simplify all the callers.
->
-> Likewise for djtag_do_operation_v2().
+> >
+> > > > diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts
+> > > b/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts
+> > > > index c37110b..d94f003 100644
+> > > > --- a/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts
+> > > > +++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts
+> > > > @@ -139,3 +139,78 @@
+> > > >  &duart1 {
+> > > >  	status = "okay";
+> > > >  };
+> > > > +
+> > > > +/include/ "fsl-ls1043-post.dtsi"
+> > > > +
+> > >
+> > > Ditto
+> > >
+> > > > +&soc {
+> > > > +	fman at 1a00000 {
+> > > > +		ethernet at e0000 {
+> > >
+> > > You defined enet0 label.  Why don't you use it?
+> > >
+> >
+> > The enet0 label is used by u-boot for fix-ups, providing the
+> > actual offset here makes it easier to follow.
+> 
+> You will not need to construct the node hierarchy with label.  And
+> alias/label name is more easier to follow than offset.
+> 
+> Shawn
 
-Ok. As this should never happen by design of hardware, it is a serious 
-problem. So shall
-add BUG_ON and simplify all callers.
+When I said easier to follow I was referring to someone creating a
+new device tree for his custom board, not someone reading the device
+tree. If you have the board and SoC reference manuals in your hands
+and you are writing a new board device tree, having the offset here
+makes things easier. The benefit of having one less indentation level
+is lesser than that.
 
-Thanks,
-Anurup
-
-> Thanks,
-> Mark.
+Madalin
