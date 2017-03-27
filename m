@@ -1,126 +1,115 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 27 Mar 2017 16:37:57 +0100
-Subject: [PATCH v3] efifb: avoid reconfiguration of BAR that covers the
- framebuffer
-In-Reply-To: <CAKv+Gu_iUir5d3evOvS3tUK6vY1H7KBktDf253MA8vyZDwOKPA@mail.gmail.com>
-References: <1490196629-28088-1-git-send-email-ard.biesheuvel@linaro.org>
- <20170322193111.GA8190@wunner.de>
- <CAKv+Gu_X-SEnz7h9J8boqqjOQGHQawwdSAq4haH-OGu8zdfNfA@mail.gmail.com>
- <20170323084819.GA23281@h08.hostsharing.net>
- <CAKv+Gu93eJ-js3g7M6Jdm6XGMaWMswFmzBG2qNT4rn+3=1+EyA@mail.gmail.com>
- <20170323105727.GA2441@red-moon>
- <CAKv+Gu-J664KXaZR19nViq4o1n_x=P-trsZ0oNDiONuBpAcd7A@mail.gmail.com>
- <20170323143151.GA21544@red-moon>
- <CAKv+Gu_iUir5d3evOvS3tUK6vY1H7KBktDf253MA8vyZDwOKPA@mail.gmail.com>
-Message-ID: <CAKv+Gu90Q77fOi73Ui++cOip4uHwPgXXo6aj8c2O3mjtnqQEgg@mail.gmail.com>
+From: slash.tmp@free.fr (Mason)
+Date: Mon, 27 Mar 2017 17:53:22 +0200
+Subject: [RFC PATCH v0.2] PCI: Add support for tango PCIe host bridge
+In-Reply-To: <012f7fcb-eaeb-70dd-a1a9-06c213789d30@arm.com>
+References: <91db1f47-3024-9712-309a-fb4b21e42028@free.fr>
+ <e5c0bace-fcbe-de3f-b76f-0fb672562e84@arm.com>
+ <310db9dd-7db6-2106-2e53-f0083b2d3758@free.fr>
+ <012f7fcb-eaeb-70dd-a1a9-06c213789d30@arm.com>
+Message-ID: <0502e180-5517-12d6-e3a1-bcea0da7e201@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 March 2017 at 15:15, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> On 23 March 2017 at 14:31, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
->> On Thu, Mar 23, 2017 at 12:25:48PM +0000, Ard Biesheuvel wrote:
->>> On 23 March 2017 at 10:57, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
->>> > On Thu, Mar 23, 2017 at 09:04:03AM +0000, Ard Biesheuvel wrote:
->>> >> On 23 March 2017 at 08:48, Lukas Wunner <lukas@wunner.de> wrote:
->>> >> > On Wed, Mar 22, 2017 at 07:32:43PM +0000, Ard Biesheuvel wrote:
->>> >> >> On 22 March 2017 at 19:31, Lukas Wunner <lukas@wunner.de> wrote:
->>> >> >> > On Wed, Mar 22, 2017 at 03:30:29PM +0000, Ard Biesheuvel wrote:
->>> >> >> >> On UEFI systems, the PCI subsystem is enumerated by the firmware,
->>> >> >> >> and if a graphical framebuffer is exposed by a PCI device, its base
->>> >> >> >> address and size are exposed to the OS via the Graphics Output
->>> >> >> >> Protocol (GOP).
->>> >> >> >>
->>> >> >> >> On arm64 PCI systems, the entire PCI hierarchy is reconfigured from
->>> >> >> >> scratch at boot. This may result in the GOP framebuffer address to
->>> >> >> >> become stale, if the BAR covering the framebuffer is modified. This
->>> >> >> >> will cause the framebuffer to become unresponsive, and may in some
->>> >> >> >> cases result in unpredictable behavior if the range is reassigned to
->>> >> >> >> another device.
->>> >> >> >
->>> >> >> > Hm, commit message seems to indicate the issue is restricted to arm64,
->>> >> >> > yet there's no IS_ENABLED(ARM64) to constrain the added code to that arch?
->>> >> >>
->>> >> >> True. I am eager to get some x86 coverage for this, since I would
->>> >> >> expect this not to do any harm. But I'm fine with making it ARM/arm64
->>> >> >> specific in the final version.
->>> >> >
->>> >> > I see.  IIUC, this is only a problem because pci_bus_assign_resources()
->>> >> > is called from arch/arm64/kernel/pci.c:pci_acpi_scan_root() (as well as
->>> >> > the host drivers) and x86 isn't affected because it doesn't do that.
->>> >> >
->>> >>
->>> >> Correct. But on x86 (or rather, on a PC), you can be sure that UEFI
->>> >> (or the legacy PCI bios) performed the resource assignment already.
->>> >> One could argue that this is equally the case when running arm64 in
->>> >> ACPI mode, but in general, you cannot assume the presence of firmware
->>> >> on ARM/arm64 that has already taken care of this, and so the state of
->>> >> the BARs has to be presumed invalid.
->>> >
->>> > The story is a bit more convoluted than that owing to x86 (and other
->>> > arches) legacy.
->>> >
->>> > x86 tries to claim all PCI resources (in two passes - first enabled
->>> > devices, second disabled devices) and that predates ACPI/UEFI.
->>> >
->>> > Mind, x86 reassign resources that can't be claimed too, the only
->>> > difference with ARM64 is that, for the better or the worse, we
->>> > have decided not to claim the FW PCI set-up on ARM64 even if it
->>> > is sane, we do not even try, it was a deliberate choice.
->>> >
->>> > This patch should be harmless on x86 since if the FB PCI BAR is set
->>> > up sanely, claiming it again should be a nop (to be checked).
->>> >
+On 24/03/2017 19:47, Marc Zyngier wrote:
+
+> On 23/03/17 17:03, Mason wrote:
+>
+>> On 23/03/2017 15:22, Marc Zyngier wrote:
+>>
+>>> On 23/03/17 13:05, Mason wrote:
 >>>
->>> I have checked this with OVMF under QEMU. Claiming the resource early
->>> like we do this in this patch does not result in any diagnostic output
->>> or other symptoms that would suggest that anything unexpected occurs.
+>>>> +	writel_relaxed(status, pcie->msi_status); /* clear IRQs */
+>>>
+>>> Why isn't this your irq_ack method instead of open-coding it?
 >>
->> There is something that I do not understand on how the resource
->> claiming works on x86. IIUC on x86, resource claiming is done in:
->>
->> arch/x86/pci/legacy.c
->>
->> pci_subsys_init()
->>  -> pcibios_init()
->>   -> pcibios_resource_survey()
->>
->> pci_subsys_init() is run in a subsys_initcall.
->>
->
-> Yes, the call trace I get for the resource claim for the efifb BAR
-> without this patch is
->
-> pci_subsys_init+0x3f/0x43
-> - pcibios_init+0x2c/0x3d
-> -- pcibios_resource_survey+0x38/0x6a
-> --- pci_legacy_init+0x2e/0x2e
-> ---- pcibios_allocate_resources+0x8a/0x240
-> ----- pci_claim_resource+0xdc/0x140
->
->
->> Now, how do we ensure that resource claiming is carried out _after_
->> the PCI root busses have been actually scanned ?
->>
->> The ACPI scan handler interface (so the interface to actually scan
->> a PCI root bridge in ACPI) is initialized in acpi_init() (which
->> is a subsys_initcall), how do we guarantee that is run before
->> pci_subsys_init() ?
->>
->
-> $ nm vmlinux |grep -E '__initcall_(acpi_init|pci_subsys_init)'
-> ffffffff81d540b8 t __initcall_acpi_init4
-> ffffffff81d54158 t __initcall_pci_subsys_init4
->
-> so it appears to depend on link order currently.
+>> I based my driver on the Altera driver, and I did it like
+>> I thought they did. I will try fixing my code.
+> 
+> Doesn't make it right, unfortunately. I wish you would try to understand
+> the API first instead of copy-pasting things (including potential bugs).
 
-Bjorn, what is your take on this?
+So far, I have not been able to get the irqchip framework to
+call the irq_ack functions I registered.
 
-Claiming the BAR resources associated with the efifb region from a
-DECLARE_PCI_FIXUP_HEADER() handler does not seem to interfere with the
-way resources are claimed later on. For arm64, we need this to ensure
-that the BAR doesn't move, but for x86 this does not seem to be an
-issue. This means we could potentially make the quirk ARM-only, but I
-am a bit reluctant to do so and create even more divergence.
+Should I pass a different handler than handle_simple_irq
+to irq_domain_set_info?
 
-Thanks,
-Ard.
+	irq_domain_set_info(domain, virq, pos, &tango_msi_chip,
+		domain->host_data, handle_simple_irq, NULL, NULL);
+
+
+When an MSI packet arrives at the MSI doorbell address, the controller
+reads the packet's data; this is the MSI number "num". It sets bit "num"
+to 1 in the status regs, and raises IRQ line 55 on the system intc.
+The IRQ signal remains high, until software clears it by writing 1
+in bit "num" of the status regs.
+
+Is this an edge interrupt or a level interrupt?
+
+I was told if the interrupt request is triggered by an event, then
+it is an edge interrupt. The reception of an MSI packet is an event.
+But the IRQ remains high, so this feels like a level high.
+I'm hopelessly confused :-(
+
+
+>>>> +	mutex_lock(&pcie->lock);
+>>>> +
+>>>> +	mask = readl_relaxed(pcie->msi_mask);
+>>>
+>>> Do you really need to read this from the HW each time you allocate an
+>>> interrupt? That feels pretty crazy. You're much better off having an
+>>> in-memory bitmap that will make things more efficient [...]
+
+I have one remaining issue with bitmaps.
+
+My HW regs are 32b. How do I grab e.g. bits 96-127?
+All I can think of is
+  u32 val = ((u32 *)bitmap)[3];
+
+Is this acceptable?
+
+mrutland mentioned bitmap_to_u32array() but IIUC it is used to
+copy an entire bitmap.
+
+
+>>>> +	if (pos < MSI_COUNT)
+>>>> +		writel(mask | BIT(pos), pcie->msi_mask);
+>>>
+>>> And it would make a lot more sense to move this write (which should be
+>>> relaxed) to irq_unmask. Also, calling msi_mask for something that is an
+>>> enable register is a bit counter intuitive.
+>>
+>> I don't have as much experience as you.
+>> I just used the names in the HW documentation.
+>> I think it is the "mask" (as in bitmap) of enabled MSIs.
+>> I will change "mask" to "enable".
+>>
+>> Are you saying I should not use pci_msi_mask_irq and pci_msi_unmask_irq,
+>> but register custom implementations? I should still call these in my
+>> custom functions, right?
+> 
+> You can call both in your own mask/unmask methods. They serve different
+> purpose (one is at the endpoint level, the other is at the MSI
+> controller level).
+
+So, if I understand correctly, I should check for an available MSIs
+using the in-memory bitmap in tango_irq_domain_alloc(), but I would
+defer actually enabling the MSI until irq_unmask?
+
+I think work on bitmap and on the underlying HW regs need to be
+protected under the same spinlock, correct?
+
+
+>> Note: I don't have an "interrupt-map" prop because rev1 doesn't support
+>> legacy PCI interrupts (INTx). But I see the PCI framework wrongly mapping
+>> intA to my system's interrupt #1, presumably because I am lacking an
+>> interrupt-map?
+> 
+> Probably. I don't think it is legal not to have an interrupt-map.
+
+My understanding is that the interrupt-map actually specifies how to
+map the legacy IRQs. My platform does not support legacy IRQs; maybe
+there is some binding to say that? Maybe this is more a question for
+the PCI folks.
+
+Regards.
