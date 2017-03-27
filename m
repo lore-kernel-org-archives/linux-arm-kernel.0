@@ -1,35 +1,27 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Mon, 27 Mar 2017 10:04:08 +0530
-Subject: [PATCH v8 2/3] dmaengine: pl330: remove pdata based initialization
-In-Reply-To: <f0d36362-ce75-02a0-0bfa-e265cba03b8b@samsung.com>
-References: <1486650171-20598-1-git-send-email-m.szyprowski@samsung.com>
- <CGME20170209142308eucas1p24d52db3d52e19228e8f423c3dc8b085b@eucas1p2.samsung.com>
- <1486650171-20598-3-git-send-email-m.szyprowski@samsung.com>
- <f0d36362-ce75-02a0-0bfa-e265cba03b8b@samsung.com>
-Message-ID: <20170327043408.GC9308@localhost>
+From: minchan@kernel.org (Minchan Kim)
+Date: Mon, 27 Mar 2017 14:01:34 +0900
+Subject: [PATCH v3 5/7] zram: Convert to using memset_l
+In-Reply-To: <20170324161318.18718-6-willy@infradead.org>
+References: <20170324161318.18718-1-willy@infradead.org>
+ <20170324161318.18718-6-willy@infradead.org>
+Message-ID: <20170327050134.GA19601@bbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 22, 2017 at 09:22:23AM +0100, Marek Szyprowski wrote:
-> Hi Vinod
+On Fri, Mar 24, 2017 at 09:13:16AM -0700, Matthew Wilcox wrote:
+> From: Matthew Wilcox <mawilcox@microsoft.com>
 > 
+> zram was the motivation for creating memset_l().  Minchan Kim sees a 7%
+> performance improvement on x86 with 100MB of non-zero deduplicatable
+> data:
 > 
-> On 2017-02-09 15:22, Marek Szyprowski wrote:
-> >This driver is now used only on platforms which support device tree, so
-> >it is safe to remove legacy platform data based initialization code.
-> >
-> >Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> >Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
-> >Acked-by: Arnd Bergmann <arnd@arndb.de>
-> >For plat-samsung:
-> >Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
+>         perf stat -r 10 dd if=/dev/zram0 of=/dev/null
 > 
-> Vinod: This patch is completely independent from the rest of the changes
-> from that patchset. Could you apply it, or do you want me to resend it
-> separately? Runtime pm related changes will wait until a new DMA engine API
-> is ready.
+> vanilla:        0.232050465 seconds time elapsed ( +-  0.51% )
+> memset_l:	0.217219387 seconds time elapsed ( +-  0.07% )
+> 
+> Signed-off-by: Matthew Wilcox <mawilcox@microsoft.com>
+> Tested-by: Minchan Kim <minchan@kernel.org>
+Acked-by: Minchan Kim <minchan@kernel.org>
 
-Sure, please resend it :)
-
--- 
-~Vinod
+Thanks!
