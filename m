@@ -1,41 +1,33 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Mon, 27 Mar 2017 18:03:39 +0100
-Subject: [PATCH v2 1/9] arm64: KVM: PMU: Refactor pmu_*_el0_disabled
-In-Reply-To: <20170327160345.12402-2-marc.zyngier@arm.com>
-References: <20170327160345.12402-1-marc.zyngier@arm.com>
- <20170327160345.12402-2-marc.zyngier@arm.com>
-Message-ID: <e1ad349e-a14c-328a-83ea-4f939c49beb5@arm.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Mon, 27 Mar 2017 11:09:30 -0600
+Subject: [PATCH 0/3] coresight: next v4.11-rc4
+Message-ID: <1490634573-11068-1-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/03/17 17:03, Marc Zyngier wrote:
-> There is a lot of duplication in the pmu_*_el0_disabled helpers,
-> and as we're going to modify them shortly, let's move all the
-> common stuff in a single function.
->
-> No functionnal change.
+Good morning,
 
-nit: s/functionnal/functional
+Just a few patches this time around - please consider for inclusion in the 4.12
+cycle.  Everything applies on your 'char-misc-next' branch (57c0eabbd57e).
 
->
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm64/kvm/sys_regs.c | 25 +++++++++++--------------
->  1 file changed, 11 insertions(+), 14 deletions(-)
->
-> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-> index 0e26f8c2b56f..7e1d673304d5 100644
-> --- a/arch/arm64/kvm/sys_regs.c
-> +++ b/arch/arm64/kvm/sys_regs.c
-> @@ -460,35 +460,32 @@ static void reset_pmcr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
->  	vcpu_sys_reg(vcpu, PMCR_EL0) = val;
->  }
->
-> -static bool pmu_access_el0_disabled(struct kvm_vcpu *vcpu)
-> +static bool check_disabled(struct kvm_vcpu *vcpu, u64 flags)
+Thanks,
+Mathieu
 
-minor nit: check_disabled sounds too generic for a helper which checks for
-something specific to pmuserenr_el0 register in a file where we deal with
-lot of system registers. check_pmu_access_disabled()  ?
+Mike Leach (1):
+  coresight: Fixes coresight DT parse to get correct output port ID.
 
-Suzuki
+Olav Haugan (2):
+  coresight: Replace sprintf with scnprintf
+  coresight: etm3x: Correctly output counter values in sysfs node
+
+ drivers/hwtracing/coresight/coresight-etb10.c      |  2 +-
+ drivers/hwtracing/coresight/coresight-etm-perf.c   |  2 +-
+ .../hwtracing/coresight/coresight-etm3x-sysfs.c    | 80 ++++++++++++----------
+ drivers/hwtracing/coresight/coresight-funnel.c     |  4 +-
+ drivers/hwtracing/coresight/coresight-stm.c        |  2 +-
+ drivers/hwtracing/coresight/coresight-tmc.c        |  2 +-
+ drivers/hwtracing/coresight/of_coresight.c         |  2 +-
+ 7 files changed, 52 insertions(+), 42 deletions(-)
+
+-- 
+2.7.4
