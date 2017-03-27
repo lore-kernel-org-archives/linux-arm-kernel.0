@@ -1,55 +1,110 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Mon, 27 Mar 2017 15:15:04 +0530
-Subject: [PATCH v5 08/24] Documentation: PCI: Add binding documentation for
- pci-test endpoint function
-In-Reply-To: <20170327094520.3129-1-kishon@ti.com>
-References: <20170327094520.3129-1-kishon@ti.com>
-Message-ID: <20170327094520.3129-9-kishon@ti.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 27 Mar 2017 11:46:48 +0200
+Subject: [PATCH v2 4/7] pinctrl: armada-37xx: Add gpio support
+In-Reply-To: <CACRpkdaueEJKTJq6QihyBS18wgtgqVLHAFa=13_2X8AYuh7tqg@mail.gmail.com>
+ (Linus Walleij's message of "Mon, 27 Mar 2017 10:57:15 +0200")
+References: <cover.26288667a039bc9f8e62dec2fd6342ded4014d12.1490120798.git-series.gregory.clement@free-electrons.com>
+ <913cf9807c7c351bb7dabac9b3336431dac060e5.1490120798.git-series.gregory.clement@free-electrons.com>
+ <CACRpkdaueEJKTJq6QihyBS18wgtgqVLHAFa=13_2X8AYuh7tqg@mail.gmail.com>
+Message-ID: <878tnraw6v.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add binding documentation for pci-test endpoint function that helps in
-adding and configuring pci-test endpoint function.
+Hi Linus,
+ 
+ On lun., mars 27 2017, Linus Walleij <linus.walleij@linaro.org> wrote:
 
-Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
----
- Documentation/PCI/00-INDEX                              |  2 ++
- .../PCI/endpoint/function/binding/pci-test.txt          | 17 +++++++++++++++++
- 2 files changed, 19 insertions(+)
- create mode 100644 Documentation/PCI/endpoint/function/binding/pci-test.txt
+> On Tue, Mar 21, 2017 at 7:28 PM, Gregory CLEMENT
+> <gregory.clement@free-electrons.com> wrote:
+>
+> You should add something to your Kconfig including:
+>
+> select GPIOLIB
+> select OF_GPIO
+>
+> or so... or depends on. You certainly need them.
 
-diff --git a/Documentation/PCI/00-INDEX b/Documentation/PCI/00-INDEX
-index 4e5a2832f4e7..53717b7fcdd4 100644
---- a/Documentation/PCI/00-INDEX
-+++ b/Documentation/PCI/00-INDEX
-@@ -18,3 +18,5 @@ endpoint/pci-endpoint-cfs.txt
- 	- guide to use configfs to configure the pci endpoint function.
- endpoint/pci-test-function.txt
- 	- specification of *pci test* function device.
-+endpoint/function/binding/
-+	- binding documentation for pci endpoint function
-diff --git a/Documentation/PCI/endpoint/function/binding/pci-test.txt b/Documentation/PCI/endpoint/function/binding/pci-test.txt
-new file mode 100644
-index 000000000000..c44fc18d78cc
---- /dev/null
-+++ b/Documentation/PCI/endpoint/function/binding/pci-test.txt
-@@ -0,0 +1,17 @@
-+PCI TEST ENDPOINT FUNCTION
-+
-+name: Should be "pci_epf_test" to bind to the pci_epf_test driver.
-+
-+Configurable Fields:
-+vendorid	 : should be 0x104c
-+deviceid	 : should be 0xb500 for DRA74x and 0xb501 for DRA72x
-+revid		 : don't care
-+progif_code	 : don't care
-+subclass_code	 : don't care
-+baseclass_code	 : should be 0xff
-+cache_line_size	 : don't care
-+subsys_vendor_id : don't care
-+subsys_id	 : don't care
-+interrupt_pin	 : Should be 1 - INTA, 2 - INTB, 3 - INTC, 4 -INTD
-+msi_interrupts	 : Should be 1 to 32 depending on the number of msi interrupts
-+		   to test
+I missed it I will do it in v4.
+
+>
+>> +static int armada_37xx_gpiochip_register(struct platform_device *pdev,
+>> +                                       struct armada_37xx_pinctrl *info)
+>> +{
+>> +       struct device_node *np;
+>> +       struct gpio_chip *gc;
+>> +       int ret = -ENODEV;
+>> +
+>> +       for_each_child_of_node(info->dev->of_node, np) {
+>> +               if (of_find_property(np, "gpio-controller", NULL)) {
+>> +                       ret = 0;
+>> +                       break;
+>> +               }
+>> +       };
+>
+> OK so several GPIO chips as subnodes, why not one device per
+> chip? Or have we discussed this before? It seems a bit weird,
+> apparently there is just one node with a gpio-controller, as you're
+> just adding one pin range.
+
+As you probably noticed pinctrl and gpio register are mixed in this
+hardware. One of the register is alos use to get some clock freqeuncy,
+so that's why I ended with a syscon node. The parent node is the
+pinctrl. My main motivation to use a subnode was to be ablee to have a
+phandle associated with the GPIO chip. In my first version I only have
+one node but then I realized that I could not use GPIO in the device
+tree without an phandle to point it.
+
+If you have an other solution, I would be happy to remove this subnode.
+
+
+>
+> What happens if there would be two gpio-controllers? The second
+> is just ignored without error?
+
+There won't be a second gpio-controllers because we only have one gpio
+controller by pin controller (as they are actually the same). Also as I
+said above, the subnode is mainly here to provide a phandle.
+
+But I can add a comment to emphasize it.
+
+
+>
+>> +       ret = gpiochip_add_data(gc, info);
+>> +       if (ret)
+>> +               return ret;
+>
+> Can't you use devm_gpiochip_add_data()?
+
+I think I can.
+
+>
+>> +       ret = gpiochip_add_pin_range(&info->gpio_chip, dev_name(dev), 0,
+>> +                                    pinbase, info->data->nr_pins);
+>> +       if (ret)
+>> +               return ret;
+>
+> Why can't you put the range(s) into the device tree?
+>
+> We already have code in drivers/gpio/gpiolib-of.c to do this
+> for you. And generic range definition bindings.
+
+It was done in the v3.
+
+Tanks,
+
+Gregory
+
+>
+> Yours,
+> Linus Walleij
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
 -- 
-2.11.0
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
