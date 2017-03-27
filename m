@@ -1,41 +1,54 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 27 Mar 2017 10:49:29 +0100
-Subject: [PATCH v2 01/22] PCI: remove __weak tag from pci_remap_iospace()
+Date: Mon, 27 Mar 2017 10:49:32 +0100
+Subject: [PATCH v2 04/22] PCI: fix pci_remap_iospace() remap attribute
 In-Reply-To: <20170327094954.7162-1-lorenzo.pieralisi@arm.com>
 References: <20170327094954.7162-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20170327094954.7162-2-lorenzo.pieralisi@arm.com>
+Message-ID: <20170327094954.7162-5-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-pci_remap_iospace() is marked as a weak symbol even though
-no architecture is currently overriding it; given that its
-implementation internals have already code paths that are
-arch specific (ie PCI_IOBASE and ioremap_page_range() attributes)
-there is no need to leave the weak symbol in the kernel since the
-same functionality can be achieved by customizing per-arch the
-corresponding functionality.
+According to the PCI local bus specifications (Revision 3.0, 3.2.5),
+I/O Address space transactions are non-posted. On architectures where
+I/O space is implemented through a chunk of memory mapped space mapped
+to PCI address space (ie IA64/ARM/ARM64) the memory mapping for the
+region backing I/O Address Space transactions determines the I/O
+transactions attributes (before the transactions actually reaches the
+PCI bus where it is handled according to the PCI specifications).
 
-Remove the __weak symbol from pci_remap_iospace().
+Current pci_remap_iospace() interface, that is used to map the PCI I/O
+Address Space into virtual address space, use pgprot_device() as memory
+attribute for the virtual address mapping, that in some architectures
+(ie ARM64) provides non-cacheable but write bufferable mappings (ie
+posted writes), which clash with the non-posted write behaviour for I/O
+Address Space mandated by the PCI specifications.
+
+Update the prot ioremap_page_range() parameter in pci_remap_iospace()
+to pgprot_nonposted to ensure that the virtual mapping backing
+I/O Address Space guarantee non-posted write transactions issued
+when addressing I/O Address Space through the MMIO mapping.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Will Deacon <will.deacon@arm.com>
 Cc: Bjorn Helgaas <bhelgaas@google.com>
+Cc: Russell King <linux@armlinux.org.uk>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
 ---
  drivers/pci/pci.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-index 7904d02..bd98674 100644
+index bd98674..9e084c0 100644
 --- a/drivers/pci/pci.c
 +++ b/drivers/pci/pci.c
-@@ -3363,7 +3363,7 @@ unsigned long __weak pci_address_to_pio(phys_addr_t address)
-  *	Only architectures that have memory mapped IO functions defined
-  *	(and the PCI_IOBASE value defined) should call this function.
-  */
--int __weak pci_remap_iospace(const struct resource *res, phys_addr_t phys_addr)
-+int pci_remap_iospace(const struct resource *res, phys_addr_t phys_addr)
- {
- #if defined(PCI_IOBASE) && defined(CONFIG_MMU)
- 	unsigned long vaddr = (unsigned long)PCI_IOBASE + res->start;
+@@ -3375,7 +3375,7 @@ int pci_remap_iospace(const struct resource *res, phys_addr_t phys_addr)
+ 		return -EINVAL;
+ 
+ 	return ioremap_page_range(vaddr, vaddr + resource_size(res), phys_addr,
+-				  pgprot_device(PAGE_KERNEL));
++				  pgprot_nonposted(PAGE_KERNEL));
+ #else
+ 	/* this architecture does not have memory mapped I/O space,
+ 	   so this function should never be called */
 -- 
 2.10.0
