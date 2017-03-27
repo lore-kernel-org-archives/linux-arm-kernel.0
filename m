@@ -1,85 +1,76 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun, 26 Mar 2017 22:51:24 +0200
-Subject: [PATCH 4/5] clk: sunxi-ng: Add driver for A83T CCU
-In-Reply-To: <CAGb2v67ey1Ppc3wf1154QKoCX-xsOjWDEsXi5gxPbL4MY37zHw@mail.gmail.com>
-References: <20170214033526.16977-1-wens@csie.org>
- <20170214033526.16977-5-wens@csie.org>
- <20170214095819.utsftcvti5zdmlmi@lukather>
- <CAGb2v66PxbhUdqSwFc5iFN2wDVQbOsibDkckXpFsxXW1WJNe3w@mail.gmail.com>
- <20170215094954.h3wyaxlqkeb342yu@lukather>
- <CAGb2v67ey1Ppc3wf1154QKoCX-xsOjWDEsXi5gxPbL4MY37zHw@mail.gmail.com>
-Message-ID: <20170326205124.vdjbmjukfysgbefc@lukather>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 27 Mar 2017 09:46:43 +0100
+Subject: [PATCH v9 15/15] irqchip: mbigen: Add ACPI support
+In-Reply-To: <12635f14-8cbd-61ba-74fa-495a81f94038@huawei.com>
+References: <1488890410-15503-1-git-send-email-guohanjun@huawei.com>
+ <1488890410-15503-16-git-send-email-guohanjun@huawei.com>
+ <20170321144521.GA4392@red-moon>
+ <12635f14-8cbd-61ba-74fa-495a81f94038@huawei.com>
+Message-ID: <c07135ba-f14f-fa2f-bd1b-e00cc758b3e7@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chen-Yu,
+Hanjun, John,
 
-On Wed, Mar 22, 2017 at 02:50:31PM +0800, Chen-Yu Tsai wrote:
-> On Wed, Feb 15, 2017 at 5:49 PM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > On Tue, Feb 14, 2017 at 06:26:39PM +0800, Chen-Yu Tsai wrote:
-> >> On Tue, Feb 14, 2017 at 5:58 PM, Maxime Ripard
-> >> <maxime.ripard@free-electrons.com> wrote:
-> >> > On Tue, Feb 14, 2017 at 11:35:25AM +0800, Chen-Yu Tsai wrote:
-> >> >> +/* Some PLLs are input * N / div1 / P. Model them as NKMP with no K */
-> >> >
-> >> > Is that even working?
-> >>
-> >> Looking at the nkmp clock code, only .recalc_rate will work properly though.
-> >> Maybe I could fix up the code so it handles zero width factors.
-> >>
-> >> > I'm not quite sure we want to do that. We might model it as a NP clock
-> >> > with a variable prediv?
-> >>
-> >> There's no NP clock type yet. And a problem with a variable prediv is that
-> >> it doesn't participate in factor calculation. It's effectively fixed.
-> >>
-> >> I did this for the A80 as well though. Fixing up the NKMP clock might be
-> >> easier.
-> >
-> > Then maybe we just need a NMP clock type then. What I'm really afraid
-> > of is that we'll just end up in a clk-factors situation that was
-> > simply impossible to maintain without breaking anything, hence why we
-> > had different clock types then.
+On 22/03/17 14:12, John Garry wrote:
+> On 21/03/2017 14:45, Lorenzo Pieralisi wrote:
+>> On Tue, Mar 07, 2017 at 08:40:10PM +0800, Hanjun Guo wrote:
+>>> From: Hanjun Guo <hanjun.guo@linaro.org>
+>>>
+>>> With the preparation of platform msi support and interrupt producer
+>>> in DSDT, we can add mbigen ACPI support now.
+>>>
+>>> We are using Interrupt resource type in _CRS methd to indicate number
+>>> of irq pins instead of num_pins in DT to avoid _DSD usage in this case.
+>>>
+>>> For mbigen,
+>>>     Device(MBI0) {
+>>>           Name(_HID, "HISI0152")
+>>>           Name(_UID, Zero)
+>>>           Name(_CRS, ResourceTemplate() {
+>>>                   Memory32Fixed(ReadWrite, 0xa0080000, 0x10000)
+>>> 		  Interrupt(ResourceProducer,...) {12,14,....}
+>>
+>> What do these interrupt numbers represent ? This looks wrong to me.
+>> An interrupt descriptor is there to describe the interrupts a device
+>> can generate; you are using it just to add a "standard" (that is
+>> not standard at all) way of counting the number of vectors allocated
+>> to this specific chip and that's just wrong.
+>>
 > 
-> Upon further review, I think it will work. I did notice a discrepancy
-> between .set_rate and .round_rate though. Will send fixes later.
+> As I understand, the count of interrupts we are declaring for the mbigen 
+> is the same as the sum of interrupts for that mbigen's children.
 > 
-> About the old clk-factors situation, I'm not exactly sure what part
-> you're referring to.
-
-We need to be able to support old DTs, which will still use the old
-clock code. Whatever solution we come up with need to take that into
-account.
-
-> To me it seems the "factors" bits are mostly the same. Differences
-> are mostly with parent-specific pre-dividers, clock post-dividers,
-> and non-standard factors. The first is nicely handled by the new mux
-> wrapper, the second is currently only used with NK types, and the
-> last is currently only supported by single factor divider or
-> multiplier clocks with tables.
+> So at the point we probe the mbigen, can we just deference the children 
+> to count their interrupts, and use this as the #msis?
 > 
-> Non-standard factors are probably the trickiest one, but given we will
-> support full factor tables for some of the tricky CPU PLLs, this is
-> probably solved, even if not implemented yet.
+>> Can't you use something like Agustin did in the QCOM combiner:
+>>
+>> drivers/irqchip/qcom-irq-combiner.c
+>>
+>> to detect the MSI vector length (ie by describing the MBIgen through
+>> generic registers and use the bit width to compute the vector
+>> lenght) ? I am not sure how feasible it is given that my knowledge
+>> of MBIgen is pretty poor.
+>>
+>> I understand we want to avoid _DSD properties but we should not
+>> work around standard bindings to achieve that goal.
+>>
 > 
-> I'll start with the NP style clocks, which only use P when the output
-> is under a certain frequency.
+> We use "num-pins" for dt solution, but it is not so welcome here.
 
-Do we need to use a P factor? I mean, we can just create a custom
-clock for that, I'd realy don't want to cripple the generic code for a
-completely non-generic problem.
+Well, this device is already completely out of any standard description
+on the ACPI side. And given that it bloats both the ACPI tables and the
+kernel data structures, I can only suggest that you take advantage of
+_DSD here, as misusing the standard properties is not something that we
+should condone. It will also make the driver more manageable, as it will
+use similar properties on both firmware implementations.
 
-Maxime
+I feel like I need to stress the urgency here. We're at -rc4, and still
+with unsolved issues. None of us want to miss the next merge window.
 
+Thanks,
+
+	M.
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170326/c2e28624/attachment-0001.sig>
+Jazz is not dead. It just smells funny...
