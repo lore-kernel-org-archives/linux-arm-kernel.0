@@ -1,154 +1,174 @@
-From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Mon, 27 Mar 2017 11:42:51 -0700
-Subject: [PATCH v7 1/2] dt-bindings: Add GPCv2 power gating driver
-In-Reply-To: <20170324063216.GC12604@b29396-OptiPlex-7040>
-References: <20170321145004.21265-1-andrew.smirnov@gmail.com>
- <20170321145004.21265-2-andrew.smirnov@gmail.com>
- <20170324063216.GC12604@b29396-OptiPlex-7040>
-Message-ID: <CAHQ1cqH4HnVsiAT6wxVJ=b-AJKWCK6L7kTxLZ7JFrZ4B-t2PQg@mail.gmail.com>
+From: ahs3@redhat.com (Al Stone)
+Date: Mon, 27 Mar 2017 12:56:19 -0600
+Subject: [PATCH v9 15/15] irqchip: mbigen: Add ACPI support
+In-Reply-To: <20170327152702.GB12092@red-moon>
+References: <1488890410-15503-1-git-send-email-guohanjun@huawei.com>
+ <1488890410-15503-16-git-send-email-guohanjun@huawei.com>
+ <20170321144521.GA4392@red-moon>
+ <12635f14-8cbd-61ba-74fa-495a81f94038@huawei.com>
+ <c07135ba-f14f-fa2f-bd1b-e00cc758b3e7@arm.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E204C0AB7@FRAEML521-MBX.china.huawei.com>
+ <20170327152702.GB12092@red-moon>
+Message-ID: <6ea7e293-bde4-3c22-a987-cec1843da39b@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 23, 2017 at 11:32 PM, Dong Aisheng <dongas86@gmail.com> wrote:
-> On Tue, Mar 21, 2017 at 07:50:03AM -0700, Andrey Smirnov wrote:
->> Add DT bindings for power domain driver for GPCv2 IP block found in
->> i.MX7 SoCs.
+On 03/27/2017 09:27 AM, Lorenzo Pieralisi wrote:
+> [+Al,Darren to comment on _DSD review process]
+> 
+> On Mon, Mar 27, 2017 at 12:24:45PM +0000, Gabriele Paoloni wrote:
+>> Hi Marc Many thanks for your comments
 >>
->> Cc: yurovsky at gmail.com
->> Cc: Lucas Stach <l.stach@pengutronix.de>
->> Cc: Rob Herring <robh+dt@kernel.org>
->> Cc: Mark Rutland <mark.rutland@arm.com>
->> Cc: Fabio Estevam <fabio.estevam@nxp.com>
->> Cc: Dong Aisheng <dongas86@gmail.com>
->> Cc: devicetree at vger.kernel.org
->> Cc: linux-arm-kernel at lists.infradead.org
->> Cc: linux-kernel at vger.kernel.org
->> Acked-by: Rob Herring <robh@kernel.org>
->> Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
->> ---
->>  .../devicetree/bindings/power/fsl,imx-gpcv2.txt    | 71 ++++++++++++++++++++++
->>  include/dt-bindings/power/imx7-power.h             | 18 ++++++
->>  2 files changed, 89 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/power/fsl,imx-gpcv2.txt
->>  create mode 100644 include/dt-bindings/power/imx7-power.h
+>>> -----Original Message-----
+>>> From: linuxarm-bounces at huawei.com [mailto:linuxarm-bounces at huawei.com]
+>>> On Behalf Of Marc Zyngier
+>>> Sent: 27 March 2017 09:47
+>>> To: John Garry; Lorenzo Pieralisi; Guohanjun (Hanjun Guo)
+>>> Cc: Rafael J. Wysocki; Yimin (Leo); Greg KH; Linuxarm; linux-
+>>> kernel at vger.kernel.org; Sinan Kaya; linux-acpi at vger.kernel.org; Hanjun
+>>> Guo; Tomasz Nowicki; Thomas Gleixner; linux-arm-
+>>> kernel at lists.infradead.org
+>>> Subject: Re: [PATCH v9 15/15] irqchip: mbigen: Add ACPI support
+>>>
+>>> Hanjun, John,
+>>>
+>>> On 22/03/17 14:12, John Garry wrote:
+>>>> On 21/03/2017 14:45, Lorenzo Pieralisi wrote:
+>>>>> On Tue, Mar 07, 2017 at 08:40:10PM +0800, Hanjun Guo wrote:
+>>>>>> From: Hanjun Guo <hanjun.guo@linaro.org>
+>>>>>>
+>>>>>> With the preparation of platform msi support and interrupt producer
+>>>>>> in DSDT, we can add mbigen ACPI support now.
+>>>>>>
+>>>>>> We are using Interrupt resource type in _CRS methd to indicate
+>>> number
+>>>>>> of irq pins instead of num_pins in DT to avoid _DSD usage in this
+>>> case.
+>>>>>>
+>>>>>> For mbigen,
+>>>>>>     Device(MBI0) {
+>>>>>>           Name(_HID, "HISI0152")
+>>>>>>           Name(_UID, Zero)
+>>>>>>           Name(_CRS, ResourceTemplate() {
+>>>>>>                   Memory32Fixed(ReadWrite, 0xa0080000, 0x10000)
+>>>>>> 		  Interrupt(ResourceProducer,...) {12,14,....}
+>>>>>
+>>>>> What do these interrupt numbers represent ? This looks wrong to me.
+>>>>> An interrupt descriptor is there to describe the interrupts a device
+>>>>> can generate; you are using it just to add a "standard" (that is
+>>>>> not standard at all) way of counting the number of vectors allocated
+>>>>> to this specific chip and that's just wrong.
+>>>>>
+>>>>
+>>>> As I understand, the count of interrupts we are declaring for the
+>>> mbigen
+>>>> is the same as the sum of interrupts for that mbigen's children.
+>>>>
+>>>> So at the point we probe the mbigen, can we just deference the
+>>> children
+>>>> to count their interrupts, and use this as the #msis?
+>>>>
+>>>>> Can't you use something like Agustin did in the QCOM combiner:
+>>>>>
+>>>>> drivers/irqchip/qcom-irq-combiner.c
+>>>>>
+>>>>> to detect the MSI vector length (ie by describing the MBIgen through
+>>>>> generic registers and use the bit width to compute the vector
+>>>>> lenght) ? I am not sure how feasible it is given that my knowledge
+>>>>> of MBIgen is pretty poor.
+>>>>>
+>>>>> I understand we want to avoid _DSD properties but we should not
+>>>>> work around standard bindings to achieve that goal.
+>>>>>
+>>>>
+>>>> We use "num-pins" for dt solution, but it is not so welcome here.
+>>>
+>>> Well, this device is already completely out of any standard description
+>>> on the ACPI side. And given that it bloats both the ACPI tables and the
+>>> kernel data structures, I can only suggest that you take advantage of
+>>> _DSD here, as misusing the standard properties is not something that we
+>>> should condone. It will also make the driver more manageable, as it
+>>> will
+>>> use similar properties on both firmware implementations.
+>>>
+>>> I feel like I need to stress the urgency here. We're at -rc4, and still
+>>> with unsolved issues. None of us want to miss the next merge window.
+>>>
 >>
->> diff --git a/Documentation/devicetree/bindings/power/fsl,imx-gpcv2.txt b/Documentation/devicetree/bindings/power/fsl,imx-gpcv2.txt
->> new file mode 100644
->> index 0000000..02f45c6
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/power/fsl,imx-gpcv2.txt
->> @@ -0,0 +1,71 @@
->> +Freescale i.MX General Power Controller v2
->> +==========================================
->> +
->> +The i.MX7S/D General Power Control (GPC) block contains Power Gating
->> +Control (PGC) for various power domains.
->> +
->> +Required properties:
->> +
->> +- compatible: Should be "fsl,imx7d-gpc"
->> +
->> +- reg: should be register base and length as documented in the
->> +  datasheet
->> +
->> +- interrupts: Should contain GPC interrupt request 1
->> +
->> +Power domains contained within GPC node are generic power domain
->> +providers, documented in
->> +Documentation/devicetree/bindings/power/power_domain.txt, which are
->> +described as subnodes of the power gating controller 'pgc' node,
->> +which, in turn, is expected to contain the following:
->> +
->> +Required properties:
->> +
->> +- reg: Power domain index. Valid values are defined in
->> +  include/dt-bindings/power/imx7-power.h
->> +
->> +- #power-domain-cells: Should be 0
->> +
->> +Optional properties:
->> +
->> +- power-supply: Power supply used to power the domain
->> +
->> +Example:
->> +
->> +     gpc: gpc at 303a0000 {
->> +             compatible = "fsl,imx7d-gpc";
->> +             reg = <0x303a0000 0x1000>;
->> +             interrupt-controller;
->> +             interrupts = <GIC_SPI 87 IRQ_TYPE_LEVEL_HIGH>;
->> +             #interrupt-cells = <3>;
->> +             interrupt-parent = <&intc>;
->> +
->> +             pgc {
->> +                     #address-cells = <1>;
->> +                     #size-cells = <0>;
->> +
->> +                     pgc_pcie_phy: power-domain at 3 {
->> +                             #power-domain-cells = <0>;
->> +
->> +                             reg = <IMX7_POWER_DOMAIN_PCIE_PHY>;
->> +                             power-supply = <&reg_1p0d>;
->> +                     };
->> +             };
->> +     };
->> +
->> +
->> +Specifying power domain for IP modules
->> +======================================
->> +
->> +IP cores belonging to a power domain should contain a 'power-domains'
->> +property that is a phandle for PGC node representing the domain.
->> +
->> +Example of a device that is part of the PCIE_PHY power domain:
->> +
->> +     pcie: pcie at 33800000 {
->> +           reg = <0x33800000 0x4000>,
->> +                 <0x4ff00000 0x80000>;
->> +             /* ... */
->> +             power-domains = <&pgc_pcie_phy>;
->> +             /* ... */
->> +     };
->> diff --git a/include/dt-bindings/power/imx7-power.h b/include/dt-bindings/power/imx7-power.h
->> new file mode 100644
->> index 0000000..eb70023
->> --- /dev/null
->> +++ b/include/dt-bindings/power/imx7-power.h
->> @@ -0,0 +1,18 @@
->> +/*
->> + *  Copyright (C) 2017 Impinj
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + */
->> +
->> +#ifndef __DT_BINDINGS_IMX7_POWER_H__
->> +#define __DT_BINDINGS_IMX7_POWER_H__
->> +
->> +#define IMX7_POWER_DOMAIN_USB_HSIC_PHY       0
->> +#define IMX7_POWER_DOMAIN_USB_OTG2_PHY       1
->> +#define IMX7_POWER_DOMAIN_USB_OTG1_PHY       2
->> +#define IMX7_POWER_DOMAIN_PCIE_PHY   3
->> +#define IMX7_POWER_DOMAIN_MIPI_PHY   4
->
-> Nitpick: Probably better to define according to the reference manual
-> defined order.
->
-> 0x800 ~ 0x83F : PGC for A7 core0
-> 0x840 ~ 0x87F: PGC for A7 core1
-> 0x880 ~ 0x8BF: PGC for A7 SCU
-> 0xA00 ~ 0xA3F: PGC for fastmix/megamix
-> 0xC00 ~ 0xC3F: PGC for MIPI PHY
-> 0xC40 ~ 0xC7F: PGC for PCIE_PHY
-> 0xC80 ~ 0xCBF: Reserved
-> 0xCC0 ~ 0xCFF: Reserved
-> 0xD00 ~ 0xD3F: PGC for USB HSIC PHY
->
-> You can drop A7 core/scu/fastmix/megamix as well.
->
+>> As follow up our guys would work on a solution whose ACPI table looks
+>> like the following one:
+>>
+>> For mbigen,
+>>     Device(MBI0) {
+>>           Name(_HID, "HISI0152")
+>>           Name(_UID, Zero)
+>>           Name(_CRS, ResourceTemplate() {
+>>                   Memory32Fixed(ReadWrite, 0xa0080000, 0x10000)
+>>           })
+>>
+>>     Name(_DSD, Package () {
+>>       ToUUID("daffd814-6eba-4d8c-8a91-bc9bbf4aa301"),
+>>       Package ()
+>>       {
+>>         Package () {"num-pins", xxx}
+>>       }
+>>     })
+>>     }
 
-Sure, will do.
+Please fix the indentation here; the ASL parser doesn't care, but I don't
+see '}'s as clearly as it does :).  In particular, _DSD usage *must* be for
+a device and it does not look like that if one doesn't carefully count all
+the parentheses and braces.
 
-Thanks,
-Andrey Smirnov
+>>
+>> For devices,
+>>    Device(COM0) {
+>>           Name(_HID, "ACPIIDxx")
+>>           Name(_UID, Zero)
+>>           Name(_CRS, ResourceTemplate() {
+>>                  Memory32Fixed(ReadWrite, 0xb0030000, 0x10000)
+>> 		 Interrupt(ResourceConsumer,..., "\_SB.MBI0") {12}
+>>           })
+>>     }
+>>
+>>
+>> Marc, Lorenzo if you are ok with the above we will submit v10 based on this...
+> 
+> I am ok with it. I am not 100% up-to-date on what's the status on _DSD
+> bindings/review/guidelines but it would be certainly a good idea to
+> kickstart the process for MBIgen which basically means following this
+> as far as I know (and post to the relevant mailing list):
+> 
+> https://github.com/ahs3/dsd/blob/master/documentation/process_rules.txt
+
+So, let's correct this bit: consider that URL deprecated, please, and refer
+instead to the text that was agreed upon and in the kernel tree:
+
+	Documentation/acpi/DSD-properties-rules.txt
+
+> Al and Darren may add to that as they have more insights.
+
+Since this use of _DSD is very specific to this device, and this device
+only, I don't have any real objections.  I will say that "num-pins" is
+not terribly descriptive so it would be really good to either use a much
+more descriptive name or add plenty of commentary in the code -- and
+preferably both.  I would recommend including the ASL in the code comments,
+with a description of how the property is to be used and what it means.
+
+> I would like to send IORT patches to Catalin as soon as possible so
+> as Marc pointed out the sooner we sort this out the better.
+> 
+> Thanks,
+> Lorenzo
+> 
+
+
+-- 
+ciao,
+al
+-----------------------------------
+Al Stone
+Software Engineer
+Red Hat, Inc.
+ahs3 at redhat.com
+-----------------------------------
