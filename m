@@ -1,184 +1,167 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Mon, 27 Mar 2017 10:27:26 +0100
-Subject: [PATCH v2 7/7] arm64: hugetlb: Add break-before-make logic for
- contiguous entries
-In-Reply-To: <20170327092726.31730-1-punit.agrawal@arm.com>
-References: <20170327092726.31730-1-punit.agrawal@arm.com>
-Message-ID: <20170327092726.31730-8-punit.agrawal@arm.com>
+From: eric.auger@redhat.com (Eric Auger)
+Date: Mon, 27 Mar 2017 11:30:51 +0200
+Subject: [PATCH v4 01/22] KVM: arm/arm64: Add vITS save/restore API
+ documentation
+In-Reply-To: <1490607072-21610-1-git-send-email-eric.auger@redhat.com>
+References: <1490607072-21610-1-git-send-email-eric.auger@redhat.com>
+Message-ID: <1490607072-21610-2-git-send-email-eric.auger@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Steve Capper <steve.capper@arm.com>
+Add description for how to access vITS registers and how to flush/restore
+vITS tables into/from memory
 
-It has become apparent that one has to take special care when modifying
-attributes of memory mappings that employ the contiguous bit.
+Signed-off-by: Eric Auger <eric.auger@redhat.com>
 
-Both the requirement and the architecturally correct "Break-Before-Make"
-technique of updating contiguous entries can be found described in:
-ARM DDI 0487A.k_iss10775, "Misprogramming of the Contiguous bit",
-page D4-1762.
-
-The huge pte accessors currently replace the attributes of contiguous
-pte entries in place thus can, on certain platforms, lead to TLB
-conflict aborts or even erroneous results returned from TLB lookups.
-
-This patch adds a helper function get_clear_flush(.) that clears a
-contiguous entry and returns the head pte (whilst taking care to
-retain dirty bit information that could have been modified by DBM).
-A tlb invalidate is performed to then ensure that there is no
-possibility of multiple tlb entries being present for the same
-region.
-
-Cc: David Woods <dwoods@mellanox.com>
-Signed-off-by: Steve Capper <steve.capper@arm.com>
-(Fixed indentation and some comments cleanup)
-Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-Reviewed-by: Mark Rutland <mark.rutland@arm.com>
 ---
- arch/arm64/mm/hugetlbpage.c | 81 +++++++++++++++++++++++++++++++++++----------
- 1 file changed, 64 insertions(+), 17 deletions(-)
+v3 -> v4:
+- take into account Peter's comments:
+  - typos
+  - KVM_DEV_ARM_VGIC_GRP_ITS_TABLES kvm_device_attr = 0
+  - add a validity bit in DTE
+  - document all fields in CTE and ITE
+  - document ABI revision
+- take into account Andre's comments:
+  - document restrictions about GITS_CREADR writing and GITS_IIDR
+  - document -EBUSY error if one or more VCPUS are runnning
+  - document 64b registers only can be accessed with 64b access
+- itt_addr field matches bits [51:8] of the itt_addr
 
-diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
-index ef85d0656039..e2106932daa0 100644
---- a/arch/arm64/mm/hugetlbpage.c
-+++ b/arch/arm64/mm/hugetlbpage.c
-@@ -68,6 +68,47 @@ static int find_num_contig(struct mm_struct *mm, unsigned long addr,
- 	return CONT_PTES;
- }
- 
-+/*
-+ * Changing some bits of contiguous entries requires us to follow a
-+ * Break-Before-Make approach, breaking the whole contiguous set
-+ * before we can change any entries. See ARM DDI 0487A.k_iss10775,
-+ * "Misprogramming of the Contiguous bit", page D4-1762.
-+ *
-+ * This helper performs the break step.
-+ */
-+static pte_t get_clear_flush(struct mm_struct *mm,
-+			     unsigned long addr,
-+			     pte_t *ptep,
-+			     unsigned long pgsize,
-+			     unsigned long ncontig)
-+{
-+	unsigned long i, saddr = addr;
-+	struct vm_area_struct vma = { .vm_mm = mm };
-+	pte_t orig_pte = huge_ptep_get(ptep);
+v1 -> v2:
+- DTE and ITE now are 8 bytes
+- DTE and ITE now indexed by deviceid/eventid
+- use ITE name instead of ITTE
+- mentions ITT_addr matches bits [51:8] of the actual address
+- mentions LE layout
+---
+ Documentation/virtual/kvm/devices/arm-vgic-its.txt | 118 +++++++++++++++++++++
+ 1 file changed, 118 insertions(+)
+
+diff --git a/Documentation/virtual/kvm/devices/arm-vgic-its.txt b/Documentation/virtual/kvm/devices/arm-vgic-its.txt
+index 6081a5b..0902d20 100644
+--- a/Documentation/virtual/kvm/devices/arm-vgic-its.txt
++++ b/Documentation/virtual/kvm/devices/arm-vgic-its.txt
+@@ -36,3 +36,121 @@ Groups:
+     -ENXIO:  ITS not properly configured as required prior to setting
+              this attribute
+     -ENOMEM: Memory shortage when allocating ITS internal data
 +
-+	/*
-+	 * If we already have a faulting entry then we don't need
-+	 * to break before make (there won't be a tlb entry cached).
-+	 */
-+	if (!pte_present(orig_pte))
-+		return orig_pte;
++  KVM_DEV_ARM_VGIC_GRP_ITS_REGS
++  Attributes:
++      The attr field of kvm_device_attr encodes the offset of the
++      ITS register, relative to the ITS control frame base address
++      (ITS_base).
 +
-+	for (i = 0; i < ncontig; i++, addr += pgsize, ptep++) {
-+		pte_t pte = ptep_get_and_clear(mm, addr, ptep);
++      kvm_device_attr.addr points to a __u64 value whatever the width
++      of the addressed register (32/64 bits). 64 bit registers can only
++      be accessed with full length.
 +
-+		/*
-+		 * If HW_AFDBM is enabled, then the HW could turn on
-+		 * the dirty bit for any page in the set, so check
-+		 * them all.  All hugetlb entries are already young.
-+		 */
-+		if (IS_ENABLED(CONFIG_ARM64_HW_AFDBM) && pte_dirty(pte))
-+			orig_pte = pte_mkdirty(orig_pte);
-+	}
++      Writes to read-only registers are ignored by the kernel except for:
++      - GITS_READR. It needs to be restored otherwise commands in the queue
++        will be re-executed after CWRITER setting. Writing this register is
++        allowed if the ITS is not enabled (GITS_CTLR.enable = 0). Also it
++        needs to be restored after GITS_CBASER since a write to GITS_CBASER
++        resets GITS_CREADR.
++      - GITS_IIDR. Its Revision field encodes the table layout ABI revision.
 +
-+	flush_tlb_range(&vma, saddr, addr);
-+	return orig_pte;
-+}
++      For other registers, getting or setting a register has the same
++      effect as reading/writing the register on real hardware.
++  Errors:
++    -ENXIO: Offset does not correspond to any supported register
++    -EFAULT: Invalid user pointer for attr->addr
++    -EINVAL: Offset is not 64-bit aligned
++    -EBUSY: one or more VCPUS are running
 +
- void set_huge_pte_at(struct mm_struct *mm, unsigned long addr,
- 			    pte_t *ptep, pte_t pte)
- {
-@@ -93,6 +134,8 @@ void set_huge_pte_at(struct mm_struct *mm, unsigned long addr,
- 	dpfn = pgsize >> PAGE_SHIFT;
- 	hugeprot = pte_pgprot(pte);
- 
-+	get_clear_flush(mm, addr, ptep, pgsize, ncontig);
++  KVM_DEV_ARM_VGIC_GRP_ITS_TABLES
++  Attributes
++       The attr field of kvm_device_attr must be zero.
 +
- 	for (i = 0; i < ncontig; i++, ptep++, addr += pgsize, pfn += dpfn) {
- 		pr_debug("%s: set pte %p to 0x%llx\n", __func__, ptep,
- 			 pte_val(pfn_pte(pfn, hugeprot)));
-@@ -202,7 +245,7 @@ pte_t arch_make_huge_pte(pte_t entry, struct vm_area_struct *vma,
- pte_t huge_ptep_get_and_clear(struct mm_struct *mm,
- 			      unsigned long addr, pte_t *ptep)
- {
--	int ncontig, i;
-+	int ncontig;
- 	size_t pgsize;
- 	pte_t orig_pte = huge_ptep_get(ptep);
- 
-@@ -210,17 +253,8 @@ pte_t huge_ptep_get_and_clear(struct mm_struct *mm,
- 		return ptep_get_and_clear(mm, addr, ptep);
- 
- 	ncontig = find_num_contig(mm, addr, ptep, &pgsize);
--	for (i = 0; i < ncontig; i++, addr += pgsize, ptep++) {
--		/*
--		 * If HW_AFDBM is enabled, then the HW could
--		 * turn on the dirty bit for any of the page
--		 * in the set, so check them all.
--		 */
--		if (pte_dirty(ptep_get_and_clear(mm, addr, ptep)))
--			orig_pte = pte_mkdirty(orig_pte);
--	}
- 
--	return orig_pte;
-+	return get_clear_flush(mm, addr, ptep, pgsize, ncontig);
- }
- 
- int huge_ptep_set_access_flags(struct vm_area_struct *vma,
-@@ -230,6 +264,7 @@ int huge_ptep_set_access_flags(struct vm_area_struct *vma,
- 	int ncontig, i, changed = 0;
- 	size_t pgsize = 0;
- 	unsigned long pfn = pte_pfn(pte), dpfn;
-+	pte_t orig_pte;
- 	pgprot_t hugeprot;
- 
- 	if (!pte_cont(pte))
-@@ -239,10 +274,12 @@ int huge_ptep_set_access_flags(struct vm_area_struct *vma,
- 	dpfn = pgsize >> PAGE_SHIFT;
- 	hugeprot = pte_pgprot(pte);
- 
--	for (i = 0; i < ncontig; i++, ptep++, addr += pgsize, pfn += dpfn) {
--		changed |= ptep_set_access_flags(vma, addr, ptep,
--				pfn_pte(pfn, hugeprot), dirty);
--	}
-+	orig_pte = get_clear_flush(vma->vm_mm, addr, ptep, pgsize, ncontig);
-+	if (!pte_same(orig_pte, pte))
-+		changed = 1;
++       request the flush-save/restore of the ITS tables, namely
++       the device table, the collection table, all the ITT tables,
++       the LPI pending tables. On save, the tables are flushed
++       into guest memory at the location provisioned by the guest
++       in GITS_BASER (device and collection tables), in the MAPD
++       command (ITT_addr), GICR_PENDBASERs (pending tables).
 +
-+	for (i = 0; i < ncontig; i++, ptep++, addr += pgsize, pfn += dpfn)
-+		set_pte_at(vma->vm_mm, addr, ptep, pfn_pte(pfn, hugeprot));
- 
- 	return changed;
- }
-@@ -252,6 +289,9 @@ void huge_ptep_set_wrprotect(struct mm_struct *mm,
- {
- 	int ncontig, i;
- 	size_t pgsize;
-+	pte_t pte = pte_wrprotect(huge_ptep_get(ptep)), orig_pte;
-+	unsigned long pfn = pte_pfn(pte), dpfn;
-+	pgprot_t hugeprot;
- 
- 	if (!pte_cont(*ptep)) {
- 		ptep_set_wrprotect(mm, addr, ptep);
-@@ -259,8 +299,15 @@ void huge_ptep_set_wrprotect(struct mm_struct *mm,
- 	}
- 
- 	ncontig = find_num_contig(mm, addr, ptep, &pgsize);
--	for (i = 0; i < ncontig; i++, ptep++, addr += pgsize)
--		ptep_set_wrprotect(mm, addr, ptep);
-+	dpfn = pgsize >> PAGE_SHIFT;
++       This means the GIC should be restored before the ITS and all
++       ITS registers but the GITS_CTLR must be restored before
++       restoring the ITS tables.
 +
-+	orig_pte = get_clear_flush(mm, addr, ptep, pgsize, ncontig);
-+	if (pte_dirty(orig_pte))
-+		pte = pte_mkdirty(pte);
++       The GITS_READR and GITS_IIDR read-only registers must also
++       be restored before the table restore. The IIDR revision field
++       encodes the ABI revision of the table layout. If not set by
++       user space, the restoration of the tables will fail.
 +
-+	hugeprot = pte_pgprot(pte);
-+	for (i = 0; i < ncontig; i++, ptep++, addr += pgsize, pfn += dpfn)
-+		set_pte_at(mm, addr, ptep, pfn_pte(pfn, hugeprot));
- }
- 
- void huge_ptep_clear_flush(struct vm_area_struct *vma,
++       Note the LPI configuration table is read-only for the
++       in-kernel ITS and its save/restore goes through the standard
++       RAM save/restore.
++
++       The layout of the tables in guest memory defines an ABI.
++       The entries are laid in little endian format as follows;
++
++  Errors:
++    -EINVAL: kvm_device_attr not equal to 0, invalid table data
++    -EFAULT: invalid guest ram access
++    -EBUSY: one or more VCPUS are running
++
++    ITS Table ABI REV1:
++    -------------------
++
++    The device table and ITE are respectively indexed by device id and
++    eventid. The collection table however is not indexed by collection id:
++    CTE are written at the beginning of the buffer.
++
++    Device Table Entry (DTE) layout: entry size = 8 bytes
++
++    bits:     | 63| 62 ... 49 | 48 ... 5 | 4 ... 0 |
++    values:   | V |   next    | ITT_addr |  Size   |
++
++    where;
++    - V indicates whether the entry is valid,
++    - ITT_addr matches bits [51:8] of the ITT address (256B aligned),
++    - next field is meaningful only if the entry is valid.
++    It equals to 0 if this entry is the last one; otherwise it corresponds
++    to the minimum between the offset to the next device id and 2^14 -1.
++
++    Collection Table Entry (CTE) layout: entry size = 8 bytes
++
++    bits:     | 63| 62 ..  52  | 51 ... 16 | 15  ...   0 |
++    values:   | V |    RES0    |  RDBase   |    ICID     |
++
++    where:
++    - V indicates whether the entry is valid,
++    - RDBase matches the PE number (GICR_TYPER.Processor_Number),
++    - ICID matches the collection ID
++
++    Interrupt Translation Entry (ITE) layout: entry size = 8 bytes
++
++    bits:     | 63 ... 48 | 47 ... 16 | 15 ... 0 |
++    values:   |    next   |   pINTID  |  ICID    |
++
++    where:
++    - pINTID is the physical LPI ID,
++    - ICID is the collection ID,
++    - next field is meaningful only if the entry is valid (pINTID != 0).
++    It equals to 0 if this entry is the last one; otherwise it corresponds
++    to the minimum between the eventid offset to the next ITE and 2^16 -1.
++
++    LPI Pending Table layout:
++
++    As specified in the ARM Generic Interrupt Controller Architecture
++    Specification GIC Architecture version 3.0 and version 4. The first
++    1kB is not modified and therefore should contain zeroes.
++
++    Future evolutions of the ITS table layout:
++
++    At the moment the table layout is defined and optimized for physical
++    LPI support.
++
++    In the future we might implement direct injection of virtual LPIS.
++    This will require an upgrade of the table layout and an evolution of
++    the ABI. The ABI revision is encoded in the GITS_IIDR revision field.
++    That register must be restored before the table restoration, otherwise
++    the operation will fail.
++
++    ABI V1: GITS_IIDR.Revision = 1
 -- 
-2.11.0
+2.5.5
