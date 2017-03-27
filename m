@@ -1,27 +1,38 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 27 Mar 2017 17:21:45 +0200
-Subject: [PATCH 0/7] memory: atmel-ebi: Add PM ops
-In-Reply-To: <20170327151432.ybb3pfuxivdhb7ji@dell>
-References: <1489653034-17777-1-git-send-email-boris.brezillon@free-electrons.com>
- <e27d2dd0-ce23-d63d-04dc-7be745770a00@atmel.com>
- <20170327151432.ybb3pfuxivdhb7ji@dell>
-Message-ID: <20170327152145.bkpjac3outkjxbwf@piout.net>
+From: nicolas.ferre@microchip.com (Nicolas Ferre)
+Date: Mon, 27 Mar 2017 17:22:00 +0200
+Subject: [PATCH] MAINTAINERS: Add memory drivers to AT91 entry
+In-Reply-To: <20170327152101.21977-1-alexandre.belloni@free-electrons.com>
+References: <20170327152101.21977-1-alexandre.belloni@free-electrons.com>
+Message-ID: <030be639-2114-7588-5671-b3ec4377dfa3@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Le 27/03/2017 ? 17:21, Alexandre Belloni a ?crit :
+> Both atmel-ebi and atmel-sdram are maintained as part of the Atmel ARM
+> SoCs.
+> 
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
-On 27/03/2017 at 16:14:32 +0100, Lee Jones wrote:
-> There doesn't appear to be a Maintainer for the memory subsystem.
+Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+
+> ---
+>  MAINTAINERS | 1 +
+>  1 file changed, 1 insertion(+)
 > 
-> Who is the Maintainer for drivers/memory/atmel-ebi.c?
-> 
-> If it's you, would you care to add an entry to MAINTAINERS?
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index c45c02bc6082..6531d239db6b 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -1111,6 +1111,7 @@ F:	arch/arm/boot/dts/at91*.dtsi
+>  F:	arch/arm/boot/dts/sama*.dts
+>  F:	arch/arm/boot/dts/sama*.dtsi
+>  F:	arch/arm/include/debug/at91.S
+> +F:	drivers/memory/atmel*
+>  
+>  ARM/ATMEL AT91 Clock Support
+>  M:	Boris Brezillon <boris.brezillon@free-electrons.com>
 > 
 
-I did just that.
 
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Nicolas Ferre
