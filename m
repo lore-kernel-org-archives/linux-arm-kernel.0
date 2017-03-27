@@ -1,72 +1,218 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Mon, 27 Mar 2017 14:29:29 +0100
-Subject: Tegra baseline test results for v4.11-rc4
-Message-ID: <eca008ba-b1d1-4a84-4856-87fa9e28a32a@nvidia.com>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Mon, 27 Mar 2017 14:31:44 +0100
+Subject: [PATCH] KVM: arm/arm64: Signal SIGBUS when stage2 discovers
+ hwpoison memory
+In-Reply-To: <20170327124459.GA21871@cbox> (Christoffer Dall's message of
+ "Mon, 27 Mar 2017 14:44:59 +0200")
+References: <20170315160727.16465-1-james.morse@arm.com>
+ <20170324183044.GK25903@cbox>
+ <87y3vrezjb.fsf@e105922-lin.cambridge.arm.com>
+ <58D8FEF8.9000205@arm.com> <20170327124459.GA21871@cbox>
+Message-ID: <87mvc6g81r.fsf@e105922-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here are some basic Tegra test results for Linux v4.11-rc4.
-Logs and other details at:
+Christoffer Dall <cdall@linaro.org> writes:
 
-    https://nvtb.github.io//linux/test_v4.11-rc4/20170326143102/
+> On Mon, Mar 27, 2017 at 01:00:56PM +0100, James Morse wrote:
+>> Hi guys,
+>> 
+>> On 27/03/17 12:20, Punit Agrawal wrote:
+>> > Christoffer Dall <cdall@linaro.org> writes:
+>> >> On Wed, Mar 15, 2017 at 04:07:27PM +0000, James Morse wrote:
+>> >>> Once we enable ARCH_SUPPORTS_MEMORY_FAILURE on arm64[0], notifications for
+>> >>> broken memory can call memory_failure() in mm/memory-failure.c to deliver
+>> >>> SIGBUS to any user space process using the page, and notify all the
+>> >>> in-kernel users.
+>> >>>
+>> >>> If the page corresponded with guest memory, KVM will unmap this page
+>> >>> from its stage2 page tables. The user space process that allocated
+>> >>> this memory may have never touched this page in which case it may not
+>> >>> be mapped meaning SIGBUS won't be delivered.
+>> >>>
+>> >>> When this happens KVM discovers pfn == KVM_PFN_ERR_HWPOISON when it
+>> >>> comes to process the stage2 fault.
+>> >>>
+>> >>> Do as x86 does, and deliver the SIGBUS when we discover
+>> >>> KVM_PFN_ERR_HWPOISON. Use the stage2 mapping size as the si_addr_lsb
+>> >>> as this matches the user space mapping size.
+>> 
+>> >>> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+>> >>> index 962616fd4ddd..9d1aa294e88f 100644
+>> >>> --- a/arch/arm/kvm/mmu.c
+>> >>> +++ b/arch/arm/kvm/mmu.c
+>> >>> @@ -20,8 +20,10 @@
+>> >>>  #include <linux/kvm_host.h>
+>> >>>  #include <linux/io.h>
+>> >>>  #include <linux/hugetlb.h>
+>> >>> +#include <linux/sched/signal.h>
+>> >>>  #include <trace/events/kvm.h>
+>> >>>  #include <asm/pgalloc.h>
+>> >>> +#include <asm/siginfo.h>
+>> >>>  #include <asm/cacheflush.h>
+>> >>>  #include <asm/kvm_arm.h>
+>> >>>  #include <asm/kvm_mmu.h>
+>> >>> @@ -1237,6 +1239,23 @@ static void coherent_cache_guest_page(struct kvm_vcpu *vcpu, kvm_pfn_t pfn,
+>> >>>  	__coherent_cache_guest_page(vcpu, pfn, size);
+>> >>>  }
+>> >>>  
+>> >>> +static void kvm_send_hwpoison_signal(unsigned long address, bool hugetlb)
+>> >>> +{
+>> >>> +	siginfo_t info;
+>> >>> +
+>> >>> +	info.si_signo   = SIGBUS;
+>> >>> +	info.si_errno   = 0;
+>> >>> +	info.si_code    = BUS_MCEERR_AR;
+>> >>> +	info.si_addr    = (void __user *)address;
+>> >>> +
+>> >>> +	if (hugetlb)
+>> >>> +		info.si_addr_lsb = PMD_SHIFT;
+>> >>> +	else
+>> >>> +		info.si_addr_lsb = PAGE_SHIFT;
+>> >>> +
+>> >>> +	send_sig_info(SIGBUS, &info, current);
+>> >>> +}
+>> >>> +
+>> >>>  static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>> >>>  			  struct kvm_memory_slot *memslot, unsigned long hva,
+>> >>>  			  unsigned long fault_status)
+>> >>> @@ -1306,6 +1325,10 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>> >>>  	smp_rmb();
+>> >>>  
+>> >>>  	pfn = gfn_to_pfn_prot(kvm, gfn, write_fault, &writable);
+>> >>> +	if (pfn == KVM_PFN_ERR_HWPOISON) {
+>> >>> +		kvm_send_hwpoison_signal(hva, hugetlb);
+>> >>
+>> >> The way this is called means that we'll only notify userspace of a huge
+>> >> mapping if userspace is mapping hugetlbfs, and not because the stage2
+>> >> mapping may or may not have used transparent huge pages when the error
+>> >> was discovered.  Is this the desired semantics?
+>> 
+>> No,
+>> 
+>> 
+>> > I think so.
+>> >
+>> > AFAIUI, transparent hugepages are split before being poisoned while all
+>> > the underlying pages of a hugepage are poisoned together, i.e., no
+>> > splitting.
+>> 
+>> In which case I need to look into this some more!
+>> 
+>> My thinking was we should report the size that was knocked out of the stage2 to
+>> avoid the guest repeatedly faulting until it has touched every guest-page-size
+>> in the stage2 hole.
+>
+> By signaling something at the fault path, I think it's going to be very
+> hard to backtrack how the stage 2 page tables looked like when faults
+> started happening, because I think these are completely decoupled events
+> (the mmu notifier and the later fault).
+>
+>> 
+>> Reading the code in that kvm/mmu.c it looked like the mapping sizes would always
+>> be the same as those used by userspace.
+>
+> I think the mapping sizes should be the same between userspace and KVM,
+> but the mapping size of a particular page (and associated pages) may
+> vary over time.
 
+Stage 1 and Stage 2 support different hugepage sizes. A larger size
+stage 1 page maps to multiple stage 2 page table entries. For stage 1,
+we support PUD_SIZE, CONT_PMD_SIZE, PMD_SIZE and CONT_PTE_SIZE while
+only PMD_SIZE is supported for Stage 2.
 
-Test summary
-------------
+>
+>> 
+>> If the page was split before KVM could have taken this fault I assumed it would
+>> fault on the page-size mapping and hugetlb would be false.
+>
+> I think you could have a huge page, which gets unmapped as a result on
+> it getting split (perhaps because there was a failure on one page) and
+> later as you fault, you can discover a range which can be a hugetlbfs or
+> transparent huge pages.
+>
+> The question that I don't know is how Linux behaves if a page is marked
+> with hwpoison, in that case, if Linux never supports THP and always
+> marks an entire huge page in a hugetlbfs with the poison, then I think
+> we're mostly good here.  If not, we should make sure we align with
+> whatever the rest of the kernel does.
 
-Build: zImage:
-    Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
+AFAICT, a hugetlbfs page is poisoned as a whole while thp is split
+before poisoning. Quoting comment near the top of memory_failure() in
+mm/memory_failure.c.
 
-Build: Image:
-    Pass: ( 1/ 1): defconfig
+    /*
+     * Currently errors on hugetlbfs pages are measured in hugepage units,
+     * so nr_pages should be 1 << compound_order.  OTOH when errors are on
+     * transparent hugepages, they are supposed to be split and error
+     * measurement is done in normal page units.  So nr_pages should be one
+     * in this case.
+     */
 
-Boot to userspace: defconfig:
-    Pass: ( 4/ 4): qemu-vexpress64, tegra132-norrin,
-		   tegra210-p2371-0000, tegra210-smaug
+>
+>> (which is already
+>> wrong for another reason, looks like I grabbed the variable before
+>> transparent_hugepage_adjust() has had a go a it.).
+>> 
+>
+> yes, which is why I asked if you only care about hugetlbfs.
+>
 
-Boot to userspace: multi_v7_defconfig:
-    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+Based on the comment above, we should never get a poisoned page that is
+part of a transparent hugepage.
 
-Boot to userspace: tegra_defconfig:
-    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+>> 
+>> >> Also notice that the hva is not necessarily aligned to the beginning of
+>> >> the huge page, so can we be giving userspace wrong information by
+>> >> pointing in the middle of a huge page and telling it there was an
+>> >> address error in the size of the PMD ?
+>> >>
+>> > 
+>> > I could be reading it wrong but I think we are fine here - the address
+>> > (hva) is the location that faulted. And the lsb indicates the least
+>> > significant bit of the faulting address (See man sigaction(2)). The
+>> > receiver of the signal is expected to use the address and lsb to workout
+>> > the extent of corruption.
+>> 
+>> kill_proc() in mm/memory-failure.c does this too, but the address is set by
+>> page_address_in_vma() in add_to_kill() of the same file. (I'll chat with Punit
+>> off list.)
+>> 
+>> 
+>> > Though I missed a subtlety while reviewing the patch before. The
+>> > reported lsb should be for the userspace hugepage mapping (i.e., hva)
+>> > and not for the stage 2.
+>> 
+>> I thought these were always supposed to be the same, and using hugetlb was a bug
+>> because I didn't look closely enough at what is_vm_hugetlb_page() does.
 
-PM: System suspend: multi_v7_defconfig:
-    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+See above.
 
-PM: System suspend: tegra_defconfig:
-    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+>> 
+>> 
+>> > In light of this, I'd like to retract my Reviewed-by tag for this
+>> > version of the patch as I believe we'll need to change the lsb
+>> > reporting.
+>> 
+>> Sure, lets work out what this should be doing. I'm beginning to suspect x86's
+>> 'always page size' was correct to begin with!
+>> 
+>
+> I had a sense of that too, but it would be good to understand how you
+> mark and individual page within a hugetlbfs huge page with hwpoison...
 
+I don't think it is possible to mark an individual page in a hugetlbfs
+page - it's all or nothing.
 
-vmlinux object size
-(delta in bytes from test_v4.11-rc3 (97da3854c526d3a6ee05c849c96e48d21527606c)):
-   text     data      bss    total  kernel
-    +28        0        0      +28  defconfig
-   -328        0        0     -328  multi_v7_defconfig
-    +88      +72        0     +160  tegra_defconfig
+AFAICT, the SIGBUS report is for user mappings and doesn't have to care
+whether it's Stage 2 hugetlb page or thp. And the lsb determination should
+take the Stage 1 hugepage size into account - something along the lines
+of the snippet from previous email.
 
+Hope that makes sense.
 
-Boot-time memory difference
-(delta in bytes from test_v4.11-rc3 (97da3854c526d3a6ee05c849c96e48d21527606c))
-    avail    rsrvd     high    freed                board              kconfig                  dtb
-        .        .        .        .      qemu-vexpress64            defconfig           __internal
-        .        .        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
-        .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
-        .        .        .        .  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
-        .        .        .        .  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
-        .        .        .        .    tegra124-nyan-big   multi_v7_defconfig    tegra124-nyan-big
-        .        .        .        .    tegra124-nyan-big      tegra_defconfig    tegra124-nyan-big
-        .        .        .        .      tegra132-norrin            defconfig      tegra132-norrin
-        .        .        .        .    tegra20-trimslice   multi_v7_defconfig    tegra20-trimslice
-        .        .        .        .    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
-        .        .        .        .  tegra210-p2371-0000            defconfig  tegra210-p2371-0000
-        .        .        .        .       tegra210-smaug            defconfig       tegra210-smaug
-        .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
-        .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
+Punit
 
-
---
-nvpublic
+>
+> Thanks,
+> -Christoffer
