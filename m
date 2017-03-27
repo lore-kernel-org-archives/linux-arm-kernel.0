@@ -1,91 +1,69 @@
-From: architt@codeaurora.org (Archit Taneja)
-Date: Mon, 27 Mar 2017 12:03:41 +0530
-Subject: [PATCH v2] drm: dw_hdmi: Don't rely on the status of the bridge
- for updating HPD
-In-Reply-To: <20170310093129.16890-1-romain.perier@collabora.com>
-References: <20170310093129.16890-1-romain.perier@collabora.com>
-Message-ID: <49effa0d-d6df-815b-33a7-c4cd8e25e300@codeaurora.org>
+From: anurupvasu@gmail.com (Anurup M)
+Date: Mon, 27 Mar 2017 12:04:06 +0530
+Subject: [PATCH v6 07/11] drivers: perf: hisi: Add support for Hisilicon
+ SoC event counters
+In-Reply-To: <20170324115707.GD22771@leverpostej>
+References: <1489127311-112778-1-git-send-email-anurup.m@huawei.com>
+ <20170321165252.GA29116@leverpostej> <58D4F277.7080006@gmail.com>
+ <20170324115707.GD22771@leverpostej>
+Message-ID: <58D8B25E.90308@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On 03/10/2017 03:01 PM, Romain Perier wrote:
-> Currently, the irq handler that monitores changes for HPD anx RX_SENSE
-> relies on the status of the bridge for updating the status of the HPD.
-> The update is done only when the bridge is enabled.
->
-> However, on Rockchip platforms we have found use cases where it could be
-> a problem. When HDMI is being used, turning off/on the screen or
-> unplugging/re-plugging the cable, the following simplified code path
-> will happen:
->
-> - dw_hdmi_irq() will be triggered by an HPD event, as the bridge is on
-> hdmi->disabled is false, then the handler will update the rxsense flag
-> accordingly.
-> - dw_hdmi_update_power() will be invoked with the mode
-> DRM_FORCE_UNSPECIFIED and rxsense == 1, so dw_hdmi_poweroff() will be
-> called and the PHY will be desactivated (its pixel clocks and TMDS)
->
+
+On Friday 24 March 2017 05:27 PM, Mark Rutland wrote:
+>> +/* hip05/06 chips L3C bank identifier */
+>> >+static u32 l3c_bankid_map_v1[MAX_BANKS] = {
+>> >+    0x02, 0x04, 0x01, 0x08,
+>> >+};
+>> >+
+>> >+/* hip07 chip L3C bank identifier */
+>> >+static u32 l3c_bankid_map_v2[MAX_BANKS] = {
+>> >+    0x01, 0x02, 0x03, 0x04,
+>> >+};
+>> >
+>> >Is my approach OK? or can be improved?
+> I think it would make more sense for this to be described in the DT.
+
+Ok. Shall describe it in DT.
+
 > [...]
 >
-> - dw_hdmi_bridge_disable() will be invoked, the bridge will be marked as
-> disabled.
+>> I shall handle the error internally and propagate it until a void
+>> >function (pmu->start, pmu->stop, pmu->del etc. are void).
+>> >e.g. in the scenario pmu->add ---> pmu->start. If start fail,
+>> >pmu->add cannot catch it and continues.
+>> >the counter index could be cleared when pmu->del is called later.
+>> >
+>> >Is this fine? Any suggestion to handle it?
+> Propagating it up to a void function, only to silently fail is not good.
 >
-> - dw_hdmi_irq() will be triggered by an HPD event, as the bridge is
-> currently disabled the HPD status won't be updated, so hdmi->rxsense
-> won't be changed. Even if the data part of the PHY is disabled, this
-> information coming from the HDMI Transmitter is correct and should be
-> saved.
->
+> Given it seems this should only happen if there is a major HW problem,
+> I'd be happier with a BUG_ON() in the djtag accessors.
+
+Yes, it occur only when major HQ problem. I would add BUG_ON in djtag 
+and simplify callers.
+
 > [...]
 >
-> - dw_hdmi_bridge_enable() will be invoked, the bridge will be marked as
-> enabled.
-> - dw_hdmi_update_power() will be called. When hdmi->force is equal to
-> DRM_FORCE_UNSPECIFIED the function will rely on hdmi->rxsense. If this
-> field has not been updated by the irq handler, it will be false and
-> DRM_FORCE_ON won't be put to hdmi->force.
->
-> Consequently, most of the time dw_hdmi_poweron() won't be called in this
-> use case, TMDS won't be re-enabled the PHY won't be re-initialized,
-> resulting in a "Signal not found".
->
-> This commit fixes the issue by removing the check for "!hdmi->disabled".
-> As already explained, even if the PHY is partially disabled, information
-> coming from HDMI Transmitter about HPD should be saved for a later use.
+>>> > >In the absence of pmu::{enable,disable}, you must disallow groups, since
+>>> > >their events will be enabled for different periods of time.
+>> >
+>> >For L3 cache and MN PMU, pmu::{enable,disable}is present. But in
+>> >case of Hisilicon DDRC PMU,
+>> >it is not available. It only support continuous counting. I shall
+>> >disallow groups when adding support
+>> >for DDRC PMU.
+> Given this code does not currently support the DDRC, please simplify
+> the coder to assume these callbacks always exist. We can alter it when
+> DDRC support arrives.
 
-I pushed this to drm-misc-next after incorporating the directory change and
-fixing some typos in the commit message.
+Ok. Sure. Shall remove all similar checks added for DDRC in this file to 
+simplify.
 
 Thanks,
-Archit
+Anurup
 
->
-> Signed-off-by: Romain Perier <romain.perier@collabora.com>
-> ---
->
-> Changes in v2:
-> - I have re-worded the commit message, as suggested by Russel
->
->  drivers/gpu/drm/bridge/dw-hdmi.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/gpu/drm/bridge/dw-hdmi.c b/drivers/gpu/drm/bridge/dw-hdmi.c
-> index 3a70016..5b6090c 100644
-> --- a/drivers/gpu/drm/bridge/dw-hdmi.c
-> +++ b/drivers/gpu/drm/bridge/dw-hdmi.c
-> @@ -1793,7 +1793,7 @@ static irqreturn_t dw_hdmi_irq(int irq, void *dev_id)
->  	if (intr_stat &
->  	    (HDMI_IH_PHY_STAT0_RX_SENSE | HDMI_IH_PHY_STAT0_HPD)) {
->  		mutex_lock(&hdmi->mutex);
-> -		if (!hdmi->disabled && !hdmi->force) {
-> +		if (!hdmi->force) {
->  			/*
->  			 * If the RX sense status indicates we're disconnected,
->  			 * clear the software rxsense status.
->
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+> Thanks,
+> Mark.
