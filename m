@@ -1,84 +1,47 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 27 Mar 2017 17:03:44 +0100
-Subject: [PATCH v2 8/9] arm: KVM: Make unexpected register accesses inject an
- undef
+Date: Mon, 27 Mar 2017 17:03:41 +0100
+Subject: [PATCH v2 5/9] arm64: KVM: PMU: Inject UNDEF on read access to
+ PMSWINC_EL0
 In-Reply-To: <20170327160345.12402-1-marc.zyngier@arm.com>
 References: <20170327160345.12402-1-marc.zyngier@arm.com>
-Message-ID: <20170327160345.12402-9-marc.zyngier@arm.com>
+Message-ID: <20170327160345.12402-6-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Reads from write-only system registers are generally confined to
-EL1 and not propagated to EL2 (that's what the architecture
-mantates). In order to be sure that we have a sane behaviour
-even in the unlikely event that we have a broken system, we still
-handle it in KVM. Same goes for write to RO registers.
-
-In that case, let's inject an undef into the guest.
+PMSWINC_EL0 is a WO register, so let's UNDEF when reading from it
+(in the highly hypothetical case where this doesn't UNDEF at EL1).
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/kvm/coproc.c | 18 ++++++++++++++++++
- arch/arm/kvm/coproc.h | 18 ------------------
- 2 files changed, 18 insertions(+), 18 deletions(-)
+ arch/arm64/kvm/sys_regs.c | 13 ++++++-------
+ 1 file changed, 6 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/kvm/coproc.c b/arch/arm/kvm/coproc.c
-index 3e5e4194ef86..519aac12b365 100644
---- a/arch/arm/kvm/coproc.c
-+++ b/arch/arm/kvm/coproc.c
-@@ -40,6 +40,24 @@
-  * Co-processor emulation
-  *****************************************************************************/
+diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+index 19a036b4f6ac..f80a61af5e88 100644
+--- a/arch/arm64/kvm/sys_regs.c
++++ b/arch/arm64/kvm/sys_regs.c
+@@ -772,16 +772,15 @@ static bool access_pmswinc(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+ 	if (!kvm_arm_pmu_v3_ready(vcpu))
+ 		return trap_raz_wi(vcpu, p, r);
  
-+static bool write_to_read_only(struct kvm_vcpu *vcpu,
-+			       const struct coproc_params *params)
-+{
-+	WARN_ONCE(1, "CP15 write to read-only register\n");
-+	print_cp_instr(params);
-+	kvm_inject_undefined(vcpu);
-+	return false;
-+}
++	if (!p->is_write)
++		return read_from_write_only(vcpu, p);
 +
-+static bool read_from_write_only(struct kvm_vcpu *vcpu,
-+				 const struct coproc_params *params)
-+{
-+	WARN_ONCE(1, "CP15 read to write-only register\n");
-+	print_cp_instr(params);
-+	kvm_inject_undefined(vcpu);
-+	return false;
-+}
-+
- /* 3 bits per cache level, as per CLIDR, but non-existent caches always 0 */
- static u32 cache_levels;
+ 	if (pmu_write_swinc_el0_disabled(vcpu))
+ 		return false;
  
-diff --git a/arch/arm/kvm/coproc.h b/arch/arm/kvm/coproc.h
-index eef1759c2b65..3a41b7d1eb86 100644
---- a/arch/arm/kvm/coproc.h
-+++ b/arch/arm/kvm/coproc.h
-@@ -81,24 +81,6 @@ static inline bool read_zero(struct kvm_vcpu *vcpu,
- 	return true;
+-	if (p->is_write) {
+-		mask = kvm_pmu_valid_counter_mask(vcpu);
+-		kvm_pmu_software_increment(vcpu, p->regval & mask);
+-		return true;
+-	}
+-
+-	return false;
++	mask = kvm_pmu_valid_counter_mask(vcpu);
++	kvm_pmu_software_increment(vcpu, p->regval & mask);
++	return true;
  }
  
--static inline bool write_to_read_only(struct kvm_vcpu *vcpu,
--				      const struct coproc_params *params)
--{
--	kvm_debug("CP15 write to read-only register at: %08lx\n",
--		  *vcpu_pc(vcpu));
--	print_cp_instr(params);
--	return false;
--}
--
--static inline bool read_from_write_only(struct kvm_vcpu *vcpu,
--					const struct coproc_params *params)
--{
--	kvm_debug("CP15 read to write-only register at: %08lx\n",
--		  *vcpu_pc(vcpu));
--	print_cp_instr(params);
--	return false;
--}
--
- /* Reset functions */
- static inline void reset_unknown(struct kvm_vcpu *vcpu,
- 				 const struct coproc_reg *r)
+ static bool access_pmuserenr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
 -- 
 2.11.0
