@@ -1,9 +1,10 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 27 Mar 2017 10:49:40 +0100
-Subject: [PATCH v2 12/22] PCI: rockchip: update PCI config space remap function
+Date: Mon, 27 Mar 2017 10:49:44 +0100
+Subject: [PATCH v2 16/22] PCI: designware: update PCI config space remap
+ function
 In-Reply-To: <20170327094954.7162-1-lorenzo.pieralisi@arm.com>
 References: <20170327094954.7162-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20170327094954.7162-13-lorenzo.pieralisi@arm.com>
+Message-ID: <20170327094954.7162-17-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,24 +15,48 @@ memory mappings for PCI configuration space are used.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Cc: Bjorn Helgaas <bhelgaas@google.com>
-Cc: Wenrui Li <wenrui.li@rock-chips.com>
-Cc: Shawn Lin <shawn.lin@rock-chips.com>
+Cc: Jingoo Han <jingoohan1@gmail.com>
+Cc: Joao Pinto <Joao.Pinto@synopsys.com>
 ---
- drivers/pci/host/pcie-rockchip.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/pci/dwc/pcie-designware-host.c | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/pci/host/pcie-rockchip.c b/drivers/pci/host/pcie-rockchip.c
-index 26ddd35..a078131 100644
---- a/drivers/pci/host/pcie-rockchip.c
-+++ b/drivers/pci/host/pcie-rockchip.c
-@@ -822,7 +822,7 @@ static int rockchip_pcie_parse_dt(struct rockchip_pcie *rockchip)
- 	regs = platform_get_resource_byname(pdev,
- 					    IORESOURCE_MEM,
- 					    "axi-base");
--	rockchip->reg_base = devm_ioremap_resource(dev, regs);
-+	rockchip->reg_base = devm_ioremap_nopost_resource(dev, regs);
- 	if (IS_ERR(rockchip->reg_base))
- 		return PTR_ERR(rockchip->reg_base);
+diff --git a/drivers/pci/dwc/pcie-designware-host.c b/drivers/pci/dwc/pcie-designware-host.c
+index 5ba3349..d2dd228 100644
+--- a/drivers/pci/dwc/pcie-designware-host.c
++++ b/drivers/pci/dwc/pcie-designware-host.c
+@@ -338,8 +338,8 @@ int dw_pcie_host_init(struct pcie_port *pp)
+ 	}
  
+ 	if (!pci->dbi_base) {
+-		pci->dbi_base = devm_ioremap(dev, pp->cfg->start,
+-					resource_size(pp->cfg));
++		pci->dbi_base = devm_ioremap_nopost(dev, pp->cfg->start,
++						    resource_size(pp->cfg));
+ 		if (!pci->dbi_base) {
+ 			dev_err(dev, "error with ioremap\n");
+ 			ret = -ENOMEM;
+@@ -350,8 +350,8 @@ int dw_pcie_host_init(struct pcie_port *pp)
+ 	pp->mem_base = pp->mem->start;
+ 
+ 	if (!pp->va_cfg0_base) {
+-		pp->va_cfg0_base = devm_ioremap(dev, pp->cfg0_base,
+-						pp->cfg0_size);
++		pp->va_cfg0_base = devm_ioremap_nopost(dev, pp->cfg0_base,
++						       pp->cfg0_size);
+ 		if (!pp->va_cfg0_base) {
+ 			dev_err(dev, "error with ioremap in function\n");
+ 			ret = -ENOMEM;
+@@ -360,8 +360,8 @@ int dw_pcie_host_init(struct pcie_port *pp)
+ 	}
+ 
+ 	if (!pp->va_cfg1_base) {
+-		pp->va_cfg1_base = devm_ioremap(dev, pp->cfg1_base,
+-						pp->cfg1_size);
++		pp->va_cfg1_base = devm_ioremap_nopost(dev, pp->cfg1_base,
++						       pp->cfg1_size);
+ 		if (!pp->va_cfg1_base) {
+ 			dev_err(dev, "error with ioremap\n");
+ 			ret = -ENOMEM;
 -- 
 2.10.0
