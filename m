@@ -1,151 +1,82 @@
-From: cedric.madianga@gmail.com (M'boumba Cedric Madianga)
-Date: Mon, 27 Mar 2017 12:06:10 +0200
-Subject: [PATCH 1/2] dt-bindings: Document the STM32 MDMA bindings
-In-Reply-To: <20170320215250.wwhq6lzwe45jmwks@rob-hp-laptop>
-References: <1489417599-31308-1-git-send-email-cedric.madianga@gmail.com>
- <1489417599-31308-2-git-send-email-cedric.madianga@gmail.com>
- <20170320215250.wwhq6lzwe45jmwks@rob-hp-laptop>
-Message-ID: <CAOAejn10dPjYTj8vBTDj5bc_RPTmkYC7uuBMPnP-R0BsQiRwhw@mail.gmail.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Mon, 27 Mar 2017 15:35:25 +0530
+Subject: [PATCH v5 0/8] Add dual-role OTG support for Allwinner H3
+In-Reply-To: <20170325145015.22076-1-icenowy@aosc.xyz>
+References: <20170325145015.22076-1-icenowy@aosc.xyz>
+Message-ID: <73c148dd-fe21-da12-45d1-0c70d9a5b998@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
 
-2017-03-20 22:52 GMT+01:00 Rob Herring <robh@kernel.org>:
-> On Mon, Mar 13, 2017 at 04:06:38PM +0100, M'boumba Cedric Madianga wrote:
->> This patch adds documentation of device tree bindings for the STM32 MDMA
->> controller.
->>
->> Signed-off-by: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
->> Reviewed-by: Ludovic BARRE <ludovic.barre@st.com>
->> ---
->>  .../devicetree/bindings/dma/stm32-mdma.txt         | 94 ++++++++++++++++++++++
->>  1 file changed, 94 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/dma/stm32-mdma.txt
->>
->> diff --git a/Documentation/devicetree/bindings/dma/stm32-mdma.txt b/Documentation/devicetree/bindings/dma/stm32-mdma.txt
->> new file mode 100644
->> index 0000000..26a930c
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/dma/stm32-mdma.txt
->> @@ -0,0 +1,94 @@
->> +* STMicroelectronics STM32 MDMA controller
->> +
->> +The STM32 MDMA is a general-purpose direct memory access controller capable of
->> +supporting 64 independent DMA channels with 256 HW requests.
->> +
->> +Required properties:
->> +- compatible: Should be "st,stm32-mdma"
->
-> Should be more specific.
 
-The compatible string is not specific enough ? I don't see how to specific more.
+On Saturday 25 March 2017 08:20 PM, Icenowy Zheng wrote:
+> Allwinner H3 have a its USB PHY0 routed to two USB controllers: one is
+> a MUSB controller, which can work in peripheral mode, but works badly in
+> host mode (several hardware will fail on the MUSB controller, even connect
+> one MUSB controller in peripheral mode to another one in host mode cannot
+> work); the other is a pair of EHCI/OHCI controller, which can work only
+> in host mode, but have better compatibillity. The route is controlled in
+> a register, which we have set it to HCI only when we do not know about
+> it well.
+> 
+> Add support to route to the best controller according to current USB mode
+> (host/peripheral).
+> 
+> Note: Currently even if hardware only support hostmode, we should still
+> enable the MUSB controller, as it controls the USB mode. (Some this kind
+> of hardware can also work in peripheral mode by settings in the sysfs
+> node of MUSB, then connect it to another host via a USB Type-A to Type-A
+> cable.)
+> 
+> Patch 1 changes the device tree binding to include the "pmu0" for HCI pair.
+> 
+> Patch 2 and 3 are fixes for H3 PHY, in order to make MUSB really working
+> on H3.
+> 
+> Patch 4 adds support for auto routing of PHY0. It's currently only enabled
+> on H3, but it's easy to extend it to other SoCs which feature this
+> route control.
 
->
->> +- reg: Should contain MDMA registers location and length. This should include
->> +  all of the per-channel registers.
->> +- interrupts: Should contain the MDMA interrupt.
->> +- clocks: Should contain the input clock of the DMA instance.
->> +- resets: Reference to a reset controller asserting the DMA controller.
->> +- #dma-cells : Must be <5>. See DMA client paragraph for more details.
->> +
->> +Optional properties:
->> +- dma-channels: Number of DMA channels supported by the controller.
->> +- dma-requests: Number of DMA request signals supported by the controller.
->> +- st,ahb-addr-masks: Array of u32 mask to list memory devices addressed via
->> +  AHB bus.
->
-> I don't understand what this is.
+merged the 1st four patch of this series.
 
-The MDMA is able to address memories and devices from AHB bus or AXI bus.
-The MDMA has a little different way of working to address AHB
-device/memory and AXI device/memory.
-In STM32H7 platform, almost all devices are addressed by AXI bus.
-But we have some memories adress by AHB bus.
-So, we add these parameter to be able to handle this.
+Thanks
+Kishon
 
->
->> +
->> +Example:
->
-> Put the 2 examples together.
-
-OK
-
->
->> +
->> +     mdma1: dma at 52000000 {
->> +             compatible = "st,stm32-mdma";
->> +             reg = <0x52000000 0x1000>;
->> +             interrupts = <122>;
->> +             clocks = <&clk_dummy>;
->> +             resets = <&rcc 992>;
->> +             #dma-cells = <5>;
->> +             dma-channels = <16>;
->> +             dma-requests = <32>;
->> +             st,ahb-addr-masks = <0x20000000>, <0x00000000>;
->> +     };
->> +
->> +* DMA client
->> +
->> +DMA clients connected to the STM32 MDMA controller must use the format
->> +described in the dma.txt file, using a six-cell specifier for each channel:
->> +a phandle to the MDMA controller plus the following five integer cells:
->> +
->> +1. The request line number
->> +2. The priority level
->> +     0x00: Low
->> +     0x01: Medium
->> +     0x10: High
->> +     0x11: Very high
->> +3. A 32bit mask specifying the DMA channel configuration
->> + -bit 0-1: Source increment mode
->> +     0x00: Source address pointer is fixed
->> +     0x10: Source address pointer is incremented after each data transfer
->> +     0x11: Source address pointer is decremented after each data transfer
->> + -bit 2-3: Destination increment mode
->> +     0x00: Destination address pointer is fixed
->> +     0x10: Destination address pointer is incremented after each data
->> +     transfer
->> +     0x11: Destination address pointer is decremented after each data
->> +     transfer
->> + -bit 8-9: Source increment offset size
->> +     0x00: byte (8bit)
->> +     0x01: half-word (16bit)
->> +     0x10: word (32bit)
->> +     0x11: double-word (64bit)
->> + -bit 10-11: Destination increment offset size
->> +     0x00: byte (8bit)
->> +     0x01: half-word (16bit)
->> +     0x10: word (32bit)
->> +     0x11: double-word (64bit)
->> +-bit 25-18: The number of bytes to be transferred in a single transfer
->> +     (min = 1 byte, max = 128 bytes)
->> +-bit 29:28: Trigger Mode
->> +     0x00: Each MDMA request triggers a buffer transfer (max 128 bytes)
->> +     0x01: Each MDMA request triggers a block transfer (max 64K bytes)
->> +     0x10: Each MDMA request triggers a repeated block transfer
->> +     0x11: Each MDMA request triggers a linked list transfer
->> +4. A 32bit value specifying the register to be used to acknowledge the request
->> +   if no HW ack signal is used by the MDMA client
->> +5. A 32bit mask specifying the value to be written to acknowledge the request
->> +   if no HW ack signal is used by the MDMA client
->> +
->> +Example:
->> +
->> +     i2c4: i2c at 5c002000 {
->> +             compatible = "st,stm32f7-i2c";
->> +             reg = <0x5c002000 0x400>;
->> +             interrupts = <GIC_SPI 95 IRQ_TYPE_NONE>,
->> +                          <GIC_SPI 96 IRQ_TYPE_NONE>;
->> +             clocks = <&clk_hsi>;
->> +             #address-cells = <1>;
->> +             #size-cells = <0>;
->> +             dmas = <&mdma1 36 0x0 0x40008 0x0 0x0>,
->> +                    <&mdma1 37 0x0 0x40002 0x0 0x0>;
->> +             dma-names = "rx", "tx";
->> +             status = "disabled";
->> +     };
->> --
->> 1.9.1
->>
+> 
+> Patch 5 adds necessary device tree nodes to the H3/H5 DTSI file. Note: The
+> phy is not bind for OHCI/EHCI0, as OHCI/EHCI drivers will keep the VBUS
+> on. Only MUSB driver can properly handle a dual-role PHY.
+> 
+> Patch 6 enables USB OTG functionality on Orange Pi One board, which is
+> the only H3 board I have that have proper OTG function. It's easy to
+> enable OTG on other boards with their schematics.
+> 
+> Patch 7 enables USB OTG functionality on Orange Pi Zero board, as the
+> board cannot output power on Vbus, I only enabled peripheral mode by
+> default.
+> 
+> Patch 8 enables USB OTG funcionality on Orange Pi PC2 board, which is
+> the newly support H5 board, and have USB-related pins same as Orange
+> Pi One.
+> 
+> The USB PHY on V3s/A64 SoCs also feature this capability, and it will
+> be soon enabled on these SoCs after this patchset is merged.
+> 
+> Icenowy Zheng (8):
+>   dt: bindings: add pmu0 regs for USB PHYs on Allwinner H3/V3s/A64
+>   phy: sun4i-usb: change PHYCTL register clearing code
+>   phy: sun4i-usb: add PHYCTL offset for H3 SoC
+>   phy: sun4i-usb: support automatically switch PHY0 route to MUSB/HCI
+>   ARM: sunxi: h3/h5: add usb_otg and OHCI/EHCI for usbc0 on H3/H5
+>   ARM: sun8i: h3: enable USB OTG on Orange Pi One
+>   ARM: sun8i: h2+: enable USB OTG for Orange Pi Zero board
+>   arm64: allwinner: h5: enable USB OTG on Orange Pi PC 2 board
+> 
+>  .../devicetree/bindings/phy/sun4i-usb-phy.txt      |  1 +
+>  arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts  | 20 +++++++-
+>  arch/arm/boot/dts/sun8i-h3-orangepi-one.dts        | 22 ++++++++-
+>  arch/arm/boot/dts/sunxi-h3-h5.dtsi                 | 32 ++++++++++++
+>  .../boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts  | 27 +++++++++-
+>  drivers/phy/phy-sun4i-usb.c                        | 57 ++++++++++++++--------
+>  6 files changed, 135 insertions(+), 24 deletions(-)
+> 
