@@ -1,34 +1,44 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 27 Mar 2017 12:03:03 +0100
-Subject: [PATCH v2 05/10] KVM: arm/arm64: vgic: Get rid of unnecessary
- process_maintenance operation
-In-Reply-To: <20170321211059.8719-6-cdall@linaro.org>
-References: <20170321211059.8719-1-cdall@linaro.org>
- <20170321211059.8719-6-cdall@linaro.org>
-Message-ID: <b94b9e68-ee7f-a3d7-2c1f-7df9ebbcadc6@arm.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Mon, 27 Mar 2017 18:59:05 +0800
+Subject: [PATCH] net: mvneta: set rx mode during resume if interface is running
+Message-ID: <20170327105905.1404-1-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/03/17 21:10, Christoffer Dall wrote:
-> From: Christoffer Dall <christoffer.dall@linaro.org>
-> 
-> Since we always read back the LRs that we wrote to the guest and the
-> MISR and EISR registers simply provide a summary of the configuration of
-> the bits in the LRs, there is really no need to read back those status
-> registers and process them.  We can might as well just signal the
-                                  ^^^
-Typo.
+I found a bug by:
 
-> notifyfd when folding the LR state and save some cycles in the process.
-> 
-> We now clear the underflow bit in the fold_lr_state functions as we only
-> need to clear this bit if we had used all the LRs, so this is as good a
-> place as any to do that work.
-> 
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+0. boot and start dhcp client
+1. echo mem > /sys/power/state
+2. resume back immediately
+3. don't touch dhcp client to renew the lease
+4. ping the gateway. No acks
 
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+Usually, after step2, the DHCP lease isn't expired, so in theory we
+should resume all back. But in fact, it doesn't. It turns out
+the rx mode isn't resumed correctly. This patch fixes it by adding
+mvneta_set_rx_mode(dev) in the resume hook if interface is running.
 
-	M.
+Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+---
+ drivers/net/ethernet/marvell/mvneta.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
+index aebbc5399a06..cc126204dc4d 100644
+--- a/drivers/net/ethernet/marvell/mvneta.c
++++ b/drivers/net/ethernet/marvell/mvneta.c
+@@ -4449,8 +4449,11 @@ static int mvneta_resume(struct device *device)
+ 		mvneta_fixed_link_update(pp, dev->phydev);
+ 
+ 	netif_device_attach(dev);
+-	if (netif_running(dev))
++	if (netif_running(dev)) {
+ 		mvneta_open(dev);
++		mvneta_set_rx_mode(dev);
++	}
++
+ 	return 0;
+ }
+ #endif
 -- 
-Jazz is not dead. It just smells funny...
+2.11.0
