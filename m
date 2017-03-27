@@ -1,123 +1,176 @@
-From: jonas.jensen@gmail.com (Jonas Jensen)
-Date: Mon, 27 Mar 2017 14:31:19 +0200
-Subject: [PATCH v2] net: moxa: fix TX overrun memory leak
-Message-ID: <1490617879-14014-1-git-send-email-jonas.jensen@gmail.com>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Mon, 27 Mar 2017 14:44:59 +0200
+Subject: [PATCH] KVM: arm/arm64: Signal SIGBUS when stage2 discovers
+ hwpoison memory
+In-Reply-To: <58D8FEF8.9000205@arm.com>
+References: <20170315160727.16465-1-james.morse@arm.com>
+ <20170324183044.GK25903@cbox>
+ <87y3vrezjb.fsf@e105922-lin.cambridge.arm.com>
+ <58D8FEF8.9000205@arm.com>
+Message-ID: <20170327124459.GA21871@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-moxart_mac_start_xmit() doesn't care where tx_tail is, tx_head can
-catch and pass tx_tail, which is bad because moxart_tx_finished()
-isn't guaranteed to catch up on freeing resources from tx_tail.
+On Mon, Mar 27, 2017 at 01:00:56PM +0100, James Morse wrote:
+> Hi guys,
+> 
+> On 27/03/17 12:20, Punit Agrawal wrote:
+> > Christoffer Dall <cdall@linaro.org> writes:
+> >> On Wed, Mar 15, 2017 at 04:07:27PM +0000, James Morse wrote:
+> >>> Once we enable ARCH_SUPPORTS_MEMORY_FAILURE on arm64[0], notifications for
+> >>> broken memory can call memory_failure() in mm/memory-failure.c to deliver
+> >>> SIGBUS to any user space process using the page, and notify all the
+> >>> in-kernel users.
+> >>>
+> >>> If the page corresponded with guest memory, KVM will unmap this page
+> >>> from its stage2 page tables. The user space process that allocated
+> >>> this memory may have never touched this page in which case it may not
+> >>> be mapped meaning SIGBUS won't be delivered.
+> >>>
+> >>> When this happens KVM discovers pfn == KVM_PFN_ERR_HWPOISON when it
+> >>> comes to process the stage2 fault.
+> >>>
+> >>> Do as x86 does, and deliver the SIGBUS when we discover
+> >>> KVM_PFN_ERR_HWPOISON. Use the stage2 mapping size as the si_addr_lsb
+> >>> as this matches the user space mapping size.
+> 
+> >>> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+> >>> index 962616fd4ddd..9d1aa294e88f 100644
+> >>> --- a/arch/arm/kvm/mmu.c
+> >>> +++ b/arch/arm/kvm/mmu.c
+> >>> @@ -20,8 +20,10 @@
+> >>>  #include <linux/kvm_host.h>
+> >>>  #include <linux/io.h>
+> >>>  #include <linux/hugetlb.h>
+> >>> +#include <linux/sched/signal.h>
+> >>>  #include <trace/events/kvm.h>
+> >>>  #include <asm/pgalloc.h>
+> >>> +#include <asm/siginfo.h>
+> >>>  #include <asm/cacheflush.h>
+> >>>  #include <asm/kvm_arm.h>
+> >>>  #include <asm/kvm_mmu.h>
+> >>> @@ -1237,6 +1239,23 @@ static void coherent_cache_guest_page(struct kvm_vcpu *vcpu, kvm_pfn_t pfn,
+> >>>  	__coherent_cache_guest_page(vcpu, pfn, size);
+> >>>  }
+> >>>  
+> >>> +static void kvm_send_hwpoison_signal(unsigned long address, bool hugetlb)
+> >>> +{
+> >>> +	siginfo_t info;
+> >>> +
+> >>> +	info.si_signo   = SIGBUS;
+> >>> +	info.si_errno   = 0;
+> >>> +	info.si_code    = BUS_MCEERR_AR;
+> >>> +	info.si_addr    = (void __user *)address;
+> >>> +
+> >>> +	if (hugetlb)
+> >>> +		info.si_addr_lsb = PMD_SHIFT;
+> >>> +	else
+> >>> +		info.si_addr_lsb = PAGE_SHIFT;
+> >>> +
+> >>> +	send_sig_info(SIGBUS, &info, current);
+> >>> +}
+> >>> +
+> >>>  static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+> >>>  			  struct kvm_memory_slot *memslot, unsigned long hva,
+> >>>  			  unsigned long fault_status)
+> >>> @@ -1306,6 +1325,10 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+> >>>  	smp_rmb();
+> >>>  
+> >>>  	pfn = gfn_to_pfn_prot(kvm, gfn, write_fault, &writable);
+> >>> +	if (pfn == KVM_PFN_ERR_HWPOISON) {
+> >>> +		kvm_send_hwpoison_signal(hva, hugetlb);
+> >>
+> >> The way this is called means that we'll only notify userspace of a huge
+> >> mapping if userspace is mapping hugetlbfs, and not because the stage2
+> >> mapping may or may not have used transparent huge pages when the error
+> >> was discovered.  Is this the desired semantics?
+> 
+> No,
+> 
+> 
+> > I think so.
+> >
+> > AFAIUI, transparent hugepages are split before being poisoned while all
+> > the underlying pages of a hugepage are poisoned together, i.e., no
+> > splitting.
+> 
+> In which case I need to look into this some more!
+> 
+> My thinking was we should report the size that was knocked out of the stage2 to
+> avoid the guest repeatedly faulting until it has touched every guest-page-size
+> in the stage2 hole.
 
-Add a check in moxart_mac_start_xmit() stopping the queue at
-the end of the circular buffer. Wake it on completion.
+By signaling something at the fault path, I think it's going to be very
+hard to backtrack how the stage 2 page tables looked like when faults
+started happening, because I think these are completely decoupled events
+(the mmu notifier and the later fault).
 
-Addresses https://bugzilla.kernel.org/show_bug.cgi?id=99451
+> 
+> Reading the code in that kvm/mmu.c it looked like the mapping sizes would always
+> be the same as those used by userspace.
 
-Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
----
+I think the mapping sizes should be the same between userspace and KVM,
+but the mapping size of a particular page (and associated pages) may
+vary over time.
 
-Notes:
-    ChangeLog v1->v2:
-    - stop queue instead of dropping frames
-    
-    The following trick was used to trigger the leak.
-    
-    On the host (where this driver runs):
-    1. iptables-restore /etc/iptables.conf && echo 1 > /proc/sys/net/ipv4/ip_forward && ifconfig eth0:0 192.168.5.1
-    2. cat /dev/zero | nc -l -p 3334
-    
-    On a client configured with 192.168.5.1 as a gateway:
-    1. nc -v 192.168.5.1 3334 > /dev/null &
-    repeat the following multiple times, interrup after a few seconds with CTRL+C:
-    2. wget http://cdimage.debian.org/debian-cd/current/amd64/iso-cd/debian-8.7.1-amd64-netinst.iso
-    
-    Result (especially note columns <active_objs> and <num_objs> of kmalloc-192 and kmalloc-2048):
-    
-    date && ifconfig && echo 1 > /proc/sys/vm/drop_caches && cat /proc/slabinfo
-    Fri Mar 24 16:22:54 CET 2017
-    ..
-              RX bytes:57737 (56.3 KiB)  TX bytes:6638 (6.4 KiB)
-    ..
-     # name            <active_objs> <num_objs> <objsize> <objperslab> <pagesperslab> : tunables <limit> ..
-    ..
-    kmalloc-8192           8      8   8192    4    8 : tunables    0    0    0 : slabdata      2      2      0
-    kmalloc-4096          13     16   4096    8    8 : tunables    0    0    0 : slabdata      2      2      0
-    kmalloc-2048          40     40   2048    8    4 : tunables    0    0    0 : slabdata      5      5      0
-    kmalloc-1024          94     96   1024    8    2 : tunables    0    0    0 : slabdata     12     12      0
-    kmalloc-512          179    184    512    8    1 : tunables    0    0    0 : slabdata     23     23      0
-    kmalloc-256           76     80    256   16    1 : tunables    0    0    0 : slabdata      5      5      0
-    kmalloc-192          126    126    192   21    1 : tunables    0    0    0 : slabdata      6      6      0
-    kmalloc-128          340    416    128   32    1 : tunables    0    0    0 : slabdata     13     13      0
-    kmalloc-96          8353   8358     96   42    1 : tunables    0    0    0 : slabdata    199    199      0
-    kmalloc-64           313    320     64   64    1 : tunables    0    0    0 : slabdata      5      5      0
-    kmalloc-32          1460   1536     32  128    1 : tunables    0    0    0 : slabdata     12     12      0
-    
-    date && ifconfig && echo 1 > /proc/sys/vm/drop_caches && cat /proc/slabinfo
-    Fri Mar 24 16:26:36 CET 2017
-    ..
-              RX bytes:70381213 (67.1 MiB)  TX bytes:86208719 (82.2 MiB)
-    ..
-     # name            <active_objs> <num_objs> <objsize> <objperslab> <pagesperslab> : tunables <limit> ..
-    ..
-    kmalloc-8192           8      8   8192    4    8 : tunables    0    0    0 : slabdata      2      2      0
-    kmalloc-4096          13     16   4096    8    8 : tunables    0    0    0 : slabdata      2      2      0
-    kmalloc-2048        2159   2194   2048    8    4 : tunables    0    0    0 : slabdata    275    275      0
-    kmalloc-1024         100    104   1024    8    2 : tunables    0    0    0 : slabdata     13     13      0
-    kmalloc-512          182    184    512    8    1 : tunables    0    0    0 : slabdata     23     23      0
-    kmalloc-256           76     80    256   16    1 : tunables    0    0    0 : slabdata      5      5      0
-    kmalloc-192         2638   2667    192   21    1 : tunables    0    0    0 : slabdata    127    127      0
-    kmalloc-128          344    416    128   32    1 : tunables    0    0    0 : slabdata     13     13      0
-    kmalloc-96          8353   8358     96   42    1 : tunables    0    0    0 : slabdata    199    199      0
-    kmalloc-64           313    320     64   64    1 : tunables    0    0    0 : slabdata      5      5      0
-    kmalloc-32          1625   1664     32  128    1 : tunables    0    0    0 : slabdata     13     13      0
-    
-    Applies to next-20170310
+> 
+> If the page was split before KVM could have taken this fault I assumed it would
+> fault on the page-size mapping and hugetlb would be false.
 
- drivers/net/ethernet/moxa/moxart_ether.c | 12 ++++++++++--
- 1 file changed, 10 insertions(+), 2 deletions(-)
+I think you could have a huge page, which gets unmapped as a result on
+it getting split (perhaps because there was a failure on one page) and
+later as you fault, you can discover a range which can be a hugetlbfs or
+transparent huge pages.
 
-diff --git a/drivers/net/ethernet/moxa/moxart_ether.c b/drivers/net/ethernet/moxa/moxart_ether.c
-index 06c9f41..fa571d5 100644
---- a/drivers/net/ethernet/moxa/moxart_ether.c
-+++ b/drivers/net/ethernet/moxa/moxart_ether.c
-@@ -25,6 +25,7 @@
- #include <linux/of_irq.h>
- #include <linux/crc32.h>
- #include <linux/crc32c.h>
-+#include <linux/circ_buf.h>
- 
- #include "moxart_ether.h"
- 
-@@ -297,6 +298,7 @@ static void moxart_tx_finished(struct net_device *ndev)
- 		tx_tail = TX_NEXT(tx_tail);
- 	}
- 	priv->tx_tail = tx_tail;
-+	netif_wake_queue(ndev);
- }
- 
- static irqreturn_t moxart_mac_interrupt(int irq, void *dev_id)
-@@ -324,13 +326,19 @@ static int moxart_mac_start_xmit(struct sk_buff *skb, struct net_device *ndev)
- 	struct moxart_mac_priv_t *priv = netdev_priv(ndev);
- 	void *desc;
- 	unsigned int len;
--	unsigned int tx_head = priv->tx_head;
-+	unsigned int tx_head, tx_tail;
- 	u32 txdes1;
- 	int ret = NETDEV_TX_BUSY;
- 
-+	spin_lock_irq(&priv->txlock);
-+
-+	tx_head = priv->tx_head;
-+	tx_tail = priv->tx_tail;
- 	desc = priv->tx_desc_base + (TX_REG_DESC_SIZE * tx_head);
- 
--	spin_lock_irq(&priv->txlock);
-+	if (CIRC_SPACE(tx_head, tx_tail, TX_DESC_NUM) == 1)
-+		netif_stop_queue(ndev);
-+
- 	if (moxart_desc_read(desc + TX_REG_OFFSET_DESC0) & TX_DESC0_DMA_OWN) {
- 		net_dbg_ratelimited("no TX space for packet\n");
- 		priv->stats.tx_dropped++;
--- 
-1.8.2.1
+The question that I don't know is how Linux behaves if a page is marked
+with hwpoison, in that case, if Linux never supports THP and always
+marks an entire huge page in a hugetlbfs with the poison, then I think
+we're mostly good here.  If not, we should make sure we align with
+whatever the rest of the kernel does.
+
+> (which is already
+> wrong for another reason, looks like I grabbed the variable before
+> transparent_hugepage_adjust() has had a go a it.).
+> 
+
+yes, which is why I asked if you only care about hugetlbfs.
+
+> 
+> >> Also notice that the hva is not necessarily aligned to the beginning of
+> >> the huge page, so can we be giving userspace wrong information by
+> >> pointing in the middle of a huge page and telling it there was an
+> >> address error in the size of the PMD ?
+> >>
+> > 
+> > I could be reading it wrong but I think we are fine here - the address
+> > (hva) is the location that faulted. And the lsb indicates the least
+> > significant bit of the faulting address (See man sigaction(2)). The
+> > receiver of the signal is expected to use the address and lsb to workout
+> > the extent of corruption.
+> 
+> kill_proc() in mm/memory-failure.c does this too, but the address is set by
+> page_address_in_vma() in add_to_kill() of the same file. (I'll chat with Punit
+> off list.)
+> 
+> 
+> > Though I missed a subtlety while reviewing the patch before. The
+> > reported lsb should be for the userspace hugepage mapping (i.e., hva)
+> > and not for the stage 2.
+> 
+> I thought these were always supposed to be the same, and using hugetlb was a bug
+> because I didn't look closely enough at what is_vm_hugetlb_page() does.
+> 
+> 
+> > In light of this, I'd like to retract my Reviewed-by tag for this
+> > version of the patch as I believe we'll need to change the lsb
+> > reporting.
+> 
+> Sure, lets work out what this should be doing. I'm beginning to suspect x86's
+> 'always page size' was correct to begin with!
+> 
+
+I had a sense of that too, but it would be good to understand how you
+mark and individual page within a hugetlbfs huge page with hwpoison...
+
+Thanks,
+-Christoffer
