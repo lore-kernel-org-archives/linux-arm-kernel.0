@@ -1,30 +1,29 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 27 Mar 2017 11:52:23 +0100
-Subject: [PATCH v2 02/10] KVM: arm/arm64: vgic: Avoid flushing vgic state
- when there's no pending IRQ
-In-Reply-To: <20170321211059.8719-3-cdall@linaro.org>
+Date: Mon, 27 Mar 2017 11:59:12 +0100
+Subject: [PATCH v2 04/10] KVM: arm/arm64: vgic: Only set underflow when
+ actually out of LRs
+In-Reply-To: <20170321211059.8719-5-cdall@linaro.org>
 References: <20170321211059.8719-1-cdall@linaro.org>
- <20170321211059.8719-3-cdall@linaro.org>
-Message-ID: <bd56c2b3-bd4e-dd42-61bf-2ec1f81dba38@arm.com>
+ <20170321211059.8719-5-cdall@linaro.org>
+Message-ID: <4205a35a-d183-8c7b-3b3f-534a52e8ccab@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 21/03/17 21:10, Christoffer Dall wrote:
-> From: Shih-Wei Li <shihwei@cs.columbia.edu>
+> We currently assume that all the interrupts in our AP list will be
+> queued to LRs, but that's not necessarily the case, because some of them
+> could have been migrated away to different VCPUs and only the VCPU
+> thread itself can remove interrupts from its AP list.
 > 
-> We do not need to flush vgic states in each world switch unless
-> there is pending IRQ queued to the vgic's ap list. We can thus reduce
-> the overhead by not grabbing the spinlock and not making the extra
-> function call to vgic_flush_lr_state.
+> Therefore, slightly change the logic to only setting the underflow
+> interrupt when we actually run out of LRs.
 > 
-> Note: list_empty is a single atomic read (uses READ_ONCE) and can
-> therefore check if a list is empty or not without the need to take the
-> spinlock protecting the list.
+> As it turns out, this allows us to further simplify the handling in
+> vgic_sync_hwstate in later patches.
 > 
-> Signed-off-by: Shih-Wei Li <shihwei@cs.columbia.edu>
 > Signed-off-by: Christoffer Dall <cdall@linaro.org>
 
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
 	M.
 -- 
