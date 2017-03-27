@@ -1,36 +1,47 @@
 From: chunyan.zhang@spreadtrum.com (Chunyan Zhang)
-Date: Mon, 27 Mar 2017 14:06:42 +0800
-Subject: [PATCH V5 4/4] serial: sprd: adjust TIMEOUT to a big value
+Date: Mon, 27 Mar 2017 14:06:41 +0800
+Subject: [PATCH V5 3/4] dt-bindings: serial: add a new compatible string for
+ SC9860
 In-Reply-To: <1490594802-27073-1-git-send-email-chunyan.zhang@spreadtrum.com>
 References: <1490594802-27073-1-git-send-email-chunyan.zhang@spreadtrum.com>
-Message-ID: <1490594802-27073-5-git-send-email-chunyan.zhang@spreadtrum.com>
+Message-ID: <1490594802-27073-4-git-send-email-chunyan.zhang@spreadtrum.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wei Qiao <wei.qiao@spreadtrum.com>
+SC9860 use the same serial device which SC9836 uses, so added a new
+compatible string to support SC9860 as well, also added an example
+of how to describe this serial device in DT.
 
-SPRD_TIMEOUT was 256, which is too small to wait until the status
-switched to workable in a while loop, so that the earlycon could
-not work correctly.
-
-Signed-off-by: Wei Qiao <wei.qiao@spreadtrum.com>
 Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
+Acked-by: Rob Herring <robh@kernel.org>
 ---
- drivers/tty/serial/sprd_serial.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ Documentation/devicetree/bindings/serial/sprd-uart.txt | 14 +++++++++++++-
+ 1 file changed, 13 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/tty/serial/sprd_serial.c b/drivers/tty/serial/sprd_serial.c
-index d98e3dc..90996ad 100644
---- a/drivers/tty/serial/sprd_serial.c
-+++ b/drivers/tty/serial/sprd_serial.c
-@@ -36,7 +36,7 @@
- #define SPRD_FIFO_SIZE		128
- #define SPRD_DEF_RATE		26000000
- #define SPRD_BAUD_IO_LIMIT	3000000
--#define SPRD_TIMEOUT		256
-+#define SPRD_TIMEOUT		256000
+diff --git a/Documentation/devicetree/bindings/serial/sprd-uart.txt b/Documentation/devicetree/bindings/serial/sprd-uart.txt
+index 2aff0f2..cab40f0 100644
+--- a/Documentation/devicetree/bindings/serial/sprd-uart.txt
++++ b/Documentation/devicetree/bindings/serial/sprd-uart.txt
+@@ -1,7 +1,19 @@
+ * Spreadtrum serial UART
  
- /* the offset of serial registers and BITs for them */
- /* data registers */
+ Required properties:
+-- compatible: must be "sprd,sc9836-uart"
++- compatible: must be one of:
++  * "sprd,sc9836-uart"
++  * "sprd,sc9860-uart", "sprd,sc9836-uart"
++
+ - reg: offset and length of the register set for the device
+ - interrupts: exactly one interrupt specifier
+ - clocks: phandles to input clocks.
++
++Example:
++	uart0: serial at 0 {
++		compatible = "sprd,sc9860-uart",
++			     "sprd,sc9836-uart";
++		reg = <0x0 0x100>;
++		interrupts = <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&ext_26m>;
++	};
 -- 
 2.7.4
