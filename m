@@ -1,23 +1,27 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 27 Mar 2017 09:34:35 -0500
-Subject: [RFC PATCH 3/3] of: fix node traversing in of_dma_get_range
-In-Reply-To: <1490419893-5073-3-git-send-email-oza.oza@broadcom.com>
-References: <1490419893-5073-1-git-send-email-oza.oza@broadcom.com>
- <1490419893-5073-3-git-send-email-oza.oza@broadcom.com>
-Message-ID: <CAL_Jsq+1f2pHEy7=2Q7xGYYJjuQk3rLHH4pPTKRVN4QTtSr4Kw@mail.gmail.com>
+From: slash.tmp@free.fr (Mason)
+Date: Mon, 27 Mar 2017 16:35:56 +0200
+Subject: [RFC PATCH v0.2] PCI: Add support for tango PCIe host bridge
+In-Reply-To: <6e847686-43c6-11e9-6782-dec0fe81a58e@arm.com>
+References: <91db1f47-3024-9712-309a-fb4b21e42028@free.fr>
+ <e5c0bace-fcbe-de3f-b76f-0fb672562e84@arm.com>
+ <310db9dd-7db6-2106-2e53-f0083b2d3758@free.fr>
+ <9fffedd4-6292-b662-a588-a68fe7380af6@free.fr>
+ <6e847686-43c6-11e9-6782-dec0fe81a58e@arm.com>
+Message-ID: <9c65e647-8395-4467-53ca-c20ed374131b@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 25, 2017 at 12:31 AM, Oza Pawandeep <oza.oza@broadcom.com> wrote:
-> it jumps to the parent node without examining the child node.
-> also with that, it throws "no dma-ranges found for node"
-> for pci dma-ranges.
->
-> this patch fixes device node traversing for dma-ranges.
+On 24/03/2017 19:22, Marc Zyngier wrote:
 
-What's the DT look like that doesn't work?
+> You cannot directly use a pointer to a u32 in any of the bitmap
+> operations. You need to copy the value to an unsigned long, and
+> apply the bitmap op on that.
 
-dma-ranges is supposed to be a bus property, not a device's property.
-So looking at the parent is correct behavior generally.
+On my platform, find_first_zero_bit() resolves to
 
-Rob
+  int _find_first_zero_bit_le(const void * p, unsigned size);
+
+If the underlying implementation actually expects an unsigned long
+pointer, should the function prototype be changed?
+
+Regards.
