@@ -1,9 +1,10 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 27 Mar 2017 10:49:43 +0100
-Subject: [PATCH v2 15/22] PCI: hisi: update PCI config space remap function
+Date: Mon, 27 Mar 2017 10:49:38 +0100
+Subject: [PATCH v2 10/22] PCI: xilinx-nwl: update PCI config space remap
+ function
 In-Reply-To: <20170327094954.7162-1-lorenzo.pieralisi@arm.com>
 References: <20170327094954.7162-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20170327094954.7162-16-lorenzo.pieralisi@arm.com>
+Message-ID: <20170327094954.7162-11-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,46 +14,25 @@ driver to use the devm_ioremap_nopost* interface to make sure the correct
 memory mappings for PCI configuration space are used.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Signed-off-by: Gabriele Paoloni <gabriele.paoloni@huawei.com>
 Cc: Bjorn Helgaas <bhelgaas@google.com>
-Cc: Zhou Wang <wangzhou1@hisilicon.com>
+Cc: Bharat Kumar Gogada <bharat.kumar.gogada@xilinx.com>
+Cc: Michal Simek <michal.simek@xilinx.com>
 ---
- drivers/pci/dwc/pcie-hisi.c | 7 +++----
- 1 file changed, 3 insertions(+), 4 deletions(-)
+ drivers/pci/host/pcie-xilinx-nwl.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/pci/dwc/pcie-hisi.c b/drivers/pci/dwc/pcie-hisi.c
-index fd66a31..66a91b2 100644
---- a/drivers/pci/dwc/pcie-hisi.c
-+++ b/drivers/pci/dwc/pcie-hisi.c
-@@ -99,7 +99,7 @@ static int hisi_pcie_init(struct pci_config_window *cfg)
- 		return -ENOMEM;
- 	}
+diff --git a/drivers/pci/host/pcie-xilinx-nwl.c b/drivers/pci/host/pcie-xilinx-nwl.c
+index 4c3e0ab..cc042b1 100644
+--- a/drivers/pci/host/pcie-xilinx-nwl.c
++++ b/drivers/pci/host/pcie-xilinx-nwl.c
+@@ -761,7 +761,7 @@ static int nwl_pcie_parse_dt(struct nwl_pcie *pcie,
+ 	pcie->phys_pcie_reg_base = res->start;
  
--	reg_base = devm_ioremap(dev, res->start, resource_size(res));
-+	reg_base = devm_ioremap_nopost(dev, res->start, resource_size(res));
- 	if (!reg_base)
- 		return -ENOMEM;
- 
-@@ -296,10 +296,9 @@ static int hisi_pcie_probe(struct platform_device *pdev)
- 	}
- 
- 	reg = platform_get_resource_byname(pdev, IORESOURCE_MEM, "rc_dbi");
--	pci->dbi_base = devm_ioremap_resource(dev, reg);
-+	pci->dbi_base = devm_ioremap_nopost_resource(dev, reg);
- 	if (IS_ERR(pci->dbi_base))
- 		return PTR_ERR(pci->dbi_base);
--
- 	platform_set_drvdata(pdev, hisi_pcie);
- 
- 	ret = hisi_add_pcie_port(hisi_pcie, pdev);
-@@ -360,7 +359,7 @@ static int hisi_pcie_platform_init(struct pci_config_window *cfg)
- 		return -EINVAL;
- 	}
- 
--	reg_base = devm_ioremap(dev, res->start, resource_size(res));
-+	reg_base = devm_ioremap_nopost(dev, res->start, resource_size(res));
- 	if (!reg_base)
- 		return -ENOMEM;
- 
+ 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "cfg");
+-	pcie->ecam_base = devm_ioremap_resource(dev, res);
++	pcie->ecam_base = devm_ioremap_nopost_resource(dev, res);
+ 	if (IS_ERR(pcie->ecam_base))
+ 		return PTR_ERR(pcie->ecam_base);
+ 	pcie->phys_ecam_base = res->start;
 -- 
 2.10.0
