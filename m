@@ -1,154 +1,38 @@
-From: madalin.bucur@nxp.com (Madalin-Cristian Bucur)
-Date: Mon, 27 Mar 2017 07:03:40 +0000
-Subject: [PATCH v2 1/2] dts: arm64: add LS1043A DPAA support
-In-Reply-To: <20170327062719.GQ30608@dragon>
-References: <1488382505-17554-1-git-send-email-madalin.bucur@nxp.com>
- <1488382505-17554-2-git-send-email-madalin.bucur@nxp.com>
- <20170314070732.GH3618@dragon>
- <HE1PR04MB11297D944241012F44C0ADF8EC3C0@HE1PR04MB1129.eurprd04.prod.outlook.com>
- <20170327062719.GQ30608@dragon>
-Message-ID: <HE1PR04MB1129A2CA69EB29CD45DBCD17EC330@HE1PR04MB1129.eurprd04.prod.outlook.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 27 Mar 2017 08:29:25 +0100
+Subject: [PATCH v2] arm: Fix memory attribute inconsistencies when using
+ fixmap
+In-Reply-To: <20170324201736.GA3317@afzalpc>
+References: <20170321173030.7751-1-tixy@linaro.org>
+ <1490117781.3136.9.camel@linaro.org>
+ <CAKv+Gu82PsyyC=fQHxUn5mrCdmQvhwK+DK342-vv8y53mLcpng@mail.gmail.com>
+ <1490175988.2890.1.camel@linaro.org>
+ <CAKv+Gu8VoSLOUiNSXsrtQUr8TQdGBqiOmhsKS+N2dhToMusOUg@mail.gmail.com>
+ <1490196388.2890.8.camel@linaro.org> <20170324201736.GA3317@afzalpc>
+Message-ID: <CAKv+Gu8sU9burJh6sX6hREuqPwLatf-FVZ=5SbGsB0Sorf8Z8Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Shawn Guo [mailto:shawnguo at kernel.org]
-> Sent: Monday, March 27, 2017 9:27 AM
-> Subject: Re: [PATCH v2 1/2] dts: arm64: add LS1043A DPAA support
-> 
-> On Wed, Mar 22, 2017 at 10:58:12AM +0000, Madalin-Cristian Bucur wrote:
-> > > > +&soc {
-> > > > +
-> > > > +/include/ "qoriq-fman3-0.dtsi"
-> > > > +/include/ "qoriq-fman3-0-1g-0.dtsi"
-> > > > +/include/ "qoriq-fman3-0-1g-1.dtsi"
-> > > > +/include/ "qoriq-fman3-0-1g-2.dtsi"
-> > > > +/include/ "qoriq-fman3-0-1g-3.dtsi"
-> > > > +/include/ "qoriq-fman3-0-1g-4.dtsi"
-> > > > +/include/ "qoriq-fman3-0-1g-5.dtsi"
-> > > > +/include/ "qoriq-fman3-0-10g-0.dtsi"
-> > >
-> > > We usually put the includes at the beginning of the file, and #include
-> > > is more recommended than /include/.
-> >
-> > I'm not making use of the header file inclusion feature #include
-> provides
-> > (nor plan to) in these files thus I've selected /include/ here.
-> 
-> Let's be simple and consistent.  Use #include please.
+On 24 March 2017 at 20:17, afzal mohammed <afzal.mohd.ma@gmail.com> wrote:
+> Hi,
+>
+> On Wed, Mar 22, 2017 at 03:26:28PM +0000, Jon Medhurst (Tixy) wrote:
+>> > > On Tue, 2017-03-21 at 19:00 +0000, Ard Biesheuvel wrote:
+>
+>> > > > It looks like nommu should be unaffected, but it is worth giving it a
+>> > > > spin as well
+>>
+>> After much faffing around I got MPS2 booting a Linux kernel, and
+>> somewhat to my surprise it seems to boot fine, all the way up to
+>> panicking because it didn't find an init. This was with $subject patch.
+>
+> Vybrid VF610 Cortex M4 boots to prompt w/ this patch on current mainline.
+>
+> Vybrid VF610 Cortex A5 using !MMU Kernel w/ this patch too boots to
+> prompt (climbing onto the shoulder's of Vladimir, not Torvalds HEAD)
+>
 
-I can do that, running the preprocessor on these files without being required
-does not add that much time in the end. I'm not a fan of this feature, I never
-liked the fact one loses the liberty of easily using dtc directly to debug
-using dtc -O dts when adding #includes.
+Thanks for testing!
 
-> > > > +	fman at 1a00000 {
-> > > > +		enet0: ethernet at e0000 {
-> > > > +		};
-> > > > +
-> > > > +		enet1: ethernet at e2000 {
-> > > > +		};
-> > > > +
-> > > > +		enet2: ethernet at e4000 {
-> > > > +		};
-> > > > +
-> > > > +		enet3: ethernet at e6000 {
-> > > > +		};
-> > > > +
-> > > > +		enet4: ethernet at e8000 {
-> > > > +		};
-> > > > +
-> > > > +		enet5: ethernet at ea000 {
-> > > > +		};
-> > > > +
-> > > > +		enet6: ethernet at f0000 {
-> > > > +		};
-> > > > +	};
-> > >
-> > > I do not quite understand why these nodes are empty.
-> >
-> > These nodes provide the aliases (and custom SoC mapping) for the
-> > FMan ports that are used on this particular SoC. The particular
-> > node details are found in the port dtsi file thus no information
-> > is required here. Given the fact that the numbering and actual
-> > ports that are in use can vary between SoCs, the aliases cannot
-> > be included in the port dtsi nor in the FMan dtsi.
-> 
-> Do not completely follow.  What do you mean by 'port dtsi file'?  Maybe
-> I should wait for you new patches with better commit log and comments to
-> understand these odd empty nodes.
-
-The DPAA IP can have a certain number of ports. Out of those, a certain
-SoC can use all or only a subset, with diverse decisions on actual numbering
-of the used ports. Next, when using the SoC on a particular board, some
-ports will be used, some will not. The file hierarchy relates to this
-hierarchy - you have individual port files that are included by the
-SoC dtsi which in turn is included by the board dts. These nodes do not
-need any new content as all the node details are provided by the port
-dtsi files. The information they provide is the alias used for each port.
-
-> >
-> > > > +};
-> > > > diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts
-> > > b/arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts
-> > > > index 0989d63..ee66bb2 100644
-> > > > --- a/arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts
-> > > > +++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts
-> > > > @@ -181,3 +181,5 @@
-> > > >  		reg = <0>;
-> > > >  	};
-> > > >  };
-> > > > +
-> > > > +/include/ "fsl-ls1043-post.dtsi"
-> > >
-> > > Move it to header of the file.
-> >
-> > This is to be included at the end, to make sure the references are
-> > met and to allow overrides if needed.
-> 
-> What is broken if you move the include to header?
-
-Not much besides the structure we've always used for our SoCs device
-trees. The file is called "-post.dtsi" because here is the place any
-required overrides can be made, if needed. Moving to the top renders
-having this separate file useless.
-
-> >
-> > > > diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts
-> > > b/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts
-> > > > index c37110b..d94f003 100644
-> > > > --- a/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts
-> > > > +++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts
-> > > > @@ -139,3 +139,78 @@
-> > > >  &duart1 {
-> > > >  	status = "okay";
-> > > >  };
-> > > > +
-> > > > +/include/ "fsl-ls1043-post.dtsi"
-> > > > +
-> > >
-> > > Ditto
-> > >
-> > > > +&soc {
-> > > > +	fman at 1a00000 {
-> > > > +		ethernet at e0000 {
-> > >
-> > > You defined enet0 label.  Why don't you use it?
-> > >
-> >
-> > The enet0 label is used by u-boot for fix-ups, providing the
-> > actual offset here makes it easier to follow.
-> 
-> You will not need to construct the node hierarchy with label.  And
-> alias/label name is more easier to follow than offset.
-> 
-> Shawn
-
-When I said easier to follow I was referring to someone creating a
-new device tree for his custom board, not someone reading the device
-tree. If you have the board and SoC reference manuals in your hands
-and you are writing a new board device tree, having the offset here
-makes things easier. The benefit of having one less indentation level
-is lesser than that.
-
-Madalin
+I suppose this patch is ready to go into the patch system, with
+Afzal's tested-by as well as mine.
