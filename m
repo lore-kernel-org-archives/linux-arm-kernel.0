@@ -1,124 +1,151 @@
 From: eric.auger@redhat.com (Eric Auger)
-Date: Mon, 27 Mar 2017 11:30:54 +0200
-Subject: [PATCH v4 04/22] KVM: arm64: ITS: KVM_DEV_ARM_VGIC_GRP_ITS_REGS group
+Date: Mon, 27 Mar 2017 11:30:56 +0200
+Subject: [PATCH v4 06/22] KVM: arm64: ITS: Implement vgic_its_has_attr_regs
+ and attr_regs_access
 In-Reply-To: <1490607072-21610-1-git-send-email-eric.auger@redhat.com>
 References: <1490607072-21610-1-git-send-email-eric.auger@redhat.com>
-Message-ID: <1490607072-21610-5-git-send-email-eric.auger@redhat.com>
+Message-ID: <1490607072-21610-7-git-send-email-eric.auger@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ITS KVM device exposes a new KVM_DEV_ARM_VGIC_GRP_ITS_REGS
-group which allows the userspace to save/restore ITS registers.
+This patch implements vgic_its_has_attr_regs and vgic_its_attr_regs_access
+upon the MMIO framework. VGIC ITS KVM device KVM_DEV_ARM_VGIC_GRP_ITS_REGS
+group becomes functional.
 
-At this stage the get/set/has operations are not yet implemented.
+At least GITS_CREADR requires to differentiate a guest write action from a
+user access. As such let's introduce a new uaccess_its_write
+vgic_register_region callback.
 
 Signed-off-by: Eric Auger <eric.auger@redhat.com>
-Reviewed-by: Andre Przywara <andre.przywara@arm.com>
 
 ---
 
 v3 -> v4:
-- added Andre's R-b
+- remove changes to the REGISTER_ITS_DESC macro. This will be handled in
+  subsequent patch with the introduction of a new REGISTER_ITS_DESC_UACCESS
+  macro
+- fix IIDR access and add a comment wrt full length access
+- handle endianness
+- add kvm lock and vcpus lock
 ---
- arch/arm/include/uapi/asm/kvm.h   |  1 +
- arch/arm64/include/uapi/asm/kvm.h |  1 +
- virt/kvm/arm/vgic/vgic-its.c      | 36 +++++++++++++++++++++++++++++++++++-
- 3 files changed, 37 insertions(+), 1 deletion(-)
+ virt/kvm/arm/vgic/vgic-its.c  | 78 +++++++++++++++++++++++++++++++++++++++++--
+ virt/kvm/arm/vgic/vgic-mmio.h |  9 +++--
+ 2 files changed, 83 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
-index 6ebd3e6..4beb83b 100644
---- a/arch/arm/include/uapi/asm/kvm.h
-+++ b/arch/arm/include/uapi/asm/kvm.h
-@@ -192,6 +192,7 @@ struct kvm_arch_memory_slot {
- #define KVM_DEV_ARM_VGIC_GRP_REDIST_REGS 5
- #define KVM_DEV_ARM_VGIC_GRP_CPU_SYSREGS 6
- #define KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO  7
-+#define KVM_DEV_ARM_VGIC_GRP_ITS_REGS	8
- #define KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_SHIFT	10
- #define KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_MASK \
- 			(0x3fffffULL << KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_SHIFT)
-diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
-index c286035..7e8dd69 100644
---- a/arch/arm64/include/uapi/asm/kvm.h
-+++ b/arch/arm64/include/uapi/asm/kvm.h
-@@ -212,6 +212,7 @@ struct kvm_arch_memory_slot {
- #define KVM_DEV_ARM_VGIC_GRP_REDIST_REGS 5
- #define KVM_DEV_ARM_VGIC_GRP_CPU_SYSREGS 6
- #define KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO  7
-+#define KVM_DEV_ARM_VGIC_GRP_ITS_REGS 8
- #define KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_SHIFT	10
- #define KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_MASK \
- 			(0x3fffffULL << KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_SHIFT)
 diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index 3ffcbbe..f687e91 100644
+index f687e91..9b9ea86 100644
 --- a/virt/kvm/arm/vgic/vgic-its.c
 +++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -1466,6 +1466,19 @@ static void vgic_its_destroy(struct kvm_device *kvm_dev)
- 	kfree(its);
- }
- 
-+int vgic_its_has_attr_regs(struct kvm_device *dev,
-+			   struct kvm_device_attr *attr)
-+{
-+	return -ENXIO;
-+}
-+
-+int vgic_its_attr_regs_access(struct kvm_device *dev,
-+			      struct kvm_device_attr *attr,
-+			      u64 *reg, bool is_write)
-+{
-+	return -ENXIO;
-+}
-+
- static int vgic_its_has_attr(struct kvm_device *dev,
- 			     struct kvm_device_attr *attr)
+@@ -1469,14 +1469,88 @@ static void vgic_its_destroy(struct kvm_device *kvm_dev)
+ int vgic_its_has_attr_regs(struct kvm_device *dev,
+ 			   struct kvm_device_attr *attr)
  {
-@@ -1482,6 +1495,8 @@ static int vgic_its_has_attr(struct kvm_device *dev,
- 			return 0;
- 		}
- 		break;
-+	case KVM_DEV_ARM_VGIC_GRP_ITS_REGS:
-+		return vgic_its_has_attr_regs(dev, attr);
- 	}
- 	return -ENXIO;
+-	return -ENXIO;
++	const struct vgic_register_region *region;
++	struct vgic_io_device iodev = {
++		.regions = its_registers,
++		.nr_regions = ARRAY_SIZE(its_registers),
++	};
++	gpa_t offset = attr->attr;
++
++	region = vgic_find_mmio_region(iodev.regions,
++				       iodev.nr_regions,
++				       offset);
++	if (!region)
++		return -ENXIO;
++
++	return 0;
  }
-@@ -1521,6 +1536,15 @@ static int vgic_its_set_attr(struct kvm_device *dev,
- 			return 0;
- 		}
- 		break;
-+	case KVM_DEV_ARM_VGIC_GRP_ITS_REGS: {
-+		u64 __user *uaddr = (u64 __user *)(long)attr->addr;
-+		u64 reg;
-+
-+		if (get_user(reg, uaddr))
-+			return -EFAULT;
-+
-+		return vgic_its_attr_regs_access(dev, attr, &reg, true);
-+	}
- 	}
- 	return -ENXIO;
- }
-@@ -1541,10 +1565,20 @@ static int vgic_its_get_attr(struct kvm_device *dev,
- 		if (copy_to_user(uaddr, &addr, sizeof(addr)))
- 			return -EFAULT;
- 		break;
-+	}
-+	case KVM_DEV_ARM_VGIC_GRP_ITS_REGS: {
-+		u64 __user *uaddr = (u64 __user *)(long)attr->addr;
-+		u64 reg;
-+		int ret;
-+
-+		ret = vgic_its_attr_regs_access(dev, attr, &reg, false);
-+		if (ret)
-+			return ret;
-+		return put_user(reg, uaddr);
-+	}
- 	default:
- 		return -ENXIO;
- 	}
--	}
  
- 	return 0;
+ int vgic_its_attr_regs_access(struct kvm_device *dev,
+ 			      struct kvm_device_attr *attr,
+ 			      u64 *reg, bool is_write)
+ {
+-	return -ENXIO;
++	const struct vgic_register_region *region;
++	struct vgic_io_device iodev = {
++		.regions = its_registers,
++		.nr_regions = ARRAY_SIZE(its_registers),
++	};
++	struct vgic_its *its = dev->private;
++	gpa_t addr, offset = attr->attr;
++	unsigned int len;
++	unsigned long data = 0;
++	int ret = 0;
++
++	/*
++	 * Among supported registers, only GITS_CTLR (0x0) and GITS_IIDR (0x4)
++	 * are 32 bits. Others are 64 bits.
++	 */
++	if ((offset < 0x8 && offset & 0x3) || (offset >= 0x8 && offset & 0x7))
++		return -EINVAL;
++
++	mutex_lock(&dev->kvm->lock);
++
++	if (IS_VGIC_ADDR_UNDEF(its->vgic_its_base)) {
++		ret = -ENXIO;
++		goto out;
++	}
++
++	region = vgic_find_mmio_region(iodev.regions,
++				       iodev.nr_regions,
++				       offset);
++	if (!region) {
++		ret = -ENXIO;
++		goto out;
++	}
++
++	if (!lock_all_vcpus(dev->kvm)) {
++		ret = -EBUSY;
++		goto out;
++	}
++
++	addr = its->vgic_its_base + offset;
++
++	/*
++	 * Only full length register accesses are supported although
++	 * the architecture spec theoretically allows upper/lower 32
++	 * bits to be accessed independently
++	 */
++	len = region->access_flags & VGIC_ACCESS_64bit ? 8 : 4;
++
++	if (is_write) {
++		data = vgic_data_mmio_bus_to_host(reg, len);
++		if (region->uaccess_its_write)
++			region->uaccess_its_write(dev->kvm, its, addr,
++						  len, data);
++		else
++			region->its_write(dev->kvm, its, addr, len, data);
++	} else {
++		data = region->its_read(dev->kvm, its, addr, len);
++		vgic_data_host_to_mmio_bus(reg, len, data);
++	}
++	unlock_all_vcpus(dev->kvm);
++out:
++	mutex_unlock(&dev->kvm->lock);
++	return ret;
  }
+ 
+ static int vgic_its_has_attr(struct kvm_device *dev,
+diff --git a/virt/kvm/arm/vgic/vgic-mmio.h b/virt/kvm/arm/vgic/vgic-mmio.h
+index 6eec91b..becc473 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio.h
++++ b/virt/kvm/arm/vgic/vgic-mmio.h
+@@ -36,8 +36,13 @@ struct vgic_register_region {
+ 	};
+ 	unsigned long (*uaccess_read)(struct kvm_vcpu *vcpu, gpa_t addr,
+ 				      unsigned int len);
+-	void (*uaccess_write)(struct kvm_vcpu *vcpu, gpa_t addr,
+-			      unsigned int len, unsigned long val);
++	union {
++		void (*uaccess_write)(struct kvm_vcpu *vcpu, gpa_t addr,
++				      unsigned int len, unsigned long val);
++		void (*uaccess_its_write)(struct kvm *kvm, struct vgic_its *its,
++					  gpa_t addr, unsigned int len,
++					  unsigned long val);
++	};
+ };
+ 
+ extern struct kvm_io_device_ops kvm_io_gic_ops;
 -- 
 2.5.5
