@@ -1,64 +1,65 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 27 Mar 2017 11:25:00 +0200
-Subject: [PATCH 0/7] memory: atmel-ebi: Add PM ops
-In-Reply-To: <1489653034-17777-1-git-send-email-boris.brezillon@free-electrons.com>
+Date: Mon, 27 Mar 2017 11:25:47 +0200
+Subject: [PATCH v2 4/7] mfd: syscon: atmel-smc: Remove unused
+ helpers/macros
+In-Reply-To: <20170316121800.swpt6d5oti3flpqj@dell>
 References: <1489653034-17777-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <e27d2dd0-ce23-d63d-04dc-7be745770a00@atmel.com>
+ <1489653034-17777-5-git-send-email-boris.brezillon@free-electrons.com>
+ <20170316101627.ecp63pr5v6l4neam@dell> <20170316113438.790bfb67@bbrezillon>
+ <20170316121800.swpt6d5oti3flpqj@dell>
+Message-ID: <679d3735-6259-1da0-f9bb-61f381fc016d@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 16/03/2017 ? 09:30, Boris Brezillon a ?crit :
-> Hello,
+Le 16/03/2017 ? 13:18, Lee Jones a ?crit :
+> On Thu, 16 Mar 2017, Boris Brezillon wrote:
 > 
-> This patchset adds a ->resume() hook to the EBI driver, but a few more
-> changes were required in order to easily implement this PM hook.
+>> Hi Lee,
+>>
+>> On Thu, 16 Mar 2017 10:16:27 +0000
+>> Lee Jones <lee.jones@linaro.org> wrote:
+>>
+>>> On Thu, 16 Mar 2017, Boris Brezillon wrote:
+>>>
+>>>> All macros prefixed with AT91[SAM9]_SMC have been replaced by equivalent
+>>>> definitions prefixed with ATMEL_SMC, and the at91sam9_smc_xxxx() helpers
+>>>> are no longer used.
+>>>> Drop these definitions before someone starts using them again.
+>>>>
+>>>> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+>>>> ---
+>>>>  include/linux/mfd/syscon/atmel-smc.h | 152 -----------------------------------
+>>>>  1 file changed, 152 deletions(-)  
+>>>
+>>> For my own reference:
+>>>   Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
+>>>
+>>> What is the plan for this set?
+>>>
+>>> I only see 2 patches.
+>>
+>> You mean, you only see 2 patches in your Inbox (that would be weird,
+>> because you're in the CC list of all patches), or only 2 patches that
+>> should go in your tree?
 > 
-> Patches 1 to 5 are just cleanup patches to simplify the EBI driver.
-> Patch 6 is fixing a bug in the EBI driver. Note that this bug has no
-> consequences until we start implementing the ->resume() hook.
-> And finally, patch 7 is implementing ->resume() so that the SMC config
-> is correctly restored when resuming the system.
+> I meant the former, but another pull down of my mail grabbed the
+> remaining patches.
 > 
-> This patchset depends on [1] which is removing the unused pata_at91
-> driver, which in turn prevents us from patching it before dropping
-> the old SMC macro definitions in patch 4.
+>>> Can they both be applied?
+>>
+>> All patches should go through the same tree, because changes in
+>> drivers/memory/atmel-ebi.c are depending on changes done in the MFD
+>> subsystem.
+>>
+>> If Nicolas is okay with that, maybe you can take everything through the
+>> MFD tree (I don't expect any conflicts in drivers/memory/atmel-ebi.c).
 > 
-> Regards,
-> 
-> Boris
-> 
-> [1]http://lkml.iu.edu/hypermail/linux/kernel/1702.2/00990.html
+> That would be okay by me.
 
-For the whole v2 series:
-Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+Yes I'm okay with that.
 
-Lee, you can take this series through your MFD tree as suggested by Boris.
+Thanks Lee for your support.
 
-Thanks, best regards,
-
-> Changes since v1:
-> - move helper functions in a C file
-> - check if tdf is at least ATMEL_SMC_MODE_TDF_MIN
-> 
-> Boris Brezillon (7):
->   mfd: syscon: atmel-smc: Add new helpers to ease SMC regs manipulation
->   memory: atmel-ebi: Simplify SMC config code
->   memory: atmel-ebi: Stop using reg_field objects for simple things
->   mfd: syscon: atmel-smc: Remove unused helpers/macros
->   memory: atmel-ebi: Change naming scheme
->   memory: atmel-ebi: Add missing ->numcs assignment
->   memory: atmel-ebi: Add PM ops
-> 
->  drivers/memory/Kconfig               |   1 +
->  drivers/memory/atmel-ebi.c           | 584 ++++++++++++-----------------------
->  drivers/mfd/Kconfig                  |   4 +
->  drivers/mfd/Makefile                 |   1 +
->  drivers/mfd/atmel-smc.c              | 314 +++++++++++++++++++
->  include/linux/mfd/syscon/atmel-smc.h | 237 ++++++--------
->  6 files changed, 606 insertions(+), 535 deletions(-)
->  create mode 100644 drivers/mfd/atmel-smc.c
-> 
-
-
+Regards,
 -- 
 Nicolas Ferre
