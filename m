@@ -1,35 +1,32 @@
-From: tobias.regnery@gmail.com (Tobias Regnery)
-Date: Mon, 27 Mar 2017 11:57:53 +0200
-Subject: [PATCH] clk: sunxi-ng: fix build error without CONFIG_RESET_CONTROLLER
-Message-ID: <20170327095753.29091-1-tobias.regnery@gmail.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Mon, 27 Mar 2017 15:15:13 +0530
+Subject: [PATCH v5 17/24] PCI: Add device IDs for DRA74x and DRA72x
+In-Reply-To: <20170327094520.3129-1-kishon@ti.com>
+References: <20170327094520.3129-1-kishon@ti.com>
+Message-ID: <20170327094520.3129-18-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With CONFIG_RESET_CONTROLLER=n we get the following link error in the
-sunxi-ng clk driver:
+Add device IDs for DRA74x and DRA72x devices. These devices have
+configurable PCI endpoint.
 
-drivers/built-in.o: In function `sunxi_ccu_probe':
-mux-core.c:(.text+0x12fe68): undefined reference to 'reset_controller_register'
-mux-core.c:(.text+0x12fe68): relocation truncated to fit: R_AARCH64_CALL26 against undefined symbol 'reset_controller_register'
-
-Fix this by adding the appropriate select statement.
-
-Signed-off-by: Tobias Regnery <tobias.regnery@gmail.com>
+Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- drivers/clk/sunxi-ng/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+ include/linux/pci_ids.h | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/drivers/clk/sunxi-ng/Kconfig b/drivers/clk/sunxi-ng/Kconfig
-index 213cf64e4fab..8af8f4be8e3b 100644
---- a/drivers/clk/sunxi-ng/Kconfig
-+++ b/drivers/clk/sunxi-ng/Kconfig
-@@ -1,6 +1,7 @@
- config SUNXI_CCU
- 	bool "Clock support for Allwinner SoCs"
- 	depends on ARCH_SUNXI || COMPILE_TEST
-+	select RESET_CONTROLLER
- 	default ARCH_SUNXI
+diff --git a/include/linux/pci_ids.h b/include/linux/pci_ids.h
+index a4f77feecbb0..5f6b71d15393 100644
+--- a/include/linux/pci_ids.h
++++ b/include/linux/pci_ids.h
+@@ -862,6 +862,8 @@
+ #define PCI_DEVICE_ID_TI_X620		0xac8d
+ #define PCI_DEVICE_ID_TI_X420		0xac8e
+ #define PCI_DEVICE_ID_TI_XX20_FM	0xac8f
++#define PCI_DEVICE_ID_TI_DRA74x		0xb500
++#define PCI_DEVICE_ID_TI_DRA72x		0xb501
  
- if SUNXI_CCU
+ #define PCI_VENDOR_ID_SONY		0x104d
+ 
 -- 
 2.11.0
