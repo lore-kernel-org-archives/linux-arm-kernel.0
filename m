@@ -1,115 +1,173 @@
-From: slash.tmp@free.fr (Mason)
-Date: Mon, 27 Mar 2017 17:53:22 +0200
-Subject: [RFC PATCH v0.2] PCI: Add support for tango PCIe host bridge
-In-Reply-To: <012f7fcb-eaeb-70dd-a1a9-06c213789d30@arm.com>
-References: <91db1f47-3024-9712-309a-fb4b21e42028@free.fr>
- <e5c0bace-fcbe-de3f-b76f-0fb672562e84@arm.com>
- <310db9dd-7db6-2106-2e53-f0083b2d3758@free.fr>
- <012f7fcb-eaeb-70dd-a1a9-06c213789d30@arm.com>
-Message-ID: <0502e180-5517-12d6-e3a1-bcea0da7e201@free.fr>
+From: shameerali.kolothum.thodi@huawei.com (Shameerali Kolothum Thodi)
+Date: Mon, 27 Mar 2017 15:58:37 +0000
+Subject: [PATCH V9 00/11] IOMMU probe deferral support
+References: <1489086061-9356-1-git-send-email-sricharan@codeaurora.org>
+ <58D49845.9060407@hisilicon.com>
+ <0ea8022b-a19b-335d-6cc6-81510196f891@codeaurora.org>
+ <5FC3163CFD30C246ABAA99954A238FA81750B7CB@lhreml504-mbs>
+ <db3d68f8-713c-9ae2-7df9-324bc1b375b1@arm.com>
+Message-ID: <5FC3163CFD30C246ABAA99954A238FA81750CCC4@lhreml504-mbs>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/03/2017 19:47, Marc Zyngier wrote:
 
-> On 23/03/17 17:03, Mason wrote:
->
->> On 23/03/2017 15:22, Marc Zyngier wrote:
->>
->>> On 23/03/17 13:05, Mason wrote:
->>>
->>>> +	writel_relaxed(status, pcie->msi_status); /* clear IRQs */
->>>
->>> Why isn't this your irq_ack method instead of open-coding it?
->>
->> I based my driver on the Altera driver, and I did it like
->> I thought they did. I will try fixing my code.
+
+> -----Original Message-----
+> From: Shameerali Kolothum Thodi
+> Sent: Monday, March 27, 2017 3:53 PM
+> To: 'Robin Murphy'; Sricharan R; Wangzhou (B); will.deacon at arm.com;
+> joro at 8bytes.org; lorenzo.pieralisi at arm.com; iommu at lists.linux-
+> foundation.org; linux-arm-kernel at lists.infradead.org; linux-arm-
+> msm at vger.kernel.org; m.szyprowski at samsung.com;
+> bhelgaas at google.com; linux-pci at vger.kernel.org; linux-
+> acpi at vger.kernel.org; tn at semihalf.com; hanjun.guo at linaro.org;
+> okaya at codeaurora.org
+> Subject: RE: [PATCH V9 00/11] IOMMU probe deferral support
 > 
-> Doesn't make it right, unfortunately. I wish you would try to understand
-> the API first instead of copy-pasting things (including potential bugs).
-
-So far, I have not been able to get the irqchip framework to
-call the irq_ack functions I registered.
-
-Should I pass a different handler than handle_simple_irq
-to irq_domain_set_info?
-
-	irq_domain_set_info(domain, virq, pos, &tango_msi_chip,
-		domain->host_data, handle_simple_irq, NULL, NULL);
-
-
-When an MSI packet arrives at the MSI doorbell address, the controller
-reads the packet's data; this is the MSI number "num". It sets bit "num"
-to 1 in the status regs, and raises IRQ line 55 on the system intc.
-The IRQ signal remains high, until software clears it by writing 1
-in bit "num" of the status regs.
-
-Is this an edge interrupt or a level interrupt?
-
-I was told if the interrupt request is triggered by an event, then
-it is an edge interrupt. The reception of an MSI packet is an event.
-But the IRQ remains high, so this feels like a level high.
-I'm hopelessly confused :-(
-
-
->>>> +	mutex_lock(&pcie->lock);
->>>> +
->>>> +	mask = readl_relaxed(pcie->msi_mask);
->>>
->>> Do you really need to read this from the HW each time you allocate an
->>> interrupt? That feels pretty crazy. You're much better off having an
->>> in-memory bitmap that will make things more efficient [...]
-
-I have one remaining issue with bitmaps.
-
-My HW regs are 32b. How do I grab e.g. bits 96-127?
-All I can think of is
-  u32 val = ((u32 *)bitmap)[3];
-
-Is this acceptable?
-
-mrutland mentioned bitmap_to_u32array() but IIUC it is used to
-copy an entire bitmap.
-
-
->>>> +	if (pos < MSI_COUNT)
->>>> +		writel(mask | BIT(pos), pcie->msi_mask);
->>>
->>> And it would make a lot more sense to move this write (which should be
->>> relaxed) to irq_unmask. Also, calling msi_mask for something that is an
->>> enable register is a bit counter intuitive.
->>
->> I don't have as much experience as you.
->> I just used the names in the HW documentation.
->> I think it is the "mask" (as in bitmap) of enabled MSIs.
->> I will change "mask" to "enable".
->>
->> Are you saying I should not use pci_msi_mask_irq and pci_msi_unmask_irq,
->> but register custom implementations? I should still call these in my
->> custom functions, right?
 > 
-> You can call both in your own mask/unmask methods. They serve different
-> purpose (one is at the endpoint level, the other is at the MSI
-> controller level).
-
-So, if I understand correctly, I should check for an available MSIs
-using the in-memory bitmap in tango_irq_domain_alloc(), but I would
-defer actually enabling the MSI until irq_unmask?
-
-I think work on bitmap and on the underlying HW regs need to be
-protected under the same spinlock, correct?
-
-
->> Note: I don't have an "interrupt-map" prop because rev1 doesn't support
->> legacy PCI interrupts (INTx). But I see the PCI framework wrongly mapping
->> intA to my system's interrupt #1, presumably because I am lacking an
->> interrupt-map?
+> > -----Original Message-----
+> > From: Robin Murphy [mailto:robin.murphy at arm.com]
+> > Sent: Friday, March 24, 2017 6:39 PM
+> > To: Shameerali Kolothum Thodi; Sricharan R; Wangzhou (B);
+> > will.deacon at arm.com; joro at 8bytes.org; lorenzo.pieralisi at arm.com;
+> > iommu at lists.linux-foundation.org; linux-arm-kernel at lists.infradead.org;
+> > linux-arm-msm at vger.kernel.org; m.szyprowski at samsung.com;
+> > bhelgaas at google.com; linux-pci at vger.kernel.org; linux-
+> > acpi at vger.kernel.org; tn at semihalf.com; hanjun.guo at linaro.org;
+> > okaya at codeaurora.org
+> > Subject: Re: [PATCH V9 00/11] IOMMU probe deferral support
+> >
+> > On 24/03/17 09:27, Shameerali Kolothum Thodi wrote:
+> > > Hi Sricharan,
+> > >
+> > >> -----Original Message-----
+> > >> From: Sricharan R [mailto:sricharan at codeaurora.org]
+> [...]
+> > >> Looks like this triggers the start of the bug.
+> > >> So the below check in iommu_dma_init_domain fails,
+> > >>
+> > >>          if (domain->geometry.force_aperture) {
+> > >>                  if (base > domain->geometry.aperture_end ||
+> > >>                      base + size <= domain->geometry.aperture_start) {
+> > >>
+> > >> and the rest goes out of sync after that. Can you print out the base,
+> > >> aperture_start and end values to see why the check fails ?
+> > >
+> > > dev_info(dev, "0x%llx 0x%llx, 0x%llx 0x%llx, 0x%llx 0x%llx\n", base, size,
+> > domain->geometry.aperture_start, domain->geometry.aperture_end,
+> > *dev->dma_mask, dev->coherent_dma_mask);
+> > >
+> > > [  183.752100] ixgbevf 0000:81:10.0: 0x0 0x100000000, 0x0 0xffffffffffff,
+> > 0xffffffff 0xffffffff
+> > > .....
+> > > [  319.508037] vfio-pci 0000:81:10.0: 0x0 0x0, 0x0 0xffffffffffff,
+> > 0xffffffffffffffff 0xffffffffffffffff
+> > >
+> > > Yes, size seems to be the problem here. When the VF  device gets
+> attached
+> > to vfio-pci,
+> > > somehow the dev->coherent_dma_mask is set to 64 bits and size
+> become
+> > zero.
+> >
+> > AFAICS, this is either down to patch 3 (which should apply on its own
+> > easily enough for testing), or patch 6, implying that somehow the
+> > vfio-pci device gets its DMA mask widened to 64 bits somewhere between
+> > very soon after after creation (where we originally called
+> > of_dma_configure()) and immediately before probe (where we now call
+> it).
+> >
+> > Either way I guess this is yet more motivation to write that "change the
+> > arch_setup_dma_ops() interface to take a mask instead of a size" patch...
 > 
-> Probably. I don't think it is legal not to have an interrupt-map.
+> Just applying the patch 3 and binding the device into vfio-pci is fine. Please
+> find the
+> log below (with  dev_info debug added to iommu_dma_init_domain ).
+> ...
+> [  142.851906] iommu: Adding device 0000:81:10.0 to group 6
+> [  142.852063] ixgbevf 0000:81:10.0: 0x0 0x100000000, 0x0 0xffffffffffff,
+> 0xffffffff 0xffffffff   ---->dev_info()
+> [  142.852836] ixgbevf 0000:81:10.0: enabling device (0000 -> 0002)
+> [  142.852962] ixgbe 0000:81:00.0 eth0: VF Reset msg received from vf 0
+> [  142.853833] ixgbe 0000:81:00.0: VF 0 has no MAC address assigned, you
+> may have to assign one manually
+> [  142.863956] ixgbevf 0000:81:10.0: MAC address not assigned by
+> administrator.
+> [  142.863960] ixgbevf 0000:81:10.0: Assigning random MAC address
+> [  142.865689] ixgbevf 0000:81:10.0: da:9f:f8:1e:57:3a
+> [  142.865692] ixgbevf 0000:81:10.0: MAC: 1
+> [  142.865693] ixgbevf 0000:81:10.0: Intel(R) 82599 Virtual Function
+> [  142.939145] ixgbe 0000:81:00.0 eth0: NIC Link is Up 1 Gbps, Flow Control:
+> None
+> [  152.902894] nfs: server 172.18.45.166 not responding, still trying
+> [  188.980933] nfs: server 172.18.45.166 not responding, still trying
+> [  188.981298] nfs: server 172.18.45.166 OK
+> [  188.981593] nfs: server 172.18.45.166 OK
+> [  221.755626] VFIO - User Level meta-driver version: 0.3
+> ...
+> 
+> Applied up to patch 6, and the issue appeared,
+> 
+> [  145.212351] iommu: Adding device 0000:81:10.0 to group 5
+> [  145.212367] ixgbevf 0000:81:10.0: 0x0 0x100000000, 0x0 0xffffffffffff,
+> 0xffffffff 0xffffffff
+> [  145.213261] ixgbevf 0000:81:10.0: enabling device (0000 -> 0002)
+> [  145.213394] ixgbe 0000:81:00.0 eth0: VF Reset msg received from vf 0
+> [  145.214272] ixgbe 0000:81:00.0: VF 0 has no MAC address assigned, you
+> may have to assign one manually
+> [  145.224379] ixgbevf 0000:81:10.0: MAC address not assigned by
+> administrator.
+> [  145.224384] ixgbevf 0000:81:10.0: Assigning random MAC address
+> [  145.225941] ixgbevf 0000:81:10.0: 1a:85:06:48:a7:19
+> [  145.225944] ixgbevf 0000:81:10.0: MAC: 1
+> [  145.225946] ixgbevf 0000:81:10.0: Intel(R) 82599 Virtual Function
+> [  145.299961] ixgbe 0000:81:00.0 eth0: NIC Link is Up 1 Gbps, Flow Control:
+> None
+> [  154.947742] nfs: server 172.18.45.166 not responding, still trying
+> [  191.025780] nfs: server 172.18.45.166 not responding, still trying
+> [  191.026122] nfs: server 172.18.45.166 OK
+> [  191.026317] nfs: server 172.18.45.166 OK
+> [  263.706402] VFIO - User Level meta-driver version: 0.3
+> [  269.757613] vfio-pci 0000:81:10.0: 0x0 0x0, 0x0 0xffffffffffff, 0xffffffffffffffff
+> 0xffffffffffffffff
+> [  269.757617] specified DMA range outside IOMMU capability
+> [  269.757618] Failed to set up IOMMU for device 0000:81:10.0; retaining
+> platform DMA ops
+> 
+>  From the logs its clear that  when ixgbevf driver originally probes and adds
+> the device
+>  to smmu  the dma mask is 32, but when it binds to vfio-pci, it becomes 64 bit.
 
-My understanding is that the interrupt-map actually specifies how to
-map the legacy IRQs. My platform does not support legacy IRQs; maybe
-there is some binding to say that? Maybe this is more a question for
-the PCI folks.
+Just to add to that, the mask is set to 64 bit in the ixgebvf driver probe[1]
 
-Regards.
+[  127.914001] ixgbe 0000:81:00.0 eth0: SR-IOV enabled with 1 VFs
+[  127.914106] ixgbe 0000:81:00.0: removed PHC on eth0
+[  128.125166] ixgbe 0000:81:00.0: Multiqueue Enabled: Rx Queue count = 4, Tx Queue count = 4
+[  128.143857] ixgbe 0000:81:00.0: registered PHC device on eth0
+[  128.314754] ixgbe 0000:81:00.0 eth0: detected SFP+: 11
+[  128.357878] pci 0000:81:10.0: [8086:10ed] type 00 class 0x020000
+[  128.358416] iommu: Adding device 0000:81:10.0 to group 5
+[  128.358443] ixgbevf 0000:81:10.0: 0x0 0x100000000, 0x0 0xffffffffffff, 0xffffffff 0xffffffff
+[  128.359326] ixgbevf 0000:81:10.0: enabling device (0000 -> 0002)
+[  128.359333] Shameer: ixgbevf_probe, 64 bit			------------->mask set to 64 bit
+[  128.359462] ixgbe 0000:81:00.0 eth0: VF Reset msg received from vf 0
+[  128.360331] ixgbe 0000:81:00.0: VF 0 has no MAC address assigned, you may have to assign one manually
+[  128.370470] ixgbevf 0000:81:10.0: MAC address not assigned by administrator.
+[  128.370474] ixgbevf 0000:81:10.0: Assigning random MAC address
+[  128.372172] ixgbevf 0000:81:10.0: ea:40:b9:e9:cb:04
+[  128.372176] ixgbevf 0000:81:10.0: MAC: 1
+[  128.372178] ixgbevf 0000:81:10.0: Intel(R) 82599 Virtual Function
+[  128.445551] ixgbe 0000:81:00.0 eth0: NIC Link is Up 1 Gbps, Flow Control: None
+[  138.089869] nfs: server 172.18.45.166 not responding, still trying
+[  174.697868] nfs: server 172.18.45.166 not responding, still trying
+[  174.698359] nfs: server 172.18.45.166 OK
+[  174.698582] nfs: server 172.18.45.166 OK
+[  465.942259] VFIO - User Level meta-driver version: 0.3
+ [  472.754074] vfio-pci 0000:81:10.0: 0x0 0x0, 0x0 0xffffffffffff, 0xffffffffffffffff 0xffffffffffffffff
+[  472.754075] specified DMA range outside IOMMU capability
+[  472.754077] Failed to set up IOMMU for device 0000:81:10.0; retaining platform DMA ops
+
+1. http://lxr.free-electrons.com/source/drivers/net/ethernet/intel/ixgbevf/ixgbevf_main.c#L3996
+
+
+ 
