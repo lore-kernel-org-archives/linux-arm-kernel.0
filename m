@@ -1,53 +1,43 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Mon, 27 Mar 2017 12:23:49 +0200
-Subject: [PATCH 2/8] pinctrl: stm32: use gpio-ranges to declare bank range
-In-Reply-To: <CACRpkdbhqT688-1MajRshqgn0bH0h2s=LM06gEQYgRmMZC_n0g@mail.gmail.com>
-References: <1485533721-9019-1-git-send-email-alexandre.torgue@st.com>
- <1485533721-9019-3-git-send-email-alexandre.torgue@st.com>
- <CACRpkdYtZCJVrZhXOPXd-MNMX0Ry_H1dLQopKwsj9HnO03BtKg@mail.gmail.com>
- <2d0cd144-9a72-52d5-b2c9-c6c9e09ac494@st.com>
- <CACRpkdbhqT688-1MajRshqgn0bH0h2s=LM06gEQYgRmMZC_n0g@mail.gmail.com>
-Message-ID: <7be9d251-f177-ce15-9d91-d8533ddffa06@st.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Mon, 27 Mar 2017 15:56:05 +0530
+Subject: [GIT PULL] Immutable branch between MFD and PHY due for the v4.12
+ merge window
+In-Reply-To: <20170323105110.26w3g6jxrlgdtka7@dell>
+References: <20170314164653.15771-1-krzk@kernel.org>
+ <20170314164653.15771-5-krzk@kernel.org>
+ <20170323105110.26w3g6jxrlgdtka7@dell>
+Message-ID: <81a5348b-a5a2-9b67-2d85-fde7594d6d42@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus
+On Thursday 23 March 2017 04:21 PM, Lee Jones wrote:
+> Enjoy!
+> 
+> The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
+> 
+>   Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/lee/mfd.git ib-mfd-phy-v4.12
 
-On 02/01/2017 04:01 PM, Linus Walleij wrote:
-> On Mon, Jan 30, 2017 at 5:29 PM, Alexandre Torgue
-> <alexandre.torgue@st.com> wrote:
->> On 01/30/2017 04:19 PM, Linus Walleij wrote:
->
->>>> +       if (!of_parse_phandle_with_fixed_args(np, "gpio-ranges", 3, 0,
->>>> &args))
->>>> +               bank_nr = args.args[1] / STM32_GPIO_PINS_PER_BANK;
->>>> +       else {
->>>> +               range->name = bank->gpio_chip.label;
->>>> +               range->id = bank_nr;
->>>> +               range->pin_base = range->id * STM32_GPIO_PINS_PER_BANK;
->>>> +               range->base = range->id * STM32_GPIO_PINS_PER_BANK;
->>>> +               range->npins = npins;
->>>> +               range->gc = &bank->gpio_chip;
->>>> +               pinctrl_add_gpio_range(pctl->pctl_dev,
->>>> +                                      &pctl->banks[bank_nr].range);
->>>> +       }
->>
->>
->> I Keep the old way to get range in order to keep compatibility with older
->> device tree (if no gpio ranges are defined).
->
-> Aha I understand. Sorry for my stupidity.
->
-> Go ahead with this!
+merged this to linux-phy.
 
-I saw an issue about this patch. It doesn't seem to be merged, so I will 
-send a V2 only for this patch.
+Thanks
+Kishon
 
-Regards
-Alex
-
-
->
-> Yours,
-> Linus Walleij
->
+> 
+> for you to fetch changes up to f7f6c060547c51691f9b943e6c33f63675c1a0a9:
+> 
+>   mfd: exynos-lpass: Use common soc/exynos-regs-pmu.h header (2017-03-23 10:47:27 +0000)
+> 
+> ----------------------------------------------------------------
+> Immutable branch between MFD and PHY due for the v4.12 merge window
+> 
+> ----------------------------------------------------------------
+> Krzysztof Kozlowski (1):
+>       mfd: exynos-lpass: Use common soc/exynos-regs-pmu.h header
+> 
+>  drivers/mfd/exynos-lpass.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
