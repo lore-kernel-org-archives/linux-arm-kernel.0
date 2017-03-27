@@ -1,120 +1,169 @@
 From: eric.auger@redhat.com (Eric Auger)
-Date: Mon, 27 Mar 2017 11:31:12 +0200
-Subject: [PATCH v4 22/22] KVM: arm64: ITS: Pending table save/restore
+Date: Mon, 27 Mar 2017 11:31:10 +0200
+Subject: [PATCH v4 20/22] KVM: arm64: ITS: ITT flush and restore
 In-Reply-To: <1490607072-21610-1-git-send-email-eric.auger@redhat.com>
 References: <1490607072-21610-1-git-send-email-eric.auger@redhat.com>
-Message-ID: <1490607072-21610-23-git-send-email-eric.auger@redhat.com>
+Message-ID: <1490607072-21610-21-git-send-email-eric.auger@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Save and restore the pending tables.
+Introduce routines to flush and restore device ITT and their
+interrupt table entries (ITE).
 
-Pending table restore obviously requires the pendbaser to be
-already set.
+The routines will be called on device table flush and
+restore. They will become static in subsequent patches.
 
 Signed-off-by: Eric Auger <eric.auger@redhat.com>
 
 ---
 
 v3 -> v4:
-- remove the wrong comment about locking
-- pass kvm struct instead of its handle
-- add comment about restore method
-- remove GITR_PENDABASER.PTZ check
-- continue if target_vcpu == NULL
-- new locking strategy
+- lookup_table and compute_next_eventid_offset become static in this
+  patch
+- remove static along with vgic_its_flush/restore_itt to avoid
+  compilation warnings
+- next field only computed with a shift (mask removed)
+- handle the case where the last element has not been found
 
-v1 -> v2:
-- do not care about the 1st KB which should be zeroed according to
-  the spec.
+v2 -> v3:
+- add return 0 in vgic_its_restore_ite (was in subsequent patch)
+
+v2: creation
 ---
- virt/kvm/arm/vgic/vgic-its.c | 66 ++++++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 64 insertions(+), 2 deletions(-)
+ virt/kvm/arm/vgic/vgic-its.c | 107 +++++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 104 insertions(+), 3 deletions(-)
 
 diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index a516bbb..e10aa81 100644
+index b907e3c..02c0694 100644
 --- a/virt/kvm/arm/vgic/vgic-its.c
 +++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -1804,16 +1804,78 @@ static int lookup_table(struct vgic_its *its, gpa_t base, int size, int esz,
-  */
- static int vgic_its_flush_pending_tables(struct kvm *kvm)
+@@ -1707,7 +1707,7 @@ u32 compute_next_devid_offset(struct list_head *h, struct its_device *dev)
+ 	return min_t(u32, next_offset, VITS_DTE_MAX_DEVID_OFFSET);
+ }
+ 
+-u32 compute_next_eventid_offset(struct list_head *h, struct its_ite *ite)
++static u32 compute_next_eventid_offset(struct list_head *h, struct its_ite *ite)
  {
--	return -ENXIO;
-+	struct vgic_dist *dist = &kvm->arch.vgic;
+ 	struct list_head *e = &ite->ite_list;
+ 	struct its_ite *next;
+@@ -1749,8 +1749,8 @@ typedef int (*entry_fn_t)(struct vgic_its *its, u32 id, void *addr,
+  *
+  * Return: < 0 on error, 1 if last element identified, 0 otherwise
+  */
+-int lookup_table(struct vgic_its *its, gpa_t base, int size, int esz,
+-		 int start_id, entry_fn_t fn, void *opaque)
++static int lookup_table(struct vgic_its *its, gpa_t base, int size, int esz,
++			int start_id, entry_fn_t fn, void *opaque)
+ {
+ 	gpa_t gpa = base, top = base + size - 1;
+ 	unsigned long len = size;
+@@ -1815,6 +1815,107 @@ static int vgic_its_restore_pending_tables(struct kvm *kvm)
+ 	return -ENXIO;
+ }
+ 
++static int vgic_its_flush_ite(struct vgic_its *its, struct its_device *dev,
++			      struct its_ite *ite, gpa_t gpa)
++{
++	struct kvm *kvm = its->dev->kvm;
++	u32 next_offset;
++	u64 val;
++
++	next_offset = compute_next_eventid_offset(&dev->itt_head, ite);
++	val = ((u64)next_offset << 48) | ((u64)ite->lpi << 16) |
++		ite->collection->collection_id;
++	val = cpu_to_le64(val);
++	return kvm_write_guest(kvm, gpa, &val, VITS_ESZ);
++}
++
++/**
++ * vgic_its_restore_ite - restore an interrupt translation entry
++ * @event_id: id used for indexing
++ * @ptr: kernel VA where the 8 byte ITE is located
++ * @opaque: pointer to the its_device
++ * @next: id offset to the next entry
++ */
++static int vgic_its_restore_ite(struct vgic_its *its, u32 event_id,
++				void *ptr, void *opaque, u32 *next)
++{
++	struct its_device *dev = (struct its_device *)opaque;
++	struct its_collection *collection;
++	struct kvm *kvm = its->dev->kvm;
++	u64 val, *p = (u64 *)ptr;
 +	struct vgic_irq *irq;
++	u32 coll_id, lpi_id;
++	struct its_ite *ite;
 +	int ret;
 +
-+	list_for_each_entry(irq, &dist->lpi_list_head, lpi_list) {
-+		struct kvm_vcpu *vcpu;
-+		gpa_t pendbase, ptr;
-+		bool stored;
-+		u8 val;
++	val = *p;
++	*next = 1;
 +
-+		vcpu = irq->target_vcpu;
-+		if (!vcpu)
-+			continue;
++	val = le64_to_cpu(val);
 +
-+		pendbase = PENDBASER_ADDRESS(vcpu->arch.vgic_cpu.pendbaser);
++	coll_id = val & GENMASK_ULL(15, 0);
++	lpi_id = (val & GENMASK_ULL(47, 16)) >> 16;
 +
-+		ptr = pendbase + (irq->intid / BITS_PER_BYTE);
++	if (!lpi_id)
++		return 0;
 +
-+		ret = kvm_read_guest(kvm, (gpa_t)ptr, &val, 1);
-+		if (ret)
-+			return ret;
++	*next = val >> 48;
 +
-+		stored = val & (irq->intid % BITS_PER_BYTE);
-+		if (stored == irq->pending_latch)
-+			continue;
++	collection = find_collection(its, coll_id);
++	if (!collection)
++		return -EINVAL;
 +
-+		if (irq->pending_latch)
-+			val |= 1 << (irq->intid % BITS_PER_BYTE);
-+		else
-+			val &= ~(1 << (irq->intid % BITS_PER_BYTE));
++	ret = vgic_its_alloc_ite(dev, &ite, collection,
++				  lpi_id, event_id);
++	if (ret)
++		return ret;
 +
-+		ret = kvm_write_guest(kvm, (gpa_t)ptr, &val, 1);
++	irq = vgic_add_lpi(kvm, lpi_id);
++	if (IS_ERR(irq))
++		return PTR_ERR(irq);
++	ite->irq = irq;
++
++	/* restore the configuration of the LPI */
++	ret = update_lpi_config(kvm, irq, NULL);
++	if (ret)
++		return ret;
++
++	update_affinity_ite(kvm, ite);
++	return 0;
++}
++
++int vgic_its_flush_itt(struct vgic_its *its, struct its_device *device)
++{
++	gpa_t base = device->itt_addr;
++	struct its_ite *ite;
++	int ret;
++
++	list_for_each_entry(ite, &device->itt_head, ite_list) {
++		gpa_t gpa = base + ite->event_id * VITS_ESZ;
++
++		ret = vgic_its_flush_ite(its, device, ite, gpa);
 +		if (ret)
 +			return ret;
 +	}
-+
 +	return 0;
- }
- 
++}
++
++int vgic_its_restore_itt(struct vgic_its *its, struct its_device *dev)
++{
++	size_t max_size = BIT_ULL(dev->nb_eventid_bits) * VITS_ESZ;
++	gpa_t base = dev->itt_addr;
++	int ret;
++
++	ret =  lookup_table(its, base, max_size, VITS_ESZ, 0,
++			    vgic_its_restore_ite, dev);
++
++	if (ret < 0)
++		return ret;
++
++	/* if the last element has not been found we are in trouble */
++	return ret ? 0 : -EINVAL;
++}
++
  /**
-  * vgic_its_restore_pending_tables - Restore the pending tables from guest
-  * RAM to internal data structs
-+ *
-+ * Does not scan the whole pending tables but just loop on all registered
-+ * LPIS and scan their associated pending bit. This obviously requires
-+ * the ITEs to be restored before.
-  */
- static int vgic_its_restore_pending_tables(struct kvm *kvm)
- {
--	return -ENXIO;
-+	struct vgic_dist *dist = &kvm->arch.vgic;
-+	struct vgic_irq *irq;
-+	int ret;
-+
-+	list_for_each_entry(irq, &dist->lpi_list_head, lpi_list) {
-+		struct kvm_vcpu *vcpu;
-+		gpa_t pendbase, ptr;
-+		u8 val;
-+
-+		vcpu = irq->target_vcpu;
-+		if (!vcpu)
-+			continue;
-+
-+		pendbase = PENDBASER_ADDRESS(vcpu->arch.vgic_cpu.pendbaser);
-+
-+		ptr = pendbase + (irq->intid / BITS_PER_BYTE);
-+
-+		ret = kvm_read_guest(kvm, (gpa_t)ptr, &val, 1);
-+		if (ret)
-+			return ret;
-+		irq->pending_latch = val & (1 << (irq->intid % BITS_PER_BYTE));
-+	}
-+	return 0;
- }
- 
- static int vgic_its_flush_ite(struct vgic_its *its, struct its_device *dev,
+  * vgic_its_flush_device_tables - flush the device table and all ITT
+  * into guest RAM
 -- 
 2.5.5
