@@ -1,83 +1,82 @@
 From: yangbo.lu@nxp.com (Yangbo Lu)
-Date: Mon, 27 Mar 2017 15:49:38 +0800
-Subject: [v3, 3/7] mmc: sdhci-of-esdhc: add tuning support
+Date: Mon, 27 Mar 2017 15:49:39 +0800
+Subject: [v3, 4/7] mmc: sdhci: Control the delay between tuning commands
 In-Reply-To: <1490600982-5410-1-git-send-email-yangbo.lu@nxp.com>
 References: <1490600982-5410-1-git-send-email-yangbo.lu@nxp.com>
-Message-ID: <1490600982-5410-4-git-send-email-yangbo.lu@nxp.com>
+Message-ID: <1490600982-5410-5-git-send-email-yangbo.lu@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-eSDHC uses tuning block for tuning procedure. So the tuning
-block control register must be configured properly before tuning.
+From: Adrian Hunter <adrian.hunter@intel.com>
 
+The delay between tuning commands for SD cards is not part of the
+specification. A driver that needs it probably needs it for eMMC
+too, whereas most drivers would probably like to set it to 0. Make
+it a host member (host->tuning_delay) that defaults to the existing
+behaviour. Drivers can set it to zero to eliminate the delay, or
+set it to a positive value to always have a delay.
+
+Signed-off-by: Adrian Hunter <adrian.hunter@intel.com>
 Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
 ---
 Changes for v2:
-	- Replaced old function for mmc_host_ops.execute_tuning with
-	  esdhc_execute_tuning to support eSDHC tuning.
+	- None
 Changes for v3:
-	- Put .execute_tuning assigning after after IS_ERR(host) check.
+	- Used a host member for tuning delay instead of a quirk.(Adrian's patch)
+	- Addressed warning in checkpatch.
 ---
- drivers/mmc/host/sdhci-esdhc.h    |  5 +++++
- drivers/mmc/host/sdhci-of-esdhc.c | 20 ++++++++++++++++++++
- 2 files changed, 25 insertions(+)
+ drivers/mmc/host/sdhci.c | 11 ++++++++---
+ drivers/mmc/host/sdhci.h |  2 ++
+ 2 files changed, 10 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/mmc/host/sdhci-esdhc.h b/drivers/mmc/host/sdhci-esdhc.h
-index 6869567..c4bbd74 100644
---- a/drivers/mmc/host/sdhci-esdhc.h
-+++ b/drivers/mmc/host/sdhci-esdhc.h
-@@ -53,9 +53,14 @@
- #define ESDHC_CLOCK_HCKEN		0x00000002
- #define ESDHC_CLOCK_IPGEN		0x00000001
+diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+index 0d4485d..ffd1607 100644
+--- a/drivers/mmc/host/sdhci.c
++++ b/drivers/mmc/host/sdhci.c
+@@ -2100,9 +2100,9 @@ static void __sdhci_execute_tuning(struct sdhci_host *host, u32 opcode)
+ 			break;
+ 		}
  
-+/* Tuning Block Control Register */
-+#define ESDHC_TBCTL			0x120
-+#define ESDHC_TB_EN			0x00000004
-+
- /* Control Register for DMA transfer */
- #define ESDHC_DMA_SYSCTL		0x40c
- #define ESDHC_PERIPHERAL_CLK_SEL	0x00080000
-+#define ESDHC_FLUSH_ASYNC_FIFO		0x00040000
- #define ESDHC_DMA_SNOOP			0x00000040
- 
- #endif /* _DRIVERS_MMC_SDHCI_ESDHC_H */
-diff --git a/drivers/mmc/host/sdhci-of-esdhc.c b/drivers/mmc/host/sdhci-of-esdhc.c
-index a70499a..8c8e147 100644
---- a/drivers/mmc/host/sdhci-of-esdhc.c
-+++ b/drivers/mmc/host/sdhci-of-esdhc.c
-@@ -630,6 +630,25 @@ static int esdhc_signal_voltage_switch(struct mmc_host *mmc,
+-		/* eMMC spec does not require a delay between tuning cycles */
+-		if (opcode == MMC_SEND_TUNING_BLOCK)
+-			mdelay(1);
++		/* Spec does not require a delay between tuning cycles */
++		if (host->tuning_delay > 0)
++			mdelay(host->tuning_delay);
  	}
+ 
+ 	pr_info("%s: Tuning failed, falling back to fixed sampling clock\n",
+@@ -2164,6 +2164,9 @@ int sdhci_execute_tuning(struct mmc_host *mmc, u32 opcode)
+ 
+ 	host->mmc->retune_period = tuning_count;
+ 
++	if (host->tuning_delay < 0)
++		host->tuning_delay = opcode == MMC_SEND_TUNING_BLOCK;
++
+ 	sdhci_start_tuning(host);
+ 
+ 	__sdhci_execute_tuning(host, opcode);
+@@ -3108,6 +3111,8 @@ struct sdhci_host *sdhci_alloc_host(struct device *dev,
+ 	host->cqe_ier     = SDHCI_CQE_INT_MASK;
+ 	host->cqe_err_ier = SDHCI_CQE_INT_ERR_MASK;
+ 
++	host->tuning_delay = -1;
++
+ 	return host;
  }
  
-+static int esdhc_execute_tuning(struct mmc_host *mmc, u32 opcode)
-+{
-+	struct sdhci_host *host = mmc_priv(mmc);
-+	u32 val;
-+
-+	/* Use tuning block for tuning procedure */
-+	esdhc_clock_enable(host, false);
-+	val = sdhci_readl(host, ESDHC_DMA_SYSCTL);
-+	val |= ESDHC_FLUSH_ASYNC_FIFO;
-+	sdhci_writel(host, val, ESDHC_DMA_SYSCTL);
-+
-+	val = sdhci_readl(host, ESDHC_TBCTL);
-+	val |= ESDHC_TB_EN;
-+	sdhci_writel(host, val, ESDHC_TBCTL);
-+	esdhc_clock_enable(host, true);
-+
-+	return sdhci_execute_tuning(mmc, opcode);
-+}
-+
- #ifdef CONFIG_PM_SLEEP
- static u32 esdhc_proctl;
- static int esdhc_of_suspend(struct device *dev)
-@@ -787,6 +806,7 @@ static int sdhci_esdhc_probe(struct platform_device *pdev)
+diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h
+index fdb5d7e..2407960 100644
+--- a/drivers/mmc/host/sdhci.h
++++ b/drivers/mmc/host/sdhci.h
+@@ -538,6 +538,8 @@ struct sdhci_host {
+ #define SDHCI_TUNING_MODE_1	0
+ #define SDHCI_TUNING_MODE_2	1
+ #define SDHCI_TUNING_MODE_3	2
++	/* Delay (ms) between tuning commands */
++	int			tuning_delay;
  
- 	host->mmc_host_ops.start_signal_voltage_switch =
- 		esdhc_signal_voltage_switch;
-+	host->mmc_host_ops.execute_tuning = esdhc_execute_tuning;
- 
- 	esdhc_init(pdev, host);
- 
+ 	unsigned long private[0] ____cacheline_aligned;
+ };
 -- 
 2.1.0.27.g96db324
