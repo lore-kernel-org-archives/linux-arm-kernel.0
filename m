@@ -1,182 +1,170 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 27 Mar 2017 14:04:02 -0500
-Subject: [PATCH] clk: stm32h7: Add stm32h743 clock driver
-In-Reply-To: <dce20025-9f42-e747-e325-e1667504e615@st.com>
-References: <1489569810-24350-1-git-send-email-gabriel.fernandez@st.com>
- <20170324020630.vhffmeeb6wto53zx@rob-hp-laptop>
- <dce20025-9f42-e747-e325-e1667504e615@st.com>
-Message-ID: <CAL_Jsq++rdPqNZk54S7gQaeLBdzSptogp3dp9P1HmNTV67Sk9w@mail.gmail.com>
+From: icenowy@aosc.io (icenowy at aosc.io)
+Date: Tue, 28 Mar 2017 03:13:26 +0800
+Subject: [PATCH v2 1/5] dt-bindings: update device tree binding for
+ Allwinner PRCM CCUs
+In-Reply-To: <20170327134719.g6l3hzbba6cxkhb7@lukather>
+References: <20170327091147.6B24A7C19A5@relay.mailchannels.net>
+ <20170327134719.g6l3hzbba6cxkhb7@lukather>
+Message-ID: <a165c713004a2d1186feceee780ee04d@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 24, 2017 at 4:41 AM, Gabriel Fernandez
-<gabriel.fernandez@st.com> wrote:
-> Hi Rob,
->
-> Thanks for reviewing
->
->
->
-> On 03/24/2017 03:06 AM, Rob Herring wrote:
->>
->> On Wed, Mar 15, 2017 at 10:23:30AM +0100, gabriel.fernandez at st.com wrote:
->>>
->>> From: Gabriel Fernandez <gabriel.fernandez@st.com>
->>>
->>> This patch enables clocks for STM32H743 boards.
->>>
->>> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
->>> ---
->>>   .../devicetree/bindings/clock/st,stm32h7-rcc.txt   |  152 ++
->>>   drivers/clk/Makefile                               |    1 +
->>>   drivers/clk/clk-stm32h7.c                          | 1586
->>> ++++++++++++++++++++
->>>   include/dt-bindings/clock/stm32h7-clks.h           |  165 ++
->>>   include/dt-bindings/mfd/stm32h7-rcc.h              |  138 ++
->>>   5 files changed, 2042 insertions(+)
->>>   create mode 100644
->>> Documentation/devicetree/bindings/clock/st,stm32h7-rcc.txt
->>>   create mode 100644 drivers/clk/clk-stm32h7.c
->>>   create mode 100644 include/dt-bindings/clock/stm32h7-clks.h
->>>   create mode 100644 include/dt-bindings/mfd/stm32h7-rcc.h
->>>
->>> diff --git a/Documentation/devicetree/bindings/clock/st,stm32h7-rcc.txt
->>> b/Documentation/devicetree/bindings/clock/st,stm32h7-rcc.txt
->>> new file mode 100644
->>> index 0000000..9d4b587
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/clock/st,stm32h7-rcc.txt
->>> @@ -0,0 +1,152 @@
->>> +STMicroelectronics STM32H7 Reset and Clock Controller
->>> +=====================================================
->>> +
->>> +The RCC IP is both a reset and a clock controller.
->>> +
->>> +Please refer to clock-bindings.txt for common clock controller binding
->>> usage.
->>> +Please also refer to reset.txt for common reset controller binding
->>> usage.
->>> +
->>> +Required properties:
->>> +- compatible: Should be:
->>> +  "st,stm32h743-rcc"
->>> +
->>> +- reg: should be register base and length as documented in the
->>> +  datasheet
->>> +
->>> +- #reset-cells: 1, see below
->>> +
->>> +- #clock-cells : from common clock binding; shall be set to 1
->>> +
->>> +- clocks: External oscillator clock phandle
->>> +  - high speed external clock signal (HSE)
->>> +  - low speed external clock signal (LSE)
->>> +  - external I2S clock (I2S_CKIN)
->>> +
->>> +- st,syscfg: phandle for pwrcfg, mandatory to disable/enable backup
->>> domain
->>> +  write protection (RTC clock).
->>> +
->>> +- pll x node: Allow to register a pll with specific parameters.
->>> +  Please see PLL section below.
->>> +
->>> +Example:
->>> +
->>> +       rcc: rcc at 58024400 {
->>> +               #reset-cells = <1>;
->>> +               #clock-cells = <2>
->>> +               compatible = "st,stm32h743-rcc", "st,stm32-rcc";
->>> +               reg = <0x58024400 0x400>;
->>> +               clocks = <&clk_hse>, <&clk_lse>, <&clk_i2s_ckin>;
->>> +
->>> +               st,syscfg = <&pwrcfg>;
->>> +
->>> +               #address-cells = <1>;
->>> +               #size-cells = <0>;
->>> +
->>> +               vco1 at 58024430 {
->>> +                       #clock-cells = <0>;
->>> +                       compatible = "stm32,pll";
->>> +                       reg = <0>;
->>
->> The reg addr value and unit address don't match.
->
-> ok il will change into
->
->         vco1 at 0 {
->                 reg = <0>;
->
->
->>
->>> +               };
->>> +
->>> +               vco2 at 58024438 {
->>> +                       #clock-cells = <0>;
->>> +                       compatible = "stm32,pll";
->>> +                       reg = <1>;
->>> +                       st,clock-div = <2>;
->>> +                       st,clock-mult = <40>;
->>> +                       st,frac-status = <0>;
->>> +                       st,frac = <0>;
->>> +                       st,vcosel = <1>;
->>> +                       st,pllrge = <2>;
->>> +               };
->>> +       };
->>> +
->>> +
->>> +STM32H7 PLL
->>> +-----------
->>> +
->>> +The VCO of STM32 PLL could be reprensented like this:
->>> +
->>> +  Vref    ---------       --------
->>> +    ---->| / DIVM  |---->| x DIVN | ------> VCO
->>> +          ---------       --------
->>> +                            ^
->>> +                            |
->>> +                         -------
->>> +                        | FRACN |
->>> +                         -------
->>> +
->>> +When the PLL is configured in integer mode:
->>> +- VCO = ( Vref / DIVM ) * DIVN
->>> +
->>> +When the PLL is configured in fractional mode:
->>> +- VCO = ( Vref / DIVM ) * ( DIVN + FRACN / 2^13)
->>> +
->>> +
->>> +Required properties for pll node:
->>> +- compatible: Should be:
->>> +  "stm32,pll"
->>
->> Only 1 single PLL design for all STM32 chips ever?
->
-> no, i can change into "stm32h7,pll"
+? 2017-03-27 21:47?Maxime Ripard ???
+> On Mon, Mar 27, 2017 at 05:11:29PM +0800, Icenowy Zheng wrote:
+>> 
+>> 2017?3?26? 21:10? Maxime Ripard <maxime.ripard@free-electrons.com>???
+>> >
+>> > On Thu, Mar 23, 2017 at 07:17:03AM +0800, Icenowy Zheng wrote:
+>> > >
+>> > >
+>> > > 23.03.2017, 04:09, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
+>> > > > On Wed, Mar 22, 2017 at 02:22:22AM +0800, Icenowy Zheng wrote:
+>> > > >> ?21.03.2017, 15:41, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
+>> > > >> ?> On Thu, Mar 16, 2017 at 01:28:04AM +0800, Icenowy Zheng wrote:
+>> > > >> ?>> ?Many Allwinner SoCs after A31 have a CCU in PRCM block.
+>> > > >> ?>>
+>> > > >> ?>> ?Give the ones on H3 and A64 compatible strings.
+>> > > >> ?>>
+>> > > >> ?>> ?Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+>> > > >> ?>> ?---
+>> > > >> ?>> ?Changes in v2:
+>> > > >> ?>> ?- Add iosc for R_CCU's on H3/A64. (A31, A23 and A33 seem to have different
+>> > > >> ?>> ???clock for mux 3 of ar100 clk. Investgations are needed for them.)
+>> > > >> ?>>
+>> > > >> ?>> ??Documentation/devicetree/bindings/clock/sunxi-ccu.txt | 18 +++++++++++++++++-
+>> > > >> ?>> ??1 file changed, 17 insertions(+), 1 deletion(-)
+>> > > >> ?>>
+>> > > >> ?>> ?diff --git a/Documentation/devicetree/bindings/clock/sunxi-ccu.txt b/Documentation/devicetree/bindings/clock/sunxi-ccu.txt
+>> > > >> ?>> ?index 68512aa398a9..4a4addff595d 100644
+>> > > >> ?>> ?--- a/Documentation/devicetree/bindings/clock/sunxi-ccu.txt
+>> > > >> ?>> ?+++ b/Documentation/devicetree/bindings/clock/sunxi-ccu.txt
+>> > > >> ?>> ?@@ -7,9 +7,11 @@ Required properties :
+>> > > >> ?>> ??????????????????- "allwinner,sun8i-a23-ccu"
+>> > > >> ?>> ??????????????????- "allwinner,sun8i-a33-ccu"
+>> > > >> ?>> ??????????????????- "allwinner,sun8i-h3-ccu"
+>> > > >> ?>> ?+ - "allwinner,sun8i-h3-r-ccu"
+>> > > >> ?>> ??????????????????- "allwinner,sun8i-v3s-ccu"
+>> > > >> ?>> ??????????????????- "allwinner,sun9i-a80-ccu"
+>> > > >> ?>> ??????????????????- "allwinner,sun50i-a64-ccu"
+>> > > >> ?>> ?+ - "allwinner,sun50i-a64-r-ccu"
+>> > > >> ?>> ??????????????????- "allwinner,sun50i-h5-ccu"
+>> > > >> ?>>
+>> > > >> ?>> ??- reg: Must contain the registers base address and length
+>> > > >> ?>> ?@@ -20,7 +22,11 @@ Required properties :
+>> > > >> ?>> ??- #clock-cells : must contain 1
+>> > > >> ?>> ??- #reset-cells : must contain 1
+>> > > >> ?>>
+>> > > >> ?>> ?-Example:
+>> > > >> ?>> ?+For the PRCM CCUs on H3/A64, one more clock is needed:
+>> > > >> ?>> ?+- "iosc": another frequency oscillator used for CPUS (usually at 32000Hz,
+>> > > >> ?>> ?+ not the same with losc)
+>> > > >> ?>
+>> > > >> ?> This is called the internal oscillator in the datasheet, it would
+>> > > >> ?> probably make more sense to call it that way in the documentation too.
+>> > > >> ?>
+>> > > >> ?> This oscillator seems to be clocked at 16MHz, so we should represent
+>> > > >> ?> it as such.
+>> > > >> ?>
+>> > > >> ?> And I'm wondering, are you *sure* that it's fed directly from the
+>> > > >> ?> internal oscillator, or goes through the registers in the RTC, with
+>> > > >> ?> the 32 divider and 16 prescaler by default that makes it at roughly
+>> > > >> ?> the same rate (31.25kHz).
+>> > > >>
+>> > > >> ?In fact I know nothing about it -- I only represented the code in BSP
+>> > > >> ?clock driver.
+>> > > >>
+>> > > >> ?The mux value 3 varies from SoC to SoC. For A64/H5 it's 32000,
+>> > > >> ?for A33 it's 667000 (seems to be directly the internal OSC, as the
+>> > > >> ?user manual says the internal OSC is 600~700kHz; but it's named
+>> > > >> ?cpuosc rather than iosc in A33 BSP clock driver); for A80 it's even
+>> > > >> ?PLL_AUDIO.
+>> > > >
+>> > > > Where are you getting those info from?
+>> > > >
+>> > > > As far as I know, the A33 PRCM takes the hosc, losc, pll6 and CPU
+>> > > > (internal) oscillator:
+>> > > > https://github.com/allwinner-zh/linux-3.4-sunxi/blob/master/drivers/clk/sunxi/clk-sun8iw5.c#L508
+>> > > >
+>> > > > The H3 takes the hosc and losc:
+>> > > > https://github.com/allwinner-zh/linux-3.4-sunxi/blob/master/drivers/clk/sunxi/clk-sun8iw7.c#L379
+>> > > >
+>> > > > The A80 takes the hosc and losc:
+>> > > > https://github.com/allwinner-zh/linux-3.4-sunxi/blob/master/drivers/clk/sunxi/clk-sun9iw1.c#L281
+>> > > >
+>> > > > The A64 takes the hosc, losc, pll-periph0 and the iosc, which indeed
+>> > > > seems to be fed from the internal oscillator with the divider in the
+>> > > > RTC:
+>> > > > https://github.com/longsleep/linux-pine64/blob/lichee-dev-v3.10.65-bsp2.0/arch/arm64/boot/dts/sun50iw1p1-clk.dtsi#L19
+>> > > > https://github.com/longsleep/linux-pine64/blob/lichee-dev-v3.10.65-bsp2.0/drivers/clk/sunxi/clk-sun50iw1.c#L603
+>> > >
+>> > > But then in sunxi_init_clocks function, the iosc clock is initialized
+>> > > as a fixed clock with 32000Hz.
+>> > >
+>> > > The clock node in BSP device tree have a compatible of
+>> > > allwinner,fixed-clock, but not fixed-clock, which makes it not able
+>> > > to be really probed.
+>> >
+>> > That clock is registered:
+>> > https://github.com/longsleep/linux-pine64/blob/lichee-dev-v3.10.65-bsp2.0/drivers/clk/sunxi/clk-sun50iw1.c#L1193
+>> >
+>> 
+>> Oh yes, but conflicts exist between the iosc registered in
+>> clk-sun50iw1.c and described in sun50iw1p1-clk.dtsi . The former is
+>> 32000, and the latter is 16000000.
+> 
+> No, it is 16MHz / 32 / 16 = 31.25 kHz
+> 
+>> What should we do then?
+>> 
+>> (Maybe it will be better to temporarily ignore this mux, as it's
+>> difficult to finally find out this correct mux...)
+> 
+> That is not an option, we will not be able to fix it afterwards.
+> 
+> What we should do is getting an actual idea of what's going on, and
+> not just hacking something together hoping it will work.
+> 
+> You can start by figuring out how the Allwinner clock driver actually
+> works and / or by trying the various muxing options with something you
+> can measure the frequency with. The i2c or uart coupled with a scope
+> or logical analyzer would be a great fit for that.
+> 
+> Using the PRCM timer is another option and you can measure the
+> frequency it counts at.
 
-Actually, should be "st,stm32h7-pll".
+The MUX 3 of AR100 is surely Internal OSC on A64/H3/H5.
 
->
->>> +
->>> +- #clock-cells: from common clock binding; shall be set to 0
->>> +- reg: Should be the pll number.
->>> +
->>> +Optional properties:
->>> +- st,clock-div:  DIVM division factor       : <1..63>
->>> +- st,clock-mult: DIVN multiplication factor : <4..512>
->>> +
->>> +- st,frac-status:
->>> +   - 0 Pll is configured in integer mode
->>> +   - 1 Pll is configure in fractional mode
->>
->> Isn't this implied by the presence of the next property?
->
-> do you prefer this ?
->
-> - st,frac :
-> 0 : pll is configured in integer mode
-> 1..8191 : Fractional part of the multiplication factor and pll is configured
-> in fractional mode
+Some measurement done with AR100 (all in Hz):
 
-Why not no st,frac property means integer mode?
+H5 (Orange Pi PC2):
+16351952
+16347120
+16343624
 
-Rob
+A64 (Pine64+):
+11192560
+11174128
+11174992
+
+H3 (Orange Pi One):
+15676016
+15625088
+15600144
+
+H2+ (Orange Pi Zero):
+15907560
+15823768
+15805144
+
+Seems that on H3/H5 the IOSC is ~16MHz, but on A64 it's... ~12MHz?
+(Although the usermanual says 16Mhz in the chapter of RTC)
+
+Maybe some further investigations should be done on more boards.
+
+A fork of ar100-info is at
+https://github.com/Icenowy/ar100-info/tree/hz-test ,
+which contains IOSC frequency calculation and show in Hz. (and of
+course H5/A64 support)
+
+> 
+> Maxime
