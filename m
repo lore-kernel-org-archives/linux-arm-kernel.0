@@ -1,60 +1,106 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 27 Mar 2017 10:57:15 +0200
-Subject: [PATCH v2 4/7] pinctrl: armada-37xx: Add gpio support
-In-Reply-To: <913cf9807c7c351bb7dabac9b3336431dac060e5.1490120798.git-series.gregory.clement@free-electrons.com>
-References: <cover.26288667a039bc9f8e62dec2fd6342ded4014d12.1490120798.git-series.gregory.clement@free-electrons.com>
- <913cf9807c7c351bb7dabac9b3336431dac060e5.1490120798.git-series.gregory.clement@free-electrons.com>
-Message-ID: <CACRpkdaueEJKTJq6QihyBS18wgtgqVLHAFa=13_2X8AYuh7tqg@mail.gmail.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Mon, 27 Mar 2017 11:09:33 +0200
+Subject: [PATCH] ARM: dts: at91: sama5d2: add dma properties to UART nodes
+Message-ID: <20170327090933.18312-1-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 21, 2017 at 7:28 PM, Gregory CLEMENT
-<gregory.clement@free-electrons.com> wrote:
+From: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-You should add something to your Kconfig including:
+commit b1708b72a0959a032cd2eebb77fa9086ea3e0c84 upstream
 
-select GPIOLIB
-select OF_GPIO
+The dmas/dma-names properties are added to the UART nodes. Note that additional
+properties are needed to enable them at the board level: check bindings for
+details.
 
-or so... or depends on. You certainly need them.
+Cc: <stable@vger.kernel.org> # 4.4.x
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
 
-> +static int armada_37xx_gpiochip_register(struct platform_device *pdev,
-> +                                       struct armada_37xx_pinctrl *info)
-> +{
-> +       struct device_node *np;
-> +       struct gpio_chip *gc;
-> +       int ret = -ENODEV;
-> +
-> +       for_each_child_of_node(info->dev->of_node, np) {
-> +               if (of_find_property(np, "gpio-controller", NULL)) {
-> +                       ret = 0;
-> +                       break;
-> +               }
-> +       };
+Hi,
 
-OK so several GPIO chips as subnodes, why not one device per
-chip? Or have we discussed this before? It seems a bit weird,
-apparently there is just one node with a gpio-controller, as you're
-just adding one pin range.
+Commit 6b1d7b6f54c7deb80a00b9271dc3abb7a5674b65 triggered a bug in the atmel tty
+driver when the dma channels are not specified. It is safe to backport
+b1708b72a0959a032cd2eebb77fa9086ea3e0c84, defining the uart dma channels to fix
+it.
 
-What happens if there would be two gpio-controllers? The second
-is just ignored without error?
+ arch/arm/boot/dts/sama5d2.dtsi | 35 +++++++++++++++++++++++++++++++++++
+ 1 file changed, 35 insertions(+)
 
-> +       ret = gpiochip_add_data(gc, info);
-> +       if (ret)
-> +               return ret;
-
-Can't you use devm_gpiochip_add_data()?
-
-> +       ret = gpiochip_add_pin_range(&info->gpio_chip, dev_name(dev), 0,
-> +                                    pinbase, info->data->nr_pins);
-> +       if (ret)
-> +               return ret;
-
-Why can't you put the range(s) into the device tree?
-
-We already have code in drivers/gpio/gpiolib-of.c to do this
-for you. And generic range definition bindings.
-
-Yours,
-Linus Walleij
+diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
+index 3f750f6170f2..82d0c19e9720 100644
+--- a/arch/arm/boot/dts/sama5d2.dtsi
++++ b/arch/arm/boot/dts/sama5d2.dtsi
+@@ -880,6 +880,13 @@
+ 				compatible = "atmel,at91sam9260-usart";
+ 				reg = <0xf801c000 0x100>;
+ 				interrupts = <24 IRQ_TYPE_LEVEL_HIGH 7>;
++				dmas = <&dma0
++					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1) |
++					 AT91_XDMAC_DT_PERID(35))>,
++				       <&dma0
++					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1) |
++					 AT91_XDMAC_DT_PERID(36))>;
++				dma-names = "tx", "rx";
+ 				clocks = <&uart0_clk>;
+ 				clock-names = "usart";
+ 				status = "disabled";
+@@ -889,6 +896,13 @@
+ 				compatible = "atmel,at91sam9260-usart";
+ 				reg = <0xf8020000 0x100>;
+ 				interrupts = <25 IRQ_TYPE_LEVEL_HIGH 7>;
++				dmas = <&dma0
++					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1) |
++					 AT91_XDMAC_DT_PERID(37))>,
++				       <&dma0
++					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1) |
++					 AT91_XDMAC_DT_PERID(38))>;
++				dma-names = "tx", "rx";
+ 				clocks = <&uart1_clk>;
+ 				clock-names = "usart";
+ 				status = "disabled";
+@@ -898,6 +912,13 @@
+ 				compatible = "atmel,at91sam9260-usart";
+ 				reg = <0xf8024000 0x100>;
+ 				interrupts = <26 IRQ_TYPE_LEVEL_HIGH 7>;
++				dmas = <&dma0
++					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1) |
++					 AT91_XDMAC_DT_PERID(39))>,
++				       <&dma0
++					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1) |
++					 AT91_XDMAC_DT_PERID(40))>;
++				dma-names = "tx", "rx";
+ 				clocks = <&uart2_clk>;
+ 				clock-names = "usart";
+ 				status = "disabled";
+@@ -1016,6 +1037,13 @@
+ 				compatible = "atmel,at91sam9260-usart";
+ 				reg = <0xfc008000 0x100>;
+ 				interrupts = <27 IRQ_TYPE_LEVEL_HIGH 7>;
++				dmas = <&dma0
++					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1) |
++					 AT91_XDMAC_DT_PERID(41))>,
++				       <&dma0
++					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1) |
++					 AT91_XDMAC_DT_PERID(42))>;
++				dma-names = "tx", "rx";
+ 				clocks = <&uart3_clk>;
+ 				clock-names = "usart";
+ 				status = "disabled";
+@@ -1024,6 +1052,13 @@
+ 			uart4: serial at fc00c000 {
+ 				compatible = "atmel,at91sam9260-usart";
+ 				reg = <0xfc00c000 0x100>;
++				dmas = <&dma0
++					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1) |
++					 AT91_XDMAC_DT_PERID(43))>,
++				       <&dma0
++					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1) |
++					 AT91_XDMAC_DT_PERID(44))>;
++				dma-names = "tx", "rx";
+ 				interrupts = <28 IRQ_TYPE_LEVEL_HIGH 7>;
+ 				clocks = <&uart4_clk>;
+ 				clock-names = "usart";
+-- 
+2.11.0
