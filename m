@@ -1,161 +1,145 @@
 From: eric.auger@redhat.com (Eric Auger)
-Date: Mon, 27 Mar 2017 11:31:07 +0200
-Subject: [PATCH v4 17/22] KVM: arm64: ITS: Add infrastructure for table lookup
+Date: Mon, 27 Mar 2017 11:31:04 +0200
+Subject: [PATCH v4 14/22] KVM: arm64: ITS: vgic_its_alloc_ite/device
 In-Reply-To: <1490607072-21610-1-git-send-email-eric.auger@redhat.com>
 References: <1490607072-21610-1-git-send-email-eric.auger@redhat.com>
-Message-ID: <1490607072-21610-18-git-send-email-eric.auger@redhat.com>
+Message-ID: <1490607072-21610-15-git-send-email-eric.auger@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a generic lookup_table() helper whose role consists in
-scanning a contiguous table located in guest RAM and applying
-a callback on each entry. Entries can be handled as linked lists
-since the callback may return an offset to the next entry and
-also tell that an entry is the last one.
-
-Helper functions also are added to compute the device/event ID
-offset to the next DTE/ITE.
-
-compute_next_devid_offset, compute_next_eventid_offset and
-lookup_table will become static in subsequent patches
+Add two new helpers to allocate an its ite and an its device.
+This will avoid duplication on restore path.
 
 Signed-off-by: Eric Auger <eric.auger@redhat.com>
 
 ---
 
 v3 -> v4:
-- remove static to avoid compilation warning
-- correct size computation in looup_table()
-- defines now encode the number of bits used for devid and eventid offsets
-- use BIT() - 1 to encode the max offets
+- fix allocation
+- add comment about its_lock mutex hold
+
+v1 -> v2:
+- report itt_size fix and remove ITE_SIZE
+- s/itte/ite/g
 ---
- virt/kvm/arm/vgic/vgic-its.c | 107 +++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 107 insertions(+)
+ virt/kvm/arm/vgic/vgic-its.c | 73 ++++++++++++++++++++++++++++++--------------
+ 1 file changed, 50 insertions(+), 23 deletions(-)
 
 diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index 7364b7d..8eaeba4 100644
+index 76dd562..2a1ccbf 100644
 --- a/virt/kvm/arm/vgic/vgic-its.c
 +++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -184,6 +184,8 @@ static struct its_ite *find_ite(struct vgic_its *its, u32 device_id,
- #define VITS_ESZ 8
- #define VITS_TYPER_IDBITS 16
- #define VITS_TYPER_DEVBITS 16
-+#define VITS_DTE_MAX_DEVID_OFFSET	(BIT(14) - 1)
-+#define VITS_ITE_MAX_EVENTID_OFFSET	(BIT(16) - 1)
- 
- /*
-  * Finds and returns a collection in the ITS collection table.
-@@ -1686,6 +1688,111 @@ int vgic_its_attr_regs_access(struct kvm_device *dev,
- 	return ret;
+@@ -726,6 +726,27 @@ static void vgic_its_free_collection(struct vgic_its *its, u32 coll_id)
+ 	kfree(collection);
  }
  
-+u32 compute_next_devid_offset(struct list_head *h, struct its_device *dev)
++/* Must be called with its_lock mutex held */
++static int vgic_its_alloc_ite(struct its_device *device,
++			       struct its_ite **itep,
++			       struct its_collection *collection,
++			       u32 lpi_id, u32 event_id)
 +{
-+	struct list_head *e = &dev->dev_list;
-+	struct its_device *next;
-+	u32 next_offset;
++	struct its_ite *ite;
 +
-+	if (e->next == h)
-+		return 0;
-+	next = list_entry(e->next, struct its_device, dev_list);
-+	next_offset = next->device_id - dev->device_id;
++	ite = kzalloc(sizeof(*ite), GFP_KERNEL);
++	if (!ite)
++		return -ENOMEM;
 +
-+	return min_t(u32, next_offset, VITS_DTE_MAX_DEVID_OFFSET);
-+}
++	ite->event_id	= event_id;
++	ite->collection = collection;
++	ite->lpi = lpi_id;
 +
-+u32 compute_next_eventid_offset(struct list_head *h, struct its_ite *ite)
-+{
-+	struct list_head *e = &ite->ite_list;
-+	struct its_ite *next;
-+	u32 next_offset;
-+
-+	if (e->next == h)
-+		return 0;
-+	next = list_entry(e->next, struct its_ite, ite_list);
-+	next_offset = next->event_id - ite->event_id;
-+
-+	return min_t(u32, next_offset, VITS_ITE_MAX_EVENTID_OFFSET);
-+}
-+
-+/**
-+ * entry_fn_t - Callback called on a table entry restore path
-+ * @its: its handle
-+ * @id: id of the entry
-+ * @addr: kernel VA of the entry
-+ * @opaque: pointer to an opaque data
-+ * @next_offset: minimal ID offset to the next entry. 0 if this
-+ * entry is the last one, 1 if the entry is invalid, >= 1 if an
-+ * entry's next_offset field was truly decoded
-+ *
-+ * Return: < 0 on error, 0 otherwise
-+ */
-+typedef int (*entry_fn_t)(struct vgic_its *its, u32 id, void *addr,
-+			  void *opaque, u32 *next_offset);
-+
-+/**
-+ * lookup_table - scans a contiguous table in guest RAM and applies a function
-+ * to each entry
-+ *
-+ * @its: its handle
-+ * @base: base gpa of the table
-+ * @size: size of the table in bytes
-+ * @esz: entry size in bytes
-+ * @start_id: first entry's ID
-+ * @fn: function to apply on each entry
-+ *
-+ * Return: < 0 on error, 1 if last element identified, 0 otherwise
-+ */
-+int lookup_table(struct vgic_its *its, gpa_t base, int size, int esz,
-+		 int start_id, entry_fn_t fn, void *opaque)
-+{
-+	gpa_t gpa = base, top = base + size - 1;
-+	unsigned long len = size;
-+	int ret, seg, offset = offset_in_page(gpa);
-+	gfn_t gfn = gpa >> PAGE_SHIFT;
-+	u32 id = start_id + (gpa - base)/esz;
-+	struct kvm *kvm = its->dev->kvm;
-+	kvm_pfn_t pfn;
-+
-+	while ((seg = next_segment(len, offset)) != 0) {
-+		u32 next_offset;
-+		bool writeable;
-+		void *addr;
-+
-+		pfn = gfn_to_pfn_prot(kvm, gfn, true, &writeable);
-+		if (is_error_noslot_pfn(pfn))
-+			return -EINVAL;
-+		addr = phys_to_virt((u64)pfn << PAGE_SHIFT);
-+		addr += offset;
-+
-+		while (seg > 0) {
-+			size_t byte_offset;
-+
-+			ret = fn(its, id, addr, opaque, &next_offset);
-+			if (ret < 0 || (!ret && !next_offset))
-+				goto out;
-+
-+			byte_offset = next_offset * esz;
-+
-+			id += next_offset;
-+			gpa += byte_offset;
-+			addr += byte_offset;
-+			seg -= byte_offset;
-+		}
-+		kvm_release_pfn_clean(pfn);
-+
-+		len = top - gpa + 1;
-+		offset = offset_in_page(gpa);
-+		gfn = gpa >> PAGE_SHIFT;
-+		id = start_id + (gpa - base)/esz;
-+	}
++	list_add_tail(&ite->ite_list, &device->itt_head);
++	*itep = ite;
 +	return 0;
-+out:
-+	kvm_release_pfn_clean(pfn);
-+	return (ret < 0 ? ret : 1);
 +}
 +
- /**
-  * vgic_its_flush_pending_tables - Flush the pending tables into guest RAM
-  */
+ /*
+  * The MAPTI and MAPI commands map LPIs to ITTEs.
+  * Must be called with its_lock mutex held.
+@@ -739,7 +760,7 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
+ 	struct its_ite *ite;
+ 	struct its_device *device;
+ 	struct its_collection *collection, *new_coll = NULL;
+-	int lpi_nr;
++	int lpi_nr, ret;
+ 	struct vgic_irq *irq;
+ 
+ 	device = find_its_device(its, device_id);
+@@ -769,19 +790,13 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
+ 		new_coll = collection;
+ 	}
+ 
+-	ite = kzalloc(sizeof(struct its_ite), GFP_KERNEL);
+-	if (!ite) {
++	ret = vgic_its_alloc_ite(device, &ite, collection, lpi_nr, event_id);
++	if (ret) {
+ 		if (new_coll)
+ 			vgic_its_free_collection(its, coll_id);
+-		return -ENOMEM;
++		return ret;
+ 	}
+ 
+-	ite->event_id	= event_id;
+-	list_add_tail(&ite->ite_list, &device->itt_head);
+-
+-	ite->collection = collection;
+-	ite->lpi = lpi_nr;
+-
+ 	irq = vgic_add_lpi(kvm, lpi_nr);
+ 	if (IS_ERR(irq)) {
+ 		if (new_coll)
+@@ -820,6 +835,29 @@ static void vgic_its_unmap_device(struct kvm *kvm, struct its_device *device)
+ 	kfree(device);
+ }
+ 
++/* Must be called with its_lock mutex held */
++static int vgic_its_alloc_device(struct vgic_its *its,
++				 struct its_device **devp,
++				 u32 device_id, gpa_t itt_addr,
++				 u8 nb_eventid_bits)
++{
++	struct its_device *device;
++
++	device = kzalloc(sizeof(*device), GFP_KERNEL);
++	if (!device)
++		return -ENOMEM;
++
++	device->device_id = device_id;
++	device->itt_addr = itt_addr;
++	device->nb_eventid_bits = nb_eventid_bits;
++	INIT_LIST_HEAD(&device->itt_head);
++
++	list_add_tail(&device->dev_list, &its->device_list);
++	*devp = device;
++
++	return 0;
++}
++
+ /*
+  * MAPD maps or unmaps a device ID to Interrupt Translation Tables (ITTs).
+  * Must be called with the its_lock mutex held.
+@@ -856,19 +894,8 @@ static int vgic_its_cmd_handle_mapd(struct kvm *kvm, struct vgic_its *its,
+ 	if (!valid)
+ 		return 0;
+ 
+-	device = kzalloc(sizeof(struct its_device), GFP_KERNEL);
+-	if (!device)
+-		return -ENOMEM;
+-
+-	device->device_id = device_id;
+-	device->nb_eventid_bits = nb_eventid_bits;
+-	device->itt_addr = itt_addr;
+-
+-	INIT_LIST_HEAD(&device->itt_head);
+-
+-	list_add_tail(&device->dev_list, &its->device_list);
+-
+-	return 0;
++	return vgic_its_alloc_device(its, &device, device_id,
++				     itt_addr, nb_eventid_bits);
+ }
+ 
+ /*
 -- 
 2.5.5
