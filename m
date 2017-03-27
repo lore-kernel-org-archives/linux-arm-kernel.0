@@ -1,168 +1,166 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 27 Mar 2017 13:19:06 -0700
-Subject: [PATCH 3/9] arm64: mm: install SError abort handler
-In-Reply-To: <867f3doekq.fsf@arm.com>
-References: <20170324144632.5896-1-opendmb@gmail.com>
- <20170324144632.5896-4-opendmb@gmail.com>
- <20170324151654.GD29588@leverpostej> <58D54DE8.9020707@gmail.com>
- <20170324173515.GB10746@leverpostej>
- <710c4142-ae20-9715-3e51-910a2073a64e@gmail.com>
- <20170324183051.GD10746@leverpostej>
- <b6090e54-a1f8-701a-6f86-6968d3effcf8@gmail.com> <867f3doekq.fsf@arm.com>
-Message-ID: <04a391ca-c11c-3c45-ce32-ba2dc111226f@gmail.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Tue, 28 Mar 2017 04:23:46 +0800
+Subject: [PATCH v9 15/15] irqchip: mbigen: Add ACPI support
+In-Reply-To: <6ea7e293-bde4-3c22-a987-cec1843da39b@redhat.com>
+References: <1488890410-15503-1-git-send-email-guohanjun@huawei.com>
+ <1488890410-15503-16-git-send-email-guohanjun@huawei.com>
+ <20170321144521.GA4392@red-moon>
+ <12635f14-8cbd-61ba-74fa-495a81f94038@huawei.com>
+ <c07135ba-f14f-fa2f-bd1b-e00cc758b3e7@arm.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E204C0AB7@FRAEML521-MBX.china.huawei.com>
+ <20170327152702.GB12092@red-moon>
+ <6ea7e293-bde4-3c22-a987-cec1843da39b@redhat.com>
+Message-ID: <58D974D2.7060809@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/25/2017 03:06 AM, Marc Zyngier wrote:
-> On Fri, Mar 24 2017 at 07:02:05 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
->> On 03/24/2017 11:31 AM, Mark Rutland wrote:
->>> Hi Florian,
->>>
->>> On Fri, Mar 24, 2017 at 10:53:48AM -0700, Florian Fainelli wrote:
->>>> On 03/24/2017 10:35 AM, Mark Rutland wrote:
->>>>> On Fri, Mar 24, 2017 at 09:48:40AM -0700, Doug Berger wrote:
->>>>>> On 03/24/2017 08:16 AM, Mark Rutland wrote:
->>>>>>> On Fri, Mar 24, 2017 at 07:46:26AM -0700, Doug Berger wrote:
->>>>>
->>>>>> If you would consider an alternative implementation where we scrap
->>>>>> the SError handler (i.e. maintain the ugliness in our downstream
->>>>>> kernel) in favor of a more gentle user mode crash on SError that
->>>>>> allows the kernel the opportunity to service the interrupt for
->>>>>> diagnostic purposes I could try to repackage that.
->>>>>
->>>>> If this is just for diagnostic purposes, I believe you can register a
->>>>> panic notifier, which can then read from the bus. The panic will occur,
->>>>> but you'll have the opportunity to log some information to dmesg.
+Hi Al,
+
+Thanks for your feedback, reply inline.
+
+On 03/28/2017 02:56 AM, Al Stone wrote:
+> On 03/27/2017 09:27 AM, Lorenzo Pieralisi wrote:
+>> [+Al,Darren to comment on _DSD review process]
+>>
+>> On Mon, Mar 27, 2017 at 12:24:45PM +0000, Gabriele Paoloni wrote:
+>>> Hi Marc Many thanks for your comments
+>>>> Hanjun, John,
 >>>>
->>>> And crash the kernel? That sounds awful, FWIW the ARM/Linux kernel is
->>>> able to recover just fine from user-space accessing e.g: invalid
->>>> physical addresses in the GISB register space, bringing the same level
->>>> of functionality to ARM64/Linux sounds reasonable to me.
+>>>> On 22/03/17 14:12, John Garry wrote:
+>>>>> On 21/03/2017 14:45, Lorenzo Pieralisi wrote:
+>>>>>> On Tue, Mar 07, 2017 at 08:40:10PM +0800, Hanjun Guo wrote:
+>>>>>>> From: Hanjun Guo <hanjun.guo@linaro.org>
+>>>>>>>
+>>>>>>> With the preparation of platform msi support and interrupt producer
+>>>>>>> in DSDT, we can add mbigen ACPI support now.
+>>>>>>>
+>>>>>>> We are using Interrupt resource type in _CRS methd to indicate
+>>>> number
+>>>>>>> of irq pins instead of num_pins in DT to avoid _DSD usage in this
+>>>> case.
+>>>>>>>
+>>>>>>> For mbigen,
+>>>>>>>      Device(MBI0) {
+>>>>>>>            Name(_HID, "HISI0152")
+>>>>>>>            Name(_UID, Zero)
+>>>>>>>            Name(_CRS, ResourceTemplate() {
+>>>>>>>                    Memory32Fixed(ReadWrite, 0xa0080000, 0x10000)
+>>>>>>> 		  Interrupt(ResourceProducer,...) {12,14,....}
+>>>>>>
+>>>>>> What do these interrupt numbers represent ? This looks wrong to me.
+>>>>>> An interrupt descriptor is there to describe the interrupts a device
+>>>>>> can generate; you are using it just to add a "standard" (that is
+>>>>>> not standard at all) way of counting the number of vectors allocated
+>>>>>> to this specific chip and that's just wrong.
+>>>>>>
+>>>>>
+>>>>> As I understand, the count of interrupts we are declaring for the
+>>>> mbigen
+>>>>> is the same as the sum of interrupts for that mbigen's children.
+>>>>>
+>>>>> So at the point we probe the mbigen, can we just deference the
+>>>> children
+>>>>> to count their interrupts, and use this as the #msis?
+>>>>>
+>>>>>> Can't you use something like Agustin did in the QCOM combiner:
+>>>>>>
+>>>>>> drivers/irqchip/qcom-irq-combiner.c
+>>>>>>
+>>>>>> to detect the MSI vector length (ie by describing the MBIgen through
+>>>>>> generic registers and use the bit width to compute the vector
+>>>>>> lenght) ? I am not sure how feasible it is given that my knowledge
+>>>>>> of MBIgen is pretty poor.
+>>>>>>
+>>>>>> I understand we want to avoid _DSD properties but we should not
+>>>>>> work around standard bindings to achieve that goal.
+>>>>>>
+>>>>>
+>>>>> We use "num-pins" for dt solution, but it is not so welcome here.
+>>>>
+>>>> Well, this device is already completely out of any standard description
+>>>> on the ACPI side. And given that it bloats both the ACPI tables and the
+>>>> kernel data structures, I can only suggest that you take advantage of
+>>>> _DSD here, as misusing the standard properties is not something that we
+>>>> should condone. It will also make the driver more manageable, as it
+>>>> will
+>>>> use similar properties on both firmware implementations.
+>>>>
+>>>> I feel like I need to stress the urgency here. We're at -rc4, and still
+>>>> with unsolved issues. None of us want to miss the next merge window.
+>>>>
 >>>
->>> I disagree, given that:
+>>> As follow up our guys would work on a solution whose ACPI table looks
+>>> like the following one:
 >>>
->>> (a) You cannot determine the (HW) origin of the SError in an
->>>     architecturally portable way. i.e. when you take an SError, you have
->>>     no way of determining what asynchronous event caused it.
+>>> For mbigen,
+>>>      Device(MBI0) {
+>>>            Name(_HID, "HISI0152")
+>>>            Name(_UID, Zero)
+>>>            Name(_CRS, ResourceTemplate() {
+>>>                    Memory32Fixed(ReadWrite, 0xa0080000, 0x10000)
+>>>            })
 >>>
->>> (b) SError is effectively an edge-triggered interrupt for fatal system
->>>     errors (e.g. it may be triggered in resonse to ECC errors,
->>>     corruption detected in caches, etc). Even if you can determine that
->>>     the GISB triggered *an* SError, this does not tell you that this was
->>>     the *only* SError.
->>
->> Correct, which is why Doug's changes allow chaining of handlers.
->>
->>>
->>>     If you take an SError, something bad has already happened. Your data
->>>     may already have been corrupted, and worse, you don't know when or
->>>     where specifically this occurred (nor how many times).
->>
->> Sure, but that still allows you to send the correct signal to a faulting
->> application (unless I am missing something here).
->>
->>>     
->>> (c) You cannot determine the (SW) origin of an SError without relying
->>>     upon implementation details. This cannot be written in a way that
->>>     does not rely on microarchitecture, integration, etc, and would need
->>>     to be updated for every future system with this misfeature.
->>
->> Which is exactly what is being done here, with the help of platform
->> specific information (we would not load brcmstb_gisb.c if we were not on
->> a platform where it makes sense to use that HW).
->>
->>>
->>> (d) Even if you can determine the (SW) origin of an SError by relying on
->>>     IMPLEMENTATION DEFINED details, your handler needs to be intimately
->>>     familiar with the arch in question in order to attempt to recover.
->>>
->>>     For example, the existing code tries to skip an ARM instruction in
->>>     some cases. For arm64 there are three cases that would need to be
->>>     handled (AArch64 A64, AArch32 A32/ARM, AArch32 T32/Thumb).
->>>
->>>     Further, it appears to me that the existing code is broken given
->>>     that it doesn't handle Thumb, and given that it's skipping an
->>>     instruction in response to an asynchronous event -- i.e. some
->>>     arbitrary instruction after the one which triggered the abort.
->>
->> OK, that could presumably be fixed though.
->>
->>>
->>> For better or worse, SError *must* be treated as fatal.
->>
->> I disagree here, since this is a platform specific SError exception that
->> we can actually handle correctly there is a chance to actually not take
->> down the system on something that can be made non fatal and informative
->> at the same time.
->>
->>>
->>> As Doug stated:
->>>
->>>     The main benefit is to help debug user mode code that accidentally
->>>     maps a bad address since we would never make such an egregious error
->>>     in the kernel ;)
->>>
->>> This is just one of many ways a userspace application with direct HW
->>> access can bring down the system. I see no reason to treat it any
->>> differently, especially given the above points.
->>
->> Partially disagree, in the absence of a way to specifically deal with
->> the exception, I would almost agree, but this is not the case here, we
->> have a piece of HW that can help us locate the problem, display an
->> informative message, and send a SIGBUS to the faulting application.
->>
->> Anyway, I won't argue much further than that, but I certainly don't
->> think taking down an entire system is going to prove itself useful when
->> you need to deploy such a kernel to hundreds of people who have no clue
->> what so ever what their actual problem is in the first place. Taking a
->> SIGBUS and printing a message can at least allow us to say: read more
->> carefully, it say exactly what's wrong.
-> 
-> I think there is one point that hasn't been made in this discussion. You
-> seem to assume that an SError should be handled the same way on an ARMv8
-> system as you handle it on your ARMv7 platform.
+>>>      Name(_DSD, Package () {
+>>>        ToUUID("daffd814-6eba-4d8c-8a91-bc9bbf4aa301"),
+>>>        Package ()
+>>>        {
+>>>          Package () {"num-pins", xxx}
+>>>        }
+>>>      })
+>>>      }
+>
+> Please fix the indentation here; the ASL parser doesn't care, but I don't
+> see '}'s as clearly as it does :).  In particular, _DSD usage *must* be for
+> a device and it does not look like that if one doesn't carefully count all
+> the parentheses and braces.
 
-Correct, that is absolutely a conscious (or not) assumption about the
-platforms being discussed here, and therefore the proposed patches.
+I will fix it :)
 
-> 
-> In most cases, Linux on ARMv7 runs (for better or worse) in secure mode,
-> making it the only software agent capable of handling an Asynchronous
-> Abort. On v8, Linux runs in non-secure mode, and relies on secure
-> firmware for a large set of platform specific services (PM, CPU
-> bring-up...). Crucially, error handling is one of these services.
-> 
-> It is largely expected that an SError should be first taken to EL3
-> (SCR_EL3.EA being set), handled there by any platform-specific FW able
-> to triage and log the error, and could even be reported to EL1NS via
-> some standard mechanism. If the FW decides to reinject this SError to
-> the non-secure side, then this is bound to be fatal, because even the FW
-> couldn't handle it.
-> 
-> So my view is that you should move that kind of error handling to the
-> place where it actually belongs. It will give you the opportunity to
-> print out your debug messages if necessary, and leave the SError
-> handling in the kernel the way it should be: fatal.
+>
+>>>
+>>> For devices,
+>>>     Device(COM0) {
+>>>            Name(_HID, "ACPIIDxx")
+>>>            Name(_UID, Zero)
+>>>            Name(_CRS, ResourceTemplate() {
+>>>                   Memory32Fixed(ReadWrite, 0xb0030000, 0x10000)
+>>> 		 Interrupt(ResourceConsumer,..., "\_SB.MBI0") {12}
+>>>            })
+>>>      }
+>>>
+>>>
+>>> Marc, Lorenzo if you are ok with the above we will submit v10 based on this...
+>>
+>> I am ok with it. I am not 100% up-to-date on what's the status on _DSD
+>> bindings/review/guidelines but it would be certainly a good idea to
+>> kickstart the process for MBIgen which basically means following this
+>> as far as I know (and post to the relevant mailing list):
+>>
+>> https://github.com/ahs3/dsd/blob/master/documentation/process_rules.txt
+>
+> So, let's correct this bit: consider that URL deprecated, please, and refer
+> instead to the text that was agreed upon and in the kernel tree:
+>
+> 	Documentation/acpi/DSD-properties-rules.txt
+>
+>> Al and Darren may add to that as they have more insights.
+>
+> Since this use of _DSD is very specific to this device, and this device
+> only, I don't have any real objections.
 
-Your point of view is absolutely valid, but does not necessarily match
-the reality of things as implemented in real life because:
+Thanks for the confirmation.
 
-- the trusted firmware on some platforms is something that is subject to
-a different process than a kernel or user-space upgrade and/or
-security/certification process, and may be challenging to update in the
-future, so people design it with everything they will ever need: PSCI
-v0.2 services and that's it
+> I will say that "num-pins" is
+> not terribly descriptive so it would be really good to either use a much
+> more descriptive name or add plenty of commentary in the code -- and
+> preferably both.  I would recommend including the ASL in the code comments,
+> with a description of how the property is to be used and what it means.
 
-- there is what ARM Ltd. provides as guidelines about how a platform
-should be done (read: must, should?), and there is how implementors end
-up making (most often uneducated, biased and under time pressure) design
-decisions about how a platform will be designed, and prototype is as
-close as you could get to a product in the embedded space
+"num-pins" is used for mbigen DT support:
+https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/Documentation/devicetree/bindings/interrupt-controller/hisilicon,mbigen-v2.txt
 
-That being said, it is definitively something that should be done, so
-we'll make sure this gets funneled back to the appropriate people so
-they can think about adding SError handling where it should be done.
+I think we can use the name unchanged and adding more comments
+as you suggested, will cc you for this updated patch.
 
-Thanks for the feedback!
--- 
-Florian
+Thanks
+Hanjun
