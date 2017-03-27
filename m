@@ -1,159 +1,114 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 27 Mar 2017 18:22:02 +0100
-Subject: [PATCH] efi: arm: enable DMI/SMBIOS
-In-Reply-To: <1488410642-13176-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1488410642-13176-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <CAKv+Gu_jk6EDJBiRt+PazFkFnXxVXcyLg-tM3cy2AAFvDMUJCA@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 27 Mar 2017 18:33:14 +0100
+Subject: [PATCH V9 00/11] IOMMU probe deferral support
+In-Reply-To: <f67fb561-4238-6933-04f3-0f910f9232d1@arm.com>
+References: <1489086061-9356-1-git-send-email-sricharan@codeaurora.org>
+ <58D49845.9060407@hisilicon.com>
+ <0ea8022b-a19b-335d-6cc6-81510196f891@codeaurora.org>
+ <5FC3163CFD30C246ABAA99954A238FA81750B7CB@lhreml504-mbs>
+ <db3d68f8-713c-9ae2-7df9-324bc1b375b1@arm.com>
+ <5FC3163CFD30C246ABAA99954A238FA81750CCC4@lhreml504-mbs>
+ <f67fb561-4238-6933-04f3-0f910f9232d1@arm.com>
+Message-ID: <20170327173314.GA17035@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 March 2017 at 23:24, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> Wire up the existing support for SMBIOS tables (aka DMI), by moving the
-> arm64 init code to drivers/firmware/efi/arm-runtime.c, which is shared
-> between ARM and arm64, and adding a asm/dmi.h header to ARM that defines
-> the mapping routines for the firmware tables.
->
-> This allows userspace to access these tables to discover system information
-> exposed by the firmware. It also sets the hardware name used in crash
-> dumps, e.g.,
->
->   Unable to handle kernel NULL pointer dereference at virtual address 00000000
->   pgd = ed3c0000
->   [00000000] *pgd=bf1f3835
->   Internal error: Oops: 817 [#1] SMP THUMB2
->   Modules linked in:
->   CPU: 0 PID: 759 Comm: bash Not tainted 4.10.0-09601-g0e8f38792120-dirty #112
->   Hardware name: QEMU KVM Virtual Machine, BIOS 0.0.0 02/06/2015
->   ^^^
->
-> NOTE: This does *NOT* enable or encourage the use of DMI quirks, i.e., the
->       the practice of identifying the platform via DMI to decide whether
->       certain workarounds for buggy hardware and/or firmware need to be
->       enabled. This would require the DMI subsystem to be enabled much
->       earlier than we do on ARM, which is non-trivial.
->
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+On Mon, Mar 27, 2017 at 05:18:15PM +0100, Robin Murphy wrote:
 
-If there are no concerns with this patch, I would like to queue it for
-v4.12 in the EFI tree.
+[...]
 
-Russell, do you have any objections?
+> >> [  145.212351] iommu: Adding device 0000:81:10.0 to group 5
+> >> [  145.212367] ixgbevf 0000:81:10.0: 0x0 0x100000000, 0x0 0xffffffffffff,
+> >> 0xffffffff 0xffffffff
+> >> [  145.213261] ixgbevf 0000:81:10.0: enabling device (0000 -> 0002)
+> >> [  145.213394] ixgbe 0000:81:00.0 eth0: VF Reset msg received from vf 0
+> >> [  145.214272] ixgbe 0000:81:00.0: VF 0 has no MAC address assigned, you
+> >> may have to assign one manually
+> >> [  145.224379] ixgbevf 0000:81:10.0: MAC address not assigned by
+> >> administrator.
+> >> [  145.224384] ixgbevf 0000:81:10.0: Assigning random MAC address
+> >> [  145.225941] ixgbevf 0000:81:10.0: 1a:85:06:48:a7:19
+> >> [  145.225944] ixgbevf 0000:81:10.0: MAC: 1
+> >> [  145.225946] ixgbevf 0000:81:10.0: Intel(R) 82599 Virtual Function
+> >> [  145.299961] ixgbe 0000:81:00.0 eth0: NIC Link is Up 1 Gbps, Flow Control:
+> >> None
+> >> [  154.947742] nfs: server 172.18.45.166 not responding, still trying
+> >> [  191.025780] nfs: server 172.18.45.166 not responding, still trying
+> >> [  191.026122] nfs: server 172.18.45.166 OK
+> >> [  191.026317] nfs: server 172.18.45.166 OK
+> >> [  263.706402] VFIO - User Level meta-driver version: 0.3
+> >> [  269.757613] vfio-pci 0000:81:10.0: 0x0 0x0, 0x0 0xffffffffffff, 0xffffffffffffffff
+> >> 0xffffffffffffffff
+> >> [  269.757617] specified DMA range outside IOMMU capability
+> >> [  269.757618] Failed to set up IOMMU for device 0000:81:10.0; retaining
+> >> platform DMA ops
+> >>
+> >>  From the logs its clear that  when ixgbevf driver originally probes and adds
+> >> the device
+> >>  to smmu  the dma mask is 32, but when it binds to vfio-pci, it becomes 64 bit.
+> > 
+> > Just to add to that, the mask is set to 64 bit in the ixgebvf driver probe[1]
+> 
+> Aha, but of course it's still the same struct device getting bound to
+> VFIO later, so whatever mask the first driver set is still in there when
+> we go through of_dma_configure() the second time (and the fact that we
+> go through more than once being the new behaviour). So yes, this is a
+> legitimate problem and we really do need to be robust against size
+> overflow. I reckon the below tweak of your fix is probably the way to
+> go; cleaning up the arch_setup_dma_ops() interface can happen later.
 
-Thanks,
-Ard.
+Yes. On ACPI the additional issue is, given that we now call
+*_dma_configure multiple times, we end up adding the _same_ stream
+id to an existing fwspec ids array which triggers the SMMUv3 driver bug,
+because we try to configure the same id twice (it does not happen
+in DT since you have a check similar to the one I added below).
 
+ACPI fix(es) below please let me know if it actually fixes the issues:
 
-> ---
->  arch/arm/Kconfig                   | 11 +++++++++++
->  arch/arm/include/asm/dmi.h         | 19 +++++++++++++++++++
->  arch/arm64/kernel/efi.c            | 15 ---------------
->  drivers/firmware/efi/arm-runtime.c | 15 +++++++++++++++
->  4 files changed, 45 insertions(+), 15 deletions(-)
->  create mode 100644 arch/arm/include/asm/dmi.h
->
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index fda6a46d27cf..8214ea99b2f3 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -2089,6 +2089,17 @@ config EFI
->           is only useful for kernels that may run on systems that have
->           UEFI firmware.
->
-> +config DMI
-> +       bool "Enable support for SMBIOS (DMI) tables"
-> +       depends on EFI
-> +       default y
-> +       help
-> +         This enables SMBIOS/DMI feature for systems.
-> +
-> +         This option is only useful on systems that have UEFI firmware.
-> +         However, even with this option, the resultant kernel should
-> +         continue to boot on existing non-UEFI platforms.
-> +
->  endmenu
->
->  menu "CPU Power Management"
-> diff --git a/arch/arm/include/asm/dmi.h b/arch/arm/include/asm/dmi.h
-> new file mode 100644
-> index 000000000000..df2d2ff06f5b
-> --- /dev/null
-> +++ b/arch/arm/include/asm/dmi.h
-> @@ -0,0 +1,19 @@
-> +/*
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#ifndef __ASM_DMI_H
-> +#define __ASM_DMI_H
-> +
-> +#include <linux/io.h>
-> +#include <linux/slab.h>
-> +
-> +#define dmi_early_remap(x, l)          memremap(x, l, MEMREMAP_WB)
-> +#define dmi_early_unmap(x, l)          memunmap(x)
-> +#define dmi_remap(x, l)                        memremap(x, l, MEMREMAP_WB)
-> +#define dmi_unmap(x)                   memunmap(x)
-> +#define dmi_alloc(l)                   kzalloc(l, GFP_KERNEL)
-> +
-> +#endif
-> diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
-> index 5d17f377d905..82cd07592519 100644
-> --- a/arch/arm64/kernel/efi.c
-> +++ b/arch/arm64/kernel/efi.c
-> @@ -11,7 +11,6 @@
->   *
->   */
->
-> -#include <linux/dmi.h>
->  #include <linux/efi.h>
->  #include <linux/init.h>
->
-> @@ -117,20 +116,6 @@ int __init efi_set_mapping_permissions(struct mm_struct *mm,
->                                    set_permissions, md);
->  }
->
-> -static int __init arm64_dmi_init(void)
-> -{
-> -       /*
-> -        * On arm64, DMI depends on UEFI, and dmi_scan_machine() needs to
-> -        * be called early because dmi_id_init(), which is an arch_initcall
-> -        * itself, depends on dmi_scan_machine() having been called already.
-> -        */
-> -       dmi_scan_machine();
-> -       if (dmi_available)
-> -               dmi_set_dump_stack_arch_desc();
-> -       return 0;
-> -}
-> -core_initcall(arm64_dmi_init);
-> -
->  /*
->   * UpdateCapsule() depends on the system being shutdown via
->   * ResetSystem().
-> diff --git a/drivers/firmware/efi/arm-runtime.c b/drivers/firmware/efi/arm-runtime.c
-> index 349dc3e1e52e..7149d2f48bb1 100644
-> --- a/drivers/firmware/efi/arm-runtime.c
-> +++ b/drivers/firmware/efi/arm-runtime.c
-> @@ -165,3 +165,18 @@ void efi_virtmap_unload(void)
->         efi_set_pgd(current->active_mm);
->         preempt_enable();
->  }
-> +
-> +
-> +static int __init arm_dmi_init(void)
-> +{
-> +       /*
-> +        * On arm64/ARM, DMI depends on UEFI, and dmi_scan_machine() needs to
-> +        * be called early because dmi_id_init(), which is an arch_initcall
-> +        * itself, depends on dmi_scan_machine() having been called already.
-> +        */
-> +       dmi_scan_machine();
-> +       if (dmi_available)
-> +               dmi_set_dump_stack_arch_desc();
-> +       return 0;
-> +}
-> +core_initcall(arm_dmi_init);
-> --
-> 2.7.4
->
+-- >8 --
+diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
+index 36a9abf..e7b1940 100644
+--- a/drivers/acpi/arm64/iort.c
++++ b/drivers/acpi/arm64/iort.c
+@@ -543,6 +543,14 @@ static const struct iommu_ops *iort_iommu_xlate(struct device *dev,
+ 	const struct iommu_ops *ops = NULL;
+ 	int ret = -ENODEV;
+ 	struct fwnode_handle *iort_fwnode;
++	struct iommu_fwspec *fwspec = dev->iommu_fwspec;
++
++	/*
++	 * If we already translated the fwspec there
++	 * is nothing left to do, return the iommu_ops.
++	 */
++	if (fwspec && fwspec->ops)
++		return fwspec->ops;
+ 
+ 	if (node) {
+ 		iort_fwnode = iort_get_fwnode(node);
+diff --git a/drivers/acpi/scan.c b/drivers/acpi/scan.c
+index 823b005..2a513cc 100644
+--- a/drivers/acpi/scan.c
++++ b/drivers/acpi/scan.c
+@@ -1376,18 +1376,20 @@ enum dev_dma_attr acpi_get_dma_attr(struct acpi_device *adev)
+ int acpi_dma_configure(struct device *dev, enum dev_dma_attr attr)
+ {
+ 	const struct iommu_ops *iommu;
++	u64 size;
+ 
+ 	iort_set_dma_mask(dev);
+ 
+ 	iommu = iort_iommu_configure(dev);
+ 	if (IS_ERR(iommu))
+ 		return PTR_ERR(iommu);
++
++	size = max(dev->coherent_dma_mask, dev->coherent_dma_mask + 1);
+ 	/*
+ 	 * Assume dma valid range starts at 0 and covers the whole
+ 	 * coherent_dma_mask.
+ 	 */
+-	arch_setup_dma_ops(dev, 0, dev->coherent_dma_mask + 1, iommu,
+-			   attr == DEV_DMA_COHERENT);
++	arch_setup_dma_ops(dev, 0, size, iommu, attr == DEV_DMA_COHERENT);
+ 
+ 	return 0;
+ }
