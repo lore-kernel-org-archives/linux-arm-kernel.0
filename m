@@ -1,48 +1,34 @@
-From: Claudiu.Beznea@microchip.com (m18063)
-Date: Mon, 27 Mar 2017 17:05:58 +0300
-Subject: [PATCH v3 1/2] drivers: pwm: pwm-atmel: switch to atomic PWM
-In-Reply-To: <20170327131530.ifexyrgrp5egtbtr@piout.net>
-References: <1490189375-20384-1-git-send-email-claudiu.beznea@microchip.com>
- <1490189375-20384-2-git-send-email-claudiu.beznea@microchip.com>
- <20170327150237.69d8523f@bbrezillon>
- <20170327131530.ifexyrgrp5egtbtr@piout.net>
-Message-ID: <08b1036a-bb4d-5ae2-1a68-68ccdc0b3fef@microchip.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 27 Mar 2017 16:21:25 +0200
+Subject: [GIT PULL 1/4] bcm2835 arm DT updates for 4.12
+In-Reply-To: <1533334801.217079.1490439824805@email.1und1.de>
+References: <20170321193952.10270-1-eric@anholt.net>
+ <CAK8P3a2X0LYeidiPw4xN07WdU86Ah3_nJeropNSieJWxsHoEmA@mail.gmail.com>
+ <1533334801.217079.1490439824805@email.1und1.de>
+Message-ID: <CAK8P3a1wKL-LFH=EfG5a8u-Wn_nDCBBtaJ7Tb-ctHJekbR=7qg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 27.03.2017 16:15, Alexandre Belloni wrote:
-> On 27/03/2017 at 15:02:37 +0200, Boris Brezillon wrote:
->> Hi Claudiu,
+On Sat, Mar 25, 2017 at 12:03 PM, Stefan Wahren <stefan.wahren@i2se.com> wrote:
+>> Arnd Bergmann <arnd@arndb.de> hat am 24. M?rz 2017 um 23:25 geschrieben:
 >>
->> On Wed, 22 Mar 2017 15:29:34 +0200
->> Claudiu Beznea <claudiu.beznea@microchip.com> wrote:
->>
->>>  static const struct platform_device_id atmel_pwm_devtypes[] = {
->>>  	{
->>>  		.name = "at91sam9rl-pwm",
->>> -		.driver_data = (kernel_ulong_t)&atmel_pwm_data_v1,
->>> +		.driver_data = (kernel_ulong_t)&atmel_pwm_regs_v1,
->>>  	}, {
->>>  		.name = "sama5d3-pwm",
->>> -		.driver_data = (kernel_ulong_t)&atmel_pwm_data_v2,
->>> +		.driver_data = (kernel_ulong_t)&atmel_pwm_regs_v2,
->>>  	}, {
->>>  		/* sentinel */
->>>  	},
->> Unrelated to this series, but can you prepare a patch to get rid of
->> this platform id table (AT91 platforms have completely switched to DT
->> for quite some time now).
->>
-> Please, don't until AVR32 is gone.
-
-Sure, I will wait for it.
-
+>> Just a quick question: how do you plan to switch between the SD host
+>> drivers? If I understand this right, there are two working hardware blocks
+>> that can connect to the same slot. Do you have to configure this in
+>> device tree using  hardwired pinctrl settings, or can the user pick
+>> one of the drivers at runtime?
 >
->> You can also get rid of the "if (pdev->dev.of_node)" condition in
->> atmel_pwm_probe() since it's guaranteed to be true, otherwise the
->> ->probe() method wouldn't be called.
->>
->> Thanks,
->>
->> Boris
+> via device tree
+>
+> The relevant changes [1] hasn't been merged yet.
+>
+> [1] - http://marc.info/?l=linux-mmc&m=148896494931931&w=2
+
+Ok, I see. I can't come up with any better idea either, but it's unfortunate
+that we can't describe the hardware correctly in this case, with a DT that
+lets the OS choose the right driver, so we can't have a DTB file that
+work on old and new versions of Linux, or across operating systems
+when some of them only provide one of the two drivers and other OSs
+want to the use other one.
+
+       Arnd
