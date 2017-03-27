@@ -1,53 +1,52 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 27 Mar 2017 21:46:31 +0200
-Subject: [GIT PULL] Gemini updates for v4.12
-Message-ID: <CACRpkda=ai+4hs8GgwxUwyGZjnU1ZPQqARLNFR5t-qqLT4vcVg@mail.gmail.com>
+Date: Mon, 27 Mar 2017 21:51:45 +0200
+Subject: [GIT PULL] Gemini DTS updates for v4.12
+Message-ID: <CACRpkdYGaRwE557fLVx9nCDL1vDvsK18pRUOqHwf184kL=9Acg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC guys,
+Hi ARM SoC folks,
 
-these are some Gemini updates on top of the multiplatform
-and device tree conversion.
+here are some device tree updates for the Gemini on top of
+the initial device tree submission.
 
-This should go onto the branch named "gemeni/multiplatform"
-in the ARM SoC tree, slight misspelling but who cares as long
-as it ends up where it is supposed to be.
+These go into the branch "gemini/dts" in your tree.
 
-Please pull it in!
+Details in the signed tag.
+
+Please pull them in!
 
 Yours,
 Linus Walleij
 
-The following changes since commit 6dbb708a8fb8eef552d8de2b7574d92741b3bb31:
 
-  ARM: gemini: convert to ARMv4 multiplatform (2017-03-12 12:27:27 +0100)
+The following changes since commit 6ae4d211ab066ad3b808a2b7f0851837c44f495d:
+
+  ARM: dts: add watchdog to the Gemini (2017-03-12 12:18:29 +0100)
 
 are available in the git repository at:
 
   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-nomadik.git
-tags/gemini-multiplat-2
+tags/gemini-dts-2
 
-for you to fetch changes up to 16c86ef7fc3fff118a985705bf18fe7ec9e493e7:
+for you to fetch changes up to e3aeca1d74366a43d28e8c826ac48064f7287022:
 
-  ARM: gemini: don't select SERIAL_OF_PLATFORM (2017-03-24 22:12:42 +0100)
-
-----------------------------------------------------------------
-Gemini multiplatform updates:
-
-- Select the poweroff driver so the system can properly shut down.
-  This driver is merged in the power tree.
-- Select the right Faraday GPIO block (we renamed it).
-- Do not select SERIAL_OF_PLATFORM that just create Kconfig
-  warnings on us. We'll put that into the defconfig instead.
+  ARM: dts: add PCI to the Gemini device trees (2017-03-24 19:08:03 +0100)
 
 ----------------------------------------------------------------
-Arnd Bergmann (1):
-      ARM: gemini: don't select SERIAL_OF_PLATFORM
+DTS updates for the Gemini on top of the multiplatform base:
 
-Linus Walleij (2):
-      ARM: gemini: select gemini poweroff
-      ARM: gemini: select the right GPIO block
+- Add the power controller to the DTS.
+- Augment the GPIO nodes to also include the Faraday
+  compatible.
+- Add the PCI bus host and config to the Gemini device trees.
 
- arch/arm/mach-gemini/Kconfig | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+----------------------------------------------------------------
+Linus Walleij (3):
+      ARM: dts: add power controller to the Gemini DTS
+      ARM: dts: augment Gemini GPIO nodes
+      ARM: dts: add PCI to the Gemini device trees
+
+ arch/arm/boot/dts/gemini-sq201.dts | 22 ++++++++++++++++
+ arch/arm/boot/dts/gemini.dtsi      | 54 +++++++++++++++++++++++++++++++++++---
+ 2 files changed, 73 insertions(+), 3 deletions(-)
