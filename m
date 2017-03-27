@@ -1,95 +1,61 @@
 From: eric.auger@redhat.com (Eric Auger)
-Date: Mon, 27 Mar 2017 11:31:05 +0200
-Subject: [PATCH v4 15/22] KVM: arm64: ITS: Sort the device and ITE lists
+Date: Mon, 27 Mar 2017 11:31:01 +0200
+Subject: [PATCH v4 11/22] KVM: arm64: ITS: Interpret MAPD ITT_addr field
 In-Reply-To: <1490607072-21610-1-git-send-email-eric.auger@redhat.com>
 References: <1490607072-21610-1-git-send-email-eric.auger@redhat.com>
-Message-ID: <1490607072-21610-16-git-send-email-eric.auger@redhat.com>
+Message-ID: <1490607072-21610-12-git-send-email-eric.auger@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Natively sort the device and ITE lists in ascending
-deviceId/eventid order. This paves the way to optimized
-DTE and ITE scan in guest RAM table where entries are chained
-together using a next ID offset.
+Up to now the MAPD ITT_addr had been ignored. We will need it
+for save/restore. Let's record it in the its_device struct.
 
 Signed-off-by: Eric Auger <eric.auger@redhat.com>
-Reviewed-by: Andre Przywara <andre.przywara@arm.com>
 
 ---
 
 v3 -> v4:
-- added Andre's R-b
+- in vgic_its_cmd_handle_mapd, itt_addr directly is shifted
+- correct ittaddr bitmask to support 48bit GPA
 ---
- virt/kvm/arm/vgic/vgic-its.c | 36 ++++++++++++++++++++++++++++++++++--
- 1 file changed, 34 insertions(+), 2 deletions(-)
+ virt/kvm/arm/vgic/vgic-its.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
 diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index 2a1ccbf..7364b7d 100644
+index ddd2780..89a0db7 100644
 --- a/virt/kvm/arm/vgic/vgic-its.c
 +++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -726,6 +726,21 @@ static void vgic_its_free_collection(struct vgic_its *its, u32 coll_id)
- 	kfree(collection);
- }
+@@ -103,6 +103,7 @@ struct its_device {
+ 	/* the head for the list of ITTEs */
+ 	struct list_head itt_head;
+ 	u32 nb_eventid_bits;
++	gpa_t itt_addr;
+ 	u32 device_id;
+ };
  
-+static void ite_list_insert_sorted(struct list_head *h, struct its_ite *ite)
-+{
-+	struct list_head *pos = h->next;
-+	u32 id = ite->event_id;
-+
-+	while (pos != h) {
-+		struct its_ite *iter =
-+			list_entry(pos, struct its_ite, ite_list);
-+		if (id < iter->event_id)
-+			break;
-+		pos = pos->next;
-+	}
-+	list_add_tail(&ite->ite_list, pos);
-+}
-+
- /* Must be called with its_lock mutex held */
- static int vgic_its_alloc_ite(struct its_device *device,
- 			       struct its_ite **itep,
-@@ -742,7 +757,7 @@ static int vgic_its_alloc_ite(struct its_device *device,
- 	ite->collection = collection;
- 	ite->lpi = lpi_id;
+@@ -553,6 +554,7 @@ static u64 its_cmd_mask_field(u64 *its_cmd, int word, int shift, int size)
+ #define its_cmd_get_id(cmd)		its_cmd_mask_field(cmd, 1,  0, 32)
+ #define its_cmd_get_physical_id(cmd)	its_cmd_mask_field(cmd, 1, 32, 32)
+ #define its_cmd_get_collection(cmd)	its_cmd_mask_field(cmd, 2,  0, 16)
++#define its_cmd_get_ittaddr(cmd)	its_cmd_mask_field(cmd, 2,  8, 47)
+ #define its_cmd_get_target_addr(cmd)	its_cmd_mask_field(cmd, 2, 16, 32)
+ #define its_cmd_get_validbit(cmd)	its_cmd_mask_field(cmd, 2, 63,  1)
  
--	list_add_tail(&ite->ite_list, &device->itt_head);
-+	ite_list_insert_sorted(&device->itt_head, ite);
- 	*itep = ite;
- 	return 0;
- }
-@@ -835,6 +850,22 @@ static void vgic_its_unmap_device(struct kvm *kvm, struct its_device *device)
- 	kfree(device);
- }
+@@ -824,6 +826,7 @@ static int vgic_its_cmd_handle_mapd(struct kvm *kvm, struct vgic_its *its,
+ 	u32 device_id = its_cmd_get_deviceid(its_cmd);
+ 	bool valid = its_cmd_get_validbit(its_cmd);
+ 	u8 nb_eventid_bits = its_cmd_get_size(its_cmd) + 1;
++	gpa_t itt_addr = its_cmd_get_ittaddr(its_cmd) << 8;
+ 	struct its_device *device;
  
-+static void device_list_insert_sorted(struct list_head *h,
-+				      struct its_device *dev)
-+{
-+	struct list_head *pos = h->next;
-+	u32 id = dev->device_id;
-+
-+	while (pos != h) {
-+		struct its_device *iter =
-+			list_entry(pos, struct its_device, dev_list);
-+		if (id < iter->device_id)
-+			break;
-+		pos = pos->next;
-+	}
-+	list_add_tail(&dev->dev_list, pos);
-+}
-+
- /* Must be called with its_lock mutex held */
- static int vgic_its_alloc_device(struct vgic_its *its,
- 				 struct its_device **devp,
-@@ -852,7 +883,8 @@ static int vgic_its_alloc_device(struct vgic_its *its,
+ 	if (!vgic_its_check_id(its, its->baser_device_table, device_id))
+@@ -855,6 +858,7 @@ static int vgic_its_cmd_handle_mapd(struct kvm *kvm, struct vgic_its *its,
+ 
+ 	device->device_id = device_id;
  	device->nb_eventid_bits = nb_eventid_bits;
++	device->itt_addr = itt_addr;
+ 
  	INIT_LIST_HEAD(&device->itt_head);
  
--	list_add_tail(&device->dev_list, &its->device_list);
-+	device_list_insert_sorted(&its->device_list, device);
-+
- 	*devp = device;
- 
- 	return 0;
 -- 
 2.5.5
