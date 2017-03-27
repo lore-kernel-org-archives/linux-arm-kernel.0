@@ -1,60 +1,60 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 27 Mar 2017 09:43:09 -0700
-Subject: [PATCHv3] ARM: omap2+: Revert omap-smp.c changes resetting CPU1
- during boot
-In-Reply-To: <aa5d7ee3-2e54-2c6c-df5d-b5efff4b365e@ti.com>
-References: <20170314180555.23597-1-tony@atomide.com>
- <aa5d7ee3-2e54-2c6c-df5d-b5efff4b365e@ti.com>
-Message-ID: <20170327164308.GK10760@atomide.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Mon, 27 Mar 2017 09:59:48 -0700
+Subject: [RFC PATCH] clk: meson: gxbb: remove the "cpu_clk"
+In-Reply-To: <1490550707.29739.21.camel@baylibre.com> (Jerome Brunet's message
+ of "Sun, 26 Mar 2017 19:51:47 +0200")
+References: <20170326110602.23379-1-martin.blumenstingl@googlemail.com>
+ <1490550707.29739.21.camel@baylibre.com>
+Message-ID: <m2mvc6d5a3.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Andrew F. Davis <afd@ti.com> [170327 09:36]:
-> On 03/14/2017 01:05 PM, Tony Lindgren wrote:
-> > Commit 3251885285e1 ("ARM: OMAP4+: Reset CPU1 properly for kexec") started
-> > unconditionally resetting CPU1 because of a kexec boot issue I was seeing
-> > earlier on omap4 when doing kexec boot between two different kernel
-> > versions.
-> > 
-> > This caused issues on some systems. We should only reset CPU1 as a last
-> > resort option, and try to avoid it where possible. Doing an unconditional
-> > CPU1 reset causes issues for example when booting a bootloader configured
-> > secure OS running on CPU1 as reported by Andrew F. Davis <afd@ti.com>.
-> > 
-> > We can't completely remove the reset of CPU1 as it would break kexec
-> > booting from older kernels. But we can limit the CPU1 reset to cases
-> > where CPU1 is wrongly parked within the memory area used by the booting
-> > kernel. Then later on we can add support for parking CPU1 for kexec out
-> > of the SDRAM back to bootrom.
-> > 
-> > So let's first fix the regression reported by Andrew by making CPU1 reset
-> > conditional. To do this, we need to:
-> > 
-> > 1. Save configured AUX_CORE_BOOT_1 for later
-> > 
-> > 2. Modify AUX_CORE_BOOT_0 reading code to for HS SoCs to return
-> >    the whole register instead of the CPU mask
-> > 
-> > 3. Check if CPU1 is wrongly parked into the booting kernel by the
-> >    previous kernel and reset if needed
-> > 
-> 
-> I still don't like this style of workaround, if kexec cannot regain
-> control of core1 without a hard core reset than kexec should BUG() and
-> force the user to reboot to a sane state.
+Jerome Brunet <jbrunet@baylibre.com> writes:
 
-Yes problems still remains. I think the immediate fix there is to
-disable kexec during runtime based on some criteria for your use
-case rather than BUG() though. Somehow kexec needs to know if CPU1
-reset is acceptable, then reset CPU1 before kexec.
+> On Sun, 2017-03-26 at 13:06 +0200, Martin Blumenstingl wrote:
+>> It seems that the "cpu_clk" was carried over from the meson8b clock
+>> controller driver. On Meson GX (GXBB/GXL/GXM) the registers which are
+>> used by the cpu_clk have a different purpose (in other words: they don't
+>> control the CPU clock anymore). HHI_SYS_CPU_CLK_CNTL1 bits 31:24 are
+>> reserved according to the public S905 datasheet, while bit 23 is the
+>> "A53_trace_clk_DIS" gate (which according to the datasheet should only
+>> be used in case a silicon bug is discovered) and bits 22:20 are a
+>> divider (A53_trace_clk). The meson clk-cpu code however expects that
+>> bits 28:20 are reserved for a divider (according to the public S805
+>> datasheet this "SCALE_DIV: This value represents an N+1 divider of the
+>> input clock.").
+>> 
+>> The CPU clock on Meson GX SoCs is provided by the SCPI DVFS clock
+>> driver instead. Two examples from a Meson GXL S905X SoC:
+>> - vcpu (SCPI DVFS clock 0) rate: 1000000000 / cpu_clk rate: 708000000
+>> - vcpu (SCPI DVFS clock 0) rate: 1512000000 / cpu_clk rate: 708000000
+>> 
+>
+> Thanks for catching this Martin! Looking at the difference between the S805 and
+> S905 register description, it makes no sense that we used the same clock driver
+> for what's behind HHI_SYS_CPU_CLK_CNTL1. I agree, it should be removed from the
+> gxbb clock controller.
+>
+>> Unfortunately the CLKID_CPUCLK was already exported (but is currently
+>> not used) to DT.
+>> 
+>> This is an RFC because I would like to hear other people's opinion on
+>> how to clean up the CLKID_CPUCLK (as it leaves a "hole" in
+>> gxbb_hw_onecell_data and changes the DT API (by removing a currently
+>> unused #define).
+>> 
+>
+> In general the DT ABI should be stable but since no one is using this ID, and
+> what it refers to is clearly wrong, I don't think we would disrupt anything by
+> removing it.
+>
+> For the "hole" in the ids, Neil and I had similar problem while working other
+> topics. We managed to dodge it but I think it was only a matter of time ...
+>
+> In the end, it is not a big deal if there is holes in the onecell_data, as long
+> as we take care to avoid it when we register the clocks:
 
-> Anyway, this patch does remove the unconditional reset and fixes my
-> use-case is some situations (when not using kexec) so:
-> 
-> Tested-by: Andrew F. Davis <afd@ti.com>
+Agreed.  It's better to have holes in the clkid space than to introduce
+DT incompatibility.
 
-OK thanks for testing.
-
-Regards,
-
-Tony
+Kevin
