@@ -1,113 +1,223 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 27 Mar 2017 13:18:06 +0100
-Subject: Query: ARM64: A random failure with hugetlbfs linked mmap() of a
- stack area
-In-Reply-To: <4796e7df-808c-b07b-209d-ea02ecf74888@redhat.com>
-References: <4e776e1f-dd11-2fa2-5109-6c2b5184b70d@redhat.com>
- <20170324161558.GA10491@leverpostej>
- <d6ee1a17-4518-5a37-f8b7-b62030c24cc7@redhat.com>
- <20170324172533.GA10746@leverpostej>
- <2b8bf63f-3e20-aa26-2d75-83aa2ab35cde@redhat.com>
- <20170324181652.GC10746@leverpostej>
- <4796e7df-808c-b07b-209d-ea02ecf74888@redhat.com>
-Message-ID: <20170327121806.GA12578@leverpostej>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Mon, 27 Mar 2017 13:18:39 +0100
+Subject: [RFC PATCH 01/30] iommu/arm-smmu-v3: Link groups and devices
+In-Reply-To: <20170227195441.5170-2-jean-philippe.brucker@arm.com>
+References: <20170227195441.5170-1-jean-philippe.brucker@arm.com>
+ <20170227195441.5170-2-jean-philippe.brucker@arm.com>
+Message-ID: <9ce9e3c5-3f94-8b06-2bd7-a665f0f33304@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 25, 2017 at 05:44:58PM +0530, Pratyush Anand wrote:
-> On Friday 24 March 2017 11:46 PM, Mark Rutland wrote:
-> >>>For your report, it's not clear to me what's going on. Did you take the
-> >>>/proc/pid/maps data from teh exact same process that the segfault
-> >>>occurred in? and/or did you disable ASLR?
-> >>Yes, it is from the same process.
-> >That is troubling; I cannot explain that.
+Hi Jean-Philippe,
+
+On 27/02/17 19:54, Jean-Philippe Brucker wrote:
+> Reintroduce smmu_group. This structure was removed during the generic DT
+> bindings rework, but will be needed when implementing PCIe ATS, to lookup
+> devices attached to a given domain.
 > 
-> Can you pl try in an infinite loop for some time and see if
-> "SIGSEGV" is received in any of the run at your end.
+> When unmapping from a domain, we need to send an invalidation to all
+> devices that could have stored the mapping in their ATC. It would be nice
+> to use IOMMU API's iommu_group_for_each_dev, but that list is protected by
+> group->mutex, which we can't use because atc_invalidate won't be allowed
+> to sleep. So add a list of devices, protected by a spinlock.
 
-After several thousand runs, I see a few unhandled translations faults
-(all for address 0) in dmesg. 
+Much as I dislike that particular duplication, with patch #4 in mind I
+think there's a more fundamental problem - since the primary reason for
+multi-device groups is lack of ACS, is there any guarantee that ATS
+support/enablement will be actually be homogeneous across any old set of
+devices in that situation, and thus valid to evaluate at the iommu_group
+level?
 
-I suspect that in this case, the hugepage has clobbered some
-datastructure used shortly after the return from the syscall, and we end
-up dereferencing a pointer that's been replaced with zeroes.
+That said, looking at how things end up at the top commit, I think this
+is fairly easily sidestepped. We have this pattern a few times:
 
-> >>Since, I was not able to reproduce with gdb so, I had inserted a
-> >>scanf() just before mmap() and then had read /proc/pid/maps.
-> >That might be because GDB disables ASLR by default. Did you re-enable
-> >ASLR within GDB with:
-> >
-> >	set disable-randomization off
-> >
-> >If not, could you give that a go?
+	spin_lock_irqsave(&smmu_domain->groups_lock)
+	list_for_each_entry(&smmu_domain->groups)
+		spin_lock(&smmu_group->devices_lock)
+		list_for_each_entry(&smmu_group->devices)
+			do a thing for each device in the domain...
+
+which strongly suggests that we'd be better off just linking the devices
+to the domain directly - which would also let us scope ats_enabled to
+the per-device level which seems safer than per-group as above. And if
+only devices with ATS enabled are added to a domain's list in the first
+place, then ATC invalidate gets even simpler too.
+
+The only other uses I can see are of smmu_group->domain, which always
+looks to be directly equivalent to to_smmu_domain(iommu_group->domain).
+Overall it really looks like the smmu_group abstraction winds up making
+the end result more complex than it needs to be.
+
+Robin.
+
+> Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
+> ---
+>  drivers/iommu/arm-smmu-v3.c | 74 +++++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 74 insertions(+)
 > 
-> Yes, with ASLR enabled, it reproduced in GDB as well. I do not see
-> SIGILL, it is SIGSEGV there too.
-
-So far, I have not managed to trigger a single SIGSEGV while running
-under GDB.
-
-However, I have a theory that could explain that. I suspect that my
-toolchain has built the binary with an executable stack, while yours has
-not. Linux automatically sets READ_IMPLIES_EXEC for binaries with
-executable stacks, which IIUC would implicitly make the mmap RWX rather
-than RW.
-
-So in my case, the huge page is executable, and I get a SIGILL when
-trying to execute from it. In your case, the huge page is not
-executable, so you get a SIGSEGV.
-
-Looking at your report below:
-
-> Mapped address spaces:
+> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+> index 5806a6acc94e..ce8b68fe254b 100644
+> --- a/drivers/iommu/arm-smmu-v3.c
+> +++ b/drivers/iommu/arm-smmu-v3.c
+> @@ -625,6 +625,9 @@ struct arm_smmu_device {
+>  struct arm_smmu_master_data {
+>  	struct arm_smmu_device		*smmu;
+>  	struct arm_smmu_strtab_ent	ste;
+> +
+> +	struct device			*dev;
+> +	struct list_head		group_head;
+>  };
+>  
+>  /* SMMU private data for an IOMMU domain */
+> @@ -650,6 +653,11 @@ struct arm_smmu_domain {
+>  	struct iommu_domain		domain;
+>  };
+>  
+> +struct arm_smmu_group {
+> +	struct list_head		devices;
+> +	spinlock_t			devices_lock;
+> +};
+> +
+>  struct arm_smmu_option_prop {
+>  	u32 opt;
+>  	const char *prop;
+> @@ -665,6 +673,8 @@ static struct arm_smmu_domain *to_smmu_domain(struct iommu_domain *dom)
+>  	return container_of(dom, struct arm_smmu_domain, domain);
+>  }
+>  
+> +#define to_smmu_group iommu_group_get_iommudata
+> +
+>  static void parse_driver_options(struct arm_smmu_device *smmu)
+>  {
+>  	int i = 0;
+> @@ -1595,6 +1605,30 @@ static int arm_smmu_install_ste_for_dev(struct iommu_fwspec *fwspec)
+>  	return 0;
+>  }
+>  
+> +static void arm_smmu_group_release(void *smmu_group)
+> +{
+> +	kfree(smmu_group);
+> +}
+> +
+> +static struct arm_smmu_group *arm_smmu_group_alloc(struct iommu_group *group)
+> +{
+> +	struct arm_smmu_group *smmu_group = to_smmu_group(group);
+> +
+> +	if (smmu_group)
+> +		return smmu_group;
+> +
+> +	smmu_group = kzalloc(sizeof(*smmu_group), GFP_KERNEL);
+> +	if (!smmu_group)
+> +		return NULL;
+> +
+> +	INIT_LIST_HEAD(&smmu_group->devices);
+> +	spin_lock_init(&smmu_group->devices_lock);
+> +
+> +	iommu_group_set_iommudata(group, smmu_group, arm_smmu_group_release);
+> +
+> +	return smmu_group;
+> +}
+> +
+>  static void arm_smmu_detach_dev(struct device *dev)
+>  {
+>  	struct arm_smmu_master_data *master = dev->iommu_fwspec->iommu_priv;
+> @@ -1607,7 +1641,9 @@ static void arm_smmu_detach_dev(struct device *dev)
+>  static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
+>  {
+>  	int ret = 0;
+> +	struct iommu_group *group;
+>  	struct arm_smmu_device *smmu;
+> +	struct arm_smmu_group *smmu_group;
+>  	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
+>  	struct arm_smmu_master_data *master;
+>  	struct arm_smmu_strtab_ent *ste;
+> @@ -1619,6 +1655,17 @@ static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
+>  	smmu = master->smmu;
+>  	ste = &master->ste;
+>  
+> +	/*
+> +	 * When adding devices, this is the first occasion we have to create the
+> +	 * smmu_group and attach it to iommu_group.
+> +	 */
+> +	group = iommu_group_get(dev);
+> +	smmu_group = arm_smmu_group_alloc(group);
+> +	if (!smmu_group) {
+> +		iommu_group_put(group);
+> +		return -ENOMEM;
+> +	}
+> +
+>  	/* Already attached to a different domain? */
+>  	if (!ste->bypass)
+>  		arm_smmu_detach_dev(dev);
+> @@ -1659,6 +1706,9 @@ static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
+>  
+>  out_unlock:
+>  	mutex_unlock(&smmu_domain->init_mutex);
+> +
+> +	iommu_group_put(group);
+> +
+>  	return ret;
+>  }
+>  
+> @@ -1745,7 +1795,9 @@ static struct iommu_ops arm_smmu_ops;
+>  static int arm_smmu_add_device(struct device *dev)
+>  {
+>  	int i, ret;
+> +	unsigned long flags;
+>  	struct arm_smmu_device *smmu;
+> +	struct arm_smmu_group *smmu_group;
+>  	struct arm_smmu_master_data *master;
+>  	struct iommu_fwspec *fwspec = dev->iommu_fwspec;
+>  	struct iommu_group *group;
+> @@ -1769,6 +1821,7 @@ static int arm_smmu_add_device(struct device *dev)
+>  			return -ENOMEM;
+>  
+>  		master->smmu = smmu;
+> +		master->dev = dev;
+>  		fwspec->iommu_priv = master;
+>  	}
+>  
+> @@ -1789,6 +1842,12 @@ static int arm_smmu_add_device(struct device *dev)
+>  
+>  	group = iommu_group_get_for_dev(dev);
+>  	if (!IS_ERR(group)) {
+> +		smmu_group = to_smmu_group(group);
+> +
+> +		spin_lock_irqsave(&smmu_group->devices_lock, flags);
+> +		list_add(&master->group_head, &smmu_group->devices);
+> +		spin_unlock_irqrestore(&smmu_group->devices_lock, flags);
+> +
+>  		iommu_group_put(group);
+>  		iommu_device_link(&smmu->iommu, dev);
+>  	}
+> @@ -1800,7 +1859,10 @@ static void arm_smmu_remove_device(struct device *dev)
+>  {
+>  	struct iommu_fwspec *fwspec = dev->iommu_fwspec;
+>  	struct arm_smmu_master_data *master;
+> +	struct arm_smmu_group *smmu_group;
+>  	struct arm_smmu_device *smmu;
+> +	struct iommu_group *group;
+> +	unsigned long flags;
+>  
+>  	if (!fwspec || fwspec->ops != &arm_smmu_ops)
+>  		return;
+> @@ -1809,6 +1871,18 @@ static void arm_smmu_remove_device(struct device *dev)
+>  	smmu = master->smmu;
+>  	if (master && master->ste.valid)
+>  		arm_smmu_detach_dev(dev);
+> +
+> +	if (master) {
+> +		group = iommu_group_get(dev);
+> +		smmu_group = to_smmu_group(group);
+> +
+> +		spin_lock_irqsave(&smmu_group->devices_lock, flags);
+> +		list_del(&master->group_head);
+> +		spin_unlock_irqrestore(&smmu_group->devices_lock, flags);
+> +
+> +		iommu_group_put(group);
+> +	}
+> +
+>  	iommu_group_remove_device(dev);
+>  	iommu_device_unlink(&smmu->iommu, dev);
+>  	kfree(master);
 > 
->           Start Addr           End Addr       Size     Offset objfile
->             0x400000           0x410000    0x10000        0x0
-> /home/panand/work/hugetlb/hugetlb_test_stack
->             0x410000           0x420000    0x10000        0x0
-> /home/panand/work/hugetlb/hugetlb_test_stack
->             0x420000           0x430000    0x10000    0x10000
-> /home/panand/work/hugetlb/hugetlb_test_stack
-
-All the entries from here ...
-
->       0xffffada70000     0xffffadbd0000   0x160000        0x0
-> /usr/lib64/libc-2.17.so
->       0xffffadbd0000     0xffffadbe0000    0x10000   0x150000
-> /usr/lib64/libc-2.17.so
->       0xffffadbe0000     0xffffadbf0000    0x10000   0x160000
-> /usr/lib64/libc-2.17.so
->       0xffffadc10000     0xffffadc20000    0x10000        0x0 [vvar]
->       0xffffadc20000     0xffffadc30000    0x10000        0x0 [vdso]
->       0xffffadc30000     0xffffadc50000    0x20000        0x0
-> /usr/lib64/ld-2.17.so
->       0xffffadc50000     0xffffadc60000    0x10000    0x10000
-> /usr/lib64/ld-2.17.so
->       0xffffadc60000     0xffffadc70000    0x10000    0x20000
-
-... to here ...
-
-> /usr/lib64/ld-2.17.so
->       0xffffcb1d0000     0xffffcb200000    0x30000        0x0 [stack]
-> (gdb) c
-> Continuing.
-> hpage_size is 20000000
-> file path is /mnt/hugetlbfs/test
-> stack_address is 0xffffcb1facc0
-> Address to be mapped is 0xffffa0000000
-
-... are clobbered by this map, which will cover the range:
-	
-	0xffffa0000000-0xFFFFC0000000
-
-> Program received signal SIGSEGV, Segmentation fault.
-> 0x0000ffffadb45a44 in __mmap (addr=<optimized out>, len=536870912,
-> prot=3, flags=17, fd=7, offset=0)
-
-That address falls within libc-2.17.so, which is clobbered by the mmap.
-
-Do you happen to know how to parse that 'prot=3' in the SEGV report? I'm
-guessing that means RW, !X.
-
-Thanks,
-Mark.
