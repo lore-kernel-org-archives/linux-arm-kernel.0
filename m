@@ -1,71 +1,41 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 27 Mar 2017 15:17:25 +0200
-Subject: [PATCH v3 4/4] mvebu: wrt1900ac: Use pwm-fan rather than gpio-fan
-In-Reply-To: <20170326230558.6b6c4ec6@gmail.com>
-References: <20170324141815.7252-1-ralph.sennhauser@gmail.com>
- <20170324141815.7252-5-ralph.sennhauser@gmail.com>
- <20170324143505.GK28518@lunn.ch>
- <20170326230558.6b6c4ec6@gmail.com>
-Message-ID: <20170327131725.GA25549@lunn.ch>
+From: juri.lelli@arm.com (Juri Lelli)
+Date: Mon, 27 Mar 2017 14:18:17 +0100
+Subject: [PATCH v3 1/9] Documentation: arm: fix wrong reference number in DT
+ definition
+In-Reply-To: <20170327131825.32134-1-juri.lelli@arm.com>
+References: <20170327131825.32134-1-juri.lelli@arm.com>
+Message-ID: <20170327131825.32134-2-juri.lelli@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 26, 2017 at 11:05:58PM +0200, Ralph Sennhauser wrote:
-> On Fri, 24 Mar 2017 15:35:05 +0100
-> Andrew Lunn <andrew@lunn.ch> wrote:
-> 
-> > > +	pwm_fan {
-> > >  		/* SUNON HA4010V4-0000-C99 */
-> > > -		compatible = "gpio-fan";
-> > > -		gpios = <&gpio0 24 0>;
-> > >  
-> > > -		gpio-fan,speed-map = <0    0
-> > > -				      4500 1>;
-> > > +		compatible = "pwm-fan";
-> > > +		pwms = <&gpio0 24 4000 0>;  
-> > 
-> > Hi Ralph
-> > 
-> > I believe this last 0 is the flags parameter. Now that we have
-> > #pwm-cells = 1, i think this last 0 should be dropped.
-> > 
-> > 	  Andrew
-> 
-> Hi Andrew,
-> 
-> isn't the 4000 (period?) pwm-cell #2 and 0 (flags?) pwm-cell #3? I
-> actually expect "pwms = <&gpio0 24>;" here or "#pwm-cells = <2>;"
+Reference to cpu capacity binding has a wrong number. Fix it.
 
-Hi Ralph
+Reported-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Signed-off-by: Juri Lelli <juri.lelli@arm.com>
+Acked-by: Rob Herring <robh@kernel.org>
+---
+ Documentation/devicetree/bindings/arm/cpus.txt | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
->From Documentation/devicetree/bindings/pwm/pwm.txt:
-
-        pwm-list ::= <single-pwm> [pwm-list]
-        single-pwm ::= <pwm-phandle> <pwm-specifier>
-        pwm-phandle : phandle to PWM controller node
-        pwm-specifier : array of #pwm-cells specifying the given PWM
-                        (controller specific)
-
-Our pwm-list has a single single-pwm.
-phandle is &gpio0.
-The remaining parts are the specifier, or which there should be #pwm-calls.
-
->From Documentation/devicetree/bindings/pwm/pwm.txt again:
-
-pwm-specifier typically encodes the chip-relative PWM number and the PWM
-period in nanoseconds.
-
-Optionally, the pwm-specifier can encode a number of flags (defined in
-<dt-bindings/pwm/pwm.h>) in a third cell:
-- PWM_POLARITY_INVERTED: invert the PWM signal polarity
-
-So we are using the 24th PWM and 4000 nanosecod period. We don't want
-any flags.
-
-So
-
-pwms = <&gpio0 24 4000>;  
-
-has a phandle, and then 2 cells.
-
-    Andrew
+diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
+index 698ad1f097fa..83ec3fa0a05e 100644
+--- a/Documentation/devicetree/bindings/arm/cpus.txt
++++ b/Documentation/devicetree/bindings/arm/cpus.txt
+@@ -248,7 +248,7 @@ nodes to be present and contain the properties described below.
+ 		Usage: Optional
+ 		Value type: <u32>
+ 		Definition:
+-			# u32 value representing CPU capacity [3] in
++			# u32 value representing CPU capacity [4] in
+ 			  DMIPS/MHz, relative to highest capacity-dmips-mhz
+ 			  in the system.
+ 
+@@ -475,5 +475,5 @@ cpus {
+ [2] arm/msm/qcom,kpss-acc.txt
+ [3] ARM Linux kernel documentation - idle states bindings
+     Documentation/devicetree/bindings/arm/idle-states.txt
+-[3] ARM Linux kernel documentation - cpu capacity bindings
++[4] ARM Linux kernel documentation - cpu capacity bindings
+     Documentation/devicetree/bindings/arm/cpu-capacity.txt
+-- 
+2.10.0
