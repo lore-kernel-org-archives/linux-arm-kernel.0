@@ -1,71 +1,75 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Mon, 27 Mar 2017 23:04:59 +0800
-Subject: [PATCH v4 13/22] KVM: arm64: ITS:
- KVM_DEV_ARM_VGIC_GRP_ITS_TABLES group
-In-Reply-To: <1490607072-21610-14-git-send-email-eric.auger@redhat.com>
-Message-ID: <201703272354.OaYhCMvV%fengguang.wu@intel.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 27 Mar 2017 16:14:32 +0100
+Subject: [PATCH 0/7] memory: atmel-ebi: Add PM ops
+In-Reply-To: <e27d2dd0-ce23-d63d-04dc-7be745770a00@atmel.com>
+References: <1489653034-17777-1-git-send-email-boris.brezillon@free-electrons.com>
+ <e27d2dd0-ce23-d63d-04dc-7be745770a00@atmel.com>
+Message-ID: <20170327151432.ybb3pfuxivdhb7ji@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
+On Mon, 27 Mar 2017, Nicolas Ferre wrote:
 
-[auto build test ERROR on kvmarm/next]
-[also build test ERROR on v4.11-rc4 next-20170327]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+> Le 16/03/2017 ? 09:30, Boris Brezillon a ?crit :
+> > Hello,
+> > 
+> > This patchset adds a ->resume() hook to the EBI driver, but a few more
+> > changes were required in order to easily implement this PM hook.
+> > 
+> > Patches 1 to 5 are just cleanup patches to simplify the EBI driver.
+> > Patch 6 is fixing a bug in the EBI driver. Note that this bug has no
+> > consequences until we start implementing the ->resume() hook.
+> > And finally, patch 7 is implementing ->resume() so that the SMC config
+> > is correctly restored when resuming the system.
+> > 
+> > This patchset depends on [1] which is removing the unused pata_at91
+> > driver, which in turn prevents us from patching it before dropping
+> > the old SMC macro definitions in patch 4.
+> > 
+> > Regards,
+> > 
+> > Boris
+> > 
+> > [1]http://lkml.iu.edu/hypermail/linux/kernel/1702.2/00990.html
+> 
+> For the whole v2 series:
+> Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+> 
+> Lee, you can take this series through your MFD tree as suggested by Boris.
 
-url:    https://github.com/0day-ci/linux/commits/Eric-Auger/vITS-save-restore/20170327-195443
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git next
-config: arm64-defconfig (attached as .config)
-compiler: aarch64-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm64 
+There doesn't appear to be a Maintainer for the memory subsystem.
 
-All errors (new ones prefixed by >>):
+Who is the Maintainer for drivers/memory/atmel-ebi.c?
 
-   arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-its.c: In function 'vgic_its_has_attr':
->> arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-its.c:1766:33: error: 'its' undeclared (first use in this function)
-      return vgic_its_table_restore(its);
-                                    ^~~
-   arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-its.c:1766:33: note: each undeclared identifier is reported only once for each function it appears in
+If it's you, would you care to add an entry to MAINTAINERS?
 
-vim +/its +1766 arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-its.c
+> > Changes since v1:
+> > - move helper functions in a C file
+> > - check if tdf is at least ATMEL_SMC_MODE_TDF_MIN
+> > 
+> > Boris Brezillon (7):
+> >   mfd: syscon: atmel-smc: Add new helpers to ease SMC regs manipulation
+> >   memory: atmel-ebi: Simplify SMC config code
+> >   memory: atmel-ebi: Stop using reg_field objects for simple things
+> >   mfd: syscon: atmel-smc: Remove unused helpers/macros
+> >   memory: atmel-ebi: Change naming scheme
+> >   memory: atmel-ebi: Add missing ->numcs assignment
+> >   memory: atmel-ebi: Add PM ops
+> > 
+> >  drivers/memory/Kconfig               |   1 +
+> >  drivers/memory/atmel-ebi.c           | 584 ++++++++++++-----------------------
+> >  drivers/mfd/Kconfig                  |   4 +
+> >  drivers/mfd/Makefile                 |   1 +
+> >  drivers/mfd/atmel-smc.c              | 314 +++++++++++++++++++
+> >  include/linux/mfd/syscon/atmel-smc.h | 237 ++++++--------
+> >  6 files changed, 606 insertions(+), 535 deletions(-)
+> >  create mode 100644 drivers/mfd/atmel-smc.c
+> > 
+> 
+> 
 
-  1750			case KVM_DEV_ARM_VGIC_CTRL_INIT:
-  1751				return 0;
-  1752			}
-  1753			break;
-  1754		case KVM_DEV_ARM_VGIC_GRP_ITS_REGS: {
-  1755			u64 __user *uaddr = (u64 __user *)(long)attr->addr;
-  1756			u64 reg;
-  1757	
-  1758			if (get_user(reg, uaddr))
-  1759				return -EFAULT;
-  1760	
-  1761			return vgic_its_attr_regs_access(dev, attr, &reg, true);
-  1762		}
-  1763		case KVM_DEV_ARM_VGIC_GRP_ITS_TABLES:
-  1764			if (attr->attr)
-  1765				return -EINVAL;
-> 1766			return vgic_its_table_restore(its);
-  1767		}
-  1768		return -ENXIO;
-  1769	}
-  1770	
-  1771	static int vgic_its_set_attr(struct kvm_device *dev,
-  1772				     struct kvm_device_attr *attr)
-  1773	{
-  1774		struct vgic_its *its = dev->private;
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 33916 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170327/bc1b0096/attachment-0001.gz>
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
