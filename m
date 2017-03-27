@@ -1,25 +1,23 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon, 27 Mar 2017 10:21:36 -0400
-Subject: [PATCH V3] ACPI / IPMI: allow ACPI_IPMI with IPMI_SSIF
-In-Reply-To: <1b71a9cf-f7c7-7bc4-2934-a357b0b5016b@acm.org>
-References: <1490450575-29450-1-git-send-email-okaya@codeaurora.org>
- <1b71a9cf-f7c7-7bc4-2934-a357b0b5016b@acm.org>
-Message-ID: <6b3eb826-acca-d3b5-5520-18d9ffd03e9c@codeaurora.org>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 27 Mar 2017 09:34:35 -0500
+Subject: [RFC PATCH 3/3] of: fix node traversing in of_dma_get_range
+In-Reply-To: <1490419893-5073-3-git-send-email-oza.oza@broadcom.com>
+References: <1490419893-5073-1-git-send-email-oza.oza@broadcom.com>
+ <1490419893-5073-3-git-send-email-oza.oza@broadcom.com>
+Message-ID: <CAL_Jsq+1f2pHEy7=2Q7xGYYJjuQk3rLHH4pPTKRVN4QTtSr4Kw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rafael,
+On Sat, Mar 25, 2017 at 12:31 AM, Oza Pawandeep <oza.oza@broadcom.com> wrote:
+> it jumps to the parent node without examining the child node.
+> also with that, it throws "no dma-ranges found for node"
+> for pci dma-ranges.
+>
+> this patch fixes device node traversing for dma-ranges.
 
-On 3/25/2017 9:25 PM, Corey Minyard wrote:
-> If the ACPI people ack this, I can queue it, or they can take it with:
-> 
-> Acked-by: Corey Minyard <cminyard@mvista.com>
+What's the DT look like that doesn't work?
 
-What's your preference?
+dma-ranges is supposed to be a bus property, not a device's property.
+So looking at the parent is correct behavior generally.
 
-Sinan
-
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Rob
