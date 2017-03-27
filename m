@@ -1,58 +1,48 @@
-From: eric.auger@redhat.com (Eric Auger)
-Date: Mon, 27 Mar 2017 11:31:06 +0200
-Subject: [PATCH v4 16/22] KVM: expose next_segment()
-In-Reply-To: <1490607072-21610-1-git-send-email-eric.auger@redhat.com>
-References: <1490607072-21610-1-git-send-email-eric.auger@redhat.com>
-Message-ID: <1490607072-21610-17-git-send-email-eric.auger@redhat.com>
+From: cl@rock-chips.com (cl at rock-chips.com)
+Date: Mon, 27 Mar 2017 17:40:45 +0800
+Subject: [PATCH v4 0/6] initialize dtsi file and dts file for RK3328 SoCs
+Message-ID: <1490607650-18650-1-git-send-email-cl@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Expose next_segment() as we would like to reuse this routine in
-ARM vgic-its code.
+From: Liang Chen <cl@rock-chips.com>
 
-Signed-off-by: Eric Auger <eric.auger@redhat.com>
----
- include/linux/kvm_host.h | 8 ++++++++
- virt/kvm/kvm_main.c      | 8 --------
- 2 files changed, 8 insertions(+), 8 deletions(-)
+Changes in v4:
+    Remove some assigned-clocks as they should be inited in their
+    respective device nodes.
 
-diff --git a/include/linux/kvm_host.h b/include/linux/kvm_host.h
-index 2c14ad9..b4b5d82 100644
---- a/include/linux/kvm_host.h
-+++ b/include/linux/kvm_host.h
-@@ -92,6 +92,14 @@ static inline bool is_noslot_pfn(kvm_pfn_t pfn)
- 	return pfn == KVM_PFN_NOSLOT;
- }
- 
-+static inline int next_segment(unsigned long len, int offset)
-+{
-+	if (len > PAGE_SIZE - offset)
-+		return PAGE_SIZE - offset;
-+	else
-+		return len;
-+}
-+
- /*
-  * architectures with KVM_HVA_ERR_BAD other than PAGE_OFFSET (e.g. s390)
-  * provide own defines and kvm_is_error_hva
-diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
-index a17d787..b825e86 100644
---- a/virt/kvm/kvm_main.c
-+++ b/virt/kvm/kvm_main.c
-@@ -1738,14 +1738,6 @@ void kvm_get_pfn(kvm_pfn_t pfn)
- }
- EXPORT_SYMBOL_GPL(kvm_get_pfn);
- 
--static int next_segment(unsigned long len, int offset)
--{
--	if (len > PAGE_SIZE - offset)
--		return PAGE_SIZE - offset;
--	else
--		return len;
--}
--
- static int __kvm_read_guest_page(struct kvm_memory_slot *slot, gfn_t gfn,
- 				 void *data, int offset, int len)
- {
+Changes in v3:
+    Adjust some descriptions in dtsi.
+
+Changes in v2:
+    Remove RK_FUNC_* in dtsi as it dose not help understand things better.
+    Adjust the order of description in dt-bindings.
+
+v1:
+These patchs depend on pinctrl patchs as below:
+
+https://patchwork.kernel.org/patch/9566427/
+https://patchwork.kernel.org/patch/9566425/
+https://patchwork.kernel.org/patch/9566431/
+
+Liang Chen (6):
+  dt-bindings: iio: rockchip-saradc: add support for rk3328
+  dt-bindings: i2c: rk3x: add support for rk3328
+  dt-bindings: soc: rockchip: grf: add support for rk3328
+  arm64: dts: rockchip: add core dtsi file for RK3328 SoCs
+  arm64: dts: rockchip: add dts file for RK3328
+  dt-bindings: document rockchip rk3328-evb board
+
+ Documentation/devicetree/bindings/arm/rockchip.txt |    4 +
+ Documentation/devicetree/bindings/i2c/i2c-rk3x.txt |    1 +
+ .../bindings/iio/adc/rockchip-saradc.txt           |    1 +
+ .../devicetree/bindings/soc/rockchip/grf.txt       |    1 +
+ arch/arm64/boot/dts/rockchip/Makefile              |    1 +
+ arch/arm64/boot/dts/rockchip/rk3328-evb.dts        |   57 +
+ arch/arm64/boot/dts/rockchip/rk3328.dtsi           | 1275 ++++++++++++++++++++
+ 7 files changed, 1340 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/rockchip/rk3328-evb.dts
+ create mode 100644 arch/arm64/boot/dts/rockchip/rk3328.dtsi
+
 -- 
-2.5.5
+1.9.1
