@@ -1,45 +1,135 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 27 Mar 2017 10:49:46 +0100
-Subject: [PATCH v2 18/22] PCI: xgene: update PCI config space remap function
+Date: Mon, 27 Mar 2017 10:49:30 +0100
+Subject: [PATCH v2 02/22] asm-generic/io.h: add ioremap_nopost remap interface
 In-Reply-To: <20170327094954.7162-1-lorenzo.pieralisi@arm.com>
 References: <20170327094954.7162-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20170327094954.7162-19-lorenzo.pieralisi@arm.com>
+Message-ID: <20170327094954.7162-3-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PCI configuration space should be mapped with a memory region type that
-generates on the CPU host bus non-posted write transations. Update the
-driver to use the devm_ioremap_nopost* interface to make sure the correct
-memory mappings for PCI configuration space are used.
+The PCI specifications (Rev 3.0, 3.2.5 "Transaction Ordering and
+Posting") mandate non-posted configuration transactions. As further
+highlighted in the PCIe specifications (4.0 - Rev0.3, "Ordering
+Considerations for the Enhanced Configuration Access Mechanism"),
+through ECAM and ECAM-derivative configuration mechanism, the memory
+mapped transactions from the host CPU into Configuration Requests on the
+PCI express fabric may create ordering problems for software because
+writes to memory address are typically posted transactions (unless the
+architecture can enforce through virtual address mapping non-posted
+write transactions behaviour) but writes to Configuration Space are not
+posted on the PCI express fabric.
+
+Current DT and ACPI host bridge controllers map PCI configuration space
+(ECAM and ECAM-derivative) into the virtual address space through
+ioremap() calls, that are non-cacheable device accesses on most
+architectures, but may provide "bufferable" or "posted" write semantics
+in architecture like eg ARM/ARM64 that allow ioremap'ed regions writes
+to be buffered in the bus connecting the host CPU to the PCI fabric;
+this behaviour, as underlined in the PCIe specifications, may trigger
+transactions ordering rules and must be prevented.
+
+Introduce a new generic and explicit API to create a memory
+mapping for ECAM and ECAM-derivative config space area that
+defaults to ioremap_nocache() (which should provide a sane default
+behaviour) but still allowing architectures on which ioremap_nocache()
+results in posted write transactions to override the function
+call with an arch specific implementation that complies with
+the PCI specifications for configuration transactions.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Thomas Gleixner <tglx@linutronix.de>
 Cc: Bjorn Helgaas <bhelgaas@google.com>
-Cc: Tanmay Inamdar <tinamdar@apm.com>
+Cc: Richard Henderson <rth@twiddle.net>
+Cc: Russell King <linux@armlinux.org.uk>
+Cc: Tony Luck <tony.luck@intel.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Ingo Molnar <mingo@redhat.com>
+Cc: Haavard Skinnemoen <hskinnemoen@gmail.com>
 ---
- drivers/pci/host/pci-xgene.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/alpha/include/asm/io.h | 1 +
+ arch/avr32/include/asm/io.h | 1 +
+ arch/frv/include/asm/io.h   | 1 +
+ arch/ia64/include/asm/io.h  | 1 +
+ arch/x86/include/asm/io.h   | 1 +
+ include/asm-generic/io.h    | 4 ++++
+ 6 files changed, 9 insertions(+)
 
-diff --git a/drivers/pci/host/pci-xgene.c b/drivers/pci/host/pci-xgene.c
-index 1a61087..df8e13c 100644
---- a/drivers/pci/host/pci-xgene.c
-+++ b/drivers/pci/host/pci-xgene.c
-@@ -248,7 +248,7 @@ static int xgene_pcie_ecam_init(struct pci_config_window *cfg, u32 ipversion)
- 		dev_err(dev, "can't get CSR resource\n");
- 		return ret;
- 	}
--	port->csr_base = devm_ioremap_resource(dev, &csr);
-+	port->csr_base = devm_ioremap_nopost_resource(dev, &csr);
- 	if (IS_ERR(port->csr_base))
- 		return PTR_ERR(port->csr_base);
+diff --git a/arch/alpha/include/asm/io.h b/arch/alpha/include/asm/io.h
+index ff40491..27379ea 100644
+--- a/arch/alpha/include/asm/io.h
++++ b/arch/alpha/include/asm/io.h
+@@ -300,6 +300,7 @@ static inline void __iomem * ioremap_nocache(unsigned long offset,
+ }
  
-@@ -359,7 +359,7 @@ static int xgene_pcie_map_reg(struct xgene_pcie_port *port,
- 	struct resource *res;
+ #define ioremap_uc ioremap_nocache
++#define ioremap_nopost ioremap_nocache
  
- 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "csr");
--	port->csr_base = devm_ioremap_resource(dev, res);
-+	port->csr_base = devm_ioremap_nopost_resource(dev, res);
- 	if (IS_ERR(port->csr_base))
- 		return PTR_ERR(port->csr_base);
+ static inline void iounmap(volatile void __iomem *addr)
+ {
+diff --git a/arch/avr32/include/asm/io.h b/arch/avr32/include/asm/io.h
+index f855646..3f1ced8 100644
+--- a/arch/avr32/include/asm/io.h
++++ b/arch/avr32/include/asm/io.h
+@@ -298,6 +298,7 @@ extern void __iounmap(void __iomem *addr);
+ #define ioremap_wc ioremap_nocache
+ #define ioremap_wt ioremap_nocache
+ #define ioremap_uc ioremap_nocache
++#define ioremap_nopost ioremap_nocache
  
+ #define cached(addr) P1SEGADDR(addr)
+ #define uncached(addr) P2SEGADDR(addr)
+diff --git a/arch/frv/include/asm/io.h b/arch/frv/include/asm/io.h
+index 8062fc7..302fb8c 100644
+--- a/arch/frv/include/asm/io.h
++++ b/arch/frv/include/asm/io.h
+@@ -290,6 +290,7 @@ static inline void __iomem *ioremap_fullcache(unsigned long physaddr, unsigned l
+ 
+ #define ioremap_wc ioremap_nocache
+ #define ioremap_uc ioremap_nocache
++#define ioremap_nopost ioremap_nocache
+ 
+ extern void iounmap(void volatile __iomem *addr);
+ 
+diff --git a/arch/ia64/include/asm/io.h b/arch/ia64/include/asm/io.h
+index 5de673a..70a4985 100644
+--- a/arch/ia64/include/asm/io.h
++++ b/arch/ia64/include/asm/io.h
+@@ -434,6 +434,7 @@ static inline void __iomem * ioremap_cache (unsigned long phys_addr, unsigned lo
+ }
+ #define ioremap_cache ioremap_cache
+ #define ioremap_uc ioremap_nocache
++#define ioremap_nopost ioremap_nocache
+ 
+ 
+ /*
+diff --git a/arch/x86/include/asm/io.h b/arch/x86/include/asm/io.h
+index 7afb0e2..50b292f 100644
+--- a/arch/x86/include/asm/io.h
++++ b/arch/x86/include/asm/io.h
+@@ -171,6 +171,7 @@ static inline unsigned int isa_virt_to_bus(volatile void *address)
+ extern void __iomem *ioremap_nocache(resource_size_t offset, unsigned long size);
+ extern void __iomem *ioremap_uc(resource_size_t offset, unsigned long size);
+ #define ioremap_uc ioremap_uc
++#define ioremap_nopost ioremap_nocache
+ 
+ extern void __iomem *ioremap_cache(resource_size_t offset, unsigned long size);
+ extern void __iomem *ioremap_prot(resource_size_t offset, unsigned long size, unsigned long prot_val);
+diff --git a/include/asm-generic/io.h b/include/asm-generic/io.h
+index 7ef015e..0e81938 100644
+--- a/include/asm-generic/io.h
++++ b/include/asm-generic/io.h
+@@ -915,6 +915,10 @@ extern void ioport_unmap(void __iomem *p);
+ #endif /* CONFIG_GENERIC_IOMAP */
+ #endif /* CONFIG_HAS_IOPORT_MAP */
+ 
++#ifndef ioremap_nopost
++#define ioremap_nopost ioremap_nocache
++#endif
++
+ #ifndef xlate_dev_kmem_ptr
+ #define xlate_dev_kmem_ptr xlate_dev_kmem_ptr
+ static inline void *xlate_dev_kmem_ptr(void *addr)
 -- 
 2.10.0
