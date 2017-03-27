@@ -1,126 +1,70 @@
 From: gmbnomis@gmail.com (Simon Baatz)
-Date: Mon, 27 Mar 2017 20:02:07 +0200
-Subject: [PATCH v2 1/2] mtd: nand: orion: fix clk handling
-Message-ID: <20170327180208.13414-1-gmbnomis@gmail.com>
+Date: Mon, 27 Mar 2017 20:02:08 +0200
+Subject: [PATCH v2 2/2] mtd: nand: orion: improve handling of optional clock
+In-Reply-To: <20170327180208.13414-1-gmbnomis@gmail.com>
+References: <20170327180208.13414-1-gmbnomis@gmail.com>
+Message-ID: <20170327180208.13414-2-gmbnomis@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The clk handling in orion_nand.c had two problems:
+The clock gate used by orion_nand is not available on all platforms.
+When getting this optional clock gate, the code masked all errors.
+Let's be more precise here and actually only allow ENOENT.
 
-- In the probe function, clk_put() was called for an enabled clock,
-  which violates the API (see documentation for clk_put() in
-  include/linux/clk.h)
+EPROBE_DEFER is handled like any other error code since probe deferral
+is not supported by drivers using module_platform_driver_probe().
 
-- In the error path of the probe function, clk_put() could be called
-  twice for the same clock.
-
-In order to clean this up, use the managed function devm_clk_get() and
-store the pointer to the clk in the driver data.
-
-Fixes: baffab28b13120694fa3ebab08d3e99667a851d2 ('ARM: Orion: fix driver probe error handling with respect to clk')
-Cc: <stable@vger.kernel.org> # v4.5+
 Signed-off-by: Simon Baatz <gmbnomis@gmail.com>
 ---
 
 Changes in v2:
-* changed whitespace alignment in orion_nand_info struct definition
+* added patch
 
- drivers/mtd/nand/orion_nand.c | 42 +++++++++++++++++++++---------------------
- 1 file changed, 21 insertions(+), 21 deletions(-)
+ drivers/mtd/nand/orion_nand.c | 20 +++++++++++++-------
+ 1 file changed, 13 insertions(+), 7 deletions(-)
 
 diff --git a/drivers/mtd/nand/orion_nand.c b/drivers/mtd/nand/orion_nand.c
-index 4a91c5d000be..3acdc20485f1 100644
+index 3acdc20485f1..f8e463a97b9e 100644
 --- a/drivers/mtd/nand/orion_nand.c
 +++ b/drivers/mtd/nand/orion_nand.c
-@@ -23,6 +23,11 @@
- #include <asm/sizes.h>
- #include <linux/platform_data/mtd-orion_nand.h>
- 
-+struct orion_nand_info {
-+	struct nand_chip chip;
-+	struct clk *clk;
-+};
-+
- static void orion_nand_cmd_ctrl(struct mtd_info *mtd, int cmd, unsigned int ctrl)
- {
- 	struct nand_chip *nc = mtd_to_nand(mtd);
-@@ -75,20 +80,21 @@ static void orion_nand_read_buf(struct mtd_info *mtd, uint8_t *buf, int len)
- 
- static int __init orion_nand_probe(struct platform_device *pdev)
- {
-+	struct orion_nand_info *info;
- 	struct mtd_info *mtd;
- 	struct nand_chip *nc;
- 	struct orion_nand_data *board;
- 	struct resource *res;
--	struct clk *clk;
- 	void __iomem *io_base;
- 	int ret = 0;
- 	u32 val = 0;
- 
--	nc = devm_kzalloc(&pdev->dev,
--			sizeof(struct nand_chip),
-+	info = devm_kzalloc(&pdev->dev,
-+			sizeof(struct orion_nand_info),
- 			GFP_KERNEL);
--	if (!nc)
-+	if (!info)
- 		return -ENOMEM;
-+	nc = &info->chip;
- 	mtd = nand_to_mtd(nc);
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-@@ -145,15 +151,13 @@ static int __init orion_nand_probe(struct platform_device *pdev)
- 	if (board->dev_ready)
- 		nc->dev_ready = board->dev_ready;
- 
--	platform_set_drvdata(pdev, mtd);
-+	platform_set_drvdata(pdev, info);
- 
+@@ -156,8 +156,17 @@ static int __init orion_nand_probe(struct platform_device *pdev)
  	/* Not all platforms can gate the clock, so it is not
  	   an error if the clock does not exists. */
--	clk = clk_get(&pdev->dev, NULL);
--	if (!IS_ERR(clk)) {
--		clk_prepare_enable(clk);
--		clk_put(clk);
--	}
-+	info->clk = devm_clk_get(&pdev->dev, NULL);
-+	if (!IS_ERR(info->clk))
-+		clk_prepare_enable(info->clk);
+ 	info->clk = devm_clk_get(&pdev->dev, NULL);
+-	if (!IS_ERR(info->clk))
+-		clk_prepare_enable(info->clk);
++	if (IS_ERR(info->clk)) {
++		ret = PTR_ERR(info->clk);
++		if (ret == -ENOENT) {
++			info->clk = NULL;
++		} else {
++			dev_err(&pdev->dev, "failed to get clock!\n");
++			return ret;
++		}
++	}
++
++	clk_prepare_enable(info->clk);
  
  	ret = nand_scan(mtd, 1);
  	if (ret)
-@@ -169,26 +173,22 @@ static int __init orion_nand_probe(struct platform_device *pdev)
+@@ -173,9 +182,7 @@ static int __init orion_nand_probe(struct platform_device *pdev)
  	return 0;
  
  no_dev:
--	if (!IS_ERR(clk)) {
--		clk_disable_unprepare(clk);
--		clk_put(clk);
--	}
-+	if (!IS_ERR(info->clk))
-+		clk_disable_unprepare(info->clk);
- 
+-	if (!IS_ERR(info->clk))
+-		clk_disable_unprepare(info->clk);
+-
++	clk_disable_unprepare(info->clk);
  	return ret;
  }
  
- static int orion_nand_remove(struct platform_device *pdev)
- {
--	struct mtd_info *mtd = platform_get_drvdata(pdev);
--	struct clk *clk;
-+	struct orion_nand_info *info = platform_get_drvdata(pdev);
-+	struct nand_chip *chip = &info->chip;
-+	struct mtd_info *mtd = nand_to_mtd(chip);
+@@ -187,8 +194,7 @@ static int orion_nand_remove(struct platform_device *pdev)
  
  	nand_release(mtd);
  
--	clk = clk_get(&pdev->dev, NULL);
--	if (!IS_ERR(clk)) {
--		clk_disable_unprepare(clk);
--		clk_put(clk);
--	}
-+	if (!IS_ERR(info->clk))
-+		clk_disable_unprepare(info->clk);
+-	if (!IS_ERR(info->clk))
+-		clk_disable_unprepare(info->clk);
++	clk_disable_unprepare(info->clk);
  
  	return 0;
  }
