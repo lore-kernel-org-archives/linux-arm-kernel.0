@@ -1,48 +1,82 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Mon, 27 Mar 2017 09:53:27 +0100
-Subject: [PATCH v2] arm: Fix memory attribute inconsistencies when using
- fixmap
-In-Reply-To: <CAKv+Gu8sU9burJh6sX6hREuqPwLatf-FVZ=5SbGsB0Sorf8Z8Q@mail.gmail.com>
-References: <20170321173030.7751-1-tixy@linaro.org>
- <1490117781.3136.9.camel@linaro.org>
- <CAKv+Gu82PsyyC=fQHxUn5mrCdmQvhwK+DK342-vv8y53mLcpng@mail.gmail.com>
- <1490175988.2890.1.camel@linaro.org>
- <CAKv+Gu8VoSLOUiNSXsrtQUr8TQdGBqiOmhsKS+N2dhToMusOUg@mail.gmail.com>
- <1490196388.2890.8.camel@linaro.org> <20170324201736.GA3317@afzalpc>
- <CAKv+Gu8sU9burJh6sX6hREuqPwLatf-FVZ=5SbGsB0Sorf8Z8Q@mail.gmail.com>
-Message-ID: <1490604807.3245.1.camel@linaro.org>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 27 Mar 2017 16:53:05 +0800
+Subject: [PATCH 4/5] clk: sunxi-ng: Add driver for A83T CCU
+In-Reply-To: <20170326205124.vdjbmjukfysgbefc@lukather>
+References: <20170214033526.16977-1-wens@csie.org>
+ <20170214033526.16977-5-wens@csie.org>
+ <20170214095819.utsftcvti5zdmlmi@lukather>
+ <CAGb2v66PxbhUdqSwFc5iFN2wDVQbOsibDkckXpFsxXW1WJNe3w@mail.gmail.com>
+ <20170215094954.h3wyaxlqkeb342yu@lukather>
+ <CAGb2v67ey1Ppc3wf1154QKoCX-xsOjWDEsXi5gxPbL4MY37zHw@mail.gmail.com>
+ <20170326205124.vdjbmjukfysgbefc@lukather>
+Message-ID: <CAGb2v647bc0VdYTQDyEjAerKnfjtkDYGdhnUgpTU-Tuns6FYYA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2017-03-27 at 08:29 +0100, Ard Biesheuvel wrote:
-> On 24 March 2017 at 20:17, afzal mohammed <afzal.mohd.ma@gmail.com> wrote:
-> > Hi,
-> > 
-> > On Wed, Mar 22, 2017 at 03:26:28PM +0000, Jon Medhurst (Tixy) wrote:
-> > > > > On Tue, 2017-03-21 at 19:00 +0000, Ard Biesheuvel wrote:
-> > > > > > It looks like nommu should be unaffected, but it is worth giving it a
-> > > > > > spin as well
-> > > 
-> > > After much faffing around I got MPS2 booting a Linux kernel, and
-> > > somewhat to my surprise it seems to boot fine, all the way up to
-> > > panicking because it didn't find an init. This was with $subject patch.
-> > 
-> > Vybrid VF610 Cortex M4 boots to prompt w/ this patch on current mainline.
-> > 
-> > Vybrid VF610 Cortex A5 using !MMU Kernel w/ this patch too boots to
-> > prompt (climbing onto the shoulder's of Vladimir, not Torvalds HEAD)
-> > 
-> 
-> Thanks for testing!
+On Mon, Mar 27, 2017 at 4:51 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Hi Chen-Yu,
+>
+> On Wed, Mar 22, 2017 at 02:50:31PM +0800, Chen-Yu Tsai wrote:
+>> On Wed, Feb 15, 2017 at 5:49 PM, Maxime Ripard
+>> <maxime.ripard@free-electrons.com> wrote:
+>> > On Tue, Feb 14, 2017 at 06:26:39PM +0800, Chen-Yu Tsai wrote:
+>> >> On Tue, Feb 14, 2017 at 5:58 PM, Maxime Ripard
+>> >> <maxime.ripard@free-electrons.com> wrote:
+>> >> > On Tue, Feb 14, 2017 at 11:35:25AM +0800, Chen-Yu Tsai wrote:
+>> >> >> +/* Some PLLs are input * N / div1 / P. Model them as NKMP with no K */
+>> >> >
+>> >> > Is that even working?
+>> >>
+>> >> Looking at the nkmp clock code, only .recalc_rate will work properly though.
+>> >> Maybe I could fix up the code so it handles zero width factors.
+>> >>
+>> >> > I'm not quite sure we want to do that. We might model it as a NP clock
+>> >> > with a variable prediv?
+>> >>
+>> >> There's no NP clock type yet. And a problem with a variable prediv is that
+>> >> it doesn't participate in factor calculation. It's effectively fixed.
+>> >>
+>> >> I did this for the A80 as well though. Fixing up the NKMP clock might be
+>> >> easier.
+>> >
+>> > Then maybe we just need a NMP clock type then. What I'm really afraid
+>> > of is that we'll just end up in a clk-factors situation that was
+>> > simply impossible to maintain without breaking anything, hence why we
+>> > had different clock types then.
+>>
+>> Upon further review, I think it will work. I did notice a discrepancy
+>> between .set_rate and .round_rate though. Will send fixes later.
+>>
+>> About the old clk-factors situation, I'm not exactly sure what part
+>> you're referring to.
+>
+> We need to be able to support old DTs, which will still use the old
+> clock code. Whatever solution we come up with need to take that into
+> account.
+>
+>> To me it seems the "factors" bits are mostly the same. Differences
+>> are mostly with parent-specific pre-dividers, clock post-dividers,
+>> and non-standard factors. The first is nicely handled by the new mux
+>> wrapper, the second is currently only used with NK types, and the
+>> last is currently only supported by single factor divider or
+>> multiplier clocks with tables.
+>>
+>> Non-standard factors are probably the trickiest one, but given we will
+>> support full factor tables for some of the tricky CPU PLLs, this is
+>> probably solved, even if not implemented yet.
+>>
+>> I'll start with the NP style clocks, which only use P when the output
+>> is under a certain frequency.
+>
+> Do we need to use a P factor? I mean, we can just create a custom
+> clock for that, I'd realy don't want to cripple the generic code for a
+> completely non-generic problem.
 
-Yes, thanks Afzal.
+I'm not sure. AFAIK the vendor BSP cpufreq doesn't use frequencies
+low enough to require the P divider, so we could just ignore it. But
+then we need to make sure it's set to 1 at probe time, while keeping
+the output frequency usable, which would kind of bloat the probe
+function. FYI I'm in favor of doing it this way.
 
-> 
-> I suppose this patch is ready to go into the patch system, with
-> Afzal's tested-by as well as mine.
-
-Done...
-http://www.armlinux.org.uk/developer/patches/viewpatch.php?id=8667/1
-
--- 
-Tixy
+ChenYu
