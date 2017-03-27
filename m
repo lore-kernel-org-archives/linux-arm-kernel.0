@@ -1,45 +1,34 @@
-From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Mon, 27 Mar 2017 12:05:47 +0100
-Subject: [RFC PATCH 21/30] iommu/arm-smmu-v3: Handle device faults from PRI
-In-Reply-To: <0b3e3ddd-acc3-5ba7-639f-5c9192da57c3@gmail.com>
-References: <20170227195441.5170-1-jean-philippe.brucker@arm.com>
- <20170227195441.5170-22-jean-philippe.brucker@arm.com>
- <8520D5D51A55D047800579B0941471982640F43C@XAP-PVEXMBX02.xlnx.xilinx.com>
- <0b3e3ddd-acc3-5ba7-639f-5c9192da57c3@gmail.com>
-Message-ID: <132394da-38e9-1722-833e-88303463ca4c@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 27 Mar 2017 12:03:03 +0100
+Subject: [PATCH v2 05/10] KVM: arm/arm64: vgic: Get rid of unnecessary
+ process_maintenance operation
+In-Reply-To: <20170321211059.8719-6-cdall@linaro.org>
+References: <20170321211059.8719-1-cdall@linaro.org>
+ <20170321211059.8719-6-cdall@linaro.org>
+Message-ID: <b94b9e68-ee7f-a3d7-2c1f-7df9ebbcadc6@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Valmiki,
-
-On 25/03/17 05:16, valmiki wrote:
->> When we receive a PRI Page Request (PPR) from the SMMU, it contains a
->> context identifier SID:SSID, an IOVA and the requested access flags.
->>
->> Search the domain corresponding to SID:SSID, and call handle_mm_fault on
->> its mm. If memory management is able to fix the fault, we ask the device
->> to retry the access with a PRI_SUCCESS message. Otherwise send PRI_FAIL.
->>
-> Hi Jean,
+On 21/03/17 21:10, Christoffer Dall wrote:
+> From: Christoffer Dall <christoffer.dall@linaro.org>
 > 
-> I need some clarification. Page fault handling is already part of MMU.
-> When PRI requested page results in page fault, smmu is going to invoke
-> handle_mm_fault which is part of memory management unit ?
+> Since we always read back the LRs that we wrote to the guest and the
+> MISR and EISR registers simply provide a summary of the configuration of
+> the bits in the LRs, there is really no need to read back those status
+> registers and process them.  We can might as well just signal the
+                                  ^^^
+Typo.
 
-Yes, the SMMU driver calls into the memory management code.
+> notifyfd when folding the LR state and save some cycles in the process.
+> 
+> We now clear the underflow bit in the fold_lr_state functions as we only
+> need to clear this bit if we had used all the LRs, so this is as good a
+> place as any to do that work.
+> 
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 
-> If so this functionality is yet to be added in SMMU driver ?
->
-> Because i haven't seen this API being called in your patches.
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 
-This patch implements the fault handling part:
-
-(1) A PRI Page Request (PPR) is received by arm_smmu_handle_ppr. It is
-    forwarded to work queue fault_queue
-(2) The PPR is handled by arm_smmu_handle_fault, which calls
-    _arm_smmu_handle_fault, which calls arm_smmu_handle_mm_fault and
-    finally handle_mm_fault.
-(3) We send a response via arm_smmu_fault_reply
-
-Thanks,
-Jean-Philippe
+	M.
+-- 
+Jazz is not dead. It just smells funny...
