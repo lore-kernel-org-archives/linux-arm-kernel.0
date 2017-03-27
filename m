@@ -1,62 +1,51 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 27 Mar 2017 10:49:44 +0100
-Subject: [PATCH v2 16/22] PCI: designware: update PCI config space remap
- function
+Date: Mon, 27 Mar 2017 10:49:35 +0100
+Subject: [PATCH v2 07/22] PCI: ECAM: use ioremap_nopost() to map config region
 In-Reply-To: <20170327094954.7162-1-lorenzo.pieralisi@arm.com>
 References: <20170327094954.7162-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20170327094954.7162-17-lorenzo.pieralisi@arm.com>
+Message-ID: <20170327094954.7162-8-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PCI configuration space should be mapped with a memory region type that
-generates on the CPU host bus non-posted write transations. Update the
-driver to use the devm_ioremap_nopost* interface to make sure the correct
-memory mappings for PCI configuration space are used.
+Current ECAM kernel implementation uses ioremap() to map the ECAM
+configuration space memory region; this is not safe in that on some
+architectures the ioremap interface provides mappings that allow posted
+write transactions. This, as highlighted in the PCIe specifications
+(4.0 - Rev0.3, "Ordering Considerations for the Enhanced Configuration
+Address Mechanism"), can create ordering issues for software because
+posted writes transactions on the CPU host bus are non posted in the
+PCI express fabric.
+
+Update the ioremap() interface to use ioremap_nopost() whose
+mapping attributes guarantee that non-posted writes transactions
+are issued for memory writes within the ECAM memory mapped address
+region.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Cc: Bjorn Helgaas <bhelgaas@google.com>
-Cc: Jingoo Han <jingoohan1@gmail.com>
-Cc: Joao Pinto <Joao.Pinto@synopsys.com>
 ---
- drivers/pci/dwc/pcie-designware-host.c | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+ drivers/pci/ecam.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/pci/dwc/pcie-designware-host.c b/drivers/pci/dwc/pcie-designware-host.c
-index 5ba3349..d2dd228 100644
---- a/drivers/pci/dwc/pcie-designware-host.c
-+++ b/drivers/pci/dwc/pcie-designware-host.c
-@@ -338,8 +338,8 @@ int dw_pcie_host_init(struct pcie_port *pp)
+diff --git a/drivers/pci/ecam.c b/drivers/pci/ecam.c
+index 2fee61b..70d722a 100644
+--- a/drivers/pci/ecam.c
++++ b/drivers/pci/ecam.c
+@@ -84,12 +84,13 @@ struct pci_config_window *pci_ecam_create(struct device *dev,
+ 		if (!cfg->winp)
+ 			goto err_exit_malloc;
+ 		for (i = 0; i < bus_range; i++) {
+-			cfg->winp[i] = ioremap(cfgres->start + i * bsz, bsz);
++			cfg->winp[i] = ioremap_nopost(cfgres->start + i * bsz,
++						      bsz);
+ 			if (!cfg->winp[i])
+ 				goto err_exit_iomap;
+ 		}
+ 	} else {
+-		cfg->win = ioremap(cfgres->start, bus_range * bsz);
++		cfg->win = ioremap_nopost(cfgres->start, bus_range * bsz);
+ 		if (!cfg->win)
+ 			goto err_exit_iomap;
  	}
- 
- 	if (!pci->dbi_base) {
--		pci->dbi_base = devm_ioremap(dev, pp->cfg->start,
--					resource_size(pp->cfg));
-+		pci->dbi_base = devm_ioremap_nopost(dev, pp->cfg->start,
-+						    resource_size(pp->cfg));
- 		if (!pci->dbi_base) {
- 			dev_err(dev, "error with ioremap\n");
- 			ret = -ENOMEM;
-@@ -350,8 +350,8 @@ int dw_pcie_host_init(struct pcie_port *pp)
- 	pp->mem_base = pp->mem->start;
- 
- 	if (!pp->va_cfg0_base) {
--		pp->va_cfg0_base = devm_ioremap(dev, pp->cfg0_base,
--						pp->cfg0_size);
-+		pp->va_cfg0_base = devm_ioremap_nopost(dev, pp->cfg0_base,
-+						       pp->cfg0_size);
- 		if (!pp->va_cfg0_base) {
- 			dev_err(dev, "error with ioremap in function\n");
- 			ret = -ENOMEM;
-@@ -360,8 +360,8 @@ int dw_pcie_host_init(struct pcie_port *pp)
- 	}
- 
- 	if (!pp->va_cfg1_base) {
--		pp->va_cfg1_base = devm_ioremap(dev, pp->cfg1_base,
--						pp->cfg1_size);
-+		pp->va_cfg1_base = devm_ioremap_nopost(dev, pp->cfg1_base,
-+						       pp->cfg1_size);
- 		if (!pp->va_cfg1_base) {
- 			dev_err(dev, "error with ioremap\n");
- 			ret = -ENOMEM;
 -- 
 2.10.0
