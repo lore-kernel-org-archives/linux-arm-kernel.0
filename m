@@ -1,141 +1,53 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 28 Mar 2017 16:58:14 +0200
-Subject: [PATCH v22 02/11] clocksource: arm_arch_timer: separate out
- device-tree code and remove arch_timer_detect_rate
-In-Reply-To: <20170321163122.9183-3-fu.wei@linaro.org>
-References: <20170321163122.9183-1-fu.wei@linaro.org>
- <20170321163122.9183-3-fu.wei@linaro.org>
-Message-ID: <20170328145814.GE2123@mai>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 28 Mar 2017 10:00:01 -0500
+Subject: [V9, 07/11] iommu: of: Handle IOMMU lookup failure with deferred
+ probing or error
+In-Reply-To: <1489086061-9356-8-git-send-email-sricharan@codeaurora.org>
+References: <1489086061-9356-8-git-send-email-sricharan@codeaurora.org>
+Message-ID: <20170328150001.j57jko6mx35npgp2@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 22, 2017 at 12:31:13AM +0800, fu.wei at linaro.org wrote:
-> From: Fu Wei <fu.wei@linaro.org>
+On Fri, Mar 10, 2017 at 12:30:57AM +0530, Sricharan R wrote:
+> From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 > 
-> Currently, the counter frequency detection call(arch_timer_detect_rate)
-> includes getting the frequency from the device-tree property, the per-cpu
-> arch-timer and the memory-mapped (MMIO) timer interfaces.
-> But reading device-tree property will be needed only when system boot with
-> device-tree, and reading from the per-cpu arch-timer and the memory-mapped
-> (MMIO) timer interfaces will be needed only when the system initializes
-> the relevant timer.
+> Failures to look up an IOMMU when parsing the DT iommus property need to
+> be handled separately from the .of_xlate() failures to support deferred
+> probing.
 > 
-> This patch separates out device-tree code, keep them in device-tree init
-> function, and removes arch_timer_detect_rate founction, then uses the
-> arch_timer_get_cntfrq and arch_timer_mem_get_cntfrq directly.
+> The lack of a registered IOMMU can be caused by the lack of a driver for
+> the IOMMU, the IOMMU device probe not having been performed yet, having
+> been deferred, or having failed.
 > 
-> Signed-off-by: Fu Wei <fu.wei@linaro.org>
+> The first case occurs when the device tree describes the bus master and
+> IOMMU topology correctly but no device driver exists for the IOMMU yet
+> or the device driver has not been compiled in. Return NULL, the caller
+> will configure the device without an IOMMU.
+> 
+> The second and third cases are handled by deferring the probe of the bus
+> master device which will eventually get reprobed after the IOMMU.
+> 
+> The last case is currently handled by deferring the probe of the bus
+> master device as well. A mechanism to either configure the bus master
+> device without an IOMMU or to fail the bus master device probe depending
+> on whether the IOMMU is optional or mandatory would be a good
+> enhancement.
+> 
+> Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Signed-off-by: Laurent Pichart <laurent.pinchart+renesas@ideasonboard.com>
+> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
 > ---
->  drivers/clocksource/arm_arch_timer.c | 58 +++++++++++++++++++-----------------
->  1 file changed, 30 insertions(+), 28 deletions(-)
-> 
-> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-> index 843f923..29ca7d6 100644
-> --- a/drivers/clocksource/arm_arch_timer.c
-> +++ b/drivers/clocksource/arm_arch_timer.c
-> @@ -560,30 +560,6 @@ static u32 arch_timer_mem_get_cntfrq(void __iomem *cntbase)
->  	return readl_relaxed(cntbase + CNTFRQ);
->  }
->  
-> -static void
-> -arch_timer_detect_rate(void __iomem *cntbase, struct device_node *np)
-> -{
-> -	/* Who has more than one independent system counter? */
-> -	if (arch_timer_rate)
-> -		return;
-> -
-> -	/*
-> -	 * Try to determine the frequency from the device tree or CNTFRQ,
-> -	 * if ACPI is enabled, get the frequency from CNTFRQ ONLY.
-> -	 */
-> -	if (!acpi_disabled ||
-> -	    of_property_read_u32(np, "clock-frequency", &arch_timer_rate)) {
-> -		if (cntbase)
-> -			arch_timer_rate = arch_timer_mem_get_cntfrq(cntbase);
-> -		else
-> -			arch_timer_rate = arch_timer_get_cntfrq();
-> -	}
-> -
-> -	/* Check the timer frequency. */
-> -	if (arch_timer_rate == 0)
-> -		pr_warn("frequency not available\n");
-> -}
-> -
->  static void arch_timer_banner(unsigned type)
->  {
->  	pr_info("%s%s%s timer(s) running at %lu.%02luMHz (%s%s%s).\n",
-> @@ -958,7 +934,17 @@ static int __init arch_timer_of_init(struct device_node *np)
->  	for (i = ARCH_TIMER_PHYS_SECURE_PPI; i < ARCH_TIMER_MAX_TIMER_PPI; i++)
->  		arch_timer_ppi[i] = irq_of_parse_and_map(np, i);
->  
-> -	arch_timer_detect_rate(NULL, np);
-> +	/*
-> +	 * Try to determine the frequency from the device tree,
-> +	 * if fail, get the frequency from the sysreg CNTFRQ.
-> +	 */
-> +	if (!arch_timer_rate &&
+>  drivers/base/dma-mapping.c | 5 +++--
+>  drivers/iommu/of_iommu.c   | 4 ++--
+>  drivers/of/device.c        | 7 ++++++-
+>  include/linux/of_device.h  | 9 ++++++---
+>  4 files changed, 17 insertions(+), 8 deletions(-)
 
-This variable is set only if "arm,armv7-timer" and "arm,armv7-timer-mem" are
-declared together in the DT, right ?
+Maybe it is the same issue reported for VFIO, but virtio-pci is broken 
+with v8 of this series. Bisecting blames this commit which looks like it 
+hasn't changeed. 
 
-Two declarations for a single variable ? Ignore the !arch_timer_rate.
+Rob
 
-> +	    of_property_read_u32(np, "clock-frequency", &arch_timer_rate))
-> +		arch_timer_rate = arch_timer_get_cntfrq();
-> +	if (!arch_timer_rate) {
-> +		pr_err(FW_BUG "frequency not available.\n");
-> +		return -EINVAL;
-> +	}
-
-Please, clarify this block, the conditions are unclear.
-
->  
->  	arch_timer_c3stop = !of_property_read_bool(np, "always-on");
->  
-> @@ -1069,7 +1055,19 @@ static int __init arch_timer_mem_init(struct device_node *np)
->  		goto out;
->  	}
->  
-> -	arch_timer_detect_rate(base, np);
-> +	/*
-> +	 * Try to determine the frequency from the device tree,
-> +	 * if fail, get the frequency from the CNTFRQ reg of MMIO timer.
-> +	 */
-> +	if (!arch_timer_rate &&
-> +	    of_property_read_u32(np, "clock-frequency", &arch_timer_rate))
-> +		arch_timer_rate = arch_timer_mem_get_cntfrq(base);
-> +	if (!arch_timer_rate) {
-> +		pr_err(FW_BUG "MMIO frequency not available.\n");
-> +		ret = -EINVAL;
-> +		goto out;
-> +	}
-> +
->  	ret = arch_timer_mem_register(base, irq);
->  	if (ret)
->  		goto out;
-> @@ -1130,8 +1128,12 @@ static int __init arch_timer_acpi_init(struct acpi_table_header *table)
->  		map_generic_timer_interrupt(gtdt->non_secure_el2_interrupt,
->  		gtdt->non_secure_el2_flags);
->  
-> -	/* Get the frequency from CNTFRQ */
-> -	arch_timer_detect_rate(NULL, NULL);
-> +	/* Get the frequency from the sysreg CNTFRQ */
-> +	arch_timer_rate = arch_timer_get_cntfrq();
-> +	if (!arch_timer_rate) {
-> +		pr_err(FW_BUG "frequency not available.\n");
-> +		return -EINVAL;
-> +	}
->  
->  	arch_timer_uses_ppi = arch_timer_select_ppi();
->  	if (!arch_timer_ppi[arch_timer_uses_ppi]) {
-> -- 
-> 2.9.3
-> 
-
--- 
-
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+P.S. Doesn't look like you have copied the DT maintainers nor list for 
+the DT changes.
