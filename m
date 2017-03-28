@@ -1,10 +1,10 @@
 From: elena.reshetova@intel.com (Elena Reshetova)
-Date: Tue, 28 Mar 2017 11:56:36 +0300
-Subject: [PATCH 09/16] drivers,
- net: convert masces_rx_sa.refcnt from atomic_t to refcount_t
+Date: Tue, 28 Mar 2017 11:56:34 +0300
+Subject: [PATCH 07/16] drivers, net,
+ mlx5: convert fs_node.refcount from atomic_t to refcount_t
 In-Reply-To: <1490691403-4016-1-git-send-email-elena.reshetova@intel.com>
 References: <1490691403-4016-1-git-send-email-elena.reshetova@intel.com>
-Message-ID: <1490691403-4016-10-git-send-email-elena.reshetova@intel.com>
+Message-ID: <1490691403-4016-8-git-send-email-elena.reshetova@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -19,56 +19,134 @@ Signed-off-by: Hans Liljestrand <ishkamiel@gmail.com>
 Signed-off-by: Kees Cook <keescook@chromium.org>
 Signed-off-by: David Windsor <dwindsor@gmail.com>
 ---
- drivers/net/macsec.c | 9 +++++----
- 1 file changed, 5 insertions(+), 4 deletions(-)
+ drivers/net/ethernet/mellanox/mlx5/core/fs_core.c | 24 +++++++++++------------
+ drivers/net/ethernet/mellanox/mlx5/core/fs_core.h |  3 ++-
+ 2 files changed, 14 insertions(+), 13 deletions(-)
 
-diff --git a/drivers/net/macsec.c b/drivers/net/macsec.c
-index ff0a5ed..bc0b00a 100644
---- a/drivers/net/macsec.c
-+++ b/drivers/net/macsec.c
-@@ -16,6 +16,7 @@
- #include <crypto/aead.h>
- #include <linux/etherdevice.h>
- #include <linux/rtnetlink.h>
-+#include <linux/refcount.h>
- #include <net/genetlink.h>
- #include <net/sock.h>
- #include <net/gro_cells.h>
-@@ -146,7 +147,7 @@ struct macsec_rx_sa {
- 	struct macsec_key key;
- 	spinlock_t lock;
- 	u32 next_pn;
--	atomic_t refcnt;
-+	refcount_t refcnt;
- 	bool active;
- 	struct macsec_rx_sa_stats __percpu *stats;
- 	struct macsec_rx_sc *sc;
-@@ -314,7 +315,7 @@ static struct macsec_rx_sa *macsec_rxsa_get(struct macsec_rx_sa __rcu *ptr)
- 	if (!sa || !sa->active)
- 		return NULL;
- 
--	if (!atomic_inc_not_zero(&sa->refcnt))
-+	if (!refcount_inc_not_zero(&sa->refcnt))
- 		return NULL;
- 
- 	return sa;
-@@ -350,7 +351,7 @@ static void free_rxsa(struct rcu_head *head)
- 
- static void macsec_rxsa_put(struct macsec_rx_sa *sa)
+diff --git a/drivers/net/ethernet/mellanox/mlx5/core/fs_core.c b/drivers/net/ethernet/mellanox/mlx5/core/fs_core.c
+index 2478516..4f74d15 100644
+--- a/drivers/net/ethernet/mellanox/mlx5/core/fs_core.c
++++ b/drivers/net/ethernet/mellanox/mlx5/core/fs_core.c
+@@ -163,7 +163,7 @@ static void tree_init_node(struct fs_node *node,
+ 			   unsigned int refcount,
+ 			   void (*remove_func)(struct fs_node *))
  {
--	if (atomic_dec_and_test(&sa->refcnt))
-+	if (refcount_dec_and_test(&sa->refcnt))
- 		call_rcu(&sa->rcu, free_rxsa);
+-	atomic_set(&node->refcount, refcount);
++	refcount_set(&node->refcount, refcount);
+ 	INIT_LIST_HEAD(&node->list);
+ 	INIT_LIST_HEAD(&node->children);
+ 	mutex_init(&node->lock);
+@@ -173,7 +173,7 @@ static void tree_init_node(struct fs_node *node,
+ static void tree_add_node(struct fs_node *node, struct fs_node *parent)
+ {
+ 	if (parent)
+-		atomic_inc(&parent->refcount);
++		refcount_inc(&parent->refcount);
+ 	node->parent = parent;
+ 
+ 	/* Parent is the root */
+@@ -185,7 +185,7 @@ static void tree_add_node(struct fs_node *node, struct fs_node *parent)
+ 
+ static void tree_get_node(struct fs_node *node)
+ {
+-	atomic_inc(&node->refcount);
++	refcount_inc(&node->refcount);
  }
  
-@@ -1324,7 +1325,7 @@ static int init_rx_sa(struct macsec_rx_sa *rx_sa, char *sak, int key_len,
+ static void nested_lock_ref_node(struct fs_node *node,
+@@ -193,7 +193,7 @@ static void nested_lock_ref_node(struct fs_node *node,
+ {
+ 	if (node) {
+ 		mutex_lock_nested(&node->lock, class);
+-		atomic_inc(&node->refcount);
++		refcount_inc(&node->refcount);
+ 	}
+ }
  
- 	rx_sa->active = false;
- 	rx_sa->next_pn = 1;
--	atomic_set(&rx_sa->refcnt, 1);
-+	refcount_set(&rx_sa->refcnt, 1);
- 	spin_lock_init(&rx_sa->lock);
+@@ -201,14 +201,14 @@ static void lock_ref_node(struct fs_node *node)
+ {
+ 	if (node) {
+ 		mutex_lock(&node->lock);
+-		atomic_inc(&node->refcount);
++		refcount_inc(&node->refcount);
+ 	}
+ }
  
- 	return 0;
+ static void unlock_ref_node(struct fs_node *node)
+ {
+ 	if (node) {
+-		atomic_dec(&node->refcount);
++		refcount_dec(&node->refcount);
+ 		mutex_unlock(&node->lock);
+ 	}
+ }
+@@ -218,7 +218,7 @@ static void tree_put_node(struct fs_node *node)
+ 	struct fs_node *parent_node = node->parent;
+ 
+ 	lock_ref_node(parent_node);
+-	if (atomic_dec_and_test(&node->refcount)) {
++	if (refcount_dec_and_test(&node->refcount)) {
+ 		if (parent_node)
+ 			list_del_init(&node->list);
+ 		if (node->remove_func)
+@@ -233,8 +233,8 @@ static void tree_put_node(struct fs_node *node)
+ 
+ static int tree_remove_node(struct fs_node *node)
+ {
+-	if (atomic_read(&node->refcount) > 1) {
+-		atomic_dec(&node->refcount);
++	if (refcount_read(&node->refcount) > 1) {
++		refcount_dec(&node->refcount);
+ 		return -EEXIST;
+ 	}
+ 	tree_put_node(node);
+@@ -982,7 +982,7 @@ static void destroy_flow_handle(struct fs_fte *fte,
+ 				int i)
+ {
+ 	for (; --i >= 0;) {
+-		if (atomic_dec_and_test(&handle->rule[i]->node.refcount)) {
++		if (refcount_dec_and_test(&handle->rule[i]->node.refcount)) {
+ 			fte->dests_size--;
+ 			list_del(&handle->rule[i]->node.list);
+ 			kfree(handle->rule[i]);
+@@ -1013,7 +1013,7 @@ create_flow_handle(struct fs_fte *fte,
+ 		if (dest) {
+ 			rule = find_flow_rule(fte, dest + i);
+ 			if (rule) {
+-				atomic_inc(&rule->node.refcount);
++				refcount_inc(&rule->node.refcount);
+ 				goto rule_found;
+ 			}
+ 		}
+@@ -1282,7 +1282,7 @@ static struct mlx5_flow_handle *add_rule_fg(struct mlx5_flow_group *fg,
+ 	list_add(&fte->node.list, prev);
+ add_rules:
+ 	for (i = 0; i < handle->num_rules; i++) {
+-		if (atomic_read(&handle->rule[i]->node.refcount) == 1)
++		if (refcount_read(&handle->rule[i]->node.refcount) == 1)
+ 			tree_add_node(&handle->rule[i]->node, &fte->node);
+ 	}
+ unlock_fte:
+diff --git a/drivers/net/ethernet/mellanox/mlx5/core/fs_core.h b/drivers/net/ethernet/mellanox/mlx5/core/fs_core.h
+index 8e668c6..86bc743b 100644
+--- a/drivers/net/ethernet/mellanox/mlx5/core/fs_core.h
++++ b/drivers/net/ethernet/mellanox/mlx5/core/fs_core.h
+@@ -33,6 +33,7 @@
+ #ifndef _MLX5_FS_CORE_
+ #define _MLX5_FS_CORE_
+ 
++#include <linux/refcount.h>
+ #include <linux/mlx5/fs.h>
+ 
+ enum fs_node_type {
+@@ -80,7 +81,7 @@ struct fs_node {
+ 	struct fs_node		*root;
+ 	/* lock the node for writing and traversing */
+ 	struct mutex		lock;
+-	atomic_t		refcount;
++	refcount_t		refcount;
+ 	void			(*remove_func)(struct fs_node *);
+ };
+ 
 -- 
 2.7.4
