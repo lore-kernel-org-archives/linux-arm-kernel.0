@@ -1,78 +1,43 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 28 Mar 2017 16:55:24 +0200
-Subject: [PATCH v2 06/18] arm64: arch_timer: Add infrastructure for
- multiple erratum detection methods
-In-Reply-To: <ee4b5b59-e6ef-6f55-792c-6aa39d354adb@arm.com>
-References: <20170322154114.GE30499@mai>
- <a922484a-1bb0-cfd0-1996-fab026a4feae@arm.com>
- <20170323173030.GA24630@mai>
- <5e8faa45-bb1b-fd9b-f34f-93ce5babb0a3@arm.com>
- <20170327075628.GE24630@mai>
- <e0e0a3d7-2252-5fd6-3247-c128208fd9b9@arm.com>
- <20170328133438.GB2123@mai>
- <ec5e673c-6d02-fc88-9913-b0f9261da05e@arm.com>
- <20170328143633.GC2123@mai>
- <ee4b5b59-e6ef-6f55-792c-6aa39d354adb@arm.com>
-Message-ID: <20170328145524.GD2123@mai>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Tue, 28 Mar 2017 07:57:40 -0700
+Subject: [RFT PATCH 5/6] pinctrl: meson: use gpio-ranges from DT
+In-Reply-To: <c575d8e4-05ca-8eb0-8b64-24a65a5711a7@baylibre.com> (Neil
+ Armstrong's message of "Tue, 28 Mar 2017 11:38:20 +0200")
+References: <1490286449-19448-1-git-send-email-narmstrong@baylibre.com>
+ <1490286449-19448-6-git-send-email-narmstrong@baylibre.com>
+ <CACRpkdZqfwKZ=2SQzr_D5-M5em+7JBS7eUaJ_VH33uV5AZ8xRw@mail.gmail.com>
+ <c575d8e4-05ca-8eb0-8b64-24a65a5711a7@baylibre.com>
+Message-ID: <m27f39bg9n.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 28, 2017 at 03:48:23PM +0100, Marc Zyngier wrote:
-> On 28/03/17 15:36, Daniel Lezcano wrote:
-> > On Tue, Mar 28, 2017 at 03:07:52PM +0100, Marc Zyngier wrote:
-> > 
-> > [ ... ]
-> > 
-> >>>>> -bool arch_timer_check_global_cap_erratum(const struct arch_timer_erratum_workaround *wa,
-> >>>>> -					 const void *arg)
-> >>>>> +bool arch_timer_check_cap_erratum(const struct arch_timer_erratum_workaround *wa,
-> >>>>> +				  const void *arg)
-> >>>>>  {
-> >>>>> -	return cpus_have_cap((uintptr_t)wa->id);
-> >>>>> +	return cpus_have_cap((uintptr_t)wa->id) | this_cpu_has_cap((uintptr_t)wa->id);
-> >>>>
-> >>>> Not quite. Here, you're making all capability-based errata to be be
-> >>>> global (if a single CPU in the system has a capability, then by
-> >>>> transitivity cpus_have_cap returns true). If that's a big-little system,
-> >>>> you end-up applying the workaround to all CPUs, including those unaffected.
-> >>>>
-> >>>> I'd rather drop cpus_have_cap altogether and rely on individual CPU
-> >>>> matching (since we don't have a need for a global capability erratum
-> >>>> handling yet).
-> >>>
-> >>> Ok, thanks.
-> >>
-> >> Quick update. I've just implemented this, and found out that getting rid
-> >> of local/global has an unfortunate effect:
-> >>
-> >> Since we only probe the global errata (using ACPI for example) on the
-> >> boot CPU path, we lose propagation of the erratum across the secondary
-> >> CPUs. One way of solving this is to convert the secondary boot path to
-> >> be aware of DT vs ACPI vs detection method of the month. Which isn't
-> >> easy, since by the time we boot secondary CPUs, we don't have the
-> >> pointers to the various ACPI tables anymore. Also, assuming we were
-> >> careful and saved the pointers, the tables may have been unmapped. Fun.
-> > 
-> > My proposal was supposed to prevent that. The detecion is done in the
-> > subsystems, ACPI detects ACPI errata, DT detects DT errata and CPU detects CPU
-> > errata. The drivers get the errata and enable the workaround. The id
-> > association <-> errata self contains errata types (void *, char *, int). So
-> > everything can be done in a CPU basis without local / global dance.
-> 
-> I'm sorry, but it feels like a Jumbo-Jet sized hammer to try and squash
-> a fly (I'm staying away from the frozen shark metaphor here). You're
-> willing to add a whole list of things with private ids that need
-> matching to kill a flag? I don't think this buys us anything but extra
-> complexity and another maintenance headache.
+Neil Armstrong <narmstrong@baylibre.com> writes:
 
-Well, it is like your approach except it is split in two steps.
+> On 03/28/2017 11:30 AM, Linus Walleij wrote:
+>> On Thu, Mar 23, 2017 at 5:27 PM, Neil Armstrong <narmstrong@baylibre.com> wrote:
+>> 
+>> '> When trying to add a gpio-hog, we enter a weird loop where the gpio-ranges
+>>> is needed when gpiochip_add_data() is called but in the current implementation
+>>> the ranges are added from the driver afterwards.
+>>>
+>>> A simple solution is to rely on the DR gpio-ranges attribute and remove the
+>>> call to gpiochip_add_pin_range().
+>>>
+>>> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+>> 
+>> This is fine once the ranges have been applied to the device trees I guess.
+>> 
+>> Tell me when you want me to merge this.
+>> 
+>> Yours,
+>> Linus Walleij
+>> 
+>
+> Hi Linus,
+>
+> Kevin should merge the DT patches since they have now Tested and Reviewed by's, so you can merge it now if you can.
+> Since it will live in you pinctrl tree, it will only impact linux-next until Kevin merges them.
 
-Can you explain where is the extra complexity ? May be I am missing the point.
+I've applied the DT patches now (branch: v4.12/dt64)
 
--- 
-
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Kevin
