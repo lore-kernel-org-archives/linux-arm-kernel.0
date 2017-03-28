@@ -1,44 +1,100 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 27 Mar 2017 17:18:00 -0700
-Subject: [PATCHv2 9/9] ARM: dts: omap4: convert to use the new clkctrl
- clocks for the drivers
-In-Reply-To: <1489741781-12816-10-git-send-email-t-kristo@ti.com>
-References: <1489741781-12816-1-git-send-email-t-kristo@ti.com>
- <1489741781-12816-10-git-send-email-t-kristo@ti.com>
-Message-ID: <20170328001800.GR10760@atomide.com>
+From: slongerbeam@gmail.com (Steve Longerbeam)
+Date: Mon, 27 Mar 2017 17:40:19 -0700
+Subject: [PATCH v6 02/39] [media] dt-bindings: Add bindings for i.MX media
+ driver
+In-Reply-To: <1490661656-10318-1-git-send-email-steve_longerbeam@mentor.com>
+References: <1490661656-10318-1-git-send-email-steve_longerbeam@mentor.com>
+Message-ID: <1490661656-10318-3-git-send-email-steve_longerbeam@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tero Kristo <t-kristo@ti.com> [170317 02:12]:
-> Convert the drivers to use the new clkctrl clocks.
-> 
-> Signed-off-by: Tero Kristo <t-kristo@ti.com>
-> ---
->  arch/arm/boot/dts/omap4.dtsi | 164 ++++++++++++++++++++++++++++++++++++++-----
->  1 file changed, 146 insertions(+), 18 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
-> index 3ecf616..c39304a 100644
-> --- a/arch/arm/boot/dts/omap4.dtsi
-> +++ b/arch/arm/boot/dts/omap4.dtsi
-> @@ -94,16 +94,22 @@
->  			compatible = "ti,omap4-mpu";
->  			ti,hwmods = "mpu";
->  			sram = <&ocmcram>;
-> +			clocks = <&mpuss_clkctrl OMAP4_MPU_CLKCTRL 0>;
-> +			clock-names = "clkctrl";
->  		};
+Add bindings documentation for the i.MX media driver.
 
-Oh one more thing. I don't think we should add the clocks
-here as they are now wrongly allocated to the device within
-the interconnect target module. These clocks really belong
-to each interconnect target module that we don't have in the
-dts yet.
+Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
+---
+ Documentation/devicetree/bindings/media/imx.txt | 74 +++++++++++++++++++++++++
+ 1 file changed, 74 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/media/imx.txt
 
-So we're better off adding the clockctrl clocks and then
-changing the dts to use the interconnect target modules
-with the clockctrl clocks.
-
-Regards,
-
-Tony
+diff --git a/Documentation/devicetree/bindings/media/imx.txt b/Documentation/devicetree/bindings/media/imx.txt
+new file mode 100644
+index 0000000..3059c06
+--- /dev/null
++++ b/Documentation/devicetree/bindings/media/imx.txt
+@@ -0,0 +1,74 @@
++Freescale i.MX Media Video Device
++=================================
++
++Video Media Controller node
++---------------------------
++
++This is the media controller node for video capture support. It is a
++virtual device that lists the camera serial interface nodes that the
++media device will control.
++
++Required properties:
++- compatible : "fsl,imx-capture-subsystem";
++- ports      : Should contain a list of phandles pointing to camera
++		sensor interface ports of IPU devices
++
++example:
++
++capture-subsystem {
++	compatible = "fsl,imx-capture-subsystem";
++	ports = <&ipu1_csi0>, <&ipu1_csi1>;
++};
++
++fim child node
++--------------
++
++This is an optional child node of the ipu_csi port nodes. If present and
++available, it enables the Frame Interval Monitor. Its properties can be
++used to modify the method in which the FIM measures frame intervals.
++Refer to Documentation/media/v4l-drivers/imx.rst for more info on the
++Frame Interval Monitor.
++
++Optional properties:
++- fsl,input-capture-channel: an input capture channel and channel flags,
++			     specified as <chan flags>. The channel number
++			     must be 0 or 1. The flags can be
++			     IRQ_TYPE_EDGE_RISING, IRQ_TYPE_EDGE_FALLING, or
++			     IRQ_TYPE_EDGE_BOTH, and specify which input
++			     capture signal edge will trigger the input
++			     capture event. If an input capture channel is
++			     specified, the FIM will use this method to
++			     measure frame intervals instead of via the EOF
++			     interrupt. The input capture method is much
++			     preferred over EOF as it is not subject to
++			     interrupt latency errors. However it requires
++			     routing the VSYNC or FIELD output signals of
++			     the camera sensor to one of the i.MX input
++			     capture pads (SD1_DAT0, SD1_DAT1), which also
++			     gives up support for SD1.
++
++
++mipi_csi2 node
++--------------
++
++This is the device node for the MIPI CSI-2 Receiver, required for MIPI
++CSI-2 sensors.
++
++Required properties:
++- compatible	: "fsl,imx6-mipi-csi2", "snps,dw-mipi-csi2";
++- reg           : physical base address and length of the register set;
++- clocks	: the MIPI CSI-2 receiver requires three clocks: hsi_tx
++		  (the D-PHY clock), video_27m (D-PHY PLL reference
++		  clock), and eim_podf;
++- clock-names	: must contain "dphy", "ref", "pix";
++- port@*        : five port nodes must exist, containing endpoints
++		  connecting to the source and sink devices according to
++		  of_graph bindings. The first port is an input port,
++		  connecting with a MIPI CSI-2 source, and ports 1
++		  through 4 are output ports connecting with parallel
++		  bus sink endpoint nodes and correspond to the four
++		  MIPI CSI-2 virtual channel outputs.
++
++Optional properties:
++- interrupts	: must contain two level-triggered interrupts,
++		  in order: 100 and 101;
+-- 
+2.7.4
