@@ -1,64 +1,254 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 28 Mar 2017 16:11:29 +0100
-Subject: [V9, 07/11] iommu: of: Handle IOMMU lookup failure with deferred
- probing or error
-In-Reply-To: <20170328150001.j57jko6mx35npgp2@rob-hp-laptop>
-References: <1489086061-9356-8-git-send-email-sricharan@codeaurora.org>
- <20170328150001.j57jko6mx35npgp2@rob-hp-laptop>
-Message-ID: <3cb3f6ec-8f5f-6b93-1ea8-c3abc55d9555@arm.com>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Tue, 28 Mar 2017 17:12:23 +0200
+Subject: [PATCH] KVM: arm/arm64: Signal SIGBUS when stage2 discovers
+ hwpoison memory
+In-Reply-To: <871sthfoac.fsf@e105922-lin.cambridge.arm.com>
+References: <20170315160727.16465-1-james.morse@arm.com>
+ <20170324183044.GK25903@cbox>
+ <87y3vrezjb.fsf@e105922-lin.cambridge.arm.com>
+ <58D8FEF8.9000205@arm.com> <20170327124459.GA21871@cbox>
+ <87mvc6g81r.fsf@e105922-lin.cambridge.arm.com>
+ <20170327144711.GB21871@cbox>
+ <871sthfoac.fsf@e105922-lin.cambridge.arm.com>
+Message-ID: <20170328151223.GC20211@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/03/17 16:00, Rob Herring wrote:
-> On Fri, Mar 10, 2017 at 12:30:57AM +0530, Sricharan R wrote:
->> From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
->>
->> Failures to look up an IOMMU when parsing the DT iommus property need to
->> be handled separately from the .of_xlate() failures to support deferred
->> probing.
->>
->> The lack of a registered IOMMU can be caused by the lack of a driver for
->> the IOMMU, the IOMMU device probe not having been performed yet, having
->> been deferred, or having failed.
->>
->> The first case occurs when the device tree describes the bus master and
->> IOMMU topology correctly but no device driver exists for the IOMMU yet
->> or the device driver has not been compiled in. Return NULL, the caller
->> will configure the device without an IOMMU.
->>
->> The second and third cases are handled by deferring the probe of the bus
->> master device which will eventually get reprobed after the IOMMU.
->>
->> The last case is currently handled by deferring the probe of the bus
->> master device as well. A mechanism to either configure the bus master
->> device without an IOMMU or to fail the bus master device probe depending
->> on whether the IOMMU is optional or mandatory would be a good
->> enhancement.
->>
->> Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
->> Signed-off-by: Laurent Pichart <laurent.pinchart+renesas@ideasonboard.com>
->> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
->> ---
->>  drivers/base/dma-mapping.c | 5 +++--
->>  drivers/iommu/of_iommu.c   | 4 ++--
->>  drivers/of/device.c        | 7 ++++++-
->>  include/linux/of_device.h  | 9 ++++++---
->>  4 files changed, 17 insertions(+), 8 deletions(-)
+On Tue, Mar 28, 2017 at 03:50:51PM +0100, Punit Agrawal wrote:
+> Christoffer Dall <cdall@linaro.org> writes:
 > 
-> Maybe it is the same issue reported for VFIO, but virtio-pci is broken 
-> with v8 of this series. Bisecting blames this commit which looks like it 
-> hasn't changeed. 
+> > On Mon, Mar 27, 2017 at 02:31:44PM +0100, Punit Agrawal wrote:
+> >> Christoffer Dall <cdall@linaro.org> writes:
+> >> 
+> >> > On Mon, Mar 27, 2017 at 01:00:56PM +0100, James Morse wrote:
+> >> >> Hi guys,
+> >> >> 
+> >> >> On 27/03/17 12:20, Punit Agrawal wrote:
+> >> >> > Christoffer Dall <cdall@linaro.org> writes:
+> >> >> >> On Wed, Mar 15, 2017 at 04:07:27PM +0000, James Morse wrote:
+> >> >> >>> Once we enable ARCH_SUPPORTS_MEMORY_FAILURE on arm64[0], notifications for
+> >> >> >>> broken memory can call memory_failure() in mm/memory-failure.c to deliver
+> >> >> >>> SIGBUS to any user space process using the page, and notify all the
+> >> >> >>> in-kernel users.
+> >> >> >>>
+> >> >> >>> If the page corresponded with guest memory, KVM will unmap this page
+> >> >> >>> from its stage2 page tables. The user space process that allocated
+> >> >> >>> this memory may have never touched this page in which case it may not
+> >> >> >>> be mapped meaning SIGBUS won't be delivered.
+> >> >> >>>
+> >> >> >>> When this happens KVM discovers pfn == KVM_PFN_ERR_HWPOISON when it
+> >> >> >>> comes to process the stage2 fault.
+> >> >> >>>
+> >> >> >>> Do as x86 does, and deliver the SIGBUS when we discover
+> >> >> >>> KVM_PFN_ERR_HWPOISON. Use the stage2 mapping size as the si_addr_lsb
+> >> >> >>> as this matches the user space mapping size.
+> >> >> 
+> >> >> >>> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+> >> >> >>> index 962616fd4ddd..9d1aa294e88f 100644
+> >> >> >>> --- a/arch/arm/kvm/mmu.c
+> >> >> >>> +++ b/arch/arm/kvm/mmu.c
+> >> >> >>> @@ -20,8 +20,10 @@
+> >> >> >>>  #include <linux/kvm_host.h>
+> >> >> >>>  #include <linux/io.h>
+> >> >> >>>  #include <linux/hugetlb.h>
+> >> >> >>> +#include <linux/sched/signal.h>
+> >> >> >>>  #include <trace/events/kvm.h>
+> >> >> >>>  #include <asm/pgalloc.h>
+> >> >> >>> +#include <asm/siginfo.h>
+> >> >> >>>  #include <asm/cacheflush.h>
+> >> >> >>>  #include <asm/kvm_arm.h>
+> >> >> >>>  #include <asm/kvm_mmu.h>
+> >> >> >>> @@ -1237,6 +1239,23 @@ static void coherent_cache_guest_page(struct kvm_vcpu *vcpu, kvm_pfn_t pfn,
+> >> >> >>>  	__coherent_cache_guest_page(vcpu, pfn, size);
+> >> >> >>>  }
+> >> >> >>>  
+> >> >> >>> +static void kvm_send_hwpoison_signal(unsigned long address, bool hugetlb)
+> >> >> >>> +{
+> >> >> >>> +	siginfo_t info;
+> >> >> >>> +
+> >> >> >>> +	info.si_signo   = SIGBUS;
+> >> >> >>> +	info.si_errno   = 0;
+> >> >> >>> +	info.si_code    = BUS_MCEERR_AR;
+> >> >> >>> +	info.si_addr    = (void __user *)address;
+> >> >> >>> +
+> >> >> >>> +	if (hugetlb)
+> >> >> >>> +		info.si_addr_lsb = PMD_SHIFT;
+> >> >> >>> +	else
+> >> >> >>> +		info.si_addr_lsb = PAGE_SHIFT;
+> >> >> >>> +
+> >> >> >>> +	send_sig_info(SIGBUS, &info, current);
+> >> >> >>> +}
+> >> >> >>> +
+> >> >> >>>  static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+> >> >> >>>  			  struct kvm_memory_slot *memslot, unsigned long hva,
+> >> >> >>>  			  unsigned long fault_status)
+> >> >> >>> @@ -1306,6 +1325,10 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+> >> >> >>>  	smp_rmb();
+> >> >> >>>  
+> >> >> >>>  	pfn = gfn_to_pfn_prot(kvm, gfn, write_fault, &writable);
+> >> >> >>> +	if (pfn == KVM_PFN_ERR_HWPOISON) {
+> >> >> >>> +		kvm_send_hwpoison_signal(hva, hugetlb);
+> >> >> >>
+> >> >> >> The way this is called means that we'll only notify userspace of a huge
+> >> >> >> mapping if userspace is mapping hugetlbfs, and not because the stage2
+> >> >> >> mapping may or may not have used transparent huge pages when the error
+> >> >> >> was discovered.  Is this the desired semantics?
+> >> >> 
+> >> >> No,
+> >> >> 
+> >> >> 
+> >> >> > I think so.
+> >> >> >
+> >> >> > AFAIUI, transparent hugepages are split before being poisoned while all
+> >> >> > the underlying pages of a hugepage are poisoned together, i.e., no
+> >> >> > splitting.
+> >> >> 
+> >> >> In which case I need to look into this some more!
+> >> >> 
+> >> >> My thinking was we should report the size that was knocked out of the stage2 to
+> >> >> avoid the guest repeatedly faulting until it has touched every guest-page-size
+> >> >> in the stage2 hole.
+> >> >
+> >> > By signaling something at the fault path, I think it's going to be very
+> >> > hard to backtrack how the stage 2 page tables looked like when faults
+> >> > started happening, because I think these are completely decoupled events
+> >> > (the mmu notifier and the later fault).
+> >> >
+> >> >> 
+> >> >> Reading the code in that kvm/mmu.c it looked like the mapping sizes would always
+> >> >> be the same as those used by userspace.
+> >> >
+> >> > I think the mapping sizes should be the same between userspace and KVM,
+> >> > but the mapping size of a particular page (and associated pages) may
+> >> > vary over time.
+> >> 
+> >> Stage 1 and Stage 2 support different hugepage sizes. A larger size
+> >> stage 1 page maps to multiple stage 2 page table entries. For stage 1,
+> >> we support PUD_SIZE, CONT_PMD_SIZE, PMD_SIZE and CONT_PTE_SIZE while
+> >> only PMD_SIZE is supported for Stage 2.
+> >> 
+> >> >
+> >> >> 
+> >> >> If the page was split before KVM could have taken this fault I assumed it would
+> >> >> fault on the page-size mapping and hugetlb would be false.
+> >> >
+> >> > I think you could have a huge page, which gets unmapped as a result on
+> >> > it getting split (perhaps because there was a failure on one page) and
+> >> > later as you fault, you can discover a range which can be a hugetlbfs or
+> >> > transparent huge pages.
+> >> >
+> >> > The question that I don't know is how Linux behaves if a page is marked
+> >> > with hwpoison, in that case, if Linux never supports THP and always
+> >> > marks an entire huge page in a hugetlbfs with the poison, then I think
+> >> > we're mostly good here.  If not, we should make sure we align with
+> >> > whatever the rest of the kernel does.
+> >> 
+> >> AFAICT, a hugetlbfs page is poisoned as a whole while thp is split
+> >> before poisoning. Quoting comment near the top of memory_failure() in
+> >> mm/memory_failure.c.
+> >> 
+> >>     /*
+> >>      * Currently errors on hugetlbfs pages are measured in hugepage units,
+> >>      * so nr_pages should be 1 << compound_order.  OTOH when errors are on
+> >>      * transparent hugepages, they are supposed to be split and error
+> >>      * measurement is done in normal page units.  So nr_pages should be one
+> >>      * in this case.
+> >>      */
+> >> 
+> >> >
+> >> >> (which is already
+> >> >> wrong for another reason, looks like I grabbed the variable before
+> >> >> transparent_hugepage_adjust() has had a go a it.).
+> >> >> 
+> >> >
+> >> > yes, which is why I asked if you only care about hugetlbfs.
+> >> >
+> >> 
+> >> Based on the comment above, we should never get a poisoned page that is
+> >> part of a transparent hugepage.
+> >> 
+> >> >> 
+> >> >> >> Also notice that the hva is not necessarily aligned to the beginning of
+> >> >> >> the huge page, so can we be giving userspace wrong information by
+> >> >> >> pointing in the middle of a huge page and telling it there was an
+> >> >> >> address error in the size of the PMD ?
+> >> >> >>
+> >> >> > 
+> >> >> > I could be reading it wrong but I think we are fine here - the address
+> >> >> > (hva) is the location that faulted. And the lsb indicates the least
+> >> >> > significant bit of the faulting address (See man sigaction(2)). The
+> >> >> > receiver of the signal is expected to use the address and lsb to workout
+> >> >> > the extent of corruption.
+> >> >> 
+> >> >> kill_proc() in mm/memory-failure.c does this too, but the address is set by
+> >> >> page_address_in_vma() in add_to_kill() of the same file. (I'll chat with Punit
+> >> >> off list.)
+> >> >> 
+> >> >> 
+> >> >> > Though I missed a subtlety while reviewing the patch before. The
+> >> >> > reported lsb should be for the userspace hugepage mapping (i.e., hva)
+> >> >> > and not for the stage 2.
+> >> >> 
+> >> >> I thought these were always supposed to be the same, and using hugetlb was a bug
+> >> >> because I didn't look closely enough at what is_vm_hugetlb_page() does.
+> >> 
+> >> See above.
+> >> 
+> >> >> 
+> >> >> 
+> >> >> > In light of this, I'd like to retract my Reviewed-by tag for this
+> >> >> > version of the patch as I believe we'll need to change the lsb
+> >> >> > reporting.
+> >> >> 
+> >> >> Sure, lets work out what this should be doing. I'm beginning to suspect x86's
+> >> >> 'always page size' was correct to begin with!
+> >> >> 
+> >> >
+> >> > I had a sense of that too, but it would be good to understand how you
+> >> > mark and individual page within a hugetlbfs huge page with hwpoison...
+> >> 
+> >> I don't think it is possible to mark an individual page in a hugetlbfs
+> >> page - it's all or nothing.
+> >> 
+> >> AFAICT, the SIGBUS report is for user mappings and doesn't have to care
+> >> whether it's Stage 2 hugetlb page or thp. And the lsb determination should
+> >> take the Stage 1 hugepage size into account - something along the lines
+> >> of the snippet from previous email.
+> >> 
+> >
+> > I think the lsb should indicate the size of the memory region known to
+> > be broken by the kernel - however that whole mechanism works.
+> 
+> Agreed.
+> 
+> To re-iterate and confirm that we are on the same page 
 
-v8 managed to break *all* PCI devices which didn't have an associated
-"iommu-map". The problem was actually in patch 2 (and is fixed in this
-version), but it only hit at this point once we start propagating the
-erroneous error code back to the driver probe.
+Haha, good one.
 
-Robin.
+> (this time using
+> correct terminology) -
+> 
+> * the kernel poisons pages in PAGE_SIZEed or hugepage sized units
+>   depending on where the poisoned address maps to. If the affected
+>   location maps to a transparent hugepage, the thp is split and the
+>   PAGE_SIZed unit corresponding to the location is poisoned.
+> 
+> * When sending a SIGBUS on encountering a poisoned pfn, the lsb should
+>   be -
+>   
+>   - PAGE_SHIFT, if the hva does not map to a hugepage
+>   - huge_page_shift(hstate_vma(vma)), if the hva belongs to a hugepage
+> 
+> Hopefully that makes sense.
+> 
 
-> 
-> Rob
-> 
-> P.S. Doesn't look like you have copied the DT maintainers nor list for 
-> the DT changes.
-> 
+Yes, sounds reasonable to me.  Only thing we could argue, is that if
+userspace knows it's dealing with hugetlbfs, it should know the minimal
+granularity of the memory it can deal with, so maybe that's why x86
+doesn't bother and always just uses PAGE_SHIFT.
+
+In both cases though, the patch was mostly fine, and probably gets the
+job done regardless of which lsb is reported.
+
+Thanks,
+-Christoffer
