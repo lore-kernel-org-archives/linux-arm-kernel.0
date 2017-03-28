@@ -1,53 +1,106 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 28 Mar 2017 10:00:01 -0500
-Subject: [V9, 07/11] iommu: of: Handle IOMMU lookup failure with deferred
- probing or error
-In-Reply-To: <1489086061-9356-8-git-send-email-sricharan@codeaurora.org>
-References: <1489086061-9356-8-git-send-email-sricharan@codeaurora.org>
-Message-ID: <20170328150001.j57jko6mx35npgp2@rob-hp-laptop>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 28 Mar 2017 17:02:20 +0200
+Subject: [PATCH v22 03/11] clocksource: arm_arch_timer: refactor
+ arch_timer_needs_probing
+In-Reply-To: <20170321163122.9183-4-fu.wei@linaro.org>
+References: <20170321163122.9183-1-fu.wei@linaro.org>
+ <20170321163122.9183-4-fu.wei@linaro.org>
+Message-ID: <20170328150220.GF2123@mai>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 10, 2017 at 12:30:57AM +0530, Sricharan R wrote:
-> From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+On Wed, Mar 22, 2017 at 12:31:14AM +0800, fu.wei at linaro.org wrote:
+> From: Fu Wei <fu.wei@linaro.org>
 > 
-> Failures to look up an IOMMU when parsing the DT iommus property need to
-> be handled separately from the .of_xlate() failures to support deferred
-> probing.
+> When system init with device-tree, we don't know which node will be
+> initialized first. And the code in arch_timer_common_init should wait
+> until per-cpu timer and MMIO timer are both initialized. So we need
+> arch_timer_needs_probing to detect the init status of system.
 > 
-> The lack of a registered IOMMU can be caused by the lack of a driver for
-> the IOMMU, the IOMMU device probe not having been performed yet, having
-> been deferred, or having failed.
+> But currently the code is dispersed in arch_timer_needs_probing and
+> arch_timer_common_init. And the function name doesn't specify that
+> it's only for device-tree. This is somewhat confusing.
+
+Can the following patch help you to solve nicely the situation ?
+
+https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1360007.html
+ 
+> This patch move all related code from arch_timer_common_init to
+> arch_timer_needs_probing, refactor it, and rename it to
+> arch_timer_needs_of_probing. And make sure that it will be called
+> only if acpi is disabled.
 > 
-> The first case occurs when the device tree describes the bus master and
-> IOMMU topology correctly but no device driver exists for the IOMMU yet
-> or the device driver has not been compiled in. Return NULL, the caller
-> will configure the device without an IOMMU.
-> 
-> The second and third cases are handled by deferring the probe of the bus
-> master device which will eventually get reprobed after the IOMMU.
-> 
-> The last case is currently handled by deferring the probe of the bus
-> master device as well. A mechanism to either configure the bus master
-> device without an IOMMU or to fail the bus master device probe depending
-> on whether the IOMMU is optional or mandatory would be a good
-> enhancement.
-> 
-> Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> Signed-off-by: Laurent Pichart <laurent.pinchart+renesas@ideasonboard.com>
-> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+> Signed-off-by: Fu Wei <fu.wei@linaro.org>
+> Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
 > ---
->  drivers/base/dma-mapping.c | 5 +++--
->  drivers/iommu/of_iommu.c   | 4 ++--
->  drivers/of/device.c        | 7 ++++++-
->  include/linux/of_device.h  | 9 ++++++---
->  4 files changed, 17 insertions(+), 8 deletions(-)
+>  drivers/clocksource/arm_arch_timer.c | 34 +++++++++++++++++++---------------
+>  1 file changed, 19 insertions(+), 15 deletions(-)
+> 
+> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+> index 29ca7d6..d1a05d9 100644
+> --- a/drivers/clocksource/arm_arch_timer.c
+> +++ b/drivers/clocksource/arm_arch_timer.c
+> @@ -839,15 +839,28 @@ static const struct of_device_id arch_timer_mem_of_match[] __initconst = {
+>  	{},
+>  };
+>  
+> -static bool __init
+> -arch_timer_needs_probing(int type, const struct of_device_id *matches)
+> +static bool __init arch_timer_needs_of_probing(void)
+>  {
+>  	struct device_node *dn;
+>  	bool needs_probing = false;
+> +	unsigned int mask = ARCH_TIMER_TYPE_CP15 | ARCH_TIMER_TYPE_MEM;
+>  
+> -	dn = of_find_matching_node(NULL, matches);
+> -	if (dn && of_device_is_available(dn) && !(arch_timers_present & type))
+> +	/* We have two timers, and both device-tree nodes are probed. */
+> +	if ((arch_timers_present & mask) == mask)
+> +		return false;
+> +
+> +	/*
+> +	 * Only one type of timer is probed,
+> +	 * check if we have another type of timer node in device-tree.
+> +	 */
+> +	if (arch_timers_present & ARCH_TIMER_TYPE_CP15)
+> +		dn = of_find_matching_node(NULL, arch_timer_mem_of_match);
+> +	else
+> +		dn = of_find_matching_node(NULL, arch_timer_of_match);
+> +
+> +	if (dn && of_device_is_available(dn))
+>  		needs_probing = true;
+> +
+>  	of_node_put(dn);
+>  
+>  	return needs_probing;
+> @@ -855,17 +868,8 @@ arch_timer_needs_probing(int type, const struct of_device_id *matches)
+>  
+>  static int __init arch_timer_common_init(void)
+>  {
+> -	unsigned mask = ARCH_TIMER_TYPE_CP15 | ARCH_TIMER_TYPE_MEM;
+> -
+> -	/* Wait until both nodes are probed if we have two timers */
+> -	if ((arch_timers_present & mask) != mask) {
+> -		if (arch_timer_needs_probing(ARCH_TIMER_TYPE_MEM,
+> -					     arch_timer_mem_of_match))
+> -			return 0;
+> -		if (arch_timer_needs_probing(ARCH_TIMER_TYPE_CP15,
+> -					     arch_timer_of_match))
+> -			return 0;
+> -	}
+> +	if (acpi_disabled && arch_timer_needs_of_probing())
+> +		return 0;
+>  
+>  	arch_timer_banner(arch_timers_present);
+>  	arch_counter_register(arch_timers_present);
+> -- 
+> 2.9.3
+> 
 
-Maybe it is the same issue reported for VFIO, but virtio-pci is broken 
-with v8 of this series. Bisecting blames this commit which looks like it 
-hasn't changeed. 
+-- 
 
-Rob
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
 
-P.S. Doesn't look like you have copied the DT maintainers nor list for 
-the DT changes.
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
