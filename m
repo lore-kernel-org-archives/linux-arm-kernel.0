@@ -1,42 +1,50 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Tue, 28 Mar 2017 18:17:01 +0900
-Subject: [PATCH v5 0/3] clk: let clk_disable() return immediately if clk is
- NULL for last 3 clks
-Message-ID: <1490692624-11931-1-git-send-email-yamada.masahiro@socionext.com>
+Date: Tue, 28 Mar 2017 18:17:02 +0900
+Subject: [PATCH v5 1/3] ARM: mmp: let clk_disable() return immediately if clk
+ is NULL
+In-Reply-To: <1490692624-11931-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1490692624-11931-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <1490692624-11931-2-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+In many of clk_disable() implementations, it is a no-op for a NULL
+pointer input, but this is one of the exceptions.
 
-Hi Andrew,
+Making it treewide consistent will allow clock consumers to call
+clk_disable() without NULL pointer check.
 
-Please consider to apply this series to your tree.
-This trivial series has been left over so long.
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+---
 
-Stephen Boyd suggested to split the series per-arch,
-and I did so.
-But sub-architecture maintainers did not respond
-in spite of my several times pings.
+Changes in v5:
+  - None
 
+Changes in v4:
+  - Split into per-arch patches
 
-Please see this:
-w90x900:   https://patchwork.kernel.org/patch/9338047/
-mmp:       https://patchwork.kernel.org/patch/9338049/
-blackfin   https://patchwork.kernel.org/patch/9338053/
+Changes in v3:
+  - Return only when clk is NULL.  Do not take care of error pointer.
 
+Changes in v2:
+  - Rebase on Linux 4.6-rc1
 
-Stephen mentioned Andrew could pick up this in case maintainers are silent.
-http://lkml.iu.edu/hypermail/linux/kernel/1609.2/00801.html
+ arch/arm/mach-mmp/clock.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-
-Masahiro Yamada (3):
-  ARM: mmp: let clk_disable() return immediately if clk is NULL
-  ARM: w90x900: let clk_disable() return immediately if clk is NULL
-  blackfin: bf609: let clk_disable() return immediately if clk is NULL
-
- arch/arm/mach-mmp/clock.c        | 3 +++
- arch/arm/mach-w90x900/clock.c    | 3 +++
- arch/blackfin/mach-bf609/clock.c | 3 +++
- 3 files changed, 9 insertions(+)
-
+diff --git a/arch/arm/mach-mmp/clock.c b/arch/arm/mach-mmp/clock.c
+index ac6633d..28fe64c 100644
+--- a/arch/arm/mach-mmp/clock.c
++++ b/arch/arm/mach-mmp/clock.c
+@@ -67,6 +67,9 @@ void clk_disable(struct clk *clk)
+ {
+ 	unsigned long flags;
+ 
++	if (!clk)
++		return;
++
+ 	WARN_ON(clk->enabled == 0);
+ 
+ 	spin_lock_irqsave(&clocks_lock, flags);
 -- 
 2.7.4
