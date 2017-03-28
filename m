@@ -1,87 +1,27 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Tue, 28 Mar 2017 14:46:23 +0200
-Subject: [PATCH v2 1/9] arm64: KVM: PMU: Refactor pmu_*_el0_disabled
-In-Reply-To: <20170327160345.12402-2-marc.zyngier@arm.com>
-References: <20170327160345.12402-1-marc.zyngier@arm.com>
- <20170327160345.12402-2-marc.zyngier@arm.com>
-Message-ID: <20170328124623.GJ31156@cbox>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Tue, 28 Mar 2017 08:52:52 -0400
+Subject: [PATCH V5 0/4] PCI/ASPM: reconfigure ASPM following hotplug for
+ POLICY_DEFAULT
+In-Reply-To: <92EBB4272BF81E4089A7126EC1E7B2846675AEDC@IRSMSX101.ger.corp.intel.com>
+References: <1490477893-9517-1-git-send-email-okaya@codeaurora.org>
+ <f062dc8f-df66-bfd8-a0d7-50ac1cadf975@codeaurora.org>
+ <92EBB4272BF81E4089A7126EC1E7B2846675AEDC@IRSMSX101.ger.corp.intel.com>
+Message-ID: <c9820456-d9b1-cd97-533b-889905e27603@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 27, 2017 at 05:03:37PM +0100, Marc Zyngier wrote:
-> There is a lot of duplication in the pmu_*_el0_disabled helpers,
-> and as we're going to modify them shortly, let's move all the
-> common stuff in a single function.
-> 
-> No functionnal change.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm64/kvm/sys_regs.c | 25 +++++++++++--------------
->  1 file changed, 11 insertions(+), 14 deletions(-)
-> 
-> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-> index 0e26f8c2b56f..7e1d673304d5 100644
-> --- a/arch/arm64/kvm/sys_regs.c
-> +++ b/arch/arm64/kvm/sys_regs.c
-> @@ -460,35 +460,32 @@ static void reset_pmcr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
->  	vcpu_sys_reg(vcpu, PMCR_EL0) = val;
->  }
->  
-> -static bool pmu_access_el0_disabled(struct kvm_vcpu *vcpu)
-> +static bool check_disabled(struct kvm_vcpu *vcpu, u64 flags)
->  {
->  	u64 reg = vcpu_sys_reg(vcpu, PMUSERENR_EL0);
-> +	bool cond = (reg & flags) || vcpu_mode_priv(vcpu);
-
-nit: I would call this variable 'enabled' and then return !enabled to
-make it clear what's going on.
-
-(If you agree, I can fix this up when applying along with the typo and
-rename pointed out by Suzuki).
-
->  
-> -	return !((reg & ARMV8_PMU_USERENR_EN) || vcpu_mode_priv(vcpu));
-> +	return !cond;
->  }
->  
-> -static bool pmu_write_swinc_el0_disabled(struct kvm_vcpu *vcpu)
-> +static bool pmu_access_el0_disabled(struct kvm_vcpu *vcpu)
->  {
-> -	u64 reg = vcpu_sys_reg(vcpu, PMUSERENR_EL0);
-> +	return check_disabled(vcpu, ARMV8_PMU_USERENR_EN);
-> +}
->  
-> -	return !((reg & (ARMV8_PMU_USERENR_SW | ARMV8_PMU_USERENR_EN))
-> -		 || vcpu_mode_priv(vcpu));
-> +static bool pmu_write_swinc_el0_disabled(struct kvm_vcpu *vcpu)
-> +{
-> +	return check_disabled(vcpu, ARMV8_PMU_USERENR_SW | ARMV8_PMU_USERENR_EN);
->  }
->  
->  static bool pmu_access_cycle_counter_el0_disabled(struct kvm_vcpu *vcpu)
->  {
-> -	u64 reg = vcpu_sys_reg(vcpu, PMUSERENR_EL0);
-> -
-> -	return !((reg & (ARMV8_PMU_USERENR_CR | ARMV8_PMU_USERENR_EN))
-> -		 || vcpu_mode_priv(vcpu));
-> +	return check_disabled(vcpu, ARMV8_PMU_USERENR_CR | ARMV8_PMU_USERENR_EN);
->  }
->  
->  static bool pmu_access_event_counter_el0_disabled(struct kvm_vcpu *vcpu)
->  {
-> -	u64 reg = vcpu_sys_reg(vcpu, PMUSERENR_EL0);
-> -
-> -	return !((reg & (ARMV8_PMU_USERENR_ER | ARMV8_PMU_USERENR_EN))
-> -		 || vcpu_mode_priv(vcpu));
-> +	return check_disabled(vcpu, ARMV8_PMU_USERENR_ER | ARMV8_PMU_USERENR_EN);
->  }
->  
->  static bool access_pmcr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
-> -- 
-> 2.11.0
+On 3/28/2017 2:02 AM, Patel, Mayurkumar wrote:
+> Thanks for your patches. I am seeing kernel panic after applying
+> these patches (on top of latest kernel) each time during early boot in pci_aspm_init() (any hints already?) function.
+> Need to check if it's something related to my local setup or it's because of these changes.
+> For now I don't have more details why it crashes but I will dig in further and I will provide
+> you more data as soon as I have it.
 > 
 
-Otherwise:
+Interesting, I retested Qemu and I don't see an issue. 
+Can you share your bootlog when you see the crash?
 
-Reviewed-by: Christoffer Dall <cdall@linaro.org>
+-- 
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
