@@ -1,27 +1,30 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 28 Mar 2017 11:30:56 +0200
-Subject: [RFT PATCH 5/6] pinctrl: meson: use gpio-ranges from DT
-In-Reply-To: <1490286449-19448-6-git-send-email-narmstrong@baylibre.com>
-References: <1490286449-19448-1-git-send-email-narmstrong@baylibre.com>
- <1490286449-19448-6-git-send-email-narmstrong@baylibre.com>
-Message-ID: <CACRpkdZqfwKZ=2SQzr_D5-M5em+7JBS7eUaJ_VH33uV5AZ8xRw@mail.gmail.com>
+From: David.Laight@ACULAB.COM (David Laight)
+Date: Tue, 28 Mar 2017 09:33:21 +0000
+Subject: [PATCH 06/16] drivers, net, mlx5: convert mlx5_cq.refcount from
+ atomic_t to refcount_t
+In-Reply-To: <1490691403-4016-7-git-send-email-elena.reshetova@intel.com>
+References: <1490691403-4016-1-git-send-email-elena.reshetova@intel.com>
+ <1490691403-4016-7-git-send-email-elena.reshetova@intel.com>
+Message-ID: <063D6719AE5E284EB5DD2968C1650D6DCFFBE8AF@AcuExch.aculab.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 23, 2017 at 5:27 PM, Neil Armstrong <narmstrong@baylibre.com> wrote:
+From: Elena Reshetova
+> Sent: 28 March 2017 09:57
+> 
+> refcount_t type and corresponding API should be
+> used instead of atomic_t when the variable is used as
+> a reference counter. This allows to avoid accidental
+> refcounter overflows that might lead to use-after-free
+> situations.
 
-'> When trying to add a gpio-hog, we enter a weird loop where the gpio-ranges
-> is needed when gpiochip_add_data() is called but in the current implementation
-> the ranges are added from the driver afterwards.
->
-> A simple solution is to rely on the DR gpio-ranges attribute and remove the
-> call to gpiochip_add_pin_range().
->
-> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+I can't help feeling that you ought to find a scheme
+that will detect extra decrements and extra increments
+before the counter wraps 32 bits.
 
-This is fine once the ranges have been applied to the device trees I guess.
+If an extra reference is requested every 100us it takes 4.8 days
+for the counter to increment back to zero.
+Simple tests aren't doing to find that - but it can easily happen
+on a system that is running for several years.
 
-Tell me when you want me to merge this.
-
-Yours,
-Linus Walleij
+	David
