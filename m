@@ -1,124 +1,215 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 28 Mar 2017 16:19:06 +0200
-Subject: [PATCH v2 5/7] pinctrl: aramda-37xx: Add irqchip support
-In-Reply-To: <CACRpkdY0DzMGiRTWeS23iCY3Vja9dnXJVaMqOnhJRpBLowfYTA@mail.gmail.com>
- (Linus Walleij's message of "Tue, 28 Mar 2017 15:04:39 +0200")
-References: <cover.26288667a039bc9f8e62dec2fd6342ded4014d12.1490120798.git-series.gregory.clement@free-electrons.com>
- <0e60fccd7913b83ee53d2921ce8f297927e8b6f3.1490120798.git-series.gregory.clement@free-electrons.com>
- <CACRpkdYv6WDWM60dRMaYfEt50M8N-yLYk2TRguNi78aQtt6X9A@mail.gmail.com>
- <87vaqtadry.fsf@free-electrons.com>
- <CACRpkdY0DzMGiRTWeS23iCY3Vja9dnXJVaMqOnhJRpBLowfYTA@mail.gmail.com>
-Message-ID: <87mvc5a3hh.fsf@free-electrons.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 28 Mar 2017 15:29:45 +0100
+Subject: [RFC PATCH 1/3] of/pci: dma-ranges to account highest possible
+ host bridge dma_mask
+In-Reply-To: <CAMSpPPdnQdWeyTsnESRFx52gtxQLxwfPQwQgDFSN=katfW7suA@mail.gmail.com>
+References: <1490419893-5073-1-git-send-email-oza.oza@broadcom.com>
+ <CAL_JsqLtTiH7DhqKf_x7xy1KZYQyiOreK=M90HFr=8BDW9542w@mail.gmail.com>
+ <CAMSpPPdnQdWeyTsnESRFx52gtxQLxwfPQwQgDFSN=katfW7suA@mail.gmail.com>
+Message-ID: <de6bfedf-62aa-98e4-dae5-7862ab3ba754@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
- 
- On mar., mars 28 2017, Linus Walleij <linus.walleij@linaro.org> wrote:
-
-> On Tue, Mar 28, 2017 at 12:36 PM, Gregory CLEMENT
-> <gregory.clement@free-electrons.com> wrote:
->>  On lun., mars 27 2017, Linus Walleij <linus.walleij@linaro.org> wrote:
->
->>>> +                       u32 virq = irq_linear_revmap(d, hwirq +
->>>> +                                                    i * GPIO_PER_REG);
+On 28/03/17 06:27, Oza Oza wrote:
+> On Mon, Mar 27, 2017 at 8:16 PM, Rob Herring <robh@kernel.org> wrote:
+>> On Sat, Mar 25, 2017 at 12:31 AM, Oza Pawandeep <oza.oza@broadcom.com> wrote:
+>>> it is possible that PCI device supports 64-bit DMA addressing,
+>>> and thus it's driver sets device's dma_mask to DMA_BIT_MASK(64),
+>>> however PCI host bridge may have limitations on the inbound
+>>> transaction addressing. As an example, consider NVME SSD device
+>>> connected to iproc-PCIe controller.
 >>>
->>> Use irq_find_mapping() instead please.
->>
->> As we are in the interrupt handler I chose to use this function because
->> according to its documentation: "This is a fast path alternative to
->> irq_find_mapping() that can be called directly by irq controller code to
->> save a handful of instructions".
->>
->> The only restriction is "It is always safe to call, but won't find irqs
->> mapped using the radix tree.". So I think that for this driver it is
->> okay.
->
-> So you are relying on the core code in gpiolib to select a linear
-> map. That is implicit semantics, and either all drivers using
-> GPIOLIB_IRQCHIP should be changed to irq_linear_revmap()
-> or all stay with irq_find_mapping().
->
-> In this case, I doubt it that you are actually so timing critical that
-> it matters. Please use irq_find_mapping().
-
-OK
-
->>>> +       ret = gpiochip_irqchip_add(gc, irqchip, 0,
->>>> +                                  handle_level_irq, IRQ_TYPE_NONE);
+>>> Currently, the IOMMU DMA ops only considers PCI device dma_mask
+>>> when allocating an IOVA. This is particularly problematic on
+>>> ARM/ARM64 SOCs where the IOMMU (i.e. SMMU) translates IOVA to
+>>> PA for in-bound transactions only after PCI Host has forwarded
+>>> these transactions on SOC IO bus. This means on such ARM/ARM64
+>>> SOCs the IOVA of in-bound transactions has to honor the addressing
+>>> restrictions of the PCI Host.
 >>>
->>> If you also set up the handler in .set_type() you can assign
->>> handle_bad_irq() here and let .set_type set the right handler
->>> as e.g. drivers/gpio/gpio-pl061.c.
->>
->> Well the hardware can only manage the edge trigger, so there is no
->> benefit to modify it each time we want to change the kind of edge we
->> want (raising or falling). But your comment make me realized that I used
->> the wrong one, I will move to handle_edge_irq in the v4.
->
-> Ooops, yeah handle_edge_irq() is what calls the ACK callback.
->
->>>> +       for (i = 0; i < nrirqs; i++) {
->>>> +               struct irq_data *d = irq_get_irq_data(gc->irq_base + i);
->>>> +
->>>> +               d->mask = 1 << (i % GPIO_PER_REG);
->>>> +       }
+>>> current pcie frmework and of framework integration assumes dma-ranges
+>>> in a way where memory-mapped devices define their dma-ranges.
+>>> dma-ranges: (child-bus-address, parent-bus-address, length).
 >>>
->>> What is this? It looks like a big hack. At least put in a fat
->>> comment about what is going on and why.
+>>> but iproc based SOCs and even Rcar based SOCs has PCI world dma-ranges.
+>>> dma-ranges = <0x43000000 0x00 0x00 0x00 0x00 0x80 0x00>;
 >>
->> I can reuse a part of the commit log here: "The only unusual "feature"
->> is that many interrupts are connected to the parent interrupt
->> controller. But we do not take advantage of this and use the chained irq
->> with all of them."
->
-> What you're doing is mocking around with core irqchip semantics.
-> Is ->mask really supposed to be played around with from the outsid
-> like this?
+>> If you implement a common function, then I expect to see other users
+>> converted to use it. There's also PCI hosts in arch/powerpc that parse
+>> dma-ranges.
+> 
+> the common function should be similar to what
+> of_pci_get_host_bridge_resources is doing right now.
+> it parses ranges property right now.
+> 
+> the new function would look look following.
+> 
+> of_pci_get_dma_ranges(struct device_node *dev, struct list_head *resources)
+> where resources would return the dma-ranges.
+> 
+> but right now if you see the patch, of_dma_configure calls the new
+> function, which actually returns the largest possible size.
+> so this new function has to be generic in a way where other PCI hosts
+> can use it. but certainly iproc(Broadcom SOC) , rcar based SOCs can
+> use it for sure.
+> 
+> although having powerpc using it;  is a separate exercise, since I do
+> not have any access to other PCI hosts such as powerpc. but we can
+> workout with them on thsi forum if required.
+> 
+> so overall, of_pci_get_dma_ranges has to serve following 2 purposes.
+> 
+> 1) it has to return largest possible size to of_dma_configure to
+> generate largest possible dma_mask.
+> 
+> 2) it also has to return resources (dma-ranges) parsed, to the users.
+> 
+> so to address above needs
+> 
+> of_pci_get_dma_ranges(struct device_node *dev, struct list_head
+> *resources, u64 *size)
+> 
+> dev -> device node.
+> resources -> dma-ranges in allocated list.
+> size -> highest possible size to generate possible dma_mask for
+> of_dma_configure.
+> 
+> let em know how this sounds.
 
-According to the documentation mask is a "precomputed bitmask for
-accessing the chip registers" and it is exactly the way it is used in
-this driver.
+Note that the point of passing PCI host bridges into of_dma_configure()
+in the first place was to avoid having some separate PCI-specific path
+for DMA configuration. I worry that introducing bus-specific dma-ranges
+parsing largely defeats that, since we end up with the worst of both
+worlds; effectively-duplicated code, and/or a load of extra complexity
+to then attempt to reconverge the divergent paths (there really
+shouldn't be any need to allocate a list of anything). Given that
+of_translate_dma_address() is already bus-agnostic, it hardly seems
+justifiable for its caller not to be so as well, especially when it
+mostly just comes down to getting the right #address-cells value.
 
-Moreover, currently ->mask is only used by the generic irqchip framework
-and not by the core of the irqchip subsystem. So the mask initialization
-is not done from the oustide but at the same level as the generic
-irqchip which is not used here.
+The patch below is actually enough to make typical cases work, but is
+vile, so I'm not seriously considering it (hence I've not bothered
+making IOMMU configuration handle all circumstances). What it has served
+to do, though, is give me a clear idea of how to properly sort out the
+not-quite-right device/parent assumptions between of_dma_configure() and
+of_dma_get_range() rather than bodging around them any further - stay tuned.
 
+Robin.
 
-> Anyways: BIT(i % GPIO_PER_REG) is nicer.
+----->8-----
+From: Robin Murphy <robin.murphy@arm.com>
+Subject: [PATCH] of/pci: Use child node for DMA configuration
 
-OK
+of_dma_configure() expects to be passed an OF node representing the
+device being configured - for PCI devices we currently pass the node of
+the appropriate host controller, which sort of works for inherited
+properties which may appear at any level, like "dma-coherent", but falls
+apart for properties which actually care about specific device-parent
+relationships, like "dma-ranges".
 
->
->>>> +       for (i = 0; i < nr_irq_parent; i++) {
->>>> +               int irq = irq_of_parse_and_map(np, i);
->>>
->>> I think gpiochip_irqchip_add() will do this for you already,
->>> as it calls irq_create_mapping() for all offsets which will call
->>> irq_of_parse_and_map() am I right?
->>
->> After reading the code, it doesn't seem it is the case. At least there
->> is no irq_of_parse_and_map() call from gpiochip_irqchip_add(). And waht
->> we need here is to associate each IRQ to the same GPIO handler.
->>
->> I can still try without this line to confirm it.
->
-> It has irq_create_mapping(gpiochip->irqdomain, offset); that get
-> called for every IRQ, and that will eventually call irq_of_parse_and_map()
-> if the IRQs are defined in the device tree. (IIRC)
+Solve this by attempting to find a suitable child node if the PCI
+hierarchy is actually represented in DT, and if not then faking one up
+as a last resort, to make all of DMA configuration work as expected.
 
-When I followed the functions called I never find a call to
-irq_of_parse_and_map(), the closer things related to device tree I found
-was:
-"virq = irq_domain_alloc_descs(-1, 1, hwirq, of_node_to_nid(of_node),
-NULL);"
-http://elixir.free-electrons.com/source/kernel/irq/irqdomain.c?v=4.11-rc4#L507
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+---
+ drivers/iommu/of_iommu.c |  3 ++-
+ drivers/pci/of.c         | 24 ++++++++++++++++++++++++
+ drivers/pci/probe.c      | 14 +++++++++++++-
+ include/linux/pci.h      |  3 +++
+ 4 files changed, 42 insertions(+), 2 deletions(-)
 
-Gregory
+diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
+index 2683e9fc0dcf..35c97b945c15 100644
+--- a/drivers/iommu/of_iommu.c
++++ b/drivers/iommu/of_iommu.c
+@@ -146,7 +146,8 @@ const struct iommu_ops *of_iommu_configure(struct
+device *dev,
+ 	int idx = 0;
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+ 	if (dev_is_pci(dev))
+-		return of_pci_iommu_configure(to_pci_dev(dev), master_np);
++		return of_pci_iommu_configure(to_pci_dev(dev),
++					      of_get_next_parent(master_np));
+
+ 	/*
+ 	 * We don't currently walk up the tree looking for a parent IOMMU.
+diff --git a/drivers/pci/of.c b/drivers/pci/of.c
+index e112da11630e..96eece1c423d 100644
+--- a/drivers/pci/of.c
++++ b/drivers/pci/of.c
+@@ -88,3 +88,27 @@ struct irq_domain
+*pci_host_bridge_of_msi_domain(struct pci_bus *bus)
+ 	return NULL;
+ #endif
+ }
++
++struct device_node *pci_dev_get_dma_of_node(struct pci_dev *dev)
++{
++	struct device_node *np;
++	struct pci_bus *bus = dev->bus;
++
++	/* Is the device itself actually described in the DT? */
++	np = of_node_get(dev->dev.of_node);
++	if (np)
++		return np;
++
++	/* Or is some intermediate bridge? That would do... */
++	for (bus = dev->bus; bus->parent; bus = bus->parent) {
++		np = of_node_get(bus->bridge->of_node);
++		if (np)
++			return np;
++	}
++
++	/* Failing that, any child of the same host bridge? */
++	if (bus->bridge->parent)
++		np = of_get_next_child(bus->bridge->parent->of_node, NULL);
++
++	return np;
++}
+diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+index dfc9a2794141..4f7ade64aa3e 100644
+--- a/drivers/pci/probe.c
++++ b/drivers/pci/probe.c
+@@ -1906,7 +1906,19 @@ static void pci_dma_configure(struct pci_dev *dev)
+
+ 	if (IS_ENABLED(CONFIG_OF) &&
+ 		bridge->parent && bridge->parent->of_node) {
+-			of_dma_configure(&dev->dev, bridge->parent->of_node);
++		struct device_node *np, tmp = {0};
++
++		np = pci_dev_get_dma_of_node(dev);
++		if (!np) {
++			np = &tmp;
++			of_node_set_flag(np, OF_DETACHED);
++			of_node_init(np);
++			tmp.parent = bridge->parent->of_node;
++		}
++
++		of_dma_configure(&dev->dev, np);
++		if (np != &tmp)
++			of_node_put(np);
+ 	} else if (has_acpi_companion(bridge)) {
+ 		struct acpi_device *adev = to_acpi_device_node(bridge->fwnode);
+ 		enum dev_dma_attr attr = acpi_get_dma_attr(adev);
+diff --git a/include/linux/pci.h b/include/linux/pci.h
+index eb3da1a04e6c..94ecd1817f58 100644
+--- a/include/linux/pci.h
++++ b/include/linux/pci.h
+@@ -2086,6 +2086,7 @@ void pci_release_of_node(struct pci_dev *dev);
+ void pci_set_bus_of_node(struct pci_bus *bus);
+ void pci_release_bus_of_node(struct pci_bus *bus);
+ struct irq_domain *pci_host_bridge_of_msi_domain(struct pci_bus *bus);
++struct device_node *pci_dev_get_dma_of_node(struct pci_dev *dev);
+
+ /* Arch may override this (weak) */
+ struct device_node *pcibios_get_phb_of_node(struct pci_bus *bus);
+@@ -2110,6 +2111,8 @@ static inline struct device_node *
+ pci_device_to_OF_node(const struct pci_dev *pdev) { return NULL; }
+ static inline struct irq_domain *
+ pci_host_bridge_of_msi_domain(struct pci_bus *bus) { return NULL; }
++static inline struct device_node *
++pci_dev_get_dma_of_node(struct pci_dev *dev) { return NULL; }
+ #endif  /* CONFIG_OF */
+
+ #ifdef CONFIG_ACPI
