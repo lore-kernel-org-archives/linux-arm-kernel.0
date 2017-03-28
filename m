@@ -1,87 +1,77 @@
-From: leonard.crestez@nxp.com (Leonard Crestez)
-Date: Tue, 28 Mar 2017 22:49:55 +0300
-Subject: [RFC 4/8] regulator: core: Check enabling bypass respects
- constraints
-In-Reply-To: <20170328164754.z2c2ttovs3sxbcos@sirena.org.uk>
-References: <cover.1490199005.git.leonard.crestez@nxp.com>
- <1edff9bc610969b0c53fa1080d5db021c8e00b2d.1490199005.git.leonard.crestez@nxp.com>
- <20170324125212.vikgekqxsnu7htzl@sirena.org.uk>
- <1490704781.3546.57.camel@nxp.com>
- <20170328164754.z2c2ttovs3sxbcos@sirena.org.uk>
-Message-ID: <1490730595.15830.1.camel@nxp.com>
+From: minyard@acm.org (Corey Minyard)
+Date: Tue, 28 Mar 2017 15:01:02 -0500
+Subject: [PATCH] ACPI / IPMI: change warning to debug on timeout
+In-Reply-To: <39c54677-1472-afff-ec70-45a790f56e50@codeaurora.org>
+References: <1490283150-24000-1-git-send-email-okaya@codeaurora.org>
+ <537c0d7a-fd95-2e7f-be07-9e3ca79ca07a@acm.org>
+ <39c54677-1472-afff-ec70-45a790f56e50@codeaurora.org>
+Message-ID: <67243d7f-0195-a214-b9d4-bdac48743893@acm.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2017-03-28 at 17:47 +0100, Mark Brown wrote:
-> On Tue, Mar 28, 2017 at 03:39:41PM +0300, Leonard Crestez wrote:
-> > On Fri, 2017-03-24 at 12:52 +0000, Mark Brown wrote:
+On 03/25/2017 09:08 AM, Sinan Kaya wrote:
+> On 3/24/2017 10:55 PM, Corey Minyard wrote:
+>> Why would a timeout for a message be expected?  The BMC should
+>> at least respond with an error for an incorrect message.
+> Let me add some more context...
+>
+> In this particular case, the FRU ID that I was trying to access was
+> correct.
+>
+> Platform supports PCIe hotplug. The FRU is embedded into the HW that
+> is being removed. That's what I mean by non-existent.
+>
+> When the device is ejected and a FRU command is executed, BMC times out
+> reaching to the FRU on the device.
+>
+> When the device is inserted, everything works as expected.
 
-> Please fix your mail client to word wrap within paragraphs at something
-> substantially less than 80 columns.??Doing this makes your messages much
-> easier to read and reply to.
+I haven't added this yet.  Someone who knows more about the ACPI side of 
+IPMI
+should probably comment.  So I've added Lv Zheng.
 
-Sorry, still messing around with Evolution and Exchange.
+This is ok with me, though.  If you remove a management controller, a 
+timeout is
+expected.  However, if the management controller is still present, a 
+timeout is
+probably not the best error code, "destination unavailable" is probably 
+a better
+choice.
 
-> > > to the supply.??Usually bypass is used for low power retention modes
-> > > with different settings to those used in normal operation that wouldn't
-> > > be desired in normal operation, if we were going to have constraints for
-> > > this I'd expect a separate set used during bypass.
-> > 
-> > In this particular case it's not possible to set constraints on the parent
-> > regulator so that both ldo-enable and ldo-bypass modes work. The maximum allowed
-> > voltage for ldo-bypass is lower than the minimum required to support the chip at
-> > max frequency wit ldo-enable.
-> 
-> If things are really so sensitive that you can't bypass without lowering
-> the voltage then it's hard to see how you can safely transition into and
-> out of bypass mode.
+So:
 
-The CPU frequency is set to the minimum value so that when bypass mode
-is entered and voltage rises (because the dropout goes away) it is
-still low enough. Transitioning out of bypass mode is not implemented
-but you would presumably have to go to the minimum frequency again,
-raise the voltage above what is required and the flip the switch.
+Acked-by: Corey Minyard <cminyard@mvista.com>
 
-> > I'm not sure I understand why you are against applying constraints to the parent
-> > when in bypass mode, it seems like the obvious thing to do if you want to
-> > support flexible configuration. The check I introduced is probably not enough to
-> > cover all cases, for example it would still be possible to explicitly change
-> > parent voltage afterwards.
-> 
-> To repeat what I said previously the whole point of bypassing is to not
-> do regulation and generally the constraints in the unregulated idle case
-> are substantially more relaxed.??This would break use cases relying on
-> the existing behaviour which wouldn't expect to affect the parent
-> voltage at all, either stopping things working or making them less
-> efficient by needlessly regulating the voltage down which defeats the
-> main point of bypassing.
+-corey
 
-So what you want is to prevent voltage changes unless strictly
-required, even lowering? What I want is to get the minimum voltage in
-the SOC because that's where power is being consumed.
-
-It's not at all obvious that in bypass mode the output constraints of a
-regulator need not be respected by the core. I expected the opposite,
-this is something that should be documented.
-
-But if the bypassed regulator has a downstream consumer then it's
-requirements should definitely still be met in bypass mode, right? I
-could set my maximum voltage directly from cpufreq in that case.
-
-Or should a bypassed regulator ignore all other requests? One of the
-behaviors that this patch series relies on is that calling set_voltage
-on a bypassed regulator propagates this request to the supply and picks
-the minimum voltage there. An alternative implementation would be to
-call set_voltage directly on the supply regulator by changing the
-"{arm,soc,pu}-supply" references in DT to point to the PMIC instead.
-Would that be better?
-
-Both approaches work. Relying on propagation feels like it is the
-"right way" to handle this, even if it's harder to get right and the
-regulator core does not entirely support it. But it's possible that
-this is based on a misunderstanding of what "bypass" is actually
-supposed to do.
-
--- 
-Regards,
-Leonard
+>
+>> -corey
+>>
+>> On 03/23/2017 10:32 AM, Sinan Kaya wrote:
+>>> Getting timeout message from BMC when trying to read from a non-existent
+>>> FRU. This is expected but warning is not.
+>>>
+>>> Let's reduce the warning to debug.
+>>>
+>>> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+>>> ---
+>>>    drivers/acpi/acpi_ipmi.c | 3 +--
+>>>    1 file changed, 1 insertion(+), 2 deletions(-)
+>>>
+>>> diff --git a/drivers/acpi/acpi_ipmi.c b/drivers/acpi/acpi_ipmi.c
+>>> index 747c2ba..1b64419 100644
+>>> --- a/drivers/acpi/acpi_ipmi.c
+>>> +++ b/drivers/acpi/acpi_ipmi.c
+>>> @@ -429,8 +429,7 @@ static void ipmi_msg_handler(struct ipmi_recv_msg *msg, void *user_msg_data)
+>>>        if (msg->recv_type == IPMI_RESPONSE_RECV_TYPE &&
+>>>            msg->msg.data_len == 1) {
+>>>            if (msg->msg.data[0] == IPMI_TIMEOUT_COMPLETION_CODE) {
+>>> -            dev_WARN_ONCE(dev, true,
+>>> -                      "Unexpected response (timeout).\n");
+>>> +            dev_dbg_once(dev, "Unexpected response (timeout).\n");
+>>>                tx_msg->msg_done = ACPI_IPMI_TIMEOUT;
+>>>            }
+>>>            goto out_comp;
+>>
+>>
+>
