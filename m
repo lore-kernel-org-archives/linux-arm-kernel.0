@@ -1,44 +1,63 @@
-From: kora22@server.alarabya.co (kora22 at server.alarabya.co)
-Date: Tue, 28 Mar 2017 01:21:18 +0000
-Subject: Delivery Notification
-Message-ID: <E1csfp0-0005z5-2R@server.alarabya.co>
+From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
+Date: Tue, 28 Mar 2017 23:24:15 +0200
+Subject: [PATCH v2,1/3] meson_uart: expose CLKID_UARTx
+In-Reply-To: <1490728490.20764.8.camel@baylibre.com>
+References: <20170328092545.4644-1-hgkr.klein@gmail.com>
+ <20170328092545.4644-2-hgkr.klein@gmail.com>
+ <1490716277.20764.6.camel@baylibre.com>
+ <71489b62-78c8-7082-587e-8598dc43ca59@gmail.com>
+ <1490728490.20764.8.camel@baylibre.com>
+Message-ID: <CAFBinCDF29+kQpedsJPqRy6fztWrj91Qi6tCno_2S6UCkhW7XQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Customer,
+Hi Jerome,
 
-Please review your parcel delivery label in the attachment!
+On Tue, Mar 28, 2017 at 9:14 PM, Jerome Brunet <jbrunet@baylibre.com> wrote:
+> On Tue, 2017-03-28 at 20:18 +0200, Helmut Klein wrote:
+>> i know for sure that the bluetooth chip of my system is connected to
+>> uart_A. so this clock must be exposed.
+>>
+>> i don't know if the other 2 uarts are used on other hardware. so i will
+>> remove them from my patch.
+>
+> What I meant is device trees "upstream".
+> I would expect such patch as part of a series to add support for your board in
+> device-tree, with its bluetooth chipset.
+are you sure about this? Helmut is configuring the core clock of the
+UART controller(s) here. we have the same thing for many other drivers
+as well (MMC, SAR ADC, I2C, SPI, ethernet, you name it...) - these
+clocks are not part of a device specific .dts but rather the SoC
+specific dts (for example meson-gxbb.dtsi - because these clocks are
+not board specific).
+I guess most boards are not affected because the bootloader simply
+enables the UART0 core/gate clock and keeps it enabled when booting
+the kernel. additionally our clock gates are marked with
+CLK_IGNORE_UNUSED so if the bootloader keeps the gates enabled then
+we're not disabling it either.
 
-FedEx
+> I think it would better to drop this patch from the series.
+> You can either keep it for your personal work, or send it again when upstreaming
+> the support for your board and/or add the support for the bluetooth chip.
+if we decide to pass the core/gate clock directly in SoC.dtsi then we
+should think about doing it for all three non-AO UARTs (uart_a, uart_b
+and uart_c).
+we can test uart_b on GPIODV_24 and GPIODV_25 on the Khadas VIM board
+for example (pins 22 and 23 on the header, default mode of these pins
+is i2c_sck_a and i2c_sda_a, but we can re-configure it).
+uart_c unfortunately cannot be tested on the Khadas VIM board since
+it's only routed to GPIOX_8 and GPIOX_9 which are hard-wired to the
+bluetooth module's PCM pins (BTPCM_DOUT and BTPCM_DIN).
 
------BEGIN PGP PUBLIC KEY BLOCK-----
-
-WRC9IN82DzNGEZExsSrlFIWBsYP+hk+1CiI4u7WJU+NfXLGbezbrBcZQr2g/EHBkE4a0IdqI2Od2
-Nl82qeEiXgt/WZxFbegR2A3ABpyMCqUK9n60yc7h9e0WxU4ge/DQNS/r/ESTMl0AIiATcsitFG5e
-+f86G1H2j84llHHDndauTODG9epjUzfeYx+YvQYv7GeaFImneELnC5XC6okxUQGCUhxPdoMuq7bu
-sjnd6/htMBYX2s0qHLo33WdTQTuV+Lx1DM8tvxPDdLHgRFDAG+VFF1EwBLn346ctQsRsqqn4xtVB
-zjSSN3qF22ISR3y29XJfTSEYjJF5ZPEr1YMCCnB4XxE8CybZ5i30HurPC5zbvR52ByVqAEhxRTn7
-tXwdhgiyoIbeNbrc2Zadd7Z9yKP7X6P7mTz6myhRJlzCIoxcFJeJW9REI7KkoEdqa4QRE4LfHWMi
-UoT7MJgROfAXrIv7wj1OvfCOOJgD9T+9poLN8WwtyoQcrk6HhfC5MxDGagqait/bEIQIzpa6Vg6y
-EGqbkN+3visRZhLO8IKDSJB96WiekgSmAilr9FZjdbjQwgCoUKkpnl6fwlB+mPAqKEOWZYgSMOkp
-T5ynvhYHXRLUlWr+mmLIZZwu46ltk+lQKg0IG0LucpT7NdrK8q7UCp/dT6QWAsq0VsFzz3CZGB8F
-HyAh8xTcFMQlH6WFZ/L+QKxsk4yUhniHyZ6Ekos81ozc+94IWN4p+SYyISehF+LjTpGngA6kAJIy
-2JUfdWjYaR7a2dtwOt7E0CF266PpO14venYJ55cZuUh20WbVxTCxOXuVoy/TVJwPh2Zj9ztaTE1C
-Z/heniOomvLvzFkDQYUY2tg4GpUK2TU9KIqJ1DKikLOQqpYJp4cCDsz42nisczBnqVkwh67lAYQ8
-qBa4SC0bLsoAY0kD5ry9rbcw4bWc3sWDhfVcrJLaJ4Hba1zlA+9nMgcMsDsqaBvWtsjpX1X1P/ma
-crMaL7MX+RqXy0smoqRcmfAW7BCncqa58pbZOl27h8TRbtrQ6xdPyv7eM1EASr/Mx2UwuSk2HeIc
-Q4xOrF6ERElifFSTfd7gJdIVD5E7dbwzRjLi4zZt/1WK3PzBMugXdtI7GCGBwjy8+MCiiMl0NmkF
-bjZUY8P5wCKUvkx/DtaIW2CRJRJrow2piWvMhgRdwRx5f0kr0KWOKJ1jrw95eAv6ALVi5ywaFudT
-qAKdkbzql/R+5S9rIml0n4L++/M8H5Xk1Swk/vZ9Lhv1zLz7SQZJ3oY4TD1rMZ/MCKiHNxvjz5yD
-be3xooG2srzR/DQj3Pl7ADPsMVj0/HYZjQ0jVvud3w==
+for Helmut this would mean that instead of dropping this patch (or
+dropping CLKID_UART1 and CLKID_UART2 from this patch) he would rather
+have to *add* another patch (for meson-gxbb.dtsi and meson-gxl.dtsi)
+which passes the core clocks to the corresponding UART controllers
+(similar to the CLKID_SD_EMMC_ clocks).
 
 
------END PGP PUBLIC KEY BLOCK-----
+Regards,
+Martin
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: FedEx-Parcel-ID-GQ07YASL.zip
-Type: application/zip
-Size: 1041 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170328/1b013149/attachment.zip>
+
+[0] http://lxr.free-electrons.com/source/drivers/clk/meson/clkc.h?v=4.10#L110
