@@ -1,65 +1,230 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Tue, 28 Mar 2017 15:51:23 +0900
-Subject: [PATCH v34 05/14] arm64: mm: add set_memory_valid()
+Date: Tue, 28 Mar 2017 15:51:24 +0900
+Subject: [PATCH v34 06/14] arm64: kdump: protect crash dump kernel memory
 In-Reply-To: <20170328064831.15894-1-takahiro.akashi@linaro.org>
 References: <20170328064831.15894-1-takahiro.akashi@linaro.org>
-Message-ID: <20170328065130.16019-3-takahiro.akashi@linaro.org>
+Message-ID: <20170328065130.16019-4-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This function validates and invalidates PTE entries, and will be utilized
-in kdump to protect loaded crash dump kernel image.
+arch_kexec_protect_crashkres() and arch_kexec_unprotect_crashkres()
+are meant to be called by kexec_load() in order to protect the memory
+allocated for crash dump kernel once the image is loaded.
+
+The protection is implemented by unmapping the relevant segments in crash
+dump kernel memory, rather than making it read-only as other archs do,
+to prevent any corruption due to potential cache alias (with different
+attributes) problem.
+
+Page-level mappings are consistently used here so that we can change
+the attributes of segments in page granularity as well as shrink the region
+also in page granularity through /sys/kernel/kexec_crash_size, putting
+the freed memory back to buddy system.
 
 Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
 ---
- arch/arm64/include/asm/cacheflush.h |  1 +
- arch/arm64/mm/pageattr.c            | 15 +++++++++------
- 2 files changed, 10 insertions(+), 6 deletions(-)
+ arch/arm64/kernel/machine_kexec.c | 32 +++++++++++---
+ arch/arm64/mm/mmu.c               | 90 ++++++++++++++++++++-------------------
+ 2 files changed, 72 insertions(+), 50 deletions(-)
 
-diff --git a/arch/arm64/include/asm/cacheflush.h b/arch/arm64/include/asm/cacheflush.h
-index 5a2a6ee65f65..728f933cef8c 100644
---- a/arch/arm64/include/asm/cacheflush.h
-+++ b/arch/arm64/include/asm/cacheflush.h
-@@ -154,5 +154,6 @@ int set_memory_ro(unsigned long addr, int numpages);
- int set_memory_rw(unsigned long addr, int numpages);
- int set_memory_x(unsigned long addr, int numpages);
- int set_memory_nx(unsigned long addr, int numpages);
-+int set_memory_valid(unsigned long addr, unsigned long size, int enable);
+diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
+index bc96c8a7fc79..b63baa749609 100644
+--- a/arch/arm64/kernel/machine_kexec.c
++++ b/arch/arm64/kernel/machine_kexec.c
+@@ -14,7 +14,9 @@
  
- #endif
-diff --git a/arch/arm64/mm/pageattr.c b/arch/arm64/mm/pageattr.c
-index 8def55e7249b..3212ee0558f6 100644
---- a/arch/arm64/mm/pageattr.c
-+++ b/arch/arm64/mm/pageattr.c
-@@ -125,20 +125,23 @@ int set_memory_x(unsigned long addr, int numpages)
- }
- EXPORT_SYMBOL_GPL(set_memory_x);
+ #include <asm/cacheflush.h>
+ #include <asm/cpu_ops.h>
++#include <asm/mmu.h>
+ #include <asm/mmu_context.h>
++#include <asm/page.h>
  
--#ifdef CONFIG_DEBUG_PAGEALLOC
--void __kernel_map_pages(struct page *page, int numpages, int enable)
-+int set_memory_valid(unsigned long addr, int numpages, int enable)
- {
--	unsigned long addr = (unsigned long) page_address(page);
+ #include "cpu-reset.h"
+ 
+@@ -22,8 +24,6 @@
+ extern const unsigned char arm64_relocate_new_kernel[];
+ extern const unsigned long arm64_relocate_new_kernel_size;
+ 
+-static unsigned long kimage_start;
 -
- 	if (enable)
--		__change_memory_common(addr, PAGE_SIZE * numpages,
-+		return __change_memory_common(addr, PAGE_SIZE * numpages,
- 					__pgprot(PTE_VALID),
- 					__pgprot(0));
- 	else
--		__change_memory_common(addr, PAGE_SIZE * numpages,
-+		return __change_memory_common(addr, PAGE_SIZE * numpages,
- 					__pgprot(0),
- 					__pgprot(PTE_VALID));
+ /**
+  * kexec_image_info - For debugging output.
+  */
+@@ -64,8 +64,6 @@ void machine_kexec_cleanup(struct kimage *kimage)
+  */
+ int machine_kexec_prepare(struct kimage *kimage)
+ {
+-	kimage_start = kimage->start;
+-
+ 	kexec_image_info(kimage);
+ 
+ 	if (kimage->type != KEXEC_TYPE_CRASH && cpus_are_stuck_in_kernel()) {
+@@ -183,7 +181,7 @@ void machine_kexec(struct kimage *kimage)
+ 	kexec_list_flush(kimage);
+ 
+ 	/* Flush the new image if already in place. */
+-	if (kimage->head & IND_DONE)
++	if ((kimage != kexec_crash_image) && (kimage->head & IND_DONE))
+ 		kexec_segment_flush(kimage);
+ 
+ 	pr_info("Bye!\n");
+@@ -201,7 +199,7 @@ void machine_kexec(struct kimage *kimage)
+ 	 */
+ 
+ 	cpu_soft_restart(1, reboot_code_buffer_phys, kimage->head,
+-		kimage_start, 0);
++		kimage->start, 0);
+ 
+ 	BUG(); /* Should never get here. */
+ }
+@@ -210,3 +208,25 @@ void machine_crash_shutdown(struct pt_regs *regs)
+ {
+ 	/* Empty routine needed to avoid build errors. */
  }
 +
-+#ifdef CONFIG_DEBUG_PAGEALLOC
-+void __kernel_map_pages(struct page *page, int numpages, int enable)
++void arch_kexec_protect_crashkres(void)
 +{
-+	set_memory_valid((unsigned long)page_address(page), numpages, enable);
++	int i;
++
++	kexec_segment_flush(kexec_crash_image);
++
++	for (i = 0; i < kexec_crash_image->nr_segments; i++)
++		set_memory_valid(
++			__phys_to_virt(kexec_crash_image->segment[i].mem),
++			kexec_crash_image->segment[i].memsz >> PAGE_SHIFT, 0);
 +}
- #ifdef CONFIG_HIBERNATION
- /*
-  * When built with CONFIG_DEBUG_PAGEALLOC and CONFIG_HIBERNATION, this function
++
++void arch_kexec_unprotect_crashkres(void)
++{
++	int i;
++
++	for (i = 0; i < kexec_crash_image->nr_segments; i++)
++		set_memory_valid(
++			__phys_to_virt(kexec_crash_image->segment[i].mem),
++			kexec_crash_image->segment[i].memsz >> PAGE_SHIFT, 1);
++}
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index d28dbcf596b6..f6a3c0e9d37f 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -22,6 +22,8 @@
+ #include <linux/kernel.h>
+ #include <linux/errno.h>
+ #include <linux/init.h>
++#include <linux/ioport.h>
++#include <linux/kexec.h>
+ #include <linux/libfdt.h>
+ #include <linux/mman.h>
+ #include <linux/nodemask.h>
+@@ -332,56 +334,31 @@ static void create_mapping_late(phys_addr_t phys, unsigned long virt,
+ 			     NULL, debug_pagealloc_enabled());
+ }
+ 
+-static void __init __map_memblock(pgd_t *pgd, phys_addr_t start, phys_addr_t end)
++static void __init __map_memblock(pgd_t *pgd, phys_addr_t start,
++				  phys_addr_t end, pgprot_t prot,
++				  bool page_mappings_only)
++{
++	__create_pgd_mapping(pgd, start, __phys_to_virt(start), end - start,
++			     prot, early_pgtable_alloc,
++			     page_mappings_only);
++}
++
++static void __init map_mem(pgd_t *pgd)
+ {
+ 	phys_addr_t kernel_start = __pa_symbol(_text);
+ 	phys_addr_t kernel_end = __pa_symbol(__init_begin);
++	struct memblock_region *reg;
+ 
+ 	/*
+-	 * Take care not to create a writable alias for the
+-	 * read-only text and rodata sections of the kernel image.
++	 * Temporarily marked as NOMAP to skip mapping in the next for-loop
+ 	 */
++	memblock_mark_nomap(kernel_start, kernel_end - kernel_start);
+ 
+-	/* No overlap with the kernel text/rodata */
+-	if (end < kernel_start || start >= kernel_end) {
+-		__create_pgd_mapping(pgd, start, __phys_to_virt(start),
+-				     end - start, PAGE_KERNEL,
+-				     early_pgtable_alloc,
+-				     debug_pagealloc_enabled());
+-		return;
+-	}
+-
+-	/*
+-	 * This block overlaps the kernel text/rodata mappings.
+-	 * Map the portion(s) which don't overlap.
+-	 */
+-	if (start < kernel_start)
+-		__create_pgd_mapping(pgd, start,
+-				     __phys_to_virt(start),
+-				     kernel_start - start, PAGE_KERNEL,
+-				     early_pgtable_alloc,
+-				     debug_pagealloc_enabled());
+-	if (kernel_end < end)
+-		__create_pgd_mapping(pgd, kernel_end,
+-				     __phys_to_virt(kernel_end),
+-				     end - kernel_end, PAGE_KERNEL,
+-				     early_pgtable_alloc,
+-				     debug_pagealloc_enabled());
+-
+-	/*
+-	 * Map the linear alias of the [_text, __init_begin) interval as
+-	 * read-only/non-executable. This makes the contents of the
+-	 * region accessible to subsystems such as hibernate, but
+-	 * protects it from inadvertent modification or execution.
+-	 */
+-	__create_pgd_mapping(pgd, kernel_start, __phys_to_virt(kernel_start),
+-			     kernel_end - kernel_start, PAGE_KERNEL_RO,
+-			     early_pgtable_alloc, debug_pagealloc_enabled());
+-}
+-
+-static void __init map_mem(pgd_t *pgd)
+-{
+-	struct memblock_region *reg;
++#ifdef CONFIG_KEXEC_CORE
++	if (crashk_res.end)
++		memblock_mark_nomap(crashk_res.start,
++				    resource_size(&crashk_res));
++#endif
+ 
+ 	/* map all the memory banks */
+ 	for_each_memblock(memory, reg) {
+@@ -393,8 +370,33 @@ static void __init map_mem(pgd_t *pgd)
+ 		if (memblock_is_nomap(reg))
+ 			continue;
+ 
+-		__map_memblock(pgd, start, end);
++		__map_memblock(pgd, start, end,
++			       PAGE_KERNEL, debug_pagealloc_enabled());
++	}
++
++	/*
++	 * Map the linear alias of the [_text, __init_begin) interval as
++	 * read-only/non-executable. This makes the contents of the
++	 * region accessible to subsystems such as hibernate, but
++	 * protects it from inadvertent modification or execution.
++	 */
++	__map_memblock(pgd, kernel_start, kernel_end,
++		       PAGE_KERNEL_RO, debug_pagealloc_enabled());
++	memblock_clear_nomap(kernel_start, kernel_end - kernel_start);
++
++#ifdef CONFIG_KEXEC_CORE
++	/*
++	 * User page-level mappings here so that we can shrink the region
++	 * in page granularity and put back unused memory to buddy system
++	 * through /sys/kernel/kexec_crash_size interface.
++	 */
++	if (crashk_res.end) {
++		__map_memblock(pgd, crashk_res.start, crashk_res.end + 1,
++			       PAGE_KERNEL, true);
++		memblock_clear_nomap(crashk_res.start,
++				     resource_size(&crashk_res));
+ 	}
++#endif
+ }
+ 
+ void mark_rodata_ro(void)
 -- 
 2.11.1
