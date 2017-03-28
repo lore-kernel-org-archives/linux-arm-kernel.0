@@ -1,54 +1,56 @@
-From: leonard.crestez@nxp.com (Leonard Crestez)
-Date: Tue, 28 Mar 2017 14:16:50 +0300
-Subject: [PATCH] ARM: imx_v6_v7_defconfig: Select SMSC_PHY
-In-Reply-To: <20170324064318.GD12604@b29396-OptiPlex-7040>
-References: <82d0aeeaed87ae5c9390b889cef4c54d715cde61.1490191972.git.leonard.crestez@nxp.com>
- <20170324064318.GD12604@b29396-OptiPlex-7040>
-Message-ID: <1490699810.3546.10.camel@nxp.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 28 Mar 2017 13:19:29 +0200
+Subject: [PATCH v2 02/11] ARM: at91: pm: Move at91_ramc_read/write to pm.c
+In-Reply-To: <20170328111938.21297-1-alexandre.belloni@free-electrons.com>
+References: <20170328111938.21297-1-alexandre.belloni@free-electrons.com>
+Message-ID: <20170328111938.21297-3-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2017-03-24 at 14:43 +0800, Dong Aisheng wrote:
-> Hi Leonard,
-> 
-> On Wed, Mar 22, 2017 at 04:27:37PM +0200, Leonard Crestez wrote:
-> > 
-> > The imx6sl-evk board has a LAN8720A ethernet phy supported by SMSC_PHY.
-> > Add this driver to the default imx config since the device is present on
-> > one of the evaluation boards.
-> Upstream currently no evaluation board support.
-> 
-> This may leave to Shawn to decide whether apply it.
+Those macros are only used in pm.c, move them there so we can remove the
+test on __ASSEMBLY__.
 
-Really? But the dts for this eval board is included in upstream. Shouldn't the
-default config try to work with the default imx*.dts files included?
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ arch/arm/mach-at91/pm.c | 6 ++++++
+ arch/arm/mach-at91/pm.h | 8 --------
+ 2 files changed, 6 insertions(+), 8 deletions(-)
 
-> > This used to work mostly fine with the generic phy driver but since
-> > commit 0878fff1f42c18e448ab5b8b4f6a3eb32365b5b6 that driver no longer
-> I guess you should get a checkpatch error here.
-
-Because I didn't reference that other commit right? Sorry about this.
-
-Should I submit again with an improved commit message?
-
-> > performs a soft reset on startup. This causes netboot to sometimes
-> > timeout on DHCP because RX doesn't work right. DHCP is eventually retried
-> > and
-> Probably another checkpatch warning.
-
-Why, line too long?
-
-> > This was generated with "make savedefconfig" and it includes a few
-> > additional minor cleanups.
-> > 
-> It is a bit strange, after apply your patch, i still get a lot difference
-> as follows when savedefconfig:
->?
-> I don't know what's wrong. Toolchains difference?
-
-Maybe, kconfig acts strangely sometimes. It's not clear option ordering is
-guaranteed to be stable. I don't think it matters though.
-
---
-Regards,
-Leonard
+diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
+index 9e2b5c1e503e..41789aa4df86 100644
+--- a/arch/arm/mach-at91/pm.c
++++ b/arch/arm/mach-at91/pm.c
+@@ -45,6 +45,12 @@ static struct {
+ } at91_pm_data;
+ 
+ static void __iomem *at91_ramc_base[2];
++#define at91_ramc_read(id, field) \
++	__raw_readl(at91_ramc_base[id] + field)
++
++#define at91_ramc_write(id, field, value) \
++	__raw_writel(value, at91_ramc_base[id] + field)
++
+ 
+ static int at91_pm_valid_state(suspend_state_t state)
+ {
+diff --git a/arch/arm/mach-at91/pm.h b/arch/arm/mach-at91/pm.h
+index bf980c6ef294..8eed156ef19a 100644
+--- a/arch/arm/mach-at91/pm.h
++++ b/arch/arm/mach-at91/pm.h
+@@ -17,14 +17,6 @@
+ #include <soc/at91/at91sam9_ddrsdr.h>
+ #include <soc/at91/at91sam9_sdramc.h>
+ 
+-#ifndef __ASSEMBLY__
+-#define at91_ramc_read(id, field) \
+-	__raw_readl(at91_ramc_base[id] + field)
+-
+-#define at91_ramc_write(id, field, value) \
+-	__raw_writel(value, at91_ramc_base[id] + field)
+-#endif
+-
+ #define AT91_MEMCTRL_MC		0
+ #define AT91_MEMCTRL_SDRAMC	1
+ #define AT91_MEMCTRL_DDRSDR	2
+-- 
+2.11.0
