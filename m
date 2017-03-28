@@ -1,101 +1,156 @@
-From: elena.reshetova@intel.com (Elena Reshetova)
-Date: Tue, 28 Mar 2017 11:56:43 +0300
-Subject: [PATCH 16/16] drivers, net,
- intersil: convert request_context.refcount from atomic_t to refcount_t
-In-Reply-To: <1490691403-4016-1-git-send-email-elena.reshetova@intel.com>
-References: <1490691403-4016-1-git-send-email-elena.reshetova@intel.com>
-Message-ID: <1490691403-4016-17-git-send-email-elena.reshetova@intel.com>
+From: adrian.hunter@intel.com (Adrian Hunter)
+Date: Tue, 28 Mar 2017 12:01:33 +0300
+Subject: [PATCH] mmc: core: Do not hold re-tuning during CMD6 commands
+In-Reply-To: <CAPDyKFoWyVrdk7bG1n=rTSOddvqaj-uTO70QoGmcKQK1Fhio2w@mail.gmail.com>
+References: <1490336341-22292-1-git-send-email-chaotian.jing@mediatek.com>
+ <1490336341-22292-2-git-send-email-chaotian.jing@mediatek.com>
+ <13a83728-0031-5683-c371-4b517df32299@intel.com>
+ <1490344369.22814.10.camel@mhfsdcap03>
+ <03d54000-9ced-1b31-df80-d254f02433db@intel.com>
+ <1490348427.22814.19.camel@mhfsdcap03>
+ <CAPDyKFoo5sJ2XtjyiW1DLjhFdJySbDK7+N05vrKpeiZsp25qrA@mail.gmail.com>
+ <1490578500.22814.31.camel@mhfsdcap03>
+ <CAPDyKFoWyVrdk7bG1n=rTSOddvqaj-uTO70QoGmcKQK1Fhio2w@mail.gmail.com>
+Message-ID: <a0df1a1d-a776-f1e6-1ee2-e66faff375d3@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-refcount_t type and corresponding API should be
-used instead of atomic_t when the variable is used as
-a reference counter. This allows to avoid accidental
-refcounter overflows that might lead to use-after-free
-situations.
+On 28/03/17 11:30, Ulf Hansson wrote:
+> [...]
+> 
+>>>
+>>> If there is a problem in __mmc_switch(), let's try to fix it there first.
+>>>
+>> Anyway, it is a bug of retry 3 times at max but without check current
+>> card status and ensure it's in transfer state before next retry.
+> 
+> Correct. Do you want to send a patch that fixes this? Otherwise I can do it...
+> 
+>>>>>> I think the purpose of "re-tune" is trying to cover particular case(eg.
+>>>>>> voltage fluctuate or EMI or some glitch of host/device which caused CRC
+>>>>>> error)
+>>>>>
+>>>>> No, re-tuning is to compensate for drift caused primarily by temperature change.
+>>>>>
+>>>> Yes, by JEDEC spec, temperature change cause timing drift of EMMC
+>>>> device, but, as you mentioned, maybe I have a hardware problem of host,
+>>>> but needs Software to cover it. so that we are doing our best to do
+>>>> re-tune if got CRC error. if could recover it, then  it's better than
+>>>> system hung.
+>>>
+>>> Exactly in what cases do you get CRC errors for CMD6. We need a full
+>>> cmd log to understand and to help.
+>>>
+>>>>>> error) , but in such cases, too many cases are disable re-tune function
+>>>>>> by mmc_retune_hold(), for example, in this case, if a response CRC error
+>>>>>> got then we never have chance to recover it. then cause system cannot
+>>>>>> access emmc or suspend/resume fail.
+>>>>>
+>>>>> Maybe you have a hardware problem.
+>>>
+>>> There is no way I am going to accept patches touching this part of the
+>>> mmc core, without providing real evidence for how it solves a problem.
+>>> To me, it seems like you are applying a workaround for another issue.
+>>>
+>>> Again, try to provide us with some more data and logs, then perhaps we
+>>> can help narrow down the issues.
+>>>
+>>> Kind regards
+>>> Uffe
+>>
+>> Below is the fail log of suspend fail.
+>> the normal command tune result should be 0xffffff9ff, but some time, we
+>> get the tune result of 0xffffffff, then we choose the 10 as the best
+>> tune parameter, which is not stable.
+>> I know that we should focus on why we get the result of 0xffffffff, this
+>> may be result of device/host timing shifting while tuning. but what I
+>> want to do is that when get a response CRC error, we can do re-tune to
+>> recovery it, but not only return the -84 and cause suspend fail
+>> eventually. if all hardware are perfect, then we don't need the re-tune
+>> mechanism.
+> 
+> Thanks for elaborating!
+> 
+> Can you please also tell exactly which of the CMD6 commands in the
+> suspend sequence that is triggering this problem? Cache flush? Power
+> off notification?
+> 
+>>
+>> as Adrian's comment, if temperature change at here caused CMD6 response
+>> CRC error, then how to recovery it ?
+> 
+> So in your case, allowing re-tuning a little longer in __mmc_switch()
+> solves your problem. Clearly there are cases when we need to prevent
+> re-tuning when sending CMD6, however maybe not in all cases as we do
+> today.
+> 
+> For example it seems reasonable to not hold retuning before sending
+> CMD6 for cache flush, but instead it should be sufficient to hold it
+> before polling for busy in __mmc_switch().
+> 
+> Adrian, what's your thoughts on this?
 
-Signed-off-by: Elena Reshetova <elena.reshetova@intel.com>
-Signed-off-by: Hans Liljestrand <ishkamiel@gmail.com>
-Signed-off-by: Kees Cook <keescook@chromium.org>
-Signed-off-by: David Windsor <dwindsor@gmail.com>
----
- drivers/net/wireless/intersil/orinoco/orinoco_usb.c | 15 ++++++++-------
- 1 file changed, 8 insertions(+), 7 deletions(-)
+mmc_retune_hold() and mmc_retune_release() are designed to go around a group
+of commands, but re-tuning can still be done before the first command. i.e.
 
-diff --git a/drivers/net/wireless/intersil/orinoco/orinoco_usb.c b/drivers/net/wireless/intersil/orinoco/orinoco_usb.c
-index 98e1380..95dd03e 100644
---- a/drivers/net/wireless/intersil/orinoco/orinoco_usb.c
-+++ b/drivers/net/wireless/intersil/orinoco/orinoco_usb.c
-@@ -64,6 +64,7 @@
- #include <linux/etherdevice.h>
- #include <linux/wireless.h>
- #include <linux/firmware.h>
-+#include <linux/refcount.h>
- 
- #include "mic.h"
- #include "orinoco.h"
-@@ -268,7 +269,7 @@ enum ezusb_state {
- 
- struct request_context {
- 	struct list_head list;
--	atomic_t refcount;
-+	refcount_t refcount;
- 	struct completion done;	/* Signals that CTX is dead */
- 	int killed;
- 	struct urb *outurb;	/* OUT for req pkt */
-@@ -298,7 +299,7 @@ static inline u8 ezusb_reply_inc(u8 count)
- 
- static void ezusb_request_context_put(struct request_context *ctx)
- {
--	if (!atomic_dec_and_test(&ctx->refcount))
-+	if (!refcount_dec_and_test(&ctx->refcount))
- 		return;
- 
- 	WARN_ON(!ctx->done.done);
-@@ -328,7 +329,7 @@ static void ezusb_request_timerfn(u_long _ctx)
- 	} else {
- 		ctx->state = EZUSB_CTX_RESP_TIMEOUT;
- 		dev_dbg(&ctx->outurb->dev->dev, "couldn't unlink\n");
--		atomic_inc(&ctx->refcount);
-+		refcount_inc(&ctx->refcount);
- 		ctx->killed = 1;
- 		ezusb_ctx_complete(ctx);
- 		ezusb_request_context_put(ctx);
-@@ -361,7 +362,7 @@ static struct request_context *ezusb_alloc_ctx(struct ezusb_priv *upriv,
- 	ctx->out_rid = out_rid;
- 	ctx->in_rid = in_rid;
- 
--	atomic_set(&ctx->refcount, 1);
-+	refcount_set(&ctx->refcount, 1);
- 	init_completion(&ctx->done);
- 
- 	setup_timer(&ctx->timer, ezusb_request_timerfn, (u_long)ctx);
-@@ -469,7 +470,7 @@ static void ezusb_req_queue_run(struct ezusb_priv *upriv)
- 	list_move_tail(&ctx->list, &upriv->req_active);
- 
- 	if (ctx->state == EZUSB_CTX_QUEUED) {
--		atomic_inc(&ctx->refcount);
-+		refcount_inc(&ctx->refcount);
- 		result = usb_submit_urb(ctx->outurb, GFP_ATOMIC);
- 		if (result) {
- 			ctx->state = EZUSB_CTX_REQSUBMIT_FAIL;
-@@ -507,7 +508,7 @@ static void ezusb_req_enqueue_run(struct ezusb_priv *upriv,
- 		spin_unlock_irqrestore(&upriv->req_lock, flags);
- 		goto done;
- 	}
--	atomic_inc(&ctx->refcount);
-+	refcount_inc(&ctx->refcount);
- 	list_add_tail(&ctx->list, &upriv->req_pending);
- 	spin_unlock_irqrestore(&upriv->req_lock, flags);
- 
-@@ -1464,7 +1465,7 @@ static inline void ezusb_delete(struct ezusb_priv *upriv)
- 		int err;
- 
- 		ctx = list_entry(item, struct request_context, list);
--		atomic_inc(&ctx->refcount);
-+		refcount_inc(&ctx->refcount);
- 
- 		ctx->outurb->transfer_flags |= URB_ASYNC_UNLINK;
- 		err = usb_unlink_urb(ctx->outurb);
--- 
-2.7.4
+	mmc_retune_hold
+	<re-tune can happen here>
+	cmd A
+	<re-tune not allowed here>
+	cmd B
+	<re-tune not allowed here>
+	cmd C
+	mmc_retune_release
+
+That is the same in the retry case:
+
+	mmc_retune_hold
+	<re-tune can happen here>
+	cmd A
+	<re-tune not allowed here>
+	retry cmd A
+	<re-tune not allowed here>
+	cmd B
+	<re-tune not allowed here>
+	cmd C
+	mmc_retune_release
+
+The retry mechanism provided by mmc_wait_for_cmd() and friends really only
+makes sense for simple commands.  In other cases, like this, we need to
+consider what state the card is in.  For __mmc_switch we need to consider
+whether the card is busy or whether a timing change been made.
+
+> 
+>>
+>> [  129.106622]  (0)[96:mmcqd/0]mtk-msdc 11230000.mmc: phase:
+>> [map:fffff9ff] [maxlen:21] [final:21] -->current result is OK and 21 is
+>> stable
+>> [  129.109404]  (0)[96:mmcqd/0]mtk-msdc 11230000.mmc: phase:
+>> [map:ffffe03f] [maxlen:19] [final:22]
+>> --------------------> below is next resume and re-init card:
+>> [  129.778454]  (0)[96:mmcqd/0]mtk-msdc 11230000.mmc: Regulator set
+>> error -22: 3300000 - 3300000
+>> [  130.016987]  (0)[96:mmcqd/0]mtk-msdc 11230000.mmc: phase:
+>> [map:ffffffff] [maxlen:32] [final:10] --> this result if not OK and 10
+>> is not stable.
+> 
+> As you suspect the tuning didn't work out correctly, then why don't
+> you retry one more time?
+
+Or restore the previously known good result?
+
+> 
+>> [  130.019556]  (0)[96:mmcqd/0]mtk-msdc 11230000.mmc: phase:
+>> [map:ffffc03f] [maxlen:18] [final:23]
+>> [  130.124279]  (1)[1248:system_server]mmc0: cache flush error -84
+>> [  130.125058]  (1)[1248:system_server]dpm_run_callback():
+>> mmc_bus_suspend+0x0/0x4c returns -84
+>> [  130.126104]  (1)[1248:system_server]PM: Device mmc0:0001 failed to
+>> suspend: error -84
+>>
+>>
+>>
+> 
+> Kind regards
+> Uffe
+> 
