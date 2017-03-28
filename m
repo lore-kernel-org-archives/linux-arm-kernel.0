@@ -1,85 +1,72 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Tue, 28 Mar 2017 17:51:17 +0200
-Subject: [PATCH v2,1/3] meson_uart: expose CLKID_UARTx
-In-Reply-To: <20170328092545.4644-2-hgkr.klein@gmail.com>
-References: <20170328092545.4644-1-hgkr.klein@gmail.com>
- <20170328092545.4644-2-hgkr.klein@gmail.com>
-Message-ID: <1490716277.20764.6.camel@baylibre.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Tue, 28 Mar 2017 17:52:31 +0200
+Subject: [GIT PULL 1/3] Rockchip dts32 updates for 4.12 part1
+Message-ID: <5178456.jWASpzTAdU@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2017-03-28 at 11:25 +0200, Helmut Klein wrote:
-> Expose the clock ids for the three none AO uarts to the dt-bindings
+Hi Arnd, Kevin, Olof,
 
-Are they all used in the device tree ?
-We try to only expose what we need in the DT
-The recent discussion over CLKID_CPUCLK proved it was a sane thing to do.
+This set is the first round of devicetree updates for 4.12. It comes
+in 3 parts, 32bit dts, general 64bit dts and the 64bit dts based on
+Olof's shared symlink branch.
+As always tags describe what's in there.
 
-> 
-> Signed-off-by: Helmut Klein <hgkr.klein@gmail.com>
-> ---
-> ?drivers/clk/meson/gxbb.h??????????????| 6 +++---
-> ?include/dt-bindings/clock/gxbb-clkc.h | 3 +++
-> ?2 files changed, 6 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/clk/meson/gxbb.h b/drivers/clk/meson/gxbb.h
-> index 8ee2022ce5d5..1edfaa5fe307 100644
-> --- a/drivers/clk/meson/gxbb.h
-> +++ b/drivers/clk/meson/gxbb.h
-> @@ -194,7 +194,7 @@
-> ?/* #define CLKID_SAR_ADC */
-> ?#define CLKID_SMART_CARD	??24
-> ?#define CLKID_RNG0		??25
-> -#define CLKID_UART0		??26
-> +/* CLKID_UART0 */
-> ?#define CLKID_SDHC		??27
-> ?#define CLKID_STREAM		??28
-> ?#define CLKID_ASYNC_FIFO	??29
-> @@ -216,7 +216,7 @@
-> ?#define CLKID_ADC		??45
-> ?#define CLKID_BLKMV		??46
-> ?#define CLKID_AIU		??47
-> -#define CLKID_UART1		??48
-> +/* CLKID_UART1 */
-> ?#define CLKID_G2D		??49
-> ?/* CLKID_USB0 */
-> ?/* CLKID_USB1 */
-> @@ -236,7 +236,7 @@
-> ?/* CLKID_USB0_DDR_BRIDGE */
-> ?#define CLKID_MMC_PCLK		??66
-> ?#define CLKID_DVIN		??67
-> -#define CLKID_UART2		??68
-> +/* CLKID_UART2 */
-> ?/* #define CLKID_SANA */
-> ?#define CLKID_VPU_INTR		??70
-> ?#define CLKID_SEC_AHB_AHB3_BRIDGE 71
-> diff --git a/include/dt-bindings/clock/gxbb-clkc.h b/include/dt-
-> bindings/clock/gxbb-clkc.h
-> index 692846c7941b..7b329df47752 100644
-> --- a/include/dt-bindings/clock/gxbb-clkc.h
-> +++ b/include/dt-bindings/clock/gxbb-clkc.h
-> @@ -15,13 +15,16 @@
-> ?#define CLKID_SPI		34
-> ?#define CLKID_I2C		22
-> ?#define CLKID_SAR_ADC		23
-> +#define CLKID_UART0		26
-> ?#define CLKID_ETH		36
-> +#define CLKID_UART1		48
-> ?#define CLKID_USB0		50
-> ?#define CLKID_USB1		51
-> ?#define CLKID_USB		55
-> ?#define CLKID_HDMI_PCLK		63
-> ?#define CLKID_USB1_DDR_BRIDGE	64
-> ?#define CLKID_USB0_DDR_BRIDGE	65
-> +#define CLKID_UART2		68
-> ?#define CLKID_SANA		69
-> ?#define CLKID_GCLK_VENCI_INT0	77
-> ?#define CLKID_AO_I2C		93
-> --
-> 2.11.0
-> 
-> 
-> _______________________________________________
-> linux-amlogic mailing list
-> linux-amlogic at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-amlogic
+So if nothing stands out, please pull.
+
+
+Thanks
+Heiko
+
+The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
+
+  Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.12-rockchip-dts32-1
+
+for you to fetch changes up to 94bbdd77247d8c16eed5f55dddcf1cbc38d06cc4:
+
+  ARM: dts: rockchip: setup DMA-channels for mmc0 and emmc for rk3188 (2017-03-22 16:49:39 +0100)
+
+----------------------------------------------------------------
+Contains one new board, the Tinkerboard from Asus based on the rk3288,
+definitions for the mmc resets in the socs reset controller, sound
+support for the Rock2, dma support for mmc controllers on the rk3188
+and a led-fix for the MiQi board and and irq-fix for older Cortex-A9 socs.
+
+----------------------------------------------------------------
+Alexander Kochetkov (1):
+      ARM: dts: rockchip: setup DMA-channels for mmc0 and emmc for rk3188
+
+Eddie Cai (2):
+      dt-bindings: add rk3288-based Asus Tinker board
+      ARM: dts: rockchip: add dts for RK3288-Tinker board
+
+Heiko Stuebner (5):
+      ARM: dts: rockchip: add rk3288 dw-mmc resets
+      ARM: dts: rockchip: add rk3036 dw-mmc resets
+      ARM: dts: rockchip: add rk3066/rk3188 dw-mmc resets
+      ARM: dts: rockchip: add rk322x dw-mmc resets
+      ARM: dts: rockchip: fix PPI misconfiguration on Cortex-A9 socs
+
+Romain Perier (1):
+      ARM: dts: rockchip: Add support for ES8388 to the Radxa Rock 2
+
+Willy Tarreau (1):
+      ARM: dts: rockchip: fix the MiQi board's LED definition
+
+ Documentation/devicetree/bindings/arm/rockchip.txt |   3 +
+ arch/arm/boot/dts/Makefile                         |   1 +
+ arch/arm/boot/dts/rk3036.dtsi                      |   6 +
+ arch/arm/boot/dts/rk3188.dtsi                      |   4 +-
+ arch/arm/boot/dts/rk322x.dtsi                      |   2 +
+ arch/arm/boot/dts/rk3288-miqi.dts                  |  12 +-
+ arch/arm/boot/dts/rk3288-rock2-som.dtsi            |   2 +-
+ arch/arm/boot/dts/rk3288-rock2-square.dts          |  41 ++
+ arch/arm/boot/dts/rk3288-tinker.dts                | 536 +++++++++++++++++++++
+ arch/arm/boot/dts/rk3288.dtsi                      |   8 +
+ arch/arm/boot/dts/rk3xxx.dtsi                      |  16 +-
+ 11 files changed, 616 insertions(+), 15 deletions(-)
+ create mode 100644 arch/arm/boot/dts/rk3288-tinker.dts
