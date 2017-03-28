@@ -1,59 +1,115 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Tue, 28 Mar 2017 21:16:02 +0200
-Subject: [PATCH v2, 3/3] tty/serial: meson_uart: add the core clock
- handling to the driver
-In-Reply-To: <20170328092545.4644-4-hgkr.klein@gmail.com>
-References: <20170328092545.4644-1-hgkr.klein@gmail.com>
- <20170328092545.4644-4-hgkr.klein@gmail.com>
-Message-ID: <1490728562.20764.9.camel@baylibre.com>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Tue, 28 Mar 2017 21:21:36 +0200
+Subject: [PATCH 2/2] PCI: Add legacy firmware support for Cavium ThunderX host
+ controller
+In-Reply-To: <1489564155-3881-3-git-send-email-tn@semihalf.com>
+References: <1489564155-3881-3-git-send-email-tn@semihalf.com>
+Message-ID: <1490728896-30520-1-git-send-email-tn@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2017-03-28 at 11:25 +0200, Helmut Klein wrote:
-> This patch gets the core clock as provided by the DT and enables it.
-> The code was taken from Amlogic's serial driver, and was tested on my
-> board.
-> 
-> Signed-off-by: Helmut Klein <hgkr.klein@gmail.com>
-> ---
-> ?drivers/tty/serial/meson_uart.c | 10 ++++++++++
-> ?1 file changed, 10 insertions(+)
-> 
-> diff --git a/drivers/tty/serial/meson_uart.c b/drivers/tty/serial/meson_uart.c
-> index 60f16795d16b..cb99112288eb 100644
-> --- a/drivers/tty/serial/meson_uart.c
-> +++ b/drivers/tty/serial/meson_uart.c
-> @@ -600,6 +600,7 @@ static int meson_uart_probe(struct platform_device *pdev)
-> ?	struct resource *res_mem, *res_irq;
-> ?	struct uart_port *port;
-> ?	struct clk *clk;
-> +	struct clk *core_clk;
-> ?	int ret = 0;
-> 
-> ?	if (pdev->dev.of_node)
-> @@ -625,6 +626,15 @@ static int meson_uart_probe(struct platform_device *pdev)
-> ?	if (!port)
-> ?		return -ENOMEM;
-> 
-> +	core_clk = devm_clk_get(&pdev->dev, "core");
-> +	if (!IS_ERR(core_clk)) {
-> +		ret = clk_prepare_enable(core_clk);
-> +		if (ret) {
-> +			dev_err(&pdev->dev, "couldn't enable clkc\n");
-> +			return ret;
-> +		}
-> +	}
-> +
-> ?	clk = clk_get(&pdev->dev, NULL);
-Now that you have 2 clocks, shouldn't this be named as well ?
+During early days of PCI quirks support ThunderX firmware did not provide
+PNP0c02 node with PCI configuration space and PEM-specific register ranges.
+This means that for legacy FW we are not reserving these resources and
+cannot gather PEM-specific resources for further PEM initialization.
 
-> ?	if (IS_ERR(clk))
-> ?		return PTR_ERR(clk);
-> --
-> 2.11.0
-> 
-> 
-> _______________________________________________
-> linux-amlogic mailing list
-> linux-amlogic at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-amlogic
+In order to support already deployed legacy FW calculate PEM-specific ranges
+and provide resources reservation as fallback scenario into PEM driver when
+we could not gather PEM reg base from ACPI tables.
+
+Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+Signed-off-by: Vadim Lomovtsev <Vadim.Lomovtsev@caviumnetworks.com>
+---
+ drivers/pci/host/pci-thunder-pem.c | 62 ++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 60 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/pci/host/pci-thunder-pem.c b/drivers/pci/host/pci-thunder-pem.c
+index e354010..cea5814 100644
+--- a/drivers/pci/host/pci-thunder-pem.c
++++ b/drivers/pci/host/pci-thunder-pem.c
+@@ -14,6 +14,7 @@
+  * Copyright (C) 2015 - 2016 Cavium, Inc.
+  */
+ 
++#include <linux/bitfield.h>
+ #include <linux/kernel.h>
+ #include <linux/init.h>
+ #include <linux/of_address.h>
+@@ -319,6 +320,49 @@ static int thunder_pem_init(struct device *dev, struct pci_config_window *cfg,
+ 
+ #if defined(CONFIG_ACPI) && defined(CONFIG_PCI_QUIRKS)
+ 
++#define PEM_RES_BASE		0x87e0c0000000UL
++#define PEM_NODE_MASK		GENMASK(45, 44)
++#define PEM_INDX_MASK		GENMASK(26, 24)
++#define PEM_MIN_DOM_IN_NODE	4
++#define PEM_MAX_DOM_IN_NODE	10
++
++static void thunder_pem_reserve_range(struct device *dev, int seg,
++				      struct resource *r)
++{
++	resource_size_t start = r->start, end = r->end;
++	struct resource *res;
++	const char *regionid;
++
++	regionid = kasprintf(GFP_KERNEL, "PEM RC:%d", seg);
++	if (!regionid)
++		return;
++
++	res = request_mem_region(start, end - start + 1, regionid);
++	if (res)
++		res->flags &= ~IORESOURCE_BUSY;
++	else
++		kfree(regionid);
++
++	dev_info(dev, "%pR %s reserved\n", r,
++		 res ? "has been" : "could not be");
++}
++
++static void thunder_pem_legacy_fw(struct acpi_pci_root *root,
++				 struct resource *res_pem)
++{
++	int node = acpi_get_node(root->device->handle);
++	int index;
++
++	if (node == NUMA_NO_NODE)
++		node = 0;
++
++	index = root->segment - PEM_MIN_DOM_IN_NODE;
++	index -= node * PEM_MAX_DOM_IN_NODE;
++	res_pem->start = PEM_RES_BASE | FIELD_PREP(PEM_NODE_MASK, node) |
++					FIELD_PREP(PEM_INDX_MASK, index);
++	res_pem->flags = IORESOURCE_MEM;
++}
++
+ static int thunder_pem_acpi_init(struct pci_config_window *cfg)
+ {
+ 	struct device *dev = cfg->parent;
+@@ -332,9 +376,23 @@ static int thunder_pem_acpi_init(struct pci_config_window *cfg)
+ 		return -ENOMEM;
+ 
+ 	ret = acpi_get_rc_resources(dev, "CAVA02B", root->segment, res_pem);
++
++	/*
++	 * If we fail to gather resources it means that we run with old
++	 * FW where we need to calculate PEM-specific resources manually.
++	 */
+ 	if (ret) {
+-		dev_err(dev, "can't get rc base address\n");
+-		return ret;
++		thunder_pem_legacy_fw(root, res_pem);
++		/*
++		 * Reserve 64K size PEM specific resources. The full 16M range
++		 * size is required for thunder_pem_init() call.
++		 */
++		res_pem->end = res_pem->start + SZ_64K - 1;
++		thunder_pem_reserve_range(dev, root->segment, res_pem);
++		res_pem->end = res_pem->start + SZ_16M - 1;
++
++		/* Reserve PCI configuration space as well. */
++		thunder_pem_reserve_range(dev, root->segment, &cfg->res);
+ 	}
+ 
+ 	return thunder_pem_init(dev, cfg, res_pem);
+-- 
+2.7.4
