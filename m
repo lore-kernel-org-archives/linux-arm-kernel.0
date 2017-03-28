@@ -1,48 +1,34 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Tue, 28 Mar 2017 17:54:06 +0200
-Subject: [GIT PULL 3/3] Rockchip dts64 updates (using arm/arm64 symlinks) for
- 4.12 part1
-In-Reply-To: <5178456.jWASpzTAdU@phil>
-References: <5178456.jWASpzTAdU@phil>
-Message-ID: <5670481.GxV7NCMtHk@phil>
+From: tj@kernel.org (Tejun Heo)
+Date: Tue, 28 Mar 2017 11:55:12 -0400
+Subject: [PATCH v2 08/22] lib: implement Devres ioremap_nopost() interface
+In-Reply-To: <20170328145003.GB18046@red-moon>
+References: <20170327094954.7162-1-lorenzo.pieralisi@arm.com>
+ <20170327094954.7162-9-lorenzo.pieralisi@arm.com>
+ <20170328014129.GJ25380@bhelgaas-glaptop.roam.corp.google.com>
+ <20170328145003.GB18046@red-moon>
+Message-ID: <20170328155512.GA28157@htj.duckdns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 0a6081b673bb6aaec31771b3111dd6741c94382f:
+Hello,
 
-  arm64: dts: add arm/arm64 include symlinks (2017-03-21 17:21:28 -0700)
+On Tue, Mar 28, 2017 at 03:50:03PM +0100, Lorenzo Pieralisi wrote:
+> > I know this comment was just copied from other devm_ioremap*()
+> > interfaces, but I think it's slightly misleading to call this the "BUS
+> > offset".  That suggests this is a bus address, but it is not.  Maybe
+> > it should be "resource address" or similar?
+> > 
+> > I propose a separate patch to update the existing comments, followed
+> > by this patch to add this new one.
+> 
+> I agree with you, maybe Tejun has more context on why that parameter
+> is called BUS offset ? Anyway, I can easily do what you suggest above,
+> just asking Tejun if there is something I am missing.
 
-are available in the git repository at:
+I'm pretty sure I copied it from somewhere without thinking much about
+it.  Please feel free to change.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.12-rockchip-dts64-symlinks-1
+Thanks.
 
-for you to fetch changes up to b9ed79fa91c5271ca166dfde99883ca3afb190fe:
-
-  arm64: dts: rockchip: add regulator info for Kevin digitizer (2017-03-23 00:51:58 +0100)
-
-----------------------------------------------------------------
-Rockchip dts changes based on the newly created arm/arm64 symlinks.
-The core addition is the support for the rk3399-based Gru family of
-ChromeOS devices, like the Kevin board which is the recently released
-Samsung Chromebook Plus. Additionally the usb3 controllers are added
-to rk3399 as they're used on Gru devices and even without full type-c
-support they can at least drive usb2 devices already.
-
-----------------------------------------------------------------
-Brian Norris (5):
-      arm64: dts: rockchip: support dwc3 USB for rk3399
-      dt-bindings: Document rk3399 Gru/Kevin
-      arm64: dts: rockchip: add Gru/Kevin DTS
-      arm64: dts: rockchip: describe Gru/Kevin OPPs + CPU regulators
-      arm64: dts: rockchip: add regulator info for Kevin digitizer
-
- Documentation/devicetree/bindings/arm/rockchip.txt |   20 +
- arch/arm64/boot/dts/rockchip/Makefile              |    1 +
- arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts  |  306 ++++++
- arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi       | 1103 ++++++++++++++++++++
- arch/arm64/boot/dts/rockchip/rk3399-opp.dtsi       |  145 +++
- arch/arm64/boot/dts/rockchip/rk3399.dtsi           |   54 +
- 6 files changed, 1629 insertions(+)
- create mode 100644 arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
- create mode 100644 arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
- create mode 100644 arch/arm64/boot/dts/rockchip/rk3399-opp.dtsi
+-- 
+tejun
