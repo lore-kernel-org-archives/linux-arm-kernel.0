@@ -1,40 +1,25 @@
-From: davem@davemloft.net (David Miller)
-Date: Mon, 27 Mar 2017 20:50:26 -0700 (PDT)
-Subject: [PATCH v2] net: moxa: fix TX overrun memory leak
-In-Reply-To: <1490617879-14014-1-git-send-email-jonas.jensen@gmail.com>
-References: <1490617879-14014-1-git-send-email-jonas.jensen@gmail.com>
-Message-ID: <20170327.205026.1935467634311224337.davem@davemloft.net>
+From: gengdongjiu@huawei.com (gengdongjiu)
+Date: Tue, 28 Mar 2017 12:19:43 +0800
+Subject: [PATCH V13 10/10] arm/arm64: KVM: add guest SEA support
+In-Reply-To: <20170324160158.GH25903@cbox>
+References: <1490136425-4324-1-git-send-email-tbaicar@codeaurora.org>
+ <1490136425-4324-11-git-send-email-tbaicar@codeaurora.org>
+ <20170324160158.GH25903@cbox>
+Message-ID: <734ab018-2112-eddf-10dc-426f8ebe3848@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jonas Jensen <jonas.jensen@gmail.com>
-Date: Mon, 27 Mar 2017 14:31:19 +0200
+Hi Tyler,
 
-> @@ -25,6 +25,7 @@
->  #include <linux/of_irq.h>
->  #include <linux/crc32.h>
->  #include <linux/crc32c.h>
-> +#include <linux/circ_buf.h>
->  
->  #include "moxart_ether.h"
->  
-> @@ -297,6 +298,7 @@ static void moxart_tx_finished(struct net_device *ndev)
->  		tx_tail = TX_NEXT(tx_tail);
+I have a question for below code.
+
+On 2017/3/25 0:01, Christoffer Dall wrote:
+>  	is_iabt = kvm_vcpu_trap_is_iabt(vcpu);
+> -	if (unlikely(!is_iabt && kvm_vcpu_dabt_isextabt(vcpu))) {
+> +	if (unlikely(!is_iabt && kvm_vcpu_dabt_isextabt(vcpu)) && sea_status) {
+>  		kvm_inject_vabt(vcpu);
+when it is SEA synchronized abort, why here inject a asynchronous abort through kvm_inject_vabt(vcpu) instead of synchronized abort? seem the original kvm source code is also do that, so I am confused about that.
+thanks .
+
+>  		return 1;
 >  	}
->  	priv->tx_tail = tx_tail;
-> +	netif_wake_queue(ndev);
->  }
->  
->  static irqreturn_t moxart_mac_interrupt(int irq, void *dev_id)
-
-Doing the wakeup unconditionally is very wasteful, you just need to do it
-when enough space has been made available.
-
-Therefore the wakeup should be more like:
-
-	if (netif_queue_stopped(ndev) &&
-	    moxart_tx_queue_space(ndev) >= MOXART_TX_WAKEUP_THRESHOLD)
-		netif_wake_queue();
-
-Otherwise you're just going to flap back and forth under high load and
-get almost not packet batching at all, hurting performance.
