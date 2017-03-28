@@ -1,114 +1,89 @@
-From: mike.looijmans@topic.nl (Mike Looijmans)
-Date: Tue, 28 Mar 2017 07:50:59 +0200
-Subject: [Question] firmware/psci.c: prevent registering pm_power_off
-In-Reply-To: <20170327171709.GB13752@leverpostej>
-References: <64d01077-e2e8-01e2-f763-779a60c0fe68@topic.nl>
- <947a7f4d-63ac-5ce4-007a-ca414cd150e7@arm.com> <58D93CF7.8090409@topic.nl>
- <20170327171709.GB13752@leverpostej>
-Message-ID: <bcd51cf4-fa88-3d80-24af-7de2a047e0e5@topic.nl>
+From: mayurkumar.patel@intel.com (Patel, Mayurkumar)
+Date: Tue, 28 Mar 2017 06:02:03 +0000
+Subject: [PATCH V5 0/4] PCI/ASPM: reconfigure ASPM following hotplug for
+ POLICY_DEFAULT
+In-Reply-To: <f062dc8f-df66-bfd8-a0d7-50ac1cadf975@codeaurora.org>
+References: <1490477893-9517-1-git-send-email-okaya@codeaurora.org>
+ <f062dc8f-df66-bfd8-a0d7-50ac1cadf975@codeaurora.org>
+Message-ID: <92EBB4272BF81E4089A7126EC1E7B2846675AEDC@IRSMSX101.ger.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-?On 27-03-17 19:17, Mark Rutland wrote:
-> On Mon, Mar 27, 2017 at 06:25:27PM +0200, Mike Looijmans wrote:
->> On 27-03-17 16:02, Sudeep Holla wrote:
->>>
->>> On 27/03/17 14:36, Mike Looijmans wrote:
->>>> Problem: The board uses gpio-poweroff to power down, because the "kill"
->>>> signal is controlled by an I2C IO expander. This doesn't work because
->>>> drivers/firmware/psci.c unconditionally registers pm_power_off,
->>>> resulting in the gpio-poweroff driver to refuse to register. The PSCI
->>>> firmware isn't actually capable of really turning off the power, but
->>>> there appears to be no way to tell the psci driver about that.
->>>
->>> That's because {SYSTEM_OFF,RESET} functions are mandatory since v0.2 to
->>> be compliant with a PSCI specification.
->>>
->>> So the question is why is PSCI being advertised in the DT if the
->>> firmware is not compliant ?
+Hi Sinan
+
+>Hi Mayurkumkar,
+>
+>On 3/25/2017 5:38 PM, Sinan Kaya wrote:
+>> When the operating system is booted with the default ASPM policy
+>> (POLICY_DEFAULT), current code is querying the enable/disable
+>> states from ASPM registers to determine the policy.
 >>
->> The PSCI firmware doesn't have access to the GPIO to turn off power.
->
-> I take it that means no SYSTEM_RESET either.
-
-SYSTEM_RESET should work. (It actually does not, but I take it that's a bug in 
-the firmware that needs to be resolved some day, since RESET and POWERDOWN 
-don't work on any board at all, not even Xilinx' own boards.)
-
-> Are there any other mandatory PSCI 0.2+ features that are not
-> implemented?
->
-> Which PSCI implementation is being used here?
-
-The PCSI firmware is this (the module is an Zynq MPSoC):
-https://github.com/Xilinx/arm-trusted-firmware
-
-> If PSCI was advertised as a legacy < 0.2 version, we would not register
-> pm_power_off, but other features that you might want (e.g.
-> SYSTEM_SUSPEND) would not be available.
-
-Interesting approach, it looks like with the "legacy" one can specify one's 
-own call IDs.
-
->
-> [...]
->
->>> One approach is to implement SYSTEM_OFF in PSCI using the same GPIO. Thereby
->>> making it compliant and allowing any secure entity running in the platform
->>> to shutdown gracefully.
+>> For example, a BIOS could set the power saving state to performance
+>> and clear all ASPM control registers. A balanced ASPM policy could
+>> enable L0s and disable L1. A power conscious BIOS could enable both
+>> L0s and L1 to trade off latency and performance vs. power.
 >>
->> Cannot practically do that. The GPIO to switch the power off is on a
->> IO expander on an I2C bus behind a I2C multiplexer on the I2C
->> controller of the CPU with a dozen other I2C devices. The PSCI would
->> somehow need access to the I2C controller without interfering with
->> the kernel, change the multiplexer (again without interfering) and
->> then set the IO in the expander chip.
+>> After hotplug removal, pcie_aspm_exit_link_state() function clears
+>> the ASPM registers. An insertion following hotplug removal reads
+>> incorrect policy as ASPM disabled even though ASPM was enabled
+>> during boot.
+>>
+>> This is caused by the fact that same function is used for reconfiguring
+>> ASPM regardless of the power on state.
+>>
+>> ------------------------
+>> Changes from v4 (http://www.spinics.net/lists/linux-pci/msg59245.html)
+>> ------------------------
+>> - pci_aspm_init(): Fix function comment.  Called for every device we
+>>   enumerate.
+>> 	Upstream link partner:  Shouldn't need to check pdev->link_state
+>>         (should always be NULL for a brand-new device).
+>>
+>> - pcie_aspm_init_link_state(): Called for bridges (upstream end of
+>>     link) after all children have been enumerated.  No longer needs to
+>>     check aspm_support_enabled or pdev->has_secondary_link or the VIA
+>>     quirk: pci_aspm_init() already checked that stuff, so we only need
+>>     to check pdev->link_state here.
+>>
+>> - split the last patch into two
+>>   PCI/ASPM: move link_state cleanup to bridge remove
+>>   PCI/ASPM: save power on values during bridge init
+>>
+>> - create bugzilla (https://bugzilla.kernel.org/show_bug.cgi?id=194895)
+>> - add fixes tags
+>>
+>> Sinan Kaya (4):
+>>   PCI/ASPM: introduce pci_aspm_init() and add to pci_init_capabilities()
+>>   PCI/ASPM: add init hook to device_add
+>>   PCI/ASPM: save power on values during bridge init
+>>   PCI/ASPM: move link_state cleanup to bridge remove
+>>
+>>  drivers/pci/pcie/aspm.c | 93 +++++++++++++++++++++++++++++++++----------------
+>>  drivers/pci/probe.c     |  3 ++
+>>  drivers/pci/remove.c    |  3 +-
+>>  include/linux/pci.h     |  2 ++
+>>  4 files changed, 69 insertions(+), 32 deletions(-)
+>>
 >
-> Given this is SYSTEM_OFF, the firmware can forcefully get the kernel out
-> of the way. For example, it can send an SGI to other CPUs to bring those
-> into the FW before attempting to poke the HW.
-
-So instead of a "set this GPIO" the power down routine becomes something like 
-this in the ATF which will become a fork unique to this module/board combination:
-- Move the I2C controller to the "trusted" domain
-- Send a string of "magic" I2C bytes to the controller to set the mux
-- Send a string of "magic" I2C bytes to the controller to activate the gpio
-
->> I'd expect other boards to have similar issues, especially if
->> they're modules on a carrier board like this one. The PSCI could
->> turn off the CPU, but having it turn off the board completely, even
->> if it could, would require board-unique firmware for each board.
->> Hey, that's like moving back to the "platform data and code" times
->> like before the devicetree was introduced.
+>Can you test this on your system and provide your tested-by if all good?
 >
-> I appreciate that the board/module case is a little special, but this is
-> a much more constrained case than a general purpose kernel with platform
-> code, and it is possible to some extent to have a configurable firmware.
+>Sinan
+>
 
-Well, having a I2C (or one-wire, SPI, gpio) power controller on a board cannot 
-be that uncommon. How do other boards arrange this?
+Thanks for your patches. I am seeing kernel panic after applying
+these patches (on top of latest kernel) each time during early boot in pci_aspm_init() (any hints already?) function.
+Need to check if it's something related to my local setup or it's because of these changes.
+For now I don't have more details why it crashes but I will dig in further and I will provide
+you more data as soon as I have it.
 
-This would force all boards to write their own version of the ATF and somehow 
-send the commands needed to turn off power, while the kernel has everything it 
-needs to do that already.
-
-It's the lack of choice I'm trying to solve here. The current situation is 
-that if you have PSCI you MUST use it to turn off (and reset) the board, 
-there's no possibility to have it any other way. Just because it sets a global 
-variable unconditionally.
-
-
-
-Kind regards,
-
-Mike Looijmans
-System Expert
-
-TOPIC Products
-Materiaalweg 4, NL-5681 RJ Best
-Postbus 440, NL-5680 AK Best
-Telefoon: +31 (0) 499 33 69 79
-E-mail: mike.looijmans at topicproducts.com
-Website: www.topicproducts.com
-
-Please consider the environment before printing this e-mail
+>--
+>Sinan Kaya
+>Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+>Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Intel Deutschland GmbH
+Registered Address: Am Campeon 10-12, 85579 Neubiberg, Germany
+Tel: +49 89 99 8853-0, www.intel.de
+Managing Directors: Christin Eisenschmid, Christian Lamprechter
+Chairperson of the Supervisory Board: Nicole Lau
+Registered Office: Munich
+Commercial Register: Amtsgericht Muenchen HRB 186928
