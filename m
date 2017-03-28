@@ -1,72 +1,70 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Tue, 28 Mar 2017 08:56:27 +0800
-Subject: [arm:phy 30/47] drivers/net//phy/phylink.c:818:9: error: implicit
- declaration of function 'phy_restart_aneg'
-Message-ID: <201703280825.Jy1thxKE%fengguang.wu@intel.com>
+From: slongerbeam@gmail.com (Steve Longerbeam)
+Date: Mon, 27 Mar 2017 17:40:51 -0700
+Subject: [PATCH v6 34/39] media: imx: csi: fix crop rectangle reset in sink
+ set_fmt
+In-Reply-To: <1490661656-10318-1-git-send-email-steve_longerbeam@mentor.com>
+References: <1490661656-10318-1-git-send-email-steve_longerbeam@mentor.com>
+Message-ID: <1490661656-10318-35-git-send-email-steve_longerbeam@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   git://git.armlinux.org.uk/~rmk/linux-arm.git phy
-head:   a96d8e502e7464884a8aa0954441c9dfe0593204
-commit: 8c4876c90afc26859275be88f8320047a48494b7 [30/47] net: mvneta: convert to phylink
-config: sh-allyesconfig (attached as .config)
-compiler: sh4-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout 8c4876c90afc26859275be88f8320047a48494b7
-        # save the attached .config to linux build tree
-        make.cross ARCH=sh 
+From: Philipp Zabel <p.zabel@pengutronix.de>
 
-All errors (new ones prefixed by >>):
+The csi_try_crop call in set_fmt should compare the cropping rectangle
+to the currently set input format, not to the previous input format.
 
-   drivers/net//phy/phylink.c: In function 'phylink_ethtool_nway_reset':
->> drivers/net//phy/phylink.c:818:9: error: implicit declaration of function 'phy_restart_aneg' [-Werror=implicit-function-declaration]
-      ret = phy_restart_aneg(pl->phydev);
-            ^~~~~~~~~~~~~~~~
-   cc1: some warnings being treated as errors
-
-vim +/phy_restart_aneg +818 drivers/net//phy/phylink.c
-
-7a562f6e Russell King 2015-09-22  802  		return -EINVAL;
-7a562f6e Russell King 2015-09-22  803  
-7a562f6e Russell King 2015-09-22  804  	mutex_lock(&pl->config_mutex);
-7a562f6e Russell King 2015-09-22  805  	ret = __phylink_ethtool_ksettings_set(pl, kset);
-7a562f6e Russell King 2015-09-22  806  	mutex_unlock(&pl->config_mutex);
-7a562f6e Russell King 2015-09-22  807  
-7a562f6e Russell King 2015-09-22  808  	return ret;
-7a562f6e Russell King 2015-09-22  809  }
-7a562f6e Russell King 2015-09-22  810  EXPORT_SYMBOL_GPL(phylink_ethtool_ksettings_set);
-7a562f6e Russell King 2015-09-22  811  
-f833c62b Russell King 2015-10-01  812  int phylink_ethtool_nway_reset(struct phylink *pl)
-f833c62b Russell King 2015-10-01  813  {
-f833c62b Russell King 2015-10-01  814  	int ret = 0;
-f833c62b Russell King 2015-10-01  815  
-f833c62b Russell King 2015-10-01  816  	mutex_lock(&pl->config_mutex);
-f833c62b Russell King 2015-10-01  817  	if (pl->phydev)
-f833c62b Russell King 2015-10-01 @818  		ret = phy_restart_aneg(pl->phydev);
-f833c62b Russell King 2015-10-01  819  	phylink_mac_an_restart(pl);
-f833c62b Russell King 2015-10-01  820  	mutex_unlock(&pl->config_mutex);
-f833c62b Russell King 2015-10-01  821  
-f833c62b Russell King 2015-10-01  822  	return ret;
-f833c62b Russell King 2015-10-01  823  }
-f833c62b Russell King 2015-10-01  824  EXPORT_SYMBOL_GPL(phylink_ethtool_nway_reset);
-f833c62b Russell King 2015-10-01  825  
-7a562f6e Russell King 2015-09-22  826  /* This emulates MII registers for a fixed-mode phy operating as per the
-
-:::::: The code at line 818 was first introduced by commit
-:::::: f833c62b63e6ec7dbd24e1ce6e8331c0b7f2e78f phylink: add ethtool nway_reset support
-
-:::::: TO: Russell King <rmk+kernel@arm.linux.org.uk>
-:::::: CC: Russell King <rmk+kernel@armlinux.org.uk>
-
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
 ---
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 44562 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170328/e2d1ffa4/attachment-0001.gz>
+ drivers/staging/media/imx/imx-media-csi.c | 11 +++++------
+ 1 file changed, 5 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/staging/media/imx/imx-media-csi.c b/drivers/staging/media/imx/imx-media-csi.c
+index 8597d7e..dee5733 100644
+--- a/drivers/staging/media/imx/imx-media-csi.c
++++ b/drivers/staging/media/imx/imx-media-csi.c
+@@ -1025,13 +1025,11 @@ __csi_get_fmt(struct csi_priv *priv, struct v4l2_subdev_pad_config *cfg,
+ static int csi_try_crop(struct csi_priv *priv,
+ 			struct v4l2_rect *crop,
+ 			struct v4l2_subdev_pad_config *cfg,
+-			enum v4l2_subdev_format_whence which,
++			struct v4l2_mbus_framefmt *infmt,
+ 			struct imx_media_subdev *sensor)
+ {
+ 	struct v4l2_of_endpoint *sensor_ep;
+-	struct v4l2_mbus_framefmt *infmt;
+ 
+-	infmt = __csi_get_fmt(priv, cfg, CSI_SINK_PAD, which);
+ 	sensor_ep = &sensor->sensor_ep;
+ 
+ 	crop->width = min_t(__u32, infmt->width, crop->width);
+@@ -1214,8 +1212,7 @@ static int csi_set_fmt(struct v4l2_subdev *sd,
+ 		crop.top = 0;
+ 		crop.width = sdformat->format.width;
+ 		crop.height = sdformat->format.height;
+-		ret = csi_try_crop(priv, &crop, cfg,
+-				   sdformat->which, sensor);
++		ret = csi_try_crop(priv, &crop, cfg, &sdformat->format, sensor);
+ 		if (ret)
+ 			goto out;
+ 
+@@ -1299,6 +1296,7 @@ static int csi_set_selection(struct v4l2_subdev *sd,
+ 			     struct v4l2_subdev_selection *sel)
+ {
+ 	struct csi_priv *priv = v4l2_get_subdevdata(sd);
++	struct v4l2_mbus_framefmt *infmt;
+ 	struct imx_media_subdev *sensor;
+ 	int ret = 0;
+ 
+@@ -1332,7 +1330,8 @@ static int csi_set_selection(struct v4l2_subdev *sd,
+ 		goto out;
+ 	}
+ 
+-	ret = csi_try_crop(priv, &sel->r, cfg, sel->which, sensor);
++	infmt = __csi_get_fmt(priv, cfg, CSI_SINK_PAD, sel->which);
++	ret = csi_try_crop(priv, &sel->r, cfg, infmt, sensor);
+ 	if (ret)
+ 		goto out;
+ 
+-- 
+2.7.4
