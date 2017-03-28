@@ -1,34 +1,49 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Tue, 28 Mar 2017 11:55:12 -0400
-Subject: [PATCH v2 08/22] lib: implement Devres ioremap_nopost() interface
-In-Reply-To: <20170328145003.GB18046@red-moon>
-References: <20170327094954.7162-1-lorenzo.pieralisi@arm.com>
- <20170327094954.7162-9-lorenzo.pieralisi@arm.com>
- <20170328014129.GJ25380@bhelgaas-glaptop.roam.corp.google.com>
- <20170328145003.GB18046@red-moon>
-Message-ID: <20170328155512.GA28157@htj.duckdns.org>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Tue, 28 Mar 2017 17:53:13 +0200
+Subject: [GIT PULL 2/3] Rockchip dts64 updates for 4.12 part1
+In-Reply-To: <5178456.jWASpzTAdU@phil>
+References: <5178456.jWASpzTAdU@phil>
+Message-ID: <17137029.z2AnQCnjUI@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
 
-On Tue, Mar 28, 2017 at 03:50:03PM +0100, Lorenzo Pieralisi wrote:
-> > I know this comment was just copied from other devm_ioremap*()
-> > interfaces, but I think it's slightly misleading to call this the "BUS
-> > offset".  That suggests this is a bus address, but it is not.  Maybe
-> > it should be "resource address" or similar?
-> > 
-> > I propose a separate patch to update the existing comments, followed
-> > by this patch to add this new one.
-> 
-> I agree with you, maybe Tejun has more context on why that parameter
-> is called BUS offset ? Anyway, I can easily do what you suggest above,
-> just asking Tejun if there is something I am missing.
+  Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
 
-I'm pretty sure I copied it from somewhere without thinking much about
-it.  Please feel free to change.
+are available in the git repository at:
 
-Thanks.
+  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.12-rockchip-dts64-1
 
--- 
-tejun
+for you to fetch changes up to 41b464ef10219e45513d1bcaddacd47ce0bd6136:
+
+  arm64: dts: rockchip: fix PCIe domain number for rk3399 (2017-03-22 17:50:09 +0100)
+
+----------------------------------------------------------------
+Contains various changes for the rk3368 (dma, i2s, disable mailbox per
+default, mmc-resets) and also removes the wrongly added idle states, that
+do not match the hardware's capabilities, as well as some general rk3399
+pcie fixes as well as also the mmc resets.
+
+----------------------------------------------------------------
+Brian Norris (1):
+      arm64: dts: rockchip: sort rk3399-pcie by unit address
+
+Heiko Stuebner (3):
+      arm64: dts: rockchip: remove wrongly added idle states on rk3368
+      arm64: dts: rockchip: add rk3368 dw-mmc resets
+      arm64: dts: rockchip: add rk3399 dw-mmc resets
+
+Huibin Hong (1):
+      arm64: dts: rockchip: add dmac nodes for rk3368 SoCs
+
+Jianqun Xu (2):
+      arm64: dts: rockchip: add i2s nodes support for RK3368 SoCs
+      arm64: dts: rockchip: disable mailbox of RK3368 SoCs per default
+
+Shawn Lin (1):
+      arm64: dts: rockchip: fix PCIe domain number for rk3399
+
+ arch/arm64/boot/dts/rockchip/rk3368.dtsi | 94 +++++++++++++++++++++++++-------
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi | 93 ++++++++++++++++---------------
+ 2 files changed, 123 insertions(+), 64 deletions(-)
