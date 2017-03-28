@@ -1,59 +1,38 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Tue, 28 Mar 2017 22:29:31 +0200
-Subject: [PATCH 00/15] arm64/kvm: use common sysreg definitions
-In-Reply-To: <20170328184828.GF8643@leverpostej>
-References: <1489079247-31092-1-git-send-email-mark.rutland@arm.com>
- <87a88tv94d.fsf@on-the-bus.cambridge.arm.com>
- <20170310183555.GB6271@arm.com>
- <20170322183512.GB27921@leverpostej>
- <20170328184828.GF8643@leverpostej>
-Message-ID: <20170328202931.GF20211@cbox>
+From: illusionist.neo@gmail.com (Shubham Bansal)
+Date: Wed, 29 Mar 2017 02:19:54 +0530
+Subject: arch: arm: bpf: Converting cBPF to eBPF for arm 32 bit
+In-Reply-To: <20170315.145512.1542025976162251828.davem@davemloft.net>
+References: <CAHgaXd+EKJ0FWaaPojsNJtgY_YpdQXu6eMEp97uOpTFAWs4qTQ@mail.gmail.com>
+ <CAGXu5jLo8UvpNSQZBHjWZoO959ha6KFQxFzmg7SK44wz=R_QSg@mail.gmail.com>
+ <CAHgaXdJL92XRjHae2Nb9j9SerSe65=N=ErDHTQf23sdBxwthzw@mail.gmail.com>
+ <20170315.145512.1542025976162251828.davem@davemloft.net>
+Message-ID: <CAHgaXd+4QkFxnt-_iCqH8AyCN_Y8gXwr+y=iugz38NKSWspsbA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 28, 2017 at 07:48:28PM +0100, Mark Rutland wrote:
-> On Wed, Mar 22, 2017 at 06:35:13PM +0000, Mark Rutland wrote:
-> > On Fri, Mar 10, 2017 at 06:35:55PM +0000, Will Deacon wrote:
-> > > On Fri, Mar 10, 2017 at 08:17:22AM +0000, Marc Zyngier wrote:
-> > 
-> > > > The next question is how do we merge this. Obviously, we can't split it
-> > > > between trees, and this is very likely to clash with anything that we
-> > > > will merge on the KVM side (the sysreg table is a popular place).
-> > > > 
-> > > > Will, Catalin: Would it make sense to create a stable branch with these
-> > > > patches, and merge it into both the arm64 and KVM trees? That'd make
-> > > > things easier...
-> > > 
-> > > I think the scope for conflict on our side is pretty high too, so a shared
-> > > branch might be the best way to go. I don't want to branch just yet though,
-> > > so I'll probably wait a week or so before setting something in stone.
-> > 
-> > Any further thoughts on this?
-> > 
-> > Christoffer has Acked the KVM bits, so if you're happy to do so for the
-> > arm64 bits I can make a stable branch.
-> 
-> Looking around, it doesn't look like there's anything outside of arm64
-> that'll conflict on the <asm/sysreg.h> changes, and git's happy to merge
-> my changes with Suzuki's changes currently queued in arm64's
-> for-next/core branch.
-> 
-> I think it would make sense for those to be in a common branch taken by
-> both the arm64 and KVM trees, with the KVM-specific parts being taken by
-> KVM alone atop of that.
-> 
-> Would everyone be happy with that?
+Thanks David. It helped a lot.
 
-I'm happy with that.
+Hi Daniel,
 
-> 
-> For reference, I've updated my branches so that arm64/common-sysreg only
-> contains the common parts, with the KVM parts atop of that in
-> kvm/common-sysreg.
-> 
+Do you have any document to understand the working of tail calls? I
+looked at your presentations but it seemed confusing to me. Anything
+simple would be great, just about the tail calls. I don't think I need
+examples, I can get them from your presentations. I just need a very
+general idea. May be you know the code in kernel where it is
+implemented.
+Thanks for the help Daniel.
 
-Will, Catalin:  Let me know if you're going to pull from common-sysreg
-and I'll do the same and add the kvm patches above.
+Best,
+Shubham Bansal
 
-Thanks for preparing the patches.
--Christoffer
+
+On Thu, Mar 16, 2017 at 3:25 AM, David Miller <davem@davemloft.net> wrote:
+> From: Shubham Bansal <illusionist.neo@gmail.com>
+> Date: Wed, 15 Mar 2017 17:43:44 +0530
+>
+>>> You can't truncate, but you'll have to build 64-bit ops using 32-bit registers.
+>>
+>> A small example would help a lot.
+>
+> You can simply perform 64-bit operations in C code and see what gcc
+> outputs for that code on this 32-bit target.
