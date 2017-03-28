@@ -1,46 +1,88 @@
 From: opendmb@gmail.com (Doug Berger)
-Date: Tue, 28 Mar 2017 14:34:26 -0700
-Subject: [PATCH v2 3/8] bus: brcmstb_gisb: Use register offsets with writes too
+Date: Tue, 28 Mar 2017 14:34:27 -0700
+Subject: [PATCH v2 4/8] bus: brcmstb_gisb: Correct hooking of ARM aborts
 In-Reply-To: <20170328213431.10904-1-opendmb@gmail.com>
 References: <20170328213431.10904-1-opendmb@gmail.com>
-Message-ID: <20170328213431.10904-4-opendmb@gmail.com>
+Message-ID: <20170328213431.10904-5-opendmb@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit corrects the bug introduced in commit f80835875d3d
-("bus: brcmstb_gisb: Look up register offsets in a table") such
-that gisb_write() translates the register enumeration into an
-offset from the base address for writes as well as reads.
+The fault status reporting in the FSR registers is different depending
+on whether the Long Physical Address Extension (LPAE) is being used.
 
-Fixes: f80835875d3d ("bus: brcmstb_gisb: Look up register offsets in a table")
+This commit corrects the registerring of fault handlers for arm
+architecture kernels when the LPAE is enabled.  It also forces the
+handler to report that the abort exception was unhandled so that the
+appropriate signal is sent to the offending user process.
+
 Signed-off-by: Doug Berger <opendmb@gmail.com>
-Acked-by: Gregory Fong <gregory.0xf0@gmail.com>
 ---
- drivers/bus/brcmstb_gisb.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ drivers/bus/brcmstb_gisb.c | 19 ++++++++++++++-----
+ 1 file changed, 14 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/bus/brcmstb_gisb.c b/drivers/bus/brcmstb_gisb.c
-index 72fe0a5a8bf3..a94598d0945a 100644
+index a94598d0945a..9eba0143f1a4 100644
 --- a/drivers/bus/brcmstb_gisb.c
 +++ b/drivers/bus/brcmstb_gisb.c
-@@ -1,5 +1,5 @@
- /*
-- * Copyright (C) 2014 Broadcom Corporation
-+ * Copyright (C) 2014-2017 Broadcom
-  *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License version 2 as
-@@ -127,9 +127,9 @@ static void gisb_write(struct brcmstb_gisb_arb_device *gdev, u32 val, int reg)
- 		return;
+@@ -225,27 +225,29 @@ static int brcmstb_gisb_arb_decode_addr(struct brcmstb_gisb_arb_device *gdev,
+ static int brcmstb_bus_error_handler(unsigned long addr, unsigned int fsr,
+ 				     struct pt_regs *regs)
+ {
+-	int ret = 0;
+ 	struct brcmstb_gisb_arb_device *gdev;
  
- 	if (gdev->big_endian)
--		iowrite32be(val, gdev->base + reg);
-+		iowrite32be(val, gdev->base + offset);
- 	else
--		iowrite32(val, gdev->base + reg);
-+		iowrite32(val, gdev->base + offset);
+ 	/* iterate over each GISB arb registered handlers */
+ 	list_for_each_entry(gdev, &brcmstb_gisb_arb_device_list, next)
+-		ret |= brcmstb_gisb_arb_decode_addr(gdev, "bus error");
++		brcmstb_gisb_arb_decode_addr(gdev, "bus error");
++
++#if !defined(CONFIG_ARM_LPAE)
+ 	/*
+ 	 * If it was an imprecise abort, then we need to correct the
+ 	 * return address to be _after_ the instruction.
+ 	*/
+ 	if (fsr & (1 << 10))
+ 		regs->ARM_pc += 4;
++#endif
+ 
+-	return ret;
++	/* Always report unhandled exception */
++	return 1;
  }
+ #endif
  
- static ssize_t gisb_arb_get_timeout(struct device *dev,
+ #ifdef CONFIG_MIPS
+ static int brcmstb_bus_error_handler(struct pt_regs *regs, int is_fixup)
+ {
+-	int ret = 0;
+ 	struct brcmstb_gisb_arb_device *gdev;
+ 	u32 cap_status;
+ 
+@@ -258,7 +260,7 @@ static int brcmstb_bus_error_handler(struct pt_regs *regs, int is_fixup)
+ 			goto out;
+ 		}
+ 
+-		ret |= brcmstb_gisb_arb_decode_addr(gdev, "bus error");
++		brcmstb_gisb_arb_decode_addr(gdev, "bus error");
+ 	}
+ out:
+ 	return is_fixup ? MIPS_BE_FIXUP : MIPS_BE_FATAL;
+@@ -379,9 +381,16 @@ static int __init brcmstb_gisb_arb_probe(struct platform_device *pdev)
+ 	list_add_tail(&gdev->next, &brcmstb_gisb_arb_device_list);
+ 
+ #ifdef CONFIG_ARM
++#ifdef CONFIG_ARM_LPAE
++	hook_fault_code(16, brcmstb_bus_error_handler, SIGBUS, 0,
++			"synchronous external abort");
++	hook_fault_code(17, brcmstb_bus_error_handler, SIGBUS, 0,
++			"asynchronous external abort");
++#else
+ 	hook_fault_code(22, brcmstb_bus_error_handler, SIGBUS, 0,
+ 			"imprecise external abort");
+ #endif
++#endif /* CONFIG_ARM */
+ #ifdef CONFIG_MIPS
+ 	board_be_handler = brcmstb_bus_error_handler;
+ #endif
 -- 
 2.12.0
